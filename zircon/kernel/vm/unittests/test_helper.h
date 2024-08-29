@@ -28,6 +28,7 @@
 #include <vm/physmap.h>
 #include <vm/pmm.h>
 #include <vm/pmm_checker.h>
+#include <vm/pmm_node.h>
 #include <vm/scanner.h>
 #include <vm/vm.h>
 #include <vm/vm_address_region.h>
@@ -35,8 +36,6 @@
 #include <vm/vm_object.h>
 #include <vm/vm_object_paged.h>
 #include <vm/vm_object_physical.h>
-
-#include "../pmm_node.h"
 
 namespace vm_unittest {
 

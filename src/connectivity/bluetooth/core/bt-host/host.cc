@@ -53,7 +53,7 @@ std::unique_ptr<BtHostComponent> BtHostComponent::CreateForTesting(async_dispatc
 
 bool BtHostComponent::Initialize(
     fidl::ClientEnd<fuchsia_hardware_bluetooth::Vendor> vendor_client_end, InitCallback init_cb,
-    ErrorCallback error_cb) {
+    ErrorCallback error_cb, bool legacy_pairing_enabled) {
   std::unique_ptr<bt::controllers::FidlController> controller =
       std::make_unique<bt::controllers::FidlController>(std::move(vendor_client_end),
                                                         async_get_default_dispatcher());
@@ -63,8 +63,10 @@ bool BtHostComponent::Initialize(
 
   bt_log(INFO, "bt-host", "Create GATT layer");
   gatt_ = gatt::GATT::Create();
-
-  gap_ = gap::Adapter::Create(pw_dispatcher_, hci_->GetWeakPtr(), gatt_->GetWeakPtr());
+  gap::Adapter::Config config = {
+      .legacy_pairing_enabled = legacy_pairing_enabled,
+  };
+  gap_ = gap::Adapter::Create(pw_dispatcher_, hci_->GetWeakPtr(), gatt_->GetWeakPtr(), config);
   if (!gap_) {
     bt_log(WARN, "bt-host", "GAP could not be created");
     return false;

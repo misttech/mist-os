@@ -60,10 +60,10 @@ constexpr uint32_t kCurrentProtocolVersion = 63;
 //   - INITIAL_VERSION_FOR_API_LEVEL_CURRENT = kCurrentProtocolVersion
 //   - CURRENT_SUPPORTED_API_LEVEL = NEXT_STABLE_API_LEVEL
 
-#define INITIAL_VERSION_FOR_API_LEVEL_MINUS_2 56
-#define INITIAL_VERSION_FOR_API_LEVEL_MINUS_1 58
-#define INITIAL_VERSION_FOR_API_LEVEL_CURRENT 60
-#define CURRENT_SUPPORTED_API_LEVEL 19
+#define INITIAL_VERSION_FOR_API_LEVEL_MINUS_2 58
+#define INITIAL_VERSION_FOR_API_LEVEL_MINUS_1 60
+#define INITIAL_VERSION_FOR_API_LEVEL_CURRENT 63
+#define CURRENT_SUPPORTED_API_LEVEL 22
 
 constexpr uint32_t kMinimumProtocolVersion = INITIAL_VERSION_FOR_API_LEVEL_MINUS_2;
 
@@ -214,10 +214,7 @@ struct HelloReply {
   // It will get deserialized with |ver| = 0 to extract the |signature| and |version| member, and
   // then it will get deserialized again with the correct version to get everything else.
   void Serialize(Serializer& ser, uint32_t ver) {
-    ser | signature | version | arch | page_size;
-    if (ver >= 58) {
-      ser | platform;
-    }
+    ser | signature | version | arch | page_size | platform;
   }
 };
 
@@ -293,24 +290,7 @@ struct AttachReply {
   std::vector<ComponentInfo> components;
 
   void Serialize(Serializer& ser, uint32_t ver) {
-    ser | timestamp | koid | status | name;
-    if (ver < 57) {
-      // The component information if the task is a process and the process is running in a
-      // component.
-      std::optional<ComponentInfo> component = std::nullopt;
-      if (!components.empty()) {
-        component = components[0];
-      }
-      components.clear();
-
-      ser | component;
-
-      if (component) {
-        components = {*component};
-      }
-    } else {
-      ser | components;
-    }
+    ser | timestamp | koid | status | name | components;
   }
 };
 
@@ -717,23 +697,7 @@ struct NotifyProcessStarting {
   uint32_t filter_id = kInvalidFilterId;
 
   void Serialize(Serializer& ser, uint32_t ver) {
-    ser | timestamp | type | koid | name;
-    if (ver < 57) {
-      // The component information if the process is running in a component.
-      std::optional<ComponentInfo> component = std::nullopt;
-      if (!components.empty()) {
-        component = components[0];
-      }
-      components.clear();
-
-      ser | component;
-
-      if (component) {
-        components = {*component};
-      }
-    } else {
-      ser | components;
-    }
+    ser | timestamp | type | koid | name | components;
 
     if (ver >= 61) {
       ser | filter_id;
@@ -809,19 +773,7 @@ struct NotifyModules {
   uint64_t process_koid = 0;
   std::vector<Module> modules;
 
-  void Serialize(Serializer& ser, uint32_t ver) {
-    ser | timestamp | process_koid | modules;
-
-    if (ver < 54) {
-      // The list of threads in the process stopped automatically as a result of the module load.
-      // The client will want to resume these threads once it has processed the load.
-      //
-      // Removed in version 54 but the old client can still use this to resume.
-      std::vector<ProcessThreadId> stopped_threads;
-      stopped_threads.push_back({.process = process_koid});
-      ser | stopped_threads;
-    }
-  }
+  void Serialize(Serializer& ser, uint32_t ver) { ser | timestamp | process_koid | modules; }
 };
 
 struct NotifyIO {

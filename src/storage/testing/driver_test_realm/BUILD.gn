@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
+import("//build/rust/rustc_binary.gni")
 import("//tools/cmc/build/expect_includes.gni")
 
 group("driver_test_realm") {
@@ -19,29 +20,29 @@ expect_includes("client_includes") {
   includes = [ "meta/client.shard.cml" ]
 }
 
-executable("bin") {
+rustc_binary("bin") {
   testonly = true
-  output_name = "storage_driver_test_realm"
-  sources = [ "storage_driver_test_realm.cc" ]
+  name = "storage_driver_test_realm"
+  edition = "2021"
   deps = [
-    "//sdk/fidl/fuchsia.component.test:fuchsia.component.test_cpp",
-    "//sdk/fidl/fuchsia.driver.test:fuchsia.driver.test_cpp",
-    "//sdk/lib/component/incoming/cpp",
-    "//sdk/lib/device-watcher/cpp",
-    "//sdk/lib/syslog/cpp",
+    "//sdk/fidl/fuchsia.component.test:fuchsia.component.test_rust",
+    "//sdk/fidl/fuchsia.driver.test:fuchsia.driver.test_rust",
+    "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
+    "//sdk/lib/driver_test_realm/realm_builder/rust",
+    "//src/lib/fidl/rust/fidl",
+    "//src/lib/fuchsia",
+    "//src/lib/fuchsia-component",
+    "//src/lib/fuchsia-component-test",
+    "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:futures",
   ]
-
-  # TODO(https://fxbug.dev/42176699): This target uses mutable tables which are deprecated,
-  # rather than builders.
-  configs += [ "//build/cpp:fidl-wire-deprecated-mutable-tables" ]
+  source_root = "main.rs"
+  sources = [ "main.rs" ]
 }
 
 fuchsia_component("component") {
   testonly = true
   component_name = "storage_driver_test_realm"
   manifest = "meta/storage_driver_test_realm.cml"
-  deps = [
-    ":bin",
-    "//sdk/lib/driver_test_realm:static",
-  ]
+  deps = [ ":bin" ]
 }

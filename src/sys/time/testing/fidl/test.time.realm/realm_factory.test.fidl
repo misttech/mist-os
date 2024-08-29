@@ -79,7 +79,6 @@ open protocol RealmFactory {
         /// the impedance mismatch between the test realm internals and this FIDL
         /// API.
         push_source_puppet client_end:PushSourcePuppet;
-
         opts @generated_name("CreateResponseOpts") resource table {
             /// The channel for retrieving the RTC updates. To be be populated
             /// only if the realm is created with `RealmOptions.rtc.rtc_handle`.

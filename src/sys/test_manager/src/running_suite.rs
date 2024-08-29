@@ -19,6 +19,7 @@ use crate::{diagnostics, facet, resolver};
 use anyhow::{anyhow, format_err, Context, Error};
 use fidl::endpoints::{create_proxy, ClientEnd};
 use fidl_fuchsia_component_resolution::ResolverProxy;
+use fidl_fuchsia_pkg::PackageResolverProxy;
 use ftest::Invocation;
 use ftest_manager::{CaseStatus, LaunchError, SuiteStatus};
 use fuchsia_async::{self as fasync, TimeoutExt};
@@ -83,6 +84,7 @@ impl RunningSuite {
         test_url: &str,
         facets: facet::SuiteFacets,
         resolver: Arc<ResolverProxy>,
+        pkg_resolver: Arc<PackageResolverProxy>,
         above_root_capabilities_for_test: Arc<AboveRootCapabilitiesForTest>,
         debug_data_sender: DebugDataSender,
         diagnostics: &DiagnosticNode,
@@ -104,6 +106,7 @@ impl RunningSuite {
             &facets,
             above_root_capabilities_for_test,
             resolver,
+            pkg_resolver,
             debug_data_sender,
             suite_realm,
         )
@@ -644,6 +647,7 @@ async fn get_realm(
     suite_facet: &facet::SuiteFacets,
     above_root_capabilities_for_test: Arc<AboveRootCapabilitiesForTest>,
     resolver: Arc<ResolverProxy>,
+    pkg_resolver: Arc<PackageResolverProxy>,
     debug_data_sender: DebugDataSender,
     suite_realm: &Option<SuiteRealm>,
 ) -> Result<(RealmBuilder, async_utils::event::Event), RealmBuilderError> {
@@ -672,6 +676,7 @@ async fn get_realm(
                     hermetic_test_package_name_clone.clone(),
                     other_allowed_packages_clone.clone(),
                     resolver.clone(),
+                    pkg_resolver.clone(),
                 ))
             },
             ChildOptions::new(),
@@ -878,6 +883,31 @@ async fn get_realm(
                 .capability(Capability::protocol::<fsys::StorageAdminMarker>())
                 .from(Ref::capability(CUSTOM_ARTIFACTS_CAPABILITY_NAME))
                 .to(Ref::parent()),
+        )
+        .await?;
+
+    // We need to expose the raw protocols so that the driver test realm's driver framework
+    // can use it in order to provide support for subpackaged drivers.
+    wrapper_realm
+        .add_route(
+            Route::new()
+                .capability(
+                    Capability::protocol_by_name("fuchsia.component.resolution.Resolver-hermetic")
+                        .path("/svc/fuchsia.component.resolution.Resolver"),
+                )
+                .from(&resolver)
+                .to(test_root.clone()),
+        )
+        .await?;
+    wrapper_realm
+        .add_route(
+            Route::new()
+                .capability(
+                    Capability::protocol_by_name("fuchsia.pkg.PackageResolver-hermetic")
+                        .path("/svc/fuchsia.pkg.PackageResolver"),
+                )
+                .from(&resolver)
+                .to(test_root.clone()),
         )
         .await?;
 

@@ -151,6 +151,9 @@ template("subbuild") {
                            ])
 
     metadata = {
+      if (defined(invoker.metadata)) {
+        forward_variables_from(invoker.metadata, "*")
+      }
       ninja_subbuilds = [
         {
           build_dir = rebase_path(_build_dir, root_build_dir)

@@ -11,10 +11,16 @@
     },
     use: [
         {
-            directory: "dev-topological",
+            directory: "dev-class",
             rights: [ "r*" ],
-            path: "/dev",
+            path: "/dev/class",
         },
-        { protocol: "fuchsia.tracing.provider.Registry" },
+        {
+            protocol: [
+                "fuchsia.driver.development.Manager",
+                "fuchsia.driver.registrar.DriverRegistrar",
+                "fuchsia.tracing.provider.Registry",
+            ],
+        },
     ],
 }

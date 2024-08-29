@@ -22,6 +22,7 @@ group("tests") {
 fuchsia_component_manifest("manifest") {
   component_name = "driver-index"
   manifest = "meta/driver-index.cml"
+  restricted_features = [ "delivery_type" ]
 }
 
 fuchsia_structured_config_rust_lib("driver_index_config") {
@@ -46,16 +47,21 @@ rustc_binary("bin") {
     ":driver_index_config",
     "//sdk/fidl/fuchsia.component.decl:fuchsia.component.decl_rust",
     "//sdk/fidl/fuchsia.component.resolution:fuchsia.component.resolution_rust",
+    "//sdk/fidl/fuchsia.component.sandbox:fuchsia.component.sandbox_rust",
     "//sdk/fidl/fuchsia.data:fuchsia.data_rust",
     "//sdk/fidl/fuchsia.driver.development:fuchsia.driver.development_rust",
     "//sdk/fidl/fuchsia.driver.framework:fuchsia.driver.framework_rust",
     "//sdk/fidl/fuchsia.driver.index:fuchsia.driver.index_rust",
     "//sdk/fidl/fuchsia.driver.registrar:fuchsia.driver.registrar_rust",
+    "//sdk/fidl/fuchsia.process.lifecycle:fuchsia.process.lifecycle_rust",
     "//src/devices/lib/bind:lib",
+    "//src/lib/detect-stall",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-component",
+    "//src/lib/fuchsia-runtime",
+    "//src/lib/sandbox",
     "//src/lib/zircon/rust:fuchsia-zircon",
     "//src/sys/lib/cm_rust",
     "//src/sys/lib/cm_types",
@@ -64,10 +70,13 @@ rustc_binary("bin") {
     "//src/sys/pkg/lib/fuchsia-hash",
     "//src/sys/pkg/lib/fuchsia-pkg",
     "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:bincode",
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:rand",
     "//third_party/rust_crates:regex",
+    "//third_party/rust_crates:serde",
     "//third_party/rust_crates:tracing",
+    "//third_party/rust_crates:zstd",
   ]
 
   test_deps = [
@@ -80,11 +89,13 @@ rustc_binary("bin") {
   sources = [
     "src/composite_node_spec_manager.rs",
     "src/driver_loading_fuzzer.rs",
+    "src/escrow_support.rs",
     "src/indexer.rs",
     "src/load_driver.rs",
     "src/main.rs",
     "src/match_common.rs",
     "src/resolved_driver.rs",
+    "src/serde_ext.rs",
   ]
 }
 

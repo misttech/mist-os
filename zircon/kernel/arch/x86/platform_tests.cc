@@ -46,7 +46,7 @@ namespace {
 static void rdtscp_aux(void* context) {
   uint32_t* const aux = reinterpret_cast<uint32_t*>(context);
   uint32_t tsc_lo, tsc_hi, aux_msr;
-  asm volatile("rdtscp" : "=a"(tsc_lo), "=d"(tsc_hi), "=c"(aux_msr));
+  __asm__ volatile("rdtscp" : "=a"(tsc_lo), "=d"(tsc_hi), "=c"(aux_msr));
   *aux = aux_msr;
 }
 

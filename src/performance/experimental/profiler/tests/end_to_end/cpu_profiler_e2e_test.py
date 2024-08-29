@@ -37,6 +37,31 @@ class CpuProfilerEndToEndTest(fuchsia_base_test.FuchsiaBaseTest):
         )
         asserts.assert_greater(output_json["samples_collected"], 10)
 
+    def test_launch_test(self) -> None:
+        component_url = (
+            "fuchsia-pkg://fuchsia.com/gtest_target#meta/gtest_target.cm"
+        )
+        output_json = json.loads(
+            self.device.ffx.run(
+                [
+                    "--machine",
+                    "json",
+                    "profiler",
+                    "launch",
+                    "--test",
+                    "--url",
+                    component_url,
+                    "--duration",
+                    "2",
+                    "--print-stats",
+                    "--symbolize",
+                    "false",
+                ],
+                capture_output=True,
+            )
+        )
+        asserts.assert_greater(output_json["samples_collected"], 10)
+
 
 if __name__ == "__main__":
     test_runner.main()

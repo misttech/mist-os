@@ -1,0 +1,18 @@
+// Copyright 2024 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
+// This library isn't in the SDK currently, but an @available annotation is
+// required in order to avoid fidlc complaints about fields using types that are
+// deprecated in other libraries which are in the SDK.
+//
+// The "added" version is totally fake since this isn't in the SDK. We choose 19
+// to have it be less than current HEAD so we can use deprecated and removed
+// parameters without complaints from fidlc.
+//
+// TODO(b/360409878): Remove the available annotations in this non-SDK fidl lib.
+// This can happen when the earlier of A or B happens: (A) when a non-SDK fidl
+// lib can build when referring to SDK deprecated protocols/types. (B) when this
+// lib no longer needs to refer to SDK deprecated protocols/types.
+@available(added=19)
+library fuchsia.hardware.sysmem;

@@ -412,25 +412,63 @@ TEST_F(FileCacheTest, LockedPageRelease) {
   ASSERT_EQ(page, released_page);
 }
 
-TEST_F(FileCacheTest, Redirty) {
+using WritebackTest = SingleFileTest;
+
+TEST_F(WritebackTest, DataWriteFailure) {
   char buf[kPageSize];
   FileTester::AppendToFile(&vnode<File>(), buf, kPageSize);
   fbl::RefPtr<Page> page;
   ASSERT_EQ(vnode<File>().FindPage(0, &page), ZX_OK);
   ASSERT_TRUE(page->IsDirty());
+
   WritebackOperation op = {.bSync = true};
   vnode<File>().Writeback(op);
   ASSERT_FALSE(page->IsDirty());
+
+  // I/O failure
   auto hook = [](const block_fifo_request_t &_req, const zx::vmo *_vmo) { return ZX_ERR_IO; };
   LockedPage(page).SetDirty();
   ASSERT_TRUE(page->IsDirty());
   DeviceTester::SetHook(fs_.get(), hook);
   vnode<File>().Writeback(op);
   ASSERT_TRUE(page->IsDirty());
+  {
+    op.bSync = false;
+    vnode<File>().Writeback(op);
+    LockedPage locked_page(page);
+    locked_page.WaitOnWriteback();
+    ASSERT_TRUE(page->IsDirty());
+  }
+
+  // Retry
   DeviceTester::SetHook(fs_.get(), nullptr);
   vnode<File>().Writeback(op);
   ASSERT_FALSE(page->IsDirty());
   ASSERT_FALSE(fs_->GetSuperblockInfo().TestCpFlags(CpFlag::kCpErrorFlag));
+}
+
+TEST_F(WritebackTest, InvalidPage) {
+  char buf[kPageSize];
+  FileTester::AppendToFile(&vnode<File>(), buf, kPageSize);
+  /// Schedule |page| for writeback
+  vnode<File>().Writeback();
+
+  fbl::RefPtr<Page> page;
+  ASSERT_EQ(vnode<File>().FindPage(0, &page), ZX_OK);
+  ASSERT_TRUE(page->IsWriteback());
+  ASSERT_FALSE(page->IsDirty());
+  ASSERT_TRUE(IsValidBlockAddr(page->GetBlockAddr()));
+
+  {
+    // Make an exception case that |page| is assigned an invalid address during writeback
+    LockedPage locked_page(page);
+    locked_page->ClearWriteback();
+    locked_page.SetWriteback(kNewAddr);
+    locked_page.WaitOnWriteback();
+  }
+
+  // |page| should be notified.
+  ASSERT_FALSE(page->IsWriteback());
 }
 
 }  // namespace

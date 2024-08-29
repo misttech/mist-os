@@ -9,7 +9,7 @@
 
 #include <atomic>
 
-namespace sysmem_driver {
+namespace sysmem_service {
 
 MemoryAllocator::MemoryAllocator(fuchsia_hardware_sysmem::HeapProperties properties)
     : heap_properties_(std::move(properties)) {
@@ -38,4 +38,4 @@ void MemoryAllocator::RemoveDestroyCallback(intptr_t key) {
   destroy_callbacks_.erase(key);
 }
 
-}  // namespace sysmem_driver
+}  // namespace sysmem_service

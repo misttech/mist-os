@@ -30,7 +30,7 @@ impl DefineSubsystemConfiguration<DriverFrameworkConfig> for DriverFrameworkSubs
 
         let enable_ephemeral_drivers = match (context.build_type, context.feature_set_level) {
             (BuildType::Eng, FeatureSupportLevel::Standard) => {
-                builder.platform_bundle("full_package_drivers");
+                builder.platform_bundle("full_drivers");
                 true
             }
             (_, _) => false,
@@ -111,6 +111,32 @@ impl DefineSubsystemConfiguration<DriverFrameworkConfig> for DriverFrameworkSubs
                 test_fuzzing_config.enable_test_shutdown_delays.into(),
             ),
         )?;
+
+        match driver_framework_config.enable_driver_index_stop_on_idle {
+            Some(true) => {
+                // Explicitly enabled by platform config.
+                // Set to 10 seconds.
+                builder.set_config_capability(
+                    "fuchsia.driver.index.StopOnIdleTimeoutMillis",
+                    Config::new(ConfigValueType::Int64, 10000.into()),
+                )?;
+            }
+            Some(false) => {
+                // Explicitly disabled by platform config.
+                builder.set_config_capability(
+                    "fuchsia.driver.index.StopOnIdleTimeoutMillis",
+                    Config::new_void(),
+                )?;
+            }
+            None => {
+                // Unspecified. Defaults to enabled.
+                // Disabled for soft transition.
+                builder.set_config_capability(
+                    "fuchsia.driver.index.StopOnIdleTimeoutMillis",
+                    Config::new_void(),
+                )?;
+            }
+        };
 
         // Include bus-pci driver through a platform AIB.
         if context.board_info.provides_feature("fuchsia::bus_pci") {

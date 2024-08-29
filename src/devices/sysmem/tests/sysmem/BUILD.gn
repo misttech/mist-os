@@ -56,19 +56,13 @@ test("sysmem-v2") {
 
 fuchsia_unittest_package("sysmem-test-v1") {
   manifest = "meta/sysmem-v1.cml"
-  deps = [
-    ":sysmem-v1",
-    "//src/devices/sysmem/bin/sysmem_connector:sysmem_connector_cmp",
-  ]
+  deps = [ ":sysmem-v1" ]
   test_type = "system"
 }
 
 fuchsia_unittest_package("sysmem-test-v2") {
   manifest = "meta/sysmem-v2.cml"
-  deps = [
-    ":sysmem-v2",
-    "//src/devices/sysmem/bin/sysmem_connector:sysmem_connector_cmp",
-  ]
+  deps = [ ":sysmem-v2" ]
   test_type = "system"
 }
 

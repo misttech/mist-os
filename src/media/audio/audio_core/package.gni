@@ -224,7 +224,7 @@ template("audio_core_test_package") {
     # driver realm is automatically included along with the virtual audio driver.
     deps = [
       ":${component_target}",
-      "//src/cobalt/bin/testing/mock_cobalt:component_v2",
+      "//src/cobalt/bin/testing/fake_cobalt:component_v2",
       "//src/media/audio/drivers/virtual_audio:virtual_audio_driver",
       "//src/power/testing/thermal-test-control:thermal-test-control-v2",
     ]

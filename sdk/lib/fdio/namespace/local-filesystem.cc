@@ -210,8 +210,8 @@ zx::result<fdio_ptr> fdio_namespace::CreateConnection(fbl::RefPtr<LocalVnode> vn
   return fdio_internal::CreateLocalConnection(fbl::RefPtr(this), std::move(vn));
 }
 
-zx_status_t fdio_namespace::Connect(std::string_view path, fio::wire::OpenFlags flags,
-                                    fidl::ServerEnd<fio::Node> server_end) const {
+zx_status_t fdio_namespace::ConnectDeprecated(std::string_view path, fio::wire::OpenFlags flags,
+                                              fidl::ServerEnd<fio::Node> server_end) const {
   // Require that we start at /
   if (!cpp20::starts_with(path, '/')) {
     return ZX_ERR_NOT_FOUND;
@@ -247,6 +247,48 @@ zx_status_t fdio_namespace::Connect(std::string_view path, fio::wire::OpenFlags 
                           fidl::UnownedClientEnd<fio::Directory> directory(borrowed_handle);
                           return fdio_internal::fdio_open_at(directory, path, flags,
                                                              std::move(server_end));
+                        },
+                    },
+                    vn->NodeType());
+}
+
+zx_status_t fdio_namespace::Connect(std::string_view path, fio::wire::Flags flags,
+                                    zx::channel object) const {
+  // Require that we start at /
+  if (!cpp20::starts_with(path, '/')) {
+    return ZX_ERR_NOT_FOUND;
+  }
+  // Skip leading slash.
+  path.remove_prefix(1);
+
+  fbl::RefPtr<LocalVnode> vn;
+  {
+    fbl::AutoLock lock(&lock_);
+    vn = root_;
+    zx_status_t status = WalkLocked(&vn, &path);
+    if (status != ZX_OK) {
+      return status;
+    }
+  }
+
+  return std::visit(fdio::overloaded{
+                        [](LocalVnode::Local& l) {
+                          // Cannot connect to non-mount-points.
+                          return ZX_ERR_NOT_SUPPORTED;
+                        },
+                        [](LocalVnode::Intermediate& c) {
+                          // Cannot connect to non-mount-points.
+                          return ZX_ERR_NOT_SUPPORTED;
+                        },
+                        [&](LocalVnode::Remote& s) {
+                          zx_handle_t borrowed_handle = ZX_HANDLE_INVALID;
+                          zx_status_t status = zxio_borrow(s.Connection(), &borrowed_handle);
+                          if (status != ZX_OK) {
+                            return status;
+                          }
+                          fidl::UnownedClientEnd<fio::Directory> directory(borrowed_handle);
+                          return fdio_internal::fdio_open3_at(directory, path, flags,
+                                                              std::move(object));
                         },
                     },
                     vn->NodeType());

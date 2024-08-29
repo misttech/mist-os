@@ -132,6 +132,9 @@ void LocalComponentInstance::Kill() {
   Exit(ZX_ERR_CANCELED);
 }
 
+#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+void LocalComponentInstance::handle_unknown_method(uint64_t ordinal, bool has_response) {}
+#endif
 void LocalComponentInstance::Exit(zx_status_t epitaph_value) {
   if (binding_.is_bound()) {
     binding_.Close(epitaph_value);

@@ -5,8 +5,9 @@ library fuchsia.sysmem;
 
 using zx;
 
-// TODO(https://fxbug.dev/42107169): change struct to table
-/// Information about a buffer collection and its buffers.
+/// Deprecated. Use ['fuchsia.sysmem2.BufferCollectionInfo'].
+///
+/// This type is deprecated for new code but still used by some camera code.
 type BufferCollectionInfo = resource struct {
     /// The number of buffers in the collection.
     buffer_count uint32;

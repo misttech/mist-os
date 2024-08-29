@@ -48,15 +48,15 @@ class KeyedTestObjBase : public TestObjBase {
 
 // The base class for hash-able test objects.  Implements a default hash
 // function accessor as well as inheriting from KeyedTestObjBase
-template <typename KeyType, typename HashType, HashType kNumBuckets>
+template <typename KeyType, typename HashType>
 class HashedTestObjBase : public KeyedTestObjBase<KeyType> {
  public:
   explicit HashedTestObjBase(size_t val) : KeyedTestObjBase<KeyType>(val) {}
-
   static HashType GetHash(const KeyType& key) {
-    // Our simple hash function just multiplies by a big prime and mods by
-    // the number of buckets.
-    return (static_cast<HashType>(key) * 0xcf2fd713) % kNumBuckets;
+    // Our simple hash function just multiplies by a big prime and relies on the
+    // default hashtable traits to apply the modulus at the appropriate point in
+    // the process of computing the final index.
+    return (static_cast<HashType>(key) * 0xcf2fd713);
   }
 };
 

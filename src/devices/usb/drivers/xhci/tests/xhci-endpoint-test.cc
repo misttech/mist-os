@@ -9,9 +9,8 @@
 #include <list>
 
 #include <fake-dma-buffer/fake-dma-buffer.h>
-#include <zxtest/zxtest.h>
 
-#include "src/devices/usb/drivers/xhci/usb-xhci.h"
+#include "src/devices/usb/drivers/xhci/tests/test-env.h"
 #include "src/devices/usb/drivers/xhci/xhci-device-state.h"
 
 namespace usb_xhci {
@@ -24,31 +23,27 @@ constexpr uint32_t kDeviceId = 0;
 constexpr uint32_t kSlot = kDeviceId + 1;
 constexpr uint32_t kPort = 0;
 
-class EndpointHarness : public zxtest::Test {
+class EndpointHarness : public ::testing::Test {
  public:
   void SetUp() override {
-    loop_.StartThread("client-loop");
-
-    sync_completion_t wait;
-    async::PostTask(loop_.dispatcher(), [&]() {
-      hci_ = std::make_unique<UsbXhci>(nullptr, xhci_config::Config({.enable_suspend = false}),
-                                       ddk_fake::CreateBufferFactory(), loop_.dispatcher());
-      sync_completion_signal(&wait);
-    });
-    sync_completion_wait(&wait, zx::time::infinite().get());
-    hci_->SetTestHarness(this);
-    ASSERT_OK(hci_->InitThread());
+    ASSERT_TRUE(driver_test()
+                    .StartDriverWithCustomStartArgs([&](fdf::DriverStartArgs& args) {
+                      xhci_config::Config fake_config;
+                      fake_config.enable_suspend() = false;
+                      args.config(fake_config.ToVmo());
+                    })
+                    .is_ok());
+    ASSERT_OK(driver_test().driver()->TestInit(this));
   }
 
   void Init(uint8_t ep_addr) {
-    ep_ = std::make_unique<Endpoint>(hci_.get(), kDeviceId, ep_addr);
+    ep_ = std::make_unique<Endpoint>(driver_test().driver(), kDeviceId, ep_addr);
     EXPECT_OK(ep_->Init(nullptr, nullptr));
 
     // Connect client
     auto endpoints = fidl::Endpoints<fuchsia_hardware_usb_endpoint::Endpoint>::Create();
     ep_->Connect(ep_->dispatcher(), std::move(endpoints.server));
-    client_.Bind(std::move(endpoints.client), loop_.dispatcher(),
-                 fidl::ObserveTeardown([&]() { sync_completion_signal(&client_unbound_); }));
+    client_.Bind(std::move(endpoints.client));
   }
 
   void TearDown() override {
@@ -56,10 +51,7 @@ class EndpointHarness : public zxtest::Test {
       expected_cancel_all_.emplace(kDeviceId, ep_->ep_addr());
       expected_disable_endpoint_.emplace(kDeviceId, ep_->ep_addr());
 
-      {
-        auto unused = std::move(client_);
-      }
-      sync_completion_wait(&client_unbound_, zx::time::infinite().get());
+      auto unused = std::move(client_);
     }
     ep_.reset();
 
@@ -67,12 +59,7 @@ class EndpointHarness : public zxtest::Test {
     EXPECT_TRUE(expected_ring_doorbell_.empty());
     EXPECT_TRUE(expected_disable_endpoint_.empty());
 
-    sync_completion_t wait;
-    async::PostTask(loop_.dispatcher(), [&]() {
-      hci_.reset();
-      sync_completion_signal(&wait);
-    });
-    sync_completion_wait(&wait, zx::time::infinite().get());
+    ASSERT_TRUE(driver_test().StopDriver().is_ok());
   }
 
   FakeTRB* CreateTRB() {
@@ -92,6 +79,7 @@ class EndpointHarness : public zxtest::Test {
     return it->get();
   }
 
+  fdf_testing::ForegroundDriverTest<EmptyTestConfig>& driver_test() { return driver_test_; }
   const std::list<std::unique_ptr<FakeTRB>>& trbs() { return trbs_; }
 
   sync_completion_t doorbell_;
@@ -100,29 +88,29 @@ class EndpointHarness : public zxtest::Test {
   std::queue<std::pair<uint32_t, uint8_t>> expected_disable_endpoint_;
 
  protected:
-  async::Loop loop_{&kAsyncLoopConfigNeverAttachToThread};
-  std::unique_ptr<UsbXhci> hci_;
   std::unique_ptr<Endpoint> ep_;
-  fidl::SharedClient<fuchsia_hardware_usb_endpoint::Endpoint> client_;
+  fidl::SyncClient<fuchsia_hardware_usb_endpoint::Endpoint> client_;
 
  private:
-  sync_completion_t client_unbound_;
+  fdf_testing::ForegroundDriverTest<EmptyTestConfig> driver_test_;
   std::list<std::unique_ptr<FakeTRB>> trbs_;
 };
 
 // Fake implementations of UsbXhci
-zx_status_t UsbXhci::InitThread() {
+zx::result<> UsbXhci::Init(std::unique_ptr<dma_buffer::BufferFactory> buffer_factory) {
+  buffer_factory_ = std::move(buffer_factory);
+
   slot_size_bytes_ = 64;
 
   fbl::AllocChecker ac;
   interrupters_ = fbl::MakeArray<Interrupter>(&ac, 1);
   if (!ac.check()) {
-    return ZX_ERR_NO_MEMORY;
+    return zx::error(ZX_ERR_NO_MEMORY);
   }
   max_slots_ = 32;
   device_state_ = fbl::MakeArray<fbl::RefPtr<DeviceState>>(&ac, max_slots_);
   if (!ac.check()) {
-    return ZX_ERR_NO_MEMORY;
+    return zx::error(ZX_ERR_NO_MEMORY);
   }
 
   // Create device_state_
@@ -134,45 +122,39 @@ zx_status_t UsbXhci::InitThread() {
   GetDeviceState()[kDeviceId] = std::move(state);
 
   EXPECT_OK(fake_bti_create(bti_.reset_and_get_address()));
-  return ZX_OK;
+  return zx::ok();
 }
 void UsbXhci::Shutdown(zx_status_t status) {}
 void UsbXhci::UsbHciRequestQueue(usb_request_t* usb_request,
                                  const usb_request_complete_callback_t* complete_cb) {}
 zx_status_t UsbXhci::UsbHciCancelAll(uint32_t device_id, uint8_t ep_address) {
-  EXPECT_FALSE(reinterpret_cast<EndpointHarness*>(test_harness_)->expected_cancel_all_.empty());
-  EXPECT_EQ(reinterpret_cast<EndpointHarness*>(test_harness_)->expected_cancel_all_.front().first,
-            device_id);
-  EXPECT_EQ(reinterpret_cast<EndpointHarness*>(test_harness_)->expected_cancel_all_.front().second,
-            ep_address);
-  reinterpret_cast<EndpointHarness*>(test_harness_)->expected_cancel_all_.pop();
+  auto* test_harness = GetTestHarness<EndpointHarness>();
+  EXPECT_FALSE(test_harness->expected_cancel_all_.empty());
+  EXPECT_EQ(test_harness->expected_cancel_all_.front().first, device_id);
+  EXPECT_EQ(test_harness->expected_cancel_all_.front().second, ep_address);
+  test_harness->expected_cancel_all_.pop();
   return ZX_OK;
 }
 fpromise::promise<void, zx_status_t> UsbXhci::UsbHciDisableEndpoint(uint32_t device_id,
                                                                     uint8_t ep_addr) {
-  EXPECT_FALSE(
-      reinterpret_cast<EndpointHarness*>(test_harness_)->expected_disable_endpoint_.empty());
-  EXPECT_EQ(
-      reinterpret_cast<EndpointHarness*>(test_harness_)->expected_disable_endpoint_.front().first,
-      device_id);
-  EXPECT_EQ(
-      reinterpret_cast<EndpointHarness*>(test_harness_)->expected_disable_endpoint_.front().second,
-      ep_addr);
-  reinterpret_cast<EndpointHarness*>(test_harness_)->expected_disable_endpoint_.pop();
+  auto* test_harness = GetTestHarness<EndpointHarness>();
+  EXPECT_FALSE(test_harness->expected_disable_endpoint_.empty());
+  EXPECT_EQ(test_harness->expected_disable_endpoint_.front().first, device_id);
+  EXPECT_EQ(test_harness->expected_disable_endpoint_.front().second, ep_addr);
+  test_harness->expected_disable_endpoint_.pop();
   return fpromise::make_result_promise<void, zx_status_t>(fpromise::ok());
 }
 bool UsbXhci::Running() const { return true; }
 void UsbXhci::RingDoorbell(uint8_t slot, uint8_t target) {
-  EXPECT_FALSE(reinterpret_cast<EndpointHarness*>(test_harness_)->expected_ring_doorbell_.empty());
-  EXPECT_EQ(
-      reinterpret_cast<EndpointHarness*>(test_harness_)->expected_ring_doorbell_.front().first,
-      slot);
+  auto* test_harness = GetTestHarness<EndpointHarness>();
+  EXPECT_FALSE(test_harness->expected_ring_doorbell_.empty());
+  EXPECT_EQ(test_harness->expected_ring_doorbell_.front().first, slot);
   EXPECT_EQ(
       reinterpret_cast<EndpointHarness*>(test_harness_)->expected_ring_doorbell_.front().second,
       target);
-  reinterpret_cast<EndpointHarness*>(test_harness_)->expected_ring_doorbell_.pop();
+  test_harness->expected_ring_doorbell_.pop();
 
-  sync_completion_signal(&reinterpret_cast<EndpointHarness*>(test_harness_)->doorbell_);
+  sync_completion_signal(&test_harness->doorbell_);
 }
 
 // Fake implementations of DeviceState
@@ -211,7 +193,7 @@ zx_status_t TransferRing::Init(size_t page_size, const zx::bti& bti, EventRing* 
   if (trbs_ != nullptr) {
     return ZX_ERR_BAD_STATE;
   }
-  trbs_ = static_cast<EndpointHarness*>(hci_->GetTestHarness())->CreateTRB();
+  trbs_ = hci_->GetTestHarness<EndpointHarness>()->CreateTRB();
   static_assert(sizeof(uint64_t) == sizeof(this));
   trbs_->ptr = reinterpret_cast<uint64_t>(this);
   trbs_->status = pcs_;
@@ -232,7 +214,7 @@ zx_status_t TransferRing::AllocateTRB(TRB** trb, State* state) {
     state->pcs = pcs_;
     state->trbs = trbs_;
   }
-  trbs_ = static_cast<EndpointHarness*>(hci_->GetTestHarness())->CreateTRB();
+  trbs_ = hci_->GetTestHarness<EndpointHarness>()->CreateTRB();
   trbs_->ptr = 0;
   trbs_->status = pcs_;
   *trb = trbs_;
@@ -240,7 +222,7 @@ zx_status_t TransferRing::AllocateTRB(TRB** trb, State* state) {
 }
 zx::result<ContiguousTRBInfo> TransferRing::AllocateContiguous(size_t count) {
   fbl::AutoLock _(&mutex_);
-  trbs_ = static_cast<EndpointHarness*>(hci_->GetTestHarness())->CreateTRBs(count)->contig.data();
+  trbs_ = hci_->GetTestHarness<EndpointHarness>()->CreateTRBs(count)->contig.data();
   trbs_->ptr = 0;
   trbs_->status = pcs_;
   ContiguousTRBInfo info;
@@ -255,15 +237,10 @@ TEST_F(EndpointHarness, Init) { Init(1); }
 TEST_F(EndpointHarness, GetInfo) {
   Init(1);
 
-  sync_completion_t wait;
-  client_->GetInfo().Then(
-      [&](const fidl::Result<fuchsia_hardware_usb_endpoint::Endpoint::GetInfo>& result) {
-        EXPECT_TRUE(result.is_error());
-        EXPECT_TRUE(result.error_value().is_domain_error());
-        EXPECT_EQ(result.error_value().domain_error(), ZX_ERR_NOT_SUPPORTED);
-        sync_completion_signal(&wait);
-      });
-  sync_completion_wait(&wait, zx::time::infinite().get());
+  auto result = client_->GetInfo();
+  EXPECT_TRUE(result.is_error());
+  EXPECT_TRUE(result.error_value().is_domain_error());
+  EXPECT_EQ(result.error_value().domain_error(), ZX_ERR_NOT_SUPPORTED);
 }
 
 TEST_F(EndpointHarness, QueueControlRequest) {
@@ -273,15 +250,12 @@ TEST_F(EndpointHarness, QueueControlRequest) {
   std::vector<fuchsia_hardware_usb_endpoint::VmoInfo> vmo_info;
   vmo_info.emplace_back(std::move(
       fuchsia_hardware_usb_endpoint::VmoInfo().id(8).size(2 * zx_system_get_page_size())));
-  sync_completion_t wait;
-  client_->RegisterVmos({std::move(vmo_info)})
-      .Then([&](const fidl::Result<fuchsia_hardware_usb_endpoint::Endpoint::RegisterVmos>& result) {
-        ASSERT_TRUE(result.is_ok());
-        EXPECT_EQ(result->vmos().size(), 1);
-        EXPECT_EQ(result->vmos().at(0).id(), 8);
-        sync_completion_signal(&wait);
-      });
-  sync_completion_wait(&wait, zx::time::infinite().get());
+  {
+    auto result = client_->RegisterVmos({std::move(vmo_info)});
+    ASSERT_TRUE(result.is_ok());
+    EXPECT_EQ(result->vmos().size(), 1UL);
+    EXPECT_EQ(result->vmos().at(0).id(), 8UL);
+  }
 
   expected_ring_doorbell_.emplace(kSlot, 1);
   zx::vmo vmo;
@@ -310,29 +284,29 @@ TEST_F(EndpointHarness, QueueControlRequest) {
 
   // Setup
   auto iter = trbs().begin();
-  auto setup_trb = static_cast<Setup*>(static_cast<TRB*>((++iter)->get()));
-  EXPECT_EQ(setup_trb->length(), 8);
-  EXPECT_EQ(setup_trb->IDT(), 1);
+  auto setup_trb = static_cast<struct Setup*>(static_cast<TRB*>((++iter)->get()));
+  EXPECT_EQ(setup_trb->length(), 8UL);
+  EXPECT_EQ(setup_trb->IDT(), 1UL);
   EXPECT_EQ(setup_trb->TRT(), Setup::IN);
   // Data
   auto data_trb = static_cast<ControlData*>(static_cast<TRB*>((++iter)->get()));
-  EXPECT_EQ(data_trb->DIRECTION(), 1);
-  EXPECT_EQ(data_trb->INTERRUPTER(), 0);
+  EXPECT_EQ(data_trb->DIRECTION(), 1UL);
+  EXPECT_EQ(data_trb->INTERRUPTER(), 0UL);
   EXPECT_EQ(data_trb->LENGTH(), zx_system_get_page_size());
-  EXPECT_EQ(data_trb->SIZE(), 1);
+  EXPECT_EQ(data_trb->SIZE(), 1UL);
   EXPECT_TRUE(data_trb->ISP());
   EXPECT_TRUE(data_trb->NO_SNOOP());
   // Normal
   auto normal_trb = static_cast<Normal*>(static_cast<TRB*>((++iter)->get()));
-  EXPECT_EQ(normal_trb->INTERRUPTER(), 0);
+  EXPECT_EQ(normal_trb->INTERRUPTER(), 0UL);
   EXPECT_EQ(normal_trb->LENGTH(), zx_system_get_page_size());
-  EXPECT_EQ(normal_trb->SIZE(), 0);
+  EXPECT_EQ(normal_trb->SIZE(), 0UL);
   EXPECT_TRUE(normal_trb->ISP());
   EXPECT_TRUE(normal_trb->NO_SNOOP());
   // Status
   auto status_trb = static_cast<Status*>(static_cast<TRB*>((++iter)->get()));
-  EXPECT_EQ(status_trb->DIRECTION(), 0);
-  EXPECT_EQ(status_trb->INTERRUPTER(), 0);
+  EXPECT_EQ(status_trb->DIRECTION(), 0UL);
+  EXPECT_EQ(status_trb->INTERRUPTER(), 0UL);
   EXPECT_TRUE(status_trb->IOC());
 }
 
@@ -343,15 +317,12 @@ TEST_F(EndpointHarness, QueueNormalRequest) {
   std::vector<fuchsia_hardware_usb_endpoint::VmoInfo> vmo_info;
   vmo_info.emplace_back(std::move(
       fuchsia_hardware_usb_endpoint::VmoInfo().id(8).size(2 * zx_system_get_page_size())));
-  sync_completion_t wait;
-  client_->RegisterVmos({std::move(vmo_info)})
-      .Then([&](const fidl::Result<fuchsia_hardware_usb_endpoint::Endpoint::RegisterVmos>& result) {
-        ASSERT_TRUE(result.is_ok());
-        EXPECT_EQ(result->vmos().size(), 1);
-        EXPECT_EQ(result->vmos().at(0).id(), 8);
-        sync_completion_signal(&wait);
-      });
-  sync_completion_wait(&wait, zx::time::infinite().get());
+  {
+    auto result = client_->RegisterVmos({std::move(vmo_info)});
+    ASSERT_TRUE(result.is_ok());
+    EXPECT_EQ(result->vmos().size(), 1UL);
+    EXPECT_EQ(result->vmos().at(0).id(), 8UL);
+  }
 
   expected_ring_doorbell_.emplace(kSlot, 2 + kDeviceId);
   std::vector<fuchsia_hardware_usb_request::Request> requests;
@@ -374,20 +345,20 @@ TEST_F(EndpointHarness, QueueNormalRequest) {
   auto trb = (++trbs().begin())->get()->contig.data();
   EXPECT_EQ(Control::FromTRB(trb).Type(), Control::Normal);
   auto data_trb = static_cast<Normal*>(trb);
-  EXPECT_EQ(data_trb->IOC(), 0);
-  EXPECT_EQ(data_trb->ISP(), 1);
-  EXPECT_EQ(data_trb->INTERRUPTER(), 0);
+  EXPECT_EQ(data_trb->IOC(), 0UL);
+  EXPECT_EQ(data_trb->ISP(), 1UL);
+  EXPECT_EQ(data_trb->INTERRUPTER(), 0UL);
   EXPECT_EQ(data_trb->LENGTH(), zx_system_get_page_size());
-  EXPECT_EQ(data_trb->SIZE(), 1);
+  EXPECT_EQ(data_trb->SIZE(), 1UL);
   EXPECT_TRUE(data_trb->NO_SNOOP());
 
   // Data (page 1, contiguous)
   data_trb = static_cast<Normal*>(++trb);
-  EXPECT_EQ(data_trb->IOC(), 1);
-  EXPECT_EQ(data_trb->ISP(), 1);
-  EXPECT_EQ(data_trb->INTERRUPTER(), 0);
+  EXPECT_EQ(data_trb->IOC(), 1UL);
+  EXPECT_EQ(data_trb->ISP(), 1UL);
+  EXPECT_EQ(data_trb->INTERRUPTER(), 0UL);
   EXPECT_EQ(data_trb->LENGTH(), zx_system_get_page_size());
-  EXPECT_EQ(data_trb->SIZE(), 0);
+  EXPECT_EQ(data_trb->SIZE(), 0UL);
   EXPECT_TRUE(data_trb->NO_SNOOP());
 }
 

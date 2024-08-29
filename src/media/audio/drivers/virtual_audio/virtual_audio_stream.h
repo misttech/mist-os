@@ -124,9 +124,8 @@ class VirtualAudioStream : public audio::SimpleAudioStream {
   zx::time ref_start_time_ __TA_GUARDED(domain_token());
 
   // Members related to the driver's delivery of position notifications to AudioCore.
-  async::TaskClosureMethod<VirtualAudioStream,
-                           &VirtualAudioStream::ProcessRingNotification> notify_timer_
-      __TA_GUARDED(domain_token()){this};
+  async::TaskClosureMethod<VirtualAudioStream, &VirtualAudioStream::ProcessRingNotification>
+      notify_timer_ __TA_GUARDED(domain_token()){this};
   uint32_t notifications_per_ring_ __TA_GUARDED(domain_token()) = 0;
   zx::duration ref_notification_period_ __TA_GUARDED(domain_token()) = zx::duration(0);
   zx::time target_mono_notification_time_ __TA_GUARDED(domain_token()) = zx::time(0);
@@ -136,10 +135,8 @@ class VirtualAudioStream : public audio::SimpleAudioStream {
   // alternate notifications-per-ring cadence. If a VirtualAudio client specifies the same cadence
   // that AudioCore has requested, then we simply use the above members and deliver those same
   // notifications to the VA client as well.
-  async::TaskClosureMethod<
-      VirtualAudioStream,
-      &VirtualAudioStream::ProcessVaClientRingNotification> va_client_notify_timer_
-      __TA_GUARDED(domain_token()){this};
+  async::TaskClosureMethod<VirtualAudioStream, &VirtualAudioStream::ProcessVaClientRingNotification>
+      va_client_notify_timer_ __TA_GUARDED(domain_token()){this};
 
   std::optional<uint32_t> va_client_notifications_per_ring_ __TA_GUARDED(domain_token()) =
       std::nullopt;

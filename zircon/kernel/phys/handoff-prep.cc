@@ -30,6 +30,7 @@
 #include <phys/new.h>
 #include <phys/stdio.h>
 #include <phys/symbolize.h>
+#include <phys/uart.h>
 
 #include "log.h"
 #include "physboot.h"
@@ -89,14 +90,11 @@ constexpr ktl::string_view VmoNameString(const PhysVmo::Name& name) {
 
 }  // namespace
 
-void HandoffPrep::Init(ktl::span<ktl::byte> buffer) {
-  // TODO(https://fxbug.dev/42164859): Use the buffer inside the data ZBI via a
-  // SingleHeapAllocator.  Later allocator() will return a real(ish) allocator.
-  allocator_.allocate_function() = AllocateFunction(buffer);
-
+void HandoffPrep::Init() {
+  PhysHandoffTemporaryPtr<const PhysHandoff> handoff;
   fbl::AllocChecker ac;
-  handoff_ = new (allocator(), ac) PhysHandoff;
-  ZX_ASSERT_MSG(ac.check(), "handoff buffer too small for PhysHandoff!");
+  handoff_ = New(handoff, ac);
+  ZX_ASSERT_MSG(ac.check(), "Failed to allocate PhysHandoff!");
 }
 
 void HandoffPrep::SetInstrumentation() {
@@ -104,14 +102,14 @@ void HandoffPrep::SetInstrumentation() {
                                   ktl::string_view vmo_name_suffix, size_t content_size) {
     PhysVmo::Name phys_vmo_name =
         instrumentation::DebugdataVmoName(sink_name, vmo_name, vmo_name_suffix, /*is_static=*/true);
-    return PublishVmo(VmoNameString(phys_vmo_name), content_size);
+    return PublishExtraVmo(VmoNameString(phys_vmo_name), content_size);
   };
   for (const ElfImage* module : gSymbolize->modules()) {
     module->PublishDebugdata(publish_debugdata);
   }
 }
 
-ktl::span<ktl::byte> HandoffPrep::PublishVmo(ktl::string_view name, size_t content_size) {
+ktl::span<ktl::byte> HandoffPrep::PublishExtraVmo(ktl::string_view name, size_t content_size) {
   if (content_size == 0) {
     return {};
   }
@@ -127,23 +125,23 @@ ktl::span<ktl::byte> HandoffPrep::PublishVmo(ktl::string_view name, size_t conte
                 static_cast<int>(name.size()), name.data());
   ZX_DEBUG_ASSERT(buffer.size() == content_size);
 
-  vmos_.push_front(handoff_vmo);
+  extra_vmos_.push_front(handoff_vmo);
   return buffer;
 }
 
-void HandoffPrep::FinishVmos() {
-  ZX_ASSERT_MSG(vmos_.size() <= PhysVmo::kMaxHandoffPhysVmos,
-                "Too many phys VMOs in hand-off! %zu > max %zu", vmos_.size(),
-                PhysVmo::kMaxHandoffPhysVmos);
+void HandoffPrep::FinishExtraVmos() {
+  ZX_ASSERT_MSG(extra_vmos_.size() <= PhysVmo::kMaxExtraHandoffPhysVmos,
+                "Too many phys VMOs in hand-off! %zu > max %zu", extra_vmos_.size(),
+                PhysVmo::kMaxExtraHandoffPhysVmos);
 
   fbl::AllocChecker ac;
-  ktl::span phys_vmos = New(handoff()->vmos, ac, vmos_.size());
-  ZX_ASSERT_MSG(ac.check(), "cannot allocate %zu * %zu-byte PhysVmo", vmos_.size(),
+  ktl::span extra_phys_vmos = New(handoff()->extra_vmos, ac, extra_vmos_.size());
+  ZX_ASSERT_MSG(ac.check(), "cannot allocate %zu * %zu-byte PhysVmo", extra_vmos_.size(),
                 sizeof(PhysVmo));
-  ZX_DEBUG_ASSERT(phys_vmos.size() == vmos_.size());
+  ZX_DEBUG_ASSERT(extra_phys_vmos.size() == extra_vmos_.size());
 
-  for (PhysVmo& phys_vmo : phys_vmos) {
-    phys_vmo = ktl::move(vmos_.pop_front()->vmo);
+  for (PhysVmo& phys_vmo : extra_phys_vmos) {
+    phys_vmo = ktl::move(extra_vmos_.pop_front()->vmo);
   }
 }
 
@@ -152,19 +150,9 @@ void HandoffPrep::SetMemory() {
   // providing a PERIPHERAL range that already covers UART MMIO, but there is
   // currently a gap in that coverage.
   if constexpr (kArchHandoffGenerateUartPeripheralRanges) {
-    uart::internal::Visit(
-        [](const auto& uart) {
-          using dcfg_type = ktl::decay_t<decltype(uart.config())>;
-          if constexpr (ktl::is_same_v<dcfg_type, zbi_dcfg_simple_t>) {
-            memalloc::Range uart_mmio = {
-                .addr = fbl::round_down(uart.config().mmio_phys, ZX_PAGE_SIZE),
-                .size = ZX_PAGE_SIZE,
-                .type = memalloc::Type::kPeripheral,
-            };
-            ZX_ASSERT(Allocation::GetPool().MarkAsPeripheral(uart_mmio).is_ok());
-          }
-        },
-        gBootOptions->serial);
+    if (auto uart_mmio = GetUartMmioRange(gBootOptions->serial, ZX_PAGE_SIZE)) {
+      ZX_ASSERT(Allocation::GetPool().MarkAsPeripheral(*uart_mmio).is_ok());
+    }
   }
 
   // Normalizes types so that only those that are of interest to the kernel
@@ -177,6 +165,7 @@ void HandoffPrep::SetMemory() {
       case memalloc::Type::kNvram:
       case memalloc::Type::kPeripheral:
       case memalloc::Type::kReservedLow:
+      case memalloc::Type::kTemporaryPhysHandoff:
       case memalloc::Type::kTestRamReserve:
         return type;
 
@@ -204,16 +193,25 @@ void HandoffPrep::SetMemory() {
   };
   memalloc::NormalizeRanges(pool, count_ranges, normed_type);
 
+  // Note, however, that New() has allocation side-effects around the creation
+  // of temporary hand-off memory. Accordingly, overestimate the length by one
+  // possible ranges when allocating the array, and adjust it after the fact.
+
   fbl::AllocChecker ac;
-  ktl::span handoff_ranges = New(handoff()->memory, ac, len);
-  ZX_ASSERT_MSG(ac.check(), "cannot allocate %zu bytes for memory handoff", len);
+  ktl::span handoff_ranges = New(handoff()->memory, ac, len + 1);
+  ZX_ASSERT_MSG(ac.check(), "cannot allocate %zu bytes for memory handoff",
+                len * sizeof(memalloc::Range));
 
   // Now simply record the normalized ranges.
-  auto record_ranges = [it = handoff_ranges.begin()](const memalloc::Range& range) mutable {
+  auto it = handoff_ranges.begin();
+  auto record_ranges = [&it](const memalloc::Range& range) {
     *it++ = range;
     return true;
   };
   memalloc::NormalizeRanges(pool, record_ranges, normed_type);
+
+  handoff()->memory.size_ = it - handoff_ranges.begin();
+  handoff_ranges = ktl::span(handoff_ranges.begin(), it);
 
   if (gBootOptions->phys_verbose) {
     printf("%s: Physical memory handed off to the kernel:\n", ProgramName());
@@ -242,7 +240,7 @@ void HandoffPrep::PublishLog(ktl::string_view name, Log&& log) {
   Allocation buffer = ktl::move(log).TakeBuffer();
   ZX_ASSERT(content_size <= buffer.size_bytes());
 
-  ktl::span copy = PublishVmo(name, content_size);
+  ktl::span copy = PublishExtraVmo(name, content_size);
   ZX_ASSERT(copy.size_bytes() == content_size);
   memcpy(copy.data(), buffer.get(), content_size);
 
@@ -326,9 +324,7 @@ void HandoffPrep::SetVersionString(KernelStorage::Bootfs kernel_package) {
   PublishLog("i/llvm-profile/s/physboot.log", ktl::move(*ktl::exchange(gLog, nullptr)));
 
   // Finalize the published VMOs, including the log just published above.
-  FinishVmos();
-
-  SetMemory();
+  FinishExtraVmos();
 
   // Now that all time samples have been collected, copy gBootTimes into the
   // hand-off.
@@ -339,6 +335,10 @@ void HandoffPrep::SetVersionString(KernelStorage::Bootfs kernel_package) {
   // on.  TODO(https://fxbug.dev/42164859): Actually there is some printing in BootZbi,
   // but no current drivers carry post-Init() state so it's harmless for now.
   uart.Visit([&handoff_options](const auto& driver) { handoff_options.serial = driver.uart(); });
+
+  // This must be called last, as this finalizes the state of memory to hand off
+  // to the kernel, which is affected by other set-up routines.
+  SetMemory();
 
   boot(handoff());
   ZX_PANIC("HandoffPrep::DoHandoff boot function returned!");

@@ -12,7 +12,6 @@
 #include <lib/driver/incoming/cpp/namespace.h>
 #include <lib/driver/outgoing/cpp/outgoing_directory.h>
 #include <lib/driver/testing/cpp/driver_test.h>
-#include <lib/driver/testing/cpp/test_environment.h>
 #include <lib/fdf/testing.h>
 #include <lib/fidl/cpp/binding.h>
 #include <lib/fidl/cpp/decoder.h>

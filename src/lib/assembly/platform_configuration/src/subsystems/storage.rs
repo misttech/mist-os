@@ -95,6 +95,14 @@ impl DefineSubsystemConfiguration<StorageConfig> for StorageSubsystemConfig {
             builder.platform_bundle("factory_data");
         }
 
+        if storage_config.mutable_storage_garbage_collection {
+            context.ensure_feature_set_level(
+                &[FeatureSupportLevel::Standard],
+                "Mutable storage garbage collection",
+            )?;
+            builder.platform_bundle("storage_cache_manager");
+        }
+
         // Collect the arguments from the board.
         let blobfs_max_bytes = context.board_info.filesystems.fvm.blobfs.maximum_bytes.unwrap_or(0);
         let blobfs_initial_inodes =
@@ -175,6 +183,24 @@ impl DefineSubsystemConfiguration<StorageConfig> for StorageSubsystemConfig {
             Config::new(ConfigValueType::Bool, true.into()),
         )?;
 
+        let disable_automount = match storage_config.disable_automount {
+            Some(disable_automount) => Config::new(ConfigValueType::Bool, disable_automount.into()),
+            None => Config::new_void(),
+        };
+        let algorithm = match &storage_config.filesystems.blobfs_write_compression_algorithm {
+            Some(algorithm) => Config::new(
+                ConfigValueType::String { max_size: 20 },
+                serde_json::to_value(algorithm)?,
+            ),
+            None => Config::new_void(),
+        };
+        let policy = match &storage_config.filesystems.blobfs_cache_eviction_policy {
+            Some(policy) => {
+                Config::new(ConfigValueType::String { max_size: 20 }, serde_json::to_value(policy)?)
+            }
+            None => Config::new_void(),
+        };
+
         let configs = [
             ("fuchsia.fshost.Blobfs", Config::new_bool(true)),
             ("fuchsia.fshost.BlobfsMaxBytes", Config::new_uint64(blobfs_max_bytes)),
@@ -216,10 +242,14 @@ impl DefineSubsystemConfiguration<StorageConfig> for StorageSubsystemConfig {
                     "fuchsia-boot:///fxfs-crypt#meta/fxfs-crypt.cm".into(),
                 ),
             ),
+            ("fuchsia.fshost.DisableAutomount", disable_automount),
+            ("fuchsia.blobfs.WriteCompressionAlgorithm", algorithm),
+            ("fuchsia.blobfs.CacheEvictionPolicy", policy),
         ];
         for config in configs {
             builder.set_config_capability(config.0, config.1)?;
         }
+
         Ok(())
     }
 }

@@ -68,7 +68,7 @@ class HermeticAudioRealm {
 
   // Component names which can be passed to ReadInspect;
   static inline std::string kAudioCore = "audio_core";
-  static inline std::string kMockCobalt = "mock_cobalt";
+  static inline std::string kFakeCobalt = "fake_cobalt";
   static inline std::string kThermalTestControl = "thermal_test_control";
 
   const std::shared_ptr<std::optional<inspect::testing::TreeClient>>& InspectTree() {

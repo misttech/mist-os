@@ -10,7 +10,7 @@ use crate::bpf::program::Program;
 use crate::bpf::syscalls::BpfTypeFormat;
 use crate::mm::memory::MemoryObject;
 use crate::mm::ProtectionFlags;
-use crate::task::{CurrentTask, EventHandler, Kernel, Task, WaitCanceler, Waiter};
+use crate::task::{CurrentTask, EventHandler, Task, WaitCanceler, Waiter};
 use crate::vfs::buffers::{InputBuffer, OutputBuffer};
 use crate::vfs::{
     fileops_impl_nonseekable, fileops_impl_noop_sync, fs_node_impl_not_dir,
@@ -21,7 +21,7 @@ use crate::vfs::{
 };
 use linux_uapi::XATTR_NAME_SELINUX;
 use starnix_logging::track_stub;
-use starnix_sync::{FileOpsCore, Locked};
+use starnix_sync::{FileOpsCore, Locked, Unlocked};
 use starnix_uapi::auth::FsCred;
 use starnix_uapi::device_type::DeviceType;
 use starnix_uapi::errors::Errno;
@@ -156,9 +156,11 @@ pub fn get_bpf_object(task: &Task, fd: FdNumber) -> Result<BpfHandle, Errno> {
 pub struct BpfFs;
 impl BpfFs {
     pub fn new_fs(
-        kernel: &Arc<Kernel>,
+        _locked: &mut Locked<'_, Unlocked>,
+        current_task: &CurrentTask,
         options: FileSystemOptions,
     ) -> Result<FileSystemHandle, Errno> {
+        let kernel = current_task.kernel();
         let fs = FileSystem::new(kernel, CacheMode::Permanent, BpfFs, options)?;
         let node = FsNode::new_root_with_properties(
             BpfFsDir::new(DEFAULT_BPF_SELINUX_CONTEXT.into()),

@@ -2,6 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+// The added=19 is fake because this fidl lib is not in the SDK, but fidlc
+// currently needs this available annotation in order for this lib to refer to
+// types/protocols which are in the SDK which are deprecated.
+@available(added=19)
 library fuchsia.sysmem2.internal;
 
 using fuchsia.sysmem;
@@ -85,6 +89,8 @@ open protocol CombinedBufferCollectionToken {
     strict SetDispensableV1();
     @selector("fuchsia.sysmem/BufferCollectionToken.CreateBufferCollectionTokenGroup")
     strict CreateBufferCollectionTokenGroupV1(resource struct {
+        // The added=19 is fake - see comment at top of this file.
+        @available(added=19, deprecated=23, note="use fuchsia.sysmem2")
         group_request server_end:fuchsia.sysmem.BufferCollectionTokenGroup;
     });
 

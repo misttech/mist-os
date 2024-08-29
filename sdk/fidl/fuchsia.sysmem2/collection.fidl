@@ -782,7 +782,7 @@ open protocol BufferCollection {
     /// * error [`fuchsia.sysmem2/Error.PENDING`] The buffer collection hasn't
     ///   attempted allocation yet. This means that WaitForAllBuffersAllocated
     ///   would not respond quickly.
-    @available(added=HEAD)
+    @available(added=NEXT)
     flexible CheckAllBuffersAllocated() -> () error Error;
 
     /// Create a new token to add a new participant to an existing logical

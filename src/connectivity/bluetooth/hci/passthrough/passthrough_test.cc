@@ -8,9 +8,9 @@
 #include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
 #include <lib/driver/compat/cpp/device_server.h>
 #include <lib/driver/component/cpp/driver_base.h>
-#include <lib/driver/testing/cpp/driver_lifecycle.h>
 #include <lib/driver/testing/cpp/driver_runtime.h>
-#include <lib/driver/testing/cpp/test_environment.h>
+#include <lib/driver/testing/cpp/internal/driver_lifecycle.h>
+#include <lib/driver/testing/cpp/internal/test_environment.h>
 #include <lib/driver/testing/cpp/test_node.h>
 #include <lib/fdf/env.h>
 #include <lib/fdf/testing.h>
@@ -54,6 +54,8 @@ class HciTransportServer : public fidl::WireServer<fuchsia_hardware_bluetooth::H
 
 }  // namespace
 
+// WARNING: Don't use this test as a template for new tests as it uses the old driver testing
+// library.
 class PassthroughTest : public ::testing::Test {
  public:
   void SetUp() override {
@@ -87,7 +89,9 @@ class PassthroughTest : public ::testing::Test {
     runtime_.ShutdownAllDispatchers(fdf::Dispatcher::GetCurrent()->get());
   }
 
-  fdf_testing::DriverUnderTest<bt::passthrough::PassthroughDevice>& driver() { return driver_; }
+  fdf_testing::internal::DriverUnderTest<bt::passthrough::PassthroughDevice>& driver() {
+    return driver_;
+  }
 
   std::optional<fdf_testing::TestNode>& node_server() { return node_server_; }
 
@@ -102,8 +106,8 @@ class PassthroughTest : public ::testing::Test {
   HciTransportServer hci_server_;
 
   std::optional<fdf_testing::TestNode> node_server_;
-  std::optional<fdf_testing::TestEnvironment> test_environment_;
-  fdf_testing::DriverUnderTest<bt::passthrough::PassthroughDevice> driver_;
+  std::optional<fdf_testing::internal::TestEnvironment> test_environment_;
+  fdf_testing::internal::DriverUnderTest<bt::passthrough::PassthroughDevice> driver_;
 };
 
 TEST_F(PassthroughTest, Lifecycle) {}

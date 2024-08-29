@@ -64,18 +64,19 @@ class VsyncReceiver {
   zx::result<> SetReceivingState(bool receiving);
 
  private:
-  // Start receiving Vsync interrupts.
+  // Posts a task to begin listening for Vsync interrupts.
   //
-  // The VsyncReceiver must not be receiving Vsync interrupts before it's
-  // called.
-  zx::result<> Start();
+  // The VsyncReceiver must not be receiving (or scheduled to receive) Vsync
+  // interrupts before this method is called.
+  zx::result<> PostStart();
 
-  // Stop receiving Vsync interrupts.
+  // Posts a task to stop receiving Vsync interrupts.
   //
   // Unhandled Vysnc interrupts queued in the dispatcher will be canceled.
   //
-  // The VsyncReceiver must be receiving Vsync interrupts before it's called.
-  zx::result<> Stop();
+  // The VsyncReceiver must be receiving (or scheduled to receive) Vsync
+  // interrupts before this method is called.
+  zx::result<> PostStop();
 
   void OnVsync(zx::time timestamp);
 

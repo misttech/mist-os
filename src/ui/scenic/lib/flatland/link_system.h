@@ -25,7 +25,6 @@
 #include "src/ui/scenic/lib/flatland/transform_graph.h"
 #include "src/ui/scenic/lib/flatland/transform_handle.h"
 #include "src/ui/scenic/lib/flatland/uber_struct.h"
-#include "src/ui/scenic/lib/scenic/util/error_reporter.h"
 #include "src/ui/scenic/lib/utils/dispatcher_holder.h"
 #include "src/ui/scenic/lib/utils/object_linker.h"
 

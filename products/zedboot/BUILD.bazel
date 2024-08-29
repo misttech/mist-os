@@ -24,6 +24,11 @@ fuchsia_product_configuration(
             "feature_set_level": "bootstrap",
             "development_support": {
                 "include_netsvc": True,
+                "tools": {
+                    "storage": {
+                        "enable_partitioning_tools": True,
+                    },
+                },
             },
             "storage": {
                 "filesystems": {
@@ -51,6 +56,11 @@ fuchsia_product_configuration(
             "feature_set_level": "bootstrap",
             "development_support": {
                 "include_netsvc": True,
+                "tools": {
+                    "storage": {
+                        "enable_partitioning_tools": True,
+                    },
+                },
             },
             "storage": {
                 "filesystems": {

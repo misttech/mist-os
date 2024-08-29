@@ -401,5 +401,5 @@ n/a
 [fidl-language]: /docs/reference/fidl/language/language.md
 [fidl-protocols]: /docs/reference/fidl/language/language.md#protocols
 [fidl-rubric]: /docs/development/api/fidl.md
-[fuchsia-system-interface]: /docs/concepts/packages/system.md
+[fuchsia-system-interface]: /docs/concepts/kernel/system.md
 [processargs]: /docs/concepts/process/program_loading.md#the_processargs_protocol

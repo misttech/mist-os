@@ -13,9 +13,9 @@
 #include <lib/async-loop/loop.h>
 #include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
-#include <lib/driver/testing/cpp/driver_lifecycle.h>
 #include <lib/driver/testing/cpp/driver_runtime.h>
-#include <lib/driver/testing/cpp/test_environment.h>
+#include <lib/driver/testing/cpp/internal/driver_lifecycle.h>
+#include <lib/driver/testing/cpp/internal/test_environment.h>
 #include <lib/driver/testing/cpp/test_node.h>
 #include <lib/fake-resource/resource.h>
 #include <lib/fdf/cpp/dispatcher.h>
@@ -162,6 +162,8 @@ class FakeIoportResource : public fidl::testing::TestBase<fuchsia_kernel::Ioport
   zx::unowned_resource root_resource_;
 };
 
+// WARNING: Don't use this test as a template for new tests as it uses the old driver testing
+// library.
 class IntegrationTest : public ::testing::Test {
  public:
   void SetUp() override {
@@ -187,10 +189,10 @@ class IntegrationTest : public ::testing::Test {
 
   async_patterns::TestDispatcherBound<fdf_testing::TestNode> node_server_{
       env_dispatcher_->async_dispatcher(), std::in_place, std::string("root")};
-  async_patterns::TestDispatcherBound<fdf_testing::TestEnvironment> test_environment_{
+  async_patterns::TestDispatcherBound<fdf_testing::internal::TestEnvironment> test_environment_{
       env_dispatcher_->async_dispatcher(), std::in_place};
-  async_patterns::TestDispatcherBound<fdf_testing::DriverUnderTest<IntelDisplayDriver>> driver_{
-      display_dispatcher_->async_dispatcher(), std::in_place};
+  async_patterns::TestDispatcherBound<fdf_testing::internal::DriverUnderTest<IntelDisplayDriver>>
+      driver_{display_dispatcher_->async_dispatcher(), std::in_place};
 
   pci::FakePciProtocol pci_;
   MockAllocator sysmem_{env_dispatcher_->async_dispatcher()};
@@ -255,23 +257,26 @@ void IntegrationTest::SetUpEnvironment() {
       std::move(create_start_args_zx_result).value();
   start_args_ = std::move(start_args);
 
-  zx::result<> add_sysmem_result = test_environment_.SyncCall([&](fdf_testing::TestEnvironment*
-                                                                      env) {
-    return env->incoming_directory().component().AddUnmanagedProtocol<fuchsia_sysmem2::Allocator>(
-        sysmem_.bind_handler(env_dispatcher_->async_dispatcher()));
-  });
+  zx::result<> add_sysmem_result =
+      test_environment_.SyncCall([&](fdf_testing::internal::TestEnvironment* env) {
+        return env->incoming_directory()
+            .component()
+            .AddUnmanagedProtocol<fuchsia_sysmem2::Allocator>(
+                sysmem_.bind_handler(env_dispatcher_->async_dispatcher()));
+      });
   ASSERT_OK(add_sysmem_result);
 
-  zx::result<> add_pci_result = test_environment_.SyncCall([&](fdf_testing::TestEnvironment* env) {
-    return env->incoming_directory().AddService<fuchsia_hardware_pci::Service>(
-        fuchsia_hardware_pci::Service::InstanceHandler(
-            {.device = pci_.bind_handler(pci_dispatcher_->async_dispatcher())}),
-        "pci");
-  });
+  zx::result<> add_pci_result =
+      test_environment_.SyncCall([&](fdf_testing::internal::TestEnvironment* env) {
+        return env->incoming_directory().AddService<fuchsia_hardware_pci::Service>(
+            fuchsia_hardware_pci::Service::InstanceHandler(
+                {.device = pci_.bind_handler(pci_dispatcher_->async_dispatcher())}),
+            "pci");
+      });
   ASSERT_OK(add_pci_result);
 
   zx::result<> add_framebuffer_resource_result =
-      test_environment_.SyncCall([&](fdf_testing::TestEnvironment* env) {
+      test_environment_.SyncCall([&](fdf_testing::internal::TestEnvironment* env) {
         return env->incoming_directory()
             .component()
             .AddUnmanagedProtocol<fuchsia_kernel::FramebufferResource>(
@@ -280,7 +285,7 @@ void IntegrationTest::SetUpEnvironment() {
   ASSERT_OK(add_framebuffer_resource_result);
 
   zx::result<> add_mmio_resource_result =
-      test_environment_.SyncCall([&](fdf_testing::TestEnvironment* env) {
+      test_environment_.SyncCall([&](fdf_testing::internal::TestEnvironment* env) {
         return env->incoming_directory()
             .component()
             .AddUnmanagedProtocol<fuchsia_kernel::MmioResource>(
@@ -289,7 +294,7 @@ void IntegrationTest::SetUpEnvironment() {
   ASSERT_OK(add_mmio_resource_result);
 
   zx::result<> add_ioport_resource_result =
-      test_environment_.SyncCall([&](fdf_testing::TestEnvironment* env) {
+      test_environment_.SyncCall([&](fdf_testing::internal::TestEnvironment* env) {
         return env->incoming_directory()
             .component()
             .AddUnmanagedProtocol<fuchsia_kernel::IoportResource>(
@@ -298,7 +303,7 @@ void IntegrationTest::SetUpEnvironment() {
   ASSERT_OK(add_ioport_resource_result);
 
   zx::result<> add_system_state_transition_result =
-      test_environment_.SyncCall([&](fdf_testing::TestEnvironment* env) {
+      test_environment_.SyncCall([&](fdf_testing::internal::TestEnvironment* env) {
         return env->incoming_directory()
             .component()
             .AddUnmanagedProtocol<fuchsia_device_manager::SystemStateTransition>(
@@ -306,8 +311,8 @@ void IntegrationTest::SetUpEnvironment() {
       });
   ASSERT_OK(add_system_state_transition_result);
 
-  zx::result<> serve_result = test_environment_.SyncCall(&fdf_testing::TestEnvironment::Initialize,
-                                                         std::move(incoming_directory_server));
+  zx::result<> serve_result = test_environment_.SyncCall(
+      &fdf_testing::internal::TestEnvironment::Initialize, std::move(incoming_directory_server));
   ASSERT_OK(serve_result);
 }
 
@@ -347,8 +352,9 @@ bool IsIntelGpuCoreNode(const DeviceNode& node) {
 }
 
 TEST_F(IntegrationTest, BindAndInit) {
-  zx::result<> start_result = driver_runtime_.RunToCompletion(driver_.SyncCall(
-      &fdf_testing::DriverUnderTest<IntelDisplayDriver>::Start, (std::move(start_args_))));
+  zx::result<> start_result = driver_runtime_.RunToCompletion(
+      driver_.SyncCall(&fdf_testing::internal::DriverUnderTest<IntelDisplayDriver>::Start,
+                       (std::move(start_args_))));
   ASSERT_OK(start_result);
 
   std::vector<DeviceNode> nodes = node_server_.SyncCall([&](fdf_testing::TestNode* root) {
@@ -378,7 +384,7 @@ TEST_F(IntegrationTest, BindAndInit) {
   ASSERT_NE(display_engine_banjo_node_it, intel_gpu_core_node_it);
 
   zx::result<> stop_result = driver_runtime_.RunToCompletion(
-      driver_.SyncCall(&fdf_testing::DriverUnderTest<IntelDisplayDriver>::PrepareStop));
+      driver_.SyncCall(&fdf_testing::internal::DriverUnderTest<IntelDisplayDriver>::PrepareStop));
   EXPECT_OK(stop_result);
 }
 
@@ -387,12 +393,13 @@ TEST_F(IntegrationTest, BindAndInit) {
 TEST_F(IntegrationTest, InitFailsIfBootloaderGetInfoFails) {
   fake_framebuffer::SetFramebuffer({.status = ZX_ERR_INVALID_ARGS});
 
-  zx::result<> start_result = driver_runtime_.RunToCompletion(driver_.SyncCall(
-      &fdf_testing::DriverUnderTest<IntelDisplayDriver>::Start, (std::move(start_args_))));
+  zx::result<> start_result = driver_runtime_.RunToCompletion(
+      driver_.SyncCall(&fdf_testing::internal::DriverUnderTest<IntelDisplayDriver>::Start,
+                       (std::move(start_args_))));
   ASSERT_OK(start_result);
 
   zx::result<ddk::AnyProtocol> gpu_protocol_result =
-      driver_.SyncCall([&](fdf_testing::DriverUnderTest<IntelDisplayDriver>* driver) {
+      driver_.SyncCall([&](fdf_testing::internal::DriverUnderTest<IntelDisplayDriver>* driver) {
         return (*driver)->GetProtocol(ZX_PROTOCOL_INTEL_GPU_CORE);
       });
   ASSERT_OK(gpu_protocol_result);
@@ -407,7 +414,7 @@ TEST_F(IntegrationTest, InitFailsIfBootloaderGetInfoFails) {
   EXPECT_EQ(0u, addr);
 
   zx::result<> stop_result = driver_runtime_.RunToCompletion(
-      driver_.SyncCall(&fdf_testing::DriverUnderTest<IntelDisplayDriver>::PrepareStop));
+      driver_.SyncCall(&fdf_testing::internal::DriverUnderTest<IntelDisplayDriver>::PrepareStop));
   EXPECT_OK(stop_result);
 }
 
@@ -429,12 +436,13 @@ TEST_F(IntegrationTest, GttAllocationDoesNotOverlapBootloaderFramebuffer) {
       .stride = kStride,
   });
 
-  zx::result<> start_result = driver_runtime_.RunToCompletion(driver_.SyncCall(
-      &fdf_testing::DriverUnderTest<IntelDisplayDriver>::Start, (std::move(start_args_))));
+  zx::result<> start_result = driver_runtime_.RunToCompletion(
+      driver_.SyncCall(&fdf_testing::internal::DriverUnderTest<IntelDisplayDriver>::Start,
+                       (std::move(start_args_))));
   ASSERT_OK(start_result);
 
   zx::result<ddk::AnyProtocol> gpu_protocol_result =
-      driver_.SyncCall([&](fdf_testing::DriverUnderTest<IntelDisplayDriver>* driver) {
+      driver_.SyncCall([&](fdf_testing::internal::DriverUnderTest<IntelDisplayDriver>* driver) {
         return (*driver)->GetProtocol(ZX_PROTOCOL_INTEL_GPU_CORE);
       });
   ASSERT_OK(gpu_protocol_result);
@@ -448,7 +456,7 @@ TEST_F(IntegrationTest, GttAllocationDoesNotOverlapBootloaderFramebuffer) {
   EXPECT_EQ(ZX_ROUNDUP(kHeight * kStride * 3, PAGE_SIZE), addr);
 
   zx::result<> stop_result = driver_runtime_.RunToCompletion(
-      driver_.SyncCall(&fdf_testing::DriverUnderTest<IntelDisplayDriver>::PrepareStop));
+      driver_.SyncCall(&fdf_testing::internal::DriverUnderTest<IntelDisplayDriver>::PrepareStop));
   EXPECT_OK(stop_result);
 }
 
@@ -466,12 +474,13 @@ TEST_F(IntegrationTest, SysmemImport) {
       .format_modifier = fuchsia_images2::wire::PixelFormatModifier::kLinear,
   });
 
-  zx::result<> start_result = driver_runtime_.RunToCompletion(driver_.SyncCall(
-      &fdf_testing::DriverUnderTest<IntelDisplayDriver>::Start, (std::move(start_args_))));
+  zx::result<> start_result = driver_runtime_.RunToCompletion(
+      driver_.SyncCall(&fdf_testing::internal::DriverUnderTest<IntelDisplayDriver>::Start,
+                       (std::move(start_args_))));
   ASSERT_OK(start_result);
 
   zx::result<ddk::AnyProtocol> display_protocol_result =
-      driver_.SyncCall([&](fdf_testing::DriverUnderTest<IntelDisplayDriver>* driver) {
+      driver_.SyncCall([&](fdf_testing::internal::DriverUnderTest<IntelDisplayDriver>* driver) {
         return (*driver)->GetProtocol(ZX_PROTOCOL_DISPLAY_ENGINE);
       });
   ASSERT_OK(display_protocol_result);
@@ -514,7 +523,7 @@ TEST_F(IntegrationTest, SysmemImport) {
   ASSERT_OK(import_image_status);
 
   uint64_t bytes_per_row =
-      driver_.SyncCall([&](fdf_testing::DriverUnderTest<IntelDisplayDriver>* driver) {
+      driver_.SyncCall([&](fdf_testing::internal::DriverUnderTest<IntelDisplayDriver>* driver) {
         const GttRegion& region = (*driver)->controller()->SetupGttImage(
             kDisplayImageMetadata, image_handle, COORDINATE_TRANSFORMATION_IDENTITY);
         return region.bytes_per_row();
@@ -525,7 +534,7 @@ TEST_F(IntegrationTest, SysmemImport) {
   display.ReleaseImage(image_handle);
 
   zx::result<> stop_result = driver_runtime_.RunToCompletion(
-      driver_.SyncCall(&fdf_testing::DriverUnderTest<IntelDisplayDriver>::PrepareStop));
+      driver_.SyncCall(&fdf_testing::internal::DriverUnderTest<IntelDisplayDriver>::PrepareStop));
   EXPECT_OK(stop_result);
 }
 
@@ -543,12 +552,13 @@ TEST_F(IntegrationTest, SysmemRotated) {
       .format_modifier = fuchsia_images2::wire::PixelFormatModifier::kIntelI915YTiled,
   });
 
-  zx::result<> start_result = driver_runtime_.RunToCompletion(driver_.SyncCall(
-      &fdf_testing::DriverUnderTest<IntelDisplayDriver>::Start, (std::move(start_args_))));
+  zx::result<> start_result = driver_runtime_.RunToCompletion(
+      driver_.SyncCall(&fdf_testing::internal::DriverUnderTest<IntelDisplayDriver>::Start,
+                       (std::move(start_args_))));
   ASSERT_OK(start_result);
 
   zx::result<ddk::AnyProtocol> display_protocol_result =
-      driver_.SyncCall([&](fdf_testing::DriverUnderTest<IntelDisplayDriver>* driver) {
+      driver_.SyncCall([&](fdf_testing::internal::DriverUnderTest<IntelDisplayDriver>* driver) {
         return (*driver)->GetProtocol(ZX_PROTOCOL_DISPLAY_ENGINE);
       });
   ASSERT_OK(display_protocol_result);
@@ -593,7 +603,7 @@ TEST_F(IntegrationTest, SysmemRotated) {
 
   // Check that rotating the image doesn't hang.
   uint64_t bytes_per_row =
-      driver_.SyncCall([&](fdf_testing::DriverUnderTest<IntelDisplayDriver>* driver) {
+      driver_.SyncCall([&](fdf_testing::internal::DriverUnderTest<IntelDisplayDriver>* driver) {
         const GttRegion& region = (*driver)->controller()->SetupGttImage(
             kDisplayImageMetadata, image_handle, COORDINATE_TRANSFORMATION_ROTATE_CCW_90);
         return region.bytes_per_row();
@@ -604,7 +614,7 @@ TEST_F(IntegrationTest, SysmemRotated) {
   display.ReleaseImage(image_handle);
 
   zx::result<> stop_result = driver_runtime_.RunToCompletion(
-      driver_.SyncCall(&fdf_testing::DriverUnderTest<IntelDisplayDriver>::PrepareStop));
+      driver_.SyncCall(&fdf_testing::internal::DriverUnderTest<IntelDisplayDriver>::PrepareStop));
   EXPECT_OK(stop_result);
 }
 

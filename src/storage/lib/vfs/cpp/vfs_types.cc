@@ -12,7 +12,6 @@
 
 namespace fio = fuchsia_io;
 
-#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
 // Verify that permission flags align with the Rights enumeration.
 static_assert(static_cast<uint64_t>(fio::Rights::kConnect) ==
               static_cast<uint64_t>(fio::Flags::kPermConnect));
@@ -32,7 +31,6 @@ static_assert(static_cast<uint64_t>(fio::Rights::kTraverse) ==
               static_cast<uint64_t>(fio::Flags::kPermTraverse));
 static_assert(static_cast<uint64_t>(fio::Rights::kModifyDirectory) ==
               static_cast<uint64_t>(fio::Flags::kPermModify));
-#endif
 
 namespace fs {
 
@@ -187,7 +185,6 @@ fio::Rights DownscopeRights(fio::Rights rights, VnodeProtocol protocol) {
   }
 }
 
-#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
 namespace {
 
 constexpr fio::NodeProtocolKinds FlagsToProtocols(fio::Flags flags) {
@@ -198,9 +195,11 @@ constexpr fio::NodeProtocolKinds FlagsToProtocols(fio::Flags flags) {
   if (flags & fio::Flags::kProtocolFile) {
     protocols |= fio::NodeProtocolKinds::kFile;
   }
+#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
   if (flags & fio::Flags::kProtocolSymlink) {
     protocols |= fio::NodeProtocolKinds::kSymlink;
   }
+#endif
   if (flags & fio::Flags::kProtocolService) {
     protocols |= fio::NodeProtocolKinds::kConnector;
   }
@@ -254,8 +253,6 @@ zx::result<VnodeProtocol> NegotiateProtocol(fio::Flags flags, fio::NodeProtocolK
   }
   return zx::error(ZX_ERR_WRONG_TYPE);
 }
-
-#endif
 
 zx::result<VnodeProtocol> NegotiateProtocol(fio::NodeProtocolKinds supported,
                                             fio::NodeProtocolKinds requested) {

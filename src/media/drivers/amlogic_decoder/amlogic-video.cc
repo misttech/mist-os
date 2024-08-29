@@ -869,11 +869,8 @@ std::string GetObjectName(zx_handle_t handle) {
 
 zx_status_t AmlogicVideo::SetDeviceType(zx_device_t* parent) {
   constexpr uint32_t kMaxPropertyCount = 10;
-  zx_device_prop_t props[kMaxPropertyCount] = {};
   zx_device_str_prop_t str_props[kMaxPropertyCount] = {};
   device_props_args_t prop_out_args = {
-      .props = props,
-      .prop_count = kMaxPropertyCount,
       .str_props = str_props,
       .str_prop_count = kMaxPropertyCount,
   };

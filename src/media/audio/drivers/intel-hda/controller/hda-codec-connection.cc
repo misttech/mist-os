@@ -10,6 +10,8 @@
 #include <memory>
 #include <utility>
 
+#include <bind/fuchsia/audio/intelhda/cpp/bind.h>
+#include <bind/fuchsia/cpp/bind.h>
 #include <fbl/algorithm.h>
 #include <fbl/auto_lock.h>
 #include <intel-hda/utils/codec-commands.h>
@@ -24,8 +26,8 @@ namespace audio::intel_hda {
 #define SET_DEVICE_PROP(_prop, _value)                                                             \
   do {                                                                                             \
     static_assert(PROP_##_prop < std::size(decltype(dev_props_){}), "Invalid Device Property ID"); \
-    dev_props_[PROP_##_prop].id = BIND_IHDA_CODEC_##_prop;                                         \
-    dev_props_[PROP_##_prop].value = (_value);                                                     \
+    dev_props_[PROP_##_prop] =                                                                     \
+        ddk::MakeStrProperty(bind_fuchsia::IHDA_CODEC_##_prop, static_cast<uint32_t>(_value));     \
   } while (false)
 
 HdaCodecConnection::ProbeCommandListEntry HdaCodecConnection::PROBE_COMMANDS[] = {
@@ -55,8 +57,9 @@ ihda_codec_protocol_ops_t HdaCodecConnection::CODEC_PROTO_THUNKS = {
 HdaCodecConnection::HdaCodecConnection(IntelHDAController& controller, uint8_t codec_id)
     : controller_(controller), codec_id_(codec_id), loop_(&kAsyncLoopConfigNeverAttachToThread) {
   ::memset(&dev_props_, 0, sizeof(dev_props_));
-  dev_props_[PROP_PROTOCOL].id = BIND_PROTOCOL;
-  dev_props_[PROP_PROTOCOL].value = ZX_PROTOCOL_IHDA_CODEC;
+  dev_props_[PROP_PROTOCOL] = ddk::MakeStrProperty(
+      bind_fuchsia::PROTOCOL,
+      static_cast<uint32_t>(bind_fuchsia_audio_intelhda::BIND_PROTOCOL_IHDA_CODEC));
 
   const auto& info = controller_.dev_info();
   snprintf(log_prefix_, sizeof(log_prefix_), "IHDA Codec %02x:%02x.%01x/%02x", info.bus_id,
@@ -206,10 +209,10 @@ zx_status_t HdaCodecConnection::PublishDevice() {
   args.name = name;
   args.ctx = this;
   args.ops = &CODEC_DEVICE_THUNKS;
-  args.proto_id = ZX_PROTOCOL_IHDA_CODEC;
+  args.proto_id = bind_fuchsia_audio_intelhda::BIND_PROTOCOL_IHDA_CODEC;
   args.proto_ops = &CODEC_PROTO_THUNKS;
-  args.props = dev_props_;
-  args.prop_count = std::size(dev_props_);
+  args.str_props = dev_props_;
+  args.str_prop_count = std::size(dev_props_);
 
   // Publish the device.
   zx_status_t res = device_add(controller_.dev_node(), &args, &dev_node_);

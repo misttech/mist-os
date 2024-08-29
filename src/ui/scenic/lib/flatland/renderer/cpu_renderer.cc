@@ -166,7 +166,7 @@ void CpuRenderer::Render(const allocation::ImageMetadata& render_target,
                          const std::vector<zx::event>& release_fences = {},
                          bool apply_color_conversion = false) {
   std::scoped_lock lock(lock_);
-  FX_DCHECK(images.size() == rectangles.size());
+  FX_CHECK(images.size() == rectangles.size());
   if (images.size() == 1) {
     // TODO(b/304596608): Handle the most basic case first (images[0]).
     // This should be extended to other cases later.
@@ -177,11 +177,12 @@ void CpuRenderer::Render(const allocation::ImageMetadata& render_target,
     uint32_t rectangle_width = static_cast<uint32_t>(rectangle.extent.x);
     uint32_t rectangle_height = static_cast<uint32_t>(rectangle.extent.y);
 
+    constexpr uint64_t kBytesPerPixel = 4;
+
     // |allocation::kInvalidImageId| indicates solid fill color. Create and fill vmo for common ops.
     if (image_id == allocation::kInvalidImageId) {
       image.width = rectangle_width;
       image.height = rectangle_height;
-      const auto kBytesPerPixel = 4;
       fuchsia::sysmem2::ImageFormatConstraints constraints;
       *constraints.mutable_pixel_format() = fuchsia::images2::PixelFormat::R8G8B8A8;
       *constraints.mutable_max_size() = {.width = rectangle_width, .height = rectangle_height};
@@ -206,34 +207,36 @@ void CpuRenderer::Render(const allocation::ImageMetadata& render_target,
     const auto& image_constraints = image_map_itr_->second.second;
 
     // Make sure the image conforms to the constraints of the collection.
-    FX_DCHECK(image.width <= image_constraints.max_size().width);
-    FX_DCHECK(image.height <= image_constraints.max_size().height);
+    FX_CHECK(image.width <= image_constraints.max_size().width);
+    FX_CHECK(image.height <= image_constraints.max_size().height);
 
     auto render_target_id = render_target.identifier;
-    FX_DCHECK(render_target_id != allocation::kInvalidId);
+    FX_CHECK(render_target_id != allocation::kInvalidId);
     const auto& render_target_map_itr_ = image_map_.find(render_target_id);
-    FX_DCHECK(render_target_map_itr_ != image_map_.end());
+    FX_CHECK(render_target_map_itr_ != image_map_.end());
     const auto& render_target_constraints = render_target_map_itr_->second.second;
 
-    // The image and render_target should be BGRA32 or R8G8B8A8.
     fuchsia::images2::PixelFormat image_type = image_constraints.pixel_format();
     fuchsia::images2::PixelFormat render_type = render_target_constraints.pixel_format();
-    FX_DCHECK(utils::Pixel::IsFormatSupported(image_type));
-    FX_DCHECK(utils::Pixel::IsFormatSupported(render_type));
+    FX_CHECK(utils::Pixel::IsFormatSupported(image_type));
+    FX_CHECK(utils::Pixel::IsFormatSupported(render_type));
 
     // The rectangle, image, and render_target should be compatible, e.g. the image dimensions are
     // equal to the rectangle dimensions and less than or equal to the render target dimensions.
-    FX_DCHECK(rectangle.orientation == fuchsia::ui::composition::Orientation::CCW_0_DEGREES);
-    FX_DCHECK(rectangle_width <= render_target.width);
-    FX_DCHECK(rectangle_height <= render_target.height);
-    FX_DCHECK(rectangle_width == image.width);
-    FX_DCHECK(rectangle_height == image.height);
-    FX_DCHECK(rectangle.origin.x == 0);
-    FX_DCHECK(rectangle.origin.y == 0);
+    FX_CHECK(rectangle.orientation == fuchsia::ui::composition::Orientation::CCW_0_DEGREES);
+    FX_CHECK(rectangle_width <= render_target.width);
+    FX_CHECK(rectangle_height <= render_target.height);
+    FX_CHECK(rectangle_width == image.width);
+    FX_CHECK(rectangle_height == image.height);
+    FX_CHECK(rectangle.origin.x == 0);
+    FX_CHECK(rectangle.origin.y == 0);
 
     auto image_pixels_per_row = utils::GetPixelsPerRow(image_constraints, image.width);
     auto render_target_pixels_per_row =
         utils::GetPixelsPerRow(render_target_constraints, render_target.width);
+
+    // Ensure that the inner loop below is using the correct size pixel format.
+    FX_CHECK(utils::Pixel(255, 255, 255, 255).ToFormat(render_type).size() == kBytesPerPixel);
 
     // Copy the image vmo into the render_target vmo.
     MapHostPointer(
@@ -244,9 +247,19 @@ void CpuRenderer::Render(const allocation::ImageMetadata& render_target,
                          [render_target_ptr, render_target_num_bytes, image, render_target,
                           image_pixels_per_row, render_target_pixels_per_row, image_type,
                           render_type](const uint8_t* image_ptr, uint32_t image_num_bytes) {
-                           FX_DCHECK(image_num_bytes <= render_target_num_bytes);
+                           // This is conservative, e.g. it will trigger if we have a 4-byte image
+                           // format and a 2-byte target format like RGB565.  The code below already
+                           // handles this case via `Pixel::FromVmo()` and `Pixel::ToFormat()`, so
+                           // if we trigger this CHECK we can simply relax this condition (after
+                           // verifying that we have sufficient test coverage).
+                           FX_CHECK(image_num_bytes <= render_target_num_bytes);
+
                            uint32_t min_height = std::min(image.height, render_target.height);
                            uint32_t min_width = std::min(image.width, render_target.width);
+
+                           // Avoid allocation in the inner loop.
+                           std::vector<uint8_t> color;
+                           color.reserve(kBytesPerPixel);
                            for (uint32_t y = 0; y < min_height; y++) {
                              // Copy image pixels into the render target.
                              //
@@ -256,9 +269,10 @@ void CpuRenderer::Render(const allocation::ImageMetadata& render_target,
                              for (uint32_t x = 0; x < min_width; x++) {
                                utils::Pixel pixel = utils::Pixel::FromVmo(
                                    image_ptr, image_pixels_per_row, x, y, image_type);
-                               std::vector<uint8_t> color = pixel.ToFormat(render_type);
-                               uint32_t start = y * render_target_pixels_per_row * 4 + x * 4;
-                               for (uint32_t offset = 0; offset < 4; offset++) {
+                               pixel.ToFormat(render_type, color);
+                               uint32_t start = y * render_target_pixels_per_row * kBytesPerPixel +
+                                                x * kBytesPerPixel;
+                               for (uint32_t offset = 0; offset < kBytesPerPixel; offset++) {
                                  render_target_ptr[start + offset] = color[offset];
                                }
                              }

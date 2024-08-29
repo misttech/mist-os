@@ -2,21 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::fs::devtmpfs::dev_tmp_fs;
-use crate::fs::ext4::ExtFilesystem;
-use crate::fs::functionfs::FunctionFs;
-use crate::fs::overlayfs::OverlayFs;
-use crate::fs::proc::proc_fs;
-use crate::fs::sysfs::sys_fs;
-use crate::fs::tmpfs::TmpFs;
-use crate::fs::tracefs::trace_fs;
 use crate::mutable_state::{state_accessor, state_implementation};
-use crate::security;
 use crate::task::{CurrentTask, EventHandler, Kernel, Task, WaitCanceler, Waiter};
 use crate::time::utc;
 use crate::vfs::buffers::InputBuffer;
 use crate::vfs::fs_registry::FsRegistry;
-use crate::vfs::fuse::{new_fuse_fs, new_fusectl_fs};
 use crate::vfs::socket::{SocketAddress, SocketHandle, UnixSocket};
 use crate::vfs::{
     fileops_impl_dataless, fileops_impl_delegate_read_and_seek, fileops_impl_nonseekable,
@@ -25,12 +15,11 @@ use crate::vfs::{
     FileSystemHandle, FileSystemOptions, FsNode, FsNodeHandle, FsNodeOps, FsStr, FsString,
     PathBuilder, RenameFlags, SimpleFileNode, SymlinkTarget, UnlinkKind,
 };
-use fidl_fuchsia_io as fio;
 use macro_rules_attribute::apply;
 use ref_cast::RefCast;
 use starnix_logging::log_warn;
 use starnix_sync::{
-    BeforeFsNodeAppend, DeviceOpen, FileOpsCore, LockBefore, Locked, Mutex, RwLock,
+    BeforeFsNodeAppend, DeviceOpen, FileOpsCore, LockBefore, Locked, Mutex, RwLock, Unlocked,
 };
 use starnix_uapi::arc_key::{ArcKey, PtrKey, WeakKey};
 use starnix_uapi::auth::UserAndOrGroupId;
@@ -687,21 +676,6 @@ impl fmt::Debug for Mount {
     }
 }
 
-pub trait FileSystemCreator {
-    fn kernel(&self) -> &Arc<Kernel>;
-
-    fn create_filesystem<L>(
-        &self,
-        locked: &mut Locked<'_, L>,
-        fs_type: &FsStr,
-        options: FileSystemOptions,
-    ) -> Result<FileSystemHandle, Errno>
-    where
-        L: LockBefore<DeviceOpen>,
-        L: LockBefore<FileOpsCore>,
-        L: LockBefore<BeforeFsNodeAppend>;
-}
-
 impl Kernel {
     pub fn get_next_mount_id(&self) -> u64 {
         self.next_mount_id.next()
@@ -716,74 +690,24 @@ impl Kernel {
     }
 }
 
-impl FileSystemCreator for Arc<Kernel> {
-    fn kernel(&self) -> &Arc<Kernel> {
-        self
-    }
-
-    fn create_filesystem<L>(
+impl CurrentTask {
+    pub fn create_filesystem(
         &self,
-        _locked: &mut Locked<'_, L>,
+        locked: &mut Locked<'_, Unlocked>,
         fs_type: &FsStr,
         options: FileSystemOptions,
-    ) -> Result<FileSystemHandle, Errno>
-    where
-        L: LockBefore<FileOpsCore>,
-        L: LockBefore<DeviceOpen>,
-    {
-        if let Some(result) =
-            self.expando.get::<FsRegistry>().create(self, fs_type, options.clone())
-        {
-            return result;
-        }
-        Ok(match &**fs_type {
-            b"remotefs" => crate::fs::fuchsia::create_remotefs_filesystem(
-                self,
-                self.container_data_dir
-                    .as_ref()
-                    .ok_or_else(|| errno!(EPERM, "Missing container data directory"))?,
-                options,
-                fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
-            )?,
-            b"tmpfs" => TmpFs::new_fs_with_options(self, options)?,
-            _ => {
-                return error!(ENODEV, fs_type);
-            }
-        })
-    }
-}
-
-impl FileSystemCreator for CurrentTask {
-    fn kernel(&self) -> &Arc<Kernel> {
-        (self as &Task).kernel()
-    }
-
-    fn create_filesystem<L>(
-        &self,
-        locked: &mut Locked<'_, L>,
-        fs_type: &FsStr,
-        options: FileSystemOptions,
-    ) -> Result<FileSystemHandle, Errno>
-    where
-        L: LockBefore<FileOpsCore>,
-        L: LockBefore<DeviceOpen>,
-        L: LockBefore<BeforeFsNodeAppend>,
-    {
-        let kernel = self.kernel();
-
-        match &**fs_type {
-            b"fuse" => new_fuse_fs(self, options),
-            b"fusectl" => new_fusectl_fs(self, options),
-            b"devtmpfs" => Ok(dev_tmp_fs(locked, self).clone()),
-            b"ext4" => ExtFilesystem::new_fs(locked, kernel, self, options),
-            b"functionfs" => FunctionFs::new_fs(self, options),
-            b"overlay" => OverlayFs::new_fs(locked, self, options),
-            b"proc" => Ok(proc_fs(self, options).clone()),
-            b"tracefs" => Ok(trace_fs(self, options).clone()),
-            b"selinuxfs" => security::new_selinux_fs(self, options),
-            b"sysfs" => Ok(sys_fs(self, options).clone()),
-            _ => kernel.create_filesystem(locked, fs_type, options),
-        }
+    ) -> Result<FileSystemHandle, Errno> {
+        // Please register new file systems via //src/starnix/modules/lib.rs, even if the file
+        // system is implemented inside starnix_core.
+        //
+        // Most file systems should be implemented as modules. The VFS provides various traits that
+        // let starnix_core integrate file systems without needing to depend on the file systems
+        // directly.
+        self.kernel()
+            .expando
+            .get::<FsRegistry>()
+            .create(locked, self, fs_type, options)
+            .ok_or_else(|| errno!(ENODEV, fs_type))?
     }
 }
 

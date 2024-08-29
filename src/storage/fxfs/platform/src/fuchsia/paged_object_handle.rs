@@ -406,8 +406,9 @@ impl PagedObjectHandle {
                 // Ranges must be returned in order.
                 assert!(range.start >= last_end);
                 last_end = range.end;
-                flush_batches
-                    .add_range(FlushRange { range, is_zero_range: modified_range.is_zero_range() });
+                let mode =
+                    if modified_range.is_zero_range() { BatchMode::Zero } else { BatchMode::Cow };
+                flush_batches.add_range(range, mode);
             }
         }
 
@@ -456,7 +457,7 @@ impl PagedObjectHandle {
         previous_content_size: u64,
         crtime: Option<Timestamp>,
         mtime: Option<Timestamp>,
-        flush_batch: Option<&FlushBatch>,
+        zero_batch: Option<FlushBatch>,
     ) -> Result<(), Error> {
         let mut transaction = self.new_transaction(None).await?;
         self.add_metadata_to_transaction(
@@ -468,7 +469,7 @@ impl PagedObjectHandle {
         )
         .await?;
 
-        if let Some(batch) = flush_batch {
+        if let Some(batch) = zero_batch.as_ref() {
             assert!(batch.dirty_byte_count == 0);
             batch.writeback_begin(self.vmo(), self.pager());
             batch
@@ -476,7 +477,7 @@ impl PagedObjectHandle {
                 .await?;
         }
         transaction.commit().await.context("Failed to commit transaction")?;
-        if let Some(batch) = flush_batch {
+        if let Some(batch) = zero_batch {
             batch.writeback_end(self.vmo(), self.pager());
         }
         Ok(())
@@ -490,6 +491,7 @@ impl PagedObjectHandle {
         mut previous_content_size: u64,
         crtime: Option<Timestamp>,
         mtime: Option<Timestamp>,
+        zero_batch: Option<FlushBatch>,
         flush_batches: Vec<FlushBatch>,
     ) -> Result<(), Error> {
         let pager = self.pager();
@@ -550,6 +552,18 @@ impl PagedObjectHandle {
 
             batch.writeback_end(vmo, pager);
             self.owner().report_pager_clean(batch.dirty_byte_count);
+        }
+
+        if let Some(zero_batch) = zero_batch {
+            assert!(zero_batch.dirty_byte_count == 0);
+            let mut transaction = self.new_transaction(None).await?;
+            zero_batch.writeback_begin(vmo, pager);
+            zero_batch
+                .add_to_transaction(&mut transaction, vmo, &self.handle, content_size)
+                .await
+                .context("zero batch add_to_transaction failed")?;
+            transaction.commit().await.context("failed to commit for zero batch")?;
+            zero_batch.writeback_end(vmo, pager);
         }
 
         // Before releasing the reservation, mark those pages as cleaned, since they weren't used.
@@ -617,6 +631,7 @@ impl PagedObjectHandle {
             batches: flush_batches,
             dirty_page_count: pages_to_flush,
             skipped_dirty_page_count: mut pages_not_flushed,
+            zero_batch,
         } = self.collect_flush_batches(content_size)?;
 
         // If pages were dirtied between getting the reservation and collecting the dirty ranges
@@ -647,14 +662,8 @@ impl PagedObjectHandle {
         }
 
         if pages_to_flush == 0 {
-            self.flush_metadata(
-                content_size,
-                previous_content_size,
-                crtime,
-                mtime,
-                flush_batches.first(),
-            )
-            .await?;
+            self.flush_metadata(content_size, previous_content_size, crtime, mtime, zero_batch)
+                .await?;
             dismiss_scopeguard(reservation_guard);
             self.inner.lock().unwrap().end_flush();
         } else {
@@ -665,6 +674,7 @@ impl PagedObjectHandle {
                 previous_content_size,
                 crtime,
                 mtime,
+                zero_batch,
                 flush_batches,
             )
             .await?
@@ -904,6 +914,12 @@ impl ObjectHandle for PagedObjectHandle {
     }
 }
 
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+enum BatchMode {
+    Zero,
+    Cow,
+}
+
 #[derive(Default, Debug)]
 struct FlushBatches {
     batches: Vec<FlushBatch>,
@@ -914,19 +930,28 @@ struct FlushBatches {
     /// The number of pages that were marked dirty but are not included in `batches` because they
     /// don't need to be flushed. These are pages that were beyond the VMO's content size.
     skipped_dirty_page_count: u64,
+
+    /// Any zero ranges get put into their own batch, so we can account for them with pager
+    /// writeback while still allowing us to shortcut a full data flush if we aren't actually
+    /// writing any data. Zero ranges don't actually add any metadata at the moment (and will error
+    /// if they do) so we don't need to split them up.
+    zero_batch: Option<FlushBatch>,
 }
 
 impl FlushBatches {
-    fn add_range(&mut self, range: FlushRange) {
+    fn add_range(&mut self, range: Range<u64>, mode: BatchMode) {
+        if mode == BatchMode::Zero {
+            let zero_batch = self.zero_batch.get_or_insert_with(|| FlushBatch::new(mode));
+            zero_batch.add_range(range);
+            return;
+        }
         if self.batches.is_empty() {
-            self.batches.push(FlushBatch::default());
+            self.batches.push(FlushBatch::new(mode));
         }
-        if !range.is_zero_range {
-            self.dirty_page_count += range.page_count();
-        }
+        self.dirty_page_count += how_many(range.end - range.start, zx::system_get_page_size());
         let mut remaining = self.batches.last_mut().unwrap().add_range(range);
         while let Some(range) = remaining {
-            let mut batch = FlushBatch::default();
+            let mut batch = FlushBatch::new(mode);
             remaining = batch.add_range(range);
             self.batches.push(batch);
         }
@@ -937,35 +962,40 @@ impl FlushBatches {
     }
 }
 
-#[derive(Default, Debug, PartialEq)]
+#[derive(Debug, PartialEq)]
 struct FlushBatch {
     /// The ranges to be flushed in this batch.
-    ranges: Vec<FlushRange>,
+    ranges: Vec<Range<u64>>,
 
     /// The number of bytes spanned by `ranges`, excluding zero ranges.
     dirty_byte_count: u64,
+
+    mode: BatchMode,
 }
 
 impl FlushBatch {
+    fn new(mode: BatchMode) -> Self {
+        Self { ranges: Vec::new(), dirty_byte_count: 0, mode }
+    }
+
     /// Adds `range` to this batch. If `range` doesn't entirely fit into this batch then the
     /// remaining part of the range is returned.
-    fn add_range(&mut self, range: FlushRange) -> Option<FlushRange> {
-        debug_assert!(range.range.start >= self.ranges.last().map_or(0, |r| r.range.end));
-        if range.is_zero_range {
+    fn add_range(&mut self, range: Range<u64>) -> Option<Range<u64>> {
+        debug_assert!(range.start >= self.ranges.last().map_or(0, |r| r.end));
+        if self.mode == BatchMode::Zero {
             self.ranges.push(range);
             return None;
         }
 
-        let split_point = range.range.start + (FLUSH_BATCH_SIZE - self.dirty_byte_count);
-        let (range, remaining) = range.range.split(split_point);
+        let split_point = range.start + (FLUSH_BATCH_SIZE - self.dirty_byte_count);
+        let (range, remaining) = range.split(split_point);
 
         if let Some(range) = range {
-            let range = FlushRange { range, is_zero_range: false };
-            self.dirty_byte_count += range.len();
+            self.dirty_byte_count += range.end - range.start;
             self.ranges.push(range);
         }
 
-        remaining.map(|range| FlushRange { range, is_zero_range: false })
+        remaining
     }
 
     fn page_count(&self) -> u64 {
@@ -973,19 +1003,18 @@ impl FlushBatch {
     }
 
     fn writeback_begin(&self, vmo: &zx::Vmo, pager: &Pager) {
+        let options = match self.mode {
+            BatchMode::Zero => zx::PagerWritebackBeginOptions::DIRTY_RANGE_IS_ZERO,
+            BatchMode::Cow => zx::PagerWritebackBeginOptions::empty(),
+        };
         for range in &self.ranges {
-            let options = if range.is_zero_range {
-                zx::PagerWritebackBeginOptions::DIRTY_RANGE_IS_ZERO
-            } else {
-                zx::PagerWritebackBeginOptions::empty()
-            };
-            pager.writeback_begin(vmo, range.range.clone(), options);
+            pager.writeback_begin(vmo, range.clone(), options);
         }
     }
 
     fn writeback_end(&self, vmo: &zx::Vmo, pager: &Pager) {
         for range in &self.ranges {
-            pager.writeback_end(vmo, range.range.clone());
+            pager.writeback_end(vmo, range.clone());
         }
     }
 
@@ -996,18 +1025,16 @@ impl FlushBatch {
         handle: &'a DataObjectHandle<FxVolume>,
         content_size: u64,
     ) -> Result<(), Error> {
-        for range in &self.ranges {
-            if range.is_zero_range {
+        if self.mode == BatchMode::Zero {
+            for range in &self.ranges {
                 // TODO(https://fxbug.dev/349447236): This doesn't seem to ever do anything, so
                 // this experimental assert is going to sit around for a bit to see if there is a
                 // case we aren't aware of.
                 let pre_zero_len = transaction.mutations().len();
-                handle
-                    .zero(transaction, range.range.clone())
-                    .await
-                    .context("zeroing a range failed")?;
+                handle.zero(transaction, range.clone()).await.context("zeroing a range failed")?;
                 assert_eq!(pre_zero_len, transaction.mutations().len());
             }
+            return Ok(());
         }
 
         if self.dirty_byte_count > 0 {
@@ -1017,10 +1044,7 @@ impl FlushBatch {
 
             let mut dirty_ranges = Vec::new();
             for range in &self.ranges {
-                if range.is_zero_range {
-                    continue;
-                }
-                let range = range.range.clone();
+                let range = range.clone();
                 let (head, tail) = slice.split_at_mut(
                     (std::cmp::min(range.end, content_size) - range.start).try_into().unwrap(),
                 );
@@ -1044,23 +1068,7 @@ impl FlushBatch {
     }
 
     fn end(&self) -> u64 {
-        self.ranges.last().map(|r| r.range.end).unwrap_or(0)
-    }
-}
-
-#[derive(Debug, PartialEq, Clone)]
-struct FlushRange {
-    range: Range<u64>,
-    is_zero_range: bool,
-}
-
-impl FlushRange {
-    fn len(&self) -> u64 {
-        self.range.end - self.range.start
-    }
-
-    fn page_count(&self) -> u64 {
-        how_many(self.range.end - self.range.start, zx::system_get_page_size())
+        self.ranges.last().map(|r| r.end).unwrap_or(0)
     }
 }
 
@@ -1554,103 +1562,53 @@ mod tests {
     }
 
     #[test]
-    fn test_flush_range() {
-        let range = FlushRange { range: 0..4096, is_zero_range: false };
-        assert_eq!(range.len(), 4096);
-        assert_eq!(range.page_count(), 1);
-
-        let range = FlushRange { range: 4096..8192, is_zero_range: false };
-        assert_eq!(range.len(), 4096);
-        assert_eq!(range.page_count(), 1);
-
-        let range = FlushRange { range: 4096..4608, is_zero_range: false };
-        assert_eq!(range.len(), 512);
-        assert_eq!(range.page_count(), 1);
-    }
-
-    #[test]
-    fn test_flush_batch_zero_ranges_do_not_count_towards_dirty_bytes() {
-        let mut flush_batch = FlushBatch::default();
-
-        assert_eq!(flush_batch.add_range(FlushRange { range: 0..4096, is_zero_range: true }), None);
-        assert_eq!(flush_batch.dirty_byte_count, 0);
-
-        let remaining = flush_batch
-            .add_range(FlushRange { range: 4096..FLUSH_BATCH_SIZE * 2, is_zero_range: false });
-        // The batch was filled up and the amount that couldn't fit was returned.
-        assert!(remaining.is_some());
-        assert_eq!(flush_batch.dirty_byte_count, FLUSH_BATCH_SIZE);
-
-        // Switching the extra amount to a zero range will cause it to  fit because it doesn't count
-        // towards the dirty bytes.
-        let mut remaining = remaining.unwrap();
-        remaining.is_zero_range = true;
-        assert_eq!(flush_batch.add_range(remaining), None);
-    }
-
-    #[test]
     fn test_flush_batch_page_count() {
-        let mut flush_batch = FlushBatch::default();
+        let mut flush_batch = FlushBatch::new(BatchMode::Cow);
         assert_eq!(flush_batch.page_count(), 0);
 
-        flush_batch.add_range(FlushRange { range: 0..4096, is_zero_range: true });
-        // Zero ranges don't count towards the page count.
-        assert_eq!(flush_batch.page_count(), 0);
-
-        flush_batch.add_range(FlushRange { range: 4096..8192, is_zero_range: false });
+        flush_batch.add_range(4096..8192);
         assert_eq!(flush_batch.page_count(), 1);
 
         // Adding a partial page rounds up to the next page. Only the page containing the content
         // size should be a partial page so handling multiple partial pages isn't necessary.
-        flush_batch.add_range(FlushRange { range: 8192..8704, is_zero_range: false });
+        flush_batch.add_range(8192..8704);
         assert_eq!(flush_batch.page_count(), 2);
     }
 
     #[test]
     fn test_flush_batch_add_range_splits_range() {
-        let mut flush_batch = FlushBatch::default();
+        let mut flush_batch = FlushBatch::new(BatchMode::Cow);
 
-        let remaining = flush_batch
-            .add_range(FlushRange { range: 0..(FLUSH_BATCH_SIZE + 4096), is_zero_range: false });
+        let remaining = flush_batch.add_range(0..(FLUSH_BATCH_SIZE + 4096));
         let remaining = remaining.expect("The batch should have run out of space");
-        assert_eq!(remaining.range, FLUSH_BATCH_SIZE..(FLUSH_BATCH_SIZE + 4096));
-        assert_eq!(remaining.is_zero_range, false);
+        assert_eq!(remaining, FLUSH_BATCH_SIZE..(FLUSH_BATCH_SIZE + 4096));
 
-        let range = FlushRange {
-            range: (FLUSH_BATCH_SIZE + 4096)..(FLUSH_BATCH_SIZE + 8192),
-            is_zero_range: false,
-        };
+        let range = (FLUSH_BATCH_SIZE + 4096)..(FLUSH_BATCH_SIZE + 8192);
         assert_eq!(flush_batch.add_range(range.clone()), Some(range));
     }
 
     #[test]
     fn test_flush_batches_add_range_huge_range() {
         let mut batches = FlushBatches::default();
-        batches.add_range(FlushRange {
-            range: 0..(FLUSH_BATCH_SIZE * 2 + 8192),
-            is_zero_range: false,
-        });
+        batches.add_range(0..(FLUSH_BATCH_SIZE * 2 + 8192), BatchMode::Cow);
         assert_eq!(batches.dirty_page_count, 258);
         assert_eq!(
             batches.batches,
             vec![
                 FlushBatch {
-                    ranges: vec![FlushRange { range: 0..FLUSH_BATCH_SIZE, is_zero_range: false }],
+                    ranges: vec![0..FLUSH_BATCH_SIZE],
                     dirty_byte_count: FLUSH_BATCH_SIZE,
+                    mode: BatchMode::Cow,
                 },
                 FlushBatch {
-                    ranges: vec![FlushRange {
-                        range: FLUSH_BATCH_SIZE..(FLUSH_BATCH_SIZE * 2),
-                        is_zero_range: false
-                    }],
+                    ranges: vec![FLUSH_BATCH_SIZE..(FLUSH_BATCH_SIZE * 2)],
                     dirty_byte_count: FLUSH_BATCH_SIZE,
+                    mode: BatchMode::Cow,
                 },
                 FlushBatch {
-                    ranges: vec![FlushRange {
-                        range: (FLUSH_BATCH_SIZE * 2)..(FLUSH_BATCH_SIZE * 2 + 8192),
-                        is_zero_range: false
-                    }],
+                    ranges: vec![(FLUSH_BATCH_SIZE * 2)..(FLUSH_BATCH_SIZE * 2 + 8192)],
                     dirty_byte_count: 8192,
+                    mode: BatchMode::Cow,
                 }
             ]
         );
@@ -1660,62 +1618,44 @@ mod tests {
     fn test_flush_batches_add_range_multiple_ranges() {
         let page_size = zx::system_get_page_size() as u64;
         let mut batches = FlushBatches::default();
-        batches.add_range(FlushRange { range: 0..page_size, is_zero_range: false });
-        batches.add_range(FlushRange { range: page_size..(page_size * 3), is_zero_range: true });
-        batches.add_range(FlushRange {
-            range: (page_size * 7)..(page_size * 150),
-            is_zero_range: false,
-        });
-        batches.add_range(FlushRange {
-            range: (page_size * 200)..(page_size * 500),
-            is_zero_range: true,
-        });
-        batches.add_range(FlushRange {
-            range: (page_size * 500)..(page_size * 650),
-            is_zero_range: false,
-        });
+        batches.add_range(0..page_size, BatchMode::Cow);
+        batches.add_range(page_size..(page_size * 3), BatchMode::Zero);
+        batches.add_range((page_size * 7)..(page_size * 150), BatchMode::Cow);
+        batches.add_range((page_size * 200)..(page_size * 500), BatchMode::Zero);
+        batches.add_range((page_size * 500)..(page_size * 650), BatchMode::Cow);
 
         assert_eq!(batches.dirty_page_count, 294);
         assert_eq!(
             batches.batches,
             vec![
                 FlushBatch {
-                    ranges: vec![
-                        FlushRange { range: 0..page_size, is_zero_range: false },
-                        FlushRange { range: page_size..(page_size * 3), is_zero_range: true },
-                        FlushRange {
-                            range: (page_size * 7)..(page_size * 134),
-                            is_zero_range: false
-                        },
-                    ],
+                    ranges: vec![0..page_size, (page_size * 7)..(page_size * 134),],
                     dirty_byte_count: FLUSH_BATCH_SIZE,
+                    mode: BatchMode::Cow,
                 },
                 FlushBatch {
                     ranges: vec![
-                        FlushRange {
-                            range: (page_size * 134)..(page_size * 150),
-                            is_zero_range: false
-                        },
-                        FlushRange {
-                            range: (page_size * 200)..(page_size * 500),
-                            is_zero_range: true,
-                        },
-                        FlushRange {
-                            range: (page_size * 500)..(page_size * 612),
-                            is_zero_range: false
-                        },
+                        (page_size * 134)..(page_size * 150),
+                        (page_size * 500)..(page_size * 612),
                     ],
                     dirty_byte_count: FLUSH_BATCH_SIZE,
+                    mode: BatchMode::Cow,
                 },
                 FlushBatch {
-                    ranges: vec![FlushRange {
-                        range: (page_size * 612)..(page_size * 650),
-                        is_zero_range: false
-                    }],
+                    ranges: vec![(page_size * 612)..(page_size * 650)],
                     dirty_byte_count: 38 * page_size,
+                    mode: BatchMode::Cow,
                 }
             ]
         );
+        assert_eq!(
+            batches.zero_batch,
+            Some(FlushBatch {
+                ranges: vec![page_size..(page_size * 3), (page_size * 200)..(page_size * 500),],
+                dirty_byte_count: 0,
+                mode: BatchMode::Zero,
+            })
+        )
     }
 
     #[test]

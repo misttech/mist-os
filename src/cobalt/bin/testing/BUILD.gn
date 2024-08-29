@@ -6,13 +6,13 @@ group("testing") {
   testonly = true
   deps = [
     ":fake_clock_lib",
-    "mock_cobalt",
+    "fake_cobalt",
   ]
 }
 
 group("tests") {
   testonly = true
-  deps = [ "mock_cobalt:tests" ]
+  deps = [ "fake_cobalt:tests" ]
 }
 
 source_set("stub_metric_event_logger_lib") {

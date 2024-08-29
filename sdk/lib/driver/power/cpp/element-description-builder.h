@@ -9,22 +9,17 @@
 #include <fidl/fuchsia.hardware.power/cpp/fidl.h>
 #include <fidl/fuchsia.power.broker/cpp/fidl.h>
 
-namespace fdf_power {
-class ParentElementHasher final {
- public:
-  /// Make a unique string as our hash key.
-  size_t operator()(const fuchsia_hardware_power::ParentElement& element) const;
-};
+#include "sdk/lib/driver/power/cpp/types.h"
 
-using TokenMap =
-    std::unordered_map<fuchsia_hardware_power::ParentElement, zx::event, ParentElementHasher>;
+namespace fdf_power {
+
+using TokenMap = std::unordered_map<ParentElement, zx::event>;
 
 using ElementDependencyMap =
-    std::unordered_map<fuchsia_hardware_power::ParentElement,
-                       std::vector<fuchsia_power_broker::LevelDependency>, ParentElementHasher>;
+    std::unordered_map<ParentElement, std::vector<fuchsia_power_broker::LevelDependency>>;
 
 struct ElementDesc {
-  fuchsia_hardware_power::wire::PowerElementConfiguration element_config_;
+  PowerElementConfiguration element_config;
   TokenMap tokens;
   zx::event assertive_token;
   zx::event opportunistic_token;
@@ -43,9 +38,8 @@ struct ElementDesc {
 
 class ElementDescBuilder {
  public:
-  explicit ElementDescBuilder(fuchsia_hardware_power::wire::PowerElementConfiguration config,
-                              TokenMap tokens)
-      : element_config_(config), tokens_(std::move(tokens)) {}
+  explicit ElementDescBuilder(PowerElementConfiguration config, TokenMap tokens)
+      : element_config(std::move(config)), tokens_(std::move(tokens)) {}
 
   /// Build an `ElementDesc` object based on the information we've been given.
   ///
@@ -81,7 +75,7 @@ class ElementDescBuilder {
       fidl::ServerEnd<fuchsia_power_broker::ElementControl> element_control);
 
  private:
-  fuchsia_hardware_power::wire::PowerElementConfiguration element_config_;
+  PowerElementConfiguration element_config;
   TokenMap tokens_;
   std::optional<zx::event> assertive_token_;
   std::optional<zx::event> opportunistic_token_;

@@ -18,14 +18,6 @@
     ],
     offer: [
         {
-            protocol: "fuchsia.logger.LogSink",
-            from: "parent",
-            to: [
-                "#mediasession",
-                "#mediasession-examples",
-            ],
-        },
-        {
             protocol: "fuchsia.media.UsageReporter",
             from: "#audio_core",
             to: "#mediasession",

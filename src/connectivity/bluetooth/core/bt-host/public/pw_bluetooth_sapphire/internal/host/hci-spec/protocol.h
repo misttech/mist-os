@@ -290,18 +290,6 @@ constexpr OpCode kWriteLocalName = ControllerAndBasebandOpCode(0x0013);
 // Read Local Name Command (v1.1) (BR/EDR)
 constexpr OpCode kReadLocalName = ControllerAndBasebandOpCode(0x0014);
 
-struct ReadLocalNameReturnParams {
-  // See enum StatusCode in hci_constants.h.
-  StatusCode status;
-
-  // A UTF-8 encoded User Friendly Descriptive Name for the device.
-  // If the name contained in the parameter is shorter than 248 octets, the end
-  // of the name is indicated by a NULL octet (0x00), and the following octets
-  // (to fill up 248 octets, which is the length of the parameter) do not have
-  // valid values.
-  uint8_t local_name[kMaxNameLength];
-} __attribute__((packed));
-
 // ==========================================
 // Write Page Timeout Command (v1.1) (BR/EDR)
 constexpr OpCode kWritePageTimeout = ControllerAndBasebandOpCode(0x0018);
@@ -317,19 +305,6 @@ constexpr OpCode kWriteScanEnable = ControllerAndBasebandOpCode(0x001A);
 // ===============================================
 // Read Page Scan Activity Command (v1.1) (BR/EDR)
 constexpr OpCode kReadPageScanActivity = ControllerAndBasebandOpCode(0x001B);
-
-struct ReadPageScanActivityReturnParams {
-  // See enum StatusCode in hci_constants.h.
-  StatusCode status;
-
-  // Page_Scan_Interval, in time slices (0.625ms)
-  // Range: kPageScanIntervalMin - kPageScanIntervalMax in hci_constants.h
-  uint16_t page_scan_interval;
-
-  // Page_Scan_Window, in time slices
-  // Range: kPageScanWindowMin - kPageScanWindowMax in hci_constants.h
-  uint16_t page_scan_window;
-} __attribute__((packed));
 
 // ================================================
 // Write Page Scan Activity Command (v1.1) (BR/EDR)
@@ -354,7 +329,6 @@ constexpr OpCode kWriteClassOfDevice = ControllerAndBasebandOpCode(0x0024);
 
 // =============================================
 // Write Automatic Flush Timeout Command (v1.1) (BR/EDR)
-
 constexpr OpCode kWriteAutomaticFlushTimeout =
     ControllerAndBasebandOpCode(0x0028);
 
@@ -370,14 +344,6 @@ constexpr OpCode kWriteSynchronousFlowControlEnable =
 // ===================================
 // Read Inquiry Scan Type (v1.2) (BR/EDR)
 constexpr OpCode kReadInquiryScanType = ControllerAndBasebandOpCode(0x0042);
-
-struct ReadInquiryScanTypeReturnParams {
-  // See enum StatusCode in hci_constants.h.
-  StatusCode status;
-
-  // See enum class InquiryScanType in hci_constants.h for possible values.
-  InquiryScanType inquiry_scan_type;
-} __attribute__((packed));
 
 // ====================================
 // Write Inquiry Scan Type (v1.2) (BR/EDR)
@@ -402,14 +368,6 @@ constexpr OpCode kWriteInquiryMode = ControllerAndBasebandOpCode(0x0045);
 // Read Page Scan Type (v1.2) (BR/EDR)
 constexpr OpCode kReadPageScanType = ControllerAndBasebandOpCode(0x0046);
 
-struct ReadPageScanTypeReturnParams {
-  // See enum StatusCode in hci_constants.h.
-  StatusCode status;
-
-  // See enum class PageScanType in hci_constants.h for possible values.
-  pw::bluetooth::emboss::PageScanType page_scan_type;
-} __attribute__((packed));
-
 // ====================================
 // Write Page Scan Type (v1.2) (BR/EDR)
 constexpr OpCode kWritePageScanType = ControllerAndBasebandOpCode(0x0047);
@@ -422,14 +380,6 @@ constexpr OpCode kWriteExtendedInquiryResponse =
 // ==============================================
 // Read Simple Pairing Mode (v2.1 + EDR) (BR/EDR)
 constexpr OpCode kReadSimplePairingMode = ControllerAndBasebandOpCode(0x0055);
-
-struct ReadSimplePairingModeReturnParams {
-  // See enum StatusCode in hci_constants.h
-  StatusCode status;
-
-  // Simple pairing Mode.
-  GenericEnableParam simple_pairing_mode;
-} __attribute__((packed));
 
 // ===============================================
 // Write Simple Pairing Mode (v2.1 + EDR) (BR/EDR)
@@ -988,15 +938,6 @@ constexpr OpCode kLELongTermKeyRequestNegativeReply =
 // ============================================
 // LE Read Supported States Command (v4.0) (LE)
 constexpr OpCode kLEReadSupportedStates = LEControllerCommandOpCode(0x001C);
-
-struct LEReadSupportedStatesReturnParams {
-  // See enum StatusCode in hci_constants.h.
-  StatusCode status;
-
-  // Bit-mask of supported state or state combinations. See Core Spec v4.2,
-  // Volume 2, Part E, Section 7.8.27 "LE Read Supported States Command".
-  uint64_t le_states;
-} __attribute__((packed));
 
 // ====================================
 // LE Receiver Test Command (v4.0) (LE)

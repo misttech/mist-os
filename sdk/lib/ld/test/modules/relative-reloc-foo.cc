@@ -4,6 +4,8 @@
 
 #include <stdint.h>
 
+#include "suffixed-symbol.h"
+
 namespace {
 
 const int val = 17;
@@ -11,7 +13,7 @@ const int* val_ptr = &val;
 
 }  // namespace
 
-extern "C" [[gnu::visibility("default")]] int64_t foo() {
+extern "C" [[gnu::visibility("default")]] int64_t SUFFIXED_SYMBOL(foo)() {
   const int** foo_ptr;
   // We need to take the address of `val_ptr` so the compiler doesn't optimize
   // this as a pc-relative load to `val`. Similarly, we need the compiler to

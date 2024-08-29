@@ -18,8 +18,10 @@
     "args": [
         "-kernel",
         "{{guest.kernel_image}}",
+    {{#if guest.zbi_image }}
         "-initrd",
         "{{guest.zbi_image}}",
+    {{/if}}
         "-m",
         "{{device.memory.quantity}}{{ua device.memory.units}}",
         "-smp",
@@ -236,9 +238,6 @@
             {{#if (eq host.os "macos")}}
                 "kernel.page-scanner.page-table-eviction-policy=never",
             {{/if}}
-        {{/if}}
-        {{#if (eq runtime.log_level "verbose")}}
-            "verbose",
         {{/if}}
         {{#if (eq device.cpu.architecture "riscv64")}}
         {{else}}

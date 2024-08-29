@@ -58,6 +58,8 @@ class IntelDspStream : public codecs::IntelHDADaiBase,
     completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
   }
   void WatchDelayInfo(WatchDelayInfoCompleter::Sync& completer) override;
+  void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_hardware_audio::RingBuffer>,
+                             fidl::UnknownMethodCompleter::Sync&) override;
 
  private:
   friend class fbl::RefPtr<IntelDspStream>;

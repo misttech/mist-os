@@ -3,10 +3,14 @@
 # found in the LICENSE file.
 
 import("//build/python/python_host_test.gni")
+import("//build/python/python_library.gni")
 
 if (is_host) {
   python_host_test("mem_digest_test") {
     main_source = "mem_digest_test.py"
+
+    #TODO(b/361301238): Either delete these scripts or add type annotation.
+    enable_mypy = false
     sources = [
       "digest.py",
       "mem_digest.py",
@@ -21,5 +25,10 @@ if (is_host) {
 
 group("tests") {
   testonly = true
-  public_deps = [ ":mem_digest_test($host_toolchain)" ]
+  public_deps = [
+    ":mem_digest_test($host_toolchain)",
+    "dataclasses_json_lite:tests",
+    "debug_json:tests",
+    "multidict:tests",
+  ]
 }

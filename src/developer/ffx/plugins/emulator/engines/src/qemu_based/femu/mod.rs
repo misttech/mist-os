@@ -134,16 +134,24 @@ impl EmulatorEngine for FemuEngine {
         cmd.args(&emulator_configuration.flags.options)
             .arg("-fuchsia")
             .args(&emulator_configuration.flags.args);
-        let extra_args = emulator_configuration
-            .flags
-            .kernel_args
-            .iter()
-            .map(|x| x.to_string())
-            .collect::<Vec<_>>()
-            .join(" ");
-        if extra_args.len() > 0 {
-            cmd.args(["-append", &extra_args]);
+
+        // Can't have kernel args if there is no kernel, but if there is a custom configuration template,
+        // add them anyway since the configuration and the custom template could be out of sync.
+        if emulator_configuration.guest.kernel_image.is_some()
+            || emulator_configuration.runtime.config_override
+        {
+            let extra_args = emulator_configuration
+                .flags
+                .kernel_args
+                .iter()
+                .map(|x| x.to_string())
+                .collect::<Vec<_>>()
+                .join(" ");
+            if extra_args.len() > 0 {
+                cmd.args(["-append", &extra_args]);
+            }
         }
+
         if self.data.get_emulator_configuration().flags.envs.len() > 0 {
             // Add environment variables if not already present.
             // This does not overwrite any existing values.
@@ -212,11 +220,15 @@ impl QemuBasedEngine for FemuEngine {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::qemu_based::tests::make_fake_sdk;
+    use crate::EngineBuilder;
     use emulator_instance::NetworkingMode;
     use std::ffi::OsStr;
+    use std::fs;
     use std::path::PathBuf;
+    use tempfile::tempdir;
 
-    #[test]
+    #[fuchsia::test]
     fn test_build_emulator_cmd() {
         let program_name = "/test_femu_bin";
         let mut cfg = EmulatorConfiguration::default();
@@ -233,7 +245,7 @@ mod tests {
             [(OsStr::new("FLAG_NAME_THAT_DOES_NOT_EXIST"), Some(OsStr::new("1")))]
         );
     }
-    #[test]
+    #[fuchsia::test]
     fn test_build_emulator_cmd_existing_env() {
         env::set_var("FLAG_NAME_THAT_DOES_EXIST", "preset_value");
         let program_name = "/test_femu_bin";
@@ -247,5 +259,56 @@ mod tests {
         let cmd = test_engine.build_emulator_cmd();
         assert_eq!(cmd.get_program(), program_name);
         assert_eq!(cmd.get_envs().collect::<Vec<_>>(), []);
+    }
+
+    #[fuchsia::test]
+    async fn test_build_cmd_with_custom_template() {
+        let env = ffx_config::test_init().await.expect("test env");
+        make_fake_sdk(&env).await;
+        let temp = tempdir().expect("cannot get tempdir");
+        let emu_instances = EmulatorInstances::new(temp.path().to_owned());
+
+        let mut cfg = EmulatorConfiguration::default();
+        let template_file = temp.path().join("custom-template.json");
+        fs::write(
+            &template_file,
+            r#"
+        {
+        "args": [
+            "-kernel",
+            "boot-shim.bin",
+            "-initrd",
+            "test.zbi"
+        ],
+        "envs": {},
+        "features": [],
+        "kernel_args": ["zircon.nodename=some-emu","TERM=dumb"],
+        "options": []
+        }"#,
+        )
+        .expect("custom template contents");
+        cfg.runtime.template = Some(template_file);
+        cfg.runtime.config_override = true;
+        let engine = EngineBuilder::new(emu_instances.clone())
+            .config(cfg.clone())
+            .engine_type(EngineType::Femu)
+            .build()
+            .await
+            .expect("engine built");
+
+        let cmd = engine.build_emulator_cmd();
+        let actual: Vec<_> = cmd.get_args().collect();
+
+        let expected = vec![
+            "-fuchsia",
+            "-kernel",
+            "boot-shim.bin",
+            "-initrd",
+            "test.zbi",
+            "-append",
+            "TERM=dumb zircon.nodename=some-emu",
+        ];
+
+        assert_eq!(actual, expected)
     }
 }

@@ -55,9 +55,9 @@
         // We cannot use a single service due to the lack of service merging.
         {
             service: [
+                "bootstrap.base-drivers",
                 "bootstrap.boot-drivers",
-                "bootstrap.full-pkg-drivers",
-                "bootstrap.pkg-drivers",
+                "bootstrap.full-drivers",
             ],
             availability: "optional",
         },

@@ -16,7 +16,6 @@ group("ffx") {
 
   public_deps = [
     ":ffx-defaults.json($host_toolchain)",
-    ":ffx_build_dir_config_file($default_toolchain)",
     ":ffx_tool($host_toolchain)",
     ":tests",
     "lib($host_toolchain)",
@@ -27,7 +26,6 @@ if (current_toolchain == default_toolchain) {
   _ffx_build_dir_config_data_file = "${target_gen_dir}/ffx-config-data.json"
 
   action("ffx_build_dir_config_file") {
-    testonly = true
     script = "write_ffx_config.py"
     inputs = [ _ffx_build_dir_config_data_file ]
 
@@ -112,6 +110,7 @@ if (current_toolchain == default_toolchain) {
 if (is_host) {
   group("ffx_tool") {
     deps = [
+      ":ffx_build_dir_config_file($default_toolchain)",
       ":host",
       "frontends/ffx:ffx_bin($host_toolchain)",
       "tools($host_toolchain)",

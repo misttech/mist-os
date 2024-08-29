@@ -3,5 +3,5 @@
 // found in the LICENSE file.
 
 /// Libraries for advertising, searching for, and connecting to BR/EDR Bluetooth profiles.
-@available(added=NEXT)
+@available(added=23)
 library fuchsia.bluetooth.bredr;

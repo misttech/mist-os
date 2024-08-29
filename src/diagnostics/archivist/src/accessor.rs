@@ -207,9 +207,9 @@ impl ArchiveAccessorServer {
                     _ => return Err(AccessorError::InvalidSelectors("unrecognized selectors")),
                 };
 
-                let static_selectors_matchers = pipeline.static_selectors_matchers();
+                let static_hierarchy_allowlist = pipeline.static_hierarchy_allowlist();
                 let unpopulated_container_vec =
-                    inspect_repo.fetch_inspect_data(&selectors, static_selectors_matchers);
+                    inspect_repo.fetch_inspect_data(&selectors, static_hierarchy_allowlist);
 
                 let per_component_budget_opt = if unpopulated_container_vec.is_empty() {
                     None

@@ -7,7 +7,7 @@ using zx;
 
 /// A payload of data sourced from or sent to a protocol or service on the
 /// remote peer.
-@available(added=NEXT)
+@available(added=23)
 type Packet = struct {
     packet vector<byte>:MAX;
 };
@@ -16,7 +16,7 @@ type Packet = struct {
 /// serves as a token to keeping the `Channel` open. Closing this protocol (and
 /// the associated `socket` for BR/EDR channels) will close the underlying
 /// channel.
-@available(added=NEXT)
+@available(added=23)
 open protocol Channel {
     /// Send multiple packets of data over the channel. Only one `Send`
     /// may be pending at a time.
@@ -55,7 +55,7 @@ open protocol Channel {
 /// peer rejects the requested mode, the channel will fail to be established.
 ///
 /// For a description of each mode, see Bluetooth Spec v5.4, Vol 3, Part A, Sec 2.4.
-@available(added=NEXT)
+@available(added=23)
 type ChannelMode = flexible enum {
     /// BR/EDR only.
     BASIC = 1;
@@ -69,7 +69,7 @@ type ChannelMode = flexible enum {
 
 /// Authentication and permission requirements to access an advertised service.
 /// BR/EDR only.
-@available(added=NEXT)
+@available(added=23)
 type SecurityRequirements = table {
     /// If present and true, the physical link must be authenticated with
     /// on-path attacker protection to access this service.  If missing then
@@ -85,7 +85,7 @@ type SecurityRequirements = table {
 
 /// The set of parameters to use or that were used to establish an L2CAP
 /// connection-oriented channel.
-@available(added=NEXT)
+@available(added=23)
 type ChannelParameters = table {
     /// Optional.
     /// For BR/EDR: If not provided, BASIC will be used.

@@ -3,88 +3,122 @@
 // found in the LICENSE file.
 
 #include "src/storage/f2fs/f2fs.h"
+#include "src/storage/f2fs/storage_buffer.h"
 
 namespace f2fs {
 
-Writer::Writer(BcacheMapper *bcache_mapper, size_t capacity) : bcache_mapper_(bcache_mapper) {
-  write_buffer_ =
-      std::make_unique<StorageBuffer>(bcache_mapper, capacity, kBlockSize, "WriteBuffer");
+Writer::Writer(std::unique_ptr<StorageBufferPool> pool)
+    : max_block_address_(pool->Block()->Maxblk()), bcache_mapper_(pool->Block()) {
+  pool_ = std::move(pool);
 }
 
 Writer::~Writer() {
-  sync_completion_t completion;
-  ScheduleWriteBlocks(&completion);
-  ZX_ASSERT(sync_completion_wait(&completion, ZX_TIME_INFINITE) == ZX_OK);
+  Sync();
   executor_.Terminate();
   writeback_executor_.Terminate();
 }
 
-StorageOperations Writer::MakeStorageOperations(PageList &to_submit) {
-  {
-    std::lock_guard lock(mutex_);
-    while (!pages_.is_empty()) {
-      auto page = pages_.pop_front();
-      auto num_pages_or = write_buffer_->ReserveWriteOperation(*page);
-      if (num_pages_or.is_error()) {
-        if (num_pages_or.status_value() == ZX_ERR_UNAVAILABLE) {
-          // No available buffers. Need to submit pending StorageOperations to free buffers.
-          pages_.push_front(std::move(page));
-          break;
-        }
-        // If |page| has an invalid addr, just drop it.
-        to_submit.push_back(std::move(page));
-      } else {
-        to_submit.push_back(std::move(page));
-        if (num_pages_or.value() >= kDefaultBlocksPerSegment) {
-          // Merged enough StorageOperations. Submit it.
-          break;
-        }
-      }
-    }
-  }
-  return write_buffer_->TakeWriteOperations();
+void Writer::Sync() {
+  sync_completion_t completion;
+  ScheduleWriteBlocks(&completion);
+  ZX_ASSERT_MSG(sync_completion_wait(&completion, zx::sec(kWriteTimeOut).get()) == ZX_OK,
+                "FlushDirtyMetaPages() timeout");
 }
 
-fpromise::promise<> Writer::GetTaskForWriteIO(sync_completion_t *completion) {
-  return fpromise::make_promise([this, completion]() mutable {
-    while (true) {
-      PageList pages;
-      auto operations = MakeStorageOperations(pages);
-      if (operations.IsEmpty()) {
+zx::result<storage::Operation> Writer::PageToOperation(OwnedStorageBuffer &buffer, Page &page) {
+  if (!IsValidBlockAddr(page.GetBlockAddr()) || page.GetBlockAddr() >= max_block_address_) {
+    return zx::error(ZX_ERR_INVALID_ARGS);
+  }
+
+  zx::result index_or = buffer->Reserve(1);
+  if (index_or.is_error()) {
+    return zx::error(ZX_ERR_UNAVAILABLE);
+  }
+
+  storage::OperationType type = storage::OperationType::kWrite;
+  if (page.IsCommit()) {
+    type = storage::OperationType::kWritePreflushAndFua;
+    page.ClearCommit();
+  } else if (page.IsSync()) {
+    type = storage::OperationType::kWriteFua;
+    page.ClearSync();
+  }
+
+  storage::Operation op = {
+      .type = type,
+      .vmo_offset = *index_or,
+      .dev_offset = page.GetBlockAddr(),
+      .length = 1,
+  };
+  // Copy data of |page| to |buffer|
+  page.Read(buffer->Data(op.vmo_offset));
+  return zx::ok(op);
+}
+
+std::vector<storage::BufferedOperation> Writer::BuildBufferedOperation(OwnedStorageBuffer &buffer,
+                                                                       PageList &pages,
+                                                                       PageList &to_submit) {
+  fs::BufferedOperationsBuilder builder;
+  NotifyWriteback notifier;
+  while (!pages.is_empty()) {
+    auto page = pages.pop_front();
+    zx::result operation_or = PageToOperation(buffer, *page);
+    if (operation_or.is_error()) {
+      if (operation_or.error_value() == ZX_ERR_UNAVAILABLE) {
+        // No available buffers. Need to submit pending StorageOperations to free buffers.
+        pages.push_front(std::move(page));
+        return builder.TakeOperations();
+      }
+      // If |page| has an invalid addr, notify waiters.
+      if (page->IsUptodate()) {
+        FX_LOGS(ERROR) << "(" << page->GetKey() << ": " << page->GetVnode().GetKey()
+                       << ") page has an invalid addr: " << page->GetBlockAddr();
+      }
+      notifier.ReserveNotify(std::move(page));
+      continue;
+    }
+    to_submit.push_back(std::move(page));
+    builder.Add(*operation_or, &buffer->GetVmoBuffer());
+  }
+  return builder.TakeOperations();
+}
+
+fpromise::promise<> Writer::GetTaskForWriteIO(PageList to_submit, sync_completion_t *completion) {
+  return fpromise::make_promise([this, to_submit = std::move(to_submit), completion]() mutable {
+    while (!to_submit.is_empty()) {
+      PageList submitted;
+      OwnedStorageBuffer buffer = pool_->Get(kDefaultBlocksPerSegment);
+      auto operations = BuildBufferedOperation(buffer, to_submit, submitted);
+      if (operations.empty()) {
         break;
       }
-      zx_status_t io_status = bcache_mapper_->RunRequests(operations.TakeOperations());
-      if (auto ret = operations.Completion(
-              io_status,
-              [pages = std::move(pages)](const StorageOperations &operation,
-                                         zx_status_t io_status) mutable {
-                NotifyWriteback notifier;
-                while (!pages.is_empty()) {
-                  auto page = pages.pop_front();
-                  // The instance of a Vnode is alive when it has any writeback pages.
-                  if (io_status != ZX_OK) {
-                    LockedPage locked_page(page);
-                    // It is safe to get |page| locked since waiters do not acquire the lock.
-                    if (locked_page->GetVnode().IsMeta() || io_status == ZX_ERR_UNAVAILABLE ||
-                        io_status == ZX_ERR_PEER_CLOSED) {
-                      // When it fails to write metadata or the block device is not available,
-                      // set kCpErrorFlag to enter read-only mode.
-                      locked_page->fs()->GetSuperblockInfo().SetCpFlags(CpFlag::kCpErrorFlag);
-                    } else {
-                      // When IO errors occur with node and data Pages, just set a dirty flag
-                      // to retry it with another LBA.
-                      locked_page.SetDirty();
-                    }
-                  }
-                  if (page->GetVnode().IsNode()) {
-                    fbl::RefPtr<NodePage>::Downcast(page)->SetFsyncMark(false);
-                  }
-                  page->ClearColdData();
-                  notifier.ReserveNotify(std::move(page));
-                }
-              });
-          ret != ZX_OK) {
-        FX_LOGS(WARNING) << "failed to write blocks. " << zx_status_get_string(ret);
+      zx_status_t io_status = bcache_mapper_->RunRequests(operations);
+      NotifyWriteback notifier;
+      while (!submitted.is_empty()) {
+        auto page = submitted.pop_front();
+        // The instance of page->GetVnode() is alive as long as it has any writeback pages.
+        if (io_status != ZX_OK) {
+          if (page->GetVnode().IsMeta() || io_status == ZX_ERR_UNAVAILABLE ||
+              io_status == ZX_ERR_PEER_CLOSED) {
+            // When it fails to write metadata or the block device is not available,
+            // set kCpErrorFlag to enter read-only mode.
+            page->fs()->GetSuperblockInfo().SetCpFlags(CpFlag::kCpErrorFlag);
+          } else {
+            // When IO errors occur with node and data Pages, just set a dirty flag
+            // to retry it with another LBA.
+            LockedPage locked_page = LockedPage(page, std::try_to_lock);
+            if (locked_page) {
+              locked_page.SetDirty();
+            } else {
+              page->SetDirty();
+            }
+          }
+        }
+        if (page->GetVnode().IsNode()) {
+          fbl::RefPtr<NodePage>::Downcast(page)->SetFsyncMark(false);
+        }
+        page->ClearColdData();
+        notifier.ReserveNotify(std::move(page));
       }
     }
     if (completion) {
@@ -94,22 +128,19 @@ fpromise::promise<> Writer::GetTaskForWriteIO(sync_completion_t *completion) {
   });
 }
 
-void Writer::ScheduleTask(fpromise::promise<> task) {
-  executor_.schedule_task(sequencer_.wrap(std::move(task)));
-}
-
 void Writer::ScheduleWriteback(fpromise::promise<> task) {
   writeback_executor_.schedule_task(std::move(task));
 }
 
 void Writer::ScheduleWriteBlocks(sync_completion_t *completion, PageList pages, bool flush) {
-  if (!pages.is_empty()) {
+  bool need_flush = completion != nullptr || flush;
+  if (!pages.is_empty() || need_flush) {
     std::lock_guard lock(mutex_);
     pages_.splice(pages_.end(), pages);
-  }
-  if (flush || completion) {
-    auto task = GetTaskForWriteIO(completion);
-    ScheduleTask(std::move(task));
+    // Submit |pages_| when too many pages are waiting for writeback or |need_flush| is set.
+    if (need_flush || pages_.size() >= kDefaultBlocksPerSegment) {
+      executor_.schedule_task(sequencer_.wrap(GetTaskForWriteIO(std::move(pages_), completion)));
+    }
   }
 }
 

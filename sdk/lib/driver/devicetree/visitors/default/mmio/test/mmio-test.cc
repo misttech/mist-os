@@ -42,10 +42,18 @@ TEST(MmioVisitorTest, ReadRegSuccessfully) {
   ASSERT_EQ(3lu, mmio->size());
   ASSERT_EQ(REG_A_BASE, *(*mmio)[0].base());
   ASSERT_EQ(static_cast<uint64_t>(REG_A_LENGTH), *(*mmio)[0].length());
+  ASSERT_TRUE((*mmio)[0].name().has_value());
+  ASSERT_EQ(*(*mmio)[0].name(), "reg-a");
+
   ASSERT_EQ((uint64_t)REG_B_BASE_WORD0 << 32 | REG_B_BASE_WORD1, *(*mmio)[1].base());
   ASSERT_EQ((uint64_t)REG_B_LENGTH_WORD0 << 32 | REG_B_LENGTH_WORD1, *(*mmio)[1].length());
+  ASSERT_TRUE((*mmio)[1].name().has_value());
+  ASSERT_EQ(*(*mmio)[1].name(), "reg-b");
+
   ASSERT_EQ((uint64_t)REG_C_BASE_WORD0 << 32 | REG_C_BASE_WORD1, *(*mmio)[2].base());
   ASSERT_EQ((uint64_t)REG_C_LENGTH_WORD0 << 32 | REG_C_LENGTH_WORD1, *(*mmio)[2].length());
+  ASSERT_TRUE((*mmio)[2].name().has_value());
+  ASSERT_EQ(*(*mmio)[2].name(), "reg-c");
 }
 
 TEST(MmioVisitorTest, TranslateRegSuccessfully) {

@@ -38,10 +38,7 @@
             to: "#codec_factory",
         },
         {
-            protocol: [
-                "fuchsia.logger.LogSink",
-                "fuchsia.sysinfo.SysInfo",
-            ],
+            protocol: [ "fuchsia.sysinfo.SysInfo" ],
             from: "parent",
             to: "#codec_factory",
         },

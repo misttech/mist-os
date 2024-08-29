@@ -149,7 +149,7 @@ closed protocol RadarBurstReader {
         2: error StatusCode;
     });
 
-    @available(removed=17)
+    @available(removed=16)
     strict -> OnBurst2(flexible union {
         1: burst Burst;
         2: error StatusCode;

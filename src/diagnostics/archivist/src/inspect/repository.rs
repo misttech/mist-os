@@ -6,8 +6,7 @@ use crate::identity::ComponentIdentity;
 use crate::inspect::container::{
     InspectArtifactsContainer, InspectHandle, UnpopulatedInspectDataContainer,
 };
-use crate::pipeline::Pipeline;
-use diagnostics_hierarchy::HierarchyMatcher;
+use crate::pipeline::{Pipeline, StaticHierarchyAllowlist};
 use fidl::endpoints::ClientEnd;
 use fidl::{AsHandleRef, HandleBased};
 use fidl_fuchsia_diagnostics::Selector;
@@ -15,7 +14,6 @@ use flyweights::FlyStr;
 use fuchsia_sync::{RwLock, RwLockWriteGuard};
 use futures::channel::{mpsc, oneshot};
 use futures::prelude::*;
-use moniker::ExtendedMoniker;
 use std::collections::HashMap;
 use std::sync::{Arc, Weak};
 use tracing::{debug, warn};
@@ -54,9 +52,9 @@ impl InspectRepository {
     pub fn fetch_inspect_data(
         &self,
         component_selectors: &Option<Vec<Selector>>,
-        moniker_to_static_matcher_map: Option<HashMap<ExtendedMoniker, Arc<HierarchyMatcher>>>,
+        static_allowlist: StaticHierarchyAllowlist,
     ) -> Vec<UnpopulatedInspectDataContainer> {
-        self.inner.read().fetch_inspect_data(component_selectors, moniker_to_static_matcher_map)
+        self.inner.read().fetch_inspect_data(component_selectors, static_allowlist)
     }
 
     fn add_inspect_artifacts(
@@ -262,28 +260,16 @@ impl InspectRepositoryInner {
     fn fetch_inspect_data(
         &self,
         all_dynamic_selectors: &Option<Vec<Selector>>,
-        moniker_to_static_matcher_map: Option<HashMap<ExtendedMoniker, Arc<HierarchyMatcher>>>,
+        static_allowlist: StaticHierarchyAllowlist,
     ) -> Vec<UnpopulatedInspectDataContainer> {
         let mut containers = vec![];
         for (identity, container) in self.diagnostics_containers.iter() {
-            let optional_hierarchy_matcher = match &moniker_to_static_matcher_map {
-                Some(map) => {
-                    match map.get(&identity.moniker) {
-                        Some(inspect_matcher) => Some(Arc::clone(inspect_matcher)),
-                        // Return early if there were static selectors, and none were for this
-                        // moniker.
-                        None => continue,
-                    }
-                }
-                None => None,
-            };
+            let component_allowlist = static_allowlist.get(&identity.moniker);
 
             // This artifact contains inspect and matches a passed selector.
-            if let Some(unpopulated) = container.create_unpopulated(
-                identity,
-                optional_hierarchy_matcher,
-                all_dynamic_selectors,
-            ) {
+            if let Some(unpopulated) =
+                container.create_unpopulated(identity, component_allowlist, all_dynamic_selectors)
+            {
                 containers.push(unpopulated);
             }
         }
@@ -317,6 +303,7 @@ mod tests {
     use fidl_fuchsia_inspect as finspect;
     use fuchsia_inspect::{Inspector, InspectorConfig};
     use fuchsia_zircon::DurationNum;
+    use moniker::ExtendedMoniker;
     use selectors::FastError;
     use std::sync::LazyLock;
 
@@ -393,7 +380,7 @@ mod tests {
         data_repo
             .add_inspect_handle(Arc::clone(&identity), InspectHandle::tree(proxy, Some("test")));
         assert!(data_repo.inner.read().get(&identity).is_some());
-        assert!(pipeline.static_selectors_matchers().unwrap().contains_key(&moniker));
+        assert!(pipeline.static_hierarchy_allowlist().component_was_added(&moniker));
 
         // When the directory disconnects, both the pipeline matchers and the repo are cleaned
         drop(server_end);
@@ -401,7 +388,7 @@ mod tests {
             fasync::Timer::new(fasync::Time::after(100_i64.millis())).await;
         }
 
-        assert!(!pipeline.static_selectors_matchers().unwrap().contains_key(&moniker));
+        assert!(!pipeline.static_hierarchy_allowlist().component_was_added(&moniker));
     }
 
     #[fuchsia::test]
@@ -423,21 +410,49 @@ mod tests {
         data_repo
             .add_inspect_handle(Arc::clone(&identity2), InspectHandle::tree(proxy, Some("test")));
 
-        assert_eq!(2, data_repo.inner.read().fetch_inspect_data(&None, None).len());
+        assert_eq!(
+            2,
+            data_repo
+                .inner
+                .read()
+                .fetch_inspect_data(&None, StaticHierarchyAllowlist::new_disabled())
+                .len()
+        );
 
         let selectors = Some(vec![
             selectors::parse_selector::<FastError>("a/b/foo:root").expect("parse selector")
         ]);
-        assert_eq!(1, data_repo.inner.read().fetch_inspect_data(&selectors, None).len());
+        assert_eq!(
+            1,
+            data_repo
+                .inner
+                .read()
+                .fetch_inspect_data(&selectors, StaticHierarchyAllowlist::new_disabled())
+                .len()
+        );
 
         let selectors = Some(vec![
             selectors::parse_selector::<FastError>("a/b/f*:root").expect("parse selector")
         ]);
-        assert_eq!(2, data_repo.inner.read().fetch_inspect_data(&selectors, None).len());
+        assert_eq!(
+            2,
+            data_repo
+                .inner
+                .read()
+                .fetch_inspect_data(&selectors, StaticHierarchyAllowlist::new_disabled())
+                .len()
+        );
 
         let selectors =
             Some(vec![selectors::parse_selector::<FastError>("foo:root").expect("parse selector")]);
-        assert_eq!(0, data_repo.inner.read().fetch_inspect_data(&selectors, None).len());
+        assert_eq!(
+            0,
+            data_repo
+                .inner
+                .read()
+                .fetch_inspect_data(&selectors, StaticHierarchyAllowlist::new_disabled())
+                .len()
+        );
     }
 
     #[fuchsia::test]

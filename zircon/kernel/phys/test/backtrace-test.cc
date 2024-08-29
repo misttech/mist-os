@@ -91,15 +91,36 @@ namespace {
 
 [[gnu::noinline]] PHYS_SINGLETHREAD ptrdiff_t Foo() { return Otter() - 1; }
 
+extern "C" [[gnu::noinline]] PHYS_SINGLETHREAD ptrdiff_t CalledFromAsmWithPrologue() {
+  return Otter() - 1;
+}
+
+// To test assembly macros used on various platforms, we need to call a function
+// that uses .prologue.fp/.epilogue.fp, and ensure that the macros follow the
+// calling convention for each target architecture.
+extern "C" ptrdiff_t CallerWithAsmPrologue();
+
+ptrdiff_t PHYS_SINGLETHREAD CheckAsmMacros() {
+  ptrdiff_t entry_depth = Foo();
+  ptrdiff_t from_asm_depth = CallerWithAsmPrologue();
+  ptrdiff_t exit_depth = Foo();
+  ZX_ASSERT(exit_depth == entry_depth);
+  return from_asm_depth;
+}
+
 }  // namespace
 
 [[gnu::noinline]] int TestMain(void* zbi, arch::EarlyTicks) {
   MainSymbolize symbolize("backtrace-test");
 
   if (zbi && static_cast<zbi_header_t*>(zbi)->type == ZBI_TYPE_CONTAINER) {
-    ZX_ASSERT(Foo() == 4);  // _start -> PhysMain -> ZbiMain -> TestMain -> Foo
+    ZX_ASSERT(Foo() == 4);  // _start -> PhysMain -> ZbiMain -> TestMain -> Foo -> Otter...
+    ZX_ASSERT(CheckAsmMacros() ==
+              5);  // _start -> PhysMain -> ZbiMain -> TestMain -> CallerWithAsmPrologue -> Otter...
   } else {
-    ZX_ASSERT(Foo() == 3);  // _start -> PhysMain -> TestMain -> Foo...
+    ZX_ASSERT(Foo() == 3);             // _start -> PhysMain -> TestMain -> Foo -> Otter...
+    ZX_ASSERT(CheckAsmMacros() == 4);  // _start -> PhysMain -> TestMain -> CallerWithAsmPrologue ->
+                                       // CalledFromAsmWithPrologue -> Otter...
   }
   return 0;
 }

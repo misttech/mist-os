@@ -9,14 +9,11 @@ Updates the Fuchsia platform version.
 import argparse
 import json
 import os
-import re
 import secrets
-import shutil
 import sys
-from pathlib import Path
 
 
-def generate_random_abi_revision(already_used: set[int]) -> int:
+def _generate_random_abi_revision(already_used: set[int]) -> int:
     """Generates a random 64-bit ABI revision, avoiding values in
     `already_used` and other reserved ranges."""
     while True:
@@ -58,7 +55,7 @@ def update_version_history(
                     )
                     return False
 
-            abi_revision = generate_random_abi_revision(
+            abi_revision = _generate_random_abi_revision(
                 set(int(v["abi_revision"], 16) for v in versions.values())
             )
             versions[str(fuchsia_api_level)] = dict(
@@ -69,6 +66,8 @@ def update_version_history(
             )
             f.seek(0)
             json.dump(version_history, f, indent=4)
+            # JSON dump does not include a new line at the end.
+            f.write("\n")
             f.truncate()
             return True
     except FileNotFoundError:
@@ -82,15 +81,13 @@ Did you run this script from the root of the source tree?""".format(
         return False
 
 
-def create_owners_file_for_in_development_level(level_dir_path: str) -> None:
-    """Creates an OWNERS file in `level_dir_path` that allows a wider set of
-    reviewers while the level is in development.
-    """
+def _create_owners_file(level_dir_path: str) -> None:
+    """Creates an OWNERS file in `level_dir_path` with limited approvers."""
     owners_path = os.path.join(level_dir_path, "OWNERS")
 
     print(f"Creating {owners_path}")
     with open(owners_path, "w") as f:
-        f.write("include /sdk/history/IN_DEVELOPMENT_API_LEVEL_OWNERS\n")
+        f.write("include /sdk/history/FROZEN_API_LEVEL_OWNERS\n")
 
 
 def main() -> int:
@@ -118,7 +115,7 @@ def main() -> int:
         print(f"Failed to create directory for new level: {e}")
         return 1
 
-    create_owners_file_for_in_development_level(level_dir_path)
+    _create_owners_file(level_dir_path)
 
     # TODO(https://fxbug.dev/349622444): Automate this.
     # TODO(https://fxbug.dev/349622444): If this is automated, enable building

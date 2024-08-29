@@ -6,8 +6,9 @@ use crate::constants;
 use crate::diagnostics::{GlobalConnectionStats, TRACE_CATEGORY};
 use crate::identity::ComponentIdentity;
 use crate::inspect::collector::{self as collector, InspectData};
+use crate::pipeline::ComponentAllowlist;
 use diagnostics_data::{self as schema, InspectHandleName};
-use diagnostics_hierarchy::{DiagnosticsHierarchy, HierarchyMatcher};
+use diagnostics_hierarchy::DiagnosticsHierarchy;
 use fidl::endpoints::Proxy;
 use flyweights::FlyStr;
 use fuchsia_async::{self as fasync, DurationExt, TimeoutExt};
@@ -146,10 +147,14 @@ impl InspectArtifactsContainer {
     pub fn create_unpopulated(
         &self,
         identity: &Arc<ComponentIdentity>,
-        matcher: Option<Arc<HierarchyMatcher>>,
+        allowlist: ComponentAllowlist,
         dynamic_selectors: &Option<impl AsRef<[fdiagnostics::Selector]>>,
     ) -> Option<UnpopulatedInspectDataContainer> {
         if self.inspect_handles.is_empty() {
+            return None;
+        }
+
+        if allowlist.all_filtered_out() {
             return None;
         }
 
@@ -168,7 +173,7 @@ impl InspectArtifactsContainer {
 
         Some(UnpopulatedInspectDataContainer {
             identity: Arc::clone(identity),
-            inspect_matcher: matcher,
+            component_allowlist: allowlist,
             inspect_handles: self
                 .inspect_handles
                 .values()
@@ -394,9 +399,7 @@ pub struct PopulatedInspectDataContainer {
     /// moniker, along with the metadata needed to populate
     /// this snapshot's diagnostics schema.
     pub snapshot: SnapshotData,
-    /// Optional hierarchy matcher. If unset, the reader is running
-    /// in all-access mode, meaning no matching or filtering is required.
-    pub inspect_matcher: Option<Arc<HierarchyMatcher>>,
+    pub component_allowlist: ComponentAllowlist,
 }
 
 enum Status {
@@ -466,7 +469,7 @@ impl State {
                         let result = PopulatedInspectDataContainer {
                             identity: Arc::clone(&self.unpopulated.identity),
                             snapshot,
-                            inspect_matcher: self.unpopulated.inspect_matcher.clone(),
+                            component_allowlist: self.unpopulated.component_allowlist.clone(),
                         };
                         self.add_elapsed_time(start_time);
                         return Some((result, self));
@@ -488,7 +491,7 @@ pub struct UnpopulatedInspectDataContainer {
     pub inspect_handles: Vec<Weak<InspectHandle>>,
     /// Optional hierarchy matcher. If unset, the reader is running
     /// in all-access mode, meaning no matching or filtering is required.
-    pub inspect_matcher: Option<Arc<HierarchyMatcher>>,
+    pub component_allowlist: ComponentAllowlist,
 }
 
 impl UnpopulatedInspectDataContainer {
@@ -538,7 +541,7 @@ impl UnpopulatedInspectDataContainer {
                     global_stats.add_timeout();
                     let result = PopulatedInspectDataContainer {
                         identity: Arc::clone(&unpopulated_for_timeout.identity),
-                        inspect_matcher: unpopulated_for_timeout.inspect_matcher.clone(),
+                        component_allowlist: unpopulated_for_timeout.component_allowlist.clone(),
                         snapshot: SnapshotData::failed(
                             schema::InspectError { message: TIMEOUT_MESSAGE.to_string() },
                             None,
@@ -594,7 +597,7 @@ mod test {
         let container = UnpopulatedInspectDataContainer {
             identity: EMPTY_IDENTITY.clone(),
             inspect_handles: vec![Arc::downgrade(&handle)],
-            inspect_matcher: None,
+            component_allowlist: ComponentAllowlist::new_disabled(),
         };
         let mut stream = container.populate(
             0,
@@ -618,7 +621,7 @@ mod test {
         let container = UnpopulatedInspectDataContainer {
             identity: EMPTY_IDENTITY.clone(),
             inspect_handles: vec![Arc::downgrade(&directory)],
-            inspect_matcher: None,
+            component_allowlist: ComponentAllowlist::new_disabled(),
         };
         let mut stream = container.populate(
             1000000,
@@ -670,7 +673,9 @@ mod test {
         let selectors = Some(vec![all_selector]);
 
         let (_rx, iac) = inspect_artifacts_container_with_one_dir();
-        let container = iac.create_unpopulated(&O_K_IDENTITY, None, &selectors).unwrap();
+        let container = iac
+            .create_unpopulated(&O_K_IDENTITY, ComponentAllowlist::new_disabled(), &selectors)
+            .unwrap();
 
         assert_eq!(1, container.inspect_handles.len());
 
@@ -693,7 +698,9 @@ mod test {
         let selectors = Some(vec![selector_with_wrong_tree_name]);
 
         let (_rx, iac) = inspect_artifacts_container_with_one_dir();
-        let container = iac.create_unpopulated(&O_K_IDENTITY, None, &selectors).unwrap();
+        let container = iac
+            .create_unpopulated(&O_K_IDENTITY, ComponentAllowlist::new_disabled(), &selectors)
+            .unwrap();
 
         assert_eq!(0, container.inspect_handles.len());
 
@@ -717,7 +724,9 @@ mod test {
         let selectors = Some(vec![selector_with_no_tree_names]);
 
         let (_rx, iac) = inspect_artifacts_container_with_one_dir();
-        let container = iac.create_unpopulated(&O_K_IDENTITY, None, &selectors).unwrap();
+        let container = iac
+            .create_unpopulated(&O_K_IDENTITY, ComponentAllowlist::new_disabled(), &selectors)
+            .unwrap();
         assert_eq!(1, container.inspect_handles.len());
     }
 
@@ -758,7 +767,9 @@ mod test {
         let selectors = Some(vec![b_only]);
 
         let (_rx, iac) = inspect_artifacts_container_with_n_trees(["a"]);
-        let container = iac.create_unpopulated(&O_K_IDENTITY, None, &selectors).unwrap();
+        let container = iac
+            .create_unpopulated(&O_K_IDENTITY, ComponentAllowlist::new_disabled(), &selectors)
+            .unwrap();
         assert_eq!(0, container.inspect_handles.len());
     }
 
@@ -768,7 +779,11 @@ mod test {
 
         let (_rxs, iac) = inspect_artifacts_container_with_n_trees(["a", "b"]);
         let container = iac
-            .create_unpopulated(&O_K_IDENTITY, None, &None::<&[fdiagnostics::Selector]>)
+            .create_unpopulated(
+                &O_K_IDENTITY,
+                ComponentAllowlist::new_disabled(),
+                &None::<&[fdiagnostics::Selector]>,
+            )
             .unwrap();
         assert_eq!(2, container.inspect_handles.len());
 
@@ -791,7 +806,9 @@ mod test {
         let selectors = Some(vec![all_selector]);
 
         let (_rxs, iac) = inspect_artifacts_container_with_n_trees(["a", "b"]);
-        let container = iac.create_unpopulated(&O_K_IDENTITY, None, &selectors).unwrap();
+        let container = iac
+            .create_unpopulated(&O_K_IDENTITY, ComponentAllowlist::new_disabled(), &selectors)
+            .unwrap();
         assert_eq!(2, container.inspect_handles.len());
     }
 
@@ -820,7 +837,9 @@ mod test {
         let selectors = Some(vec![lists_each_name]);
 
         let (_rxs, iac) = inspect_artifacts_container_with_n_trees(["a", "b"]);
-        let container = iac.create_unpopulated(&O_K_IDENTITY, None, &selectors).unwrap();
+        let container = iac
+            .create_unpopulated(&O_K_IDENTITY, ComponentAllowlist::new_disabled(), &selectors)
+            .unwrap();
         assert_eq!(2, container.inspect_handles.len());
     }
 
@@ -847,7 +866,9 @@ mod test {
         let selectors = Some(vec![a_only]);
 
         let (_rxs, iac) = inspect_artifacts_container_with_n_trees(["a", "b"]);
-        let container = iac.create_unpopulated(&O_K_IDENTITY, None, &selectors).unwrap();
+        let container = iac
+            .create_unpopulated(&O_K_IDENTITY, ComponentAllowlist::new_disabled(), &selectors)
+            .unwrap();
         assert_eq!(1, container.inspect_handles.len());
 
         match container.inspect_handles[0].upgrade().unwrap().as_ref() {
@@ -881,7 +902,9 @@ mod test {
         let selectors = Some(vec![a_but_wrong_case]);
 
         let (_rxs, iac) = inspect_artifacts_container_with_n_trees(["a", "b"]);
-        let container = iac.create_unpopulated(&O_K_IDENTITY, None, &selectors).unwrap();
+        let container = iac
+            .create_unpopulated(&O_K_IDENTITY, ComponentAllowlist::new_disabled(), &selectors)
+            .unwrap();
         assert_eq!(0, container.inspect_handles.len());
     }
 }

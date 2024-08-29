@@ -40,6 +40,7 @@ open protocol PinImpl {
     /// The PinImpl server should create a new interrupt object for each call to `GetInterrupt()`.
     strict GetInterrupt(struct {
         pin uint32;
+        options fuchsia.hardware.gpio.InterruptOptions;
     }) -> (resource struct {
         interrupt zx.Handle:INTERRUPT;
     }) error zx.Status;

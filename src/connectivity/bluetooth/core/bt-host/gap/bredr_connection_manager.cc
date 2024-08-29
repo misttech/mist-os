@@ -169,6 +169,7 @@ BrEdrConnectionManager::BrEdrConnectionManager(
     l2cap::ChannelManager* l2cap,
     bool use_interlaced_scan,
     bool local_secure_connections_supported,
+    bool legacy_pairing_enabled,
     pw::async::Dispatcher& dispatcher)
     : hci_(std::move(hci)),
       cache_(peer_cache),
@@ -179,6 +180,7 @@ BrEdrConnectionManager::BrEdrConnectionManager(
       page_scan_window_(0),
       use_interlaced_scan_(use_interlaced_scan),
       local_secure_connections_supported_(local_secure_connections_supported),
+      legacy_pairing_enabled_(legacy_pairing_enabled),
       dispatcher_(dispatcher),
       weak_self_(this) {
   BT_DEBUG_ASSERT(hci_.is_alive());
@@ -802,6 +804,8 @@ void BrEdrConnectionManager::InitializeConnection(
   auto on_peer_disconnect_cb = [this, link = link.get()] {
     OnPeerDisconnect(link);
   };
+
+  // Create the BrEdrConnection object and place into |connections_| map
   auto [conn_iter, success] =
       connections_.try_emplace(handle,
                                peer->GetWeakPtr(),
@@ -816,8 +820,6 @@ void BrEdrConnectionManager::InitializeConnection(
   BT_ASSERT(success);
 
   BrEdrConnection& connection = conn_iter->second;
-  connection.pairing_state_manager().SetPairingDelegate(pairing_delegate_);
-  connection.set_security_mode(security_mode());
   connection.AttachInspect(inspect_properties_.connections_node_,
                            inspect_properties_.connections_node_.UniqueName(
                                kInspectConnectionNodeNamePrefix));
@@ -880,6 +882,25 @@ void BrEdrConnectionManager::CompleteConnectionSetup(
            handle);
     return;
   }
+
+  // Now that interrogation has successfully completed, check if the peer's
+  // feature bits indicate SSP support. If not, use LegacyPairingState to
+  // perform pairing if legacy pairing is enabled.
+  PairingStateManager::PairingStateType pairing_type =
+      PairingStateManager::PairingStateType::kSecureSimplePairing;
+  if (!peer->IsSecureSimplePairingSupported()) {
+    if (!legacy_pairing_enabled_) {
+      bt_log(
+          WARN,
+          "gap-bredr",
+          "Peer %s does not support SSP but legacy pairing is not enabled so pairing cannot occur",
+          bt_str(peer_id));
+      return;
+    }
+    pairing_type = PairingStateManager::PairingStateType::kLegacyPairing;
+  }
+  conn_state.CreateOrUpdatePairingState(
+      pairing_type, pairing_delegate_, security_mode());
 
   WeakPtr<hci::BrEdrConnection> const connection =
       conn_state.link().GetWeakPtr();
@@ -1286,6 +1307,14 @@ BrEdrConnectionManager::OnIoCapabilityRequest(
     return hci::CommandChannel::EventCallbackResult::kContinue;
   }
   auto [handle, conn_ptr] = *conn_pair;
+
+  // If we receive an HCI_IO_Capability_Request event before interrogation is
+  // complete, there will be no pairing state object so we need to create it now
+  conn_ptr->CreateOrUpdatePairingState(
+      PairingStateManager::PairingStateType::kSecureSimplePairing,
+      pairing_delegate_,
+      security_mode());
+
   auto reply = conn_ptr->pairing_state_manager().OnIoCapabilityRequest();
 
   if (!reply) {
@@ -1329,6 +1358,16 @@ BrEdrConnectionManager::OnIoCapabilityResponse(
            bt_str(addr));
     return hci::CommandChannel::EventCallbackResult::kContinue;
   }
+
+  // If we receive an HCI_IO_Capability_Response event before interrogation is
+  // complete, there will be no pairing state object so we need to create it
+  // now. If we previously created a pairing state object because there was
+  // already an HCI_IO_Capability_Request event, then this method will no-op.
+  conn_pair->second->CreateOrUpdatePairingState(
+      PairingStateManager::PairingStateType::kSecureSimplePairing,
+      pairing_delegate_,
+      security_mode());
+
   conn_pair->second->pairing_state_manager().OnIoCapabilityResponse(
       params.io_capability().Read());
   return hci::CommandChannel::EventCallbackResult::kContinue;
@@ -1360,12 +1399,22 @@ BrEdrConnectionManager::OnLinkKeyRequest(const hci::EmbossEventPacket& event) {
     if (!conn_pair) {
       bt_log(WARN,
              "gap-bredr",
-             "can't find connection for ltk (id: %s)",
+             "Can't find current connection or connection request for peer %s",
              bt_str(peer_id));
       SendLinkKeyRequestNegativeReply(addr.value());
       return hci::CommandChannel::EventCallbackResult::kContinue;
     }
     auto& [handle, conn] = *conn_pair;
+
+    // TODO(https://fxbug.dev/355466957): Pairing state type is unknown if a
+    // link key request is received after ACL connection is complete but before
+    // interrogation is complete. Default to using SSP for now.
+    if (!conn->interrogation_complete()) {
+      conn->CreateOrUpdatePairingState(
+          PairingStateManager::PairingStateType::kSecureSimplePairing,
+          pairing_delegate_,
+          security_mode());
+    }
 
     link_key = conn->pairing_state_manager().OnLinkKeyRequest();
   } else {
@@ -1424,6 +1473,18 @@ BrEdrConnectionManager::OnLinkKeyNotification(
     return hci::CommandChannel::EventCallbackResult::kContinue;
   }
 
+  if (!legacy_pairing_enabled_ &&
+      key_type == pw::bluetooth::emboss::KeyType::COMBINATION) {
+    bt_log(
+        WARN,
+        "gap-bredr",
+        "Got %u key type in link key notification for peer %s but legacy pairing is not enabled",
+        static_cast<uint8_t>(key_type),
+        bt_str(peer->identifier()));
+    cache_->LogBrEdrBondingEvent(false);
+    return hci::CommandChannel::EventCallbackResult::kContinue;
+  }
+
   bt_log(INFO,
          "gap-bredr",
          "got link key notification (key type: %u, peer: %s)",
@@ -1453,15 +1514,6 @@ BrEdrConnectionManager::OnLinkKeyNotification(
 
   auto peer_id = peer->identifier();
 
-  if (sec_props.level() == sm::SecurityLevel::kNoSecurity) {
-    bt_log(WARN,
-           "gap-bredr",
-           "link key for peer %s has insufficient security; not stored",
-           bt_str(peer_id));
-    cache_->LogBrEdrBondingEvent(false);
-    return hci::CommandChannel::EventCallbackResult::kContinue;
-  }
-
   UInt128 key_value;
   ::emboss::support::ReadWriteContiguousBuffer(&key_value)
       .CopyFrom(params.link_key().value().BackingStorage(), key_value.size());
@@ -1471,10 +1523,20 @@ BrEdrConnectionManager::OnLinkKeyNotification(
 
   auto handle = FindConnectionById(peer_id);
   if (!handle) {
-    bt_log(WARN,
-           "gap-bredr",
-           "can't find current connection for ltk (peer: %s)",
-           bt_str(peer_id));
+    std::optional<BrEdrConnectionRequest*> request =
+        FindConnectionRequestById(peer_id);
+    if (!request) {
+      bt_log(WARN,
+             "gap-bredr",
+             "Can't find current connection or connection request for peer %s",
+             bt_str(peer_id));
+    } else {
+      // The connection request's legacy pairing state object must exist at this
+      // point since we created it in the request's constructor.
+      BT_ASSERT(request.value()->legacy_pairing_state());
+      request.value()->legacy_pairing_state()->OnLinkKeyNotification(
+          key_value, static_cast<hci_spec::LinkKeyType>(key_type));
+    }
   } else {
     handle->second->link().set_link_key(
         hci_key, static_cast<hci_spec::LinkKeyType>(key_type));
@@ -1703,15 +1765,33 @@ BrEdrConnectionManager::OnPinCodeRequest(const hci::EmbossEventPacket& event) {
     // The ACL connection is complete so get the PIN code
     auto conn_pair = FindConnectionByAddress(addr.value());
     if (!conn_pair.has_value()) {
-      bt_log(ERROR,
+      bt_log(WARN,
              "gap-bredr",
-             "Got %s for unconnected addr: %s",
-             __func__,
+             "Can't find current connection or connection request for peer %s",
              bt_str(addr));
       SendPinCodeRequestNegativeReply(addr.value());
       return hci::CommandChannel::EventCallbackResult::kContinue;
     }
     auto [handle, conn_ptr] = *conn_pair;
+
+    if (conn_ptr->pairing_state_manager().secure_simple_pairing_state()) {
+      // TODO(https://fxbug.dev/355466957): If a SecureSimplePairingState object
+      // already exists for this connection, we have the following edge case: we
+      // received an HCI_Link_Key_Request event after ACL connection was
+      // complete but before interrogation was complete. We temporarily default
+      // to SSP which causes this error when it is actually legacy pairing.
+
+      SendPinCodeRequestNegativeReply(addr.value());
+      return hci::CommandChannel::EventCallbackResult::kContinue;
+    }
+
+    // If we receive an HCI_PIN_Code_Request event before interrogation is
+    // complete, there will be no pairing state object so we need to create it
+    // now
+    conn_ptr->CreateOrUpdatePairingState(
+        PairingStateManager::PairingStateType::kLegacyPairing,
+        pairing_delegate_,
+        security_mode());
 
     conn_ptr->pairing_state_manager().OnPinCodeRequest(std::move(pin_code_cb));
   } else {

@@ -15,8 +15,8 @@ group("tests") {
     "bt-hfp-audio-gateway-integration-tests:tests",
     "bt-rfcomm-integration-tests:tests",
 
-    # Mock cobalt component that is injected into the integration tests.
-    "//src/cobalt/bin/testing/mock_cobalt",
+    # Fake cobalt component that is injected into the integration tests.
+    "//src/cobalt/bin/testing/fake_cobalt",
 
     # Mock piconet server component that is injected into the integration tests.
     "//src/connectivity/bluetooth/testing/mock-piconet-server",

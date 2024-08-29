@@ -697,7 +697,7 @@ group("rand_xorshift") {
 }
 
 group("rayon") {
-  public_deps = [ ":rayon-v1_5_3" ]
+  public_deps = [ ":rayon-v1_10_0" ]
 }
 
 group("ref-cast") {
@@ -3508,7 +3508,7 @@ rust_library("criterion-v0_2_11") {
   deps += [ ":rand_os-v0_1_2" ]
   deps += [ ":rand_xoshiro-v0_1_0" ]
   deps += [ ":rayon-core-v1_12_1" ]
-  deps += [ ":rayon-v1_5_3" ]
+  deps += [ ":rayon-v1_10_0" ]
   deps += [ ":serde-v1_0_204" ]
   deps += [ ":serde_derive-v1_0_204($host_toolchain)" ]
   deps += [ ":serde_json-v1_0_87" ]
@@ -7755,6 +7755,7 @@ rust_library("log-v0_4_22") {
     "--edition=2021",
     "-Cmetadata=70ad1c5e24df7c26",
     "-Cextra-filename=-70ad1c5e24df7c26",
+    "--cfg=feature=\"kv\"",
     "--cfg=feature=\"std\"",
   ]
 
@@ -11763,22 +11764,21 @@ rust_library("rand_xoshiro-v0_1_0") {
   applicable_licenses = [ ":rand_xoshiro-v0_1_0.license" ]
 }
 
-license("rayon-v1_5_3.license") {
+license("rayon-v1_10_0.license") {
   public_package_name = "rayon"
   license_files = [
-    "//third_party/rust_crates/vendor/rayon-1.5.3/LICENSE-APACHE",
-    "//third_party/rust_crates/vendor/rayon-1.5.3/LICENSE-MIT",
+    "//third_party/rust_crates/vendor/rayon-1.10.0/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/rayon-1.10.0/LICENSE-MIT",
   ]
 }
 
-rust_library("rayon-v1_5_3") {
+rust_library("rayon-v1_10_0") {
   crate_name = "rayon"
-  crate_root = "//third_party/rust_crates/vendor/rayon-1.5.3/src/lib.rs"
-  output_name = "rayon-f607b54c8ec712a5"
+  crate_root = "//third_party/rust_crates/vendor/rayon-1.10.0/src/lib.rs"
+  output_name = "rayon-2c5f2bd3edf049a3"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":crossbeam-deque-v0_8_1" ]
   deps += [ ":either-v1_8_0" ]
   deps += [ ":rayon-core-v1_12_1" ]
 
@@ -11786,17 +11786,14 @@ rust_library("rayon-v1_5_3") {
 
   rustflags = [
     "--cap-lints=allow",
-    "--edition=2018",
-    "-Cmetadata=f607b54c8ec712a5",
-    "-Cextra-filename=-f607b54c8ec712a5",
-    "--cfg=has_control_flow",
-    "--cfg=has_min_const_generics",
-    "--cfg=has_step_by_rev",
+    "--edition=2021",
+    "-Cmetadata=2c5f2bd3edf049a3",
+    "-Cextra-filename=-2c5f2bd3edf049a3",
   ]
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":rayon-v1_5_3.license" ]
+  applicable_licenses = [ ":rayon-v1_10_0.license" ]
 }
 
 license("rayon-core-v1_12_1.license") {

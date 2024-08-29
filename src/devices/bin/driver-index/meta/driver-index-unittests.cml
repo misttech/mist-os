@@ -2,22 +2,23 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 {
-    include: [ "syslog/client.shard.cml" ],
+    include: [
+        "//src/sys/test_runners/rust/default.shard.cml",
+        "syslog/client.shard.cml",
+    ],
     program: {
-        runner: "rust_test_runner",
         binary: "bin/driver_index_bin_test",
     },
     capabilities: [
-        // This protocol needs to be defined here so it can be exposed from self below.
-        { protocol: "fuchsia.test.Suite" },
+        // Needs to exist here for the escrow use below.
+        { protocol: "fuchsia.driver.index.DriverIndex" },
     ],
-    use: [],
-    expose: [
-        // The Test Runner Framework expects this protocol to be exposed
-        // from the test component. The Rust test adapter provides this protocol.
+    use: [
+        // Used by run_with_timeout test.
         {
-            protocol: "fuchsia.test.Suite",
+            protocol: "fuchsia.driver.index.DriverIndex",
             from: "self",
+            path: "/escrow/fuchsia.driver.index.DriverIndex",
         },
     ],
 }

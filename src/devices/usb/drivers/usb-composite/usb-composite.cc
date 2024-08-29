@@ -9,6 +9,8 @@
 #include <lib/ddk/debug.h>
 #include <stdio.h>
 
+#include <bind/fuchsia/cpp/bind.h>
+#include <bind/fuchsia/usb/cpp/bind.h>
 #include <fbl/auto_lock.h>
 
 #include "src/devices/usb/drivers/usb-composite/usb-interface.h"
@@ -84,23 +86,27 @@ zx_status_t UsbComposite::AddInterface(const usb_interface_descriptor_t* interfa
   char name[20];
   snprintf(name, sizeof(name), "ifc-%03d", interface_desc->b_interface_number);
 
-  zx_device_prop_t props[] = {
-      {BIND_PROTOCOL, 0, ZX_PROTOCOL_USB_INTERFACE},
-      {BIND_USB_VID, 0, device_desc_.id_vendor},
-      {BIND_USB_PID, 0, device_desc_.id_product},
-      {BIND_USB_CLASS, 0, interface->usb_class()},
-      {BIND_USB_SUBCLASS, 0, interface->usb_subclass()},
-      {BIND_USB_PROTOCOL, 0, interface->usb_protocol()},
-      {BIND_USB_INTERFACE_NUMBER, 0, interface_desc->b_interface_number},
+  zx_device_str_prop_t props[] = {
+      ddk::MakeStrProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_usb::BIND_PROTOCOL_INTERFACE),
+      ddk::MakeStrProperty(bind_fuchsia::USB_VID, static_cast<uint32_t>(device_desc_.id_vendor)),
+      ddk::MakeStrProperty(bind_fuchsia::USB_PID, static_cast<uint32_t>(device_desc_.id_product)),
+      ddk::MakeStrProperty(bind_fuchsia::USB_CLASS, static_cast<uint32_t>(interface->usb_class())),
+      ddk::MakeStrProperty(bind_fuchsia::USB_SUBCLASS,
+                           static_cast<uint32_t>(interface->usb_subclass())),
+      ddk::MakeStrProperty(bind_fuchsia::USB_PROTOCOL,
+                           static_cast<uint32_t>(interface->usb_protocol())),
+      ddk::MakeStrProperty(bind_fuchsia::USB_INTERFACE_NUMBER,
+                           static_cast<uint32_t>(interface_desc->b_interface_number)),
   };
 
   std::array offers = {
       fuchsia_hardware_usb::UsbService::Name,
   };
 
-  auto status = interface->DdkAdd(
-      ddk::DeviceAddArgs(name).set_props(props).set_fidl_service_offers(offers).set_outgoing_dir(
-          client_end->TakeChannel()));
+  auto status = interface->DdkAdd(ddk::DeviceAddArgs(name)
+                                      .set_str_props(props)
+                                      .set_fidl_service_offers(offers)
+                                      .set_outgoing_dir(client_end->TakeChannel()));
   if (status == ZX_OK) {
     // Hold a reference while devmgr has a pointer to this object.
     interface.release();
@@ -137,23 +143,28 @@ zx_status_t UsbComposite::AddInterfaceAssoc(const usb_interface_assoc_descriptor
   char name[20];
   snprintf(name, sizeof(name), "asc-%03d", assoc_desc->b_first_interface);
 
-  zx_device_prop_t props[] = {
-      {BIND_PROTOCOL, 0, ZX_PROTOCOL_USB_INTERFACE_ASSOCIATION},
-      {BIND_USB_VID, 0, device_desc_.id_vendor},
-      {BIND_USB_PID, 0, device_desc_.id_product},
-      {BIND_USB_CLASS, 0, interface->usb_class()},
-      {BIND_USB_SUBCLASS, 0, interface->usb_subclass()},
-      {BIND_USB_PROTOCOL, 0, interface->usb_protocol()},
-      {BIND_USB_INTERFACE_NUMBER, 0, assoc_desc->b_first_interface},
+  zx_device_str_prop_t props[] = {
+      ddk::MakeStrProperty(bind_fuchsia::PROTOCOL,
+                           bind_fuchsia_usb::BIND_PROTOCOL_INTERFACE_ASSOCIATION),
+      ddk::MakeStrProperty(bind_fuchsia::USB_VID, static_cast<uint32_t>(device_desc_.id_vendor)),
+      ddk::MakeStrProperty(bind_fuchsia::USB_PID, static_cast<uint32_t>(device_desc_.id_product)),
+      ddk::MakeStrProperty(bind_fuchsia::USB_CLASS, static_cast<uint32_t>(interface->usb_class())),
+      ddk::MakeStrProperty(bind_fuchsia::USB_SUBCLASS,
+                           static_cast<uint32_t>(interface->usb_subclass())),
+      ddk::MakeStrProperty(bind_fuchsia::USB_PROTOCOL,
+                           static_cast<uint32_t>(interface->usb_protocol())),
+      ddk::MakeStrProperty(bind_fuchsia::USB_INTERFACE_NUMBER,
+                           static_cast<uint32_t>(assoc_desc->b_first_interface)),
   };
 
   std::array offers = {
       fuchsia_hardware_usb::UsbService::Name,
   };
 
-  auto status = interface->DdkAdd(
-      ddk::DeviceAddArgs(name).set_props(props).set_fidl_service_offers(offers).set_outgoing_dir(
-          client_end->TakeChannel()));
+  auto status = interface->DdkAdd(ddk::DeviceAddArgs(name)
+                                      .set_str_props(props)
+                                      .set_fidl_service_offers(offers)
+                                      .set_outgoing_dir(client_end->TakeChannel()));
   if (status == ZX_OK) {
     // Hold a reference while devmgr has a pointer to this object.
     interface.release();

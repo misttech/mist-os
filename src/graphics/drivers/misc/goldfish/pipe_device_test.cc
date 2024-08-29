@@ -26,6 +26,9 @@
 #include <thread>
 #include <vector>
 
+#include <bind/fuchsia/cpp/bind.h>
+#include <bind/fuchsia/goldfish/platform/cpp/bind.h>
+#include <bind/fuchsia/google/platform/cpp/bind.h>
 #include <zxtest/zxtest.h>
 
 #include "src/devices/lib/acpi/mock/mock-acpi.h"
@@ -40,10 +43,13 @@ namespace {
 constexpr uint32_t kPipeMinDeviceVersion = 2;
 constexpr uint32_t kMaxSignalledPipes = 64;
 
-constexpr zx_device_prop_t kDefaultPipeDeviceProps[] = {
-    {BIND_PLATFORM_DEV_VID, 0, PDEV_VID_GOOGLE},
-    {BIND_PLATFORM_DEV_PID, 0, PDEV_PID_GOLDFISH},
-    {BIND_PLATFORM_DEV_DID, 0, PDEV_DID_GOLDFISH_PIPE_CONTROL},
+const zx_device_str_prop_t kDefaultPipeDeviceProps[] = {
+    ddk::MakeStrProperty(bind_fuchsia::PLATFORM_DEV_VID,
+                         bind_fuchsia_google_platform::BIND_PLATFORM_DEV_VID_GOOGLE),
+    ddk::MakeStrProperty(bind_fuchsia::PLATFORM_DEV_PID,
+                         bind_fuchsia_goldfish_platform::BIND_PLATFORM_DEV_PID_GOLDFISH),
+    ddk::MakeStrProperty(bind_fuchsia::PLATFORM_DEV_DID,
+                         bind_fuchsia_goldfish_platform::BIND_PLATFORM_DEV_DID_PIPE_CONTROL),
 };
 constexpr const char* kDefaultPipeDeviceName = "goldfish-pipe";
 
@@ -353,19 +359,23 @@ TEST_F(PipeDeviceTest, ChildDevice) {
   auto child1 = std::make_unique<PipeChildDevice>(dut_, test_loop_.dispatcher());
   auto child2 = std::make_unique<PipeChildDevice>(dut_, test_loop_.dispatcher());
 
-  constexpr zx_device_prop_t kPropsChild1[] = {
-      {BIND_PLATFORM_DEV_VID, 0, PDEV_VID_GOOGLE},
-      {BIND_PLATFORM_DEV_PID, 0, PDEV_PID_GOLDFISH},
-      {BIND_PLATFORM_DEV_DID, 0, 0x01},
+  const zx_device_str_prop_t kPropsChild1[] = {
+      ddk::MakeStrProperty(bind_fuchsia::PLATFORM_DEV_VID,
+                           bind_fuchsia_google_platform::BIND_PLATFORM_DEV_VID_GOOGLE),
+      ddk::MakeStrProperty(bind_fuchsia::PLATFORM_DEV_PID,
+                           bind_fuchsia_goldfish_platform::BIND_PLATFORM_DEV_PID_GOLDFISH),
+      ddk::MakeStrProperty(bind_fuchsia::PLATFORM_DEV_DID, 0x01u),
   };
   constexpr const char* kDeviceNameChild1 = "goldfish-pipe-child1";
   ASSERT_OK(child1->Bind(kPropsChild1, kDeviceNameChild1));
   child1.release();
 
-  constexpr zx_device_prop_t kPropsChild2[] = {
-      {BIND_PLATFORM_DEV_VID, 0, PDEV_VID_GOOGLE},
-      {BIND_PLATFORM_DEV_PID, 0, PDEV_PID_GOLDFISH},
-      {BIND_PLATFORM_DEV_DID, 0, 0x02},
+  const zx_device_str_prop_t kPropsChild2[] = {
+      ddk::MakeStrProperty(bind_fuchsia::PLATFORM_DEV_VID,
+                           bind_fuchsia_google_platform::BIND_PLATFORM_DEV_VID_GOOGLE),
+      ddk::MakeStrProperty(bind_fuchsia::PLATFORM_DEV_PID,
+                           bind_fuchsia_goldfish_platform::BIND_PLATFORM_DEV_PID_GOLDFISH),
+      ddk::MakeStrProperty(bind_fuchsia::PLATFORM_DEV_DID, 0x02u),
   };
   constexpr const char* kDeviceNameChild2 = "goldfish-pipe-child2";
   ASSERT_OK(child2->Bind(kPropsChild2, kDeviceNameChild2));

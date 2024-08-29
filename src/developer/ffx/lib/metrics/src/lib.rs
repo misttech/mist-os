@@ -47,15 +47,6 @@ pub fn sanitize(parameter: &str) -> String {
     redact_host_and_user_from(parameter)
 }
 
-pub async fn add_ffx_overnet_proxy_drop_event(error_message: String) -> Result<()> {
-    let custom_dimensions = BTreeMap::from([("error_message", error_message.into())]);
-    let mut metrics_svc = ga4_metrics().await?;
-    metrics_svc
-        .add_custom_event(None, None, None, custom_dimensions, Some("overnet_proxy_shutdown"))
-        .await?;
-    metrics_svc.send_events().await
-}
-
 pub async fn add_ffx_launch_event(
     sanitized_args: String,
     time: u128,

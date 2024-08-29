@@ -31,18 +31,17 @@ source_set("common") {
     "//sdk/banjo/fuchsia.hardware.usb.hci:fuchsia.hardware.usb.hci_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.usb.phy:fuchsia.hardware.usb.phy_banjo_cpp",
     "//sdk/fidl/fuchsia.hardware.usb.hci:fuchsia.hardware.usb.hci_cpp",
-    "//sdk/lib/component/outgoing/cpp",
+    "//sdk/lib/driver/compat/cpp",
+    "//sdk/lib/driver/component/cpp:cpp",
     "//sdk/lib/fit-promise",
     "//src/devices/bus/lib/device-protocol-pdev",
     "//src/devices/lib/dma-buffer",
     "//src/devices/lib/mmio",
     "//src/devices/lib/synchronous-executor",
     "//src/devices/pci/lib/device-protocol-pci",
-    "//src/devices/usb/lib/usb",
-    "//src/devices/usb/lib/usb-endpoint:usb-endpoint-server",
-    "//src/devices/usb/lib/usb-phy",
-    "//src/lib/ddk",
-    "//src/lib/ddktl",
+    "//src/devices/usb/lib/usb:usb-dfv2-compat-logging",
+    "//src/devices/usb/lib/usb-endpoint:usb-endpoint-server-dfv2-compat-logging",
+    "//src/devices/usb/lib/usb-phy:usb-phy-dfv2-compat-logging",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/hwreg",
@@ -69,7 +68,6 @@ fuchsia_driver("xhci-driver") {
   ]
   deps = [
     ":common",
-    "//src/devices/lib/driver",
     "//src/devices/lib/driver:driver_runtime",
   ]
 }
@@ -82,10 +80,7 @@ fuchsia_component_manifest("xhci-manifest") {
 fuchsia_driver_component("xhci") {
   info = "meta/xhci-info.json"
   cm_label = ":xhci-manifest"
-  deps = [
-    ":usb_xhci_bind",
-    ":xhci-driver",
-  ]
+  deps = [ ":xhci-driver" ]
 }
 
 fuchsia_structured_config_cpp_elf_lib("xhci-config") {

@@ -68,6 +68,7 @@ executable("bin") {
     "//sdk/fidl/fuchsia.io:fuchsia.io_cpp",
     "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_cpp",
     "//sdk/fidl/fuchsia.pkg:fuchsia.pkg_cpp",
+    "//sdk/fidl/fuchsia.pkg:fuchsia.pkg_cpp",
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/component/outgoing/cpp",
     "//sdk/lib/sys/component/cpp/testing:cpp",
@@ -77,6 +78,7 @@ executable("bin") {
     "//src/lib/ddk:ddk-metadata-headers",
     "//src/lib/files",
     "//src/storage/lib/vfs/cpp",
+    "//third_party/rapidjson",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
   ]
 }
@@ -112,6 +114,7 @@ executable("fake_resolver_bin") {
   deps = [
     "//sdk/fidl/fuchsia.component.decl:fuchsia.component.decl_cpp",
     "//sdk/fidl/fuchsia.component.resolution:fuchsia.component.resolution_cpp",
+    "//sdk/fidl/fuchsia.driver.test:fuchsia.driver.test_cpp",
     "//sdk/fidl/fuchsia.io:fuchsia.io_cpp",
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/component/outgoing/cpp",

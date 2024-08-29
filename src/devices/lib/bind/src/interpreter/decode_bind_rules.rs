@@ -6,6 +6,7 @@ use crate::bytecode_constants::*;
 use crate::interpreter::common::*;
 use crate::interpreter::instruction_decoder::*;
 use num_traits::FromPrimitive;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 // Each node section header contains a u8 node type and a uint32 section
@@ -104,7 +105,7 @@ fn split_off_node(
     ))
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 pub enum DecodedRules {
     Normal(DecodedBindRules),
     Composite(DecodedCompositeBindRules),
@@ -130,7 +131,7 @@ impl DecodedRules {
     }
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 pub struct DecodedDebugInfo {
     pub symbol_table: HashMap<u32, String>,
 }
@@ -166,7 +167,7 @@ pub fn decode_debug_bytecode(
 
 // This struct decodes and unwraps the given bytecode into a symbol table
 // and list of instructions. It contains an optional debug section.
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 pub struct DecodedBindRules {
     pub symbol_table: HashMap<u32, String>,
     pub instructions: Vec<u8>,
@@ -206,7 +207,7 @@ impl DecodedBindRules {
     }
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 pub struct Node {
     // Symbol table ID for the node name.
     pub name_id: u32,
@@ -216,7 +217,7 @@ pub struct Node {
 
 // This struct decodes and unwraps the given bytecode into a symbol table
 // and list of instructions.
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 pub struct DecodedCompositeBindRules {
     pub symbol_table: HashMap<u32, String>,
     pub device_name_id: u32,

@@ -12,13 +12,9 @@ rustc_library("wlan-fullmac-mlme") {
   edition = "2021"
 
   deps = [
-    "//sdk/fidl/fuchsia.wlan.common:fuchsia.wlan.common_banjo_rust",
     "//sdk/fidl/fuchsia.wlan.common:fuchsia.wlan.common_rust",
-    "//sdk/fidl/fuchsia.wlan.fullmac:fuchsia.wlan.fullmac_banjo_rust",
     "//sdk/fidl/fuchsia.wlan.fullmac:fuchsia.wlan.fullmac_rust",
-    "//sdk/fidl/fuchsia.wlan.ieee80211:fuchsia.wlan.ieee80211_banjo_rust",
     "//sdk/fidl/fuchsia.wlan.ieee80211:fuchsia.wlan.ieee80211_rust",
-    "//sdk/fidl/fuchsia.wlan.internal:fuchsia.wlan.internal_banjo_rust",
     "//sdk/fidl/fuchsia.wlan.internal:fuchsia.wlan.internal_rust",
     "//sdk/fidl/fuchsia.wlan.mlme:fuchsia.wlan.mlme_rust",
     "//sdk/fidl/fuchsia.wlan.sme:fuchsia.wlan.sme_rust",
@@ -44,13 +40,13 @@ rustc_library("wlan-fullmac-mlme") {
   ]
 
   sources = [
-    "src/convert/banjo_to_fidl.rs",
     "src/convert/fullmac_to_mlme.rs",
     "src/convert/mlme_to_fullmac.rs",
     "src/convert/mod.rs",
     "src/device.rs",
     "src/lib.rs",
     "src/logger.rs",
+    "src/wlan_fullmac_impl_ifc_request_handler.rs",
   ]
 }
 

@@ -776,7 +776,7 @@
     {
         "kind": "protocol",
         "name": "fuchsia.hardware.audio.signalprocessing/Reader",
-        "openness": "closed",
+        "openness": "open",
         "transport": "channel"
     },
     {
@@ -920,7 +920,7 @@
     {
         "kind": "protocol",
         "name": "fuchsia.hardware.audio.signalprocessing/SignalProcessing",
-        "openness": "closed",
+        "openness": "open",
         "transport": "channel"
     },
     {

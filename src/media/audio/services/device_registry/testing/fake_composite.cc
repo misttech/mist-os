@@ -731,6 +731,10 @@ void FakeComposite::SetTopology(SetTopologyRequest& request,
   completer.Reply(fit::ok());
 }
 
+void FakeComposite::handle_unknown_method(
+    fidl::UnknownMethodMetadata<fuchsia_hardware_audio_signalprocessing::SignalProcessing>,
+    fidl::UnknownMethodCompleter::Sync&) {}
+
 // Inject std::nullopt to simulate "no topology", such as at power-up or after Reset().
 void FakeComposite::InjectTopologyChange(std::optional<TopologyId> topology_id) {
   topology_has_changed_ = topology_id.has_value();

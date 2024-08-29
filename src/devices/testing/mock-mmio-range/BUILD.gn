@@ -4,19 +4,14 @@
 
 import("//build/cpp/library_headers.gni")
 
-library_headers("headers") {
+library_headers("mock-mmio-range") {
   testonly = true
   headers = [ "mock-mmio-range/mock-mmio-range.h" ]
-}
-
-source_set("mock-mmio-range") {
-  testonly = true
   public_deps = [
-    ":headers",
+    "//sdk/lib/stdcompat",
     "//src/devices/lib/mmio",
     "//zircon/system/ulib/fbl",
   ]
-  sources = []
 }
 
 group("tests") {

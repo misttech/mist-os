@@ -4,6 +4,7 @@
 
 //! Sampling rate and aggregation intervals.
 
+use itertools::Itertools;
 use num::Integer;
 use std::fmt::{self, Debug, Display, Formatter};
 use std::marker::PhantomData;
@@ -12,6 +13,7 @@ use std::{cmp, iter};
 use crate::experimental::clock::{Duration, DurationExt as _, Quanta, QuantaExt as _, Tick};
 use crate::experimental::series::interpolation::InterpolationState;
 use crate::experimental::series::statistic::Statistic;
+use crate::experimental::Vec1;
 
 /// An interval that has elapsed during a [`Tick`].
 ///
@@ -168,10 +170,9 @@ impl<T> IntervalExpiration<PhantomData<T>> {
 ///   2. **Sampling period count.** This is the number of sampling periods that form the sampling
 ///      interval. This determines the minimum number of samples (interpolated or otherwise) folded
 ///      into the aggregation for the sampling interval.
-///   3. **Capacity.** This affects the number of sampling intervals (and therefore aggregations)
-///      that are stored to represent an aggregated series. The number of sampling intervals that
-///      are stored are dependent on the buffer implementation and the compression ratio. This
-///      quantity is somewhat extrinsic to the time interval itself.
+///   3. **Capacity.** This is the number of sampling intervals (and therefore aggregations) that
+///      must be stored to represent an aggregated series. This quantity is somewhat extrinsic to
+///      the time interval itself, but determines its durability.
 ///
 /// These quantities are concatenated into a shorthand to describe sampling intervals, formatted
 /// as `capacity x sampling_period_count x maximum_sampling_period`. For example, a 10x2x5s
@@ -196,6 +197,14 @@ impl SamplingInterval {
             sampling_period_count: cmp::max(1, sampling_period_count),
             max_sampling_period: cmp::max(1, max_sampling_period.into().into_quanta().abs()),
         }
+    }
+
+    /// Gets the durability of the interval.
+    ///
+    /// Durability is the maximum period of time represented by the aggregations of a sampling
+    /// interval. This is the time period for which it represents historical data.
+    pub fn durability(&self) -> Duration {
+        self.max_sampling_period() * (self.sampling_period_count * self.capacity)
     }
 
     /// Gets the duration of the interval (also known as the aggregation period).
@@ -313,16 +322,101 @@ impl Display for SamplingInterval {
 }
 
 /// One or more cooperative [`SamplingInterval`]s.
-/// Used to produce one or more cooperative [`SamplingInterval`]s.
 #[derive(Clone, Debug)]
-pub enum SamplingProfile {
-    Granular,
-    Balanced,
+pub struct SamplingProfile(Vec1<SamplingInterval>);
+
+impl SamplingProfile {
+    fn from_sampling_intervals<I>(intervals: I) -> Self
+    where
+        Vec1<SamplingInterval>: From<I>,
+    {
+        SamplingProfile(intervals.into())
+    }
+
+    /// Constructs a highly granular sampling profile with high fidelity.
+    ///
+    /// The minimum granularity is 10s and the maximum durability is 20m.
+    pub fn highly_granular() -> Self {
+        SamplingProfile::from_sampling_intervals([
+            // 720x1x10s
+            SamplingInterval::new(720, 1, Duration::from_seconds(10)),
+            // 3600x1x1m
+            SamplingInterval::new(3600, 1, Duration::from_minutes(1)),
+        ])
+    }
+
+    /// Constructs a granular sampling profile with decently high fidelity.
+    pub fn granular() -> Self {
+        SamplingProfile::from_sampling_intervals([
+            // 720x1x10s
+            SamplingInterval::new(720, 1, Duration::from_seconds(10)),
+            // 600x1x1m
+            SamplingInterval::new(600, 1, Duration::from_minutes(1)),
+            // 360x1x5m
+            SamplingInterval::new(720, 1, Duration::from_minutes(5)),
+        ])
+    }
+
+    /// Constructs a sampling profile with fidelity and durability that is applicable to most
+    /// metrics.
+    pub fn balanced() -> Self {
+        SamplingProfile::from_sampling_intervals([
+            // 120x1x10s
+            SamplingInterval::new(120, 1, Duration::from_seconds(10)),
+            // 120x1x1m
+            SamplingInterval::new(120, 1, Duration::from_minutes(1)),
+            // 120x1x5m
+            SamplingInterval::new(120, 1, Duration::from_minutes(5)),
+            // 120x1x30m
+            SamplingInterval::new(120, 1, Duration::from_minutes(30)),
+        ])
+    }
+
+    /// Gets the minimum granularity of the profile.
+    pub fn granularity(&self) -> Duration {
+        self.0.iter().map(SamplingInterval::max_sampling_period).min().unwrap()
+    }
+
+    /// Gets the maximum durability of the profile.
+    pub fn durability(&self) -> Duration {
+        self.0.iter().map(SamplingInterval::durability).max().unwrap()
+    }
+
+    pub(crate) fn into_sampling_intervals(self) -> Vec1<SamplingInterval> {
+        self.0
+    }
 }
 
 impl Default for SamplingProfile {
     fn default() -> Self {
-        SamplingProfile::Balanced
+        SamplingProfile::balanced()
+    }
+}
+
+impl Display for SamplingProfile {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
+        use itertools::Position::{First, Last, Middle, Only};
+
+        // Avoid `join` and other sources of intermediate allocations.
+        write!(
+            formatter,
+            "{}..{}: ",
+            self.granularity().into_quanta().into_nearest_unit_display(),
+            self.durability().into_quanta().into_nearest_unit_display(),
+        )?;
+        for interval in self.0.iter().with_position() {
+            match interval {
+                First(interval) | Middle(interval) => write!(formatter, "{} + ", interval),
+                Only(interval) | Last(interval) => write!(formatter, "{}", interval),
+            }?;
+        }
+        Ok(())
+    }
+}
+
+impl From<SamplingInterval> for SamplingProfile {
+    fn from(interval: SamplingInterval) -> Self {
+        SamplingProfile(Vec1::from_item(interval))
     }
 }
 
@@ -434,7 +528,7 @@ mod tests {
     }
 
     impl Statistic for MockStatistic {
-        type Semantic = Counter<u64>;
+        type Semantic = Counter;
         type Sample = u64;
         type Aggregation = u64;
 

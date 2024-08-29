@@ -11,7 +11,7 @@ use crate::vfs::{
     FsNodeOps, FsStr, MemoryFileNode, MemoryXattrStorage, SymlinkNode, XattrStorage as _,
 };
 use starnix_logging::{log_warn, track_stub};
-use starnix_sync::{FileOpsCore, Locked, Mutex, MutexGuard};
+use starnix_sync::{FileOpsCore, Locked, Mutex, MutexGuard, Unlocked};
 use starnix_uapi::auth::FsCred;
 use starnix_uapi::device_type::DeviceType;
 use starnix_uapi::errors::Errno;
@@ -118,6 +118,14 @@ impl FileSystemOps for Arc<TmpFs> {
 
         Ok(())
     }
+}
+
+pub fn tmp_fs(
+    _locked: &mut Locked<'_, Unlocked>,
+    current_task: &CurrentTask,
+    options: FileSystemOptions,
+) -> Result<FileSystemHandle, Errno> {
+    TmpFs::new_fs_with_options(&current_task.kernel(), options)
 }
 
 impl TmpFs {

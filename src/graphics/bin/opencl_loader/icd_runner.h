@@ -10,7 +10,8 @@
 
 #include "src/storage/lib/vfs/cpp/synchronous_vfs.h"
 
-class ComponentControllerImpl : public fidl::Server<fuchsia_component_runner::ComponentController> {
+class ComponentControllerImpl final
+    : public fidl::Server<fuchsia_component_runner::ComponentController> {
  public:
   // Binds `controller` to a new component controller using the given `outgoing_dir` and
   // `pkg_directory`. On error, `controller` will be closed with an epitaph.
@@ -24,6 +25,9 @@ class ComponentControllerImpl : public fidl::Server<fuchsia_component_runner::Co
   explicit ComponentControllerImpl(async_dispatcher_t* dispatcher);
   void Stop(StopCompleter::Sync& completer) override { binding_->Close(ZX_OK); }
   void Kill(KillCompleter::Sync& completer) override { binding_->Close(ZX_OK); }
+  void handle_unknown_method(
+      fidl::UnknownMethodMetadata<fuchsia_component_runner::ComponentController>,
+      fidl::UnknownMethodCompleter::Sync&) override {}
 
   fs::SynchronousVfs vfs_;
   std::optional<fidl::ServerBindingRef<fuchsia_component_runner::ComponentController>> binding_;

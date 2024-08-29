@@ -5,9 +5,9 @@
 #include "../usb-mass-storage.h"
 
 #include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
-#include <lib/driver/testing/cpp/driver_lifecycle.h>
 #include <lib/driver/testing/cpp/driver_runtime.h>
-#include <lib/driver/testing/cpp/test_environment.h>
+#include <lib/driver/testing/cpp/internal/driver_lifecycle.h>
+#include <lib/driver/testing/cpp/internal/test_environment.h>
 #include <lib/driver/testing/cpp/test_node.h>
 #include <zircon/process.h>
 
@@ -560,11 +560,13 @@ static void CompletionCallback(void* ctx, zx_status_t status, block_op_t* op) {
 
 struct IncomingNamespace {
   fdf_testing::TestNode node{"root"};
-  fdf_testing::TestEnvironment env{fdf::Dispatcher::GetCurrent()->get()};
+  fdf_testing::internal::TestEnvironment env{fdf::Dispatcher::GetCurrent()->get()};
   compat::DeviceServer device_server;
   UsbBanjoServer usb_banjo_server;
 };
 
+// WARNING: Don't use this test as a template for new tests as it uses the old driver testing
+// library.
 class UmsTest : public zxtest::Test {
  public:
   UmsTest()
@@ -597,7 +599,7 @@ class UmsTest : public zxtest::Test {
   fdf_testing::DriverRuntime runtime_;
   fdf::UnownedSynchronizedDispatcher env_dispatcher_;
   async_patterns::TestDispatcherBound<IncomingNamespace> incoming_;
-  fdf_testing::DriverUnderTest<ums::UsbMassStorageDevice> dut_;
+  fdf_testing::internal::DriverUnderTest<ums::UsbMassStorageDevice> dut_;
 
   void StartDriver(ErrorInjection inject_failure = NoFault) {
     // Device parameters for physical (parent) device

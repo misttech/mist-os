@@ -7,9 +7,10 @@ use crate::compiler::Symbol;
 use crate::interpreter::common::*;
 use crate::parser::bind_library;
 use num_traits::FromPrimitive;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 pub struct DecodedCondition {
     pub is_equal: bool,
     pub lhs: Symbol,
@@ -18,7 +19,7 @@ pub struct DecodedCondition {
 
 // Verifies and converts instruction bytecode into a set of DecodedInstructions.
 // TODO(https://fxbug.dev/42175142): Add IDs to the Label and Jump statements.
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 pub enum DecodedInstruction {
     UnconditionalAbort,
     Condition(DecodedCondition),

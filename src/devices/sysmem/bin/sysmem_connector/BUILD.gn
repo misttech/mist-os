@@ -4,8 +4,56 @@
 
 import("//build/components.gni")
 
+# TODO(b/362587923): Move this file and sources here to src/sysmem or
+# src/bringup/bin/sysmem.
+
+# These build args are not the correct place to configure sysmem (outside of
+# local experiments). Instead, use BoardSysmemConfig and/or PlatformSysmemConfig
+# via the assembly tool. The settings in PlatformSysmemConfig can override
+# settings in the BoardSysmemConfig. See also
+# BoardProvidedConfig.sysmem_format_costs which can also be specified for the
+# board.
+#
+# TODO(b/347090887): Remove these when developer overrides are wired up for
+# bazel-based builds.
+declare_args() {
+  sysmem_contiguous_memory_size = -1
+  sysmem_contiguous_memory_size_percent = 5
+  sysmem_protected_memory_size = 0
+  sysmem_protected_memory_size_percent = -1
+  sysmem_contiguous_guard_pages_fatal = false
+  sysmem_contiguous_guard_pages_internal = false
+  sysmem_contiguous_guard_page_count = -1
+  sysmem_contiguous_guard_pages_unused = false
+  sysmem_contiguous_guard_pages_unused_fraction_denominator = 128
+  sysmem_contiguous_guard_pages_unused_cycle_seconds = 600
+  sysmem_protected_ranges_disable_dynamic = false
+}
+
+fuchsia_component_manifest("manifest") {
+  component_name = "sysmem_connector"
+  manifest = "meta/sysmem_connector.cml"
+}
+
+fuchsia_structured_config_cpp_elf_lib("config_cpp_elf_lib") {
+  cm_label = ":manifest"
+  namespace = "sysmem_config"
+}
+
+# TODO(b/362587923): Remove "connector". Kept in step 1 of sysmem move for
+# clarity of diffs.
 executable("sysmem_connector_executable") {
   output_name = "sysmem_connector"
+
+  configs += [
+    "//build/config:all_source",
+    "//build/config/fuchsia:enable_zircon_asserts",
+  ]
+
+  if (is_mistos) {
+    configs -= [ "//build/config/fuchsia:enable_zircon_asserts" ]
+    configs += [ "//build/config/mistos:enable_zircon_asserts" ]
+  }
 
   sources = [
     "app.cc",
@@ -13,14 +61,14 @@ executable("sysmem_connector_executable") {
   ]
 
   deps = [
-    "//sdk/fidl/fuchsia.feedback:fuchsia.feedback_hlcpp",
-    "//sdk/fidl/fuchsia.hardware.sysmem:fuchsia.hardware.sysmem_hlcpp",
-    "//sdk/fidl/fuchsia.metrics:fuchsia.metrics_hlcpp",
-    "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_hlcpp",
-    "//sdk/fidl/fuchsia.sysmem2:fuchsia.sysmem2_hlcpp",
+    "//sdk/fidl/fuchsia.feedback:fuchsia.feedback_cpp",
+    "//sdk/fidl/fuchsia.hardware.sysmem:fuchsia.hardware.sysmem_cpp",
+    "//sdk/fidl/fuchsia.metrics:fuchsia.metrics_cpp",
+    "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_cpp",
+    "//sdk/fidl/fuchsia.sysmem2:fuchsia.sysmem2_cpp",
     "//sdk/lib/sys/cpp",
-    "//sdk/lib/syslog/cpp",
     "//sdk/lib/vfs/cpp",
+    "//src/devices/sysmem/drivers/sysmem:sysmem_common_srcs",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/sysmem-connector",
@@ -28,44 +76,39 @@ executable("sysmem_connector_executable") {
   ]
 }
 
+# TODO(b/362587923): Remove "connector". Kept in step 1 of sysmem move for
+# clarity of diffs.
 fuchsia_component("sysmem_connector_cmp") {
   component_name = "sysmem_connector"
-  manifest = "meta/sysmem_connector.cml"
+  cm_label = ":manifest"
   deps = [ ":sysmem_connector_executable" ]
 }
 
+fuchsia_structured_config_values("config_values") {
+  cm_label = ":manifest"
+  values = {
+    contiguous_memory_size = sysmem_contiguous_memory_size
+    contiguous_memory_size_percent = sysmem_contiguous_memory_size_percent
+    protected_memory_size = sysmem_protected_memory_size
+    protected_memory_size_percent = sysmem_protected_memory_size_percent
+    contiguous_guard_pages_fatal = sysmem_contiguous_guard_pages_fatal
+    contiguous_guard_pages_internal = sysmem_contiguous_guard_pages_internal
+    contiguous_guard_page_count = sysmem_contiguous_guard_page_count
+    contiguous_guard_pages_unused = sysmem_contiguous_guard_pages_unused
+    contiguous_guard_pages_unused_fraction_denominator =
+        sysmem_contiguous_guard_pages_unused_fraction_denominator
+    contiguous_guard_pages_unused_cycle_seconds =
+        sysmem_contiguous_guard_pages_unused_cycle_seconds
+    protected_ranges_disable_dynamic = sysmem_protected_ranges_disable_dynamic
+  }
+}
+
 fuchsia_package("pkg") {
+  # TODO(b/362587923): Remove "connector". Kept in step 1 of sysmem move for
+  # clarity of diffs.
   package_name = "sysmem_connector"
-  deps = [ ":sysmem_connector_cmp" ]
-}
-
-executable("sysmem_connector_test_executable") {
-  testonly = true
-  output_name = "sysmem_connector_test"
-
-  sources = [ "test/sysmem_connector_test.cc" ]
-
   deps = [
-    "//sdk/fidl/fuchsia.hardware.sysmem:fuchsia.hardware.sysmem_hlcpp",
-    "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_hlcpp",
-    "//sdk/fidl/fuchsia.sysmem2:fuchsia.sysmem2_hlcpp",
-    "//sdk/lib/sys/cpp",
-    "//sdk/lib/syslog/cpp",
-    "//src/lib/fsl",
-    "//src/lib/fxl/test:gtest_main",
-    "//third_party/googletest:gtest",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
+    ":config_values",
+    ":sysmem_connector_cmp",
   ]
-}
-
-fuchsia_test_component("sysmem_connector_test_component") {
-  manifest = "meta/sysmem_connector_test.cml"
-  deps = [ ":sysmem_connector_test_executable" ]
-  test_type = "system"
-}
-
-fuchsia_test_package("sysmem_connector_test") {
-  test_components = [ ":sysmem_connector_test_component" ]
-  deps = [ ":sysmem_connector_cmp" ]
 }

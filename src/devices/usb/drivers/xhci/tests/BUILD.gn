@@ -9,14 +9,12 @@ source_set("test-libs") {
   testonly = true
   public_deps = [
     "..:common",
-    "//sdk/lib/async_patterns/testing/cpp",
+    "//sdk/lib/driver/testing/cpp",
     "//src/devices/bus/testing/fake-pdev",
-    "//src/devices/lib/mmio:test_helper",
     "//src/devices/testing/fake-dma-buffer",
     "//src/devices/testing/fake-mmio-reg",
-    "//src/devices/testing/mock-ddk",
-    "//zircon/system/ulib/async-loop:async-loop-default",
-    "//zircon/system/ulib/mock-function",
+    "//src/lib/fxl/test:gtest_main",
+    "//src/lib/testing/predicates",
   ]
 }
 
@@ -61,6 +59,7 @@ test("xhci-core-unittest-bin") {
     ":test-libs",
     "//src/devices/lib/driver:driver_runtime",
   ]
+  defines = [ "TEST_SKIP_INIT" ]
 }
 
 test("xhci-event-ring-unittest-bin") {

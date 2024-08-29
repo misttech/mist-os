@@ -2273,7 +2273,7 @@ void arch_zero_page(void* _ptr) {
   uint32_t zva_size = arm64_zva_size;
   uintptr_t end_ptr = ptr + PAGE_SIZE;
   do {
-    __asm volatile("dc zva, %0" ::"r"(ptr));
+    __asm__ volatile("dc zva, %0" ::"r"(ptr));
     ptr += zva_size;
   } while (ptr != end_ptr);
 }
@@ -2350,7 +2350,7 @@ void ArmVmICacheConsistencyManager::Finish() {
   }
   // Under the assumption our icache is VIPT then as we do not know all the virtual aliases of the
   // sections we cleaned our only option is to dump the entire icache.
-  asm volatile("ic ialluis" ::: "memory");
+  __asm__ volatile("ic ialluis" ::: "memory");
   __isb(ARM_MB_SY);
   need_invalidate_ = false;
 }

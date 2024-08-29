@@ -22,7 +22,7 @@ func TestSerialShellEnabled(t *testing.T) {
 	distro := emulatortest.UnpackFrom(t, filepath.Join(exPath, "test_data"), emulator.DistributionParams{Emulator: emulator.Qemu})
 	arch := distro.TargetCPU()
 	device := emulator.DefaultVirtualDevice(string(arch))
-	device.Initrd = "recovery-eng"
+	device.Initrd = "recovery-fdr"
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	i := distro.CreateContext(ctx, device)

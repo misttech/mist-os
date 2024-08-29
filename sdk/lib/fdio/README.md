@@ -126,6 +126,7 @@ the basis for higher-level functions in FDIO like the directory functions:
   * [fdio_ns_opendir()]
   * [fdio_ns_chdir()]
   * [fdio_ns_open()]
+  * [fdio_ns_open3()]
   * [fdio_ns_service_connect()]
 
 Namespaces can be converted into parallel arrays of path/handle/type. This

@@ -2,18 +2,12 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import json
 import logging
 import os
-from importlib.resources import as_file, files
 
-import test_data
 from fuchsia_base_test import fuchsia_base_test
 from mobly import test_runner
-from perf_publish import publish
-from perf_test_utils import utils
-from trace_processing import trace_importing, trace_metrics, trace_model
-from trace_processing.metrics import power
+from trace_processing import trace_importing, trace_model
 
 _LOGGER = logging.getLogger(__name__)
 

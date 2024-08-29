@@ -25,6 +25,7 @@ rustc_binary("bin") {
   ]
 
   deps = [
+    "//sdk/fidl/fuchsia.element:fuchsia.element_rust",
     "//sdk/fidl/fuchsia.images2:fuchsia.images2_rust",
     "//sdk/fidl/fuchsia.math:fuchsia.math_rust",
     "//sdk/fidl/fuchsia.scenic.scheduling:fuchsia.scenic.scheduling_rust",

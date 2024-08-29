@@ -16,7 +16,7 @@ pub(crate) async fn create_realm() -> Result<InstalledNamespace, Error> {
     inner_create_realm(fidl_test_sampler::RealmOptions {
         sampler_component_name: Some(SAMPLER_NAME.into()),
         single_counter_name: Some(COUNTER_NAME.into()),
-        mock_cobalt_name: Some(COBALT_NAME.into()),
+        fake_cobalt_name: Some(COBALT_NAME.into()),
         test_archivist_name: Some(ARCHIVIST_NAME.into()),
         ..Default::default()
     })

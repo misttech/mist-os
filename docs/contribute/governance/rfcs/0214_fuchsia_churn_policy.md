@@ -164,7 +164,7 @@ proposal addresses?
 [build-products]: /docs/development/build/build_system/boards_and_products.md#products
 [contributor-guide]: /CONTRIBUTING.md
 [fec]: /docs/contribute/governance/eng_council.md
-[fuchsia-abi]: /docs/concepts/packages/system.md
+[fuchsia-abi]: /docs/concepts/kernel/system.md
 [fuchsia-sdk]: /docs/development/sdk/index.md
 [governance-policies]: /docs/contribute/governance/governance.md
 [soft-transitions]: /docs/development/source_code/working_across_petals.md#soft-transitions

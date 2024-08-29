@@ -12,7 +12,7 @@ namespace fdf_power {
 
 ElementDesc ElementDescBuilder::Build() {
   ElementDesc to_return;
-  to_return.element_config_ = element_config_;
+  to_return.element_config = element_config;
   to_return.tokens = std::move(tokens_);
 
   if (this->assertive_token_.has_value()) {

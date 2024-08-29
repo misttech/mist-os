@@ -645,7 +645,6 @@ async fn inspect_devices(name: &str) {
                     Ethernet: {
                         Rx: {
                             NoEthertype: 0u64,
-                            NonLocalDstAddr: 0u64,
                             UnsupportedEthertype: 0u64,
                         },
                     },
@@ -708,7 +707,6 @@ async fn inspect_devices(name: &str) {
                     Ethernet: {
                         Rx: {
                             NoEthertype: 0u64,
-                            NonLocalDstAddr: 0u64,
                             UnsupportedEthertype: 0u64,
                         },
                     },
@@ -778,7 +776,6 @@ async fn inspect_counters(name: &str) {
                 "Ethernet": {
                     "Rx": {
                         NoEthertype: 0u64,
-                        NonLocalDstAddr: 0u64,
                         UnsupportedEthertype: 0u64,
                     },
                 },

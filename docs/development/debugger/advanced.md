@@ -15,7 +15,7 @@ You can use the [`ffx debug core`](https://fuchsia.dev/reference/tools/sdk/ffx#c
 command to load a crash report, for example:
 
 ```none
-ffx debug core <var>crash_dump_file</var>
+ffx debug core {{ '<var>crash_dump_file</var>' }}
 ```
 
 ## Download symbols {#download-symbols}

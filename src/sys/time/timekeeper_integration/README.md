@@ -12,7 +12,7 @@ The test component implements a number of services:
  by Timekeeper to forward the `fuchsia.time.external.*` connections it receives from
  Timekeeper to the test component.
 
-In addition, the test launches a mock Cobalt component, which makes
+In addition, the test launches a fake Cobalt component, which makes
 `fuchsia.metrics.MetricEventLoggerFactory` available to Timekeeper.
 
 ## Fake-clock tests

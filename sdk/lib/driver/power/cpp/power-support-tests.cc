@@ -241,18 +241,17 @@ TEST_F(PowerLibTest, TestLeaseHelper) {
       root.component().Connect("fuchsia.power.broker.Topology", power_broker.server.TakeChannel());
   ASSERT_EQ(ZX_OK, connect_result);
 
-  fuchsia_hardware_power::PowerElementConfiguration config{{
-      .element = fuchsia_hardware_power::PowerElement{{
+  fdf_power::PowerElementConfiguration config{
+      .element{
           .name = "parent_element",
           .levels =
               {
-                  {{{.level = 0, .name = "zero"}}, {{.level = 1, .name = "one"}}},
+                  {{.level = 0, .name = "zero"}, {.level = 1, .name = "one"}},
               },
-      }},
-  }};
+      },
+  };
 
-  fidl::Arena arena;
-  fdf_power::ElementDescBuilder element_builder(fidl::ToWire(arena, config), fdf_power::TokenMap());
+  fdf_power::ElementDescBuilder element_builder(config, fdf_power::TokenMap());
   fdf_power::ElementDesc description = element_builder.Build();
   auto result = fdf_power::AddElement(power_broker.client, description);
 
@@ -519,21 +518,19 @@ TEST_F(PowerLibTest, TestElementRunnerManualSet) {
 TEST_F(PowerLibTest, AddElementNoDep) {
   // Create the dependency configuration and create a
   // map<parent_name, vec<level_deps> used for call validation later.
-  fuchsia_hardware_power::PowerLevel one = {{.level = 0, .name = "one", .transitions = {}}};
-  fuchsia_hardware_power::PowerLevel two = {{.level = 1, .name = "two", .transitions = {}}};
-  fuchsia_hardware_power::PowerLevel three = {{.level = 2, .name = "three", .transitions = {}}};
+  std::string parent_name = "element_first_parent";
+  fdf_power::PowerLevel one = {.level = 0, .name = "one", .transitions{}};
+  fdf_power::PowerLevel two = {.level = 1, .name = "two", .transitions{}};
+  fdf_power::PowerLevel three = {.level = 2, .name = "three", .transitions{}};
 
-  fuchsia_hardware_power::PowerElement pe = {{
+  fdf_power::PowerElement pe = {
       .name = "the_element",
-      .levels = {{one, two, three}},
-  }};
+      .levels = {one, two, three},
+  };
 
-  fuchsia_hardware_power::PowerElementConfiguration df_config = {
-      {.element = pe, .dependencies = {{}}}};
+  fdf_power::PowerElementConfiguration df_config{.element = pe, .dependencies = {}};
 
-  std::unordered_map<fuchsia_hardware_power::ParentElement, zx::event,
-                     fdf_power::ParentElementHasher>
-      tokens;
+  std::unordered_map<fdf_power::ParentElement, zx::event> tokens;
 
   // Make the fake power broker
   async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
@@ -553,9 +550,9 @@ TEST_F(PowerLibTest, AddElementNoDep) {
   // Call add element
   fidl::Arena arena;
   zx::event invalid, invalid2;
-  auto call_result = fdf_power::AddElement(endpoints.client, fidl::ToWire(arena, df_config),
-                                           std::move(tokens), invalid.borrow(), invalid2.borrow(),
-                                           std::nullopt, std::nullopt, std::nullopt);
+  auto call_result =
+      fdf_power::AddElement(endpoints.client, df_config, std::move(tokens), invalid.borrow(),
+                            invalid2.borrow(), std::nullopt, std::nullopt, std::nullopt);
   ASSERT_TRUE(call_result.is_ok());
   loop.Shutdown();
   loop.JoinThreads();
@@ -567,50 +564,47 @@ TEST_F(PowerLibTest, AddElementSingleDep) {
   // Create the dependency configuration and create a
   // map<parent_name, vec<level_deps> used for call validation later.
   std::string parent_name = "element_first_parent";
-  fuchsia_hardware_power::PowerLevel one = {{.level = 0, .name = "one", .transitions = {}}};
-  fuchsia_hardware_power::PowerLevel two = {{.level = 1, .name = "two", .transitions = {}}};
-  fuchsia_hardware_power::PowerLevel three = {{.level = 2, .name = "three", .transitions = {}}};
+  fdf_power::PowerLevel one = {.level = 0, .name = "one", .transitions{}};
+  fdf_power::PowerLevel two = {.level = 1, .name = "two", .transitions{}};
+  fdf_power::PowerLevel three = {.level = 2, .name = "three", .transitions{}};
 
-  fuchsia_hardware_power::PowerElement pe = {{
+  fdf_power::PowerElement pe{
       .name = "the_element",
-      .levels = {{one, two, three}},
-  }};
+      .levels = {one, two, three},
+  };
 
-  fuchsia_hardware_power::LevelTuple one_to_one = {{
+  fdf_power::LevelTuple one_to_one{
       .child_level = 1,
       .parent_level = 1,
-  }};
-  fuchsia_hardware_power::LevelTuple three_to_two = {{
+  };
+  fdf_power::LevelTuple three_to_two{
       .child_level = 3,
       .parent_level = 2,
-  }};
+  };
 
-  fuchsia_hardware_power::PowerDependency power_dep = {{
+  fdf_power::PowerDependency power_dep{
       .child = "n/a",
-      .parent = fuchsia_hardware_power::ParentElement::WithInstanceName(parent_name),
-      .level_deps = {{one_to_one, three_to_two}},
-      .strength = fuchsia_hardware_power::RequirementType::kAssertive,
-  }};
+      .parent = fdf_power::ParentElement::WithInstanceName(parent_name),
+      .level_deps = {one_to_one, three_to_two},
+      .strength = fdf_power::RequirementType::kAssertive,
+  };
 
-  fuchsia_hardware_power::PowerElementConfiguration df_config = {
-      {.element = pe, .dependencies = {{power_dep}}}};
+  fdf_power::PowerElementConfiguration df_config{.element = pe, .dependencies = {power_dep}};
 
   zx::event parent_token;
   ASSERT_EQ(ZX_OK, zx::event::create(0, &parent_token));
 
   // map of level dependencies we'll use later for validation
   std::unordered_map<uint8_t, uint8_t> child_to_parent_levels{
-      {one_to_one.child_level().value(), one_to_one.parent_level().value()},
-      {three_to_two.child_level().value(), three_to_two.parent_level().value()}};
+      {one_to_one.child_level, one_to_one.parent_level},
+      {three_to_two.child_level, three_to_two.parent_level}};
 
   // Create the map of dependency names to zx::event tokens
   // Make a copy of the token
   zx::event token_copy;
   ASSERT_EQ(ZX_OK, parent_token.duplicate(ZX_RIGHT_SAME_RIGHTS, &token_copy));
-  std::unordered_map<fuchsia_hardware_power::ParentElement, zx::event,
-                     fdf_power::ParentElementHasher>
-      tokens;
-  tokens.insert(std::make_pair(fuchsia_hardware_power::ParentElement::WithInstanceName(parent_name),
+  std::unordered_map<fdf_power::ParentElement, zx::event> tokens;
+  tokens.insert(std::make_pair(fdf_power::ParentElement::WithInstanceName(parent_name),
                                std::move(token_copy)));
 
   // Make the fake power broker
@@ -649,9 +643,9 @@ TEST_F(PowerLibTest, AddElementSingleDep) {
   // Call add element
   fidl::Arena arena;
   zx::event invalid1, invalid2;
-  auto call_result = fdf_power::AddElement(endpoints.client, fidl::ToWire(arena, df_config),
-                                           std::move(tokens), invalid1.borrow(), invalid2.borrow(),
-                                           std::nullopt, std::nullopt, std::nullopt);
+  auto call_result =
+      fdf_power::AddElement(endpoints.client, df_config, std::move(tokens), invalid1.borrow(),
+                            invalid2.borrow(), std::nullopt, std::nullopt, std::nullopt);
 
   ASSERT_TRUE(call_result.is_ok());
 
@@ -664,47 +658,47 @@ TEST_F(PowerLibTest, AddElementSingleDep) {
 TEST_F(PowerLibTest, AddElementDoubleDep) {
   // Create the dependency configuration and create a
   // map<parent_name, vec<level_deps> used for call validation later.
-  fuchsia_hardware_power::ParentElement parent_name_first =
-      fuchsia_hardware_power::ParentElement::WithInstanceName("element_first_parent");
-  fuchsia_hardware_power::ParentElement parent_name_second =
-      fuchsia_hardware_power::ParentElement::WithInstanceName("element_second_parent");
-  fuchsia_hardware_power::PowerLevel one = {{.level = 0, .name = "one", .transitions = {}}};
-  fuchsia_hardware_power::PowerLevel two = {{.level = 1, .name = "two", .transitions = {}}};
-  fuchsia_hardware_power::PowerLevel three = {{.level = 2, .name = "three", .transitions = {}}};
+  fdf_power::ParentElement parent_name_first =
+      fdf_power::ParentElement::WithInstanceName("element_first_parent");
+  fdf_power::ParentElement parent_name_second =
+      fdf_power::ParentElement::WithInstanceName("element_second_parent");
+  fdf_power::PowerLevel one{.level = 0, .name = "one", .transitions{}};
+  fdf_power::PowerLevel two{.level = 1, .name = "two", .transitions{}};
+  fdf_power::PowerLevel three{.level = 2, .name = "three", .transitions{}};
 
-  fuchsia_hardware_power::PowerElement pe = {{
+  fdf_power::PowerElement pe = {
       .name = "the_element",
-      .levels = {{one, two, three}},
-  }};
+      .levels = {one, two, three},
+  };
 
-  uint16_t dep_one_level = 1;
-  fuchsia_hardware_power::LevelTuple one_to_one = {{
+  uint8_t dep_one_level = 1;
+  fdf_power::LevelTuple one_to_one{
       .child_level = dep_one_level,
       .parent_level = 1,
-  }};
+  };
 
-  fuchsia_hardware_power::PowerDependency power_dep_one = {{
+  fdf_power::PowerDependency power_dep_one{
       .child = "n/a",
       .parent = parent_name_first,
-      .level_deps = {{one_to_one}},
-      .strength = fuchsia_hardware_power::RequirementType::kAssertive,
-  }};
+      .level_deps = {one_to_one},
+      .strength = fdf_power::RequirementType::kAssertive,
+  };
 
-  uint16_t dep_two_level = 3;
-  fuchsia_hardware_power::LevelTuple three_to_two = {{
+  uint8_t dep_two_level = 3;
+  fdf_power::LevelTuple three_to_two{
       .child_level = dep_two_level,
       .parent_level = 2,
-  }};
+  };
 
-  fuchsia_hardware_power::PowerDependency power_dep_two = {{
+  fdf_power::PowerDependency power_dep_two{
       .child = "n/a",
       .parent = parent_name_second,
-      .level_deps = {{three_to_two}},
-      .strength = fuchsia_hardware_power::RequirementType::kAssertive,
-  }};
+      .level_deps = {three_to_two},
+      .strength = fdf_power::RequirementType::kAssertive,
+  };
 
-  fuchsia_hardware_power::PowerElementConfiguration df_config = {
-      {.element = pe, .dependencies = {{power_dep_one, power_dep_two}}}};
+  fdf_power::PowerElementConfiguration df_config = {.element = pe,
+                                                    .dependencies = {power_dep_one, power_dep_two}};
 
   zx::event parent_token_one;
   ASSERT_EQ(ZX_OK, zx::event::create(0, &parent_token_one));
@@ -713,15 +707,13 @@ TEST_F(PowerLibTest, AddElementDoubleDep) {
   ASSERT_EQ(ZX_OK, zx::event::create(0, &parent_token_two));
 
   // map of level dependencies we'll use later for validation
-  std::unordered_map<uint16_t, uint16_t> child_to_parent_levels{
-      {one_to_one.child_level().value(), one_to_one.parent_level().value()},
-      {three_to_two.child_level().value(), three_to_two.parent_level().value()}};
+  std::unordered_map<uint8_t, uint8_t> child_to_parent_levels{
+      {one_to_one.child_level, one_to_one.parent_level},
+      {three_to_two.child_level, three_to_two.parent_level}};
 
   // Create the map of dependency names to zx::event tokens
   // Make a copy of the token
-  std::unordered_map<fuchsia_hardware_power::ParentElement, zx::event,
-                     fdf_power::ParentElementHasher>
-      tokens;
+  std::unordered_map<fdf_power::ParentElement, zx::event> tokens;
   {
     zx::event token_one_copy;
     ASSERT_EQ(ZX_OK, parent_token_one.duplicate(ZX_RIGHT_SAME_RIGHTS, &token_one_copy));
@@ -779,9 +771,9 @@ TEST_F(PowerLibTest, AddElementDoubleDep) {
   // Call add element
   fidl::Arena arena;
   zx::event invalid1, invalid2;
-  auto call_result = fdf_power::AddElement(endpoints.client, fidl::ToWire(arena, df_config),
-                                           std::move(tokens), invalid1.borrow(), invalid2.borrow(),
-                                           std::nullopt, std::nullopt, std::nullopt);
+  auto call_result =
+      fdf_power::AddElement(endpoints.client, df_config, std::move(tokens), invalid1.borrow(),
+                            invalid2.borrow(), std::nullopt, std::nullopt, std::nullopt);
 
   ASSERT_TRUE(call_result.is_ok());
 
@@ -793,41 +785,40 @@ TEST_F(PowerLibTest, AddElementDoubleDep) {
 /// parent levels is converted correctly from configuration format to the
 /// format used by Power Framework.
 TEST_F(PowerLibTest, LevelDependencyWithSingleParent) {
-  fuchsia_hardware_power::ParentElement parent =
-      fuchsia_hardware_power::ParentElement::WithInstanceName("element_first_parent");
-  fuchsia_hardware_power::PowerLevel one = {{.level = 0, .name = "one", .transitions = {}}};
-  fuchsia_hardware_power::PowerLevel two = {{.level = 1, .name = "two", .transitions = {}}};
-  fuchsia_hardware_power::PowerLevel three = {{.level = 2, .name = "three", .transitions = {}}};
+  fdf_power::ParentElement parent =
+      fdf_power::ParentElement::WithInstanceName("element_first_parent");
+  fdf_power::PowerLevel one = {.level = 0, .name = "one", .transitions{}};
+  fdf_power::PowerLevel two = {.level = 1, .name = "two", .transitions{}};
+  fdf_power::PowerLevel three = {.level = 2, .name = "three", .transitions{}};
 
-  fuchsia_hardware_power::PowerElement pe = {{
+  fdf_power::PowerElement pe{
       .name = "the_element",
-      .levels = {{one, two, three}},
-  }};
+      .levels = {one, two, three},
+  };
 
-  fuchsia_hardware_power::LevelTuple one_to_one = {{
+  fdf_power::LevelTuple one_to_one{
       .child_level = 1,
       .parent_level = 1,
-  }};
-  fuchsia_hardware_power::LevelTuple three_to_two = {{
+  };
+  fdf_power::LevelTuple three_to_two{
       .child_level = 3,
       .parent_level = 2,
-  }};
+  };
 
-  std::unordered_map<uint16_t, uint16_t> child_to_parent_levels{
-      {one_to_one.child_level().value(), one_to_one.parent_level().value()},
-      {three_to_two.child_level().value(), three_to_two.parent_level().value()}};
+  std::unordered_map<uint8_t, uint8_t> child_to_parent_levels{
+      {one_to_one.child_level, one_to_one.parent_level},
+      {three_to_two.child_level, three_to_two.parent_level}};
 
-  fuchsia_hardware_power::PowerDependency power_dep = {{
+  fdf_power::PowerDependency power_dep{
       .child = "n/a",
       .parent = parent,
-      .level_deps = {{one_to_one, three_to_two}},
-      .strength = fuchsia_hardware_power::RequirementType::kAssertive,
-  }};
+      .level_deps = {one_to_one, three_to_two},
+      .strength = fdf_power::RequirementType::kAssertive,
+  };
 
-  fuchsia_hardware_power::PowerElementConfiguration df_config = {
-      {.element = pe, .dependencies = {{power_dep}}}};
-  fidl::Arena test;
-  auto output = fdf_power::LevelDependencyFromConfig(fidl::ToWire(test, df_config)).value();
+  fdf_power::PowerElementConfiguration df_config = {.element{pe}, .dependencies = {power_dep}};
+
+  auto output = fdf_power::LevelDependencyFromConfig(df_config).value();
 
   // we expect that "element_first_parent" will have two entries
   // one for each of the level deps we've expressed
@@ -848,29 +839,27 @@ TEST_F(PowerLibTest, LevelDependencyWithSingleParent) {
 
 /// Check that power levels are take out of the driver config format correctly.
 TEST_F(PowerLibTest, ExtractPowerLevelsFromConfig) {
-  fuchsia_hardware_power::ParentElement parent =
-      fuchsia_hardware_power::ParentElement::WithInstanceName("element_first_parent");
-  fuchsia_hardware_power::PowerLevel one = {{.level = 0, .name = "one", .transitions = {}}};
-  fuchsia_hardware_power::PowerLevel two = {{.level = 0, .name = "two", .transitions = {}}};
-  fuchsia_hardware_power::PowerLevel three = {{.level = 0, .name = "three", .transitions = {}}};
+  fdf_power::ParentElement parent =
+      fdf_power::ParentElement::WithInstanceName("element_first_parent");
+  fdf_power::PowerLevel one{.level = 0, .name = "one", .transitions{}};
+  fdf_power::PowerLevel two{.level = 0, .name = "two", .transitions{}};
+  fdf_power::PowerLevel three{.level = 0, .name = "three", .transitions{}};
 
-  fuchsia_hardware_power::PowerElement pe = {{
+  fdf_power::PowerElement pe{
       .name = "the_element",
-      .levels = {{one, two, three}},
-  }};
+      .levels = {one, two, three},
+  };
 
-  fuchsia_hardware_power::PowerDependency power_dep = {{
+  fdf_power::PowerDependency power_dep{
       .child = "n/a",
       .parent = parent,
       .level_deps = {},
-      .strength = fuchsia_hardware_power::RequirementType::kAssertive,
-  }};
+      .strength = fdf_power::RequirementType::kAssertive,
+  };
 
-  fuchsia_hardware_power::PowerElementConfiguration df_config = {
-      {.element = pe, .dependencies = {{power_dep}}}};
+  fdf_power::PowerElementConfiguration df_config{.element = pe, .dependencies = {power_dep}};
 
-  fidl::Arena test;
-  auto converted = fdf_power::PowerLevelsFromConfig(fidl::ToWire(test, df_config));
+  auto converted = fdf_power::PowerLevelsFromConfig(df_config);
 
   ASSERT_EQ(static_cast<size_t>(3), converted.size());
 }
@@ -889,24 +878,20 @@ TEST_F(PowerLibTest, GetTokensNoTokens) {
       fidl::CreateEndpoints<fuchsia_io::Directory>().value();
   vfs.ServeDirectory(std::move(empty_dir), std::move(dir_endpoints.server));
 
-  fuchsia_hardware_power::PowerLevel one = {{.level = 1, .name = "one", .transitions = {}}};
-  fuchsia_hardware_power::PowerLevel two = {{.level = 2, .name = "two", .transitions = {}}};
-  fuchsia_hardware_power::PowerLevel three = {{.level = 3, .name = "three", .transitions = {}}};
+  fdf_power::PowerLevel one{.level = 1, .name = "one", .transitions{}};
+  fdf_power::PowerLevel two{.level = 2, .name = "two", .transitions{}};
+  fdf_power::PowerLevel three{.level = 3, .name = "three", .transitions{}};
 
-  fuchsia_hardware_power::PowerElement pe = {{
+  fdf_power::PowerElement pe{
       .name = "the_element",
-      .levels = {{one, two, three}},
-  }};
+      .levels = {one, two, three},
+  };
 
   // Specify no dependencies
-  fuchsia_hardware_power::PowerElementConfiguration df_config = {
-      {.element = pe, .dependencies = {}}};
+  fdf_power::PowerElementConfiguration df_config{.element = pe, .dependencies = {}};
 
-  fidl::Arena test;
-  fit::result<fdf_power::Error, std::unordered_map<fuchsia_hardware_power::ParentElement, zx::event,
-                                                   fdf_power::ParentElementHasher>>
-      result = fdf_power::GetDependencyTokens(fidl::ToWire(test, df_config),
-                                              std::move(dir_endpoints.client));
+  fit::result<fdf_power::Error, std::unordered_map<fdf_power::ParentElement, zx::event>> result =
+      fdf_power::GetDependencyTokens(df_config, std::move(dir_endpoints.client));
 
   // Should be no tokens, but also no errors
   ASSERT_EQ(result.value().size(), static_cast<size_t>(0));
@@ -918,8 +903,7 @@ TEST_F(PowerLibTest, GetTokensNoTokens) {
 /// power element.
 TEST_F(PowerLibTest, GetTokensOneDepOneLevel) {
   std::string parent_name = "parentOne";
-  fuchsia_hardware_power::ParentElement parent =
-      fuchsia_hardware_power::ParentElement::WithInstanceName(parent_name);
+  fdf_power::ParentElement parent = fdf_power::ParentElement::WithInstanceName(parent_name);
   async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
   loop.StartThread();
   fidl::ServerBindingGroup<fuchsia_hardware_power::PowerTokenProvider> bindings;
@@ -940,38 +924,37 @@ TEST_F(PowerLibTest, GetTokensOneDepOneLevel) {
   vfs.ServeDirectory(std::move(power_token_service), std::move(dir_endpoints.server));
 
   // Specify the power element
-  fuchsia_hardware_power::PowerLevel one = {{.level = 0, .name = "one", .transitions = {}}};
-  fuchsia_hardware_power::PowerLevel two = {{.level = 1, .name = "two", .transitions = {}}};
-  fuchsia_hardware_power::PowerLevel three = {{.level = 2, .name = "three", .transitions = {}}};
+  fdf_power::PowerLevel one{.level = 0, .name = "one", .transitions{}};
+  fdf_power::PowerLevel two{.level = 1, .name = "two", .transitions{}};
+  fdf_power::PowerLevel three{.level = 2, .name = "three", .transitions{}};
 
-  fuchsia_hardware_power::PowerElement pe = {{
+  fdf_power::PowerElement pe{
       .name = "the_element",
-      .levels = {{one, two, three}},
-  }};
+      .levels = {one, two, three},
+  };
 
   // Create a dependency between a level on this element and a level on the
   // parent
-  fuchsia_hardware_power::PowerDependency power_dep = {{
+  fdf_power::PowerDependency power_dep{
       .child = "n/a",
       .parent = parent,
-      .level_deps = {{
-          {{
-              .child_level = 1,
-              .parent_level = 2,
-          }},
-      }},
-      .strength = fuchsia_hardware_power::RequirementType::kAssertive,
-  }};
+      .level_deps =
+          {
+              {
+                  .child_level = 1,
+                  .parent_level = 2,
+              },
+          },
+      .strength = fdf_power::RequirementType::kAssertive,
+  };
 
-  fuchsia_hardware_power::PowerElementConfiguration df_config = {
-      {.element = pe, .dependencies = {{power_dep}}}};
+  fdf_power::PowerElementConfiguration df_config = {.element = pe, .dependencies = {power_dep}};
 
   // With the given configuration, get the dependency tokens. We expect this to
   // call into the PowerTokenProvider we built above which calls into our
   // FakeTokenServer instance.
-  fidl::Arena test;
-  fit::result<fdf_power::Error, fdf_power::TokenMap> result = fdf_power::GetDependencyTokens(
-      fidl::ToWire(test, df_config), std::move(dir_endpoints.client));
+  fit::result<fdf_power::Error, fdf_power::TokenMap> result =
+      fdf_power::GetDependencyTokens(df_config, std::move(dir_endpoints.client));
 
   ASSERT_TRUE(result.is_ok());
   fdf_power::TokenMap token_map = std::move(result.value());
@@ -994,8 +977,7 @@ TEST_F(PowerLibTest, GetTokensOneDepOneLevel) {
 /// the same parent element.
 TEST_F(PowerLibTest, GetTokensOneDepTwoLevels) {
   std::string parent_name = "parentOne";
-  fuchsia_hardware_power::ParentElement parent =
-      fuchsia_hardware_power::ParentElement::WithInstanceName(parent_name);
+  fdf_power::ParentElement parent = fdf_power::ParentElement::WithInstanceName(parent_name);
   async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
   loop.StartThread();
   fidl::ServerBindingGroup<fuchsia_hardware_power::PowerTokenProvider> bindings;
@@ -1016,42 +998,41 @@ TEST_F(PowerLibTest, GetTokensOneDepTwoLevels) {
   vfs.ServeDirectory(std::move(namespace_svc_dir), std::move(dir_endpoints.server));
 
   // Specify the power element
-  fuchsia_hardware_power::PowerLevel one = {{.level = 0, .name = "one", .transitions = {}}};
-  fuchsia_hardware_power::PowerLevel two = {{.level = 1, .name = "two", .transitions = {}}};
-  fuchsia_hardware_power::PowerLevel three = {{.level = 2, .name = "three", .transitions = {}}};
+  fdf_power::PowerLevel one{.level = 0, .name = "one", .transitions{}};
+  fdf_power::PowerLevel two{.level = 1, .name = "two", .transitions{}};
+  fdf_power::PowerLevel three{.level = 2, .name = "three", .transitions{}};
 
-  fuchsia_hardware_power::PowerElement pe = {{
+  fdf_power::PowerElement pe{
       .name = "the_element",
-      .levels = {{one, two, three}},
-  }};
+      .levels = {one, two, three},
+  };
 
   // Create a dependency between a level on this element and a level on the
   // parent
-  fuchsia_hardware_power::PowerDependency power_dep = {{
+  fdf_power::PowerDependency power_dep{
       .child = "n/a",
       .parent = parent,
-      .level_deps = {{
-          {{
-              .child_level = 1,
-              .parent_level = 2,
-          }},
-          {{
-              .child_level = 2,
-              .parent_level = 4,
-          }},
-      }},
-      .strength = fuchsia_hardware_power::RequirementType::kAssertive,
-  }};
+      .level_deps =
+          {
+              {
+                  .child_level = 1,
+                  .parent_level = 2,
+              },
+              {
+                  .child_level = 2,
+                  .parent_level = 4,
+              },
+          },
+      .strength = fdf_power::RequirementType::kAssertive,
+  };
 
-  fuchsia_hardware_power::PowerElementConfiguration df_config = {
-      {.element = pe, .dependencies = {{power_dep}}}};
+  fdf_power::PowerElementConfiguration df_config{.element = pe, .dependencies = {power_dep}};
 
   // With the given configuration, get the dependency tokens. We expect this to
   // call into the PowerTokenProvider we built above which calls into our
   // FakeTokenServer instance.
-  fidl::Arena test;
-  fit::result<fdf_power::Error, fdf_power::TokenMap> result = fdf_power::GetDependencyTokens(
-      fidl::ToWire(test, df_config), std::move(dir_endpoints.client));
+  fit::result<fdf_power::Error, fdf_power::TokenMap> result =
+      fdf_power::GetDependencyTokens(df_config, std::move(dir_endpoints.client));
 
   ASSERT_TRUE(result.is_ok());
   fdf_power::TokenMap token_map = std::move(result.value());
@@ -1074,11 +1055,11 @@ TEST_F(PowerLibTest, GetTokensOneDepTwoLevels) {
 /// has a dependency on two different parents.
 TEST_F(PowerLibTest, GetTokensTwoDepTwoLevels) {
   std::string parent_name1 = "parentOne";
-  fuchsia_hardware_power::ParentElement parent_element1 =
-      fuchsia_hardware_power::ParentElement::WithInstanceName(parent_name1);
+  fdf_power::ParentElement parent_element1 =
+      fdf_power::ParentElement::WithInstanceName(parent_name1);
   std::string parent_name2 = "parentTwo";
-  fuchsia_hardware_power::ParentElement parent_element2 =
-      fuchsia_hardware_power::ParentElement::WithInstanceName(parent_name2);
+  fdf_power::ParentElement parent_element2 =
+      fdf_power::ParentElement::WithInstanceName(parent_name2);
   async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
   loop.StartThread();
   fidl::ServerBindingGroup<fuchsia_hardware_power::PowerTokenProvider> bindings;
@@ -1102,52 +1083,53 @@ TEST_F(PowerLibTest, GetTokensTwoDepTwoLevels) {
   vfs.ServeDirectory(std::move(power_token_service), std::move(dir_endpoints.server));
 
   // Specify the power element
-  fuchsia_hardware_power::PowerLevel one = {{.level = 0, .name = "one", .transitions = {}}};
-  fuchsia_hardware_power::PowerLevel two = {{.level = 1, .name = "two", .transitions = {}}};
-  fuchsia_hardware_power::PowerLevel three = {{.level = 2, .name = "three", .transitions = {}}};
+  fdf_power::PowerLevel one{.level = 0, .name = "one", .transitions{}};
+  fdf_power::PowerLevel two{.level = 1, .name = "two", .transitions{}};
+  fdf_power::PowerLevel three{.level = 2, .name = "three", .transitions{}};
 
-  fuchsia_hardware_power::PowerElement pe = {{
+  fdf_power::PowerElement pe{
       .name = "the_element",
-      .levels = {{one, two, three}},
-  }};
+      .levels = {one, two, three},
+  };
 
   // Create a dependency between a level on this element and a level on the
   // parent
-  fuchsia_hardware_power::PowerDependency power_dep_one = {{
+  fdf_power::PowerDependency power_dep_one{
       .child = "n/a",
       .parent = parent_element1,
-      .level_deps = {{
-          {{
-              .child_level = 1,
-              .parent_level = 2,
-          }},
-      }},
-      .strength = fuchsia_hardware_power::RequirementType::kAssertive,
-  }};
+      .level_deps =
+          {
+              {
+                  .child_level = 1,
+                  .parent_level = 2,
+              },
+          },
+      .strength = fdf_power::RequirementType::kAssertive,
+  };
 
   // Create a dependency between a level on this element and a level on the
   // parent
-  fuchsia_hardware_power::PowerDependency power_dep_two = {{
+  fdf_power::PowerDependency power_dep_two{
       .child = "n/a",
       .parent = parent_element2,
-      .level_deps = {{
-          {{
-              .child_level = 2,
-              .parent_level = 4,
-          }},
-      }},
-      .strength = fuchsia_hardware_power::RequirementType::kAssertive,
-  }};
+      .level_deps =
+          {
+              {
+                  .child_level = 2,
+                  .parent_level = 4,
+              },
+          },
+      .strength = fdf_power::RequirementType::kAssertive,
+  };
 
-  fuchsia_hardware_power::PowerElementConfiguration df_config = {
-      {.element = pe, .dependencies = {{power_dep_one, power_dep_two}}}};
+  fdf_power::PowerElementConfiguration df_config{.element = pe,
+                                                 .dependencies = {power_dep_one, power_dep_two}};
 
   // With the given configuration, get the dependency tokens. We expect this to
   // call into the PowerTokenProvider we built above which calls into our
   // FakeTokenServer instance.
-  fidl::Arena test;
-  fit::result<fdf_power::Error, fdf_power::TokenMap> result = fdf_power::GetDependencyTokens(
-      fidl::ToWire(test, df_config), std::move(dir_endpoints.client));
+  fit::result<fdf_power::Error, fdf_power::TokenMap> result =
+      fdf_power::GetDependencyTokens(df_config, std::move(dir_endpoints.client));
 
   ASSERT_TRUE(result.is_ok());
   fdf_power::TokenMap token_map = std::move(result.value());
@@ -1187,45 +1169,45 @@ TEST_F(PowerLibTest, ApplyPowerConfiguration) {
   async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
   loop.StartThread();
   // Create the dependency configuration
-  fuchsia_hardware_power::ParentElement parent_name_first =
-      fuchsia_hardware_power::ParentElement::WithInstanceName("element_first_parent");
-  fuchsia_hardware_power::ParentElement parent_name_second =
-      fuchsia_hardware_power::ParentElement::WithInstanceName("element_second_parent");
-  fuchsia_hardware_power::PowerLevel one = {{.level = 0, .name = "one", .transitions = {}}};
-  fuchsia_hardware_power::PowerLevel two = {{.level = 1, .name = "two", .transitions = {}}};
-  fuchsia_hardware_power::PowerLevel three = {{.level = 2, .name = "three", .transitions = {}}};
+  fdf_power::ParentElement parent_name_first =
+      fdf_power::ParentElement::WithInstanceName("element_first_parent");
+  fdf_power::ParentElement parent_name_second =
+      fdf_power::ParentElement::WithInstanceName("element_second_parent");
+  fdf_power::PowerLevel one{.level = 0, .name = "one", .transitions{}};
+  fdf_power::PowerLevel two{.level = 1, .name = "two", .transitions{}};
+  fdf_power::PowerLevel three{.level = 2, .name = "three", .transitions{}};
 
-  fuchsia_hardware_power::PowerElement pe = {{
+  fdf_power::PowerElement pe{
       .name = "the_element",
-      .levels = {{one, two, three}},
-  }};
+      .levels = {one, two, three},
+  };
 
-  fuchsia_hardware_power::LevelTuple one_to_one = {{
+  fdf_power::LevelTuple one_to_one{
       .child_level = 1,
       .parent_level = 1,
-  }};
+  };
 
-  fuchsia_hardware_power::PowerDependency power_dep_one = {{
+  fdf_power::PowerDependency power_dep_one{
       .child = "the_element",
       .parent = parent_name_first,
-      .level_deps = {{one_to_one}},
-      .strength = fuchsia_hardware_power::RequirementType::kAssertive,
-  }};
+      .level_deps = {one_to_one},
+      .strength = fdf_power::RequirementType::kAssertive,
+  };
 
-  fuchsia_hardware_power::LevelTuple three_to_two = {{
+  fdf_power::LevelTuple three_to_two{
       .child_level = 3,
       .parent_level = 2,
-  }};
+  };
 
-  fuchsia_hardware_power::PowerDependency power_dep_two = {{
+  fdf_power::PowerDependency power_dep_two{
       .child = "the_element",
       .parent = parent_name_second,
-      .level_deps = {{three_to_two}},
-      .strength = fuchsia_hardware_power::RequirementType::kAssertive,
-  }};
+      .level_deps = {three_to_two},
+      .strength = fdf_power::RequirementType::kAssertive,
+  };
 
-  fuchsia_hardware_power::PowerElementConfiguration df_config = {
-      {.element = pe, .dependencies = {{power_dep_one, power_dep_two}}}};
+  fdf_power::PowerElementConfiguration df_config{.element = pe,
+                                                 .dependencies = {power_dep_one, power_dep_two}};
 
   // Create service token instances
   fidl::ServerBindingGroup<fuchsia_hardware_power::PowerTokenProvider> token_bindings;
@@ -1307,10 +1289,7 @@ TEST_F(PowerLibTest, ApplyPowerConfiguration) {
       {.path = "/svc", .directory = std::move(dir_endpoints.client)}});
   fdf::Namespace ns = fdf::Namespace::Create(namespace_entries).value();
 
-  fidl::Arena arena;
-  fidl::VectorView<fuchsia_hardware_power::wire::PowerElementConfiguration> configs;
-  configs.Allocate(arena, 1);
-  configs.at(0) = fidl::ToWire(arena, df_config);
+  std::vector<fdf_power::PowerElementConfiguration> configs{df_config};
 
   // Now we've done all that, do the call and check that we get one thing back
   ASSERT_EQ(fdf_power::ApplyPowerConfiguration(ns, configs).value().size(), static_cast<size_t>(1));
@@ -1322,11 +1301,11 @@ TEST_F(PowerLibTest, ApplyPowerConfiguration) {
 /// on two different parent power elements.
 TEST_F(PowerLibTest, GetTokensOneLevelTwoDeps) {
   std::string parent_name1 = "parentOne";
-  fuchsia_hardware_power::ParentElement parent_element1 =
-      fuchsia_hardware_power::ParentElement::WithInstanceName(parent_name1);
+  fdf_power::ParentElement parent_element1 =
+      fdf_power::ParentElement::WithInstanceName(parent_name1);
   std::string parent_name2 = "parenttwo";
-  fuchsia_hardware_power::ParentElement parent_element2 =
-      fuchsia_hardware_power::ParentElement::WithInstanceName(parent_name2);
+  fdf_power::ParentElement parent_element2 =
+      fdf_power::ParentElement::WithInstanceName(parent_name2);
   async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
   loop.StartThread();
   fidl::ServerBindingGroup<fuchsia_hardware_power::PowerTokenProvider> bindings;
@@ -1350,52 +1329,53 @@ TEST_F(PowerLibTest, GetTokensOneLevelTwoDeps) {
   vfs.ServeDirectory(std::move(power_token_service), std::move(dir_endpoints.server));
 
   // Specify the power element
-  fuchsia_hardware_power::PowerLevel one = {{.level = 0, .name = "one", .transitions = {}}};
-  fuchsia_hardware_power::PowerLevel two = {{.level = 1, .name = "two", .transitions = {}}};
-  fuchsia_hardware_power::PowerLevel three = {{.level = 2, .name = "three", .transitions = {}}};
+  fdf_power::PowerLevel one{.level = 0, .name = "one", .transitions{}};
+  fdf_power::PowerLevel two{.level = 1, .name = "two", .transitions{}};
+  fdf_power::PowerLevel three{.level = 2, .name = "three", .transitions{}};
 
-  fuchsia_hardware_power::PowerElement pe = {{
+  fdf_power::PowerElement pe{
       .name = "the_element",
-      .levels = {{one, two, three}},
-  }};
+      .levels = {one, two, three},
+  };
 
   // Create a dependency between a level on this element and a level on the
   // parent
-  fuchsia_hardware_power::PowerDependency power_dep_one = {{
+  fdf_power::PowerDependency power_dep_one{
       .child = "n/a",
       .parent = parent_element1,
-      .level_deps = {{
-          {{
-              .child_level = 1,
-              .parent_level = 2,
-          }},
-      }},
-      .strength = fuchsia_hardware_power::RequirementType::kAssertive,
-  }};
+      .level_deps =
+          {
+              {
+                  .child_level = 1,
+                  .parent_level = 2,
+              },
+          },
+      .strength = fdf_power::RequirementType::kAssertive,
+  };
 
   // Create a dependency between a level on this element and a level on the
   // parent
-  fuchsia_hardware_power::PowerDependency power_dep_two = {{
+  fdf_power::PowerDependency power_dep_two{
       .child = "n/a",
       .parent = parent_element2,
-      .level_deps = {{
-          {{
-              .child_level = 1,
-              .parent_level = 6,
-          }},
-      }},
-      .strength = fuchsia_hardware_power::RequirementType::kAssertive,
-  }};
+      .level_deps =
+          {
+              {
+                  .child_level = 1,
+                  .parent_level = 6,
+              },
+          },
+      .strength = fdf_power::RequirementType::kAssertive,
+  };
 
-  fuchsia_hardware_power::PowerElementConfiguration df_config = {
-      {.element = pe, .dependencies = {{power_dep_one, power_dep_two}}}};
+  fdf_power::PowerElementConfiguration df_config{.element = pe,
+                                                 .dependencies = {power_dep_one, power_dep_two}};
 
   // With the given configuration, get the dependency tokens. We expect this to
   // call into the PowerTokenProvider we built above which calls into our
   // FakeTokenServer instance.
-  fidl::Arena test;
-  fit::result<fdf_power::Error, fdf_power::TokenMap> result = fdf_power::GetDependencyTokens(
-      fidl::ToWire(test, df_config), std::move(dir_endpoints.client));
+  fit::result<fdf_power::Error, fdf_power::TokenMap> result =
+      fdf_power::GetDependencyTokens(df_config, std::move(dir_endpoints.client));
 
   ASSERT_TRUE(result.is_ok());
   fdf_power::TokenMap token_map = std::move(result.value());
@@ -1493,43 +1473,37 @@ TEST_F(PowerLibTest, TestSagElements) {
       {.path = "/svc", .directory = std::move(dir_endpoints.client)}});
   fdf::Namespace ns = fdf::Namespace::Create(namespace_entries).value();
 
-  fuchsia_hardware_power::ParentElement parent = fuchsia_hardware_power::ParentElement::WithSag(
-      fuchsia_hardware_power::SagElement::kExecutionState);
-  fuchsia_hardware_power::PowerLevel one = {{.level = 0, .name = "one", .transitions = {}}};
-  fuchsia_hardware_power::PowerLevel two = {{.level = 1, .name = "two", .transitions = {}}};
-  fuchsia_hardware_power::PowerLevel three = {{.level = 2, .name = "three", .transitions = {}}};
+  fdf_power::ParentElement parent =
+      fdf_power::ParentElement::WithSag(fdf_power::SagElement::kExecutionState);
+  fdf_power::PowerLevel one{.level = 0, .name = "one", .transitions{}};
+  fdf_power::PowerLevel two{.level = 1, .name = "two", .transitions{}};
+  fdf_power::PowerLevel three{.level = 2, .name = "three", .transitions{}};
 
-  fuchsia_hardware_power::PowerElement pe = {{
+  fdf_power::PowerElement pe{
       .name = "the_element",
-      .levels = {{one, two, three}},
-  }};
+      .levels = {one, two, three},
+  };
 
-  fuchsia_hardware_power::LevelTuple one_to_one = {{
+  fdf_power::LevelTuple one_to_one{
       .child_level = 1,
       .parent_level = 1,
-  }};
-  fuchsia_hardware_power::LevelTuple three_to_two = {{
+  };
+  fdf_power::LevelTuple three_to_two{
       .child_level = 3,
       .parent_level = 2,
-  }};
+  };
 
-  std::unordered_map<uint16_t, uint16_t> child_to_parent_levels{
-      {one_to_one.child_level().value(), one_to_one.parent_level().value()},
-      {three_to_two.child_level().value(), three_to_two.parent_level().value()}};
-
-  fuchsia_hardware_power::PowerDependency power_dep = {{
+  fdf_power::PowerDependency power_dep{
       .child = "n/a",
       .parent = parent,
-      .level_deps = {{one_to_one, three_to_two}},
-      .strength = fuchsia_hardware_power::RequirementType::kOpportunistic,
-  }};
+      .level_deps = {one_to_one, three_to_two},
+      .strength = fdf_power::RequirementType::kOpportunistic,
+  };
 
-  fuchsia_hardware_power::PowerElementConfiguration df_config = {
-      {.element = pe, .dependencies = {{power_dep}}}};
+  fdf_power::PowerElementConfiguration df_config{.element = pe, .dependencies = {power_dep}};
 
-  fidl::Arena test;
   fit::result<fdf_power::Error, fdf_power::TokenMap> call_result =
-      fdf_power::GetDependencyTokens(ns, fidl::ToWire(test, df_config));
+      fdf_power::GetDependencyTokens(ns, df_config);
 
   EXPECT_TRUE(call_result.is_ok());
   loop.Shutdown();
@@ -1575,8 +1549,8 @@ TEST_F(PowerLibTest, TestDriverAndSagElements) {
 
   // Now let's add dependencies on non-SAG elements
   std::string driver_parent_name = "driver_parent";
-  fuchsia_hardware_power::ParentElement driver_parent =
-      fuchsia_hardware_power::ParentElement::WithInstanceName(driver_parent_name);
+  fdf_power::ParentElement driver_parent =
+      fdf_power::ParentElement::WithInstanceName(driver_parent_name);
 
   fidl::ServerBindingGroup<fuchsia_hardware_power::PowerTokenProvider> token_service_bindings;
   // Service dir which contains the service instances
@@ -1591,51 +1565,50 @@ TEST_F(PowerLibTest, TestDriverAndSagElements) {
 
   vfs.ServeDirectory(std::move(svcs_dir), std::move(dir_endpoints.server));
 
-  fuchsia_hardware_power::ParentElement parent = fuchsia_hardware_power::ParentElement::WithSag(
-      fuchsia_hardware_power::SagElement::kExecutionState);
-  fuchsia_hardware_power::PowerLevel one = {{.level = 0, .name = "one", .transitions = {}}};
-  fuchsia_hardware_power::PowerLevel two = {{.level = 1, .name = "two", .transitions = {}}};
-  fuchsia_hardware_power::PowerLevel three = {{.level = 2, .name = "three", .transitions = {}}};
+  fdf_power::ParentElement parent =
+      fdf_power::ParentElement::WithSag(fdf_power::SagElement::kExecutionState);
+  fdf_power::PowerLevel one{.level = 0, .name = "one", .transitions{}};
+  fdf_power::PowerLevel two{.level = 1, .name = "two", .transitions{}};
+  fdf_power::PowerLevel three{.level = 2, .name = "three", .transitions{}};
 
-  fuchsia_hardware_power::PowerElement pe = {{
+  fdf_power::PowerElement pe = {
       .name = "the_element",
-      .levels = {{one, two, three}},
-  }};
+      .levels = {one, two, three},
+  };
 
-  fuchsia_hardware_power::LevelTuple one_to_one = {{
+  fdf_power::LevelTuple one_to_one{
       .child_level = 1,
       .parent_level = 1,
-  }};
-  fuchsia_hardware_power::LevelTuple three_to_two = {{
+  };
+  fdf_power::LevelTuple three_to_two{
       .child_level = 3,
       .parent_level = 2,
-  }};
+  };
 
-  fuchsia_hardware_power::PowerDependency power_dep = {{
+  fdf_power::PowerDependency power_dep{
       .child = "n/a",
       .parent = parent,
-      .level_deps = {{one_to_one, three_to_two}},
-      .strength = fuchsia_hardware_power::RequirementType::kOpportunistic,
-  }};
+      .level_deps = {one_to_one, three_to_two},
+      .strength = fdf_power::RequirementType::kOpportunistic,
+  };
 
-  fuchsia_hardware_power::LevelTuple two_to_two = {{
+  fdf_power::LevelTuple two_to_two{
       .child_level = 2,
       .parent_level = 2,
-  }};
+  };
 
-  fuchsia_hardware_power::PowerDependency driver_power_dep = {{
+  fdf_power::PowerDependency driver_power_dep{
       .child = "n/a",
       .parent = driver_parent,
-      .level_deps = {{two_to_two}},
-      .strength = fuchsia_hardware_power::RequirementType::kOpportunistic,
-  }};
+      .level_deps = {two_to_two},
+      .strength = fdf_power::RequirementType::kOpportunistic,
+  };
 
-  fuchsia_hardware_power::PowerElementConfiguration df_config = {
-      {.element = pe, .dependencies = {{power_dep, driver_power_dep}}}};
+  fdf_power::PowerElementConfiguration df_config{.element = pe,
+                                                 .dependencies = {power_dep, driver_power_dep}};
 
-  fidl::Arena test;
-  fit::result<fdf_power::Error, fdf_power::TokenMap> call_result = fdf_power::GetDependencyTokens(
-      fidl::ToWire(test, df_config), std::move(dir_endpoints.client));
+  fit::result<fdf_power::Error, fdf_power::TokenMap> call_result =
+      fdf_power::GetDependencyTokens(df_config, std::move(dir_endpoints.client));
 
   EXPECT_TRUE(call_result.is_ok());
 
@@ -1667,8 +1640,8 @@ TEST_F(PowerLibTest, TestDriverInstanceDep) {
 
   // Now let's add dependencies on non-SAG elements
   std::string driver_instance_name = "instance_name";
-  fuchsia_hardware_power::ParentElement driver_parent =
-      fuchsia_hardware_power::ParentElement::WithInstanceName(driver_instance_name);
+  fdf_power::ParentElement driver_parent =
+      fdf_power::ParentElement::WithInstanceName(driver_instance_name);
 
   fidl::ServerBindingGroup<fuchsia_hardware_power::PowerTokenProvider> token_service_bindings;
   // Service dir which contains the service instances
@@ -1684,42 +1657,31 @@ TEST_F(PowerLibTest, TestDriverInstanceDep) {
   fs::SynchronousVfs vfs(loop.dispatcher());
   vfs.ServeDirectory(std::move(svcs_dir), std::move(dir_endpoints.server));
 
-  fuchsia_hardware_power::PowerLevel one = {{.level = 0, .name = "one", .transitions = {}}};
-  fuchsia_hardware_power::PowerLevel two = {{.level = 1, .name = "two", .transitions = {}}};
-  fuchsia_hardware_power::PowerLevel three = {{.level = 2, .name = "three", .transitions = {}}};
+  fdf_power::PowerLevel one{.level = 0, .name = "one", .transitions{}};
+  fdf_power::PowerLevel two{.level = 1, .name = "two", .transitions{}};
+  fdf_power::PowerLevel three{.level = 2, .name = "three", .transitions{}};
 
-  fuchsia_hardware_power::PowerElement pe = {{
+  fdf_power::PowerElement pe{
       .name = "the_element",
-      .levels = {{one, two, three}},
-  }};
+      .levels = {one, two, three},
+  };
 
-  fuchsia_hardware_power::LevelTuple one_to_one = {{
-      .child_level = 1,
-      .parent_level = 1,
-  }};
-  fuchsia_hardware_power::LevelTuple three_to_two = {{
-      .child_level = 3,
-      .parent_level = 2,
-  }};
-
-  fuchsia_hardware_power::LevelTuple two_to_two = {{
+  fdf_power::LevelTuple two_to_two{
       .child_level = 2,
       .parent_level = 2,
-  }};
+  };
 
-  fuchsia_hardware_power::PowerDependency driver_power_dep = {{
+  fdf_power::PowerDependency driver_power_dep{
       .child = "n/a",
       .parent = driver_parent,
-      .level_deps = {{two_to_two}},
-      .strength = fuchsia_hardware_power::RequirementType::kOpportunistic,
-  }};
+      .level_deps = {two_to_two},
+      .strength = fdf_power::RequirementType::kOpportunistic,
+  };
 
-  fuchsia_hardware_power::PowerElementConfiguration df_config = {
-      {.element = pe, .dependencies = {{driver_power_dep}}}};
+  fdf_power::PowerElementConfiguration df_config{.element = pe, .dependencies = {driver_power_dep}};
 
-  fidl::Arena test;
-  fit::result<fdf_power::Error, fdf_power::TokenMap> call_result = fdf_power::GetDependencyTokens(
-      fidl::ToWire(test, df_config), std::move(dir_endpoints.client));
+  fit::result<fdf_power::Error, fdf_power::TokenMap> call_result =
+      fdf_power::GetDependencyTokens(df_config, std::move(dir_endpoints.client));
 
   EXPECT_TRUE(call_result.is_ok());
 

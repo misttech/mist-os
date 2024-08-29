@@ -79,6 +79,8 @@ class ControlServer
   void Reset(ResetCompleter::Sync& completer) final;
   void CodecStart(CodecStartCompleter::Sync& completer) final;
   void CodecStop(CodecStopCompleter::Sync& completer) final;
+  void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_audio_device::Control>,
+                             fidl::UnknownMethodCompleter::Sync&) final;
 
   // fuchsia.hardware.audio.signalprocessing.SignalProcessing support
   //

@@ -219,7 +219,6 @@ impl ProtocolsExt for fio::OpenFlags {
     }
 }
 
-#[cfg(fuchsia_api_level_at_least = "HEAD")]
 impl ProtocolsExt for fio::Flags {
     fn is_dir_allowed(&self) -> bool {
         self.contains(fio::Flags::PROTOCOL_DIRECTORY) || self.is_any_node_protocol_allowed()
@@ -382,7 +381,6 @@ impl ToFileOptions for fio::OpenFlags {
     }
 }
 
-#[cfg(fuchsia_api_level_at_least = "HEAD")]
 impl ToFileOptions for fio::Flags {
     fn to_file_options(&self) -> Result<FileOptions, Status> {
         // Verify protocols.
@@ -435,7 +433,6 @@ impl ToNodeOptions for fio::OpenFlags {
     }
 }
 
-#[cfg(fuchsia_api_level_at_least = "HEAD")]
 impl ToNodeOptions for fio::Flags {
     fn to_node_options(&self, dirent_type: fio::DirentType) -> Result<NodeOptions, Status> {
         // Strictly, we shouldn't allow rights to be specified with PROTOCOL_NODE, but there's a
@@ -485,7 +482,6 @@ impl ToNodeOptions for NodeOptions {
     }
 }
 
-#[cfg(fuchsia_api_level_at_least = "HEAD")]
 fn flags_to_rights(flags: &fio::Flags) -> fio::Rights {
     let mut rights = fio::Rights::empty();
     if flags.contains(fio::Flags::PERM_READ) {
@@ -518,12 +514,10 @@ fn flags_to_rights(flags: &fio::Flags) -> fio::Rights {
     rights
 }
 
-#[cfg(fuchsia_api_level_at_least = "HEAD")]
 pub trait ToFlags {
     fn to_flags(&self) -> fio::Flags;
 }
 
-#[cfg(fuchsia_api_level_at_least = "HEAD")]
 impl ToFlags for fio::Operations {
     fn to_flags(&self) -> fio::Flags {
         // The constants in `fio::Operations` are aligned with those in `fio::Flags`.

@@ -4,12 +4,12 @@
 
 #include "src/devices/usb/drivers/xhci/usb-xhci.h"
 
-#include <lib/ddk/binding_driver.h>
-#include <lib/ddk/debug.h>
 #include <lib/ddk/hw/arch_ops.h>
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
 #include <lib/device-protocol/pci.h>
+#include <lib/driver/component/cpp/driver_export.h>
+#include <lib/driver/component/cpp/node_add_args.h>
 #include <lib/fit/defer.h>
 #include <lib/fpromise/promise.h>
 #include <lib/trace/event.h>
@@ -122,7 +122,7 @@ fpromise::promise<void, zx_status_t> UsbXhci::Timeout(uint16_t target_interrupte
 fpromise::promise<void, zx_status_t> UsbXhci::DisableSlotCommand(uint32_t slot_id) {
   auto state = device_state_[slot_id - 1];
   if (!state) {
-    zxlogf(ERROR, "%s expects that slot is in use. state should not be nullptr", __func__);
+    FDF_LOG(ERROR, "%s expects that slot is in use. state should not be nullptr", __func__);
     // TODO(https://fxbug.dev/42067447): Use and test appropriate result status.
     return fpromise::make_error_promise<zx_status_t>(ZX_OK);
   }
@@ -135,7 +135,7 @@ fpromise::promise<void, zx_status_t> UsbXhci::DisableSlotCommand(DeviceState& st
   {
     fbl::AutoLock _(&state.transaction_lock());
     if (!state.IsValid()) {
-      zxlogf(ERROR, "DisableSlotCommand state is not valid");
+      FDF_LOG(ERROR, "DisableSlotCommand state is not valid");
       // TODO(https://fxbug.dev/42067447): Use and test appropriate result status.
       return fpromise::make_error_promise<zx_status_t>(ZX_OK);
     }
@@ -196,7 +196,7 @@ TRBPromise UsbXhci::AddressDeviceCommand(uint8_t slot_id, uint8_t port_id) {
   cmd.set_SlotID(slot_id);
   auto slot_context = command_ring_.AllocateContext();
   if (!slot_context) {
-    zxlogf(ERROR, "No memory.");
+    FDF_LOG(ERROR, "No memory.");
     return fpromise::make_result_promise(
                fpromise::result<TRB*, zx_status_t>(fpromise::error(ZX_ERR_NO_MEMORY)))
         .box();
@@ -209,7 +209,7 @@ TRBPromise UsbXhci::AddressDeviceCommand(uint8_t slot_id, uint8_t port_id) {
 std::optional<usb_speed_t> UsbXhci::GetDeviceSpeed(uint8_t slot) {
   auto state = device_state_[slot - 1];
   if (!state) {
-    zxlogf(ERROR, "%s expects that slot is in use. state should not be nullptr", __func__);
+    FDF_LOG(ERROR, "%s expects that slot is in use. state should not be nullptr", __func__);
     return std::nullopt;
   }
   {
@@ -234,7 +234,7 @@ TRBPromise UsbXhci::AddressDeviceCommand(uint8_t slot_id, uint8_t port_id,
                                          std::optional<HubInfo> hub_info, bool bsr) {
   auto state = device_state_[slot_id - 1];
   if (!state) {
-    zxlogf(ERROR, "%s expects that slot is in use. state should not be nullptr", __func__);
+    FDF_LOG(ERROR, "%s expects that slot is in use. state should not be nullptr", __func__);
     return fpromise::make_error_promise(ZX_ERR_IO_NOT_PRESENT);
   }
   return state->AddressDeviceCommand(this, slot_id, port_id, hub_info, dcbaa_, InterrupterMapping(),
@@ -262,7 +262,7 @@ void UsbXhci::SetDeviceInformation(uint8_t slot, uint8_t port, const std::option
 TRBPromise UsbXhci::SetMaxPacketSizeCommand(uint8_t slot_id, uint8_t bMaxPacketSize0) {
   auto state = device_state_[slot_id - 1];
   if (!state) {
-    zxlogf(ERROR, "%s expects that slot is in use. state should not be nullptr", __func__);
+    FDF_LOG(ERROR, "%s expects that slot is in use. state should not be nullptr", __func__);
     return fpromise::make_error_promise(ZX_ERR_IO_NOT_PRESENT);
   }
   usb_xhci::AddressDeviceStruct cmd;
@@ -286,11 +286,11 @@ TRBPromise UsbXhci::SetMaxPacketSizeCommand(uint8_t slot_id, uint8_t bMaxPacketS
 
 zx_status_t UsbXhci::DeviceOnline(uint32_t slot, uint16_t port, usb_speed_t speed) {
   bool is_usb_3 = false;
-  zxlogf(DEBUG, "Device online. slot - %d port - %d", slot, port);
+  FDF_LOG(DEBUG, "Device online. slot - %d port - %d", slot, port);
   {
     auto state = device_state_[slot - 1];
     if (!state) {
-      zxlogf(ERROR, "%s expects that slot is in use. state should not be nullptr", __func__);
+      FDF_LOG(ERROR, "%s expects that slot is in use. state should not be nullptr", __func__);
       return ZX_ERR_IO_NOT_PRESENT;
     }
     fbl::AutoLock transaction_lock(&state->transaction_lock());
@@ -304,7 +304,7 @@ zx_status_t UsbXhci::DeviceOnline(uint32_t slot, uint16_t port, usb_speed_t spee
         {
           auto state = device_state_[slot - 1];
           if (!state) {
-            zxlogf(ERROR, "%s expects that slot is in use. state should not be nullptr", __func__);
+            FDF_LOG(ERROR, "%s expects that slot is in use. state should not be nullptr", __func__);
             return ZX_ERR_IO_NOT_PRESENT;
           }
           fbl::AutoLock _(&state->transaction_lock());
@@ -338,7 +338,7 @@ zx_status_t UsbXhci::DeviceOnline(uint32_t slot, uint16_t port, usb_speed_t spee
 fpromise::promise<void, zx_status_t> UsbXhci::DeviceOffline(uint32_t slot) {
   auto state = device_state_[slot - 1];
   if (!state) {
-    zxlogf(ERROR, "%s expects that slot is in use. state should not be nullptr", __func__);
+    FDF_LOG(ERROR, "%s expects that slot is in use. state should not be nullptr", __func__);
     return fpromise::make_error_promise<zx_status_t>(ZX_ERR_IO_NOT_PRESENT);
   }
   {
@@ -353,7 +353,7 @@ fpromise::promise<void, zx_status_t> UsbXhci::DeviceOffline(uint32_t slot) {
                    const ddk::UsbBusInterfaceProtocolClient& bus) mutable {
     auto state = std::move(device_state_[slot - 1]);
     if (!state) {
-      zxlogf(ERROR, "%s expects that slot is in use. state should not be nullptr", __func__);
+      FDF_LOG(ERROR, "%s expects that slot is in use. state should not be nullptr", __func__);
       return ZX_ERR_IO_NOT_PRESENT;
     }
     for (uint8_t i = 0; i < kMaxEndpoints; i++) {
@@ -385,7 +385,7 @@ fpromise::promise<void, zx_status_t> UsbXhci::DeviceOffline(uint32_t slot) {
 void UsbXhci::CreateDeviceInspectNode(uint32_t slot, uint16_t vendor_id, uint16_t product_id) {
   auto state = device_state_[slot - 1];
   if (!state) {
-    zxlogf(ERROR, "%s expects that slot is in use. state should not be nullptr", __func__);
+    FDF_LOG(ERROR, "%s expects that slot is in use. state should not be nullptr", __func__);
     return;
   }
 
@@ -413,7 +413,7 @@ fpromise::promise<void, zx_status_t> UsbXhci::UsbHciHubDeviceAddedAsync(uint32_t
                                                                         usb_speed_t speed) {
   auto state = device_state_[device_id];
   if (!state) {
-    zxlogf(ERROR, "%s expects that slot is in use. state should not be nullptr", __func__);
+    FDF_LOG(ERROR, "%s expects that slot is in use. state should not be nullptr", __func__);
     return fpromise::make_error_promise<zx_status_t>(ZX_ERR_IO_NOT_PRESENT);
   }
   // Acquire a slot
@@ -433,10 +433,10 @@ fpromise::promise<void, zx_status_t> UsbXhci::UsbHciHubDeviceAddedAsync(uint32_t
       hub.tt_info = state->GetHubLocked()->tt_info;
     }
   }
-  zxlogf(INFO,
-         "Hub found: Speed: %d, Port: %d, Parent port:%d "
-         "Route String:%d, Multi_tt:%d, Device ID:%d",
-         hub.hub_speed, port, hub.parent_port_number, hub.route_string, hub.multi_tt, device_id);
+  FDF_LOG(INFO,
+          "Hub found: Speed: %d, Port: %d, Parent port:%d "
+          "Route String:%d, Multi_tt:%d, Device ID:%d",
+          hub.hub_speed, port, hub.parent_port_number, hub.route_string, hub.multi_tt, device_id);
 
   return EnumerateDevice(this, static_cast<uint8_t>(port), std::make_optional(hub));
 }
@@ -447,7 +447,7 @@ fpromise::promise<void, zx_status_t> UsbXhci::ConfigureHubAsync(uint32_t device_
                                                                 bool multi_tt) {
   auto state = device_state_[device_id];
   if (!state) {
-    zxlogf(ERROR, "%s expects that slot is in use. state should not be nullptr", __func__);
+    FDF_LOG(ERROR, "%s expects that slot is in use. state should not be nullptr", __func__);
     return fpromise::make_error_promise<zx_status_t>(ZX_ERR_IO_NOT_PRESENT);
   }
   HubInfo hub;
@@ -496,8 +496,8 @@ fpromise::promise<void, zx_status_t> UsbXhci::ConfigureHubAsync(uint32_t device_
       .and_then([=](TRB*& trb) -> fpromise::promise<void, zx_status_t> {
         auto completion = reinterpret_cast<CommandCompletionEvent*>(trb);
         if (completion->CompletionCode() != CommandCompletionEvent::Success) {
-          zxlogf(ERROR, "Failed to configure endpoint: CompletionCode() == %u",
-                 completion->CompletionCode());
+          FDF_LOG(ERROR, "Failed to configure endpoint: CompletionCode() == %u",
+                  completion->CompletionCode());
           return fpromise::make_error_promise<zx_status_t>(ZX_ERR_IO);
         }
         if (speed != USB_SPEED_SUPER) {
@@ -536,107 +536,77 @@ fpromise::promise<void, zx_status_t> UsbXhci::ConfigureHubAsync(uint32_t device_
       .box();
 }
 
-void UsbXhci::DdkSuspend(ddk::SuspendTxn txn) {
-  sync_completion_wait(&init_complete_, ZX_TIME_INFINITE);
+void UsbXhci::Stop() {
+  running_ = false;
   if (!mmio_.has_value()) {
-    txn.Reply(ZX_ERR_BAD_STATE, 0);
     return;
   }
-  // TODO(https://fxbug.dev/42118825): do different things based on the requested_state and suspend
-  // reason. for now we shutdown the driver in preparation for mexec
+
   USBCMD::Get(cap_length_).ReadFrom(&mmio_.value()).set_ENABLE(0).WriteTo(&mmio_.value());
   while (!USBSTS::Get(cap_length_).ReadFrom(&mmio_.value()).HCHalted()) {
   }
-  txn.Reply(ZX_OK, 0);
-}
-
-void UsbXhci::DdkUnbind(ddk::UnbindTxn txn) {
-  // Prevent anything external to us from queueing any more work during shutdown.
-  sync_completion_wait(&init_complete_, ZX_TIME_INFINITE);
-
-  running_ = false;
-  PostCallback([this, transaction = std::move(txn)](
-                   const ddk::UsbBusInterfaceProtocolClient& client) mutable {
-    ddk_interaction_loop_.Quit();
-    USBCMD::Get(cap_length_).ReadFrom(&mmio_.value()).set_ENABLE(0).WriteTo(&mmio_.value());
-    while (!USBSTS::Get(cap_length_).ReadFrom(&mmio_.value()).HCHalted()) {
+  // Disable all interrupters
+  for (auto& it : interrupters_) {
+    it.Stop();
+  }
+  // Should now be safe to terminate everything on the command ring
+  bool pending;
+  do {
+    pending = false;
+    auto trbs = command_ring_.TakePendingTRBs();
+    for (auto& trb : trbs) {
+      pending = true;
+      CommandCompletionEvent evt;
+      evt.ptr = 0;
+      evt.set_Type(Control::CommandCompletionEvent);
+      evt.set_CompletionCode(CommandCompletionEvent::CommandRingStopped);
+      if (trb.completer.has_value()) {
+        trb.completer.value().complete_ok(trb.trb);
+      }
     }
-    // Disable all interrupters
-    for (auto& it : interrupters_) {
-      it.Stop();
-    }
-    // Should now be safe to terminate everything on the command ring
-    bool pending;
-    do {
-      pending = false;
-      auto trbs = command_ring_.TakePendingTRBs();
+    // Ensure that we've actually invoked the completions above
+    // before moving to the next step.
+    // TODO(https://fxbug.dev/42120782): Migrate to joins
+    RunUntilIdle();
+    for (size_t i = 0; i < max_slots_; i++) {
+      auto state = device_state_[i];
+      if (!state) {
+        continue;
+      }
+      fbl::DoublyLinkedList<std::unique_ptr<TRBContext>> trbs;
+      {
+        fbl::AutoLock _(&state->transaction_lock());
+        trbs = state->GetEndpoint().transfer_ring().TakePendingTRBs();
+      }
       for (auto& trb : trbs) {
         pending = true;
-        CommandCompletionEvent evt;
-        evt.ptr = 0;
-        evt.set_Type(Control::CommandCompletionEvent);
-        evt.set_CompletionCode(CommandCompletionEvent::CommandRingStopped);
-        if (trb.completer.has_value()) {
-          trb.completer.value().complete_ok(trb.trb);
-        }
+        std::get<Request>(*trb.request).Complete(ZX_ERR_IO_NOT_PRESENT, 0);
       }
-      // Ensure that we've actually invoked the completions above
-      // before moving to the next step.
-      // TODO(https://fxbug.dev/42120782): Migrate to joins
-      RunUntilIdle();
-      for (size_t i = 0; i < max_slots_; i++) {
-        auto state = device_state_[i];
-        if (!state) {
-          continue;
-        }
+      for (uint8_t c = 0; c < 32; c++) {
         fbl::DoublyLinkedList<std::unique_ptr<TRBContext>> trbs;
         {
           fbl::AutoLock _(&state->transaction_lock());
-          trbs = state->GetEndpoint().transfer_ring().TakePendingTRBs();
+          trbs = state->GetEndpoint(c).transfer_ring().TakePendingTRBs();
         }
         for (auto& trb : trbs) {
           pending = true;
           std::get<Request>(*trb.request).Complete(ZX_ERR_IO_NOT_PRESENT, 0);
         }
-        for (uint8_t c = 0; c < 32; c++) {
-          fbl::DoublyLinkedList<std::unique_ptr<TRBContext>> trbs;
-          {
-            fbl::AutoLock _(&state->transaction_lock());
-            trbs = state->GetEndpoint(c).transfer_ring().TakePendingTRBs();
-          }
-          for (auto& trb : trbs) {
-            pending = true;
-            std::get<Request>(*trb.request).Complete(ZX_ERR_IO_NOT_PRESENT, 0);
-          }
-        }
-      }
-      // Flush any outstanding async I/O
-      // TODO(https://fxbug.dev/42120782): Migrate to joins
-      RunUntilIdle();
-    } while (pending);
-
-    for (auto& it : device_state_) {
-      if (it) {
-        // Reset HCI reference in device state so that HCI commands won't be issued.
-        it->ResetHci();
       }
     }
-    device_state_.reset();
-    interrupters_.reset();
-    transaction.Reply();
-    return ZX_OK;
-  });
-}
+    // Flush any outstanding async I/O
+    // TODO(https://fxbug.dev/42120782): Migrate to joins
+    RunUntilIdle();
+  } while (pending);
 
-void UsbXhci::DdkRelease() {
-  int output;
-  if (ddk_interaction_thread_.has_value()) {
-    thrd_join(*ddk_interaction_thread_, &output);
+  for (auto& it : device_state_) {
+    if (it) {
+      // Reset HCI reference in device state so that HCI commands won't be issued.
+      it->ResetHci();
+    }
   }
-  if (init_thread_.has_value()) {
-    thrd_join(*init_thread_, &output);
-  }
-  delete this;
+  device_state_.reset();
+  interrupters_.reset();
 }
 
 // USB HCI protocol implementation.
@@ -652,7 +622,7 @@ void UsbXhci::UsbHciRequestQueue(usb_request_t* usb_request,
   }
   auto state = device_state_[request.request()->header.device_id];
   if (!state) {
-    zxlogf(ERROR, "%s expects that slot is in use. state should not be nullptr", __func__);
+    FDF_LOG(ERROR, "%s expects that slot is in use. state should not be nullptr", __func__);
     request.Complete(ZX_ERR_IO_NOT_PRESENT, 0);
     return;
   }
@@ -691,7 +661,19 @@ void UsbXhci::UsbHciSetBusInterface(const usb_bus_interface_protocol_t* bus_intf
   }
   ZX_ASSERT(bus_intf != nullptr);
   bus_ = bus_intf;
-  sync_completion_signal(&bus_completion);
+
+  USBCMD::Get(cap_length_)
+      .ReadFrom(&mmio_.value())
+      .set_ENABLE(1)
+      .set_INTE(1)
+      .set_HSEE(1)
+      .set_EWE(0)
+      .WriteTo(&mmio_.value());
+  while (USBSTS::Get(cap_length_).ReadFrom(&mmio_.value()).HCHalted()) {
+    zx::nanosleep(zx::deadline_after(zx::msec(1)));
+  }
+
+  sync_completion_signal(&bringup_);
 }
 size_t UsbXhci::UsbHciGetMaxDeviceCount() {
   // Last two slots represent the virtual hubs (USB 2.0 and 3.0 respectively)
@@ -727,7 +709,7 @@ fpromise::promise<void, zx_status_t> UsbXhci::UsbHciEnableEndpoint(
   auto context = command_ring_.AllocateContext();
   auto state = device_state_[device_id];
   if (!state) {
-    zxlogf(ERROR, "%s expects that slot is in use. state should not be nullptr", __func__);
+    FDF_LOG(ERROR, "%s expects that slot is in use. state should not be nullptr", __func__);
     return fpromise::make_error_promise<zx_status_t>(ZX_ERR_IO_NOT_PRESENT);
   }
   SlotContext* slot_context;
@@ -822,8 +804,8 @@ fpromise::promise<void, zx_status_t> UsbXhci::UsbHciEnableEndpoint(
               return fpromise::error(ZX_ERR_NO_RESOURCES);
             }
             if (completion->CompletionCode() != CommandCompletionEvent::Success) {
-              zxlogf(ERROR, "Failed to configure endpoint: CompletionCode() == %u",
-                     completion->CompletionCode());
+              FDF_LOG(ERROR, "Failed to configure endpoint: CompletionCode() == %u",
+                      completion->CompletionCode());
               return fpromise::error(ZX_ERR_IO);
             }
             free_buffers.cancel();
@@ -843,7 +825,7 @@ fpromise::promise<void, zx_status_t> UsbXhci::UsbHciDisableEndpoint(uint32_t dev
   auto context = command_ring_.AllocateContext();
   auto state = device_state_[device_id];
   if (!state) {
-    zxlogf(ERROR, "%s expects that slot is in use. state should not be nullptr", __func__);
+    FDF_LOG(ERROR, "%s expects that slot is in use. state should not be nullptr", __func__);
     return fpromise::make_error_promise<zx_status_t>(ZX_ERR_IO_NOT_PRESENT);
   }
   uint8_t index = XhciEndpointIndex(ep_addr);
@@ -875,8 +857,8 @@ fpromise::promise<void, zx_status_t> UsbXhci::UsbHciDisableEndpoint(uint32_t dev
             }
             auto completion = reinterpret_cast<CommandCompletionEvent*>(result.value());
             if (completion->CompletionCode() != CommandCompletionEvent::Success) {
-              zxlogf(ERROR, "Failed to configure endpoint: CompletionCode() == %u",
-                     completion->CompletionCode());
+              FDF_LOG(ERROR, "Failed to configure endpoint: CompletionCode() == %u",
+                      completion->CompletionCode());
               return fpromise::error(ZX_ERR_BAD_STATE);
             }
             auto endpoint_context = reinterpret_cast<EndpointContext*>(
@@ -967,7 +949,7 @@ zx_status_t UsbXhci::UsbHciHubDeviceRemoved(uint32_t hub_id, uint32_t port) {
   }
   auto hub_state = device_state_[hub_id];
   if (!hub_state) {
-    zxlogf(ERROR, "%s expects that slot is in use. hub_state should not be nullptr", __func__);
+    FDF_LOG(ERROR, "%s expects that slot is in use. hub_state should not be nullptr", __func__);
     return ZX_ERR_IO_NOT_PRESENT;
   }
   uint32_t device_id;
@@ -985,7 +967,7 @@ zx_status_t UsbXhci::UsbHciHubDeviceRemoved(uint32_t hub_id, uint32_t port) {
   }
   auto device_state = std::move(device_state_[device_id]);
   if (!device_state) {
-    zxlogf(ERROR, "%s expects that slot is in use. device_state should not be nullptr", __func__);
+    FDF_LOG(ERROR, "%s expects that slot is in use. device_state should not be nullptr", __func__);
     return ZX_ERR_IO_NOT_PRESENT;
   }
   {
@@ -1037,7 +1019,7 @@ fpromise::promise<void, zx_status_t> UsbXhci::UsbHciResetEndpointAsync(uint32_t 
   }
   auto state = device_state_[device_id];
   if (!state) {
-    zxlogf(ERROR, "%s expects that slot is in use. state should not be nullptr", __func__);
+    FDF_LOG(ERROR, "%s expects that slot is in use. state should not be nullptr", __func__);
     return fpromise::make_error_promise<zx_status_t>(ZX_ERR_IO_NOT_PRESENT);
   }
   ResetEndpoint reset_command;
@@ -1111,7 +1093,7 @@ size_t UsbXhci::UsbHciGetMaxTransferSize(uint32_t device_id, uint8_t ep_address)
   }
   auto state = device_state_[device_id];
   if (!state) {
-    zxlogf(ERROR, "%s expects that slot is in use. state should not be nullptr", __func__);
+    FDF_LOG(ERROR, "%s expects that slot is in use. state should not be nullptr", __func__);
     return 0;
   }
 
@@ -1221,9 +1203,12 @@ void UsbXhci::Shutdown(zx_status_t status) {
   if (status != ZX_OK) {
     // If we're shutting down due to an error (not just regular unbind)
     // ensure that we remove the device.
-    zxlogf(ERROR, "Internal xhci error, shutting down with error: %s",
-           zx_status_get_string(status));
-    DdkAsyncRemove();
+    FDF_LOG(ERROR, "Internal xhci error, shutting down with error: %s",
+            zx_status_get_string(status));
+    auto result = controller_->Remove();
+    if (!result.ok()) {
+      FDF_LOG(ERROR, "Failed to remove node %s", result.FormatDescription().c_str());
+    }
   }
 }
 
@@ -1317,7 +1302,7 @@ zx_status_t UsbXhci::InitMmio() {
   std::optional<fdf::MmioBuffer> mmio;
   status = pdev_.MapMmio(0, &mmio);
   if (status != ZX_OK) {
-    zxlogf(ERROR, "UsbXhci: failed to map MMIO registers (%s)", zx_status_get_string(status));
+    FDF_LOG(ERROR, "UsbXhci: failed to map MMIO registers (%s)", zx_status_get_string(status));
     return status;
   }
   mmio_ = std::move(*mmio);
@@ -1332,7 +1317,7 @@ zx_status_t UsbXhci::InitMmio() {
     status = pdev_.GetInterrupt(i, config_.enable_suspend() ? ZX_INTERRUPT_WAKE_VECTOR : 0,
                                 &interrupter(i).GetIrq());
     if (status != ZX_OK) {
-      zxlogf(ERROR, "UsbXhci: failed fetch interrupt (%s)", zx_status_get_string(status));
+      FDF_LOG(ERROR, "UsbXhci: failed fetch interrupt (%s)", zx_status_get_string(status));
       return status;
     }
   }
@@ -1348,9 +1333,9 @@ void UsbXhci::ParseSupportedProtocol() {
         auto word0 = CapabilityRegWord0::Get(current).ReadFrom(&mmio_.value());
         auto word2 = CapabilityRegWord2::Get(current).ReadFrom(&mmio_.value());
 
-        zxlogf(DEBUG, "Supported protocol info: Revision:%d:%d USB%d port offset %d port count %d",
-               word0.MAJOR_REVISION(), word0.MINOR_REVISION(), word0.MAJOR_REVISION(),
-               word2.PortOffset(), word2.PortCount());
+        FDF_LOG(DEBUG, "Supported protocol info: Revision:%d:%d USB%d port offset %d port count %d",
+                word0.MAJOR_REVISION(), word0.MINOR_REVISION(), word0.MAJOR_REVISION(),
+                word2.PortOffset(), word2.PortCount());
       }
       if (!current.NEXT()) {
         break;
@@ -1403,25 +1388,24 @@ void UsbXhci::ResetController() {
   }
 }
 
-int UsbXhci::InitThread() {
-  ZX_ASSERT(init_txn_.has_value());  // This is set in DdkInit before creating this thread.
-  auto call = fit::defer([=]() { init_txn_->Reply(ZX_ERR_INTERNAL); });
-  auto init_completer = fit::defer([=]() { sync_completion_signal(&init_complete_); });
+zx::result<> UsbXhci::Init(std::unique_ptr<dma_buffer::BufferFactory> buffer_factory) {
+  buffer_factory_ = std::move(buffer_factory);
+
   // Initialize either the PCI or MMIO structures first
   zx_status_t status;
   if (pci_.is_valid()) {
     status = InitPci();
     if (status != ZX_ERR_PEER_CLOSED && status != ZX_OK) {
-      zxlogf(ERROR, "PCI initialization failed with: %s", zx_status_get_string(status));
-      return thrd_error;
+      FDF_LOG(ERROR, "PCI initialization failed with: %s", zx_status_get_string(status));
+      return zx::error(status);
     }
   }
   // Because pci_.is_valid() may have changed in InitQuirks().
   if (!pci_.is_valid()) {
     status = InitMmio();
     if (status != ZX_OK) {
-      zxlogf(ERROR, "MMIO initialization failed with: %s", zx_status_get_string(status));
-      return thrd_error;
+      FDF_LOG(ERROR, "MMIO initialization failed with: %s", zx_status_get_string(status));
+      return zx::error(status);
     }
   }
   // Perform the BIOS handoff if necessary
@@ -1437,29 +1421,18 @@ int UsbXhci::InitThread() {
   cap_length_ = cap_length;
   // Perform xHCI reset process
   ResetController();
-  // Start DDK interaction thread
-  thrd_t thrd;
-  int thread_status = thrd_create_with_name(
-      &thrd,
-      [](void* ctx) -> int {
-        auto hci = static_cast<UsbXhci*>(ctx);
-        hci->ddk_interaction_loop_.Run();
-        return thrd_success;
-      },
-      this, "ddk_interaction_thread");
-  if (thread_status != thrd_success) {
-    return thread_status;
-  }
-  ddk_interaction_thread_ = thrd;
   // Finish HCI initialization
   status = HciFinalize();
   if (status != ZX_OK) {
-    zxlogf(ERROR, "xHCI initialization failed with %s", zx_status_get_string(status));
-    return thrd_error;
+    FDF_LOG(ERROR, "xHCI initialization failed with %s", zx_status_get_string(status));
+    return zx::error(status);
   }
-  // If |HciFinalize| succeeded, it would have replied to |init_txn_| and made the device visible.
-  call.cancel();
-  return thrd_success;
+  status = CreateNode();
+  if (status != ZX_OK) {
+    FDF_LOG(ERROR, "Failed to create node %d", status);
+    return zx::error(status);
+  }
+  return zx::ok();
 }
 
 zx_status_t UsbXhci::HciFinalize() {
@@ -1468,7 +1441,7 @@ zx_status_t UsbXhci::HciFinalize() {
 
   // Initialize Inspect values
   HciVersion hci_version = HciVersion::Get().ReadFrom(&mmio_.value());
-  inspect_.Init(hci_version.reg_value(), hcsparams1, hcc_);
+  inspect_.Init(inspector().root(), hci_version.reg_value(), hcsparams1, hcc_);
 
   // Reset Warm Reset Change (WRC) bit if necessary (see Table 5-27, bit 19 in Section 5.4.8,
   // xHCI specification). This is done to acknowledge any warm reset done during bootup.
@@ -1490,12 +1463,12 @@ zx_status_t UsbXhci::HciFinalize() {
     zx::bti bti;
     if (pci_.is_valid()) {
       if (status = pci_.GetBti(0, &bti); status != ZX_OK) {
-        zxlogf(ERROR, "pci_.GetBti(): %s", zx_status_get_string(status));
+        FDF_LOG(ERROR, "pci_.GetBti(): %s", zx_status_get_string(status));
         return ZX_ERR_INTERNAL;
       }
     } else {
       if (status = pdev_.GetBti(0, &bti); status != ZX_OK) {
-        zxlogf(ERROR, "pdev_.GetBti(): %s", zx_status_get_string(status));
+        FDF_LOG(ERROR, "pdev_.GetBti(): %s", zx_status_get_string(status));
         return ZX_ERR_INTERNAL;
       }
     }
@@ -1506,18 +1479,18 @@ zx_status_t UsbXhci::HciFinalize() {
   // TODO(bbosak): Correct this to use variable alignment when we get kernel
   // support for this.
   if (page_size != zx_system_get_page_size()) {
-    zxlogf(ERROR, "xHC page size differs from platform page size");
+    FDF_LOG(ERROR, "xHC page size differs from platform page size");
     return ZX_ERR_INTERNAL;
   }
   uint32_t align_log2 = 0;
 
   status = buffer_factory_->CreatePaged(bti_, zx_system_get_page_size(), false, &dcbaa_buffer_);
   if (status != ZX_OK) {
-    zxlogf(ERROR, "buffer_factory_->CreatePaged(): %s", zx_status_get_string(status));
+    FDF_LOG(ERROR, "buffer_factory_->CreatePaged(): %s", zx_status_get_string(status));
     return ZX_ERR_INTERNAL;
   }
   if (is_32bit_ && (dcbaa_buffer_->phys()[0] >= UINT32_MAX)) {
-    zxlogf(ERROR, "xHC using 32bit mode but dcbaa buffer address overflows 32bits");
+    FDF_LOG(ERROR, "xHC using 32bit mode but dcbaa buffer address overflows 32bits");
     return ZX_ERR_INTERNAL;
   }
   dcbaa_ = static_cast<uint64_t*>(dcbaa_buffer_->virt());
@@ -1532,23 +1505,25 @@ zx_status_t UsbXhci::HciFinalize() {
                      ((hcsparams2.MAX_SCRATCHPAD_BUFFERS_HIGH() << 5) + 1);
   scratchpad_buffers_ = fbl::MakeArray<std::unique_ptr<dma_buffer::ContiguousBuffer>>(&ac, buffers);
   if (!ac.check()) {
-    zxlogf(ERROR, "fbl::MakeArray<std::unique_ptr<dma_buffer::ContiguousBuffer>> allocation fails");
+    FDF_LOG(ERROR,
+            "fbl::MakeArray<std::unique_ptr<dma_buffer::ContiguousBuffer>> allocation fails");
     return ZX_ERR_NO_MEMORY;
   }
   if (fbl::round_up(buffers * sizeof(uint64_t), zx_system_get_page_size()) >
       zx_system_get_page_size()) {
     // We can't create multi-page contiguously physical uncached buffers.
     // This is presently not supported in the kernel.
-    zxlogf(ERROR, "physically-contiguous buffer exceeds system pagesize");
+    FDF_LOG(ERROR, "physically-contiguous buffer exceeds system pagesize");
     return ZX_ERR_NOT_SUPPORTED;
   }
   if (buffer_factory_->CreatePaged(bti_, zx_system_get_page_size(), false,
                                    &scratchpad_buffer_array_) != ZX_OK) {
-    zxlogf(ERROR, "buffer_factory_->CreateContiguous(buffer[0]): %s", zx_status_get_string(status));
+    FDF_LOG(ERROR, "buffer_factory_->CreateContiguous(buffer[0]): %s",
+            zx_status_get_string(status));
     return ZX_ERR_INTERNAL;
   }
   if (is_32bit_ && (scratchpad_buffer_array_->phys()[0] >= UINT32_MAX)) {
-    zxlogf(ERROR, "xHC using 32bit mode but scratchpad buffer[0] address overflows 32bits");
+    FDF_LOG(ERROR, "xHC using 32bit mode but scratchpad buffer[0] address overflows 32bits");
     return ZX_ERR_INTERNAL;
   }
   uint64_t* scratchpad_buffer_array = static_cast<uint64_t*>(scratchpad_buffer_array_->virt());
@@ -1556,12 +1531,12 @@ zx_status_t UsbXhci::HciFinalize() {
     status =
         buffer_factory_->CreateContiguous(bti_, page_size, align_log2, &scratchpad_buffers_[i]);
     if (status != ZX_OK) {
-      zxlogf(ERROR, "buffer_factory_->CreateContiguous(buffer[%zu]): %s", i,
-             zx_status_get_string(status));
+      FDF_LOG(ERROR, "buffer_factory_->CreateContiguous(buffer[%zu]): %s", i,
+              zx_status_get_string(status));
       return ZX_ERR_INTERNAL;
     }
     if (is_32bit_ && (scratchpad_buffers_[i]->phys() >= UINT32_MAX)) {
-      zxlogf(ERROR, "xHC using 32bit mode but scratchpad buffer[%zu] address overflows 32bits", i);
+      FDF_LOG(ERROR, "xHC using 32bit mode but scratchpad buffer[%zu] address overflows 32bits", i);
       return ZX_ERR_INTERNAL;
     }
     scratchpad_buffer_array[i] = scratchpad_buffers_[i]->phys();
@@ -1571,12 +1546,12 @@ zx_status_t UsbXhci::HciFinalize() {
   slot_size_bytes_ = hcc_.CSZ() == 1 ? 64 : 32;
   device_state_ = fbl::MakeArray<fbl::RefPtr<DeviceState>>(&ac, max_slots_);
   if (!ac.check()) {
-    zxlogf(ERROR, "fbl::MakeArray<DeviceState> allocation fails");
+    FDF_LOG(ERROR, "fbl::MakeArray<DeviceState> allocation fails");
     return ZX_ERR_NO_MEMORY;
   }
   port_state_ = fbl::MakeArray<PortState>(&ac, hcsparams1.MaxPorts());
   if (!ac.check()) {
-    zxlogf(ERROR, "fbl::MakeArray<PortState> allocation fails");
+    FDF_LOG(ERROR, "fbl::MakeArray<PortState> allocation fails");
     return ZX_ERR_NO_MEMORY;
   }
   hw_mb();
@@ -1589,14 +1564,14 @@ zx_status_t UsbXhci::HciFinalize() {
     status = interrupter(i).Init(i, page_size, &mmio_.value(), offset, 1 << hcsparams2.ERST_MAX(),
                                  doorbell_offset_, this, hcc_, dcbaa_);
     if (status != ZX_OK) {
-      zxlogf(ERROR, "interrupter(%d).Init(): %s", i, zx_status_get_string(status));
+      FDF_LOG(ERROR, "interrupter(%d).Init(): %s", i, zx_status_get_string(status));
       return ZX_ERR_INTERNAL;
     }
   }
   status =
       command_ring_.Init(page_size, &bti_, &interrupter(0).ring(), is_32bit_, &mmio_.value(), this);
   if (status != ZX_OK) {
-    zxlogf(ERROR, "command_ring_.Init(): %s", zx_status_get_string(status));
+    FDF_LOG(ERROR, "command_ring_.Init(): %s", zx_status_get_string(status));
     return ZX_ERR_INTERNAL;
   }
   CRCR cr = command_ring_.phys(cap_length_);
@@ -1607,87 +1582,56 @@ zx_status_t UsbXhci::HciFinalize() {
   // in the beginning.
   for (uint16_t i = 0; i < irq_count_; i++) {
     if (status = interrupter(i).Start(offset, mmio_.value().View(0)); status != ZX_OK) {
-      zxlogf(ERROR, "interrupter(%d).Start(): %s", i, zx_status_get_string(status));
+      FDF_LOG(ERROR, "interrupter(%d).Start(): %s", i, zx_status_get_string(status));
       return ZX_ERR_INTERNAL;
     }
   }
-  init_txn_->Reply(ZX_OK);  // This will make the device visible and able to be unbound.
-  sync_completion_wait(&bus_completion, ZX_TIME_INFINITE);
-  USBCMD::Get(cap_length_)
-      .ReadFrom(&mmio_.value())
-      .set_ENABLE(1)
-      .set_INTE(1)
-      .set_HSEE(1)
-      .set_EWE(0)
-      .WriteTo(&mmio_.value());
-  while (USBSTS::Get(cap_length_).ReadFrom(&mmio_.value()).HCHalted()) {
-    zx::nanosleep(zx::deadline_after(zx::msec(1)));
-  }
-
-  sync_completion_signal(&bringup_);
   return ZX_OK;
 }
 
-zx_status_t UsbXhci::Init() {
-  if (!(pci_.is_valid() || pdev_.is_valid())) {
-    return ZX_ERR_IO_INVALID;
+zx_status_t UsbXhci::CreateNode() {
+  {
+    auto result = outgoing()->AddService<fuchsia_hardware_usb_hci::UsbHciService>(
+        fuchsia_hardware_usb_hci::UsbHciService::InstanceHandler({
+            .device =
+                bindings_.CreateHandler(this, fdf::Dispatcher::GetCurrent()->async_dispatcher(),
+                                        fidl::kIgnoreBindingClosure),
+        }));
+    if (result.is_error()) {
+      FDF_LOG(ERROR, "Failed to add UsbHci service %s", result.status_string());
+      return result.status_value();
+    }
   }
 
-  zx::result result = outgoing_.AddService<fuchsia_hardware_usb_hci::UsbHciService>(
-      fuchsia_hardware_usb_hci::UsbHciService::InstanceHandler({
-          .device = bindings_.CreateHandler(this, dispatcher_, fidl::kIgnoreBindingClosure),
-      }));
+  std::vector<fuchsia_driver_framework::NodeProperty> props{banjo_server_.property()};
+  compat::DeviceServer::BanjoConfig banjo_config;
+  banjo_config.callbacks[ZX_PROTOCOL_USB_HCI] = banjo_server_.callback();
+  {
+    zx::result<> result =
+        compat_server_.Initialize(incoming(), outgoing(), node_name(), kDeviceName,
+                                  compat::ForwardMetadata::All(), std::move(banjo_config));
+    if (result.is_error()) {
+      FDF_LOG(ERROR, "Failed to init compat server %s", result.status_string());
+      return result.error_value();
+    }
+  }
+  auto offers = compat_server_.CreateOffers2();
+  offers.push_back(fdf::MakeOffer2<fuchsia_hardware_usb_hci::UsbHciService>());
+  auto result = AddChild(kDeviceName, props, offers);
   if (result.is_error()) {
-    zxlogf(ERROR, "Failed to add service %s", result.status_string());
-    return result.status_value();
+    FDF_LOG(ERROR, "Failed to add child %s", result.status_string());
+    return result.error_value();
   }
-  auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-  if (endpoints.is_error()) {
-    return endpoints.status_value();
-  }
-  result = outgoing_.Serve(std::move(endpoints->server));
-  if (result.is_error()) {
-    zxlogf(ERROR, "Failed to service the outgoing directory");
-    return result.status_value();
-  }
-
-  std::array offers = {
-      fuchsia_hardware_usb_hci::UsbHciService::Name,
-  };
-  zx_status_t status = DdkAdd(ddk::DeviceAddArgs("xhci")
-                                  .set_inspect_vmo(inspect_.inspector.DuplicateVmo())
-                                  .set_fidl_service_offers(offers)
-                                  .set_outgoing_dir(endpoints->client.TakeChannel()));
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "DdkAdd() error: %s", zx_status_get_string(status));
-    return status;
-  }
+  controller_.Bind(std::move(*result));
 
   return ZX_OK;
-}
-
-void UsbXhci::DdkInit(ddk::InitTxn txn) {
-  init_txn_ = std::move(txn);
-  thrd_t init_thread;
-  if (thrd_create_with_name(
-          &init_thread,
-          [](void* ctx) {
-            UsbXhci* hci = static_cast<UsbXhci*>(ctx);
-            return hci->InitThread();
-          },
-          this, "xhci-init-thread") != thrd_success) {
-    return init_txn_->Reply(ZX_ERR_INTERNAL);  // This will schedule unbinding of the device.
-  }
-  init_thread_ = init_thread;
-  // The init thread will reply to |init_txn_| once it is ready to make the device visible
-  // and able to be unbound.
 }
 
 void UsbXhci::ConnectToEndpoint(ConnectToEndpointRequest& request,
                                 ConnectToEndpointCompleter::Sync& completer) {
   auto state = device_state_[request.device_id()];
   if (!state) {
-    zxlogf(ERROR, "%s expects that slot is in use. state should not be nullptr", __func__);
+    FDF_LOG(ERROR, "%s expects that slot is in use. state should not be nullptr", __func__);
     completer.Reply(fit::as_error(ZX_ERR_IO_NOT_PRESENT));
     return;
   }
@@ -1717,8 +1661,9 @@ TRBPromise UsbXhci::SubmitCommand(const TRB& command, std::unique_ptr<TRBContext
 }
 
 // Initialize xHCI Inspect node and values.
-void Inspect::Init(uint16_t hci_version_in, HCSPARAMS1& hcs1, HCCPARAMS1& hcc1) {
-  root = inspector.GetRoot().CreateChild("usb-xhci");
+void Inspect::Init(inspect::Node& parent, uint16_t hci_version_in, HCSPARAMS1& hcs1,
+                   HCCPARAMS1& hcc1) {
+  root = parent.CreateChild("usb-xhci");
 
   hci_version = root.CreateUint("hci_version", hci_version_in);
   max_device_slots = root.CreateUint("max_device_slots", hcs1.MaxSlots());
@@ -1728,58 +1673,43 @@ void Inspect::Init(uint16_t hci_version_in, HCSPARAMS1& hcs1, HCCPARAMS1& hcc1) 
   context_size_bytes = root.CreateUint("context_size_bytes", hcc1.CSZ() == 1 ? 64 : 32);
 }
 
-// Static function; called by the DDK bind operation.
-zx_status_t UsbXhci::Create(void* ctx, zx_device_t* parent) {
-  zx_handle_t structured_config_vmo;
-  zx_status_t status = device_get_config_vmo(parent, &structured_config_vmo);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to get config vmo: %s", zx_status_get_string(status));
-    return status;
-  }
-
-  fbl::AllocChecker ac;
-  auto dev = std::unique_ptr<UsbXhci>(new (&ac) UsbXhci(
-      parent, xhci_config::Config::CreateFromVmo(zx::vmo(structured_config_vmo)),
-      dma_buffer::CreateBufferFactory(), fdf::Dispatcher::GetCurrent()->async_dispatcher()));
-  if (!ac.check()) {
-    return ZX_ERR_NO_MEMORY;
-  }
-
-  zx::result pdev_result = ddk::PDevFidl::Create(parent, ddk::PDevFidl::kFragmentName);
-  if (pdev_result.is_ok()) {
-    dev->pdev_ = std::move(pdev_result.value());
-    // We need at least a PDEV, but the PHY is optional
-    // for devices not implementing OTG.
-    auto phy = usb_phy::UsbPhyClient::Create(parent, "xhci-phy");
-    if (phy.is_ok()) {
-      dev->phy_.emplace(std::move(phy.value()));
+zx::result<> UsbXhci::Start() {
+  zx::result pdev_result =
+      incoming()->Connect<fuchsia_hardware_platform_device::Service::Device>("pdev");
+  if (pdev_result.is_ok() && pdev_result->is_valid()) {
+    pdev_ = ddk::PDevFidl(std::move(*pdev_result));
+    // We need at least a PDEV, but the PHY is optional for devices not implementing OTG.
+    auto phy_result = usb_phy::UsbPhyClient::Create(incoming(), "xhci-phy");
+    if (phy_result.is_ok()) {
+      phy_.emplace(std::move(phy_result.value()));
     }
   } else {
     // A device doesn't have to have a PDEV. It might use PCI instead.
     if (pdev_result.error_value() != ZX_ERR_NOT_FOUND) {
-      zxlogf(ERROR, "UsbXhci::Init: could not get platform device protocol: %s",
-             pdev_result.status_string());
-      return ZX_ERR_NOT_SUPPORTED;
+      FDF_LOG(ERROR, "UsbXhci::Init: could not get platform device protocol: %s",
+              pdev_result.status_string());
+      return zx::error(ZX_ERR_NOT_SUPPORTED);
     }
   }
-
-  status = dev->Init();
-  if (status != ZX_OK) {
-    return status;
+  zx::result pci_result = incoming()->Connect<fuchsia_hardware_pci::Service::Device>("pdev");
+  if (pci_result.is_ok()) {
+    pci_ = ddk::Pci(std::move(*pci_result));
   }
 
-  // devmgr is now in charge of the device.
-  [[maybe_unused]] auto* dummy = dev.release();
-  return ZX_OK;
-}
+  if (!(pci_.is_valid() || pdev_.is_valid())) {
+    return zx::error(ZX_ERR_IO_INVALID);
+  }
 
-static constexpr zx_driver_ops_t driver_ops = []() {
-  zx_driver_ops_t ops = {};
-  ops.version = DRIVER_OPS_VERSION;
-  ops.bind = UsbXhci::Create;
-  return ops;
-}();
+#ifndef TEST_SKIP_INIT
+  zx::result<> result = Init(dma_buffer::CreateBufferFactory());
+  if (result.is_error()) {
+    FDF_LOG(ERROR, "Init failed %s", result.status_string());
+    return result.take_error();
+  }
+#endif
+  return zx::ok();
+}
 
 }  // namespace usb_xhci
 
-ZIRCON_DRIVER(usb_xhci, usb_xhci::driver_ops, "zircon", "0.1");
+FUCHSIA_DRIVER_EXPORT(usb_xhci::UsbXhci);

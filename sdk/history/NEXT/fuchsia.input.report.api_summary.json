@@ -33,6 +33,11 @@
     },
     {
         "kind": "enum/member",
+        "name": "fuchsia.input.report/ConsumerControlButton.FUNCTION",
+        "value": "8"
+    },
+    {
+        "kind": "enum/member",
         "name": "fuchsia.input.report/ConsumerControlButton.MIC_MUTE",
         "value": "5"
     },
@@ -40,6 +45,11 @@
         "kind": "enum/member",
         "name": "fuchsia.input.report/ConsumerControlButton.PAUSE",
         "value": "3"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.input.report/ConsumerControlButton.POWER",
+        "value": "9"
     },
     {
         "kind": "enum/member",

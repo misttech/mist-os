@@ -17,7 +17,15 @@ async fn main() -> Result<(), Error> {
             },
         )?;
 
-    let mut sensor_manager = SensorManager::new(driver_proxy);
+    let playback_proxy = fuchsia_component::client::connect_to_protocol::<
+        playback_fidl::PlaybackMarker,
+    >()
+    .map_err(|e| {
+        tracing::error!("Failed to connect to sensor playback protocol. {:#?}", e);
+        return e;
+    })?;
+
+    let mut sensor_manager = SensorManager::new(driver_proxy, playback_proxy);
 
     // This should run forever.
     let result = sensor_manager.run().await;

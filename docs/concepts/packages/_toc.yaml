@@ -8,11 +8,13 @@
 toc:
 - title: "Fuchsia packages"
   path: /docs/concepts/packages/package.md
-- title: "Fuchsia package URLs"
-  path: /docs/concepts/packages/package_url.md
 - title: "Developing with Fuchsia packages"
   path: /docs/concepts/packages/package_update.md
-- title: "Running Package Servers"
+- title: "Fuchsia package URLs"
+  path: /docs/concepts/packages/package_url.md
+- title: "Fuchsia merkle roots"
+  path:  /docs/concepts/packages/merkleroot.md
+- title: "Package servers"
   section:
   - title: "Starting package servers"
     path: /docs/concepts/packages/package_server_start.md
@@ -20,15 +22,13 @@ toc:
     path: /docs/concepts/packages/package_server_list.md
   - title: "Stopping package servers"
     path: /docs/concepts/packages/package_server_stop.md
-- title: "Merkle roots"
-  path:  /docs/concepts/packages/merkleroot.md
-- title: "Garbage collection"
-  path: /docs/concepts/packages/garbage_collection.md
-- title: "Update package"
-  path: /docs/concepts/packages/update_pkg.md
-- title: "System updates"
-  path: /docs/concepts/packages/ota.md
-- title: "Fuchsia system interface"
-  path: /docs/concepts/packages/system.md
-- title: "Software Update System"
-  path: /docs/concepts/packages/software_update_system.md
+- title: "Package updates"
+  section:
+  - title: "OTA updates"
+    path: /docs/concepts/packages/ota.md
+  - title: "The update package"
+    path: /docs/concepts/packages/update_pkg.md
+  - title: "Software update system"
+    path: /docs/concepts/packages/software_update_system.md
+  - title: "Garbage collection"
+    path: /docs/concepts/packages/garbage_collection.md

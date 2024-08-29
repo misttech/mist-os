@@ -23,6 +23,10 @@ namespace display {
 FakeDisplayStack::FakeDisplayStack(std::unique_ptr<SysmemServiceProvider> sysmem_service_provider,
                                    const fake_display::FakeDisplayDeviceConfig& device_config)
     : sysmem_service_provider_(std::move(sysmem_service_provider)) {
+  if (!fdf::Logger::HasGlobalInstance()) {
+    logger_.emplace();
+  }
+
   fidl::ClientEnd<fuchsia_sysmem2::Allocator> sysmem_allocator = ConnectToSysmemAllocatorV2();
   display_ = std::make_unique<fake_display::FakeDisplay>(device_config, std::move(sysmem_allocator),
                                                          inspect::Inspector{});

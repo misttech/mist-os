@@ -41,7 +41,7 @@
             ],
         },
         {
-            directory: "dev-topological",
+            directory: "dev-class",
             from: "parent",
             to: [
                 "#cpu_v2",

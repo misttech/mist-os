@@ -167,7 +167,6 @@ assembly_input_bundle("bootstrap") {
     "//src/devices/sysmem/bin/sysmem_connector:pkg",
     "//src/zircon/bin/role_manager:package",
   ]
-  kernel_cmdline = [ "blobfs.cache-eviction-policy=NEVER_EVICT" ]
 
   compiled_packages = [
     {
@@ -610,13 +609,6 @@ assembly_input_bundle("virtcon") {
   ]
 }
 
-assembly_input_bundle("virtcon_disable") {
-  kernel_cmdline = [
-    "virtcon.hide-on-boot",
-    "virtcon.disable=true",
-  ]
-}
-
 # The netsvc AIB is included by all eng products.
 #
 assembly_input_bundle("netsvc") {
@@ -745,6 +737,14 @@ assembly_input_bundle("clock_development_tools") {
   bootfs_files_labels = [ "//src/devices/clock/bin/clock:bootfs" ]
 }
 
+# Includes the CLIs necessary for the Fuchsia installer.
+assembly_input_bundle("partitioning_tools") {
+  bootfs_files_labels = [
+    "//src/storage/bin/disk-pave:bootfs",
+    "//src/storage/bin/mount:bootfs",
+  ]
+}
+
 ########
 #
 # The /core realm AIBs
@@ -794,7 +794,7 @@ assembly_input_bundle("core_realm") {
         {
           component_name = "bootstrap"
           shards = [
-            "//src/devices/bin/driver_framework/meta/package_drivers.bootstrap_shard.cml",
+            "//src/devices/bin/driver_framework/meta/base_drivers.bootstrap_shard.cml",
             "//src/sys/pkg/bin/pkg-cache/meta/pkg-cache.bootstrap_shard.cml",
           ]
         },
@@ -834,7 +834,6 @@ assembly_input_bundle("core_realm") {
           [
             "//src/connectivity/bluetooth/profiles/bt-a2dp/meta/bt-a2dp-common.core_shard.cml",
             "//src/intl/intl_services/meta/intl.core_shard.base.cml",
-            "//src/media/audio/audio_core/meta/audio_core.core_shard.base.cml",
             "//src/recovery/system/meta/core_shards/base.shard.cml",
             "//src/recovery/system/meta/core_shards/ui.shard.cml",
             "//src/session/bin/session_manager/meta/session_manager.core_shard.cml",
@@ -1990,17 +1989,6 @@ assembly_input_bundle("detect_user") {
 # (via the `:core_realm` AIB).  Each should list which feature_set_level and
 # build type that it is valid for.
 
-# Input groups
-#
-# feature_set_levels: minimal
-# build-types:all
-#
-# These AIBs are opaque groups of inputs that are common to many products, but
-# have not been organized into specific features yet.
-assembly_input_bundle("input_group_one") {
-  base_packages = [ "//src/sys/cache_manager" ]
-}
-
 ########
 #
 # Bluetooth Support
@@ -2197,7 +2185,7 @@ assembly_input_bundle("driver_framework") {
 # feature_set_levels: minimal
 # build-types: eng
 #
-assembly_input_bundle("full_package_drivers") {
+assembly_input_bundle("full_drivers") {
   compiled_packages = [
     {
       bootfs_package = true
@@ -2205,7 +2193,7 @@ assembly_input_bundle("full_package_drivers") {
       components = [
         {
           component_name = "bootstrap"
-          shards = [ "//src/devices/bin/driver_framework/meta/full_package_drivers.bootstrap_shard.cml" ]
+          shards = [ "//src/devices/bin/driver_framework/meta/full_drivers.bootstrap_shard.cml" ]
         },
       ]
     },
@@ -2705,6 +2693,15 @@ assembly_input_bundle("fshost_fvm_f2fs") {
     },
   ]
   bootfs_packages = [ "//src/storage/f2fs/bin:package" ]
+}
+
+# Automatic garbage collection for mutable storage
+#
+# feature_set_levels: minimal
+# build-types:all
+#
+assembly_input_bundle("storage_cache_manager") {
+  base_packages = [ "//src/sys/cache_manager" ]
 }
 
 assembly_input_bundle("system_update_checker") {
@@ -3766,8 +3763,8 @@ assembly_input_bundle("sensors_framework") {
 # features_set_levels: utility, minimal
 # build-types: eng
 #
-assembly_input_bundle("sensors_playback") {
-  base_packages = [ "//src/sensors/playback:sensors_playback" ]
+assembly_input_bundle("sensors_framework_eng") {
+  base_packages = [ "//src/sensors:sensors_eng" ]
 
   compiled_packages = [
     {
@@ -3775,8 +3772,7 @@ assembly_input_bundle("sensors_playback") {
       components = [
         {
           component_name = "core"
-          shards =
-              [ "//src/sensors/playback/meta/sensors_playback.core_shard.cml" ]
+          shards = [ "//src/sensors/meta/sensors_eng.core_shard.cml" ]
         },
       ]
     },

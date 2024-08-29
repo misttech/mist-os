@@ -58,7 +58,7 @@ fuchsia_package("pkg") {
   testonly = true
   deps = [
     ":default",
-    "//src/cobalt/bin/testing/mock_cobalt:component_v2",
+    "//src/cobalt/bin/testing/fake_cobalt:component_v2",
     "//src/lib/fake-clock/svc",
     "//src/lib/fuchsia-component-test/realm_builder_server:realm_builder_server_component",
     "//src/sys/time/testing:config-values-faketime",

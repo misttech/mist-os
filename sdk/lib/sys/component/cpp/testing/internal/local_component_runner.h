@@ -60,6 +60,11 @@ class LocalComponentInstance final : public fuchsia::component::runner::Componen
   // fuchsia::component::runner::ComponentController
   void Kill() override;
 
+#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+  // fuchsia::component::runner::ComponentController
+  void handle_unknown_method(uint64_t ordinal, bool has_response) override;
+#endif
+
   // If on_exit is set, close the ComponentController and call the given on_exit
   // function.
   void Exit(zx_status_t);

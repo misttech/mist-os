@@ -38,7 +38,6 @@ void RemoteDir::OpenRemote(fio::OpenFlags flags, fio::ModeType mode, fidl::Strin
                         ", response=", status.FormatDescription());
 }
 
-#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
 void RemoteDir::OpenRemote(fuchsia_io::wire::Directory2Open3Request request) const {
   // We consume the |request| channel when making the wire call to the remote end, so on failure
   // there isn't anywhere for us to propagate the error.
@@ -48,7 +47,5 @@ void RemoteDir::OpenRemote(fuchsia_io::wire::Directory2Open3Request request) con
   FS_PRETTY_TRACE_DEBUG("RemoteDir::OpenRemote: path='", request.path, "', flags=", request.flags,
                         "', options=", request.options, ", response=", status.FormatDescription());
 }
-
-#endif
 
 }  // namespace fs

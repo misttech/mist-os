@@ -6,7 +6,8 @@
 #define SRC_DEVICES_POWER_LIB_FROM_FIDL_CPP_FROM_FIDL_H_
 
 #include <fidl/fuchsia.hardware.power/cpp/natural_types.h>
-#include <lib/driver/power/cpp/types.h>
+
+#include "sdk/lib/driver/power/cpp/types.h"
 
 namespace power::from_fidl {
 

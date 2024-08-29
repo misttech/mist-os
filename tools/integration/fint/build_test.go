@@ -97,7 +97,7 @@ func TestBuild(t *testing.T) {
 	failedBuildRunner := func(cmd []string, _ io.Writer) error {
 		// Make ninja build fail, but ninjatrace succeed.
 		prog := filepath.Base(cmd[0])
-		if prog == "ninjatrace" || prog == "buildstats" {
+		if prog == "ninjatrace_prebuilt" || prog == "buildstats_prebuilt" {
 			return nil
 		}
 		// prog == "ninja"
@@ -424,7 +424,7 @@ func TestBuild(t *testing.T) {
 				ArtifactDir: artifactDir,
 			},
 			runnerFunc: func(cmd []string, stdout io.Writer) error {
-				if filepath.Base(cmd[0]) == "ninjatrace" {
+				if filepath.Base(cmd[0]) == "ninjatrace_prebuilt" {
 					return fmt.Errorf("failed to run command: %s", cmd)
 				}
 				return nil
@@ -748,10 +748,10 @@ func TestBuild(t *testing.T) {
 			fileExists := func(_ string) bool { return true }
 			tc.modules.tools = append(tc.modules.tools, makeTools(
 				map[string][]string{
-					"gn":         {"linux", "mac"},
-					"ninja":      {"linux", "mac"},
-					"buildstats": {"linux", "mac"},
-					"ninjatrace": {"linux", "mac"},
+					"gn":                  {"linux", "mac"},
+					"ninja":               {"linux", "mac"},
+					"buildstats_prebuilt": {"linux", "mac"},
+					"ninjatrace_prebuilt": {"linux", "mac"},
 				},
 			)...)
 			ctx := context.Background()

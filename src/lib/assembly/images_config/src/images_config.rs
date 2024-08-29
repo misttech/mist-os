@@ -605,6 +605,7 @@ mod tests {
             no_zxcrypt: false,
             image_mode: pfc::FilesystemImageMode::NoImage,
             volume: pfc::VolumeConfig::Fxfs,
+            ..Default::default()
         };
 
         let images = ImagesConfig::from_product_and_board(&product, &board).unwrap();
@@ -642,6 +643,7 @@ mod tests {
             no_zxcrypt: false,
             image_mode: pfc::FilesystemImageMode::Partition,
             volume: pfc::VolumeConfig::Fxfs,
+            ..Default::default()
         };
 
         let images = ImagesConfig::from_product_and_board(&product, &board).unwrap();
@@ -687,6 +689,7 @@ mod tests {
                 blob: Some(pfc::BlobFvmVolumeConfig { blob_layout: BlobfsLayout::Compact }),
                 reserved: Some(pfc::ReservedFvmVolumeConfig { reserved_slices: 7 }),
             }),
+            ..Default::default()
         };
 
         let images = ImagesConfig::from_product_and_board(&product, &board).unwrap();
@@ -782,6 +785,7 @@ mod tests {
                 blob: Some(pfc::BlobFvmVolumeConfig { blob_layout: BlobfsLayout::Compact }),
                 reserved: Some(pfc::ReservedFvmVolumeConfig { reserved_slices: 7 }),
             }),
+            ..Default::default()
         };
 
         let images = ImagesConfig::from_product_and_board(&product, &board).unwrap();

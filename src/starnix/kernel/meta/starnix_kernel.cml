@@ -118,6 +118,11 @@
             from: "parent",
             availability: "optional",
         },
+        {
+            service: "fuchsia.hardware.sockettunnel.Service",
+            from: "parent",
+            availability: "optional",
+        },
     ],
     expose: [
         {

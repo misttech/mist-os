@@ -9,6 +9,7 @@
 #include <lib/virtual_alloc.h>
 #include <lib/zircon-internal/macros.h>
 
+#include <vm/pmm.h>
 #include <vm/scanner.h>
 #include <vm/vm_address_region.h>
 

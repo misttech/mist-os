@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{create_filesystem_from_spec, run_component_features};
+use crate::{run_component_features, MountAction};
 use anyhow::{anyhow, bail, Error};
 use fidl::endpoints::{ControlHandle, RequestStream, ServerEnd};
 use fidl::AsyncChannel;
@@ -200,7 +200,7 @@ pub async fn start_component(
                     })?;
                 if let Some(local_mounts) = local_mounts {
                     for mount in local_mounts.iter() {
-                        let action = create_filesystem_from_spec(locked, current_task, &pkg, mount)
+                        let action = MountAction::from_spec(locked, current_task, &pkg, mount)
                             .map_err(|e| {
                                 log_error!("Error while mounting the filesystems: {e:?}");
                                 errno!(EINVAL)
@@ -300,6 +300,10 @@ async fn serve_component_controller(
                             fcomponent::Error::InstanceDied.into_primitive() as i32,
                         ));
                     }
+                    return;
+                }
+                Ok(ComponentControllerRequest::_UnknownMethod { ordinal, .. }) => {
+                    log_info!("Unknown method received: {ordinal}");
                     return;
                 }
                 Err(_) => {

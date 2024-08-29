@@ -10,6 +10,8 @@
 #include <lib/driver/power/cpp/element-description-builder.h>
 #include <lib/driver/power/cpp/power-support.h>
 
+#include "src/devices/power/lib/from-fidl/cpp/from-fidl.h"
+
 namespace fake_child_device {
 zx::result<> FakeChild::Start() {
   // Connect to the Device from our platform device parent and get our power
@@ -20,12 +22,27 @@ zx::result<> FakeChild::Start() {
     return device_connection.take_error();
   }
 
-  fidl::WireSyncClient<fuchsia_hardware_platform_device::Device> device_client(
-      std::move(device_connection.value()));
-  auto power_config = device_client->GetPowerConfiguration();
+  fdf_power::PowerElementConfiguration power_config;
+  {
+    fidl::SyncClient<fuchsia_hardware_platform_device::Device> device_client(
+        std::move(device_connection.value()));
+    fidl::Result fidl_config = device_client->GetPowerConfiguration();
+    if (fidl_config.is_error()) {
+      return zx::error(ZX_ERR_INTERNAL);
+    }
+    if (fidl_config.value().config().empty()) {
+      return zx::error(ZX_ERR_INTERNAL);
+    }
+    zx::result result =
+        power::from_fidl::CreatePowerElementConfiguration(fidl_config.value().config()[0]);
+    if (result.is_error()) {
+      return result.take_error();
+    }
+    power_config = std::move(result.value());
+  }
 
   // Ask the library to get our dependency tokens.
-  auto res = fdf_power::GetDependencyTokens(*incoming(), power_config->value()->config[0]);
+  auto res = fdf_power::GetDependencyTokens(*incoming(), power_config);
   if (res.is_error()) {
     return zx::error(ZX_ERR_INTERNAL);
   }
@@ -41,7 +58,7 @@ zx::result<> FakeChild::Start() {
     fidl::ClientEnd<fuchsia_power_broker::Topology> broker = std::move(pb_open.value());
 
     fdf_power::ElementDesc description =
-        fdf_power::ElementDescBuilder(power_config->value()->config[0], std::move(tokens)).Build();
+        fdf_power::ElementDescBuilder(power_config, std::move(tokens)).Build();
 
     auto add_result = fdf_power::AddElement(broker, description);
     if (!add_result.is_ok()) {

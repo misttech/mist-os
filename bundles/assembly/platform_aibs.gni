@@ -33,7 +33,6 @@ bootstrap_user_platform_aib_names = [
 
   # Graphics
   "virtcon",
-  "virtcon_disable",
 
   # Kernel args
   "kernel_args_user",
@@ -124,6 +123,7 @@ bootstrap_eng_platform_aib_names = [
 
   # Storage
   "fshost_storage_host",
+  "partitioning_tools",
 ]
 
 # The names of all of the platform's 'testonly=false' Assembly Input Bundles
@@ -232,9 +232,7 @@ user_platform_aib_names =
 
       # Storage
       "factory_data",
-
-      # Opaque input groups.
-      "input_group_one",
+      "storage_cache_manager",
 
       # ICU-specific version of intl_services
 
@@ -357,15 +355,15 @@ eng_only_platform_aib_names =
       "topology_test_daemon",
 
       # Driver development support
-      "full_package_drivers",
+      "full_drivers",
 
       # Audio development/debugging
       "audio_development_support",
       "intel_hda",
       "video_development_support",
 
-      # Sensor data playback support.
-      "sensors_playback",
+      # Sensors support with playback.
+      "sensors_framework_eng",
 
       # Bluetooth testing support
       "bluetooth_pandora",

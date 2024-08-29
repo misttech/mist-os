@@ -59,6 +59,9 @@ class _FuchsiaCmds:
         return f"hrtimer-ctl --id 2 --event {duration}"
 
 
+_RESUME_DURATION_TOLERANCE_MILLISECONDS: float = 200
+
+
 class _RegExPatterns:
     """Class to hold Regular Expression patterns."""
 
@@ -521,93 +524,120 @@ class SystemPowerStateController(
         Raises:
             errors.SystemPowerStateControllerError: In case of failure
         """
-        suspend_resume_count_before: int = (
-            self._get_suspend_resume_count_sag_inspect_data()
-        )
+        suspend_resume_stats_before: dict[
+            str, int
+        ] = self._get_suspend_stats_from_sag_inspect_data()
 
-        suspend_events_before: dict[
+        suspend_resume_events_before: dict[
             str, dict[str, int]
         ] = self._get_suspend_events_from_fsh_inspect_data()
 
         yield
 
-        suspend_resume_count_after: int = (
-            self._get_suspend_resume_count_sag_inspect_data()
-        )
+        suspend_resume_stats_after: dict[
+            str, int
+        ] = self._get_suspend_stats_from_sag_inspect_data()
         self._validate_using_sag_inspect_data(
             suspend_state,
             resume_mode,
-            suspend_resume_count_before,
-            suspend_resume_count_after,
+            suspend_resume_stats_before,
+            suspend_resume_stats_after,
         )
 
-        suspend_events_after: dict[
+        suspend_resume_events_after: dict[
             str, dict[str, int]
         ] = self._get_suspend_events_from_fsh_inspect_data()
         self._validate_using_fsh_inspect_data(
             suspend_state,
             resume_mode,
-            suspend_events_before,
-            suspend_events_after,
+            suspend_resume_events_before,
+            suspend_resume_events_after,
         )
 
     def _validate_using_sag_inspect_data(
         self,
         suspend_state: system_power_state_controller_interface.SuspendState,
         resume_mode: system_power_state_controller_interface.ResumeMode,
-        suspend_resume_count_before: int,
-        suspend_resume_count_after: int,
+        suspend_resume_stats_before: dict[str, int],
+        suspend_resume_stats_after: dict[str, int],
     ) -> None:
         """Validate suspend-resume operation using SAG inspect data.
 
         Args:
             suspend_state: Which state to suspend the Fuchsia device into.
             resume_mode: Information about how to resume the device.
-            suspend_resume_count_before: Suspend-Resume count before.
-            suspend_resume_count_after: Suspend-Resume count after.
+            suspend_resume_stats_before: Suspend-Resume stats before.
+            suspend_resume_stats_after: Suspend-Resume stats after.
 
         Raises:
             errors.SystemPowerStateControllerError: In case of failure
         """
-        if suspend_resume_count_after != suspend_resume_count_before + 1:
+        # "suspend_stats": {
+        #     "fail_count": 0,
+        #     "last_failed_error": 0,
+        #     "last_time_in_suspend": 3053743875,
+        #     "last_time_in_suspend_operations": 188959,
+        #     "success_count": 1
+        # },
+
+        if (
+            suspend_resume_stats_after["success_count"]
+            != suspend_resume_stats_before["success_count"] + 1
+        ):
             raise errors.SystemPowerStateControllerError(
                 f"Based on SAG inspect data, '{suspend_state}' followed "
                 f"by '{resume_mode}' operation didn't succeed on "
                 f"'{self._device_name}'. "
             )
+
+        suspend_resume_duration_nano_sec: float = suspend_resume_stats_after[
+            "last_time_in_suspend"
+        ]
+        suspend_resume_duration_sec: float = round(
+            suspend_resume_duration_nano_sec / 1e9, 4
+        )
+
+        self._validate_suspend_resume_duration_using_inspect_data(
+            suspend_state=suspend_state,
+            resume_mode=resume_mode,
+            actual_suspend_resume_duration_nano_sec=suspend_resume_duration_nano_sec,
+            inspect_data_src="SAG",
+        )
+
         _LOGGER.info(
             "Successfully verified '%s' followed by '%s' operations on '%s' "
-            "using SAG inspect data.",
+            "using SAG inspect data. Operations took '%s seconds' to complete.",
             suspend_state,
             resume_mode,
             self._device_name,
+            suspend_resume_duration_sec,
         )
 
     def _validate_using_fsh_inspect_data(
         self,
         suspend_state: system_power_state_controller_interface.SuspendState,
         resume_mode: system_power_state_controller_interface.ResumeMode,
-        suspend_events_before: dict[str, dict[str, int]],
-        suspend_events_after: dict[str, dict[str, int]],
+        suspend_resume_events_before: dict[str, dict[str, int]],
+        suspend_resume_events_after: dict[str, dict[str, int]],
     ) -> None:
         """Validate suspend-resume operation using FSH inspect data.
 
         Args:
             suspend_state: Which state to suspend the Fuchsia device into.
             resume_mode: Information about how to resume the device.
-            suspend_events_before: Suspend-Resume events before.
-            suspend_events_after: Suspend-Resume events after.
+            suspend_resume_events_before: Suspend-Resume events before.
+            suspend_resume_events_after: Suspend-Resume events after.
 
         Raises:
             errors.SystemPowerStateControllerError: In case of failure
         """
-        # suspend_events_before:
+        # suspend_resume_events_before:
         # {
         #     '0': {'suspended': 75685149500},
         #     '1': {'resumed': 76510325583},
         # }
 
-        # suspend_events_after:
+        # suspend_resume_events_after:
         # {
         #     '0': {'suspended': 75685149500},
         #     '1': {'resumed': 76510325583},
@@ -615,17 +645,17 @@ class SystemPowerStateController(
         #     '3': {'resumed': 109833015166}
         # }
 
-        # current_suspend_events:
+        # current_suspend_resume_events:
         # {
         #     '2': {'suspended': 109243654875},
         #     '3': {'resumed': 109833015166}
         # }
-        current_suspend_events: dict[str, dict[str, int]] = {
+        current_suspend_resume_events: dict[str, dict[str, int]] = {
             k: v
-            for k, v in suspend_events_after.items()
-            if k not in suspend_events_before
+            for k, v in suspend_resume_events_after.items()
+            if k not in suspend_resume_events_before
         }
-        if len(current_suspend_events) != 2:
+        if len(current_suspend_resume_events) != 2:
             raise errors.SystemPowerStateControllerError(
                 f"Based on FSH inspect data, '{suspend_state}' followed "
                 f"by '{resume_mode}' operation didn't succeed on "
@@ -634,7 +664,7 @@ class SystemPowerStateController(
 
         suspend_enter_timer: int | None = None
         suspend_exit_timer: int | None = None
-        for k, v in current_suspend_events.items():
+        for k, v in current_suspend_resume_events.items():
             if "suspended" in v:
                 suspend_enter_timer = v["suspended"]
             elif "resumed" in v:
@@ -649,25 +679,20 @@ class SystemPowerStateController(
                 f"by '{resume_mode}' operation didn't succeed on "
                 f"'{self._device_name}'. "
             )
+
         suspend_resume_duration_nano_sec: float = (
             suspend_exit_timer - suspend_enter_timer
         )
         suspend_resume_duration_sec: float = round(
-            suspend_resume_duration_nano_sec / 1e9, 2
+            suspend_resume_duration_nano_sec / 1e9, 4
         )
-        if isinstance(
-            resume_mode,
-            (system_power_state_controller_interface.TimerResume,),
-        ):
-            timer_duration_nano_sec: float = resume_mode.duration * 1e9
-            if suspend_resume_duration_nano_sec > timer_duration_nano_sec:
-                raise errors.SystemPowerStateControllerError(
-                    f"Based on FSH inspect data, '{suspend_state}' followed by "
-                    f"'{resume_mode}' operation took "
-                    f"'{suspend_resume_duration_sec} seconds' on "
-                    f"'{self._device_name}'. Expected it to not take more than "
-                    f"'{resume_mode.duration} seconds'.",
-                )
+
+        self._validate_suspend_resume_duration_using_inspect_data(
+            suspend_state=suspend_state,
+            resume_mode=resume_mode,
+            actual_suspend_resume_duration_nano_sec=suspend_resume_duration_nano_sec,
+            inspect_data_src="FSH",
+        )
 
         _LOGGER.info(
             "Successfully verified '%s' followed by '%s' operations on '%s' "
@@ -678,17 +703,65 @@ class SystemPowerStateController(
             suspend_resume_duration_sec,
         )
 
-    # TODO (https://fxbug.dev/335494603): Update this logic, once fxr/1072776 lands
+    def _validate_suspend_resume_duration_using_inspect_data(
+        self,
+        suspend_state: system_power_state_controller_interface.SuspendState,
+        resume_mode: system_power_state_controller_interface.ResumeMode,
+        actual_suspend_resume_duration_nano_sec: float,
+        inspect_data_src: str,
+    ) -> None:
+        """Validate suspend-resume duration received from inspect data.
+
+        Args:
+            suspend_state: Which state to suspend the Fuchsia device into.
+            resume_mode: Information about how to resume the device.
+            actual_suspend_resume_duration_nano_sec: Suspend-Resume duration.
+            inspect_data_src: Inspect data source.
+
+        Raises:
+            errors.SystemPowerStateControllerError: In case of failure
+        """
+        if not isinstance(
+            resume_mode,
+            (system_power_state_controller_interface.TimerResume,),
+        ):
+            return
+
+        # It could take few milliseconds for the device to fully resume after the timer fires.
+        resume_duration_tolerance_nano_sec: float = (
+            _RESUME_DURATION_TOLERANCE_MILLISECONDS * 1e6
+        )
+        expected_suspend_resume_duration_with_tolerance_nano_sec: float = (
+            resume_mode.duration * 1e9
+        ) + resume_duration_tolerance_nano_sec
+
+        if (
+            actual_suspend_resume_duration_nano_sec
+            > expected_suspend_resume_duration_with_tolerance_nano_sec
+        ):
+            actual_suspend_resume_duration_sec: float = round(
+                actual_suspend_resume_duration_nano_sec / 1e9, 4
+            )
+
+            raise errors.SystemPowerStateControllerError(
+                f"Based on {inspect_data_src} inspect data, '{suspend_state}' followed by "
+                f"'{resume_mode}' operation took "
+                f"'{actual_suspend_resume_duration_sec} seconds' on "
+                f"'{self._device_name}'. Expected it to not take more than "
+                f"'{resume_mode.duration} seconds'.",
+            )
+
     # pylint: disable=missing-raises-doc
-    def _get_suspend_resume_count_sag_inspect_data(self) -> int:
-        """Returns suspend-resume count by reading the SAG inspect data.
+    def _get_suspend_stats_from_sag_inspect_data(self) -> dict[str, int]:
+        """Returns suspend-resume stats by reading the SAG inspect data.
 
         Returns:
-            suspend-resume count.
+            suspend-resume stats.
 
         Raises:
             errors.SystemPowerStateControllerError: Failed to read SAG inspect data.
         """
+        # TODO (https://fxbug.dev/335494603): Update this logic, once fxr/1072776 lands
         # Sample SAG inspect data:
         # [
         #     {
@@ -700,31 +773,47 @@ class SystemPowerStateController(
         #         "moniker": "bootstrap/system-activity-governor",
         #         "payload": {
         #             "root": {
-        #                 "booting": False,
-        #                 "power_elements": {
-        #                     "execution_resume_latency": {
-        #                         "resume_latencies": [0],
-        #                         "resume_latency": 0,
-        #                         "power_level": 0,
+        #                     "booting": False,
+        #                     "fuchsia.inspect.Health": {
+        #                         "start_timestamp_nanos": 911136500,
+        #                         "status": "OK"
         #                     },
-        #                     "wake_handling": {"power_level": 0},
-        #                     "full_wake_handling": {"power_level": 0},
-        #                     "application_activity": {"power_level": 1},
-        #                     "execution_state": {"power_level": 2},
-        #                 },
-        #                 "suspend_events": {},
-        #                 "suspend_stats": {
-        #                     "success_count": 0,
-        #                     "fail_count": 0,
-        #                     "last_failed_error": 0,
-        #                     "last_time_in_suspend": -1,
-        #                     "last_time_in_suspend_operations": -1,
-        #                 },
-        #                 "fuchsia.inspect.Health": {
-        #                     "start_timestamp_nanos": 892116500,
-        #                     "status": "OK",
-        #                 },
-        #             }
+        #                     "power_elements": {
+        #                         "application_activity": {
+        #                             "power_level": 1
+        #                         },
+        #                         "execution_resume_latency": {
+        #                             "power_level": 0,
+        #                             "resume_latencies": [0],
+        #                             "resume_latency": 0
+        #                         },
+        #                         "execution_state": {
+        #                             "power_level": 2
+        #                         },
+        #                         "full_wake_handling": {
+        #                             "power_level": 0
+        #                         },
+        #                         "wake_handling": {
+        #                             "power_level": 0
+        #                         }
+        #                     },
+        #                     "suspend_events": {
+        #                         "0": {
+        #                             "suspended": 20226056875
+        #                         },
+        #                         "1": {
+        #                             "duration": 3053743875,
+        #                             "resumed": 23281073708
+        #                         }
+        #                     },
+        #                     "suspend_stats": {
+        #                         "fail_count": 0,
+        #                         "last_failed_error": 0,
+        #                         "last_time_in_suspend": 3053743875,
+        #                         "last_time_in_suspend_operations": 188959,
+        #                         "success_count": 1
+        #                     },
+        #                     "wake_leases": {}
         #         },
         #         "version": 1,
         #     }
@@ -759,12 +848,7 @@ class SystemPowerStateController(
             sag_inspect_root_data: dict[str, Any] = sag_inspect_data.payload[
                 "root"
             ]
-            suspend_stats: dict[str, Any] = sag_inspect_root_data[
-                "suspend_stats"
-            ]
-            suspend_resume_count: int = suspend_stats["success_count"]
-
-            return suspend_resume_count
+            return sag_inspect_root_data["suspend_stats"]
         except errors.InspectError as err:
             raise errors.SystemPowerStateControllerError(
                 f"Failed to read SAG inspect data from {self._device_name}"

@@ -195,7 +195,7 @@ zx::result<size_t> VnodeF2fs::CreateAndPopulateVmo(zx::vmo &vmo, const size_t of
       }
 
       if (i == num_requested_blocks && actual_read_blocks == 0) {
-        // There is no need for read IO on the requested blocks, so we skip the readahead checks.
+        // All pages are already uptodate, and we can skip disk I/Os as well as readahead.
         break;
       }
     }
@@ -758,9 +758,7 @@ zx_status_t VnodeF2fs::SyncFile(bool datasync) {
     return ZX_OK;
   }
 
-  WritebackOperation op;
-  Writeback(op);
-
+  Writeback();
   bool need_cp = NeedToCheckpoint();
   if (need_cp) {
     fs()->SyncFs();

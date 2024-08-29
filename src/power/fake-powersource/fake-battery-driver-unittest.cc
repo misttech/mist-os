@@ -7,9 +7,9 @@
 #include <lib/async-loop/loop.h>
 #include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
 #include <lib/driver/component/cpp/driver_base.h>
-#include <lib/driver/testing/cpp/driver_lifecycle.h>
 #include <lib/driver/testing/cpp/driver_runtime.h>
-#include <lib/driver/testing/cpp/test_environment.h>
+#include <lib/driver/testing/cpp/internal/driver_lifecycle.h>
+#include <lib/driver/testing/cpp/internal/test_environment.h>
 #include <lib/driver/testing/cpp/test_node.h>
 #include <lib/fdf/env.h>
 #include <lib/fdf/testing.h>
@@ -26,6 +26,8 @@ using fuchsia_hardware_powersource::wire::BatteryInfo;
 using fuchsia_hardware_powersource::wire::BatteryUnit;
 using fuchsia_hardware_powersource::wire::PowerType;
 
+// WARNING: Don't use this test as a template for new tests as it uses the old driver testing
+// library.
 // If the environment needs to run on a background driver dispatcher (for example if the driver
 // needs to make sync FIDL calls), we need to run the environment on a background dispatcher while
 // keeping the driver on the main thread.
@@ -45,7 +47,7 @@ class FakeBatteryDriverTest : public ::testing::Test {
 
     // Start the test environment
     zx::result init_result =
-        test_environment_.SyncCall(&fdf_testing::TestEnvironment::Initialize,
+        test_environment_.SyncCall(&fdf_testing::internal::TestEnvironment::Initialize,
                                    std::move(start_args->incoming_directory_server));
     EXPECT_EQ(ZX_OK, init_result.status_value());
     zx::result driver = runtime_.RunToCompletion(driver_.Start(std::move(start_args->start_args)));
@@ -57,7 +59,7 @@ class FakeBatteryDriverTest : public ::testing::Test {
     EXPECT_EQ(ZX_OK, result.status_value());
   }
 
-  fdf_testing::DriverUnderTest<fake_powersource::Driver>& driver() { return driver_; }
+  fdf_testing::internal::DriverUnderTest<fake_powersource::Driver>& driver() { return driver_; }
 
   async_dispatcher_t* env_dispatcher() { return test_env_dispatcher_->async_dispatcher(); }
 
@@ -74,10 +76,10 @@ class FakeBatteryDriverTest : public ::testing::Test {
 
   // The env_dispatcher is an fdf_dispatcher so we can add driver transport FIDL servers into this
   // environment.
-  async_patterns::TestDispatcherBound<fdf_testing::TestEnvironment> test_environment_{
+  async_patterns::TestDispatcherBound<fdf_testing::internal::TestEnvironment> test_environment_{
       env_dispatcher(), std::in_place};
 
-  fdf_testing::DriverUnderTest<fake_powersource::Driver> driver_;
+  fdf_testing::internal::DriverUnderTest<fake_powersource::Driver> driver_;
 };
 
 TEST_F(FakeBatteryDriverTest, CanGetInfo) {

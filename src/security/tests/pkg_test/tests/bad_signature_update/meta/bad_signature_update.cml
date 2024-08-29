@@ -50,7 +50,7 @@
         // Non-production dependencies.
         {
             name: "cobalt",
-            url: "#meta/mock_cobalt.cm",
+            url: "#meta/fake_cobalt.cm",
         },
 
         // Production non-package delivery components.
@@ -174,6 +174,16 @@
                 "fuchsia.fshost.StorageHost",
                 "fuchsia.fshost.UseDiskMigration",
             ],
+        },
+        {
+            from: "void",
+            to: "#fshost",
+            config: [
+                "fuchsia.blobfs.CacheEvictionPolicy",
+                "fuchsia.blobfs.WriteCompressionAlgorithm",
+                "fuchsia.fshost.DisableAutomount",
+            ],
+            availability: "optional",
         },
         {
             directory: "blob-exec",

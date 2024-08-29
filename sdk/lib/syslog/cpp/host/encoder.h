@@ -40,13 +40,13 @@ struct MsgHeader {
 
   const char* c_str() {
     NullTerminate();
-    return reinterpret_cast<const char*>(buffer->data);
+    return reinterpret_cast<const char*>(buffer->data());
   }
 
   void WriteChar(const char value) {
     if (!RemainingSpace()) {
       buffer->Flush();
-      offset = reinterpret_cast<char*>(buffer->data);
+      offset = reinterpret_cast<char*>(buffer->data());
       WriteString("CONTINUATION: ");
     }
     assert((offset + 1) < (reinterpret_cast<const char*>(this) + sizeof(LogBuffer)));
@@ -70,7 +70,7 @@ struct MsgHeader {
 
   void FlushAndReset() {
     buffer->Flush();
-    offset = reinterpret_cast<char*>(buffer->data);
+    offset = reinterpret_cast<char*>(buffer->data());
   }
 
   // Writes a string to the buffer and returns the
@@ -92,7 +92,7 @@ struct MsgHeader {
   void Init(LogBuffer* buffer, fuchsia_logging::LogSeverity severity) {
     this->severity = severity;
     user_tag = nullptr;
-    offset = reinterpret_cast<char*>(buffer->data);
+    offset = reinterpret_cast<char*>(buffer->data());
     first_tag = true;
     has_msg = false;
     first_kv = true;
@@ -100,7 +100,7 @@ struct MsgHeader {
   }
 
   static MsgHeader* CreatePtr(LogBuffer* buffer) {
-    return reinterpret_cast<MsgHeader*>(&buffer->record_state);
+    return reinterpret_cast<MsgHeader*>(buffer->record_state());
   }
 };
 
@@ -108,7 +108,7 @@ struct MsgHeader {
 const std::string GetNameForLogSeverity(fuchsia_logging::LogSeverity severity);
 #endif
 
-static_assert(sizeof(MsgHeader) <= sizeof(LogBuffer::record_state),
+static_assert(sizeof(MsgHeader) <= LogBuffer::record_state_size(),
               "message header must be no larger than record_state");
 }  // namespace syslog_runtime::internal
 

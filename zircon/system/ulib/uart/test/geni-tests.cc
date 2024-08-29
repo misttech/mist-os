@@ -28,7 +28,9 @@ void Init(SimpleTestDriver& driver) {
       .ExpectWrite(uint32_t{0b0000'0000'0100'0001}, 0x48)  // Enable clock< div=4
       .ExpectWrite(uint32_t{0b0000'0000'0100'0001}, 0x4c)  // Enable clock< div=4
 
-      .ExpectWrite(uint32_t{0b0000'0000'0000'0000'0000'0000'0000'0010}, 0x814)   // RX Watermark = 2
+      .ExpectWrite(uint32_t{0b0000'0000'0000'0000'0000'0000'0000'1100},
+                   0x814)  // RFR Watermark = 12
+      .ExpectWrite(uint32_t{0b0000'0000'0000'0000'0000'0000'0000'1000}, 0x810)   // RX Watermark = 8
       .ExpectWrite(uint32_t{0b0000'0000'0000'0000'0000'0000'0000'0100}, 0x80c);  // TX Watermark = 4
 
   driver.Init();

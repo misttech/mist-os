@@ -334,7 +334,7 @@ class WebEngineTest : public VirtualKeyboardBase {
         std::make_pair(kFontsProvider, kFontsProviderUrl),
         std::make_pair(kIntl, kIntlUrl),
         std::make_pair(kMemoryPressureProvider, kMemoryPressureProviderUrl),
-        std::make_pair(kMockCobalt, kMockCobaltUrl),
+        std::make_pair(kFakeCobalt, kFakeCobaltUrl),
         std::make_pair(kNetstack, kNetstackUrl),
         std::make_pair(kWebContextProvider, kWebContextProviderUrl),
     };
@@ -385,7 +385,7 @@ class WebEngineTest : public VirtualKeyboardBase {
                 {
                     target, ChildRef{kFontsProvider}, ChildRef{kMemoryPressureProvider},
                     ChildRef{kBuildInfoProvider}, ChildRef{kWebContextProvider}, ChildRef{kIntl},
-                    ChildRef{kMockCobalt},
+                    ChildRef{kFakeCobalt},
                     // Not including kNetstack here, since it emits spurious
                     // FATAL errors.
                 },
@@ -427,7 +427,7 @@ class WebEngineTest : public VirtualKeyboardBase {
          .source = ChildRef{kWebContextProvider},
          .targets = {target}},
         {.capabilities = {Protocol{fuchsia::metrics::MetricEventLoggerFactory::Name_}},
-         .source = ChildRef{kMockCobalt},
+         .source = ChildRef{kFakeCobalt},
          .targets = {ChildRef{kMemoryPressureProvider}}},
         {.capabilities = {Protocol{fuchsia::sysmem::Allocator::Name_},
                           Protocol{fuchsia::sysmem2::Allocator::Name_}},
@@ -477,8 +477,8 @@ class WebEngineTest : public VirtualKeyboardBase {
   }
 
  private:
-  static constexpr auto kMockCobalt = "cobalt";
-  static constexpr auto kMockCobaltUrl = "#meta/mock_cobalt.cm";
+  static constexpr auto kFakeCobalt = "cobalt";
+  static constexpr auto kFakeCobaltUrl = "#meta/fake_cobalt.cm";
 
   static constexpr auto kWebVirtualKeyboardClient = "web_virtual_keyboard_client";
   static constexpr auto kWebVirtualKeyboardUrl = "#meta/web-virtual-keyboard-client.cm";

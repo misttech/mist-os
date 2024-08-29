@@ -22,7 +22,7 @@ use {
     fidl_fuchsia_samplertestcontroller as fsamplertestcontroller, fidl_test_sampler as ftest,
 };
 
-const MOCK_COBALT_URL: &str = "#meta/mock_cobalt.cm";
+const FAKE_COBALT_URL: &str = "#meta/fake_cobalt.cm";
 const SINGLE_COUNTER_URL: &str = "#meta/single_counter_test_component.cm";
 const SAMPLER_URL: &str = "#meta/sampler.cm";
 const ARCHIVIST_URL: &str = "#meta/archivist-for-embedding.cm";
@@ -34,8 +34,8 @@ pub async fn create_realm(options: ftest::RealmOptions) -> Result<RealmInstance,
         options.sampler_component_name.as_ref().map(|s| s.as_str()).unwrap_or("sampler");
     let single_counter_name =
         options.single_counter_name.as_ref().map(|s| s.as_str()).unwrap_or("single_counter");
-    let mock_cobalt_name =
-        options.mock_cobalt_name.as_ref().map(|s| s.as_str()).unwrap_or("mock_cobalt");
+    let fake_cobalt_name =
+        options.fake_cobalt_name.as_ref().map(|s| s.as_str()).unwrap_or("fake_cobalt");
     let test_archivist_name =
         options.test_archivist_name.as_ref().map(|s| s.as_str()).unwrap_or("test_case_archivist");
     let builder = RealmBuilder::new().await?;
@@ -47,8 +47,8 @@ pub async fn create_realm(options: ftest::RealmOptions) -> Result<RealmInstance,
         )
         .await?;
     let wrapper_realm = builder.add_child_realm("wrapper", ChildOptions::new()).await?;
-    let mock_cobalt =
-        wrapper_realm.add_child(mock_cobalt_name, MOCK_COBALT_URL, ChildOptions::new()).await?;
+    let fake_cobalt =
+        wrapper_realm.add_child(fake_cobalt_name, FAKE_COBALT_URL, ChildOptions::new()).await?;
     let single_counter = wrapper_realm
         .add_child(single_counter_name, SINGLE_COUNTER_URL, ChildOptions::new())
         .await?;
@@ -61,7 +61,7 @@ pub async fn create_realm(options: ftest::RealmOptions) -> Result<RealmInstance,
         .add_route(
             Route::new()
                 .capability(Capability::protocol::<fmetrics_test::MetricEventLoggerQuerierMarker>())
-                .from(&mock_cobalt)
+                .from(&fake_cobalt)
                 .to(Ref::parent()),
         )
         .await?;
@@ -91,7 +91,7 @@ pub async fn create_realm(options: ftest::RealmOptions) -> Result<RealmInstance,
         .add_route(
             Route::new()
                 .capability(Capability::protocol::<fmetrics::MetricEventLoggerFactoryMarker>())
-                .from(&mock_cobalt)
+                .from(&fake_cobalt)
                 .to(&sampler),
         )
         .await?;
@@ -141,7 +141,7 @@ pub async fn create_realm(options: ftest::RealmOptions) -> Result<RealmInstance,
                 .capability(Capability::protocol::<flogger::LogSinkMarker>())
                 .from(Ref::parent())
                 .to(&test_case_archivist)
-                .to(&mock_cobalt)
+                .to(&fake_cobalt)
                 .to(&sampler)
                 .to(&single_counter),
         )
@@ -151,7 +151,7 @@ pub async fn create_realm(options: ftest::RealmOptions) -> Result<RealmInstance,
             Route::new()
                 .capability(Capability::protocol::<finspect::InspectSinkMarker>())
                 .from(&test_case_archivist)
-                .to(&mock_cobalt)
+                .to(&fake_cobalt)
                 .to(&sampler)
                 .to(&single_counter),
         )

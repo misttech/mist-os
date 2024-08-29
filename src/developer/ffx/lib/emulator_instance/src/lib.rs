@@ -84,6 +84,7 @@ pub struct FlagData {
 /// A pre-formatted disk image containing the base packages of the system.
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub enum DiskImage {
+    Fat(PathBuf),
     Fvm(PathBuf),
     Fxfs(PathBuf),
 }
@@ -99,6 +100,7 @@ impl Deref for DiskImage {
 
     fn deref(&self) -> &Self::Target {
         match self {
+            DiskImage::Fat(path) => path,
             DiskImage::Fvm(path) => path,
             DiskImage::Fxfs(path) => path,
         }
@@ -113,11 +115,13 @@ pub struct GuestConfig {
 
     /// The Fuchsia kernel, which loads alongside the ZBI and brings up the OS.
     /// This can also be a efi image, in which case there is no zbi needed.
-    pub kernel_image: PathBuf,
+    /// There can also be bootloader images (.fatfs) that boot directly and do not
+    /// require a kernel.
+    pub kernel_image: Option<PathBuf>,
 
     /// Zircon Boot image, this is Fuchsia's initial ram disk used in the boot process.
     /// Note: This is not used if the kernel image is an efi image.
-    pub zbi_image: PathBuf,
+    pub zbi_image: Option<PathBuf>,
 
     /// Hash of zbi_image or kernel if the kernel is efi. Used to detect changes when reusing
     /// an emulator instance.
@@ -140,18 +144,30 @@ pub struct GuestConfig {
 
 impl GuestConfig {
     pub fn is_efi(&self) -> bool {
-        match self.kernel_image.extension() {
-            Some(ext) if ext == "efi" => true,
-            _ => false,
+        match &self.kernel_image {
+            Some(file_path) => file_path.extension().unwrap_or_default() == "efi",
+            None => {
+                if let Some(DiskImage::Fat(_)) = self.disk_image {
+                    true
+                } else {
+                    false
+                }
+            }
         }
     }
 
     pub fn get_image_hashes(&self) -> Result<(u64, u64)> {
-        let zbi_hash = match self.kernel_image.extension() {
-            Some(ext) if ext == "efi" => {
-                get_file_hash(&self.kernel_image).context("could not calculate efi hash")?
+        // If there is an efi kernel, and no zbi, use the kernel to calculate the hash.
+
+        let zbi_hash = match &self.zbi_image {
+            Some(zbi_path) => get_file_hash(zbi_path).context("could not calculate zbi hash")?,
+            None => {
+                if let Some(file_path) = &self.kernel_image {
+                    get_file_hash(file_path).context("could not calculate efi hash")?
+                } else {
+                    0
+                }
             }
-            _ => get_file_hash(&self.zbi_image).context("could not calculate zbi hash")?,
         };
 
         let disk_hash = if let Some(disk) = &self.disk_image {
@@ -175,12 +191,27 @@ impl GuestConfig {
         let zbi_path = &self.zbi_image;
         let disk_image_path = &self.disk_image;
 
-        if !kernel_path.exists() {
-            bail!("kernel file {:?} does not exist.", kernel_path);
-        }
+        // Either a kernel of a FAT diskimage (which is the bootloader) needs
+        // to be present.
+        match kernel_path {
+            Some(file_path) => {
+                if !file_path.exists() {
+                    bail!("kernel file {:?} does not exist.", kernel_path);
+                }
+            }
+            None => {
+                if let Some(DiskImage::Fat(fat_path)) = disk_image_path {
+                    if !fat_path.exists() {
+                        bail!("FAT file {:?} does not exist.", fat_path);
+                    }
+                } else {
+                    bail!("No kernel file or bootloader file configured.");
+                }
+            }
+        };
 
-        if !self.is_efi() {
-            if !zbi_path.exists() {
+        if let Some(file_path) = zbi_path.as_ref() {
+            if !file_path.exists() {
                 bail!("zbi file {:?} does not exist.", zbi_path);
             }
         }

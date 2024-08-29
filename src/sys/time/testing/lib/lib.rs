@@ -41,7 +41,7 @@ const TIMEKEEPER_URL: &str = "#meta/timekeeper_for_integration.cm";
 /// URL for timekeeper with fake time.
 const TIMEKEEPER_FAKE_TIME_URL: &str = "#meta/timekeeper_with_fake_time.cm";
 /// URL for fake cobalt.
-const COBALT_URL: &str = "#meta/mock_cobalt.cm";
+const COBALT_URL: &str = "#meta/fake_cobalt.cm";
 /// URL for the fake clock component.
 const FAKE_CLOCK_URL: &str = "#meta/fake_clock.cm";
 
@@ -85,8 +85,8 @@ impl NestedTimekeeper {
         let push_source_puppet = Arc::new(PushSourcePuppet::new());
 
         let builder = RealmBuilder::new().await.unwrap();
-        let mock_cobalt =
-            builder.add_child("mock_cobalt", COBALT_URL, ChildOptions::new()).await.unwrap();
+        let fake_cobalt =
+            builder.add_child("fake_cobalt", COBALT_URL, ChildOptions::new()).await.unwrap();
 
         let timekeeper_url = if use_fake_clock { TIMEKEEPER_FAKE_TIME_URL } else { TIMEKEEPER_URL };
         tracing::trace!("using timekeeper_url: {}", timekeeper_url);
@@ -192,7 +192,7 @@ impl NestedTimekeeper {
                     .capability(Capability::protocol_by_name(
                         "fuchsia.metrics.test.MetricEventLoggerQuerier",
                     ))
-                    .from(&mock_cobalt)
+                    .from(&fake_cobalt)
                     .to(Ref::parent()),
             )
             .await
@@ -204,7 +204,7 @@ impl NestedTimekeeper {
                     .capability(Capability::protocol_by_name(
                         "fuchsia.metrics.MetricEventLoggerFactory",
                     ))
-                    .from(&mock_cobalt)
+                    .from(&fake_cobalt)
                     .to(&timekeeper),
             )
             .await
@@ -215,7 +215,7 @@ impl NestedTimekeeper {
                 Route::new()
                     .capability(Capability::protocol_by_name("fuchsia.logger.LogSink"))
                     .from(Ref::parent())
-                    .to(&mock_cobalt)
+                    .to(&fake_cobalt)
                     .to(&timekeeper)
                     .to(&timesource_server)
                     .to(&maintenance_server),

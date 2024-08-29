@@ -36,6 +36,10 @@
             path: "/realm_builder_exposed_dir/fuchsia.driver.development.Manager",
         },
         {
+            protocol: "fuchsia.driver.framework.CompositeNodeManager",
+            path: "/realm_builder_exposed_dir/fuchsia.driver.framework.CompositeNodeManager",
+        },
+        {
             protocol: "fuchsia.driver.registrar.DriverRegistrar",
             path: "/realm_builder_exposed_dir/fuchsia.driver.registrar.DriverRegistrar",
         },
@@ -54,17 +58,12 @@
             path: "/realm_builder_exposed_dir/dev-class",
         },
 
-        // TODO(https://fxbug.dev/357251576): expose this in a better way
-        {
-            service: "fuchsia.hardware.ramdisk.Service",
-            path: "/realm_builder_exposed_dir/fuchsia.hardware.ramdisk.Service",
-        },
-
         // From DTR to #realm_builder
         {
             protocol: [
                 "fuchsia.boot.Items",
                 "fuchsia.driver.index.DriverIndex",
+                "fuchsia.driver.test.Internal",
                 "fuchsia.kernel.RootJob",
             ],
         },
@@ -74,9 +73,9 @@
             path: "/boot",
         },
         {
-            directory: "pkg_drivers",
+            directory: "base_drivers",
             rights: [ "rx*" ],
-            path: "/pkg_drivers",
+            path: "/base_drivers",
         },
     ],
 
@@ -92,14 +91,24 @@
             from: "parent",
             availability: "optional",
         },
+        {
+            protocol: "fuchsia.pkg.PackageResolver-hermetic",
+            from: "parent",
+        },
     ],
 
     // LINT.ThenChange(/sdk/lib/driver_test_realm/realm_builder/rust/src/lib.rs)
     offer: [
         {
+            protocol: "fuchsia.component.resolution.Resolver-hermetic",
+            from: "parent",
+            to: "#realm_builder",
+        },
+        {
             protocol: [
                 "fuchsia.boot.Items",
                 "fuchsia.device.manager.SystemStateTransition",
+                "fuchsia.driver.test.Internal",
                 "fuchsia.kernel.RootJob",
             ],
             from: "self",
@@ -111,7 +120,7 @@
             to: "#realm_builder",
         },
         {
-            directory: "pkg_drivers",
+            directory: "base_drivers",
             from: "self",
             to: "#realm_builder",
         },
@@ -133,13 +142,10 @@
             protocol: [
                 "fuchsia.device.manager.Administrator",
                 "fuchsia.driver.development.Manager",
+                "fuchsia.driver.framework.CompositeNodeManager",
                 "fuchsia.driver.registrar.DriverRegistrar",
                 "fuchsia.driver.test.Realm",
             ],
-            from: "self",
-        },
-        {
-            service: "fuchsia.hardware.ramdisk.Service",
             from: "self",
         },
     ],

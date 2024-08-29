@@ -13,8 +13,6 @@
 #include <lib/fidl/cpp/binding.h>
 
 #include <map>
-#include <mutex>
-#include <thread>
 #include <unordered_map>
 
 #include "src/ui/scenic/lib/display/display.h"
@@ -51,10 +49,10 @@ class FlatlandManager {
   scheduling::SessionId CreateFlatland(
       fidl::InterfaceRequest<fuchsia::ui::composition::Flatland> flatland);
 
-  // TODO(https://fxbug.dev/42156949): this creates a FlatlandDisplay attached to the "primary" hardware
-  // display (i.e. the only one supported).  In the future there will be APIs that allow clients to
-  // enumerate the displays, and to allow creation of a FlatlandDisplay bound to a specific one of
-  // them.  For now, attempts to create a second concurrent FlatlandDisplay (or
+  // TODO(https://fxbug.dev/42156949): This creates a FlatlandDisplay attached to the "primary"
+  // hardware display (i.e. the only one supported). In the future there will be APIs that allow
+  // clients to enumerate the displays, and to allow creation of a FlatlandDisplay bound to a
+  // specific one of them. For now, attempts to create a second concurrent FlatlandDisplay (or
   // gfx::DisplayCompositor) will fail.
   void CreateFlatlandDisplay(
       fidl::InterfaceRequest<fuchsia::ui::composition::FlatlandDisplay> flatland);
@@ -79,9 +77,8 @@ class FlatlandManager {
   // Sessions still alive (but which might have been remove from FlatlandManager).
   size_t GetAliveSessionCount() const { return alive_sessions_; }
 
-  // TODO(https://fxbug.dev/42156949): This is a temporary method assuming that there are either 0 or 1
-  // displays with attached Flatland content.  Used by TemporaryFrameRendererDelegator: if no
-  // FlatlandDisplay is found, then it assumes that there might be "Gfx" content to render.
+  // TODO(https://fxbug.dev/42156949): This is method assumes that there are either 0 or 1
+  // displays with attached Flatland content.
   std::shared_ptr<FlatlandDisplay> GetPrimaryFlatlandDisplayForRendering();
 
  private:
@@ -102,8 +99,8 @@ class FlatlandManager {
     bool initial_credits_returned = false;
   };
 
-  // TODO(https://fxbug.dev/42156567): there's quite some overlap with FlatlandInstance.  Can they be unified?
-  // Perhaps name the unified struct "FlatlandApiInstance"?
+  // TODO(https://fxbug.dev/42156567): there's quite some overlap with FlatlandInstance.  Can they
+  // be unified? Perhaps name the unified struct "FlatlandApiInstance"?
   struct FlatlandDisplayInstance {
     // The looper for this Flatland display, which will be run on a worker thread spawned by the
     // async::Loop itself. It must be the first member of this struct so that |impl| is

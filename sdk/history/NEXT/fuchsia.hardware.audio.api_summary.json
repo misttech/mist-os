@@ -1257,7 +1257,7 @@
     {
         "kind": "protocol",
         "name": "fuchsia.hardware.audio/RingBuffer",
-        "openness": "closed",
+        "openness": "open",
         "transport": "channel"
     },
     {

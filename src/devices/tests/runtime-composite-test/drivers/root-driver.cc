@@ -9,6 +9,7 @@
 #include <lib/ddk/driver.h>
 
 #include <bind/composite/test/lib/cpp/bind.h>
+#include <bind/fuchsia/cpp/bind.h>
 #include <bind/fuchsia/test/cpp/bind.h>
 
 namespace bind_test = bind_composite_test_lib;
@@ -26,12 +27,8 @@ zx_status_t RootDriver::Bind(void* ctx, zx_device_t* dev) {
   [[maybe_unused]] auto ptr = root_dev.release();
 
   // Add 2 children that matches the first composite node spec node.
-  zx_device_prop_t fragment_props[] = {
-      {50, 0, 10},
-  };
-
   zx_device_str_prop_t str_fragment_props[] = {
-      {bind_test::FLAG.c_str(), str_prop_bool_val(false)},
+      {bind_test::FLAG.c_str(), str_prop_bool_val(true)},
   };
 
   auto dispatcher = fdf::Dispatcher::GetCurrent();
@@ -44,7 +41,6 @@ zx_status_t RootDriver::Bind(void* ctx, zx_device_t* dev) {
       frct::Service::Name,
   };
   status = fragment_dev_a->DdkAdd(ddk::DeviceAddArgs("composite_fragment_a")
-                                      .set_props(fragment_props)
                                       .set_str_props(str_fragment_props)
                                       .set_proto_id(bind_fuchsia_test::BIND_PROTOCOL_COMPAT_CHILD)
                                       .set_runtime_service_offers(offers)
@@ -56,13 +52,13 @@ zx_status_t RootDriver::Bind(void* ctx, zx_device_t* dev) {
   [[maybe_unused]] auto fragment_a_ptr = fragment_dev_a.release();
 
   // Add the leaf device.
-  zx_device_prop_t leaf_props[] = {
-      {BIND_PROTOCOL, 0, bind_fuchsia_test::BIND_PROTOCOL_DEVICE},
+  zx_device_str_prop_t leaf_props[] = {
+      ddk::MakeStrProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_test::BIND_PROTOCOL_DEVICE),
   };
 
   auto leaf_dev = std::make_unique<RootDriver>(dev);
   status = leaf_dev->DdkAdd(ddk::DeviceAddArgs("leaf")
-                                .set_props(leaf_props)
+                                .set_str_props(leaf_props)
                                 .set_proto_id(bind_fuchsia_test::BIND_PROTOCOL_DEVICE));
   if (status != ZX_OK) {
     return status;

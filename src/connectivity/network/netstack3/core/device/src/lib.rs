@@ -31,10 +31,10 @@ pub mod ethernet {
     pub use crate::internal::base::EthernetDeviceCounters;
     pub use crate::internal::ethernet::{
         get_mac, get_mtu, join_link_multicast, leave_link_multicast, send_as_ethernet_frame_to_dst,
-        send_ip_frame, set_mtu, set_promiscuous_mode, DynamicEthernetDeviceState,
-        EthernetCreationProperties, EthernetIpLinkDeviceDynamicStateContext,
-        EthernetIpLinkDeviceStaticStateContext, EthernetLinkDevice, EthernetTimerId,
-        MaxEthernetFrameSize, RecvEthernetFrameMeta, StaticEthernetDeviceState,
+        send_ip_frame, set_mtu, DynamicEthernetDeviceState, EthernetCreationProperties,
+        EthernetIpLinkDeviceDynamicStateContext, EthernetIpLinkDeviceStaticStateContext,
+        EthernetLinkDevice, EthernetTimerId, MaxEthernetFrameSize, RecvEthernetFrameMeta,
+        StaticEthernetDeviceState,
     };
     pub use crate::internal::id::{
         EthernetDeviceId, EthernetPrimaryDeviceId, EthernetWeakDeviceId,

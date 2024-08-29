@@ -33,7 +33,6 @@ class InterruptDispatcher : public SoloDispatcher<InterruptDispatcher, ZX_DEFAUL
  public:
   InterruptDispatcher& operator=(const InterruptDispatcher&) = delete;
   zx_obj_type_t get_type() const final { return ZX_OBJ_TYPE_INTERRUPT; }
-  uint32_t get_flags() const { return flags_; }
 
   bool is_wake_vector() const { return flags_ & INTERRUPT_WAKE_VECTOR; }
 
@@ -59,8 +58,28 @@ class InterruptDispatcher : public SoloDispatcher<InterruptDispatcher, ZX_DEFAUL
   virtual void DeactivateInterrupt() = 0;
   virtual void UnregisterInterruptHandler() = 0;
 
+  enum Flags : uint32_t {
+    // The interrupt is virtual.
+    INTERRUPT_VIRTUAL = (1u << 0),
+    // The interrupt should be unmasked before waiting on the event.
+    //
+    // Mutually exclusive with INTERRUPT_UNMASK_PREWAIT_UNLOCKED.
+    INTERRUPT_UNMASK_PREWAIT = (1u << 1),
+    // The same as |INTERRUPT_UNMASK_PREWAIT| except release the dispatcher
+    // spinlock before waiting.
+    //
+    // Mutually exclusive with INTERRUPT_UNMASK_PREWAIT.
+    INTERRUPT_UNMASK_PREWAIT_UNLOCKED = (1u << 2),
+    // The interrupt should be masked following waiting.
+    INTERRUPT_MASK_POSTWAIT = (1u << 4),
+    // The interrupt may wake the system from suspend.
+    INTERRUPT_WAKE_VECTOR = (1u << 5),
+    // Allow kernel tests to call Ack() without binding to a port.
+    INTERRUPT_ALLOW_ACK_WITHOUT_PORT_FOR_TEST = (1u << 6)
+  };
+
   // It is an error to specify both INTERRUPT_UNMASK_PREWAIT and INTERRUPT_UNMASK_PREWAIT_UNLOCKED.
-  explicit InterruptDispatcher(uint32_t flags);
+  explicit InterruptDispatcher(Flags flags);
   void Signal() { event_.Signal(); }
   bool SendPacketLocked(zx_time_t timestamp) TA_REQ(spinlock_);
 
@@ -71,31 +90,11 @@ class InterruptDispatcher : public SoloDispatcher<InterruptDispatcher, ZX_DEFAUL
   void InitializeWakeEvent() TA_REQ(spinlock_) { wake_event_.Initialize(); }
   void DestroyWakeEvent() TA_REQ(spinlock_) { wake_event_.Destroy(); }
 
-  // Bits for Interrupt.flags
-  // The interrupt is virtual.
-  static constexpr uint32_t INTERRUPT_VIRTUAL = (1u << 0);
-  // The interrupt should be unmasked before waiting on the event.
-  //
-  // Mutually exclusive with INTERRUPT_UNMASK_PREWAIT_UNLOCKED.
-  static constexpr uint32_t INTERRUPT_UNMASK_PREWAIT = (1u << 1);
-  // The same as |INTERRUPT_UNMASK_PREWAIT| except release the dispatcher
-  // spinlock before waiting.
-  //
-  // Mutually exclusive with INTERRUPT_UNMASK_PREWAIT.
-  static constexpr uint32_t INTERRUPT_UNMASK_PREWAIT_UNLOCKED = (1u << 2);
-  // The interrupt should be masked following waiting.
-  static constexpr uint32_t INTERRUPT_MASK_POSTWAIT = (1u << 4);
-  // The interrupt may wake the system from suspend.
-  static constexpr uint32_t INTERRUPT_WAKE_VECTOR = (1u << 5);
-  // Allow kernel tests to call Ack() without binding to a port.
-  static constexpr uint32_t INTERRUPT_ALLOW_ACK_WITHOUT_PORT_FOR_TEST = (1u << 6);
-
  private:
   AutounsignalEvent event_;
-  // Interrupt Flags
-  const uint32_t flags_;
 
   zx_time_t timestamp_ TA_GUARDED(spinlock_);
+  const Flags flags_;
   // Current state of the interrupt object
   InterruptState state_ TA_GUARDED(spinlock_);
   PortInterruptPacket port_packet_ TA_GUARDED(spinlock_) = {};

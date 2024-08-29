@@ -1,7 +1,7 @@
 // Copyright 2018 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-@available(added=NEXT)
+@available(added=23)
 library fuchsia.bluetooth.host;
 
 using fuchsia.bluetooth as bt;
@@ -13,7 +13,7 @@ using fuchsia.bluetooth.gatt2;
 using fuchsia.bluetooth.le;
 
 /// Receives a bt-host by protocol for use in the Bluetooth Host Subsystem
-@discoverable
+@discoverable(client="platform,external", server="platform")
 open protocol Receiver {
     /// Adds a new bt-host. If `request` cannot be handled, it should be closed.
     flexible AddHost(resource struct {

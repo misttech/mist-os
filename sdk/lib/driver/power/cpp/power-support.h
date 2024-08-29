@@ -5,7 +5,6 @@
 #ifndef LIB_DRIVER_POWER_CPP_POWER_SUPPORT_H_
 #define LIB_DRIVER_POWER_CPP_POWER_SUPPORT_H_
 
-#include <fidl/fuchsia.hardware.power/cpp/fidl.h>
 #include <fidl/fuchsia.power.broker/cpp/fidl.h>
 #include <lib/driver/incoming/cpp/namespace.h>
 #include <lib/fidl/cpp/wire/internal/transport_channel.h>
@@ -14,6 +13,7 @@
 #include <lib/zx/handle.h>
 
 #include "sdk/lib/driver/power/cpp/element-description-builder.h"
+#include "sdk/lib/driver/power/cpp/types.h"
 
 /// Collection of helpers for driver authors working with the power framework.
 /// The basic usage model is
@@ -219,18 +219,7 @@ class LeaseDependency {
 /// In effect, this function converts the provided |power_configs| into their
 /// corresponding `ElementDesc` objects and returns them.
 fit::result<Error, std::vector<ElementDesc>> ApplyPowerConfiguration(
-    const fdf::Namespace& ns,
-    fidl::VectorView<fuchsia_hardware_power::wire::PowerElementConfiguration> power_configs);
-
-/// Uses the provided namespace and platform device instance to get a power
-/// configuration, add corresponding power elements to the power topology, and
-/// return `ElementDesc` objects equivalent to the power configuration.
-///
-/// This function retrieves the config via |dev| and then calls
-/// `ApplyPowerConfiguration`, see its documentation for additional
-/// information.
-fit::result<Error, std::vector<ElementDesc>> GetAndApplyPowerConfiguration(
-    const fdf::Namespace& ns, const fidl::ClientEnd<fuchsia_hardware_platform_device::Device>& dev);
+    const fdf::Namespace& ns, cpp20::span<PowerElementConfiguration> power_configs);
 
 /// Create a lease based on the set of dependencies represented by
 /// |dependencies|. When the lease is fulfilled those dependencies will be at
@@ -274,7 +263,7 @@ CreateLeaseHelper(const fidl::ClientEnd<fuchsia_power_broker::Topology>& topolog
 ///   - Error::INVALID_ARGS if `element_config` is missing fields, for example
 ///     if a level dependency doesn't have a parent level.
 fit::result<Error, ElementDependencyMap> LevelDependencyFromConfig(
-    fuchsia_hardware_power::wire::PowerElementConfiguration element_config);
+    const PowerElementConfiguration& element_config);
 
 /// Given a `PowerElementConfiguration` from driver framework, convert this
 /// into a set of Power Broker's `PowerLevel` objects.
@@ -282,7 +271,7 @@ fit::result<Error, ElementDependencyMap> LevelDependencyFromConfig(
 /// If the `PowerElementConfiguration` expresses no levels, we return an
 /// empty vector.
 std::vector<fuchsia_power_broker::PowerLevel> PowerLevelsFromConfig(
-    fuchsia_hardware_power::wire::PowerElementConfiguration element_config);
+    PowerElementConfiguration element_config);
 
 /// For the Power Element represented by `element_config`, get the tokens for
 /// the element's dependencies (ie. "parents") from
@@ -297,9 +286,8 @@ std::vector<fuchsia_power_broker::PowerLevel> PowerLevelsFromConfig(
 ///      service or a protocol required to get a token.
 ///   - `Error::DEPENDENCY_NOT_FOUND` if a token for a required dependency is
 ///     not available.
-fit::result<Error, TokenMap> GetDependencyTokens(
-    const fdf::Namespace& ns,
-    fuchsia_hardware_power::wire::PowerElementConfiguration element_config);
+fit::result<Error, TokenMap> GetDependencyTokens(const fdf::Namespace& ns,
+                                                 const PowerElementConfiguration& element_config);
 
 /// For the Power Element represented by `element_config`, get the tokens for
 /// the
@@ -318,9 +306,8 @@ fit::result<Error, TokenMap> GetDependencyTokens(
 ///      service or a protocol required to get a token.
 ///   - `Error::DEPENDENCY_NOT_FOUND` if a token for a required dependency is
 ///     not available.
-fit::result<Error, TokenMap> GetDependencyTokens(
-    fuchsia_hardware_power::wire::PowerElementConfiguration element_config,
-    fidl::ClientEnd<fuchsia_io::Directory> svcs_dir);
+fit::result<Error, TokenMap> GetDependencyTokens(const PowerElementConfiguration& element_config,
+                                                 fidl::ClientEnd<fuchsia_io::Directory> svcs_dir);
 
 /// Call `AddElement` on the `power_broker` channel passed in.
 /// This function uses the `config` and `tokens` arguments to properly construct
@@ -337,7 +324,7 @@ fit::result<Error, TokenMap> GetDependencyTokens(
 ///     channel.
 fit::result<Error> AddElement(
     const fidl::ClientEnd<fuchsia_power_broker::Topology>& power_broker,
-    fuchsia_hardware_power::wire::PowerElementConfiguration config, TokenMap tokens,
+    const PowerElementConfiguration& config, TokenMap tokens,
     const zx::unowned_event& assertive_token, const zx::unowned_event& opportunistic_token,
     std::optional<std::pair<fidl::ServerEnd<fuchsia_power_broker::CurrentLevel>,
                             fidl::ServerEnd<fuchsia_power_broker::RequiredLevel>>>

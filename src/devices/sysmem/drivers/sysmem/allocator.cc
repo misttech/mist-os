@@ -4,15 +4,15 @@
 
 #include "allocator.h"
 
-#include <lib/ddk/trace/event.h>
 #include <lib/fidl/internal.h>
+#include <lib/trace/event.h>
 #include <lib/zx/channel.h>
 #include <lib/zx/event.h>
 #include <zircon/fidl.h>
 
 #include "logical_buffer_collection.h"
 
-namespace sysmem_driver {
+namespace sysmem_service {
 
 using Error = fuchsia_sysmem2::Error;
 
@@ -21,7 +21,7 @@ Allocator::Allocator(Device* parent_device)
   // nothing else to do here
 }
 
-Allocator::~Allocator() { LogInfo(FROM_HERE, "~Allocator"); }
+Allocator::~Allocator() {}
 
 // static
 void Allocator::CreateOwnedV1(fidl::ServerEnd<fuchsia_sysmem::Allocator> server_end, Device* device,
@@ -273,8 +273,6 @@ void Allocator::V2::ValidateBufferCollectionToken(
 
 void Allocator::V1::SetDebugClientInfo(SetDebugClientInfoRequest& request,
                                        SetDebugClientInfoCompleter::Sync& completer) {
-  ZX_DEBUG_ASSERT(allocator_->parent_device_->loop_dispatcher() ==
-                  fdf::Dispatcher::GetCurrent()->async_dispatcher());
   allocator_->client_debug_info_.emplace();
   allocator_->client_debug_info_->name = std::string(request.name().begin(), request.name().end());
   allocator_->client_debug_info_->id = request.id();
@@ -282,8 +280,6 @@ void Allocator::V1::SetDebugClientInfo(SetDebugClientInfoRequest& request,
 
 void Allocator::V2::SetDebugClientInfo(SetDebugClientInfoRequest& request,
                                        SetDebugClientInfoCompleter::Sync& completer) {
-  ZX_DEBUG_ASSERT(allocator_->parent_device_->loop_dispatcher() ==
-                  fdf::Dispatcher::GetCurrent()->async_dispatcher());
   if (!request.name().has_value()) {
     allocator_->LogError(FROM_HERE, "SetDebugClientInfo requires name set");
     completer.Close(ZX_ERR_INTERNAL);
@@ -374,4 +370,4 @@ void Allocator::V2::handle_unknown_method(
   completer.Close(ZX_ERR_INTERNAL);
 }
 
-}  // namespace sysmem_driver
+}  // namespace sysmem_service

@@ -293,6 +293,7 @@ mod tests {
                 .context("fidl read")?
             {
                 InputDeviceRegistryRequest::Register { device, .. } => device,
+                InputDeviceRegistryRequest::RegisterAndGetDeviceInfo { device, .. } => device,
             }
             .into_proxy()
             .context("converting client_end to proxy")?;

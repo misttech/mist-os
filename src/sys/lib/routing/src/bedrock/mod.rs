@@ -11,3 +11,4 @@ pub mod structured_dict;
 pub mod with_availability;
 pub mod with_policy_check;
 pub mod with_porcelain_type;
+pub mod with_rights;

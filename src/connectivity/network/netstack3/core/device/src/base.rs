@@ -183,9 +183,6 @@ impl<BT: DeviceLayerTypes> OrderedLockAccess<Devices<BT>> for DeviceLayerState<B
 /// Counters for ethernet devices.
 #[derive(Default)]
 pub struct EthernetDeviceCounters {
-    /// Count of incoming frames dropped because the destination address was for
-    /// another device.
-    pub recv_ethernet_other_dest: Counter,
     /// Count of incoming frames dropped due to an unsupported ethertype.
     pub recv_unsupported_ethertype: Counter,
     /// Count of incoming frames dropped due to an empty ethertype.
@@ -195,10 +192,8 @@ pub struct EthernetDeviceCounters {
 impl Inspectable for EthernetDeviceCounters {
     fn record<I: Inspector>(&self, inspector: &mut I) {
         inspector.record_child("Ethernet", |inspector| {
-            let Self { recv_ethernet_other_dest, recv_no_ethertype, recv_unsupported_ethertype } =
-                self;
+            let Self { recv_no_ethertype, recv_unsupported_ethertype } = self;
             inspector.record_child("Rx", |inspector| {
-                inspector.record_counter("NonLocalDstAddr", recv_ethernet_other_dest);
                 inspector.record_counter("NoEthertype", recv_no_ethertype);
                 inspector.record_counter("UnsupportedEthertype", recv_unsupported_ethertype);
             });

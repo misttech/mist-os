@@ -101,24 +101,28 @@ class Ipv4 {
   }
 };
 
-int ExpectedGetBufferSizeFuchsia(int set_size) {
+enum class BufferSizeType { kTcpSend, kUdpRecv };
+
+int ExpectedGetBufferSizeFuchsia(int set_size, BufferSizeType buffer_type) {
   if (std::getenv(kNetstack2EnvVar)) {
     set_size *= 2;
     // NB: Netstack 2 clamps the value on set within a certain range, and
     // there are benchmark cases that set buffer sizes both above and below
     // this range (when doubled) so the logic needs to be replicated here.
-    if (set_size < 4096) {
-      return 4096;
+    return std::clamp(set_size, 4096, 4 << 20);
+  }
+  if (std::getenv(kNetstack3EnvVar)) {
+    switch (buffer_type) {
+      case BufferSizeType::kTcpSend:
+        return std::clamp(set_size, 2048, 4 << 20);
+      case BufferSizeType::kUdpRecv:
+        return set_size;
     }
-    if (set_size > (4 << 20)) {
-      return 4 << 20;
-    }
-    return set_size;
   }
   return set_size;
 }
 
-int ExpectedGetBufferSize(int set_size) {
+int ExpectedGetBufferSize(int set_size, BufferSizeType buffer_type) {
   // The desired return value for getting SO_SNDBUF and SO_RCVBUF on Linux
   // and Netstack2 is double the amount of payload bytes due to the fact
   // that the value is doubled on set to account for overhead according
@@ -129,7 +133,7 @@ int ExpectedGetBufferSize(int set_size) {
   // If running on Starnix, the expected value should actually be that of
   // Fuchsia's, and not Linux's.
   if (std::getenv(kStarnixEnvVar)) {
-    return ExpectedGetBufferSizeFuchsia(set_size);
+    return ExpectedGetBufferSizeFuchsia(set_size, buffer_type);
   }
   set_size *= 2;
   // NB: This minimum is a magic number and seems to contradict the stated
@@ -139,7 +143,7 @@ int ExpectedGetBufferSize(int set_size) {
   }
   return set_size;
 #endif
-  return ExpectedGetBufferSizeFuchsia(set_size);
+  return ExpectedGetBufferSizeFuchsia(set_size, buffer_type);
 }
 
 // Helper no-op function to assert functions abstracted over IP version are properly parameterized.
@@ -178,7 +182,7 @@ bool TcpWriteRead(perftest::RepeatState* state, int transfer) {
     CHECK_ZERO_ERRNO(
         getsockopt(client_sock.get(), SOL_SOCKET, SO_SNDBUF, &sndbuf_opt, &sndbuf_optlen));
 
-    int want_sndbuf = ExpectedGetBufferSize(transfer);
+    int want_sndbuf = ExpectedGetBufferSize(transfer, BufferSizeType::kTcpSend);
     FX_CHECK(sndbuf_opt == want_sndbuf)
         << "sndbuf size (" << sndbuf_opt << ") != want (" << want_sndbuf << ")";
   }
@@ -186,6 +190,24 @@ bool TcpWriteRead(perftest::RepeatState* state, int transfer) {
   const int32_t no_delay = 1;
   CHECK_ZERO_ERRNO(
       setsockopt(client_sock.get(), SOL_TCP, TCP_NODELAY, &no_delay, sizeof(no_delay)));
+
+  // Also update the receive buffer size.
+  //
+  // This ensures fairness in the benchmark since TCP will base the window value
+  // on the available receive buffer size and different numbers will skew the
+  // test results.
+  //
+  // This is set on the listening socket, which is inherited by accepted sockets
+  // on creation.
+  //
+  // We use double the transfer size so silly window avoidance doesn't kick in
+  // in-between test iterations which causes pollution in the results.
+  //
+  // We don't perform the getopt check here on return to reduce the amount of
+  // change detectors on buffer sizes required here, since the buffer size is
+  // not load-bearing for the test to complete successfully.
+  int recvbuf = transfer * 2;
+  CHECK_ZERO_ERRNO(setsockopt(listen_sock.get(), SOL_SOCKET, SO_RCVBUF, &recvbuf, sizeof(recvbuf)));
 
   CHECK_ZERO_ERRNO(connect(client_sock.get(), sockaddr.as_sockaddr(), sockaddr.socklen()));
 
@@ -246,7 +268,7 @@ bool UdpWriteRead(perftest::RepeatState* state, int message_size, int message_co
   CHECK_ZERO_ERRNO(
       getsockopt(server_sock.get(), SOL_SOCKET, SO_RCVBUF, &rcvbuf_opt, &rcvbuf_optlen));
 
-  int want_rcvbuf = ExpectedGetBufferSize(message_size * message_count);
+  int want_rcvbuf = ExpectedGetBufferSize(message_size * message_count, BufferSizeType::kUdpRecv);
   // On Linux, payloads are stored with a fixed per-packet overhead. Linux
   // accounts for this overhead by setting the actual buffer size to double
   // the size set with SO_RCVBUF. This hack fails when SO_RCVBUF is small and
@@ -268,6 +290,20 @@ bool UdpWriteRead(perftest::RepeatState* state, int message_size, int message_co
 
   fbl::unique_fd client_sock;
   CHECK_TRUE_ERRNO(client_sock = fbl::unique_fd(socket(Ip::kFamily, SOCK_DGRAM, 0)));
+
+  // Always set the send buffer size so the benchmark is fair around UDP
+  // blocking for all platforms. Similarly to receive buffer, we only change it
+  // if it's smaller than what we need.
+  int sndbuf_opt;
+  socklen_t sndbuf_optlen = sizeof(sndbuf_opt);
+  int want_sndbuf = message_size * message_count;
+  CHECK_ZERO_ERRNO(
+      getsockopt(client_sock.get(), SOL_SOCKET, SO_SNDBUF, &sndbuf_opt, &sndbuf_optlen));
+  if (sndbuf_opt < want_sndbuf) {
+    int snd_bufsize = message_size * message_count;
+    CHECK_ZERO_ERRNO(
+        setsockopt(client_sock.get(), SOL_SOCKET, SO_SNDBUF, &snd_bufsize, sizeof(snd_bufsize)));
+  }
   CHECK_ZERO_ERRNO(connect(client_sock.get(), sockaddr.as_sockaddr(), sockaddr.socklen()));
 
   std::vector<uint8_t> send_bytes, recv_bytes;

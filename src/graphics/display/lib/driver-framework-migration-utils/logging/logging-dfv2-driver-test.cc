@@ -2,9 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <lib/driver/testing/cpp/driver_lifecycle.h>
 #include <lib/driver/testing/cpp/driver_runtime.h>
-#include <lib/driver/testing/cpp/test_environment.h>
+#include <lib/driver/testing/cpp/internal/driver_lifecycle.h>
+#include <lib/driver/testing/cpp/internal/test_environment.h>
 #include <lib/driver/testing/cpp/test_node.h>
 #include <lib/syslog/structured_backend/fuchsia_syslog.h>
 
@@ -17,6 +17,8 @@ namespace display {
 
 namespace {
 
+// WARNING: Don't use this test as a template for new tests as it uses the old driver testing
+// library.
 class DriverLoggingTest : public ::testing::Test {
  public:
   void SetUp() override {
@@ -47,7 +49,9 @@ class DriverLoggingTest : public ::testing::Test {
     runtime_.ShutdownAllDispatchers(fdf::Dispatcher::GetCurrent()->get());
   }
 
-  fdf_testing::DriverUnderTest<testing::Dfv2DriverWithLogging>& driver() { return driver_; }
+  fdf_testing::internal::DriverUnderTest<testing::Dfv2DriverWithLogging>& driver() {
+    return driver_;
+  }
 
  private:
   // Attaches a foreground dispatcher for us automatically.
@@ -55,8 +59,8 @@ class DriverLoggingTest : public ::testing::Test {
 
   // These will use the foreground dispatcher.
   std::optional<fdf_testing::TestNode> node_server_;
-  std::optional<fdf_testing::TestEnvironment> test_environment_;
-  fdf_testing::DriverUnderTest<testing::Dfv2DriverWithLogging> driver_;
+  std::optional<fdf_testing::internal::TestEnvironment> test_environment_;
+  fdf_testing::internal::DriverUnderTest<testing::Dfv2DriverWithLogging> driver_;
 };
 
 TEST_F(DriverLoggingTest, MinimumLogLevelTrace) {

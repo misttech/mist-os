@@ -11,7 +11,7 @@
 #include "lib/zx/channel.h"
 #include "node.h"
 
-namespace sysmem_driver {
+namespace sysmem_service {
 
 // A BufferCollectionTokenGroup represents a prioritized OR among the child tokens of the group.
 //
@@ -141,6 +141,6 @@ class BufferCollectionTokenGroup : public Node {
   bool is_all_children_present_ = false;
 };
 
-}  // namespace sysmem_driver
+}  // namespace sysmem_service
 
 #endif  // SRC_DEVICES_SYSMEM_DRIVERS_SYSMEM_BUFFER_COLLECTION_TOKEN_GROUP_H_

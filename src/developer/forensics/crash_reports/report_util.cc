@@ -144,13 +144,13 @@ void ExtractAnnotationsAndAttachments(fuchsia::feedback::CrashReport report,
     if (dart_report.has_exception_type()) {
       annotations->Set(kDartExceptionRuntimeTypeKey, dart_report.exception_type());
     } else {
-      FX_LOGS(WARNING) << "no Dart exception type to attach to Crashpad report";
+      FX_LOGS(WARNING) << "no Dart exception type to attach to crash report";
     }
 
     if (dart_report.has_exception_message()) {
       annotations->Set(kDartExceptionMessageKey, dart_report.exception_message());
     } else {
-      FX_LOGS(WARNING) << "no Dart exception message to attach to Crashpad report";
+      FX_LOGS(WARNING) << "no Dart exception message to attach to crash report";
     }
 
     if (dart_report.has_exception_stack_trace()) {
@@ -196,7 +196,7 @@ void ExtractAnnotationsAndAttachments(fuchsia::feedback::CrashReport report,
     if (native_report.has_minidump()) {
       *minidump = std::move(*native_report.mutable_minidump());
     } else {
-      FX_LOGS(WARNING) << "no minidump to attach to Crashpad report";
+      FX_LOGS(WARNING) << "no minidump to attach to crash report";
       // We don't want to overwrite the client-provided signature.
       if (!report.has_crash_signature()) {
         annotations->Set(kCrashSignatureKey, "fuchsia-no-minidump");
@@ -211,7 +211,7 @@ void ExtractAnnotationsAndAttachments(fuchsia::feedback::CrashReport report,
       (*attachments)[kDartExceptionStackTraceKey] =
           std::move(*dart_report.mutable_exception_stack_trace());
     } else {
-      FX_LOGS(WARNING) << "no Dart exception stack trace to attach to Crashpad report";
+      FX_LOGS(WARNING) << "no Dart exception stack trace to attach to crash report";
       annotations->Set(kCrashSignatureKey, "fuchsia-no-dart-stack-trace");
     }
   }

@@ -55,7 +55,21 @@ directly on the frame buffer.
 
 To disable virtcon, add
 
-        --args='dev_bootfs_labels=["//products/kernel_cmdline:virtcon.disable--true"]'
+        --assembly-override `//build/images/fuchsia/*=//local:disable_virtcon'
+
+and define a `//local/BUILD.gn` file as follows:
+
+```
+import("//build/assembly/developer_overrides.gni")
+
+assembly_developer_overrides("disable_virtcon") {
+  platform = {
+    graphics = {
+      enable_virtual_console = false
+    }
+  }
+}
+```
 
 ## Running
 

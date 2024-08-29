@@ -80,6 +80,13 @@ type NodeAttributesQuery = flexible bits : uint64 {
     ROOT_HASH = 0x8000;
     @available(added=HEAD)
     VERITY_ENABLED = 0x10000;
+
+    /// Casefold (case-insensitive filename) support.
+    /// When true, file lookups will be case-insensitive but case-preserving. i.e. "Foo" will
+    /// be stored verbatim but can be opened as "foo", "fOO", etc. Casefolding is done in
+    /// accordance to the Unicode 12 NFD normalization and casefolding standard.
+    @available(added=HEAD)
+    CASEFOLD = 0x20000;
 };
 
 type MutableNodeAttributes = table {
@@ -106,6 +113,13 @@ type MutableNodeAttributes = table {
     /// always update this if this is the only attribute being updated.
     @available(added=18)
     7: access_time uint64;
+
+    /// Casefold (case-insensitive filename) support
+    /// This attribute can only be changed on empty directories and will be inherited by any
+    /// child directories that are subsequently created.
+    /// The only filesystem to support this at the time of writing is Fxfs.
+    @available(added=HEAD)
+    8: casefold bool;
 };
 
 // TODO(https://fxbug.dev/42057114): Inline this into its only reference when fidlgen_go is fixed.

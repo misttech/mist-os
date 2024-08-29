@@ -13,6 +13,7 @@
 #include <lib/async-loop/loop.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/driver/testing/cpp/driver_runtime.h>
+#include <lib/driver/testing/cpp/scoped_global_logger.h>
 #include <lib/fdf/cpp/dispatcher.h>
 #include <lib/sync/cpp/completion.h>
 
@@ -45,6 +46,8 @@ class FakeDisplayStack {
   void SyncShutdown();
 
  private:
+  std::optional<fdf_testing::ScopedGlobalLogger> logger_;
+
   std::shared_ptr<fdf_testing::DriverRuntime> driver_runtime_ = mock_ddk::GetDriverRuntime();
   std::unique_ptr<SysmemServiceProvider> sysmem_service_provider_;
 

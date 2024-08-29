@@ -122,16 +122,20 @@ The [PCI driver](/src/devices/bus/drivers/pci/kpci.cc) publishes the matching
 device with the following properties:
 
 ```c
-zx_device_prop_t device_props[] = {
-    {BIND_PROTOCOL, 0, ZX_PROTOCOL_PCI},
-    {BIND_PCI_VID, 0, info.vendor_id},
-    {BIND_PCI_DID, 0, info.device_id},
-    {BIND_PCI_CLASS, 0, info.base_class},
-    {BIND_PCI_SUBCLASS, 0, info.sub_class},
-    {BIND_PCI_INTERFACE, 0, info.program_interface},
-    {BIND_PCI_REVISION, 0, info.revision_id},
-    {BIND_PCI_BDF_ADDR, 0, BIND_PCI_BDF_PACK(info.bus_id, info.dev_id,
-                                             info.func_id)},
+zx_device_str_prop_t pci_device_props[] = {
+    ddk::MakeStrProperty(bind_fuchsia::PCI_VID,
+        static_cast<uint32_t>(device.info.vendor_id)),
+    ddk::MakeStrProperty(bind_fuchsia::PCI_DID,
+        static_cast<uint32_t>(device.info.device_id)),
+    ddk::MakeStrProperty(bind_fuchsia::PCI_CLASS,
+        static_cast<uint32_t>(device.info.base_class)),
+    ddk::MakeStrProperty(bind_fuchsia::PCI_SUBCLASS,
+        static_cast<uint32_t>(device.info.sub_class)),
+    ddk::MakeStrProperty(bind_fuchsia::PCI_INTERFACE,
+        static_cast<uint32_t>(device.info.program_interface)),
+    ddk::MakeStrProperty(bind_fuchsia::PCI_REVISION,
+        static_cast<uint32_t>(device.info.revision_id)),
+    ddk::MakeStrProperty(bind_fuchsia::PCI_TOPO, pci_bind_topo),
 };
 ```
 

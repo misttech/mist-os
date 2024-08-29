@@ -23,10 +23,6 @@ if (is_fuchsia) {
   import("//build/product.gni")
   import("//src/sys/core/build/core.gni")
 
-  core_realm_definition("core_realm") {
-    testonly = true
-  }
-
   product_assembly_configuration("product_assembly_config") {
     testonly = true
     platform = {
@@ -62,7 +58,6 @@ if (is_fuchsia) {
     product_assembly_config_label = ":product_assembly_config"
     allow_eng_platform_bundle_use = true
 
-    core_realm_definition = ":core_realm"
     board_config_label = ":board_config"
 
     base_packages = []
@@ -180,12 +175,11 @@ if (is_host) {
       depfile = "$target_gen_dir/$target_name.d"
       inputs = [ _package_manifest_list ]
 
-      # Typically the timestamp of a directory doesn't accurately reflect the state of its contents,
-      # but since this script writes a depfile including all outputs it's okay to to specify a
-      # single directory here as the output.
-      outputs = [ _copied_package_dir ]
+      outputs = [ "$target_out_dir/$target_name.populated" ]
       args = [
         "--working-dir",
+        rebase_path(_copied_package_dir, root_build_dir),
+        "--stamp-file",
         rebase_path(outputs[0], root_build_dir),
         "--depfile",
         rebase_path(depfile, root_build_dir),
@@ -208,7 +202,15 @@ if (is_host) {
 
   populate_fx_publish_working_dir("fx_publish_bazel_assembly_working_dir") {
     package_manifest_list = bazel_assembly_cache_packages_list
-    deps = [ ":bazel_assembly_cache_packages.list($default_toolchain)" ]
+    deps = [
+      ":bazel_assembly_cache_packages.list($default_toolchain)",
+
+      # NOTE: It's necessary to claim bazel assembly directly as a dependency.
+      # Without this, if there are no changes in images_assembly.json, this
+      # target won't correctly rebuild, even if the content of the packages it
+      # reference have changed.
+      ":bazel_pb($default_toolchain)",
+    ]
     output = bazel_assembled_test_dir
     testonly = true
   }

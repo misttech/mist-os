@@ -8,9 +8,9 @@
 #include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
 #include <lib/component/incoming/cpp/service.h>
 #include <lib/driver/compat/cpp/logging.h>
-#include <lib/driver/testing/cpp/driver_lifecycle.h>
 #include <lib/driver/testing/cpp/driver_runtime.h>
-#include <lib/driver/testing/cpp/test_environment.h>
+#include <lib/driver/testing/cpp/internal/driver_lifecycle.h>
+#include <lib/driver/testing/cpp/internal/test_environment.h>
 #include <lib/driver/testing/cpp/test_node.h>
 
 #include <gtest/gtest.h>
@@ -22,6 +22,8 @@ namespace aml_canvas {
 
 namespace {
 
+// WARNING: Don't use this test as a template for new tests as it uses the old driver testing
+// library.
 class AmlCanvasDriverTest : public ::testing::Test {
  public:
   void SetUp() override {
@@ -34,8 +36,8 @@ class AmlCanvasDriverTest : public ::testing::Test {
     start_args_ = std::move(start_args);
     driver_outgoing_ = std::move(outgoing_directory_client);
 
-    zx::result init_result = test_environment_.SyncCall(&fdf_testing::TestEnvironment::Initialize,
-                                                        std::move(incoming_directory_server));
+    zx::result init_result = test_environment_.SyncCall(
+        &fdf_testing::internal::TestEnvironment::Initialize, std::move(incoming_directory_server));
     ASSERT_OK(init_result);
 
     zx::vmo mmio_vmo;
@@ -53,7 +55,7 @@ class AmlCanvasDriverTest : public ::testing::Test {
 
     auto instance_handler = fake_pdev_.SyncCall(&fake_pdev::FakePDevFidl::GetInstanceHandler,
                                                 async_patterns::PassDispatcher);
-    test_environment_.SyncCall([&](fdf_testing::TestEnvironment* env) {
+    test_environment_.SyncCall([&](fdf_testing::internal::TestEnvironment* env) {
       const zx::result result =
           env->incoming_directory().AddService<fuchsia_hardware_platform_device::Service>(
               std::move(instance_handler));
@@ -81,18 +83,19 @@ class AmlCanvasDriverTest : public ::testing::Test {
 
   void StartDriver() {
     zx::result start_result = runtime_.RunToCompletion(driver_.SyncCall(
-        &fdf_testing::DriverUnderTest<AmlCanvasDriver>::Start, (std::move(start_args_))));
+        &fdf_testing::internal::DriverUnderTest<AmlCanvasDriver>::Start, (std::move(start_args_))));
     ASSERT_OK(start_result);
   }
 
   void StopDriver() {
     zx::result stop_result = runtime_.RunToCompletion(
-        driver_.SyncCall(&fdf_testing::DriverUnderTest<AmlCanvasDriver>::PrepareStop));
+        driver_.SyncCall(&fdf_testing::internal::DriverUnderTest<AmlCanvasDriver>::PrepareStop));
     ASSERT_OK(stop_result);
   }
 
   fdf_testing::DriverRuntime& runtime() { return runtime_; }
-  async_patterns::TestDispatcherBound<fdf_testing::DriverUnderTest<AmlCanvasDriver>>& driver() {
+  async_patterns::TestDispatcherBound<fdf_testing::internal::DriverUnderTest<AmlCanvasDriver>>&
+  driver() {
     return driver_;
   }
 
@@ -112,11 +115,11 @@ class AmlCanvasDriverTest : public ::testing::Test {
       env_async_dispatcher(), std::in_place, std::string("root")};
   async_patterns::TestDispatcherBound<fake_pdev::FakePDevFidl> fake_pdev_{env_async_dispatcher(),
                                                                           std::in_place};
-  async_patterns::TestDispatcherBound<fdf_testing::TestEnvironment> test_environment_{
+  async_patterns::TestDispatcherBound<fdf_testing::internal::TestEnvironment> test_environment_{
       env_async_dispatcher(), std::in_place};
 
-  async_patterns::TestDispatcherBound<fdf_testing::DriverUnderTest<AmlCanvasDriver>> driver_{
-      driver_async_dispatcher(), std::in_place};
+  async_patterns::TestDispatcherBound<fdf_testing::internal::DriverUnderTest<AmlCanvasDriver>>
+      driver_{driver_async_dispatcher(), std::in_place};
 
   fuchsia_driver_framework::DriverStartArgs start_args_;
   fidl::ClientEnd<fuchsia_io::Directory> driver_outgoing_;

@@ -14,6 +14,7 @@ group("tests") {
     "devfs_exporter:tests",
     "driver-runner-integration:tests",
     "dynamic_offers:tests",
+    "index_stop_idle:tests",
     "init-child-first:tests",
     "inspect:tests",
     "interop:tests",

@@ -363,8 +363,7 @@ def _build_fuchsia_package_impl(ctx):
 
         if FuchsiaComponentInfo in dep:
             component_info = dep[FuchsiaComponentInfo]
-            component_manifest = component_info.manifest
-            component_dest = "meta/%s" % (component_manifest.basename)
+            component_dest = "meta/%s.cm" % (component_info.name)
 
             packaged_components.append(FuchsiaPackagedComponentInfo(
                 component_info = component_info,

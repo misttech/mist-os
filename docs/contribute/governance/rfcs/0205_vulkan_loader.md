@@ -457,7 +457,7 @@ The [Linux/Windows/MacOS loader][loaderinterface].
 [loader-protocol]: /sdk/fidl/fuchsia.vulkan.loader/loader.fidl
 [create-instance]: https://www.khronos.org/registry/vulkan/specs/1.3-extensions/man/html/vkCreateInstance.html
 [GetIcdList]: https://fuchsia.dev/reference/fidl/fuchsia.gpu.magma#Device.GetIcdList
-[ICD-abi]: /docs/concepts/packages/system.md#vulkan-icd
+[ICD-abi]: /docs/concepts/kernel/system.md#vulkan-icd
 [runner]: /docs/concepts/components/v2/capabilities/runner.md
 [loader-source]: /third_party/Vulkan-Loader
 [component]: /docs/glossary/README.md#component

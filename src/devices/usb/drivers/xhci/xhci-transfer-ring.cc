@@ -365,20 +365,20 @@ bool TransferRing::IsTRBInRange(TRB* trb, TRB* start, TRB* end) {
 zx_status_t TransferRing::CompleteTRB(TRB* trb, std::unique_ptr<TRBContext>* context) {
   fbl::AutoLock l(&mutex_);
   if (pending_trbs_.is_empty()) {
-    zxlogf(ERROR, "Pending TRB list is empty but we received a completion event");
+    FDF_LOG(ERROR, "Pending TRB list is empty but we received a completion event");
     return ZX_ERR_CANCELED;
   }
   dequeue_trb_ = trb;
   *context = pending_trbs_.pop_front();
   if (!IsTRBInRange(trb, (*context)->first_trb, (*context)->trb) &&
       (trb != (*context)->setup_trb)) {
-    zxlogf(ERROR, "Lost a TRB! Expected %p but we received an event for %p", (*context)->trb, trb);
+    FDF_LOG(ERROR, "Lost a TRB! Expected %p but we received an event for %p", (*context)->trb, trb);
     return ZX_ERR_IO;
   }
   if (trb != (*context)->trb) {
-    zxlogf(WARNING,
-           "Received a completion event in response to not the last TRB."
-           " This transaction should have failed! Please double check.");
+    FDF_LOG(WARNING,
+            "Received a completion event in response to not the last TRB."
+            " This transaction should have failed! Please double check.");
   }
   return ZX_OK;
 }
@@ -474,8 +474,8 @@ zx::result<ContiguousTRBInfo> TransferRing::AllocateContiguous(size_t count) {
       if (current != prev + 1) {
         // NOTE: Today we can't guarantee the availability of contiguous physical memory,
         // so we'll bail out if we can't satisfy the request.
-        zxlogf(ERROR,
-               "No physically contiguous memory available to satisfy TRB allocation request.\n");
+        FDF_LOG(ERROR,
+                "No physically contiguous memory available to satisfy TRB allocation request.\n");
         return zx::error(ZX_ERR_NO_MEMORY);
       }
       prev = current;

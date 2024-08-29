@@ -18,7 +18,7 @@
 
 #include "logging.h"
 
-namespace sysmem_driver {
+namespace sysmem_service {
 
 // ClientDebugInfo carries debug-specific information that can be attached to a Node, either by a
 // participant, or using values inherited from the parent Node, or default values established when
@@ -210,9 +210,9 @@ class NodeProperties : public std::enable_shared_from_this<NodeProperties> {
   // the current NodeProperties.  For LogicalBufferCollection::root_, these counts are for the whole
   // tree.
   //
-  // TODO(https://fxbug.dev/42150808): Limit node_count() of root_, but instead of failing root_ when
-  // limit reached, prune a sub-tree selected to prefer more-nested over less nested, and larger
-  // node count over smaller node count (lexicographically).
+  // TODO(https://fxbug.dev/42150808): Limit node_count() of root_, but instead of failing root_
+  // when limit reached, prune a sub-tree selected to prefer more-nested over less nested, and
+  // larger node count over smaller node count (lexicographically).
   uint32_t node_count() const;
   uint32_t connected_client_count() const;
   uint32_t buffer_collection_count() const;
@@ -347,6 +347,6 @@ class NodeProperties : public std::enable_shared_from_this<NodeProperties> {
   bool is_marked_ = false;
 };
 
-}  // namespace sysmem_driver
+}  // namespace sysmem_service
 
 #endif  // SRC_DEVICES_SYSMEM_DRIVERS_SYSMEM_NODE_PROPERTIES_H_

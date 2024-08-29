@@ -32,6 +32,7 @@ group("tests_no_e2e") {
     "intl:tests",
     "lib:tests",
     "media:tests",
+    "paravirtualization:tests",
     "performance:tests",
     "power:tests",
     "recovery:tests_no_e2e",

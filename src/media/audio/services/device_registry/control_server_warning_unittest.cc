@@ -70,6 +70,8 @@ class ControlServerWarningTest : public AudioDeviceRegistryServerTestBase,
     return control_client;
   }
 
+  void handle_unknown_event(fidl::UnknownEventMetadata<fad::Control>) override {}
+
   static ElementId ring_buffer_id() { return fad::kDefaultRingBufferElementId; }
   static ElementId dai_id() { return fad::kDefaultDaiInterconnectElementId; }
 };

@@ -579,7 +579,7 @@ impl TryFromEnv for fidl_fuchsia_developer_remotecontrol::RemoteControlProxy {
                 Ok(p) => Ok(p),
                 Err(e) => {
                     if let Some(ffx_e) = &e.downcast_ref::<FfxError>() {
-                        let message = format!("{ffx_e} when creating remotecontrol proxy");
+                        let message = format!("Failed connecting to remote control proxy: {ffx_e}");
                         Err(e).user_message(message)
                     } else {
                         Err(e).user_message("Failed to create remote control proxy")

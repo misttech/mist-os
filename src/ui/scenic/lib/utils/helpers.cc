@@ -26,19 +26,6 @@ using fuchsia::ui::composition::Orientation;
 
 namespace utils {
 
-fuchsia::ui::scenic::Present2Args CreatePresent2Args(zx_time_t requested_presentation_time,
-                                                     std::vector<zx::event> acquire_fences,
-                                                     std::vector<zx::event> release_fences,
-                                                     zx_duration_t requested_prediction_span) {
-  fuchsia::ui::scenic::Present2Args args;
-  args.set_requested_presentation_time(requested_presentation_time);
-  args.set_acquire_fences(std::move(acquire_fences));
-  args.set_release_fences(std::move(release_fences));
-  args.set_requested_prediction_span(requested_prediction_span);
-
-  return args;
-}
-
 zx_koid_t ExtractKoid(const fuchsia::ui::views::ViewRef& view_ref) {
   return fsl::GetKoid(view_ref.reference.get());
 }

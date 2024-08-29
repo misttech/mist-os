@@ -58,6 +58,8 @@ source_set("lib") {
     "//sdk/lib/driver/promise/cpp",
     "//sdk/lib/inspect/component/cpp",
     "//sdk/lib/stdcompat",
+    "//src/devices/bind/fuchsia:fuchsia_cpp",
+    "//src/devices/bind/fuchsia.platform:fuchsia.platform_cpp",
     "//src/devices/lib/driver:driver_runtime",
     "//src/lib/ddk",
     "//src/lib/ddktl",

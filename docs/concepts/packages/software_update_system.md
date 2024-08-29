@@ -1,4 +1,4 @@
-# Software Update System
+# Software update system
 
 Fuchsia is a project that constantly gets updates for new features, enhancements,
 and security fixes. Fuchsia's software update system makes use of

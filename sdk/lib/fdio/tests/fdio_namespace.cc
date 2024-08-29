@@ -45,6 +45,8 @@ TEST(NamespaceTest, NullPaths) {
   zx::channel service0, service1;
   ASSERT_OK(zx::channel::create(0, &service0, &service1));
   EXPECT_STATUS(fdio_ns_open(ns, nullptr, 0, service0.release()), ZX_ERR_INVALID_ARGS);
+  ASSERT_OK(zx::channel::create(0, &service0, &service1));
+  EXPECT_STATUS(fdio_ns_open3(ns, nullptr, 0, service0.release()), ZX_ERR_INVALID_ARGS);
 
   ASSERT_OK(fdio_ns_destroy(ns));
 }
@@ -149,6 +151,27 @@ TEST(NamespaceTest, ConnectRoot) {
   ASSERT_OK(fdio_ns_destroy(ns));
 }
 
+TEST(NamespaceTest, ConnectRootOpen3) {
+  fdio_ns_t* ns;
+  ASSERT_OK(fdio_ns_create(&ns));
+
+  zx::channel ch0, ch1;
+  ASSERT_OK(zx::channel::create(0, &ch0, &ch1));
+
+  ASSERT_OK(fdio_ns_bind(ns, "/", ch0.release()));
+  ASSERT_STATUS(ZX_ERR_TIMED_OUT,
+                ch1.wait_one(ZX_CHANNEL_READABLE, zx::time::infinite_past(), nullptr));
+
+  zx::channel service0, service1;
+  ASSERT_OK(zx::channel::create(0, &service0, &service1));
+  ASSERT_OK(fdio_ns_open3(ns, "/foo", 1u, service0.release()));
+
+  // Expect an incoming connect on ch1
+  ASSERT_OK(ch1.wait_one(ZX_CHANNEL_READABLE, zx::time::infinite_past(), nullptr));
+
+  ASSERT_OK(fdio_ns_destroy(ns));
+}
+
 TEST(NamespaceTest, ConnectCanonicalPath) {
   fdio_ns_t* ns;
   ASSERT_OK(fdio_ns_create(&ns));
@@ -163,6 +186,27 @@ TEST(NamespaceTest, ConnectCanonicalPath) {
   zx::channel service0, service1;
   ASSERT_OK(zx::channel::create(0, &service0, &service1));
   ASSERT_OK(fdio_ns_open(ns, "/foo/bar", 1u, service0.release()));
+
+  // Expect an incoming connect on ch1
+  ASSERT_OK(ch1.wait_one(ZX_CHANNEL_READABLE, zx::time::infinite_past(), nullptr));
+
+  ASSERT_OK(fdio_ns_destroy(ns));
+}
+
+TEST(NamespaceTest, ConnectCanonicalPathOpen3) {
+  fdio_ns_t* ns;
+  ASSERT_OK(fdio_ns_create(&ns));
+
+  zx::channel ch0, ch1;
+  ASSERT_OK(zx::channel::create(0, &ch0, &ch1));
+
+  ASSERT_OK(fdio_ns_bind(ns, "/foo", ch0.release()));
+  ASSERT_STATUS(ZX_ERR_TIMED_OUT,
+                ch1.wait_one(ZX_CHANNEL_READABLE, zx::time::infinite_past(), nullptr));
+
+  zx::channel service0, service1;
+  ASSERT_OK(zx::channel::create(0, &service0, &service1));
+  ASSERT_OK(fdio_ns_open3(ns, "/foo/bar", 1u, service0.release()));
 
   // Expect an incoming connect on ch1
   ASSERT_OK(ch1.wait_one(ZX_CHANNEL_READABLE, zx::time::infinite_past(), nullptr));
@@ -191,6 +235,27 @@ TEST(NamespaceTest, ConnectNonCanonicalPath) {
   ASSERT_OK(fdio_ns_destroy(ns));
 }
 
+TEST(NamespaceTest, ConnectNonCanonicalPathOpen3) {
+  fdio_ns_t* ns;
+  ASSERT_OK(fdio_ns_create(&ns));
+
+  zx::channel ch0, ch1;
+  ASSERT_OK(zx::channel::create(0, &ch0, &ch1));
+
+  ASSERT_OK(fdio_ns_bind(ns, "/foo", ch0.release()));
+  ASSERT_STATUS(ZX_ERR_TIMED_OUT,
+                ch1.wait_one(ZX_CHANNEL_READABLE, zx::time::infinite_past(), nullptr));
+
+  zx::channel service0, service1;
+  ASSERT_OK(zx::channel::create(0, &service0, &service1));
+  ASSERT_OK(fdio_ns_open3(ns, "//foo/fake_subdir/.././Service", 1u, service0.release()));
+
+  // Expect an incoming connect on ch1
+  ASSERT_OK(ch1.wait_one(ZX_CHANNEL_READABLE, zx::time::infinite_past(), nullptr));
+
+  ASSERT_OK(fdio_ns_destroy(ns));
+}
+
 TEST(NamespaceTest, ConnectOversizedPath) {
   fdio_ns_t* ns;
   ASSERT_OK(fdio_ns_create(&ns));
@@ -206,6 +271,8 @@ TEST(NamespaceTest, ConnectOversizedPath) {
   EXPECT_EQ(long_path.length(), PATH_MAX);
 
   EXPECT_STATUS(fdio_ns_open(ns, long_path.c_str(), 0u, ch0.release()), ZX_ERR_BAD_PATH);
+  ASSERT_OK(zx::channel::create(0, &ch0, &ch1));
+  EXPECT_STATUS(fdio_ns_open3(ns, long_path.c_str(), 0u, ch0.release()), ZX_ERR_BAD_PATH);
 
   ASSERT_OK(fdio_ns_destroy(ns));
 }
@@ -223,6 +290,8 @@ TEST(NamespaceTest, ConnectOversizedPathComponent) {
   long_path_component.append(NAME_MAX + 1, 'a');
 
   EXPECT_STATUS(fdio_ns_open(ns, long_path_component.c_str(), 0u, ch0.release()), ZX_ERR_BAD_PATH);
+  ASSERT_OK(zx::channel::create(0, &ch0, &ch1));
+  EXPECT_STATUS(fdio_ns_open3(ns, long_path_component.c_str(), 0u, ch0.release()), ZX_ERR_BAD_PATH);
 
   ASSERT_OK(fdio_ns_destroy(ns));
 }

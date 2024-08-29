@@ -748,7 +748,8 @@ void Tas58xx::WatchTopology(
     fuchsia::hardware::audio::signalprocessing::SignalProcessing::WatchTopologyCallback callback) {
   if (!responded_to_watch_topology_) {
     responded_to_watch_topology_ = true;
-    callback(kTopologyId);
+    callback(fuchsia::hardware::audio::signalprocessing::Reader_WatchTopology_Result::WithResponse(
+        fuchsia::hardware::audio::signalprocessing::Reader_WatchTopology_Response(kTopologyId)));
   } else if (topology_callback_) {
     // The client called WatchTopology when another hanging get was pending.
     // This is an error condition and hence we unbind the channel.
@@ -1165,6 +1166,8 @@ zx_status_t Tas58xx::UpdateReg(uint8_t reg, uint8_t mask, uint8_t value) {
   }
   return WriteReg(reg, (old_value & ~mask) | (value & mask));
 }
+
+void Tas58xx::handle_unknown_method(uint64_t ordinal, bool method_has_response) {}
 
 zx_status_t tas58xx_bind(void* ctx, zx_device_t* parent) { return Tas58xx::Create(parent); }
 

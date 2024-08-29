@@ -5,9 +5,14 @@
 
 #[cfg(not(feature = "starnix_lite"))]
 use crate::{
-    create_filesystem_from_spec, expose_root, get_serial_number, parse_features,
-    parse_numbered_handles, run_container_features, serve_component_runner,
-    serve_container_controller, serve_graphical_presenter, Features,
+    expose_root, get_serial_number, parse_features, parse_numbered_handles, run_container_features,
+    serve_component_runner, serve_container_controller, serve_graphical_presenter, Features,
+    MountAction,
+};
+#[cfg(feature = "starnix_lite")]
+use crate::{
+    create_filesystem_from_spec, expose_root, parse_features, parse_numbered_handles,
+    run_container_features, serve_component_runner, serve_container_controller, Features, MountAction
 };
 #[cfg(feature = "starnix_lite")]
 use crate::{
@@ -38,8 +43,6 @@ use futures::{FutureExt, StreamExt, TryStreamExt};
 use runner::{get_program_string, get_program_strvec};
 use starnix_core::execution::execute_task_with_prerun_result;
 use starnix_core::fs::fuchsia::create_remotefs_filesystem;
-use starnix_core::fs::layeredfs::LayeredFs;
-use starnix_core::fs::overlayfs::OverlayFs;
 use starnix_core::fs::tmpfs::TmpFs;
 use starnix_core::security;
 use starnix_core::task::{set_thread_role, CurrentTask, ExitStatus, Kernel, Task};
@@ -50,9 +53,11 @@ use starnix_logging::{
     log_error, log_info, log_warn, trace_duration, CATEGORY_STARNIX, NAME_CREATE_CONTAINER,
 };
 use starnix_modules::{init_common_devices, register_common_file_systems};
+use starnix_modules_layeredfs::LayeredFs;
 #[cfg(not(feature = "starnix_lite"))]
 use starnix_modules_magma::get_magma_params;
-use starnix_sync::{BeforeFsNodeAppend, DeviceOpen, FileOpsCore, LockBefore, Locked};
+use starnix_modules_overlayfs::OverlayStack;
+use starnix_sync::{DeviceOpen, FileOpsCore, LockBefore, Locked, Unlocked};
 use starnix_uapi::errors::{SourceContext, ENOENT};
 use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::resource_limits::Resource;
@@ -541,23 +546,18 @@ async fn create_container(
     Ok(Container { kernel, _node: node, _thread_bound: Default::default() })
 }
 
-fn create_fs_context<L>(
-    locked: &mut Locked<'_, L>,
+fn create_fs_context(
+    locked: &mut Locked<'_, Unlocked>,
     kernel: &Arc<Kernel>,
     features: &Features,
     config: &Config,
     pkg_dir_proxy: &fio::DirectorySynchronousProxy,
-) -> Result<Arc<FsContext>, Error>
-where
-    L: LockBefore<FileOpsCore>,
-    L: LockBefore<DeviceOpen>,
-    L: LockBefore<BeforeFsNodeAppend>,
-{
+) -> Result<Arc<FsContext>, Error> {
     // The mounts are applied in the order listed. Mounting will fail if the designated mount
     // point doesn't exist in a previous mount. The root must be first so other mounts can be
     // applied on top of it.
     let mut mounts_iter = config.mounts.iter();
-    let mut root = create_filesystem_from_spec(
+    let mut root = MountAction::new_for_root(
         locked,
         kernel,
         pkg_dir_proxy,
@@ -599,7 +599,7 @@ where
         root.fs = LayeredFs::new_fs(kernel, root.fs, mappings.into_iter().collect());
     }
     if features.rootfs_rw {
-        root.fs = OverlayFs::wrap_fs_in_writable_layer(kernel, root.fs)?;
+        root.fs = OverlayStack::wrap_fs_in_writable_layer(kernel, root.fs)?;
     }
     Ok(FsContext::new(Namespace::new_with_flags(root.fs, root.flags)))
 }
@@ -640,22 +640,17 @@ fn parse_rlimits(rlimits: &[String]) -> Result<Vec<(Resource, u64)>, Error> {
     Ok(res)
 }
 
-fn mount_filesystems<L>(
-    locked: &mut Locked<'_, L>,
+fn mount_filesystems(
+    locked: &mut Locked<'_, Unlocked>,
     system_task: &CurrentTask,
     config: &Config,
     pkg_dir_proxy: &fio::DirectorySynchronousProxy,
-) -> Result<(), Error>
-where
-    L: LockBefore<FileOpsCore>,
-    L: LockBefore<DeviceOpen>,
-    L: LockBefore<BeforeFsNodeAppend>,
-{
+) -> Result<(), Error> {
     let mut mounts_iter = config.mounts.iter();
     // Skip the first mount, that was used to create the root filesystem.
     let _ = mounts_iter.next();
     for mount_spec in mounts_iter {
-        let action = create_filesystem_from_spec(locked, system_task, pkg_dir_proxy, mount_spec)
+        let action = MountAction::from_spec(locked, system_task, pkg_dir_proxy, mount_spec)
             .with_source_context(|| format!("creating filesystem from spec: {}", &mount_spec))?;
         let mount_point = system_task
             .lookup_path_from_root(action.path.as_ref())

@@ -798,6 +798,9 @@ config("default_warnings") {
       # one false positive in GCC 14 that was not obvious how to work around
       # locally.  Needs to be pursued upstream.
       "-Wno-maybe-uninitialized",
+
+      # TODO(https://fxbug.dev/362618077): Spuriously fires.
+      "-Wno-alloc-size-larger-than",
     ]
   }
 
@@ -1537,4 +1540,18 @@ config("Wno-deprecated-pragma") {
 # collection across ifs_shared_library_ldscript as an input linker script.
 config("ifs-as-needed") {
   lib_dirs = [ ifs_shared_library_as_needed_dir ]
+}
+
+group("test_executable_deps") {
+  deps = []
+
+  # Symbolizer markup is currently only supported on Linux hosts.
+  #
+  # TODO(https://fxbug.dev/319148300): Determine if we can make this just
+  # `is_linux`. The other uses we have for non-host Linux toolchains are
+  # probably places where markup makes sense, but that can be for later
+  # consideration.
+  if (is_host && is_linux) {
+    deps += [ "//build/config/sanitizers:sanitizers_use_symbolizer_markup" ]
+  }
 }

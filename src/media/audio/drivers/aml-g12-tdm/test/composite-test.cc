@@ -11,9 +11,9 @@
 #include <lib/component/incoming/cpp/service.h>
 #include <lib/ddk/platform-defs.h>
 #include <lib/driver/incoming/cpp/namespace.h>
-#include <lib/driver/testing/cpp/driver_lifecycle.h>
 #include <lib/driver/testing/cpp/driver_runtime.h>
-#include <lib/driver/testing/cpp/test_environment.h>
+#include <lib/driver/testing/cpp/internal/driver_lifecycle.h>
+#include <lib/driver/testing/cpp/internal/test_environment.h>
 #include <lib/driver/testing/cpp/test_node.h>
 #include <lib/fake-bti/bti.h>
 #include <lib/fdio/directory.h>
@@ -248,9 +248,11 @@ class FakeGpio : public fidl::testing::WireTestBase<fuchsia_hardware_gpio::Gpio>
 
 struct IncomingNamespace {
   fdf_testing::TestNode node_{std::string("root")};
-  fdf_testing::TestEnvironment env_{fdf::Dispatcher::GetCurrent()->get()};
+  fdf_testing::internal::TestEnvironment env_{fdf::Dispatcher::GetCurrent()->get()};
 };
 
+// WARNING: Don't use this test as a template for new tests as it uses the old driver testing
+// library.
 class AmlG12CompositeTest : public testing::Test {
  public:
   AmlG12CompositeTest()
@@ -304,8 +306,8 @@ class AmlG12CompositeTest : public testing::Test {
       driver_start_args = std::move(start_args_result->start_args);
     });
 
-    zx::result result = runtime_.RunToCompletion(
-        dut_.SyncCall(&fdf_testing::DriverUnderTest<Driver>::Start, std::move(driver_start_args)));
+    zx::result result = runtime_.RunToCompletion(dut_.SyncCall(
+        &fdf_testing::internal::DriverUnderTest<Driver>::Start, std::move(driver_start_args)));
     ASSERT_EQ(ZX_OK, result.status_value());
 
     incoming_.SyncCall([this](IncomingNamespace* incoming) {
@@ -317,8 +319,8 @@ class AmlG12CompositeTest : public testing::Test {
   }
 
   void TearDown() override {
-    zx::result result =
-        runtime_.RunToCompletion(dut_.SyncCall(&fdf_testing::DriverUnderTest<Driver>::PrepareStop));
+    zx::result result = runtime_.RunToCompletion(
+        dut_.SyncCall(&fdf_testing::internal::DriverUnderTest<Driver>::PrepareStop));
     ASSERT_EQ(ZX_OK, result.status_value());
   }
 
@@ -462,7 +464,7 @@ class AmlG12CompositeTest : public testing::Test {
   fdf::UnownedSynchronizedDispatcher env_dispatcher_;
   fdf::UnownedSynchronizedDispatcher driver_dispatcher_;
   // Use dut_ instead of driver_ because driver_ is used by gtest.
-  async_patterns::TestDispatcherBound<fdf_testing::DriverUnderTest<Driver>> dut_{
+  async_patterns::TestDispatcherBound<fdf_testing::internal::DriverUnderTest<Driver>> dut_{
       driver_dispatcher(), std::in_place};
 
  protected:
@@ -613,7 +615,8 @@ TEST_F(AmlG12CompositeTest, ElementsState) {
   ASSERT_TRUE(elements_result.is_ok());
 
   // Able to set element state for all (dai_interconnect) elements with no parameters.
-  for (auto element : elements_result->processing_elements()) {
+  for (fuchsia_hardware_audio_signalprocessing::Element& element :
+       elements_result->processing_elements()) {
     if (element.type() == fuchsia_hardware_audio_signalprocessing::ElementType::kDaiInterconnect) {
       fuchsia_hardware_audio_signalprocessing::SignalProcessingSetElementStateRequest request;
       request.processing_element_id(*element.id());
@@ -1161,31 +1164,31 @@ class AmlG12CompositeRingBufferTest : public AmlG12CompositeTest {
 };
 
 TEST_F(AmlG12CompositeRingBufferTest, RingBufferProperties) {
-  for (auto& id : kAllValidRingBufferIds) {
+  for (const fuchsia_hardware_audio::ElementId& id : kAllValidRingBufferIds) {
     TestProperties(id);
   }
 }
 
 TEST_F(AmlG12CompositeRingBufferTest, RingBufferGetVmo) {
-  for (auto& id : kAllValidRingBufferIds) {
+  for (const fuchsia_hardware_audio::ElementId& id : kAllValidRingBufferIds) {
     TestGetVmo(id);
   }
 }
 
 TEST_F(AmlG12CompositeRingBufferTest, RingBufferGetVmoMultipleTimes) {
-  for (auto& id : kAllValidRingBufferIds) {
+  for (const fuchsia_hardware_audio::ElementId& id : kAllValidRingBufferIds) {
     TestGetVmoMultipleTimes(id);
   }
 }
 
 TEST_F(AmlG12CompositeRingBufferTest, RingBuffersStartStop) {
-  for (auto& id : kAllValidRingBufferIds) {
+  for (const fuchsia_hardware_audio::ElementId& id : kAllValidRingBufferIds) {
     TestCreationAndStartStop(id);
   }
 }
 
 TEST_F(AmlG12CompositeRingBufferTest, RingBuffersClientCloseChannel) {
-  for (auto& id : kAllValidRingBufferIds) {
+  for (const fuchsia_hardware_audio::ElementId& id : kAllValidRingBufferIds) {
     auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_audio::RingBuffer>();
     fuchsia_hardware_audio::CompositeCreateRingBufferRequest request(
         id, GetDefaultRingBufferFormat(), std::move(endpoints->server));
@@ -1197,19 +1200,19 @@ TEST_F(AmlG12CompositeRingBufferTest, RingBuffersClientCloseChannel) {
 }
 
 TEST_F(AmlG12CompositeRingBufferTest, RingBufferStartStartedRingBuffer) {
-  for (auto& id : kAllValidRingBufferIds) {
+  for (const fuchsia_hardware_audio::ElementId& id : kAllValidRingBufferIds) {
     TestStartStartedRingBuffer(id);
   }
 }
 
 TEST_F(AmlG12CompositeRingBufferTest, RingBufferStopStoppedRingBuffer) {
-  for (auto& id : kAllValidRingBufferIds) {
+  for (const fuchsia_hardware_audio::ElementId& id : kAllValidRingBufferIds) {
     TestStopStoppedRingBuffer(id);
   }
 }
 
 TEST_F(AmlG12CompositeRingBufferTest, RingBufferGetDelay) {
-  for (auto& id : kAllValidRingBufferIds) {
+  for (const fuchsia_hardware_audio::ElementId& id : kAllValidRingBufferIds) {
     TestGetDelay(id);
   }
 }

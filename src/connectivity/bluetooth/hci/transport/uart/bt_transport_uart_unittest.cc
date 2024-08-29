@@ -6,12 +6,7 @@
 
 #include <fidl/fuchsia.hardware.serial/cpp/wire.h>
 #include <lib/async/cpp/task.h>
-#include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
-#include <lib/driver/testing/cpp/driver_lifecycle.h>
-#include <lib/driver/testing/cpp/driver_runtime.h>
 #include <lib/driver/testing/cpp/driver_test.h>
-#include <lib/driver/testing/cpp/test_environment.h>
-#include <lib/driver/testing/cpp/test_node.h>
 #include <lib/fdio/directory.h>
 #include <zircon/device/bt-hci.h>
 

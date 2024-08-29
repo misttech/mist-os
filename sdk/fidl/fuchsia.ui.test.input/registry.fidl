@@ -35,7 +35,7 @@ type CoordinateUnit = flexible enum {
 ///
 /// Enables clients to register fake input devices, which can be used to
 /// inject input events directly into Input Pipeline.
-@discoverable
+@discoverable(server="platform")
 closed protocol Registry {
 
     /// Enables the client to inject touch events using the corresponding
@@ -55,6 +55,25 @@ closed protocol Registry {
         2: coordinate_unit CoordinateUnit;
     }) -> ();
 
+    /// Enables the client to inject touch events using the corresponding
+    /// client end to `device`. Returns device_id of the created device.
+    ///
+    /// Clients are allowed at most one in-flight call at a time. Subsequent
+    /// calls must wait until the acknowledgment returns. Non-compliance
+    /// results in channel closure.
+    ///
+    /// The `fuchsia.ui.test.input.TouchScreen` channel will remain open even
+    /// if the `Registry` connection closes.
+    @available(added=NEXT)
+    strict RegisterTouchScreenAndGetDeviceInfo(resource table {
+        1: device server_end:TouchScreen;
+
+        /// Indicates the coordinate space in which to describe touch events.
+        2: coordinate_unit CoordinateUnit;
+    }) -> (resource table {
+        1: device_id uint32;
+    });
+
     /// Enables the client to inject media buttons events using the
     /// corresponding client end to `device`.
     ///
@@ -67,6 +86,22 @@ closed protocol Registry {
     strict RegisterMediaButtonsDevice(resource table {
         1: device server_end:MediaButtonsDevice;
     }) -> ();
+
+    /// Enables the client to inject media buttons events using the
+    /// corresponding client end to `device`. Returns device_id of the created device.
+    ///
+    /// Clients are allowed at most one in-flight call at a time. Subsequent
+    /// calls must wait until the acknowledgment returns. Non-compliance
+    /// results in channel closure.
+    ///
+    /// The `fuchsia.ui.test.input.MediaButtonsDevice` channel will remain open
+    /// even if the `Registry` connection closes.
+    @available(added=NEXT)
+    strict RegisterMediaButtonsDeviceAndGetDeviceInfo(resource table {
+        1: device server_end:MediaButtonsDevice;
+    }) -> (resource table {
+        1: device_id uint32;
+    });
 
     /// Enables the client to inject keyboard events using the corresponding
     /// client end to `device`.
@@ -81,6 +116,22 @@ closed protocol Registry {
         1: device server_end:Keyboard;
     }) -> ();
 
+    /// Enables the client to inject keyboard events using the corresponding
+    /// client end to `device`. Returns device_id of the created device.
+    ///
+    /// Clients are allowed at most one in-flight call at a time. Subsequent
+    /// calls must wait until the acknowledgment returns. Non-compliance
+    /// results in channel closure.
+    ///
+    /// The `fuchsia.ui.test.input.Keyboard` channel will remain open even
+    /// if the `Registry` connection closes.
+    @available(added=NEXT)
+    strict RegisterKeyboardAndGetDeviceInfo(resource table {
+        1: device server_end:Keyboard;
+    }) -> (resource table {
+        1: device_id uint32;
+    });
+
     /// Enables the client to inject mouse events using the corresponding
     /// client end to `device`.
     ///
@@ -93,4 +144,20 @@ closed protocol Registry {
     strict RegisterMouse(resource table {
         1: device server_end:Mouse;
     }) -> ();
+
+    /// Enables the client to inject mouse events using the corresponding
+    /// client end to `device`. Returns device_id of the created device.
+    ///
+    /// Clients are allowed at most one in-flight call at a time. Subsequent
+    /// calls must wait until the acknowledgment returns. Non-compliance
+    /// results in channel closure.
+    ///
+    /// The `fuchsia.ui.test.input.Mouse` channel will remain open even
+    /// if the `Registry` connection closes.
+    @available(added=NEXT)
+    strict RegisterMouseAndGetDeviceInfo(resource table {
+        1: device server_end:Mouse;
+    }) -> (resource table {
+        1: device_id uint32;
+    });
 };

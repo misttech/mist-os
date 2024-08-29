@@ -3,10 +3,11 @@
 // found in the LICENSE file.
 
 use crate::driver_loading_fuzzer::Session;
+use crate::escrow_support::{apply_state, handle_stall, resume_state};
 use crate::indexer::*;
 use crate::load_driver::*;
 use crate::resolved_driver::ResolvedDriver;
-use anyhow::Context;
+use anyhow::{anyhow, Context, Result};
 use driver_index_config::Config;
 use fidl_fuchsia_driver_index::{
     DevelopmentManagerRequest, DevelopmentManagerRequestStream, DriverIndexRequest,
@@ -20,17 +21,20 @@ use std::collections::HashSet;
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 use {
-    fidl_fuchsia_component_resolution as fresolution, fidl_fuchsia_driver_development as fdd,
-    fidl_fuchsia_driver_framework as fdf, fidl_fuchsia_driver_registrar as fdr,
+    fidl_fuchsia_component_resolution as fresolution, fidl_fuchsia_component_sandbox as fsandbox,
+    fidl_fuchsia_driver_development as fdd, fidl_fuchsia_driver_framework as fdf,
+    fidl_fuchsia_driver_registrar as fdr, fidl_fuchsia_process_lifecycle as flifecycle,
     fuchsia_async as fasync,
 };
 
 mod composite_node_spec_manager;
 mod driver_loading_fuzzer;
+mod escrow_support;
 mod indexer;
 mod load_driver;
 mod match_common;
 mod resolved_driver;
+mod serde_ext;
 
 /// Wraps all hosted protocols into a single type that can be matched against
 /// and dispatched.
@@ -85,7 +89,7 @@ fn create_and_setup_index(boot_drivers: Vec<ResolvedDriver>, config: &Config) ->
 async fn run_driver_info_iterator_server(
     driver_info: Arc<Mutex<Vec<fdf::DriverInfo>>>,
     stream: fdd::DriverInfoIteratorRequestStream,
-) -> Result<(), anyhow::Error> {
+) -> Result<()> {
     stream
         .map(|result| result.context("failed request"))
         .try_for_each(|request| async {
@@ -113,7 +117,7 @@ async fn run_driver_info_iterator_server(
 async fn run_composite_node_specs_iterator_server(
     specs: Arc<Mutex<Vec<fdf::CompositeInfo>>>,
     stream: fdd::CompositeNodeSpecIteratorRequestStream,
-) -> Result<(), anyhow::Error> {
+) -> Result<()> {
     stream
         .map(|result| result.context("failed request"))
         .try_for_each(|request| async {
@@ -141,7 +145,7 @@ async fn run_composite_node_specs_iterator_server(
 async fn run_driver_development_server(
     indexer: Rc<Indexer>,
     stream: DevelopmentManagerRequestStream,
-) -> Result<(), anyhow::Error> {
+) -> Result<()> {
     stream
         .map(|result| result.context("failed request"))
         .try_for_each(|request| async {
@@ -209,7 +213,7 @@ async fn run_driver_registrar_server(
     indexer: Rc<Indexer>,
     stream: fdr::DriverRegistrarRequestStream,
     full_resolver: &Option<fresolution::ResolverProxy>,
-) -> Result<(), anyhow::Error> {
+) -> Result<()> {
     stream
         .map(|result| result.context("failed request"))
         .try_for_each(|request| async {
@@ -248,10 +252,12 @@ async fn run_driver_registrar_server(
     Ok(())
 }
 
-async fn run_index_server(
+async fn run_index_server_with_timeout(
     indexer: Rc<Indexer>,
     stream: DriverIndexRequestStream,
-) -> Result<(), anyhow::Error> {
+    idle_timeout: fasync::Duration,
+) -> Result<()> {
+    let (stream, unbind_if_stalled) = detect_stall::until_stalled(stream, idle_timeout);
     stream
         .map(|result| result.context("failed request"))
         .try_for_each(|request| async {
@@ -296,22 +302,171 @@ async fn run_index_server(
             Ok(())
         })
         .await?;
+
+    // The `unbind_if_stalled` future will resolve if the stream was idle
+    // for `idle_timeout` or if the stream finished. If the stream was idle,
+    // it will resolve with the unbound server endpoint.
+    //
+    // If the connection did not close or receive new messages within the
+    // timeout, send it over to component manager to wait for it on our behalf.
+    if let Ok(Some(server_end)) = unbind_if_stalled.await {
+        // Escrow the `server_end`...
+        // This will open `/escrow/fuchsia.driver.index.DriverIndex` and pass the server
+        // endpoint obtained from the idle FIDL connection.
+        client::connect_channel_to_protocol_at::<fidl_fuchsia_driver_index::DriverIndexMarker>(
+            server_end.into(),
+            "/escrow",
+        )?;
+    }
+
     Ok(())
 }
 
-// NOTE: This tag is load-bearing to make sure that the output
-// shows up in serial.
-#[fuchsia::main(logging_tags = ["driver"])]
-async fn main() -> Result<(), anyhow::Error> {
-    let mut service_fs = ServiceFs::new_local();
+async fn run_load_base_drivers(
+    should_load_base_drivers: bool,
+    index: &Rc<Indexer>,
+    config: Config,
+    eager_drivers: HashSet<cm_types::Url>,
+    disabled_drivers: HashSet<cm_types::Url>,
+) -> Result<()> {
+    if should_load_base_drivers {
+        let base_resolver = client::connect_to_protocol_at_path::<fresolution::ResolverMarker>(
+            "/svc/fuchsia.component.resolution.Resolver-base",
+        )
+        .context("Failed to connect to base component resolver")?;
+        let res = load_base_drivers(
+            index.clone(),
+            &config.base_drivers,
+            &base_resolver,
+            &eager_drivers,
+            &disabled_drivers,
+        )
+        .await
+        .context("Error loading base packages")
+        .map_err(log_error);
+        tracing::info!("loaded base drivers.");
+        res
+    } else {
+        Ok(())
+    }
+}
+
+async fn run_driver_index(
+    index: &Rc<Indexer>,
+    idle_timeout: fasync::Duration,
+    full_resolver: Option<fresolution::ResolverProxy>,
+    lifecycle_control_handle: flifecycle::LifecycleControlHandle,
+    capability_store: fsandbox::CapabilityStoreProxy,
+    id_gen: sandbox::CapabilityIdGenerator,
+    dict_id: u64,
+) -> Result<()> {
+    let mut service_fs = ServiceFs::new();
 
     service_fs.dir("svc").add_fidl_service(IncomingRequest::DriverIndexProtocol);
     service_fs.dir("svc").add_fidl_service(IncomingRequest::DriverDevelopmentProtocol);
     service_fs.dir("svc").add_fidl_service(IncomingRequest::DriverRegistrarProtocol);
     service_fs.take_and_serve_directory_handle().context("failed to serve outgoing namespace")?;
 
-    let config = Config::take_from_startup_handle();
+    let staller_service_fs = service_fs.until_stalled(idle_timeout);
+    staller_service_fs
+                .for_each_concurrent(None, |item| async {
+                    // match on `request` and handle each protocol.
+                    match item {
+                        fuchsia_component::server::Item::Request(request, _active_guard) => {
+                            // Note on |_active_guard|:
+                            // While we have an active server running for any of the below protocols
+                            // (driver index, driver development, driver registrar) we hold the
+                            // |_active_guard| alive. This prevents the stall logic in the
+                            // service_fs from kicking in and sending us into the stall branch.
+                            //
+                            // The driver development and driver registrar protocols are generally
+                            // very short lived as the clients are ffx tools, so they connect, call
+                            // the method they want, and then disconnect.
+                            //
+                            // The driver index is used by the driver manager actively during
+                            // the startup of a device, but then once in a stable state it becomes
+                            // idle. When that happens and the idle timeout is reached, the
+                            // index_server will exit and escrow its server end with the component
+                            // framework and return back out to here.
+                            //
+                            // Both of these mechanisms will allow the |_active_guard| to release
+                            // and allow the stall handler to be reached.
+                            match request {
+                                IncomingRequest::DriverIndexProtocol(stream) => {
+                                    run_index_server_with_timeout(
+                                        index.clone(),
+                                        stream,
+                                        idle_timeout,
+                                    )
+                                    .await
+                                }
+                                IncomingRequest::DriverDevelopmentProtocol(stream) => {
+                                    run_driver_development_server(index.clone(), stream).await
+                                }
+                                IncomingRequest::DriverRegistrarProtocol(stream) => {
+                                    run_driver_registrar_server(
+                                        index.clone(),
+                                        stream,
+                                        &full_resolver,
+                                    )
+                                    .await
+                                }
+                            }
+                        }
+                        fuchsia_component::server::Item::Stalled(outgoing_directory) => {
+                            let stall_result = handle_stall(
+                                index.clone(),
+                                &lifecycle_control_handle,
+                                outgoing_directory,
+                                &capability_store,
+                                &id_gen,
+                                dict_id,
+                            )
+                            .await;
+                            if let Err(e) = stall_result {
+                                panic!("Stall handler failed with '{:?}'. Next index run will have incomplete data.", e);
+                            }
+                            Ok(())
+                        }
+                    }
+                    .unwrap_or_else(|e| tracing::error!("Error running index_server: {:?}", e))
+                })
+                .await;
+    Ok(())
+}
 
+// TODO(https://fxbug.dev/339457865):
+// We have to do this for now, but ideally we can stop doing this if we can use the escrow feature
+// without signing up to listen to stop requests.
+async fn run_stop_watcher(mut lifecycle_request_stream: flifecycle::LifecycleRequestStream) {
+    let Some(Ok(request)) = lifecycle_request_stream.next().await else {
+        return std::future::pending::<()>().await;
+    };
+    match request {
+        flifecycle::LifecycleRequest::Stop { .. } => {
+            // TODO(https://fxbug.dev/332341289): If the framework asks us to stop, we still
+            // end up dropping requests. If we teach the `ServiceFs` etc. libraries to skip
+            // the timeout when this happens, we can cleanly stop the component.
+            return;
+        }
+    }
+}
+
+// NOTE: This tag is load-bearing to make sure that the output
+// shows up in serial.
+#[fuchsia::main(logging_tags = ["driver"])]
+async fn main() -> Result<()> {
+    let lifecycle =
+        fuchsia_runtime::take_startup_handle(fuchsia_runtime::HandleType::Lifecycle.into())
+            .expect("Expected to have a lifecycle startup handle.");
+    let lifecycle = fidl::endpoints::ServerEnd::<flifecycle::LifecycleMarker>::new(
+        fuchsia_zircon::Channel::from(lifecycle),
+    );
+    let (lifecycle_request_stream, lifecycle_control_handle) = lifecycle
+        .into_stream_and_control_handle()
+        .expect("Could not convert lifecycle handle to stream and control handle.");
+
+    let config = Config::take_from_startup_handle();
     let full_resolver = if config.enable_ephemeral_drivers {
         Some(
             client::connect_to_protocol_at_path::<fresolution::ResolverMarker>(
@@ -322,6 +477,30 @@ async fn main() -> Result<(), anyhow::Error> {
     } else {
         None
     };
+
+    let capability_store = client::connect_to_protocol::<fsandbox::CapabilityStoreMarker>()
+        .expect("Could not connect to CapabilityStore protocol.");
+    let id_gen = sandbox::CapabilityIdGenerator::new();
+    let dict_id = id_gen.next();
+    let resumed_state = match fuchsia_runtime::take_startup_handle(
+        fuchsia_runtime::HandleType::EscrowedDictionary.into(),
+    ) {
+        Some(dictionary) => {
+            let dictionary = fsandbox::Capability::Dictionary(fsandbox::DictionaryRef {
+                token: dictionary.into(),
+            });
+            capability_store
+                .import(dict_id, dictionary)
+                .await
+                .map_err(|e| anyhow!("Failed to call import: {:?}", e))?
+                .map_err(|e| anyhow!("Failed to import with store error: {:?}", e))?;
+
+            Some(resume_state(&capability_store, &id_gen, dict_id).await?)
+        }
+        None => None,
+    };
+
+    let dict_id = id_gen.next();
 
     let eager_drivers: HashSet<cm_types::Url> = config
         .bind_eager
@@ -347,14 +526,24 @@ async fn main() -> Result<(), anyhow::Error> {
     )
     .context("Failed to connect to boot resolver")?;
 
-    let boot_drivers =
-        load_boot_drivers(&config.boot_drivers, &boot_resolver, &eager_drivers, &disabled_drivers)
-            .await
-            .context("Failed to load boot drivers")
-            .map_err(log_error)?;
+    let boot_repo_resume = resumed_state.as_ref().and_then(|s| s.boot_repo.clone());
+    let boot_drivers = match boot_repo_resume {
+        Some(boot_repo) => {
+            tracing::info!("loading boot drivers from escrow.");
+            boot_repo
+        }
+        None => load_boot_drivers(
+            &config.boot_drivers,
+            &boot_resolver,
+            &eager_drivers,
+            &disabled_drivers,
+        )
+        .await
+        .context("Failed to load boot drivers")
+        .map_err(log_error)?,
+    };
 
     let mut should_load_base_drivers = true;
-
     for argument in std::env::args() {
         if argument == "--no-base-drivers" {
             should_load_base_drivers = false;
@@ -362,53 +551,73 @@ async fn main() -> Result<(), anyhow::Error> {
         }
     }
 
-    let index = create_and_setup_index(boot_drivers, &config);
+    let idle_timeout = if config.stop_on_idle_timeout_millis >= 0 {
+        fasync::Duration::from_millis(config.stop_on_idle_timeout_millis)
+    } else {
+        // Negative value means no timeout.
+        fasync::Duration::INFINITE
+    };
 
-    let (res1, _) = futures::future::join(
-        async {
-            if should_load_base_drivers {
-                let base_resolver =
-                    client::connect_to_protocol_at_path::<fresolution::ResolverMarker>(
-                        "/svc/fuchsia.component.resolution.Resolver-base",
-                    )
-                    .context("Failed to connect to base component resolver")?;
-                load_base_drivers(
-                    index.clone(),
-                    &config.base_drivers,
-                    &base_resolver,
-                    &eager_drivers,
-                    &disabled_drivers,
-                )
-                .await
-                .context("Error loading base packages")
-                .map_err(log_error)
-            } else {
-                Ok(())
+    let index = create_and_setup_index(boot_drivers, &config);
+    if let Some(resume_state) = resumed_state {
+        let base_loaded = apply_state(resume_state, index.clone());
+        if base_loaded {
+            should_load_base_drivers = false;
+        }
+    };
+
+    // We don't want to block driver manager from matching up with boot drivers while we resolve
+    // base drivers, so we run them in parallel.
+    // The base drivers task completes when the base drivers are loaded in.
+    // The driver index task does not complete unless the idle timeout is reached.
+    // Therefore the join of these two does not complete unless the index task completes when idle
+    // timeout is reached.
+    let main_tasks = futures::future::join(
+        run_load_base_drivers(
+            should_load_base_drivers,
+            &index,
+            config,
+            eager_drivers,
+            disabled_drivers,
+        ),
+        run_driver_index(
+            &index,
+            idle_timeout,
+            full_resolver,
+            lifecycle_control_handle,
+            capability_store,
+            id_gen,
+            dict_id,
+        ),
+    )
+    .fuse();
+
+    // This task watches for stop requests from the component framework. It does not complete
+    // unless it receives a stop request.
+    let stop_watcher = run_stop_watcher(lifecycle_request_stream).fuse();
+
+    futures::pin_mut!(main_tasks);
+    futures::pin_mut!(stop_watcher);
+
+    // We select between the main tasks and the stop watcher. Either the main tasks completes,
+    // which indicates the idle timeout has been reached, or the stop watcher completes which
+    // indicates a stop request came in from the Component Framework.
+    futures::select! {
+        (base_drivers_result, index_result) = main_tasks => {
+            tracing::info!("driver-index stopping because it is idle.");
+
+            if base_drivers_result.is_err() {
+                return base_drivers_result;
+            }
+
+            if index_result.is_err() {
+                return index_result;
             }
         },
-        async {
-            service_fs
-                .for_each_concurrent(None, |request: IncomingRequest| async {
-                    // match on `request` and handle each protocol.
-                    match request {
-                        IncomingRequest::DriverIndexProtocol(stream) => {
-                            run_index_server(index.clone(), stream).await
-                        }
-                        IncomingRequest::DriverDevelopmentProtocol(stream) => {
-                            run_driver_development_server(index.clone(), stream).await
-                        }
-                        IncomingRequest::DriverRegistrarProtocol(stream) => {
-                            run_driver_registrar_server(index.clone(), stream, &full_resolver).await
-                        }
-                    }
-                    .unwrap_or_else(|e| tracing::error!("Error running index_server: {:?}", e))
-                })
-                .await;
-        },
-    )
-    .await;
-
-    res1?;
+        () = stop_watcher => {
+            tracing::info!("driver-index stopping because it was told to stop.");
+        }
+    }
 
     Ok(())
 }
@@ -417,14 +626,14 @@ async fn main() -> Result<(), anyhow::Error> {
 mod tests {
     use super::*;
     use crate::composite_node_spec_manager::strip_parents_from_spec;
-    use crate::resolved_driver::DriverPackageType;
+    use crate::resolved_driver::{DeviceCategoryDef, DriverPackageType};
     use bind::compiler::{
         CompiledBindRules, CompositeBindRules, CompositeNode, Symbol, SymbolicInstruction,
         SymbolicInstructionInfo,
     };
     use bind::interpreter::decode_bind_rules::DecodedRules;
     use bind::parser::bind_library::ValueType;
-    use fidl::endpoints::{ClientEnd, Proxy};
+    use fidl::endpoints::{ClientEnd, DiscoverableProtocolMarker, Proxy};
     use std::collections::HashMap;
     use {
         fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_data as fdata,
@@ -510,9 +719,7 @@ mod tests {
         })
     }
 
-    async fn run_resolver_server(
-        stream: fresolution::ResolverRequestStream,
-    ) -> Result<(), anyhow::Error> {
+    async fn run_resolver_server(stream: fresolution::ResolverRequestStream) -> Result<()> {
         stream
             .map(|result| result.context("failed request"))
             .try_for_each(|request| async {
@@ -538,6 +745,14 @@ mod tests {
             })
             .await?;
         Ok(())
+    }
+
+    async fn run_index_server(
+        indexer: Rc<Indexer>,
+        stream: DriverIndexRequestStream,
+    ) -> Result<()> {
+        return run_index_server_with_timeout(indexer, stream, fuchsia_zircon::Duration::INFINITE)
+            .await;
     }
 
     async fn execute_driver_index_test(
@@ -569,6 +784,30 @@ mod tests {
             bind::bytecode_encoder::encode_v2::encode_to_bytecode_v2(bind_rules).unwrap(),
         )
         .unwrap()
+    }
+
+    #[fuchsia::test]
+    async fn run_with_timeout() {
+        let (proxy, stream) =
+            fidl::endpoints::create_proxy_and_stream::<fdi::DriverIndexMarker>().unwrap();
+        let index = Rc::new(Indexer::new(vec![], BaseRepo::Resolved(std::vec![]), false));
+        run_index_server_with_timeout(
+            index.clone(),
+            stream,
+            fuchsia_zircon::Duration::from_millis(10),
+        )
+        .await
+        .unwrap();
+
+        let result =
+            proxy.add_composite_node_spec(&fdf::CompositeNodeSpec { ..Default::default() }).await;
+        assert_eq!(true, result.is_err());
+        let fidl::Error::ClientChannelClosed { status, protocol_name } = result.err().unwrap()
+        else {
+            panic!("wrong error");
+        };
+        assert_eq!(fdi::DriverIndexMarker::PROTOCOL_NAME, protocol_name);
+        assert_eq!(status.into_raw(), Status::NOT_FOUND.into_raw());
     }
 
     // This test depends on '/pkg/config/drivers_for_test.json' existing in the test package.
@@ -3548,12 +3787,12 @@ mod tests {
                 }
             ]),
             vec![
-                fdf::DeviceCategory {
+                DeviceCategoryDef {
                     category: Some("usb".to_string()),
                     subcategory: None,
                     ..Default::default()
                 },
-                fdf::DeviceCategory {
+                DeviceCategoryDef {
                     category: Some("connectivity".to_string()),
                     subcategory: Some("ethernet".to_string()),
                     ..Default::default()

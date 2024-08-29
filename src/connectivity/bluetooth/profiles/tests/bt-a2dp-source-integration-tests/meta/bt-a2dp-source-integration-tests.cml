@@ -15,15 +15,15 @@
     },
     children: [
         {
-            name: "mock-cobalt",
-            url: "fuchsia-pkg://fuchsia.com/bt-a2dp-source-integration-tests#meta/mock_cobalt.cm",
+            name: "fake-cobalt",
+            url: "fuchsia-pkg://fuchsia.com/bt-a2dp-source-integration-tests#meta/fake_cobalt.cm",
         },
     ],
     offer: [
         {
             protocol: "fuchsia.logger.LogSink",
             from: "parent",
-            to: [ "#mock-cobalt" ],
+            to: [ "#fake-cobalt" ],
         },
         {
             protocol: [
@@ -41,7 +41,7 @@
         },
         {
             protocol: [ "fuchsia.metrics.MetricEventLoggerFactory" ],
-            from: "#mock-cobalt",
+            from: "#fake-cobalt",
             to: [ "#realm_builder" ],
         },
     ],

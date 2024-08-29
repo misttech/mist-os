@@ -7,6 +7,7 @@
 #ifndef ZIRCON_KERNEL_VM_INCLUDE_VM_TRI_PAGE_STORAGE_H_
 #define ZIRCON_KERNEL_VM_INCLUDE_VM_TRI_PAGE_STORAGE_H_
 
+#include <arch/kernel_aspace.h>
 #include <fbl/canary.h>
 #include <vm/compression.h>
 

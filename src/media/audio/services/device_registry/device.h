@@ -44,12 +44,13 @@ class Device : public std::enable_shared_from_this<Device> {
   ~Device();
 
   template <typename ProtocolT>
-  class RingBufferFidlErrorHandler : public fidl::AsyncEventHandler<ProtocolT> {
+  class RingBufferFidlErrorHandler final : public fidl::AsyncEventHandler<ProtocolT> {
    public:
     RingBufferFidlErrorHandler(Device* device, ElementId element_id, std::string name)
         : device_(device), element_id_(element_id), name_(std::move(name)) {}
     RingBufferFidlErrorHandler() = default;
     void on_fidl_error(fidl::UnbindInfo info) override;
+    void handle_unknown_event(fidl::UnknownEventMetadata<ProtocolT> metadata) override {}
 
    protected:
     Device* device() const { return device_; }
@@ -75,6 +76,12 @@ class Device : public std::enable_shared_from_this<Device> {
    private:
     Device* device_;
     std::string name_;
+  };
+
+  template <typename ProtocolT>
+  class FidlOpenErrorHandler : public FidlErrorHandler<ProtocolT> {
+    using FidlErrorHandler<ProtocolT>::FidlErrorHandler;
+    void handle_unknown_event(fidl::UnknownEventMetadata<ProtocolT> metadata) override {}
   };
 
   void Initialize();
@@ -383,7 +390,7 @@ class Device : public std::enable_shared_from_this<Device> {
 
   std::optional<fidl::Client<fuchsia_hardware_audio_signalprocessing::SignalProcessing>>
       sig_proc_client_;
-  FidlErrorHandler<fuchsia_hardware_audio_signalprocessing::SignalProcessing> sig_proc_handler_;
+  FidlOpenErrorHandler<fuchsia_hardware_audio_signalprocessing::SignalProcessing> sig_proc_handler_;
 
   std::optional<fidl::Client<fuchsia_hardware_audio::Codec>> codec_client_;
   FidlErrorHandler<fuchsia_hardware_audio::Codec> codec_handler_;

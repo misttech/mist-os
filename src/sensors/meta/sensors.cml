@@ -7,6 +7,13 @@
         runner: "elf",
         binary: "bin/sensors",
     },
+    children: [
+        {
+            name: "sensors_playback",
+            url: "sensors_playback#meta/sensors_playback.cm",
+            startup: "eager",
+        },
+    ],
     capabilities: [
         { protocol: "fuchsia.sensors.Manager" },
     ],
@@ -16,7 +23,7 @@
                 "fuchsia.hardware.sensors.Driver",
                 "fuchsia.hardware.sensors.Playback",
             ],
-            from: "parent",
+            from: "#sensors_playback",
         },
     ],
     expose: [

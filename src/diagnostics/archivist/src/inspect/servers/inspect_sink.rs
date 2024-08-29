@@ -181,6 +181,7 @@ mod tests {
     use crate::inspect::container::InspectHandle;
     use crate::inspect::repository::InspectRepository;
     use crate::inspect::servers::InspectSinkServer;
+    use crate::pipeline::StaticHierarchyAllowlist;
     use assert_matches::assert_matches;
     use diagnostics_assertions::assert_json_diff;
     use fidl::endpoints::{create_proxy_and_stream, create_request_stream, ClientEnd};
@@ -313,7 +314,7 @@ mod tests {
             let containers = self.repo.fetch_inspect_data(
                 &Some(vec![selectors::parse_selector::<VerboseError>(&format!("{identity}:root"))
                     .expect("parse selector")]),
-                None,
+                StaticHierarchyAllowlist::new_disabled(),
             );
             assert_eq!(containers.len(), 1);
             assertions(

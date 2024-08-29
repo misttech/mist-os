@@ -99,6 +99,8 @@ class ParentElement {
  private:
   using ValueType = std::variant<SagElement, std::string>;
 
+  friend std::hash<ParentElement>;
+
   // The index of the value associated with `type` stored within `value_`. This index isn't stored
   // in `Type` because it is considered an implementation detail.
   static constexpr size_t kSagIndex = 0;
@@ -132,5 +134,16 @@ struct PowerElementConfiguration {
 };
 
 }  // namespace fdf_power
+
+namespace std {
+
+template <>
+struct hash<fdf_power::ParentElement> {
+  auto operator()(const fdf_power::ParentElement& parent) const -> size_t {
+    return hash<fdf_power::ParentElement::ValueType>{}(parent.value_);
+  }
+};
+
+}  // namespace std
 
 #endif  // LIB_DRIVER_POWER_CPP_TYPES_H_

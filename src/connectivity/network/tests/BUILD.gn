@@ -16,7 +16,6 @@ group("tests") {
     "fidl:tests",
     "getifaddrs:tests",
     "integration:tests",
-    "iperf:tests",
     "iptables:tests",
     "multi_nic:tests",
     "socket:tests",

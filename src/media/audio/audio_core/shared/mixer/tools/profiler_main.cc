@@ -640,7 +640,8 @@ Options ParseCommandLine(int argc, char** argv) {
 }  // namespace
 
 int main(int argc, char** argv) {
-  fuchsia_logging::SetTags({"audio_mixer_profiler"});
+  fuchsia_logging::LogSettingsBuilder builder;
+  builder.WithTags({"audio_mixer_profiler"}).BuildAndInitialize();
 
   auto opt = ParseCommandLine(argc, argv);
   printf("\n\n Performance Profiling\n\n");

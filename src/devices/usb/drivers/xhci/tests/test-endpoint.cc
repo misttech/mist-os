@@ -7,7 +7,6 @@
 // implemented in the test file itself.
 
 #include "src/devices/usb/drivers/xhci/tests/test-env.h"
-#include "src/devices/usb/drivers/xhci/usb-xhci.h"
 
 namespace usb_xhci {
 

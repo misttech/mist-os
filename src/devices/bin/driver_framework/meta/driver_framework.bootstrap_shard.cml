@@ -11,7 +11,9 @@
         {
             name: "driver_index",
             url: "fuchsia-boot:///driver-index#meta/driver-index.cm",
-            on_terminate: "reboot",
+
+            // TODO(https://fxbug.dev/352624082): Use on_terminate: "reboot_on_error".
+            // on_terminate: "reboot",
         },
         {
             // Exists to augment capability graph with information about when #boot-drivers should
@@ -22,8 +24,8 @@
             environment: "#devfs-env",
         },
         {
-            // Exists to augment capability graph with information about when #pkg-drivers and
-            // #full-pkg-drivers should be stopped. Most components should prefer depending on
+            // Exists to augment capability graph with information about when #base-drivers and
+            // #full-drivers should be stopped. Most components should prefer depending on
             // capabiliites provided by this component over #devfs.
             name: "devfs-with-pkg",
             url: "fuchsia-boot:///devfs#meta/devfs-pkg.cm",
@@ -61,6 +63,12 @@
         },
         {
             from: "parent",
+            to: "#driver_index",
+            config: "fuchsia.driver.index.StopOnIdleTimeoutMillis",
+            availability: "optional",
+        },
+        {
+            from: "parent",
             to: "#driver_manager",
             config: [
                 "fuchsia.driver.DelayFallbackUntilBaseDriversIndexed",
@@ -77,18 +85,6 @@
                 "fuchsia.power.SuspendEnabled",
                 "fuchsia.usb.PeripheralConfig.Functions",
             ],
-        },
-        {
-            from: "parent",
-            to: "#boot-drivers",
-            config: [
-                "fuchsia.sysmem.ContiguousGuardPagesUnused",
-                "fuchsia.sysmem.FixedContiguousMemorySize",
-                "fuchsia.sysmem.FixedProtectedMemorySize",
-                "fuchsia.sysmem.PercentContiguousMemorySize",
-                "fuchsia.sysmem.PercentProtectedMemorySize",
-            ],
-            availability: "optional",
         },
         {
             protocol: "fuchsia.tracing.provider.Registry",
@@ -282,14 +278,14 @@
             to: [ "#devfs" ],
         },
         {
-            service: [ "bootstrap.pkg-drivers" ],
-            from: "#pkg-drivers",
+            service: [ "bootstrap.base-drivers" ],
+            from: "#base-drivers",
             to: [ "#devfs-with-pkg" ],
             source_availability: "unknown",
         },
         {
-            service: [ "bootstrap.full-pkg-drivers" ],
-            from: "#full-pkg-drivers",
+            service: [ "bootstrap.full-drivers" ],
+            from: "#full-drivers",
             to: [ "#devfs-with-pkg" ],
             source_availability: "unknown",
         },
@@ -364,11 +360,6 @@
             protocol: [ "fuchsia.power.system.ActivityGovernor" ],
             from: "#system-activity-governor",
             to: "#boot-drivers",
-
-            // system-activity-governor depends on the suspend HAL but not all
-            // drivers depend on system-activity-governor.
-            // Weak to resolve dependency cycles.
-            dependency: "weak",
             source_availability: "unknown",
         },
         {
@@ -388,11 +379,11 @@
             from: "#driver_index",
         },
         {
-            service: "fuchsia.hardware.rtc.Service",
-            from: "#boot-drivers",
-        },
-        {
-            service: "fuchsia.hardware.cpu.ctrl.Service",
+            service: [
+                "fuchsia.hardware.cpu.ctrl.Service",
+                "fuchsia.hardware.rtc.Service",
+                "fuchsia.hardware.sockettunnel.Service",
+            ],
             from: "#boot-drivers",
         },
         {

@@ -93,6 +93,16 @@
                 "fuchsia.fshost.UseDiskMigration",
             ],
         },
+        {
+            from: "parent",
+            to: "#fshost",
+            config: [
+                "fuchsia.blobfs.CacheEvictionPolicy",
+                "fuchsia.blobfs.WriteCompressionAlgorithm",
+                "fuchsia.fshost.DisableAutomount",
+            ],
+            availability: "optional",
+        },
     ],
     expose: [
         {

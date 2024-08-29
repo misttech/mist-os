@@ -16,12 +16,22 @@
 
 {
   "args": [
-    "-kernel",
-    "{{guest.kernel_image}}",
+    {{#if guest.kernel_image }}
+        "-kernel",
+        "{{guest.kernel_image}}",
+    {{/if}}
     "-drive",
     "if=pflash,format=raw,readonly=on,file={{guest.ovmf_code}}",
     "-drive",
     "if=pflash,format=raw,snapshot=on,file={{guest.ovmf_vars}}",
+    {{#if guest.disk_image }}
+        "-drive",
+        "if=none,format=raw,file={{di guest.disk_image}},id=uefi",
+        "-device",
+        "nec-usb-xhci,id=xhci0",
+        "-device",
+        "usb-storage,bus=xhci0.0,drive=uefi,removable=on,bootindex=0",
+    {{/if}}
     "-m",
     "{{device.memory.quantity}}{{ua device.memory.units}}",
     "-smp",
@@ -30,16 +40,6 @@
         "4",
     {{else}}
         "4,threads=2",
-    {{/if}}
-    {{#if guest.disk_image}}
-        {{#if (eq device.cpu.architecture "riscv64")}}
-            "-drive", "file={{di guest.disk_image}},format=raw,if=none,id=vdisk",
-            "-device", "virtio-blk-pci,drive=vdisk",
-        {{else}}
-            "-drive", "file={{di guest.disk_image}},format=raw,if=none,id=vdisk,cache=unsafe",
-            "-object", "iothread,id=iothread0",
-            "-device", "virtio-blk-pci,drive=vdisk,iothread=iothread0",
-        {{/if}}
     {{/if}}
     {{! The QMP is an interface for issuing commands to the emulator. The
         commands are sent in JSON, as are the results. The syntax for this
@@ -255,13 +255,9 @@
     {{else}}
         "TERM=dumb",
     {{/if}}
-    "devmgr.suspend-timeout-debug=true",
-    "driver.usb_mass_storage.disable",
-     "driver.usb_cdc.log=debug",
     "kernel.entropy-mixin=de330defe83c3d93556612a133f893892b6b49f96944c3c363197a679a6339b0",
     "kernel.halt-on-panic=true",
     "kernel.experimental.serial_migration=true",
-    "virtcon.disable=true",
     "zircon.nodename={{runtime.name}}"
     {{#each runtime.addl_kernel_args}}
         ,"{{this}}"

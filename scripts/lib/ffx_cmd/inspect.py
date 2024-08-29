@@ -2,8 +2,6 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import json
-from dataclasses import dataclass
 
 import fx_cmd
 from async_utils.command import CommandOutput

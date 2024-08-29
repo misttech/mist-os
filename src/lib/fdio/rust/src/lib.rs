@@ -662,6 +662,28 @@ impl Namespace {
         zx::Status::ok(status)
     }
 
+    /// Open an object at |path| relative to the root of this namespace with |flags|.
+    ///
+    /// |path| must be absolute.
+    ///
+    /// This corresponds with fdio_ns_open3 in C.
+    pub fn open3(
+        &self,
+        path: &str,
+        flags: fio::Flags,
+        channel: zx::Channel,
+    ) -> Result<(), zx::Status> {
+        let &Self { ns } = self;
+        let path = CString::new(path)?;
+        let path = path.as_ptr();
+        let flags = flags.bits();
+
+        // The channel is always consumed.
+        let channel = channel.into_raw();
+        let status = unsafe { fdio_sys::fdio_ns_open3(ns, path, flags, channel) };
+        zx::Status::ok(status)
+    }
+
     /// Create a new directory within the namespace, bound to the provided
     /// directory-protocol-compatible channel. The path must be an absolute path, like "/x/y/z",
     /// containing no "." nor ".." entries. It is relative to the root of the namespace.
@@ -773,6 +795,22 @@ mod tests {
     }
 
     #[test]
+    fn namespace_bind_open3_unbind() {
+        let namespace = Namespace::installed().unwrap();
+        // client => ns_server => ns_client => server
+        //        ^            ^            ^-- zx channel connection
+        //        |            |-- connected through namespace bind/connect
+        //        |-- zx channel connection
+        let (ns_client, _server) = fidl::endpoints::create_endpoints();
+        let (_client, ns_server) = zx::Channel::create();
+        let path = "/test_path1";
+
+        assert_eq!(namespace.bind(path, ns_client), Ok(()));
+        assert_eq!(namespace.open3(path, fio::Flags::empty(), ns_server), Ok(()));
+        assert_eq!(namespace.unbind(path), Ok(()));
+    }
+
+    #[test]
     fn namespace_double_bind_error() {
         let namespace = Namespace::installed().unwrap();
         let (ns_client1, _server1) = fidl::endpoints::create_endpoints();
@@ -792,6 +830,12 @@ mod tests {
 
         assert_eq!(
             namespace.open(path, fio::OpenFlags::empty(), ns_server),
+            Err(zx::Status::NOT_FOUND)
+        );
+
+        let (_client, ns_server) = zx::Channel::create();
+        assert_eq!(
+            namespace.open3(path, fio::Flags::empty(), ns_server),
             Err(zx::Status::NOT_FOUND)
         );
     }

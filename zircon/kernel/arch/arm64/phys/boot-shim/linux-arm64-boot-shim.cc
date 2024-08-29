@@ -59,10 +59,11 @@ void PhysMain(void* flat_devicetree_blob, arch::EarlyTicks ticks) {
   MainSymbolize symbolize(kShimName);
 
   // Memory has been initialized, we can finish up parsing the rest of the items from the boot shim.
-  boot_shim::DevicetreeBootShim<
-      boot_shim::UartItem<>, boot_shim::PoolMemConfigItem, boot_shim::ArmDevicetreePsciItem,
-      boot_shim::ArmDevicetreeGicItem, boot_shim::DevicetreeDtbItem,
-      boot_shim::ArmDevicetreeCpuTopologyItem, boot_shim::ArmDevicetreeTimerItem>
+  boot_shim::DevicetreeBootShim<boot_shim::UartItem<>, boot_shim::PoolMemConfigItem,
+                                boot_shim::NvramItem, boot_shim::ArmDevicetreePsciItem,
+                                boot_shim::ArmDevicetreeGicItem, boot_shim::DevicetreeDtbItem,
+                                boot_shim::ArmDevicetreeCpuTopologyItem,
+                                boot_shim::ArmDevicetreeTimerItem>
       shim(kShimName, gDevicetreeBoot.fdt);
   shim.set_mmio_observer([&](boot_shim::DevicetreeMmioRange mmio_range) {
     auto& pool = Allocation::GetPool();
@@ -85,31 +86,21 @@ void PhysMain(void* flat_devicetree_blob, arch::EarlyTicks ticks) {
   });
   shim.set_cmdline(gDevicetreeBoot.cmdline);
   shim.Get<boot_shim::UartItem<>>().Init(GetUartDriver().uart());
-  shim.Get<boot_shim::PoolMemConfigItem>().Init(Allocation::GetPool());
   shim.Get<boot_shim::DevicetreeDtbItem>().set_payload(
       {reinterpret_cast<const ktl::byte*>(gDevicetreeBoot.fdt.fdt().data()),
        gDevicetreeBoot.fdt.size_bytes()});
+  shim.Get<boot_shim::PoolMemConfigItem>().Init(Allocation::GetPool());
+  if (gDevicetreeBoot.nvram) {
+    shim.Get<boot_shim::NvramItem>().set_payload(*gDevicetreeBoot.nvram);
+  }
 
   // Mark the UART MMIO range as peripheral range.
-  uart::internal::Visit(
-      [&shim](const auto& driver) {
-        using config_type = ktl::decay_t<decltype(driver.config())>;
-        if constexpr (ktl::is_same_v<config_type, zbi_dcfg_simple_t>) {
-          const zbi_dcfg_simple_t& uart_mmio_config = driver.config();
-          uint64_t base_addr = fbl::round_down<uint64_t>(uart_mmio_config.mmio_phys, ZX_PAGE_SIZE);
-          if (Allocation::GetPool()
-                  .MarkAsPeripheral({
-                      .addr = base_addr,
-                      .size = ZX_PAGE_SIZE,
-                      .type = memalloc::Type::kPeripheral,
-                  })
-                  .is_error()) {
-            printf("%s: Failed to mark [%#" PRIx64 ", %#" PRIx64 "] as peripheral.\n",
-                   shim.shim_name(), base_addr, base_addr + ZX_PAGE_SIZE);
-          }
-        }
-      },
-      GetUartDriver().uart());
+  if (auto uart_mmio = GetUartMmioRange(GetUartDriver().uart(), ZX_PAGE_SIZE)) {
+    if (Allocation::GetPool().MarkAsPeripheral(*uart_mmio).is_error()) {
+      printf("%s: Failed to mark [%#" PRIx64 ", %#" PRIx64 "] as peripheral.\n", shim.shim_name(),
+             uart_mmio->addr, uart_mmio->end());
+    }
+  }
 
   // Fill DevicetreeItems.
   ZX_ASSERT(shim.Init());

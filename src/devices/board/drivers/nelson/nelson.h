@@ -155,6 +155,14 @@ class Nelson : public NelsonType {
     }});
   }
 
+  static fuchsia_hardware_pinimpl::InitStep GpioInput(uint32_t index) {
+    return fuchsia_hardware_pinimpl::InitStep::WithCall({{
+        index,
+        fuchsia_hardware_pinimpl::InitCall::WithBufferMode(
+            fuchsia_hardware_gpio::BufferMode::kInput),
+    }});
+  }
+
   static fuchsia_hardware_pinimpl::InitStep GpioFunction(uint32_t index, uint64_t function) {
     return fuchsia_hardware_pinimpl::InitStep::WithCall({{
         index,

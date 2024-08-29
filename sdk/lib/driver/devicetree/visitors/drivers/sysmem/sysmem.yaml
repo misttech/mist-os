@@ -31,16 +31,8 @@ properties:
 
   size:
     description:
-      This field is not used by the sysmem driver for allocation. The size is classified into
-      contiguous and protected size as listed below.
-
-  contiguous-size:
-    $ref: /schemas/types.yaml#/definitions/uint64
-    description: The size of the contiguous memory pool to be reserved.
-
-  protected-size:
-    $ref: /schemas/types.yaml#/definitions/uint64
-    description: The size of the protected memory pool to be reserved.
+      This field is not used by the sysmem driver for allocation. See sysmem.cml for
+      the sysmem structured config fields relevant to pool sizes.
 
 required:
   - compatible
@@ -52,8 +44,4 @@ examples:
     sysmem: fuchsia,sysmem {
       compatible = "fuchsia,sysmem";
       size = <0x00 0x00>;
-      contiguous-size = <0x00 0x10000>;
-      protected-size = <0x00 0x2000>;
-      vid = <0x00 0x00>;
-      pid = <0x00 0x00>;
     };

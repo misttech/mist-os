@@ -20,7 +20,8 @@ void TestDriverIndex::MatchDriver(MatchDriverRequestView request,
                                   MatchDriverCompleter::Sync& completer) {
   std::optional<uint32_t> id;
   for (auto& property : request->args.properties()) {
-    if (property.key.is_int_value() && property.key.int_value() == BIND_PLATFORM_DEV_INSTANCE_ID) {
+    if (property.key.is_string_value() &&
+        property.key.string_value().get() == bind_fuchsia::PLATFORM_DEV_INSTANCE_ID) {
       id = property.value.int_value();
     }
   }
@@ -155,7 +156,7 @@ void BindManagerTestBase::AddAndBindNode(
   auto node = CreateNode(name, enable_multibind);
   auto instance_id = GetOrAddInstanceId(name);
   std::vector<fuchsia_driver_framework::NodeProperty> node_properties = {
-      fdf::MakeProperty(BIND_PLATFORM_DEV_INSTANCE_ID, instance_id)};
+      fdf::MakeProperty(bind_fuchsia::PLATFORM_DEV_INSTANCE_ID, instance_id)};
   node->SetNonCompositeProperties(node_properties);
   nodes_.emplace(name, node);
   InvokeBind(name, std::move(tracker));
@@ -396,8 +397,8 @@ TEST_F(BindManagerTestBase, TestAddNode) {
   ASSERT_TRUE(test_node_1_properties.has_value());
   ASSERT_EQ(2u, test_node_1_properties->size());
   const auto& test_node_1_property_1 = test_node_1_properties.value()[0];
-  ASSERT_EQ(static_cast<uint32_t>(BIND_PLATFORM_DEV_INSTANCE_ID),
-            test_node_1_property_1.key.int_value());
+  ASSERT_EQ(bind_fuchsia::PLATFORM_DEV_INSTANCE_ID,
+            test_node_1_property_1.key.string_value().get());
   ASSERT_EQ(static_cast<uint32_t>(0), test_node_1_property_1.value.int_value());
 
   AddAndBindNode("test-2");
@@ -411,8 +412,8 @@ TEST_F(BindManagerTestBase, TestAddNode) {
   ASSERT_TRUE(test_node_2_properties.has_value());
   ASSERT_EQ(2u, test_node_2_properties->size());
   const auto& test_node_2_property_1 = test_node_2_properties.value()[0];
-  ASSERT_EQ(static_cast<uint32_t>(BIND_PLATFORM_DEV_INSTANCE_ID),
-            test_node_2_property_1.key.int_value());
+  ASSERT_EQ(bind_fuchsia::PLATFORM_DEV_INSTANCE_ID,
+            test_node_2_property_1.key.string_value().get());
   ASSERT_EQ(static_cast<uint32_t>(1), test_node_2_property_1.value.int_value());
 
   // Complete the outstanding request.

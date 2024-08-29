@@ -22,5 +22,4 @@ assembly_input_groups("bootstrap") {
 
 assembly_input_groups("network") {
   visibility = [ "*" ]
-  base_packages = [ "//src/connectivity/network:for_transition" ]
 }

@@ -7,12 +7,18 @@
 
 #include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
 #include <lib/driver/component/cpp/driver_base.h>
-#include <lib/driver/testing/cpp/driver_lifecycle.h>
 #include <lib/driver/testing/cpp/driver_runtime.h>
-#include <lib/driver/testing/cpp/test_environment.h>
 #include <lib/driver/testing/cpp/test_node.h>
 
 #include <type_traits>
+
+#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+#include <lib/driver/testing/cpp/internal/driver_lifecycle.h>
+#include <lib/driver/testing/cpp/internal/test_environment.h>
+#else
+#include <lib/driver/testing/cpp/driver_lifecycle.h>
+#include <lib/driver/testing/cpp/test_environment.h>
+#endif
 
 namespace fdf_testing {
 
@@ -56,7 +62,11 @@ class EnvWrapper {
 
  private:
   fdf_testing::TestNode node_server_{"root"};
+#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+  TestEnvironment test_environment_;
+#else
   fdf_testing::TestEnvironment test_environment_;
+#endif
   fidl::ClientEnd<fuchsia_io::Directory> outgoing_client_;
 
   // User env should be the last field as it could contain references to the test_environment_.
@@ -66,14 +76,14 @@ class EnvWrapper {
 
 // Helper macros to validate the incoming configuration.
 
-#define SETUP_HAS_USING(name)                                                   \
-  template <typename T, typename = void>                                        \
-  struct Has##name : public ::std::false_type {};                               \
-                                                                                \
-  template <typename T>                                                         \
-  struct Has##name<T, std::void_t<typename T::name>> : public std::true_type{}; \
-                                                                                \
-  template <typename T>                                                         \
+#define SETUP_HAS_USING(name)                                                    \
+  template <typename T, typename = void>                                         \
+  struct Has##name : public ::std::false_type {};                                \
+                                                                                 \
+  template <typename T>                                                          \
+  struct Has##name<T, std::void_t<typename T::name>> : public std::true_type {}; \
+                                                                                 \
+  template <typename T>                                                          \
   constexpr inline auto Has##name##V = Has##name<T>::value;
 
 SETUP_HAS_USING(DriverType)
@@ -105,7 +115,7 @@ template <typename T, typename = void>
 struct HasGetDriverRegistration : public ::std::false_type {};
 template <typename T>
 struct HasGetDriverRegistration<T, std::void_t<decltype(T::GetDriverRegistration)>>
-    : public std::true_type{};
+    : public std::true_type {};
 template <typename T>
 constexpr static auto HasGetDriverRegistrationV = HasGetDriverRegistration<T>::value;
 

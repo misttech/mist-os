@@ -80,6 +80,10 @@ class GenericResult:
     def __fidl_type__(self):
         return self.fidl_type
 
+    @property
+    def __fidl_raw_type__(self):
+        return self.fidl_type
+
 
 def parse_txid(msg: FidlMessage):
     (b, _) = msg

@@ -25,6 +25,7 @@
 #include <lib/zx/bti.h>
 #include <lib/zx/channel.h>
 #include <lib/zx/result.h>
+#include <lib/zx/time.h>
 #include <zircon/assert.h>
 #include <zircon/errors.h>
 #include <zircon/limits.h>
@@ -745,7 +746,7 @@ zx_status_t DisplayEngine::DisplayEngineSetDisplayPower(uint64_t display_id, boo
     zx::result<> set_receiving_state_result =
         vsync_receiver_->SetReceivingState(/*receiving=*/power_on);
     if (set_receiving_state_result.is_error()) {
-      FDF_LOG(ERROR, "Failed to begin receiving Vsync interrupts: %s",
+      FDF_LOG(ERROR, "Failed to set Vsync interrupt receiving state: %s",
               set_receiving_state_result.status_string());
       return set_receiving_state_result.status_value();
     }

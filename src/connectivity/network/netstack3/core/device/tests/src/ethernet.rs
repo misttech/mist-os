@@ -6,10 +6,9 @@ use alloc::vec::Vec;
 use assert_matches::assert_matches;
 
 use ip_test_macro::ip_test;
-use net_declare::net_mac;
 use net_types::ethernet::Mac;
 use net_types::ip::{AddrSubnet, Ip, IpAddr, IpAddress, IpVersion, Ipv4, Ipv6, Ipv6Addr};
-use net_types::{MulticastAddr, SpecifiedAddr, UnicastAddr, Witness};
+use net_types::{SpecifiedAddr, UnicastAddr, Witness};
 use netstack3_base::testutil::{new_rng, TestIpExt, TEST_ADDRS_V4};
 use netstack3_base::FrameDestination;
 use netstack3_core::device::{
@@ -25,13 +24,10 @@ use netstack3_core::testutil::{
     DEFAULT_INTERFACE_METRIC,
 };
 use netstack3_core::IpExt;
-use netstack3_device::ethernet;
 use netstack3_device::testutil::IPV6_MIN_IMPLIED_MAX_FRAME_SIZE;
 use netstack3_ip::device::{IpAddressId as _, IpDeviceStateContext};
 use packet::{Buf, Serializer as _};
-use packet_formats::ethernet::{
-    EthernetFrameBuilder, EthernetFrameLengthCheck, ETHERNET_MIN_BODY_LEN_NO_TAG,
-};
+use packet_formats::ethernet::EthernetFrameLengthCheck;
 use packet_formats::icmp::IcmpDestUnreachable;
 use packet_formats::ip::{IpPacketBuilder, IpProto};
 use packet_formats::testdata::{dns_request_v4, dns_request_v6};
@@ -231,104 +227,6 @@ where
     // Should not route packets anymore
     ctx.test_api().receive_ip_packet::<I, _>(&device, Some(frame_dst), buf);
     assert_matches!(ctx.bindings_ctx.take_ethernet_frames()[..], []);
-}
-
-#[ip_test(I)]
-#[test_case(UnicastAddr::new(net_mac!("12:13:14:15:16:17")).unwrap(), true; "unicast")]
-#[test_case(MulticastAddr::new(net_mac!("13:14:15:16:17:18")).unwrap(), false; "multicast")]
-fn test_promiscuous_mode<I: TestIpExt + IpExt>(other_mac: impl Witness<Mac>, is_other_host: bool) {
-    // Test that frames not destined for a device will still be accepted
-    // when the device is put into promiscuous mode. In all cases, frames
-    // that are destined for a device must always be accepted.
-
-    let config = I::TEST_ADDRS;
-    let (mut ctx, device_ids) = FakeCtxBuilder::with_addrs(config.clone()).build();
-    let eth_device = &device_ids[0];
-
-    let buf = Buf::new(Vec::new(), ..)
-        .encapsulate(I::PacketBuilder::new(
-            config.remote_ip.get(),
-            config.local_ip.get(),
-            64,
-            IpProto::Tcp.into(),
-        ))
-        .encapsulate(EthernetFrameBuilder::new(
-            config.remote_mac.get(),
-            config.local_mac.get(),
-            I::ETHER_TYPE,
-            ETHERNET_MIN_BODY_LEN_NO_TAG,
-        ))
-        .serialize_vec_outer()
-        .ok()
-        .unwrap()
-        .unwrap_b();
-
-    // Accept packet destined for this device if promiscuous mode is off.
-    ethernet::set_promiscuous_mode(&mut ctx.core_ctx(), &eth_device, false);
-    ctx.core_api()
-        .device::<EthernetLinkDevice>()
-        .receive_frame(RecvEthernetFrameMeta { device_id: eth_device.clone() }, buf.clone());
-
-    assert_eq!(ctx.core_ctx.common_ip::<I>().counters().dispatch_receive_ip_packet.get(), 1);
-    assert_eq!(
-        ctx.core_ctx.common_ip::<I>().counters().dispatch_receive_ip_packet_other_host.get(),
-        0
-    );
-
-    // Accept packet destined for this device if promiscuous mode is on.
-    ethernet::set_promiscuous_mode(&mut ctx.core_ctx(), &eth_device, true);
-    ctx.core_api()
-        .device::<EthernetLinkDevice>()
-        .receive_frame(RecvEthernetFrameMeta { device_id: eth_device.clone() }, buf);
-
-    assert_eq!(ctx.core_ctx.common_ip::<I>().counters().dispatch_receive_ip_packet.get(), 2);
-    assert_eq!(
-        ctx.core_ctx.common_ip::<I>().counters().dispatch_receive_ip_packet_other_host.get(),
-        0
-    );
-
-    let buf = Buf::new(Vec::new(), ..)
-        .encapsulate(I::PacketBuilder::new(
-            config.remote_ip.get(),
-            config.local_ip.get(),
-            64,
-            IpProto::Tcp.into(),
-        ))
-        .encapsulate(EthernetFrameBuilder::new(
-            config.remote_mac.get(),
-            other_mac.get(),
-            I::ETHER_TYPE,
-            ETHERNET_MIN_BODY_LEN_NO_TAG,
-        ))
-        .serialize_vec_outer()
-        .ok()
-        .unwrap()
-        .unwrap_b();
-
-    // Reject packet not destined for this device if promiscuous mode is
-    // off.
-    ethernet::set_promiscuous_mode(&mut ctx.core_ctx(), &eth_device, false);
-    ctx.core_api()
-        .device::<EthernetLinkDevice>()
-        .receive_frame(RecvEthernetFrameMeta { device_id: eth_device.clone() }, buf.clone());
-
-    assert_eq!(ctx.core_ctx.common_ip::<I>().counters().dispatch_receive_ip_packet.get(), 2);
-    assert_eq!(
-        ctx.core_ctx.common_ip::<I>().counters().dispatch_receive_ip_packet_other_host.get(),
-        0
-    );
-
-    // Accept packet not destined for this device if promiscuous mode is on.
-    ethernet::set_promiscuous_mode(&mut ctx.core_ctx(), &eth_device, true);
-    ctx.core_api()
-        .device::<EthernetLinkDevice>()
-        .receive_frame(RecvEthernetFrameMeta { device_id: eth_device.clone() }, buf);
-
-    assert_eq!(ctx.core_ctx.common_ip::<I>().counters().dispatch_receive_ip_packet.get(), 3);
-    assert_eq!(
-        ctx.core_ctx.common_ip::<I>().counters().dispatch_receive_ip_packet_other_host.get(),
-        u64::from(is_other_host)
-    );
 }
 
 #[netstack3_macros::context_ip_bounds(I, FakeBindingsCtx)]

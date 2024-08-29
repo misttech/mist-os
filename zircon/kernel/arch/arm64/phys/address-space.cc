@@ -53,7 +53,7 @@ void EnablePagingForEl(const AddressSpace& aspace) {
   // Clear out the data and instruction caches, and all TLBs.
   arch::InvalidateLocalCaches();
   arch::InvalidateLocalTlbs();
-  __dsb(ARM_MB_SY);
+  arch::DeviceMemoryBarrier();
   __isb(ARM_MB_SY);
 
   // Set up the Memory Attribute Indirection Register (MAIR).

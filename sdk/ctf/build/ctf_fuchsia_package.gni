@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
+import("//sdk/ctf/build/ctf_output_directory.gni")
 
 # Creates a FAR archive from a ctf_fuchsia_package_archive target.
 #
@@ -48,8 +49,12 @@ template("ctf_fuchsia_package_archive") {
     testonly = true
     deps = [ ":$copy_target" ]
     metadata = {
-      _ctf_artifacts = get_target_outputs(":$copy_target")
-      ctf_artifacts = rebase_path(_ctf_artifacts, root_out_dir)
+      _ctf_artifacts = []
+      foreach(out_target, get_target_outputs(":$copy_target")) {
+        out_target = rebase_path(out_target, root_out_dir)
+        _ctf_artifacts += [ "${ctf_output_directory}/${out_target}" ]
+      }
+      ctf_artifacts = _ctf_artifacts
 
       # For usage, see generate_ctf_packages.gni and generate_ctf_tests.gni
       package_archives = [

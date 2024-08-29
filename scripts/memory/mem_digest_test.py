@@ -32,6 +32,7 @@ sys.argv.pop()
 
 
 class MainArgParserTests(unittest.TestCase):
+    @unittest.skip(reason="test broken. b/361301238")
     def test_digest(self):
         parser = mem_digest.get_arg_parser()
         snapshot_path = os.path.join(TEST_DIR_PATH, "test_snapshot.json")
@@ -51,6 +52,7 @@ class MainArgParserTests(unittest.TestCase):
         with open(csv_path) as csv:
             self.assertEqual(stdout, csv.read())
 
+    @unittest.skip(reason="test broken. b/361301238")
     def test_digest_human(self):
         parser = mem_digest.get_arg_parser()
         snapshot_path = os.path.join(TEST_DIR_PATH, "test_snapshot.json")

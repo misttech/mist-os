@@ -4,6 +4,7 @@
 
 #include "aml-suspend.h"
 
+#include <fidl/fuchsia.io/cpp/wire.h>
 #include <fidl/fuchsia.kernel/cpp/wire.h>
 #include <lib/driver/component/cpp/driver_export.h>
 #include <zircon/errors.h>
@@ -88,12 +89,15 @@ zx::result<> AmlSuspend::Start() {
   fuchsia_hardware_suspend::SuspendService::InstanceHandler handler({
       .suspender = suspend_bindings_.CreateHandler(this, dispatcher(), fidl::kIgnoreBindingClosure),
   });
+
   auto result =
       outgoing()->AddService<fuchsia_hardware_suspend::SuspendService>(std::move(handler));
   if (result.is_error()) {
     FDF_LOG(ERROR, "Failed to add Suspender service %s", result.status_string());
     return result.take_error();
   }
+
+  AtStart();
 
   zx::result resource = GetCpuResource();
   if (!resource.is_ok()) {
@@ -179,4 +183,5 @@ void AmlSuspend::Serve(fidl::ServerEnd<fuchsia_hardware_suspend::Suspender> requ
 
 }  // namespace suspend
 
-FUCHSIA_DRIVER_EXPORT(suspend::AmlSuspend);
+// See driver-registration.cc for:
+// FUCHSIA_DRIVER_EXPORT(suspend::AmlSuspend);

@@ -310,8 +310,16 @@ impl ServiceLevelConnection {
         self.connected() && self.state.initialized
     }
 
-    pub fn get_selected_codec(&self) -> Option<CodecId> {
+    pub fn selected_codec(&self) -> Option<CodecId> {
         self.state.selected_codec
+    }
+
+    /// Returns the set of codecs that are possible to use for this peer
+    /// (they are supported by the peer and local)
+    pub fn supported_codecs(&self) -> Vec<CodecId> {
+        let mut supported = self.state.codecs_supported();
+        supported.retain(CodecId::is_supported);
+        supported
     }
 
     pub fn three_way_calling(&self) -> bool {
@@ -344,11 +352,19 @@ impl ServiceLevelConnection {
         self.set_initialized();
     }
 
+    fn queue_slc_request(&mut self, request: SlcRequest) {
+        info!(?request, "Queueing Request");
+        if let Err(e) = self.sender.try_send(request) {
+            warn!("Couldn't relay procedure info request to internal receiver: {:?}", e);
+        }
+    }
+
     /// Sets the channel status to initialized.
     /// Note: This should only be called when the SLCI Procedure has successfully finished
     /// or in testing scenarios.
     fn set_initialized(&mut self) {
         info!("Service Level Connection initialized: {:?}", SlcInitializationDebug(&self.state));
+        self.queue_slc_request(SlcRequest::Initialized);
         self.state.initialized = true;
         self.inspect.initialized(fasync::Time::now());
     }
@@ -492,9 +508,7 @@ impl ServiceLevelConnection {
                 return;
             }
         };
-        if let Err(e) = self.sender.try_send(info_request) {
-            warn!("Couldn't relay procedure info request to internal receiver: {:?}", e);
-        }
+        self.queue_slc_request(info_request);
     }
 
     /// Consume `bytes` from the peer (HF) and handle the command.
@@ -902,6 +916,7 @@ pub(crate) mod tests {
         let (mut slc, remote) = create_and_connect_slc();
         // Bypass the SLCI procedure by setting the channel to initialized.
         slc.set_initialized();
+        expect_slc_ready(&mut exec, &mut slc, std::mem::discriminant(&SlcRequest::Initialized));
 
         let set_speaker_gain_part_one = b"AT+VG";
         let set_speaker_gain_part_two = b"S=1\r";
@@ -923,6 +938,7 @@ pub(crate) mod tests {
         let (mut slc, remote) = create_and_connect_slc();
         // Bypass the SLCI procedure by setting the channel to initialized.
         slc.set_initialized();
+        expect_slc_ready(&mut exec, &mut slc, std::mem::discriminant(&SlcRequest::Initialized));
 
         let set_speaker_gain_send_dtmf = b"AT+VGS=1\rAT+VTS=#\r";
 
@@ -1046,7 +1062,12 @@ pub(crate) mod tests {
         // be sent to the peer.
         let command4 = format!("AT+CMER=3,0,0,1\r").into_bytes();
         let _ = remote.write(&command4);
-        expect_slc_pending(&mut exec, &mut slc);
+
+        // That's the end of the SLCI process, We should emit to the peer that we are initialized.
+        let slc_next_poll = exec.run_until_stalled(&mut slc.next());
+        let Poll::Ready(Some(Ok(SlcRequest::Initialized))) = slc_next_poll else {
+            panic!("Expected Initialized from connection after initialization but got {slc_next_poll:?}");
+        };
         expect_peer_ready(&mut exec, &mut remote, None);
 
         // The SLC should be considered initialized and the SLCI Procedure is done.
@@ -1180,11 +1201,11 @@ pub(crate) mod tests {
         // Peer requests to enable the Indicator Status update in the AG.
         let command4 = format!("AT+CMER=3,0,0,1\r").into_bytes();
         let _ = remote.write(&command4);
-        expect_slc_pending(&mut exec, &mut slc);
-        expect_peer_ready(&mut exec, &mut remote, None);
-
         // At this point, the mandatory portion of the SLCI procedure is complete. There are no optional
         // steps since we responded with an empty set of AgFeatures.
+        expect_slc_ready(&mut exec, &mut slc, std::mem::discriminant(&SlcRequest::Initialized));
+        expect_peer_ready(&mut exec, &mut remote, None);
+
         assert!(slc.initialized());
 
         // A third request to send a PhoneStatus update _after_ SLCI completes is OK. This should

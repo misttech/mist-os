@@ -74,7 +74,8 @@ function diff_text() {
 }
 
 function diff_binary() {
-  "$detail_diff" "$1" "$2"
+  # cmp is faster, as it terminates at first byte difference.
+  cmp "$1" "$2" || "$detail_diff" "$1" "$2"
 }
 
 function exe_unstripped_expect() {

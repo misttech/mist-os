@@ -28,14 +28,6 @@ use zerocopy::{AsBytes, NoCell};
 /// The version of the SELinux "status" file this implementation implements.
 const SELINUX_STATUS_VERSION: u32 = 1;
 
-/// Specifies whether the implementation should be fully functional, or provide
-/// only hard-coded fake information.
-#[derive(Copy, Clone, Debug)]
-pub enum Mode {
-    Enable,
-    Fake,
-}
-
 struct LoadedPolicy {
     /// Parsed policy structure.
     parsed: Policy<ByValue<Vec<u8>>>,
@@ -155,10 +147,6 @@ impl SecurityServerState {
 }
 
 pub struct SecurityServer {
-    /// Determines whether the security server is enabled, or only provides
-    /// a hard-coded set of fake responses.
-    mode: Mode,
-
     /// Manager for any access vector cache layers that are shared between threads subject to access
     /// control by this security server. This [`AvcManager`] is also responsible for constructing
     /// thread-local caches for use by individual threads that subject to access control by this
@@ -170,7 +158,7 @@ pub struct SecurityServer {
 }
 
 impl SecurityServer {
-    pub fn new(mode: Mode) -> Arc<Self> {
+    pub fn new() -> Arc<Self> {
         let avc_manager = AvcManager::new();
         let status = SeLinuxStatus::new_default().expect("Failed to create SeLinuxStatus");
         let state = Mutex::new(SecurityServerState {
@@ -183,7 +171,7 @@ impl SecurityServer {
             policy_change_count: 0,
         });
 
-        let security_server = Arc::new(Self { mode, avc_manager, state });
+        let security_server = Arc::new(Self { avc_manager, state });
 
         // TODO(http://b/304776236): Consider constructing shared owner of `AvcManager` and
         // `SecurityServer` to eliminate weak reference.
@@ -298,21 +286,13 @@ impl SecurityServer {
     /// Returns true if the policy requires unknown class / permissions to be
     /// denied. Defaults to true until a policy is loaded.
     pub fn deny_unknown(&self) -> bool {
-        if self.is_fake() {
-            false
-        } else {
-            self.state.lock().deny_unknown()
-        }
+        self.state.lock().deny_unknown()
     }
 
     /// Returns true if the policy requires unknown class / permissions to be
     /// rejected. Defaults to false until a policy is loaded.
     pub fn reject_unknown(&self) -> bool {
-        if self.is_fake() {
-            false
-        } else {
-            self.state.lock().reject_unknown()
-        }
+        self.state.lock().reject_unknown()
     }
 
     /// Returns the list of names of boolean conditionals defined by the
@@ -508,16 +488,9 @@ impl SecurityServer {
         let new_value = SeLinuxStatusValue {
             enforcing: state.enforcing as u32,
             policyload: state.policy_change_count,
-            deny_unknown: if self.is_fake() { 0 } else { state.deny_unknown() as u32 },
+            deny_unknown: state.deny_unknown() as u32,
         };
         state.status.set_value(new_value);
-    }
-
-    pub fn is_fake(&self) -> bool {
-        match self.mode {
-            Mode::Fake => true,
-            _ => false,
-        }
     }
 }
 
@@ -544,18 +517,13 @@ impl AccessVectorComputer for SecurityServer {
     }
 
     fn is_permissive(&self, class: ObjectClass) -> bool {
-        match self.mode {
-            Mode::Fake => true,
-            _ => {
-                let state = self.state.lock();
-                if !state.enforcing {
-                    true
-                } else if let Some(policy) = &state.policy {
-                    policy.parsed.is_permissive(class)
-                } else {
-                    true
-                }
-            }
+        let state = self.state.lock();
+        if !state.enforcing {
+            true
+        } else if let Some(policy) = &state.policy {
+            policy.parsed.is_permissive(class)
+        } else {
+            true
         }
     }
 }
@@ -603,9 +571,9 @@ mod tests {
     const TESTS_BINARY_POLICY: &[u8] =
         include_bytes!("../testdata/micro_policies/security_server_tests_policy.pp");
 
-    fn security_server_with_tests_policy(mode: Mode) -> Arc<SecurityServer> {
+    fn security_server_with_tests_policy() -> Arc<SecurityServer> {
         let policy_bytes = TESTS_BINARY_POLICY.to_vec();
-        let security_server = SecurityServer::new(mode);
+        let security_server = SecurityServer::new();
         assert_eq!(
             Ok(()),
             security_server.load_policy(policy_bytes).map_err(|e| format!("{:?}", e))
@@ -616,7 +584,7 @@ mod tests {
     #[fuchsia::test]
     fn sid_to_security_context() {
         let security_context = b"unconfined_u:unconfined_r:unconfined_t:s0";
-        let security_server = security_server_with_tests_policy(Mode::Enable);
+        let security_server = security_server_with_tests_policy();
         let sid = security_server
             .security_context_to_sid(security_context.into())
             .expect("creating SID from security context should succeed");
@@ -628,7 +596,7 @@ mod tests {
 
     #[fuchsia::test]
     fn sids_for_different_security_contexts_differ() {
-        let security_server = security_server_with_tests_policy(Mode::Enable);
+        let security_server = security_server_with_tests_policy();
         let sid1 = security_server
             .security_context_to_sid(b"user0:object_r:type0:s0".into())
             .expect("creating SID from security context should succeed");
@@ -641,7 +609,7 @@ mod tests {
     #[fuchsia::test]
     fn sids_for_same_security_context_are_equal() {
         let security_context = b"unconfined_u:unconfined_r:unconfined_t:s0";
-        let security_server = security_server_with_tests_policy(Mode::Enable);
+        let security_server = security_server_with_tests_policy();
         let sid_count_before = security_server.state.lock().sids.len();
         let sid1 = security_server
             .security_context_to_sid(security_context.into())
@@ -656,7 +624,7 @@ mod tests {
     #[fuchsia::test]
     fn sids_allocated_outside_initial_range() {
         let security_context = b"unconfined_u:unconfined_r:unconfined_t:s0";
-        let security_server = security_server_with_tests_policy(Mode::Enable);
+        let security_server = security_server_with_tests_policy();
         let sid_count_before = security_server.state.lock().sids.len();
         let sid = security_server
             .security_context_to_sid(security_context.into())
@@ -667,7 +635,7 @@ mod tests {
 
     #[fuchsia::test]
     fn compute_access_vector_allows_all() {
-        let security_server = SecurityServer::new(Mode::Enable);
+        let security_server = SecurityServer::new();
         let sid1 = SecurityId::initial(InitialSid::Kernel);
         let sid2 = SecurityId::initial(InitialSid::Unlabeled);
         assert_eq!(
@@ -677,30 +645,21 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn fake_security_server_is_fake() {
-        let security_server = SecurityServer::new(Mode::Enable);
-        assert_eq!(security_server.is_fake(), false);
-
-        let fake_security_server = SecurityServer::new(Mode::Fake);
-        assert_eq!(fake_security_server.is_fake(), true);
-    }
-
-    #[fuchsia::test]
     fn loaded_policy_can_be_retrieved() {
-        let security_server = security_server_with_tests_policy(Mode::Enable);
+        let security_server = security_server_with_tests_policy();
         assert_eq!(TESTS_BINARY_POLICY, security_server.get_binary_policy().as_slice());
     }
 
     #[fuchsia::test]
     fn loaded_policy_is_validated() {
         let not_really_a_policy = "not a real policy".as_bytes().to_vec();
-        let security_server = SecurityServer::new(Mode::Enable);
+        let security_server = SecurityServer::new();
         assert!(security_server.load_policy(not_really_a_policy.clone()).is_err());
     }
 
     #[fuchsia::test]
     fn enforcing_mode_is_reported() {
-        let security_server = SecurityServer::new(Mode::Enable);
+        let security_server = SecurityServer::new();
         assert!(!security_server.is_enforcing());
 
         security_server.set_enforcing(true);
@@ -709,14 +668,14 @@ mod tests {
 
     #[fuchsia::test]
     fn without_policy_conditional_booleans_are_empty() {
-        let security_server = SecurityServer::new(Mode::Enable);
+        let security_server = SecurityServer::new();
         assert!(security_server.conditional_booleans().is_empty());
     }
 
     #[fuchsia::test]
     fn conditional_booleans_can_be_queried() {
         let policy_bytes = TESTSUITE_BINARY_POLICY.to_vec();
-        let security_server = SecurityServer::new(Mode::Enable);
+        let security_server = SecurityServer::new();
         assert_eq!(
             Ok(()),
             security_server.load_policy(policy_bytes).map_err(|e| format!("{:?}", e))
@@ -733,7 +692,7 @@ mod tests {
     #[fuchsia::test]
     fn conditional_booleans_can_be_changed() {
         let policy_bytes = TESTSUITE_BINARY_POLICY.to_vec();
-        let security_server = SecurityServer::new(Mode::Enable);
+        let security_server = SecurityServer::new();
         assert_eq!(
             Ok(()),
             security_server.load_policy(policy_bytes).map_err(|e| format!("{:?}", e))
@@ -762,7 +721,7 @@ mod tests {
         // u32 values.
         const STATUS_T_SIZE: usize = size_of::<u32>() * 5;
 
-        let security_server = SecurityServer::new(Mode::Enable);
+        let security_server = SecurityServer::new();
         let status_vmo = security_server.get_status_vmo();
 
         // Verify the content and actual size of the structure are as expected.
@@ -812,7 +771,7 @@ mod tests {
 
     #[fuchsia::test]
     fn status_file_layout() {
-        let security_server = SecurityServer::new(Mode::Enable);
+        let security_server = SecurityServer::new();
         security_server.set_enforcing(false);
         let mut seq_no: u32 = 0;
         with_status_t(&security_server, |status| {
@@ -833,7 +792,7 @@ mod tests {
 
     #[fuchsia::test]
     fn parse_security_context_no_policy() {
-        let security_server = SecurityServer::new(Mode::Enable);
+        let security_server = SecurityServer::new();
         let error = security_server
             .security_context_to_sid(b"unconfined_u:unconfined_r:unconfined_t:s0".into())
             .expect_err("expected error");
@@ -843,7 +802,7 @@ mod tests {
 
     #[fuchsia::test]
     fn compute_new_file_sid_no_policy() {
-        let security_server = SecurityServer::new(Mode::Enable);
+        let security_server = SecurityServer::new();
 
         // Only initial SIDs can exist, until a policy has been loaded.
         let source_sid = SecurityId::initial(InitialSid::Kernel);
@@ -857,7 +816,7 @@ mod tests {
 
     #[fuchsia::test]
     fn compute_new_file_sid_no_defaults() {
-        let security_server = SecurityServer::new(Mode::Enable);
+        let security_server = SecurityServer::new();
         let policy_bytes =
             include_bytes!("../testdata/micro_policies/file_no_defaults_policy.pp").to_vec();
         security_server.load_policy(policy_bytes).expect("binary policy loads");
@@ -883,7 +842,7 @@ mod tests {
 
     #[fuchsia::test]
     fn compute_new_file_sid_source_defaults() {
-        let security_server = SecurityServer::new(Mode::Enable);
+        let security_server = SecurityServer::new();
         let policy_bytes =
             include_bytes!("../testdata/micro_policies/file_source_defaults_policy.pp").to_vec();
         security_server.load_policy(policy_bytes).expect("binary policy loads");
@@ -909,7 +868,7 @@ mod tests {
 
     #[fuchsia::test]
     fn compute_new_file_sid_target_defaults() {
-        let security_server = SecurityServer::new(Mode::Enable);
+        let security_server = SecurityServer::new();
         let policy_bytes =
             include_bytes!("../testdata/micro_policies/file_target_defaults_policy.pp").to_vec();
         security_server.load_policy(policy_bytes).expect("binary policy loads");
@@ -934,7 +893,7 @@ mod tests {
 
     #[fuchsia::test]
     fn compute_new_file_sid_range_source_low_default() {
-        let security_server = SecurityServer::new(Mode::Enable);
+        let security_server = SecurityServer::new();
         let policy_bytes =
             include_bytes!("../testdata/micro_policies/file_range_source_low_policy.pp").to_vec();
         security_server.load_policy(policy_bytes).expect("binary policy loads");
@@ -959,7 +918,7 @@ mod tests {
 
     #[fuchsia::test]
     fn compute_new_file_sid_range_source_low_high_default() {
-        let security_server = SecurityServer::new(Mode::Enable);
+        let security_server = SecurityServer::new();
         let policy_bytes =
             include_bytes!("../testdata/micro_policies/file_range_source_low_high_policy.pp")
                 .to_vec();
@@ -985,7 +944,7 @@ mod tests {
 
     #[fuchsia::test]
     fn compute_new_file_sid_range_source_high_default() {
-        let security_server = SecurityServer::new(Mode::Enable);
+        let security_server = SecurityServer::new();
         let policy_bytes =
             include_bytes!("../testdata/micro_policies/file_range_source_high_policy.pp").to_vec();
         security_server.load_policy(policy_bytes).expect("binary policy loads");
@@ -1010,7 +969,7 @@ mod tests {
 
     #[fuchsia::test]
     fn compute_new_file_sid_range_target_low_default() {
-        let security_server = SecurityServer::new(Mode::Enable);
+        let security_server = SecurityServer::new();
         let policy_bytes =
             include_bytes!("../testdata/micro_policies/file_range_target_low_policy.pp").to_vec();
         security_server.load_policy(policy_bytes).expect("binary policy loads");
@@ -1035,7 +994,7 @@ mod tests {
 
     #[fuchsia::test]
     fn compute_new_file_sid_range_target_low_high_default() {
-        let security_server = SecurityServer::new(Mode::Enable);
+        let security_server = SecurityServer::new();
         let policy_bytes =
             include_bytes!("../testdata/micro_policies/file_range_target_low_high_policy.pp")
                 .to_vec();
@@ -1061,7 +1020,7 @@ mod tests {
 
     #[fuchsia::test]
     fn compute_new_file_sid_range_target_high_default() {
-        let security_server = SecurityServer::new(Mode::Enable);
+        let security_server = SecurityServer::new();
         let policy_bytes =
             include_bytes!("../testdata/micro_policies/file_range_target_high_policy.pp").to_vec();
         security_server.load_policy(policy_bytes).expect("binary policy loads");
@@ -1086,7 +1045,7 @@ mod tests {
 
     #[fuchsia::test]
     fn unknown_sids_are_effectively_unlabeled() {
-        let security_server = security_server_with_tests_policy(Mode::Enable);
+        let security_server = security_server_with_tests_policy();
         security_server.set_enforcing(true);
 
         let valid_sid =
@@ -1125,29 +1084,9 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn permission_check_fake_mode_enforcing() {
-        let security_server = security_server_with_tests_policy(Mode::Fake);
-        security_server.set_enforcing(true);
-        assert!(security_server.is_fake());
-        assert!(security_server.is_enforcing());
-
-        let sid =
-            security_server.security_context_to_sid("user0:object_r:type0:s0".into()).unwrap();
-        let permission_check = security_server.as_permission_check();
-
-        // Test policy grants "type0" the process-fork permission to itself.
-        assert!(permission_check.has_permission(sid, sid, ProcessPermission::Fork));
-
-        // Test policy does not grant "type0" the process-getrlimit permission to itself, but
-        // the security server's "fake" mode makes the check permissive.
-        assert!(permission_check.has_permission(sid, sid, ProcessPermission::GetRlimit));
-    }
-
-    #[fuchsia::test]
     fn permission_check_permissive() {
-        let security_server = security_server_with_tests_policy(Mode::Enable);
+        let security_server = security_server_with_tests_policy();
         security_server.set_enforcing(false);
-        assert!(!security_server.is_fake());
         assert!(!security_server.is_enforcing());
 
         let sid =
@@ -1164,9 +1103,8 @@ mod tests {
 
     #[fuchsia::test]
     fn permission_check_enforcing() {
-        let security_server = security_server_with_tests_policy(Mode::Enable);
+        let security_server = security_server_with_tests_policy();
         security_server.set_enforcing(true);
-        assert!(!security_server.is_fake());
         assert!(security_server.is_enforcing());
 
         let sid =

@@ -2,9 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#![allow(dead_code)]
-/// TODO(https://fxbug.dev/313442116): These are not currently used in production but will be used
-/// when the Banjo FFI is removed.
 use anyhow::{bail, Context, Result};
 use tracing::warn;
 use {

@@ -19,8 +19,8 @@
 
 namespace media::audio::testing {
 
-class FakeAudioDriver : public fuchsia::hardware::audio::StreamConfig,
-                        public fuchsia::hardware::audio::RingBuffer {
+class FakeAudioDriver final : public fuchsia::hardware::audio::StreamConfig,
+                              public fuchsia::hardware::audio::RingBuffer {
  public:
   FakeAudioDriver(zx::channel channel, async_dispatcher_t* dispatcher);
 
@@ -105,6 +105,7 @@ class FakeAudioDriver : public fuchsia::hardware::audio::StreamConfig,
     callback(fpromise::error(ZX_ERR_NOT_SUPPORTED));
   }
   void WatchDelayInfo(fuchsia::hardware::audio::RingBuffer::WatchDelayInfoCallback callback) final;
+  void handle_unknown_method(uint64_t ordinal, bool method_has_response) final {}
 
   void PositionNotification();
 

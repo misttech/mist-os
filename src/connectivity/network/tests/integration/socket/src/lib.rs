@@ -1806,6 +1806,32 @@ async fn tcp_socket<N: Netstack>(name: &str) {
     run_tcp_socket_test(&server, SERVER_SUBNET.addr, &client, CLIENT_SUBNET.addr).await
 }
 
+// This is a regression test for https://fxbug.dev/361402347.
+#[netstack_test]
+#[variant(I, Ip)]
+#[variant(N, Netstack)]
+async fn tcp_bind_listen_on_same_port_different_address<I: TestIpExt, N: Netstack>(name: &str) {
+    let sandbox = netemul::TestSandbox::new().expect("create sandbox");
+    let net = sandbox.create_network("net").await.expect("create network");
+    let netstack =
+        sandbox.create_netstack_realm::<N, _>(format!("{}", name)).expect("create netstack realm");
+    let interface = netstack.join_network(&net, "ep").await.expect("join network");
+    interface.add_address_and_subnet_route(I::CLIENT_SUBNET).await.expect("configure address");
+    interface.add_address_and_subnet_route(I::SERVER_SUBNET).await.expect("configure address");
+
+    const PORT: u16 = 80;
+
+    let first = TcpSocket::new_in_realm::<I>(&netstack).await.expect("create TCP socket");
+    let fnet_ext::IpAddress(addr) = I::CLIENT_SUBNET.addr.into();
+    first.bind(&std::net::SocketAddr::new(addr, PORT).into()).expect("no conflict");
+    first.listen(0).expect("no conflict");
+
+    let second = TcpSocket::new_in_realm::<I>(&netstack).await.expect("create TCP socket");
+    let fnet_ext::IpAddress(addr) = I::SERVER_SUBNET.addr.into();
+    second.bind(&std::net::SocketAddr::new(addr, PORT).into()).expect("no conflict");
+    second.listen(0).expect("no conflict");
+}
+
 enum WhichEnd {
     Send,
     Receive,
@@ -1832,7 +1858,7 @@ async fn tcp_buffer_size<I: TestIpExt, N: Netstack>(name: &str, which: WhichEnd)
             }
             WhichEnd::Receive => {
                 const RECEIVE_BUFFER_SIZE: usize = 128 * 1024;
-                let receiver_ref = SockRef::from(sender.std());
+                let receiver_ref = SockRef::from(receiver.std());
                 set_size = RECEIVE_BUFFER_SIZE;
                 receiver_ref
                     .set_recv_buffer_size(RECEIVE_BUFFER_SIZE)

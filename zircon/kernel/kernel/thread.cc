@@ -1099,7 +1099,7 @@ void Thread::SetMigrateFnLocked(MigrateFn migrate_fn) {
 void Thread::CallMigrateFnLocked(MigrateStage stage) {
   if (unlikely(migrate_fn_)) {
     switch (stage) {
-      case MigrateStage::Before:
+      case MigrateStage::Save:
         if (!migrate_pending_) {
           // We are leaving our last CPU and calling our migration function as we
           // go.  Assert that we are running on the proper CPU, and clear our last
@@ -1114,7 +1114,7 @@ void Thread::CallMigrateFnLocked(MigrateStage stage) {
         }
         break;
 
-      case MigrateStage::After:
+      case MigrateStage::Restore:
         if (migrate_pending_) {
           migrate_pending_ = false;
           migrate_fn_(this, stage);
@@ -1143,7 +1143,7 @@ void Thread::CallMigrateFnForCpu(cpu_num_t cpu) {
     SingletonChainLockGuardNoIrqSave thread_guard{thread.lock_,
                                                   CLT_TAG("Thread::CallMigrateFnForCpu")};
     if (thread.state() != THREAD_READY && thread.scheduler_state().last_cpu_ == cpu) {
-      thread.CallMigrateFnLocked(Thread::MigrateStage::Before);
+      thread.CallMigrateFnLocked(Thread::MigrateStage::Save);
     }
   }
 }
@@ -2316,7 +2316,7 @@ void Thread::Current::GetBacktrace(Backtrace& out_bt) {
   // (https://fxbug.dev/42179766): Force the function to not tail call GetBacktraceCommon.
   // This will make sure the frame pointer we grabbed at the top
   // of the function is still valid across the call.
-  asm volatile("");
+  __asm__ volatile("");
 }
 
 void Thread::Current::GetBacktrace(vaddr_t fp, Backtrace& out_bt) {

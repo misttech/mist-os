@@ -301,6 +301,7 @@ impl TestServer {
                             }
                             abort_handle.abort();
                         }
+                        fcrunner::ComponentControllerRequest::_UnknownMethod { .. } => (),
                     }
                 }
             }

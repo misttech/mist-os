@@ -250,15 +250,17 @@ const (
 	ProtocolFooOrdinal uint64 = 0x567a8096af6e6139
 )
 
-// Bindings for this protocol have not been generated because it is an
-// open protocol. If bindings for open protocols are
-// needed in Go, please contact the FIDL team: fidl-dev@fuchsia.dev.
 type ProtocolWithCtxInterface _bindings.ChannelProxy
 
-// Bindings for this protocol have not been generated because it is an
-// open protocol. If bindings for open protocols are
-// needed in Go, please contact the FIDL team: fidl-dev@fuchsia.dev.
-type ProtocolWithCtx interface{}
+func (p *ProtocolWithCtxInterface) Foo(ctx_ _bindings.Context) error {
+	var req_ _bindings.Message
+	err_ := ((*_bindings.ChannelProxy)(p)).Send(ProtocolFooOrdinal, req_)
+	return err_
+}
+
+type ProtocolWithCtx interface {
+	Foo(ctx_ _bindings.Context) error
+}
 type ProtocolWithCtxInterfaceRequest _bindings.InterfaceRequest
 
 func NewProtocolWithCtxInterfaceRequest() (ProtocolWithCtxInterfaceRequest, *ProtocolWithCtxInterface, error) {
@@ -266,12 +268,17 @@ func NewProtocolWithCtxInterfaceRequest() (ProtocolWithCtxInterfaceRequest, *Pro
 	return ProtocolWithCtxInterfaceRequest(req), (*ProtocolWithCtxInterface)(cli), err
 }
 
-// Bindings for this protocol have not been generated because it is an
-// open protocol. If bindings for open protocols are
-// needed in Go, please contact the FIDL team: fidl-dev@fuchsia.dev.
-type ProtocolWithCtxStub struct{}
+type ProtocolWithCtxStub struct {
+	Impl ProtocolWithCtx
+}
 
-// Bindings for this protocol have not been generated because it is an
-// open protocol. If bindings for open protocols are
-// needed in Go, please contact the FIDL team: fidl-dev@fuchsia.dev.
-type ProtocolEventProxy struct{}
+func (s_ *ProtocolWithCtxStub) Dispatch(args_ _bindings.DispatchArgs) (_bindings.Message, bool, error) {
+	switch args_.Ordinal {
+	case ProtocolFooOrdinal:
+		err_ := s_.Impl.Foo(args_.Ctx)
+		return nil, false, err_
+	}
+	return nil, false, _bindings.ErrUnknownOrdinal
+}
+
+type ProtocolEventProxy _bindings.ChannelProxy

@@ -76,7 +76,6 @@ class TestMoveSources(unittest.TestCase):
         """
         )
         source = "source/lib"
-        dest = "something/else/lib"
         actual = move_source.find_referenced_targets(build_graph, source)
         expected_labels = [
             "//source/lib/used:used_tests",

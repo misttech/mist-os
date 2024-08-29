@@ -16,9 +16,9 @@
 #include <lib/ddk/metadata.h>
 #include <lib/driver/compat/cpp/device_server.h>
 #include <lib/driver/component/cpp/driver_export.h>
-#include <lib/driver/testing/cpp/driver_lifecycle.h>
 #include <lib/driver/testing/cpp/driver_runtime.h>
-#include <lib/driver/testing/cpp/test_environment.h>
+#include <lib/driver/testing/cpp/internal/driver_lifecycle.h>
+#include <lib/driver/testing/cpp/internal/test_environment.h>
 #include <lib/driver/testing/cpp/test_node.h>
 #include <lib/fidl/cpp/wire/client.h>
 #include <lib/fidl/cpp/wire/connect_service.h>
@@ -357,7 +357,7 @@ struct IncomingNamespace {
   }
 
   fdf_testing::TestNode node{"root"};
-  fdf_testing::TestEnvironment env{fdf::Dispatcher::GetCurrent()->get()};
+  fdf_testing::internal::TestEnvironment env{fdf::Dispatcher::GetCurrent()->get()};
   compat::DeviceServer device_server;
   zx::event exec_opportunistic, wake_assertive;
   std::optional<FakeSystemActivityGovernor> system_activity_governor;
@@ -365,6 +365,8 @@ struct IncomingNamespace {
   FakePowerTokenProvider power_token_provider;
 };
 
+// WARNING: Don't use this test as a template for new tests as it uses the old driver testing
+// library.
 class SdmmcBlockDeviceTest : public zxtest::TestWithParam<bool> {
  public:
   SdmmcBlockDeviceTest()
@@ -682,7 +684,7 @@ class SdmmcBlockDeviceTest : public zxtest::TestWithParam<bool> {
   fdf_testing::DriverRuntime runtime_;
   fdf::UnownedSynchronizedDispatcher env_dispatcher_;
   async_patterns::TestDispatcherBound<IncomingNamespace> incoming_;
-  fdf_testing::DriverUnderTest<TestSdmmcRootDevice> dut_;
+  fdf_testing::internal::DriverUnderTest<TestSdmmcRootDevice> dut_;
   SdmmcBlockDevice* block_device_;
   ddk::BlockImplProtocolClient user_;
   ddk::BlockImplProtocolClient boot1_;

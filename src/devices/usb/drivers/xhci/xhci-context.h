@@ -7,7 +7,6 @@
 
 #include <lib/fit/function.h>
 #include <lib/fpromise/bridge.h>
-#include <lib/synchronous-executor/executor.h>
 
 #include <memory>
 

@@ -23,10 +23,7 @@ rustc_library("windowed-stats") {
     "//third_party/rust_crates:tracing",
   ]
 
-  test_deps = [
-    "//src/lib/diagnostics/testing/diagnostics-assertions/rust:diagnostics-assertions",
-    "//third_party/rust_crates:test-case",
-  ]
+  test_deps = [ "//src/lib/diagnostics/testing/diagnostics-assertions/rust:diagnostics-assertions" ]
 
   sources = [
     "src/aggregations.rs",

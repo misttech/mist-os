@@ -343,7 +343,7 @@ type GetVmoError = strict enum {
     INTERNAL_ERROR = 2;
 };
 
-closed protocol RingBuffer {
+closed(removed=NEXT) open(added=NEXT) protocol RingBuffer {
     /// Accessor for top level static properties.
     strict GetProperties() -> (struct {
         properties RingBufferProperties;
@@ -465,7 +465,7 @@ closed protocol RingBuffer {
     /// If `WatchDelayInfo` is called for a second time before the first call has completed, the
     /// channel must be closed with an error `ZX_ERR_BAD_STATE` returned.
     @available(added=HEAD)
-    strict WatchDelayInfo() -> (struct {
+    flexible WatchDelayInfo() -> (struct {
         delay_info DelayInfo;
     });
 };

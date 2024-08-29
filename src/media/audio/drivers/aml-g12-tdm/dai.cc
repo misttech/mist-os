@@ -16,6 +16,8 @@
 #include <optional>
 #include <utility>
 
+#include <bind/fuchsia/amlogic/platform/cpp/bind.h>
+#include <bind/fuchsia/cpp/bind.h>
 #include <fbl/algorithm.h>
 
 namespace audio::aml_g12 {
@@ -428,7 +430,8 @@ void AmlG12TdmDai::WatchDelayInfo(WatchDelayInfoCallback callback) {
   fuchsia::hardware::audio::DelayInfo delay_info = {};
   // No external delay information is provided by this driver.
   delay_info.set_internal_delay(internal_delay_nsec_);
-  callback(std::move(delay_info));
+  callback(fuchsia::hardware::audio::RingBuffer_WatchDelayInfo_Result::WithResponse(
+      ::fuchsia::hardware::audio::RingBuffer_WatchDelayInfo_Response(std::move(delay_info))));
 }
 
 static zx_status_t dai_bind(void* ctx, zx_device_t* device) {
@@ -456,16 +459,21 @@ static zx_status_t dai_bind(void* ctx, zx_device_t* device) {
     zxlogf(ERROR, "Could not init device");
     return status;
   }
-  zx_device_prop_t props[] = {
-      {BIND_PLATFORM_DEV_VID, 0, PDEV_VID_AMLOGIC},
-      {BIND_PLATFORM_DEV_DID, 0, PDEV_DID_AMLOGIC_DAI_OUT},
-  };
+
   const char* name = "aml-g12-tdm-dai-out";
+  uint32_t device_did = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_DID_DAI_OUT;
   if (metadata.is_input) {
-    props[1].value = PDEV_DID_AMLOGIC_DAI_IN;
+    device_did = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_DID_DAI_IN;
     name = "aml-g12-tdm-dai-in";
   }
-  status = dai->DdkAdd(ddk::DeviceAddArgs(name).set_props(props));
+
+  zx_device_str_prop_t props[] = {
+      ddk::MakeStrProperty(bind_fuchsia::PLATFORM_DEV_VID,
+                           bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_VID_AMLOGIC),
+      ddk::MakeStrProperty(bind_fuchsia::PLATFORM_DEV_DID, device_did),
+  };
+
+  status = dai->DdkAdd(ddk::DeviceAddArgs(name).set_str_props(props));
   if (status != ZX_OK) {
     zxlogf(ERROR, "Could not add DAI driver to the DDK");
     return status;

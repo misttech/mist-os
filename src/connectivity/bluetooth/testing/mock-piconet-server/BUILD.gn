@@ -108,6 +108,6 @@ group("tests") {
     ":mock-piconet-server-tests",
 
     # Packages for components that are injected into the tests.
-    "//src/cobalt/bin/testing/mock_cobalt",
+    "//src/cobalt/bin/testing/fake_cobalt",
   ]
 }

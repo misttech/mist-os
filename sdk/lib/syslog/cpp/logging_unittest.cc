@@ -346,7 +346,7 @@ TEST(StructuredLogging, FlushAndReset) {
   ASSERT_EQ(header->RemainingSpace(), initial - 4);
   header->FlushAndReset();
   ASSERT_EQ(header->RemainingSpace(),
-            sizeof(syslog_runtime::LogBuffer::data) - 2);  // last byte reserved for NULL terminator
+            syslog_runtime::LogBuffer::data_size() - 2);  // last byte reserved for NULL terminator
 }
 #endif
 

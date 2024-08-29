@@ -59,6 +59,14 @@ pub struct BluetoothProfilesConfig {
     pub hfp: HfpConfig,
 }
 
+/// Platform configuration for Bluetooth core features.
+#[derive(Clone, Copy, Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema)]
+pub struct BluetoothCoreConfig {
+    /// Enable BR/EDR legacy pairing.
+    #[serde(default)]
+    pub legacy_pairing_enabled: bool,
+}
+
 /// Platform configuration options for Bluetooth.
 /// The default platform configuration does not include any Bluetooth packages.
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, JsonSchema)]
@@ -71,6 +79,11 @@ pub enum BluetoothConfig {
         /// Configuration for Bluetooth profiles. The default includes no profiles.
         #[serde(default)]
         profiles: BluetoothProfilesConfig,
+
+        /// Configuration for Bluetooth core.
+        #[serde(default)]
+        core: BluetoothCoreConfig,
+
         /// Configuration for `bt-snoop`.
         #[serde(default)]
         snoop: Snoop,
@@ -116,6 +129,7 @@ mod tests {
         let parsed: BluetoothConfig = serde_json::from_value(json).unwrap();
         let expected = BluetoothConfig::Standard {
             profiles: BluetoothProfilesConfig::default(),
+            core: BluetoothCoreConfig::default(),
             snoop: Snoop::Lazy,
         };
 
@@ -138,6 +152,9 @@ mod tests {
                     "enabled": true,
                 },
             },
+            "core": {
+                "legacy_pairing_enabled": true,
+            },
         });
 
         let parsed: BluetoothConfig = serde_json::from_value(json).unwrap();
@@ -146,8 +163,12 @@ mod tests {
             avrcp: AvrcpConfig { enabled: true },
             hfp: HfpConfig { enabled: true },
         };
-        let expected =
-            BluetoothConfig::Standard { profiles: expected_profiles, snoop: Snoop::Eager };
+        let expected_core = BluetoothCoreConfig { legacy_pairing_enabled: true };
+        let expected = BluetoothConfig::Standard {
+            profiles: expected_profiles,
+            core: expected_core,
+            snoop: Snoop::Eager,
+        };
 
         assert_eq!(parsed, expected);
     }

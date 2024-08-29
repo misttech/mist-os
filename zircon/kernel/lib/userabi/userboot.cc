@@ -231,7 +231,8 @@ void bootstrap_vmos(Handle** handles) {
 
   HandoffEnd end = EndHandoff();
 
-  ktl::copy(end.phys_vmos.begin(), end.phys_vmos.end(), &handles[userboot::kFirstPhysVmo]);
+  ktl::copy(end.extra_phys_vmos.begin(), end.extra_phys_vmos.end(),
+            &handles[userboot::kFirstExtraPhysVmo]);
 
   handles[userboot::kZbi] = end.zbi;
 

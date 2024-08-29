@@ -49,10 +49,8 @@ pgoff_t F2fs::FlushDirtyMetaPages(bool is_commit) {
       }
       return ZX_OK;
     };
-    sync_completion_t completion;
-    ScheduleWriter(&completion);
-    ZX_ASSERT_MSG(sync_completion_wait(&completion, zx::sec(kWriteTimeOut).get()) == ZX_OK,
-                  "FlushDirtyMetaPages() timeout");
+    // Ensure that all pending Pages in |writer_| are written out on storage before the commit.
+    writer_->Sync();
   }
   return GetMetaVnode().Writeback(operation);
 }
@@ -273,7 +271,7 @@ zx_status_t F2fs::GetValidCheckpoint() {
   return ZX_OK;
 }
 
-pgoff_t F2fs::FlushDirtyDataPages(WritebackOperation &operation, bool wait_writer) {
+pgoff_t F2fs::FlushDirtyDataPages(WritebackOperation &operation) {
   pgoff_t total_nwritten = 0;
   GetVCache().ForDirtyVnodesIf(
       [&](fbl::RefPtr<VnodeF2fs> &vnode) {
@@ -290,14 +288,6 @@ pgoff_t F2fs::FlushDirtyDataPages(WritebackOperation &operation, bool wait_write
         return ZX_OK;
       },
       std::move(operation.if_vnode));
-
-  if (wait_writer) {
-    // Wait until writers finish and release the ref of dirty vnodes.
-    sync_completion_t completion;
-    ScheduleWriter(&completion);
-    ZX_ASSERT_MSG(sync_completion_wait(&completion, zx::sec(kWriteTimeOut).get()) == ZX_OK,
-                  "FlushDirtyDataPages() timeout");
-  }
   return total_nwritten;
 }
 
@@ -328,6 +318,7 @@ zx::result<pgoff_t> F2fs::FlushDirtyNodePages(WritebackOperation &operation) {
 }
 
 void F2fs::FlushDirsAndNodes() {
+  // Here, we just schedule dirty Pages to be written back on storage.
   do {
     // Write out all dirty dentry pages and remove orphans from dirty list.
     WritebackOperation op = {.bReleasePages = HasNotEnoughMemory()};
@@ -337,7 +328,7 @@ void F2fs::FlushDirsAndNodes() {
       }
       return ZX_ERR_NEXT;
     };
-    FlushDirtyDataPages(op, true);
+    FlushDirtyDataPages(op);
   } while (superblock_info_->GetPageCount(CountType::kDirtyDents));
 
   // POR: we should ensure that there is no dirty node pages

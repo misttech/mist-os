@@ -4,6 +4,9 @@
 
 use crate::mode_management::{Defect, EventHistory, IfaceFailure, PhyFailure};
 use crate::telemetry;
+use fuchsia_inspect::{Node as InspectNode, StringReference};
+use fuchsia_inspect_contrib::inspect_insert;
+use fuchsia_inspect_contrib::log::WriteInspect;
 use futures::channel::mpsc;
 use tracing::warn;
 
@@ -115,6 +118,25 @@ impl RecoveryAction {
     }
 }
 
+impl WriteInspect for RecoveryAction {
+    fn write_inspect(&self, writer: &InspectNode, key: impl Into<StringReference>) {
+        match self {
+            RecoveryAction::PhyRecovery(PhyRecoveryOperation::DestroyIface { iface_id }) => {
+                inspect_insert!(writer, var key: {DestroyIface: {iface_id: iface_id}})
+            }
+            RecoveryAction::PhyRecovery(PhyRecoveryOperation::ResetPhy { phy_id }) => {
+                inspect_insert!(writer, var key: {ResetPhy: {phy_id: phy_id}})
+            }
+            RecoveryAction::IfaceRecovery(IfaceRecoveryOperation::Disconnect { iface_id }) => {
+                inspect_insert!(writer, var key: {Disconnect: {iface_id: iface_id}})
+            }
+            RecoveryAction::IfaceRecovery(IfaceRecoveryOperation::StopAp { iface_id }) => {
+                inspect_insert!(writer, var key: {StopAp: {iface_id: iface_id}})
+            }
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct RecoverySummary {
     pub defect: Defect,
@@ -161,6 +183,15 @@ impl RecoverySummary {
                 ))
             }
         }
+    }
+}
+
+impl WriteInspect for RecoverySummary {
+    fn write_inspect(&self, writer: &InspectNode, key: impl Into<StringReference>) {
+        inspect_insert!(writer, var key: {
+            defect: self.defect,
+            action: self.action,
+        })
     }
 }
 

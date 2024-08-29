@@ -41,14 +41,14 @@
             allow_long_names: true,
         },
         {
-            name: "pkg-drivers",
+            name: "base-drivers",
             environment: "#driver-env",
             durability: "single_run",
             allowed_offers: "static_and_dynamic",
             allow_long_names: true,
         },
         {
-            name: "full-pkg-drivers",
+            name: "full-drivers",
             environment: "#driver-env",
             durability: "single_run",
             allowed_offers: "static_and_dynamic",
@@ -117,9 +117,9 @@
             protocol: [ "fuchsia.driver.framework.CompositeNodeManager" ],
             from: "#driver_manager",
             to: [
+                "#base-drivers",
                 "#boot-drivers",
-                "#full-pkg-drivers",
-                "#pkg-drivers",
+                "#full-drivers",
             ],
         },
         {
@@ -171,20 +171,22 @@
             availability: "optional",
         },
         {
-            protocol: [ "fuchsia.kernel.IommuResource" ],
-            from: "void",
-            to: [ "#boot-drivers" ],
-            availability: "optional",
-        },
-        {
             protocol: [ "fuchsia.device.manager.SystemStateTransition" ],
             from: "parent",
             to: [
+                "#base-drivers",
                 "#boot-drivers",
                 "#driver-hosts",
-                "#full-pkg-drivers",
-                "#pkg-drivers",
+                "#full-drivers",
             ],
+        },
+        {
+            protocol: [
+                "fuchsia.component.resolution.Resolver-hermetic",
+                "fuchsia.driver.test.Internal",
+            ],
+            from: "parent",
+            to: [ "#fake-resolver" ],
         },
         {
             protocol: [
@@ -224,7 +226,7 @@
             rights: [ "r*" ],
         },
         {
-            directory: "pkg_drivers",
+            directory: "base_drivers",
             from: "parent",
             to: [ "#fake-resolver" ],
             rights: [ "rx*" ],
@@ -242,6 +244,7 @@
             protocol: [
                 "fuchsia.device.manager.Administrator",
                 "fuchsia.driver.development.Manager",
+                "fuchsia.driver.framework.CompositeNodeManager",
                 "fuchsia.inspect.InspectSink",
             ],
             from: "#driver_manager",
@@ -296,6 +299,11 @@
                     resolver: "pkg-resolver",
                     from: "#fake-resolver",
                     scheme: "fuchsia-pkg",
+                },
+                {
+                    resolver: "test-pkg-resolver",
+                    from: "#fake-resolver",
+                    scheme: "dtr-test-pkg",
                 },
             ],
 

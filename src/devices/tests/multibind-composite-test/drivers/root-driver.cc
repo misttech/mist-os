@@ -68,14 +68,14 @@ zx_status_t RootDriver::Bind(void* ctx, zx_device_t* dev) {
   const std::string kNodes[] = {"node_a", "node_b", "node_c", "node_d"};
   uint32_t instance_id = 1;
   for (auto& node : kNodes) {
-    zx_device_prop_t node_props[] = {
-        {BIND_PROTOCOL, 0, bind_fuchsia_test::BIND_PROTOCOL_COMPAT_CHILD},
-        {BIND_PLATFORM_DEV_INSTANCE_ID, 0, instance_id++},
+    zx_device_str_prop_t node_props[] = {
+        ddk::MakeStrProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_test::BIND_PROTOCOL_COMPAT_CHILD),
+        ddk::MakeStrProperty(bind_fuchsia::PLATFORM_DEV_INSTANCE_ID, instance_id++),
     };
 
     auto node_dev = std::make_unique<RootDriver>(dev);
     status = node_dev->DdkAdd(ddk::DeviceAddArgs(node.c_str())
-                                  .set_props(node_props)
+                                  .set_str_props(node_props)
                                   .set_proto_id(bind_fuchsia_test::BIND_PROTOCOL_COMPAT_CHILD)
                                   .set_flags(DEVICE_ADD_ALLOW_MULTI_COMPOSITE));
     if (status != ZX_OK) {

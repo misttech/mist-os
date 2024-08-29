@@ -6,9 +6,9 @@
 #define SRC_DEVICES_BLOCK_DRIVERS_UFS_TEST_UNIT_LIB_H_
 
 #include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
-#include <lib/driver/testing/cpp/driver_lifecycle.h>
 #include <lib/driver/testing/cpp/driver_runtime.h>
-#include <lib/driver/testing/cpp/test_environment.h>
+#include <lib/driver/testing/cpp/internal/driver_lifecycle.h>
+#include <lib/driver/testing/cpp/internal/test_environment.h>
 #include <lib/driver/testing/cpp/test_node.h>
 #include <lib/inspect/testing/cpp/zxtest/inspect.h>
 
@@ -112,7 +112,7 @@ class FakePci : public fidl::WireServer<fuchsia_hardware_pci::Device> {
 
 struct IncomingNamespace {
   fdf_testing::TestNode node{"root"};
-  fdf_testing::TestEnvironment env{fdf::Dispatcher::GetCurrent()->get()};
+  fdf_testing::internal::TestEnvironment env{fdf::Dispatcher::GetCurrent()->get()};
   FakePci pci_server;
 };
 
@@ -137,6 +137,8 @@ class TestUfs : public Ufs {
   static ufs_mock_device::UfsMockDevice* mock_device_;
 };
 
+// WARNING: Don't use this test as a template for new tests as it uses the old driver testing
+// library.
 // TODO(https://fxbug.dev/42075643): This should use fdf_testing::DriverTestFixture.
 class UfsTest : public inspect::InspectTestHelper, public zxtest::Test {
  public:
@@ -180,7 +182,7 @@ class UfsTest : public inspect::InspectTestHelper, public zxtest::Test {
   fdf_testing::DriverRuntime runtime_;
   fdf::UnownedSynchronizedDispatcher env_dispatcher_;
   async_patterns::TestDispatcherBound<IncomingNamespace> incoming_;
-  fdf_testing::DriverUnderTest<TestUfs> dut_;
+  fdf_testing::internal::DriverUnderTest<TestUfs> dut_;
 };
 
 }  // namespace ufs

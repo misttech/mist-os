@@ -26,7 +26,6 @@ zx_status_t v1_bind(void* ctx, zx_device_t* dev) {
 
   device_add_args_t args{
       .name = "leaf",
-      .prop_count = 0,
       .proto_id = bind_fuchsia_test::BIND_PROTOCOL_DEVICE,
   };
   zx_device_t* out = nullptr;

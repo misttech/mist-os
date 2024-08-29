@@ -7,7 +7,9 @@
 
 #include <fuchsia/ui/composition/cpp/fidl.h>
 #include <lib/async/dispatcher.h>
+#include <lib/zx/event.h>
 
+#include <map>
 #include <memory>
 
 #include "src/ui/scenic/lib/flatland/flatland_presenter.h"

@@ -65,10 +65,21 @@ fuchsia_cc_test(
     name = "gatt_test",
     testonly = True,
     srcs = [
+        "client_test.cc",
+        "gatt_test.cc",
+        "generic_attribute_service_test.cc",
+        "local_service_manager_test.cc",
+        "remote_service_manager_test.cc",
+        "server_test.cc",
     ],
     death_unittest = True,
     visibility = ["//visibility:public"],
     deps = [
+        ":gatt",
+        ":testing",
+        "//src/connectivity/bluetooth/core/bt-host/att",
+        "//src/connectivity/bluetooth/core/bt-host/l2cap:testing",
+        "//src/connectivity/bluetooth/core/bt-host/testing",
         "//src/connectivity/bluetooth/core/bt-host/testing:gtest_main",
     ],
 )

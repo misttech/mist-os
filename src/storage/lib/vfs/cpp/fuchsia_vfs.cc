@@ -442,7 +442,6 @@ zx_status_t FuchsiaVfs::ServeDirectory(fbl::RefPtr<fs::Vnode> vn,
   return Serve(vn, server_end.TakeChannel(), options);
 }
 
-#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
 zx::result<> FuchsiaVfs::Serve3(Open2Result open_result, fuchsia_io::Rights rights,
                                 zx::channel& object_request, fuchsia_io::Flags flags,
                                 const fuchsia_io::wire::Options& options) {
@@ -484,16 +483,18 @@ zx::result<> FuchsiaVfs::Serve3(Open2Result open_result, fuchsia_io::Rights righ
       connection = std::make_unique<internal::NodeConnection>(this, vnode, rights);
       break;
     }
-    case fs::VnodeProtocol::kService: {
+    case VnodeProtocol::kService: {
       // TODO(b/324112857): There's nothing we can do if this fails since |Vnode::ConnectService|
       // consumes the channel. We should change it so that on failure, the channel is not consumed.
       // We should then close the channel with an epitaph using the error.
       [[maybe_unused]] zx_status_t status = vnode->ConnectService(std::move(object_request));
       return zx::ok();
     }
+#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
     case VnodeProtocol::kSymlink: {
       return zx::error(ZX_ERR_NOT_SUPPORTED);
     }
+#endif
   }
   ZX_DEBUG_ASSERT(connection != nullptr);
 
@@ -526,6 +527,5 @@ zx::result<> FuchsiaVfs::Serve3(Open2Result open_result, fuchsia_io::Rights righ
   }
   return result;
 }
-#endif
 
 }  // namespace fs

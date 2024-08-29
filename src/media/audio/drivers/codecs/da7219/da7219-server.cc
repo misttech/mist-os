@@ -651,4 +651,8 @@ void Server::SetTopology(SetTopologyRequestView request, SetTopologyCompleter::S
   }
 }
 
+void Server::handle_unknown_method(
+    fidl::UnknownMethodMetadata<fuchsia_hardware_audio_signalprocessing::SignalProcessing>,
+    fidl::UnknownMethodCompleter::Sync&) {}
+
 }  // namespace audio::da7219

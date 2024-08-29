@@ -37,6 +37,15 @@ pub struct ProductFilesystemConfig {
     /// Which volume to build to hold the filesystems.
     #[serde(default)]
     pub volume: VolumeConfig,
+
+    /// The compression algorithm that blobfs should use for writing blobs at runtime.
+    /// If unset, an internally defined system default is used.
+    pub blobfs_write_compression_algorithm: Option<BlobfsWriteCompressionAlgorithm>,
+
+    /// Controls blobfs' eviction strategy for pager-backed blobs with no open
+    /// handles or VMO clones. If unset, an internally defined system default is
+    /// used.
+    pub blobfs_cache_eviction_policy: Option<BlobfsCacheEvictionPolicy>,
 }
 
 /// The filename to use for the zbi and vbmeta.
@@ -176,4 +185,34 @@ pub enum BlobfsLayout {
 pub struct ReservedFvmVolumeConfig {
     /// The number of slices to reserve in the fvm.
     pub reserved_slices: u64,
+}
+
+/// Compression algorithms
+#[derive(Serialize, Deserialize, Debug, PartialEq, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub enum BlobfsWriteCompressionAlgorithm {
+    /// Use a ZSTD based compression scheme.
+    #[serde(rename = "zstd_chunked")]
+    ZSTDChunked,
+
+    /// Do no apply compression to blobs when writing the to disk.
+    #[serde(rename = "uncompressed")]
+    Uncompressed,
+}
+
+/// Eviction policies for blob cache management.
+#[derive(Serialize, Deserialize, Debug, PartialEq, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub enum BlobfsCacheEvictionPolicy {
+    /// Blobs that are not pager-backed are not affected by this knob.
+    /// Nodes are never evicted. It is recommended to enable kernel
+    /// page eviction (`kernel.page-scanner.enable-eviction`) in this case, as
+    /// otherwise blobfs will indefinitely retain all data pages in memory.
+    #[serde(rename = "never_evict")]
+    NeverEvict,
+
+    /// Nodes are evicted as soon as they have no open handles or VMO clones.
+    /// They will need to be loaded from disk again on next access.
+    #[serde(rename = "evict_immediately")]
+    EvictImmediately,
 }

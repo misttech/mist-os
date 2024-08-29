@@ -17,6 +17,7 @@ fuchsia_driver("driver") {
   sources = [ "root.cc" ]
   deps = [
     ":bind",
+    "//src/devices/bind/fuchsia:fuchsia_cpp",
     "//src/devices/bind/fuchsia.test:fuchsia.test_cpp",
     "//src/devices/lib/driver",
     "//src/devices/tests/v2/compat-node-group/bind:fuchsia.compat_cpp",

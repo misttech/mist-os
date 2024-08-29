@@ -8,13 +8,22 @@
 #include <lib/component/incoming/cpp/service.h>
 #include <lib/driver/component/cpp/tests/test_driver.h>
 #include <lib/driver/incoming/cpp/namespace.h>
-#include <lib/driver/testing/cpp/driver_lifecycle.h>
 #include <lib/driver/testing/cpp/driver_runtime.h>
-#include <lib/driver/testing/cpp/test_environment.h>
+#include <lib/driver/testing/cpp/internal/driver_lifecycle.h>
+#include <lib/driver/testing/cpp/internal/test_environment.h>
 #include <lib/driver/testing/cpp/test_node.h>
 #include <lib/fdio/directory.h>
 
 #include <gtest/gtest.h>
+
+// WARNING!
+// This test is using the old driver testing libraries. These were verbose and difficult to use
+// directly. We have a new driver testing library that wraps the logic provided by these libraries
+// and moves these into the internal namespace. The new library is in the header:
+// <lib/driver/testing/cpp/driver_test.h>
+// This library is the replacement that should be used from now on. It is also referred to
+// as the driver test fixture library in some places due to historical reasons. See the tests over
+// in fixture_based_tests.cc for example tests using the library.
 
 class ZirconProtocolServer
     : public fidl::WireServer<fuchsia_driver_component_test::ZirconProtocol> {
@@ -53,6 +62,7 @@ class DriverProtocolServer : public fdf::WireServer<fuchsia_driver_component_tes
 };
 // [END provide_handler]
 
+// SEE WARNING AT TOP. DO NOT COPY INTO NEW TESTS.
 // Sets up the environment to have both Zircon and Driver transport services.
 class TestIncomingAndOutgoingFidlsBase : public ::testing::Test {
  public:
@@ -66,7 +76,7 @@ class TestIncomingAndOutgoingFidlsBase : public ::testing::Test {
     // Start the test environment
     // [START initialize_test_environment]
     zx::result init_result =
-        test_environment_.SyncCall(&fdf_testing::TestEnvironment::Initialize,
+        test_environment_.SyncCall(&fdf_testing::internal::TestEnvironment::Initialize,
                                    std::move(start_args->incoming_directory_server));
     ASSERT_EQ(ZX_OK, init_result.status_value());
     // [END initialize_test_environment]
@@ -82,7 +92,7 @@ class TestIncomingAndOutgoingFidlsBase : public ::testing::Test {
     // [START move_server_handlers]
     test_environment_.SyncCall([zircon_proto_handler = std::move(zircon_proto_handler),
                                 driver_proto_handler = std::move(driver_proto_handler)](
-                                   fdf_testing::TestEnvironment* env) mutable {
+                                   fdf_testing::internal::TestEnvironment* env) mutable {
       zx::result result =
           env->incoming_directory().AddService<fuchsia_driver_component_test::ZirconService>(
               std::move(zircon_proto_handler));
@@ -97,7 +107,7 @@ class TestIncomingAndOutgoingFidlsBase : public ::testing::Test {
     // test_environment_ and device_server live on the same dispatcher so moving the ptr from one
     // to the other is fine to do.
     fdf::OutgoingDirectory* outgoing_ptr;
-    test_environment_.SyncCall([&outgoing_ptr](fdf_testing::TestEnvironment* test_env) {
+    test_environment_.SyncCall([&outgoing_ptr](fdf_testing::internal::TestEnvironment* test_env) {
       outgoing_ptr = &test_env->incoming_directory();
     });
     device_server.SyncCall([outgoing_ptr](compat::DeviceServer* device_server) {
@@ -162,7 +172,7 @@ class TestIncomingAndOutgoingFidlsBase : public ::testing::Test {
       env_dispatcher(), std::in_place, std::string("root")};
 
   // The environment can serve both the Zircon and Driver transport based protocols to the driver.
-  async_patterns::TestDispatcherBound<fdf_testing::TestEnvironment> test_environment_{
+  async_patterns::TestDispatcherBound<fdf_testing::internal::TestEnvironment> test_environment_{
       env_dispatcher(), std::in_place};
 
   fidl::ClientEnd<fuchsia_io::Directory> driver_outgoing_;
@@ -170,6 +180,7 @@ class TestIncomingAndOutgoingFidlsBase : public ::testing::Test {
   fuchsia_driver_framework::DriverStartArgs start_args_;
 };
 
+// SEE WARNING AT TOP. DO NOT COPY INTO NEW TESTS.
 // Set the driver dispatcher to default so we can access |driver()| directly.
 class TestIncomingAndOutgoingFidlsDefaultDriver : public TestIncomingAndOutgoingFidlsBase {
  public:
@@ -203,7 +214,7 @@ class TestIncomingAndOutgoingFidlsDefaultDriver : public TestIncomingAndOutgoing
 
  private:
   // The driver under test.
-  fdf_testing::DriverUnderTest<TestDriver> driver_;
+  fdf_testing::internal::DriverUnderTest<TestDriver> driver_;
 };
 
 TEST_F(TestIncomingAndOutgoingFidlsDefaultDriver, ValidateDriverIncomingServices) {
@@ -267,6 +278,7 @@ TEST_F(TestIncomingAndOutgoingFidlsDefaultDriver, ConnectWithDriverService) {
   });
 }
 
+// SEE WARNING AT TOP. DO NOT COPY INTO NEW TESTS.
 // Set the driver dispatcher to be managed so that we can make sync client calls into the driver
 // hosted services directly from the test instead of using |RunSyncClientTask| from above.
 class TestIncomingAndOutgoingFidlsManagedDriver : public TestIncomingAndOutgoingFidlsBase {
@@ -274,13 +286,13 @@ class TestIncomingAndOutgoingFidlsManagedDriver : public TestIncomingAndOutgoing
   void SetUp() override {
     TestIncomingAndOutgoingFidlsBase::SetUp();
     zx::result result = runtime().RunToCompletion(driver_.SyncCall(
-        &fdf_testing::DriverUnderTest<TestDriver>::Start, std::move(start_args())));
+        &fdf_testing::internal::DriverUnderTest<TestDriver>::Start, std::move(start_args())));
     ASSERT_EQ(ZX_OK, result.status_value());
   }
 
   void TearDown() override {
     zx::result result = runtime().RunToCompletion(
-        driver_.SyncCall(&fdf_testing::DriverUnderTest<TestDriver>::PrepareStop));
+        driver_.SyncCall(&fdf_testing::internal::DriverUnderTest<TestDriver>::PrepareStop));
     ASSERT_EQ(ZX_OK, result.status_value());
 
     // Tear down the environment after the driver goes through PrepareStop.
@@ -289,7 +301,8 @@ class TestIncomingAndOutgoingFidlsManagedDriver : public TestIncomingAndOutgoing
     runtime().ShutdownAllDispatchers(driver_dispatcher_->get());
   }
 
-  async_patterns::TestDispatcherBound<fdf_testing::DriverUnderTest<TestDriver>>& driver() {
+  async_patterns::TestDispatcherBound<fdf_testing::internal::DriverUnderTest<TestDriver>>&
+  driver() {
     return driver_;
   }
   async_dispatcher_t* driver_dispatcher() { return driver_dispatcher_->async_dispatcher(); }
@@ -299,12 +312,12 @@ class TestIncomingAndOutgoingFidlsManagedDriver : public TestIncomingAndOutgoing
   fdf::UnownedSynchronizedDispatcher driver_dispatcher_ = runtime().StartBackgroundDispatcher();
 
   // The driver under test.
-  async_patterns::TestDispatcherBound<fdf_testing::DriverUnderTest<TestDriver>> driver_{
+  async_patterns::TestDispatcherBound<fdf_testing::internal::DriverUnderTest<TestDriver>> driver_{
       driver_dispatcher(), std::in_place};
 };
 
 TEST_F(TestIncomingAndOutgoingFidlsManagedDriver, ConnectWithDevfs) {
-  driver().SyncCall([](fdf_testing::DriverUnderTest<TestDriver>* driver) {
+  driver().SyncCall([](fdf_testing::internal::DriverUnderTest<TestDriver>* driver) {
     zx::result result = (*driver)->ExportDevfsNodeSync();
     ASSERT_EQ(ZX_OK, result.status_value());
   });
@@ -325,7 +338,7 @@ TEST_F(TestIncomingAndOutgoingFidlsManagedDriver, ConnectWithDevfs) {
 }
 
 TEST_F(TestIncomingAndOutgoingFidlsManagedDriver, ConnectWithZirconService) {
-  driver().SyncCall([](fdf_testing::DriverUnderTest<TestDriver>* driver) {
+  driver().SyncCall([](fdf_testing::internal::DriverUnderTest<TestDriver>* driver) {
     zx::result result = (*driver)->ServeZirconService();
     ASSERT_EQ(ZX_OK, result.status_value());
   });
@@ -341,7 +354,7 @@ TEST_F(TestIncomingAndOutgoingFidlsManagedDriver, ConnectWithZirconService) {
 }
 
 TEST_F(TestIncomingAndOutgoingFidlsManagedDriver, ConnectWithDriverService) {
-  driver().SyncCall([](fdf_testing::DriverUnderTest<TestDriver>* driver) {
+  driver().SyncCall([](fdf_testing::internal::DriverUnderTest<TestDriver>* driver) {
     zx::result result = (*driver)->ServeDriverService();
     ASSERT_EQ(ZX_OK, result.status_value());
   });

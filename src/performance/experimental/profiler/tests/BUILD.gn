@@ -69,6 +69,22 @@ fuchsia_unittest_package("profiler_unittests") {
   deps = [ ":profiler_unittest_bin" ]
 }
 
+executable("gtest_target_bin") {
+  sources = [ "gtest_target.cc" ]
+  deps = [
+    "//sdk/lib/fdio",
+    "//src/lib/fxl/test:gtest_main",
+    "//zircon/system/ulib/async:async-cpp",
+    "//zircon/system/ulib/async-loop:async-loop-cpp",
+    "//zircon/system/ulib/async-loop:async-loop-default",
+  ]
+  testonly = true
+}
+
+fuchsia_unittest_package("gtest_target") {
+  deps = [ ":gtest_target_bin" ]
+}
+
 group("tests") {
   testonly = true
   public_deps = [

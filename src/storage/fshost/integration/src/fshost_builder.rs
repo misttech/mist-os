@@ -110,6 +110,9 @@ impl FshostBuilder {
             ("fxfs_blob", "fuchsia.fshost.FxfsBlob"),
             ("fxfs_crypt_url", "fuchsia.fshost.FxfsCryptUrl"),
             ("storage_host", "fuchsia.fshost.StorageHost"),
+            ("disable_automount", "fuchsia.fshost.DisableAutomount"),
+            ("blobfs_write_compression_algorithm", "fuchsia.blobfs.WriteCompressionAlgorithm"),
+            ("blobfs_cache_eviction_policy", "fuchsia.blobfs.CacheEvictionPolicy"),
         ]);
 
         // Add the overrides as capabilities and route them.

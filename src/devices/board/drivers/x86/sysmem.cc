@@ -24,23 +24,6 @@ static const std::vector<fpbus::Bti> sysmem_btis = {
     }},
 };
 
-// On x86 not much is known about the display adapter or other hardware.
-static const std::vector<uint8_t> sysmem_metadata = [] {
-  fuchsia_hardware_sysmem::Metadata metadata;
-  metadata.vid() = PDEV_VID_GENERIC;
-  metadata.pid() = PDEV_PID_GENERIC;
-  auto persist_result = fidl::Persist(metadata);
-  ZX_ASSERT(persist_result.is_ok());
-  return std::move(persist_result.value());
-}();
-
-static const std::vector<fpbus::Metadata> GetSysmemMetadataList() {
-  return std::vector<fpbus::Metadata>{{{
-      .type = fuchsia_hardware_sysmem::wire::kMetadataType,
-      .data = sysmem_metadata,
-  }}};
-}
-
 static const fpbus::Node GetSystemDev() {
   fpbus::Node node;
   node.name() = "sysmem";
@@ -48,7 +31,6 @@ static const fpbus::Node GetSystemDev() {
   node.pid() = PDEV_PID_GENERIC;
   node.did() = PDEV_DID_SYSMEM;
   node.bti() = sysmem_btis;
-  node.metadata() = GetSysmemMetadataList();
   return node;
 }
 

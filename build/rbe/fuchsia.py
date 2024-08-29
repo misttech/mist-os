@@ -9,7 +9,6 @@ This includes information like:
   * path conventions
 """
 
-import glob
 import os
 import platform
 import sys

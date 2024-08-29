@@ -22,7 +22,7 @@ namespace brownout_protection {
 namespace audio_fidl = ::fuchsia::hardware::audio;
 namespace signal_fidl = ::fuchsia::hardware::audio::signalprocessing;
 
-class FakeCodec : public audio::SimpleCodecServer, public signal_fidl::SignalProcessing {
+class FakeCodec final : public audio::SimpleCodecServer, public signal_fidl::SignalProcessing {
  public:
   FakeCodec(zx_device_t* parent) : SimpleCodecServer(parent) {}
   fuchsia_hardware_audio::CodecService::InstanceHandler GetInstanceHandler() {
@@ -97,6 +97,8 @@ class FakeCodec : public audio::SimpleCodecServer, public signal_fidl::SignalPro
   audio::GainState GetGainState() override { return gain_state; }
   void SetGainState(audio::GainState state) override { gain_state = state; }
   inspect::Inspector& inspect() { return SimpleCodecServer::inspect(); }
+
+  void handle_unknown_method(uint64_t ordinal, bool method_has_response) override {}
 
  private:
   static constexpr uint64_t kAglPeId = 1;

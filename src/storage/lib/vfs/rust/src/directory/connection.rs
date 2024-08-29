@@ -14,15 +14,15 @@ use crate::path::Path;
 
 use anyhow::Error;
 use fidl::endpoints::ServerEnd;
-#[cfg(any(fuchsia_api_level_less_than = "NEXT", fuchsia_api_level_at_least = "PLATFORM"))]
+#[cfg(any(fuchsia_api_level_less_than = "23", fuchsia_api_level_at_least = "PLATFORM"))]
 use fidl::epitaph::ChannelEpitaphExt;
 use fidl_fuchsia_io as fio;
 use fuchsia_zircon_status::Status;
 use std::convert::TryInto as _;
 use storage_trace::{self as trace, TraceFutureExt};
 
-#[cfg(fuchsia_api_level_at_least = "HEAD")]
-use crate::{common::CreationMode, ObjectRequest, ObjectRequestRef, ProtocolsExt};
+use crate::common::CreationMode;
+use crate::{ObjectRequest, ObjectRequestRef, ProtocolsExt};
 
 /// Return type for `BaseConnection::handle_request`.
 pub enum ConnectionState {
@@ -175,7 +175,7 @@ impl<DirectoryType: Directory> BaseConnection<DirectoryType> {
                 yield_to_executor().await;
             }
             #[cfg(any(
-                fuchsia_api_level_less_than = "NEXT",
+                fuchsia_api_level_less_than = "23",
                 fuchsia_api_level_at_least = "PLATFORM"
             ))]
             fio::DirectoryRequest::Open2 {
@@ -250,7 +250,6 @@ impl<DirectoryType: Directory> BaseConnection<DirectoryType> {
             fio::DirectoryRequest::CreateSymlink { responder, .. } => {
                 responder.send(Err(Status::NOT_SUPPORTED.into_raw()))?;
             }
-            #[cfg(fuchsia_api_level_at_least = "HEAD")]
             fio::DirectoryRequest::Open3 {
                 path,
                 mut flags,
@@ -335,7 +334,6 @@ impl<DirectoryType: Directory> BaseConnection<DirectoryType> {
         directory.open(self.scope.clone(), flags, path, server_end);
     }
 
-    #[cfg(fuchsia_api_level_at_least = "HEAD")]
     fn handle_open3(
         &self,
         path: String,

@@ -112,7 +112,7 @@ where
     ) -> Result<Self::DeviceId, ResolveRouteError> {
         let remote_ip = SocketIpAddr::new_from_multicast(addr);
         let ResolvedRoute { src_addr: _, device, local_delivery_device, next_hop: _ } =
-            ip::resolve_route_to_destination(self, None, None, Some(remote_ip), false)?;
+            ip::resolve_output_route_to_destination(self, None, None, Some(remote_ip))?;
         // NB: Because the original address is multicast, it cannot be assigned
         // to a local interface. Thus local delivery should never be requested.
         debug_assert!(local_delivery_device.is_none(), "{:?}", local_delivery_device);
@@ -225,7 +225,7 @@ impl<BT: BindingsTypes, I: IpLayerIpExt> UnlockedAccess<crate::lock_ordering::Ip
 }
 
 #[netstack3_macros::instantiate_ip_impl_block(I)]
-impl<I, BC, L> IpStateContext<I, BC> for CoreCtx<'_, BC, L>
+impl<I, BC, L> IpStateContext<I> for CoreCtx<'_, BC, L>
 where
     I: IpLayerIpExt,
     BC: BindingsContext,
@@ -260,7 +260,7 @@ where
 }
 
 #[netstack3_macros::instantiate_ip_impl_block(I)]
-impl<I, BC, L> IpRouteTablesContext<I, BC> for CoreCtx<'_, BC, L>
+impl<I, BC, L> IpRouteTablesContext<I> for CoreCtx<'_, BC, L>
 where
     I: IpLayerIpExt,
     BC: BindingsContext,

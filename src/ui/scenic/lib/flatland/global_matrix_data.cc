@@ -8,9 +8,7 @@
 #include <lib/trace/event.h>
 
 #include <cmath>
-#include <iterator>
 
-#include "src/ui/lib/escher/geometry/types.h"
 #include "src/ui/scenic/lib/flatland/flatland_types.h"
 
 #include <glm/gtc/epsilon.hpp>

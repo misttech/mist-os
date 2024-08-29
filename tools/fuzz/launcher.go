@@ -144,9 +144,6 @@ func getQemuInvocation(config qemuConfig) ([]string, error) {
 	qemuCmd.AddKernelArg("kernel.lockup-detector.heartbeat-age-threshold-ms=0")
 	qemuCmd.AddKernelArg("kernel.lockup-detector.heartbeat-age-fatal-threshold-ms=0")
 
-	// Disable the virtcon.
-	qemuCmd.AddKernelArg("virtcon.disable=true")
-
 	// Unbuffer log output.
 	qemuCmd.AddKernelArg("kernel.bypass-debuglog=true")
 

@@ -15,7 +15,7 @@ use crate::task::{
     ExceptionResult, ExitStatus, Kernel, ProcessGroup, PtraceCoreState, SeccompStateValue,
     StopState, TaskBuilder, TaskFlags, ThreadGroup, ThreadGroupWriteGuard,
 };
-use crate::vfs::{DelayedReleaser, FileSystemCreator};
+use crate::vfs::DelayedReleaser;
 use anyhow::{format_err, Error};
 #[cfg(feature = "syscall_stats")]
 use fuchsia_inspect::NumericProperty;

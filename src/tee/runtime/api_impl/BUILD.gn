@@ -23,15 +23,15 @@ config("export_scudo_dynamic_options") {
 # fill "pattern" of 0.
 sanitizer_extra_options("malloc_fill_byte_zero_asan") {
   args = [ "malloc_fill_byte=0:max_malloc_fill_size=2147483647" ]
-  output_name = "asan_default_options"
   tags = [ "asan" ]
+  sanitizer = "asan"
 }
 
 # HWAsan also replaces the allocator and needs the same options.
 sanitizer_extra_options("malloc_fill_byte_zero_hwasan") {
   args = [ "malloc_fill_byte=0:max_malloc_fill_size=2147483647" ]
-  output_name = "hwasan_default_options"
   tags = [ "hwasan" ]
+  sanitizer = "hwasan"
 }
 
 rustc_library("api_impl") {

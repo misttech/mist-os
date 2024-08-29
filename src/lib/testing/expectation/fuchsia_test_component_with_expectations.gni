@@ -49,6 +49,7 @@ template("fuchsia_test_component_with_expectations") {
 
   _expectations_target = "${target_name}_preprocessed_expectations"
   preprocess_expectations(_expectations_target) {
+    testonly = true
     if (defined(invoker.generated_expectations)) {
       assert(!defined(invoker.expectations))
 

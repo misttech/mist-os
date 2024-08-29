@@ -20,7 +20,6 @@ typedef struct zx_device_str_prop zx_device_str_prop_t;
 typedef struct zx_device_str_prop_val zx_device_str_prop_val_t;
 typedef struct zx_driver_rec zx_driver_rec_t;
 
-typedef struct zx_bind_inst zx_bind_inst_t;
 typedef struct zx_driver_binding zx_driver_binding_t;
 
 // echo -n "zx_driver_ops_v0.5" | sha256sum | cut -c1-16
@@ -128,12 +127,6 @@ typedef struct device_add_args {
   // Pointer to device's device protocol operations
   const zx_protocol_device_t* ops;
 
-  // Optional list of device properties.
-  const zx_device_prop_t* props;
-
-  // Number of device properties
-  uint32_t prop_count;
-
   // Optional list of device string properties.
   const zx_device_str_prop_t* str_props;
 
@@ -199,18 +192,6 @@ typedef struct device_init_reply_args {
 } device_init_reply_args_t;
 
 typedef struct {
-  // Optional list of device properties.
-  // Memory owned by the caller.
-  zx_device_prop_t* props;
-
-  // Size of the device properties array.
-  // To be filled by the caller.
-  const uint32_t prop_count;
-
-  // Count of properties filled with valid data.
-  // Will be filled by the callee.
-  uint32_t actual_prop_count;
-
   // Optional list of device string properties.
   // Memory owned by the caller.
   zx_device_str_prop_t* str_props;
@@ -305,29 +286,6 @@ void device_resume_reply(zx_device_t* device, zx_status_t status, uint8_t out_po
 // This API should be used in preference to hard coding parameters in drivers.
 zx_status_t device_set_profile_by_role(zx_device_t* device, zx_handle_t thread, const char* role,
                                        size_t role_size);
-
-// A description of a part of a device fragment.  It provides a bind program
-// that will match a device on the path from the root of the device tree to the
-// target device.
-typedef struct device_fragment_part {
-  uint32_t instruction_count;
-  const zx_bind_inst_t* match_program;
-} device_fragment_part_t;
-
-// A description of a device that makes up part of a composite device.  The
-// particular device is identified by a sequence of part descriptions.  Each
-// part description must match either the target device or one of its ancestors.
-// The first element in |parts| must describe the root of the device tree.  The
-// last element in |parts| must describe the target device itself.  The
-// remaining elements of |parts| must match devices on the path from the root to
-// the target device, in order.  Some of those devices may be skipped, but every
-// element of |parts| must have a match.  This sequence of matches between
-// |parts| and devices must be unique.
-typedef struct device_fragment {
-  const char* name;
-  uint32_t parts_count;
-  const device_fragment_part_t* parts;
-} device_fragment_t;
 
 typedef enum {
   ZX_DEVICE_PROPERTY_VALUE_UNDEFINED = 0,

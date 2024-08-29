@@ -2,26 +2,27 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use super::{check_permission, fs_node_effective_sid};
 use crate::mm::memory::MemoryObject;
 use crate::task::CurrentTask;
 use crate::vfs::buffers::{InputBuffer, OutputBuffer};
 use crate::vfs::{
-    emit_dotdot, fileops_impl_directory, fileops_impl_nonseekable, fileops_impl_noop_sync,
+    emit_dotdot, fileops_impl_directory, fileops_impl_noop_sync, fileops_impl_seekable,
     fs_node_impl_dir_readonly, fs_node_impl_not_dir, parse_unsigned_file, unbounded_seek,
     BytesFile, BytesFileOps, CacheMode, DirectoryEntryType, DirentSink, FileObject, FileOps,
     FileSystem, FileSystemHandle, FileSystemOps, FileSystemOptions, FsNode, FsNodeHandle,
-    FsNodeInfo, FsNodeOps, FsStr, FsString, MemoryFileNode, SeekTarget, StaticDirectoryBuilder,
-    VecDirectory, VecDirectoryEntry,
+    FsNodeInfo, FsNodeOps, FsStr, FsString, MemoryFileNode, SeekTarget, SimpleFileNode,
+    StaticDirectoryBuilder, VecDirectory, VecDirectoryEntry,
 };
 
-use bstr::ByteSlice;
 use fuchsia_zircon as zx;
 use fuchsia_zircon::HandleBased;
 use selinux::policy::SUPPORTED_POLICY_VERSION;
+use selinux::SecurityPermission;
 use selinux_core::security_server::SecurityServer;
 use selinux_core::{InitialSid, SecurityId};
 use starnix_logging::{impossible_error, log_error, log_info, track_stub};
-use starnix_sync::{FileOpsCore, Locked, Mutex};
+use starnix_sync::{FileOpsCore, Locked};
 use starnix_uapi::device_type::DeviceType;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::file_mode::mode;
@@ -29,6 +30,7 @@ use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::vfs::default_statfs;
 use starnix_uapi::{errno, error, off_t, statfs, SELINUX_MAGIC};
 use std::borrow::Cow;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 
 struct SeLinuxFs;
@@ -62,23 +64,23 @@ impl SeLinuxFs {
         };
 
         // Read-only files & directories, exposing SELinux internal state.
-        dir.entry(current_task, "checkreqprot", SeCheckReqProt::new_node(), mode!(IFREG, 0o644));
+        dir.entry(current_task, "checkreqprot", CheckReqProtApi::new_node(), mode!(IFREG, 0o644));
         dir.entry(
             current_task,
             "class",
-            SeLinuxClassDirectory::new(security_server.clone()),
+            ClassDirectory::new(security_server.clone()),
             mode!(IFDIR, 0o555),
         );
         dir.entry(
             current_task,
             "deny_unknown",
-            SeDenyUnknown::new_node(security_server.clone()),
+            DenyUnknownFile::new_node(security_server.clone()),
             mode!(IFREG, 0o444),
         );
         dir.entry(
             current_task,
             "reject_unknown",
-            SeRejectUnknown::new_node(security_server.clone()),
+            RejectUnknownFile::new_node(security_server.clone()),
             mode!(IFREG, 0o444),
         );
         dir.subdir(current_task, "initial_contexts", 0o555, |dir| {
@@ -86,7 +88,7 @@ impl SeLinuxFs {
                 dir.entry(
                     current_task,
                     initial_sid.name(),
-                    SeInitialContext::new_node(security_server.clone(), initial_sid),
+                    InitialContextFile::new_node(security_server.clone(), initial_sid),
                     mode!(IFREG, 0o444),
                 );
             }
@@ -95,7 +97,7 @@ impl SeLinuxFs {
         dir.entry(
             current_task,
             "policy",
-            SePolicy::new_node(security_server.clone()),
+            PolicyFile::new_node(security_server.clone()),
             mode!(IFREG, 0o600),
         );
         dir.entry(
@@ -121,24 +123,24 @@ impl SeLinuxFs {
         );
 
         // Write-only files used to configure and query SELinux.
-        dir.entry(current_task, "access", AccessFileNode::new(), mode!(IFREG, 0o666));
+        dir.entry(current_task, "access", AccessApi::new_node(), mode!(IFREG, 0o666));
         dir.entry(
             current_task,
             "context",
-            SeContext::new_node(security_server.clone()),
+            ContextApi::new_node(security_server.clone()),
             mode!(IFREG, 0o666),
         );
-        dir.entry(current_task, "create", SeCreate::new_node(), mode!(IFREG, 0o666));
+        dir.entry(current_task, "create", CreateApi::new_node(), mode!(IFREG, 0o666));
         dir.entry(
             current_task,
             "load",
-            SeLoad::new_node(security_server.clone()),
+            LoadApi::new_node(security_server.clone()),
             mode!(IFREG, 0o600),
         );
         dir.entry(
             current_task,
             "commit_pending_bools",
-            SeLinuxCommitBooleans::new_node(security_server.clone()),
+            CommitBooleansApi::new_node(security_server.clone()),
             mode!(IFREG, 0o200),
         );
 
@@ -146,13 +148,13 @@ impl SeLinuxFs {
         dir.entry(
             current_task,
             "booleans",
-            SeLinuxBooleansDirectory::new(security_server.clone()),
+            BooleansDirectory::new(security_server.clone()),
             mode!(IFDIR, 0o555),
         );
         dir.entry(
             current_task,
             "enforce",
-            SeEnforce::new_node(security_server.clone()),
+            EnforceApi::new_node(security_server.clone()),
             // TODO(b/297313229): Get mode from the container.
             mode!(IFREG, 0o644),
         );
@@ -166,18 +168,26 @@ impl SeLinuxFs {
     }
 }
 
-struct SeLoad {
+/// "load" API, accepting a binary policy in a single `write()` operation, which must be at seek
+/// position zero.
+struct LoadApi {
     security_server: Arc<SecurityServer>,
 }
 
-impl SeLoad {
+impl LoadApi {
     fn new_node(security_server: Arc<SecurityServer>) -> impl FsNodeOps {
-        BytesFile::new_node(Self { security_server })
+        SeLinuxApi::new_node(move || Ok(Self { security_server: security_server.clone() }))
     }
 }
 
-impl BytesFileOps for SeLoad {
-    fn write(&self, _current_task: &CurrentTask, data: Vec<u8>) -> Result<(), Errno> {
+impl SeLinuxApiOps for LoadApi {
+    fn api_write_permission() -> SecurityPermission {
+        SecurityPermission::LoadPolicy
+    }
+    fn api_write(&self, offset: usize, data: Vec<u8>) -> Result<(), Errno> {
+        if offset != 0 {
+            return error!(EINVAL);
+        }
         log_info!("Loading {} byte policy", data.len());
         self.security_server.load_policy(data).map_err(|error| {
             log_error!("Policy load error: {}", error);
@@ -186,144 +196,170 @@ impl BytesFileOps for SeLoad {
     }
 }
 
-struct SePolicy {
+/// "policy" file, which allows the currently-loaded binary policy, to be read as a normal file,
+/// including supporting seek-aware reads.
+struct PolicyFile {
     security_server: Arc<SecurityServer>,
 }
 
-impl SePolicy {
+impl PolicyFile {
     fn new_node(security_server: Arc<SecurityServer>) -> impl FsNodeOps {
         BytesFile::new_node(Self { security_server })
     }
 }
 
-impl BytesFileOps for SePolicy {
+impl BytesFileOps for PolicyFile {
     fn read(&self, _current_task: &CurrentTask) -> Result<Cow<'_, [u8]>, Errno> {
         Ok(self.security_server.get_binary_policy().into())
     }
 }
 
-struct SeEnforce {
+/// "enforce" API used to control whether SELinux is globally permissive, versus enforcing.
+struct EnforceApi {
     security_server: Arc<SecurityServer>,
 }
 
-impl SeEnforce {
+impl EnforceApi {
     fn new_node(security_server: Arc<SecurityServer>) -> impl FsNodeOps {
-        BytesFile::new_node(Self { security_server })
+        SeLinuxApi::new_node(move || Ok(Self { security_server: security_server.clone() }))
     }
 }
 
-impl BytesFileOps for SeEnforce {
-    fn write(&self, _current_task: &CurrentTask, data: Vec<u8>) -> Result<(), Errno> {
+impl SeLinuxApiOps for EnforceApi {
+    fn api_write_permission() -> SecurityPermission {
+        SecurityPermission::SetEnforce
+    }
+
+    fn api_write(&self, _offset: usize, data: Vec<u8>) -> Result<(), Errno> {
         let enforce = parse_unsigned_file::<u32>(&data)? != 0;
         self.security_server.set_enforcing(enforce);
         Ok(())
     }
 
-    fn read(&self, _current_task: &CurrentTask) -> Result<Cow<'_, [u8]>, Errno> {
+    fn api_read(&self, _offset: usize) -> Result<Cow<'_, [u8]>, Errno> {
         Ok(format!("{}", self.security_server.is_enforcing() as u32).into_bytes().into())
     }
 }
 
-struct SeDenyUnknown {
+/// "deny_unknown" file which exposes how classes & permissions not defined by the policy should
+/// be allowed or denied.
+struct DenyUnknownFile {
     security_server: Arc<SecurityServer>,
 }
 
-impl SeDenyUnknown {
+impl DenyUnknownFile {
     fn new_node(security_server: Arc<SecurityServer>) -> impl FsNodeOps {
         BytesFile::new_node(Self { security_server })
     }
 }
 
-impl BytesFileOps for SeDenyUnknown {
+impl BytesFileOps for DenyUnknownFile {
     fn read(&self, _current_task: &CurrentTask) -> Result<Cow<'_, [u8]>, Errno> {
         Ok(format!("{}", self.security_server.deny_unknown() as u32).into_bytes().into())
     }
 }
 
-struct SeRejectUnknown {
+/// "reject_unknown" file which exposes whether kernel classes & permissions not defined by the
+/// policy would have prevented the policy being loaded.
+struct RejectUnknownFile {
     security_server: Arc<SecurityServer>,
 }
 
-impl SeRejectUnknown {
+impl RejectUnknownFile {
     fn new_node(security_server: Arc<SecurityServer>) -> impl FsNodeOps {
         BytesFile::new_node(Self { security_server })
     }
 }
 
-impl BytesFileOps for SeRejectUnknown {
+impl BytesFileOps for RejectUnknownFile {
     fn read(&self, _current_task: &CurrentTask) -> Result<Cow<'_, [u8]>, Errno> {
         Ok(format!("{}", self.security_server.reject_unknown() as u32).into_bytes().into())
     }
 }
 
-struct SeCreate {
-    data: Mutex<Vec<u8>>,
-}
+/// "create" API used to determine the Security Context to associate with a new resource instance
+/// based on source, target, and target class.
+struct CreateApi;
 
-impl SeCreate {
+impl CreateApi {
     fn new_node() -> impl FsNodeOps {
-        BytesFile::new_node(Self { data: Mutex::default() })
+        SeLinuxApi::new_node(|| Ok(Self {}))
     }
 }
 
-impl BytesFileOps for SeCreate {
-    fn write(&self, _current_task: &CurrentTask, data: Vec<u8>) -> Result<(), Errno> {
-        *self.data.lock() = data;
+impl SeLinuxApiOps for CreateApi {
+    fn api_write_permission() -> SecurityPermission {
+        SecurityPermission::ComputeCreate
+    }
+    fn api_write(&self, _offset: usize, _data: Vec<u8>) -> Result<(), Errno> {
+        track_stub!(TODO("https://fxbug.dev/361552580"), "selinux create");
         Ok(())
     }
-    fn read(&self, _current_task: &CurrentTask) -> Result<Cow<'_, [u8]>, Errno> {
-        Ok(self.data.lock().clone().into())
+    fn api_read(&self, _offset: usize) -> Result<Cow<'_, [u8]>, Errno> {
+        Ok([].as_ref().into())
     }
 }
 
-struct SeCheckReqProt;
+struct CheckReqProtApi;
 
-impl SeCheckReqProt {
+impl CheckReqProtApi {
     fn new_node() -> impl FsNodeOps {
-        BytesFile::new_node(Self {})
+        SeLinuxApi::new_node(|| Ok(Self {}))
     }
 }
 
-impl BytesFileOps for SeCheckReqProt {
-    fn write(&self, _current_task: &CurrentTask, data: Vec<u8>) -> Result<(), Errno> {
+impl SeLinuxApiOps for CheckReqProtApi {
+    fn api_write_permission() -> SecurityPermission {
+        SecurityPermission::SetCheckReqProt
+    }
+
+    fn api_write(&self, _offset: usize, data: Vec<u8>) -> Result<(), Errno> {
         let _checkreqprot = parse_unsigned_file::<u32>(&data)? != 0;
         track_stub!(TODO("https://fxbug.dev/322874766"), "selinux checkreqprot");
         Ok(())
     }
 }
 
-struct SeContext {
+/// "context" API which accepts a Security Context in a single `write()` operation, whose result indicates
+/// whether the supplied context was valid with respect to the current policy.
+struct ContextApi {
     security_server: Arc<SecurityServer>,
 }
 
-impl SeContext {
+impl ContextApi {
     fn new_node(security_server: Arc<SecurityServer>) -> impl FsNodeOps {
-        BytesFile::new_node(Self { security_server })
+        SeLinuxApi::new_node(move || Ok(Self { security_server: security_server.clone() }))
     }
 }
 
-impl BytesFileOps for SeContext {
-    fn write(&self, _current_task: &CurrentTask, data: Vec<u8>) -> Result<(), Errno> {
+impl SeLinuxApiOps for ContextApi {
+    fn api_write_permission() -> SecurityPermission {
+        SecurityPermission::CheckContext
+    }
+
+    fn api_write(&self, _offset: usize, data: Vec<u8>) -> Result<(), Errno> {
         // Validate that the `data` describe valid user, role, type, etc by attempting to create
         // a SID from it.
-        let context = data.as_slice().trim_end_with(|c| c == '\0');
-        self.security_server.security_context_to_sid(context.into()).map_err(|_| errno!(EINVAL))?;
+        // TODO: https://fxbug.dev/362476447 - Provide a validate API that does not allocate a SID.
+        self.security_server
+            .security_context_to_sid(data.as_slice().into())
+            .map_err(|_| errno!(EINVAL))?;
         Ok(())
     }
 }
 
-struct SeInitialContext {
+struct InitialContextFile {
     security_server: Arc<SecurityServer>,
     initial_sid: InitialSid,
 }
 
-impl SeInitialContext {
+impl InitialContextFile {
     fn new_node(security_server: Arc<SecurityServer>, initial_sid: InitialSid) -> impl FsNodeOps {
         BytesFile::new_node(Self { security_server, initial_sid })
     }
 }
 
-impl BytesFileOps for SeInitialContext {
+impl BytesFileOps for InitialContextFile {
     fn read(&self, _current_task: &CurrentTask) -> Result<Cow<'_, [u8]>, Errno> {
         let sid = SecurityId::initial(self.initial_sid);
         if let Some(context) = self.security_server.sid_to_security_context(sid) {
@@ -337,39 +373,32 @@ impl BytesFileOps for SeInitialContext {
     }
 }
 
-struct AccessFile {
+struct AccessApi {
     seqno: u64,
 }
 
-impl FileOps for AccessFile {
-    fileops_impl_nonseekable!();
-    fileops_impl_noop_sync!();
+impl AccessApi {
+    fn new_node() -> impl FsNodeOps {
+        static SEQUENCE_NO: AtomicU64 = AtomicU64::new(0);
+        SeLinuxApi::new_node(move || Ok(Self { seqno: SEQUENCE_NO.fetch_add(1, Ordering::SeqCst) }))
+    }
+}
 
-    fn read(
-        &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
-        _file: &FileObject,
-        _current_task: &CurrentTask,
-        offset: usize,
-        data: &mut dyn OutputBuffer,
-    ) -> Result<usize, Errno> {
-        debug_assert!(offset == 0);
-        // Format is allowed decided autitallow auditdeny seqno flags
-        // Everything but seqno must be in hexadecimal format and represents a bits field.
-        let content = format!("ffffffff ffffffff 0 ffffffff {} 0\n", self.seqno);
-        data.write(content.as_bytes())
+impl SeLinuxApiOps for AccessApi {
+    fn api_write_permission() -> SecurityPermission {
+        SecurityPermission::ComputeAv
     }
 
-    fn write(
-        &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
-        _file: &FileObject,
-        _current_task: &CurrentTask,
-        offset: usize,
-        data: &mut dyn InputBuffer,
-    ) -> Result<usize, Errno> {
-        debug_assert!(offset == 0);
-        Ok(data.drain())
+    fn api_write(&self, _offset: usize, _data: Vec<u8>) -> Result<(), Errno> {
+        track_stub!(TODO("https://fxbug.dev/361551536"), "selinux access");
+        Ok(())
+    }
+
+    fn api_read(&self, _offset: usize) -> Result<Cow<'_, [u8]>, Errno> {
+        // Format is allowed decided auditallow auditdeny seqno flags
+        // Everything but seqno must be in hexadecimal format and represents a bits field.
+        let result = format!("ffffffff ffffffff 0 ffffffff {} 0\n", self.seqno);
+        Ok(result.into_bytes().into())
     }
 }
 
@@ -388,46 +417,17 @@ impl FsNodeOps for DeviceFileNode {
     }
 }
 
-struct AccessFileNode {
-    seqno: Mutex<u64>,
-}
-
-impl AccessFileNode {
-    fn new() -> Self {
-        Self { seqno: Mutex::new(0) }
-    }
-}
-
-impl FsNodeOps for AccessFileNode {
-    fs_node_impl_not_dir!();
-
-    fn create_file_ops(
-        &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
-        _node: &FsNode,
-        _current_task: &CurrentTask,
-        _flags: OpenFlags,
-    ) -> Result<Box<dyn FileOps>, Errno> {
-        let seqno = {
-            let mut writer = self.seqno.lock();
-            *writer += 1;
-            *writer
-        };
-        Ok(Box::new(AccessFile { seqno }))
-    }
-}
-
-struct SeLinuxBooleansDirectory {
+struct BooleansDirectory {
     security_server: Arc<SecurityServer>,
 }
 
-impl SeLinuxBooleansDirectory {
+impl BooleansDirectory {
     fn new(security_server: Arc<SecurityServer>) -> Arc<Self> {
         Arc::new(Self { security_server })
     }
 }
 
-impl FsNodeOps for Arc<SeLinuxBooleansDirectory> {
+impl FsNodeOps for Arc<BooleansDirectory> {
     fs_node_impl_dir_readonly!();
 
     fn create_file_ops(
@@ -450,7 +450,7 @@ impl FsNodeOps for Arc<SeLinuxBooleansDirectory> {
         if self.security_server.conditional_booleans().contains(&utf8_name) {
             Ok(node.fs().create_node(
                 current_task,
-                SeLinuxBoolean::new_node(self.security_server.clone(), utf8_name),
+                BooleanFile::new_node(self.security_server.clone(), utf8_name),
                 FsNodeInfo::new_factory(mode!(IFREG, 0o644), current_task.as_fscred()),
             ))
         } else {
@@ -459,7 +459,7 @@ impl FsNodeOps for Arc<SeLinuxBooleansDirectory> {
     }
 }
 
-impl FileOps for SeLinuxBooleansDirectory {
+impl FileOps for BooleansDirectory {
     fileops_impl_directory!();
     fileops_impl_noop_sync!();
 
@@ -498,18 +498,18 @@ impl FileOps for SeLinuxBooleansDirectory {
     }
 }
 
-struct SeLinuxBoolean {
+struct BooleanFile {
     security_server: Arc<SecurityServer>,
     name: String,
 }
 
-impl SeLinuxBoolean {
+impl BooleanFile {
     fn new_node(security_server: Arc<SecurityServer>, name: String) -> impl FsNodeOps {
-        BytesFile::new_node(SeLinuxBoolean { security_server, name })
+        BytesFile::new_node(BooleanFile { security_server, name })
     }
 }
 
-impl BytesFileOps for SeLinuxBoolean {
+impl BytesFileOps for BooleanFile {
     fn write(&self, _current_task: &CurrentTask, data: Vec<u8>) -> Result<(), Errno> {
         let value = parse_unsigned_file::<u32>(&data)? != 0;
         self.security_server.set_pending_boolean(&self.name, value).map_err(|_| errno!(EIO))
@@ -525,22 +525,29 @@ impl BytesFileOps for SeLinuxBoolean {
     }
 }
 
-struct SeLinuxCommitBooleans {
+struct CommitBooleansApi {
     security_server: Arc<SecurityServer>,
 }
 
-impl SeLinuxCommitBooleans {
+impl CommitBooleansApi {
     fn new_node(security_server: Arc<SecurityServer>) -> impl FsNodeOps {
-        BytesFile::new_node(SeLinuxCommitBooleans { security_server })
+        SeLinuxApi::new_node(move || {
+            Ok(CommitBooleansApi { security_server: security_server.clone() })
+        })
     }
 }
 
-impl BytesFileOps for SeLinuxCommitBooleans {
-    fn write(&self, _current_task: &CurrentTask, data: Vec<u8>) -> Result<(), Errno> {
+impl SeLinuxApiOps for CommitBooleansApi {
+    fn api_write_permission() -> SecurityPermission {
+        SecurityPermission::SetBool
+    }
+
+    fn api_write(&self, _offset: usize, data: Vec<u8>) -> Result<(), Errno> {
         // "commit_pending_booleans" expects a numeric argument, which is
         // interpreted as a boolean, with the pending booleans committed if the
         // value is true (i.e. non-zero).
         let commit = parse_unsigned_file::<u32>(&data)? != 0;
+
         if commit {
             self.security_server.commit_pending_booleans();
         }
@@ -548,17 +555,17 @@ impl BytesFileOps for SeLinuxCommitBooleans {
     }
 }
 
-struct SeLinuxClassDirectory {
+struct ClassDirectory {
     security_server: Arc<SecurityServer>,
 }
 
-impl SeLinuxClassDirectory {
+impl ClassDirectory {
     fn new(security_server: Arc<SecurityServer>) -> Arc<Self> {
         Arc::new(Self { security_server })
     }
 }
 
-impl FsNodeOps for Arc<SeLinuxClassDirectory> {
+impl FsNodeOps for Arc<ClassDirectory> {
     fs_node_impl_dir_readonly!();
 
     /// Returns the set of classes under the "class" directory.
@@ -599,7 +606,7 @@ impl FsNodeOps for Arc<SeLinuxClassDirectory> {
         dir.entry(
             current_task,
             "perms",
-            SeLinuxPermsDirectory::new(self.security_server.clone(), name.to_string()),
+            PermsDirectory::new(self.security_server.clone(), name.to_string()),
             mode!(IFDIR, 0o555),
         );
         Ok(dir.build(current_task).clone())
@@ -607,18 +614,18 @@ impl FsNodeOps for Arc<SeLinuxClassDirectory> {
 }
 
 /// Represents the perms/ directory under each class entry of the SeLinuxClassDirectory.
-struct SeLinuxPermsDirectory {
+struct PermsDirectory {
     security_server: Arc<SecurityServer>,
     class_name: String,
 }
 
-impl SeLinuxPermsDirectory {
+impl PermsDirectory {
     fn new(security_server: Arc<SecurityServer>, class_name: String) -> Arc<Self> {
         Arc::new(Self { security_server, class_name })
     }
 }
 
-impl FsNodeOps for Arc<SeLinuxPermsDirectory> {
+impl FsNodeOps for Arc<PermsDirectory> {
     fs_node_impl_dir_readonly!();
 
     /// Lists all available permissions for the corresponding class.
@@ -654,7 +661,7 @@ impl FsNodeOps for Arc<SeLinuxPermsDirectory> {
             .class_permissions_by_name(&(self.class_name))
             .map_err(|_| errno!(ENOENT))?
             .iter()
-            .find(|(_permission_id, permission_name)| permission_name == name.as_bytes())
+            .find(|(_permission_id, permission_name)| permission_name == name)
             .ok_or_else(|| errno!(ENOENT))?
             .0;
 
@@ -663,6 +670,97 @@ impl FsNodeOps for Arc<SeLinuxPermsDirectory> {
             BytesFile::new_node(format!("{}", found_permission_id).into_bytes()),
             FsNodeInfo::new_factory(mode!(IFREG, 0o444), current_task.as_fscred()),
         ))
+    }
+}
+
+fn check_security_permission(
+    current_task: &CurrentTask,
+    node: &FsNode,
+    permission: SecurityPermission,
+) -> Result<(), Errno> {
+    let security_server = current_task.kernel().security_state.server.as_ref().unwrap();
+    if !security_server.has_policy() {
+        return Ok(());
+    }
+    let source_sid = current_task.read().security_state.attrs.current_sid;
+    let target_sid = fs_node_effective_sid(&security_server, current_task, node);
+    let permission_check = security_server.as_permission_check();
+    // TODO: https://fxbug.dev/349117435 - Enable as soon as selinuxfs is labelled (via genfscon).
+    check_permission(&permission_check, source_sid, target_sid, permission).or(Ok(()))
+}
+
+/// File node implementation tailored to the behaviour of the APIs exposed to userspace via the
+/// SELinux filesystem.fx
+///
+/// API files in the SELinux filesystem have persistent seek offsets, which APIs either
+/// ignore (e.g. request-response APIs like "access" or "context") or error-out if non-zero
+/// (e.g. the policy "load" file).
+///
+/// Userspace use of SELinux API files follows a simple request/response flow, with the caller
+/// `write()`ing a string of request bytes, and then `read()`ing a string of result bytes
+/// from the API file.
+struct SeLinuxApi<T: SeLinuxApiOps + Sync + Send + 'static> {
+    ops: T,
+}
+
+impl<T: SeLinuxApiOps + Sync + Send + 'static> SeLinuxApi<T> {
+    /// Returns a new `SeLinuxApi` file node that will use `create_ops` to create a new `SeLinuxApiOps`
+    /// instance every time a caller opens the file.
+    fn new_node<F>(create_ops: F) -> impl FsNodeOps
+    where
+        F: Fn() -> Result<T, Errno> + Send + Sync + 'static,
+    {
+        SimpleFileNode::new(move || create_ops().map(|ops| SeLinuxApi { ops }))
+    }
+}
+
+/// Trait implemented for each SELinux API file (e.g. "create", "load") to define its behaviour.
+trait SeLinuxApiOps {
+    /// Returns the "security" class permission that is required in order to write to the API file.
+    fn api_write_permission() -> SecurityPermission;
+
+    /// Processes a request written to an API file. Although API files are seekable, the offset
+    /// is ignored by most API file implementations, or may be required to be zero.
+    fn api_write(&self, _offset: usize, _data: Vec<u8>) -> Result<(), Errno> {
+        error!(EINVAL)
+    }
+
+    /// Reads the result of a request previously written to the API file. For most APIs the offset
+    /// is simply ignored, in contrast to the behaviour implemented by `BytesFile`.
+    fn api_read(&self, _offset: usize) -> Result<Cow<'_, [u8]>, Errno> {
+        error!(EINVAL)
+    }
+}
+
+impl<T: SeLinuxApiOps + Sync + Send + 'static> FileOps for SeLinuxApi<T> {
+    fileops_impl_seekable!();
+    fileops_impl_noop_sync!();
+
+    fn read(
+        &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
+        _file: &FileObject,
+        _current_task: &CurrentTask,
+        offset: usize,
+        data: &mut dyn OutputBuffer,
+    ) -> Result<usize, Errno> {
+        let response = self.ops.api_read(offset)?;
+        data.write(&response)
+    }
+
+    fn write(
+        &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
+        file: &FileObject,
+        current_task: &CurrentTask,
+        offset: usize,
+        data: &mut dyn InputBuffer,
+    ) -> Result<usize, Errno> {
+        check_security_permission(current_task, &file.name.entry.node, T::api_write_permission())?;
+        let data = data.read_all()?;
+        let data_len = data.len();
+        self.ops.api_write(offset, data)?;
+        Ok(data_len)
     }
 }
 

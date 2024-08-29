@@ -5,12 +5,15 @@
 pub mod component;
 
 use fidl::endpoints::ServerEnd;
+#[cfg(fuchsia_api_level_at_least = "HEAD")]
+use fidl_fuchsia_component_sandbox as fsandbox;
+#[cfg(fuchsia_api_level_at_least = "23")]
+use fidl_fuchsia_component_sandbox as _;
 use std::path::Path;
 use thiserror::Error;
 use {
-    fidl_fuchsia_component_runner as fcrunner, fidl_fuchsia_component_sandbox as fsandbox,
-    fidl_fuchsia_data as fdata, fidl_fuchsia_io as fio, fidl_fuchsia_mem as fmem,
-    fidl_fuchsia_process as fprocess, fuchsia_zircon as zx,
+    fidl_fuchsia_component_runner as fcrunner, fidl_fuchsia_data as fdata, fidl_fuchsia_io as fio,
+    fidl_fuchsia_mem as fmem, fidl_fuchsia_process as fprocess, fuchsia_zircon as zx,
 };
 
 const ARGS_KEY: &str = "args";
@@ -348,11 +351,13 @@ pub struct StartInfo {
     /// identify the running component without knowing its moniker.
     ///
     /// The token is invalidated when the component instance is destroyed.
+    #[cfg(fuchsia_api_level_at_least = "HEAD")]
     pub component_instance: Option<zx::Event>,
 
     /// A dictionary containing data and handles that the component has escrowed
     /// during its previous execution via
     /// `fuchsia.component.runner/ComponentController.OnEscrow`.
+    #[cfg(fuchsia_api_level_at_least = "HEAD")]
     pub escrowed_dictionary: Option<fsandbox::DictionaryRef>,
 }
 
@@ -371,7 +376,9 @@ impl TryFrom<fcrunner::ComponentStartInfo> for StartInfo {
             numbered_handles: start_info.numbered_handles.unwrap_or_else(|| Vec::new()),
             encoded_config: start_info.encoded_config,
             break_on_start: start_info.break_on_start,
+            #[cfg(fuchsia_api_level_at_least = "HEAD")]
             component_instance: start_info.component_instance,
+            #[cfg(fuchsia_api_level_at_least = "HEAD")]
             escrowed_dictionary: start_info.escrowed_dictionary,
         })
     }

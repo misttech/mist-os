@@ -20,7 +20,7 @@ use windowed_stats::experimental::clock::{TimedSample, Timestamp};
 use windowed_stats::experimental::series::interpolation::Constant;
 use windowed_stats::experimental::series::statistic::Union;
 use windowed_stats::experimental::series::{
-    BitSet, RoundRobinSampler, Sampler, SamplingProfile, TimeMatrix,
+    RoundRobinSampler, Sampler, SamplingProfile, TimeMatrix,
 };
 use wlan_common::bss::BssDescription;
 use wlan_common::channel::Channel;
@@ -341,17 +341,17 @@ trait ConnectDisconnectTimeSeries: std::fmt::Debug + Send {
 
 #[derive(Debug)]
 struct ConnectDisconnectTimeSeriesImpl {
-    wlan_connectivity_states: TimeMatrix<Union<BitSet<u64>>, Constant>,
-    connected_networks: TimeMatrix<Union<BitSet<u64>>, Constant>,
-    disconnected_networks: TimeMatrix<Union<BitSet<u64>>, Constant>,
-    disconnect_sources: TimeMatrix<Union<BitSet<u64>>, Constant>,
+    wlan_connectivity_states: TimeMatrix<Union<u64>, Constant>,
+    connected_networks: TimeMatrix<Union<u64>, Constant>,
+    disconnected_networks: TimeMatrix<Union<u64>, Constant>,
+    disconnect_sources: TimeMatrix<Union<u64>, Constant>,
 }
 
 impl ConnectDisconnectTimeSeriesImpl {
     pub fn new() -> Self {
         Self {
             wlan_connectivity_states: TimeMatrix::new(
-                SamplingProfile::Granular,
+                SamplingProfile::highly_granular(),
                 Constant::default(),
             ),
             connected_networks: TimeMatrix::default(),

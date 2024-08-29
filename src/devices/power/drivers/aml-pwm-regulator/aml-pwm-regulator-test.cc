@@ -9,9 +9,9 @@
 #include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
 #include <lib/ddk/metadata.h>
 #include <lib/driver/compat/cpp/device_server.h>
-#include <lib/driver/testing/cpp/driver_lifecycle.h>
 #include <lib/driver/testing/cpp/driver_runtime.h>
-#include <lib/driver/testing/cpp/test_environment.h>
+#include <lib/driver/testing/cpp/internal/driver_lifecycle.h>
+#include <lib/driver/testing/cpp/internal/test_environment.h>
 #include <lib/driver/testing/cpp/test_node.h>
 #include <lib/sync/cpp/completion.h>
 
@@ -136,12 +136,14 @@ class MockPwmServer final : public fidl::testing::WireTestBase<fuchsia_hardware_
 
 struct IncomingNamespace {
   fdf_testing::TestNode test_node{std::string("root")};
-  fdf_testing::TestEnvironment test_env{fdf::Dispatcher::GetCurrent()->get()};
+  fdf_testing::internal::TestEnvironment test_env{fdf::Dispatcher::GetCurrent()->get()};
   compat::DeviceServer compat_server;
 
   MockPwmServer mock_pwm_server;
 };
 
+// WARNING: Don't use this test as a template for new tests as it uses the old driver testing
+// library.
 class AmlPwmRegulatorTest : public zxtest::Test {
  public:
   void SetUp() override {
@@ -184,9 +186,9 @@ class AmlPwmRegulatorTest : public zxtest::Test {
     });
 
     // Start dut_.
-    auto result = runtime_.RunToCompletion(
-        dut_.SyncCall(&fdf_testing::DriverUnderTest<aml_pwm_regulator::AmlPwmRegulator>::Start,
-                      std::move(start_args)));
+    auto result = runtime_.RunToCompletion(dut_.SyncCall(
+        &fdf_testing::internal::DriverUnderTest<aml_pwm_regulator::AmlPwmRegulator>::Start,
+        std::move(start_args)));
     ASSERT_TRUE(result.is_ok());
   }
 
@@ -215,7 +217,7 @@ class AmlPwmRegulatorTest : public zxtest::Test {
   async_patterns::TestDispatcherBound<IncomingNamespace> incoming_{
       env_dispatcher_->async_dispatcher(), std::in_place};
   async_patterns::TestDispatcherBound<
-      fdf_testing::DriverUnderTest<aml_pwm_regulator::AmlPwmRegulator>>
+      fdf_testing::internal::DriverUnderTest<aml_pwm_regulator::AmlPwmRegulator>>
       dut_{driver_dispatcher_->async_dispatcher(), std::in_place};
 };
 

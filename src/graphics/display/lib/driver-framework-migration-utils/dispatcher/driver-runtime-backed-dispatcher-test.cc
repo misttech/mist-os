@@ -4,9 +4,9 @@
 
 #include <lib/async/cpp/irq.h>
 #include <lib/driver/component/cpp/driver_base.h>
-#include <lib/driver/testing/cpp/driver_lifecycle.h>
 #include <lib/driver/testing/cpp/driver_runtime.h>
-#include <lib/driver/testing/cpp/test_environment.h>
+#include <lib/driver/testing/cpp/internal/driver_lifecycle.h>
+#include <lib/driver/testing/cpp/internal/test_environment.h>
 #include <lib/driver/testing/cpp/test_node.h>
 #include <lib/fpromise/promise.h>
 #include <lib/sync/cpp/completion.h>
@@ -25,6 +25,8 @@ namespace display {
 
 namespace {
 
+// WARNING: Don't use this test as a template for new tests as it uses the old driver testing
+// library.
 // Tests dispatching asynchronous tasks and IRQ handler events on the
 // `fdf::Dispatcher`-backed dispatcher.
 //
@@ -83,8 +85,8 @@ class DriverDispatcherTest : public ::testing::Test {
 
   // These will use the foreground dispatcher.
   std::optional<fdf_testing::TestNode> node_server_;
-  std::optional<fdf_testing::TestEnvironment> test_environment_;
-  fdf_testing::DriverUnderTest<testing::Dfv2DriverWithDispatcher> driver_;
+  std::optional<fdf_testing::internal::TestEnvironment> test_environment_;
+  fdf_testing::internal::DriverUnderTest<testing::Dfv2DriverWithDispatcher> driver_;
 
   bool driver_stopped_ = false;
 };

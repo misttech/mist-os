@@ -26,7 +26,6 @@ _FUCHSIA_ROOT = os.path.dirname(  # $root
 
 sys.path += [os.path.join(_FUCHSIA_ROOT, "third_party", "mako")]
 from mako.lookup import TemplateLookup
-from mako.template import Template
 
 
 class Frontend(object):
@@ -182,11 +181,9 @@ class Frontend(object):
 
     def prepare(self, arch, atom_types):
         """Called before elements are processed."""
-        pass
 
     def finalize(self, arch, atom_types):
         """Called after all elements have been processed."""
-        pass
 
     def run(self):
         """Runs this frontend through the contents of the archive.

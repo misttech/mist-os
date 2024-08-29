@@ -39,6 +39,7 @@
 class VmMapping;
 class MultiPageRequest;
 class VmObjectPaged;
+class VmObjectPhysical;
 class VmAspace;
 class VmObject;
 class VmHierarchyBase;
@@ -789,5 +790,34 @@ class VmObject : public VmHierarchyBase,
   DECLARE_SINGLETON_CRITICAL_MUTEX(AllVmosLock);
   static GlobalList all_vmos_ TA_GUARDED(AllVmosLock::Get());
 };
+
+namespace internal {
+template <typename T>
+struct VmObjectTypeTag;
+template <>
+struct VmObjectTypeTag<VmObjectPaged> {
+  static constexpr bool PAGED = true;
+};
+template <>
+struct VmObjectTypeTag<VmObjectPhysical> {
+  static constexpr bool PAGED = false;
+};
+}  // namespace internal
+
+template <typename T>
+fbl::RefPtr<T> DownCastVmObject(fbl::RefPtr<VmObject> vmo) {
+  if (likely(internal::VmObjectTypeTag<T>::PAGED == vmo->is_paged())) {
+    return fbl::RefPtr<T>::Downcast(ktl::move(vmo));
+  }
+  return nullptr;
+}
+
+template <typename T>
+inline T* DownCastVmObject(VmObject* vmo) {
+  if (likely(internal::VmObjectTypeTag<T>::PAGED == vmo->is_paged())) {
+    return static_cast<T*>(vmo);
+  }
+  return nullptr;
+}
 
 #endif  // ZIRCON_KERNEL_VM_INCLUDE_VM_VM_OBJECT_H_

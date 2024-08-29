@@ -6,7 +6,7 @@
 load("@bazel_skylib//lib:unittest.bzl", "analysistest", "asserts")
 load("@fuchsia_sdk//fuchsia:defs.bzl", "fuchsia_component", "fuchsia_driver_component", "fuchsia_package", "get_component_manifests", "get_driver_component_manifests")
 load("@fuchsia_sdk//fuchsia/private:providers.bzl", "FuchsiaPackageInfo")
-load("//test_utils:make_file.bzl", "make_file")
+load("//test_utils:make_file.bzl", "make_fake_component_manifest", "make_file")
 
 ## Name Tests
 def _name_test_impl(ctx):
@@ -66,10 +66,10 @@ def _test_package_and_archive_name():
         archive_name = "some_other_archive.far",
     )
 
-def _mock_component(name, manifest_name, is_driver):
-    make_file(
+def _mock_component(name, is_driver):
+    make_fake_component_manifest(
         name = name + "_manifest",
-        filename = manifest_name,
+        component_name = name,
         tags = ["manual"],
     )
 
@@ -133,12 +133,10 @@ def _test_package_deps():
     for i in range(1, 3):
         _mock_component(
             name = "component_" + str(i),
-            manifest_name = "component_" + str(i) + ".cm",
             is_driver = False,
         )
         _mock_component(
             name = "driver_" + str(i),
-            manifest_name = "driver_" + str(i) + ".cm",
             is_driver = True,
         )
 

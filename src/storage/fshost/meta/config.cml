@@ -172,5 +172,28 @@
             key: "storage_host",
             type: "bool",
         },
+        {
+            config: "fuchsia.fshost.DisableAutomount",
+            key: "disable_automount",
+            type: "bool",
+            availability: "optional",
+            default: false,
+        },
+        {
+            config: "fuchsia.blobfs.WriteCompressionAlgorithm",
+            key: "blobfs_write_compression_algorithm",
+            type: "string",
+            max_size: 20,
+            availability: "optional",
+            default: "zstd_chunked",
+        },
+        {
+            config: "fuchsia.blobfs.CacheEvictionPolicy",
+            key: "blobfs_cache_eviction_policy",
+            type: "string",
+            max_size: 20,
+            availability: "optional",
+            default: "never_evict",
+        },
     ],
 }

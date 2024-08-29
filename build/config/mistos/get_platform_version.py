@@ -93,8 +93,7 @@ def get_gn_variables(version_history_path: Path) -> Dict[str, Any]:
 
     return {
         # All numbered API levels in the JSON file.
-        # TODO(https://fxbug.dev/326277078): Add that these levels are all
-        # frozen once "NEXT" is implemented.
+        # All are frozen or previously frozen. None are in-development.
         "all_numbered_api_levels": all_numbered_api_levels,
         # API levels that the IDK supports targeting.
         "idk_buildable_api_levels": idk_buildable_api_levels,
@@ -102,10 +101,6 @@ def get_gn_variables(version_history_path: Path) -> Dict[str, Any]:
         "runtime_supported_api_levels": runtime_supported_api_levels,
         # API levels whose contents should not change anymore.
         "frozen_api_levels": sunset_api_levels + supported_api_levels,
-        # The greatest number assigned to a numbered API level.
-        # TODO(https://fxbug.dev/305961460): Remove this because the highest
-        # numbered API level should not be particularly special.
-        "deprecated_highest_numbered_api_level": max(all_numbered_api_levels),
     }
 
 

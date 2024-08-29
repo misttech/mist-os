@@ -670,10 +670,9 @@ fn icmp_error_on_address_resolution_failure_tcp_forwarding<I: TestIpExt + IpExt>
         [("local", local_device, Some(remote_ip)), ("remote", remote_device.clone(), None)]
     {
         net.with_context(ctx, |ctx| {
-            let (mut core_ctx, bindings_ctx) = ctx.contexts();
-            ip::testutil::add_route::<I, _, _>(
+            let mut core_ctx = ctx.core_ctx();
+            ip::testutil::add_route::<I, _>(
                 &mut core_ctx,
-                bindings_ctx,
                 AddableEntry {
                     subnet: Subnet::new(I::UNSPECIFIED_ADDRESS, 0).unwrap(),
                     device: device.into(),

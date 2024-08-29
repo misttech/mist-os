@@ -8,13 +8,13 @@
 #include <fidl/fuchsia.sysmem2/cpp/fidl.h>
 #include <zircon/types.h>
 
-namespace sysmem_driver {
+namespace sysmem_service {
 
 struct AllocationResult {
   const fuchsia_sysmem2::BufferCollectionInfo* buffer_collection_info = nullptr;
   const std::optional<fuchsia_sysmem2::Error> maybe_error;
 };
 
-}  // namespace sysmem_driver
+}  // namespace sysmem_service
 
 #endif  // SRC_DEVICES_SYSMEM_DRIVERS_SYSMEM_ALLOCATION_RESULT_H_

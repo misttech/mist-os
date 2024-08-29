@@ -95,34 +95,44 @@ zx::result<> VsyncReceiver::SetReceivingState(bool receiving) {
     return zx::ok();
   }
   if (receiving) {
-    return Start();
+    return PostStart();
   }
-  return Stop();
+  return PostStop();
 }
 
-zx::result<> VsyncReceiver::Start() {
+zx::result<> VsyncReceiver::PostStart() {
   ZX_DEBUG_ASSERT(!is_receiving_);
-  zx_status_t status = irq_handler_.Begin(irq_handler_dispatcher_.async_dispatcher());
-  if (status != ZX_OK) {
-    FDF_LOG(ERROR, "Failed to bind the Vsync handler to the async loop: %s",
-            zx_status_get_string(status));
-    return zx::error(status);
+
+  zx_status_t post_task_status =
+      async::PostTask(irq_handler_dispatcher_.async_dispatcher(), [this] {
+        zx_status_t status = irq_handler_.Begin(irq_handler_dispatcher_.async_dispatcher());
+        if (status != ZX_OK) {
+          FDF_LOG(ERROR, "Failed to bind the Vsync handler to the async loop: %s",
+                  zx_status_get_string(status));
+        }
+      });
+
+  if (post_task_status != ZX_OK) {
+    FDF_LOG(ERROR, "Failed to post the Vsync handler begin task: %s",
+            zx_status_get_string(post_task_status));
+    return zx::error(post_task_status);
   }
   is_receiving_ = true;
   return zx::ok();
 }
 
-zx::result<> VsyncReceiver::Stop() {
+zx::result<> VsyncReceiver::PostStop() {
   ZX_DEBUG_ASSERT(is_receiving_);
 
   // DFv2-backed async dispatchers requires all interrupt handlers to be
   // unbound from the same dispatcher they were bound to.
-  zx_status_t cancel_status;
-  libsync::Completion cancel_completion;
-  zx_status_t post_task_status = async::PostTask(irq_handler_dispatcher_.async_dispatcher(), [&]() {
-    cancel_status = irq_handler_.Cancel();
-    cancel_completion.Signal();
-  });
+  zx_status_t post_task_status =
+      async::PostTask(irq_handler_dispatcher_.async_dispatcher(), [this]() {
+        zx_status_t status = irq_handler_.Cancel();
+        if (status != ZX_OK) {
+          FDF_LOG(ERROR, "Failed to cancel the Vsync handler: %s", zx_status_get_string(status));
+        }
+      });
 
   if (post_task_status != ZX_OK) {
     FDF_LOG(ERROR, "Failed to post the Vsync handler cancel task: %s",
@@ -130,11 +140,6 @@ zx::result<> VsyncReceiver::Stop() {
     return zx::error(post_task_status);
   }
 
-  cancel_completion.Wait();
-  if (cancel_status != ZX_OK) {
-    FDF_LOG(ERROR, "Failed to cancel the Vsync handler: %s", zx_status_get_string(cancel_status));
-    return zx::error(cancel_status);
-  }
   is_receiving_ = false;
   return zx::ok();
 }

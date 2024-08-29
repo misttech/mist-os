@@ -2,6 +2,12 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+load(
+    "@fuchsia_sdk//fuchsia:defs.bzl",
+    "fuchsia_cc_test",
+    "fuchsia_unittest_package",
+)
+
 package(default_visibility = ["//visibility:public"])
 
 # Backend for pw_async:task
@@ -76,3 +82,24 @@ cc_library(
     ],
 )
 
+fuchsia_cc_test(
+  name = "pw_async_fuchsia_test",
+  srcs = [
+    "dispatcher_test.cc",
+    "fake_dispatcher_fixture_test.cc",
+  ],
+  deps = [
+    ":dispatcher",
+    "@pigweed//pw_async:fake_dispatcher_fixture",
+    "@fuchsia_sdk//pkg/async-testing",
+    "@pigweed//pw_unit_test",
+    "@pigweed//pw_unit_test:printf_main",
+  ]
+)
+
+fuchsia_unittest_package(
+  name = "test_pkg",
+  package_name = "pw_async_fuchsia_tests",
+  fuchsia_api_level = "HEAD",
+  unit_tests = [":pw_async_fuchsia_test"]
+)

@@ -1,0 +1,27 @@
+// Copyright 2024 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
+library fuchsia.driver.test;
+
+using fuchsia.component.resolution;
+using fuchsia.io;
+using zx;
+
+/// This protocol is served by the driver_test_realm component to be used by the inner
+/// fake-resolver component.
+@available(added=HEAD)
+@discoverable
+closed protocol Internal {
+    /// Gets the test component's package directory. This is used to read drivers in this package
+    /// and find the list of its subpackages.
+    strict GetTestPackage() -> (resource struct {
+        test_pkg_dir client_end:fuchsia.io.Directory;
+    }) error zx.Status;
+
+    /// Gets the test component's resolution context. This is used to open subpackages of the
+    /// test package.
+    strict GetTestResolutionContext() -> (struct {
+        context fuchsia.component.resolution.Context;
+    });
+};

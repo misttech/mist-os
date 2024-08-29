@@ -14,7 +14,7 @@
 #include "logical_buffer_collection.h"
 #include "node.h"
 
-namespace sysmem_driver {
+namespace sysmem_service {
 
 class BufferCollectionToken;
 
@@ -201,6 +201,6 @@ class BufferCollectionToken : public Node, public LoggingMixin {
   inspect::ValueList properties_;
 };
 
-}  // namespace sysmem_driver
+}  // namespace sysmem_service
 
 #endif  // SRC_DEVICES_SYSMEM_DRIVERS_SYSMEM_BUFFER_COLLECTION_TOKEN_H_

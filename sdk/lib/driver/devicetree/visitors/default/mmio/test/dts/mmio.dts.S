@@ -19,5 +19,6 @@
                REG_B_LENGTH_WORD0 REG_B_LENGTH_WORD1
                REG_C_BASE_WORD0 REG_C_BASE_WORD1
                REG_C_LENGTH_WORD0 REG_C_LENGTH_WORD1>;
+        reg-names = "reg-a", "reg-b", "reg-c";
     };
 };

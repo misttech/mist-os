@@ -11,6 +11,7 @@ group("tests") {
   deps = [
     ":sensors-tests",
     "playback:tests",
+    "tests",
   ]
 }
 
@@ -69,6 +70,11 @@ fuchsia_package("sensors") {
   deps = [ ":component" ]
 }
 
+fuchsia_package("sensors_eng") {
+  deps = [ ":component" ]
+  subpackages = [ "//src/sensors/playback:sensors_playback" ]
+}
+
 fuchsia_component("test-driver-component") {
   component_name = "test-driver"
   testonly = true
@@ -94,10 +100,6 @@ fuchsia_test_package("sensors-tests") {
     "//src/sensors/playback:sensors_playback",
   ]
   test_specs = {
-    # TODO(https://fxbug.dev/331662688): These tests use the same playback component, so the tests
-    # flake when they attempt to configure playback at the same time. These tests should use realm
-    # builder to ensure that each test has its own instance of the playback component.
-    parallel = 1
     log_settings = {
       max_severity = "ERROR"
     }

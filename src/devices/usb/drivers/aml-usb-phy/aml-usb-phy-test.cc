@@ -7,9 +7,9 @@
 #include <fidl/fuchsia.hardware.platform.device/cpp/wire_test_base.h>
 #include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
 #include <lib/ddk/metadata.h>
-#include <lib/driver/testing/cpp/driver_lifecycle.h>
 #include <lib/driver/testing/cpp/driver_runtime.h>
-#include <lib/driver/testing/cpp/test_environment.h>
+#include <lib/driver/testing/cpp/internal/driver_lifecycle.h>
+#include <lib/driver/testing/cpp/internal/test_environment.h>
 #include <lib/driver/testing/cpp/test_node.h>
 #include <lib/zx/clock.h>
 #include <lib/zx/interrupt.h>
@@ -116,13 +116,15 @@ class TestAmlUsbPhyDevice : public AmlUsbPhyDevice {
 
 struct IncomingNamespace {
   fdf_testing::TestNode node_{std::string("root")};
-  fdf_testing::TestEnvironment env_{fdf::Dispatcher::GetCurrent()->get()};
+  fdf_testing::internal::TestEnvironment env_{fdf::Dispatcher::GetCurrent()->get()};
 
   compat::DeviceServer device_server_;
   FakePDev pdev_server;
   mock_registers::MockRegisters registers{fdf::Dispatcher::GetCurrent()->async_dispatcher()};
 };
 
+// WARNING: Don't use this test as a template for new tests as it uses the old driver testing
+// library.
 // Fixture that supports tests of AmlUsbPhy::Create.
 class AmlUsbPhyTest : public testing::Test {
  public:
@@ -243,7 +245,7 @@ class AmlUsbPhyTest : public testing::Test {
   async_patterns::TestDispatcherBound<IncomingNamespace> incoming_{
       env_dispatcher_->async_dispatcher(), std::in_place};
   fidl::ClientEnd<fuchsia_io::Directory> outgoing_;
-  fdf_testing::DriverUnderTest<TestAmlUsbPhyDevice> dut_{
+  fdf_testing::internal::DriverUnderTest<TestAmlUsbPhyDevice> dut_{
       TestAmlUsbPhyDevice::GetDriverRegistration()};
 };
 

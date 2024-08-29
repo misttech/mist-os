@@ -8,7 +8,7 @@
 #include <fidl/fuchsia.ui.composition/cpp/fidl.h>
 #include <fidl/fuchsia.ui.views/cpp/fidl.h>
 #include <fuchsia/sysmem/cpp/fidl.h>
-#include <fuchsia/ui/scenic/cpp/fidl.h>
+#include <fuchsia/ui/composition/cpp/fidl.h>
 #include <fuchsia/ui/views/cpp/fidl.h>
 #include <lib/zx/event.h>
 
@@ -20,12 +20,6 @@ using SysmemTokens = struct {
 };
 
 constexpr std::array<float, 2> kDefaultPixelScale = {1.f, 1.f};
-
-// Helper for creating a Present2Args fidl struct.
-fuchsia::ui::scenic::Present2Args CreatePresent2Args(zx_time_t requested_presentation_time,
-                                                     std::vector<zx::event> acquire_fences,
-                                                     std::vector<zx::event> release_fences,
-                                                     zx_duration_t requested_prediction_span);
 
 // Helper for extracting the koid from a ViewRef.
 zx_koid_t ExtractKoid(const fuchsia::ui::views::ViewRef& view_ref);

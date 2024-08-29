@@ -118,10 +118,6 @@ void CheckedFtruncate(int fd, uint8_t* u8, ssize_t new_len) {
 // Test that truncate doesn't have issues dealing with larger files
 // Repeatedly write to / truncate a file.
 TEST_P(LargeTruncateTest, RepeatedlyWritingAndTruncatingLargeFileSucceeds) {
-  if (fs().GetTraits().name == "f2fs") {
-    // TODO(https://fxbug.dev/354796037): Remove when f2fs can handle larger page batches.
-    GTEST_SKIP();
-  }
   // Fill a test buffer with data
   fbl::AllocChecker ac;
   std::unique_ptr<uint8_t[]> buf(new (&ac) uint8_t[buffer_size()]);

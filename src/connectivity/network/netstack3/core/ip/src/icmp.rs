@@ -40,8 +40,8 @@ use packet_formats::icmp::{
     Icmpv6ParameterProblem, Icmpv6ParameterProblemCode, Icmpv6TimeExceededCode, MessageBody,
     OriginalPacket,
 };
-use packet_formats::ip::{DscpAndEcn, Ipv4Proto, Ipv6Proto};
-use packet_formats::ipv4::{Ipv4FragmentType, Ipv4Header};
+use packet_formats::ip::{DscpAndEcn, IpPacket, Ipv4Proto, Ipv6Proto};
+use packet_formats::ipv4::{Ipv4FragmentType, Ipv4Header, Ipv4OnlyMeta};
 use packet_formats::ipv6::{ExtHdrParseError, Ipv6Header};
 use zerocopy::ByteSlice;
 
@@ -293,19 +293,63 @@ impl<BT: IcmpBindingsTypes> AsMut<IcmpState<Ipv6, BT>> for Icmpv6State<BT> {
 }
 
 /// An extension trait providing ICMP handler properties.
-pub trait IcmpHandlerIpExt: Ip {
+pub trait IcmpHandlerIpExt: IpExt {
     type SourceAddress: Witness<Self::Addr>;
     type IcmpError;
+
+    /// A try-conversion from [`Self::RecvSrcAddr`] to [`Self::SourceAddress`].
+    fn received_source_as_icmp_source(src: Self::RecvSrcAddr) -> Option<Self::SourceAddress>;
+
+    /// An IP-specific constructor for TtlExpired ICMP errors.
+    fn new_ttl_expired<B: ByteSlice>(
+        proto: Self::Proto,
+        header_len: usize,
+        meta: <Self::Packet<B> as IpPacket<B, Self>>::VersionSpecificMeta,
+    ) -> Self::IcmpError;
+
+    /// An IP-specific optional-constructor for MTU Exceeded ICMP errors.
+    fn new_mtu_exceeded(proto: Self::Proto, header_len: usize, mtu: Mtu)
+        -> Option<Self::IcmpError>;
 }
 
 impl IcmpHandlerIpExt for Ipv4 {
     type SourceAddress = SpecifiedAddr<Ipv4Addr>;
     type IcmpError = Icmpv4Error;
+    fn received_source_as_icmp_source(src: Ipv4Addr) -> Option<SpecifiedAddr<Ipv4Addr>> {
+        SpecifiedAddr::new(src)
+    }
+    fn new_ttl_expired<B: ByteSlice>(
+        proto: Ipv4Proto,
+        header_len: usize,
+        Ipv4OnlyMeta { id: _, fragment_type }: Ipv4OnlyMeta,
+    ) -> Icmpv4Error {
+        Icmpv4Error { kind: Icmpv4ErrorKind::TtlExpired { proto, fragment_type }, header_len }
+    }
+    fn new_mtu_exceeded(_proto: Ipv4Proto, _header_len: usize, _mtu: Mtu) -> Option<Icmpv4Error> {
+        // NB: ICMPv4 has no representation of MTU exceeded errors.
+        None
+    }
 }
 
 impl IcmpHandlerIpExt for Ipv6 {
     type SourceAddress = UnicastAddr<Ipv6Addr>;
     type IcmpError = Icmpv6ErrorKind;
+    fn received_source_as_icmp_source(src: Ipv6SourceAddr) -> Option<UnicastAddr<Ipv6Addr>> {
+        match src {
+            Ipv6SourceAddr::Unicast(src) => Some(src.get()),
+            Ipv6SourceAddr::Unspecified => None,
+        }
+    }
+    fn new_ttl_expired<B: ByteSlice>(
+        proto: Ipv6Proto,
+        header_len: usize,
+        _meta: (),
+    ) -> Icmpv6ErrorKind {
+        Icmpv6ErrorKind::TtlExpired { proto, header_len }
+    }
+    fn new_mtu_exceeded(proto: Ipv6Proto, header_len: usize, mtu: Mtu) -> Option<Icmpv6ErrorKind> {
+        Some(Icmpv6ErrorKind::PacketTooBig { proto, header_len, mtu })
+    }
 }
 
 /// A kind of ICMPv4 error.
@@ -1098,7 +1142,7 @@ fn receive_ndp_packet<
     CC: InnerIcmpv6Context<BC>
         + Ipv6DeviceHandler<BC>
         + IpDeviceHandler<Ipv6, BC>
-        + IpDeviceStateContext<Ipv6, BC>
+        + IpDeviceStateContext<Ipv6>
         + NudIpHandler<Ipv6, BC>
         + IpLayerHandler<Ipv6, BC>
         + CounterContext<NdpCounters>,
@@ -1504,7 +1548,7 @@ impl<
             + InnerIcmpContext<Ipv6, BC>
             + Ipv6DeviceHandler<BC>
             + IpDeviceHandler<Ipv6, BC>
-            + IpDeviceStateContext<Ipv6, BC>
+            + IpDeviceStateContext<Ipv6>
             + PmtuHandler<Ipv6, BC>
             + NudIpHandler<Ipv6, BC>
             + IpLayerHandler<Ipv6, BC>
@@ -3264,7 +3308,7 @@ mod tests {
         }
     }
 
-    impl IpDeviceStateContext<Ipv6, FakeIcmpBindingsCtx<Ipv6>> for FakeIcmpCoreCtx<Ipv6> {
+    impl IpDeviceStateContext<Ipv6> for FakeIcmpCoreCtx<Ipv6> {
         fn with_next_packet_id<O, F: FnOnce(&()) -> O>(&self, cb: F) -> O {
             cb(&())
         }

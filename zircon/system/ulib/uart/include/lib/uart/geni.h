@@ -174,15 +174,34 @@ struct WatermarkRegister : public hwreg::RegisterBase<WatermarkRegister, uint32_
   static auto Get(uint32_t offset) { return hwreg::RegisterAddr<WatermarkRegister>(offset); }
 };
 
+// Module: QUPV3_0_SE0_GENI4_DATA
+// QUPV3_0_SE0_GENI_TX_WATERMARK_REG
+// GENI TX FIFO Watermark Register
+//
 // IRQ fires when the length goes below the watermark
 // (meaning there is free space in the FIFO to write.)
 struct TxWatermarkRegister {
   static auto Get() { return WatermarkRegister::Get(0x80c); }
 };
 
+// Module: QUPV3_0_SE0_GENI4_DATA
+// QUPV3_0_SE0_GENI_RX_WATERMARK_REG
+// GENI RX FIFO Watermark Register
+//
 // IRQ fires when the length goes above the watermark
 // (meaning there is data in the FIFO to write.)
 struct RxWatermarkRegister {
+  static auto Get() { return WatermarkRegister::Get(0x810); }
+};
+
+// Module: QUPV3_0_SE0_GENI4_DATA
+// QUPV3_0_SE0_GENI_RX_RFR_WATERMARK_REG
+// GENI RX FIFO Ready for Receive Watermark Register
+//
+// Asserts the hardware condition to continue reading data from the hardware
+// when RX FIFO length is less than the watermark (meaning there is free
+// space in the FIFO to write).
+struct RxReadyForReceiveWatermarkRegister {
   static auto Get() { return WatermarkRegister::Get(0x814); }
 };
 
@@ -278,13 +297,12 @@ struct Driver : public DriverBase<Driver, ZBI_KERNEL_DRIVER_GENI_UART, zbi_dcfg_
   // As needed, these can be discovered rather than hard coded.
   static constexpr uint32_t kFrequency = 7372800;
   static constexpr uint32_t kBaudRate = 115200;
-  static constexpr uint32_t kOversampling = 16; // 16 on newer boards, 32 before geni fw 2.5
+  static constexpr uint32_t kOversampling = 16;  // 16 on newer boards, 32 before geni fw 2.5
   static constexpr uint32_t kClockRate = kBaudRate * kOversampling;
   static constexpr uint32_t kClockDiv = kFrequency / kClockRate;
 
   // FIFO fill watermark in terms of FIFO words (kFifoWidth bytes)
   static constexpr uint32_t kTxFifoWatermark = 4;
-  static constexpr uint32_t kRxFifoWatermark = 2;
 
   static constexpr uint32_t kFifoWidth = 4;     // in bytes
   static constexpr uint32_t kRxFifoDepth = 16;  // in fifos
@@ -322,12 +340,34 @@ struct Driver : public DriverBase<Driver, ZBI_KERNEL_DRIVER_GENI_UART, zbi_dcfg_
     auto s_clk = SecondaryClockRegister::Get().FromValue(0);
     s_clk.set_enable(1).set_div(kClockDiv).WriteTo(io.io());
 
-    // If needed, add RFR watermark configuration.
+    // The bootloader has configured the UART serial engine prior to Fuchsia
+    // boot. It has configured the RX and RX RFR (Ready for Receive)
+    // watermark registers and started the secondary (read) command on the
+    // engine. The FIFO configuration was later reset (?), leaving the serial
+    // engine in an unstable state when this driver loads.
+    //
+    // We have to set the watermark registers with their previous values
+    // to make it work properly.
+    //
+    // TODO(https://fxbug.dev/362847591): Instead of relying on the following
+    // reinitialization logic, the driver should reset the serial engine
+    // and start the RX procedure from a fresh hardware state.
 
-    // Setup watermarks for future interrupt use.
+    // Previous RFR (Ready for Receive) and RX watermark values set by the
+    // bootloader driver. Their previous values were not stored in any
+    // registers so we have to hard code them.
+    static constexpr uint32_t kRxRfrFifoWatermark = kRxFifoDepth - 4;
+    static constexpr uint32_t kRxFifoWatermark = kRxFifoDepth - 8;
+
+    // Setup RFR (Ready for Receive) watermark and RX watermark for future
+    // interrupt use.
+    auto rfr_wm = RxReadyForReceiveWatermarkRegister::Get().FromValue(0);
+    rfr_wm.set_length(kRxRfrFifoWatermark).WriteTo(io.io());
+
     auto rx_wm = RxWatermarkRegister::Get().FromValue(0);
     rx_wm.set_length(kRxFifoWatermark).WriteTo(io.io());
 
+    // Setup TX watermark for future interrupt use.
     auto tx_wm = TxWatermarkRegister::Get().FromValue(0);
     tx_wm.set_length(kTxFifoWatermark).WriteTo(io.io());
   }

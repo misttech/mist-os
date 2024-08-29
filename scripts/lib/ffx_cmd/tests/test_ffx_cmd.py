@@ -2,13 +2,11 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import os
 import pathlib
 import unittest
 
 import ffx_cmd
 import fx_cmd
-from async_utils.command import AsyncCommand
 
 
 class TestFfxCmd(unittest.TestCase):

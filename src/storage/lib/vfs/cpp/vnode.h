@@ -193,9 +193,9 @@ class Vnode : public VnodeRefCounted<Vnode>, public fbl::Recyclable<Vnode> {
   virtual void OpenRemote(fuchsia_io::OpenFlags, fuchsia_io::ModeType, fidl::StringView,
                           fidl::ServerEnd<fuchsia_io::Node>) const;
 
-#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
+  // If |IsRemote()| returns true, requests to open this Vnode via fuchsia.io/Directory.Open3 will
+  // be forwarded to this function.
   virtual void OpenRemote(fuchsia_io::wire::Directory2Open3Request request) const;
-#endif
 
   // Instead of adding a |file_lock::FileLock| member variable to |Vnode|,
   // maintain a map from |this| to the lock objects. This is done, because

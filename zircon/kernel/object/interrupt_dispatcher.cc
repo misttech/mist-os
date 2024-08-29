@@ -15,10 +15,10 @@
 #include <object/port_dispatcher.h>
 #include <object/process_dispatcher.h>
 
-InterruptDispatcher::InterruptDispatcher(uint32_t flags)
+InterruptDispatcher::InterruptDispatcher(Flags flags)
     : WakeVector(&InterruptDispatcher::wake_event_),
-      flags_(flags),
       timestamp_(0),
+      flags_(flags),
       state_(InterruptState::IDLE),
       wake_event_(*this) {
   DEBUG_ASSERT((flags & INTERRUPT_UNMASK_PREWAIT) == 0 ||

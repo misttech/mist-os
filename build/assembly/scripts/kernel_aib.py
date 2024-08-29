@@ -10,13 +10,10 @@
 import argparse
 import json
 import logging
-import os
 import sys
-from collections import defaultdict
 
 from assembly import (
     AIBCreator,
-    AssemblyInputBundle,
     AssemblyInputBundleCreationException,
     KernelInfo,
 )
@@ -73,7 +70,7 @@ def main() -> None:
 if __name__ == "__main__":
     try:
         main()
-    except AssemblyInputBundleCreationException as exc:
+    except AssemblyInputBundleCreationException:
         logger.exception(
             "A problem occured building the kernel assembly input bundle"
         )

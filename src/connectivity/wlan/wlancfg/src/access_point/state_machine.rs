@@ -13,6 +13,9 @@ use crate::util::state_machine::{self, ExitReason, IntoStateExt, StateMachineSta
 use anyhow::format_err;
 use fidl_fuchsia_wlan_sme as fidl_sme;
 use fuchsia_async::{self as fasync, DurationExt};
+use fuchsia_inspect::{Node as InspectNode, StringReference};
+use fuchsia_inspect_contrib::inspect_insert;
+use fuchsia_inspect_contrib::log::WriteInspect;
 use fuchsia_sync::Mutex;
 use fuchsia_zircon::{self as zx, DurationNum};
 use futures::channel::{mpsc, oneshot};
@@ -127,6 +130,25 @@ impl Status {
             mode: config.mode,
             num_clients: update.num_clients,
             security_type: config.id.security_type,
+        }
+    }
+}
+
+impl WriteInspect for Status {
+    fn write_inspect(&self, writer: &InspectNode, key: impl Into<StringReference>) {
+        match self {
+            Status::Started { band, channel, mode, num_clients, security_type } => {
+                inspect_insert!(writer, var key: {
+                    Started: {
+                        band: format!("{:?}", band),
+                        channel: channel,
+                        mode: format!("{:?}", mode),
+                        num_clients: num_clients,
+                        security_type: format!("{:?}", security_type)
+                    }
+                })
+            }
+            other => inspect_insert!(writer, var key: format!("{:?}", other)),
         }
     }
 }
@@ -2700,5 +2722,103 @@ mod tests {
 
         // Verify that the state has been set to Started.
         assert_variant!(test_values.status_reader.read_status(), Ok(Status::Started { .. }));
+    }
+
+    struct InspectTestValues {
+        exec: fasync::TestExecutor,
+        inspector: fuchsia_inspect::Inspector,
+        _node: fuchsia_inspect::Node,
+        status_node: fuchsia_inspect_contrib::nodes::BoundedListNode,
+    }
+
+    impl InspectTestValues {
+        fn new(exec: fasync::TestExecutor) -> Self {
+            let inspector = fuchsia_inspect::Inspector::default();
+            let _node = inspector.root().create_child("node");
+            let status_node =
+                fuchsia_inspect_contrib::nodes::BoundedListNode::new(_node.clone_weak(), 1);
+
+            Self { exec, inspector, _node, status_node }
+        }
+
+        fn log_status(&mut self, status: Status) -> fuchsia_inspect::reader::DiagnosticsHierarchy {
+            fuchsia_inspect_contrib::inspect_log!(self.status_node, "status" => status);
+            let read_fut = fuchsia_inspect::reader::read(&self.inspector);
+            let mut read_fut = pin!(read_fut);
+            assert_variant!(
+                self.exec.run_until_stalled(&mut read_fut),
+                Poll::Ready(Ok(hierarchy)) => hierarchy
+            )
+        }
+    }
+
+    #[fuchsia::test]
+    fn test_stopping_status_inspect_log() {
+        let exec = fasync::TestExecutor::new_with_fake_time();
+        let mut test_values = InspectTestValues::new(exec);
+        let hierarchy = test_values.log_status(Status::Stopping);
+        diagnostics_assertions::assert_data_tree!(hierarchy, root: contains {
+            node: contains {
+                "0": contains {
+                    status: "Stopping"
+                }
+            }
+        });
+    }
+
+    #[fuchsia::test]
+    fn test_stopped_status_inspect_log() {
+        let exec = fasync::TestExecutor::new_with_fake_time();
+        let mut test_values = InspectTestValues::new(exec);
+        let hierarchy = test_values.log_status(Status::Stopped);
+        diagnostics_assertions::assert_data_tree!(hierarchy, root: contains {
+            node: contains {
+                "0": contains {
+                    status: "Stopped"
+                }
+            }
+        });
+    }
+
+    #[fuchsia::test]
+    fn test_starting_status_inspect_log() {
+        let exec = fasync::TestExecutor::new_with_fake_time();
+        let mut test_values = InspectTestValues::new(exec);
+        let hierarchy = test_values.log_status(Status::Starting);
+        diagnostics_assertions::assert_data_tree!(hierarchy, root: contains {
+            node: contains {
+                "0": contains {
+                    status: "Starting"
+                }
+            }
+        });
+    }
+
+    #[fuchsia::test]
+    fn test_started_status_inspect_log() {
+        let exec = fasync::TestExecutor::new_with_fake_time();
+        let mut test_values = InspectTestValues::new(exec);
+        let hierarchy = test_values.log_status(Status::Started {
+            band: types::OperatingBand::Any,
+            channel: 1,
+            mode: types::ConnectivityMode::Unrestricted,
+            num_clients: 2,
+            security_type: types::SecurityType::None,
+        });
+        diagnostics_assertions::assert_data_tree!(hierarchy, root: contains {
+            node: contains {
+                "0": contains {
+                    status: contains {
+                        Started: {
+                            band: "Any",
+                            channel: 1_u64,
+                            mode: "Unrestricted",
+                            num_clients: 2_u64,
+                            security_type: "None"
+                        }
+                    }
+                }
+            }
+        });
     }
 }

@@ -303,7 +303,7 @@ bool Client::WriteAbrMetadataCustom(void* context, const AbrSlotData* a, const A
                                     uint8_t one_shot_recovery) {
   if (auto res = static_cast<Client*>(context)->WriteCustom(a, b, one_shot_recovery);
       res.is_error()) {
-    ERROR("Failed to read abr data from storage. %s\n", res.status_string());
+    ERROR("Failed to write abr data to storage. %s\n", res.status_string());
     return false;
   }
   return true;

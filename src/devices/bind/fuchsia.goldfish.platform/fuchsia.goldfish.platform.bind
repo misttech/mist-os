@@ -10,3 +10,13 @@ extend uint fuchsia.BIND_PROTOCOL {
   PIPE = 0x13,
   SYNC = 0x9A,
 };
+
+extend uint fuchsia.BIND_PLATFORM_DEV_PID {
+  GOLDFISH = 0x0D,
+};
+
+extend uint fuchsia.BIND_PLATFORM_DEV_DID {
+  CONTROL = 0x07,
+  PIPE_CONTROL = 0x09,
+  PIPE_SENSOR = 0x0A,
+};

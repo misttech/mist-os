@@ -27,7 +27,7 @@ TEST_F(DeviceEnumerationTest, Vim3DeviceTreeTest) {
       "dev.sys.platform.dsi-display-ff900000",
       "dev.sys.platform.ethernet-phy-ff634000.ethernet-phy-ff634000_group.aml-ethernet.dwmac-ff3f0000_group.dwmac.Designware-MAC.network-device",
       "dev.sys.platform.ethernet-phy-ff634000.ethernet-phy-ff634000_group.aml-ethernet.dwmac-ff3f0000_group.dwmac.eth_phy.phy_null_device",
-      "dev.sys.platform.fuchsia-sysmem.sysmem",
+      "dev.sys.platform.fuchsia-sysmem",
       "dev.sys.platform.gpio-buttons.gpio-buttons_group.buttons",
       "dev.sys.platform.gpio-controller-ff634400.aml-gpio.gpio-init",
       "dev.sys.platform.gpio-controller-ff634400.aml-gpio.gpio",

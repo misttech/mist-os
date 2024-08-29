@@ -4,9 +4,7 @@
 # found in the LICENSE file.
 
 import argparse
-import json
 import subprocess
-import sys
 
 
 def main():

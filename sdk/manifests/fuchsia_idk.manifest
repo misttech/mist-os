@@ -267,6 +267,7 @@ fidl_library://fidl/fuchsia.hardware.sdio (unstable)
 fidl_library://fidl/fuchsia.hardware.sdmmc (unstable)
 fidl_library://fidl/fuchsia.hardware.sharedmemory (unstable)
 fidl_library://fidl/fuchsia.hardware.spiimpl (unstable)
+fidl_library://fidl/fuchsia.hardware.spmi (unstable)
 fidl_library://fidl/fuchsia.hardware.temperature
 fidl_library://fidl/fuchsia.hardware.trippoint
 fidl_library://fidl/fuchsia.hardware.usb.phy (unstable)

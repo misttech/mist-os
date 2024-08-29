@@ -5,15 +5,13 @@
 #ifndef SRC_DEVICES_USB_DRIVERS_XHCI_XHCI_INTERRUPTER_H_
 #define SRC_DEVICES_USB_DRIVERS_XHCI_XHCI_INTERRUPTER_H_
 
-#include <lib/async-loop/cpp/loop.h>
-#include <lib/async/cpp/executor.h>
+#include <lib/async/cpp/irq.h>
+#include <lib/async/cpp/task.h>
 #include <lib/device-protocol/pci.h>
+#include <lib/sync/cpp/completion.h>
 #include <lib/zx/interrupt.h>
 
-#include <thread>
-
 #include "src/devices/usb/drivers/xhci/xhci-event-ring.h"
-#include "zircon/system/ulib/inspect/include/lib/inspect/cpp/vmo/types.h"
 
 namespace usb_xhci {
 
@@ -25,11 +23,27 @@ class Interrupter {
   Interrupter() = default;
 
   ~Interrupter() {
-    if (thread_.joinable()) {
-      thread_.join();
-    }
-    if (irq_.is_valid()) {
-      irq_.destroy();
+    if (dispatcher_.get()) {
+      zx_status_t cancel_status;
+      libsync::Completion cancel_completion;
+      zx_status_t post_task_status = async::PostTask(dispatcher_.async_dispatcher(), [&]() {
+        cancel_status = irq_handler_.Cancel();
+        cancel_completion.Signal();
+      });
+
+      if (post_task_status != ZX_OK) {
+        FDF_LOG(ERROR, "Failed to post the irq handler cancel task: %s",
+                zx_status_get_string(post_task_status));
+      } else {
+        cancel_completion.Wait();
+        if (cancel_status != ZX_OK) {
+          FDF_LOG(ERROR, "Failed to cancel the irq handler: %s",
+                  zx_status_get_string(cancel_status));
+        }
+      }
+
+      dispatcher_.ShutdownAsync();
+      irq_shutdown_completion_.Wait();
     }
   }
 
@@ -46,10 +60,6 @@ class Interrupter {
       return;
     }
     active_ = false;
-    if (async_executor_.has_value()) {
-      async_executor_.value().schedule_task(fpromise::make_ok_promise().then(
-          [=](fpromise::result<void, void>& result) { async_loop_->Quit(); }));
-    }
   }
 
   EventRing& ring() { return event_ring_; }
@@ -62,14 +72,16 @@ class Interrupter {
   fpromise::promise<void, zx_status_t> Timeout(zx::time deadline);
 
  private:
+  zx_status_t StartIrqThread();
+
+  fdf::SynchronizedDispatcher dispatcher_;
+
   std::atomic_bool active_ = false;
   uint16_t interrupter_;
-  zx_status_t IrqThread();
   zx::interrupt irq_;
-  std::thread thread_;
   EventRing event_ring_;
-  std::optional<async::Executor> async_executor_;
-  std::optional<async::Loop> async_loop_;
+  async::Irq irq_handler_;
+  libsync::Completion irq_shutdown_completion_;
 
   // published inspect data
   inspect::Node inspect_root_;

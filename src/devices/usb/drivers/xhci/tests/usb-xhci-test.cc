@@ -4,23 +4,19 @@
 
 #include "src/devices/usb/drivers/xhci/usb-xhci.h"
 
-#include <lib/async-loop/default.h>
-#include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
-#include <lib/component/outgoing/cpp/outgoing_directory.h>
-#include <lib/device-protocol/pdev-fidl.h>
+#include <lib/driver/testing/cpp/driver_test.h>
 #include <lib/sync/completion.h>
 #include <lib/zx/bti.h>
 #include <lib/zx/vmar.h>
-#include <zircon/types.h>
 
 #include <list>
 
 #include <fake-dma-buffer/fake-dma-buffer.h>
 #include <fake-mmio-reg/fake-mmio-reg.h>
-#include <zxtest/zxtest.h>
+#include <gtest/gtest.h>
 
 #include "src/devices/bus/testing/fake-pdev/fake-pdev.h"
-#include "src/devices/testing/mock-ddk/mock-device.h"
+#include "src/lib/testing/predicates/status.h"
 
 namespace usb_xhci {
 
@@ -90,6 +86,8 @@ class FakeDevice {
     constexpr auto kDoorbellBase = 1024 * sizeof(uint32_t);
     constexpr auto kImodi = 457 * sizeof(uint32_t);
 
+    constexpr uint8_t kCapLength = 0x1c;
+
     region_.emplace(sizeof(uint32_t), 2048);
 
     region()[kHcsParams2].SetReadCallback([]() {
@@ -126,7 +124,7 @@ class FakeDevice {
         driver_owned_controller_ = true;
       }
     });
-    region()[kOffset].SetReadCallback([=]() { return 0x1c; });
+    region()[kOffset].SetReadCallback([=]() { return kCapLength; });
 
     region()[kHcsParams1].SetReadCallback([=]() {
       HCSPARAMS1 parms = HCSPARAMS1::Get().FromValue(0);
@@ -163,36 +161,36 @@ class FakeDevice {
     });
 
     region()[kUsbSts].SetReadCallback([=]() {
-      auto sts = USBSTS::Get(0x1c).FromValue(0);
+      auto sts = USBSTS::Get(kCapLength).FromValue(0);
       sts.set_HCHalted(!controller_enabled_);
       return sts.reg_value();
     });
 
     region()[kUsbPageSize].SetReadCallback([=]() {
-      USB_PAGESIZE size = USB_PAGESIZE::Get(0x1c).FromValue(0);
+      USB_PAGESIZE size = USB_PAGESIZE::Get(kCapLength).FromValue(0);
       size.set_PageSize(1);
       return size.reg_value();
     });
 
     region()[kConfig].SetReadCallback([=]() {
-      CONFIG config = CONFIG::Get(0x1c).FromValue(0);
+      CONFIG config = CONFIG::Get(kCapLength).FromValue(0);
       config.set_MaxSlotsEn(slots_enabled_);
       return config.reg_value();
     });
 
     region()[kConfig].SetWriteCallback([=](uint64_t value) {
-      CONFIG config = CONFIG::Get(0x1c).FromValue(static_cast<uint32_t>(value));
+      CONFIG config = CONFIG::Get(kCapLength).FromValue(static_cast<uint32_t>(value));
       slots_enabled_ = config.MaxSlotsEn();
     });
 
     region()[kCrCr].SetWriteCallback([=](uint64_t value) {
-      CRCR cr = CRCR::Get(0x1c).FromValue(value);
+      CRCR cr = CRCR::Get(kCapLength).FromValue(value);
       crcr_ = reinterpret_cast<zx_paddr_t>(cr.PTR());
     });
 
     region()[kDcbaa].SetReadCallback([=]() { return dcbaa_; });
     region()[kDcbaa].SetWriteCallback([=](uint64_t value) {
-      auto val = DCBAAP::Get(0x1c).FromValue(value);
+      auto val = DCBAAP::Get(kCapLength).FromValue(value);
       dcbaa_ = val.PTR();
     });
     doorbell_callback_ = [](uint8_t doorbell, uint8_t target) {};
@@ -291,13 +289,40 @@ class FakeUsbBus : public ddk::UsbBusInterfaceProtocol<FakeUsbBus> {
   usb_bus_interface_protocol_t proto_;
 };
 
-struct IncomingNamespace {
-  fake_pdev::FakePDevFidl pdev_server;
-  component::OutgoingDirectory outgoing{async_get_default_dispatcher()};
+class XhciTestEnvironment : fdf_testing::Environment {
+ public:
+  zx::result<> Serve(fdf::OutgoingDirectory& to_driver_vfs) override {
+    device_server_.Init(component::kDefaultInstance, "root");
+    EXPECT_OK(
+        device_server_.Serve(fdf::Dispatcher::GetCurrent()->async_dispatcher(), &to_driver_vfs));
+
+    fake_pdev::FakePDevFidl::Config config;
+    config.mmios[0] = fake_device_.mmio();
+    config.irqs[0] = {};
+    EXPECT_OK(zx::interrupt::create(zx::resource(), 0, ZX_INTERRUPT_VIRTUAL, &config.irqs[0]));
+    fake_device_.set_irq_signaller(config.irqs[0].borrow());
+    config.use_fake_bti = true;
+    pdev_server_.SetConfig(std::move(config));
+    return to_driver_vfs.AddService<fuchsia_hardware_platform_device::Service>(
+        pdev_server_.GetInstanceHandler(fdf::Dispatcher::GetCurrent()->async_dispatcher()), "pdev");
+  }
+
+  FakeDevice& fake_device() { return fake_device_; }
+
+ private:
+  compat::DeviceServer device_server_;
+  fake_pdev::FakePDevFidl pdev_server_;
+  FakeDevice fake_device_;
+};
+
+class XhciTestConfig final {
+ public:
+  using DriverType = usb_xhci::UsbXhci;
+  using EnvironmentType = XhciTestEnvironment;
 };
 
 using TestRequest = usb::CallbackRequest<sizeof(max_align_t)>;
-class XhciHarness : public zxtest::Test {
+class XhciHarness : public ::testing::Test {
  public:
   FakeTRB* CreateTRB() {
     auto it = trbs_.insert(trbs_.end(), std::make_unique<FakeTRB>());
@@ -316,15 +341,16 @@ class XhciHarness : public zxtest::Test {
     return it->get();
   }
 
-  size_t GetMaxDeviceCount() { return xhci_->UsbHciGetMaxDeviceCount(); }
+  size_t GetMaxDeviceCount() { return driver_test().driver()->UsbHciGetMaxDeviceCount(); }
 
-  void RequestQueue(TestRequest request) { request.Queue(*xhci_); }
+  void RequestQueue(TestRequest request) { request.Queue(*driver_test().driver()); }
 
   template <typename Callback>
   zx_status_t AllocateRequest(std::optional<TestRequest>* request, uint32_t device_id,
                               uint64_t data_size, uint8_t endpoint, Callback callback) {
-    zx_status_t result = TestRequest::Alloc(request, data_size, endpoint,
-                                            xhci_->UsbHciGetRequestSize(), std::move(callback));
+    zx_status_t result =
+        TestRequest::Alloc(request, data_size, endpoint,
+                           driver_test().driver()->UsbHciGetRequestSize(), std::move(callback));
     if (result != ZX_OK) {
       return result;
     }
@@ -359,14 +385,14 @@ class XhciHarness : public zxtest::Test {
   FakeUsbDevice ConnectDevice(uint8_t port, usb_speed_t speed) {
     std::optional<HubInfo> hub;
     uint8_t slot = AllocateSlot();
-    xhci_->GetPortState()[port - 1].is_connected = true;
-    xhci_->GetPortState()[port - 1].link_active = true;
-    xhci_->GetPortState()[port - 1].slot_id = slot;
-    xhci_->SetDeviceInformation(slot, slot, hub);
-    xhci_->AddressDeviceCommand(slot, port, hub, true);
+    driver_test().driver()->GetPortState()[port - 1].is_connected = true;
+    driver_test().driver()->GetPortState()[port - 1].link_active = true;
+    driver_test().driver()->GetPortState()[port - 1].slot_id = slot;
+    driver_test().driver()->SetDeviceInformation(slot, slot, hub);
+    driver_test().driver()->AddressDeviceCommand(slot, port, hub, true);
     bus_.reset();
-    xhci_->DeviceOnline(slot, port, speed);
-    bus_.wait();
+    driver_test().driver()->DeviceOnline(slot, port, speed);
+    EXPECT_OK(driver_test().RunOnBackgroundDispatcherSync([this]() { bus_.wait(); }));
     return bus_.devices().find(slot - 1)->second;
   }
 
@@ -374,20 +400,12 @@ class XhciHarness : public zxtest::Test {
     usb_endpoint_descriptor_t ep_desc = {};
     ep_desc.bm_attributes = USB_ENDPOINT_BULK;
     ep_desc.b_endpoint_address = ep_num | (is_in_endpoint ? 0x80 : 0);
-    xhci_->UsbHciEnableEndpoint(device_id, &ep_desc, nullptr);
-  }
-
-  zx_status_t ResetEndpointCommand(uint32_t device_id, uint8_t ep_address) {
-    return xhci_->UsbHciResetEndpoint(device_id, ep_address);
-  }
-
-  zx_status_t CancelAllCommand(uint32_t device_id, uint8_t ep_address) {
-    return xhci_->UsbHciCancelAll(device_id, ep_address);
+    driver_test().driver()->UsbHciEnableEndpoint(device_id, &ep_desc, nullptr);
   }
 
   zx_status_t CompleteCommand(TRB* trb, CommandCompletionEvent* event) {
     std::unique_ptr<TRBContext> context;
-    zx_status_t status = xhci_->GetCommandRing()->CompleteTRB(trb, &context);
+    zx_status_t status = driver_test().driver()->GetCommandRing()->CompleteTRB(trb, &context);
     if (status != ZX_OK) {
       return status;
     }
@@ -396,29 +414,25 @@ class XhciHarness : public zxtest::Test {
   }
 
   void SetDoorbellListener(fit::function<void(uint8_t, uint8_t)> listener) {
-    fake_device_.SetDoorbellCallback(std::move(listener));
+    driver_test().RunInEnvironmentTypeContext([&](XhciTestEnvironment& env) {
+      env.fake_device().SetDoorbellCallback(std::move(listener));
+    });
   }
 
-  FakeTRB* crcr() { return fake_device_.crcr(); }
-
-  ~XhciHarness() {
-    // The order of destroying the objects matter. First release the xhci device by destroying the
-    // mock ddk root. Then release resources xhci was dependent on.
-    root_ = nullptr;
-    trbs_.clear();
+  FakeTRB* crcr_next() {
+    return FakeTRB::get(driver_test().RunInEnvironmentTypeContext<zx_paddr_t>(
+        [](XhciTestEnvironment& env) { return env.fake_device().crcr()->next; }));
   }
+
+  ~XhciHarness() { trbs_.clear(); }
+
+  fdf_testing::ForegroundDriverTest<XhciTestConfig>& driver_test() { return driver_test_; }
 
  protected:
-  UsbXhci* xhci_ = nullptr;
   FakeUsbBus bus_;
-  std::shared_ptr<MockDevice> root_ = MockDevice::FakeRootParent();
-  MockDevice* mock_ddk_xhci_ = nullptr;
-  FakeDevice fake_device_;
-  async::Loop incoming_loop_{&kAsyncLoopConfigNoAttachToCurrentThread};
-  async_patterns::TestDispatcherBound<IncomingNamespace> incoming_{incoming_loop_.dispatcher(),
-                                                                   std::in_place};
 
  private:
+  fdf_testing::ForegroundDriverTest<XhciTestConfig> driver_test_;
   std::vector<uint8_t> slot_freelist_;
   uint8_t slot_id_ = 0;
   std::list<std::unique_ptr<FakeTRB>> trbs_;
@@ -427,53 +441,28 @@ class XhciHarness : public zxtest::Test {
 class XhciMmioHarness : public XhciHarness {
  public:
   void SetUp() override {
-    fake_pdev::FakePDevFidl::Config config;
-    config.mmios[0] = fake_device_.mmio();
-    config.irqs[0] = {};
-    ASSERT_OK(zx::interrupt::create(zx::resource(), 0, ZX_INTERRUPT_VIRTUAL, &config.irqs[0]));
-    fake_device_.set_irq_signaller(config.irqs[0].borrow());
-    config.use_fake_bti = true;
-
-    auto outgoing_endpoints = fidl::Endpoints<fuchsia_io::Directory>::Create();
-    ASSERT_OK(incoming_loop_.StartThread("incoming-ns-thread"));
-    incoming_.SyncCall([config = std::move(config), server = std::move(outgoing_endpoints.server)](
-                           IncomingNamespace* infra) mutable {
-      infra->pdev_server.SetConfig(std::move(config));
-      ASSERT_OK(infra->outgoing.AddService<fuchsia_hardware_platform_device::Service>(
-          infra->pdev_server.GetInstanceHandler()));
-
-      ASSERT_OK(infra->outgoing.Serve(std::move(server)));
-    });
-    ASSERT_NO_FATAL_FAILURE();
-    root_->AddFidlService(fuchsia_hardware_platform_device::Service::Name,
-                          std::move(outgoing_endpoints.client));
-
-    auto dev =
-        std::make_unique<UsbXhci>(root_.get(), xhci_config::Config({.enable_suspend = false}),
-                                  ddk_fake::CreateBufferFactory(), loop_.dispatcher());
-    dev->SetTestHarness(this);
-    dev->DdkAdd("xhci");
-    ASSERT_EQ(1, root_->child_count());
-    mock_ddk_xhci_ = root_->GetLatestChild();
-    mock_ddk_xhci_->InitOp();
-    ASSERT_OK(mock_ddk_xhci_->WaitUntilInitReplyCalled());
-    ASSERT_OK(mock_ddk_xhci_->InitReplyCallStatus());
-    dev->UsbHciSetBusInterface(bus_.proto());
-    xhci_ = dev.release();
+    ASSERT_TRUE(driver_test()
+                    .StartDriverWithCustomStartArgs([&](fdf::DriverStartArgs& args) {
+                      xhci_config::Config fake_config;
+                      fake_config.enable_suspend() = false;
+                      args.config(fake_config.ToVmo());
+                    })
+                    .is_ok());
+    ASSERT_OK(driver_test().driver()->TestInit(this));
+    driver_test().driver()->UsbHciSetBusInterface(bus_.proto());
   }
 
-  void TearDown() override {
-    mock_ddk_xhci_->UnbindOp();
-    ASSERT_OK(mock_ddk_xhci_->WaitUntilUnbindReplyCalled());
-  }
-
- private:
-  async::Loop loop_{&kAsyncLoopConfigNeverAttachToThread};
+  void TearDown() override { ASSERT_TRUE(driver_test().StopDriver().is_ok()); }
 };
 
 fbl::DoublyLinkedList<std::unique_ptr<TRBContext>> TransferRing::TakePendingTRBs() {
   fbl::AutoLock al(&mutex_);
   return std::move(pending_trbs_);
+}
+
+zx::result<> UsbXhci::TestInit(void* test_harness) {
+  test_harness_ = test_harness;
+  return Init(ddk_fake::CreateBufferFactory());
 }
 
 void EventRing::ScheduleTask(fpromise::promise<void, zx_status_t> promise) {
@@ -496,7 +485,7 @@ zx_status_t TransferRing::AllocateTRB(TRB** trb, State* state) {
     state->pcs = pcs_;
     state->trbs = trbs_;
   }
-  auto new_trb = static_cast<XhciHarness*>(hci_->GetTestHarness())->CreateTRB();
+  auto new_trb = hci_->GetTestHarness<XhciHarness>()->CreateTRB();
   new_trb->prev = static_cast<FakeTRB*>(trbs_)->phys();
   static_cast<FakeTRB*>(trbs_)->next = new_trb->phys();
   trbs_ = new_trb;
@@ -508,7 +497,7 @@ zx_status_t TransferRing::AllocateTRB(TRB** trb, State* state) {
 
 zx::result<ContiguousTRBInfo> TransferRing::AllocateContiguous(size_t count) {
   fbl::AutoLock _(&mutex_);
-  auto new_trb = static_cast<XhciHarness*>(hci_->GetTestHarness())->CreateTRBs(count);
+  auto new_trb = hci_->GetTestHarness<XhciHarness>()->CreateTRBs(count);
   new_trb->prev = static_cast<FakeTRB*>(trbs_)->phys();
   static_cast<FakeTRB*>(trbs_)->next = new_trb->phys();
   trbs_ = new_trb->contig.data();
@@ -555,8 +544,6 @@ zx_status_t TransferRing::AssignContext(TRB* trb, std::unique_ptr<TRBContext> co
   return ZX_OK;
 }
 
-zx_status_t xhci_start_root_hubs(UsbXhci* xhci) { return ZX_OK; }
-
 zx_status_t TransferRing::Init(size_t page_size, const zx::bti& bti, EventRing* ring, bool is_32bit,
                                fdf::MmioBuffer* mmio, UsbXhci* hci) {
   fbl::AutoLock _(&mutex_);
@@ -572,7 +559,7 @@ zx_status_t TransferRing::Init(size_t page_size, const zx::bti& bti, EventRing* 
   token_++;
   stalled_ = false;
   hci_ = hci;
-  trbs_ = static_cast<XhciHarness*>(hci_->GetTestHarness())->CreateTRB();
+  trbs_ = hci_->GetTestHarness<XhciHarness>()->CreateTRB();
   static_assert(sizeof(uint64_t) == sizeof(this));
   trbs_->ptr = reinterpret_cast<uint64_t>(this);
   trbs_->status = pcs_;
@@ -607,7 +594,7 @@ zx_status_t TransferRing::AddTRB(const TRB& trb, std::unique_ptr<TRBContext> con
     return ZX_ERR_INVALID_ARGS;
   }
   FakeTRB* alloc_trb;
-  alloc_trb = static_cast<XhciHarness*>(hci_->GetTestHarness())->CreateTRB();
+  alloc_trb = hci_->GetTestHarness<XhciHarness>()->CreateTRB();
   alloc_trb->prev = static_cast<FakeTRB*>(trbs_)->phys();
   static_cast<FakeTRB*>(trbs_)->next = alloc_trb->phys();
   trbs_ = alloc_trb;
@@ -710,7 +697,7 @@ zx_status_t Interrupter::Start(const RuntimeRegisterOffset& offset,
   return ZX_OK;
 }
 
-int Interrupter::IrqThread() { return 0; }
+zx_status_t Interrupter::StartIrqThread() { return ZX_OK; }
 
 fpromise::promise<void, zx_status_t> Interrupter::Timeout(zx::time deadline) {
   return fpromise::make_result_promise<void, zx_status_t>(fpromise::ok());
@@ -758,7 +745,7 @@ TEST_F(XhciMmioHarness, QueueControlRequest) {
   RequestQueue(std::move(*request));
   ASSERT_TRUE(rang);
   // Find slot context pointer in address device command
-  auto cr = FakeTRB::get(crcr()->next);
+  auto cr = crcr_next();
   Control control_trb = Control::FromTRB(cr);
   ASSERT_EQ(control_trb.Type(), Control::AddressDeviceCommand);
   auto control = static_cast<unsigned char*>(reinterpret_cast<FakeVMO*>(cr->ptr)->virt);
@@ -771,17 +758,17 @@ TEST_F(XhciMmioHarness, QueueControlRequest) {
   auto initial_trb = trb;
   // Setup
   trb = FakeTRB::get(trb->next);
-  auto setup_trb = static_cast<Setup*>(static_cast<TRB*>(trb));
-  ASSERT_EQ(setup_trb->length(), 8);
-  ASSERT_EQ(setup_trb->IDT(), 1);
+  auto setup_trb = static_cast<struct Setup*>(static_cast<TRB*>(trb));
+  ASSERT_EQ(setup_trb->length(), 8UL);
+  ASSERT_EQ(setup_trb->IDT(), 1UL);
   ASSERT_EQ(setup_trb->TRT(), Setup::IN);
   // Data
   trb = FakeTRB::get(trb->next);
   auto data_trb = static_cast<ControlData*>(static_cast<TRB*>(trb));
-  ASSERT_EQ(data_trb->DIRECTION(), 1);
-  ASSERT_EQ(data_trb->INTERRUPTER(), 0);
+  ASSERT_EQ(data_trb->DIRECTION(), 1UL);
+  ASSERT_EQ(data_trb->INTERRUPTER(), 0UL);
   ASSERT_EQ(data_trb->LENGTH(), zx_system_get_page_size());
-  ASSERT_EQ(data_trb->SIZE(), 1);
+  ASSERT_EQ(data_trb->SIZE(), 1UL);
   ASSERT_TRUE(data_trb->ISP());
   ASSERT_TRUE(data_trb->NO_SNOOP());
   void** virt = reinterpret_cast<void**>(FakeTRB::get(static_cast<zx_paddr_t>(data_trb->ptr))->ptr);
@@ -789,16 +776,16 @@ TEST_F(XhciMmioHarness, QueueControlRequest) {
   // Normal
   trb = FakeTRB::get(trb->next);
   auto normal_trb = static_cast<Normal*>(static_cast<TRB*>(trb));
-  ASSERT_EQ(normal_trb->INTERRUPTER(), 0);
+  ASSERT_EQ(normal_trb->INTERRUPTER(), 0UL);
   ASSERT_EQ(normal_trb->LENGTH(), zx_system_get_page_size());
-  ASSERT_EQ(normal_trb->SIZE(), 0);
+  ASSERT_EQ(normal_trb->SIZE(), 0UL);
   ASSERT_TRUE(normal_trb->ISP());
   ASSERT_TRUE(normal_trb->NO_SNOOP());
   // Status
   trb = FakeTRB::get(trb->next);
   auto status_trb = static_cast<Status*>(static_cast<TRB*>(trb));
-  ASSERT_EQ(status_trb->DIRECTION(), 0);
-  ASSERT_EQ(status_trb->INTERRUPTER(), 0);
+  ASSERT_EQ(status_trb->DIRECTION(), 0UL);
+  ASSERT_EQ(status_trb->INTERRUPTER(), 0UL);
   ASSERT_TRUE(status_trb->IOC());
   // Interrupt on completion
   TransferRing* ring = reinterpret_cast<TransferRing*>(initial_trb->ptr);
@@ -830,10 +817,11 @@ TEST_F(XhciMmioHarness, QueueNormalRequest) {
   RequestQueue(std::move(*request));
   ASSERT_TRUE(rang);
   // Find slot context pointer in address device command
-  auto cr = FakeTRB::get(crcr()->next);
+  auto cr = crcr_next();
   Control control_trb = Control::FromTRB(cr);
   ASSERT_EQ(control_trb.Type(), Control::AddressDeviceCommand);
-  auto control = static_cast<unsigned char*>(reinterpret_cast<FakeVMO*>(cr->ptr)->virt);
+  [[maybe_unused]] auto control =
+      static_cast<unsigned char*>(reinterpret_cast<FakeVMO*>(cr->ptr)->virt);
   auto endpoint_context = reinterpret_cast<EndpointContext*>(control + (64 * 4));
   auto ring_phys =
       static_cast<zx_paddr_t>(static_cast<uint64_t>(endpoint_context->dequeue_pointer_a) |
@@ -846,11 +834,11 @@ TEST_F(XhciMmioHarness, QueueNormalRequest) {
   auto trb = FakeTRB::get(trb_start->next)->contig.data();
   auto data_trb = static_cast<Normal*>(static_cast<TRB*>(trb));
   ASSERT_EQ(Control::FromTRB(data_trb).Type(), Control::Normal);
-  ASSERT_EQ(data_trb->IOC(), 0);
-  ASSERT_EQ(data_trb->ISP(), 1);
-  ASSERT_EQ(data_trb->INTERRUPTER(), 0);
+  ASSERT_EQ(data_trb->IOC(), 0UL);
+  ASSERT_EQ(data_trb->ISP(), 1UL);
+  ASSERT_EQ(data_trb->INTERRUPTER(), 0UL);
   ASSERT_EQ(data_trb->LENGTH(), zx_system_get_page_size());
-  ASSERT_EQ(data_trb->SIZE(), 1);
+  ASSERT_EQ(data_trb->SIZE(), 1UL);
   ASSERT_TRUE(data_trb->NO_SNOOP());
   void** virt = reinterpret_cast<void**>(FakeTRB::get(static_cast<zx_paddr_t>(data_trb->ptr))->ptr);
   *virt = virt;
@@ -858,11 +846,11 @@ TEST_F(XhciMmioHarness, QueueNormalRequest) {
   // Data (page 1, contiguous)
   trb++;
   data_trb = static_cast<Normal*>(static_cast<TRB*>(trb));
-  ASSERT_EQ(data_trb->IOC(), 1);
-  ASSERT_EQ(data_trb->ISP(), 1);
-  ASSERT_EQ(data_trb->INTERRUPTER(), 0);
+  ASSERT_EQ(data_trb->IOC(), 1UL);
+  ASSERT_EQ(data_trb->ISP(), 1UL);
+  ASSERT_EQ(data_trb->INTERRUPTER(), 0UL);
   ASSERT_EQ(data_trb->LENGTH(), zx_system_get_page_size());
-  ASSERT_EQ(data_trb->SIZE(), 0);
+  ASSERT_EQ(data_trb->SIZE(), 0UL);
   ASSERT_TRUE(data_trb->NO_SNOOP());
 
   // Interrupt on completion
@@ -876,7 +864,7 @@ TEST_F(XhciMmioHarness, QueueNormalRequest) {
 TEST_F(XhciMmioHarness, CancelAllOnDisabledEndpoint) {
   ConnectDevice(1, USB_SPEED_HIGH);
   zx_status_t cancel_status;
-  auto cr = FakeTRB::get(crcr()->next);
+  auto cr = crcr_next();
   Control control_trb = Control::FromTRB(cr);
   ASSERT_EQ(control_trb.Type(), Control::AddressDeviceCommand);
   CommandCompletionEvent event;
@@ -890,15 +878,15 @@ TEST_F(XhciMmioHarness, CancelAllOnDisabledEndpoint) {
       switch (control.Type()) {
         case Control::StopEndpointCommand: {
           auto cancel_command = reinterpret_cast<StopEndpoint*>(cr);
-          ASSERT_EQ(cancel_command->ENDPOINT(), 2);
-          ASSERT_EQ(cancel_command->SLOT(), 1);
+          ASSERT_EQ(cancel_command->ENDPOINT(), 2UL);
+          ASSERT_EQ(cancel_command->SLOT(), 1UL);
           got_stop_endpoint = true;
           ASSERT_OK(CompleteCommand(cr, &event));
         } break;
       }
     }
   });
-  cancel_status = CancelAllCommand(0, 1);
+  cancel_status = driver_test().driver()->UsbHciCancelAll(0, 1);
   ASSERT_TRUE(got_stop_endpoint);
   ASSERT_EQ(cancel_status, ZX_ERR_IO_NOT_PRESENT);
 }
@@ -908,15 +896,15 @@ TEST_F(XhciMmioHarness, ResetEndpointTestSuccessCase) {
   EnableEndpoint(0, 1, false);
   uint64_t paddr;
   {
-    auto& state = xhci_->GetDeviceState()[0];
-    ASSERT_NOT_NULL(state);
+    auto& state = driver_test().driver()->GetDeviceState()[0];
+    ASSERT_TRUE(state);
     fbl::AutoLock l(&state->transaction_lock());
     auto& transfer_ring = state->GetEndpoint(0).transfer_ring();
     transfer_ring.set_stall(true);
     paddr = transfer_ring.PeekCommandRingControlRegister(0).value().reg_value();
   }
   zx_status_t reset_status;
-  auto cr = FakeTRB::get(crcr()->next);
+  auto cr = crcr_next();
   Control control_trb = Control::FromTRB(cr);
   ASSERT_EQ(control_trb.Type(), Control::AddressDeviceCommand);
   CommandCompletionEvent event;
@@ -935,8 +923,8 @@ TEST_F(XhciMmioHarness, ResetEndpointTestSuccessCase) {
       switch (control.Type()) {
         case Control::ResetEndpointCommand: {
           auto reset_command = reinterpret_cast<ResetEndpoint*>(cr);
-          ASSERT_EQ(reset_command->ENDPOINT(), 2);
-          ASSERT_EQ(reset_command->SLOT(), 1);
+          ASSERT_EQ(reset_command->ENDPOINT(), 2UL);
+          ASSERT_EQ(reset_command->SLOT(), 1UL);
           got_reset_endpoint = true;
           ASSERT_OK(CompleteCommand(cr, &event));
         } break;
@@ -944,7 +932,7 @@ TEST_F(XhciMmioHarness, ResetEndpointTestSuccessCase) {
           // ResetEndpoint should be sent prior to SetTrDequeuePointer
           ASSERT_TRUE(got_reset_endpoint);
           auto set_cmd = reinterpret_cast<SetTRDequeuePointer*>(cr);
-          ASSERT_EQ(set_cmd->ENDPOINT(), 2);
+          ASSERT_EQ(set_cmd->ENDPOINT(), 2UL);
           ASSERT_EQ(set_cmd->ptr, paddr);
           ASSERT_OK(CompleteCommand(cr, &event));
           got_set_tr_dequeue_ptr = true;
@@ -952,7 +940,7 @@ TEST_F(XhciMmioHarness, ResetEndpointTestSuccessCase) {
       }
     }
   });
-  reset_status = ResetEndpointCommand(0, 1);
+  reset_status = driver_test().driver()->UsbHciResetEndpoint(0, 1);
   ASSERT_TRUE(got_reset_endpoint);
   ASSERT_TRUE(got_set_tr_dequeue_ptr);
   ASSERT_OK(reset_status);
@@ -962,14 +950,14 @@ TEST_F(XhciMmioHarness, ResetEndpointFailsIfNotStalled) {
   ConnectDevice(1, USB_SPEED_HIGH);
   EnableEndpoint(0, 1, false);
   {
-    auto& state = xhci_->GetDeviceState()[0];
-    ASSERT_NOT_NULL(state);
+    auto& state = driver_test().driver()->GetDeviceState()[0];
+    ASSERT_TRUE(state);
     fbl::AutoLock l(&state->transaction_lock());
     state->GetEndpoint(0).transfer_ring().set_stall(false);
   }
-  ASSERT_EQ(ResetEndpointCommand(0, 1), ZX_ERR_INVALID_ARGS);
+  ASSERT_EQ(driver_test().driver()->UsbHciResetEndpoint(0, 1), ZX_ERR_INVALID_ARGS);
 }
 
-TEST_F(XhciMmioHarness, GetMaxDeviceCount) { ASSERT_EQ(GetMaxDeviceCount(), 34); }
+TEST_F(XhciMmioHarness, GetMaxDeviceCount) { ASSERT_EQ(GetMaxDeviceCount(), 34UL); }
 
 }  // namespace usb_xhci

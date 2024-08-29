@@ -44,7 +44,8 @@ class PipeDevice : public DeviceType {
   ~PipeDevice();
 
   zx_status_t Bind();
-  zx_status_t CreateChildDevice(cpp20::span<const zx_device_prop_t> props, const char* dev_name);
+  zx_status_t CreateChildDevice(cpp20::span<const zx_device_str_prop_t> props,
+                                const char* dev_name);
 
   // Device protocol implementation.
   void DdkRelease();
@@ -103,7 +104,7 @@ class PipeChildDevice : public PipeChildDeviceType,
   PipeChildDevice(PipeDevice* parent, async_dispatcher_t* dispatcher);
   ~PipeChildDevice() override = default;
 
-  zx_status_t Bind(cpp20::span<const zx_device_prop_t> props, const char* dev_name);
+  zx_status_t Bind(cpp20::span<const zx_device_str_prop_t> props, const char* dev_name);
 
   // Device protocol implementation.
   void DdkUnbind(ddk::UnbindTxn txn);

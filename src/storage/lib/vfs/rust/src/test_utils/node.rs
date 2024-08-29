@@ -26,7 +26,6 @@ where
     new_proxy
 }
 
-#[cfg(fuchsia_api_level_at_least = "HEAD")]
 pub fn open3_get_proxy<M>(
     proxy: &fio::DirectoryProxy,
     flags: fio::Flags,

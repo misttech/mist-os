@@ -17,101 +17,100 @@
 #include <string>
 
 namespace fuchsia_logging {
-// Sets the log tags without modifying the settings. This is ignored on host.
-void SetTags(const std::initializer_list<std::string>& tags);
 
-// Interest listener configuration
+/// Interest listener configuration
 enum InterestListenerBehavior : uint8_t {
-  // Disable interest listening completely
+  /// Disable interest listening completely
   Disabled = 0,
-  // Enable the interest listener, but don't wait for an initial interest.
+  /// Enable the interest listener, but don't wait for an initial interest.
   EnabledNonBlocking = 1,
-  // Enable the interest listener, and block logging startup on an initial interest
+  /// Enable the interest listener, and block logging startup on an initial interest
   Enabled = 2,
 };
 
-// Settings which control the behavior of logging.
+/// Settings which control the behavior of logging.
 struct LogSettings {
-  // The minimum logging level.
-  // Anything at or above this level will be logged (if applicable).
-  // Anything below this level will be silently ignored.
-  //
-  // The log level defaults to LOG_INFO.
-  //
-  // Log messages for FX_VLOGS(x) (from macros.h) log verbosities in
-  // the range between INFO and DEBUG
+  /// The minimum logging level.
+  /// Anything at or above this level will be logged (if applicable).
+  /// Anything below this level will be silently ignored.
+  ///
+  /// The log level defaults to LOG_INFO.
+  ///
+  /// Log messages for FX_VLOGS(x) (from macros.h) log verbosities in
+  /// the range between INFO and DEBUG
   fuchsia_logging::LogSeverity min_log_level = fuchsia_logging::DefaultLogLevel;
   std::vector<std::string> tags;
 #ifndef __Fuchsia__
-  // The name of a file to which the log should be written.
-  // When non-empty, the previous log output is closed and logging is
-  // redirected to the specified file.  It is not possible to revert to
-  // the previous log output through this interface.
+  /// The name of a file to which the log should be written.
+  /// When non-empty, the previous log output is closed and logging is
+  /// redirected to the specified file.  It is not possible to revert to
+  /// the previous log output through this interface.
   std::string log_file;
 #else
-  // A single-threaded dispatcher to use for change notifications.
-  // Must be single-threaded. Passing a dispatcher that has multiple threads
-  // will result in undefined behavior.
-  // This must be an async_dispatcher_t*.
-  // This can't be defined as async_dispatcher_t* since it is used
-  // from fxl which is a host+target library. This prevents us
-  // from adding a Fuchsia-specific dependency.
+  /// A single-threaded dispatcher to use for change notifications.
+  /// Must be single-threaded. Passing a dispatcher that has multiple threads
+  /// will result in undefined behavior.
+  /// This must be an async_dispatcher_t*.
+  /// This can't be defined as async_dispatcher_t* since it is used
+  /// from fxl which is a host+target library. This prevents us
+  /// from adding a Fuchsia-specific dependency.
   async_dispatcher_t* single_threaded_dispatcher = nullptr;
   // Allows to define the LogSink handle to use. When no handle is provided, the default LogSink
   // in the pogram incoming namespace will be used.
   zx_handle_t log_sink = ZX_HANDLE_INVALID;
-  // Interest listener callback, or nullptr
+  /// Interest listener callback, or nullptr
   void (*severity_change_callback)(fuchsia_logging::LogSeverity severity) = nullptr;
   fuchsia_logging::InterestListenerBehavior interest_listener_config_ = fuchsia_logging::Enabled;
 #endif
 };
 static_assert(std::is_copy_constructible<LogSettings>::value);
 
-// Builder class that allows building log settings,
-// then setting them.
+/// Builder class that allows building log settings,
+/// then setting them.
 class LogSettingsBuilder {
  public:
-  // Sets the default log severity. If not explicitly set,
-  // this defaults to INFO, or to the value specified by Archivist.
+  /// Sets the default log severity. If not explicitly set,
+  /// this defaults to INFO, or to the value specified by Archivist.
   LogSettingsBuilder& WithMinLogSeverity(LogSeverity min_log_level);
 
-  // Sets the tags that are implicitly logged with every message.
+  /// Sets the tags that are implicitly logged with every message.
   LogSettingsBuilder& WithTags(const std::initializer_list<std::string>& tags);
 
 #ifndef __Fuchsia__
-  // Sets the log file.
+  /// Sets the log file.
   LogSettingsBuilder& WithLogFile(const std::string_view& log_file);
 #else
-  // Sets the log sink handle.
+  /// Sets the log sink handle.
   LogSettingsBuilder& WithLogSink(zx_handle_t log_sink);
 
-  // Sets the dispatcher to use.
+  /// Sets the dispatcher to use.
   LogSettingsBuilder& WithDispatcher(async_dispatcher_t* dispatcher);
 
-  // Disables the interest listener.
+  /// Disables the interest listener.
   LogSettingsBuilder& DisableInterestListener();
 
-  // Disables waiting for the initial interest from Archivist.
-  // The level specified in SetMinLogSeverity or INFO will be used
-  // as the default.
+  /// Disables waiting for the initial interest from Archivist.
+  /// The level specified in SetMinLogSeverity or INFO will be used
+  /// as the default.
   LogSettingsBuilder& DisableWaitForInitialInterest();
 
-  // Configures the interest listener settings.
+  /// Configures the interest listener settings.
   LogSettingsBuilder& WithInterestListenerConfiguration(InterestListenerBehavior config);
 
+  /// Sets a callback that is invoked when the severity changes.
   LogSettingsBuilder& WithSeverityChangedListener(
       void (*callback)(fuchsia_logging::LogSeverity severity));
 #endif
-  // Configures the log settings
-  // and initializes (or re-initializes) the LogSink connection.
+  /// Configures the log settings
+  /// and initializes (or re-initializes) the LogSink connection.
   void BuildAndInitialize();
 
  private:
   LogSettings settings_;
 };
 
-// Gets the minimum log severity for the current process. Never returns a value
-// higher than LOG_FATAL.
+/// Gets the minimum log severity for the current process. Never returns a value
+/// higher than LOG_FATAL.
 LogSeverity GetMinLogSeverity();
 
 }  // namespace fuchsia_logging

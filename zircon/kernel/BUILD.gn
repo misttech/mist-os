@@ -107,7 +107,11 @@ if (current_toolchain == default_toolchain) {
         "//zircon/kernel/lib/user_copy:headers.config",
 
         # <vm/pmm_checker.h> has #include <lib/boot-options/boot-options.h>.
+        "//zircon/kernel/lib/acpi_lite:headers.config",
         "//zircon/kernel/lib/boot-options:headers.config",
+        "//zircon/kernel/lib/devicetree:headers.config",
+        "//zircon/system/ulib/uart:headers.config",
+        "//zircon/system/ulib/hwreg:headers.config",
 
         # <vm/phys/arena.h> has #include <lib/memalloc/range.h>
         "//zircon/kernel/phys/lib/memalloc:range.headers.config",
@@ -816,6 +820,7 @@ if (is_kernel) {
       "lib/devicetree/tests",
       "lib/efi:tests",
       "lib/heap/cmpctmalloc:tests",
+      "lib/power-management:tests",
       "lib/sched:tests",
       "phys:tests",
       "phys/lib:tests",

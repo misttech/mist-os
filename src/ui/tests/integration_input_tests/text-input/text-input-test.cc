@@ -242,8 +242,8 @@ class ChromiumInputTest : public ChromiumInputBase {
   static constexpr auto kBuildInfoProvider = "build_info_provider";
   static constexpr auto kBuildInfoProviderUrl = "#meta/fake_build_info.cm";
 
-  static constexpr auto kMockCobalt = "cobalt";
-  static constexpr auto kMockCobaltUrl = "#meta/mock_cobalt.cm";
+  static constexpr auto kFakeCobalt = "cobalt";
+  static constexpr auto kFakeCobaltUrl = "#meta/fake_cobalt.cm";
 
   static constexpr auto kFontsProvider = "fonts_provider";
   static constexpr auto kFontsProviderUrl = "#meta/font_provider_hermetic_for_test.cm";
@@ -262,7 +262,7 @@ class ChromiumInputTest : public ChromiumInputBase {
         std::make_pair(kBuildInfoProvider, kBuildInfoProviderUrl),
         std::make_pair(kMemoryPressureProvider, kMemoryPressureProviderUrl),
         std::make_pair(kNetstack, kNetstackUrl),
-        std::make_pair(kMockCobalt, kMockCobaltUrl),
+        std::make_pair(kFakeCobalt, kFakeCobaltUrl),
         std::make_pair(kFontsProvider, kFontsProviderUrl),
         std::make_pair(kIntl, kIntlUrl),
         std::make_pair(kWebContextProvider, kWebContextProviderUrl),
@@ -287,7 +287,7 @@ class ChromiumInputTest : public ChromiumInputBase {
                 {
                     target, ChildRef{kFontsProvider}, ChildRef{kMemoryPressureProvider},
                     ChildRef{kBuildInfoProvider}, ChildRef{kWebContextProvider}, ChildRef{kIntl},
-                    ChildRef{kMockCobalt},
+                    ChildRef{kFakeCobalt},
                     // Not including kNetstack here, since it emits spurious
                     // FATAL errors.
                 },
@@ -349,7 +349,7 @@ class ChromiumInputTest : public ChromiumInputBase {
          .targets = {target}},
         {.capabilities = {Protocol{
              fidl::DiscoverableProtocolName<fuchsia_metrics::MetricEventLoggerFactory>}},
-         .source = ChildRef{kMockCobalt},
+         .source = ChildRef{kFakeCobalt},
          .targets = {ChildRef{kMemoryPressureProvider}}},
         {.capabilities = {Protocol{fidl::DiscoverableProtocolName<fuchsia_ui_input3::Keyboard>}},
          .source = kTestUIStackRef,

@@ -6,8 +6,8 @@
 #define SRC_DEVICES_SYSMEM_DRIVERS_SYSMEM_NODE_H_
 
 #include <fidl/fuchsia.sysmem2/cpp/wire.h>
-#include <lib/ddk/trace/event.h>
 #include <lib/fit/defer.h>
+#include <lib/trace/event.h>
 #include <lib/zx/channel.h>
 #include <lib/zx/eventpair.h>
 #include <stdint.h>
@@ -28,7 +28,7 @@
 #include "logical_buffer_collection.h"
 #include "versions.h"
 
-namespace sysmem_driver {
+namespace sysmem_service {
 
 class NodeProperties;
 class BufferCollection;
@@ -521,6 +521,6 @@ class Node : public fbl::RefCounted<Node> {
   bool was_unfound_node_ = false;
 };
 
-}  // namespace sysmem_driver
+}  // namespace sysmem_service
 
 #endif  // SRC_DEVICES_SYSMEM_DRIVERS_SYSMEM_NODE_H_

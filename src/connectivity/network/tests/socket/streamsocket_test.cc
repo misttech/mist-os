@@ -1268,8 +1268,9 @@ TEST_P(BlockedIOTest, CloseWhileBlocked) {
   bool is_write = io_method.isWrite();
 
   if (kIsFuchsia && is_write) {
-    GTEST_SKIP() << "TODO(https://fxbug.dev/42138506): Enable socket write methods after we are able "
-                    "to deterministically block on socket writes.";
+    GTEST_SKIP()
+        << "TODO(https://fxbug.dev/42138506): Enable socket write methods after we are able "
+           "to deterministically block on socket writes.";
   }
 
   // If linger is enabled, closing the socket will cause a TCP RST (by definition).
@@ -1757,9 +1758,9 @@ TEST_P(HangupTest, DuringConnect) {
               EXPECT_EQ(n, 1);
               EXPECT_EQ(pfd.revents, POLLOUT | POLLWRNORM | POLLHUP | POLLERR);
             } else {
-              // TODO(https://fxbug.dev/42161904): Poll for POLLIN and POLLRDHUP to show their absence.
-              // Can't be polled now because these events are asserted synchronously, and they might
-              // be ready before the other expected events are asserted.
+              // TODO(https://fxbug.dev/42161904): Poll for POLLIN and POLLRDHUP to show their
+              // absence. Can't be polled now because these events are asserted synchronously, and
+              // they might be ready before the other expected events are asserted.
               pfd.events ^= (POLLIN | POLLRDHUP);
               // TODO(https://fxbug.dev/42166160): Remove the poll timeout.
               int n = poll(&pfd, 1, std::chrono::milliseconds(kDeprecatedTimeout).count());
@@ -1818,9 +1819,9 @@ TEST_P(HangupTest, DuringConnect) {
             EXPECT_EQ(n, 1);
             EXPECT_EQ(pfd.revents, POLLOUT | POLLWRNORM | POLLHUP);
           } else {
-            // TODO(https://fxbug.dev/42161904): Poll for POLLIN and POLLRDHUP to show their absence.
-            // Can't be polled now because these events are asserted synchronously, and they might
-            // be ready before the other expected events are asserted.
+            // TODO(https://fxbug.dev/42161904): Poll for POLLIN and POLLRDHUP to show their
+            // absence. Can't be polled now because these events are asserted synchronously, and
+            // they might be ready before the other expected events are asserted.
             pfd.events ^= (POLLIN | POLLRDHUP);
             // TODO(https://fxbug.dev/42166160): Remove the poll timeout.
             int n = poll(&pfd, 1, std::chrono::milliseconds(kDeprecatedTimeout).count());
@@ -2186,5 +2187,80 @@ TEST_P(IOMethodTest, NullptrFaultSTREAM) {
 
 INSTANTIATE_TEST_SUITE_P(IOMethodTests, IOMethodTest, testing::ValuesIn(kAllIOMethods),
                          [](const auto info) { return info.param.IOMethodToString(); });
+
+class ReuseAddrTest : public testing::TestWithParam<std::tuple<SocketAddr, SocketAddr>> {};
+
+TEST_P(ReuseAddrTest, TCPListenerReuseAddrConflicts) {
+  auto [first_addr, second_addr] = GetParam();
+  const int kSockOptOn = 1;
+  fbl::unique_fd first, second;
+
+  // Bind one listener with SO_REUSEADDR set.
+  ASSERT_TRUE(first = fbl::unique_fd(socket(first_addr.domain.Get(), SOCK_STREAM, 0)))
+      << strerror(errno);
+  ASSERT_EQ(setsockopt(first.get(), SOL_SOCKET, SO_REUSEADDR, &kSockOptOn, sizeof(kSockOptOn)), 0)
+      << strerror(errno);
+  // If we're binding to an IPv6 address, also set IPV6_V6ONLY (disable dual-stack
+  // mode) so we don't interfere with any other tests exercising IPv4.
+  if (first_addr.domain.Get() == AF_INET6) {
+    ASSERT_EQ(setsockopt(first.get(), SOL_IPV6, IPV6_V6ONLY, &kSockOptOn, sizeof(kSockOptOn)), 0)
+        << strerror(errno);
+  }
+  ASSERT_EQ(
+      bind(first.get(), reinterpret_cast<const sockaddr*>(&first_addr.addr), first_addr.addr_len),
+      0)
+      << strerror(errno);
+
+  // Get the port that the first listener is bound on so we can bind to the same
+  // one.
+  ASSERT_EQ(
+      getsockname(first.get(), reinterpret_cast<sockaddr*>(&first_addr.addr), &first_addr.addr_len),
+      0)
+      << strerror(errno);
+  second_addr.SetPort(first_addr.GetPort());
+
+  // Bind another listener to the same port, also with SO_REUSEADDR.
+  ASSERT_TRUE(second = fbl::unique_fd(socket(second_addr.domain.Get(), SOCK_STREAM, 0)))
+      << strerror(errno);
+  ASSERT_EQ(setsockopt(second.get(), SOL_SOCKET, SO_REUSEADDR, &kSockOptOn, sizeof(kSockOptOn)), 0)
+      << strerror(errno);
+  // If we're binding to an IPv6 address, also set IPV6_V6ONLY (disable dual-stack
+  // mode) so we don't interfere with any other tests exercising IPv4.
+  if (second_addr.domain.Get() == AF_INET6) {
+    ASSERT_EQ(setsockopt(second.get(), SOL_IPV6, IPV6_V6ONLY, &kSockOptOn, sizeof(kSockOptOn)), 0)
+        << strerror(errno);
+  }
+  ASSERT_EQ(bind(second.get(), reinterpret_cast<const sockaddr*>(&second_addr.addr),
+                 second_addr.addr_len),
+            0)
+      << strerror(errno);
+
+  // The first listen should succeed.
+  ASSERT_EQ(listen(first.get(), 0), 0) << strerror(errno);
+
+  // The second listen should fail.
+  ASSERT_EQ(listen(second.get(), 0), -1);
+  ASSERT_EQ(errno, EADDRINUSE) << strerror(errno);
+}
+
+std::string SocketAddrsToString(
+    const testing::TestParamInfo<std::tuple<SocketAddr, SocketAddr>> info) {
+  const auto& [first, second] = info.param;
+  std::stringstream s;
+  s << first.description << "_" << second.description;
+  return s.str();
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    ReuseAddrTestsV4, ReuseAddrTest,
+    testing::Combine(testing::Values(SocketAddr::IPv4Any(), SocketAddr::IPv4Loopback()),
+                     testing::Values(SocketAddr::IPv4Any(), SocketAddr::IPv4Loopback())),
+    SocketAddrsToString);
+
+INSTANTIATE_TEST_SUITE_P(
+    ReuseAddrTestsV6, ReuseAddrTest,
+    testing::Combine(testing::Values(SocketAddr::IPv6Any(), SocketAddr::IPv6Loopback()),
+                     testing::Values(SocketAddr::IPv6Any(), SocketAddr::IPv6Loopback())),
+    SocketAddrsToString);
 
 }  // namespace

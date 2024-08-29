@@ -7,6 +7,12 @@
         "vulkan/client.shard.cml",
     ],
     program: {
-        args: [ "--use-vulkan" ],
+        args: [
+            // Render using Vulkan instead of CPU.
+            "--use-vulkan",
+
+            // Connect to GraphicalPresenter instead of serving ViewProvider protocol.
+            "--use-graphical-presenter",
+        ],
     },
 }

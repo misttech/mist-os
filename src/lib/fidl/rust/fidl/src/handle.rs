@@ -112,6 +112,7 @@ pub mod non_fuchsia_handles {
     invoke_for_handle_types!(host_handle);
 }
 
+#[allow(clippy::too_long_first_doc_paragraph)]
 /// Converts a vector of `HandleDisposition` (handles bundled with their
 /// intended object type and rights) to a vector of `HandleInfo` (handles
 /// bundled with their actual type and rights, guaranteed by the kernel).

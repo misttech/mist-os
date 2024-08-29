@@ -23,4 +23,3 @@ pub mod mem;
 pub mod perfetto_consumer;
 pub mod remote_block_device;
 pub mod terminal;
-pub mod tun;

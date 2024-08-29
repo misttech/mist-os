@@ -27,7 +27,7 @@ namespace media_audio {
 inline constexpr bool kLogFakeCodec = false;
 
 // This driver implements the audio driver interface and is configurable to simulate audio hardware.
-class FakeCodec
+class FakeCodec final
     : public fidl::testing::TestBase<fuchsia_hardware_audio::CodecConnector>,
       public fidl::testing::TestBase<fuchsia_hardware_audio::Codec>,
       public fidl::testing::TestBase<fuchsia_hardware_audio_signalprocessing::SignalProcessing> {
@@ -204,6 +204,9 @@ class FakeCodec
     ADR_LOG_OBJECT(kLogFakeCodec);
     completer.Reply(fit::error(ZX_ERR_NOT_SUPPORTED));
   }
+  void handle_unknown_method(
+      fidl::UnknownMethodMetadata<fuchsia_hardware_audio_signalprocessing::SignalProcessing>,
+      fidl::UnknownMethodCompleter::Sync&) final {}
 
   bool CheckDaiFormatSupported(const fuchsia_hardware_audio::DaiFormat& candidate);
 

@@ -14,8 +14,11 @@ use crate::peer::procedure::ProcedureMarker;
 use crate::peer::update::AgUpdate;
 
 /// A request made by the Service Level Connection for more information from the
-/// HFP component.
+/// HFP component, or report from the ServiceLevelConnection
 pub enum SlcRequest {
+    /// Sent when the SLC Initialization Procedure has completed
+    Initialized,
+
     GetAgFeatures {
         response: Box<dyn FnOnce(AgFeatures) -> AgUpdate>,
     },
@@ -79,7 +82,7 @@ pub enum SlcRequest {
         response: Box<dyn FnOnce(Result<(), ()>) -> AgUpdate>,
     },
 
-    /// Setup the Sco connection, as requested by the CodecConnectionSetup
+    /// Setup the SCO connection, as requested by the CodecConnectionSetup
     SynchronousConnectionSetup {
         response: Box<dyn FnOnce(Result<(), ()>) -> AgUpdate>,
     },
@@ -89,10 +92,12 @@ pub enum SlcRequest {
     },
 }
 
-impl From<&SlcRequest> for ProcedureMarker {
-    fn from(src: &SlcRequest) -> ProcedureMarker {
+impl TryFrom<&SlcRequest> for ProcedureMarker {
+    type Error = crate::error::Error;
+
+    fn try_from(src: &SlcRequest) -> Result<ProcedureMarker, Self::Error> {
         use SlcRequest::*;
-        match src {
+        Ok(match src {
             GetAgFeatures { .. } | GetAgIndicatorStatus { .. } => Self::SlcInitialization,
             GetNetworkOperatorName { .. } => Self::QueryOperatorSelection,
             GetSubscriberNumberInformation { .. } => Self::SubscriberNumberInformation,
@@ -109,7 +114,8 @@ impl From<&SlcRequest> for ProcedureMarker {
             InitiateCall { .. } => Self::InitiateCall,
             SynchronousConnectionSetup { .. } => Self::CodecConnectionSetup,
             RestartCodecConnectionSetup { .. } => Self::CodecSupport,
-        }
+            Initialized => return Err(Self::Error::OutOfRange),
+        })
     }
 }
 
@@ -117,6 +123,7 @@ impl fmt::Debug for SlcRequest {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let s;
         let output = match &self {
+            Self::Initialized => "Initialized",
             Self::GetAgFeatures { .. } => "GetAgFeatures",
             Self::GetAgIndicatorStatus { .. } => "GetAgIndicatorStatus",
             Self::GetSubscriberNumberInformation { .. } => "GetSubscriberNumberInformation",

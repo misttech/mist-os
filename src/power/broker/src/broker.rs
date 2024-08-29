@@ -204,8 +204,99 @@ impl Broker {
             })
     }
 
+    // Deactivate claims that are now broken due to a disorderly level transition.
+    // TODO(b/356400605): Consider simplifying this function by adding support for reverse
+    // dependency traversal, so that we do not have to scan all leases, but only elements
+    // that directly depend on the disorderly element.
+    fn deactivate_broken_claims(&mut self, element_id: &ElementID, prev_level: IndexedPowerLevel) {
+        let element_level =
+            ElementLevel { element_id: element_id.clone(), level: prev_level.clone() };
+        // For each lease, find the dependencies that are parents of the broken element.
+        let mut affected_elements = HashSet::new();
+        let mut affected_leases = HashSet::new();
+        let (assertive_dependencies_safe, opportunistic_dependencies_safe) =
+            self.catalog.topology.all_direct_and_indirect_dependencies(&element_level);
+        self.catalog.leases.iter()
+            .for_each(|(lease_id, lease)| {
+                tracing::debug!("deactivate_broken_claims({lease_id}, {element_id}@{prev_level})");
+                let lease_element_level = ElementLevel {
+                    element_id: lease.synthetic_element_id.clone(),
+                    level: IndexedPowerLevel { level: LeasePowerLevel::Satisfied as u8, index: 1 },
+                };
+                let (assertive_dependencies_lease, opportunistic_dependencies_lease) =
+                    self.catalog.topology.all_direct_and_indirect_dependencies(&lease_element_level);
+                if !assertive_dependencies_lease
+                    .iter()
+                    .chain(opportunistic_dependencies_lease.iter())
+                    .any(|d| {
+                        d.requires.element_id == *element_id && d.requires.level.satisfies(prev_level)
+                    }) {
+                    tracing::debug!("There was no dependency in this lease that required this element to be at that level.");
+                    return;
+                }
+                // Find the set difference between the dependencies of this lease and
+                // the dependencies of the disorderly element. The element's dependencies
+                // are 'safe' as none of their dependencies are broken. The difference
+                // constitutes the dependencies of this lease that broke.
+                let assertive_dependencies_broken =
+                    HashSet::<Dependency>::from_iter(assertive_dependencies_lease)
+                        .difference(&HashSet::<Dependency>::from_iter(assertive_dependencies_safe.clone()))
+                        .cloned()
+                        .collect::<HashSet<Dependency>>();
+                let opportunistic_dependencies_broken =
+                    HashSet::<Dependency>::from_iter(opportunistic_dependencies_lease)
+                        .difference(&HashSet::<Dependency>::from_iter(opportunistic_dependencies_safe.clone()))
+                        .cloned()
+                        .collect::<HashSet<Dependency>>();
+                let broken_claims = assertive_dependencies_broken
+                    .into_iter()
+                    .chain(opportunistic_dependencies_broken.into_iter())
+                    .map(|d| Claim::new(d.clone(), &lease_id))
+                    .collect::<HashSet<_>>();
+
+                for claim in broken_claims {
+                    let mut claim_on_broken_element = false;
+                    if claim.requires().element_id == *element_id {
+                        claim_on_broken_element = true;
+                    }
+                    self.catalog
+                        .assertive_claims
+                        .activated
+                        .for_lease(&lease_id)
+                        .into_iter()
+                        .chain(self.catalog.opportunistic_claims.activated.for_lease(&lease_id))
+                        .filter(|c| c.dependency == claim.dependency)
+                        .collect::<Vec<_>>()
+                        .into_iter()
+                        .for_each(|c| {
+                            // Immediately deactivate these claims, instead of simply
+                            // marking them for deactivation. This ensures that they
+                            // drop their level immediately.
+                            if !claim_on_broken_element {
+                                self.catalog.assertive_claims.deactivate_claim(&c.id);
+                            }
+                            self.catalog.opportunistic_claims.deactivate_claim(&c.id);
+                            affected_elements.insert(c.requires().element_id.clone());
+                            affected_leases.insert(lease_id.clone());
+                        });
+                }
+            });
+        affected_elements.remove(&element_id);
+        self.update_required_levels(&affected_elements.iter().collect());
+        if affected_elements.len() > 1 {
+            self.update_required_level(&element_id, prev_level.clone());
+        }
+        for lease in affected_leases {
+            self.update_lease_status(&lease);
+        }
+    }
+
     pub fn update_current_level(&mut self, element_id: &ElementID, level: IndexedPowerLevel) {
         tracing::debug!("update_current_level({element_id}, {level:?})");
+        let is_disorderly_update = self
+            .required
+            .get(&element_id)
+            .is_some_and(|prev_required_level| !level.satisfies(prev_required_level.level));
         let prev_level = self.update_current_level_internal(element_id, level);
         if prev_level.as_ref() == Some(&level) {
             tracing::debug!(
@@ -291,13 +382,15 @@ impl Broker {
             return;
         }
         if prev_level.unwrap() > level {
-            // If the level was lowered, find activated claims whose lease has
-            // become contingent or dropped and see if any of these claims no
-            // longer have any dependents and thus can be deactivated or
-            // dropped.
+            // If the level was lowered, first find any claims that have been
+            // marked to deactivate. This is the 'orderly' case, where the level
+            // of the element was lowered as a result of a dropped lease. This
+            // step finds marked-to-deactivate claims and lowers their levels in
+            // an orderly fashion.
             tracing::debug!(
                 "update_current_level({element_id}): level decreased from {prev_level:?} to {level:?}"
             );
+
             let assertive_claims_marked_to_deactivate = self
                 .catalog
                 .assertive_claims
@@ -314,6 +407,14 @@ impl Broker {
                 self.find_claims_to_drop_or_deactivate(&opportunistic_claims_marked_to_deactivate);
             self.drop_or_deactivate_assertive_claims(&assertive_claims_with_no_dependents);
             self.drop_or_deactivate_opportunistic_claims(&opportunistic_claims_with_no_dependents);
+
+            // After handling the claims that were dropped properly, we handle those
+            // which were dropped unexpectedly, i.e. 'disorderly' elements. When this
+            // occurs, we compute the set of activated claims that are no longer valid
+            // and immediately deactivate them.
+            if is_disorderly_update {
+                self.deactivate_broken_claims(&element_id, prev_level.unwrap().clone());
+            }
         }
     }
 
@@ -754,7 +855,7 @@ impl Broker {
                 self.current_level_satisfies(c.requires())
                 // Otherwise, it can only be activated if all of its
                 // dependencies are satisfied.
-                    || self.all_dependencies_satisfied(&c.requires())
+                || self.all_dependencies_satisfied(&c.requires())
             })
             .collect();
         for claim in &claims_to_activate {
@@ -6831,5 +6932,353 @@ mod tests {
                         },
                         "events": contains {},
         }}}});
+    }
+
+    #[fuchsia::test]
+    async fn test_disorderly_element() {
+        // Tests that when an element behaves in a disorderly fashion, the broker does
+        // not drop the levels of any elements that it depends on, but immediately drops
+        // the levels of any elements that depend on it. An element's level change is
+        // considered disorderly if it drops its current level even though it has been
+        // requested to be at a higher required level.
+        //
+        // X is our 'disorderly element', it has an assertive dependency on grandparent GP1.
+        // X has an opportunistic dependency on grandparent GP2.
+        // P1 (parent) has an assertive dependency on X.
+        // P2 (parent) has an opportunistic dependency on X.
+        // C1 and C2 have an assertive and opportunistic dependency on P1.
+        // C3 and C4 have an assertive and opportunistic dependency on P2.
+        //
+        // C1 = P1   GP1
+        // C2 /  \\ //
+        //         X
+        // C4 \   / \
+        // C3 = P2   GP2
+        let inspect = fuchsia_inspect::component::inspector();
+        let inspect_node = inspect.root().create_child("test");
+        let mut broker = Broker::new(inspect_node);
+
+        let token_gp1 = DependencyToken::create();
+        let token_gp2 = DependencyToken::create();
+        let token_x_assertive = DependencyToken::create();
+        let token_x_opportunistic = DependencyToken::create();
+        let token_p1_assertive: fidl::Event = DependencyToken::create();
+        let token_p1_opportunistic: fidl::Event = DependencyToken::create();
+        let token_p2_assertive = DependencyToken::create();
+        let token_p2_opportunistic = DependencyToken::create();
+
+        let element_gp1 = broker
+            .add_element(
+                "GP1",
+                OFF.level,
+                BINARY_POWER_LEVELS.to_vec(),
+                vec![],
+                vec![token_gp1
+                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                    .expect("dup failed")
+                    .into()],
+                vec![],
+            )
+            .expect("add_element failed");
+        let element_gp2 = broker
+            .add_element(
+                "GP2",
+                OFF.level,
+                BINARY_POWER_LEVELS.to_vec(),
+                vec![],
+                vec![],
+                vec![token_gp2
+                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                    .expect("dup failed")
+                    .into()],
+            )
+            .expect("add_element failed");
+        let element_x = broker
+            .add_element(
+                "X",
+                OFF.level,
+                BINARY_POWER_LEVELS.to_vec(),
+                vec![
+                    fpb::LevelDependency {
+                        dependency_type: DependencyType::Assertive,
+                        dependent_level: ON.level,
+                        requires_token: token_gp1
+                            .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                            .expect("dup failed")
+                            .into(),
+                        requires_level_by_preference: vec![ON.level],
+                    },
+                    fpb::LevelDependency {
+                        dependency_type: DependencyType::Opportunistic,
+                        dependent_level: ON.level,
+                        requires_token: token_gp2
+                            .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                            .expect("dup failed")
+                            .into(),
+                        requires_level_by_preference: vec![ON.level],
+                    },
+                ],
+                vec![token_x_assertive
+                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                    .expect("dup failed")
+                    .into()],
+                vec![token_x_opportunistic
+                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                    .expect("dup failed")
+                    .into()],
+            )
+            .expect("add_element failed");
+        let element_p1 = broker
+            .add_element(
+                "P1",
+                OFF.level,
+                BINARY_POWER_LEVELS.to_vec(),
+                vec![fpb::LevelDependency {
+                    dependency_type: DependencyType::Assertive,
+                    dependent_level: ON.level,
+                    requires_token: token_x_assertive
+                        .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                        .expect("dup failed")
+                        .into(),
+                    requires_level_by_preference: vec![ON.level],
+                }],
+                vec![token_p1_assertive
+                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                    .expect("dup failed")
+                    .into()],
+                vec![token_p1_opportunistic
+                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                    .expect("dup failed")
+                    .into()],
+            )
+            .expect("add_element failed");
+        let element_p2 = broker
+            .add_element(
+                "P2",
+                OFF.level,
+                BINARY_POWER_LEVELS.to_vec(),
+                vec![fpb::LevelDependency {
+                    dependency_type: DependencyType::Opportunistic,
+                    dependent_level: ON.level,
+                    requires_token: token_x_opportunistic
+                        .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                        .expect("dup failed")
+                        .into(),
+                    requires_level_by_preference: vec![ON.level],
+                }],
+                vec![token_p2_assertive
+                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                    .expect("dup failed")
+                    .into()],
+                vec![token_p2_opportunistic
+                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                    .expect("dup failed")
+                    .into()],
+            )
+            .expect("add_element failed");
+        let element_c1 = broker
+            .add_element(
+                "C1",
+                OFF.level,
+                BINARY_POWER_LEVELS.to_vec(),
+                vec![fpb::LevelDependency {
+                    dependency_type: DependencyType::Assertive,
+                    dependent_level: ON.level,
+                    requires_token: token_p1_assertive
+                        .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                        .expect("dup failed")
+                        .into(),
+                    requires_level_by_preference: vec![ON.level],
+                }],
+                vec![],
+                vec![],
+            )
+            .expect("add_element failed");
+        let element_c2 = broker
+            .add_element(
+                "C2",
+                OFF.level,
+                BINARY_POWER_LEVELS.to_vec(),
+                vec![fpb::LevelDependency {
+                    dependency_type: DependencyType::Opportunistic,
+                    dependent_level: ON.level,
+                    requires_token: token_p1_opportunistic
+                        .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                        .expect("dup failed")
+                        .into(),
+                    requires_level_by_preference: vec![ON.level],
+                }],
+                vec![],
+                vec![],
+            )
+            .expect("add_element failed");
+        let element_c3 = broker
+            .add_element(
+                "C3",
+                OFF.level,
+                BINARY_POWER_LEVELS.to_vec(),
+                vec![fpb::LevelDependency {
+                    dependency_type: DependencyType::Assertive,
+                    dependent_level: ON.level,
+                    requires_token: token_p2_assertive
+                        .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                        .expect("dup failed")
+                        .into(),
+                    requires_level_by_preference: vec![ON.level],
+                }],
+                vec![],
+                vec![],
+            )
+            .expect("add_element failed");
+        let element_c4 = broker
+            .add_element(
+                "C4",
+                OFF.level,
+                BINARY_POWER_LEVELS.to_vec(),
+                vec![fpb::LevelDependency {
+                    dependency_type: DependencyType::Opportunistic,
+                    dependent_level: ON.level,
+                    requires_token: token_p2_opportunistic
+                        .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                        .expect("dup failed")
+                        .into(),
+                    requires_level_by_preference: vec![ON.level],
+                }],
+                vec![],
+                vec![],
+            )
+            .expect("add_element failed");
+
+        let mut broker_status = BrokerStatusMatcher::new();
+
+        // Grab all required leases and power on all elements.
+        let lease_gp2 = broker.acquire_lease(&element_gp2, ON).expect("acquire failed");
+        let lease_c1 = broker.acquire_lease(&element_c1, ON).expect("acquire failed");
+        let lease_c2 = broker.acquire_lease(&element_c2, ON).expect("acquire failed");
+        let lease_c3 = broker.acquire_lease(&element_c3, ON).expect("acquire failed");
+        let lease_c4 = broker.acquire_lease(&element_c4, ON).expect("acquire failed");
+        broker.update_current_level(&element_gp1, ON);
+        broker.update_current_level(&element_gp2, ON);
+        broker.update_current_level(&element_x, ON);
+        broker.update_current_level(&element_p1, ON);
+        broker.update_current_level(&element_p2, ON);
+        broker.update_current_level(&element_c1, ON);
+        broker.update_current_level(&element_c2, ON);
+        broker.update_current_level(&element_c3, ON);
+        broker.update_current_level(&element_c4, ON);
+
+        // At this point, all elements should have required level ON.
+        broker_status.required_level.update(&element_gp1, ON);
+        broker_status.required_level.update(&element_gp2, ON);
+        broker_status.required_level.update(&element_x, ON);
+        broker_status.required_level.update(&element_p1, ON);
+        broker_status.required_level.update(&element_p2, ON);
+        broker_status.required_level.update(&element_c1, ON);
+        broker_status.required_level.update(&element_c2, ON);
+        broker_status.required_level.update(&element_c3, ON);
+        broker_status.required_level.update(&element_c4, ON);
+        broker_status.lease.update(&lease_gp2.id, LeaseStatus::Satisfied, false);
+        broker_status.lease.update(&lease_c1.id, LeaseStatus::Satisfied, false);
+        broker_status.lease.update(&lease_c2.id, LeaseStatus::Satisfied, false);
+        broker_status.lease.update(&lease_c3.id, LeaseStatus::Satisfied, false);
+        broker_status.lease.update(&lease_c4.id, LeaseStatus::Satisfied, false);
+        broker_status.assert_matches(&broker);
+
+        // Trigger disorderly drop of X.
+        // All parents and grandparents of X should immediately drop to OFF.
+        // X's required level should also become OFF, to
+        // All leases, except for GP2, should now be pending and not-contingent.
+        broker.update_current_level(&element_x, OFF);
+        broker_status.required_level.update(&element_p1, OFF);
+        broker_status.required_level.update(&element_p2, OFF);
+        broker_status.required_level.update(&element_c1, OFF);
+        broker_status.required_level.update(&element_c2, OFF);
+        broker_status.required_level.update(&element_c3, OFF);
+        broker_status.required_level.update(&element_c4, OFF);
+        broker_status.lease.update(&lease_c1.id, LeaseStatus::Pending, false);
+        broker_status.lease.update(&lease_c2.id, LeaseStatus::Pending, false);
+        broker_status.lease.update(&lease_c3.id, LeaseStatus::Pending, false);
+        broker_status.lease.update(&lease_c4.id, LeaseStatus::Pending, false);
+        broker_status.assert_matches(&broker);
+
+        // Turn off all parent/child elements to preserve ordering.
+        broker.update_current_level(&element_p1, OFF);
+        broker.update_current_level(&element_p2, OFF);
+        broker.update_current_level(&element_c1, OFF);
+        broker.update_current_level(&element_c2, OFF);
+        broker.update_current_level(&element_c3, OFF);
+        broker.update_current_level(&element_c4, OFF);
+        broker_status.assert_matches(&broker);
+
+        // Update X to ON.
+        // P1 and P2's required level should become ON.
+        broker.update_current_level(&element_x, ON);
+        broker_status.required_level.update(&element_p1, ON);
+        broker_status.required_level.update(&element_p2, ON);
+        broker_status.assert_matches(&broker);
+
+        // Update P1 and P2 to ON.
+        broker.update_current_level(&element_p1, ON);
+        broker.update_current_level(&element_p2, ON);
+        broker_status.required_level.update(&element_c1, ON);
+        broker_status.required_level.update(&element_c2, ON);
+        broker_status.required_level.update(&element_c3, ON);
+        broker_status.required_level.update(&element_c4, ON);
+        broker_status.assert_matches(&broker);
+
+        // Update C1, C2, C3, and C4 to ON.
+        // All leases should now be satisfied.
+        broker.update_current_level(&element_c1, ON);
+        broker.update_current_level(&element_c2, ON);
+        broker.update_current_level(&element_c3, ON);
+        broker.update_current_level(&element_c4, ON);
+        broker_status.lease.update(&lease_c1.id, LeaseStatus::Satisfied, false);
+        broker_status.lease.update(&lease_c2.id, LeaseStatus::Satisfied, false);
+        broker_status.lease.update(&lease_c3.id, LeaseStatus::Satisfied, false);
+        broker_status.lease.update(&lease_c4.id, LeaseStatus::Satisfied, false);
+        broker_status.assert_matches(&broker);
+
+        // Drop all leases, power down children.
+        broker.drop_lease(&lease_gp2.id).expect("drop_lease failed");
+        broker.drop_lease(&lease_c1.id).expect("drop_lease failed");
+        broker.drop_lease(&lease_c2.id).expect("drop_lease failed");
+        broker.drop_lease(&lease_c3.id).expect("drop_lease failed");
+        broker.drop_lease(&lease_c4.id).expect("drop_lease failed");
+        broker_status.required_level.update(&element_c1, OFF);
+        broker_status.required_level.update(&element_c2, OFF);
+        broker_status.required_level.update(&element_c3, OFF);
+        broker_status.required_level.update(&element_c4, OFF);
+        broker_status.lease.remove(&lease_gp2.id);
+        broker_status.lease.remove(&lease_c1.id);
+        broker_status.lease.remove(&lease_c2.id);
+        broker_status.lease.remove(&lease_c3.id);
+        broker_status.lease.remove(&lease_c4.id);
+        broker_status.assert_matches(&broker);
+
+        // Power down all elements to remove activated claims.
+        broker.update_current_level(&element_c1, OFF);
+        broker.update_current_level(&element_c2, OFF);
+        broker.update_current_level(&element_c3, OFF);
+        broker.update_current_level(&element_c4, OFF);
+        broker_status.required_level.update(&element_p1, OFF);
+        broker_status.required_level.update(&element_p2, OFF);
+        broker_status.assert_matches(&broker);
+
+        broker.update_current_level(&element_p1, OFF);
+        broker.update_current_level(&element_p2, OFF);
+        broker_status.required_level.update(&element_x, OFF);
+        broker_status.assert_matches(&broker);
+
+        broker.update_current_level(&element_x, OFF);
+        broker_status.required_level.update(&element_gp1, OFF);
+        broker_status.required_level.update(&element_gp2, OFF);
+        broker_status.assert_matches(&broker);
+
+        // All leases should be cleaned up.
+        assert_lease_cleaned_up(&broker.catalog, &lease_gp2.id);
+        assert_lease_cleaned_up(&broker.catalog, &lease_c1.id);
+        assert_lease_cleaned_up(&broker.catalog, &lease_c2.id);
+        assert_lease_cleaned_up(&broker.catalog, &lease_c3.id);
+        assert_lease_cleaned_up(&broker.catalog, &lease_c4.id);
     }
 }

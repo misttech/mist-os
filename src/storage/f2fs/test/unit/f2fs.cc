@@ -222,5 +222,118 @@ TEST(F2fsTest, GetFilesystemInfo) {
   FileTester::Unmount(std::move(fs), &bc);
 }
 
+using StorageTest = SingleFileTest;
+
+TEST_F(StorageTest, LargeIOs) {
+  // Create a fake block for test
+  constexpr size_t kNumPages = 50 * 1024 * 1024 / Page::Size();
+  auto device = std::make_unique<block_client::FakeBlockDevice>(
+      block_client::FakeBlockDevice::Config{.block_count = kNumPages, .block_size = Page::Size()});
+  bool readonly_device = false;
+  zx::result block_or = CreateBcacheMapper(std::move(device), &readonly_device);
+  ASSERT_TRUE(block_or.is_ok());
+
+  // Create |reader_| and |writer | based on the fake block
+  std::unique_ptr<StorageBufferPool> buffer_pool = std::make_unique<StorageBufferPool>(&**block_or);
+  size_t large_buffer_size = buffer_pool->GetLargeBufferSize();
+
+  ASSERT_TRUE(kNumPages > large_buffer_size * 2);
+
+  std::unique_ptr<Reader> reader_ = std::make_unique<Reader>(std::move(buffer_pool));
+  std::unique_ptr<Writer> writer_ =
+      std::make_unique<Writer>(std::make_unique<StorageBufferPool>(&**block_or));
+
+  // Use meta vnode for test as we need Pages using discardable vmo
+  VnodeF2fs &vnode = fs_->GetMetaVnode();
+  std::vector<block_t> addrs;
+  PageList pages;
+
+  // Write twice as many Pages as |large_buffer_size|
+  size_t num_pages = large_buffer_size * 2;
+  for (block_t i = 1; i <= num_pages; ++i) {
+    LockedPage page;
+    vnode.GrabCachePage(i, &page);
+    page->ClearUptodate();
+    page.Zero();
+    *page->GetAddress<block_t>() = i;
+    page.SetWriteback(i);
+    pages.push_back(page.release());
+  }
+  sync_completion_t completion;
+  writer_->ScheduleWriteBlocks(&completion, std::move(pages));
+  ASSERT_TRUE(sync_completion_wait(&completion, zx::sec(kWriteTimeOut).get()) == ZX_OK);
+
+  // Reset Pages
+  std::vector<LockedPage> locked_pages;
+  for (block_t i = 1; i <= num_pages; ++i) {
+    LockedPage page;
+    vnode.GrabCachePage(i, &page);
+    page->ClearUptodate();
+    ASSERT_EQ(*page->GetAddress<block_t>(), i);
+    page.Zero();
+    locked_pages.push_back(std::move(page));
+    addrs.push_back(i);
+  }
+
+  // Verify and reset read Pages
+  ASSERT_TRUE(reader_->ReadBlocks(locked_pages, addrs).is_ok());
+  block_t i = 0;
+  for (auto &page : locked_pages) {
+    ASSERT_TRUE(page->IsUptodate());
+    ASSERT_EQ(*page->GetAddress<block_t>(), addrs[i++]);
+    page.Zero();
+    page->ClearUptodate();
+  }
+
+  zx::vmo read_vmo;
+  zx_vaddr_t paddr;
+  // Verify and reset read vmo
+  ASSERT_EQ(zx::vmo::create(num_pages * Page::Size(), 0, &read_vmo), ZX_OK);
+  ASSERT_EQ(zx::vmar::root_self()->map(ZX_VM_PERM_READ | ZX_VM_PERM_WRITE, 0, read_vmo, 0,
+                                       num_pages * Page::Size(), &paddr),
+            ZX_OK);
+  ASSERT_TRUE(reader_->ReadBlocks(read_vmo, addrs).is_ok());
+  for (block_t i = 0; i < num_pages; ++i) {
+    zx_vaddr_t target = paddr + (i * Page::Size());
+    ASSERT_EQ(*reinterpret_cast<size_t *>(target), addrs[i]);
+    *reinterpret_cast<size_t *>(target) = 0U;
+  }
+
+  // The below Pages should not be read.
+  // In case that a page is invalidated
+  addrs[0] = kNullAddr;
+  addrs[num_pages * 2 / 3] = kNullAddr;
+
+  // In case that a page is not alloated addr.
+  addrs[num_pages / 3] = kNewAddr;
+  locked_pages[num_pages / 3]->SetUptodate();
+
+  // In case that a page is already uptodate
+  locked_pages[num_pages - 1]->SetUptodate();
+
+  // Verify read Pages
+  ASSERT_TRUE(reader_->ReadBlocks(locked_pages, addrs).is_ok());
+  ASSERT_TRUE(reader_->ReadBlocks(read_vmo, addrs).is_ok());
+  for (block_t i = 0; i < num_pages; ++i) {
+    LockedPage &page = locked_pages[i];
+    zx_vaddr_t target = paddr + (i * Page::Size());
+    if (!IsValidBlockAddr(addrs[i])) {
+      ASSERT_EQ(*page->GetAddress<block_t>(), 0U);
+      ASSERT_EQ(page->IsUptodate(), addrs[i] == kNewAddr);
+      ASSERT_EQ(*reinterpret_cast<size_t *>(target), 0U);
+    } else if (i == num_pages - 1) {
+      ASSERT_TRUE(page->IsUptodate());
+      ASSERT_EQ(*page->GetAddress<block_t>(), 0U);
+    } else {
+      ASSERT_TRUE(page->IsUptodate());
+      ASSERT_EQ(*page->GetAddress<block_t>(), addrs[i]);
+      ASSERT_EQ(*reinterpret_cast<size_t *>(target), addrs[i]);
+    }
+    page->ClearUptodate();
+  }
+
+  ASSERT_EQ(zx::vmar::root_self()->unmap(paddr, num_pages * Page::Size()), ZX_OK);
+}
+
 }  // namespace
 }  // namespace f2fs

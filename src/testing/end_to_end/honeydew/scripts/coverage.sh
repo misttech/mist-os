@@ -46,7 +46,7 @@ PYTHONPATH=$FUCHSIA_DIR/$BUILD_DIR/host_x64:$FUCHSIA_DIR/src/developer/ffx/lib/f
 
 echo "Running coverage tool..."
 HONEYDEW_FASTBOOT_OVERRIDE=$FASTBOOT_PATH coverage \
-    run -m unittest discover \
+    run --source $HONEYDEW_SRC -m unittest discover \
     --top-level-directory $HONEYDEW_SRC \
     --start-directory $HONEYDEW_SRC/tests/unit_tests \
     --pattern "*_test.py"

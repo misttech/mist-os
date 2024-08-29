@@ -49,8 +49,9 @@ class Core {
   async_dispatcher_t* dispatcher_;
 };
 
-class Server : public fidl::WireServer<fuchsia_hardware_audio::Codec>,
-               public fidl::WireServer<fuchsia_hardware_audio_signalprocessing::SignalProcessing> {
+class Server final
+    : public fidl::WireServer<fuchsia_hardware_audio::Codec>,
+      public fidl::WireServer<fuchsia_hardware_audio_signalprocessing::SignalProcessing> {
  public:
   explicit Server(std::shared_ptr<Core> core, bool is_input);
   async_dispatcher_t* dispatcher() { return core_->dispatcher(); }
@@ -89,6 +90,9 @@ class Server : public fidl::WireServer<fuchsia_hardware_audio::Codec>,
   void SetElementState(SetElementStateRequestView request,
                        SetElementStateCompleter::Sync& completer) override;
   void SetTopology(SetTopologyRequestView request, SetTopologyCompleter::Sync& completer) override;
+  void handle_unknown_method(
+      fidl::UnknownMethodMetadata<fuchsia_hardware_audio_signalprocessing::SignalProcessing>,
+      fidl::UnknownMethodCompleter::Sync&) override;
 
   void MaybeCompleteWatchElementState();
 

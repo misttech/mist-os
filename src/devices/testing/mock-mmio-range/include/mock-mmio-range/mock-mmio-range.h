@@ -5,7 +5,6 @@
 #ifndef SRC_DEVICES_TESTING_MOCK_MMIO_RANGE_INCLUDE_MOCK_MMIO_RANGE_MOCK_MMIO_RANGE_H_
 #define SRC_DEVICES_TESTING_MOCK_MMIO_RANGE_INCLUDE_MOCK_MMIO_RANGE_MOCK_MMIO_RANGE_H_
 
-#include <lib/mmio-ptr/fake.h>
 #include <lib/mmio/mmio.h>
 #include <lib/stdcompat/span.h>
 #include <zircon/compiler.h>

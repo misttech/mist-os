@@ -11,41 +11,17 @@ bind_test("wlanif_bind_test") {
   deps = [ "//sdk/fidl/fuchsia.wlan.fullmac:fuchsia.wlan.fullmac_bindlib" ]
 }
 
-executable("device_unittest") {
-  output_name = "wlanif_device_unittest"
+executable("startup_shutdown_unittest") {
+  output_name = "wlanif_startup_shutdown_unittest"
   testonly = true
 
-  sources = [
-    "device_unittest.cc",
-    "test_bss.cc",
-    "test_bss.h",
-  ]
+  sources = [ "startup_shutdown_unittest.cc" ]
   deps = [
-    "//sdk/fidl/fuchsia.component.decl:fuchsia.component.decl_cpp",
     "//sdk/fidl/fuchsia.driver.framework:fuchsia.driver.framework_cpp",
-    "//sdk/fidl/fuchsia.wlan.common:fuchsia.wlan.common_banjo_c",
-    "//sdk/fidl/fuchsia.wlan.common:fuchsia.wlan.common_hlcpp",
-    "//sdk/fidl/fuchsia.wlan.mlme:fuchsia.wlan.mlme_hlcpp",
-    "//sdk/fidl/fuchsia.wlan.sme:fuchsia.wlan.sme_hlcpp",
+    "//sdk/fidl/fuchsia.wlan.fullmac:fuchsia.wlan.fullmac_cpp",
     "//sdk/lib/async_patterns/testing/cpp:cpp",
     "//sdk/lib/driver/testing/cpp:cpp",
     "//sdk/lib/sys/cpp/testing:cpp",
-    "//src/connectivity/wlan/drivers/wlanif:lib_source_mlme_stub",
-    "//src/lib/fxl/test:gtest_main",
-    "//zircon/system/ulib/sync",
-    "//zircon/system/ulib/sync:sync-cpp",
-    "//zircon/system/ulib/zx",
-  ]
-
-  # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings
-  configs += [ "//build/config:Wno-conversion" ]
-}
-
-executable("convert_unittest") {
-  output_name = "wlanif_convert_unittest"
-  testonly = true
-  sources = [ "convert_unittest.cc" ]
-  deps = [
     "//src/connectivity/wlan/drivers/wlanif:lib_source_mlme_stub",
     "//src/lib/fxl/test:gtest_main",
     "//third_party/googletest:gtest",
@@ -53,30 +29,12 @@ executable("convert_unittest") {
     "//zircon/system/ulib/sync:sync-cpp",
     "//zircon/system/ulib/zx",
   ]
-
-  # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings
-  configs += [ "//build/config:Wno-conversion" ]
 }
 
-tests = [
-  "device",
-  "convert",
-]
-
-foreach(test, tests) {
-  name = "${test}_test"
-  fuchsia_unittest_component("${name}_component") {
-    component_name = name
-    deps = [ ":${test}_unittest" ]
-  }
-}
-
-fuchsia_test_package("wlanif_unittest") {
-  test_components = []
-  foreach(test, tests) {
-    test_components += [ ":${test}_test_component" ]
-  }
+fuchsia_unittest_package("wlanif_unittest") {
+  deps = [ ":startup_shutdown_unittest" ]
   test_specs = {
+    # Some tests mock MLME failing to start. In those cases, wlanif will emit error logs.
     log_settings = {
       max_severity = "ERROR"
     }

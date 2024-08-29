@@ -5,7 +5,7 @@
 """Unit tests for trace_utils.py."""
 
 import unittest
-from typing import Any, Dict, List
+from typing import List
 
 import test_utils
 from trace_processing import trace_metrics, trace_model, trace_time, trace_utils

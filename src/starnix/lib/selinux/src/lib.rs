@@ -59,6 +59,8 @@ enumerable_enum! {
         Fifo,
         /// The SELinux "sock_file" object class.
         Socket,
+        /// The SELinux "security" object class.
+        Security,
     }
 }
 
@@ -72,6 +74,7 @@ impl ObjectClass {
             Self::Link => "lnk_file",
             Self::Fifo => "fifo_file",
             Self::Socket => "sock_file",
+            Self::Security => "security",
         }
     }
 }
@@ -195,6 +198,8 @@ permission_enum! {
         Process(ProcessPermission),
         /// Permissions for the well-known SELinux "file" object class.
         File(FilePermission),
+        /// Permissions for access to parts of the "selinuxfs" used to administer and query SELinux.
+        Security(SecurityPermission),
     }
 }
 
@@ -288,6 +293,28 @@ class_permission_enum! {
         /// Permission to use a file as an entry point into the new domain on transition.
         Entrypoint("entrypoint"),
     }
+}
+
+class_permission_enum! {
+    /// A well-known "security" class permission in SELinux policy, used to control access to
+    /// sensitive administrative and query API surfaces in the "selinuxfs".
+    #[derive(Clone, Debug, Eq, Hash, PartialEq)]
+    SecurityPermission {
+        /// Permission to validate Security Context using the "context" API.
+        CheckContext("check_context"),
+        /// Permission to compute access vectors via the "access" API.
+        ComputeAv("compute_av"),
+        /// Permission to compute security contexts for newly created objects via "create".
+        ComputeCreate("compute_create"),
+        /// Permission to load a new binary policy into the kernel via the "load" API.
+        LoadPolicy("load_policy"),
+        /// Permission to commit booleans to control conditional elements of the policy.
+        SetBool("setbool"),
+        /// Permission to change the way permissions are validated for `mmap()` operations.
+        SetCheckReqProt("setcheckreqprot"),
+        /// Permission to switch the system between permissive and enforcing modes, via "enforce".
+        SetEnforce("setenforce"),
+     }
 }
 
 /// Initial Security Identifier (SID) values defined by the SELinux Reference Policy.

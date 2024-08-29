@@ -6,7 +6,7 @@
 
 #include <gtest/gtest.h>
 
-namespace pw_random_zircon {
+namespace pw::random_fuchsia {
 
 TEST(ZirconRandomGeneratorTest, Get) {
   // Getting a random number should not crash.
@@ -26,4 +26,4 @@ TEST(ZirconRandomGeneratorTest, InjectEntropyBits) {
   rng.InjectEntropyBits(/*data=*/1, /*num_bits=*/31);
 }
 
-}  // namespace pw_random_zircon
+}  // namespace pw::random_fuchsia

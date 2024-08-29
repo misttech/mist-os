@@ -114,10 +114,10 @@ zx_status_t EventRing::Init(size_t page_size, const zx::bti& bti, fdf::MmioBuffe
   do {
     status = AddSegment(true);
     if (status != ZX_OK) {
-      zxlogf(WARNING,
-             "Event ring failed to add a segment during initialization. "
-             "The EventRing currently has space for %zu TRBs (status %d)",
-             segments_.TrbCount(), status);
+      FDF_LOG(WARNING,
+              "Event ring failed to add a segment during initialization. "
+              "The EventRing currently has space for %zu TRBs (status %d)",
+              segments_.TrbCount(), status);
 
       if (segments_.TrbCount() == 0) {
         return status;
@@ -206,7 +206,7 @@ fpromise::promise<void, zx_status_t> EventRing::HandlePortStatusChangeEvent(uint
         // USB 2.0 requires a port reset to advance to U0
         Usb2DeviceAttach(port_id);
         needs_enum = true;
-        zxlogf(DEBUG, "Port %d is a USB 2 device and will be enumerated.", port_id);
+        FDF_LOG(DEBUG, "Port %d is a USB 2 device and will be enumerated.", port_id);
       }
     } else {
       // USB 3.0 port connect, since we got a connect status bit set,
@@ -214,7 +214,7 @@ fpromise::promise<void, zx_status_t> EventRing::HandlePortStatusChangeEvent(uint
       if (!hci_->GetPortState()[port_id - 1].is_connected) {
         Usb3DeviceAttach(port_id);
         needs_enum = true;
-        zxlogf(DEBUG, "Port %d is a USB 3 device and will be enumerated.", port_id);
+        FDF_LOG(DEBUG, "Port %d is a USB 3 device and will be enumerated.", port_id);
       }
       if ((sc.PLS() == PORTSC::U0) && (sc.PED()) && (!sc.PR()) &&
           !hci_->GetPortState()[port_id - 1].link_active) {
@@ -275,9 +275,9 @@ fpromise::promise<void, zx_status_t> EventRing::HandlePortStatusChangeEvent(uint
         .set_OCC(1)
         .WriteTo(mmio_);
     if (overcurrent) {
-      zxlogf(ERROR, "Port %i has overcurrent active.", static_cast<int>(port_id));
+      FDF_LOG(ERROR, "Port %i has overcurrent active.", static_cast<int>(port_id));
     } else {
-      zxlogf(ERROR, "Overcurrent event on port %i cleared.", static_cast<int>(port_id));
+      FDF_LOG(ERROR, "Overcurrent event on port %i cleared.", static_cast<int>(port_id));
     }
   }
   if (sc.CSC()) {
@@ -356,7 +356,7 @@ void EventRing::CallPortStatusChanged(fbl::RefPtr<PortStatusChangeState> state) 
       ScheduleTask(HandlePortStatusChangeEvent(enum_task->port_number)
                        .then([this, state, task = std::move(enum_task)](
                                  fpromise::result<void, zx_status_t>& result) mutable
-                             -> fpromise::result<void, zx_status_t> {
+                                 -> fpromise::result<void, zx_status_t> {
                          if (result.is_error()) {
                            if (result.error() == ZX_ERR_BAD_STATE) {
                              return fpromise::error(ZX_ERR_BAD_STATE);
@@ -404,7 +404,7 @@ void EventRing::ScheduleTask(fpromise::promise<void, zx_status_t> promise) {
     // a fatal error in xHCI. When this occurs, we should immediately
     // attempt to shutdown the controller. This error cannot be recovered from.
     if (status == ZX_ERR_BAD_STATE) {
-      zxlogf(ERROR, "Scheduled task returned a fatal error, shutting down");
+      FDF_LOG(ERROR, "Scheduled task returned a fatal error, shutting down");
       hci_->Shutdown(status);
     }
   });
@@ -509,7 +509,7 @@ void EventRing::AdvanceErdp() {
       segment_index_ = 0;
     } break;
     default: {
-      zxlogf(ERROR, "This should not happen.");
+      FDF_LOG(ERROR, "This should not happen.");
     } break;
   }
 }
@@ -622,15 +622,15 @@ zx_status_t EventRing::HandleIRQ() {
           host_controller_event_->Add(1);
           // NOTE: We can't really do anything here. This typically indicates some kind of error
           // condition.
-          zxlogf(DEBUG, "Host controller event: %u",
-                 static_cast<CommandCompletionEvent*>(erdp_virt_)->CompletionCode());
+          FDF_LOG(DEBUG, "Host controller event: %u",
+                  static_cast<CommandCompletionEvent*>(erdp_virt_)->CompletionCode());
           break;
         default:
           if (!unhandled_events_) {
             unhandled_events_ = events_.CreateLinearUintHistogram("UnhandledEvents", 1, 1, 40);
           }
           unhandled_events_->Insert(control->Type());
-          zxlogf(ERROR, "Unexpected transfer event: %u", control->Type());
+          FDF_LOG(ERROR, "Unexpected transfer event: %u", control->Type());
           break;
       }
 
@@ -683,7 +683,7 @@ zx_status_t EventRing::HandleCommandCompletionInterrupt() {
   std::unique_ptr<TRBContext> context;
   zx_status_t status = command_ring_->CompleteTRB(trb, &context);
   if (status != ZX_OK) {
-    zxlogf(ERROR, "command_ring_->CompleteTRB(): %s", zx_status_get_string(status));
+    FDF_LOG(ERROR, "command_ring_->CompleteTRB(): %s", zx_status_get_string(status));
     hci_->Shutdown(ZX_ERR_BAD_STATE);
     return ZX_ERR_BAD_STATE;
   }
@@ -691,8 +691,8 @@ zx_status_t EventRing::HandleCommandCompletionInterrupt() {
   if (completion_event->CompletionCode() != CommandCompletionEvent::Success) {
     // Log all failing commands for now. As error handling is added to the command callbacks, this
     // can be reduced.
-    zxlogf(WARNING, "Received command completion event with completion code: %u",
-           completion_event->CompletionCode());
+    FDF_LOG(WARNING, "Received command completion event with completion code: %u",
+            completion_event->CompletionCode());
   }
 
   if (context->completer.has_value()) {
@@ -710,12 +710,12 @@ void EventRing::HandleTransferInterrupt() {
 
   auto device_state = hci_->GetDeviceState()[transfer_event->SlotID() - 1];
   if (!device_state) {
-    zxlogf(WARNING, "Device state invalid");
+    FDF_LOG(WARNING, "Device state invalid");
     return;
   }
   fbl::AutoLock l(&device_state->transaction_lock());
   if (!device_state->IsValid()) {
-    zxlogf(WARNING, "Device state invalid");
+    FDF_LOG(WARNING, "Device state invalid");
     return;
   }
 
@@ -728,26 +728,26 @@ void EventRing::HandleTransferInterrupt() {
   }
 
   if (transfer_event->CompletionCode() == CommandCompletionEvent::RingOverrun) {
-    zxlogf(DEBUG, "Transfer ring overrrun on slot %u endpoint %u", transfer_event->SlotID(),
-           transfer_event->EndpointID());
+    FDF_LOG(DEBUG, "Transfer ring overrrun on slot %u endpoint %u", transfer_event->SlotID(),
+            transfer_event->EndpointID());
     return;
   }
   if (transfer_event->CompletionCode() == CommandCompletionEvent::RingUnderrun) {
-    zxlogf(DEBUG, "Transfer ring underrun on slot %u endpoint %u", transfer_event->SlotID(),
-           transfer_event->EndpointID());
+    FDF_LOG(DEBUG, "Transfer ring underrun on slot %u endpoint %u", transfer_event->SlotID(),
+            transfer_event->EndpointID());
     return;
   }
 
   if (transfer_event->CompletionCode() == CommandCompletionEvent::EndpointNotEnabledError) {
-    zxlogf(WARNING, "Endpoint not enabled error for slot %u endpoint %u", transfer_event->SlotID(),
-           transfer_event->EndpointID());
+    FDF_LOG(WARNING, "Endpoint not enabled error for slot %u endpoint %u", transfer_event->SlotID(),
+            transfer_event->EndpointID());
     return;
   }
 
   auto& ring = ep->transfer_ring();
   if (transfer_event->CompletionCode() == CommandCompletionEvent::MissedServiceError) {
-    zxlogf(DEBUG, "Missed service error on slot %u endpoint %u", transfer_event->SlotID(),
-           transfer_event->EndpointID());
+    FDF_LOG(DEBUG, "Missed service error on slot %u endpoint %u", transfer_event->SlotID(),
+            transfer_event->EndpointID());
     std::unique_ptr<TRBContext> context;
     ring.CompleteTRB(nullptr, &context);
     ep->RequestComplete(ZX_ERR_IO_MISSED_DEADLINE, 0, std::move(*context->request));
@@ -758,8 +758,8 @@ void EventRing::HandleTransferInterrupt() {
   }
 
   if (transfer_event->CompletionCode() == CommandCompletionEvent::StallError) {
-    zxlogf(DEBUG, "Transfer ring stall on slot %u endpoint %u", transfer_event->SlotID(),
-           transfer_event->EndpointID());
+    FDF_LOG(DEBUG, "Transfer ring stall on slot %u endpoint %u", transfer_event->SlotID(),
+            transfer_event->EndpointID());
     ring.set_stall(true);
     auto completions = ring.TakePendingTRBs();
 
@@ -775,7 +775,7 @@ void EventRing::HandleTransferInterrupt() {
       if (completions.is_empty()) {
         bool handled = StallWorkaroundForDefectiveHubs(context);
         if (handled) {
-          zxlogf(DEBUG, "Handled stall with workaround for defective hubs");
+          FDF_LOG(DEBUG, "Handled stall with workaround for defective hubs");
           return;
         }
       }
@@ -794,8 +794,8 @@ void EventRing::HandleTransferInterrupt() {
   // If there is no transfer TRB pointer here then it probably indicates an event type that we don't
   // handle. Section 4.17.4.
   if (unlikely(!erdp_virt_->ptr)) {
-    zxlogf(ERROR, "Unhandled event (completion code %u) with no transfer TRB pointer.",
-           transfer_event->CompletionCode());
+    FDF_LOG(ERROR, "Unhandled event (completion code %u) with no transfer TRB pointer.",
+            transfer_event->CompletionCode());
     return;
   }
 
@@ -840,7 +840,7 @@ void EventRing::HandleTransferInterrupt() {
   // TODO(https://fxbug.dev/42059338): Once we reliably keep track of TRBs, this error handling
   // should be removed and replaced by: ZX_ASSERT(status == ZX_OK).
   if (status != ZX_OK) {
-    zxlogf(ERROR, "Lost a TRB! Completion code is %u", transfer_event->CompletionCode());
+    FDF_LOG(ERROR, "Lost a TRB! Completion code is %u", transfer_event->CompletionCode());
 
     auto completions = ring.TakePendingTRBs();
     l.release();
@@ -859,14 +859,14 @@ void EventRing::HandleTransferInterrupt() {
       }
 
       if (completion->trb == trb) {
-        zxlogf(ERROR, "Current TRB was found at index %zd", index);
+        FDF_LOG(ERROR, "Current TRB was found at index %zd", index);
         found = true;
       }
       ep->RequestComplete(ZX_ERR_IO, 0, std::move(*completion->request));
       index++;
     }
     if (!found) {
-      zxlogf(ERROR, "Current TRB was not found");
+      FDF_LOG(ERROR, "Current TRB was not found");
     }
 
     return;
@@ -878,7 +878,7 @@ void EventRing::HandleTransferInterrupt() {
       (transfer_event->CompletionCode() != CommandCompletionEvent::ShortPacket)) {
     // asix-88179 will stall the endpoint if we're sending data too fast. The driver expects us to
     // give it a ZX_ERR_IO_INVALID response when this happens.
-    zxlogf(WARNING, "transfer_event->CompletionCode() == %u", transfer_event->CompletionCode());
+    FDF_LOG(WARNING, "transfer_event->CompletionCode() == %u", transfer_event->CompletionCode());
     ep->RequestComplete(ZX_ERR_IO_INVALID, 0, std::move(*context->request));
     return;
   }
@@ -898,7 +898,7 @@ void EventRing::HandleTransferInterrupt() {
 fpromise::promise<void, zx_status_t> EventRing::LinkUp(uint8_t port_id) {
   // Port is in U0 state (link up)
   // Enumerate device
-  zxlogf(DEBUG, "Event Link Up %d.", port_id);
+  FDF_LOG(DEBUG, "Event Link Up %d.", port_id);
   return EnumerateDevice(hci_, port_id, std::nullopt);
 }
 

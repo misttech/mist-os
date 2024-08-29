@@ -392,12 +392,15 @@ impl PeerTask {
     /// Processes a `request` for information from an HFP procedure.
     async fn procedure_request(&mut self, request: SlcRequest) {
         info!("HF procedure request ({}): {:?}", self.id, request);
-        let marker = (&request).into();
+        let marker = (&request).try_into().ok();
         match request {
+            SlcRequest::Initialized => {
+                self.audio_control.lock().connect(self.id, &self.connection.supported_codecs());
+            }
             SlcRequest::GetAgFeatures { response } => {
                 let features = (&self.local_config).into();
                 // Update the procedure with the retrieved AG update.
-                self.connection.receive_ag_request(marker, response(features)).await;
+                self.connection.receive_ag_request(marker.unwrap(), response(features)).await;
             }
             SlcRequest::GetSubscriberNumberInformation { response } => {
                 let result = if let Some(handler) = &mut self.handler {
@@ -405,7 +408,7 @@ impl PeerTask {
                 } else {
                     vec![]
                 };
-                self.connection.receive_ag_request(marker, response(result)).await;
+                self.connection.receive_ag_request(marker.unwrap(), response(result)).await;
             }
             SlcRequest::GetAgIndicatorStatus { response } => {
                 let call_ind = self.calls.indicators();
@@ -419,7 +422,7 @@ impl PeerTask {
                     battchg: self.battery_level,
                 };
                 // Update the procedure with the retrieved AG update.
-                self.connection.receive_ag_request(marker, response(status)).await;
+                self.connection.receive_ag_request(marker.unwrap(), response(status)).await;
             }
             SlcRequest::GetNetworkOperatorName { response } => {
                 let format = self.connection.network_operator_name_format();
@@ -441,15 +444,15 @@ impl PeerTask {
                     _ => None, // The format must be set before getting the network name.
                 };
                 // Update the procedure with the result of retrieving the AG network name.
-                self.connection.receive_ag_request(marker, response(name_option)).await;
+                self.connection.receive_ag_request(marker.unwrap(), response(name_option)).await;
             }
             SlcRequest::SendDtmf { code, response } => {
                 let result = self.calls.send_dtmf_code(code).await;
-                self.connection.receive_ag_request(marker, response(result)).await;
+                self.connection.receive_ag_request(marker.unwrap(), response(result)).await;
             }
             SlcRequest::SendHfIndicator { indicator, response } => {
                 self.hf_indicator_update(indicator);
-                self.connection.receive_ag_request(marker, response()).await;
+                self.connection.receive_ag_request(marker.unwrap(), response()).await;
             }
             SlcRequest::SetNrec { enable, response } => {
                 let result = if let Some(handler) = &mut self.handler {
@@ -461,41 +464,41 @@ impl PeerTask {
                 } else {
                     Err(())
                 };
-                self.connection.receive_ag_request(marker, response(result)).await;
+                self.connection.receive_ag_request(marker.unwrap(), response(result)).await;
             }
             SlcRequest::SpeakerVolumeSynchronization { level, response } => {
                 self.gain_control.report_speaker_gain(level);
-                self.connection.receive_ag_request(marker, response()).await;
+                self.connection.receive_ag_request(marker.unwrap(), response()).await;
             }
             SlcRequest::MicrophoneVolumeSynchronization { level, response } => {
                 self.gain_control.report_microphone_gain(level);
-                self.connection.receive_ag_request(marker, response()).await;
+                self.connection.receive_ag_request(marker.unwrap(), response()).await;
             }
             SlcRequest::QueryCurrentCalls { response } => {
                 let result = self.calls.current_calls();
-                self.connection.receive_ag_request(marker, response(result)).await;
+                self.connection.receive_ag_request(marker.unwrap(), response(result)).await;
             }
             SlcRequest::Answer { response } => {
                 let result = self.calls.answer().map_err(|e| {
                     warn!(peer = %self.id, %e, "Unexpected Answer from Hands Free");
                 });
-                self.connection.receive_ag_request(marker, response(result)).await;
+                self.connection.receive_ag_request(marker.unwrap(), response(result)).await;
             }
             SlcRequest::HangUp { response } => {
                 let result = self.calls.hang_up().map_err(|e| {
                     warn!(peer = %self.id, %e, "Unexpected Hang Up from Hands Free");
                 });
-                self.connection.receive_ag_request(marker, response(result)).await;
+                self.connection.receive_ag_request(marker.unwrap(), response(result)).await;
             }
             SlcRequest::Hold { command, response } => {
                 let result = self.calls.hold(command).map_err(|e| {
                     warn!(peer = %self.id, %e, ?command, "Unexpected Action from Hands Free");
                 });
-                self.connection.receive_ag_request(marker, response(result)).await;
+                self.connection.receive_ag_request(marker.unwrap(), response(result)).await;
             }
             SlcRequest::InitiateCall { call_action, response } => {
                 let result = self.handle_initiate_call(call_action).await;
-                self.connection.receive_ag_request(marker, response(result)).await;
+                self.connection.receive_ag_request(marker.unwrap(), response(result)).await;
             }
             SlcRequest::SynchronousConnectionSetup { response } => {
                 if self.sco_state.is_active() {
@@ -506,7 +509,7 @@ impl PeerTask {
                 // TODO(https://fxbug.dev/42152169): Because we may need to send an OK response to the HF
                 // just before setting up the synchronous connection, we send it here by routing
                 // through the procedure.
-                self.connection.receive_ag_request(marker, AgUpdate::Ok).await;
+                self.connection.receive_ag_request(marker.unwrap(), AgUpdate::Ok).await;
 
                 let codecs = self.get_codecs();
                 let setup_result =
@@ -524,10 +527,10 @@ impl PeerTask {
                 };
                 let result =
                     finish_result.map_err(|e| warn!(?e, "Error setting up audio connection"));
-                self.connection.receive_ag_request(marker, response(result)).await;
+                self.connection.receive_ag_request(marker.unwrap(), response(result)).await;
             }
             SlcRequest::RestartCodecConnectionSetup { response } => {
-                self.connection.receive_ag_request(marker, response()).await;
+                self.connection.receive_ag_request(marker.unwrap(), response()).await;
                 // Start CodecConnectionSetup running again.
                 self.initiate_codec_negotiation(None).await;
             }
@@ -646,36 +649,32 @@ impl PeerTask {
                 request = self.connection.next() => {
                     drop(sco_state);
                     info!("Handling SLC request {:?} for peer {}.", request, self.id);
-                    if let Some(request) = request {
-                        match request {
-                            Ok(r) => self.procedure_request(r).await,
-                            Err(e) => {
-                                warn!("SLC stream error {:?} for peer {}", e, self.id);
-                                break;
-                            }
-                        }
-                    } else {
+                    let Some(request) = request else {
                         info!("Peer task channel closed for peer {}", self.id);
+                        self.audio_control.lock().disconnect(self.id);
                         break;
-                    }
+                    };
+                    let Ok(r) = request else {
+                        warn!("SLC stream error {:?} for peer {}", request.err().unwrap(), self.id);
+                        break;
+                    };
+                    self.procedure_request(r).await
                 }
                 update = self.network_updates.next() => {
                     drop(sco_state);
                     info!("Handling network update {:?} for peer {}", update, self.id);
-                    if let Some(update) = stream_item_map_or_log(update, "PeerHandler::WatchNetworkUpdate", &self.id) {
-                        self.handle_network_update(update).await
-                    } else {
+                    let Some(update) = stream_item_map_or_log(update, "PeerHandler::WatchNetworkUpdate", &self.id) else {
                         break;
-                    }
+                    };
+                    self.handle_network_update(update).await
                 }
                 _ = self.ringer.select_next_some() => {
                     drop(sco_state);
                     info!("Handling ring for peer {}.", self.id);
-                    if let Some(call) = self.calls.ringing() {
-                        self.ring_update(call).await;
-                    } else {
-                        self.ringer.ring(false);
-                    }
+                    match self.calls.ringing() {
+                        Some(call) => self.ring_update(call).await,
+                        None => self.ringer.ring(false),
+                    };
                 }
                 complete => break,
             }
@@ -875,7 +874,7 @@ impl PeerTask {
     }
 
     fn get_codecs(&self) -> Vec<CodecId> {
-        self.connection.get_selected_codec().map_or(DEFAULT_CODECS.to_vec(), |c| vec![c])
+        self.connection.selected_codec().map_or(DEFAULT_CODECS.to_vec(), |c| vec![c])
     }
 }
 
@@ -1956,18 +1955,12 @@ mod tests {
 
         exec.run_until_stalled(&mut audio_connection_fut).expect_pending("shouldn't be done yet");
 
-        // Expect a sco connection, and have it succeed.
-        let sco_complete_fut = expect_sco_connection(profile_requests, true, Ok(()));
-        let sco_complete_fut = pin!(sco_complete_fut);
-        let result = exec.run_singlethreaded(&mut futures::future::select(
-            audio_connection_fut,
-            sco_complete_fut,
-        ));
+        // Expect an SCO connection, and have it succeed.
+        let sco_complete_fut = pin!(expect_sco_connection(profile_requests, true, Ok(())));
 
-        let (remote_sco, mut audio_connection_fut) = match result {
-            Either::Right(r) => r,
-            Either::Left(_) => panic!("Audio connection future shouldn't have finished"),
-        };
+        // SCO connection shiould complete first
+        let (remote_sco, mut audio_connection_fut) =
+            run_while(exec, audio_connection_fut, sco_complete_fut);
 
         let res = exec.run_until_stalled(&mut audio_connection_fut).expect("should be done");
         let local_sco = res.expect("should have started up okay");
@@ -1983,8 +1976,10 @@ mod tests {
         let mut exec = fasync::TestExecutor::new();
         // SLC is connected at the start of the test.
         let (connection, _old_remote) = create_and_connect_slc();
-        let (mut peer, _sender, _receiver, mut profile_requests, test_audio_control) =
+        let (peer, _sender, _receiver, mut profile_requests, test_audio_control) =
             setup_peer_task_audiocontrol(Some(connection));
+
+        let mut peer = run_peer_until_stalled(&mut exec, peer);
 
         assert!(peer.connection.connected());
 
@@ -2121,6 +2116,42 @@ mod tests {
     }
 
     #[fuchsia::test]
+    fn audio_control_connection_is_added_when_connected() {
+        let mut exec = fasync::TestExecutor::new();
+        // SLC is connected at the start of the test.
+        let (connection, _old_remote) = create_and_initialize_slc(SlcState::default());
+        let (peer, _sender, _receiver, _profile_requests, test_audio_control) =
+            setup_peer_task_audiocontrol(Some(connection));
+
+        let peer = run_peer_until_stalled(&mut exec, peer);
+
+        assert!(test_audio_control.is_connected(PeerId(1)));
+
+        assert!(peer.connection.connected());
+    }
+
+    #[fuchsia::test]
+    fn audio_control_disconnected_when_peer_disconnects() {
+        let mut exec = fasync::TestExecutor::new();
+        // SLC is connected at the start of the test.
+        let (connection, old_remote) = create_and_initialize_slc(SlcState::default());
+        let (peer, _sender, receiver, _profile_requests, test_audio_control) =
+            setup_peer_task_audiocontrol(Some(connection));
+
+        let peer = run_peer_until_stalled(&mut exec, peer);
+
+        assert!(peer.connection.connected());
+
+        drop(old_remote);
+
+        let mut run_fut = pin!(peer.run(receiver));
+        let peer = exec.run_until_stalled(&mut run_fut).expect("complete when SLC disconnects");
+
+        assert!(!peer.connection.connected());
+        assert!(!test_audio_control.is_connected(PeerId(1)));
+    }
+
+    #[fuchsia::test]
     fn sco_connection_closed_when_audio_stops_unexpectedly() {
         let mut exec = fasync::TestExecutor::new();
         // SLC is connected at the start of the test.
@@ -2130,7 +2161,7 @@ mod tests {
 
         assert!(peer.connection.connected());
 
-        let _remote_sco = setup_audio(&mut exec, &mut peer, &mut profile_requests);
+        let mut remote_sco = setup_audio(&mut exec, &mut peer, &mut profile_requests);
 
         // Should have started up the test audio control.
         assert!(test_audio_control.is_started(PeerId(1)));
@@ -2138,7 +2169,7 @@ mod tests {
         // Run the peer task until it's stalled
         let peer = run_peer_until_stalled(&mut exec, peer);
 
-        // Unexpectedly stop the audio.
+        // Unexpectedly stop the audio. Event should come through the task channel.
         test_audio_control.unexpected_stop(
             PeerId(1),
             AudioError::AudioCore { source: anyhow::format_err!("Whoops") },
@@ -2151,6 +2182,12 @@ mod tests {
         let mut run_fut = pin!(run_fut);
         exec.run_until_stalled(&mut run_fut)
             .expect_pending("shouldn't be done while sender is live");
+
+        let sco_request = exec
+            .run_until_stalled(&mut remote_sco.next())
+            .expect("SCO requests should be complete");
+        assert!(sco_request.is_none());
+
         sender.try_send(PeerRequest::Shutdown).unwrap();
         let peer = exec.run_until_stalled(&mut run_fut).unwrap();
 

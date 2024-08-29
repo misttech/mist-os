@@ -9,23 +9,16 @@ import("//build/drivers.gni")
 all_hdrs = [
   "device.h",
   "debug.h",
-  "convert.h",
 ]
 
-all_src = [
-  "device.cc",
-  "convert.cc",
-]
+all_src = [ "device.cc" ]
 
 all_deps = [
   ":wlanif_bind",
   "//sdk/fidl/fuchsia.driver.compat:fuchsia.driver.compat_cpp",
   "//sdk/fidl/fuchsia.driver.framework:fuchsia.driver.framework_cpp",
-  "//sdk/fidl/fuchsia.wlan.common:fuchsia.wlan.common_banjo_c",
   "//sdk/fidl/fuchsia.wlan.device:fuchsia.wlan.device_hlcpp",
-  "//sdk/fidl/fuchsia.wlan.fullmac:fuchsia.wlan.fullmac_banjo_cpp",
   "//sdk/fidl/fuchsia.wlan.fullmac:fuchsia.wlan.fullmac_cpp",
-  "//sdk/fidl/fuchsia.wlan.internal:fuchsia.wlan.internal_banjo_c",
   "//sdk/fidl/fuchsia.wlan.internal:fuchsia.wlan.internal_hlcpp",
   "//sdk/fidl/fuchsia.wlan.mlme:fuchsia.wlan.mlme_hlcpp",
   "//sdk/lib/driver/compat/cpp",

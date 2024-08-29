@@ -14,7 +14,7 @@ use std::sync::Arc;
 use tracing::warn;
 use {
     diagnostics_log as flog, fidl_fuchsia_component_resolution as fresolution,
-    fidl_fuchsia_logger as flogger, fuchsia_async as fasync,
+    fidl_fuchsia_logger as flogger, fidl_fuchsia_pkg as fpkg, fuchsia_async as fasync,
 };
 
 type LogSubscriber = dyn tracing::Subscriber + std::marker::Send + std::marker::Sync + 'static;
@@ -66,6 +66,42 @@ async fn validate_hermetic_package(
                 });
                 warn!("{}", s);
                 return Err(fresolution::ResolverError::PackageNotFound);
+            }
+        }
+        PackageUrl::Relative(_url) => {
+            // don't do anything as we don't restrict relative urls.
+        }
+    }
+    Ok(())
+}
+
+async fn validate_hermetic_url(
+    pkg_url_str: &str,
+    subscriber: Arc<LogSubscriber>,
+    hermetic_test_package_name: &String,
+    other_allowed_packages: &AllowedPackages,
+) -> Result<(), fpkg::ResolveError> {
+    let pkg_url = PackageUrl::parse(pkg_url_str).map_err(|err| {
+        warn!("cannot parse {}, {:?}", pkg_url_str, err);
+        fpkg::ResolveError::InvalidUrl
+    })?;
+
+    match pkg_url {
+        PackageUrl::Absolute(pkg_url) => {
+            let package_name = pkg_url.name();
+            if hermetic_test_package_name != package_name.as_ref()
+                && !other_allowed_packages.pkgs.contains(package_name.as_ref())
+            {
+                let s = format!("failed to resolve component {}: package {} is not in the test package allowlist: '{}, {}'
+                \nSee https://fuchsia.dev/fuchsia-src/development/testing/components/test_runner_framework?hl=en#hermetic-resolver
+                for more information.",
+                &pkg_url_str, package_name, hermetic_test_package_name, other_allowed_packages.pkgs.iter().join(", "));
+                // log in both test managers log sink and test's log sink so that it is easy to retrieve.
+                tracing::subscriber::with_default(subscriber, || {
+                    warn!("{}", s);
+                });
+                warn!("{}", s);
+                return Err(fpkg::ResolveError::PackageNotFound);
             }
         }
         PackageUrl::Relative(_url) => {
@@ -146,14 +182,117 @@ async fn serve_resolver(
     }
 }
 
+async fn serve_pkg_resolver(
+    mut stream: fpkg::PackageResolverRequestStream,
+    subscriber: Arc<LogSubscriber>,
+    hermetic_test_package_name: Arc<String>,
+    other_allowed_packages: AllowedPackages,
+    pkg_resolver: Arc<fpkg::PackageResolverProxy>,
+) {
+    while let Some(request) = stream.try_next().await.expect("failed to serve component resolver") {
+        match request {
+            fpkg::PackageResolverRequest::Resolve { package_url, dir, responder } => {
+                let result = if let Err(err) = validate_hermetic_url(
+                    &package_url,
+                    subscriber.clone(),
+                    &hermetic_test_package_name,
+                    &other_allowed_packages,
+                )
+                .await
+                {
+                    Err(err)
+                } else {
+                    let subscriber = subscriber.clone();
+                    pkg_resolver.resolve(&package_url, dir).await.unwrap_or_else(|err| {
+                        tracing::subscriber::with_default(subscriber, || {
+                            warn!("failed to resolve pkg {}: {:?}", package_url, err);
+                        });
+                        Err(fpkg::ResolveError::Internal)
+                    })
+                };
+                let result_ref = result.as_ref();
+                let result_ref = result_ref.map_err(|e| e.to_owned());
+                if let Err(e) = responder.send(result_ref) {
+                    warn!("Failed sending load response for {}: {}", package_url, e);
+                }
+            }
+            fpkg::PackageResolverRequest::ResolveWithContext {
+                package_url,
+                context,
+                dir,
+                responder,
+            } => {
+                // We don't need to worry about validating context because it should have
+                // been produced by Resolve call above.
+                let result = if let Err(err) = validate_hermetic_url(
+                    &package_url,
+                    subscriber.clone(),
+                    &hermetic_test_package_name,
+                    &other_allowed_packages,
+                )
+                .await
+                {
+                    Err(err)
+                } else {
+                    let subscriber = subscriber.clone();
+                    pkg_resolver
+                        .resolve_with_context(&package_url, &context, dir)
+                        .await
+                        .unwrap_or_else(|err| {
+                            tracing::subscriber::with_default(subscriber, || {
+                                warn!(
+                                    "failed to resolve pkg {} with context {:?}: {:?}",
+                                    package_url, context, err
+                                );
+                            });
+                            Err(fpkg::ResolveError::Internal)
+                        })
+                };
+                let result_ref = result.as_ref();
+                let result_ref = result_ref.map_err(|e| e.to_owned());
+                if let Err(e) = responder.send(result_ref) {
+                    warn!("Failed sending load response for {}: {}", package_url, e);
+                }
+            }
+            fpkg::PackageResolverRequest::GetHash { package_url, responder } => {
+                let result = if let Err(_err) = validate_hermetic_url(
+                    package_url.url.as_str(),
+                    subscriber.clone(),
+                    &hermetic_test_package_name,
+                    &other_allowed_packages,
+                )
+                .await
+                {
+                    Err(fuchsia_zircon::Status::INTERNAL.into_raw())
+                } else {
+                    let subscriber = subscriber.clone();
+                    pkg_resolver.get_hash(&package_url).await.unwrap_or_else(|err| {
+                        tracing::subscriber::with_default(subscriber, || {
+                            warn!("failed to resolve pkg {}: {:?}", package_url.url.as_str(), err);
+                        });
+                        Err(fuchsia_zircon::Status::INTERNAL.into_raw())
+                    })
+                };
+                let result_ref = result.as_ref();
+                let result_ref = result_ref.map_err(|e| e.to_owned());
+                if let Err(e) = responder.send(result_ref) {
+                    warn!("Failed sending load response for {}: {}", package_url.url.as_str(), e);
+                }
+            }
+        }
+    }
+}
+
 pub async fn serve_hermetic_resolver(
     handles: LocalComponentHandles,
     hermetic_test_package_name: Arc<String>,
     other_allowed_packages: AllowedPackages,
     full_resolver: Arc<fresolution::ResolverProxy>,
+    pkg_resolver: Arc<fpkg::PackageResolverProxy>,
 ) -> Result<(), Error> {
     let mut fs = ServiceFs::new();
-    let mut tasks = vec![];
+    let mut resolver_tasks = vec![];
+    let mut pkg_resolver_tasks = vec![];
     let log_proxy = handles
         .connect_to_named_protocol::<flogger::LogSinkMarker>(flogger::LogSinkMarker::DEBUG_NAME)?;
     let tags = ["test_resolver"];
@@ -167,18 +306,42 @@ pub async fn serve_hermetic_resolver(
         }
     };
 
+    let resolver_hermetic_test_package_name = hermetic_test_package_name.clone();
+    let resolver_other_allowed_packages = other_allowed_packages.clone();
+    let resolver_log_publisher = log_publisher.clone();
+
+    let pkg_resolver_hermetic_test_package_name = hermetic_test_package_name.clone();
+    let pkg_resolver_other_allowed_packages = other_allowed_packages.clone();
+    let pkg_resolver_log_publisher = log_publisher.clone();
+
     fs.dir("svc").add_fidl_service(move |stream: fresolution::ResolverRequestStream| {
         let full_resolver = full_resolver.clone();
-        let hermetic_test_package_name = hermetic_test_package_name.clone();
-        let other_allowed_packages = other_allowed_packages.clone();
-        let log_publisher = log_publisher.clone();
-        tasks.push(fasync::Task::local(async move {
+        let hermetic_test_package_name = resolver_hermetic_test_package_name.clone();
+        let other_allowed_packages = resolver_other_allowed_packages.clone();
+        let log_publisher = resolver_log_publisher.clone();
+        resolver_tasks.push(fasync::Task::local(async move {
             serve_resolver(
                 stream,
                 log_publisher,
                 hermetic_test_package_name,
                 other_allowed_packages,
                 full_resolver,
+            )
+            .await;
+        }));
+    });
+    fs.dir("svc").add_fidl_service(move |stream: fpkg::PackageResolverRequestStream| {
+        let pkg_resolver = pkg_resolver.clone();
+        let hermetic_test_package_name = pkg_resolver_hermetic_test_package_name.clone();
+        let other_allowed_packages = pkg_resolver_other_allowed_packages.clone();
+        let log_publisher = pkg_resolver_log_publisher.clone();
+        pkg_resolver_tasks.push(fasync::Task::local(async move {
+            serve_pkg_resolver(
+                stream,
+                log_publisher,
+                hermetic_test_package_name,
+                other_allowed_packages,
+                pkg_resolver,
             )
             .await;
         }));

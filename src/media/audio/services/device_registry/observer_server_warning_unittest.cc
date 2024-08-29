@@ -38,6 +38,8 @@ class ObserverServerWarningTest : public AudioDeviceRegistryServerTestBase,
     RunLoopUntilIdle();
     return added_device_id;
   }
+
+  void handle_unknown_event(fidl::UnknownEventMetadata<fad::Observer>) override {}
 };
 
 class ObserverServerCodecWarningTest : public ObserverServerWarningTest {

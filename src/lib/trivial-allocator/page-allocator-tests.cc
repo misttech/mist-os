@@ -85,4 +85,65 @@ TEST(TrivialAllocatorDeathTest, PageAllocatorVmar) {
 
 #endif
 
+TEST(TrivialAllocatorTests, PageAllocatorRelease) {
+  static constexpr uint64_t kPageSize = 0x1000;
+
+  struct Memory {
+    struct Capability {};
+
+    Memory(bool& deallocated, bool& released, bool& sealed)
+        : deallocated(deallocated), released(released), sealed(sealed) {}
+
+    size_t page_size() const { return kPageSize; }
+
+    // `this` gives a canonical (albeit nonsensical) pointer.
+    std::pair<void*, Capability> Allocate(size_t) { return {this, {}}; }
+
+    void Deallocate(Capability, void* ptr, size_t size) {
+      ExpectAddressAndSize(ptr, size);
+      deallocated = true;
+    }
+
+    void Release(Capability, void* ptr, size_t size) {
+      ExpectAddressAndSize(ptr, size);
+      released = true;
+    }
+
+    void Seal(Capability, void* ptr, size_t size) {
+      ExpectAddressAndSize(ptr, size);
+      deallocated = true;
+    }
+
+    void ExpectAddressAndSize(void* ptr, size_t size) {
+      EXPECT_EQ(this, ptr);
+      EXPECT_EQ(kPageSize, size);
+    }
+
+    bool& deallocated;
+    bool& released;
+    bool& sealed;
+  };
+
+  bool deallocated = false;
+  bool released = false;
+  bool sealed = false;
+  {
+    trivial_allocator::PageAllocator<Memory> allocator(deallocated, released, sealed);
+    EXPECT_FALSE(deallocated);
+    EXPECT_FALSE(released);
+    EXPECT_FALSE(sealed);
+
+    size_t size = 1;
+    auto allocation = allocator(size, 1);
+    allocation.release();
+
+    EXPECT_FALSE(deallocated);
+    EXPECT_TRUE(released);
+    EXPECT_FALSE(sealed);
+  }
+
+  EXPECT_FALSE(deallocated);
+  EXPECT_FALSE(sealed);
+}
+
 }  // namespace

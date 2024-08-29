@@ -4,10 +4,14 @@
 
 #include "src/devices/hrtimer/drivers/aml-hrtimer/aml-hrtimer.h"
 
+#include <fidl/fuchsia.hardware.power/cpp/fidl.h>
 #include <lib/driver/component/cpp/driver_export.h>
+#include <lib/driver/logging/cpp/structured_logger.h>
 #include <lib/driver/power/cpp/element-description-builder.h>
 #include <lib/driver/power/cpp/power-support.h>
 #include <zircon/syscalls-next.h>
+
+#include "src/devices/power/lib/from-fidl/cpp/from-fidl.h"
 
 namespace hrtimer {
 
@@ -19,6 +23,8 @@ zx::result<PowerConfiguration> AmlHrtimer::GetPowerConfiguration(
     return power_broker.take_error();
   }
 
+  // TODO(b/358361345): Use //sdk/lib/driver/platform-device/cpp to retrieve power configuration
+  // once it supports it.
   const auto result_power_config = pdev->GetPowerConfiguration();
   if (!result_power_config.ok()) {
     FDF_LOG(ERROR, "Call to get power config failed: %s", result_power_config.status_string());
@@ -35,14 +41,22 @@ zx::result<PowerConfiguration> AmlHrtimer::GetPowerConfiguration(
     return zx::error(ZX_ERR_NOT_SUPPORTED);
   }
 
-  const auto& config = result_power_config->value()->config[0];
-  if (config.element().name().get() != "aml-hrtimer-wake") {
+  const auto& wire_config = result_power_config->value()->config[0];
+  if (wire_config.element().name().get() != "aml-hrtimer-wake") {
     FDF_LOG(ERROR, "Unexpected power element: %s",
-            std::string(config.element().name().get()).c_str());
+            std::string(wire_config.element().name().get()).c_str());
     return zx::error(ZX_ERR_BAD_STATE);
   }
 
-  auto tokens = fdf_power::GetDependencyTokens(*incoming(), config);
+  fuchsia_hardware_power::PowerElementConfiguration natural_config = fidl::ToNatural(wire_config);
+  zx::result config = power::from_fidl::CreatePowerElementConfiguration(natural_config);
+  if (config.is_error()) {
+    FDF_SLOG(ERROR, "Failed to convert power element configuration from fidl.",
+             KV("status", config.status_string()));
+    return config.take_error();
+  }
+
+  auto tokens = fdf_power::GetDependencyTokens(*incoming(), config.value());
   if (tokens.is_error()) {
     FDF_LOG(ERROR, "Failed to get power dependency tokens: %u",
             static_cast<uint8_t>(tokens.error_value()));
@@ -50,7 +64,7 @@ zx::result<PowerConfiguration> AmlHrtimer::GetPowerConfiguration(
   }
 
   fdf_power::ElementDesc description =
-      fdf_power::ElementDescBuilder(config, std::move(tokens.value())).Build();
+      fdf_power::ElementDescBuilder(config.value(), std::move(tokens.value())).Build();
   auto result_add_element = fdf_power::AddElement(power_broker.value(), description);
   if (result_add_element.is_error()) {
     FDF_LOG(ERROR, "Failed to add power element: %u",

@@ -13,6 +13,14 @@ import subprocess
 import sys
 from enum import Enum
 
+SCRIPT_DIR = os.path.dirname(__file__)
+FUCHSIA_DIR = os.path.join(SCRIPT_DIR, "..", "..", "..")
+PREBUILT_3P_DIR = os.path.join(FUCHSIA_DIR, "prebuilt", "third_party")
+HOST_OS = {"Linux": "linux", "Darwin": "mac"}[platform.system()]
+HOST_CPU = {"x86_64": "x64", "arm64": "arm64"}[platform.machine()]
+HOST_PLATFORM = f"{HOST_OS}-{HOST_CPU}"
+
+
 # Special values identifying a PE (i.e., Portable Executable) image, of which
 # UEFI executables are examples.
 #
@@ -196,8 +204,6 @@ class BootTest(object):
 
 
 def find_bootserver(build_dir):
-    host_os = {"Linux": "linux", "Darwin": "mac"}[platform.system()]
-    host_cpu = {"x86_64": "x64", "arm64": "arm64"}[platform.machine()]
     with open(os.path.join(build_dir, "tool_paths.json")) as file:
         tool_paths = json.load(file)
     bootservers = [
@@ -205,13 +211,13 @@ def find_bootserver(build_dir):
         for tool in tool_paths
         if (
             tool["name"] == "bootserver"
-            and tool["cpu"] == host_cpu
-            and tool["os"] == host_os
+            and tool["cpu"] == HOST_CPU
+            and tool["os"] == HOST_OS
         )
     ]
     if bootservers:
         return bootservers[0]
-    print("Cannot find bootserver for %s-%s" % (host_os, host_cpu))
+    print("Cannot find bootserver for %s-%s" % (HOST_OS, HOST_CPU))
     sys.exit(1)
 
 
@@ -223,6 +229,11 @@ way to do this is to add //bundles/boot_tests to your `fx set` invocation.
 
 
 def main():
+    build_dir = os.path.relpath(os.getenv("FUCHSIA_BUILD_DIR"))
+    if build_dir is None:
+        print("FUCHSIA_BUILD_DIR not set")
+        return 1
+
     parser = argparse.ArgumentParser(
         prog="fx run-boot-test", description="Run a boot test.", epilog=EPILOG
     )
@@ -258,8 +269,10 @@ def main():
         "--crosvm-path",
         metavar="PATH",
         type=str,
-        # TODO(https://fxbug.dev/335547883): Point at a prebuilt in checkout.
-        default="crosvm",
+        default=os.path.relpath(
+            os.path.join(PREBUILT_3P_DIR, "crosvm", HOST_PLATFORM, "crosvm"),
+            build_dir,
+        ),
         help="Use crosvm binary at PATH",
     )
     parser.add_argument(
@@ -281,10 +294,6 @@ def main():
     )
     args = parser.parse_args()
 
-    build_dir = os.path.relpath(os.getenv("FUCHSIA_BUILD_DIR"))
-    if build_dir is None:
-        print("FUCHSIA_BUILD_DIR not set")
-        return 1
     if args.arch is None:
         print("FUCHSIA_ARCH not set")
         return 1

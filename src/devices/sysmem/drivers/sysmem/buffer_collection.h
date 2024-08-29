@@ -18,7 +18,7 @@
 #include "node.h"
 #include "src/devices/sysmem/drivers/sysmem/device.h"
 
-namespace sysmem_driver {
+namespace sysmem_service {
 
 // This class indirectly implements both V1 and V2 BufferCollection server.
 //
@@ -237,6 +237,6 @@ class BufferCollection : public Node {
   bool wait_for_buffers_seen_ = false;
 };
 
-}  // namespace sysmem_driver
+}  // namespace sysmem_service
 
 #endif  // SRC_DEVICES_SYSMEM_DRIVERS_SYSMEM_BUFFER_COLLECTION_H_

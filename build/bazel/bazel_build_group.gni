@@ -83,10 +83,14 @@ template("bazel_build_group") {
     _bazel_targets += [ subtarget.bazel_target ]
 
     if (defined(subtarget.deps)) {
-      # Add subtarget deps while removing duplicates.
-      _deps += subtarget.deps
-      _deps -= subtarget.deps
-      _deps += subtarget.deps
+      # Loop over the deps individually, because the += / -= pattern doesn't
+      # work correctly if used with a list that contains duplicates (the -=
+      # step will fail with a "trying to remove X, but it wasn't there error")
+      foreach(dep, subtarget.deps) {
+        _deps += [ dep ]
+        _deps -= [ dep ]
+        _deps += [ dep ]
+      }
     }
 
     if (defined(subtarget.copy_outputs)) {

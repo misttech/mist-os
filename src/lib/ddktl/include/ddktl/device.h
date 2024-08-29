@@ -381,11 +381,6 @@ class DeviceAddArgs {
     args_.ctx = ctx;
     return *this;
   }
-  DeviceAddArgs& set_props(cpp20::span<const zx_device_prop_t> props) {
-    args_.props = props.data();
-    args_.prop_count = static_cast<uint32_t>(props.size());
-    return *this;
-  }
   DeviceAddArgs& set_str_props(cpp20::span<const zx_device_str_prop_t> props) {
     args_.str_props = props.data();
     args_.str_prop_count = static_cast<uint32_t>(props.size());

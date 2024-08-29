@@ -177,6 +177,7 @@ class SimpleCodecServerInstance
   void WatchPlugState(WatchPlugStateCallback callback) override {
     parent_->WatchPlugState(std::move(callback), this);
   }
+  void handle_unknown_method(uint64_t ordinal, bool method_has_response) override {}
 
   SimpleCodecServerInternal<T>* parent_;
   fidl::Binding<fuchsia::hardware::audio::Codec> binding_;

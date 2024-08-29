@@ -509,8 +509,6 @@ pub fn convert_protocol<'a>(
 ) -> Result<compare::Protocol> {
     let mut methods = BTreeMap::new();
 
-    let context = context.nest_member(&p.name, Some(&p.name));
-
     for pm in &p.methods {
         methods.insert(
             pm.ordinal,
@@ -572,7 +570,8 @@ pub fn convert_abi_surface(ir: Rc<ir::IR>) -> Result<compare::AbiSurface> {
 
     for decl in ir.declarations.values() {
         if let Declaration::Protocol(decl) = decl {
-            let protocol = convert_protocol(decl, &context)?;
+            let protocol =
+                convert_protocol(decl, &context.nest_member(&decl.name, Some(&decl.name)))?;
 
             if let Some(discoverable) = protocol.discoverable.clone() {
                 abi_surface.discoverable.insert(discoverable.name, protocol);

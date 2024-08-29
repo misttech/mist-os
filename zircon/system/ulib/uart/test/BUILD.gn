@@ -16,7 +16,6 @@ test("uart-unittests") {
     "amlogic-tests.cc",
     "driver-tests.cc",
     "geni-tests.cc",
-    "imx-tests.cc",
     "motmot-tests.cc",
     "ns8250-tests.cc",
     "onlcr-tests.cc",

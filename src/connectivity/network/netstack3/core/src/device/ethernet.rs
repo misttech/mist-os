@@ -186,7 +186,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::FilterState<Ipv6>>
             Some(_) => lookup_addr,
             None => lookup_addr.to_solicited_node_address().into_specified(),
         };
-        let src_ip = ip::IpDeviceStateContext::<Ipv6, _>::get_local_addr_for_remote(
+        let src_ip = ip::IpDeviceStateContext::<Ipv6>::get_local_addr_for_remote(
             self,
             &device_id.clone().into(),
             Some(dst_ip),

@@ -217,7 +217,7 @@ impl AudioControl for PartialOffloadAudioControl {
 
 struct TestAudioControlInner {
     started: HashSet<PeerId>,
-    _connected: HashMap<PeerId, HashSet<CodecId>>,
+    connected: HashMap<PeerId, HashSet<CodecId>>,
     connections: HashMap<PeerId, ScoConnection>,
     event_sender: futures::channel::mpsc::Sender<AudioControlEvent>,
 }
@@ -240,6 +240,11 @@ impl TestAudioControl {
         let lock = self.inner.lock();
         lock.started.contains(&id) && lock.connections.contains_key(&id)
     }
+
+    pub fn is_connected(&self, id: PeerId) -> bool {
+        let lock = self.inner.lock();
+        lock.connected.contains_key(&id)
+    }
 }
 
 impl Default for TestAudioControl {
@@ -249,7 +254,7 @@ impl Default for TestAudioControl {
         Self {
             inner: Arc::new(Mutex::new(TestAudioControlInner {
                 started: Default::default(),
-                _connected: Default::default(),
+                connected: Default::default(),
                 connections: Default::default(),
                 event_sender,
             })),
@@ -285,13 +290,13 @@ impl AudioControl for TestAudioControl {
 
     fn connect(&mut self, id: PeerId, supported_codecs: &[CodecId]) {
         let mut lock = self.inner.lock();
-        let _ = lock._connected.insert(id, supported_codecs.iter().cloned().collect());
+        let _ = lock.connected.insert(id, supported_codecs.iter().cloned().collect());
     }
 
     fn disconnect(&mut self, id: PeerId) {
         let _ = self.stop(id);
         let mut lock = self.inner.lock();
-        let _ = lock._connected.remove(&id);
+        let _ = lock.connected.remove(&id);
     }
 
     fn take_events(&self) -> BoxStream<'static, AudioControlEvent> {

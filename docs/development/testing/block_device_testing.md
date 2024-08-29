@@ -17,7 +17,25 @@ $ blktest -d /dev/class/block/000
 Fuchsia filesystem correctness on a filesystem.
 
 To avoid racing with the auto-mounter, it is recommended to run this
-test with the kernel command line option "zircon.system.disable-automount=true".
+test with the assembly override:
+
+```
+--assembly-override '//build/images/fuchsia/*=//local:disable_automount'
+```
+
+with a `//local/BUILD.gn` file as follows:
+
+```
+import("//build/assembly/developer_overrides.gni")
+
+assembly_developer_overrides("disable_automount") {
+  platform = {
+    storage = {
+      disable_automount = false
+    }
+  }
+}
+```
 
 ```shell
 $ /boot/test/fs/fs-test -d /dev/class/block/000 -f minfs

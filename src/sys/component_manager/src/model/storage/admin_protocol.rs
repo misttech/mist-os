@@ -70,7 +70,7 @@ impl From<StorageError> for fsys::DeletionError {
                     }
                     _ => fsys::DeletionError::Protocol,
                 },
-                Some(DeletionErrorCause::File(_)) => fsys::DeletionError::Protocol,
+                Some(DeletionErrorCause::File { _error_code }) => fsys::DeletionError::Protocol,
                 Some(DeletionErrorCause::FileRequest(fidl::Error::ClientChannelClosed {
                     ..
                 })) => fsys::DeletionError::Connection,
@@ -86,8 +86,7 @@ enum DeletionErrorCause {
     Directory(ffs_dir::EnumerateError),
     /// The IPC to the I/O server succeeded, but the file operation
     /// returned an error.
-    #[allow(dead_code)] // TODO(https://fxbug.dev/318827209)
-    File(i32),
+    File { _error_code: i32 },
     /// The IPC to the I/O server failed.
     FileRequest(fidl::Error),
 }
@@ -457,7 +456,7 @@ impl StorageAdmin {
                 ffs_dir::DirentKind::Symlink | ffs_dir::DirentKind::File => {
                     match dir.unlink(&entry.name, &fio::UnlinkOptions::default()).await {
                         Err(e) => errors.push(DeletionErrorCause::FileRequest(e)),
-                        Ok(Err(e)) => errors.push(DeletionErrorCause::File(e)),
+                        Ok(Err(e)) => errors.push(DeletionErrorCause::File { _error_code: e }),
                         _ => {}
                     }
                 }

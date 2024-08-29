@@ -6,7 +6,6 @@
 """
 
 import argparse
-import collections
 import dataclasses
 import enum
 import os
@@ -203,7 +202,6 @@ class _ScanDepsCommandTransformer(object):
         """
 
         handle_optarg = None
-        output_arg = False
         # Use the original command (without response files expanded)
         # to avoid command length limits.
         # Because of this, this transformation on --emit only works

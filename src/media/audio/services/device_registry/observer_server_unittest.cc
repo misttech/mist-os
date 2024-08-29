@@ -92,6 +92,8 @@ class ObserverServerTest : public AudioDeviceRegistryServerTestBase,
         fidl::Client<fad::RingBuffer>(std::move(ring_buffer_client_end), dispatcher());
     return std::make_pair(std::move(ring_buffer_client), std::move(ring_buffer_server_end));
   }
+
+  void handle_unknown_event(fidl::UnknownEventMetadata<fad::Observer>) override {}
 };
 
 class ObserverServerCodecTest : public ObserverServerTest {

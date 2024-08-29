@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <fidl/fuchsia.hardware.power/cpp/fidl.h>
 #include <fidl/fuchsia.power.broker/cpp/fidl.h>
 
 #include <src/lib/testing/loop_fixture/test_loop_fixture.h>
@@ -32,7 +31,7 @@ void check_channels_peered(zx_handle_t c1, zx_handle_t c2) {
 }
 
 TEST_F(ElementBuilderTests, ElementBuilderFilledOut) {
-  fuchsia_hardware_power::wire::PowerElementConfiguration config;
+  fdf_power::PowerElementConfiguration config;
   fdf_power::TokenMap tokens;
 
   zx_handle_t active, passive;
@@ -81,7 +80,7 @@ TEST_F(ElementBuilderTests, ElementBuilderFilledOut) {
 }
 
 TEST_F(ElementBuilderTests, ElementBuilderMissingCurrentLevel) {
-  fuchsia_hardware_power::wire::PowerElementConfiguration config;
+  fdf_power::PowerElementConfiguration config;
   fdf_power::TokenMap tokens;
 
   zx_handle_t active, passive;
@@ -127,7 +126,7 @@ TEST_F(ElementBuilderTests, ElementBuilderMissingCurrentLevel) {
 }
 
 TEST_F(ElementBuilderTests, ElementBuilderMin) {
-  fuchsia_hardware_power::wire::PowerElementConfiguration config;
+  fdf_power::PowerElementConfiguration config;
   fdf_power::TokenMap tokens;
   fdf_power::ElementDesc desc = fdf_power::ElementDescBuilder(config, std::move(tokens)).Build();
 

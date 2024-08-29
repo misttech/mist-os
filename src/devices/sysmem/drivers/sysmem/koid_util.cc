@@ -9,9 +9,9 @@
 #include <zircon/errors.h>
 #include <zircon/types.h>
 
-#include "macros.h"
+#include "src/devices/sysmem/drivers/sysmem/macros.h"
 
-namespace sysmem_driver {
+namespace sysmem_service {
 
 zx_status_t get_handle_koids(const zx::object_base& this_end, zx_koid_t* this_end_koid,
                              zx_koid_t* that_end_koid, zx_obj_type_t type) {
@@ -41,4 +41,4 @@ zx_status_t get_handle_koids(const zx::object_base& this_end, zx_koid_t* this_en
   return ZX_OK;
 }
 
-}  // namespace sysmem_driver
+}  // namespace sysmem_service

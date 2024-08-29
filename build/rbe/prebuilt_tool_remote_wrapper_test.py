@@ -6,9 +6,7 @@
 import contextlib
 import io
 import os
-import subprocess
 import sys
-import tempfile
 import unittest
 from pathlib import Path
 from typing import Any, Sequence
@@ -22,8 +20,6 @@ import remote_action
 
 class ImmediateExit(Exception):
     """For mocking functions that do not return."""
-
-    pass
 
 
 def _write_file_contents(path: Path, contents: str) -> None:

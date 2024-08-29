@@ -3,13 +3,12 @@
 // found in the LICENSE file.
 
 use tracing::error;
-use wlan_fullmac_mlme::device::{FullmacDevice, RawFullmacDeviceFfi};
+use wlan_fullmac_mlme::device::FullmacDevice;
 use wlan_fullmac_mlme::{FullmacMlme, FullmacMlmeHandle};
 use {fidl_fuchsia_wlan_fullmac as fidl_fullmac, fuchsia_zircon as zx};
 
 #[no_mangle]
 pub extern "C" fn start_fullmac_mlme(
-    raw_device: RawFullmacDeviceFfi,
     fullmac_client_end_handle: zx::sys::zx_handle_t,
 ) -> *mut FullmacMlmeHandle {
     let fullmac_impl_sync_proxy = {
@@ -19,7 +18,7 @@ pub extern "C" fn start_fullmac_mlme(
         let channel = fidl::Channel::from(handle);
         fidl_fullmac::WlanFullmacImpl_SynchronousProxy::new(channel)
     };
-    let device = FullmacDevice::new(raw_device, fullmac_impl_sync_proxy);
+    let device = FullmacDevice::new(fullmac_impl_sync_proxy);
     match FullmacMlme::start(device) {
         Ok(mlme) => Box::into_raw(Box::new(mlme)),
         Err(e) => {

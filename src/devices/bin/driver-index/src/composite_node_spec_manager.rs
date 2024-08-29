@@ -4,6 +4,7 @@
 
 use crate::match_common::{get_composite_rules_from_composite_driver, node_to_device_property};
 use crate::resolved_driver::ResolvedDriver;
+use crate::serde_ext::{CompositeInfoDef, ConditionDef};
 use bind::compiler::symbol_table::{get_deprecated_key_identifier, get_deprecated_key_value};
 use bind::compiler::Symbol;
 use bind::interpreter::decode_bind_rules::DecodedRules;
@@ -11,20 +12,22 @@ use bind::interpreter::match_bind::{match_bind, DeviceProperties, MatchBindData,
 use fuchsia_zircon::sys::zx_status_t;
 use fuchsia_zircon::Status;
 use regex::Regex;
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::collections::{BTreeMap, HashMap, HashSet};
 use {fidl_fuchsia_driver_framework as fdf, fidl_fuchsia_driver_index as fdi};
 
 const NAME_REGEX: &'static str = r"^[a-zA-Z0-9\-_]*$";
 
-#[derive(Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq, Serialize, Deserialize)]
 pub struct BindRuleCondition {
+    #[serde(with = "ConditionDef")]
     condition: fdf::Condition,
     values: Vec<Symbol>,
 }
 
 type BindRules = BTreeMap<PropertyKey, BindRuleCondition>;
 
-#[derive(Clone)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct CompositeParentRef {
     // This is the spec name. Corresponds with the key of spec_list.
     pub name: String,
@@ -33,15 +36,89 @@ pub struct CompositeParentRef {
     pub index: u32,
 }
 
+pub fn serialize_parent_refs<S>(
+    target: &HashMap<BindRules, Vec<CompositeParentRef>>,
+    ser: S,
+) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    let container = target
+        .into_iter()
+        .map(|entry| (entry.0.into_iter().collect::<Vec<_>>(), entry.1))
+        .collect::<Vec<_>>();
+    serde::Serialize::serialize(&container, ser)
+}
+
+pub fn deserialize_parent_refs<'de, D>(
+    des: D,
+) -> Result<HashMap<BindRules, Vec<CompositeParentRef>>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let container: Vec<(Vec<(PropertyKey, BindRuleCondition)>, Vec<CompositeParentRef>)> =
+        serde::Deserialize::deserialize(des)?;
+
+    let result: HashMap<BindRules, Vec<CompositeParentRef>> = HashMap::from_iter(
+        container.into_iter().map(|entry| (BindRules::from_iter(entry.0.into_iter()), entry.1)),
+    );
+    Ok(result)
+}
+
+pub fn serialize_spec_list<S>(
+    spec_list: &HashMap<String, fdf::CompositeInfo>,
+    serializer: S,
+) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    #[derive(Serialize)]
+    struct Wrapper<'a>(#[serde(with = "CompositeInfoDef")] &'a fdf::CompositeInfo);
+
+    let converted = spec_list.iter().map(|(_name, sl)| Wrapper(sl)).collect::<Vec<_>>();
+    serde::Serialize::serialize(&converted, serializer)
+}
+
+fn deserialize_spec_list<'de, D>(
+    deserializer: D,
+) -> Result<HashMap<String, fdf::CompositeInfo>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    #[derive(Deserialize)]
+    struct Wrapper(#[serde(with = "CompositeInfoDef")] fdf::CompositeInfo);
+
+    let wrapper_vec: Vec<Wrapper> = serde::Deserialize::deserialize(deserializer)?;
+    Ok(HashMap::from_iter(wrapper_vec.into_iter().map(|entry| {
+        let name = entry.0.spec.as_ref().and_then(|s| s.name.as_ref()).unwrap().to_owned();
+        (name, entry.0)
+    })))
+}
+
 // The CompositeNodeSpecManager struct is responsible of managing a list of specs
 // for matching.
+#[derive(Serialize, Deserialize, Default)]
+
 pub struct CompositeNodeSpecManager {
     // Maps a list of specs to the bind rules of their nodes. This is to handle multiple
     // specs that share a node with the same bind rules. Used for matching nodes.
+    //
+    // This requires the custom serializer/deserializer as serde does not handle maps
+    // with non-string keys. Both the root HashMap and the inner BTree (BindRules type)
+    // get converted to vectors in the custom serialization and from vectors in the deserialization.
+    #[serde(
+        serialize_with = "serialize_parent_refs",
+        deserialize_with = "deserialize_parent_refs"
+    )]
     pub parent_refs: HashMap<BindRules, Vec<CompositeParentRef>>,
 
     // Maps specs to the name. This list ensures that we don't add multiple specs with
     // the same name.
+    //
+    // This requires a custom serializer/deserializer as the value type is a fidl type without
+    // built-in serde support. We manually create a local duplicate of the type using serde's remote
+    // types feature and use a wrapper type to do the serialization/deserialization for us.
+    #[serde(serialize_with = "serialize_spec_list", deserialize_with = "deserialize_spec_list")]
     pub spec_list: HashMap<String, fdf::CompositeInfo>,
 }
 

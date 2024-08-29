@@ -121,7 +121,7 @@ class EmulatorDevice : public fidl::WireAsyncEventHandler<fuchsia_driver_framewo
   void SendAclPacketToHost(pw::span<const std::byte> buffer);
   void SendIsoPacketToHost(pw::span<const std::byte> buffer);
 
-  pw_random_zircon::ZirconRandomGenerator rng_;
+  pw::random_fuchsia::ZirconRandomGenerator rng_;
 
   // Responsible for running the thread-hostile |fake_device_|
   pw::async_fuchsia::FuchsiaDispatcher pw_dispatcher_;

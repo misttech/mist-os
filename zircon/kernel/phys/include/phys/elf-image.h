@@ -176,7 +176,7 @@ class ElfImage {
   }
 
   // Publish instrumentation VMOs for this module.  The argument is similar
-  // called like HandoffPrep::PublishVmo, which see; PublishDebugdataFunction
+  // called like HandoffPrep::PublishExtraVmo, which see; PublishDebugdataFunction
   // takes different arguments to name the data, so it can be used to compose
   // either a ZBI_TYPE_DEBUGDATA payload or a named VMO.
   void PublishDebugdata(PublishDebugdataFunction publish_debugdata) const;

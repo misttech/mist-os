@@ -5,14 +5,12 @@
 #ifndef SRC_DEVICES_SYSMEM_DRIVERS_SYSMEM_DEVICE_H_
 #define SRC_DEVICES_SYSMEM_DRIVERS_SYSMEM_DEVICE_H_
 
-#include <fidl/fuchsia.hardware.platform.device/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.sysmem/cpp/fidl.h>
 #include <fidl/fuchsia.sysmem/cpp/fidl.h>
 #include <fidl/fuchsia.sysmem2/cpp/fidl.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async/cpp/wait.h>
 #include <lib/closure-queue/closure_queue.h>
-#include <lib/driver/compat/cpp/device_server.h>
 #include <lib/driver/component/cpp/driver_base.h>
 #include <lib/fit/thread_checker.h>
 #include <lib/inspect/cpp/inspect.h>
@@ -28,9 +26,9 @@
 #include <fbl/vector.h>
 #include <region-alloc/region-alloc.h>
 
+#include "src/devices/sysmem/bin/sysmem_connector/sysmem_config.h"
 #include "src/devices/sysmem/drivers/sysmem/memory_allocator.h"
 #include "src/devices/sysmem/drivers/sysmem/snapshot_annotation_register.h"
-#include "src/devices/sysmem/drivers/sysmem/sysmem_config.h"
 #include "src/devices/sysmem/drivers/sysmem/sysmem_metrics.h"
 #include "src/devices/sysmem/drivers/sysmem/usage_pixel_format_cost.h"
 
@@ -38,7 +36,7 @@ namespace sys {
 class ServiceDirectory;
 }  // namespace sys
 
-namespace sysmem_driver {
+namespace sysmem_service {
 
 class Device;
 class BufferCollectionToken;
@@ -58,26 +56,31 @@ struct Settings {
 // to notice when/if sysmem crashes, and to set a (limited) service directory for sysmem to use to
 // connect to Cobalt. DriverConnector is not for use by other drivers.
 //
-// Driver clients of sysmem connect via fuchsia_hardware_sysmem::Service.
+// Driver clients of sysmem also connect via sysmem-connector.
 //
 // The fuchsia_hardware_sysmem::Sysmem protocol is used by the securemem driver and by external
 // heaps such as goldfish.
 //
-// The Device loads on the sysmem node, with one owned child node that exists only for the devfs
-// entry.
-class Device final : public fdf::DriverBase,
-                     public MemoryAllocator::Owner,
-                     public fidl::Server<fuchsia_device_fs::Connector>,
-                     public fidl::Server<fuchsia_hardware_sysmem::DriverConnector>,
+// TODO(b/362587923): Rename this class to "Sysmem".
+class Device final : public MemoryAllocator::Owner,
                      public fidl::Server<fuchsia_hardware_sysmem::Sysmem> {
  public:
-  Device(fdf::DriverStartArgs start_args, fdf::UnownedSynchronizedDispatcher driver_dispatcher);
-  zx::result<> Start() override;
+  struct CreateArgs {
+    bool create_bti = false;
+    bool expect_structured_config = false;
+    bool serve_outgoing = false;
+  };
+  static zx::result<std::unique_ptr<Device>> Create(async_dispatcher_t* dispatcher,
+                                                    const CreateArgs& create_args);
 
-  ~Device() __TA_REQUIRES(*driver_checker_);
+  // Use Create() instead.
+  Device(async_dispatcher_t* dispatcher);
+
+  ~Device() __TA_REQUIRES(client_checker_);
 
   // currently public only for tests
-  [[nodiscard]] zx_status_t Initialize() __TA_REQUIRES(*driver_checker_);
+  [[nodiscard]] zx::result<> Initialize(const CreateArgs& create_args)
+      __TA_REQUIRES(client_checker_);
 
   zx::result<zx::resource> GetInfoResource();
 
@@ -92,12 +95,14 @@ class Device final : public fdf::DriverBase,
   //
 
   [[nodiscard]] zx_status_t RegisterHeapInternal(
-      fuchsia_sysmem2::Heap heap, fidl::ClientEnd<fuchsia_hardware_sysmem::Heap> heap_connection);
+      fuchsia_sysmem2::Heap heap, fidl::ClientEnd<fuchsia_hardware_sysmem::Heap> heap_connection)
+      __TA_REQUIRES(client_checker_);
   // Also called directly by a test.
   [[nodiscard]] zx_status_t RegisterSecureMemInternal(
-      fidl::ClientEnd<fuchsia_sysmem2::SecureMem> secure_mem_connection);
+      fidl::ClientEnd<fuchsia_sysmem2::SecureMem> secure_mem_connection)
+      __TA_REQUIRES(client_checker_);
   // Also called directly by a test.
-  [[nodiscard]] zx_status_t UnregisterSecureMemInternal();
+  [[nodiscard]] zx_status_t UnregisterSecureMemInternal() __TA_REQUIRES(client_checker_);
 
   // MemoryAllocator::Owner implementation.
   [[nodiscard]] const zx::bti& bti() override;
@@ -110,26 +115,13 @@ class Device final : public fdf::DriverBase,
 
   inspect::Node* heap_node() override { return &heaps_; }
 
-  // fuchsia_device_fs::Connector impl
-  void Connect(ConnectRequest& request, ConnectCompleter::Sync& completer) override;
+  zx::result<> BeginServing() __TA_REQUIRES(*loop_checker_);
 
-  // fuchsia_hardware_sysmem::DriverConnector impl
-  void ConnectV1(ConnectV1Request& request, ConnectV1Completer::Sync& completer) override;
-  void ConnectV2(ConnectV2Request& request, ConnectV2Completer::Sync& completer) override;
-  void ConnectSysmem(ConnectSysmemRequest& request,
-                     ConnectSysmemCompleter::Sync& completer) override;
-  void SetAuxServiceDirectory(SetAuxServiceDirectoryRequest& request,
-                              SetAuxServiceDirectoryCompleter::Sync& completer) override;
-
-  // fuchsia_hardware_sysmem::Sysmem impl
+  // fuchsia_hardware_sysmem::Sysmem impl; these run on client_dispatcher_.
   void RegisterHeap(RegisterHeapRequest& request, RegisterHeapCompleter::Sync& completer) override;
   void RegisterSecureMem(RegisterSecureMemRequest& request,
                          RegisterSecureMemCompleter::Sync& completer) override;
   void UnregisterSecureMem(UnregisterSecureMemCompleter::Sync& completer) override;
-
-  [[nodiscard]] uint32_t pdev_device_info_vid();
-
-  [[nodiscard]] uint32_t pdev_device_info_pid();
 
   // Track/untrack the token by the koid of the server end of its FIDL channel. TrackToken() is only
   // allowed after/during token->OnServerKoid(). UntrackToken() is allowed even if there was never a
@@ -161,11 +153,9 @@ class Device final : public fdf::DriverBase,
   [[nodiscard]] const fuchsia_hardware_sysmem::HeapProperties* GetHeapProperties(
       const fuchsia_sysmem2::Heap& heap) const;
 
-  // This is the dispatcher the driver is created with.
-  [[nodiscard]] async_dispatcher_t* driver_dispatcher() { return fdf::DriverBase::dispatcher(); }
-
   // This is the dispatcher we run most of sysmem on (at least for now).
-  [[nodiscard]] async_dispatcher_t* loop_dispatcher() { return loop_.async_dispatcher(); }
+  [[nodiscard]] async_dispatcher_t* loop_dispatcher() { return loop_.dispatcher(); }
+  [[nodiscard]] async_dispatcher_t* client_dispatcher() { return client_dispatcher_; }
 
   [[nodiscard]] std::unordered_set<LogicalBufferCollection*>& logical_buffer_collections() {
     std::lock_guard checker(*loop_checker_);
@@ -192,7 +182,7 @@ class Device final : public fdf::DriverBase,
 
   [[nodiscard]] const Settings& settings() const { return settings_; }
 
-  void ResetThreadCheckerForTesting() { loop_checker_.emplace(loop_.async_dispatcher()); }
+  void ResetThreadCheckerForTesting() { loop_checker_.emplace(); }
 
   bool protected_ranges_disable_dynamic() const override {
     std::lock_guard checker(*loop_checker_);
@@ -232,6 +222,13 @@ class Device final : public fdf::DriverBase,
     std::ignore = async::PostTask(loop_dispatcher(), std::move(to_run));
   }
 
+  template <typename F>
+  void PostTaskToClientDispatcher(F to_run) {
+    // This either succeeds, or fails because we're shutting down a test. We never actually shut
+    // down the real sysmem.
+    std::ignore = async::PostTask(client_dispatcher(), std::move(to_run));
+  }
+
   // Runs `to_run` on the sysmem `loop_` dispatcher and waits for `to_run` to finish.
   //
   // Must not be called from the `loop_` dispatcher, and `to_run` must not call `RunSyncOnLoop()` or
@@ -240,6 +237,16 @@ class Device final : public fdf::DriverBase,
   void RunSyncOnLoop(F to_run) {
     libsync::Completion done;
     PostTask([&done, to_run = std::move(to_run)]() mutable {
+      std::move(to_run)();
+      done.Signal();
+    });
+    done.Wait();
+  }
+
+  template <typename F>
+  void RunSyncOnClientDispatcher(F to_run) {
+    libsync::Completion done;
+    PostTaskToClientDispatcher([&done, to_run = std::move(to_run)]() mutable {
       std::move(to_run)();
       done.Signal();
     });
@@ -290,8 +297,11 @@ class Device final : public fdf::DriverBase,
   fidl::ServerBindingGroup<fuchsia_sysmem2::Allocator>& v2_allocators() { return v2_allocators_; }
 
   // public for tests
-  mutable std::optional<async::synchronization_checker> driver_checker_;
-  mutable std::optional<async::synchronization_checker> loop_checker_;
+  //
+  // The client_dispatcher_ has a single thread. This checks we're on that thread.
+  mutable fit::thread_checker client_checker_;
+  // Checks we're on the one loop_ thread.
+  mutable std::optional<fit::thread_checker> loop_checker_;
   fidl::ServerBindingGroup<fuchsia_hardware_sysmem::Sysmem>& BindingsForTest() { return bindings_; }
 
   const UsagePixelFormatCost& usage_pixel_format_cost() {
@@ -301,6 +311,9 @@ class Device final : public fdf::DriverBase,
 
   // Iff callback returns false, stop iterating and return.
   void ForeachSecureHeap(fit::function<bool(const fuchsia_sysmem2::Heap&)> callback);
+
+  zx::result<zx::bti> CreateBti() __TA_REQUIRES(client_checker_);
+  zx::bti& mutable_bti_for_testing() { return bti_; }
 
  private:
   class SecureMemConnection {
@@ -334,15 +347,20 @@ class Device final : public fdf::DriverBase,
   void LogCollectionsTimer(async_dispatcher_t* dispatcher, async::TaskBase* task,
                            zx_status_t status);
 
-  void DdkUnbindInternal() __TA_REQUIRES(*driver_checker_);
+  void Shutdown() __TA_REQUIRES(client_checker_);
 
   zx::result<fuchsia_sysmem2::Config> GetConfigFromFile();
 
   inspect::Inspector inspector_;
 
-  // Other than DDK call-ins, everything runs on the loop_ thread.
-  fdf::SynchronizedDispatcher loop_;
-  libsync::Completion loop_shut_down_;
+  // We use this dispatcher to serve fuchsia_hardware_sysmem::Sysmem, since that needs to be on a
+  // separate dispatcher from loop_.dispatcher() (at least for now).
+  async_dispatcher_t* client_dispatcher_ = nullptr;
+
+  // Other than client call-ins and the fuchsia.hardware.Sysmem protocol, everything runs on the
+  // loop_ thread.
+  async::Loop loop_;
+  thrd_t loop_thrd_{};
 
   // Currently located at bootstrap/driver_manager:root/sysmem.
   inspect::Node sysmem_root_;
@@ -350,12 +368,8 @@ class Device final : public fdf::DriverBase,
 
   inspect::Node collections_node_;
 
-  fidl::WireSyncClient<fuchsia_hardware_platform_device::Device> pdev_;
+  // In some unit tests, !bti_.is_valid() or bti_ is a fake BTI.
   zx::bti bti_;
-
-  // Initialize these to a value that won't be mistaken for a real vid or pid.
-  uint32_t pdev_device_info_vid_ = std::numeric_limits<uint32_t>::max();
-  uint32_t pdev_device_info_pid_ = std::numeric_limits<uint32_t>::max();
 
   // This map allows us to look up the BufferCollectionToken by the koid of
   // the server end of a BufferCollectionToken channel.
@@ -463,17 +477,8 @@ class Device final : public fdf::DriverBase,
   async::TaskMethod<Device, &Device::LogCollectionsTimer> log_all_collections_{this};
 
   fidl::ServerBindingGroup<fuchsia_hardware_sysmem::Sysmem> bindings_;
-
-  fidl::ServerBindingGroup<fuchsia_device_fs::Connector> devfs_connector_;
-  fidl::ServerBindingGroup<fuchsia_hardware_sysmem::DriverConnector> driver_connectors_;
   fidl::ServerBindingGroup<fuchsia_sysmem::Allocator> v1_allocators_;
   fidl::ServerBindingGroup<fuchsia_sysmem2::Allocator> v2_allocators_;
-
-  std::optional<fdf::OwnedChildNode> devfs_owned_child_node_;
-
-  compat::SyncInitializedDeviceServer compat_server_;
-
-  fidl::SyncClient<fuchsia_driver_framework::NodeController> compat_node_controller_client_;
 
   std::optional<const UsagePixelFormatCost> usage_pixel_format_cost_;
 
@@ -482,8 +487,10 @@ class Device final : public fdf::DriverBase,
   // in secure_allocators_. At that point secure_allocators_ owns the allocator and we reset() this
   // field.
   std::unique_ptr<ContiguousPooledMemoryAllocator> pending_protected_allocator_;
+
+  std::optional<component::OutgoingDirectory> outgoing_ __TA_GUARDED(*loop_checker_);
 };
 
-}  // namespace sysmem_driver
+}  // namespace sysmem_service
 
 #endif  // SRC_DEVICES_SYSMEM_DRIVERS_SYSMEM_DEVICE_H_

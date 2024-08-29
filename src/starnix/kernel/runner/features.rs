@@ -11,7 +11,6 @@ use anyhow::{anyhow, Error};
 use bstr::BString;
 #[cfg(not(feature = "starnix_lite"))]
 use fuchsia_zircon as zx;
-use selinux_core::security_server;
 #[cfg(not(feature = "starnix_lite"))]
 use starnix_core::device::android::bootloader_message_store::android_bootloader_message_store_init;
 #[cfg(not(feature = "starnix_lite"))]
@@ -57,16 +56,13 @@ use {
 pub struct Features {
     pub kernel: KernelFeatures,
 
-    /// Configures whether SELinux is fully enabled, faked, or unavailable.
-    pub selinux: Option<security_server::Mode>,
+    pub selinux: bool,
 
     #[cfg(not(feature = "starnix_lite"))]
     pub ashmem: bool,
 
     #[cfg(not(feature = "starnix_lite"))]
     pub framebuffer: bool,
-    #[cfg(not(feature = "starnix_lite"))]
-    pub framebuffer2: bool,
 
     #[cfg(not(feature = "starnix_lite"))]
     pub gralloc: bool,
@@ -142,8 +138,6 @@ pub fn parse_features(entries: &Vec<String>) -> Result<Features, Error> {
             #[cfg(not(feature = "starnix_lite"))]
             ("framebuffer", _) => features.framebuffer = true,
             #[cfg(not(feature = "starnix_lite"))]
-            ("framebuffer2", _) => features.framebuffer2 = true,
-            #[cfg(not(feature = "starnix_lite"))]
             ("gralloc", _) => features.gralloc = true,
             #[cfg(not(feature = "starnix_lite"))]
             ("magma", _) => features.magma = true,
@@ -163,14 +157,7 @@ pub fn parse_features(entries: &Vec<String>) -> Result<Features, Error> {
             }
             ("rootfs_rw", _) => features.rootfs_rw = true,
             ("self_profile", _) => features.self_profile = true,
-            ("selinux", mode_arg) => features.selinux = match mode_arg.as_ref() {
-                Some(mode) => if mode == "fake" {
-                    Some(security_server::Mode::Fake)
-                } else {
-                    return Err(anyhow!("Invalid SELinux mode"));
-                },
-                None => Some(security_server::Mode::Enable),
-            },
+            ("selinux", _) => features.selinux = true,
             ("test_data", _) => features.test_data = true,
             (f, _) => {
                 return Err(anyhow!("Unsupported feature: {}", f));
@@ -193,7 +180,7 @@ pub fn run_container_features(
     let mut enabled_profiling = false;
 
     #[cfg(not(feature = "starnix_lite"))]
-    if features.framebuffer || features.framebuffer2 {
+    if features.framebuffer {
         fb_device_init(locked, system_task);
 
         let (touch_source_proxy, touch_source_stream) = fidl::endpoints::create_sync_proxy();
@@ -248,12 +235,7 @@ pub fn run_container_features(
         touch_policy_device.clone().register(locked, &kernel.kthreads.system_task());
         touch_policy_device.start_relay(&kernel, touch_standby_receiver);
 
-        if features.framebuffer2 {
-            kernel
-                .framebuffer
-                .start_server(kernel, None)
-                .expect("Failed to start framebuffer server");
-        }
+        kernel.framebuffer.start_server(kernel, None).expect("Failed to start framebuffer server");
     }
     #[cfg(not(feature = "starnix_lite"))]
     if features.gralloc {

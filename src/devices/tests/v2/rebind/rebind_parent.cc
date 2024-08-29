@@ -16,6 +16,8 @@
 #include <string>
 #include <unordered_map>
 
+#include <bind/fuchsia/cpp/bind.h>
+
 #include "lib/zx/result.h"
 
 namespace rebind_parent {
@@ -50,7 +52,7 @@ class RebindParentServer : public fidl::Server<fuchsia_rebind_test::RebindParent
     fidl::Arena arena;
 
     auto properties = fidl::VectorView<fuchsia_driver_framework::wire::NodeProperty>(arena, 1);
-    properties[0] = fdf::MakeProperty(arena, BIND_PROTOCOL, 1234);
+    properties[0] = fdf::MakeProperty(arena, bind_fuchsia::PROTOCOL, 1234u);
 
     auto args = fuchsia_driver_framework::wire::NodeAddArgs::Builder(arena)
                     .name(arena, kChildNodeName)

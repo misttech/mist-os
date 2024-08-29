@@ -82,6 +82,8 @@ class PDev {
 
   bool is_valid() const { return pdev_.is_valid(); }
 
+  // TODO(b/358361345): Add function to retrieve and apply power configuration.
+
  private:
   fidl::WireSyncClient<fuchsia_hardware_platform_device::Device> pdev_;
 };

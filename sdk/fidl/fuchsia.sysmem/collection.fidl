@@ -5,6 +5,7 @@ library fuchsia.sysmem;
 
 using zx;
 
+@available(added=7, deprecated=23, note="use fuchsia.sysmem2")
 const MAX_COUNT_DUPLICATES uint32 = 64;
 
 /// Actually creating this many children isn't recommended in most typical
@@ -15,14 +16,14 @@ const MAX_COUNT_DUPLICATES uint32 = 64;
 /// settable via these protocols.  The maximum number of total nodes in a sysmem
 /// token tree is limited to a separate maximum that is not settable via these
 /// protocols.
-@available(added=9)
+@available(added=9, deprecated=23, note="use fuchsia.sysmem2")
 const MAX_COUNT_CREATE_CHILDREN int32 = 64;
 
 // A protocol mixin for all nodes in the tree established by
 // BufferCollectionToken creation and BufferCollectionTokenGroup creation,
 // including BufferCollectionToken(s) which have since been converted to a
 // BufferCollection channel.
-@available(added=9)
+@available(added=9, deprecated=23, note="use fuchsia.sysmem2")
 closed protocol Node {
     // Sync()
     //
@@ -59,7 +60,6 @@ closed protocol Node {
     /// know that this token is/was valid, or BufferCollectionToken.Sync() may
     /// hang forever.  See ValidateBufferCollectionToken() to check token
     /// validity first if the token isn't already known to be (is/was) valid.
-    @available(added=9)
     strict Sync() -> ();
 
     // Close()
@@ -106,14 +106,12 @@ closed protocol Node {
     /// constraints remain intact (just as they would if the
     /// BufferCollectionTokenGroup channel had remained open), and the close
     /// doesn't trigger or propagate failure.
-    @available(added=9)
     strict Close();
 
     /// Set a name for VMOs in this buffer collection. The name may be truncated
     /// shorter. The name only affects VMOs allocated after it's set - this call
     /// does not rename existing VMOs. If multiple clients set different names
     /// then the larger priority value will win.
-    @available(added=9)
     strict SetName(struct {
         priority uint32;
         name string:64;
@@ -141,7 +139,6 @@ closed protocol Node {
     /// info directly relevant to the current client.  Also, SetVerboseLogging()
     /// can be used to help disambiguate if a Node is suspected of having info
     /// that was copied from its parent.
-    @available(added=9)
     strict SetDebugClientInfo(struct {
         name string:64;
         id uint64;
@@ -151,7 +148,6 @@ closed protocol Node {
     /// after creating a collection. Clients can call this method to change
     /// when the log is printed. If multiple client set the deadline, it's
     /// unspecified which deadline will take effect.
-    @available(added=9)
     strict SetDebugTimeoutLogDeadline(struct {
         deadline zx.Time;
     });
@@ -186,7 +182,6 @@ closed protocol Node {
     /// This may be a NOP for some nodes due to intentional policy associated
     /// with the node, if we don't trust a node enough to let it turn on verbose
     /// logging.
-    @available(added=9)
     strict SetVerboseLogging();
 
     // GetNodeRef()
@@ -201,7 +196,6 @@ closed protocol Node {
     /// potentially being on different channels.
     ///
     /// See also IsAlternateFor().
-    @available(added=9)
     strict GetNodeRef() -> (resource struct {
         node_ref zx.Handle:EVENT;
     });
@@ -286,7 +280,6 @@ closed protocol Node {
     ///     Node(s) has a direct or indirect parent BufferCollectionTokenGroup
     ///     which selects a child sub-tree other than the sub-tree containing
     ///     the calling Node or node_ref Node.
-    @available(added=9)
     strict IsAlternateFor(resource struct {
         node_ref zx.Handle:EVENT;
     }) -> (struct {
@@ -301,9 +294,20 @@ closed protocol Node {
 /// We use a channel for the BufferCollectionToken instead of a single eventpair
 /// (pair) because this way we can detect error conditions like a participant
 /// dying mid-create.
+///
+/// The fuchsia.sysmem.BufferCollectionToken type is not yet deprecated due to
+/// its use in some other protocols (for now), but all the internals of
+/// fuchsia.sysmem.BufferCollectionToken are deprecated. Token channels serve
+/// both fuchsia.sysmem.BufferCollectionToken and
+/// fuchsia.sysmem2.BufferCollectionToken.
+///
+/// This protocol will be deprecated once other protocols have switched their
+/// token fields to fuchsia.sysmem2.BufferCollectionToken.
+//
 // LINT.IfChange
+@available(added=7)
 closed protocol BufferCollectionToken {
-    @available(added=9)
+    @available(added=9, deprecated=23, note="use fuchsia.sysmem2")
     compose Node;
 
     // See Node for non-deprecated equivalents.  Re-building existing code will
@@ -356,6 +360,7 @@ closed protocol BufferCollectionToken {
     /// participant to gain rights that the participant doesn't already have.
     /// The value ZX_RIGHT_SAME_RIGHTS can be used to specify that no
     /// attenuation should be applied.
+    @available(added=7, deprecated=23, note="use fuchsia.sysmem2")
     strict DuplicateSync(struct {
         rights_attenuation_masks vector<zx.Rights>:MAX_COUNT_DUPLICATES;
     }) -> (resource struct {
@@ -403,6 +408,7 @@ closed protocol BufferCollectionToken {
     /// `token_request` is the server end of a BufferCollectionToken channel.
     /// The client end of this channel acts as another participant in creating the
     /// shared BufferCollection.
+    @available(added=7, deprecated=23, note="use fuchsia.sysmem2")
     strict Duplicate(resource struct {
         rights_attenuation_mask uint32;
         token_request server_end:BufferCollectionToken;
@@ -461,6 +467,7 @@ closed protocol BufferCollectionToken {
     /// be used to replace the failed dispensable token.
     ///
     /// SetDispensable() on an already-dispensable token is idempotent.
+    @available(added=7, deprecated=23, note="use fuchsia.sysmem2")
     strict SetDispensable();
 
     // CreateBufferCollectionTokenGroup()
@@ -484,7 +491,7 @@ closed protocol BufferCollectionToken {
     ///
     /// group_request - the server end of a BufferCollectionTokenGroup channel
     /// to be served by sysmem.
-    @available(added=9)
+    @available(added=9, deprecated=23, note="use fuchsia.sysmem2")
     strict CreateBufferCollectionTokenGroup(resource struct {
         group_request server_end:BufferCollectionTokenGroup;
     });
@@ -519,6 +526,7 @@ closed protocol BufferCollectionToken {
 /// memory fragmentation and avoid overlap of buffer allocation lifetimes for
 /// the old and new collections. Collections can be large enough that it's worth
 /// avoiding allocation overlap (in time).
+@available(added=7, deprecated=23, note="use fuchsia.sysmem2.BufferCollection")
 closed protocol BufferCollection {
     @available(added=9)
     compose Node;
@@ -628,11 +636,11 @@ closed protocol BufferCollection {
     strict CheckSingleBufferAllocated(struct {
         buffer_index uint64;
     });
-    @available(deprecated=9, removed=HEAD)
+    @available(deprecated=9, removed=23)
     strict SetConstraintsAuxBuffers(struct {
         constraints BufferCollectionConstraintsAuxBuffers;
     });
-    @available(deprecated=9, removed=HEAD)
+    @available(deprecated=9, removed=23)
     strict GetAuxBuffers() -> (resource struct {
         status zx.Status;
         buffer_collection_info_aux_buffers BufferCollectionInfo_2;
@@ -854,7 +862,7 @@ closed protocol BufferCollection {
 /// SetDispensable() or AttachToken() and the BufferCollectionTokenGroup is part
 /// of a sub-tree under such a node that doesn't propagate failure to its
 /// parent).
-@available(added=9)
+@available(added=9, deprecated=23, note="use fuchsia.sysmem2")
 closed protocol BufferCollectionTokenGroup {
     compose Node;
 

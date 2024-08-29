@@ -487,6 +487,7 @@ impl SoftStreamConfig {
                 responder.send(&delay_info)?;
                 self.delay_info_replied = true;
             }
+            RingBufferRequest::_UnknownMethod { .. } => (),
         }
         Ok(())
     }

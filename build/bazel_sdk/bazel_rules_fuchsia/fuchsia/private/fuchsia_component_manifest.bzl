@@ -10,6 +10,17 @@ load(
     "FuchsiaComponentManifestShardInfo",
 )
 
+_COMMON_CMC_ATTRIBUTES = {
+    # This is to get the coverage.shard.cml in the SDK, so it can be merged
+    # in when coverage is enabled.
+    "_sdk_coverage_shard": attr.label(
+        default = "@fuchsia_sdk//pkg/sys/testing:coverage",
+    ),
+}
+
+def _component_name_from_cml_file(cml_file):
+    return cml_file.basename[:-4]
+
 def _fuchsia_component_manifest_shard_collection_impl(ctx):
     return FuchsiaComponentManifestShardCollectionInfo(
         shards = [dep for dep in ctx.attr.deps],
@@ -54,36 +65,16 @@ fuchsia_component_manifest_shard = rule(
     },
 )
 
-def _fuchsia_component_manifest_impl(ctx):
+def _compile_component_manifest(ctx, manifest_in, component_name, includes_in):
     sdk = ctx.toolchains["@fuchsia_sdk//fuchsia:toolchain"]
-    if not (ctx.file.src or ctx.attr.content):
-        fail("Either 'src' or 'content' needs to be specified.")
-
-    if ctx.file.src and ctx.attr.content:
-        fail("Only one of 'src' and 'content' can be specified.")
-
-    if ctx.attr.content and not ctx.attr.component_name:
-        fail("When 'content' is specified, 'component_name' must also be specified.")
-
-    component_name = ctx.attr.component_name or ctx.file.src.basename[:-4]
-    config_package_path = "meta/%s.cvf" % component_name
-
-    if ctx.file.src:
-        manifest_in = ctx.file.src
-    else:
-        manifest_in = ctx.actions.declare_file("%s.cml" % component_name)
-        ctx.actions.write(
-            output = manifest_in,
-            content = ctx.attr.content,
-            is_executable = False,
-        )
 
     # output should have the .cm extension
     manifest_out = ctx.actions.declare_file("meta/{}.cm".format(component_name))
+    config_package_path = "meta/%s.cvf" % component_name
 
     if ctx.configuration.coverage_enabled:
         coverage_shard = ctx.attr._sdk_coverage_shard[FuchsiaComponentManifestShardInfo]
-        manifest_merged = ctx.actions.declare_file("%s_merged.cml" % manifest_in.basename[:-4])
+        manifest_merged = ctx.actions.declare_file("%s_merged.cml" % _component_name_from_cml_file(manifest_in))
         ctx.actions.run(
             executable = sdk.cmc,
             arguments = [
@@ -104,7 +95,7 @@ def _fuchsia_component_manifest_impl(ctx):
     # use a dict to eliminate workspace root duplicates
     include_path_dict = {}
     includes = []
-    for dep in ctx.attr.includes + sdk.cmc_includes[FuchsiaComponentManifestShardCollectionInfo].shards:
+    for dep in includes_in + sdk.cmc_includes[FuchsiaComponentManifestShardCollectionInfo].shards:
         if FuchsiaComponentManifestShardInfo in dep:
             shard = dep[FuchsiaComponentManifestShardInfo]
             includes.append(shard.file)
@@ -139,10 +130,34 @@ def _fuchsia_component_manifest_impl(ctx):
     return [
         DefaultInfo(files = depset([manifest_out])),
         FuchsiaComponentManifestInfo(
-            component_name = ctx.attr.component_name,
+            compiled_manifest = manifest_out,
+            component_name = component_name,
             config_package_path = config_package_path,
         ),
     ]
+
+def _fuchsia_component_manifest_impl(ctx):
+    if not (ctx.file.src or ctx.attr.content):
+        fail("Either 'src' or 'content' needs to be specified.")
+
+    if ctx.file.src and ctx.attr.content:
+        fail("Only one of 'src' and 'content' can be specified.")
+
+    if ctx.attr.content and not ctx.attr.component_name:
+        fail("When 'content' is specified, 'component_name' must also be specified.")
+
+    component_name = ctx.attr.component_name or _component_name_from_cml_file(ctx.file.src)
+
+    if ctx.file.src:
+        manifest_in = ctx.file.src
+    else:
+        manifest_in = ctx.actions.declare_file("%s.cml" % component_name)
+        ctx.actions.write(
+            output = manifest_in,
+            content = ctx.attr.content,
+        )
+
+    return _compile_component_manifest(ctx, manifest_in, component_name, ctx.attr.includes)
 
 _fuchsia_component_manifest = rule(
     doc = """Compiles a component manifest from a input file.
@@ -174,12 +189,7 @@ src file and included in the includes attribute.
             doc = "A list of dependencies which are included in the src cml",
             providers = [FuchsiaComponentManifestShardInfo],
         ),
-        # This is to get the coverage.shard.cml in the SDK, so it can be merged
-        # in when coverage is enabled.
-        "_sdk_coverage_shard": attr.label(
-            default = "@fuchsia_sdk//pkg/sys/testing:coverage",
-        ),
-    },
+    } | _COMMON_CMC_ATTRIBUTES,
 )
 
 def fuchsia_component_manifest(*, name, tags = ["manual"], **kwargs):
@@ -188,3 +198,36 @@ def fuchsia_component_manifest(*, name, tags = ["manual"], **kwargs):
         tags = tags,
         **kwargs
     )
+
+def _ensure_compiled_component_manifest_impl(ctx):
+    if FuchsiaComponentManifestInfo in ctx.attr.dep:
+        # This is already a compiled manifest so just return the providers.
+        return [
+            ctx.attr.dep[DefaultInfo],
+            ctx.attr.dep[FuchsiaComponentManifestInfo],
+        ]
+    else:
+        return _compile_component_manifest(
+            ctx,
+            ctx.file.dep,
+            _component_name_from_cml_file(ctx.file.dep),
+            [],
+        )
+
+ensure_compiled_component_manifest = rule(
+    implementation = _ensure_compiled_component_manifest_impl,
+    doc = """Checks to see if dep is a compiled manifest or plain file.
+
+    This rule is not intended for general usage but is meant to be used in the
+    fuchsia_component macros to ensure that the target that is passed in as the
+    manifest gets compiled.
+    """,
+    toolchains = ["@fuchsia_sdk//fuchsia:toolchain"],
+    attrs = {
+        "dep": attr.label(
+            doc = "The dependency to check. This should either be a plain cml file or a fuchsia_component_manifest target.",
+            allow_single_file = [".cml", ".cm"],
+        ),
+    } | _COMMON_CMC_ATTRIBUTES,
+    provides = [FuchsiaComponentManifestInfo],
+)

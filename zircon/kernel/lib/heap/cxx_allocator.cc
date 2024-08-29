@@ -34,11 +34,11 @@ void operator delete[](void* p, std::size_t s, std::align_val_t align) { sized_f
 // default-visibility definitions regardless of all the ways to tell it to use
 // hidden visibility.  So there is nothing left but to go around the compiler's
 // back and force them to .hidden via assembler directives.
-asm(".hidden _ZdaPv");
-asm(".hidden _ZdaPvm");
-asm(".hidden _ZdlPv");
-asm(".hidden _ZdlPvm");
-asm(".hidden _ZdlPvSt11align_val_t");
-asm(".hidden _ZdaPvSt11align_val_t");
-asm(".hidden _ZdlPvmSt11align_val_t");
-asm(".hidden _ZdaPvmSt11align_val_t");
+__asm__(".hidden _ZdaPv");
+__asm__(".hidden _ZdaPvm");
+__asm__(".hidden _ZdlPv");
+__asm__(".hidden _ZdlPvm");
+__asm__(".hidden _ZdlPvSt11align_val_t");
+__asm__(".hidden _ZdaPvSt11align_val_t");
+__asm__(".hidden _ZdlPvmSt11align_val_t");
+__asm__(".hidden _ZdaPvmSt11align_val_t");

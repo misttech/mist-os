@@ -57,7 +57,11 @@ void FakeController::Settings::ApplyDualModeDefaults() {
   SetBit(&lmp_features_page0, hci_spec::LMPFeature::kExtendedFeatures);
   SetBit(&lmp_features_page0, hci_spec::LMPFeature::kRSSIwithInquiryResults);
   SetBit(&lmp_features_page0, hci_spec::LMPFeature::kExtendedInquiryResponse);
+  SetBit(&lmp_features_page0,
+         hci_spec::LMPFeature::kSecureSimplePairingControllerSupport);
   lmp_features_page1 = 0;
+  SetBit(&lmp_features_page1,
+         hci_spec::LMPFeature::kSecureSimplePairingHostSupport);
   lmp_features_page2 = 0;
   le_features = 0;
   le_supported_states = 0;
@@ -1649,12 +1653,14 @@ void FakeController::OnLEReadBufferSizeV2() {
 }
 
 void FakeController::OnLEReadSupportedStates() {
-  hci_spec::LEReadSupportedStatesReturnParams params;
-  params.status = pwemb::StatusCode::SUCCESS;
-  params.le_states = pw::bytes::ConvertOrderTo(cpp20::endian::little,
-                                               settings_.le_supported_states);
-  RespondWithCommandComplete(hci_spec::kLEReadSupportedStates,
-                             BufferView(&params, sizeof(params)));
+  auto packet = hci::EmbossEventPacket::New<
+      pwemb::LEReadSupportedStatesCommandCompleteEventWriter>(
+      hci_spec::kCommandCompleteEventCode);
+  auto view = packet.view_t();
+  view.status().Write(pwemb::StatusCode::SUCCESS);
+  view.le_states().BackingStorage().WriteLittleEndianUInt<64>(
+      settings_.le_supported_states);
+  RespondWithCommandComplete(pwemb::OpCode::LE_READ_SUPPORTED_STATES, &packet);
 }
 
 void FakeController::OnLEReadLocalSupportedFeatures() {
@@ -1752,17 +1758,20 @@ void FakeController::OnWriteSimplePairingMode(
 }
 
 void FakeController::OnReadSimplePairingMode() {
-  hci_spec::ReadSimplePairingModeReturnParams params;
-  params.status = pwemb::StatusCode::SUCCESS;
+  auto event_packet = hci::EmbossEventPacket::New<
+      pwemb::ReadSimplePairingModeCommandCompleteEventWriter>(
+      hci_spec::kCommandCompleteEventCode);
+  auto view = event_packet.view_t();
+  view.status().Write(pwemb::StatusCode::SUCCESS);
   if (CheckBit(settings_.lmp_features_page1,
                hci_spec::LMPFeature::kSecureSimplePairingHostSupport)) {
-    params.simple_pairing_mode = pwemb::GenericEnableParam::ENABLE;
+    view.simple_pairing_mode().Write(pwemb::GenericEnableParam::ENABLE);
   } else {
-    params.simple_pairing_mode = pwemb::GenericEnableParam::DISABLE;
+    view.simple_pairing_mode().Write(pwemb::GenericEnableParam::DISABLE);
   }
 
-  RespondWithCommandComplete(hci_spec::kReadSimplePairingMode,
-                             BufferView(&params, sizeof(params)));
+  RespondWithCommandComplete(pwemb::OpCode::READ_SIMPLE_PAIRING_MODE,
+                             &event_packet);
 }
 
 void FakeController::OnWritePageScanType(
@@ -1773,11 +1782,13 @@ void FakeController::OnWritePageScanType(
 }
 
 void FakeController::OnReadPageScanType() {
-  hci_spec::ReadPageScanTypeReturnParams params;
-  params.status = pwemb::StatusCode::SUCCESS;
-  params.page_scan_type = page_scan_type_;
-  RespondWithCommandComplete(hci_spec::kReadPageScanType,
-                             BufferView(&params, sizeof(params)));
+  auto event_packet = hci::EmbossEventPacket::New<
+      pwemb::ReadPageScanTypeCommandCompleteEventWriter>(
+      hci_spec::kCommandCompleteEventCode);
+  auto view = event_packet.view_t();
+  view.status().Write(pwemb::StatusCode::SUCCESS);
+  view.page_scan_type().Write(page_scan_type_);
+  RespondWithCommandComplete(pwemb::OpCode::READ_PAGE_SCAN_TYPE, &event_packet);
 }
 
 void FakeController::OnWriteInquiryMode(
@@ -1813,14 +1824,15 @@ void FakeController::OnWritePageScanActivity(
 }
 
 void FakeController::OnReadPageScanActivity() {
-  hci_spec::ReadPageScanActivityReturnParams params;
-  params.status = pwemb::StatusCode::SUCCESS;
-  params.page_scan_interval =
-      pw::bytes::ConvertOrderTo(cpp20::endian::little, page_scan_interval_);
-  params.page_scan_window =
-      pw::bytes::ConvertOrderTo(cpp20::endian::little, page_scan_window_);
-  RespondWithCommandComplete(hci_spec::kReadPageScanActivity,
-                             BufferView(&params, sizeof(params)));
+  auto event_packet = hci::EmbossEventPacket::New<
+      pwemb::ReadPageScanActivityCommandCompleteEventWriter>(
+      hci_spec::kCommandCompleteEventCode);
+  auto view = event_packet.view_t();
+  view.status().Write(pwemb::StatusCode::SUCCESS);
+  view.page_scan_interval().Write(page_scan_interval_);
+  view.page_scan_window().Write(page_scan_window_);
+  RespondWithCommandComplete(pwemb::OpCode::READ_PAGE_SCAN_ACTIVITY,
+                             &event_packet);
 }
 
 void FakeController::OnWriteScanEnable(
@@ -1841,14 +1853,15 @@ void FakeController::OnReadScanEnable() {
 }
 
 void FakeController::OnReadLocalName() {
-  hci_spec::ReadLocalNameReturnParams params;
-  params.status = pwemb::StatusCode::SUCCESS;
-  auto mut_view =
-      MutableBufferView(params.local_name, hci_spec::kMaxNameLength);
-  mut_view.Write((const uint8_t*)(local_name_.c_str()),
-                 std::min(local_name_.length() + 1, hci_spec::kMaxNameLength));
-  RespondWithCommandComplete(hci_spec::kReadLocalName,
-                             BufferView(&params, sizeof(params)));
+  auto event_packet = hci::EmbossEventPacket::New<
+      pwemb::ReadLocalNameCommandCompleteEventWriter>(
+      hci_spec::kCommandCompleteEventCode);
+  auto view = event_packet.view_t();
+  view.status().Write(pwemb::StatusCode::SUCCESS);
+  unsigned char* name_from_event = view.local_name().BackingStorage().data();
+  char* name_as_cstr = reinterpret_cast<char*>(name_from_event);
+  std::strncpy(name_as_cstr, local_name_.c_str(), hci_spec::kMaxNameLength);
+  RespondWithCommandComplete(pwemb::OpCode::READ_LOCAL_NAME, &event_packet);
 }
 
 void FakeController::OnWriteLocalName(

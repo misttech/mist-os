@@ -28,12 +28,11 @@ pub async fn connect_to_rcs(env: &FhoEnvironment) -> Result<RemoteControlProxy> 
         tries += 1;
         let res = RemoteControlProxy::try_from_env(env).await;
         if res.is_ok() || tries > retry_count {
-            break res;
+            // Using `TryFromEnv` on `RemoteControlProxy` already contains user error information,
+            // which will be propagated after exiting the loop.
+            break Ok(res?);
         }
     }
-    .with_user_message(|| {
-        format!("Failed to connect to remote control protocol on target after {retry_count} tries. Is the target device connected and functioning?")
-    })
 }
 
 pub async fn open_moniker<P>(

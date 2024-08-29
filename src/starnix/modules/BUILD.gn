@@ -7,8 +7,11 @@ import("//build/rust/rustc_library.gni")
 group("tests") {
   testonly = true
   deps = [
+    "ext4:tests",
     "input:tests",
+    "layeredfs:tests",
     "loop:tests",
+    "tracefs:tests",
   ]
 }
 
@@ -24,7 +27,13 @@ rustc_library("modules") {
     "//src/starnix/kernel:starnix_core",
     "//src/starnix/lib/starnix-sync",
     "//src/starnix/lib/starnix-uapi",
+    "//src/starnix/modules/ext4",
+    "//src/starnix/modules/functionfs",
+    "//src/starnix/modules/fuse",
     "//src/starnix/modules/loop",
+    "//src/starnix/modules/overlayfs",
+    "//src/starnix/modules/tracefs",
+    "//src/starnix/modules/tun",
     "//src/starnix/modules/zram",
   ]
 

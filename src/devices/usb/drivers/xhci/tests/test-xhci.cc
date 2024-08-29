@@ -6,9 +6,23 @@
 // here return the equivalent of "not supported." Any functions that should be supported will be
 // implemented in the test file itself.
 
-#include "src/devices/usb/drivers/xhci/usb-xhci.h"
+#include <lib/driver/component/cpp/driver_export.h>
+
+#include <fake-dma-buffer/fake-dma-buffer.h>
+
+#include "src/devices/usb/drivers/xhci/tests/test-env.h"
 
 namespace usb_xhci {
+
+// Static Default Implementations
+zx::result<> UsbXhci::TestInit(void* test_harness) {
+  test_harness_ = test_harness;
+  return Init(ddk_fake::CreateBufferFactory());
+}
+
+zx::result<> UsbXhci::Start() { return zx::ok(); }
+
+void UsbXhci::Stop() {}
 
 void UsbXhci::ConnectToEndpoint(ConnectToEndpointRequest& request,
                                 ConnectToEndpointCompleter::Sync& completer) {
@@ -56,10 +70,6 @@ size_t UsbXhci::UsbHciGetMaxTransferSize(uint32_t device_id, uint8_t ep_address)
 
 size_t UsbXhci::UsbHciGetRequestSize() { return Request::RequestSize(sizeof(usb_request_t)); }
 
-fpromise::promise<void, zx_status_t> UsbXhci::DeviceOffline(uint32_t slot) {
-  return fpromise::make_error_promise<zx_status_t>(ZX_ERR_NOT_SUPPORTED);
-}
-
 DeviceState::~DeviceState() = default;
 
 zx_status_t DeviceState::InitEndpoint(uint8_t ep_addr, EventRing* event_ring, fdf::MmioBuffer* mmio)
@@ -69,3 +79,5 @@ zx_status_t DeviceState::InitEndpoint(uint8_t ep_addr, EventRing* event_ring, fd
 }
 
 }  // namespace usb_xhci
+
+FUCHSIA_DRIVER_EXPORT(usb_xhci::UsbXhci);

@@ -10,7 +10,7 @@ import subprocess
 import sys
 import zipfile
 from collections import deque
-from io import BufferedReader, StringIO, TextIOWrapper
+from io import BufferedReader, TextIOWrapper
 from tempfile import TemporaryDirectory
 from typing import Any
 
@@ -103,7 +103,6 @@ def main() -> int:
     # extract power topology and events
     pb = find_dict(moniker="bootstrap/power-broker", json=json_contents)
     graph = pb["payload"]["root"]["broker"]["topology"]["fuchsia.inspect.Graph"]
-    topology = graph["topology"]
     events = graph["events"]
 
     event_keys_sorted = sorted(events)

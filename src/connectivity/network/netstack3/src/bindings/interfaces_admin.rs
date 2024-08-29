@@ -867,10 +867,10 @@ fn set_configuration(
                 warn!("TODO(https://fxbug.dev/42071402): support IGMP configuration changes")
             }
             if let Some(forwarding) = forwarding {
-                info!("updating IPv6 forwarding on {core_id:?} to enabled={forwarding}");
+                info!("updating IPv4 forwarding on {core_id:?} to enabled={forwarding}");
             }
             if let Some(forwarding) = multicast_forwarding {
-                info!("updating IPv6 multicast forwarding on {core_id:?} to enabled={forwarding}");
+                info!("updating IPv4 multicast forwarding on {core_id:?} to enabled={forwarding}");
             }
 
             (

@@ -22,11 +22,11 @@ class VirtualAudioDai;
 using VirtualAudioDaiDeviceType =
     ddk::Device<VirtualAudioDai, ddk::Messageable<fuchsia_hardware_audio::DaiConnector>::Mixin>;
 
-class VirtualAudioDai : public VirtualAudioDaiDeviceType,
-                        public ddk::internal::base_protocol,
-                        public fidl::Server<fuchsia_hardware_audio::Dai>,
-                        public fidl::Server<fuchsia_hardware_audio::RingBuffer>,
-                        public VirtualAudioDriver {
+class VirtualAudioDai final : public VirtualAudioDaiDeviceType,
+                              public ddk::internal::base_protocol,
+                              public fidl::Server<fuchsia_hardware_audio::Dai>,
+                              public fidl::Server<fuchsia_hardware_audio::RingBuffer>,
+                              public VirtualAudioDriver {
  public:
   static fuchsia_virtualaudio::Configuration GetDefaultConfig(bool is_input);
 
@@ -90,6 +90,8 @@ class VirtualAudioDai : public VirtualAudioDaiDeviceType,
   void WatchDelayInfo(WatchDelayInfoCompleter::Sync& completer) override;
   void SetActiveChannels(fuchsia_hardware_audio::RingBufferSetActiveChannelsRequest& request,
                          SetActiveChannelsCompleter::Sync& completer) override;
+  void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_hardware_audio::RingBuffer>,
+                             fidl::UnknownMethodCompleter::Sync&) override;
 
  private:
   void ResetRingBuffer();

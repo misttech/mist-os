@@ -39,6 +39,7 @@
 #include "symbolizer_markup.h"
 #include "targets.h"
 #include "taskfinder.h"
+#include "test_component.h"
 #include "unowned_component.h"
 
 #ifdef EXPERIMENTAL_THREAD_SAMPLER_ENABLED
@@ -252,10 +253,10 @@ void profiler::ProfilerControllerImpl::Configure(ConfigureRequest& request,
       break;
     }
     case fuchsia_cpu_profiler::TargetConfig::Tag::kComponent: {
-      const auto& attach_config = request.config()->target()->component();
+      auto attach_config = request.config()->target()->component();
       switch (attach_config->Which()) {
         case fuchsia_cpu_profiler::AttachConfig::Tag::kLaunchComponent: {
-          auto& launch_config = attach_config->launch_component();
+          auto launch_config = attach_config->launch_component();
           if (!launch_config->url()) {
             FX_LOGS(ERROR) << "Cannot launch a component without a specified url!";
             completer.Reply(
@@ -297,8 +298,28 @@ void profiler::ProfilerControllerImpl::Configure(ConfigureRequest& request,
           component_target_ = std::move(*res);
           break;
         }
+        case fuchsia_cpu_profiler::AttachConfig::Tag::kLaunchTest: {
+          auto test_config = attach_config->launch_test();
+          if (!test_config->url()) {
+            FX_LOGS(ERROR) << "Cannot launch a component without a specified url!";
+            completer.Reply(
+                fit::error(fuchsia_cpu_profiler::SessionConfigureError::kMissingComponentUrl));
+            return;
+          }
+
+          zx::result<std::unique_ptr<TestComponent>> res = TestComponent::Create(
+              dispatcher_, test_config->url().value(), std::move(test_config->options()));
+          if (res.is_error()) {
+            FX_PLOGS(ERROR, res.error_value()) << "Failed to launch test: " << *test_config->url();
+            completer.Reply(fit::error(fuchsia_cpu_profiler::SessionConfigureError::kBadState));
+            return;
+          }
+          component_target_ = std::move(*res);
+          break;
+        }
+
         case fuchsia_cpu_profiler::AttachConfig::Tag::kAttachToComponentMoniker: {
-          auto& attach_moniker = attach_config->attach_to_component_moniker();
+          auto attach_moniker = attach_config->attach_to_component_moniker();
           zx::result<std::unique_ptr<profiler::Component>> res =
               profiler::UnownedComponent::Create(dispatcher_, attach_moniker, std::nullopt);
           if (res.is_error()) {
@@ -310,7 +331,7 @@ void profiler::ProfilerControllerImpl::Configure(ConfigureRequest& request,
           break;
         }
         case fuchsia_cpu_profiler::AttachConfig::Tag::kAttachToComponentUrl: {
-          auto& attach_url = attach_config->attach_to_component_url();
+          auto attach_url = attach_config->attach_to_component_url();
           zx::result<std::unique_ptr<profiler::Component>> res =
               profiler::UnownedComponent::Create(dispatcher_, std::nullopt, attach_url);
           if (res.is_error()) {
@@ -329,14 +350,13 @@ void profiler::ProfilerControllerImpl::Configure(ConfigureRequest& request,
       }
       break;
     }
-    case fuchsia_cpu_profiler::TargetConfig::Tag::kTest:
     default:
       completer.Reply(
           fit::error(fuchsia_cpu_profiler::SessionConfigureError::kInvalidConfiguration));
       return;
   }
 
-  if (!component_target_) {
+  if (!finder.Empty()) {
     zx::result<TaskFinder::FoundTasks> handles_result = finder.FindHandles();
     if (handles_result.is_error()) {
       FX_PLOGS(ERROR, handles_result.error_value()) << "Failed to walk job tree";
@@ -381,44 +401,46 @@ void profiler::ProfilerControllerImpl::Start(StartRequest& request,
   }
   sample_specs_.clear();
   targets_.Clear();
-  if (component_target_) {
-    ComponentWatcher::ComponentEventHandler on_start_handler = [this](std::string moniker,
-                                                                      std::string) {
-      zx::result<zx_koid_t> job_id = MonikerToJobId(moniker);
-      if (job_id.is_error()) {
-        FX_PLOGS(ERROR, job_id.error_value()) << "Failed to get moniker from Job ID";
-        return;
-      }
-      TaskFinder tf;
-      tf.AddJob(*job_id);
-      zx::result<TaskFinder::FoundTasks> handles = tf.FindHandles();
-      if (handles.is_error()) {
-        FX_PLOGS(ERROR, handles.error_value()) << "Failed to find handle for: " << moniker;
-        return;
-      }
-      for (auto& [koid, handle] : handles->jobs) {
-        if (koid == job_id) {
-          zx::result<JobTarget> target = MakeJobTarget(zx::job(handle.release()));
-          if (target.is_error()) {
-            FX_PLOGS(ERROR, target.status_value()) << "Failed to make target for: " << moniker;
-            return;
-          }
-          zx::result<> target_result = sampler_->AddTarget(std::move(*target));
-          if (target_result.is_error()) {
-            FX_PLOGS(ERROR, target_result.error_value()) << "Failed to add target for: " << moniker;
-            return;
-          }
-          break;
+  ComponentWatcher::ComponentEventHandler on_start_handler = [this](std::string moniker,
+                                                                    std::string) {
+    FX_LOGS(INFO) << "Attaching via moniker: " << moniker;
+    zx::result<zx_koid_t> job_id = MonikerToJobId(moniker);
+    if (job_id.is_error()) {
+      FX_PLOGS(ERROR, job_id.error_value()) << "Failed to get Job ID from moniker";
+      return;
+    }
+    TaskFinder tf;
+    tf.AddJob(*job_id);
+    zx::result<TaskFinder::FoundTasks> handles = tf.FindHandles();
+    if (handles.is_error()) {
+      FX_PLOGS(ERROR, handles.error_value()) << "Failed to find handle for: " << moniker;
+      return;
+    }
+    for (auto& [koid, handle] : handles->jobs) {
+      if (koid == job_id) {
+        zx::result<JobTarget> target = MakeJobTarget(zx::job(handle.release()));
+        if (target.is_error()) {
+          FX_PLOGS(ERROR, target.status_value()) << "Failed to make target for: " << moniker;
+          return;
         }
+        zx::result<> target_result = sampler_->AddTarget(std::move(*target));
+        if (target_result.is_error()) {
+          FX_PLOGS(ERROR, target_result.error_value()) << "Failed to add target for: " << moniker;
+          return;
+        }
+        break;
       }
-    };
+    }
+  };
+
+  if (component_target_) {
     if (zx::result<> res = component_target_->Start(std::move(on_start_handler)); res.is_error()) {
       FX_PLOGS(ERROR, res.error_value()) << "Failed to start!";
       completer.Close(res.error_value());
       Reset();
       return;
     }
-  };
+  }
 
   size_t buffer_size_mb = request.buffer_size_mb().value_or(8);
   zx::result<> start_res = sampler_->Start(buffer_size_mb);
@@ -435,6 +457,7 @@ void profiler::ProfilerControllerImpl::Start(StartRequest& request,
 void profiler::ProfilerControllerImpl::Stop(StopCompleter::Sync& completer) {
   zx::result<profiler::SymbolizationContext> modules = sampler_->GetContexts();
   if (modules.is_error()) {
+    FX_PLOGS(ERROR, modules.status_value()) << "Failed to get modules";
     Reset();
     completer.Close(modules.status_value());
     return;

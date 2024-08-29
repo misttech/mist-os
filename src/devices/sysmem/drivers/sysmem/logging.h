@@ -5,15 +5,19 @@
 #ifndef SRC_DEVICES_SYSMEM_DRIVERS_SYSMEM_LOGGING_H_
 #define SRC_DEVICES_SYSMEM_DRIVERS_SYSMEM_LOGGING_H_
 
+#include <lib/syslog/cpp/macros.h>
 #include <stdarg.h>
 #include <zircon/compiler.h>
 
 #include <string>
 
-namespace sysmem_driver {
+namespace sysmem_service {
 
-void vLog(bool is_error, const char* file, int line, const char* prefix1, const char* prefix2,
+void vLog(::fuchsia_logging::LogSeverity severity, const char* file, int line, const char* prefix,
           const char* format, va_list args);
+
+void Log(::fuchsia_logging::LogSeverity severity, const char* file, int line, const char* prefix,
+         const char* format, ...) __PRINTFLIKE(5, 6);
 
 // Creates a unique name by concatenating prefix and a 64-bit unique number.
 std::string CreateUniqueName(const char* prefix);
@@ -42,13 +46,15 @@ class LoggingMixin {
   void LogInfo(Location location, const char* format, ...) __PRINTFLIKE(3, 4) {
     va_list args;
     va_start(args, format);
-    vLog(false, location.file(), location.line(), logging_prefix_, "info", format, args);
+    vLog(::fuchsia_logging::LOG_INFO, location.file(), location.line(), logging_prefix_, format,
+         args);
     va_end(args);
   }
   void LogError(Location location, const char* format, ...) __PRINTFLIKE(3, 4) {
     va_list args;
     va_start(args, format);
-    vLog(true, location.file(), location.line(), logging_prefix_, "error", format, args);
+    vLog(::fuchsia_logging::LOG_INFO, location.file(), location.line(), logging_prefix_, format,
+         args);
     va_end(args);
   }
 
@@ -58,6 +64,6 @@ class LoggingMixin {
   const char* logging_prefix_;
 };
 
-}  // namespace sysmem_driver
+}  // namespace sysmem_service
 
 #endif  // SRC_DEVICES_SYSMEM_DRIVERS_SYSMEM_LOGGING_H_

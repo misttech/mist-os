@@ -56,6 +56,10 @@ impl DriverTestRealmBuilder for RealmBuilder {
                 .capability(Capability::protocol_by_name("fuchsia.logger.LogSink"))
                 .capability(Capability::protocol_by_name("fuchsia.inspect.InspectSink"))
                 .capability(Capability::protocol_by_name("fuchsia.diagnostics.ArchiveAccessor"))
+                .capability(Capability::protocol_by_name(
+                    "fuchsia.component.resolution.Resolver-hermetic",
+                ))
+                .capability(Capability::protocol_by_name("fuchsia.pkg.PackageResolver-hermetic"))
                 .from(Ref::parent())
                 .to(&driver_realm),
         )
@@ -67,6 +71,9 @@ impl DriverTestRealmBuilder for RealmBuilder {
                 .capability(Capability::directory("dev-topological").rights(fio::R_STAR_DIR))
                 .capability(Capability::protocol_by_name("fuchsia.device.manager.Administrator"))
                 .capability(Capability::protocol_by_name("fuchsia.driver.development.Manager"))
+                .capability(Capability::protocol_by_name(
+                    "fuchsia.driver.framework.CompositeNodeManager",
+                ))
                 .capability(Capability::protocol_by_name(
                     "fuchsia.driver.registrar.DriverRegistrar",
                 ))

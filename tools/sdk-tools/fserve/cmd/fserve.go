@@ -88,7 +88,7 @@ func main() {
 	helpFlag := flag.Bool("help", false, "Show the usage message")
 	repoFlag := flag.String("repo-dir", "", "Specify the path to the package repository.")
 	bucketFlag := flag.String("bucket", "", "Specify the GCS bucket for the prebuilt packages.")
-	imageFlag := flag.String("image", "", "Specify the GCS file name for prebuild packages.")
+	imageFlag := flag.String("image", "", "Specify the GCS file name for prebuilt packages.")
 	nameFlag := flag.String("name", "devhost", "Name is used as the update channel identifier, as reported by fuchsia.update.channel.Provider.")
 	repoPortFlag := flag.String("server-port", "", "Port number to use when serving the packages.")
 	killFlag := flag.Bool("kill", false, "Kills any existing package manager server.")
@@ -736,7 +736,7 @@ func printValidImages(sdk sdkProvider, version string, bucket string) error {
 	return nil
 }
 
-// downloadImageIfNeeded downloads from GCS the packages for the given prebuillt image.
+// downloadImageIfNeeded downloads from GCS the packages for the given prebuilt image.
 // The md5 hash of the tarball is stored to check for differences from the downloaded version.
 // if the hash matches, the tarball is not un-tarred.
 func downloadImageIfNeeded(ctx context.Context, sdk sdkProvider, version string, bucket string, srcPath string, imageFilename string, repoPath string) error {

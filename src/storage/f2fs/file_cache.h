@@ -132,6 +132,8 @@ class Page : public PageRefCounted<Page>,
   void SetColdData();
   bool ClearColdData();
 
+  bool SetDirty();
+
   static constexpr uint32_t Size() { return kPageSize; }
   block_t GetBlockAddr() const {
     if (TestFlag(PageFlag::kPageWriteback)) {
@@ -157,7 +159,6 @@ class Page : public PageRefCounted<Page>,
   void RecyclePage();
 
  private:
-  bool SetDirty();
   zx_status_t Map();
   bool TestFlag(PageFlag flag) const {
     return flags_[static_cast<uint8_t>(flag)].test(std::memory_order_acquire);
@@ -255,7 +256,8 @@ class LockedPage final {
   // WaitOnWriteback() before it.
   void Invalidate();
   // It waits for the writeback flag of |page_| to be cleared. So, it should not be called with
-  // FileCache::page_lock_ acquired. It keeps LockedPage::lock_ acquired.
+  // FileCache::page_lock_ acquired. It acquires LockedPage::lock_ during waiting.
+  // TODO(b/293975446): Consider releasing |lock_| during waiting.
   void WaitOnWriteback();
   bool SetWriteback(block_t addr = kNullAddr);
 

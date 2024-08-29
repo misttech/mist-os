@@ -8,9 +8,9 @@
 #include <lib/ddk/metadata.h>
 #include <lib/driver/compat/cpp/device_server.h>
 #include <lib/driver/component/cpp/driver_export.h>
-#include <lib/driver/testing/cpp/driver_lifecycle.h>
 #include <lib/driver/testing/cpp/driver_runtime.h>
-#include <lib/driver/testing/cpp/test_environment.h>
+#include <lib/driver/testing/cpp/internal/driver_lifecycle.h>
+#include <lib/driver/testing/cpp/internal/test_environment.h>
 #include <lib/driver/testing/cpp/test_node.h>
 #include <lib/fzl/vmo-mapper.h>
 #include <lib/sdio/hw.h>
@@ -80,10 +80,12 @@ FakeSdmmcDevice TestSdmmcRootDevice::sdmmc_;
 
 struct IncomingNamespace {
   fdf_testing::TestNode node{"root"};
-  fdf_testing::TestEnvironment env{fdf::Dispatcher::GetCurrent()->get()};
+  fdf_testing::internal::TestEnvironment env{fdf::Dispatcher::GetCurrent()->get()};
   compat::DeviceServer device_server;
 };
 
+// WARNING: Don't use this test as a template for new tests as it uses the old driver testing
+// library.
 class SdioControllerDeviceTest : public zxtest::Test {
  public:
   SdioControllerDeviceTest()
@@ -206,7 +208,7 @@ class SdioControllerDeviceTest : public zxtest::Test {
   async_patterns::TestDispatcherBound<IncomingNamespace> incoming_;
 
  private:
-  fdf_testing::DriverUnderTest<TestSdmmcRootDevice> dut_;
+  fdf_testing::internal::DriverUnderTest<TestSdmmcRootDevice> dut_;
   SdioControllerDevice* sdio_controller_device_;
   fidl::ClientEnd<fuchsia_io::Directory> outgoing_directory_client_;
 };

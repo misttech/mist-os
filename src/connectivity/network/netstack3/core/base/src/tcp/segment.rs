@@ -7,6 +7,7 @@
 use crate::alloc::borrow::ToOwned;
 use core::borrow::Borrow;
 use core::convert::TryFrom as _;
+use core::fmt::Debug;
 use core::num::{NonZeroU16, TryFromIntError};
 use core::ops::Range;
 
@@ -18,7 +19,7 @@ use packet_formats::tcp::options::TcpOption;
 use packet_formats::tcp::{TcpSegment, TcpSegmentBuilder, TcpSegmentBuilderWithOptions};
 use thiserror::Error;
 
-use super::base::{Control, Mss, SendPayload};
+use super::base::{Control, Mss};
 use super::seqnum::{SeqNum, UnscaledWindowSize, WindowScale, WindowSize};
 
 /// A TCP segment.
@@ -156,9 +157,13 @@ impl<P: Payload> Segment<P> {
     ) -> (Self, usize) {
         Self::with_data_options(seq, ack, control, wnd, data, Options::default())
     }
-}
 
-impl<P: Payload> Segment<P> {
+    /// Maps the payload in the segment with `f`.
+    pub fn map_payload<R, F: FnOnce(P) -> R>(self, f: F) -> Segment<R> {
+        let Segment { header, data } = self;
+        Segment { header, data: f(data) }
+    }
+
     /// Returns the length of the segment in sequence number space.
     ///
     /// Per RFC 793 (https://tools.ietf.org/html/rfc793#page-25):
@@ -252,6 +257,65 @@ impl<P: Payload> Segment<P> {
             }
         })
     }
+
+    /// Creates a segment with no data.
+    pub fn new(
+        seq: SeqNum,
+        ack: Option<SeqNum>,
+        control: Option<Control>,
+        wnd: UnscaledWindowSize,
+    ) -> Self {
+        Self::with_options(seq, ack, control, wnd, Options::default())
+    }
+
+    /// Creates a new segment with options but no data.
+    pub fn with_options(
+        seq: SeqNum,
+        ack: Option<SeqNum>,
+        control: Option<Control>,
+        wnd: UnscaledWindowSize,
+        options: Options,
+    ) -> Self {
+        // All of the checks on lengths are optimized out:
+        // https://godbolt.org/z/KPd537G6Y
+        let (seg, truncated) =
+            Segment::with_data_options(seq, ack, control, wnd, P::new_empty(), options);
+        debug_assert_eq!(truncated, 0);
+        seg
+    }
+
+    /// Creates an ACK segment.
+    pub fn ack(seq: SeqNum, ack: SeqNum, wnd: UnscaledWindowSize) -> Self {
+        Segment::new(seq, Some(ack), None, wnd)
+    }
+
+    /// Creates a SYN segment.
+    pub fn syn(seq: SeqNum, wnd: UnscaledWindowSize, options: Options) -> Self {
+        Segment::with_options(seq, None, Some(Control::SYN), wnd, options)
+    }
+
+    /// Creates a SYN-ACK segment.
+    pub fn syn_ack(seq: SeqNum, ack: SeqNum, wnd: UnscaledWindowSize, options: Options) -> Self {
+        Segment::with_options(seq, Some(ack), Some(Control::SYN), wnd, options)
+    }
+
+    /// Creates a RST segment.
+    pub fn rst(seq: SeqNum) -> Self {
+        Segment::new(seq, None, Some(Control::RST), UnscaledWindowSize::from(0))
+    }
+
+    /// Creates a RST-ACK segment.
+    pub fn rst_ack(seq: SeqNum, ack: SeqNum) -> Self {
+        Segment::new(seq, Some(ack), Some(Control::RST), UnscaledWindowSize::from(0))
+    }
+}
+
+impl Segment<()> {
+    /// Converts this segment with `()` data into any `P` payload's `new_empty`
+    /// form.
+    pub fn into_empty<P: Payload>(self) -> Segment<P> {
+        self.map_payload(|()| P::new_empty())
+    }
 }
 
 impl SegmentHeader {
@@ -296,58 +360,6 @@ impl SegmentHeader {
     }
 }
 
-impl Segment<()> {
-    /// Creates a segment with no data.
-    pub fn new(
-        seq: SeqNum,
-        ack: Option<SeqNum>,
-        control: Option<Control>,
-        wnd: UnscaledWindowSize,
-    ) -> Self {
-        Self::with_options(seq, ack, control, wnd, Options::default())
-    }
-
-    /// Creates a new segment with options but no data.
-    pub fn with_options(
-        seq: SeqNum,
-        ack: Option<SeqNum>,
-        control: Option<Control>,
-        wnd: UnscaledWindowSize,
-        options: Options,
-    ) -> Self {
-        // All of the checks on lengths are optimized out:
-        // https://godbolt.org/z/KPd537G6Y
-        let (seg, truncated) = Segment::with_data_options(seq, ack, control, wnd, (), options);
-        debug_assert_eq!(truncated, 0);
-        seg
-    }
-
-    /// Creates an ACK segment.
-    pub fn ack(seq: SeqNum, ack: SeqNum, wnd: UnscaledWindowSize) -> Self {
-        Segment::new(seq, Some(ack), None, wnd)
-    }
-
-    /// Creates a SYN segment.
-    pub fn syn(seq: SeqNum, wnd: UnscaledWindowSize, options: Options) -> Self {
-        Segment::with_options(seq, None, Some(Control::SYN), wnd, options)
-    }
-
-    /// Creates a SYN-ACK segment.
-    pub fn syn_ack(seq: SeqNum, ack: SeqNum, wnd: UnscaledWindowSize, options: Options) -> Self {
-        Segment::with_options(seq, Some(ack), Some(Control::SYN), wnd, options)
-    }
-
-    /// Creates a RST segment.
-    pub fn rst(seq: SeqNum) -> Self {
-        Segment::new(seq, None, Some(Control::RST), UnscaledWindowSize::from(0))
-    }
-
-    /// Creates a RST-ACK segment.
-    pub fn rst_ack(seq: SeqNum, ack: SeqNum) -> Self {
-        Segment::new(seq, Some(ack), Some(Control::RST), UnscaledWindowSize::from(0))
-    }
-}
-
 /// A TCP payload that only allows for getting the length of the payload.
 pub trait PayloadLen {
     /// Returns the length of the payload.
@@ -372,6 +384,11 @@ pub trait Payload: PayloadLen + Sized {
     ///
     /// Panics if offset is too large or we couldn't fill the `dst` slice.
     fn partial_copy(&self, offset: usize, dst: &mut [u8]);
+
+    /// Creates a new empty payload.
+    ///
+    /// An empty payload must report 0 as its length.
+    fn new_empty() -> Self;
 }
 
 impl PayloadLen for &[u8] {
@@ -397,6 +414,10 @@ impl Payload for &[u8] {
 
     fn partial_copy(&self, offset: usize, dst: &mut [u8]) {
         dst.copy_from_slice(&self[offset..offset + dst.len()])
+    }
+
+    fn new_empty() -> Self {
+        &[]
     }
 }
 
@@ -425,19 +446,15 @@ impl Payload for () {
             );
         }
     }
+
+    fn new_empty() -> Self {
+        ()
+    }
 }
 
 impl<I: PayloadLen, B> PayloadLen for InnerSerializer<I, B> {
     fn len(&self) -> usize {
         PayloadLen::len(self.inner())
-    }
-}
-
-impl From<Segment<()>> for Segment<&'static [u8]> {
-    fn from(
-        Segment { header: SegmentHeader { seq, ack, wnd, control, options }, data: () }: Segment<()>,
-    ) -> Self {
-        Segment { header: SegmentHeader { seq, ack, wnd, control, options }, data: &[] }
     }
 }
 
@@ -487,17 +504,6 @@ impl<'a> TryFrom<TcpSegment<&'a [u8]>> for Segment<&'a [u8]> {
     }
 }
 
-impl From<Segment<()>> for Segment<SendPayload<'static>> {
-    fn from(
-        Segment { header: SegmentHeader { seq, ack, wnd, control, options }, data: () }: Segment<()>,
-    ) -> Self {
-        Segment {
-            header: SegmentHeader { seq, ack, wnd, control, options },
-            data: SendPayload::Contiguous(&[]),
-        }
-    }
-}
-
 impl<A> TryFrom<&TcpSegmentBuilder<A>> for SegmentHeader
 where
     A: IpAddress,
@@ -531,6 +537,8 @@ where
 #[cfg(feature = "testutils")]
 mod testutils {
     use super::*;
+
+    use crate::tcp::base::SendPayload;
 
     impl Segment<SendPayload<'static>> {
         /// Create a new segment with the given seq, ack, and data. If `split` is true, then the
@@ -573,9 +581,7 @@ mod testutils {
             assert_eq!(truncated, 0);
             seg
         }
-    }
 
-    impl Segment<()> {
         /// Creates a new FIN segment.
         pub fn fin(seq: SeqNum, ack: SeqNum, wnd: UnscaledWindowSize) -> Self {
             Segment::new(seq, Some(ack), Some(Control::FIN), wnd)
@@ -648,6 +654,10 @@ mod test {
 
         fn partial_copy(&self, _offset: usize, _dst: &mut [u8]) {
             unimplemented!("TestPayload doesn't carry any data");
+        }
+
+        fn new_empty() -> Self {
+            Self(0..0)
         }
     }
 

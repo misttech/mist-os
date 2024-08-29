@@ -6,6 +6,7 @@
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/ddk/binding_driver.h>
 
+#include <bind/fuchsia/cpp/bind.h>
 #include <ddktl/device.h>
 
 namespace audio {
@@ -130,11 +131,12 @@ zx_status_t test_bind(void* ctx, zx_device_t* parent) {
   if (dai == nullptr) {
     return ZX_ERR_NO_MEMORY;
   }
-  zx_device_prop_t props[] = {
-      {BIND_PLATFORM_DEV_VID, 0, 1},
-      {BIND_PLATFORM_DEV_DID, 0, 2},
+
+  zx_device_str_prop_t props[] = {
+      ddk::MakeStrProperty(bind_fuchsia::PLATFORM_DEV_VID, 1u),
+      ddk::MakeStrProperty(bind_fuchsia::PLATFORM_DEV_DID, 2u),
   };
-  zx_status_t status = dai->DdkAdd(ddk::DeviceAddArgs("test").set_props(props));
+  zx_status_t status = dai->DdkAdd(ddk::DeviceAddArgs("test").set_str_props(props));
   if (status != ZX_OK) {
     return status;
   }

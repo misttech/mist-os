@@ -39,7 +39,7 @@ class BtHostComponent {
   using ErrorCallback = fit::callback<void()>;
   [[nodiscard]] bool Initialize(
       fidl::ClientEnd<fuchsia_hardware_bluetooth::Vendor> vendor_client_end, InitCallback init_cb,
-      ErrorCallback error_cb);
+      ErrorCallback error_cb, bool legacy_pairing_enabled);
 
   // Shuts down all systems.
   void ShutDown();
@@ -63,7 +63,7 @@ class BtHostComponent {
 
   bool initialize_rng_;
 
-  pw_random_zircon::ZirconRandomGenerator random_generator_;
+  pw::random_fuchsia::ZirconRandomGenerator random_generator_;
 
   std::unique_ptr<bt::hci::Transport> hci_;
 

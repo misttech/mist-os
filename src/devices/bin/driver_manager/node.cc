@@ -97,9 +97,9 @@ const char* CollectionName(Collection collection) {
     case Collection::kBoot:
       return "boot-drivers";
     case Collection::kPackage:
-      return "pkg-drivers";
+      return "base-drivers";
     case Collection::kFullPackage:
-      return "full-pkg-drivers";
+      return "full-drivers";
   }
 }
 
@@ -471,6 +471,12 @@ void Node::OnBind() const {
       LOGF(ERROR, "Failed to send OnBind event: %s", result.FormatDescription().data());
     }
   }
+}
+
+void Node::handle_unknown_method(
+    fidl::UnknownMethodMetadata<fuchsia_component_runner::ComponentController> metadata,
+    fidl::UnknownMethodCompleter::Sync& completer) {
+  LOGF(INFO, "Unknown ComponentController method request received: %lu", metadata.method_ordinal);
 }
 
 void Node::Stop(StopCompleter::Sync& completer) {
@@ -1438,7 +1444,9 @@ void Node::SetAndPublishInspect() {
             .id = static_cast<uint16_t>(key),
             .value = value,
         });
-        if (key == BIND_PROTOCOL) {
+        // TODO(b/361852885): Remove this hardcoded value once integer based keys are
+        // removed.
+        if (key == 0x01 /* BIND_PROTOCOL */) {
           protocol_id = value;
         }
       }

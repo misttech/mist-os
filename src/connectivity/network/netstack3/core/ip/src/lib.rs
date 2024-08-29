@@ -213,7 +213,7 @@ pub mod raw {
 pub use internal::api::{RoutesAnyApi, RoutesApi};
 pub use internal::base::{
     gen_ip_packet_id, receive_ipv4_packet, receive_ipv4_packet_action, receive_ipv6_packet,
-    receive_ipv6_packet_action, resolve_route_to_destination, AddressStatus,
+    receive_ipv6_packet_action, resolve_output_route_to_destination, AddressStatus,
     BaseTransportIpContext, DropReason, FilterHandlerProvider, HopLimits, IpCounters,
     IpDeviceContext, IpDeviceStateContext, IpLayerBindingsContext, IpLayerContext, IpLayerEvent,
     IpLayerHandler, IpLayerIpExt, IpLayerTimerId, IpPacketDestination, IpRouteTablesContext,
@@ -229,7 +229,7 @@ pub use internal::reassembly::{FragmentContext, FragmentTimerId, IpPacketFragmen
 pub use internal::routing::rules::RulesTable;
 pub use internal::routing::{
     request_context_add_route, request_context_del_routes, AddRouteError, IpRoutingDeviceContext,
-    RoutingTable,
+    NonLocalSrcAddrPolicy, PacketOrigin, RoutingTable,
 };
 pub use internal::types::{
     AddableEntry, AddableEntryEither, AddableMetric, Destination, Entry, EntryEither, Generation,

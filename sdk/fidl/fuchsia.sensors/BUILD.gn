@@ -8,5 +8,8 @@ fidl("fuchsia.sensors") {
   sdk_category = "internal"
 
   sources = [ "sensors.fidl" ]
-  public_deps = [ "//sdk/fidl/fuchsia.sensors.types" ]
+  public_deps = [
+    "//sdk/fidl/fuchsia.hardware.sensors",
+    "//sdk/fidl/fuchsia.sensors.types",
+  ]
 }

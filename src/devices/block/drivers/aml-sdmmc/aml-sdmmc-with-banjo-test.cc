@@ -11,9 +11,9 @@
 #include <fidl/fuchsia.power.system/cpp/test_base.h>
 #include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
 #include <lib/driver/component/cpp/driver_export.h>
-#include <lib/driver/testing/cpp/driver_lifecycle.h>
 #include <lib/driver/testing/cpp/driver_runtime.h>
-#include <lib/driver/testing/cpp/test_environment.h>
+#include <lib/driver/testing/cpp/internal/driver_lifecycle.h>
+#include <lib/driver/testing/cpp/internal/test_environment.h>
 #include <lib/driver/testing/cpp/test_node.h>
 #include <lib/fake-bti/bti.h>
 #include <lib/fzl/vmo-mapper.h>
@@ -413,7 +413,7 @@ struct IncomingNamespace {
   }
 
   fdf_testing::TestNode node{"root"};
-  fdf_testing::TestEnvironment env{fdf::Dispatcher::GetCurrent()->get()};
+  fdf_testing::internal::TestEnvironment env{fdf::Dispatcher::GetCurrent()->get()};
   fake_pdev::FakePDevFidl pdev_server;
   FakeClock clock_server;
   zx::event exec_opportunistic, wake_assertive;
@@ -421,6 +421,8 @@ struct IncomingNamespace {
   FakePowerBroker power_broker;
 };
 
+// WARNING: Don't use this test as a template for new tests as it uses the old driver testing
+// library.
 class AmlSdmmcWithBanjoTest : public zxtest::Test {
  public:
   AmlSdmmcWithBanjoTest()
@@ -694,7 +696,7 @@ class AmlSdmmcWithBanjoTest : public zxtest::Test {
   fdf::UnownedSynchronizedDispatcher env_dispatcher_;
   async_patterns::TestDispatcherBound<IncomingNamespace> incoming_;
   fidl::ClientEnd<fuchsia_io::Directory> outgoing_directory_client_;
-  fdf_testing::DriverUnderTest<TestAmlSdmmcWithBanjo> dut_;
+  fdf_testing::internal::DriverUnderTest<TestAmlSdmmcWithBanjo> dut_;
 
  private:
   fdf::MmioBuffer mmio_buffer_;

@@ -68,6 +68,7 @@ template("test") {
   }
 
   executable(_exe_target_name) {
+    deps = []
     forward_variables_from(invoker,
                            "*",
                            [
@@ -84,6 +85,7 @@ template("test") {
 
     # Exclude tests from tool_paths.json.
     emit_tool_path = false
+    deps += [ "//build/config:test_executable_deps" ]
 
     # Exclude tests from tool_paths.json.
     emit_tool_path = false

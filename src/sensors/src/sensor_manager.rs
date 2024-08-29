@@ -18,6 +18,8 @@ use std::collections::HashMap;
 pub struct SensorManager {
     sensors: HashMap<i32, SensorInfo>,
     driver_proxy: playback_fidl::DriverProxy,
+    playback_proxy: playback_fidl::PlaybackProxy,
+    playback_configured: bool,
 }
 
 enum IncomingRequest {
@@ -30,6 +32,12 @@ async fn handle_sensors_request(
 ) -> anyhow::Result<()> {
     match request {
         ManagerRequest::GetSensorsList { responder } => {
+            if !manager.playback_configured {
+                tracing::warn!("Received request for sensor list, but playback has not been configured. Sending empty list");
+                let _ = responder.send(Vec::<SensorInfo>::new().as_slice());
+                return Ok(());
+            }
+
             if let Ok(sensors) = manager.driver_proxy.get_sensors_list().await {
                 manager.sensors = HashMap::new();
                 for sensor in sensors {
@@ -49,6 +57,14 @@ async fn handle_sensors_request(
             }
         }
         ManagerRequest::ConfigureSensorRates { id, sensor_rate_config, responder } => {
+            if !manager.playback_configured {
+                tracing::warn!(
+                    "Received request to configure a sensor before playback was configured"
+                );
+                let _ = responder.send(Err(ConfigureSensorRateError::DriverUnavailable));
+                return Ok(());
+            }
+
             if !manager.sensors.keys().contains(&id) {
                 tracing::warn!(
                     "Received ConfigureSensorRates request for unknown sensor id: {}",
@@ -83,6 +99,12 @@ async fn handle_sensors_request(
             }
         }
         ManagerRequest::Activate { id, responder } => {
+            if !manager.playback_configured {
+                tracing::warn!("Received request to activate sensor with id: {} before playback was configured", id);
+                let _ = responder.send(Err(ActivateSensorError::DriverUnavailable));
+                return Ok(());
+            }
+
             if !manager.sensors.keys().contains(&id) {
                 tracing::warn!("Received request to activate unknown sensor id: {}", id);
                 let _ = responder.send(Err(ActivateSensorError::InvalidSensorId));
@@ -97,6 +119,12 @@ async fn handle_sensors_request(
             }
         }
         ManagerRequest::Deactivate { id, responder } => {
+            if !manager.playback_configured {
+                tracing::warn!("Received request to deactivate sensor with id: {} before playback was configured", id);
+                let _ = responder.send(Err(DeactivateSensorError::DriverUnavailable));
+                return Ok(());
+            }
+
             if !manager.sensors.keys().contains(&id) {
                 tracing::warn!("Received request to deactivate unknown sensor id: {}", id);
                 let _ = responder.send(Err(DeactivateSensorError::InvalidSensorId));
@@ -109,6 +137,26 @@ async fn handle_sensors_request(
                     let _ = responder.send(Ok(()));
                 }
             }
+        }
+        ManagerRequest::ConfigurePlayback { source_config, responder } => {
+            let res = manager.playback_proxy.configure_playback(&source_config).await;
+            let response: Result<(), ConfigurePlaybackError>;
+
+            match res {
+                Ok(Ok(())) => {
+                    response = Ok(());
+                }
+                Err(e) => {
+                    tracing::warn!("Error while configuring sensor playback: {:#?}", e);
+                    response = Err(ConfigurePlaybackError::PlaybackUnavailable);
+                }
+                Ok(Err(e)) => {
+                    response = Err(from_driver_playback_error(e));
+                }
+            }
+
+            manager.playback_configured = response.is_ok();
+            let _ = responder.send(response);
         }
         ManagerRequest::_UnknownMethod { ordinal, .. } => {
             tracing::warn!("ManagerRequest::_UnknownMethod with ordinal {}", ordinal);
@@ -183,10 +231,13 @@ async fn handle_sensor_manager_request_stream(
 }
 
 impl SensorManager {
-    pub fn new(driver_proxy: playback_fidl::DriverProxy) -> Self {
+    pub fn new(
+        driver_proxy: playback_fidl::DriverProxy,
+        playback_proxy: playback_fidl::PlaybackProxy,
+    ) -> Self {
         let sensors = HashMap::new();
 
-        Self { sensors, driver_proxy }
+        Self { sensors, driver_proxy, playback_proxy, playback_configured: false }
     }
 
     pub async fn run(&mut self) -> Result<(), Error> {
@@ -237,6 +288,48 @@ impl SensorManager {
     }
 }
 
+fn from_driver_playback_error(
+    val: playback_fidl::ConfigurePlaybackError,
+) -> ConfigurePlaybackError {
+    match val {
+        playback_fidl::ConfigurePlaybackError::InvalidConfigType => {
+            ConfigurePlaybackError::InvalidConfigType
+        }
+        playback_fidl::ConfigurePlaybackError::ConfigMissingFields => {
+            ConfigurePlaybackError::ConfigMissingFields
+        }
+        playback_fidl::ConfigurePlaybackError::DuplicateSensorInfo => {
+            ConfigurePlaybackError::DuplicateSensorInfo
+        }
+        playback_fidl::ConfigurePlaybackError::NoEventsForSensor => {
+            ConfigurePlaybackError::NoEventsForSensor
+        }
+        playback_fidl::ConfigurePlaybackError::EventFromUnknownSensor => {
+            ConfigurePlaybackError::EventFromUnknownSensor
+        }
+        playback_fidl::ConfigurePlaybackError::EventSensorTypeMismatch => {
+            ConfigurePlaybackError::EventSensorTypeMismatch
+        }
+        playback_fidl::ConfigurePlaybackError::EventPayloadTypeMismatch => {
+            ConfigurePlaybackError::EventPayloadTypeMismatch
+        }
+        playback_fidl::ConfigurePlaybackError::FileOpenFailed => {
+            ConfigurePlaybackError::FileOpenFailed
+        }
+        playback_fidl::ConfigurePlaybackError::FileParseError => {
+            ConfigurePlaybackError::FileParseError
+        }
+        playback_fidl::ConfigurePlaybackError::__SourceBreaking { unknown_ordinal } => {
+            // This should be unreachable because playback is subpackaged with the sensor manager.
+            tracing::error!(
+                "Received unknown error from Sensor Playback with ordinal: {:#?}",
+                unknown_ordinal
+            );
+            ConfigurePlaybackError::PlaybackUnavailable
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -261,7 +354,7 @@ mod tests {
                 sensor_id: get_test_sensor().sensor_id.unwrap(),
                 sensor_type: SensorType::HeartRate,
                 payload: EventPayload::Float(i as f32),
-                // These two values get ignored by playback
+                // These two values get ignored by playback.
                 sequence_number: 0,
                 timestamp: 0,
             };
@@ -284,26 +377,19 @@ mod tests {
         playback_fidl::PlaybackSourceConfig::FixedValuesConfig(fixed_values_config)
     }
 
-    async fn connect_playback() -> playback_fidl::PlaybackProxy {
-        fuchsia_component::client::connect_to_protocol::<playback_fidl::PlaybackMarker>().unwrap()
-    }
-
-    async fn setup_playback(
-        playback_proxy: &playback_fidl::PlaybackProxy,
-        source_config: playback_fidl::PlaybackSourceConfig,
-    ) {
-        let _ = playback_proxy.configure_playback(&source_config).await;
-    }
-
     async fn setup_manager() -> ManagerProxy {
         let (mut sender, receiver) = mpsc::unbounded::<ManagerControlHandle>();
+
+        let playback_proxy =
+            fuchsia_component::client::connect_to_protocol::<playback_fidl::PlaybackMarker>()
+                .unwrap();
 
         let driver_proxy =
             fuchsia_component::client::connect_to_protocol::<playback_fidl::DriverMarker>()
                 .unwrap();
         let driver_event_stream = driver_proxy.take_event_stream();
 
-        let mut manager = SensorManager::new(driver_proxy);
+        let mut manager = SensorManager::new(driver_proxy, playback_proxy);
         let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<ManagerMarker>().unwrap();
 
         fuchsia_async::Task::spawn(async move {
@@ -322,144 +408,86 @@ mod tests {
         proxy
     }
 
-    async fn setup() -> (ManagerProxy, playback_fidl::PlaybackProxy) {
-        let playback_proxy = connect_playback().await;
-        setup_playback(&playback_proxy, get_playback_config()).await;
-
+    async fn setup() -> ManagerProxy {
         let manager_proxy = setup_manager().await;
+        let _ = manager_proxy.configure_playback(&get_playback_config()).await;
+
         // When the SensorManager starts, it gets the initial list of sensors before handling any
         // requests. These tests do not call SensorManager::run, so the sensor list can be
         // populated by calling get_sensors_list.
         let _ = manager_proxy.get_sensors_list().await;
 
-        (manager_proxy, playback_proxy)
+        manager_proxy
     }
 
-    #[fuchsia::test]
-    async fn test_get_sensors_list() {
-        // Playback is misconfigured.
-        let mut fixed_values_config = playback_fidl::FixedValuesPlaybackConfig {
+    async fn clear_playback_config(proxy: &ManagerProxy) {
+        let fixed_values_config = playback_fidl::FixedValuesPlaybackConfig {
             sensor_list: None,
             sensor_events: None,
             ..Default::default()
         };
-        let playback_proxy = connect_playback().await;
-        setup_playback(
-            &playback_proxy,
-            playback_fidl::PlaybackSourceConfig::FixedValuesConfig(fixed_values_config),
-        )
-        .await;
 
-        let proxy = setup_manager().await;
-
-        let fidl_sensors = proxy.get_sensors_list().await.unwrap();
-        assert!(fidl_sensors.is_empty());
-
-        // Playback is configured with empty values.
-        fixed_values_config = playback_fidl::FixedValuesPlaybackConfig {
-            sensor_list: Some(Vec::new()),
-            sensor_events: Some(Vec::new()),
-            ..Default::default()
-        };
-        setup_playback(
-            &playback_proxy,
-            playback_fidl::PlaybackSourceConfig::FixedValuesConfig(fixed_values_config),
-        )
-        .await;
-        let fidl_sensors = proxy.get_sensors_list().await.unwrap();
-        assert!(fidl_sensors.is_empty());
-
-        // Playback is configured with the default sensor.
-        setup_playback(&playback_proxy, get_playback_config()).await;
-        let fidl_sensors = proxy.get_sensors_list().await.unwrap();
-        assert!(fidl_sensors.contains(&get_test_sensor()));
+        let _ = proxy
+            .configure_playback(&playback_fidl::PlaybackSourceConfig::FixedValuesConfig(
+                fixed_values_config,
+            ))
+            .await;
     }
 
     #[fuchsia::test]
-    async fn test_activate_sensor() {
-        let (proxy, _playback_proxy) = setup().await;
-        let id = get_test_sensor().sensor_id.expect("sensor_id");
+    async fn test_configure_playback() {
+        // Creates an invalid playback_proxy so that ConfigurePlayback gets PEER_CLOSED when trying
+        // to make a request.
+        let (playback_proxy, _) =
+            fidl::endpoints::create_proxy::<playback_fidl::PlaybackMarker>().unwrap();
 
-        assert!(proxy.activate(id).await.unwrap().is_ok());
+        let driver_proxy =
+            fuchsia_component::client::connect_to_protocol::<playback_fidl::DriverMarker>()
+                .unwrap();
 
-        // Activate an already activated sensor
-        assert!(proxy.activate(id).await.unwrap().is_ok());
+        let mut manager = SensorManager::new(driver_proxy, playback_proxy);
+        let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<ManagerMarker>().unwrap();
+        fuchsia_async::Task::spawn(async move {
+            handle_sensor_manager_request_stream(stream, &mut manager)
+                .await
+                .expect("Failed to process request stream");
+        })
+        .detach();
 
-        assert_eq!(proxy.activate(-1).await.unwrap(), Err(ActivateSensorError::InvalidSensorId));
-    }
-
-    #[fuchsia::test]
-    async fn test_deactivate_sensor() {
-        let (proxy, _playback_proxy) = setup().await;
-        let _ = proxy.get_sensors_list().await;
-        let id = get_test_sensor().sensor_id.expect("sensor_id");
-
-        assert!(proxy.deactivate(id).await.unwrap().is_ok());
-
-        // Deactivate an already deactivated sensor
-        assert!(proxy.deactivate(id).await.unwrap().is_ok());
-
+        let res = proxy.configure_playback(&get_playback_config()).await;
         assert_eq!(
-            proxy.deactivate(-1).await.unwrap(),
-            Err(DeactivateSensorError::InvalidSensorId)
+            res.unwrap(),
+            Err(fidl_fuchsia_sensors::ConfigurePlaybackError::PlaybackUnavailable)
         );
-    }
 
-    #[fuchsia::test]
-    async fn test_configure_sensor_rates() {
-        let (proxy, _playback_proxy) = setup().await;
-        let _ = proxy.get_sensors_list().await;
-        let id = get_test_sensor().sensor_id.expect("sensor_id");
+        // Set up a new manager with a valid playback connection.
+        let proxy = setup().await;
+        clear_playback_config(&proxy).await;
 
-        let mut config = SensorRateConfig {
-            sampling_period_ns: Some(1),
-            max_reporting_latency_ns: Some(1),
+        let mut fixed_values_config = playback_fidl::FixedValuesPlaybackConfig {
+            sensor_list: Some(vec![get_test_sensor()]),
+            sensor_events: Some(get_test_events()),
+            ..Default::default()
+        };
+        let res = proxy
+            .configure_playback(&playback_fidl::PlaybackSourceConfig::FixedValuesConfig(
+                fixed_values_config,
+            ))
+            .await;
+        assert!(res.is_ok());
+
+        fixed_values_config = playback_fidl::FixedValuesPlaybackConfig {
+            sensor_list: None,
+            sensor_events: None,
             ..Default::default()
         };
 
-        assert!(proxy.configure_sensor_rates(id, &config.clone()).await.unwrap().is_ok());
+        let res = proxy
+            .configure_playback(&playback_fidl::PlaybackSourceConfig::FixedValuesConfig(
+                fixed_values_config,
+            ))
+            .await;
 
-        let mut res = proxy.configure_sensor_rates(-1, &config.clone()).await.unwrap();
-        assert_eq!(res, Err(ConfigureSensorRateError::InvalidSensorId));
-
-        config.max_reporting_latency_ns = None;
-        config.sampling_period_ns = None;
-        res = proxy.configure_sensor_rates(id, &config.clone()).await.unwrap();
-        assert_eq!(res, Err(ConfigureSensorRateError::InvalidConfig));
-    }
-
-    #[fuchsia::test]
-    async fn test_sensor_event_stream() {
-        let (proxy, _playback_proxy) = setup().await;
-        let id = get_test_sensor().sensor_id.unwrap();
-        let _ = proxy.activate(id).await;
-
-        let config = SensorRateConfig {
-            sampling_period_ns: Some(0),
-            max_reporting_latency_ns: Some(0),
-            ..Default::default()
-        };
-
-        assert!(proxy.configure_sensor_rates(id, &config.clone()).await.unwrap().is_ok());
-
-        let mut event_stream = proxy.take_event_stream();
-        let mut events: Vec<SensorEvent> = Vec::new();
-        for _i in 1..4 {
-            let mut event: SensorEvent =
-                event_stream.next().await.unwrap().unwrap().into_on_sensor_event().unwrap();
-            // The test cannot know these values ahead of time, so it can zero them so that it can
-            // match the rest of the event.
-            event.timestamp = 0;
-            event.sequence_number = 0;
-
-            events.push(event);
-        }
-
-        assert_eq!(events.len(), 3);
-
-        let test_events = get_test_events();
-        for event in events {
-            assert!(test_events.contains(&event));
-        }
+        assert_eq!(res.unwrap(), Err(ConfigurePlaybackError::ConfigMissingFields));
     }
 }

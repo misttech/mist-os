@@ -100,7 +100,7 @@ fuchsia_test_package("text-input-test") {
     # TODO(https://fxbug.dev/42070261): Should these be deps of the individual test
     # targets above?
     "//src/chromium:web_context_provider_for_test",
-    "//src/cobalt/bin/testing/mock_cobalt",
+    "//src/cobalt/bin/testing/fake_cobalt",
     "//src/connectivity/network:netstack-for-tests",
     "//src/developer/build_info/testing:fake-build-info-component",
     "//src/developer/memory/monitor:component",

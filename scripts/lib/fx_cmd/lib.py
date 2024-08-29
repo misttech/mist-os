@@ -268,7 +268,6 @@ class CommandTransformer(typing.Generic[EventType, ReturnType], ABC):
                 to publish a new event in the bespoke event type for
                 this transformer.
         """
-        pass
 
     @abstractmethod
     def _to_output(

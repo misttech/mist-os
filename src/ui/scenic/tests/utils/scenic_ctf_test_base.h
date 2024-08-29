@@ -26,7 +26,7 @@ namespace integration_tests {
 /// ScenicCtfTest use realm_proxy to connect scenic test realm.
 /// The scenic test realm consists of three components:
 ///   * Scenic
-///   * Mock Cobalt
+///   * Fake Cobalt
 ///   * Fake Display Provider
 ///
 /// topology as follows:

@@ -1080,9 +1080,9 @@ mod tests {
         );
     }
 
-    #[allow(dead_code)] // TODO(https://fxbug.dev/318827209)
+    // Note the inner u32 is used in the debug implementation.
     #[derive(Debug)]
-    struct PrintMe(u32);
+    struct PrintMe(#[allow(unused)] u32);
 
     type ByteEncoder = Encoder<Cursor<[u8; 1024]>>;
     static LAST_RECORD: LazyLock<Mutex<Option<ByteEncoder>>> = LazyLock::new(|| Mutex::new(None));

@@ -43,7 +43,7 @@ DECLARE_SINGLETON_MUTEX(kasan_lock);
 
 inline bool shadow_address_is_mapped(vaddr_t va) {
   InterruptDisableGuard irqd;
-  asm volatile("at s1e1r, %0" ::"r"(va) : "memory");
+  __asm__ volatile("at s1e1r, %0" ::"r"(va) : "memory");
   uint64_t par = __arm_rsr64("par_el1");
 
   return !BIT(par, 0);

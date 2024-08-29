@@ -1845,24 +1845,6 @@ INSTANTIATE_TEST_SUITE_P(IOSendingMethodTests, IOSendingMethodTest,
                          DomainAndIOMethodToString);
 #endif  // defined(__Fuchsia__)
 
-std::pair<sockaddr_storage, socklen_t> AnySockaddrAndSocklenForDomain(const SocketDomain& domain) {
-  sockaddr_storage addr{
-      .ss_family = domain.Get(),
-  };
-  switch (domain.which()) {
-    case SocketDomain::Which::IPv4: {
-      auto& sin = *reinterpret_cast<sockaddr_in*>(&addr);
-      sin.sin_addr.s_addr = htonl(INADDR_ANY);
-      return std::make_pair(addr, sizeof(sin));
-    }
-    case SocketDomain::Which::IPv6: {
-      auto& sin6 = *reinterpret_cast<sockaddr_in6*>(&addr);
-      sin6.sin6_addr = IN6ADDR_ANY_INIT;
-      return std::make_pair(addr, sizeof(sin6));
-    }
-  }
-}
-
 class AllDomainTests : public testing::TestWithParam<SocketDomain> {};
 
 TEST_P(AllDomainTests, SendToAnyAddr) {
@@ -2361,7 +2343,8 @@ TEST_P(NetDatagramSocketsCmsgRecvTest, TruncatedMessageByOneByte) {
   ASSERT_NO_FATAL_FAILURE(
       SendAndCheckReceivedMessage(control, socklen_t(sizeof(control)), [&](msghdr& msghdr) {
         if (kIsFuchsia) {
-          // TODO(https://fxbug.dev/42167124): Add support for truncated control messages (MSG_CTRUNC).
+          // TODO(https://fxbug.dev/42167124): Add support for truncated control messages
+          // (MSG_CTRUNC).
           EXPECT_EQ(msghdr.msg_controllen, 0u);
           EXPECT_EQ(CMSG_FIRSTHDR(&msghdr), nullptr);
         } else {

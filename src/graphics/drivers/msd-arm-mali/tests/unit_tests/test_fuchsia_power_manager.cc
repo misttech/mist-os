@@ -8,7 +8,7 @@
 #include <fidl/fuchsia.power.system/cpp/test_base.h>
 #include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
 #include <lib/driver/testing/cpp/driver_runtime.h>
-#include <lib/driver/testing/cpp/test_environment.h>
+#include <lib/driver/testing/cpp/internal/test_environment.h>
 #include <lib/driver/testing/cpp/test_node.h>
 
 #include <gtest/gtest.h>
@@ -279,7 +279,7 @@ struct IncomingNamespace {
   }
 
   fdf_testing::TestNode node{"root"};
-  fdf_testing::TestEnvironment env{fdf::Dispatcher::GetCurrent()->get()};
+  fdf_testing::internal::TestEnvironment env{fdf::Dispatcher::GetCurrent()->get()};
   fake_pdev::FakePDevFidl pdev_server;
   zx::event exec_opportunistic, wake_assertive;
   std::optional<FakeSystemActivityGovernor> system_activity_governor;
@@ -327,6 +327,8 @@ fuchsia_hardware_power::PowerElementConfiguration hardware_power_config() {
   return hardware_power_config;
 }
 
+// WARNING: Don't use this test as a template for new tests as it uses the old driver testing
+// library.
 TEST(FuchsiaPowerManager, Basic) {
   zx::result incoming_directory_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
   std::unique_ptr<DriverLoggerHarness> harness = DriverLoggerHarness::Create();

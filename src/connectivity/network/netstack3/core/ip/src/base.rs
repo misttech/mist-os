@@ -20,7 +20,8 @@ use explicit::ResultExt as _;
 use lock_order::lock::{OrderedLockAccess, OrderedLockRef};
 use log::{debug, error, trace};
 use net_types::ip::{
-    GenericOverIp, Ip, IpAddress, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Ipv6SourceAddr, Mtu, Subnet,
+    GenericOverIp, Ip, IpAddress, IpInvariant, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Ipv6SourceAddr, Mtu,
+    Subnet,
 };
 use net_types::{
     MulticastAddr, MulticastAddress, SpecifiedAddr, SpecifiedAddress as _, UnicastAddr, Witness,
@@ -29,10 +30,11 @@ use netstack3_base::socket::SocketIpAddrExt as _;
 use netstack3_base::sync::{Mutex, PrimaryRc, RwLock, StrongRc, WeakRc};
 use netstack3_base::{
     AnyDevice, BroadcastIpExt, CoreTimerContext, Counter, CounterContext, DeviceIdContext,
-    DeviceIdentifier as _, ErrorAndSerializer, EventContext, FrameDestination, HandleableTimer,
-    Inspectable, Inspector, InstantContext, IpExt, NestedIntoCoreTimerCtx, NotFoundError,
-    RngContext, SendFrameErrorReason, StrongDeviceIdentifier, TimerBindingsTypes, TimerContext,
-    TimerHandler, TracingContext, WrapBroadcastMarker,
+    DeviceIdentifier as _, DeviceWithName, ErrorAndSerializer, EventContext, FrameDestination,
+    HandleableTimer, Inspectable, Inspector, InstantContext, IpExt, Matcher as _,
+    NestedIntoCoreTimerCtx, NotFoundError, RngContext, SendFrameErrorReason,
+    StrongDeviceIdentifier, TimerBindingsTypes, TimerContext, TimerHandler, TracingContext,
+    WrapBroadcastMarker,
 };
 use netstack3_filter::{
     self as filter, ConntrackConnection, FilterBindingsContext, FilterBindingsTypes,
@@ -73,8 +75,10 @@ use crate::internal::reassembly::{
     FragmentBindingsTypes, FragmentHandler, FragmentProcessingState, FragmentTimerId,
     FragmentablePacket, IpPacketFragmentCache,
 };
-use crate::internal::routing::rules::{Rule, RuleAction, RulesTable};
-use crate::internal::routing::{IpRoutingDeviceContext, RoutingTable};
+use crate::internal::routing::rules::{Rule, RuleAction, RuleInput, RulesTable};
+use crate::internal::routing::{
+    IpRoutingDeviceContext, NonLocalSrcAddrPolicy, PacketOrigin, RoutingTable,
+};
 use crate::internal::socket::{IpSocketBindingsContext, IpSocketContext, IpSocketHandler};
 use crate::internal::types::{self, Destination, NextHop, ResolvedRoute, RoutableIpAddr};
 use crate::internal::{ipv6, multicast_forwarding};
@@ -108,6 +112,25 @@ pub const IPV6_DEFAULT_SUBNET: Subnet<Ipv6Addr> =
 pub enum TransportReceiveError {
     ProtocolUnsupported,
     PortUnreachable,
+}
+
+impl TransportReceiveError {
+    fn into_icmpv4_error(self, header_len: usize) -> Icmpv4Error {
+        let kind = match self {
+            TransportReceiveError::ProtocolUnsupported => Icmpv4ErrorKind::ProtocolUnreachable,
+            TransportReceiveError::PortUnreachable => Icmpv4ErrorKind::PortUnreachable,
+        };
+        Icmpv4Error { kind, header_len }
+    }
+
+    fn into_icmpv6_error(self, header_len: usize) -> Icmpv6ErrorKind {
+        match self {
+            TransportReceiveError::ProtocolUnsupported => {
+                Icmpv6ErrorKind::ProtocolUnreachable { header_len }
+            }
+            TransportReceiveError::PortUnreachable => Icmpv6ErrorKind::PortUnreachable,
+        }
+    }
 }
 
 /// Sidecar metadata passed along with the packet.
@@ -411,7 +434,7 @@ impl<
         BC: FilterBindingsContext,
         CC: IpDeviceContext<I, BC>
             + IpSocketHandler<I, BC>
-            + IpStateContext<I, BC>
+            + IpStateContext<I>
             + FilterIpContext<I, BC>
             + UseTransportIpContextBlanket,
     > BaseTransportIpContext<I, BC> for CC
@@ -430,7 +453,7 @@ impl<
     fn get_default_hop_limits(&mut self, device: Option<&Self::DeviceId>) -> HopLimits {
         match device {
             Some(device) => HopLimits {
-                unicast: IpDeviceStateContext::<I, _>::get_hop_limit(self, device),
+                unicast: IpDeviceStateContext::<I>::get_hop_limit(self, device),
                 ..DEFAULT_HOP_LIMITS
             },
             None => DEFAULT_HOP_LIMITS,
@@ -443,7 +466,13 @@ impl<
         dst: SpecifiedAddr<I::Addr>,
         device: Option<&Self::DeviceId>,
     ) {
-        match lookup_route_table(self, device, dst.get()) {
+        match lookup_route_table(
+            self,
+            dst.get(),
+            // TODO(https://fxbug.dev/361817008): This will be broken by PBRs with custom rules. We
+            // need to make sure we confirm the reachability with the correct neighbor.
+            PacketOrigin::Local { bound_address: None, bound_device: device },
+        ) {
             Some(Destination { next_hop, device }) => {
                 let neighbor = match next_hop {
                     NextHop::RemoteAsNeighbor => dst,
@@ -671,9 +700,11 @@ impl IpLayerIpExt for Ipv6 {
 }
 
 /// The state context provided to the IP layer.
-pub trait IpStateContext<I: IpLayerIpExt, BC>: IpRouteTablesContext<I, BC> {
+pub trait IpStateContext<I: IpLayerIpExt>:
+    IpRouteTablesContext<I, DeviceId: DeviceWithName>
+{
     /// The context that provides access to the IP routing tables.
-    type IpRouteTablesCtx<'a>: IpRouteTablesContext<I, BC, DeviceId = Self::DeviceId>;
+    type IpRouteTablesCtx<'a>: IpRouteTablesContext<I, DeviceId = Self::DeviceId>;
 
     /// Gets an immutable reference to the rules table.
     fn with_rules_table<
@@ -695,11 +726,11 @@ pub trait IpStateContext<I: IpLayerIpExt, BC>: IpRouteTablesContext<I, BC> {
 }
 
 /// The state context that gives access to routing tables provided to the IP layer.
-pub trait IpRouteTablesContext<I: IpLayerIpExt, BC>: DeviceIdContext<AnyDevice> {
+pub trait IpRouteTablesContext<I: IpLayerIpExt>: DeviceIdContext<AnyDevice> {
     /// The inner device id context.
     type IpDeviceIdCtx<'a>: DeviceIdContext<AnyDevice, DeviceId = Self::DeviceId, WeakDeviceId = Self::WeakDeviceId>
         + IpRoutingDeviceContext<I>
-        + IpDeviceStateContext<I, BC>;
+        + IpDeviceStateContext<I>;
 
     /// Gets the main table ID.
     fn main_table_id(&self) -> RoutingTableId<I, Self::DeviceId>;
@@ -768,7 +799,7 @@ pub trait IpRouteTablesContext<I: IpLayerIpExt, BC>: DeviceIdContext<AnyDevice> 
 }
 
 /// Provides access to an IP device's state for the IP layer.
-pub trait IpDeviceStateContext<I: IpLayerIpExt, BC>: DeviceIdContext<AnyDevice> {
+pub trait IpDeviceStateContext<I: IpLayerIpExt>: DeviceIdContext<AnyDevice> {
     /// Calls the callback with the next packet ID.
     fn with_next_packet_id<O, F: FnOnce(&I::PacketIdState) -> O>(&self, cb: F) -> O;
 
@@ -795,7 +826,7 @@ pub trait IpDeviceStateContext<I: IpLayerIpExt, BC>: DeviceIdContext<AnyDevice> 
 }
 
 /// The IP device context provided to the IP layer.
-pub trait IpDeviceContext<I: IpLayerIpExt, BC>: IpDeviceStateContext<I, BC> {
+pub trait IpDeviceContext<I: IpLayerIpExt, BC>: IpDeviceStateContext<I> {
     /// Is the device enabled?
     fn is_ip_device_enabled(&mut self, device_id: &Self::DeviceId) -> bool;
 
@@ -890,7 +921,7 @@ pub trait IpLayerContext<
     I: IpLayerIpExt,
     BC: IpLayerBindingsContext<I, <Self as DeviceIdContext<AnyDevice>>::DeviceId>,
 >:
-    IpStateContext<I, BC>
+    IpStateContext<I>
     + IpDeviceContext<I, BC>
     + MulticastForwardingStateContext<I>
     + MulticastForwardingDeviceContext<I>
@@ -900,7 +931,7 @@ pub trait IpLayerContext<
 impl<
         I: IpLayerIpExt,
         BC: IpLayerBindingsContext<I, <CC as DeviceIdContext<AnyDevice>>::DeviceId>,
-        CC: IpStateContext<I, BC>
+        CC: IpStateContext<I>
             + IpDeviceContext<I, BC>
             + MulticastForwardingStateContext<I>
             + MulticastForwardingDeviceContext<I>,
@@ -930,11 +961,7 @@ fn is_unicast_assigned<I: IpLayerIpExt>(status: &I::AddressStatus) -> bool {
     )
 }
 
-fn is_local_assigned_address<
-    I: Ip + IpLayerIpExt,
-    BC: IpLayerBindingsContext<I, CC::DeviceId>,
-    CC: IpDeviceStateContext<I, BC>,
->(
+fn is_local_assigned_address<I: Ip + IpLayerIpExt, CC: IpDeviceStateContext<I>>(
     core_ctx: &mut CC,
     device: &CC::DeviceId,
     addr: SpecifiedAddr<I::Addr>,
@@ -953,7 +980,7 @@ where
     A: IpAddress,
     A::Version: IpLayerIpExt,
     BC: IpLayerBindingsContext<A::Version, CC::DeviceId>,
-    CC: IpDeviceStateContext<A::Version, BC> + IpDeviceContext<A::Version, BC>,
+    CC: IpDeviceStateContext<A::Version> + IpDeviceContext<A::Version, BC>,
 {
     core_ctx.with_address_statuses(addr, |mut it| {
         it.find_map(|(device, status)| is_unicast_assigned::<A::Version>(&status).then_some(device))
@@ -963,33 +990,26 @@ where
 // Returns the local IP address to use for sending packets from the
 // given device to `addr`, restricting to `local_ip` if it is not
 // `None`.
-fn get_local_addr<
-    I: Ip + IpLayerIpExt,
-    BC: IpLayerBindingsContext<I, CC::DeviceId>,
-    CC: IpDeviceStateContext<I, BC>,
->(
+fn get_local_addr<I: Ip + IpLayerIpExt, CC: IpDeviceStateContext<I>>(
     core_ctx: &mut CC,
-    local_ip: Option<IpDeviceAddr<I::Addr>>,
+    local_ip_and_policy: Option<(IpDeviceAddr<I::Addr>, NonLocalSrcAddrPolicy)>,
     device: &CC::DeviceId,
     remote_addr: Option<RoutableIpAddr<I::Addr>>,
-    allow_non_local_src: bool,
 ) -> Result<IpDeviceAddr<I::Addr>, ResolveRouteError> {
     // TODO(https://fxbug.dev/360187268): Use a witness type to prevent callers
     // from providing a multicast local ip.
-    let local_ip =
-        if local_ip.is_some_and(|ip| ip.addr().is_multicast()) { None } else { local_ip };
+    let local_ip_and_policy = local_ip_and_policy.filter(|(ip, _policy)| !ip.addr().is_multicast());
 
-    if let Some(local_ip) = local_ip {
-        if allow_non_local_src {
-            return Ok(local_ip);
+    match local_ip_and_policy {
+        Some((local_ip, NonLocalSrcAddrPolicy::Allow)) => Ok(local_ip),
+        Some((local_ip, NonLocalSrcAddrPolicy::Deny)) => {
+            is_local_assigned_address(core_ctx, device, local_ip.into())
+                .then_some(local_ip)
+                .ok_or(ResolveRouteError::NoSrcAddr)
         }
-        is_local_assigned_address(core_ctx, device, local_ip.into())
-            .then_some(local_ip)
-            .ok_or(ResolveRouteError::NoSrcAddr)
-    } else {
-        core_ctx
+        None => core_ctx
             .get_local_addr_for_remote(device, remote_addr.map(Into::into))
-            .ok_or(ResolveRouteError::NoSrcAddr)
+            .ok_or(ResolveRouteError::NoSrcAddr),
     }
 }
 
@@ -1019,52 +1039,59 @@ pub enum ResolveRouteError {
 /// - `ControlFlow::Continue(_)` if we finished walking the rules table without yielding any result.
 fn walk_rules<
     I: IpLayerIpExt,
-    BC,
-    CC: IpStateContext<I, BC>,
+    CC: IpStateContext<I>,
     O,
     State,
     F: FnMut(
         State,
-        &mut <CC::IpRouteTablesCtx<'_> as IpRouteTablesContext<I, BC>>::IpDeviceIdCtx<'_>,
+        &mut <CC::IpRouteTablesCtx<'_> as IpRouteTablesContext<I>>::IpDeviceIdCtx<'_>,
         &RoutingTable<I, CC::DeviceId>,
     ) -> ControlFlow<O, State>,
 >(
     core_ctx: &mut CC,
     init: State,
+    rule_input: &RuleInput<'_, I, CC::DeviceId>,
     mut lookup_table: F,
 ) -> ControlFlow<RuleAction<O>, State> {
     core_ctx.with_rules_table(|core_ctx, rules| {
-        rules.iter().try_fold(init, |state, Rule { action }| match action {
-            RuleAction::Unreachable => return ControlFlow::Break(RuleAction::Unreachable),
-            RuleAction::Lookup(table_id) => {
-                core_ctx.with_ip_routing_table(table_id, |core_ctx, table| {
-                    match lookup_table(state, core_ctx, table) {
-                        ControlFlow::Break(out) => ControlFlow::Break(RuleAction::Lookup(out)),
-                        ControlFlow::Continue(state) => ControlFlow::Continue(state),
-                    }
-                })
+        rules.iter().try_fold(init, |state, Rule { action, matcher }| {
+            if !matcher.matches(rule_input) {
+                return ControlFlow::Continue(state);
+            }
+            match action {
+                RuleAction::Unreachable => return ControlFlow::Break(RuleAction::Unreachable),
+                RuleAction::Lookup(table_id) => {
+                    core_ctx.with_ip_routing_table(table_id, |core_ctx, table| {
+                        match lookup_table(state, core_ctx, table) {
+                            ControlFlow::Break(out) => ControlFlow::Break(RuleAction::Lookup(out)),
+                            ControlFlow::Continue(state) => ControlFlow::Continue(state),
+                        }
+                    })
+                }
             }
         })
     })
 }
 
-/// Returns the forwarding instructions for reaching the given destination.
+/// Returns the outgoing routing instructions for reaching the given destination.
 ///
 /// If a `device` is specified, the resolved route is limited to those that
 /// egress over the device.
 ///
 /// If `src_ip` is specified the resolved route is limited to those that egress
 /// over a device with the address assigned.
-pub fn resolve_route_to_destination<
+///
+/// This function should only be used for calculating a route for an outgoing packet
+/// that is generated by us.
+pub fn resolve_output_route_to_destination<
     I: Ip + IpDeviceStateIpExt + IpDeviceIpExt + IpLayerIpExt,
     BC: IpDeviceBindingsContext<I, CC::DeviceId> + IpLayerBindingsContext<I, CC::DeviceId>,
     CC: IpLayerContext<I, BC> + device::IpDeviceConfigurationContext<I, BC>,
 >(
     core_ctx: &mut CC,
     device: Option<&CC::DeviceId>,
-    src_ip: Option<IpDeviceAddr<I::Addr>>,
+    src_ip_and_policy: Option<(IpDeviceAddr<I::Addr>, NonLocalSrcAddrPolicy)>,
     dst_ip: Option<RoutableIpAddr<I::Addr>>,
-    allow_non_local_src: bool,
 ) -> Result<ResolvedRoute<I, CC::DeviceId>, ResolveRouteError> {
     enum LocalDelivery<A, D> {
         WeakLoopback { dst_ip: A, device: D },
@@ -1100,7 +1127,7 @@ pub fn resolve_route_to_destination<
                     // a zone ID, then use strong host to enforce that the
                     // source and destination addresses are assigned to the
                     // same interface.
-                    if src_ip.is_some_and(|ip| ip.as_ref().must_have_zone())
+                    if src_ip_and_policy.is_some_and(|(ip, _policy)| ip.as_ref().must_have_zone())
                         || dst_ip.as_ref().must_have_zone()
                     {
                         LocalDelivery::StrongForDevice(dst_device)
@@ -1117,20 +1144,19 @@ pub fn resolve_route_to_destination<
 
         let (src_addr, dest_device) = match local_delivery {
             LocalDelivery::WeakLoopback { dst_ip, device } => {
-                let src_ip = match src_ip {
-                    Some(src_ip) => {
-                        if !allow_non_local_src {
-                            let _device = get_device_with_assigned_address(core_ctx, src_ip.into())
-                                .ok_or(ResolveRouteError::NoSrcAddr)?;
-                        }
+                let src_ip = match src_ip_and_policy {
+                    Some((src_ip, NonLocalSrcAddrPolicy::Deny)) => {
+                        let _device = get_device_with_assigned_address(core_ctx, src_ip.into())
+                            .ok_or(ResolveRouteError::NoSrcAddr)?;
                         src_ip
                     }
+                    Some((src_ip, NonLocalSrcAddrPolicy::Allow)) => src_ip,
                     None => dst_ip,
                 };
                 (src_ip, device)
             }
             LocalDelivery::StrongForDevice(device) => {
-                (get_local_addr(core_ctx, src_ip, &device, dst_ip, allow_non_local_src)?, device)
+                (get_local_addr(core_ctx, src_ip_and_policy, &device, dst_ip)?, device)
             }
         };
         return Ok(ResolvedRoute {
@@ -1140,17 +1166,19 @@ pub fn resolve_route_to_destination<
             next_hop: NextHop::RemoteAsNeighbor,
         });
     }
+    let bound_address = src_ip_and_policy.map(|(sock_addr, _policy)| sock_addr.into_inner().get());
+    let rule_input =
+        RuleInput { packet_origin: PacketOrigin::Local { bound_address, bound_device: device } };
     let result = walk_rules(
         core_ctx,
         None, /* first error encountered */
+        &rule_input,
         |first_error, core_ctx, table| {
             let mut matching_with_addr = table.lookup_filter_map(
                 core_ctx,
                 device,
                 dst_ip.map_or(I::UNSPECIFIED_ADDRESS, |a| a.addr()),
-                |core_ctx, d| {
-                    Some(get_local_addr(core_ctx, src_ip, d, dst_ip, allow_non_local_src))
-                },
+                |core_ctx, d| Some(get_local_addr(core_ctx, src_ip_and_policy, d, dst_ip)),
             );
 
             let first_error_in_this_table = match matching_with_addr.next() {
@@ -1228,7 +1256,17 @@ impl<
         addr: RoutableIpAddr<I::Addr>,
         transparent: bool,
     ) -> Result<ResolvedRoute<I, CC::DeviceId>, ResolveRouteError> {
-        resolve_route_to_destination(self, device, local_ip, Some(addr), transparent)
+        let src_ip_and_policy = local_ip.map(|local_ip| {
+            (
+                local_ip,
+                if transparent {
+                    NonLocalSrcAddrPolicy::Allow
+                } else {
+                    NonLocalSrcAddrPolicy::Deny
+                },
+            )
+        });
+        resolve_output_route_to_destination(self, device, src_ip_and_policy, Some(addr))
     }
 
     fn send_ip_packet<S>(
@@ -1278,7 +1316,7 @@ pub trait IpLayerIngressContext<
     BC: IpLayerBindingsContext<I, Self::DeviceId>,
 >:
     IpTransportDispatchContext<I, BC, DeviceId: filter::InterfaceProperties<BC::DeviceClass>>
-    + IpDeviceStateContext<I, BC>
+    + IpDeviceStateContext<I>
     + IpDeviceSendContext<I, BC>
     + IcmpErrorHandler<I, BC>
     + IpLayerContext<I, BC>
@@ -1295,7 +1333,7 @@ impl<
                 I,
                 BC,
                 DeviceId: filter::InterfaceProperties<BC::DeviceClass>,
-            > + IpDeviceStateContext<I, BC>
+            > + IpDeviceStateContext<I>
             + IpDeviceSendContext<I, BC>
             + IcmpErrorHandler<I, BC>
             + IpLayerContext<I, BC>
@@ -1406,7 +1444,7 @@ impl<StrongDeviceId: StrongDeviceIdentifier, BT: IpLayerBindingsTypes>
 /// Generates an IP packet ID.
 ///
 /// This is only meaningful for IPv4, see [`IpLayerIpExt`].
-pub fn gen_ip_packet_id<I: IpLayerIpExt, BC, CC: IpDeviceStateContext<I, BC>>(
+pub fn gen_ip_packet_id<I: IpLayerIpExt, CC: IpDeviceStateContext<I>>(
     core_ctx: &mut CC,
 ) -> I::PacketId {
     core_ctx.with_next_packet_id(|state| I::next_packet_id_from_state(state))
@@ -1802,10 +1840,15 @@ where
     }
 }
 
-/// A [`TransportReceiveError`], and the metadata required to handle it.
-struct DispatchIpPacketError<I: IcmpHandlerIpExt> {
-    /// The error that occurred while dispatching to the transport layer.
-    err: TransportReceiveError,
+/// An ICMP error, and the metadata required to send it.
+///
+/// This allows the sending of the ICMP error to be decoupled from the
+/// generation of the error, which is advantageous because sending the error
+/// requires the underlying packet buffer, which cannot be "moved" in certain
+/// contexts.
+struct IcmpErrorSender<'a, I: IcmpHandlerIpExt, D> {
+    /// The ICMP error that should be sent.
+    err: I::IcmpError,
     /// The original source IP address of the packet (before the local-ingress
     /// hook evaluation).
     src_ip: I::SourceAddress,
@@ -1814,59 +1857,30 @@ struct DispatchIpPacketError<I: IcmpHandlerIpExt> {
     dst_ip: SpecifiedAddr<I::Addr>,
     /// The frame destination of the packet.
     frame_dst: Option<FrameDestination>,
+    /// The device out which to send the error.
+    device: &'a D,
     /// The metadata from the packet, allowing the packet's backing buffer to be
     /// returned to it's pre-IP-parse state with [`GrowBuffer::undo_parse`].
     meta: ParseMetadata,
 }
 
-impl<I: IcmpHandlerIpExt> DispatchIpPacketError<I> {
+impl<'a, I: IcmpHandlerIpExt, D> IcmpErrorSender<'a, I, D> {
     /// Generate an send an appropriate ICMP error in response to this error.
     ///
     /// The provided `body` must be the original buffer from which the IP
     /// packet responsible for this error was parsed. It is expected to be in a
     /// state that allows undoing the IP packet parse (e.g. unmodified after the
     /// IP packet was parsed).
-    fn respond_with_icmp_error<B: BufferMut, BC, CC: IcmpErrorHandler<I, BC>>(
+    fn respond_with_icmp_error<B, BC, CC>(
         self,
         core_ctx: &mut CC,
         bindings_ctx: &mut BC,
         mut body: B,
-        device: &CC::DeviceId,
-    ) {
-        fn icmp_error_from_transport_error<I: IcmpHandlerIpExt>(
-            err: TransportReceiveError,
-            header_len: usize,
-        ) -> I::IcmpError {
-            #[derive(GenericOverIp)]
-            #[generic_over_ip(I, Ip)]
-            struct ErrorHolder<I: Ip + IcmpHandlerIpExt>(I::IcmpError);
-
-            let ErrorHolder(err) = match err {
-                TransportReceiveError::ProtocolUnsupported => I::map_ip(
-                    header_len,
-                    |header_len| {
-                        ErrorHolder(Icmpv4Error {
-                            kind: Icmpv4ErrorKind::ProtocolUnreachable,
-                            header_len,
-                        })
-                    },
-                    |header_len| ErrorHolder(Icmpv6ErrorKind::ProtocolUnreachable { header_len }),
-                ),
-                TransportReceiveError::PortUnreachable => I::map_ip(
-                    header_len,
-                    |header_len| {
-                        ErrorHolder(Icmpv4Error {
-                            kind: Icmpv4ErrorKind::PortUnreachable,
-                            header_len,
-                        })
-                    },
-                    |_header_len| ErrorHolder(Icmpv6ErrorKind::PortUnreachable),
-                ),
-            };
-            err
-        }
-
-        let DispatchIpPacketError { err, src_ip, dst_ip, frame_dst, meta } = self;
+    ) where
+        B: BufferMut,
+        CC: IcmpErrorHandler<I, BC, DeviceId = D>,
+    {
+        let IcmpErrorSender { err, src_ip, dst_ip, frame_dst, device, meta } = self;
         // Undo the parsing of the IP Packet, moving the buffer's cursor so that
         // it points at the start of the IP header. This way, the sent ICMP
         // error will contain the entire original IP packet.
@@ -1879,7 +1893,7 @@ impl<I: IcmpHandlerIpExt> DispatchIpPacketError<I> {
             src_ip,
             dst_ip,
             body,
-            icmp_error_from_transport_error::<I>(err, meta.header_len()),
+            err,
         );
     }
 }
@@ -1905,17 +1919,19 @@ impl<I: IcmpHandlerIpExt> DispatchIpPacketError<I> {
 /// coming from a device, i.e., `device` given is `None`,
 /// `dispatch_receive_ip_packet` will also panic.
 fn dispatch_receive_ipv4_packet<
+    'a,
+    'b,
     BC: IpLayerBindingsContext<Ipv4, CC::DeviceId>,
     CC: IpLayerIngressContext<Ipv4, BC> + CounterContext<IpCounters<Ipv4>>,
 >(
-    core_ctx: &mut CC,
-    bindings_ctx: &mut BC,
-    device: &CC::DeviceId,
+    core_ctx: &'a mut CC,
+    bindings_ctx: &'a mut BC,
+    device: &'b CC::DeviceId,
     frame_dst: Option<FrameDestination>,
-    mut packet: Ipv4Packet<&mut [u8]>,
+    mut packet: Ipv4Packet<&'a mut [u8]>,
     mut packet_metadata: IpLayerPacketMetadata<Ipv4, BC>,
     meta: ReceiveIpPacketMeta<Ipv4>,
-) -> Result<(), DispatchIpPacketError<Ipv4>> {
+) -> Result<(), IcmpErrorSender<'b, Ipv4, CC::DeviceId>> {
     core_ctx.increment(|counters| &counters.dispatch_receive_ip_packet);
 
     match frame_dst {
@@ -1966,7 +1982,14 @@ fn dispatch_receive_ipv4_packet<
         .or_else(|err| {
             if let Some(src_ip) = SpecifiedAddr::new(src_ip) {
                 let (_, _, _, meta) = packet.into_metadata();
-                Err(DispatchIpPacketError { err, src_ip, dst_ip, frame_dst, meta })
+                Err(IcmpErrorSender {
+                    err: err.into_icmpv4_error(meta.header_len()),
+                    src_ip,
+                    dst_ip,
+                    frame_dst,
+                    device,
+                    meta,
+                })
             } else {
                 Ok(())
             }
@@ -1978,17 +2001,19 @@ fn dispatch_receive_ipv4_packet<
 /// `dispatch_receive_ipv6_packet` has the same semantics as
 /// `dispatch_receive_ipv4_packet`, but for IPv6.
 fn dispatch_receive_ipv6_packet<
+    'a,
+    'b,
     BC: IpLayerBindingsContext<Ipv6, CC::DeviceId>,
     CC: IpLayerIngressContext<Ipv6, BC> + CounterContext<IpCounters<Ipv6>>,
 >(
-    core_ctx: &mut CC,
-    bindings_ctx: &mut BC,
-    device: &CC::DeviceId,
+    core_ctx: &'a mut CC,
+    bindings_ctx: &'a mut BC,
+    device: &'b CC::DeviceId,
     frame_dst: Option<FrameDestination>,
-    mut packet: Ipv6Packet<&mut [u8]>,
+    mut packet: Ipv6Packet<&'a mut [u8]>,
     mut packet_metadata: IpLayerPacketMetadata<Ipv6, BC>,
     meta: ReceiveIpPacketMeta<Ipv6>,
-) -> Result<(), DispatchIpPacketError<Ipv6>> {
+) -> Result<(), IcmpErrorSender<'b, Ipv6, CC::DeviceId>> {
     // TODO(https://fxbug.dev/42095067): Once we support multiple extension
     // headers in IPv6, we will need to verify that the callers of this
     // function are still sound. In particular, they may accidentally pass a
@@ -2052,13 +2077,286 @@ fn dispatch_receive_ipv6_packet<
         .or_else(|err| {
             if let Ipv6SourceAddr::Unicast(src_ip) = src_ip {
                 let (_, _, _, meta) = packet.into_metadata();
-                Err(DispatchIpPacketError { err, src_ip: *src_ip, dst_ip, frame_dst, meta })
+                Err(IcmpErrorSender {
+                    err: err.into_icmpv6_error(meta.header_len()),
+                    src_ip: *src_ip,
+                    dst_ip,
+                    frame_dst,
+                    device,
+                    meta,
+                })
             } else {
                 Ok(())
             }
         });
     packet_metadata.acknowledge_drop();
     result
+}
+
+/// The metadata required to forward an IP Packet.
+///
+/// This allows the forwarding of the packet to be decoupled from the
+/// determination of how to forward. This is advantageous because forwarding
+/// requires the underlying packet buffer, which cannot be "moved" in certain
+/// contexts.
+struct IpPacketForwarder<'a, I: IpLayerIpExt + IcmpHandlerIpExt, D, BT: FilterBindingsTypes> {
+    inbound_device: &'a D,
+    outbound_device: &'a D,
+    packet_meta: IpLayerPacketMetadata<I, BT>,
+    src_ip: I::RecvSrcAddr,
+    dst_ip: SpecifiedAddr<I::Addr>,
+    destination: IpPacketDestination<I, &'a D>,
+    proto: I::Proto,
+    parse_meta: ParseMetadata,
+    frame_dst: Option<FrameDestination>,
+}
+
+impl<'a, I, D, BC> IpPacketForwarder<'a, I, D, BC>
+where
+    I: IpLayerIpExt + IcmpHandlerIpExt,
+    BC: IpLayerBindingsContext<I, D>,
+{
+    // Forward the provided buffer as specified by this [`IpPacketForwarder`].
+    fn forward_with_buffer<CC, B>(self, core_ctx: &mut CC, bindings_ctx: &mut BC, buffer: B)
+    where
+        B: BufferMut,
+        CC: IpLayerIngressContext<I, BC, DeviceId = D> + CounterContext<IpCounters<I>>,
+    {
+        let Self {
+            inbound_device,
+            outbound_device,
+            packet_meta,
+            src_ip,
+            dst_ip,
+            destination,
+            proto,
+            parse_meta,
+            frame_dst,
+        } = self;
+
+        let packet = ForwardedPacket::new(src_ip.into(), dst_ip.get(), proto, parse_meta, buffer);
+
+        trace!("forward_with_buffer: forwarding {} packet", I::NAME);
+
+        match send_ip_frame(
+            core_ctx,
+            bindings_ctx,
+            outbound_device,
+            destination,
+            packet,
+            packet_meta,
+        ) {
+            Ok(()) => (),
+            Err(IpSendFrameError { serializer, error }) => {
+                match error {
+                    IpSendFrameErrorReason::Device(
+                        SendFrameErrorReason::SizeConstraintsViolation,
+                    ) => {
+                        debug!("failed to forward {} packet: MTU exceeded", I::NAME);
+                        core_ctx.increment(|counters: &IpCounters<I>| &counters.mtu_exceeded);
+                        let mtu = core_ctx.get_mtu(inbound_device);
+                        // NB: Ipv6 sends a PacketTooBig error. Ipv4 sends nothing.
+                        let Some(err) = I::new_mtu_exceeded(proto, parse_meta.header_len(), mtu)
+                        else {
+                            return;
+                        };
+                        // NB: Only send an ICMP error if the sender's src
+                        // is specified.
+                        let Some(src_ip) = I::received_source_as_icmp_source(src_ip) else {
+                            return;
+                        };
+                        // TODO(https://fxbug.dev/362489447): Increment the TTL since we
+                        // just decremented it. The fact that we don't do this is
+                        // technically a violation of the ICMP spec (we're not
+                        // encapsulating the original packet that caused the
+                        // issue, but a slightly modified version of it), but
+                        // it's not that big of a deal because it won't affect
+                        // the sender's ability to figure out the minimum path
+                        // MTU. This may break other logic, though, so we should
+                        // still fix it eventually.
+                        core_ctx.send_icmp_error_message(
+                            bindings_ctx,
+                            inbound_device,
+                            frame_dst,
+                            src_ip,
+                            dst_ip,
+                            serializer.into_buffer(),
+                            err,
+                        );
+                    }
+                    IpSendFrameErrorReason::Device(SendFrameErrorReason::QueueFull)
+                    | IpSendFrameErrorReason::Device(SendFrameErrorReason::Alloc)
+                    | IpSendFrameErrorReason::IllegalLoopbackAddress => (),
+                }
+                debug!("failed to forward {} packet: {error:?}", I::NAME);
+            }
+        }
+    }
+}
+
+/// The action to take for a packet that was a candidate for forwarding.
+enum ForwardingAction<'a, I: IpLayerIpExt + IcmpHandlerIpExt, D, BT: FilterBindingsTypes> {
+    /// Drop the packet without forwarding it or generating an ICMP error.
+    SilentlyDrop,
+    /// Forward the packet, as specified by the [`IpPacketForwarder`].
+    Forward(IpPacketForwarder<'a, I, D, BT>),
+    /// Drop the packet without forwarding, and generate an ICMP error as
+    /// specified by the [`IcmpErrorSender`].
+    DropWithIcmpError(IcmpErrorSender<'a, I, D>),
+}
+
+impl<'a, I, D, BC> ForwardingAction<'a, I, D, BC>
+where
+    I: IpLayerIpExt + IcmpHandlerIpExt,
+    BC: IpLayerBindingsContext<I, D>,
+{
+    /// Perform the action prescribed by self, with the provided packet buffer.
+    fn perform_action_with_buffer<CC, B>(self, core_ctx: &mut CC, bindings_ctx: &mut BC, buffer: B)
+    where
+        B: BufferMut,
+        CC: IpLayerIngressContext<I, BC, DeviceId = D> + CounterContext<IpCounters<I>>,
+    {
+        match self {
+            ForwardingAction::SilentlyDrop => {}
+            ForwardingAction::Forward(forwarder) => {
+                forwarder.forward_with_buffer(core_ctx, bindings_ctx, buffer)
+            }
+            ForwardingAction::DropWithIcmpError(icmp_sender) => {
+                icmp_sender.respond_with_icmp_error(core_ctx, bindings_ctx, buffer)
+            }
+        }
+    }
+}
+
+/// Determine which [`ForwardingAction`] should be taken for an IP packet.
+fn determine_ip_packet_forwarding_action<'a, 'b, I, BC, CC, B>(
+    core_ctx: &'a mut CC,
+    mut packet: I::Packet<&'a mut [u8]>,
+    mut packet_meta: IpLayerPacketMetadata<I, BC>,
+    inbound_device: &'b CC::DeviceId,
+    outbound_device: &'b CC::DeviceId,
+    destination: IpPacketDestination<I, &'b CC::DeviceId>,
+    frame_dst: Option<FrameDestination>,
+    src_ip: I::RecvSrcAddr,
+    dst_ip: SpecifiedAddr<I::Addr>,
+) -> ForwardingAction<'b, I, CC::DeviceId, BC>
+where
+    I: IpLayerIpExt + IcmpHandlerIpExt,
+    BC: IpLayerBindingsContext<I, CC::DeviceId>,
+    CC: IpLayerIngressContext<I, BC> + CounterContext<IpCounters<I>>,
+    B: BufferMut,
+    I::Packet<&'a mut [u8]>: netstack3_filter::IpPacket<I>,
+{
+    let ttl = packet.ttl();
+    if ttl <= 1 {
+        // TTL is 0 or would become 0 after decrement.
+        // For IPv4, see "TTL" section, https://tools.ietf.org/html/rfc791#page-14.
+        // For IPv6, see "Hop Limit" section, https://datatracker.ietf.org/doc/html/rfc2460#page-5.
+        core_ctx.increment(|counters: &IpCounters<I>| &counters.ttl_expired);
+        debug!("{} packet not forwarded due to expired TTL", I::NAME);
+
+        // Only send an ICMP error if the src_ip is specified.
+        let Some(src_ip) = I::received_source_as_icmp_source(src_ip) else {
+            core_ctx.increment(|counters: &IpCounters<I>| &counters.unspecified_source);
+            packet_meta.acknowledge_drop();
+            return ForwardingAction::SilentlyDrop;
+        };
+
+        // Construct and send the appropriate ICMP error for the IP version.
+        let version_specific_meta = packet.version_specific_meta();
+        let (_, _, proto, parse_meta): (I::Addr, I::Addr, _, _) = packet.into_metadata();
+        let err = I::new_ttl_expired(proto, parse_meta.header_len(), version_specific_meta);
+        packet_meta.acknowledge_drop();
+        return ForwardingAction::DropWithIcmpError(IcmpErrorSender {
+            err,
+            src_ip,
+            dst_ip,
+            frame_dst,
+            device: inbound_device,
+            meta: parse_meta,
+        });
+    }
+
+    trace!("determine_ip_packet_forwarding_action: adequate TTL");
+
+    // For IPv6 packets, handle extension headers first.
+    //
+    // Any previous handling of extension headers was done under the
+    // assumption that we are the final destination of the packet. Now that
+    // we know we're forwarding, we need to re-examine them.
+    let maybe_ipv6_packet_action = I::map_ip_in(
+        &packet,
+        |_packet| None,
+        |packet| {
+            Some(ipv6::handle_extension_headers(core_ctx, inbound_device, frame_dst, packet, false))
+        },
+    );
+    match maybe_ipv6_packet_action {
+        None => {} // NB: Ipv4 case.
+        Some(Ipv6PacketAction::_Discard) => {
+            core_ctx.increment(|counters: &IpCounters<I>| {
+                #[derive(GenericOverIp)]
+                #[generic_over_ip(I, Ip)]
+                struct InCounters<'a, I: IpLayerIpExt>(&'a I::RxCounters);
+                let IpInvariant(counter) = I::map_ip(
+                    InCounters(&counters.version_rx),
+                    |_counters| {
+                        unreachable!(
+                            "`I` must be `Ipv6` because we're handling IPv6 extension headers"
+                        )
+                    },
+                    |InCounters(counters)| IpInvariant(&counters.extension_header_discard),
+                );
+                counter
+            });
+            trace!(
+                "determine_ip_packet_forwarding_action: handled IPv6 extension headers: \
+                discarding packet"
+            );
+            packet_meta.acknowledge_drop();
+            return ForwardingAction::SilentlyDrop;
+        }
+        Some(Ipv6PacketAction::Continue) => {
+            trace!(
+                "determine_ip_packet_forwarding_action: handled IPv6 extension headers: \
+                forwarding packet"
+            );
+        }
+        Some(Ipv6PacketAction::ProcessFragment) => {
+            unreachable!(
+                "When forwarding packets, we should only ever look at the hop by hop \
+                    options extension header (if present)"
+            )
+        }
+    };
+
+    match core_ctx.filter_handler().forwarding_hook(
+        &mut packet,
+        inbound_device,
+        outbound_device,
+        &mut packet_meta,
+    ) {
+        filter::Verdict::Drop => {
+            packet_meta.acknowledge_drop();
+            trace!("determine_ip_packet_forwarding_action: filter verdict: Drop");
+            return ForwardingAction::SilentlyDrop;
+        }
+        filter::Verdict::Accept => {}
+    }
+
+    packet.set_ttl(ttl - 1);
+    let (_, _, proto, parse_meta): (I::Addr, I::Addr, _, _) = packet.into_metadata();
+    ForwardingAction::Forward(IpPacketForwarder {
+        inbound_device,
+        outbound_device,
+        packet_meta,
+        src_ip,
+        dst_ip,
+        destination,
+        proto,
+        parse_meta,
+        frame_dst,
+    })
 }
 
 pub(crate) fn send_ip_frame<I, CC, BC, S>(
@@ -2149,7 +2447,7 @@ fn process_fragment<'a, I, CC, BC>(
     core_ctx: &mut CC,
     bindings_ctx: &mut BC,
     packet: I::Packet<&'a mut [u8]>,
-) -> Result<ProcessFragmentResult<'a, I>, DispatchIpPacketError<I>>
+) -> ProcessFragmentResult<'a, I>
 where
     I: IpLayerIpExt + IcmpHandlerIpExt,
     for<'b> I::Packet<&'b mut [u8]>: FragmentablePacket,
@@ -2160,7 +2458,7 @@ where
         // Handle the packet right away since reassembly is not needed.
         FragmentProcessingState::NotNeeded(packet) => {
             trace!("receive_ip_packet: not fragmented");
-            Ok(ProcessFragmentResult::NotNeeded(packet))
+            ProcessFragmentResult::NotNeeded(packet)
         }
         // Ready to reassemble a packet.
         FragmentProcessingState::Ready { key, packet_len } => {
@@ -2176,12 +2474,12 @@ where
                 buffer.buffer_view_mut(),
             ) {
                 // Successfully reassembled the packet, handle it.
-                Ok(()) => Ok(ProcessFragmentResult::Reassembled(buffer.into_inner())),
+                Ok(()) => ProcessFragmentResult::Reassembled(buffer.into_inner()),
                 Err(e) => {
                     core_ctx
                         .increment(|counters: &IpCounters<I>| &counters.fragment_reassembly_error);
                     debug!("receive_ip_packet: fragmented, failed to reassemble: {:?}", e);
-                    Ok(ProcessFragmentResult::Done)
+                    ProcessFragmentResult::Done
                 }
             };
             reassemble_result
@@ -2191,18 +2489,18 @@ where
         FragmentProcessingState::NeedMoreFragments => {
             core_ctx.increment(|counters: &IpCounters<I>| &counters.need_more_fragments);
             trace!("receive_ip_packet: fragmented, need more before reassembly");
-            Ok(ProcessFragmentResult::Done)
+            ProcessFragmentResult::Done
         }
         // TODO(ghanan): Handle invalid fragments.
         FragmentProcessingState::InvalidFragment => {
             core_ctx.increment(|counters: &IpCounters<I>| &counters.invalid_fragment);
             trace!("receive_ip_packet: fragmented, invalid");
-            Ok(ProcessFragmentResult::Done)
+            ProcessFragmentResult::Done
         }
         FragmentProcessingState::OutOfMemory => {
             core_ctx.increment(|counters: &IpCounters<I>| &counters.fragment_cache_full);
             trace!("receive_ip_packet: fragmented, dropped because OOM");
-            Ok(ProcessFragmentResult::Done)
+            ProcessFragmentResult::Done
         }
     }
 }
@@ -2355,9 +2653,9 @@ pub fn receive_ipv4_packet<
     // (even if the fragment data has values that implies that the packet is not
     // fragmented).
     let mut packet = match process_fragment(core_ctx, bindings_ctx, packet) {
-        Ok(ProcessFragmentResult::Done) => return,
-        Ok(ProcessFragmentResult::NotNeeded(packet)) => packet,
-        Ok(ProcessFragmentResult::Reassembled(buf)) => {
+        ProcessFragmentResult::Done => return,
+        ProcessFragmentResult::NotNeeded(packet) => packet,
+        ProcessFragmentResult::Reassembled(buf) => {
             let buf = Buf::new(buf, ..);
             buffer = packet::Either::B(buf);
 
@@ -2371,10 +2669,6 @@ pub fn receive_ipv4_packet<
                     return;
                 }
             }
-        }
-        Err(err) => {
-            err.respond_with_icmp_error(core_ctx, bindings_ctx, buffer, device);
-            return;
         }
     };
 
@@ -2420,9 +2714,7 @@ pub fn receive_ipv4_packet<
                 packet_metadata,
                 meta,
             )
-            .unwrap_or_else(|err| {
-                err.respond_with_icmp_error(core_ctx, bindings_ctx, buffer, device)
-            });
+            .unwrap_or_else(|err| err.respond_with_icmp_error(core_ctx, bindings_ctx, buffer));
             return;
         }
     }
@@ -2456,94 +2748,25 @@ pub fn receive_ipv4_packet<
                 packet_metadata,
                 meta,
             )
-            .unwrap_or_else(|err| {
-                err.respond_with_icmp_error(core_ctx, bindings_ctx, buffer, device)
-            });
+            .unwrap_or_else(|err| err.respond_with_icmp_error(core_ctx, bindings_ctx, buffer));
         }
         ReceivePacketAction::Forward {
-            original_dst: dst_ip,
+            original_dst,
             dst: Destination { device: dst_device, next_hop },
         } => {
-            let destination = IpPacketDestination::from_next_hop(next_hop, dst_ip);
-            let ttl = packet.ttl();
-            if ttl > 1 {
-                trace!("receive_ipv4_packet: forwarding");
-
-                match core_ctx.filter_handler().forwarding_hook(
-                    &mut packet,
-                    device,
-                    &dst_device,
-                    &mut packet_metadata,
-                ) {
-                    filter::Verdict::Drop => {
-                        packet_metadata.acknowledge_drop();
-                        return;
-                    }
-                    filter::Verdict::Accept => {}
-                }
-
-                packet.set_ttl(ttl - 1);
-                let (src, dst, proto, meta) = packet.into_metadata();
-                let packet = ForwardedPacket::new(src, dst, proto, meta, buffer);
-
-                match send_ip_frame(
-                    core_ctx,
-                    bindings_ctx,
-                    &dst_device,
-                    destination,
-                    packet,
-                    packet_metadata,
-                ) {
-                    Ok(()) => (),
-                    Err(IpSendFrameError { serializer: _, error }) => {
-                        match error {
-                            IpSendFrameErrorReason::Device(
-                                SendFrameErrorReason::SizeConstraintsViolation,
-                            ) => {
-                                core_ctx.increment(|counters: &IpCounters<Ipv4>| {
-                                    &counters.mtu_exceeded
-                                });
-                            }
-                            IpSendFrameErrorReason::Device(SendFrameErrorReason::QueueFull)
-                            | IpSendFrameErrorReason::Device(SendFrameErrorReason::Alloc)
-                            | IpSendFrameErrorReason::IllegalLoopbackAddress => (),
-                        }
-                        debug!("failed to forward IPv4 packet: {error:?}");
-                    }
-                }
-            } else {
-                // TTL is 0 or would become 0 after decrement; see "TTL"
-                // section, https://tools.ietf.org/html/rfc791#page-14
-                use packet_formats::ipv4::Ipv4Header as _;
-                core_ctx.increment(|counters: &IpCounters<Ipv4>| &counters.ttl_expired);
-                debug!("received IPv4 packet dropped due to expired TTL");
-                let fragment_type = packet.fragment_type();
-                let (src_ip, _, proto, meta): (_, Ipv4Addr, _, _) =
-                    drop_packet_and_undo_parse!(packet, buffer);
-                packet_metadata.acknowledge_drop();
-                let src_ip = match SpecifiedAddr::new(src_ip) {
-                    Some(ip) => ip,
-                    None => {
-                        core_ctx
-                            .increment(|counters: &IpCounters<Ipv4>| &counters.unspecified_source);
-                        trace!("receive_ipv4_packet: Cannot send ICMP error in response to packet with unspecified source IP address");
-                        return;
-                    }
-                };
-                IcmpErrorHandler::<Ipv4, _>::send_icmp_error_message(
-                    core_ctx,
-                    bindings_ctx,
-                    device,
-                    frame_dst,
-                    src_ip,
-                    dst_ip,
-                    buffer,
-                    Icmpv4Error {
-                        kind: Icmpv4ErrorKind::TtlExpired { proto, fragment_type },
-                        header_len: meta.header_len(),
-                    },
-                );
-            }
+            let src_ip = packet.src_ip();
+            determine_ip_packet_forwarding_action::<Ipv4, _, _, B>(
+                core_ctx,
+                packet,
+                packet_metadata,
+                device,
+                &dst_device,
+                IpPacketDestination::from_next_hop(next_hop, original_dst),
+                frame_dst,
+                src_ip,
+                original_dst,
+            )
+            .perform_action_with_buffer(core_ctx, bindings_ctx, buffer);
         }
         ReceivePacketAction::SendNoRouteToDest { dst: dst_ip } => {
             use packet_formats::ipv4::Ipv4Header as _;
@@ -2728,8 +2951,8 @@ pub fn receive_ipv6_packet<
                 // header (even if the fragment data has values that implies
                 // that the packet is not fragmented).
                 match process_fragment(core_ctx, bindings_ctx, packet) {
-                    Ok(ProcessFragmentResult::Done) => return,
-                    Ok(ProcessFragmentResult::NotNeeded(packet)) => {
+                    ProcessFragmentResult::Done => return,
+                    ProcessFragmentResult::NotNeeded(packet) => {
                         // While strange, it's possible for there to be a Fragment
                         // header that says the packet doesn't need defragmentation.
                         // As per RFC 8200 4.5:
@@ -2746,7 +2969,7 @@ pub fn receive_ipv6_packet<
                         // Fragment header.
                         (packet, Some(Ipv6PacketAction::Continue))
                     }
-                    Ok(ProcessFragmentResult::Reassembled(buf)) => {
+                    ProcessFragmentResult::Reassembled(buf) => {
                         let buf = Buf::new(buf, ..);
                         buffer = packet::Either::B(buf);
 
@@ -2763,10 +2986,6 @@ pub fn receive_ipv6_packet<
                                 return;
                             }
                         }
-                    }
-                    Err(err) => {
-                        err.respond_with_icmp_error(core_ctx, bindings_ctx, buffer, device);
-                        return;
                     }
                 }
             }
@@ -2809,9 +3028,7 @@ pub fn receive_ipv6_packet<
                 packet_metadata,
                 meta,
             )
-            .unwrap_or_else(|err| {
-                err.respond_with_icmp_error(core_ctx, bindings_ctx, buffer, device)
-            });
+            .unwrap_or_else(|err| err.respond_with_icmp_error(core_ctx, bindings_ctx, buffer));
             return;
         }
     }
@@ -2870,7 +3087,7 @@ pub fn receive_ipv6_packet<
                         ReceiveIpPacketMeta::default(),
                     )
                     .unwrap_or_else(|err| {
-                        err.respond_with_icmp_error(core_ctx, bindings_ctx, buffer, device)
+                        err.respond_with_icmp_error(core_ctx, bindings_ctx, buffer)
                     });
                 }
                 Ipv6PacketAction::ProcessFragment => {
@@ -2880,128 +3097,21 @@ pub fn receive_ipv6_packet<
             }
         }
         ReceivePacketAction::Forward {
-            original_dst: dst_ip,
+            original_dst,
             dst: Destination { device: dst_device, next_hop },
         } => {
-            let ttl = packet.ttl();
-            if ttl > 1 {
-                trace!("receive_ipv6_packet: forwarding");
-
-                // Handle extension headers first.
-                //
-                // We can't reuse delivery_extension_header_action here because
-                // that was parsed under the assumption that we are the final
-                // destination of the packet.
-                match ipv6::handle_extension_headers(core_ctx, device, frame_dst, &packet, false) {
-                    Ipv6PacketAction::_Discard => {
-                        core_ctx.increment(|counters: &IpCounters<Ipv6>| {
-                            &counters.version_rx.extension_header_discard
-                        });
-                        trace!("receive_ipv6_packet: handled IPv6 extension headers: discarding packet");
-                        return;
-                    }
-                    Ipv6PacketAction::Continue => {
-                        trace!("receive_ipv6_packet: handled IPv6 extension headers: forwarding packet");
-                    }
-                    Ipv6PacketAction::ProcessFragment => {
-                        unreachable!(
-                            "When forwarding packets, we should only ever look at the hop by hop \
-                            options extension header (if present)"
-                        )
-                    }
-                }
-
-                match core_ctx.filter_handler().forwarding_hook(
-                    &mut packet,
-                    device,
-                    &dst_device,
-                    &mut packet_metadata,
-                ) {
-                    filter::Verdict::Drop => {
-                        packet_metadata.acknowledge_drop();
-                        return;
-                    }
-                    filter::Verdict::Accept => {}
-                }
-
-                let destination = IpPacketDestination::from_next_hop(next_hop, dst_ip);
-                packet.set_ttl(ttl - 1);
-                let (src, dst, proto, meta) = packet.into_metadata();
-                let packet = ForwardedPacket::new(src, dst, proto, meta, buffer);
-
-                match send_ip_frame(
-                    core_ctx,
-                    bindings_ctx,
-                    &dst_device,
-                    destination,
-                    packet,
-                    packet_metadata,
-                ) {
-                    Ok(()) => (),
-                    Err(IpSendFrameError {
-                        serializer,
-                        error:
-                            IpSendFrameErrorReason::Device(
-                                SendFrameErrorReason::SizeConstraintsViolation,
-                            ),
-                    }) => {
-                        debug!("failed to forward IPv6 packet: MTU exceeded");
-                        core_ctx.increment(|counters: &IpCounters<Ipv6>| &counters.mtu_exceeded);
-
-                        if let Ipv6SourceAddr::Unicast(src_ip) = src_ip {
-                            trace!("receive_ipv6_packet: Sending ICMPv6 Packet Too Big");
-                            // TODO(joshlf): Increment the TTL since we just
-                            // decremented it. The fact that we don't do this is
-                            // technically a violation of the ICMP spec (we're not
-                            // encapsulating the original packet that caused the
-                            // issue, but a slightly modified version of it), but
-                            // it's not that big of a deal because it won't affect
-                            // the sender's ability to figure out the minimum path
-                            // MTU. This may break other logic, though, so we should
-                            // still fix it eventually.
-                            let mtu = core_ctx.get_mtu(&device);
-                            IcmpErrorHandler::<Ipv6, _>::send_icmp_error_message(
-                                core_ctx,
-                                bindings_ctx,
-                                device,
-                                frame_dst,
-                                *src_ip,
-                                dst_ip,
-                                serializer.into_buffer(),
-                                Icmpv6ErrorKind::PacketTooBig {
-                                    proto,
-                                    header_len: meta.header_len(),
-                                    mtu,
-                                },
-                            );
-                        }
-                    }
-                    Err(IpSendFrameError { serializer: _, error }) => {
-                        debug!("failed to forward IPv6 packet: {error:?}");
-                    }
-                }
-            } else {
-                // Hop Limit is 0 or would become 0 after decrement; see RFC
-                // 2460 Section 3.
-                core_ctx.increment(|counters: &IpCounters<Ipv6>| &counters.ttl_expired);
-                debug!("received IPv6 packet dropped due to expired Hop Limit");
-                packet_metadata.acknowledge_drop();
-
-                if let Ipv6SourceAddr::Unicast(src_ip) = src_ip {
-                    let (_, _, proto, meta): (Ipv6Addr, Ipv6Addr, _, _) =
-                        drop_packet_and_undo_parse!(packet, buffer);
-                    IcmpErrorHandler::<Ipv6, _>::send_icmp_error_message(
-                        core_ctx,
-                        bindings_ctx,
-                        device,
-                        frame_dst,
-                        *src_ip,
-                        dst_ip,
-                        buffer,
-                        Icmpv6ErrorKind::TtlExpired { proto, header_len: meta.header_len() },
-                    );
-                }
-            }
+            determine_ip_packet_forwarding_action::<Ipv6, _, _, B>(
+                core_ctx,
+                packet,
+                packet_metadata,
+                device,
+                &dst_device,
+                IpPacketDestination::from_next_hop(next_hop, original_dst),
+                frame_dst,
+                src_ip,
+                original_dst,
+            )
+            .perform_action_with_buffer(core_ctx, bindings_ctx, buffer);
         }
         ReceivePacketAction::SendNoRouteToDest { dst: dst_ip } => {
             core_ctx.increment(|counters: &IpCounters<Ipv6>| &counters.no_route_to_host);
@@ -3092,6 +3202,8 @@ pub enum DropReason {
     Tentative,
     /// Remote packet destined to the unspecified address.
     UnspecifiedDestination,
+    /// Cannot forward a packet with unspecified source address.
+    ForwardUnspecifiedSource,
     /// Packet should be forwarded but packet's inbound interface has forwarding
     /// disabled.
     ForwardingDisabledInboundIface,
@@ -3342,29 +3454,46 @@ fn receive_ip_packet_action_common<
         // to mean that, consistent with IPv4's behavior, we should silently
         // discard the packet in this case.
         core_ctx.increment(|counters| &counters.forwarding_disabled);
-        ReceivePacketAction::Drop { reason: DropReason::ForwardingDisabledInboundIface }
-    } else {
-        match lookup_route_table(core_ctx, None, *dst_ip) {
-            Some(dst) => {
-                core_ctx.increment(|counters| &counters.forward);
-                ReceivePacketAction::Forward { original_dst: dst_ip, dst }
-            }
-            None => {
-                core_ctx.increment(|counters| &counters.no_route_to_host);
-                ReceivePacketAction::SendNoRouteToDest { dst: dst_ip }
-            }
+        return ReceivePacketAction::Drop { reason: DropReason::ForwardingDisabledInboundIface };
+    }
+    // Per https://www.rfc-editor.org/rfc/rfc4291.html#section-2.5.2:
+    //   An IPv6 packet with a source address of unspecified must never be forwarded by an IPv6
+    //   router.
+    // Per https://datatracker.ietf.org/doc/html/rfc1812#section-5.3.7:
+    //   A router SHOULD NOT forward any packet that has an invalid IP source address or a source
+    //   address on network 0
+    let Some(source_address) = SpecifiedAddr::new(packet.src_ip()) else {
+        return ReceivePacketAction::Drop { reason: DropReason::ForwardUnspecifiedSource };
+    };
+    match lookup_route_table(
+        core_ctx,
+        *dst_ip,
+        PacketOrigin::NonLocal { source_address, incoming_device: device_id },
+    ) {
+        Some(dst) => {
+            core_ctx.increment(|counters| &counters.forward);
+            ReceivePacketAction::Forward { original_dst: dst_ip, dst }
+        }
+        None => {
+            core_ctx.increment(|counters| &counters.no_route_to_host);
+            ReceivePacketAction::SendNoRouteToDest { dst: dst_ip }
         }
     }
 }
 
 // Look up the route to a host.
-fn lookup_route_table<I: IpLayerIpExt, BC, CC: IpStateContext<I, BC>>(
+fn lookup_route_table<I: IpLayerIpExt, CC: IpStateContext<I>>(
     core_ctx: &mut CC,
-    device: Option<&CC::DeviceId>,
     dst_ip: I::Addr,
+    packet_origin: PacketOrigin<I, &CC::DeviceId>,
 ) -> Option<Destination<I::Addr, CC::DeviceId>> {
-    match walk_rules(core_ctx, (), |(), core_ctx, table| {
-        match table.lookup(core_ctx, device, dst_ip) {
+    let bound_device = match packet_origin {
+        PacketOrigin::Local { bound_address: _, bound_device } => bound_device,
+        PacketOrigin::NonLocal { source_address: _, incoming_device: _ } => None,
+    };
+    let rule_input = RuleInput { packet_origin };
+    match walk_rules(core_ctx, (), &rule_input, |(), core_ctx, table| {
+        match table.lookup(core_ctx, bound_device, dst_ip) {
             Some(dst) => ControlFlow::Break(Some(dst)),
             None => ControlFlow::Continue(()),
         }
@@ -3507,7 +3636,7 @@ pub trait IpLayerHandler<I: IpExt, BC>: DeviceIdContext<AnyDevice> {
 impl<
         I: IpLayerIpExt,
         BC: IpLayerBindingsContext<I, <CC as DeviceIdContext<AnyDevice>>::DeviceId>,
-        CC: IpLayerEgressContext<I, BC> + IpDeviceStateContext<I, BC>,
+        CC: IpLayerEgressContext<I, BC> + IpDeviceStateContext<I>,
     > IpLayerHandler<I, BC> for CC
 {
     fn send_ip_packet_from_device<S>(
@@ -3565,7 +3694,7 @@ pub(crate) fn send_ip_packet_from_device<I, BC, CC, S>(
 where
     I: IpLayerIpExt,
     BC: IpLayerBindingsContext<I, <CC as DeviceIdContext<AnyDevice>>::DeviceId>,
-    CC: IpLayerEgressContext<I, BC> + IpDeviceStateContext<I, BC>,
+    CC: IpLayerEgressContext<I, BC> + IpDeviceStateContext<I>,
     S: TransportPacketSerializer<I>,
     S::Buffer: BufferMut,
 {

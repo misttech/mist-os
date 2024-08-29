@@ -479,7 +479,8 @@ void FakeStreamConfig::WatchDelayInfo(WatchDelayInfoCallback callback) {
     }
 
     delay_has_changed_ = false;
-    callback(std::move(delay_info));
+    callback(fuchsia::hardware::audio::RingBuffer_WatchDelayInfo_Result::WithResponse(
+        fuchsia::hardware::audio::RingBuffer_WatchDelayInfo_Response(std::move(delay_info))));
   } else {
     pending_delay_callback_ = std::move(callback);
   }

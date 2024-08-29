@@ -13,12 +13,7 @@ import pathlib
 import sys
 from typing import Any, Dict, List
 
-from trace_processing import (
-    hardware_configs,
-    trace_importing,
-    trace_metrics,
-    trace_model,
-)
+from trace_processing import hardware_configs, trace_importing, trace_model
 from trace_processing.metrics import agg_cpu_breakdown, cpu_breakdown
 
 # Default cut-off for the percentage CPU. Any process that has CPU below this

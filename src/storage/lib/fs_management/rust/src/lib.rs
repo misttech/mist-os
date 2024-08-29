@@ -18,6 +18,7 @@ use fidl_fuchsia_fs_startup::{
     CompressionAlgorithm, EvictionPolicyOverride, FormatOptions, StartOptions,
 };
 use fuchsia_zircon as zx;
+use std::convert::From;
 use std::sync::Arc;
 
 // Re-export errors as public.
@@ -113,17 +114,39 @@ pub enum BlobLayout {
 }
 
 /// Compression used for blobs in blobfs
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub enum BlobCompression {
+    #[default]
     ZSTDChunked,
     Uncompressed,
 }
 
+impl From<&str> for BlobCompression {
+    fn from(value: &str) -> Self {
+        match value {
+            "zstd_chunked" => Self::ZSTDChunked,
+            "uncompressed" => Self::Uncompressed,
+            _ => Default::default(),
+        }
+    }
+}
+
 /// Eviction policy used for blobs in blobfs
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub enum BlobEvictionPolicy {
+    #[default]
     NeverEvict,
     EvictImmediately,
+}
+
+impl From<&str> for BlobEvictionPolicy {
+    fn from(value: &str) -> Self {
+        match value {
+            "never_evict" => Self::NeverEvict,
+            "evict_immediately" => Self::EvictImmediately,
+            _ => Default::default(),
+        }
+    }
 }
 
 /// Blobfs Filesystem Configuration
@@ -136,9 +159,9 @@ pub struct Blobfs {
     pub num_inodes: u64,
     // Start Options
     pub readonly: bool,
-    pub write_compression_algorithm: Option<BlobCompression>,
+    pub write_compression_algorithm: BlobCompression,
     pub write_compression_level: Option<i32>,
-    pub cache_eviction_policy_override: Option<BlobEvictionPolicy>,
+    pub cache_eviction_policy_override: BlobEvictionPolicy,
     pub component_type: ComponentType,
 }
 
@@ -180,20 +203,18 @@ impl FSConfig for Blobfs {
                     cache_eviction_policy_override: EvictionPolicyOverride::None,
                     startup_profiling_seconds: 0,
                 };
-                if let Some(compression) = &self.write_compression_algorithm {
-                    start_options.write_compression_algorithm = match compression {
-                        BlobCompression::ZSTDChunked => CompressionAlgorithm::ZstdChunked,
-                        BlobCompression::Uncompressed => CompressionAlgorithm::Uncompressed,
-                    }
-                }
-                if let Some(eviction) = &self.cache_eviction_policy_override {
-                    start_options.cache_eviction_policy_override = match eviction {
+                start_options.write_compression_algorithm = match &self.write_compression_algorithm
+                {
+                    BlobCompression::ZSTDChunked => CompressionAlgorithm::ZstdChunked,
+                    BlobCompression::Uncompressed => CompressionAlgorithm::Uncompressed,
+                };
+                start_options.cache_eviction_policy_override =
+                    match &self.cache_eviction_policy_override {
                         BlobEvictionPolicy::NeverEvict => EvictionPolicyOverride::NeverEvict,
                         BlobEvictionPolicy::EvictImmediately => {
                             EvictionPolicyOverride::EvictImmediately
                         }
-                    }
-                }
+                    };
                 start_options
             },
             component_type: self.component_type.clone(),

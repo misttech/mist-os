@@ -96,6 +96,11 @@
             source_availability: "unknown",
         },
         {
+            protocol: "fuchsia.pkg.PackageResolver",
+            from: "#pkg-resolver",
+            to: "#test_manager",
+        },
+        {
             protocol: "fuchsia.intl.PropertyProvider",
             from: "#intl",
             to: "#test_manager",

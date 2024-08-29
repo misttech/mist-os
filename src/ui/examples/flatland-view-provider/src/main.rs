@@ -20,6 +20,7 @@ use flatland_frame_scheduling_lib::*;
 use fuchsia_component::client::connect_to_protocol;
 use fuchsia_component::{self as component};
 use fuchsia_framebuffer::FrameUsage;
+use fuchsia_scenic::flatland::ViewCreationTokenPair;
 use fuchsia_scenic::ViewRefPair;
 use futures::channel::mpsc::{unbounded, UnboundedSender};
 use futures::prelude::*;
@@ -27,9 +28,10 @@ use internal_message::*;
 use std::ops::DerefMut;
 use tracing::{error, info, warn};
 use {
-    fidl_fuchsia_math as fmath, fidl_fuchsia_ui_app as fapp, fidl_fuchsia_ui_composition as fland,
-    fidl_fuchsia_ui_pointer as fptr, fidl_fuchsia_ui_views as fviews, fuchsia_async as fasync,
-    fuchsia_trace as trace, fuchsia_zircon as zx,
+    fidl_fuchsia_element as felement, fidl_fuchsia_math as fmath, fidl_fuchsia_ui_app as fapp,
+    fidl_fuchsia_ui_composition as fland, fidl_fuchsia_ui_pointer as fptr,
+    fidl_fuchsia_ui_views as fviews, fuchsia_async as fasync, fuchsia_trace as trace,
+    fuchsia_zircon as zx,
 };
 
 const IMAGE_COUNT: usize = 3;
@@ -80,6 +82,10 @@ pub struct Args {
     #[argh(switch)]
     #[allow(unused)]
     use_vulkan: bool,
+    /// select whether to use GraphicalPresenter or ViewProvider to connect to the scene graph.
+    #[argh(switch)]
+    #[allow(unused)]
+    use_graphical_presenter: bool,
 }
 
 struct AppModel<'a> {
@@ -308,7 +314,7 @@ impl<'a> AppModel<'a> {
     }
 }
 
-fn setup_fidl_services(sender: UnboundedSender<InternalMessage>) {
+fn serve_view_provider_service(sender: UnboundedSender<InternalMessage>) {
     let view_provider_cb = move |stream: fapp::ViewProviderRequestStream| {
         let sender = sender.clone();
         fasync::Task::local(
@@ -316,6 +322,8 @@ fn setup_fidl_services(sender: UnboundedSender<InternalMessage>) {
                 .try_for_each(move |req| {
                     match req {
                         fapp::ViewProviderRequest::CreateView2 { args, .. } => {
+                            info!("Received ViewProvider.CreateView2 request.");
+
                             let view_creation_token = args.view_creation_token.unwrap();
                             // We do not get passed a view ref so create our own.
                             let view_identity = fviews::ViewIdentityOnCreation::from(
@@ -397,6 +405,7 @@ async fn main() {
 
     let args: Args = argh::from_env();
     let frame_usage = if args.use_vulkan { FrameUsage::Gpu } else { FrameUsage::Cpu };
+    let use_graphical_presenter = args.use_graphical_presenter;
 
     let (internal_sender, mut internal_receiver) = unbounded::<InternalMessage>();
 
@@ -410,11 +419,47 @@ async fn main() {
 
     info!("Established Flatland connection");
 
-    setup_fidl_services(internal_sender.clone());
+    if !use_graphical_presenter {
+        serve_view_provider_service(internal_sender.clone());
+    }
     setup_handle_flatland_events(flatland.take_event_stream(), internal_sender.clone());
 
     let mut app = AppModel::new(&flatland, internal_sender.clone(), &sched_lib);
     let mut renderer = app.init_scene(frame_usage).await;
+
+    if use_graphical_presenter {
+        info!("Connecting directly to GraphicalPresenter");
+
+        let presenter = connect_to_protocol::<felement::GraphicalPresenterMarker>()
+            .expect("error connecting to GraphicalPresenter");
+
+        let tokens = ViewCreationTokenPair::new().expect("error creating ViewCreationTokenPair");
+
+        // Announce view to the presenter.
+        {
+            let view_spec = felement::ViewSpec {
+                viewport_creation_token: Some(tokens.viewport_creation_token),
+                ..Default::default()
+            };
+            let result = presenter.present_view(view_spec, None, None).await;
+            result
+                .expect("fidl error calling present_view()")
+                .expect("present_view() returned error");
+        }
+
+        // Create Flatland view.
+        {
+            let view_identity = fviews::ViewIdentityOnCreation::from(
+                ViewRefPair::new().expect("failed to create ViewRefPair"),
+            );
+            internal_sender
+                .unbounded_send(InternalMessage::CreateView(
+                    tokens.view_creation_token,
+                    view_identity,
+                ))
+                .expect("failed to send InternalMessage.");
+        }
+    }
 
     let mut present_count = 0;
     loop {

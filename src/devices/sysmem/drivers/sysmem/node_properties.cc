@@ -17,7 +17,7 @@
 #include "node.h"
 #include "utils.h"
 
-namespace sysmem_driver {
+namespace sysmem_service {
 
 NodeProperties::~NodeProperties() {
   ZX_DEBUG_ASSERT(child_count() == 0);
@@ -366,4 +366,4 @@ ConnectionVersion NodeProperties::connection_version() const {
   return node()->connection_version();
 }
 
-}  // namespace sysmem_driver
+}  // namespace sysmem_service

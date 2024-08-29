@@ -7,6 +7,7 @@
 #include <fidl/fuchsia.hardware.power/cpp/fidl.h>
 #include <fidl/fuchsia.io/cpp/wire.h>
 #include <fidl/fuchsia.power.system/cpp/fidl.h>
+#include <lib/driver/logging/cpp/structured_logger.h>
 #include <lib/driver/power/cpp/element-description-builder.h>
 #include <lib/fit/defer.h>
 #include <lib/fzl/vmo-mapper.h>
@@ -23,6 +24,7 @@
 #include "sdmmc-root-device.h"
 #include "sdmmc-rpmb-device.h"
 #include "src/devices/block/lib/common/include/common.h"
+#include "src/devices/power/lib/from-fidl/cpp/from-fidl.h"
 #include "tools/power_config/lib/cpp/power_config.h"
 
 namespace sdmmc {
@@ -277,17 +279,9 @@ zx_status_t SdmmcBlockDevice::AddDevice() {
 
 zx::result<> SdmmcBlockDevice::ConfigurePowerManagement() {
   // Load our config from the package.
-  zx::result natural_power_configs = GetAllPowerConfigs(*parent_->driver_incoming());
-  if (natural_power_configs.is_error()) {
-    FDF_LOGL(INFO, logger(), "Error getting power configs: %s",
-             natural_power_configs.status_string());
-    return zx::error(ZX_ERR_NOT_FOUND);
-  }
-  fidl::Arena<> arena;
-  const fuchsia_hardware_power::wire::ComponentPowerConfiguration power_configs =
-      fidl::ToWire(arena, std::move(natural_power_configs.value()));
-  if (power_configs.power_elements.empty()) {
-    FDF_LOGL(INFO, logger(), "No power configs found.");
+  zx::result power_configs = GetAllPowerConfigs(*parent_->driver_incoming());
+  if (power_configs.is_error()) {
+    FDF_LOGL(INFO, logger(), "Error getting power configs: %s", power_configs.status_string());
     return zx::error(ZX_ERR_NOT_FOUND);
   }
 
@@ -299,8 +293,20 @@ zx::result<> SdmmcBlockDevice::ConfigurePowerManagement() {
   }
 
   // Register power configs with the Power Broker.
-  for (const fuchsia_hardware_power::wire::PowerElementConfiguration& config :
-       power_configs.power_elements) {
+  for (size_t i = 0; i < power_configs->power_elements().size(); ++i) {
+    fdf_power::PowerElementConfiguration config;
+    {
+      const fuchsia_hardware_power::PowerElementConfiguration& config_fidl =
+          power_configs->power_elements()[i];
+      zx::result result = power::from_fidl::CreatePowerElementConfiguration(config_fidl);
+      if (result.is_error()) {
+        FDF_SLOG(ERROR, "Failed to parse power element configuration.", KV("index", i),
+                 KV("status", result.status_string()));
+        return result.take_error();
+      }
+      config = std::move(result.value());
+    }
+
     auto tokens = fdf_power::GetDependencyTokens(*parent_->driver_incoming(), config);
     if (tokens.is_error()) {
       FDF_LOGL(ERROR, logger(), "Failed to get power dependency tokens: %u.",
@@ -317,7 +323,7 @@ zx::result<> SdmmcBlockDevice::ConfigurePowerManagement() {
       return zx::error(ZX_ERR_INTERNAL);
     }
 
-    if (config.element().name().get() == kHardwarePowerElementName) {
+    if (config.element.name == kHardwarePowerElementName) {
       hardware_power_element_control_client_ =
           fidl::WireSyncClient<fuchsia_power_broker::ElementControl>(
               std::move(description.element_control_client.value()));
@@ -328,7 +334,7 @@ zx::result<> SdmmcBlockDevice::ConfigurePowerManagement() {
               std::move(description.current_level_client.value()));
       hardware_power_required_level_client_ = fidl::WireClient<fuchsia_power_broker::RequiredLevel>(
           std::move(description.required_level_client.value()), parent_->driver_async_dispatcher());
-    } else if (config.element().name().get() == kSystemWakeOnRequestPowerElementName) {
+    } else if (config.element.name == kSystemWakeOnRequestPowerElementName) {
       wake_on_request_element_control_client_ =
           fidl::WireSyncClient<fuchsia_power_broker::ElementControl>(
               std::move(description.element_control_client.value()));
@@ -342,8 +348,8 @@ zx::result<> SdmmcBlockDevice::ConfigurePowerManagement() {
               std::move(description.required_level_client.value()),
               parent_->driver_async_dispatcher());
     } else {
-      FDF_LOGL(ERROR, logger(), "Unexpected power element: %s",
-               std::string(config.element().name().get()).c_str());
+      FDF_SLOG(ERROR, "Unexpected power element.", KV("index", i),
+               KV("element-name", config.element.name));
       return zx::error(ZX_ERR_BAD_STATE);
     }
   }

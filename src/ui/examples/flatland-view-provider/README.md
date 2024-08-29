@@ -9,10 +9,16 @@ content.  It displays colored squares which rotate colors through time.  It also
 to touch events and echoes them to the syslog.
 
 `flatland-view-provider-vulkan.cm` is the same, except it uses Vulkan to render, instead
-of negotiating CPU-writable buffers with sysmem.
+of negotiating CPU-writable buffers with sysmem.  Also, this component connects directly
+to the `fuchsia.element.GraphicalPresenter` protocol, rather than serving the
+`fuchsia.ui.app.ViewProvider` protocol and waiting for a request.
+
+The same binary is used by the two components; the difference is that the latter
+passes `--use-vulkan` and `--use-graphical-presenter` to the program.
 
 TODO(https://fxbug.dev/42055867): the Vulkan version uses a single filled rect, instead of rendering
 each quadrant in a different color.
 
 To launch:
-`ffx session add fuchsia-pkg://fuchsia.com/flatland-examples#meta/flatland-view-provider.cm`
+- `ffx session add fuchsia-pkg://fuchsia.com/flatland-examples#meta/flatland-view-provider.cm`
+- `ffx session add fuchsia-pkg://fuchsia.com/flatland-examples#meta/flatland-view-provider-vulkan.cm`

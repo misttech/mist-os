@@ -13,10 +13,13 @@ use crate::mode_management::iface_manager_types::*;
 use crate::mode_management::phy_manager::{CreateClientIfacesReason, PhyManagerApi};
 use crate::mode_management::{recovery, Defect};
 use crate::telemetry::{TelemetryEvent, TelemetrySender};
-use crate::util::state_machine::status_publisher_and_reader;
+use crate::util::state_machine::{status_publisher_and_reader, StateMachineStatusReader};
 use crate::util::{atomic_oneshot_stream, future_with_metadata, listener};
 use anyhow::{format_err, Error};
 use fidl::endpoints::create_proxy;
+use fuchsia_inspect_contrib::log::InspectListClosure;
+use fuchsia_inspect_contrib::nodes::BoundedListNode;
+use fuchsia_inspect_contrib::{inspect_insert, inspect_log};
 use futures::channel::{mpsc, oneshot};
 use futures::future::{ready, BoxFuture, Fuse};
 use futures::lock::Mutex;
@@ -33,6 +36,7 @@ use {fidl_fuchsia_wlan_common as fidl_common, fuchsia_async as fasync, fuchsia_z
 // Maximum allowed interval between scans when attempting to reconnect client interfaces.  This
 // value is taken from legacy state machine.
 const MAX_AUTO_CONNECT_RETRY_SECONDS: i64 = 10;
+const INSPECT_RECOVERY_INTERFACE_RECORDS: usize = 14;
 
 #[cfg_attr(test, derive(Debug))]
 enum ConnectionSelectionResponse {
@@ -56,6 +60,7 @@ struct ClientIfaceContainer {
     security_support: fidl_common::SecuritySupport,
     /// The time of the last scan for roaming or new connection on this iface.
     last_roam_time: fasync::Time,
+    status: StateMachineStatusReader<client_fsm::Status>,
 }
 
 pub(crate) struct ApIfaceContainer {
@@ -63,6 +68,7 @@ pub(crate) struct ApIfaceContainer {
     pub config: Option<ap_fsm::ApConfig>,
     pub ap_state_machine: Box<dyn AccessPointApi + Send + Sync>,
     enabled_time: Option<zx::MonotonicTime>,
+    status: StateMachineStatusReader<ap_fsm::Status>,
 }
 
 #[derive(Clone, Debug)]
@@ -84,6 +90,7 @@ async fn create_client_state_machine(
     (
         Box<dyn client_fsm::ClientApi + Send>,
         future_with_metadata::FutureWithMetadata<(), StateMachineMetadata>,
+        StateMachineStatusReader<client_fsm::Status>,
     ),
     Error,
 > {
@@ -103,7 +110,7 @@ async fn create_client_state_machine(
     let event_stream = sme_proxy.take_event_stream();
 
     // State machine status information
-    let (publisher, _reader) = status_publisher_and_reader::<client_fsm::Status>();
+    let (publisher, status) = status_publisher_and_reader::<client_fsm::Status>();
 
     let fut = client_fsm::serve(
         iface_id,
@@ -123,7 +130,7 @@ async fn create_client_state_machine(
         StateMachineMetadata { iface_id, role: fidl_fuchsia_wlan_common::WlanMacRole::Client };
     let fut = future_with_metadata::FutureWithMetadata::new(metadata, Box::pin(fut));
 
-    Ok((Box::new(new_client), fut))
+    Ok((Box::new(new_client), fut, status))
 }
 
 /// Accounts for WLAN interfaces that are present and utilizes them to service requests that are
@@ -145,6 +152,8 @@ pub(crate) struct IfaceManagerService {
     telemetry_sender: TelemetrySender,
     // A sender to be cloned for state machines to report defects to the IfaceManager.
     defect_sender: mpsc::UnboundedSender<Defect>,
+    _node: fuchsia_inspect::Node,
+    recovery_node: BoundedListNode,
 }
 
 impl IfaceManagerService {
@@ -158,7 +167,10 @@ impl IfaceManagerService {
         roam_manager: RoamManager,
         telemetry_sender: TelemetrySender,
         defect_sender: mpsc::UnboundedSender<Defect>,
+        _node: fuchsia_inspect::Node,
     ) -> Self {
+        let recovery_node = _node.create_child("recovery_record");
+        let recovery_node = BoundedListNode::new(recovery_node, INSPECT_RECOVERY_INTERFACE_RECORDS);
         IfaceManagerService {
             phy_manager: phy_manager.clone(),
             client_update_sender,
@@ -173,6 +185,8 @@ impl IfaceManagerService {
             connection_selection_futures: FuturesUnordered::new(),
             telemetry_sender,
             defect_sender,
+            _node,
+            recovery_node,
         }
     }
 
@@ -266,6 +280,11 @@ impl IfaceManagerService {
         // Get the security support for this iface.
         let security_support =
             features_proxy.query_security_support().await?.map_err(zx::Status::from_raw)?;
+
+        // Setup a status reader for the container.  Since this state machine is uninitialized,
+        // drop the publishing end and allow the reader side to assume the default state.
+        let (_publisher, status) = status_publisher_and_reader::<client_fsm::Status>();
+
         Ok(ClientIfaceContainer {
             iface_id,
             sme_proxy,
@@ -273,6 +292,7 @@ impl IfaceManagerService {
             client_state_machine: None,
             security_support,
             last_roam_time: fasync::Time::now(),
+            status,
         })
     }
 
@@ -316,7 +336,7 @@ impl IfaceManagerService {
         // Spawn the AP state machine.
         let (sender, receiver) = mpsc::channel(1);
         let state_machine = ap_fsm::AccessPoint::new(sender);
-        let (publisher, _reader) = status_publisher_and_reader::<ap_fsm::Status>();
+        let (publisher, status) = status_publisher_and_reader::<ap_fsm::Status>();
 
         let event_stream = sme_proxy.take_event_stream();
         let state_machine_fut = ap_fsm::serve(
@@ -342,6 +362,7 @@ impl IfaceManagerService {
             config: None,
             ap_state_machine: Box::new(state_machine),
             enabled_time: None,
+            status,
         })
     }
 
@@ -489,7 +510,7 @@ impl IfaceManagerService {
             }
             None => {
                 // Create the state machine and controller.
-                let (new_client, fut) = create_client_state_machine(
+                let (new_client, fut, status) = create_client_state_machine(
                     client_iface.iface_id,
                     &mut self.dev_monitor_proxy,
                     self.client_update_sender.clone(),
@@ -500,6 +521,7 @@ impl IfaceManagerService {
                     self.roam_manager.clone(),
                 )
                 .await?;
+                client_iface.status = status;
                 client_iface.client_state_machine = Some(new_client);
 
                 // Begin running and monitoring the client state machine future.
@@ -573,7 +595,7 @@ impl IfaceManagerService {
                 }
 
                 // Create the state machine and controller.
-                let (new_client, fut) = create_client_state_machine(
+                let (new_client, fut, status) = create_client_state_machine(
                     client.iface_id,
                     &mut self.dev_monitor_proxy,
                     self.client_update_sender.clone(),
@@ -587,6 +609,7 @@ impl IfaceManagerService {
 
                 self.fsm_futures.push(fut);
                 client.config = Some(connect_selection.target.network);
+                client.status = status;
                 client.client_state_machine = Some(new_client);
                 client.last_roam_time = fasync::Time::now();
                 break;
@@ -614,7 +637,7 @@ impl IfaceManagerService {
                 // Create the state machine and controller.  The state machine is setup with no
                 // initial network config.  This will cause it to quickly exit, notifying the
                 // monitor loop that the interface needs attention.
-                let (new_client, fut) = create_client_state_machine(
+                let (new_client, fut, status) = create_client_state_machine(
                     client_iface.iface_id,
                     &mut self.dev_monitor_proxy,
                     self.client_update_sender.clone(),
@@ -629,6 +652,7 @@ impl IfaceManagerService {
                 // Begin running and monitoring the client state machine future.
                 self.fsm_futures.push(fut);
 
+                client_iface.status = status;
                 client_iface.client_state_machine = Some(new_client);
                 self.clients.push(client_iface);
             }
@@ -1403,6 +1427,31 @@ async fn serve_iface_functionality(
         },
         action = recovery_action_receiver.select_next_some() => {
             *recovery_in_progress = true;
+
+            let client_statuses = InspectListClosure(&iface_manager.clients, |node_writer, key, client| {
+                if let Ok(status) = client.status.read_status() {
+                    inspect_insert!(node_writer, var key: {
+                        id: client.iface_id,
+                        status: status
+                    });
+                }
+            });
+
+            let ap_statuses = InspectListClosure(&iface_manager.aps, |node_writer, key, ap| {
+                if let Ok(status) = ap.status.read_status() {
+                    inspect_insert!(node_writer, var key: {
+                        id: ap.iface_id,
+                        status: status
+                    });
+                }
+            });
+
+            inspect_log!(iface_manager.recovery_node, {
+                summary: action,
+                clients: client_statuses,
+                aps: ap_statuses
+            });
+
             operation_futures.push(initiate_recovery(iface_manager.phy_manager.clone(), action))
         },
     }
@@ -1466,7 +1515,9 @@ mod tests {
         poll_sme_req,
     };
     use async_trait::async_trait;
+    use diagnostics_assertions::assert_data_tree;
     use fuchsia_async::{DurationExt, TestExecutor};
+    use fuchsia_inspect::reader;
     use futures::stream::StreamFuture;
     use futures::task::Poll;
     use ieee80211::MacAddr;
@@ -1507,6 +1558,7 @@ mod tests {
         pub ap_update_sender: listener::ApListenerMessageSender,
         pub saved_networks: Arc<dyn SavedNetworksManagerApi>,
         pub scan_requester: Arc<FakeScanRequester>,
+        pub inspector: inspect::Inspector,
         pub node: inspect::Node,
         pub telemetry_sender: TelemetrySender,
         pub telemetry_receiver: mpsc::Receiver<TelemetryEvent>,
@@ -1533,7 +1585,7 @@ mod tests {
         let saved_networks = exec.run_singlethreaded(SavedNetworksManager::new_for_test());
         let saved_networks = Arc::new(saved_networks);
         let inspector = inspect::Inspector::default();
-        let node = inspector.root().create_child("phy_manager");
+        let node = inspector.root().create_child("node");
         let (telemetry_sender, telemetry_receiver) = mpsc::channel::<TelemetryEvent>(100);
         let telemetry_sender = TelemetrySender::new(telemetry_sender);
         let scan_requester = Arc::new(FakeScanRequester::new());
@@ -1556,6 +1608,7 @@ mod tests {
             ap_update_sender: ap_sender,
             saved_networks,
             scan_requester,
+            inspector,
             node,
             telemetry_sender,
             telemetry_receiver,
@@ -1794,6 +1847,7 @@ mod tests {
     ) -> (IfaceManagerService, StreamFuture<fidl_fuchsia_wlan_sme::ClientSmeRequestStream>) {
         let (sme_proxy, server) = create_proxy::<fidl_fuchsia_wlan_sme::ClientSmeMarker>()
             .expect("failed to create an sme channel");
+        let (_publisher, status) = status_publisher_and_reader::<client_fsm::Status>();
         let mut client_container = ClientIfaceContainer {
             iface_id: TEST_CLIENT_IFACE_ID,
             sme_proxy,
@@ -1801,6 +1855,7 @@ mod tests {
             client_state_machine: None,
             security_support: fake_security_support(),
             last_roam_time: fasync::Time::now(),
+            status,
         };
         let phy_manager = FakePhyManager {
             create_iface_ok: true,
@@ -1823,6 +1878,7 @@ mod tests {
             test_values.roam_manager.clone(),
             test_values.telemetry_sender.clone(),
             test_values.defect_sender.clone(),
+            test_values.node.clone_weak(),
         );
 
         if configured {
@@ -1855,11 +1911,13 @@ mod tests {
         test_values: &TestValues,
         fake_ap: FakeAp,
     ) -> IfaceManagerService {
+        let (_publisher, status) = status_publisher_and_reader::<ap_fsm::Status>();
         let ap_container = ApIfaceContainer {
             iface_id: TEST_AP_IFACE_ID,
             config: None,
             ap_state_machine: Box::new(fake_ap),
             enabled_time: None,
+            status,
         };
         let phy_manager = FakePhyManager {
             create_iface_ok: true,
@@ -1882,6 +1940,7 @@ mod tests {
             test_values.roam_manager.clone(),
             test_values.telemetry_sender.clone(),
             test_values.defect_sender.clone(),
+            test_values.node.clone_weak(),
         );
 
         iface_manager.aps.push(ap_container);
@@ -2394,7 +2453,7 @@ mod tests {
         let test_values = test_setup(&mut exec);
         let phy_manager = create_empty_phy_manager(
             test_values.monitor_service_proxy.clone(),
-            test_values.node,
+            test_values.node.clone_weak(),
             test_values.telemetry_sender.clone(),
             test_values.recovery_sender,
         );
@@ -2409,6 +2468,7 @@ mod tests {
             test_values.roam_manager,
             test_values.telemetry_sender,
             test_values.defect_sender,
+            test_values.node,
         );
 
         // Call connect on the IfaceManager
@@ -2449,6 +2509,7 @@ mod tests {
             test_values.roam_manager.clone(),
             test_values.telemetry_sender,
             test_values.defect_sender,
+            test_values.node,
         );
 
         // Construct the connect request.
@@ -2582,7 +2643,7 @@ mod tests {
             test_values.monitor_service_proxy.clone(),
             recovery::lookup_recovery_profile(""),
             false,
-            test_values.node,
+            test_values.node.clone_weak(),
             test_values.telemetry_sender.clone(),
             test_values.recovery_sender,
         );
@@ -2596,6 +2657,7 @@ mod tests {
             test_values.roam_manager.clone(),
             test_values.telemetry_sender,
             test_values.defect_sender,
+            test_values.node,
         );
 
         // Call disconnect on the IfaceManager
@@ -2721,7 +2783,7 @@ mod tests {
             test_values.monitor_service_proxy.clone(),
             recovery::lookup_recovery_profile(""),
             false,
-            test_values.node,
+            test_values.node.clone_weak(),
             test_values.telemetry_sender.clone(),
             test_values.recovery_sender,
         );
@@ -2735,6 +2797,7 @@ mod tests {
             test_values.roam_manager.clone(),
             test_values.telemetry_sender,
             test_values.defect_sender,
+            test_values.node,
         );
 
         // Call stop_client_connections.
@@ -2838,7 +2901,7 @@ mod tests {
             test_values.monitor_service_proxy.clone(),
             recovery::lookup_recovery_profile(""),
             false,
-            test_values.node,
+            test_values.node.clone_weak(),
             test_values.telemetry_sender.clone(),
             test_values.recovery_sender,
         );
@@ -2852,6 +2915,7 @@ mod tests {
             test_values.roam_manager.clone(),
             test_values.telemetry_sender,
             test_values.defect_sender,
+            test_values.node,
         );
 
         // Call stop_client_connections.
@@ -2972,7 +3036,7 @@ mod tests {
             test_values.monitor_service_proxy.clone(),
             recovery::lookup_recovery_profile(""),
             false,
-            test_values.node,
+            test_values.node.clone_weak(),
             test_values.telemetry_sender.clone(),
             test_values.recovery_sender,
         );
@@ -2986,6 +3050,7 @@ mod tests {
             test_values.roam_manager.clone(),
             test_values.telemetry_sender,
             test_values.defect_sender,
+            test_values.node,
         );
 
         {
@@ -3184,7 +3249,7 @@ mod tests {
             test_values.monitor_service_proxy.clone(),
             recovery::lookup_recovery_profile(""),
             false,
-            test_values.node,
+            test_values.node.clone_weak(),
             test_values.telemetry_sender.clone(),
             test_values.recovery_sender,
         );
@@ -3198,6 +3263,7 @@ mod tests {
             test_values.roam_manager.clone(),
             test_values.telemetry_sender,
             test_values.defect_sender,
+            test_values.node,
         );
 
         // Call start_ap.
@@ -3322,7 +3388,7 @@ mod tests {
             test_values.monitor_service_proxy.clone(),
             recovery::lookup_recovery_profile(""),
             false,
-            test_values.node,
+            test_values.node.clone_weak(),
             test_values.telemetry_sender.clone(),
             test_values.recovery_sender,
         );
@@ -3336,6 +3402,7 @@ mod tests {
             test_values.roam_manager.clone(),
             test_values.telemetry_sender,
             test_values.defect_sender,
+            test_values.node,
         );
         let fut = iface_manager.stop_ap(TEST_SSID.clone(), TEST_PASSWORD.as_bytes().to_vec());
         let mut fut = pin!(fut);
@@ -3352,6 +3419,7 @@ mod tests {
         iface_manager.aps[0].enabled_time = Some(zx::MonotonicTime::get());
 
         // Insert a second iface and add it to the list of APs.
+        let (_publisher, status) = status_publisher_and_reader::<ap_fsm::Status>();
         let second_iface = ApIfaceContainer {
             iface_id: 2,
             config: None,
@@ -3361,6 +3429,7 @@ mod tests {
                 exit_succeeds: true,
             }),
             enabled_time: Some(zx::MonotonicTime::get()),
+            status,
         };
         iface_manager.aps.push(second_iface);
 
@@ -3392,6 +3461,7 @@ mod tests {
         iface_manager.aps[0].enabled_time = Some(zx::MonotonicTime::get());
 
         // Insert a second iface and add it to the list of APs.
+        let (_publisher, status) = status_publisher_and_reader::<ap_fsm::Status>();
         let second_iface = ApIfaceContainer {
             iface_id: 2,
             config: None,
@@ -3401,6 +3471,7 @@ mod tests {
                 exit_succeeds: true,
             }),
             enabled_time: Some(zx::MonotonicTime::get()),
+            status,
         };
         iface_manager.aps.push(second_iface);
 
@@ -3432,6 +3503,7 @@ mod tests {
         iface_manager.aps[0].enabled_time = Some(zx::MonotonicTime::get());
 
         // Insert a second iface and add it to the list of APs.
+        let (_publisher, status) = status_publisher_and_reader::<ap_fsm::Status>();
         let second_iface = ApIfaceContainer {
             iface_id: 2,
             config: None,
@@ -3441,6 +3513,7 @@ mod tests {
                 exit_succeeds: true,
             }),
             enabled_time: Some(zx::MonotonicTime::get()),
+            status,
         };
         iface_manager.aps.push(second_iface);
 
@@ -3474,7 +3547,7 @@ mod tests {
             test_values.monitor_service_proxy.clone(),
             recovery::lookup_recovery_profile(""),
             false,
-            test_values.node,
+            test_values.node.clone_weak(),
             test_values.telemetry_sender.clone(),
             test_values.recovery_sender,
         );
@@ -3488,6 +3561,7 @@ mod tests {
             test_values.roam_manager.clone(),
             test_values.telemetry_sender,
             test_values.defect_sender,
+            test_values.node,
         );
 
         let fut = iface_manager.stop_all_aps();
@@ -3561,6 +3635,7 @@ mod tests {
             create_iface_manager_with_client(&test_values, true);
         let removed_iface_id = 123;
         iface_manager.clients[0].iface_id = removed_iface_id;
+        let (_publisher, status) = status_publisher_and_reader::<ap_fsm::Status>();
 
         let ap_iface = ApIfaceContainer {
             iface_id: TEST_AP_IFACE_ID,
@@ -3571,6 +3646,7 @@ mod tests {
                 exit_succeeds: true,
             }),
             enabled_time: None,
+            status,
         };
         iface_manager.aps.push(ap_iface);
 
@@ -3637,6 +3713,7 @@ mod tests {
             create_iface_manager_with_client(&test_values, true);
         let removed_iface_id = 123;
         iface_manager.clients[0].iface_id = removed_iface_id;
+        let (_publisher, status) = status_publisher_and_reader::<ap_fsm::Status>();
 
         let ap_iface = ApIfaceContainer {
             iface_id: TEST_AP_IFACE_ID,
@@ -3647,6 +3724,7 @@ mod tests {
                 exit_succeeds: true,
             }),
             enabled_time: None,
+            status,
         };
         iface_manager.aps.push(ap_iface);
 
@@ -3700,6 +3778,7 @@ mod tests {
             create_iface_manager_with_client(&test_values, true);
 
         let removed_iface_id = 123;
+        let (_publisher, status) = status_publisher_and_reader::<ap_fsm::Status>();
         let ap_iface = ApIfaceContainer {
             iface_id: removed_iface_id,
             config: None,
@@ -3709,6 +3788,7 @@ mod tests {
                 exit_succeeds: true,
             }),
             enabled_time: None,
+            status,
         };
         iface_manager.aps.push(ap_iface);
 
@@ -3736,6 +3816,7 @@ mod tests {
         let (mut iface_manager, _next_sme_req) =
             create_iface_manager_with_client(&test_values, true);
 
+        let (_publisher, status) = status_publisher_and_reader::<ap_fsm::Status>();
         let ap_iface = ApIfaceContainer {
             iface_id: TEST_AP_IFACE_ID,
             config: None,
@@ -3745,6 +3826,7 @@ mod tests {
                 exit_succeeds: true,
             }),
             enabled_time: None,
+            status,
         };
         iface_manager.aps.push(ap_iface);
 
@@ -3787,7 +3869,7 @@ mod tests {
             test_values.monitor_service_proxy.clone(),
             recovery::lookup_recovery_profile(""),
             false,
-            test_values.node,
+            test_values.node.clone_weak(),
             test_values.telemetry_sender.clone(),
             test_values.recovery_sender,
         );
@@ -3801,6 +3883,7 @@ mod tests {
             test_values.roam_manager.clone(),
             test_values.telemetry_sender,
             test_values.defect_sender,
+            test_values.node,
         );
 
         {
@@ -3897,7 +3980,7 @@ mod tests {
             test_values.monitor_service_proxy.clone(),
             recovery::lookup_recovery_profile(""),
             false,
-            test_values.node,
+            test_values.node.clone_weak(),
             test_values.telemetry_sender.clone(),
             test_values.recovery_sender,
         );
@@ -3911,6 +3994,7 @@ mod tests {
             test_values.roam_manager.clone(),
             test_values.telemetry_sender,
             test_values.defect_sender,
+            test_values.node,
         );
 
         {
@@ -3971,7 +4055,7 @@ mod tests {
             test_values.monitor_service_proxy.clone(),
             recovery::lookup_recovery_profile(""),
             false,
-            test_values.node,
+            test_values.node.clone_weak(),
             test_values.telemetry_sender.clone(),
             test_values.recovery_sender,
         );
@@ -3985,6 +4069,7 @@ mod tests {
             test_values.roam_manager.clone(),
             test_values.telemetry_sender,
             test_values.defect_sender,
+            test_values.node,
         );
 
         {
@@ -4437,7 +4522,7 @@ mod tests {
             test_values.monitor_service_proxy.clone(),
             recovery::lookup_recovery_profile(""),
             false,
-            test_values.node,
+            test_values.node.clone_weak(),
             test_values.telemetry_sender.clone(),
             test_values.recovery_sender,
         );
@@ -4451,6 +4536,7 @@ mod tests {
             test_values.roam_manager.clone(),
             test_values.telemetry_sender,
             test_values.defect_sender,
+            test_values.node,
         );
 
         // Create mpsc channel to handle requests.
@@ -4560,7 +4646,7 @@ mod tests {
             test_values.monitor_service_proxy.clone(),
             recovery::lookup_recovery_profile(""),
             false,
-            test_values.node,
+            test_values.node.clone_weak(),
             test_values.telemetry_sender.clone(),
             test_values.recovery_sender,
         );
@@ -4574,6 +4660,7 @@ mod tests {
             test_values.roam_manager.clone(),
             test_values.telemetry_sender,
             test_values.defect_sender,
+            test_values.node,
         );
 
         // Report a new interface.
@@ -4680,6 +4767,7 @@ mod tests {
             test_values.roam_manager.clone(),
             test_values.telemetry_sender,
             test_values.defect_sender,
+            test_values.node,
         );
 
         // Make start client connections request
@@ -4760,6 +4848,7 @@ mod tests {
             test_values.roam_manager.clone(),
             test_values.telemetry_sender,
             test_values.defect_sender,
+            test_values.node,
         );
 
         // Make stop client connections request
@@ -4967,7 +5056,7 @@ mod tests {
         let test_values = test_setup(&mut exec);
         let phy_manager = create_empty_phy_manager(
             test_values.monitor_service_proxy.clone(),
-            test_values.node,
+            test_values.node.clone_weak(),
             test_values.telemetry_sender.clone(),
             test_values.recovery_sender,
         );
@@ -4981,6 +5070,7 @@ mod tests {
             test_values.roam_manager.clone(),
             test_values.telemetry_sender,
             test_values.defect_sender,
+            test_values.node,
         );
 
         // Update the saved networks with knowledge of the test SSID and credentials.
@@ -5546,17 +5636,20 @@ mod tests {
             test_values.roam_manager.clone(),
             test_values.telemetry_sender.clone(),
             test_values.defect_sender,
+            test_values.node,
         );
 
         // If the test calls for it, create an AP interface to test that the IfaceManager preserves
         // the configuration and restores it after setting the country code.
         if ap_enabled {
             let fake_ap = FakeAp { start_succeeds: true, stop_succeeds: true, exit_succeeds: true };
+            let (_publisher, status) = status_publisher_and_reader::<ap_fsm::Status>();
             let ap_container = ApIfaceContainer {
                 iface_id: TEST_AP_IFACE_ID,
                 config: Some(create_ap_config(&TEST_SSID, TEST_PASSWORD)),
                 ap_state_machine: Box::new(fake_ap),
                 enabled_time: None,
+                status,
             };
             iface_manager.aps.push(ap_container);
         }
@@ -5672,6 +5765,7 @@ mod tests {
             test_values.roam_manager.clone(),
             test_values.telemetry_sender.clone(),
             test_values.defect_sender.clone(),
+            test_values.node,
         );
 
         // Send a defect to the IfaceManager service loop.
@@ -5729,6 +5823,7 @@ mod tests {
             test_values.roam_manager.clone(),
             test_values.telemetry_sender.clone(),
             test_values.defect_sender.clone(),
+            test_values.node,
         );
 
         // Send a recovery summary to the IfaceManager service loop.
@@ -5791,6 +5886,7 @@ mod tests {
             test_values.roam_manager.clone(),
             test_values.telemetry_sender.clone(),
             test_values.defect_sender.clone(),
+            test_values.node,
         );
 
         // Send an AP start failure + reset PHY recovery summary to the IfaceManager service loop.
@@ -5873,6 +5969,7 @@ mod tests {
             test_values.roam_manager.clone(),
             test_values.telemetry_sender.clone(),
             test_values.defect_sender.clone(),
+            test_values.node,
         );
 
         // Send an AP start failure + reset PHY recovery summary to the IfaceManager service loop.
@@ -6012,11 +6109,13 @@ mod tests {
 
         // Setup the fake AP.
         let (ap_sender, ap_receiver) = mpsc::channel(1);
+        let (_publisher, status) = status_publisher_and_reader::<ap_fsm::Status>();
         iface_manager.aps.push(ApIfaceContainer {
             iface_id: TEST_AP_IFACE_ID,
             config: Some(create_ap_config(&TEST_SSID, TEST_PASSWORD)),
             ap_state_machine: Box::new(ap_fsm::AccessPoint::new(ap_sender)),
             enabled_time: None,
+            status,
         });
 
         // For all of the operations except SetCountry, the atomic operation can be stalled by
@@ -6130,5 +6229,124 @@ mod tests {
         let req = SetCountryRequest { country_code: Some([0, 0]), responder: ack_sender };
         let req = IfaceManagerRequest::AtomicOperation(AtomicOperation::SetCountry(req));
         test_atomic_operation(req, ack_receiver);
+    }
+
+    #[fuchsia::test]
+    fn test_recovery_inspect_logging() {
+        let mut exec = fuchsia_async::TestExecutor::new();
+        let mut test_values = test_setup(&mut exec);
+        let phy_manager = Arc::new(Mutex::new(FakePhyManager {
+            create_iface_ok: true,
+            destroy_iface_ok: true,
+            wpa3_iface: None,
+            set_country_ok: true,
+            country_code: None,
+            client_connections_enabled: true,
+            client_ifaces: vec![],
+            defects: vec![],
+            recovery_sender: None,
+        }));
+        let mut iface_manager = IfaceManagerService::new(
+            phy_manager.clone(),
+            test_values.client_update_sender.clone(),
+            test_values.ap_update_sender.clone(),
+            test_values.monitor_service_proxy.clone(),
+            test_values.saved_networks.clone(),
+            test_values.connection_selection_requester.clone(),
+            test_values.roam_manager.clone(),
+            test_values.telemetry_sender.clone(),
+            test_values.defect_sender.clone(),
+            test_values.node.clone_weak(),
+        );
+
+        // Set up a fake client and fake AP and write some fake statuses for them.
+        let (sme_proxy, _server) = create_proxy::<fidl_fuchsia_wlan_sme::ClientSmeMarker>()
+            .expect("failed to create an sme channel");
+        let (client_publisher, status) = status_publisher_and_reader::<client_fsm::Status>();
+        let client_status = client_fsm::Status::Connected { channel: 1, rssi: 2, snr: 3 };
+        client_publisher.publish_status(client_status.clone());
+        let client_container = ClientIfaceContainer {
+            iface_id: TEST_CLIENT_IFACE_ID,
+            sme_proxy,
+            config: None,
+            client_state_machine: None,
+            security_support: fake_security_support(),
+            last_roam_time: fasync::Time::now(),
+            status,
+        };
+
+        iface_manager.clients.push(client_container);
+
+        let fake_ap = FakeAp { start_succeeds: true, stop_succeeds: true, exit_succeeds: true };
+        let (ap_publisher, status) = status_publisher_and_reader::<ap_fsm::Status>();
+        let ap_status = ap_fsm::Status::Starting;
+        ap_publisher.publish_status(ap_status.clone());
+        let ap_container = ApIfaceContainer {
+            iface_id: TEST_AP_IFACE_ID,
+            config: None,
+            ap_state_machine: Box::new(fake_ap),
+            enabled_time: None,
+            status,
+        };
+
+        iface_manager.aps.push(ap_container);
+
+        // Send an AP start failure + reset PHY recovery summary to the IfaceManager service loop.
+        let defect = Defect::Iface(IfaceFailure::ApStartFailure { iface_id: 0 });
+        let action =
+            recovery::RecoveryAction::PhyRecovery(recovery::PhyRecoveryOperation::ResetPhy {
+                phy_id: 0,
+            });
+        test_values
+            .recovery_sender
+            .try_send(recovery::RecoverySummary { defect, action })
+            .expect("failed to send recovery summary");
+
+        // Run the IfaceManager service so that it can process the recovery summary.
+        let (_, receiver) = mpsc::channel(0);
+        let serve_fut = serve_iface_manager_requests(
+            iface_manager,
+            receiver,
+            test_values.defect_receiver,
+            test_values.recovery_receiver,
+        );
+        let mut serve_fut = pin!(serve_fut);
+        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+
+        // Verify that the inspect data was written as a part of the recovery process.
+        let read_fut = reader::read(&test_values.inspector);
+        let mut read_fut = pin!(read_fut);
+        assert_variant!(exec.run_until_stalled(&mut read_fut), Poll::Ready(Ok(hierarchy)) => {
+            assert_data_tree!(hierarchy, root: contains {
+                node: contains {
+                    recovery_record: contains {
+                        "0": contains {
+                            summary: contains {
+                                defect: contains {
+                                    ApStartFailure: { iface_id: 0_u64 }
+                                },
+                                action: contains {
+                                    ResetPhy: { phy_id: 0_u64 }
+                                }
+                            },
+                            clients: contains {
+                                "0": contains {
+                                    id: 0_u64,
+                                    status: contains {
+                                        Connected: { channel: 1_u64, rssi: 2_i64, snr: 3_i64 }
+                                    }
+                                }
+                            },
+                            aps: contains {
+                                "0": contains {
+                                    id: 1_u64,
+                                    status: "Starting"
+                                }
+                            },
+                        }
+                    }
+                }
+            });
+        });
     }
 }

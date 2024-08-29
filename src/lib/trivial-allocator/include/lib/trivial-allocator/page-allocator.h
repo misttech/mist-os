@@ -23,16 +23,18 @@ namespace trivial_allocator {
 //  * `size_t page_size() const;`
 //  * `std::pair<void*, Capability> Allocate(size_t);`
 //  * `void Deallocate(Capability, void*, size_t);`
+//  * `void Release(Capability, void*, size_t);`
 //  * `void Seal(Capability, void*, size_t);`
 //
 // The page_size() returned must be a power of two.  The size passed to
 // Allocate will always be a multiple of that size.
 //
 // The Capability is some default-constructible, movable object.  It's passed
-// back in the Deallocate or Seal call, or just destroyed if the memory is
-// leaked without being sealed.  Either Deallocate or Seal (but not both) may
-// be called with the same capability, pointer, and size from an Allocate call.
-// Deallocate returns the memory.  Seal makes the memory read-only.
+// back in the Deallocate, Release, or Seal call, or just destroyed if the
+// memory is leaked without being sealed.  At most one of Deallocate, Release,
+// and Seal may be called with the same capability, pointer, and size from an
+// Allocate call. Deallocate returns the memory.  Release intentionally leaks
+// the memory, Seal makes the memory read-only.
 
 template <class Memory>
 class PageAllocator {
@@ -80,8 +82,7 @@ class PageAllocator {
     }
 
     void* release() {
-      capability_ = {};
-      size_ = 0;
+      allocator_->memory().Release(std::exchange(capability_, {}), ptr_, std::exchange(size_, 0));
       return std::exchange(ptr_, nullptr);
     }
 

@@ -18,7 +18,7 @@ use netstack3_base::socket::{
 };
 use netstack3_base::{
     trace_duration, BidirectionalConverter as _, Control, CounterContext, CtxPair, EitherDeviceId,
-    Mss, NotFoundError, Segment, SegmentHeader, SendPayload, SeqNum, StrongDeviceIdentifier as _,
+    Mss, NotFoundError, Payload, Segment, SegmentHeader, SeqNum, StrongDeviceIdentifier as _,
     WeakDeviceIdentifier,
 };
 use netstack3_filter::TransportPacketSerializer;
@@ -27,7 +27,7 @@ use netstack3_ip::{
     BaseTransportIpContext, IpTransportContext, ReceiveIpPacketMeta, TransportIpContext,
     TransportReceiveError,
 };
-use packet::{BufferMut, BufferView as _, EmptyBuf, InnerPacketBuilder as _, Serializer as _};
+use packet::{BufferMut, BufferView as _, EmptyBuf, InnerPacketBuilder, Serializer as _};
 use packet_formats::error::ParseError;
 use packet_formats::ip::{IpExt, IpProto};
 use packet_formats::tcp::{
@@ -392,7 +392,7 @@ fn handle_incoming_packet<WireI, BC, CC>(
                 None,
                 None,
                 conn_addr,
-                seg.into(),
+                seg.into_empty(),
             );
         }
     } else {
@@ -698,7 +698,7 @@ where
             Some(conn_id),
             Some(&ip_sock),
             conn_addr.ip,
-            seg.into(),
+            seg.into_empty(),
         );
     }
 
@@ -1069,23 +1069,22 @@ where
             Some(&listener_id),
             Some(&ip_sock),
             incoming_addrs,
-            seg.into(),
+            seg.into_empty(),
         );
     }
 
     result
 }
 
-pub(super) fn tcp_serialize_segment<'a, S, I>(
-    segment: S,
+pub(super) fn tcp_serialize_segment<I, P>(
+    segment: Segment<P>,
     conn_addr: ConnIpAddr<I::Addr, NonZeroU16, NonZeroU16>,
-) -> impl TransportPacketSerializer<I, Buffer = EmptyBuf> + Debug + 'a
+) -> impl TransportPacketSerializer<I, Buffer = EmptyBuf> + Debug
 where
-    S: Into<Segment<SendPayload<'a>>>,
     I: IpExt,
+    P: InnerPacketBuilder + Debug + Payload,
 {
-    let Segment { header: SegmentHeader { seq, ack, wnd, control, options, .. }, data } =
-        segment.into();
+    let Segment { header: SegmentHeader { seq, ack, wnd, control, options, .. }, data } = segment;
     let ConnIpAddr { local: (local_ip, local_port), remote: (remote_ip, remote_port) } = conn_addr;
     let mut builder = TcpSegmentBuilder::new(
         local_ip.addr(),
@@ -1116,7 +1115,7 @@ mod test {
     use const_unwrap::const_unwrap_option;
     use ip_test_macro::ip_test;
     use netstack3_base::testutil::TestIpExt;
-    use netstack3_base::{Options, UnscaledWindowSize};
+    use netstack3_base::{Options, SendPayload, UnscaledWindowSize};
     use packet::ParseBuffer as _;
     use test_case::test_case;
 
@@ -1127,9 +1126,9 @@ mod test {
     const FAKE_DATA: &'static [u8] = &[1, 2, 3, 4, 5, 6, 7, 8, 9, 0];
 
     #[ip_test(I)]
-    #[test_case(Segment::syn(SEQ, UnscaledWindowSize::from(u16::MAX), Options { mss: None, window_scale: None }).into(), &[]; "syn")]
-    #[test_case(Segment::syn(SEQ, UnscaledWindowSize::from(u16::MAX), Options { mss: Some(Mss(const_unwrap_option(NonZeroU16::new(1440 as u16)))), window_scale: None }).into(), &[]; "syn with mss")]
-    #[test_case(Segment::ack(SEQ, ACK, UnscaledWindowSize::from(u16::MAX)).into(), &[]; "ack")]
+    #[test_case(Segment::syn(SEQ, UnscaledWindowSize::from(u16::MAX), Options { mss: None, window_scale: None }), &[]; "syn")]
+    #[test_case(Segment::syn(SEQ, UnscaledWindowSize::from(u16::MAX), Options { mss: Some(Mss(const_unwrap_option(NonZeroU16::new(1440 as u16)))), window_scale: None }), &[]; "syn with mss")]
+    #[test_case(Segment::ack(SEQ, ACK, UnscaledWindowSize::from(u16::MAX)), &[]; "ack")]
     #[test_case(Segment::with_fake_data(SEQ, ACK, FAKE_DATA, false), FAKE_DATA; "contiguous data")]
     #[test_case(Segment::with_fake_data(SEQ, ACK, FAKE_DATA, true), FAKE_DATA; "split data")]
     fn tcp_serialize_segment<I: TestIpExt>(
@@ -1140,7 +1139,7 @@ mod test {
         const DEST_PORT: NonZeroU16 = const_unwrap_option(NonZeroU16::new(2222));
 
         let options = segment.header.options;
-        let serializer = super::tcp_serialize_segment::<_, I>(
+        let serializer = super::tcp_serialize_segment::<I, _>(
             segment,
             ConnIpAddr {
                 local: (SocketIpAddr::try_from(I::TEST_ADDRS.local_ip).unwrap(), SOURCE_PORT),

@@ -27,7 +27,6 @@ use crate::task::{
 
 #[cfg(not(feature = "starnix_lite"))]
 use crate::vdso::vdso_loader::Vdso;
-use crate::vfs::fuse::FuseCtlFs;
 use crate::vfs::socket::{
     GenericMessage, GenericNetlink, NetlinkSenderReceiverProvider, NetlinkToClientSender,
     SocketAddress,
@@ -139,8 +138,6 @@ pub struct Kernel {
     pub security_state: security::KernelState,
     // Owned by tracefs/fs.rs
     pub trace_fs: OnceCell<FileSystemHandle>,
-    // Owned by vfs/fuse.rs
-    pub fusectl_fs: OnceCell<Arc<FuseCtlFs>>,
 
     /// The registry of device drivers.
     pub device_registry: DeviceRegistry,
@@ -361,7 +358,6 @@ impl Kernel {
             nmfs: Default::default(),
             security_state,
             trace_fs: Default::default(),
-            fusectl_fs: Default::default(),
             device_registry: DeviceRegistry::new(),
             container_svc,
             container_data_dir,

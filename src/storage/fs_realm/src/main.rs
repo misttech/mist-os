@@ -9,7 +9,7 @@ use fidl_fuchsia_hardware_block::BlockMarker;
 use fidl_fuchsia_process_lifecycle::{LifecycleRequest, LifecycleRequestStream};
 use fs_management::filesystem::{Filesystem, ServingSingleVolumeFilesystem};
 use fs_management::format::{detect_disk_format, DiskFormat};
-use fs_management::{BlobCompression, Blobfs, F2fs, Fxfs, Minfs};
+use fs_management::{Blobfs, F2fs, Fxfs, Minfs};
 use fuchsia_fs::directory::clone_no_describe;
 use fuchsia_runtime::{take_startup_handle, HandleType};
 use futures::channel::mpsc;
@@ -60,9 +60,11 @@ impl FsRealmState {
                 let blobfs = Blobfs {
                     verbose: options.verbose.unwrap_or(false),
                     readonly: options.read_only.unwrap_or(false),
-                    write_compression_algorithm: blob_compression(
-                        options.write_compression_algorithm,
-                    ),
+                    write_compression_algorithm: options
+                        .write_compression_algorithm
+                        .unwrap_or_default()
+                        .as_str()
+                        .into(),
                     ..Default::default()
                 };
                 Filesystem::new(device, blobfs)
@@ -106,18 +108,6 @@ impl FsRealmState {
             fs.shutdown().await?;
         }
         Ok(())
-    }
-}
-
-fn blob_compression(compression: Option<String>) -> Option<BlobCompression> {
-    if let Some(compression_alg) = compression {
-        match compression_alg.as_ref() {
-            "ZSTD_CHUNKED" => Some(BlobCompression::ZSTDChunked),
-            "UNCOMPRESSED" => Some(BlobCompression::Uncompressed),
-            _ => None,
-        }
-    } else {
-        None
     }
 }
 

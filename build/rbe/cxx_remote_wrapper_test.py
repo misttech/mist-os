@@ -24,8 +24,6 @@ import remote_action
 class ImmediateExit(Exception):
     """For mocking functions that do not return."""
 
-    pass
-
 
 def _strs(items: Sequence[Any]) -> Sequence[str]:
     return [str(i) for i in items]

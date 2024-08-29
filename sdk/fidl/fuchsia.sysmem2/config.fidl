@@ -33,7 +33,7 @@ using fuchsia.images2;
 /// Because this type is only intended for use with persistent fidl, where the
 /// length of a serialized instance isn't bounded, we don't bound the internal
 /// vector element counts.
-@available(added=NEXT)
+@available(added=23)
 type Config = table {
     /// This is the ordered list of FormatCost entries which will be considered
     /// by sysmem when breaking ties among formats supported by all participants
@@ -70,7 +70,7 @@ type Config = table {
 /// contains only format costs. We don't mind having more separate files during
 /// the build, but it's nice to get sysmem's domain config down to a single file
 /// on-device.
-@available(added=NEXT)
+@available(added=23)
 type FormatCosts = table {
     /// This is a chunk of entries that'll end up in
     /// ['fuchsia.sysmem2.Config.format_costs'] (see above) unless overriden by
@@ -114,7 +114,7 @@ type FormatCosts = table {
 /// efficient formats with better performance, lower memory bandwidth usage,
 /// etc, for a given set of usage bits, taking into account quirks that may be
 /// unique to a given board or overall platform config.
-@available(added=NEXT)
+@available(added=23)
 type FormatCostEntry = table {
     /// Must be set. If two entries have logically equal key (after field
     /// defaults are applied), the later entry will override the earlier entry.
@@ -137,7 +137,7 @@ type FormatCostEntry = table {
 /// required_usage_bits as a previous entry will override that previous entry.
 /// For matching purposes, an absent pixel_format_modifier matches LINEAR, and
 /// an absent required_buffer_usage_bits matches all-0 usage bits.
-@available(added=NEXT)
+@available(added=23)
 type FormatCostKey = table {
     /// The pixel_format and pixel_format_modifier are the format to which this
     /// FormatCost entry applies.

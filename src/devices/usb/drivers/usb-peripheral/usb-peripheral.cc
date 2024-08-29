@@ -28,6 +28,8 @@
 #include <string>
 #include <vector>
 
+#include <bind/fuchsia/cpp/bind.h>
+#include <bind/fuchsia/usb/cpp/bind.h>
 #include <ddktl/fidl.h>
 #include <fbl/alloc_checker.h>
 #include <fbl/auto_lock.h>
@@ -734,13 +736,18 @@ zx_status_t UsbPeripheral::AddFunctionDevices() {
 
       auto& desc = function->GetFunctionDescriptor();
 
-      zx_device_prop_t props[] = {
-          {BIND_PROTOCOL, 0, ZX_PROTOCOL_USB_FUNCTION},
-          {BIND_USB_CLASS, 0, desc.interface_class},
-          {BIND_USB_SUBCLASS, 0, desc.interface_subclass},
-          {BIND_USB_PROTOCOL, 0, desc.interface_protocol},
-          {BIND_USB_VID, 0, device_desc_.id_vendor},
-          {BIND_USB_PID, 0, device_desc_.id_product},
+      zx_device_str_prop_t props[] = {
+          ddk::MakeStrProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_usb::BIND_PROTOCOL_FUNCTION),
+          ddk::MakeStrProperty(bind_fuchsia::USB_CLASS,
+                               static_cast<uint32_t>(desc.interface_class)),
+          ddk::MakeStrProperty(bind_fuchsia::USB_SUBCLASS,
+                               static_cast<uint32_t>(desc.interface_subclass)),
+          ddk::MakeStrProperty(bind_fuchsia::USB_PROTOCOL,
+                               static_cast<uint32_t>(desc.interface_protocol)),
+          ddk::MakeStrProperty(bind_fuchsia::USB_VID,
+                               static_cast<uint32_t>(device_desc_.id_vendor)),
+          ddk::MakeStrProperty(bind_fuchsia::USB_PID,
+                               static_cast<uint32_t>(device_desc_.id_product)),
       };
 
       auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
@@ -757,7 +764,7 @@ zx_status_t UsbPeripheral::AddFunctionDevices() {
           fuchsia_hardware_usb_function::UsbFunctionService::Name,
       };
       status = function->DdkAdd(ddk::DeviceAddArgs(name)
-                                    .set_props(props)
+                                    .set_str_props(props)
                                     .forward_metadata(parent(), DEVICE_METADATA_MAC_ADDRESS)
                                     .forward_metadata(parent(), DEVICE_METADATA_SERIAL_NUMBER)
                                     .set_fidl_service_offers(offers)

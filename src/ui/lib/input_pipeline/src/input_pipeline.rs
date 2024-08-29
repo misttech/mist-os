@@ -549,6 +549,7 @@ impl InputPipeline {
                     )
                     .await;
                 }
+                fidl_fuchsia_input_injection::InputDeviceRegistryRequest::RegisterAndGetDeviceInfo { .. } => {}
             }
         }
 

@@ -27,14 +27,10 @@
 #include <lib/mmio/mmio-buffer.h>
 #include <zircon/syscalls.h>
 
-#include <atomic>
-#include <thread>
-
 #include <fake-dma-buffer/fake-dma-buffer.h>
-#include <zxtest/zxtest.h>
 
 #include "src/devices/lib/mmio/test-helper.h"
-#include "src/devices/usb/drivers/xhci/usb-xhci.h"
+#include "src/devices/usb/drivers/xhci/tests/test-env.h"
 #include "src/devices/usb/drivers/xhci/xhci-event-ring.h"
 
 namespace usb_xhci {
@@ -84,6 +80,49 @@ struct TestState {
   }
 };
 
+class EnumerationTests : public ::testing::Test {
+ public:
+  void SetUp() override {
+    ASSERT_TRUE(driver_test()
+                    .StartDriverWithCustomStartArgs([&](fdf::DriverStartArgs& args) {
+                      xhci_config::Config fake_config;
+                      fake_config.enable_suspend() = false;
+                      args.config(fake_config.ToVmo());
+                    })
+                    .is_ok());
+    ASSERT_OK(driver_test().driver()->TestInit(this));
+  }
+
+  void TearDown() override { ASSERT_TRUE(driver_test().StopDriver().is_ok()); }
+
+  fdf_testing::ForegroundDriverTest<EmptyTestConfig>& driver_test() { return driver_test_; }
+  TestState& state() { return state_; }
+
+  std::optional<HubInfo> TestHubInfo(uint8_t hub_depth, uint8_t hub_slot, uint8_t hub_port,
+                                     usb_speed_t speed, bool multi_tt) {
+    auto hub_state = fbl::MakeRefCounted<DeviceState>(hub_slot - 1, driver_test().driver());
+    {
+      fbl::AutoLock _(&hub_state->transaction_lock());
+      hub_state->SetDeviceInformation(hub_slot, hub_port, std::nullopt);
+    }
+    return HubInfo(std::move(hub_state), hub_depth, speed, multi_tt);
+  }
+
+  void VerifyHubInfo(std::optional<HubInfo>& hub_info, uint8_t hub_depth, uint8_t hub_slot,
+                     uint8_t hub_port, usb_speed_t speed, bool multi_tt) {
+    ASSERT_EQ(hub_info->hub_depth, hub_depth);
+    ASSERT_EQ(hub_info->hub_state->GetSlot(), hub_slot);
+    ASSERT_EQ(hub_info->hub_state->GetPort(), hub_port);
+    ASSERT_EQ(hub_info->hub_speed, speed);
+    ASSERT_EQ(hub_info->multi_tt, multi_tt);
+  }
+
+ private:
+  fdf_testing::ForegroundDriverTest<EmptyTestConfig> driver_test_;
+  TestState state_;
+};
+
+// EventRing Methods
 void EventRing::ScheduleTask(fpromise::promise<void, zx_status_t> promise) {
   auto continuation = promise.or_else([=](const zx_status_t& status) {
     // ZX_ERR_BAD_STATE is a special value that we use to signal
@@ -98,6 +137,7 @@ void EventRing::ScheduleTask(fpromise::promise<void, zx_status_t> promise) {
 
 void EventRing::RunUntilIdle() { executor_.run_until_idle(); }
 
+// Interrupter Methods
 zx_status_t Interrupter::Init(uint16_t interrupter, size_t page_size, fdf::MmioBuffer* buffer,
                               const RuntimeRegisterOffset& offset, uint32_t erst_max,
                               DoorbellOffset doorbell_offset, UsbXhci* hci, HCCPARAMS1 hcc_params_1,
@@ -113,20 +153,21 @@ zx_status_t Interrupter::Start(const RuntimeRegisterOffset& offset,
 
 fpromise::promise<void, zx_status_t> Interrupter::Timeout(zx::time deadline) {
   fpromise::bridge<TRB*, zx_status_t> bridge;
-  auto state = reinterpret_cast<TestState*>(hci_->parent());
-  auto context = state->trb_context_allocator_.New();
+  auto& state = hci_->GetTestHarness<EnumerationTests>()->state();
+  auto context = state.trb_context_allocator_.New();
   FakeTRB* trb = new FakeTRB();
   trb->Op = FakeTRB::Op::Timeout;
   trb->deadline = deadline;
   context->trb = trb;
   context->completer = std::move(bridge.completer);
-  state->pending_operations.push_back(std::move(context));
+  state.pending_operations.push_back(std::move(context));
   return bridge.consumer.promise().discard_value();
 }
 
+// UsbXhci Methods
 void UsbXhci::SetDeviceInformation(uint8_t slot, uint8_t port, const std::optional<HubInfo>& hub) {
-  auto state = reinterpret_cast<TestState*>(parent_);
-  auto context = state->trb_context_allocator_.New();
+  auto& state = GetTestHarness<EnumerationTests>()->state();
+  auto context = state.trb_context_allocator_.New();
   FakeTRB* trb = new FakeTRB();
   trb->Op = FakeTRB::Op::SetDeviceInformation;
   trb->slot = slot;
@@ -137,20 +178,20 @@ void UsbXhci::SetDeviceInformation(uint8_t slot, uint8_t port, const std::option
   // a TRB that would be inside of a DMA buffer, since it is shared between the
   // device and the CPU)
   context->trb = trb;
-  state->pending_operations.push_back(std::move(context));
+  state.pending_operations.push_back(std::move(context));
 
   // slot must exist in device_state_ so it's reported as connected.
   device_state_[slot - 1] = fbl::MakeRefCounted<DeviceState>(slot - 1, this);
 }
 
 std::optional<usb_speed_t> UsbXhci::GetDeviceSpeed(uint8_t slot) {
-  auto state = reinterpret_cast<TestState*>(parent_);
-  return state->speeds[slot - 1];
+  auto& state = GetTestHarness<EnumerationTests>()->state();
+  return state.speeds[slot - 1];
 }
 
 zx_status_t UsbXhci::DeviceOnline(uint32_t slot, uint16_t port, usb_speed_t speed) {
-  auto state = reinterpret_cast<TestState*>(parent_);
-  auto context = state->trb_context_allocator_.New();
+  auto& state = GetTestHarness<EnumerationTests>()->state();
+  auto context = state.trb_context_allocator_.New();
   FakeTRB* trb = new FakeTRB();
   trb->Op = FakeTRB::Op::OnlineDevice;
   trb->slot = slot;
@@ -161,13 +202,13 @@ zx_status_t UsbXhci::DeviceOnline(uint32_t slot, uint16_t port, usb_speed_t spee
   // a TRB that would be inside of a DMA buffer, since it is shared between the
   // device and the CPU)
   context->trb = trb;
-  state->pending_operations.push_back(std::move(context));
+  state.pending_operations.push_back(std::move(context));
   return ZX_OK;
 }
 
 void UsbXhci::Shutdown(zx_status_t status) {
-  auto state = reinterpret_cast<TestState*>(parent_);
-  auto context = state->trb_context_allocator_.New();
+  auto& state = GetTestHarness<EnumerationTests>()->state();
+  auto context = state.trb_context_allocator_.New();
   FakeTRB* trb = new FakeTRB();
   trb->Op = FakeTRB::Op::ShutdownController;
   trb->status = status;
@@ -176,14 +217,14 @@ void UsbXhci::Shutdown(zx_status_t status) {
   // a TRB that would be inside of a DMA buffer, since it is shared between the
   // device and the CPU)
   context->trb = trb;
-  state->pending_operations.push_back(std::move(context));
+  state.pending_operations.push_back(std::move(context));
 }
 
 TRBPromise UsbXhci::AddressDeviceCommand(uint8_t slot_id, uint8_t port_id,
                                          std::optional<HubInfo> hub_info, bool bsr) {
   fpromise::bridge<TRB*, zx_status_t> bridge;
-  auto state = reinterpret_cast<TestState*>(parent_);
-  auto context = state->trb_context_allocator_.New();
+  auto& state = GetTestHarness<EnumerationTests>()->state();
+  auto context = state.trb_context_allocator_.New();
   FakeTRB* trb = new FakeTRB();
   trb->Op = FakeTRB::Op::AddressDevice;
   trb->slot = slot_id;
@@ -196,14 +237,14 @@ TRBPromise UsbXhci::AddressDeviceCommand(uint8_t slot_id, uint8_t port_id,
   // device and the CPU)
   context->trb = trb;
   context->completer = std::move(bridge.completer);
-  state->pending_operations.push_back(std::move(context));
+  state.pending_operations.push_back(std::move(context));
   return bridge.consumer.promise();
 }
 
 TRBPromise UsbXhci::AddressDeviceCommand(uint8_t slot_id, uint8_t port_id) {
   fpromise::bridge<TRB*, zx_status_t> bridge;
-  auto state = reinterpret_cast<TestState*>(parent_);
-  auto context = state->trb_context_allocator_.New();
+  auto& state = GetTestHarness<EnumerationTests>()->state();
+  auto context = state.trb_context_allocator_.New();
   FakeTRB* trb = new FakeTRB();
   trb->Op = FakeTRB::Op::AddressDevice;
   trb->slot = slot_id;
@@ -214,14 +255,14 @@ TRBPromise UsbXhci::AddressDeviceCommand(uint8_t slot_id, uint8_t port_id) {
   // device and the CPU)
   context->trb = trb;
   context->completer = std::move(bridge.completer);
-  state->pending_operations.push_back(std::move(context));
+  state.pending_operations.push_back(std::move(context));
   return bridge.consumer.promise();
 }
 
 TRBPromise UsbXhci::SetMaxPacketSizeCommand(uint8_t slot_id, uint8_t bMaxPacketSize0) {
   fpromise::bridge<TRB*, zx_status_t> bridge;
-  auto state = reinterpret_cast<TestState*>(parent_);
-  auto context = state->trb_context_allocator_.New();
+  auto& state = GetTestHarness<EnumerationTests>()->state();
+  auto context = state.trb_context_allocator_.New();
   FakeTRB* trb = new FakeTRB();
   trb->Op = FakeTRB::Op::SetMaxPacketSize;
   trb->slot = slot_id;
@@ -232,32 +273,32 @@ TRBPromise UsbXhci::SetMaxPacketSizeCommand(uint8_t slot_id, uint8_t bMaxPacketS
   // device and the CPU)
   context->trb = trb;
   context->completer = std::move(bridge.completer);
-  state->pending_operations.push_back(std::move(context));
+  state.pending_operations.push_back(std::move(context));
   return bridge.consumer.promise();
 }
 
 TRBPromise UsbXhci::EnableSlotCommand() {
   fpromise::bridge<TRB*, zx_status_t> bridge;
-  auto state = reinterpret_cast<TestState*>(parent_);
-  auto context = state->trb_context_allocator_.New();
+  auto& state = GetTestHarness<EnumerationTests>()->state();
+  auto context = state.trb_context_allocator_.New();
   FakeTRB* trb = new FakeTRB();
   trb->Op = FakeTRB::Op::EnableSlot;
-  trb->slot = state->slot;
-  state->slot++;
+  trb->slot = state.slot;
+  state.slot++;
   // NOTE: The TRB for the purposes of the test is owned by our test harness.
   // In a real environment, this would be owned by the transfer ring (it would be
   // a TRB that would be inside of a DMA buffer, since it is shared between the
   // device and the CPU)
   context->trb = trb;
   context->completer = std::move(bridge.completer);
-  state->pending_operations.push_back(std::move(context));
+  state.pending_operations.push_back(std::move(context));
   return bridge.consumer.promise();
 }
 
 fpromise::promise<void, zx_status_t> UsbXhci::DisableSlotCommand(uint32_t slot) {
   fpromise::bridge<TRB*, zx_status_t> bridge;
-  auto state = reinterpret_cast<TestState*>(parent_);
-  auto context = state->trb_context_allocator_.New();
+  auto& state = GetTestHarness<EnumerationTests>()->state();
+  auto context = state.trb_context_allocator_.New();
   FakeTRB* trb = new FakeTRB();
   trb->Op = FakeTRB::Op::DisableSlot;
   trb->slot = slot;
@@ -267,37 +308,36 @@ fpromise::promise<void, zx_status_t> UsbXhci::DisableSlotCommand(uint32_t slot) 
   // device and the CPU)
   context->trb = trb;
   context->completer = std::move(bridge.completer);
-  state->pending_operations.push_back(std::move(context));
+  state.pending_operations.push_back(std::move(context));
   return bridge.consumer.promise().discard_value();
 }
 
-void UsbXhci::ResetPort(uint16_t port) {}
+void UsbXhci::UsbHciRequestQueue(usb_request_t* usb_request,
+                                 const usb_request_complete_callback_t* complete_cb) {
+  auto& state = GetTestHarness<EnumerationTests>()->state();
+  auto context = state.trb_context_allocator_.New();
+  context->request = Request(usb_request, *complete_cb, sizeof(usb_request_t));
+  context->token = state.token;
+  state.pending_operations.push_back(std::move(context));
+}
 
 zx_status_t UsbXhci::UsbHciCancelAll(uint32_t device_id, uint8_t ep_address) {
   return ZX_ERR_NOT_SUPPORTED;
 }
 
-void UsbXhci::UsbHciRequestQueue(usb_request_t* usb_request,
-                                 const usb_request_complete_callback_t* complete_cb) {
-  auto state = reinterpret_cast<TestState*>(parent_);
-  auto context = state->trb_context_allocator_.New();
-  context->request = Request(usb_request, *complete_cb, sizeof(usb_request_t));
-  context->token = state->token;
-  state->pending_operations.push_back(std::move(context));
-}
-
-uint16_t UsbXhci::InterrupterMapping() { return 0; }
-
 // Interrupter takes a View which needs to refer back to a MmioBuffer that
 // hasn't gone out of scope, so since there's no other scaffolding here we're
 // going to just hold it here.
 fdf::MmioBuffer kInterruptorMmio = fdf_testing::CreateMmioBuffer(zx_system_get_page_size());
-int UsbXhci::InitThread() {
+
+zx::result<> UsbXhci::Init(std::unique_ptr<dma_buffer::BufferFactory> buffer_factory) {
+  buffer_factory_ = std::move(buffer_factory);
+
   interrupters_ = fbl::MakeArray<Interrupter>(1);
   interrupters_[0].Init(0, 0, nullptr, {}, 0, {}, this, {}, nullptr);
   interrupters_[0].Start(RuntimeRegisterOffset::Get().FromValue(0), kInterruptorMmio.View(0));
   device_state_ = fbl::MakeArray<fbl::RefPtr<DeviceState>>(32);
-  return 0;
+  return zx::ok();
 }
 
 fpromise::promise<OwnedRequest, void> UsbXhci::UsbHciRequestQueue(OwnedRequest usb_request) {
@@ -318,69 +358,34 @@ fpromise::promise<void, zx_status_t> UsbXhci::Timeout(uint16_t target_interrupte
   return interrupter(target_interrupter).Timeout(deadline);
 }
 
-zx_status_t TransferRing::DeinitIfActive() { return ZX_OK; }
-
 void UsbXhci::CreateDeviceInspectNode(uint32_t slot, uint16_t vendor_id, uint16_t product_id) {}
 
-class EnumerationTests : public zxtest::Test {
- public:
-  EnumerationTests()
-      : controller_(reinterpret_cast<zx_device_t*>(&state_),
-                    xhci_config::Config({.enable_suspend = false}), ddk_fake::CreateBufferFactory(),
-                    loop_.dispatcher()) {
-    controller_.InitThread();
-  }
-  TestState& state() { return state_; }
-
-  UsbXhci& controller() { return controller_; }
-
-  std::optional<HubInfo> TestHubInfo(uint8_t hub_depth, uint8_t hub_slot, uint8_t hub_port,
-                                     usb_speed_t speed, bool multi_tt) {
-    auto hub_state = fbl::MakeRefCounted<DeviceState>(hub_slot - 1, &controller_);
-    {
-      fbl::AutoLock _(&hub_state->transaction_lock());
-      hub_state->SetDeviceInformation(hub_slot, hub_port, std::nullopt);
-    }
-    return HubInfo(std::move(hub_state), hub_depth, speed, multi_tt);
-  }
-
-  void VerifyHubInfo(std::optional<HubInfo>& hub_info, uint8_t hub_depth, uint8_t hub_slot,
-                     uint8_t hub_port, usb_speed_t speed, bool multi_tt) {
-    ASSERT_EQ(hub_info->hub_depth, hub_depth);
-    ASSERT_EQ(hub_info->hub_state->GetSlot(), hub_slot);
-    ASSERT_EQ(hub_info->hub_state->GetPort(), hub_port);
-    ASSERT_EQ(hub_info->hub_speed, speed);
-    ASSERT_EQ(hub_info->multi_tt, multi_tt);
-  }
-
- private:
-  async::Loop loop_{&kAsyncLoopConfigNeverAttachToThread};
-  TestState state_;
-  UsbXhci controller_;
-};
+// TransferRing Methods
+zx_status_t TransferRing::DeinitIfActive() { return ZX_OK; }
 
 TEST_F(EnumerationTests, EnableSlotCommandPassesThroughFailureCode) {
   std::optional<HubInfo> hub_info;
   constexpr uint8_t kPort = 5;
-  auto enumeration_task = EnumerateDevice(&controller(), kPort, std::move(hub_info));
+  auto enumeration_task = EnumerateDevice(driver_test().driver(), kPort, std::move(hub_info));
   auto enable_slot_task = state().pending_operations.pop_front();
   auto enum_slot_trb = FakeTRB::FromTRB(enable_slot_task->trb);
   ASSERT_EQ(enum_slot_trb->Op, FakeTRB::Op::EnableSlot);
   enable_slot_task->completer->complete_error(ZX_ERR_UNAVAILABLE);
-  ASSERT_EQ(controller().RunSynchronously(0, std::move(enumeration_task)), ZX_ERR_UNAVAILABLE);
+  ASSERT_EQ(driver_test().driver()->RunSynchronously(0, std::move(enumeration_task)),
+            ZX_ERR_UNAVAILABLE);
 }
 
 TEST_F(EnumerationTests, EnableSlotCommandReturnsIOErrorOnFailure) {
   std::optional<HubInfo> hub_info;
   constexpr uint8_t kPort = 5;
-  auto enumeration_task = EnumerateDevice(&controller(), kPort, std::move(hub_info));
+  auto enumeration_task = EnumerateDevice(driver_test().driver(), kPort, std::move(hub_info));
   auto enable_slot_task = state().pending_operations.pop_front();
   auto enum_slot_trb = FakeTRB::FromTRB(enable_slot_task->trb);
   ASSERT_EQ(enum_slot_trb->Op, FakeTRB::Op::EnableSlot);
   reinterpret_cast<CommandCompletionEvent*>(enum_slot_trb.get())
       ->set_CompletionCode(CommandCompletionEvent::UndefinedError);
   enable_slot_task->completer->complete_ok(enum_slot_trb.get());
-  ASSERT_EQ(controller().RunSynchronously(0, std::move(enumeration_task)), ZX_ERR_IO);
+  ASSERT_EQ(driver_test().driver()->RunSynchronously(0, std::move(enumeration_task)), ZX_ERR_IO);
 }
 
 TEST_F(EnumerationTests, EnableSlotCommandSetsDeviceInformationOnSuccess) {
@@ -391,7 +396,7 @@ TEST_F(EnumerationTests, EnableSlotCommandSetsDeviceInformationOnSuccess) {
   constexpr usb_speed_t kSpeed = USB_SPEED_HIGH;
   constexpr bool kMultiTT = false;
   auto enumeration_task = EnumerateDevice(
-      &controller(), kPort, TestHubInfo(kHubDepth, kHubSlot, kHubPort, kSpeed, kMultiTT));
+      driver_test().driver(), kPort, TestHubInfo(kHubDepth, kHubSlot, kHubPort, kSpeed, kMultiTT));
   auto enable_slot_task = state().pending_operations.pop_front();
   auto enum_slot_trb = FakeTRB::FromTRB(enable_slot_task->trb);
   ASSERT_EQ(enum_slot_trb->Op, FakeTRB::Op::EnableSlot);
@@ -399,14 +404,14 @@ TEST_F(EnumerationTests, EnableSlotCommandSetsDeviceInformationOnSuccess) {
       ->set_CompletionCode(CommandCompletionEvent::Success);
   reinterpret_cast<CommandCompletionEvent*>(enum_slot_trb.get())->set_SlotID(1);
   enable_slot_task->completer->complete_ok(enum_slot_trb.get());
-  controller().ScheduleTask(0, std::move(enumeration_task));
-  controller().RunUntilIdle(0);
+  driver_test().driver()->ScheduleTask(0, std::move(enumeration_task));
+  driver_test().driver()->RunUntilIdle(0);
   auto device_information = FakeTRB::FromTRB(state().pending_operations.pop_front()->trb);
   ASSERT_EQ(device_information->Op, FakeTRB::Op::SetDeviceInformation);
   VerifyHubInfo(device_information->hub_info, kHubDepth, kHubSlot, kHubPort, kSpeed, kMultiTT);
   ASSERT_EQ(device_information->port, kPort);
-  ASSERT_EQ(device_information->slot, 1);
-  controller().RunUntilIdle(0);
+  ASSERT_EQ(device_information->slot, 1UL);
+  driver_test().driver()->RunUntilIdle(0);
   auto address_device_op = FakeTRB::FromTRB(state().pending_operations.pop_front()->trb);
   ASSERT_EQ(address_device_op->Op, FakeTRB::Op::AddressDevice);
 }
@@ -421,7 +426,7 @@ TEST_F(EnumerationTests, AddressDeviceCommandPassesThroughFailureCode) {
   constexpr bool kMultiTT = false;
   zx_status_t completion_code = -1;
   auto enumeration_task =
-      EnumerateDevice(&controller(), kPort,
+      EnumerateDevice(driver_test().driver(), kPort,
                       TestHubInfo(kHubDepth, kHubSlot, kHubPort, kSpeed, kMultiTT))
           .then([&](fpromise::result<void, zx_status_t>& result) {
             if (result.is_ok()) {
@@ -438,27 +443,27 @@ TEST_F(EnumerationTests, AddressDeviceCommandPassesThroughFailureCode) {
       ->set_CompletionCode(CommandCompletionEvent::Success);
   reinterpret_cast<CommandCompletionEvent*>(enum_slot_trb.get())->set_SlotID(1);
   enable_slot_task->completer->complete_ok(enum_slot_trb.get());
-  controller().ScheduleTask(0, std::move(enumeration_task));
-  controller().RunUntilIdle(0);
+  driver_test().driver()->ScheduleTask(0, std::move(enumeration_task));
+  driver_test().driver()->RunUntilIdle(0);
   auto device_information = FakeTRB::FromTRB(state().pending_operations.pop_front()->trb);
   ASSERT_EQ(device_information->Op, FakeTRB::Op::SetDeviceInformation);
   VerifyHubInfo(device_information->hub_info, kHubDepth, kHubSlot, kHubPort, kSpeed, kMultiTT);
   ASSERT_EQ(device_information->port, kPort);
-  ASSERT_EQ(device_information->slot, 1);
-  controller().RunUntilIdle(0);
+  ASSERT_EQ(device_information->slot, 1UL);
+  driver_test().driver()->RunUntilIdle(0);
 
   // AddressDevice
   auto address_device = state().pending_operations.pop_front();
   auto address_device_op = FakeTRB::FromTRB(address_device->trb);
   ASSERT_EQ(address_device_op->Op, FakeTRB::Op::AddressDevice);
-  ASSERT_EQ(address_device_op->slot, 1);
+  ASSERT_EQ(address_device_op->slot, 1UL);
   ASSERT_EQ(address_device_op->port, kPort);
   VerifyHubInfo(address_device_op->hub_info, kHubDepth, kHubSlot, kHubPort, kSpeed, kMultiTT);
   address_device->completer->complete_error(ZX_ERR_IO_OVERRUN);
-  controller().RunUntilIdle(0);
+  driver_test().driver()->RunUntilIdle(0);
   auto disable_trb = FakeTRB::FromTRB(state().pending_operations.pop_front()->trb);
   ASSERT_EQ(disable_trb->Op, FakeTRB::Op::DisableSlot);
-  ASSERT_EQ(disable_trb->slot, 1);
+  ASSERT_EQ(disable_trb->slot, 1UL);
   ASSERT_EQ(completion_code, ZX_ERR_IO_OVERRUN);
 }
 
@@ -472,7 +477,7 @@ TEST_F(EnumerationTests, AddressDeviceCommandReturnsErrorOnFailure) {
   constexpr bool kMultiTT = false;
   zx_status_t completion_code = -1;
   auto enumeration_task =
-      EnumerateDevice(&controller(), kPort,
+      EnumerateDevice(driver_test().driver(), kPort,
                       TestHubInfo(kHubDepth, kHubSlot, kHubPort, kSpeed, kMultiTT))
           .then([&](fpromise::result<void, zx_status_t>& result) {
             if (result.is_ok()) {
@@ -489,29 +494,29 @@ TEST_F(EnumerationTests, AddressDeviceCommandReturnsErrorOnFailure) {
       ->set_CompletionCode(CommandCompletionEvent::Success);
   reinterpret_cast<CommandCompletionEvent*>(enum_slot_trb.get())->set_SlotID(1);
   enable_slot_task->completer->complete_ok(enum_slot_trb.get());
-  controller().ScheduleTask(0, std::move(enumeration_task));
-  controller().RunUntilIdle(0);
+  driver_test().driver()->ScheduleTask(0, std::move(enumeration_task));
+  driver_test().driver()->RunUntilIdle(0);
   auto device_information = FakeTRB::FromTRB(state().pending_operations.pop_front()->trb);
   ASSERT_EQ(device_information->Op, FakeTRB::Op::SetDeviceInformation);
   VerifyHubInfo(device_information->hub_info, kHubDepth, kHubSlot, kHubPort, kSpeed, kMultiTT);
   ASSERT_EQ(device_information->port, kPort);
-  ASSERT_EQ(device_information->slot, 1);
-  controller().RunUntilIdle(0);
+  ASSERT_EQ(device_information->slot, 1UL);
+  driver_test().driver()->RunUntilIdle(0);
 
   // AddressDevice
   auto address_device = state().pending_operations.pop_front();
   auto address_device_op = FakeTRB::FromTRB(address_device->trb);
   ASSERT_EQ(address_device_op->Op, FakeTRB::Op::AddressDevice);
-  ASSERT_EQ(address_device_op->slot, 1);
+  ASSERT_EQ(address_device_op->slot, 1UL);
   ASSERT_EQ(address_device_op->port, kPort);
   VerifyHubInfo(address_device_op->hub_info, kHubDepth, kHubSlot, kHubPort, kSpeed, kMultiTT);
   reinterpret_cast<CommandCompletionEvent*>(address_device_op.get())
       ->set_CompletionCode(CommandCompletionEvent::Stopped);
   address_device->completer->complete_ok(address_device_op.get());
-  controller().RunUntilIdle(0);
+  driver_test().driver()->RunUntilIdle(0);
   auto disable_trb = FakeTRB::FromTRB(state().pending_operations.pop_front()->trb);
   ASSERT_EQ(disable_trb->Op, FakeTRB::Op::DisableSlot);
-  ASSERT_EQ(disable_trb->slot, 1);
+  ASSERT_EQ(disable_trb->slot, 1UL);
   ASSERT_EQ(completion_code, ZX_ERR_IO);
 }
 
@@ -526,7 +531,7 @@ TEST_F(EnumerationTests, AddressDeviceCommandShouldOnlineDeviceUponCompletion) {
   state().speeds[0] = kSpeed;
   zx_status_t completion_code = -1;
   auto enumeration_task =
-      EnumerateDevice(&controller(), kPort,
+      EnumerateDevice(driver_test().driver(), kPort,
                       TestHubInfo(kHubDepth, kHubSlot, kHubPort, kSpeed, kMultiTT))
           .then([&](fpromise::result<void, zx_status_t>& result) {
             if (result.is_ok()) {
@@ -543,75 +548,75 @@ TEST_F(EnumerationTests, AddressDeviceCommandShouldOnlineDeviceUponCompletion) {
       ->set_CompletionCode(CommandCompletionEvent::Success);
   reinterpret_cast<CommandCompletionEvent*>(enum_slot_trb.get())->set_SlotID(1);
   enable_slot_task->completer->complete_ok(enum_slot_trb.get());
-  controller().ScheduleTask(0, std::move(enumeration_task));
-  controller().RunUntilIdle(0);
+  driver_test().driver()->ScheduleTask(0, std::move(enumeration_task));
+  driver_test().driver()->RunUntilIdle(0);
   auto device_information = FakeTRB::FromTRB(state().pending_operations.pop_front()->trb);
   ASSERT_EQ(device_information->Op, FakeTRB::Op::SetDeviceInformation);
   VerifyHubInfo(device_information->hub_info, kHubDepth, kHubSlot, kHubPort, kSpeed, kMultiTT);
   ASSERT_EQ(device_information->port, kPort);
-  ASSERT_EQ(device_information->slot, 1);
+  ASSERT_EQ(device_information->slot, 1UL);
 
   // AddressDevice
   auto address_device = state().pending_operations.pop_front();
   auto address_device_op = FakeTRB::FromTRB(address_device->trb);
   ASSERT_EQ(address_device_op->Op, FakeTRB::Op::AddressDevice);
-  ASSERT_EQ(address_device_op->slot, 1);
+  ASSERT_EQ(address_device_op->slot, 1UL);
   ASSERT_EQ(address_device_op->port, kPort);
   VerifyHubInfo(address_device_op->hub_info, kHubDepth, kHubSlot, kHubPort, kSpeed, kMultiTT);
   reinterpret_cast<CommandCompletionEvent*>(address_device_op.get())
       ->set_CompletionCode(CommandCompletionEvent::Success);
   address_device->completer->complete_ok(address_device_op.get());
-  controller().RunUntilIdle(0);
+  driver_test().driver()->RunUntilIdle(0);
   // Timeout
   auto timeout = state().pending_operations.pop_front();
   ASSERT_TRUE(FakeTRB::FromTRB(timeout->trb)->deadline.get());
   timeout->completer->complete_ok(address_device_op.get());
-  controller().RunUntilIdle(0);
+  driver_test().driver()->RunUntilIdle(0);
   // GetMaxPacketSize
   auto get_max_packet_size = state().pending_operations.pop_front();
   auto get_max_packet_size_request = std::move(std::get<Request>(*get_max_packet_size->request));
-  ASSERT_EQ(get_max_packet_size_request.request()->header.device_id, 0);
-  ASSERT_EQ(get_max_packet_size_request.request()->header.ep_address, 0);
-  ASSERT_EQ(get_max_packet_size_request.request()->header.length, 8);
+  ASSERT_EQ(get_max_packet_size_request.request()->header.device_id, 0UL);
+  ASSERT_EQ(get_max_packet_size_request.request()->header.ep_address, 0UL);
+  ASSERT_EQ(get_max_packet_size_request.request()->header.length, 8UL);
   ASSERT_EQ(get_max_packet_size_request.request()->setup.bm_request_type,
             USB_DIR_IN | USB_TYPE_STANDARD | USB_RECIP_DEVICE);
   ASSERT_EQ(get_max_packet_size_request.request()->setup.w_value, USB_DT_DEVICE << 8);
-  ASSERT_EQ(get_max_packet_size_request.request()->setup.w_index, 0);
+  ASSERT_EQ(get_max_packet_size_request.request()->setup.w_index, 0UL);
   ASSERT_EQ(get_max_packet_size_request.request()->setup.b_request, USB_REQ_GET_DESCRIPTOR);
-  ASSERT_EQ(get_max_packet_size_request.request()->setup.w_length, 8);
+  ASSERT_EQ(get_max_packet_size_request.request()->setup.w_length, 8UL);
   ASSERT_TRUE(get_max_packet_size_request.request()->direct);
   usb_device_descriptor_t* descriptor;
   ASSERT_OK(get_max_packet_size_request.Mmap(reinterpret_cast<void**>(&descriptor)));
   descriptor->b_descriptor_type = USB_DT_DEVICE;
   descriptor->b_max_packet_size0 = 42;
   get_max_packet_size_request.Complete(ZX_OK, 8);
-  controller().RunUntilIdle(0);
+  driver_test().driver()->RunUntilIdle(0);
 
   // GetDeviceDescriptor
   auto get_descriptor = state().pending_operations.pop_front();
   auto get_descriptor_request = std::move(std::get<Request>(*get_descriptor->request));
-  ASSERT_EQ(get_descriptor_request.request()->header.device_id, 0);
-  ASSERT_EQ(get_descriptor_request.request()->header.ep_address, 0);
+  ASSERT_EQ(get_descriptor_request.request()->header.device_id, 0UL);
+  ASSERT_EQ(get_descriptor_request.request()->header.ep_address, 0UL);
   ASSERT_EQ(get_descriptor_request.request()->header.length, sizeof(usb_device_descriptor_t));
   ASSERT_EQ(get_descriptor_request.request()->setup.bm_request_type,
             USB_DIR_IN | USB_TYPE_STANDARD | USB_RECIP_DEVICE);
   ASSERT_EQ(get_descriptor_request.request()->setup.w_value, USB_DT_DEVICE << 8);
-  ASSERT_EQ(get_descriptor_request.request()->setup.w_index, 0);
+  ASSERT_EQ(get_descriptor_request.request()->setup.w_index, 0UL);
   ASSERT_EQ(get_descriptor_request.request()->setup.b_request, USB_REQ_GET_DESCRIPTOR);
   ASSERT_EQ(get_descriptor_request.request()->setup.w_length, sizeof(usb_device_descriptor_t));
   ASSERT_TRUE(get_descriptor_request.request()->direct);
   ASSERT_OK(get_descriptor_request.Mmap(reinterpret_cast<void**>(&descriptor)));
   descriptor->b_descriptor_type = USB_DT_DEVICE;
   get_descriptor_request.Complete(ZX_OK, sizeof(usb_device_descriptor_t));
-  controller().RunUntilIdle(0);
+  driver_test().driver()->RunUntilIdle(0);
 
   // Online Device
   auto online_trb = FakeTRB::FromTRB(state().pending_operations.pop_front()->trb);
   ASSERT_EQ(online_trb->Op, FakeTRB::Op::OnlineDevice);
-  ASSERT_EQ(online_trb->slot, 1);
+  ASSERT_EQ(online_trb->slot, 1UL);
   ASSERT_EQ(online_trb->port, kPort);
   ASSERT_EQ(online_trb->speed, USB_SPEED_HIGH);
-  controller().RunUntilIdle(0);
+  driver_test().driver()->RunUntilIdle(0UL);
   ASSERT_EQ(completion_code, ZX_OK);
   ASSERT_TRUE(state().pending_operations.is_empty());
 }
@@ -628,7 +633,7 @@ TEST_F(EnumerationTests, AddressDeviceCommandShouldOnlineDeviceAfterSuccessfulRe
   state().speeds[1] = kSpeed;
   zx_status_t completion_code = -1;
   auto enumeration_task =
-      EnumerateDevice(&controller(), kPort,
+      EnumerateDevice(driver_test().driver(), kPort,
                       TestHubInfo(kHubDepth, kHubSlot, kHubPort, kSpeed, kMultiTT))
           .then([&](fpromise::result<void, zx_status_t>& result) {
             if (result.is_ok()) {
@@ -645,35 +650,35 @@ TEST_F(EnumerationTests, AddressDeviceCommandShouldOnlineDeviceAfterSuccessfulRe
       ->set_CompletionCode(CommandCompletionEvent::Success);
   reinterpret_cast<CommandCompletionEvent*>(enum_slot_trb.get())->set_SlotID(1);
   enable_slot_task->completer->complete_ok(enum_slot_trb.get());
-  controller().ScheduleTask(0, std::move(enumeration_task));
-  controller().RunUntilIdle(0);
+  driver_test().driver()->ScheduleTask(0, std::move(enumeration_task));
+  driver_test().driver()->RunUntilIdle(0);
   auto device_information = FakeTRB::FromTRB(state().pending_operations.pop_front()->trb);
   ASSERT_EQ(device_information->Op, FakeTRB::Op::SetDeviceInformation);
   VerifyHubInfo(device_information->hub_info, kHubDepth, kHubSlot, kHubPort, kSpeed, kMultiTT);
   ASSERT_EQ(device_information->port, kPort);
-  ASSERT_EQ(device_information->slot, 1);
+  ASSERT_EQ(device_information->slot, 1UL);
 
   // AddressDevice
   auto address_device = state().pending_operations.pop_front();
   auto address_device_op = FakeTRB::FromTRB(address_device->trb);
   ASSERT_EQ(address_device_op->Op, FakeTRB::Op::AddressDevice);
-  ASSERT_EQ(address_device_op->slot, 1);
+  ASSERT_EQ(address_device_op->slot, 1UL);
   ASSERT_EQ(address_device_op->port, kPort);
   VerifyHubInfo(address_device_op->hub_info, kHubDepth, kHubSlot, kHubPort, kSpeed, kMultiTT);
   reinterpret_cast<CommandCompletionEvent*>(address_device_op.get())
       ->set_CompletionCode(CommandCompletionEvent::UsbTransactionError);
   address_device->completer->complete_ok(address_device_op.get());
-  controller().RunUntilIdle(0);
+  driver_test().driver()->RunUntilIdle(0UL);
 
   // DisableSlot
   auto disable_op = state().pending_operations.pop_front();
   auto disable_trb = FakeTRB::FromTRB(disable_op->trb);
   ASSERT_EQ(disable_trb->Op, FakeTRB::Op::DisableSlot);
-  ASSERT_EQ(disable_trb->slot, 1);
+  ASSERT_EQ(disable_trb->slot, 1UL);
   reinterpret_cast<CommandCompletionEvent*>(disable_trb.get())
       ->set_CompletionCode(CommandCompletionEvent::UsbTransactionError);
   disable_op->completer->complete_ok(disable_trb.get());
-  controller().RunUntilIdle(0);
+  driver_test().driver()->RunUntilIdle(0);
 
   // EnableSlot
   enable_slot_task = state().pending_operations.pop_front();
@@ -683,132 +688,132 @@ TEST_F(EnumerationTests, AddressDeviceCommandShouldOnlineDeviceAfterSuccessfulRe
       ->set_CompletionCode(CommandCompletionEvent::Success);
   reinterpret_cast<CommandCompletionEvent*>(enum_slot_trb.get())->set_SlotID(2);
   enable_slot_task->completer->complete_ok(enum_slot_trb.get());
-  controller().RunUntilIdle(0);
+  driver_test().driver()->RunUntilIdle(0);
 
   // Set device information
   device_information = FakeTRB::FromTRB(state().pending_operations.pop_front()->trb);
   ASSERT_EQ(device_information->Op, FakeTRB::Op::SetDeviceInformation);
   VerifyHubInfo(device_information->hub_info, kHubDepth, kHubSlot, kHubPort, kSpeed, kMultiTT);
   ASSERT_EQ(device_information->port, kPort);
-  ASSERT_EQ(device_information->slot, 2);
-  controller().RunUntilIdle(0);
+  ASSERT_EQ(device_information->slot, 2UL);
+  driver_test().driver()->RunUntilIdle(0);
 
   // AddressDevice with BSR = 1
   address_device = state().pending_operations.pop_front();
   address_device_op = FakeTRB::FromTRB(address_device->trb);
   ASSERT_EQ(address_device_op->Op, FakeTRB::Op::AddressDevice);
   ASSERT_TRUE(address_device_op->bsr);
-  ASSERT_EQ(address_device_op->slot, 2);
+  ASSERT_EQ(address_device_op->slot, 2UL);
   ASSERT_EQ(address_device_op->port, kPort);
   VerifyHubInfo(address_device_op->hub_info, kHubDepth, kHubSlot, kHubPort, kSpeed, kMultiTT);
   reinterpret_cast<CommandCompletionEvent*>(address_device_op.get())
       ->set_CompletionCode(CommandCompletionEvent::Success);
   address_device->completer->complete_ok(address_device_op.get());
-  controller().RunUntilIdle(0);
+  driver_test().driver()->RunUntilIdle(0);
 
   // GetMaxPacketSize
   auto get_max_packet_size = state().pending_operations.pop_front();
   auto get_max_packet_size_request = std::move(std::get<Request>(*get_max_packet_size->request));
-  ASSERT_EQ(get_max_packet_size_request.request()->header.device_id, 1);
-  ASSERT_EQ(get_max_packet_size_request.request()->header.ep_address, 0);
-  ASSERT_EQ(get_max_packet_size_request.request()->header.length, 8);
+  ASSERT_EQ(get_max_packet_size_request.request()->header.device_id, 1UL);
+  ASSERT_EQ(get_max_packet_size_request.request()->header.ep_address, 0UL);
+  ASSERT_EQ(get_max_packet_size_request.request()->header.length, 8UL);
   ASSERT_EQ(get_max_packet_size_request.request()->setup.bm_request_type,
             USB_DIR_IN | USB_TYPE_STANDARD | USB_RECIP_DEVICE);
   ASSERT_EQ(get_max_packet_size_request.request()->setup.w_value, USB_DT_DEVICE << 8);
-  ASSERT_EQ(get_max_packet_size_request.request()->setup.w_index, 0);
+  ASSERT_EQ(get_max_packet_size_request.request()->setup.w_index, 0UL);
   ASSERT_EQ(get_max_packet_size_request.request()->setup.b_request, USB_REQ_GET_DESCRIPTOR);
-  ASSERT_EQ(get_max_packet_size_request.request()->setup.w_length, 8);
+  ASSERT_EQ(get_max_packet_size_request.request()->setup.w_length, 8UL);
   ASSERT_TRUE(get_max_packet_size_request.request()->direct);
   usb_device_descriptor_t* descriptor;
   ASSERT_OK(get_max_packet_size_request.Mmap(reinterpret_cast<void**>(&descriptor)));
   descriptor->b_descriptor_type = USB_DT_DEVICE;
   descriptor->b_max_packet_size0 = 42;
   get_max_packet_size_request.Complete(ZX_OK, 8);
-  controller().RunUntilIdle(0);
+  driver_test().driver()->RunUntilIdle(0);
 
   // SetMaxPacketSize
   auto set_max_packet_size = state().pending_operations.pop_front();
   auto set_max_packet_size_trb = FakeTRB::FromTRB(set_max_packet_size->trb);
   ASSERT_EQ(set_max_packet_size_trb->Op, FakeTRB::Op::SetMaxPacketSize);
-  ASSERT_EQ(set_max_packet_size_trb->slot, 2);
-  ASSERT_EQ(set_max_packet_size_trb->max_packet_size, 42);
+  ASSERT_EQ(set_max_packet_size_trb->slot, 2UL);
+  ASSERT_EQ(set_max_packet_size_trb->max_packet_size, 42UL);
   reinterpret_cast<CommandCompletionEvent*>(set_max_packet_size_trb.get())
       ->set_CompletionCode(CommandCompletionEvent::Success);
   set_max_packet_size->completer->complete_ok(set_max_packet_size_trb.get());
-  controller().RunUntilIdle(0);
+  driver_test().driver()->RunUntilIdle(0);
 
   // AddressDevice with BSR = 0
   address_device = state().pending_operations.pop_front();
   address_device_op = FakeTRB::FromTRB(address_device->trb);
   ASSERT_EQ(address_device_op->Op, FakeTRB::Op::AddressDevice);
   ASSERT_FALSE(address_device_op->bsr);
-  ASSERT_EQ(address_device_op->slot, 2);
+  ASSERT_EQ(address_device_op->slot, 2UL);
   reinterpret_cast<CommandCompletionEvent*>(address_device_op.get())
       ->set_CompletionCode(CommandCompletionEvent::Success);
   address_device->completer->complete_ok(address_device_op.get());
-  controller().RunUntilIdle(0);
+  driver_test().driver()->RunUntilIdle(0);
 
   // Timeout
   auto timeout = state().pending_operations.pop_front();
   ASSERT_TRUE(FakeTRB::FromTRB(timeout->trb)->deadline.get());
   timeout->completer->complete_ok(address_device_op.get());
-  controller().RunUntilIdle(0);
+  driver_test().driver()->RunUntilIdle(0);
 
   // GetMaxPacketSize
   get_max_packet_size = state().pending_operations.pop_front();
   get_max_packet_size_request = std::move(std::get<Request>(*get_max_packet_size->request));
-  ASSERT_EQ(get_max_packet_size_request.request()->header.device_id, 1);
-  ASSERT_EQ(get_max_packet_size_request.request()->header.ep_address, 0);
-  ASSERT_EQ(get_max_packet_size_request.request()->header.length, 8);
+  ASSERT_EQ(get_max_packet_size_request.request()->header.device_id, 1UL);
+  ASSERT_EQ(get_max_packet_size_request.request()->header.ep_address, 0UL);
+  ASSERT_EQ(get_max_packet_size_request.request()->header.length, 8UL);
   ASSERT_EQ(get_max_packet_size_request.request()->setup.bm_request_type,
             USB_DIR_IN | USB_TYPE_STANDARD | USB_RECIP_DEVICE);
   ASSERT_EQ(get_max_packet_size_request.request()->setup.w_value, USB_DT_DEVICE << 8);
-  ASSERT_EQ(get_max_packet_size_request.request()->setup.w_index, 0);
+  ASSERT_EQ(get_max_packet_size_request.request()->setup.w_index, 0UL);
   ASSERT_EQ(get_max_packet_size_request.request()->setup.b_request, USB_REQ_GET_DESCRIPTOR);
-  ASSERT_EQ(get_max_packet_size_request.request()->setup.w_length, 8);
+  ASSERT_EQ(get_max_packet_size_request.request()->setup.w_length, 8UL);
   ASSERT_TRUE(get_max_packet_size_request.request()->direct);
   ASSERT_OK(get_max_packet_size_request.Mmap(reinterpret_cast<void**>(&descriptor)));
   descriptor->b_descriptor_type = USB_DT_DEVICE;
   descriptor->b_max_packet_size0 = 32;
   get_max_packet_size_request.Complete(ZX_OK, 8);
-  controller().RunUntilIdle(0);
+  driver_test().driver()->RunUntilIdle(0);
 
   // SetMaxPacketSize (full-speed device requires setting this again)
   set_max_packet_size = state().pending_operations.pop_front();
   set_max_packet_size_trb = FakeTRB::FromTRB(set_max_packet_size->trb);
   ASSERT_EQ(set_max_packet_size_trb->Op, FakeTRB::Op::SetMaxPacketSize);
-  ASSERT_EQ(set_max_packet_size_trb->slot, 2);
-  ASSERT_EQ(set_max_packet_size_trb->max_packet_size, 32);
+  ASSERT_EQ(set_max_packet_size_trb->slot, 2UL);
+  ASSERT_EQ(set_max_packet_size_trb->max_packet_size, 32UL);
   reinterpret_cast<CommandCompletionEvent*>(set_max_packet_size_trb.get())
       ->set_CompletionCode(CommandCompletionEvent::Success);
   set_max_packet_size->completer->complete_ok(set_max_packet_size_trb.get());
-  controller().RunUntilIdle(0);
+  driver_test().driver()->RunUntilIdle(0);
 
   // GetDeviceDescriptor
   auto get_descriptor = state().pending_operations.pop_front();
   auto get_descriptor_request = std::move(std::get<Request>(*get_descriptor->request));
-  ASSERT_EQ(get_descriptor_request.request()->header.device_id, 1);
-  ASSERT_EQ(get_descriptor_request.request()->header.ep_address, 0);
+  ASSERT_EQ(get_descriptor_request.request()->header.device_id, 1UL);
+  ASSERT_EQ(get_descriptor_request.request()->header.ep_address, 0UL);
   ASSERT_EQ(get_descriptor_request.request()->header.length, sizeof(usb_device_descriptor_t));
   ASSERT_EQ(get_descriptor_request.request()->setup.bm_request_type,
             USB_DIR_IN | USB_TYPE_STANDARD | USB_RECIP_DEVICE);
   ASSERT_EQ(get_descriptor_request.request()->setup.w_value, USB_DT_DEVICE << 8);
-  ASSERT_EQ(get_descriptor_request.request()->setup.w_index, 0);
+  ASSERT_EQ(get_descriptor_request.request()->setup.w_index, 0UL);
   ASSERT_EQ(get_descriptor_request.request()->setup.b_request, USB_REQ_GET_DESCRIPTOR);
   ASSERT_EQ(get_descriptor_request.request()->setup.w_length, sizeof(usb_device_descriptor_t));
   ASSERT_TRUE(get_descriptor_request.request()->direct);
   ASSERT_OK(get_descriptor_request.Mmap(reinterpret_cast<void**>(&descriptor)));
   descriptor->b_descriptor_type = USB_DT_DEVICE;
   get_descriptor_request.Complete(ZX_OK, sizeof(usb_device_descriptor_t));
-  controller().RunUntilIdle(0);
+  driver_test().driver()->RunUntilIdle(0);
 
   // Online Device
   auto online_trb = FakeTRB::FromTRB(state().pending_operations.pop_front()->trb);
   ASSERT_EQ(online_trb->Op, FakeTRB::Op::OnlineDevice);
-  ASSERT_EQ(online_trb->slot, 2);
-  ASSERT_EQ(online_trb->port, 5);
+  ASSERT_EQ(online_trb->slot, 2UL);
+  ASSERT_EQ(online_trb->port, 5UL);
   ASSERT_EQ(online_trb->speed, USB_SPEED_FULL);
-  controller().RunUntilIdle(0);
+  driver_test().driver()->RunUntilIdle(0);
   ASSERT_EQ(completion_code, ZX_OK);
   ASSERT_TRUE(state().pending_operations.is_empty());
 }
@@ -823,7 +828,7 @@ TEST_F(EnumerationTests, DisableSlotAfterFailedRetry) {
   state().speeds[1] = kSpeed;
   zx_status_t completion_code = ZX_OK;
   auto enumeration_task =
-      EnumerateDevice(&controller(), 5,
+      EnumerateDevice(driver_test().driver(), 5,
                       TestHubInfo(kHubDepth, kHubSlot, kHubPort, kSpeed, kMultiTT))
           .then([&](fpromise::result<void, zx_status_t>& result) {
             if (result.is_ok()) {
@@ -842,12 +847,12 @@ TEST_F(EnumerationTests, DisableSlotAfterFailedRetry) {
       ->set_CompletionCode(CommandCompletionEvent::Success);
   reinterpret_cast<CommandCompletionEvent*>(enum_slot_trb.get())->set_SlotID(1);
   enable_slot_task->completer->complete_ok(enum_slot_trb.get());
-  controller().ScheduleTask(0, std::move(enumeration_task));
-  controller().RunUntilIdle(0);
+  driver_test().driver()->ScheduleTask(0, std::move(enumeration_task));
+  driver_test().driver()->RunUntilIdle(0);
 
   auto device_information = FakeTRB::FromTRB(state().pending_operations.pop_front()->trb);
   ASSERT_EQ(device_information->Op, FakeTRB::Op::SetDeviceInformation);
-  ASSERT_EQ(device_information->slot, 1);
+  ASSERT_EQ(device_information->slot, 1UL);
 
   // AddressDevice. Return USB Transaction Error to force a retry.
   auto address_device = state().pending_operations.pop_front();
@@ -856,17 +861,17 @@ TEST_F(EnumerationTests, DisableSlotAfterFailedRetry) {
   reinterpret_cast<CommandCompletionEvent*>(address_device_op.get())
       ->set_CompletionCode(CommandCompletionEvent::UsbTransactionError);
   address_device->completer->complete_ok(address_device_op.get());
-  controller().RunUntilIdle(0);
+  driver_test().driver()->RunUntilIdle(0);
 
   // DisableSlot
   auto disable_op = state().pending_operations.pop_front();
   auto disable_trb = FakeTRB::FromTRB(disable_op->trb);
   ASSERT_EQ(disable_trb->Op, FakeTRB::Op::DisableSlot);
-  ASSERT_EQ(disable_trb->slot, 1);
+  ASSERT_EQ(disable_trb->slot, 1UL);
   reinterpret_cast<CommandCompletionEvent*>(disable_trb.get())
       ->set_CompletionCode(CommandCompletionEvent::UsbTransactionError);
   disable_op->completer->complete_ok(disable_trb.get());
-  controller().RunUntilIdle(0);
+  driver_test().driver()->RunUntilIdle(0);
 
   // EnableSlot
   enable_slot_task = state().pending_operations.pop_front();
@@ -876,12 +881,12 @@ TEST_F(EnumerationTests, DisableSlotAfterFailedRetry) {
       ->set_CompletionCode(CommandCompletionEvent::Success);
   reinterpret_cast<CommandCompletionEvent*>(enum_slot_trb.get())->set_SlotID(2);
   enable_slot_task->completer->complete_ok(enum_slot_trb.get());
-  controller().RunUntilIdle(0);
+  driver_test().driver()->RunUntilIdle(0);
 
   // Set device information
   device_information = FakeTRB::FromTRB(state().pending_operations.pop_front()->trb);
-  ASSERT_EQ(device_information->slot, 2);
-  controller().RunUntilIdle(0);
+  ASSERT_EQ(device_information->slot, 2UL);
+  driver_test().driver()->RunUntilIdle(0);
 
   // AddressDevice. Return a failure to trigger DisableSlot.
   address_device = state().pending_operations.pop_front();
@@ -889,13 +894,13 @@ TEST_F(EnumerationTests, DisableSlotAfterFailedRetry) {
   reinterpret_cast<CommandCompletionEvent*>(address_device_op.get())
       ->set_CompletionCode(CommandCompletionEvent::CommandAborted);
   address_device->completer->complete_ok(address_device_op.get());
-  controller().RunUntilIdle(0);
+  driver_test().driver()->RunUntilIdle(0);
 
   // DisableSlot
   disable_trb = FakeTRB::FromTRB(state().pending_operations.pop_front()->trb);
   ASSERT_EQ(disable_trb->Op, FakeTRB::Op::DisableSlot);
-  ASSERT_EQ(disable_trb->slot, 2);
-  EXPECT_NOT_OK(completion_code);
+  ASSERT_EQ(disable_trb->slot, 2UL);
+  EXPECT_NE(completion_code, ZX_OK);
 }
 
 }  // namespace usb_xhci

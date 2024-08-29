@@ -4,16 +4,11 @@
 
 use anyhow::{Context, Error};
 use fidl_fuchsia_boot::{ArgumentsMarker, BoolPair};
-use fs_management::{BlobCompression, BlobEvictionPolicy};
 use fuchsia_component::client::connect_to_protocol;
 
 #[derive(Default)]
 pub struct BootArgs {
     netsvc_netboot: bool,
-    zircon_system_filesystem_check: bool,
-    zircon_system_disable_automount: bool,
-    blobfs_write_compression_algorithm: Option<String>,
-    blobfs_eviction_policy: Option<String>,
 }
 
 impl BootArgs {
@@ -25,57 +20,15 @@ impl BootArgs {
         let arguments_proxy = connect_to_protocol::<ArgumentsMarker>()
             .context("Failed to connect to Arguments protocol")?;
 
-        let defaults = &[
-            BoolPair { key: "netsvc.netboot".to_string(), defaultval: false },
-            BoolPair { key: "zircon.system.filesystem-check".to_string(), defaultval: false },
-            BoolPair { key: "zircon.system.disable-automount".to_string(), defaultval: false },
-        ];
+        let defaults = &[BoolPair { key: "netsvc.netboot".to_string(), defaultval: false }];
         let ret = arguments_proxy.get_bools(defaults).await.context("get_bools failed")?;
 
         let netsvc_netboot = ret[0];
-        let zircon_system_filesystem_check = ret[1];
-        let zircon_system_disable_automount = ret[2];
 
-        let blobfs_write_compression_algorithm = arguments_proxy
-            .get_string("blobfs.write-compression-algorithm")
-            .await
-            .context("Failed to get blobfs write compression algorithm")?;
-
-        let blobfs_eviction_policy = arguments_proxy
-            .get_string("blobfs.cache-eviction-policy")
-            .await
-            .context("Failed to get blobfs cache eviction policy")?;
-
-        Ok(BootArgs {
-            netsvc_netboot,
-            zircon_system_filesystem_check,
-            zircon_system_disable_automount,
-            blobfs_write_compression_algorithm,
-            blobfs_eviction_policy,
-        })
+        Ok(BootArgs { netsvc_netboot })
     }
 
     pub fn netboot(&self) -> bool {
-        self.netsvc_netboot || self.zircon_system_disable_automount
-    }
-
-    pub fn check_filesystems(&self) -> bool {
-        self.zircon_system_filesystem_check
-    }
-
-    pub fn blobfs_write_compression_algorithm(&self) -> Option<BlobCompression> {
-        match self.blobfs_write_compression_algorithm.as_deref() {
-            Some("ZSTD_CHUNKED") => Some(BlobCompression::ZSTDChunked),
-            Some("UNCOMPRESSED") => Some(BlobCompression::Uncompressed),
-            _ => None,
-        }
-    }
-
-    pub fn blobfs_eviction_policy(&self) -> Option<BlobEvictionPolicy> {
-        match self.blobfs_eviction_policy.as_deref() {
-            Some("NEVER_EVICT") => Some(BlobEvictionPolicy::NeverEvict),
-            Some("EVICT_IMMEDIATELY") => Some(BlobEvictionPolicy::EvictImmediately),
-            _ => None,
-        }
+        self.netsvc_netboot
     }
 }

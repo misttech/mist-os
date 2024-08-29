@@ -218,6 +218,15 @@ _flag_groups = struct(
         cflags = ["-ftrivial-auto-var-init=pattern"],
         combine_cflags_with_ldflags = False,
     ),
+    relpath_debug_info = _make_flag_group_struct(
+        # Relativize paths to source files and linker inputs to avoid
+        # leaking absolute paths, and ensure consistency
+        # between local and remote compiling/linking.
+        # TODO(b/358472850): relativize paths for compilation
+        ldflags = [
+            "-no-canonical-prefixes",
+        ],
+    ),
 )
 
 #
@@ -323,6 +332,7 @@ _default_compile_flags_feature = feature(
                 _flag_groups.pic,
                 _flag_groups.symbol_no_undefined,
                 _flag_groups.icf,
+                _flag_groups.relpath_debug_info,
             ]),
         ),
         # These are ldflags that will be added to dbg builds

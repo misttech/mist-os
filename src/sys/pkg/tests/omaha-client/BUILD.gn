@@ -80,7 +80,7 @@ fuchsia_test_package("omaha-client-integration-tests") {
   test_components = [ ":omaha-client-test-root" ]
   deps = [
     ":omaha-client-test-driver",
-    "//src/cobalt/bin/testing/mock_cobalt:component_v2",
+    "//src/cobalt/bin/testing/fake_cobalt:component_v2",
     "//src/connectivity/network:netstack-for-tests",
     "//src/connectivity/network/dns:component",
     "//src/sys/pkg/bin/omaha-client:component",

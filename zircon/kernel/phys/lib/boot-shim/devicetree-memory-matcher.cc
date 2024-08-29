@@ -7,12 +7,45 @@
 #include <lib/zircon-internal/align.h>
 
 #include "lib/boot-shim/devicetree.h"
+#include "lib/devicetree/matcher.h"
+#include "lib/memalloc/range.h"
 
 namespace boot_shim {
+namespace {
+
+constexpr std::string_view kRamOops = "ramoops";
+
+bool IsRamOops(const devicetree::NodePath& path, const devicetree::PropertyDecoder& decoder) {
+  if (path.back().name() == kRamOops) {
+    return true;
+  }
+
+  auto compatible_list =
+      decoder.FindAndDecodeProperty<&devicetree::PropertyValue::AsStringList>("compatible");
+  if (!compatible_list) {
+    return false;
+  }
+
+  return std::find(compatible_list->begin(), compatible_list->end(), kRamOops) !=
+         compatible_list->end();
+}
+
+}  // namespace
 
 devicetree::ScanState DevicetreeMemoryMatcher::OnNode(const devicetree::NodePath& path,
                                                       const devicetree::PropertyDecoder& decoder) {
   if (path.IsDescendentOf("/reserved-memory")) {
+    if (IsRamOops(path, decoder)) {
+      OnEachRangeFromReg(decoder, [this](uint64_t addr, uint64_t size) {
+        nvram_ = {
+            .base = addr,
+            .length = size,
+        };
+        return true;
+      });
+      return devicetree::ScanState::kActive;
+    }
+
     if (!AppendRangesFromReg(decoder, memalloc::Type::kReserved)) {
       return devicetree::ScanState::kDone;
     }
@@ -66,19 +99,19 @@ devicetree::ScanState DevicetreeMemoryMatcher::HandleReservedMemoryNode(
   return devicetree::ScanState::kActive;
 }
 
-bool DevicetreeMemoryMatcher::AppendRangesFromReg(const devicetree::PropertyDecoder& decoder,
-                                                  memalloc::Type memrange_type) {
+void DevicetreeMemoryMatcher::OnEachRangeFromReg(const devicetree::PropertyDecoder& decoder,
+                                                 RangeVisitor range_visitor) {
   // Look at the reg property for possible memory banks.
   const auto& [reg_property] = decoder.FindProperties("reg");
 
   if (!reg_property) {
-    return true;
+    return;
   }
 
   auto reg_ptr = reg_property->AsReg(decoder);
   if (!reg_ptr) {
     OnError("Memory: Failed to decode 'reg'.");
-    return true;
+    return;
   }
 
   auto& reg = *reg_ptr;
@@ -96,18 +129,26 @@ bool DevicetreeMemoryMatcher::AppendRangesFromReg(const devicetree::PropertyDeco
     }
 
     size = ZX_PAGE_ALIGN(*translated_address + *size) - *translated_address;
-
-    // Append each range as available memory.
-    if (!AppendRange(memalloc::Range{
-            .addr = *translated_address,
-            .size = *size,
-            .type = memrange_type,
-        })) {
-      return false;
+    if (!range_visitor(*translated_address, *size)) {
+      return;
     }
   }
+}
 
-  return true;
+bool DevicetreeMemoryMatcher::AppendRangesFromReg(const devicetree::PropertyDecoder& decoder,
+                                                  memalloc::Type memrange_type) {
+  bool had_errors = false;
+  auto appender = [this, &had_errors, memrange_type](uint64_t addr, uint64_t size) -> bool {
+    had_errors = !AppendRange({
+        .addr = addr,
+        .size = size,
+        .type = memrange_type,
+    });
+    return !had_errors;
+  };
+  OnEachRangeFromReg(decoder, appender);
+
+  return !had_errors;
 }
 
 }  // namespace boot_shim

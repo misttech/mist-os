@@ -166,7 +166,7 @@ static void x86_pat_sync_task(void* raw_context) {
   x86_set_cr0(cr0);
 
   /* Step 5: Flush all caches */
-  __asm volatile("wbinvd" ::: "memory");
+  __asm__ volatile("wbinvd" ::: "memory");
 
   /* Step 6: If the PGE flag is set, clear it to flush the TLB */
   ulong cr4 = x86_get_cr4();
@@ -220,7 +220,7 @@ static void x86_pat_sync_task(void* raw_context) {
   write_msr(X86_MSR_IA32_MTRR_DEF_TYPE, target_mtrrs->mtrr_def);
 
   /* Step 11: Flush all cache and the TLB again */
-  __asm volatile("wbinvd" ::: "memory");
+  __asm__ volatile("wbinvd" ::: "memory");
   x86_set_cr3(x86_get_cr3());
 
   /* Step 12: Enter the normal cache mode */

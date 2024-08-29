@@ -305,8 +305,7 @@ TEST_F(MmapTest, ReleasePagedVmoInVnodeRecycle) {
   FileTester::AppendToFile(test_vnode, write_buf, PAGE_SIZE);
 
   // Sync to remove vnode from dirty list.
-  WritebackOperation op;
-  test_vnode->Writeback(op);
+  test_vnode->Writeback();
   fs_->SyncFs();
 
   zx::vmo vmo;

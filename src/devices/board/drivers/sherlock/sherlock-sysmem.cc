@@ -24,24 +24,6 @@ static const std::vector<fpbus::Bti> sysmem_btis{
     }},
 };
 
-static const std::vector<uint8_t> sysmem_metadata = [] {
-  fuchsia_hardware_sysmem::Metadata metadata;
-  metadata.vid() = PDEV_VID_AMLOGIC;
-  metadata.pid() = PDEV_PID_AMLOGIC_T931;
-  auto persist_result = fidl::Persist(metadata);
-  // Given permitted values set above, we won't see failure here. An OOM would fail before getting
-  // here.
-  ZX_ASSERT(persist_result.is_ok());
-  return std::move(persist_result.value());
-}();
-
-static const std::vector<fpbus::Metadata> sysmem_metadata_list{
-    {{
-        .type = fuchsia_hardware_sysmem::wire::kMetadataType,
-        .data = sysmem_metadata,
-    }},
-};
-
 static const fpbus::Node sysmem_dev = []() {
   fpbus::Node ret = {};
   ret.name() = "sysmem";
@@ -49,7 +31,6 @@ static const fpbus::Node sysmem_dev = []() {
   ret.pid() = PDEV_PID_GENERIC;
   ret.did() = PDEV_DID_SYSMEM;
   ret.bti() = sysmem_btis;
-  ret.metadata() = sysmem_metadata_list;
   return ret;
 }();
 

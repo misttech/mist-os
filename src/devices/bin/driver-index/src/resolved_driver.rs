@@ -10,6 +10,7 @@ use cm_rust::FidlIntoNative;
 use fidl_fuchsia_pkg_ext::BlobId;
 use fuchsia_pkg::PackageDirectory;
 use futures::TryFutureExt;
+use serde::{Deserialize, Serialize};
 use {
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_component_resolution as fresolution,
     fidl_fuchsia_driver_framework as fdf, fidl_fuchsia_driver_index as fdi,
@@ -18,7 +19,7 @@ use {
 pub const DEFAULT_DEVICE_CATEGORY: &str = "misc";
 
 // Cached drivers don't exist yet so we allow dead code.
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[allow(dead_code)]
 pub enum DriverPackageType {
     Boot = 0,
@@ -27,13 +28,19 @@ pub enum DriverPackageType {
     Universe = 3,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+pub struct DeviceCategoryDef {
+    pub category: Option<String>,
+    pub subcategory: Option<String>,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct ResolvedDriver {
     pub component_url: cm_types::Url,
     pub bind_rules: DecodedRules,
     pub bind_bytecode: Vec<u8>,
     pub colocate: bool,
-    pub device_categories: Vec<fdf::DeviceCategory>,
+    pub device_categories: Vec<DeviceCategoryDef>,
     pub fallback: bool,
     pub package_type: DriverPackageType,
     pub package_hash: Option<BlobId>,
@@ -140,7 +147,16 @@ impl ResolvedDriver {
             colocate: Some(self.colocate),
             package_type: fdf::DriverPackageType::from_primitive(self.package_type as u8),
             is_fallback: Some(self.fallback),
-            device_categories: Some(self.device_categories.clone()),
+            device_categories: Some(
+                self.device_categories
+                    .iter()
+                    .map(|c| fdf::DeviceCategory {
+                        category: c.category.clone(),
+                        subcategory: c.subcategory.clone(),
+                        ..Default::default()
+                    })
+                    .collect(),
+            ),
             bind_rules_bytecode: if full { Some(self.bind_bytecode.clone()) } else { None },
             driver_framework_version: match self.is_dfv2 {
                 Some(true) => Some(2),
@@ -218,8 +234,8 @@ fn get_rules_string_value(component: &cm_rust::ComponentDecl, key: &str) -> Opti
 
 fn get_rules_device_categories_vec(
     component: &cm_rust::ComponentDecl,
-) -> Option<Vec<fdf::DeviceCategory>> {
-    let default_val = Some(vec![fdf::DeviceCategory {
+) -> Option<Vec<DeviceCategoryDef>> {
+    let default_val = Some(vec![DeviceCategoryDef {
         category: Some(DEFAULT_DEVICE_CATEGORY.to_string()),
         subcategory: None,
         ..Default::default()
@@ -243,13 +259,13 @@ fn get_rules_device_categories_vec(
 
 pub fn get_device_categories_from_component_data(
     dictionaries: &Vec<fidl_fuchsia_data::Dictionary>,
-) -> Vec<fdf::DeviceCategory> {
+) -> Vec<DeviceCategoryDef> {
     let mut categories = Vec::new();
     for dictionary in dictionaries {
         if let Some(entries) = &dictionary.entries {
             let category = get_dictionary_string_value(entries, "category");
             let subcategory = get_dictionary_string_value(entries, "subcategory");
-            categories.push(fdf::DeviceCategory { category, subcategory, ..Default::default() });
+            categories.push(DeviceCategoryDef { category, subcategory, ..Default::default() });
         }
     }
     categories

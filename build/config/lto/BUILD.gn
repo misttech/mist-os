@@ -108,15 +108,32 @@ config("lto-whole-program-devirtualization") {
   ldflags = cflags
 }
 
+# Enables linker plugin LTO.
+#
+# If an rlib is only ever going to get used later with a -Clto compilation then
+# you can pass -Clinker-plugin-lto to speed up compilation and avoid generating
+# object files that aren't used.
+#
+# See
+# https://doc.rust-lang.org/rustc/codegen-options/index.html#linker-plugin-lto
+# for details.
+config("lto-rust-linker-plugin") {
+  rustflags = [
+    "-Clinker-plugin-lto",
+    "-Zsplit-lto-unit",
+  ]
+}
+
 config("lto-rust") {
   rustflags = [
     "-Clto=fat",
     "-Zdylib-lto",
-    "-Clinker-plugin-lto",
-    "-Zsplit-lto-unit",
   ]
 
-  configs = [ ":lto-workarounds" ]
+  configs = [
+    ":lto-rust-linker-plugin",
+    ":lto-workarounds",
+  ]
 }
 
 # This can be appended with:

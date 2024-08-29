@@ -24,9 +24,9 @@
 namespace media_audio {
 
 // This driver implements the audio driver interface and is configurable to simulate audio hardware.
-class FakeStreamConfig : public fuchsia::hardware::audio::StreamConfig,
-                         public fuchsia::hardware::audio::signalprocessing::SignalProcessing,
-                         public fuchsia::hardware::audio::RingBuffer {
+class FakeStreamConfig final : public fuchsia::hardware::audio::StreamConfig,
+                               public fuchsia::hardware::audio::signalprocessing::SignalProcessing,
+                               public fuchsia::hardware::audio::RingBuffer {
   static inline constexpr bool kLogFakeStreamConfig = false;
 
  public:
@@ -194,6 +194,7 @@ class FakeStreamConfig : public fuchsia::hardware::audio::StreamConfig,
                        fuchsia::hardware::audio::signalprocessing::SettableElementState state,
                        SetElementStateCallback callback) override {}
   void SetTopology(TopologyId topology_id, SetTopologyCallback callback) override {}
+  void handle_unknown_method(uint64_t ordinal, bool method_has_response) override {}
 
   // fuchsia hardware audio RingBuffer Interface
   void GetProperties(fuchsia::hardware::audio::RingBuffer::GetPropertiesCallback callback) final;

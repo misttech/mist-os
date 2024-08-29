@@ -11,7 +11,7 @@
 #include "logical_buffer_collection.h"
 #include "node_properties.h"
 
-namespace sysmem_driver {
+namespace sysmem_service {
 
 // static
 OrphanedNode& OrphanedNode::EmplaceInTree(
@@ -87,4 +87,4 @@ void OrphanedNode::CloseServerBinding(zx_status_t epitaph) {
   // NOP
 }
 
-}  // namespace sysmem_driver
+}  // namespace sysmem_service

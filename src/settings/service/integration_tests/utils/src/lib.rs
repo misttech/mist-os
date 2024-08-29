@@ -106,7 +106,7 @@ pub async fn create_realm_basic(info: &SettingsRealmInfo<'_>) -> Result<(), Erro
     Ok(())
 }
 
-// Mock cobalt impl since it's not necessary for the integration tests.
+// Fake cobalt impl since it's not necessary for the integration tests.
 async fn cobalt_impl(handles: LocalComponentHandles) -> Result<(), Error> {
     let mut fs = ServiceFs::new();
     let _: &mut ServiceFsDir<'_, _> =

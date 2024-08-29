@@ -168,6 +168,7 @@ fuchsia_package(
     name = "pkg",
     package_name = "debug_agent",
     components = [":component"],
+    fuchsia_api_level = "HEAD",
     package_repository_name = "fuchsia.com",
     # TODO(jayzhuang): Figure out how to express the following in Bazel.
     #

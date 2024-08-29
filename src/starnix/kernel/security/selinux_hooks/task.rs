@@ -14,6 +14,24 @@ use starnix_uapi::errors::Errno;
 use starnix_uapi::signals::{Signal, SIGCHLD, SIGKILL, SIGSTOP};
 use starnix_uapi::{errno, error};
 
+/// Updates the SELinux thread group state on exec, using the security ID associated with the
+/// resolved elf.
+pub fn update_state_on_exec(current_task: &CurrentTask, elf_security_state: &ResolvedElfState) {
+    let task_attrs = &mut current_task.write().security_state.attrs;
+    let previous_sid = task_attrs.current_sid;
+
+    *task_attrs = TaskAttrs {
+        current_sid: elf_security_state
+            .sid
+            .expect("SELinux enabled but missing resolved elf state"),
+        previous_sid,
+        exec_sid: None,
+        fscreate_sid: None,
+        keycreate_sid: None,
+        sockcreate_sid: None,
+    };
+}
+
 /// Returns `TaskAttrs` for a new `Task`, based on the `parent` state, and the specified clone flags.
 pub fn task_alloc(parent: &Task, _clone_flags: u64) -> TaskAttrs {
     parent.read().security_state.attrs.clone()
@@ -315,7 +333,6 @@ mod tests {
         create_kernel_and_task_with_selinux, create_kernel_task_and_unlocked_with_selinux,
         create_task,
     };
-    use selinux_core::security_server::Mode;
     use selinux_core::SecurityId;
     use starnix_uapi::signals::SIGTERM;
     use starnix_uapi::{error, CLONE_SIGHAND, CLONE_THREAD, CLONE_VM};
@@ -937,7 +954,7 @@ mod tests {
         const BOUNDED_CONTEXT: &[u8] = b"test_u:test_r:bounded_t:s0";
         const UNBOUNDED_CONTEXT: &[u8] = b"test_u:test_r:unbounded_t:s0";
 
-        let security_server = SecurityServer::new(Mode::Enable);
+        let security_server = SecurityServer::new();
         security_server.set_enforcing(true);
         security_server.load_policy(BINARY_POLICY.to_vec()).expect("policy load failed");
         let unbounded_sid = security_server

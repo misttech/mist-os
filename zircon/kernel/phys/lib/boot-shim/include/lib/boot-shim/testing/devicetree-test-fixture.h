@@ -158,23 +158,20 @@ class TestMixin : public zxtest::Test, public Base... {
   using Mixin = TestMixin;
   static_assert(sizeof...(Base) > 0);
 
-  static void SetUpTestSuite() { SetUp<Base...>(); }
-  static void TearDownTestSuite() { TearDown<Base...>(); }
+  static void SetUpTestSuite() { (SetUpOne<Base>() && ...); }
+  static void TearDownTestSuite() { (TearDownOne<Base>() && ...); }
 
  private:
-  template <typename Head, typename... Rest>
-  static void SetUp() {
-    Head::SetUpTestSuite();
-    if constexpr (sizeof...(Rest) > 0) {
-      SetUp<Rest...>();
-    }
+  template <typename T>
+  static bool SetUpOne() {
+    T::SetUpTestSuite();
+    return true;
   }
-  template <typename Head, typename... Rest>
-  static void TearDown() {
-    Head::TearDownTestSuite();
-    if constexpr (sizeof...(Rest) > 1) {
-      TearDown<Head, Rest...>();
-    }
+
+  template <typename T>
+  static bool TearDownOne() {
+    T::SetUpTestSuite();
+    return true;
   }
 };
 

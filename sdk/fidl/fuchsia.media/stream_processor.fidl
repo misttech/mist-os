@@ -229,18 +229,18 @@ type StreamBufferPartialSettings = resource table {
     /// The client guarantees that the token is already known to sysmem (via
     /// BufferCollectionToken.Sync(), BufferCollection.Sync(), or
     /// BufferCollectionEvents.OnDuplicatedTokensKnownByServer()).
-    @available(added=NEXT)
+    @available(added=23)
     7: sysmem2_token client_end:fuchsia.sysmem2.BufferCollectionToken;
-    @available(added=7, deprecated=NEXT, note="use sysmem2_token")
+    @available(added=7, deprecated=23, note="use sysmem2_token")
     6: sysmem_token client_end:fuchsia.sysmem.BufferCollectionToken;
 
-    @available(added=7, deprecated=NEXT, note="fuchsia.sysmem2.BufferCollection.SetConstraints")
+    @available(added=7, deprecated=23, note="fuchsia.sysmem2.BufferCollection.SetConstraints")
     @deprecated("Ignore. Obsolete.")
     3: single_buffer_mode bool;
-    @available(added=7, deprecated=NEXT, note="fuchsia.sysmem2.BufferCollection.SetConstraints")
+    @available(added=7, deprecated=23, note="fuchsia.sysmem2.BufferCollection.SetConstraints")
     @deprecated("Ignore. Use fuchsia.sysmem.BufferCollection.SetConstraints() ")
     4: packet_count_for_server uint32;
-    @available(added=7, deprecated=NEXT, note="fuchsia.sysmem2.BufferCollection.SetConstraints")
+    @available(added=7, deprecated=23, note="fuchsia.sysmem2.BufferCollection.SetConstraints")
     @deprecated("Ignore. Use fuchsia.sysmem.BufferCollection.SetConstraints() ")
     5: packet_count_for_client uint32;
 };

@@ -203,36 +203,8 @@ fn format_byte_count(byte_count: usize) -> String {
     }
 }
 
-// TODO(https://fxbug.dev/42081857): Remove the following if NS3 is eventually
-// made to behave the same as NS2.
-//
-// Returns the value we expect a getsockopt call for SO_SNDBUF and
-// SO_RCVBUF to return if a previous setsockopt call was made with `set_size`.
-//
-// Note that NS2 doubles the value on set and returns the doubled value on get,
-// but NS3 does not do this, hence the need for this function.
-fn expected_get_buffer_size(set_size: usize, netstack3: bool) -> usize {
-    if netstack3 {
-        if set_size < 256 {
-            256
-        } else {
-            set_size
-        }
-    } else {
-        let set_size = set_size * 2;
-        if set_size < 4096 {
-            4096
-        } else if set_size > (4 << 20) {
-            4 << 20
-        } else {
-            set_size
-        }
-    }
-}
-
 async fn bench_tcp<'a, I: IpExt>(
     test_suite: &'static str,
-    netstack3: bool,
     iter_count: usize,
     client_realm: &netemul::TestRealm<'a>,
     server_realm: &netemul::TestRealm<'a>,
@@ -267,8 +239,6 @@ async fn bench_tcp<'a, I: IpExt>(
         // Set send buffer to transfer size to ensure we can write
         // `transfer` bytes before reading it on the other end.
         client_sock.set_send_buffer_size(transfer).expect("set send buffer size to transfer size");
-        let want = expected_get_buffer_size(transfer, netstack3);
-        assert_eq!(client_sock.send_buffer_size().expect("get send buffer size"), want);
 
         // Disable the Nagle algorithm, it introduces artificial
         // latency that defeats this benchmark.
@@ -276,6 +246,19 @@ async fn bench_tcp<'a, I: IpExt>(
         client_sock.connect(&listen_sockaddr).expect("connect");
 
         let (server_sock, _): (_, socket2::SockAddr) = listen_sock.accept().expect("accept");
+
+        // Also set the receive buffer size.
+        //
+        // We use double the transfer size so silly window avoidance doesn't
+        // kick in in-between test iterations which causes pollution in the
+        // results.
+        //
+        // This ensures fairness in the benchmark since TCP will base the window
+        // value on the available receive buffer size and different numbers will
+        // skew the test results.
+        server_sock
+            .set_recv_buffer_size(transfer * 2)
+            .expect("set receive buffer size to transfer size");
         (client_sock, server_sock)
     };
 
@@ -322,7 +305,6 @@ async fn bench_tcp<'a, I: IpExt>(
 
 async fn bench_udp<'a, I: IpExt>(
     test_suite: &'static str,
-    netstack3: bool,
     iter_count: usize,
     client_realm: &netemul::TestRealm<'a>,
     server_realm: &netemul::TestRealm<'a>,
@@ -361,13 +343,19 @@ async fn bench_udp<'a, I: IpExt>(
         server_sock.bind(&bind_sockaddr).expect("bind");
         let server_sockaddr = server_sock.local_addr().expect("local addr");
 
+        let transfer_size = message_size * message_count;
+
         // Set receive buffer to the total size of the write to ensure the
         // entire write can complete before reading.
-        server_sock
-            .set_recv_buffer_size(message_size * message_count)
-            .expect("set receive buffer size");
-        let want = expected_get_buffer_size(message_size * message_count, netstack3);
-        assert_eq!(server_sock.recv_buffer_size().expect("get receive buffer size"), want);
+        server_sock.set_recv_buffer_size(transfer_size).expect("set receive buffer size");
+
+        // Also set the send buffer size to the transfer value.
+        //
+        // This ensures fairness in the benchmark when comparing platforms so
+        // we're not relying on default value differences.
+        client_sock
+            .set_send_buffer_size(transfer_size)
+            .expect("set send buffer size to transfer size");
 
         client_sock.connect(&server_sockaddr).expect("connect");
 
@@ -518,7 +506,6 @@ async fn main() {
             metrics.push(
                 bench_tcp::<net_types::ip::Ipv4>(
                     test_suite,
-                    netstack3,
                     iter_count,
                     &client_realm,
                     &server_realm,
@@ -530,7 +517,6 @@ async fn main() {
             metrics.push(
                 bench_tcp::<net_types::ip::Ipv6>(
                     test_suite,
-                    netstack3,
                     iter_count,
                     &client_realm,
                     &server_realm,
@@ -552,7 +538,6 @@ async fn main() {
                 metrics.push(
                     bench_udp::<net_types::ip::Ipv4>(
                         test_suite,
-                        netstack3,
                         iter_count,
                         &client_realm,
                         &server_realm,
@@ -564,7 +549,6 @@ async fn main() {
                 metrics.push(
                     bench_udp::<net_types::ip::Ipv6>(
                         test_suite,
-                        netstack3,
                         iter_count,
                         &client_realm,
                         &server_realm,

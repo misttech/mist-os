@@ -251,7 +251,6 @@ def extract_and_output_rebase_warnings(log):
     ... ''')
     True
     """
-    ret = True
     non_tracking = re.compile(
         r'WARN: For Project "(.*)", branch "(.*)" does not track'
     )

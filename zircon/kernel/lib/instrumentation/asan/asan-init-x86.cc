@@ -121,7 +121,7 @@ void asan_remap_shadow_internal(volatile pt_entry_t* pdp, uintptr_t start, size_
   uint8_t* startp = addr2shadow(start);
   uint8_t* endp = addr2shadow(start + size);
   for (long i = 0; i < endp - startp; i += PAGE_SIZE) {
-    asm volatile("invlpg (%0)" ::"r"(&(startp[i])));
+    __asm__ volatile("invlpg (%0)" ::"r"(&(startp[i])));
   }
 }
 

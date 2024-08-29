@@ -23,31 +23,12 @@ zx::result<> QemuRiscv64::SysmemInit() {
       }},
   };
 
-  const fuchsia_hardware_sysmem::Metadata kSysmemMetadata = [] {
-    fuchsia_hardware_sysmem::Metadata metadata;
-    metadata.vid() = PDEV_VID_QEMU;
-    metadata.pid() = PDEV_PID_QEMU;
-    return metadata;
-  }();
-
-  auto metadata_result = fidl::Persist(kSysmemMetadata);
-  ZX_ASSERT(metadata_result.is_ok());
-  auto& metadata = metadata_result.value();
-
-  std::vector<fpbus::Metadata> kSysmemMetadataList{
-      {{
-          .type = fuchsia_hardware_sysmem::wire::kMetadataType,
-          .data = std::move(metadata),
-      }},
-  };
-
   fpbus::Node sysmem_dev;
   sysmem_dev.name() = "sysmem";
   sysmem_dev.vid() = PDEV_VID_GENERIC;
   sysmem_dev.pid() = PDEV_PID_GENERIC;
   sysmem_dev.did() = PDEV_DID_SYSMEM;
   sysmem_dev.bti() = kSysmemBtis;
-  sysmem_dev.metadata() = kSysmemMetadataList;
 
   fidl::Arena<> fidl_arena;
   fdf::Arena arena('SYSM');

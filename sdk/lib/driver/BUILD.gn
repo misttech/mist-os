@@ -11,6 +11,8 @@ group("tests") {
     "component/cpp:tests",
     "devfs:tests",
     "devicetree:tests",
+    "fake-bti/cpp:tests",
+    "fake-object/cpp:tests",
     "metadata/cpp:tests",
     "platform-device/cpp:tests",
     "power/cpp:tests",

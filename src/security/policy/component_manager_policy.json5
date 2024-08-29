@@ -87,8 +87,8 @@
                 capability: "protocol",
                 target_monikers: [
                     "/bootstrap/boot-drivers:**",
-                    "/bootstrap/pkg-drivers:**",
-                    "/bootstrap/full-pkg-drivers:**",
+                    "/bootstrap/base-drivers:**",
+                    "/bootstrap/full-drivers:**",
                     "/core/sshd-host/shell:**",
                     "/core/testing/system-tests:**",
                     "/core/test_manager/system-tests:**",
@@ -174,7 +174,6 @@
                     "/bootstrap/boot-drivers:dev",
                     "/core/sshd-host/shell:**",
                     "/core/test_manager/system-tests:**",
-
                     "/core/zircon-guest-manager/vmm",
                     "/core/debian-guest-manager/vmm",
                     "/core/termina-guest-manager/vmm",
@@ -229,7 +228,6 @@
                     "/core/test_manager/chromium-system-tests:**",
                     "/core/test_manager/chromium-tests:**",
                     "/core/testing/chromium-tests:**",
-
                     "/core/zircon-guest-manager/vmm",
                     "/core/debian-guest-manager/vmm",
                     "/core/termina-guest-manager/vmm",
@@ -307,7 +305,6 @@
 
                     // TODO(https://fxbug.dev/42181123): Remove once https://fxbug.dev/42167600 is fixed.
                     "/core/sl4f",
-
                 ],
             },
             {
@@ -322,7 +319,6 @@
                     "/bootstrap/console-launcher",
                     "/bootstrap/full_resolver",
                     "/bootstrap/netsvc",
-
                     "/core/sshd-host/shell:**",
 
                     // debug-dash-launcher is used in engineering builds to launch

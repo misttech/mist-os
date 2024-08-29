@@ -57,6 +57,37 @@ type SensorType = flexible enum : uint32 {
     DEVICE_PRIVATE_BASE = 0x10000;
 };
 
+/// Unit type for each measurement.
+type SensorMeasurementUnit = flexible enum : uint32 {
+    /// Unitless
+    NONE = 0;
+
+    /// Movement/position
+    M_PER_SEC_SQRD = 1;
+    DEGREES = 2;
+    RAD_PER_SECOND = 3;
+    QUATERNION_AND_METERS = 4;
+
+    /// Environment
+    TESLA = 5;
+    PASCAL = 6;
+    METER = 7;
+    RELATIVE_HUMIDITY = 8;
+    CELSIUS = 9;
+    LUX = 10;
+
+    /// Biometric
+    STEPS = 11;
+    BEATS_PER_MIN = 12;
+
+    /// Power sensors
+    WATTS = 21;
+    VOLTS = 22;
+    AMPS = 23;
+    JOULES = 24;
+    COULOMBS = 25;
+};
+
 /// Describes a sensor's wake-up behavior. A wake-up sensor will wake up the
 /// application processor when there is new data available. A non wake-up sensor
 /// will not.
@@ -133,6 +164,9 @@ type SensorInfo = table {
     ///
     /// Required.
     7: reporting_mode SensorReportingMode;
+
+    /// The unit type of returned measurements.
+    8: measurement_unit SensorMeasurementUnit;
 };
 
 /// Uncalibrated samples from 3 axis sensors (eg. accelerometer, gyroscope,

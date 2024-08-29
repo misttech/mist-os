@@ -1389,14 +1389,15 @@ fn new_ip_packet_buf<I: IpExt>(src_addr: I::Addr, dst_addr: I::Addr) -> impl AsR
         .unwrap()
 }
 
-// Helper function to call receive ipv4/ipv6 packet action.
-fn receive_ip_packet_action<I: IpExt + TestIpExt>(
+// Helper function to call receive ipv4/ipv6 packet action with an source address.
+fn receive_ip_packet_action_with_src_addr<I: IpExt + TestIpExt>(
     ctx: &mut Ctx<FakeBindingsCtx>,
     dev: &DeviceId<FakeBindingsCtx>,
+    src_addr: I::Addr,
     dst_addr: I::Addr,
 ) -> ReceivePacketAction<I, DeviceId<FakeBindingsCtx>> {
     let Ctx { core_ctx, bindings_ctx: _ } = ctx;
-    let buf = new_ip_packet_buf::<I>(I::TEST_ADDRS.remote_ip.get(), dst_addr);
+    let buf = new_ip_packet_buf::<I>(src_addr, dst_addr);
     let mut buf_ref = buf.as_ref();
     let packet = buf_ref.parse::<I::Packet<_>>().expect("parse should succeed");
 
@@ -1414,6 +1415,15 @@ fn receive_ip_packet_action<I: IpExt + TestIpExt>(
         },
     );
     action
+}
+
+// Helper function to call receive ipv4/ipv6 packet action.
+fn receive_ip_packet_action<I: IpExt + TestIpExt>(
+    ctx: &mut Ctx<FakeBindingsCtx>,
+    dev: &DeviceId<FakeBindingsCtx>,
+    dst_addr: I::Addr,
+) -> ReceivePacketAction<I, DeviceId<FakeBindingsCtx>> {
+    receive_ip_packet_action_with_src_addr(ctx, dev, I::TEST_ADDRS.remote_ip.get(), dst_addr)
 }
 
 #[test]
@@ -1453,6 +1463,27 @@ fn test_receive_ip_packet_action() {
     assert_eq!(
         receive_ip_packet_action::<Ipv6>(&mut ctx, &v6_dev, Ipv6::UNSPECIFIED_ADDRESS),
         ReceivePacketAction::Drop { reason: DropReason::UnspecifiedDestination }
+    );
+
+    // Receive packet destined to a local address but with unspecified source address, we should
+    // deliver it locally.
+    assert_eq!(
+        receive_ip_packet_action_with_src_addr::<Ipv4>(
+            &mut ctx,
+            &v4_dev,
+            Ipv4::UNSPECIFIED_ADDRESS,
+            v4_config.local_ip.get()
+        ),
+        ReceivePacketAction::Deliver { address_status: Ipv4PresentAddressStatus::Unicast }
+    );
+    assert_eq!(
+        receive_ip_packet_action_with_src_addr::<Ipv6>(
+            &mut ctx,
+            &v6_dev,
+            Ipv6::UNSPECIFIED_ADDRESS,
+            v6_config.local_ip.get()
+        ),
+        ReceivePacketAction::Deliver { address_status: Ipv6PresentAddressStatus::UnicastAssigned }
     );
 
     // Receive packet addressed to us.
@@ -1574,6 +1605,28 @@ fn test_receive_ip_packet_action() {
     // enabled both globally and on the inbound device.
     ctx.test_api().set_unicast_forwarding_enabled::<Ipv4>(&v4_dev, true);
     ctx.test_api().set_unicast_forwarding_enabled::<Ipv6>(&v6_dev, true);
+
+    // Receive packet destined to a remote address but with unspecified source address, we should
+    // drop it.
+    assert_eq!(
+        receive_ip_packet_action_with_src_addr::<Ipv4>(
+            &mut ctx,
+            &v4_dev,
+            Ipv4::UNSPECIFIED_ADDRESS,
+            v4_config.remote_ip.get()
+        ),
+        ReceivePacketAction::Drop { reason: DropReason::ForwardUnspecifiedSource }
+    );
+    assert_eq!(
+        receive_ip_packet_action_with_src_addr::<Ipv6>(
+            &mut ctx,
+            &v6_dev,
+            Ipv6::UNSPECIFIED_ADDRESS,
+            v6_config.remote_ip.get()
+        ),
+        ReceivePacketAction::Drop { reason: DropReason::ForwardUnspecifiedSource }
+    );
+
     assert_eq!(
         receive_ip_packet_action::<Ipv4>(&mut ctx, &v4_dev, *v4_config.remote_ip),
         ReceivePacketAction::Forward {
@@ -2089,7 +2142,7 @@ fn loopback_assignment_state_v4(addr: Ipv4Addr, status: Ipv4PresentAddressStatus
 
     let addr = SpecifiedAddr::new(addr).expect("test cases should provide specified addrs");
     assert_eq!(
-        IpDeviceStateContext::<Ipv4, _>::address_status_for_device(
+        IpDeviceStateContext::<Ipv4>::address_status_for_device(
             &mut ctx.core_ctx(),
             addr,
             &loopback_id

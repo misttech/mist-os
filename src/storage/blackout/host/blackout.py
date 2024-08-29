@@ -13,7 +13,6 @@ the block device label (and optionally path) to run on.
 
 import asyncio
 import logging
-import time
 
 import fidl.fuchsia_blackout_test as blackout
 import honeydew.errors
@@ -43,17 +42,25 @@ class BlackoutTest(test_case_revive.TestCaseRevive):
         self.device_label = self.user_params.get("device_label", "default-test")
         self.device_path = self.user_params.get("device_path")
         self.test_duration = self.user_params.get("test_duration", 0)
+        self.destroy_after_test = self.user_params.get(
+            "destroy_after_test", False
+        )
 
         self.create_blackout_component()
 
     def teardown_class(self) -> None:
-        self.dut.ffx.run(
-            [
-                "component",
-                "stop",
-                self.component_name,
-            ]
-        )
+        try:
+            self.dut.ffx.run(
+                [
+                    "component",
+                    "stop",
+                    self.component_name,
+                ]
+            )
+        except honeydew.errors.FfxCommandError:
+            _LOGGER.warning(
+                "Blackout: Failed to stop component during teardown"
+            )
         super().teardown_class()
 
     def setup_test(self) -> None:
@@ -77,6 +84,15 @@ class BlackoutTest(test_case_revive.TestCaseRevive):
             )
         )
         asserts.assert_equal(res.err, None, "Failed to run load generation")
+        if self.destroy_after_test:
+            _LOGGER.info("Blackout: destroying test component instance")
+            self.dut.ffx.run(
+                [
+                    "component",
+                    "destroy",
+                    self.component_name,
+                ]
+            )
 
     def create_blackout_component(self) -> None:
         # TODO(https://fxbug.dev/340586785): sometimes this fails. Until it becomes more stable (or

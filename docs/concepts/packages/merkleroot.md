@@ -1,4 +1,4 @@
-# Fuchsia Merkle Roots
+# Fuchsia merkle roots
 
 [Merkle Trees][merkletree] are used in various places in the Fuchsia ecosystem,
 including the [FAR Archive Format][far], the Blob Storage Filesystem, and the

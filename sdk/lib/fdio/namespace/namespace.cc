@@ -51,7 +51,20 @@ zx_status_t fdio_ns_open(fdio_ns_t* ns, const char* path, uint32_t flags, zx_han
     return ZX_ERR_BAD_PATH;
   }
   auto remote = fidl::ServerEnd<fio::Node>(zx::channel(request));
-  return ns->Connect(clean, static_cast<fio::wire::OpenFlags>(flags), std::move(remote));
+  return ns->ConnectDeprecated(clean, static_cast<fio::wire::OpenFlags>(flags), std::move(remote));
+}
+
+__EXPORT
+zx_status_t fdio_ns_open3(fdio_ns_t* ns, const char* path, uint64_t flags, zx_handle_t request) {
+  if (path == nullptr) {
+    return ZX_ERR_INVALID_ARGS;
+  }
+  fdio_internal::PathBuffer clean;
+  bool is_dir;
+  if (!fdio_internal::CleanPath(path, &clean, &is_dir)) {
+    return ZX_ERR_BAD_PATH;
+  }
+  return ns->Connect(clean, static_cast<fio::wire::Flags>(flags), zx::channel(request));
 }
 
 __EXPORT

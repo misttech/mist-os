@@ -10,12 +10,12 @@ use async_fs::File;
 use core::fmt;
 use errors::{ffx_bail, ffx_error};
 use fho::{deferred, moniker, FfxMain, FfxTool, MachineWriter, ToolIO};
-use fidl_fuchsia_cpu_profiler as profiler;
 use fuchsia_async::unblock;
 use std::io::{stdin, BufRead};
 use std::process::Command;
 use std::time::Duration;
 use tempfile::Builder;
+use {fidl_fuchsia_cpu_profiler as profiler, fidl_fuchsia_test_manager as test_manager};
 
 use schemars::JsonSchema;
 use serde::Serialize;
@@ -262,13 +262,23 @@ pub async fn profiler(
             (target, config, session_opts)
         }
         ProfilerSubCommand::Launch(opts) => {
-            let attach_config =
+            let component_config = if opts.test {
+                profiler::AttachConfig::LaunchTest(profiler::LaunchTest {
+                    url: Some(opts.url.clone()),
+                    options: Some(test_manager::RunSuiteOptions {
+                        test_case_filters: Some(opts.test_filters),
+                        ..Default::default()
+                    }),
+                    ..Default::default()
+                })
+            } else {
                 profiler::AttachConfig::LaunchComponent(profiler::LaunchComponent {
                     url: Some(opts.url.clone()),
                     moniker: opts.moniker.clone(),
                     ..Default::default()
-                });
-            let target = profiler::TargetConfig::Component(attach_config);
+                })
+            };
+            let target = profiler::TargetConfig::Component(component_config);
             let config = profiler::SamplingConfig {
                 period: Some(opts.sample_period_us * 1000),
                 timebase: Some(profiler::Counter::PlatformIndependent(

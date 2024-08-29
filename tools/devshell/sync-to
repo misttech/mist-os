@@ -143,7 +143,7 @@ class SyncToCommand:
         self.dry_run: bool = args.dry_run
         self.force: bool = args.force
         self.verbose: bool = args.verbose
-        self.jiri_update_extra_args: list[str] = ["-v"] if self.verbose else []
+        self.jiri_update_prefix_args: list[str] = ["-v"] if self.verbose else []
 
     @property
     def integration_dir(self) -> pathlib.Path:
@@ -250,7 +250,7 @@ class SyncToCommand:
         # checkout prior to syncing and have `reset` restore the exact contents
         # of the old checkout instead of always going back to JIRI_HEAD.
         print("Resetting the tree to the latest...")
-        self.jiri("update", "-gc", *self.jiri_update_extra_args)
+        self.jiri(*self.jiri_update_prefix_args, "update", "-gc")
 
     def sync_to_release_branch(self) -> None:
         print(f"{self.state!r} looks like a branch name")
@@ -320,11 +320,11 @@ class SyncToCommand:
 
         print(f"Syncing to Jiri snapshot {str(snapshot_file)!r}")
         self.jiri(
+            *self.jiri_update_prefix_args,
             "update",
             "-local-manifest",
             "-gc",
             snapshot_file,
-            *self.jiri_update_extra_args,
         )
 
     def sync_to_integration_ref(self, ref: str) -> None:
@@ -350,7 +350,10 @@ class SyncToCommand:
         )
         try:
             self.jiri(
-                "update", "-local-manifest", "-gc", *self.jiri_update_extra_args
+                *self.jiri_update_prefix_args,
+                "update",
+                "-local-manifest",
+                "-gc",
             )
         except subprocess.CalledProcessError:
             print("Sync failed, restoring the integration repo to JIRI_HEAD")
@@ -515,11 +518,11 @@ class SyncToCommand:
         # update` again to make sure we respect any project/package pin updates.
         if has_integration_patch:
             self.jiri(
+                *self.jiri_update_prefix_args,
                 "update",
                 "-local-manifest",
                 "-rebase-tracked",
                 "-gc",
-                *self.jiri_update_extra_args,
             )
 
     def sync_to_legacy_build_id(self, build_id: str) -> None:

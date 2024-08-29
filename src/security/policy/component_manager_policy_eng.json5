@@ -67,7 +67,7 @@
                 capability: "protocol",
                 target_monikers: [
                     "/core/testing/vfs-compliance-tests:**",
-                    "/bootstrap/pkg-drivers:**",
+                    "/bootstrap/base-drivers:**",
                 ],
             },
             {
@@ -86,7 +86,7 @@
                 source_name: "fuchsia.kernel.InfoResource",
                 capability: "protocol",
                 target_monikers: [
-                    "/bootstrap/pkg-drivers:**",
+                    "/bootstrap/base-drivers:**",
                     "/core/sshd-host/shell:**",
                     "/core/testing/vfs-compliance-tests:**",
                 ],
@@ -274,6 +274,7 @@
                     "/core/process_resolver",
                     "/core/sshd-host/shell:**",
                     "/core/system-update-checker",
+                    "/core/test_manager",
                 ],
             },
             {
@@ -292,7 +293,6 @@
                 capability: "protocol",
                 target_monikers: [
                     "/core/sl4f",
-
                     "/core/sshd-host/shell:**",
                 ],
             },

@@ -70,6 +70,23 @@ impl HostRealm {
         });
         builder.replace_realm_decl(realm_decl).await.unwrap();
 
+        // Route config capabilities from root to bt-host-collection
+        builder
+            .add_capability(cm_rust::CapabilityDecl::Config(cm_rust::ConfigurationDecl {
+                name: "fuchsia.bluetooth.LegacyPairing".parse()?,
+                value: cm_rust::ConfigValue::Single(cm_rust::ConfigSingleValue::Bool(false)),
+            }))
+            .await?;
+
+        builder
+            .add_route(
+                Route::new()
+                    .capability(Capability::configuration("fuchsia.bluetooth.LegacyPairing"))
+                    .from(Ref::self_())
+                    .to(Ref::collection(BT_HOST_COLLECTION.to_string())),
+            )
+            .await?;
+
         // Route capabilities between realm components and bt-host-collection
         builder
             .add_route(

@@ -40,18 +40,18 @@ fpromise::promise<usb_device_descriptor_t, zx_status_t> GetDeviceDescriptor(UsbX
         auto& request = result.value();
         zx_status_t status = request.request()->response.status;
         if (status != ZX_OK) {
-          zxlogf(ERROR, "GetDeviceDescriptor request failed %s", zx_status_get_string(status));
+          FDF_LOG(ERROR, "GetDeviceDescriptor request failed %s", zx_status_get_string(status));
           return fpromise::error(status);
         }
         usb_device_descriptor_t descriptor;
         ssize_t actual = request.CopyFrom(&descriptor, length, 0);
         if (actual != length) {
-          zxlogf(ERROR, "GetDeviceDescriptor request expected %u bytes, got %zd", length, actual);
+          FDF_LOG(ERROR, "GetDeviceDescriptor request expected %u bytes, got %zd", length, actual);
           return fpromise::error(ZX_ERR_IO);
         }
         if (descriptor.b_descriptor_type != USB_DT_DEVICE) {
-          zxlogf(ERROR, "GetDeviceDescriptor got bad descriptor type: %u",
-                 descriptor.b_descriptor_type);
+          FDF_LOG(ERROR, "GetDeviceDescriptor got bad descriptor type: %u",
+                  descriptor.b_descriptor_type);
           return fpromise::error(ZX_ERR_IO);
         }
         return fpromise::ok(descriptor);
@@ -103,7 +103,7 @@ fpromise::promise<void, zx_status_t> RetryEnumeration(UsbXhci* hci, uint8_t port
       .and_then([=](TRB*& result) -> TRBPromise {
         auto completion_event = static_cast<CommandCompletionEvent*>(result);
         if (completion_event->CompletionCode() != CommandCompletionEvent::Success) {
-          zxlogf(ERROR, "Enable slot command failed: %d", completion_event->CompletionCode());
+          FDF_LOG(ERROR, "Enable slot command failed: %d", completion_event->CompletionCode());
           return fpromise::make_error_promise(ZX_ERR_IO);
         }
         // After successfully obtaining a device slot, issue an Address Device command and enable
@@ -118,7 +118,7 @@ fpromise::promise<void, zx_status_t> RetryEnumeration(UsbXhci* hci, uint8_t port
         // If we fail during the retry, give up.
         auto completion_event = static_cast<CommandCompletionEvent*>(result);
         if (completion_event->CompletionCode() != CommandCompletionEvent::Success) {
-          zxlogf(ERROR, "Address device command failed: %d", completion_event->CompletionCode());
+          FDF_LOG(ERROR, "Address device command failed: %d", completion_event->CompletionCode());
           return fpromise::make_error_promise(ZX_ERR_IO);
         }
         return UpdateMaxPacketSize(hci, *state->slot);
@@ -126,7 +126,7 @@ fpromise::promise<void, zx_status_t> RetryEnumeration(UsbXhci* hci, uint8_t port
       .and_then([=](TRB*& result) -> TRBPromise {
         auto completion_event = static_cast<CommandCompletionEvent*>(result);
         if (completion_event->CompletionCode() != CommandCompletionEvent::Success) {
-          zxlogf(ERROR, "Update max packat size failed: %d", completion_event->CompletionCode());
+          FDF_LOG(ERROR, "Update max packat size failed: %d", completion_event->CompletionCode());
           return fpromise::make_ok_promise(result);
         }
         // Issue a SET_ADDRESS request to the device
@@ -135,7 +135,7 @@ fpromise::promise<void, zx_status_t> RetryEnumeration(UsbXhci* hci, uint8_t port
       .and_then([=](TRB*& result) -> fpromise::result<void, zx_status_t> {
         auto completion_event = static_cast<CommandCompletionEvent*>(result);
         if (completion_event->CompletionCode() != CommandCompletionEvent::Success) {
-          zxlogf(ERROR, "Address device command failed: %d", completion_event->CompletionCode());
+          FDF_LOG(ERROR, "Address device command failed: %d", completion_event->CompletionCode());
           return fpromise::error(ZX_ERR_IO);
         }
         return fpromise::ok();
@@ -152,7 +152,7 @@ fpromise::promise<void, zx_status_t> EnumerateDevice(UsbXhci* hci, uint8_t port,
       .and_then([=](TRB*& result) -> TRBPromise {
         auto completion_event = static_cast<CommandCompletionEvent*>(result);
         if (completion_event->CompletionCode() != CommandCompletionEvent::Success) {
-          zxlogf(ERROR, "Enable slot command failed: %d", completion_event->CompletionCode());
+          FDF_LOG(ERROR, "Enable slot command failed: %d", completion_event->CompletionCode());
           return fpromise::make_error_promise(ZX_ERR_IO);
         }
         // After successfully obtaining a device slot,
@@ -167,15 +167,15 @@ fpromise::promise<void, zx_status_t> EnumerateDevice(UsbXhci* hci, uint8_t port,
         // Check for errors and retry if the device refuses the SET_ADDRESS command
         auto completion_event = static_cast<CommandCompletionEvent*>(result);
         if (completion_event->CompletionCode() == CommandCompletionEvent::UsbTransactionError) {
-          zxlogf(ERROR, "Address device command failed with transaction error.");
+          FDF_LOG(ERROR, "Address device command failed with transaction error.");
           if (!hci->IsDeviceConnected(*state->slot)) {
             return fpromise::make_error_promise<zx_status_t>(ZX_ERR_IO);
           }
-          zxlogf(INFO, "Retrying enumeration.");
+          FDF_LOG(INFO, "Retrying enumeration.");
           return RetryEnumeration(hci, port, hub_info, state);
         }
         if (completion_event->CompletionCode() != CommandCompletionEvent::Success) {
-          zxlogf(ERROR, "Address device failed error: %d", completion_event->CompletionCode());
+          FDF_LOG(ERROR, "Address device failed error: %d", completion_event->CompletionCode());
           return fpromise::make_error_promise<zx_status_t>(ZX_ERR_IO);
         }
         return fpromise::make_result_promise<void, zx_status_t>(fpromise::ok());
@@ -183,7 +183,7 @@ fpromise::promise<void, zx_status_t> EnumerateDevice(UsbXhci* hci, uint8_t port,
       .and_then([=]() -> fpromise::promise<void, zx_status_t> {
         auto speed = hci->GetDeviceSpeed(*state->slot);
         if (!speed.has_value()) {
-          zxlogf(ERROR, "Device speed is invalid.");
+          FDF_LOG(ERROR, "Device speed is invalid.");
           return fpromise::make_error_promise<>(ZX_ERR_BAD_STATE);
         }
         if (speed.value() != USB_SPEED_SUPER) {
@@ -205,7 +205,7 @@ fpromise::promise<void, zx_status_t> EnumerateDevice(UsbXhci* hci, uint8_t port,
         // Set the max packet size if the device is a full speed device.
         auto speed = hci->GetDeviceSpeed(*state->slot);
         if (!speed.has_value()) {
-          zxlogf(ERROR, "Device speed is invalid.");
+          FDF_LOG(ERROR, "Device speed is invalid.");
           return fpromise::make_error_promise<zx_status_t>(ZX_ERR_BAD_STATE);
         }
         if (speed.value() != USB_SPEED_FULL) {
@@ -228,20 +228,20 @@ fpromise::promise<void, zx_status_t> EnumerateDevice(UsbXhci* hci, uint8_t port,
         // Online the device, making it visible to the DDK (enumeration has completed)
         auto speed = hci->GetDeviceSpeed(*state->slot);
         if (!speed.has_value()) {
-          zxlogf(ERROR, "Device speed is invalid.");
+          FDF_LOG(ERROR, "Device speed is invalid.");
           return fpromise::error(ZX_ERR_BAD_STATE);
         }
         zx_status_t status = hci->DeviceOnline(*state->slot, port, speed.value());
         if (status != ZX_OK) {
-          zxlogf(ERROR, "DeviceOnline failed: %s", zx_status_get_string(status));
+          FDF_LOG(ERROR, "DeviceOnline failed: %s", zx_status_get_string(status));
           return fpromise::error(status);
         }
-        zxlogf(DEBUG, "Enumeration successful");
+        FDF_LOG(DEBUG, "Enumeration successful");
         return fpromise::ok();
       })
       .or_else([=](const zx_status_t& status) -> fpromise::result<void, zx_status_t> {
         // Clean up the slot if we didn't successfully enumerate.
-        zxlogf(ERROR, "Enumeration failed: %s", zx_status_get_string(status));
+        FDF_LOG(ERROR, "Enumeration failed: %s", zx_status_get_string(status));
         if (state->slot.has_value()) {
           hci->ScheduleTask(kPrimaryInterrupter, hci->DisableSlotCommand(*state->slot));
         }

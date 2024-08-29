@@ -76,7 +76,7 @@ static_library("stub-delete") {
 sanitizer_extra_options("suppress-lsan-for-stub-delete") {
   visibility = [ ":*" ]
   args = [ "detect_leaks=0" ]
-  output_name = "lsan_default_options"
+  sanitizer = "lsan"
   tags = [ "lsan" ]
 }
 

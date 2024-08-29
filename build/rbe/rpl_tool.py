@@ -13,7 +13,7 @@ import contextlib
 import os
 import sys
 from pathlib import Path
-from typing import Any, Callable, Dict, Iterable, Optional, Sequence
+from typing import Callable, Iterable, Sequence
 
 import cl_utils
 import fuchsia

@@ -5139,15 +5139,115 @@ const (
 	UnknownInteractionsAjarProtocolFlexibleEventTableOrdinal    uint64 = 0x9ca944d1d6436b0
 )
 
-// Bindings for this protocol have not been generated because it is an
-// ajar protocol. If bindings for ajar protocols are
-// needed in Go, please contact the FIDL team: fidl-dev@fuchsia.dev.
 type UnknownInteractionsAjarProtocolWithCtxInterface _bindings.ChannelProxy
 
-// Bindings for this protocol have not been generated because it is an
-// ajar protocol. If bindings for ajar protocols are
-// needed in Go, please contact the FIDL team: fidl-dev@fuchsia.dev.
-type UnknownInteractionsAjarProtocolWithCtx interface{}
+func (p *UnknownInteractionsAjarProtocolWithCtxInterface) StrictOneWay(ctx_ _bindings.Context) error {
+	var req_ _bindings.Message
+	err_ := ((*_bindings.ChannelProxy)(p)).Send(UnknownInteractionsAjarProtocolStrictOneWayOrdinal, req_)
+	return err_
+}
+
+// NOTE: flexible method UnknownInteractionsAjarProtocolWithCtx.FlexibleOneWay is not implemented in Go.
+
+func (p *UnknownInteractionsAjarProtocolWithCtxInterface) StrictTwoWay(ctx_ _bindings.Context) error {
+	var req_ _bindings.Message
+	var resp_ _bindings.Message
+	err_ := ((*_bindings.ChannelProxy)(p)).Call(UnknownInteractionsAjarProtocolStrictTwoWayOrdinal, req_, resp_)
+	return err_
+}
+
+func (p *UnknownInteractionsAjarProtocolWithCtxInterface) StrictTwoWayFields(ctx_ _bindings.Context) (int32, error) {
+	var req_ _bindings.Message
+	resp_ := &UnknownInteractionsAjarProtocolStrictTwoWayFieldsResponse{}
+	err_ := ((*_bindings.ChannelProxy)(p)).Call(UnknownInteractionsAjarProtocolStrictTwoWayFieldsOrdinal, req_, resp_)
+	return (*resp_).SomeField, err_
+}
+
+func (p *UnknownInteractionsAjarProtocolWithCtxInterface) StrictTwoWayUnion(ctx_ _bindings.Context) (UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse, error) {
+	var req_ _bindings.Message
+	resp_ := &UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse{}
+	err_ := ((*_bindings.ChannelProxy)(p)).Call(UnknownInteractionsAjarProtocolStrictTwoWayUnionOrdinal, req_, resp_)
+	return (*resp_), err_
+}
+
+func (p *UnknownInteractionsAjarProtocolWithCtxInterface) StrictTwoWayTable(ctx_ _bindings.Context) (UnknownInteractionsAjarProtocolStrictTwoWayTableResponse, error) {
+	var req_ _bindings.Message
+	resp_ := &UnknownInteractionsAjarProtocolStrictTwoWayTableResponse{}
+	err_ := ((*_bindings.ChannelProxy)(p)).Call(UnknownInteractionsAjarProtocolStrictTwoWayTableOrdinal, req_, resp_)
+	return (*resp_), err_
+}
+
+func (p *UnknownInteractionsAjarProtocolWithCtxInterface) StrictTwoWayErr(ctx_ _bindings.Context) (UnknownInteractionsAjarProtocolStrictTwoWayErrResult, error) {
+	var req_ _bindings.Message
+	resp_ := &UnknownInteractionsAjarProtocolStrictTwoWayErrResult{}
+	err_ := ((*_bindings.ChannelProxy)(p)).Call(UnknownInteractionsAjarProtocolStrictTwoWayErrOrdinal, req_, resp_)
+	return (*resp_), err_
+}
+
+func (p *UnknownInteractionsAjarProtocolWithCtxInterface) StrictTwoWayFieldsErr(ctx_ _bindings.Context) (UnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResult, error) {
+	var req_ _bindings.Message
+	resp_ := &UnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResult{}
+	err_ := ((*_bindings.ChannelProxy)(p)).Call(UnknownInteractionsAjarProtocolStrictTwoWayFieldsErrOrdinal, req_, resp_)
+	return (*resp_), err_
+}
+
+func (p *UnknownInteractionsAjarProtocolWithCtxInterface) StrictTwoWayUnionErr(ctx_ _bindings.Context) (UnknownInteractionsAjarProtocolStrictTwoWayUnionErrResult, error) {
+	var req_ _bindings.Message
+	resp_ := &UnknownInteractionsAjarProtocolStrictTwoWayUnionErrResult{}
+	err_ := ((*_bindings.ChannelProxy)(p)).Call(UnknownInteractionsAjarProtocolStrictTwoWayUnionErrOrdinal, req_, resp_)
+	return (*resp_), err_
+}
+
+func (p *UnknownInteractionsAjarProtocolWithCtxInterface) StrictTwoWayTableErr(ctx_ _bindings.Context) (UnknownInteractionsAjarProtocolStrictTwoWayTableErrResult, error) {
+	var req_ _bindings.Message
+	resp_ := &UnknownInteractionsAjarProtocolStrictTwoWayTableErrResult{}
+	err_ := ((*_bindings.ChannelProxy)(p)).Call(UnknownInteractionsAjarProtocolStrictTwoWayTableErrOrdinal, req_, resp_)
+	return (*resp_), err_
+}
+
+func (p *UnknownInteractionsAjarProtocolWithCtxInterface) ExpectStrictEvent(ctx_ _bindings.Context) error {
+	var resp_ _bindings.Message
+	err_ := ((*_bindings.ChannelProxy)(p)).Recv(UnknownInteractionsAjarProtocolStrictEventOrdinal, resp_)
+	return err_
+}
+
+func (p *UnknownInteractionsAjarProtocolWithCtxInterface) ExpectStrictEventFields(ctx_ _bindings.Context) (int32, error) {
+	resp_ := &UnknownInteractionsAjarProtocolStrictEventFieldsRequest{}
+	err_ := ((*_bindings.ChannelProxy)(p)).Recv(UnknownInteractionsAjarProtocolStrictEventFieldsOrdinal, resp_)
+	return (*resp_).SomeField, err_
+}
+
+func (p *UnknownInteractionsAjarProtocolWithCtxInterface) ExpectStrictEventUnion(ctx_ _bindings.Context) (UnknownInteractionsAjarProtocolStrictEventUnionRequest, error) {
+	resp_ := &UnknownInteractionsAjarProtocolStrictEventUnionRequest{}
+	err_ := ((*_bindings.ChannelProxy)(p)).Recv(UnknownInteractionsAjarProtocolStrictEventUnionOrdinal, resp_)
+	return (*resp_), err_
+}
+
+func (p *UnknownInteractionsAjarProtocolWithCtxInterface) ExpectStrictEventTable(ctx_ _bindings.Context) (UnknownInteractionsAjarProtocolStrictEventTableRequest, error) {
+	resp_ := &UnknownInteractionsAjarProtocolStrictEventTableRequest{}
+	err_ := ((*_bindings.ChannelProxy)(p)).Recv(UnknownInteractionsAjarProtocolStrictEventTableOrdinal, resp_)
+	return (*resp_), err_
+}
+
+// NOTE: flexible event UnknownInteractionsAjarProtocolWithCtx.FlexibleEvent is not implemented in Go.
+
+// NOTE: flexible event UnknownInteractionsAjarProtocolWithCtx.FlexibleEventFields is not implemented in Go.
+
+// NOTE: flexible event UnknownInteractionsAjarProtocolWithCtx.FlexibleEventUnion is not implemented in Go.
+
+// NOTE: flexible event UnknownInteractionsAjarProtocolWithCtx.FlexibleEventTable is not implemented in Go.
+
+type UnknownInteractionsAjarProtocolWithCtx interface {
+	StrictOneWay(ctx_ _bindings.Context) error
+	StrictTwoWay(ctx_ _bindings.Context) error
+	StrictTwoWayFields(ctx_ _bindings.Context) (int32, error)
+	StrictTwoWayUnion(ctx_ _bindings.Context) (UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse, error)
+	StrictTwoWayTable(ctx_ _bindings.Context) (UnknownInteractionsAjarProtocolStrictTwoWayTableResponse, error)
+	StrictTwoWayErr(ctx_ _bindings.Context) (UnknownInteractionsAjarProtocolStrictTwoWayErrResult, error)
+	StrictTwoWayFieldsErr(ctx_ _bindings.Context) (UnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResult, error)
+	StrictTwoWayUnionErr(ctx_ _bindings.Context) (UnknownInteractionsAjarProtocolStrictTwoWayUnionErrResult, error)
+	StrictTwoWayTableErr(ctx_ _bindings.Context) (UnknownInteractionsAjarProtocolStrictTwoWayTableErrResult, error)
+}
 type UnknownInteractionsAjarProtocolWithCtxInterfaceRequest _bindings.InterfaceRequest
 
 func NewUnknownInteractionsAjarProtocolWithCtxInterfaceRequest() (UnknownInteractionsAjarProtocolWithCtxInterfaceRequest, *UnknownInteractionsAjarProtocolWithCtxInterface, error) {
@@ -5155,15 +5255,68 @@ func NewUnknownInteractionsAjarProtocolWithCtxInterfaceRequest() (UnknownInterac
 	return UnknownInteractionsAjarProtocolWithCtxInterfaceRequest(req), (*UnknownInteractionsAjarProtocolWithCtxInterface)(cli), err
 }
 
-// Bindings for this protocol have not been generated because it is an
-// ajar protocol. If bindings for ajar protocols are
-// needed in Go, please contact the FIDL team: fidl-dev@fuchsia.dev.
-type UnknownInteractionsAjarProtocolWithCtxStub struct{}
+type UnknownInteractionsAjarProtocolWithCtxStub struct {
+	Impl UnknownInteractionsAjarProtocolWithCtx
+}
 
-// Bindings for this protocol have not been generated because it is an
-// ajar protocol. If bindings for ajar protocols are
-// needed in Go, please contact the FIDL team: fidl-dev@fuchsia.dev.
-type UnknownInteractionsAjarProtocolEventProxy struct{}
+func (s_ *UnknownInteractionsAjarProtocolWithCtxStub) Dispatch(args_ _bindings.DispatchArgs) (_bindings.Message, bool, error) {
+	switch args_.Ordinal {
+	case UnknownInteractionsAjarProtocolStrictOneWayOrdinal:
+		err_ := s_.Impl.StrictOneWay(args_.Ctx)
+		return nil, false, err_
+	case UnknownInteractionsAjarProtocolStrictTwoWayOrdinal:
+		err_ := s_.Impl.StrictTwoWay(args_.Ctx)
+		return nil, true, err_
+	case UnknownInteractionsAjarProtocolStrictTwoWayFieldsOrdinal:
+		someField, err_ := s_.Impl.StrictTwoWayFields(args_.Ctx)
+		out_ := &UnknownInteractionsAjarProtocolStrictTwoWayFieldsResponse{SomeField: someField}
+		return out_, true, err_
+	case UnknownInteractionsAjarProtocolStrictTwoWayUnionOrdinal:
+		payload, err_ := s_.Impl.StrictTwoWayUnion(args_.Ctx)
+		out_ := &payload
+		return out_, true, err_
+	case UnknownInteractionsAjarProtocolStrictTwoWayTableOrdinal:
+		payload, err_ := s_.Impl.StrictTwoWayTable(args_.Ctx)
+		out_ := &payload
+		return out_, true, err_
+	case UnknownInteractionsAjarProtocolStrictTwoWayErrOrdinal:
+		payload, err_ := s_.Impl.StrictTwoWayErr(args_.Ctx)
+		out_ := &payload
+		return out_, true, err_
+	case UnknownInteractionsAjarProtocolStrictTwoWayFieldsErrOrdinal:
+		payload, err_ := s_.Impl.StrictTwoWayFieldsErr(args_.Ctx)
+		out_ := &payload
+		return out_, true, err_
+	case UnknownInteractionsAjarProtocolStrictTwoWayUnionErrOrdinal:
+		payload, err_ := s_.Impl.StrictTwoWayUnionErr(args_.Ctx)
+		out_ := &payload
+		return out_, true, err_
+	case UnknownInteractionsAjarProtocolStrictTwoWayTableErrOrdinal:
+		payload, err_ := s_.Impl.StrictTwoWayTableErr(args_.Ctx)
+		out_ := &payload
+		return out_, true, err_
+	}
+	return nil, false, _bindings.ErrUnknownOrdinal
+}
+
+type UnknownInteractionsAjarProtocolEventProxy _bindings.ChannelProxy
+
+func (p *UnknownInteractionsAjarProtocolEventProxy) StrictEvent() error {
+	var event_ _bindings.Message
+	return ((*_bindings.ChannelProxy)(p)).Send(UnknownInteractionsAjarProtocolStrictEventOrdinal, event_)
+}
+func (p *UnknownInteractionsAjarProtocolEventProxy) StrictEventFields(someField int32) error {
+	event_ := &UnknownInteractionsAjarProtocolStrictEventFieldsRequest{SomeField: someField}
+	return ((*_bindings.ChannelProxy)(p)).Send(UnknownInteractionsAjarProtocolStrictEventFieldsOrdinal, event_)
+}
+func (p *UnknownInteractionsAjarProtocolEventProxy) StrictEventUnion(payload UnknownInteractionsAjarProtocolStrictEventUnionRequest) error {
+	event_ := &payload
+	return ((*_bindings.ChannelProxy)(p)).Send(UnknownInteractionsAjarProtocolStrictEventUnionOrdinal, event_)
+}
+func (p *UnknownInteractionsAjarProtocolEventProxy) StrictEventTable(payload UnknownInteractionsAjarProtocolStrictEventTableRequest) error {
+	event_ := &payload
+	return ((*_bindings.ChannelProxy)(p)).Send(UnknownInteractionsAjarProtocolStrictEventTableOrdinal, event_)
+}
 
 const (
 	UnknownInteractionsClosedProtocolStrictOneWayOrdinal          uint64 = 0x59282385962da24
@@ -5379,15 +5532,131 @@ const (
 	UnknownInteractionsProtocolFlexibleEventTableOrdinal      uint64 = 0x4f72dd46888b89e0
 )
 
-// Bindings for this protocol have not been generated because it is an
-// open protocol. If bindings for open protocols are
-// needed in Go, please contact the FIDL team: fidl-dev@fuchsia.dev.
 type UnknownInteractionsProtocolWithCtxInterface _bindings.ChannelProxy
 
-// Bindings for this protocol have not been generated because it is an
-// open protocol. If bindings for open protocols are
-// needed in Go, please contact the FIDL team: fidl-dev@fuchsia.dev.
-type UnknownInteractionsProtocolWithCtx interface{}
+func (p *UnknownInteractionsProtocolWithCtxInterface) StrictOneWay(ctx_ _bindings.Context) error {
+	var req_ _bindings.Message
+	err_ := ((*_bindings.ChannelProxy)(p)).Send(UnknownInteractionsProtocolStrictOneWayOrdinal, req_)
+	return err_
+}
+
+// NOTE: flexible method UnknownInteractionsProtocolWithCtx.FlexibleOneWay is not implemented in Go.
+
+func (p *UnknownInteractionsProtocolWithCtxInterface) StrictTwoWay(ctx_ _bindings.Context) error {
+	var req_ _bindings.Message
+	var resp_ _bindings.Message
+	err_ := ((*_bindings.ChannelProxy)(p)).Call(UnknownInteractionsProtocolStrictTwoWayOrdinal, req_, resp_)
+	return err_
+}
+
+func (p *UnknownInteractionsProtocolWithCtxInterface) StrictTwoWayFields(ctx_ _bindings.Context) (int32, error) {
+	var req_ _bindings.Message
+	resp_ := &UnknownInteractionsProtocolStrictTwoWayFieldsResponse{}
+	err_ := ((*_bindings.ChannelProxy)(p)).Call(UnknownInteractionsProtocolStrictTwoWayFieldsOrdinal, req_, resp_)
+	return (*resp_).SomeField, err_
+}
+
+func (p *UnknownInteractionsProtocolWithCtxInterface) StrictTwoWayUnion(ctx_ _bindings.Context) (UnknownInteractionsProtocolStrictTwoWayUnionResponse, error) {
+	var req_ _bindings.Message
+	resp_ := &UnknownInteractionsProtocolStrictTwoWayUnionResponse{}
+	err_ := ((*_bindings.ChannelProxy)(p)).Call(UnknownInteractionsProtocolStrictTwoWayUnionOrdinal, req_, resp_)
+	return (*resp_), err_
+}
+
+func (p *UnknownInteractionsProtocolWithCtxInterface) StrictTwoWayTable(ctx_ _bindings.Context) (UnknownInteractionsProtocolStrictTwoWayTableResponse, error) {
+	var req_ _bindings.Message
+	resp_ := &UnknownInteractionsProtocolStrictTwoWayTableResponse{}
+	err_ := ((*_bindings.ChannelProxy)(p)).Call(UnknownInteractionsProtocolStrictTwoWayTableOrdinal, req_, resp_)
+	return (*resp_), err_
+}
+
+func (p *UnknownInteractionsProtocolWithCtxInterface) StrictTwoWayErr(ctx_ _bindings.Context) (UnknownInteractionsProtocolStrictTwoWayErrResult, error) {
+	var req_ _bindings.Message
+	resp_ := &UnknownInteractionsProtocolStrictTwoWayErrResult{}
+	err_ := ((*_bindings.ChannelProxy)(p)).Call(UnknownInteractionsProtocolStrictTwoWayErrOrdinal, req_, resp_)
+	return (*resp_), err_
+}
+
+func (p *UnknownInteractionsProtocolWithCtxInterface) StrictTwoWayFieldsErr(ctx_ _bindings.Context) (UnknownInteractionsProtocolStrictTwoWayFieldsErrResult, error) {
+	var req_ _bindings.Message
+	resp_ := &UnknownInteractionsProtocolStrictTwoWayFieldsErrResult{}
+	err_ := ((*_bindings.ChannelProxy)(p)).Call(UnknownInteractionsProtocolStrictTwoWayFieldsErrOrdinal, req_, resp_)
+	return (*resp_), err_
+}
+
+func (p *UnknownInteractionsProtocolWithCtxInterface) StrictTwoWayUnionErr(ctx_ _bindings.Context) (UnknownInteractionsProtocolStrictTwoWayUnionErrResult, error) {
+	var req_ _bindings.Message
+	resp_ := &UnknownInteractionsProtocolStrictTwoWayUnionErrResult{}
+	err_ := ((*_bindings.ChannelProxy)(p)).Call(UnknownInteractionsProtocolStrictTwoWayUnionErrOrdinal, req_, resp_)
+	return (*resp_), err_
+}
+
+func (p *UnknownInteractionsProtocolWithCtxInterface) StrictTwoWayTableErr(ctx_ _bindings.Context) (UnknownInteractionsProtocolStrictTwoWayTableErrResult, error) {
+	var req_ _bindings.Message
+	resp_ := &UnknownInteractionsProtocolStrictTwoWayTableErrResult{}
+	err_ := ((*_bindings.ChannelProxy)(p)).Call(UnknownInteractionsProtocolStrictTwoWayTableErrOrdinal, req_, resp_)
+	return (*resp_), err_
+}
+
+// NOTE: flexible method UnknownInteractionsProtocolWithCtx.FlexibleTwoWay is not implemented in Go.
+
+// NOTE: flexible method UnknownInteractionsProtocolWithCtx.FlexibleTwoWayFields is not implemented in Go.
+
+// NOTE: flexible method UnknownInteractionsProtocolWithCtx.FlexibleTwoWayUnion is not implemented in Go.
+
+// NOTE: flexible method UnknownInteractionsProtocolWithCtx.FlexibleTwoWayTable is not implemented in Go.
+
+// NOTE: flexible method UnknownInteractionsProtocolWithCtx.FlexibleTwoWayErr is not implemented in Go.
+
+// NOTE: flexible method UnknownInteractionsProtocolWithCtx.FlexibleTwoWayFieldsErr is not implemented in Go.
+
+// NOTE: flexible method UnknownInteractionsProtocolWithCtx.FlexibleTwoWayUnionErr is not implemented in Go.
+
+// NOTE: flexible method UnknownInteractionsProtocolWithCtx.FlexibleTwoWayTableErr is not implemented in Go.
+
+func (p *UnknownInteractionsProtocolWithCtxInterface) ExpectStrictEvent(ctx_ _bindings.Context) error {
+	var resp_ _bindings.Message
+	err_ := ((*_bindings.ChannelProxy)(p)).Recv(UnknownInteractionsProtocolStrictEventOrdinal, resp_)
+	return err_
+}
+
+func (p *UnknownInteractionsProtocolWithCtxInterface) ExpectStrictEventFields(ctx_ _bindings.Context) (int32, error) {
+	resp_ := &UnknownInteractionsProtocolStrictEventFieldsRequest{}
+	err_ := ((*_bindings.ChannelProxy)(p)).Recv(UnknownInteractionsProtocolStrictEventFieldsOrdinal, resp_)
+	return (*resp_).SomeField, err_
+}
+
+func (p *UnknownInteractionsProtocolWithCtxInterface) ExpectStrictEventUnion(ctx_ _bindings.Context) (UnknownInteractionsProtocolStrictEventUnionRequest, error) {
+	resp_ := &UnknownInteractionsProtocolStrictEventUnionRequest{}
+	err_ := ((*_bindings.ChannelProxy)(p)).Recv(UnknownInteractionsProtocolStrictEventUnionOrdinal, resp_)
+	return (*resp_), err_
+}
+
+func (p *UnknownInteractionsProtocolWithCtxInterface) ExpectStrictEventTable(ctx_ _bindings.Context) (UnknownInteractionsProtocolStrictEventTableRequest, error) {
+	resp_ := &UnknownInteractionsProtocolStrictEventTableRequest{}
+	err_ := ((*_bindings.ChannelProxy)(p)).Recv(UnknownInteractionsProtocolStrictEventTableOrdinal, resp_)
+	return (*resp_), err_
+}
+
+// NOTE: flexible event UnknownInteractionsProtocolWithCtx.FlexibleEvent is not implemented in Go.
+
+// NOTE: flexible event UnknownInteractionsProtocolWithCtx.FlexibleEventFields is not implemented in Go.
+
+// NOTE: flexible event UnknownInteractionsProtocolWithCtx.FlexibleEventUnion is not implemented in Go.
+
+// NOTE: flexible event UnknownInteractionsProtocolWithCtx.FlexibleEventTable is not implemented in Go.
+
+type UnknownInteractionsProtocolWithCtx interface {
+	StrictOneWay(ctx_ _bindings.Context) error
+	StrictTwoWay(ctx_ _bindings.Context) error
+	StrictTwoWayFields(ctx_ _bindings.Context) (int32, error)
+	StrictTwoWayUnion(ctx_ _bindings.Context) (UnknownInteractionsProtocolStrictTwoWayUnionResponse, error)
+	StrictTwoWayTable(ctx_ _bindings.Context) (UnknownInteractionsProtocolStrictTwoWayTableResponse, error)
+	StrictTwoWayErr(ctx_ _bindings.Context) (UnknownInteractionsProtocolStrictTwoWayErrResult, error)
+	StrictTwoWayFieldsErr(ctx_ _bindings.Context) (UnknownInteractionsProtocolStrictTwoWayFieldsErrResult, error)
+	StrictTwoWayUnionErr(ctx_ _bindings.Context) (UnknownInteractionsProtocolStrictTwoWayUnionErrResult, error)
+	StrictTwoWayTableErr(ctx_ _bindings.Context) (UnknownInteractionsProtocolStrictTwoWayTableErrResult, error)
+}
 type UnknownInteractionsProtocolWithCtxInterfaceRequest _bindings.InterfaceRequest
 
 func NewUnknownInteractionsProtocolWithCtxInterfaceRequest() (UnknownInteractionsProtocolWithCtxInterfaceRequest, *UnknownInteractionsProtocolWithCtxInterface, error) {
@@ -5395,12 +5664,65 @@ func NewUnknownInteractionsProtocolWithCtxInterfaceRequest() (UnknownInteraction
 	return UnknownInteractionsProtocolWithCtxInterfaceRequest(req), (*UnknownInteractionsProtocolWithCtxInterface)(cli), err
 }
 
-// Bindings for this protocol have not been generated because it is an
-// open protocol. If bindings for open protocols are
-// needed in Go, please contact the FIDL team: fidl-dev@fuchsia.dev.
-type UnknownInteractionsProtocolWithCtxStub struct{}
+type UnknownInteractionsProtocolWithCtxStub struct {
+	Impl UnknownInteractionsProtocolWithCtx
+}
 
-// Bindings for this protocol have not been generated because it is an
-// open protocol. If bindings for open protocols are
-// needed in Go, please contact the FIDL team: fidl-dev@fuchsia.dev.
-type UnknownInteractionsProtocolEventProxy struct{}
+func (s_ *UnknownInteractionsProtocolWithCtxStub) Dispatch(args_ _bindings.DispatchArgs) (_bindings.Message, bool, error) {
+	switch args_.Ordinal {
+	case UnknownInteractionsProtocolStrictOneWayOrdinal:
+		err_ := s_.Impl.StrictOneWay(args_.Ctx)
+		return nil, false, err_
+	case UnknownInteractionsProtocolStrictTwoWayOrdinal:
+		err_ := s_.Impl.StrictTwoWay(args_.Ctx)
+		return nil, true, err_
+	case UnknownInteractionsProtocolStrictTwoWayFieldsOrdinal:
+		someField, err_ := s_.Impl.StrictTwoWayFields(args_.Ctx)
+		out_ := &UnknownInteractionsProtocolStrictTwoWayFieldsResponse{SomeField: someField}
+		return out_, true, err_
+	case UnknownInteractionsProtocolStrictTwoWayUnionOrdinal:
+		payload, err_ := s_.Impl.StrictTwoWayUnion(args_.Ctx)
+		out_ := &payload
+		return out_, true, err_
+	case UnknownInteractionsProtocolStrictTwoWayTableOrdinal:
+		payload, err_ := s_.Impl.StrictTwoWayTable(args_.Ctx)
+		out_ := &payload
+		return out_, true, err_
+	case UnknownInteractionsProtocolStrictTwoWayErrOrdinal:
+		payload, err_ := s_.Impl.StrictTwoWayErr(args_.Ctx)
+		out_ := &payload
+		return out_, true, err_
+	case UnknownInteractionsProtocolStrictTwoWayFieldsErrOrdinal:
+		payload, err_ := s_.Impl.StrictTwoWayFieldsErr(args_.Ctx)
+		out_ := &payload
+		return out_, true, err_
+	case UnknownInteractionsProtocolStrictTwoWayUnionErrOrdinal:
+		payload, err_ := s_.Impl.StrictTwoWayUnionErr(args_.Ctx)
+		out_ := &payload
+		return out_, true, err_
+	case UnknownInteractionsProtocolStrictTwoWayTableErrOrdinal:
+		payload, err_ := s_.Impl.StrictTwoWayTableErr(args_.Ctx)
+		out_ := &payload
+		return out_, true, err_
+	}
+	return nil, false, _bindings.ErrUnknownOrdinal
+}
+
+type UnknownInteractionsProtocolEventProxy _bindings.ChannelProxy
+
+func (p *UnknownInteractionsProtocolEventProxy) StrictEvent() error {
+	var event_ _bindings.Message
+	return ((*_bindings.ChannelProxy)(p)).Send(UnknownInteractionsProtocolStrictEventOrdinal, event_)
+}
+func (p *UnknownInteractionsProtocolEventProxy) StrictEventFields(someField int32) error {
+	event_ := &UnknownInteractionsProtocolStrictEventFieldsRequest{SomeField: someField}
+	return ((*_bindings.ChannelProxy)(p)).Send(UnknownInteractionsProtocolStrictEventFieldsOrdinal, event_)
+}
+func (p *UnknownInteractionsProtocolEventProxy) StrictEventUnion(payload UnknownInteractionsProtocolStrictEventUnionRequest) error {
+	event_ := &payload
+	return ((*_bindings.ChannelProxy)(p)).Send(UnknownInteractionsProtocolStrictEventUnionOrdinal, event_)
+}
+func (p *UnknownInteractionsProtocolEventProxy) StrictEventTable(payload UnknownInteractionsProtocolStrictEventTableRequest) error {
+	event_ := &payload
+	return ((*_bindings.ChannelProxy)(p)).Send(UnknownInteractionsProtocolStrictEventTableOrdinal, event_)
+}

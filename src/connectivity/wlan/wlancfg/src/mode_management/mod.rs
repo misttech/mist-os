@@ -9,6 +9,9 @@ use crate::telemetry::TelemetrySender;
 use crate::util::listener;
 use anyhow::Error;
 use fuchsia_async as fasync;
+use fuchsia_inspect::{Node as InspectNode, StringReference};
+use fuchsia_inspect_contrib::inspect_insert;
+use fuchsia_inspect_contrib::log::WriteInspect;
 use futures::channel::mpsc;
 use futures::lock::Mutex;
 use futures::Future;
@@ -32,6 +35,7 @@ pub fn create_iface_manager(
     roam_manager: RoamManager,
     telemetry_sender: TelemetrySender,
     recovery_receiver: recovery::RecoveryActionReceiver,
+    node: fuchsia_inspect::Node,
 ) -> (Arc<Mutex<iface_manager_api::IfaceManager>>, impl Future<Output = Result<Infallible, Error>>)
 {
     let (sender, receiver) = mpsc::channel(0);
@@ -47,6 +51,7 @@ pub fn create_iface_manager(
         roam_manager,
         telemetry_sender,
         defect_sender,
+        node,
     );
     let iface_manager_service = iface_manager::serve_iface_manager_requests(
         iface_manager,
@@ -97,6 +102,34 @@ impl PartialEq for IfaceFailure {
 pub enum Defect {
     Phy(PhyFailure),
     Iface(IfaceFailure),
+}
+
+impl WriteInspect for Defect {
+    fn write_inspect(&self, writer: &InspectNode, key: impl Into<StringReference>) {
+        match self {
+            Defect::Phy(PhyFailure::IfaceCreationFailure { phy_id }) => {
+                inspect_insert!(writer, var key: {IfaceCreationFailure: {phy_id: phy_id}})
+            }
+            Defect::Phy(PhyFailure::IfaceDestructionFailure { phy_id }) => {
+                inspect_insert!(writer, var key: {IfaceDestructionFailure: {phy_id: phy_id}})
+            }
+            Defect::Iface(IfaceFailure::CanceledScan { iface_id }) => {
+                inspect_insert!(writer, var key: {CanceledScan: {iface_id: iface_id}})
+            }
+            Defect::Iface(IfaceFailure::FailedScan { iface_id }) => {
+                inspect_insert!(writer, var key: {FailedScan: {iface_id: iface_id}})
+            }
+            Defect::Iface(IfaceFailure::EmptyScanResults { iface_id }) => {
+                inspect_insert!(writer, var key: {EmptyScanResults: {iface_id: iface_id}})
+            }
+            Defect::Iface(IfaceFailure::ApStartFailure { iface_id }) => {
+                inspect_insert!(writer, var key: {ApStartFailure: {iface_id: iface_id}})
+            }
+            Defect::Iface(IfaceFailure::ConnectionFailure { iface_id }) => {
+                inspect_insert!(writer, var key: {ConnectionFailure: {iface_id: iface_id}})
+            }
+        }
+    }
 }
 
 #[derive(Debug, PartialEq)]

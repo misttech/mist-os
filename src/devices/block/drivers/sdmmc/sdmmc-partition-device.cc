@@ -9,6 +9,8 @@
 #include <string.h>
 #include <zircon/hw/gpt.h>
 
+#include <bind/fuchsia/cpp/bind.h>
+
 #include "sdmmc-block-device.h"
 #include "sdmmc-root-device.h"
 #include "sdmmc-types.h"
@@ -69,7 +71,8 @@ zx_status_t PartitionDevice::AddDevice() {
   fidl::Arena arena;
 
   fidl::VectorView<fuchsia_driver_framework::wire::NodeProperty> properties(arena, 1);
-  properties[0] = fdf::MakeProperty(arena, BIND_PROTOCOL, ZX_PROTOCOL_BLOCK_IMPL);
+  properties[0] = fdf::MakeProperty(arena, bind_fuchsia::PROTOCOL,
+                                    static_cast<uint32_t>(ZX_PROTOCOL_BLOCK_IMPL));
 
   std::vector<fuchsia_driver_framework::wire::Offer> offers = compat_server_.CreateOffers2(arena);
 

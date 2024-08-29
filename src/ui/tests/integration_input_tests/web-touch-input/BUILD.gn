@@ -10,29 +10,30 @@ executable("web-touch-input-test-bin") {
   sources = [ "web-touch-input-test.cc" ]
   output_name = "web-touch-input-test"
   deps = [
-    "//sdk/fidl/fuchsia.accessibility.semantics:fuchsia.accessibility.semantics_hlcpp",
-    "//sdk/fidl/fuchsia.buildinfo:fuchsia.buildinfo_hlcpp",
-    "//sdk/fidl/fuchsia.component:fuchsia.component_hlcpp",
-    "//sdk/fidl/fuchsia.fonts:fuchsia.fonts_hlcpp",
-    "//sdk/fidl/fuchsia.hardware.display:fuchsia.hardware.display_hlcpp",
-    "//sdk/fidl/fuchsia.input.injection:fuchsia.input.injection_hlcpp",
-    "//sdk/fidl/fuchsia.intl:fuchsia.intl_hlcpp",
-    "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_hlcpp",
-    "//sdk/fidl/fuchsia.memorypressure:fuchsia.memorypressure_hlcpp",
-    "//sdk/fidl/fuchsia.metrics:fuchsia.metrics_hlcpp",
-    "//sdk/fidl/fuchsia.net.interfaces:fuchsia.net.interfaces_hlcpp",
-    "//sdk/fidl/fuchsia.posix.socket:fuchsia.posix.socket_hlcpp",
-    "//sdk/fidl/fuchsia.process:fuchsia.process_hlcpp",
-    "//sdk/fidl/fuchsia.scheduler:fuchsia.scheduler_hlcpp",
-    "//sdk/fidl/fuchsia.tracing.provider:fuchsia.tracing.provider_hlcpp",
-    "//sdk/fidl/fuchsia.ui.app:fuchsia.ui.app_hlcpp",
-    "//sdk/fidl/fuchsia.ui.display.singleton:fuchsia.ui.display.singleton_hlcpp",
-    "//sdk/fidl/fuchsia.ui.input:fuchsia.ui.input_hlcpp",
-    "//sdk/fidl/fuchsia.ui.pointer:fuchsia.ui.pointer_hlcpp",
-    "//sdk/fidl/fuchsia.ui.scenic:fuchsia.ui.scenic_hlcpp",
-    "//sdk/fidl/fuchsia.ui.test.input:fuchsia.ui.test.input_hlcpp",
-    "//sdk/fidl/fuchsia.vulkan.loader:fuchsia.vulkan.loader_hlcpp",
-    "//sdk/fidl/fuchsia.web:fuchsia.web_hlcpp",
+    "//sdk/fidl/fuchsia.accessibility.semantics:fuchsia.accessibility.semantics_cpp",
+    "//sdk/fidl/fuchsia.buildinfo:fuchsia.buildinfo_cpp",
+    "//sdk/fidl/fuchsia.component:fuchsia.component_cpp",
+    "//sdk/fidl/fuchsia.element:fuchsia.element_cpp",
+    "//sdk/fidl/fuchsia.fonts:fuchsia.fonts_cpp",
+    "//sdk/fidl/fuchsia.hardware.display:fuchsia.hardware.display_cpp",
+    "//sdk/fidl/fuchsia.input.injection:fuchsia.input.injection_cpp",
+    "//sdk/fidl/fuchsia.intl:fuchsia.intl_cpp",
+    "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_cpp",
+    "//sdk/fidl/fuchsia.memorypressure:fuchsia.memorypressure_cpp",
+    "//sdk/fidl/fuchsia.metrics:fuchsia.metrics_cpp",
+    "//sdk/fidl/fuchsia.net.interfaces:fuchsia.net.interfaces_cpp",
+    "//sdk/fidl/fuchsia.posix.socket:fuchsia.posix.socket_cpp",
+    "//sdk/fidl/fuchsia.process:fuchsia.process_cpp",
+    "//sdk/fidl/fuchsia.scheduler:fuchsia.scheduler_cpp",
+    "//sdk/fidl/fuchsia.tracing.provider:fuchsia.tracing.provider_cpp",
+    "//sdk/fidl/fuchsia.ui.app:fuchsia.ui.app_cpp",
+    "//sdk/fidl/fuchsia.ui.display.singleton:fuchsia.ui.display.singleton_cpp",
+    "//sdk/fidl/fuchsia.ui.input:fuchsia.ui.input_cpp",
+    "//sdk/fidl/fuchsia.ui.pointer:fuchsia.ui.pointer_cpp",
+    "//sdk/fidl/fuchsia.ui.scenic:fuchsia.ui.scenic_cpp",
+    "//sdk/fidl/fuchsia.ui.test.input:fuchsia.ui.test.input_cpp",
+    "//sdk/fidl/fuchsia.vulkan.loader:fuchsia.vulkan.loader_cpp",
+    "//sdk/fidl/fuchsia.web:fuchsia.web_cpp",
     "//sdk/lib/sys/component/cpp/testing:cpp",
     "//sdk/lib/sys/cpp",
     "//sdk/lib/ui/scenic/cpp",
@@ -44,6 +45,10 @@ executable("web-touch-input-test-bin") {
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/zx",
+
+    # TODO(https://fxbug.dev/296294151): Fix after realm builder support new C++ binding.
+    "//sdk/fidl/fuchsia.component.decl:fuchsia.component.decl_cpp_hlcpp_conversion",
+    "//src/lib/fidl/cpp:hlcpp_conversion",
   ]
 }
 
@@ -58,7 +63,7 @@ fuchsia_test_component("web-touch-input-test-component") {
 fuchsia_test_package("web-touch-input-test") {
   test_components = [ ":web-touch-input-test-component" ]
   deps = [
-    "//src/cobalt/bin/testing/mock_cobalt",
+    "//src/cobalt/bin/testing/fake_cobalt",
     "//src/connectivity/network:netstack-for-tests",
     "//src/developer/build_info/testing:fake-build-info-component",
     "//src/developer/memory/monitor:component",
@@ -98,7 +103,7 @@ group("tests") {
     # TODO(https://fxbug.dev/42070261): Should these be deps of the individual test
     # targets above?
     "//src/chromium:web_context_provider_for_test",
-    "//src/cobalt/bin/testing/mock_cobalt",
+    "//src/cobalt/bin/testing/fake_cobalt",
     "//src/graphics/bin/vulkan_loader",
     "//src/graphics/display/testing/fake-coordinator-connector",
     "//src/testing/fidl/intl_property_manager",

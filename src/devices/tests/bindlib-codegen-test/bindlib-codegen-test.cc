@@ -22,7 +22,7 @@
 namespace lib = bind_bindlib_codegen_testlib;
 namespace parent = bind_bindlibparent_codegen_testlib;
 
-const std::string kChildDevicePath = "/dev/sys/test/parent";
+const std::string kChildDevicePath = "dev.sys.test.parent";
 
 class BindLibToFidlCodeGenTest : public testing::Test {
  protected:
@@ -69,8 +69,7 @@ class BindLibToFidlCodeGenTest : public testing::Test {
   fuchsia::driver::development::ManagerSyncPtr driver_dev_;
 };
 
-// TODO(b/316176095): Re-enable test after ensuring it works with DFv2.
-TEST_F(BindLibToFidlCodeGenTest, DISABLED_DeviceProperties) {
+TEST_F(BindLibToFidlCodeGenTest, DeviceProperties) {
   fuchsia::driver::development::NodeInfoIteratorSyncPtr iterator;
   ASSERT_EQ(ZX_OK, driver_dev_->GetNodeInfo({kChildDevicePath}, iterator.NewRequest(),
                                             /* exact_match= */ true));
@@ -78,8 +77,9 @@ TEST_F(BindLibToFidlCodeGenTest, DISABLED_DeviceProperties) {
   std::vector<fuchsia::driver::development::NodeInfo> devices;
   ASSERT_EQ(iterator->GetNext(&devices), ZX_OK);
 
+  ASSERT_EQ(devices.size(), 1lu);
   auto& props = devices[0].node_property_list();
-  ASSERT_EQ(static_cast<size_t>(9), props.size());
+  ASSERT_EQ(static_cast<size_t>(11), props.size());
 
   ASSERT_EQ(bind_fuchsia::PROTOCOL, props[0].key.string_value());
   ASSERT_TRUE(props[0].value.is_int_value());
@@ -100,14 +100,14 @@ TEST_F(BindLibToFidlCodeGenTest, DISABLED_DeviceProperties) {
 
   ASSERT_EQ("bindlib.codegen.testlib.Moon", props[4].key.string_value());
   ASSERT_EQ(lib::MOON, props[4].key.string_value());
-  ASSERT_TRUE(props[4].value.is_enum_value());
-  ASSERT_EQ("bindlib.codegen.testlib.Moon.Half", props[4].value.enum_value());
-  ASSERT_EQ(lib::MOON_HALF, props[4].value.enum_value());
+  ASSERT_TRUE(props[4].value.is_string_value());
+  ASSERT_EQ("bindlib.codegen.testlib.Moon.Half", props[4].value.string_value());
+  ASSERT_EQ(lib::MOON_HALF, props[4].value.string_value());
 
   ASSERT_EQ("bindlib.codegen.testlib.bobolink", props[5].key.string_value());
   ASSERT_EQ(lib::BOBOLINK, props[5].key.string_value());
   ASSERT_TRUE(props[5].value.is_int_value());
-  ASSERT_EQ(static_cast<uint32_t>(10), props[5].value.int_value());
+  ASSERT_EQ(10u, props[5].value.int_value());
 
   ASSERT_EQ("bindlib.codegen.testlib.flag", props[6].key.string_value());
   ASSERT_EQ(lib::FLAG, props[6].key.string_value());
@@ -124,6 +124,14 @@ TEST_F(BindLibToFidlCodeGenTest, DISABLED_DeviceProperties) {
   ASSERT_EQ("bindlibparent.codegen.testlib.Grit", props[8].key.string_value());
   ASSERT_EQ(parent::GRIT, props[8].key.string_value());
   ASSERT_TRUE(props[8].value.is_int_value());
-  ASSERT_EQ(static_cast<uint32_t>(100), props[8].value.int_value());
-  ASSERT_EQ(parent::GRIT_COARSE, props[8].value.int_value());
+  ASSERT_EQ(200u, props[8].value.int_value());
+  ASSERT_EQ(lib::GRIT_FINE, props[8].value.int_value());
+
+  ASSERT_EQ("fuchsia.driver.compat.Service", props[9].key.string_value());
+  ASSERT_TRUE(props[9].value.is_string_value());
+  ASSERT_EQ("fuchsia.driver.compat.Service.ZirconTransport", props[9].value.string_value());
+
+  ASSERT_EQ("fuchsia.platform.DRIVER_FRAMEWORK_VERSION", props[10].key.string_value());
+  ASSERT_TRUE(props[10].value.is_int_value());
+  ASSERT_EQ(2u, props[10].value.int_value());
 }

@@ -309,7 +309,7 @@ bool set_migrate_fn_test() {
   struct {
     int count = 0;
     cpu_num_t last_cpu = INVALID_CPU;
-    Thread::MigrateStage next_stage = Thread::MigrateStage::Before;
+    Thread::MigrateStage next_stage = Thread::MigrateStage::Save;
     bool success = true;
   } migrate_state;
 
@@ -319,7 +319,7 @@ bool set_migrate_fn_test() {
     ++migrate_state.count;
 
     cpu_num_t current_cpu = arch_curr_cpu_num();
-    if ((stage == Thread::MigrateStage::After) && (migrate_state.last_cpu == current_cpu)) {
+    if ((stage == Thread::MigrateStage::Restore) && (migrate_state.last_cpu == current_cpu)) {
       UNITTEST_FAIL_TRACEF("Expected to have migrated CPU.");
       migrate_state.success = false;
     }
@@ -332,10 +332,10 @@ bool set_migrate_fn_test() {
     }
 
     switch (migrate_state.next_stage) {
-      case Thread::MigrateStage::Before:
-        migrate_state.next_stage = Thread::MigrateStage::After;
+      case Thread::MigrateStage::Save:
+        migrate_state.next_stage = Thread::MigrateStage::Restore;
         break;
-      case Thread::MigrateStage::After:
+      case Thread::MigrateStage::Restore:
         migrate_state.next_stage = Thread::MigrateStage::Exiting;
         if (thread->LastCpuLocked() != current_cpu) {
           UNITTEST_FAIL_TRACEF("Expected last CPU to be current CPU after migrate.");
@@ -589,7 +589,7 @@ bool migrate_stress_test() {
     auto migrate_fn = [&state = threads[i]](Thread* thread, Thread::MigrateStage stage) {
       Guard<SpinLock, IrqSave> guard(&state.lock);
       switch (stage) {
-        case Thread::MigrateStage::Before:
+        case Thread::MigrateStage::Save:
           ZX_ASSERT_MSG(!state.is_migrating, "Thread is already migrating");
           ZX_ASSERT_MSG(state.allowed_cpu == arch_curr_cpu_num(),
                         "Migrate function called on incorrect CPU.");
@@ -597,7 +597,7 @@ bool migrate_stress_test() {
           state.is_migrating = true;
           break;
 
-        case Thread::MigrateStage::After:
+        case Thread::MigrateStage::Restore:
           ZX_ASSERT(state.is_migrating);
           state.is_migrating = false;
           state.allowed_cpu = arch_curr_cpu_num();

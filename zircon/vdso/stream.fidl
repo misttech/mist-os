@@ -68,7 +68,7 @@ closed protocol Stream {
     ///
     /// `ZX_ERR_BAD_HANDLE`  *vmo* is not a valid handle.
     ///
-    /// `ZX_ERR_WRONG_TYPE`  *vmo* is not a VMO handle.
+    /// `ZX_ERR_WRONG_TYPE`  *vmo* is contiguous, physical or not a VMO handle.
     ///
     /// `ZX_ERR_ACCESS_DENIED`  *vmo* does not have the rights required for the given
     /// options.

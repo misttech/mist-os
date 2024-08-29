@@ -763,4 +763,11 @@ void VirtualAudioComposite::SetTopology(SetTopologyRequest& request,
   }
 }
 
+void VirtualAudioComposite::handle_unknown_method(
+    fidl::UnknownMethodMetadata<fuchsia_hardware_audio::RingBuffer>,
+    fidl::UnknownMethodCompleter::Sync&) {}
+void VirtualAudioComposite::handle_unknown_method(
+    fidl::UnknownMethodMetadata<fuchsia_hardware_audio_signalprocessing::SignalProcessing>,
+    fidl::UnknownMethodCompleter::Sync&) {}
+
 }  // namespace virtual_audio

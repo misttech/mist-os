@@ -55,9 +55,6 @@ TEST(MockDdk, InitOps) {
   EXPECT_EQ(ZX_OK, device->InitReplyCallStatus());
 }
 
-const std::array kProps = {
-    zx_device_prop_t{0, 1, 2},
-};
 const std::array kStrProps = {
     zx_device_str_prop_t{.key = "key1", .property_value = str_prop_str_val("value")},
     zx_device_str_prop_t{.key = "key2", .property_value = str_prop_int_val(10)}};
@@ -79,8 +76,7 @@ class TestDevice : public DeviceType {
     auto dev = std::make_unique<TestDevice>(parent);
     // The device_add_args_t will be filled out by the
     // base class.
-    auto status = dev->DdkAdd(
-        ddk::DeviceAddArgs("my-test-device").set_props(kProps).set_str_props(kStrProps));
+    auto status = dev->DdkAdd(ddk::DeviceAddArgs("my-test-device").set_str_props(kStrProps));
     // The MockDevice is now in charge of the memory for dev
     if (status == ZX_OK) {
       return zx::ok(dev.release());
@@ -688,8 +684,6 @@ TEST(MockDdk, GetProperties) {
   ASSERT_TRUE(result.is_ok());
   TestDevice* test_device = result.value();
 
-  ASSERT_EQ(test_device->zxdev()->GetProperties().size(), kProps.size());
-  ASSERT_EQ(memcmp(test_device->zxdev()->GetProperties().data(), kProps.data(), kProps.size()), 0);
   ASSERT_EQ(test_device->zxdev()->GetStringProperties().size(), cpp20::span(kStrProps).size());
   ASSERT_EQ(memcmp(test_device->zxdev()->GetStringProperties().data(), kStrProps.data(),
                    kStrProps.size()),

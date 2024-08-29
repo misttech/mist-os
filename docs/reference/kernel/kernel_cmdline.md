@@ -28,31 +28,6 @@ names.
 In order to specify options in the build, see
 [this guide](/docs/development/kernel/build.md#options).
 
-## blobfs.cache-eviction-policy=\<policy\>
-
-Controls blobfs' eviction strategy for pager-backed blobs with no open handles
-or VMO clones. If unset, an internally defined system default is used.
-
-Blobs that are not pager-backed are not affected by this knob.
-
-The following values are supported:
-
-*   `NEVER_EVICT`: Nodes are never evicted. It is recommended to enable kernel
-    page eviction (`kernel.page-scanner.enable-eviction`) in this case, as
-    otherwise blobfs will indefinitely retain all data pages in memory.
-*   `EVICT_IMMEDIATELY`: Nodes are evicted as soon as they have no open handles
-    or VMO clones. They will need to be loaded from disk again on next access.
-
-## blobfs.write-compression-algorithm=\<algorithm\>
-
-The compression algorithm that blobfs should use for writing blobs at runtime.
-If unset, an internally defined system default is used.
-
-The following values are supported:
-
-*   `ZSTD_CHUNKED`
-*   `UNCOMPRESSED`
-
 ## boot.usb=\<bool\>
 
 If true, indicates that the boot storage medium is connected over a USB bus.
@@ -67,12 +42,6 @@ this is not specified, the default next program will be used.
 Arguments to the program can optionally be specified using a comma separator
 between the program and individual arguments. For example,
 'bootsvc.next=bin/mybin,arg1,arg2'.
-
-## clock\.backstop=\<seconds\>
-
-Sets the initial offset (from the Unix epoch, in seconds) for the UTC clock. The
-clock will be set by the device coordinator at boot time, and then later, if an
-RTC is present, the RTC clock will be sanitized to at least this time.
 
 ## console.shell=\<bool\>
 
@@ -92,16 +61,6 @@ Note again that the name of the driver is the "Driver" argument to the
 ZIRCON\_DRIVER macro. It is not, for example, the name of the device, which for
 some drivers is almost identical, except that the device may be named "foo-bar"
 whereas the driver name must use underscores, e.g., "foo_bar".
-
-## driver.sysmem.contiguous_memory_size=\<num>
-
-Overrides the board-driver-specified size for sysmem's contiguous memory
-pool. Value is in bytes.
-
-## driver.sysmem.protected_memory_size=\<num>
-
-Overrides the board-driver-specified size for sysmem's default protected memory
-pool. Value is in bytes.
 
 ## driver.tests.enable=\<bool>
 
@@ -154,12 +113,6 @@ to pass arguments to an executable.
 
 This option is disabled if console.shell is false.
 
-## zircon.system.disable-automount=\<bool>
-
-This option prevents the fshost from auto-mounting any disk filesystems
-(/system, /data, etc), which can be useful for certain low level test setups. It
-is false by default. It is implied by **netsvc.netboot=true**
-
 ## zircon.system.pkgfs.cmd=\<command>
 
 This option requests that *command* be run once the blob partition is mounted.
@@ -182,13 +135,6 @@ also be mounted as `/system`.
 ## zircon.system.pkgfs.file.*path*=\<blobid>
 
 Used with [`zircon.system.pkgfs.cmd`](#zircon.system.pkgfs.cmd), above.
-
-## zircon.system.filesystem-check=\<bool>
-
-This option requests that filesystems automatically mounted by the system are
-pre-verified using a filesystem consistency checker before being mounted.
-
-By default, this option is set to false.
 
 ## netsvc.netboot=\<bool>
 
@@ -266,28 +212,6 @@ found in the BOOTFS will be `pkg/foo/bin/app`, `pkg/foo/lib/ld.so.1`, etc.
 If this option is set, userboot will attempt to power off the machine when the
 process it launches exits. Note if `userboot.reboot` is set then
 `userboot.shutdown` will be ignored.
-
-## virtcon.disable
-
-Do not launch the virtual console service if this option is present.
-
-## virtcon.hide-on-boot
-
-If this option is present, the virtual console will not take ownership of any
-displays until the user switches to it with a device control key combination.
-
-## virtcon.keep-log-visible
-
-If this option is present, the virtual console service will keep the debug log
-(vc0) visible instead of switching to the first shell (vc1) at startup.
-
-## virtcon.keymap=\<name>
-
-Specify the keymap for the virtual console. "qwerty" and "dvorak" are supported.
-
-## virtcon.font=\<name>
-
-Specify the font for the virtual console. "9x16" and "18x32" are supported.
 
 ## zircon.nodename=\<name>
 

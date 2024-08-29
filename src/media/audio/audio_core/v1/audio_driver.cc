@@ -494,63 +494,70 @@ void AudioDriver::RequestDelayInfo() {
   state_ = State::Configuring_GettingDelayInfo;
   SetCommandTimeout(kDefaultLongCmdTimeout, "RingBuffer::WatchDelayInfo");
 
-  ring_buffer_fidl_->WatchDelayInfo([this](fuchsia::hardware::audio::DelayInfo info) {
-    if constexpr (kLogAudioDriverCallbacks) {
-      FX_LOGS(INFO) << "AudioDriver::ring_buffer_fidl::WatchDelayInfo callback";
-    }
+  ring_buffer_fidl_->WatchDelayInfo(
+      [this](fuchsia::hardware::audio::RingBuffer_WatchDelayInfo_Result result) {
+        if (result.is_framework_err()) {
+          FX_LOGS(ERROR) << "WatchDelayInfo method missing";
+          return;
+        }
+        fuchsia::hardware::audio::DelayInfo& info = result.response().delay_info;
 
-    OBTAIN_EXECUTION_DOMAIN_TOKEN(token, &owner_->mix_domain());
-    external_delay_ = zx::nsec(info.has_external_delay() ? info.external_delay() : 0);
-    internal_delay_ = zx::nsec(info.has_internal_delay() ? info.internal_delay() : 0);
+        if constexpr (kLogAudioDriverCallbacks) {
+          FX_LOGS(INFO) << "AudioDriver::ring_buffer_fidl::WatchDelayInfo callback";
+        }
 
-    if constexpr (kLogDriverDelayProperties) {
-      FX_LOGS(INFO) << "Audio " << (owner_->is_input() ? " Input" : "Output")
-                    << " received external_delay " << std::setw(8) << external_delay_.to_nsecs()
-                    << " ns, internal_delay " << std::setw(8) << internal_delay_.to_nsecs()
-                    << " ns";
-    }
+        OBTAIN_EXECUTION_DOMAIN_TOKEN(token, &owner_->mix_domain());
+        external_delay_ = zx::nsec(info.has_external_delay() ? info.external_delay() : 0);
+        internal_delay_ = zx::nsec(info.has_internal_delay() ? info.internal_delay() : 0);
 
-    auto format = GetFormat();
-    auto bytes_per_frame = format->bytes_per_frame();
-    FX_CHECK(bytes_per_frame > 0);
-    uint32_t frames_per_second = format->frames_per_second();
-    // Ceiling up to the next complete frame, if needed (the client's "safe write/read" zone cannot
-    // extend partially into a frame).
-    driver_transfer_frames_ = (driver_transfer_bytes_ + bytes_per_frame - 1) / bytes_per_frame;
-    // This delay is used in the calculation of the client's minimum lead time. We ceiling up to the
-    // next nsec, just to be cautious.
-    driver_transfer_delay_ = zx::nsec(format->frames_per_ns().Inverse().Scale(
-        *driver_transfer_frames_, TimelineRate::RoundingMode::Ceiling));
+        if constexpr (kLogDriverDelayProperties) {
+          FX_LOGS(INFO) << "Audio " << (owner_->is_input() ? " Input" : "Output")
+                        << " received external_delay " << std::setw(8) << external_delay_.to_nsecs()
+                        << " ns, internal_delay " << std::setw(8) << internal_delay_.to_nsecs()
+                        << " ns";
+        }
 
-    // Figure out how many frames we need in our ring buffer.
-    int64_t min_bytes_64 = format->frames_per_ns().Scale(min_ring_buffer_duration_.to_nsecs(),
-                                                         TimelineRate::RoundingMode::Ceiling) *
-                           bytes_per_frame;
-    bool overflow = ((min_bytes_64 == TimelineRate::kOverflow) ||
-                     (min_bytes_64 > (std::numeric_limits<int64_t>::max() -
-                                      (*driver_transfer_frames_ * bytes_per_frame))));
+        auto format = GetFormat();
+        auto bytes_per_frame = format->bytes_per_frame();
+        FX_CHECK(bytes_per_frame > 0);
+        uint32_t frames_per_second = format->frames_per_second();
+        // Ceiling up to the next complete frame, if needed (the client's "safe write/read" zone
+        // cannot extend partially into a frame).
+        driver_transfer_frames_ = (driver_transfer_bytes_ + bytes_per_frame - 1) / bytes_per_frame;
+        // This delay is used in the calculation of the client's minimum lead time. We ceiling up to
+        // the next nsec, just to be cautious.
+        driver_transfer_delay_ = zx::nsec(format->frames_per_ns().Inverse().Scale(
+            *driver_transfer_frames_, TimelineRate::RoundingMode::Ceiling));
 
-    int64_t min_frames_64;
-    if (!overflow) {
-      min_frames_64 = min_bytes_64 / bytes_per_frame;
-      min_frames_64 += *driver_transfer_frames_;
-      overflow = min_frames_64 > std::numeric_limits<uint32_t>::max();
-    }
+        // Figure out how many frames we need in our ring buffer.
+        int64_t min_bytes_64 = format->frames_per_ns().Scale(min_ring_buffer_duration_.to_nsecs(),
+                                                             TimelineRate::RoundingMode::Ceiling) *
+                               bytes_per_frame;
+        bool overflow = ((min_bytes_64 == TimelineRate::kOverflow) ||
+                         (min_bytes_64 > (std::numeric_limits<int64_t>::max() -
+                                          (*driver_transfer_frames_ * bytes_per_frame))));
 
-    if (overflow) {
-      FX_LOGS(ERROR) << "Overflow while attempting to compute ring buffer size in frames.";
-      FX_LOGS(ERROR) << "duration              : " << min_ring_buffer_duration_.get();
-      FX_LOGS(ERROR) << "bytes per frame       : " << bytes_per_frame;
-      FX_LOGS(ERROR) << "frames per sec        : " << frames_per_second;
-      FX_LOGS(ERROR) << "driver_transfer_frames: " << *driver_transfer_frames_;
-      FX_LOGS(ERROR) << "driver_transfer_delay : " << driver_transfer_delay_->get() << " nsec";
-      return;
-    }
+        int64_t min_frames_64;
+        if (!overflow) {
+          min_frames_64 = min_bytes_64 / bytes_per_frame;
+          min_frames_64 += *driver_transfer_frames_;
+          overflow = min_frames_64 > std::numeric_limits<uint32_t>::max();
+        }
 
-    RequestRingBufferVmo(min_frames_64);
+        if (overflow) {
+          FX_LOGS(ERROR) << "Overflow while attempting to compute ring buffer size in frames.";
+          FX_LOGS(ERROR) << "duration              : " << min_ring_buffer_duration_.get();
+          FX_LOGS(ERROR) << "bytes per frame       : " << bytes_per_frame;
+          FX_LOGS(ERROR) << "frames per sec        : " << frames_per_second;
+          FX_LOGS(ERROR) << "driver_transfer_frames: " << *driver_transfer_frames_;
+          FX_LOGS(ERROR) << "driver_transfer_delay : " << driver_transfer_delay_->get() << " nsec";
+          return;
+        }
 
-    // TODO(https://fxbug.dev/42065006): Watch for subsequent delay updates.
-  });
+        RequestRingBufferVmo(min_frames_64);
+
+        // TODO(https://fxbug.dev/42065006): Watch for subsequent delay updates.
+      });
 }
 
 void AudioDriver::RequestRingBufferVmo(int64_t min_frames_64) {

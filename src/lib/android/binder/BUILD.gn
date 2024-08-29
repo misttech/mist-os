@@ -52,85 +52,88 @@ binder_source_base =
     "//third_party/android/platform/frameworks/native/libs/binder/"
 
 source_set("binder") {
-  defines = [ "BINDER_WITH_KERNEL_IPC" ]
-  public = rebase_path([
-                         "Binder.h",
-                         "BinderService.h",
-                         "BpBinder.h",
-                         "Common.h",
-                         "Delegate.h",
-                         "Enums.h",
-                         "Functional.h",
-                         "IBinder.h",
-                         "IInterface.h",
-                         "IMemory.h",
-                         "IPCThreadState.h",
-                         "IResultReceiver.h",
-                         "IServiceManagerFFI.h",
-                         "IServiceManager.h",
-                         "IShellCallback.h",
-                         "LazyServiceRegistrar.h",
-                         "MemoryBase.h",
-                         "MemoryDealer.h",
-                         "MemoryHeapBase.h",
-                         "Parcelable.h",
-                         "ParcelableHolder.h",
-                         "ParcelFileDescriptor.h",
-                         "Parcel.h",
-                         "PersistableBundle.h",
-                         "ProcessState.h",
-                         "RecordedTransaction.h",
-                         "RpcCertificateFormat.h",
-                         "RpcKeyFormat.h",
-                         "RpcServer.h",
-                         "RpcSession.h",
-                         "RpcThreads.h",
-                         "RpcTransport.h",
-                         "RpcTransportRaw.h",
-                         "SafeInterface.h",
-                         "Stability.h",
-                         "Status.h",
-                         "TextOutput.h",
-                         "Trace.h",
-                         "unique_fd.h",
-                       ],
-                       "",
-                       binder_source_base + "include/binder")
-  sources = rebase_path([
-                          "BackendUnifiedServiceManager.cpp",
-                          "Binder.cpp",
-                          "BpBinder.cpp",
-                          "BufferedTextOutput.cpp",
-                          "Debug.cpp",
-                          "FdTrigger.cpp",
-                          "IInterface.cpp",
-                          "IPCThreadState.cpp",
-                          "IResultReceiver.cpp",
-                          "IServiceManager.cpp",
-                          "OS_android.cpp",
-                          "OS_unix_base.cpp",
-                          "Parcel.cpp",
-                          "ParcelFileDescriptor.cpp",
-                          "ProcessState.cpp",
-                          "RecordedTransaction.cpp",
-                          "RpcServer.cpp",
-                          "RpcSession.cpp",
-                          "RpcState.cpp",
-                          "RpcTransportRaw.cpp",
-                          "Stability.cpp",
-                          "Static.cpp",
-                          "Status.cpp",
-                          "TextOutput.cpp",
-                          "Utils.cpp",
-                          "ndk/ibinder.cpp",
-                          "ndk/parcel.cpp",
-                          "ndk/process.cpp",
-                          "ndk/service_manager.cpp",
-                          "ndk/stability.cpp",
-                          "ndk/status.cpp",
-                        ],
-                        "",
-                        binder_source_base)
+  header_files = [
+    "Binder.h",
+    "BinderService.h",
+    "BpBinder.h",
+    "Common.h",
+    "Delegate.h",
+    "Enums.h",
+    "Functional.h",
+    "IBinder.h",
+    "IInterface.h",
+    "IMemory.h",
+    "IResultReceiver.h",
+    "IShellCallback.h",
+    "LazyServiceRegistrar.h",
+    "MemoryBase.h",
+    "MemoryDealer.h",
+    "MemoryHeapBase.h",
+    "Parcelable.h",
+    "ParcelableHolder.h",
+    "ParcelFileDescriptor.h",
+    "Parcel.h",
+    "PersistableBundle.h",
+    "RecordedTransaction.h",
+    "RpcCertificateFormat.h",
+    "RpcKeyFormat.h",
+    "RpcServer.h",
+    "RpcSession.h",
+    "RpcThreads.h",
+    "RpcTransport.h",
+    "RpcTransportRaw.h",
+    "SafeInterface.h",
+    "Stability.h",
+    "Status.h",
+    "TextOutput.h",
+    "Trace.h",
+    "unique_fd.h",
+  ]
+  source_files = [
+    "Binder.cpp",
+    "BpBinder.cpp",
+    "Debug.cpp",
+    "FdTrigger.cpp",
+    "IInterface.cpp",
+    "IResultReceiver.cpp",
+    "OS_android.cpp",
+    "OS_unix_base.cpp",
+    "Parcel.cpp",
+    "ParcelFileDescriptor.cpp",
+    "RecordedTransaction.cpp",
+    "RpcServer.cpp",
+    "RpcSession.cpp",
+    "RpcState.cpp",
+    "RpcTransportRaw.cpp",
+    "Stability.cpp",
+    "Status.cpp",
+    "TextOutput.cpp",
+    "Utils.cpp",
+    "ndk/ibinder.cpp",
+    "ndk/parcel.cpp",
+    "ndk/process.cpp",
+    "ndk/service_manager.cpp",
+    "ndk/stability.cpp",
+    "ndk/status.cpp",
+  ]
+  if (is_fuchsia) {
+    defines = [ "BINDER_WITH_KERNEL_IPC" ]
+    header_files += [
+      "ProcessState.h",
+      "IPCThreadState.h",
+      "IServiceManager.h",
+    ]
+    source_files += [
+      "BackendUnifiedServiceManager.cpp",
+      "BufferedTextOutput.cpp",
+      "IPCThreadState.cpp",
+      "IServiceManager.cpp",
+      "ProcessState.cpp",
+      "Static.cpp",
+    ]
+  }
+  public = rebase_path(header_files, "", binder_source_base + "include/binder")
+  sources = rebase_path(source_files, "", binder_source_base)
 
   # These headers:
   #   "IPermissionController.h",
@@ -174,5 +177,14 @@ source_set("binder") {
   cflags_cc = [
     # See https://bugs.fuchsia.dev/p/fuchsia/issues/detail?id=130665 for explanation.
     "-fno-sanitize=alignment",
+
+    # IPCThreadState.cpp contains unused variables.
+    "-Wno-unused-variable",
   ]
+  if (is_host) {
+    cflags_cc += [
+      # Parcel.cpp contains unused functions in the host build
+      "-Wno-unused-function",
+    ]
+  }
 }

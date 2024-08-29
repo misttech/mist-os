@@ -23,11 +23,11 @@ pub enum Error {
     #[error("Encountered a diagnostics data repository node with more than one artifact container. {0:?}")]
     MultipleArtifactContainers(Vec<String>),
 
-    #[error("Failed to match component moniker agianst selectors: {0:?}")]
-    MatchComponentMoniker(#[source] anyhow::Error),
-
     #[error(transparent)]
     Hierarchy(#[from] diagnostics_hierarchy::Error),
+
+    #[error(transparent)]
+    Selectors(#[from] anyhow::Error),
 }
 
 #[derive(Debug, Error)]

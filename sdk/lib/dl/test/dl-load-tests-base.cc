@@ -58,4 +58,35 @@ DlLoadTestsBase::RetrieveFile(Diagnostics& diag, std::string_view filename) {
   return fit::error(std::nullopt);
 }
 
+void DlLoadTestsBase::TearDown() {
+  for (auto& [ptr, info] : opened_modules()) {
+    ADD_FAILURE() << info.refcnt << " calls to dlopen(\"" << info.name
+                  << "\") without corresponding dlclose(" << ptr << ")";
+    while (--info.refcnt) {
+      UntrackModule(ptr);
+      CleanUpOpenedFile(ptr);
+    }
+  }
+}
+
+void DlLoadTestsBase::TrackModule(void* module, std::string filename) {
+  if (auto it = opened_modules_.find(module); it != opened_modules_.end()) {
+    // The file has already been opened in this test, just increment the refcount.
+    it->second.refcnt++;
+  } else {
+    opened_modules_.insert({module, {std::move(filename), 1}});
+  }
+}
+
+void DlLoadTestsBase::UntrackModule(void* file) {
+  auto it = opened_modules_.find(file);
+  ASSERT_NE(it, opened_modules_.end());
+  ASSERT_GT(it->second.refcnt, 0u);
+  // Decrement the refcount of the file. If it reaches 0, then erase the entry
+  // from the map.
+  if (!(--it->second.refcnt)) {
+    opened_modules_.erase(it);
+  }
+}
+
 }  // namespace dl::testing

@@ -133,9 +133,9 @@ mod tests {
     use crate::{facet, AboveRootCapabilitiesForTest};
     use async_trait::async_trait;
     use fidl::endpoints::create_proxy_and_stream;
-    use fidl_fuchsia_component_resolution as fresolution;
     use fidl_fuchsia_test_manager::{RunOptions, SuiteControllerMarker};
     use std::sync::{Arc, Mutex};
+    use {fidl_fuchsia_component_resolution as fresolution, fidl_fuchsia_pkg as fpkg};
 
     async fn create_fake_suite(test_url: String) -> Suite {
         let (_controller_proxy, controller_stream) =
@@ -143,7 +143,11 @@ mod tests {
         let (resolver_proxy, _resolver_stream) =
             create_proxy_and_stream::<fresolution::ResolverMarker>()
                 .expect("create resolver proxy");
+        let (pkg_resolver_proxy, _pkg_resolver_stream) =
+            create_proxy_and_stream::<fpkg::PackageResolverMarker>()
+                .expect("create resolver proxy");
         let resolver_proxy = Arc::new(resolver_proxy);
+        let pkg_resolver_proxy = Arc::new(pkg_resolver_proxy);
         let routing_info = Arc::new(AboveRootCapabilitiesForTest::new_empty_for_tests());
         Suite {
             realm: None,
@@ -159,6 +163,7 @@ mod tests {
             },
             controller: controller_stream,
             resolver: resolver_proxy,
+            pkg_resolver: pkg_resolver_proxy,
             above_root_capabilities_for_test: routing_info,
             facets: facet::ResolveStatus::Unresolved,
         }

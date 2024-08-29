@@ -84,8 +84,12 @@ template("network_unified_binary") {
     configs -= [ "//build/config/rust/lints:allow_unused_results" ]
 
     # The unified binary builds with LTO so avoid unnecessary work
-    # when generating the library for it.
-    configs += [ "//build/config/rust:linker_plugin_lto" ]
+    # when generating the library for it by adding lto-rust-linker-plugin
+    # config in non-lto variants. We add this config by default in the
+    # LTO variants.
+    if (!is_lto_variant) {
+      configs += [ "//build/config/lto:lto-rust-linker-plugin" ]
+    }
   }
 
   gub_target_name = target_name + "_gub"

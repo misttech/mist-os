@@ -72,7 +72,7 @@ zx::result<fidl::VectorView<Parameter>> SetRoleCommon(RoleTarget target, std::st
                                                       std::vector<Parameter> input_parameters) {
 // TODO(https://fxbug.dev/323262398): Remove this check once the necessary API is in the SDK.
 #if FUCHSIA_API_LEVEL_LESS_THAN(HEAD)
-  return ZX_ERR_NOT_SUPPORTED;
+  return zx::error(ZX_ERR_NOT_SUPPORTED);
 #endif  // #if FUCHSIA_API_LEVEL_LESS_THAN(HEAD)
   zx::result client = role_client.Connect();
   if (!client.is_ok()) {

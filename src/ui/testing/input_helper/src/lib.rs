@@ -189,6 +189,7 @@ pub async fn handle_registry_request_stream(request_stream: RegistryRequestStrea
 
                     responder.send().expect("Failed to respond to RegisterTouchScreen request");
                 }
+                RegistryRequest::RegisterTouchScreenAndGetDeviceInfo { .. } => {}
                 RegistryRequest::RegisterMediaButtonsDevice { payload, responder, .. } => {
                     info!("register media buttons device");
 
@@ -217,6 +218,7 @@ pub async fn handle_registry_request_stream(request_stream: RegistryRequestStrea
                         .send()
                         .expect("Failed to respond to RegisterMediaButtonsDevice request");
                 }
+                RegistryRequest::RegisterMediaButtonsDeviceAndGetDeviceInfo { .. } => {}
                 RegistryRequest::RegisterKeyboard { payload, responder, .. } => {
                     info!("register keyboard device");
 
@@ -243,6 +245,7 @@ pub async fn handle_registry_request_stream(request_stream: RegistryRequestStrea
 
                     responder.send().expect("Failed to respond to RegisterKeyboard request");
                 }
+                RegistryRequest::RegisterKeyboardAndGetDeviceInfo { .. } => {}
                 RegistryRequest::RegisterMouse { payload, responder } => {
                     info!("register mouse device");
 
@@ -270,6 +273,7 @@ pub async fn handle_registry_request_stream(request_stream: RegistryRequestStrea
 
                     responder.send().expect("Failed to respond to RegisterMouse request");
                 }
+                RegistryRequest::RegisterMouseAndGetDeviceInfo { .. } => {}
             }
 
             task_group.join().await;

@@ -96,7 +96,7 @@ void x86_intel_load_microcode_patch(cpu_id::CpuId* cpuid, MsrAccess* msr, zx_iov
       reinterpret_cast<uintptr_t>(static_cast<char*>(patch.buffer) + sizeof(*hdr));
   // Write back & invalidate caches before loading microcode; this is not necessary
   // per the SDM, but Intel posts to LKML indicate it may be required.
-  asm volatile("wbinvd" ::: "memory");
+  __asm__ volatile("wbinvd" ::: "memory");
   msr->write_msr(X86_MSR_IA32_BIOS_UPDT_TRIG, data);
 }
 
@@ -106,7 +106,7 @@ uint32_t x86_intel_get_patch_level(void) {
     // Invoking CPUID for leaf 1h fills in the microcode patch level into the high half of
     // X86_MSR_IA32_BIOS_SIGN_ID MSR. Operations between CPUID and RDMSR may clear the MSR;
     // write this sequence in assembly to ensure that there are none.
-    asm volatile(
+    __asm__ volatile(
         "xorl %%eax, %%eax\n"
         "xorl %%edx, %%edx\n"
         "movl $0x8b, %%ecx\n"

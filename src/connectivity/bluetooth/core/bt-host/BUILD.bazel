@@ -100,6 +100,7 @@ fuchsia_structured_config_values(
     cvf_output_name = "bt-host",
     values = {
         "device_path": "/dev/class/bt-hci/000",
+        "legacy_pairing_enabled": False,
     },
 )
 

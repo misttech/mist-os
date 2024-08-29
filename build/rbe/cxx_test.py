@@ -251,7 +251,6 @@ class CxxActionTests(unittest.TestCase):
 
     def test_simple_clang_asm(self) -> None:
         source = Path("hello.s")
-        i_file = Path("hello.i")
         output = Path("hello.o")
         c = cxx.CxxAction(_strs(["clang", "-c", source, "-o", output]))
         self.assertEqual(c.output_file, output)
@@ -271,7 +270,6 @@ class CxxActionTests(unittest.TestCase):
 
     def test_simple_clang_asm_pp(self) -> None:
         source = Path("hello.S")
-        i_file = Path("hello.i")
         output = Path("hello.o")
         c = cxx.CxxAction(_strs(["clang", "-c", source, "-o", output]))
         self.assertEqual(c.output_file, output)
@@ -723,7 +721,6 @@ class CxxActionTests(unittest.TestCase):
 
     def test_profile_list(self) -> None:
         source = Path("hello.cc")
-        ii_file = Path("hello.ii")
         output = Path("hello.o")
         profile = Path("my/online/profile.list")
         c = cxx.CxxAction(
@@ -743,7 +740,6 @@ class CxxActionTests(unittest.TestCase):
 
     def test_profile_generate(self) -> None:
         source = Path("hello.cc")
-        ii_file = Path("hello.ii")
         output = Path("hello.o")
         c = cxx.CxxAction(
             _strs(
@@ -761,7 +757,6 @@ class CxxActionTests(unittest.TestCase):
 
     def test_profile_generate_with_dir(self) -> None:
         source = Path("hello.cc")
-        ii_file = Path("hello.ii")
         output = Path("hello.o")
         pdir = Path("my/pg/dir")
         c = cxx.CxxAction(
@@ -780,7 +775,6 @@ class CxxActionTests(unittest.TestCase):
 
     def test_profile_instr_generate(self) -> None:
         source = Path("hello.cc")
-        ii_file = Path("hello.ii")
         output = Path("hello.o")
         c = cxx.CxxAction(
             _strs(
@@ -798,7 +792,6 @@ class CxxActionTests(unittest.TestCase):
 
     def test_profile_instr_generate_with_file(self) -> None:
         source = Path("hello.cc")
-        ii_file = Path("hello.ii")
         output = Path("hello.o")
         pfile = Path("pg/path/to/file.profraw")
         c = cxx.CxxAction(

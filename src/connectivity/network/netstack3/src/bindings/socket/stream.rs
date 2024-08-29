@@ -110,6 +110,11 @@ impl ListenerNotifier for LocalZirconSocketAndNotifier {
     }
 }
 
+static ZIRCON_SOCKET_BUFFER_SIZE: Lazy<usize> = Lazy::new(|| {
+    let (local, _peer) = zx::Socket::create_stream();
+    local.info().unwrap().tx_buf_max
+});
+
 impl TcpBindingsTypes for BindingsCtx {
     type ReceiveBuffer = ReceiveBufferWithZirconSocket;
     type SendBuffer = SendBufferWithZirconSocket;
@@ -129,13 +134,8 @@ impl TcpBindingsTypes for BindingsCtx {
     }
 
     fn default_buffer_sizes() -> BufferSizes {
-        static ZIRCON_SOCKET_BUFFER_SIZE: Lazy<usize> = Lazy::new(|| {
-            let (local, _peer) = zx::Socket::create_stream();
-            local.info().unwrap().tx_buf_max
-        });
         static RING_BUFFER_DEFAULT_SIZE: Lazy<usize> =
             Lazy::new(|| RingBuffer::default().target_capacity());
-
         BufferSizes { receive: *ZIRCON_SOCKET_BUFFER_SIZE, send: *RING_BUFFER_DEFAULT_SIZE }
     }
 }
@@ -190,6 +190,10 @@ impl Takeable for ReceiveBufferWithZirconSocket {
 }
 
 impl Buffer for ReceiveBufferWithZirconSocket {
+    fn capacity_range() -> (usize, usize) {
+        (Self::MIN_CAPACITY, *ZIRCON_SOCKET_BUFFER_SIZE)
+    }
+
     fn limits(&self) -> BufferLimits {
         let Self { socket, out_of_order, zx_socket_capacity } = self;
         let BufferLimits { len: _, capacity: out_of_order_capacity } = out_of_order.limits();
@@ -216,7 +220,6 @@ impl Buffer for ReceiveBufferWithZirconSocket {
 
     fn request_capacity(&mut self, size: usize) {
         let Self { zx_socket_capacity, socket: _, out_of_order } = self;
-
         let ring_buffer_size =
             usize::min(usize::max(size, Self::MIN_CAPACITY), *zx_socket_capacity);
 
@@ -298,6 +301,10 @@ pub(crate) struct SendBufferWithZirconSocket {
 }
 
 impl Buffer for SendBufferWithZirconSocket {
+    fn capacity_range() -> (usize, usize) {
+        (Self::MIN_CAPACITY, Self::MAX_CAPACITY)
+    }
+
     fn limits(&self) -> BufferLimits {
         let Self { zx_socket_capacity, socket, ready_to_send, notifier } = self;
         let info = socket.info().expect("failed to get socket info");
@@ -402,6 +409,8 @@ impl SendBufferWithZirconSocket {
 }
 
 impl SendBuffer for SendBufferWithZirconSocket {
+    type Payload<'a> = SendPayload<'a>;
+
     fn mark_read(&mut self, count: usize) {
         self.ready_to_send.mark_read(count);
         self.poll()

@@ -71,6 +71,16 @@ zx_status_t IsolatedDevmgr::Create(Args* args, IsolatedDevmgr* out) {
       .source = {ChildRef{"fshost_config"}},
       .targets = {ChildRef{"fshost"}},
   });
+  realm_builder.AddRoute(Route{
+      .capabilities =
+          {
+              Config{"fuchsia.fshost.DisableAutomount"},
+              Config{"fuchsia.blobfs.WriteCompressionAlgorithm"},
+              Config{"fuchsia.blobfs.CacheEvictionPolicy"},
+          },
+      .source = {VoidRef()},
+      .targets = {ChildRef{"fshost"}},
+  });
 
   realm_builder.AddRoute(Route{
       .capabilities = {Protocol{"fuchsia.process.Launcher"}},

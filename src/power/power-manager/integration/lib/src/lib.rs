@@ -28,7 +28,7 @@ use {
 
 const POWER_MANAGER_URL: &str = "#meta/power-manager.cm";
 const CPU_MANAGER_URL: &str = "#meta/cpu-manager.cm";
-const MOCK_COBALT_URL: &str = "#meta/mock_cobalt.cm";
+const FAKE_COBALT_URL: &str = "#meta/fake_cobalt.cm";
 const FAKE_CLOCK_URL: &str = "#meta/fake_clock.cm";
 
 /// Increase the time scale so Power Manager's interval-based operation runs faster for testing.
@@ -87,10 +87,10 @@ impl TestEnvBuilder {
             .await
             .expect("Failed to add child: cpu_manager");
 
-        let mock_cobalt = realm_builder
-            .add_child("mock_cobalt", MOCK_COBALT_URL, ChildOptions::new())
+        let fake_cobalt = realm_builder
+            .add_child("fake_cobalt", FAKE_COBALT_URL, ChildOptions::new())
             .await
-            .expect("Failed to add child: mock_cobalt");
+            .expect("Failed to add child: fake_cobalt");
 
         let fake_clock = realm_builder
             .add_child("fake_clock", FAKE_CLOCK_URL, ChildOptions::new())
@@ -154,7 +154,7 @@ impl TestEnvBuilder {
         let parent_to_cobalt_routes =
             Route::new().capability(Capability::protocol_by_name("fuchsia.logger.LogSink"));
         realm_builder
-            .add_route(parent_to_cobalt_routes.from(Ref::parent()).to(&mock_cobalt))
+            .add_route(parent_to_cobalt_routes.from(Ref::parent()).to(&fake_cobalt))
             .await
             .unwrap();
 
@@ -189,7 +189,7 @@ impl TestEnvBuilder {
         let cobalt_to_power_manager_routes = Route::new()
             .capability(Capability::protocol_by_name("fuchsia.metrics.MetricEventLoggerFactory"));
         realm_builder
-            .add_route(cobalt_to_power_manager_routes.from(&mock_cobalt).to(&power_manager))
+            .add_route(cobalt_to_power_manager_routes.from(&fake_cobalt).to(&power_manager))
             .await
             .unwrap();
 

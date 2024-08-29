@@ -23,9 +23,7 @@ from typing import (
     Mapping,
     Optional,
     Sequence,
-    Set,
     Tuple,
-    Union,
 )
 
 from fidl_codec import add_ir_path, encode_fidl_object
@@ -118,6 +116,9 @@ class Method(dict):
     def name(self) -> str:
         return self["name"]
 
+    def raw_name(self) -> str:
+        return self.name()
+
 
 class IR(dict):
     """A light wrapper around a dict that contains some convenience lookup methods."""
@@ -158,6 +159,9 @@ class IR(dict):
 
     def name(self) -> str:
         return normalize_identifier(self["name"])
+
+    def raw_name(self) -> str:
+        return super().__getitem__("name")
 
     def identifier(self) -> str:
         return normalize_identifier(self["identifier"])
@@ -368,10 +372,7 @@ def type_annotation(type_ir, root_ir, recurse_guard=None) -> type:
     kind = type_ir["kind"]
     if kind == "identifier":
         ident = type_ir.raw_identifier()
-        ident_kind = get_kind_by_identifier(ident, root_ir)
         ty = get_type_by_identifier(ident, root_ir, recurse_guard)
-        if ident_kind == "bits":
-            ty = Union[ty, Set[ty]]
         return wrap_optional(ty)
     elif kind == "primitive":
         return string_to_basetype(type_ir["subtype"])
@@ -476,6 +477,7 @@ def experimental_resource_type(ir, root_ir, recurse_guard=None) -> type:
             "__doc__": docstring(ir),
             "__fidl_kind__": "experimental_resource",
             "__fidl_type__": ir.name(),
+            "__fidl_raw_type__": ir.raw_name(),
         },
     )
     return ty
@@ -555,6 +557,7 @@ def union_type(ir, root_ir, recurse_guard=None) -> type:
             "__str__": union_str,
             "__eq__": union_eq,
             "__fidl_type__": ir.name(),
+            "__fidl_raw_type__": ir.raw_name(),
         },
     )
     # TODO(https://fxbug.dev/42078357): Prevent unions from having more than one value set at the same time.
@@ -610,6 +613,7 @@ def struct_type(ir, root_ir, recurse_guard=None) -> type:
     ty = dataclasses.make_dataclass(name, members)
     setattr(ty, "__fidl_kind__", "struct")
     setattr(ty, "__fidl_type__", ir.name())
+    setattr(ty, "__fidl_raw_type__", ir.raw_name())
     setattr(ty, "__doc__", docstring(ir))
     setattr(ty, "__getitem__", struct_and_table_subscript)
     return ty
@@ -631,6 +635,7 @@ def table_type(ir, root_ir, recurse_guard=None) -> type:
     ty = dataclasses.make_dataclass(name, it)
     setattr(ty, "__fidl_kind__", "table")
     setattr(ty, "__fidl_type__", ir.name())
+    setattr(ty, "__fidl_raw_type__", ir.raw_name())
     setattr(ty, "__doc__", docstring(ir))
     setattr(ty, "__getitem__", struct_and_table_subscript)
     return ty
@@ -662,7 +667,7 @@ def const_declaration(ir, root_ir, recurse_guard=None) -> FIDLConstant:
     elif kind == "identifier":
         ident = ir["type"].identifier()
         ty = get_type_by_identifier(ident, root_ir, recurse_guard)
-        if type(ty) == str:
+        if type(ty) is str:
             return FIDLConstant(name, ty(ir["value"]["value"]))
         elif ty.__class__ == enum.EnumMeta:
             return FIDLConstant(name, ty(int(ir["value"]["value"])))
@@ -703,6 +708,7 @@ def alias_declaration(ir, root_ir, recurse_guard=None) -> type:
             setattr(ty, "__doc__", docstring(ir))
             setattr(ty, "__fidl_kind__", "alias")
             setattr(ty, "__fidl_type__", ir.name())
+            setattr(ty, "__fidl_raw_type__", ir.raw_name())
             setattr(
                 ty,
                 "__members_for_aliasing__",
@@ -713,6 +719,7 @@ def alias_declaration(ir, root_ir, recurse_guard=None) -> type:
             "__doc__": docstring(ir),
             "__fidl_kind__": "alias",
             "__fidl_type__": ir.name(),
+            "__fidl_raw_type__": ir.raw_name(),
         }
         return type(name, (base_type,), base_params)
 
@@ -1011,6 +1018,7 @@ def create_method(
     setattr(method_impl, "__signature__", inspect.Signature(params))
     setattr(method_impl, "__doc__", docstring(method))
     setattr(method_impl, "__fidl_type__", method.name())
+    setattr(method_impl, "__fidl_raw_type__", method.raw_name())
     setattr(method_impl, "__name__", method.name())
     return method_impl
 
@@ -1147,8 +1155,12 @@ class FIDLLibraryModule(types.ModuleType):
             library = obj.__module__
             library = library.removeprefix("fidl.")
             library = library.replace("_", ".")
-            type_name = f"{library}/{type(obj).__name__}"
-            return encode_fidl_object(obj, library, type_name)
+            try:
+                type_name = f"{obj.__fidl_raw_type__}"
+            except AttributeError:
+                type_name = f"{library}/{type(obj).__name__}"
+            finally:
+                return encode_fidl_object(obj, library, type_name)
 
         setattr(t, "__module__", self.fullname)
         setattr(t, "encode", encode_func)

@@ -16,6 +16,7 @@ group("tests") {
   ]
 }
 
+# TODO(b/362587923): Remove along with sysmem deprecated_device.cc.
 driver_bind_rules("sysmem_bind") {
   rules = "meta/sysmem.bind"
   bind_output = "sysmem.bindbc"
@@ -27,39 +28,8 @@ driver_bind_rules("sysmem_bind") {
   ]
 }
 
-# These build args are not the correct place to configure sysmem (outside of
-# local experiments). Instead, use BoardSysmemConfig and/or PlatformSysmemConfig
-# via the assembly tool. The settings in PlatformSysmemConfig can override
-# settings in the BoardSysmemConfig. See also
-# BoardProvidedConfig.sysmem_format_costs which can also be specified for the
-# board.
-#
-# TODO(b/347090887): Remove these when developer overrides are wired up for
-# bazel-based builds.
-declare_args() {
-  driver_sysmem_contiguous_memory_size = -1
-  driver_sysmem_contiguous_memory_size_percent = 5
-  driver_sysmem_protected_memory_size = 0
-  driver_sysmem_protected_memory_size_percent = -1
-  driver_sysmem_contiguous_guard_pages_fatal = false
-  driver_sysmem_contiguous_guard_pages_internal = false
-  driver_sysmem_contiguous_guard_page_count = -1
-  driver_sysmem_contiguous_guard_pages_unused = false
-  driver_sysmem_contiguous_guard_pages_unused_fraction_denominator = 128
-  driver_sysmem_contiguous_guard_pages_unused_cycle_seconds = 600
-  driver_sysmem_protected_ranges_disable_dynamic = false
-}
-
-fuchsia_component_manifest("manifest") {
-  component_name = "sysmem"
-  manifest = "meta/sysmem.cml"
-}
-
-fuchsia_structured_config_cpp_elf_lib("config_cpp_elf_lib") {
-  cm_label = ":manifest"
-  namespace = "sysmem_config"
-}
-
+# TODO(b/362587923): Move to src/devices/sysmem/bin/sysmem_connector's BUILD.gn,
+# but that file will be at src/sysmem or src/bringup/bin/sysmem.
 source_set("sysmem_common_srcs") {
   sources = [
     "allocator.cc",
@@ -84,7 +54,6 @@ source_set("sysmem_common_srcs") {
     "utils.cc",
   ]
   public_deps = [
-    ":config_cpp_elf_lib",
     ":fuchsia.sysmem2.internal_cpp",
     "//sdk/fidl/fuchsia.feedback:fuchsia.feedback_cpp",
     "//sdk/fidl/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_cpp",
@@ -97,13 +66,11 @@ source_set("sysmem_common_srcs") {
     "//sdk/fidl/fuchsia.sysmem2:fuchsia.sysmem2_cpp",
     "//sdk/lib/async_patterns/cpp",
     "//sdk/lib/component/outgoing/cpp",
-    "//sdk/lib/driver/compat/cpp",
-    "//sdk/lib/driver/component/cpp",
     "//sdk/lib/fidl",
     "//sdk/lib/fit",
-    "//sdk/lib/sys/cpp:cpp",
+    "//sdk/lib/syslog/cpp",
     "//src/devices/bind/fuchsia.sysmem.heap:fuchsia.sysmem.heap_cpp",
-    "//src/devices/lib/driver:driver_runtime",
+    "//src/devices/sysmem/bin/sysmem_connector:config_cpp_elf_lib",
     "//src/devices/sysmem/metrics",
     "//src/lib/memory_barriers",
     "//src/lib/metrics_buffer",
@@ -127,8 +94,10 @@ source_set("sysmem_common_srcs") {
   ]
 }
 
+# TODO(b/362587923): Remove along with sysmem deprecated_device.cc.
 fuchsia_driver("sysmem-driver") {
   output_name = "sysmem"
+  sources = [ "deprecated_device.cc" ]
   configs += [
     "//build/config:all_source",
     "//build/config/fuchsia:enable_zircon_asserts",
@@ -158,48 +127,28 @@ fuchsia_driver("sysmem-driver") {
   }
   deps = [
     ":sysmem_bind",
-    ":sysmem_common_srcs",
+    "//sdk/lib/driver/component/cpp:cpp",
+    "//src/devices/lib/driver:driver_runtime",
   ]
 }
 
+# TODO(b/362587923): Remove along with sysmem deprecated_device.cc.
 fuchsia_driver_component("sysmem") {
   visibility = [ ":*" ]
   info = "meta/sysmem-info.json"
   component_name = "sysmem"
+  manifest = "meta/sysmem.cml"
   deps = [ ":sysmem-driver" ]
-  cm_label = ":manifest"
 }
 
-fuchsia_structured_config_values("config_values") {
-  cm_label = ":manifest"
-  values = {
-    contiguous_memory_size = driver_sysmem_contiguous_memory_size
-    contiguous_memory_size_percent =
-        driver_sysmem_contiguous_memory_size_percent
-    protected_memory_size = driver_sysmem_protected_memory_size
-    protected_memory_size_percent = driver_sysmem_protected_memory_size_percent
-    contiguous_guard_pages_fatal = driver_sysmem_contiguous_guard_pages_fatal
-    contiguous_guard_pages_internal =
-        driver_sysmem_contiguous_guard_pages_internal
-    contiguous_guard_page_count = driver_sysmem_contiguous_guard_page_count
-    contiguous_guard_pages_unused = driver_sysmem_contiguous_guard_pages_unused
-    contiguous_guard_pages_unused_fraction_denominator =
-        driver_sysmem_contiguous_guard_pages_unused_fraction_denominator
-    contiguous_guard_pages_unused_cycle_seconds =
-        driver_sysmem_contiguous_guard_pages_unused_cycle_seconds
-    protected_ranges_disable_dynamic =
-        driver_sysmem_protected_ranges_disable_dynamic
-  }
-}
-
+# TODO(b/362587923): Remove along with sysmem deprecated_device.cc.
 fuchsia_driver_package("package") {
   package_name = "sysmem-driver"
-  driver_components = [
-    ":sysmem",
-    ":config_values",
-  ]
+  driver_components = [ ":sysmem" ]
 }
 
+# TODO(b/362587923): Move to src/devices/sysmem/bin/sysmem_connector's BUILD.gn,
+# but that file will be at src/sysmem or src/bringup/bin/sysmem.
 test("sysmem-unittest-bin") {
   if (is_fuchsia) {
     fdio_config = [ "//build/config/fuchsia:fdio_config" ]
@@ -226,14 +175,11 @@ test("sysmem-unittest-bin") {
     ":sysmem_common_srcs",
     "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_cpp",
     "//sdk/lib/async_patterns/testing/cpp",
-    "//sdk/lib/driver/testing/cpp:scoped_global_logger",
     "//sdk/lib/fidl",
     "//sdk/lib/fit",
     "//src/devices/bus/testing/fake-pdev",
+    "//src/devices/sysmem/bin/sysmem_connector:config_cpp_elf_lib",
     "//src/devices/testing/fake-bti",
-    "//src/devices/testing/mock-ddk",
-    "//src/lib/ddk",
-    "//src/lib/ddktl",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/predicates",
     "//third_party/googletest:gtest",
@@ -253,6 +199,8 @@ test("sysmem-unittest-bin") {
   ]
 }
 
+# TODO(b/362587923): Move to src/devices/sysmem/bin/sysmem_connector's BUILD.gn,
+# but that file will be at src/sysmem or src/bringup/bin/sysmem.
 template("test_format_costs_file") {
   resource(target_name) {
     _input = invoker.format_costs
@@ -265,18 +213,26 @@ template("test_format_costs_file") {
   }
 }
 
+# TODO(b/362587923): Move to src/devices/sysmem/bin/sysmem_connector's BUILD.gn,
+# but that file will be at src/sysmem or src/bringup/bin/sysmem.
 test_format_costs_file("test_format_costs_arm_mali") {
   format_costs = "//src/devices/sysmem/format_costs/arm_mali"
 }
 
+# TODO(b/362587923): Move to src/devices/sysmem/bin/sysmem_connector's BUILD.gn,
+# but that file will be at src/sysmem or src/bringup/bin/sysmem.
 test_format_costs_file("test_format_costs_intel") {
   format_costs = "//src/devices/sysmem/format_costs/intel"
 }
 
+# TODO(b/362587923): Move to src/devices/sysmem/bin/sysmem_connector's BUILD.gn,
+# but that file will be at src/sysmem or src/bringup/bin/sysmem.
 test_format_costs_file("test_format_costs_video_decoder_nv12") {
   format_costs = "//src/devices/sysmem/format_costs/video_decoder_nv12"
 }
 
+# TODO(b/362587923): Move to src/devices/sysmem/bin/sysmem_connector's BUILD.gn,
+# but that file will be at src/sysmem or src/bringup/bin/sysmem.
 fuchsia_unittest_package("sysmem-unittest") {
   deps = [
     ":sysmem-unittest-bin",
@@ -291,6 +247,8 @@ fuchsia_unittest_package("sysmem-unittest") {
   }
 }
 
+# TODO(b/362587923): Move to src/devices/sysmem/bin/sysmem_connector's BUILD.gn,
+# but that file will be at src/sysmem or src/bringup/bin/sysmem.
 fidl("fuchsia.sysmem2.internal") {
   sdk_category = "internal"
   api = "fuchsia.sysmem2.internal.api"

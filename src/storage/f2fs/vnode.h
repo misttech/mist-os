@@ -320,6 +320,10 @@ class VnodeF2fs : public fs::PagedVnode,
   }
 
   pgoff_t Writeback(WritebackOperation &operation);
+  pgoff_t Writeback() {
+    WritebackOperation op;
+    return Writeback(op);
+  }
 
   std::vector<LockedPage> InvalidatePages(pgoff_t start = 0, pgoff_t end = kPgOffMax,
                                           bool zero = true) {

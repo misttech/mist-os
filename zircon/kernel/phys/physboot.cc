@@ -131,8 +131,18 @@ ChainBoot LoadZirconZbi(KernelStorage::Bootfs kernelfs, const ArchPatchInfo& pat
 
 void FreeDataZbi(BootZbi& boot) {
   ktl::span zbi = boot.DataZbi().storage();
-  ZX_ASSERT(
-      Allocation::GetPool().Free(reinterpret_cast<uintptr_t>(zbi.data()), zbi.size()).is_ok());
+
+  uint64_t data_start = reinterpret_cast<uintptr_t>(zbi.data());
+  uint64_t data_end = data_start + zbi.size();
+
+#ifdef __x86_64__
+  uint64_t kernel_start = TrampolineBoot::kLegacyLoadAddress;
+  uint64_t kernel_end = kernel_start + boot.KernelMemorySize();
+  if (kernel_start <= data_start && data_start < kernel_end) {
+    data_start = ktl::min(kernel_end, data_end);
+  }
+#endif
+  ZX_ASSERT(Allocation::GetPool().Free(data_start, data_end - data_start).is_ok());
 }
 
 }  // namespace
@@ -184,11 +194,7 @@ void FreeDataZbi(BootZbi& boot) {
     ZX_ASSERT(it != relocated_image.end());
     ZX_ASSERT(relocated_image.take_error().is_ok());
 
-    // In the trampoline boot case we would have already recharacterized the old
-    // data ZBI within TrampolineBoot::Load().
-#ifndef __x86_64__
     FreeDataZbi(boot);
-#endif
     boot.DataZbi() = ktl::move(relocated_image);
     handoff_item = it;
   }
@@ -201,7 +207,7 @@ void FreeDataZbi(BootZbi& boot) {
 
   // Prepare the handoff data structures.
   HandoffPrep prep;
-  prep.Init(handoff_item->payload);
+  prep.Init();
 
   prep.DoHandoff(uart, zbi, package, patch_info, [&boot](PhysHandoff* handoff) {
     // Even though the kernel is still a ZBI and mostly using the ZBI protocol

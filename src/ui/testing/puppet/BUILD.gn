@@ -56,13 +56,7 @@ fuchsia_component("ui-puppet-component") {
   testonly = true
   component_name = "ui-puppet"
   manifest = "meta/ui-puppet.cml"
-  deps = [
-    ":bin",
-
-    # Include some default config (it doesn't matter which, since we're going to override it).
-    "//src/ui/testing/test_ui_stack:flatland_scene_manager_config",
-    "//src/ui/testing/test_ui_stack:test-ui-stack-component",
-  ]
+  deps = [ ":bin" ]
 }
 
 fuchsia_package("ui-puppet") {

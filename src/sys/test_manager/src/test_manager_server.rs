@@ -13,6 +13,7 @@ use crate::{constants, debug_data_server, facet};
 use fidl::endpoints::ControlHandle;
 use fidl::Error;
 use fidl_fuchsia_component_resolution::ResolverProxy;
+use fidl_fuchsia_pkg::PackageResolverProxy;
 use fidl_fuchsia_test_manager::{QueryEnumerateInRealmResponder, QueryEnumerateResponder};
 use ftest_manager::LaunchError;
 use fuchsia_async::{self as fasync};
@@ -25,6 +26,7 @@ use {fidl_fuchsia_test_manager as ftest_manager, fuchsia_zircon as zx};
 pub async fn run_test_manager_run_builder_server(
     mut stream: ftest_manager::RunBuilderRequestStream,
     resolver: Arc<ResolverProxy>,
+    pkg_resolver: Arc<PackageResolverProxy>,
     above_root_capabilities_for_test: Arc<AboveRootCapabilitiesForTest>,
     root_diagnostics: &RootDiagnosticNode,
 ) -> Result<(), TestManagerError> {
@@ -56,6 +58,7 @@ pub async fn run_test_manager_run_builder_server(
                     options,
                     controller,
                     resolver: resolver.clone(),
+                    pkg_resolver: pkg_resolver.clone(),
                     above_root_capabilities_for_test: above_root_capabilities_for_test.clone(),
                     facets: facet::ResolveStatus::Unresolved,
                 });
@@ -106,6 +109,7 @@ pub async fn run_test_manager_run_builder_server(
                     options,
                     controller,
                     resolver: resolver.clone(),
+                    pkg_resolver: pkg_resolver.clone(),
                     above_root_capabilities_for_test: above_root_capabilities_for_test.clone(),
                     facets: facet::ResolveStatus::Unresolved,
                 });
@@ -167,6 +171,7 @@ impl QueryResponder {
 pub async fn run_test_manager_query_server(
     mut stream: ftest_manager::QueryRequestStream,
     resolver: Arc<ResolverProxy>,
+    pkg_resolver: Arc<PackageResolverProxy>,
     above_root_capabilities_for_test: Arc<AboveRootCapabilitiesForTest>,
     root_diagnostics: &RootDiagnosticNode,
 ) -> Result<(), TestManagerError> {
@@ -234,6 +239,7 @@ pub async fn run_test_manager_query_server(
                     &test_url,
                     facets,
                     resolver.clone(),
+                    pkg_resolver.clone(),
                     above_root_capabilities_for_test.clone(),
                     sender,
                     &diagnostics,
@@ -354,6 +360,7 @@ pub async fn serve_early_boot_profiles(
 pub async fn run_test_manager_test_case_enumerator_server(
     mut stream: ftest_manager::TestCaseEnumeratorRequestStream,
     resolver: Arc<ResolverProxy>,
+    pkg_resolver: Arc<PackageResolverProxy>,
     above_root_capabilities_for_test: Arc<AboveRootCapabilitiesForTest>,
     root_diagnostics: &RootDiagnosticNode,
 ) -> Result<(), TestManagerError> {
@@ -430,6 +437,7 @@ pub async fn run_test_manager_test_case_enumerator_server(
                             &test_suite_url,
                             facets,
                             resolver.clone(),
+                            pkg_resolver.clone(),
                             above_root_capabilities_for_test.clone(),
                             sender,
                             &diagnostics,
@@ -524,6 +532,7 @@ async fn drain_test_case_names(
 pub async fn run_test_manager_suite_runner_server(
     mut stream: ftest_manager::SuiteRunnerRequestStream,
     resolver: Arc<ResolverProxy>,
+    pkg_resolver: Arc<PackageResolverProxy>,
     above_root_capabilities_for_test: Arc<AboveRootCapabilitiesForTest>,
     root_diagnostics: &RootDiagnosticNode,
 ) -> Result<(), TestManagerError> {
@@ -603,6 +612,7 @@ pub async fn run_test_manager_suite_runner_server(
                     },
                     controller,
                     resolver: resolver.clone(),
+                    pkg_resolver: pkg_resolver.clone(),
                     above_root_capabilities_for_test: above_root_capabilities_for_test.clone(),
                     facets: facet::ResolveStatus::Unresolved,
                 };

@@ -64,6 +64,7 @@ Symbols:
   - { Name: fdio_ns_get_installed, Type: Func }
   - { Name: fdio_ns_is_bound, Type: Func }
   - { Name: fdio_ns_open, Type: Func }
+  - { Name: fdio_ns_open3, Type: Func }
   - { Name: fdio_ns_opendir, Type: Func }
   - { Name: fdio_ns_service_connect, Type: Func }
   - { Name: fdio_ns_unbind, Type: Func }

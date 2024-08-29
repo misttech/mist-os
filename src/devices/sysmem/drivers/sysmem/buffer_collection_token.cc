@@ -4,7 +4,7 @@
 
 #include "buffer_collection_token.h"
 
-#include <lib/ddk/trace/event.h>
+#include <lib/trace/event.h>
 #include <lib/zx/channel.h>
 #include <zircon/errors.h>
 #include <zircon/types.h>
@@ -13,7 +13,7 @@
 #include "node.h"
 #include "node_properties.h"
 
-namespace sysmem_driver {
+namespace sysmem_service {
 
 BufferCollectionToken::~BufferCollectionToken() {
   TRACE_DURATION("gfx", "BufferCollectionToken::~BufferCollectionToken", "this", this,
@@ -508,7 +508,8 @@ void BufferCollectionToken::FailAsync(Location location, zx_status_t status, con
                                       ...) {
   va_list args;
   va_start(args, format);
-  vLog(true, location.file(), location.line(), logging_prefix(), "fail", format, args);
+  vLog(::fuchsia_logging::LOG_WARNING, location.file(), location.line(), logging_prefix(), format,
+       args);
   va_end(args);
 
   // Idempotent, so only close once.
@@ -561,4 +562,4 @@ ConnectionVersion BufferCollectionToken::connection_version() const {
   return last_seen_version_;
 }
 
-}  // namespace sysmem_driver
+}  // namespace sysmem_service

@@ -656,3 +656,9 @@
   available_in_git: '6c1fb8879937a16ab3cf4bfeb2c7a19d56ed181d'
   areas: ['Audio']
   path: 'src/media/audio/drivers/aml-dsp/aml-g12-pdm-dsp'
+- short_description: 'IMX* kernel UART driver'
+  deletion_reason: 'Hardware is not actively supported'
+  gerrit_change_id: '1098052'
+  available_in_git: 'b69d05374ff7fd131a31548fb44fd38137e277f6'
+  areas: ['Kernel', 'UART']
+  path: '/zircon/kernel/dev/uart/imx'

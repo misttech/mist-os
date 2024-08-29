@@ -10,7 +10,7 @@
 
 #include <cstdint>
 
-namespace sysmem_driver {
+namespace sysmem_service {
 
 // This class effectively breaks ties in a platform-specific way among the list
 // of PixelFormat(s) that a set of participants are all able to support.
@@ -32,9 +32,6 @@ class UsagePixelFormatCost {
   // is lower cost, 0 if they're equal cost or unknown, and 1 if the first
   // format is higher cost.
   //
-  // Passing in pdev_device_info_vid and pdev_device_info_pid allows the
-  // implementation to depend on the platform bus driver device VID and PID.
-  //
   // By passing in the BufferCollectionConstraints, the implementation can
   // consider other aspects of constraints in addition to the usage.
   int32_t Compare(const fuchsia_sysmem2::BufferCollectionConstraints& constraints,
@@ -47,6 +44,6 @@ class UsagePixelFormatCost {
   const std::vector<fuchsia_sysmem2::FormatCostEntry> entries_;
 };
 
-}  // namespace sysmem_driver
+}  // namespace sysmem_service
 
 #endif  // SRC_DEVICES_SYSMEM_DRIVERS_SYSMEM_USAGE_PIXEL_FORMAT_COST_H_

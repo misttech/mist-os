@@ -27,6 +27,12 @@
             to: "#profiler",
         },
         {
+            protocol: [ "fuchsia.test.manager.SuiteRunner" ],
+            from: "#test_manager",
+            to: "#profiler",
+            source_availability: "unknown",
+        },
+        {
             event_stream: [ "debug_started" ],
             from: "parent",
             to: "#profiler",

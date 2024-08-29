@@ -26,7 +26,7 @@ impl PartitionDescriptor {
             type_guid: self.type_guid.into_bytes(),
             instance_guid: self.instance_guid.into_bytes(),
             first_lba: self.start_block,
-            last_lba: self.start_block + self.num_blocks,
+            last_lba: self.start_block + self.num_blocks.saturating_sub(1),
             flags: 0,
             name,
         }
@@ -48,10 +48,6 @@ pub fn format_gpt(vmo: &zx::Vmo, block_size: u32, partitions: Vec<PartitionDescr
     let partition_table_len = partitions.len() * part_size;
     let partition_table_nblocks =
         partition_table_len.checked_next_multiple_of(block_size as usize).unwrap() as u64 / bs;
-
-    // Ensure there are enough blocks for both copies of the metadata, plus the protective MBR
-    // block.
-    assert!(nblocks > 1 + 2 * (1 + partition_table_nblocks));
 
     let mut header = Header::new(nblocks, block_size, partitions.len() as u32).unwrap();
 

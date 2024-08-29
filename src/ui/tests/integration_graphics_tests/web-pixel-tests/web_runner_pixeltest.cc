@@ -116,7 +116,7 @@ class WebRunnerPixelTest : public ui_testing::PortableUITest,
         std::make_pair(kFontsProvider, kFontsProviderUrl),
         std::make_pair(kIntl, kIntlUrl),
         std::make_pair(kMemoryPressureProvider, kMemoryPressureProviderUrl),
-        std::make_pair(kMockCobalt, kMockCobaltUrl),
+        std::make_pair(kFakeCobalt, kFakeCobaltUrl),
         std::make_pair(kNetstack, kNetstackUrl),
         std::make_pair(kWebClient, kWebClientUrl),
         std::make_pair(kTextManager, kTextManagerUrl),
@@ -158,7 +158,7 @@ class WebRunnerPixelTest : public ui_testing::PortableUITest,
              .source = ParentRef(),
              .targets = {ChildRef{kFontsProvider}}},
             {.capabilities = {Protocol{fuchsia::metrics::MetricEventLoggerFactory::Name_}},
-             .source = ChildRef{kMockCobalt},
+             .source = ChildRef{kFakeCobalt},
              .targets = {ChildRef{kMemoryPressureProvider}}},
             {.capabilities = {Protocol{fuchsia::sysmem::Allocator::Name_},
                               Protocol{fuchsia::sysmem2::Allocator::Name_},
@@ -266,8 +266,8 @@ class WebRunnerPixelTest : public ui_testing::PortableUITest,
   static constexpr auto kBuildInfoProvider = "build_info_provider";
   static constexpr auto kBuildInfoProviderUrl = "#meta/fake_build_info.cm";
 
-  static constexpr auto kMockCobalt = "cobalt";
-  static constexpr auto kMockCobaltUrl = "#meta/mock_cobalt.cm";
+  static constexpr auto kFakeCobalt = "cobalt";
+  static constexpr auto kFakeCobaltUrl = "#meta/fake_cobalt.cm";
 
   static constexpr auto kHttpServer = "http_server";
   static constexpr auto kHttpServerUrl = "#meta/http_server.cm";

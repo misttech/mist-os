@@ -7,12 +7,6 @@ import("//src/lib/fostr/build/fostr_fidl.gni")
 fostr_fidl("fuchsia.ui.gfx") {
   fidl_target = "//sdk/fidl/fuchsia.ui.gfx"
 
-  additional_include = "src/lib/fostr/fidl/fuchsia.ui.gfx/amendments.h"
-
-  amendments_path = "//src/lib/fostr/fidl/fuchsia.ui.gfx/amendments.json"
-
-  public_deps = [ ":amendments" ]
-
   deps = [
     "//src/lib/fostr/fidl/fuchsia.images",
     "//src/lib/fostr/fidl/fuchsia.math",
@@ -20,13 +14,4 @@ fostr_fidl("fuchsia.ui.gfx") {
     "//src/lib/fostr/fidl/fuchsia.ui.composition",
     "//src/lib/fostr/fidl/fuchsia.ui.views",
   ]
-}
-
-source_set("amendments") {
-  sources = [
-    "amendments.cc",
-    "amendments.h",
-  ]
-
-  public_deps = [ "//sdk/fidl/fuchsia.ui.gfx:fuchsia.ui.gfx_hlcpp" ]
 }

@@ -6,6 +6,8 @@
 
 #include <lib/syslog/cpp/macros.h>
 
+#if FUCHSIA_API_LEVEL_AT_MOST(17)
+
 using fuchsia::ui::gfx::Event;
 using fuchsia::ui::gfx::ImportUnboundEvent;
 using fuchsia::ui::gfx::MetricsEvent;
@@ -94,3 +96,5 @@ std::ostream& operator<<(std::ostream& stream,
   return stream << "ViewStateChangedEvent(view_id=" << event.view_holder_id
                 << ", state=.is_rendering" << event.state.is_rendering << ")";
 }
+
+#endif  // FUCHSIA_API_LEVEL_AT_MOST(17)

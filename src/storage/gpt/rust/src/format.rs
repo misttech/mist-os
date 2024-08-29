@@ -144,7 +144,7 @@ impl Header {
             self.first_usable
         );
         ensure!(
-            self.first_usable < self.last_usable
+            self.first_usable <= self.last_usable
                 && self.last_usable + partition_table_blocks <= second_lba,
             "Invalid last_usable {}",
             self.last_usable

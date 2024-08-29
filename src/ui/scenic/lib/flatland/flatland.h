@@ -11,6 +11,7 @@
 #include <lib/async/dispatcher.h>
 #include <lib/fidl/cpp/binding.h>
 #include <lib/fit/function.h>
+#include <lib/zx/channel.h>
 
 #include <map>
 #include <memory>
@@ -19,7 +20,6 @@
 #include <unordered_set>
 #include <vector>
 
-#include "lib/zx/channel.h"
 #include "src/ui/lib/escher/flib/fence_queue.h"
 #include "src/ui/scenic/lib/allocation/buffer_collection_importer.h"
 #include "src/ui/scenic/lib/flatland/flatland_presenter.h"
@@ -31,7 +31,6 @@
 #include "src/ui/scenic/lib/scheduling/id.h"
 #include "src/ui/scenic/lib/scheduling/present2_helper.h"
 #include "src/ui/scenic/lib/utils/dispatcher_holder.h"
-#include "src/ui/scenic/lib/utils/object_linker.h"
 
 #include <glm/glm.hpp>
 #include <glm/mat3x3.hpp>

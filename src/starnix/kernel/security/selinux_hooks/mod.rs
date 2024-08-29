@@ -6,7 +6,7 @@ pub(super) mod selinuxfs;
 pub(super) mod task;
 pub(super) mod testing;
 
-use super::{FsNodeSecurityXattr, FsNodeState, ResolvedElfState};
+use super::{FsNodeSecurityXattr, FsNodeState};
 use crate::task::CurrentTask;
 use crate::vfs::fs_args::MountParams;
 use crate::vfs::{
@@ -27,27 +27,6 @@ use std::sync::OnceLock;
 /// Maximum supported size for the extended attribute value used to store SELinux security
 /// contexts in a filesystem node extended attributes.
 const SECURITY_SELINUX_XATTR_VALUE_MAX_SIZE: usize = 4096;
-
-/// Updates the SELinux thread group state on exec, using the security ID associated with the
-/// resolved elf.
-pub(super) fn update_state_on_exec(
-    current_task: &CurrentTask,
-    elf_security_state: &ResolvedElfState,
-) {
-    let task_attrs = &mut current_task.write().security_state.attrs;
-    let previous_sid = task_attrs.current_sid;
-
-    *task_attrs = TaskAttrs {
-        current_sid: elf_security_state
-            .sid
-            .expect("SELinux enabled but missing resolved elf state"),
-        previous_sid,
-        exec_sid: None,
-        fscreate_sid: None,
-        keycreate_sid: None,
-        sockcreate_sid: None,
-    };
-}
 
 /// Checks if the task with `_source_sid` has the permission to mount at `_path` the object specified by
 /// `_dev_name` of type `_fs_type`, with the mounting flags `_flags` and filesystem data `_data`.

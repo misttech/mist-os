@@ -2,32 +2,34 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <fuchsia/accessibility/semantics/cpp/fidl.h>
-#include <fuchsia/buildinfo/cpp/fidl.h>
-#include <fuchsia/component/cpp/fidl.h>
-#include <fuchsia/fonts/cpp/fidl.h>
-#include <fuchsia/input/injection/cpp/fidl.h>
-#include <fuchsia/intl/cpp/fidl.h>
-#include <fuchsia/kernel/cpp/fidl.h>
-#include <fuchsia/memorypressure/cpp/fidl.h>
-#include <fuchsia/metrics/cpp/fidl.h>
-#include <fuchsia/net/interfaces/cpp/fidl.h>
-#include <fuchsia/posix/socket/cpp/fidl.h>
-#include <fuchsia/process/cpp/fidl.h>
-#include <fuchsia/scheduler/cpp/fidl.h>
-#include <fuchsia/sysmem/cpp/fidl.h>
-#include <fuchsia/sysmem2/cpp/fidl.h>
-#include <fuchsia/tracing/provider/cpp/fidl.h>
-#include <fuchsia/ui/app/cpp/fidl.h>
-#include <fuchsia/ui/display/singleton/cpp/fidl.h>
-#include <fuchsia/ui/input/cpp/fidl.h>
-#include <fuchsia/ui/pointer/cpp/fidl.h>
-#include <fuchsia/ui/scenic/cpp/fidl.h>
-#include <fuchsia/ui/test/input/cpp/fidl.h>
-#include <fuchsia/vulkan/loader/cpp/fidl.h>
-#include <fuchsia/web/cpp/fidl.h>
+#include <fidl/fuchsia.accessibility.semantics/cpp/fidl.h>
+#include <fidl/fuchsia.buildinfo/cpp/fidl.h>
+#include <fidl/fuchsia.component.decl/cpp/hlcpp_conversion.h>
+#include <fidl/fuchsia.component/cpp/fidl.h>
+#include <fidl/fuchsia.element/cpp/fidl.h>
+#include <fidl/fuchsia.fonts/cpp/fidl.h>
+#include <fidl/fuchsia.input.injection/cpp/fidl.h>
+#include <fidl/fuchsia.intl/cpp/fidl.h>
+#include <fidl/fuchsia.kernel/cpp/fidl.h>
+#include <fidl/fuchsia.memorypressure/cpp/fidl.h>
+#include <fidl/fuchsia.metrics/cpp/fidl.h>
+#include <fidl/fuchsia.net.interfaces/cpp/fidl.h>
+#include <fidl/fuchsia.posix.socket/cpp/fidl.h>
+#include <fidl/fuchsia.process/cpp/fidl.h>
+#include <fidl/fuchsia.scheduler/cpp/fidl.h>
+#include <fidl/fuchsia.sysmem/cpp/fidl.h>
+#include <fidl/fuchsia.sysmem2/cpp/fidl.h>
+#include <fidl/fuchsia.tracing.provider/cpp/fidl.h>
+#include <fidl/fuchsia.ui.app/cpp/fidl.h>
+#include <fidl/fuchsia.ui.display.singleton/cpp/fidl.h>
+#include <fidl/fuchsia.ui.input/cpp/fidl.h>
+#include <fidl/fuchsia.ui.pointer/cpp/fidl.h>
+#include <fidl/fuchsia.ui.scenic/cpp/fidl.h>
+#include <fidl/fuchsia.ui.test.input/cpp/fidl.h>
+#include <fidl/fuchsia.vulkan.loader/cpp/fidl.h>
+#include <fidl/fuchsia.web/cpp/fidl.h>
 #include <lib/async/cpp/task.h>
-#include <lib/fidl/cpp/binding_set.h>
+#include <lib/fidl/cpp/channel.h>
 #include <lib/sys/component/cpp/testing/realm_builder.h>
 #include <lib/sys/component/cpp/testing/realm_builder_types.h>
 #include <lib/sys/cpp/component_context.h>
@@ -46,8 +48,7 @@
 #include <vector>
 
 #include <gtest/gtest.h>
-
-#include "src/ui/testing/util/portable_ui_test.h"
+#include <src/ui/testing/util/portable_ui_test.h>
 
 // This test exercises the touch input dispatch path from Input Pipeline to a Chromium. It is a
 // multi-component test, and carefully avoids sleeping or polling for component coordination.
@@ -123,6 +124,9 @@ constexpr zx::duration kTimeout = zx::min(5);
 // long as it differs from the ZX_CLOCK_MONOTONIC=0 defined by Zircon.
 using time_utc = zx::basic_time<1>;
 
+// Maximum distance between two physical pixel coordinates so that they are considered equal.
+constexpr double kEpsilon = 0.5f;
+
 constexpr auto kMockResponseListener = "response_listener";
 
 std::vector<float> ConfigsToTest() {
@@ -144,28 +148,16 @@ std::vector<std::tuple<T>> AsTuples(std::vector<T> v) {
 
 enum class TapLocation { kTopLeft, kTopRight };
 
-// Combines all vectors in `vecs` into one.
-template <typename T>
-std::vector<T> merge(std::initializer_list<std::vector<T>> vecs) {
-  std::vector<T> result;
-  for (auto v : vecs) {
-    result.insert(result.end(), v.begin(), v.end());
-  }
-  return result;
-}
-
-bool CompareDouble(double f0, double f1, double epsilon) { return std::abs(f0 - f1) <= epsilon; }
-
 class ResponseState {
  public:
-  const std::vector<fuchsia::ui::test::input::TouchInputListenerReportTouchInputRequest>&
+  const std::vector<fuchsia_ui_test_input::TouchInputListenerReportTouchInputRequest>&
   events_received() {
     return events_received_;
   }
 
  private:
   friend class ResponseListenerServer;
-  std::vector<fuchsia::ui::test::input::TouchInputListenerReportTouchInputRequest> events_received_;
+  std::vector<fuchsia_ui_test_input::TouchInputListenerReportTouchInputRequest> events_received_;
 };
 
 // This component implements the test.touch.ResponseListener protocol
@@ -175,19 +167,40 @@ class ResponseState {
 // component. This is accomplished, in part, because the realm_builder
 // library creates the necessary plumbing. It creates a manifest for the component
 // and routes all capabilities to and from it.
-class ResponseListenerServer : public fuchsia::ui::test::input::TouchInputListener,
+class ResponseListenerServer : public fidl::Server<fuchsia_ui_test_input::TouchInputListener>,
+                               public fidl::Server<fuchsia_ui_test_input::TestAppStatusListener>,
                                public LocalComponentImpl {
  public:
   explicit ResponseListenerServer(async_dispatcher_t* dispatcher,
-                                  std::weak_ptr<ResponseState> state)
-      : dispatcher_(dispatcher), state_(std::move(state)) {}
+                                  std::weak_ptr<ResponseState> state,
+                                  std::weak_ptr<bool> ready_to_inject)
+      : dispatcher_(dispatcher),
+        state_(std::move(state)),
+        ready_to_inject_(std::move(ready_to_inject)) {}
 
-  // |fuchsia::ui::test::input::TouchInputListener|
-  void ReportTouchInput(
-      fuchsia::ui::test::input::TouchInputListenerReportTouchInputRequest request) override {
+  // |fuchsia_ui_test_input::TouchInputListener|
+  void ReportTouchInput(ReportTouchInputRequest& request,
+                        ReportTouchInputCompleter::Sync& completer) override {
     if (auto s = state_.lock()) {
       s->events_received_.push_back(std::move(request));
     }
+  }
+
+  void ReportStatus(ReportStatusRequest& req, ReportStatusCompleter::Sync& completer) override {
+    if (req.status() == fuchsia_ui_test_input::TestAppStatus::kHandlersRegistered) {
+      if (auto ready = ready_to_inject_.lock()) {
+        *ready = true;
+      }
+    }
+
+    completer.Reply();
+  }
+
+  void handle_unknown_method(
+      fidl::UnknownMethodMetadata<fuchsia_ui_test_input::TestAppStatusListener> metadata,
+      fidl::UnknownMethodCompleter::Sync& completer) override {
+    FX_LOGS(WARNING) << "TestAppStatusListener Received an unknown method with ordinal "
+                     << metadata.method_ordinal;
   }
 
   // |LocalComponentImpl::Start|
@@ -196,26 +209,23 @@ class ResponseListenerServer : public fuchsia::ui::test::input::TouchInputListen
   void OnStart() override {
     // When this component starts, add a binding to the test.touch.ResponseListener
     // protocol to this component's outgoing directory.
-    FX_CHECK(outgoing()->AddPublicService(
-                 fidl::InterfaceRequestHandler<fuchsia::ui::test::input::TouchInputListener>(
-                     [this](auto request) {
-                       bindings_.AddBinding(this, std::move(request), dispatcher_);
-                     })) == ZX_OK);
+    outgoing()->AddProtocol<fuchsia_ui_test_input::TouchInputListener>(
+        touch_bindings_.CreateHandler(this, dispatcher_, fidl::kIgnoreBindingClosure));
+    outgoing()->AddProtocol<fuchsia_ui_test_input::TestAppStatusListener>(
+        app_status_bindings_.CreateHandler(this, dispatcher_, fidl::kIgnoreBindingClosure));
   }
 
  private:
   async_dispatcher_t* dispatcher_ = nullptr;
-  fidl::BindingSet<fuchsia::ui::test::input::TouchInputListener> bindings_;
+  fidl::ServerBindingGroup<fuchsia_ui_test_input::TouchInputListener> touch_bindings_;
+  fidl::ServerBindingGroup<fuchsia_ui_test_input::TestAppStatusListener> app_status_bindings_;
   std::weak_ptr<ResponseState> state_;
+  std::weak_ptr<bool> ready_to_inject_;
 };
 
 class WebEngineTest : public ui_testing::PortableUITest,
                       public testing::WithParamInterface<std::tuple<float>> {
  protected:
-  ~WebEngineTest() override {
-    FX_CHECK(touch_injection_request_count() > 0) << "injection expected but didn't happen.";
-  }
-
   std::string GetTestUIStackUrl() override { return "#meta/test-ui-stack.cm"; }
 
   void SetUp() override {
@@ -230,15 +240,21 @@ class WebEngineTest : public ui_testing::PortableUITest,
     // Register input injection device.
     FX_LOGS(INFO) << "Registering input injection device";
     RegisterTouchScreen();
+
+    WaitForViewPresentation();
+
+    FX_LOGS(INFO) << "Wait for Chromium send out ready";
+    RunLoopUntil([this]() { return *(ready_to_inject_); });
+  }
+
+  std::vector<std::pair<ChildName, std::string>> GetEagerTestComponents() override {
+    return {
+        std::make_pair(kOneChromiumClient, kOneChromiumUrl),
+    };
   }
 
   std::vector<Route> GetTestRoutes() override {
-    return merge({GetWebEngineRoutes(ChildRef{kOneChromiumClient}),
-                  {
-                      {.capabilities = {Protocol{fuchsia::ui::app::ViewProvider::Name_}},
-                       .source = ChildRef{kOneChromiumClient},
-                       .targets = {ParentRef()}},
-                  }});
+    return GetWebEngineRoutes(ChildRef{kOneChromiumClient});
   }
 
   std::vector<std::pair<ChildName, std::string>> GetTestComponents() override {
@@ -247,56 +263,24 @@ class WebEngineTest : public ui_testing::PortableUITest,
         std::make_pair(kFontsProvider, kFontsProviderUrl),
         std::make_pair(kIntl, kIntlUrl),
         std::make_pair(kMemoryPressureProvider, kMemoryPressureProviderUrl),
-        std::make_pair(kMockCobalt, kMockCobaltUrl),
+        std::make_pair(kFakeCobalt, kFakeCobaltUrl),
         std::make_pair(kNetstack, kNetstackUrl),
-        std::make_pair(kOneChromiumClient, kOneChromiumUrl),
         std::make_pair(kTextManager, kTextManagerUrl),
         std::make_pair(kWebContextProvider, kWebContextProviderUrl),
     };
   }
 
-  bool LastEventReceivedMatchesLocation(float expected_x, float expected_y,
-                                        const std::string& component_name) {
-    const auto& events_received = response_state_->events_received();
-    if (events_received.empty()) {
-      return false;
-    }
+  void ExpectLocation(const fuchsia_ui_test_input::TouchInputListenerReportTouchInputRequest& e,
+                      float expected_x, float expected_y, const std::string& component_name) {
+    auto pixel_scale = e.device_pixel_ratio().has_value() ? e.device_pixel_ratio().value() : 1;
 
-    const auto& last_event = events_received.back();
+    auto actual_x = pixel_scale * e.local_x().value();
+    auto actual_y = pixel_scale * e.local_y().value();
+    auto actual_component_name = e.component_name().value();
 
-    auto pixel_scale = last_event.has_device_pixel_ratio() ? last_event.device_pixel_ratio() : 1;
-
-    auto actual_x = pixel_scale * last_event.local_x();
-    auto actual_y = pixel_scale * last_event.local_y();
-    auto actual_component_name = last_event.component_name();
-
-    FX_LOGS(INFO) << "Expecting event for component " << component_name << " at (" << expected_x
-                  << ", " << expected_y << ")";
-    FX_LOGS(INFO) << "Received event for component " << actual_component_name << " at (" << actual_x
-                  << ", " << actual_y << "), accounting for pixel scale of " << pixel_scale;
-
-    return CompareDouble(actual_x, expected_x, pixel_scale) &&
-           CompareDouble(actual_y, expected_y, pixel_scale) &&
-           actual_component_name == component_name;
-  }
-
-  bool LastEventReceivedMatchesPhase(fuchsia::ui::pointer::EventPhase phase,
-                                     const std::string& component_name) {
-    const auto& events_received = response_state_->events_received();
-    if (events_received.empty()) {
-      return false;
-    }
-
-    const auto& last_event = events_received.back();
-    const auto actual_phase = last_event.phase();
-    auto actual_component_name = last_event.component_name();
-
-    FX_LOGS(INFO) << "Expecting event for component " << component_name << " at phase ("
-                  << static_cast<uint32_t>(phase) << ")";
-    FX_LOGS(INFO) << "Received event for component " << actual_component_name << " at phaase ("
-                  << static_cast<uint32_t>(actual_phase) << ")";
-
-    return phase == actual_phase && actual_component_name == component_name;
+    EXPECT_NEAR(expected_x, actual_x, kEpsilon);
+    EXPECT_NEAR(expected_y, actual_y, kEpsilon);
+    EXPECT_EQ(actual_component_name, component_name);
   }
 
   void InjectInput(TapLocation tap_location) {
@@ -306,7 +290,6 @@ class WebEngineTest : public ui_testing::PortableUITest,
     //
     // Hence, a tap in the center of the display's top-right quadrant is observed by the child
     // view as a tap in the center of its top-left quadrant.
-    auto touch = std::make_unique<fuchsia::ui::input::TouchscreenReport>();
     switch (tap_location) {
       case TapLocation::kTopLeft:
         // center of top right quadrant -> ends up as center of top left quadrant
@@ -321,102 +304,89 @@ class WebEngineTest : public ui_testing::PortableUITest,
     }
   }
 
-  // Injects an input event, and posts a task to retry after `kTapRetryInterval`.
-  //
-  // We post the retry task because the first input event we send to WebEngine may be lost.
-  // The reason the first event may be lost is that there is a race condition as the WebEngine
-  // starts up.
-  //
-  // More specifically: in order for our web app's JavaScript code (see kAppCode in
-  // web-touch-input-chromium.cc) to receive the injected input, two things must be true before we
-  // inject the input:
-  // * The WebEngine must have installed its `render_node_`, and
-  // * The WebEngine must have set the shape of its `input_node_`
-  //
-  // The problem we have is that the `is_rendering` signal that we monitor only guarantees us
-  // the `render_node_` is ready. If the `input_node_` is not ready at that time, Scenic will
-  // find that no node was hit by the touch, and drop the touch event.
-  //
-  // As for why `is_rendering` triggers before there's any hittable element, that falls out of
-  // the way WebEngine constructs its scene graph. Namely, the `render_node_` has a shape, so
-  // that node `is_rendering` as soon as it is `Present()`-ed. Walking transitively up the
-  // scene graph, that causes our `Session` to receive the `is_rendering` signal.
-  //
-  // For more details, see https://fxbug.dev/42135095.
-  //
-  // TODO(https://fxbug.dev/42136267): Improve synchronization when we move to Flatland.
-  void TryInject() {
-    InjectInput(TapLocation::kTopLeft);
-    async::PostDelayedTask(dispatcher(), [this] { TryInject(); }, kTapRetryInterval);
-  }
-
   // Routes needed to setup Chromium client.
   static std::vector<Route> GetWebEngineRoutes(ChildRef target) {
     return {
+        {.capabilities =
+             {Protocol{fidl::DiscoverableProtocolName<
+                  fuchsia_accessibility_semantics::SemanticsManager>},
+              Protocol{fidl::DiscoverableProtocolName<fuchsia_element::GraphicalPresenter>},
+              Protocol{fidl::DiscoverableProtocolName<fuchsia_ui_scenic::Scenic>},
+              Protocol{fidl::DiscoverableProtocolName<fuchsia_ui_composition::Flatland>},
+              Protocol{fidl::DiscoverableProtocolName<fuchsia_ui_composition::Allocator>}},
+         .source = kTestUIStackRef,
+         .targets = {target}},
         {
             .capabilities =
                 {
-                    Protocol{fuchsia::logger::LogSink::Name_},
+                    Protocol{fidl::DiscoverableProtocolName<fuchsia_logger::LogSink>},
                 },
             .source = ParentRef(),
             .targets =
                 {
                     target, ChildRef{kFontsProvider}, ChildRef{kMemoryPressureProvider},
                     ChildRef{kBuildInfoProvider}, ChildRef{kWebContextProvider}, ChildRef{kIntl},
-                    ChildRef{kMockCobalt},
+                    ChildRef{kFakeCobalt},
                     // Not including kNetstack here, since it emits spurious
                     // FATAL errors.
                 },
         },
-        {.capabilities = {Protocol{fuchsia::kernel::VmexResource::Name_},
-                          Protocol{fuchsia::process::Launcher::Name_}},
+        {.capabilities =
+             {
+                 Protocol{fidl::DiscoverableProtocolName<fuchsia_kernel::VmexResource>},
+                 Protocol{fidl::DiscoverableProtocolName<fuchsia_process::Launcher>},
+                 Protocol{fidl::DiscoverableProtocolName<fuchsia_vulkan_loader::Loader>},
+             },
+         .source = ParentRef(),
          .targets = {target}},
-        {.capabilities = {Protocol{fuchsia::ui::test::input::TouchInputListener::Name_}},
+        {.capabilities =
+             {
+                 Protocol{
+                     fidl::DiscoverableProtocolName<fuchsia_ui_test_input::TouchInputListener>},
+                 Protocol{
+                     fidl::DiscoverableProtocolName<fuchsia_ui_test_input::TestAppStatusListener>},
+             },
          .source = ChildRef{kMockResponseListener},
          .targets = {target}},
-        {.capabilities = {Protocol{fuchsia::fonts::Provider::Name_}},
+        {.capabilities = {Protocol{fidl::DiscoverableProtocolName<fuchsia_fonts::Provider>}},
          .source = ChildRef{kFontsProvider},
          .targets = {target}},
         {.capabilities =
              {
-                 Protocol{fuchsia::tracing::provider::Registry::Name_},
+                 Protocol{fidl::DiscoverableProtocolName<fuchsia_tracing_provider::Registry>},
              },
          .source = ParentRef(),
          .targets = {target, ChildRef{kFontsProvider}}},
-        {.capabilities = {Protocol{fuchsia::ui::input::ImeService::Name_}},
+        {.capabilities = {Protocol{fidl::DiscoverableProtocolName<fuchsia_ui_input::ImeService>}},
          .source = ChildRef{kTextManager},
          .targets = {target}},
-        {.capabilities = {Protocol{fuchsia::memorypressure::Provider::Name_}},
+        {.capabilities = {Protocol{
+             fidl::DiscoverableProtocolName<fuchsia_memorypressure::Provider>}},
          .source = ChildRef{kMemoryPressureProvider},
          .targets = {target}},
-        {.capabilities = {Protocol{fuchsia::net::interfaces::State::Name_}},
+        {.capabilities = {Protocol{fidl::DiscoverableProtocolName<fuchsia_net_interfaces::State>}},
          .source = ChildRef{kNetstack},
          .targets = {target}},
-        {.capabilities = {Protocol{fuchsia::accessibility::semantics::SemanticsManager::Name_},
-                          Protocol{fuchsia::ui::scenic::Scenic::Name_}},
-         .source = kTestUIStackRef,
-         .targets = {target}},
-        {.capabilities = {Protocol{fuchsia::ui::composition::Flatland::Name_},
-                          Protocol{fuchsia::ui::composition::Allocator::Name_}},
-         .source = kTestUIStackRef,
-         .targets = {target}},
-        {.capabilities = {Protocol{fuchsia::web::ContextProvider::Name_}},
+        {.capabilities = {Protocol{fidl::DiscoverableProtocolName<fuchsia_web::ContextProvider>}},
          .source = ChildRef{kWebContextProvider},
          .targets = {target}},
-        {.capabilities = {Protocol{fuchsia::tracing::provider::Registry::Name_}},
+        {.capabilities = {Protocol{
+             fidl::DiscoverableProtocolName<fuchsia_tracing_provider::Registry>}},
          .source = ParentRef(),
          .targets = {ChildRef{kFontsProvider}}},
-        {.capabilities = {Protocol{fuchsia::metrics::MetricEventLoggerFactory::Name_}},
-         .source = ChildRef{kMockCobalt},
+        {.capabilities = {Protocol{
+             fidl::DiscoverableProtocolName<fuchsia_metrics::MetricEventLoggerFactory>}},
+         .source = ChildRef{kFakeCobalt},
          .targets = {ChildRef{kMemoryPressureProvider}}},
-        {.capabilities = {Protocol{fuchsia::sysmem::Allocator::Name_},
-                          Protocol{fuchsia::sysmem2::Allocator::Name_}},
+        {.capabilities = {Protocol{fidl::DiscoverableProtocolName<fuchsia_sysmem::Allocator>},
+                          Protocol{fidl::DiscoverableProtocolName<fuchsia_sysmem2::Allocator>}},
          .source = ParentRef(),
          .targets = {ChildRef{kMemoryPressureProvider}, target}},
-        {.capabilities = {Protocol{fuchsia::kernel::RootJobForInspect::Name_},
-                          Protocol{fuchsia::kernel::Stats::Name_},
-                          Protocol{fuchsia::scheduler::RoleManager::Name_},
-                          Protocol{fuchsia::tracing::provider::Registry::Name_}},
+        {.capabilities =
+             {Protocol{fidl::DiscoverableProtocolName<fuchsia_kernel::RootJobForInspect>},
+              Protocol{fidl::DiscoverableProtocolName<fuchsia_kernel::Stats>},
+              Protocol{fidl::DiscoverableProtocolName<fuchsia_scheduler::RoleManager>},
+              Protocol{fidl::DiscoverableProtocolName<fuchsia_tracing_provider::Registry>}},
          .source = ParentRef(),
          .targets = {ChildRef{kMemoryPressureProvider}}},
         {.capabilities = {Config{kCaptureOnPressureChange}},
@@ -434,24 +404,24 @@ class WebEngineTest : public ui_testing::PortableUITest,
         {.capabilities = {Config{kNormalCaptureDelay}},
          .source = VoidRef(),
          .targets = {ChildRef{kMemoryPressureProvider}}},
-        {.capabilities = {Protocol{fuchsia::posix::socket::Provider::Name_}},
+        {.capabilities = {Protocol{fidl::DiscoverableProtocolName<fuchsia_posix_socket::Provider>}},
          .source = ChildRef{kNetstack},
          .targets = {target}},
-        {.capabilities = {Protocol{fuchsia::buildinfo::Provider::Name_}},
+        {.capabilities = {Protocol{fidl::DiscoverableProtocolName<fuchsia_buildinfo::Provider>}},
          .source = ChildRef{kBuildInfoProvider},
          .targets = {target}},
-        {.capabilities = {Protocol{fuchsia::intl::PropertyProvider::Name_}},
+        {.capabilities = {Protocol{fidl::DiscoverableProtocolName<fuchsia_intl::PropertyProvider>}},
          .source = ChildRef{kIntl},
          .targets = {target}},
         {.capabilities =
              {
                  Directory{
                      .name = "root-ssl-certificates",
-                     .type = fuchsia::component::decl::DependencyType::STRONG,
+                     .type = fidl::NaturalToHLCPP(fuchsia_component_decl::DependencyType::kStrong),
                  },
                  Directory{
                      .name = "tzdata-icu",
-                     .type = fuchsia::component::decl::DependencyType::STRONG,
+                     .type = fidl::NaturalToHLCPP(fuchsia_component_decl::DependencyType::kStrong),
                  },
              },
          .source = ParentRef(),
@@ -473,12 +443,15 @@ class WebEngineTest : public ui_testing::PortableUITest,
   void ExtendRealm() override {
     // Key part of service setup: have this test component vend the
     // |ResponseListener| service in the constructed realm.
-    realm_builder().AddLocalChild(kMockResponseListener, [d = dispatcher(), s = response_state_]() {
-      return std::make_unique<ResponseListenerServer>(d, s);
-    });
+    realm_builder().AddLocalChild(
+        kMockResponseListener,
+        [d = dispatcher(), response_state = response_state_, ready_to_inject = ready_to_inject_]() {
+          return std::make_unique<ResponseListenerServer>(d, response_state, ready_to_inject);
+        });
   }
 
   std::shared_ptr<ResponseState> response_state_ = std::make_shared<ResponseState>();
+  std::shared_ptr<bool> ready_to_inject_ = std::make_shared<bool>(false);
 
   static constexpr auto kFontsProvider = "fonts_provider";
   static constexpr auto kFontsProviderUrl = "#meta/font_provider_hermetic_for_test.cm";
@@ -507,36 +480,24 @@ class WebEngineTest : public ui_testing::PortableUITest,
   static constexpr auto kBuildInfoProvider = "build_info_provider";
   static constexpr auto kBuildInfoProviderUrl = "#meta/fake_build_info.cm";
 
-  static constexpr auto kMockCobalt = "cobalt";
-  static constexpr auto kMockCobaltUrl = "#meta/mock_cobalt.cm";
-
-  // The typical latency on devices we've tested is ~60 msec. The retry interval is chosen to be
-  // a) Long enough that it's unlikely that we send a new tap while a previous tap is still being
-  //    processed. That is, it should be far more likely that a new tap is sent because the first
-  //    tap was lost, than because the system is just running slowly.
-  // b) Short enough that we don't slow down tryjobs.
-  //
-  // The first property is important to avoid skewing the latency metrics that we collect.
-  // For an explanation of why a tap might be lost, see the documentation for TryInject().
-  static constexpr auto kTapRetryInterval = zx::sec(1);
+  static constexpr auto kFakeCobalt = "cobalt";
+  static constexpr auto kFakeCobaltUrl = "#meta/fake_cobalt.cm";
 };
 
 INSTANTIATE_TEST_SUITE_P(WebEngineTestParameterized, WebEngineTest,
                          testing::ValuesIn(AsTuples(ConfigsToTest())));
 
 TEST_P(WebEngineTest, ChromiumTap) {
-  // Launch client view, and wait until it's rendering to proceed with the test.
-  FX_LOGS(INFO) << "Initializing scene";
-  LaunchClient();
-  FX_LOGS(INFO) << "Client launched";
+  InjectInput(TapLocation::kTopLeft);
 
-  TryInject();
-  RunLoopUntil([this] {
-    return LastEventReceivedMatchesLocation(
-        /*expected_x=*/static_cast<float>(display_height()) / 4.f,
-        /*expected_y=*/static_cast<float>(display_width()) / 4.f,
-        /*component_name=*/"web-touch-input-chromium");
-  });
+  RunLoopUntil([&] { return response_state()->events_received().size() >= 1; });
+
+  ASSERT_EQ(response_state()->events_received().size(), 1u);
+
+  ExpectLocation(response_state()->events_received()[0],
+                 /*expected_x=*/static_cast<float>(display_height()) / 4.f,
+                 /*expected_y=*/static_cast<float>(display_width()) / 4.f,
+                 /*component_name=*/"web-touch-input-chromium");
 }
 
 }  // namespace

@@ -15,44 +15,6 @@
 #include "src/storage/lib/vfs/cpp/vnode.h"
 
 namespace driver_manager {
-namespace {
-const char* BindParamName(uint32_t param_num) {
-  switch (param_num) {
-    case BIND_PROTOCOL:
-      return "Protocol";
-    case BIND_USB_VID:
-      return "USB.VID";
-    case BIND_USB_PID:
-      return "USB.PID";
-    case BIND_USB_CLASS:
-      return "USB.Class";
-    case BIND_USB_SUBCLASS:
-      return "USB.Subclass";
-    case BIND_USB_PROTOCOL:
-      return "USB.Protocol";
-    case BIND_PLATFORM_DEV_VID:
-      return "PlatDev.VID";
-    case BIND_PLATFORM_DEV_PID:
-      return "PlatDev.PID";
-    case BIND_PLATFORM_DEV_DID:
-      return "PlatDev.DID";
-    case BIND_IHDA_CODEC_VID:
-      return "IHDA.Codec.VID";
-    case BIND_IHDA_CODEC_DID:
-      return "IHDA.Codec.DID";
-    case BIND_IHDA_CODEC_MAJOR_REV:
-      return "IHDACodec.MajorRev";
-    case BIND_IHDA_CODEC_MINOR_REV:
-      return "IHDACodec.MinorRev";
-    case BIND_IHDA_CODEC_VENDOR_REV:
-      return "IHDACodec.VendorRev";
-    case BIND_IHDA_CODEC_VENDOR_STEP:
-      return "IHDACodec.VendorStep";
-    default:
-      return NULL;
-  }
-}
-}  // namespace
 
 void InspectSinkForDrivers::Publish(PublishRequest& request, PublishCompleter::Sync& completer) {
   const auto result = external_connection_->Publish(
@@ -175,14 +137,9 @@ void DeviceInspect::SetStaticValues(const std::string& topological_path, uint32_
 
   for (uint32_t i = 0; i < properties.size(); ++i) {
     const zx_device_prop_t* p = &properties[i];
-    const char* param_name = BindParamName(p->id);
     auto property = properties_array.CreateChild(std::to_string(i));
     property.CreateUint("value", p->value, &static_values_);
-    if (param_name) {
-      property.CreateString("id", param_name, &static_values_);
-    } else {
-      property.CreateString("id", std::to_string(p->id), &static_values_);
-    }
+    property.CreateString("id", std::to_string(p->id), &static_values_);
     static_values_.emplace(std::move(property));
   }
 

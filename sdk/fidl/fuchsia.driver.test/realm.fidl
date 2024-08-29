@@ -6,6 +6,7 @@ library fuchsia.driver.test;
 
 using zx;
 using fuchsia.io;
+using fuchsia.component.resolution;
 using fuchsia.component.test;
 using fuchsia.diagnostics;
 
@@ -100,6 +101,7 @@ type RealmArgs = resource table {
     @available(added=HEAD)
     12: exposes vector<Expose>:MAX;
 
+    /// DEPRECATED: Use test_component to provide resolved test component.
     /// The driver test realm can load drivers packaged with the test suite
     /// through this directory. Note that this directory must be readable
     /// and executable.
@@ -127,6 +129,20 @@ type RealmArgs = resource table {
     /// Default: empty
     @available(added=22)
     15: dtr_exposes vector<fuchsia.component.test.Capability>:MAX;
+
+    /// The resolved component information of the test component that is starting
+    /// the driver test realm. This will be used to discover drivers that the test
+    /// wants to provide to the driver test realm. Drivers can be both in the test
+    /// component package, or a subpackage of the test component package.
+    /// Default: empty
+    @available(added=23)
+    16: test_component fuchsia.component.resolution.Component;
+
+    /// How long the driver index waits idle before it saves state, escrows its handles
+    /// with the component framework, and shuts down.
+    /// Default: never shuts down
+    @available(added=HEAD)
+    17: driver_index_stop_timeout_millis int64;
 };
 
 /// This protocol is for the DriverTestRealm. It is an integration test

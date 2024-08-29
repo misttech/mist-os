@@ -32,6 +32,7 @@
 #include <lib/zx/vmo.h>
 #include <zircon/status.h>
 
+#include <list>
 #include <memory>
 #include <unordered_map>
 #include <vector>
@@ -39,7 +40,10 @@
 #include <ddk/metadata/test.h>
 #include <fbl/string_printf.h>
 #include <fbl/unique_fd.h>
+#include <rapidjson/document.h>
 
+#include "fidl/fuchsia.io/cpp/markers.h"
+#include "lib/fidl/cpp/wire/channel.h"
 #include "sdk/lib/driver_test_realm/driver_test_realm_config.h"
 #include "src/lib/files/directory.h"
 #include "src/lib/files/file.h"
@@ -54,6 +58,8 @@ namespace {
 
 namespace fio = fuchsia_io;
 namespace fdt = fuchsia_driver_test;
+namespace fres = fuchsia_component_resolution;
+namespace fpkg = fuchsia_pkg;
 
 using namespace component_testing;
 
@@ -205,6 +211,30 @@ class FakeRootJob final : public fidl::WireServer<fuchsia_kernel::RootJob> {
   }
 };
 
+class InternalServer final : public fidl::WireServer<fuchsia_driver_test::Internal> {
+ public:
+  InternalServer(fres::Context context, fidl::ClientEnd<fuchsia_io::Directory> test_pkg_dir)
+      : context_(std::move(context)), test_pkg_dir_(std::move(test_pkg_dir)) {}
+
+  void GetTestPackage(GetTestPackageCompleter::Sync& completer) override {
+    auto dir_clone = component::Clone(test_pkg_dir_);
+    if (dir_clone.is_ok()) {
+      completer.ReplySuccess(std::move(*dir_clone));
+    } else {
+      completer.ReplyError(dir_clone.error_value());
+    }
+  }
+
+  void GetTestResolutionContext(GetTestResolutionContextCompleter::Sync& completer) override {
+    fidl::Arena arena;
+    completer.Reply(fidl::ToWire(arena, context_));
+  }
+
+ private:
+  fres::Context context_;
+  fidl::ClientEnd<fuchsia_io::Directory> test_pkg_dir_;
+};
+
 zx::result<fidl::ClientEnd<fio::Directory>> OpenPkgDir() {
   auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
   if (endpoints.is_error()) {
@@ -330,17 +360,25 @@ class DriverTestRealm final : public fidl::Server<fuchsia_driver_test::Realm> {
       boot_dir = std::move(res.value());
     }
 
-    // Setup /pkg_drivers
-    fidl::ClientEnd<fuchsia_io::Directory> pkg_drivers_dir;
+    // Setup /base_drivers
+    fidl::ClientEnd<fuchsia_io::Directory> base_drivers_dir;
     if (request.args().pkg().has_value()) {
-      pkg_drivers_dir = fidl::ClientEnd<fuchsia_io::Directory>(std::move(*request.args().pkg()));
+      base_drivers_dir = fidl::ClientEnd<fuchsia_io::Directory>(std::move(*request.args().pkg()));
     } else {
       auto res = OpenPkgDir();
       if (res.is_error()) {
         completer.Reply(res.take_error());
         return;
       }
-      pkg_drivers_dir = std::move(res.value());
+      base_drivers_dir = std::move(res.value());
+    }
+
+    // Look at the test's component package and subpackages.
+    fidl::ClientEnd<fuchsia_io::Directory> test_pkg_dir;
+    fres::Context test_resolution_context;
+    if (request.args().test_component().has_value()) {
+      test_resolution_context = *request.args().test_component()->resolution_context();
+      test_pkg_dir = std::move(*request.args().test_component()->package()->directory());
     }
 
     // We only index /pkg if it's not identical to /boot.
@@ -348,9 +386,17 @@ class DriverTestRealm final : public fidl::Server<fuchsia_driver_test::Realm> {
 
     zx::result base_and_boot_configs = ConstructBootAndBaseConfig(
         boot_dir,
-        create_pkg_config ? pkg_drivers_dir : fidl::UnownedClientEnd<fuchsia_io::Directory>({}));
+        create_pkg_config ? base_drivers_dir : fidl::UnownedClientEnd<fuchsia_io::Directory>({}),
+        test_pkg_dir, test_resolution_context);
     if (base_and_boot_configs.is_error()) {
       completer.Reply(base_and_boot_configs.take_error());
+      return;
+    }
+
+    result = outgoing_->AddProtocol<fuchsia_driver_test::Internal>(
+        std::make_unique<InternalServer>(test_resolution_context, std::move(test_pkg_dir)));
+    if (result.is_error()) {
+      completer.Reply(result.take_error());
       return;
     }
 
@@ -360,7 +406,7 @@ class DriverTestRealm final : public fidl::Server<fuchsia_driver_test::Realm> {
       return;
     }
 
-    result = outgoing_->AddDirectory(std::move(pkg_drivers_dir), "pkg_drivers");
+    result = outgoing_->AddDirectory(std::move(base_drivers_dir), "base_drivers");
     if (result.is_error()) {
       completer.Reply(result.take_error());
       return;
@@ -377,8 +423,8 @@ class DriverTestRealm final : public fidl::Server<fuchsia_driver_test::Realm> {
         {
             fdt::Collection::kPackageDrivers,
             {
-                CollectionRef{"pkg-drivers"},
-                CollectionRef{"full-pkg-drivers"},
+                CollectionRef{"base-drivers"},
+                CollectionRef{"full-drivers"},
             },
         },
     };
@@ -435,8 +481,8 @@ class DriverTestRealm final : public fidl::Server<fuchsia_driver_test::Realm> {
               .targets =
                   {
                       CollectionRef{"boot-drivers"},
-                      CollectionRef{"pkg-drivers"},
-                      CollectionRef{"full-pkg-drivers"},
+                      CollectionRef{"base-drivers"},
+                      CollectionRef{"full-drivers"},
                   },
           });
         }
@@ -494,7 +540,7 @@ class DriverTestRealm final : public fidl::Server<fuchsia_driver_test::Realm> {
               .capabilities = {converted.value()},
               .source =
                   {
-                      CollectionRef{"pkg-drivers"},
+                      CollectionRef{"base-drivers"},
                   },
               .targets = {ParentRef()},
           });
@@ -502,7 +548,7 @@ class DriverTestRealm final : public fidl::Server<fuchsia_driver_test::Realm> {
               .capabilities = {converted.value()},
               .source =
                   {
-                      CollectionRef{"full-pkg-drivers"},
+                      CollectionRef{"full-drivers"},
                   },
               .targets = {ParentRef()},
           });
@@ -529,6 +575,10 @@ class DriverTestRealm final : public fidl::Server<fuchsia_driver_test::Realm> {
         .name = "fuchsia.driver.DisabledDrivers",
         .value = request.args().driver_disable().value_or(kEmptyVec),
     });
+    configurations.push_back({
+        .name = "fuchsia.driver.index.StopOnIdleTimeoutMillis",
+        .value = ConfigValue::Int64(request.args().driver_index_stop_timeout_millis().value_or(-1)),
+    });
     realm_builder_.AddConfiguration(std::move(configurations));
     realm_builder_.AddRoute({
         .capabilities =
@@ -537,6 +587,7 @@ class DriverTestRealm final : public fidl::Server<fuchsia_driver_test::Realm> {
                 component_testing::Config{.name = "fuchsia.driver.BaseDrivers"},
                 component_testing::Config{.name = "fuchsia.driver.BindEager"},
                 component_testing::Config{.name = "fuchsia.driver.DisabledDrivers"},
+                component_testing::Config{.name = "fuchsia.driver.index.StopOnIdleTimeoutMillis"},
             },
         .source = component_testing::SelfRef{},
         .targets = {component_testing::ChildRef{"driver-index"}},
@@ -643,33 +694,109 @@ class DriverTestRealm final : public fidl::Server<fuchsia_driver_test::Realm> {
     std::vector<std::string> base_drivers;
   };
   static zx::result<BootAndBaseConfigResult> ConstructBootAndBaseConfig(
-      fidl::UnownedClientEnd<fuchsia_io::Directory> boot_dir,
-      fidl::UnownedClientEnd<fuchsia_io::Directory> pkg_drivers_dir) {
-    auto list = std::vector<
-        std::tuple<fidl::UnownedClientEnd<fuchsia_io::Directory>, std::string, std::string>>{
-        std::make_tuple(boot_dir, "fuchsia-boot:///", "boot"),
-    };
-    std::unordered_map<std::string, std::vector<std::string>> results;
-    if (pkg_drivers_dir.is_valid()) {
-      list.emplace_back(pkg_drivers_dir, "fuchsia-pkg://fuchsia.com/", "pkg");
-    } else {
-      results["pkg"] = {};
+      fidl::UnownedClientEnd<fuchsia_io::Directory> boot_drivers_dir,
+      fidl::UnownedClientEnd<fuchsia_io::Directory> base_drivers_dir,
+      fidl::UnownedClientEnd<fuchsia_io::Directory> test_pkg_dir,
+      const fres::Context& test_resolution_context) {
+    zx::result cloned_boot_drivers_dir = component::Clone(boot_drivers_dir);
+    if (cloned_boot_drivers_dir.is_error()) {
+      FX_LOG_KV(ERROR, "Unable to clone dir");
+      return zx::error(ZX_ERR_IO);
     }
 
-    for (const auto& [dir, url_prefix, type] : list) {
-      // Check each manifest to see if it uses the driver runner.
-      zx::result cloned_dir = component::Clone(dir);
-      if (cloned_dir.is_error()) {
+    std::list<
+        std::tuple<fidl::ClientEnd<fuchsia_io::Directory>, std::string, std::string, std::string>>
+        list;
+    list.emplace_back(*std::move(cloned_boot_drivers_dir), "fuchsia-boot:///", "dtr", "boot");
+
+    std::unordered_map<std::string, std::vector<std::string>> results;
+    if (base_drivers_dir.is_valid()) {
+      zx::result cloned_base_drivers_dir = component::Clone(base_drivers_dir);
+      if (cloned_base_drivers_dir.is_error()) {
+        FX_LOG_KV(ERROR, "Unable to clone dir");
+        return zx::error(ZX_ERR_IO);
+      }
+
+      list.emplace_back(*std::move(cloned_base_drivers_dir), "fuchsia-pkg://fuchsia.com/", "dtr",
+                        "base");
+    } else if (test_pkg_dir.is_valid()) {
+      zx::result cloned_test_pkg_dir = component::Clone(test_pkg_dir);
+      if (cloned_test_pkg_dir.is_error()) {
+        FX_LOG_KV(ERROR, "Unable to clone dir");
+        return zx::error(ZX_ERR_IO);
+      }
+
+      // Add the test package itself.
+      list.emplace_back(*std::move(cloned_test_pkg_dir), "dtr-test-pkg://fuchsia.com/", "", "base");
+
+      // Need to clone again to use in fdio_fd_create.
+      cloned_test_pkg_dir = component::Clone(test_pkg_dir);
+      if (cloned_test_pkg_dir.is_error()) {
         FX_LOG_KV(ERROR, "Unable to clone dir");
         return zx::error(ZX_ERR_IO);
       }
       fbl::unique_fd dir_fd;
-      zx_status_t status =
-          fdio_fd_create(cloned_dir->TakeHandle().release(), dir_fd.reset_and_get_address());
+      zx_status_t status = fdio_fd_create(cloned_test_pkg_dir->TakeHandle().release(),
+                                          dir_fd.reset_and_get_address());
       if (status != ZX_OK) {
         FX_LOG_KV(ERROR, "Failed to turn dir into fd");
         return zx::error(ZX_ERR_IO);
       }
+
+      // Read off the subpackages that exist in the test package.
+      std::string result;
+      files::ReadFileToStringAt(dir_fd.get(), "meta/fuchsia.pkg/subpackages", &result);
+      rapidjson::Document subpackages_doc;
+      subpackages_doc.Parse(result.c_str());
+      auto& subpackages = subpackages_doc["subpackages"];
+      std::vector<std::string> subpackage_names;
+      subpackage_names.reserve(subpackages.MemberCount());
+      for (rapidjson::Value::ConstMemberIterator itr = subpackages.MemberBegin();
+           itr != subpackages.MemberEnd(); ++itr) {
+        subpackage_names.push_back(itr->name.GetString());
+      }
+
+      // Resolve the subpackage using the context.
+      auto resolver =
+          component::Connect<fpkg::PackageResolver>("/svc/fuchsia.pkg.PackageResolver-hermetic");
+      if (resolver.is_error()) {
+        FX_LOG_KV(ERROR, "Failed to connect to resolver protocol.",
+                  FX_KV("error", zx_status_get_string(resolver.error_value())));
+        return resolver.take_error();
+      }
+
+      fidl::Arena arena;
+      fuchsia_pkg::wire::ResolutionContext converted_context(
+          {.bytes = fidl::ToWire(arena, test_resolution_context.bytes())});
+
+      // Add the subpackages of the test package into the list.
+      for (auto& subpackage_name : subpackage_names) {
+        auto [client, server] = fidl::Endpoints<fuchsia_io::Directory>::Create();
+        auto resolve_result = fidl::WireCall(*resolver)->ResolveWithContext(
+            fidl::StringView(arena, subpackage_name), converted_context, std::move(server));
+        if (!resolve_result.ok() || resolve_result->is_error()) {
+          FX_LOG_KV(ERROR, "Failed to resolve_with_context in the test package.",
+                    FX_KV("error", resolve_result.FormatDescription().c_str()));
+          return zx::error(ZX_ERR_INTERNAL);
+        }
+
+        list.emplace_back(std::move(client), "dtr-test-pkg://fuchsia.com/", subpackage_name,
+                          "base");
+      }
+    } else {
+      results["base"] = {};
+    }
+
+    for (auto& [dir, url_prefix, pkg_name, type] : list) {
+      // Check each manifest to see if it uses the driver runner.
+      fbl::unique_fd dir_fd;
+      zx_status_t status =
+          fdio_fd_create(dir.TakeHandle().release(), dir_fd.reset_and_get_address());
+      if (status != ZX_OK) {
+        FX_LOG_KV(ERROR, "Failed to turn dir into fd");
+        return zx::error(ZX_ERR_IO);
+      }
+
       std::vector<std::string> manifests;
       if (!files::ReadDirContentsAt(dir_fd.get(), "meta", &manifests)) {
         FX_LOG_KV(WARNING, "Unable to dir contents for ",
@@ -698,8 +825,8 @@ class DriverTestRealm final : public fidl::Server<fuchsia_driver_test::Realm> {
           continue;
         }
 
-        // We add a fake package name of dtr to make it identifiable.
-        std::string entry = fxl::Substitute("$0dtr#meta/$1", url_prefix, manifest);
+        // Construct the url entry from the pieces provided in the list entry.
+        std::string entry = fxl::Substitute("$0$1#meta/$2", url_prefix, pkg_name, manifest);
         driver_components.push_back(entry);
       }
 
@@ -708,7 +835,7 @@ class DriverTestRealm final : public fidl::Server<fuchsia_driver_test::Realm> {
 
     return zx::ok(BootAndBaseConfigResult{
         .boot_drivers = std::move(results["boot"]),
-        .base_drivers = std::move(results["pkg"]),
+        .base_drivers = std::move(results["base"]),
     });
   }
 

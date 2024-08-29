@@ -28,6 +28,9 @@ from honeydew.affordances.fuchsia_controller import tracing as tracing_fc
 from honeydew.affordances.fuchsia_controller.bluetooth.profiles import (
     bluetooth_gap as gap_fc,
 )
+from honeydew.affordances.fuchsia_controller.bluetooth.profiles import (
+    bluetooth_le as le_fc,
+)
 from honeydew.affordances.fuchsia_controller.ui import (
     user_input as user_input_fc,
 )
@@ -50,6 +53,9 @@ from honeydew.interfaces.affordances.bluetooth.profiles import (
 )
 from honeydew.interfaces.affordances.bluetooth.profiles import (
     bluetooth_gap as bluetooth_gap_interface,
+)
+from honeydew.interfaces.affordances.bluetooth.profiles import (
+    bluetooth_le as bluetooth_le_interface,
 )
 from honeydew.interfaces.affordances.ui import screenshot, user_input
 from honeydew.interfaces.affordances.wlan import wlan, wlan_policy
@@ -405,6 +411,19 @@ class FuchsiaDevice(
             bluetooth_avrcp.BluetoothAvrcp object
         """
         raise NotImplementedError
+
+    @properties.Affordance
+    def bluetooth_le(self) -> bluetooth_le_interface.BluetoothLE:
+        """Returns a BluetoothGap affordance object.
+
+        Returns:
+            bluetooth_gap.BluetoothGap object
+        """
+        return le_fc.BluetoothLE(
+            device_name=self.device_name,
+            fuchsia_controller=self.fuchsia_controller,
+            reboot_affordance=self,
+        )
 
     @properties.Affordance
     def bluetooth_gap(self) -> bluetooth_gap_interface.BluetoothGap:

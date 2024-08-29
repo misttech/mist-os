@@ -2,13 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <lib/fit/defer.h>
+#include <lib/maybe-standalone-test/maybe-standalone.h>
+#include <lib/zx/bti.h>
 #include <lib/zx/event.h>
+#include <lib/zx/iommu.h>
 #include <lib/zx/stream.h>
 #include <lib/zx/time.h>
 #include <lib/zx/vmo.h>
 #include <limits.h>
 #include <stdio.h>
 #include <unistd.h>
+#include <zircon/syscalls/iommu.h>
 #include <zircon/syscalls/object.h>
 #include <zircon/system/public/zircon/syscalls.h>
 #include <zircon/system/utest/core/pager/userpager.h>
@@ -21,6 +26,8 @@
 #include <vector>
 
 #include <zxtest/zxtest.h>
+
+#include "zircon/system/utest/core/vmo/helpers.h"
 
 namespace {
 
@@ -1456,6 +1463,57 @@ TEST(StreamTestCase, AppendSuppliesZeroes) {
   // anyway.
   ASSERT_FALSE(pager.GetPageReadRequest(vmo, 0, &offset, &length));
   pager_thread.join();
+}
+
+// Tests that passing a contiguous or physical VMO into zx_stream_create will return
+// ZX_ERR_WRONG_TYPE.
+TEST(StreamTestCase, NoStreamFromContiguousOrPhysicalVmo) {
+  // Resources for contiguous VMO.
+  zx::unowned_resource system_resource = maybe_standalone::GetSystemResource();
+  if (!system_resource->is_valid()) {
+    printf("System resource not available, skipping\n");
+    return;
+  }
+
+  zx::result<zx::resource> result =
+      maybe_standalone::GetSystemResourceWithBase(system_resource, ZX_RSRC_SYSTEM_IOMMU_BASE);
+  ASSERT_OK(result.status_value());
+  zx::resource iommu_resource = std::move(result.value());
+
+  zx::iommu iommu;
+  zx::bti bti;
+  zx_iommu_desc_dummy_t desc;
+  auto final_bti_check = fit::defer([&bti]() {
+    if (bti.is_valid()) {
+      zx_info_bti_t info;
+      ASSERT_OK(bti.get_info(ZX_INFO_BTI, &info, sizeof(info), nullptr, nullptr));
+      EXPECT_EQ(0, info.pmo_count);
+      EXPECT_EQ(0, info.quarantine_count);
+    }
+  });
+
+  ASSERT_OK(zx::iommu::create(iommu_resource, ZX_IOMMU_TYPE_DUMMY, &desc, sizeof(desc), &iommu));
+  EXPECT_OK(zx::bti::create(iommu, 0, 0xdead1eaf, &bti));
+
+  // Create a contiguous VMO & check that a stream cannot be created.
+  zx::vmo c_vmo;
+  ASSERT_OK(zx::vmo::create_contiguous(bti, zx_system_get_page_size(), 0, &c_vmo));
+
+  zx::stream stream;
+  EXPECT_EQ(zx::stream::create(ZX_STREAM_MODE_READ, c_vmo, 0, &stream), ZX_ERR_WRONG_TYPE);
+
+  // Create a physical VMO & check that a stream cannot be created.
+  vmo_test::PhysVmo p_vmo;
+  if (auto res = vmo_test::GetTestPhysVmo(); !res.is_ok()) {
+    if (res.error_value() == ZX_ERR_NOT_SUPPORTED) {
+      printf("Root resource not available, skipping\n");
+    }
+    return;
+  } else {
+    p_vmo = std::move(res.value());
+  }
+
+  EXPECT_EQ(zx::stream::create(ZX_STREAM_MODE_READ, p_vmo.vmo, 0, &stream), ZX_ERR_WRONG_TYPE);
 }
 
 }  // namespace

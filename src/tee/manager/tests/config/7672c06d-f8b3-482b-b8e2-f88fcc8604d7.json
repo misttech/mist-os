@@ -1,5 +1,7 @@
 {
     "url": "ta-panic#meta/ta-panic.cm",
     "singleInstance": false,
+    "multiSession": false,
+    "instanceKeepAlive": false,
     "capabilities": []
 }

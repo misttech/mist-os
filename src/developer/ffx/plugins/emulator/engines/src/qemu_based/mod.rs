@@ -9,7 +9,6 @@ use crate::arg_templates::process_flag_template;
 use crate::qemu_based::comms::{spawn_pipe_thread, QemuSocket};
 use crate::show_output;
 use async_trait::async_trait;
-use cfg_if::cfg_if;
 use emulator_instance::{
     AccelerationMode, ConsoleType, DiskImage, EmulatorConfiguration, EngineState, GuestConfig,
     NetworkingMode,
@@ -39,62 +38,45 @@ use std::time::{Duration, Instant};
 use std::{env, str};
 use tempfile::NamedTempFile;
 
-#[cfg(test)]
-use mockall::automock;
+pub(crate) async fn get_host_tool(name: &str) -> Result<PathBuf> {
+    let sdk = ffx_config::global_env_context()
+        .ok_or_else(|| bug!("loading global environment context"))?
+        .get_sdk()
+        .await?;
 
-#[cfg_attr(test, automock)]
-#[allow(dead_code)]
-mod modules {
-    use super::*;
+    // Attempts to get a host tool from the SDK manifest. If it fails, falls
+    // back to attempting to derive the path to the host tool binary by simply checking
+    // for its existence in `ffx`'s directory.
+    // TODO(https://fxbug.dev/42181753): When issues around including aemu in the sdk are resolved, this
+    // hack can be removed.
+    match ffx_config::get_host_tool(&sdk, name).await {
+        Ok(path) => Ok(path),
+        Err(error) => {
+            tracing::warn!(
+                "failed to get host tool {} from manifest. Trying local SDK dir: {}",
+                name,
+                error
+            );
+            let mut ffx_path = std::env::current_exe()
+                .map_err(|e| bug!("getting current ffx exe path for host tool {name}: {e}"))?;
+            ffx_path = std::fs::canonicalize(ffx_path.clone())
+                .map_err(|e| bug!("canonicalizing ffx path {ffx_path:?}: {e}"))?;
 
-    pub(crate) async fn get_host_tool(name: &str) -> Result<PathBuf> {
-        let sdk = ffx_config::global_env_context()
-            .ok_or_else(|| bug!("loading global environment context"))?
-            .get_sdk()
-            .await?;
+            let tool_path = ffx_path
+                .parent()
+                .ok_or_else(|| bug!("ffx path missing parent {ffx_path:?}"))?
+                .join(name);
 
-        // Attempts to get a host tool from the SDK manifest. If it fails, falls
-        // back to attempting to derive the path to the host tool binary by simply checking
-        // for its existence in `ffx`'s directory.
-        // TODO(https://fxbug.dev/42181753): When issues around including aemu in the sdk are resolved, this
-        // hack can be removed.
-        match ffx_config::get_host_tool(&sdk, name).await {
-            Ok(path) => Ok(path),
-            Err(error) => {
-                tracing::warn!(
-                    "failed to get host tool {} from manifest. Trying local SDK dir: {}",
-                    name,
-                    error
-                );
-                let mut ffx_path = std::env::current_exe()
-                    .map_err(|e| bug!("getting current ffx exe path for host tool {name}: {e}"))?;
-                ffx_path = std::fs::canonicalize(ffx_path.clone())
-                    .map_err(|e| bug!("canonicalizing ffx path {ffx_path:?}: {e}"))?;
-
-                let tool_path = ffx_path
-                    .parent()
-                    .ok_or_else(|| bug!("ffx path missing parent {ffx_path:?}"))?
-                    .join(name);
-
-                if tool_path.exists() {
-                    Ok(tool_path)
-                } else {
-                    return_bug!("{error}. Host tool '{name}' not found after checking in `ffx` directory as stopgap.")
-                }
+            if tool_path.exists() {
+                Ok(tool_path)
+            } else {
+                return_bug!("{error}. Host tool '{name}' not found after checking in `ffx` directory as stopgap.")
             }
         }
     }
 }
 
 const KNOCK_TARGET_TIMEOUT: Duration = Duration::from_secs(6);
-
-cfg_if! {
-    if #[cfg(test)] {
-        pub(crate) use self::mock_modules::get_host_tool;
-    } else {
-pub(crate) use self::modules::get_host_tool;
-    }
-}
 
 pub(crate) mod comms;
 pub(crate) mod femu;
@@ -142,26 +124,24 @@ pub(crate) trait QemuBasedEngine: EmulatorEngine {
         fs::create_dir_all(&instance_root)
             .map_err(|e| bug!("Error creating {instance_root:?}: {e}"))?;
 
-        let kernel_name = emu_config.guest.kernel_image.file_name().ok_or_else(|| {
-            bug!("cannot read kernel file name '{:?}'", emu_config.guest.kernel_image)
-        })?;
-        let kernel_path = instance_root.join(kernel_name);
-        if kernel_path.exists() && reuse {
-            tracing::debug!("Using existing file for {:?}", kernel_path.file_name().unwrap());
-        } else {
-            fs::copy(&emu_config.guest.kernel_image, &kernel_path)
-                .map_err(|e| bug!("cannot stage kernel file: {e}"))?;
+        if let Some(kernel_image) = &emu_config.guest.kernel_image {
+            let kernel_name = kernel_image.file_name().ok_or_else(|| {
+                bug!("cannot read kernel file name '{:?}'", emu_config.guest.kernel_image)
+            })?;
+            let kernel_path = instance_root.join(kernel_name);
+            if kernel_path.exists() && reuse {
+                tracing::debug!("Using existing file for {:?}", kernel_path.file_name().unwrap());
+            } else {
+                fs::copy(&kernel_image, &kernel_path)
+                    .map_err(|e| bug!("cannot stage kernel file: {e}"))?;
+            }
+            updated_guest.kernel_image = Some(kernel_path);
         }
 
-        // If the kernel is an efi image, skip the zbi processing.
-        let zbi_path = if !emu_config.guest.is_efi() {
-            let zbi_path = instance_root.join(
-                emu_config
-                    .guest
-                    .zbi_image
-                    .file_name()
-                    .ok_or_else(|| bug!("cannot read zbi file name"))?,
-            );
+        // If the kernel is an efi image, or has no zbi, skip the zbi processing.
+        let zbi_path = if let Some(zbi_image_path) = &emu_config.guest.zbi_image {
+            let zbi_path = instance_root
+                .join(zbi_image_path.file_name().ok_or_else(|| bug!("cannot read zbi file name"))?);
 
             if zbi_path.exists() && reuse {
                 tracing::debug!("Using existing file for {:?}", zbi_path.file_name().unwrap());
@@ -172,14 +152,14 @@ pub(crate) trait QemuBasedEngine: EmulatorEngine {
             } else {
                 // Add the authorized public keys to the zbi image to enable SSH access to
                 // the guest.
-                Self::embed_boot_data(&emu_config.guest.zbi_image, &zbi_path)
+                Self::embed_boot_data(&zbi_image_path, &zbi_path)
                     .await
                     .map_err(|e| bug!("cannot embed boot data: {e}"))?;
             }
-            zbi_path
+            Some(zbi_path)
         } else {
-            tracing::debug!("Skipping zbi staging since this is an efi image");
-            emu_config.guest.zbi_image.clone()
+            tracing::debug!("Skipping zbi staging; no zbi file in product bundle.");
+            None
         };
 
         if let Some(disk_image) = &emu_config.guest.disk_image {
@@ -239,18 +219,20 @@ pub(crate) trait QemuBasedEngine: EmulatorEngine {
                             bug!("Failed to persist temp Fxfs image to {dest_path:?}: {e}")
                         })?;
                     }
+                    // FAT does not need to be resized.
+                    DiskImage::Fat(_) => (),
                 };
             }
             // Update the guest config to reference the staged disk image.
             updated_guest.disk_image = match disk_image {
                 DiskImage::Fvm(_) => Some(DiskImage::Fvm(dest_path)),
                 DiskImage::Fxfs(_) => Some(DiskImage::Fxfs(dest_path)),
+                DiskImage::Fat(_) => Some(disk_image.clone()),
             };
         } else {
             updated_guest.disk_image = None;
         }
 
-        updated_guest.kernel_image = kernel_path;
         updated_guest.zbi_image = zbi_path;
         if emu_config.guest.is_efi() {
             // Set the OVMF files
@@ -891,10 +873,11 @@ mod tests {
         DataAmount, DataUnits, EmulatorInstanceData, EmulatorInstanceInfo, EmulatorInstances,
         EngineType, PortMapping,
     };
-    use ffx_config::ConfigLevel;
+    use ffx_config::{ConfigLevel, TestEnv};
     use serde::{Deserialize, Serialize};
     use std::io::Read;
     use std::os::unix::net::UnixListener;
+    use std::os::unix::prelude::PermissionsExt as _;
     use tempfile::{tempdir, TempDir};
 
     #[derive(Default, Serialize)]
@@ -941,6 +924,74 @@ mod tests {
         }
     }
 
+    pub(crate) async fn make_fake_sdk(env: &TestEnv) {
+        env.context
+            .query("sdk.root")
+            .level(Some(ConfigLevel::User))
+            .set(env.isolate_root.path().to_string_lossy().into())
+            .await
+            .expect("sdk.root setting");
+        let manifest_path = env.isolate_root.path().join("meta/manifest.json");
+        fs::create_dir_all(manifest_path.parent().unwrap()).expect("temp sdk dir");
+        fs::write(
+            &manifest_path,
+            r#"{ "arch": {  "host": "x86_64-linux-gnu",  "target": ["x64" ] },
+            "id": "9999",
+            "parts": [
+                {
+      "meta": "qemu_uefi_internal-meta.json",
+      "type": "companion_host_tool"
+    }],  "root": "..",
+  "schema_version": "1"}"#,
+        )
+        .expect("sdk manifest");
+
+        const ECHO_SCRIPT_CONTENTS: &str = "#!/bin/bash\necho \"$@\"";
+
+        let fake_qemu = env.isolate_root.path().join("fake_qemu");
+        fs::write(&fake_qemu, ECHO_SCRIPT_CONTENTS).expect("fake qemu");
+        fs::set_permissions(&fake_qemu, fs::Permissions::from_mode(0o770))
+            .expect("setting permissions");
+        env.context
+            .query("sdk.overrides.qemu_internal")
+            .level(Some(ConfigLevel::User))
+            .set(fake_qemu.to_string_lossy().into())
+            .await
+            .expect("qemu override");
+
+        let fake_aemu = env.isolate_root.path().join("fake_aemu");
+        fs::write(&fake_aemu, ECHO_SCRIPT_CONTENTS).expect("fake aemu");
+        fs::set_permissions(&fake_aemu, fs::Permissions::from_mode(0o770))
+            .expect("setting permissions");
+        env.context
+            .query("sdk.overrides.aemu_internal")
+            .level(Some(ConfigLevel::User))
+            .set(fake_qemu.to_string_lossy().into())
+            .await
+            .expect("aemu override");
+
+        let fake_fvm = env.isolate_root.path().join("fake_fvm");
+        fs::write(&fake_fvm, ECHO_SCRIPT_CONTENTS).expect("fake fvm");
+        fs::set_permissions(&fake_fvm, fs::Permissions::from_mode(0o770))
+            .expect("setting permissions");
+        env.context
+            .query("sdk.overrides.fvm")
+            .level(Some(ConfigLevel::User))
+            .set(fake_fvm.to_string_lossy().into())
+            .await
+            .expect("fvm override");
+
+        let fake_zbi = env.isolate_root.path().join("fake_zbi");
+        fs::write(&fake_zbi, ECHO_SCRIPT_CONTENTS).expect("fake zbi");
+        fs::set_permissions(&fake_zbi, fs::Permissions::from_mode(0o770))
+            .expect("setting permissions");
+        env.context
+            .query("sdk.overrides.zbi")
+            .level(Some(ConfigLevel::User))
+            .set(fake_zbi.to_string_lossy().into())
+            .await
+            .expect("zbi override");
+    }
     // Note that the caller MUST initialize the ffx_config environment before calling this function
     // since we override config values as part of the test. This looks like:
     //     let env = ffx_config::test_init().await?;
@@ -979,8 +1030,8 @@ mod tests {
             .set(json!(root.display().to_string()))
             .await?;
 
-        guest.kernel_image = kernel_path;
-        guest.zbi_image = zbi_path;
+        guest.kernel_image = Some(kernel_path);
+        guest.zbi_image = Some(zbi_path);
         guest.disk_image = Some(disk_image_path);
 
         // Set the paths to use for the SSH keys
@@ -1010,6 +1061,7 @@ mod tests {
 
     async fn test_staging_no_reuse_common(disk_image_format: DiskImageFormat) -> Result<()> {
         let env = ffx_config::test_init().await?;
+        make_fake_sdk(&env).await;
         let temp = tempdir().map_err(|e| bug!("cannot get tempdir: {e}"))?;
         let instance_name = "test-instance";
         let mut emu_config = EmulatorConfiguration::default();
@@ -1017,10 +1069,7 @@ mod tests {
 
         let root = setup(&env.context, &mut emu_config.guest, &temp, disk_image_format).await?;
 
-        let ctx = mock_modules::get_host_tool_context();
-        ctx.expect().returning(|_| Ok(PathBuf::from("echo")));
-
-        write_to(&emu_config.guest.kernel_image, ORIGINAL)
+        write_to(&emu_config.guest.kernel_image.clone().expect("test kernel filename"), ORIGINAL)
             .map_err(|e| bug!("cannot write original value to kernel file: {e}"))?;
         write_to(emu_config.guest.disk_image.as_ref().unwrap(), ORIGINAL)
             .map_err(|e| bug!("cannot write original value to disk image file: {e}"))?;
@@ -1033,8 +1082,8 @@ mod tests {
 
         let actual = updated.map_err(|e| bug!("cannot get updated guest config: {e}"))?;
         let expected = GuestConfig {
-            kernel_image: root.join(instance_name).join("kernel"),
-            zbi_image: root.join(instance_name).join("zbi"),
+            kernel_image: Some(root.join(instance_name).join("kernel")),
+            zbi_image: Some(root.join(instance_name).join("zbi")),
             disk_image: Some(
                 disk_image_format.as_disk_image(root.join(instance_name).join("disk")),
             ),
@@ -1043,7 +1092,7 @@ mod tests {
         assert_eq!(actual, expected);
 
         // Test no reuse when old files exist. The original files should be overwritten.
-        write_to(&emu_config.guest.kernel_image, UPDATED)
+        write_to(&emu_config.guest.kernel_image.clone().expect("kernel image name"), UPDATED)
             .map_err(|e| bug!("cannot write updated value to kernel file: {e}"))?;
         write_to(emu_config.guest.disk_image.as_ref().unwrap(), UPDATED)
             .map_err(|e| bug!("cannot write updated value to disk image file: {e}"))?;
@@ -1056,8 +1105,8 @@ mod tests {
 
         let actual = updated.map_err(|e| bug!("cannot get updated guest config, reuse: {e}"))?;
         let expected = GuestConfig {
-            kernel_image: root.join(instance_name).join("kernel"),
-            zbi_image: root.join(instance_name).join("zbi"),
+            kernel_image: Some(root.join(instance_name).join("kernel")),
+            zbi_image: Some(root.join(instance_name).join("zbi")),
             disk_image: Some(
                 disk_image_format.as_disk_image(root.join(instance_name).join("disk")),
             ),
@@ -1065,9 +1114,12 @@ mod tests {
         };
         assert_eq!(actual, expected);
 
-        eprintln!("Reading contents from {}", actual.kernel_image.display());
+        eprintln!(
+            "Reading contents from {}",
+            actual.kernel_image.clone().expect("kernel file path").display()
+        );
         eprintln!("Reading contents from {}", actual.disk_image.as_ref().unwrap().display());
-        let mut kernel = File::open(&actual.kernel_image)
+        let mut kernel = File::open(&actual.kernel_image.clone().expect("kernel file path"))
             .map_err(|e| bug!("cannot open overwritten kernel file for read: {e}"))?;
         let mut disk_image = File::open(&*actual.disk_image.unwrap())
             .map_err(|e| bug!("cannot open overwritten disk image file for read: {e}"))?;
@@ -1106,6 +1158,7 @@ mod tests {
 
     async fn test_staging_with_reuse_common(disk_image_format: DiskImageFormat) -> Result<()> {
         let env = ffx_config::test_init().await?;
+        make_fake_sdk(&env).await;
         let temp = tempdir().expect("cannot get tempdir");
         let instance_name = "test-instance";
         let mut emu_config = EmulatorConfiguration::default();
@@ -1113,11 +1166,8 @@ mod tests {
 
         let root = setup(&env.context, &mut emu_config.guest, &temp, disk_image_format).await?;
 
-        let ctx = mock_modules::get_host_tool_context();
-        ctx.expect().returning(|_| Ok(PathBuf::from("echo")));
-
         // This checks if --reuse is true, but the directory isn't there to reuse; should succeed.
-        write_to(&emu_config.guest.kernel_image, ORIGINAL)
+        write_to(&emu_config.guest.kernel_image.clone().expect("kernel file path"), ORIGINAL)
             .expect("cannot write original value to kernel file");
         write_to(emu_config.guest.disk_image.as_ref().unwrap(), ORIGINAL)
             .expect("cannot write original value to disk image file");
@@ -1130,8 +1180,8 @@ mod tests {
 
         let actual = updated.expect("cannot get updated guest config");
         let expected = GuestConfig {
-            kernel_image: root.join(instance_name).join("kernel"),
-            zbi_image: root.join(instance_name).join("zbi"),
+            kernel_image: Some(root.join(instance_name).join("kernel")),
+            zbi_image: Some(root.join(instance_name).join("zbi")),
             disk_image: Some(
                 disk_image_format.as_disk_image(root.join(instance_name).join("disk")),
             ),
@@ -1141,7 +1191,7 @@ mod tests {
 
         // Test reuse. Note that the ZBI file isn't actually copied in the test, since we replace
         // the ZBI tool with an "echo" command.
-        write_to(&emu_config.guest.kernel_image, UPDATED)
+        write_to(&emu_config.guest.kernel_image.clone().expect("kernel file path"), UPDATED)
             .expect("cannot write updated value to kernel file");
         write_to(emu_config.guest.disk_image.as_ref().unwrap(), UPDATED)
             .expect("cannot write updated value to disk image file");
@@ -1154,8 +1204,8 @@ mod tests {
 
         let actual = updated.expect("cannot get updated guest config, reuse");
         let expected = GuestConfig {
-            kernel_image: root.join(instance_name).join("kernel"),
-            zbi_image: root.join(instance_name).join("zbi"),
+            kernel_image: Some(root.join(instance_name).join("kernel")),
+            zbi_image: Some(root.join(instance_name).join("zbi")),
             disk_image: Some(
                 disk_image_format.as_disk_image(root.join(instance_name).join("disk")),
             ),
@@ -1163,9 +1213,12 @@ mod tests {
         };
         assert_eq!(actual, expected);
 
-        eprintln!("Reading contents from {}", actual.kernel_image.display());
-        let mut kernel =
-            File::open(&actual.kernel_image).expect("cannot open reused kernel file for read");
+        eprintln!(
+            "Reading contents from {}",
+            actual.kernel_image.clone().expect("kernel file path").display()
+        );
+        let mut kernel = File::open(&actual.kernel_image.expect("kernel file path"))
+            .expect("cannot open reused kernel file for read");
         let mut fvm =
             File::open(&*actual.disk_image.unwrap()).expect("cannot open reused fvm file for read");
 
@@ -1202,20 +1255,21 @@ mod tests {
     // There's no equivalent test for FVM for now -- extending FVM images is more complex and
     // depends on an external binary, making testing challenging.
     #[fuchsia::test]
-
     async fn test_staging_resize_fxfs() -> Result<()> {
         let env = ffx_config::test_init().await?;
+        make_fake_sdk(&env).await;
         let temp = tempdir().expect("cannot get tempdir");
         let instance_name = "test-instance";
         let mut emu_config = EmulatorConfiguration::default();
         let root = setup(&env.context, &mut emu_config.guest, &temp, DiskImageFormat::Fxfs).await?;
 
-        let ctx = mock_modules::get_host_tool_context();
-        ctx.expect().returning(|_| Ok(PathBuf::from("echo")));
-
         const EXPECTED_DATA: &[u8] = b"hello, world";
 
-        std::fs::write(&emu_config.guest.kernel_image, "whatever").expect("writing kernel image");
+        std::fs::write(
+            &emu_config.guest.kernel_image.as_ref().expect("kernel file path"),
+            "whatever",
+        )
+        .expect("writing kernel image");
         std::fs::write(emu_config.guest.disk_image.as_ref().unwrap(), EXPECTED_DATA)
             .expect("writing guest image");
         // Make the input file read-only to ensure that the staged version is RW.
@@ -1234,8 +1288,8 @@ mod tests {
                 .expect("Failed to get guest config");
 
         let expected = GuestConfig {
-            kernel_image: root.join(instance_name).join("kernel"),
-            zbi_image: root.join(instance_name).join("zbi"),
+            kernel_image: Some(root.join(instance_name).join("kernel")),
+            zbi_image: Some(root.join(instance_name).join("zbi")),
             disk_image: Some(DiskImage::Fxfs(root.join(instance_name).join("disk"))),
             ..Default::default()
         };
@@ -1258,15 +1312,13 @@ mod tests {
     #[fuchsia::test]
     async fn test_embed_boot_data() -> Result<()> {
         let env = ffx_config::test_init().await?;
+        make_fake_sdk(&env).await;
         let temp = tempdir().expect("cannot get tempdir");
         let mut emu_config = EmulatorConfiguration::default();
 
         let root = setup(&env.context, &mut emu_config.guest, &temp, DiskImageFormat::Fvm).await?;
 
-        let ctx = mock_modules::get_host_tool_context();
-        ctx.expect().returning(|_| Ok(PathBuf::from("echo")));
-
-        let src = emu_config.guest.zbi_image;
+        let src = emu_config.guest.zbi_image.expect("zbi image path");
         let dest = root.join("dest.zbi");
 
         <TestEngine as QemuBasedEngine>::embed_boot_data(&src, &dest).await?;
@@ -1274,7 +1326,7 @@ mod tests {
         Ok(())
     }
 
-    #[test]
+    #[fuchsia::test]
     fn test_validate_net() -> Result<()> {
         // User mode doesn't have specific requirements, so it should return OK.
         let engine = TestEngine::default();

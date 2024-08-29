@@ -62,6 +62,7 @@ source_set("aml-sdmmc-driver-source") {
     "//src/devices/lib/amlogic",
     "//src/devices/lib/dma-buffer",
     "//src/devices/lib/mmio",
+    "//src/devices/power/lib/from-fidl/cpp",
     "//src/lib/vmo_store",
     "//zircon/system/ulib/hwreg",
     "//zircon/system/ulib/inspect",

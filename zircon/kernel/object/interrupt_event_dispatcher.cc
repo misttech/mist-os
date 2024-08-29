@@ -63,18 +63,18 @@ zx_status_t InterruptEventDispatcher::Create(KernelHandle<InterruptDispatcher>* 
       return ZX_ERR_INVALID_ARGS;
   }
 
-  uint32_t interrupt_flags = 0;
+  Flags interrupt_flags{};
 
   if (tm == IRQ_TRIGGER_MODE_LEVEL) {
-    interrupt_flags |= INTERRUPT_UNMASK_PREWAIT | INTERRUPT_MASK_POSTWAIT;
+    interrupt_flags = Flags(interrupt_flags | INTERRUPT_UNMASK_PREWAIT | INTERRUPT_MASK_POSTWAIT);
   }
 
   if (options & ZX_INTERRUPT_WAKE_VECTOR) {
-    interrupt_flags |= INTERRUPT_WAKE_VECTOR;
+    interrupt_flags = Flags(interrupt_flags | INTERRUPT_WAKE_VECTOR);
   }
 
   if (allow_ack_without_port_for_test) {
-    interrupt_flags |= INTERRUPT_ALLOW_ACK_WITHOUT_PORT_FOR_TEST;
+    interrupt_flags = Flags(interrupt_flags | INTERRUPT_ALLOW_ACK_WITHOUT_PORT_FOR_TEST);
   }
 
   // Attempt to construct the dispatcher.
@@ -86,8 +86,6 @@ zx_status_t InterruptEventDispatcher::Create(KernelHandle<InterruptDispatcher>* 
   if (!ac.check()) {
     return ZX_ERR_NO_MEMORY;
   }
-
-  Guard<CriticalMutex> guard{disp->get_lock()};
 
   // Remap the vector if we have been asked to do so.
   if (options & ZX_INTERRUPT_REMAP_IRQ) {
@@ -134,7 +132,7 @@ void InterruptEventDispatcher::IrqHandler(void* ctx) {
   self->InterruptHandler();
 }
 
-InterruptEventDispatcher::InterruptEventDispatcher(uint32_t vector, uint32_t flags)
+InterruptEventDispatcher::InterruptEventDispatcher(uint32_t vector, Flags flags)
     : InterruptDispatcher(flags), vector_(vector) {
   kcounter_add(dispatcher_interrupt_event_create_count, 1);
   InitializeWakeEvent();

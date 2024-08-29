@@ -10,7 +10,8 @@
 
 #include "macros.h"
 
-namespace sysmem_driver {
+namespace sysmem_service {
+
 ExternalMemoryAllocator::ExternalMemoryAllocator(
     MemoryAllocator::Owner* owner, fidl::WireSharedClient<fuchsia_hardware_sysmem::Heap> heap,
     fuchsia_hardware_sysmem::HeapProperties properties)
@@ -77,4 +78,4 @@ void ExternalMemoryAllocator::Delete(zx::vmo parent_vmo) {
   }
 }
 
-}  // namespace sysmem_driver
+}  // namespace sysmem_service

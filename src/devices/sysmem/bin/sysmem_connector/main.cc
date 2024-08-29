@@ -7,7 +7,8 @@
 #include <lib/syslog/cpp/log_settings.h>
 #include <lib/trace-provider/provider.h>
 
-#include "app.h"
+#include "src/devices/sysmem/bin/sysmem_connector/app.h"
+#include "src/devices/sysmem/bin/sysmem_connector/sysmem_config.h"
 
 int main(int argc, const char** argv) {
   // kAsyncLoopConfigAttachToCurrentThread is currently required by
@@ -15,7 +16,7 @@ int main(int argc, const char** argv) {
   // async_get_default_dispatcher().
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
   fuchsia_logging::LogSettingsBuilder builder;
-  builder.WithTags({"sysmem_connector"}).BuildAndInitialize();
+  builder.WithTags({"sysmem"}).BuildAndInitialize();
   trace::TraceProviderWithFdio trace_provider(loop.dispatcher());
   App app(loop.dispatcher());
   loop.Run();

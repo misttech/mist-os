@@ -205,7 +205,7 @@ template("bad_signature_update") {
              "//src/connectivity/network/netstack:component",
 
              # Mock SWD component dependencies.
-             "//src/cobalt/bin/testing/mock_cobalt:component_v2",
+             "//src/cobalt/bin/testing/fake_cobalt:component_v2",
              "//src/security/tests/pkg_test/tests:fake_boot_arguments_v0-component",
 
              #

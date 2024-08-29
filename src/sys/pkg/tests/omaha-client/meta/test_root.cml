@@ -9,8 +9,8 @@
             url: "fuchsia-pkg://fuchsia.com/omaha-client-integration-tests#meta/test_driver.cm",
         },
         {
-            name: "mock_cobalt",
-            url: "fuchsia-pkg://fuchsia.com/omaha-client-integration-tests#meta/mock_cobalt.cm",
+            name: "fake_cobalt",
+            url: "fuchsia-pkg://fuchsia.com/omaha-client-integration-tests#meta/fake_cobalt.cm",
         },
     ],
     offer: [
@@ -26,7 +26,7 @@
             ],
             from: "parent",
             to: [
-                "#mock_cobalt",
+                "#fake_cobalt",
                 "#test_driver",
             ],
         },
@@ -42,7 +42,7 @@
         },
         {
             protocol: [ "fuchsia.metrics.MetricEventLoggerFactory" ],
-            from: "#mock_cobalt",
+            from: "#fake_cobalt",
             to: "#test_driver",
         },
         {

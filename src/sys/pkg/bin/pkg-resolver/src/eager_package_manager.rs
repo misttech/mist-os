@@ -687,7 +687,7 @@ fn load_result_to_event_code(
 mod tests {
     use super::*;
     use crate::resolver_service::MockResolver;
-    use crate::test_util::{get_mock_cobalt_sender, verify_cobalt_emits_event};
+    use crate::test_util::{get_fake_cobalt_sender, verify_cobalt_emits_event};
     use assert_matches::assert_matches;
     use fidl_fuchsia_pkg::{
         BlobInfoIteratorRequest, NeededBlobsRequest, PackageCacheMarker, PackageCacheRequest,
@@ -895,7 +895,7 @@ mod tests {
         data_proxy: Option<fio::DirectoryProxy>,
         #[builder(default = "CachePackages::from_entries(vec![])")]
         cache_packages: CachePackages,
-        #[builder(default = "get_mock_cobalt_sender().0")]
+        #[builder(default = "get_fake_cobalt_sender().0")]
         cobalt_sender: ProtocolSender<MetricEvent>,
     }
 
@@ -1056,7 +1056,7 @@ mod tests {
             ],
         };
         let (pkg_cache, pkg_cache_stream) = get_mock_pkg_cache();
-        let (cobalt_sender, mut cobalt_receiver) = get_mock_cobalt_sender();
+        let (cobalt_sender, mut cobalt_receiver) = get_fake_cobalt_sender();
 
         let data_dir = tempfile::tempdir().unwrap();
         let data_proxy = fuchsia_fs::directory::open_in_namespace(
@@ -1184,7 +1184,7 @@ mod tests {
             }],
         };
         let (pkg_cache, pkg_cache_stream) = get_mock_pkg_cache();
-        let (cobalt_sender, mut cobalt_receiver) = get_mock_cobalt_sender();
+        let (cobalt_sender, mut cobalt_receiver) = get_fake_cobalt_sender();
 
         let data_dir = tempfile::tempdir().unwrap();
         let data_proxy = fuchsia_fs::directory::open_in_namespace(
@@ -1220,7 +1220,7 @@ mod tests {
     #[fasync::run_singlethreaded(test)]
     async fn test_load_persistent_eager_packages_not_available() {
         let url = UnpinnedAbsolutePackageUrl::parse(TEST_URL).unwrap();
-        let (cobalt_sender, mut cobalt_receiver) = get_mock_cobalt_sender();
+        let (cobalt_sender, mut cobalt_receiver) = get_fake_cobalt_sender();
 
         let data_dir = tempfile::tempdir().unwrap();
         let data_proxy = fuchsia_fs::directory::open_in_namespace(
@@ -1245,7 +1245,7 @@ mod tests {
     #[fasync::run_singlethreaded(test)]
     async fn test_load_persistent_eager_packages_storage_error() {
         let url = UnpinnedAbsolutePackageUrl::parse(TEST_URL).unwrap();
-        let (cobalt_sender, mut cobalt_receiver) = get_mock_cobalt_sender();
+        let (cobalt_sender, mut cobalt_receiver) = get_fake_cobalt_sender();
 
         let manager =
             TestEagerPackageManagerBuilder::default().cobalt_sender(cobalt_sender).build().await;
@@ -1262,7 +1262,7 @@ mod tests {
     async fn test_no_data_fallback_to_cache() {
         let url = UnpinnedAbsolutePackageUrl::parse(TEST_URL).unwrap();
         let (pkg_cache, pkg_cache_stream) = get_mock_pkg_cache();
-        let (cobalt_sender, mut cobalt_receiver) = get_mock_cobalt_sender();
+        let (cobalt_sender, mut cobalt_receiver) = get_fake_cobalt_sender();
 
         let (manager, ()) = future::join(
             TestEagerPackageManagerBuilder::default()
@@ -1287,7 +1287,7 @@ mod tests {
     async fn test_empty_persistent_fidl_fallback_to_cache() {
         let url = UnpinnedAbsolutePackageUrl::parse(TEST_URL).unwrap();
         let (pkg_cache, pkg_cache_stream) = get_mock_pkg_cache();
-        let (cobalt_sender, mut cobalt_receiver) = get_mock_cobalt_sender();
+        let (cobalt_sender, mut cobalt_receiver) = get_fake_cobalt_sender();
 
         let data_dir = tempfile::tempdir().unwrap();
         let data_proxy = fuchsia_fs::directory::open_in_namespace(
