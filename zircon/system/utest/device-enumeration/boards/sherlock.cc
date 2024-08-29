@@ -110,14 +110,10 @@ TEST_F(DeviceEnumerationTest, SherlockTest) {
   };
   VerifyNodes(kNodeMonikers);
 
-  // TODO(b/324268831): Remove these once devfs is deprecated.
-  static const char* kDevFsPaths[] = {
-      "class/cpu-ctrl/000",    "class/cpu-ctrl/001",    "class/thermal/000",
-      "class/thermal/001",     "class/adc/000",         "class/adc/001",
-      "class/adc/002",         "class/adc/003",         "class/temperature/000",
-      "class/temperature/001", "class/temperature/002",
-  };
-  ASSERT_NO_FATAL_FAILURE(TestRunner(kDevFsPaths, std::size(kDevFsPaths)));
+  ASSERT_NO_FATAL_FAILURE(device_enumeration::WaitForClassDeviceCount("class/cpu-ctrl", 2));
+  ASSERT_NO_FATAL_FAILURE(device_enumeration::WaitForClassDeviceCount("class/thermal", 2));
+  ASSERT_NO_FATAL_FAILURE(device_enumeration::WaitForClassDeviceCount("class/adc", 4));
+  ASSERT_NO_FATAL_FAILURE(device_enumeration::WaitForClassDeviceCount("class/temperature", 3));
 }
 
 }  // namespace
