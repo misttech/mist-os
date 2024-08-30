@@ -290,7 +290,7 @@ executable("decompressor") {
     ":decompressor_impl",
     ":fuchsia.blobfs.internal_cpp",
     "//sdk/lib/component/outgoing/cpp",
-    "//sdk/lib/fidl/cpp",
+    "//sdk/lib/fidl/hlcpp",
     "//sdk/lib/syslog/cpp",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/async-loop:async-loop-default",

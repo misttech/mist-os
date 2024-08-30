@@ -73,7 +73,7 @@ executable("relay") {
   ]
   public_deps = [
     ":test.fuzzer_hlcpp",
-    "//sdk/lib/fidl/cpp",
+    "//sdk/lib/fidl/hlcpp",
     "//sdk/lib/syslog/cpp",
     "//sdk/testing/fidl:test_support",
     "//src/lib/fxl",

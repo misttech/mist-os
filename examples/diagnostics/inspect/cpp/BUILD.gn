@@ -29,7 +29,7 @@ source_set("lib") {
 
   public_deps = [
     "//examples/components/routing/fidl:echo_hlcpp",
-    "//sdk/lib/fidl/cpp",
+    "//sdk/lib/fidl/hlcpp",
 
     # [START inspect_libs]
     "//sdk/lib/inspect/component/cpp",

@@ -9,14 +9,14 @@ import("//build/test.gni")
 source_set("fuzzing") {
   testonly = true
   sources = [
-    "decoder_encoder.h",
-    "fuzzer.h",
-    "server_provider.h",
-    "traits.h",
+    "include/lib/fidl/cpp/fuzzing/decoder_encoder.h",
+    "include/lib/fidl/cpp/fuzzing/fuzzer.h",
+    "include/lib/fidl/cpp/fuzzing/server_provider.h",
+    "include/lib/fidl/cpp/fuzzing/traits.h",
   ]
   public_deps = [
-    "//sdk/lib/fidl/cpp",
     "//sdk/lib/fidl/cpp/wire",
+    "//sdk/lib/fidl/hlcpp",
     "//sdk/lib/fuzzing/cpp",
     "//sdk/lib/fuzzing/cpp:traits",
     "//zircon/system/public",
@@ -25,7 +25,14 @@ source_set("fuzzing") {
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/async-loop:async-loop-default",
   ]
-  public_configs = [ "//sdk/config" ]
+  public_configs = [
+    "//sdk/config",
+    ":config",
+  ]
+}
+
+config("config") {
+  include_dirs = [ "include" ]
 }
 
 test("fidl_hlcpp_fuzzing_unittests") {

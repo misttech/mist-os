@@ -186,7 +186,7 @@ icu_source_set("lib") {
   deps = [
     "//sdk/fidl/fuchsia.ui.input:fuchsia.ui.input_hlcpp",
     "//sdk/fidl/fuchsia.ui.views:fuchsia.ui.views_hlcpp",
-    "//sdk/lib/fidl/cpp",
+    "//sdk/lib/fidl/hlcpp",
     "//sdk/lib/sys/cpp",
     "//sdk/lib/syslog/cpp",
     "//src/lib/fsl",

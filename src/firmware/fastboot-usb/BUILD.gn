@@ -28,7 +28,7 @@ executable("bin") {
   deps = [
     "//sdk/fidl/fuchsia.component:fuchsia.component_cpp",
     "//sdk/fidl/fuchsia.hardware.fastboot:fuchsia.hardware.fastboot_cpp",
-    "//sdk/lib/fidl/cpp",
+    "//sdk/lib/fidl/hlcpp",
     "//sdk/lib/sys/cpp",
     "//src/firmware/lib/fastboot",
     "//src/lib/fsl",

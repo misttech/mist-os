@@ -19,11 +19,11 @@ source_set("fostr") {
 
   if (is_fuchsia) {
     public_deps = [
-      "//sdk/lib/fidl/cpp",
+      "//sdk/lib/fidl/hlcpp",
       "//zircon/system/ulib/zx",
     ]
   } else {
-    public_deps = [ "//sdk/lib/fidl/cpp:cpp_base" ]
+    public_deps = [ "//sdk/lib/fidl/hlcpp:hlcpp_base" ]
   }
 
   deps = [ ":fostr_shared" ]
@@ -61,7 +61,7 @@ test("fostr-test-bin") {
     ":fostr",
     "//sdk/fidl/fuchsia.boot:fuchsia.boot_cpp",
     "//sdk/lib/component/incoming/cpp",
-    "//sdk/lib/fidl/cpp",
+    "//sdk/lib/fidl/hlcpp",
     "//src/lib/fostr/fidl/fuchsia.example.fostr",
     "//src/lib/fostr/fidl/fuchsia.example.fostr2",
     "//src/lib/fsl",

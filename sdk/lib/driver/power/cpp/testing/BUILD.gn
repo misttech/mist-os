@@ -22,7 +22,7 @@ source_set("fakes") {
     ":fidl_test_base_default",
     "//sdk/fidl/fuchsia.power.broker:fuchsia.power.broker_cpp",
     "//sdk/fidl/fuchsia.power.system:fuchsia.power.system_cpp",
-    "//sdk/lib/fidl/cpp",
+    "//sdk/lib/fidl/hlcpp",
     "//zircon/system/ulib/async:async-cpp",
   ]
 }
@@ -31,7 +31,7 @@ source_set("fidl_test_base_default") {
   testonly = true
   public = [ "fidl_test_base_default.h" ]
   public_deps = [
-    "//sdk/lib/fidl/cpp",
+    "//sdk/lib/fidl/hlcpp",
     "//third_party/googletest:gtest",
   ]
 }

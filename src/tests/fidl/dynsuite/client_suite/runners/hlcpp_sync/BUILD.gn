@@ -9,7 +9,7 @@ executable("bin") {
   output_name = "client_suite_under_test_hlcpp_sync"
   sources = [ "main.cc" ]
   deps = [
-    "//sdk/lib/fidl/cpp",
+    "//sdk/lib/fidl/hlcpp",
     "//sdk/lib/sys/cpp",
     "//src/tests/fidl/dynsuite/client_suite/fidl:fidl.clientsuite_hlcpp",
     "//src/tests/fidl/dynsuite/client_suite/runners/hlcpp_util:hlcpp_util",

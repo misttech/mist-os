@@ -22,7 +22,7 @@ source_set("traits") {
   public_configs = [ "//sdk/config" ]
   public_deps = [
     ":cpp",
-    "//sdk/lib/fidl/cpp:cpp_sync",
+    "//sdk/lib/fidl/hlcpp:hlcpp_sync",
     "//zircon/system/ulib/zx",
   ]
 }

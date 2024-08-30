@@ -5,6 +5,7 @@
 #ifndef CTF_TESTS_PKG_FIDL_CPP_TEST_TEST_UTIL_H_
 #define CTF_TESTS_PKG_FIDL_CPP_TEST_TEST_UTIL_H_
 
+#include <lib/fidl/cpp/message.h>
 #include <lib/fidl/cpp/wire_format_metadata.h>
 #include <lib/fidl/internal.h>
 
@@ -15,7 +16,6 @@
 #include <zxtest/zxtest.h>
 
 #include "lib/fidl/cpp/clone.h"
-#include "sdk/lib/fidl/cpp/message.h"
 
 namespace fidl {
 namespace test {

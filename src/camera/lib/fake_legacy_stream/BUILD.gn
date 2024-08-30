@@ -23,7 +23,7 @@ source_set("lib") {
     "fake_legacy_stream.h",
   ]
   deps = [
-    "//sdk/lib/fidl/cpp",
+    "//sdk/lib/fidl/hlcpp",
     "//sdk/lib/syslog/cpp",
     "//zircon/system/ulib/async",
   ]

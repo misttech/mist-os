@@ -53,7 +53,7 @@ icu_source_set("screen_reader") {
   ]
 
   deps = [
-    "//sdk/lib/fidl/cpp",
+    "//sdk/lib/fidl/hlcpp",
     "//sdk/lib/sys/cpp",
     "//sdk/lib/syslog/cpp",
     "//src/ui/a11y/lib/gesture_manager",

@@ -15,7 +15,7 @@ source_set("lib") {
     "controller_error.h",
   ]
   deps = [
-    "//sdk/lib/fidl/cpp",
+    "//sdk/lib/fidl/hlcpp",
     "//sdk/lib/sys/cpp",
     "//sdk/lib/syslog/cpp",
     "//src/lib/fxl",

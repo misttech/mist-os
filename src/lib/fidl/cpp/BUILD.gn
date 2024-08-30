@@ -98,7 +98,7 @@ sdk_source_set("hlcpp_conversion") {
   public = [ "include/lib/fidl/cpp/hlcpp_conversion.h" ]
   public_configs = [ ":cpp_base.headers" ]
   public_deps = [
-    "//sdk/lib/fidl/cpp:cpp_base",
+    "//sdk/lib/fidl/hlcpp:hlcpp_base",
     "//src/lib/fidl/cpp:cpp_base",
   ]
 }

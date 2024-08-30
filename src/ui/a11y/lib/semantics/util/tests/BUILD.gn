@@ -14,7 +14,7 @@ executable("semantics_util_tests") {
 
   sources = [ "semantic_transform_unittest.cc" ]
   deps = [
-    "//sdk/lib/fidl/cpp",
+    "//sdk/lib/fidl/hlcpp",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/loop_fixture",
     "//src/ui/a11y/lib/semantics/util",

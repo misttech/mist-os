@@ -27,7 +27,7 @@ source_set("virtual_camera_hal_controller") {
   public_deps = [
     ":stream_storage",
     "//sdk/fidl/fuchsia.camera2.hal:fuchsia.camera2.hal_hlcpp",
-    "//sdk/lib/fidl/cpp",
+    "//sdk/lib/fidl/hlcpp",
   ]
   deps = [ "//sdk/lib/syslog/cpp" ]
 }

@@ -41,7 +41,7 @@ icu_source_set("time-zone-info-service-lib") {
   ]
 
   deps = [
-    "//sdk/lib/fidl/cpp",
+    "//sdk/lib/fidl/hlcpp",
     "//sdk/lib/sys/cpp",
     "//sdk/lib/sys/service/cpp",
     "//sdk/lib/syslog/cpp",

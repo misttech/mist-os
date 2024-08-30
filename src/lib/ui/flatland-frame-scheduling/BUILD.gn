@@ -34,7 +34,7 @@ source_set("simple_present_hlcpp") {
 
   public_deps = [
     "//sdk/fidl/fuchsia.ui.composition:fuchsia.ui.composition_hlcpp",
-    "//sdk/lib/fidl/cpp",
+    "//sdk/lib/fidl/hlcpp",
     "//sdk/lib/sys/cpp:cpp",
     "//sdk/lib/syslog/cpp",
   ]
@@ -48,7 +48,7 @@ source_set("simple_present") {
 
   public_deps = [
     "//sdk/fidl/fuchsia.ui.composition:fuchsia.ui.composition_cpp",
-    "//sdk/lib/fidl/cpp",
+    "//sdk/lib/fidl/hlcpp",
   ]
 
   deps = [

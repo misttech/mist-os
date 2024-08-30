@@ -29,7 +29,7 @@ source_set("lib") {
   public = [ "fake_stream.h" ]
   deps = [
     ":impl_header",
-    "//sdk/lib/fidl/cpp",
+    "//sdk/lib/fidl/hlcpp",
     "//sdk/lib/syslog/cpp",
     "//zircon/system/ulib/async:async-cpp",
     "//zircon/system/ulib/async-loop:async-loop-cpp",

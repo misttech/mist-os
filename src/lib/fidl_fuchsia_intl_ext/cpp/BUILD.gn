@@ -7,6 +7,6 @@ source_set("cpp") {
 
   deps = [
     "//sdk/fidl/fuchsia.intl:fuchsia.intl_hlcpp",
-    "//sdk/lib/fidl/cpp",
+    "//sdk/lib/fidl/hlcpp",
   ]
 }

@@ -74,4 +74,4 @@ the source of the crash, and try the operation again.
 As a component author, it's important to help users get additional meaningful error messages
 when they see the `zx_err_peer_closed` error. To do this, your code should set
 an epitaph with the
-[binding::Close(zx_status_t epitaph_value)](/sdk/lib/fidl/cpp/binding.h#199) binding.
+[binding::Close(zx_status_t epitaph_value)](/sdk/lib/fidl/hlcpp/include/lib/fidl/cpp/binding.h#199) binding.

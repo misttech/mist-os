@@ -13,7 +13,7 @@ source_set("namespace") {
   public_deps = [ "//sdk/lib/component/incoming/cpp" ]
 
   deps = [
-    "//sdk/lib/fidl/cpp",
+    "//sdk/lib/fidl/hlcpp",
     "//zircon/system/ulib/zx",
   ]
 }

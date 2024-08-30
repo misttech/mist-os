@@ -28,7 +28,7 @@ executable("touch-flatland-client-binary") {
     "//sdk/fidl/fuchsia.ui.views:fuchsia.ui.views_cpp",
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/component/outgoing/cpp",
-    "//sdk/lib/fidl/cpp",
+    "//sdk/lib/fidl/hlcpp",
     "//sdk/lib/sys/cpp",
     "//sdk/lib/syslog/cpp",
     "//sdk/lib/ui/scenic/cpp",

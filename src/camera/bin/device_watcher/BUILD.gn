@@ -34,7 +34,7 @@ source_set("lib") {
     "//sdk/fidl/fuchsia.io:fuchsia.io_hlcpp",
     "//sdk/fidl/fuchsia.process:fuchsia.process_hlcpp",
     "//sdk/lib/component/outgoing/cpp",
-    "//sdk/lib/fidl/cpp",
+    "//sdk/lib/fidl/hlcpp",
     "//sdk/lib/fit-promise",
     "//sdk/lib/sys/cpp",
     "//sdk/lib/syslog/cpp",
@@ -76,7 +76,7 @@ executable("camera_device_watcher_unittest_bin") {
   deps = [
     ":fuchsia.camera.test_hlcpp",
     ":lib",
-    "//sdk/lib/fidl/cpp",
+    "//sdk/lib/fidl/hlcpp",
     "//sdk/lib/sys/cpp/testing:unit",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/loop_fixture",

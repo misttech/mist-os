@@ -10,7 +10,7 @@ source_set("tts") {
 
   public_deps = [
     "//sdk/fidl/fuchsia.accessibility.tts:fuchsia.accessibility.tts_hlcpp",
-    "//sdk/lib/fidl/cpp",
+    "//sdk/lib/fidl/hlcpp",
     "//sdk/lib/fit",
     "//sdk/lib/sys/cpp",
   ]

@@ -30,7 +30,7 @@ sdk_source_set("testing") {
     "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_cpp",
     "//sdk/fidl/fuchsia.ui.composition:fuchsia.ui.composition_hlcpp",
     "//sdk/fidl/fuchsia.ui.views:fuchsia.ui.views_hlcpp",
-    "//sdk/lib/fidl/cpp",
+    "//sdk/lib/fidl/hlcpp",
     "//zircon/system/ulib/async",
     "//zircon/system/ulib/syslog",
     "//zircon/system/ulib/zx",

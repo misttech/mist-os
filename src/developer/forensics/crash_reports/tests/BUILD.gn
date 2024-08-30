@@ -61,7 +61,7 @@ executable("crash_reporter_unittest_exe") {
     "//sdk/fidl/fuchsia.mem:fuchsia.mem_hlcpp",
     "//sdk/fidl/fuchsia.settings:fuchsia.settings_hlcpp",
     "//sdk/fidl/fuchsia.time:fuchsia.time_hlcpp",
-    "//sdk/lib/fidl/cpp",
+    "//sdk/lib/fidl/hlcpp",
     "//sdk/lib/fit-promise",
     "//sdk/lib/syslog/cpp",
     "//src/developer/forensics/crash_reports:constants",

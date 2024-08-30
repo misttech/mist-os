@@ -7,15 +7,15 @@
 
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
+#include <lib/fidl/cpp/binding.h>
 
 #include <gtest/gtest.h>
-#include <sdk/lib/fidl/cpp/binding.h>
 
 #include "src/lib/fidl_codec/library_loader.h"
 
 namespace fidl_codec {
 
-// Stolen from //sdk/lib/fidl/cpp/test/async_loop_for_test.{h,cc}; cc
+// Stolen from //sdk/lib/fidl/hlcpp/test/async_loop_for_test.{h,cc}; cc
 // is not public
 
 class AsyncLoopForTestImpl;

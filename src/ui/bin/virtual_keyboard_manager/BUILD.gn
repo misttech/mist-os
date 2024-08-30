@@ -51,7 +51,7 @@ source_set("lib") {
 
   deps = [
     ":virtual_keyboard",
-    "//sdk/lib/fidl/cpp",
+    "//sdk/lib/fidl/hlcpp",
   ]
 }
 

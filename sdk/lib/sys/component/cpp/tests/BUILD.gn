@@ -33,7 +33,7 @@ executable("echo_server_bin") {
   sources = [ "echo_server.cc" ]
 
   deps = [
-    "//sdk/lib/fidl/cpp",
+    "//sdk/lib/fidl/hlcpp",
     "//sdk/lib/sys/cpp",
     "//src/lib/fxl:fxl_cli",
     "//src/testing/fidl:placeholders_hlcpp",
@@ -50,7 +50,7 @@ executable("echo_server_sc_bin") {
 
   deps = [
     ":echo_server_config_lib",
-    "//sdk/lib/fidl/cpp",
+    "//sdk/lib/fidl/hlcpp",
     "//sdk/lib/sys/cpp",
     "//src/lib/fxl",
     "//src/testing/fidl:placeholders_hlcpp",
@@ -74,7 +74,7 @@ executable("realm_builder_test_bin") {
     "//sdk/fidl/fuchsia.io:fuchsia.io_hlcpp",
     "//sdk/fidl/fuchsia.logger:fuchsia.logger_hlcpp",
     "//sdk/fidl/fuchsia.sys2:fuchsia.sys2_hlcpp",
-    "//sdk/lib/fidl/cpp",
+    "//sdk/lib/fidl/hlcpp",
     "//sdk/lib/sys/component/cpp/testing:cpp",
     "//sdk/lib/sys/cpp",
     "//sdk/lib/syslog/cpp",
@@ -96,7 +96,7 @@ executable("internal_test_bin") {
     "//sdk/fidl/fuchsia.component.decl:fuchsia.component.decl_hlcpp",
     "//sdk/fidl/fuchsia.component.test:fuchsia.component.test_hlcpp",
     "//sdk/fidl/fuchsia.io:fuchsia.io_hlcpp",
-    "//sdk/lib/fidl/cpp",
+    "//sdk/lib/fidl/hlcpp",
     "//sdk/lib/sys/component/cpp/testing:cpp",
     "//sdk/lib/sys/cpp",
     "//src/lib/fxl/test:gtest_main",

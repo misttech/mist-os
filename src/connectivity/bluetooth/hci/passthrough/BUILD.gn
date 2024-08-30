@@ -62,7 +62,7 @@ executable("tests_executable") {
     "//sdk/lib/driver/component/cpp",
     "//sdk/lib/driver/runtime:driver_runtime_cpp",
     "//sdk/lib/driver/testing/cpp",
-    "//sdk/lib/fidl/cpp",
+    "//sdk/lib/fidl/hlcpp",
     "//src/devices/lib/driver:driver_runtime",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/loop_fixture",

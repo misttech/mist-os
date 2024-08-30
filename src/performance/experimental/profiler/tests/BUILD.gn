@@ -15,7 +15,7 @@ executable("profiler_integration_test_bin") {
     "//sdk/fidl/fuchsia.sys2:fuchsia.sys2_cpp",
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/fdio",
-    "//sdk/lib/fidl/cpp",
+    "//sdk/lib/fidl/hlcpp",
     "//sdk/lib/syslog/cpp",
     "//src/lib/fsl",
     "//src/lib/fxl/test:gtest_main",

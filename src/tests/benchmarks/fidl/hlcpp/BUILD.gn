@@ -46,7 +46,7 @@ executable("bin") {
   sources = [ "main.cc" ]
   deps = [
            "//sdk/lib/fidl",
-           "//sdk/lib/fidl/cpp",
+           "//sdk/lib/fidl/hlcpp",
            "//src/zircon/lib/zircon",
            "//zircon/system/ulib/perftest",
          ] + gidl_deps

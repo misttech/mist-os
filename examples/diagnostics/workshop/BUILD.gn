@@ -30,7 +30,7 @@ executable("example_profile_store_bin") {
 
   deps = [
     ":lib",
-    "//sdk/lib/fidl/cpp",
+    "//sdk/lib/fidl/hlcpp",
     "//sdk/lib/sys/cpp",
     "//src/lib/fxl:fxl_cli",
     "//zircon/system/ulib/async:async-cpp",
@@ -44,7 +44,7 @@ executable("example_profile_writer") {
 
   deps = [
     "fidl:fuchsia.examples.diagnostics_hlcpp",
-    "//sdk/lib/fidl/cpp",
+    "//sdk/lib/fidl/hlcpp",
     "//sdk/lib/sys/cpp",
     "//sdk/lib/syslog/cpp",
     "//src/lib/fxl:fxl_cli",
@@ -59,7 +59,7 @@ executable("example_profile_reader") {
 
   deps = [
     "fidl:fuchsia.examples.diagnostics_hlcpp",
-    "//sdk/lib/fidl/cpp",
+    "//sdk/lib/fidl/hlcpp",
     "//sdk/lib/sys/cpp",
     "//sdk/lib/syslog/cpp",
     "//src/lib/fxl:fxl_cli",

@@ -107,7 +107,7 @@ foreach(test, fidl_compatibility_tests_categories) {
       "fidl:fidl_service_cpp",
       "fidl:fidl_service_hlcpp",
       "//sdk/lib/component/incoming/cpp",
-      "//sdk/lib/fidl/cpp",
+      "//sdk/lib/fidl/hlcpp",
       "//sdk/lib/sys/component/cpp/testing:cpp",
       "//sdk/lib/sys/cpp",
       "//src/lib/files",

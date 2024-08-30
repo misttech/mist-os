@@ -73,7 +73,7 @@ executable("constructor_helper_proc") {
   sources = [ "constructor_helper.cc" ]
 
   deps = [
-    "//sdk/lib/fidl/cpp",
+    "//sdk/lib/fidl/hlcpp",
     "//sdk/lib/sys/cpp",
     "//src/lib/files",
     "//src/lib/fxl:fxl_cli",
