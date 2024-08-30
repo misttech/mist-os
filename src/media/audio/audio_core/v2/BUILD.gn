@@ -118,6 +118,11 @@ group("tests") {
   deps = [
     # TODO(https://fxbug.dev/42181009): temporary to ensure this builds
     ":audio_core_main",
-    ":audio_core_v2_unittests",
   ]
+
+  # TODO(https://fxbug.dev/360004388): These tests are causing ssh connect
+  # error on core.arm64-coverage-qemu_kvm. Fix the issue and enable them back.
+  if (!is_coverage || target_cpu != "arm64") {
+    deps += [ ":audio_core_v2_unittests" ]
+  }
 }
