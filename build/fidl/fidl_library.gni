@@ -69,10 +69,9 @@ template("fidl_library") {
   assert(defined(invoker.fidl_ir_json), "fidl_ir_json is required")
   assert(!(defined(invoker.stable) && defined(invoker.versioned)),
          "stable and versioned are mutually exclusive")
-  if (defined(invoker.available)) {
-    assert(defined(invoker.testonly) && invoker.testonly,
-           "the `available` parameter is only allowed on testonly libraries")
-  }
+  assert(!defined(invoker.available) ||
+             (defined(invoker.testonly) && invoker.testonly),
+         "the `available` parameter is only allowed on `testonly` libraries")
 
   main_target_name = target_name
 
@@ -137,8 +136,26 @@ template("fidl_library") {
     "public_deps",
     "sources",
     "testonly",
-    "versioned",
   ]
+
+  if (defined(invoker.versioned)) {
+    _platform_override_name = string_split(invoker.versioned, ":")
+    _platform_override_name = _platform_override_name[0]
+    assert(
+        !requires_compatibility_tests || _platform_override_name == "fuchsia",
+        "Overriding `versioned` is not allowed for SDK FIDL library '$library_name', which is a Fuchsia platform API requiring compatibility tests.")
+
+    fidlc_versioned_arg = invoker.versioned
+  } else if (defined(invoker.testonly) && invoker.testonly) {
+    fidlc_versioned_arg = "unversioned"
+  } else if (stable) {
+    fidlc_versioned_arg = "fuchsia"
+  } else if (in_fuchsia_namespace && requires_compatibility_tests) {
+    # Unstable libraries in the IDK.
+    # TODO(https://fxbug.dev/325669391): Remove the `in_fuchsia_namespace` part of the condition
+    # above once vendor SDK libraries no longer requires_compatibility_tests
+    fidlc_versioned_arg = "fuchsia:HEAD"
+  }
 
   fidl_ir(compilation_target_name) {
     forward_variables_from(invoker, invoker_variables_to_forward_to_fidl_ir)
@@ -150,15 +167,8 @@ template("fidl_library") {
     if (!defined(available)) {
       available = [ "fuchsia:$fidl_target_api_levels" ]
     }
-    if (!defined(versioned)) {
-      if (defined(invoker.testonly) && invoker.testonly) {
-        versioned = "unversioned"
-      } else if (stable) {
-        versioned = "fuchsia"
-      } else if (in_fuchsia_namespace && requires_compatibility_tests) {
-        # Temporarily we only enable this check for partner and partner_internal.
-        versioned = "fuchsia:HEAD"
-      }
+    if (defined(fidlc_versioned_arg)) {
+      versioned = fidlc_versioned_arg
     }
   }
 
@@ -271,15 +281,6 @@ template("fidl_library") {
   # Enforce compatibility checks for all FIDL libraries included in the IDK with
   # platform `fuchsia`.
   if (requires_compatibility_tests) {
-    if (defined(invoker.versioned)) {
-      _platform = string_split(invoker.versioned, ":")
-      _platform = _platform[0]
-    }
-    assert(!defined(invoker.versioned) || _platform == "fuchsia",
-           "Cannot override `versioned` for SDK FIDL library $library_name")
-    assert(!defined(invoker.available),
-           "Cannot override `available` for SDK FIDL library $library_name")
-
     # GN lets us include both integers and strings in the same list.
     _in_development_api_level = "NEXT"
 
@@ -319,12 +320,21 @@ template("fidl_library") {
         fidl_target_name = main_target_name
         fidl_library_name = library_name
 
-        # TODO(https://fxbug.dev/325669391): in_fuchsia_namespace should always
-        # be true here, but currently it isn't for vendor SDK libraries. Those
-        # libraries likely should be excluded in requires_compatibility_tests.
-        if (in_fuchsia_namespace) {
-          versioned = "fuchsia"
+        # TODO(https://fxbug.dev/325669391): Prevent vendor SDK libraries from reaching this point
+        # and remove the LHS of`||` and the if condition.
+        # This requires excluding them from `requires_compatibility_tests`.
+        assert((!in_fuchsia_namespace && !defined(fidlc_versioned_arg)) ||
+               fidlc_versioned_arg == "fuchsia" ||
+               (fidlc_versioned_arg == "fuchsia:HEAD" && !stable))
+        if (defined(fidlc_versioned_arg)) {
+          versioned = fidlc_versioned_arg
         }
+
+        # `available` is only allowed for `testonly` libraries (asserted above). Defensively double
+        # check here where we ignore `available`.
+        assert(
+            !defined(available),
+            "Overriding `available` is not allowed for for SDK FIDL library '$library_name'.")
 
         available = [ "fuchsia:$level" ]
         target_api_level = level
