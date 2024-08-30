@@ -591,24 +591,54 @@ fit::result<std::string> EnsureValidZirconPsOutput(std::string_view ps_output) {
 }  // namespace
 
 zx_status_t ZirconEnclosedGuest::WaitForSystemReady(zx::time deadline) {
-  std::string ps;
+  std::string output;
 
-  // Keep running `ps` until we get a reasonable result or run out of time.
+  // Keep running the ready test until we get a reasonable result or run out of time. Ideally we
+  // want to wait for the driver framework to have finished enumerating and binding devices, as
+  // shutting down before this is a known bug that can lead to system hangs.
+  // Checking for this is difficult and for x86 we can wait for the ACPI driver to finish (which is
+  // the last thing to come up), but otherwise we just wait for some general system processes to
+  // come up, by inspecting ps, and hope that is good enough.
+#if __x86_64__
+  auto acpi_check = [&]() {
+    do {
+      zx_status_t status =
+          Execute({"waitfor", "verbose", "class=acpi", "topo=/dev/sys/platform/pt/acpi/_SB_/pt",
+                   "&&", "echo", "ACPI_READY"},
+                  {}, deadline, &output);
+      if (status != ZX_OK) {
+        return status;
+      }
+      if (output.find("ACPI_READY") != std::string::npos) {
+        return ZX_OK;
+      }
+
+      // Keep trying until we run out of time.
+      zx::nanosleep(std::min(zx::deadline_after(kRetryStep), deadline));
+    } while (zx::clock::get_monotonic() < deadline);
+
+    FX_LOGS(ERROR) << "Failed to wait for ACPI_READY";
+    return ZX_ERR_TIMED_OUT;
+  };
+  if (zx_status_t status = acpi_check(); status != ZX_OK) {
+    return status;
+  }
+#endif
   do {
     // Execute `ps`.
-    zx_status_t status = Execute({"ps"}, {}, deadline, &ps);
+    zx_status_t status = Execute({"ps"}, {}, deadline, &output);
     if (status != ZX_OK) {
       return status;
     }
-    if (EnsureValidZirconPsOutput(ps).is_ok()) {
+    if (EnsureValidZirconPsOutput(output).is_ok()) {
       return ZX_OK;
     }
-
     // Keep trying until we run out of time.
     zx::nanosleep(std::min(zx::deadline_after(kRetryStep), deadline));
   } while (zx::clock::get_monotonic() < deadline);
 
-  FX_LOGS(ERROR) << "Failed to wait for processes: " << EnsureValidZirconPsOutput(ps).error_value();
+  FX_LOGS(ERROR) << "Failed to wait for processes: "
+                 << EnsureValidZirconPsOutput(output).error_value();
   return ZX_ERR_TIMED_OUT;
 }
 
