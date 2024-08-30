@@ -16,7 +16,7 @@
 #include "logging.h"
 #include "logical_buffer_collection.h"
 #include "node.h"
-#include "src/devices/sysmem/drivers/sysmem/device.h"
+#include "src/devices/sysmem/drivers/sysmem/sysmem.h"
 
 namespace sysmem_service {
 

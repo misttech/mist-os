@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_DEVICES_SYSMEM_DRIVERS_SYSMEM_DEVICE_H_
-#define SRC_DEVICES_SYSMEM_DRIVERS_SYSMEM_DEVICE_H_
+#ifndef SRC_DEVICES_SYSMEM_DRIVERS_SYSMEM_SYSMEM_H_
+#define SRC_DEVICES_SYSMEM_DRIVERS_SYSMEM_SYSMEM_H_
 
 #include <fidl/fuchsia.hardware.sysmem/cpp/fidl.h>
 #include <fidl/fuchsia.sysmem/cpp/fidl.h>
@@ -38,7 +38,7 @@ class ServiceDirectory;
 
 namespace sysmem_service {
 
-class Device;
+class Sysmem;
 class BufferCollectionToken;
 class LogicalBuffer;
 class LogicalBufferCollection;
@@ -60,9 +60,7 @@ struct Settings {
 //
 // The fuchsia_hardware_sysmem::Sysmem protocol is used by the securemem driver and by external
 // heaps such as goldfish.
-//
-// TODO(b/362587923): Rename this class to "Sysmem".
-class Device final : public MemoryAllocator::Owner,
+class Sysmem final : public MemoryAllocator::Owner,
                      public fidl::Server<fuchsia_hardware_sysmem::Sysmem> {
  public:
   struct CreateArgs {
@@ -70,13 +68,13 @@ class Device final : public MemoryAllocator::Owner,
     bool expect_structured_config = false;
     bool serve_outgoing = false;
   };
-  static zx::result<std::unique_ptr<Device>> Create(async_dispatcher_t* dispatcher,
+  static zx::result<std::unique_ptr<Sysmem>> Create(async_dispatcher_t* dispatcher,
                                                     const CreateArgs& create_args);
 
   // Use Create() instead.
-  Device(async_dispatcher_t* dispatcher);
+  Sysmem(async_dispatcher_t* dispatcher);
 
-  ~Device() __TA_REQUIRES(client_checker_);
+  ~Sysmem() __TA_REQUIRES(client_checker_);
 
   // currently public only for tests
   [[nodiscard]] zx::result<> Initialize(const CreateArgs& create_args)
@@ -430,7 +428,7 @@ class Device final : public MemoryAllocator::Owner,
                                const protected_ranges::Range& range) override;
 
     fuchsia_sysmem2::Heap heap{};
-    Device* parent{};
+    Sysmem* parent{};
     bool is_dynamic{};
     uint64_t range_granularity{};
     uint64_t max_range_count{};
@@ -474,7 +472,7 @@ class Device final : public MemoryAllocator::Owner,
 
   bool is_secure_mem_ready_ __TA_GUARDED(*loop_checker_) = false;
 
-  async::TaskMethod<Device, &Device::LogCollectionsTimer> log_all_collections_{this};
+  async::TaskMethod<Sysmem, &Sysmem::LogCollectionsTimer> log_all_collections_{this};
 
   fidl::ServerBindingGroup<fuchsia_hardware_sysmem::Sysmem> bindings_;
   fidl::ServerBindingGroup<fuchsia_sysmem::Allocator> v1_allocators_;
@@ -493,4 +491,4 @@ class Device final : public MemoryAllocator::Owner,
 
 }  // namespace sysmem_service
 
-#endif  // SRC_DEVICES_SYSMEM_DRIVERS_SYSMEM_DEVICE_H_
+#endif  // SRC_DEVICES_SYSMEM_DRIVERS_SYSMEM_SYSMEM_H_

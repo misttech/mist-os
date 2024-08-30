@@ -12,7 +12,7 @@
 #include <lib/driver/testing/cpp/test_node.h>
 
 #include "src/devices/bus/testing/fake-pdev/fake-pdev.h"
-#include "src/devices/sysmem/drivers/sysmem/device.h"
+#include "src/devices/sysmem/drivers/sysmem/sysmem.h"
 #include "src/devices/testing/mock-ddk/mock-device.h"
 #include "src/graphics/display/drivers/fake/sysmem-service-provider.h"
 
@@ -42,7 +42,7 @@ class FakeSysmemDeviceHierarchy : public SysmemServiceProvider {
 
  private:
   async::Loop loop_;
-  std::unique_ptr<sysmem_service::Device> sysmem_service_;
+  std::unique_ptr<sysmem_service::Sysmem> sysmem_service_;
 };
 
 }  // namespace display

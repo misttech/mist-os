@@ -113,7 +113,7 @@ void BufferCollection::BindInternalV1(zx::channel collection_request,
                                       ErrorHandlerWrapper error_handler_wrapper) {
   v1_server_.emplace(*this);
   server_binding_v1_ = fidl::BindServer(
-      parent_device()->loop_dispatcher(),
+      parent_sysmem()->loop_dispatcher(),
       fidl::ServerEnd<fuchsia_sysmem::BufferCollection>(std::move(collection_request)),
       &v1_server_.value(),
       [error_handler_wrapper = std::move(error_handler_wrapper)](
@@ -126,7 +126,7 @@ void BufferCollection::BindInternalV2(zx::channel collection_request,
                                       ErrorHandlerWrapper error_handler_wrapper) {
   v2_server_.emplace(*this);
   server_binding_v2_ = fidl::BindServer(
-      parent_device()->loop_dispatcher(),
+      parent_sysmem()->loop_dispatcher(),
       fidl::ServerEnd<fuchsia_sysmem2::BufferCollection>(std::move(collection_request)),
       &v2_server_.value(),
       [error_handler_wrapper = std::move(error_handler_wrapper)](

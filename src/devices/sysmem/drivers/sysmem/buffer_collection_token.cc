@@ -9,9 +9,9 @@
 #include <zircon/errors.h>
 #include <zircon/types.h>
 
-#include "device.h"
 #include "node.h"
 #include "node_properties.h"
+#include "sysmem.h"
 
 namespace sysmem_service {
 
@@ -24,7 +24,7 @@ BufferCollectionToken::~BufferCollectionToken() {
   // of value in the tracked set of values).
 
   // It's fine if server_koid() is ZX_KOID_INVALID - no effect in that case.
-  parent_device()->UntrackToken(this);
+  parent_sysmem()->UntrackToken(this);
 }
 
 void BufferCollectionToken::CloseServerBinding(zx_status_t epitaph) {
@@ -36,7 +36,7 @@ void BufferCollectionToken::CloseServerBinding(zx_status_t epitaph) {
     }
   }
   server_binding_ = {};
-  parent_device()->UntrackToken(this);
+  parent_sysmem()->UntrackToken(this);
 }
 
 // static
@@ -81,7 +81,7 @@ void BufferCollectionToken::BindInternalCombinedV1AndV2(zx::channel token_reques
                                                         ErrorHandlerWrapper error_handler_wrapper) {
   server_.emplace(*this);
   server_binding_ =
-      fidl::BindServer(parent_device()->loop_dispatcher(),
+      fidl::BindServer(parent_sysmem()->loop_dispatcher(),
                        TokenServerEndCombinedV1AndV2(std::move(token_request)), &server_.value(),
                        [error_handler_wrapper = std::move(error_handler_wrapper)](
                            BufferCollectionToken::CombinedTokenServer* token, fidl::UnbindInfo info,
@@ -279,8 +279,8 @@ void BufferCollectionToken::CombinedTokenServer::ReleaseV2(ReleaseV2Completer::S
 
 void BufferCollectionToken::OnServerKoid() {
   ZX_DEBUG_ASSERT(has_server_koid());
-  parent_device()->TrackToken(this);
-  if (parent_device()->TryRemoveKoidFromUnfoundTokenList(server_koid())) {
+  parent_sysmem()->TrackToken(this);
+  if (parent_sysmem()->TryRemoveKoidFromUnfoundTokenList(server_koid())) {
     set_unfound_node();
     // LogicalBufferCollection will print an error, since it might have useful client information.
   }

@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "device.h"
+#include "sysmem.h"
 
 #include <dirent.h>
 #include <fcntl.h>
@@ -203,9 +203,9 @@ class ContiguousSystemRamMemoryAllocator : public MemoryAllocator {
 
 }  // namespace
 
-Device::Device(async_dispatcher_t* client_dispatcher)
+Sysmem::Sysmem(async_dispatcher_t* client_dispatcher)
     : client_dispatcher_(client_dispatcher), loop_(&kAsyncLoopConfigNeverAttachToThread) {
-  LOG(DEBUG, "Device::Device");
+  LOG(DEBUG, "Sysmem::Sysmem");
   std::lock_guard checker(client_checker_);
 
   zx_status_t start_thread_status = loop_.StartThread("sysmem-loop", &loop_thrd_);
@@ -214,13 +214,13 @@ Device::Device(async_dispatcher_t* client_dispatcher)
   RunSyncOnLoop([this] { loop_checker_.emplace(); });
 }
 
-Device::~Device() {
+Sysmem::~Sysmem() {
   std::lock_guard checker(client_checker_);
   Shutdown();
   LOG(DEBUG, "Finished Shutdown");
 }
 
-zx_status_t Device::GetContiguousGuardParameters(const std::optional<sysmem_config::Config>& config,
+zx_status_t Sysmem::GetContiguousGuardParameters(const std::optional<sysmem_config::Config>& config,
                                                  uint64_t* guard_bytes_out,
                                                  bool* unused_pages_guarded,
                                                  int64_t* unused_guard_pattern_period_bytes,
@@ -263,7 +263,7 @@ zx_status_t Device::GetContiguousGuardParameters(const std::optional<sysmem_conf
   return ZX_OK;
 }
 
-void Device::Shutdown() {
+void Sysmem::Shutdown() {
   // disconnect existing connections from drivers
   bindings_.RemoveAll();
 
@@ -297,7 +297,7 @@ void Device::Shutdown() {
     // Async notice when all still-existing LogicalBufferCollection(s) go away then shut down loop_.
     // This requires sysmem clients to close their remaining sysmem VMO handles to proceed async.
     //
-    // If we decide in future that we want to be able to stop/delete the Device without requiring
+    // If we decide in future that we want to be able to stop/delete the Sysmem without requiring
     // client VMOs to close first, we'll want to ensure that the securemem protocol and securemem
     // drivers can avoid orphaning protected_memory_size, while also leaving buffers HW-protected
     // until clients are done with the buffers - currently not a real issue since both sysmem and
@@ -307,14 +307,14 @@ void Device::Shutdown() {
   });
 
   // If a test is stuck waiting here, ensure that the test is dropping its sysmem VMO handles before
-  // ~Device.
+  // ~Sysmem.
   loop_.JoinThreads();
   loop_.Shutdown();
 
   LOG(DEBUG, "Finished Shutdown");
 }
 
-void Device::CheckForUnbind() {
+void Sysmem::CheckForUnbind() {
   std::lock_guard checker(*loop_checker_);
   if (!waiting_for_unbind_) {
     return;
@@ -337,17 +337,17 @@ void Device::CheckForUnbind() {
     }
   }
 
-  // This will cause the loop thread to exit and will allow ~Device to continue.
+  // This will cause the loop thread to exit and will allow ~Sysmem to continue.
   loop_.Quit();
 }
 
-std::optional<SnapshotAnnotationRegister>& Device::snapshot_annotation_register() {
+std::optional<SnapshotAnnotationRegister>& Sysmem::snapshot_annotation_register() {
   return snapshot_annotation_register_;
 }
 
-SysmemMetrics& Device::metrics() { return metrics_; }
+SysmemMetrics& Sysmem::metrics() { return metrics_; }
 
-protected_ranges::ProtectedRangesCoreControl& Device::protected_ranges_core_control(
+protected_ranges::ProtectedRangesCoreControl& Sysmem::protected_ranges_core_control(
     const fuchsia_sysmem2::Heap& heap) {
   std::lock_guard checker(*loop_checker_);
   auto iter = secure_mem_controls_.find(heap);
@@ -355,15 +355,15 @@ protected_ranges::ProtectedRangesCoreControl& Device::protected_ranges_core_cont
   return iter->second;
 }
 
-bool Device::SecureMemControl::IsDynamic() { return is_dynamic; }
+bool Sysmem::SecureMemControl::IsDynamic() { return is_dynamic; }
 
-uint64_t Device::SecureMemControl::GetRangeGranularity() { return range_granularity; }
+uint64_t Sysmem::SecureMemControl::GetRangeGranularity() { return range_granularity; }
 
-uint64_t Device::SecureMemControl::MaxRangeCount() { return max_range_count; }
+uint64_t Sysmem::SecureMemControl::MaxRangeCount() { return max_range_count; }
 
-bool Device::SecureMemControl::HasModProtectedRange() { return has_mod_protected_range; }
+bool Sysmem::SecureMemControl::HasModProtectedRange() { return has_mod_protected_range; }
 
-void Device::SecureMemControl::AddProtectedRange(const protected_ranges::Range& range) {
+void Sysmem::SecureMemControl::AddProtectedRange(const protected_ranges::Range& range) {
   std::lock_guard checker(*parent->loop_checker_);
   ZX_DEBUG_ASSERT(parent->secure_mem_);
   fuchsia_sysmem2::SecureHeapAndRange secure_heap_and_range;
@@ -380,7 +380,7 @@ void Device::SecureMemControl::AddProtectedRange(const protected_ranges::Range& 
                 result.error_value().FormatDescription().c_str());
 }
 
-void Device::SecureMemControl::DelProtectedRange(const protected_ranges::Range& range) {
+void Sysmem::SecureMemControl::DelProtectedRange(const protected_ranges::Range& range) {
   std::lock_guard checker(*parent->loop_checker_);
   ZX_DEBUG_ASSERT(parent->secure_mem_);
   fuchsia_sysmem2::SecureHeapAndRange secure_heap_and_range;
@@ -398,7 +398,7 @@ void Device::SecureMemControl::DelProtectedRange(const protected_ranges::Range& 
                 result.error_value().FormatDescription().c_str());
 }
 
-void Device::SecureMemControl::ModProtectedRange(const protected_ranges::Range& old_range,
+void Sysmem::SecureMemControl::ModProtectedRange(const protected_ranges::Range& old_range,
                                                  const protected_ranges::Range& new_range) {
   if (new_range.end() != old_range.end() && new_range.begin() != old_range.begin()) {
     LOG(INFO,
@@ -429,7 +429,7 @@ void Device::SecureMemControl::ModProtectedRange(const protected_ranges::Range& 
                 result.error_value().FormatDescription().c_str());
 }
 
-void Device::SecureMemControl::ZeroProtectedSubRange(bool is_covering_range_explicit,
+void Sysmem::SecureMemControl::ZeroProtectedSubRange(bool is_covering_range_explicit,
                                                      const protected_ranges::Range& range) {
   std::lock_guard checker(*parent->loop_checker_);
   ZX_DEBUG_ASSERT(parent->secure_mem_);
@@ -448,10 +448,10 @@ void Device::SecureMemControl::ZeroProtectedSubRange(bool is_covering_range_expl
                 result.error_value().FormatDescription().c_str());
 }
 
-zx::result<std::unique_ptr<Device>> Device::Create(async_dispatcher_t* client_dispatcher,
-                                                   const Device::CreateArgs& create_args) {
+zx::result<std::unique_ptr<Sysmem>> Sysmem::Create(async_dispatcher_t* client_dispatcher,
+                                                   const Sysmem::CreateArgs& create_args) {
   LOG(DEBUG, "Create()");
-  auto device = std::make_unique<Device>(client_dispatcher);
+  auto device = std::make_unique<Sysmem>(client_dispatcher);
 
   std::lock_guard checker(device->client_checker_);
 
@@ -464,7 +464,7 @@ zx::result<std::unique_ptr<Device>> Device::Create(async_dispatcher_t* client_di
   return zx::ok(std::move(device));
 }
 
-zx::result<> Device::Initialize(const CreateArgs& create_args) {
+zx::result<> Sysmem::Initialize(const CreateArgs& create_args) {
   // Put everything under a node called "sysmem" because there's currently there's not a simple way
   // to distinguish (using a selector) which driver inspect information is coming from.
   sysmem_root_ = inspector_.GetRoot().CreateChild("sysmem");
@@ -651,7 +651,7 @@ zx::result<> Device::Initialize(const CreateArgs& create_args) {
   return zx::ok();
 }
 
-zx::result<zx::bti> Device::CreateBti() {
+zx::result<zx::bti> Sysmem::CreateBti() {
   auto iommu_client_result = component::Connect<fuchsia_kernel::IommuResource>();
   if (!iommu_client_result.is_ok()) {
     LOG(ERROR, "component::Connect<fuchsia_kernel::IommuResource>() failed: %s",
@@ -683,7 +683,7 @@ zx::result<zx::bti> Device::CreateBti() {
   return zx::ok(std::move(bti));
 }
 
-zx::result<> Device::BeginServing() {
+zx::result<> Sysmem::BeginServing() {
   // While outgoing_ is on loop_dispatcher(), the fuchsia_hardware_sysmem::Sysmem protocol is served
   // on client_dispatcher().
   outgoing_ = component::OutgoingDirectory(loop_dispatcher());
@@ -729,7 +729,7 @@ zx::result<> Device::BeginServing() {
   return zx::ok();
 }
 
-zx_status_t Device::RegisterHeapInternal(
+zx_status_t Sysmem::RegisterHeapInternal(
     fuchsia_sysmem2::Heap heap, fidl::ClientEnd<fuchsia_hardware_sysmem::Heap> heap_connection) {
   class EventHandler : public fidl::WireAsyncEventHandler<fuchsia_hardware_sysmem::Heap> {
    public:
@@ -765,7 +765,7 @@ zx_status_t Device::RegisterHeapInternal(
         device_->allocators_.erase(heap_);
     }
 
-    static void Bind(Device* device, fidl::ClientEnd<fuchsia_hardware_sysmem::Heap> heap_client_end,
+    static void Bind(Sysmem* device, fidl::ClientEnd<fuchsia_hardware_sysmem::Heap> heap_client_end,
                      fuchsia_sysmem2::Heap heap) {
       auto event_handler = std::unique_ptr<EventHandler>(new EventHandler(device, heap));
       event_handler->heap_client_.Bind(std::move(heap_client_end), device->loop_dispatcher(),
@@ -773,10 +773,10 @@ zx_status_t Device::RegisterHeapInternal(
     }
 
    private:
-    EventHandler(Device* device, fuchsia_sysmem2::Heap heap)
+    EventHandler(Sysmem* device, fuchsia_sysmem2::Heap heap)
         : device_(device), heap_(std::move(heap)) {}
 
-    Device* const device_;
+    Sysmem* const device_;
     fidl::WireSharedClient<fuchsia_hardware_sysmem::Heap> heap_client_;
     const fuchsia_sysmem2::Heap heap_;
     std::weak_ptr<ExternalMemoryAllocator> weak_associated_allocator_;
@@ -789,7 +789,7 @@ zx_status_t Device::RegisterHeapInternal(
   return ZX_OK;
 }
 
-zx_status_t Device::RegisterSecureMemInternal(
+zx_status_t Sysmem::RegisterSecureMemInternal(
     fidl::ClientEnd<fuchsia_sysmem2::SecureMem> secure_mem_connection) {
   LOG(DEBUG, "sysmem RegisterSecureMem begin");
 
@@ -828,7 +828,7 @@ zx_status_t Device::RegisterSecureMemInternal(
     // loop is shutting down.
     zx_status_t status = wait_for_close->Begin(loop_dispatcher());
     if (status != ZX_OK) {
-      LOG(ERROR, "Device::RegisterSecureMem() failed wait_for_close->Begin()");
+      LOG(ERROR, "Sysmem::RegisterSecureMem() failed wait_for_close->Begin()");
       return;
     }
 
@@ -1000,7 +1000,7 @@ zx_status_t Device::RegisterSecureMemInternal(
 
 // This call allows us to tell the difference between expected vs. unexpected close of the tee_
 // channel.
-zx_status_t Device::UnregisterSecureMemInternal() {
+zx_status_t Sysmem::UnregisterSecureMemInternal() {
   // By this point, the securemem driver's suspend(mexec) has already prepared for mexec.
   //
   // In this path, the server end of the channel hasn't closed yet, but will be closed shortly after
@@ -1018,11 +1018,11 @@ zx_status_t Device::UnregisterSecureMemInternal() {
   return ZX_OK;
 }
 
-const zx::bti& Device::bti() { return bti_; }
+const zx::bti& Sysmem::bti() { return bti_; }
 
 // Only use this in cases where we really can't use zx::vmo::create_contiguous() because we must
 // specify a specific physical range.
-zx::result<zx::vmo> Device::CreatePhysicalVmo(uint64_t base, uint64_t size) {
+zx::result<zx::vmo> Sysmem::CreatePhysicalVmo(uint64_t base, uint64_t size) {
   // This isn't called much, so get the mmio resource each time rather than caching it.
   zx::result resource_result = component::Connect<fuchsia_kernel::MmioResource>();
   if (resource_result.is_error()) {
@@ -1046,7 +1046,7 @@ zx::result<zx::vmo> Device::CreatePhysicalVmo(uint64_t base, uint64_t size) {
   return zx::ok(std::move(result_vmo));
 }
 
-void Device::TrackToken(BufferCollectionToken* token) {
+void Sysmem::TrackToken(BufferCollectionToken* token) {
   std::lock_guard checker(*loop_checker_);
   ZX_DEBUG_ASSERT(token->has_server_koid());
   zx_koid_t server_koid = token->server_koid();
@@ -1055,7 +1055,7 @@ void Device::TrackToken(BufferCollectionToken* token) {
   tokens_by_koid_.insert({server_koid, token});
 }
 
-void Device::UntrackToken(BufferCollectionToken* token) {
+void Sysmem::UntrackToken(BufferCollectionToken* token) {
   std::lock_guard checker(*loop_checker_);
   if (!token->has_server_koid()) {
     // The caller is allowed to un-track a token that never saw
@@ -1068,7 +1068,7 @@ void Device::UntrackToken(BufferCollectionToken* token) {
   tokens_by_koid_.erase(token->server_koid());
 }
 
-bool Device::TryRemoveKoidFromUnfoundTokenList(zx_koid_t token_server_koid) {
+bool Sysmem::TryRemoveKoidFromUnfoundTokenList(zx_koid_t token_server_koid) {
   std::lock_guard checker(*loop_checker_);
   // unfound_token_koids_ is limited to kMaxUnfoundTokenCount (and likely empty), so a loop over it
   // should be efficient enough.
@@ -1081,7 +1081,7 @@ bool Device::TryRemoveKoidFromUnfoundTokenList(zx_koid_t token_server_koid) {
   return false;
 }
 
-BufferCollectionToken* Device::FindTokenByServerChannelKoid(zx_koid_t token_server_koid) {
+BufferCollectionToken* Sysmem::FindTokenByServerChannelKoid(zx_koid_t token_server_koid) {
   std::lock_guard checker(*loop_checker_);
   auto iter = tokens_by_koid_.find(token_server_koid);
   if (iter == tokens_by_koid_.end()) {
@@ -1097,7 +1097,7 @@ BufferCollectionToken* Device::FindTokenByServerChannelKoid(zx_koid_t token_serv
   return iter->second;
 }
 
-Device::FindLogicalBufferByVmoKoidResult Device::FindLogicalBufferByVmoKoid(zx_koid_t vmo_koid) {
+Sysmem::FindLogicalBufferByVmoKoidResult Sysmem::FindLogicalBufferByVmoKoid(zx_koid_t vmo_koid) {
   auto iter = vmo_koids_.find(vmo_koid);
   if (iter == vmo_koids_.end()) {
     return {nullptr, false};
@@ -1105,7 +1105,7 @@ Device::FindLogicalBufferByVmoKoidResult Device::FindLogicalBufferByVmoKoid(zx_k
   return iter->second;
 }
 
-MemoryAllocator* Device::GetAllocator(const fuchsia_sysmem2::BufferMemorySettings& settings) {
+MemoryAllocator* Sysmem::GetAllocator(const fuchsia_sysmem2::BufferMemorySettings& settings) {
   std::lock_guard checker(*loop_checker_);
   if (*settings.heap()->heap_type() == bind_fuchsia_sysmem_heap::HEAP_TYPE_SYSTEM_RAM &&
       *settings.is_physically_contiguous()) {
@@ -1119,7 +1119,7 @@ MemoryAllocator* Device::GetAllocator(const fuchsia_sysmem2::BufferMemorySetting
   return iter->second.get();
 }
 
-const fuchsia_hardware_sysmem::HeapProperties* Device::GetHeapProperties(
+const fuchsia_hardware_sysmem::HeapProperties* Sysmem::GetHeapProperties(
     const fuchsia_sysmem2::Heap& heap) const {
   std::lock_guard checker(*loop_checker_);
   auto iter = allocators_.find(heap);
@@ -1129,16 +1129,16 @@ const fuchsia_hardware_sysmem::HeapProperties* Device::GetHeapProperties(
   return &iter->second->heap_properties();
 }
 
-void Device::AddVmoKoid(zx_koid_t koid, bool is_weak, LogicalBuffer& logical_buffer) {
+void Sysmem::AddVmoKoid(zx_koid_t koid, bool is_weak, LogicalBuffer& logical_buffer) {
   vmo_koids_.insert({koid, {&logical_buffer, is_weak}});
 }
 
-void Device::RemoveVmoKoid(zx_koid_t koid) {
+void Sysmem::RemoveVmoKoid(zx_koid_t koid) {
   // May not be present if ~TrackedParentVmo called in error path prior to being fully set up.
   vmo_koids_.erase(koid);
 }
 
-void Device::LogAllBufferCollections() {
+void Sysmem::LogAllBufferCollections() {
   std::lock_guard checker(*loop_checker_);
   IndentTracker indent_tracker(0);
   auto indent = indent_tracker.Current();
@@ -1165,7 +1165,7 @@ void Device::LogAllBufferCollections() {
   };
 }
 
-void Device::ForeachSecureHeap(fit::function<bool(const fuchsia_sysmem2::Heap&)> callback) {
+void Sysmem::ForeachSecureHeap(fit::function<bool(const fuchsia_sysmem2::Heap&)> callback) {
   std::lock_guard checker(*loop_checker_);
   for (auto& allocator : secure_allocators_) {
     bool keep_going = callback(allocator.first);
@@ -1175,19 +1175,19 @@ void Device::ForeachSecureHeap(fit::function<bool(const fuchsia_sysmem2::Heap&)>
   }
 }
 
-Device::SecureMemConnection::SecureMemConnection(
+Sysmem::SecureMemConnection::SecureMemConnection(
     fidl::ClientEnd<fuchsia_sysmem2::SecureMem> channel,
     std::unique_ptr<async::Wait> wait_for_close)
     : connection_(std::move(channel)), wait_for_close_(std::move(wait_for_close)) {
   // nothing else to do here
 }
 
-const fidl::SyncClient<fuchsia_sysmem2::SecureMem>& Device::SecureMemConnection::channel() const {
+const fidl::SyncClient<fuchsia_sysmem2::SecureMem>& Sysmem::SecureMemConnection::channel() const {
   ZX_DEBUG_ASSERT(connection_);
   return connection_;
 }
 
-void Device::LogCollectionsTimer(async_dispatcher_t* loop_dispatcher, async::TaskBase* task,
+void Sysmem::LogCollectionsTimer(async_dispatcher_t* loop_dispatcher, async::TaskBase* task,
                                  zx_status_t status) {
   std::lock_guard checker(*loop_checker_);
   LogAllBufferCollections();
@@ -1195,7 +1195,7 @@ void Device::LogCollectionsTimer(async_dispatcher_t* loop_dispatcher, async::Tas
   ZX_ASSERT(ZX_OK == log_all_collections_.PostDelayed(loop_dispatcher, kLogAllCollectionsInterval));
 }
 
-void Device::RegisterHeap(RegisterHeapRequest& request, RegisterHeapCompleter::Sync& completer) {
+void Sysmem::RegisterHeap(RegisterHeapRequest& request, RegisterHeapCompleter::Sync& completer) {
   std::lock_guard checker(client_checker_);
   // TODO(b/316646315): Change RegisterHeap to specify fuchsia_sysmem2::Heap, and remove the
   // conversion here.
@@ -1216,7 +1216,7 @@ void Device::RegisterHeap(RegisterHeapRequest& request, RegisterHeapCompleter::S
   }
 }
 
-void Device::RegisterSecureMem(RegisterSecureMemRequest& request,
+void Sysmem::RegisterSecureMem(RegisterSecureMemRequest& request,
                                RegisterSecureMemCompleter::Sync& completer) {
   std::lock_guard checker(client_checker_);
   zx_status_t status = RegisterSecureMemInternal(std::move(request.secure_mem_connection()));
@@ -1226,7 +1226,7 @@ void Device::RegisterSecureMem(RegisterSecureMemRequest& request,
   }
 }
 
-void Device::UnregisterSecureMem(UnregisterSecureMemCompleter::Sync& completer) {
+void Sysmem::UnregisterSecureMem(UnregisterSecureMemCompleter::Sync& completer) {
   std::lock_guard checker(client_checker_);
   zx_status_t status = UnregisterSecureMemInternal();
   if (status == ZX_OK) {
@@ -1236,7 +1236,7 @@ void Device::UnregisterSecureMem(UnregisterSecureMemCompleter::Sync& completer) 
   }
 }
 
-zx::result<fuchsia_sysmem2::Config> Device::GetConfigFromFile() {
+zx::result<fuchsia_sysmem2::Config> Sysmem::GetConfigFromFile() {
   int config_fd = open(kSysmemConfigFilename, O_RDONLY);
   if (config_fd == -1) {
     int local_errno = errno;

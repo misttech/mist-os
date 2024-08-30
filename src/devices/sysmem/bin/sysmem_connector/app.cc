@@ -14,13 +14,13 @@
 #include <sdk/lib/syslog/cpp/macros.h>
 
 App::App(async_dispatcher_t* dispatcher) : dispatcher_(dispatcher) {
-  sysmem_service::Device::CreateArgs create_args{
+  sysmem_service::Sysmem::CreateArgs create_args{
       .create_bti = true,
       .expect_structured_config = true,
       .serve_outgoing = true,
   };
-  auto create_result = sysmem_service::Device::Create(dispatcher_, create_args);
-  ZX_ASSERT_MSG(create_result.is_ok(), "sysmem_service::Device::Create() failed: %s",
+  auto create_result = sysmem_service::Sysmem::Create(dispatcher_, create_args);
+  ZX_ASSERT_MSG(create_result.is_ok(), "sysmem_service::Sysmem::Create() failed: %s",
                 create_result.status_string());
   device_ = std::move(create_result.value());
 }
