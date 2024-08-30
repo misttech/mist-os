@@ -189,7 +189,7 @@ std::vector<diagnostics::reader::LogsData> RetrieveLogsAsLogMessage(const zx::so
   return ret;
 }
 
-zx::channel SetupFakeLog(bool wait_for_initial_interest, fuchsia_logging::LogSeverity severity) {
+zx::channel SetupFakeLog(bool wait_for_initial_interest, FuchsiaLogSeverity severity) {
   zx::channel channels[2];
   zx::channel::create(0, &channels[0], &channels[1]);
   fuchsia_logging::LogSettingsBuilder builder;

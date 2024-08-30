@@ -22,7 +22,7 @@ ConvertFormattedContentToLogMessages(fuchsia::diagnostics::FormattedContent cont
 // Get the severity corresponding to the given verbosity. Note that
 // verbosity relative to the default severity and can be thought of
 // as incrementally "more vebose than" the baseline.
-fuchsia_logging::LogSeverity GetSeverityFromVerbosity(uint8_t verbosity);
+FuchsiaLogSeverity GetSeverityFromVerbosity(uint8_t verbosity);
 
 }  // namespace diagnostics::accessor2logger
 

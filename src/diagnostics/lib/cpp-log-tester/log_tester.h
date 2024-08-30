@@ -18,7 +18,7 @@ namespace log_tester {
 /// and returns the handle to the logsink
 /// to be passed to RetrieveLogs later.
 zx::channel SetupFakeLog(bool wait_for_initial_interest = false,
-                         fuchsia_logging::LogSeverity severity = fuchsia_logging::LOG_INFO);
+                         FuchsiaLogSeverity severity = FUCHSIA_LOG_INFO);
 
 /// Retrieves logs from a given LogSink connection,
 /// and converts them to plaintext.
