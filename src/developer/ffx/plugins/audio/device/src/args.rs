@@ -131,10 +131,16 @@ pub struct PlayCommand {
 
     #[argh(
         option,
-        description = "signal processing element ID, \
-        for an Endpoint element of type RingBuffer"
+        description = "signal processing element ID, for an Endpoint element of type RingBuffer"
     )]
     pub element_id: Option<fadevice::ElementId>,
+
+    #[argh(
+        option,
+        description = "bitmask of channels to activate (deactivate the others). \
+If not specified, activate all channels present in the playback format"
+    )]
+    pub channels: Option<u64>,
 }
 
 #[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
@@ -153,8 +159,7 @@ pub struct RecordCommand {
 
     #[argh(
         option,
-        description = "signal processing element ID, \
-        for an Endpoint element of type RingBuffer"
+        description = "signal processing element ID, for an Endpoint element of type RingBuffer"
     )]
     pub element_id: Option<fadevice::ElementId>,
 }

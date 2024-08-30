@@ -29,6 +29,12 @@ pub trait RingBuffer {
 
     /// Returns the number of bytes allocated to the consumer.
     fn consumer_bytes(&self) -> u64;
+
+    /// Changes which channels are active.
+    async fn set_active_channels(
+        &self,
+        active_channels_bitmask: u64,
+    ) -> Result<zx::MonotonicTime, anyhow::Error>;
 }
 
 /// A [RingBuffer] backed by the `fuchsia.hardware.audio.RingBuffer` protocol.
@@ -87,6 +93,19 @@ impl RingBuffer for HardwareRingBuffer {
 
     fn consumer_bytes(&self) -> u64 {
         self.driver_transfer_bytes
+    }
+
+    async fn set_active_channels(
+        &self,
+        active_channels_bitmask: u64,
+    ) -> Result<zx::MonotonicTime, anyhow::Error> {
+        let set_time = self
+            .proxy
+            .set_active_channels(active_channels_bitmask)
+            .await
+            .context("failed to call SetActiveChannels")?
+            .map_err(|err| anyhow!("failed to set active channels: {:?}", err))?;
+        Ok(zx::MonotonicTime::from_nanos(set_time))
     }
 }
 
@@ -161,5 +180,22 @@ impl RingBuffer for AudioDeviceRingBuffer {
 
     fn consumer_bytes(&self) -> u64 {
         self.consumer_bytes
+    }
+
+    async fn set_active_channels(
+        &self,
+        active_channels_bitmask: u64,
+    ) -> Result<zx::MonotonicTime, anyhow::Error> {
+        let response = self
+            .proxy
+            .set_active_channels(&fadevice::RingBufferSetActiveChannelsRequest {
+                channel_bitmask: Some(active_channels_bitmask),
+                ..Default::default()
+            })
+            .await
+            .context("failed to call SetActiveChannels")?
+            .map_err(|err| anyhow!("failed to set active channels: {:?}", err))?;
+        let set_time = response.set_time.unwrap_or(0);
+        Ok(zx::MonotonicTime::from_nanos(set_time))
     }
 }
