@@ -21,30 +21,6 @@ import("//build/toolchain/variant.gni")
 #  - All code paths related to |is_host| has been removed (the Zircon toolchain
 #    are never used to build host binaries).
 
-# These flags are enabled by default in Fuchsia's Clang toolchain, but we set
-# them explicitly to support other Clang toolchains and Clang-based tools.
-config("clang_defaults") {
-  if (clang_embed_bitcode) {
-    cflags += [
-      "-Xclang",
-      "-fembed-bitcode=all",
-    ]
-  }
-
-  # Set relax relocations flag only for x64 ELF targets.
-  if (current_cpu == "x64" && is_elf) {
-    asmflags = [ "-Wa,--mrelax-relocations=yes" ]
-  }
-  if (current_os == "linux") {
-    cflags_cc = [ "-stdlib=libc++" ]
-    ldflags = [
-      "-stdlib=libc++",
-      "-unwindlib=libunwind",
-      "-rtlib=compiler-rt",
-    ]
-  }
-}
-
 config("compiler") {
   # Per CPU targeting policy we always target the baseline when building the
   # kernel, rather than using board_configs. This is done to reduce binary
@@ -98,7 +74,10 @@ config("compiler") {
     # TODO: "$current_os:compiler",
   ]
   if (!is_gcc) {
-    configs += [ ":clang_defaults" ]
+    configs += [
+      "//build/config:clang_defaults",
+      "//build/config:embed_bitcode",
+    ]
   }
 
   # This is done even if !is_fuchsia to catch cases like the kernel.efi

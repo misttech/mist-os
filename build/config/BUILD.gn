@@ -165,6 +165,14 @@ config("clang_defaults") {
   if (current_cpu == "x64" && is_elf) {
     asmflags = [ "-Wa,--mrelax-relocations=yes" ]
   }
+  if (current_os == "linux") {
+    cflags_cc = [ "-stdlib=libc++" ]
+    ldflags = [
+      "-stdlib=libc++",
+      "-unwindlib=libunwind",
+      "-rtlib=compiler-rt",
+    ]
+  }
 }
 
 config("embed_bitcode") {
