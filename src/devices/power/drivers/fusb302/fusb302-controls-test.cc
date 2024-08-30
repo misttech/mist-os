@@ -6,6 +6,7 @@
 
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
+#include <lib/driver/testing/cpp/scoped_global_logger.h>
 #include <lib/inspect/cpp/vmo/types.h>
 #include <lib/inspect/testing/cpp/zxtest/inspect.h>
 #include <lib/mock-i2c/mock-i2c.h>
@@ -40,8 +41,6 @@ constexpr int kControl4Address = 0x10;
 class Fusb302ControlsTest : public inspect::InspectTestHelper, public zxtest::Test {
  public:
   void SetUp() override {
-    fdf::Logger::SetGlobalInstance(&logger_);
-
     auto endpoints = fidl::Endpoints<fuchsia_hardware_i2c::Device>::Create();
     mock_i2c_client_ = std::move(endpoints.client);
 
@@ -54,15 +53,11 @@ class Fusb302ControlsTest : public inspect::InspectTestHelper, public zxtest::Te
                       inspect_.GetRoot().CreateChild("Controls"));
   }
 
-  void TearDown() override {
-    mock_i2c_.VerifyAndClear();
-    fdf::Logger::SetGlobalInstance(nullptr);
-  }
+  void TearDown() override { mock_i2c_.VerifyAndClear(); }
 
  protected:
+  fdf_testing::ScopedGlobalLogger logger_;
   inspect::Inspector inspect_;
-  fdf::Logger logger_{"fusb302-controls-test", FUCHSIA_LOG_DEBUG, zx::socket{},
-                      fidl::WireClient<fuchsia_logger::LogSink>()};
 
   async::Loop loop_{&kAsyncLoopConfigNeverAttachToThread};
   mock_i2c::MockI2c mock_i2c_;
