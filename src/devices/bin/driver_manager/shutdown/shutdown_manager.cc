@@ -276,10 +276,6 @@ void ShutdownManager::SignalPackageShutdown(fit::callback<void(zx_status_t)> cb)
   }
 }
 
-void ShutdownManager::SuspendWithoutExit(SuspendWithoutExitCompleter::Sync& completer) {
-  LOGF(FATAL, "SuspendWithoutExit not supported");
-}
-
 void ShutdownManager::Stop(StopCompleter::Sync& completer) {
   lifecycle_stop_ = true;
   SignalBootShutdown(ToCallback(completer));

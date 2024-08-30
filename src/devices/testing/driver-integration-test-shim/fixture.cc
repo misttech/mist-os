@@ -211,23 +211,4 @@ zx_status_t IsolatedDevmgr::Create(Args* args, IsolatedDevmgr* out) {
   return ZX_OK;
 }
 
-zx_status_t IsolatedDevmgr::SuspendDriverManager() {
-  auto endpoints = fidl::CreateEndpoints<fuchsia_device_manager::Administrator>();
-  if (endpoints.is_error()) {
-    return endpoints.error_value();
-  }
-  zx_status_t status = realm_->component().Connect(
-      fidl::DiscoverableProtocolName<fuchsia_device_manager::Administrator>,
-      endpoints->server.TakeChannel());
-  if (status != ZX_OK) {
-    return status;
-  }
-  auto result = fidl::WireCall(endpoints->client)->SuspendWithoutExit();
-  if (!result.ok()) {
-    return result.status();
-  }
-
-  return ZX_OK;
-}
-
 }  // namespace driver_integration_test

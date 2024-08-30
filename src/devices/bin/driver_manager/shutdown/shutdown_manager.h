@@ -24,8 +24,7 @@ using fuchsia_device_manager::SystemPowerState;
 // Theory of operation of ShutdownManager:
 //  There are a number of ways shutdown can be initiated:
 //   - The process could be terminated, resulting in a signal from the Lifecycle channel
-//   - The administrator interface could signal UnregisterSystemStorageForShutdown, or
-//     SuspendWithoutExit
+//   - The administrator interface could signal UnregisterSystemStorageForShutdown
 //   - Any of the fidl connections could be dropped
 //  These events can cause one of two stages of the driver shutdown to be triggered:
 //  Package Shutdown:  The shutdown manager signals the node_remover to shut down all package
@@ -133,10 +132,6 @@ class ShutdownManager : public fidl::WireServer<fuchsia_device_manager::Administ
   // will immediatetly return.
   void UnregisterSystemStorageForShutdown(
       UnregisterSystemStorageForShutdownCompleter::Sync& completer) override;
-
-  // Tell DriverManager to go through the suspend process, but don't exit
-  // afterwards. This is used in tests to check that suspend works correctly.
-  void SuspendWithoutExit(SuspendWithoutExitCompleter::Sync& completer) override;
 
   // fuchsia.process.lifecycle/Lifecycle interface
   // The process must clean up its state in preparation for termination, and
