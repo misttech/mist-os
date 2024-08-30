@@ -11,9 +11,6 @@ decode ARM Exception Syndrome Register (ESR) values
 # then further decode the RAS-specific details.
 
 import argparse
-import io
-import os
-import subprocess
 import sys
 
 

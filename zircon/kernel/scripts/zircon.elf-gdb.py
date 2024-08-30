@@ -435,7 +435,6 @@ class _InfoZirconProcesses(gdb.Command):
         # Do this first to make sure the previous value gets cleared out.
         # There's no way to unset a convenience var, so KISS.
         gdb.execute("set $zx_processes = (ProcessDispatcher*[1]) { 0 }")
-        tls_entry_lkuser = gdb.parse_and_eval("TLS_ENTRY_LKUSER")
         processes = _get_process_list()
         num_processes = len(processes)
         # The array is origin-1-indexed. Have a null first entry to KISS.
