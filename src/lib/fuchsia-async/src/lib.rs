@@ -68,3 +68,4 @@ pub use fuchsia_async_macro::{run, run_singlethreaded, run_until_stalled};
 
 /// Testing support for repeated runs
 pub mod test_support;
+pub mod waker_list;
