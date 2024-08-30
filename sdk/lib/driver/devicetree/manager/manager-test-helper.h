@@ -8,8 +8,8 @@
 #include <fidl/fuchsia.driver.framework/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.platform.bus/cpp/driver/fidl.h>
 #include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
-#include <lib/driver/logging/cpp/logger.h>
 #include <lib/driver/testing/cpp/driver_runtime.h>
+#include <lib/driver/testing/cpp/scoped_global_logger.h>
 
 #include <memory>
 
@@ -134,24 +134,20 @@ class FakeEnvWrapper {
 
 class ManagerTestHelper {
  public:
-  explicit ManagerTestHelper(std::string_view tag) { ConnectLogger(tag); }
-
-  ~ManagerTestHelper() { fdf::Logger::SetGlobalInstance(nullptr); }
+  explicit ManagerTestHelper(std::string_view unused_tag) {}
 
   zx::result<> DoPublish(Manager& manager);
 
   async_patterns::TestDispatcherBound<FakeEnvWrapper>& env() { return env_; }
 
  private:
-  void ConnectLogger(std::string_view tag);
-
   fdf_testing::DriverRuntime runtime_;
+  fdf_testing::ScopedGlobalLogger logger_;
   fdf::UnownedSynchronizedDispatcher env_dispatcher = runtime_.StartBackgroundDispatcher();
   async_patterns::TestDispatcherBound<FakeEnvWrapper> env_{env_dispatcher->async_dispatcher(),
                                                            std::in_place};
   fidl::SyncClient<fuchsia_driver_framework::Node> node_;
   fdf::WireSyncClient<fuchsia_hardware_platform_bus::PlatformBus> pbus_;
-  std::unique_ptr<fdf::Logger> logger_;
 };
 
 }  // namespace fdf_devicetree::testing

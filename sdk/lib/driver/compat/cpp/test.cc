@@ -5,6 +5,7 @@
 #include <lib/driver/compat/cpp/connect.h>
 #include <lib/driver/compat/cpp/logging.h>
 #include <lib/driver/testing/cpp/driver_runtime.h>
+#include <lib/driver/testing/cpp/scoped_global_logger.h>
 #include <lib/fdio/directory.h>
 
 #include <memory>
@@ -61,23 +62,17 @@ TEST(CompatConnectTest, Connection) {
 }
 
 TEST(LoggingTest, LogLevelEnabled) {
-  fdf::Logger logger("test", FUCHSIA_LOG_DEBUG, zx::socket{},
-                     fidl::WireClient<fuchsia_logger::LogSink>{});
-  fdf::Logger::SetGlobalInstance(&logger);
+  fdf_testing::ScopedGlobalLogger logger;
   ASSERT_FALSE(zxlog_level_enabled(TRACE));
-  ASSERT_TRUE(zxlog_level_enabled(DEBUG));
+  ASSERT_FALSE(zxlog_level_enabled(DEBUG));
   ASSERT_TRUE(zxlog_level_enabled(ERROR));
-  fdf::Logger::SetGlobalInstance(nullptr);
 }
 
 TEST(LoggingTest, LogOutput) {
-  fdf::Logger logger("test", FUCHSIA_LOG_DEBUG, zx::socket{},
-                     fidl::WireClient<fuchsia_logger::LogSink>{});
-  fdf::Logger::SetGlobalInstance(&logger);
+  fdf_testing::ScopedGlobalLogger logger;
   zxlogf(TRACE, "Trace %d", 0);
   zxlogf(DEBUG, "Debug %d", 1);
   zxlogf(INFO, "Info %d", 2);
   zxlogf(WARNING, "Warning %d", 3);
   zxlogf(ERROR, "Error %d", 4);
-  fdf::Logger::SetGlobalInstance(nullptr);
 }

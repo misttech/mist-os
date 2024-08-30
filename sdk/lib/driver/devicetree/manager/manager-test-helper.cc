@@ -162,24 +162,6 @@ FakeEnvWrapper::non_pbus_nodes_at(size_t index) {
   return node_.requests()[index];
 }
 
-void ManagerTestHelper::ConnectLogger(std::string_view tag) {
-  zx::socket client_end, server_end;
-  zx_status_t status = zx::socket::create(ZX_SOCKET_DATAGRAM, &client_end, &server_end);
-  ZX_ASSERT(status == ZX_OK);
-
-  auto connect_result = component::Connect<fuchsia_logger::LogSink>();
-  ZX_ASSERT(connect_result.is_ok());
-
-  fidl::WireSyncClient<fuchsia_logger::LogSink> log_sink;
-  log_sink.Bind(std::move(*connect_result));
-  auto sink_result = log_sink->ConnectStructured(std::move(server_end));
-  ZX_ASSERT(sink_result.ok());
-
-  logger_ = std::make_unique<fdf::Logger>(tag, 0, std::move(client_end),
-                                          fidl::WireClient<fuchsia_logger::LogSink>());
-  fdf::Logger::SetGlobalInstance(logger_.get());
-}
-
 zx::result<> ManagerTestHelper::DoPublish(Manager& manager) {
   auto pbus_endpoints = fdf::Endpoints<fuchsia_hardware_platform_bus::PlatformBus>::Create();
   auto mgr_endpoints = fidl::Endpoints<fuchsia_driver_framework::CompositeNodeManager>::Create();
