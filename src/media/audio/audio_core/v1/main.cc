@@ -26,9 +26,7 @@ constexpr char kProcessConfigPath[] = "/config/data/audio_core_config.json";
 
 static int StartAudioCore(const fxl::CommandLine& cl) {
   fuchsia_logging::LogSettingsBuilder builder;
-  builder.WithMinLogSeverity(fuchsia_logging::LOG_INFO)
-      .WithTags({"audio_core"})
-      .BuildAndInitialize();
+  builder.WithMinLogSeverity(FUCHSIA_LOG_INFO).WithTags({"audio_core"}).BuildAndInitialize();
 
   FX_LOGS(INFO) << "AudioCore starting up";
 

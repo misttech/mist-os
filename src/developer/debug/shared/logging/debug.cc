@@ -92,14 +92,12 @@ double SecondsSinceStart() {
 
 }  // namespace
 
-bool IsDebugLoggingActive() {
-  return fuchsia_logging::IsSeverityEnabled(fuchsia_logging::LOG_DEBUG);
-}
+bool IsDebugLoggingActive() { return fuchsia_logging::IsSeverityEnabled(FUCHSIA_LOG_DEBUG); }
 
 void SetDebugLogging(bool activate) {
   fuchsia_logging::LogSettingsBuilder builder;
   if (activate) {
-    builder.WithMinLogSeverity(fuchsia_logging::LOG_DEBUG);
+    builder.WithMinLogSeverity(FUCHSIA_LOG_DEBUG);
   }
   builder.BuildAndInitialize();
 }

@@ -82,7 +82,7 @@ void RoleManager::handle_unknown_method(
 void RoleManager::LogRequest(SetRoleRequestView request) {
   // Return early if debug logging is not enabled. This allows us to bypass an extra
   // zx_object_get_info syscall.
-  if (fuchsia_logging::GetMinLogSeverity() > fuchsia_logging::LOG_DEBUG) {
+  if (fuchsia_logging::GetMinLogSeverity() > FUCHSIA_LOG_DEBUG) {
     return;
   }
 

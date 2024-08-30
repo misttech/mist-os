@@ -46,14 +46,14 @@ class ThrottledLogger {
  public:
   virtual ~ThrottledLogger() = default;
 
-  // TODO(https://fxbug.dev/42065692): Add another implementation that throttles to N log messages per second.
-  // Consider using this instead of FromCounts, especially anywhere that logging frequency is
-  // derived from external inputs.
+  // TODO(https://fxbug.dev/42065692): Add another implementation that throttles to N log messages
+  // per second. Consider using this instead of FromCounts, especially anywhere that logging
+  // frequency is derived from external inputs.
 
   // Given a list of pairs `(severity, count)`, each `count` messages are logged at `severity`.
   // If multiple severities are enabled at a specific time, the higest severity is used.
   static std::unique_ptr<ThrottledLogger> FromCounts(
-      std::vector<std::pair<fuchsia_logging::LogSeverity, int64_t>> counts);
+      std::vector<std::pair<FuchsiaLogSeverity, int64_t>> counts);
 
   // Returns true if the next log message should be enabled.
   // Intended to be called by THROTTLED_LOG only.
@@ -61,7 +61,7 @@ class ThrottledLogger {
 
   // Returns the severity to use for the current log message.
   // Intended to be called by THROTTLED_LOG only.
-  virtual fuchsia_logging::LogSeverity current_severity() = 0;
+  virtual FuchsiaLogSeverity current_severity() = 0;
 };
 
 }  // namespace media_audio

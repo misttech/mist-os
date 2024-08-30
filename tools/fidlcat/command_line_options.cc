@@ -281,22 +281,21 @@ const char* const kVersionHelp = R"(  --version
 // |settings| contains the output.
 bool SetLogSettings(const std::string& level, int multiplier, fxl::LogSettings* settings) {
   if (level == "trace") {
-    settings->min_log_level = fuchsia_logging::LOG_TRACE;
+    settings->min_log_level = FUCHSIA_LOG_TRACE;
   } else if (level == "debug") {
-    settings->min_log_level = fuchsia_logging::LOG_DEBUG;
+    settings->min_log_level = FUCHSIA_LOG_DEBUG;
   } else if (level == "info") {
-    settings->min_log_level = fuchsia_logging::LOG_INFO;
+    settings->min_log_level = FUCHSIA_LOG_INFO;
   } else if (level == "warning") {
-    settings->min_log_level = fuchsia_logging::LOG_WARNING;
+    settings->min_log_level = FUCHSIA_LOG_WARNING;
   } else if (level == "error") {
-    settings->min_log_level = fuchsia_logging::LOG_ERROR;
+    settings->min_log_level = FUCHSIA_LOG_ERROR;
   } else if (level == "fatal") {
-    settings->min_log_level = fuchsia_logging::LOG_FATAL;
+    settings->min_log_level = FUCHSIA_LOG_FATAL;
   } else if (fxl::StringToNumberWithError(level, &settings->min_log_level)) {
     settings->min_log_level =
-        fuchsia_logging::LOG_INFO +
-        static_cast<fuchsia_logging::LogSeverity>(
-            (multiplier * (multiplier > 0 ? FUCHSIA_LOG_SEVERITY_STEP_SIZE : 1)));
+        FUCHSIA_LOG_INFO + static_cast<FuchsiaLogSeverity>((
+                               multiplier * (multiplier > 0 ? FUCHSIA_LOG_SEVERITY_STEP_SIZE : 1)));
 
   } else {
     return false;
