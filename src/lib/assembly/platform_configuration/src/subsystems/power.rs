@@ -26,6 +26,16 @@ impl DefineSubsystemConfiguration<PowerConfig> for PowerManagementSubsystem {
                 .context("Adding cpu_manager config file")?;
         }
 
+        if let Some(energy_model_config) = &context.board_info.configuration.energy_model {
+            builder
+                .bootfs()
+                .file(FileEntry {
+                    source: energy_model_config.as_utf8_pathbuf().into(),
+                    destination: BootfsDestination::EnergyModelConfig,
+                })
+                .context("Adding energy model config file for processor power management")?;
+        }
+
         if let Some(power_manager_config) = &context.board_info.configuration.power_manager {
             builder
                 .bootfs()

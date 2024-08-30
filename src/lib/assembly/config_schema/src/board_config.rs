@@ -138,6 +138,10 @@ pub struct BoardProvidedConfig {
     #[file_relative_paths]
     pub cpu_manager: Option<FileRelativePathBuf>,
 
+    /// Energy model configuration for processor power management
+    #[file_relative_paths]
+    pub energy_model: Option<FileRelativePathBuf>,
+
     /// Configuration for the power-manager service
     #[file_relative_paths]
     pub power_manager: Option<FileRelativePathBuf>,

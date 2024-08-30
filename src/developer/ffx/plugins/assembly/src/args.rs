@@ -382,6 +382,10 @@ pub struct BoardInputBundleArgs {
     #[argh(option)]
     pub cpu_manager_config: Option<Utf8PathBuf>,
 
+    /// energy model configuration for processor power management
+    #[argh(option)]
+    pub energy_model_config: Option<Utf8PathBuf>,
+
     /// arguments to pass to the kernel on boot
     #[argh(option)]
     pub kernel_boot_args: Vec<String>,
