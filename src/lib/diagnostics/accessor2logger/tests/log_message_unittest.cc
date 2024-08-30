@@ -39,19 +39,19 @@ TEST(LogMessage, WrongType) {
 }
 
 std::string SeverityToString(const int32_t severity) {
-  if (severity == fuchsia_logging::LOG_TRACE) {
+  if (severity == FUCHSIA_LOG_TRACE) {
     return "TRACE";
-  } else if (severity == fuchsia_logging::LOG_DEBUG) {
+  } else if (severity == FUCHSIA_LOG_DEBUG) {
     return "DEBUG";
-  } else if (severity > fuchsia_logging::LOG_DEBUG && severity < fuchsia_logging::LOG_INFO) {
-    return fxl::StringPrintf("VLOG(%d)", fuchsia_logging::LOG_INFO - severity);
-  } else if (severity == fuchsia_logging::LOG_INFO) {
+  } else if (severity > FUCHSIA_LOG_DEBUG && severity < FUCHSIA_LOG_INFO) {
+    return fxl::StringPrintf("VLOG(%d)", FUCHSIA_LOG_INFO - severity);
+  } else if (severity == FUCHSIA_LOG_INFO) {
     return "INFO";
-  } else if (severity == fuchsia_logging::LOG_WARNING) {
+  } else if (severity == FUCHSIA_LOG_WARNING) {
     return "WARN";
-  } else if (severity == fuchsia_logging::LOG_ERROR) {
+  } else if (severity == FUCHSIA_LOG_ERROR) {
     return "ERROR";
-  } else if (severity == fuchsia_logging::LOG_FATAL) {
+  } else if (severity == FUCHSIA_LOG_FATAL) {
     return "FATAL";
   }
   return "INVALID";

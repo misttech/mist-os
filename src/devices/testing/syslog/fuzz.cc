@@ -31,8 +31,8 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
   };
   auto severity = provider.ConsumeIntegral<fuchsia_logging::LogSeverity>();
   // Fatal crashes...
-  if (severity == fuchsia_logging::LOG_FATAL) {
-    severity = fuchsia_logging::LOG_ERROR;
+  if (severity == FUCHSIA_LOG_FATAL) {
+    severity = FUCHSIA_LOG_ERROR;
   }
   auto file = provider.ConsumeRandomLengthString();
   auto line = provider.ConsumeIntegral<unsigned int>();

@@ -1032,8 +1032,8 @@ void LogicalBufferCollection::LogAndFailRootNode(Location location, Error error,
   ZX_DEBUG_ASSERT(format);
   va_list args;
   va_start(args, format);
-  vLog(::fuchsia_logging::LOG_WARNING, location.file(), location.line(), "LogicalBufferCollection",
-       format, args);
+  vLog(FUCHSIA_LOG_WARNING, location.file(), location.line(), "LogicalBufferCollection", format,
+       args);
   va_end(args);
   FailRootNode(error);
 }
@@ -1053,7 +1053,7 @@ void LogicalBufferCollection::LogAndFailDownFrom(Location location, NodeProperti
   va_list args;
   va_start(args, format);
   bool is_root = (tree_to_fail == root_.get());
-  vLog(::fuchsia_logging::LOG_INFO, location.file(), location.line(),
+  vLog(FUCHSIA_LOG_INFO, location.file(), location.line(),
        is_root ? "LogicalBufferCollection root fail" : "LogicalBufferCollection sub-tree fail",
        format, args);
   va_end(args);
@@ -1097,7 +1097,7 @@ void LogicalBufferCollection::LogAndFailNode(Location location, NodeProperties* 
   va_list args;
   va_start(args, format);
   bool is_root = (tree_to_fail == root_.get());
-  vLog(::fuchsia_logging::LOG_INFO, location.file(), location.line(),
+  vLog(FUCHSIA_LOG_INFO, location.file(), location.line(),
        is_root ? "LogicalBufferCollection root fail" : "LogicalBufferCollection sub-tree fail",
        format, args);
   va_end(args);
@@ -1116,7 +1116,7 @@ void LogErrorInternal(Location location, const char* format, ...) {
   va_list args;
   va_start(args, format);
 
-  vLog(::fuchsia_logging::LOG_ERROR, location.file(), location.line(), nullptr, format, args);
+  vLog(FUCHSIA_LOG_ERROR, location.file(), location.line(), nullptr, format, args);
 
   va_end(args);
 }
@@ -1126,11 +1126,11 @@ void LogicalBufferCollection::LogInfo(Location location, const char* format, ...
   va_list args;
   va_start(args, format);
 
-  ::fuchsia_logging::LogSeverity severity;
+  FuchsiaLogSeverity severity;
   if (is_verbose_logging()) {
-    severity = ::fuchsia_logging::LOG_INFO;
+    severity = FUCHSIA_LOG_INFO;
   } else {
-    severity = ::fuchsia_logging::LOG_DEBUG;
+    severity = FUCHSIA_LOG_DEBUG;
   }
 
   vLog(severity, location.file(), location.line(), nullptr, format, args);

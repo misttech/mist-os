@@ -58,26 +58,26 @@ class LoggingFixture : public ::testing::Test {
   }
 
  private:
-  LogSeverity old_severity_;
+  FuchsiaLogSeverity old_severity_;
   int old_stderr_;
 };
 
 using LoggingFixtureDeathTest = LoggingFixture;
 #ifdef __Fuchsia__
 std::string SeverityToString(const int32_t severity) {
-  if (severity == fuchsia_logging::LOG_TRACE) {
+  if (severity == FUCHSIA_LOG_TRACE) {
     return "TRACE";
-  } else if (severity == fuchsia_logging::LOG_DEBUG) {
+  } else if (severity == FUCHSIA_LOG_DEBUG) {
     return "DEBUG";
-  } else if (severity > fuchsia_logging::LOG_DEBUG && severity < fuchsia_logging::LOG_INFO) {
-    return fxl::StringPrintf("VLOG(%d)", fuchsia_logging::LOG_INFO - severity);
-  } else if (severity == fuchsia_logging::LOG_INFO) {
+  } else if (severity > FUCHSIA_LOG_DEBUG && severity < FUCHSIA_LOG_INFO) {
+    return fxl::StringPrintf("VLOG(%d)", FUCHSIA_LOG_INFO - severity);
+  } else if (severity == FUCHSIA_LOG_INFO) {
     return "INFO";
-  } else if (severity == fuchsia_logging::LOG_WARNING) {
+  } else if (severity == FUCHSIA_LOG_WARNING) {
     return "WARN";
-  } else if (severity == fuchsia_logging::LOG_ERROR) {
+  } else if (severity == FUCHSIA_LOG_ERROR) {
     return "ERROR";
-  } else if (severity == fuchsia_logging::LOG_FATAL) {
+  } else if (severity == FUCHSIA_LOG_FATAL) {
     return "FATAL";
   }
   return "INVALID";
@@ -279,13 +279,13 @@ TEST_F(LoggingFixture, BackendDirect) {
   LogState state = SetupLogs(false);
 
   {
-    syslog_runtime::LogBufferBuilder builder(fuchsia_logging::LOG_ERROR);
+    syslog_runtime::LogBufferBuilder builder(FUCHSIA_LOG_ERROR);
     auto buffer =
         builder.WithFile("foo.cc", 42).WithMsg("Log message").WithCondition("condition").Build();
     buffer.WriteKeyValue("tag", "fake tag");
     buffer.Flush();
   }
-  syslog_runtime::LogBufferBuilder builder(fuchsia_logging::LOG_ERROR);
+  syslog_runtime::LogBufferBuilder builder(FUCHSIA_LOG_ERROR);
   auto buffer =
       builder.WithMsg("fake message").WithCondition("condition").WithFile("foo.cc", 42).Build();
   buffer.WriteKeyValue("tag", "fake tag");
@@ -327,7 +327,7 @@ TEST(StructuredLogging, Remaining) {
   ASSERT_TRUE(temp_dir.NewTempFile(&log_file));
   builder.WithLogFile(log_file);
   builder.BuildAndInitialize();
-  syslog_runtime::LogBufferBuilder builder2(LOG_INFO);
+  syslog_runtime::LogBufferBuilder builder2(FUCHSIA_LOG_INFO);
   auto buffer = builder2.WithFile("test", 5).WithMsg("test_msg").Build();
   auto header = syslog_runtime::internal::MsgHeader::CreatePtr(&buffer);
   auto initial = header->RemainingSpace();
@@ -338,7 +338,7 @@ TEST(StructuredLogging, Remaining) {
 }
 
 TEST(StructuredLogging, FlushAndReset) {
-  syslog_runtime::LogBufferBuilder builder(LOG_INFO);
+  syslog_runtime::LogBufferBuilder builder(FUCHSIA_LOG_INFO);
   auto buffer = builder.WithFile("test", 5).WithMsg("test_msg").Build();
   auto header = syslog_runtime::internal::MsgHeader::CreatePtr(&buffer);
   auto initial = header->RemainingSpace();

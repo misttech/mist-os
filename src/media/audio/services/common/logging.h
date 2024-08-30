@@ -20,10 +20,9 @@ namespace media_audio {
 // A macro that can be used whenever code is unreachable. This is equivalent to `FX_CHECK(false)`
 // but also tells the compiler that nothing is reachable after this statement. Like other logging
 // macros, it accepts stream operators to write a custom failure message.
-#define UNREACHABLE                                                                            \
-  ::media_audio::LogMessageVoidifyNoReturn() &                                                 \
-      ::fuchsia_logging::LogMessage(::fuchsia_logging::LOG_FATAL, __FILE__, __LINE__, nullptr, \
-                                    nullptr)                                                   \
+#define UNREACHABLE                                                                          \
+  ::media_audio::LogMessageVoidifyNoReturn() &                                               \
+      ::fuchsia_logging::LogMessage(FUCHSIA_LOG_FATAL, __FILE__, __LINE__, nullptr, nullptr) \
           .stream()
 
 // Implementation detail of UNREACHABLE.

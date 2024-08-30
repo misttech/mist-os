@@ -35,43 +35,43 @@ class LogSettingsFixture : public ::testing::Test {
 
 TEST(LogSettings, ParseValidOptions) {
   fxl::LogSettings settings;
-  settings.min_log_level = fuchsia_logging::LOG_FATAL;
+  settings.min_log_level = FUCHSIA_LOG_FATAL;
 
   EXPECT_TRUE(ParseLogSettings(CommandLineFromInitializerList({"argv0"}), &settings));
-  EXPECT_EQ(fuchsia_logging::LOG_FATAL, settings.min_log_level);
+  EXPECT_EQ(FUCHSIA_LOG_FATAL, settings.min_log_level);
 
   EXPECT_TRUE(ParseLogSettings(CommandLineFromInitializerList({"argv0", "--quiet=0"}), &settings));
-  EXPECT_EQ(fuchsia_logging::LOG_INFO, settings.min_log_level);
+  EXPECT_EQ(FUCHSIA_LOG_INFO, settings.min_log_level);
 
   EXPECT_TRUE(ParseLogSettings(CommandLineFromInitializerList({"argv0", "--quiet"}), &settings));
-  EXPECT_EQ(fuchsia_logging::LOG_WARNING, settings.min_log_level);
+  EXPECT_EQ(FUCHSIA_LOG_WARNING, settings.min_log_level);
 
   EXPECT_TRUE(ParseLogSettings(CommandLineFromInitializerList({"argv0", "--quiet=3"}), &settings));
-  EXPECT_EQ(fuchsia_logging::LOG_FATAL, settings.min_log_level);
+  EXPECT_EQ(FUCHSIA_LOG_FATAL, settings.min_log_level);
 
   EXPECT_TRUE(
       ParseLogSettings(CommandLineFromInitializerList({"argv0", "--severity=TRACE"}), &settings));
-  EXPECT_EQ(fuchsia_logging::LOG_TRACE, settings.min_log_level);
+  EXPECT_EQ(FUCHSIA_LOG_TRACE, settings.min_log_level);
 
   EXPECT_TRUE(
       ParseLogSettings(CommandLineFromInitializerList({"argv0", "--severity=DEBUG"}), &settings));
-  EXPECT_EQ(fuchsia_logging::LOG_DEBUG, settings.min_log_level);
+  EXPECT_EQ(FUCHSIA_LOG_DEBUG, settings.min_log_level);
 
   EXPECT_TRUE(
       ParseLogSettings(CommandLineFromInitializerList({"argv0", "--severity=INFO"}), &settings));
-  EXPECT_EQ(fuchsia_logging::LOG_INFO, settings.min_log_level);
+  EXPECT_EQ(FUCHSIA_LOG_INFO, settings.min_log_level);
 
   EXPECT_TRUE(
       ParseLogSettings(CommandLineFromInitializerList({"argv0", "--severity=WARNING"}), &settings));
-  EXPECT_EQ(fuchsia_logging::LOG_WARNING, settings.min_log_level);
+  EXPECT_EQ(FUCHSIA_LOG_WARNING, settings.min_log_level);
 
   EXPECT_TRUE(
       ParseLogSettings(CommandLineFromInitializerList({"argv0", "--severity=ERROR"}), &settings));
-  EXPECT_EQ(fuchsia_logging::LOG_ERROR, settings.min_log_level);
+  EXPECT_EQ(FUCHSIA_LOG_ERROR, settings.min_log_level);
 
   EXPECT_TRUE(
       ParseLogSettings(CommandLineFromInitializerList({"argv0", "--severity=FATAL"}), &settings));
-  EXPECT_EQ(fuchsia_logging::LOG_FATAL, settings.min_log_level);
+  EXPECT_EQ(FUCHSIA_LOG_FATAL, settings.min_log_level);
 #ifndef __Fuchsia__
   EXPECT_TRUE(ParseLogSettings(
       CommandLineFromInitializerList({"argv0", "--log-file=/tmp/custom.log"}), &settings));
@@ -81,25 +81,25 @@ TEST(LogSettings, ParseValidOptions) {
 
 TEST(LogSettings, ParseInvalidOptions) {
   fxl::LogSettings settings;
-  settings.min_log_level = fuchsia_logging::LOG_FATAL;
+  settings.min_log_level = FUCHSIA_LOG_FATAL;
 
-  EXPECT_EQ(fuchsia_logging::LOG_FATAL, settings.min_log_level);
+  EXPECT_EQ(FUCHSIA_LOG_FATAL, settings.min_log_level);
 
   EXPECT_FALSE(
       ParseLogSettings(CommandLineFromInitializerList({"argv0", "--quiet=-1"}), &settings));
-  EXPECT_EQ(fuchsia_logging::LOG_FATAL, settings.min_log_level);
+  EXPECT_EQ(FUCHSIA_LOG_FATAL, settings.min_log_level);
 
   EXPECT_FALSE(
       ParseLogSettings(CommandLineFromInitializerList({"argv0", "--quiet=123garbage"}), &settings));
-  EXPECT_EQ(fuchsia_logging::LOG_FATAL, settings.min_log_level);
+  EXPECT_EQ(FUCHSIA_LOG_FATAL, settings.min_log_level);
 
   EXPECT_FALSE(ParseLogSettings(
       CommandLineFromInitializerList({"argv0", "--severity=TRACEgarbage"}), &settings));
-  EXPECT_EQ(fuchsia_logging::LOG_FATAL, settings.min_log_level);
+  EXPECT_EQ(FUCHSIA_LOG_FATAL, settings.min_log_level);
 
   EXPECT_FALSE(ParseLogSettings(
       CommandLineFromInitializerList({"argv0", "--severity=TRACE --quiet=1"}), &settings));
-  EXPECT_EQ(fuchsia_logging::LOG_FATAL, settings.min_log_level);
+  EXPECT_EQ(FUCHSIA_LOG_FATAL, settings.min_log_level);
 }
 
 TEST_F(LogSettingsFixture, ToArgv) {
