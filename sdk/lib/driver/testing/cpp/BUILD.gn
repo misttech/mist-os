@@ -71,10 +71,8 @@ source_set("scoped_global_logger") {
     "scoped_global_logger.cc",
     "scoped_global_logger.h",
   ]
-  deps = [ "//zircon/system/ulib/sync:sync-cpp" ]
   public_deps = [
     "//sdk/lib/driver/logging/cpp",
-    "//zircon/system/ulib/async:async-cpp",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
   ]
 }
