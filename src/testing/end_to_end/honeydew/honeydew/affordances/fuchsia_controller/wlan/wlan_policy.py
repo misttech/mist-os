@@ -11,7 +11,7 @@ from dataclasses import dataclass
 
 import fidl.fuchsia_wlan_policy as f_wlan_policy
 from fuchsia_controller_py import Channel, ZxStatus
-from fuchsia_controller_py.wrappers import AsyncAdapter
+from fuchsia_controller_py.wrappers import AsyncAdapter, asyncmethod
 
 from honeydew import errors
 from honeydew.interfaces.affordances.wlan import wlan_policy
@@ -292,13 +292,34 @@ class WlanPolicy(AsyncAdapter, wlan_policy.WlanPolicy):
         """
         raise NotImplementedError()
 
-    def start_client_connections(self) -> None:
+    @asyncmethod
+    # pylint: disable-next=invalid-overridden-method
+    async def start_client_connections(self) -> None:
         """Enables device to initiate connections to networks.
+
+        See fuchsia.wlan.policy/ClientController.StartClientConnections().
 
         Raises:
             HoneydewWlanError: Error from WLAN stack.
         """
-        raise NotImplementedError()
+        if self._client_controller is None:
+            self.create_client_controller()
+        assert self._client_controller is not None
+
+        try:
+            resp = (
+                await self._client_controller.proxy.start_client_connections()
+            )
+            status = RequestStatus.from_fidl(resp.status)
+            if status != RequestStatus.ACKNOWLEDGED:
+                raise errors.HoneydewWlanError(
+                    "ClientController.StartClientConnections() returned "
+                    f"request status {status}"
+                )
+        except ZxStatus as status:
+            raise errors.HoneydewWlanError(
+                f"ClientController.StartClientConnections() error {status}"
+            ) from status
 
     def stop_client_connections(self) -> None:
         """Disables device for initiating connections to networks.

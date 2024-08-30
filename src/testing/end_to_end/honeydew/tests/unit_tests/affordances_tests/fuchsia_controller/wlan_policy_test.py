@@ -6,13 +6,15 @@
 import unittest
 from collections.abc import Iterator
 from contextlib import contextmanager
+from typing import TypeVar
 from unittest import mock
 
+import fidl.fuchsia_wlan_common as f_wlan_common
 import fidl.fuchsia_wlan_policy as f_wlan_policy
-from fuchsia_controller_py import Channel
+from fuchsia_controller_py import Channel, ZxStatus
 
 from honeydew.affordances.fuchsia_controller.wlan import wlan_policy
-from honeydew.errors import NotSupportedError
+from honeydew.errors import HoneydewWlanError, NotSupportedError
 from honeydew.interfaces.device_classes import affordances_capable
 from honeydew.transports import ffx as ffx_transport
 from honeydew.transports import fuchsia_controller as fc_transport
@@ -21,6 +23,16 @@ from honeydew.typing.wlan import (
     SecurityType,
     WlanClientState,
 )
+
+_T = TypeVar("_T")
+
+
+async def _async_response(response: _T) -> _T:
+    return response
+
+
+async def _async_error(err: Exception) -> None:
+    raise err
 
 
 # pylint: disable=protected-access
@@ -176,10 +188,63 @@ class WlanPolicyFCTests(unittest.TestCase):
         with self.assertRaises(NotImplementedError):
             self.wlan_policy_obj.set_new_update_listener()
 
-    def test_start_client_connections(self) -> None:
-        """Test if start_client_connections works."""
-        with self.assertRaises(NotImplementedError):
+    def test_start_client_connections_passes(self) -> None:
+        """Test if start_client_connections passes as expected."""
+        with self._mock_create_client_controller() as client_controller:
+            client_controller.start_client_connections.return_value = _async_response(
+                f_wlan_policy.ClientControllerStartClientConnectionsResponse(
+                    status=f_wlan_common.RequestStatus.ACKNOWLEDGED
+                )
+            )
             self.wlan_policy_obj.start_client_connections()
+
+    def test_start_client_connections_fails(self) -> None:
+        """Test if start_client_connections fails in expected ways."""
+        with self._mock_create_client_controller() as client_controller:
+            for msg, resp in [
+                (
+                    "not supported",
+                    _async_response(
+                        f_wlan_policy.ClientControllerStartClientConnectionsResponse(
+                            status=f_wlan_common.RequestStatus.REJECTED_NOT_SUPPORTED
+                        )
+                    ),
+                ),
+                (
+                    "incompatible mode",
+                    _async_response(
+                        f_wlan_policy.ClientControllerStartClientConnectionsResponse(
+                            status=f_wlan_common.RequestStatus.REJECTED_INCOMPATIBLE_MODE
+                        )
+                    ),
+                ),
+                (
+                    "already in use",
+                    _async_response(
+                        f_wlan_policy.ClientControllerStartClientConnectionsResponse(
+                            status=f_wlan_common.RequestStatus.REJECTED_ALREADY_IN_USE
+                        )
+                    ),
+                ),
+                (
+                    "duplicate request",
+                    _async_response(
+                        f_wlan_policy.ClientControllerStartClientConnectionsResponse(
+                            status=f_wlan_common.RequestStatus.REJECTED_DUPLICATE_REQUEST
+                        )
+                    ),
+                ),
+                (
+                    "internal error",
+                    _async_error(ZxStatus(ZxStatus.ZX_ERR_INTERNAL)),
+                ),
+            ]:
+                with self.subTest(msg=msg, resp=resp):
+                    client_controller.start_client_connections.return_value = (
+                        resp
+                    )
+                    with self.assertRaises(HoneydewWlanError):
+                        self.wlan_policy_obj.start_client_connections()
 
     def test_stop_client_connections(self) -> None:
         """Test if stop_client_connections works."""
