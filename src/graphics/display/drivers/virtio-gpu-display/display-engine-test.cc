@@ -12,7 +12,7 @@
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/async-loop/testing/cpp/real_loop.h>
-#include <lib/driver/logging/cpp/logger.h>
+#include <lib/driver/testing/cpp/scoped_global_logger.h>
 #include <lib/fake-bti/bti.h>
 #include <lib/fidl/cpp/wire/channel.h>
 #include <lib/zx/pmt.h>
@@ -203,8 +203,6 @@ class VirtioGpuTest : public testing::Test, public loop_fixture::RealLoop {
   ~VirtioGpuTest() override = default;
 
   void SetUp() override {
-    fdf::Logger::SetGlobalInstance(&logger_);
-
     zx::bti bti;
     fake_bti_create(bti.reset_and_get_address());
 
@@ -243,8 +241,6 @@ class VirtioGpuTest : public testing::Test, public loop_fixture::RealLoop {
 
     banjo_controller_.reset();
     device_.reset();
-
-    fdf::Logger::SetGlobalInstance(nullptr);
   }
 
   void ImportBufferCollection(display::DriverBufferCollectionId buffer_collection_id) {
@@ -255,8 +251,7 @@ class VirtioGpuTest : public testing::Test, public loop_fixture::RealLoop {
   }
 
  protected:
-  fdf::Logger logger_{"test", FUCHSIA_LOG_TRACE, zx::socket{},
-                      fidl::WireClient<fuchsia_logger::LogSink>{}};
+  fdf_testing::ScopedGlobalLogger logger_;
 
   std::vector<uint8_t> virtio_control_queue_buffer_pool_;
   std::vector<uint8_t> virtio_cursor_queue_buffer_pool_;

@@ -7,8 +7,8 @@
 #include <fidl/fuchsia.hardware.platform.device/cpp/wire.h>
 #include <lib/async-loop/testing/cpp/real_loop.h>
 #include <lib/device-protocol/pdev-fidl.h>
-#include <lib/driver/logging/cpp/logger.h>
 #include <lib/driver/testing/cpp/driver_runtime.h>
+#include <lib/driver/testing/cpp/scoped_global_logger.h>
 #include <lib/fake-bti/bti.h>
 #include <lib/mmio/mmio-buffer.h>
 #include <lib/zx/bti.h>
@@ -31,13 +31,6 @@ class FakePdevTest : public ::testing::Test, public loop_fixture::RealLoop {
   FakePdevTest() = default;
   ~FakePdevTest() = default;
 
-  void SetUp() override {
-    logger_ =
-        std::make_unique<fdf::Logger>("board-resources-pdev-test", FUCHSIA_LOG_INFO, zx::socket{},
-                                      fidl::WireClient<fuchsia_logger::LogSink>{});
-    fdf::Logger::SetGlobalInstance(logger_.get());
-  }
-
   fidl::ClientEnd<fuchsia_hardware_platform_device::Device> ConnectToFakePdev() {
     auto [pdev_client, pdev_server] =
         fidl::Endpoints<fuchsia_hardware_platform_device::Device>::Create();
@@ -46,7 +39,7 @@ class FakePdevTest : public ::testing::Test, public loop_fixture::RealLoop {
   }
 
  protected:
-  std::unique_ptr<fdf::Logger> logger_;
+  fdf_testing::ScopedGlobalLogger logger_;
   fake_pdev::FakePDevFidl fake_pdev_server_;
 };
 

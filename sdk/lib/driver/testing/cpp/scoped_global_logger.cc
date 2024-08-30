@@ -6,7 +6,8 @@
 
 namespace fdf_testing {
 
-ScopedGlobalLogger::ScopedGlobalLogger() : loop_(&kAsyncLoopConfigNeverAttachToThread) {
+ScopedGlobalLogger::ScopedGlobalLogger(FuchsiaLogSeverity min_severity)
+    : loop_(&kAsyncLoopConfigNeverAttachToThread) {
   ZX_ASSERT_MSG(!fdf::Logger::HasGlobalInstance(), "There is already an active logger.");
 
   zx::result open_result = component::OpenServiceRoot();
@@ -24,8 +25,9 @@ ScopedGlobalLogger::ScopedGlobalLogger() : loop_(&kAsyncLoopConfigNeverAttachToT
   ZX_ASSERT(ns_result.is_ok());
 
   // Create Logger with dispatcher and namespace.
-  zx::result<std::unique_ptr<fdf::Logger>> logger = fdf::Logger::Create(
-      std::move(ns_result).value(), loop_.dispatcher(), "fdf-testing-scoped-global-logger");
+  zx::result<std::unique_ptr<fdf::Logger>> logger =
+      fdf::Logger::Create(std::move(ns_result).value(), loop_.dispatcher(),
+                          "fdf-testing-scoped-global-logger", min_severity);
   ZX_ASSERT(logger.is_ok());
 
   logger_ = std::move(logger).value();

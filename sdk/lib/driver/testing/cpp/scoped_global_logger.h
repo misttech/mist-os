@@ -20,7 +20,7 @@ namespace fdf_testing {
 // global logger.
 class ScopedGlobalLogger {
  public:
-  ScopedGlobalLogger();
+  explicit ScopedGlobalLogger(FuchsiaLogSeverity min_severity = FUCHSIA_LOG_INFO);
   ~ScopedGlobalLogger();
 
  private:
