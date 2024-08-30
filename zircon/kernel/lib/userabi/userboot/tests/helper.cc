@@ -53,6 +53,7 @@ class StashSvcServer final : public fidl::WireServer<fuchsia_boot::SvcStash> {
 
 // TODO(https://fxbug.dev/42072759): Replace copy & pasted FIDL C bindings with new C++ bindings
 // when that's allowed.
+// TODO(https://fxbug.dev/324111518): Migrate this to fuchsia.io/Directory.Open3.
 
 struct fuchsia_io_DirectoryOpenRequest {
   FIDL_ALIGNDECL
