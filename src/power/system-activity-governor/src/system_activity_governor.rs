@@ -34,6 +34,10 @@ use {fidl_fuchsia_power_broker as fbroker, fidl_fuchsia_power_suspend as fsuspen
 
 const SUSPEND_FAILURE_RETRY_DELAY: zx::Duration = zx::Duration::from_seconds(1);
 
+// SAG will wait up to this long for an OnSuspendStarted callback to complete.
+// TODO(b/363055581): Remove this timeout when it is no longer needed.
+const ON_SUSPEND_STARTED_TIMEOUT: zx::Duration = zx::Duration::from_seconds(1);
+
 type NotifyFn = Box<dyn Fn(&fsuspend::SuspendStats, fsuspend::StatsWatchResponder) -> bool>;
 type StatsHangingGet = HangingGet<fsuspend::SuspendStats, fsuspend::StatsWatchResponder, NotifyFn>;
 type StatsPublisher = Publisher<fsuspend::SuspendStats, fsuspend::StatsWatchResponder, NotifyFn>;
@@ -1143,7 +1147,17 @@ impl SuspendResumeListener for SystemActivityGovernor {
         // mutable borrow of listeners. Clone the listeners to prevent this.
         let listeners: Vec<_> = self.listeners.borrow_mut().clone();
         for l in listeners {
-            let _ = l.on_suspend_started().await;
+            // TODO(b/363055581): Remove the timeout when it is no longer needed.
+            let _ = l
+                .on_suspend_started()
+                .on_timeout(ON_SUSPEND_STARTED_TIMEOUT.after_now(), || {
+                    tracing::warn!(
+                        "OnSuspendStarted callback did not complete after {:?}.",
+                        ON_SUSPEND_STARTED_TIMEOUT
+                    );
+                    Ok(())
+                })
+                .await;
         }
     }
 

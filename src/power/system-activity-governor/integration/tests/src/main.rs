@@ -10,7 +10,7 @@ use fidl_fuchsia_power_broker::{self as fbroker, LeaseStatus};
 use fuchsia_component::client::connect_to_protocol;
 use fuchsia_zircon::{self as zx, AsHandleRef, HandleBased};
 use futures::channel::mpsc;
-use futures::{FutureExt, StreamExt};
+use futures::StreamExt;
 use power_broker_client::{basic_update_fn_factory, run_power_element, PowerElementContext};
 use realm_proxy_client::RealmProxyClient;
 use std::collections::HashMap;
@@ -1483,7 +1483,7 @@ async fn test_activity_governor_suspends_after_listener_hanging_on_resume() -> R
 }
 
 #[fuchsia::test]
-async fn test_activity_governor_does_not_suspend_while_on_suspend_started_hangs() -> Result<()> {
+async fn test_activity_governor_still_suspends_if_on_suspend_started_hangs() -> Result<()> {
     let (realm, _) = create_realm().await?;
     let suspend_device = realm.connect_to_protocol::<tsc::DeviceMarker>().await?;
     set_up_default_suspender(&suspend_device).await;
@@ -1533,25 +1533,18 @@ async fn test_activity_governor_does_not_suspend_while_on_suspend_started_hangs(
     })
     .detach();
 
-    // Queue up a callback from `suspend_device`, to let us know when
-    // SAG requests to suspend the hardware.
-    let await_suspend = suspend_device.await_suspend();
-
     // Cycle execution_state power level to make SAG start suspending.
     {
         let suspend_controller = create_suspend_topology(&realm).await?;
         lease(&suspend_controller, 1).await?;
     }
 
-    // Wait to receive the OnSuspendStarted() callback.
+    // Ensure that the OnSuspendStarted callback begins.
     on_suspend_started_rx.next().await.unwrap();
 
-    // Give SAG some time to take any further suspend actions.
-    fasync::Timer::new(fasync::Duration::from_millis(1000)).await;
+    // Verify that SAG does not block indefinitely on OnSuspendStarted.
+    assert_eq!(0, suspend_device.await_suspend().await.unwrap().unwrap().state_index.unwrap());
 
-    // Verify that SAG did _not_ suspend the hardware (because we did not
-    // respond to the callback).
-    assert!(await_suspend.now_or_never().is_none());
     Ok(())
 }
 
