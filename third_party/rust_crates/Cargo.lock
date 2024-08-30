@@ -1325,6 +1325,7 @@ dependencies = [
  "mio 0.8.9",
  "mock-omaha-server",
  "mockall",
+ "munge",
  "nix 0.26.2",
  "nom",
  "nom_locate",
@@ -2311,6 +2312,26 @@ name = "multimap"
 version = "0.8.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e5ce46fe64a9d73be07dcbe690a38ce1b293be448fd8ce1e6c1b8062c9f72c6a"
+
+[[package]]
+name = "munge"
+version = "0.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "64142d38c84badf60abf06ff9bd80ad2174306a5b11bd4706535090a30a419df"
+dependencies = [
+ "munge_macro",
+]
+
+[[package]]
+name = "munge_macro"
+version = "0.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1bb5c1d8184f13f7d0ccbeeca0def2f9a181bce2624302793005f5ca8aa62e5e"
+dependencies = [
+ "proc-macro2 1.0.86",
+ "quote 1.0.35",
+ "syn 2.0.69",
+]
 
 [[package]]
 name = "nix"

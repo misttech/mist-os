@@ -516,6 +516,10 @@ group("mockall") {
   public_deps = [ ":mockall-v0_9_0" ]
 }
 
+group("munge") {
+  public_deps = [ ":munge-v0_4_1" ]
+}
+
 import("//src/lib/fuchsia_nix/nix_visibility.gni")
 
 group("nix") {
@@ -8462,6 +8466,65 @@ rust_library("multimap-v0_8_3") {
   visibility = [ ":*" ]
 
   applicable_licenses = [ ":multimap-v0_8_3.license" ]
+}
+
+license("munge-v0_4_1.license") {
+  public_package_name = "munge"
+  license_files = [ "//third_party/rust_crates/vendor/munge-0.4.1/LICENSE" ]
+}
+
+rust_library("munge-v0_4_1") {
+  crate_name = "munge"
+  crate_root = "//third_party/rust_crates/vendor/munge-0.4.1/src/lib.rs"
+  output_name = "munge-74906358e355fb86"
+  configs -= [ "//build/config/rust:2018_idioms" ]
+
+  deps = []
+  deps += [ ":munge_macro-v0_4_1($host_toolchain)" ]
+
+  rustenv = []
+
+  rustflags = [
+    "--cap-lints=allow",
+    "--edition=2021",
+    "-Cmetadata=74906358e355fb86",
+    "-Cextra-filename=-74906358e355fb86",
+  ]
+
+  visibility = [ ":*" ]
+
+  applicable_licenses = [ ":munge-v0_4_1.license" ]
+}
+
+license("munge_macro-v0_4_1.license") {
+  public_package_name = "munge_macro"
+  license_files =
+      [ "//third_party/rust_crates/vendor/munge_macro-0.4.1/LICENSE" ]
+}
+
+rust_proc_macro("munge_macro-v0_4_1") {
+  crate_name = "munge_macro"
+  crate_root = "//third_party/rust_crates/vendor/munge_macro-0.4.1/src/lib.rs"
+  output_name = "munge_macro-2c8cbd7a937e6983"
+  configs -= [ "//build/config/rust:2018_idioms" ]
+
+  deps = []
+  deps += [ ":proc-macro2-v1_0_86" ]
+  deps += [ ":quote-v1_0_35" ]
+  deps += [ ":syn-v2_0_69" ]
+
+  rustenv = []
+
+  rustflags = [
+    "--cap-lints=allow",
+    "--edition=2021",
+    "-Cmetadata=2c8cbd7a937e6983",
+    "-Cextra-filename=-2c8cbd7a937e6983",
+  ]
+
+  visibility = [ ":*" ]
+
+  applicable_licenses = [ ":munge_macro-v0_4_1.license" ]
 }
 
 license("nix-v0_26_2.license") {
