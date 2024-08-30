@@ -75,7 +75,6 @@ per_test_modules = [
   ":multiple-foo-deps",
   ":transitive-foo-dep",
   ":multiple-transitive-foo-deps",
-  ":relative-reloc-foo",
   ":root-precedence-in-dep-resolution",
   ":precedence-in-dep-resolution",
 ]
@@ -1209,12 +1208,6 @@ foreach(test, [ "" ] + per_test_suffices) {
     ]
   }
 
-  # relative-reloc-foo: foo() returns 17
-  test_loadable_module("relative-reloc-foo$suffix.module") {
-    defines = [ "TEST_SYMBOL_SUFFIX=$sym_suffix" ]
-    sources = [ "relative-reloc-foo.cc" ]
-  }
-
   # root-precedence-in-dep-resolution: foo() returns 17
   #   - bar-v1: bar_v1() calls foo()
   #    - foo-v1 -> foo() returns 2
@@ -1222,7 +1215,7 @@ foreach(test, [ "" ] + per_test_suffices) {
   #    - foo-v2 -> foo() returns 7
   test_loadable_module("root-precedence-in-dep-resolution$suffix.module") {
     defines = [ "TEST_SYMBOL_SUFFIX=$sym_suffix" ]
-    sources = [ "relative-reloc-foo.cc" ]
+    sources = [ "foo-ret-17.cc" ]
     shlib_deps = [
       ":bar-v1$suffix",
       ":bar-v2$suffix",
