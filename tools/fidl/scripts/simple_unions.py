@@ -7,7 +7,7 @@
 Find protocols with [Layout = "Simple"] that pass unions.
 """
 
-from ir import Enum, Libraries, Struct, Union
+from ir import Libraries, Struct, Union
 
 fidl_libraries = Libraries()
 

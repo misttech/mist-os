@@ -6,8 +6,6 @@
 
 import argparse
 import io
-import json
-import os
 import shutil
 import sys
 import zipfile

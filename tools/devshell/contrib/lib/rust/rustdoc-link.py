@@ -11,9 +11,9 @@ from os import environ, link, symlink
 from pathlib import Path
 from shutil import copy, copytree
 from subprocess import run
-from sys import argv, exit, stderr
-from tempfile import TemporaryDirectory, mkdtemp
-from typing import Any, Callable, Optional, Sequence
+from sys import argv, stderr
+from tempfile import TemporaryDirectory
+from typing import Any, Callable
 
 from rust import HOST_PLATFORM
 

@@ -8,7 +8,6 @@ import json
 import sys
 import typing
 from collections import OrderedDict
-from dataclasses import dataclass
 
 import collectors
 import data
