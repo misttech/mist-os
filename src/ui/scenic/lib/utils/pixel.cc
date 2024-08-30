@@ -85,23 +85,14 @@ Pixel Pixel::FromVmoBgra(const uint8_t* vmo_host, uint32_t stride, uint32_t x, u
 }
 
 std::vector<uint8_t> Pixel::ToFormat(fuchsia::images2::PixelFormat type) const {
-  std::vector<uint8_t> bytes;
-  ToFormat(type, bytes);
-  return bytes;
-}
-
-void Pixel::ToFormat(fuchsia::images2::PixelFormat type, std::vector<uint8_t>& bytes) const {
-  switch (type) {
-    case fuchsia::images2::PixelFormat::B8G8R8A8:
-      ToBgra(bytes);
-      break;
-    case fuchsia::images2::PixelFormat::R5G6B5:
-      ToRgb565(bytes);
-      break;
-    default:
-      FX_DCHECK(type == fuchsia::images2::PixelFormat::R8G8B8A8);
-      ToRgba(bytes);
+  if (type == fuchsia::images2::PixelFormat::B8G8R8A8) {
+    return ToBgra();
   }
+  if (type == fuchsia::images2::PixelFormat::R5G6B5) {
+    return ToRgb565();
+  }
+  FX_DCHECK(type == fuchsia::images2::PixelFormat::R8G8B8A8);
+  return ToRgba();
 }
 
 std::vector<uint8_t> Pixel::ToFormat(fuchsia::sysmem::PixelFormatType type) const {
@@ -115,11 +106,12 @@ std::vector<uint8_t> Pixel::ToFormat(fuchsia::sysmem::PixelFormatType type) cons
   return ToRgba();
 }
 
-void Pixel::ToRgb565(std::vector<uint8_t>& bytes) const {
+std::vector<uint8_t> Pixel::ToRgb565() const {
   uint16_t color = static_cast<uint16_t>(((red >> 3) << 11) | ((green >> 2) << 5) | (blue >> 3));
-  bytes.resize(sizeof(color));
+  std::vector<uint8_t> data(sizeof(color));
 
-  memcpy(bytes.data(), &color, sizeof(color));
+  memcpy(data.data(), &color, sizeof(color));
+  return data;
 }
 
 bool Pixel::IsFormatSupported(fuchsia::images2::PixelFormat type) {
