@@ -141,7 +141,6 @@ fuchsia_structured_config_values("test_config") {
     delay_fallback_until_base_drivers_indexed = true
     suspend_timeout_fallback = true
     verbose = false
-    driver_host_crash_policy = "restart-driver-host"
     root_driver = "fuchsia-boot:///dtr#meta/test-parent-sys.cm"
     enable_test_shutdown_delays = false
   }

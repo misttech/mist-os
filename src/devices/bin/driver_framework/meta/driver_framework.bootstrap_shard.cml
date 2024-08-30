@@ -72,7 +72,6 @@
             to: "#driver_manager",
             config: [
                 "fuchsia.driver.DelayFallbackUntilBaseDriversIndexed",
-                "fuchsia.driver.manager.DriverHostCrashPolicy",
                 "fuchsia.driver.manager.EnableTestShutdownDelays",
                 "fuchsia.driver.manager.RootDriver",
             ],
