@@ -116,22 +116,25 @@ impl<T: 'static> Task<T> {
 }
 
 impl<T: 'static> Task<T> {
-    /// Cancel a task and wait for cancellation to complete.
-    pub async fn cancel(mut self) -> Option<T> {
+    /// Cancel a task and returns a future that resolves once the cancellation is complete.  The
+    /// future can be ignored in which case the task will still be cancelled.
+    pub fn cancel(mut self) -> impl Future<Output = Option<T>> {
         // SAFETY: We spawned the task so the return type should be correct.
         let result = unsafe { self.scope.cancel(self.task_id) };
-        match result {
-            Some(output) => Some(output),
-            None => {
-                // If we are dropped from here, we'll end up calling `cancel_and_detach` (see
-                // below).
-                let result = std::future::poll_fn(|cx| {
-                    // SAFETY: We spawned the task so the return type should be correct.
-                    unsafe { self.scope.poll_cancelled(self.task_id, cx) }
-                })
-                .await;
-                self.task_id = 0;
-                result
+        async move {
+            match result {
+                Some(output) => Some(output),
+                None => {
+                    // If we are dropped from here, we'll end up calling `cancel_and_detach` (see
+                    // below).
+                    let result = std::future::poll_fn(|cx| {
+                        // SAFETY: We spawned the task so the return type should be correct.
+                        unsafe { self.scope.poll_cancelled(self.task_id, cx) }
+                    })
+                    .await;
+                    self.task_id = 0;
+                    result
+                }
             }
         }
     }

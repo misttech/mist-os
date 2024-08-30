@@ -9,7 +9,9 @@ use super::common::{Executor, Task};
 use crate::atomic_future::CancelAndDetachResult;
 use fuchsia_sync::{Mutex, MutexGuard};
 use rustc_hash::{FxHashMap as HashMap, FxHashSet as HashSet};
+use state::JoinResult;
 use std::borrow::Borrow;
+use std::collections::hash_map::Entry;
 use std::collections::hash_set;
 use std::future::{Future, IntoFuture};
 use std::mem::{self, ManuallyDrop};
@@ -208,14 +210,19 @@ mod state {
         children: HashSet<WeakScopeRef>,
         all_tasks: HashMap<usize, Arc<Task>>,
         // LINT.ThenChange(//src/developer/debug/zxdb/console/commands/verb_async_backtrace.cc)
-        /// Wakers for joining each task.
-        pub(crate) join_wakers: HashMap<usize, Waker>,
+        /// Wakers/results for joining each task.
+        pub(crate) join_results: HashMap<usize, JoinResult>,
         /// Waker for joining the scope.
         scope_waker: Option<Waker>,
         /// The number of children that transitively contain tasks, plus one for
         /// this scope if it directly contains tasks.
         subscopes_with_tasks: u32,
         status: Status,
+    }
+
+    pub enum JoinResult {
+        Waker(Waker),
+        Result(Arc<Task>),
     }
 
     #[repr(u8)] // So zxdb can read the status.
@@ -242,7 +249,7 @@ mod state {
                 parent,
                 children: Default::default(),
                 all_tasks: Default::default(),
-                join_wakers: Default::default(),
+                join_results: Default::default(),
                 scope_waker: None,
                 subscopes_with_tasks: 0,
                 status,
@@ -269,14 +276,33 @@ mod state {
 
         pub(crate) fn take_task(&mut self, id: usize) -> (Option<Arc<Task>>, ScopeWaker) {
             match self.all_tasks.remove(&id) {
-                Some(task) => (Some(task), self.on_task_removed()),
+                Some(task) => (Some(task), self.on_task_removed(0)),
                 None => (None, ScopeWaker::empty()),
             }
         }
 
-        pub(crate) fn remove_task(&mut self, id: usize) -> ScopeWaker {
-            // TODO: Consider using Entry API
-            self.take_task(id).1
+        pub(crate) fn task_did_finish(&mut self, id: usize) -> ScopeWaker {
+            if let Some(task) = self.all_tasks.remove(&id) {
+                let mut wakers = self.on_task_removed(1);
+                if !task.future.is_detached() {
+                    match self.join_results.entry(id) {
+                        Entry::Occupied(mut o) => {
+                            let JoinResult::Waker(waker) =
+                                std::mem::replace(o.get_mut(), JoinResult::Result(task))
+                            else {
+                                unreachable!()
+                            };
+                            wakers.0.push(waker);
+                        }
+                        Entry::Vacant(v) => {
+                            v.insert(JoinResult::Result(task));
+                        }
+                    }
+                }
+                wakers
+            } else {
+                ScopeWaker::empty()
+            }
         }
 
         pub(super) fn children(&self) -> &HashSet<WeakScopeRef> {
@@ -316,7 +342,7 @@ mod state {
             self.status = Status::Cancelled;
             let all_tasks = std::mem::take(&mut self.all_tasks);
             let waker =
-                if all_tasks.is_empty() { ScopeWaker::empty() } else { self.on_task_removed() };
+                if all_tasks.is_empty() { ScopeWaker::empty() } else { self.on_task_removed(0) };
             let children = self.children.drain();
             (all_tasks, children, waker)
         }
@@ -361,11 +387,12 @@ mod state {
         }
 
         /// If the scope is finished, returns the join waker for the scope.
-        fn on_task_removed(&mut self) -> ScopeWaker {
-            if !self.all_tasks.is_empty() {
-                return ScopeWaker::empty();
+        fn on_task_removed(&mut self, num_wakers_hint: usize) -> ScopeWaker {
+            if self.all_tasks.is_empty() {
+                ScopeWaker(self.on_last_task_removed(num_wakers_hint))
+            } else {
+                ScopeWaker(Vec::with_capacity(num_wakers_hint))
             }
-            ScopeWaker(self.on_last_task_removed(0))
         }
 
         pub(super) fn poll_join(&mut self, cx: &mut Context<'_>) -> Poll<()> {
@@ -399,7 +426,7 @@ mod state {
     }
 }
 
-pub(super) use state::{ScopeState, ScopeWaker, Status};
+pub(super) use state::{ScopeState, Status};
 
 pub(super) struct ScopeInner {
     pub(super) executor: Arc<Executor>,
@@ -437,7 +464,7 @@ impl ScopeRef {
         if let Some(task) = state.all_tasks().get(&task_id) {
             task.future.detach();
         }
-        state.join_wakers.remove(&task_id);
+        state.join_results.remove(&task_id);
     }
 
     /// Cancels the task.
@@ -446,35 +473,26 @@ impl ScopeRef {
     ///
     /// The caller must guarantee that `R` is the correct type.
     pub(crate) unsafe fn cancel<R>(&self, task_id: usize) -> Option<R> {
-        let mut scope_waker = ScopeWaker::empty();
         let mut state = self.lock();
-        state.join_wakers.remove(&task_id);
-        let result = state
-            .all_tasks()
-            .get(&task_id)
-            .and_then(|task| {
-                if task.future.cancel() {
-                    self.inner.executor.ready_tasks.push(task.clone());
-                }
-                task.future.take_result()
-            })
-            .and_then(|result| {
-                // If we took the result we can remove the task.
-                scope_waker = state.remove_task(task_id);
-                Some(result)
-            });
-        scope_waker.wake_and_release(state);
-        result
+        if let Some(JoinResult::Result(task)) = state.join_results.remove(&task_id) {
+            return task.future.take_result();
+        }
+        state.all_tasks().get(&task_id).and_then(|task| {
+            if task.future.cancel() {
+                self.inner.executor.ready_tasks.push(task.clone());
+            }
+            task.future.take_result()
+        })
     }
 
     /// Cancels and detaches the task.
     pub(crate) fn cancel_and_detach(&self, task_id: usize) {
         let mut state = self.lock();
-        state.join_wakers.remove(&task_id);
+        state.join_results.remove(&task_id);
         if let Some(task) = state.all_tasks().get(&task_id) {
             match task.future.cancel_and_detach() {
                 CancelAndDetachResult::Done => {
-                    state.remove_task(task_id).wake_and_release(state);
+                    state.take_task(task_id).1.wake_and_release(state);
                 }
                 CancelAndDetachResult::AddToRunQueue => {
                     self.inner.executor.ready_tasks.push(task.clone());
@@ -494,19 +512,23 @@ impl ScopeRef {
         task_id: usize,
         cx: &mut Context<'_>,
     ) -> Poll<R> {
-        let mut scope_waker = ScopeWaker::empty();
         let mut state = self.inner.state.lock();
-        let Some(task) = state.all_tasks().get(&task_id) else { return Poll::Pending };
-        let result = if let Some(result) = task.future.take_result() {
-            state.join_wakers.remove(&task_id);
-            scope_waker = state.remove_task(task_id);
-            Poll::Ready(result)
-        } else {
-            state.join_wakers.insert(task_id, cx.waker().clone());
-            Poll::Pending
-        };
-        scope_waker.wake_and_release(state);
-        result
+        match state.join_results.entry(task_id) {
+            Entry::Occupied(mut o) => match o.get_mut() {
+                JoinResult::Waker(waker) => *waker = cx.waker().clone(),
+                JoinResult::Result(task) => {
+                    if let Some(result) = task.future.take_result() {
+                        o.remove();
+                        return Poll::Ready(result);
+                    }
+                    // The task has been cancelled so all we can do is forever return pending.
+                }
+            },
+            Entry::Vacant(v) => {
+                v.insert(JoinResult::Waker(cx.waker().clone()));
+            }
+        }
+        Poll::Pending
     }
 
     /// Polls for the task to be cancelled.
@@ -516,17 +538,20 @@ impl ScopeRef {
         cx: &mut Context<'_>,
     ) -> Poll<Option<R>> {
         let mut state = self.inner.state.lock();
-        if let Some(task) = state.all_tasks().get(&task_id) {
-            if let Some(result) = task.future.take_result() {
-                state.remove_task(task_id).wake_and_release(state);
-                Poll::Ready(Some(result))
-            } else {
-                state.join_wakers.insert(task_id, cx.waker().clone());
-                Poll::Pending
+        match state.join_results.entry(task_id) {
+            Entry::Occupied(mut o) => match o.get_mut() {
+                JoinResult::Waker(waker) => *waker = cx.waker().clone(),
+                JoinResult::Result(task) => {
+                    let result = task.future.take_result();
+                    o.remove();
+                    return Poll::Ready(result);
+                }
+            },
+            Entry::Vacant(v) => {
+                v.insert(JoinResult::Waker(cx.waker().clone()));
             }
-        } else {
-            Poll::Ready(None)
         }
+        Poll::Pending
     }
 
     /// Cancels tasks in this scope and all child scopes.
@@ -707,18 +732,23 @@ mod tests {
     }
 
     #[test]
-    fn completed_task_is_cleaned_up_after_cancel() {
+    fn completed_tasks_are_cleaned_up_after_cancel() {
         let mut executor = TestExecutor::new();
         let scope = executor.root_scope().new_child();
-        let task = scope.spawn(async { 1 });
-        assert_eq!(executor.run_until_stalled(&mut std::future::pending::<()>()), Poll::Pending);
+
+        let task1 = scope.spawn(pending::<()>());
+        let task2 = scope.spawn(async {});
+        assert_eq!(executor.run_until_stalled(&mut pending::<()>()), Poll::Pending);
         assert_eq!(scope.lock().all_tasks().len(), 1);
 
         // Running the executor after cancelling the task isn't currently
         // necessary, but we might decide to do async cleanup in the future.
-        assert_eq!(Some(Some(1)), task.cancel().now_or_never());
-        assert_eq!(executor.run_until_stalled(&mut std::future::pending::<()>()), Poll::Pending);
+        assert_eq!(task1.cancel().now_or_never(), None);
+        assert_eq!(task2.cancel().now_or_never(), Some(Some(())));
+
+        assert_eq!(executor.run_until_stalled(&mut pending::<()>()), Poll::Pending);
         assert_eq!(scope.lock().all_tasks().len(), 0);
+        assert_eq!(scope.lock().join_results.len(), 0);
     }
 
     #[test]
@@ -734,11 +764,13 @@ mod tests {
         let scope = executor.root_scope().new_child();
         let mut task = scope.spawn(async { 1 });
         scope.spawn(async {}).detach();
+        let task2 = scope.spawn(pending::<()>());
         // Fuse to stay agnostic as to whether the join completes before or
         // after awaiting the task handle.
         let mut join = scope.join().fuse();
         let _ = executor.run_until_stalled(&mut join);
         assert_eq!(executor.run_until_stalled(&mut task), Poll::Ready(1));
+        let _ = task2.cancel();
         assert_eq!(executor.run_until_stalled(&mut join), Poll::Ready(()));
     }
 
@@ -773,7 +805,7 @@ mod tests {
     }
 
     #[test]
-    fn join_scope_blocks_until_spawned_task_completes_and_is_polled() {
+    fn join_scope_blocks_until_spawned_task_completes() {
         let mut executor = TestExecutor::new();
         let scope = executor.root_scope().new_child();
         let remote = RemoteControlFuture::new();
@@ -781,9 +813,8 @@ mod tests {
         let mut scope_join = scope.join();
         assert_eq!(executor.run_until_stalled(&mut scope_join), Poll::Pending);
         remote.resolve();
-        assert_eq!(executor.run_until_stalled(&mut scope_join), Poll::Pending);
-        assert_eq!(executor.run_until_stalled(&mut task), Poll::Ready(()));
         assert_eq!(executor.run_until_stalled(&mut scope_join), Poll::Ready(()));
+        assert_eq!(executor.run_until_stalled(&mut task), Poll::Ready(()));
     }
 
     #[test]
@@ -799,21 +830,6 @@ mod tests {
         child_join.detach();
         assert_eq!(executor.run_until_stalled(&mut scope_join), Poll::Pending);
         remote.resolve();
-        assert_eq!(executor.run_until_stalled(&mut scope_join), Poll::Ready(()));
-    }
-
-    #[test]
-    fn join_scope_blocks_until_completed_task_handle_of_dropped_child_is_dropped() {
-        let mut executor = TestExecutor::new();
-        let scope = executor.root_scope().new_child();
-        let child = scope.new_child();
-        let task = child.spawn(async { 1 });
-        let (mut scope_join, mut child_join) = (scope.join(), child.join());
-        assert_eq!(executor.run_until_stalled(&mut scope_join), Poll::Pending);
-        assert_eq!(executor.run_until_stalled(&mut child_join), Poll::Pending);
-        drop(child_join);
-        assert_eq!(executor.run_until_stalled(&mut scope_join), Poll::Pending);
-        drop(task);
         assert_eq!(executor.run_until_stalled(&mut scope_join), Poll::Ready(()));
     }
 
@@ -955,6 +971,17 @@ mod tests {
     }
 
     #[test]
+    fn join_completes_while_completed_task_handle_is_held() {
+        let mut executor = TestExecutor::new();
+        let scope = executor.root_scope().new_child();
+        let mut task = scope.spawn(async { 1 });
+        scope.spawn(async {}).detach();
+        let mut join = scope.join();
+        assert_eq!(executor.run_until_stalled(&mut join), Poll::Ready(()));
+        assert_eq!(executor.run_until_stalled(&mut task), Poll::Ready(1));
+    }
+
+    #[test]
     fn can_spawn_from_non_executor_thread() {
         let mut executor = TestExecutor::new();
         let scope = executor.root_scope().clone();
@@ -968,7 +995,7 @@ mod tests {
                 .detach()
         })
         .join();
-        let _ = executor.run_until_stalled(&mut std::future::pending::<()>());
+        let _ = executor.run_until_stalled(&mut pending::<()>());
         assert!(done.load(Ordering::Relaxed));
     }
 

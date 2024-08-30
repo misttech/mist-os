@@ -69,19 +69,22 @@ pub mod task {
             self.abort_on_drop = false;
         }
 
-        /// cancel a task and wait for cancellation to complete.
-        pub async fn cancel(mut self) -> Option<T> {
+        /// Cancel a task and returns a future that resolves once the cancellation is complete.  The
+        /// future can be ignored in which case the task will still be cancelled.
+        pub fn cancel(mut self) -> impl Future<Output = Option<T>> {
             self.task.abort();
-            let res = (&mut self.task).await;
+            async move {
+                let res = (&mut self.task).await;
 
-            match res {
-                Ok(value) => Some(value),
-                Err(err) => {
-                    if err.is_panic() {
-                        // Propagate panic
-                        std::panic::resume_unwind(err.into_panic());
+                match res {
+                    Ok(value) => Some(value),
+                    Err(err) => {
+                        if err.is_panic() {
+                            // Propagate panic
+                            std::panic::resume_unwind(err.into_panic());
+                        }
+                        None
                     }
-                    None
                 }
             }
         }
