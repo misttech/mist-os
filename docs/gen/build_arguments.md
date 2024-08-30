@@ -7856,14 +7856,6 @@ Whether or not unified address spaces are leveraged.
 
 From //src/starnix/kernel/args.gni:29
 
-### storage_enable_tracing
-
-Whether or not tracing is enabled for storage.
-
-**Current value (from the default):** `false`
-
-From //src/storage/lib/trace/BUILD.gn:11
-
 ### sysmem_contiguous_guard_page_count
 
 **Current value (from the default):** `-1`
