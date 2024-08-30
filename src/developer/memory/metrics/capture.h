@@ -46,16 +46,12 @@ struct Vmo {
   std::vector<zx_koid_t> children;
 };
 
-enum class CaptureLevel { KMEM, PROCESS, VMO };
-
-struct CaptureState {
-  fidl::WireSyncClient<fuchsia_kernel::Stats> stats_client;
-  zx_koid_t self_koid;
-};
+enum class CaptureLevel : uint8_t { KMEM, PROCESS, VMO };
 
 // OS is an abstract interface to Zircon OS calls.
 class OS {
  public:
+  virtual ~OS() = default;
   virtual zx_status_t GetKernelStats(fidl::WireSyncClient<fuchsia_kernel::Stats>* stats_client) = 0;
   virtual zx_handle_t ProcessSelf() = 0;
   virtual zx_time_t GetMonotonic() = 0;
@@ -73,36 +69,16 @@ class OS {
       zx_info_kmem_stats_t& kmem) = 0;
   virtual zx_status_t GetKernelMemoryStatsExtended(
       const fidl::WireSyncClient<fuchsia_kernel::Stats>& stats_client,
-      zx_info_kmem_stats_extended_t& kmem_ext, zx_info_kmem_stats_t* kmem = nullptr) = 0;
+      zx_info_kmem_stats_extended_t& kmem_ext, zx_info_kmem_stats_t* kmem) = 0;
   virtual zx_status_t GetKernelMemoryStatsCompression(
       const fidl::WireSyncClient<fuchsia_kernel::Stats>& stats_client,
       zx_info_kmem_stats_compression_t& kmem_compression) = 0;
 };
 
-// GetInfoVector executes an OS::GetInfo call that outputs a list of element inside |buffer|,
-// ensuring that |buffer| is big enough to receive the list of elements. |GetInfoVector| returns
-// the status of the call and the number of elements effectively returned.
-template <typename T>
-zx::result<size_t> GetInfoVector(OS& os, zx_handle_t handle, uint32_t topic,
-                                 std::vector<T>& buffer) {
-  size_t num_entries = 0, available_entries = 0;
-  zx_status_t s = os.GetInfo(handle, topic, buffer.data(), buffer.size() * sizeof(T), &num_entries,
-                             &available_entries);
-  if (s != ZX_OK) {
-    return zx::error(s);
-  } else if (num_entries == available_entries) {
-    return zx::ok(num_entries);
-  }
-  buffer.resize(available_entries);
-  s = os.GetInfo(handle, topic, buffer.data(), buffer.size() * sizeof(T), &num_entries,
-                 &available_entries);
-  if (s != ZX_OK) {
-    return zx::error(s);
-  }
-  return zx::ok(num_entries);
-}
+// Returns an OS implementation querying Zircon Kernel.
+std::unique_ptr<OS> CreateDefaultOS();
 
-// A CaptureStrategy holds the strategy for getting VMO information out of a process tree.
+// Extracts VMO information out of a process tree.
 class CaptureStrategy {
  public:
   virtual ~CaptureStrategy() {}
@@ -120,25 +96,6 @@ class CaptureStrategy {
 class Capture {
  public:
   static const std::vector<std::string> kDefaultRootedVmoNames;
-  static zx_status_t GetCaptureState(CaptureState* state);
-
-  // Initialize a Capture instance. Be sure to call GetCapture prior to passing
-  // the Capture instance to other systems (such as a Digest).
-  //
-  // Tip: This may require capabilities (in your .cml file) for
-  //   fuchsia.kernel.RootJobForInspect and fuchsia.kernel.Stats, e.g.:
-  //   "use": {
-  //       "protocol": [
-  //           "fuchsia.kernel.RootJobForInspect",
-  //           "fuchsia.kernel.Stats",
-  //           ...
-  //
-  // GetCapture takes ownership of the provided |strategy|, as it stateful and should not be
-  // reused between calls.
-  static zx_status_t GetCapture(
-      Capture* capture, const CaptureState& state, CaptureLevel level,
-      std::unique_ptr<CaptureStrategy> strategy,
-      const std::vector<std::string>& rooted_vmo_names = kDefaultRootedVmoNames);
 
   zx_time_t time() const { return time_; }
   const zx_info_kmem_stats_t& kmem() const { return kmem_; }
@@ -158,13 +115,6 @@ class Capture {
   const Vmo& vmo_for_koid(zx_koid_t koid) const { return koid_to_vmo_.at(koid); }
 
  private:
-  static zx_status_t GetCaptureState(CaptureState* state, OS& os);
-  static zx_status_t GetCapture(Capture* capture, const CaptureState& state, CaptureLevel level,
-                                std::unique_ptr<CaptureStrategy> strategy, OS& os,
-                                const std::vector<std::string>& rooted_vmo_names);
-  void ReallocateDescendents(const std::vector<std::string>& rooted_vmo_names);
-  void ReallocateDescendents(Vmo* parent);
-
   zx_time_t time_;
   zx_info_kmem_stats_t kmem_ = {};
   std::optional<zx_info_kmem_stats_extended_t> kmem_extended_;
@@ -173,8 +123,32 @@ class Capture {
   std::unordered_map<zx_koid_t, Vmo> koid_to_vmo_;
   std::vector<zx_koid_t> root_vmos_;
 
-  class ProcessGetter;
   friend class ::TestMonitor;
+  friend class TestUtils;
+  friend class CaptureMaker;
+};
+
+// Holds the necessary components required to create a |Capture|.
+class CaptureMaker {
+ public:
+  static fit::result<zx_status_t, std::unique_ptr<CaptureMaker>> Create(
+      std::unique_ptr<OS> os, std::unique_ptr<CaptureStrategy> strategy);
+
+  zx_status_t GetCapture(
+      Capture* capture, CaptureLevel level,
+      const std::vector<std::string>& rooted_vmo_names = Capture::kDefaultRootedVmoNames);
+
+ private:
+  CaptureMaker(fidl::WireSyncClient<fuchsia_kernel::Stats> stats_client, std::unique_ptr<OS> os,
+               std::unique_ptr<CaptureStrategy> strategy);
+  static void ReallocateDescendents(Vmo& parent, std::unordered_map<zx_koid_t, Vmo>& koid_to_vmo);
+  static void ReallocateDescendents(const std::vector<std::string>& rooted_vmo_names,
+                                    std::unordered_map<zx_koid_t, Vmo>& koid_to_vmo);
+  // zx_koid_t self_koid_;
+  fidl::WireSyncClient<fuchsia_kernel::Stats> stats_client_;
+  std::unique_ptr<OS> os_;
+  std::unique_ptr<CaptureStrategy> strategy_;
+
   friend class TestUtils;
 };
 

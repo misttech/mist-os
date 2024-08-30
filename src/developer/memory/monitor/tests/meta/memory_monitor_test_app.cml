@@ -21,6 +21,7 @@
                 "fuchsia.kernel.RootJobForInspect",
                 "fuchsia.kernel.Stats",
                 "fuchsia.tracing.provider.Registry",
+                "fuchsia.logger.LogSink",
             ],
         },
 

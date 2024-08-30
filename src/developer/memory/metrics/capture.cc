@@ -17,6 +17,7 @@
 #include <zircon/status.h>
 #include <zircon/types.h>
 
+#include <memory>
 #include <optional>
 
 #include <task-utils/walker.h>
@@ -188,60 +189,38 @@ class OSImpl : public OS, public TaskEnumerator {
                             zx_koid_t /* parent_koid */)>
       cb_;
 };
+// Returns an OS implementation querying Zircon Kernel.
+std::unique_ptr<OS> CreateDefaultOS() { return std::make_unique<OSImpl>(); }
 
 const std::vector<std::string> Capture::kDefaultRootedVmoNames = {
     "SysmemContiguousPool", "SysmemAmlogicProtectedPool", "Sysmem-core"};
-// static.
-zx_status_t Capture::GetCaptureState(CaptureState* state) {
-  OSImpl osImpl;
-  return GetCaptureState(state, osImpl);
+
+CaptureMaker::CaptureMaker(fidl::WireSyncClient<fuchsia_kernel::Stats> stats_client,
+                           std::unique_ptr<OS> os, std::unique_ptr<CaptureStrategy> strategy)
+    : stats_client_(std::move(stats_client)), os_(std::move(os)), strategy_(std::move(strategy)) {
+  FX_CHECK(strategy_);
+  FX_CHECK(os_);
 }
 
-zx_status_t Capture::GetCaptureState(CaptureState* state, OS& os) {
-  TRACE_DURATION("memory_metrics", "Capture::GetCaptureState");
-  zx_status_t err = os.GetKernelStats(&state->stats_client);
-  if (err != ZX_OK) {
-    return err;
-  }
-
-  zx_info_handle_basic_t info;
-  err = os.GetInfo(os.ProcessSelf(), ZX_INFO_HANDLE_BASIC, &info, sizeof(info), nullptr, nullptr);
-  if (err != ZX_OK) {
-    return err;
-  }
-
-  state->self_koid = info.koid;
-  return ZX_OK;
-}
-
-// static.
-zx_status_t Capture::GetCapture(Capture* capture, const CaptureState& state, CaptureLevel level,
-                                std::unique_ptr<CaptureStrategy> strategy,
-                                const std::vector<std::string>& rooted_vmo_names) {
-  OSImpl osImpl;
-  return GetCapture(capture, state, level, std::move(strategy), osImpl, rooted_vmo_names);
-}
-
-zx_status_t Capture::GetCapture(Capture* capture, const CaptureState& state, CaptureLevel level,
-                                std::unique_ptr<CaptureStrategy> strategy, OS& os,
-                                const std::vector<std::string>& rooted_vmo_names) {
+zx_status_t CaptureMaker::GetCapture(Capture* capture, CaptureLevel level,
+                                     const std::vector<std::string>& rooted_vmo_names) {
   TRACE_DURATION("memory_metrics", "Capture::GetCapture");
-  FX_CHECK(strategy);
-  capture->time_ = os.GetMonotonic();
+  capture->time_ = os_->GetMonotonic();
 
   // Capture level KMEM only queries ZX_INFO_KMEM_STATS, as opposed to ZX_INFO_KMEM_STATS_EXTENDED
   // which queries a more detailed set of kernel metrics. KMEM capture level is used to poll the
   // free memory level every 10s in order to keep the highwater digest updated, so a lightweight
   // syscall is preferable.
   if (level == CaptureLevel::KMEM) {
-    return os.GetKernelMemoryStats(state.stats_client, capture->kmem_);
+    return os_->GetKernelMemoryStats(stats_client_, capture->kmem_);
   }
 
-  // ZX_INFO_KMEM_STATS_EXTENDED is more expensive to collect than ZX_INFO_KMEM_STATS, so only query
-  // it for the more detailed capture levels. Use kmem_extended_ to populate the shared fields in
-  // kmem_ (kmem_extended_ is a superset of kmem_), avoiding the need for a redundant syscall.
-  zx_status_t err = os.GetKernelMemoryStatsExtended(
-      state.stats_client, capture->kmem_extended_.emplace(), &capture->kmem_);
+  // ZX_INFO_KMEM_STATS_EXTENDED is more expensive to collect than ZX_INFO_KMEM_STATS, so only
+  // query it for the more detailed capture levels. Use kmem_extended_ to populate the shared
+  // fields in kmem_ (kmem_extended_ is a superset of kmem_), avoiding the need for a redundant
+  // syscall.
+  zx_status_t err = os_->GetKernelMemoryStatsExtended(
+      stats_client_, capture->kmem_extended_.emplace(), &capture->kmem_);
   if (err != ZX_OK) {
     return err;
   }
@@ -249,8 +228,7 @@ zx_status_t Capture::GetCapture(Capture* capture, const CaptureState& state, Cap
   // Some Fuchsia systems use ZRAM, ie. compressed RAM. ZX_INFO_KMEM_STATS_COMPRESSION retrieves
   // information about this compression, so we can get an accurate view of the actual physical
   // memory used.
-  err =
-      os.GetKernelMemoryStatsCompression(state.stats_client, capture->kmem_compression_.emplace());
+  err = os_->GetKernelMemoryStatsCompression(stats_client_, capture->kmem_compression_.emplace());
   // Assume compression is disabled when there is no storage.
   if (!capture->kmem_compression_->compressed_storage_bytes) {
     capture->kmem_compression_ = std::nullopt;
@@ -262,21 +240,21 @@ zx_status_t Capture::GetCapture(Capture* capture, const CaptureState& state, Cap
   // We don't have a guarantee on the iteration order of GetProcesses. To be able to filter jobs
   // correctly based on the name of their processes, we need to go through all processes first. We
   // extract the process handle and keep it to avoid walking the process tree a second time.
-  err = os.GetProcesses(
-      [&os, &strategy](int depth, zx::handle handle, zx_koid_t koid, zx_koid_t parent_koid) {
+  err = os_->GetProcesses(
+      [this](int depth, zx::handle handle, zx_koid_t koid, zx_koid_t parent_koid) {
         TRACE_DURATION("memory_metrics", "Capture::GetProcesses::Callback");
         Process process{.koid = koid, .job = parent_koid};
 
-        zx_status_t s = os.GetProperty(handle.get(), ZX_PROP_NAME, process.name, ZX_MAX_NAME_LEN);
+        zx_status_t s = os_->GetProperty(handle.get(), ZX_PROP_NAME, process.name, ZX_MAX_NAME_LEN);
         if (s != ZX_OK) {
           return s == ZX_ERR_BAD_STATE ? ZX_OK : s;
         }
 
-        s = strategy->OnNewProcess(os, std::move(process), std::move(handle));
+        s = strategy_->OnNewProcess(*os_, std::move(process), std::move(handle));
         return s == ZX_ERR_BAD_STATE ? ZX_OK : s;
       });
 
-  auto result = strategy->Finalize(os);
+  auto result = strategy_->Finalize(*os_);
   if (result.is_error()) {
     return result.error_value();
   }
@@ -285,9 +263,23 @@ zx_status_t Capture::GetCapture(Capture* capture, const CaptureState& state, Cap
   capture->koid_to_vmo_ = std::move(koid_to_vmo);
 
   TRACE_DURATION_BEGIN("memory_metrics", "Capture::GetProcesses::ReallocateDescendents");
-  capture->ReallocateDescendents(rooted_vmo_names);
+  ReallocateDescendents(rooted_vmo_names, capture->koid_to_vmo_);
   TRACE_DURATION_END("memory_metrics", "Capture::GetProcesses::ReallocateDescendents");
   return err;
+}
+
+fit::result<zx_status_t, std::unique_ptr<CaptureMaker>> CaptureMaker::Create(
+    std::unique_ptr<OS> os, std::unique_ptr<CaptureStrategy> strategy) {
+  TRACE_DURATION("memory_metrics", "Capture::GetCaptureState");
+  fidl::WireSyncClient<fuchsia_kernel::Stats> stats_client;
+
+  zx_status_t err = os->GetKernelStats(&stats_client);
+  if (err != ZX_OK) {
+    return fit::error(err);
+  }
+
+  return fit::ok(std::unique_ptr<CaptureMaker>(
+      new CaptureMaker{std::move(stats_client), std::move(os), std::move(strategy)}));
 }
 
 // Descendents of this vmo will have their allocated_bytes treated as an allocation of their
@@ -296,40 +288,43 @@ zx_status_t Capture::GetCapture(Capture* capture, const CaptureState& state, Cap
 // committed_bytes of their own. For accounting purposes it gives more clarity to push the
 // committed bytes to the lowest points in the tree, where the vmo names give more specific
 // meanings.
-void Capture::ReallocateDescendents(Vmo* parent) {
-  for (auto& child_koid : parent->children) {
-    auto& child = koid_to_vmo_.at(child_koid);
-    if (child.parent_koid == parent->koid) {
-      uint64_t reallocated_bytes = std::min(parent->committed_bytes, child.allocated_bytes);
-      parent->committed_bytes -= reallocated_bytes;
+void CaptureMaker::ReallocateDescendents(Vmo& parent,
+                                         std::unordered_map<zx_koid_t, Vmo>& koid_to_vmo) {
+  for (auto& child_koid : parent.children) {
+    auto& child = koid_to_vmo.at(child_koid);
+    if (child.parent_koid == parent.koid) {
+      uint64_t reallocated_bytes = std::min(parent.committed_bytes, child.allocated_bytes);
+      parent.committed_bytes -= reallocated_bytes;
       child.committed_bytes = reallocated_bytes;
-      ReallocateDescendents(&child);
+      ReallocateDescendents(child, koid_to_vmo);
     }
   }
 }
 
 // See the above description of ReallocateDescendents(zx_koid_t) for the specific behavior for each
 // vmo that has a name listed in rooted_vmo_names.
-void Capture::ReallocateDescendents(const std::vector<std::string>& rooted_vmo_names) {
+void CaptureMaker::ReallocateDescendents(const std::vector<std::string>& rooted_vmo_names,
+                                         std::unordered_map<zx_koid_t, Vmo>& koid_to_vmo) {
   TRACE_DURATION("memory_metrics", "Capture::ReallocateDescendents");
-  for (auto const& [_, child] : koid_to_vmo_) {
+  std::vector<zx_koid_t> root_vmos;
+  for (auto const& [_, child] : koid_to_vmo) {
     if (child.parent_koid == ZX_KOID_INVALID) {
-      root_vmos_.push_back(child.koid);
+      root_vmos.push_back(child.koid);
       continue;
     }
-    auto parent_it = koid_to_vmo_.find(child.parent_koid);
-    if (parent_it == koid_to_vmo_.end()) {
+    auto parent_it = koid_to_vmo.find(child.parent_koid);
+    if (parent_it == koid_to_vmo.end()) {
       continue;
     }
     parent_it->second.children.push_back(child.koid);
   }
-  for (auto& vmo_koid : root_vmos_) {
-    auto& vmo = koid_to_vmo_.at(vmo_koid);
+  for (auto& vmo_koid : root_vmos) {
+    auto& vmo = koid_to_vmo.at(vmo_koid);
     for (const auto& vmo_name : rooted_vmo_names) {
       if (vmo.name != vmo_name) {
         continue;
       }
-      ReallocateDescendents(&vmo);
+      ReallocateDescendents(vmo, koid_to_vmo);
     }
   }
 }
