@@ -28,6 +28,7 @@ test("arena-selection-tests") {
     "//src/lib/fxl/test:gtest_main",
     "//third_party/googletest:gtest",
     "//zircon/kernel/phys/lib/memalloc",
+    "//zircon/kernel/phys/lib/memalloc:testing",
   ]
 }
 

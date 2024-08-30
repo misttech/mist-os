@@ -135,6 +135,81 @@ constexpr void SelectPmmArenas(cpp20::span<const memalloc::Range> ranges,     //
                                ErrorCallback&& errors,                        //
                                uint64_t max_wasted_bytes = kMaxWastedArenaBytes);
 
+// Within a given set of ranges, identifies each aligned allocation or hole in
+// RAM, providing it to the callback. If part of an allocation or hole falls
+// below a page boundary and was previously provided to the callback, it will
+// not be again. The callback returns true iff it wished to proceed with the
+// iteration.
+//
+// This routine is of interest to the PMM, as we wish to wire all such ranges
+// that fall within an arena.
+template <uint64_t PageSize, typename Callback>
+void ForEachAlignedAllocationOrHole(cpp20::span<const memalloc::Range> ranges, Callback&& cb) {
+  auto align = [](memalloc::Range& range) {
+    uint64_t start = range.addr & -PageSize;
+    range.size = ((range.addr - start) + range.size + PageSize - 1) & -PageSize;
+    range.addr = start;
+  };
+
+  std::optional<memalloc::Range> prev;
+  for (memalloc::Range range : ranges) {
+    if (range.type != memalloc::Type::kFreeRam) {
+      align(range);
+    }
+
+    if (prev) {
+      // If `prev` is an allocation or hole, its aligning may have eaten into
+      // `range`; trim accordingly.
+      if (prev->type != memalloc::Type::kFreeRam) {
+        if (prev->end() >= range.end()) {
+          continue;
+        }
+        if (prev->end() > range.addr) {
+          range.size -= prev->end() - range.addr;
+          range.addr = prev->end();
+        }
+      }
+
+      // Check for a hole between `prev` and `range`.
+      if (prev->end() < range.addr) {
+        memalloc::Range hole{
+            .addr = prev->end(),
+            .size = range.addr - prev->end(),
+            .type = memalloc::Type::kReserved,
+        };
+        align(hole);
+        if (!cb(hole)) {
+          return;
+        }
+
+        // If `range` is free RAM, aligning the hole below it may have eaten
+        // into it; trim accordingly.
+        if (range.type == memalloc::Type::kFreeRam) {
+          if (hole.end() >= range.end()) {
+            continue;
+          }
+          if (hole.end() > range.addr) {
+            range.size -= hole.end() - range.addr;
+            range.addr = hole.end();
+          }
+        }
+      }
+    }
+
+    if (range.type != memalloc::Type::kFreeRam) {
+      // Non-RAM ranges (i.e., peripheral or unknown) should be treated as
+      // holes.
+      if (!memalloc::IsRamType(range.type)) {
+        range.type = memalloc::Type::kReserved;
+      }
+      if (!cb(range)) {
+        return;
+      };
+    }
+    prev = range;
+  }
+}
+
 namespace internal {
 
 // PmmArenaSelector gives the implementation details of SelectPmmArenas(),
