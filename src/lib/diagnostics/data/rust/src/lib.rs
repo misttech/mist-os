@@ -361,6 +361,7 @@ impl LogsMetadata {
 
 /// Severities a log message can have, often called the log's "level".
 // NOTE: this is only duplicated because we can't get Serialize/Deserialize on the FIDL type
+// LINT.IfChange
 #[derive(Clone, Copy, Debug, Deserialize, Eq, Ord, PartialEq, PartialOrd, Serialize)]
 pub enum Severity {
     /// Trace records include detailed information about program execution.
@@ -387,6 +388,7 @@ pub enum Severity {
     #[serde(rename = "FATAL", alias = "Fatal")]
     Fatal,
 }
+// LINT.ThenChange(/src/lib/assembly/config_schema/src/platform_config/diagnostics_config.rs)
 
 impl TryFrom<i32> for Severity {
     type Error = anyhow::Error;

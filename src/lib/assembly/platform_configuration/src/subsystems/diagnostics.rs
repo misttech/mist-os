@@ -7,7 +7,7 @@ use crate::subsystems::prelude::*;
 use anyhow::{anyhow, Context};
 use assembly_config_capabilities::{Config, ConfigNestedValueType, ConfigValueType};
 use assembly_config_schema::platform_config::diagnostics_config::{
-    ArchivistConfig, ArchivistPipeline, DiagnosticsConfig, PipelineType,
+    ArchivistConfig, ArchivistPipeline, DiagnosticsConfig, LogSeverity, PipelineType,
 };
 use assembly_util::{
     read_config, write_json_file, BootfsPackageDestination, FileEntry, PackageSetDestination,
@@ -48,6 +48,7 @@ impl DefineSubsystemConfiguration<DiagnosticsConfig> for DiagnosticsSubsystem {
             additional_serial_log_components,
             sampler,
             memory_monitor,
+            component_log_initial_interests,
         } = diagnostics_config;
         // LINT.IfChange
         let mut bind_services = BTreeSet::from([
@@ -132,6 +133,27 @@ impl DefineSubsystemConfiguration<DiagnosticsConfig> for DiagnosticsSubsystem {
                     max_count: 512,
                 },
                 deny_serial_log_tags.into(),
+            ),
+        )?;
+
+        if *context.build_type == BuildType::User
+            && component_log_initial_interests.iter().any(|interest| {
+                matches!(interest.log_severity, LogSeverity::Debug | LogSeverity::Trace)
+            })
+        {
+            return Err(anyhow!(
+                "Component log severity cannot be below info when build type is set to user"
+            ));
+        }
+
+        builder.set_config_capability(
+            "fuchsia.diagnostics.ComponentInitialInterests",
+            Config::new(
+                ConfigValueType::Vector {
+                    nested_type: ConfigNestedValueType::String { max_size: 4096 },
+                    max_count: 512,
+                },
+                serde_json::to_value(component_log_initial_interests)?,
             ),
         )?;
 
