@@ -4,9 +4,10 @@
 
 #include "src/performance/ktrace_provider/app.h"
 
-#include <fuchsia/tracing/kernel/cpp/fidl.h>
+#include <fidl/fuchsia.tracing.kernel/cpp/fidl.h>
 #include <lib/async/cpp/task.h>
 #include <lib/async/default.h>
+#include <lib/component/incoming/cpp/protocol.h>
 #include <lib/fxt/fields.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/trace-engine/instrumentation.h>
@@ -24,8 +25,6 @@
 namespace ktrace_provider {
 namespace {
 
-using fuchsia::tracing::kernel::Controller_Sync;
-using fuchsia::tracing::kernel::ControllerSyncPtr;
 struct KTraceCategory {
   const char* name;
   uint32_t group;
@@ -51,51 +50,52 @@ constexpr char kRetainCategory[] = "kernel:retain";
 
 constexpr char kLogCategory[] = "log";
 
-void LogFidlFailure(const char* rqst_name, zx_status_t fidl_status, zx_status_t rqst_status) {
-  if (fidl_status != ZX_OK) {
-    FX_LOGS(ERROR) << "Ktrace FIDL " << rqst_name << " failed: status=" << fidl_status;
-  } else if (rqst_status != ZX_OK) {
-    FX_LOGS(ERROR) << "Ktrace " << rqst_name << " failed: status=" << rqst_status;
+template <typename T>
+void LogFidlFailure(const char* rqst_name, const fidl::Result<T>& result) {
+  if (result.is_error()) {
+    FX_LOGS(ERROR) << "Ktrace FIDL " << rqst_name
+                   << " failed: " << result.error_value().status_string();
+  } else if (result->status() != ZX_OK) {
+    FX_PLOGS(ERROR, result->status()) << "Ktrace " << rqst_name << " failed";
   }
 }
 
-void RequestKtraceStop(Controller_Sync& controller) {
-  zx_status_t stop_status;
-  zx_status_t status = controller.Stop(&stop_status);
-  LogFidlFailure("stop", status, stop_status);
+void RequestKtraceStop(const fidl::SyncClient<fuchsia_tracing_kernel::Controller>& controller) {
+  fidl::Result result = controller->Stop();
+  LogFidlFailure("stop", result);
 }
 
-void RequestKtraceRewind(Controller_Sync& controller) {
-  zx_status_t rewind_status;
-  zx_status_t status = controller.Rewind(&rewind_status);
-  LogFidlFailure("rewind", status, rewind_status);
+void RequestKtraceRewind(const fidl::SyncClient<fuchsia_tracing_kernel::Controller>& controller) {
+  fidl::Result result = controller->Rewind();
+  LogFidlFailure("rewind", result);
 }
 
-void RequestKtraceStart(Controller_Sync& controller, trace_buffering_mode_t buffering_mode,
-                        uint32_t group_mask) {
-  using BufferingMode = fuchsia::tracing::BufferingMode;
-  zx_status_t start_status;
-  zx_status_t status;
+void RequestKtraceStart(const fidl::SyncClient<fuchsia_tracing_kernel::Controller>& controller,
+                        trace_buffering_mode_t buffering_mode, uint32_t group_mask) {
+  using BufferingMode = fuchsia_tracing::BufferingMode;
 
+  BufferingMode fidl_buffering_mode = BufferingMode::kOneshot;
   switch (buffering_mode) {
     // ktrace does not currently support streaming, so for now we preserve the
     // legacy behavior of falling back on one-shot mode.
     case TRACE_BUFFERING_MODE_STREAMING:
     case TRACE_BUFFERING_MODE_ONESHOT:
-      status = controller.Start(group_mask, BufferingMode::ONESHOT, &start_status);
+      fidl_buffering_mode = BufferingMode::kOneshot;
       break;
 
     case TRACE_BUFFERING_MODE_CIRCULAR:
-      status = controller.Start(group_mask, BufferingMode::CIRCULAR, &start_status);
+      fidl_buffering_mode = BufferingMode::kCircular;
       break;
 
     default:
-      start_status = ZX_ERR_INVALID_ARGS;
-      status = ZX_ERR_INVALID_ARGS;
-      break;
+      FX_PLOGS(ERROR, ZX_ERR_INVALID_ARGS) << "Invalid buffering mode: " << buffering_mode;
+      return;
   }
 
-  LogFidlFailure("start", status, start_status);
+  fidl::Result status =
+      controller->Start({{.group_mask = group_mask, .buffering_mode = fidl_buffering_mode}});
+
+  LogFidlFailure("start", status);
 }
 
 }  // namespace
@@ -113,8 +113,7 @@ std::vector<trace::KnownCategory> GetKnownCategories() {
   return known_categories;
 }
 
-App::App(const fxl::CommandLine& command_line)
-    : component_context_(sys::ComponentContext::CreateAndServeOutgoingDirectory()) {
+App::App(const fxl::CommandLine& command_line) {
   trace_observer_.Start(async_get_default_dispatcher(), [this] { UpdateState(); });
 }
 
@@ -171,11 +170,12 @@ void App::StartKTrace(uint32_t group_mask, trace_buffering_mode_t buffering_mode
 
   FX_LOGS(INFO) << "Starting ktrace";
 
-  ControllerSyncPtr ktrace_controller;
-  if (zx_status_t status = svc_->Connect(ktrace_controller.NewRequest()); status != ZX_OK) {
-    FX_PLOGS(ERROR, status) << " failed to connect to ktrace controller";
+  zx::result client_end = component::Connect<fuchsia_tracing_kernel::Controller>();
+  if (client_end.is_error()) {
+    FX_PLOGS(ERROR, client_end.error_value()) << " failed to connect to ktrace controller";
     return;
   }
+  auto ktrace_controller = fidl::SyncClient{std::move(*client_end)};
 
   context_ = trace_acquire_prolonged_context();
   if (!context_) {
@@ -184,11 +184,11 @@ void App::StartKTrace(uint32_t group_mask, trace_buffering_mode_t buffering_mode
   }
   current_group_mask_ = group_mask;
 
-  RequestKtraceStop(*ktrace_controller);
+  RequestKtraceStop(ktrace_controller);
   if (!retain_current_data) {
-    RequestKtraceRewind(*ktrace_controller);
+    RequestKtraceRewind(ktrace_controller);
   }
-  RequestKtraceStart(*ktrace_controller, buffering_mode, group_mask);
+  RequestKtraceStart(ktrace_controller, buffering_mode, group_mask);
 
   FX_LOGS(DEBUG) << "Ktrace started";
 }
@@ -263,15 +263,16 @@ void App::StopKTrace() {
   FX_LOGS(INFO) << "Stopping ktrace";
 
   {
-    ControllerSyncPtr ktrace_controller;
-    if (zx_status_t status = svc_->Connect(ktrace_controller.NewRequest()); status != ZX_OK) {
-      FX_PLOGS(ERROR, status) << " failed to connect to ktrace controller";
+    zx::result client_end = component::Connect<fuchsia_tracing_kernel::Controller>();
+    if (client_end.is_error()) {
+      FX_PLOGS(ERROR, client_end.error_value()) << " failed to connect to ktrace controller";
       return;
     }
-    RequestKtraceStop(*ktrace_controller);
+    auto ktrace_controller = fidl::SyncClient{std::move(*client_end)};
+    RequestKtraceStop(ktrace_controller);
   }
 
-  auto drain_context = DrainContext::Create(svc_);
+  auto drain_context = DrainContext::Create();
   if (!drain_context) {
     FX_LOGS(ERROR) << "Failed to start reading kernel buffer";
     return;

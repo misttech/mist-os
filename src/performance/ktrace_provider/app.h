@@ -24,13 +24,13 @@ struct DrainContext {
   DrainContext(zx::time start, trace_prolonged_context_t* context)
       : start(start), context(context) {}
 
-  static std::unique_ptr<DrainContext> Create(const std::shared_ptr<sys::ServiceDirectory>& svc) {
+  static std::unique_ptr<DrainContext> Create() {
     auto context = trace_acquire_prolonged_context();
     if (context == nullptr) {
       return nullptr;
     }
     auto out = std::make_unique<DrainContext>(zx::clock::get_monotonic(), context);
-    if (zx_status_t result = out->reader.Init(svc); result != ZX_OK) {
+    if (zx_status_t result = out->reader.Init(); result != ZX_OK) {
       return nullptr;
     }
 
@@ -55,14 +55,12 @@ class App {
                    bool retain_current_data);
   void StopKTrace();
 
-  std::unique_ptr<sys::ComponentContext> component_context_;
   trace::TraceObserver trace_observer_;
   LogImporter log_importer_;
   uint32_t current_group_mask_ = 0u;
   // This context keeps the trace context alive until we've written our trace
   // records, which doesn't happen until after tracing has stopped.
   trace_prolonged_context_t* context_ = nullptr;
-  std::shared_ptr<sys::ServiceDirectory> svc_ = sys::ServiceDirectory::CreateFromNamespace();
 
   App(const App&) = delete;
   App(App&&) = delete;
