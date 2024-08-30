@@ -14,9 +14,8 @@ use anyhow::bail;
 use fuchsia_inspect::Inspector;
 use fuchsia_inspect_contrib::auto_persist;
 use futures::channel::{mpsc, oneshot};
+use futures::future::BoxFuture;
 use futures::{select, StreamExt};
-use std::future::Future;
-use std::pin::Pin;
 use tracing::{error, info, warn};
 use wlan_common::sink::UnboundedSink;
 use wlan_sme::serve::create_sme;
@@ -29,8 +28,6 @@ use {
 
 #[derive(thiserror::Error, Debug)]
 pub enum FullmacMlmeError {
-    #[error("Unable to get startup result")]
-    UnableToGetStartupResult,
     #[error("device.start failed: {0}")]
     DeviceStartFailed(zx::Status),
     #[error("Failed to get usme bootstrap stream: {0}")]
@@ -120,7 +117,237 @@ impl FullmacMlmeHandle {
 
 const INSPECT_VMO_SIZE_BYTES: usize = 1000 * 1024;
 
-pub struct FullmacMlme<D: DeviceOps + Send> {
+/// Starts and serves the FullMAC MLME on a separate thread.
+///
+/// This will block until the FullMAC MLME has been initialized. MLME is considered "initialized"
+/// after it bootstraps USME, queries the vendor driver for supported hardware features, and
+/// creates the SME and MLME main loop futures. See the `start` function in this file for details.
+///
+/// Returns a handle to MLME on success, and an error if MLME failed to initialize.
+pub fn start_and_serve_on_separate_thread<D: DeviceOps + Send + 'static>(
+    device: D,
+) -> anyhow::Result<FullmacMlmeHandle> {
+    // Logger requires the executor to be initialized first.
+    let mut executor = fasync::LocalExecutor::new();
+    logger::init();
+
+    let (driver_event_sender, driver_event_stream) = mpsc::unbounded();
+    let driver_event_sender_clone = driver_event_sender.clone();
+    let inspector =
+        Inspector::new(fuchsia_inspect::InspectorConfig::default().size(INSPECT_VMO_SIZE_BYTES));
+    let inspect_usme_node = inspector.root().create_child("usme");
+
+    let (startup_sender, startup_receiver) = oneshot::channel();
+    let mlme_loop_join_handle = std::thread::spawn(move || {
+        // NOTE: Until MLME can be made async, MLME needs two threads to be able to
+        // send requests to the vendor driver and receive requests from the vendor driver
+        // simultaneously.
+        let mut executor = fasync::SendExecutor::new(2);
+
+        info!("Starting WLAN MLME main loop");
+        let future = start_and_serve(
+            device,
+            driver_event_sender_clone,
+            driver_event_stream,
+            inspector,
+            inspect_usme_node,
+            startup_sender,
+        );
+        executor.run(future);
+    });
+
+    match executor.run_singlethreaded(startup_receiver) {
+        Ok(Ok(())) => (),
+        Ok(Err(err)) => bail!(
+            "MLME failed to start with error {}. MLME main loop returned {:?}.",
+            err,
+            mlme_loop_join_handle.join()
+        ),
+        Err(oneshot::Canceled) => bail!(
+            "MLME thread dropped startup_sender. MLME main loop returned {:?}",
+            mlme_loop_join_handle.join()
+        ),
+    };
+
+    Ok(FullmacMlmeHandle {
+        driver_event_sender,
+        mlme_loop_join_handle: Some(mlme_loop_join_handle),
+    })
+}
+
+/// Contains the initialized MLME main loop and SME futures.
+///
+/// Both futures do not hold references, so they should satisfy the 'static lifetime.
+struct StartedDriver {
+    mlme_main_loop_fut: BoxFuture<'static, anyhow::Result<()>>,
+    sme_fut: BoxFuture<'static, anyhow::Result<()>>,
+}
+
+/// This initializes the MLME and SME, then on successful initialization runs the MLME main loop
+/// future and SME futures concurrently until completion.
+///
+/// Notifies when startup is complete through |startup_sender|.
+///
+/// If initialization fails, then this exits immediately.
+///
+/// # Panics
+///
+/// This panics if sending over |startup_sender| returns an error. This probably means the
+/// thread that owns |startup_sender| already exited to an error/panic.
+async fn start_and_serve<D: DeviceOps + Send + 'static>(
+    device: D,
+    driver_event_sender: mpsc::UnboundedSender<FullmacDriverEvent>,
+    driver_event_stream: mpsc::UnboundedReceiver<FullmacDriverEvent>,
+    inspector: Inspector,
+    inspect_usme_node: fuchsia_inspect::Node,
+    startup_sender: oneshot::Sender<Result<(), FullmacMlmeError>>,
+) {
+    let StartedDriver { mlme_main_loop_fut, sme_fut } =
+        match start(device, driver_event_stream, driver_event_sender, inspector, inspect_usme_node)
+            .await
+        {
+            Ok(initialized_mlme) => {
+                startup_sender.send(Ok(())).unwrap();
+                initialized_mlme
+            }
+            Err(e) => {
+                startup_sender.send(Err(e)).unwrap();
+                return;
+            }
+        };
+
+    match futures::try_join!(mlme_main_loop_fut, sme_fut) {
+        Ok(_) => info!("MLME and/or SME event loop exited gracefully"),
+        Err(e) => error!("MLME and/or SME event loop exited with error: {:?}", e),
+    }
+}
+
+/// Starts the MLME and SME.
+///
+/// This:
+/// - Handles the channel exchange over WlanFullmacImpl::Start().
+/// - Retrieves the generic SME channel over the USME bootstrap channel.
+/// - Creates the SME future.
+/// - Creates the MLME main loop future.
+///
+/// On success, returns a `StartedDriver` that contains the MLME main loop and SME futures.
+async fn start<D: DeviceOps + Send + 'static>(
+    mut device: D,
+    driver_event_stream: mpsc::UnboundedReceiver<FullmacDriverEvent>,
+    driver_event_sender: mpsc::UnboundedSender<FullmacDriverEvent>,
+    inspector: Inspector,
+    inspect_usme_node: fuchsia_inspect::Node,
+) -> Result<StartedDriver, FullmacMlmeError> {
+    let (fullmac_ifc_client_end, fullmac_ifc_request_stream) =
+        fidl::endpoints::create_request_stream()
+            .map_err(FullmacMlmeError::FailedToCreateIfcRequestStream)?;
+
+    let usme_bootstrap_protocol_channel =
+        device.start(fullmac_ifc_client_end).map_err(FullmacMlmeError::DeviceStartFailed)?;
+
+    let server = fidl::endpoints::ServerEnd::<fidl_sme::UsmeBootstrapMarker>::new(
+        usme_bootstrap_protocol_channel,
+    );
+
+    let mut usme_bootstrap_stream =
+        server.into_stream().map_err(FullmacMlmeError::FailedToGetUsmeBootstrapStream)?;
+
+    let fidl_sme::UsmeBootstrapRequest::Start {
+        generic_sme_server,
+        legacy_privacy_support,
+        responder,
+        ..
+    } = usme_bootstrap_stream
+        .next()
+        .await
+        .ok_or(FullmacMlmeError::UsmeBootstrapStreamTerminated)?
+        .map_err(FullmacMlmeError::UsmeBootstrapStreamFailed)?;
+
+    let inspect_vmo =
+        inspector.duplicate_vmo().ok_or(FullmacMlmeError::FailedToDuplicateInspectVmo)?;
+
+    responder.send(inspect_vmo).map_err(FullmacMlmeError::FailedToRespondToUsmeBootstrapRequest)?;
+
+    let generic_sme_stream =
+        generic_sme_server.into_stream().map_err(FullmacMlmeError::FailedToGetGenericSmeStream)?;
+
+    // Create SME
+    let cfg = wlan_sme::Config {
+        wep_supported: legacy_privacy_support.wep_supported,
+        wpa1_supported: legacy_privacy_support.wpa1_supported,
+    };
+
+    let (mlme_event_sender, mlme_event_receiver) = mpsc::unbounded();
+    let mlme_event_sink = UnboundedSink::new(mlme_event_sender);
+
+    let device_info = fullmac_to_mlme::convert_device_info(
+        device.query_device_info().map_err(FullmacMlmeError::FailedToQueryVendorDriver)?,
+    );
+
+    let mac_sublayer_support =
+        device.query_mac_sublayer_support().map_err(FullmacMlmeError::FailedToQueryVendorDriver)?;
+
+    if mac_sublayer_support.device.mac_implementation_type
+        != fidl_common::MacImplementationType::Fullmac
+    {
+        return Err(FullmacMlmeError::InvalidMacImplementationType(
+            mac_sublayer_support.device.mac_implementation_type,
+        ));
+    }
+
+    if mac_sublayer_support.data_plane.data_plane_type
+        != fidl_common::DataPlaneType::GenericNetworkDevice
+    {
+        return Err(FullmacMlmeError::InvalidDataPlaneType(
+            mac_sublayer_support.data_plane.data_plane_type,
+        ));
+    }
+
+    let security_support =
+        device.query_security_support().map_err(FullmacMlmeError::FailedToQueryVendorDriver)?;
+
+    let spectrum_management_support = device
+        .query_spectrum_management_support()
+        .map_err(FullmacMlmeError::FailedToQueryVendorDriver)?;
+
+    // TODO(https://fxbug.dev/42064968): Get persistence working by adding the appropriate configs
+    //                         in *.cml files
+    let (persistence_proxy, _persistence_server_end) =
+        fidl::endpoints::create_proxy::<fidl_fuchsia_diagnostics_persist::DataPersistenceMarker>()
+            .map_err(FullmacMlmeError::FailedToCreatePersistenceProxy)?;
+
+    let (persistence_req_sender, _persistence_req_forwarder_fut) =
+        auto_persist::create_persistence_req_sender(persistence_proxy);
+
+    let (mlme_request_stream, sme_fut) = create_sme(
+        cfg.into(),
+        mlme_event_receiver,
+        &device_info,
+        mac_sublayer_support,
+        security_support,
+        spectrum_management_support,
+        inspect_usme_node,
+        persistence_req_sender,
+        generic_sme_stream,
+    )
+    .map_err(FullmacMlmeError::FailedToCreateSme)?;
+
+    let mlme = MlmeMainLoop {
+        device,
+        mlme_request_stream,
+        mlme_event_sink,
+        driver_event_stream,
+        is_bss_protected: false,
+        device_link_state: fidl_mlme::ControlledPortState::Closed,
+    };
+
+    let driver_event_sink = FullmacDriverEventSink(UnboundedSink::new(driver_event_sender));
+    let mlme_main_loop_fut = Box::pin(mlme.serve(fullmac_ifc_request_stream, driver_event_sink));
+
+    Ok(StartedDriver { mlme_main_loop_fut, sme_fut })
+}
+
+struct MlmeMainLoop<D: DeviceOps> {
     device: D,
     mlme_request_stream: wlan_sme::MlmeStream,
     mlme_event_sink: wlan_sme::MlmeEventSink,
@@ -129,228 +356,20 @@ pub struct FullmacMlme<D: DeviceOps + Send> {
     device_link_state: fidl_mlme::ControlledPortState,
 }
 
-impl<D: DeviceOps + Send + 'static> FullmacMlme<D> {
-    pub fn start(device: D) -> Result<FullmacMlmeHandle, anyhow::Error> {
-        // Logger requires the executor to be initialized first.
-        let mut executor = fasync::LocalExecutor::new();
-        logger::init();
-
-        let (driver_event_sender, driver_event_stream) = mpsc::unbounded();
-        let driver_event_sender_clone = driver_event_sender.clone();
-        let inspector = Inspector::new(
-            fuchsia_inspect::InspectorConfig::default().size(INSPECT_VMO_SIZE_BYTES),
-        );
-        let inspect_usme_node = inspector.root().create_child("usme");
-
-        let (startup_sender, startup_receiver) = oneshot::channel();
-        let mlme_loop_join_handle = std::thread::spawn(move || {
-            // NOTE: Until MLME can be made async, MLME needs two threads to be able to
-            // send requests to the vendor driver and receive requests from the vendor driver
-            // simultaneously.
-            let mut executor = fasync::SendExecutor::new(2);
-
-            info!("Starting WLAN MLME main loop");
-            let future = Self::mlme_main_loop(
-                device,
-                driver_event_sender_clone,
-                driver_event_stream,
-                inspector,
-                inspect_usme_node,
-                startup_sender,
-            );
-            executor.run(future);
-        });
-
-        let startup_result = executor.run_singlethreaded(startup_receiver);
-        match startup_result.map_err(|_e| FullmacMlmeError::UnableToGetStartupResult) {
-            Ok(Ok(())) => Ok(FullmacMlmeHandle {
-                driver_event_sender,
-                mlme_loop_join_handle: Some(mlme_loop_join_handle),
-            }),
-            Err(err) | Ok(Err(err)) => match mlme_loop_join_handle.join() {
-                Ok(()) => bail!("Failed to start the MLME event loop: {:?}", err),
-                Err(panic_err) => {
-                    bail!("MLME event loop failed and then panicked: {}, {:?}", err, panic_err)
-                }
-            },
-        }
-    }
-
-    /// Initializes the MLME.
+impl<D: DeviceOps> MlmeMainLoop<D> {
+    /// Runs the MLME main loop.
     ///
     /// This:
-    /// - Handles the channel exchange over WlanFullmacImpl::Start().
-    /// - Retrieves the generic SME channel over the USME bootstrap channel.
-    /// - Creates the SME future.
+    /// - Spawns the background task that implements the WlanFullmacImplIfc server.
+    /// - Handles SME -> Vendor Driver requests by servicing |self.mlme_request_stream|.
+    /// - Handles Vendor Driver -> SME requests by servicing |self.driver_event_stream|.
     ///
-    /// On success, returns an instance of FullmacMlme and the SME future.
-    async fn initialize(
-        mut device: D,
-        driver_event_stream: mpsc::UnboundedReceiver<FullmacDriverEvent>,
-        inspector: Inspector,
-        inspect_usme_node: fuchsia_inspect::Node,
-    ) -> Result<
-        (
-            Self,
-            Pin<Box<impl Future<Output = Result<(), anyhow::Error>>>>,
-            fidl_fullmac::WlanFullmacImplIfcRequestStream,
-        ),
-        FullmacMlmeError,
-    > {
-        let (fullmac_ifc_client_end, fullmac_ifc_request_stream) =
-            fidl::endpoints::create_request_stream()
-                .map_err(FullmacMlmeError::FailedToCreateIfcRequestStream)?;
-
-        let usme_bootstrap_protocol_channel =
-            device.start(fullmac_ifc_client_end).map_err(FullmacMlmeError::DeviceStartFailed)?;
-
-        let server = fidl::endpoints::ServerEnd::<fidl_sme::UsmeBootstrapMarker>::new(
-            usme_bootstrap_protocol_channel,
-        );
-
-        let mut usme_bootstrap_stream =
-            server.into_stream().map_err(FullmacMlmeError::FailedToGetUsmeBootstrapStream)?;
-
-        let fidl_sme::UsmeBootstrapRequest::Start {
-            generic_sme_server,
-            legacy_privacy_support,
-            responder,
-            ..
-        } = usme_bootstrap_stream
-            .next()
-            .await
-            .ok_or(FullmacMlmeError::UsmeBootstrapStreamTerminated)?
-            .map_err(FullmacMlmeError::UsmeBootstrapStreamFailed)?;
-
-        let inspect_vmo =
-            inspector.duplicate_vmo().ok_or(FullmacMlmeError::FailedToDuplicateInspectVmo)?;
-
-        responder
-            .send(inspect_vmo)
-            .map_err(FullmacMlmeError::FailedToRespondToUsmeBootstrapRequest)?;
-
-        let generic_sme_stream = generic_sme_server
-            .into_stream()
-            .map_err(FullmacMlmeError::FailedToGetGenericSmeStream)?;
-
-        // Create SME
-        let cfg = wlan_sme::Config {
-            wep_supported: legacy_privacy_support.wep_supported,
-            wpa1_supported: legacy_privacy_support.wpa1_supported,
-        };
-
-        let (mlme_event_sender, mlme_event_receiver) = mpsc::unbounded();
-        let mlme_event_sink = UnboundedSink::new(mlme_event_sender);
-
-        let device_info = fullmac_to_mlme::convert_device_info(
-            device.query_device_info().map_err(FullmacMlmeError::FailedToQueryVendorDriver)?,
-        );
-
-        let mac_sublayer_support = device
-            .query_mac_sublayer_support()
-            .map_err(FullmacMlmeError::FailedToQueryVendorDriver)?;
-
-        if mac_sublayer_support.device.mac_implementation_type
-            != fidl_common::MacImplementationType::Fullmac
-        {
-            return Err(FullmacMlmeError::InvalidMacImplementationType(
-                mac_sublayer_support.device.mac_implementation_type,
-            ));
-        }
-
-        if mac_sublayer_support.data_plane.data_plane_type
-            != fidl_common::DataPlaneType::GenericNetworkDevice
-        {
-            return Err(FullmacMlmeError::InvalidDataPlaneType(
-                mac_sublayer_support.data_plane.data_plane_type,
-            ));
-        }
-
-        let security_support =
-            device.query_security_support().map_err(FullmacMlmeError::FailedToQueryVendorDriver)?;
-
-        let spectrum_management_support = device
-            .query_spectrum_management_support()
-            .map_err(FullmacMlmeError::FailedToQueryVendorDriver)?;
-
-        // TODO(https://fxbug.dev/42064968): Get persistence working by adding the appropriate configs
-        //                         in *.cml files
-        let (persistence_proxy, _persistence_server_end) = fidl::endpoints::create_proxy::<
-            fidl_fuchsia_diagnostics_persist::DataPersistenceMarker,
-        >()
-        .map_err(FullmacMlmeError::FailedToCreatePersistenceProxy)?;
-
-        let (persistence_req_sender, _persistence_req_forwarder_fut) =
-            auto_persist::create_persistence_req_sender(persistence_proxy);
-
-        let (mlme_request_stream, sme_fut) = create_sme(
-            cfg.into(),
-            mlme_event_receiver,
-            &device_info,
-            mac_sublayer_support,
-            security_support,
-            spectrum_management_support,
-            inspect_usme_node,
-            persistence_req_sender,
-            generic_sme_stream,
-        )
-        .map_err(FullmacMlmeError::FailedToCreateSme)?;
-
-        let mlme = Self {
-            device,
-            mlme_request_stream,
-            mlme_event_sink,
-            driver_event_stream,
-            is_bss_protected: false,
-            device_link_state: fidl_mlme::ControlledPortState::Closed,
-        };
-
-        Ok((mlme, sme_fut, fullmac_ifc_request_stream))
-    }
-
-    /// The main MLME loop.
+    /// |self.driver_event_stream| is populated by the WlanFullmacImplIfc server task, except for
+    /// the `Stop` event which is sent by `FullmacMlmeHandle::stop`.
     ///
-    /// This initializes the MLME, then on successful initialization runs the MLME main loop future
-    /// and SME futures concurrently until completion.
-    ///
-    /// Notifies the thread that calls |Self::start| when startup is complete through |startup_sender|.
-    ///
-    /// If initialization fails, then this exits immediately.
-    ///
-    /// # Panics
-    ///
-    /// This panics if sending over |startup_sender| returns an error. This probably means the
-    /// thread that called |Self::start| already exited due to an error/panic.
-    async fn mlme_main_loop(
-        device: D,
-        driver_event_sink: mpsc::UnboundedSender<FullmacDriverEvent>,
-        driver_event_stream: mpsc::UnboundedReceiver<FullmacDriverEvent>,
-        inspector: Inspector,
-        inspect_usme_node: fuchsia_inspect::Node,
-        startup_sender: oneshot::Sender<Result<(), FullmacMlmeError>>,
-    ) {
-        let (mlme, sme_fut, fullmac_ifc_request_stream) =
-            match Self::initialize(device, driver_event_stream, inspector, inspect_usme_node).await
-            {
-                Ok(ret) => {
-                    startup_sender.send(Ok(())).unwrap();
-                    ret
-                }
-                Err(e) => {
-                    startup_sender.send(Err(e)).unwrap();
-                    return;
-                }
-            };
-
-        let driver_event_sink = FullmacDriverEventSink(UnboundedSink::new(driver_event_sink));
-        let mlme_main_loop_fut = mlme.run_main_loop(fullmac_ifc_request_stream, driver_event_sink);
-        match futures::try_join!(mlme_main_loop_fut, sme_fut) {
-            Ok(_) => info!("MLME and/or SME event loop exited gracefully"),
-            Err(e) => error!("MLME and/or SME event loop exited with error: {:?}", e),
-        }
-    }
-
-    pub async fn run_main_loop(
+    /// Returns success if it receives the `Stop` event on |self.driver_event_stream|, and returns
+    /// an error in all other cases.
+    async fn serve(
         mut self,
         fullmac_ifc_request_stream: fidl_fullmac::WlanFullmacImplIfcRequestStream,
         driver_event_sink: FullmacDriverEventSink,
@@ -857,7 +876,7 @@ mod main_loop_tests {
 
             let mocks = fake_device.mocks.clone();
 
-            let test_fut = Box::pin(FullmacMlme::mlme_main_loop(
+            let test_fut = Box::pin(start_and_serve(
                 fake_device,
                 driver_event_sender.clone(),
                 driver_event_stream,
@@ -1613,7 +1632,7 @@ mod handle_mlme_request_tests {
 
     pub struct TestHelper {
         fake_device: Arc<Mutex<FakeFullmacDeviceMocks>>,
-        mlme: FullmacMlme<FakeFullmacDevice>,
+        mlme: MlmeMainLoop<FakeFullmacDevice>,
         mlme_event_receiver: mpsc::UnboundedReceiver<fidl_mlme::MlmeEvent>,
         driver_calls: mpsc::UnboundedReceiver<DriverCall>,
         _mlme_request_sender: mpsc::UnboundedSender<wlan_sme::MlmeRequest>,
@@ -1630,7 +1649,7 @@ mod handle_mlme_request_tests {
             let (driver_event_sender, driver_event_stream) = mpsc::unbounded();
             let mocks = fake_device.mocks.clone();
 
-            let mlme = FullmacMlme {
+            let mlme = MlmeMainLoop {
                 device: fake_device,
                 mlme_request_stream,
                 mlme_event_sink,
@@ -2452,7 +2471,7 @@ mod handle_driver_event_tests {
 
             let mocks = fake_device.mocks.clone();
 
-            let mlme = FullmacMlme {
+            let mlme = MlmeMainLoop {
                 device: fake_device,
                 mlme_request_stream,
                 mlme_event_sink,
@@ -2460,8 +2479,7 @@ mod handle_driver_event_tests {
                 is_bss_protected: false,
                 device_link_state,
             };
-            let test_fut =
-                Box::pin(mlme.run_main_loop(fullmac_ifc_request_stream, driver_event_sink));
+            let test_fut = Box::pin(mlme.serve(fullmac_ifc_request_stream, driver_event_sink));
             let test_helper = TestHelper {
                 fake_device: mocks,
                 mlme_request_sender,
