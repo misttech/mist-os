@@ -6,11 +6,6 @@ import("//build/components.gni")
 import("//build/rust/rustc_library.gni")
 import("//build/test.gni")
 
-declare_args() {
-  # Whether or not tracing is enabled for storage.
-  storage_enable_tracing = false
-}
-
 template("rust_storage_trace") {
   rustc_library(target_name) {
     name = invoker.name
@@ -33,7 +28,7 @@ template("rust_storage_trace") {
 
 rust_storage_trace("trace") {
   name = "storage_trace"
-  enable_tracing = is_fuchsia && storage_enable_tracing
+  enable_tracing = is_fuchsia
   visibility = [ "//src/storage/*" ]
   testonly = false
 }
@@ -110,7 +105,7 @@ source_set("storage_trace_disabled_cpp") {
 # Generates the main c++ tracing target and a test that depends on it. The test is run on host to
 # ensure that the :cpp target can compile for host builds.
 cpp_storage_trace("cpp") {
-  enable_tracing = is_fuchsia && storage_enable_tracing
+  enable_tracing = is_fuchsia
   visibility = [ "//src/storage/*" ]
   testonly = false
   test_name = "storage_trace_cpp_test"
