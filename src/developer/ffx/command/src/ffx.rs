@@ -2,7 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{analytics_command, user_error, Error, FfxContext, MetricsSession, Result};
+use crate::{
+    analytics_command, return_user_error, user_error, Error, FfxContext, MetricsSession, Result,
+};
 use argh::{ArgsInfo, FromArgs};
 use camino::Utf8PathBuf;
 use ffx_command_error::bug;
@@ -14,7 +16,7 @@ use ffx_writer::Format;
 use std::collections::HashMap;
 use std::fmt::Write;
 use std::os::unix::process::ExitStatusExt;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::ExitStatus;
 use std::str::FromStr;
 
@@ -283,9 +285,41 @@ pub struct Ffx {
     pub core: bool,
 }
 
+/// When a tool is run in "core" mode there are certain constraints on passed
+/// arguments. This ensures they are all satisfied
+pub fn check_core_constraints(ffx: &Ffx) -> Result<()> {
+    // In this case we're not in core mode so we just exit out
+    if !ffx.core {
+        return Ok(());
+    }
+
+    if ffx.machine.is_none() {
+        return_user_error!("ffx core requires that the machine schema be specified");
+    }
+    if ffx.target.is_none() {
+        return_user_error!("ffx core requries that the target be explicetly specified");
+    }
+
+    if ffx.config.len() > 1 {
+        return_user_error!("Core mode requires at most one --config flag to be passed");
+    }
+
+    for potential_config in ffx.config.iter() {
+        let try_path = Path::new(potential_config);
+        if !try_path.is_file() {
+            return_user_error!(
+                "When running in core mode, config flags must be passed as a path to a file"
+            );
+        }
+    }
+
+    Ok(())
+}
+
 impl Ffx {
     pub fn load_context(&self, exe_kind: ExecutableKind) -> Result<EnvironmentContext> {
-        let env_vars = HashMap::from_iter(std::env::vars());
+        let env_vars =
+            if self.core { HashMap::new() } else { HashMap::from_iter(std::env::vars()) };
         self.load_context_with_env(exe_kind, env_vars)
     }
 
@@ -471,6 +505,60 @@ mod test {
     use ffx_config::environment::EnvironmentKind;
     use std::io::Write;
     use tempfile::{tempdir, TempDir};
+
+    #[test]
+    fn test_check_ffx_core() {
+        struct TestCase {
+            inputs: Vec<&'static str>,
+            name: String,
+        }
+
+        let cases = vec![
+            TestCase {
+                inputs: vec!["ffx", "--core", "target", "echo"],
+                name: "Missing Machine".into(),
+            },
+            TestCase {
+                inputs: vec!["ffx", "--core", "--machine", "json", "target", "echo"],
+                name: "Missing Target Name".into(),
+            },
+            TestCase {
+                inputs: vec![
+                    "ffx",
+                    "--core",
+                    "--config",
+                    "foo=bar",
+                    "--machine",
+                    "json",
+                    "target",
+                    "echo",
+                ],
+                name: "Bad config setting".into(),
+            },
+            TestCase {
+                inputs: vec![
+                    "ffx",
+                    "--core",
+                    "--config",
+                    "foo=bar",
+                    "--config",
+                    "some_file.json",
+                    "--machine",
+                    "json",
+                    "target",
+                    "echo",
+                ],
+                name: "Multiple config settings".into(),
+            },
+        ];
+
+        for case in cases {
+            let cmd_line =
+                FfxCommandLine::new(None, &case.inputs).expect("Command line should parse");
+            let res = check_core_constraints(&cmd_line.global);
+            assert!(res.is_err(), "Test Case {} was not an error", case.name);
+        }
+    }
 
     #[test]
     fn cmd_only_last_component() {
