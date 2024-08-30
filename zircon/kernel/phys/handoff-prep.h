@@ -92,12 +92,7 @@ class HandoffPrep {
 
   // Add an additonal, generic VMO to be simply published to userland.  The
   // kernel proper won't ever look at it.
-  //
-  // TODO(https://fxbug.dev/42164859): Currently this returns the buffer to copy the
-  // contents into.  Later this will require a whole-page allocation that gets
-  // handed off.  It can be changed in place hereafter until the moment of
-  // handoff.
-  ktl::span<ktl::byte> PublishExtraVmo(ktl::string_view name, size_t content_size);
+  void PublishExtraVmo(PhysVmo&& vmo);
 
  private:
   template <memalloc::Type Type>
@@ -152,6 +147,12 @@ class HandoffPrep {
   };
 
   inline static TemporaryAllocator temporary_allocator_;
+
+  // Constructs a PhysVmo from the provided information, enforcing that `data`
+  // is page-aligned and that page-rounding `content_size` up yields
+  // `data.size_bytes()`.
+  static PhysVmo MakePhysVmo(ktl::span<const ktl::byte> data, ktl::string_view name,
+                             size_t content_size);
 
   void SaveForMexec(const zbi_header_t& header, ktl::span<const ktl::byte> payload);
 

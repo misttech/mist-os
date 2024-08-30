@@ -97,36 +97,46 @@ void HandoffPrep::Init() {
   ZX_ASSERT_MSG(ac.check(), "Failed to allocate PhysHandoff!");
 }
 
+PhysVmo HandoffPrep::MakePhysVmo(ktl::span<const ktl::byte> data, ktl::string_view name,
+                                 size_t content_size) {
+  uintptr_t addr = reinterpret_cast<uintptr_t>(data.data());
+  ZX_ASSERT((addr % ZX_PAGE_SIZE) == 0);
+  ZX_ASSERT((data.size_bytes() % ZX_PAGE_SIZE) == 0);
+  ZX_ASSERT(((content_size + ZX_PAGE_SIZE - 1) & -ZX_PAGE_SIZE) == data.size_bytes());
+
+  PhysVmo vmo{.addr = addr, .content_size = content_size};
+  vmo.set_name(name);
+  return vmo;
+}
+
 void HandoffPrep::SetInstrumentation() {
   auto publish_debugdata = [this](ktl::string_view sink_name, ktl::string_view vmo_name,
                                   ktl::string_view vmo_name_suffix, size_t content_size) {
     PhysVmo::Name phys_vmo_name =
         instrumentation::DebugdataVmoName(sink_name, vmo_name, vmo_name_suffix, /*is_static=*/true);
-    return PublishExtraVmo(VmoNameString(phys_vmo_name), content_size);
+
+    size_t aligned_size = (content_size + ZX_PAGE_SIZE - 1) & -ZX_PAGE_SIZE;
+    fbl::AllocChecker ac;
+    ktl::span contents =
+        Allocation::New(ac, memalloc::Type::kPhysDebugdata, aligned_size, ZX_PAGE_SIZE).release();
+    ZX_ASSERT_MSG(ac.check(), "cannot allocate %zu bytes for instrumentation phys VMO",
+                  aligned_size);
+    PublishExtraVmo(MakePhysVmo(contents, VmoNameString(phys_vmo_name), content_size));
+    return contents;
   };
   for (const ElfImage* module : gSymbolize->modules()) {
     module->PublishDebugdata(publish_debugdata);
   }
 }
 
-ktl::span<ktl::byte> HandoffPrep::PublishExtraVmo(ktl::string_view name, size_t content_size) {
-  if (content_size == 0) {
-    return {};
-  }
+void HandoffPrep::PublishExtraVmo(PhysVmo&& vmo) {
   fbl::AllocChecker ac;
   HandoffVmo* handoff_vmo = new (gPhysNew<memalloc::Type::kPhysScratch>, ac) HandoffVmo;
   ZX_ASSERT_MSG(ac.check(), "cannot allocate %zu scratch bytes for HandoffVmo",
                 sizeof(*handoff_vmo));
 
-  handoff_vmo->vmo.set_name(name);
-
-  ktl::span buffer = New(handoff_vmo->vmo.data, ac, content_size);
-  ZX_ASSERT_MSG(ac.check(), "cannot allocate %zu bytes for %.*s", content_size,
-                static_cast<int>(name.size()), name.data());
-  ZX_DEBUG_ASSERT(buffer.size() == content_size);
-
+  handoff_vmo->vmo = ktl::move(vmo);
   extra_vmos_.push_front(handoff_vmo);
-  return buffer;
 }
 
 void HandoffPrep::FinishExtraVmos() {
@@ -162,8 +172,10 @@ void HandoffPrep::SetMemory() {
       // The allocations that should survive into the hand-off.
       case memalloc::Type::kDataZbi:
       case memalloc::Type::kKernel:
+      case memalloc::Type::kPhysDebugdata:
       case memalloc::Type::kNvram:
       case memalloc::Type::kPeripheral:
+      case memalloc::Type::kPhysLog:
       case memalloc::Type::kReservedLow:
       case memalloc::Type::kTemporaryPhysHandoff:
       case memalloc::Type::kTestRamReserve:
@@ -236,21 +248,29 @@ void HandoffPrep::PublishLog(ktl::string_view name, Log&& log) {
     return;
   }
 
+  // TODO(https://fxbug.dev/42164859): While trampoline booting is in effect in
+  // the x86 codepath, care needs to be taken with `Allocation`s made before
+  // the fixed-address image recharacterization that TrampolineBoot does. In
+  // particular, we cannot turn the log in its current location into a PhysVmo
+  // as that might lie within the fixed-address image location. Accordingly, we
+  // allocate a copy of it and register that.
   const size_t content_size = log.size_bytes();
   Allocation buffer = ktl::move(log).TakeBuffer();
   ZX_ASSERT(content_size <= buffer.size_bytes());
 
-  ktl::span copy = PublishExtraVmo(name, content_size);
-  ZX_ASSERT(copy.size_bytes() == content_size);
+  size_t aligned_size = (content_size + ZX_PAGE_SIZE - 1) & -ZX_PAGE_SIZE;
+  fbl::AllocChecker ac;
+  ktl::span copy =
+      Allocation::New(ac, memalloc::Type::kPhysLog, aligned_size, ZX_PAGE_SIZE).release();
+  ZX_ASSERT_MSG(ac.check(), "cannot allocate %zu bytes for phys log", aligned_size);
   memcpy(copy.data(), buffer.get(), content_size);
 
-  // TODO(https://fxbug.dev/347766366): While trampoline booting is in effect in
-  // the x86 codepath, care needs to be taken with `Allocation`s made before
-  // the fixed-address image recharacterization that TrampolineBoot does. In
-  // particular, we do not want to absent-mindedly free a region that was
-  // recharacterized as being a part of a fixed-address image. Until
-  // TrampolineBoot is removed from kernel boot, defensively leak the log buffer
-  // allocation.
+  PublishExtraVmo(MakePhysVmo(copy, name, content_size));
+
+  // TODO(https://fxbug.dev/42164859): As above, we do not want to
+  // absent-mindedly free a region that occupies space within the fixed-address
+  // image location. Until TrampolineBoot is removed from kernel boot, we
+  // defensively leak the log buffer allocation.
   ktl::ignore = buffer.release();
 }
 

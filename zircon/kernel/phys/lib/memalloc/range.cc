@@ -63,7 +63,9 @@ std::string_view ToString(Type type) {
     case Type::kTemporaryIdentityPageTables:
       return "temporary identity page tables"sv;
     case Type::kKernelPageTables:
-      return "kernel page tables";
+      return "kernel page tables"sv;
+    case Type::kPhysDebugdata:
+      return "phys debugdata"sv;
     case Type::kDevicetreeBlob:
       return "devicetree blob"sv;
     case Type::kPhysScratch:

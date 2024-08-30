@@ -88,6 +88,9 @@ enum class Type : uint64_t {
   // proper's lifetime.
   kKernelPageTables,
 
+  // A debug data blob of phys origin (e.g., related to instrumentation).
+  kPhysDebugdata,
+
   // A firmware-provided devicetree blob.
   kDevicetreeBlob,
 

@@ -12,6 +12,7 @@
 
 #include <lib/arch/ticks.h>
 #include <lib/crypto/entropy_pool.h>
+#include <lib/memalloc/range.h>
 #include <lib/stdcompat/span.h>
 #include <lib/uart/all.h>
 #include <lib/zbi-format/board.h>
@@ -33,10 +34,6 @@
 #include "handoff-ptr.h"
 
 struct BootOptions;
-
-namespace memalloc {
-struct Range;
-}
 
 // This holds arch::EarlyTicks timestamps collected by physboot before the
 // kernel proper is cognizant.  Once the platform timer hardware is set up for
@@ -81,28 +78,35 @@ struct PhysVmo {
   // beyond the special ones explicitly enumerated.
   static constexpr size_t kMaxExtraHandoffPhysVmos = 3;
 
+  // The full page-aligned size of the memory.
+  constexpr size_t size_bytes() const { return (content_size + ZX_PAGE_SIZE - 1) & -ZX_PAGE_SIZE; }
+
   void set_name(std::string_view new_name) { new_name.copy(name.data(), name.size() - 1); }
 
-  // TODO(https://fxbug.dev/42164859): Currently these are actually copied like everything
-  // else into temporary handoff space (the only kind), so only the actual
-  // content size is allocated.  Eventually these will just be handed off here
-  // as a paddr and size of whole physical pages plus a precise content size.
-  PhysHandoffTemporarySpan<const std::byte> data;
+  // The physical address of the memory.
+  uintptr_t addr = 0;
+  size_t content_size = 0;
   Name name{};
 };
 static_assert(std::is_default_constructible_v<PhysVmo>);
 
-// A physical address range.
-struct PhysAddressRange {
-  constexpr uintptr_t end() const { return addr + size; }
-
-  uintptr_t addr = 0;
-  size_t size = 0;
-};
-
 // This holds (or points to) everything that is handed off from physboot to the
 // kernel proper at boot time.
 struct PhysHandoff {
+  // Whether the given type represents physical memory that should be turned
+  // into a VMO.
+  static bool IsPhysVmoType(memalloc::Type type) {
+    switch (type) {
+      case memalloc::Type::kDataZbi:
+      case memalloc::Type::kPhysDebugdata:
+      case memalloc::Type::kPhysLog:
+        return true;
+      default:
+        break;
+    }
+    return false;
+  }
+
   constexpr bool Valid() const { return magic == kMagic; }
 
   static constexpr uint64_t kMagic = 0xfeedfaceb002da2a;
@@ -122,8 +126,8 @@ struct PhysHandoff {
   // the kernel proper.
   PhysHandoffTemporarySpan<const PhysVmo> extra_vmos;
 
-  // Physical address range of the data ZBI.
-  PhysAddressRange zbi;
+  // The data ZBI.
+  PhysVmo zbi;
 
   // Entropy gleaned from ZBI Items such as 'ZBI_TYPE_SECURE_ENTROPY' and/or command line.
   std::optional<crypto::EntropyPool> entropy_pool;

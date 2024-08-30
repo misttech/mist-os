@@ -278,6 +278,15 @@ class PmmNode {
   list_node phys_handoff_temporary_list_ TA_GUARDED(lock_) =
       LIST_INITIAL_VALUE(phys_handoff_temporary_list_);
 
+  // The pages comprising the page-aligned regions of memory that we expect to
+  // turn into VMOs to hand-off to userspace - as determined by
+  // PhysHandoff::IsPhysVmoType() - populated and marked as wired on Init().
+  //
+  // It is expected that this memory will be unwired and turned into VMOs by the
+  // end of the phys hand-off phase, and it is the responsibility of
+  // PmmNode::EndHandoff() to ensure afterward that this list is empty.
+  list_node phys_handoff_vmo_list_ TA_GUARDED(lock_) = LIST_INITIAL_VALUE(phys_handoff_vmo_list_);
+
   // The pages intended to be permanently reserved.
   //
   // TODO(https://fxbug.dev/42164859): Well, this list also currently includes

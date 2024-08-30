@@ -24,6 +24,7 @@
 #include <kernel/mp.h>
 #include <kernel/scheduler.h>
 #include <kernel/thread.h>
+#include <phys/handoff.h>
 #include <pretty/cpp/sizes.h>
 #include <vm/phys/arena.h>
 #include <vm/physmap.h>
@@ -137,7 +138,10 @@ zx_status_t PmmNode::Init(ktl::span<const memalloc::Range> ranges) TA_NO_THREAD_
   return ZX_OK;
 }
 
-void PmmNode::EndHandoff() { FreeList(&phys_handoff_temporary_list_); }
+void PmmNode::EndHandoff() {
+  FreeList(&phys_handoff_temporary_list_);
+  ZX_ASSERT(list_is_empty(&phys_handoff_vmo_list_));
+}
 
 zx_status_t PmmNode::GetArenaInfo(size_t count, uint64_t i, pmm_arena_info_t* buffer,
                                   size_t buffer_size) {
@@ -612,9 +616,14 @@ void PmmNode::InitReservedRange(const memalloc::Range& range) {
     p->set_state(vm_page_state::WIRED);
   }
 
-  list_node_t* list = range.type == memalloc::Type::kTemporaryPhysHandoff
-                          ? &phys_handoff_temporary_list_
-                          : &permanently_reserved_list_;
+  list_node_t* list;
+  if (range.type == memalloc::Type::kTemporaryPhysHandoff) {
+    list = &phys_handoff_temporary_list_;
+  } else if (PhysHandoff::IsPhysVmoType(range.type)) {
+    list = &phys_handoff_vmo_list_;
+  } else {
+    list = &permanently_reserved_list_;
+  }
   if (list_is_empty(list)) {
     list_move(&reserved, list);
   } else {
