@@ -6,51 +6,89 @@
 
 load("//fuchsia/private:fuchsia_cc.bzl", "fuchsia_wrap_cc_binary")
 
-_MISSING_SRCS_FAIL_MESSAGE = """fuchsia_cc_requires at least 1 src which calls FUCHSIA_DRIVER_EXPORT.
-
-Once we are able to migrate away from cc_binary -> cc_shared_library we be able to remove this
-restriction but until then we must include that src to properly link in the required
-symbols.
-"""
-
 def fuchsia_cc_driver(name, srcs = [], output_name = None, deps = [], **kwargs):
     """Creates a binary driver which targets Fuchsia.
 
-    Wraps a cc_binary rule and provides appropriate defaults.
+    Wraps a cc_shared_library rule and provides appropriate defaults.
 
     This method currently just simply ensures that libc++ is statically linked.
     In the future it will ensure drivers are correctly versioned and carry the
     appropriate package resources.
 
+    If srcs are included the macro will create a cc_library and put all of the
+    deps into that library. If srcs are not provided then the deps will be added
+    directly to the cc_shared_library.
+
     Args:
         name: the target name
-        srcs: the sources to include in the driver.
-        output_name: (optional) the name of the .so to build. If excluded will default to lib<name>.so
+        srcs: (optional) the sources to include in the driver. If not provided,
+          the user should provide a cc_library in the deps.
+        output_name: (optional) the name of the .so to build. If excluded,
+          will default to lib<name>.so
         deps: The deps for the driver
-        **kwargs: The arguments to forward to cc_binary
+        **kwargs: The arguments to forward to cc_library
     """
-    if len(srcs) == 0:
-        fail(_MISSING_SRCS_FAIL_MESSAGE)
 
-    # Ensure that our binary is named with a .so at the end
-    bin_name = output_name or "lib{}".format(name)
-    if not bin_name.endswith(".so"):
-        bin_name = bin_name + ".so"
+    # Remove this value because we want to set it on our own. If we don't
+    # remove it the fuchsia_wrap_cc_binary to fail with an unknown attribute.
+    kwargs.pop("linkshared", None)
 
-    # Grab the user supplied linkopts and add our specific opts that are required
-    # for all drivers
-    linkopts = kwargs.pop("linkopts", [])
-    linkopts.extend([
+    shared_lib_name = (output_name or "lib{}".format(name)).removesuffix(".so") + ".so"
+
+    # Ensure we are packaging the lib/libdriver_runtime.so
+    deps.append(
+        "@fuchsia_sdk//pkg/driver_runtime_shared_lib",
+    )
+
+    user_link_flags = [
         # We need to run our own linker script to limit the symbols that are exported
         # and to make the driver framework symbols global.
         "-Wl,--undefined-version",
         "-Wl,--version-script",
         "$(location @fuchsia_sdk//fuchsia/private:driver.ld)",
-    ])
+    ]
 
-    # Remove this value because we want to set it on our own. If we don't
-    # remove it the fuchsia_wrap_cc_binary to fail with an unknown attribute.
-    kwargs.pop("linkshared", None)
+    # maintain backwards compatability with cc_binary
+    user_link_flags.extend(kwargs.pop("linkopts", []))
+
+    # collect any flags that the user passed in
+    user_link_flags.extend(kwargs.pop("user_link_flags", []))
+
+    # If a user includes srcs then we need to create a cc_library and put all of
+    # the deps in that target. Otherwise, the user has provided their own
+    # cc_library as a dep in which case we can
+    if len(srcs) > 0:
+        native.cc_library(
+            name = name + "_srcs",
+            srcs = srcs,
+            deps = deps,
+            # pull out the kwargs
+            defines = kwargs.pop("defines", None),
+            **kwargs
+        )
+        deps.append(":" + name + "_srcs")
+
+        # only include the cc_library in the deps of the cc_shared_library. If
+        # we don't do this then the linker will error out with a duplicate
+        # symbols error.
+        shared_library_deps = [":" + name + "_srcs"]
+    else:
+        shared_library_deps = deps
+
+    cc_shared_library_name = name + "_cc_shared_library"
+    native.cc_shared_library(
+        name = cc_shared_library_name,
+        deps = shared_library_deps,
+        additional_linker_inputs = ["@fuchsia_sdk//fuchsia/private:driver.ld"],
+        user_link_flags = user_link_flags,
+        shared_lib_name = shared_lib_name,
+        features = kwargs.pop("features", []) + [
+            # Ensure that we are statically linking c++.
+            "static_cpp_standard_library",
+        ],
+        visibility = ["//visibility:private"],
+        **kwargs
+    )
 
     # To forward to fuchsia_wrap_cc_binary. If we don't do this here we end up
     # with duplicate entries in cc_binary which will cause a failure.
@@ -58,35 +96,11 @@ def fuchsia_cc_driver(name, srcs = [], output_name = None, deps = [], **kwargs):
     tags = kwargs.pop("tags", None)
     testonly = kwargs.pop("testonly", None)
 
-    # Ensure we are packaging the lib/libdriver_runtime.so
-    deps.append(
-        "@fuchsia_sdk//pkg/driver_runtime_shared_lib",
-    )
-
-    native.cc_binary(
-        name = name + "_cc_binary",
-        additional_linker_inputs = [
-            "@fuchsia_sdk//fuchsia/private:driver.ld",
-        ],
-        linkopts = linkopts,
-        linkshared = True,
-        srcs = srcs,
-        deps = deps,
-        features = kwargs.pop("features", []) + [
-            # Ensure that we are statically linking c++.
-            "static_cpp_standard_library",
-        ],
-        visibility = ["//visibility:private"],
-        testonly = testonly,
-        **kwargs
-    )
-
     fuchsia_wrap_cc_binary(
         name = name,
-        # Ensure that our bin_name ends in .so
-        bin_name = bin_name,
+        bin_name = shared_lib_name,
         install_root = "driver/",
-        cc_binary = ":{}_cc_binary".format(name),
+        cc_binary = ":{}".format(cc_shared_library_name),
         exact_cc_binary_deps = deps,
         # We do not want libc++ and libunwind packaged since they get statically linked.
         package_clang_dist_files = False,

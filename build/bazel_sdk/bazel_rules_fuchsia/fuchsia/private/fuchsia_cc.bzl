@@ -102,7 +102,7 @@ def _fuchsia_cc_impl(ctx):
     ]
 
 _fuchsia_cc_binary, _fuchsia_cc_test = rule_variants(
-    variants = ("executable", "test"),
+    variants = (None, "test"),
     implementation = _fuchsia_cc_impl,
     toolchains = ["@bazel_tools//tools/cpp:toolchain_type"],
     doc = """Attaches fuchsia-specific metadata to native cc_* targets.
@@ -122,7 +122,7 @@ _fuchsia_cc_binary, _fuchsia_cc_test = rule_variants(
         "native_target": attr.label(
             doc = "The underlying cc_* target.",
             mandatory = True,
-            providers = [[CcInfo, DefaultInfo]],
+            providers = [[CcInfo, DefaultInfo], [CcSharedLibraryInfo, DefaultInfo]],
         ),
         "clang_debug_symbols": attr.label(
             doc = "Clang debug symbols.",
