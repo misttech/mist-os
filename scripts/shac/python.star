@@ -5,7 +5,7 @@
 load("./common.star", "FORMATTER_MSG", "cipd_platform_name", "get_fuchsia_dir", "os_exec")
 
 def _pyfmt(ctx):
-    """Formats Python code using autoflake, isort and black on a Python code base.
+    """Formats Python code using Black and sorts imports using isort on a Python code base.
 
     Args:
       ctx: A ctx instance.
@@ -18,65 +18,35 @@ def _pyfmt(ctx):
     if not py_files:
         return
 
-    # Format tools make conflicting code style changes. To ensure consistent formatting:
-    # 1. Run Autoflake to remove unused imports and variables.
-    # 2. Run isort to sort imports on the autoflake formatted code.
-    # 3. Run black on the isort formatted code to enforce its code style guidelines.
+    # Isort and black make conflicting code style changes. To ensure consistent formatting:
+    # 1. Run isort to sort imports and apply its formatting rules.
+    # 2. Run black on the formatted code to enforce its code style guidelines.
     fuchsia_dir = get_fuchsia_dir(ctx)
-    platform = cipd_platform_name(ctx)
 
-    autoflake_cmd = [
-        "%s/prebuilt/third_party/python3/%s/bin/python3" % (
-            fuchsia_dir,
-            platform,
-        ),
-        "%s/third_party/pylibs/autoflake/main.py" % fuchsia_dir,
-        "--remove-unused-variables",
-        "--remove-all-unused-imports",
-        "--remove-duplicate-keys",
-        "--ignore-init-module-imports",
-        "--stdout",
-    ]
     isort_cmd = [
         "%s/prebuilt/third_party/python3/%s/bin/python3" % (
             fuchsia_dir,
-            platform,
+            cipd_platform_name(ctx),
         ),
         "%s/third_party/pylibs/isort/main.py" % fuchsia_dir,
-        # The skip flag is necessary to override the default autoflake behavior,
-        # which includes the "build/" directory in its skip section.
-        "--skip",
-        ".venvs",
         "--stdout",
-        "--filename",
     ]
+    isort_procs = [(f, os_exec(ctx, isort_cmd + [f])) for f in py_files]
+
     black_cmd = [
         "%s/prebuilt/third_party/black/%s/black" % (
             fuchsia_dir,
-            platform,
+            cipd_platform_name(ctx),
         ),
         "--config",
         "%s/pyproject.toml" % fuchsia_dir,
         "-",
     ]
-
-    # Run autoflake on each file
-    autoflake_procs = [(f, os_exec(ctx, autoflake_cmd + [f])) for f in py_files]
-
-    # Run isort on the output of the autoflake.
-    isort_procs = []
-    for f, proc in autoflake_procs:
-        formatted = proc.wait().stdout
-        isort_procs.append(
-            (f, os_exec(ctx, isort_cmd + [f, "-"], stdin = formatted)),
-        )
-
-    # Run black on the output of the isort.
     black_procs = []
-    for f, proc in isort_procs:
-        formatted = proc.wait().stdout
+    for filepath, proc in isort_procs:
+        isort_formatted = proc.wait().stdout
         black_procs.append(
-            (f, os_exec(ctx, black_cmd, stdin = formatted)),
+            (filepath, os_exec(ctx, black_cmd, stdin = isort_formatted)),
         )
 
     for filepath, proc in black_procs:
