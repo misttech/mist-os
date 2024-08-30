@@ -46,6 +46,7 @@ rustc_library("wlan-fullmac-mlme") {
     "src/device.rs",
     "src/lib.rs",
     "src/logger.rs",
+    "src/mlme_main_loop.rs",
     "src/wlan_fullmac_impl_ifc_request_handler.rs",
   ]
 }
