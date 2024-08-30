@@ -12,20 +12,11 @@
 #include <lib/stdcompat/span.h>
 #include <stdio.h>
 
-#include <algorithm>
 #include <memory>
-#include <random>
-#include <sstream>
-#include <string>
 #include <vector>
 
-#include <gtest/gtest.h>
-
-#include "algorithm.h"
-#include "ostream.h"  // Enables Range auto-stringification in gtest error messages
-
 //
-// Shared test utilities.
+// Some shared test utilities.
 //
 
 // PoolContext holds both a Pool and the memory that backs its bookkeeping.
@@ -39,53 +30,6 @@ struct PoolContext {
     return bookkeeping.back().get();
   });
 };
-
-inline std::string ToString(const memalloc::Range& range) {
-  std::stringstream ss;
-  ss << range;
-  return ss.str();
-}
-
-template <typename RangeIter>
-inline std::string ToString(RangeIter first, RangeIter last) {
-  std::string s;
-  for (auto it = first; it != last; ++it) {
-    s += "  " + ToString(*it) + "\n";
-  }
-  return s;
-}
-
-inline std::string ToString(const std::vector<memalloc::Range>& ranges) {
-  return ToString(ranges.begin(), ranges.end());
-}
-
-inline std::string ToString(const cpp20::span<const memalloc::Range>& ranges) {
-  return ToString(ranges.begin(), ranges.end());
-}
-
-template <size_t N>
-inline void Shuffle(memalloc::Range (&ranges)[N]) {
-  static std::default_random_engine engine{0xc0ffee};
-  std::shuffle(std::begin(ranges), std::end(ranges), engine);
-}
-
-inline void CompareRanges(cpp20::span<const memalloc::Range> expected,
-                          cpp20::span<const memalloc::Range> actual) {
-  EXPECT_EQ(expected.size(), actual.size());
-  size_t num_comparable = std::min(expected.size(), actual.size());
-  for (size_t i = 0; i < num_comparable; ++i) {
-    EXPECT_EQ(expected[i], actual[i]) << i;
-  }
-
-  if (expected.size() > num_comparable) {
-    printf("Unaccounted for expected ranges:\n%s",
-           ToString(expected.begin() + num_comparable, expected.end()).c_str());
-  }
-  if (actual.size() > num_comparable) {
-    printf("Unaccounted for actual ranges:\n%s",
-           ToString(actual.begin() + num_comparable, actual.end()).c_str());
-  }
-}
 
 inline cpp20::span<memalloc::Range> RangesFromBytes(const std::vector<std::byte>& bytes) {
   void* ptr = const_cast<void*>(static_cast<const void*>(bytes.data()));

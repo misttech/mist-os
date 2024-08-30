@@ -69,17 +69,14 @@ source_set("memalloc") {
   ]
   if (is_kernel) {
     deps += [ "//zircon/kernel/lib/libc" ]
-  } else {
-    sources += [ "ostream.cc" ]
   }
 }
 
-source_set("testing") {
+library_headers("testing") {
   testonly = true
+  headers = [ "lib/memalloc/testing/range.h" ]
   public_deps = [
-    ":memalloc",
-
-    # test.h has #include <gtest/gtest.h>.
+    ":range.headers",
     "//third_party/googletest:gtest",
   ]
 }

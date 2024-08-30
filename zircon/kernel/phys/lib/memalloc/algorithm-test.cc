@@ -7,16 +7,16 @@
 #include "algorithm.h"
 
 #include <lib/memalloc/range.h>
+#include <lib/memalloc/testing/range.h>
 #include <lib/stdcompat/span.h>
 #include <zircon/assert.h>
 
 #include <memory>
+#include <random>
 #include <string>
 #include <vector>
 
 #include <gtest/gtest.h>
-
-#include "test.h"
 
 namespace {
 
@@ -33,7 +33,7 @@ void TestFindNormalizedRamRanges(cpp20::span<memalloc::Range> input,
     actual.push_back(range);
     return true;
   });
-  ASSERT_NO_FATAL_FAILURE(CompareRanges(expected, {actual}));
+  ASSERT_NO_FATAL_FAILURE(memalloc::testing::CompareRanges(expected, {actual}));
 }
 
 void TestFindNormalizedRanges(cpp20::span<memalloc::Range> input,
@@ -47,7 +47,7 @@ void TestFindNormalizedRanges(cpp20::span<memalloc::Range> input,
                                                  return true;
                                                });
   ASSERT_FALSE(result.is_error());
-  ASSERT_NO_FATAL_FAILURE(CompareRanges(expected, {actual}));
+  ASSERT_NO_FATAL_FAILURE(memalloc::testing::CompareRanges(expected, {actual}));
 }
 
 void ExpectBadOverlap(cpp20::span<memalloc::Range> input) {
@@ -75,7 +75,7 @@ void TestRangeStream(cpp20::span<cpp20::span<memalloc::Range>> inputs,
   }
   EXPECT_EQ(actual.size(), stream.size());
   EXPECT_EQ(actual.empty(), stream.empty());
-  ASSERT_NO_FATAL_FAILURE(CompareRanges(expected, {actual}));
+  ASSERT_NO_FATAL_FAILURE(memalloc::testing::CompareRanges(expected, {actual}));
 
   // Repeated calls should yield nullptr.
   EXPECT_EQ(nullptr, stream());
@@ -90,7 +90,12 @@ void TestRangeStream(cpp20::span<cpp20::span<memalloc::Range>> inputs,
   }
   EXPECT_EQ(actual.size(), stream.size());
   EXPECT_EQ(actual.empty(), stream.empty());
-  ASSERT_NO_FATAL_FAILURE(CompareRanges(expected, {actual}));
+  ASSERT_NO_FATAL_FAILURE(memalloc::testing::CompareRanges(expected, {actual}));
+}
+
+void Shuffle(cpp20::span<memalloc::Range> ranges) {
+  static std::default_random_engine engine{0xc0ffee};
+  std::shuffle(ranges.begin(), ranges.end(), engine);
 }
 
 TEST(MemallocFindTests, NoRanges) {
