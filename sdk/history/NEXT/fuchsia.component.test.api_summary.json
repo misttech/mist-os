@@ -62,6 +62,18 @@
     },
     {
         "kind": "union/member",
+        "name": "fuchsia.component.test/Capability.resolver",
+        "ordinal": "9",
+        "type": "fuchsia.component.test/Resolver"
+    },
+    {
+        "kind": "union/member",
+        "name": "fuchsia.component.test/Capability.runner",
+        "ordinal": "10",
+        "type": "fuchsia.component.test/Runner"
+    },
+    {
+        "kind": "union/member",
         "name": "fuchsia.component.test/Capability.service",
         "ordinal": "4",
         "type": "fuchsia.component.test/Service"
@@ -883,6 +895,50 @@
     {
         "kind": "struct",
         "name": "fuchsia.component.test/Realm_GetRealmDecl_Response"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.component.test/Resolver.as",
+        "ordinal": "2",
+        "type": "string:255"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.component.test/Resolver.name",
+        "ordinal": "1",
+        "type": "string:255"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.component.test/Resolver.path",
+        "ordinal": "3",
+        "type": "string:4095"
+    },
+    {
+        "kind": "table",
+        "name": "fuchsia.component.test/Resolver"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.component.test/Runner.as",
+        "ordinal": "2",
+        "type": "string:255"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.component.test/Runner.name",
+        "ordinal": "1",
+        "type": "string:255"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.component.test/Runner.path",
+        "ordinal": "3",
+        "type": "string:4095"
+    },
+    {
+        "kind": "table",
+        "name": "fuchsia.component.test/Runner"
     },
     {
         "kind": "table/member",

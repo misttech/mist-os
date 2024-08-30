@@ -1248,6 +1248,12 @@ impl RealmNode2 {
                         }) => {
                             check_for_parent_target_error(availability)?;
                         }
+                        #[cfg(fuchsia_api_level_at_least = "NEXT")]
+                        ftest::Capability::Resolver(ftest::Resolver { .. })
+                        | ftest::Capability::Runner(ftest::Runner { .. }) => {
+                            // Resolver and Runner capabilities are always required so we do not
+                            // need to validate anything here.
+                        }
                         _ => {
                             return Err(RealmBuilderError::CapabilityInvalid(anyhow::format_err!(
                                 "unknown capability type",
@@ -1357,8 +1363,8 @@ async fn add_use_decl_if_needed(
 ) -> Result<(), RealmBuilderError> {
     #[cfg(fuchsia_api_level_at_least = "HEAD")]
     match capability {
-        // Dictionaries don't support Use.
-        ftest::Capability::Dictionary(_) => return Ok(()),
+        // Dictionaries and resolvers don't support Use.
+        ftest::Capability::Dictionary(_) | ftest::Capability::Resolver(_) => return Ok(()),
         _ => {}
     }
     if let fcdecl::Ref::Child(child) = ref_ {
@@ -1542,6 +1548,18 @@ fn create_capability_decl(
                 source_dictionary: None,
             })
         }
+        #[cfg(fuchsia_api_level_at_least = "NEXT")]
+        ftest::Capability::Resolver(resolver) => {
+            let name = try_into_source_name(&resolver.name)?;
+            let source_path = Some(try_into_service_path(&resolver.name, &resolver.path)?);
+            cm_rust::CapabilityDecl::Resolver(cm_rust::ResolverDecl { name, source_path })
+        }
+        #[cfg(fuchsia_api_level_at_least = "NEXT")]
+        ftest::Capability::Runner(runner) => {
+            let name = try_into_source_name(&runner.name)?;
+            let source_path = Some(try_into_service_path(&runner.name, &runner.path)?);
+            cm_rust::CapabilityDecl::Runner(cm_rust::RunnerDecl { name, source_path })
+        }
         _ => {
             return Err(RealmBuilderError::CapabilityInvalid(anyhow::format_err!(
                 "Encountered unsupported capability variant: {:?}.",
@@ -1686,6 +1704,36 @@ fn create_offer_decl(
                 availability,
             })
         }
+        #[cfg(fuchsia_api_level_at_least = "NEXT")]
+        ftest::Capability::Resolver(resolver) => {
+            let source_name = try_into_source_name(&resolver.name)?;
+            #[cfg(fuchsia_api_level_at_least = "HEAD")]
+            let source_dictionary = parse_relative_path(resolver.from_dictionary)?;
+            let target_name = try_into_target_name(&resolver.name, &resolver.as_)?;
+            cm_rust::OfferDecl::Resolver(cm_rust::OfferResolverDecl {
+                source,
+                source_name,
+                #[cfg(fuchsia_api_level_at_least = "HEAD")]
+                source_dictionary,
+                target,
+                target_name,
+            })
+        }
+        #[cfg(fuchsia_api_level_at_least = "NEXT")]
+        ftest::Capability::Runner(runner) => {
+            let source_name = try_into_source_name(&runner.name)?;
+            #[cfg(fuchsia_api_level_at_least = "HEAD")]
+            let source_dictionary = parse_relative_path(runner.from_dictionary)?;
+            let target_name = try_into_target_name(&runner.name, &runner.as_)?;
+            cm_rust::OfferDecl::Runner(cm_rust::OfferRunnerDecl {
+                source,
+                source_name,
+                #[cfg(fuchsia_api_level_at_least = "HEAD")]
+                source_dictionary,
+                target,
+                target_name,
+            })
+        }
         _ => {
             return Err(RealmBuilderError::CapabilityInvalid(anyhow::format_err!(
                 "Encountered unsupported capability variant: {:?}.",
@@ -1800,6 +1848,42 @@ fn create_expose_decl(
                 target: cm_rust::ExposeTarget::Parent,
                 target_name,
                 availability: cm_rust::Availability::Required,
+            })
+        }
+        #[cfg(fuchsia_api_level_at_least = "NEXT")]
+        ftest::Capability::Resolver(resolver) => {
+            let source_name = try_into_source_name(&resolver.name)?;
+            #[cfg(fuchsia_api_level_at_least = "HEAD")]
+            let source_dictionary = parse_relative_path(resolver.from_dictionary)?;
+            let target_name = match exposing_in {
+                ExposingIn::Child => try_into_source_name(&resolver.name)?,
+                ExposingIn::Realm => try_into_target_name(&resolver.name, &resolver.as_)?,
+            };
+            cm_rust::ExposeDecl::Resolver(cm_rust::ExposeResolverDecl {
+                source: source.clone(),
+                source_name,
+                #[cfg(fuchsia_api_level_at_least = "HEAD")]
+                source_dictionary,
+                target: cm_rust::ExposeTarget::Parent,
+                target_name,
+            })
+        }
+        #[cfg(fuchsia_api_level_at_least = "NEXT")]
+        ftest::Capability::Runner(runner) => {
+            let source_name = try_into_source_name(&runner.name)?;
+            #[cfg(fuchsia_api_level_at_least = "HEAD")]
+            let source_dictionary = parse_relative_path(runner.from_dictionary)?;
+            let target_name = match exposing_in {
+                ExposingIn::Child => try_into_source_name(&runner.name)?,
+                ExposingIn::Realm => try_into_target_name(&runner.name, &runner.as_)?,
+            };
+            cm_rust::ExposeDecl::Runner(cm_rust::ExposeRunnerDecl {
+                source: source.clone(),
+                source_name,
+                #[cfg(fuchsia_api_level_at_least = "HEAD")]
+                source_dictionary,
+                target: cm_rust::ExposeTarget::Parent,
+                target_name,
             })
         }
         _ => {
@@ -1926,6 +2010,19 @@ fn create_use_decl(capability: ftest::Capability) -> Result<cm_rust::UseDecl, Re
                 filter,
                 scope: event.scope.as_ref().cloned().map(FidlIntoNative::fidl_into_native),
                 availability: cm_rust::Availability::Required,
+            })
+        }
+        #[cfg(fuchsia_api_level_at_least = "HEAD")]
+        ftest::Capability::Runner(runner) => {
+            // If the capability was renamed in the parent's offer declaration, we want to use the
+            // post-rename version of it here.
+            let source_name = try_into_target_name(&runner.name, &runner.as_)?;
+            let source_dictionary = parse_relative_path(runner.from_dictionary)?;
+
+            cm_rust::UseDecl::Runner(cm_rust::UseRunnerDecl {
+                source: cm_rust::UseSource::Parent,
+                source_name,
+                source_dictionary,
             })
         }
         _ => {
