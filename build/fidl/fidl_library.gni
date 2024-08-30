@@ -84,6 +84,12 @@ template("fidl_library") {
   requires_compatibility_tests = is_sdk_included_publishable ||
                                  (defined(invoker.sdk_category) &&
                                   invoker.sdk_category == "partner_internal")
+  if (defined(invoker.versioned) && invoker.versioned == "unversioned") {
+    # Vendor SDK libraries are are `is_sdk_included_publishable` but  not in the
+    # "fuchsia" namespace and not intended to be compaitibility tested. They
+    # specify "unversioned" so that they can be excluded here.
+    requires_compatibility_tests = false
+  }
 
   stable = defined(invoker.stable) && invoker.stable
 
