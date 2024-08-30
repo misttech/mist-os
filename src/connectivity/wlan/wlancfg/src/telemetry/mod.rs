@@ -18,7 +18,7 @@ use fidl_fuchsia_metrics::{MetricEvent, MetricEventPayload};
 use fuchsia_async::{self as fasync, TimeoutExt};
 use fuchsia_inspect::{
     ArrayProperty, InspectType, Inspector, LazyNode, Node as InspectNode, NumericProperty,
-    UintProperty,
+    Property, UintProperty,
 };
 use fuchsia_inspect_contrib::auto_persist::{self, AutoPersist};
 use fuchsia_inspect_contrib::inspectable::{InspectableBool, InspectableU64};
@@ -1705,6 +1705,8 @@ struct StatsLogger {
     time_series_stats: Arc<Mutex<TimeSeriesStats>>,
     last_1d_stats: Arc<Mutex<WindowedStats<StatCounters>>>,
     last_7d_stats: Arc<Mutex<WindowedStats<StatCounters>>>,
+    last_successful_recovery: UintProperty,
+    successful_recoveries: UintProperty,
     /// Stats aggregated for each day and then logged into Cobalt.
     /// As these stats are more detailed than `last_1d_stats`, we do not track per-hour
     /// windowed stats in order to reduce space and heap allocation. Instead, these stats
@@ -1732,6 +1734,8 @@ impl StatsLogger {
         let time_series_stats = Arc::new(Mutex::new(TimeSeriesStats::new()));
         let last_1d_stats = Arc::new(Mutex::new(WindowedStats::new(24)));
         let last_7d_stats = Arc::new(Mutex::new(WindowedStats::new(7)));
+        let last_successful_recovery = inspect_node.create_uint("last_successful_recovery", 0);
+        let successful_recoveries = inspect_node.create_uint("successful_recoveries", 0);
         let _time_series_inspect_node = inspect_time_series::inspect_create_stats(
             inspect_node,
             "time_series",
@@ -1747,6 +1751,8 @@ impl StatsLogger {
             time_series_stats,
             last_1d_stats,
             last_7d_stats,
+            last_successful_recovery,
+            successful_recoveries,
             last_1d_detailed_stats: DailyDetailedStats::new(),
             stat_ops: vec![],
             hr_tick: 0,
@@ -3887,6 +3893,11 @@ impl StatsLogger {
                 1,
                 event_codes,
             ))
+        }
+
+        if outcome == RecoveryOutcome::Success {
+            self.last_successful_recovery.set(fasync::Time::now().into_nanos() as u64);
+            let _ = self.successful_recoveries.add(1);
         }
 
         match reason {
@@ -8301,6 +8312,7 @@ mod tests {
         dimensions: Vec<u32>,
     ) {
         let (mut test_helper, mut test_fut) = setup_test();
+        test_helper.exec.set_fake_time(fasync::Time::from_nanos(1));
 
         // Send the recovery event metric
         test_helper.telemetry_sender.send(recovery_event);
@@ -8323,6 +8335,24 @@ mod tests {
         assert_variant!(test_helper.advance_test_fut(&mut test_fut), Poll::Pending);
         let logged_metrics = test_helper.get_logged_metrics(expected_metric_id);
         assert!(logged_metrics.is_empty());
+
+        // If the recovery was successful, ensure that the last successful recovery time has been
+        // updated.  If it was not successful, the last recovery time should not have been changed.
+        if dimensions[0] == RecoveryOutcome::Success.as_event_code() {
+            assert_data_tree_with_respond_blocking_req!(test_helper, test_fut, root: contains {
+                stats: contains {
+                    last_successful_recovery: 1_u64,
+                    successful_recoveries: 1_u64
+                }
+            });
+        } else {
+            assert_data_tree_with_respond_blocking_req!(test_helper, test_fut, root: contains {
+                stats: contains {
+                    last_successful_recovery: 0_u64,
+                    successful_recoveries: 0_u64
+                }
+            });
+        }
     }
 
     #[test_case(

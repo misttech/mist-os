@@ -23,8 +23,14 @@
         disconnect_count_7d: "INSPECT:core/wlancfg:root/client_stats/7d_counters:disconnect_count",
         downtime_duration_7d: "INSPECT:core/wlancfg:root/client_stats/7d_counters:downtime_duration",
         downtime_no_saved_neighbor_duration_7d: "INSPECT:core/wlancfg:root/client_stats/7d_counters:downtime_no_saved_neighbor_duration",
+
+        // Recovery-related records
+        last_successful_recovery: "INSPECT:core/wlancfg:root/client_stats:last_successful_recovery",
+        successful_recoveries: "INSPECT:core/wlancfg:root/client_stats:successful_recoveries",
     },
     eval: {
+        last_24_hours: "Fn([time], time > Now() - Hours(24))",
+
         // Gauges for up to last 24 hours
         // Don't trigger from last-1d counters unless there has been at least 6 hours worth of data.
         enough_1d_counters_data: "total_duration_1d > Hours(6)",
@@ -128,6 +134,15 @@
             trigger: "And(disconnect_per_day_connected_ratio_7d > 3.0, enough_7d_counters_data)",
             repeat: "Hours(24)",
             signature: "high-disconnect-per-day-connected-ratio-weekly",
+        },
+
+        // Trigger a snapshot if a device has triggered recovery and recovery was successful in
+        // getting WLAN working again.
+        successful_wlan_recovery_attempt: {
+            type: "Snapshot",
+            trigger: "And(Apply(last_24_hours, [last_successful_recovery]), successful_recoveries > 0)",
+            repeat: "Hours(24)",
+            signature: "successful-wlan-recovery-intervention",
         },
     },
     test: {
@@ -539,6 +554,36 @@
 
                 // 2 days in nanoseconds
                 total_duration_7d: 1728e11,
+            },
+        },
+        successful_recent_recovery: {
+            yes: [
+                "successful_wlan_recovery_attempt",
+            ],
+            now: "Hours(0)",
+            values: {
+                last_successful_recovery: 0,
+                successful_recoveries: 1,
+            },
+        },
+        successful_recovery_is_too_old: {
+            no: [
+                "successful_wlan_recovery_attempt",
+            ],
+            now: "Hours(25)",
+            values: {
+                last_successful_recovery: 0,
+                successful_recoveries: 1,
+            },
+        },
+        no_successful_recoveries: {
+            no: [
+                "successful_wlan_recovery_attempt",
+            ],
+            now: "Hours(0)",
+            values: {
+                last_successful_recovery: 0,
+                successful_recoveries: 0,
             },
         },
     },
