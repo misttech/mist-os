@@ -6,6 +6,7 @@
 #define SRC_DEVELOPER_DEBUG_ZXDB_SYMBOLS_MOCK_LINE_TABLE_H_
 
 #include "src/developer/debug/zxdb/symbols/line_table.h"
+#include "src/developer/debug/zxdb/symbols/symbol.h"
 
 namespace zxdb {
 
@@ -25,6 +26,8 @@ class MockLineTable : public LineTable {
   std::optional<std::string> GetFileNameByIndex(uint64_t file_id) const override;
   LazySymbol GetFunctionForRow(const llvm::DWARFDebugLine::Row& row) const override;
 
+  void SetSymbolForRow(const llvm::DWARFDebugLine::Row& row, fxl::RefPtr<Symbol> symbol);
+
   // Helper to construct a line table row.
   //
   // Note that the |file| is a 1-based number (subtract 1 to index into file_names_).
@@ -41,6 +44,7 @@ class MockLineTable : public LineTable {
  private:
   FileNameVector file_names_;
   RowVector rows_;
+  std::map<uint64_t, fxl::RefPtr<Symbol>> fn_for_row_;
 };
 
 }  // namespace zxdb
