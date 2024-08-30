@@ -28,25 +28,6 @@ namespace fdecl = fuchsia_component_decl;
 namespace fio = fuchsia::io;
 namespace frunner = fuchsia_component_runner;
 
-void CallComponentStart(driver_runner::TestRealm& realm,
-                        driver_manager::DriverHostRunner& driver_host_runner,
-                        std::string_view driver_host_path,
-                        const std::vector<std::string_view> expected_libs);
-
-class TestTransaction : public fidl::Transaction {
- private:
-  std::unique_ptr<Transaction> TakeOwnership() override {
-    return std::make_unique<TestTransaction>();
-  }
-
-  zx_status_t Reply(fidl::OutgoingMessage* message, fidl::WriteOptions write_options) override {
-    EXPECT_TRUE(false);
-    return ZX_OK;
-  }
-
-  void Close(zx_status_t epitaph) override { EXPECT_TRUE(false); }
-};
-
 class DriverHostRunnerTest : public gtest::TestLoopFixture {
   void SetUp() {
     loader_ = driver_loader::Loader::Create();
@@ -111,8 +92,11 @@ void DriverHostRunnerTest::StartDriverHost(std::string_view driver_host_path,
   ASSERT_TRUE(RunLoopUntilIdle());
   ASSERT_TRUE(created_component);
 
-  ASSERT_NO_FATAL_FAILURE(
-      CallComponentStart(realm(), *driver_host_runner_, driver_host_path, expected_libs));
+  auto pkg_endpoints = fidl::Endpoints<fuchsia_io::Directory>::Create();
+  test_utils::TestPkg test_pkg(std::move(pkg_endpoints.server), driver_host_path,
+                               "bin/driver_host2", expected_libs);
+  ASSERT_NO_FATAL_FAILURE(driver_runner::DriverHostComponentStart(realm(), *driver_host_runner_,
+                                                                  std::move(pkg_endpoints.client)));
   ASSERT_TRUE(got_cb);
 
   std::unordered_set<const driver_manager::DriverHostRunner::DriverHost*> driver_hosts =
@@ -128,45 +112,6 @@ fidl::ClientEnd<fuchsia_component::Realm> DriverHostRunnerTest::ConnectToRealm()
   realm_binding_.emplace(dispatcher(), std::move(realm_endpoints.server), &realm_,
                          fidl::kIgnoreBindingClosure);
   return std::move(realm_endpoints.client);
-}
-
-void CallComponentStart(driver_runner::TestRealm& realm,
-                        driver_manager::DriverHostRunner& driver_host_runner,
-                        std::string_view driver_host_path,
-                        const std::vector<std::string_view> expected_libs) {
-  fidl::Arena arena;
-
-  fidl::VectorView<fdata::wire::DictionaryEntry> program_entries(arena, 1);
-  program_entries[0].key.Set(arena, "binary");
-  program_entries[0].value = fdata::wire::DictionaryValue::WithStr(arena, "bin/driver_host2");
-  auto program_builder = fdata::wire::Dictionary::Builder(arena);
-  program_builder.entries(program_entries);
-
-  auto pkg_endpoints = fidl::Endpoints<fuchsia_io::Directory>::Create();
-  test_utils::TestPkg test_pkg(std::move(pkg_endpoints.server), driver_host_path,
-                               "bin/driver_host2", expected_libs);
-
-  fidl::VectorView<frunner::wire::ComponentNamespaceEntry> ns_entries(arena, 1);
-  ns_entries[0] = frunner::wire::ComponentNamespaceEntry::Builder(arena)
-                      .path("/pkg")
-                      .directory(std::move(pkg_endpoints.client))
-                      .Build();
-
-  auto start_info_builder = frunner::wire::ComponentStartInfo::Builder(arena);
-  start_info_builder.resolved_url("fuchsia-boot:///driver_host2#meta/driver_host2.cm")
-      .program(program_builder.Build())
-      .ns(ns_entries)
-      .numbered_handles(realm.TakeHandles(arena));
-
-  auto controller_endpoints = fidl::Endpoints<frunner::ComponentController>::Create();
-  TestTransaction transaction;
-  {
-    fidl::WireServer<frunner::ComponentRunner>::StartCompleter::Sync completer(&transaction);
-    fidl::WireRequest<frunner::ComponentRunner::Start> request{
-        start_info_builder.Build(), std::move(controller_endpoints.server)};
-    static_cast<fidl::WireServer<frunner::ComponentRunner>&>(driver_host_runner)
-        .Start(&request, completer);
-  }
 }
 
 int64_t DriverHostRunnerTest::WaitForProcessExit(const zx::process& process) {
@@ -245,6 +190,11 @@ TEST_F(DynamicLinkingTest, StartRootDriver) {
                     "false" /* host_restart_on_crash */, "false" /* use_next_vdso */,
                     "true" /* use_dynamic_linker */);
   };
+
+  auto driver_host_pkg_endpoints = fidl::Endpoints<fuchsia_io::Directory>::Create();
+  test_utils::TestPkg driver_host_test_pkg(std::move(driver_host_pkg_endpoints.server),
+                                           kDriverHostTestPkgPath, "bin/driver_host2",
+                                           kDriverHostExpectedLibs);
   // TODO(https://fxbug.dev/341998660): currently starting the driver has not been
   // completely implemented, so the returned StartDriverResult is not very useful.
   [[maybe_unused]] auto root_driver = StartDriver(
@@ -253,11 +203,8 @@ TEST_F(DynamicLinkingTest, StartRootDriver) {
           .binary = kRootDriverBinary,
           .use_dynamic_linker = true,
       },
-      std::move(start_handler), std::move(pkg_endpoints.client));
-
-  ASSERT_NO_FATAL_FAILURE(CallComponentStart(realm(),
-                                             *driver_runner().driver_host_runner_for_tests(),
-                                             kDriverHostTestPkgPath, kDriverHostExpectedLibs));
+      std::move(start_handler), std::move(pkg_endpoints.client),
+      std::move(driver_host_pkg_endpoints.client));
 
   std::unordered_set<const driver_manager::DriverHostRunner::DriverHost*> driver_hosts =
       driver_runner().driver_host_runner_for_tests()->DriverHosts();
