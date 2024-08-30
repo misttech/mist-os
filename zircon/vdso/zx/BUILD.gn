@@ -12,8 +12,9 @@ fidl("zx") {
   ]
 
   sdk_category = "partner"
-  stable = true
   sdk_area = "Unknown"
+  versioned = "fuchsia"
+  stable = true
 
   api = "//sdk/fidl/zx/zx.api"
 

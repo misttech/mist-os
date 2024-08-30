@@ -67,8 +67,9 @@ template("fidl_library") {
   assert(defined(invoker.sources), "sources is required")
   assert(defined(invoker.library_name), "library_name is required")
   assert(defined(invoker.fidl_ir_json), "fidl_ir_json is required")
-  assert(!(defined(invoker.stable) && defined(invoker.versioned)),
-         "stable and versioned are mutually exclusive")
+  assert(!(defined(invoker.stable) && invoker.stable == false &&
+               defined(invoker.versioned)),
+         "`stable` must not be `false` when `versioned` is specified")
   assert(!defined(invoker.available) ||
              (defined(invoker.testonly) && invoker.testonly),
          "the `available` parameter is only allowed on `testonly` libraries")
