@@ -15,6 +15,7 @@ source_set("ldso") {
   configs -= [ "//build/config:symbol_visibility_hidden" ]
 
   deps = [
+    "//sdk/lib/ld:tlsdesc",
     "//zircon/kernel/lib/arch",
     "//zircon/third_party/ulib/musl:musl_internal",
   ]
