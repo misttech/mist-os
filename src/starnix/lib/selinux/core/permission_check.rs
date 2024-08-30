@@ -6,92 +6,87 @@ use super::access_vector_cache::{Fixed, Locked, Query, DEFAULT_SHARED_SIZE};
 use super::security_server::SecurityServer;
 use super::SecurityId;
 
-use selinux::policy::{AccessVector, AccessVectorComputer};
-use selinux::{AbstractObjectClass, ClassPermission, ObjectClass, Permission};
+use selinux::policy::AccessVectorComputer;
+use selinux::{ClassPermission, Permission};
 use std::sync::Weak;
 
-/// Private module for sealed traits with tightly controlled implementations.
-mod private {
-    /// Public super-trait to seal [`super::PermissionCheck`].
-    pub trait PermissionCheck {}
+/// Describes the result of a permission lookup between two Security Contexts.
+#[derive(Clone, Debug, PartialEq)]
+pub struct PermissionCheckResult {
+    /// True if the specified permissions should be permitted.
+    pub permit: bool,
+
+    /// True if details of the check should be audit logged. Audit logs are by default only output
+    /// when the policy defines that the permissions should be denied (whether or not the check is
+    /// "permissive"), but may be suppressed for some denials ("dontaudit"), or for some allowed
+    /// permissions ("auditallow").
+    pub audit: bool,
 }
 
-/// Extension of [`Query`] that integrates sealed `has_permission()` trait method.
-pub trait PermissionCheck: AccessVectorComputer + Query + private::PermissionCheck {
-    /// Returns true if and only if all `permissions` are granted to `source_sid` acting on
-    /// `target_sid` as a `target_class`.
-    ///
-    /// # Singleton trait implementation
-    ///
-    /// *Do not provide alternative implementations of this trait.* There must be one consistent
-    /// way of computing `has_permission()` in terms of `Query::query()`.
-    fn has_permission<P: ClassPermission + Into<Permission> + Clone + 'static>(
-        &self,
-        source_sid: SecurityId,
-        target_sid: SecurityId,
-        permission: P,
-    ) -> bool {
-        let target_class = permission.class();
-        let has_permission = if let Some(permission_access_vector) =
-            self.access_vector_from_permissions(&[permission])
-        {
-            let permitted_access_vector = self.query(source_sid, target_sid, target_class.into());
-            permission_access_vector & permitted_access_vector == permission_access_vector
-        } else {
-            false
-        };
-        if !has_permission {
-            // TODO(b/331375792): Failures should be audit-logged, even if permitted.
-            if !self.is_permissive(target_class) {
-                return false;
-            }
-        }
-        true
-    }
-}
-
-/// Every [`AccessVectorComputer`] + [`Query`] implements [`private::PermissionCheck`].
-impl<Q: AccessVectorComputer + Query> private::PermissionCheck for Q {}
-
-/// Every [`AccessVectorComputer`] + [`Query`] implements [`PermissionCheck`] *without overriding
-/// associated functions*.
-impl<Q: AccessVectorComputer + Query> PermissionCheck for Q {}
-
-pub struct PermissionCheckImpl<'a> {
+/// Implements the `has_permission()` API, based on supplied `Query` and `AccessVectorComputer`
+/// implementations.
+// TODO: https://fxbug.dev/362699811 - Revise the traits to avoid direct dependencies on `SecurityServer`.
+pub struct PermissionCheck<'a> {
     security_server: &'a SecurityServer,
     access_vector_cache: &'a Locked<Fixed<Weak<SecurityServer>, DEFAULT_SHARED_SIZE>>,
 }
 
-impl<'a> PermissionCheckImpl<'a> {
+impl<'a> PermissionCheck<'a> {
     pub(crate) fn new(
         security_server: &'a SecurityServer,
         access_vector_cache: &'a Locked<Fixed<Weak<SecurityServer>, DEFAULT_SHARED_SIZE>>,
     ) -> Self {
         Self { security_server, access_vector_cache }
     }
-}
 
-impl<'a> AccessVectorComputer for PermissionCheckImpl<'a> {
-    fn access_vector_from_permissions<P: ClassPermission + Into<Permission> + Clone + 'static>(
-        &self,
-        permissions: &[P],
-    ) -> Option<AccessVector> {
-        self.security_server.access_vector_from_permissions(permissions)
-    }
-
-    fn is_permissive(&self, class: ObjectClass) -> bool {
-        self.security_server.is_permissive(class)
-    }
-}
-
-impl<'a> Query for PermissionCheckImpl<'a> {
-    fn query(
+    /// Returns whether the `source_sid` has the specified `permission` on `target_sid`.
+    /// The result indicates both whether `permission` is `permit`ted, and whether the caller
+    /// should `audit` log the query.
+    pub fn has_permission<P: ClassPermission + Into<Permission> + Clone + 'static>(
         &self,
         source_sid: SecurityId,
         target_sid: SecurityId,
-        target_class: AbstractObjectClass,
-    ) -> AccessVector {
-        self.access_vector_cache.query(source_sid, target_sid, target_class)
+        permission: P,
+    ) -> PermissionCheckResult {
+        has_permission(
+            self.access_vector_cache,
+            self.security_server,
+            source_sid,
+            target_sid,
+            permission,
+        )
+    }
+
+    // TODO: https://fxbug.dev/362699811 - Remove this once `SecurityServer` APIs such as `sid_to_security_context()`
+    // are exposed via a trait rather than directly by that implementation.
+    pub fn security_server(&self) -> &SecurityServer {
+        self.security_server
+    }
+}
+
+/// Internal implementation of the `has_permission()` API, in terms of the `Query` and `AccessVectorComputer` traits.
+fn has_permission<P: ClassPermission + Into<Permission> + Clone + 'static>(
+    query: &impl Query,
+    access_vector_computer: &impl AccessVectorComputer,
+    source_sid: SecurityId,
+    target_sid: SecurityId,
+    permission: P,
+) -> PermissionCheckResult {
+    let target_class = permission.class();
+    let has_permission = if let Some(permission_access_vector) =
+        access_vector_computer.access_vector_from_permissions(&[permission])
+    {
+        let permitted_access_vector = query.query(source_sid, target_sid, target_class.into());
+        permission_access_vector & permitted_access_vector == permission_access_vector
+    } else {
+        false
+    };
+    // TODO: https://fxbug.dev/362706116 - Apply "dontaudit" and "auditallow" here.
+    let audit = !has_permission;
+    if has_permission {
+        PermissionCheckResult { permit: true, audit }
+    } else {
+        PermissionCheckResult { permit: access_vector_computer.is_permissive(target_class), audit }
     }
 }
 
@@ -102,7 +97,8 @@ mod tests {
 
     use once_cell::sync::Lazy;
     use selinux::policy::testing::{ACCESS_VECTOR_0001, ACCESS_VECTOR_0010};
-    use selinux::ProcessPermission;
+    use selinux::policy::AccessVector;
+    use selinux::{AbstractObjectClass, ObjectClass, ProcessPermission};
     use std::any::Any;
     use std::num::NonZeroU32;
     use std::sync::atomic::{AtomicU32, Ordering};
@@ -215,18 +211,14 @@ mod tests {
         for permission in &permissions {
             // DenyAllPermissions denies.
             assert_eq!(
-                false,
-                PermissionCheck::has_permission(
-                    &deny_all,
-                    *A_TEST_SID,
-                    *A_TEST_SID,
-                    permission.clone()
-                )
+                PermissionCheckResult { permit: false, audit: true },
+                has_permission(&deny_all, &deny_all, *A_TEST_SID, *A_TEST_SID, permission.clone())
             );
             // AllowAllPermissions allows.
             assert_eq!(
-                true,
-                PermissionCheck::has_permission(
+                PermissionCheckResult { permit: true, audit: false },
+                has_permission(
+                    &allow_all,
                     &allow_all,
                     *A_TEST_SID,
                     *A_TEST_SID,

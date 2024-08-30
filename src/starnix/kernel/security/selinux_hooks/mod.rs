@@ -13,10 +13,10 @@ use crate::vfs::{
 };
 use linux_uapi::XATTR_NAME_SELINUX;
 use selinux::{ClassPermission, InitialSid, Permission, ProcessPermission, SecurityPermission};
-use selinux_core::permission_check::PermissionCheck;
+use selinux_core::permission_check::{PermissionCheck, PermissionCheckResult};
 use selinux_core::security_server::SecurityServer;
 use selinux_core::SecurityId;
-use starnix_logging::track_stub;
+use starnix_logging::{log_warn, track_stub};
 use starnix_uapi::error;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::mount_flags::MountFlags;
@@ -30,7 +30,7 @@ const SECURITY_SELINUX_XATTR_VALUE_MAX_SIZE: usize = 4096;
 /// Checks if the task with `_source_sid` has the permission to mount at `_path` the object specified by
 /// `_dev_name` of type `_fs_type`, with the mounting flags `_flags` and filesystem data `_data`.
 pub(super) fn sb_mount(
-    _permission_check: &impl PermissionCheck,
+    _permission_check: &PermissionCheck<'_>,
     _current_task: &CurrentTask,
     _dev_name: &bstr::BStr,
     _path: &NamespaceNode,
@@ -45,7 +45,7 @@ pub(super) fn sb_mount(
 /// Checks if the task with `_source_sid` has the permission to unmount the filesystem mounted on
 /// `_node` using the unmount flags `_flags`.
 pub(super) fn sb_umount(
-    _permission_check: &impl PermissionCheck,
+    _permission_check: &PermissionCheck<'_>,
     _current_task: &CurrentTask,
     _node: &NamespaceNode,
     _flags: UnmountFlags,
@@ -219,26 +219,52 @@ fn fs_node_resolve_security_label(
     sid
 }
 
-/// Checks if `permissions` are allowed from the task with `source_sid` to the task with `target_sid`.
+/// Checks whether `source_sid` is allowed the specified `permission` on `target_sid`.
 fn check_permission<P: ClassPermission + Into<Permission> + Clone + 'static>(
-    permission_check: &impl PermissionCheck,
+    permission_check: &PermissionCheck<'_>,
     source_sid: SecurityId,
     target_sid: SecurityId,
-    permissions: P,
+    permission: P,
 ) -> Result<(), Errno> {
-    match permission_check.has_permission(source_sid, target_sid, permissions) {
-        true => Ok(()),
-        false => error!(EACCES),
+    let PermissionCheckResult { permit, audit } =
+        permission_check.has_permission(source_sid, target_sid, permission.clone());
+
+    if audit {
+        use bstr::BStr;
+
+        // TODO: https://fxbug.dev/362707360 - Add details to audit logging.
+        let result = if permit { "allowed" } else { "denied" };
+        let tclass = permission.class().name();
+        let permission_name = permission.into().name();
+        let security_server = permission_check.security_server();
+        let scontext = security_server
+            .sid_to_security_context(source_sid)
+            .unwrap_or_else(|| b"<invalid>".to_vec());
+        let scontext = BStr::new(&scontext);
+        let tcontext = security_server
+            .sid_to_security_context(target_sid)
+            .unwrap_or_else(|| b"<invalid>".to_vec());
+        let tcontext = BStr::new(&tcontext);
+
+        // See the SELinux Project's "AVC Audit Events" description (at
+        // https://selinuxproject.org/page/NB_AL) for details of the format and fields.
+        log_warn!("avc: {result} {{ {permission_name} }} scontext={scontext} tcontext={tcontext} tclass={tclass}");
+    }
+
+    if permit {
+        Ok(())
+    } else {
+        error!(EACCES)
     }
 }
 
-/// Checks that `subject_sid` has the specified process `permissions` on `self`.
+/// Checks that `subject_sid` has the specified process `permission` on `self`.
 fn check_self_permission(
-    permission_check: &impl PermissionCheck,
+    permission_check: &PermissionCheck<'_>,
     subject_sid: SecurityId,
-    permissions: ProcessPermission,
+    permission: ProcessPermission,
 ) -> Result<(), Errno> {
-    check_permission(permission_check, subject_sid, subject_sid, permissions)
+    check_permission(permission_check, subject_sid, subject_sid, permission)
 }
 
 /// Return security state to associate with a filesystem based on the supplied mount options.

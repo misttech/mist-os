@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::access_vector_cache::{Manager as AvcManager, Query, QueryMut};
-use crate::permission_check::{PermissionCheck, PermissionCheckImpl};
+use crate::permission_check::PermissionCheck;
 use crate::seq_lock::SeqLock;
 use crate::SecurityId;
 
@@ -182,8 +182,8 @@ impl SecurityServer {
 
     /// Converts a shared pointer to [`SecurityServer`] to a [`PermissionCheck`] without consuming
     /// the pointer.
-    pub fn as_permission_check<'a>(self: &'a Self) -> impl PermissionCheck + 'a {
-        PermissionCheckImpl::new(self, self.avc_manager.get_shared_cache())
+    pub fn as_permission_check<'a>(self: &'a Self) -> PermissionCheck<'a> {
+        PermissionCheck::new(self, self.avc_manager.get_shared_cache())
     }
 
     /// Returns the security ID mapped to `security_context`, creating it if it does not exist.
@@ -1059,28 +1059,28 @@ mod tests {
         let permission_check = security_server.as_permission_check();
 
         // Test policy allows "type0" the process getsched capability to "unlabeled_t".
-        assert!(permission_check.has_permission(
-            valid_sid,
-            unlabeled_sid,
-            ProcessPermission::GetSched
-        ));
-        assert!(!permission_check.has_permission(
-            valid_sid,
-            unlabeled_sid,
-            ProcessPermission::SetSched
-        ));
+        assert!(
+            permission_check
+                .has_permission(valid_sid, unlabeled_sid, ProcessPermission::GetSched)
+                .permit
+        );
+        assert!(
+            !permission_check
+                .has_permission(valid_sid, unlabeled_sid, ProcessPermission::SetSched)
+                .permit
+        );
 
         // Test policy allows "unlabeled_t" the process setsched capability to "type0".
-        assert!(!permission_check.has_permission(
-            unlabeled_sid,
-            valid_sid,
-            ProcessPermission::GetSched
-        ));
-        assert!(permission_check.has_permission(
-            unlabeled_sid,
-            valid_sid,
-            ProcessPermission::SetSched
-        ));
+        assert!(
+            !permission_check
+                .has_permission(unlabeled_sid, valid_sid, ProcessPermission::GetSched)
+                .permit
+        );
+        assert!(
+            permission_check
+                .has_permission(unlabeled_sid, valid_sid, ProcessPermission::SetSched)
+                .permit
+        );
     }
 
     #[fuchsia::test]
@@ -1094,11 +1094,11 @@ mod tests {
         let permission_check = security_server.as_permission_check();
 
         // Test policy grants "type0" the process-fork permission to itself.
-        assert!(permission_check.has_permission(sid, sid, ProcessPermission::Fork));
+        assert!(permission_check.has_permission(sid, sid, ProcessPermission::Fork).permit);
 
         // Test policy does not grant "type0" the process-getrlimit permission to itself, but
         // the security server is configured to be permissive.
-        assert!(permission_check.has_permission(sid, sid, ProcessPermission::GetRlimit));
+        assert!(permission_check.has_permission(sid, sid, ProcessPermission::GetRlimit).permit);
     }
 
     #[fuchsia::test]
@@ -1112,9 +1112,9 @@ mod tests {
         let permission_check = security_server.as_permission_check();
 
         // Test policy grants "type0" the process-fork permission to itself.
-        assert!(permission_check.has_permission(sid, sid, ProcessPermission::Fork));
+        assert!(permission_check.has_permission(sid, sid, ProcessPermission::Fork).permit);
 
         // Test policy does not grant "type0" the process-getrlimit permission to itself.
-        assert!(!permission_check.has_permission(sid, sid, ProcessPermission::GetRlimit));
+        assert!(!permission_check.has_permission(sid, sid, ProcessPermission::GetRlimit).permit);
     }
 }
