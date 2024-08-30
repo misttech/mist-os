@@ -13,10 +13,11 @@ namespace examples::drivers::metadata {
 // This driver demonstrates how to retrieve the metadata from its parent driver,
 // Forwarder. It implements the `fuchsia_examples_metadata::Retriever` protocol
 // for testing purposes.
-class Retriever final : public fdf::DriverBase,
-                        public fidl::Server<fuchsia_examples_metadata::Retriever> {
+class RetrieverDriver final : public fdf::DriverBase,
+                              public fidl::Server<fuchsia_examples_metadata::Retriever> {
  public:
-  Retriever(fdf::DriverStartArgs start_args, fdf::UnownedSynchronizedDispatcher driver_dispatcher)
+  RetrieverDriver(fdf::DriverStartArgs start_args,
+                  fdf::UnownedSynchronizedDispatcher driver_dispatcher)
       : DriverBase("child", std::move(start_args), std::move(driver_dispatcher)) {}
 
   zx::result<> Start() override {
@@ -75,7 +76,7 @@ class Retriever final : public fdf::DriverBase,
 
   // Used by tests in order to communicate with the driver.
   driver_devfs::Connector<fuchsia_examples_metadata::Retriever> devfs_connector_{
-      fit::bind_member<&Retriever::Serve>(this)};
+      fit::bind_member<&RetrieverDriver::Serve>(this)};
 
   fidl::ServerBindingGroup<fuchsia_examples_metadata::Retriever> bindings_;
   std::optional<fdf::OwnedChildNode> child_node_;
@@ -83,4 +84,4 @@ class Retriever final : public fdf::DriverBase,
 
 }  // namespace examples::drivers::metadata
 
-FUCHSIA_DRIVER_EXPORT(examples::drivers::metadata::Retriever);
+FUCHSIA_DRIVER_EXPORT(examples::drivers::metadata::RetrieverDriver);

@@ -12,14 +12,16 @@
 
 namespace examples::drivers::metadata {
 
-// This driver demonstrates how to send
-// `fuchsia.examples.metadata.Metadata` metadata to its children.
-// It implements `fuchsia_examples_metadata::Sender` protocol for testing.
-class Sender final : public fdf::DriverBase,
-                     public fidl::Server<fuchsia_examples_metadata::Sender> {
+// This driver demonstrates how it can forward the
+// `fuchsia.examples.metadata.Metadata` metadata from its parent
+// driver, `Sender`, to its children. It implements
+// `fuchsia_examples_metadata::Forwarder` protocol for testing.
+class ForwarderDriver final : public fdf::DriverBase,
+                              public fidl::Server<fuchsia_examples_metadata::Forwarder> {
  public:
-  Sender(fdf::DriverStartArgs start_args, fdf::UnownedSynchronizedDispatcher driver_dispatcher)
-      : DriverBase("sender", std::move(start_args), std::move(driver_dispatcher)) {}
+  ForwarderDriver(fdf::DriverStartArgs start_args,
+                  fdf::UnownedSynchronizedDispatcher driver_dispatcher)
+      : DriverBase("parent", std::move(start_args), std::move(driver_dispatcher)) {}
 
   zx::result<> Start() override {
     // Serve the metadata to the driver's child nodes.
@@ -29,32 +31,34 @@ class Sender final : public fdf::DriverBase,
       return zx::error(status);
     }
 
-    status = AddForwarderChild();
+    status = AddRetrieverChild();
     if (status != ZX_OK) {
-      FDF_SLOG(ERROR, "Failed to add forwarder child.", KV("status", zx_status_get_string(status)));
+      FDF_SLOG(ERROR, "Failed to add retriever child.", KV("status", zx_status_get_string(status)));
       return zx::error(status);
     }
 
     return zx::ok();
   }
 
-  // fuchsia.examples.metadata/Sender implementation.
-  void SetMetadata(SetMetadataRequest& request, SetMetadataCompleter::Sync& completer) override {
-    zx_status_t status = metadata_server_.SetMetadata(request.metadata());
+  // fuchsia.examples.metadata/Forwarder implementation.
+  void ForwardMetadata(ForwardMetadataCompleter::Sync& completer) override {
+    zx_status_t status = metadata_server_.ForwardMetadata(incoming());
     if (status != ZX_OK) {
-      FDF_SLOG(ERROR, "Failed to set metadata.", KV("status", zx_status_get_string(status)));
+      FDF_SLOG(ERROR, "Failed to forward metadata.", KV("status", zx_status_get_string(status)));
       completer.Reply(fit::error(status));
+      return;
     }
+
     completer.Reply(fit::ok());
   }
 
  private:
-  void Serve(fidl::ServerEnd<fuchsia_examples_metadata::Sender> request) {
+  void Serve(fidl::ServerEnd<fuchsia_examples_metadata::Forwarder> request) {
     bindings_.AddBinding(dispatcher(), std::move(request), this, fidl::kIgnoreBindingClosure);
   }
 
-  // Add a child node for the `forwarder` driver to bind to.
-  zx_status_t AddForwarderChild() {
+  // Add a child node for the `retriever` driver to bind to.
+  zx_status_t AddRetrieverChild() {
     ZX_ASSERT_MSG(!controller_.has_value(), "Already added child.");
 
     zx::result connector = devfs_connector_.Bind(dispatcher());
@@ -67,12 +71,12 @@ class Sender final : public fdf::DriverBase,
 
     static const std::vector<fuchsia_driver_framework::NodeProperty> kProperties{
         fdf::MakeProperty(bind_fuchsia_examples_metadata::CHILD_TYPE,
-                          bind_fuchsia_examples_metadata::CHILD_TYPE_FORWARDER)};
+                          bind_fuchsia_examples_metadata::CHILD_TYPE_RETRIEVER)};
 
     // Offer the metadata service to the child node.
     std::vector offers{metadata_server_.MakeOffer()};
 
-    zx::result controller = AddChild("sender", devfs_args, kProperties, offers);
+    zx::result controller = AddChild("forwarder", devfs_args, kProperties, offers);
     if (controller.is_error()) {
       FDF_SLOG(ERROR, "Failed to add child.", KV("status", controller.status_string()));
       return controller.error_value();
@@ -83,17 +87,17 @@ class Sender final : public fdf::DriverBase,
     return ZX_OK;
   }
 
-  // Responsible for serving metadata.
+  // Responsible for forwarding metadata.
   MetadataServer metadata_server_;
 
   // Used by tests in order to communicate with the driver via devfs.
-  driver_devfs::Connector<fuchsia_examples_metadata::Sender> devfs_connector_{
-      fit::bind_member<&Sender::Serve>(this)};
+  driver_devfs::Connector<fuchsia_examples_metadata::Forwarder> devfs_connector_{
+      fit::bind_member<&ForwarderDriver::Serve>(this)};
 
-  fidl::ServerBindingGroup<fuchsia_examples_metadata::Sender> bindings_;
+  fidl::ServerBindingGroup<fuchsia_examples_metadata::Forwarder> bindings_;
   std::optional<fidl::ClientEnd<fuchsia_driver_framework::NodeController>> controller_;
 };
 
 }  // namespace examples::drivers::metadata
 
-FUCHSIA_DRIVER_EXPORT(examples::drivers::metadata::Sender);
+FUCHSIA_DRIVER_EXPORT(examples::drivers::metadata::ForwarderDriver);

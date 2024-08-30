@@ -17,7 +17,7 @@ driver_bind_rules("bind") {
 fuchsia_driver("driver") {
   testonly = true
   output_name = "forwarder_driver"
-  sources = [ "forwarder.cc" ]
+  sources = [ "forwarder-driver.cc" ]
   deps = [
     "//examples/drivers/metadata:fuchsia_examples_metadata_bind_library_cpp",
     "//examples/drivers/metadata/fuchsia.examples.metadata:fuchsia.examples.metadata_cpp",
