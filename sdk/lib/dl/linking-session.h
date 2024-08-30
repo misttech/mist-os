@@ -83,11 +83,11 @@ class LinkingSession {
         return fit::error(true);
       }
 
-      if (auto result = module.Load(diag, *std::move(file))) {
+      if (module.Load(diag, *std::move(file))) {
         // Create and enqueue a module for each dependency from the Load result
         // so it can be processed and loaded in the future.
         auto enqueue_dep = [this, &diag](const Soname& name) { return EnqueueModule(diag, name); };
-        if (std::all_of(std::begin(*result), std::end(*result), enqueue_dep)) {
+        if (std::all_of(module.dep_names().begin(), module.dep_names().end(), enqueue_dep)) {
           return fit::ok();
         }
       }
@@ -238,17 +238,17 @@ class LinkingSession<Loader>::SessionModule
   }
 
   // Load `file` into the system image, decode phdrs and save the metadata in
-  // the the ABI module. Decode the module's dependencies (if any), and
-  // return a vector their so names.
+  // the the ABI module. The Soname objects of the module's DT_NEEDEDs are
+  // decoded and stored for later dependency traversal.
   template <class File>
-  std::optional<Vector<Soname>> Load(Diagnostics& diag, File&& file) {
+  bool Load(Diagnostics& diag, File&& file) {
     // Read the file header and program headers into stack buffers and map in
     // the image.  This fills in load_info() as well as the module vaddr bounds
     // and phdrs fields.
     Loader loader;
     auto headers = decoded().LoadFromFile(diag, loader, std::forward<File>(file));
     if (!headers) [[unlikely]] {
-      return std::nullopt;
+      return false;
     }
 
     Vector<size_type> needed_offsets;
@@ -258,7 +258,7 @@ class LinkingSession<Loader>::SessionModule
             diag, loader.memory(), loader.page_size(), *headers, max_tls_modid,
             elfldltl::DynamicRelocationInfoObserver(decoded().reloc_info()),
             NeededObserver(needed_offsets))) [[unlikely]] {
-      return std::nullopt;
+      return false;
     }
 
     // After successfully loading the file, finalize the module's mapping by
@@ -268,23 +268,23 @@ class LinkingSession<Loader>::SessionModule
 
     // TODO(https://fxbug.dev/324136435): The code that parses the names from
     // the symbol table be shared with <lib/ld/remote-decoded-module.h>.
-    if (Vector<Soname> needed_names;
-        needed_names.reserve(diag, kNeededError, needed_offsets.size())) [[likely]] {
-      for (size_type offset : needed_offsets) {
-        std::string_view name = this->symbol_info().string(offset);
-        if (name.empty()) [[unlikely]] {
-          diag.FormatError("DT_NEEDED has DT_STRTAB offset ", offset, " with DT_STRSZ ",
-                           this->symbol_info().strtab().size());
-          return std::nullopt;
-        }
-        if (!needed_names.push_back(diag, kNeededError, Soname{name})) [[unlikely]] {
-          return std::nullopt;
-        }
+    assert(dep_names_.is_empty());
+    if (!dep_names_.reserve(diag, kNeededError, needed_offsets.size())) [[unlikely]] {
+      return false;
+    }
+    for (size_type offset : needed_offsets) {
+      std::string_view name = this->symbol_info().string(offset);
+      if (name.empty()) [[unlikely]] {
+        diag.FormatError("DT_NEEDED has DT_STRTAB offset ", offset, " with DT_STRSZ ",
+                         this->symbol_info().strtab().size());
+        return false;
       }
-      return std::move(needed_names);
+      if (!dep_names_.push_back(diag, kNeededError, Soname{name})) [[unlikely]] {
+        return false;
+      }
     }
 
-    return std::nullopt;
+    return true;
   }
 
   // Perform relative and symbolic relocations, resolving symbols from the
@@ -301,6 +301,8 @@ class LinkingSession<Loader>::SessionModule
   // Apply relro protections. `relro_` cannot be used after this call.
   bool ProtectRelro(Diagnostics& diag) { return std::move(relro_).Commit(diag); }
 
+  const Vector<Soname>& dep_names() const { return dep_names_; }
+
  private:
   // A SessionModule can only be created with SessionModule::Create...).
   explicit SessionModule(RuntimeModule& runtime_module) : runtime_module_(runtime_module) {}
@@ -316,6 +318,10 @@ class LinkingSession<Loader>::SessionModule
   // The relro capability that is provided when the module is decoded and is
   // used to apply relro protections after the module is relocated.
   Relro relro_;
+
+  // The decoded Soname objects of the dependencies of this module, in the order
+  // that its corresponding DT_NEEDED offset appears in the dynamic phdr.
+  Vector<Soname> dep_names_;
 };
 
 }  // namespace dl
