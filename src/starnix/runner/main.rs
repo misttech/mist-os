@@ -127,16 +127,12 @@ async fn serve_starnix_manager(
                     }
                 };
 
-                let events = vec![wake_locks, wake_event];
-                let mut wait_items: Vec<zx::WaitItem<'_>> = events
-                    .iter()
-                    .flatten()
-                    .map(|e| zx::WaitItem {
-                        handle: e.as_handle_ref(),
-                        waitfor: zx::Signals::EVENT_SIGNALED,
-                        pending: zx::Signals::empty(),
-                    })
-                    .collect();
+                let mut wait_items: Vec<zx::WaitItem<'_>> =
+                    vec![wait_item_for(&wake_event), wait_item_for(&wake_locks)]
+                        .into_iter()
+                        .flatten()
+                        .collect();
+
                 let _ = zx::object_wait_many(
                     &mut wait_items,
                     // TODO: Remove the timeout once events are actually sent from the kernel.
@@ -152,6 +148,17 @@ async fn serve_starnix_manager(
         }
     }
     Ok(())
+}
+
+fn wait_item_for<'a, T>(event: &'a Option<T>) -> Option<zx::WaitItem<'a>>
+where
+    T: AsHandleRef,
+{
+    event.as_ref().map(|event| zx::WaitItem {
+        handle: event.as_handle_ref(),
+        waitfor: zx::Signals::EVENT_SIGNALED,
+        pending: zx::Signals::empty(),
+    })
 }
 
 async fn suspend_kernels(kernels: &Kernels, suspended_processes: &Mutex<Vec<zx::Handle>>) {
