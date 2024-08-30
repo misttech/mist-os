@@ -716,6 +716,10 @@ group("regex-syntax") {
   public_deps = [ ":regex-syntax-v0_8_3" ]
 }
 
+group("rend") {
+  public_deps = [ ":rend-v0_5_0-pre6" ]
+}
+
 group("ring") {
   public_deps = [ ":ring-v0_16_20" ]
 }
@@ -12272,6 +12276,34 @@ rust_library("remove_dir_all-v0_5_1") {
   visibility = [ ":*" ]
 
   applicable_licenses = [ ":remove_dir_all-v0_5_1.license" ]
+}
+
+license("rend-v0_5_0-pre6.license") {
+  public_package_name = "rend"
+  license_files = [ "//third_party/rust_crates/vendor/rend-0.5.0-pre6/LICENSE" ]
+}
+
+rust_library("rend-v0_5_0-pre6") {
+  crate_name = "rend"
+  crate_root = "//third_party/rust_crates/vendor/rend-0.5.0-pre6/src/lib.rs"
+  output_name = "rend-929feff604f4cad"
+  configs -= [ "//build/config/rust:2018_idioms" ]
+
+  deps = []
+
+  rustenv = []
+
+  rustflags = [
+    "--cap-lints=allow",
+    "--edition=2021",
+    "-Cmetadata=929feff604f4cad",
+    "-Cextra-filename=-929feff604f4cad",
+    "--cfg=feature=\"default\"",
+  ]
+
+  visibility = [ ":*" ]
+
+  applicable_licenses = [ ":rend-v0_5_0-pre6.license" ]
 }
 
 license("rfc6979-v0_3_1.license") {

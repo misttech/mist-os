@@ -1369,6 +1369,7 @@ dependencies = [
  "ref-cast",
  "regex",
  "regex-syntax 0.8.3",
+ "rend",
  "ring",
  "rust_icu_common",
  "rust_icu_sys",
@@ -3441,6 +3442,12 @@ checksum = "3488ba1b9a2084d38645c4c08276a1752dcbf2c7130d74f1569681ad5d2799c5"
 dependencies = [
  "winapi",
 ]
+
+[[package]]
+name = "rend"
+version = "0.5.0-pre6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7f02fc3227b019649985d2f89e254e345f027cc58af7bbf5faa4f3f7271bc4cc"
 
 [[package]]
 name = "rfc6979"
