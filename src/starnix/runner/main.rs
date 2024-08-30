@@ -96,7 +96,56 @@ async fn serve_starnix_manager(
     while let Some(event) = stream.try_next().await? {
         match event {
             fstarnixrunner::ManagerRequest::Suspend { responder, .. } => {
-                suspend_kernels(kernels, &suspended_processes, responder).await
+                suspend_kernels(kernels, &suspended_processes).await;
+                if let Err(e) = responder.send() {
+                    warn!("error replying to suspend request: {e}");
+                }
+            }
+            fstarnixrunner::ManagerRequest::SuspendContainer { payload, responder, .. } => {
+                let Some(container_job) = payload.container_job else {
+                    if let Err(e) =
+                        responder.send(Err(fstarnixrunner::SuspendError::SuspendFailure))
+                    {
+                        warn!("error responding to suspend request {:?}", e);
+                    }
+                    continue;
+                };
+
+                let (wake_locks, wake_event) = (payload.wake_locks, payload.wake_event);
+                // These handles need to kept alive until the end of the block, as they will
+                // resume the kernel when dropped.
+                let _suspend_handles = match suspend_kernel(&container_job).await {
+                    Ok(handles) => handles,
+                    Err(e) => {
+                        warn!("error suspending container {:?}", e);
+                        if let Err(e) =
+                            responder.send(Err(fstarnixrunner::SuspendError::SuspendFailure))
+                        {
+                            warn!("error responding to suspend request {:?}", e);
+                        }
+                        continue;
+                    }
+                };
+
+                let events = vec![wake_locks, wake_event];
+                let mut wait_items: Vec<zx::WaitItem<'_>> = events
+                    .iter()
+                    .flatten()
+                    .map(|e| zx::WaitItem {
+                        handle: e.as_handle_ref(),
+                        waitfor: zx::Signals::EVENT_SIGNALED,
+                        pending: zx::Signals::empty(),
+                    })
+                    .collect();
+                let _ = zx::object_wait_many(
+                    &mut wait_items,
+                    // TODO: Remove the timeout once events are actually sent from the kernel.
+                    zx::MonotonicTime::after(zx::Duration::from_millis(5000)),
+                );
+
+                if let Err(e) = responder.send(Ok(())) {
+                    warn!("error responding to suspend request {:?}", e);
+                }
             }
             fstarnixrunner::ManagerRequest::Resume { .. } => resume_kernels(&suspended_processes),
             _ => {}
@@ -105,21 +154,16 @@ async fn serve_starnix_manager(
     Ok(())
 }
 
-async fn suspend_kernels(
-    kernels: &Kernels,
-    suspended_processes: &Mutex<Vec<zx::Handle>>,
-    responder: fstarnixrunner::ManagerSuspendResponder,
-) {
+async fn suspend_kernels(kernels: &Kernels, suspended_processes: &Mutex<Vec<zx::Handle>>) {
     fuchsia_trace::duration!(c"starnix_runner", c"suspend_kernels");
 
     debug!("suspending processes...");
     for job in kernels.all_jobs() {
-        suspended_processes.lock().append(&mut suspend_kernel(&job).await);
+        suspended_processes
+            .lock()
+            .append(&mut suspend_kernel(&job).await.expect("Failed to suspend kernel job"));
     }
     debug!("...done suspending processes");
-    if let Err(e) = responder.send() {
-        warn!("error replying to suspend request: {e}");
-    }
 }
 
 fn resume_kernels(suspended_processes: &Mutex<Vec<zx::Handle>>) {
@@ -149,7 +193,7 @@ async fn serve_attribution_provider(
 }
 
 /// Suspends `kernel` by suspending all the processes in the kernel's job.
-async fn suspend_kernel(kernel_job: &zx::Job) -> Vec<zx::Handle> {
+async fn suspend_kernel(kernel_job: &zx::Job) -> Result<Vec<zx::Handle>, Error> {
     let mut handles = std::collections::HashMap::<zx::Koid, zx::Handle>::new();
     loop {
         let process_koids = kernel_job.processes().expect("failed to get processes");
@@ -167,9 +211,19 @@ async fn suspend_kernel(kernel_job: &zx::Job) -> Vec<zx::Handle> {
                 kernel_job.get_child(&process_koid, zx::Rights::SAME_RIGHTS.bits())
             {
                 let process = zx::Process::from_handle(process_handle);
-                if let Ok(suspend_handle) = process.suspend() {
-                    handles.insert(process_koid, suspend_handle);
-                }
+                match process.suspend() {
+                    Ok(suspend_handle) => {
+                        handles.insert(process_koid, suspend_handle);
+                    }
+                    Err(zx::Status::BAD_STATE) => {
+                        // The process was already dead or dying, and thus can't be suspended.
+                        continue;
+                    }
+                    Err(e) => {
+                        tracing::warn!("Failed process suspension: {:?}", e);
+                        return Err(e.into());
+                    }
+                };
                 processes.push(process);
             }
         }
@@ -185,7 +239,10 @@ async fn suspend_kernel(kernel_job: &zx::Job) -> Vec<zx::Handle> {
                         zx::Signals::THREAD_SUSPENDED,
                         zx::MonotonicTime::after(zx::Duration::INFINITE),
                     ) {
-                        Err(e) => tracing::warn!("Error waiting for task suspension: {:?}", e),
+                        Err(e) => {
+                            tracing::warn!("Error waiting for task suspension: {:?}", e);
+                            return Err(e.into());
+                        }
                         _ => {}
                     }
                 }
@@ -197,5 +254,5 @@ async fn suspend_kernel(kernel_job: &zx::Job) -> Vec<zx::Handle> {
         }
     }
 
-    handles.into_values().collect()
+    Ok(handles.into_values().collect())
 }

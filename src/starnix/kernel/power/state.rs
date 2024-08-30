@@ -6,10 +6,16 @@ use crate::task::CurrentTask;
 use crate::vfs::{BytesFile, BytesFileOps, FsNodeOps};
 use fidl_fuchsia_power_broker::PowerLevel;
 use itertools::Itertools;
+#[cfg(not(feature = "wake_locks"))]
 use starnix_logging::log_warn;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::{errno, error};
 use std::borrow::Cow;
+
+#[cfg(feature = "wake_locks")]
+use fidl_fuchsia_starnix_runner as frunner;
+#[cfg(feature = "wake_locks")]
+use fuchsia_component::client::connect_to_protocol_sync;
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
 pub enum SuspendState {
@@ -90,7 +96,31 @@ impl BytesFileOps for PowerStateFile {
             return error!(EINVAL);
         }
         fuchsia_trace::duration!(c"power", c"starnix-sysfs:suspend");
-        power_manager.suspend(state).inspect_err(|e| log_warn!("Suspend failed: {e}"))?;
+        #[cfg(not(feature = "wake_locks"))]
+        {
+            power_manager.suspend(state).inspect_err(|e| log_warn!("Suspend failed: {e}"))?;
+        }
+
+        #[cfg(feature = "wake_locks")]
+        {
+            let manager = connect_to_protocol_sync::<frunner::ManagerMarker>()
+                .expect("Failed to connect to manager");
+            let _ = manager
+                .suspend_container(
+                    frunner::ManagerSuspendContainerRequest {
+                        container_job: Some(
+                            fuchsia_runtime::job_default()
+                                .duplicate(fuchsia_zircon::Rights::SAME_RIGHTS)
+                                .expect("Failed to dup handle"),
+                        ),
+                        wake_event: None,
+                        wake_locks: None,
+                        ..Default::default()
+                    },
+                    fuchsia_zircon::Time::INFINITE,
+                )
+                .expect("Failed to suspend container.");
+        }
         Ok(())
     }
 
