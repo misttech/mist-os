@@ -123,14 +123,6 @@
             availability: "optional",
         },
         {
-            // TODO(https://fxbug.dev/42059306) delete once launched by tiles-session
-            protocol: [
-                "fuchsia.developer.tiles.Controller.flatland",
-                "fuchsia.ui.app.ViewProvider",
-            ],
-            availability: "optional",
-        },
-        {
             protocol: "fuchsia.weave.FactoryDataManager",
             availability: "optional",
         },

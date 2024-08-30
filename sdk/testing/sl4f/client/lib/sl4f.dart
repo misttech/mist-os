@@ -16,7 +16,6 @@ export 'src/dump.dart';
 export 'src/exceptions.dart';
 export 'src/factory_store.dart';
 export 'src/feedback_data_provider.dart';
-export 'src/flatland_example.dart';
 export 'src/input.dart';
 export 'src/inspect.dart';
 export 'src/media_session.dart';
