@@ -82,10 +82,14 @@ std::vector<char*> GetFfxArgV(const std::filesystem::path& ffx_test_data_path,
   // In infra, this environment variable is populated with the device that's been assigned to the
   // infra bot. Locally, a user can also set this to point to a specific device if they choose, but
   // `fx set-device` will also work just as well.
-  char* device_addr = std::getenv(kFuchsiaDeviceSshAddr.data());
-  if (device_addr) {
+  std::string device_addr = std::getenv(kFuchsiaDeviceSshAddr.data());
+  if (!device_addr.empty()) {
     ffx_args.push_back(const_cast<char*>("--target"));
-    ffx_args.push_back(device_addr);
+    if (auto port = std::getenv(kFuchsiaDeviceSshPort.data()); port != nullptr) {
+      device_addr.push_back(':');
+      device_addr.append(port);
+    }
+    ffx_args.push_back(strdup(device_addr.data()));
   }
   ffx_args.push_back(const_cast<char*>("--config"));
   std::string ffx_config_arg(kFfxCommonConfig);
