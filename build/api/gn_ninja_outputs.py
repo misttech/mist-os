@@ -272,7 +272,6 @@ class NinjaOutputsTabular(NinjaOutputsBase):
         return paths
 
     def path_to_gn_label(self, path: str) -> str:
-        labels = []
         lines = self._find_rows_containing_value(path.encode())
         for line in lines:
             items = line.split(b"\t")

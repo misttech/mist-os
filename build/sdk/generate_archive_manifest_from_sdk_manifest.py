@@ -9,7 +9,7 @@ import argparse
 import json
 import os
 import sys
-from typing import Any, Sequence
+from typing import Any
 
 try:
     # Python 3

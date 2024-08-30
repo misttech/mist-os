@@ -163,7 +163,6 @@ tests=tests.json
             self.assert_output(["print", module], expected)
 
     def test_print_all(self):
-        msg = "When printing all modules at once"
         expected = {
             "args": {
                 "file": "args.json",

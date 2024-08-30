@@ -7,7 +7,6 @@
 
 import dataclasses
 import unittest
-from pathlib import Path
 
 from file_access import FileAccess
 from gn_label import GnLabel

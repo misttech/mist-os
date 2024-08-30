@@ -8,12 +8,9 @@ import hashlib
 import json
 import logging
 import re
-from collections import defaultdict
 from pathlib import Path
 from typing import Any, Dict, List, Set
 from typing.re import Pattern as re_Pattern
-
-from gn_label import GnLabel
 
 
 @dataclasses.dataclass(frozen=True)

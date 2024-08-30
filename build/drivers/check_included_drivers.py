@@ -5,7 +5,6 @@
 """Check that all drivers included are in the driver allowlist."""
 
 import argparse
-import json
 import os
 
 

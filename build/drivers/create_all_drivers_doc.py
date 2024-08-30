@@ -6,7 +6,6 @@
 
 import argparse
 import json
-import os
 
 import yaml
 
@@ -38,7 +37,6 @@ def main():
     args = parser.parse_args()
 
     doc_list = args.doc_list.read().splitlines()
-    output_name = os.path.realpath(args.output.name)
 
     all_drivers_doc_dict = {}
 
