@@ -102,11 +102,6 @@ zx_status_t Sherlock::Create(void* ctx, zx_device_t* parent) {
 
 int Sherlock::Start() {
   // Load protocol implementation drivers first.
-  if (SysmemInit() != ZX_OK) {
-    zxlogf(ERROR, "SysmemInit() failed");
-    return -1;
-  }
-
   if (I2cInit() != ZX_OK) {
     zxlogf(ERROR, "I2cInit() failed");
   }

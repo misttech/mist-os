@@ -55,7 +55,6 @@ fuchsia_driver("platform-bus-x86-driver") {
     "iommu-driver-tests.cc",
     "methods.cc",
     "power.cc",
-    "sysmem.cc",
     "x86-driver-tests.cc",
     "x86.cc",
     "x86.h",

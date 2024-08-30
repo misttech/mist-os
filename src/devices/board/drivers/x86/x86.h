@@ -79,8 +79,6 @@ class X86 : public DeviceType {
   X86& operator=(const X86&) = delete;
   X86& operator=(X86&&) = delete;
 
-  zx_status_t SysmemInit();
-
   zx_status_t GoldfishControlInit();
 
   // Register this instance with devmgr.

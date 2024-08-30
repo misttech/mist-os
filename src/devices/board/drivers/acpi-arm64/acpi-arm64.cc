@@ -67,14 +67,7 @@ void AcpiArm64::DdkInit(ddk::InitTxn txn) {
 
   auto dispatcher = fdf::Dispatcher::GetCurrent();
   async::PostTask(dispatcher->async_dispatcher(), [txn = std::move(txn), this]() mutable {
-    zx::result<> zx_status = SysmemInit();
-    if (zx_status.is_error()) {
-      zxlogf(ERROR, "Sysmem init failed: %s", zx_status.status_string());
-      txn.Reply(zx_status.status_value());
-      return;
-    }
-
-    zx_status = SmbiosInit();
+    zx::result<> zx_status = SmbiosInit();
     if (zx_status.is_error()) {
       zxlogf(ERROR, "SMBIOS init failed: %s", zx_status.status_string());
       txn.Reply(zx_status.status_value());

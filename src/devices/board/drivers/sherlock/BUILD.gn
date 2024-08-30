@@ -56,7 +56,6 @@ template("sherlock_driver") {
       "sherlock-sdio.cc",
       "sherlock-securemem.cc",
       "sherlock-spi.cc",
-      "sherlock-sysmem.cc",
       "sherlock-tee.cc",
       "sherlock-thermal.cc",
       "sherlock-thermistor.cc",

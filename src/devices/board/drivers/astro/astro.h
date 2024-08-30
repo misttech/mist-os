@@ -94,7 +94,6 @@ class Astro : public AstroType {
   zx_status_t SdioInit();
   zx_status_t SecureMemInit();
   zx_status_t Start();
-  zx_status_t SysmemInit();
   zx_status_t TeeInit();
   zx_status_t ThermalInit();
   zx_status_t ThermistorInit();

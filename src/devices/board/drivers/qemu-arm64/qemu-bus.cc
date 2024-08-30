@@ -33,12 +33,6 @@ int QemuArm64::Thread() {
     return thrd_error;
   }
 
-  status = SysmemInit();
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "%s: SysmemInit() failed %d", __func__, status);
-    return thrd_error;
-  }
-
   status = PciAdd();
   if (status != ZX_OK) {
     zxlogf(ERROR, "%s: PciAdd() failed %d", __func__, status);

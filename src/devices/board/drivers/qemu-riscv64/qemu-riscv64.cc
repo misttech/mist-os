@@ -40,13 +40,8 @@ void QemuRiscv64::SysinfoInit() {
 
 void QemuRiscv64::DdkInit(ddk::InitTxn txn) {
   SysinfoInit();
-  zx::result<> result = SysmemInit();
-  if (result.is_error()) {
-    zxlogf(ERROR, "Couldn't initialize sysmem: %s", result.status_string());
-    return txn.Reply(result.error_value());
-  }
 
-  result = RtcInit();
+  zx::result<> result = RtcInit();
   if (result.is_error()) {
     zxlogf(ERROR, "Couldn't initialize rtc: %s", result.status_string());
     return txn.Reply(result.error_value());

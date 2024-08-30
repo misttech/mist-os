@@ -99,13 +99,6 @@ static const fpbus::Node pl031_dev = []() {
 
 static int machina_start_thread(void* arg) {
   machina_board_t* bus = static_cast<machina_board_t*>(arg);
-  zx_status_t status;
-
-  status = machina_sysmem_init(bus);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "machina_board_bind machina_sysmem_init failed: %d", status);
-    return status;
-  }
 
   std::vector<fpbus::Bti> pci_btis = {
       {{
