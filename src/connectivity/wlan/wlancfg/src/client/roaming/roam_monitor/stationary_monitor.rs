@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::client::config_management::Credential;
 use crate::client::roaming::lib::*;
 use crate::client::roaming::roam_monitor::RoamMonitorApi;
 use crate::client::types;
@@ -35,16 +36,18 @@ pub struct StationaryMonitor {
 
 impl StationaryMonitor {
     pub fn new(
-        currently_fulfilled_connection: types::ConnectSelection,
-        signal: types::Signal,
+        ap_state: types::ApState,
+        network_identifier: types::NetworkIdentifier,
+        credential: Credential,
         telemetry_sender: TelemetrySender,
     ) -> Self {
-        // Calculate a connection quality score
         let connection_data = RoamingConnectionData::new(
-            currently_fulfilled_connection,
+            ap_state.clone(),
+            network_identifier,
+            credential,
             EwmaSignalData::new(
-                signal.rssi_dbm,
-                signal.snr_db,
+                ap_state.tracked.signal.rssi_dbm,
+                ap_state.tracked.signal.snr_db,
                 STATIONARY_ROAMING_EWMA_SMOOTHING_FACTOR,
             ),
         );
@@ -56,7 +59,7 @@ impl StationaryMonitor {
     fn handle_signal_report(
         &mut self,
         stats: fidl_internal::SignalReportIndication,
-    ) -> Result<bool, anyhow::Error> {
+    ) -> Result<RoamTriggerDataOutcome, anyhow::Error> {
         self.connection_data.signal_data.update_with_new_measurement(stats.rssi_dbm, stats.snr_db);
 
         // Update velocity with EWMA signal, to smooth out noise.
@@ -70,7 +73,7 @@ impl StationaryMonitor {
         let mut roam_reasons: Vec<RoamReason> = vec![];
         roam_reasons.append(&mut check_signal_thresholds(
             &self.connection_data.signal_data,
-            self.connection_data.currently_fulfilled_connection.target.bss.channel,
+            self.connection_data.ap_state.tracked.channel,
         ));
 
         let now = fasync::Time::now();
@@ -79,7 +82,7 @@ impl StationaryMonitor {
                 < self.connection_data.previous_roam_scan_data.time_prev_roam_scan
                     + MIN_TIME_BETWEEN_ROAM_SCANS
         {
-            return Ok(false);
+            return Ok(RoamTriggerDataOutcome::Noop);
         }
 
         let is_scan_old = now
@@ -99,14 +102,20 @@ impl StationaryMonitor {
             self.connection_data.previous_roam_scan_data.time_prev_roam_scan = fasync::Time::now();
             self.connection_data.previous_roam_scan_data.roam_reasons_prev_scan = roam_reasons;
             self.connection_data.previous_roam_scan_data.rssi_prev_roam_scan = rssi;
-            return Ok(true);
+            return Ok(RoamTriggerDataOutcome::RoamSearch(
+                self.connection_data.network_identifier.clone(),
+                self.connection_data.credential.clone(),
+            ));
         }
-        Ok(false)
+        Ok(RoamTriggerDataOutcome::Noop)
     }
 }
 
 impl RoamMonitorApi for StationaryMonitor {
-    fn should_roam_search(&mut self, data: RoamTriggerData) -> Result<bool, anyhow::Error> {
+    fn handle_roam_trigger_data(
+        &mut self,
+        data: RoamTriggerData,
+    ) -> Result<RoamTriggerDataOutcome, anyhow::Error> {
         match data {
             RoamTriggerData::SignalReportInd(stats) => self.handle_signal_report(stats),
         }
@@ -115,9 +124,7 @@ impl RoamMonitorApi for StationaryMonitor {
         &self,
         candidate: types::ScannedCandidate,
     ) -> Result<bool, anyhow::Error> {
-        if candidate.is_same_bss_security_and_credential(
-            &self.connection_data.currently_fulfilled_connection.target,
-        ) {
+        if candidate.bss.bssid == self.connection_data.ap_state.original().bssid {
             info!("Selected roam candidate is the currently connected candidate, ignoring");
             return Ok(false);
         }
@@ -136,10 +143,6 @@ impl RoamMonitorApi for StationaryMonitor {
             return Ok(false);
         }
         Ok(true)
-    }
-
-    fn get_roam_data(&self) -> Result<RoamingConnectionData, anyhow::Error> {
-        Ok(self.connection_data.clone())
     }
 }
 
@@ -167,7 +170,7 @@ fn check_signal_thresholds(
 mod test {
     use super::*;
     use crate::util::testing::{
-        generate_random_bss, generate_random_roaming_connection_data,
+        generate_random_bss, generate_random_password, generate_random_roaming_connection_data,
         generate_random_scanned_candidate,
     };
     use fidl_fuchsia_wlan_internal as fidl_internal;
@@ -274,21 +277,23 @@ mod test {
         // Advance the time so that we allow roam scanning,
         exec.set_fake_time(fasync::Time::after(fasync::Duration::from_hours(1)));
 
-        // Generate trigger data that won't change the above values, and send to should_roam_search
+        // Generate trigger data that won't change the above values, and send to handle_roam_trigger_data
         // method.
         let trigger_data =
             RoamTriggerData::SignalReportInd(fidl_internal::SignalReportIndication {
                 rssi_dbm: rssi,
                 snr_db: snr,
             });
-        let should_roam_search = test_values
+        let result = test_values
             .monitor
-            .should_roam_search(trigger_data)
+            .handle_roam_trigger_data(trigger_data)
             .expect("error handling roam trigger data");
 
         match test_case {
-            HandleSignalReportTriggerDataTestCase::GoodRssiAndSnr => assert!(!should_roam_search),
-            _ => assert!(should_roam_search),
+            HandleSignalReportTriggerDataTestCase::GoodRssiAndSnr => {
+                assert_variant!(result, RoamTriggerDataOutcome::Noop)
+            }
+            _ => assert_variant!(result, RoamTriggerDataOutcome::RoamSearch { .. }),
         }
     }
 
@@ -319,10 +324,13 @@ mod test {
         exec.set_fake_time(fasync::Time::after(fasync::Duration::from_hours(1)));
 
         // Send trigger data, and verify that we are told to roam search.
-        assert!(test_values
-            .monitor
-            .should_roam_search(trigger_data.clone())
-            .expect("error handling roam trigger data"));
+        assert_variant!(
+            test_values
+                .monitor
+                .handle_roam_trigger_data(trigger_data.clone())
+                .expect("error handling roam trigger data"),
+            RoamTriggerDataOutcome::RoamSearch { .. }
+        );
 
         // Advance the time less than the minimum between roam scans.
         exec.set_fake_time(fasync::Time::after(
@@ -338,19 +346,25 @@ mod test {
             });
 
         // Send trigger data, and verify that we aren't told to roam search because it is too soon.
-        assert!(!test_values
-            .monitor
-            .should_roam_search(trigger_data.clone())
-            .expect("error handling roam trigger data"));
+        assert_variant!(
+            test_values
+                .monitor
+                .handle_roam_trigger_data(trigger_data.clone())
+                .expect("error handling roam trigger data"),
+            RoamTriggerDataOutcome::Noop
+        );
 
         // Advance the time past the minimum time.
         exec.set_fake_time(fasync::Time::after(fasync::Duration::from_seconds(2)));
 
         // Verify that we now are told to roam scan search.
-        assert!(test_values
-            .monitor
-            .should_roam_search(trigger_data)
-            .expect("error handling roam trigger data"));
+        assert_variant!(
+            test_values
+                .monitor
+                .handle_roam_trigger_data(trigger_data.clone())
+                .expect("error handling roam trigger data"),
+            RoamTriggerDataOutcome::RoamSearch { .. }
+        );
     }
 
     #[fuchsia::test]
@@ -381,10 +395,13 @@ mod test {
         exec.set_fake_time(initial_time);
 
         // Send trigger data, and verify that we would be told to roam scan.
-        assert!(test_values
-            .monitor
-            .should_roam_search(trigger_data.clone())
-            .expect("error handling roam trigger data"));
+        assert_variant!(
+            test_values
+                .monitor
+                .handle_roam_trigger_data(trigger_data.clone())
+                .expect("error handling roam trigger data"),
+            RoamTriggerDataOutcome::RoamSearch { .. }
+        );
 
         // Advance the time so its past the minimum between roam scans, but not the time between
         // scans if there are no other changes.
@@ -394,10 +411,13 @@ mod test {
 
         // Send identical trigger data, and verify that we don't scan, because the RSSI is unchanged,
         // the roam reasons are unchanged, and the last scan is too recent.
-        assert!(!test_values
-            .monitor
-            .should_roam_search(trigger_data.clone())
-            .expect("error handling roam trigger data"));
+        assert_variant!(
+            test_values
+                .monitor
+                .handle_roam_trigger_data(trigger_data.clone())
+                .expect("error handling roam trigger data"),
+            RoamTriggerDataOutcome::Noop
+        );
     }
 
     #[fuchsia::test]
@@ -428,10 +448,13 @@ mod test {
         exec.set_fake_time(initial_time);
 
         // Send trigger data, and verify that we would be told to roam scan.
-        assert!(test_values
-            .monitor
-            .should_roam_search(trigger_data.clone())
-            .expect("error handling roam trigger data"));
+        assert_variant!(
+            test_values
+                .monitor
+                .handle_roam_trigger_data(trigger_data.clone())
+                .expect("error handling roam trigger data"),
+            RoamTriggerDataOutcome::RoamSearch { .. }
+        );
 
         // Advance the time so its past the time between roam scans, even if no change.
         exec.set_fake_time(
@@ -440,10 +463,13 @@ mod test {
 
         // Send trigger data, and verify that we will now scan, despite no RSSI or roam reason
         // change, because the last scan is considered old.
-        assert!(test_values
-            .monitor
-            .should_roam_search(trigger_data.clone())
-            .expect("error handling roam trigger data"));
+        assert_variant!(
+            test_values
+                .monitor
+                .handle_roam_trigger_data(trigger_data.clone())
+                .expect("error handling roam trigger data"),
+            RoamTriggerDataOutcome::RoamSearch { .. }
+        );
     }
 
     #[fuchsia::test]
@@ -474,10 +500,13 @@ mod test {
         exec.set_fake_time(initial_time);
 
         // Send trigger data, and verify that we would be told to roam scan.
-        assert!(test_values
-            .monitor
-            .should_roam_search(trigger_data.clone())
-            .expect("error handling roam trigger data"));
+        assert_variant!(
+            test_values
+                .monitor
+                .handle_roam_trigger_data(trigger_data.clone())
+                .expect("error handling roam trigger data"),
+            RoamTriggerDataOutcome::RoamSearch { .. }
+        );
 
         // Advance the time so its past the minimum between roam scans.
         exec.set_fake_time(
@@ -493,10 +522,13 @@ mod test {
 
         // Send trigger data, and verify we will now scan, despite a recent scan and no new roam
         // reasons, because the RSSI is different.
-        assert!(test_values
-            .monitor
-            .should_roam_search(trigger_data.clone())
-            .expect("error handling roam trigger data"));
+        assert_variant!(
+            test_values
+                .monitor
+                .handle_roam_trigger_data(trigger_data.clone())
+                .expect("error handling roam trigger data"),
+            RoamTriggerDataOutcome::RoamSearch { .. }
+        );
     }
 
     #[fuchsia::test]
@@ -526,10 +558,13 @@ mod test {
         exec.set_fake_time(initial_time);
 
         // Send trigger data, and verify that we would be told to roam scan.
-        assert!(test_values
-            .monitor
-            .should_roam_search(trigger_data.clone())
-            .expect("error handling roam trigger data"));
+        assert_variant!(
+            test_values
+                .monitor
+                .handle_roam_trigger_data(trigger_data.clone())
+                .expect("error handling roam trigger data"),
+            RoamTriggerDataOutcome::RoamSearch { .. }
+        );
 
         // Advance the time so its past the minimum between roam scans.
         exec.set_fake_time(
@@ -545,10 +580,13 @@ mod test {
 
         // Send trigger data, and verify we will now scan, despite a recent scan and no RSSI change,
         // because the there is a new roam reason.
-        assert!(test_values
-            .monitor
-            .should_roam_search(trigger_data.clone())
-            .expect("error handling roam trigger data"));
+        assert_variant!(
+            test_values
+                .monitor
+                .handle_roam_trigger_data(trigger_data.clone())
+                .expect("error handling roam trigger data"),
+            RoamTriggerDataOutcome::RoamSearch { .. }
+        );
     }
 
     #[fuchsia::test]
@@ -617,15 +655,11 @@ mod test {
                     rssi_dbm: (current_rssi + MIN_RSSI_IMPROVEMENT_TO_ROAM + 1.0) as i8,
                     snr_db: (current_snr + MIN_SNR_IMPROVEMENT_TO_ROAM + 1.0) as i8,
                 },
-                ..test_values
-                    .monitor
-                    .connection_data
-                    .currently_fulfilled_connection
-                    .target
-                    .bss
-                    .clone()
+                bssid: test_values.monitor.connection_data.ap_state.original().bssid,
+                ..generate_random_bss()
             },
-            ..test_values.monitor.connection_data.currently_fulfilled_connection.target.clone()
+            credential: generate_random_password(),
+            ..generate_random_scanned_candidate()
         };
         assert!(!test_values
             .monitor
@@ -651,7 +685,7 @@ mod test {
             });
         let _ = test_values
             .monitor
-            .should_roam_search(trigger_data)
+            .handle_roam_trigger_data(trigger_data)
             .expect("error handling roam trigger data");
 
         assert_variant!(

@@ -10,6 +10,7 @@ use crate::util::pseudo_energy::EwmaSignalData;
 use ieee80211::{Bssid, MacAddrBytes, Ssid};
 use rand::distributions::{Alphanumeric, DistString};
 use rand::{Rng as _, RngCore};
+use wlan_common::bss::BssDescription;
 use wlan_common::channel::{Cbw, Channel};
 use wlan_common::random_fidl_bss_description;
 use wlan_common::scan::Compatibility;
@@ -132,6 +133,11 @@ pub fn generate_random_bss_with_compatibility() -> types::Bss {
         },
         ..generate_random_bss()
     }
+}
+
+pub fn generate_random_ap_state() -> types::ApState {
+    let bss_desc = BssDescription::try_from(random_fidl_bss_description!()).unwrap();
+    types::ApState::from(bss_desc)
 }
 
 pub fn generate_random_saved_network_data() -> types::InternalSavedNetworkData {
@@ -347,5 +353,10 @@ pub fn generate_random_ewma_signal_data() -> EwmaSignalData {
 }
 
 pub fn generate_random_roaming_connection_data() -> RoamingConnectionData {
-    RoamingConnectionData::new(generate_connect_selection(), generate_random_ewma_signal_data())
+    RoamingConnectionData::new(
+        generate_random_ap_state(),
+        generate_random_network_identifier(),
+        generate_random_password(),
+        generate_random_ewma_signal_data(),
+    )
 }

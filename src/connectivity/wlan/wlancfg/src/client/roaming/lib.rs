@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::client::config_management::Credential;
 use crate::client::types;
 use crate::util::pseudo_energy::{EwmaSignalData, RssiVelocity};
 use tracing::error;
@@ -55,25 +56,27 @@ impl From<String> for RoamingPolicy {
 #[derive(Clone)]
 #[cfg_attr(test, derive(Debug, PartialEq))]
 pub struct RoamingConnectionData {
-    // Information about the current connection, from the time of initial connection.
-    pub currently_fulfilled_connection: types::ConnectSelection,
-    // Tracked and updated throughout the connection.
+    pub ap_state: types::ApState,
+    pub network_identifier: types::NetworkIdentifier,
+    pub credential: Credential,
     pub signal_data: EwmaSignalData,
     pub rssi_velocity: RssiVelocity,
     pub previous_roam_scan_data: PreviousRoamScanData,
 }
 impl RoamingConnectionData {
     pub fn new(
-        currently_fulfilled_connection: types::ConnectSelection,
+        ap_state: types::ApState,
+        network_identifier: types::NetworkIdentifier,
+        credential: Credential,
         signal_data: EwmaSignalData,
     ) -> Self {
         Self {
-            currently_fulfilled_connection: currently_fulfilled_connection.clone(),
+            ap_state: ap_state.clone(),
+            network_identifier,
+            credential,
             signal_data,
             rssi_velocity: RssiVelocity::new(signal_data.ewma_rssi.get()),
-            previous_roam_scan_data: PreviousRoamScanData::new(
-                currently_fulfilled_connection.target.bss.signal.rssi_dbm,
-            ),
+            previous_roam_scan_data: PreviousRoamScanData::new(ap_state.tracked.signal.rssi_dbm),
         }
     }
 }
@@ -101,6 +104,14 @@ impl PreviousRoamScanData {
 #[derive(Clone, Debug)]
 pub enum RoamTriggerData {
     SignalReportInd(fidl_internal::SignalReportIndication),
+}
+
+// Actions that could be taken after handling new roam trigger data.
+#[derive(Clone)]
+#[cfg_attr(test, derive(Debug, PartialEq))]
+pub enum RoamTriggerDataOutcome {
+    Noop,
+    RoamSearch(types::NetworkIdentifier, Credential),
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]

@@ -3,14 +3,13 @@
 // found in the LICENSE file.
 #![cfg(test)]
 
-use crate::client::roaming::lib::{RoamTriggerData, RoamingConnectionData};
+use crate::client::roaming::lib::{RoamTriggerData, RoamTriggerDataOutcome};
 use crate::client::roaming::roam_monitor::RoamMonitorApi;
 use crate::client::{scan, types as client_types};
 use crate::config_management::{
     Credential, NetworkConfig, NetworkConfigError, NetworkIdentifier, PastConnectionData,
     PastConnectionList, SavedNetworksManagerApi,
 };
-use crate::util::testing::generate_random_roaming_connection_data;
 use async_trait::async_trait;
 use futures::channel::mpsc;
 use futures::lock::Mutex;
@@ -371,9 +370,8 @@ impl scan::ScanRequestApi for FakeScanRequester {
 #[derive(Clone)]
 pub struct FakeRoamMonitor {
     pub trigger_data_queue: VecDeque<RoamTriggerData>,
-    pub response_to_should_roam_scan: bool,
+    pub response_to_should_roam_scan: RoamTriggerDataOutcome,
     pub response_to_should_send_roam_request: bool,
-    pub response_to_get_roam_data: RoamingConnectionData,
 }
 
 impl Default for FakeRoamMonitor {
@@ -386,25 +384,24 @@ impl FakeRoamMonitor {
     pub fn new() -> Self {
         Self {
             trigger_data_queue: VecDeque::new(),
-            response_to_should_roam_scan: false,
+            response_to_should_roam_scan: RoamTriggerDataOutcome::Noop,
             response_to_should_send_roam_request: false,
-            response_to_get_roam_data: generate_random_roaming_connection_data(),
         }
     }
 }
 
 impl RoamMonitorApi for FakeRoamMonitor {
-    fn should_roam_search(&mut self, data: RoamTriggerData) -> Result<bool, anyhow::Error> {
+    fn handle_roam_trigger_data(
+        &mut self,
+        data: RoamTriggerData,
+    ) -> Result<RoamTriggerDataOutcome, anyhow::Error> {
         self.trigger_data_queue.push_back(data);
-        Ok(self.response_to_should_roam_scan)
+        Ok(self.response_to_should_roam_scan.clone())
     }
     fn should_send_roam_request(
         &self,
         _candidate: client_types::ScannedCandidate,
     ) -> Result<bool, anyhow::Error> {
         Ok(self.response_to_should_send_roam_request)
-    }
-    fn get_roam_data(&self) -> Result<RoamingConnectionData, anyhow::Error> {
-        Ok(self.response_to_get_roam_data.clone())
     }
 }

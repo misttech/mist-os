@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::client::config_management::Credential;
 use crate::client::connection_selection::ConnectionSelectionRequester;
 use crate::client::roaming::lib::*;
 use crate::client::roaming::roam_monitor;
@@ -18,15 +19,17 @@ use tracing::{debug, error};
 // Create a roam monitor implementation based on the roaming profile.
 fn create_roam_monitor(
     roaming_policy: RoamingPolicy,
-    currently_fulfilled_connection: types::ConnectSelection,
-    signal: types::Signal,
+    ap_state: types::ApState,
+    network_identifier: types::NetworkIdentifier,
+    credential: Credential,
     telemetry_sender: TelemetrySender,
 ) -> Box<dyn roam_monitor::RoamMonitorApi> {
     match roaming_policy {
         RoamingPolicy::Enabled { profile: RoamingProfile::Stationary, .. } => {
             Box::new(roam_monitor::stationary_monitor::StationaryMonitor::new(
-                currently_fulfilled_connection,
-                signal,
+                ap_state,
+                network_identifier,
+                credential,
                 telemetry_sender.clone(),
             ))
         }
@@ -40,8 +43,9 @@ fn create_roam_monitor(
 #[cfg_attr(test, derive(Debug))]
 pub enum RoamServiceRequest {
     InitializeRoamMonitor {
-        currently_fulfilled_connection: types::ConnectSelection,
-        signal: types::Signal,
+        ap_state: types::ApState,
+        network_identifier: types::NetworkIdentifier,
+        credential: Credential,
         roam_sender: mpsc::Sender<types::ScannedCandidate>,
         roam_trigger_data_receiver: mpsc::Receiver<RoamTriggerData>,
     },
@@ -60,8 +64,9 @@ impl RoamManager {
     // Create a roam monitor and return handles for passing trigger data and roam requests .
     pub fn initialize_roam_monitor(
         &mut self,
-        currently_fulfilled_connection: types::ConnectSelection,
-        signal: types::Signal,
+        ap_state: types::ApState,
+        network_identifier: types::NetworkIdentifier,
+        credential: Credential,
     ) -> (roam_monitor::RoamDataSender, mpsc::Receiver<types::ScannedCandidate>) {
         let (roam_sender, roam_receiver) = mpsc::channel(ROAMING_CHANNEL_BUFFER_SIZE);
         let (roam_trigger_data_sender, roam_trigger_data_receiver) =
@@ -69,8 +74,9 @@ impl RoamManager {
         let _ = self
             .sender
             .try_send(RoamServiceRequest::InitializeRoamMonitor {
-                currently_fulfilled_connection,
-                signal,
+                ap_state,
+                network_identifier,
+                credential,
                 roam_sender,
                 roam_trigger_data_receiver,
             })
@@ -98,9 +104,9 @@ pub async fn serve_local_roam_manager_requests(
             req = roam_service_request_receiver.select_next_some() => {
                 match req {
                     // Create and start a roam monitor future, passing in handles from caller. This
-                    // ensures that new data is initialized for every new called (e.g. connected_state).
-                    RoamServiceRequest::InitializeRoamMonitor { currently_fulfilled_connection, signal, roam_sender, roam_trigger_data_receiver }=> {
-                        let monitor = create_roam_monitor(roaming_policy, currently_fulfilled_connection, signal, telemetry_sender.clone());
+                    // ensures that new data is initialized for every new caller (e.g. connected_state).
+                    RoamServiceRequest::InitializeRoamMonitor { ap_state, network_identifier, credential, roam_sender, roam_trigger_data_receiver }=> {
+                        let monitor = create_roam_monitor(roaming_policy, ap_state, network_identifier, credential, telemetry_sender.clone());
                         let monitor_fut = roam_monitor::serve_roam_monitor(monitor, roam_trigger_data_receiver, connection_selection_requester.clone(), roam_sender.clone(), telemetry_sender.clone());
                         monitor_futs.push(Box::pin(monitor_fut));
                     }
@@ -119,7 +125,8 @@ mod tests {
     use super::*;
     use crate::telemetry::TelemetryEvent;
     use crate::util::testing::{
-        generate_connect_selection, generate_random_roaming_connection_data, generate_random_signal,
+        generate_random_ap_state, generate_random_network_identifier, generate_random_password,
+        generate_random_roaming_connection_data,
     };
     use fidl_fuchsia_wlan_internal::SignalReportIndication;
     use fuchsia_async::TestExecutor;
@@ -160,8 +167,9 @@ mod tests {
         let telemetry_sender = TelemetrySender::new(telemetry_sender);
         let monitor = create_roam_monitor(
             roaming_policy,
-            generate_connect_selection(),
-            generate_random_signal(),
+            generate_random_ap_state(),
+            generate_random_network_identifier(),
+            generate_random_password(),
             telemetry_sender.clone(),
         );
         match roaming_policy {
@@ -173,8 +181,9 @@ mod tests {
             RoamingPolicy::Enabled { profile: RoamingProfile::Stationary, .. } => {
                 let stationary_monitor: Box<dyn roam_monitor::RoamMonitorApi> =
                     Box::new(roam_monitor::stationary_monitor::StationaryMonitor::new(
-                        generate_connect_selection(),
-                        generate_random_signal(),
+                        generate_random_ap_state(),
+                        generate_random_network_identifier(),
+                        generate_random_password(),
                         telemetry_sender.clone(),
                     ));
 
@@ -200,11 +209,9 @@ mod tests {
         // Send a request to initialize a roam monitor
         let connection_data = generate_random_roaming_connection_data();
         let (mut roam_monitor_sender, _) = test_values.roam_manager.initialize_roam_monitor(
-            connection_data.currently_fulfilled_connection.clone(),
-            types::Signal {
-                rssi_dbm: connection_data.signal_data.ewma_rssi.get() as i8,
-                snr_db: connection_data.signal_data.ewma_snr.get() as i8,
-            },
+            connection_data.ap_state.clone(),
+            generate_random_network_identifier(),
+            generate_random_password(),
         );
 
         assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
@@ -233,11 +240,9 @@ mod tests {
         // Send a request to initialize a roam monitor
         let connection_data = generate_random_roaming_connection_data();
         let (mut roam_monitor_sender, _) = test_values.roam_manager.initialize_roam_monitor(
-            connection_data.currently_fulfilled_connection.clone(),
-            types::Signal {
-                rssi_dbm: connection_data.signal_data.ewma_rssi.get() as i8,
-                snr_db: connection_data.signal_data.ewma_snr.get() as i8,
-            },
+            connection_data.ap_state.clone(),
+            generate_random_network_identifier(),
+            generate_random_password(),
         );
 
         assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);

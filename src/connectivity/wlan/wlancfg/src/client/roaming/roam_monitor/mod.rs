@@ -2,8 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::client::config_management::Credential;
 use crate::client::connection_selection::ConnectionSelectionRequester;
-use crate::client::roaming::lib::{RoamTriggerData, RoamingConnectionData};
+use crate::client::roaming::lib::{RoamTriggerData, RoamTriggerDataOutcome};
 use crate::client::types;
 use crate::telemetry::{TelemetryEvent, TelemetrySender};
 use anyhow::{format_err, Error};
@@ -33,21 +34,21 @@ impl RoamDataSender {
         Ok(self.sender.try_send(RoamTriggerData::SignalReportInd(ind))?)
     }
 }
-
 /// Trait for creating different roam monitors based on roaming profiles.
 pub trait RoamMonitorApi: Send + Sync + Any {
-    // Handles trigger data and evaluates current state. Returns true if roam
-    // search is warranted. All roam monitors MUST handle all trigger data types, even if they take
-    // no action.
-    fn should_roam_search(&mut self, data: RoamTriggerData) -> Result<bool, anyhow::Error>;
+    // Handles trigger data and evaluates current state. Returns an outcome to be taken (e.g. if
+    // roam search is warranted). All roam monitors MUST handle all trigger data types, even if
+    // they always take no action.
+    fn handle_roam_trigger_data(
+        &mut self,
+        data: RoamTriggerData,
+    ) -> Result<RoamTriggerDataOutcome, anyhow::Error>;
     // Determines if the selected roam candidate is still relevant and provides enough potential
     // improvement to warrant a roam. Returns true if roam request should be sent to state machine.
     fn should_send_roam_request(
         &self,
         candidate: types::ScannedCandidate,
     ) -> Result<bool, anyhow::Error>;
-    // Returns tracked roam data, or error if data is not tracked by roam monitor.
-    fn get_roam_data(&self) -> Result<RoamingConnectionData, anyhow::Error>;
 }
 
 // Service loop that orchestrates interaction between state machine (incoming roam data and outgoing
@@ -66,23 +67,21 @@ pub async fn serve_roam_monitor(
 
     loop {
         select! {
-            // Handle incoming trigger data, queueing a roam search request if necessary.
+            // Handle incoming trigger data.
             trigger_data = trigger_data_receiver.next() => if let Some(data) = trigger_data {
-                if roam_monitor.should_roam_search(data).unwrap_or_else(|e| {
-                    error!("error handling roam trigger data: {}", e);
-                    false
-                }) {
-                    if let Ok(roam_data) = roam_monitor.get_roam_data() {
+                match roam_monitor.handle_roam_trigger_data(data) {
+                    Ok(RoamTriggerDataOutcome::RoamSearch(network_identifier, credential)) => {
                         telemetry_sender.send(TelemetryEvent::RoamingScan);
                         info!("Performing scan to find proactive local roaming candidates.");
                         let roam_search_fut = get_roaming_connection_selection_future(
                             connection_selection_requester.clone(),
-                            roam_data
+                            network_identifier.clone(),
+                            credential.clone(),
                         );
                         roam_search_result_futs.push(roam_search_fut.boxed());
-                    } else {
-                        error!("Unexpected error getting roam data");
-                    }
+                    },
+                    Ok(RoamTriggerDataOutcome::Noop) => {},
+                    Err(e) => error!("error handling roam trigger data: {}", e),
                 }
             },
             // Handle the result of a completed roam search, sending recommentation to roam if
@@ -118,15 +117,10 @@ pub async fn serve_roam_monitor(
 // to be queued and that can also return the initiating request.
 async fn get_roaming_connection_selection_future(
     mut connection_selection_requester: ConnectionSelectionRequester,
-    roaming_connection_data: RoamingConnectionData,
+    network_identifier: types::NetworkIdentifier,
+    credential: Credential,
 ) -> Result<types::ScannedCandidate, Error> {
-    match connection_selection_requester
-        .do_roam_selection(
-            roaming_connection_data.currently_fulfilled_connection.target.network.clone(),
-            roaming_connection_data.currently_fulfilled_connection.target.credential.clone(),
-        )
-        .await?
-    {
+    match connection_selection_requester.do_roam_selection(network_identifier, credential).await? {
         Some(candidate) => Ok(candidate),
         None => Err(format_err!("No roam candidates found.")),
     }
@@ -138,7 +132,10 @@ mod test {
     use crate::client::connection_selection::ConnectionSelectionRequest;
     use crate::telemetry::TelemetryEvent;
     use crate::util::testing::fakes::FakeRoamMonitor;
-    use crate::util::testing::generate_random_scanned_candidate;
+    use crate::util::testing::{
+        generate_random_network_identifier, generate_random_password,
+        generate_random_scanned_candidate,
+    };
     use fidl_fuchsia_wlan_internal as fidl_internal;
     use fuchsia_async::TestExecutor;
     use futures::pin_mut;
@@ -193,17 +190,17 @@ mod test {
         });
     }
 
-    #[test_case(false; "should not queue roam search")]
-    #[test_case(true; "should queue roam search")]
+    #[test_case(RoamTriggerDataOutcome::Noop; "should not queue roam search")]
+    #[test_case(RoamTriggerDataOutcome::RoamSearch(generate_random_network_identifier(), generate_random_password()); "should queue roam search")]
     #[fuchsia::test(add_test_attr = false)]
-    fn test_serve_loop_handles_trigger_data(response_to_should_roam_scan: bool) {
+    fn test_serve_loop_handles_trigger_data(response_to_should_roam_scan: RoamTriggerDataOutcome) {
         let mut exec = TestExecutor::new();
         let mut test_values = setup_test();
 
         // Create a fake roam monitor. Set the should_roam_scan response, so we can verify that the
         // serve loop forwarded the data and that the correct action was taken.
         let mut roam_monitor = FakeRoamMonitor::new();
-        roam_monitor.response_to_should_roam_scan = response_to_should_roam_scan;
+        roam_monitor.response_to_should_roam_scan = response_to_should_roam_scan.clone();
 
         // Start a serve loop with the fake roam monitor
         let serve_fut = serve_roam_monitor(
@@ -232,20 +229,26 @@ mod test {
         // Run loop forward.
         assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
 
-        if response_to_should_roam_scan {
-            // Verify metric was sent for upcoming roam scan
-            assert_variant!(
-                test_values.telemetry_receiver.try_next(),
-                Ok(Some(TelemetryEvent::RoamingScan))
-            );
-            // Verify that a roam search request was sent after monitor responded true.
-            assert_variant!(
-                test_values.connection_selection_request_receiver.try_next(),
-                Ok(Some(_))
-            );
-        } else {
-            // Verify that no roam search was triggered after monitor responded false.
-            assert_variant!(test_values.connection_selection_request_receiver.try_next(), Err(_));
+        match response_to_should_roam_scan {
+            RoamTriggerDataOutcome::RoamSearch(..) => {
+                // Verify metric was sent for upcoming roam scan
+                assert_variant!(
+                    test_values.telemetry_receiver.try_next(),
+                    Ok(Some(TelemetryEvent::RoamingScan))
+                );
+                // Verify that a roam search request was sent after monitor responded true.
+                assert_variant!(
+                    test_values.connection_selection_request_receiver.try_next(),
+                    Ok(Some(_))
+                );
+            }
+            RoamTriggerDataOutcome::Noop => {
+                // Verify that no roam search was triggered after monitor responded false.
+                assert_variant!(
+                    test_values.connection_selection_request_receiver.try_next(),
+                    Err(_)
+                );
+            }
         }
     }
 
@@ -259,7 +262,10 @@ mod test {
         // Create a fake roam monitor. Set should_roam_scan to true to ensure roam searches get
         // queued. Conditionally set the should_send_roam_request response.
         let mut roam_monitor = FakeRoamMonitor::new();
-        roam_monitor.response_to_should_roam_scan = true;
+        roam_monitor.response_to_should_roam_scan = RoamTriggerDataOutcome::RoamSearch(
+            generate_random_network_identifier(),
+            generate_random_password(),
+        );
         roam_monitor.response_to_should_send_roam_request = response_to_should_send_roam_request;
 
         // Start a serve loop with the fake roam monitor

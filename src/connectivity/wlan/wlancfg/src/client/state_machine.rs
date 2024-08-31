@@ -5,7 +5,7 @@
 use crate::client::roaming::local_roam_manager::RoamManager;
 use crate::client::roaming::roam_monitor::RoamDataSender;
 use crate::client::types;
-use crate::config_management::{PastConnectionData, SavedNetworksManagerApi};
+use crate::config_management::{Credential, PastConnectionData, SavedNetworksManagerApi};
 use crate::mode_management::{Defect, IfaceFailure};
 use crate::telemetry::{
     DisconnectInfo, TelemetryEvent, TelemetrySender, AVERAGE_SCORE_DELTA_MINIMUM_DURATION,
@@ -494,9 +494,11 @@ async fn connecting_state<'a>(
             info!("Successfully connected to network");
             let network_is_likely_hidden = common_options.network_is_likely_hidden(&options).await;
             let connected_options = ConnectedOptions {
-                currently_fulfilled_connection: options.connect_selection.clone(),
                 connect_txn_stream: connect_txn.take_event_stream(),
                 ap_state: Box::new(ap_state),
+                network_identifier: options.connect_selection.target.network.clone(),
+                credential: options.connect_selection.target.credential.clone(),
+                ess_connect_reason: options.connect_selection.reason,
                 multiple_bss_candidates: options.connect_selection.target.network_has_multiple_bss,
                 connection_attempt_time: start_time,
                 time_to_connect: fasync::Time::now() - start_time,
@@ -601,7 +603,9 @@ struct ConnectedOptions {
     // future network selection.
     ap_state: Box<types::ApState>,
     multiple_bss_candidates: bool,
-    currently_fulfilled_connection: types::ConnectSelection,
+    network_identifier: types::NetworkIdentifier,
+    credential: Credential,
+    ess_connect_reason: types::ConnectReason,
     connect_txn_stream: fidl_sme::ConnectTransactionEventStream,
     network_is_likely_hidden: bool,
     /// Time at which connect was first attempted, historical data for network scoring.
@@ -637,8 +641,9 @@ async fn connected_state(
     // Initialize roam monitor with roam manager service.
     let (mut roam_monitor_sender, mut roam_receiver) =
         common_options.roam_manager.initialize_roam_monitor(
-            options.currently_fulfilled_connection.clone(),
-            options.ap_state.tracked.signal,
+            (*options.ap_state).clone(),
+            options.network_identifier.clone(),
+            options.credential.clone(),
         );
 
     // Timer to log post-connection scores metrics.
@@ -726,7 +731,7 @@ async fn connected_state(
                                     connected_duration: now - connect_start_time,
                                     is_sme_reconnecting: false,
                                     disconnect_source,
-                                    previous_connect_reason: options.currently_fulfilled_connection.reason,
+                                    previous_connect_reason: options.ess_connect_reason,
                                     ap_state: (*options.ap_state).clone(),
                                     signals: past_signals.clone(),
                                 };
@@ -765,7 +770,7 @@ async fn connected_state(
                         let options = DisconnectingOptions {
                             disconnect_responder: None,
                             previous_network: Some((
-                                options.currently_fulfilled_connection.target.network.clone(),
+                                options.network_identifier.clone(),
                                 types::DisconnectStatus::ConnectionFailed
                             )),
                             next_network: None,
@@ -794,7 +799,7 @@ async fn connected_state(
                         let options = DisconnectingOptions {
                             disconnect_responder: Some(responder),
                             previous_network: Some((
-                                options.currently_fulfilled_connection.target.network.clone(),
+                                options.network_identifier.clone(),
                                 types::DisconnectStatus::ConnectionStopped
                             )),
                             next_network: None,
@@ -805,7 +810,7 @@ async fn connected_state(
                     Some(ManualRequest::Connect(new_connect_selection)) => {
                         // Check if it's the same network as we're currently connected to. If yes, reply immediately
                         if new_connect_selection.target.network
-                            == options.currently_fulfilled_connection.target.network {
+                            == options.network_identifier {
                             info!("Received connection request for current network, deduping");
                             continue
                         }
@@ -827,7 +832,7 @@ async fn connected_state(
                         let options = DisconnectingOptions {
                             disconnect_responder: None,
                             previous_network: Some((
-                                options.currently_fulfilled_connection.target.network,
+                                options.network_identifier,
                                 types::DisconnectStatus::ConnectionStopped
                             )),
                             next_network: Some(ConnectingOptions {
@@ -880,7 +885,7 @@ async fn notify_when_disconnect_detected(
         connected_duration: now - connect_start_time,
         is_sme_reconnecting: fidl_info.is_sme_reconnecting,
         disconnect_source: fidl_info.disconnect_source,
-        previous_connect_reason: options.currently_fulfilled_connection.reason,
+        previous_connect_reason: options.ess_connect_reason,
         ap_state: (*options.ap_state).clone(),
         signals: past_signals,
     };
@@ -922,11 +927,7 @@ async fn record_disconnect(
     );
     common_options
         .saved_networks_manager
-        .record_disconnect(
-            &options.currently_fulfilled_connection.target.network.clone(),
-            &options.currently_fulfilled_connection.target.credential,
-            data,
-        )
+        .record_disconnect(&options.network_identifier.clone(), &options.credential, data)
         .await;
 }
 
@@ -1003,7 +1004,7 @@ async fn notify_on_manual_disconnect(
             types::convert_to_sme_disconnect_reason(reason),
         ),
         ap_state: *options.ap_state.clone(),
-        previous_connect_reason: options.currently_fulfilled_connection.reason,
+        previous_connect_reason: options.ess_connect_reason,
         signals: past_signals,
     };
     common_options
@@ -1036,7 +1037,7 @@ async fn notify_on_manual_connect(
             types::convert_to_sme_disconnect_reason(reason),
         ),
         ap_state: *options.ap_state.clone(),
-        previous_connect_reason: options.currently_fulfilled_connection.reason,
+        previous_connect_reason: options.ess_connect_reason,
         signals: past_signals.clone(),
     };
     common_options
@@ -2013,9 +2014,11 @@ mod tests {
         let connection_attempt_time = fasync::Time::now();
         let time_to_connect = zx::Duration::from_seconds(10);
         let options = ConnectedOptions {
-            currently_fulfilled_connection: connect_selection.clone(),
             multiple_bss_candidates: connect_selection.target.network_has_multiple_bss,
             ap_state: Box::new(init_ap_state.clone()),
+            network_identifier: connect_selection.target.network.clone(),
+            credential: connect_selection.target.credential.clone(),
+            ess_connect_reason: connect_selection.reason,
             connect_txn_stream: connect_txn_proxy.take_event_stream(),
             network_is_likely_hidden: false,
             connection_attempt_time,
@@ -2162,9 +2165,11 @@ mod tests {
         let connection_attempt_time = fasync::Time::now();
         let time_to_connect = zx::Duration::from_seconds(10);
         let options = ConnectedOptions {
-            currently_fulfilled_connection: connect_selection.clone(),
             multiple_bss_candidates: connect_selection.target.network_has_multiple_bss,
             ap_state: Box::new(init_ap_state.clone()),
+            network_identifier: connect_selection.target.network.clone(),
+            credential: connect_selection.target.credential.clone(),
+            ess_connect_reason: connect_selection.reason,
             connect_txn_stream: connect_txn_proxy.take_event_stream(),
             network_is_likely_hidden: false,
             connection_attempt_time,
@@ -2252,8 +2257,10 @@ mod tests {
                 .expect("failed to create a connect txn channel");
         let connect_txn_handle = connect_txn_stream.control_handle();
         let options = ConnectedOptions {
-            currently_fulfilled_connection: connect_selection.clone(),
             ap_state: Box::new(ap_state.clone()),
+            network_identifier: connect_selection.target.network.clone(),
+            credential: connect_selection.target.credential.clone(),
+            ess_connect_reason: connect_selection.reason,
             multiple_bss_candidates: connect_selection.target.network_has_multiple_bss,
             connect_txn_stream: connect_txn_proxy.take_event_stream(),
             network_is_likely_hidden: false,
@@ -2448,8 +2455,10 @@ mod tests {
             create_proxy_and_stream::<fidl_sme::ConnectTransactionMarker>()
                 .expect("failed to create a connect txn channel");
         let options = ConnectedOptions {
-            currently_fulfilled_connection: connect_selection.clone(),
             ap_state: Box::new(ap_state.clone()),
+            network_identifier: connect_selection.target.network.clone(),
+            credential: connect_selection.target.credential.clone(),
+            ess_connect_reason: connect_selection.reason,
             multiple_bss_candidates: connect_selection.target.network_has_multiple_bss,
             connect_txn_stream: connect_txn_proxy.take_event_stream(),
             network_is_likely_hidden: false,
@@ -2500,8 +2509,10 @@ mod tests {
         let connection_attempt_time = fasync::Time::now();
         let time_to_connect = zx::Duration::from_seconds(10);
         let options = ConnectedOptions {
-            currently_fulfilled_connection: first_connect_selection.clone(),
             ap_state: Box::new(first_ap_state.clone()),
+            network_identifier: first_connect_selection.target.network.clone(),
+            credential: first_connect_selection.target.credential.clone(),
+            ess_connect_reason: first_connect_selection.reason,
             multiple_bss_candidates: first_connect_selection.target.network_has_multiple_bss,
             connect_txn_stream: connect_txn_proxy.take_event_stream(),
             network_is_likely_hidden: false,
@@ -2693,8 +2704,10 @@ mod tests {
                 .expect("failed to create a connect txn channel");
         let connect_txn_handle = connect_txn_stream.control_handle();
         let options = ConnectedOptions {
-            currently_fulfilled_connection: connect_selection.clone(),
             ap_state: Box::new(ap_state.clone()),
+            network_identifier: connect_selection.target.network.clone(),
+            credential: connect_selection.target.credential.clone(),
+            ess_connect_reason: connect_selection.reason,
             multiple_bss_candidates: connect_selection.target.network_has_multiple_bss,
             connect_txn_stream: connect_txn_proxy.take_event_stream(),
             network_is_likely_hidden: false,
@@ -2755,7 +2768,9 @@ mod tests {
                 .expect("failed to create a connect txn channel");
         let connect_txn_handle = connect_txn_stream.control_handle();
         let options = ConnectedOptions {
-            currently_fulfilled_connection: connect_selection.clone(),
+            network_identifier: connect_selection.target.network.clone(),
+            credential: connect_selection.target.credential.clone(),
+            ess_connect_reason: connect_selection.reason,
             ap_state: Box::new(ap_state.clone()),
             multiple_bss_candidates: connect_selection.target.network_has_multiple_bss,
             connect_txn_stream: connect_txn_proxy.take_event_stream(),
@@ -2812,7 +2827,9 @@ mod tests {
                 .expect("failed to create a connect txn channel");
         let connect_txn_handle = connect_txn_stream.control_handle();
         let options = ConnectedOptions {
-            currently_fulfilled_connection: connect_selection.clone(),
+            network_identifier: connect_selection.target.network.clone(),
+            credential: connect_selection.target.credential.clone(),
+            ess_connect_reason: connect_selection.reason,
             ap_state: Box::new(ap_state),
             multiple_bss_candidates: connect_selection.target.network_has_multiple_bss,
             connect_txn_stream: connect_txn_proxy.take_event_stream(),
@@ -2930,7 +2947,9 @@ mod tests {
             create_proxy_and_stream::<fidl_sme::ConnectTransactionMarker>()
                 .expect("failed to create a connect txn channel");
         let options = ConnectedOptions {
-            currently_fulfilled_connection: connect_selection.clone(),
+            network_identifier: connect_selection.target.network.clone(),
+            credential: connect_selection.target.credential.clone(),
+            ess_connect_reason: connect_selection.reason,
             ap_state: Box::new(ap_state.clone()),
             multiple_bss_candidates: connect_selection.target.network_has_multiple_bss,
             connect_txn_stream: connect_txn_proxy.take_event_stream(),
@@ -3029,7 +3048,9 @@ mod tests {
             create_proxy_and_stream::<fidl_sme::ConnectTransactionMarker>()
                 .expect("failed to create a connect txn channel");
         let options = ConnectedOptions {
-            currently_fulfilled_connection: connect_selection.clone(),
+            network_identifier: connect_selection.target.network.clone(),
+            credential: connect_selection.target.credential.clone(),
+            ess_connect_reason: connect_selection.reason,
             ap_state: Box::new(ap_state),
             multiple_bss_candidates: connect_selection.target.network_has_multiple_bss,
             connect_txn_stream: connect_txn_proxy.take_event_stream(),
