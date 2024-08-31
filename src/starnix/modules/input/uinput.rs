@@ -26,7 +26,7 @@ use starnix_uapi::errors::Errno;
 use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::user_address::UserRef;
 use starnix_uapi::{device_type, errno, error, uapi};
-use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::atomic::{AtomicI32, Ordering};
 use zerocopy::FromBytes;
 
 // Return the current uinput API version 5, it also told caller this uinput
@@ -310,14 +310,14 @@ impl UinputDevice {
 }
 
 // TODO(b/312467059): Remove once ESC -> Power workaround can be remove.
-static COUNT_OF_UINPUT_DEVICE: AtomicU32 = AtomicU32::new(0);
+static COUNT_OF_UINPUT_DEVICE: AtomicI32 = AtomicI32::new(0);
 
 fn new_device() {
     let _ = COUNT_OF_UINPUT_DEVICE.fetch_add(1, Ordering::SeqCst);
 }
 
 fn destroy_device() {
-    let _ = COUNT_OF_UINPUT_DEVICE.fetch_add(1, Ordering::SeqCst);
+    let _ = COUNT_OF_UINPUT_DEVICE.fetch_sub(1, Ordering::SeqCst);
 }
 
 pub fn uinput_running() -> bool {
