@@ -404,6 +404,7 @@ mod tests {
             bind_services: vec![],
             allow_serial_logs: vec![],
             deny_serial_log_tags: vec![],
+            component_initial_interests: vec![],
             per_component_batch_timeout_seconds: -1,
         };
 

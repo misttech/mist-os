@@ -22,6 +22,7 @@ default_config = {
   pipelines_path = "/config/data"
   allow_serial_logs = []
   deny_serial_log_tags = []
+  component_initial_interests = []
   per_component_batch_timeout_seconds = 10
 }
 

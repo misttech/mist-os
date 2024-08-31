@@ -48,6 +48,17 @@
             },
         },
 
+        // Instructs the archivist what log levels to send to components alongside their initial
+        // interest queries.
+        component_initial_interests: {
+            type: "vector",
+            max_count: 512,
+            element: {
+                type: "string",
+                max_size: 4096,
+            },
+        },
+
         // Instructs the archivist to not send logs containing any of these tags to serial even if
         // the component emitting these logs was configured to have its logs sent to serial.
         deny_serial_log_tags: {

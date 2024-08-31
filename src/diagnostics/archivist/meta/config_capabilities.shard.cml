@@ -44,6 +44,17 @@
             },
         },
         {
+            config: "fuchsia.diagnostics.ComponentInitialInterests",
+            key: "component_initial_interests",
+            availability: "optional",
+            type: "vector",
+            max_count: 512,
+            element: {
+                type: "string",
+                max_size: 4096,
+            },
+        },
+        {
             config: "fuchsia.diagnostics.DenySerialLogs",
             key: "deny_serial_log_tags",
             availability: "optional",
