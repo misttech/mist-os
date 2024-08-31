@@ -5,6 +5,8 @@
 use crate::task::CurrentTask;
 use crate::vfs::{BytesFile, BytesFileOps, FsNodeOps};
 use fidl_fuchsia_power_broker::PowerLevel;
+#[cfg(feature = "wake_locks")]
+use fuchsia_zircon as zx;
 use itertools::Itertools;
 #[cfg(not(feature = "wake_locks"))]
 use starnix_logging::log_warn;
@@ -110,16 +112,17 @@ impl BytesFileOps for PowerStateFile {
                     frunner::ManagerSuspendContainerRequest {
                         container_job: Some(
                             fuchsia_runtime::job_default()
-                                .duplicate(fuchsia_zircon::Rights::SAME_RIGHTS)
+                                .duplicate(zx::Rights::SAME_RIGHTS)
                                 .expect("Failed to dup handle"),
                         ),
-                        wake_event: None,
+                        wake_event: current_task.kernel().hrtimer_manager.duplicate_timer_event(),
                         wake_locks: None,
                         ..Default::default()
                     },
-                    fuchsia_zircon::Time::INFINITE,
+                    zx::Time::INFINITE,
                 )
                 .expect("Failed to suspend container.");
+            current_task.kernel().hrtimer_manager.reset_timer_event();
         }
         Ok(())
     }

@@ -64,6 +64,9 @@ pub struct HrTimerManager {
     device_proxy: Option<fhrtimer::DeviceSynchronousProxy>,
     resolution: fhrtimer::Resolution,
     state: Mutex<HrTimerManagerState>,
+
+    /// The event that is registered with hrtimer.
+    timer_event: Option<zx::Event>,
 }
 pub type HrTimerManagerHandle = Arc<HrTimerManager>;
 
@@ -84,9 +87,28 @@ struct HrTimerManagerState {
 impl HrTimerManager {
     pub fn new() -> HrTimerManagerHandle {
         let device_proxy = connect_to_hrtimer().ok();
+        let event = zx::Event::create();
+        let timer_event = event.duplicate_handle(zx::Rights::SAME_RIGHTS).ok();
+        device_proxy.as_ref().map(|d| {
+            d.set_event(HRTIMER_DEFAULT_ID, event, zx::MonotonicTime::INFINITE).expect("failed")
+        });
         let resolution = get_hrtimer_resolution(device_proxy.as_ref())
             .unwrap_or(fhrtimer::Resolution::Duration(0));
-        Arc::new(Self { device_proxy, resolution, state: Default::default() })
+        Arc::new(Self { device_proxy, resolution, state: Default::default(), timer_event })
+    }
+
+    /// Returns the event that is signaled hrtimer when timers trigger.
+    pub fn duplicate_timer_event(&self) -> Option<zx::Event> {
+        self.timer_event.as_ref().and_then(|e| e.duplicate_handle(zx::Rights::SAME_RIGHTS).ok())
+    }
+
+    /// Clears the `EVENT_SIGNALED` signal on the hrtimer event.
+    pub fn reset_timer_event(&self) {
+        if let Some(e) = self.timer_event.as_ref() {
+            e.as_handle_ref()
+                .signal(zx::Signals::EVENT_SIGNALED, zx::Signals::NONE)
+                .expect("Failed to clear signal on timer event");
+        }
     }
 
     fn lock(&self) -> MutexGuard<'_, HrTimerManagerState> {
@@ -431,6 +453,7 @@ mod tests {
             device_proxy: Some(proxy),
             resolution: fhrtimer::Resolution::Duration(10000),
             state: Default::default(),
+            timer_event: None,
         })
     }
 
