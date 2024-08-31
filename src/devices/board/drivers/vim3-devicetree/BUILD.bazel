@@ -51,7 +51,6 @@ fuchsia_package_resource_collection(
         "@internal_sdk//pkg/devicetree-regulator-visitor",
         "@internal_sdk//pkg/devicetree-sdmmc-visitor",
         "@internal_sdk//pkg/devicetree-serial-port-visitor",
-        "@internal_sdk//pkg/devicetree-sysmem-visitor",
         "@internal_sdk//pkg/devicetree-thermal-zones-visitor",
         "@internal_sdk//pkg/devicetree-usb-phy-visitor",
     ],

@@ -23,7 +23,6 @@ group("tests") {
     "regulator:tests",
     "serial:tests",
     "spi-controllers:tests",
-    "sysmem:tests",
     "thermal:tests",
     "usb:tests",
   ]
@@ -52,7 +51,6 @@ devicetree_visitor_collection("all-driver-visitors") {
     "//sdk/lib/driver/devicetree/visitors/drivers/regulator/regulator:regulator-visitor",
     "//sdk/lib/driver/devicetree/visitors/drivers/serial/serial-port:serial-port-visitor",
     "//sdk/lib/driver/devicetree/visitors/drivers/spi-controllers/spi-bus-visitor",
-    "//sdk/lib/driver/devicetree/visitors/drivers/sysmem:sysmem-visitor",
     "//sdk/lib/driver/devicetree/visitors/drivers/thermal/thermal-zones:thermal-zones-visitor",
     "//sdk/lib/driver/devicetree/visitors/drivers/usb/aml-usb-phy:aml-usb-phy-visitor",
     "//sdk/lib/driver/devicetree/visitors/drivers/usb/dwc2:dwc2-visitor",
