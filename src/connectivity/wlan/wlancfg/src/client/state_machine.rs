@@ -707,6 +707,13 @@ async fn connected_state(
                                 );
 
                                 *options.ap_state = ap_state;
+                                // Re-initialize roam monitor for new BSS
+                                (roam_monitor_sender, roam_receiver) =
+                                    common_options.roam_manager.initialize_roam_monitor(
+                                        (*options.ap_state).clone(),
+                                        options.network_identifier.clone(),
+                                        options.credential.clone(),
+                                    );
                                 info!("Roam succeeded");
                             }
                             common_options.telemetry_sender.send(TelemetryEvent::RoamResult {
@@ -760,6 +767,13 @@ async fn connected_state(
                         }
                         fidl_sme::ConnectTransactionEvent::OnChannelSwitched { info } => {
                             options.ap_state.tracked.channel.primary = info.new_channel;
+                            // Re-initialize roam monitor for new channel
+                            (roam_monitor_sender, roam_receiver) =
+                                common_options.roam_manager.initialize_roam_monitor(
+                                    (*options.ap_state).clone(),
+                                    options.network_identifier.clone(),
+                                    options.credential.clone(),
+                                );
                             notify_on_channel_switch(&common_options, &options, info);
                             false
                         }
@@ -1082,9 +1096,11 @@ mod tests {
     use fuchsia_zircon::prelude::*;
     use futures::task::Poll;
     use futures::Future;
+    use ieee80211::MacAddrBytes;
     use lazy_static::lazy_static;
+    use rand::Rng;
     use std::pin::pin;
-    use wlan_common::assert_variant;
+    use wlan_common::{assert_variant, random_fidl_bss_description};
     use wlan_metrics_registry::PolicyDisconnectionMigratedMetricDimensionReason;
 
     lazy_static! {
@@ -3069,7 +3085,9 @@ mod tests {
 
         // Verify roam monitor request was sent.
         assert_variant!(test_values.roam_service_request_receiver.try_next(), Ok(Some(request)) => {
-            assert_variant!(request, RoamServiceRequest::InitializeRoamMonitor { .. });
+            assert_variant!(request, RoamServiceRequest::InitializeRoamMonitor { ap_state, .. } => {
+                assert_eq!(ap_state.tracked.channel.primary, bss_description.channel.primary)
+            });
         });
 
         // Run the state machine
@@ -3088,6 +3106,13 @@ mod tests {
             });
         });
 
+        // Verify the roam monitor was re-initialized with the new channel
+        assert_variant!(test_values.roam_service_request_receiver.try_next(), Ok(Some(request)) => {
+            assert_variant!(request, RoamServiceRequest::InitializeRoamMonitor { ap_state, .. } => {
+                assert_eq!(ap_state.tracked.channel.primary, 10)
+            });
+        });
+
         // Have SME notify Policy of disconnection so we can see whether the channel in the
         // BssDescription has changed.
         let is_sme_reconnecting = false;
@@ -3103,6 +3128,228 @@ mod tests {
                 assert_eq!(info.ap_state.tracked.channel.primary, 10);
             });
         });
+    }
+
+    #[fuchsia::test]
+    fn connected_state_on_roam_result_success() {
+        let mut exec = fasync::TestExecutor::new_with_fake_time();
+        exec.set_fake_time(fasync::Time::from_nanos(0));
+
+        let mut test_values = test_setup();
+        let mut telemetry_receiver = test_values.telemetry_receiver;
+
+        let connect_selection = generate_connect_selection();
+        let bss_description =
+            Sequestered::release(connect_selection.target.bss.bss_description.clone());
+        let ap_state =
+            types::ApState::from(BssDescription::try_from(bss_description.clone()).unwrap());
+
+        // Set up the state machine, starting at the connected state.
+        let (connect_txn_proxy, connect_txn_stream) =
+            create_proxy_and_stream::<fidl_sme::ConnectTransactionMarker>()
+                .expect("failed to create a connect txn channel");
+        let options = ConnectedOptions {
+            network_identifier: connect_selection.target.network.clone(),
+            credential: connect_selection.target.credential.clone(),
+            ess_connect_reason: connect_selection.reason,
+            ap_state: Box::new(ap_state),
+            multiple_bss_candidates: connect_selection.target.network_has_multiple_bss,
+            connect_txn_stream: connect_txn_proxy.take_event_stream(),
+            network_is_likely_hidden: false,
+            connection_attempt_time: fasync::Time::now(),
+            time_to_connect: zx::Duration::from_seconds(10),
+        };
+        let initial_state = connected_state(test_values.common_options, options);
+
+        let connect_txn_handle = connect_txn_stream.control_handle();
+        let fut = run_state_machine(initial_state);
+        let mut fut = pin!(fut);
+
+        // Run the state machine
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+
+        // Verify roam monitor request was sent.
+        assert_variant!(test_values.roam_service_request_receiver.try_next(), Ok(Some(request)) => {
+            assert_variant!(request, RoamServiceRequest::InitializeRoamMonitor { .. });
+        });
+
+        // Send a successful roam result
+        let bss_desc = random_fidl_bss_description!();
+        let roam_result = fidl_sme::RoamResult {
+            bssid: [1, 1, 1, 1, 1, 1],
+            status_code: fidl_ieee80211::StatusCode::Success,
+            original_association_maintained: false,
+            bss_description: Some(Box::new(bss_desc.clone())),
+            disconnect_info: None,
+            is_credential_rejected: false,
+        };
+        connect_txn_handle.send_on_roam_result(&roam_result).expect("failed to send roam result");
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+
+        // Verify the roam monitor was re-initialized with the new BSS
+        assert_variant!(test_values.roam_service_request_receiver.try_next(), Ok(Some(request)) => {
+            assert_variant!(request, RoamServiceRequest::InitializeRoamMonitor { ap_state, .. } => {
+                assert_eq!(ap_state.original().bssid.to_array(), bss_desc.bssid);
+            });
+        });
+
+        // Verify telemetry event
+        assert_variant!(telemetry_receiver.try_next(), Ok(Some(event)) => {
+            assert_variant!(event, TelemetryEvent::RoamResult { result, .. } => {
+                assert_eq!(result, roam_result);
+            });
+        });
+    }
+
+    #[fuchsia::test]
+    fn connected_state_on_roam_result_failed_original_association_maintained() {
+        let mut exec = fasync::TestExecutor::new_with_fake_time();
+        exec.set_fake_time(fasync::Time::from_nanos(0));
+
+        let mut test_values = test_setup();
+        let mut telemetry_receiver = test_values.telemetry_receiver;
+
+        let connect_selection = generate_connect_selection();
+        let bss_description =
+            Sequestered::release(connect_selection.target.bss.bss_description.clone());
+        let ap_state =
+            types::ApState::from(BssDescription::try_from(bss_description.clone()).unwrap());
+
+        // Set up the state machine, starting at the connected state.
+        let (connect_txn_proxy, connect_txn_stream) =
+            create_proxy_and_stream::<fidl_sme::ConnectTransactionMarker>()
+                .expect("failed to create a connect txn channel");
+        let options = ConnectedOptions {
+            network_identifier: connect_selection.target.network.clone(),
+            credential: connect_selection.target.credential.clone(),
+            ess_connect_reason: connect_selection.reason,
+            ap_state: Box::new(ap_state),
+            multiple_bss_candidates: connect_selection.target.network_has_multiple_bss,
+            connect_txn_stream: connect_txn_proxy.take_event_stream(),
+            network_is_likely_hidden: false,
+            connection_attempt_time: fasync::Time::now(),
+            time_to_connect: zx::Duration::from_seconds(10),
+        };
+        let initial_state = connected_state(test_values.common_options, options);
+
+        let connect_txn_handle = connect_txn_stream.control_handle();
+        let fut = run_state_machine(initial_state);
+        let mut fut = pin!(fut);
+
+        // Run the state machine
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+
+        // Verify roam monitor request was sent.
+        assert_variant!(test_values.roam_service_request_receiver.try_next(), Ok(Some(request)) => {
+            assert_variant!(request, RoamServiceRequest::InitializeRoamMonitor { .. });
+        });
+
+        // Send a failed roam result, where the original association was maintained.
+        let roam_result = fidl_sme::RoamResult {
+            bssid: [1, 1, 1, 1, 1, 1],
+            status_code: fidl_ieee80211::StatusCode::JoinFailure,
+            original_association_maintained: true,
+            bss_description: Some(Box::new(bss_description.clone())),
+            disconnect_info: None,
+            is_credential_rejected: false,
+        };
+        connect_txn_handle.send_on_roam_result(&roam_result).expect("failed to send roam result");
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+
+        // Verify telemetry event
+        assert_variant!(telemetry_receiver.try_next(), Ok(Some(event)) => {
+            assert_variant!(event, TelemetryEvent::RoamResult { result, .. } => {
+                assert_eq!(result, roam_result);
+            });
+        });
+
+        // Verify the roam monitor was *NOT* re-initialized.
+        assert_variant!(test_values.roam_service_request_receiver.try_next(), Err(_));
+    }
+
+    #[fuchsia::test]
+    fn connected_state_on_roam_result_failed_and_disconnected() {
+        let mut exec = fasync::TestExecutor::new_with_fake_time();
+        exec.set_fake_time(fasync::Time::from_nanos(0));
+
+        let mut test_values = test_setup();
+        let mut telemetry_receiver = test_values.telemetry_receiver;
+        let sme_fut = test_values.sme_req_stream.into_future();
+        let mut sme_fut = pin!(sme_fut);
+
+        let connect_selection = generate_connect_selection();
+        let bss_description =
+            Sequestered::release(connect_selection.target.bss.bss_description.clone());
+        let ap_state =
+            types::ApState::from(BssDescription::try_from(bss_description.clone()).unwrap());
+
+        // Set up the state machine, starting at the connected state.
+        let (connect_txn_proxy, connect_txn_stream) =
+            create_proxy_and_stream::<fidl_sme::ConnectTransactionMarker>()
+                .expect("failed to create a connect txn channel");
+        let options = ConnectedOptions {
+            network_identifier: connect_selection.target.network.clone(),
+            credential: connect_selection.target.credential.clone(),
+            ess_connect_reason: connect_selection.reason,
+            ap_state: Box::new(ap_state),
+            multiple_bss_candidates: connect_selection.target.network_has_multiple_bss,
+            connect_txn_stream: connect_txn_proxy.take_event_stream(),
+            network_is_likely_hidden: false,
+            connection_attempt_time: fasync::Time::now(),
+            time_to_connect: zx::Duration::from_seconds(10),
+        };
+        let initial_state = connected_state(test_values.common_options, options);
+
+        let connect_txn_handle = connect_txn_stream.control_handle();
+        let fut = run_state_machine(initial_state);
+        let mut fut = pin!(fut);
+
+        // Run the state machine
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+
+        // Verify roam monitor request was sent.
+        assert_variant!(test_values.roam_service_request_receiver.try_next(), Ok(Some(request)) => {
+            assert_variant!(request, RoamServiceRequest::InitializeRoamMonitor { .. });
+        });
+
+        // Send a failed roam result, where the original association was *NOT* maintained.
+        let disconnect_info = fidl_sme::DisconnectInfo {
+            is_sme_reconnecting: false,
+            disconnect_source: fidl_sme::DisconnectSource::Ap(fidl_sme::DisconnectCause {
+                mlme_event_name: fidl_sme::DisconnectMlmeEventName::DisassociateIndication,
+                reason_code: fidl_ieee80211::ReasonCode::UnspecifiedReason,
+            }),
+        };
+        let roam_result = fidl_sme::RoamResult {
+            bssid: [1, 1, 1, 1, 1, 1],
+            status_code: fidl_ieee80211::StatusCode::JoinFailure,
+            original_association_maintained: false,
+            bss_description: None,
+            disconnect_info: Some(Box::new(disconnect_info)),
+            is_credential_rejected: false,
+        };
+        connect_txn_handle.send_on_roam_result(&roam_result).expect("failed to send roam result");
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+
+        // Verify telemetry event for roam result
+        assert_variant!(telemetry_receiver.try_next(), Ok(Some(event)) => {
+            assert_variant!(event, TelemetryEvent::RoamResult { result, .. } => {
+                assert_eq!(result, roam_result);
+            });
+        });
+
+        // Verify telemetry event for disconnect
+        assert_variant!(telemetry_receiver.try_next(), Ok(Some(event)) => {
+            assert_variant!(event, TelemetryEvent::Disconnected { info, .. } => {
+                assert_eq!(info.disconnect_source, disconnect_info.disconnect_source);
+            });
+        });
+
+        // Check for an SME disconnect request
+        assert_variant!(
+            poll_sme_req(&mut exec, &mut sme_fut),
+            Poll::Ready(fidl_sme::ClientSmeRequest::Disconnect { .. })
+        );
     }
 
     #[fuchsia::test]
