@@ -68,8 +68,13 @@ function diff_with() {
 }
 
 function json_diff() {
-  local diff_status=0
+  # format nicely using jq or jsonformat5
   diff_with "$jq" . -- "$1" "$2"
+}
+
+function zip_diff() {
+  # compare the table of contents, including timestamps
+  diff_with unzip -l -- "$1" "$2"
 }
 
 function binary_diff() {
@@ -106,11 +111,14 @@ case "$1" in
     diff -u "$1" "$2" | head -n "$diff_limit"
     ;;
   *.json)
-    json_diff "$1" "$2" | head -n  "$diff_limit"
+    json_diff "$1" "$2" | head -n "$diff_limit"
     ;;
   # TODO: .bc LLVM bitcode
   *.a | *.o | *.so | *.rlib)
     binary_diff "$1" "$2"
+    ;;
+  *.zip)
+    zip_diff "$1" "$2" | head -n "$diff_limit"
     ;;
   *)
     filetype="$(file "$1" | head -n 1 | sed -e "s|^$1: ||")"

@@ -78,6 +78,11 @@ function diff_binary() {
   cmp "$1" "$2" || "$detail_diff" "$1" "$2"
 }
 
+function diff_zip() {
+  # cmp is faster, as it terminates at first byte difference.
+  cmp "$1" "$2" || "$detail_diff" "$1" "$2"
+}
+
 function exe_unstripped_expect() {
   # Print "diff/match/unknown" depending on whether this file is known to be
   # reproducible across identical builds.
@@ -383,12 +388,11 @@ function diff_file_relpath() {
     *.vboot) expect=unknown; diff_binary "$left" "$right" ;;
     *.zbi) expect=unknown; diff_binary "$left" "$right" ;;
 
-    # These zip archives do match already.
-    lib_python3.*.zip) expect=match; diff_binary "$left" "$right" ;;
+    *.pyz | *.zip) expect=match; diff_zip "$left" "$right" ;;
     # Most archives carry timestamp information of their contents.
     # One way to make this reproducible is to force a magic date/time
     # while archiving, which effectively removes time variance.
-    *.tar | *.tar.gz | *.tgz | *.pyz | *.zip) expect=diff; diff_binary "$left" "$right" ;;
+    *.tar | *.tar.gz | *.tgz) expect=diff; diff_binary "$left" "$right" ;;
 
     # Ignore ninja logs, as they bear timestamps,
     # and are non-essential build artifacts.
