@@ -32,5 +32,6 @@ group("tests") {
     "images_json:tests",
     "multidict:tests",
     "smaps:tests",
+    "snapshots:tests",
   ]
 }
