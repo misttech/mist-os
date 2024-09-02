@@ -151,22 +151,6 @@ zx_status_t VmObjectDispatcher::Read(user_out_ptr<char> user_data, uint64_t offs
   return vmo_->ReadUser(user_data, offset, length, VmObjectReadWriteOptions::None, out_actual);
 }
 
-zx_status_t VmObjectDispatcher::ReadVector(user_out_iovec_t user_data, uint64_t offset,
-                                           size_t length, size_t* out_actual) {
-  canary_.Assert();
-
-  return vmo_->ReadUserVector(user_data, offset, length, out_actual);
-}
-
-zx_status_t VmObjectDispatcher::WriteVector(
-    user_in_iovec_t user_data, uint64_t offset, size_t length, VmObjectReadWriteOptions options,
-    size_t* out_actual, VmObject::OnWriteBytesTransferredCallback on_bytes_transferred) {
-  canary_.Assert();
-
-  return vmo_->WriteUserVector(user_data, offset, length, options, out_actual,
-                               on_bytes_transferred);
-}
-
 zx_status_t VmObjectDispatcher::Write(
     user_in_ptr<const char> user_data, uint64_t offset, size_t length, size_t* out_actual,
     VmObject::OnWriteBytesTransferredCallback on_bytes_transferred) {
@@ -336,35 +320,6 @@ uint64_t VmObjectDispatcher::GetContentSize() const {
   canary_.Assert();
 
   return content_size_mgr_->GetContentSize();
-}
-
-zx_status_t VmObjectDispatcher::ExpandIfNecessary(uint64_t requested_vmo_size, bool can_resize_vmo,
-                                                  uint64_t* out_actual) {
-  canary_.Assert();
-
-  uint64_t current_vmo_size = vmo_->size();
-  *out_actual = current_vmo_size;
-
-  uint64_t required_vmo_size = ROUNDUP(requested_vmo_size, PAGE_SIZE);
-  // Overflow when rounding up.
-  if (required_vmo_size < requested_vmo_size) {
-    return ZX_ERR_OUT_OF_RANGE;
-  }
-
-  if (required_vmo_size > current_vmo_size) {
-    if (!can_resize_vmo) {
-      return ZX_ERR_NOT_SUPPORTED;
-    }
-    zx_status_t status = vmo_->Resize(required_vmo_size);
-    if (status != ZX_OK) {
-      // Resizing failed but the rest of the current VMO size can be used.
-      return status;
-    }
-
-    *out_actual = required_vmo_size;
-  }
-
-  return ZX_OK;
 }
 
 zx_status_t VmObjectDispatcher::RangeOp(uint32_t op, uint64_t offset, uint64_t size,
