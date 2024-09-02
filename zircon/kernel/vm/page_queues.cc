@@ -1443,7 +1443,7 @@ bool PageQueues::DebugPageIsSpecificQueue(const vm_page_t* page, PageQueue queue
 }
 
 bool PageQueues::DebugPageIsReclaim(const vm_page_t* page, size_t* queue) const {
-  return DebugPageIsSpecificReclaim(page, [](auto cow) { return cow->can_evict(); }, queue);
+  return DebugPageIsSpecificReclaim(page, [](auto cow) { return true; }, queue);
 }
 
 bool PageQueues::DebugPageIsReclaimDontNeed(const vm_page_t* page) const {
