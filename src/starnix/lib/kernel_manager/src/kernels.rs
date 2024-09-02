@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::StarnixKernel;
 use anyhow::Error;
 use attribution_server::{AttributionServer, AttributionServerHandle};
 use fidl::endpoints::{Proxy, ServerEnd};
@@ -9,7 +10,6 @@ use fidl::HandleBased;
 use frunner::{ComponentControllerMarker, ComponentStartInfo};
 use fuchsia_component::client::connect_to_protocol;
 use fuchsia_sync::Mutex;
-use kernel_manager::StarnixKernel;
 use slab::Slab;
 use std::sync::Arc;
 use vfs::execution_scope::ExecutionScope;
