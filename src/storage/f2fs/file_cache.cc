@@ -618,8 +618,9 @@ void FileCache::WaitOnWriteback(Page &page) {
 
 void FileCache::NotifyWriteback(PageList pages) {
   std::lock_guard lock(flag_lock_);
-  for (auto &page : pages) {
-    page.ClearWriteback();
+  while (!pages.is_empty()) {
+    auto page = pages.pop_front();
+    page->ClearWriteback();
   }
   flag_cvar_.notify_all();
 }

@@ -78,7 +78,7 @@ class StorageBufferPool {
     return large_buffers_;
   }
 
-  // Everu user should transfer the ownership of borrowed buffers to this method after use.
+  // Every user should transfer the ownership of borrowed buffers to this method after use.
   void Return(std::unique_ptr<StorageBuffer> buffer);
   std::unique_ptr<StorageBuffer> Retrieve(size_t size) __TA_REQUIRES(mutex_);
 
