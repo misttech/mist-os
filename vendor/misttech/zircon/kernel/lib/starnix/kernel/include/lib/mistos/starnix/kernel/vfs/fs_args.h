@@ -14,19 +14,21 @@
 #include <charconv>
 
 #include <fbl/intrusive_hash_table.h>
+#include <ktl/string_view.h>
 #include <ktl/unique_ptr.h>
 
 namespace starnix::fs_args {
 
 struct HashableFsString : public fbl::SinglyLinkedListable<ktl::unique_ptr<HashableFsString>> {
   // Required to instantiate fbl::DefaultKeyedObjectTraits.
-  FsString GetKey() const { return key; }
+  ktl::string_view GetKey() const { return key; }
 
   // Required to instantiate fbl::DefaultHashTraits.
-  static size_t GetHash(FsString key) { return std::hash<std::string_view>{}(key); }
+  static size_t GetHash(const ktl::string_view& key) { return std::hash<ktl::string_view>{}(key); }
 
-  FsString key;
-  FsString value;
+  ktl::string_view key;
+
+  ktl::string_view value;
 };
 
 // generic_parse_mount_options parses a comma-separated list of options of the
@@ -38,15 +40,16 @@ struct HashableFsString : public fbl::SinglyLinkedListable<ktl::unique_ptr<Hasha
 // map{"key0":"value3","key1":"","key2":"value2"}
 //
 // generic_parse_mount_options is not appropriate if values may contain commas.
-void generic_parse_mount_options(const FsStr& data,
-                                 fbl::HashTable<FsString, ktl::unique_ptr<HashableFsString>>* out);
+void generic_parse_mount_options(
+    const FsStr& data, fbl::HashTable<ktl::string_view, ktl::unique_ptr<HashableFsString>>* out);
 
 // Parses `data` slice into another type.
 //
 // This relies on std::from_chars and validade the `data` to be utf8.
 template <typename T>
 fit::result<Errno, T> parse(const FsString& data) {
-  if (!util::IsStringUTF8(data)) {
+  ktl::string_view tmp(data.data(), data.size());
+  if (!util::IsStringUTF8(tmp)) {
     return fit::error(errno(EINVAL));
   }
   T parsed_value;

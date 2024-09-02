@@ -5,13 +5,15 @@
 
 #include "lib/mistos/starnix/kernel/vfs/fs_args.h"
 
-#include <ktl/unique_ptr.h>
+#include <lib/mistos/starnix/kernel/vfs/path.h>
 
+#include <ktl/string_view.h>
+#include <ktl/unique_ptr.h>
 
 namespace starnix::fs_args {
 
-void generic_parse_mount_options(const FsStr& data,
-                                 fbl::HashTable<FsString, ktl::unique_ptr<HashableFsString>>* out) {
+void generic_parse_mount_options(
+    const FsStr& data, fbl::HashTable<ktl::string_view, ktl::unique_ptr<HashableFsString>>* out) {
   if (data.empty() || out == nullptr) {
     return;
   }
@@ -23,15 +25,13 @@ void generic_parse_mount_options(const FsStr& data,
     auto equal_pos = std::find(start, comma_pos, '=');
     size_t value_length = (comma_pos > equal_pos) ? (comma_pos - equal_pos - 1) : 0;
 
-    FsString key(start, equal_pos - start);
-    FsString value(equal_pos + 1, value_length);
-
     fbl::AllocChecker ac;
     ktl::unique_ptr<HashableFsString> hashable(new (&ac) HashableFsString{});
     ZX_ASSERT(ac.check());
-    hashable->key = key;
-    hashable->value = value;
-    out->insert_or_replace(std::move(hashable));
+
+    hashable->key = ktl::move(ktl::string_view(&*start, static_cast<size_t>(equal_pos - start)));
+    hashable->value = ktl::move(ktl::string_view(&*(equal_pos + 1), value_length));
+    out->insert_or_replace(ktl::move(hashable));
 
     if (comma_pos == end) {
       break;
@@ -40,4 +40,4 @@ void generic_parse_mount_options(const FsStr& data,
   }
 }
 
-} // namespace starnix::fs_args
+}  // namespace starnix::fs_args
