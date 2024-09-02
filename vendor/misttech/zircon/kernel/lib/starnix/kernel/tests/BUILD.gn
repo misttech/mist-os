@@ -8,7 +8,8 @@ source_set("tests") {
     #"atomic_counter-test.cc",
     #"current_task-test.cc",
     #"fd_table-test.cc",
-    #"fs_args-test.cc",
+    "fs_args-test.cc",
+
     #"fs_node-test.cc",
     #"io_buffers-test.cc",
     #"kernel-test.cc",
@@ -16,7 +17,9 @@ source_set("tests") {
     #"locks-test.cc",
     #"memory_manager-test.cc",
     "path-test.cc",
+
     #"pidtable-test.cc",
+
     #"task-test.cc",
     #"task/syscalls-test.cc",
     #"thread_group-test.cc",

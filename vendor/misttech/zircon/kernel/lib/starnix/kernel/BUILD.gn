@@ -42,7 +42,8 @@ zx_library("kernel") {
     #"vfs/fd_table.cc",
     #"vfs/file_object.cc",
     #"vfs/file_system.cc",
-    #"vfs/fs_args.cc",
+    "vfs/fs_args.cc",
+
     #"vfs/fs_context.cc",
     #"vfs/fs_node.cc",
     #"vfs/module.cc",
