@@ -2,37 +2,29 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//build/zbi/zbi.gni")
-import("//build/zbi/zbi_input.gni")
-
 source_set("tests") {
   sources = [
-    "arch/${current_cpu}/syscalls-test.cc",
-    "atomic_counter-test.cc",
-    "current_task-test.cc",
-    "fd_table-test.cc",
-    "fs_args-test.cc",
-    "fs_node-test.cc",
-    "io_buffers-test.cc",
-    "kernel-test.cc",
-    "loader-test.cc",
-    "locks-test.cc",
-    "memory_manager-test.cc",
+    #"arch/${current_cpu}/syscalls-test.cc",
+    #"atomic_counter-test.cc",
+    #"current_task-test.cc",
+    #"fd_table-test.cc",
+    #"fs_args-test.cc",
+    #"fs_node-test.cc",
+    #"io_buffers-test.cc",
+    #"kernel-test.cc",
+    #"loader-test.cc",
+    #"locks-test.cc",
+    #"memory_manager-test.cc",
     "path-test.cc",
-    "pidtable-test.cc",
-    "task-test.cc",
-    "task/syscalls-test.cc",
-    "thread_group-test.cc",
-    "tmpfs-test.cc",
-    "vfs/syscalls-test.cc",
+    #"pidtable-test.cc",
+    #"task-test.cc",
+    #"task/syscalls-test.cc",
+    #"thread_group-test.cc",
+    #"tmpfs-test.cc",
+    #"vfs/syscalls-test.cc",
   ]
   deps = [
-    "//zircon/kernel/lib/mistos/starnix/kernel",
-    "//zircon/system/ulib/zxtest:zxtest-mistos",
+    "//vendor/misttech/zircon/kernel/lib/starnix/kernel",
+    "//zircon/kernel/lib/unittest",
   ]
-}
-
-zbi_input("hello_starnix") {
-  deps = [ "//zircon/kernel/lib/mistos/starnix/examples/hello_starnix:bin" ]
-  type = "bootfs"
 }

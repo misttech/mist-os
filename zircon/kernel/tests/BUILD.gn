@@ -139,6 +139,8 @@ if (toolchain_environment == "kernel") {
       if (is_mistos) {
         deps -= [ "//zircon/kernel/lib/userabi" ]
         deps += [ "//vendor/misttech/zircon/kernel/lib/userabi" ]
+
+        deps += [ "//vendor/misttech/zircon/kernel/lib/starnix/kernel/tests" ]
       }
     }
     public_deps = [ "//zircon/system/ulib/zx:headers" ]

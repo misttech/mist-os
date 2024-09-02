@@ -4,38 +4,70 @@
 // found in the LICENSE file.
 
 #include <lib/mistos/starnix/kernel/vfs/path.h>
+#include <lib/unittest/unittest.h>
 
-#include <zxtest/zxtest.h>
-
-namespace {
+#include <ktl/string_view.h>
 
 using namespace starnix;
 
-TEST(Path, test_path_builder) {
+bool test_path_builder() {
+  BEGIN_TEST;
+  FsString expected;
+  FsString actual;
   PathBuilder p;
-  ASSERT_EQ("/", p.build_absolute());
 
   p = PathBuilder();
-  ASSERT_EQ("", p.build_relative());
+  actual = p.build_absolute();
+  expected = ktl::string_view("/");
+  ASSERT_EQ(expected.size(), actual.size());
+  ASSERT_BYTES_EQ(reinterpret_cast<const uint8_t*>(expected.data()),
+                  reinterpret_cast<const uint8_t*>(actual.data()), expected.size());
+
+  p = PathBuilder();
+  actual = p.build_relative();
+  expected = ktl::string_view("");
+  ASSERT_EQ(expected.size(), actual.size());
+  ASSERT_BYTES_EQ(reinterpret_cast<const uint8_t*>(expected.data()),
+                  reinterpret_cast<const uint8_t*>(actual.data()), expected.size());
 
   p = PathBuilder();
   p.prepend_element("foo");
-  ASSERT_EQ("/foo", p.build_absolute());
+  actual = p.build_absolute();
+  expected = ktl::string_view("/foo");
+  ASSERT_EQ(expected.size(), actual.size());
+  ASSERT_BYTES_EQ(reinterpret_cast<const uint8_t*>(expected.data()),
+                  reinterpret_cast<const uint8_t*>(actual.data()), expected.size());
 
   p = PathBuilder();
   p.prepend_element("foo");
-  ASSERT_EQ("foo", p.build_relative());
+  actual = p.build_relative();
+  expected = ktl::string_view("foo");
+  ASSERT_EQ(expected.size(), actual.size());
+  ASSERT_BYTES_EQ(reinterpret_cast<const uint8_t*>(expected.data()),
+                  reinterpret_cast<const uint8_t*>(actual.data()), expected.size());
 
   p = PathBuilder();
   p.prepend_element("foo");
   p.prepend_element("bar");
-  ASSERT_EQ("/bar/foo", p.build_absolute());
+  actual = p.build_absolute();
+  expected = ktl::string_view("/bar/foo");
+  ASSERT_EQ(expected.size(), actual.size());
+  ASSERT_BYTES_EQ(reinterpret_cast<const uint8_t*>(expected.data()),
+                  reinterpret_cast<const uint8_t*>(actual.data()), expected.size());
 
   p = PathBuilder();
   p.prepend_element("foo");
   p.prepend_element("1234567890123456789012345678901234567890");
   p.prepend_element("bar");
-  ASSERT_EQ("/bar/1234567890123456789012345678901234567890/foo", p.build_absolute());
+  actual = p.build_absolute();
+  expected = ktl::string_view("/bar/1234567890123456789012345678901234567890/foo");
+  ASSERT_EQ(expected.size(), actual.size());
+  ASSERT_BYTES_EQ(reinterpret_cast<const uint8_t*>(expected.data()),
+                  reinterpret_cast<const uint8_t*>(actual.data()), expected.size());
+
+  END_TEST;
 }
 
-}  // namespace
+UNITTEST_START_TESTCASE(starnix_path_builder)
+UNITTEST("test path builder", test_path_builder)
+UNITTEST_END_TESTCASE(starnix_path_builder, "starnix_path_builder", "Tests for PathBuilder")
