@@ -19,6 +19,8 @@
 
 namespace {
 
+using testing::MatchesRegex;
+
 class ProcfsTest : public ::testing::Test {
  protected:
   // Verifies whether the input string is a valid UUID in hyphenated format
@@ -56,6 +58,19 @@ TEST_F(ProcfsTest, ProcSysKernelRandomBootIdExists) {
   EXPECT_EQ(0, access("/proc/sys/kernel/random/boot_id", R_OK));
   EXPECT_TRUE(files::ReadFileToString("/proc/sys/kernel/random/boot_id", &uuid));
   is_valid_uuid(uuid);
+}
+
+// Verify /proc/pressure/{cpu,io,memory} contains something reasonable.
+TEST_F(ProcfsTest, ProcPressure) {
+  for (auto path : {"/proc/pressure/cpu", "/proc/pressure/io", "/proc/pressure/memory"}) {
+    EXPECT_EQ(0, access(path, R_OK));
+    std::string content;
+    EXPECT_TRUE(files::ReadFileToString(path, &content));
+    // Some systems does not eport the `full` statistics for CPU.
+    EXPECT_THAT(content,
+                MatchesRegex("some avg10=[0-9.]+ avg60=[0-9.]+ avg300=[0-9.]+ total=[0-9.]+\n"
+                             "(full avg10=[0-9.]+ avg60=[0-9.]+ avg300=[0-9.]+ total=[0-9.]+\n)?"));
+  }
 }
 
 }  // namespace

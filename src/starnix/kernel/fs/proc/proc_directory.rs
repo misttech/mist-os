@@ -473,11 +473,28 @@ impl FsNodeOps for MountsSymlink {
 /// Creates the /proc/pressure directory. https://docs.kernel.org/accounting/psi.html
 fn pressure_directory(current_task: &CurrentTask, fs: &FileSystemHandle) -> FsNodeHandle {
     let mut dir = StaticDirectoryBuilder::new(fs);
-    dir.entry(current_task, "memory", PressureFile::new_node(), mode!(IFREG, 0o666));
+    dir.entry(
+        current_task,
+        "memory",
+        PressureFile::new_node(PressureFileKind::MEMORY),
+        mode!(IFREG, 0o666),
+    );
+    dir.entry(
+        current_task,
+        "cpu",
+        PressureFile::new_node(PressureFileKind::CPU),
+        mode!(IFREG, 0o666),
+    );
+    dir.entry(
+        current_task,
+        "io",
+        PressureFile::new_node(PressureFileKind::IO),
+        mode!(IFREG, 0o666),
+    );
     dir.build(current_task)
 }
 
-struct PressureFileSource;
+struct PressureFileSource {}
 impl DynamicFileSource for PressureFileSource {
     fn generate(&self, sink: &mut DynamicFileBuf) -> Result<(), Errno> {
         writeln!(sink, "some avg10={:.2} avg60={:.2} avg300={:.2} total={}", 0, 0, 0, 0)?;
@@ -486,15 +503,28 @@ impl DynamicFileSource for PressureFileSource {
     }
 }
 
-struct PressureFile(DynamicFile<PressureFileSource>);
+#[derive(Clone, Copy)]
+enum PressureFileKind {
+    MEMORY,
+    CPU,
+    IO,
+}
+
+struct PressureFile {
+    kind: PressureFileKind,
+    source: DynamicFile<PressureFileSource>,
+}
+
 impl PressureFile {
-    pub fn new_node() -> impl FsNodeOps {
-        SimpleFileNode::new(move || Ok(Self(DynamicFile::new(PressureFileSource {}))))
+    pub fn new_node(kind: PressureFileKind) -> impl FsNodeOps {
+        SimpleFileNode::new(move || {
+            Ok(Self { kind, source: DynamicFile::new(PressureFileSource {}) })
+        })
     }
 }
 
 impl FileOps for PressureFile {
-    fileops_impl_delegate_read_and_seek!(self, self.0);
+    fileops_impl_delegate_read_and_seek!(self, self.source);
     fileops_impl_noop_sync!();
 
     /// Pressure notifications are configured by writing to the file.
@@ -507,7 +537,15 @@ impl FileOps for PressureFile {
         data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno> {
         // Ignore the request for now.
-        track_stub!(TODO("https://fxbug.dev/322873423"), "pressure notification setup");
+
+        track_stub!(
+            TODO("https://fxbug.dev/322873423"),
+            match self.kind {
+                PressureFileKind::MEMORY => "memory pressure notification setup",
+                PressureFileKind::CPU => "cpu pressure notification setup",
+                PressureFileKind::IO => "io pressure notification setup",
+            }
+        );
         Ok(data.drain())
     }
 
