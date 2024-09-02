@@ -4588,7 +4588,7 @@ impl BinderFs {
         for name in DEFAULT_BINDERS {
             root.add_binder_device(kernel, FsString::from(name))?;
         }
-        fs.set_root(root);
+        fs.set_root_node(FsNode::new_root(root));
         Ok(fs)
     }
 }

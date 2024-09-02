@@ -260,7 +260,7 @@ impl RemoteFs {
         if use_remote_ids {
             root_node.node_id = node_id;
         }
-        fs.set_root_node(root_node);
+        fs.set_existing_root_node(root_node);
         Ok(fs)
     }
 }

@@ -8,20 +8,20 @@ pub(super) mod testing;
 use super::{FsNodeSecurityXattr, FsNodeState};
 use crate::task::CurrentTask;
 use crate::vfs::fs_args::MountParams;
-use crate::vfs::{
-    FileSystem, FsNode, FsNodeHandle, FsStr, FsString, NamespaceNode, ValueOrSize, XattrOp,
-};
+use crate::vfs::{FileSystem, FsNode, FsStr, FsString, NamespaceNode, ValueOrSize, XattrOp};
 use linux_uapi::XATTR_NAME_SELINUX;
-use selinux::{ClassPermission, InitialSid, Permission, ProcessPermission, SecurityPermission};
+use once_cell::sync::OnceCell;
+use selinux::{
+    ClassPermission, FileClass, InitialSid, Permission, ProcessPermission, SecurityPermission,
+};
 use selinux_core::permission_check::{PermissionCheck, PermissionCheckResult};
 use selinux_core::security_server::SecurityServer;
 use selinux_core::SecurityId;
 use starnix_logging::{log_warn, track_stub};
-use starnix_uapi::error;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::mount_flags::MountFlags;
 use starnix_uapi::unmount_flags::UnmountFlags;
-use std::sync::OnceLock;
+use starnix_uapi::{errno, error};
 
 /// Maximum supported size for the extended attribute value used to store SELinux security
 /// contexts in a filesystem node extended attributes.
@@ -70,11 +70,18 @@ fn ensure_fs_label<'a>(
                 .unwrap_or(SecurityId::initial(InitialSid::Unlabeled));
             return FileSystemLabel { sid, scheme: FileSystemLabelingScheme::Mountpoint };
         }
+
+        // If there is an `fs_context` then parse it, falling back to "unlabeled" if invalid.
+        // Otherwise, use the default "file" context.
         let fs_sid = mount_options
             .fs_context
             .as_ref()
-            .and_then(|context| security_server.security_context_to_sid((&context).into()).ok())
-            .unwrap_or(SecurityId::initial(InitialSid::Unlabeled));
+            .map(|context| {
+                security_server
+                    .security_context_to_sid((&context).into())
+                    .unwrap_or(SecurityId::initial(InitialSid::Unlabeled))
+            })
+            .unwrap_or(SecurityId::initial(InitialSid::File));
         let root_sid = mount_options
             .root_context
             .as_ref()
@@ -94,15 +101,93 @@ fn ensure_fs_label<'a>(
     })
 }
 
+/// Creates an [`FsNodeSecurityXattr`] for the security context of `sid`.
+fn make_fs_node_security_xattr(
+    security_server: &SecurityServer,
+    sid: SecurityId,
+) -> Option<FsNodeSecurityXattr> {
+    security_server.sid_to_security_context(sid).map(|value| FsNodeSecurityXattr {
+        name: XATTR_NAME_SELINUX.to_bytes().into(),
+        value: value.into(),
+    })
+}
+
+/// Returns the security attribute with which to label the root node for a file
+/// system, when it is being created. This should not be called when re-creating
+/// the in-memory structures for the root node of persisted file systems.
+pub(super) fn fs_node_init_root_security(
+    security_server: &SecurityServer,
+    root_node: &FsNode,
+) -> Option<FsNodeSecurityXattr> {
+    // This hook is only called once, when a node is set as the root for a file system.
+    assert!(root_node.info().security_state.sid.is_none());
+
+    let fs = root_node.fs();
+    let label = ensure_fs_label(security_server, &fs);
+
+    let (sid, xattr) = match label.scheme {
+        FileSystemLabelingScheme::Mountpoint => {
+            // mountpoint-labeling labels every node with the same context as the file system.
+            (label.sid, None)
+        }
+        FileSystemLabelingScheme::FsUse { root_sid, .. } => {
+            (root_sid, make_fs_node_security_xattr(security_server, root_sid))
+        }
+    };
+
+    // TODO: Labelling file systems other than "tmpfs" breaks some things!
+    if **fs.name() == *b"tmpfs" {
+        set_cached_sid(root_node, sid);
+    }
+
+    xattr
+}
+
 /// Returns the security attribute to label a newly created inode with, if any.
 pub(super) fn fs_node_init_security_and_xattr(
-    _security_server: &SecurityServer,
-    _current_task: &CurrentTask,
-    _new_node: &FsNodeHandle,
-    _parent: Option<&FsNodeHandle>,
+    security_server: &SecurityServer,
+    current_task: &CurrentTask,
+    new_node: &FsNode,
+    parent: &FsNode,
 ) -> Result<Option<FsNodeSecurityXattr>, Errno> {
-    // TODO(b/334091674): If there is no `parent` then this is the "root" node; apply `root_context`, if set.
-    Ok(None)
+    // TODO: This hook may be called whenever a node is re-linked into the cache,
+    // so skip labelling if it already has one.
+    if new_node.info().security_state.sid.is_some() {
+        return Ok(None);
+    }
+
+    let fs = new_node.fs();
+    let label = ensure_fs_label(security_server, &fs);
+
+    let (sid, xattr) = match label.scheme {
+        FileSystemLabelingScheme::Mountpoint => {
+            // mountpoint-labeling labels every node with the same context as the file system.
+            (label.sid, None)
+        }
+        FileSystemLabelingScheme::FsUse { .. } => {
+            // fs_use-labeling determines the label for new nodes based on those of the parent
+            // file node, and the task performing the action.
+            let task_sid = current_task.read().security_state.attrs.current_sid;
+            let parent_sid = fs_node_effective_sid(security_server, current_task, &parent);
+
+            // TODO: https://fxbug.dev/349800754 - Determine what it means for this to fail!
+            let sid = security_server
+                .compute_new_file_sid(task_sid, parent_sid, FileClass::File)
+                .map_err(|_| errno!(EPERM))?;
+
+            // TODO: https://fxbug.dev/355180447 - Return an xattr to set if the labeling scheme for
+            // the file system is "fs_use_xattr".
+            (sid, make_fs_node_security_xattr(security_server, sid))
+        }
+    };
+
+    // TODO: Labelling file systems other than "tmpfs" breaks some things!
+    if **fs.name() == *b"tmpfs" {
+        set_cached_sid(new_node, sid);
+        Ok(xattr)
+    } else {
+        Ok(None)
+    }
 }
 
 /// Returns the Security Context corresponding to the SID with which `FsNode`
@@ -268,7 +353,7 @@ fn check_self_permission(
 }
 
 /// Return security state to associate with a filesystem based on the supplied mount options.
-pub fn file_system_init_security(
+pub(super) fn file_system_init_security(
     _fs_type: &FsStr,
     mount_params: &MountParams,
 ) -> Result<FileSystemState, Errno> {
@@ -279,10 +364,10 @@ pub fn file_system_init_security(
 
     #[cfg(not(test))]
     // TODO: https://fxbug.dev/355628002 - Remove this as soon as `fs_use_*` Contexts are being determine from policy.
-    let def_context = if **_fs_type == *b"tmpfs" && def_context.is_none() && context.is_none() {
+    let fs_context = if **_fs_type == *b"tmpfs" && fs_context.is_none() && context.is_none() {
         Some(b"u:object_r:tmpfs:s0".into())
     } else {
-        def_context
+        fs_context
     };
 
     // If a "context" is specified then it is used for all nodes in the filesystem, so none of the other
@@ -295,7 +380,7 @@ pub fn file_system_init_security(
 
     let mount_options = FileSystemMountOptions { context, def_context, fs_context, root_context };
 
-    Ok(FileSystemState { mount_options, label: OnceLock::new() })
+    Ok(FileSystemState { mount_options, label: OnceCell::new() })
 }
 
 /// Used by the "selinuxfs" module to perform checks on SELinux API file accesses.
@@ -365,7 +450,7 @@ pub(super) struct FileSystemState {
     // TODO: https://fxbug.dev/349800754 - Investigate whether the mount options
     // need to be retained after the file system has been labeled.
     mount_options: FileSystemMountOptions,
-    label: OnceLock<FileSystemLabel>,
+    label: OnceCell<FileSystemLabel>,
 }
 
 #[derive(Clone, Debug, PartialEq)]

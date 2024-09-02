@@ -3,11 +3,12 @@
 // found in the LICENSE file.
 
 use crate::security::selinux_hooks::{
-    check_permission, check_self_permission, fs_node_effective_sid, FsNodeHandle, PermissionCheck,
+    check_permission, check_self_permission, fs_node_effective_sid, PermissionCheck,
     ProcessPermission, TaskAttrs,
 };
 use crate::security::{Arc, ProcAttr, ResolvedElfState, SecurityServer};
 use crate::task::{CurrentTask, Task};
+use crate::vfs::FsNode;
 use selinux::{FilePermission, NullessByteStr, ObjectClass};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::signals::{Signal, SIGCHLD, SIGKILL, SIGSTOP};
@@ -50,7 +51,7 @@ pub fn check_task_create_access(
 pub fn check_exec_access(
     security_server: &Arc<SecurityServer>,
     current_task: &CurrentTask,
-    executable_node: &FsNodeHandle,
+    executable_node: &FsNode,
 ) -> Result<ResolvedElfState, Errno> {
     let (current_sid, exec_sid) = {
         let state = &current_task.read().security_state.attrs;

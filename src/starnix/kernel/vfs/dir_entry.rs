@@ -2,12 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::security;
 use crate::task::CurrentTask;
 use crate::vfs::{
     path, CheckAccessReason, FileHandle, FileObject, FsNodeHandle, FsNodeLinkBehavior, FsStr,
-    FsString, MountInfo, Mounts, NamespaceNode, UnlinkKind,
+    FsString, MountInfo, Mounts, NamespaceNode, UnlinkKind, XattrOp,
 };
 use bitflags::bitflags;
+use starnix_logging::track_stub;
 use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked, RwLock, RwLockWriteGuard};
 use starnix_uapi::auth::FsCred;
 use starnix_uapi::errors::{Errno, ENOENT};
@@ -778,7 +780,32 @@ impl DirEntry {
         };
 
         let (child, exists) = match create_result {
-            CreationResult::Created => (child, false),
+            CreationResult::Created => {
+                if let Ok(Some(security_xattr)) =
+                    security::fs_node_init_security_and_xattr(current_task, &child.node, &self.node)
+                {
+                    // TODO: https://fxbug.dev/355809976 - Should failure to store the xattr be
+                    // ignored (e.g. if "vfat" were mounted with "fs_use_xattr" labeling)?
+                    if child
+                        .node
+                        .ops()
+                        .set_xattr(
+                            &child.node,
+                            current_task,
+                            security_xattr.name,
+                            security_xattr.value.as_slice().into(),
+                            XattrOp::Create,
+                        )
+                        .is_err()
+                    {
+                        track_stub!(
+                            TODO("https://fxbug.dev/355809976"),
+                            "set_xattr for new fs node"
+                        );
+                    }
+                }
+                (child, false)
+            }
             CreationResult::Existed { create_fn } => {
                 if child.ops.revalidate(current_task, &child)? {
                     (child, true)
