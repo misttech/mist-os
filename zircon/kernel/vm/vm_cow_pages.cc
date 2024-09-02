@@ -2808,8 +2808,9 @@ VmCowPages::LookupCursor::TargetAllocateCopyPageAsResult(vm_page_t* source, Dirt
   target_->IncrementHierarchyGenerationCountLocked();
 
   // If asked to explicitly mark zero forks, and this is actually fork of the zero page, move to the
-  // correct queue.
-  if (zero_fork_ && source == vm_get_zero_page()) {
+  // correct queue. Discardable pages are not considered zero forks as they are always in the
+  // reclaimable page queues.
+  if (zero_fork_ && source == vm_get_zero_page() && !target_->is_discardable()) {
     pmm_page_queues()->MoveToAnonymousZeroFork(out_page);
   }
 

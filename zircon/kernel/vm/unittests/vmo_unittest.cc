@@ -2924,21 +2924,34 @@ static bool vmo_discard_test() {
   // Lock and commit all pages. Verify the size.
   EXPECT_EQ(ZX_OK, vmo->TryLockRange(0, kSize));
   EXPECT_EQ(ZX_OK, vmo->CommitRange(0, kSize));
+  vm_page_t* page = nullptr;
+  ASSERT_OK(vmo->GetPageBlocking(0, 0, nullptr, &page, nullptr));
   EXPECT_EQ(kSize, vmo->size());
   EXPECT_EQ(kSize, vmo->GetAttributedMemory().uncompressed_bytes);
 
   // Cannot discard when locked.
   EXPECT_EQ(0u, vmo->DebugGetCowPages()->DiscardPages());
+  EXPECT_EQ(vmo->DebugGetCowPages()
+                ->ReclaimPage(page, 0, VmCowPages::EvictionHintAction::Follow, nullptr)
+                .Total(),
+            0u);
   EXPECT_EQ(kSize, vmo->GetAttributedMemory().uncompressed_bytes);
 
   // Unlock.
   EXPECT_EQ(ZX_OK, vmo->UnlockRange(0, kSize));
   EXPECT_EQ(kSize, vmo->size());
 
+  // Page should be in reclaimable queue.
+  EXPECT_TRUE(Pmm::Node().GetPageQueues()->DebugPageIsReclaim(page));
+
   uint64_t reclamation_count = vmo->ReclamationEventCount();
 
   // Should be able to discard now.
-  EXPECT_EQ(kSize / PAGE_SIZE, vmo->DebugGetCowPages()->DiscardPages());
+  EXPECT_EQ(kSize / PAGE_SIZE,
+            vmo->DebugGetCowPages()
+                ->ReclaimPage(page, 0, VmCowPages::EvictionHintAction::Follow, nullptr)
+                .Total());
+  page = nullptr;
   EXPECT_EQ(0u, vmo->GetAttributedMemory().uncompressed_bytes);
   EXPECT_GT(vmo->ReclamationEventCount(), reclamation_count);
   // Verify that the size is not affected.
@@ -2958,28 +2971,49 @@ static bool vmo_discard_test() {
 
   // Commit and pin some pages, then unlock.
   EXPECT_EQ(ZX_OK, vmo->CommitRangePinned(0, kSize, false));
+  ASSERT_OK(vmo->GetPageBlocking(0, 0, nullptr, &page, nullptr));
   EXPECT_EQ(kSize, vmo->GetAttributedMemory().uncompressed_bytes);
   EXPECT_EQ(ZX_OK, vmo->UnlockRange(0, kNewSize));
+
+  // Page is pinned, so not in the reclaim queue, but in the wired queue.
+  EXPECT_FALSE(Pmm::Node().GetPageQueues()->DebugPageIsReclaim(page));
+  EXPECT_TRUE(Pmm::Node().GetPageQueues()->DebugPageIsWired(page));
 
   reclamation_count = vmo->ReclamationEventCount();
 
   // Cannot discard a vmo with pinned pages.
   EXPECT_EQ(0u, vmo->DebugGetCowPages()->DiscardPages());
+  EXPECT_EQ(vmo->DebugGetCowPages()
+                ->ReclaimPage(page, 0, VmCowPages::EvictionHintAction::Follow, nullptr)
+                .Total(),
+            0u);
   EXPECT_EQ(kNewSize, vmo->size());
   EXPECT_EQ(kSize, vmo->GetAttributedMemory().uncompressed_bytes);
   EXPECT_EQ(reclamation_count, vmo->ReclamationEventCount());
 
   // Unpin the pages. Should be able to discard now.
   vmo->Unpin(0, kSize);
-  EXPECT_EQ(kSize / PAGE_SIZE, vmo->DebugGetCowPages()->DiscardPages());
+  EXPECT_TRUE(Pmm::Node().GetPageQueues()->DebugPageIsReclaim(page));
+  EXPECT_EQ(kSize / PAGE_SIZE,
+            vmo->DebugGetCowPages()
+                ->ReclaimPage(page, 0, VmCowPages::EvictionHintAction::Follow, nullptr)
+                .Total());
+  page = nullptr;
   EXPECT_EQ(kNewSize, vmo->size());
   EXPECT_EQ(0u, vmo->GetAttributedMemory().uncompressed_bytes);
   EXPECT_GT(vmo->ReclamationEventCount(), reclamation_count);
 
-  // Lock and commit pages. Unlock.
+  // Lock and commit pages, this time by writing them through a user mapping.
   EXPECT_EQ(ZX_OK, vmo->LockRange(0, kNewSize, &lock_state));
-  EXPECT_EQ(ZX_OK, vmo->CommitRange(0, kNewSize));
+  ktl::unique_ptr<testing::UserMemory> user_memory = testing::UserMemory::Create(vmo);
+  ASSERT_TRUE(user_memory);
+  for (size_t offset = 0; offset < kNewSize; offset += PAGE_SIZE) {
+    char val = 42;
+    user_memory->put(val, offset);
+  }
   EXPECT_EQ(ZX_OK, vmo->UnlockRange(0, kNewSize));
+  ASSERT_OK(vmo->GetPageBlocking(0, 0, nullptr, &page, nullptr));
+  EXPECT_TRUE(Pmm::Node().GetPageQueues()->DebugPageIsReclaim(page));
 
   // Cannot discard a non-discardable vmo.
   vmo.reset();
