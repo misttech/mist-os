@@ -30,5 +30,6 @@ group("tests") {
     "dataclasses_json_lite:tests",
     "debug_json:tests",
     "multidict:tests",
+    "smaps:tests",
   ]
 }
