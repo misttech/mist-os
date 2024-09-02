@@ -72,7 +72,7 @@ class VmObjectDispatcher final : public SoloDispatcher<VmObjectDispatcher, ZX_DE
   // Dispatcher implementation.
   void on_zero_handles() final;
 
-  fbl::RefPtr<ContentSizeManager> content_size_manager() const { return content_size_mgr_; }
+  zx::result<fbl::RefPtr<ContentSizeManager>> content_size_manager() TA_EXCL(get_lock());
 
   // VmObjectDispatcher own methods.
   zx_status_t Read(user_out_ptr<char> user_data, uint64_t offset, size_t length,
@@ -112,8 +112,12 @@ class VmObjectDispatcher final : public SoloDispatcher<VmObjectDispatcher, ZX_DE
   fbl::RefPtr<VmObject> const vmo_;
 
   // Manages the content size associated with this VMO. The content size is used by streams created
-  // against this VMO.
-  fbl::RefPtr<ContentSizeManager> const content_size_mgr_;
+  // against this VMO. The content size manager is lazily created, hence this field is guarded by
+  // the lock, however once created it can be assumed to be constant.
+  // Creating the content size manager can be deferred as long as the content is exactly the vmo
+  // size, and there are no streams or other operations that implicitly require a content size
+  // manager to exist.
+  fbl::RefPtr<ContentSizeManager> content_size_mgr_ TA_GUARDED(get_lock());
 
   // The koid of the related pager object, or ZX_KOID_INVALID if
   // there is no related pager.

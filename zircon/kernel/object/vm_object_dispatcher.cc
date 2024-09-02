@@ -69,12 +69,12 @@ zx_status_t VmObjectDispatcher::CreateWithCsm(fbl::RefPtr<VmObject> vmo,
                                               zx_rights_t* rights) {
   fbl::AllocChecker ac;
   KernelHandle new_handle(fbl::AdoptRef(new (&ac) VmObjectDispatcher(
-      ktl::move(vmo), ktl::move(content_size_manager), pager_koid, initial_mutability)));
+      ktl::move(vmo), content_size_manager, pager_koid, initial_mutability)));
   if (!ac.check()) {
     return ZX_ERR_NO_MEMORY;
   }
 
-  new_handle.dispatcher()->vmo()->SetUserContentSize(new_handle.dispatcher()->content_size_mgr_);
+  new_handle.dispatcher()->vmo()->SetUserContentSize(ktl::move(content_size_manager));
 
   new_handle.dispatcher()->vmo()->set_user_id(new_handle.dispatcher()->get_koid());
   *rights =
@@ -87,13 +87,18 @@ zx_status_t VmObjectDispatcher::Create(fbl::RefPtr<VmObject> vmo, uint64_t conte
                                        zx_koid_t pager_koid, InitialMutability initial_mutability,
                                        KernelHandle<VmObjectDispatcher>* handle,
                                        zx_rights_t* rights) {
-  fbl::RefPtr<ContentSizeManager> content_size_manager;
-  zx_status_t status = ContentSizeManager::Create(content_size, &content_size_manager);
-  if (status != ZX_OK) {
-    return status;
+  fbl::RefPtr<ContentSizeManager> csm;
+  // If the initial content size we want to track is exactly equal to the current VMO size then we
+  // can defer creating the content size manager till later.
+  if (content_size != vmo->size()) {
+    auto result = ContentSizeManager::Create(content_size);
+    if (result.is_error()) {
+      return result.status_value();
+    }
+    csm = ktl::move(*result);
   }
-  return CreateWithCsm(ktl::move(vmo), ktl::move(content_size_manager), pager_koid,
-                       initial_mutability, handle, rights);
+  return CreateWithCsm(ktl::move(vmo), ktl::move(csm), pager_koid, initial_mutability, handle,
+                       rights);
 }
 
 VmObjectDispatcher::VmObjectDispatcher(fbl::RefPtr<VmObject> vmo,
@@ -163,10 +168,15 @@ zx_status_t VmObjectDispatcher::Write(
 zx_status_t VmObjectDispatcher::SetSize(uint64_t size) {
   canary_.Assert();
 
-  ContentSizeManager::Operation op(content_size_mgr_.get());
-  Guard<Mutex> guard{AliasedLock, content_size_mgr_->lock(), op.lock()};
+  auto csm = content_size_manager();
+  if (csm.is_error()) {
+    return csm.status_value();
+  }
 
-  content_size_mgr_->BeginSetContentSizeLocked(size, &op, &guard);
+  ContentSizeManager::Operation op((*csm).get());
+  Guard<Mutex> guard{AliasedLock, csm->lock(), op.lock()};
+
+  csm->BeginSetContentSizeLocked(size, &op, &guard);
 
   uint64_t size_aligned = ROUNDUP(size, PAGE_SIZE);
   // Check for overflow when rounding up.
@@ -260,9 +270,14 @@ zx_info_vmo_t VmObjectDispatcher::GetVmoInfo(zx_rights_t rights) {
 zx_status_t VmObjectDispatcher::SetContentSize(uint64_t content_size) {
   canary_.Assert();
 
-  ContentSizeManager::Operation op(content_size_mgr_.get());
-  Guard<Mutex> guard{AliasedLock, content_size_mgr_->lock(), op.lock()};
-  content_size_mgr_->BeginSetContentSizeLocked(content_size, &op, &guard);
+  auto csm = content_size_manager();
+  if (csm.is_error()) {
+    return csm.status_value();
+  }
+
+  ContentSizeManager::Operation op((*csm).get());
+  Guard<Mutex> guard{AliasedLock, csm->lock(), op.lock()};
+  csm->BeginSetContentSizeLocked(content_size, &op, &guard);
 
   uint64_t vmo_size = vmo_->size();
   if (content_size < vmo_size) {
@@ -281,11 +296,16 @@ zx_status_t VmObjectDispatcher::SetContentSize(uint64_t content_size) {
 zx_status_t VmObjectDispatcher::SetStreamSize(uint64_t stream_size) {
   canary_.Assert();
 
-  ContentSizeManager::Operation op(content_size_mgr_.get());
-  Guard<Mutex> guard{AliasedLock, content_size_mgr_->lock(), op.lock()};
+  auto csm = content_size_manager();
+  if (csm.is_error()) {
+    return csm.status_value();
+  }
+
+  ContentSizeManager::Operation op((*csm).get());
+  Guard<Mutex> guard{AliasedLock, csm->lock(), op.lock()};
 
   uint64_t vmo_size = vmo_->size();
-  uint64_t old_stream_size = GetContentSize();
+  uint64_t old_stream_size = csm->GetContentSize();
 
   if (stream_size == old_stream_size) {
     return ZX_OK;
@@ -296,7 +316,7 @@ zx_status_t VmObjectDispatcher::SetStreamSize(uint64_t stream_size) {
     return ZX_ERR_OUT_OF_RANGE;
   }
 
-  content_size_mgr_->BeginSetContentSizeLocked(stream_size, &op, &guard);
+  csm->BeginSetContentSizeLocked(stream_size, &op, &guard);
 
   // Zero the range from min(stream size, old stream size) to the end of the VMO.
   uint64_t zero_start = ktl::min(stream_size, old_stream_size);
@@ -319,7 +339,18 @@ zx_status_t VmObjectDispatcher::SetStreamSize(uint64_t stream_size) {
 uint64_t VmObjectDispatcher::GetContentSize() const {
   canary_.Assert();
 
-  return content_size_mgr_->GetContentSize();
+  // Retrieving the stream size needs to be a non-fallible operation, so we avoid allocating one if
+  // it doesn't exist, since the allocation could fail.
+  ContentSizeManager* csm;
+  {
+    Guard<CriticalMutex> guard{get_lock()};
+    if (!content_size_mgr_) {
+      return vmo_->size();
+    }
+    csm = content_size_mgr_.get();
+  }
+
+  return csm->GetContentSize();
 }
 
 zx_status_t VmObjectDispatcher::RangeOp(uint32_t op, uint64_t offset, uint64_t size,
@@ -507,4 +538,16 @@ zx_status_t VmObjectDispatcher::CreateChild(uint32_t options, uint64_t offset, u
     UpdateStateLocked(ZX_VMO_ZERO_CHILDREN, 0);
   }
   return status;
+}
+
+zx::result<fbl::RefPtr<ContentSizeManager>> VmObjectDispatcher::content_size_manager() {
+  Guard<CriticalMutex> guard{get_lock()};
+  if (unlikely(!content_size_mgr_)) {
+    auto result = ContentSizeManager::Create(vmo_->size());
+    if (result.is_error()) {
+      return result.take_error();
+    }
+    content_size_mgr_ = ktl::move(*result);
+  }
+  return zx::ok(content_size_mgr_);
 }

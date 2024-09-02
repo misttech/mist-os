@@ -173,8 +173,7 @@ class ContentSizeManager : public fbl::RefCounted<ContentSizeManager> {
 
   // Create a ContentSizeManager with its initial content size set to |content_size|. Returns a
   // RefPtr to the newly created ContentSizeManager in |content_size_manager| on success.
-  static zx_status_t Create(uint64_t content_size,
-                            fbl::RefPtr<ContentSizeManager>* content_size_manager);
+  static zx::result<fbl::RefPtr<ContentSizeManager>> Create(uint64_t content_size);
 
   Lock<Mutex>* lock() const TA_RET_CAP(lock_) { return &lock_; }
 
