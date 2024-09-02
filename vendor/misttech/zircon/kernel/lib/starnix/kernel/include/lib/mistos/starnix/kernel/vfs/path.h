@@ -46,7 +46,7 @@ class BString {
   }
 
   // Assigns this string to a copy of another string.
-  BString& operator=(BString& other) {
+  BString& operator=(const BString& other) {
     data_.reset();
     ktl::copy(other.begin(), other.end(), util::back_inserter(data_));
     return *this;
@@ -60,6 +60,11 @@ class BString {
     data_.swap(other.data_);
     return *this;
   }
+
+  // Create a std::string_view backed by the string.
+  // The view does not take ownership of the data so the string
+  // must outlast the std::string_view.
+  operator ktl::string_view() const { return {data(), size()}; }
 
   // Accessors
   const char* data() const { return data_.data(); }
