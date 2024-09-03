@@ -94,13 +94,6 @@ template("fidl_library") {
 
   stable = defined(invoker.stable) && invoker.stable
 
-  # TODO(https://fxbug.dev/346884696): Replace with a solution that does not
-  # rely on fragile allow-listing of names. See the related TODOs below.
-  in_fuchsia_namespace =
-      invoker.library_name ==
-      "fuchsia." + string_replace(invoker.library_name, "fuchsia.", "", 1) ||
-      invoker.library_name == "zx"
-
   # Additional dependencies to add when this target is published in an SDK.
   sdk_atom_deps = []
 
@@ -113,10 +106,7 @@ template("fidl_library") {
     not_needed([ "sdk_atom_deps" ])
   }
   if (!requires_compatibility_tests) {
-    not_needed([
-                 "goldens_dir",
-                 "in_fuchsia_namespace",
-               ])
+    not_needed([ "goldens_dir" ])
   }
   if (!stable) {
     not_needed(invoker, [ "api" ])
@@ -145,6 +135,7 @@ template("fidl_library") {
     "testonly",
   ]
 
+  # If `versioned` is not specified, set the default as defined in fidl.gni.
   if (defined(invoker.versioned)) {
     _platform_override_name = string_split(invoker.versioned, ":")
     _platform_override_name = _platform_override_name[0]
@@ -155,14 +146,30 @@ template("fidl_library") {
     fidlc_versioned_arg = invoker.versioned
   } else if (defined(invoker.testonly) && invoker.testonly) {
     fidlc_versioned_arg = "unversioned"
-  } else if (stable) {
-    fidlc_versioned_arg = "fuchsia"
-  } else if (in_fuchsia_namespace && requires_compatibility_tests) {
-    # Unstable libraries in the IDK.
-    # TODO(https://fxbug.dev/325669391): Remove the `in_fuchsia_namespace` part of the condition
-    # above once vendor SDK libraries no longer requires_compatibility_tests
-    fidlc_versioned_arg = "fuchsia:HEAD"
+  } else if (invoker.library_name ==
+             "fuchsia." +
+             string_replace(invoker.library_name, "fuchsia.", "", 1)) {
+    # It is a non-test library in the "fuchsia" namespace. Set `versioned` to appropriate default.
+    if (stable) {
+      fidlc_versioned_arg = "fuchsia"
+    } else if (requires_compatibility_tests) {
+      fidlc_versioned_arg = "fuchsia:HEAD"
+    } else {
+      # Some libraries in the "fuchsia" namespace are unversioned (do not specify
+      # `@available(added=HEAD)`) and thus fidlc would fail with
+      # "$library_name is versioned under platform 'unversioned', but expected platform 'fuchsia'"
+      # if a platform is specified.
+      # TODO(https://fxbug.dev/325669391): Make those libraries versioned and uncomment this line.
+      # fidlc_versioned_arg = "fuchsia:HEAD"
+    }
+  } else {
+    fidlc_versioned_arg = "unversioned"
   }
+
+  assert((!stable && !requires_compatibility_tests) ||
+             (fidlc_versioned_arg == "fuchsia" && stable) ||
+             (fidlc_versioned_arg == "fuchsia:HEAD" && !stable),
+         "The IDK only supports versioned libraries in the 'fuchsia' platform.")
 
   fidl_ir(compilation_target_name) {
     forward_variables_from(invoker, invoker_variables_to_forward_to_fidl_ir)
@@ -327,15 +334,9 @@ template("fidl_library") {
         fidl_target_name = main_target_name
         fidl_library_name = library_name
 
-        # TODO(https://fxbug.dev/325669391): Prevent vendor SDK libraries from reaching this point
-        # and remove the LHS of`||` and the if condition.
-        # This requires excluding them from `requires_compatibility_tests`.
-        assert((!in_fuchsia_namespace && !defined(fidlc_versioned_arg)) ||
-               fidlc_versioned_arg == "fuchsia" ||
+        assert((fidlc_versioned_arg == "fuchsia" && stable) ||
                (fidlc_versioned_arg == "fuchsia:HEAD" && !stable))
-        if (defined(fidlc_versioned_arg)) {
-          versioned = fidlc_versioned_arg
-        }
+        versioned = fidlc_versioned_arg
 
         # `available` is only allowed for `testonly` libraries (asserted above). Defensively double
         # check here where we ignore `available`.
@@ -354,11 +355,7 @@ template("fidl_library") {
       }
       sdk_atom_deps += [ ":$fidl_ir_target_name" ]
 
-      # TODO(https://fxbug.dev/42052847): Remove in_fuchsia_namespace exception.
-      # It's needed because we use the goldens as action.inputs so the build
-      # expects them to exist, but APIs outside the "fuchsia" namespace aren't
-      # compatibility tested and don't have goldens.
-      if (in_fuchsia_namespace && level != "HEAD") {
+      if (level != "HEAD") {
         test_target = "${target_name}_${level}_compatibility_test"
         fidl_api_compatibility_test(test_target) {
           forward_variables_from(invoker, [ "testonly" ])

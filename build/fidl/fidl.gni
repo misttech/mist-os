@@ -76,17 +76,21 @@ import("//build/testing/host_test_data.gni")
 #     to ensure fuzzers for golden libraries compile successfully.
 #
 #   versioned (optional)
-#     A string of the form PLATFORM or PLATFORM:VERSION. Validates that the
-#     library is versioned under PLATFORM and added at VERSION (if provided).
-#     The library's actual platform is determined as follows:
+#     A string of the form PLATFORM or PLATFORM:VERSION. If provided, fidlc
+#     will validate that the library is versioned under PLATFORM and added at
+#     VERSION (if provided).
+#     fidlc determines the library's actual platform from FIDL files as follows:
 #       * If there are no @available attributes, the platform is "unversioned".
 #       * The platform can be explicit with @available(platform="PLATFORM").
 #       * Otherwise, the platform is the first component of the library name.
-#     Defaults to "fuchsia" when the library name starts with "fuchsia." and
-#     sdk_category is "cts", "partner_internal", "partner", or "public".
-#     Defaults to "unversioned" for testonly libraries. Otherwise, no default.
-#     TODO(https://fxbug.dev/325669391): Expand enforcement by ensuring that
-#     there is always a default value.
+#     Defaults are:
+#       * When testonly is true: "unversioned"
+#       * When the library name starts with "fuchsia.":
+#         * If `stable` is true: to "fuchsia"
+#         * For unstable libraries in the IDK: "fuchsia:HEAD"
+#         * Otherwise: Unset.
+#           TODO(https://fxbug.dev/325669391): Update when fixed.
+#       * Otherwise: "unversioned"
 #
 #   available (optional)
 #     A list of strings of the form PLATFORM:VERSION. This is needed when using
@@ -132,11 +136,10 @@ import("//build/testing/host_test_data.gni")
 #     Set to true to enable Zither bindings for this library.
 #     See //zircon/tools/zither/README.md for details.
 #
-#   stable (optional)
-#     Whether this library is stabilized. If false, there will not be
-#     .api file generated, and the atom will be marked as unstable in the final
-#     IDK.
-#     Defaults to false.
+#   stable (optional flag, default to false)
+#     Whether this library is stabilized.
+#     When true, `versioned` defaults to "fuchsia" and an .api file is
+#     generated. When false, the atom is marked as unstable in the final IDK.
 #
 #   applicable_licenses
 #   public_deps
