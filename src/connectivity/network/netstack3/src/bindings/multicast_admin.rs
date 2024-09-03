@@ -4,11 +4,15 @@
 
 //! FIDL Worker for the `fuchsia.net.multicast.admin` API.
 
+use std::num::NonZeroU64;
+
 use derivative::Derivative;
 use fidl::endpoints::{DiscoverableProtocolMarker as _, RequestStream};
 use fidl_fuchsia_net_multicast_admin::{self as fnet_multicast_admin, TableControllerCloseReason};
 use fidl_fuchsia_net_multicast_ext::{
-    FidlMulticastAdminIpExt, FidlResponder as _, TableControllerRequest, TerminalEventControlHandle,
+    AddRouteError, DelRouteError, FidlMulticastAdminIpExt, FidlResponder as _,
+    Route as FidlExtRoute, TableControllerRequest, TerminalEventControlHandle,
+    UnicastSourceAndMulticastDestination,
 };
 use futures::channel::mpsc::{UnboundedReceiver, UnboundedSender};
 use futures::channel::oneshot;
@@ -16,10 +20,18 @@ use futures::future::OptionFuture;
 use futures::StreamExt as _;
 use log::{error, info, warn};
 use net_types::ip::{GenericOverIp, Ip, Ipv4, Ipv6};
+use netstack3_core::device::DeviceId;
+use netstack3_core::ip::{
+    ForwardMulticastRouteError, MulticastForwardingDisabledError, MulticastRoute,
+    MulticastRouteKey, MulticastRouteTarget,
+};
 use netstack3_core::IpExt;
 
-use crate::bindings::util::ResultExt as _;
-use crate::bindings::{BindingsCtx, Ctx};
+use crate::bindings::util::{
+    DeviceNotFoundError, IntoFidl, ResultExt as _, TryFromFidl, TryFromFidlWithContext,
+    TryIntoCore as _, TryIntoCoreWithContext,
+};
+use crate::bindings::{BindingsCtx, ConversionContext, Ctx};
 
 /// An event associated with the `fuchsia.net.multicast.admin` FIDL API.
 enum MulticastAdminEvent<I: IpExt + FidlMulticastAdminIpExt> {
@@ -325,25 +337,29 @@ fn handle_event<I: IpExt + FidlMulticastAdminIpExt>(
 }
 
 /// Handler for [`TableControllerRequest`].
-fn handle_request<I: FidlMulticastAdminIpExt>(
-    _ctx: &mut Ctx,
+#[netstack3_core::context_ip_bounds(I, BindingsCtx)]
+fn handle_request<I: IpExt + FidlMulticastAdminIpExt>(
+    ctx: &mut Ctx,
     client: &mut MulticastAdminClient<I>,
     request: TableControllerRequest<I>,
 ) -> Result<(), TableControllerCloseReason> {
     match request {
         TableControllerRequest::AddRoute { addresses, route, responder } => {
-            // TODO(https://fxbug.dev/323052525): Support adding multicast routes.
-            warn!(
-                "not adding multicast route; \
-                unimplemented: addresses={addresses:?}, route={route:?}"
-            );
-            responder.try_send(Ok(())).unwrap_or_log("failed to respond");
+            info!("adding multicast route: addresses={addresses:?}, route={route:?}");
+            let result = handle_add_route(ctx, addresses, route);
+            if let Err(e) = &result {
+                warn!("failed to add multicast route: {e:?}")
+            }
+            responder.try_send(result).unwrap_or_log("failed to respond");
             Ok(())
         }
         TableControllerRequest::DelRoute { addresses, responder } => {
-            // TODO(https://fxbug.dev/323052525): Support deleting multicast routes.
-            warn!("not deleting multicast route; unimplemented: addresses={addresses:?}");
-            responder.try_send(Ok(())).unwrap_or_log("failed to respond");
+            info!("removing multicast route: addresses={addresses:?}");
+            let result = handle_del_route(ctx, addresses);
+            if let Err(e) = &result {
+                warn!("failed to remove multicast route: {e:?}")
+            }
+            responder.try_send(result).unwrap_or_log("failed to respond");
             Ok(())
         }
         TableControllerRequest::GetRouteStats { addresses, responder } => {
@@ -365,10 +381,122 @@ fn handle_request<I: FidlMulticastAdminIpExt>(
     }
 }
 
+/// Add a multicast route to the Netstack.
+#[netstack3_core::context_ip_bounds(I, BindingsCtx)]
+fn handle_add_route<I: IpExt + FidlMulticastAdminIpExt>(
+    ctx: &mut Ctx,
+    addresses: UnicastSourceAndMulticastDestination<I>,
+    route: fnet_multicast_admin::Route,
+) -> Result<(), AddRouteError> {
+    let key = addresses.try_into_core().map_err(IntoFidl::<AddRouteError>::into_fidl)?;
+    let route = FidlExtRoute::try_from(route)?;
+    let route = route.try_into_core_with_ctx(ctx.bindings_ctx())?;
+    match ctx.api().multicast_forwarding().add_multicast_route(key, route) {
+        Ok(None) => {}
+        Ok(Some(prev_route)) => info!("overwrote previous multicast route: {prev_route:?}"),
+        Err(MulticastForwardingDisabledError {}) => {
+            unreachable!("the existence of a `MulticastAdminClient` proves the api is enabled")
+        }
+    }
+    Ok(())
+}
+
+/// Remove a multicast route from the Netstack.
+#[netstack3_core::context_ip_bounds(I, BindingsCtx)]
+fn handle_del_route<I: IpExt + FidlMulticastAdminIpExt>(
+    ctx: &mut Ctx,
+    addresses: UnicastSourceAndMulticastDestination<I>,
+) -> Result<(), DelRouteError> {
+    let key = addresses.try_into_core().map_err(IntoFidl::<DelRouteError>::into_fidl)?;
+    match ctx.api().multicast_forwarding().remove_multicast_route(&key) {
+        Ok(None) => Err(DelRouteError::NotFound),
+        Ok(Some(_route)) => Ok(()),
+        Err(MulticastForwardingDisabledError {}) => {
+            unreachable!("the existance of a `MulticastAdminClient` proves the api is enabled")
+        }
+    }
+}
+
+/// Error with the provided [`UnicastSourceAndMulticastDestination`].
+#[derive(Debug, PartialEq)]
+pub struct MulticastRouteAddressError;
+
+impl IntoFidl<AddRouteError> for MulticastRouteAddressError {
+    fn into_fidl(self) -> AddRouteError {
+        let MulticastRouteAddressError {} = self;
+        AddRouteError::InvalidAddress
+    }
+}
+
+impl IntoFidl<DelRouteError> for MulticastRouteAddressError {
+    fn into_fidl(self) -> DelRouteError {
+        let MulticastRouteAddressError {} = self;
+        DelRouteError::InvalidAddress
+    }
+}
+
+impl<I: IpExt + FidlMulticastAdminIpExt> TryFromFidl<UnicastSourceAndMulticastDestination<I>>
+    for MulticastRouteKey<I>
+{
+    type Error = MulticastRouteAddressError;
+
+    fn try_from_fidl(addrs: UnicastSourceAndMulticastDestination<I>) -> Result<Self, Self::Error> {
+        let UnicastSourceAndMulticastDestination { unicast_source, multicast_destination } = addrs;
+        MulticastRouteKey::new(unicast_source, multicast_destination)
+            .ok_or(MulticastRouteAddressError)
+    }
+}
+
+impl TryFromFidlWithContext<FidlExtRoute> for MulticastRoute<DeviceId<BindingsCtx>> {
+    type Error = AddRouteError;
+
+    fn try_from_fidl_with_ctx<C: ConversionContext>(
+        ctx: &C,
+        route: FidlExtRoute,
+    ) -> Result<Self, Self::Error> {
+        let FidlExtRoute { expected_input_interface, action } = route;
+        let input_interface: DeviceId<BindingsCtx> =
+            TryFromFidlWithContext::try_from_fidl_with_ctx(
+                ctx,
+                NonZeroU64::new(expected_input_interface)
+                    .ok_or(AddRouteError::InterfaceNotFound)?,
+            )
+            .map_err(|DeviceNotFoundError {}| AddRouteError::InterfaceNotFound)?;
+        match action {
+            fnet_multicast_admin::Action::OutgoingInterfaces(interfaces) => {
+                let targets = interfaces
+                    .into_iter()
+                    .map(|fnet_multicast_admin::OutgoingInterfaces { id, min_ttl }| {
+                        let output_interface: DeviceId<BindingsCtx> =
+                            TryFromFidlWithContext::try_from_fidl_with_ctx(
+                                ctx,
+                                NonZeroU64::new(id).ok_or(AddRouteError::InterfaceNotFound)?,
+                            )
+                            .map_err(|DeviceNotFoundError {}| AddRouteError::InterfaceNotFound)?;
+                        Ok(MulticastRouteTarget { output_interface, min_ttl })
+                    })
+                    .collect::<Result<Vec<_>, AddRouteError>>()?;
+                MulticastRoute::new_forward(input_interface, targets.into()).map_err(|e| match e {
+                    ForwardMulticastRouteError::DuplicateTarget => AddRouteError::DuplicateOutput,
+                    ForwardMulticastRouteError::EmptyTargetList => {
+                        AddRouteError::RequiredRouteFieldsMissing
+                    }
+                    ForwardMulticastRouteError::InputInterfaceIsTarget => {
+                        AddRouteError::InputCannotBeOutput
+                    }
+                })
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
+    use crate::bindings::util::testutils::{
+        FakeConversionContext, BINDING_ID1, BINDING_ID2, INVALID_BINDING_ID,
+    };
     use crate::NetstackSeed;
 
     use assert_matches::assert_matches;
@@ -377,6 +505,14 @@ mod tests {
     use futures::task::Poll;
     use futures::{poll, FutureExt};
     use ip_test_macro::ip_test;
+    use net_declare::{net_ip_v4, net_ip_v6};
+    use net_types::ip::{Ipv4Addr, Ipv6Addr};
+    use test_case::test_case;
+
+    const UNICAST_V4: Ipv4Addr = net_ip_v4!("192.0.2.1");
+    const MULTICAST_V4: Ipv4Addr = net_ip_v4!("224.0.1.1");
+    const UNICAST_V6: Ipv6Addr = net_ip_v6!("2001:0DB8::1");
+    const MULTICAST_V6: Ipv6Addr = net_ip_v6!("ff0e::1");
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn worker_teardown() {
@@ -496,4 +632,101 @@ mod tests {
 
     // TODO(https://fxbug.dev/353330225): Add a test to verify that device
     // removal will remove any multicast routes that reference the device.
+
+    #[test_case(UnicastSourceAndMulticastDestination{
+        unicast_source: UNICAST_V4,
+        multicast_destination: MULTICAST_V4,
+        } => None; "success")]
+    #[test_case(UnicastSourceAndMulticastDestination{
+        unicast_source: UNICAST_V4,
+        multicast_destination: UNICAST_V4,
+        } => Some(MulticastRouteAddressError); "unicast_dst")]
+    #[test_case(UnicastSourceAndMulticastDestination{
+        unicast_source: MULTICAST_V4,
+        multicast_destination: MULTICAST_V4,
+        } => Some(MulticastRouteAddressError); "multicast_src")]
+    fn key_from_fidl_ipv4(
+        addrs: UnicastSourceAndMulticastDestination<Ipv4>,
+    ) -> Option<MulticastRouteAddressError> {
+        MulticastRouteKey::try_from_fidl(addrs).err()
+    }
+
+    #[test_case(UnicastSourceAndMulticastDestination{
+        unicast_source: UNICAST_V6,
+        multicast_destination: MULTICAST_V6,
+        } => None; "success")]
+    #[test_case(UnicastSourceAndMulticastDestination{
+        unicast_source: UNICAST_V6,
+        multicast_destination: UNICAST_V6,
+        } => Some(MulticastRouteAddressError); "unicast_dst")]
+    #[test_case(UnicastSourceAndMulticastDestination{
+        unicast_source: MULTICAST_V6,
+        multicast_destination: MULTICAST_V6,
+        } => Some(MulticastRouteAddressError); "multicast_src")]
+    fn key_from_fidl_ipv6(
+        addrs: UnicastSourceAndMulticastDestination<Ipv6>,
+    ) -> Option<MulticastRouteAddressError> {
+        MulticastRouteKey::try_from_fidl(addrs).err()
+    }
+
+    #[test_case(FidlExtRoute {
+        expected_input_interface: BINDING_ID1.into(),
+        action: fnet_multicast_admin::Action::OutgoingInterfaces(vec![
+            fnet_multicast_admin::OutgoingInterfaces {
+                id: BINDING_ID2.into(),
+                min_ttl: 0,
+            }
+        ]),
+        } => None; "success")]
+    #[test_case(FidlExtRoute {
+        expected_input_interface: INVALID_BINDING_ID.get(),
+        action: fnet_multicast_admin::Action::OutgoingInterfaces(vec![
+            fnet_multicast_admin::OutgoingInterfaces {
+                id: BINDING_ID2.into(),
+                min_ttl: 0,
+            }
+        ]),
+        } => Some(AddRouteError::InterfaceNotFound); "invalid_iif")]
+    #[test_case(FidlExtRoute {
+        expected_input_interface: BINDING_ID1.into(),
+        action: fnet_multicast_admin::Action::OutgoingInterfaces(vec![
+            fnet_multicast_admin::OutgoingInterfaces {
+                id: INVALID_BINDING_ID.into(),
+                min_ttl: 0,
+            }
+        ]),
+        } => Some(AddRouteError::InterfaceNotFound); "invalid_oif")]
+    #[test_case(FidlExtRoute {
+        expected_input_interface: BINDING_ID1.into(),
+        action: fnet_multicast_admin::Action::OutgoingInterfaces(vec![]),
+        } => Some(AddRouteError::RequiredRouteFieldsMissing); "no_oif")]
+    #[test_case(FidlExtRoute {
+        expected_input_interface: BINDING_ID1.into(),
+        action: fnet_multicast_admin::Action::OutgoingInterfaces(vec![
+            fnet_multicast_admin::OutgoingInterfaces {
+                id: BINDING_ID1.into(),
+                min_ttl: 0,
+            }
+        ]),
+        } => Some(AddRouteError::InputCannotBeOutput); "iff_is_oif")]
+    #[test_case(FidlExtRoute {
+        expected_input_interface: BINDING_ID1.into(),
+        action: fnet_multicast_admin::Action::OutgoingInterfaces(vec![
+            fnet_multicast_admin::OutgoingInterfaces {
+                id: BINDING_ID2.into(),
+                min_ttl: 0,
+            },
+            fnet_multicast_admin::OutgoingInterfaces {
+                id: BINDING_ID2.into(),
+                min_ttl: 0,
+            }
+        ]),
+        } => Some(AddRouteError::DuplicateOutput); "duplicate_oif")]
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn route_from_fidl(route: FidlExtRoute) -> Option<AddRouteError> {
+        let ctx = FakeConversionContext::new().await;
+        let outcome = MulticastRoute::try_from_fidl_with_ctx(&ctx, route).err();
+        ctx.shutdown().await;
+        outcome
+    }
 }

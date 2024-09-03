@@ -460,6 +460,53 @@ impl<'a> FidlResponder<WatchRoutingEventsResponse<'a, Ipv6>>
     }
 }
 
+/// The types of errors that may occur when creating [`Route`] from FIDL.
+#[derive(Debug, PartialEq)]
+pub enum RouteConversionError {
+    RequiredFieldMissing,
+}
+
+impl From<RouteConversionError> for AddRouteError {
+    fn from(route_conversion_error: RouteConversionError) -> AddRouteError {
+        match route_conversion_error {
+            RouteConversionError::RequiredFieldMissing => AddRouteError::RequiredRouteFieldsMissing,
+        }
+    }
+}
+
+/// A sanitized `fnet_multicast_admin::Route`.
+///
+/// All required fields are verified to be present.
+#[derive(Debug, PartialEq)]
+pub struct Route {
+    pub expected_input_interface: u64,
+    pub action: fnet_multicast_admin::Action,
+}
+
+impl TryFrom<fnet_multicast_admin::Route> for Route {
+    type Error = RouteConversionError;
+    fn try_from(fidl: fnet_multicast_admin::Route) -> Result<Self, Self::Error> {
+        let fnet_multicast_admin::Route { expected_input_interface, action, __source_breaking } =
+            fidl;
+        if let (Some(expected_input_interface), Some(action)) = (expected_input_interface, action) {
+            Ok(Route { expected_input_interface, action })
+        } else {
+            Err(RouteConversionError::RequiredFieldMissing)
+        }
+    }
+}
+
+impl From<Route> for fnet_multicast_admin::Route {
+    fn from(route: Route) -> fnet_multicast_admin::Route {
+        let Route { expected_input_interface, action } = route;
+        fnet_multicast_admin::Route {
+            expected_input_interface: Some(expected_input_interface),
+            action: Some(action),
+            __source_breaking: fidl::marker::SourceBreaking,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -625,5 +672,45 @@ mod tests {
         err: GetRouteStatsError,
     ) -> fnet_multicast_admin::Ipv6RoutingTableControllerGetRouteStatsError {
         fnet_multicast_admin::Ipv6RoutingTableControllerGetRouteStatsError::from(err)
+    }
+
+    #[test_case(
+        fnet_multicast_admin::Route {
+            expected_input_interface: Some(1),
+            action: Some(fnet_multicast_admin::Action::OutgoingInterfaces(vec![])),
+            __source_breaking: fidl::marker::SourceBreaking,
+        },
+        Ok(Route {
+            expected_input_interface: 1,
+            action: fnet_multicast_admin::Action::OutgoingInterfaces(vec![]),
+        });
+        "success"
+    )]
+    #[test_case(
+        fnet_multicast_admin::Route {
+            expected_input_interface: None,
+            action: Some(fnet_multicast_admin::Action::OutgoingInterfaces(vec![])),
+            __source_breaking: fidl::marker::SourceBreaking,
+        },
+        Err(RouteConversionError::RequiredFieldMissing);
+        "missing input interface"
+    )]
+    #[test_case(
+        fnet_multicast_admin::Route {
+            expected_input_interface: Some(1),
+            action: None,
+            __source_breaking: fidl::marker::SourceBreaking,
+        },
+        Err(RouteConversionError::RequiredFieldMissing);
+        "missing action"
+    )]
+    fn route_conversion(
+        fidl: fnet_multicast_admin::Route,
+        expected_result: Result<Route, RouteConversionError>,
+    ) {
+        assert_eq!(Route::try_from(fidl.clone()), expected_result);
+        if let Ok(route) = expected_result {
+            assert_eq!(fnet_multicast_admin::Route::from(route), fidl);
+        }
     }
 }

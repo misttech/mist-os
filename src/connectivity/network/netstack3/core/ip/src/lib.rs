@@ -185,9 +185,12 @@ pub mod socket {
 
 /// Multicast Forwarding
 pub mod multicast_forwarding {
-    pub use crate::internal::multicast_forwarding::api::MulticastForwardingApi;
+    pub use crate::internal::multicast_forwarding::api::{
+        MulticastForwardingApi, MulticastForwardingDisabledError,
+    };
     pub use crate::internal::multicast_forwarding::route::{
-        MulticastRoute, MulticastRouteKey, MulticastRouteTarget, MulticastRouteTargets,
+        ForwardMulticastRouteError, MulticastRoute, MulticastRouteKey, MulticastRouteTarget,
+        MulticastRouteTargets,
     };
     pub use crate::internal::multicast_forwarding::state::{
         MulticastForwardingEnabledState, MulticastForwardingPendingPackets,
