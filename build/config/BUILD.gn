@@ -50,13 +50,14 @@ if (zircon_toolchain != false) {
 config("language") {
   cflags_c = [ "-std=c11" ]
   cflags_cc = [ "-std=c++$fuchsia_cxx_version" ]
+  defines = []
 
   if (fuchsia_cxx_version < 20) {
     # TODO(https://fxbug.dev/42064981): libc++ now marks the C++20
     # synchronization primitives as deprecated in older C++ standards which
     # affects Fuchsia since we use these primitives across the codebase. We
     # temporarily suppress these warnings until C++20 becomes the default.
-    defines = [ "_LIBCPP_DISABLE_DEPRECATION_WARNINGS" ]
+    defines += [ "_LIBCPP_DISABLE_DEPRECATION_WARNINGS" ]
   }
 
   if (current_os == "mac") {
