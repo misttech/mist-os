@@ -115,7 +115,7 @@ bool mutex_spin_time_test(void) {
 
       // Spin until we notice that the thread is blocked.
       auto get_thread_state = [](const Thread& t) -> thread_state {
-        SingletonChainLockGuardIrqSave guard{t.get_lock(), CLT_TAG("mutex_spin_time_test")};
+        SingleChainLockGuard guard{IrqSaveOption, t.get_lock(), CLT_TAG("mutex_spin_time_test")};
         return t.state();
       };
 

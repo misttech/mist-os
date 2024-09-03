@@ -19,7 +19,9 @@ namespace {
 bool instantiate() {
   BEGIN_TEST;
 
-  { Prng prng("", 0); }
+  {
+    Prng prng("", 0);
+  }
 
   END_TEST;
 }
@@ -170,7 +172,7 @@ bool prng_blocks() {
   while (true) {
     {
       // The drawer thread should be blocked waiting for the prng to have enough entropy.
-      SingletonChainLockGuardIrqSave guard{drawer->get_lock(), CLT_TAG("prng_blocks")};
+      SingleChainLockGuard guard{IrqSaveOption, drawer->get_lock(), CLT_TAG("prng_blocks")};
       if (drawer->state() == THREAD_BLOCKED) {
         break;
       }

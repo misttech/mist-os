@@ -59,11 +59,15 @@ static void timer_callback_func(Timer* timer, zx_time_t now, void* arg) {
   PreemptDisableTestAccess::ClearPending(&preemption_state);
   ASSERT(preemption_state.preempts_pending() == 0);
   {
-    Thread& current_thread = *Thread::Current::Get();
-    ChainLockTransactionIrqSave clt{CLT_TAG("PreemptDisableTests timer_callback")};
-    UnconditionalChainLockGuard guard(current_thread.get_lock());
-    clt.Finalize();
-    Scheduler::Reschedule(&current_thread);
+    const auto do_transaction = [&]() TA_REQ(chainlock_transaction_token) {
+      Thread& current_thread = *Thread::Current::Get();
+      ChainLockGuard guard(current_thread.get_lock());
+      ChainLockTransaction::Finalize();
+      Scheduler::Reschedule(&current_thread);
+      return ChainLockTransaction::Done;
+    };
+    ChainLockTransaction::UntilDone(IrqSaveOption, CLT_TAG("PreemptDisableTests timer_callback"),
+                                    do_transaction);
   }
   ASSERT(preemption_state.preempts_pending() != 0);
 
@@ -447,7 +451,8 @@ static bool test_local_preempt_pending() {
     t->Resume();
     while (true) {
       Thread::Current::Yield();
-      SingletonChainLockGuardIrqSave guard{t->get_lock(), CLT_TAG("test_local_preempt_pending")};
+      SingleChainLockGuard guard{IrqSaveOption, t->get_lock(),
+                                 CLT_TAG("test_local_preempt_pending")};
       if (args.started.load() && t->scheduler_state().state() == THREAD_BLOCKED) {
         break;
       }

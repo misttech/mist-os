@@ -60,8 +60,9 @@ struct OwnedWaitQueueTopologyTests {
     const OwnedWaitQueue* target_queue() const { return target_queue_; }
     const OwnedWaitQueue* blocking_queue() const TA_EXCL(chainlock_transaction_token) {
       ASSERT(thread_ != nullptr);
-      SingletonChainLockGuardIrqSave guard{
-          thread_->get_lock(), CLT_TAG("OwnedWaitQueueTopologyTests::TestThread::blocking_queue")};
+      SingleChainLockGuard guard{
+          IrqSaveOption, thread_->get_lock(),
+          CLT_TAG("OwnedWaitQueueTopologyTests::TestThread::blocking_queue")};
       return OwnedWaitQueue::DowncastToOwq(thread_->wait_queue_state().blocking_wait_queue());
     }
 
@@ -96,8 +97,8 @@ struct OwnedWaitQueueTopologyTests {
     OwnedWaitQueue* owq() { return owq_.get(); }
     Thread* owner() {
       ASSERT(owq_ != nullptr);
-      SingletonChainLockGuardIrqSave guard{
-          owq_->get_lock(), CLT_TAG("OwnedWaitQueueTopologyTests::TestQueue::owner")};
+      SingleChainLockGuard guard{IrqSaveOption, owq_->get_lock(),
+                                 CLT_TAG("OwnedWaitQueueTopologyTests::TestQueue::owner")};
       return owq_->owner();
     }
 
@@ -280,23 +281,22 @@ int OwnedWaitQueueTopologyTests::TestThread::Main() {
     return -1;
   }
 
-  {
-    ChainLockTransactionIrqSave clt{
-        CLT_TAG("OwnedWaitQueueTopologyTests::TestThread::Main (final exit block)")};
-
+  const auto do_transaction =
+      [&]() TA_REQ(chainlock_transaction_token) -> ChainLockTransaction::Result<> {
     Thread* const current_thread = Thread::Current::Get();
-    ktl::array locks{&final_exit_queue_.get_lock(), &current_thread->get_lock()};
 
-    while (AcquireChainLockSet(locks) == ChainLock::Result::Backoff) {
-      clt.Relax();
+    while (!AcquireBothOrBackoff(final_exit_queue_.get_lock(), current_thread->get_lock())) {
+      return ChainLockTransaction::Action::Backoff;
     }
 
-    clt.Finalize();
-    final_exit_queue_.get_lock().AssertAcquired();
-    current_thread->get_lock().AssertAcquired();
+    ChainLockTransaction::Finalize();
     final_exit_queue_.Block(current_thread, Deadline::infinite(), Interruptible::Yes);
     current_thread->get_lock().Release();
-  }
+    return ChainLockTransaction::Done;
+  };
+  ChainLockTransaction::UntilDone(
+      IrqSaveOption, CLT_TAG("OwnedWaitQueueTopologyTests::TestThread::Main (final exit block)"),
+      do_transaction);
 
   return 0;
 }
@@ -317,8 +317,8 @@ bool OwnedWaitQueueTopologyTests::TestThread::DoBlock(TestQueue& queue, TestThre
 
   while (true) {
     {
-      SingletonChainLockGuardIrqSave guard{
-          thread_->get_lock(), CLT_TAG("OwnedWaitQueueTopologyTests::TestThread::DoBlock")};
+      SingleChainLockGuard guard{IrqSaveOption, thread_->get_lock(),
+                                 CLT_TAG("OwnedWaitQueueTopologyTests::TestThread::DoBlock")};
       if (thread_->state() == THREAD_BLOCKED) {
         break;
       }

@@ -415,8 +415,8 @@ bool set_migrate_ready_threads_test() {
       thread_state state;
       cpu_num_t curr_cpu;
       {
-        SingletonChainLockGuardIrqSave guard{worker->get_lock(),
-                                             CLT_TAG("set_migrate_ready_threads_test")};
+        SingleChainLockGuard guard{IrqSaveOption, worker->get_lock(),
+                                   CLT_TAG("set_migrate_ready_threads_test")};
         state = worker->state();
         curr_cpu = worker->scheduler_state().curr_cpu();
       }
@@ -870,7 +870,8 @@ bool backtrace_instance_method_test() {
   thread_state state = thread_state::THREAD_RUNNING;
   while (state != thread_state::THREAD_BLOCKED) {
     Thread::Current::SleepRelative(ZX_USEC(200));
-    SingletonChainLockGuardIrqSave guard{t->get_lock(), CLT_TAG("backtrace_instance_method_test")};
+    SingleChainLockGuard guard{IrqSaveOption, t->get_lock(),
+                               CLT_TAG("backtrace_instance_method_test")};
     state = t->state();
   }
 

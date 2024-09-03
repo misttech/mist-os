@@ -29,6 +29,7 @@
 #include <assert.h>
 #include <debug.h>
 #include <lib/fit/defer.h>
+#include <lib/kconcurrent/chainlock.h>
 #include <lib/kconcurrent/chainlock_transaction.h>
 #include <lib/zircon-internal/macros.h>
 #include <sys/types.h>
@@ -64,31 +65,31 @@ zx_status_t Event::WaitWorker(const Deadline& deadline, Interruptible interrupti
   // lock, so by holding it here, we can check the state of the signal and fast
   // abort if we need to, or descend into the wait queue and be certain to fully
   // block in the queue before releasing the lock.
-  ChainLockTransactionIrqSave clt{CLT_TAG("Event::WaitWorker")};
-  for (;; clt.Relax()) {
-    wait_.get_lock().AcquireUnconditionally();
+  const auto do_transaction =
+      [&]() TA_REQ(chainlock_transaction_token) -> ChainLockTransaction::Result<zx_status_t> {
+    wait_.get_lock().AcquireFirstInChain();
 
-    zx_status_t ret = result_.load(ktl::memory_order_relaxed);
-    if (ret == kNotSignaled) {
+    zx_status_t result = result_.load(ktl::memory_order_relaxed);
+    if (result == kNotSignaled) {
       // Looks like we are not currently signaled.  Now try to obtain the
       // current thread's lock so we can block it.
       Thread* current_thread = Thread::Current::Get();
-      if (current_thread->get_lock().Acquire() == ChainLock::Result::Backoff) {
+      if (!current_thread->get_lock().AcquireOrBackoff()) {
         wait_.get_lock().Release();
-        continue;
+        return ChainLockTransaction::Action::Backoff;
       }
-      current_thread->get_lock().AssertAcquired();
-      clt.Finalize();
+
+      ChainLockTransaction::Finalize();
 
       // We got the lock, go ahead and block the thread.  This will
       // automatically release the queue's lock after the thread has been added
       // to the queue and is committed to blocking.  We will need release the
       // thread's lock ourselves after it wakes up, as it will be obtained as it
       // becomes scheduled.
-      ret = wait_.BlockEtc(current_thread, deadline, signal_mask, ResourceOwnership::Normal,
-                           interruptible);
+      result = wait_.BlockEtc(current_thread, deadline, signal_mask, ResourceOwnership::Normal,
+                              interruptible);
       current_thread->get_lock().Release();
-      return ret;
+      return result;
     }
 
     /* signaled, we're going to fall through */
@@ -98,8 +99,11 @@ zx_status_t Event::WaitWorker(const Deadline& deadline, Interruptible interrupti
     }
 
     wait_.get_lock().Release();
-    return ret;
-  }
+    return result;
+  };
+
+  return ChainLockTransaction::UntilDone(IrqSaveOption, CLT_TAG("Event::WaitWorker"),
+                                         do_transaction);
 }
 
 /**
@@ -120,23 +124,22 @@ void Event::Signal(zx_status_t wait_result) {
 
   // In order to transition from not-signaled to signaled, we must be
   // holding our wait queue's lock.
-  ChainLockTransactionIrqSave clt{CLT_TAG("Event::Signal")};
-  auto finalize_clt = fit::defer([&clt]() TA_NO_THREAD_SAFETY_ANALYSIS { clt.Finalize(); });
-  for (;; clt.Relax()) {
-    UnconditionalChainLockGuard guard{wait_.get_lock()};
+  const auto do_transaction =
+      [&]() TA_REQ(chainlock_transaction_token) -> ChainLockTransaction::Result<> {
+    ChainLockGuard guard{wait_.get_lock()};
 
     // If we are already signaled, we are finished.  We should be able to assert
     // that there are no waiters right now.
     if (result_.load(ktl::memory_order_relaxed) != kNotSignaled) {
       DEBUG_ASSERT(wait_.Count() == 0);
-      break;
+      return ChainLockTransaction::Done;
     }
 
     // If there are no threads waiting in the event, we can just mark it
     // signaled and get out.
     if (wait_.Count() == 0) {
       result_.store(wait_result, ktl::memory_order_relaxed);
-      break;
+      return ChainLockTransaction::Done;
     }
 
     // Try to lock with one or all of the threads for wake.
@@ -146,11 +149,11 @@ void Event::Signal(zx_status_t wait_result) {
 
     // If we failed to lock, we need to drop the queue lock, then try again.
     if (!maybe_unblock_list.has_value()) {
-      continue;
+      return ChainLockTransaction::Action::Backoff;
     }
 
     // We have all of our locks now, time to proceed with the wake operations (if any)
-    finalize_clt.call();
+    ChainLockTransaction::Finalize();
 
     // Success.  If we not an auto-reset event, or we failed to find anyone to
     // wake, make sure to set the event to the signaled state.
@@ -165,8 +168,9 @@ void Event::Signal(zx_status_t wait_result) {
     if (has_threads_to_wake) {
       Scheduler::Unblock(ktl::move(maybe_unblock_list).value());
     }
-    break;
-  }
+    return ChainLockTransaction::Done;
+  };
+  ChainLockTransaction::UntilDone(IrqSaveOption, CLT_TAG("Event::Signal"), do_transaction);
 }
 
 /**

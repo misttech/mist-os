@@ -697,7 +697,7 @@ zx::result<ktl::unique_ptr<V>> Vcpu::Create(G& guest, uint16_t vpid, zx_vaddr_t 
 
   {
     Guard<SpinLock, IrqSave> list_guard{&Thread::get_list_lock()};
-    SingletonChainLockGuardIrqSave thread_guard{thread->get_lock(), CLT_TAG("Vcpu::Create")};
+    SingleChainLockGuard thread_guard{IrqSaveOption, thread->get_lock(), CLT_TAG("Vcpu::Create")};
 
     // Only set the thread migrate function after we have initialised the VMCS.
     // Otherwise, the migrate function may interact with an uninitialised VMCS.
@@ -736,7 +736,8 @@ Vcpu::~Vcpu() {
     // either our thread, or nullptr if the thread has already exited.
     Guard<SpinLock, IrqSave> guard{&Thread::get_list_lock()};
     if (thread_ != nullptr) {
-      SingletonChainLockGuardNoIrqSave thread_guard{thread_->get_lock(), CLT_TAG("Vcpu::~Vcpu")};
+      SingleChainLockGuard thread_guard{NoIrqSaveOption, thread_->get_lock(),
+                                        CLT_TAG("Vcpu::~Vcpu")};
       thread_->set_vcpu(false);
       // Clear the migration function, so that |thread_| does not reference
       // |this| after destruction of the VCPU.
@@ -1000,8 +1001,8 @@ void Vcpu::InterruptCpu() {
     //
     // TODO(johngro): Do we need any of this?  Can we just use the Thread's
     // last_cpu member instead?
-    SingletonChainLockGuardNoIrqSave thread_guard{thread_->get_lock(),
-                                                  CLT_TAG("Vcpu::InterruptCpu")};
+    SingleChainLockGuard thread_guard{NoIrqSaveOption, thread_->get_lock(),
+                                      CLT_TAG("Vcpu::InterruptCpu")};
 
     // If the VCPU thread is still running, and we have a valid last_cpu_, send
     // the thread's CPU an IPI.

@@ -22,13 +22,14 @@ library_headers("headers") {
 
 source_set("kconcurrent") {
   sources = [
-    "chainlock.cc",
     "chainlock_transaction.cc",
     "seqlock.cc",
   ]
   public_deps = [ ":headers" ]
   deps = [
     "//zircon/kernel/lib/arch",
+    "//zircon/kernel/lib/counters",
+    "//zircon/system/ulib/affine",
     "//zircon/system/ulib/concurrent",
     "//zircon/system/ulib/lockdep",
   ]

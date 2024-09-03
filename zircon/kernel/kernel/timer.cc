@@ -26,6 +26,7 @@
 #include <lib/affine/ratio.h>
 #include <lib/arch/intrin.h>
 #include <lib/counters.h>
+#include <lib/kconcurrent/chainlock_transaction.h>
 #include <lib/zircon-internal/macros.h>
 #include <platform.h>
 #include <stdlib.h>

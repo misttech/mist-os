@@ -128,7 +128,7 @@ zx_status_t x86_get_set_vector_regs(Thread* thread, zx_thread_state_vector_regs_
   // Whether to force the components to be marked present in the xsave area.
   bool mark_present = access == RegAccess::kSet;
 
-  SingletonChainLockGuardIrqSave guard{thread->get_lock(), CLT_TAG("x86_get_set_vector_regs")};
+  SingleChainLockGuard guard{IrqSaveOption, thread->get_lock(), CLT_TAG("x86_get_set_vector_regs")};
   DEBUG_ASSERT(thread->IsUserStateSavedLocked());
 
   constexpr int kNumSSERegs = 16;
@@ -174,7 +174,7 @@ zx_status_t x86_get_set_vector_regs(Thread* thread, zx_thread_state_vector_regs_
 }  // namespace
 
 zx_status_t arch_get_general_regs(Thread* thread, zx_thread_state_general_regs_t* out) {
-  SingletonChainLockGuardIrqSave guard{thread->get_lock(), CLT_TAG("arch_get_general_regs")};
+  SingleChainLockGuard guard{IrqSaveOption, thread->get_lock(), CLT_TAG("arch_get_general_regs")};
 
   DEBUG_ASSERT(thread->IsUserStateSavedLocked());
 
@@ -202,7 +202,7 @@ zx_status_t arch_get_general_regs(Thread* thread, zx_thread_state_general_regs_t
 }
 
 zx_status_t arch_set_general_regs(Thread* thread, const zx_thread_state_general_regs_t* in) {
-  SingletonChainLockGuardIrqSave guard{thread->get_lock(), CLT_TAG("arch_set_general_regs")};
+  SingleChainLockGuard guard{IrqSaveOption, thread->get_lock(), CLT_TAG("arch_set_general_regs")};
 
   DEBUG_ASSERT(thread->IsUserStateSavedLocked());
 
@@ -247,7 +247,7 @@ zx_status_t arch_set_general_regs(Thread* thread, const zx_thread_state_general_
 }
 
 zx_status_t arch_get_single_step(Thread* thread, zx_thread_state_single_step_t* out) {
-  SingletonChainLockGuardIrqSave guard{thread->get_lock(), CLT_TAG("arch_get_single_step")};
+  SingleChainLockGuard guard{IrqSaveOption, thread->get_lock(), CLT_TAG("arch_get_single_step")};
 
   DEBUG_ASSERT(thread->IsUserStateSavedLocked());
 
@@ -277,7 +277,7 @@ zx_status_t arch_set_single_step(Thread* thread, const zx_thread_state_single_st
     return ZX_ERR_INVALID_ARGS;
   }
 
-  SingletonChainLockGuardIrqSave guard{thread->get_lock(), CLT_TAG("arch_set_single_step")};
+  SingleChainLockGuard guard{IrqSaveOption, thread->get_lock(), CLT_TAG("arch_set_single_step")};
 
   DEBUG_ASSERT(thread->IsUserStateSavedLocked());
 
@@ -310,7 +310,7 @@ zx_status_t arch_get_fp_regs(Thread* thread, zx_thread_state_fp_regs_t* out) {
   // Don't leak any reserved fields.
   memset(out, 0, sizeof(zx_thread_state_fp_regs_t));
 
-  SingletonChainLockGuardIrqSave guard{thread->get_lock(), CLT_TAG("arch_get_fp_regs")};
+  SingleChainLockGuard guard{IrqSaveOption, thread->get_lock(), CLT_TAG("arch_get_fp_regs")};
 
   DEBUG_ASSERT(thread->IsUserStateSavedLocked());
 
@@ -332,7 +332,7 @@ zx_status_t arch_get_fp_regs(Thread* thread, zx_thread_state_fp_regs_t* out) {
 }
 
 zx_status_t arch_set_fp_regs(Thread* thread, const zx_thread_state_fp_regs_t* in) {
-  SingletonChainLockGuardIrqSave guard{thread->get_lock(), CLT_TAG("arch_set_fp_regs")};
+  SingleChainLockGuard guard{IrqSaveOption, thread->get_lock(), CLT_TAG("arch_set_fp_regs")};
 
   DEBUG_ASSERT(thread->IsUserStateSavedLocked());
 
@@ -365,7 +365,7 @@ zx_status_t arch_set_vector_regs(Thread* thread, const zx_thread_state_vector_re
 }
 
 zx_status_t arch_get_debug_regs(Thread* thread, zx_thread_state_debug_regs_t* out) {
-  SingletonChainLockGuardIrqSave guard{thread->get_lock(), CLT_TAG("arch_get_debug_regs")};
+  SingleChainLockGuard guard{IrqSaveOption, thread->get_lock(), CLT_TAG("arch_get_debug_regs")};
 
   DEBUG_ASSERT(thread->IsUserStateSavedLocked());
 
@@ -383,7 +383,7 @@ zx_status_t arch_get_debug_regs(Thread* thread, zx_thread_state_debug_regs_t* ou
 }
 
 zx_status_t arch_set_debug_regs(Thread* thread, const zx_thread_state_debug_regs_t* in) {
-  SingletonChainLockGuardIrqSave guard{thread->get_lock(), CLT_TAG("arch_set_debug_regs")};
+  SingleChainLockGuard guard{IrqSaveOption, thread->get_lock(), CLT_TAG("arch_set_debug_regs")};
 
   DEBUG_ASSERT(thread->IsUserStateSavedLocked());
 

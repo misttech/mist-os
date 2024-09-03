@@ -562,7 +562,7 @@ struct DebuglogTests {
 
     ChainLock lock;
     {
-      SingletonChainLockGuardIrqSave guard{lock, CLT_TAG("DebuglogTests")};
+      SingleChainLockGuard guard{IrqSaveOption, lock, CLT_TAG("DebuglogTests")};
       ASSERT_EQ(ZX_OK, log->Write(DEBUGLOG_WARNING, 0, {msg, sizeof(msg)}));
     }
 

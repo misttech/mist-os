@@ -7,6 +7,7 @@
 #include "object/futex_context.h"
 
 #include <assert.h>
+#include <lib/kconcurrent/chainlock.h>
 #include <lib/kconcurrent/chainlock_transaction.h>
 #include <lib/ktrace.h>
 #include <lib/zircon-internal/macros.h>
@@ -398,12 +399,27 @@ zx_status_t FutexContext::FutexWait(user_in_ptr<const zx_futex_t> value_ptr,
       // Now we can go ahead and obtain the ChainLocks we need, and once we have
       // them, drop the spinlocks we are holding.
       Thread* const current_kernel_thread = Thread::Current::Get();
-      ChainLockTransactionNoIrqSave clt{CLT_TAG("FutexContext::FutexWaitInternal")};
+
+      // StateSaver handles the relax operation during backoff.
+      ChainLockTransaction::StateSaver<ChainLockTransaction::StateOptions::NoIrqSave> state_saver;
+
+      // Create a bare transaction to avoid tripping over all of the existing guards and auto state
+      // save/restore RAII objects above.
+      // TODO(eieio): Figure out how to refactor this method into a pattern that is amedable to the
+      // standard chain lock transaction pattern.
+      ChainLockTransaction transaction =
+          ChainLockTransaction::MakeBareTransaction(CLT_TAG("FutexContext::FutexWaitInternal"));
 
       Thread* const new_owner = new_owner_observation.core_thread();
-      OwnedWaitQueue::BAAOLockingDetails locking_details =
-          futex_ref->waiters_.LockForBAAOOperation(current_kernel_thread, new_owner);
-      clt.Finalize();
+      OwnedWaitQueue::BAAOLockingDetails locking_details;
+      while (!futex_ref->waiters_.LockForBAAOOperationOrBackoff(current_kernel_thread, new_owner,
+                                                                locking_details)) {
+        // No other chain locks are held. Simply try again until the locks are obtained.
+        transaction.AssertNumLocksHeld(0);
+        state_saver.Relax(transaction);
+      }
+
+      transaction.Finalize();
 
       // We now have all of the locks we need in order to block our thread.
       // We can now drop the:
@@ -735,8 +751,8 @@ zx_status_t FutexContext::FutexGetOwner(user_in_ptr<const zx_futex_t> value_ptr,
   // to enter the queue's lock in order to check.
   if (futex_ref != nullptr) {
     {  // explicit lock scope
-      SingletonChainLockGuardIrqSave guard{futex_ref->waiters_.get_lock(),
-                                           CLT_TAG("FutexContext::FutexGetOwner")};
+      SingleChainLockGuard guard{IrqSaveOption, futex_ref->waiters_.get_lock(),
+                                 CLT_TAG("FutexContext::FutexGetOwner")};
 
       if (const Thread* owner = futex_ref->waiters_.owner(); owner != nullptr) {
         // Any thread which owns a FutexState's wait queue *must* be a

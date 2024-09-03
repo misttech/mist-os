@@ -312,8 +312,9 @@ class LockedOwnedWaitQueue : public OwnedWaitQueue {
   }
 
   bool HasInheritedSchedulerStateStorage() const {
-    SingletonChainLockGuardIrqSave guard{
-        get_lock(), CLT_TAG("LockedOwnedWaitQueue::HasInheritedSchedulerStateStorage (pi_tests)")};
+    SingleChainLockGuard guard{
+        IrqSaveOption, get_lock(),
+        CLT_TAG("LockedOwnedWaitQueue::HasInheritedSchedulerStateStorage (pi_tests)")};
     return inherited_scheduler_state_storage() != nullptr;
   }
 };
@@ -430,8 +431,8 @@ class TestThread {
       return thread_state::THREAD_DEATH;
     }
 
-    SingletonChainLockGuardIrqSave guard{thread_->get_lock(),
-                                         CLT_TAG("TestThread::tstate (pi_tests)")};
+    SingleChainLockGuard guard{IrqSaveOption, thread_->get_lock(),
+                               CLT_TAG("TestThread::tstate (pi_tests)")};
     return thread_->state();
   }
 
@@ -510,26 +511,22 @@ bool TestThread::BlockOnWaitQueue(WaitQueue* wq, zx::duration relative_timeout) 
                            ? Deadline::infinite()
                            : Deadline::after(relative_timeout.get());
 
-    ChainLockTransactionPreemptDisableAndIrqSave clt{
-        CLT_TAG("TestThread::BlockOnWaitQueue (pi_tests)")};
-    for (;; clt.Relax()) {
+    const auto do_transaction = [&]() TA_REQ(
+                                    chainlock_transaction_token,
+                                    preempt_disabled_token) -> ChainLockTransaction::Result<> {
       Thread* const current_thread = Thread::Current::Get();
-      ktl::array locks{&current_thread->get_lock(), &wq->get_lock()};
-      ChainLock::Result res = AcquireChainLockSet(locks);
-
-      if (res == ChainLock::Result::Backoff) {
-        continue;
+      if (!AcquireBothOrBackoff(current_thread->get_lock(), wq->get_lock())) {
+        return ChainLockTransaction::Action::Backoff;
       }
 
-      DEBUG_ASSERT(res == ChainLock::Result::Ok);
-      clt.Finalize();
-
-      current_thread->get_lock().AssertAcquired();
-      wq->get_lock().AssertAcquired();
+      ChainLockTransaction::Finalize();
       wq->Block(current_thread, timeout, Interruptible::Yes);
       current_thread->get_lock().Release();
-      break;
-    }
+      return ChainLockTransaction::Done;
+    };
+    ChainLockTransaction::UntilDone(PreemptDisableAndIrqSaveOption,
+                                    CLT_TAG("TestThread::BlockOnWaitQueue (pi_tests)"),
+                                    do_transaction);
   };
 
   state_.store(State::WAITING_TO_START);
@@ -1557,7 +1554,7 @@ bool pi_test_cycle() {
       // owned by the first thread when we tried to create the cycle, but the
       // implementation should have refused and left the queue with now owner.
       auto ObserveOwner = [](OwnedWaitQueue& queue) -> const Thread* {
-        SingletonChainLockGuardIrqSave guard{queue.get_lock(), CLT_TAG("pi_test_cycle")};
+        SingleChainLockGuard guard{IrqSaveOption, queue.get_lock(), CLT_TAG("pi_test_cycle")};
         return queue.owner();
       };
 
@@ -1639,8 +1636,8 @@ bool bug_42182770_regression() {
     // utilization in the queue's values.
     ASSERT_TRUE(fair_thread.BlockOnOwnedWaitQueue(owq.get(), nullptr));
     {
-      SingletonChainLockGuardIrqSave guard{owq->get_lock(),
-                                           CLT_TAG("pi_tests::bug_42182770_regression #1")};
+      SingleChainLockGuard guard{IrqSaveOption, owq->get_lock(),
+                                 CLT_TAG("pi_tests::bug_42182770_regression #1")};
       ASSERT_NONNULL(owq->inherited_scheduler_state_storage());
 
       const SchedulerState::WaitQueueInheritedSchedulerState& iss =
@@ -1659,8 +1656,8 @@ bool bug_42182770_regression() {
     // queue.
     ASSERT_TRUE(deadline_thread.BlockOnOwnedWaitQueue(owq.get(), nullptr));
     {
-      SingletonChainLockGuardIrqSave guard{owq->get_lock(),
-                                           CLT_TAG("pi_tests::bug_42182770_regression #2")};
+      SingleChainLockGuard guard{IrqSaveOption, owq->get_lock(),
+                                 CLT_TAG("pi_tests::bug_42182770_regression #2")};
       ASSERT_NONNULL(owq->const_inherited_scheduler_state_storage());
 
       const SchedDeadlineParams& params =
@@ -1691,8 +1688,8 @@ bool bug_42182770_regression() {
     // considered to be undefined.
     ASSERT_TRUE(deadline_thread.Reset(true));
     {
-      SingletonChainLockGuardIrqSave guard{owq->get_lock(),
-                                           CLT_TAG("pi_tests::bug_42182770_regression #3")};
+      SingleChainLockGuard guard{IrqSaveOption, owq->get_lock(),
+                                 CLT_TAG("pi_tests::bug_42182770_regression #3")};
       ASSERT_NONNULL(owq->const_inherited_scheduler_state_storage());
 
       const SchedulerState::WaitQueueInheritedSchedulerState& iss =

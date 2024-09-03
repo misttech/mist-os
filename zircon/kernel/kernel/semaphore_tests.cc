@@ -89,8 +89,8 @@ static int wait_sema_thread(void* arg) {
 }
 
 static bool thread_is_blocked(const Thread* t) {
-  SingletonChainLockGuardIrqSave guard{t->get_lock(),
-                                       CLT_TAG("thread_is_blocked (semaphore tests)")};
+  SingleChainLockGuard guard{IrqSaveOption, t->get_lock(),
+                             CLT_TAG("thread_is_blocked (semaphore tests)")};
   return (t->state() == THREAD_BLOCKED);
 }
 

@@ -743,10 +743,8 @@ zx_status_t sys_object_get_info(zx_handle_t handle, uint32_t topic, user_out_ptr
         // account for idle time if a cpu is currently idle
         {
           const Thread& idle_power_thread = cpu->idle_power_thread.thread();
-          ChainLockTransactionIrqSave clt{CLT_TAG("ZX_INFO_CPU_STATS idle time rollup")};
-          UnconditionalChainLockGuard guard{idle_power_thread.get_lock()};
-          clt.Finalize();
-
+          SingleChainLockGuard guard{IrqSaveOption, idle_power_thread.get_lock(),
+                                     CLT_TAG("ZX_INFO_CPU_STATS idle time rollup")};
           zx_time_t idle_time = cpu->stats.idle_time;
           const bool is_idle = Scheduler::PeekIsIdle(i);
           if (is_idle) {

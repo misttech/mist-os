@@ -25,7 +25,8 @@ static constexpr uint64_t kMdscrSSMask = 1;
 static constexpr uint64_t kSSMaskSPSR = (1 << 21);
 
 zx_status_t arch_get_general_regs(Thread* thread, zx_thread_state_general_regs_t* out) {
-  SingletonChainLockGuardIrqSave thread_guard{thread->get_lock(), CLT_TAG("arch_get_general_regs")};
+  SingleChainLockGuard thread_guard{IrqSaveOption, thread->get_lock(),
+                                    CLT_TAG("arch_get_general_regs")};
 
   DEBUG_ASSERT(thread->IsUserStateSavedLocked());
 
@@ -50,7 +51,8 @@ zx_status_t arch_get_general_regs(Thread* thread, zx_thread_state_general_regs_t
 }
 
 zx_status_t arch_set_general_regs(Thread* thread, const zx_thread_state_general_regs_t* in) {
-  SingletonChainLockGuardIrqSave thread_guard{thread->get_lock(), CLT_TAG("arch_set_general_regs")};
+  SingleChainLockGuard thread_guard{IrqSaveOption, thread->get_lock(),
+                                    CLT_TAG("arch_set_general_regs")};
 
   DEBUG_ASSERT(thread->IsUserStateSavedLocked());
 
@@ -75,7 +77,8 @@ zx_status_t arch_set_general_regs(Thread* thread, const zx_thread_state_general_
 }
 
 zx_status_t arch_get_single_step(Thread* thread, zx_thread_state_single_step_t* out) {
-  SingletonChainLockGuardIrqSave thread_guard{thread->get_lock(), CLT_TAG("arch_get_single_step")};
+  SingleChainLockGuard thread_guard{IrqSaveOption, thread->get_lock(),
+                                    CLT_TAG("arch_get_single_step")};
 
   DEBUG_ASSERT(thread->IsUserStateSavedLocked());
 
@@ -98,7 +101,8 @@ zx_status_t arch_set_single_step(Thread* thread, const zx_thread_state_single_st
     return ZX_ERR_INVALID_ARGS;
   }
 
-  SingletonChainLockGuardIrqSave thread_guard{thread->get_lock(), CLT_TAG("arch_set_single_step")};
+  SingleChainLockGuard thread_guard{IrqSaveOption, thread->get_lock(),
+                                    CLT_TAG("arch_set_single_step")};
 
   DEBUG_ASSERT(thread->IsUserStateSavedLocked());
 
@@ -129,7 +133,8 @@ zx_status_t arch_set_fp_regs(Thread* thread, const zx_thread_state_fp_regs_t* in
 }
 
 zx_status_t arch_get_vector_regs(Thread* thread, zx_thread_state_vector_regs_t* out) {
-  SingletonChainLockGuardIrqSave thread_guard{thread->get_lock(), CLT_TAG("arch_get_vector_regs")};
+  SingleChainLockGuard thread_guard{IrqSaveOption, thread->get_lock(),
+                                    CLT_TAG("arch_get_vector_regs")};
 
   DEBUG_ASSERT(thread->IsUserStateSavedLocked());
 
@@ -145,7 +150,8 @@ zx_status_t arch_get_vector_regs(Thread* thread, zx_thread_state_vector_regs_t* 
 }
 
 zx_status_t arch_set_vector_regs(Thread* thread, const zx_thread_state_vector_regs_t* in) {
-  SingletonChainLockGuardIrqSave thread_guard{thread->get_lock(), CLT_TAG("arch_set_vector_regs")};
+  SingleChainLockGuard thread_guard{IrqSaveOption, thread->get_lock(),
+                                    CLT_TAG("arch_set_vector_regs")};
 
   DEBUG_ASSERT(thread->IsUserStateSavedLocked());
 
@@ -165,7 +171,8 @@ zx_status_t arch_get_debug_regs(Thread* thread, zx_thread_state_debug_regs_t* ou
   out->hw_bps_count = arm64_hw_breakpoint_count();
   out->hw_wps_count = arm64_hw_watchpoint_count();
 
-  SingletonChainLockGuardIrqSave thread_guard{thread->get_lock(), CLT_TAG("arch_get_debug_regs")};
+  SingleChainLockGuard thread_guard{IrqSaveOption, thread->get_lock(),
+                                    CLT_TAG("arch_get_debug_regs")};
 
   DEBUG_ASSERT(thread->IsUserStateSavedLocked());
 
@@ -212,7 +219,8 @@ zx_status_t arch_set_debug_regs(Thread* thread, const zx_thread_state_debug_regs
     return ZX_ERR_INVALID_ARGS;
   }
 
-  SingletonChainLockGuardIrqSave thread_guard{thread->get_lock(), CLT_TAG("arch_set_debug_regs")};
+  SingleChainLockGuard thread_guard{IrqSaveOption, thread->get_lock(),
+                                    CLT_TAG("arch_set_debug_regs")};
 
   DEBUG_ASSERT(thread->IsUserStateSavedLocked());
 

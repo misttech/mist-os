@@ -3404,8 +3404,8 @@ static bool vmo_stack_owned_loaned_pages_interval_test() {
   // base profile.
   ot->ownership_acquired.Wait();
   {
-    SingletonChainLockGuardIrqSave guard{ot->thread->get_lock(),
-                                         CLT_TAG("vmo_stack_owned_loaned_pages_interval_test (1)")};
+    SingleChainLockGuard guard{IrqSaveOption, ot->thread->get_lock(),
+                               CLT_TAG("vmo_stack_owned_loaned_pages_interval_test (1)")};
     const SchedulerState::EffectiveProfile& ep = ot->thread->scheduler_state().effective_profile();
     ASSERT_TRUE(ep.IsFair());
     ASSERT_EQ(kOwnerThreadBaseWeight.raw_value(), ep.fair.weight.raw_value());
@@ -3434,8 +3434,8 @@ static bool vmo_stack_owned_loaned_pages_interval_test() {
   for (auto& wt : *waiting_threads) {
     while (true) {
       {
-        SingletonChainLockGuardIrqSave guard{
-            wt.thread->get_lock(), CLT_TAG("vmo_stack_owned_loaned_pages_interval_test (2)")};
+        SingleChainLockGuard guard{IrqSaveOption, wt.thread->get_lock(),
+                                   CLT_TAG("vmo_stack_owned_loaned_pages_interval_test (2)")};
         if (wt.thread->state() == THREAD_BLOCKED) {
           break;
         }
@@ -3448,8 +3448,8 @@ static bool vmo_stack_owned_loaned_pages_interval_test() {
   // should see the weight of the owning thread increased to the total of its
   // base weight, and weights of all of the threads blocked behind it.
   {
-    SingletonChainLockGuardIrqSave guard{ot->thread->get_lock(),
-                                         CLT_TAG("vmo_stack_owned_loaned_pages_interval_test (3)")};
+    SingleChainLockGuard guard{IrqSaveOption, ot->thread->get_lock(),
+                               CLT_TAG("vmo_stack_owned_loaned_pages_interval_test (3)")};
     const SchedulerState::EffectiveProfile& ep = ot->thread->scheduler_state().effective_profile();
     constexpr SchedWeight kExpectedWeight =
         kOwnerThreadBaseWeight + (kWaitingThreadCount * kBlockedThreadBaseWeight);
@@ -3461,8 +3461,8 @@ static bool vmo_stack_owned_loaned_pages_interval_test() {
   Thread::Current::SleepRelative(ZX_MSEC(100));
   {
     for (auto& wt : *waiting_threads) {
-      SingletonChainLockGuardIrqSave guard{
-          wt.thread->get_lock(), CLT_TAG("vmo_stack_owned_loaned_pages_interval_test (4)")};
+      SingleChainLockGuard guard{IrqSaveOption, wt.thread->get_lock(),
+                                 CLT_TAG("vmo_stack_owned_loaned_pages_interval_test (4)")};
       ASSERT_EQ(THREAD_BLOCKED, wt.thread->state());
     }
   }
@@ -3475,8 +3475,8 @@ static bool vmo_stack_owned_loaned_pages_interval_test() {
   for (auto& wt : *waiting_threads) {
     while (true) {
       {
-        SingletonChainLockGuardIrqSave guard{
-            wt.thread->get_lock(), CLT_TAG("vmo_stack_owned_loaned_pages_interval_test (5)")};
+        SingleChainLockGuard guard{IrqSaveOption, wt.thread->get_lock(),
+                                   CLT_TAG("vmo_stack_owned_loaned_pages_interval_test (5)")};
         if (wt.thread->state() != THREAD_BLOCKED) {
           break;
         }
@@ -3487,8 +3487,8 @@ static bool vmo_stack_owned_loaned_pages_interval_test() {
 
   // Verify that the profile of the owner thread has relaxed.
   {
-    SingletonChainLockGuardIrqSave guard{ot->thread->get_lock(),
-                                         CLT_TAG("vmo_stack_owned_loaned_pages_interval_test (6)")};
+    SingleChainLockGuard guard{IrqSaveOption, ot->thread->get_lock(),
+                               CLT_TAG("vmo_stack_owned_loaned_pages_interval_test (6)")};
     const SchedulerState::EffectiveProfile& ep = ot->thread->scheduler_state().effective_profile();
     ASSERT_TRUE(ep.IsFair());
     ASSERT_EQ(kOwnerThreadBaseWeight.raw_value(), ep.fair.weight.raw_value());

@@ -563,7 +563,7 @@ void VmAspace::AttachToThread(Thread* t) {
   // set a thread's address space.  This is only permitted because the thread
   // cannot be running yet.  Once the thread starts, only it will be allowed to
   // change its address space.
-  SingletonChainLockGuardIrqSave guard{t->get_lock(), CLT_TAG("VmAspace::AttachToThread")};
+  SingleChainLockGuard guard{IrqSaveOption, t->get_lock(), CLT_TAG("VmAspace::AttachToThread")};
 
   // not prepared to handle setting a new address space or one on a running thread
   DEBUG_ASSERT(!t->GetAspaceRefLocked());

@@ -220,8 +220,8 @@ void mp_unplug_current_cpu() {
   // (it is unclear how we would have ever obtained any in the first place)
   if constexpr (DEBUG_ASSERT_IMPLEMENTED) {
     Thread* const current_thread = Thread::Current::Get();
-    SingletonChainLockGuardIrqSave guard{current_thread->get_lock(),
-                                         CLT_TAG("mp_unplug_current_cpu")};
+    SingleChainLockGuard guard{IrqSaveOption, current_thread->get_lock(),
+                               CLT_TAG("mp_unplug_current_cpu")};
     current_thread->wait_queue_state().AssertNoOwnedWaitQueues();
   }
 

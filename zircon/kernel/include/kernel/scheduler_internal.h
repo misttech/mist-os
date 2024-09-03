@@ -160,7 +160,7 @@ inline void Scheduler::RescheduleMask(cpu_mask_t cpus_to_reschedule_mask) {
           if (current_thread->get_lock().is_held() == false) {
             active_clt->Restart(CLT_TAG("Scheduler::RescheduleMask"));
             active_clt->AssertNumLocksHeld(0);
-            UnconditionalChainLockGuard guard{current_thread->get_lock()};
+            ChainLockGuard guard{current_thread->get_lock()};
             active_clt->Finalize();
             PreemptLocked(current_thread);
           } else {
