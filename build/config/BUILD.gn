@@ -1254,7 +1254,10 @@ config("Wno-missing-declarations") {
 
 config("Wno-deprecated-anon-enum-enum-conversion") {
   cflags = [ "-Wno-deprecated-anon-enum-enum-conversion" ]
-  visibility = [ "//vendor/*" ]
+  visibility = [
+    "//src/lib/usb_bulk/cpp:usb_bulk",
+    "//vendor/*",
+  ]
 }
 
 config("symbol_visibility_hidden") {
