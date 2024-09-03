@@ -94,29 +94,10 @@ template("fidl_library") {
 
   stable = defined(invoker.stable) && invoker.stable
 
-  # Additional dependencies to add when this target is published in an SDK.
-  sdk_atom_deps = []
-
-  goldens_dir = "//sdk/history"
-  if (defined(invoker.goldens_dir)) {
-    goldens_dir = invoker.goldens_dir
-  }
-
-  if (!is_sdk_included) {
-    not_needed([ "sdk_atom_deps" ])
-  }
-  if (!requires_compatibility_tests) {
-    not_needed([ "goldens_dir" ])
-  }
-  if (!stable) {
-    not_needed(invoker, [ "api" ])
-  }
-
-  lint_stamp_file = "$target_gen_dir/$target_name.linted"
-
   compilation_target_name = "${target_name}_compile"
   verification_target_name = "${target_name}_verify"
   lint_target_name = "${target_name}_lint"
+  lint_stamp_file = "$target_gen_dir/$target_name.linted"
 
   forward_variables_from(invoker,
                          [
@@ -205,7 +186,8 @@ template("fidl_library") {
     deps = [ ":$compilation_target_name" ]
   }
 
-  sdk_atom_deps += [ ":$plasa_fragment_target_name" ]
+  # Additional dependencies to add when this target is published in an SDK.
+  sdk_atom_deps = [ ":$plasa_fragment_target_name" ]
 
   action(lint_target_name) {
     forward_variables_from(invoker,
@@ -295,9 +277,6 @@ template("fidl_library") {
   # Enforce compatibility checks for all FIDL libraries included in the IDK with
   # platform `fuchsia`.
   if (requires_compatibility_tests) {
-    # GN lets us include both integers and strings in the same list.
-    _in_development_api_level = "NEXT"
-
     api_levels = platform_version.frozen_api_levels
 
     # Include the next numbered API level when bumping the API level.
@@ -322,10 +301,16 @@ template("fidl_library") {
       api_levels += [ next_numbered_api_level ]
     }
 
-    api_levels += [ _in_development_api_level ]
+    api_levels += [
+      "NEXT",
+      "HEAD",
+    ]
 
-    # build at the unstable HEAD level.
-    api_levels += [ "HEAD" ]
+    if (defined(invoker.goldens_dir)) {
+      goldens_dir = invoker.goldens_dir
+    } else {
+      goldens_dir = "//sdk/history"
+    }
 
     foreach(level, api_levels) {
       fidl_ir_target_name = "${main_target_name}_compile_$level"
@@ -367,7 +352,7 @@ template("fidl_library") {
             # Using this policy for every level allows generating all goldens
             # from scratch. See https://fxbug.dev/324481114#comment5.
             policy = "update_golden"
-          } else if (level == _in_development_api_level) {
+          } else if (level == "NEXT") {
             policy = "ack_changes"
           } else {
             policy = "no_changes"
@@ -446,6 +431,8 @@ template("fidl_library") {
       if (defined(invoker.api)) {
         api_reference = invoker.api
       }
+    } else {
+      not_needed(invoker, [ "api" ])
     }
 
     # Process sources.
@@ -568,5 +555,6 @@ template("fidl_library") {
     }
   } else {  # is_sdk_included
     not_needed(invoker, [ "sdk_area" ])
+    not_needed([ "sdk_atom_deps" ])
   }
 }
