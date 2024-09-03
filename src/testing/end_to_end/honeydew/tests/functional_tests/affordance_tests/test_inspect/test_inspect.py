@@ -67,7 +67,7 @@ class InspectAffordanceTests(fuchsia_base_test.FuchsiaBaseTest):
 
     def test_get_data_with_multiple_selectors(self) -> None:
         selectors: list[str] = [
-            "core/system-update/system-update-checker",
+            "bootstrap/fshost",
             "bootstrap/archivist",
         ]
 
