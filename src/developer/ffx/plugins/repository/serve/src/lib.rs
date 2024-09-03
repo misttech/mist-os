@@ -712,8 +712,6 @@ mod test {
     const DEVICE_PORT: u16 = 5;
     const HOST_ADDR: &str = "1.2.3.4";
     const TARGET_NODENAME: &str = "some-target";
-    const EMPTY_REPO_PATH: &str =
-        concat!(env!("ROOT_OUT_DIR"), "/test_data/ffx_lib_pkg/empty-repo");
 
     macro_rules! rule {
         ($host_match:expr => $host_replacement:expr,
@@ -1079,12 +1077,17 @@ mod test {
 
             let tmp_port_file = tempfile::NamedTempFile::new().unwrap();
 
+            // Use a tmp repo to allow metadata updates
+            let tmp_repo = tempfile::tempdir().unwrap();
+            let tmp_repo_path = Utf8Path::from_path(tmp_repo.path()).unwrap();
+            test_utils::make_empty_pm_repo_dir(tmp_repo_path);
+
             let serve_tool = ServeTool {
                 cmd: ServeCommand {
                     repository: Some(REPO_NAME.to_string()),
                     trusted_root: None,
                     address: (REPO_IPV4_ADDR, REPO_PORT).into(),
-                    repo_path: Some(EMPTY_REPO_PATH.into()),
+                    repo_path: Some(tmp_repo_path.into()),
                     product_bundle: None,
                     alias: vec!["example.com".into(), "fuchsia.com".into()],
                     storage_type: Some(RepositoryStorageType::Ephemeral),
@@ -1220,6 +1223,11 @@ mod test {
 
         // Run main in background
         let _task = fasync::Task::local(async move {
+            // Use a tmp repo to allow metadata updates
+            let tmp_repo = tempfile::tempdir().unwrap();
+            let tmp_repo_path = Utf8Path::from_path(tmp_repo.path()).unwrap();
+            test_utils::make_empty_pm_repo_dir(tmp_repo_path);
+
             serve_impl(
                 Connector::try_from_env(&env)
                     .await
@@ -1229,7 +1237,7 @@ mod test {
                     repository: Some(REPO_NAME.to_string()),
                     trusted_root: None,
                     address: (REPO_IPV4_ADDR, REPO_PORT).into(),
-                    repo_path: Some(EMPTY_REPO_PATH.into()),
+                    repo_path: Some(tmp_repo_path.into()),
                     product_bundle: None,
                     alias: vec!["example.com".into(), "fuchsia.com".into()],
                     storage_type: Some(RepositoryStorageType::Ephemeral),
@@ -1361,6 +1369,11 @@ mod test {
 
         // Run main in background
         let _task = fasync::Task::local(async move {
+            // Use a tmp repo to allow metadata updates
+            let tmp_repo = tempfile::tempdir().unwrap();
+            let tmp_repo_path = Utf8Path::from_path(tmp_repo.path()).unwrap();
+            test_utils::make_empty_pm_repo_dir(tmp_repo_path);
+
             serve_impl(
                 Connector::try_from_env(&env)
                     .await
@@ -1370,7 +1383,7 @@ mod test {
                     repository: Some(REPO_NAME.to_string()),
                     trusted_root: None,
                     address: (REPO_IPV4_ADDR, REPO_PORT).into(),
-                    repo_path: Some(EMPTY_REPO_PATH.into()),
+                    repo_path: Some(tmp_repo_path.into()),
                     product_bundle: None,
                     alias: vec!["example.com".into(), "fuchsia.com".into()],
                     storage_type: Some(RepositoryStorageType::Ephemeral),
