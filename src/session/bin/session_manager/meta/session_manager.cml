@@ -354,6 +354,7 @@
                 "fuchsia.accessibility.tts.TtsManager",
                 "fuchsia.accessibility.virtualkeyboard.Registry",
                 "fuchsia.element.GraphicalPresenter",
+                "fuchsia.input.interaction.Notifier",
                 "fuchsia.input.virtualkeyboard.ControllerCreator",
                 "fuchsia.input.virtualkeyboard.Manager",
                 "fuchsia.recovery.policy.Device",
