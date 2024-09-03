@@ -145,6 +145,9 @@ struct BasicNetworkDeviceTest : public ::testing::Test {
       parent_.Bind(std::move(driver.node()), fdf::Dispatcher::GetCurrent()->async_dispatcher());
       ASSERT_TRUE(parent_.is_valid());
 
+      // Keep track of the dispatcher used to initialize the network device.
+      driver_dispatcher_ = fdf::Dispatcher::GetCurrent();
+
       test_network_device_.Start(parent_, *driver.outgoing());
       driver.AssignStopHandler(&test_network_device_);
     });
@@ -184,6 +187,7 @@ struct BasicNetworkDeviceTest : public ::testing::Test {
   fdf_testing::BackgroundDriverTest<TestFixtureConfig>& driver_test() { return driver_test_; }
 
   fdf_testing::BackgroundDriverTest<TestFixtureConfig> driver_test_;
+  fdf::UnownedDispatcher driver_dispatcher_;
 
   fdf::WireClient<fuchsia_hardware_network_driver::NetworkDeviceImpl> network_device_client_;
   TestNetworkDevice test_network_device_;
@@ -747,10 +751,12 @@ TEST_F(NetworkDeviceTestFixture, RemoveWhileRemoving) {
     // Even if we call remove while another remove is in progress there should only ever be one call
     // to NetDevRelease. Which means that removed should never be signaled here.
     EXPECT_FALSE(removed.signaled());
-    // Don't proceed with removal until the second removal has been started
-    proceed_with_removal.Wait();
     removed.Signal();
   };
+
+  // Post a task on the dispatcher that will be used for some of the removal steps in NetworkDevice.
+  // This will block the removal process from completing until we tell it to.
+  async::PostTask(driver_dispatcher_->async_dispatcher(), [&] { proceed_with_removal.Wait(); });
 
   // Since the first removal won't complete until we tell it to, the second Remove should also
   // return true.
