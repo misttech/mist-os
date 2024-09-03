@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <fidl/fuchsia.device/cpp/wire.h>
 #include <fidl/fuchsia.gpu.magma/cpp/wire.h>
 #include <lib/fdio/directory.h>
 #include <lib/fit/defer.h>
@@ -21,22 +20,5 @@ TEST(HardwareUnitTests, All) {
 #else
 TEST(HardwareUnitTests, DISABLED_All) {
 #endif
-  fidl::ClientEnd parent_device =
-      magma::TestDeviceBase::GetParentDeviceFromId(MAGMA_VENDOR_ID_INTEL);
-
-  const char* kTestDriverPath = "libmsd_intel_test.cm";
-  // The test driver will run unit tests on startup.
-  magma::TestDeviceBase::RebindDevice(parent_device, kTestDriverPath);
-
-  // Reload the production driver so later tests shouldn't be affected.
-  auto cleanup = fit::defer([&]() { magma::TestDeviceBase::RebindDevice(parent_device); });
-
-  magma::TestDeviceBase test_base(MAGMA_VENDOR_ID_INTEL);
-
-  fidl::UnownedClientEnd<fuchsia_gpu_magma::TestDevice> channel{test_base.magma_channel()};
-
-  const fidl::WireResult result = fidl::WireCall(channel)->GetUnitTestStatus();
-
-  EXPECT_EQ(ZX_OK, result.status()) << "Device connection lost, check syslog for any errors.";
-  EXPECT_EQ(ZX_OK, result->status) << "Tests reported errors, check syslog.";
+  // TODO(https://fxbug.dev/328808539)
 }

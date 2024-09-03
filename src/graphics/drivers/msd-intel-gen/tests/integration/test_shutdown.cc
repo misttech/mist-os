@@ -150,29 +150,7 @@ class TestConnection : public magma::TestDeviceBase {
 // the DFv2 intel-i915 driver doesn't support the fuchsia.device/Controller
 // protocol and does not export the devfs node.
 TEST(Shutdown, DISABLED_Test) {
-  constexpr uint32_t kMaxCount = 10;
-  for (uint32_t i = 0; i < kMaxCount; i++) {
-    std::future wait_future = std::async([test = std::make_unique<TestConnection>()]() mutable {
-      magma_status_t status = MAGMA_STATUS_OK;
-      // Keep testing the driver until we see that it has gone away (because of the restart).
-      while (status == MAGMA_STATUS_OK) {
-        status = test->Test();
-      }
-      EXPECT_EQ(MAGMA_STATUS_CONNECTION_LOST, status);
-    });
-    std::future restart_future = std::async(
-        []() { magma::TestDeviceBase::RebindParentDeviceFromId(MAGMA_VENDOR_ID_INTEL); });
-    restart_future.wait();
-    wait_future.wait();
-
-    // Perform one more test to be sure the rebind was successful.
-    TestConnection test;
-    EXPECT_EQ(MAGMA_STATUS_OK, test.Test());
-
-    if (HasFailure()) {
-      return;
-    }
-  }
+  // TODO(https://fxbug.dev/328808539)
 }
 
 }  // namespace

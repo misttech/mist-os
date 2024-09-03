@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <fidl/fuchsia.device/cpp/wire.h>
 #include <fidl/fuchsia.gpu.magma/cpp/wire.h>
 #include <lib/fidl/cpp/wire/channel.h>
 #include <lib/magma/magma.h>

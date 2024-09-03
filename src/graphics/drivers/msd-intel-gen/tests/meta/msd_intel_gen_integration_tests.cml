@@ -13,9 +13,9 @@
     use: [
         {
             // For /dev/class/gpu, /dev/class/gpu-performance-counters, and /dev/sys/platform/pt/PCI0/bus/00:02.0/00:02.0/intel-gpu-core
-            directory: "dev-topological",
+            directory: "dev-class",
             rights: [ "r*" ],
-            path: "/dev",
+            path: "/dev/class",
         },
         { protocol: "fuchsia.tracing.provider.Registry" },
     ],

@@ -35,7 +35,7 @@
             to: [ "#test" ],
         },
         {
-            directory: "dev-topological",
+            directory: "dev-class",
             from: "parent",
             to: [ "#test" ],
         },

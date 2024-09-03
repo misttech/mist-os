@@ -10,13 +10,6 @@ assert(
     is_fuchsia,
     "Product definitions and assemblies should only be defined in the fuchsia toolchain")
 
-_base_driver_packages = [
-  {
-    package_target = "//src/graphics/drivers/msd-intel-gen:msd-intel-gen-test"
-    driver_components = [ "meta/libmsd_intel_test.cm" ]
-  },
-]
-
 # This is the base platform configuration used by core
 _platform_configuration_base = {
   build_type = "eng"
@@ -123,7 +116,6 @@ product_assembly_configuration("core") {
     build_info = default_product_build_info
   }
 
-  base_driver_packages = _base_driver_packages
   base_packages = _base_packages
   deps = [ "//build/info:build_info_files" ]
 }
@@ -138,7 +130,6 @@ product_assembly_configuration("core_with_f2fs") {
     build_info = default_product_build_info
   }
 
-  base_driver_packages = _base_driver_packages
   base_packages = _base_packages
   deps = [ "//build/info:build_info_files" ]
 }
@@ -153,7 +144,6 @@ product_assembly_configuration("core_with_minfs") {
     build_info = default_product_build_info
   }
 
-  base_driver_packages = _base_driver_packages
   base_packages = _base_packages
   deps = [ "//build/info:build_info_files" ]
 }
@@ -173,7 +163,6 @@ product_assembly_configuration("core_with_netstack3") {
     build_info = default_product_build_info
   }
 
-  base_driver_packages = _base_driver_packages
   base_packages = _base_packages
   deps = [ "//build/info:build_info_files" ]
 }
@@ -195,7 +184,6 @@ product_assembly_configuration("core_with_dfv2_fuzzing") {
     build_info = default_product_build_info
   }
 
-  base_driver_packages = _base_driver_packages
   base_packages = _base_packages
   deps = [ "//build/info:build_info_files" ]
 }

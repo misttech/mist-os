@@ -5,7 +5,6 @@
 #ifndef SRC_GRAPHICS_MAGMA_LIB_MAGMA_CLIENT_TEST_UTIL_TEST_DEVICE_HELPER_H_
 #define SRC_GRAPHICS_MAGMA_LIB_MAGMA_CLIENT_TEST_UTIL_TEST_DEVICE_HELPER_H_
 
-#include <fidl/fuchsia.device/cpp/wire.h>
 #include <fidl/fuchsia.driver.development/cpp/fidl.h>
 #include <fidl/fuchsia.gpu.magma/cpp/wire.h>
 #include <lib/component/incoming/cpp/protocol.h>
@@ -28,10 +27,6 @@ class TestDeviceBase {
   TestDeviceBase() = default;
 
   void InitializeFromFileName(const char* device_name) {
-    auto controller_client = component::Connect<fuchsia_device::Controller>(
-        std::string(device_name) + "/device_controller");
-    ASSERT_TRUE(controller_client.is_ok()) << controller_client.status_string();
-    device_controller_ = std::move(*controller_client);
     auto magma_client = component::Connect<fuchsia_gpu_magma::TestDevice>(device_name);
     ASSERT_TRUE(magma_client.is_ok()) << magma_client.status_string();
 
@@ -55,48 +50,6 @@ class TestDeviceBase {
       device_ = 0;
     }
     GTEST_FAIL();
-  }
-
-  // Get a channel to the parent device, so we can rebind the driver to it. This
-  // requires sandbox access to /dev/sys.
-  fidl::ClientEnd<fuchsia_device::Controller> GetParentDevice() {
-    char path[fuchsia_device::wire::kMaxDevicePathLen + 1];
-    auto res = fidl::WireCall(device_controller_)->GetTopologicalPath();
-
-    EXPECT_EQ(ZX_OK, res.status());
-    EXPECT_TRUE(res->is_ok());
-
-    auto& response = *res->value();
-    EXPECT_LE(response.path.size(), fuchsia_device::wire::kMaxDevicePathLen);
-
-    memcpy(path, response.path.data(), response.path.size());
-    path[response.path.size()] = 0;
-    // Remove everything after the final slash.
-    *strrchr(path, '/') = 0;
-
-    auto parent =
-        component::Connect<fuchsia_device::Controller>(std::string(path) + "/device_controller");
-
-    EXPECT_EQ(ZX_OK, parent.status_value());
-    return std::move(*parent);
-  }
-
-  static fidl::ClientEnd<fuchsia_device::Controller> GetParentDeviceFromId(uint64_t id) {
-    magma::TestDeviceBase test_base(id);
-    return test_base.GetParentDevice();
-  }
-
-  static void RebindParentDeviceFromId(uint64_t id, const std::string& url_suffix = "") {
-    fidl::ClientEnd parent = GetParentDeviceFromId(id);
-    RebindDevice(parent, url_suffix);
-  }
-
-  static void RebindDevice(fidl::UnownedClientEnd<fuchsia_device::Controller> device,
-                           const std::string& url_suffix = "") {
-    fidl::WireResult result =
-        fidl::WireCall(device)->Rebind(fidl::StringView::FromExternal(url_suffix));
-    ASSERT_EQ(ZX_OK, result.status());
-    ASSERT_TRUE(result->is_ok()) << zx_status_get_string(result->error_value());
   }
 
   static void RestartDFv2Driver(const std::string& driver_url, uint32_t gpu_vendor_id) {
@@ -145,7 +98,6 @@ class TestDeviceBase {
     }
   }
 
-  const fidl::ClientEnd<fuchsia_device::Controller>& channel() { return device_controller_; }
   const fidl::UnownedClientEnd<fuchsia_gpu_magma::TestDevice>& magma_channel() {
     return magma_channel_;
   }
@@ -187,7 +139,6 @@ class TestDeviceBase {
 
  private:
   magma_device_t device_ = 0;
-  fidl::ClientEnd<fuchsia_device::Controller> device_controller_;
   fidl::UnownedClientEnd<fuchsia_gpu_magma::TestDevice> magma_channel_{ZX_HANDLE_INVALID};
 };
 
