@@ -232,7 +232,6 @@ def _fuchsia_clang_repository_impl(ctx):
         toolchain_config_template,
         substitutions = {
             "%{SYSROOT_PATH_PREFIX}": sysroot_path_prefix,
-            "%{CROSSTOOL_ROOT}": str(ctx.path(".")),
             "%{CLANG_VERSION}": clang_version,
             "%{SDK_ROOT}": ctx.attr.sdk_root_label.workspace_name,
             "%{HOST_OS}": normalized_os,
