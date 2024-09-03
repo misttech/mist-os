@@ -41,6 +41,15 @@ class ControlFidlHandler : public FidlHandler<fuchsia_audio_device::Control> {
   }
 };
 
+class ObserverFidlHandler : public FidlHandler<fuchsia_audio_device::Observer> {
+ public:
+  ObserverFidlHandler(MediaApp* parent, std::string_view name) : FidlHandler(parent, name) {}
+  void handle_unknown_event(
+      fidl::UnknownEventMetadata<fuchsia_audio_device::Observer> metadata) override {
+    std::cout << "ObserverFidlHandler: unknown event (Observer) ordinal " << metadata.event_ordinal;
+  }
+};
+
 class MediaApp {
   // Display device metadata received from AudioDeviceRegistry, for each device
   static inline constexpr bool kLogDeviceInfo = false;
@@ -101,9 +110,9 @@ class MediaApp {
   size_t channels_per_frame_ = 0;
 
   FidlHandler<fuchsia_audio_device::Registry> reg_handler_{this, "Registry"};
-  FidlHandler<fuchsia_audio_device::Observer> obs_handler_{this, "Observer"};
   FidlHandler<fuchsia_audio_device::RingBuffer> rb_handler_{this, "RingBuffer"};
   ControlFidlHandler ctl_handler_{this, "Control"};
+  ObserverFidlHandler obs_handler_{this, "Observer"};
 };
 
 }  // namespace examples

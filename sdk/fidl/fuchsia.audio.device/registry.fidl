@@ -266,7 +266,7 @@ open protocol Observer {
     //
     // TODO(https://fxbug.dev/42052918): Remove legacy gain aspects once driver API does.
     // Going forward, gain will be handled by `SignalProcessing`.
-    strict WatchGainState() -> (table {
+    flexible WatchGainState() -> (table {
         /// The device's most recent gain state.
         1: state GainState;
     }) error ObserverWatchGainStateError;
@@ -275,7 +275,7 @@ open protocol Observer {
     /// called for the first time, it will return immediately.
     ///
     /// Should only be called for Codec or StreamConfig devices.
-    strict WatchPlugState() -> (table {
+    flexible WatchPlugState() -> (table {
         /// The device's current plug state.
         1: state PlugState;
 
@@ -288,7 +288,7 @@ open protocol Observer {
     /// This clock will be in the domain specified in the device's `Info` table.
     ///
     /// Should only be called for Composite or StreamConfig devices.
-    strict GetReferenceClock() -> (resource table {
+    flexible GetReferenceClock() -> (resource table {
         /// The device's reference clock.
         1: reference_clock zx.Handle:CLOCK;
     }) error ObserverGetReferenceClockError;

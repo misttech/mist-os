@@ -8,6 +8,7 @@
 #include <fidl/fuchsia.hardware.audio.signalprocessing/cpp/common_types.h>
 #include <fidl/fuchsia.hardware.audio.signalprocessing/cpp/natural_types.h>
 #include <fidl/fuchsia.hardware.audio/cpp/fidl.h>
+#include <lib/fidl/cpp/wire/unknown_interaction_handler.h>
 #include <lib/zx/clock.h>
 #include <zircon/errors.h>
 
@@ -93,7 +94,9 @@ class ObserverServerTest : public AudioDeviceRegistryServerTestBase,
     return std::make_pair(std::move(ring_buffer_client), std::move(ring_buffer_server_end));
   }
 
-  void handle_unknown_event(fidl::UnknownEventMetadata<fad::Observer>) override {}
+  void handle_unknown_event(fidl::UnknownEventMetadata<fad::Observer> metadata) override {
+    FAIL() << "ObserverServerTest: unknown event (Observer) ordinal " << metadata.event_ordinal;
+  }
 };
 
 class ObserverServerCodecTest : public ObserverServerTest {
