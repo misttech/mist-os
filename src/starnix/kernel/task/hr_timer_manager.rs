@@ -186,9 +186,14 @@ impl HrTimerManager {
                                     // are activated.
                                     drop(lease_channel);
                                 }
+                                // Remove the expired HrTimer from the heap.
+                                self_ref
+                                    .lock()
+                                    .timer_heap
+                                    .retain(|t| !Arc::ptr_eq(&t.hr_timer, &hrtimer_ref));
                                 loop {
-                                    // After the front HrTimer, which has the soonest deadline, expires,
-                                    // we need to start the next one in the heap.
+                                    // After the front HrTimer expires, we need to start the next
+                                    // one in the heap.
                                     let mut guard = self_ref.lock();
                                     match self_ref.start_next(current_task, &mut guard) {
                                         Ok(_) => break,
