@@ -67,6 +67,7 @@ template("install_host_tools") {
     copy(target_name) {
       forward_variables_from(invoker,
                              [
+                               "metadata",
                                "testonly",
                                "visibility",
                              ])
