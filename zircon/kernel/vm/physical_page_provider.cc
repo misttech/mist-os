@@ -187,40 +187,37 @@ zx_status_t PhysicalPageProvider::WaitOnEvent(Event* event) {
     for (uint64_t offset = request_offset; offset < request_end; offset += PAGE_SIZE) {
       vm_page_t* page = paddr_to_vm_page(phys_base_ + offset);
       DEBUG_ASSERT(page);
-      // Despite the efforts of GetCowWithReplaceablePage(), we may still find below that the
-      // VmCowPages doesn't have the page any more.  If that's because the page is FREE_LOANED,
-      // great - in that case we can move on to the next page.
-      //
-      // Motivation for this loop:  Currently, loaned pages aren't moved between VmCowPages without
-      // going through FREE_LOANED, so currently we could do without this loop.  By having this
-      // loop, we can accommodate such a move being added (and/or borrowing in situations where we
-      // do move pages between VmCowPages) without that breaking page reclaim due to lack of this
-      // loop. Since the readability downside of this loop is low, and mitigated by this comment, it
-      // seems worth accommodating such a potential page move.  In particular, it's not obvious how
-      // to reliably guarantee that we'd notice the lack of this loop if we added a page move
-      // elsewhere, so it seems good to avoid that problem by including this loop now, to save the
-      // pain of discovering its absence later.
-      //
-      // This loop tries again until the page is FREE_LOANED, but currently this loop is expected to
-      // only execute up to once.
+      // GetCowForLoanedPage() only finds pages that are definitely in the page queues. Pages might
+      // be stack owned if they are moving between the page queues and the pmm. In this case we must
+      // wait on the stack ownership event until the page 'settles' into place. We might need to
+      // both wait for the alloc path, but then it could be getting free'd before we manage to
+      // lookup the page queues, and so we must wait again.
+      // Due to the loaned cancelled flag (that pmm_end_loan sets) the number of waits should be
+      // bounded to a max of two, since a page can at most be going from ALLOC->OBJECT and then
+      // ALLOC->FREE_LOANED, after which it is trapped by loan cancelled. For safety we allow the
+      // loop to run additional times, but warn on an excessive number of iterations.
+      // cannot keep we run in a loop for safety and warn if we see an excessive number
+      // of iterations.
       uint32_t iterations = 0;
       while (!page->is_free_loaned()) {
         // Page should never have entered the regular FREE state without us finding it and
         // explicitly ending the loan.
         DEBUG_ASSERT(!page->is_free());
-        if (++iterations % 10 == 0) {
+        if (++iterations % 2 == 0) {
           dprintf(INFO, "PhysicalPageProvider::WaitOnEvent() looping more than expected\n");
         }
-        auto maybe_vmo_backlink = pmm_page_queues()->GetCowWithReplaceablePage(page, cow_pages_);
+        auto maybe_vmo_backlink = pmm_page_queues()->GetCowForLoanedPage(page);
         if (!maybe_vmo_backlink) {
-          // There may not be a backlink if the page was at least on the way toward FREE_LOANED.  In
-          // this case GetCowWithReplaceablePage() already waited for stack ownership to be over
-          // before returning.
-          DEBUG_ASSERT(page->is_free_loaned());
-          // next page
+          // If the page is not in the page queues then it is in one of the following states.
+          //  * Is in the PMM.
+          //  * Just got allocated and is on the way to the page queues.
+          //  * Just got removed from the page queues and is on the way to the PMM.
+          // For the first case it will kept in free loaned by the pmm_cancel_loan call above, and
+          // our work is done. For the latter two cases we can wait till the page is not stack
+          // owned, solidifying it into one of the two locations.
+          // All of these are handled by just going around the loop.
         } else {
           auto& vmo_backlink = maybe_vmo_backlink.value();
-          // Else GetCowWithReplaceablePage would have kept trying.
           DEBUG_ASSERT(vmo_backlink.cow);
           auto& cow_container = vmo_backlink.cow;
 
@@ -240,19 +237,17 @@ zx_status_t PhysicalPageProvider::WaitOnEvent(Event* event) {
           }
 
           if (needs_evict) {
-            bool evict_result = cow_container->ReclaimPageForEviction(page, vmo_backlink.offset);
-            if (!evict_result) {
-              // We must have raced and this page has already become free, or is currently in a
-              // stack ownership somewhere else on the way to becoming free. For the second case we
-              // wait until it's not stack owned, ensuring that the only possible state is that the
-              // page is FREE_LOANED.
-              StackOwnedLoanedPagesInterval::WaitUntilContiguousPageNotStackOwned(page);
-            }
+            cow_container->ReclaimPageForEviction(page, vmo_backlink.offset);
+            // Either eviction succeeded, and the loaned page is in the PMM, or it failed and we are
+            // racing with another thread doing the free. For both cases we can just wait till its
+            // not stack owned and then when we go around the loop we should find it in the
+            // FREE_LOANED state.
           }
-          // Either this thread made it FREE_LOANED, or this thread waited for it to be FREE_LOANED.
-          DEBUG_ASSERT(page->is_free_loaned());
-          // The page has been replaced with a different page that doesn't have loan_cancelled set.
         }
+        // Ensure the page is not currently stack owned before trying the loop again. This method
+        // has a very quick early abort if not stack owned, so calling redundantly is not
+        // inefficient, so we do it for simplicity of code layout.
+        StackOwnedLoanedPagesInterval::WaitUntilContiguousPageNotStackOwned(page);
       }
     }  // for pages of request
 

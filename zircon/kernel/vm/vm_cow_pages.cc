@@ -6482,7 +6482,7 @@ void VmCowPages::RangeChangeUpdateLocked(uint64_t offset, uint64_t len, RangeCha
   RangeChangeUpdateListLocked(&list, op);
 }
 
-bool VmCowPages::ReclaimPageForEviction(vm_page_t* page, uint64_t offset) {
+void VmCowPages::ReclaimPageForEviction(vm_page_t* page, uint64_t offset) {
   canary_.Assert();
 
   Guard<CriticalMutex> guard{lock()};
@@ -6490,14 +6490,14 @@ bool VmCowPages::ReclaimPageForEviction(vm_page_t* page, uint64_t offset) {
   // Check this page is still a part of this VMO.
   const VmPageOrMarker* page_or_marker = page_list_.Lookup(offset);
   if (!page_or_marker || !page_or_marker->IsPage() || page_or_marker->Page() != page) {
-    return false;
+    return;
   }
 
   // We shouldn't have been asked to evict a pinned page.
   ASSERT(page->object.pin_count == 0);
 
   // Ignore any hints, we were asked directly to evict.
-  return ReclaimPageForEvictionLocked(page, offset, EvictionHintAction::Ignore).Total() != 0;
+  ReclaimPageForEvictionLocked(page, offset, EvictionHintAction::Ignore);
 }
 
 VmCowPages::ReclaimCounts VmCowPages::ReclaimPageForEvictionLocked(vm_page_t* page, uint64_t offset,
