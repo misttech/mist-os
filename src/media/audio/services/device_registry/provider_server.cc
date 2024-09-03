@@ -5,6 +5,7 @@
 #include "src/media/audio/services/device_registry/provider_server.h"
 
 #include <fidl/fuchsia.audio.device/cpp/natural_types.h>
+#include <lib/fidl/cpp/wire/unknown_interaction_handler.h>
 #include <lib/fit/internal/result.h>
 
 #include <utility>
@@ -87,6 +88,13 @@ void ProviderServer::AddDevice(AddDeviceRequest& request, AddDeviceCompleter::Sy
   parent_->AddDevice(Device::Create(parent_, thread().dispatcher(), *request.device_name(),
                                     *request.device_type(), std::move(*request.driver_client())));
   completer.Reply(fit::success(fad::ProviderAddDeviceResponse{}));
+}
+
+// We complain but don't close the connection, to accommodate older and newer clients.
+void ProviderServer::handle_unknown_method(
+    fidl::UnknownMethodMetadata<fuchsia_audio_device::Provider> metadata,
+    fidl::UnknownMethodCompleter::Sync& completer) {
+  ADR_WARN_METHOD() << "unknown method (Provider) ordinal " << metadata.method_ordinal;
 }
 
 }  // namespace media_audio

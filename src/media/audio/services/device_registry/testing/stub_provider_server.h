@@ -7,6 +7,7 @@
 
 #include <fidl/fuchsia.audio.device/cpp/fidl.h>
 #include <lib/fidl/cpp/wire/internal/transport_channel.h>
+#include <lib/fidl/cpp/wire/unknown_interaction_handler.h>
 #include <lib/fit/internal/result.h>
 #include <lib/syslog/cpp/macros.h>
 
@@ -22,23 +23,30 @@ namespace media_audio {
 // FIDL server for fuchsia_audio_device/Provider (a stub "do-nothing" implementation).
 class StubProviderServer
     : public BaseFidlServer<StubProviderServer, fidl::Server, fuchsia_audio_device::Provider> {
+  static constexpr bool kLogStubProviderServer = true;
+
  public:
   static std::shared_ptr<StubProviderServer> Create(
       std::shared_ptr<const FidlThread> thread,
       fidl::ServerEnd<fuchsia_audio_device::Provider> server_end) {
-    FX_LOGS(INFO) << kClassName << "::" << __FUNCTION__;
+    ADR_LOG_STATIC(kLogStubProviderServer);
     return BaseFidlServer::Create(std::move(thread), std::move(server_end));
   }
 
   // fuchsia.audio.device.Provider implementation
   void AddDevice(AddDeviceRequest& request, AddDeviceCompleter::Sync& completer) override {
-    FX_LOGS(INFO) << kClassName << "::" << __FUNCTION__ << ": request to add "
-                  << request.device_type() << " "
-                  << (request.device_name().has_value()
-                          ? std::string("'") + *request.device_name() + "'"
-                          : "<none>");
+    ADR_LOG_STATIC(kLogStubProviderServer)
+        << "request to add " << request.device_type() << " "
+        << (request.device_name().has_value() ? std::string("'") + *request.device_name() + "'"
+                                              : "<none>");
 
     completer.Reply(fit::success(fuchsia_audio_device::ProviderAddDeviceResponse{}));
+  }
+
+  void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_audio_device::Provider> metadata,
+                             fidl::UnknownMethodCompleter::Sync& completer) override {
+    ADR_WARN_METHOD() << "unknown method (Provider) ordinal " << metadata.method_ordinal;
+    completer.Close(ZX_ERR_NOT_SUPPORTED);
   }
 
  private:

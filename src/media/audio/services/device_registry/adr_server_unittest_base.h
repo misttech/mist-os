@@ -117,6 +117,11 @@ class AudioDeviceRegistryServerTestBase : public gtest::TestLoopFixture {
       LogFidlClientError(error, "Provider");
       parent()->provider_fidl_error_status_ = error.status();
     }
+    void handle_unknown_event(
+        fidl::UnknownEventMetadata<fuchsia_audio_device::Provider> metadata) override {
+      FX_LOGS(WARNING) << "ProviderFidlHandler: unknown method (Provider) ordinal "
+                       << metadata.event_ordinal;
+    }
   };
   std::optional<zx_status_t>& provider_fidl_error_status() { return provider_fidl_error_status_; }
 
