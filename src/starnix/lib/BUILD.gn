@@ -24,6 +24,7 @@ group("tests") {
     "range_map:tests",
     "selinux:tests",
     "starnix-lifecycle:tests",
+    "starnix-sync:tests",
     "starnix-uapi:tests",
     "syncio:tests",
     "third_party:tests",
