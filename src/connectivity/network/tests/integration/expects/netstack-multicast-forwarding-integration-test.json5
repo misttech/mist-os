@@ -29,10 +29,6 @@
             type: "expect_failure_with_err_logs",
             matchers: [
                 // TODO(https://fxbug.dev/323052525): Support Multicast Routing.
-                "add_multicast_route_v4_ns3::link_local_unicast_source_address",
-                "add_multicast_route_v6_ns3::link_local_unicast_source_address",
-                "del_multicast_route_v4_ns3::link_local_unicast_source_address",
-                "del_multicast_route_v6_ns3::link_local_unicast_source_address",
                 "get_route_stats_errors_v4_ns3::link_local_multicast_destination_address",
                 "get_route_stats_errors_v4_ns3::link_local_unicast_source_address",
                 "get_route_stats_errors_v4_ns3::any_source_address",
