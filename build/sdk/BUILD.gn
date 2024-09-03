@@ -76,6 +76,7 @@ _sdk_source_sets_list = [
   "//src/lib/fidl/cpp:hlcpp_conversion",
   "//src/lib/fidl/cpp:natural_ostream",
   "//src/lib/fidl/cpp",
+  "//sdk/lib/syslog/cpp",
   "//zircon/system/ulib/async-loop:async-loop-cpp",
   "//zircon/system/ulib/async-loop",
   "//zircon/system/ulib/async-testing:async-testing",

@@ -16,9 +16,6 @@ sdk_source_set("cpp") {
     build_as_static = true
   }
 
-  # Keep internal for now until the API stabilizes.
-  category = "internal"
-
   sdk_name = "syslog_cpp"
 
   include_base = "//sdk"
@@ -37,6 +34,8 @@ sdk_source_set("cpp") {
   ]
 
   if (is_fuchsia) {
+    category = "partner"
+
     sources += [
       "logging_backend_fuchsia.cc",
       "logging_backend_fuchsia_globals.h",
@@ -44,7 +43,6 @@ sdk_source_set("cpp") {
 
     deps = [
       ":backend_fuchsia_globals",
-      "//sdk/fidl/fuchsia.diagnostics.stream:fuchsia.diagnostics.stream_cpp",
       "//sdk/fidl/fuchsia.logger:fuchsia.logger_cpp",
       "//sdk/lib/component/incoming/cpp",
       "//sdk/lib/fdio",
@@ -61,6 +59,9 @@ sdk_source_set("cpp") {
       "//zircon/system/ulib/zx",
     ]
   } else {
+    # Don't ship the host logging library in the SDK.
+    category = "internal"
+
     sources += [
       "host/encoder.h",
       "host/logging_backend.cc",

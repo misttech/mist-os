@@ -1,0 +1,7 @@
+{
+  "pkg/syslog_cpp/include/lib/syslog/cpp/log_level.h": "69678960d59273aa9823bb08535d871f",
+  "pkg/syslog_cpp/include/lib/syslog/cpp/log_settings.h": "4f4875c984fbdefca3cdee343907f19a",
+  "pkg/syslog_cpp/include/lib/syslog/cpp/logging_backend.h": "5850948dec81d4beea020925b47f1bc6",
+  "pkg/syslog_cpp/include/lib/syslog/cpp/logging_backend_fuchsia_globals.h": "0291f064bc0f26bbe75b115e18817b3b",
+  "pkg/syslog_cpp/include/lib/syslog/cpp/macros.h": "9c3c4bf9e6b66f5f1dc6ec61bbc592c8"
+}
