@@ -1733,7 +1733,9 @@ fn test_multicast_forwarding_receive_ip_packet_action<I: IpExt + TestIpExt>() {
     // Verify `MulticastForward` now that we have a route.
     assert_matches!(
         receive_ip_packet_action::<I>(&mut ctx, &dev, mcast_addr.clone()),
-        ReceivePacketAction::MulticastForward { targets: actual_targets, address_status}
+        ReceivePacketAction::MulticastForward {
+            targets: actual_targets, address_status, dst_ip: _
+        }
         if actual_targets == targets && address_status.as_ref().is_some_and(is_multicast::<I>)
     );
 
@@ -1751,8 +1753,9 @@ fn test_multicast_forwarding_receive_ip_packet_action<I: IpExt + TestIpExt>() {
     // Verify `address_status` is None, now that we've left the group.
     assert_matches!(
         receive_ip_packet_action::<I>(&mut ctx, &dev, mcast_addr.clone()),
-        ReceivePacketAction::MulticastForward { targets: actual_targets, address_status: None }
-        if actual_targets == targets
+        ReceivePacketAction::MulticastForward {
+            targets: actual_targets, address_status: None, dst_ip: _
+        } if actual_targets == targets
     );
 
     // Remove the route.
