@@ -160,12 +160,6 @@ board_input_bundle("main_bundle") {
       driver_components = [ "meta/dwmac.cm" ]
     },
     {
-      package_target =
-          "//src/connectivity/ethernet/drivers/realtek-8211f:package"
-      package_set = "bootfs"
-      driver_components = [ "meta/realtek-8211f.cm" ]
-    },
-    {
       package_target = "//src/devices/adc/drivers/aml-saradc:package"
       package_set = "bootfs"
       driver_components = [ "meta/aml-saradc.cm" ]

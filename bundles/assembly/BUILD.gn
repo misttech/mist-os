@@ -448,6 +448,13 @@ assembly_input_bundle("bus_pci_driver") {
 
 # AIB for the realtek-8211f driver
 assembly_input_bundle("realtek_8211f_driver") {
+  boot_driver_packages = [
+    {
+      package_target =
+          "//src/connectivity/ethernet/drivers/realtek-8211f:package"
+      driver_components = [ "meta/realtek-8211f.cm" ]
+    },
+  ]
 }
 
 # The most minimal AIB that is included in eng assembled systems that are meant

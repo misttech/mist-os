@@ -329,6 +329,12 @@ impl DefineSubsystemConfiguration<PlatformConnectivityConfig> for ConnectivitySu
             builder.platform_bundle("location_emergency");
         }
 
+        // Include realtek-8211f driver through a platform AIB.
+        if context.board_info.provides_feature("fuchsia::realtek_8211f") {
+            // We only need this driver feature in the utility / standard feature set levels.
+            builder.platform_bundle("realtek_8211f_driver");
+        }
+
         Ok(())
     }
 }
