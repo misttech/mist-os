@@ -668,6 +668,7 @@ struct Component {
     scope: ExecutionScope,
     fvm: Mutex<Option<Arc<Fvm>>>,
     mounted: Mutex<HashMap<u16, Arc<BlockServer<SessionManager<PartitionInterface>>>>>,
+    volumes_directory: Arc<vfs::directory::immutable::Simple>,
 }
 
 impl Component {
@@ -677,6 +678,7 @@ impl Component {
             scope: ExecutionScope::new(),
             fvm: Mutex::default(),
             mounted: Mutex::default(),
+            volumes_directory: vfs::directory::immutable::simple(),
         }
     }
 
@@ -750,30 +752,37 @@ impl Component {
         let device_holder = DeviceHolder::new(BlockDevice::new(Box::new(client), false).await?);
         let mut fvm = Fvm::open(device_holder).await?;
 
-        let volumes_directory = vfs::directory::immutable::simple();
-
         for (&index, partition) in &fvm.inner.get_mut().metadata.partitions {
-            let weak = Arc::downgrade(self);
-            volumes_directory.add_entry(
-                partition.name(),
-                vfs::service::host(move |requests| {
-                    let weak = weak.clone();
-                    async move {
-                        if let Some(me) = weak.upgrade() {
-                            let _ = me.handle_volume_requests(requests, index).await;
-                        }
-                    }
-                }),
-            )?;
+            self.add_volume_to_volumes_directory(index, &partition.name())?;
         }
 
         self.export_dir.add_entry_may_overwrite(
             "volumes",
-            volumes_directory,
+            self.volumes_directory.clone(),
             /* overwrite: */ true,
         )?;
 
         *self.fvm.lock().unwrap() = Some(Arc::new(fvm));
+        Ok(())
+    }
+
+    fn add_volume_to_volumes_directory(
+        self: &Arc<Self>,
+        index: u16,
+        name: &str,
+    ) -> Result<(), Error> {
+        let weak = Arc::downgrade(self);
+        self.volumes_directory.add_entry(
+            name,
+            vfs::service::host(move |requests| {
+                let weak = weak.clone();
+                async move {
+                    if let Some(me) = weak.upgrade() {
+                        let _ = me.handle_volume_requests(requests, index).await;
+                    }
+                }
+            }),
+        )?;
         Ok(())
     }
 
@@ -926,12 +935,17 @@ impl Component {
             None => 1,
         };
         let partition_index = fvm.create_partition(inner, type_guid, guid, slices, name).await?;
-        self.handle_mount(partition_index, outgoing_directory, mount_options).await.map_err(
-            |error| {
-                warn!(?error, "Created partition {name}, but failed to mount");
-                error
-            },
-        )
+
+        async move {
+            self.add_volume_to_volumes_directory(partition_index, name)?;
+
+            self.handle_mount(partition_index, outgoing_directory, mount_options).await
+        }
+        .await
+        .map_err(|error| {
+            warn!(?error, "Created partition {name}, but failed to mount");
+            error
+        })
     }
 }
 
@@ -1247,8 +1261,8 @@ mod tests {
     use fake_block_server::FakeServer;
     use fidl::endpoints::RequestStream;
     use fidl_fuchsia_fs_startup::{
-        CompressionAlgorithm, CreateOptions, EvictionPolicyOverride, MountOptions, StartOptions,
-        StartupMarker, VolumeMarker, VolumesMarker,
+        CheckOptions, CompressionAlgorithm, CreateOptions, EvictionPolicyOverride, MountOptions,
+        StartOptions, StartupMarker, VolumeMarker, VolumesMarker,
     };
     use fidl_fuchsia_hardware_block::BlockMarker;
     use fuchsia_component::client::{
@@ -1439,6 +1453,20 @@ mod tests {
                 client.read_at(MutableBufferSlice::Memory(&mut read_buf), offset).await.unwrap();
                 assert_eq!(&buf, &read_buf);
             }
+
+            // Make sure the volume appears in the volumes directory.
+            let volume_proxy = connect_to_named_protocol_at_dir_root::<VolumeMarker>(
+                &fixture.outgoing_dir,
+                "volumes/foo",
+            )
+            .unwrap();
+
+            // Check we connected by calling the Check method (even though it's unsupported).
+            assert_eq!(
+                volume_proxy.check(CheckOptions::default()).await.unwrap(),
+                Err(zx::sys::ZX_ERR_NOT_SUPPORTED)
+            );
+
             fixture.fake_server
         };
 
