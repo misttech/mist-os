@@ -16,12 +16,10 @@ namespace termina_guest_manager {
 
 class TerminaGuestManager : GuestManager, public fuchsia::virtualization::LinuxManager {
  public:
-  explicit TerminaGuestManager(async_dispatcher_t* dispatcher,
-                               fit::function<void()> stop_manager_callback);
+  explicit TerminaGuestManager(async_dispatcher_t* dispatcher);
   TerminaGuestManager(async_dispatcher_t* dispatcher,
                       std::unique_ptr<sys::ComponentContext> context,
-                      termina_config::Config structured_config,
-                      fit::function<void()> stop_manager_callback);
+                      termina_config::Config structured_config);
 
   TerminaGuestManager(const TerminaGuestManager&) = delete;
   TerminaGuestManager& operator=(const TerminaGuestManager&) = delete;
@@ -51,7 +49,6 @@ class TerminaGuestManager : GuestManager, public fuchsia::virtualization::LinuxM
   std::optional<GuestInfo> info_;
   fuchsia::virtualization::GuestPtr guest_controller_;
   std::unique_ptr<Guest> guest_;
-  fit::function<void()> stop_manager_callback_;
   async_dispatcher_t* dispatcher_;
 };
 

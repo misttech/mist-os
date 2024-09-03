@@ -50,7 +50,6 @@
     ],
     config: {
         // One of the following:
-        //  * 'fvm' - use an FVM partition directly
         //  * 'file' - use a file
         //  * 'block-file' - use a file opened using `MODE_TYPE_BLOCK_DEVICE`.
         stateful_partition_type: {
