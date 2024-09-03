@@ -269,6 +269,7 @@
                 "fuchsia.power.profile.Watcher",
                 "fuchsia.power.systemmode.ClientConfigurator",
                 "fuchsia.process.Launcher",
+                "fuchsia.scheduler.RoleManager",
                 "fuchsia.thermal.ClientStateConnector",
             ],
             from: "parent",
