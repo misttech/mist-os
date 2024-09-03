@@ -254,6 +254,11 @@ class AudioDeviceRegistryServerTestBase : public gtest::TestLoopFixture {
       LogFidlClientError(error, "RingBuffer");
       parent()->ring_buffer_fidl_error_status_ = error.status();
     }
+    void handle_unknown_event(
+        fidl::UnknownEventMetadata<fuchsia_audio_device::RingBuffer> metadata) override {
+      FX_LOGS(WARNING) << "RingBufferFidlHandler: unknown method (RingBuffer) ordinal "
+                       << metadata.event_ordinal;
+    }
   };
   const std::unique_ptr<RingBufferFidlHandler>& ring_buffer_fidl_handler() {
     return ring_buffer_fidl_handler_;

@@ -7,6 +7,7 @@
 
 #include <fidl/fuchsia.audio.device/cpp/markers.h>
 #include <fidl/fuchsia.audio.device/cpp/type_conversions.h>
+#include <lib/fidl/cpp/wire/unknown_interaction_handler.h>
 
 #include <memory>
 
@@ -36,6 +37,8 @@ class RingBufferServer
   void Start(StartRequest& request, StartCompleter::Sync& completer) override;
   void Stop(StopRequest& request, StopCompleter::Sync& completer) override;
   void WatchDelayInfo(WatchDelayInfoCompleter::Sync& completer) override;
+  void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_audio_device::RingBuffer> metadata,
+                             fidl::UnknownMethodCompleter::Sync& completer) override;
 
   // Forwarded from ControlNotify
   void DelayInfoIsChanged(const fuchsia_audio_device::DelayInfo& delay_info);

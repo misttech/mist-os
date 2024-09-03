@@ -6,6 +6,7 @@
 
 #include <fidl/fuchsia.audio.device/cpp/markers.h>
 #include <lib/fidl/cpp/enum.h>
+#include <lib/fidl/cpp/wire/unknown_interaction_handler.h>
 #include <lib/fit/internal/result.h>
 #include <lib/trace/event.h>
 #include <zircon/errors.h>
@@ -325,6 +326,14 @@ void RingBufferServer::MaybeCompleteWatchDelayInfo() {
         .delay_info = delay_info,
     }}));
   }
+}
+
+// We complain but don't close the connection, to accommodate older and newer clients.
+void RingBufferServer::handle_unknown_method(
+    fidl::UnknownMethodMetadata<fuchsia_audio_device::RingBuffer> metadata,
+    fidl::UnknownMethodCompleter::Sync& completer) {
+  ADR_WARN_METHOD() << "unknown method (RingBuffer) ordinal " << metadata.method_ordinal;
+  completer.Close(ZX_ERR_NOT_SUPPORTED);
 }
 
 }  // namespace media_audio

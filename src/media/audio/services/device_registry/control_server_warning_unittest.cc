@@ -76,6 +76,11 @@ class ControlServerWarningTest : public AudioDeviceRegistryServerTestBase,
            << metadata.event_ordinal;
   }
 
+  void handle_unknown_event(fidl::UnknownEventMetadata<fad::RingBuffer> metadata) override {
+    FAIL() << "RingBufferServerWarningTest: unknown event (RingBuffer) ordinal "
+           << metadata.event_ordinal;
+  }
+
   static ElementId ring_buffer_id() { return fad::kDefaultRingBufferElementId; }
   static ElementId dai_id() { return fad::kDefaultDaiInterconnectElementId; }
 };
