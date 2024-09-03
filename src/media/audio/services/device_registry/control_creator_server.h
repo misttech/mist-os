@@ -6,6 +6,7 @@
 #define SRC_MEDIA_AUDIO_SERVICES_DEVICE_REGISTRY_CONTROL_CREATOR_SERVER_H_
 
 #include <fidl/fuchsia.audio.device/cpp/fidl.h>
+#include <lib/fidl/cpp/wire/unknown_interaction_handler.h>
 
 #include <memory>
 
@@ -29,6 +30,9 @@ class ControlCreatorServer : public std::enable_shared_from_this<ControlCreatorS
 
   // fuchsia.audio.device.ControlCreator implementation
   void Create(CreateRequest& request, CreateCompleter::Sync& completer) override;
+  void handle_unknown_method(
+      fidl::UnknownMethodMetadata<fuchsia_audio_device::ControlCreator> metadata,
+      fidl::UnknownMethodCompleter::Sync& completer) override;
 
   // Static object count, for debugging purposes.
   static inline uint64_t count() { return count_; }

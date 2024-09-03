@@ -162,6 +162,11 @@ class AudioDeviceRegistryServerTestBase : public gtest::TestLoopFixture {
       LogFidlClientError(error, "ControlCreator");
       parent()->control_creator_fidl_error_status_ = error.status();
     }
+    void handle_unknown_event(
+        fidl::UnknownEventMetadata<fuchsia_audio_device::ControlCreator> metadata) override {
+      FX_LOGS(WARNING) << "ControlCreatorFidlHandler: unknown method (ControlCreator) ordinal "
+                       << metadata.event_ordinal;
+    }
   };
   std::unique_ptr<TestServerAndNaturalAsyncClient<ControlCreatorServer>>
   CreateTestControlCreatorServer() {

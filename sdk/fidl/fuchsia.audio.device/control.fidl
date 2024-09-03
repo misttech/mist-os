@@ -66,9 +66,9 @@ type DelayInfo = table {
 /// A `ControlCreator` interface creates `Control` instances. Each `Control` binds
 /// to a single device. A device can only be bound to one `Control` at any time.
 @discoverable
-closed protocol ControlCreator {
+open protocol ControlCreator {
     /// Create a `Control` for the specified device.
-    strict Create(resource table {
+    flexible Create(resource table {
         /// The token id for the device to be controlled.
         ///
         /// Required.

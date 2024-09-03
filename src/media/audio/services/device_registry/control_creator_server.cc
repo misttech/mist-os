@@ -4,6 +4,7 @@
 
 #include "src/media/audio/services/device_registry/control_creator_server.h"
 
+#include <lib/fidl/cpp/wire/unknown_interaction_handler.h>
 #include <lib/fit/internal/result.h>
 #include <lib/syslog/cpp/macros.h>
 
@@ -74,6 +75,13 @@ void ControlCreatorServer::Create(CreateRequest& request, CreateCompleter::Sync&
   }
 
   completer.Reply(fit::success(fad::ControlCreatorCreateResponse{}));
+}
+
+// We complain but don't close the connection, to accommodate older and newer clients.
+void ControlCreatorServer::handle_unknown_method(
+    fidl::UnknownMethodMetadata<fuchsia_audio_device::ControlCreator> metadata,
+    fidl::UnknownMethodCompleter::Sync& completer) {
+  ADR_WARN_METHOD() << "unknown method (ControlCreator) ordinal " << metadata.method_ordinal;
 }
 
 }  // namespace media_audio
