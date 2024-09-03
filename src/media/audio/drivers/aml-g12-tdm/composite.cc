@@ -205,10 +205,12 @@ zx::result<> Driver::Start() {
       return zx::error(ZX_ERR_NOT_SUPPORTED);
   }
 
+  auto recorder = std::make_unique<Recorder>(inspector().root());
+
   server_ = std::make_unique<AudioCompositeServer>(
       std::move(mmios), std::move((*get_bti_result)->bti), dispatcher(), aml_version,
       std::move(gate_client), std::move(pll_client), std::move(gpio_sclk_clients),
-      inspector().root());
+      std::move(recorder));
 
   auto result = outgoing()->component().AddUnmanagedProtocol<fuchsia_hardware_audio::Composite>(
       bindings_.CreateHandler(server_.get(), dispatcher(), fidl::kIgnoreBindingClosure),
