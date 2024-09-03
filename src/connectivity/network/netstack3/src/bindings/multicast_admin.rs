@@ -494,14 +494,17 @@ impl TryFromFidlWithContext<FidlExtRoute> for MulticastRoute<DeviceId<BindingsCt
 mod tests {
     use super::*;
 
+    use crate::bindings::integration_tests::{StackSetupBuilder, TestSetupBuilder};
     use crate::bindings::util::testutils::{
         FakeConversionContext, BINDING_ID1, BINDING_ID2, INVALID_BINDING_ID,
     };
+    use crate::bindings::BindingId;
     use crate::NetstackSeed;
 
     use assert_matches::assert_matches;
+    use const_unwrap::const_unwrap_option;
     use fidl::endpoints::Proxy;
-    use fidl_fuchsia_net_multicast_ext::TerminalEventProxy as _;
+    use fidl_fuchsia_net_multicast_ext::TableControllerProxy as _;
     use futures::task::Poll;
     use futures::{poll, FutureExt};
     use ip_test_macro::ip_test;
@@ -630,8 +633,91 @@ mod tests {
         worker_fut.await;
     }
 
-    // TODO(https://fxbug.dev/353330225): Add a test to verify that device
-    // removal will remove any multicast routes that reference the device.
+    enum DeviceRemovalTestCase {
+        WrongDevice,
+        InputDevice,
+        OutputDevice,
+    }
+
+    #[netstack3_core::context_ip_bounds(I, BindingsCtx)]
+    #[ip_test(I)]
+    #[test_case(DeviceRemovalTestCase::WrongDevice, false; "wrong_device_no_change")]
+    #[test_case(DeviceRemovalTestCase::InputDevice, true; "removed_by_input")]
+    #[test_case(DeviceRemovalTestCase::OutputDevice, true; "removed_by_output")]
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn device_removal_purges_route_table<I: IpExt + FidlMulticastAdminIpExt>(
+        which_device: DeviceRemovalTestCase,
+        expect_removal: bool,
+    ) {
+        // Create a test_setup with 3 interfaces.
+        // NB: Don't use ID `1`, as that will conflict with Loopback.
+        const WRONG_BINDING_ID: BindingId = const_unwrap_option(NonZeroU64::new(2));
+        const INPUT_BINDING_ID: BindingId = const_unwrap_option(NonZeroU64::new(3));
+        const OUTPUT_BINDING_ID: BindingId = const_unwrap_option(NonZeroU64::new(4));
+        let mut test_setup = TestSetupBuilder::new()
+            .add_endpoint()
+            .add_endpoint()
+            .add_endpoint()
+            .add_stack(
+                StackSetupBuilder::new()
+                    .add_endpoint(1, None)
+                    .add_endpoint(2, None)
+                    .add_endpoint(3, None),
+            )
+            .build()
+            .await;
+        let test_stack = test_setup.get_mut(0);
+        test_stack.wait_for_interface_online(WRONG_BINDING_ID).await;
+        test_stack.wait_for_interface_online(INPUT_BINDING_ID).await;
+        test_stack.wait_for_interface_online(OUTPUT_BINDING_ID).await;
+        let (unicast_source, multicast_destination) =
+            I::map_ip((), |()| (UNICAST_V4, MULTICAST_V4), |()| (UNICAST_V6, MULTICAST_V6));
+        let addresses =
+            UnicastSourceAndMulticastDestination { unicast_source, multicast_destination };
+
+        let (client, request_stream) =
+            fidl::endpoints::create_proxy_and_stream::<I::TableControllerMarker>()
+                .expect("should be able to create table controller fidl endpoints");
+        test_stack
+            .ctx()
+            .bindings_ctx()
+            .multicast_admin
+            .sink::<I>()
+            .serve_multicast_admin_client(request_stream);
+
+        let route = fnet_multicast_admin::Route {
+            expected_input_interface: Some(INPUT_BINDING_ID.get()),
+            action: Some(fnet_multicast_admin::Action::OutgoingInterfaces(vec![
+                fnet_multicast_admin::OutgoingInterfaces {
+                    id: OUTPUT_BINDING_ID.get(),
+                    min_ttl: 0,
+                },
+            ])),
+            __source_breaking: fidl::marker::SourceBreaking,
+        };
+        client
+            .add_route(addresses.clone(), &route)
+            .await
+            .expect("add route request should be sent")
+            .expect("add route should succeed");
+
+        // Removal all routes referencing the device.
+        let id = match which_device {
+            DeviceRemovalTestCase::WrongDevice => WRONG_BINDING_ID.get(),
+            DeviceRemovalTestCase::InputDevice => INPUT_BINDING_ID.get(),
+            DeviceRemovalTestCase::OutputDevice => OUTPUT_BINDING_ID.get(),
+        };
+        test_stack.remove_interface(id).await;
+
+        // Verify the route was/wasn't removed.
+        let expected_result = if expect_removal { Err(DelRouteError::NotFound) } else { Ok(()) };
+        assert_eq!(
+            client.del_route(addresses).await.expect("del_route_request_should be sent"),
+            expected_result
+        );
+
+        test_setup.shutdown().await;
+    }
 
     #[test_case(UnicastSourceAndMulticastDestination{
         unicast_source: UNICAST_V4,
