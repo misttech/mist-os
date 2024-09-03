@@ -180,10 +180,10 @@ type PlugState = flexible enum {
 /// `Registry` instances notify clients as devices arrive and depart, and they
 /// create observers (see `Observer`) that notify of more detailed state changes.
 @discoverable
-closed protocol Registry {
+open protocol Registry {
     /// Register for notification when one or more devices are added.
     /// The `devices` vector will always contain at least one `Info` entry.
-    strict WatchDevicesAdded() -> (table {
+    flexible WatchDevicesAdded() -> (table {
         /// Devices added since `WatchDevicesAdded` was last called. When called
         /// for the first time, this method returns all available audio devices
         /// (even an empty vector, if no audio devices are present). Subsequent
@@ -196,13 +196,13 @@ closed protocol Registry {
     /// should immediately be re-called, in case other removals have occurred.
     /// Calls to this method will pend until the removal of a device that was
     /// included in a previous `WatchDevicesAdded` response.
-    strict WatchDeviceRemoved() -> (table {
+    flexible WatchDeviceRemoved() -> (table {
         /// The token of the device least-recently removed.
         1: token_id TokenId;
     }) error RegistryWatchDeviceRemovedError;
 
     /// Request an `Observer` for the specified device.
-    strict CreateObserver(resource table {
+    flexible CreateObserver(resource table {
         /// The token of the device to be observed.
         ///
         /// Required.

@@ -7,6 +7,7 @@
 #include <fidl/fuchsia.audio.device/cpp/fidl.h>
 #include <lib/fidl/cpp/unified_messaging_declarations.h>
 #include <lib/fidl/cpp/wire/transaction.h>
+#include <lib/fidl/cpp/wire/unknown_interaction_handler.h>
 #include <lib/fidl/cpp/wire/wire_messaging_declarations.h>
 #include <lib/fit/internal/result.h>
 #include <lib/syslog/cpp/macros.h>
@@ -201,6 +202,13 @@ void RegistryServer::CreateObserver(CreateObserverRequest& request,
       parent_->CreateObserverServer(std::move(*request.observer_server()), matching_device);
 
   completer.Reply(fit::success(fad::RegistryCreateObserverResponse{}));
+}
+
+// We complain but don't close the connection, to accommodate older and newer clients.
+void RegistryServer::handle_unknown_method(
+    fidl::UnknownMethodMetadata<fuchsia_audio_device::Registry> metadata,
+    fidl::UnknownMethodCompleter::Sync& completer) {
+  ADR_WARN_METHOD() << "unknown method (Registry) ordinal " << metadata.method_ordinal;
 }
 
 }  // namespace media_audio

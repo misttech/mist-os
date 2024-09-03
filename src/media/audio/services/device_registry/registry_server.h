@@ -6,6 +6,7 @@
 #define SRC_MEDIA_AUDIO_SERVICES_DEVICE_REGISTRY_REGISTRY_SERVER_H_
 
 #include <fidl/fuchsia.audio.device/cpp/fidl.h>
+#include <lib/fidl/cpp/wire/unknown_interaction_handler.h>
 
 #include <cstdint>
 #include <memory>
@@ -38,6 +39,8 @@ class RegistryServer
   void WatchDeviceRemoved(WatchDeviceRemovedCompleter::Sync& completer) final;
   void CreateObserver(CreateObserverRequest& request,
                       CreateObserverCompleter::Sync& completer) final;
+  void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_audio_device::Registry> metadata,
+                             fidl::UnknownMethodCompleter::Sync& completer) override;
 
   void DeviceWasAdded(const std::shared_ptr<const Device>& new_device);
   void DeviceWasRemoved(TokenId removed_id);
