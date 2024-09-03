@@ -1208,6 +1208,9 @@ impl Interface for PartitionInterface {
         new_metadata.header.generation =
             new_metadata.header.generation.checked_add(1).ok_or(zx::Status::BAD_STATE)?;
 
+        let slices = &mut new_metadata.partitions.get_mut(&self.partition_index).unwrap().slices;
+        *slices = slices.saturating_sub(slice_count as u32);
+
         let new_slot = 1 - inner.slot;
         new_metadata
             .write(self.fvm.device.as_ref(), new_metadata.header.offset_for_slot(new_slot))
@@ -1764,13 +1767,15 @@ mod tests {
     async fn test_shrink() {
         let final_checks;
 
-        async fn get_assigned_slice_count(proxy: &fvolume::VolumeProxy) -> u64 {
-            let (status, info, _) = proxy.get_volume_info().await.unwrap();
+        /// Returns the number of assigned slices for the individual volume and the whole FVM
+        /// volume.
+        async fn get_counts(proxy: &fvolume::VolumeProxy) -> (u64, u64) {
+            let (status, manager_info, volume_info) = proxy.get_volume_info().await.unwrap();
             assert_eq!(status, zx::sys::ZX_OK);
-            info.unwrap().assigned_slice_count
+            (manager_info.unwrap().assigned_slice_count, volume_info.unwrap().partition_slice_count)
         }
 
-        let initial_assigned_slice_count;
+        let initial_counts;
 
         let fake_server = {
             let fixture = Fixture::new(23 * 32768).await;
@@ -1797,9 +1802,8 @@ mod tests {
             let blobfs_volume_proxy =
                 connect_to_protocol_at_dir_svc::<fvolume::VolumeMarker>(&dir_proxy).unwrap();
 
-            // Record the initial assigned slice count.
-            let get_assigned_slice_count = || get_assigned_slice_count(&blobfs_volume_proxy);
-            initial_assigned_slice_count = get_assigned_slice_count().await;
+            // Record the initial assigned slice count via the blobfs_volume.
+            let blobfs_initial_counts = get_counts(&blobfs_volume_proxy).await;
 
             // Create a new volume.
 
@@ -1821,10 +1825,12 @@ mod tests {
                 .expect("create failed (FIDL)")
                 .expect("create failed");
 
-            assert_eq!(get_assigned_slice_count().await, initial_assigned_slice_count + 5);
-
             let volume_proxy =
                 connect_to_protocol_at_dir_svc::<fvolume::VolumeMarker>(&dir_proxy).unwrap();
+
+            let get_counts = || get_counts(&volume_proxy);
+            initial_counts = get_counts().await;
+            assert_eq!(initial_counts, (blobfs_initial_counts.0 + 5, 5));
 
             // Extend the blobfs volume so we get some fragmentation
             assert_eq!(
@@ -1832,7 +1838,7 @@ mod tests {
                 zx::sys::ZX_OK
             );
 
-            assert_eq!(get_assigned_slice_count().await, initial_assigned_slice_count + 6);
+            assert_eq!(get_counts().await, (initial_counts.0 + 1, 5));
 
             // Extend the volume we created by another 5 slices.
             assert_eq!(
@@ -1840,7 +1846,7 @@ mod tests {
                 zx::sys::ZX_OK
             );
 
-            assert_eq!(get_assigned_slice_count().await, initial_assigned_slice_count + 11);
+            assert_eq!(get_counts().await, (initial_counts.0 + 6, 10));
 
             // And again...
             assert_eq!(
@@ -1862,7 +1868,7 @@ mod tests {
                 zx::sys::ZX_OK
             );
 
-            assert_eq!(get_assigned_slice_count().await, initial_assigned_slice_count + 23);
+            assert_eq!(get_counts().await, (initial_counts.0 + 18, 20));
 
             // Write to every slice.
             let client = RemoteBlockClient::new(&volume_proxy).await.unwrap();
@@ -1877,7 +1883,7 @@ mod tests {
                 zx::sys::ZX_OK
             );
 
-            assert_eq!(get_assigned_slice_count().await, initial_assigned_slice_count + 16);
+            assert_eq!(get_counts().await, (initial_counts.0 + 11, 13));
 
             let (status, ranges, range_count) =
                 volume_proxy.query_slices(&[0, 4, 11]).await.unwrap();
@@ -1898,7 +1904,7 @@ mod tests {
                 zx::sys::ZX_OK
             );
 
-            assert_eq!(get_assigned_slice_count().await, initial_assigned_slice_count + 11);
+            assert_eq!(get_counts().await, (initial_counts.0 + 6, 8));
 
             let (status, ranges, range_count) =
                 volume_proxy.query_slices(&[0, 4, 11, 15]).await.unwrap();
@@ -1920,7 +1926,7 @@ mod tests {
                 zx::sys::ZX_OK
             );
 
-            assert_eq!(get_assigned_slice_count().await, initial_assigned_slice_count + 9);
+            assert_eq!(get_counts().await, (initial_counts.0 + 4, 6));
 
             // Some checks that we also want to perform after reopening.
             final_checks = |volume_proxy: fvolume::VolumeProxy| async move {
@@ -1976,7 +1982,7 @@ mod tests {
         let volume_proxy =
             connect_to_protocol_at_dir_svc::<fvolume::VolumeMarker>(&dir_proxy).unwrap();
 
-        assert_eq!(get_assigned_slice_count(&volume_proxy).await, initial_assigned_slice_count + 9);
+        assert_eq!(get_counts(&volume_proxy).await, (initial_counts.0 + 4, 6));
 
         final_checks(volume_proxy).await;
     }
