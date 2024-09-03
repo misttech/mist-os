@@ -495,9 +495,7 @@ mod tests {
     use super::*;
 
     use crate::bindings::integration_tests::{StackSetupBuilder, TestSetupBuilder};
-    use crate::bindings::util::testutils::{
-        FakeConversionContext, BINDING_ID1, BINDING_ID2, INVALID_BINDING_ID,
-    };
+    use crate::bindings::util::testutils::FakeConversionContext;
     use crate::bindings::BindingId;
     use crate::NetstackSeed;
 
@@ -756,54 +754,54 @@ mod tests {
     }
 
     #[test_case(FidlExtRoute {
-        expected_input_interface: BINDING_ID1.into(),
+        expected_input_interface: FakeConversionContext::BINDING_ID1.into(),
         action: fnet_multicast_admin::Action::OutgoingInterfaces(vec![
             fnet_multicast_admin::OutgoingInterfaces {
-                id: BINDING_ID2.into(),
+                id: FakeConversionContext::BINDING_ID2.into(),
                 min_ttl: 0,
             }
         ]),
         } => None; "success")]
     #[test_case(FidlExtRoute {
-        expected_input_interface: INVALID_BINDING_ID.get(),
+        expected_input_interface: FakeConversionContext::INVALID_BINDING_ID.get(),
         action: fnet_multicast_admin::Action::OutgoingInterfaces(vec![
             fnet_multicast_admin::OutgoingInterfaces {
-                id: BINDING_ID2.into(),
+                id: FakeConversionContext::BINDING_ID2.into(),
                 min_ttl: 0,
             }
         ]),
         } => Some(AddRouteError::InterfaceNotFound); "invalid_iif")]
     #[test_case(FidlExtRoute {
-        expected_input_interface: BINDING_ID1.into(),
+        expected_input_interface: FakeConversionContext::BINDING_ID1.into(),
         action: fnet_multicast_admin::Action::OutgoingInterfaces(vec![
             fnet_multicast_admin::OutgoingInterfaces {
-                id: INVALID_BINDING_ID.into(),
+                id: FakeConversionContext::INVALID_BINDING_ID.into(),
                 min_ttl: 0,
             }
         ]),
         } => Some(AddRouteError::InterfaceNotFound); "invalid_oif")]
     #[test_case(FidlExtRoute {
-        expected_input_interface: BINDING_ID1.into(),
+        expected_input_interface: FakeConversionContext::BINDING_ID1.into(),
         action: fnet_multicast_admin::Action::OutgoingInterfaces(vec![]),
         } => Some(AddRouteError::RequiredRouteFieldsMissing); "no_oif")]
     #[test_case(FidlExtRoute {
-        expected_input_interface: BINDING_ID1.into(),
+        expected_input_interface: FakeConversionContext::BINDING_ID1.into(),
         action: fnet_multicast_admin::Action::OutgoingInterfaces(vec![
             fnet_multicast_admin::OutgoingInterfaces {
-                id: BINDING_ID1.into(),
+                id: FakeConversionContext::BINDING_ID1.into(),
                 min_ttl: 0,
             }
         ]),
         } => Some(AddRouteError::InputCannotBeOutput); "iff_is_oif")]
     #[test_case(FidlExtRoute {
-        expected_input_interface: BINDING_ID1.into(),
+        expected_input_interface: FakeConversionContext::BINDING_ID1.into(),
         action: fnet_multicast_admin::Action::OutgoingInterfaces(vec![
             fnet_multicast_admin::OutgoingInterfaces {
-                id: BINDING_ID2.into(),
+                id: FakeConversionContext::BINDING_ID2.into(),
                 min_ttl: 0,
             },
             fnet_multicast_admin::OutgoingInterfaces {
-                id: BINDING_ID2.into(),
+                id: FakeConversionContext::BINDING_ID2.into(),
                 min_ttl: 0,
             }
         ]),

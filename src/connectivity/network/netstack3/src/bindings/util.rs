@@ -1347,15 +1347,15 @@ pub(crate) mod testutils {
 
     use super::*;
 
-    pub(crate) const BINDING_ID1: BindingId = const_unwrap_option(NonZeroU64::new(1));
-    pub(crate) const BINDING_ID2: BindingId = const_unwrap_option(NonZeroU64::new(2));
-    pub(crate) const INVALID_BINDING_ID: BindingId = const_unwrap_option(NonZeroU64::new(3));
-
     pub(crate) struct FakeConversionContext {
         test_setup: TestSetup,
     }
 
     impl FakeConversionContext {
+        pub(crate) const BINDING_ID1: BindingId = const_unwrap_option(NonZeroU64::new(1));
+        pub(crate) const BINDING_ID2: BindingId = const_unwrap_option(NonZeroU64::new(2));
+        pub(crate) const INVALID_BINDING_ID: BindingId = const_unwrap_option(NonZeroU64::new(3));
+
         pub(crate) async fn shutdown(self) {
             let Self { test_setup } = self;
             test_setup.shutdown().await
@@ -1371,8 +1371,8 @@ pub(crate) mod testutils {
                 .await;
 
             let test_stack = test_setup.get_mut(0);
-            test_stack.wait_for_interface_online(BINDING_ID1).await;
-            test_stack.wait_for_interface_online(BINDING_ID2).await;
+            test_stack.wait_for_interface_online(Self::BINDING_ID1).await;
+            test_stack.wait_for_interface_online(Self::BINDING_ID2).await;
 
             Self { test_setup }
         }
@@ -1397,9 +1397,7 @@ mod tests {
     use net_declare::{net_ip_v4, net_ip_v6};
     use test_case::test_case;
 
-    use crate::bindings::util::testutils::{
-        FakeConversionContext, BINDING_ID1, INVALID_BINDING_ID,
-    };
+    use crate::bindings::util::testutils::FakeConversionContext;
 
     use super::*;
 
@@ -1509,7 +1507,7 @@ mod tests {
         fidl_net::Ipv6SocketAddress {
             address: net_ip_v6!("fe80::1").into_ext(),
             port: 8080,
-            zone_index: INVALID_BINDING_ID.into(),
+            zone_index: FakeConversionContext::INVALID_BINDING_ID.into(),
         },
         SocketAddressError::Device(DeviceNotFoundError);
         "IPv6 specified invalid zone")]
@@ -1560,7 +1558,7 @@ mod tests {
         fidl_net::Ipv6SocketAddress {
             address: net_ip_v6!("fe80::1").into_ext(),
             port: 8080,
-            zone_index: BINDING_ID1.into()
+            zone_index: FakeConversionContext::BINDING_ID1.into()
         },
         (Some(
             ZonedAddr::Zoned(AddrAndZone::new(SpecifiedAddr::new(net_ip_v6!("fe80::1")).unwrap(), ReplaceWithCoreId).unwrap())
@@ -1582,9 +1580,9 @@ mod tests {
         let ctx = FakeConversionContext::new().await;
         let zoned = zoned.map(|z| match z {
             ZonedAddr::Unzoned(z) => ZonedAddr::Unzoned(z).into(),
-            ZonedAddr::Zoned(z) => ZonedAddr::Zoned(
-                z.map_zone(|ReplaceWithCoreId| ctx.get_core_id(BINDING_ID1).unwrap()),
-            )
+            ZonedAddr::Zoned(z) => ZonedAddr::Zoned(z.map_zone(|ReplaceWithCoreId| {
+                ctx.get_core_id(FakeConversionContext::BINDING_ID1).unwrap()
+            }))
             .into(),
         });
 
@@ -1639,12 +1637,13 @@ mod tests {
     #[fuchsia_async::run_singlethreaded(test)]
     async fn device_id_from_bindings_id() {
         let ctx = FakeConversionContext::new().await;
-        let device_id: DeviceId<_> = BINDING_ID1.try_into_core_with_ctx(&ctx).unwrap();
-        let core = ctx.get_core_id(BINDING_ID1).unwrap();
+        let device_id: DeviceId<_> =
+            FakeConversionContext::BINDING_ID1.try_into_core_with_ctx(&ctx).unwrap();
+        let core = ctx.get_core_id(FakeConversionContext::BINDING_ID1).unwrap();
         assert_eq!(device_id, core);
 
         assert_eq!(
-            INVALID_BINDING_ID.try_into_core_with_ctx(&ctx),
+            FakeConversionContext::INVALID_BINDING_ID.try_into_core_with_ctx(&ctx),
             Err::<DeviceId<_>, _>(DeviceNotFoundError)
         );
         ctx
