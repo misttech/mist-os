@@ -5,21 +5,27 @@
 
 #include "lib/mistos/starnix/kernel/vfs/fs_args.h"
 
+#include <lib/fit/result.h>
 #include <lib/mistos/starnix/kernel/vfs/path.h>
 
 #include <ktl/string_view.h>
 #include <ktl/unique_ptr.h>
 
-namespace starnix::fs_args {
+namespace starnix {
 
-void generic_parse_mount_options(
-    const FsStr& data, fbl::HashTable<ktl::string_view, ktl::unique_ptr<HashableFsString>>* out) {
-  if (data.empty() || out == nullptr) {
-    return;
+namespace parse_mount_options {
+
+fit::result<Errno> parse_mount_options(const FsStr& input, FsStringHashTable* out) {
+  if (out == nullptr) {
+    return fit::error(errno(EINVAL));
   }
 
-  auto start = data.begin();
-  auto end = data.end();
+  if (input.empty()) {
+    return fit::ok();
+  }
+
+  auto start = input.begin();
+  auto end = input.end();
   while (start <= end) {
     auto comma_pos = std::find(start, end, ',');
     auto equal_pos = std::find(start, comma_pos, '=');
@@ -29,8 +35,8 @@ void generic_parse_mount_options(
     ktl::unique_ptr<HashableFsString> hashable(new (&ac) HashableFsString{});
     ZX_ASSERT(ac.check());
 
-    hashable->key = ktl::move(ktl::string_view(&*start, static_cast<size_t>(equal_pos - start)));
-    hashable->value = ktl::move(ktl::string_view(&*(equal_pos + 1), value_length));
+    hashable->key = ktl::move(FsString(&*start, static_cast<size_t>(equal_pos - start)));
+    hashable->value = ktl::move(FsString(&*(equal_pos + 1), value_length));
     out->insert_or_replace(ktl::move(hashable));
 
     if (comma_pos == end) {
@@ -38,6 +44,28 @@ void generic_parse_mount_options(
     }
     start = comma_pos + 1;
   }
+  return fit::ok();
 }
 
-}  // namespace starnix::fs_args
+}  // namespace parse_mount_options
+
+fit::result<Errno, MountParams> MountParams::parse(const FsStr& data) {
+  MountParams mp;
+  auto options_or_error = parse_mount_options::parse_mount_options(data, &mp.options_);
+  if (options_or_error.is_error())
+    return options_or_error.take_error();
+  return fit::ok(mp);
+}
+
+MountParams::MountParams(const MountParams& other) {
+  for (const auto& pair : other.options_) {
+    fbl::AllocChecker ac;
+    ktl::unique_ptr<HashableFsString> hashable(new (&ac) HashableFsString{});
+    ZX_ASSERT(ac.check());
+    hashable->key = pair.key;
+    hashable->value = pair.value;
+    options_.insert_or_replace(ktl::move(hashable));
+  }
+}
+
+}  // namespace starnix
