@@ -37,6 +37,8 @@ const MAX_FLAT_MAP_REGENS: &str = "PROPTEST_MAX_FLAT_MAP_REGENS";
 const MAX_SHRINK_TIME: &str = "PROPTEST_MAX_SHRINK_TIME";
 #[cfg(feature = "std")]
 const MAX_SHRINK_ITERS: &str = "PROPTEST_MAX_SHRINK_ITERS";
+#[cfg(feature = "std")]
+const MAX_DEFAULT_SIZE_RANGE: &str = "PROPTEST_MAX_DEFAULT_SIZE_RANGE";
 #[cfg(feature = "fork")]
 const FORK: &str = "PROPTEST_FORK";
 #[cfg(feature = "timeout")]
@@ -78,8 +80,6 @@ pub fn contextualize_config(mut result: Config) -> Config {
         }
     }
 
-    result.failure_persistence =
-        Some(Box::new(FileFailurePersistence::default()));
     for (var, value) in
         env::vars_os().filter_map(|(k, v)| k.into_string().ok().map(|k| (k, v)))
     {
@@ -120,6 +120,12 @@ pub fn contextualize_config(mut result: Config) -> Config {
                 &mut result.max_shrink_iters,
                 "u32",
                 MAX_SHRINK_ITERS,
+            ),
+            MAX_DEFAULT_SIZE_RANGE => parse_or_warn(
+                &value,
+                &mut result.max_default_size_range,
+                "usize",
+                MAX_DEFAULT_SIZE_RANGE,
             ),
             VERBOSE => {
                 parse_or_warn(&value, &mut result.verbose, "u32", VERBOSE)
@@ -165,6 +171,7 @@ fn default_default_config() -> Config {
         #[cfg(feature = "std")]
         max_shrink_time: 0,
         max_shrink_iters: u32::MAX,
+        max_default_size_range: 100,
         result_cache: noop_result_cache,
         #[cfg(feature = "std")]
         verbose: 0,
@@ -177,8 +184,11 @@ fn default_default_config() -> Config {
 // defaults.
 #[cfg(feature = "std")]
 lazy_static! {
-    static ref DEFAULT_CONFIG: Config =
-        contextualize_config(default_default_config());
+    static ref DEFAULT_CONFIG: Config = {
+        let mut default_config = default_default_config();
+        default_config.failure_persistence = Some(Box::new(FileFailurePersistence::default()));
+        contextualize_config(default_config)
+    };
 }
 
 /// Configuration for how a proptest test should be run.
@@ -330,6 +340,16 @@ pub struct Config {
     /// `PROPTEST_MAX_SHRINK_ITERS` environment variable. (The variable is only
     /// considered when the `std` feature is enabled, which it is by default.)
     pub max_shrink_iters: u32,
+
+    /// The default maximum size to `proptest::collection::SizeRange`. The default
+    /// strategy for collections (like `Vec`) use collections in the range of
+    /// `0..max_default_size_range`.
+    ///
+    /// The default is `100` which can be overridden by setting the
+    /// `PROPTEST_MAX_DEFAULT_SIZE_RANGE` environment variable. (The variable
+    /// is only considered when the `std` feature is enabled, which it is by
+    /// default.)
+    pub max_default_size_range: usize,
 
     /// A function to create new result caches.
     ///

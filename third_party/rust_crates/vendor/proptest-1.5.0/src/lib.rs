@@ -17,7 +17,7 @@
 #![forbid(future_incompatible)]
 #![deny(missing_docs, bare_trait_objects)]
 #![no_std]
-#![cfg_attr(feature = "cargo-clippy", allow(
+#![cfg_attr(clippy, allow(
     doc_markdown,
     // We have a lot of these lints for associated types... And we don't care.
     type_complexity
@@ -96,3 +96,13 @@ pub mod sample;
 pub mod string;
 
 pub mod prelude;
+
+#[cfg(feature = "attr-macro")]
+pub use proptest_macro::property_test; 
+
+#[cfg(feature = "attr-macro")]
+#[test]
+fn compile_tests() {
+    let t = trybuild::TestCases::new();
+    t.pass("tests/pass/*.rs");
+}

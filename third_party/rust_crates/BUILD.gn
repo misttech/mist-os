@@ -661,7 +661,7 @@ if (!(current_os == "fuchsia")) {
 }
 
 group("proptest") {
-  public_deps = [ ":proptest-v1_4_0" ]
+  public_deps = [ ":proptest-v1_5_0" ]
 }
 
 group("proptest-derive") {
@@ -2810,7 +2810,7 @@ rust_library("camino-v1_1_1") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":proptest-v1_4_0" ]
+  deps += [ ":proptest-v1_5_0" ]
   deps += [ ":serde-v1_0_204" ]
 
   rustenv = []
@@ -10859,18 +10859,18 @@ rust_proc_macro("proc-macro-error-attr-v1_0_4") {
   applicable_licenses = [ ":proc-macro-error-attr-v1_0_4.license" ]
 }
 
-license("proptest-v1_4_0.license") {
+license("proptest-v1_5_0.license") {
   public_package_name = "proptest"
   license_files = [
-    "//third_party/rust_crates/vendor/proptest-1.4.0/LICENSE-APACHE",
-    "//third_party/rust_crates/vendor/proptest-1.4.0/LICENSE-MIT",
+    "//third_party/rust_crates/vendor/proptest-1.5.0/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/proptest-1.5.0/LICENSE-MIT",
   ]
 }
 
-rust_library("proptest-v1_4_0") {
+rust_library("proptest-v1_5_0") {
   crate_name = "proptest"
-  crate_root = "//third_party/rust_crates/vendor/proptest-1.4.0/src/lib.rs"
-  output_name = "proptest-60c7a54e1a2dc821"
+  crate_root = "//third_party/rust_crates/vendor/proptest-1.5.0/src/lib.rs"
+  output_name = "proptest-7bbe8284cc55184d"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
@@ -10892,8 +10892,8 @@ rust_library("proptest-v1_4_0") {
   rustflags = [
     "--cap-lints=allow",
     "--edition=2018",
-    "-Cmetadata=60c7a54e1a2dc821",
-    "-Cextra-filename=-60c7a54e1a2dc821",
+    "-Cmetadata=7bbe8284cc55184d",
+    "-Cextra-filename=-7bbe8284cc55184d",
     "--cfg=feature=\"bit-set\"",
     "--cfg=feature=\"default\"",
     "--cfg=feature=\"fork\"",
@@ -10907,7 +10907,7 @@ rust_library("proptest-v1_4_0") {
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":proptest-v1_4_0.license" ]
+  applicable_licenses = [ ":proptest-v1_5_0.license" ]
 }
 
 license("proptest-derive-v0_3_0.license") {
