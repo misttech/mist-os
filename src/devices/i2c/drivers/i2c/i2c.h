@@ -7,14 +7,11 @@
 
 #include <fidl/fuchsia.hardware.i2c.businfo/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.i2cimpl/cpp/driver/fidl.h>
-#include <lib/ddk/metadata.h>
 #include <lib/driver/component/cpp/driver_base.h>
 
 #include "src/devices/i2c/drivers/i2c/i2c-child-server.h"
 
 namespace i2c {
-
-class I2cChildServer;
 
 class I2cDriver : public fdf::DriverBase {
   using TransferRequestView = fidl::WireServer<fuchsia_hardware_i2c::Device>::TransferRequestView;

@@ -4,6 +4,7 @@
 
 #include "src/devices/i2c/drivers/i2c/i2c-child-server.h"
 
+#include <lib/ddk/metadata.h>
 #include <lib/driver/node/cpp/add_child.h>
 
 #include <bind/fuchsia/cpp/bind.h>
@@ -12,7 +13,7 @@
 namespace i2c {
 
 zx::result<std::unique_ptr<I2cChildServer>> I2cChildServer::CreateAndAddChild(
-    I2cDriver* owner, fidl::ClientEnd<fuchsia_driver_framework::Node>& node_client,
+    OnTransact on_transact, fidl::ClientEnd<fuchsia_driver_framework::Node>& node_client,
     fdf::Logger& logger, uint32_t bus_id, const fuchsia_hardware_i2c_businfo::I2CChannel& channel,
     const std::shared_ptr<fdf::Namespace>& incoming,
     const std::shared_ptr<fdf::OutgoingDirectory>& outgoing,
@@ -51,8 +52,8 @@ zx::result<std::unique_ptr<I2cChildServer>> I2cChildServer::CreateAndAddChild(
                                      metadata.value().size());
 
   // Create the I2cChildServer.
-  auto i2c_child_server =
-      std::make_unique<I2cChildServer>(owner, std::move(compat_server), address, friendly_name);
+  auto i2c_child_server = std::make_unique<I2cChildServer>(
+      std::move(on_transact), std::move(compat_server), address, friendly_name);
   auto serve_result = outgoing->AddService<fuchsia_hardware_i2c::Service>(
       fuchsia_hardware_i2c::Service::InstanceHandler({
           .device = i2c_child_server->bindings_.CreateHandler(
@@ -102,7 +103,7 @@ zx::result<std::unique_ptr<I2cChildServer>> I2cChildServer::CreateAndAddChild(
 }
 
 void I2cChildServer::Transfer(TransferRequestView request, TransferCompleter::Sync& completer) {
-  owner_->Transact(address_, request, completer);
+  on_transact_(address_, request, completer);
 }
 
 void I2cChildServer::GetName(GetNameCompleter::Sync& completer) {

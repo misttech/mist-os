@@ -7,6 +7,7 @@
 #include <fidl/fuchsia.hardware.i2c/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.i2cimpl/cpp/fidl.h>
 #include <fidl/fuchsia.scheduler/cpp/fidl.h>
+#include <lib/ddk/metadata.h>
 #include <lib/driver/compat/cpp/metadata.h>
 #include <lib/driver/component/cpp/driver_export.h>
 #include <lib/trace/event.h>
@@ -84,7 +85,8 @@ zx::result<> I2cDriver::AddI2cChildren(fuchsia_hardware_i2c_businfo::I2CBusMetad
   for (const auto& channel : metadata.channels().value()) {
     // Add an i2c child to the owned i2c node.
     auto i2c_child_server = I2cChildServer::CreateAndAddChild(
-        this, i2c_node_, logger(), bus_id, channel, incoming(), outgoing(), node_name());
+        fit::bind_member(this, &I2cDriver::Transact), i2c_node_, logger(), bus_id, channel,
+        incoming(), outgoing(), node_name());
     if (i2c_child_server.is_error()) {
       FDF_LOG(ERROR, "Failed to create child server: %s",
               zx_status_get_string(i2c_child_server.error_value()));
