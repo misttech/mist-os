@@ -7429,7 +7429,7 @@ From //sdk/config.gni:13
 
 Identifier for the Core SDK.
 
-**Current value (from the default):** `"23.99991231.0.1"`
+**Current value (from the default):** `"24.99991231.0.1"`
 
 From //sdk/config.gni:7
 
@@ -7969,14 +7969,6 @@ built and mounted inside the container at /mnt/chromeos.
 
 From //src/virtualization/bin/termina_guest_manager/BUILD.gn:14
 
-### termina_fxfs_stateful_image
-
-Whether to use Fxfs for the stateful image
-
-**Current value (from the default):** `false`
-
-From //src/virtualization/bin/termina_guest_manager/BUILD.gn:25
-
 ### termina_hermetic_bootstrap
 
 If 'true', bundle the container image with the termina_guest_manager package
@@ -7989,7 +7981,7 @@ connection at runtime.
 
 **Current value (from the default):** `false`
 
-From //src/virtualization/bin/termina_guest_manager/BUILD.gn:40
+From //src/virtualization/bin/termina_guest_manager/BUILD.gn:37
 
 ### termina_stateful_partition_size_bytes
 
@@ -8000,7 +7992,7 @@ If you change this value you will need to rebuild the guest partition using
 
 **Current value (from the default):** `42949672960`
 
-From //src/virtualization/bin/termina_guest_manager/BUILD.gn:31
+From //src/virtualization/bin/termina_guest_manager/BUILD.gn:28
 
 ### termina_user_extras
 
