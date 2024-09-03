@@ -13,6 +13,7 @@ group("tests") {
     "devicetree:tests",
     "fake-bti/cpp:tests",
     "fake-object/cpp:tests",
+    "fake-resource/cpp:tests",
     "metadata/cpp:tests",
     "platform-device/cpp:tests",
     "power/cpp:tests",
