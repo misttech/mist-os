@@ -12,7 +12,6 @@ load(
     "flag_set",
     "with_feature_set",
 )
-load("@fuchsia_sdk_common//:toolchains/clang/sanitizer.bzl", _sanitizer_features = "sanitizer_features")
 
 _all_actions = [
     ACTION_NAMES.assemble,
@@ -522,4 +521,9 @@ features = struct(
 )
 
 # Redefine the features here so that we can share with the in-tree definitions.
-sanitizer_features = _sanitizer_features
+# This content is pulled from the fuchsia_sdk_common rules and is inserted when
+# the fuchsia_clang_repository rules runs. To see the content of this template
+# look at @fuchsia_sdk//common/toolchains/clang/sanitizer.bzl
+# It is important to have the '#' before the '{{}}' because buildifier will
+# fail if we don't. When the file name is updated we can remove this.
+#{{SANITIZER_FEATURES}}

@@ -11,28 +11,9 @@ load(
     "assert_bazel_version",
 )
 
-def _fuchsia_sdk_common_repository_impl(ctx):
-    root = ctx.path(ctx.attr._fuchsia_sdk_workspace)
-
-    # LINT.IfChange
-    ctx.symlink(root.dirname.get_child("common"), ".")
-    # LINT.ThenChange(sdk_templates/generate_sdk_build_rules.bzl)
-
-_fuchsia_sdk_common_repository = repository_rule(
-    implementation = _fuchsia_sdk_common_repository_impl,
-    attrs = {
-        "_fuchsia_sdk_workspace": attr.label(allow_single_file = True, default = "@fuchsia_sdk//:WORKSPACE.bazel"),
-    },
-)
-
 # buildifier: disable=function-docstring
 def rules_fuchsia_deps():
     assert_bazel_version(min = "6.0.0")
-
-    maybe(
-        name = "fuchsia_sdk_common",
-        repo_rule = _fuchsia_sdk_common_repository,
-    )
 
     maybe(
         name = "rules_python",

@@ -75,10 +75,13 @@ def _fuchsia_clang_repository_impl(ctx):
     cc_features_template_file = Label("//fuchsia/workspace/clang_templates:cc_features_template.bzl")
     defs_template_file = Label("//fuchsia/workspace/clang_templates:defs.bzl")
 
+    sanitizer_file = Label("//common:toolchains/clang/sanitizer.bzl")
+
     ctx.path(crosstool_template)
     ctx.path(toolchain_config_template)
     ctx.path(cc_features_template_file)
     ctx.path(defs_template_file)
+    ctx.path(sanitizer_file)
 
     # Hack to get the path to the sysroot directory, see
     # https://github.com/bazelbuild/bazel/issues/3901
@@ -91,6 +94,18 @@ def _fuchsia_clang_repository_impl(ctx):
         "defs.bzl",
     )
 
+    # The following pulls the sanitizer features out of the common rules
+    sanitizer_file_content = ctx.read(sanitizer_file).split("\n")
+    start, end = [
+        i
+        for i, s in enumerate(sanitizer_file_content)
+        if "__BEGIN_FUCHSIA_SDK_INCLUDE__" in s or
+           "__END_FUCHSIA_SDK_INCLUDE__" in s
+    ]
+    sanitizer_file_fragment = "\n".join(
+        sanitizer_file_content[start:end + 1],
+    )
+
     normalized_os = normalize_os(ctx)
     normalized_arch = normalize_arch(ctx)
 
@@ -100,6 +115,8 @@ def _fuchsia_clang_repository_impl(ctx):
         substitutions = {
             "%{HOST_OS}": normalized_os,
             "%{HOST_ARCH}": normalized_arch,
+            # Note we need to keep the '#' here to prevent buildifier from failing.
+            "#{{SANITIZER_FEATURES}}": sanitizer_file_fragment,
         },
         executable = False,
     )
