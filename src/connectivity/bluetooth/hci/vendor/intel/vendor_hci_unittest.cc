@@ -5,7 +5,7 @@
 #include "vendor_hci.h"
 
 #include <lib/async-loop/cpp/loop.h>
-#include <lib/driver/logging/cpp/logger.h>
+#include <lib/driver/testing/cpp/scoped_global_logger.h>
 
 #include <gtest/gtest-spi.h>
 #include <gtest/gtest.h>
@@ -34,21 +34,11 @@ class VendorHciTest : public ::testing::Test {
     // Create Namespace object from the entries.
     auto ns = fdf::Namespace::Create(entries);
     ZX_ASSERT(ns.is_ok());
-
-    // Create Logger with dispatcher and namespace.
-    auto logger = fdf::Logger::Create(*ns, loop_->dispatcher(), "vendor-hci-logger");
-    ZX_ASSERT(logger.is_ok());
-
-    logger_ = std::move(logger.value());
-
-    fdf::Logger::SetGlobalInstance(logger_.get());
   }
 
-  ~VendorHciTest() { fdf::Logger::SetGlobalInstance(nullptr); }
-
  private:
+  fdf_testing::ScopedGlobalLogger logger_;
   std::unique_ptr<async::Loop> loop_;
-  std::unique_ptr<fdf::Logger> logger_;
 };
 
 //////////////////////////////////////////////////////////////////////////////////////
