@@ -79,5 +79,5 @@ args=()
 if is_feature_enabled "legacy_fxtest"; then
   run-dart-tool fxtest "${args[@]}" "$@"
 else
-  fx-command-run test2 "${args[@]}" "$@"
+  fx-command-run host-tool test2 "${args[@]}" "$@"
 fi
