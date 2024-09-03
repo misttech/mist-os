@@ -22,8 +22,18 @@ Members can be renamed with `field` metadata:
 The configuration also makes possible to override the conversion from json to the field.
 """
 import dataclasses
+import sys
 from enum import Enum
-from typing import Any, Callable, Dict, Optional, Union, get_args, get_origin
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    ForwardRef,
+    Optional,
+    Union,
+    get_args,
+    get_origin,
+)
 
 
 class Undefined(Enum):
@@ -53,22 +63,35 @@ def _identity(x: Any) -> Any:
     return x
 
 
-def _default_decoder(field_type: type) -> Callable[[Any], Any]:
+def _default_decoder(cls: type, field_type: type) -> Callable[[Any], Any]:
     if get_origin(field_type) is list:
         inner_types = get_args(field_type)
         assert len(inner_types) == 1, f"Supports only list with one type"
-        inner_decoder = _default_decoder(inner_types[0])
+        inner_decoder = _default_decoder(cls, inner_types[0])
         return lambda json_data: [inner_decoder(e) for e in json_data]
     elif get_origin(field_type) is Union:
         inner_type, likely_null = get_args(field_type)
         assert likely_null is type(None), "Supports only Optional"
-        return _default_decoder(inner_type)
+        return _default_decoder(cls, inner_type)
     elif dataclasses.is_dataclass(field_type):
         assert hasattr(field_type, "from_dict"), (
             f"Class {field_type} does not have 'from_dict'. "
             "Did you annotated with `@dataclass_json()`"
         )
         return field_type.from_dict
+    elif isinstance(field_type, ForwardRef):
+        resolved_decoder = None
+
+        def decode_forward_ref(x):
+            nonlocal resolved_decoder
+            if resolved_decoder:
+                return resolved_decoder(x)
+            resolved_decoder = field_type._evaluate(
+                sys.modules.get(cls.__module__).__dict__, vars(cls), set()
+            ).from_dict
+            return resolved_decoder(x)
+
+        return decode_forward_ref
     else:
         return _identity
 
@@ -85,7 +108,7 @@ def dataclass_json(
         for field in dataclasses.fields(cls):
             json_key = field.metadata.get("field_name", field.name)
             decoder = field.metadata.get("decoder") or _default_decoder(
-                field.type
+                cls, field.type
             )
             json_to_py[json_key or field.name] = (field.name, decoder)
 
