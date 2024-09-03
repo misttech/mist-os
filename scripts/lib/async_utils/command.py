@@ -292,7 +292,6 @@ class AsyncCommand:
             callback (typing.Callable[[CommandEvent], None], optional): If set, send all
                 CommandEvents to this callback function as they are produced.
                 Defaults to None.
-            timeout (float, optional): Terminate the command after this many seconds.
 
         Raises:
             AsyncCommandError: If an internal error causes the task queue to be cancelled.
@@ -387,9 +386,8 @@ class AsyncCommand:
             await asyncio.sleep(timeout)
             timeout_signal.set()
             self.terminate()
-            # Give the process at most 5 seconds to terminate, or less
-            # if timeout is less than 5 seconds.
-            await asyncio.sleep(min(timeout, 5))
+            # Give the process at most 5 seconds to terminate.
+            await asyncio.sleep(5)
             self.kill()
 
         timeout_task: asyncio.Task[None] | None = None
