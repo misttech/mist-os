@@ -13,6 +13,7 @@ rustc_library("fidl_fuchsia_net_multicast_ext") {
     "//src/connectivity/lib/net-types",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/network/fidl_fuchsia_net_ext",
+    "//third_party/rust_crates:futures",
   ]
   test_deps = [
     "//sdk/fidl/fuchsia.net:fuchsia.net_rust",

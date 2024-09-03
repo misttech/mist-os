@@ -8,7 +8,9 @@
 //! FIDL APIs onto a single API surface that is generic over IP version.
 
 use fidl_fuchsia_net_ext::IntoExt as _;
-use fidl_fuchsia_net_multicast_admin as fnet_multicast_admin;
+use fidl_fuchsia_net_multicast_admin::{self as fnet_multicast_admin, TableControllerCloseReason};
+use futures::stream::TryStream;
+use futures::{Stream, StreamExt};
 use net_types::ip::{Ip, Ipv4, Ipv6};
 
 /// A type capable of responding to FIDL requests.
@@ -17,15 +19,35 @@ pub trait FidlResponder<R> {
     fn try_send(self, response: R) -> Result<(), fidl::Error>;
 }
 
+/// A FIDL ControlHandle that can send a terminal event.
+pub trait TerminalEventControlHandle<E> {
+    /// Send the given terminal event
+    fn send_terminal_event(&self, terminal_event: E) -> Result<(), fidl::Error>;
+}
+
+/// A FIDL Proxy that can observe terminal events.
+pub trait TerminalEventProxy<E> {
+    fn take_event_stream(&self) -> impl Stream<Item = Result<E, fidl::Error>> + std::marker::Unpin;
+}
+
 /// An IP extension providing functionality for `fuchsia_net_multicast_admin`.
 pub trait FidlMulticastAdminIpExt: Ip {
     /// Protocol Marker for the multicast routing table controller.
-    type TableControllerMarker: fidl::endpoints::DiscoverableProtocolMarker;
+    type TableControllerMarker: fidl::endpoints::DiscoverableProtocolMarker<
+        RequestStream = Self::TableControllerRequestStream,
+        Proxy = Self::TableControllerProxy,
+    >;
     /// Request Stream for the multicast routing table controller.
     type TableControllerRequestStream: fidl::endpoints::RequestStream<
         Ok: Send + Into<TableControllerRequest<Self>>,
-        ControlHandle: Send,
+        ControlHandle: Send + TerminalEventControlHandle<TableControllerCloseReason>,
+        Item = Result<
+            <Self::TableControllerRequestStream as TryStream>::Ok,
+            <Self::TableControllerRequestStream as TryStream>::Error,
+        >,
     >;
+    type TableControllerProxy: fidl::endpoints::Proxy
+        + TerminalEventProxy<TableControllerCloseReason>;
     /// The Unicast Source and Multicast Destination address tuple.
     type Addresses: Into<UnicastSourceAndMulticastDestination<Self>>;
     /// A [`FidlResponder`] for multicast routing table AddRoute requests.
@@ -45,6 +67,7 @@ impl FidlMulticastAdminIpExt for Ipv4 {
     type TableControllerMarker = fnet_multicast_admin::Ipv4RoutingTableControllerMarker;
     type TableControllerRequestStream =
         fnet_multicast_admin::Ipv4RoutingTableControllerRequestStream;
+    type TableControllerProxy = fnet_multicast_admin::Ipv4RoutingTableControllerProxy;
     type Addresses = fnet_multicast_admin::Ipv4UnicastSourceAndMulticastDestination;
     type AddRouteResponder = fnet_multicast_admin::Ipv4RoutingTableControllerAddRouteResponder;
     type DelRouteResponder = fnet_multicast_admin::Ipv4RoutingTableControllerDelRouteResponder;
@@ -58,6 +81,7 @@ impl FidlMulticastAdminIpExt for Ipv6 {
     type TableControllerMarker = fnet_multicast_admin::Ipv6RoutingTableControllerMarker;
     type TableControllerRequestStream =
         fnet_multicast_admin::Ipv6RoutingTableControllerRequestStream;
+    type TableControllerProxy = fnet_multicast_admin::Ipv6RoutingTableControllerProxy;
     type Addresses = fnet_multicast_admin::Ipv6UnicastSourceAndMulticastDestination;
     type AddRouteResponder = fnet_multicast_admin::Ipv6RoutingTableControllerAddRouteResponder;
     type DelRouteResponder = fnet_multicast_admin::Ipv6RoutingTableControllerDelRouteResponder;
@@ -65,6 +89,56 @@ impl FidlMulticastAdminIpExt for Ipv6 {
         fnet_multicast_admin::Ipv6RoutingTableControllerGetRouteStatsResponder;
     type WatchRoutingEventsResponder =
         fnet_multicast_admin::Ipv6RoutingTableControllerWatchRoutingEventsResponder;
+}
+
+impl TerminalEventControlHandle<TableControllerCloseReason>
+    for fnet_multicast_admin::Ipv4RoutingTableControllerControlHandle
+{
+    fn send_terminal_event(
+        &self,
+        terminal_event: TableControllerCloseReason,
+    ) -> Result<(), fidl::Error> {
+        self.send_on_close(terminal_event)
+    }
+}
+
+impl TerminalEventControlHandle<TableControllerCloseReason>
+    for fnet_multicast_admin::Ipv6RoutingTableControllerControlHandle
+{
+    fn send_terminal_event(
+        &self,
+        terminal_event: TableControllerCloseReason,
+    ) -> Result<(), fidl::Error> {
+        self.send_on_close(terminal_event)
+    }
+}
+
+impl TerminalEventProxy<TableControllerCloseReason>
+    for fnet_multicast_admin::Ipv4RoutingTableControllerProxy
+{
+    fn take_event_stream(
+        &self,
+    ) -> impl Stream<Item = Result<TableControllerCloseReason, fidl::Error>> {
+        self.take_event_stream().map(|e| {
+            e.map(|e| match e {
+                fnet_multicast_admin::Ipv4RoutingTableControllerEvent::OnClose { error } => error,
+            })
+        })
+    }
+}
+
+impl TerminalEventProxy<TableControllerCloseReason>
+    for fnet_multicast_admin::Ipv6RoutingTableControllerProxy
+{
+    fn take_event_stream(
+        &self,
+    ) -> impl Stream<Item = Result<TableControllerCloseReason, fidl::Error>> {
+        self.take_event_stream().map(|e| {
+            e.map(|e| match e {
+                fnet_multicast_admin::Ipv6RoutingTableControllerEvent::OnClose { error } => error,
+            })
+        })
+    }
 }
 
 /// An IP generic version of
