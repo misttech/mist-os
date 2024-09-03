@@ -4,7 +4,7 @@
 
 //! Statistics and sample aggregation.
 
-use num::{Bounded, Num, NumCast, Zero};
+use num::{Num, NumCast, Zero};
 use std::cmp;
 use std::fmt::Debug;
 use thiserror::Error;
@@ -37,22 +37,22 @@ pub trait Statistic: Clone + Fill<Self::Sample> {
     /// The type of the statistical aggregation.
     type Aggregation: Clone;
 
-    // TODO(fxbug.dev/362536353): Refactor resetting `Statistic`s. This function should only get
-    //                            the aggregation via a `&self` receiver. This (or some other)
-    //                            trait should make resetting explicit via a `reset` method. For
-    //                            convenience, consider a trivial `get_aggregation_and_reset`
-    //                            function. `Statistic` types can implement `reset` via `Default`.
-    //
-    //                            From there, more flexible resets are possible. For example, a
-    //                            `ResetFrom` wrapper type can implement `reset` via another
-    //                            arbitrary value.
+    /// Resets the state (and aggregation) of the statistic.
+    ///
+    /// The state of a statistic after a reset is arbitrary, but most types reset to a reasonable
+    /// initial state via `Default`. Some types do nothing, such as [`LatchMax`], which operates
+    /// across [`SamplingInterval`]s.
+    ///
+    /// Statistics can be configured to reset to any given state via [`Reset`].
+    ///
+    /// [`LatchMax`] crate::experimental::series::statistic::LatchMax
+    /// [`Reset`] crate::experimental::series::statistic::Reset
+    fn reset(&mut self);
+
     /// Gets the statistical aggregation.
     ///
     /// Returns `None` if no aggregation is ready.
-    ///
-    /// This operation should clear out the samples used to compute the aggregation unless
-    /// the Statistic is accumulative across sampling intervals (e.g. LatchMax).
-    fn aggregation(&mut self) -> Option<Self::Aggregation>;
+    fn aggregation(&self) -> Option<Self::Aggregation>;
 }
 
 /// The associated data semantic type of a `Statistic`.
@@ -87,6 +87,18 @@ where
 {
 }
 
+/// Extension methods for `Statistic`s.
+pub trait StatisticExt: Statistic {
+    /// Gets the statistical aggregation and resets the statistic.
+    fn get_aggregation_and_reset(&mut self) -> Option<Self::Aggregation> {
+        let aggregation = self.aggregation();
+        self.reset();
+        aggregation
+    }
+}
+
+impl<F> StatisticExt for F where F: Statistic {}
+
 /// Arithmetic mean statistic.
 ///
 /// The arithmetic mean sums samples within their domain and computes the mean as a real number
@@ -103,6 +115,10 @@ pub struct ArithmeticMean<T> {
 }
 
 impl<T> ArithmeticMean<T> {
+    pub fn with_sum(sum: T) -> Self {
+        ArithmeticMean { sum, n: 0 }
+    }
+
     fn increment(&mut self, m: u64) -> Result<(), OverflowError> {
         // TODO(https://fxbug.dev/351848566): On overflow, either saturate `self.n` or leave both
         //                                    `self.sum` and `self.n` unchanged (here and in
@@ -117,7 +133,7 @@ where
     T: Zero,
 {
     fn default() -> Self {
-        ArithmeticMean { sum: T::zero(), n: 0 }
+        ArithmeticMean::with_sum(T::zero())
     }
 }
 
@@ -162,11 +178,14 @@ impl Statistic for ArithmeticMean<f32> {
     type Sample = f32;
     type Aggregation = f32;
 
-    fn aggregation(&mut self) -> Option<Self::Aggregation> {
+    fn reset(&mut self) {
+        *self = Default::default();
+    }
+
+    fn aggregation(&self) -> Option<Self::Aggregation> {
         // This is lossy and lossiness correlates to the magnitude of `n`. See details of
         // `u64 as f32` casts.
         let aggregation = (self.n > 0).then(|| self.sum / (self.n as f32));
-        *self = Default::default();
         aggregation
     }
 }
@@ -182,12 +201,18 @@ pub struct Sum<T> {
     sum: T,
 }
 
+impl<T> Sum<T> {
+    pub fn with_sum(sum: T) -> Self {
+        Sum { sum }
+    }
+}
+
 impl<T> Default for Sum<T>
 where
     T: Zero,
 {
     fn default() -> Self {
-        Sum { sum: T::zero() }
+        Sum::with_sum(T::zero())
     }
 }
 
@@ -221,26 +246,26 @@ impl Statistic for Sum<u64> {
     type Sample = u64;
     type Aggregation = u64;
 
-    fn aggregation(&mut self) -> Option<Self::Aggregation> {
-        let sum = self.sum;
+    fn reset(&mut self) {
         *self = Default::default();
+    }
+
+    fn aggregation(&self) -> Option<Self::Aggregation> {
+        let sum = self.sum;
         Some(sum)
     }
 }
 
 /// Maximum statistic.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct Max<T> {
     /// The maximum of samples.
-    max: T,
+    max: Option<T>,
 }
 
-impl<T> Default for Max<T>
-where
-    T: Bounded,
-{
-    fn default() -> Self {
-        Max { max: T::min_value() }
+impl<T> Max<T> {
+    pub fn with_max(max: T) -> Self {
+        Max { max: Some(max) }
     }
 }
 
@@ -258,7 +283,10 @@ impl Sampler<u64> for Max<u64> {
     type Error = OverflowError;
 
     fn fold(&mut self, sample: u64) -> Result<(), Self::Error> {
-        self.max = std::cmp::max(self.max, sample);
+        self.max = Some(match self.max {
+            Some(max) => cmp::max(max, sample),
+            _ => sample,
+        });
         Ok(())
     }
 }
@@ -268,10 +296,12 @@ impl Statistic for Max<u64> {
     type Sample = u64;
     type Aggregation = u64;
 
-    fn aggregation(&mut self) -> Option<Self::Aggregation> {
-        let max = self.max;
+    fn reset(&mut self) {
         *self = Default::default();
-        Some(max)
+    }
+
+    fn aggregation(&self) -> Option<Self::Aggregation> {
+        self.max
     }
 }
 
@@ -280,12 +310,18 @@ pub struct Union<T> {
     bits: T,
 }
 
+impl<T> Union<T> {
+    pub fn with_bits(bits: T) -> Self {
+        Union { bits }
+    }
+}
+
 impl<T> Default for Union<T>
 where
     T: Zero,
 {
     fn default() -> Self {
-        Union { bits: T::zero() }
+        Union::with_bits(T::zero())
     }
 }
 
@@ -313,10 +349,12 @@ impl Statistic for Union<u64> {
     type Sample = u64;
     type Aggregation = u64;
 
-    fn aggregation(&mut self) -> Option<Self::Aggregation> {
-        let value = self.bits;
+    fn reset(&mut self) {
         *self = Default::default();
-        Some(value)
+    }
+
+    fn aggregation(&self) -> Option<Self::Aggregation> {
+        Some(self.bits)
     }
 }
 
@@ -328,17 +366,30 @@ pub struct LatchMax<T> {
     /// The last observed sample.
     last: Option<T>,
     /// The maximum of samples and the non-monotonic sum.
-    max: T,
+    max: Option<T>,
     /// The sum of non-monotonic samples.
     sum: T,
 }
 
+impl<T> LatchMax<T> {
+    pub fn with_max(max: T) -> Self
+    where
+        T: Zero,
+    {
+        LatchMax::with_max_and_sum(max, T::zero())
+    }
+
+    pub fn with_max_and_sum(max: T, sum: T) -> Self {
+        LatchMax { last: None, max: Some(max), sum }
+    }
+}
+
 impl<T> Default for LatchMax<T>
 where
-    T: Bounded + Zero,
+    T: Zero,
 {
     fn default() -> Self {
-        LatchMax { last: None, max: T::min_value(), sum: T::zero() }
+        LatchMax { last: None, max: None, sum: T::zero() }
     }
 }
 
@@ -363,7 +414,12 @@ impl Sampler<u64> for LatchMax<u64> {
             _ => {}
         }
         self.last = Some(sample);
-        self.max = cmp::max(self.max, sample.checked_add(self.sum).ok_or(OverflowError)?);
+
+        let sum = sample.checked_add(self.sum).ok_or(OverflowError)?;
+        self.max = Some(match self.max {
+            Some(max) => cmp::max(max, sum),
+            _ => sum,
+        });
         Ok(())
     }
 }
@@ -373,8 +429,10 @@ impl Statistic for LatchMax<u64> {
     type Sample = u64;
     type Aggregation = u64;
 
-    fn aggregation(&mut self) -> Option<Self::Aggregation> {
-        Some(self.max)
+    fn reset(&mut self) {}
+
+    fn aggregation(&self) -> Option<Self::Aggregation> {
+        self.max
     }
 }
 
@@ -438,15 +496,77 @@ where
     type Sample = F::Sample;
     type Aggregation = A;
 
-    fn aggregation(&mut self) -> Option<Self::Aggregation> {
+    fn reset(&mut self) {
+        self.statistic.reset()
+    }
+
+    fn aggregation(&self) -> Option<Self::Aggregation> {
         self.statistic.aggregation().map(|aggregation| (self.transform)(aggregation))
+    }
+}
+
+/// Applies an arbitrary [reset function][`reset`] to a [`Statistic`].
+///
+/// [`reset`]: crate::experimental::series::statistic::Statistic::reset
+/// [`Statistic`]: crate::experimental::series::statistic::Statistic
+#[derive(Clone, Copy, Debug)]
+pub struct Reset<F, R> {
+    statistic: F,
+    reset: R,
+}
+
+impl<F, R> Reset<F, R>
+where
+    F: Statistic,
+    R: FnMut() -> F,
+{
+    pub fn with(statistic: F, reset: R) -> Self {
+        Reset { statistic, reset }
+    }
+}
+
+impl<F, R, T> Fill<T> for Reset<F, R>
+where
+    F: Fill<T>,
+{
+    fn fill(&mut self, sample: T, n: usize) -> Result<(), Self::Error> {
+        self.statistic.fill(sample, n)
+    }
+}
+
+impl<F, R, T> Sampler<T> for Reset<F, R>
+where
+    F: Sampler<T>,
+{
+    type Error = F::Error;
+
+    fn fold(&mut self, sample: T) -> Result<(), Self::Error> {
+        self.statistic.fold(sample)
+    }
+}
+
+impl<F, R> Statistic for Reset<F, R>
+where
+    F: Statistic,
+    R: Clone + FnMut() -> F,
+{
+    type Semantic = F::Semantic;
+    type Sample = F::Sample;
+    type Aggregation = F::Aggregation;
+
+    fn reset(&mut self) {
+        self.statistic = (self.reset)();
+    }
+
+    fn aggregation(&self) -> Option<Self::Aggregation> {
+        self.statistic.aggregation()
     }
 }
 
 #[cfg(test)]
 mod tests {
     use crate::experimental::series::statistic::{
-        ArithmeticMean, LatchMax, Max, OverflowError, PostAggregation, Statistic, Sum, Union,
+        ArithmeticMean, LatchMax, Max, OverflowError, PostAggregation, Reset, Statistic, Sum, Union,
     };
     use crate::experimental::series::{Fill, Sampler};
 
@@ -603,5 +723,19 @@ mod tests {
         sum.fold(2).unwrap();
         let aggregation = sum.aggregation().unwrap();
         assert_eq!(aggregation, 4);
+    }
+
+    #[test]
+    fn reset_with_function() {
+        let mut sum = Reset::with(Sum::<u64>::default(), || Sum::with_sum(3));
+
+        assert_eq!(sum.aggregation().unwrap(), 0);
+        sum.fold(1).unwrap();
+        assert_eq!(sum.aggregation().unwrap(), 1);
+
+        sum.reset();
+        assert_eq!(sum.aggregation().unwrap(), 3);
+        sum.fold(1).unwrap();
+        assert_eq!(sum.aggregation().unwrap(), 4);
     }
 }
