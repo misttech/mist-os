@@ -19,8 +19,7 @@ from trace_processing import trace_importing, trace_metrics, trace_model
 from trace_processing.metrics import app_render, cpu
 
 TILE_URL = (
-    "fuchsia-pkg://fuchsia.com/flatland-examples#meta/"
-    "flatland-view-provider.cm"
+    "fuchsia-pkg://fuchsia.com/flatland-examples#meta/flatland-rainbow.cm"
 )
 BENCHMARK_DURATION_SEC = 10
 TEST_NAME: str = "fuchsia.app_render_latency"
@@ -33,8 +32,8 @@ class FlatlandBenchmark(fuchsia_base_test.FuchsiaBaseTest):
         dut: FuchsiaDevice object.
 
     This test traces graphic performance in tile-session
-    (src/ui/bin/tiles-session) and flatland-view-provider-example
-    (src/ui/examples/flatland-view-provider).
+    (src/ui/bin/tiles-session) and flatland-rainbow-example
+    (src/ui/examples/flatland-rainbow).
     """
 
     def setup_test(self) -> None:
@@ -51,7 +50,7 @@ class FlatlandBenchmark(fuchsia_base_test.FuchsiaBaseTest):
         self.dut.session.stop()
 
     def test_flatland(self) -> None:
-        # Add flatland-view-provider tile
+        # Add flatland-rainbow tile
         self.dut.session.add_component(TILE_URL)
 
         with self.dut.tracing.trace_session(
@@ -86,7 +85,7 @@ class FlatlandBenchmark(fuchsia_base_test.FuchsiaBaseTest):
 
         app_render_latency_results = (
             app_render.AppRenderLatencyMetricsProcessor(
-                debug_name="flatland-view-provider-example",
+                debug_name="flatland-rainbow-example",
                 aggregates_only=True,
             ).process_metrics(model)
         )

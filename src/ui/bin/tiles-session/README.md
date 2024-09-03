@@ -22,7 +22,7 @@ ffx session launch fuchsia-pkg://fuchsia.com/tiles-session#meta/tiles-session.cm
 
 For example:
 ```
-ffx session add fuchsia-pkg://fuchsia.com/flatland-examples#meta/flatland-view-provider.cm
+ffx session add fuchsia-pkg://fuchsia.com/flatland-examples#meta/flatland-rainbow.cm
 ```
 
 ## Current limitations
@@ -31,7 +31,7 @@ Only one view is supported. Adding an additional view replaces the existing one.
 
 # Use cases
 
-`tile-session` fills a few roles in the Fuchsia ecosystem:
+`tile-sessions` fills a few roles in the Fuchsia ecosystem:
 
 - educational: explain workings of a simple yet fully-functional session
 - testing: reliable basis for integration tests

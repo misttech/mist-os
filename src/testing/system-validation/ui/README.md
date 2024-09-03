@@ -14,7 +14,7 @@ system_validation_test_realm (facet: system-validation) <-- system validation te
 test component (ex: simplest_sysmem_system_validation)
     |  parent to
     V
-sample-app (ex: `flatland-view-provider.cm`)
+sample-app (ex: `flatland-rainbow.cm`)
 ```
 
 # Run existing tests

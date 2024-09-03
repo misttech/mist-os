@@ -399,7 +399,7 @@ fn setup_handle_flatland_events(
     .detach();
 }
 
-#[fuchsia::main(logging_tags = ["flatland-view-provider-example"])]
+#[fuchsia::main(logging_tags = ["flatland-rainbow-example"])]
 async fn main() {
     fuchsia_trace_provider::trace_provider_create_with_fdio();
 
@@ -412,7 +412,7 @@ async fn main() {
     let flatland =
         connect_to_protocol::<fland::FlatlandMarker>().expect("error connecting to Flatland");
 
-    const DEBUG_NAME: &str = "flatland-view-provider-example";
+    const DEBUG_NAME: &str = "flatland-rainbow-example";
     flatland.set_debug_name(DEBUG_NAME).expect("fidl error");
 
     let sched_lib = ThroughputScheduler::new();
@@ -531,7 +531,7 @@ async fn main() {
           present_parameters = sched_lib.wait_to_update().fuse() => {
             trace::duration!(c"gfx", c"FlatlandApp::PresentBegin");
             app.draw(present_parameters.expected_presentation_time, renderer.deref_mut());
-            trace::flow_begin!(c"gfx", c"Flatland::PerAppPresent[flatland-view-provider-example]", present_count.into());
+            trace::flow_begin!(c"gfx", c"Flatland::PerAppPresent[flatland-rainbow-example]", present_count.into());
             present_count += 1;
             flatland
                 .present(fland::PresentArgs {

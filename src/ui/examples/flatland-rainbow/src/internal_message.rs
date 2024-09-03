@@ -11,7 +11,7 @@ use {
 // This matches fuchsia.ui.pointer.Point2; once RFC-0052 is implemented, we can just use that type.
 pub type Point2 = [f32; 2];
 
-// Internal event loop messages used by flatland-view-provider-example.  The example communicates
+// Internal event loop messages used by flatland-rainbow-example.  The example communicates
 // asynchronously with a number of (mostly Scenic) protocols; InternalMessage helps to centralize
 // the app's responses in a single handler, and thus greatly simplifies control flow.
 #[allow(dead_code)] // The example code does not use all the fields.

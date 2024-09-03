@@ -63,19 +63,19 @@ rustc_binary("bin") {
   ]
 }
 
-fuchsia_component("flatland-view-provider") {
-  component_name = "flatland-view-provider"
-  manifest = "meta/flatland-view-provider.cml"
+fuchsia_component("flatland-rainbow") {
+  component_name = "flatland-rainbow"
+  manifest = "meta/flatland-rainbow.cml"
   deps = [ ":bin" ]
 }
 
-fuchsia_component("flatland-view-provider-vulkan") {
-  component_name = "flatland-view-provider-vulkan"
-  manifest = "meta/flatland-view-provider-vulkan.cml"
+fuchsia_component("flatland-rainbow-vulkan") {
+  component_name = "flatland-rainbow-vulkan"
+  manifest = "meta/flatland-rainbow-vulkan.cml"
   deps = [ ":bin" ]
 }
 
-fuchsia_unittest_package("flatland-view-provider-tests") {
-  manifest = "meta/flatland-view-provider-tests.cml"
+fuchsia_unittest_package("flatland-rainbow-tests") {
+  manifest = "meta/flatland-rainbow-tests.cml"
   deps = [ ":bin_test" ]
 }

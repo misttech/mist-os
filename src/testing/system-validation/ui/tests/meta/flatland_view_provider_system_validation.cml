@@ -16,7 +16,7 @@
     children: [
         {
             name: "sample-app",
-            url: "#meta/flatland-view-provider.cm",
+            url: "#meta/flatland-rainbow.cm",
         },
     ],
     use: [

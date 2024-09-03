@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 {
     include: [
-        "//src/ui/examples/flatland-view-provider/meta/flatland-view-provider.cml",
+        "//src/ui/examples/flatland-rainbow/meta/flatland-rainbow.cml",
         "vulkan/client.shard.cml",
     ],
     program: {

@@ -271,7 +271,7 @@ impl VulkanRenderer {
     }
 
     fn create_instance(entry: &ash::Entry) -> ash::Instance {
-        let app_name = CString::new("flatland-view-provider example").unwrap();
+        let app_name = CString::new("flatland-rainbow example").unwrap();
         let engine_name = CString::new("(no engine)").unwrap();
         let app_info = vk::ApplicationInfo::builder()
             .application_name(&app_name)
@@ -419,7 +419,7 @@ impl VulkanRenderer {
     ) -> Result<(Vec<ImageMemory>, fland::BufferCollectionImportToken), Error> {
         let sysmem_allocator = connect_to_protocol::<fsysmem2::AllocatorMarker>()?;
         sysmem_allocator.set_debug_client_info(&fsysmem2::AllocatorSetDebugClientInfoRequest {
-            name: Some("flatland-view-provider example".to_string()),
+            name: Some("flatland-rainbow example".to_string()),
             id: Some(fuchsia_runtime::process_self().get_koid()?.raw_koid()),
             ..Default::default()
         })?;
