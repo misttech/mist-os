@@ -638,8 +638,11 @@ void IntelHDAStream::WatchDelayInfo(WatchDelayInfoCompleter::Sync& completer) {
 }
 
 void IntelHDAStream::handle_unknown_method(
-    fidl::UnknownMethodMetadata<fuchsia_hardware_audio::RingBuffer>,
-    fidl::UnknownMethodCompleter::Sync&) {}
+    fidl::UnknownMethodMetadata<fuchsia_hardware_audio::RingBuffer> metadata,
+    fidl::UnknownMethodCompleter::Sync& completer) {
+  LOG(ERROR, "IntelHDAStream::handle_unknown_method (RingBuffer) ordinal %zu",
+      metadata.method_ordinal);
+}
 
 void IntelHDAStream::ReleaseRingBufferLocked() {
   pinned_ring_buffer_.Unpin();

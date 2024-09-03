@@ -10,6 +10,7 @@
 #include <fidl/fuchsia.hardware.audio/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.audio/cpp/test_base.h>
 #include <lib/fidl/cpp/wire/internal/transport_channel.h>
+#include <lib/fidl/cpp/wire/unknown_interaction_handler.h>
 #include <lib/zx/channel.h>
 #include <zircon/errors.h>
 
@@ -321,8 +322,9 @@ class FakeComposite final
                        SetElementStateCompleter::Sync& completer) final;
   void SetTopology(SetTopologyRequest& request, SetTopologyCompleter::Sync& completer) final;
   void handle_unknown_method(
-      fidl::UnknownMethodMetadata<fuchsia_hardware_audio_signalprocessing::SignalProcessing>,
-      fidl::UnknownMethodCompleter::Sync&) final;
+      fidl::UnknownMethodMetadata<fuchsia_hardware_audio_signalprocessing::SignalProcessing>
+          metadata,
+      fidl::UnknownMethodCompleter::Sync& completer) final;
 
   // Internal implementation methods/members
   static bool DaiFormatIsSupported(ElementId element_id,

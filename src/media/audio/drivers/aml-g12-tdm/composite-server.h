@@ -4,6 +4,7 @@
 #ifndef SRC_MEDIA_AUDIO_DRIVERS_AML_G12_TDM_COMPOSITE_SERVER_H_
 #define SRC_MEDIA_AUDIO_DRIVERS_AML_G12_TDM_COMPOSITE_SERVER_H_
 
+#include <fidl/fuchsia.hardware.audio.signalprocessing/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.audio/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.clock/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.gpio/cpp/fidl.h>
@@ -55,8 +56,9 @@ class RingBufferServer final : public fidl::Server<fuchsia_hardware_audio::RingB
   void WatchDelayInfo(WatchDelayInfoCompleter::Sync& completer) override;
   void SetActiveChannels(fuchsia_hardware_audio::RingBufferSetActiveChannelsRequest& request,
                          SetActiveChannelsCompleter::Sync& completer) override;
-  void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_hardware_audio::RingBuffer>,
-                             fidl::UnknownMethodCompleter::Sync&) override;
+  void handle_unknown_method(
+      fidl::UnknownMethodMetadata<fuchsia_hardware_audio::RingBuffer> metadata,
+      fidl::UnknownMethodCompleter::Sync& completer) override;
 
  private:
   void OnRingBufferClosed(fidl::UnbindInfo info);
@@ -207,10 +209,10 @@ class AudioCompositeServer final
   void GetTopologies(GetTopologiesCompleter::Sync& completer) override;
   void WatchTopology(WatchTopologyCompleter::Sync& completer) override;
   void SetTopology(SetTopologyRequest& request, SetTopologyCompleter::Sync& completer) override;
-  void handle_unknown_method(
-      fidl::UnknownMethodMetadata<
-          typename fuchsia_hardware_audio_signalprocessing::SignalProcessing>,
-      fidl::UnknownMethodCompleter::Sync&) override;
+  void handle_unknown_method(fidl::UnknownMethodMetadata<
+                                 typename fuchsia_hardware_audio_signalprocessing::SignalProcessing>
+                                 metadata,
+                             fidl::UnknownMethodCompleter::Sync& completer) override;
 
  private:
   static constexpr std::array<fuchsia_hardware_audio::ElementId, kNumberOfPipelines> kDaiIds = {

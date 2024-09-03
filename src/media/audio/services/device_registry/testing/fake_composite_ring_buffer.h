@@ -8,6 +8,7 @@
 #include <fidl/fuchsia.hardware.audio/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.audio/cpp/test_base.h>
 #include <lib/fidl/cpp/wire/internal/transport_channel.h>
+#include <lib/fidl/cpp/wire/unknown_interaction_handler.h>
 
 #include <cstddef>
 #include <cstdint>
@@ -52,8 +53,9 @@ class FakeCompositeRingBuffer final
   void WatchDelayInfo(WatchDelayInfoCompleter::Sync& completer) override;
   void WatchClockRecoveryPositionInfo(
       WatchClockRecoveryPositionInfoCompleter::Sync& completer) override;
-  void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_hardware_audio::RingBuffer>,
-                             fidl::UnknownMethodCompleter::Sync&) override;
+  void handle_unknown_method(
+      fidl::UnknownMethodMetadata<fuchsia_hardware_audio::RingBuffer> metadata,
+      fidl::UnknownMethodCompleter::Sync& completer) override;
 
   void NotImplemented_(const std::string& name, ::fidl::CompleterBase& completer) override;
 

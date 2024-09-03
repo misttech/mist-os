@@ -9,6 +9,7 @@
 #include <fuchsia/hardware/audio/signalprocessing/cpp/fidl.h>
 #include <lib/fidl/cpp/binding.h>
 #include <lib/fidl/cpp/wire/channel.h>
+#include <lib/fidl/cpp/wire/unknown_interaction_handler.h>
 #include <lib/fzl/vmo-mapper.h>
 #include <lib/zx/channel.h>
 #include <lib/zx/time.h>
@@ -20,6 +21,7 @@
 #include <vector>
 
 #include "src/media/audio/services/device_registry/basic_types.h"
+#include "src/media/audio/services/device_registry/logging.h"
 
 namespace media_audio {
 
@@ -194,7 +196,10 @@ class FakeStreamConfig final : public fuchsia::hardware::audio::StreamConfig,
                        fuchsia::hardware::audio::signalprocessing::SettableElementState state,
                        SetElementStateCallback callback) override {}
   void SetTopology(TopologyId topology_id, SetTopologyCallback callback) override {}
-  void handle_unknown_method(uint64_t ordinal, bool method_has_response) override {}
+  // Can we templatize to discern between SignalProcessing and RingBuffer here?
+  void handle_unknown_method(uint64_t ordinal, bool method_has_response) override {
+    ADR_WARN_METHOD() << "FakeStreamConfig: unknown method ordinal " << ordinal;
+  }
 
   // fuchsia hardware audio RingBuffer Interface
   void GetProperties(fuchsia::hardware::audio::RingBuffer::GetPropertiesCallback callback) final;
@@ -208,6 +213,7 @@ class FakeStreamConfig final : public fuchsia::hardware::audio::StreamConfig,
       uint64_t active_channels_bitmask,
       fuchsia::hardware::audio::RingBuffer::SetActiveChannelsCallback callback) final;
   void WatchDelayInfo(WatchDelayInfoCallback callback) final;
+  // handle_unknown_method for fuchsia::hardware::audio::RingBuffer?
 
   void PositionNotification();
   void SendPositionNotification(zx::time timestamp, uint32_t position);

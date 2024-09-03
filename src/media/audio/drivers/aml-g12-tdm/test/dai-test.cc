@@ -103,6 +103,9 @@ class TestAmlG12TdmDai : public AmlG12TdmDai {
     sync_completion_signal(&stopped_);
   }
   void WaitUntilStopped() { sync_completion_wait(&stopped_, ZX_TIME_INFINITE); }
+  void handle_unknown_method(uint64_t ordinal, bool method_has_response) override {
+    zxlogf(ERROR, "TestAmlG12TdmDai unknown method with ordinal %zd", ordinal);
+  }
 
  private:
   sync_completion_t stopped_ = {};

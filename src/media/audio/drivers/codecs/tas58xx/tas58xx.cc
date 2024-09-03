@@ -1167,7 +1167,9 @@ zx_status_t Tas58xx::UpdateReg(uint8_t reg, uint8_t mask, uint8_t value) {
   return WriteReg(reg, (old_value & ~mask) | (value & mask));
 }
 
-void Tas58xx::handle_unknown_method(uint64_t ordinal, bool method_has_response) {}
+void Tas58xx::handle_unknown_method(uint64_t ordinal, bool method_has_response) {
+  zxlogf(ERROR, "Tas58xx::handle_unknown_method (SignalProcessing) ordinal %zu", ordinal);
+}
 
 zx_status_t tas58xx_bind(void* ctx, zx_device_t* parent) { return Tas58xx::Create(parent); }
 

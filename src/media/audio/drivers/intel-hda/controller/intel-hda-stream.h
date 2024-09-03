@@ -93,8 +93,9 @@ class IntelHDAStream final : public fbl::RefCounted<IntelHDAStream>,
     completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
   }
   void WatchDelayInfo(WatchDelayInfoCompleter::Sync& completer) override;
-  void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_hardware_audio::RingBuffer>,
-                             fidl::UnknownMethodCompleter::Sync&) override;
+  void handle_unknown_method(
+      fidl::UnknownMethodMetadata<fuchsia_hardware_audio::RingBuffer> metadata,
+      fidl::UnknownMethodCompleter::Sync& completer) override;
 
   // Release the client ring buffer (if one has been assigned)
   void ReleaseRingBufferLocked() TA_REQ(channel_lock_);

@@ -7,6 +7,7 @@
 
 #include <fidl/fuchsia.audio.device/cpp/common_types.h>
 #include <fidl/fuchsia.audio.device/cpp/natural_types.h>
+#include <lib/fidl/cpp/wire/unknown_interaction_handler.h>
 
 #include <memory>
 #include <optional>
@@ -187,7 +188,9 @@ class AudioDeviceRegistryServerTestBase : public gtest::TestLoopFixture {
       LogFidlClientError(error, "Observer");
       parent()->observer_fidl_error_status_ = error.status();
     }
-    void handle_unknown_event(fidl::UnknownEventMetadata<fuchsia_audio_device::Observer>) override {
+    void handle_unknown_event(
+        fidl::UnknownEventMetadata<fuchsia_audio_device::Observer> metadata) override {
+      FAIL() << "ObserverFidlHandler: unknown event (Observer) ordinal " << metadata.event_ordinal;
     }
   };
   const std::unique_ptr<ObserverFidlHandler>& observer_fidl_handler() {
@@ -215,7 +218,10 @@ class AudioDeviceRegistryServerTestBase : public gtest::TestLoopFixture {
       LogFidlClientError(error, "Control");
       parent()->control_fidl_error_status_ = error.status();
     }
-    void handle_unknown_event(fidl::UnknownEventMetadata<fuchsia_audio_device::Control>) override {}
+    void handle_unknown_event(
+        fidl::UnknownEventMetadata<fuchsia_audio_device::Control> metadata) override {
+      FAIL() << "ControlFidlHandler: unknown event (Control) ordinal " << metadata.event_ordinal;
+    }
   };
   const std::unique_ptr<ControlFidlHandler>& control_fidl_handler() {
     return control_fidl_handler_;

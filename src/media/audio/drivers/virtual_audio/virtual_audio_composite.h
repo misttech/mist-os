@@ -83,8 +83,9 @@ class VirtualAudioComposite final
   void WatchDelayInfo(WatchDelayInfoCompleter::Sync& completer) override;
   void SetActiveChannels(fuchsia_hardware_audio::RingBufferSetActiveChannelsRequest& request,
                          SetActiveChannelsCompleter::Sync& completer) override;
-  void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_hardware_audio::RingBuffer>,
-                             fidl::UnknownMethodCompleter::Sync&) override;
+  void handle_unknown_method(
+      fidl::UnknownMethodMetadata<fuchsia_hardware_audio::RingBuffer> metadata,
+      fidl::UnknownMethodCompleter::Sync& completer) override;
 
   // FIDL natural C++ methods for fuchsia.hardware.audio.signalprocessing.SignalProcessing.
   void GetElements(GetElementsCompleter::Sync& completer) override;
@@ -96,8 +97,9 @@ class VirtualAudioComposite final
   void WatchTopology(WatchTopologyCompleter::Sync& completer) override;
   void SetTopology(SetTopologyRequest& request, SetTopologyCompleter::Sync& completer) override;
   void handle_unknown_method(
-      fidl::UnknownMethodMetadata<fuchsia_hardware_audio_signalprocessing::SignalProcessing>,
-      fidl::UnknownMethodCompleter::Sync&) override;
+      fidl::UnknownMethodMetadata<fuchsia_hardware_audio_signalprocessing::SignalProcessing>
+          metadata,
+      fidl::UnknownMethodCompleter::Sync& completer) override;
 
  private:
   static constexpr fuchsia_hardware_audio::TopologyId kTopologyId = 789;

@@ -10,6 +10,7 @@
 #include <lib/fidl/cpp/binding_set.h>
 #include <lib/fpromise/result.h>
 #include <lib/fzl/vmo-mapper.h>
+#include <lib/syslog/cpp/macros.h>
 #include <lib/zx/channel.h>
 #include <lib/zx/vmo.h>
 #include <zircon/device/audio.h>
@@ -105,7 +106,9 @@ class FakeAudioDriver final : public fuchsia::hardware::audio::StreamConfig,
     callback(fpromise::error(ZX_ERR_NOT_SUPPORTED));
   }
   void WatchDelayInfo(fuchsia::hardware::audio::RingBuffer::WatchDelayInfoCallback callback) final;
-  void handle_unknown_method(uint64_t ordinal, bool method_has_response) final {}
+  void handle_unknown_method(uint64_t ordinal, bool method_has_response) final {
+    FX_LOGS(WARNING) << "Unknown method with ordinal " << ordinal;
+  }
 
   void PositionNotification();
 

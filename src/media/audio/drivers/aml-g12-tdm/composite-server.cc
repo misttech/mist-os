@@ -974,8 +974,11 @@ void RingBufferServer::SetActiveChannels(
 }
 
 void RingBufferServer::handle_unknown_method(
-    fidl::UnknownMethodMetadata<fuchsia_hardware_audio::RingBuffer>,
-    fidl::UnknownMethodCompleter::Sync&) {}
+    fidl::UnknownMethodMetadata<fuchsia_hardware_audio::RingBuffer> metadata,
+    fidl::UnknownMethodCompleter::Sync& completer) {
+  FDF_LOG(ERROR, "RingBufferServer::handle_unknown_method (RingBuffer) ordinal %zu",
+          metadata.method_ordinal);
+}
 
 void AudioCompositeServer::GetElements(GetElementsCompleter::Sync& completer) {
   std::vector<fuchsia_hardware_audio_signalprocessing::Element> elements;
@@ -1121,6 +1124,11 @@ void AudioCompositeServer::SetTopology(SetTopologyRequest& request,
 }
 
 void AudioCompositeServer::handle_unknown_method(
-    fidl::UnknownMethodMetadata<typename fuchsia_hardware_audio_signalprocessing::SignalProcessing>,
-    fidl::UnknownMethodCompleter::Sync&) {}
+    fidl::UnknownMethodMetadata<typename fuchsia_hardware_audio_signalprocessing::SignalProcessing>
+        metadata,
+    fidl::UnknownMethodCompleter::Sync& completer) {
+  FDF_LOG(ERROR, "AudioCompositeServer::handle_unknown_method (SignalProcessing) ordinal %zu",
+          metadata.method_ordinal);
+}
+
 }  // namespace audio::aml_g12

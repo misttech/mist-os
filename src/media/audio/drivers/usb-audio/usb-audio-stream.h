@@ -218,7 +218,10 @@ class UsbAudioStream final : public UsbAudioStreamBase,
   void WatchDelayInfo(WatchDelayInfoCompleter::Sync& completer) override;
   void handle_unknown_method(
       fidl::UnknownMethodMetadata<fuchsia_hardware_audio::RingBuffer> metadata,
-      fidl::UnknownMethodCompleter::Sync& completer) override {}
+      fidl::UnknownMethodCompleter::Sync& completer) override {
+    zxlogf(ERROR, "UsbAudioStream::handle_unknown_method (RingBuffer) ordinal %zu",
+           metadata.method_ordinal);
+  }
 
   // fuchsia hardware audio Stream Interface (forwarded from StreamChannel)
   void GetProperties(StreamChannel::GetPropertiesCompleter::Sync& completer);

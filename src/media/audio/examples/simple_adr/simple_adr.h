@@ -31,11 +31,7 @@ class FidlHandler : public fidl::AsyncEventHandler<ProtocolT> {
   std::string_view name_;
 };
 
-class MediaApp : public fidl::AsyncEventHandler<fuchsia_audio_device::Registry>,
-                 public fidl::AsyncEventHandler<fuchsia_audio_device::Observer>,
-                 public fidl::AsyncEventHandler<fuchsia_audio_device::ControlCreator>,
-                 public fidl::AsyncEventHandler<fuchsia_audio_device::Control>,
-                 public fidl::AsyncEventHandler<fuchsia_audio_device::RingBuffer> {
+class MediaApp {
   // Display device metadata received from AudioDeviceRegistry, for each device
   static inline constexpr bool kLogDeviceInfo = false;
 

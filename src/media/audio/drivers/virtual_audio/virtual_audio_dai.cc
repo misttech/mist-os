@@ -387,7 +387,13 @@ void VirtualAudioDai::SetActiveChannels(
   completer.Reply(zx::ok(active_channel_set_time_.get()));
 }
 
+// Complain loudly but don't close the connection, since it is possible for this test fixture to be
+// used with a client that is built with a newer SDK version.
 void VirtualAudioDai::handle_unknown_method(
-    fidl::UnknownMethodMetadata<fuchsia_hardware_audio::RingBuffer>,
-    fidl::UnknownMethodCompleter::Sync&) {}
+    fidl::UnknownMethodMetadata<fuchsia_hardware_audio::RingBuffer> metadata,
+    fidl::UnknownMethodCompleter::Sync& completer) {
+  zxlogf(ERROR, "VirtualAudioDai::handle_unknown_method (RingBuffer) ordinal %zu",
+         metadata.method_ordinal);
+}
+
 }  // namespace virtual_audio

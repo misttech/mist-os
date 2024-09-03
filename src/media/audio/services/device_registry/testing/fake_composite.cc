@@ -9,6 +9,7 @@
 #include <fidl/fuchsia.hardware.audio/cpp/common_types.h>
 #include <fidl/fuchsia.hardware.audio/cpp/markers.h>
 #include <fidl/fuchsia.hardware.audio/cpp/natural_types.h>
+#include <lib/fidl/cpp/wire/unknown_interaction_handler.h>
 #include <lib/fit/result.h>
 #include <zircon/errors.h>
 
@@ -732,8 +733,11 @@ void FakeComposite::SetTopology(SetTopologyRequest& request,
 }
 
 void FakeComposite::handle_unknown_method(
-    fidl::UnknownMethodMetadata<fuchsia_hardware_audio_signalprocessing::SignalProcessing>,
-    fidl::UnknownMethodCompleter::Sync&) {}
+    fidl::UnknownMethodMetadata<fuchsia_hardware_audio_signalprocessing::SignalProcessing> metadata,
+    fidl::UnknownMethodCompleter::Sync& completer) {
+  ADR_WARN_METHOD() << "(SignalProcessing) ordinal " << metadata.method_ordinal;
+  completer.Close(ZX_ERR_NOT_SUPPORTED);
+}
 
 // Inject std::nullopt to simulate "no topology", such as at power-up or after Reset().
 void FakeComposite::InjectTopologyChange(std::optional<TopologyId> topology_id) {

@@ -6,6 +6,7 @@
 
 #include <fidl/fuchsia.hardware.audio/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.audio/cpp/test_base.h>
+#include <lib/fidl/cpp/wire/unknown_interaction_handler.h>
 #include <lib/fit/result.h>
 #include <lib/fzl/vmo-mapper.h>
 #include <lib/zx/clock.h>
@@ -186,7 +187,11 @@ void FakeCompositeRingBuffer::WatchClockRecoveryPositionInfo(
 }
 
 void FakeCompositeRingBuffer::handle_unknown_method(
-    fidl::UnknownMethodMetadata<fuchsia_hardware_audio::RingBuffer>,
-    fidl::UnknownMethodCompleter::Sync&) {}
+    fidl::UnknownMethodMetadata<fuchsia_hardware_audio::RingBuffer> metadata,
+    fidl::UnknownMethodCompleter::Sync& completer) {
+  ADR_WARN_METHOD() << "FakeCompositeRingBuffer: unknown method (RingBuffer) ordinal "
+                    << metadata.method_ordinal;
+  completer.Close(ZX_ERR_NOT_SUPPORTED);
+}
 
 }  // namespace media_audio
