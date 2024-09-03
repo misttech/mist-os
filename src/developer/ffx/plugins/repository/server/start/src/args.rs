@@ -107,4 +107,11 @@ pub struct StartCommand {
     /// Default is `false`.
     #[argh(switch)]
     pub refresh_metadata: bool,
+
+    /// auto publish packages listed in the given manifest. This uses time based versioning when publishing
+    /// and ignores missing packages. The manifest is a json file a single member "content", which
+    /// contains a list named "manifest". The list is a list of package manifests, relative paths are
+    /// relative to the directory of the auto-publish manifest.
+    #[argh(option)]
+    pub auto_publish: Option<Utf8PathBuf>,
 }

@@ -74,14 +74,14 @@ impl FfxMain for ServerStartTool {
                 } else {
                     ServerMode::Foreground
                 };
-                return server::run_foreground_server(
+                return Box::pin(server::run_foreground_server(
                     self.cmd,
                     self.context,
                     self.target_proxy_connector,
                     self.rcs_proxy_connector,
                     writer,
                     mode,
-                )
+                ))
                 .await;
             }
             // Background server mode
@@ -322,6 +322,7 @@ mod tests {
                 port_path: None,
                 no_device: false,
                 refresh_metadata: false,
+                auto_publish: None,
             },
             repos,
             context: test_env.context.clone(),
@@ -387,6 +388,7 @@ mod tests {
                 port_path: None,
                 no_device: false,
                 refresh_metadata: false,
+                auto_publish: None,
             },
             repos,
             context: test_env.context.clone(),
@@ -459,6 +461,7 @@ mod tests {
                 port_path: None,
                 no_device: false,
                 refresh_metadata: false,
+                auto_publish: None,
             },
             repos,
             context: test_env.context.clone(),
@@ -531,6 +534,7 @@ mod tests {
                 port_path: None,
                 no_device: false,
                 refresh_metadata: false,
+                auto_publish: None,
             },
             repos,
             context: test_env.context.clone(),
@@ -609,6 +613,7 @@ mod tests {
                 port_path: None,
                 no_device: false,
                 refresh_metadata: false,
+                auto_publish: None,
             },
             repos,
             context: env.context.clone(),

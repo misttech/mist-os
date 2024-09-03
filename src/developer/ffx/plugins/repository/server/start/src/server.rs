@@ -26,6 +26,7 @@ pub(crate) fn to_serve_command(cmd: &StartCommand) -> ServeCommand {
         storage_type: cmd.storage_type,
         trusted_root: cmd.trusted_root.clone(),
         refresh_metadata: cmd.refresh_metadata,
+        auto_publish: cmd.auto_publish.clone(),
     }
 }
 
@@ -71,7 +72,9 @@ pub(crate) fn to_argv(cmd: &StartCommand) -> Vec<String> {
     if cmd.refresh_metadata {
         argv.push("--refresh-metadata".into());
     }
-
+    if let Some(manifest) = &cmd.auto_publish {
+        argv.extend_from_slice(&["--auto-publish".into(), manifest.as_str().to_string()]);
+    }
     argv
 }
 
@@ -92,4 +95,98 @@ pub async fn run_foreground_server(
         mode,
     )
     .await
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use camino::Utf8PathBuf;
+    use ffx::{RepositoryRegistrationAliasConflictMode, RepositoryStorageType};
+    use std::str::FromStr as _;
+    #[fuchsia::test]
+    fn test_to_serve_command() {
+        let start_cmd = StartCommand {
+            address: Some(([127, 0, 0, 1], 8787).into()),
+            background: true,
+            daemon: false,
+            foreground: false,
+            disconnected: false,
+            repository: Some("repo-name".into()),
+            trusted_root: Some(Utf8PathBuf::from_str("/trusted/root").expect("UTF8 path")),
+            repo_path: Some(Utf8PathBuf::from_str("/repo/path/root").expect("UTF8 path")),
+            product_bundle: Some(Utf8PathBuf::from_str("/product/bundle/path").expect("UTF8 path")),
+            alias: vec!["alias1".into(), "alias2".into()],
+            storage_type: Some(RepositoryStorageType::Ephemeral),
+            alias_conflict_mode: RepositoryRegistrationAliasConflictMode::Replace,
+            port_path: Some("/path/port/file".into()),
+            no_device: false,
+            refresh_metadata: true,
+            auto_publish: Some(Utf8PathBuf::from_str("/auto/publish/list").expect("UTF8 path")),
+        };
+        let actual = to_serve_command(&start_cmd);
+
+        assert_eq!(actual.address, start_cmd.address.expect("address"));
+        assert_eq!(actual.alias, start_cmd.alias);
+        assert_eq!(actual.alias_conflict_mode, start_cmd.alias_conflict_mode);
+        assert_eq!(actual.port_path, start_cmd.port_path);
+        assert_eq!(actual.no_device, start_cmd.no_device);
+        assert_eq!(actual.product_bundle, start_cmd.product_bundle);
+        assert_eq!(actual.repo_path, start_cmd.repo_path);
+        assert_eq!(actual.repository, start_cmd.repository);
+        assert_eq!(actual.storage_type, start_cmd.storage_type);
+        assert_eq!(actual.trusted_root, start_cmd.trusted_root);
+        assert_eq!(actual.refresh_metadata, start_cmd.refresh_metadata);
+        assert_eq!(actual.auto_publish, start_cmd.auto_publish);
+    }
+
+    #[fuchsia::test]
+    fn test_to_argv() {
+        let start_cmd = StartCommand {
+            address: Some(([127, 0, 0, 1], 8787).into()),
+            background: true,
+            daemon: false,
+            foreground: false,
+            disconnected: false,
+            repository: Some("repo-name".into()),
+            trusted_root: Some(Utf8PathBuf::from_str("/trusted/root").expect("UTF8 path")),
+            repo_path: Some(Utf8PathBuf::from_str("/repo/path/root").expect("UTF8 path")),
+            product_bundle: Some(Utf8PathBuf::from_str("/product/bundle/path").expect("UTF8 path")),
+            alias: vec!["alias1".into(), "alias2".into()],
+            storage_type: Some(RepositoryStorageType::Ephemeral),
+            alias_conflict_mode: RepositoryRegistrationAliasConflictMode::Replace,
+            port_path: Some("/path/port/file".into()),
+            no_device: false,
+            refresh_metadata: true,
+            auto_publish: Some(Utf8PathBuf::from_str("/auto/publish/list").expect("UTF8 path")),
+        };
+        let actual = to_argv(&start_cmd);
+        let expected: Vec<String> = [
+            "--address",
+            "127.0.0.1:8787",
+            "--alias",
+            "alias1",
+            "--alias",
+            "alias2",
+            "--alias-conflict-mode",
+            "replace",
+            "--product-bundle",
+            "/product/bundle/path",
+            "--repo-path",
+            "/repo/path/root",
+            "--repository",
+            "repo-name",
+            "--storage-type",
+            "ephemeral",
+            "--trusted-root",
+            "/trusted/root",
+            "--refresh-metadata",
+            "--auto-publish",
+            "/auto/publish/list",
+        ]
+        .iter()
+        .map(ToString::to_string)
+        .collect();
+
+        assert_eq!(actual, expected);
+    }
 }
