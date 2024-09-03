@@ -36,6 +36,9 @@ use {fidl_fuchsia_hardware_block_volume as fvolume, fidl_fuchsia_io as fio, fuch
 // See //src/storage/fvm/format.h for a detailed description of the FVM format.
 
 static MAGIC: u64 = 0x54524150204d5646;
+
+// Whilst this is the block size that FVM uses to round up certain structures, FVM still supports
+// I/O at a smaller size than this (it will pass along the block size from the underlying device).
 const BLOCK_SIZE: u64 = 8192;
 
 // This is the maximum slice count which means the maximum slice offset is one less than this.
@@ -334,6 +337,8 @@ impl Metadata {
 impl Fvm {
     /// Opens the FVM device.
     pub async fn open(device: DeviceHolder) -> Result<Self, Error> {
+        ensure!(device.block_size() <= BLOCK_SIZE as u32, zx::Status::NOT_SUPPORTED);
+
         let mut metadata = Vec::new();
         {
             let mut header_block = device.allocate_buffer(BLOCK_SIZE as usize).await;
@@ -419,6 +424,10 @@ impl Fvm {
                 assigned_slice_count,
             }),
         })
+    }
+
+    fn block_size(&self) -> u32 {
+        self.device.block_size()
     }
 
     fn pick_metadata(
@@ -514,12 +523,13 @@ impl Fvm {
 
         const BUFFER_SIZE: usize = 1048576;
         let mut buffer = self.device.allocate_buffer(BUFFER_SIZE).await;
+        let block_size = self.block_size() as u64;
         let mut offset = device_block_offset
-            .checked_mul(BLOCK_SIZE)
+            .checked_mul(block_size)
             .ok_or(zx::Status::OUT_OF_RANGE)
             .with_context(|| format!("Bad offset ({device_block_offset})"))?;
         let mut total_len = (block_count as u64)
-            .checked_mul(BLOCK_SIZE)
+            .checked_mul(block_size)
             .ok_or(zx::Status::OUT_OF_RANGE)
             .with_context(|| format!("Bad count ({block_count})"))?;
 
@@ -896,7 +906,7 @@ impl Component {
                 &inner.metadata.partitions.get(&partition_index).ok_or(zx::Status::INTERNAL)?;
             PartitionInfo {
                 block_count: u32::MAX as u64, // Minfs has a 32 bit limit on the block count.
-                block_size: BLOCK_SIZE as u32,
+                block_size: fvm.block_size(),
                 type_guid: partition.type_guid,
                 instance_guid: partition.guid,
                 name: partition.name().to_string(),
@@ -1307,12 +1317,14 @@ mod tests {
         fake_server: Arc<FakeServer>,
     }
 
+    const BLOCK_SIZE: u32 = 512;
+
     impl Fixture {
         async fn new(extra_space: u64) -> Self {
             let contents = std::fs::read("/pkg/data/golden-fvm.blk").unwrap();
             let fake_server = Arc::new(FakeServer::new(
-                (contents.len() as u64 + extra_space) / 8192,
-                8192,
+                (contents.len() as u64 + extra_space) / BLOCK_SIZE as u64,
+                BLOCK_SIZE,
                 &contents,
             ));
             Self::from_fake_server(fake_server).await
@@ -1378,6 +1390,10 @@ mod tests {
         let block_proxy =
             connect_to_protocol_at_dir_svc::<fvolume::VolumeMarker>(&dir_proxy).unwrap();
         let client = RemoteBlockClient::new(block_proxy).await.unwrap();
+
+        // Make sure FVM passes through the right block size.
+        assert_eq!(client.block_size(), BLOCK_SIZE);
+
         let mut buf = vec![0; 8192];
         client.read_at(MutableBufferSlice::Memory(&mut buf), 0).await.unwrap();
 
