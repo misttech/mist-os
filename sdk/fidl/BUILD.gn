@@ -55,6 +55,7 @@ sdk_fidl_targets = [
   "//sdk/fidl/fuchsia.driver.development:fuchsia.driver.development",
   "//sdk/fidl/fuchsia.driver.framework:fuchsia.driver.framework",
   "//sdk/fidl/fuchsia.driver.legacy:fuchsia.driver.legacy",
+  "//sdk/fidl/fuchsia.driver.metadata:fuchsia.driver.metadata",
   "//sdk/fidl/fuchsia.driver.registrar:fuchsia.driver.registrar",
   "//sdk/fidl/fuchsia.driver.test:fuchsia.driver.test",
   "//sdk/fidl/fuchsia.element:fuchsia.element",
