@@ -1477,34 +1477,28 @@ if (current_toolchain == default_toolchain) {
   }
 }
 
-tlsdesc = {
-  if (current_cpu == "arm64") {
-    enable_dialect = "desc"
-    disable_dialect = "traditional"
-
-    # On arm64 TLSDESC is opt-in or opt-out via -mtls-dialect=... under GCC, but is always enabled for Clang.
-    can_enable = is_gcc
-    can_disable = is_gcc
-  } else if (current_cpu == "riscv64") {
-    enable_dialect = "desc"
-    disable_dialect = "trad"
-
-    # On riscv64 TLSDESC is opt-in or opt-out via -mtls-dialect=... under Clang, but is not currently supported in GCC.
-    can_enable = !is_gcc
-    can_disable = !is_gcc
-  } else if (current_cpu == "x64") {
-    enable_dialect = "gnu2"
-    disable_dialect = "gnu"
-    can_enable = true
-    can_disable = true
-  }
-}
-
 config("tlsdesc") {
   have_tlsdesc = 0
-  if (tlsdesc.can_enable) {
-    cflags = [ "-mtls-dialect=${tlsdesc.enable_dialect}" ]
-    have_tlsdesc = 1
+  if (is_gcc) {
+    # TLSDESC is opt-in or opt-out via -mtls-dialect=... under GCC.
+    if (current_cpu == "arm64") {
+      cflags = [ "-mtls-dialect=desc" ]
+      have_tlsdesc = 1
+    } else if (current_cpu == "x64") {
+      cflags = [ "-mtls-dialect=gnu2" ]
+      have_tlsdesc = 1
+    }
+  } else {
+    # TLSDESC is always on for Aarch64 under Clang.
+    if (current_cpu == "arm64") {
+      have_tlsdesc = 1
+    }
+
+    # TLSDESC is opt-in or opt-out via -mtls-dialect=... under Clang on RISCV.
+    if (current_cpu == "riscv64") {
+      cflags = [ "-mtls-dialect=desc" ]
+      have_tlsdesc = 1
+    }
   }
   defines = [
     "WANT_TLSDESC=1",
@@ -1513,10 +1507,24 @@ config("tlsdesc") {
 }
 
 config("no-tlsdesc") {
-  have_tlsdesc = 1
-  if (tlsdesc.can_disable) {
-    cflags = [ "-mtls-dialect=${tlsdesc.disable_dialect}" ]
-    have_tlsdesc = 0
+  have_tlsdesc = 0
+  if (is_gcc) {
+    # TLSDESC is opt-in or opt-out via -mtls-dialect=... under GCC.
+    if (current_cpu == "arm64") {
+      cflags = [ "-mtls-dialect=traditional" ]
+    } else if (current_cpu == "x64") {
+      cflags = [ "-mtls-dialect=gnu" ]
+    }
+  } else {
+    # TLSDESC is always on for Aarch64 under Clang.
+    if (current_cpu == "arm64") {
+      have_tlsdesc = 1
+    }
+
+    # TLSDESC is opt-in or opt-out via -mtls-dialect=... under Clang on RISCV.
+    if (current_cpu == "riscv64") {
+      cflags = [ "-mtls-dialect=trad" ]
+    }
   }
   defines = [
     "WANT_TLSDESC=0",
