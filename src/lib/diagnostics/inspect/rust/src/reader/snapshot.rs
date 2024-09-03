@@ -7,10 +7,12 @@
 
 use crate::reader::error::ReaderError;
 use crate::reader::readable_tree::SnapshotSource;
+use crate::reader::LinkValue;
 use crate::Inspector;
+use diagnostics_hierarchy::{ArrayContent, Property};
 use inspect_format::{
     constants, utils, Block, BlockAccessorExt, BlockContainer, BlockIndex, BlockType, Container,
-    CopyBytes, ReadBytes,
+    CopyBytes, Error as FormatError, PropertyFormat, ReadBytes,
 };
 use std::cmp;
 
@@ -116,6 +118,204 @@ impl Snapshot {
             };
             i += 1;
         }
+    }
+
+    pub(crate) fn get_name(&self, index: BlockIndex) -> Option<String> {
+        let block = self.get_block(index)?;
+
+        match block.block_type() {
+            BlockType::Name => self.load_name(block),
+            BlockType::StringReference => self.load_string_reference(block),
+            _ => None,
+        }
+    }
+
+    pub(crate) fn load_name(&self, block: ScannedBlock<'_>) -> Option<String> {
+        block.name_contents().ok().map(|s| s.to_string())
+    }
+
+    pub(crate) fn load_string_reference(&self, block: ScannedBlock<'_>) -> Option<String> {
+        let mut data = block.inline_string_reference().ok()?.to_vec();
+        let total_length = block.total_length().ok()?;
+        if data.len() == total_length {
+            return String::from_utf8(data).ok();
+        }
+
+        let extent_index = block.next_extent().ok()?;
+        let still_to_read_length = total_length - data.len();
+        data.append(&mut self.read_extents(still_to_read_length, extent_index).ok()?);
+
+        String::from_utf8(data).ok()
+    }
+
+    pub(crate) fn parse_numeric_property(
+        &self,
+        block: &ScannedBlock<'_>,
+    ) -> Result<Property, ReaderError> {
+        let name_index = block.name_index()?;
+        let name = self.get_name(name_index).ok_or(ReaderError::ParseName(name_index))?;
+        match block.block_type() {
+            BlockType::IntValue => {
+                let value = block.int_value()?;
+                Ok(Property::Int(name, value))
+            }
+            BlockType::UintValue => {
+                let value = block.uint_value()?;
+                Ok(Property::Uint(name, value))
+            }
+            BlockType::DoubleValue => {
+                let value = block.double_value()?;
+                Ok(Property::Double(name, value))
+            }
+            _ => Err(ReaderError::VmoFormat(FormatError::UnexpectedBlockTypeRepr(
+                "Number".to_string(),
+                block.block_type(),
+            ))),
+        }
+    }
+
+    pub(crate) fn parse_bool_property(
+        &self,
+        block: &ScannedBlock<'_>,
+    ) -> Result<Property, ReaderError> {
+        let name_index = block.name_index()?;
+        let name = self.get_name(name_index).ok_or(ReaderError::ParseName(name_index))?;
+        if matches!(block.block_type(), BlockType::BoolValue) {
+            let value = block.bool_value()?;
+            Ok(Property::Bool(name, value))
+        } else {
+            Err(ReaderError::VmoFormat(FormatError::UnexpectedBlockType(
+                BlockType::BoolValue,
+                block.block_type(),
+            )))
+        }
+    }
+
+    pub(crate) fn parse_array_property(
+        &self,
+        block: &ScannedBlock<'_>,
+    ) -> Result<Property, ReaderError> {
+        let name_index = block.name_index()?;
+        let name = self.get_name(name_index).ok_or(ReaderError::ParseName(name_index))?;
+        let array_slots = block.array_slots()?;
+        // Safety: So long as the array is valid, array_capacity will return a valid value.
+        if utils::array_capacity(block.order(), block.array_entry_type()?).unwrap() < array_slots {
+            return Err(ReaderError::AttemptedToReadTooManyArraySlots(block.index()));
+        }
+        let value_indexes = 0..array_slots;
+        let parsed_property = match block.array_entry_type().map_err(ReaderError::VmoFormat)? {
+            BlockType::IntValue => {
+                let values = value_indexes
+                    // Safety: in release mode, this can only error for index-out-of-bounds.
+                    // We check above that indexes are in-bounds.
+                    .map(|i| block.array_get_int_slot(i).unwrap())
+                    .collect::<Vec<i64>>();
+                Property::IntArray(
+                    name,
+                    // Safety: if the block is an array, it must have an array format.
+                    // We have already verified it is an array.
+                    ArrayContent::new(values, block.array_format().unwrap())
+                        .map_err(ReaderError::Hierarchy)?,
+                )
+            }
+            BlockType::UintValue => {
+                let values = value_indexes
+                    // Safety: in release mode, this can only error for index-out-of-bounds.
+                    // We check above that indexes are in-bounds.
+                    .map(|i| block.array_get_uint_slot(i).unwrap())
+                    .collect::<Vec<u64>>();
+                Property::UintArray(
+                    name,
+                    // Safety: if the block is an array, it must have an array format.
+                    // We have already verified it is an array.
+                    ArrayContent::new(values, block.array_format().unwrap())
+                        .map_err(ReaderError::Hierarchy)?,
+                )
+            }
+            BlockType::DoubleValue => {
+                let values = value_indexes
+                    // Safety: in release mode, this can only error for index-out-of-bounds.
+                    // We check above that indexes are in-bounds.
+                    .map(|i| block.array_get_double_slot(i).unwrap())
+                    .collect::<Vec<f64>>();
+                Property::DoubleArray(
+                    name,
+                    // Safety: if the block is an array, it must have an array format.
+                    // We have already verified it is an array.
+                    ArrayContent::new(values, block.array_format().unwrap())
+                        .map_err(ReaderError::Hierarchy)?,
+                )
+            }
+            BlockType::StringReference => {
+                let values = value_indexes
+                    .map(|i| {
+                        // Safety: in release mode, this can only error for index-out-of-bounds.
+                        // We check above that indexes are in-bounds.
+                        let string_idx = block.array_get_string_index_slot(i).unwrap();
+                        // default initialize unset values -- 0 index is never a string, it is always
+                        // the header block
+                        if string_idx == BlockIndex::EMPTY {
+                            return String::new();
+                        }
+
+                        self.get_block(string_idx)
+                            .map(|b| self.load_string_reference(b))
+                            .flatten()
+                            .unwrap_or(String::new())
+                    })
+                    .collect::<Vec<String>>();
+                Property::StringList(name, values)
+            }
+            t => return Err(ReaderError::UnexpectedArrayEntryFormat(t)),
+        };
+        Ok(parsed_property)
+    }
+
+    pub(crate) fn parse_property(&self, block: &ScannedBlock<'_>) -> Result<Property, ReaderError> {
+        let name_index = block.name_index()?;
+        let name = self.get_name(name_index).ok_or(ReaderError::ParseName(name_index))?;
+        let total_length = block.total_length().map_err(ReaderError::VmoFormat)?;
+        let extent_index = block.property_extent_index()?;
+        let buffer = self.read_extents(total_length, extent_index)?;
+        match block.property_format().map_err(ReaderError::VmoFormat)? {
+            PropertyFormat::String => {
+                Ok(Property::String(name, String::from_utf8_lossy(&buffer).to_string()))
+            }
+            PropertyFormat::Bytes => Ok(Property::Bytes(name, buffer)),
+        }
+    }
+
+    pub(crate) fn parse_link(&self, block: &ScannedBlock<'_>) -> Result<LinkValue, ReaderError> {
+        let name_index = block.name_index()?;
+        let name = self.get_name(name_index).ok_or(ReaderError::ParseName(name_index))?;
+        let link_content_index = block.link_content_index()?;
+        let content =
+            self.get_name(link_content_index).ok_or(ReaderError::ParseName(link_content_index))?;
+        let disposition = block.link_node_disposition()?;
+        Ok(LinkValue { name, content, disposition })
+    }
+
+    // Incrementally add the contents of each extent in the extent linked list
+    // until we reach the last extent or the maximum expected length.
+    pub(crate) fn read_extents(
+        &self,
+        total_length: usize,
+        first_extent: BlockIndex,
+    ) -> Result<Vec<u8>, ReaderError> {
+        let mut buffer = vec![0u8; total_length];
+        let mut offset = 0;
+        let mut extent_index = first_extent;
+        while extent_index != BlockIndex::EMPTY && offset < total_length {
+            let extent =
+                self.get_block(extent_index).ok_or(ReaderError::GetExtent(extent_index))?;
+            let content = extent.extent_contents()?;
+            let extent_length = cmp::min(total_length - offset, content.len());
+            buffer[offset..offset + extent_length].copy_from_slice(&content[..extent_length]);
+            offset += extent_length;
+            extent_index = extent.next_extent()?;
+        }
+
+        Ok(buffer)
     }
 
     // Used for snapshot tests.

@@ -33,10 +33,9 @@
 
 use crate::reader::snapshot::{ScannedBlock, Snapshot};
 use diagnostics_hierarchy::*;
-use inspect_format::{utils, BlockIndex, BlockType, PropertyFormat};
+use inspect_format::{BlockIndex, BlockType};
 use maplit::btreemap;
 use std::borrow::Cow;
-use std::cmp::min;
 use std::collections::BTreeMap;
 
 pub use crate::reader::error::ReaderError;
@@ -343,32 +342,8 @@ impl<'a> ScanResult<'a> {
         return Err(ReaderError::MalformedTree);
     }
 
-    fn get_name(&self, index: BlockIndex) -> Option<String> {
-        let block = self.snapshot.get_block(index)?;
-
-        match block.block_type() {
-            BlockType::Name => self.load_name(block),
-            BlockType::StringReference => self.load_string_reference(block),
-            _ => None,
-        }
-    }
-
-    fn load_name(&self, block: ScannedBlock<'_>) -> Option<String> {
-        block.name_contents().ok().map(|s| s.to_string())
-    }
-
-    fn load_string_reference(&self, block: ScannedBlock<'_>) -> Option<String> {
-        let mut data = block.inline_string_reference().ok()?.to_vec();
-        let total_length = block.total_length().ok()?;
-        if data.len() == total_length {
-            return String::from_utf8(data).ok();
-        }
-
-        let extent_index = block.next_extent().ok()?;
-        let still_to_read_length = total_length - data.len();
-        data.append(&mut self.read_extents(still_to_read_length, extent_index).ok()?);
-
-        String::from_utf8(data).ok()
+    pub fn get_name(&self, index: BlockIndex) -> Option<String> {
+        self.snapshot.get_name(index)
     }
 
     fn parse_node(&mut self, block: &ScannedBlock<'_>) -> Result<(), ReaderError> {
@@ -383,187 +358,42 @@ impl<'a> ScanResult<'a> {
         Ok(())
     }
 
+    fn push_property(
+        &mut self,
+        block: &ScannedBlock<'_>,
+        property: Property,
+    ) -> Result<(), ReaderError> {
+        let parent_index = block.parent_index()?;
+        let parent = get_or_create_scanned_node!(self.parsed_nodes, parent_index);
+        parent.partial_hierarchy.properties.push(property);
+        Ok(())
+    }
+
     fn parse_numeric_property(&mut self, block: &ScannedBlock<'_>) -> Result<(), ReaderError> {
-        let name_index = block.name_index()?;
-        let name = self.get_name(name_index).ok_or(ReaderError::ParseName(name_index))?;
-        let parent = get_or_create_scanned_node!(
-            self.parsed_nodes,
-            block.parent_index().map_err(ReaderError::VmoFormat)?
-        );
-        match block.block_type() {
-            BlockType::IntValue => {
-                let value = block.int_value()?;
-                parent.partial_hierarchy.properties.push(Property::Int(name, value));
-            }
-            BlockType::UintValue => {
-                let value = block.uint_value()?;
-                parent.partial_hierarchy.properties.push(Property::Uint(name, value));
-            }
-            BlockType::DoubleValue => {
-                let value = block.double_value()?;
-                parent.partial_hierarchy.properties.push(Property::Double(name, value));
-            }
-            _ => {}
-        }
+        self.push_property(block, self.snapshot.parse_numeric_property(block)?)?;
         Ok(())
     }
 
     fn parse_bool_property(&mut self, block: &ScannedBlock<'_>) -> Result<(), ReaderError> {
-        let name_index = block.name_index()?;
-        let name = self.get_name(name_index).ok_or(ReaderError::ParseName(name_index))?;
-        let parent_index = block.parent_index()?;
-        let parent = get_or_create_scanned_node!(self.parsed_nodes, parent_index);
-        match block.block_type() {
-            BlockType::BoolValue => {
-                let value = block.bool_value()?;
-                parent.partial_hierarchy.properties.push(Property::Bool(name, value));
-            }
-            _ => {}
-        }
+        self.push_property(block, self.snapshot.parse_bool_property(block)?)?;
         Ok(())
     }
 
     fn parse_array_property(&mut self, block: &ScannedBlock<'_>) -> Result<(), ReaderError> {
-        let name_index = block.name_index()?;
-        let name = self.get_name(name_index).ok_or(ReaderError::ParseName(name_index))?;
-        let parent_index = block.parent_index()?;
-        let array_slots = block.array_slots()?;
-        // Safety: So long as the array is valid, array_capacity will return a valid value.
-        if utils::array_capacity(block.order(), block.array_entry_type()?).unwrap() < array_slots {
-            return Err(ReaderError::AttemptedToReadTooManyArraySlots(block.index()));
-        }
-        let value_indexes = 0..array_slots;
-        let parsed_property = match block.array_entry_type().map_err(ReaderError::VmoFormat)? {
-            BlockType::IntValue => {
-                let values = value_indexes
-                    // Safety: in release mode, this can only error for index-out-of-bounds.
-                    // We check above that indexes are in-bounds.
-                    .map(|i| block.array_get_int_slot(i).unwrap())
-                    .collect::<Vec<i64>>();
-                Property::IntArray(
-                    name,
-                    // Safety: if the block is an array, it must have an array format.
-                    // We have already verified it is an array.
-                    ArrayContent::new(values, block.array_format().unwrap())
-                        .map_err(ReaderError::Hierarchy)?,
-                )
-            }
-            BlockType::UintValue => {
-                let values = value_indexes
-                    // Safety: in release mode, this can only error for index-out-of-bounds.
-                    // We check above that indexes are in-bounds.
-                    .map(|i| block.array_get_uint_slot(i).unwrap())
-                    .collect::<Vec<u64>>();
-                Property::UintArray(
-                    name,
-                    // Safety: if the block is an array, it must have an array format.
-                    // We have already verified it is an array.
-                    ArrayContent::new(values, block.array_format().unwrap())
-                        .map_err(ReaderError::Hierarchy)?,
-                )
-            }
-            BlockType::DoubleValue => {
-                let values = value_indexes
-                    // Safety: in release mode, this can only error for index-out-of-bounds.
-                    // We check above that indexes are in-bounds.
-                    .map(|i| block.array_get_double_slot(i).unwrap())
-                    .collect::<Vec<f64>>();
-                Property::DoubleArray(
-                    name,
-                    // Safety: if the block is an array, it must have an array format.
-                    // We have already verified it is an array.
-                    ArrayContent::new(values, block.array_format().unwrap())
-                        .map_err(ReaderError::Hierarchy)?,
-                )
-            }
-            BlockType::StringReference => {
-                let values = value_indexes
-                    .map(|i| {
-                        // Safety: in release mode, this can only error for index-out-of-bounds.
-                        // We check above that indexes are in-bounds.
-                        let string_idx = block.array_get_string_index_slot(i).unwrap();
-                        // default initialize unset values -- 0 index is never a string, it is always
-                        // the header block
-                        if string_idx == BlockIndex::EMPTY {
-                            return String::new();
-                        }
-
-                        self.snapshot
-                            .get_block(string_idx)
-                            .map(|b| self.load_string_reference(b))
-                            .flatten()
-                            .unwrap_or(String::new())
-                    })
-                    .collect::<Vec<String>>();
-                Property::StringList(name, values)
-            }
-            t => return Err(ReaderError::UnexpectedArrayEntryFormat(t)),
-        };
-
-        let parent = get_or_create_scanned_node!(self.parsed_nodes, parent_index);
-        parent.partial_hierarchy.properties.push(parsed_property);
-
+        self.push_property(block, self.snapshot.parse_array_property(block)?)?;
         Ok(())
     }
 
     fn parse_property(&mut self, block: &ScannedBlock<'_>) -> Result<(), ReaderError> {
-        let name_index = block.name_index()?;
-        let name = self.get_name(name_index).ok_or(ReaderError::ParseName(name_index))?;
-        let parent_index = block.parent_index()?;
-        let total_length = block.total_length().map_err(ReaderError::VmoFormat)?;
-        let extent_index = block.property_extent_index()?;
-        let buffer = self.read_extents(total_length, extent_index)?;
-        let parent = get_or_create_scanned_node!(self.parsed_nodes, parent_index);
-        match block.property_format().map_err(ReaderError::VmoFormat)? {
-            PropertyFormat::String => {
-                parent
-                    .partial_hierarchy
-                    .properties
-                    .push(Property::String(name, String::from_utf8_lossy(&buffer).to_string()));
-            }
-            PropertyFormat::Bytes => {
-                parent.partial_hierarchy.properties.push(Property::Bytes(name, buffer));
-            }
-        }
+        self.push_property(block, self.snapshot.parse_property(block)?)?;
         Ok(())
     }
 
     fn parse_link(&mut self, block: &ScannedBlock<'_>) -> Result<(), ReaderError> {
-        let name_index = block.name_index()?;
-        let name = self.get_name(name_index).ok_or(ReaderError::ParseName(name_index))?;
-        let link_content_index = block.link_content_index()?;
-        let content =
-            self.get_name(link_content_index).ok_or(ReaderError::ParseName(link_content_index))?;
-        let disposition = block.link_node_disposition()?;
         let parent_index = block.parent_index()?;
         let parent = get_or_create_scanned_node!(self.parsed_nodes, parent_index);
-        parent.partial_hierarchy.links.push(LinkValue { name, content, disposition });
+        parent.partial_hierarchy.links.push(self.snapshot.parse_link(block)?);
         Ok(())
-    }
-
-    // Incrementally add the contents of each extent in the extent linked list
-    // until we reach the last extent or the maximum expected length.
-    fn read_extents(
-        &self,
-        total_length: usize,
-        first_extent: BlockIndex,
-    ) -> Result<Vec<u8>, ReaderError> {
-        let mut buffer = vec![0u8; total_length];
-        let mut offset = 0;
-        let mut extent_index = first_extent;
-        while extent_index != BlockIndex::EMPTY && offset < total_length {
-            let extent = self
-                .snapshot
-                .get_block(extent_index)
-                .ok_or(ReaderError::GetExtent(extent_index))?;
-            let content = extent.extent_contents()?;
-            let extent_length = min(total_length - offset, content.len());
-            buffer[offset..offset + extent_length].copy_from_slice(&content[..extent_length]);
-            offset += extent_length;
-            extent_index = extent.next_extent()?;
-        }
-
-        Ok(buffer)
     }
 }
 
