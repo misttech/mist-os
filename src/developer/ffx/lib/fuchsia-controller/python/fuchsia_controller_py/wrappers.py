@@ -2,14 +2,19 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 import asyncio
-from typing import Any, Callable, Coroutine
+from typing import Any, Callable, Coroutine, ParamSpec, TypeVar
+
+_Params = ParamSpec("_Params")
+_Yield = TypeVar("_Yield")
+_Send = TypeVar("_Send")
+_Ret = TypeVar("_Ret")
 
 
 class AsyncAdapterError(Exception):
     """Raised when an asyncmethod is used outside of an AsyncAdapter."""
 
 
-class AsyncAdapter(object):
+class AsyncAdapter:
     """A wrapper or mixin that supports async calls in a synchronous context.
 
     This can be used with any object where you wish to expose functions as
@@ -31,7 +36,7 @@ class AsyncAdapter(object):
     class TestClass(AsyncAdapter, BaseTestClass):
 
         @asyncmethod
-        async def foo(self):
+        async def foo(self) -> None:
             await asyncio.sleep(1)
     ```
 
@@ -44,7 +49,7 @@ class AsyncAdapter(object):
     method resolution order.
     """
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         self._async_adapter_loop = asyncio.new_event_loop()
 
@@ -57,18 +62,18 @@ class AsyncAdapter(object):
 
 
 def asyncmethod(
-    func: Callable[[Any], Coroutine[Any, Any, None]],
-) -> Callable[[Any], None]:
+    func: Callable[_Params, Coroutine[_Yield, _Send, _Ret]],
+) -> Callable[_Params, _Ret]:
     """A decorator to expose an async method as synchronous.
 
     This should ONLY be used with classes that inherit `AsyncAdapter`.
     """
 
-    def wrapper(self, *args: str, **kwargs: dict[str, int]) -> None:
-        coro = func(self, *args, **kwargs)
+    def wrapper(*args: _Params.args, **kwargs: _Params.kwargs) -> _Ret:
+        coro = func(*args, **kwargs)
         try:
-            loop = getattr(self, "_async_adapter_loop")
-            loop.run_until_complete(coro)
+            loop = getattr(args[0], "_async_adapter_loop")  # args[0] == self
+            return loop.run_until_complete(coro)
         except AttributeError as e:
             raise AsyncAdapterError(
                 "`asyncmethod` was used outside of an `AsyncAdapter`. "
