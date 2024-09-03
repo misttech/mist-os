@@ -457,6 +457,16 @@ assembly_input_bundle("realtek_8211f_driver") {
   ]
 }
 
+# AIB for the fake-battery driver
+assembly_input_bundle("fake_battery_driver") {
+  base_driver_packages = [
+    {
+      package_target = "//src/power/fake-powersource:fake-battery"
+      driver_components = [ "meta/fake_battery.cm" ]
+    },
+  ]
+}
+
 # The most minimal AIB that is included in eng assembled systems that are meant
 # to be standalone.
 #

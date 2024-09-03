@@ -98,6 +98,16 @@ impl DefineSubsystemConfiguration<PowerConfig> for PowerManagementSubsystem {
             })?;
         }
 
+        // Include fake-battery driver through a platform AIB.
+        if context.board_info.provides_feature("fuchsia::fake_battery") {
+            // We only need this driver feature in the utility / standard feature set levels.
+            if *context.feature_set_level == FeatureSupportLevel::Standard
+                || *context.feature_set_level == FeatureSupportLevel::Utility
+            {
+                builder.platform_bundle("fake_battery_driver");
+            }
+        }
+
         Ok(())
     }
 }

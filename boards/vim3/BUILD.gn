@@ -16,6 +16,7 @@ common_board_configuration = {
   provided_features = [
     "fuchsia::bt_transport_uart",
     "fuchsia::bus_pci",
+    "fuchsia::fake_battery",
     "fuchsia::fan",
     "fuchsia::mali_gpu",
     "fuchsia::paver",
@@ -318,11 +319,6 @@ board_input_bundle("main_bundle") {
       package_target = "//src/graphics/drivers/msd-vsi-vip"
       package_set = "base"
       driver_components = [ "meta/libmsd_vsi.cm" ]
-    },
-    {
-      package_target = "//src/power/fake-powersource:fake-battery"
-      package_set = "base"
-      driver_components = [ "meta/fake_battery.cm" ]
     },
   ]
 

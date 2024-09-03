@@ -34,6 +34,7 @@ build-info-service
 ?factory-reset-trigger
 ?factory_reset
 ?factory_store_providers
+?fake-battery
 ?fan-controller
 ?font-server
 ?fonts
