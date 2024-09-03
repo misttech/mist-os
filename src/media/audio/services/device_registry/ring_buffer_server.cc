@@ -104,9 +104,9 @@ void RingBufferServer::SetActiveChannels(SetActiveChannelsRequest& request,
     return;
   }
 
-  // By this time, the Device should know whether the driver supports this method.
-  FX_CHECK(device_->supports_set_active_channels(element_id_).has_value());
-  if (!*device_->supports_set_active_channels(element_id_)) {
+  // The first time this is called, we may not know whether the driver supports this method.
+  // For subsequent calls, we can fast-finish here.
+  if (!device_->supports_set_active_channels(element_id_).value_or(true)) {
     ADR_LOG_METHOD(kLogRingBufferServerMethods) << "device does not support SetActiveChannels";
     TRACE_INSTANT("power-audio", "ADR::RingBufferServer::SetActiveChannels exit",
                   TRACE_SCOPE_PROCESS, "status",
@@ -154,6 +154,18 @@ void RingBufferServer::SetActiveChannels(SetActiveChannelsRequest& request,
         auto completer = std::move(active_channels_completer_);
         active_channels_completer_.reset();
         if (result.is_error()) {
+          if (result.status_value() == ZX_ERR_NOT_SUPPORTED) {
+            ADR_LOG_OBJECT(kLogRingBufferServerMethods)
+                << "device does not support SetActiveChannels";
+            TRACE_INSTANT(
+                "power-audio", "ADR::RingBufferServer::SetActiveChannels response",
+                TRACE_SCOPE_PROCESS, "status",
+                fidl::ToUnderlying(fad::RingBufferSetActiveChannelsError::kMethodNotSupported));
+            completer->Reply(
+                fit::error(fad::RingBufferSetActiveChannelsError::kMethodNotSupported));
+            return;
+          }
+
           ADR_WARN_OBJECT() << "SetActiveChannels callback: device has an error";
           TRACE_INSTANT("power-audio", "ADR::RingBufferServer::SetActiveChannels response",
                         TRACE_SCOPE_PROCESS, "status",

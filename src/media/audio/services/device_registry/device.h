@@ -500,7 +500,7 @@ class Device : public std::enable_shared_from_this<Device> {
     uint64_t ring_buffer_consumer_bytes = 0u;
 
     std::optional<bool> supports_set_active_channels;
-    uint64_t active_channels_bitmask = 0u;
+    std::optional<uint64_t> active_channels_bitmask;
     std::optional<zx::time> active_channels_set_time;
 
     std::optional<zx::time> start_time;

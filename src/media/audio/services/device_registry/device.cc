@@ -17,6 +17,7 @@
 #include <lib/zx/clock.h>
 #include <lib/zx/result.h>
 #include <zircon/errors.h>
+#include <zircon/rights.h>
 #include <zircon/types.h>
 
 #include <algorithm>
@@ -35,7 +36,6 @@
 #include "src/media/audio/services/device_registry/observer_notify.h"
 #include "src/media/audio/services/device_registry/signal_processing_utils.h"
 #include "src/media/audio/services/device_registry/validate.h"
-#include "zircon/rights.h"
 
 namespace media_audio {
 
@@ -532,7 +532,7 @@ void Device::DropRingBuffer(ElementId element_id) {
   rb_record.ring_buffer_producer_bytes = 0;
   rb_record.ring_buffer_consumer_bytes = 0;
 
-  rb_record.active_channels_bitmask = 0;  // ... and SetActiveChannels.
+  rb_record.active_channels_bitmask.reset();  // ... and SetActiveChannels.
   rb_record.active_channels_set_time.reset();
 
   // Clear our FIDL connection to the driver RingBuffer.
@@ -2386,8 +2386,6 @@ fad::ControlCreateRingBufferError Device::ConnectRingBufferFidl(ElementId elemen
   }
   FX_CHECK(sample_type.has_value())
       << "Invalid sample format was not detected in ValidateSampleFormatCompatibility";
-  uint64_t active_channels_bitmask =
-      (1ull << driver_format.pcm_format()->number_of_channels()) - 1ull;
 
   RingBufferRecord ring_buffer_record{
       .ring_buffer_state = RingBufferState::NotCreated,
@@ -2400,24 +2398,12 @@ fad::ControlCreateRingBufferError Device::ConnectRingBufferFidl(ElementId elemen
           // TODO(https://fxbug.dev/42168795): handle channel_layout when communicated from driver.
       }},
       .driver_format = driver_format,
-      .active_channels_bitmask = active_channels_bitmask,
   };
   ring_buffer_record.ring_buffer_client = fidl::Client<fha::RingBuffer>(
-      std::move(client), dispatcher_, ring_buffer_record.ring_buffer_handler.get()),
+      std::move(client), dispatcher_, ring_buffer_record.ring_buffer_handler.get());
 
   ring_buffer_map_.insert_or_assign(element_id, std::move(ring_buffer_record));
 
-  (void)SetActiveChannels(element_id, active_channels_bitmask, [this](zx::result<zx::time> result) {
-    if (result.is_ok()) {
-      ADR_LOG_OBJECT(kLogRingBufferFidlResponses) << "RingBuffer/SetActiveChannels IS supported";
-      return;
-    }
-    if (result.status_value() == ZX_ERR_NOT_SUPPORTED) {
-      return;
-    }
-    ADR_WARN_OBJECT() << "RingBuffer/SetActiveChannels returned error: " << result.status_string();
-    OnError(result.status_value());
-  });
   SetRingBufferState(element_id, RingBufferState::Creating);
 
   return fad::ControlCreateRingBufferError(0);
@@ -2665,7 +2651,7 @@ bool Device::SetActiveChannels(
         ring_buffer.active_channels_bitmask = channel_bitmask;
         ring_buffer.active_channels_set_time = zx::time(result->set_time());
         callback(zx::ok(*ring_buffer.active_channels_set_time));
-        LogActiveChannels(ring_buffer.active_channels_bitmask,
+        LogActiveChannels(*ring_buffer.active_channels_bitmask,
                           *ring_buffer.active_channels_set_time);
       });
   TRACE_INSTANT("power-audio", "ADR::Device::SetActiveChannels exit", TRACE_SCOPE_PROCESS, "reason",
