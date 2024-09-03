@@ -39,7 +39,7 @@ class CodecRunnerApp {
     builder.WithTags(kLogTags).BuildAndInitialize();
 #else
     fuchsia_logging::LogSettingsBuilder builder;
-    builder.WithMinLogSeverity(fuchsia_logging::LOG_DEBUG).WithTags(kLogTags).BuildAndInitialize();
+    builder.WithMinLogSeverity(FUCHSIA_LOG_DEBUG).WithTags(kLogTags).BuildAndInitialize();
 #endif
 
     trace_provider_ =

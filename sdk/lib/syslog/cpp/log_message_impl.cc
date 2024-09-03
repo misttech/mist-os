@@ -41,7 +41,7 @@ LogMessage::LogMessage(LogSeverity severity, const char* file, int line, const c
 #endif
                        )
     : severity_(severity),
-      file_(severity_ > LOG_INFO ? StripDots(file) : StripPath(file)),
+      file_(severity_ > FUCHSIA_LOG_INFO ? StripDots(file) : StripPath(file)),
       line_(line),
       condition_(condition),
       tag_(tag)
@@ -72,7 +72,7 @@ LogMessage::~LogMessage() {
     buffer.WriteKeyValue("tag", tag_);
   }
   buffer.Flush();
-  if (severity_ >= LOG_FATAL)
+  if (severity_ >= FUCHSIA_LOG_FATAL)
     __builtin_debugtrap();
 }
 

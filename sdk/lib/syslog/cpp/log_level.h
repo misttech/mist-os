@@ -13,19 +13,7 @@ namespace fuchsia_logging {
 
 using LogSeverity = uint8_t;
 
-// Default log levels.
-constexpr LogSeverity LOG_TRACE = FUCHSIA_LOG_TRACE;
-constexpr LogSeverity LOG_DEBUG = FUCHSIA_LOG_DEBUG;
-constexpr LogSeverity LOG_INFO = FUCHSIA_LOG_INFO;
-constexpr LogSeverity LOG_WARNING = FUCHSIA_LOG_WARNING;
-constexpr LogSeverity LOG_ERROR = FUCHSIA_LOG_ERROR;
-constexpr LogSeverity LOG_FATAL = FUCHSIA_LOG_FATAL;
-
-// TODO(b/299996898): Remove this once all users
-// have been migrated.
-constexpr LogSeverity DefaultLogLevel = LOG_INFO;
-
-constexpr LogSeverity kDefaultLogLevel = LOG_INFO;
+constexpr LogSeverity kDefaultLogLevel = FUCHSIA_LOG_INFO;
 
 }  // namespace fuchsia_logging
 
