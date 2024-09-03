@@ -117,7 +117,7 @@ open protocol Control {
     //
     // TODO(https://fxbug.dev/42052918): Remove legacy gain aspects once driver API does.
     // Going forward, gain will be handled by `SignalProcessing`.
-    strict SetGain(table {
+    flexible SetGain(table {
         /// The gain state to be set.
         ///
         /// Required.
@@ -128,7 +128,7 @@ open protocol Control {
     /// Composite, then the targeted RING_BUFFER ENDPOINT must be identified by `element_id`.
     ///
     /// Should only be called for Composite and StreamConfig devices.
-    strict CreateRingBuffer(resource table {
+    flexible CreateRingBuffer(resource table {
         /// The element ID for an `ENDPOINT` of type `RING_BUFFER`.
         ///
         /// Required for Composite; ignored for StreamConfig.
@@ -159,7 +159,7 @@ open protocol Control {
     /// by `element_id`.
     ///
     /// Should only be called for Codec and Composite devices.
-    strict SetDaiFormat(table {
+    flexible SetDaiFormat(table {
         /// The element ID for an `ENDPOINT` of type `DAI_INTERCONNECT`.
         ///
         /// Required for Composite; ignored for Codec.
@@ -175,7 +175,7 @@ open protocol Control {
     /// must be set (by a successful `SetDaiFormat` call) before calling this method.
     ///
     /// Should only be called for Codec devices.
-    strict CodecStart() -> (table {
+    flexible CodecStart() -> (table {
         1: start_time zx.Time;
     }) error ControlCodecStartError;
 
@@ -184,7 +184,7 @@ open protocol Control {
     /// must be set (by a successful `SetDaiFormat` call) before calling this method.
     ///
     /// Should only be called for Codec devices.
-    strict CodecStop() -> (table {
+    flexible CodecStop() -> (table {
         1: stop_time zx.Time;
     }) error ControlCodecStopError;
 
@@ -200,7 +200,7 @@ open protocol Control {
     /// As applicable, `SetTopology` and `SetElementState` must also be called.
     ///
     /// Should only be called for Codec and Composite devices.
-    strict Reset() -> (table {}) error ControlResetError;
+    flexible Reset() -> (table {}) error ControlResetError;
 };
 
 /// Errors returned by `Control/SetGain`.

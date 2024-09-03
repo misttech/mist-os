@@ -11,6 +11,7 @@
 #include <fidl/fuchsia.mem/cpp/natural_types.h>
 #include <lib/fidl/cpp/enum.h>
 #include <lib/fidl/cpp/wire/status.h>
+#include <lib/fidl/cpp/wire/unknown_interaction_handler.h>
 #include <lib/fit/internal/result.h>
 #include <lib/fit/result.h>
 #include <lib/syslog/cpp/macros.h>
@@ -900,8 +901,11 @@ void ControlServer::MaybeCompleteWatchElementState(ElementId element_id) {
   }
 }
 
+// We complain but don't close the connection, to accommodate older and newer clients.
 void ControlServer::handle_unknown_method(
-    fidl::UnknownMethodMetadata<fuchsia_audio_device::Control>,
-    fidl::UnknownMethodCompleter::Sync&) {}
+    fidl::UnknownMethodMetadata<fuchsia_audio_device::Control> metadata,
+    fidl::UnknownMethodCompleter::Sync& completer) {
+  ADR_WARN_METHOD() << "(Control) ordinal " << metadata.method_ordinal;
+}
 
 }  // namespace media_audio

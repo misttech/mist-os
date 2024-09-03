@@ -8,6 +8,7 @@
 #include <fidl/fuchsia.hardware.audio/cpp/common_types.h>
 #include <fidl/fuchsia.hardware.audio/cpp/natural_types.h>
 #include <lib/fidl/cpp/enum.h>
+#include <lib/fidl/cpp/wire/unknown_interaction_handler.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/zx/time.h>
 #include <zircon/errors.h>
@@ -70,7 +71,10 @@ class ControlServerWarningTest : public AudioDeviceRegistryServerTestBase,
     return control_client;
   }
 
-  void handle_unknown_event(fidl::UnknownEventMetadata<fad::Control>) override {}
+  void handle_unknown_event(fidl::UnknownEventMetadata<fad::Control> metadata) override {
+    FAIL() << "ControlServerWarningTest: unknown event (Control) ordinal "
+           << metadata.event_ordinal;
+  }
 
   static ElementId ring_buffer_id() { return fad::kDefaultRingBufferElementId; }
   static ElementId dai_id() { return fad::kDefaultDaiInterconnectElementId; }
