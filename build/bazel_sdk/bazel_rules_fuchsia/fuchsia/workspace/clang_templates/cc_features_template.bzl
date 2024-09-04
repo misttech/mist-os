@@ -98,7 +98,7 @@ _flag_groups = struct(
         cflags = ["-fPIC"],
     ),
     language = _make_flag_group_struct(
-        ccflags = ["-std=c++17"],
+        ccflags = ["-std=c++20"],
     ),
     no_frame_pointers = _make_flag_group_struct(
         cflags = ["-fomit-frame-pointer"],

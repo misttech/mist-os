@@ -59,8 +59,6 @@ test_suite(
 test_suite(
     name = "cpp_variants_tests",
     tests = [
-        "//fuchsia/cpp_variants:cc_17_all",
-        "//fuchsia/cpp_variants:cc_17_shadow",
         "//fuchsia/cpp_variants:cc_20_all",
     ],
 )
