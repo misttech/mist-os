@@ -38,16 +38,38 @@ def get_inspect_json(file: BufferedReader) -> str:
                     return json_file.read().decode()
 
 
-def find_dict(moniker: str, json: list[tuple[Any, Any]]) -> dict[Any, Any]:
+def find_dict_by_moniker(
+    moniker: str, json: list[tuple[Any, Any]]
+) -> dict[Any, Any]:
     queue = deque(json)
     while queue:
         curr = queue.popleft()
-        if isinstance(curr, dict) and curr.get("moniker") == moniker:
+        if isinstance(curr, dict) and moniker in curr.get("moniker"):
             return curr
         if isinstance(curr, str):
             continue
         for child in curr:
             queue.append(child)
+    print(f"No inspect found for moniker {moniker}", file=sys.stderr)
+    return {}
+
+
+def find_dict_by_metadata(
+    metadata_name: str, json: list[tuple[Any, Any]]
+) -> dict[Any, Any]:
+    queue = deque(json)
+    while queue:
+        curr = queue.popleft()
+        if (
+            isinstance(curr, dict)
+            and curr.get("metadata").get("name") == metadata_name
+        ):
+            return curr
+        if isinstance(curr, str):
+            continue
+        for child in curr:
+            queue.append(child)
+    print(f"No inspect for metadata.name {metadata_name}", file=sys.stderr)
     return {}
 
 
@@ -101,7 +123,9 @@ def main() -> int:
         return 1
 
     # extract power topology and events
-    pb = find_dict(moniker="bootstrap/power-broker", json=json_contents)
+    pb = find_dict_by_moniker(
+        moniker="bootstrap/power-broker", json=json_contents
+    )
     graph = pb["payload"]["root"]["broker"]["topology"]["fuchsia.inspect.Graph"]
     events = graph["events"]
 
@@ -214,14 +238,14 @@ def main() -> int:
     # splice in SAG and FSH events too
 
     # extract system activity governor's suspend/resume events
-    sag = find_dict(
+    sag = find_dict_by_moniker(
         moniker="bootstrap/system-activity-governor", json=json_contents
     )
     sag_events = sag["payload"]["root"]["suspend_events"]
 
     # extract fuchsia suspend hal's suspend/resume events
-    fsh = find_dict(
-        moniker="bootstrap/boot-drivers:dev.sys.platform.pt.suspend",
+    fsh = find_dict_by_metadata(
+        metadata_name="aml-suspend",
         json=json_contents,
     )
     fsh_events = fsh["payload"]["root"]["suspend_events"]

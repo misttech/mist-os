@@ -113,28 +113,23 @@ def main() -> int:
     inspect_topology = graph["topology"]
     inspect_events = graph["events"]
 
-    # cache human-readable names
-    name_of: dict[str, str] = {}
-    for elem_hash in inspect_topology:
-        name_of[elem_hash] = inspect_topology[elem_hash]["meta"]["name"]
-
     # reasonably nice ordering of elements for visual track placement in JS
     sort_gadget: TopologicalSorter[str] = TopologicalSorter()
-    for elem_hash in inspect_topology:
-        out_edges = inspect_topology[elem_hash]["relationships"]
+    for elem_id in inspect_topology:
+        out_edges = inspect_topology[elem_id]["relationships"]
         for out_elem in out_edges:
-            sort_gadget.add(out_elem, elem_hash)
-    pb_elem_order = [name_of[h] for h in sort_gadget.static_order()]
+            sort_gadget.add(out_elem, elem_id)
+    pb_elem_order = list(sort_gadget.static_order())
 
     # dict of out edges, to read in JS
     edge_set: dict[str, dict[str, dict[str, str]]] = {}
     for from_vtx in inspect_topology:
         to_vertices = inspect_topology[from_vtx]["relationships"]
         for to_vtx in to_vertices:
-            edge_set[name_of[from_vtx]] = {}
+            edge_set[from_vtx] = {}
         for to_vtx in to_vertices:
             level_map = to_vertices[to_vtx]["meta"]
-            edge_set[name_of[from_vtx]][name_of[to_vtx]] = level_map
+            edge_set[from_vtx][to_vtx] = level_map
 
     inspect_events_keys_sorted = sorted(inspect_events)
     inspect_events_start_y_idx = int(inspect_events_keys_sorted[0])
@@ -153,7 +148,7 @@ def main() -> int:
             event["when"] = f"{when}"
             event["what"] = "required_level"
             event["spec"] = f'{curr["update"]}'
-            event["whom"] = f'{name_of[curr["vertex_id"]]}'
+            event["whom"] = f'{curr["vertex_id"]}'
             events.append(event)
         elif curr["event"] == "update_key" and curr["key"] == "current_level":
             # level comply
@@ -162,7 +157,7 @@ def main() -> int:
             event["when"] = f"{when}"
             event["what"] = "current_level"
             event["spec"] = f'{curr["update"]}'
-            event["whom"] = f'{name_of[curr["vertex_id"]]}'
+            event["whom"] = f'{curr["vertex_id"]}'
             # reverse search for matching event
             for r in range(
                 int(inspect_n) - 1, inspect_events_start_y_idx - 1, -1
@@ -186,7 +181,7 @@ def main() -> int:
                 event["when"] = f"{when}"
                 event["what"] = "lease_status"
                 event["spec"] = "Pend"
-                event["whom"] = f'{name_of[curr["vertex_id"]]}'
+                event["whom"] = f'{curr["vertex_id"]}'
                 # reverse search for matching event
                 for r in range(
                     int(inspect_n) - 1, inspect_events_start_y_idx - 1, -1
@@ -207,7 +202,7 @@ def main() -> int:
                 event["when"] = f"{when}"
                 event["what"] = "lease_status"
                 event["spec"] = "Satf"
-                event["whom"] = f'{name_of[curr["vertex_id"]]}'
+                event["whom"] = f'{curr["vertex_id"]}'
                 # reverse search for matching event
                 for r in range(
                     int(inspect_n) - 1, inspect_events_start_y_idx - 1, -1
@@ -226,7 +221,7 @@ def main() -> int:
             event["when"] = f"{when}"
             event["what"] = "lease"
             event["spec"] = "New"
-            event["whom"] = f'{name_of[curr["vertex_id"]]}'
+            event["whom"] = f'{curr["vertex_id"]}'
             if level_re_match := re.search(r"\d+", curr["update"]):
                 event["level"] = level_re_match.group()
             events.append(event)
@@ -237,7 +232,7 @@ def main() -> int:
             event["when"] = f"{when}"
             event["what"] = "lease"
             event["spec"] = "Drop"
-            event["whom"] = f'{name_of[curr["vertex_id"]]}'
+            event["whom"] = f'{curr["vertex_id"]}'
             events.append(event)
         elif curr["event"] == "add_vertex":
             continue  # topology change, TBD
@@ -334,7 +329,12 @@ def main() -> int:
         (h, idx) for idx, h in enumerate(full_elem_order)
     )
 
-    edge_set["starnix-power-mode"]["application_activity"]["1"] = "0"
+    for src_elem in edge_set:
+        if src_elem.startswith("starnix-power-mode"):
+            for dst_elem in edge_set[src_elem]:
+                if dst_elem.startswith("application_activity"):
+                    edge_set[src_elem][dst_elem]["1"] = "0"
+                    break
 
     history_duration = (
         int(events[-1]["when"]) - int(events[0]["when"])
@@ -671,23 +671,23 @@ HTML_TEMPLATE = """
           // find starnix-power-mode Drop
           const t = segments[tx];
           const td = g_data[t.start];
-          if (td.whom === "starnix-power-mode" && td.what === "lease" && td.spec === "Drop") {
+          if (td.whom.startsWith("starnix-power-mode") && td.what === "lease" && td.spec === "Drop") {
             draw_dep(r.track, r.offset, r.start, t.track, t.offset, t.start);
             break;
           }
         }
-      } else if (re.whom === "starnix-power-mode" && re.what === "current_level" &&
+      } else if (re.whom.startsWith("starnix-power-mode") && re.what === "current_level" &&
                  re.spec === "1") {
         // starnix-power-mode.current_level.1 -> application_activity.required_level.0
         for (let tx = sx + 1; tx < segments.length; ++tx) {
           const t = segments[tx];
           const td = g_data[t.start];
-          if (td.whom === "application_activity" && td.spec === "0") {
+          if (td.whom.startsWith("application_activity") && td.spec === "0") {
             draw_dep(r.track, r.offset, r.end, t.track, t.offset, t.start);
             break;
           }
         }
-      } else if (re.whom === "execution_state" && re.what === "current_level" &&
+      } else if (re.whom.startsWith("execution_state") && re.what === "current_level" &&
                  re.spec === "0") {
         // execution_state.current_level.0 -> sag.suspend
         for (let tx = sx + 1; tx < segments.length; ++tx) {
@@ -718,7 +718,7 @@ HTML_TEMPLATE = """
             break;
           }
         }
-      } else if (re.whom === "starnix-power-mode" && re.what === "current_level" &&
+      } else if (re.whom.startsWith("starnix-power-mode") && re.what === "current_level" &&
                  re.spec === "4") {
         // starnix-power-mode.current_level.4 -> starnix.resume
         for (let tx = sx + 1; tx < segments.length; ++tx) {
