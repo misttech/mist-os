@@ -3,7 +3,6 @@
 This directory defines two artifacts:
 
 * A shared library ICD which provides a Lavapipe-based software Vulkan implementation
-  * Currently this is a stub implementation, see https://fxbug.dev/42075795
 * A component which makes this ICD available to the [Fuchsia Vulkan loader service][fuchsia-vulkan-loader],
   and therefore to Vulkan client apps.
   * The [Vulkan Loader RFC-0205][fuchsia-vulkan-loader-rfc] describes how the parts fit together.
