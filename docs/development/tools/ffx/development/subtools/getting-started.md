@@ -242,10 +242,10 @@ the binary, they will have to be given the binary directly.
 
 Subcommands, however, are handled differently.
 
-Subcommands need an `AvailabilityFlag` attribute added to the tool (see
-[`ffx target update`][ffx-target-update] for an example). If users want to use
-a subcommand, they will need to set the associated config option in order to
-invoke that subcommand.
+Subcommands need an `AvailabilityFlag` attribute added to the tool (see a commit
+from the history of [`ffx target update`](https://cs.opensource.google/fuchsia/fuchsia/+/main:src/developer/ffx/plugins/target/update/src/lib.rs;l=19)
+for an example). If users want to use a subcommand, they will need to set the
+associated config option in order to invoke that subcommand.
 
 However, there are problems with this approach, such as a lack of any verification
 of the FIDL dependencies of the subcommand. Therefore, the mechanism for handling
