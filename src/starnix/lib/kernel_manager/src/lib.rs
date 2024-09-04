@@ -232,17 +232,34 @@ pub async fn serve_starnix_manager(
                     }
                 };
 
-                let mut wait_items: Vec<zx::WaitItem<'_>> =
-                    vec![wait_item_for(&wake_event), wait_item_for(&wake_locks)]
-                        .into_iter()
-                        .flatten()
-                        .collect();
+                if let Some(wake_locks) = wake_locks {
+                    match wake_locks
+                        .wait_handle(zx::Signals::EVENT_SIGNALED, zx::MonotonicTime::ZERO)
+                    {
+                        Ok(_) => {
+                            // There were wake locks active after suspending all processes, resume
+                            // and fail the suspend call.
+                            if let Err(e) =
+                                responder.send(Err(fstarnixrunner::SuspendError::SuspendFailure))
+                            {
+                                warn!("error responding to suspend request {:?}", e);
+                            }
+                            continue;
+                        }
+                        Err(_) => {}
+                    };
+                }
 
-                let _ = zx::object_wait_many(
-                    &mut wait_items,
-                    // TODO: Remove the timeout once events are actually sent from the kernel.
-                    zx::MonotonicTime::after(zx::Duration::from_millis(5000)),
-                );
+                if let Some(wake_event) = wake_event {
+                    match wake_event
+                        .wait_handle(zx::Signals::EVENT_SIGNALED, zx::MonotonicTime::INFINITE)
+                    {
+                        Ok(_) => {}
+                        Err(e) => {
+                            warn!("error waiting for wake event {:?}", e);
+                        }
+                    };
+                }
 
                 if let Err(e) = responder.send(Ok(())) {
                     warn!("error responding to suspend request {:?}", e);
@@ -253,17 +270,6 @@ pub async fn serve_starnix_manager(
         }
     }
     Ok(())
-}
-
-fn wait_item_for<'a, T>(event: &'a Option<T>) -> Option<zx::WaitItem<'a>>
-where
-    T: AsHandleRef,
-{
-    event.as_ref().map(|event| zx::WaitItem {
-        handle: event.as_handle_ref(),
-        waitfor: zx::Signals::EVENT_SIGNALED,
-        pending: zx::Signals::empty(),
-    })
 }
 
 async fn suspend_kernels(kernels: &Kernels, suspended_processes: &Mutex<Vec<zx::Handle>>) {

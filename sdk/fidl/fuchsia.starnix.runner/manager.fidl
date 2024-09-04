@@ -16,6 +16,10 @@ open protocol Manager {
     flexible Resume(table {});
 
     /// Suspends the container running in `job`.
+    ///
+    /// The call will return successfully when `wake_event` has been signaled. Returns
+    /// an error if `wake_locks` is signaled at the end of suspension, or an error is
+    /// encountered when suspending the container's processes.
     flexible SuspendContainer(resource table {
         // The job of the container to suspend.
         1: container_job zx.Handle:JOB;
