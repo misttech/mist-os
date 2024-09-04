@@ -48,7 +48,7 @@ executable("web-touch-input-test-bin") {
 
     # TODO(https://fxbug.dev/296294151): Fix after realm builder support new C++ binding.
     "//sdk/fidl/fuchsia.component.decl:fuchsia.component.decl_cpp_hlcpp_conversion",
-    "//src/lib/fidl/cpp:hlcpp_conversion",
+    "//sdk/lib/fidl/cpp:hlcpp_conversion",
   ]
 }
 

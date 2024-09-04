@@ -14,7 +14,6 @@
 
 #include <memory>
 
-#include "src/lib/fidl/cpp/include/lib/fidl/cpp/client.h"
 #include "src/media/audio/services/common/base_fidl_server.h"
 #include "src/media/audio/services/common/fidl_thread.h"
 

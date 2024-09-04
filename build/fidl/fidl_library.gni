@@ -223,6 +223,7 @@ template("fidl_library") {
     # Don't lint FIDL libraries used to test FIDL itself.
     if (filter_include([ get_label_info(target_name, "dir") ],
                        [
+                         "//sdk/lib/fidl/cpp/tests/*",
                          "//sdk/testing/fidl/*",
                          "//src/devices/tools/fidlgen_banjo/tests/fidl/*",
                          "//src/lib/fidl/*",

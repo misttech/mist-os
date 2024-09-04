@@ -28,8 +28,8 @@ with tests in [//tools/fidl/fidlc/tests][fidlc-compiler-tests].
 
 Target | Codegen | Runtime Libraries | Tests
 -------|---------|-------------------|-------
-HLCPP (Old) | [/tools/fidl/fidlgen_hlcpp] | [/sdk/lib/fidl/cpp] | *(located alongside runtime libraries)*
-New C++ | [/tools/fidl/fidlgen_cpp] | [/sdk/lib/fidl/cpp] | [/src/lib/fidl/llcpp] and [/src/lib/fidl/cpp]
+HLCPP (Old) | [/tools/fidl/fidlgen_hlcpp] | [/sdk/lib/fidl/hlcpp] | *(located alongside runtime libraries)*
+New C++ | [/tools/fidl/fidlgen_cpp] | [/sdk/lib/fidl/cpp] | [/src/lib/fidl/llcpp] and [/sdk/lib/fidl/cpp]
 Go | [/tools/fidl/fidlgen_go] | [/third_party/go/src/syscall/zx/fidl](https://fuchsia.googlesource.com/third_party/go/+/main/src/syscall/zx/fidl) | *(located alongside runtime libraries)*
 Rust | [/tools/fidl/fidlgen_rust] | [/src/lib/fidl/rust] | *(located alongside runtime libraries)*
 
@@ -487,7 +487,7 @@ useful for debugging issues that prevent boot of the device.
 | walker tests w/ handle closing checks | `fx test fidl-handle-closing-tests` | //sdk/lib/fidl_base
 | hlcpp bindings tests including conformance tests     | `fx test fidl_hlcpp_unit_test_package fidl_hlcpp_conformance_test_package`         | //sdk/lib/fidl                                                             |
 | New C++ wire tests       | `fx test //src/lib/fidl/llcpp`      | //sdk/lib/fidl/cpp/wire
-| New C++ tests            | `fx test //src/lib/fidl/cpp`        | //src/lib/fidl/cpp
+| New C++ tests            | `fx test //sdk/lib/fidl/cpp`        | //sdk/lib/fidl/cpp
 | go bindings tests        | `fx test go-fidl-tests`             | //third_party/go/syscall/zx/fidl //third_party/go/syscall/zx/fidl/fidl_test //src/tests/fidl/go_bindings_test |
 | rust bindings tests      | `fx test //src/lib/fidl/rust`           | //src/lib/fidl/rust |
 
@@ -503,7 +503,7 @@ for test failures. To see those, look at the `fx qemu` or `ffx log` output.
 | hlcpp unittests          | `fx test --host fidl_hlcpp_unit_tests`          | //sdk/lib/fidl
 | hlcpp conformance tests  | `fx test --host fidl_hlcpp_conformance_tests`   | //sdk/lib/fidl
 | C++ wire types conformance tests  | `fx test --host fidl_llcpp_conformance_tests`    | //sdk/lib/fidl/cpp/wire
-| C++ natural types conformance tests  | `fx test --host fidl_cpp_conformance_tests`   | //src/lib/fidl/cpp
+| C++ natural types conformance tests  | `fx test --host fidl_cpp_conformance_tests`   | //sdk/lib/fidl/cpp
 | rust conformance tests   | `fx test --host fidl_rust_conformance_tests`    | //src/lib/fidl/rust
 | rust fidl lib tests      | `fx test --host fidl_rust_lib_tests`            | //src/lib/fidl/rust
 | go conformance tests     | `fx test --host fidl_go_conformance_tests`      | //third_party/go/syscall/zx/fidl
@@ -731,14 +731,14 @@ fidl fmt --library my_library.fidl -i
 [/tools/fidl/fidlgen_cpp]: /tools/fidl/fidlgen_cpp
 [/tools/fidl/fidlgen_go]: /tools/fidl/fidlgen_go
 [/tools/fidl/fidlgen_rust]: /tools/fidl/fidlgen_rust
-[/sdk/lib/fidl/cpp]: /sdk/lib/fidl/cpp
+[/sdk/lib/fidl/hlcpp]: /sdk/lib/fidl/hlcpp
 [/sdk/lib/fidl/cpp/wire]: /sdk/lib/fidl/cpp/wire
 [/src/lib/fidl/rust]: /src/lib/fidl/rust
 [/sdk/lib/fidl_base]: /sdk/lib/fidl_base
 [/third_party/go/src/syscall/zx/fidl]: /third_party/go/src/syscall/zx/fidl
 [/sdk/dart/fidl]: /sdk/dart/fidl
 [/src/lib/fidl/c]: /src/lib/fidl/c
-[/src/lib/fidl/cpp]: /src/lib/fidl/cpp
+[/sdk/lib/fidl/cpp]: /sdk/lib/fidl/cpp
 [/src/lib/fidl/llcpp]: /src/lib/fidl/llcpp
 [/tools/fidl/lib/fidlgen]: /tools/fidl/lib/fidlgen
 

@@ -156,7 +156,7 @@ executable("cpp_outgoing_directory_test_bin") {
     "//sdk/fidl/fuchsia.io:fuchsia.io_cpp",
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/component/outgoing/cpp",
-    "//src/lib/fidl/cpp",
+    "//sdk/lib/fidl/cpp",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/loop_fixture",
     "//src/lib/testing/predicates",

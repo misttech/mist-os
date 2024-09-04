@@ -11,7 +11,7 @@ source_set("channel_util") {
     "channel.cc",
     "channel.h",
   ]
-  public_deps = [ "//src/lib/fidl/cpp" ]
+  public_deps = [ "//sdk/lib/fidl/cpp" ]
   deps = [ "//sdk/lib/fidl" ]
 }
 
@@ -22,7 +22,7 @@ test("channel_util_test") {
     "bytes_tests.cc",
   ]
   deps = [
-    "//src/lib/fidl/cpp:cpp_base",
+    "//sdk/lib/fidl/cpp:cpp_base",
     "//src/lib/fxl/test:gtest_main",
     "//third_party/googletest:gtest",
   ]

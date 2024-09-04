@@ -7,9 +7,9 @@ group("tests") {
 
   deps = [
     "c:tests",
-    "cpp/contrib:tests",
-    "cpp/tests",
+    "contrib:tests",
     "llcpp/tests",
     "rust:tests",
+    "//sdk/lib/fidl/cpp/tests",
   ]
 }

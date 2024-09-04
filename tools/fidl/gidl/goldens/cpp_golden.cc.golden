@@ -4,7 +4,7 @@
 
 #include <fidl/test.conformance/cpp/natural_types.h>
 
-#include "src/lib/fidl/cpp/tests/conformance/conformance_utils.h"
+#include "sdk/lib/fidl/cpp/tests/conformance/conformance_utils.h"
 
 
 TEST(Conformance, GoldenBoolStruct_V2_Encode) {

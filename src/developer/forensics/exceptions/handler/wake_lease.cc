@@ -18,7 +18,7 @@
 #include "src/developer/forensics/exceptions/constants.h"
 #include "src/developer/forensics/utils/errors.h"
 #include "src/developer/forensics/utils/promise_timeout.h"
-#include "src/lib/fidl/cpp/contrib/fpromise/client.h"
+#include "src/lib/fidl/contrib/fpromise/client.h"
 
 namespace forensics::exceptions::handler {
 namespace {

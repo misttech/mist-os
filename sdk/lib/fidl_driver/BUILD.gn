@@ -63,8 +63,8 @@ sdk_source_set("fidl_driver_natural") {
     ":fidl_driver",
     "//sdk/lib/driver/runtime:driver_runtime",
     "//sdk/lib/driver/runtime:driver_runtime_cpp",
-    "//src/lib/fidl/cpp:cpp_base",
-    "//src/lib/fidl/cpp:natural_ostream",
+    "//sdk/lib/fidl/cpp:cpp_base",
+    "//sdk/lib/fidl/cpp:natural_ostream",
   ]
 
   if (is_fuchsia) {
@@ -76,6 +76,6 @@ sdk_source_set("fidl_driver_natural") {
       "include/lib/fidl_driver/cpp/unified_messaging_declarations.h",
     ]
     sources = [ "natural_messaging.cc" ]
-    public_deps += [ "//src/lib/fidl/cpp" ]
+    public_deps += [ "//sdk/lib/fidl/cpp" ]
   }
 }

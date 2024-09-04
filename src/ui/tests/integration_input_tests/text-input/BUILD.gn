@@ -76,7 +76,7 @@ executable("text-input-test-bin") {
     # TODO(https://fxbug.dev/355738783): Fix after realm builder support new C++ binding.
     "//sdk/fidl/fuchsia.component.decl:fuchsia.component.decl_cpp_hlcpp_conversion",
     "//sdk/fidl/fuchsia.io:fuchsia.io_cpp_hlcpp_conversion",
-    "//src/lib/fidl/cpp:hlcpp_conversion",
+    "//sdk/lib/fidl/cpp:hlcpp_conversion",
   ]
 }
 

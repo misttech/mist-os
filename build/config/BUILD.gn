@@ -962,6 +962,7 @@ config("Wno-conversion") {
   # To trim this list:
   # $ scripts/gn/trim_visibility.py --target="//build/config:Wno-conversion"
   visibility = [
+    "//sdk/lib/fidl/cpp/tests/dispatcher:*",
     "//sdk/lib/media/audio/cpp:*",
     "//sdk/lib/media/cpp:*",
     "//sdk/lib/sys/cpp/tests:*",
@@ -1055,7 +1056,6 @@ config("Wno-conversion") {
     "//src/lib/containers/cpp:*",
     "//src/lib/ddk:*",
     "//src/lib/elflib:*",
-    "//src/lib/fidl/cpp/tests/dispatcher:*",
     "//src/lib/fidl/llcpp/tests:*",
     "//src/lib/fidl/llcpp/tests/conformance:*",
     "//src/lib/fidl/llcpp/tests/integration:*",

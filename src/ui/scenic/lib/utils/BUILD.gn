@@ -59,7 +59,7 @@ source_set("utils") {
     "//sdk/fidl/fuchsia.ui.views:fuchsia.ui.views_hlcpp",
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/sys/cpp",
-    "//src/lib/fidl/cpp/contrib/connection:service_hub_connector",
+    "//src/lib/fidl/contrib/connection:service_hub_connector",
     "//src/ui/lib/escher",
     "//src/ui/scenic/lib/scheduling:frame_metrics_registry_cc",
     "//third_party/glm",

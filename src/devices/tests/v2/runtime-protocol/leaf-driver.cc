@@ -16,7 +16,7 @@
 #include <lib/fpromise/bridge.h>
 #include <lib/fpromise/scope.h>
 
-#include "src/lib/fidl/cpp/contrib/fpromise/client.h"
+#include "src/lib/fidl/contrib/fpromise/client.h"
 
 namespace fdf {
 using namespace fuchsia_driver_framework;

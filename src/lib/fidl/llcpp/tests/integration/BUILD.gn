@@ -119,8 +119,8 @@ fuchsia_unittest_package(
 fidl("fidl.test.coding.fuchsia") {
   testonly = true
   visibility = [
-    "//src/lib/fidl/cpp/contrib/tests/*",
-    "//src/lib/fidl/cpp/tests/*",
+    "//sdk/lib/fidl/cpp/tests/*",
+    "//src/lib/fidl/contrib/tests/*",
     "//src/lib/fidl/llcpp/tests/*",
   ]
   sources = [ "llcpp.test.fidl" ]

@@ -4,14 +4,13 @@
 
 #include "src/storage/lib/paver/x64.h"
 
+#include <lib/fidl/cpp/channel.h>
 #include <zircon/process.h>
 #include <zircon/processargs.h>
 #include <zircon/system/public/zircon/errors.h>
 
 #include <algorithm>
 #include <iterator>
-
-#include <src/lib/fidl/cpp/include/lib/fidl/cpp/channel.h>
 
 #include "fidl/fuchsia.device.manager/cpp/common_types.h"
 #include "src/lib/uuid/uuid.h"

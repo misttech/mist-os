@@ -15,7 +15,7 @@ namespace fidl {
 
 //
 // Note: when updating the documentation below, please make similar updates to
-// the one in //src/lib/fidl/cpp/include/lib/fidl/cpp/client.h and
+// the one in //sdk/lib/fidl/cpp/include/lib/fidl/cpp/client.h and
 // sdk/lib/fidl_driver/include/lib/fidl_driver/natural_client.h.
 //
 
@@ -286,8 +286,8 @@ class WireClient {
 };
 
 template <typename Protocol, typename AsyncEventHandlerReference>
-WireClient(fidl::ClientEnd<Protocol>, async_dispatcher_t*, AsyncEventHandlerReference&&)
-    -> WireClient<Protocol>;
+WireClient(fidl::ClientEnd<Protocol>, async_dispatcher_t*,
+           AsyncEventHandlerReference&&) -> WireClient<Protocol>;
 
 template <typename Protocol>
 WireClient(fidl::ClientEnd<Protocol>, async_dispatcher_t*) -> WireClient<Protocol>;
@@ -579,8 +579,8 @@ WireSharedClient(fidl::ClientEnd<Protocol>, async_dispatcher_t*, AsyncEventHandl
                  fidl::AnyTeardownObserver) -> WireSharedClient<Protocol>;
 
 template <typename Protocol, typename AsyncEventHandlerReference>
-WireSharedClient(fidl::ClientEnd<Protocol>, async_dispatcher_t*, AsyncEventHandlerReference&&)
-    -> WireSharedClient<Protocol>;
+WireSharedClient(fidl::ClientEnd<Protocol>, async_dispatcher_t*,
+                 AsyncEventHandlerReference&&) -> WireSharedClient<Protocol>;
 
 template <typename Protocol>
 WireSharedClient(fidl::ClientEnd<Protocol>, async_dispatcher_t*) -> WireSharedClient<Protocol>;
