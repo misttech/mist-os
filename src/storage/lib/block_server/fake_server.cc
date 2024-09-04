@@ -36,18 +36,20 @@ class FakeServer::FakeInterface : public Interface {
         case Operation::Tag::Read:
           len = request.operation.read.block_count * block_size_;
           buf.reserve(len);
-          ZX_ASSERT(data_.read(buf.data(), len,
-                               request.operation.read.device_block_offset * block_size_) == ZX_OK);
-          ZX_ASSERT(request.vmo->write(buf.data(), len, request.operation.read.vmo_offset) ==
+          ZX_ASSERT(data_.read(buf.data(), request.operation.read.device_block_offset * block_size_,
+                               len) == ZX_OK);
+          ZX_ASSERT(request.vmo->write(buf.data(), request.operation.read.vmo_offset, len) ==
                     ZX_OK);
           break;
 
         case Operation::Tag::Write:
           len = request.operation.write.block_count * block_size_;
           buf.reserve(len);
-          ZX_ASSERT(request.vmo->read(buf.data(), len, request.operation.read.vmo_offset) == ZX_OK);
-          ZX_ASSERT(data_.write(buf.data(), len,
-                                request.operation.read.device_block_offset * block_size_) == ZX_OK);
+          ZX_ASSERT(request.vmo->read(buf.data(), request.operation.write.vmo_offset, len) ==
+                    ZX_OK);
+          ZX_ASSERT(data_.write(buf.data(),
+                                request.operation.write.device_block_offset * block_size_,
+                                len) == ZX_OK);
           break;
 
         case Operation::Tag::Flush:
