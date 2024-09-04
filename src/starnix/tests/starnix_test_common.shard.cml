@@ -15,6 +15,10 @@
             url: "starnix_kernel#meta/starnix_kernel.cm",
         },
         {
+            name: "runner",
+            url: "starnix#meta/starnix_runner.cm",
+        },
+        {
             name: "ui",
             url: "test-ui-stack#meta/test-ui-stack.cm",
         },
@@ -66,6 +70,11 @@
                 "fuchsia.vulkan.loader.Loader",
             ],
             from: "parent",
+            to: [ "#kernel" ],
+        },
+        {
+            protocol: [ "fuchsia.starnix.runner.Manager" ],
+            from: "#runner",
             to: [ "#kernel" ],
         },
         {
