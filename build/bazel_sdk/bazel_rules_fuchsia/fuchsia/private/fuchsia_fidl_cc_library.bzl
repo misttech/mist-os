@@ -4,8 +4,8 @@
 
 """A cc_library backed by a FIDL library."""
 
-load(":providers.bzl", "FuchsiaFidlLibraryInfo")
 load("@bazel_skylib//lib:paths.bzl", "paths")
+load(":providers.bzl", "FuchsiaFidlLibraryInfo")
 
 _CodegenInfo = provider("Carries generated information across FIDL bindings code generation ", fields = ["files"])
 
@@ -55,11 +55,13 @@ def fuchsia_fidl_cc_library(name, library, binding_type = "cpp_wire", sdk_for_de
         library = library,
         binding_type = binding_type,
         sdk_for_default_deps = sdk_for_default_deps,
+        **kwargs
     )
 
     _impl_wrapper(
         name = impl_name,
         codegen = ":%s" % gen_name,
+        **kwargs
     )
 
     native.cc_library(

@@ -275,6 +275,7 @@ def fuchsia_structured_config_cpp_elf_lib(
         name = fidl_source_target,
         cm_label = cm_label,
         fidl_name = fidl_library_name,
+        **kwargs
     )
 
     # generate the C++ source
@@ -284,6 +285,7 @@ def fuchsia_structured_config_cpp_elf_lib(
         namespace = namespace,
         fidl_library_name = fidl_library_name,
         cm_label = cm_label,
+        **kwargs
     )
 
     # generate the FIDL library
@@ -295,6 +297,7 @@ def fuchsia_structured_config_cpp_elf_lib(
         srcs = [fidl_source_target],
         library = fidl_library_name,
         cc_bindings = ["cpp"],
+        **kwargs
     )
 
     cc_bind_target = "%s_bindlib_cc" % fidl_library_name
@@ -303,6 +306,7 @@ def fuchsia_structured_config_cpp_elf_lib(
         binding_type = "cpp",
         library = ":" + fidl_library_target,
         target_compatible_with = ["@platforms//os:fuchsia"],
+        **kwargs
     )
 
     native.cc_library(
@@ -312,4 +316,5 @@ def fuchsia_structured_config_cpp_elf_lib(
             ":" + cc_bind_target,
             "@fuchsia_sdk//pkg/inspect",
         ],
+        **kwargs
     )
