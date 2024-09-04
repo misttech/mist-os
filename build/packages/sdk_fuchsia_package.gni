@@ -319,7 +319,7 @@ template("sdk_fuchsia_package") {
   } else {
     # Current API level is not supported, so create an empty atom.
     print(
-        "Empty IDK atom created for package `${target_name}`, which is not supported in API level ${override_target_api_level}.")
+        "Empty IDK atom created for package `${target_name}`, which is not supported in API level ${current_build_target_api_level}.")
     sdk_noop_atom(target_name) {
       forward_variables_from(invoker,
                              [
