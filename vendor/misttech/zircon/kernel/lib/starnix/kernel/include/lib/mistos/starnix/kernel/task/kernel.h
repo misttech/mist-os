@@ -9,20 +9,17 @@
 #include <lib/mistos/starnix/kernel/lifecycle/atomic_counter.h>
 #include <lib/mistos/starnix/kernel/sync/locks.h>
 #include <lib/mistos/starnix/kernel/task/pidtable.h>
-#include <lib/mistos/starnix/kernel/vfs/module.h>
 #include <lib/mistos/util/onecell.h>
 #include <zircon/types.h>
 
-#include <utility>
-
-#include <fbl/canary.h>
 #include <fbl/ref_counted_upgradeable.h>
-#include <fbl/ref_ptr.h>
-#include <fbl/string.h>
 #include <kernel/mutex.h>
 #include <ktl/atomic.h>
 
 namespace starnix {
+
+class FileSystem;
+using FileSystemHandle = fbl::RefPtr<FileSystem>;
 
 /// The shared, mutable state for the entire Starnix kernel.
 ///
@@ -33,7 +30,7 @@ namespace starnix {
 ///
 /// The structure of this object will likely need to evolve as we implement more namespacing and
 /// isolation mechanisms, such as `namespaces(7)` and `pid_namespaces(7)`.
-class Kernel : private fbl::RefCountedUpgradeable<Kernel> {
+class Kernel : public fbl::RefCountedUpgradeable<Kernel> {
  public:
   /// The kernel threads running on behalf of this kernel.
   // pub kthreads: KernelThreads,
@@ -55,11 +52,12 @@ class Kernel : private fbl::RefCountedUpgradeable<Kernel> {
   // pub default_abstract_vsock_namespace: Arc<AbstractVsockSocketNamespace>,
 
   // The kernel command line. Shows up in /proc/cmdline.
-  fbl::String cmdline;
+  std::string_view cmdline;
 
   // Owned by anon_node.rs
   // pub anon_fs: OnceCell<FileSystemHandle>,
   OnceCell<FileSystemHandle> anon_fs;
+
   // Owned by pipe.rs
   // pub pipe_fs: OnceCell<FileSystemHandle>,
   // Owned by socket.rs
@@ -189,7 +187,7 @@ class Kernel : private fbl::RefCountedUpgradeable<Kernel> {
   // The service to handle delayed releases. This is required for elements that requires to
   // execute some code when released and requires a known context (both in term of lock context,
   // as well as `CurrentTask`).
-  DelayedReleaser delayed_releaser;
+  // DelayedReleaser delayed_releaser;
 
   /// Proxy to the scheduler profile provider for adjusting task priorities.
   // pub profile_provider: Option<ProfileProviderSynchronousProxy>,
@@ -199,11 +197,11 @@ class Kernel : private fbl::RefCountedUpgradeable<Kernel> {
 
  public:
   /// impl Kernel
-  static fit::result<zx_status_t, fbl::RefPtr<Kernel>> New(fbl::String cmdline);
+  static fit::result<zx_status_t, fbl::RefPtr<Kernel>> New(const ktl::string_view& cmdline);
 
-  uint64_t get_next_mount_id() { return next_mount_id.next(); }
+  uint64_t get_next_mount_id();
 
-  uint64_t get_next_namespace_id() { return next_namespace_id.next(); }
+  uint64_t get_next_namespace_id();
 
  public:
   using fbl::RefCountedUpgradeable<Kernel>::AddRef;
@@ -214,7 +212,7 @@ class Kernel : private fbl::RefCountedUpgradeable<Kernel> {
   ~Kernel();
 
  private:
-  Kernel(fbl::String _cmdline) : cmdline{std::move(_cmdline)} {}
+  Kernel(const ktl::string_view& _cmdline);
 };
 
 }  // namespace starnix

@@ -8,14 +8,16 @@
 #include <lib/fit/result.h>
 #include <lib/mistos/starnix/kernel/fs/mistos/syslog.h>
 #include <lib/mistos/starnix/kernel/fs/tmpfs.h>
-#include <lib/mistos/starnix/kernel/task/module.h>
-#include <lib/mistos/starnix/kernel/vfs/module.h>
+#include <lib/mistos/starnix/kernel/task/current_task.h>
+#include <lib/mistos/starnix/kernel/task/kernel.h>
+#include <lib/mistos/starnix/kernel/task/task.h>
+#include <lib/mistos/starnix/kernel/vfs/fs_node.h>
 #include <lib/mistos/starnix/testing/testing.h>
+#include <lib/unittest/unittest.h>
 
 #include <fbl/ref_ptr.h>
-#include <zxtest/zxtest.h>
 
-namespace {
+namespace unit_testing {
 
 using namespace starnix;
 using namespace starnix_uapi;
@@ -26,7 +28,9 @@ fit::result<Errno, FdNumber> add(const CurrentTask& current_task, const FdTable&
   return files.add_with_flags(*current_task.task, file, FdFlags::empty());
 }
 
-TEST(FdTable, test_fd_table_install) {
+bool test_fd_table_install() {
+  BEGIN_TEST;
+
   auto [kernel, current_task] = create_kernel_and_task();
   auto files = FdTable::Create();
   auto file = SyslogFile::new_file(*current_task);
@@ -40,12 +44,17 @@ TEST(FdTable, test_fd_table_install) {
   ASSERT_EQ(file.get(), files.get(fd0).value().get());
   ASSERT_EQ(file.get(), files.get(fd1).value().get());
 
-  ASSERT_EQ(errno(EBADF), files.get(FdNumber::from_raw(fd1.raw() + 1)).error_value());
+  ASSERT_EQ(errno(EBADF).error_code(),
+            files.get(FdNumber::from_raw(fd1.raw() + 1)).error_value().error_code());
 
   files.release();
+
+  END_TEST;
 }
 
-TEST(FdTable, test_fd_table_fork) {
+bool test_fd_table_fork() {
+  BEGIN_TEST;
+
   auto [kernel, current_task] = create_kernel_and_task();
   auto files = FdTable::Create();
   auto file = SyslogFile::new_file(*current_task);
@@ -56,21 +65,25 @@ TEST(FdTable, test_fd_table_fork) {
 
   auto forked = files.fork();
 
-  ASSERT_EQ(files.get(fd0).value(), forked.get(fd0).value());
-  ASSERT_EQ(files.get(fd1).value(), forked.get(fd1).value());
+  ASSERT_TRUE(files.get(fd0).value() == forked.get(fd0).value());
+  ASSERT_TRUE(files.get(fd1).value() == forked.get(fd1).value());
 
   ASSERT_TRUE(files.get(fd2).is_error());
   ASSERT_TRUE(forked.get(fd2).is_error());
 
   ASSERT_TRUE(files.set_fd_flags(fd0, FdFlags(FdFlagsEnum::CLOEXEC)).is_ok());
-  ASSERT_EQ(FdFlags(FdFlagsEnum::CLOEXEC), files.get_fd_flags(fd0).value());
-  ASSERT_NE(FdFlags(FdFlagsEnum::CLOEXEC), forked.get_fd_flags(fd0).value());
+  ASSERT_EQ(FdFlags(FdFlagsEnum::CLOEXEC).bits(), files.get_fd_flags(fd0).value().bits());
+  ASSERT_NE(FdFlags(FdFlagsEnum::CLOEXEC).bits(), forked.get_fd_flags(fd0).value().bits());
 
   forked.release();
   files.release();
+
+  END_TEST;
 }
 
-TEST(FdTable, test_fd_table_exec) {
+bool test_fd_table_exec() {
+  BEGIN_TEST;
+
   auto [kernel, current_task] = create_kernel_and_task();
   auto files = FdTable::Create();
   auto file = SyslogFile::new_file(*current_task);
@@ -89,9 +102,13 @@ TEST(FdTable, test_fd_table_exec) {
   ASSERT_TRUE(files.get(fd1).is_ok());
 
   files.release();
+
+  END_TEST;
 }
 
-TEST(FdTable, test_fd_table_pack_values) {
+bool test_fd_table_pack_values() {
+  BEGIN_TEST;
+
   auto [kernel, current_task] = starnix::testing::create_kernel_and_task();
   auto files = FdTable::Create();
   auto file = SyslogFile::new_file(*current_task);
@@ -113,6 +130,15 @@ TEST(FdTable, test_fd_table_pack_values) {
   ASSERT_EQ(0, another_fd.raw());
 
   files.release();
+
+  END_TEST;
 }
 
-}  // namespace
+}  // namespace unit_testing
+
+UNITTEST_START_TESTCASE(starnix_fd_table)
+UNITTEST("test fd table install", unit_testing::test_fd_table_install)
+UNITTEST("test fd table fork", unit_testing::test_fd_table_fork)
+UNITTEST("test fd table exec", unit_testing::test_fd_table_exec)
+UNITTEST("test fd table pack values", unit_testing::test_fd_table_pack_values)
+UNITTEST_END_TESTCASE(starnix_fd_table, "starnix_fd_table", "Tests for FdTable")

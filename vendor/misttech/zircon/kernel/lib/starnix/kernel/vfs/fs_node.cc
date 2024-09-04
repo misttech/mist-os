@@ -11,6 +11,9 @@
 #include <lib/mistos/starnix/kernel/task/task.h>
 #include <lib/mistos/starnix/kernel/task/thread_group.h>
 #include <lib/mistos/starnix/kernel/vfs/dir_entry.h>
+#include <lib/mistos/starnix/kernel/vfs/file_object.h>
+#include <lib/mistos/starnix/kernel/vfs/file_ops.h>
+#include <lib/mistos/starnix/kernel/vfs/fs_node_ops.h>
 #include <lib/mistos/starnix_uapi/file_mode.h>
 #include <zircon/assert.h>
 
@@ -21,9 +24,19 @@
 #include <fbl/ref_ptr.h>
 #include <ktl/unique_ptr.h>
 
+#include <ktl/enforce.h>
+
 #include <linux/errno.h>
 
 namespace starnix {
+
+FsNodeHandle FsNode::new_uncached(const CurrentTask& current_task, ktl::unique_ptr<FsNodeOps> ops,
+                                  const FileSystemHandle& fs, ino_t node_id, FsNodeInfo info) {
+  // auto creds = current_task.creds();
+  return FsNode::new_internal(ktl::move(ops), fs->kernel(), util::WeakPtr(fs.get()), node_id, info,
+                              Credentials::root())
+      ->into_handle();
+}
 
 FsNode* FsNode::new_internal(ktl::unique_ptr<FsNodeOps> ops, util::WeakPtr<Kernel> kernel,
                              util::WeakPtr<FileSystem> fs, ino_t node_id, FsNodeInfo info,
@@ -49,21 +62,23 @@ FsNode* FsNode::new_internal(ktl::unique_ptr<FsNodeOps> ops, util::WeakPtr<Kerne
 
   fbl::AllocChecker ac;
   auto fsnode = new (&ac) FsNode(ktl::move(WeakFsNodeHandle()), ktl::move(kernel), ktl::move(ops),
-                                 ktl::move(fs), node_id, std::nullopt, new_info);
+                                 ktl::move(fs), node_id, ktl::nullopt, new_info);
   ZX_ASSERT(ac.check());
   return fsnode;
 }
 
+FsNode::~FsNode() = default;
+
 FsNode::FsNode(WeakFsNodeHandle _weak_handle, util::WeakPtr<Kernel> kernel,
                ktl::unique_ptr<FsNodeOps> ops, util::WeakPtr<FileSystem> fs, ino_t _node_id,
                ktl::optional<PipeHandle> _fifo, FsNodeInfo info)
-    : weak_handle(std::move(_weak_handle)),
+    : weak_handle(ktl::move(_weak_handle)),
       ops_(ktl::move(ops)),
-      kernel_(std::move(kernel)),
-      fs_(std::move(fs)),
+      kernel_(ktl::move(kernel)),
+      fs_(ktl::move(fs)),
       node_id(_node_id),
-      fifo(std::move(_fifo)),
-      info_(std::move(info)) {}
+      fifo(ktl::move(_fifo)),
+      info_(ktl::move(info)) {}
 
 fit::result<Errno, ktl::unique_ptr<FileOps>> FsNode::create_file_ops(
     const CurrentTask& current_task, OpenFlags flags) const {
@@ -76,7 +91,7 @@ fit::result<Errno, ktl::unique_ptr<FileOps>> FsNode::open(const CurrentTask& cur
   // If O_PATH is set, there is no need to create a real FileOps because
   // most file operations are disabled.
   if (flags.contains(OpenFlagsEnum::PATH)) {
-    return fit::ok(std::move(ktl::unique_ptr<OPathOps>(OPathOps::New())));
+    return fit::ok(ktl::move(ktl::unique_ptr<OPathOps>(OPathOps::New())));
   }
 
   if (check_access) {
@@ -88,7 +103,7 @@ fit::result<Errno, ktl::unique_ptr<FileOps>> FsNode::open(const CurrentTask& cur
 
   auto [mode, rdev] = [&]() -> auto {
     auto info = this->info();
-    return std::make_pair(info->mode, info->rdev);
+    return ktl::pair(info->mode, info->rdev);
   }();
 
   auto fmt_mode = (mode & FileMode::IFMT);

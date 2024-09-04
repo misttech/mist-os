@@ -7,11 +7,11 @@
 #define ZIRCON_KERNEL_LIB_MISTOS_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_TESTING_TESTING_H_
 
 #include <lib/mistos/starnix/kernel/task/current_task.h>
-#include <lib/mistos/starnix/kernel/vfs/forward.h>
 
 #include <fbl/ref_ptr.h>
 #include <ktl/optional.h>
 #include <ktl/pair.h>
+#include <ktl/string_view.h>
 
 namespace starnix {
 
@@ -59,7 +59,8 @@ ktl::pair<fbl::RefPtr<starnix::Kernel>, AutoReleasableTask> create_kernel_and_ta
 // Creates a new `Task` in the provided kernel.
 //
 // The `Task` is backed by a real process, and can be used to test syscalls.
-AutoReleasableTask create_task(fbl::RefPtr<starnix::Kernel>& kernel, const fbl::String& task_name);
+AutoReleasableTask create_task(fbl::RefPtr<starnix::Kernel>& kernel,
+                               const ktl::string_view& task_name);
 
 // Maps `length` at `address` with `PROT_READ | PROT_WRITE`, `MAP_ANONYMOUS | MAP_PRIVATE`.
 //
