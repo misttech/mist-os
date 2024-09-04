@@ -880,7 +880,6 @@ sdk_molecule("platform_fidls") {
     "//sdk/fidl/fuchsia.hardware.display:fuchsia.hardware.display_sdk($fidl_toolchain)",
     "//sdk/fidl/fuchsia.hardware.ethernet.board:fuchsia.hardware.ethernet.board_sdk($fidl_toolchain)",
     "//sdk/fidl/fuchsia.hardware.gpio:fuchsia.hardware.gpio_sdk($fidl_toolchain)",
-    "//sdk/fidl/fuchsia.hardware.gpioimpl:fuchsia.hardware.gpioimpl_sdk($fidl_toolchain)",
     "//sdk/fidl/fuchsia.hardware.gpu.amlogic:fuchsia.hardware.gpu.amlogic_sdk($fidl_toolchain)",
     "//sdk/fidl/fuchsia.hardware.gpu.mali:fuchsia.hardware.gpu.mali_sdk($fidl_toolchain)",
     "//sdk/fidl/fuchsia.hardware.hrtimer:fuchsia.hardware.hrtimer_sdk($fidl_toolchain)",

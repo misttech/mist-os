@@ -248,7 +248,6 @@ fidl_library://fidl/fuchsia.hardware.bluetooth
 fidl_library://fidl/fuchsia.hardware.clock
 fidl_library://fidl/fuchsia.hardware.clockimpl
 fidl_library://fidl/fuchsia.hardware.gpio (unstable)
-fidl_library://fidl/fuchsia.hardware.gpioimpl (unstable)
 fidl_library://fidl/fuchsia.hardware.i2c
 fidl_library://fidl/fuchsia.hardware.i2c.businfo (unstable)
 fidl_library://fidl/fuchsia.hardware.i2cimpl (unstable)
