@@ -14,6 +14,53 @@ pub const REGISTER_COUNT: u8 = 11;
 /// The number of general r/w registers.
 pub const GENERAL_REGISTER_COUNT: u8 = 10;
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum DataWidth {
+    U8,
+    U16,
+    U32,
+    U64,
+}
+
+/// The different data width used by ebpf
+impl DataWidth {
+    pub fn bits(&self) -> usize {
+        match self {
+            Self::U8 => 8,
+            Self::U16 => 16,
+            Self::U32 => 32,
+            Self::U64 => 64,
+        }
+    }
+
+    pub fn bytes(&self) -> usize {
+        match self {
+            Self::U8 => 1,
+            Self::U16 => 2,
+            Self::U32 => 4,
+            Self::U64 => 8,
+        }
+    }
+
+    pub fn str(&self) -> &'static str {
+        match self {
+            Self::U8 => "b",
+            Self::U16 => "h",
+            Self::U32 => "w",
+            Self::U64 => "dw",
+        }
+    }
+
+    pub fn instruction_bits(&self) -> u8 {
+        match self {
+            Self::U8 => BPF_B,
+            Self::U16 => BPF_H,
+            Self::U32 => BPF_W,
+            Self::U64 => BPF_DW,
+        }
+    }
+}
+
 // The different operation types
 pub const BPF_LD: u8 = linux_uapi::BPF_LD as u8;
 pub const BPF_LDX: u8 = linux_uapi::BPF_LDX as u8;
@@ -39,7 +86,9 @@ pub const BPF_SRC_MASK: u8 = BPF_SRC_REG | BPF_SRC_IMM;
 pub const BPF_IMM: u8 = linux_uapi::BPF_IMM as u8;
 pub const BPF_MEM: u8 = linux_uapi::BPF_MEM as u8;
 pub const BPF_ATOMIC: u8 = linux_uapi::BPF_ATOMIC as u8;
-pub const BPF_LOAD_STORE_MASK: u8 = BPF_IMM | BPF_MEM | BPF_ATOMIC;
+pub const BPF_ABS: u8 = linux_uapi::BPF_ABS as u8;
+pub const BPF_IND: u8 = linux_uapi::BPF_IND as u8;
+pub const BPF_LOAD_STORE_MASK: u8 = BPF_IMM | BPF_MEM | BPF_ATOMIC | BPF_ABS | BPF_IND;
 
 // The mask for the swap operations
 pub const BPF_TO_BE: u8 = linux_uapi::BPF_TO_BE as u8;

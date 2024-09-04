@@ -6,8 +6,9 @@ use crate::bpf::map::{Map, RingBufferWakeupPolicy};
 use crate::bpf::program::ProgramType;
 use crate::task::CurrentTask;
 use ebpf::{
-    new_bpf_type_identifier, BpfValue, EbpfHelper, EbpfRunContext, FieldMapping, FieldType,
-    FunctionSignature, MemoryId, MemoryParameterSize, Type,
+    new_bpf_type_identifier, BpfValue, DataWidth, EbpfHelper, EbpfRunContext, FieldMapping,
+    FieldType, FunctionSignature, MemoryId, MemoryParameterSize, PacketAccessor, PacketDescriptor,
+    Type,
 };
 use linux_uapi::{
     __sk_buff, bpf_flow_keys, bpf_func_id_BPF_FUNC_csum_update,
@@ -30,6 +31,16 @@ use starnix_sync::{BpfHelperOps, Locked};
 use std::collections::HashSet;
 use std::sync::Arc;
 use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell};
+
+fn read_skbuf_data(
+    _context: &mut HelperFunctionContext<'_>,
+    _sk_buf_ptr: BpfValue,
+    _offset: u16,
+    _width: DataWidth,
+) -> Option<BpfValue> {
+    track_stub!(TODO("https://fxbug.dev/287120494"), "read_skbuf_data");
+    None
+}
 
 pub struct HelperFunctionContext<'a> {
     pub locked: &'a mut Locked<'a, BpfHelperOps>,
@@ -1010,5 +1021,20 @@ pub fn get_bpf_args(program_type: ProgramType) -> &'static [Type] {
         ProgramType::CgroupSockopt => &BPF_SOCKOPT_ARGS,
         ProgramType::CgroupSockAddr => &BPF_SOCK_ADDR_ARGS,
         ProgramType::Unknown(_) => &[],
+    }
+}
+
+pub fn get_packet_descriptor(
+    program_type: ProgramType,
+) -> Option<PacketDescriptor<HelperFunctionContextMarker>> {
+    match program_type {
+        ProgramType::CgroupSkb
+        | ProgramType::SchedAct
+        | ProgramType::SchedCls
+        | ProgramType::SocketFilter => Some(PacketDescriptor {
+            packet_memory_id: SK_BUF_ID.clone(),
+            packet_accessor: PacketAccessor::new(read_skbuf_data),
+        }),
+        _ => None,
     }
 }

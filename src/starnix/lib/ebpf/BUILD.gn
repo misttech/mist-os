@@ -55,6 +55,7 @@ rustc_library("ebpf") {
     "src/tests/malloc-double-free.data",
     "src/tests/malloc-use-free.data",
     "src/tests/null-checks-propagated.data",
+    "src/tests/packet-access.data",
     "src/tests/read-only-helper.data",
     "src/tests/stack-access.data",
     "src/tests/write-only-helper.data",

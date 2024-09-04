@@ -4,10 +4,10 @@
 
 #![allow(unused_variables)]
 
-use crate::visitor::{BpfVisitor, DataWidth, ProgramCounter, Register, Source};
+use crate::visitor::{BpfVisitor, ProgramCounter, Register, Source};
 use crate::{
-    EbpfError, MapSchema, BPF_MAX_INSTS, BPF_SIZE_MASK, BPF_STACK_SIZE, GENERAL_REGISTER_COUNT,
-    REGISTER_COUNT,
+    DataWidth, EbpfError, MapSchema, BPF_MAX_INSTS, BPF_SIZE_MASK, BPF_STACK_SIZE,
+    GENERAL_REGISTER_COUNT, REGISTER_COUNT,
 };
 use byteorder::{BigEndian, ByteOrder, LittleEndian, NativeEndian};
 use fuchsia_sync::Mutex;
@@ -668,6 +668,8 @@ pub struct CallingContext {
     functions: HashMap<u32, FunctionSignature>,
     /// The args of the program.
     args: Vec<Type>,
+    /// The memory id of the network packets.
+    packet_memory_id: Option<MemoryId>,
 }
 
 impl CallingContext {
@@ -680,6 +682,9 @@ impl CallingContext {
     pub fn set_args(&mut self, args: &[Type]) {
         assert!(args.len() <= 5);
         self.args = args.to_vec();
+    }
+    pub fn set_packet_memory_id(&mut self, memory_id: MemoryId) {
+        self.packet_memory_id = Some(memory_id);
     }
 }
 
@@ -2334,7 +2339,11 @@ impl BpfVisitor for DataDependencies {
         let Some(signature) = context.calling_context.functions.get(&index).cloned() else {
             return Err(format!("unknown external function {}", index));
         };
-        self.registers.remove(&0);
+        // 0 is overwritten and 1 to 5 are scratch registers
+        for register in 0..signature.args.len() + 1 {
+            self.registers.remove(&(register as Register));
+        }
+        // 1 to k are parameters.
         for register in 0..signature.args.len() {
             self.registers.insert((register + 1) as Register);
         }
@@ -2711,6 +2720,29 @@ impl BpfVisitor for DataDependencies {
         _jump_offset: i16,
     ) -> Result<(), String> {
         self.registers.remove(&dst);
+        Ok(())
+    }
+
+    fn load_from_sk_buf_data<'a>(
+        &mut self,
+        _context: &mut Self::Context<'a>,
+        dst: Register,
+        src: Register,
+        _offset: u16,
+        register_offset: Option<Register>,
+        _width: DataWidth,
+    ) -> Result<(), String> {
+        // 1 to 5 are scratch registers
+        for register in 1..6 {
+            self.registers.remove(&(register as Register));
+        }
+        // Only do something if the dst is read, otherwise the computation doesn't matter.
+        if self.registers.remove(&dst) {
+            self.registers.insert(src);
+            if let Some(reg) = register_offset {
+                self.registers.insert(reg);
+            }
+        }
         Ok(())
     }
 
@@ -3846,6 +3878,59 @@ impl BpfVisitor for ComputationContext {
         let mut next = self.jump_with_offset(jump_offset, parent)?;
         next.set_reg(dst, value.into())?;
         context.states.push(next);
+        Ok(())
+    }
+
+    fn load_from_sk_buf_data<'a>(
+        &mut self,
+        context: &mut Self::Context<'a>,
+        dst: Register,
+        src: Register,
+        offset: u16,
+        register_offset: Option<Register>,
+        width: DataWidth,
+    ) -> Result<(), String> {
+        bpf_log!(
+            self,
+            context,
+            "ldp{} {}{}",
+            width.str(),
+            register_offset.map(display_register).unwrap_or_else(Default::default),
+            print_offset(offset as i16)
+        );
+        let Some(memory_id) = context.calling_context.packet_memory_id.clone() else {
+            return Err(format!("incorrect packet access at pc {}", self.pc));
+        };
+        let src = self.reg(src)?;
+        if !matches!(src, Type::PtrToMemory { offset: 0, id: memory_id, .. }) {
+            return Err(format!("parameter is not a packet at pc {}", self.pc));
+        }
+        if let Some(reg) = register_offset {
+            let reg = self.reg(reg)?;
+            if !matches!(reg, Type::ScalarValue { unwritten_mask: 0, .. }) {
+                return Err(format!("access to unwritten offset at pc {}", self.pc));
+            }
+        }
+        // Handle the case where the load succeed.
+        let mut next = self.next()?;
+        next.set_reg(dst, Type::unknown_written_scalar_value())?;
+        for i in 1..=5 {
+            next.set_reg(i, Type::default())?;
+        }
+        context.states.push(next);
+        // Handle the case where the load fails.
+        if !matches!(self.reg(0)?, Type::ScalarValue { unwritten_mask: 0, .. }) {
+            return Err(format!("register 0 is incorrect at exit time at pc {}", self.pc));
+        }
+        if !self.resources.is_empty() {
+            return Err(format!(
+                "some resources have not been released at exit time at pc {}",
+                self.pc
+            ));
+        }
+        let this = self.clone();
+        this.terminate(context)?;
+        // Nothing to do, the program terminated with a valid scalar value.
         Ok(())
     }
 

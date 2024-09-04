@@ -5,10 +5,11 @@
 #[cfg(test)]
 pub mod test {
     use crate::{
-        new_bpf_type_identifier, BpfValue, EbpfHelper, EbpfProgramBuilder, FunctionSignature,
-        MemoryParameterSize, NullVerifierLogger, Type, BPF_ADD, BPF_ALU, BPF_ALU64, BPF_AND,
-        BPF_ARSH, BPF_ATOMIC, BPF_B, BPF_CALL, BPF_CMPXCHG, BPF_DIV, BPF_DW, BPF_END, BPF_EXIT,
-        BPF_FETCH, BPF_H, BPF_IMM, BPF_JA, BPF_JEQ, BPF_JGE, BPF_JGT, BPF_JLE, BPF_JLT, BPF_JMP,
+        new_bpf_type_identifier, BpfValue, DataWidth, EbpfHelper, EbpfProgramBuilder,
+        FunctionSignature, MemoryParameterSize, NullVerifierLogger, PacketAccessor,
+        PacketDescriptor, Type, BPF_ABS, BPF_ADD, BPF_ALU, BPF_ALU64, BPF_AND, BPF_ARSH,
+        BPF_ATOMIC, BPF_B, BPF_CALL, BPF_CMPXCHG, BPF_DIV, BPF_DW, BPF_END, BPF_EXIT, BPF_FETCH,
+        BPF_H, BPF_IMM, BPF_IND, BPF_JA, BPF_JEQ, BPF_JGE, BPF_JGT, BPF_JLE, BPF_JLT, BPF_JMP,
         BPF_JMP32, BPF_JNE, BPF_JSET, BPF_JSGE, BPF_JSGT, BPF_JSLE, BPF_JSLT, BPF_LD, BPF_LDX,
         BPF_LSH, BPF_MEM, BPF_MOD, BPF_MOV, BPF_MUL, BPF_NEG, BPF_OR, BPF_RSH, BPF_SRC_IMM,
         BPF_SRC_REG, BPF_ST, BPF_STX, BPF_SUB, BPF_TO_BE, BPF_TO_LE, BPF_W, BPF_XCHG, BPF_XOR,
@@ -155,6 +156,31 @@ pub mod test {
                     instructions.push(instruction);
                     let mut instruction = bpf_insn::default();
                     instruction.imm = high;
+                    instructions.push(instruction);
+                    instructions
+                }
+                Rule::LOAD_PACKET_OP => {
+                    let mut instructions: Vec<bpf_insn> = vec![];
+                    let mut instruction = bpf_insn::default();
+                    let mut is_ind = false;
+                    while let Some(inner) = inner.next() {
+                        match inner.as_rule() {
+                            Rule::REG_NUMBER => {
+                                instruction.set_src_reg(Self::parse_reg(inner));
+                                is_ind = true;
+                            }
+                            Rule::OFFSET => {
+                                instruction.off = Self::parse_value(inner).as_i16();
+                            }
+                            r @ _ => unreachable!("unexpected rule {r:?}"),
+                        }
+                    }
+                    instruction.code = BPF_LD | Self::parse_memory_size(&op.as_str()[3..]);
+                    if is_ind {
+                        instruction.code |= BPF_IND;
+                    } else {
+                        instruction.code |= BPF_ABS;
+                    }
                     instructions.push(instruction);
                     instructions
                 }
@@ -630,6 +656,32 @@ pub mod test {
         0.into()
     }
 
+    /// The read packet helper method. The conformance test consider that the data of the packet is
+    /// at offset 8 of the packet itself.
+    fn read_packet(
+        _context: &mut (),
+        sk_buf_ptr: BpfValue,
+        offset: u16,
+        width: DataWidth,
+    ) -> Option<BpfValue> {
+        let addr = sk_buf_ptr.add((8 + offset).into());
+        let value = match width {
+            DataWidth::U8 => {
+                BpfValue::from(unsafe { std::ptr::read_unaligned(addr.as_ptr::<u8>()) })
+            }
+            DataWidth::U16 => {
+                BpfValue::from(unsafe { std::ptr::read_unaligned(addr.as_ptr::<u16>()) })
+            }
+            DataWidth::U32 => {
+                BpfValue::from(unsafe { std::ptr::read_unaligned(addr.as_ptr::<u32>()) })
+            }
+            DataWidth::U64 => {
+                BpfValue::from(unsafe { std::ptr::read_unaligned(addr.as_ptr::<u64>()) })
+            }
+        };
+        Some(value)
+    }
+
     pub fn parse_asm(data: &str) -> Vec<bpf_insn> {
         let mut pairs =
             TestGrammar::parse(Rule::ASM_INSTRUCTIONS, data).expect("Parsing must be successful");
@@ -789,10 +841,10 @@ pub mod test {
     #[test_case(local_test_data!("malloc-double-free.data"))]
     #[test_case(local_test_data!("malloc-use-free.data"))]
     #[test_case(local_test_data!("null-checks-propagated.data"))]
+    #[test_case(local_test_data!("packet-access.data"))]
     #[test_case(local_test_data!("read-only-helper.data"))]
     #[test_case(local_test_data!("stack-access.data"))]
     #[test_case(local_test_data!("write-only-helper.data"))]
-    // #[test_case(local_test_data!(""))]
     fn test_ebpf_conformance(content: &str) {
         let Some(mut test_case) = TestCase::parse(content) else {
             // Special case that only test the test framework.
@@ -800,7 +852,12 @@ pub mod test {
         };
         let mut builder = EbpfProgramBuilder::<()>::default();
         if let Some(memory) = test_case.memory.as_ref() {
+            let memory_id = new_bpf_type_identifier();
             let buffer_size = memory.len() as u64;
+            builder.set_packet_descriptor(PacketDescriptor {
+                packet_memory_id: memory_id.clone(),
+                packet_accessor: PacketAccessor::new(read_packet),
+            });
             builder.set_args(&[
                 Type::PtrToMemory {
                     id: new_bpf_type_identifier(),

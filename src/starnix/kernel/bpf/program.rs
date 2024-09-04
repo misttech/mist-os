@@ -4,7 +4,8 @@
 
 use crate::bpf::fs::{get_bpf_object, BpfHandle};
 use crate::bpf::helpers::{
-    get_bpf_args, HelperFunctionContext, HelperFunctionContextMarker, BPF_HELPERS,
+    get_bpf_args, get_packet_descriptor, HelperFunctionContext, HelperFunctionContextMarker,
+    BPF_HELPERS,
 };
 use crate::bpf::map::Map;
 use crate::task::CurrentTask;
@@ -101,14 +102,15 @@ impl Program {
         let objects = link(current_task, &mut code, &mut builder)?;
 
         let vm = (|| {
-            // TODO(https://fxbug.dev/323503929): Only register helper function associated with the
-            // type of the bpf program.
             for (filter, helper) in BPF_HELPERS.iter() {
                 if filter.accept(info.program_type) {
                     builder.register(helper)?;
                 }
             }
             builder.set_args(get_bpf_args(info.program_type));
+            if let Some(descriptor) = get_packet_descriptor(info.program_type) {
+                builder.set_packet_descriptor(descriptor);
+            }
             let mut logger = BufferVeriferLogger::new(logger);
             builder.load(code, &mut logger)
         })()
