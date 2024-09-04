@@ -932,16 +932,12 @@ group("structopt") {
   public_deps = [ ":structopt-v0_2_14" ]
 }
 
-if (!(current_os == "fuchsia")) {
-  group("strum") {
-    public_deps = [ ":strum-v0_25_0" ]
-  }
+group("strum") {
+  public_deps = [ ":strum-v0_25_0" ]
 }
 
-if (!(current_os == "fuchsia")) {
-  group("strum_macros") {
-    public_deps = [ ":strum_macros-v0_25_3($host_toolchain)" ]
-  }
+group("strum_macros") {
+  public_deps = [ ":strum_macros-v0_25_3($host_toolchain)" ]
 }
 
 if (!(current_os == "fuchsia")) {
