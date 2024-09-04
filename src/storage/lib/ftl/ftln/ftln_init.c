@@ -186,8 +186,8 @@ static int map_page_check(FTLN ftl, ui32 apn, int process) {
             if (apn == ap0)
               break;
 
-              // Move to next written page in backwards direction. If
-              // MLC flash, move to page whose pair has higher offset.
+            // Move to next written page in backwards direction. If
+            // MLC flash, move to page whose pair has higher offset.
 #if INC_FTL_NDM_SLC
             --apn;
 #else
@@ -873,8 +873,9 @@ static int format_status(FTLN ftl) {
     ++wear_lag_histogram[ftl->blk_wc_lag[b]];
   }
 
-  ftl->logger.info(__FILE__, __LINE__, "Wear Count Range [%u, %u]", low_wc, ftl->high_bc);
-  ftl->logger.info(__FILE__, __LINE__, "Wear Count Average %u", ftl->high_bc - avg_lag);
+  ftl->logger.info(__FILE__, __LINE__, "High block count %u", ftl->high_bc);
+  ftl->logger.info(__FILE__, __LINE__, "Wear Count Range [%u, %u]", low_wc, ftl->high_wc);
+  ftl->logger.info(__FILE__, __LINE__, "Wear Count Average %u", ftl->high_wc - avg_lag);
   ftl->logger.info(__FILE__, __LINE__, "Blocks with Wear Count[=%u]: %u", ftl->high_wc - 255,
                    ftl->wear_data.max_wc_over);
   ftl->logger.info(__FILE__, __LINE__, "Blocks with estimated wear count: %u", set_to_avg);
