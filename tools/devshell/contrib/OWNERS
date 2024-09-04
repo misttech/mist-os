@@ -2,7 +2,7 @@ per-file bindc = file: /src/devices/OWNERS
 
 per-file ls-buildid=joshuaseaton@google.com
 per-file check-licenses=jcecil@google.com
-per-file check-goldens=adamperry@google.com,joshuaseaton@google.com,mkember@google.com
+per-file check-goldens=adamperry@google.com,joshuaseaton@google.com,ianloic@google.com
 per-file clang-tidy=haowei@google.com,phosek@google.com
 per-file compdb=fmil@google.com
 per-file cpu-stats=crjohns@google.com
