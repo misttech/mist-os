@@ -7,6 +7,7 @@
 #define ZIRCON_KERNEL_LIB_MISTOS_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_FS_MISTOS_SYSLOG_H_
 
 #include <lib/mistos/starnix/kernel/vfs/file_object.h>
+#include <lib/mistos/starnix/kernel/vfs/file_ops.h>
 
 namespace starnix {
 

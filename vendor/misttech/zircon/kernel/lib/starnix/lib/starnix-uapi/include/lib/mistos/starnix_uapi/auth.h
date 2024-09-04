@@ -9,7 +9,7 @@
 #include <lib/mistos/linux_uapi/typedefs.h>
 #include <stdint.h>
 
-#include <vector>
+#include <fbl/vector.h>
 
 namespace starnix_uapi {
 
@@ -33,7 +33,7 @@ struct Credentials {
   gid_t egid;
   uid_t saved_uid;
   gid_t saved_gid;
-  std::vector<gid_t> groups;
+  //fbl::Vector<gid_t> groups;
 
   // See https://man7.org/linux/man-pages/man2/setfsuid.2.html
   uid_t fsuid;

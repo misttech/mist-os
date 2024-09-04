@@ -10,7 +10,6 @@
 #include <lib/mistos/starnix_uapi/errors.h>
 
 #include <fbl/alloc_checker.h>
-#include <fbl/string.h>
 #include <fbl/vector.h>
 #include <ktl/algorithm.h>
 
@@ -105,7 +104,7 @@ fit::result<Errno, FsString> MemoryAccessorExt::read_c_string(UserCString string
   }
   // Make sure the last element holds the null byte.
   if (buffer_or_error->last(1)[0] == '\0') {
-    return fit::ok(fbl::String((char*)buffer_or_error->data(), buffer_or_error->size() - 1));
+    return fit::ok(FsString((char*)buffer_or_error->data(), buffer_or_error->size() - 1));
   }
   return fit::error(errno(ENAMETOOLONG));
 }

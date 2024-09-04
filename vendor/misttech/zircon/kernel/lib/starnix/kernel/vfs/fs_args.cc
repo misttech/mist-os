@@ -11,6 +11,8 @@
 #include <ktl/string_view.h>
 #include <ktl/unique_ptr.h>
 
+#include <ktl/enforce.h>
+
 namespace starnix {
 
 namespace parse_mount_options {
@@ -27,8 +29,8 @@ fit::result<Errno> parse_mount_options(const FsStr& input, FsStringHashTable* ou
   auto start = input.begin();
   auto end = input.end();
   while (start <= end) {
-    auto comma_pos = std::find(start, end, ',');
-    auto equal_pos = std::find(start, comma_pos, '=');
+    auto comma_pos = ktl::find(start, end, ',');
+    auto equal_pos = ktl::find(start, comma_pos, '=');
     size_t value_length = (comma_pos > equal_pos) ? (comma_pos - equal_pos - 1) : 0;
 
     fbl::AllocChecker ac;

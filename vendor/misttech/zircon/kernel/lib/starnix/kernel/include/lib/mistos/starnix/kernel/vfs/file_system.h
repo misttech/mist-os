@@ -8,7 +8,8 @@
 
 #include <lib/fit/result.h>
 #include <lib/mistos/linux_uapi/typedefs.h>
-#include <lib/mistos/starnix/kernel/vfs/forward.h>
+#include <lib/mistos/starnix/kernel/vfs/fs_args.h>
+#include <lib/mistos/starnix/kernel/vfs/fs_node_info.h>
 #include <lib/mistos/starnix/kernel/vfs/namespace.h>
 #include <lib/mistos/starnix_uapi/device_type.h>
 #include <lib/mistos/starnix_uapi/errors.h>
@@ -28,9 +29,6 @@
 #include <kernel/mutex.h>
 #include <ktl/unique_ptr.h>
 #include <ktl/variant.h>
-
-#include <asm-generic/statfs.h>
-#include <linux/stat.h>
 
 namespace starnix {
 
@@ -83,11 +81,15 @@ struct FileSystemOptions {
   FsString source;
   // Flags kept per-superblock, i.e. included in MountFlags::STORED_ON_FILESYSTEM.
   MountFlags flags = MountFlags::empty();
-  // Filesystem options passed as the last argument to mount().
-  FsString params;
+  /// Filesystem options passed as the last argument to mount().
+  MountParams params;
 };
 
 class FileSystemOps;
+class Kernel;
+class FsNodeOps;
+class FsNode;
+using WeakFsNodeHandle = util::WeakPtr<FsNode>;
 
 /// A file system that can be mounted in a namespace.
 class FileSystem : private fbl::RefCountedUpgradeable<FileSystem> {
@@ -133,9 +135,12 @@ class FileSystem : private fbl::RefCountedUpgradeable<FileSystem> {
   /// assigned number.
   ///
   /// Returns Err only if create_fn returns Err.
-  fit::result<Errno, FsNodeHandle> get_or_create_node(
-      const CurrentTask& current_task, ktl::optional<ino_t> node_id,
-      std::function<fit::result<Errno, FsNodeHandle>(ino_t)> create_fn);
+  template <typename CreateFn>
+  fit::result<Errno, FsNodeHandle> get_or_create_node(const CurrentTask& current_task,
+                                                      ktl::optional<ino_t> node_id) {
+    static_assert(std::is_invocable_r_v<fit::result<Errno, FsNodeHandle>, CreateFn, ino_t>);
+    return fit::ok(FsNodeHandle());
+  }
 
   // File systems that produce their own IDs for nodes should invoke this
   // function. The ones who leave to this object to assign the IDs should
@@ -143,8 +148,13 @@ class FileSystem : private fbl::RefCountedUpgradeable<FileSystem> {
   FsNodeHandle create_node_with_id(const CurrentTask& current_task, ktl::unique_ptr<FsNodeOps> ops,
                                    ino_t id, FsNodeInfo info);
 
+  template <typename NodeInfoFn>
   FsNodeHandle create_node(const CurrentTask& current_task, ktl::unique_ptr<FsNodeOps> ops,
-                           std::function<FsNodeInfo(ino_t)> info);
+                           NodeInfoFn info) {
+    static_assert(std::is_invocable_r_v<FsNodeInfo, NodeInfoFn, ino_t>);
+    auto node_id = next_node_id();
+    return create_node_with_id(current_task, ktl::move(ops), node_id, info(node_id));
+  }
 
   /// Remove the given FsNode from the node cache.
   ///
@@ -222,50 +232,6 @@ class FileSystem : private fbl::RefCountedUpgradeable<FileSystem> {
   /// Hack meant to stand in for the fs_use_trans selinux feature. If set, this value will be set
   /// as the selinux label on any newly created inodes in the filesystem.
   // pub selinux_context: OnceCell<FsString>,
-};
-
-class FileSystemOps {
- public:
-  virtual ~FileSystemOps() = default;
-
-  /// Return information about this filesystem.
-  ///
-  /// A typical implementation looks like this:
-  /// ```
-  /// Ok(statfs::default(FILE_SYSTEM_MAGIC))
-  /// ```
-  /// or, if the filesystem wants to customize fields:
-  /// ```
-  /// Ok(statfs {
-  ///     f_blocks: self.blocks,
-  ///     ..statfs::default(FILE_SYSTEM_MAGIC)
-  /// })
-  /// ```
-  virtual fit::result<Errno, struct statfs> statfs(const FileSystem& fs,
-                                                   const CurrentTask& current_task) = 0;
-
-  virtual const FsStr& name() = 0;
-
-  /// Whether this file system generates its own node IDs.
-  virtual bool generate_node_ids() { return false; }
-
-  virtual fit::result<Errno> rename(const FileSystem& fs, const CurrentTask& current_task,
-                                    const FsNodeHandle& old_parent, const FsStr& old_name,
-                                    const FsNodeHandle& new_parent, const FsStr& new_name,
-                                    const FsNodeHandle& renamed,
-                                    const FsNodeHandle* replaced = nullptr) {
-    return fit::error(errno(EROFS));
-  }
-
-  virtual fit::result<Errno> exchange(const FileSystem& fs, const CurrentTask& current_task,
-                                      const FsNodeHandle& node1, const FsNodeHandle& parent1,
-                                      const FsStr& name1, const FsNodeHandle& node2,
-                                      const FsNodeHandle& parent2, const FsStr& name2) {
-    return fit::error(errno(EINVAL));
-  }
-
-  /// Called when the filesystem is unmounted.
-  virtual void unmount() {}
 };
 
 }  // namespace starnix

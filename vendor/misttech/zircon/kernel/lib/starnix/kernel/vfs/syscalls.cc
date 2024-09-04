@@ -10,11 +10,12 @@
 #include <lib/mistos/starnix/kernel/task/process_group.h>
 #include <lib/mistos/starnix/kernel/task/task.h>
 #include <lib/mistos/starnix/kernel/task/thread_group.h>
+#include <lib/mistos/starnix/kernel/vfs/file_object.h>
 #include <lib/mistos/starnix/kernel/vfs/namespace.h>
 #include <lib/mistos/starnix/kernel/vfs/syscalls.h>
 #include <lib/mistos/starnix_uapi/open_flags.h>
 
-#include <fbl/string.h>
+#include <ktl/enforce.h>
 
 #include <linux/fcntl.h>
 
