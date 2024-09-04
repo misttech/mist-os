@@ -241,6 +241,20 @@ gn_targets_repository(
 
 # buildifier: disable=load-on-top
 load(
+    "//:build/bazel/fuchsia_idk/repository_rules.bzl",
+    "fuchsia_idk_repository",
+)
+
+fuchsia_idk_repository(
+    name = "fuchsia_idk",
+    idk_export_dir = "%s/sdk/exported/bazel_fuchsia_sdk_idk" % ninja_output_dir,
+    ninja_build_dir = ninja_output_dir,
+    python_executable = "prebuilt/third_party/python3/%s/bin/python3" % fuchsia_host_tag,
+    content_hash_file = "//:fuchsia_build_generated/fuchsia_idk.hash",
+)
+
+# buildifier: disable=load-on-top
+load(
     "@fuchsia_workspace//fuchsia:deps.bzl",
     "fuchsia_sdk_repository",
     "rules_fuchsia_deps",

@@ -1,0 +1,579 @@
+#!/usr/bin/env fuchsia-vendored-python
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+"""Generate a Bazel repository for a given Fuchsia IDK."""
+
+import argparse
+import json
+import os
+import sys
+import typing as T
+from pathlib import Path
+
+# Location of IDK top-level manifest listing all IDK atoms.
+_IDK_MANIFEST_RELPATH = "meta/manifest.json"
+
+
+def _write_file(path: Path, content: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if path.is_symlink():
+        path.unlink()
+    path.write_text(content)
+
+
+def _create_symlink(dst_path: Path, target_path: Path) -> None:
+    """Create symlink at |dst_path| pointing to |target_path|."""
+    dst_dir = dst_path.parent
+    dst_dir.mkdir(parents=True, exist_ok=True)
+    if not target_path.is_absolute():
+        target_path = target_path.resolve()
+    target_path = Path(os.path.relpath(target_path, dst_dir))
+    if dst_path.is_symlink() or dst_path.exists():
+        dst_path.unlink()
+    dst_path.symlink_to(target_path)
+
+
+def _to_starlark_string_list(items: T.List[str], indent: int = 4) -> str:
+    if len(items) == 0:
+        return "[]"
+    if len(items) == 1:
+        return f'["{items.pop()}"]'
+    result = "[\n"
+    for item in items:
+        result += " " * indent + f'    "{item}",\n'
+    result += " " * indent + "]"
+    return result
+
+
+def split_path_to_package_name(path: str) -> (str, str):
+    """Convert IDK-relative path to Bazel (package path, target/file name) pair."""
+    # Use a single .build-id/BUILD.bazel file for all .build-id files.
+    if path.startswith(".build-id/"):
+        return (".build-id", path[len(".build-id/") :])
+
+    # Use a single package per arch/{cpu}/ directory as well.
+    # Special case arch/{cpu}/sysroot/ too.
+    if path.startswith("arch/"):
+        path_components = path.split("/")
+        assert len(path_components) >= 3, f"Unexpected arch-related path {path}"
+        if path_components[2] == "sysroot":
+            package_name, rest = (
+                f"arch/{path_components[1]}/sysroot",
+                path_components[3:],
+            )
+        else:
+            package_name, rest = (
+                f"arch/{path_components[1]}",
+                path_components[2:],
+            )
+        return (package_name, "/".join(rest))
+
+    # Use a single packages/<name>/BUILD.bazel for prebuilt packages.
+    # Note that this includes packages/blobs/BUILD.bazel.
+    if path.startswith("packages/"):
+        path_components = path.split("/")
+        assert (
+            len(path_components) > 2
+        ), f"Unexpected package-related path: {path}"
+        package_name, rest = path_components[1], path_components[2:]
+        return (f"packages/{package_name}", "/".join(rest))
+
+    # Otherwise, use <dirname>, <basename>, with <dirname> set to the
+    # empty string instead of "." for the current directory.
+    p = Path(path)
+    package = str(p.parent)
+    if package == ".":
+        package = ""
+    return (package, p.name)
+
+
+class OutputPackageInfo(object):
+    """Information about a given Bazel package in the output IDK directory."""
+
+    def __init__(self):
+        # The list of files exported by this package.
+        self._exports: T.Set[str] = set()
+        # The list of filesgroups in this package.
+        self._filegroups: T.Dict[str, T.List[str]] = {}
+        # The list of aliases in this package.
+        self._aliases: T.Dict[str, str] = {}
+        self._target_names: T.Set[str] = set()
+
+    def add_export(self, name: str) -> None:
+        assert (
+            name not in self._target_names
+        ), f"Cannot export known target name: {name}"
+        self._exports.add(name)
+
+    def add_filegroup(self, name: str, srcs: T.Sequence[str]) -> None:
+        assert name not in self._target_names, f"Duplicate target name: {name}"
+        self._target_names.add(name)
+        self._filegroups[name] = list(srcs)
+
+    def add_alias(self, name: str, actual: str) -> None:
+        assert name not in self._target_names, f"Duplicate target name: {name}"
+        self._target_names.add(name)
+        self._aliases[name] = actual
+
+    def generate_build_bazel(self) -> str:
+        result = "# AUTO-GENERATED - DO NOT EDIT !\n\n"
+        result += 'package(default_visibility = ["//visibility:public"])\n'
+
+        if self._exports:
+            result += """
+# The following are direct symlinks that can point into the Ninja output directory or the Fuchsia source dir.
+exports_files({exports})
+""".format(
+                exports=_to_starlark_string_list(
+                    sorted(self._exports), indent=0
+                )
+            )
+
+        for name, srcs in self._filegroups.items():
+            srcs_list = _to_starlark_string_list(sorted(srcs))
+            result += f"""
+filegroup(
+    name = "{name}",
+    srcs = {srcs_list},
+)
+"""
+
+        for name, actual in self._aliases.items():
+            result += f"""
+alias(
+    name = "{name}",
+    actual = "{actual}",
+)
+"""
+        return result
+
+
+class OutputIdk(object):
+    """Information about a given output IDK directory."""
+
+    def __init__(self, output_dir: Path):
+        self._output_dir = output_dir
+        self._packages: T.Dict[str, OutputPackageInfo] = {}
+        self._symlinks: T.Dict[str, Path] = {}
+        self._files: T.Dict[str, str] = {}
+
+    def add_symlink(self, link_relpath: str, target_path: Path) -> None:
+        cur_path = self._symlinks.setdefault(link_relpath, target_path)
+        assert (
+            cur_path == target_path
+        ), f"Duplicate symlinks at {link_relpath}: [{cur_path}] vs [{target_path}]"
+        assert (
+            link_relpath not in self._files
+        ), f"Cannot add symlink {link_relpath} over existing file"
+
+    def add_file(self, relpath: str, content: str) -> None:
+        cur_content = self._files.setdefault(relpath, content)
+        assert (
+            cur_content == content
+        ), f"Duplicate file content at {relpath}:\n<<<<<<\n{cur_content}\n=====\n{content}\n>>>>"
+        assert (
+            relpath not in self._symlinks
+        ), f"Cannot add file {relpath} over existing symlink"
+
+    def add_json_file(self, relpath: str, json_content: T.Any) -> None:
+        self.add_file(
+            relpath, json.dumps(json_content, indent=2, separators=(",", ": "))
+        )
+
+    def get_package_info_for(self, package_path: str) -> OutputPackageInfo:
+        result = self._packages.get(package_path)
+        if result is None:
+            result = self._packages.setdefault(
+                package_path, OutputPackageInfo()
+            )
+        return result
+
+    def write_all(self) -> None:
+        # Write all package BUILD.bazel files.
+        for package_dir, package_info in self._packages.items():
+            package_path = self._output_dir / package_dir / "BUILD.bazel"
+            package_path.parent.mkdir(parents=True, exist_ok=True)
+            package_path.write_text(package_info.generate_build_bazel())
+
+        # Create symlinks.
+        for link_relpath, target_path in self._symlinks.items():
+            link_path = self._output_dir / link_relpath
+            _create_symlink(link_path, target_path)
+
+        # Write files.
+        for file_relpath, content in self._files.items():
+            file_path = self._output_dir / file_relpath
+            file_path.parent.mkdir(parents=True, exist_ok=True)
+            file_path.write_text(content)
+
+
+class PathRewriter(object):
+    """Rewrite paths belonging to a metadata JSON file."""
+
+    def __init__(
+        self,
+        repo_name: str,
+        output_idk: OutputIdk,
+        input_dir: Path,
+        ninja_build_dir: Path,
+        exceptions: T.Sequence[str] = [],
+    ):
+        """Create new instance
+
+        Args:
+            repo_name: Repository name (e.g. "fuchsia_idk").
+            output_idk: An OutputIdk instance.
+            input_dir: Path to the input export IDK directory.
+            ninja_build_dir: Path to the Ninja build directory.
+            exceptions: optional list of file basenames that will
+                be preerved as symlinks, even if they are generated
+                Ninja artifacts.
+        """
+        self._repo_name = repo_name
+        self._output_idk = output_idk
+        self._input_dir = input_dir
+        self._ninja_build_dir = ninja_build_dir
+        self._exceptions = exceptions
+
+    def clone_with_exceptions(
+        self, exceptions: T.Sequence[str]
+    ) -> "PathRewriter":
+        """Create new instance with a different list of exceptions."""
+        return PathRewriter(
+            self._repo_name,
+            self._output_idk,
+            self._input_dir,
+            self._ninja_build_dir,
+            exceptions,
+        )
+
+    def path(self, path: str, relative_from: None | Path = None) -> str:
+        """Rewrite a single path, potentially creating a symlink for it."""
+        package, name = split_path_to_package_name(path)
+        if relative_from:
+            assert not path.startswith(
+                ("/", "@")
+            ), f"Expected relative file: {path}"
+            src_path = (relative_from / path).resolve()
+        else:
+            src_path = (self._input_dir / path).resolve()
+
+        # Create a symlink, and ensure the file is exported
+        # by its Bazel package.
+        self._output_idk.add_symlink(path, src_path)
+        pkg_info = self._output_idk.get_package_info_for(package)
+        pkg_info.add_export(name)
+
+        if not src_path.is_relative_to(self._ninja_build_dir):
+            # This is a source file, return the path unmodified.
+            return path
+        elif os.path.basename(path) in self._exceptions:
+            # This file must be kept as a direct symlink even
+            # though it is generated by Ninja. This is currently
+            # required for sysroot files because the C++ toolchain
+            # configuration cannot currently support a generated
+            # sysroot directory.
+            return path
+        else:
+            # This is a Ninja generated file, return a label to
+            # its Bazel package.
+            return f"@{self._repo_name}//{package}:{name}"
+
+    def path_list(
+        self, paths: T.List[str], relative_from: None | Path = None
+    ) -> T.List[str]:
+        """Rewrite all paths in a list, return new list."""
+        return [self.path(p, relative_from) for p in paths]
+
+    def ffx_tool_path_list(
+        self, paths: T.List[str], relative_from: None | Path = None
+    ) -> T.List[str]:
+        """Rewrite all paths in a list, return new list."""
+        result = []
+        for path in paths:
+            new_path = self.path(path, relative_from)
+            result.append(new_path)
+            if new_path != path:
+                self._output_idk.add_symlink(
+                    new_path, (self._input_dir / path).resolve()
+                )
+
+        return [self.path(p, relative_from) for p in paths]
+
+    def property_inplace(self, obj: T.Dict[str, str], prop: str) -> None:
+        """Rewrite obj[prop] as path in-place if possible."""
+        value: str | None = obj.get(prop, None)
+        if value is not None:
+            obj[prop] = self.path(value)
+
+    def ffx_tool_property_inplace(
+        self, obj: T.Dict[str, str], prop: str
+    ) -> None:
+        value: str | None = obj.get(prop, None)
+        if value is not None:
+            new_value = self.path(value)
+            obj[prop] = new_value
+            if new_value != value:
+                self._output_idk.add_symlink(
+                    new_value, (self._input_dir / value).resolve()
+                )
+
+    def properties_inplace(
+        self, obj: T.Dict[str, str], props: T.Sequence[str]
+    ) -> None:
+        """Applies property_inplace() for a sequence of property names."""
+        for prop in props:
+            self.property_inplace(obj, prop)
+
+    def path_list_inplace(self, paths: T.List[str]) -> None:
+        """Rewrite all paths in a list, modify in-place."""
+        # Subtle: using `path_list[:] = new_value` changes the content
+        # of path_list in-place, instead of assigning a new value to
+        # the local variable by that name.
+        paths[:] = self.path_list(paths)
+
+    def ffx_tool_path_list_inplace(self, paths: T.List[str]) -> None:
+        paths[:] = self.ffx_tool_path_list(paths)
+
+    def rewrite_metadata(self, meta: T.Any) -> None:
+        """Rewrite metadata JSON value in-place."""
+        atom_type = meta.get("type")
+        # version_history.json places the type under data.type
+        if atom_type is None and "data" in meta:
+            atom_type = meta["data"].get("type")
+
+        if atom_type == "bind_library":
+            self.path_list_inplace(meta["sources"])
+            return
+
+        if atom_type == "cc_prebuilt_library":
+            self.path_list_inplace(meta["headers"])
+            # self.property_inplace(meta, "ifs")
+            binaries = meta.get("binaries", {})
+            for arch, binary_group in binaries.items():
+                self.properties_inplace(binary_group, ("debug", "dist", "link"))
+            for variant in meta.get("variants", []):
+                values = variant["values"]
+                self.properties_inplace(
+                    values, ("debug", "dist_lib", "link_lib")
+                )
+            return
+
+        if atom_type == "cc_source_library":
+            self.path_list_inplace(meta["headers"])
+            self.path_list_inplace(meta["sources"])
+            return
+
+        if atom_type == "companion_host_tool":
+            if "files" in meta:
+                self.path_list_inplace(meta["files"])
+            target_files = meta.get("target_files", {})
+            for arch, filegroup in target_files.items():
+                self.path_list_inplace(filegroup)
+            return
+
+        if atom_type == "dart_library":
+            self.path_list_inplace(meta["sources"])
+            return
+
+        if atom_type in ("component_manifest", "config", "license"):
+            self.path_list_inplace(meta["data"])
+            return
+
+        if atom_type == "documentation":
+            self.path_list_inplace(meta["docs"])
+            return
+
+        if atom_type == "emu_manifest":
+            self.path_list_inplace(meta["disk_images"])
+            self.property_inplace(meta, "initial_ramdisk")
+            self.property_inplace(meta, "kernel")
+            return
+
+        if atom_type == "experimental_python_e2e_test":
+            self.path_list_inplace(meta["files"])
+            return
+
+        if atom_type == "ffx_tool":
+            toolfiles = meta.get("files", {})
+            self.ffx_tool_property_inplace(toolfiles, "executable")
+            self.ffx_tool_property_inplace(toolfiles, "executable_metadata")
+            for arch, toolfiles in meta["target_files"].items():
+                self.ffx_tool_property_inplace(toolfiles, "executable")
+                self.ffx_tool_property_inplace(toolfiles, "executable_metadata")
+            return
+
+        if atom_type == "fhcp_tests":
+            # no paths to rewrite.
+            return
+
+        if atom_type == "fidl_library":
+            self.path_list_inplace(meta["sources"])
+            return
+
+        if atom_type == "host_tool":
+            self.ffx_tool_path_list_inplace(meta.get("files", []))
+            for arch, filegroup in meta.get("target_files", {}).items():
+                self.ffx_tool_path_list_inplace(filegroup)
+            return
+
+        if atom_type == "loadable_module":
+            for arch, filegroup in meta["binaries"].items():
+                self.path_list_inplace(filegroup)
+            self.path_list_inplace(meta["resources"])
+            return
+
+        if atom_type == "package":
+            for variant in meta["variants"]:
+                self.property_inplace(variant, "manifest_file")
+                self.path_list_inplace(variant["files"])
+            return
+
+        if atom_type == "sysroot":
+            # The following files are generated by Ninja.
+            # For now, keep them as direct symlinks until
+            # the Bazel C++ toolchain definition can support
+            # sysroot generated by Bazel actions.
+            sysroot_rewriter = self.clone_with_exceptions(
+                [
+                    "cdecls.inc",
+                    "libc.so",
+                    "libzircon.so",
+                    "Scrt1.o",
+                ]
+            )
+            # sysroot_rewriter.path_list_inplace(meta["ifs_files"])
+            for variant in meta.get("variants", []):
+                values = variant["values"]
+                sysroot_rewriter.path_list_inplace(values["debug_libs"])
+                sysroot_rewriter.path_list_inplace(values["dist_libs"])
+                sysroot_rewriter.path_list_inplace(values["headers"])
+                sysroot_rewriter.path_list_inplace(values["link_libs"])
+
+            for arch, version in meta["versions"].items():
+                sysroot_rewriter.path_list_inplace(version["debug_libs"])
+                sysroot_rewriter.path_list_inplace(version["dist_libs"])
+                sysroot_rewriter.path_list_inplace(version["headers"])
+                sysroot_rewriter.path_list_inplace(version["link_libs"])
+            return
+
+        if atom_type == "version_history":
+            # No paths to rewrite here.
+            return
+
+        if atom_type == "virtual_device":
+            # No paths to rewrite here.
+            return
+
+        raise Exception(f"Unknown atom type {atom_type} in {meta}")
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--repository-name", required=True, help="IDK repository name."
+    )
+    parser.add_argument(
+        "--output-dir", type=Path, required=True, help="Output directory path."
+    )
+    parser.add_argument(
+        "--input-dir",
+        type=Path,
+        required=True,
+        help="Input IDK export directory path.",
+    )
+    parser.add_argument(
+        "--fuchsia-dir",
+        type=Path,
+        # Assume this script is under //build/bazel/scripts/
+        default=Path(__file__).parent.parent.parent.parent,
+        help="Specify Fuchsia source directory (auto-detected)",
+    )
+    parser.add_argument(
+        "--ninja-build-dir",
+        type=Path,
+        help="Specify Ninja output directory (auto-detected)",
+    )
+    args = parser.parse_args()
+
+    out_dir = args.output_dir
+    input_dir = args.input_dir.resolve()
+
+    repo_name = args.repository_name
+
+    if not args.ninja_build_dir:
+        # args.fuchsia_dir points to the Bazel workspace which contains symlinks
+        # to the real files in the actual top-level source directory. resolve
+        # one of them to find the real location.
+        #
+        #  out/default/gen/build/bazel/workspace/README.md -->
+        #     ../../../../../../README.md
+        #
+        args.fuchsia_dir = (args.fuchsia_dir / "README.md").resolve().parent
+        if not (args.fuchsia_dir / ".jiri_manifest").exists():
+            parser.error(f"Invalid Fuchsia directory path: {args.fuchsia_dir}")
+
+        fx_build_dir = args.fuchsia_dir / ".fx-build-dir"
+        if not fx_build_dir.exists():
+            parser.error(
+                f"Cannot detect build directory, use 'fx set' in: {args.fuchsia_dir}"
+            )
+        build_subdir = fx_build_dir.read_text().strip()
+        if not build_subdir:
+            parser.error(
+                f"Cannot detect build directory, use --ninja-output-dir=DIR"
+            )
+
+        args.ninja_build_dir = args.fuchsia_dir / build_subdir
+
+    if not args.ninja_build_dir.exists():
+        parser.error(
+            f"Ninja build directory does not exist: {args.ninja_build_dir}"
+        )
+
+    ninja_build_dir = args.ninja_build_dir.resolve()
+
+    output_idk = OutputIdk(out_dir)
+
+    # Symlink then source meta/manifest.json
+    input_manifest_path = input_dir / _IDK_MANIFEST_RELPATH
+    input_manifest = json.load(input_manifest_path.open())
+
+    output_idk.add_symlink(_IDK_MANIFEST_RELPATH, input_manifest_path)
+
+    rewriter = PathRewriter(repo_name, output_idk, input_dir, ninja_build_dir)
+
+    def handle_path_list(
+        path_list: T.List[str], keep_as_symlinks: T.Sequence[str] = []
+    ):
+        output_idk.handle_meta_path_list_inplace(path_list, keep_as_symlinks)
+
+    # Handle each part separately.
+    for part in input_manifest["parts"]:
+        part_meta_path = part["meta"]
+
+        src_meta_path = input_dir / part_meta_path
+        dst_meta_path = out_dir / part_meta_path
+        try:
+            meta = json.load(src_meta_path.open())
+        except:
+            # In case of malformed input JSON file, print its path
+            # to ease debugging this script.
+            print(
+                f"INVALID METADATA FILE PATH {src_meta_path}", file=sys.stderr
+            )
+            raise
+
+        rewriter.rewrite_metadata(meta)
+
+        output_idk.add_json_file(dst_meta_path, meta)
+
+    output_idk.write_all()
+
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

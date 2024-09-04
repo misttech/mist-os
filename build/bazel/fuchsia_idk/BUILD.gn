@@ -1,0 +1,22 @@
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+# All tests here should be run at build time, as they are critical
+# to ensure the build works correctly.
+
+action("tests") {
+  testonly = true
+  script = "//build/api/run_all_tests.py"
+  inputs = [
+    "generate_repository.py",
+    "generate_repository_test.py",
+  ]
+  outputs = [ "$target_out_dir/$target_name.check" ]
+  args = [
+    "--source-dir",
+    rebase_path(get_label_info(":$target_name", "dir"), root_build_dir),
+    "--stamp",
+    rebase_path(outputs[0], root_build_dir),
+  ]
+}
