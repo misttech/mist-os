@@ -411,6 +411,9 @@ _coverage_feature = feature(
                         # This flag will get applied after the default
                         # set of flags so we can think of this as an override
                         "-O1",
+                        "-mllvm",
+                        # Enable coverage from system headers in Fuchsia.
+                        "-system-headers-coverage",
                     ],
                 ),
             ],
@@ -420,7 +423,14 @@ _coverage_feature = feature(
             flag_groups = _iter_ldflags([
                 # The statically-linked profiling runtime depends on libzircon.
                 _flag_groups.link_zircon,
-            ]),
+            ]) + [
+                flag_group(
+                    flags = [
+                        "-Wl",
+                        "-dynamic-linker=coverage/ld.so.1",
+                    ],
+                ),
+            ],
         ),
     ],
 )
