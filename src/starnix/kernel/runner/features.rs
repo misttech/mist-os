@@ -234,7 +234,7 @@ pub fn run_container_features(
         remote_block_device_init(locked, system_task);
     }
     if features.network_manager {
-        if let Err(e) = kernel.network_manager.init() {
+        if let Err(e) = kernel.network_manager.init(kernel) {
             log_error!("Network manager initialization failed: ({e:?})");
         }
     }

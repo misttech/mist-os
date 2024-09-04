@@ -3,9 +3,12 @@
 // found in the LICENSE file.
 
 use crate::fs::nmfs::NetworkMessage;
+use crate::task::Kernel;
 use bstr::BString;
 use fuchsia_component::client::connect_to_protocol_sync;
 use fuchsia_inspect_derive::{IValue, Inspect, Unit, WithInspect};
+use futures::channel::{mpsc, oneshot};
+use futures::{FutureExt as _, StreamExt as _};
 use once_cell::sync::OnceCell;
 use starnix_logging::{log_error, log_info};
 use starnix_sync::{Mutex, MutexGuard};
@@ -21,11 +24,11 @@ use {fidl_fuchsia_netpol_socketproxy as fnp_socketproxy, fuchsia_zircon as zx};
 /// Manager for communicating network properties.
 #[derive(Inspect, Default)]
 pub(crate) struct NetworkManager {
-    // TODO(https://fxbug.dev/348639637): Change this to a Mutex-wrapped
-    // Option so that the proxy can be re-initialized.
-    starnix_networks: OnceCell<fnp_socketproxy::StarnixNetworksSynchronousProxy>,
+    starnix_networks: Mutex<Option<fnp_socketproxy::StarnixNetworksSynchronousProxy>>,
     // Timeout for thread-blocking calls to the socketproxy.
     proxy_timeout: zx::Duration,
+    // Sender for requests to initiate a socketproxy reconnect.
+    initiate_reconnect_sender: OnceCell<mpsc::Sender<()>>,
     #[inspect(forward)]
     inner: Mutex<IValue<NetworkManagerInner>>,
 }
@@ -42,6 +45,8 @@ struct NetworkManagerInner {
     added_networks: SeenSentData,
     updated_networks: SeenSentData,
     removed_networks: SeenSentData,
+    attempted_reconnects: u64,
+    successful_reconnects: u64,
 }
 
 #[derive(Unit, Default)]
@@ -70,23 +75,30 @@ impl NetworkManagerHandle {
     }
 
     /// Initialize the connection to the socketproxy.
-    pub fn init(&self) -> Result<(), anyhow::Error> {
-        self.0.init()
+    pub fn init(&self, kernel: &Arc<Kernel>) -> Result<(), anyhow::Error> {
+        self.0.init(kernel)
     }
 }
 
+// The functions that propagate calls to the socketproxy prioritize maintaining
+// a correct version of local state and logging an error if the socketproxy
+// state is not aligned. By maintaining a Map of network properties
+// `NetworkManager` can replay the networks to the socketproxy in the case of
+// the component restarting.
 impl NetworkManager {
-    fn init(&self) -> Result<(), anyhow::Error> {
+    fn init(&self, kernel: &Arc<Kernel>) -> Result<(), anyhow::Error> {
         let starnix_networks =
             connect_to_protocol_sync::<fnp_socketproxy::StarnixNetworksMarker>()?;
+        let (sender, receiver) = mpsc::channel::<()>(1);
 
-        self.starnix_networks
-            .set(starnix_networks)
-            .expect("Starnix Networks should be uninitialized");
+        let _ = self.starnix_networks.lock().replace(starnix_networks);
+        self.initiate_reconnect_sender.set(sender).expect("init should only be called once");
+        spawn_reconnection_thread(kernel, receiver);
 
         Ok(())
     }
 
+    // Locks and returns the inner state of the manager.
     fn lock(&self) -> MutexGuard<'_, IValue<NetworkManagerInner>> {
         self.inner.lock()
     }
@@ -117,6 +129,38 @@ impl NetworkManager {
         network_info.into_bytes().into()
     }
 
+    // The state between the Manager and the socketproxy is
+    // inconsistent. Attempt a reconnect in order to reset the
+    // socketproxy's network state.
+    fn trigger_reconnect(&self) {
+        match self.initiate_reconnect_sender.get() {
+            Some(sender) => {
+                let mut sender_mut = sender.clone();
+                if let Err(e) = sender_mut.try_send(()) {
+                    if e.is_full() {
+                        log_info!(
+                            "Ignoring reconnection request, \
+                            reconnection already ongoing"
+                        );
+                    }
+
+                    if e.is_disconnected() {
+                        panic!(
+                            "Channel disconnected; system is in \
+                            unrecoverable state"
+                        )
+                    }
+                }
+            }
+            None => {
+                // Do nothing, the sender wasn't set. The socketproxy is not enabled.
+                // Realistically, this only gets hit in tests because
+                // `NetworkManager::ProxyNotInitialized` gets returned when the proxy does
+                // not exist, not a socketproxy-specific error.
+            }
+        }
+    }
+
     // Set the default network identifier. Propagate the change to the
     // socketproxy when present.
     pub(crate) fn set_default_network_id(&self, network_id: Option<u32>) {
@@ -142,6 +186,7 @@ impl NetworkManager {
                 log_error!(
                     "Failed to set network with id {network_id:?} as default in socketproxy; {e:?}"
                 );
+                self.trigger_reconnect();
             }
         }
     }
@@ -197,7 +242,7 @@ impl NetworkManager {
 
         // Only log when there is an internal proxy error. The `ProxyNotInitialized`
         // variant likely means that the `network_manager` feature is disabled.
-        match self.fidl_add_network((&network).into()) {
+        match self.fidl_add_network(&fnp_socketproxy::Network::from(&network)) {
             Ok(()) => {
                 log_info!("Successfully added network with id {} to socketproxy", network.netid);
                 let mut inner_guard = self.lock();
@@ -205,7 +250,11 @@ impl NetworkManager {
             }
             Err(NetworkManagerError::ProxyNotInitialized) => {}
             Err(e) => {
-                log_error!("Failed to add network with id {} to socketproxy; {e:?}", network.netid);
+                log_error!(
+                    "Failed to add network with id {:?} to socketproxy; {e:?}",
+                    network.netid
+                );
+                self.trigger_reconnect();
             }
         }
 
@@ -239,7 +288,7 @@ impl NetworkManager {
 
         // Only log when there is an internal proxy error. The `ProxyNotInitialized`
         // variant likely means that the `network_manager` feature is disabled.
-        match self.fidl_update_network((&network).into()) {
+        match self.fidl_update_network(&fnp_socketproxy::Network::from(&network)) {
             Ok(()) => {
                 log_info!("Successfully updated network with id {} in socketproxy", network.netid);
                 let mut inner_guard = self.lock();
@@ -251,6 +300,7 @@ impl NetworkManager {
                     "Failed to update network with id {} in socketproxy; {e:?}",
                     network.netid
                 );
+                self.trigger_reconnect();
             }
         }
 
@@ -291,25 +341,52 @@ impl NetworkManager {
             Err(NetworkManagerError::ProxyNotInitialized) => {}
             Err(e) => {
                 log_error!("Failed to remove network with id {network_id} in socketproxy; {e:?}");
+                self.trigger_reconnect();
             }
         }
         Ok(())
     }
-}
 
-// The functions that propagate calls to the socketproxy prioritize maintaining
-// a correct version of local state and logging an error if the socketproxy
-// state is not aligned. By maintaining a Map of network properties
-// `NetworkManager` can replay the networks to the socketproxy in the case of
-// the component restarting.
-impl NetworkManager {
-    fn starnix_networks(
-        &self,
-    ) -> Result<&fnp_socketproxy::StarnixNetworksSynchronousProxy, NetworkManagerError> {
-        match self.starnix_networks.get() {
-            Some(p) => Ok(p),
-            None => Err(NetworkManagerError::ProxyNotInitialized),
+    // Transmit the current network status to the socketproxy as a sequence of
+    // events. The only events types sent are `add_network` and
+    // `set_default_network_id`. If the default network is set,
+    // `set_default_network_id` will be the last event transmitted. This
+    // function holds the lock on `inner` so that all events can get sent in
+    // a single batch to the socketproxy without interleaving.
+    //
+    // An error will be returned on the first event that is not
+    // transmitted successfully.
+    pub(crate) fn replay_network_events(&self) -> Result<(), NetworkManagerError> {
+        let mut inner_guard = self.lock();
+        let mut inner = inner_guard.as_mut();
+
+        let fidl_events: Vec<fnp_socketproxy::Network> = inner
+            .networks
+            .values()
+            .filter_map(|network| match network {
+                // Intentionally use a `match` instead of a `map`
+                // to avoid the need to clone `network`.
+                Some(network) => Some(network.into()),
+                None => None,
+            })
+            .collect();
+
+        // This cannot be combined with the above statements due to
+        // this block needing mutable access to `inner`.
+        fidl_events.iter().try_for_each(|network| {
+            let res = self.fidl_add_network(network);
+            if res.is_ok() {
+                inner.added_networks.sent += 1;
+            }
+            res
+        })?;
+
+        if let Some(id) = inner.default_id {
+            self.fidl_set_default_network_id(Some(id))?;
+            inner.default_ids_set.sent += 1;
         }
+
+        Ok(())
     }
 
     // Call `set_default` on `StarnixNetworks`.
@@ -317,7 +394,8 @@ impl NetworkManager {
         &self,
         network_id: Option<u32>,
     ) -> Result<(), NetworkManagerError> {
-        let starnix_networks = self.starnix_networks()?;
+        let binding = self.starnix_networks.lock();
+        let starnix_networks = binding.as_ref().ok_or(NetworkManagerError::ProxyNotInitialized)?;
         let network_id = match network_id {
             Some(id) => fidl_fuchsia_posix_socket::OptionalUint32::Value(id),
             None => {
@@ -331,25 +409,152 @@ impl NetworkManager {
     // Call `add` on `StarnixNetworks`.
     fn fidl_add_network(
         &self,
-        network: fnp_socketproxy::Network,
+        network: &fnp_socketproxy::Network,
     ) -> Result<(), NetworkManagerError> {
-        let starnix_networks = self.starnix_networks()?;
-        Ok(starnix_networks.add(&network, zx::MonotonicTime::after(self.proxy_timeout))??)
+        let binding = self.starnix_networks.lock();
+        let starnix_networks = binding.as_ref().ok_or(NetworkManagerError::ProxyNotInitialized)?;
+        Ok(starnix_networks.add(&network, zx::Time::after(self.proxy_timeout))??)
     }
 
     // Call `update` on `StarnixNetworks`.
     fn fidl_update_network(
         &self,
-        network: fnp_socketproxy::Network,
+        network: &fnp_socketproxy::Network,
     ) -> Result<(), NetworkManagerError> {
-        let starnix_networks = self.starnix_networks()?;
-        Ok(starnix_networks.update(&network, zx::MonotonicTime::after(self.proxy_timeout))??)
+        let binding = self.starnix_networks.lock();
+        let starnix_networks = binding.as_ref().ok_or(NetworkManagerError::ProxyNotInitialized)?;
+        Ok(starnix_networks.update(&network, zx::Time::after(self.proxy_timeout))??)
     }
 
     // Call `remove` on `StarnixNetworks`.
     fn fidl_remove_network(&self, network_id: &u32) -> Result<(), NetworkManagerError> {
-        let starnix_networks = self.starnix_networks()?;
-        Ok(starnix_networks.remove(*network_id, zx::MonotonicTime::after(self.proxy_timeout))??)
+        let binding = self.starnix_networks.lock();
+        let starnix_networks = binding.as_ref().ok_or(NetworkManagerError::ProxyNotInitialized)?;
+        Ok(starnix_networks.remove(*network_id, zx::Time::after(self.proxy_timeout))??)
+    }
+}
+
+fn spawn_reconnection_thread(
+    kernel: &Arc<Kernel>,
+    initiate_reconnect_receiver: mpsc::Receiver<()>,
+) {
+    let handle = kernel.network_manager.clone();
+    kernel.kthreads.spawn_future(async move {
+        // Channel to handle requests to re-connect the socketproxy proxy.
+        // The oneshot response will permit the reconnection loop to `replay_network_events`.
+        let (sender, mut receiver) = mpsc::channel::<oneshot::Sender<bool>>(1);
+
+        let mut reconnect_fut = std::pin::pin!(reconnect_to_proxy_loop(handle.clone(), sender, initiate_reconnect_receiver).fuse());
+        loop {
+            futures::select! {
+                _ = reconnect_fut => unreachable!("Reconnect thread should never complete"),
+                oneshot_sender = receiver.select_next_some() => {
+                    let did_reset_proxy = match connect_to_protocol_sync::<fnp_socketproxy::StarnixNetworksMarker>() {
+                        Ok(starnix_networks) => {
+                            let _ = handle.0.starnix_networks.lock().replace(starnix_networks);
+                            true
+                        },
+                        Err(e) => {
+                            log_error!("Failed to reconnect to proxy: {e:?}");
+                            false
+                        }
+                    };
+                    match oneshot_sender.send(did_reset_proxy) {
+                        Ok(()) => {},
+                        Err(_) => log_error!("Receiver end was dropped"),
+                    };
+                }
+            }
+        }
+    });
+}
+
+async fn reconnect_to_proxy_loop(
+    handle: NetworkManagerHandle,
+    mut sender: mpsc::Sender<oneshot::Sender<bool>>,
+    mut initiate_reconnect_receiver: mpsc::Receiver<()>,
+) {
+    // The amount of time the thread should wait until it attempts to reconnect
+    // to the socketproxy protocol and replay the network events.
+    let mut reconnect_delay = zx::Duration::from_seconds(0);
+    // Each time this stream yields, attempt to reconnect to the proxy and replay events.
+    let mut reconnect_futures = futures::stream::FuturesUnordered::new();
+    loop {
+        futures::select! {
+            _ = initiate_reconnect_receiver.select_next_some() => {
+                // Only act on the initiate request when there is not already an
+                // ongoing attempt to reconnect to the socketproxy.
+                if reconnect_futures.is_empty() {
+                    log_info!("Attempting to reconnect to socketproxy");
+                    reconnect_futures.push(fuchsia_async::Interval::new(reconnect_delay).into_future())
+                }
+            }
+            _ = reconnect_futures.select_next_some() => {
+                {
+                    let mut inner_guard = handle.0.lock();
+                    let mut inner = inner_guard.as_mut();
+                    inner.attempted_reconnects += 1;
+                }
+                // Initiate a proxy reconnection to StarnixNetworks.
+                let (reconnect_sender, reconnect_receiver) = oneshot::channel::<bool>();
+                if let Err(e) = sender.try_send(reconnect_sender) {
+                    log_error!("Failed to send message to initiate proxy reconnect: {e:?}");
+                        reconnect_delay += zx::Duration::from_seconds(1);
+                        reconnect_futures.push(fuchsia_async::Interval::new(reconnect_delay).into_future());
+                        continue;
+                }
+
+                match reconnect_receiver.await {
+                    Ok(true) => {
+                        // Proxy was reset successfully. Replay network events.
+                    }
+                    Ok(false) | Err(_) => {
+                        log_error!("Unsucessfully re-connected proxy. Re-attempting \
+                            in {reconnect_delay:?}...");
+                        reconnect_delay += zx::Duration::from_seconds(1);
+                        reconnect_futures.push(fuchsia_async::Interval::new(reconnect_delay).into_future());
+                        continue;
+                    }
+                }
+
+                match handle.0.replay_network_events() {
+                    Ok(()) => {
+                        log_info!("Successfully reconnected to socketproxy and replayed events");
+                        // On success, reset `reconnect_delay` to the initial delay period.
+                        reconnect_delay = zx::Duration::from_seconds(0);
+                        {
+                            let mut inner_guard = handle.0.lock();
+                            let mut inner = inner_guard.as_mut();
+                            inner.successful_reconnects += 1;
+                        }
+                    }
+                    Err(e) => {
+                        // On failure, re-attempt to connect to the socketproxy in
+                        // `reconnect_delay` seconds.
+                        match e {
+                            NetworkManagerError::Fidl(fidl_error) => {
+                                log_error!("On replay, received FIDL error: {fidl_error:?}. \
+                                    Re-attempting in {reconnect_delay:?}...");
+                            }
+                            NetworkManagerError::Add(_) |
+                            NetworkManagerError::SetDefault(_) => {
+                                log_error!("On replay, socket proxy responded but states are \
+                                    irreconcilable: {e:?}. Re-attempting in {reconnect_delay:?}...");
+                            }
+                            NetworkManagerError::ProxyNotInitialized |
+                            NetworkManagerError::Remove(_) |
+                            NetworkManagerError::Update(_) => {
+                                unreachable!("responses not possible from `replay_network_events`");
+                            }
+                        }
+                        reconnect_delay += zx::Duration::from_seconds(1);
+                        reconnect_futures.push(
+                            fuchsia_async::Interval::new(reconnect_delay).into_future()
+                        );
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -400,8 +605,8 @@ mod tests {
     use super::*;
 
     use assert_matches::assert_matches;
-    use diagnostics_assertions::assert_data_tree;
-    use futures::StreamExt as _;
+    use diagnostics_assertions::{assert_data_tree, tree_assertion};
+    use fuchsia_inspect::DiagnosticsHierarchyGetter;
     use starnix_uapi::{EEXIST, ENOENT, EPERM};
     use test_case::test_case;
 
@@ -656,7 +861,7 @@ mod tests {
         // Remove the first network as it is no longer the default network.
         assert_matches!(manager.remove_network(network1.netid), Ok(()));
         assert_data_tree!(inspector, root: {
-            nmfs: {
+            nmfs: contains {
                 default_ids_set: {
                     seen: 2u64,
                     sent: 0u64,
@@ -671,6 +876,40 @@ mod tests {
                 },
                 removed_networks: {
                     seen: 1u64,
+                    sent: 0u64,
+                },
+            },
+        });
+    }
+
+    #[::fuchsia::test]
+    fn replay_network_events() {
+        let inspector = fuchsia_inspect::Inspector::default();
+        let manager = NetworkManagerHandle::new_with_inspect(inspector.root());
+
+        // If there aren't any networks in the Manager, replay should succeed
+        // even if the socketproxy isn't initialized.
+        assert_matches!(manager.0.replay_network_events(), Ok(()));
+
+        // Manually insert a network to simulate this network
+        // already existing in the Manager.
+        {
+            let mut inner = manager.0.lock();
+            let network_id = 1;
+            let _ = inner
+                .as_mut()
+                .networks
+                .insert(network_id, Some(test_network_message_from_id(network_id)));
+        }
+
+        assert_matches!(
+            manager.0.replay_network_events(),
+            Err(NetworkManagerError::ProxyNotInitialized)
+        );
+        assert_data_tree!(inspector, root: {
+            nmfs: contains {
+                added_networks: {
+                    seen: 0u64,
                     sent: 0u64,
                 },
             },
@@ -693,13 +932,21 @@ mod tests {
     fn setup_proxy(
         inspect_node: &fuchsia_inspect::Node,
         results: Vec<Result<(), NetworkManagerError>>,
+        initiate_reconnect_sender: Option<mpsc::Sender<()>>,
     ) -> NetworkManagerHandle {
         let manager = create_test_network_manager_handle(inspect_node);
         let (proxy, mut stream) = fidl::endpoints::create_sync_proxy_and_stream::<
             fnp_socketproxy::StarnixNetworksMarker,
         >()
         .unwrap();
-        manager.0.starnix_networks.set(proxy).expect("Starnix Networks should be uninitialized");
+        let _ = manager.0.starnix_networks.lock().replace(proxy);
+        if let Some(sender) = initiate_reconnect_sender {
+            manager
+                .0
+                .initiate_reconnect_sender
+                .set(sender)
+                .expect("setup_proxy should only be called once");
+        }
 
         let mut results = results.into_iter();
         fuchsia_async::Task::spawn(async move {
@@ -779,7 +1026,7 @@ mod tests {
         expected_data: SeenSentData,
     ) {
         let inspector = fuchsia_inspect::Inspector::default();
-        let manager = &setup_proxy(inspector.root(), results).0;
+        let manager = &setup_proxy(inspector.root(), results, None).0;
 
         manager.set_default_network_id(Some(1));
         assert_eq!(manager.get_default_network_id(), Some(1));
@@ -788,7 +1035,7 @@ mod tests {
         assert_eq!(manager.get_default_network_id(), Some(2));
 
         assert_data_tree!(inspector, root: {
-            nmfs: {
+            nmfs: contains {
                 default_ids_set: {
                     seen: expected_data.seen,
                     sent: expected_data.sent,
@@ -832,7 +1079,7 @@ mod tests {
         expected_data: SeenSentData,
     ) {
         let inspector = fuchsia_inspect::Inspector::default();
-        let manager = &setup_proxy(inspector.root(), results).0;
+        let manager = &setup_proxy(inspector.root(), results, None).0;
 
         // `add_network` returns Ok(()) as long as the network
         // addition is applied locally, regardless of if the call
@@ -844,7 +1091,7 @@ mod tests {
         assert_matches!(manager.add_network(network2.clone()), Ok(()));
 
         assert_data_tree!(inspector, root: {
-            nmfs: {
+            nmfs: contains {
                 default_ids_set: {
                     seen: 0u64,
                     sent: 0u64,
@@ -888,7 +1135,7 @@ mod tests {
         expected_data: SeenSentData,
     ) {
         let inspector = fuchsia_inspect::Inspector::default();
-        let manager = &setup_proxy(inspector.root(), results).0;
+        let manager = &setup_proxy(inspector.root(), results, None).0;
 
         let network_id = 1;
         let network = test_network_message_from_id(network_id);
@@ -908,7 +1155,7 @@ mod tests {
         assert_matches!(manager.update_network(network), Ok(()));
 
         assert_data_tree!(inspector, root: {
-            nmfs: {
+            nmfs: contains {
                 default_ids_set: {
                     seen: 0u64,
                     sent: 0u64,
@@ -943,7 +1190,7 @@ mod tests {
         expected_data: SeenSentData,
     ) {
         let inspector = fuchsia_inspect::Inspector::default();
-        let manager = &setup_proxy(inspector.root(), results).0;
+        let manager = &setup_proxy(inspector.root(), results, None).0;
 
         let network_id = 1;
         let network = test_network_message_from_id(network_id);
@@ -960,7 +1207,7 @@ mod tests {
         assert_matches!(manager.remove_network(network_id), Ok(()));
 
         assert_data_tree!(inspector, root: {
-            nmfs: {
+            nmfs: contains {
                 default_ids_set: {
                     seen: 0u64,
                     sent: 0u64,
@@ -1008,7 +1255,7 @@ mod tests {
             // Network removed from Manager and from socketproxy.
             Ok(()),
         ];
-        let manager = &setup_proxy(inspector.root(), results).0;
+        let manager = &setup_proxy(inspector.root(), results, None).0;
 
         // Add a network that doesn't get sent to the socketproxy.
         let network1 = test_network_message_from_id(1);
@@ -1109,7 +1356,7 @@ mod tests {
         // Remove a network that gets sent to the socketproxy.
         assert_matches!(manager.remove_network(2), Ok(()));
         assert_data_tree!(inspector, root: {
-            nmfs: {
+            nmfs: contains {
                 default_ids_set: {
                     seen: 3u64,
                     sent: 2u64,
@@ -1128,5 +1375,166 @@ mod tests {
                 },
             },
         });
+    }
+
+    // Assumes that all networks get added successfully to the socketproxy. The
+    // parameter toggles whether the default id gets successfully set
+    // in the socketproxy.
+    #[test_case(Ok(()), SeenSentData { seen: 0, sent: 1 }; "success")]
+    #[test_case(
+        Err(NetworkManagerError::SetDefault(fnp_socketproxy::NetworkRegistrySetDefaultError::NotFound)),
+        SeenSentData { seen: 0, sent: 0 };
+        "failed_setting_default"
+    )]
+    #[::fuchsia::test(threads = 2)]
+    async fn replay_network_events_with_proxy(
+        last_event_result: Result<(), NetworkManagerError>,
+        default_id_data: SeenSentData,
+    ) {
+        let inspector = fuchsia_inspect::Inspector::default();
+        let results = vec![Ok(()), Ok(()), last_event_result.clone()];
+        let manager = &setup_proxy(inspector.root(), results, None).0;
+
+        // If there aren't any networks in the Manager, replay should succeed.
+        assert_matches!(manager.replay_network_events(), Ok(()));
+
+        // Manually insert the networks to simulate these networks
+        // already existing in the Manager.
+        {
+            let mut inner = manager.lock();
+            let mut inner = inner.as_mut();
+            let network_id1 = 1;
+            let _ =
+                inner.networks.insert(network_id1, Some(test_network_message_from_id(network_id1)));
+            let network_id2 = 2;
+            let _ =
+                inner.networks.insert(network_id2, Some(test_network_message_from_id(network_id2)));
+            let _ = inner.default_id = Some(network_id2);
+        }
+
+        let replay_result = manager.replay_network_events();
+        match last_event_result {
+            Ok(_) => assert_matches!(replay_result, Ok(())),
+            Err(_) => assert_matches!(
+                replay_result,
+                Err(NetworkManagerError::SetDefault(
+                    fnp_socketproxy::NetworkRegistrySetDefaultError::NotFound
+                ))
+            ),
+        }
+        // `added_networks.seen` remains 0, as no new networks are added
+        // through the Manager, they are only sent to the socketproxy.
+        assert_data_tree!(inspector, root: {
+            nmfs: contains {
+                added_networks: {
+                    seen: 0u64,
+                    sent: 2u64,
+                },
+                default_ids_set: {
+                    seen: default_id_data.seen,
+                    sent: default_id_data.sent,
+                },
+            },
+        });
+    }
+
+    fn spawn_reconnection_thread_for_test(
+        handle: NetworkManagerHandle,
+        initiate_reconnect_receiver: mpsc::Receiver<()>,
+    ) {
+        fuchsia_async::Task::spawn(async move {
+            // Channel to handle requests to re-connect the socketproxy proxy.
+            // The oneshot response will permit the reconnection loop to `replay_network_events`.
+            let (sender, mut receiver) = mpsc::channel::<oneshot::Sender<bool>>(1);
+
+            let mut reconnect_fut = std::pin::pin!(reconnect_to_proxy_loop(
+                handle.clone(),
+                sender,
+                initiate_reconnect_receiver
+            )
+            .fuse());
+            loop {
+                futures::select! {
+                    _ = reconnect_fut => unreachable!("Reconnect thread should never complete"),
+                    oneshot_sender = receiver.select_next_some() => {
+                        // Respond `true` as if the proxy was replaced.
+                        oneshot_sender.send(true).expect("Receiver end was dropped");
+                    }
+                }
+            }
+        })
+        .detach();
+    }
+
+    // This test requires 3 threads. One for the main thread, one for mocking
+    // the proxy responses, and one for handling the socketproxy reconnection.
+    #[::fuchsia::test(threads = 3)]
+    async fn replay_network_events_with_reconnect_thread() {
+        let inspector = fuchsia_inspect::Inspector::default();
+        let results: Vec<Result<(), NetworkManagerError>> = vec![
+            // Network added to Manager and socketproxy.
+            Ok(()),
+            // Network set as default in Manager, but socketproxy responds
+            // with an error, triggering a reconnect to reset the state.
+            Err(NetworkManagerError::SetDefault(
+                fnp_socketproxy::NetworkRegistrySetDefaultError::NotFound,
+            )),
+            // Network added to socketproxy via network replay.
+            Ok(()),
+            // Default network set in socketproxy via network replay.
+            Ok(()),
+        ];
+        let (initiate_reconnect_sender, initiate_reconnect_receiver) = mpsc::channel(1);
+        let manager = setup_proxy(inspector.root(), results, Some(initiate_reconnect_sender));
+        spawn_reconnection_thread_for_test(manager.clone(), initiate_reconnect_receiver);
+        let manager = &manager.0;
+
+        // Add a network.
+        let network_id = 1;
+        let network = test_network_message_from_id(network_id);
+        assert_matches!(manager.add_network(network.clone()), Ok(()));
+        assert_data_tree!(inspector, root: {
+            nmfs: contains {
+                added_networks: {
+                    seen: 1u64,
+                    sent: 1u64,
+                },
+            },
+        });
+
+        // Set the default network and act like it isn't known to the socketproxy.
+        // This will initiate a reconnect to the proxy and the state to be reset.
+        manager.set_default_network_id(Some(network_id));
+        assert_data_tree!(inspector, root: {
+            nmfs: contains {
+                default_ids_set: {
+                    seen: 1u64,
+                    sent: 0u64,
+                },
+            },
+        });
+
+        // During this period `replay_network_events()` should be called from
+        // another thread and the inspect values should be updated.
+        // Use `TreeAssertion` instead of a macro to query the inspect tree in
+        // a loop without triggering an error and failing the test.
+        let assertion = tree_assertion!(root: {
+            nmfs: contains {
+                attempted_reconnects: 1u64,
+                successful_reconnects: 1u64,
+                added_networks: {
+                    seen: 1u64,
+                    sent: 2u64,
+                },
+                default_ids_set: {
+                    seen: 1u64,
+                    sent: 1u64,
+                },
+            },
+        });
+
+        while assertion.run(&inspector.get_diagnostics_hierarchy()).is_err() {
+            // Loop until the other thread updates the inspect values
+        }
     }
 }
