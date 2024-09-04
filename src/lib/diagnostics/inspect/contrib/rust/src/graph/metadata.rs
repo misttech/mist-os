@@ -285,6 +285,17 @@ impl EdgeGraphMetadata {
     pub(crate) fn id(&self) -> u64 {
         self.inner.id
     }
+
+    pub(crate) fn noop(id: <EdgeMarker as GraphObject>::Id) -> EdgeGraphMetadata {
+        Self {
+            inner: GraphMetadata {
+                id,
+                map: BTreeMap::default(),
+                events_tracker: None,
+                node: inspect::Node::default(),
+            },
+        }
+    }
 }
 
 #[derive(Debug)]

@@ -661,7 +661,7 @@ impl Topology {
             .borrow_mut()
             .entry(rq_id.clone())
             .or_insert_with(|| {
-                let dp_vertex = dp.inspect_vertex.borrow();
+                let mut dp_vertex = dp.inspect_vertex.borrow_mut();
                 let mut rq_vertex = rq.inspect_vertex.borrow_mut();
                 dp_vertex.add_edge(
                     &mut rq_vertex,

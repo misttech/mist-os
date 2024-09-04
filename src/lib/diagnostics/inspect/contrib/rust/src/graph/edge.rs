@@ -6,13 +6,15 @@ use super::events::GraphObjectEventTracker;
 use super::types::{EdgeMarker, VertexId};
 use super::{EdgeGraphMetadata, Metadata, Vertex};
 use fuchsia_inspect as inspect;
+use fuchsia_sync::{RwLock, RwLockWriteGuard};
+use std::ops::{Deref, DerefMut};
 use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::{Arc, Weak};
 
 /// An Edge in the graph.
 #[derive(Debug)]
 pub struct Edge {
-    metadata: EdgeGraphMetadata,
-    weak_node: inspect::Node,
+    state: Arc<RwLock<EdgeState>>,
 }
 
 static NEXT_ID: AtomicU64 = AtomicU64::new(0);
@@ -44,28 +46,91 @@ impl Edge {
             );
             (node, metadata)
         });
-        // We store the REAL Node in the incoming edges and return an Edge holding a weak reference
-        // to this real node. The reason to do this is that we want to drop the Inspect node
-        // associated with an Edge when any of the two vertices are dropped.
-        let weak_node = node.clone_weak();
-        to.incoming_edges.insert(from.internal_id, node);
-        Self { metadata, weak_node }
+        let state = Arc::new(RwLock::new(EdgeState::Active { metadata, _node: node }));
+        Self { state }
     }
 
     /// Get an exclusive reference to the metadata to modify it.
-    pub fn meta(&mut self) -> &mut EdgeGraphMetadata {
-        &mut self.metadata
+    pub fn meta(&mut self) -> EdgeGraphMetadataRef<'_> {
+        let lock = self.state.write();
+        EdgeGraphMetadataRef { lock }
     }
 
     pub(crate) fn id(&self) -> u64 {
-        self.metadata.id()
+        self.state.read().metadata().id()
+    }
+
+    pub(crate) fn weak_ref(&self) -> WeakEdgeRef {
+        WeakEdgeRef(Arc::downgrade(&self.state))
+    }
+}
+
+pub struct EdgeGraphMetadataRef<'a> {
+    lock: RwLockWriteGuard<'a, EdgeState>,
+}
+
+impl<'a> Deref for EdgeGraphMetadataRef<'a> {
+    type Target = EdgeGraphMetadata;
+
+    fn deref(&self) -> &Self::Target {
+        self.lock.metadata()
+    }
+}
+
+impl<'a> DerefMut for EdgeGraphMetadataRef<'a> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        self.lock.metadata_mut()
+    }
+}
+
+#[derive(Debug)]
+enum EdgeState {
+    Active { metadata: EdgeGraphMetadata, _node: inspect::Node },
+    Gone { metadata: EdgeGraphMetadata },
+}
+
+impl EdgeState {
+    pub fn mark_as_gone(&mut self) {
+        match self {
+            Self::Active { metadata, .. } => {
+                let id = metadata.id();
+                *self = Self::Gone { metadata: EdgeGraphMetadata::noop(id) };
+            }
+            Self::Gone { .. } => {}
+        }
+    }
+
+    fn metadata_mut(&mut self) -> &mut EdgeGraphMetadata {
+        match self {
+            EdgeState::Active { metadata, .. } | EdgeState::Gone { metadata, .. } => metadata,
+        }
+    }
+
+    fn metadata(&self) -> &EdgeGraphMetadata {
+        match self {
+            EdgeState::Active { metadata, .. } | EdgeState::Gone { metadata, .. } => &metadata,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct WeakEdgeRef(Weak<RwLock<EdgeState>>);
+
+impl WeakEdgeRef {
+    pub fn mark_as_gone(&self) {
+        if let Some(value) = self.0.upgrade() {
+            value.write().mark_as_gone();
+        }
+    }
+
+    pub fn is_valid(&self) -> bool {
+        self.0.upgrade().map(|v| matches!(*v.read(), EdgeState::Active { .. })).unwrap_or(false)
     }
 }
 
 impl Drop for Edge {
     fn drop(&mut self) {
-        self.weak_node.forget();
-        if let Some(ref events_tracker) = self.metadata.events_tracker() {
+        if let Some(ref events_tracker) = self.state.read().metadata().events_tracker() {
             events_tracker.record_removed(self.id());
         }
     }

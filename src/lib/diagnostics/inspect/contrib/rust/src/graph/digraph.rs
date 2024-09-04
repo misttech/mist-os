@@ -68,6 +68,10 @@ where
 mod tests {
     use super::*;
     use diagnostics_assertions::{assert_data_tree, AnyProperty};
+    use fuchsia_inspect::reader::snapshot::Snapshot;
+    use fuchsia_inspect::Inspector;
+    use inspect_format::{BlockIndex, BlockType};
+    use std::collections::BTreeSet;
 
     #[fuchsia::test]
     fn test_simple_graph() {
@@ -77,7 +81,7 @@ mod tests {
         let graph = Digraph::new(inspector.root(), DigraphOpts::default());
 
         // Create a new node with some properties.
-        let vertex_foo = graph
+        let mut vertex_foo = graph
             .add_vertex("element-1", [Metadata::new("name", "foo"), Metadata::new("level", 1u64)]);
 
         let mut vertex_bar = graph
@@ -422,7 +426,7 @@ mod tests {
         let graph = Digraph::new(inspector.root(), DigraphOpts::default());
 
         // Create a new node with some properties.
-        let vertex_one = graph.add_vertex("test-node-1", []);
+        let mut vertex_one = graph.add_vertex("test-node-1", []);
         let mut vertex_two = graph.add_vertex("test-node-2", []);
         let mut edge = vertex_one.add_edge(
             &mut vertex_two,
@@ -552,10 +556,10 @@ mod tests {
         let inspector = inspect::Inspector::default();
         let graph = Digraph::new(inspector.root(), DigraphOpts::default());
         let mut foo = graph.add_vertex("foo", [Metadata::new("hello", true)]);
-        let bar = graph.add_vertex("bar", [Metadata::new("hello", false)]);
+        let mut bar = graph.add_vertex("bar", [Metadata::new("hello", false)]);
         let mut baz = graph.add_vertex("baz", []);
 
-        let edge = bar.add_edge(&mut foo, [Metadata::new("hey", "hi")]);
+        let edge_foo = bar.add_edge(&mut foo, [Metadata::new("hey", "hi")]);
         let edge_to_baz = bar.add_edge(&mut baz, [Metadata::new("good", "bye")]);
 
         assert_data_tree!(inspector, root: {
@@ -573,7 +577,7 @@ mod tests {
                         },
                         "relationships": {
                             "foo": {
-                                "edge_id": edge.id(),
+                                "edge_id": edge_foo.id(),
                                 "meta": {
                                     hey: "hi",
                                 },
@@ -595,7 +599,7 @@ mod tests {
         });
 
         // Dropping an edge removes it from the graph, along with all properties.
-        drop(edge);
+        drop(edge_foo);
 
         assert_data_tree!(inspector, root: {
             "fuchsia.inspect.Graph": {
@@ -662,7 +666,7 @@ mod tests {
     fn drop_target_semantics() {
         let inspector = inspect::Inspector::default();
         let graph = Digraph::new(inspector.root(), DigraphOpts::default());
-        let vertex_one = graph.add_vertex("test-node-1", []);
+        let mut vertex_one = graph.add_vertex("test-node-1", []);
         let mut vertex_two = graph.add_vertex("test-node-2", []);
         let edge = vertex_one.add_edge(&mut vertex_two, []);
         assert_data_tree!(inspector, root: {
@@ -969,5 +973,88 @@ mod tests {
                 }
             }
         });
+    }
+
+    #[fuchsia::test]
+    fn validate_inspect_vmo_on_edge_drop() {
+        let inspector = inspect::Inspector::default();
+        let graph = Digraph::new(inspector.root(), DigraphOpts::default());
+        let mut vertex_a = graph.add_vertex("a", []);
+        let mut vertex_b = graph.add_vertex("b", []);
+
+        let blocks_before = non_free_blocks(&inspector);
+
+        // Creating an edge and dropping it, is a no-op operation on the blocks in the VMO. All of
+        // them should be gone.
+        let edge_a_b = vertex_a.add_edge(&mut vertex_b, [Metadata::new("src", "on")]);
+        drop(edge_a_b);
+
+        let blocks_after = non_free_blocks(&inspector);
+        assert_eq!(
+            blocks_after.symmetric_difference(&blocks_before).collect::<BTreeSet<_>>(),
+            BTreeSet::new()
+        );
+    }
+
+    #[fuchsia::test]
+    fn validate_inspect_vmo_on_dest_vertex_drop() {
+        let inspector = inspect::Inspector::default();
+        let graph = Digraph::new(inspector.root(), DigraphOpts::default());
+        let mut vertex_a = graph.add_vertex("a", []);
+
+        let initial_blocks = non_free_blocks(&inspector);
+
+        let mut vertex_b = graph.add_vertex("b", []);
+        let _edge_a_b = vertex_a.add_edge(&mut vertex_b, [Metadata::new("src", "on")]);
+
+        // Dropping the vertex should drop all of the edge and vertex_b blocks.
+        drop(vertex_b);
+
+        let after_blocks = non_free_blocks(&inspector);
+        // There should be no difference between the remaining blocks and the original ones before
+        // the operations executed.
+        assert_eq!(
+            after_blocks.symmetric_difference(&initial_blocks).collect::<BTreeSet<_>>(),
+            BTreeSet::new()
+        );
+    }
+
+    #[fuchsia::test]
+    fn validate_inspect_vmo_on_source_vertex_drop() {
+        let inspector = inspect::Inspector::default();
+        let graph = Digraph::new(inspector.root(), DigraphOpts::default());
+
+        let initial_blocks = non_free_blocks(&inspector);
+        let mut vertex_a = graph.add_vertex("a", []);
+
+        let before_blocks = non_free_blocks(&inspector);
+        let mut vertex_b = graph.add_vertex("b", []);
+        let vertex_b_blocks = non_free_blocks(&inspector)
+            .difference(&before_blocks)
+            .cloned()
+            .collect::<BTreeSet<_>>();
+
+        let _edge_a_b = vertex_a.add_edge(&mut vertex_b, [Metadata::new("src", "on")]);
+
+        // Dropping the vertex should drop all of the edge and vertex_a blocks, except for the
+        // blocks shared with vertex_b (for example string references for the strings "meta" and
+        // "relationships".
+        drop(vertex_a);
+
+        let mut expected = initial_blocks.union(&vertex_b_blocks).cloned().collect::<BTreeSet<_>>();
+        // These two blocks are expected, since they are the "meta" and "relationships" strings.
+        expected.insert((BlockIndex::new(14), BlockType::StringReference));
+        expected.insert((BlockIndex::new(16), BlockType::StringReference));
+        let after_blocks = non_free_blocks(&inspector);
+        assert_eq!(after_blocks, expected);
+    }
+
+    fn non_free_blocks(inspector: &Inspector) -> BTreeSet<(BlockIndex, BlockType)> {
+        let snapshot = Snapshot::try_from(inspector).unwrap();
+        snapshot
+            .scan()
+            .filter(|block| block.block_type() != BlockType::Free)
+            .map(|b| (b.index(), b.block_type()))
+            .collect::<BTreeSet<_>>()
     }
 }
