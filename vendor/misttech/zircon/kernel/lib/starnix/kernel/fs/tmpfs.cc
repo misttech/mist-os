@@ -6,10 +6,10 @@
 #include "lib/mistos/starnix/kernel/fs/tmpfs.h"
 
 #include <lib/fit/result.h>
-#include <lib/mistos/starnix/kernel/task/kernel.h>
-#include <lib/mistos/starnix/kernel/task/process_group.h>
-#include <lib/mistos/starnix/kernel/task/task.h>
-#include <lib/mistos/starnix/kernel/task/thread_group.h>
+#include <lib/mistos/starnix/kernel/vfs/dirent_sink.h>
+#include <lib/mistos/starnix/kernel/vfs/file_object.h>
+#include <lib/mistos/starnix/kernel/vfs/file_ops.h>
+#include <lib/mistos/starnix/kernel/vfs/fs_node.h>
 #include <lib/mistos/starnix/kernel/vfs/module.h>
 #include <lib/mistos/starnix/kernel/vfs/vmo_file.h>
 #include <lib/mistos/starnix_uapi/auth.h>
@@ -17,14 +17,42 @@
 #include <lib/mistos/starnix_uapi/file_mode.h>
 #include <lib/mistos/starnix_uapi/vfs.h>
 
-#include <string_view>
-
 #include <fbl/alloc_checker.h>
+#include <ktl/string_view.h>
 #include <ktl/unique_ptr.h>
+
+#include <ktl/enforce.h>
 
 #include <linux/magic.h>
 
 namespace starnix {
+
+namespace {
+
+struct TmpfsSpecialNode : public FsNodeOps {
+  MemoryXattrStorage xattrs;
+
+  /// impl TmpfsSpecialNode
+  static TmpfsSpecialNode* New() {
+    fbl::AllocChecker ac;
+    auto node = new (&ac) TmpfsSpecialNode();
+    ZX_ASSERT(ac.check());
+    return node;
+  }
+
+  /// impl FsNodeOps
+  fs_node_impl_dir_readonly;
+
+  fs_node_impl_xattr_delegate(xattrs);
+
+  fit::result<Errno, ktl::unique_ptr<FileOps>> create_file_ops(
+      /*FileOpsCore& locked,*/ const FsNode& node, const CurrentTask& current_task,
+      OpenFlags flags) final {
+    panic("Special nodes cannot be opened.\n");
+  }
+};
+
+}  // namespace
 
 FileSystemHandle TmpFs::new_fs(const fbl::RefPtr<Kernel>& kernel) {
   if (auto result = TmpFs::new_fs_with_options(kernel, {}); result.is_error()) {
@@ -42,27 +70,27 @@ fit::result<Errno, FileSystemHandle> TmpFs::new_fs_with_options(const fbl::RefPt
     return fit::error(errno(ENOMEM));
   }
 
-  auto fs = FileSystem::New(kernel, {CacheModeType::Permanent}, std::move(tmpfs), options);
-  fbl::HashTable<FsString, ktl::unique_ptr<fs_args::HashableFsString>> mount_options;
-  fs_args::generic_parse_mount_options(fs->options().params, &mount_options);
+  auto fs = FileSystem::New(kernel, {CacheModeType::Permanent}, ktl::move(tmpfs), options);
+  auto mount_options = fs->options().params;
 
   auto result = [&]() -> fit::result<Errno, FileMode> {
-    auto mode_str = mount_options.erase("mode");
+    auto mode_str = mount_options.remove("mode");
     if (mode_str) {
-      return FileMode::from_string({mode_str->value.data(), mode_str->value.size()});
+      return FileMode::from_string({mode_str->data(), mode_str->size()});
     } else {
       return fit::ok(FILE_MODE(IFDIR, 0777));
     }
   }();
+
   if (result.is_error()) {
     return result.take_error();
   }
   FileMode mode = result.value();
 
   auto result_uid = [&]() -> fit::result<Errno, uid_t> {
-    auto uid_str = mount_options.erase("uid");
+    auto uid_str = mount_options.remove("uid");
     if (uid_str) {
-      return fs_args::parse<uid_t>({uid_str->value.data(), uid_str->value.size()});
+      return parse<uid_t>({uid_str->data(), uid_str->size()});
     } else {
       return fit::ok(0);
     }
@@ -73,9 +101,9 @@ fit::result<Errno, FileSystemHandle> TmpFs::new_fs_with_options(const fbl::RefPt
   uid_t uid = result_uid.value();
 
   auto result_gid = [&]() -> fit::result<Errno, gid_t> {
-    auto gid_str = mount_options.erase("gid");
+    auto gid_str = mount_options.remove("gid");
     if (gid_str) {
-      return fs_args::parse<uid_t>({gid_str->value.data(), gid_str->value.size()});
+      return parse<uid_t>({gid_str->data(), gid_str->size()});
     } else {
       return fit::ok(0);
     }
@@ -93,20 +121,18 @@ fit::result<Errno, FileSystemHandle> TmpFs::new_fs_with_options(const fbl::RefPt
                                                     });
   fs->set_root_node(root_node);
 
-  /*
-  if !mount_options.is_empty() {
-      track_stub!(
-          TODO("https://fxbug.dev/322873419"),
-          "unknown tmpfs options, see logs for strings"
-      );
-      log_warn!(
-          "Unknown tmpfs options: {}",
-          itertools::join(mount_options.iter().map(|(k, v)| format!("{k}={v}")), ",")
-      );
+  if (!mount_options.is_empty()) {
+    /*track_stub!(
+        TODO("https://fxbug.dev/322873419"),
+        "unknown tmpfs options, see logs for strings"
+    );*/
+    /*log_warn!(
+        "Unknown tmpfs options: {}",
+        itertools::join(mount_options.iter().map(|(k, v)| format!("{k}={v}")), ",")
+    );*/
   }
-*/
 
-  return fit::ok(std::move(fs));
+  return fit::ok(ktl::move(fs));
 }
 
 fit::result<Errno, struct statfs> TmpFs::statfs(const FileSystem& fs,
@@ -118,6 +144,10 @@ fit::result<Errno, struct statfs> TmpFs::statfs(const FileSystem& fs,
   stat.f_bfree = 0x100000000;
   return fit::ok(stat);
 }
+
+const FsStr& TmpFs::name() { return name_; }
+
+TmpFs::~TmpFs() = default;
 
 TmpfsDirectory* TmpfsDirectory::New() {
   fbl::AllocChecker ac;
@@ -196,7 +226,7 @@ fit::result<Errno, FsNodeHandle> create_child_node(const CurrentTask& current_ta
     return fit::error(errno(EACCES));
   }
 
-  auto child = parent.fs()->create_node(current_task, std::move(ops),
+  auto child = parent.fs()->create_node(current_task, ktl::move(ops),
                                         [mode, owner, dev](ino_t id) -> FsNodeInfo {
                                           auto info = FsNodeInfo::New(id, mode, owner);
                                           info.rdev = dev;
@@ -210,13 +240,6 @@ fit::result<Errno, FsNodeHandle> create_child_node(const CurrentTask& current_ta
     /* child.write_guard_state.lock().enable_sealing(SealFlags::SEAL); */
   }
   return fit::ok(child);
-}
-
-TmpfsSpecialNode* TmpfsSpecialNode::New() {
-  fbl::AllocChecker ac;
-  auto node = new (&ac) TmpfsSpecialNode();
-  ZX_ASSERT(ac.check());
-  return node;
 }
 
 }  // namespace starnix

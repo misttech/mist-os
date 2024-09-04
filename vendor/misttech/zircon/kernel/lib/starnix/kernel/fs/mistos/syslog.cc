@@ -18,7 +18,7 @@ FileHandle SyslogFile::new_file(const CurrentTask& current_task) {
   fbl::AllocChecker ac;
   auto file = ktl::make_unique<SyslogFile>(&ac);
   ASSERT(ac.check());
-  return Anon::new_file(current_task, std::move(file), OpenFlags(OpenFlagsEnum::RDWR));
+  return Anon::new_file(current_task, ktl::move(file), OpenFlags(OpenFlagsEnum::RDWR));
 }
 
 }  // namespace starnix

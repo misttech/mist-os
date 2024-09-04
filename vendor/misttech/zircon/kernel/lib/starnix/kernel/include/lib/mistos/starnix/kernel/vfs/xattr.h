@@ -9,16 +9,38 @@
 #include <lib/fit/result.h>
 #include <lib/mistos/starnix/kernel/sync/locks.h>
 #include <lib/mistos/starnix/kernel/vfs/fs_args.h>
-#include <lib/mistos/starnix/kernel/vfs/fs_node.h>
-
-#include <vector>
+#include <lib/mistos/starnix/kernel/vfs/path.h>
 
 #include <fbl/intrusive_hash_table.h>
+#include <ktl/string_view.h>
+
+#include <linux/xattr.h>
 
 namespace starnix {
 
+enum class XattrOp {
+  Set,
+  Create,
+  Replace,
+};
+
+class XattrOpHelper {
+ public:
+  static uint32_t into_flags(XattrOp op) {
+    switch (op) {
+      case XattrOp::Set:
+        return 0;
+      case XattrOp::Create:
+        return XATTR_CREATE;
+      case XattrOp::Replace:
+        return XATTR_REPLACE;
+    }
+    return 0;  // Default to 0 if op is not recognized
+  }
+};
+
 struct MemoryXattrStorage {
-  mutable StarnixMutex<fbl::HashTable<FsString, ktl::unique_ptr<fs_args::HashableFsString>>> xattrs;
+  mutable StarnixMutex<FsStringHashTable> xattrs;
 
   /// impl MemoryXattrStorage
   fit::result<Errno, FsString> get_xattr(const FsStr& name) const;
@@ -27,7 +49,7 @@ struct MemoryXattrStorage {
 
   fit::result<Errno> remove_xattr(const FsStr& name) const;
 
-  fit::result<Errno, std::vector<FsString>> list_xattrs(const FsStr& name) const;
+  fit::result<Errno, fbl::Vector<FsString>> list_xattrs(const FsStr& name) const;
 
   /// impl Default
   static MemoryXattrStorage Default();

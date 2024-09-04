@@ -7,26 +7,32 @@
 #define ZIRCON_KERNEL_LIB_MISTOS_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_VFS_DIR_ENTRY_H_
 
 #include <lib/fit/result.h>
-#include <lib/mistos/starnix/kernel/vfs/forward.h>
-#include <lib/mistos/starnix/kernel/vfs/namespace.h>
+#include <lib/mistos/starnix/kernel/sync/locks.h>
+#include <lib/mistos/starnix/kernel/vfs/fs_node.h>
+#include <lib/mistos/starnix/kernel/vfs/mount_info.h>
 #include <lib/mistos/starnix/kernel/vfs/path.h>
 #include <lib/mistos/starnix_uapi/errors.h>
 #include <lib/mistos/util/weak_wrapper.h>
 
 #include <functional>
 #include <utility>
-#include <vector>
 
-#include <fbl/auto_lock.h>
-#include <fbl/ref_counted.h>
 #include <fbl/ref_counted_upgradeable.h>
-#include <fbl/ref_ptr.h>
 #include <kernel/mutex.h>
 #include <ktl/optional.h>
-#include <lockdep/guard.h>
-#include <zxtest/cpp/zxtest_prod.h>
+
+namespace unit_testing {
+bool test_tmpfs();
+}
 
 namespace starnix {
+
+class CurrentTask;
+class DirEntry;
+class FsNode;
+
+using DirEntryHandle = fbl::RefPtr<DirEntry>;
+using FsNodeHandle = fbl::RefPtr<FsNode>;
 
 struct DirEntryState {
   /// The parent DirEntry.
@@ -54,8 +60,6 @@ struct DirEntryState {
   uint32_t mount_count;
 };
 
-class DirEntryLockedChildren;
-
 /// An entry in a directory.
 ///
 /// This structure assigns a name to an FsNode in a given file system. An
@@ -82,8 +86,7 @@ class DirEntry
   /// The mutable state for this DirEntry.
   ///
   /// Leaf lock - do not acquire other locks while holding this one.
-  mutable DECLARE_MUTEX(DirEntry) dir_entry_state_rw_lock;
-  DirEntryState state TA_GUARDED(dir_entry_state_rw_lock);
+  mutable RwLock<DirEntryState> state;
 
   /// A partial cache of the children of this DirEntry.
   ///
@@ -95,8 +98,7 @@ class DirEntry
   /// Getting the ordering right on these is nearly impossible. However, we only need to lock the
   /// children map on the two parents and we don't need to lock the children map on the two
   /// children. So splitting the children out into its own lock resolves this.
-  mutable DECLARE_MUTEX(DirEntry) dir_entry_childern_rw_lock;
-  mutable DirEntryChildren children TA_GUARDED(dir_entry_childern_rw_lock);
+  mutable RwLock<DirEntryChildren> children;
 
   /// impl DirEntry
   static DirEntryHandle New(FsNodeHandle node, ktl::optional<DirEntryHandle> parent,
@@ -105,8 +107,101 @@ class DirEntry
   /// Returns a new DirEntry for the given `node` without parent. The entry has no local name.
   static DirEntryHandle new_unrooted(FsNodeHandle node);
 
+  class DirEntryLockedChildren {
+   private:
+    DirEntryHandle entry_;
+
+    RwLock<DirEntryChildren>::RwLockWriteGuard children_;
+
+   public:
+    DirEntryLockedChildren(DirEntryHandle entry,
+                           RwLock<DirEntry::DirEntryChildren>::RwLockWriteGuard children)
+        : entry_(ktl::move(entry)), children_(ktl::move(children)) {}
+
+    //~DirEntryLockedChildren();
+
+    /// impl<'a> DirEntryLockedChildren<'a>
+    template <typename CreateNodeFn>
+    fit::result<Errno, ktl::pair<DirEntryHandle, bool>> get_or_create_child(
+        const CurrentTask& current_task, const MountInfo& mount, const FsStr& name,
+        CreateNodeFn create_fn) {
+      auto create_child = [&]() -> fit::result<Errno, ktl::pair<DirEntryHandle, bool>> {
+        auto find_or_create_node = [&]() -> fit::result<Errno, ktl::pair<FsNodeHandle, bool>> {
+          if (auto result = entry_->node->lookup(current_task, mount, name); result.is_error()) {
+            if (result.error_value().error_code() == ENOENT) {
+              if (auto _node = create_fn(entry_->node, mount, name); _node.is_error()) {
+                return _node.take_error();
+              } else {
+                return fit::ok(ktl::pair(_node.value(), false));
+              }
+            } else {
+              return result.take_error();
+            }
+          } else {
+            auto _node = result.value();
+            return fit::ok(ktl::pair(_node, true));
+          }
+        }();
+
+        if (find_or_create_node.is_error())
+          return find_or_create_node.take_error();
+
+        auto [_node, exists] = find_or_create_node.value();
+
+        ASSERT_MSG((_node->info()->mode & FileMode::IFMT) != FileMode::EMPTY,
+                   "FsNode initialization did not populate the FileMode in FsNodeInfo.");
+
+        auto entry = DirEntry::New(_node, {entry_}, name);
+        return fit::ok(ktl::pair(entry, exists));
+      };
+
+      auto it = children_->find(name);
+      auto result = [&]() -> fit::result<Errno, ktl::pair<DirEntryHandle, bool>> {
+        if (it == children_->end()) {
+          // Vacant
+          if (auto result = create_child(); result.is_error()) {
+            return result.take_error();
+          } else {
+            auto [child, exists] = result.value();
+            children_->insert(util::WeakPtr(child.get()));
+            return fit::ok(ktl::pair(child, exists));
+          }
+        } else {
+          // Occupied
+          // It's possible that the upgrade will succeed this time around because we dropped
+          // the read lock before acquiring the write lock. Another thread might have
+          // populated this entry while we were not holding any locks.
+          auto child = it.CopyPointer().Lock();
+          if (child) {
+            child->node->fs()->did_access_dir_entry(child);
+            return fit::ok(ktl::pair(child, true));
+          }
+
+          if (auto result = create_child(); result.is_error()) {
+            return result.take_error();
+          } else {
+            auto [new_child, exists] = result.value();
+            children_->insert(util::WeakPtr(new_child.get()));
+            return fit::ok(ktl::pair(new_child, exists));
+          }
+        }
+      }();
+
+      if (result.is_error()) {
+        return result.take_error();
+      }
+
+      auto [child, exist] = result.value();
+      child->node->fs()->did_create_dir_entry(child);
+      return fit::ok(ktl::pair(child, exist));
+    }
+  };
+
  private:
-  DirEntryLockedChildren lock_children() const;
+  DirEntryLockedChildren lock_children() const {
+    return DirEntryLockedChildren(fbl::RefPtr<DirEntry>((DirEntry*)(this)),
+                                  ktl::move(children.Write()));
+  }
 
  public:
   /// The name that this node's parent calls this node.
@@ -114,10 +209,7 @@ class DirEntry
   /// If this node is mounted in a namespace, the parent of this node in that
   /// namespace might have a different name for the point in the namespace at
   /// which this node is mounted.
-  FsString local_name() const {
-    Guard<Mutex> lock(&dir_entry_state_rw_lock);
-    return state.local_name;
-  }
+  FsString local_name() const;
 
   /// Whether the given name has special semantics as a directory entry.
   ///
@@ -140,25 +232,74 @@ class DirEntry
   ///
   /// If the entry already exists, create_node_fn is not called, and EEXIST is
   /// returned.
-  fit::result<Errno, DirEntryHandle> create_entry(
-      const CurrentTask& current_task, const MountInfo& mount, const FsStr& name,
-      std::function<fit::result<Errno, FsNodeHandle>(const FsNodeHandle&, const MountInfo&,
-                                                     const FsStr&)>
-          create_node_fn);
+  template <typename CreateNodeFn>
+  fit::result<Errno, DirEntryHandle> create_entry(const CurrentTask& current_task,
+                                                  const MountInfo& mount, const FsStr& name,
+                                                  CreateNodeFn fn) {
+    static_assert(std::is_invocable_r_v<fit::result<Errno, FsNodeHandle>, CreateNodeFn,
+                                        const FsNodeHandle&, const MountInfo&, const FsStr&>);
+
+    auto result = create_entry_internal(current_task, mount, name, fn);
+    if (result.is_error()) {
+      return result.take_error();
+    }
+
+    auto [entry, exists] = result.value();
+    if (exists) {
+      return fit::error(errno(EEXIST));
+    }
+    return fit::ok(entry);
+  }
 
   /// Creates a new DirEntry. Works just like create_entry, except if the entry already exists,
   /// it is returned.
-  fit::result<Errno, DirEntryHandle> get_or_create_entry(
-      const CurrentTask& current_task, const MountInfo& mount, const FsStr& name,
-      std::function<fit::result<Errno, FsNodeHandle>(const FsNodeHandle&, const MountInfo&,
-                                                     const FsStr&)>
-          create_node_fn);
+  template <typename CreateNodeFn>
+  fit::result<Errno, DirEntryHandle> get_or_create_entry(const CurrentTask& current_task,
+                                                         const MountInfo& mount, const FsStr& name,
+                                                         CreateNodeFn fn) {
+    static_assert(std::is_invocable_r_v<fit::result<Errno, FsNodeHandle>, CreateNodeFn,
+                                        const FsNodeHandle&, const MountInfo&, const FsStr&>);
 
-  fit::result<Errno, std::pair<DirEntryHandle, bool>> create_entry_internal(
-      const CurrentTask& current_task, const MountInfo& mount, const FsStr& name,
-      std::function<fit::result<Errno, FsNodeHandle>(const FsNodeHandle&, const MountInfo&,
-                                                     const FsStr&)>
-          create_node_fn);
+    auto result = create_entry_internal(current_task, mount, name, fn);
+    if (result.is_error()) {
+      return result.take_error();
+    }
+    auto [entry, _] = result.value();
+    return fit::ok(entry);
+  }
+
+  template <typename CreateNodeFn>
+  fit::result<Errno, ktl::pair<DirEntryHandle, bool>> create_entry_internal(
+      const CurrentTask& current_task, const MountInfo& mount, const FsStr& name, CreateNodeFn fn) {
+    static_assert(std::is_invocable_r_v<fit::result<Errno, FsNodeHandle>, CreateNodeFn,
+                                        const FsNodeHandle&, const MountInfo&, const FsStr&>);
+
+    if (DirEntry::is_reserved_name(name)) {
+      return fit::error(errno(EEXIST));
+    }
+
+    // TODO: Do we need to check name for embedded NUL characters?
+    if (name.size() > static_cast<size_t>(NAME_MAX)) {
+      return fit::error(errno(ENAMETOOLONG));
+    }
+
+    /*if (name
+      .contains(SEPARATOR)) { return fit::error(errno(EINVAL)); }
+      */
+
+    auto result = get_or_create_child(current_task, mount, name, fn);
+    if (result.is_error()) {
+      return result.take_error();
+    }
+
+    auto [entry, exists] = result.value();
+    if (!exists) {
+      // An entry was created. Update the ctime and mtime of this directory.
+      // self.node.update_ctime_mtime();
+      // entry.notify_creation();
+    }
+    return fit::ok(ktl::pair(entry, exists));
+  }
 
  private:
   /// This is marked as test-only (private) because it sets the owner/group to root instead of the
@@ -167,11 +308,43 @@ class DirEntry
   fit::result<Errno, DirEntryHandle> create_dir(const CurrentTask& current_task, const FsStr& name);
 
  public:
-  fit::result<Errno, std::pair<DirEntryHandle, bool>> get_or_create_child(
+  template <typename CreateNodeFn>
+  fit::result<Errno, ktl::pair<DirEntryHandle, bool>> get_or_create_child(
       const CurrentTask& current_task, const MountInfo& mount, const FsStr& name,
-      std::function<fit::result<Errno, FsNodeHandle>(const FsNodeHandle&, const MountInfo&,
-                                                     const FsStr&)>
-          create_node_fn) const;
+      CreateNodeFn fn) const {
+    static_assert(std::is_invocable_r_v<fit::result<Errno, FsNodeHandle>, CreateNodeFn,
+                                        const FsNodeHandle&, const MountInfo&, const FsStr&>);
+
+    ASSERT(!DirEntry::is_reserved_name(name));
+    // Only directories can have children.
+    if (!node->is_dir()) {
+      return fit::error(errno(ENOTDIR));
+    }
+    // The user must be able to search the directory (requires the EXEC permission)
+    // self.node.check_access(current_task, mount, Access::EXEC)?;
+
+    // Check if the child is already in children. In that case, we can
+    // simply return the child and we do not need to call init_fn.
+    {
+      auto it = children.Read()->find(name);
+      if (it != children.Read()->end()) {
+        auto child = it.CopyPointer().Lock();
+        if (child) {
+          child->node->fs()->did_access_dir_entry(child);
+          return fit::ok(ktl::pair(child, true));
+        }
+      }
+    }
+
+    auto result = lock_children().get_or_create_child(current_task, mount, name, fn);
+    if (result.is_error()) {
+      return result.take_error();
+    }
+
+    auto [child, exists] = result.value();
+    child->node->fs()->purge_old_entries();
+    return fit::ok(ktl::pair(child, exists));
+  }
 
   /// This function is only useful for tests and has some oddities.
   ///
@@ -180,10 +353,10 @@ class DirEntry
   ///
   /// Also, the vector might have "extra" names that are in the process of
   /// being looked up. If the lookup fails, they'll be removed.
-  std::vector<FsString> copy_child_names();
+  fbl::Vector<FsString> copy_child_names();
 
-  // C++
  public:
+  // C++
   ~DirEntry();
   using fbl::RefCountedUpgradeable<DirEntry>::AddRef;
   using fbl::RefCountedUpgradeable<DirEntry>::Release;
@@ -191,30 +364,12 @@ class DirEntry
   using fbl::RefCountedUpgradeable<DirEntry>::AddRefMaybeInDestructor;
 
   // WAVL-tree Index
-  FsString GetKey() const { return local_name(); }
+  FsString GetKey() const;
 
  private:
-  ZXTEST_FRIEND_TEST(TmpFs, test_tmpfs);
+  friend bool unit_testing::test_tmpfs();
 
   DirEntry(FsNodeHandle node, DirEntryState state);
-};
-
-class DirEntryLockedChildren {
- private:
-  DirEntryHandle entry_;
-  fbl::AutoLock<Mutex> lock_;
-  DirEntry::DirEntryChildren* children_;
-
- public:
-  DirEntryLockedChildren(DirEntryHandle entry, Mutex* lock, DirEntry::DirEntryChildren* children)
-      : entry_(std::move(entry)), lock_(lock), children_(children) {}
-
-  /// impl<'a> DirEntryLockedChildren<'a>
-  fit::result<Errno, std::pair<DirEntryHandle, bool>> get_or_create_child(
-      const CurrentTask& current_task, const MountInfo& mount, const FsStr& name,
-      std::function<fit::result<Errno, FsNodeHandle>(const FsNodeHandle&, const MountInfo&,
-                                                     const FsStr&)>
-          create_fn);
 };
 
 }  // namespace starnix

@@ -59,14 +59,18 @@ fit::result<Errno, UserAddress> do_mmap(const CurrentTask& current_task, UserAdd
   }
 
   uint32_t valid_flags = get_valid_platform_mmap_flags() | MAP_PRIVATE | MAP_SHARED |
-                         MAP_ANONYMOUS | MAP_FIXED | MAP_FIXED_NOREPLACE | MAP_POPULATE |
-                         MAP_NORESERVE | MAP_STACK | MAP_DENYWRITE | MAP_GROWSDOWN;
+                         MAP_SHARED_VALIDATE | MAP_ANONYMOUS | MAP_FIXED | MAP_FIXED_NOREPLACE |
+                         MAP_POPULATE | MAP_NORESERVE | MAP_STACK | MAP_DENYWRITE | MAP_GROWSDOWN;
 
   if ((flags & !valid_flags) != 0) {
+    if ((flags & MAP_SHARED_VALIDATE) != 0) {
+      return fit::error(errno(EOPNOTSUPP));
+    }
     // track_stub !(TODO("https://fxbug.dev/322873638"), "mmap check flags", flags);
     return fit::error(errno(EINVAL));
   }
 
+  // let file = if flags & MAP_ANONYMOUS != 0 { None } else { Some(current_task.files.get(fd)?) };
   if ((flags & (MAP_PRIVATE | MAP_SHARED)) == 0 ||
       (flags & (MAP_PRIVATE | MAP_SHARED)) == (MAP_PRIVATE | MAP_SHARED)) {
     return fit::error(errno(EINVAL));
@@ -100,10 +104,9 @@ fit::result<Errno, UserAddress> do_mmap(const CurrentTask& current_task, UserAdd
     }
   }
 
-  // uint64_t vmo_offset = (flags & MAP_ANONYMOUS) ? 0 : offset;
+  // uint64_t memory_offset = (flags & MAP_ANONYMOUS) ? 0 : offset;
 
   auto options = MappingOptionsFlags::empty();
-
   if (flags & MAP_SHARED) {
     options |= MappingOptions::SHARED;
   }
@@ -123,14 +126,14 @@ fit::result<Errno, UserAddress> do_mmap(const CurrentTask& current_task, UserAdd
     options |= MappingOptions::POPULATE;
   }
 
-  if (flags & MAP_ANONYMOUS) {
+  if ((flags & MAP_ANONYMOUS) != 0) {
     return current_task->mm()->map_anonymous(daddr, length, prot_flags.value(), options,
                                              {MappingNameType::None});
   } else {
     /*
     // TODO(tbodt): maximize protection flags so that mprotect works
     let file = current_task.files.get(fd)?;
-    file.mmap(current_task, addr, vmo_offset, length, prot_flags, options, file.name.clone())
+    file.mmap(current_task, addr, memory_offset, length, prot_flags, options, file.name.clone())
     */
   }
 
