@@ -10,13 +10,13 @@ load(
     "FuchsiaAssemblyDeveloperOverridesInfo",
     "FuchsiaAssemblyDeveloperOverridesListInfo",
 )
+load(
+    ":utils.bzl",
+    "select_single_file",
+)
 
 def _fuchsia_prebuilt_assembly_developer_overrides_impl(ctx):
-    manifest = None
-    for file in ctx.files.overrides_path:
-        if file.path.endswith("product_assembly_overrides.json"):
-            manifest = file
-
+    manifest = select_single_file(ctx.files.overrides_path, "product_assembly_overrides.json")
     if not manifest:
         fail("Unable to locate 'product_assembly_overrides.json' in Assembly Developer Overrides input.")
 
@@ -32,7 +32,7 @@ _fuchsia_prebuilt_assembly_developer_overrides = rule(
     implementation = _fuchsia_prebuilt_assembly_developer_overrides_impl,
     attrs = {
         "overrides_path": attr.label(
-            doc = "Path to the directory containing the prebuilt developer overrides",
+            doc = "A label to fuchsia_assembly_developer_overrides",
             mandatory = True,
         ),
     },
