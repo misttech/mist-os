@@ -6,12 +6,9 @@
 #define ZIRCON_KERNEL_LIB_MISTOS_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_TASK_PROCESS_GROUP_H_
 
 #include <lib/mistos/linux_uapi/typedefs.h>
-#include <lib/mistos/starnix/kernel/task/forward.h>
-#include <lib/mistos/starnix/kernel/task/kernel.h>
+#include <lib/mistos/starnix/kernel/sync/locks.h>
 #include <lib/mistos/util/weak_wrapper.h>
-#include <lib/mistos/zx/job.h>
 
-#include <optional>
 #include <utility>
 
 #include <fbl/intrusive_wavl_tree.h>
@@ -19,7 +16,11 @@
 #include <fbl/ref_ptr.h>
 #include <ktl/optional.h>
 
+class JobDispatcher;
+
 namespace starnix {
+
+class ThreadGroup;
 
 class ProcessGroupMutableState {
   using BTree = fbl::WAVLTree<pid_t, util::WeakPtr<ThreadGroup>>;
@@ -67,7 +68,7 @@ class ProcessGroup : public fbl::RefCountedUpgradeable<ProcessGroup>,
   // The leader of the process group.
   pid_t leader;
 
-  zx::job job;
+  // fbl::RefPtr<JobDispatcher> job;
 
  private:
   /// The mutable state of the ProcessGroup.

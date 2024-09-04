@@ -6,13 +6,15 @@
 #include <lib/mistos/starnix/kernel/vfs/fs_args.h>
 #include <lib/unittest/unittest.h>
 
+#include "lib/mistos/starnix/kernel/vfs/path.h"
+
+namespace unit_testing {
+
 using namespace starnix;
 
 bool fs_args_empty_data() {
   BEGIN_TEST;
-  FsStr empty;
-  fbl::HashTable<ktl::string_view, ktl::unique_ptr<fs_args::HashableFsString>> parsed_data;
-  fs_args::generic_parse_mount_options(empty, &parsed_data);
+  auto parsed_data = MountParams::parse(FsStr()).value();
 
   ASSERT_TRUE(parsed_data.is_empty());
 
@@ -22,8 +24,8 @@ bool fs_args_empty_data() {
 bool fs_args_parse_options_last_value_wins() {
   BEGIN_TEST;
   FsStr data{"key0=value0,key1,key2=value2,key0=value3"};
-  fbl::HashTable<ktl::string_view, ktl::unique_ptr<fs_args::HashableFsString>> parsed_data;
-  fs_args::generic_parse_mount_options(data, &parsed_data);
+  FsStringHashTable parsed_data;
+  ASSERT_EQ(true, parse_mount_options::parse_mount_options(data, &parsed_data).is_ok());
 
   ktl::string_view expected("");
   ktl::string_view actual = parsed_data.find("key1")->value;
@@ -48,13 +50,14 @@ bool fs_args_parse_options_last_value_wins() {
 
 bool fs_args_parse_data() {
   BEGIN_TEST;
-  ASSERT_EQ(42u, fs_args::parse<size_t>("42").value());
+  ASSERT_EQ(42u, parse<size_t>("42").value());
   END_TEST;
 }
 
-UNITTEST_START_TESTCASE(starnix_fs_args)
-UNITTEST("test empty data", fs_args_empty_data)
-UNITTEST("test parse last value wins", fs_args_parse_options_last_value_wins)
-UNITTEST("test parse data", fs_args_parse_data)
+}  // namespace unit_testing
 
+UNITTEST_START_TESTCASE(starnix_fs_args)
+UNITTEST("test empty data", unit_testing::fs_args_empty_data)
+UNITTEST("test parse last value wins", unit_testing::fs_args_parse_options_last_value_wins)
+UNITTEST("test parse data", unit_testing::fs_args_parse_data)
 UNITTEST_END_TESTCASE(starnix_fs_args, "starnix_fs_args", "Tests for FsArgs")

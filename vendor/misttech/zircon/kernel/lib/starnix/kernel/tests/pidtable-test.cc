@@ -3,17 +3,22 @@
 // found in the LICENSE file.
 
 #include <lib/mistos/starnix/kernel/task/pidtable.h>
-#include <lib/mistos/starnix/kernel/task/process_group.h>
-#include <lib/mistos/starnix/kernel/task/task.h>
-#include <lib/mistos/starnix/kernel/task/thread_group.h>
+#include <lib/unittest/unittest.h>
 
-#include <zxtest/zxtest.h>
+namespace unit_testing {
 
-namespace starnix {
+using namespace starnix;
 
-TEST(PidTable, AllocatePid) {
+bool pid_table_allocate_pid() {
+  BEGIN_TEST;
+
   PidTable table;
   ASSERT_EQ(1, table.allocate_pid());
-}
 
-}  // namespace starnix
+  END_TEST;
+}
+}  // namespace unit_testing
+
+UNITTEST_START_TESTCASE(starnix_pid_table)
+UNITTEST("test trivial pid allocation", unit_testing::pid_table_allocate_pid)
+UNITTEST_END_TESTCASE(starnix_pid_table, "starnix_pid_table", "Tests for pid")

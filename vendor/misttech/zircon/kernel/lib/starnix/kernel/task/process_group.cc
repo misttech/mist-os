@@ -12,12 +12,13 @@
 
 #include <kernel/mutex.h>
 #include <ktl/optional.h>
+#include <object/job_dispatcher.h>
 
 #include <ktl/enforce.h>
 
 namespace starnix {
 
-ProcessGroup::~ProcessGroup() = default;
+ProcessGroup::~ProcessGroup() { mutable_state_.Write()->thread_groups_.clear(); }
 
 ProcessGroup::ProcessGroup(fbl::RefPtr<Session> session, pid_t _leader)
     : session(ktl::move(session)), leader(_leader) {}

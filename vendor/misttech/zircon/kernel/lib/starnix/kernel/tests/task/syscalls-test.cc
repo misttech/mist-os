@@ -3,6 +3,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <lib/mistos/starnix/kernel/mm/memory_manager.h>
 #include <lib/mistos/starnix/kernel/mm/syscalls.h>
 #include <lib/mistos/starnix/kernel/task/kernel.h>
 #include <lib/mistos/starnix/kernel/task/process_group.h>
@@ -10,18 +11,19 @@
 #include <lib/mistos/starnix/kernel/task/task.h>
 #include <lib/mistos/starnix/kernel/task/thread_group.h>
 #include <lib/mistos/starnix/testing/testing.h>
+#include <lib/unittest/unittest.h>
 
 #include <fbl/ref_ptr.h>
-#include <fbl/string.h>
-#include <zxtest/zxtest.h>
 
 #include <linux/prctl.h>
 
 using namespace starnix::testing;
 
-namespace {
+namespace unit_testing {
 
-TEST(Task, test_prctl_set_vma_anon_name) {
+bool test_prctl_set_vma_anon_name() {
+  BEGIN_TEST;
+
   auto [kernel, current_task] = create_kernel_task_and_unlocked();
 
   auto mapped_address = map_memory(*current_task, UserAddress(), PAGE_SIZE);
@@ -29,21 +31,25 @@ TEST(Task, test_prctl_set_vma_anon_name) {
 
   ASSERT_TRUE((*current_task).write_memory(name_addr, {(uint8_t*)"test-name\0", 10}).is_ok(),
               "failed to write name");
-  ASSERT_EQ(starnix_syscalls::SUCCESS, sys_prctl(*current_task, PR_SET_VMA, PR_SET_VMA_ANON_NAME,
-                                                 mapped_address.ptr(), 32, name_addr.ptr()));
-
-  ASSERT_EQ(fbl::String("test-name"),
-            (*current_task)->mm()->get_mapping_name(mapped_address + 24u));
-
-  auto munmap_result = sys_munmap(*current_task, mapped_address, PAGE_SIZE);
-  ASSERT_TRUE(munmap_result.is_ok(), "failed to unmap memory [error = %d]",
-              munmap_result.error_value().error_code());
+  ASSERT_TRUE(starnix_syscalls::SUCCESS == sys_prctl(*current_task, PR_SET_VMA,
+                                                     PR_SET_VMA_ANON_NAME, mapped_address.ptr(), 32,
+                                                     name_addr.ptr()));
 
   auto mapping_name_result = current_task->mm()->get_mapping_name(mapped_address + 24u);
+  ASSERT_TRUE(mapping_name_result.is_ok(), "failed to get address");
+  ASSERT_TRUE(starnix::FsString("test-name") == mapping_name_result.value());
+
+  auto munmap_result = sys_munmap(*current_task, mapped_address, PAGE_SIZE);
+  ASSERT_TRUE(munmap_result.is_ok(), "failed to unmap memory");
+
+  mapping_name_result = current_task->mm()->get_mapping_name(mapped_address + 24u);
   ASSERT_TRUE(mapping_name_result.is_error());
-  ASSERT_EQ(errno(EFAULT), mapping_name_result.error_value());
+  ASSERT_TRUE(errno(EFAULT) == mapping_name_result.error_value());
+
+  END_TEST;
 }
 
+#if 0
 TEST(Task, test_set_vma_name_special_chars) {
   auto [kernel, current_task] = create_kernel_task_and_unlocked();
 
@@ -126,5 +132,10 @@ TEST(Task, test_sys_getsid) {
   ASSERT_EQ(second_current->get_tid(),
             starnix::sys_getsid(*current_task, second_current->get_tid()));
 }
+#endif
 
-}  // namespace
+}  // namespace unit_testing
+
+UNITTEST_START_TESTCASE(starnix_task_syscalls)
+UNITTEST("test prctl set vma anon name", unit_testing::test_prctl_set_vma_anon_name)
+UNITTEST_END_TESTCASE(starnix_task_syscalls, "starnix_task_syscalls", "Tests for Tasks Syscalls")

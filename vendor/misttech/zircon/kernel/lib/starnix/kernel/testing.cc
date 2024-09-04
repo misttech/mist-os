@@ -14,6 +14,7 @@
 #include <lib/mistos/starnix/kernel/task/thread_group.h>
 #include <lib/mistos/starnix/kernel/vfs/dir_entry.h>
 #include <lib/mistos/starnix/kernel/vfs/fs_context.h>
+#include <lib/mistos/starnix/kernel/vfs/fs_node.h>
 
 #include <fbl/ref_ptr.h>
 
@@ -71,7 +72,7 @@ ktl::pair<fbl::RefPtr<Kernel>, AutoReleasableTask> create_kernel_and_task() {
   return create_kernel_task_and_unlocked();
 }
 
-AutoReleasableTask create_task(fbl::RefPtr<Kernel>& kernel, const fbl::String& task_name) {
+AutoReleasableTask create_task(fbl::RefPtr<Kernel>& kernel, const ktl::string_view& task_name) {
   auto init_task = CurrentTask::create_init_child_process(kernel, task_name);
   return ktl::move(testing::AutoReleasableTask::From(init_task.value()));
 }

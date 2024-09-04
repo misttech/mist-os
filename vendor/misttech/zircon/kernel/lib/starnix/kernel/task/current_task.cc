@@ -7,8 +7,8 @@
 #include <lib/fit/result.h>
 #include <lib/mistos/starnix/kernel/arch/x64/registers.h>
 #include <lib/mistos/starnix/kernel/execution/executor.h>
-#include <lib/mistos/starnix/kernel/execution/shared.h>
 #include <lib/mistos/starnix/kernel/loader.h>
+#include <lib/mistos/starnix/kernel/mm/memory_manager.h>
 #include <lib/mistos/starnix/kernel/task/kernel.h>
 #include <lib/mistos/starnix/kernel/task/process_group.h>
 #include <lib/mistos/starnix/kernel/task/session.h>
@@ -19,19 +19,16 @@
 #include <lib/mistos/starnix/kernel/vfs/file_object.h>
 #include <lib/mistos/starnix/kernel/vfs/fs_context.h>
 #include <lib/mistos/starnix/kernel/vfs/fs_node.h>
+#include <lib/mistos/starnix/kernel/vfs/lookup_context.h>
 #include <lib/mistos/starnix/kernel/vfs/namespace.h>
+#include <lib/mistos/starnix/kernel/vfs/symlink_mode.h>
 #include <lib/mistos/starnix/testing/testing.h>
 #include <lib/mistos/starnix_uapi/auth.h>
 #include <lib/mistos/starnix_uapi/errors.h>
 #include <lib/mistos/starnix_uapi/file_mode.h>
 #include <lib/mistos/starnix_uapi/user_address.h>
-// #include <lib/mistos/userloader/start.h>
-// #include <lib/mistos/userloader/userloader.h>
 #include <lib/mistos/util/strings/split_string.h>
 #include <lib/mistos/util/weak_wrapper.h>
-// #include <lib/mistos/zbi_parser/bootfs.h>
-// #include <lib/mistos/zbi_parser/option.h>
-// #include <lib/mistos/zbi_parser/zbi.h>
 #include <lib/user_copy/user_ptr.h>
 #include <trace.h>
 #include <zircon/errors.h>
@@ -42,7 +39,9 @@
 #include <fbl/alloc_checker.h>
 #include <fbl/ref_ptr.h>
 #include <kernel/mutex.h>
+#include <ktl/string_view.h>
 #include <lockdep/guard.h>
+#include <object/thread_dispatcher.h>
 
 #include "../kernel_priv.h"
 
@@ -56,6 +55,15 @@ using namespace util;
 
 namespace starnix {
 
+TaskBuilder::TaskBuilder(fbl::RefPtr<Task> task) : task(ktl::move(task)) {}
+
+TaskBuilder::~TaskBuilder() = default;
+
+Task* TaskBuilder::operator->() {
+  ASSERT_MSG(task, "called `operator->` empty Task");
+  return task.get();
+}
+
 CurrentTask::~CurrentTask() = default;
 
 CurrentTask::CurrentTask(fbl::RefPtr<Task> task) : task(ktl::move(task)) {}
@@ -65,10 +73,9 @@ Task* CurrentTask::operator->() const {
   return task.get();
 }
 
-fit::result<Errno, TaskBuilder> CurrentTask::create_init_process(const fbl::RefPtr<Kernel>& kernel,
-                                                                 pid_t pid,
-                                                                 const fbl::String& initial_name,
-                                                                 fbl::RefPtr<FsContext> fs) {
+fit::result<Errno, TaskBuilder> CurrentTask::create_init_process(
+    const fbl::RefPtr<Kernel>& kernel, pid_t pid, const ktl::string_view& initial_name,
+    fbl::RefPtr<FsContext> fs) {
   LTRACE;
   auto pids = kernel->pids.Write();
 
@@ -81,7 +88,7 @@ fit::result<Errno, TaskBuilder> CurrentTask::create_init_process(const fbl::RefP
 }
 
 fit::result<Errno, TaskBuilder> CurrentTask::create_init_child_process(
-    const fbl::RefPtr<Kernel>& kernel, const fbl::String& initial_name) {
+    const fbl::RefPtr<Kernel>& kernel, const ktl::string_view& initial_name) {
   LTRACE;
   util::WeakPtr<Task> weak_init = kernel->pids.Read()->get_task(1);
   fbl::RefPtr<Task> init_task = weak_init.Lock();
@@ -99,7 +106,7 @@ fit::result<Errno, TaskBuilder> CurrentTask::create_init_child_process(
 
 template <typename TaskInfoFactory>
 fit::result<Errno, TaskBuilder> CurrentTask::create_task(const fbl::RefPtr<Kernel>& kernel,
-                                                         const fbl::String& initial_name,
+                                                         const ktl::string_view& initial_name,
                                                          fbl::RefPtr<FsContext> root_fs,
                                                          TaskInfoFactory&& task_info_factory) {
   LTRACE;
@@ -111,29 +118,28 @@ fit::result<Errno, TaskBuilder> CurrentTask::create_task(const fbl::RefPtr<Kerne
 template <typename TaskInfoFactory>
 fit::result<Errno, TaskBuilder> CurrentTask::create_task_with_pid(
     const fbl::RefPtr<Kernel>& kernel, RwLock<PidTable>::RwLockWriteGuard& pids, pid_t pid,
-    const fbl::String& initial_name, fbl::RefPtr<FsContext> root_fs,
+    const ktl::string_view& initial_name, fbl::RefPtr<FsContext> root_fs,
     TaskInfoFactory&& task_info_factory) {
   LTRACE;
   DEBUG_ASSERT(pids->get_task(pid).Lock() == nullptr);
 
   fbl::RefPtr<ProcessGroup> process_group = ProcessGroup::New(pid, {});
-  auto job_or_error =
+  /*auto job_or_error =
       create_job(0).map_error([](auto status) { return errno(from_status_like_fdio(status)); });
+
   if (job_or_error.is_error()) {
     return job_or_error.take_error();
   }
-  process_group->job = ktl::move(job_or_error.value());
+  process_group->job = ktl::move(job_or_error.value());*/
   pids->add_process_group(process_group);
 
   auto task_info = task_info_factory(pid, process_group).value_or(TaskInfo{});
 
   process_group->insert(task_info.thread_group);
 
-  fbl::RefPtr<Task> task =
-      Task::New(pid, initial_name, task_info.thread_group, ktl::move(task_info.thread),
-                FdTable::Create(), task_info.memory_manager, root_fs, Credentials::root());
-
-  auto builder = TaskBuilder{task};
+  auto builder = TaskBuilder{Task::New(pid, initial_name, task_info.thread_group,
+                                       ktl::move(task_info.thread), FdTable::Create(),
+                                       task_info.memory_manager, root_fs, Credentials::root())};
 
   // TODO (Herrera) Add fit::defer
   {
@@ -240,7 +246,7 @@ fit::result<Errno, TaskBuilder> CurrentTask::clone_task(uint64_t flags,
   auto& pids = *kernel->pids.Write();
 
   pid_t pid;
-  fbl::String command;
+  ktl::string_view command;
   Credentials creds;
   // let scheduler_policy;
   // let uts_ns;
@@ -255,7 +261,7 @@ fit::result<Errno, TaskBuilder> CurrentTask::clone_task(uint64_t flags,
   auto task_info_or_error = [&]() -> fit::result<Errno, TaskInfo> {
     // Make sure to drop these locks ASAP to avoid inversion
     auto self = (*this);
-    auto& thread_group_state = self->thread_group->write();
+    auto thread_group_state = self->thread_group->write();
     auto state = self->mutable_state_.Read();
 
     no_new_privs = (*state).no_new_privs();
@@ -299,8 +305,9 @@ fit::result<Errno, TaskBuilder> CurrentTask::clone_task(uint64_t flags,
           self.thread_group.signal_actions.fork()
       };
       */
-      auto process_group = thread_group_state.process_group;
-      return create_zircon_process(kernel, (*this)->thread_group, pid, process_group, command);
+      auto process_group = thread_group_state->process_group;
+      return create_zircon_process(kernel, ktl::move(thread_group_state), pid, process_group,
+                                   command);
     }
   }();
 
@@ -400,10 +407,11 @@ starnix::testing::AutoReleasableTask CurrentTask::clone_task_for_test(
   return starnix::testing::AutoReleasableTask::From(result.value());
 }
 
-fit::result<Errno> CurrentTask::exec(const FileHandle& executable, const fbl::String& path,
-                                     const fbl::Vector<fbl::String>& argv,
-                                     const fbl::Vector<fbl::String>& environ) {
-  LTRACEF_LEVEL(2, "path=%s\n", path.c_str());
+fit::result<Errno> CurrentTask::exec(const FileHandle& executable, const ktl::string_view& path,
+                                     const fbl::Vector<ktl::string_view>& argv,
+                                     const fbl::Vector<ktl::string_view>& environ) {
+  // LTRACEF_LEVEL(2, "path=%s\n", path.c_str());
+
   // Executable must be a regular file
   /*
   if !executable.name.entry.node.is_reg() {
@@ -426,7 +434,7 @@ fit::result<Errno> CurrentTask::exec(const FileHandle& executable, const fbl::St
     return resolved_elf.take_error();
   }
 
-  if ((*this)->thread_group->read().tasks_count() > 1) {
+  if ((*this)->thread_group->read()->tasks_count() > 1) {
     // track_stub !(TODO("https://fxbug.dev/297434895"), "exec on multithread process");
     return fit::error(errno(EINVAL));
   }
@@ -451,12 +459,12 @@ fit::result<Errno> CurrentTask::exec(const FileHandle& executable, const fbl::St
   return fit::ok();
 }
 
-fit::result<Errno> CurrentTask::finish_exec(const fbl::String& path,
+fit::result<Errno> CurrentTask::finish_exec(const ktl::string_view& path,
                                             const ResolvedElf& resolved_elf) {
-  LTRACEF_LEVEL(2, "path=%s\n", path.c_str());
-  // Now that the exec will definitely finish (or crash), notify owners of
-  // locked futexes for the current process, which will be impossible to
-  // update after process image is replaced.  See get_robust_list(2).
+  // LTRACEF_LEVEL(2, "path=%s\n", path.c_str());
+  //  Now that the exec will definitely finish (or crash), notify owners of
+  //  locked futexes for the current process, which will be impossible to
+  //  update after process image is replaced.  See get_robust_list(2).
   /*
     self.notify_robust_list();
   */
@@ -517,7 +525,7 @@ fit::result<Errno> CurrentTask::finish_exec(const fbl::String& path,
     // TODO: POSIX timers are not preserved.
   */
 
-  task->thread_group->write().did_exec = true;
+  task->thread_group->write()->did_exec = true;
 
   // `prctl(PR_GET_NAME)` and `/proc/self/stat`
   /*
@@ -535,8 +543,8 @@ fit::result<Errno> CurrentTask::finish_exec(const fbl::String& path,
 
 // This is a temporary code while we do not support file system.
 // We just return the "file" VMO
-fit::result<Errno, FileHandle> CurrentTask::open_file_bootfs(const fbl::String& path) {
-  LTRACEF_LEVEL(2, "path=%s\n", path.c_str());
+fit::result<Errno, FileHandle> CurrentTask::open_file_bootfs(const ktl::string_view& path) {
+  // LTRACEF_LEVEL(2, "path=%s\n", path.c_str());
 #if 0
   ktl::array<zx_handle_t, userloader::kHandleCount> handles = ExtractHandles(userloader::gHandles);
 
@@ -573,9 +581,22 @@ fit::result<Errno, FileHandle> CurrentTask::open_file_bootfs(const fbl::String& 
   return fit::error(errno(from_status_like_fdio(ZX_ERR_NO_MEMORY)));
 }
 
+CurrentTask CurrentTask::From(const TaskBuilder& builder) { return ktl::move(builder.task); }
+
+util::WeakPtr<Task> CurrentTask::weak_task() const {
+  ASSERT(task);
+  return util::WeakPtr<Task>(task.get());
+}
+
+void CurrentTask::set_creds(Credentials creds) const {
+  // Guard<Mutex> lock(persistent_info->lock());
+  // persistent_info->state().creds = creds;
+}
+
 fit::result<Errno, ktl::pair<NamespaceNode, FsStr>> CurrentTask::resolve_dir_fd(
     FdNumber dir_fd, FsStr path, ResolveFlags flags) const {
-  LTRACEF_LEVEL(2, "dir_fd=%d, path=%s\n", dir_fd.raw(), path.c_str());
+  LTRACEF_LEVEL(2, "dir_fd=%d, path=[%.*s]\n", dir_fd.raw(), static_cast<int>(path.length()),
+                path.data());
 
   bool path_is_absolute = (path.size() > 1) && path[0] == '/';
   if (path_is_absolute) {
@@ -626,7 +647,8 @@ fit::result<Errno, ktl::pair<NamespaceNode, FsStr>> CurrentTask::resolve_dir_fd(
 }
 
 fit::result<Errno, FileHandle> CurrentTask::open_file(const FsStr& path, OpenFlags flags) const {
-  LTRACEF_LEVEL(2, "path=%s, flags=0x%x\n", path.c_str(), flags.bits());
+  LTRACEF_LEVEL(2, "path=[%.*s], flags=0x%x\n", static_cast<int>(path.length()), path.data(),
+                flags.bits());
   if (flags.contains(OpenFlagsEnum::CREAT)) {
     // In order to support OpenFlags::CREAT we would need to take a
     // FileMode argument.
@@ -638,7 +660,8 @@ fit::result<Errno, FileHandle> CurrentTask::open_file(const FsStr& path, OpenFla
 fit::result<Errno, ktl::pair<NamespaceNode, bool>> CurrentTask::resolve_open_path(
     LookupContext& context, NamespaceNode dir, const FsStr& path, FileMode mode,
     OpenFlags flags) const {
-  LTRACEF_LEVEL(2, "path=%s, flags=0x%x\n", path.c_str(), flags.bits());
+  LTRACEF_LEVEL(2, "path=[%.*s], flags=0x%x\n", static_cast<int>(path.length()), path.data(),
+                flags.bits());
   context.update_for_path(path);
   auto parent_content = context.with(SymlinkMode::Follow);
   auto lookup_parent_result = lookup_parent(parent_content, dir, path);
@@ -738,8 +761,9 @@ fit::result<Errno, ktl::pair<NamespaceNode, bool>> CurrentTask::resolve_open_pat
 fit::result<Errno, FileHandle> CurrentTask::open_file_at(FdNumber dir_fd, const FsStr& path,
                                                          OpenFlags flags, FileMode mode,
                                                          ResolveFlags resolve_flags) const {
-  LTRACEF_LEVEL(2, "path=%s, flags=0x%x, mode=0x%x, resolve_flags=0x%x\n", path.c_str(),
-                flags.bits(), mode.bits(), resolve_flags.bits());
+  LTRACEF_LEVEL(2, "path=[%.*s], flags=0x%x, mode=0x%x, resolve_flags=0x%x\n",
+                static_cast<int>(path.length()), path.data(), flags.bits(), mode.bits(),
+                resolve_flags.bits());
 
   if (path.empty()) {
     return fit::error(errno(ENOENT));
@@ -756,8 +780,9 @@ fit::result<Errno, FileHandle> CurrentTask::open_file_at(FdNumber dir_fd, const 
 fit::result<Errno, FileHandle> CurrentTask::open_namespace_node_at(
     NamespaceNode dir, const FsStr& path, OpenFlags _flags, FileMode mode,
     ResolveFlags& resolve_flags) const {
-  LTRACEF_LEVEL(2, "path=%s, flags=0x%x, mode=0x%x, resolve_flags=0x%x\n", path.c_str(),
-                _flags.bits(), mode.bits(), resolve_flags.bits());
+  LTRACEF_LEVEL(2, "path=[%.*s], flags=0x%x, mode=0x%x, resolve_flags=0x%x\n",
+                static_cast<int>(path.length()), path.data(), _flags.bits(), mode.bits(),
+                resolve_flags.bits());
 
   // 64-bit kernels force the O_LARGEFILE flag to be on.
   OpenFlagsImpl flags(_flags | OpenFlagsEnum::LARGEFILE);
@@ -905,7 +930,7 @@ fit::result<Errno, ktl::pair<NamespaceNode, FsString>> CurrentTask::lookup_paren
 fit::result<Errno, NamespaceNode> CurrentTask::lookup_path(LookupContext& context,
                                                            NamespaceNode dir,
                                                            const FsStr& path) const {
-  LTRACEF_LEVEL(2, "path=%s\n", path.c_str());
+  LTRACEF_LEVEL(2, "path=[%.*s]\n", static_cast<int>(path.length()), path.data());
 
   auto lookup_parent_result = lookup_parent(context, dir, path);
   if (lookup_parent_result.is_error())
@@ -915,7 +940,7 @@ fit::result<Errno, NamespaceNode> CurrentTask::lookup_path(LookupContext& contex
 }
 
 fit::result<Errno, NamespaceNode> CurrentTask::lookup_path_from_root(const FsStr& path) const {
-  LTRACEF_LEVEL(2, "path=%s\n", path.c_str());
+  LTRACEF_LEVEL(2, "path=[%.*s]\n", static_cast<int>(path.length()), path.data());
 
   LookupContext context = LookupContext::Default();
   return lookup_path(context, (*this)->fs()->root(), path);

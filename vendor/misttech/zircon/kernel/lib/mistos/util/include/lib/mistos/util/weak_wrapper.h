@@ -8,7 +8,6 @@
 #include <fbl/auto_lock.h>
 #include <fbl/mutex.h>
 #include <fbl/ref_counted_upgradeable.h>
-#include <fbl/ref_ptr.h>
 
 namespace util {
 

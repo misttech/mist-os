@@ -25,11 +25,13 @@
 
 #include "../kernel_priv.h"
 
+#include <ktl/enforce.h>
+
 #define LOCAL_TRACE STARNIX_KERNEL_GLOBAL_TRACE(0)
 
 namespace starnix {
 
-DirEntry::~DirEntry() { children.clear_unsafe(); }
+DirEntry::~DirEntry() { children.Write()->clear_unsafe(); }
 
 DirEntryHandle DirEntry::New(FsNodeHandle node, ktl::optional<DirEntryHandle> parent,
                              FsString local_name) {
@@ -41,20 +43,17 @@ DirEntryHandle DirEntry::New(FsNodeHandle node, ktl::optional<DirEntryHandle> pa
 
 DirEntryHandle DirEntry::new_unrooted(FsNodeHandle node) { return New(node, {}, {}); }
 
-DirEntryLockedChildren DirEntry::lock_children() const {
-  return DirEntryLockedChildren(fbl::RefPtr<DirEntry>((DirEntry*)(this)),
-                                &dir_entry_childern_rw_lock.lock(), &children);
-}
+FsString DirEntry::local_name() const { return state.Read()->local_name; }
 
 fit::result<Errno, DirEntryHandle> DirEntry::component_lookup(const CurrentTask& current_task,
                                                               const MountInfo& mount,
                                                               const FsStr& name) const {
-  LTRACEF_LEVEL(2, "name=%s\n", name.c_str());
+  LTRACEF_LEVEL(2, "name=[%.*s]\n", static_cast<int>(name.length()), name.data());
 
   auto get_or_create_child_result = get_or_create_child(
       current_task, mount, name,
       [&](const FsNodeHandle& d, const MountInfo& mount, const FsStr& name) -> auto {
-        LTRACEF_LEVEL(2, "name=%s\n", name.c_str());
+        // LTRACEF_LEVEL(2, "name=%s\n", name.c_str());
         return d->lookup(current_task, mount, name);
       });
 
@@ -65,9 +64,12 @@ fit::result<Errno, DirEntryHandle> DirEntry::component_lookup(const CurrentTask&
   return fit::ok(_node);
 }
 
-DirEntry::DirEntry(FsNodeHandle node, DirEntryState state)
-    : node(std::move(node)), state(std::move(state)) {}
+FsString DirEntry::GetKey() const { return local_name(); }
 
+DirEntry::DirEntry(FsNodeHandle node, DirEntryState state)
+    : node(ktl::move(node)), state(ktl::move(state)) {}
+
+#if 0
 fit::result<Errno, DirEntryHandle> DirEntry::create_entry(
     const CurrentTask& current_task, const MountInfo& mount, const FsStr& name,
     std::function<fit::result<Errno, FsNodeHandle>(const FsNodeHandle&, const MountInfo&,
@@ -129,6 +131,7 @@ fit::result<Errno, std::pair<DirEntryHandle, bool>> DirEntry::create_entry_inter
   }
   return fit::ok(std::make_pair(entry, exists));
 }
+#endif
 
 fit::result<Errno, DirEntryHandle> DirEntry::create_dir(const CurrentTask& current_task,
                                                         const FsStr& name) {
@@ -140,12 +143,13 @@ fit::result<Errno, DirEntryHandle> DirEntry::create_dir(const CurrentTask& curre
                       });
 }
 
+#if 0
 fit::result<Errno, std::pair<DirEntryHandle, bool>> DirEntry::get_or_create_child(
     const CurrentTask& current_task, const MountInfo& mount, const FsStr& name,
     std::function<fit::result<Errno, FsNodeHandle>(const FsNodeHandle&, const MountInfo&,
                                                    const FsStr&)>
         create_node_fn) const {
-  LTRACEF_LEVEL(2, "name=%s\n", name.c_str());
+  // LTRACEF_LEVEL(2, "name=%s\n", name.c_str());
   ASSERT(!DirEntry::is_reserved_name(name));
   // Only directories can have children.
   if (!node->is_dir()) {
@@ -157,9 +161,8 @@ fit::result<Errno, std::pair<DirEntryHandle, bool>> DirEntry::get_or_create_chil
   // Check if the child is already in children. In that case, we can
   // simply return the child and we do not need to call init_fn.
   {
-    Guard<Mutex> lock(&dir_entry_childern_rw_lock);
-    auto it = children.find(name);
-    if (it != children.end()) {
+    auto it = children.Read()->find(name);
+    if (it != children.Read()->end()) {
       auto child = it.CopyPointer().Lock();
       if (child) {
         child->node->fs()->did_access_dir_entry(child);
@@ -177,28 +180,32 @@ fit::result<Errno, std::pair<DirEntryHandle, bool>> DirEntry::get_or_create_chil
   child->node->fs()->purge_old_entries();
   return fit::ok(std::make_pair(child, exists));
 }
+#endif
 
-std::vector<FsString> DirEntry::copy_child_names() {
-  std::vector<FsString> child_names;
-  Guard<Mutex> lock(&dir_entry_childern_rw_lock);
-
-  for (auto iter = children.begin(); iter != children.end(); ++iter) {
+fbl::Vector<FsString> DirEntry::copy_child_names() {
+  fbl::Vector<FsString> child_names;
+  auto c = children.Read();
+  for (auto iter = c->begin(); iter != c->end(); ++iter) {
     if (iter.IsValid()) {
       auto child = iter.CopyPointer().Lock();
       if (child) {
-        child_names.push_back(child->local_name());
+        fbl::AllocChecker ac;
+        child_names.push_back(child->local_name(), &ac);
+        if (!ac.check())
+          break;
       }
     }
   }
   return child_names;
 }
 
+#if 0
 fit::result<Errno, std::pair<DirEntryHandle, bool>> DirEntryLockedChildren::get_or_create_child(
     const CurrentTask& current_task, const MountInfo& mount, const FsStr& name,
     std::function<fit::result<Errno, FsNodeHandle>(const FsNodeHandle&, const MountInfo&,
                                                    const FsStr&)>
         create_fn) {
-  LTRACEF_LEVEL(2, "name=%s\n", name.c_str());
+  LTRACEF_LEVEL(2, "name=[%.*s]\n", static_cast<int>(name.length()), name.data());
 
   auto create_child = [&]() -> fit::result<Errno, std::pair<DirEntryHandle, bool>> {
     auto find_or_create_node = [&]() -> fit::result<Errno, std::pair<FsNodeHandle, bool>> {
@@ -270,5 +277,6 @@ fit::result<Errno, std::pair<DirEntryHandle, bool>> DirEntryLockedChildren::get_
   child->node->fs()->did_create_dir_entry(child);
   return fit::ok(std::make_pair(child, exist));
 }
+#endif
 
 }  // namespace starnix

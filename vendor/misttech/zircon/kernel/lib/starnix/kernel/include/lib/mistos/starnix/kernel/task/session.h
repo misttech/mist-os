@@ -7,8 +7,6 @@
 
 #include <lib/mistos/linux_uapi/typedefs.h>
 #include <lib/mistos/starnix/kernel/sync/locks.h>
-#include <lib/mistos/starnix/kernel/task/forward.h>
-#include <lib/mistos/starnix/kernel/task/process_group.h>
 #include <lib/mistos/util/weak_wrapper.h>
 
 #include <fbl/canary.h>
@@ -19,6 +17,8 @@
 #include <kernel/mutex.h>
 
 namespace starnix {
+
+class ProcessGroup;
 
 struct SessionMutableState {
  private:
@@ -32,6 +32,8 @@ struct SessionMutableState {
  public:
   /// The controlling terminal of the session.
   // pub controlling_terminal: Option<ControllingTerminal>,
+
+  ~SessionMutableState();
 };
 
 /// A session is a collection of `ProcessGroup` objects that are related to each other. Each
@@ -60,8 +62,11 @@ class Session : public fbl::RefCounted<Session> {
   static fbl::RefPtr<Session> New(pid_t _leader);
 
   // C++
+ public:
+  ~Session();
+
  private:
-  Session(pid_t _leader) : leader(_leader) {}
+  Session(pid_t _leader);
 };
 
 }  // namespace starnix

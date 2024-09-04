@@ -6,69 +6,68 @@ import("//build/zircon/migrated_targets.gni")
 
 zx_library("kernel") {
   sources = [
-    #"arch/${current_cpu}/loader.cc",
-    #"arch/${current_cpu}/syscalls.cc",
-    #"debugcommands.cc",
+    "arch/${current_cpu}/loader.cc",
+    "arch/${current_cpu}/syscalls.cc",
+    "debugcommands.cc",
+    "execution/executor.cc",
+    "fs/mistos/syslog.cc",
+    "fs/tmpfs.cc",
 
-    #"execution/executor.cc",
-    #"fs/mistos/syslog.cc",
-    #"fs/tmpfs.cc",
     #"loader.cc",
-    #"logging/logging.cc",
-    #"mm/memory_accessor.cc",
-    #"mm/memory_manager.cc",
-    #"mm/syscalls.cc",
-    #"runner/container.cc",
+    "logging/logging.cc",
+    "mm/memory.cc",
+    "mm/memory_accessor.cc",
+    "mm/memory_manager.cc",
+    "mm/syscalls.cc",
+    "runner/container.cc",
 
     #"starnix-loader.cc",
-    #"syscalls/misc.cc",
-    #"task/current_task.cc",
-    #"task/kernel.cc",
-    #"task/pidtable.cc",
-    #"task/process_group.cc",
-    #"task/session.cc",
-
-    #"task/syscalls.cc",
-    #"task/task.cc",
-    #"task/thread_group.cc",
-
-    #"testing.cc",
-    #"vfs/anon_node.cc",
-    #"vfs/buffers/io_buffers.cc",
-    #"vfs/dir_entry.cc",
-    #"vfs/fd_numbers.cc",
-    "vfs/path.cc",
-
-    #"vfs/fd_table.cc",
-    #"vfs/file_object.cc",
-    #"vfs/file_system.cc",
+    "syscalls/misc.cc",
+    "task/current_task.cc",
+    "task/kernel.cc",
+    "task/pidtable.cc",
+    "task/process_group.cc",
+    "task/session.cc",
+    "task/syscalls.cc",
+    "task/task.cc",
+    "task/thread_group.cc",
+    "testing.cc",
+    "vfs/anon_node.cc",
+    "vfs/buffers/io_buffers.cc",
+    "vfs/dir_entry.cc",
+    "vfs/fd_numbers.cc",
+    "vfs/fd_table.cc",
+    "vfs/file_object.cc",
+    "vfs/file_system.cc",
     "vfs/fs_args.cc",
-
-    #"vfs/fs_context.cc",
-    #"vfs/fs_node.cc",
-    #"vfs/module.cc",
-    #"vfs/mount.cc",
-    #"vfs/namespace.cc",
-    #"vfs/syscalls.cc",
-    #"vfs/vmo_file.cc",
-    #"vfs/xattr.cc",
+    "vfs/fs_context.cc",
+    "vfs/fs_node.cc",
+    "vfs/fs_node_ops.cc",
+    "vfs/module.cc",
+    "vfs/mount.cc",
+    "vfs/namespace.cc",
+    "vfs/namespace_node.cc",
+    "vfs/path.cc",
+    "vfs/syscalls.cc",
+    "vfs/vmo_file.cc",
+    "vfs/xattr.cc",
 
     #"zircon/task_dispatcher.cc",
   ]
 
   public_deps = [
     "//vendor/misttech/third_party/linux_uapi",
-    "//vendor/misttech/zircon/kernel/lib/mistos/zx",
     "//vendor/misttech/zircon/kernel/lib/starnix/lib/starnix-syscalls",
     "//vendor/misttech/zircon/kernel/lib/starnix/lib/starnix-uapi",
-    "//zircon/system/ulib/zxtest:prod",
+  ]
+
+  public_deps += [
+    # <lib/userabi/rodso.h> has #include <object/handle.h>.
+    "//zircon/kernel/object",
   ]
 
   deps = [
-    "//vendor/misttech/zircon/kernel/lib/mistos/elfldltl",
-
-    #"//vendor/misttech/zircon/kernel/lib/mistos/userloader",
-    "//vendor/misttech/zircon/kernel/lib/mistos/zx_syscalls",
+    #"//vendor/misttech/zircon/kernel/lib/mistos/elfldltl",
     "//zircon/kernel/lib/console",
   ]
 }

@@ -11,6 +11,8 @@
 
 #include <ktl/enforce.h>
 
+namespace unit_testing {
+
 using namespace starnix;
 
 struct Data {
@@ -85,10 +87,12 @@ bool test_rwlock_guard_move_write() {
   END_TEST;
 }
 
+}  // namespace unit_testing
+
 UNITTEST_START_TESTCASE(starnix_sync)
-UNITTEST("test mutex raw", test_mutex_raw)
-UNITTEST("test mutex ref ptr", test_mutex_ref_ptr)
-UNITTEST("test rwlock", test_rwlock)
-UNITTEST("test rwlock ref ptr", test_rwlock_ref_ptr)
-UNITTEST("test rwlock guard move write", test_rwlock_guard_move_write)
+UNITTEST("test mutex raw", unit_testing::test_mutex_raw)
+UNITTEST("test mutex ref ptr", unit_testing::test_mutex_ref_ptr)
+UNITTEST("test rwlock", unit_testing::test_rwlock)
+UNITTEST("test rwlock ref ptr", unit_testing::test_rwlock_ref_ptr)
+UNITTEST("test rwlock guard move write", unit_testing::test_rwlock_guard_move_write)
 UNITTEST_END_TESTCASE(starnix_sync, "starnix_sync", "Tests for starnix sync")

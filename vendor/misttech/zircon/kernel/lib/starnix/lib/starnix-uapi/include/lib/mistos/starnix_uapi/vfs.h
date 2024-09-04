@@ -9,10 +9,8 @@
 #include <lib/mistos/util/bitflags.h>
 #include <zircon/types.h>
 
-// clang-format off
-#include <asm-generic/statfs.h>
+#include <asm/statfs.h>
 #include <linux/openat2.h>
-// clang-format on
 
 namespace starnix_uapi {
 

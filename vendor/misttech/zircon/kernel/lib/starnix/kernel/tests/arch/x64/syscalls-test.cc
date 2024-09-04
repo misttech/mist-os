@@ -8,22 +8,23 @@
 #include <lib/mistos/starnix/kernel/task/process_group.h>
 #include <lib/mistos/starnix/kernel/task/task.h>
 #include <lib/mistos/starnix/kernel/task/thread_group.h>
+#include <lib/mistos/starnix/kernel/vfs/file_object.h>
 #include <lib/mistos/starnix/testing/testing.h>
 #include <lib/mistos/starnix_uapi/open_flags.h>
+#include <lib/unittest/unittest.h>
 
 #include <fbl/ref_ptr.h>
-#include <fbl/string.h>
-#include <zxtest/zxtest.h>
+#include <ktl/string_view.h>
 
 using namespace starnix::testing;
-using namespace starnix;
 
-namespace {
+namespace testing {
 
-TEST(Arch, test_sys_creat) {
+bool test_sys_creat() {
+  BEGIN_TEST;
   auto [kernel, current_task] = create_kernel_and_task();
   auto path_addr = map_memory(*current_task, UserAddress(), PAGE_SIZE);
-  fbl::String path("newfile.txt");
+  ktl::string_view path("newfile.txt");
   auto result = (*current_task).write_memory(path_addr, {(uint8_t*)path.data(), path.size()});
   ASSERT_TRUE(result.is_ok());
   auto fd_or_error = sys_creat(*current_task, path_addr, starnix_uapi::FileMode());
@@ -32,6 +33,13 @@ TEST(Arch, test_sys_creat) {
 
   auto flag_or_error = current_task->files.get_fd_flags(fd_or_error.value());
   ASSERT_TRUE(flag_or_error.is_ok());
+
+  END_TEST;
 }
 
-}  // namespace
+}  // namespace testing
+
+UNITTEST_START_TESTCASE(starnix_arch_syscalls)
+UNITTEST("test sys creat", testing::test_sys_creat)
+UNITTEST_END_TESTCASE(starnix_arch_syscalls, "starnix_arch_syscalls", "Tests for Tasks Syscalls")
+

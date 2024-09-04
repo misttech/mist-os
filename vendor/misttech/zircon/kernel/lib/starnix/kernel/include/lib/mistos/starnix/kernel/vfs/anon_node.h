@@ -6,15 +6,16 @@
 #ifndef ZIRCON_KERNEL_LIB_MISTOS_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_VFS_ANON_NODE_H_
 #define ZIRCON_KERNEL_LIB_MISTOS_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_VFS_ANON_NODE_H_
 
-#include <lib/mistos/starnix/kernel/task/forward.h>
-#include <lib/mistos/starnix/kernel/vfs/forward.h>
+#include <lib/mistos/starnix/kernel/vfs/file_system_ops.h>
 #include <lib/mistos/starnix/kernel/vfs/fs_node.h>
+#include <lib/mistos/starnix/kernel/vfs/fs_node_ops.h>
 #include <lib/mistos/starnix_uapi/open_flags.h>
 #include <lib/mistos/starnix_uapi/vfs.h>
 
 #include <fbl/ref_ptr.h>
 #include <ktl/unique_ptr.h>
 
+#include <asm/statfs.h>
 #include <linux/magic.h>
 
 namespace starnix {
@@ -43,7 +44,7 @@ class AnonFs : public FileSystemOps {
  public:
   fit::result<Errno, struct statfs> statfs(const FileSystem& fs,
                                            const CurrentTask& current_task) final {
-    return fit::ok(default_statfs(ANON_INODE_FS_MAGIC));
+    return fit::ok(starnix_uapi::default_statfs(ANON_INODE_FS_MAGIC));
   }
 
   const FsStr& name() final { return name_; }

@@ -14,6 +14,7 @@
 #include <charconv>
 
 #include <fbl/intrusive_hash_table.h>
+#include <ktl/optional.h>
 #include <ktl/string_view.h>
 #include <ktl/unique_ptr.h>
 
@@ -53,6 +54,14 @@ class MountParams {
 
  public:
   static fit::result<Errno, MountParams> parse(const FsStr& data);
+
+  ktl::optional<FsString> remove(const char* key) {
+    auto ptr = options_.erase(key);
+    if (ptr)
+      return ptr->value;
+    else
+      return ktl::nullopt;
+  }
 
   bool is_empty() const { return options_.is_empty(); }
 

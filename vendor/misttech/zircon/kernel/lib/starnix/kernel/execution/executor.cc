@@ -6,122 +6,80 @@
 #include "lib/mistos/starnix/kernel/execution/executor.h"
 
 #include <lib/fit/result.h>
-#include <lib/mistos/starnix/kernel/execution/shared.h>
+#include <lib/mistos/starnix/kernel/mm/memory.h>
+#include <lib/mistos/starnix/kernel/mm/memory_manager.h>
 #include <lib/mistos/starnix/kernel/task/current_task.h>
 #include <lib/mistos/starnix/kernel/task/kernel.h>
 #include <lib/mistos/starnix/kernel/task/process_group.h>
 #include <lib/mistos/starnix/kernel/task/task.h>
 #include <lib/mistos/starnix/kernel/task/thread_group.h>
-#include <lib/mistos/starnix/kernel/zircon/task_dispatcher.h>
 #include <lib/mistos/starnix_uapi/errors.h>
 #include <lib/mistos/util/weak_wrapper.h>
-#include <lib/mistos/zx/job.h>
-#include <lib/mistos/zx/process.h>
-#include <lib/mistos/zx/thread.h>
-#include <lib/mistos/zx_syscalls/util.h>
 #include <trace.h>
 #include <zircon/types.h>
-
-#include <tuple>
-#include <utility>
 
 #include <fbl/alloc_checker.h>
 #include <fbl/ref_ptr.h>
 #include <fbl/string.h>
+#include <ktl/tuple.h>
 #include <object/dispatcher.h>
 #include <object/job_dispatcher.h>
 #include <object/process_dispatcher.h>
-#include <object/vm_address_region_dispatcher.h>
 #include <object/vm_object_dispatcher.h>
 #include <vm/vm_object_paged.h>
 
 #include "../kernel_priv.h"
 
+#include <ktl/enforce.h>
+
 #define LOCAL_TRACE STARNIX_KERNEL_GLOBAL_TRACE(0)
 
 namespace starnix {
 
-fit::result<Errno, TaskInfo> create_zircon_process(fbl::RefPtr<Kernel> kernel,
-                                                   ktl::optional<fbl::RefPtr<ThreadGroup>> parent,
-                                                   pid_t pid,
-                                                   fbl::RefPtr<ProcessGroup> process_group,
-                                                   const fbl::String& name) {
+fit::result<Errno, TaskInfo> create_zircon_process(
+    fbl::RefPtr<Kernel> kernel,
+    ktl::optional<RwLock<ThreadGroupMutableState>::RwLockWriteGuard> parent, pid_t pid,
+    fbl::RefPtr<ProcessGroup> process_group, const ktl::string_view& name) {
   LTRACE;
-  auto shared_or_errorr =
-      create_process(0, zx::unowned_job(process_group->job), name).map_error([](auto status) {
+  auto process_or_error =
+      create_process(GetRootJobDispatcher(), 0, name).map_error([](auto status) {
         return errno(from_status_like_fdio(status));
       });
-  if (shared_or_errorr.is_error()) {
-    return shared_or_errorr.take_error();
+  if (process_or_error.is_error()) {
+    return process_or_error.take_error();
   }
 
-  auto [process, root_vmar] = ktl::move(shared_or_errorr.value());
+  auto [process, root_vmar] = ktl::move(process_or_error.value());
 
-  auto mm_or_error = MemoryManager::New(ktl::move(root_vmar)).map_error([](auto status) {
-    return errno(from_status_like_fdio(status));
-  });
+  auto mm_or_error = MemoryManager::New(root_vmar).map_error(
+      [](auto status) { return errno(from_status_like_fdio(status)); });
+
   if (mm_or_error.is_error()) {
     return mm_or_error.take_error();
   }
 
-  auto thread_group = ThreadGroup::New(kernel, ktl::move(process), parent, pid, process_group);
+  auto thread_group =
+      ThreadGroup::New(kernel, ktl::move(process), ktl::move(parent), pid, process_group);
   return fit::ok(TaskInfo{{}, thread_group, *mm_or_error});
 }
 
-fit::result<zx_status_t, ktl::pair<zx::process, zx::vmar>> create_shared(uint32_t options,
-                                                                         const fbl::String& name) {
+fit::result<zx_status_t, ktl::pair<KernelHandle<ProcessDispatcher>, Vmar>> create_process(
+    fbl::RefPtr<JobDispatcher> parent, uint32_t options, const ktl::string_view& name) {
   LTRACE;
-  zx::process process;
-  zx::vmar vmar;
-  zx_status_t status = zx::process::create(*zx::unowned_job{zx::job::default_job()}, name.data(),
-                                           static_cast<uint32_t>(name.size()), 0, &process, &vmar);
-  if (status != ZX_OK) {
-    return fit::error(status);
-  }
-
-  return fit::ok(ktl::pair(ktl::move(process), ktl::move(vmar)));
-}
-
-fit::result<zx_status_t, zx::job> create_job(uint32_t options) {
-  LTRACE;
-  zx::job job;
-  zx_status_t status = zx::job::create(*zx::unowned_job{zx::job::default_job()}, options, &job);
-  if (status != ZX_OK) {
-    return fit::error(status);
-  }
-
-  return fit::ok(ktl::move(job));
-}
-
-fit::result<zx_status_t, ktl::pair<zx::process, zx::vmar>> create_process(uint32_t options,
-                                                                          zx::unowned_job job,
-                                                                          const fbl::String& name) {
-  LTRACE;
-  zx::process process;
-  zx::vmar vmar;
-  zx_status_t status = zx::process::create(*job, name.data(), static_cast<uint32_t>(name.size()), 0,
-                                           &process, &vmar);
-  if (status != ZX_OK) {
-    return fit::error(status);
-  }
-
-  return fit::ok(ktl::pair(ktl::move(process), ktl::move(vmar)));
-}
-
-fit::result<zx_status_t, zx::thread> create_thread(const zx::process& parent,
-                                                   const fbl::String& name) {
-  LTRACE;
-  zx::thread thread;
-  zx_status_t status =
-      zx::thread::create(parent, name.data(), static_cast<uint32_t>(name.size()), 0, &thread);
+  KernelHandle<ProcessDispatcher> process_handle;
+  KernelHandle<VmAddressRegionDispatcher> vmar_handle;
+  zx_rights_t process_rights, vmar_rights;
+  zx_status_t status = ProcessDispatcher::Create(parent, name, 0, &process_handle, &process_rights,
+                                                 &vmar_handle, &vmar_rights);
 
   if (status != ZX_OK) {
     return fit::error(status);
   }
 
-  return fit::ok(ktl::move(thread));
+  return fit::ok(ktl::pair(ktl::move(process_handle), Vmar{vmar_handle.release(), vmar_rights}));
 }
 
+#if 0
 // Runs the `current_task` to completion.
 //
 fit::result<zx_status_t, ExitStatus> run_task(CurrentTask& current_task) {
@@ -289,5 +247,6 @@ void execute_task(TaskBuilder task_builder, PreRun pre_run,
     }
   }
 }
+#endif
 
 }  // namespace starnix

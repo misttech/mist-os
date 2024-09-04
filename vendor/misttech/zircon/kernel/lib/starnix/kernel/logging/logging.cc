@@ -9,8 +9,10 @@
 #include <lib/mistos/util/back_insert_iterator.h>
 
 #include <fbl/alloc_checker.h>
+#include <fbl/ref_ptr.h>
 #include <fbl/vector.h>
 #include <ktl/algorithm.h>
+#include <object/vm_object_dispatcher.h>
 
 #include <ktl/enforce.h>
 
@@ -18,7 +20,7 @@ namespace starnix {
 
 Errno impossible_error(zx_status_t status) { PANIC("encountered impossible error: %d", status); }
 
-fbl::Vector<uint8_t> truncate_name(ktl::span<uint8_t> name) {
+fbl::Vector<uint8_t> from_bytes_lossy(ktl::span<const uint8_t> name) {
   fbl::Vector<uint8_t> truncated_name;
   fbl::AllocChecker ac;
   truncated_name.reserve(ZX_MAX_NAME_LEN, &ac);
@@ -37,9 +39,9 @@ fbl::Vector<uint8_t> truncate_name(ktl::span<uint8_t> name) {
   return ktl::move(truncated_name);
 }
 
-void set_zx_name(zx::unowned_handle obj, const ktl::span<uint8_t>& name) {
-  auto tname = truncate_name(name);
-  obj->set_property(ZX_PROP_NAME, tname.data(), tname.size());
+void set_zx_name(fbl::RefPtr<VmObjectDispatcher> obj, const ktl::span<const uint8_t>& name) {
+  auto tname = from_bytes_lossy(name);
+  DEBUG_ASSERT(obj->set_name(reinterpret_cast<const char*>(tname.data()), tname.size()) == ZX_OK);
 }
 
 }  // namespace starnix

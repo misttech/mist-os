@@ -13,7 +13,7 @@
 #include <lib/mistos/starnix/kernel/sync/locks.h>
 #include <lib/mistos/starnix/kernel/task/pidtable.h>
 #include <lib/mistos/starnix/kernel/vfs/fd_numbers.h>
-#include <lib/mistos/starnix/kernel/vfs/forward.h>
+#include <lib/mistos/starnix/kernel/vfs/mount.h>
 #include <lib/mistos/starnix/kernel/vfs/path.h>
 #include <lib/mistos/starnix_uapi/auth.h>
 #include <lib/mistos/starnix_uapi/file_mode.h>
@@ -27,9 +27,9 @@
 #include <utility>
 
 #include <fbl/ref_ptr.h>
-#include <fbl/string.h>
 #include <fbl/vector.h>
 #include <ktl/optional.h>
+#include <ktl/string_view.h>
 
 namespace starnix {
 
@@ -38,6 +38,7 @@ class AutoReleasableTask;
 }
 
 class Task;
+class FsContext;
 
 // The thread related information of a `CurrentTask`. The information should never be used outside
 // of the thread owning the `CurrentTask`.
@@ -71,15 +72,18 @@ class TaskBuilder {
 
  public:
   /// impl TaskBuilder
-  TaskBuilder(fbl::RefPtr<Task> task) : task(ktl::move(task)) {}
+  TaskBuilder(fbl::RefPtr<Task> task);
 
-  Task* operator->() {
-    ASSERT_MSG(task, "called `operator->` empty Task");
-    return task.get();
-  }
+  Task* operator->();
+
+ public:
+  // C++
+  ~TaskBuilder();
 };
 
 class Kernel;
+struct LookupContext;
+struct NamespaceNode;
 
 // The task object associated with the currently executing thread.
 //
@@ -96,7 +100,7 @@ class Kernel;
 class CurrentTask : public MemoryAccessorExt {
  public:
   /// impl From<TaskBuilder> for CurrentTask
-  static CurrentTask From(const TaskBuilder& builder) { return ktl::move(builder.task); }
+  static CurrentTask From(const TaskBuilder& builder);
 
  public:
   /// The underlying task object.
@@ -106,15 +110,9 @@ class CurrentTask : public MemoryAccessorExt {
 
   /// impl CurrentTask
  public:
-  util::WeakPtr<Task> weak_task() const {
-    ASSERT(task);
-    return util::WeakPtr<Task>(task.get());
-  }
+  util::WeakPtr<Task> weak_task() const;
 
-  void set_creds(Credentials creds) const {
-    // Guard<Mutex> lock(persistent_info->lock());
-    // persistent_info->state().creds = creds;
-  }
+  void set_creds(Credentials creds) const;
 
   /// Determine namespace node indicated by the dir_fd.
   ///
@@ -201,15 +199,15 @@ class CurrentTask : public MemoryAccessorExt {
   /// Resolves symlinks.
   fit::result<Errno, NamespaceNode> lookup_path_from_root(const FsStr& path) const;
 
-  fit::result<Errno> exec(const FileHandle& executable, const fbl::String& path,
-                          const fbl::Vector<fbl::String>& argv,
-                          const fbl::Vector<fbl::String>& environ);
+  fit::result<Errno> exec(const FileHandle& executable, const ktl::string_view& path,
+                          const fbl::Vector<ktl::string_view>& argv,
+                          const fbl::Vector<ktl::string_view>& environ);
 
  private:
   // After the memory is unmapped, any failure in exec is unrecoverable and results in the
   // process crashing. This function is for that second half; any error returned from this
   // function will be considered unrecoverable.
-  fit::result<Errno> finish_exec(const fbl::String& path, const ResolvedElf& resolved_elf);
+  fit::result<Errno> finish_exec(const ktl::string_view& path, const ResolvedElf& resolved_elf);
 
  public:
   // Create a process that is a child of the `init` process.
@@ -227,7 +225,7 @@ class CurrentTask : public MemoryAccessorExt {
   //
   // This function creates an underlying Zircon process to host the new task.
   static fit::result<Errno, TaskBuilder> create_init_child_process(
-      const fbl::RefPtr<Kernel>& kernel, const fbl::String& initial_name);
+      const fbl::RefPtr<Kernel>& kernel, const ktl::string_view& initial_name);
 
   // Creates the initial process for a kernel.
   //
@@ -249,20 +247,20 @@ class CurrentTask : public MemoryAccessorExt {
   // the pid for the process.
   static fit::result<Errno, TaskBuilder> create_init_process(const fbl::RefPtr<Kernel>& kernel,
                                                              pid_t pid,
-                                                             const fbl::String& initial_name,
+                                                             const ktl::string_view& initial_name,
                                                              fbl::RefPtr<FsContext> fs);
 
  private:
   template <typename TaskInfoFactory>
   static fit::result<Errno, TaskBuilder> create_task(const fbl::RefPtr<Kernel>& kernel,
-                                                     const fbl::String& initial_name,
+                                                     const ktl::string_view& initial_name,
                                                      fbl::RefPtr<FsContext> root_fs,
                                                      TaskInfoFactory&& task_info_factory);
 
   template <typename TaskInfoFactory>
   static fit::result<Errno, TaskBuilder> create_task_with_pid(
       const fbl::RefPtr<Kernel>& kernel, RwLock<PidTable>::RwLockWriteGuard& pids, pid_t pid,
-      const fbl::String& initial_name, fbl::RefPtr<FsContext> root_fs,
+      const ktl::string_view& initial_name, fbl::RefPtr<FsContext> root_fs,
       TaskInfoFactory&& task_info_factory);
 
  public:
@@ -289,7 +287,7 @@ class CurrentTask : public MemoryAccessorExt {
  public:
   // FIXME(Herrera) Temporay method to be deleted
   static fit::result<Errno, FileHandle> open_file_bootfs(
-      const fbl::String& path /*, OpenFlags flags*/);
+      const ktl::string_view& path /*, OpenFlags flags*/);
 
   /// impl MemoryAccessor for CurrentTask
   fit::result<Errno, ktl::span<uint8_t>> read_memory(UserAddress addr,

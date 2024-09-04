@@ -7,7 +7,10 @@
 
 #include <lib/mistos/starnix/kernel/task/module.h>
 #include <lib/mistos/starnix/kernel/vfs/buffers/io_buffers.h>
-#include <lib/mistos/starnix/kernel/vfs/module.h>
+#include <lib/mistos/starnix/kernel/vfs/dir_entry.h>
+#include <lib/mistos/starnix/kernel/vfs/file_ops.h>
+#include <lib/mistos/starnix/kernel/vfs/fs_node.h>
+#include <lib/mistos/starnix/kernel/vfs/mount.h>
 #include <lib/mistos/starnix_uapi/open_flags.h>
 #include <lib/mistos/util/weak_wrapper.h>
 
@@ -16,6 +19,8 @@
 #include <fbl/alloc_checker.h>
 #include <fbl/ref_ptr.h>
 #include <ktl/optional.h>
+
+#include <ktl/enforce.h>
 
 namespace starnix {
 
@@ -40,22 +45,25 @@ fit::result<Errno, long> default_ioctl(const FileObject&, const CurrentTask&, ui
   return fit::error(errno(ENOTSUP));
 }
 
-FileObject::FileObject(zx::vmo v) : offset(0), flags_(OpenFlags::empty()), vmo(std::move(v)) {}
+FileObject::FileObject(fbl::RefPtr<VmObject> vmo)
+    : offset(0), flags_(OpenFlags::empty()), vmo(ktl::move(vmo)) {}
 
 FileObject::FileObject(WeakFileHandle _weak_handle, FileObjectId _id, NamespaceNode _name,
                        FileSystemHandle _fs, ktl::unique_ptr<FileOps> _ops, OpenFlags _flags)
-    : weak_handle(std::move(_weak_handle)),
+    : weak_handle(ktl::move(_weak_handle)),
       id(_id),
       ops(ktl::move(_ops)),
-      name(std::move(_name)),
-      fs(std::move(_fs)),
+      name(ktl::move(_name)),
+      fs(ktl::move(_fs)),
       offset(0),
       flags_(_flags - OpenFlagsEnum::CREAT) {}
+
+FileObject::~FileObject() = default;
 
 FileHandle FileObject::new_anonymous(ktl::unique_ptr<FileOps> ops, FsNodeHandle node,
                                      OpenFlags flags) {
   ASSERT(!node->fs()->has_permanent_entries());
-  auto new_result = New(std::move(ops), NamespaceNode::new_anonymous_unrooted(node), flags);
+  auto new_result = New(ktl::move(ops), NamespaceNode::new_anonymous_unrooted(node), flags);
   ASSERT_MSG(new_result.value(), "Failed to create anonymous FileObject");
   return new_result.value();
 }
@@ -87,27 +95,6 @@ fit::result<Errno, FileHandle> FileObject::New(ktl::unique_ptr<FileOps> ops, Nam
 }
 
 FsNodeHandle FileObject::node() const { return name.entry->node; }
-
-fit::result<Errno, size_t> FileObject::read_internal(
-    std::function<fit::result<Errno, size_t>()> read) const {
-  if (!can_read()) {
-    return fit::error(errno(EBADF));
-  }
-
-  auto result = read();
-  if (result.is_error())
-    return result.take_error();
-  auto bytes_read = result.value();
-
-  // TODO(steveaustin) - omit updating time_access to allow info to be immutable
-  // and thus allow simultaneous reads.
-  // update_atime();
-  if (bytes_read > 0) {
-    // notify(InotifyMask::ACCESS);
-  }
-
-  return fit::ok(bytes_read);
-}
 
 fit::result<Errno, size_t> FileObject::read(const CurrentTask& current_task,
                                             OutputBuffer* data) const {
@@ -158,28 +145,6 @@ fit::result<Errno, size_t> FileObject::write_common(const CurrentTask& current_t
     return result.take_error();
 
   return ops_().write(*this, current_task, _offset, data);
-}
-
-fit::result<Errno, size_t> FileObject::write_fn(
-    const CurrentTask& current_task, std::function<fit::result<Errno, size_t>()> write) const {
-  if (!can_write()) {
-    return fit::error(errno(EBADF));
-  }
-
-  // self.node().clear_suid_and_sgid_bits(current_task) ? ;
-
-  auto result = write();
-  if (result.is_error())
-    return result.take_error();
-  auto bytes_written = result.value();
-
-  // self.node().update_ctime_mtime();
-
-  if (bytes_written > 0) {
-    // self.notify(InotifyMask::MODIFY);
-  }
-
-  return fit::ok(bytes_written);
 }
 
 fit::result<Errno, size_t> FileObject::write(const CurrentTask& current_task,
@@ -270,55 +235,6 @@ fit::result<Errno, off_t> default_eof_offset(const FileObject& file,
   if (stat_result.is_error())
     return stat_result.take_error();
   return fit::ok(static_cast<off_t>(stat_result->st_size));
-}
-
-fit::result<Errno, off_t> default_seek(
-    off_t current_offset, SeekTarget target,
-    std::function<fit::result<Errno, off_t>(off_t)> compute_end) {
-  auto lresult = [&]() -> fit::result<Errno, ktl::optional<uint64_t>> {
-    switch (target.type) {
-      case SeekTargetType::Set:
-        return fit::ok(target.offset);
-      case SeekTargetType::Cur:
-        return fit::ok(checked_add(current_offset, target.offset));
-      case SeekTargetType::End: {
-        auto result = compute_end(target.offset);
-        if (result.is_error())
-          return result.take_error();
-        return fit::ok(result.value());
-      }
-      case SeekTargetType::Data: {
-        auto eof = compute_end(0).value_or(std::numeric_limits<off_t>::max());
-        if (target.offset >= eof) {
-          return fit::error(errno(ENXIO));
-        }
-        return fit::ok(target.offset);
-      }
-      case SeekTargetType::Hole:
-        auto eof_result = compute_end(0);
-        if (eof_result.is_error())
-          return eof_result.take_error();
-        auto eof = eof_result.value();
-        if (target.offset >= eof) {
-          return fit::error(errno(ENXIO));
-        }
-        return fit::ok(eof);
-    }
-  }();
-
-  if (lresult.is_error())
-    return lresult.take_error();
-
-  auto new_offset = lresult.value();
-  if (!new_offset.has_value()) {
-    return fit::error(errno(EINVAL));
-  }
-
-  if (new_offset < 0) {
-    return fit::error(errno(EINVAL));
-  }
-
-  return fit::ok(*new_offset);
 }
 
 OPathOps* OPathOps::New() {
