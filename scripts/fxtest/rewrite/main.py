@@ -532,6 +532,13 @@ async def validate_test_selections(
         recorder.emit_warning_message(
             "\nCould not find any tests to run for at least one set of arguments you provided."
         )
+        missing_group_with_name = next(
+            filter(lambda x: len(x.names) > 0, missing_groups), None
+        )
+        if flags.exact and missing_group_with_name is not None:
+            recorder.emit_instruction_message(
+                f" --exact does not match packages or components by default\n Did you mean: --exact --package {missing_group_with_name}?"
+            )
         recorder.emit_info_message(
             "\nMake sure this test is transitively in your 'fx set' arguments."
         )
@@ -593,7 +600,7 @@ async def validate_test_selections(
 
             for group, output in zip(missing_groups, outputs):
                 assert output is not None  # Checked above
-                recorder.emit_info_message(
+                recorder.emit_verbatim_message(
                     f"\nFor `{group}`, did you mean any of the following?\n"
                 )
                 recorder.emit_verbatim_message(output.stdout)
