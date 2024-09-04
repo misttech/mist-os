@@ -2753,7 +2753,7 @@ mod test {
     use assert_matches::assert_matches;
     use net_types::ip::Ipv4;
     use netstack3_base::testutil::{FakeInstant, FakeInstantCtx};
-    use netstack3_base::{InstantContext as _, SendPayload};
+    use netstack3_base::{FragmentedPayload, InstantContext as _};
     use test_case::test_case;
 
     use super::*;
@@ -2826,7 +2826,7 @@ mod test {
     }
 
     impl SendBuffer for NullBuffer {
-        type Payload<'a> = SendPayload<'a>;
+        type Payload<'a> = &'a [u8];
 
         fn mark_read(&mut self, count: usize) {
             assert_eq!(count, 0);
@@ -2834,10 +2834,10 @@ mod test {
 
         fn peek_with<'a, F, R>(&'a mut self, offset: usize, f: F) -> R
         where
-            F: FnOnce(SendPayload<'a>) -> R,
+            F: FnOnce(Self::Payload<'a>) -> R,
         {
             assert_eq!(offset, 0);
-            f(SendPayload::Contiguous(&[]))
+            f(&[])
         }
     }
 
@@ -3424,7 +3424,7 @@ mod test {
                     ISS_1 + 1,
                     ISS_2 + 1,
                     UnscaledWindowSize::from(0),
-                    SendPayload::Contiguous(TEST_BYTES)
+                    FragmentedPayload::new_contiguous(TEST_BYTES)
                 ))
             );
             assert_eq!(
@@ -4067,7 +4067,7 @@ mod test {
                 ISS_1 + 1,
                 ISS_2 + 1,
                 UnscaledWindowSize::from_usize(BUFFER_SIZE),
-                SendPayload::Contiguous(&TEST_BYTES[1..2]),
+                FragmentedPayload::new_contiguous(&TEST_BYTES[1..2]),
             ))
         );
 
@@ -4079,7 +4079,7 @@ mod test {
                 ISS_1 + 2,
                 ISS_2 + 1,
                 UnscaledWindowSize::from_usize(BUFFER_SIZE),
-                SendPayload::Contiguous(&TEST_BYTES[2..4]),
+                FragmentedPayload::new_contiguous(&TEST_BYTES[2..4]),
             ))
         );
 
@@ -4094,7 +4094,7 @@ mod test {
                 ISS_1 + 4,
                 ISS_2 + 1,
                 UnscaledWindowSize::from_usize(BUFFER_SIZE),
-                SendPayload::Contiguous(&TEST_BYTES[4..5]),
+                FragmentedPayload::new_contiguous(&TEST_BYTES[4..5]),
             ))
         );
 
@@ -4179,7 +4179,7 @@ mod test {
                     ISS_1 + 1,
                     ISS_1 + 1,
                     UnscaledWindowSize::from(u16::MAX),
-                    SendPayload::Contiguous(TEST_BYTES),
+                    FragmentedPayload::new_contiguous(TEST_BYTES),
                 ))
             );
             assert_eq!(state.poll_send_at(), Some(clock.now() + (1 << i) * Estimator::RTO_INIT));
@@ -4210,7 +4210,7 @@ mod test {
                 ISS_1 + 1 + 1,
                 ISS_1 + 1,
                 UnscaledWindowSize::from(u16::MAX),
-                SendPayload::Contiguous(&TEST_BYTES[1..2]),
+                FragmentedPayload::new_contiguous(&TEST_BYTES[1..2]),
             ))
         );
         // Currently, snd.nxt = ISS_1 + 2, snd.max = ISS_1 + 5, a segment
@@ -4237,7 +4237,7 @@ mod test {
                 ISS_1 + 1 + 3,
                 ISS_1 + 1,
                 UnscaledWindowSize::from(u16::MAX),
-                SendPayload::Contiguous(&TEST_BYTES[3..4]),
+                FragmentedPayload::new_contiguous(&TEST_BYTES[3..4]),
             ))
         );
         // Finally the receiver ACKs all the outstanding data.
@@ -4344,7 +4344,7 @@ mod test {
                 ISS_1 + 1,
                 ISS_2 + 2,
                 last_wnd >> WindowScale::default(),
-                SendPayload::Contiguous(&TEST_BYTES[..2]),
+                FragmentedPayload::new_contiguous(&TEST_BYTES[..2]),
             ))
         );
         // We should be able to send out all remaining bytes together with a FIN.
@@ -4354,7 +4354,7 @@ mod test {
                 ISS_1 + 3,
                 ISS_2 + 2,
                 last_wnd >> WindowScale::default(),
-                SendPayload::Contiguous(&TEST_BYTES[2..]),
+                FragmentedPayload::new_contiguous(&TEST_BYTES[2..]),
             ))
         );
         // Now let's test we retransmit correctly by only acking the data.
@@ -4484,7 +4484,7 @@ mod test {
                 ISS_1 + 1,
                 ISS_2 + 1,
                 UnscaledWindowSize::from_usize(BUFFER_SIZE),
-                SendPayload::Contiguous(&TEST_BYTES[..2])
+                FragmentedPayload::new_contiguous(&TEST_BYTES[..2])
             ))
         );
 
@@ -4495,7 +4495,7 @@ mod test {
                 ISS_1 + 3,
                 ISS_2 + 1,
                 UnscaledWindowSize::from_usize(BUFFER_SIZE),
-                SendPayload::Contiguous(&TEST_BYTES[2..])
+                FragmentedPayload::new_contiguous(&TEST_BYTES[2..])
             ))
         );
 
@@ -4541,7 +4541,7 @@ mod test {
                 ISS_1 + 2,
                 ISS_2 + TEST_BYTES.len() + 1,
                 UnscaledWindowSize::from_usize(BUFFER_SIZE),
-                SendPayload::Contiguous(&TEST_BYTES[1..]),
+                FragmentedPayload::new_contiguous(&TEST_BYTES[1..]),
             ))
         );
 
@@ -4730,7 +4730,7 @@ mod test {
                 ISS_1 + 1,
                 ISS_1 + 1,
                 UnscaledWindowSize::from_usize(BUFFER_SIZE),
-                SendPayload::Contiguous(TEST_BYTES),
+                FragmentedPayload::new_contiguous(TEST_BYTES),
             ))
         );
         assert_eq!(
@@ -4739,7 +4739,7 @@ mod test {
                     ISS_1 + 1,
                     ISS_1 + 1,
                     UnscaledWindowSize::from_usize(BUFFER_SIZE),
-                    SendPayload::Contiguous(TEST_BYTES),
+                    TEST_BYTES,
                 ),
                 clock.now(),
                 &counters,
@@ -4927,7 +4927,7 @@ mod test {
                 ISS_1,
                 ISS_2,
                 UnscaledWindowSize::from(u16::MAX),
-                SendPayload::Contiguous(&[b'A'; DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE_USIZE])
+                FragmentedPayload::new_contiguous(&[b'A'; DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE_USIZE])
             ))
         );
 
@@ -4954,7 +4954,7 @@ mod test {
                             * u32::from(DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE),
                     ISS_2,
                     UnscaledWindowSize::from(u16::MAX),
-                    SendPayload::Contiguous(
+                    FragmentedPayload::new_contiguous(
                         &[expected_byte; DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE_USIZE]
                     )
                 ))
@@ -5165,7 +5165,7 @@ mod test {
         const VALUE: u8 = 0xaa;
 
         fn with_poll_send_result<const HAS_FIN: bool>(
-            f: impl FnOnce(Segment<SendPayload<'_>>),
+            f: impl FnOnce(Segment<FragmentedPayload<'_, 2>>),
             reserved_bytes: usize,
         ) {
             const DATA_LEN: usize = 40;
@@ -5207,7 +5207,7 @@ mod test {
                 .expect("has data"))
         }
 
-        let f = |segment: Segment<SendPayload<'_>>| {
+        let f = |segment: Segment<FragmentedPayload<'_, 2>>| {
             let segment_len = segment.len();
             let Segment { header: _, data } = segment;
             let data_len = data.len();
@@ -5277,7 +5277,7 @@ mod test {
                 ISS_1 + 1,
                 ISS_2 + 1,
                 UnscaledWindowSize::from_usize(BUFFER_SIZE),
-                SendPayload::Contiguous(&TEST_BYTES[0..1])
+                FragmentedPayload::new_contiguous(&TEST_BYTES[0..1])
             ))
         );
 
@@ -5306,7 +5306,7 @@ mod test {
                 ISS_1 + 1,
                 ISS_2 + 1,
                 UnscaledWindowSize::from_usize(BUFFER_SIZE),
-                SendPayload::Contiguous(&TEST_BYTES[0..1])
+                FragmentedPayload::new_contiguous(&TEST_BYTES[0..1])
             ))
         );
 
@@ -5326,7 +5326,7 @@ mod test {
                 ISS_1 + 2,
                 ISS_2 + 1,
                 UnscaledWindowSize::from_usize(BUFFER_SIZE),
-                SendPayload::Contiguous(&TEST_BYTES[1..])
+                FragmentedPayload::new_contiguous(&TEST_BYTES[1..])
             ))
         );
     }
@@ -5372,7 +5372,7 @@ mod test {
                 ISS_1 + 1,
                 ISS_2 + 1,
                 UnscaledWindowSize::from_usize(BUFFER_SIZE),
-                SendPayload::Contiguous(&TEST_BYTES[0..3])
+                FragmentedPayload::new_contiguous(&TEST_BYTES[0..3])
             ))
         );
         assert_eq!(state.poll_send(&counters, 3, clock.now(), &socket_options), None);
@@ -5383,7 +5383,7 @@ mod test {
                 ISS_1 + 4,
                 ISS_2 + 1,
                 UnscaledWindowSize::from_usize(BUFFER_SIZE),
-                SendPayload::Contiguous(&TEST_BYTES[3..5])
+                FragmentedPayload::new_contiguous(&TEST_BYTES[3..5])
             ))
         );
     }
@@ -5446,7 +5446,7 @@ mod test {
                 ISS_1 + 1,
                 ISS_1 + 1,
                 UnscaledWindowSize::from(u16::MAX),
-                SendPayload::Contiguous(&TEST_BYTES[..1]),
+                FragmentedPayload::new_contiguous(&TEST_BYTES[..1]),
             ))
         );
     }
@@ -5649,7 +5649,7 @@ mod test {
                     ISS_2 + 1,
                     ISS_1 + 1,
                     UnscaledWindowSize::from(u16::MAX),
-                    SendPayload::Contiguous(TEST_BYTES),
+                    TEST_BYTES,
                 ),
                 clock.now(),
                 &socket_options,
@@ -5677,7 +5677,7 @@ mod test {
                     ISS_2 + 1 + TEST_BYTES.len(),
                     ISS_1 + 1,
                     UnscaledWindowSize::from(u16::MAX),
-                    SendPayload::Contiguous(&full_segment_sized_payload[..]),
+                    &full_segment_sized_payload[..],
                 ),
                 clock.now(),
                 &socket_options,
@@ -5696,7 +5696,7 @@ mod test {
                     ISS_2 + 1 + TEST_BYTES.len() + full_segment_sized_payload.len(),
                     ISS_1 + 1,
                     UnscaledWindowSize::from(u16::MAX),
-                    SendPayload::Contiguous(&full_segment_sized_payload[..]),
+                    &full_segment_sized_payload[..],
                 ),
                 clock.now(),
                 &socket_options,
@@ -5760,7 +5760,7 @@ mod test {
                     ISS_2 + 2,
                     ISS_1 + 1,
                     UnscaledWindowSize::from(u16::MAX),
-                    SendPayload::Contiguous(&TEST_BYTES[1..])
+                    &TEST_BYTES[1..]
                 ),
                 clock.now(),
                 &socket_options,
@@ -5786,7 +5786,7 @@ mod test {
                     ISS_2 + 1,
                     ISS_1 + 1,
                     UnscaledWindowSize::from(u16::MAX),
-                    SendPayload::Contiguous(&TEST_BYTES[..1])
+                    &TEST_BYTES[..1]
                 ),
                 clock.now(),
                 &socket_options,
@@ -6116,7 +6116,7 @@ mod test {
                 ISS_1 + 1,
                 ISS_2 + 1,
                 WindowSize::DEFAULT >> WindowScale::default(),
-                SendPayload::Contiguous(&TEST_BYTES[..TEST_BYTES.len() - RESERVED_BYTES])
+                FragmentedPayload::new_contiguous(&TEST_BYTES[..TEST_BYTES.len() - RESERVED_BYTES])
             ))
         );
 
@@ -6199,7 +6199,7 @@ mod test {
                 ISS_1 + 1,
                 ISS_2 + 1,
                 UnscaledWindowSize::from(u16::MAX),
-                SendPayload::Contiguous(TEST_BYTES),
+                FragmentedPayload::new_contiguous(TEST_BYTES),
             )),
         );
 
@@ -6257,7 +6257,7 @@ mod test {
                 ISS_1 + 1 + TEST_BYTES.len(),
                 ISS_2 + 1,
                 UnscaledWindowSize::from(u16::MAX),
-                SendPayload::Contiguous(&TEST_BYTES[..1]),
+                FragmentedPayload::new_contiguous(&TEST_BYTES[..1]),
             ))
         );
 
@@ -6308,7 +6308,7 @@ mod test {
                 ISS_1 + 1 + TEST_BYTES.len() + 1,
                 ISS_2 + 1,
                 UnscaledWindowSize::from(u16::MAX),
-                SendPayload::Contiguous(&TEST_BYTES[1..4]),
+                FragmentedPayload::new_contiguous(&TEST_BYTES[1..4]),
             ))
         );
     }
@@ -6358,7 +6358,7 @@ mod test {
                 ISS_1 + 1,
                 ISS_1 + 1,
                 UnscaledWindowSize::from(u16::try_from(BUFFER_SIZE).unwrap()),
-                SendPayload::Contiguous(TEST_BYTES),
+                FragmentedPayload::new_contiguous(TEST_BYTES),
             )),
         );
         assert_eq!(
@@ -6367,7 +6367,7 @@ mod test {
                 ISS_1 + 1 + TEST_BYTES.len(),
                 ISS_1 + 1,
                 UnscaledWindowSize::from(u16::try_from(BUFFER_SIZE).unwrap()),
-                SendPayload::Contiguous(TEST_BYTES),
+                FragmentedPayload::new_contiguous(TEST_BYTES),
             )),
         );
 
@@ -6379,7 +6379,7 @@ mod test {
                 ISS_1 + 1,
                 ISS_1 + 1,
                 UnscaledWindowSize::from(u16::try_from(BUFFER_SIZE).unwrap()),
-                SendPayload::Contiguous(TEST_BYTES),
+                FragmentedPayload::new_contiguous(TEST_BYTES),
             )),
         );
 
@@ -6391,7 +6391,7 @@ mod test {
                     ISS_1 + 1,
                     ISS_1 + 1,
                     UnscaledWindowSize::from(u16::try_from(BUFFER_SIZE).unwrap()),
-                    SendPayload::Contiguous(TEST_BYTES),
+                    TEST_BYTES,
                 ),
                 clock.now(),
                 &counters,

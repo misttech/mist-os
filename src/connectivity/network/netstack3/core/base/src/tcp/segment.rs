@@ -538,24 +538,11 @@ where
 mod testutils {
     use super::*;
 
-    use crate::tcp::base::SendPayload;
-
-    impl Segment<SendPayload<'static>> {
-        /// Create a new segment with the given seq, ack, and data. If `split` is true, then the
-        /// data is split in half.
-        pub fn with_fake_data(seq: SeqNum, ack: SeqNum, data: &'static [u8], split: bool) -> Self {
-            let (segment, discarded) = Self::with_data(
-                seq,
-                Some(ack),
-                None,
-                UnscaledWindowSize::from(u16::MAX),
-                if split {
-                    let (first, second) = data.split_at(data.len() / 2);
-                    SendPayload::Straddle(first, second)
-                } else {
-                    SendPayload::Contiguous(data)
-                },
-            );
+    impl<'a> Segment<&'a [u8]> {
+        /// Create a new segment with the given seq, ack, and data.
+        pub fn with_fake_data(seq: SeqNum, ack: SeqNum, data: &'a [u8]) -> Self {
+            let (segment, discarded) =
+                Self::with_data(seq, Some(ack), None, UnscaledWindowSize::from(u16::MAX), data);
             assert_eq!(discarded, 0);
             segment
         }

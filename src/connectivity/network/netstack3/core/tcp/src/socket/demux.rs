@@ -1115,7 +1115,7 @@ mod test {
     use const_unwrap::const_unwrap_option;
     use ip_test_macro::ip_test;
     use netstack3_base::testutil::TestIpExt;
-    use netstack3_base::{Options, SendPayload, UnscaledWindowSize};
+    use netstack3_base::{Options, UnscaledWindowSize};
     use packet::ParseBuffer as _;
     use test_case::test_case;
 
@@ -1129,12 +1129,8 @@ mod test {
     #[test_case(Segment::syn(SEQ, UnscaledWindowSize::from(u16::MAX), Options { mss: None, window_scale: None }), &[]; "syn")]
     #[test_case(Segment::syn(SEQ, UnscaledWindowSize::from(u16::MAX), Options { mss: Some(Mss(const_unwrap_option(NonZeroU16::new(1440 as u16)))), window_scale: None }), &[]; "syn with mss")]
     #[test_case(Segment::ack(SEQ, ACK, UnscaledWindowSize::from(u16::MAX)), &[]; "ack")]
-    #[test_case(Segment::with_fake_data(SEQ, ACK, FAKE_DATA, false), FAKE_DATA; "contiguous data")]
-    #[test_case(Segment::with_fake_data(SEQ, ACK, FAKE_DATA, true), FAKE_DATA; "split data")]
-    fn tcp_serialize_segment<I: TestIpExt>(
-        segment: Segment<SendPayload<'_>>,
-        expected_body: &[u8],
-    ) {
+    #[test_case(Segment::with_fake_data(SEQ, ACK, FAKE_DATA), FAKE_DATA; "data")]
+    fn tcp_serialize_segment<I: TestIpExt>(segment: Segment<&[u8]>, expected_body: &[u8]) {
         const SOURCE_PORT: NonZeroU16 = const_unwrap_option(NonZeroU16::new(1111));
         const DEST_PORT: NonZeroU16 = const_unwrap_option(NonZeroU16::new(2222));
 

@@ -6,7 +6,7 @@
 //! in this module provide a common interface for platform-specific buffers
 //! used by TCP.
 
-use netstack3_base::{Payload, SendPayload, SeqNum, WindowSize};
+use netstack3_base::{FragmentedPayload, Payload, SeqNum, WindowSize};
 
 use alloc::vec;
 use alloc::vec::Vec;
@@ -391,7 +391,7 @@ impl ReceiveBuffer for RingBuffer {
 }
 
 impl SendBuffer for RingBuffer {
-    type Payload<'a> = SendPayload<'a>;
+    type Payload<'a> = FragmentedPayload<'a, 2>;
 
     fn mark_read(&mut self, count: usize) {
         let Self { storage, head, len, shrink: _ } = self;
@@ -403,25 +403,18 @@ impl SendBuffer for RingBuffer {
 
     fn peek_with<'a, F, R>(&'a mut self, offset: usize, f: F) -> R
     where
-        F: FnOnce(SendPayload<'a>) -> R,
+        F: FnOnce(Self::Payload<'a>) -> R,
     {
         let Self { storage, head, len, shrink: _ } = self;
         if storage.len() == 0 {
-            return f(SendPayload::Contiguous(&[]));
+            return f(FragmentedPayload::new_empty());
         }
         assert!(offset <= *len);
         RingBuffer::with_readable(
             storage,
             (*head + offset) % storage.len(),
             *len - offset,
-            |readable| match readable.len() {
-                1 => f(SendPayload::Contiguous(readable[0])),
-                2 => f(SendPayload::Straddle(readable[0], readable[1])),
-                x => unreachable!(
-                    "the ring buffer cannot have more than 2 fragments, got {} fragments ({:?})",
-                    x, readable
-                ),
-            },
+            |readable| f(readable.into_iter().map(|x| *x).collect()),
         )
     }
 }
@@ -672,7 +665,7 @@ pub(crate) mod testutil {
     }
 
     impl SendBuffer for TestSendBuffer {
-        type Payload<'a> = SendPayload<'a>;
+        type Payload<'a> = FragmentedPayload<'a, 2>;
 
         fn mark_read(&mut self, count: usize) {
             let Self { fake_stream: _, ring } = self;
@@ -681,7 +674,7 @@ pub(crate) mod testutil {
 
         fn peek_with<'a, F, R>(&'a mut self, offset: usize, f: F) -> R
         where
-            F: FnOnce(SendPayload<'a>) -> R,
+            F: FnOnce(Self::Payload<'a>) -> R,
         {
             let Self { fake_stream, ring } = self;
             let mut guard = fake_stream.lock();
@@ -809,11 +802,6 @@ pub(crate) mod testutil {
 
 #[cfg(test)]
 mod test {
-    use assert_matches::assert_matches;
-    use packet::{
-        Buf, FragmentedBytesMut, InnerPacketBuilder as _, PacketBuilder, PacketConstraints,
-        SerializeError, SerializeTarget, Serializer,
-    };
     use proptest::proptest;
     use proptest::strategy::{Just, Strategy};
     use proptest::test_runner::Config;
@@ -821,9 +809,7 @@ mod test {
     use test_case::test_case;
 
     use super::*;
-    use netstack3_base::{PayloadLen, WindowSize};
-
-    const TEST_BYTES: &'static [u8] = "Hello World!".as_bytes();
+    use netstack3_base::WindowSize;
 
     proptest! {
         #![proptest_config(Config {
@@ -974,26 +960,6 @@ mod test {
         }
 
         #[test]
-        fn send_payload_len((payload, _idx) in send_payload::with_index()) {
-            assert_eq!(payload.len(), TEST_BYTES.len())
-        }
-
-        #[test]
-        fn send_payload_slice((payload, idx) in send_payload::with_index()) {
-            let idx_u32 = u32::try_from(idx).unwrap();
-            let end = u32::try_from(TEST_BYTES.len()).unwrap();
-            assert_eq!(payload.clone().slice(0..idx_u32).to_vec(), &TEST_BYTES[..idx]);
-            assert_eq!(payload.clone().slice(idx_u32..end).to_vec(), &TEST_BYTES[idx..]);
-        }
-
-        #[test]
-        fn send_payload_partial_copy((payload, offset, len) in send_payload::with_offset_and_length()) {
-            let mut buffer = [0; TEST_BYTES.len()];
-            payload.partial_copy(offset, &mut buffer[0..len]);
-            assert_eq!(&buffer[0..len], &TEST_BYTES[offset..offset + len]);
-        }
-
-        #[test]
         fn set_target_size((mut rb, new_cap) in ring_buffer::with_new_target_size()) {
             const BYTE_TO_WRITE: u8 = 0x42;
             let written = rb.writable_regions().into_iter().fold(0, |acc, slice| {
@@ -1017,84 +983,6 @@ mod test {
                 assert_eq!(*x, expected, "i={}, rb={:?}", i, rb);
             }
         }
-    }
-
-    #[derive(Debug)]
-    struct OuterBuilder(PacketConstraints);
-
-    impl OuterBuilder {
-        const HEADER_BYTE: u8 = b'H';
-        const FOOTER_BYTE: u8 = b'H';
-    }
-
-    impl PacketBuilder for OuterBuilder {
-        fn constraints(&self) -> PacketConstraints {
-            let Self(constraints) = self;
-            constraints.clone()
-        }
-
-        fn serialize(&self, target: &mut SerializeTarget<'_>, _body: FragmentedBytesMut<'_, '_>) {
-            target.header.fill(Self::HEADER_BYTE);
-            target.footer.fill(Self::FOOTER_BYTE);
-        }
-    }
-
-    const EXAMPLE_DATA: [u8; 10] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
-    #[test_case(SendPayload::Contiguous(&EXAMPLE_DATA); "contiguous")]
-    #[test_case(SendPayload::Straddle(&EXAMPLE_DATA[0..5], &EXAMPLE_DATA[5..]); "split")]
-    #[test_case(SendPayload::Straddle(&[], &EXAMPLE_DATA); "split empty front")]
-    #[test_case(SendPayload::Straddle(&EXAMPLE_DATA, &[]); "split empty back")]
-    fn send_payload_serializer_data(payload: SendPayload<'static>) {
-        const HEADER_LEN: usize = 5;
-        const FOOTER_LEN: usize = 6;
-        let outer = OuterBuilder(PacketConstraints::new(HEADER_LEN, FOOTER_LEN, 0, usize::MAX));
-
-        assert_eq!(
-            payload
-                .into_serializer()
-                .encapsulate(outer)
-                .serialize_vec_outer()
-                .expect("should serialize")
-                .unwrap_b(),
-            Buf::new(
-                [OuterBuilder::HEADER_BYTE; HEADER_LEN]
-                    .into_iter()
-                    .chain(EXAMPLE_DATA)
-                    .chain([OuterBuilder::FOOTER_BYTE; FOOTER_LEN])
-                    .collect(),
-                ..
-            )
-        );
-    }
-
-    #[test]
-    fn send_payload_serializer_body_too_large() {
-        let outer = OuterBuilder(PacketConstraints::new(0, 0, 0, EXAMPLE_DATA.len() - 1));
-        let payload = SendPayload::Contiguous(&EXAMPLE_DATA);
-
-        assert_matches!(
-            payload.into_serializer().encapsulate(outer).serialize_vec_outer(),
-            Err((SerializeError::SizeLimitExceeded, _))
-        );
-    }
-
-    #[test]
-    fn send_payload_serializer_body_needs_padding() {
-        const PADDING: usize = 3;
-        let outer =
-            OuterBuilder(PacketConstraints::new(0, 0, EXAMPLE_DATA.len() + PADDING, usize::MAX));
-        let payload = SendPayload::Contiguous(&EXAMPLE_DATA);
-
-        // The body gets padded with zeroes.
-        assert_eq!(
-            payload
-                .into_serializer()
-                .encapsulate(outer)
-                .serialize_vec_outer()
-                .expect("can serialize")
-                .unwrap_b(),
-            Buf::new(EXAMPLE_DATA.into_iter().chain([0; PADDING]).collect(), ..)
-        );
     }
 
     #[test_case([Range { start: 0, end: 0 }]
@@ -1124,7 +1012,9 @@ mod test {
         // Write more than half the buffer.
         const BUF_SIZE: usize = 10;
         assert_eq!(rb.enqueue_data(&[0xAA; BUF_SIZE]), BUF_SIZE);
-        rb.peek_with(0, |payload| assert_eq!(payload, SendPayload::Contiguous(&[0xAA; BUF_SIZE])));
+        rb.peek_with(0, |payload| {
+            assert_eq!(payload, FragmentedPayload::new_contiguous(&[0xAA; BUF_SIZE]))
+        });
         rb.mark_read(BUF_SIZE);
 
         // Write around the end of the buffer.
@@ -1132,10 +1022,10 @@ mod test {
         rb.peek_with(0, |payload| {
             assert_eq!(
                 payload,
-                SendPayload::Straddle(
+                FragmentedPayload::new([
                     &[0xBB; (CAPACITY - BUF_SIZE)],
                     &[0xBB; (BUF_SIZE * 2 - CAPACITY)]
-                )
+                ])
             )
         });
         // Mark everything read, which should advance `head` around to the
@@ -1144,7 +1034,9 @@ mod test {
 
         // Now make a contiguous sequence of bytes readable.
         assert_eq!(rb.enqueue_data(&[0xCC; BUF_SIZE]), BUF_SIZE);
-        rb.peek_with(0, |payload| assert_eq!(payload, SendPayload::Contiguous(&[0xCC; BUF_SIZE])));
+        rb.peek_with(0, |payload| {
+            assert_eq!(payload, FragmentedPayload::new_contiguous(&[0xCC; BUF_SIZE]))
+        });
 
         // Check that the unwritten bytes are left untouched. If `head` was
         // advanced improperly, this will crash.
@@ -1308,31 +1200,6 @@ mod test {
                     let rb = RingBuffer { storage: vec![0; cap], head, len, shrink };
                     (rb, target_size)
                 })
-            })
-        }
-    }
-    mod send_payload {
-        use super::*;
-
-        pub(super) fn with_index() -> impl Strategy<Value = (SendPayload<'static>, usize)> {
-            proptest::prop_oneof![
-                (Just(SendPayload::Contiguous(TEST_BYTES)), 0..TEST_BYTES.len()),
-                (0..TEST_BYTES.len()).prop_flat_map(|split_at| {
-                    (
-                        Just(SendPayload::Straddle(
-                            &TEST_BYTES[..split_at],
-                            &TEST_BYTES[split_at..],
-                        )),
-                        0..TEST_BYTES.len(),
-                    )
-                })
-            ]
-        }
-
-        pub(super) fn with_offset_and_length(
-        ) -> impl Strategy<Value = (SendPayload<'static>, usize, usize)> {
-            with_index().prop_flat_map(|(payload, index)| {
-                (Just(payload), Just(index), 0..=TEST_BYTES.len() - index)
             })
         }
     }

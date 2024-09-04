@@ -24,9 +24,9 @@ use netstack3_core::device::{DeviceId, WeakDeviceId};
 use netstack3_core::socket::ShutdownType;
 use netstack3_core::tcp::{
     self, AcceptError, BindError, BoundInfo, Buffer, BufferLimits, BufferSizes, ConnectError,
-    ConnectionError, ConnectionInfo, IntoBuffers, ListenError, ListenerNotifier, NoConnection,
-    OriginalDestinationError, Payload, PayloadLen, ReceiveBuffer, RingBuffer, SendBuffer,
-    SendPayload, SetReuseAddrError, SocketAddr, SocketInfo, SocketOptions, Takeable,
+    ConnectionError, ConnectionInfo, FragmentedPayload, IntoBuffers, ListenError, ListenerNotifier,
+    NoConnection, OriginalDestinationError, Payload, PayloadLen, ReceiveBuffer, RingBuffer,
+    SendBuffer, SetReuseAddrError, SocketAddr, SocketInfo, SocketOptions, Takeable,
     TcpBindingsTypes, UnboundInfo,
 };
 use netstack3_core::IpExt;
@@ -409,7 +409,7 @@ impl SendBufferWithZirconSocket {
 }
 
 impl SendBuffer for SendBufferWithZirconSocket {
-    type Payload<'a> = SendPayload<'a>;
+    type Payload<'a> = FragmentedPayload<'a, 2>;
 
     fn mark_read(&mut self, count: usize) {
         self.ready_to_send.mark_read(count);
@@ -418,7 +418,7 @@ impl SendBuffer for SendBufferWithZirconSocket {
 
     fn peek_with<'a, F, R>(&'a mut self, offset: usize, f: F) -> R
     where
-        F: FnOnce(SendPayload<'a>) -> R,
+        F: FnOnce(FragmentedPayload<'a, 2>) -> R,
     {
         self.poll();
         let Self { ready_to_send, zx_socket_capacity: _, notifier: _, socket: _ } = self;
@@ -428,7 +428,7 @@ impl SendBuffer for SendBufferWithZirconSocket {
         // request that would result in an out-of-bounds peek.
         let BufferLimits { len, capacity: _ } = ready_to_send.limits();
         if offset >= len {
-            f(SendPayload::Contiguous(&[]))
+            f(FragmentedPayload::new_empty())
         } else {
             ready_to_send.peek_with(offset, f)
         }
@@ -1645,7 +1645,6 @@ where
 
 #[cfg(test)]
 mod tests {
-    use assert_matches::assert_matches;
     use test_case::test_case;
 
     use super::*;
@@ -1675,14 +1674,14 @@ mod tests {
         assert_eq!(peer.write(TEST_BYTES), Ok(TEST_BYTES.len()));
         assert_eq!(sbuf.limits().len, TEST_BYTES.len());
         sbuf.peek_with(0, |avail| {
-            assert_eq!(avail, SendPayload::Contiguous(TEST_BYTES));
+            assert_eq!(avail, FragmentedPayload::new_contiguous(TEST_BYTES));
         });
         assert_eq!(peer.write(TEST_BYTES), Ok(TEST_BYTES.len()));
         assert_eq!(sbuf.limits().len, TEST_BYTES.len() * 2);
         sbuf.mark_read(TEST_BYTES.len());
         assert_eq!(sbuf.limits().len, TEST_BYTES.len());
         sbuf.peek_with(0, |avail| {
-            assert_eq!(avail, SendPayload::Contiguous(TEST_BYTES));
+            assert_eq!(avail, FragmentedPayload::new_contiguous(TEST_BYTES));
         });
     }
 
@@ -1723,7 +1722,7 @@ mod tests {
 
         // Peeking past the end of the ring buffer should not cause a crash.
         sbuf.peek_with(SendBufferWithZirconSocket::MIN_CAPACITY, |payload| {
-            assert_matches!(payload, SendPayload::Contiguous(&[]))
+            assert_eq!(payload, FragmentedPayload::new_empty())
         })
     }
 
