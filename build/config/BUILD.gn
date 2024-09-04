@@ -71,6 +71,10 @@ config("language") {
     # toolchain's static libc++ anyway.
     defines += [ "_LIBCPP_DISABLE_AVAILABILITY" ]
   }
+
+  # Pass the same C/C++ flags to the Objective-C/C++ compiler.
+  cflags_objc = cflags_c
+  cflags_objcc = cflags_cc
 }
 
 config("color_diagnostics") {
