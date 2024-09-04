@@ -3,29 +3,16 @@
 // found in the LICENSE file.
 
 use std::collections::HashMap;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use anyhow::Error;
 use fidl_fuchsia_tee::ApplicationRequestStream;
 use fuchsia_async as fasync;
 use fuchsia_component::client::{connect_to_protocol, connect_to_protocol_at_dir_root};
 use fuchsia_component::server::ServiceFs;
+use fuchsia_tee_manager_config::TAConfig;
 use futures::prelude::*;
-use serde::Deserialize;
 use tee_internal::binding::TEE_ERROR_TARGET_DEAD;
-
-#[derive(Deserialize, Debug, Clone)]
-#[allow(dead_code)]
-#[serde(rename_all = "camelCase")]
-struct TAConfig {
-    url: String,
-    single_instance: bool,
-    // TODO: Support multiSession functionality.
-    multi_session: bool,
-    // TODO: Support instanceKeepAlive functionality.
-    instance_keep_alive: bool,
-    capabilities: Vec<()>,
-}
 
 struct TAConnectRequest {
     uuid: String,
@@ -133,14 +120,6 @@ async fn run_application(mut request: TAConnectRequest, config: TAConfig) {
     std::mem::drop(child_controller);
 }
 
-fn parse_config(path: &PathBuf) -> Result<TAConfig, Error> {
-    let contents = std::fs::read_to_string(path)
-        .map_err(|e| anyhow::anyhow!("Could not read config file at {path:?}: {e}"))?;
-    let parsed = serde_json::from_str(&contents)
-        .map_err(|e| anyhow::anyhow!("Could not deserialize {path:?} from json: {e}"))?;
-    Ok(parsed)
-}
-
 #[fuchsia::main]
 async fn main() -> Result<(), Error> {
     let mut configs = HashMap::new();
@@ -155,7 +134,7 @@ async fn main() -> Result<(), Error> {
             let uuid = Path::new(&file)
                 .file_stem()
                 .ok_or(anyhow::anyhow!("Expected path with extension"))?;
-            let config = parse_config(&path)?;
+            let config = TAConfig::parse_config(&path)?;
             let _ = configs.insert(
                 uuid.to_str().ok_or(anyhow::anyhow!("UUID string did not decode"))?.to_string(),
                 config,
