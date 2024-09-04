@@ -5,9 +5,11 @@
 #ifndef ZIRCON_KERNEL_LIB_MISTOS_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_TASK_THREAD_GROUP_DECL_H_
 #define ZIRCON_KERNEL_LIB_MISTOS_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_TASK_THREAD_GROUP_DECL_H_
 
+#include <fbl/ref_counted.h>
+
 namespace starnix {
 
-class ZombieProcess {
+class ZombieProcess : public fbl::RefCounted<ZombieProcess> {
   // pid_t pid;
   // pid_t pgid;
   // uid_t pid_tuid;

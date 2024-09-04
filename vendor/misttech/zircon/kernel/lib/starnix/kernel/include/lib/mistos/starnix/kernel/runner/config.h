@@ -5,18 +5,18 @@
 #ifndef ZIRCON_KERNEL_LIB_MISTOS_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_RUNNER_CONFIG_H_
 #define ZIRCON_KERNEL_LIB_MISTOS_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_RUNNER_CONFIG_H_
 
-#include <fbl/string.h>
 #include <fbl/vector.h>
+#include <ktl/string_view.h>
 
 namespace starnix {
 
 struct Config {
-  fbl::Vector<fbl::String> features;
-  fbl::Vector<fbl::String> init;
-  fbl::String kernel_cmdline;
-  fbl::Vector<fbl::String> mounts;
-  fbl::String name;
-  fbl::String startup_file_path;
+  fbl::Vector<ktl::string_view> features;
+  fbl::Vector<ktl::string_view> init;
+  ktl::string_view kernel_cmdline;
+  fbl::Vector<ktl::string_view> mounts;
+  ktl::string_view name;
+  ktl::string_view startup_file_path;
 };
 
 }  // namespace starnix

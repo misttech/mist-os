@@ -10,35 +10,50 @@
 #include <lib/mistos/starnix/kernel/vfs/fd_table.h>
 #include <lib/mistos/starnix/kernel/vfs/syscalls.h>
 #include <lib/mistos/starnix/testing/testing.h>
+#include <lib/unittest/unittest.h>
 
 #include <fbl/ref_ptr.h>
-#include <zxtest/zxtest.h>
+#include <ktl/string_view.h>
 
 using namespace starnix::testing;
-using namespace starnix;
 
-namespace {
+namespace unit_testing {
 
-TEST(Vfs, DISABLED_test_sys_dup) {}
+bool test_sys_dup() {
+  BEGIN_TEST;
+  END_TEST;
+}
 
-TEST(Vfs, DISABLED_test_sys_dup3) {}
+bool test_sys_dup3() {
+  BEGIN_TEST;
+  END_TEST;
+}
 
-TEST(Vfs, test_sys_open_cloexec) {
+bool test_sys_open_cloexec() {
+  BEGIN_TEST;
+
   auto [kernel, current_task] = create_kernel_task_and_unlocked_with_pkgfs();
 
   auto path_addr = map_memory(*current_task, UserAddress(), PAGE_SIZE);
-  fbl::String path("data/testfile.txt");
+  ktl::string_view path("data/testfile.txt");
   auto result = (*current_task).write_memory(path_addr, {(uint8_t*)path.data(), path.size()});
   ASSERT_TRUE(result.is_ok());
 
-  auto fd_or_error = sys_openat(*current_task, FdNumber::_AT_FDCWD, UserCString(path_addr),
+  auto fd_or_error = sys_openat(*current_task, starnix::FdNumber::_AT_FDCWD, UserCString(path_addr),
                                 O_RDONLY | O_CLOEXEC, starnix_uapi::FileMode());
-  ASSERT_TRUE(fd_or_error.is_ok(), "failed to sys_openat, error %d",
-              fd_or_error.error_value().error_code());
+  ASSERT_TRUE(fd_or_error.is_ok(), "failed to sys_openat");
 
   auto flag_or_error = current_task->files.get_fd_flags(fd_or_error.value());
   ASSERT_TRUE(flag_or_error.is_ok());
-  ASSERT_TRUE(flag_or_error.value().contains(FdFlagsEnum::CLOEXEC));
+  ASSERT_TRUE(flag_or_error.value().contains(starnix::FdFlagsEnum::CLOEXEC));
+
+  END_TEST;
 }
 
-}  // namespace
+}  // namespace unit_testing
+
+UNITTEST_START_TESTCASE(starnix_vfs_syscalls)
+// UNITTEST("test sys dup", testing::test_sys_dup)
+// UNITTEST("test sys dup3", testing::test_sys_dup3)
+UNITTEST("test sys open cloexec", unit_testing::test_sys_open_cloexec)
+UNITTEST_END_TESTCASE(starnix_vfs_syscalls, "starnix_vfs_syscalls", "Tests for VFS Syscalls")

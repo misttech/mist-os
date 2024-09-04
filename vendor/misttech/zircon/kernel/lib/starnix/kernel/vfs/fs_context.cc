@@ -11,10 +11,13 @@
 #include <lib/mistos/starnix/kernel/vfs/dir_entry.h>
 #include <lib/mistos/starnix/kernel/vfs/file_object.h>
 #include <lib/mistos/starnix/kernel/vfs/fs_node.h>
+#include <lib/mistos/starnix/kernel/vfs/mount.h>
 #include <lib/mistos/starnix/kernel/vfs/namespace.h>
 #include <lib/mistos/starnix_uapi/file_mode.h>
 
 #include <utility>
+
+#include <ktl/enforce.h>
 
 namespace starnix {
 
@@ -59,6 +62,8 @@ fbl::RefPtr<FsContext> FsContext::New(FileSystemHandle root) {
   ZX_ASSERT(ac.check());
   return handle;
 }
+
+FsContext::~FsContext() = default;
 
 FsContext::FsContext(FsContextState state) : state_(ktl::move(state)) {}
 

@@ -6,11 +6,12 @@
 #define ZIRCON_KERNEL_LIB_MISTOS_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_SYSCALLS_MISC_H_
 
 #include <lib/fit/result.h>
-#include <lib/mistos/starnix/kernel/task/forward.h>
 #include <lib/mistos/starnix_uapi/errors.h>
 #include <lib/mistos/starnix_uapi/user_address.h>
 
 namespace starnix {
+
+class CurrentTask;
 
 fit::result<Errno, size_t> sys_getrandom(const CurrentTask& current_task,
                                          starnix_uapi::UserAddress buf_addr, size_t size,

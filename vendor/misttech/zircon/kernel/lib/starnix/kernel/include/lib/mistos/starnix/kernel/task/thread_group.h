@@ -8,21 +8,26 @@
 #include <lib/fit/result.h>
 #include <lib/mistos/linux_uapi/typedefs.h>
 #include <lib/mistos/starnix/kernel/sync/locks.h>
-#include <lib/mistos/starnix/kernel/task/forward.h>
-#include <lib/mistos/starnix/kernel/task/kernel.h>
-#include <lib/mistos/starnix/kernel/task/thread_group_decl.h>
+#include <lib/mistos/starnix/kernel/task/zombie_process.h>
 #include <lib/mistos/starnix_uapi/errors.h>
 #include <lib/mistos/starnix_uapi/resource_limits.h>
 #include <lib/mistos/util/weak_wrapper.h>
-#include <lib/mistos/zx/process.h>
 
 #include <fbl/canary.h>
 #include <fbl/ref_counted.h>
-#include <fbl/ref_counted_upgradeable.h>
 #include <fbl/ref_ptr.h>
 #include <ktl/optional.h>
+#include <object/handle.h>
+
+class ProcessDispatcher;
 
 namespace starnix {
+
+class TaskContainer;
+class Kernel;
+class ProcessGroup;
+class ThreadGroup;
+class Task;
 
 /// The mutable state of the ThreadGroup.
 class ThreadGroupMutableState {
@@ -114,7 +119,8 @@ class ThreadGroupMutableState {
   size_t tasks_count() const { return tasks_.size(); }
 
  public:
-  ThreadGroupMutableState() = default;
+  ThreadGroupMutableState();
+
   ThreadGroupMutableState(ThreadGroup* base, ktl::optional<fbl::RefPtr<ThreadGroup>> parent,
                           fbl::RefPtr<ProcessGroup> process_group);
 
@@ -150,6 +156,10 @@ class ThreadGroupMutableState {
 class ThreadGroup : public fbl::RefCountedUpgradeable<ThreadGroup>,
                     public fbl::WAVLTreeContainable<util::WeakPtr<ThreadGroup>> {
  public:
+  /// Weak reference to the `OwnedRef` of this `ThreadGroup`. This allows to retrieve the
+  /// `TempRef` from a raw `ThreadGroup`.
+  util::WeakPtr<ThreadGroup> weak_thread_group;
+
   // The kernel to which this thread group belongs.
   fbl::RefPtr<Kernel> kernel;
 
@@ -161,7 +171,7 @@ class ThreadGroup : public fbl::RefCountedUpgradeable<ThreadGroup>,
   /// groups share an address space. To implement that situation, we might
   /// need to break the 1-to-1 mapping between thread groups and zx::process
   /// or teach zx::process to share address spaces.
-  zx::process process;
+  KernelHandle<ProcessDispatcher> process;
 
   /// The lead task of this thread group.
   ///
@@ -206,17 +216,20 @@ class ThreadGroup : public fbl::RefCountedUpgradeable<ThreadGroup>,
 
   /// impl ThreadGroup
  public:
-  static fbl::RefPtr<ThreadGroup> New(fbl::RefPtr<Kernel> kernel, zx::process process,
-                                      ktl::optional<fbl::RefPtr<ThreadGroup>> parent, pid_t leader,
-                                      fbl::RefPtr<ProcessGroup> process_group);
+  static fbl::RefPtr<ThreadGroup> New(
+      fbl::RefPtr<Kernel> kernel, KernelHandle<ProcessDispatcher> process,
+      ktl::optional<RwLock<ThreadGroupMutableState>::RwLockWriteGuard> parent, pid_t leader,
+      fbl::RefPtr<ProcessGroup> process_group);
 
   uint64_t get_rlimit(starnix_uapi::Resource resource) const;
 
   fit::result<Errno> add(fbl::RefPtr<Task> task);
 
   /// state_accessor!(ThreadGroup, mutable_state, Arc<ThreadGroup>);
-  const ThreadGroupMutableState& read() const { return *mutable_state_.Read(); }
-  ThreadGroupMutableState& write() { return *mutable_state_.Write(); }
+  const RwLock<ThreadGroupMutableState>::RwLockReadGuard read() const {
+    return mutable_state_.Read();
+  }
+  RwLock<ThreadGroupMutableState>::RwLockWriteGuard write() { return mutable_state_.Write(); }
 
  public:
   // C++
@@ -226,8 +239,8 @@ class ThreadGroup : public fbl::RefCountedUpgradeable<ThreadGroup>,
   pid_t GetKey() const { return leader; }
 
  private:
-  ThreadGroup(fbl::RefPtr<Kernel> kernel, zx::process process, pid_t leader,
-              ktl::optional<fbl::RefPtr<ThreadGroup>> parent,
+  ThreadGroup(fbl::RefPtr<Kernel> kernel, KernelHandle<ProcessDispatcher> process, pid_t leader,
+              ktl::optional<RwLock<ThreadGroupMutableState>::RwLockWriteGuard> parent,
               fbl::RefPtr<ProcessGroup> process_group);
 };
 

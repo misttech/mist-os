@@ -7,13 +7,18 @@
 #define ZIRCON_KERNEL_LIB_MISTOS_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_VFS_FS_CONTEXT_H_
 
 #include <lib/mistos/starnix/kernel/sync/locks.h>
-#include <lib/mistos/starnix/kernel/vfs/forward.h>
-#include <lib/mistos/starnix/kernel/vfs/namespace.h>
+#include <lib/mistos/starnix/kernel/vfs/namespace_node.h>
 #include <lib/mistos/starnix_uapi/file_mode.h>
 
 #include <fbl/ref_ptr.h>
 
 namespace starnix {
+
+class Namespace;
+class FileSystem;
+
+using FileSystemHandle = fbl::RefPtr<FileSystem>;
+using FileMode = starnix_uapi::FileMode;
 
 // The mutable state for an FsContext.
 //
@@ -61,9 +66,12 @@ class FsContext : public fbl::RefCounted<FsContext> {
 
   FileMode umask() const;
 
-  FileMode apply_umask(starnix_uapi::FileMode mode) const;
+  FileMode apply_umask(FileMode mode) const;
 
-  FileMode set_umask(starnix_uapi::FileMode mode) const;
+  FileMode set_umask(FileMode mode) const;
+
+ public:
+  ~FsContext();
 
  private:
   FsContext(FsContextState state);

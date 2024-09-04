@@ -13,23 +13,24 @@
 #include <lib/mistos/starnix/kernel/vfs/fs_context.h>
 #include <lib/mistos/starnix/kernel/vfs/path.h>
 #include <lib/mistos/starnix/testing/testing.h>
+#include <lib/unittest/unittest.h>
 
-#include <zxtest/zxtest.h>
-
-namespace {
+namespace unit_testing {
 
 using namespace starnix_uapi;
-using namespace starnix::testing;
 using namespace starnix;
 
-TEST(FsNode, open_device_file) {
+bool open_device_file() {
+  BEGIN_TEST;
+
   auto [kernel, current_task] = starnix::testing::create_kernel_and_task();
 
   // Create a device file that points to the `zero` device (which is automatically
   // registered in the kernel).
   auto result = current_task->fs()->root().create_node(*current_task, "zero",
                                                        FILE_MODE(IFCHR, 0666), DeviceType::ZERO);
-  EXPECT_TRUE(result.is_ok(), "create_node error [errno=%d]", result.error_value().error_code());
+  EXPECT_TRUE(
+      result.is_ok());  //, "create_node error [errno=%d]", result.error_value().error_code());
 
   constexpr size_t CONTENT_LEN = 10;
   auto buffer = VecOutputBuffer::New(CONTENT_LEN);
@@ -37,8 +38,9 @@ TEST(FsNode, open_device_file) {
   // Read from the zero device.
   auto flags = OpenFlags(OpenFlagsEnum::RDONLY);
   auto device_file = (*current_task).open_file("zero", flags);
-  EXPECT_TRUE(device_file.is_ok(), "open device file [errno=%d]",
-              device_file.error_value().error_code());
+  EXPECT_TRUE(
+      device_file
+          .is_ok());  //, "open device file [errno=%d]",device_file.error_value().error_code());
 
   // device_file.read(&mut locked, &current_task, &mut buffer).expect("read from zero");
   /*
@@ -51,8 +53,17 @@ TEST(FsNode, open_device_file) {
         // Assert the contents.
         assert_eq!(&[0; CONTENT_LEN], buffer.data());
   */
+  END_TEST;
 }
 
-TEST(FsNode, node_info_is_reflected_in_stat) {}
+bool node_info_is_reflected_in_stat() {
+  BEGIN_TEST;
+  END_TEST;
+}
 
-}  // namespace
+}  // namespace unit_testing
+
+UNITTEST_START_TESTCASE(starnix_fs_node)
+UNITTEST("test open device file", unit_testing::open_device_file)
+// UNITTEST("node_info_is_reflected_in_stats", node_info_is_reflected_in_stat)
+UNITTEST_END_TESTCASE(starnix_fs_node, "starnix_fs_node", "Tests for FsNode")

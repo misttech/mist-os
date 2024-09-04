@@ -5,20 +5,23 @@
 #include "lib/mistos/starnix/kernel/task/kernel.h"
 
 #include <lib/fit/result.h>
-#include <lib/mistos/starnix/kernel/task/process_group.h>
-#include <lib/mistos/starnix/kernel/task/task.h>
-#include <lib/mistos/starnix/kernel/task/thread_group.h>
+#include <lib/mistos/starnix/kernel/vfs/file_system.h>
+#include <lib/mistos/starnix/kernel/vfs/fs_node.h>
 #include <zircon/errors.h>
 
 #include <fbl/alloc_checker.h>
+#include <ktl/string_view.h>
+
+#include <ktl/enforce.h>
 
 namespace starnix {
 
+Kernel::Kernel(const ktl::string_view& _cmdline) : cmdline{ktl::move(_cmdline)} {}
+
 Kernel::~Kernel() = default;
 
-fit::result<zx_status_t, fbl::RefPtr<Kernel>> Kernel::New(fbl::String cmdline) {
+fit::result<zx_status_t, fbl::RefPtr<Kernel>> Kernel::New(const ktl::string_view& cmdline) {
   fbl::AllocChecker ac;
-
   fbl::RefPtr<Kernel> kernel = fbl::AdoptRef(new (&ac) Kernel(cmdline));
   if (!ac.check()) {
     return fit::error(ZX_ERR_NO_MEMORY);
@@ -26,5 +29,9 @@ fit::result<zx_status_t, fbl::RefPtr<Kernel>> Kernel::New(fbl::String cmdline) {
 
   return fit::ok(ktl::move(kernel));
 }
+
+uint64_t Kernel::get_next_mount_id() { return next_mount_id.next(); }
+
+uint64_t Kernel::get_next_namespace_id() { return next_namespace_id.next(); }
 
 }  // namespace starnix

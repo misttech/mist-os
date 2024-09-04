@@ -7,9 +7,7 @@
 
 #include <arch/defines.h>
 
-// clang-format off
 #include <linux/limits.h>
-// clang-format on
 
 namespace starnix_uapi {
 

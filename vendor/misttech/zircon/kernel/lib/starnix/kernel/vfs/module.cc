@@ -5,10 +5,13 @@
 
 #include "lib/mistos/starnix/kernel/vfs/module.h"
 
-#include <lib/mistos/starnix/kernel/task/module.h>
+#include <lib/mistos/starnix/kernel/task/current_task.h>
+#include <lib/mistos/starnix/kernel/vfs/file_object.h>
 
 namespace starnix {
 
 void DelayedReleaser::flush_file(FileHandle file, FdTableId id) const {}
+
+void DelayedReleaser::apply(const CurrentTask& current_task) const {}
 
 }  // namespace starnix

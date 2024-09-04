@@ -13,6 +13,12 @@
 
 namespace starnix {
 
+SessionMutableState::~SessionMutableState() = default;
+
+Session::~Session() = default;
+
+Session::Session(pid_t _leader) : leader(_leader) {}
+
 fbl::RefPtr<Session> Session::New(pid_t _leader) {
   fbl::AllocChecker ac;
 

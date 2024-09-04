@@ -8,9 +8,9 @@
 
 #include <lib/fit/result.h>
 #include <lib/mistos/starnix/kernel/sync/locks.h>
-#include <lib/mistos/starnix/kernel/task/forward.h>
-#include <lib/mistos/starnix/kernel/vfs/forward.h>
-#include <lib/mistos/starnix/kernel/vfs/fs_node.h>
+#include <lib/mistos/starnix/kernel/vfs/file_system.h>
+#include <lib/mistos/starnix/kernel/vfs/file_system_ops.h>
+#include <lib/mistos/starnix/kernel/vfs/fs_node_ops.h>
 #include <lib/mistos/starnix/kernel/vfs/xattr.h>
 #include <lib/mistos/starnix_uapi/device_type.h>
 #include <lib/mistos/starnix_uapi/errors.h>
@@ -23,15 +23,23 @@
 
 namespace starnix {
 
+class Kernel;
+
 class TmpFs : public FileSystemOps {
  public:
   static FileSystemHandle new_fs(const fbl::RefPtr<Kernel>& kernel);
+
   static fit::result<Errno, FileSystemHandle> new_fs_with_options(const fbl::RefPtr<Kernel>& kernel,
                                                                   FileSystemOptions options);
 
   fit::result<Errno, struct statfs> statfs(const FileSystem& fs,
                                            const CurrentTask& current_task) final;
-  const FsStr& name() final { return name_; }
+
+  const FsStr& name() final;
+
+ public:
+  // C++
+  ~TmpFs();
 
  private:
   const FsStr name_ = "tmpfs";
@@ -73,24 +81,6 @@ class TmpfsDirectory : public FsNodeOps {
 fit::result<Errno, FsNodeHandle> create_child_node(const CurrentTask& current_task,
                                                    const FsNode& parent, FileMode mode,
                                                    DeviceType dev, FsCred owner);
-
-struct TmpfsSpecialNode : public FsNodeOps {
-  MemoryXattrStorage xattrs;
-
-  /// impl TmpfsSpecialNode
-  static TmpfsSpecialNode* New();
-
-  /// impl FsNodeOps
-  fs_node_impl_dir_readonly;
-
-  fs_node_impl_xattr_delegate(xattrs);
-
-  fit::result<Errno, ktl::unique_ptr<FileOps>> create_file_ops(
-      /*FileOpsCore& locked,*/ const FsNode& node, const CurrentTask& current_task,
-      OpenFlags flags) final {
-    panic("Special nodes cannot be opened.\n");
-  }
-};
 
 }  // namespace starnix
 

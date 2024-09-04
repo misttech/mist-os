@@ -7,43 +7,50 @@
 
 #include <lib/fit/result.h>
 #include <lib/mistos/linux_uapi/typedefs.h>
-#include <lib/mistos/starnix/kernel/execution/shared.h>
-#include <lib/mistos/starnix/kernel/task/forward.h>
-#include <lib/mistos/zx/job.h>
+#include <lib/mistos/starnix/kernel/sync/locks.h>
+#include <lib/mistos/starnix/kernel/task/thread_group.h>
+#include <lib/mistos/starnix_uapi/errors.h>
 #include <zircon/types.h>
 
 #include <fbl/ref_ptr.h>
-#include <fbl/string.h>
 #include <ktl/optional.h>
+#include <ktl/pair.h>
+#include <object/handle.h>
+
+class ThreadDispatcher;
+class ProcessDispatcher;
+class JobDispatcher;
 
 namespace starnix {
 
-// TODO (Herrera) make parent  /*parent: Option<ThreadGroupWriteGuard<'_>>,*/
-fit::result<Errno, TaskInfo> create_zircon_process(fbl::RefPtr<Kernel> kernel,
-                                                   ktl::optional<fbl::RefPtr<ThreadGroup>> parent,
-                                                   pid_t pid,
-                                                   fbl::RefPtr<ProcessGroup> process_group,
-                                                   const fbl::String& name);
+class Kernel;
+class MemoryManager;
+class ThreadGroup;
+class ProcessGroup;
+class CurrentTask;
+struct Vmar;
 
-/// NOTE: We keep the name from Rust/Starnix but it is not creating a shared process now.
-/// Creates a process that shares half its address space with this process.
-///
-/// The created process will also share its handle table and futex context with `self`.
-///
-/// Returns the created process and a handle to the created process' restricted address space.
-///
-/// Wraps the
-/// [zx_process_create_shared](https://fuchsia.dev/fuchsia-src/reference/syscalls/process_create_shared.md)
-/// syscall.
-fit::result<zx_status_t, ktl::pair<zx::process, zx::vmar>> create_shared(uint32_t options,
-                                                                         const fbl::String& name);
+/// Result returned when creating new Zircon threads and processes for tasks.
+struct TaskInfo {
+  // The thread that was created for the task.
+  ktl::optional<fbl::RefPtr<ThreadDispatcher>> thread;
 
-fit::result<zx_status_t, zx::job> create_job(uint32_t options);
+  // The thread group that the task should be added to.
+  fbl::RefPtr<ThreadGroup> thread_group;
 
-fit::result<zx_status_t, ktl::pair<zx::process, zx::vmar>> create_process(uint32_t options,
-                                                                          zx::unowned_job job,
-                                                                          const fbl::String& name);
+  // The memory manager to use for the task.
+  fbl::RefPtr<MemoryManager> memory_manager;
+};
 
+fit::result<Errno, TaskInfo> create_zircon_process(
+    fbl::RefPtr<Kernel> kernel,
+    ktl::optional<RwLock<ThreadGroupMutableState>::RwLockWriteGuard> parent, pid_t pid,
+    fbl::RefPtr<ProcessGroup> process_group, const ktl::string_view& name);
+
+fit::result<zx_status_t, ktl::pair<KernelHandle<ProcessDispatcher>, Vmar>> create_process(
+    fbl::RefPtr<JobDispatcher> job, uint32_t options, const ktl::string_view& name);
+
+#if 0
 using PreRun = std::function<fit::result<Errno>(CurrentTask& init_task)>;
 using TaskComplete = std::function<void()>;
 
@@ -53,6 +60,7 @@ void execute_task_with_prerun_result(TaskBuilder task_builder, PreRun pre_run,
 void execute_task(TaskBuilder task_builder, PreRun pre_run,
                                      TaskComplete task_complete/*,
                   std::optional<PtraceCoreState> ptrace_state*/);
+#endif
 
 }  // namespace starnix
 

@@ -31,11 +31,11 @@ fit::result<Errno> sys_close_range(const CurrentTask& current_task, uint32_t fir
                                    uint32_t flags);
 
 fit::result<Errno, FdNumber> sys_openat(const CurrentTask& current_task, FdNumber fir_fd,
-                                     starnix_uapi::UserCString, uint32_t flags,
-                                     starnix_uapi::FileMode mode);
+                                        starnix_uapi::UserCString, uint32_t flags,
+                                        starnix_uapi::FileMode mode);
 
 fit::result<Errno, FdNumber> sys_openat2(const CurrentTask& current_task, FdNumber fir_fd,
-                                      starnix_uapi::UserCString, struct open_how, size_t size);
+                                         starnix_uapi::UserCString, struct open_how, size_t size);
 
 }  // namespace starnix
 

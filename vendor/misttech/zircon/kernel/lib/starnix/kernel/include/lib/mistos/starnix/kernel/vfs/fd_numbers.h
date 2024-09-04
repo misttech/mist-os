@@ -26,7 +26,7 @@ class FdNumber {
     if (!util::IsStringUTF8(s)) {
       return fit::error(errno(EINVAL));
     }
-    auto result = fs_args::parse<int32_t>(s);
+    auto result = parse<int32_t>(s);
     if (result.is_error())
       return result.take_error();
     return fit::ok(FdNumber(result.value()));

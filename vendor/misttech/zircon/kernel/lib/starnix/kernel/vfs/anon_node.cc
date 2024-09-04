@@ -5,8 +5,13 @@
 
 #include "lib/mistos/starnix/kernel/vfs/anon_node.h"
 
-#include <lib/mistos/starnix/kernel/task/module.h>
-#include <lib/mistos/starnix/kernel/vfs/module.h>
+#include <lib/mistos/starnix/kernel/task/current_task.h>
+#include <lib/mistos/starnix/kernel/task/kernel.h>
+#include <lib/mistos/starnix/kernel/task/task.h>
+#include <lib/mistos/starnix/kernel/vfs/file_object.h>
+#include <lib/mistos/starnix/kernel/vfs/file_ops.h>
+
+// #include <ktl/enforce.h>
 
 namespace starnix {
 
@@ -18,13 +23,13 @@ FileHandle Anon::new_file_extended(const CurrentTask& current_task, ktl::unique_
 
   auto fs = anon_fs(current_task->kernel());
   return FileObject::new_anonymous(
-      std::move(ops), fs->create_node(current_task, ktl::unique_ptr<FsNodeOps>(anon), info), flags);
+      ktl::move(ops), fs->create_node(current_task, ktl::unique_ptr<FsNodeOps>(anon), info), flags);
 }
 
 FileHandle Anon::new_file(const CurrentTask& current_task, ktl::unique_ptr<FileOps> ops,
                           OpenFlags flags) {
   return new_file_extended(
-      current_task, std::move(ops), flags,
+      current_task, ktl::move(ops), flags,
       FsNodeInfo::new_factory(FileMode::from_bits(0600), current_task->as_fscred()));
 }
 

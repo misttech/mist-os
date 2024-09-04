@@ -20,12 +20,13 @@
 
 #include <fbl/ref_ptr.h>
 #include <ktl/unique_ptr.h>
+#include <object/thread_dispatcher.h>
 
 namespace starnix {
 
 TaskPersistentInfo TaskPersistentInfoState::New(
-    pid_t tid, pid_t pid, fbl::String command,
-    Credentials creds /*, exit_signal: Option<Signal>*/) {
+    pid_t tid, pid_t pid, const ktl::string_view& command,
+    const Credentials& creds /*, exit_signal: Option<Signal>*/) {
   fbl::AllocChecker ac;
   auto info = fbl::AdoptRef(new (&ac) StarnixMutex<TaskPersistentInfoState>(
       TaskPersistentInfoState(tid, pid, command, creds)));
@@ -33,9 +34,10 @@ TaskPersistentInfo TaskPersistentInfoState::New(
   return info;
 }
 
-fbl::RefPtr<Task> Task::New(pid_t id, const fbl::String& command,
-                            fbl::RefPtr<ThreadGroup> thread_group, std::optional<zx::thread> thread,
-                            FdTable files, fbl::RefPtr<MemoryManager> mm, fbl::RefPtr<FsContext> fs,
+fbl::RefPtr<Task> Task::New(pid_t id, const ktl::string_view& command,
+                            fbl::RefPtr<ThreadGroup> thread_group,
+                            ktl::optional<fbl::RefPtr<ThreadDispatcher>> thread, FdTable files,
+                            fbl::RefPtr<MemoryManager> mm, fbl::RefPtr<FsContext> fs,
                             Credentials creds) {
   fbl::AllocChecker ac;
   fbl::RefPtr<Task> task =
@@ -48,22 +50,26 @@ fbl::RefPtr<Task> Task::New(pid_t id, const fbl::String& command,
   return ktl::move(task);
 }  // namespace starnix
 
-Task::Task(pid_t _id, fbl::RefPtr<ThreadGroup> _thread_group, ktl::optional<zx::thread> _thread,
-           FdTable _files, ktl::optional<fbl::RefPtr<MemoryManager>> mm,
-           ktl::optional<fbl::RefPtr<FsContext>> fs)
+fit::result<Errno, FdNumber> Task::add_file(FileHandle file, FdFlags flags) const {
+  return files.add_with_flags(*this, file, flags);
+}
+
+Task::Task(pid_t _id, fbl::RefPtr<ThreadGroup> _thread_group,
+           ktl::optional<fbl::RefPtr<ThreadDispatcher>> _thread, FdTable _files,
+           ktl::optional<fbl::RefPtr<MemoryManager>> mm, ktl::optional<fbl::RefPtr<FsContext>> fs)
     : id(_id),
       thread_group(ktl::move(_thread_group)),
       files(_files),
       mm_(ktl::move(mm)),
       fs_(ktl::move(fs)) {
-  *thread.Write() = ktl::move(_thread);
+  //*thread.Write() = ktl::move(_thread);
 }
 
 Task::~Task() = default;
 
-fbl::RefPtr<FsContext>& Task::fs() {
+fbl::RefPtr<FsContext> Task::fs() {
   ASSERT_MSG(fs_.has_value(), "fs must be set");
-  return fs_.value();
+  return *fs_->Read();
 }
 
 fbl::RefPtr<MemoryManager>& Task::mm() {
@@ -71,7 +77,7 @@ fbl::RefPtr<MemoryManager>& Task::mm() {
   return mm_.value();
 }
 
-const fbl::RefPtr<Kernel>& Task::kernel() const { return thread_group->kernel; }
+fbl::RefPtr<Kernel>& Task::kernel() const { return thread_group->kernel; }
 
 util::WeakPtr<Task> Task::get_task(pid_t pid) { return kernel()->pids.Read()->get_task(pid); }
 
@@ -81,22 +87,22 @@ pid_t Task::get_tid() const { return id; }
 
 fit::result<Errno, ktl::span<uint8_t>> Task::read_memory(UserAddress addr,
                                                          ktl::span<uint8_t>& bytes) const {
-  return mm_.value()->vmo_read_memory(addr, bytes);
+  return (*mm_)->syscall_read_memory(addr, bytes);
 }
 
 fit::result<Errno, ktl::span<uint8_t>> Task::read_memory_partial_until_null_byte(
     UserAddress addr, ktl::span<uint8_t>& bytes) const {
-  return mm_.value()->vmo_read_memory_partial_until_null_byte(addr, bytes);
+  return (*mm_)->syscall_read_memory_partial_until_null_byte(addr, bytes);
 }
 
 fit::result<Errno, ktl::span<uint8_t>> Task::read_memory_partial(UserAddress addr,
                                                                  ktl::span<uint8_t>& bytes) const {
-  return mm_.value()->vmo_read_memory_partial(addr, bytes);
+  return (*mm_)->syscall_read_memory_partial(addr, bytes);
 }
 
 fit::result<Errno, size_t> Task::write_memory(UserAddress addr,
                                               const ktl::span<const uint8_t>& bytes) const {
-  return mm_.value()->vmo_write_memory(addr, bytes);
+  return (*mm_)->syscall_write_memory(addr, bytes);
 }
 
 }  // namespace starnix

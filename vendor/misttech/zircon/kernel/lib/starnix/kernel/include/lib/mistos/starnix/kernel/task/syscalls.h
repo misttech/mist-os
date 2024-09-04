@@ -7,13 +7,14 @@
 
 #include <lib/fit/result.h>
 #include <lib/mistos/linux_uapi/typedefs.h>
-#include <lib/mistos/starnix/kernel/task/forward.h>
 #include <lib/mistos/starnix_syscalls/syscall_result.h>
 #include <lib/mistos/starnix_uapi/errors.h>
 
 #include <linux/sched.h>
 
 namespace starnix {
+
+class CurrentTask;
 
 fit::result<Errno, pid_t> do_clone(const CurrentTask& current_task, struct clone_args);
 

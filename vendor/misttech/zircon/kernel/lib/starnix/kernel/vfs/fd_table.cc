@@ -6,8 +6,12 @@
 #include "lib/mistos/starnix/kernel/vfs/fd_table.h"
 
 #include <lib/fit/result.h>
-#include <lib/mistos/starnix/kernel/task/module.h>
-#include <lib/mistos/starnix/kernel/vfs/module.h>
+#include <lib/mistos/starnix/kernel/task/kernel.h>
+#include <lib/mistos/starnix/kernel/task/task.h>
+#include <lib/mistos/starnix/kernel/task/thread_group.h>
+#include <lib/mistos/starnix/kernel/vfs/dir_entry.h>
+#include <lib/mistos/starnix/kernel/vfs/file_object.h>
+#include <lib/mistos/starnix/kernel/vfs/fs_node.h>
 #include <lib/mistos/starnix_uapi/resource_limits.h>
 #include <trace.h>
 
@@ -24,14 +28,30 @@ using namespace starnix_uapi;
 
 namespace starnix {
 
+FdTableEntry::FdTableEntry(FileHandle _file, FdTableId fd_table_id, FdFlags flags)
+    : file(ktl::move(_file)), fd_table_id_(fd_table_id), flags_(flags) {}
+
 FdTableEntry::~FdTableEntry() {
   LTRACEF_LEVEL(3, "fd_table_id %zx\n", fd_table_id_.id);
   auto fs = file->name.entry->node->fs();
   auto kernel = fs->kernel().Lock();
   if (kernel) {
-    kernel->delayed_releaser.flush_file(file, fd_table_id_);
+    // kernel->delayed_releaser.flush_file(file, fd_table_id_);
   }
 }
+
+FdTableStore::FdTableStore() = default;
+
+FdTableStore::FdTableStore(const FdTableStore& other) {
+  fbl::AllocChecker ac;
+  entries_.reserve(other.entries_.capacity(), &ac);
+  ASSERT(ac.check());
+
+  ktl::copy(other.entries_.begin(), other.entries_.end(), util::back_inserter(entries_));
+  next_fd_ = other.next_fd_;
+}
+
+FdTableStore& FdTableStore::operator=(FdTableStore&& other) = default;
 
 fit::result<Errno, ktl::optional<FdTableEntry>> FdTableStore::insert_entry(FdNumber fd,
                                                                            uint64_t rlimit,

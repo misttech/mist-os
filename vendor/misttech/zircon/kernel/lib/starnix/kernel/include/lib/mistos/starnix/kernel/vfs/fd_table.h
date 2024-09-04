@@ -9,7 +9,6 @@
 #include <lib/fit/result.h>
 #include <lib/mistos/starnix/kernel/sync/locks.h>
 #include <lib/mistos/starnix/kernel/vfs/fd_numbers.h>
-#include <lib/mistos/starnix/kernel/vfs/forward.h>
 #include <lib/mistos/util/back_insert_iterator.h>
 #include <lib/mistos/util/bitflags.h>
 #include <zircon/compiler.h>
@@ -38,6 +37,9 @@ struct FdTableId {
   size_t id;
 };
 
+class FileObject;
+using FileHandle = fbl::RefPtr<FileObject>;
+
 struct FdTableEntry {
  public:
   FileHandle file;
@@ -52,8 +54,7 @@ struct FdTableEntry {
   FdFlags flags_;
 
  public:
-  FdTableEntry(FileHandle _file, FdTableId fd_table_id, FdFlags flags)
-      : file(ktl::move(_file)), fd_table_id_(fd_table_id), flags_(flags) {}
+  FdTableEntry(FileHandle _file, FdTableId fd_table_id, FdFlags flags);
 
   ~FdTableEntry();
 
@@ -87,18 +88,9 @@ class FdTableStore {
   void retain(std::function<bool(const FdNumber&, FdTableEntry&)> func);
 
  public:
-  FdTableStore() = default;
-
-  FdTableStore(const FdTableStore& other) {
-    fbl::AllocChecker ac;
-    entries_.reserve(other.entries_.capacity(), &ac);
-    ASSERT(ac.check());
-
-    ktl::copy(other.entries_.begin(), other.entries_.end(), util::back_inserter(entries_));
-    next_fd_ = other.next_fd_;
-  }
-
-  FdTableStore& operator=(FdTableStore&& other) = default;
+  FdTableStore();
+  FdTableStore(const FdTableStore& other);
+  FdTableStore& operator=(FdTableStore&& other);
 
  private:
   friend class FdTableInner;

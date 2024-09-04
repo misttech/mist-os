@@ -8,29 +8,26 @@
 
 #include <lib/fit/result.h>
 #include <lib/mistos/linux_uapi/typedefs.h>
-#include <lib/mistos/starnix/kernel/task/forward.h>
+#include <lib/mistos/starnix/kernel/mm/memory_accessor.h>
+#include <lib/mistos/starnix/kernel/sync/locks.h>
 #include <lib/mistos/starnix/kernel/vfs/fd_table.h>
-#include <lib/mistos/starnix/kernel/vfs/forward.h>
-#include <lib/mistos/starnix/kernel/vfs/module.h>
 #include <lib/mistos/starnix_uapi/auth.h>
 #include <lib/mistos/util/weak_wrapper.h>
-#include <lib/mistos/zx/thread.h>
 
 #include <utility>
 
 #include <fbl/alloc_checker.h>
-#include <fbl/canary.h>
 #include <fbl/ref_counted.h>
 #include <fbl/ref_counted_upgradeable.h>
 #include <fbl/ref_ptr.h>
-#include <fbl/string.h>
 #include <kernel/mutex.h>
 #include <ktl/optional.h>
+#include <ktl/string_view.h>
 #include <ktl/unique_ptr.h>
 
-namespace starnix {
+class ThreadDispatcher;
 
-using namespace starnix_uapi;
+namespace starnix {
 
 enum class ExitStatusType { Exit, Kill, CoreDump, Stop, Continue };
 
@@ -149,14 +146,19 @@ enum class TaskStateCode {
 class TaskPersistentInfoState;
 using TaskPersistentInfo = fbl::RefPtr<StarnixMutex<TaskPersistentInfoState>>;
 
+/// The information of the task that needs to be available to the `ThreadGroup` while computing
+/// which process a wait can target. It is necessary to shared this data with the `ThreadGroup` so
+/// that it is available while the task is being dropped and so is not accessible from a weak
+/// pointer.
 class TaskPersistentInfoState {
  private:
   /// Immutable information about the task
   pid_t tid_;
+
   pid_t pid_;
 
   /// The command of this task.
-  fbl::String command_;
+  ktl::string_view command_;
 
   /// The security credentials for this task.
   Credentials creds_;
@@ -166,14 +168,14 @@ class TaskPersistentInfoState {
 
  public:
   /// impl TaskPersistentInfoState
-  static TaskPersistentInfo New(pid_t tid, pid_t pid, fbl::String command,
-                                Credentials creds /*, exit_signal: Option<Signal>*/);
+  static TaskPersistentInfo New(pid_t tid, pid_t pid, const ktl::string_view& command,
+                                const Credentials& creds /*, exit_signal: Option<Signal>*/);
 
   pid_t tid() const { return tid_; }
 
   pid_t pid() const { return pid_; }
 
-  fbl::String command() const { return command_; }
+  ktl::string_view command() const { return command_; }
 
   Credentials creds() const { return creds_; }
 
@@ -186,12 +188,16 @@ class TaskPersistentInfoState {
   */
 
  private:
-  TaskPersistentInfoState(pid_t tid, pid_t pid, fbl::String command, Credentials creds
+  TaskPersistentInfoState(pid_t tid, pid_t pid, const ktl::string_view& command,
+                          const Credentials& creds
                           /*, exit_signal: Option<Signal>*/)
-      : tid_(tid), pid_(pid), command_(ktl::move(command)), creds_(std::move(creds)) {}
+      : tid_(tid), pid_(pid), command_(ktl::move(command)), creds_(ktl::move(creds)) {}
 };
 
 class MemoryManager;
+class Kernel;
+class FsContext;
+class ThreadGroup;
 
 /// A unit of execution.
 ///
@@ -236,7 +242,7 @@ class Task : public fbl::RefCountedUpgradeable<Task>, public MemoryAccessorExt {
   //
   // Some tasks lack an underlying Zircon thread. These tasks are used internally by the
   // Starnix kernel to track background work, typically on a `kthread`.
-  mutable RwLock<ktl::optional<zx::thread>> thread;
+  mutable ktl::optional<RwLock<fbl::RefPtr<ThreadDispatcher>>> thread;
 
   // The file descriptor table for this task.
   //
@@ -248,7 +254,7 @@ class Task : public fbl::RefCountedUpgradeable<Task>, public MemoryAccessorExt {
   ktl::optional<fbl::RefPtr<MemoryManager>> mm_;
 
   // The file system for this task.
-  ktl::optional<fbl::RefPtr<FsContext>> fs_;
+  ktl::optional<RwLock<fbl::RefPtr<FsContext>>> fs_;
 
  public:
   /// The namespace for abstract AF_UNIX sockets for this task.
@@ -295,7 +301,7 @@ class Task : public fbl::RefCountedUpgradeable<Task>, public MemoryAccessorExt {
 
  public:
   /// impl Task
-  const fbl::RefPtr<Kernel>& kernel() const;
+  fbl::RefPtr<Kernel>& kernel() const;
 
   /// Upgrade a Reference to a Task, returning a ESRCH errno if the reference cannot be borrowed.
   static fit::result<Errno, fbl::RefPtr<Task>> from_weak(util::WeakPtr<Task> weak) {
@@ -312,15 +318,13 @@ class Task : public fbl::RefCountedUpgradeable<Task>, public MemoryAccessorExt {
   /// Any fields that should be initialized fresh for every task, even if the task was created
   /// with fork, are initialized to their defaults inside this function. All other fields are
   /// passed as parameters.
-  static fbl::RefPtr<Task> New(pid_t pid, const fbl::String& command,
+  static fbl::RefPtr<Task> New(pid_t pid, const ktl::string_view& command,
                                fbl::RefPtr<ThreadGroup> thread_group,
-                               ktl::optional<zx::thread> thread, FdTable files,
+                               ktl::optional<fbl::RefPtr<ThreadDispatcher>> thread, FdTable files,
                                fbl::RefPtr<MemoryManager> mm, fbl::RefPtr<FsContext> fs,
                                Credentials creds);
 
-  fit::result<Errno, FdNumber> add_file(FileHandle file, FdFlags flags) const {
-    return files.add_with_flags(*this, file, flags);
-  }
+  fit::result<Errno, FdNumber> add_file(FileHandle file, FdFlags flags) const;
 
   Credentials creds() const { return (persistent_info->Lock())->creds(); }
 
@@ -330,7 +334,7 @@ class Task : public fbl::RefCountedUpgradeable<Task>, public MemoryAccessorExt {
     }
   */
 
-  fbl::RefPtr<FsContext>& fs();
+  fbl::RefPtr<FsContext> fs();
 
   fbl::RefPtr<MemoryManager>& mm();
 
@@ -346,7 +350,7 @@ class Task : public fbl::RefCountedUpgradeable<Task>, public MemoryAccessorExt {
 
   FsCred as_fscred() const { return creds().as_fscred(); }
 
-  fbl::String command() const { return persistent_info->Lock()->command(); }
+  ktl::string_view command() const { return persistent_info->Lock()->command(); }
 
  public:
   // impl MemoryAccessor for Task
@@ -363,16 +367,16 @@ class Task : public fbl::RefCountedUpgradeable<Task>, public MemoryAccessorExt {
   fit::result<Errno, size_t> write_memory(UserAddress addr,
                                           const ktl::span<const uint8_t>& bytes) const final;
 
-  // C++
  public:
+  // C++
   ~Task();
 
  private:
   friend class CurrentTask;
 
-  Task(pid_t id, fbl::RefPtr<ThreadGroup> thread_group, ktl::optional<zx::thread> thread,
-       FdTable files, ktl::optional<fbl::RefPtr<MemoryManager>> mm,
-       ktl::optional<fbl::RefPtr<FsContext>> fs);
+  Task(pid_t id, fbl::RefPtr<ThreadGroup> thread_group,
+       ktl::optional<fbl::RefPtr<ThreadDispatcher>> thread, FdTable files,
+       ktl::optional<fbl::RefPtr<MemoryManager>> mm, ktl::optional<fbl::RefPtr<FsContext>> fs);
 };
 
 // NOTE: This class originaly was in thread_group.rs
@@ -399,6 +403,7 @@ class TaskContainer : public fbl::WAVLTreeContainable<ktl::unique_ptr<TaskContai
       : weak_(ktl::move(weak)), info_(info) {}
 
   util::WeakPtr<Task> weak_;
+
   TaskPersistentInfo info_;
 };
 

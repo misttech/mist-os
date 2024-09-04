@@ -8,6 +8,8 @@
 
 #include <ktl/string_view.h>
 
+namespace unit_testing {
+
 using namespace starnix;
 
 bool test_path_builder() {
@@ -68,6 +70,8 @@ bool test_path_builder() {
   END_TEST;
 }
 
+}  // namespace unit_testing
+
 UNITTEST_START_TESTCASE(starnix_path_builder)
-UNITTEST("test path builder", test_path_builder)
+UNITTEST("test path builder", unit_testing::test_path_builder)
 UNITTEST_END_TESTCASE(starnix_path_builder, "starnix_path_builder", "Tests for PathBuilder")

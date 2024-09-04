@@ -17,7 +17,11 @@
 #include <ktl/algorithm.h>
 #include <ktl/move.h>
 #include <ktl/span.h>
-#include <zxtest/cpp/zxtest_prod.h>
+
+namespace unit_testing {
+bool test_vec_input_buffer();
+bool test_vec_output_buffer();
+}  // namespace unit_testing
 
 namespace starnix {
 
@@ -316,7 +320,7 @@ class VecOutputBuffer : public OutputBuffer {
   ~VecOutputBuffer() override { buffer_.reset(); }
 
  private:
-  ZXTEST_FRIEND_TEST(IoBuffers, test_vec_output_buffer);
+  friend bool unit_testing::test_vec_output_buffer();
 
   VecOutputBuffer(size_t capacity) : buffer_(), capacity_(capacity) {
     fbl::AllocChecker ac;
@@ -408,7 +412,7 @@ class VecInputBuffer : public InputBuffer {
   ~VecInputBuffer() override { buffer_.reset(); }
 
  private:
-  ZXTEST_FRIEND_TEST(IoBuffers, test_vec_input_buffer);
+  friend bool unit_testing::test_vec_input_buffer();
 
   explicit VecInputBuffer(fbl::Vector<uint8_t> buffer) : buffer_(ktl::move(buffer)) {}
 };

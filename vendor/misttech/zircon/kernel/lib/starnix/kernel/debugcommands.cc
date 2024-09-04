@@ -4,11 +4,6 @@
 
 #include <lib/console.h>
 #include <lib/mistos/starnix/kernel/runner/container.h>
-#include <lib/mistos/starnix/kernel/task/current_task.h>
-#include <lib/mistos/starnix/kernel/task/kernel.h>
-#include <lib/mistos/starnix/kernel/task/process_group.h>
-#include <lib/mistos/starnix/kernel/task/task.h>
-#include <lib/mistos/starnix/kernel/task/thread_group.h>
 #include <zircon/assert.h>
 
 #include <ktl/enforce.h>
@@ -35,16 +30,16 @@ static int starnix_main(int argc, const cmd_args* argv, uint32_t flags) {
       goto notenoughargs;
     }
 
-    starnix::ConfigWrapper wrapper;
+    starnix::Config config;
     int idx = 2;
     int remain = argc - idx;
     while (remain-- > 0) {
       fbl::AllocChecker ac;
-      wrapper.config.init.push_back(argv[idx++].str, &ac);
+      config.init.push_back(argv[idx++].str, &ac);
       ZX_ASSERT(ac.check());
     }
-    wrapper.config.name = "starnix-container";
-    auto container = starnix::create_container(wrapper);
+    config.name = "starnix-container";
+    auto container = starnix::create_container(config);
     if (container.is_error()) {
       return container.error_value().error_code();
     }

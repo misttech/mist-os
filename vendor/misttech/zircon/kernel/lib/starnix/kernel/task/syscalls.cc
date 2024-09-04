@@ -7,6 +7,7 @@
 
 #include <lib/fit/result.h>
 #include <lib/mistos/linux_uapi/arch/x86_64.h>
+#include <lib/mistos/starnix/kernel/mm/memory_manager.h>
 #include <lib/mistos/starnix/kernel/task/current_task.h>
 #include <lib/mistos/starnix/kernel/task/process_group.h>
 #include <lib/mistos/starnix/kernel/task/session.h>
@@ -105,7 +106,7 @@ fit::result<Errno, pid_t> sys_gettid(const CurrentTask& current_task) {
   return fit::ok(current_task->get_tid());
 }
 fit::result<Errno, pid_t> sys_getppid(const CurrentTask& current_task) {
-  return fit::ok(current_task->thread_group->read().get_ppid());
+  return fit::ok(current_task->thread_group->read()->get_ppid());
 }
 
 fit::result<Errno, pid_t> sys_getsid(const CurrentTask& current_task, pid_t pid) {
@@ -115,7 +116,7 @@ fit::result<Errno, pid_t> sys_getsid(const CurrentTask& current_task, pid_t pid)
     return result.take_error();
   auto target_task = result.value();
   // security::check_task_getsid(current_task, &target_task)?;
-  auto sid = target_task->thread_group->read().process_group->session->leader;
+  auto sid = target_task->thread_group->read()->process_group->session->leader;
   return fit::ok(sid);
 }
 
@@ -127,7 +128,7 @@ fit::result<Errno, pid_t> sys_getpgid(const CurrentTask& current_task, pid_t pid
 
   auto task = result.value();
   // selinux_hooks::check_getpgid_access(current_task, &task)?;
-  auto pgid = task->thread_group->read().process_group->leader;
+  auto pgid = task->thread_group->read()->process_group->leader;
   return fit::ok(pgid);
 }
 
