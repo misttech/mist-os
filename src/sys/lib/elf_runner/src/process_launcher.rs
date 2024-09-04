@@ -291,7 +291,10 @@ fn describe_error<'a>(err: &LauncherError, job: zx::Unowned<'a, zx::Job>) -> Log
     let log_level: LogStyle;
     let job_message: String;
     match err {
-        LauncherError::BuilderError(err) if err.as_zx_status() == zx::Status::BAD_STATE => {
+        LauncherError::BuilderError(err)
+            if err.as_zx_status() == zx::Status::BAD_STATE
+                || matches!(err, ProcessBuilderError::LoadDynamicLinkerTimeout()) =>
+        {
             match job.info() {
                 Ok(job_info) => {
                     match job_info.exited {
@@ -409,18 +412,22 @@ mod tests {
         // Create a child job then kill it.
         let job = job_default().create_child_job().unwrap();
         job.kill().unwrap();
-        let err =
-            LauncherError::BuilderError(ProcessBuilderError::CreateProcess(zx::Status::BAD_STATE));
-        let description = describe_error(&err, job.as_handle_ref().cast());
-        assert_eq!(
-            description,
-            LogInfo {
-                style: LogStyle::JobKilled,
-                job_info: "job was killed (retcode -1024)".to_string(),
-                message:
-                    "Process operation failed because the parent job was killed. This is expected."
-            }
-        );
+        let errors = [
+            LauncherError::BuilderError(ProcessBuilderError::CreateProcess(zx::Status::BAD_STATE)),
+            LauncherError::BuilderError(ProcessBuilderError::LoadDynamicLinkerTimeout()),
+        ];
+        for err in &errors {
+            let description = describe_error(err, job.as_handle_ref().cast());
+            assert_eq!(
+                description,
+                LogInfo {
+                    style: LogStyle::JobKilled,
+                    job_info: "job was killed (retcode -1024)".to_string(),
+                    message:
+                        "Process operation failed because the parent job was killed. This is expected."
+                }
+            );
+        }
     }
 
     #[test]
