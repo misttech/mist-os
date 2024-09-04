@@ -393,7 +393,7 @@ class NetworkIdentifier:
     @staticmethod
     def from_fidl(fidl: f_wlan_policy.NetworkIdentifier) -> "NetworkIdentifier":
         return NetworkIdentifier(
-            ssid=str(MacAddress.from_bytes(fidl.ssid)),
+            ssid=bytes(fidl.ssid).decode("utf-8"),
             security_type=SecurityType.from_fidl(fidl.type),
         )
 
@@ -410,14 +410,16 @@ class NetworkState:
 
     network_identifier: NetworkIdentifier
     connection_state: ConnectionState
-    disconnect_status: DisconnectStatus
+    disconnect_status: DisconnectStatus | None
 
     @staticmethod
     def from_fidl(fidl: f_wlan_policy.NetworkState) -> "NetworkState":
         return NetworkState(
             network_identifier=NetworkIdentifier.from_fidl(fidl.id),
             connection_state=ConnectionState.from_fidl(fidl.state),
-            disconnect_status=DisconnectStatus.from_fidl(fidl.status),
+            disconnect_status=(
+                DisconnectStatus.from_fidl(fidl.status) if fidl.status else None
+            ),
         )
 
     def __lt__(self, other: NetworkState) -> bool:

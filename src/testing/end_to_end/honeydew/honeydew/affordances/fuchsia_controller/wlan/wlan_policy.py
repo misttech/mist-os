@@ -39,6 +39,9 @@ _LOGGER: logging.Logger = logging.getLogger(__name__)
 _CLIENT_PROVIDER_PROXY = FidlEndpoint(
     "core/wlancfg", "fuchsia.wlan.policy.ClientProvider"
 )
+_CLIENT_LISTENER_PROXY = FidlEndpoint(
+    "core/wlancfg", "fuchsia.wlan.policy.ClientListener"
+)
 
 
 @dataclass
@@ -89,12 +92,37 @@ class WlanPolicy(AsyncAdapter, wlan_policy.WlanPolicy):
         after this one.
         """
         if self._client_controller:
-            self._client_controller.client_state_updates_server_task.cancel()
+            self._cancel_task(
+                self._client_controller.client_state_updates_server_task
+            )
+            self._client_controller = None
 
         if not self.loop().is_closed():
             self.loop().stop()
             self.loop().run_forever()  # Handle pending tasks
             self.loop().close()
+
+    def _cancel_task(self, task: asyncio.Task[None]) -> None:
+        """Cancel a task then verify it has been cancelled.
+
+        Args:
+            task: The task to cancel
+
+        Raises:
+            RuntimeError: failed cancel verification
+        """
+        if not task.cancel():
+            # Task was already done or cancelled, nothing else to do.
+            return
+
+        # Wait for task to completely cancel.
+        try:
+            self.loop().run_until_complete(task)
+            raise RuntimeError(
+                "Expected cancellation of task to raise CancelledError"
+            )
+        except asyncio.exceptions.CancelledError:
+            pass  # expected
 
     def _verify_supported(self, device: str, ffx: ffx_transport.FFX) -> None:
         """Check if WLAN Policy is supported on the DUT.
@@ -153,9 +181,15 @@ class WlanPolicy(AsyncAdapter, wlan_policy.WlanPolicy):
         Raises:
             HoneydewWlanError: Error from WLAN stack.
         """
+        if self._client_controller:
+            self._cancel_task(
+                self._client_controller.client_state_updates_server_task
+            )
+            self._client_controller = None
+
         controller_client, controller_server = Channel.create()
         client_controller_proxy = f_wlan_policy.ClientController.Client(
-            controller_client
+            controller_client.take()
         )
 
         updates: asyncio.Queue[ClientStateSummary] = asyncio.Queue()
@@ -194,7 +228,9 @@ class WlanPolicy(AsyncAdapter, wlan_policy.WlanPolicy):
         """
         raise NotImplementedError()
 
-    def get_update(
+    @asyncmethod
+    # pylint: disable-next=invalid-overridden-method
+    async def get_update(
         self,
         timeout: float | None = None,
     ) -> ClientStateSummary:
@@ -220,7 +256,11 @@ class WlanPolicy(AsyncAdapter, wlan_policy.WlanPolicy):
             HoneydewWlanError: Error from WLAN stack.
             TypeError: Return values not correct types.
         """
-        raise NotImplementedError()
+        if self._client_controller is None:
+            self.create_client_controller()
+        assert self._client_controller is not None
+
+        return await self._client_controller.updates.get()
 
     def remove_all_networks(self) -> None:
         """Deletes all saved networks on the device.
@@ -290,7 +330,45 @@ class WlanPolicy(AsyncAdapter, wlan_policy.WlanPolicy):
         Raises:
             HoneydewWlanError: Error from WLAN stack.
         """
-        raise NotImplementedError()
+        if self._client_controller is None:
+            # There is no running fuchsia.wlan.policy/ClientStateUpdates server.
+            # Creating one is equivalent to creating a new update listener.
+            self.create_client_controller()
+            return
+
+        # Replace the existing ClientStateUpdates server without giving up our
+        # handle to ClientController. This is necessary since the ClientProvider
+        # API is designed to only allow a single caller to make ClientController
+        # calls which would impact WLAN state. If we lose our handle to the
+        # ClientController, some other component on the system could take it.
+        self._cancel_task(
+            self._client_controller.client_state_updates_server_task
+        )
+
+        client_listener_proxy = f_wlan_policy.ClientListener.Client(
+            self._fc_transport.connect_device_proxy(_CLIENT_LISTENER_PROXY)
+        )
+
+        updates: asyncio.Queue[ClientStateSummary] = asyncio.Queue()
+        updates_client, updates_server = Channel.create()
+        client_state_updates_server = ClientStateUpdatesImpl(
+            updates_server, updates
+        )
+        task = self._async_adapter_loop.create_task(
+            client_state_updates_server.serve()
+        )
+
+        try:
+            client_listener_proxy.get_listener(
+                updates=updates_client.take(),
+            )
+        except ZxStatus as status:
+            raise errors.HoneydewWlanError(
+                f"ClientListener.GetListener() error {status}"
+            ) from status
+
+        self._client_controller.updates = updates
+        self._client_controller.client_state_updates_server_task = task
 
     @asyncmethod
     # pylint: disable-next=invalid-overridden-method

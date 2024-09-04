@@ -20,6 +20,9 @@ from honeydew.transports import ffx as ffx_transport
 from honeydew.transports import fuchsia_controller as fc_transport
 from honeydew.typing.wlan import (
     ClientStateSummary,
+    ConnectionState,
+    NetworkIdentifier,
+    NetworkState,
     SecurityType,
     WlanClientState,
 )
@@ -97,6 +100,28 @@ class WlanPolicyFCTests(unittest.TestCase):
             f_client_controller.Client.return_value = client_controller_proxy
             yield client_controller_proxy
 
+    @contextmanager
+    def _mock_client_listener(self) -> Iterator[mock.MagicMock]:
+        """Mock the creation of a fuchsia.wlan.policy/ClientListener."""
+
+        client_listener_proxy = mock.MagicMock(
+            spec=f_wlan_policy.ClientListener.Client
+        )
+
+        # Create a FIDL client to the ClientListener server.
+        def get_listener(updates: Channel) -> None:
+            self.client_state_updates_proxy = (
+                f_wlan_policy.ClientStateUpdates.Client(updates)
+            )
+
+        client_listener_proxy.get_listener = mock.Mock(wraps=get_listener)
+
+        with mock.patch(
+            "fidl.fuchsia_wlan_policy.ClientListener", autospec=True
+        ) as f_client_listener:
+            f_client_listener.Client.return_value = client_listener_proxy
+            yield client_listener_proxy
+
     def test_verify_supported(self) -> None:
         """Test if _verify_supported works."""
         self.ffx_transport_obj.run.return_value = ""
@@ -160,8 +185,75 @@ class WlanPolicyFCTests(unittest.TestCase):
 
     def test_get_update(self) -> None:
         """Test if get_update works."""
-        with self.assertRaises(NotImplementedError):
-            self.wlan_policy_obj.get_update()
+        with self._mock_create_client_controller() as _client_controller:
+            self.wlan_policy_obj.create_client_controller()
+
+            self.assertIsNotNone(self.client_state_updates_proxy)
+            self.assertIsNotNone(self.wlan_policy_obj._client_controller)
+            assert self.client_state_updates_proxy is not None
+            assert self.wlan_policy_obj._client_controller is not None
+
+            for msg, fidl, expected in [
+                (
+                    "enabled",
+                    f_wlan_policy.ClientStateSummary(
+                        state=f_wlan_policy.WlanClientState.CONNECTIONS_ENABLED,
+                        networks=[],
+                    ),
+                    ClientStateSummary(
+                        state=WlanClientState.CONNECTIONS_ENABLED, networks=[]
+                    ),
+                ),
+                (
+                    "connecting",
+                    f_wlan_policy.ClientStateSummary(
+                        state=f_wlan_policy.WlanClientState.CONNECTIONS_ENABLED,
+                        networks=[
+                            f_wlan_policy.NetworkState(
+                                id=f_wlan_policy.NetworkIdentifier(
+                                    ssid=list(b"Google Guest"),
+                                    type=f_wlan_policy.SecurityType.WPA2,
+                                ),
+                                state=f_wlan_policy.ConnectionState.CONNECTING,
+                                status=None,
+                            ),
+                        ],
+                    ),
+                    ClientStateSummary(
+                        state=WlanClientState.CONNECTIONS_ENABLED,
+                        networks=[
+                            NetworkState(
+                                network_identifier=NetworkIdentifier(
+                                    ssid="Google Guest",
+                                    security_type=SecurityType.WPA2,
+                                ),
+                                connection_state=ConnectionState.CONNECTING,
+                                disconnect_status=None,
+                            )
+                        ],
+                    ),
+                ),
+                (
+                    "disabled",
+                    f_wlan_policy.ClientStateSummary(
+                        state=f_wlan_policy.WlanClientState.CONNECTIONS_DISABLED,
+                        networks=[],
+                    ),
+                    ClientStateSummary(
+                        state=WlanClientState.CONNECTIONS_DISABLED, networks=[]
+                    ),
+                ),
+            ]:
+                with self.subTest(msg=msg, fidl=fidl, expected=expected):
+                    self.wlan_policy_obj.loop().run_until_complete(
+                        self.client_state_updates_proxy.on_client_state_update(
+                            summary=fidl,
+                        )
+                    )
+                    self.assertEqual(
+                        self.wlan_policy_obj.get_update(),
+                        expected,
+                    )
 
     def test_remove_all_networks(self) -> None:
         """Test if remove_all_networks works."""
@@ -183,10 +275,45 @@ class WlanPolicyFCTests(unittest.TestCase):
         with self.assertRaises(NotImplementedError):
             self.wlan_policy_obj.scan_for_networks()
 
-    def test_set_new_update_listener(self) -> None:
-        """Test if set_new_update_listener works."""
-        with self.assertRaises(NotImplementedError):
+    def test_set_new_update_listener_without_client_controller(self) -> None:
+        """Test if set_new_update_listener creates a client controller if it
+        doesn't already exist."""
+        with self._mock_create_client_controller():
             self.wlan_policy_obj.set_new_update_listener()
+
+            self.assertIsNotNone(self.client_state_updates_proxy)
+            self.assertIsNotNone(self.wlan_policy_obj._client_controller)
+            assert self.wlan_policy_obj._client_controller is not None
+            self.assertEqual(
+                self.wlan_policy_obj._client_controller.updates.qsize(), 0
+            )
+
+    def test_set_new_update_listener_overrides(self) -> None:
+        """Test if set_new_update_listener overrides an existing client state
+        updates server."""
+        with (
+            self._mock_create_client_controller(),
+            self._mock_client_listener(),
+        ):
+            self.wlan_policy_obj.create_client_controller()
+
+            self.assertIsNotNone(self.wlan_policy_obj._client_controller)
+            assert self.wlan_policy_obj._client_controller is not None
+            old_server = (
+                self.wlan_policy_obj._client_controller.client_state_updates_server_task
+            )
+
+            self.wlan_policy_obj.set_new_update_listener()
+
+            self.assertIsNotNone(self.wlan_policy_obj._client_controller)
+            assert self.wlan_policy_obj._client_controller is not None
+            new_server = (
+                self.wlan_policy_obj._client_controller.client_state_updates_server_task
+            )
+
+            self.assertNotEqual(new_server, old_server)
+            self.assertTrue(old_server.cancelled())
+            self.assertFalse(new_server.cancelled())
 
     def test_start_client_connections_passes(self) -> None:
         """Test if start_client_connections passes as expected."""
