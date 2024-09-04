@@ -159,23 +159,7 @@ impl<'a, const N: usize> Payload for FragmentedPayload<'a, N> {
         // even on an empty range out of start bounds.
         let mut start_offset = None;
         let mut final_len = 0;
-        loop {
-            let Some((sl_offset, sl)) = storage_iter.next() else {
-                // Must've consumed the entire range by now.
-                assert_eq!(
-                    // If we didn't use start_offset the only valid value for
-                    // `byte_start` is zero.
-                    start_offset.unwrap_or(0),
-                    byte_start,
-                    "range start index out of range {byte_range:?}"
-                );
-                assert_eq!(
-                    byte_start + final_len,
-                    byte_end,
-                    "range end index out of range {byte_range:?}"
-                );
-                break;
-            };
+        while let Some((sl_offset, sl)) = storage_iter.next() {
             let orig_len = sl.len();
 
             // Advance until the start of the specified range, discarding unused
@@ -210,6 +194,16 @@ impl<'a, const N: usize> Payload for FragmentedPayload<'a, N> {
             }
             final_len += sl.len();
         }
+        // Verify that the entire range was consumed.
+        assert_eq!(
+            // If we didn't use start_offset the only valid value for
+            // `byte_start` is zero.
+            start_offset.unwrap_or(0),
+            byte_start,
+            "range start index out of range {byte_range:?}"
+        );
+        assert_eq!(byte_start + final_len, byte_end, "range end index out of range {byte_range:?}");
+
         // Canonicalize an empty payload.
         if self_start == self_end {
             self_start = 0;
@@ -220,11 +214,7 @@ impl<'a, const N: usize> Payload for FragmentedPayload<'a, N> {
 
     fn partial_copy(&self, mut offset: usize, mut dst: &mut [u8]) {
         let mut slices = self.slices().into_iter();
-        loop {
-            let Some(sl) = slices.next() else {
-                assert_eq!(dst.len(), 0, "failed to fill dst");
-                return;
-            };
+        while let Some(sl) = slices.next() {
             let l = sl.len();
             if offset >= l {
                 offset -= l;
@@ -243,6 +233,7 @@ impl<'a, const N: usize> Payload for FragmentedPayload<'a, N> {
             dst = new_dst;
             offset = 0;
         }
+        assert_eq!(dst.len(), 0, "failed to fill dst");
     }
 
     fn new_empty() -> Self {
