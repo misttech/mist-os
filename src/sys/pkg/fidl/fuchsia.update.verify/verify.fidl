@@ -3,12 +3,13 @@
 // found in the LICENSE file.
 library fuchsia.update.verify;
 
+using zx;
+
 /// An abstract representation of an update verifier, to be used when
 /// verifying if an update should be committed. This is abstracted into a
 /// separate protocol because in the future, we may add more verifiers.
 ///
 /// This is unrelated to the verification in verified execution.
-@discoverable
 closed protocol Verifier {
     /// Verifies the update we just applied does not compromise an OTA dependency.
     /// If the verification fails, the [`Verifier`] should log the reason why.
@@ -25,11 +26,6 @@ closed protocol Verifier {
     };
 };
 
-/// A Service to indicate if a component is working as expected.
-service HealthCheck {
-    verifier client_end:Verifier;
-};
-
 /// An update verifier to determine if Blobfs is working as expected.
 @discoverable
 closed protocol BlobfsVerifier {
@@ -40,4 +36,30 @@ closed protocol BlobfsVerifier {
 @discoverable
 closed protocol NetstackVerifier {
     compose Verifier;
+};
+
+type HealthStatus = strict enum {
+    HEALTHY = 1;
+    UNHEALTHY = 2;
+};
+
+/// Protocol for reading health check statuses.
+closed protocol HealthVerification {
+    /// Queries the suite of health checks.
+    ///
+    /// Returns `ZX_OK` if every required check is healthy.
+    strict QueryHealthChecks() -> (struct {
+        status zx.Status;
+    });
+};
+
+/// Protocol for setting the health checks status of a component.
+/// It is up to the component authors to decide what a component should do after marking
+/// the partition as unhealthy.
+closed protocol ComponentOtaHealthCheck {
+    strict SetHealthStatus(struct {
+        health_status HealthStatus;
+    }) -> (struct {
+        status zx.Status;
+    });
 };
