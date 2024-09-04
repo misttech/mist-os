@@ -57,6 +57,7 @@ mod sysmem;
 mod tee_clients;
 mod thermal;
 mod timekeeper;
+mod trusted_apps;
 mod ui;
 mod usb;
 mod virtualization;
@@ -465,6 +466,13 @@ fn configure_subsystems(
         builder,
     )
     .context("Configuring the 'timekeeper' subsystem")?;
+
+    trusted_apps::TrustedAppsSubsystem::define_configuration(
+        &context_base.for_subsystem("trusted_apps"),
+        &product.trusted_apps,
+        builder,
+    )
+    .context("Configuring the 'trusted_apps' subsystem")?;
 
     usb::UsbSubsystemConfig::define_configuration(
         &context_base.for_subsystem("usb"),

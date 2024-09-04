@@ -150,6 +150,8 @@ pub enum BootfsPackageDestination {
     Config,
     /// Sysmem configuration.
     SysmemConfig,
+    /// The ta-manager configuration.
+    TaManagerConfig,
     /// Variant specifically for making tests easier.
     ForTest,
     /// Any package that came from an AIB.
@@ -171,6 +173,7 @@ impl std::fmt::Display for BootfsPackageDestination {
                 Self::ArchivistPipelines => "archivist-pipelines",
                 Self::Config => "config",
                 Self::SysmemConfig => "sysmem-config",
+                Self::TaManagerConfig => "ta-manager-config",
                 Self::ForTest => "for-test",
             }
         )

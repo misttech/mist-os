@@ -467,6 +467,23 @@ assembly_input_bundle("fake_battery_driver") {
   ]
 }
 
+# TA Manager is capable of running Trusted Apps (TAs) on fuchsia.
+assembly_input_bundle("ta_manager") {
+  bootfs_packages = [ "//src/tee/manager:ta-manager" ]
+  compiled_packages = [
+    {
+      bootfs_package = true
+      name = "bootstrap"
+      components = [
+        {
+          component_name = "bootstrap"
+          shards = [ "//src/tee/manager/meta/ta-manager.bootstrap_shard.cml" ]
+        },
+      ]
+    },
+  ]
+}
+
 # The most minimal AIB that is included in eng assembled systems that are meant
 # to be standalone.
 #

@@ -6,16 +6,22 @@ use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
+/// Configuration for how to run a trusted application in Fuchsia.
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[allow(dead_code)]
 #[serde(rename_all = "camelCase")]
 pub struct TAConfig {
+    /// The component url to run as the trusted application.
     pub url: String,
+    /// Only create one instance of the trusted app and route all connections to it.
     single_instance: bool,
+    /// Whether `single_instance` trusted apps support multiple separate sessions.
     // TODO: Support multiSession functionality.
     multi_session: bool,
+    /// The trusted app should continue running even in low power states and suspension.
     // TODO: Support instanceKeepAlive functionality.
     instance_keep_alive: bool,
+    /// Additional capabilities to pass to the component at `url`.
     capabilities: Vec<()>,
 }
 

@@ -58,6 +58,7 @@ sysinfo
 ?sysmem-config
 sysmem-driver
 sysmem_connector
+?ta-manager-config
 ums-function
 usb-audio
 usb-bus
