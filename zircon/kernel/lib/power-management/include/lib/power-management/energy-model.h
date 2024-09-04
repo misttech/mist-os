@@ -21,6 +21,7 @@
 #include <zircon/syscalls-next.h>
 #include <zircon/types.h>
 
+#include <atomic>
 #include <cstdint>
 #include <limits>
 #include <string_view>
@@ -164,17 +165,17 @@ class PowerLevelTransition {
 
   constexpr PowerLevelTransition() = default;
   explicit constexpr PowerLevelTransition(const zx_processor_power_level_transition_t& transition)
-      : latency_(transition.latency), energy_cost_(transition.energy_nj) {}
+      : latency_(transition.latency), energy_cost_nj_(transition.energy_nj) {}
 
   // Latency for transitioning from a given level to another.
   constexpr zx::duration latency() const { return latency_; }
 
   // Energy cost in nano joules(nj) for transition from a given level to another.
-  constexpr uint64_t energy_cost() const { return energy_cost_; }
+  constexpr uint64_t energy_cost_nj() const { return energy_cost_nj_; }
 
   // Whether the transition is valid or not.
   explicit constexpr operator bool() {
-    return latency_ != Invalid().latency() && energy_cost_ != Invalid().energy_cost_;
+    return latency_ != Invalid().latency() && energy_cost_nj_ != Invalid().energy_cost_nj_;
   }
 
  private:
@@ -183,7 +184,7 @@ class PowerLevelTransition {
   zx::duration latency_ = zx::duration::infinite();
 
   // Amount of energy consumed to perform the transition.
-  uint64_t energy_cost_ = std::numeric_limits<uint64_t>::max();
+  uint64_t energy_cost_nj_ = std::numeric_limits<uint64_t>::max();
 };
 
 // Represents a view of the `zx_processor_power_level_transition_t` array as
@@ -294,10 +295,20 @@ class PowerDomain : public fbl::RefCounted<PowerDomain>,
   // Model describing the behavior of the power domain.
   constexpr const PowerModel& model() const { return power_model_; }
 
+  // Normalized utilization accumulated from all the entities that this `PowerDomain`
+  // is associated with (e.g. all the cpus in the power domain).
+  constexpr uint64_t total_normalized_utilization() const {
+    return total_normalized_utilization_.load(std::memory_order_relaxed);
+  }
+
  private:
+  friend class PowerState;
+
   const zx_cpu_set_t cpus_;
   const uint32_t id_;
   const PowerModel power_model_;
+
+  std::atomic<uint64_t> total_normalized_utilization_{0};
 };
 
 // `PowerDomainRegistry` provides a starting point for looking at any

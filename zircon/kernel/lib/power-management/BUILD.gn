@@ -8,7 +8,10 @@ import("//build/cpp/library_headers.gni")
 import("//build/test.gni")
 
 library_headers("headers") {
-  headers = [ "lib/power-management/energy-model.h" ]
+  headers = [
+    "lib/power-management/energy-model.h",
+    "lib/power-management/power-state.h",
+  ]
 
   public_deps = [
     "//sdk/lib/stdcompat",
@@ -18,7 +21,10 @@ library_headers("headers") {
 }
 
 source_set("power-management") {
-  sources = [ "energy-model.cc" ]
+  sources = [
+    "energy-model.cc",
+    "power-state.cc",
+  ]
   public_deps = [ ":headers" ]
   deps = [ "//zircon/system/ulib/fbl" ]
 }
@@ -29,7 +35,11 @@ group("tests") {
 }
 
 test("power-management-unittests") {
-  sources = [ "energy-model-test.cc" ]
+  sources = [
+    "energy-model-test.cc",
+    "power-state-test.cc",
+    "test-helper.cc",
+  ]
   deps = [
     ":power-management",
     "//src/lib/fxl/test:gtest_main",
