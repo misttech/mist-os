@@ -178,6 +178,16 @@ class TestArgs(unittest.TestCase):
             ],
         )
 
+    def test_exact_after_selections(self) -> None:
+        """Passing --exact after a selection works"""
+        flags = args.parse_args(["-p", "foo", "-a", "-c", "bar", "--exact"])
+        flags.validate()
+        self.assertEqual(flags.exact, True)
+        self.assertListEqual(
+            flags.selection,
+            ["--package", "foo", "--and", "--component", "bar"],
+        )
+
     @parameterized.expand(
         [
             ("default is None", [], [], None),

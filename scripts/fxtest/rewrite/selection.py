@@ -226,27 +226,33 @@ async def select_tests(
             match_tries = (
                 [closest_name_match()]
                 + [
-                    component.distances(c, recorder, id)
+                    component.distances(c, recorder, id, exact=exact_match)
                     for c in group.components
                 ]
-                + [package.distances(p, recorder, id) for p in group.packages]
+                + [
+                    package.distances(p, recorder, id, exact=exact_match)
+                    for p in group.packages
+                ]
             )
 
             distances: list[list[_TestDistance]] = await asyncio.gather(
                 *match_tries
             )
-            match_distances: defaultdict[Test, int] = defaultdict(
-                lambda: NO_MATCH_DISTANCE
-            )
+            match_distances: dict[Test, int] = dict()
             for td in itertools.chain(*distances):
-                match_distances[td.test] = min(
-                    match_distances[td.test], td.distance
-                )
-
-            for entry in entries:
                 # The final score for a match group is the worst match
                 # out of the above sets of scores.
-                final_score = match_distances[entry]
+                if (old_val := match_distances.get(td.test)) is not None:
+                    val = max(old_val, td.distance)
+                else:
+                    val = td.distance
+
+                match_distances[td.test] = val
+
+            for entry in entries:
+                final_score = match_distances.get(entry)
+                if final_score is None:
+                    final_score = NO_MATCH_DISTANCE
 
                 if exact_match and final_score != PERFECT_MATCH_DISTANCE:
                     # Allow only exact matches in exact match mode.

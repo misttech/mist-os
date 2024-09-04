@@ -290,8 +290,8 @@ class SelectTestsTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(select_path.selected, select_cm.selected)
         self.assertEqual(select_path.selected, url_prefix.selected)
 
-        for _, matches in select_path.group_matches:
-            self.assertEqual(len(matches), 1)
+        for g, matches in select_path.group_matches:
+            self.assertEqual(len(matches), 1, f"Failed in {g}")
 
         host_path = await selection.select_tests(tests, ["binary_test"])
         self.assertEqual(
@@ -370,6 +370,70 @@ class SelectTestsTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(
             host_exact.best_score["host_x64/binary_test"],
             selection.NO_MATCH_DISTANCE,
+        )
+
+    async def test_package_and_component(self) -> None:
+        """Test that --package and/or --component works"""
+        tests = [
+            self._make_package_test("src/tests", "foo-pkg", "bar-test"),
+            self._make_package_test("src/tests", "foo-pkg", "other-baz-test"),
+            self._make_package_test(
+                "src/tests", "other-bar-pkg", "other-baz-test"
+            ),
+            self._make_host_test("src/other-tests", "binary_test"),
+        ]
+
+        package_selection = await selection.select_tests(
+            tests,
+            ["--package", "foo-pkg"],
+        )
+        self.assertEqual(
+            list(map(lambda x: x.name(), package_selection.selected)),
+            [
+                "fuchsia-pkg://fuchsia.com/foo-pkg#meta/bar-test.cm",
+                "fuchsia-pkg://fuchsia.com/foo-pkg#meta/other-baz-test.cm",
+            ],
+        )
+
+        component_selection = await selection.select_tests(
+            tests,
+            ["--component", "other-baz-test"],
+        )
+        self.assertEqual(
+            list(map(lambda x: x.name(), component_selection.selected)),
+            [
+                "fuchsia-pkg://fuchsia.com/foo-pkg#meta/other-baz-test.cm",
+                "fuchsia-pkg://fuchsia.com/other-bar-pkg#meta/other-baz-test.cm",
+            ],
+        )
+
+        # Try prefix of package name.
+        both_selection = await selection.select_tests(
+            tests,
+            ["--package", "foo", "--and", "--component", "other-baz-test"],
+        )
+        self.assertEqual(
+            list(map(lambda x: x.name(), both_selection.selected)),
+            [
+                "fuchsia-pkg://fuchsia.com/foo-pkg#meta/other-baz-test.cm",
+            ],
+        )
+
+        # Prefix should not match in exact mode
+        exact_selection = await selection.select_tests(
+            tests,
+            [
+                "--package",
+                "foo",
+                "--and",
+                "--component",
+                "other-baz-test",
+            ],
+            exact_match=True,
+        )
+        self.assertEqual(
+            list(map(lambda x: x.name(), exact_selection.selected)),
+            [],
         )
 
     async def test_exact_matches(self) -> None:
