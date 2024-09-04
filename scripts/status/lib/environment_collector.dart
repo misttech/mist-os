@@ -41,7 +41,7 @@ class PreferredDeviceReader {
     DeviceFilenameReader filenameReader,
   }) {
     // if DEVICE_NAME was passed in fx -d, use it
-    String deviceName = envReader.getEnv('FUCHSIA_DEVICE_NAME');
+    String deviceName = envReader.getEnv('FUCHSIA_NODENAME');
     String notes = 'set by `fx -d`';
     if (deviceName == null) {
       filenameReader ??= DeviceFilenameReader();

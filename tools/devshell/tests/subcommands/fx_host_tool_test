@@ -77,7 +77,7 @@ EOF
 
 TEST_tool_executed() {
   BT_EXPECT ${fx} host-tool "ffx" "--flag1" "arg1"
-  btf::expect-mock-args "${ffx}" "--flag1" "arg1"
+  btf::expect-mock-args "${ffx}.mock_state.1" "--flag1" "arg1"
 }
 
 TEST_tool_not_built() {
@@ -107,10 +107,10 @@ EOF
     return 0
   }
 EOF
-  BT_EXPECT ${fx} host-tool "ffx" "--flag1" "arg1"
+  BT_EXPECT ${fx} host-tool "ffx" "--flag2" "arg2"
 
   BT_ASSERT_FILE_EXISTS "${BT_TEMP_DIR}/tools/devshell/build.mock_state"
-  btf::expect-mock-args "${ffx}" "--flag1" "arg1"
+  btf::expect-mock-args "${ffx}.mock_state.1" "--flag2" "arg2"
 }
 
 TEST_no_build() {

@@ -49,7 +49,7 @@ void main() {
     });
     test('returns env result even when deviceName file is present', () async {
       MockEnvReader envReader = MockEnvReader();
-      when(envReader.getEnv('FUCHSIA_DEVICE_NAME'))
+      when(envReader.getEnv('FUCHSIA_NODENAME'))
           .thenReturn('Really good device');
       EnvironmentCollector env = EnvironmentCollector();
       List<Item> results = await env.collect(envReader: envReader);

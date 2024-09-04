@@ -183,7 +183,8 @@ with-pinned-target() {
   fi
 
   (
-    export FUCHSIA_DEVICE_NAME="$(target-addr)"
+    FUCHSIA_NODENAME="$(target-addr)"
+    export FUCHSIA_NODENAME
     "$@"
   )
 }
