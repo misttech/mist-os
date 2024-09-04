@@ -23,6 +23,7 @@ namespace fs_management {
 __EXPORT zx::result<> CreateVolume(fidl::UnownedClientEnd<fuchsia_io::Directory> exposed_dir,
                                    std::string_view name,
                                    fidl::ServerEnd<fuchsia_io::Directory> outgoing_dir,
+                                   fuchsia_fs_startup::wire::CreateOptions create_options,
                                    fuchsia_fs_startup::wire::MountOptions options);
 
 // Opens volume |name| in the filesystem instance.  |crypt_client| is an optional channel to
