@@ -177,14 +177,17 @@ void Allocator::LogAllocationFailure(uint64_t num_blocks) const {
     return;
   }
 
-  FX_LOGS(ERROR) << "Blobfs has run out of space on persistent storage.";
-  FX_LOGS(ERROR) << "    Could not allocate " << requested_bytes << " bytes";
-  FX_LOGS(ERROR) << "    Total data bytes  : " << total_bytes;
-  FX_LOGS(ERROR) << "    Used data bytes   : " << persisted_used_bytes;
-  FX_LOGS(ERROR) << "    Preallocated bytes: " << pending_used_bytes;
-  FX_LOGS(ERROR) << "    Free data bytes   : " << free_bytes;
-  FX_LOGS(ERROR) << "    This allocation failure is the result of "
-                 << (requested_bytes <= free_bytes ? "fragmentation" : "over-allocation");
+  static OutOfSpaceLogSite site;
+  if (site.ShouldLog()) {
+    FX_LOGS(ERROR) << "Blobfs has run out of space on persistent storage.";
+    FX_LOGS(ERROR) << "    Could not allocate " << requested_bytes << " bytes";
+    FX_LOGS(ERROR) << "    Total data bytes  : " << total_bytes;
+    FX_LOGS(ERROR) << "    Used data bytes   : " << persisted_used_bytes;
+    FX_LOGS(ERROR) << "    Preallocated bytes: " << pending_used_bytes;
+    FX_LOGS(ERROR) << "    Free data bytes   : " << free_bytes;
+    FX_LOGS(ERROR) << "    This allocation failure is the result of "
+                   << (requested_bytes <= free_bytes ? "fragmentation" : "over-allocation");
+  }
 }
 
 zx_status_t Allocator::GrowNodeMap(size_t size) {
@@ -261,7 +264,7 @@ void Allocator::Decommit() {
     }
   }
   if (decommit_total > 0) {
-    FX_LOGS(INFO) << "Decommitted " << decommit_total << " bytes from the node map";
+    FX_LOGS(DEBUG) << "Decommitted " << decommit_total << " bytes from the node map";
   }
 }
 
