@@ -200,12 +200,9 @@ mod test {
 
         let client = async {
             let output: Vec<u8> = Vec::new();
-            let status = fetch_url(
-                format!("http://localhost:{}", addr.port()).parse::<hyper::Uri>().unwrap(),
-                output,
-            )
-            .await
-            .unwrap();
+            let status = fetch_url(format!("http://{addr}").parse::<hyper::Uri>().unwrap(), output)
+                .await
+                .unwrap();
             match status {
                 StatusCode::OK | StatusCode::FOUND => {}
                 _ => assert!(false, "Unexpected status code: {}", status),
