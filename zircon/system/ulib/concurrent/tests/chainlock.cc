@@ -2,12 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <lib/concurrent/capability_token.h>
 #include <lib/concurrent/chainlock.h>
 #include <lib/concurrent/chainlock_guard.h>
 #include <lib/concurrent/chainlock_transaction.h>
 #include <lib/concurrent/chainlock_transaction_common.h>
 #include <lib/concurrent/chainlockable.h>
-#include <lib/concurrent/global_capability.h>
 #include <zircon/assert.h>
 #include <zircon/compiler.h>
 #include <zircon/time.h>
@@ -52,8 +52,8 @@ class ChainLockTransaction
   static constexpr Option<ChainLockTransaction::Options::A> OptionA{};
   static constexpr Option<ChainLockTransaction::Options::B> OptionB{};
 
-  [[maybe_unused]] static constexpr concurrent::GlobalCapability option_a_cap;
-  [[maybe_unused]] static constexpr concurrent::GlobalCapability option_b_cap;
+  [[maybe_unused]] static constexpr concurrent::CapabilityToken<> option_a_cap;
+  [[maybe_unused]] static constexpr concurrent::CapabilityToken<> option_b_cap;
 
   static Options ActiveOption() { return active_option_; }
 

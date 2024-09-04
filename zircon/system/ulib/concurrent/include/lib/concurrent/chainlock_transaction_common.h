@@ -5,7 +5,7 @@
 #ifndef LIB_CONCURRENT_CHAINLOCK_TRANSACTION_COMMON_H_
 #define LIB_CONCURRENT_CHAINLOCK_TRANSACTION_COMMON_H_
 
-#include <lib/concurrent/global_capability.h>
+#include <lib/concurrent/capability_token.h>
 #include <zircon/assert.h>
 
 #include <atomic>
@@ -16,7 +16,7 @@
 
 namespace concurrent {
 
-constexpr GlobalCapability chainlock_transaction_token;
+constexpr CapabilityToken chainlock_transaction_token;
 
 // ChainLockTransactionCommon is a base class that provides chain lock transaction facilities,
 // including transaction token and saved state types, reserved token values, and the global token
