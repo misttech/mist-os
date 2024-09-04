@@ -25,7 +25,6 @@ group("tests") {
     "c:tests",
     "closure-queue:tests",
     "cmdline:tests",
-    "concurrent:tests",
     "debugdata:tests",
     "driver-unit-test:tests",
     "elf-search:tests",

@@ -39,7 +39,6 @@ class ChainLockTransaction
   static zx_ticks_t GetCurrentTicks() {
     return std::chrono::steady_clock::now().time_since_epoch().count();
   }
-  static void Yield() {}
 
   using ContentionState = std::atomic<uint64_t>;
 
@@ -263,7 +262,7 @@ TEST(ChainLock, UncontestedAcquire) {
       [&]() __TA_REQUIRES(chainlock_transaction_token) -> ChainLockTransaction::Result<> {
         EXPECT_FALSE(lock.is_held());
 
-        lock.AcquireFirstInChain();
+        lock.Acquire();
 
         EXPECT_TRUE(lock.is_held());
         EXPECT_EQ(lock.state_for_testing(), ChainLockTransaction::ActiveRef().token());
@@ -285,7 +284,7 @@ TEST(ChainLock, CyclicAcquire) {
   ChainLockTransaction::UntilDone(
       ChainLockTransaction::OptionNone, CLT_TAG("CyclicAcquire"),
       [&]() __TA_REQUIRES(chainlock_transaction_token) -> ChainLockTransaction::Result<> {
-        lock.AcquireFirstInChain();
+        lock.Acquire();
 
         ChainLock::Result result;
         EXPECT_FALSE(get_lock().AcquireOrResult(result));
@@ -387,18 +386,14 @@ TEST(ChainLock, CrossReferencingTypes) {
   TypeA value_a{0};
   TypeB value_b{0};
 
-  const auto do_transaction =
-      [&]() __TA_REQUIRES(chainlock_transaction_token) -> ChainLockTransaction::Result<> {
-    ChainLockGuard guard_a{value_a.get_lock()};
-    ChainLockGuard guard_b{value_b.get_lock(), ChainLockGuard::Defer};
-    if (!guard_b.AcquireOrBackoff()) {
-      return ChainLockTransaction::Action::Backoff;
-    }
-    EXPECT_TRUE(value_a.compare(value_b));
-    return ChainLockTransaction::Done;
-  };
   ChainLockTransaction::UntilDone(ChainLockTransaction::OptionNone,
-                                  CLT_TAG("CrossReferencingTypes"), do_transaction);
+                                  CLT_TAG("CrossReferencingTypes"),
+                                  [&]() __TA_REQUIRES(chainlock_transaction_token) {
+                                    ChainLockGuard guard_a{value_a.get_lock()};
+                                    ChainLockGuard guard_b{value_b.get_lock()};
+                                    EXPECT_TRUE(value_a.compare(value_b));
+                                    return ChainLockTransaction::Done;
+                                  });
 }
 
 }  // anonymous namespace

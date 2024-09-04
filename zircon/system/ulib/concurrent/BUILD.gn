@@ -31,8 +31,3 @@ source_set("concurrent") {
   ]
   deps = [ "//sdk/lib/stdcompat" ]
 }
-
-group("tests") {
-  testonly = true
-  deps = [ "tests:tests" ]
-}
