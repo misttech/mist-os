@@ -131,7 +131,7 @@ impl<I: Ip> RuleMatcher<I> {
 }
 
 /// Packet properties used as input for the rules engine.
-pub(crate) struct RuleInput<'a, I: Ip, D> {
+pub struct RuleInput<'a, I: Ip, D> {
     pub(crate) packet_origin: PacketOrigin<I, &'a D>,
 }
 

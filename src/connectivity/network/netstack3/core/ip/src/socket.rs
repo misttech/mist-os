@@ -15,7 +15,7 @@ use netstack3_base::socket::{SocketIpAddr, SocketIpAddrExt as _};
 use netstack3_base::{
     trace_duration, AnyDevice, CounterContext, DeviceIdContext, DeviceIdentifier, EitherDeviceId,
     InstantContext, IpExt, Mms, SendFrameErrorReason, StrongDeviceIdentifier, TracingContext,
-    WeakDeviceIdentifier as _,
+    WeakDeviceIdentifier,
 };
 use netstack3_filter::{
     self as filter, FilterBindingsContext, FilterHandler as _, InterfaceProperties, RawIpBody,
@@ -32,6 +32,8 @@ use crate::internal::base::{
 };
 use crate::internal::device::state::IpDeviceStateIpExt;
 use crate::internal::device::IpDeviceAddr;
+use crate::internal::routing::rules::RuleInput;
+use crate::internal::routing::PacketOrigin;
 use crate::internal::types::{ResolvedRoute, RoutableIpAddr};
 use crate::{HopLimits, NextHop};
 
@@ -85,6 +87,13 @@ pub trait IpSocketHandler<I: IpExt, BC>: DeviceIdContext<AnyDevice> {
         S: TransportPacketSerializer<I>,
         S::Buffer: BufferMut,
         O: SendOptions<I>;
+
+    /// Confirms the provided IP socket destination is reachable.
+    ///
+    /// Implementations must retrieve the next hop given the provided
+    /// IP socket and confirm neighbor reachability for the resolved target
+    /// device.
+    fn confirm_reachable(&mut self, bindings_ctx: &mut BC, socket: &IpSock<I, Self::WeakDeviceId>);
 
     /// Creates a temporary IP socket and sends a single packet on it.
     ///
@@ -399,6 +408,18 @@ where
 
     /// Returns `DeviceId` for the loopback device.
     fn get_loopback_device(&mut self) -> Option<Self::DeviceId>;
+
+    /// Confirms the provided IP socket destination is reachable.
+    ///
+    /// Implementations must retrieve the next hop given the provided
+    /// IP socket and confirm neighbor reachability for the resolved target
+    /// device.
+    fn confirm_reachable(
+        &mut self,
+        bindings_ctx: &mut BC,
+        dst: SpecifiedAddr<I::Addr>,
+        input: RuleInput<'_, I, Self::DeviceId>,
+    );
 }
 
 /// Enables a blanket implementation of [`IpSocketHandler`].
@@ -467,6 +488,19 @@ where
         self.increment(|counters| &counters.send_ip_packet);
 
         send_ip_packet(self, bindings_ctx, ip_sock, body, mtu, options)
+    }
+
+    fn confirm_reachable(&mut self, bindings_ctx: &mut BC, socket: &IpSock<I, CC::WeakDeviceId>) {
+        let bound_device = socket.device().and_then(|weak| weak.upgrade());
+        let bound_device = bound_device.as_ref();
+        let bound_address = Some((*socket.local_ip()).into());
+        let destination = (*socket.remote_ip()).into();
+        IpSocketContext::confirm_reachable(
+            self,
+            bindings_ctx,
+            destination,
+            RuleInput { packet_origin: PacketOrigin::Local { bound_address, bound_device } },
+        )
     }
 }
 
@@ -1231,14 +1265,6 @@ pub(crate) mod testutil {
             })))
         }
 
-        fn confirm_reachable_with_destination(
-            &mut self,
-            _bindings_ctx: &mut BC,
-            _dst: SpecifiedAddr<<I>::Addr>,
-            _device: Option<&D>,
-        ) {
-        }
-
         fn get_original_destination(&mut self, _tuple: &Tuple<I>) -> Option<(I::Addr, u16)> {
             unimplemented!()
         }
@@ -1291,6 +1317,13 @@ pub(crate) mod testutil {
             self.send_frame(bindings_ctx, meta, body).or_else(
                 |SendFrameError { serializer: _, error }| IpSockSendError::from_send_frame(error),
             )
+        }
+
+        fn confirm_reachable(
+            &mut self,
+            _bindings_ctx: &mut BC,
+            _socket: &IpSock<I, Self::WeakDeviceId>,
+        ) {
         }
     }
 
@@ -1355,20 +1388,6 @@ pub(crate) mod testutil {
         fn get_default_hop_limits(&mut self, device: Option<&Self::DeviceId>) -> HopLimits {
             BaseTransportIpContext::<I, BC>::get_default_hop_limits(
                 self.state.fake_ip_socket_ctx_mut(),
-                device,
-            )
-        }
-
-        fn confirm_reachable_with_destination(
-            &mut self,
-            bindings_ctx: &mut BC,
-            dst: SpecifiedAddr<I::Addr>,
-            device: Option<&Self::DeviceId>,
-        ) {
-            BaseTransportIpContext::<I, BC>::confirm_reachable_with_destination(
-                self.state.fake_ip_socket_ctx_mut(),
-                bindings_ctx,
-                dst,
                 device,
             )
         }

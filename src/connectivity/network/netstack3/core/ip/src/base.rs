@@ -335,18 +335,6 @@ pub trait BaseTransportIpContext<I: IpExt, BC>: DeviceIdContext<AnyDevice> {
     /// Otherwise the system defaults are returned.
     fn get_default_hop_limits(&mut self, device: Option<&Self::DeviceId>) -> HopLimits;
 
-    /// Confirms the provided destination is reachable.
-    ///
-    /// Implementations must retrieve the next hop given the provided
-    /// destination and confirm neighbor reachability for the resolved target
-    /// device.
-    fn confirm_reachable_with_destination(
-        &mut self,
-        bindings_ctx: &mut BC,
-        dst: SpecifiedAddr<I::Addr>,
-        device: Option<&Self::DeviceId>,
-    );
-
     /// Gets the original destination for the tracked connection indexed by
     /// `tuple`, which includes the source and destination addresses and
     /// transport-layer ports as well as the transport protocol number.
@@ -463,45 +451,6 @@ impl<
                 ..DEFAULT_HOP_LIMITS
             },
             None => DEFAULT_HOP_LIMITS,
-        }
-    }
-
-    fn confirm_reachable_with_destination(
-        &mut self,
-        bindings_ctx: &mut BC,
-        dst: SpecifiedAddr<I::Addr>,
-        device: Option<&Self::DeviceId>,
-    ) {
-        match lookup_route_table(
-            self,
-            dst.get(),
-            // TODO(https://fxbug.dev/361817008): This will be broken by PBRs with custom rules. We
-            // need to make sure we confirm the reachability with the correct neighbor.
-            PacketOrigin::Local { bound_address: None, bound_device: device },
-        ) {
-            Some(Destination { next_hop, device }) => {
-                let neighbor = match next_hop {
-                    NextHop::RemoteAsNeighbor => dst,
-                    NextHop::Gateway(gateway) => gateway,
-                    NextHop::Broadcast(marker) => {
-                        I::map_ip::<_, ()>(
-                            WrapBroadcastMarker(marker),
-                            |WrapBroadcastMarker(())| {
-                                debug!(
-                                    "can't confirm {dst:?}@{device:?} as reachable: \
-                                                 dst is a broadcast address"
-                                );
-                            },
-                            |WrapBroadcastMarker(never)| match never {},
-                        );
-                        return;
-                    }
-                };
-                self.confirm_reachable(bindings_ctx, &device, neighbor);
-            }
-            None => {
-                debug!("can't confirm {dst:?}@{device:?} as reachable: no route");
-            }
         }
     }
 
@@ -1295,6 +1244,39 @@ impl<
 
     fn get_loopback_device(&mut self) -> Option<Self::DeviceId> {
         device::IpDeviceConfigurationContext::<I, _>::loopback_id(self)
+    }
+
+    fn confirm_reachable(
+        &mut self,
+        bindings_ctx: &mut BC,
+        dst: SpecifiedAddr<I::Addr>,
+        input: RuleInput<'_, I, Self::DeviceId>,
+    ) {
+        match lookup_route_table(self, dst.get(), input) {
+            Some(Destination { next_hop, device }) => {
+                let neighbor = match next_hop {
+                    NextHop::RemoteAsNeighbor => dst,
+                    NextHop::Gateway(gateway) => gateway,
+                    NextHop::Broadcast(marker) => {
+                        I::map_ip::<_, ()>(
+                            WrapBroadcastMarker(marker),
+                            |WrapBroadcastMarker(())| {
+                                debug!(
+                                    "can't confirm {dst:?}@{device:?} as reachable: \
+                                    dst is a broadcast address"
+                                );
+                            },
+                            |WrapBroadcastMarker(never)| match never {},
+                        );
+                        return;
+                    }
+                };
+                IpDeviceContext::confirm_reachable(self, bindings_ctx, &device, neighbor);
+            }
+            None => {
+                debug!("can't confirm {dst:?} as reachable: no route");
+            }
+        }
     }
 }
 
@@ -3611,7 +3593,9 @@ fn receive_ip_packet_action_common<
     match lookup_route_table(
         core_ctx,
         *dst_ip,
-        PacketOrigin::NonLocal { source_address, incoming_device: device_id },
+        RuleInput {
+            packet_origin: PacketOrigin::NonLocal { source_address, incoming_device: device_id },
+        },
     ) {
         Some(dst) => {
             core_ctx.increment(|counters| &counters.forward);
@@ -3628,13 +3612,12 @@ fn receive_ip_packet_action_common<
 fn lookup_route_table<I: IpLayerIpExt, CC: IpStateContext<I>>(
     core_ctx: &mut CC,
     dst_ip: I::Addr,
-    packet_origin: PacketOrigin<I, &CC::DeviceId>,
+    rule_input: RuleInput<'_, I, CC::DeviceId>,
 ) -> Option<Destination<I::Addr, CC::DeviceId>> {
-    let bound_device = match packet_origin {
+    let bound_device = match rule_input.packet_origin {
         PacketOrigin::Local { bound_address: _, bound_device } => bound_device,
         PacketOrigin::NonLocal { source_address: _, incoming_device: _ } => None,
     };
-    let rule_input = RuleInput { packet_origin };
     match walk_rules(core_ctx, (), &rule_input, |(), core_ctx, table| {
         match table.lookup(core_ctx, bound_device, dst_ip) {
             Some(dst) => ControlFlow::Break(Some(dst)),

@@ -24,8 +24,7 @@ use netstack3_base::{
 use netstack3_filter::TransportPacketSerializer;
 use netstack3_ip::socket::{IpSockCreationError, MmsError};
 use netstack3_ip::{
-    BaseTransportIpContext, IpTransportContext, ReceiveIpPacketMeta, TransportIpContext,
-    TransportReceiveError,
+    IpTransportContext, ReceiveIpPacketMeta, TransportIpContext, TransportReceiveError,
 };
 use packet::{BufferMut, BufferView as _, EmptyBuf, InnerPacketBuilder, Serializer as _};
 use packet_formats::error::ParseError;
@@ -622,19 +621,8 @@ where
         state.on_segment::<_, BC>(counters, incoming, bindings_ctx.now(), socket_options, *defunct)
     });
 
-    let mut confirm_reachable = || {
-        let remote_ip = *ip_sock.remote_ip();
-        let device = ip_sock.device().and_then(|weak| weak.upgrade());
-        <DC as BaseTransportIpContext<WireI, _>>::confirm_reachable_with_destination(
-            core_ctx,
-            bindings_ctx,
-            remote_ip.into(),
-            device.as_ref(),
-        );
-    };
-
     match data_acked {
-        DataAcked::Yes => confirm_reachable(),
+        DataAcked::Yes => core_ctx.confirm_reachable(bindings_ctx, ip_sock),
         DataAcked::No => {}
     }
 
@@ -655,7 +643,7 @@ where
             if handshake_status
                 .update_if_pending(HandshakeStatus::Completed { reported: accept_queue.is_some() })
             {
-                confirm_reachable();
+                core_ctx.confirm_reachable(bindings_ctx, ip_sock);
             }
         }
         State::Closed(Closed { reason }) => {

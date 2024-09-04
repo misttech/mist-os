@@ -5622,20 +5622,6 @@ mod tests {
             BaseTransportIpContext::<I, BC>::get_default_hop_limits(&mut self.ip_socket_ctx, device)
         }
 
-        fn confirm_reachable_with_destination(
-            &mut self,
-            bindings_ctx: &mut BC,
-            dst: SpecifiedAddr<I::Addr>,
-            device: Option<&Self::DeviceId>,
-        ) {
-            BaseTransportIpContext::<I, BC>::confirm_reachable_with_destination(
-                &mut self.ip_socket_ctx,
-                bindings_ctx,
-                dst,
-                device,
-            )
-        }
-
         fn get_original_destination(&mut self, tuple: &Tuple<I>) -> Option<(I::Addr, u16)> {
             BaseTransportIpContext::<I, BC>::get_original_destination(
                 &mut self.ip_socket_ctx,
@@ -5682,6 +5668,14 @@ mod tests {
             O: SendOptions<I>,
         {
             self.ip_socket_ctx.send_ip_packet(bindings_ctx, socket, body, mtu, options)
+        }
+
+        fn confirm_reachable(
+            &mut self,
+            bindings_ctx: &mut BC,
+            socket: &IpSock<I, Self::WeakDeviceId>,
+        ) {
+            self.ip_socket_ctx.confirm_reachable(bindings_ctx, socket)
         }
     }
 

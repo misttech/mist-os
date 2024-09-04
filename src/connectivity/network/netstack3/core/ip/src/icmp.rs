@@ -3296,6 +3296,14 @@ mod tests {
         {
             self.ip_socket_ctx.send_ip_packet(bindings_ctx, socket, body, mtu, options)
         }
+
+        fn confirm_reachable(
+            &mut self,
+            bindings_ctx: &mut FakeIcmpBindingsCtx<I>,
+            socket: &IpSock<I, Self::WeakDeviceId>,
+        ) {
+            self.ip_socket_ctx.confirm_reachable(bindings_ctx, socket)
+        }
     }
 
     impl IpDeviceHandler<Ipv6, FakeIcmpBindingsCtx<Ipv6>> for FakeIcmpCoreCtx<Ipv6> {
