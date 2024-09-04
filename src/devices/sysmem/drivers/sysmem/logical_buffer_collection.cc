@@ -2431,10 +2431,16 @@ bool LogicalBufferCollection::CheckSanitizeBufferUsage(CheckSanitizeStage stage,
                    "A participant indicating 'none' usage can't specify any other usage.");
           return false;
         }
+        if ((*buffer_usage.none() & fuchsia_sysmem2::kNoneUsagePermitAllocation) &&
+            !(*buffer_usage.none() & fuchsia_sysmem2::kNoneUsage)) {
+          LogError(FROM_HERE, "NONE_USAGE_PERMIT_ALLOCATION requires NONE_USAGE");
+          return false;
+        }
       }
       break;
     case CheckSanitizeStage::kAggregated:
-      if (*buffer_usage.cpu() == 0 && *buffer_usage.vulkan() == 0 && *buffer_usage.display() == 0 &&
+      if (!IsNoneUsagePermitAllocation(buffer_usage) && *buffer_usage.cpu() == 0 &&
+          *buffer_usage.vulkan() == 0 && *buffer_usage.display() == 0 &&
           *buffer_usage.video() == 0) {
         LogError(FROM_HERE,
                  "At least one non-'none' usage bit must be set across all participants.");

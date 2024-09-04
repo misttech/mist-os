@@ -667,7 +667,10 @@ fpromise::result<fuchsia_sysmem2::BufferCollectionInfo> BufferCollection::CloneR
     const fuchsia_sysmem2::BufferCollectionInfo& buffer_collection_info) {
   uint32_t vmo_rights_mask = GetClientVmoRights();
   ZX_DEBUG_ASSERT(has_constraints());
-  bool is_usage = constraints().usage().has_value() && IsAnyUsage(constraints().usage().value());
+  // We want to provide VMOs if there's any real usage or IsNoneUsagePermitAllocation.
+  bool is_usage = constraints().usage().has_value() &&
+                  (IsAnyUsage(constraints().usage().value()) ||
+                   IsNoneUsagePermitAllocation(constraints().usage().value()));
   if (!is_usage || node_properties().is_weak()) {
     // By specifying 0 for rights, the V2CloneBufferCollectionInfo() below won't dup any VMO handles
     // (and won't create any child VMOs).

@@ -19,6 +19,8 @@ bool IsCpuUsage(const fuchsia_sysmem2::BufferUsage& buffer_usage);
 
 bool IsAnyUsage(const fuchsia_sysmem2::BufferUsage& buffer_usage);
 
+bool IsNoneUsagePermitAllocation(const fuchsia_sysmem2::BufferUsage& buffer_usage);
+
 namespace internal {
 
 // Partial template specialization only works on classes / structs not functions, so impl is a
