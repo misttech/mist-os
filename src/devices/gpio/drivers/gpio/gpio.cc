@@ -322,6 +322,31 @@ void GpioDevice::handle_unknown_method(
   FDF_LOG(ERROR, "Unknown Gpio method ordinal 0x%016lx", metadata.method_ordinal);
 }
 
+void GpioDevice::Configure(fuchsia_hardware_pin::wire::PinConfigureRequest* request,
+                           ConfigureCompleter::Sync& completer) {
+  fdf::Arena arena('GPIO');
+  pinimpl_.buffer(arena)
+      ->Configure(pin_, request->config)
+      .ThenExactlyOnce(fit::inline_callback<
+                       void(fdf::WireUnownedResult<fuchsia_hardware_pinimpl::PinImpl::Configure>&),
+                       sizeof(ConfigureCompleter::Async)>(
+          [completer = completer.ToAsync()](auto& result) mutable {
+            if (!result.ok()) {
+              completer.ReplyError(result.status());
+            } else if (result->is_error()) {
+              completer.ReplyError(result->error_value());
+            } else {
+              completer.ReplySuccess(result->value()->new_config);
+            }
+          }));
+}
+
+void GpioDevice::handle_unknown_method(
+    fidl::UnknownMethodMetadata<fuchsia_hardware_pin::Pin> metadata,
+    fidl::UnknownMethodCompleter::Sync& completer) {
+  FDF_LOG(ERROR, "Unknown Pin method ordinal: 0x%016lx", metadata.method_ordinal);
+}
+
 zx::result<> GpioDevice::AddServices(const std::shared_ptr<fdf::Namespace>& incoming,
                                      const std::shared_ptr<fdf::OutgoingDirectory>& outgoing,
                                      const std::optional<std::string>& node_name) {
@@ -331,19 +356,35 @@ zx::result<> GpioDevice::AddServices(const std::shared_ptr<fdf::Namespace>& inco
     return compat_result.take_error();
   }
 
-  fuchsia_hardware_gpio::Service::InstanceHandler handler({
+  fuchsia_hardware_gpio::Service::InstanceHandler gpio_handler({
       .device =
           [&](fidl::ServerEnd<fuchsia_hardware_gpio::Gpio> server) {
             async::PostTask(fidl_dispatcher_, [this, server = std::move(server)]() mutable {
-              bindings_.AddBinding(fidl_dispatcher_, std::move(server), this,
-                                   fidl::kIgnoreBindingClosure);
+              gpio_bindings_.AddBinding(fidl_dispatcher_, std::move(server), this,
+                                        fidl::kIgnoreBindingClosure);
             });
           },
   });
   zx::result<> service_result =
-      outgoing->AddService<fuchsia_hardware_gpio::Service>(std::move(handler), pin_name());
+      outgoing->AddService<fuchsia_hardware_gpio::Service>(std::move(gpio_handler), pin_name());
   if (service_result.is_error()) {
-    FDF_LOG(ERROR, "Failed to add service to the outgoing directory");
+    FDF_LOG(ERROR, "Failed to add Gpio service to the outgoing directory");
+    return service_result.take_error();
+  }
+
+  fuchsia_hardware_pin::Service::InstanceHandler pin_handler({
+      .device =
+          [&](fidl::ServerEnd<fuchsia_hardware_pin::Pin> server) {
+            async::PostTask(fidl_dispatcher_, [this, server = std::move(server)]() mutable {
+              pin_bindings_.AddBinding(fidl_dispatcher_, std::move(server), this,
+                                       fidl::kIgnoreBindingClosure);
+            });
+          },
+  });
+  service_result =
+      outgoing->AddService<fuchsia_hardware_pin::Service>(std::move(pin_handler), pin_name());
+  if (service_result.is_error()) {
+    FDF_LOG(ERROR, "Failed to add Pin service to the outgoing directory");
     return service_result.take_error();
   }
 
@@ -380,7 +421,7 @@ zx::result<> GpioDevice::AddDevice(fidl::UnownedClientEnd<fuchsia_driver_framewo
 }
 
 void GpioDevice::DevfsConnect(fidl::ServerEnd<fuchsia_hardware_gpio::Gpio> server) {
-  bindings_.AddBinding(fidl_dispatcher_, std::move(server), this, fidl::kIgnoreBindingClosure);
+  gpio_bindings_.AddBinding(fidl_dispatcher_, std::move(server), this, fidl::kIgnoreBindingClosure);
 }
 
 void GpioRootDevice::Start(fdf::StartCompleter completer) {

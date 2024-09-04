@@ -17,6 +17,7 @@
     },
     capabilities: [
         { service: "fuchsia.hardware.gpio.Service" },
+        { service: "fuchsia.hardware.pin.Service" },
     ],
     use: [
         {
@@ -27,6 +28,10 @@
     expose: [
         {
             service: "fuchsia.hardware.gpio.Service",
+            from: "self",
+        },
+        {
+            service: "fuchsia.hardware.pin.Service",
             from: "self",
         },
     ],

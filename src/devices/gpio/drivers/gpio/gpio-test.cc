@@ -184,7 +184,7 @@ class GpioTest : public ::testing::Test {
   fdf_testing::ForegroundDriverTest<FixtureConfig> driver_test_;
 };
 
-TEST_F(GpioTest, TestFidlAll) {
+TEST_F(GpioTest, TestGpioAll) {
   driver_test().RunInEnvironmentTypeContext([](GpioTestEnvironment& env) {
     constexpr gpio_pin_t pins[] = {
         DECL_GPIO_PIN(1),
@@ -341,6 +341,60 @@ TEST_F(GpioTest, TestFidlAll) {
   driver_test().runtime().ResetQuit();
 
   EXPECT_EQ(pin_state(1).interrupt_mode, fuchsia_hardware_gpio::InterruptMode::kEdgeBoth);
+
+  EXPECT_TRUE(driver_test().StopDriver().is_ok());
+}
+
+TEST_F(GpioTest, TestPinAll) {
+  driver_test().RunInEnvironmentTypeContext([](GpioTestEnvironment& env) {
+    constexpr gpio_pin_t pins[] = {
+        DECL_GPIO_PIN(1),
+        DECL_GPIO_PIN(2),
+        DECL_GPIO_PIN(3),
+    };
+
+    EXPECT_OK(env.compat().AddMetadata(DEVICE_METADATA_GPIO_PINS, pins,
+                                       std::size(pins) * sizeof(gpio_pin_t)));
+  });
+
+  EXPECT_TRUE(driver_test().StartDriver().is_ok());
+
+  zx::result client_end = driver_test().Connect<fuchsia_hardware_pin::Service::Device>("gpio-1");
+  EXPECT_TRUE(client_end.is_ok());
+
+  fidl::WireClient<fuchsia_hardware_pin::Pin> pin_client(
+      *std::move(client_end), fdf::Dispatcher::GetCurrent()->async_dispatcher());
+
+  set_pin_state(1, MockPinImpl::PinState{
+                       .pull = fuchsia_hardware_pin::Pull::kNone,
+                       .alt_function = 0,
+                       .drive_strength = 1000,
+                   });
+
+  fdf::Arena arena('TEST');
+  auto config = fuchsia_hardware_pin::wire::Configuration::Builder(arena)
+                    .pull(fuchsia_hardware_pin::Pull::kUp)
+                    .function(1)
+                    .drive_strength_ua(2000)
+                    .Build();
+  pin_client->Configure(config).ThenExactlyOnce(
+      [&](fidl::WireUnownedResult<fuchsia_hardware_pin::Pin::Configure>& result) {
+        ASSERT_TRUE(result.ok());
+        ASSERT_TRUE(result->is_ok());
+
+        ASSERT_TRUE(result->value()->new_config.has_pull());
+        EXPECT_EQ(result->value()->new_config.pull(), fuchsia_hardware_pin::Pull::kUp);
+
+        ASSERT_TRUE(result->value()->new_config.has_function());
+        EXPECT_EQ(result->value()->new_config.function(), 1u);
+
+        ASSERT_TRUE(result->value()->new_config.has_drive_strength_ua());
+        EXPECT_EQ(result->value()->new_config.drive_strength_ua(), 2000u);
+
+        driver_test().runtime().Quit();
+      });
+
+  driver_test().runtime().RunUntilIdle();
 
   EXPECT_TRUE(driver_test().StopDriver().is_ok());
 }
@@ -730,7 +784,7 @@ TEST_F(GpioTest, MultipleClients) {
     EXPECT_TRUE(client_end.is_ok());
 
     clients[i].Bind(*std::move(client_end), fdf::Dispatcher::GetCurrent()->async_dispatcher());
-    clients[i]->Write(1).ThenExactlyOnce([](auto& result) {
+    clients[i]->Read().ThenExactlyOnce([](auto& result) {
       ASSERT_TRUE(result.ok());
       EXPECT_TRUE(result->is_ok());
     });

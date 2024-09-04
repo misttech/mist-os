@@ -6,6 +6,7 @@
 #define SRC_DEVICES_GPIO_DRIVERS_GPIO_GPIO_H_
 
 #include <fidl/fuchsia.hardware.gpio/cpp/wire.h>
+#include <fidl/fuchsia.hardware.pin/cpp/wire.h>
 #include <fidl/fuchsia.hardware.pinimpl/cpp/driver/wire.h>
 #include <lib/driver/compat/cpp/compat.h>
 #include <lib/driver/component/cpp/driver_base.h>
@@ -20,7 +21,8 @@
 
 namespace gpio {
 
-class GpioDevice : public fidl::WireServer<fuchsia_hardware_gpio::Gpio> {
+class GpioDevice : public fidl::WireServer<fuchsia_hardware_gpio::Gpio>,
+                   public fidl::WireServer<fuchsia_hardware_pin::Pin> {
  public:
   GpioDevice(fdf::WireSharedClient<fuchsia_hardware_pinimpl::PinImpl> pinimpl, uint32_t pin,
              uint32_t controller_id, std::string_view name)
@@ -61,6 +63,12 @@ class GpioDevice : public fidl::WireServer<fuchsia_hardware_gpio::Gpio> {
   void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_hardware_gpio::Gpio> metadata,
                              fidl::UnknownMethodCompleter::Sync& completer) override;
 
+  void Configure(fuchsia_hardware_pin::wire::PinConfigureRequest* request,
+                 ConfigureCompleter::Sync& completer) override;
+
+  void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_hardware_pin::Pin> metadata,
+                             fidl::UnknownMethodCompleter::Sync& completer) override;
+
   std::string pin_name() const {
     char name[20];
     snprintf(name, sizeof(name), "gpio-%u", pin_);
@@ -73,7 +81,8 @@ class GpioDevice : public fidl::WireServer<fuchsia_hardware_gpio::Gpio> {
   const std::string name_;
 
   fdf::WireSharedClient<fuchsia_hardware_pinimpl::PinImpl> pinimpl_;
-  fidl::ServerBindingGroup<fuchsia_hardware_gpio::Gpio> bindings_;
+  fidl::ServerBindingGroup<fuchsia_hardware_gpio::Gpio> gpio_bindings_;
+  fidl::ServerBindingGroup<fuchsia_hardware_pin::Pin> pin_bindings_;
   compat::SyncInitializedDeviceServer compat_server_;
   fidl::ClientEnd<fuchsia_driver_framework::NodeController> controller_;
   driver_devfs::Connector<fuchsia_hardware_gpio::Gpio> devfs_connector_;
