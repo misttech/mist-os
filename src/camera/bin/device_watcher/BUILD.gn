@@ -4,6 +4,7 @@
 
 import("//build/components.gni")
 import("//build/fidl/fidl.gni")
+import("//build/testing/cc_test_executable.gni")
 import("//build/testing/environments.gni")
 import("//src/camera/debug.gni")
 
@@ -70,7 +71,7 @@ fuchsia_package("camera_device_watcher") {
   deps = [ ":camera_device_watcher_cmp" ]
 }
 
-executable("camera_device_watcher_unittest_bin") {
+cc_test_executable("camera_device_watcher_unittest_bin") {
   testonly = true
   sources = [ "device_watcher_unittest.cc" ]
   deps = [

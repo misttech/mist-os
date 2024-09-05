@@ -4,6 +4,7 @@
 
 import("//build/components.gni")
 import("//build/test.gni")
+import("//build/testing/cc_test_executable.gni")
 
 group("raw_formats") {
   public_deps = [
@@ -82,7 +83,7 @@ source_set("lookups") {
   cflags_cc = [ "--std=c++20" ]
 }
 
-executable("raw_unittests_bin") {
+cc_test_executable("raw_unittests_bin") {
   testonly = true
   sources = [
     "raw10_unittest.cc",

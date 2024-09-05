@@ -4,6 +4,7 @@
 
 import("//build/cipd.gni")
 import("//build/components.gni")
+import("//build/testing/cc_test_executable.gni")
 
 group("tests") {
   testonly = true
@@ -19,7 +20,7 @@ source_set("constants") {
   ]
 }
 
-executable("controller_unittest_bin") {
+cc_test_executable("controller_unittest_bin") {
   testonly = true
   sources = [
     "allocator_test.cc",

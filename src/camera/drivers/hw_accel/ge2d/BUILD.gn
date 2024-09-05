@@ -5,6 +5,7 @@
 import("//build/bind/bind.gni")
 import("//build/components.gni")
 import("//build/drivers.gni")
+import("//build/testing/cc_test_executable.gni")
 
 group("tests") {
   testonly = true
@@ -94,7 +95,7 @@ source_set("ge2d_on_device_test") {
   ]
 }
 
-executable("ge2d_task_unittest_bin") {
+cc_test_executable("ge2d_task_unittest_bin") {
   testonly = true
   sources = [ "ge2d_task_unittest.cc" ]
   deps = [

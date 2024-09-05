@@ -5,6 +5,7 @@
 import("//build/bind/bind.gni")
 import("//build/components.gni")
 import("//build/drivers.gni")
+import("//build/testing/cc_test_executable.gni")
 import("//src/camera/debug.gni")
 
 group("tests") {
@@ -76,7 +77,7 @@ fuchsia_driver_package("gdc") {
   driver_components = [ ":driver" ]
 }
 
-executable("gdc_task_unittest_bin") {
+cc_test_executable("gdc_task_unittest_bin") {
   testonly = true
   sources = [ "gdc_task_unittest.cc" ]
   deps = [

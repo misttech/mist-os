@@ -5,6 +5,7 @@
 import("//build/bind/bind.gni")
 import("//build/components.gni")
 import("//build/drivers.gni")
+import("//build/testing/cc_test_executable.gni")
 
 group("tests") {
   testonly = true
@@ -82,7 +83,7 @@ fuchsia_driver_package("imx227") {
   driver_components = [ ":driver" ]
 }
 
-executable("imx227_unittest_bin") {
+cc_test_executable("imx227_unittest_bin") {
   testonly = true
   sources = [ "imx227_unittest.cc" ]
   deps = [

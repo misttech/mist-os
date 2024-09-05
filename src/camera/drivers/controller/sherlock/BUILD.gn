@@ -4,6 +4,7 @@
 
 import("//build/cipd.gni")
 import("//build/components.gni")
+import("//build/testing/cc_test_executable.gni")
 import("//src/camera/drivers/controller/camera_controller_driver.gni")
 
 group("tests") {
@@ -68,7 +69,7 @@ camera_controller_driver("sherlock") {
 # than a comparison of constants defined in one place to a set of shadowed constants defined in the
 # test. If the goal is to prevent accidental changes to the configuration constants, this would be
 # better accomplished with the "goldens" paradigm.
-executable("sherlock_configs_unittest_bin") {
+cc_test_executable("sherlock_configs_unittest_bin") {
   testonly = true
   sources = [ "configs_unittest.cc" ]
   deps = [
