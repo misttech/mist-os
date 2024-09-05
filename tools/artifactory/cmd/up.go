@@ -170,7 +170,7 @@ func (cmd upCommand) execute(ctx context.Context, buildDir string) error {
 		return fmt.Errorf("-upload-manifest-json-output is required")
 	}
 
-	m, err := build.NewModules(buildDir)
+	m, err := build.NewModulesForLastBuildOnly(buildDir)
 	if err != nil {
 		return err
 	}
