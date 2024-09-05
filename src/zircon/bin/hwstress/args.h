@@ -20,7 +20,6 @@ namespace hwstress {
 // Subcommand to run.
 enum class StressTest {
   kCpu,
-  kFlash,
   kLight,
   kMemory,
 };
@@ -53,21 +52,8 @@ struct CommandLineArgs {
   // A value of "0" indicates forever.
   double test_duration_seconds = 0.0;
 
-  // Amount of RAM or flash memory to test.
+  // Amount of RAM to test.
   cmdline::Optional<int64_t> mem_to_test_megabytes;
-
-  //
-  // Flash-specific arguments.
-  //
-
-  // Path to the Fuchsia Volume Manager
-  std::string fvm_path;
-
-  // Number of full write/read cycles to perform before finishing the test.
-  uint64_t iterations = 0;
-
-  // Destroy any existing flash test partitions.
-  bool destroy_partitions = false;
 
   //
   // Memory-specific arguments.

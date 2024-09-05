@@ -37,13 +37,6 @@ std::unique_ptr<cmdline::ArgsParser<CommandLineArgs>> GetParser() {
   parser->AddSwitch("memory", 'm', "Amount of memory to test in megabytes.",
                     &CommandLineArgs::mem_to_test_megabytes);
 
-  // Flash test flags.
-  parser->AddSwitch("cleanup-test-partitions", 'c', "Cleanup all existing flash test partitions.",
-                    &CommandLineArgs::destroy_partitions);
-  parser->AddSwitch("fvm-path", 'f', "Path to Fuchsia Volume Manager.", &CommandLineArgs::fvm_path);
-  parser->AddSwitch("iterations", 'i', "Number of times to test the flash.",
-                    &CommandLineArgs::iterations);
-
   // Memory test flags.
   parser->AddSwitch("percent-memory", 0, "Percent of memory to test.",
                     &CommandLineArgs::ram_to_test_percent);
@@ -93,7 +86,6 @@ Attempts to stress hardware components by placing them under high load.
 
 Subcommands:
   cpu                    Perform a CPU stress test.
-  flash                  Perform a flash stress test.
   light                  Perform a device light / LED stress test using the first available device.
   memory                 Perform a RAM stress test.
 
@@ -121,17 +113,6 @@ CPU test options:
                          CPU cores to run the test on. A comma separated list
                          of CPU indices. If not specified all the CPUs will be
                          tested.
-
-Flash test options:
-  -c, --cleanup-test-partitions
-                         Cleanup all existing flash test partitions in the
-                         system, and then exit without testing. Can be used
-                         to clean up persistent test partitions left over from
-                         previous flash tests which did not exit cleanly.
-  -f, --fvm-path=<path>  Path to Fuchsia Volume Manager.
-  -i, --iterations=<number>
-                         Number of full write/read cycles to perform before finishing the test.
-  -m, --memory=<size>    Amount of flash memory to test, in megabytes.
 
 Light test options:
   --light-on-time=<seconds>
@@ -167,8 +148,6 @@ fit::result<std::string, CommandLineArgs> ParseArgs(cpp20::span<const char* cons
   // Parse the subcommand.
   if (first_arg == std::string_view("cpu")) {
     subcommand = StressTest::kCpu;
-  } else if (first_arg == std::string_view("flash")) {
-    subcommand = StressTest::kFlash;
   } else if (first_arg == std::string_view("memory")) {
     subcommand = StressTest::kMemory;
   } else if (first_arg == std::string_view("light")) {
@@ -233,29 +212,6 @@ fit::result<std::string, CommandLineArgs> ParseArgs(cpp20::span<const char* cons
   }
   if (result.light_off_time_seconds < 0) {
     return fit::error("'--light-off-time' cannot be negative.");
-  }
-
-  // Validate iterations.
-  if (result.iterations) {
-    if (result.iterations < 1) {
-      return fit::error("'--iterations' must be at least 1.");
-    }
-    if (result.test_duration_seconds != 0.0) {
-      return fit::error("'--duration' and '--iterations' cannot both be specified.");
-    }
-    if (result.subcommand != StressTest::kFlash) {
-      return fit::error("'--iterations' is only valid for the flash test.");
-    }
-  }
-
-  // Ensure mandatory flash test argument is provided
-  if (result.subcommand == StressTest::kFlash) {
-    if (result.destroy_partitions && !result.fvm_path.empty()) {
-      return fit::error(fxl::StringPrintf("Path to Fuchsia Volume Manager invalid with cleanup"));
-    }
-    if (!result.destroy_partitions && result.fvm_path.empty()) {
-      return fit::error(fxl::StringPrintf("Path to Fuchsia Volume Manager must be specified"));
-    }
   }
 
   // Validate CPU cores.
