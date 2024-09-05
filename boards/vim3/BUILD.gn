@@ -321,10 +321,6 @@ board_input_bundle("main_bundle") {
       driver_components = [ "meta/libmsd_vsi.cm" ]
     },
   ]
-
-  # Flag controlling kernel's uart implementation.
-  # TODO(https://fxbug.dev/326669461): Remove when migration is complete.
-  kernel_cmdline = [ "kernel.experimental.serial_migration=true" ]
 }
 
 board_input_bundle("devicetree_board_driver") {
