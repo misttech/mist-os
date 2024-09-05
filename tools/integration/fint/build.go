@@ -9,7 +9,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"io/fs"
@@ -78,6 +77,13 @@ const (
 	//
 	// This name is configured in //build/config/BUILDCONFIG.gn.
 	fileAccessTracesSuffix = "_trace.txt"
+
+	// LINT.IfChange
+	// buildSuccessStampName is the name of a file that will be present
+	// in the build directory after a successful build invocation, and will
+	// not exist if the build failed.
+	buildSuccessStampName = "last_ninja_build_success.stamp"
+	// LINT.ThenChange(//tools/devshell/build)
 )
 
 var (
@@ -127,11 +133,6 @@ func (n byLogPath) Less(i, j int) bool { return n[i].logPath < n[j].logPath }
 // subbuildEntry follows from the metadata written by GN to 'ninja_subbuilds.json'
 type subbuildEntry struct {
 	BuildDir string `json:"build_dir"`
-}
-
-func checkFileExists(filePath string) bool {
-	_, error := os.Stat(filePath)
-	return !errors.Is(error, os.ErrNotExist)
 }
 
 func getSubbuildSubdirs(ctx context.Context, subbuildsJSON string) ([]string, error) {
@@ -233,6 +234,14 @@ func buildImpl(
 		jobCount:  jobCount,
 	}
 
+	buildSuccessStampPath := filepath.Join(buildDir, buildSuccessStampName)
+	if checkFileExists(buildSuccessStampPath) {
+		err = os.Remove(buildSuccessStampPath)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	ninjaStartTime := time.Now()
 	var ninjaErr error
 	if contextSpec.ArtifactDir == "" {
@@ -263,6 +272,15 @@ func buildImpl(
 			explainSink,
 		)
 	}
+
+	// Only write the build success stamp file if the build succeeded.
+	if ninjaErr == nil {
+		err = os.WriteFile(buildSuccessStampPath, []byte{}, 0o644)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	ninjaDuration := time.Since(ninjaStartTime)
 	artifacts.NinjaDurationSeconds = int32(math.Round(ninjaDuration.Seconds()))
 

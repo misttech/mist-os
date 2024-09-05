@@ -327,6 +327,26 @@ function main {
     echo -e "\\n------ RUNNING ${tool} ------"
   fi
 
+  # A flag indicating whether a Ninja tool is invoked, instead of a build action.
+  local run_ninja_build=true
+  for opt in "${ninja_switches[@]}"; do
+    case "${opt}" in
+      -n|--dry-run|-t*)
+        run_ninja_build=
+        ;;
+    esac
+  done
+
+
+  # LINT.IfChange
+  # A file that is only created when the build succeeds.
+  local last_build_success_stamp="${FUCHSIA_BUILD_DIR}/last_ninja_build_success.stamp"
+  # LINT.ThenChange(//tools/integration/fint/build.go)
+
+  if [[ -n "${run_ninja_build}" ]]; then
+    rm -f "${last_build_success_stamp}"
+  fi
+
   if [ -n "${fint_params_path}" ]; then
     readonly fint="${FX_CACHE_DIR}/fint"
     "$FUCHSIA_DIR/tools/integration/bootstrap.sh" -o "$fint" || exit $?
@@ -376,18 +396,23 @@ build_dir: \"${FUCHSIA_BUILD_DIR}\"
         exit 1
       fi
 
-
-      echo "Building Ninja target(s): ${ninja_targets[*]}"
+      if [[ -n "${run_ninja_build}" ]]; then
+        echo "Building Ninja target(s): ${ninja_targets[*]}"
+      fi
     else
       ninja_targets=("${fuchsia_targets[@]}")
     fi
 
-
     (fx-run-ninja "${is_logging}" "$PREBUILT_NINJA" -C "${FUCHSIA_BUILD_DIR}" \
       "${ninja_switches[@]}" "${ninja_targets[@]}")
+
   fi
 
   status=$?
+
+  if [[ "${status}" == 0 && -n "${run_ninja_build}" ]]; then
+    touch "${last_build_success_stamp}"
+  fi
 
   exit-with-message
 }
