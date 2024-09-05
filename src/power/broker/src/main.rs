@@ -617,10 +617,11 @@ async fn main() -> Result<(), anyhow::Error> {
 
     // Initialize inspect
     let _inspect_server = inspect_runtime::publish(
-        // TODO(https://fxbug.dev/354754310): reduce to default size if possible
-        fuchsia_inspect::component::init_inspector_with_size(2 * DEFAULT_INSPECT_VMO),
+        // TODO(https://fxbug.dev/354754310): reduce size if possible
+        component::init_inspector_with_size(8 * DEFAULT_INSPECT_VMO),
         inspect_runtime::PublishOptions::default(),
     );
+    component::serve_inspect_stats();
     component::health().set_starting_up();
 
     service_fs.dir("svc").add_fidl_service(IncomingRequest::Topology);

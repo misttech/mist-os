@@ -25,7 +25,7 @@ use crate::fpb::PowerLevel;
 use crate::topology::*;
 
 /// Max value for inspect event history.
-const INSPECT_GRAPH_EVENT_BUFFER_SIZE: usize = 512;
+const INSPECT_GRAPH_EVENT_BUFFER_SIZE: usize = 8192;
 
 // Below are a series of type aliases for convenience
 type LevelHangingGet<T> =
