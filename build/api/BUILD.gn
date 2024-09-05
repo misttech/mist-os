@@ -13,6 +13,8 @@ if (current_toolchain == host_toolchain) {
   action("run_all_tests") {
     script = "//build/api/run_all_tests.py"
     inputs = [
+      "build_api_filter.py",
+      "build_api_filter_test.py",
       "client",
       "client.py",
       "client_test.py",
@@ -20,6 +22,11 @@ if (current_toolchain == host_toolchain) {
       "gn_labels_test.py",
       "gn_ninja_outputs.py",
       "gn_ninja_outputs_test.py",
+      "ninja_artifacts.py",
+      "ninja_artifacts_test.py",
+
+      # Ninja is accessed implicitly by the test now.
+      "//prebuilt/third_party/ninja/${host_os}-${host_cpu}/ninja",
     ]
     outputs = [ "$target_out_dir/$target_name.check" ]
     args = [

@@ -5,6 +5,7 @@
 
 import json
 import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -12,6 +13,14 @@ from typing import Any, List
 
 _SCRIPT_DIR = Path(__file__).parent
 _BUILD_API_SCRIPT = _SCRIPT_DIR / "client"
+
+# While these values are also defined in ninja_artifacts.py, redefine
+# them here to avoid an import statement, as this regression test
+# should not depend on implementation details of the client.py
+# script.
+_NINJA_BUILD_PLAN_DEPS_FILE = "build.ninja.d"
+_NINJA_LAST_BUILD_TARGETS_FILE = "last_ninja_build_targets.txt"
+_NINJA_LAST_BUILD_SUCCESS_FILE = "last_ninja_build_success.stamp"
 
 
 def _write_file(path: Path, content: str):
@@ -26,7 +35,26 @@ def _write_json(path: Path, content: Any):
 class ClientTest(unittest.TestCase):
     def setUp(self):
         self._temp_dir = tempfile.TemporaryDirectory()
-        self._build_dir = Path(self._temp_dir.name)
+        self._top_dir = Path(self._temp_dir.name)
+
+        self._build_gn_path = self._top_dir / "BUILD.gn"
+        self._build_gn_path.write_text("# EMPTY\n")
+
+        self._build_dir = self._top_dir / "out" / "build_dir"
+        self._build_dir.mkdir(parents=True)
+
+        self._build_ninja_d_path = self._build_dir / _NINJA_BUILD_PLAN_DEPS_FILE
+        self._build_ninja_d_path.write_text(
+            "build.ninja.stamp: ../../BUILD.gn\n"
+        )
+
+        self._last_build_success_path = (
+            self._build_dir / _NINJA_LAST_BUILD_SUCCESS_FILE
+        )
+        self._last_targets_path = (
+            self._build_dir / _NINJA_LAST_BUILD_TARGETS_FILE
+        )
+        self._build_ninja_path = self._build_dir / "build.ninja"
 
         # The build_api_client_info file maps each module name to its .json file.
         with (self._build_dir / "build_api_client_info").open("wt") as f:
@@ -113,18 +141,41 @@ tests=tests.json
     def tearDown(self):
         self._temp_dir.cleanup()
 
-    def run_client(self, args: List[str | Path]) -> subprocess.CompletedProcess:
+    def run_raw_client(
+        self, args: List[str | Path]
+    ) -> subprocess.CompletedProcess:
         return subprocess.run(
             [
                 _BUILD_API_SCRIPT,
-                "--build-dir",
-                str(self._build_dir),
-                "--host-tag=linux-y64",
             ]
             + [str(a) for a in args],
             cwd=self._build_dir,
             text=True,
             capture_output=True,
+        )
+
+    def assert_raw_outputs(
+        self,
+        raw_ret: subprocess.CompletedProcess,
+        expected_out: str,
+        expected_err: str = "",
+        expected_status: int = 0,
+        msg: str = "",
+    ):
+        if not expected_err and raw_ret.stderr:
+            print(f"ERROR: {raw_ret.stderr}", file=sys.stderr)
+        self.assertEqual(expected_err, raw_ret.stderr, msg=msg)
+        self.assertEqual(expected_out, raw_ret.stdout, msg=msg)
+        self.assertEqual(expected_status, raw_ret.returncode, msg=msg)
+
+    def run_client(self, args: List[str | Path]) -> subprocess.CompletedProcess:
+        return self.run_raw_client(
+            [
+                "--build-dir",
+                str(self._build_dir),
+                "--host-tag=linux-y64",
+            ]
+            + args
         )
 
     def assert_output(
@@ -135,12 +186,13 @@ tests=tests.json
         expected_status: int = 0,
         msg: str = "",
     ):
-        ret = self.run_client(args)
-        if not msg:
-            msg = "'%s' command" % " ".join(str(a) for a in args)
-        self.assertEqual(expected_err, ret.stderr, msg=msg)
-        self.assertEqual(expected_out, ret.stdout, msg=msg)
-        self.assertEqual(expected_status, ret.returncode, msg=msg)
+        return self.assert_raw_outputs(
+            self.run_client(args),
+            expected_out,
+            expected_err,
+            expected_status,
+            msg="'%s' command" % " ".join(str(a) for a in args),
+        )
 
     def assert_error(
         self,
@@ -161,6 +213,26 @@ tests=tests.json
         }
         for module, expected in MODULES.items():
             self.assert_output(["print", module], expected)
+
+    def test_print_all(self):
+        expected = {
+            "args": {
+                "file": "args.json",
+                "json": json.loads(self._args_json),
+            },
+            "build_info": {
+                "file": "build_info.json",
+                "json": json.loads(self._build_info_json),
+            },
+            "tests": {
+                "file": "tests.json",
+                "json": json.loads(self._tests_json),
+            },
+        }
+        self.assert_output(["print_all"], json.dumps(expected) + "\n")
+        self.assert_output(
+            ["print_all", "--pretty"], json.dumps(expected, indent=2) + "\n"
+        )
 
     def test_print_all(self):
         expected = {
@@ -351,6 +423,43 @@ tests=tests.json
                 ["fx_build_args_to_labels", "--args"] + args,
                 expected_err=expected_err,
             )
+
+    def test_last_ninja_artifacts(self):
+        self._build_ninja_path.write_text(
+            """
+rule copy
+  command = cp -f $in $out
+
+build out1: copy input1
+build out2: copy out1
+build out3: copy out1
+build $:default: phony out1
+build all: phony out1 out2 out3
+"""
+        )
+
+        def assert_last_ninja_artifacts_output(expected):
+            self.assert_raw_outputs(
+                self.run_raw_client(
+                    [
+                        "--build-dir",
+                        str(self._build_dir),
+                        "--fuchsia-dir",
+                        str(_SCRIPT_DIR.parent.parent.resolve()),
+                        "last_ninja_artifacts",
+                    ]
+                ),
+                expected,
+            )
+
+        # Verify that if the file doesn't exist, then the result should
+        # correspond to the :default target.
+        assert not self._last_targets_path.exists()
+        assert_last_ninja_artifacts_output("input1\nout1\n")
+
+        # Change the list of targets.
+        self._last_targets_path.write_text("all")
+        assert_last_ninja_artifacts_output("input1\nout1\nout2\nout3\n")
 
 
 if __name__ == "__main__":
