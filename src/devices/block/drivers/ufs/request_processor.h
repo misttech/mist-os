@@ -39,7 +39,7 @@ class RequestProcessor {
 
   // Check all slots to process completed requests. This function returns the number of completed
   // requests. This function is called by the ISR.
-  virtual uint32_t RequestCompletion() = 0;
+  virtual uint32_t IoRequestCompletion() = 0;
 
   RequestList &GetRequestList() { return request_list_; }
 

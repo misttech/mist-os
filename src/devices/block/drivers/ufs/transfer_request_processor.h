@@ -48,7 +48,8 @@ class TransferRequestProcessor : public RequestProcessor {
   // Allocate a slot to submit an Admin command. Use slot 31 to avoid conflicts with I/O commands.
   zx::result<uint8_t> ReserveAdminSlot();
 
-  uint32_t RequestCompletion() override;
+  uint32_t AdminRequestCompletion();
+  uint32_t IoRequestCompletion() override;
 
   // |SendScsiUpiu| allocates a slot for SCSI command UPIU and calls SendRequestUsingSlot.
   // If it is an admin command, the |io_cmd| is nullptr.
@@ -117,6 +118,7 @@ class TransferRequestProcessor : public RequestProcessor {
   void SetDoorBellRegister(uint8_t slot_num) override {
     UtrListDoorBellReg::Get().FromValue(1 << slot_num).WriteTo(&register_);
   }
+  bool ProcessSlotCompletion(uint8_t slot_num);
 };
 
 }  // namespace ufs

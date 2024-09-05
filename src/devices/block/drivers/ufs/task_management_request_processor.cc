@@ -37,7 +37,7 @@ zx::result<> TaskManagementRequestProcessor::Init() {
   return zx::ok();
 }
 
-uint32_t TaskManagementRequestProcessor::RequestCompletion() {
+uint32_t TaskManagementRequestProcessor::IoRequestCompletion() {
   uint32_t completion_count = 0;
 
   // Search for all pending slots and signed the ones already done.

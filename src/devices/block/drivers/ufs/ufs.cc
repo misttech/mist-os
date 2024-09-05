@@ -4,6 +4,11 @@
 
 #include "ufs.h"
 
+#include <fidl/fuchsia.hardware.power/cpp/fidl.h>
+#include <fidl/fuchsia.power.system/cpp/fidl.h>
+#include <lib/driver/logging/cpp/structured_logger.h>
+#include <lib/driver/power/cpp/element-description-builder.h>
+#include <lib/driver/power/cpp/power-support.h>
 #include <lib/fit/defer.h>
 #include <lib/trace/event.h>
 #include <zircon/errors.h>
@@ -14,7 +19,142 @@
 
 #include <safemath/safe_conversions.h>
 
+#include "src/devices/power/lib/from-fidl/cpp/from-fidl.h"
+
 namespace ufs {
+namespace {
+
+// TODO(b/329588116): Relocate this power config.
+// This power element represents the SDMMC controller hardware. Its opportunistic dependency on
+// SAG's (Execution State, wake handling) allows for orderly power down of the hardware before the
+// CPU suspends scheduling.
+fuchsia_hardware_power::PowerElementConfiguration GetHardwarePowerConfig() {
+  auto transitions_from_off =
+      std::vector<fuchsia_hardware_power::Transition>{fuchsia_hardware_power::Transition{{
+          .target_level = Ufs::kPowerLevelOn,
+          // TODO(b/42075643): Fill it in later with appropriate numbers.
+          .latency_us = 0,
+      }}};
+  auto transitions_from_on =
+      std::vector<fuchsia_hardware_power::Transition>{fuchsia_hardware_power::Transition{{
+          .target_level = Ufs::kPowerLevelOff,
+          // TODO(b/42075643): Fill it in later with appropriate numbers.
+          .latency_us = 0,
+      }}};
+  fuchsia_hardware_power::PowerLevel off = {
+      {.level = Ufs::kPowerLevelOff, .name = "off", .transitions = transitions_from_off}};
+  fuchsia_hardware_power::PowerLevel on = {
+      {.level = Ufs::kPowerLevelOn, .name = "on", .transitions = transitions_from_on}};
+  fuchsia_hardware_power::PowerElement hardware_power = {{
+      .name = Ufs::kHardwarePowerElementName,
+      .levels = {{off, on}},
+  }};
+
+  fuchsia_hardware_power::LevelTuple on_to_wake_handling = {{
+      .child_level = Ufs::kPowerLevelOn,
+      .parent_level = static_cast<uint8_t>(fuchsia_power_system::ExecutionStateLevel::kSuspending),
+  }};
+  fuchsia_hardware_power::PowerDependency opportunistic_on_exec_state_wake_handling = {{
+      .child = Ufs::kHardwarePowerElementName,
+      .parent = fuchsia_hardware_power::ParentElement::WithSag(
+          fuchsia_hardware_power::SagElement::kExecutionState),
+      .level_deps = {{on_to_wake_handling}},
+      .strength = fuchsia_hardware_power::RequirementType::kOpportunistic,
+  }};
+
+  fuchsia_hardware_power::PowerElementConfiguration hardware_power_config = {
+      {.element = hardware_power, .dependencies = {{opportunistic_on_exec_state_wake_handling}}}};
+  return hardware_power_config;
+}
+
+// TODO(b/329588116): Relocate this power config.
+// This power element does not represent real hardware. Its active dependency on SAG's
+// (Wake Handling, active) is used to secure the (Execution State, wake handling) necessary to
+// satisfy the hardware power element's dependency, thus allowing the hardware to wake up and serve
+// incoming requests.
+fuchsia_hardware_power::PowerElementConfiguration GetSystemWakeOnRequestPowerConfig() {
+  auto transitions_from_off =
+      std::vector<fuchsia_hardware_power::Transition>{fuchsia_hardware_power::Transition{{
+          .target_level = Ufs::kPowerLevelOn,
+          .latency_us = 0,
+      }}};
+  auto transitions_from_on =
+      std::vector<fuchsia_hardware_power::Transition>{fuchsia_hardware_power::Transition{{
+          .target_level = Ufs::kPowerLevelOff,
+          .latency_us = 0,
+      }}};
+  fuchsia_hardware_power::PowerLevel off = {
+      {.level = Ufs::kPowerLevelOff, .name = "off", .transitions = transitions_from_off}};
+  fuchsia_hardware_power::PowerLevel on = {
+      {.level = Ufs::kPowerLevelOn, .name = "on", .transitions = transitions_from_on}};
+  fuchsia_hardware_power::PowerElement wake_on_request = {{
+      .name = Ufs::kSystemWakeOnRequestPowerElementName,
+      .levels = {{off, on}},
+  }};
+
+  fuchsia_hardware_power::LevelTuple on_to_active = {{
+      .child_level = Ufs::kPowerLevelOn,
+      .parent_level = static_cast<uint8_t>(fuchsia_power_system::WakeHandlingLevel::kActive),
+  }};
+  fuchsia_hardware_power::PowerDependency assertive_on_wake_handling_active = {{
+      .child = Ufs::kSystemWakeOnRequestPowerElementName,
+      .parent = fuchsia_hardware_power::ParentElement::WithSag(
+          fuchsia_hardware_power::SagElement::kWakeHandling),
+      .level_deps = {{on_to_active}},
+      .strength = fuchsia_hardware_power::RequirementType::kAssertive,
+  }};
+
+  fuchsia_hardware_power::PowerElementConfiguration wake_on_request_config = {
+      {.element = wake_on_request, .dependencies = {{assertive_on_wake_handling_active}}}};
+  return wake_on_request_config;
+}
+
+// TODO(b/329588116): Relocate this power config.
+std::vector<fuchsia_hardware_power::PowerElementConfiguration> GetAllPowerConfigs() {
+  return std::vector<fuchsia_hardware_power::PowerElementConfiguration>{
+      GetHardwarePowerConfig(), GetSystemWakeOnRequestPowerConfig()};
+}
+
+}  // namespace
+
+zx::result<fidl::ClientEnd<fuchsia_power_broker::LeaseControl>> Ufs::AcquireLease(
+    const fidl::WireSyncClient<fuchsia_power_broker::Lessor>& lessor_client) {
+  const fidl::WireResult result = lessor_client->Lease(kPowerLevelOn);
+  if (!result.ok()) {
+    FDF_LOG(ERROR, "Call to Lease failed: %s", result.status_string());
+    return zx::error(result.status());
+  }
+  if (result->is_error()) {
+    switch (result->error_value()) {
+      case fuchsia_power_broker::LeaseError::kInternal:
+        FDF_LOG(ERROR, "Lease returned internal error.");
+        break;
+      case fuchsia_power_broker::LeaseError::kNotAuthorized:
+        FDF_LOG(ERROR, "Lease returned not authorized error.");
+        break;
+      default:
+        FDF_LOG(ERROR, "Lease returned unknown error.");
+        break;
+    }
+    return zx::error(ZX_ERR_INTERNAL);
+  }
+  if (!result->value()->lease_control.is_valid()) {
+    FDF_LOG(ERROR, "Lease returned invalid lease control client end.");
+    return zx::error(ZX_ERR_BAD_STATE);
+  }
+  return zx::ok(std::move(result->value()->lease_control));
+}
+
+void Ufs::UpdatePowerLevel(
+    const fidl::WireSyncClient<fuchsia_power_broker::CurrentLevel>& current_level_client,
+    fuchsia_power_broker::PowerLevel power_level) {
+  const fidl::WireResult result = current_level_client->Update(power_level);
+  if (!result.ok()) {
+    FDF_LOG(ERROR, "Call to Update failed: %s", result.status_string());
+  } else if (result->is_error()) {
+    FDF_LOG(ERROR, "Update returned failure.");
+  }
+}
 
 zx::result<> Ufs::NotifyEventCallback(NotifyEvent event, uint64_t data) {
   switch (event) {
@@ -173,7 +313,9 @@ void Ufs::ProcessIoSubmissions() {
   }
 }
 
-void Ufs::ProcessCompletions() { transfer_request_processor_->RequestCompletion(); }
+void Ufs::ProcessAdminCompletions() { transfer_request_processor_->AdminRequestCompletion(); }
+
+void Ufs::ProcessIoCompletions() { transfer_request_processor_->IoRequestCompletion(); }
 
 zx::result<> Ufs::Isr() {
   const fdf::MmioBuffer& mmio = mmio_.value();
@@ -234,19 +376,29 @@ zx::result<> Ufs::Isr() {
     InterruptStatusReg::Get().FromValue(0).set_crypto_engine_fatal_error_status(true).WriteTo(
         &mmio);
   }
-
   // Handle command completion interrupts.
   if (interrupt_status.utp_transfer_request_completion_status()) {
     InterruptStatusReg::Get().FromValue(0).set_utp_transfer_request_completion_status(true).WriteTo(
         &mmio);
-    sync_completion_signal(&io_signal_);
+    auto& request_list = transfer_request_processor_->GetRequestList();
+    SlotState admin_slot_state = request_list.GetSlot(kAdminCommandSlotNumber).state;
+    uint32_t door_bell = UtrListDoorBellReg::Get().ReadFrom(&mmio).door_bell();
+    bool admin_door_bell = door_bell & (1 << kAdminCommandSlotNumber);
+
+    if (admin_slot_state == SlotState::kScheduled && !admin_door_bell) {
+      sync_completion_signal(&admin_signal_);
+
+      // TODO(b/42075643) Check that the interrupt also has I/O completion.
+    } else {
+      sync_completion_signal(&io_signal_);
+    }
   }
   if (interrupt_status.utp_task_management_request_completion_status()) {
     InterruptStatusReg::Get()
         .FromValue(0)
         .set_utp_task_management_request_completion_status(true)
         .WriteTo(&mmio);
-    task_management_request_processor_->RequestCompletion();
+    task_management_request_processor_->IoRequestCompletion();
   }
   if (interrupt_status.uic_command_completion_status()) {
     // TODO(https://fxbug.dev/42075643): Handle UIC completion
@@ -286,25 +438,92 @@ int Ufs::IrqLoop() {
   return thrd_success;
 }
 
-int Ufs::IoLoop() {
+int Ufs::AdminLoop() {
   while (true) {
-    if (IsDriverShutdown()) {
-      FDF_LOG(DEBUG, "IO thread exiting.");
+    if (zx_status_t status = sync_completion_wait(&admin_signal_, ZX_TIME_INFINITE);
+        status != ZX_OK) {
+      FDF_LOG(ERROR, "Failed to wait for sync completion: %s", zx_status_get_string(status));
       break;
     }
+    sync_completion_reset(&admin_signal_);
 
+    {
+      std::lock_guard<std::mutex> lock(lock_);
+      if (driver_shutdown_) {
+        FDF_LOG(DEBUG, "Admin thread exiting.");
+        break;
+      }
+    }
+
+    if (!disable_completion_) {
+      ProcessAdminCompletions();
+    }
+  }
+  return thrd_success;
+}
+
+int Ufs::IoLoop() {
+  while (true) {
     if (zx_status_t status = sync_completion_wait(&io_signal_, ZX_TIME_INFINITE); status != ZX_OK) {
       FDF_LOG(ERROR, "Failed to wait for sync completion: %s", zx_status_get_string(status));
       break;
     }
     sync_completion_reset(&io_signal_);
 
-    // TODO(https://fxbug.dev/42075643): Process async completions
+    bool wake_on_request = false;
+    fidl::ClientEnd<fuchsia_power_broker::LeaseControl> wake_on_request_lease_control_client_end;
 
-    if (!disable_completion_) {
-      ProcessCompletions();
+    {
+      std::lock_guard<std::mutex> lock(lock_);
+      if (driver_shutdown_) {
+        FDF_LOG(DEBUG, "IO thread exiting.");
+        break;
+      }
+
+      if (!device_manager_->IsResumed()) {
+        wake_on_request = true;
+        wait_for_power_resumed_.Reset();
+
+        // Acquire lease on wake-on-request power element. This indirectly raises SAG's Execution
+        // State, satisfying the hardware power element's lease status (which is opportunistically
+        // dependent on SAG's Execution State), and thus resuming power.
+        ZX_ASSERT(!wake_on_request_lease_control_client_end.is_valid());
+        zx::result lease_control_client_end = AcquireLease(wake_on_request_lessor_client_);
+        if (!lease_control_client_end.is_ok()) {
+          FDF_LOG(ERROR, "Failed to acquire lease during wake-on-request: %s",
+                  zx_status_get_string(lease_control_client_end.status_value()));
+          return thrd_error;
+        };
+        wake_on_request_lease_control_client_end = std::move(lease_control_client_end.value());
+        ZX_ASSERT(wake_on_request_lease_control_client_end.is_valid());
+
+        ++wake_on_request_count_;
+
+        lock_.unlock();
+        wait_for_power_resumed_.Wait();
+        lock_.lock();
+      }
     }
-    ProcessIoSubmissions();
+
+    // TODO(https://fxbug.dev/42075643): We need to perform a I/O completion on the in-flight I/O
+    // before the device is suspended.
+    if (!disable_completion_) {
+      ProcessIoCompletions();
+    }
+
+    // Unable to send I/O when in suspend.
+    if (device_manager_->IsResumed()) {
+      ProcessIoSubmissions();
+    }
+
+    if (wake_on_request) {
+      // Drop lease on wake-on-request power element. This lets the hardware power element's lease
+      // status revert to pending, unless there are other entities that are raising SAG's
+      // Execution State.
+      ZX_ASSERT(wake_on_request_lease_control_client_end.is_valid());
+      wake_on_request_lease_control_client_end.channel().reset();
+      ZX_ASSERT(!wake_on_request_lease_control_client_end.is_valid());
+    }
   }
   return thrd_success;
 }
@@ -517,6 +736,8 @@ zx_status_t Ufs::Init() {
   }
   logical_unit_count_ = lun_count.value();
   controller_node.RecordUint("logical_unit_count", logical_unit_count_);
+  controller_node.RecordUint("wake_on_request_count",
+                             static_cast<uint32_t>(wake_on_request_count_));
 
   inspector().inspector().emplace(std::move(controller_node));
   inspector().inspector().emplace(std::move(wb_node));
@@ -629,6 +850,26 @@ zx::result<> Ufs::InitController() {
     return device_manager.take_error();
   }
   device_manager_ = std::move(*device_manager);
+
+  // Create and post Admin worker
+  {
+    auto admin_dispatcher = fdf::SynchronizedDispatcher::Create(
+        fdf::SynchronizedDispatcher::Options::kAllowSyncCalls, "ufs-admin-worker",
+        [&](fdf_dispatcher_t*) { admin_worker_shutdown_completion_.Signal(); });
+    if (admin_dispatcher.is_error()) {
+      FDF_LOG(ERROR, "Failed to create Admin dispatcher: %s",
+              zx_status_get_string(admin_dispatcher.status_value()));
+      return zx::error(admin_dispatcher.status_value());
+    }
+    admin_worker_dispatcher_ = *std::move(admin_dispatcher);
+
+    zx_status_t status =
+        async::PostTask(admin_worker_dispatcher_.async_dispatcher(), [this] { AdminLoop(); });
+    if (status != ZX_OK) {
+      FDF_LOG(ERROR, "Failed to start Admin worker loop: %s", zx_status_get_string(status));
+      return zx::error(status);
+    }
+  }
 
   // Create and post IO worker
   {
@@ -1035,6 +1276,225 @@ zx::result<> Ufs::ConfigResources() {
   return zx::ok();
 }
 
+zx::result<> Ufs::ConfigurePowerManagement() {
+  fidl::Arena<> arena;
+  const auto power_configs = fidl::ToWire(arena, GetAllPowerConfigs());
+  if (power_configs.count() == 0) {
+    FDF_LOGL(INFO, logger(), "No power configs found.");
+    // Do not fail driver initialization if there aren't any power configs.
+    return zx::success();
+  }
+
+  auto power_broker = driver_incoming()->Connect<fuchsia_power_broker::Topology>();
+  if (power_broker.is_error() || !power_broker->is_valid()) {
+    FDF_LOG(ERROR, "Failed to connect to power broker: %s", power_broker.status_string());
+    return power_broker.take_error();
+  }
+
+  // Register power configs with the Power Broker.
+  for (const auto& wire_config : power_configs) {
+    fdf_power::PowerElementConfiguration config;
+    {
+      fuchsia_hardware_power::PowerElementConfiguration natural_config =
+          fidl::ToNatural(wire_config);
+      zx::result result = power::from_fidl::CreatePowerElementConfiguration(natural_config);
+      if (result.is_error()) {
+        FDF_SLOG(ERROR, "Failed to convert power element config from fidl.",
+                 KV("status", result.status_string()));
+        return result.take_error();
+      }
+      config = std::move(result.value());
+    }
+
+    auto tokens = fdf_power::GetDependencyTokens(*driver_incoming(), config);
+    if (tokens.is_error()) {
+      // TODO(https://fxbug.dev/42075643): Use fuchsia.power.SuspendEnabled config cap to determine
+      // whether to expect Power Framework
+      FDF_LOG(ERROR, "Failed to get power dependency tokens: %u.",
+              static_cast<uint8_t>(tokens.error_value()));
+      return zx::success();
+    }
+
+    fdf_power::ElementDesc description =
+        fdf_power::ElementDescBuilder(config, std::move(tokens.value())).Build();
+    auto result = fdf_power::AddElement(power_broker.value(), description);
+    if (result.is_error()) {
+      FDF_LOG(ERROR, "Failed to add power element: %u", static_cast<uint8_t>(result.error_value()));
+      return zx::error(ZX_ERR_INTERNAL);
+    }
+
+    assertive_power_dep_tokens_.push_back(std::move(description.assertive_token));
+    opportunistic_power_dep_tokens_.push_back(std::move(description.opportunistic_token));
+
+    if (config.element.name == kHardwarePowerElementName) {
+      hardware_power_element_control_client_ =
+          fidl::WireSyncClient<fuchsia_power_broker::ElementControl>(
+              std::move(description.element_control_client.value()));
+      hardware_power_lessor_client_ = fidl::WireSyncClient<fuchsia_power_broker::Lessor>(
+          std::move(description.lessor_client.value()));
+      hardware_power_current_level_client_ =
+          fidl::WireSyncClient<fuchsia_power_broker::CurrentLevel>(
+              std::move(description.current_level_client.value()));
+      hardware_power_required_level_client_ = fidl::WireClient<fuchsia_power_broker::RequiredLevel>(
+          std::move(description.required_level_client.value()), driver_async_dispatcher());
+    } else if (config.element.name == kSystemWakeOnRequestPowerElementName) {
+      wake_on_request_element_control_client_ =
+          fidl::WireSyncClient<fuchsia_power_broker::ElementControl>(
+              std::move(description.element_control_client.value()));
+      wake_on_request_lessor_client_ = fidl::WireSyncClient<fuchsia_power_broker::Lessor>(
+          std::move(description.lessor_client.value()));
+      wake_on_request_current_level_client_ =
+          fidl::WireSyncClient<fuchsia_power_broker::CurrentLevel>(
+              std::move(description.current_level_client.value()));
+      wake_on_request_required_level_client_ =
+          fidl::WireClient<fuchsia_power_broker::RequiredLevel>(
+              std::move(description.required_level_client.value()), driver_async_dispatcher());
+    } else {
+      FDF_LOG(ERROR, "Unexpected power element: %s", std::string(config.element.name).c_str());
+      return zx::error(ZX_ERR_BAD_STATE);
+    }
+  }
+
+  // The lease request on the hardware power element remains persistent throughout the lifetime
+  // of this driver.
+  zx::result lease_control_client_end = AcquireLease(hardware_power_lessor_client_);
+  if (!lease_control_client_end.is_ok()) {
+    FDF_LOG(ERROR, "Failed to acquire lease on hardware power: %s",
+            zx_status_get_string(lease_control_client_end.status_value()));
+    return lease_control_client_end.take_error();
+  }
+  hardware_power_lease_control_client_end_ = std::move(lease_control_client_end.value());
+
+  // Start continuous monitoring of the required level and adjusting of the hardware's power level.
+  WatchHardwareRequiredLevel();
+  WatchWakeOnRequestRequiredLevel();
+
+  return zx::success();
+}
+
+void Ufs::WatchHardwareRequiredLevel() {
+  fidl::Arena<> arena;
+  hardware_power_required_level_client_.buffer(arena)->Watch().Then(
+      [this](fidl::WireUnownedResult<fuchsia_power_broker::RequiredLevel::Watch>& result) {
+        bool delay_before_next_watch = true;
+
+        auto defer = fit::defer([&]() {
+          if ((result.status() == ZX_ERR_CANCELED) || (result.status() == ZX_ERR_PEER_CLOSED)) {
+            FDF_LOG(WARNING, "Watch returned %s. Stop monitoring required power level.",
+                    zx_status_get_string(result.status()));
+          } else {
+            if (delay_before_next_watch) {
+              // TODO(b/339826112): Determine how to handle errors when communicating with the Power
+              // Broker. For now, avoid overwhelming the Power Broker with calls.
+              zx::nanosleep(zx::deadline_after(zx::msec(1)));
+            }
+            // Recursively call self to watch the required hardware power level again. The Watch()
+            // call blocks until the required power level has changed.
+            WatchHardwareRequiredLevel();
+          }
+        });
+
+        if (!result.ok()) {
+          FDF_LOG(ERROR, "Call to Watch failed: %s", result.status_string());
+          return;
+        }
+        if (result->is_error()) {
+          switch (result->error_value()) {
+            case fuchsia_power_broker::RequiredLevelError::kInternal:
+              FDF_LOG(ERROR, "Watch returned internal error.");
+              break;
+            case fuchsia_power_broker::RequiredLevelError::kNotAuthorized:
+              FDF_LOG(ERROR, "Watch returned not authorized error.");
+              break;
+            default:
+              FDF_LOG(ERROR, "Watch returned unknown error.");
+              break;
+          }
+          return;
+        }
+
+        const fuchsia_power_broker::PowerLevel required_level = result->value()->required_level;
+        switch (required_level) {
+          case kPowerLevelOn: {
+            // Actually raise the hardware's power level.
+            zx::result result = device_manager_->ResumePower();
+            if (result.is_error()) {
+              FDF_LOG(ERROR, "Failed to resume power: %s", result.status_string());
+              return;
+            }
+
+            // Communicate to Power Broker that the hardware power level has been raised.
+            UpdatePowerLevel(hardware_power_current_level_client_, kPowerLevelOn);
+
+            wait_for_power_resumed_.Signal();
+            break;
+          }
+          case kPowerLevelOff: {
+            // Actually lower the hardware's power level.
+            zx::result result = device_manager_->SuspendPower();
+            if (result.is_error()) {
+              FDF_LOG(ERROR, "Failed to suspend power: %s", result.status_string());
+              return;
+            }
+
+            // Communicate to Power Broker that the hardware power level has been lowered.
+            UpdatePowerLevel(hardware_power_current_level_client_, kPowerLevelOff);
+            break;
+          }
+          default:
+            FDF_LOG(ERROR, "Unexpected power level for hardware power element: %u", required_level);
+            return;
+        }
+
+        delay_before_next_watch = false;
+      });
+}
+
+void Ufs::WatchWakeOnRequestRequiredLevel() {
+  fidl::Arena<> arena;
+  wake_on_request_required_level_client_.buffer(arena)->Watch().Then(
+      [this](fidl::WireUnownedResult<fuchsia_power_broker::RequiredLevel::Watch>& result) {
+        auto defer = fit::defer([&]() {
+          if (result.status() == ZX_ERR_CANCELED) {
+            FDF_LOG(WARNING,
+                    "Watch returned canceled error. Stop monitoring required power level.");
+          } else {
+            // Recursively call self to watch the required wake-on-request power level again. The
+            // Watch() call blocks until the required power level has changed.
+            WatchWakeOnRequestRequiredLevel();
+          }
+        });
+
+        if (!result.ok()) {
+          FDF_LOG(ERROR, "Call to Watch failed: %s", result.status_string());
+          return;
+        }
+        if (result->is_error()) {
+          switch (result->error_value()) {
+            case fuchsia_power_broker::RequiredLevelError::kInternal:
+              FDF_LOG(ERROR, "Watch returned internal error.");
+              break;
+            case fuchsia_power_broker::RequiredLevelError::kNotAuthorized:
+              FDF_LOG(ERROR, "Watch returned not authorized error.");
+              break;
+            default:
+              FDF_LOG(ERROR, "Watch returned unknown error.");
+              break;
+          }
+          return;
+        }
+
+        const fuchsia_power_broker::PowerLevel required_level = result->value()->required_level;
+        if ((required_level != kPowerLevelOn) && (required_level != kPowerLevelOff)) {
+          FDF_LOG(ERROR, "Unexpected power level for wake-on-request power element: %u",
+                  required_level);
+          return;
+        }
+
+        UpdatePowerLevel(wake_on_request_current_level_client_, required_level);
+      });
+}
+
 zx::result<> Ufs::Start() {
   parent_node_.Bind(std::move(node()));
 
@@ -1072,11 +1532,21 @@ zx::result<> Ufs::Start() {
   if (zx_status_t status = Init(); status != ZX_OK) {
     return zx::error(status);
   }
+
+  // TODO(https://fxbug.dev/42075643): Use fuchsia.power.SuspendEnabled config cap to determine
+  // whether to expect Power Framework.
+  if (zx::result result = ConfigurePowerManagement(); !result.is_ok()) {
+    return result.take_error();
+  }
+
   return zx::ok();
 }
 
 void Ufs::PrepareStop(fdf::PrepareStopCompleter completer) {
-  driver_shutdown_ = true;
+  {
+    std::lock_guard<std::mutex> lock(lock_);
+    driver_shutdown_ = true;
+  }
 
   if (pci_.is_valid()) {
     const auto result = pci_->SetBusMastering(false);
@@ -1103,8 +1573,15 @@ void Ufs::PrepareStop(fdf::PrepareStopCompleter completer) {
 
   if (io_worker_dispatcher_.get()) {
     sync_completion_signal(&io_signal_);
+    wait_for_power_resumed_.Signal();
     io_worker_dispatcher_.ShutdownAsync();
     io_worker_shutdown_completion_.Wait();
+  }
+
+  if (admin_worker_dispatcher_.get()) {
+    sync_completion_signal(&admin_signal_);
+    admin_worker_dispatcher_.ShutdownAsync();
+    admin_worker_shutdown_completion_.Wait();
   }
 
   completer(zx::ok());

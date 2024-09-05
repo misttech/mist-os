@@ -288,51 +288,66 @@ zx::result<> TransferRequestProcessor::ScsiCompletion(uint8_t slot_num, RequestS
   return GetResponseStatus(descriptor, response, UpiuTransactionCodes::kCommand);
 }
 
-uint32_t TransferRequestProcessor::RequestCompletion() {
+bool TransferRequestProcessor::ProcessSlotCompletion(uint8_t slot_num) {
+  bool is_completed = false;
+
+  RequestSlot &request_slot = request_list_.GetSlot(slot_num);
+  if (request_slot.state == SlotState::kScheduled) {
+    if (!(UtrListDoorBellReg::Get().ReadFrom(&register_).door_bell() & (1 << slot_num))) {
+      zx::result<> result = zx::ok();
+      if (request_slot.is_scsi_command) {
+        // Check SCSI command response.
+        auto descriptor = request_list_.GetRequestDescriptor<TransferRequestDescriptor>(slot_num);
+        result = ScsiCompletion(slot_num, request_slot, descriptor);
+      } else {
+        // Check request command response.
+        ResponseUpiu response(request_list_.GetDescriptorBuffer<ResponseUpiu>(
+            slot_num, request_slot.response_upiu_offset));
+        if (response.GetHeader().response != UpiuHeaderResponse::kTargetSuccess) {
+          FDF_LOG(ERROR, "Transfer Request command failure: response=%x",
+                  response.GetHeader().response);
+          result = zx::error(ZX_ERR_BAD_STATE);
+        }
+      }
+      if (request_slot.io_cmd) {
+        request_slot.io_cmd->data_vmo.reset();
+        request_slot.io_cmd->device_op.Complete(result.status_value());
+      } else {
+        request_slot.result = result.status_value();
+      }
+
+      if (request_slot.is_sync) {
+        sync_completion_signal(&request_slot.complete);
+      } else {
+        UtrListCompletionNotificationReg::Get()
+            .FromValue(0)
+            .set_notification(1 << slot_num)
+            .WriteTo(&register_);
+
+        if (result = ClearSlot(request_slot); result.is_error()) {
+          FDF_LOG(ERROR, "Failed to clear slot[%u]: %s", slot_num, result.status_string());
+        }
+      }
+      is_completed = true;
+    }
+  }
+  return is_completed;
+}
+
+uint32_t TransferRequestProcessor::AdminRequestCompletion() {
+  return ProcessSlotCompletion(kAdminCommandSlotNumber);
+}
+
+uint32_t TransferRequestProcessor::IoRequestCompletion() {
   uint32_t completion_count = 0;
 
   // Search for all pending slots and signed the ones already done.
   for (uint8_t slot_num = 0; slot_num < request_list_.GetSlotCount(); ++slot_num) {
-    RequestSlot &request_slot = request_list_.GetSlot(slot_num);
-    if (request_slot.state == SlotState::kScheduled) {
-      if (!(UtrListDoorBellReg::Get().ReadFrom(&register_).door_bell() & (1 << slot_num))) {
-        zx::result<> result = zx::ok();
-        if (request_slot.is_scsi_command) {
-          // Check SCSI command response.
-          auto descriptor = request_list_.GetRequestDescriptor<TransferRequestDescriptor>(slot_num);
-          result = ScsiCompletion(slot_num, request_slot, descriptor);
-        } else {
-          // Check request command response.
-          ResponseUpiu response(request_list_.GetDescriptorBuffer<ResponseUpiu>(
-              slot_num, request_slot.response_upiu_offset));
-          if (response.GetHeader().response != UpiuHeaderResponse::kTargetSuccess) {
-            FDF_LOG(ERROR, "Transfer request command failure: response=%x",
-                    response.GetHeader().response);
-            result = zx::error(ZX_ERR_BAD_STATE);
-          }
-        }
-        if (request_slot.io_cmd) {
-          request_slot.io_cmd->data_vmo.reset();
-          request_slot.io_cmd->device_op.Complete(result.status_value());
-        } else {
-          request_slot.result = result.status_value();
-        }
-
-        if (request_slot.is_sync) {
-          sync_completion_signal(&request_slot.complete);
-        } else {
-          UtrListCompletionNotificationReg::Get()
-              .FromValue(0)
-              .set_notification(1 << slot_num)
-              .WriteTo(&register_);
-
-          if (result = ClearSlot(request_slot); result.is_error()) {
-            FDF_LOG(ERROR, "Failed to clear slot[%u]: %s", slot_num, result.status_string());
-          }
-        }
-        ++completion_count;
-      }
+    if (slot_num == kAdminCommandSlotNumber) {
+      continue;
     }
+
+    completion_count += ProcessSlotCompletion(slot_num);
   }
   return completion_count;
 }

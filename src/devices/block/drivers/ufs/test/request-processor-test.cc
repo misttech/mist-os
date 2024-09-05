@@ -49,7 +49,7 @@ TEST_F(RequestProcessorTest, TransferRequestProcessorRingRequestDoorbell) {
   ASSERT_EQ(RingRequestDoorbell<ufs::TransferRequestProcessor>(slot_num.value()).status_value(),
             ZX_OK);
   ASSERT_EQ(slot.state, SlotState::kScheduled);
-  ASSERT_EQ(dut_->GetTransferRequestProcessor().RequestCompletion(), 1);
+  ASSERT_EQ(dut_->GetTransferRequestProcessor().AdminRequestCompletion(), 1);
   ASSERT_EQ(slot.state, SlotState::kFree);
 }
 
@@ -77,7 +77,7 @@ TEST_F(RequestProcessorTest, FillDescriptorAndSendRequest) {
             ZX_OK);
 
   ASSERT_EQ(slot.state, SlotState::kScheduled);
-  ASSERT_EQ(dut_->GetTransferRequestProcessor().RequestCompletion(), 1);
+  ASSERT_EQ(dut_->GetTransferRequestProcessor().IoRequestCompletion(), 1);
   ASSERT_EQ(slot.state, SlotState::kFree);
 
   // Check Utp Transfer Request Descriptor
@@ -141,7 +141,7 @@ TEST_F(RequestProcessorTest, SendQueryUpiuException) {
   dut_->GetTransferRequestProcessor().SetTimeout(zx::msec(100));
   auto response = dut_->GetTransferRequestProcessor().SendQueryRequestUpiu(request);
   ASSERT_EQ(response.status_value(), ZX_ERR_TIMED_OUT);
-  dut_->ProcessCompletions();
+  dut_->ProcessIoCompletions();
 
   // Enable completion interrupt
   InterruptEnableReg::Get()
@@ -208,7 +208,7 @@ TEST_F(RequestProcessorTest, SendNopUpiuException) {
   auto nop_in =
       dut_->GetTransferRequestProcessor().SendRequestUpiu<NopOutUpiu, NopInUpiu>(nop_out_upiu);
   ASSERT_EQ(nop_in.status_value(), ZX_ERR_TIMED_OUT);
-  dut_->ProcessCompletions();
+  dut_->ProcessIoCompletions();
 
   // Enable completion interrupt
   InterruptEnableReg::Get()

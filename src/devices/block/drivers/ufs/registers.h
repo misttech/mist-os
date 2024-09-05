@@ -30,7 +30,7 @@ enum RegisterMap {
   kUECT = 0x44,
   kUECDME = 0x48,
   kUTRIACR = 0x4C,
-  // UTP Task Management
+  // UTP Transfer Request
   kUTRLBA = 0x50,
   kUTRLBAU = 0x54,
   kUTRLDBR = 0x58,

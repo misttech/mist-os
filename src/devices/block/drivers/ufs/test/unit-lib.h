@@ -5,6 +5,10 @@
 #ifndef SRC_DEVICES_BLOCK_DRIVERS_UFS_TEST_UNIT_LIB_H_
 #define SRC_DEVICES_BLOCK_DRIVERS_UFS_TEST_UNIT_LIB_H_
 
+#include <fidl/fuchsia.hardware.power/cpp/fidl.h>
+#include <fidl/fuchsia.power.broker/cpp/fidl.h>
+#include <fidl/fuchsia.power.system/cpp/fidl.h>
+#include <fidl/fuchsia.power.system/cpp/test_base.h>
 #include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
 #include <lib/driver/testing/cpp/driver_runtime.h>
 #include <lib/driver/testing/cpp/internal/driver_lifecycle.h>
@@ -110,10 +114,218 @@ class FakePci : public fidl::WireServer<fuchsia_hardware_pci::Device> {
   ufs_mock_device::UfsMockDevice* mock_device_;
 };
 
+class FakeSystemActivityGovernor
+    : public fidl::testing::TestBase<fuchsia_power_system::ActivityGovernor> {
+ public:
+  FakeSystemActivityGovernor(zx::event exec_state_opportunistic, zx::event wake_handling_assertive)
+      : exec_state_opportunistic_(std::move(exec_state_opportunistic)),
+        wake_handling_assertive_(std::move(wake_handling_assertive)) {}
+
+  fidl::ProtocolHandler<fuchsia_power_system::ActivityGovernor> CreateHandler() {
+    return bindings_.CreateHandler(this, fdf::Dispatcher::GetCurrent()->async_dispatcher(),
+                                   fidl::kIgnoreBindingClosure);
+  }
+
+  void GetPowerElements(GetPowerElementsCompleter::Sync& completer) override {
+    fuchsia_power_system::PowerElements elements;
+    zx::event execution_element, wake_handling_element;
+    exec_state_opportunistic_.duplicate(ZX_RIGHT_SAME_RIGHTS, &execution_element);
+    wake_handling_assertive_.duplicate(ZX_RIGHT_SAME_RIGHTS, &wake_handling_element);
+
+    fuchsia_power_system::ExecutionState exec_state = {
+        {.opportunistic_dependency_token = std::move(execution_element)}};
+
+    fuchsia_power_system::WakeHandling wake_handling = {
+        {.assertive_dependency_token = std::move(wake_handling_element)}};
+
+    elements = {
+        {.execution_state = std::move(exec_state), .wake_handling = std::move(wake_handling)}};
+
+    completer.Reply({{std::move(elements)}});
+  }
+
+  void NotImplemented_(const std::string& name, fidl::CompleterBase& completer) override {
+    ADD_FAILURE("%s is not implemented", name.c_str());
+  }
+
+  void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_power_system::ActivityGovernor> md,
+                             fidl::UnknownMethodCompleter::Sync& completer) override {}
+
+ private:
+  fidl::ServerBindingGroup<fuchsia_power_system::ActivityGovernor> bindings_;
+
+  zx::event exec_state_opportunistic_;
+  zx::event wake_handling_assertive_;
+};
+
+class FakeLessor : public fidl::Server<fuchsia_power_broker::Lessor> {
+ public:
+  void AddSideEffect(fit::function<void()> side_effect) { side_effect_ = std::move(side_effect); }
+
+  void Lease(fuchsia_power_broker::LessorLeaseRequest& req,
+             LeaseCompleter::Sync& completer) override {
+    if (side_effect_) {
+      side_effect_();
+    }
+
+    auto [lease_control_client_end, lease_control_server_end] =
+        fidl::Endpoints<fuchsia_power_broker::LeaseControl>::Create();
+    completer.Reply(fit::success(std::move(lease_control_client_end)));
+  }
+
+  void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_power_broker::Lessor> md,
+                             fidl::UnknownMethodCompleter::Sync& completer) override {}
+
+ private:
+  fit::function<void()> side_effect_;
+};
+
+class FakeCurrentLevel : public fidl::Server<fuchsia_power_broker::CurrentLevel> {
+ public:
+  void Update(fuchsia_power_broker::CurrentLevelUpdateRequest& req,
+              UpdateCompleter::Sync& completer) override {
+    completer.Reply(fit::success());
+  }
+
+  void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_power_broker::CurrentLevel> md,
+                             fidl::UnknownMethodCompleter::Sync& completer) override {}
+};
+
+class FakeRequiredLevel : public fidl::Server<fuchsia_power_broker::RequiredLevel> {
+ public:
+  void Watch(WatchCompleter::Sync& completer) override {
+    completer.Reply(fit::success(required_level_));
+  }
+
+  void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_power_broker::RequiredLevel> md,
+                             fidl::UnknownMethodCompleter::Sync& completer) override {}
+
+  fuchsia_power_broker::PowerLevel required_level_ = Ufs::kPowerLevelOff;
+};
+
+class PowerElement {
+ public:
+  explicit PowerElement(fidl::ServerEnd<fuchsia_power_broker::ElementControl> element_control,
+                        fidl::ServerBindingRef<fuchsia_power_broker::Lessor> lessor,
+                        fidl::ServerBindingRef<fuchsia_power_broker::CurrentLevel> current_level,
+                        fidl::ServerBindingRef<fuchsia_power_broker::RequiredLevel> required_level)
+      : element_control_(std::move(element_control)),
+        lessor_(std::move(lessor)),
+        current_level_(std::move(current_level)),
+        required_level_(std::move(required_level)) {}
+
+  fidl::ServerEnd<fuchsia_power_broker::ElementControl> element_control_;
+  fidl::ServerBindingRef<fuchsia_power_broker::Lessor> lessor_;
+  fidl::ServerBindingRef<fuchsia_power_broker::CurrentLevel> current_level_;
+  fidl::ServerBindingRef<fuchsia_power_broker::RequiredLevel> required_level_;
+};
+
+class FakePowerBroker : public fidl::Server<fuchsia_power_broker::Topology> {
+ public:
+  fidl::ProtocolHandler<fuchsia_power_broker::Topology> CreateHandler() {
+    return bindings_.CreateHandler(this, fdf::Dispatcher::GetCurrent()->async_dispatcher(),
+                                   fidl::kIgnoreBindingClosure);
+  }
+
+  void AddElement(fuchsia_power_broker::ElementSchema& req,
+                  AddElementCompleter::Sync& completer) override {
+    // Get channels from request.
+    ASSERT_TRUE(req.level_control_channels().has_value());
+    fidl::ServerEnd<fuchsia_power_broker::CurrentLevel>& current_level_server_end =
+        req.level_control_channels().value().current();
+    fidl::ServerEnd<fuchsia_power_broker::RequiredLevel>& required_level_server_end =
+        req.level_control_channels().value().required();
+    fidl::ServerEnd<fuchsia_power_broker::Lessor>& lessor_server_end = req.lessor_channel().value();
+
+    // Make channels to return to client
+    auto [element_control_client_end, element_control_server_end] =
+        fidl::Endpoints<fuchsia_power_broker::ElementControl>::Create();
+
+    // Instantiate (fake) lessor implementation.
+    auto lessor_impl = std::make_unique<FakeLessor>();
+    if (req.element_name() == Ufs::kHardwarePowerElementName) {
+      hardware_power_lessor_ = lessor_impl.get();
+    } else if (req.element_name() == Ufs::kSystemWakeOnRequestPowerElementName) {
+      wake_on_request_lessor_ = lessor_impl.get();
+    } else {
+      ZX_ASSERT_MSG(0, "Unexpected power element.");
+    }
+    fidl::ServerBindingRef<fuchsia_power_broker::Lessor> lessor_binding =
+        fidl::BindServer<fuchsia_power_broker::Lessor>(
+            fdf::Dispatcher::GetCurrent()->async_dispatcher(), std::move(lessor_server_end),
+            std::move(lessor_impl),
+            [](FakeLessor* impl, fidl::UnbindInfo info,
+               fidl::ServerEnd<fuchsia_power_broker::Lessor> server_end) mutable {});
+
+    // Instantiate (fake) current and required level implementations.
+    auto current_level_impl = std::make_unique<FakeCurrentLevel>();
+    auto required_level_impl = std::make_unique<FakeRequiredLevel>();
+    if (req.element_name() == Ufs::kHardwarePowerElementName) {
+      hardware_power_current_level_ = current_level_impl.get();
+      hardware_power_required_level_ = required_level_impl.get();
+    } else if (req.element_name() == Ufs::kSystemWakeOnRequestPowerElementName) {
+      wake_on_request_current_level_ = current_level_impl.get();
+      wake_on_request_required_level_ = required_level_impl.get();
+    } else {
+      ZX_ASSERT_MSG(0, "Unexpected power element.");
+    }
+    fidl::ServerBindingRef<fuchsia_power_broker::CurrentLevel> current_level_binding =
+        fidl::BindServer<fuchsia_power_broker::CurrentLevel>(
+            fdf::Dispatcher::GetCurrent()->async_dispatcher(), std::move(current_level_server_end),
+            std::move(current_level_impl),
+            [](FakeCurrentLevel* impl, fidl::UnbindInfo info,
+               fidl::ServerEnd<fuchsia_power_broker::CurrentLevel> server_end) mutable {});
+    fidl::ServerBindingRef<fuchsia_power_broker::RequiredLevel> required_level_binding =
+        fidl::BindServer<fuchsia_power_broker::RequiredLevel>(
+            fdf::Dispatcher::GetCurrent()->async_dispatcher(), std::move(required_level_server_end),
+            std::move(required_level_impl),
+            [](FakeRequiredLevel* impl, fidl::UnbindInfo info,
+               fidl::ServerEnd<fuchsia_power_broker::RequiredLevel> server_end) mutable {});
+
+    if (wake_on_request_lessor_ && hardware_power_required_level_) {
+      wake_on_request_lessor_->AddSideEffect(
+          [&]() { hardware_power_required_level_->required_level_ = Ufs::kPowerLevelOn; });
+    }
+
+    servers_.emplace_back(std::move(element_control_server_end), std::move(lessor_binding),
+                          std::move(current_level_binding), std::move(required_level_binding));
+
+    completer.Reply(fit::success());
+  }
+
+  void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_power_broker::Topology> md,
+                             fidl::UnknownMethodCompleter::Sync& completer) override {}
+
+  FakeLessor* hardware_power_lessor_ = nullptr;
+  FakeCurrentLevel* hardware_power_current_level_ = nullptr;
+  FakeRequiredLevel* hardware_power_required_level_ = nullptr;
+  FakeLessor* wake_on_request_lessor_ = nullptr;
+  FakeCurrentLevel* wake_on_request_current_level_ = nullptr;
+  FakeRequiredLevel* wake_on_request_required_level_ = nullptr;
+
+ private:
+  fidl::ServerBindingGroup<fuchsia_power_broker::Topology> bindings_;
+
+  std::vector<PowerElement> servers_;
+};
+
 struct IncomingNamespace {
+  IncomingNamespace() {
+    zx::event::create(0, &exec_opportunistic);
+    zx::event::create(0, &wake_assertive);
+    zx::event exec_opportunistic_dupe, wake_assertive_dupe;
+    ASSERT_OK(exec_opportunistic.duplicate(ZX_RIGHT_SAME_RIGHTS, &exec_opportunistic_dupe));
+    ASSERT_OK(wake_assertive.duplicate(ZX_RIGHT_SAME_RIGHTS, &wake_assertive_dupe));
+    system_activity_governor.emplace(std::move(exec_opportunistic_dupe),
+                                     std::move(wake_assertive_dupe));
+  }
+
   fdf_testing::TestNode node{"root"};
   fdf_testing::internal::TestEnvironment env{fdf::Dispatcher::GetCurrent()->get()};
   FakePci pci_server;
+  zx::event exec_opportunistic, wake_assertive;
+  std::optional<FakeSystemActivityGovernor> system_activity_governor;
+  FakePowerBroker power_broker;
 };
 
 class TestUfs : public Ufs {
@@ -147,7 +359,7 @@ class UfsTest : public inspect::InspectTestHelper, public zxtest::Test {
         incoming_(env_dispatcher_->async_dispatcher(), std::in_place) {}
 
   void InitMockDevice();
-  void StartDriver();
+  void StartDriver(bool supply_power_framework = false);
 
   void SetUp() override;
 

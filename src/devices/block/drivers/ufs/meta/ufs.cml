@@ -16,6 +16,10 @@
         fallback: "false",
     },
     use: [
+        { protocol: "fuchsia.power.broker.Topology" },
+
+        // Used by //sdk/lib/driver/power/cpp
+        { protocol: "fuchsia.power.system.ActivityGovernor" },
         { service: "fuchsia.hardware.pci.Service" },
     ],
 }
