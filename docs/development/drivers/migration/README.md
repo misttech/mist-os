@@ -55,6 +55,7 @@ identified as missing in the migration playbook above:
 
 - [Set up the compat device server in a DFv2 driver][set-up-compat-device-server]
 - [Serve Banjo protocols in a DFv2 driver][serve-banjo-protocols]
+- [Set up devfs in a DFv2 driver][set-up-devfs]
 
 <!-- Reference links -->
 
@@ -69,3 +70,4 @@ identified as missing in the migration playbook above:
 [migrate-from-dfv1-to-dfv2]: /docs/development/drivers/migration/migrate-from-dfv1-to-dfv2/overview.md
 [set-up-compat-device-server]: /docs/development/drivers/migration/set-up-compat-device-server.md
 [serve-banjo-protocols]: /docs/development/drivers/migration/serve-banjo-protocols.md
+[set-up-devfs]: /docs/development/drivers/migration/set-up-devfs.md

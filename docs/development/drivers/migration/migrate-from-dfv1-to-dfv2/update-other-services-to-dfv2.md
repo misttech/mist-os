@@ -341,6 +341,9 @@ For more information, see
 DFv2 driver codelab. Also, see this [implementation][export-to-devfs]
 of the `ExportToDevfs` method mentioned in the codelab.
 
+For more details on the `devfs` setup process,
+see the [Set up devfs in a DFv2 driver][set-up-devfs] guide.
+
 ## Use dispatchers {:#use-dispatchers}
 
 [Dispatchers][driver-dispatcher] fetch data from a channel between
@@ -607,3 +610,4 @@ All the **documentation pages** mentioned in this section:
 [banjo-server-h]: https://cs.opensource.google/fuchsia/fuchsia/+/main:sdk/lib/driver/compat/cpp/banjo_server.h
 [banjo-client-h]: https://cs.opensource.google/fuchsia/fuchsia/+/main:sdk/lib/driver/compat/cpp/banjo_client.h
 [set-up-compat-device-server]: /docs/development/drivers/migration/set-up-compat-device-server.md
+[set-up-devfs]: /docs/development/drivers/migration/set-up-devfs.md

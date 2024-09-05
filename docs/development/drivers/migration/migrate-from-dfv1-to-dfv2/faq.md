@@ -125,6 +125,9 @@ this, the audio driver [adds (or exposes) a `devfs` node][expose-devfs]
 for the speaker so that it appears as `/dev/class/audio/<random_number>`
 in the system.
 
+For more details, see the [Set up devfs in a DFv2 driver][set-up-devfs]
+guide.
+
 ## What is not implemented in DFv2 that was available in DFv1?
 
 If your DFv1 driver calls the [`load_firmware()`][load-firmware] function
@@ -256,3 +259,4 @@ contains most of the new APIs).
 [update-unit-tests]: update-other-services-to-dfv2.md#update-unit-tests-to-dfv2
 [additional-resources]: update-other-services-to-dfv2.md#additional-resources
 [serve-banjo-protocols-in-a-dfv2-driver]: /docs/development/drivers/migration/serve-banjo-protocols.md
+[set-up-devfs]: /docs/development/drivers/migration/set-up-devfs.md
