@@ -870,7 +870,10 @@ pub(super) struct FsUse<PS: ParseStrategy> {
 }
 
 impl<PS: ParseStrategy> FsUse<PS> {
-    #[allow(dead_code)]
+    pub fn fs_type(&self) -> &[u8] {
+        PS::deref_slice(&self.behavior_and_name.data)
+    }
+
     pub(super) fn behavior(&self) -> FsUseType {
         FsUseType::try_from(PS::deref(&self.behavior_and_name.metadata).behavior).unwrap()
     }
@@ -928,13 +931,13 @@ impl Counted for FsUseMetadata {
     }
 }
 
-pub(super) enum FsUseType {
-    /// Corresponds to the `fs_use_xatrr` statement.
-    FsUseXattr = 1,
-    /// Corresponds to the `fs_use_trans` statement.
-    FsUseTrans = 2,
-    /// Corresponds to the `fs_use_task` statement.
-    FsUseTask = 3,
+/// Discriminates among the different kinds of "fs_use_*" labeling statements in the policy; see
+/// https://selinuxproject.org/page/FileStatements.
+#[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
+pub enum FsUseType {
+    Xattr = 1,
+    Trans = 2,
+    Task = 3,
 }
 
 impl TryFrom<le::U32> for FsUseType {
@@ -942,9 +945,9 @@ impl TryFrom<le::U32> for FsUseType {
 
     fn try_from(value: le::U32) -> Result<Self, Self::Error> {
         match value.get() {
-            1 => Ok(FsUseType::FsUseXattr),
-            2 => Ok(FsUseType::FsUseTrans),
-            3 => Ok(FsUseType::FsUseTask),
+            1 => Ok(FsUseType::Xattr),
+            2 => Ok(FsUseType::Trans),
+            3 => Ok(FsUseType::Task),
             _ => Err(ValidateError::InvalidFsUseType { value: value.get() }.into()),
         }
     }

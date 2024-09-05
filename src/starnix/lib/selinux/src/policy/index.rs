@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use super::arrays::Context;
+use super::arrays::{Context, FsUseType};
 use super::extensible_bitmap::ExtensibleBitmapSpan;
 use super::metadata::HandleUnknown;
 use super::parser::ParseStrategy;
@@ -13,9 +13,15 @@ use super::symbols::{
 };
 use super::{CategoryId, ParsedPolicy, RoleId, TypeId};
 
-use crate::ClassPermission as _;
+use crate::{ClassPermission as _, NullessByteStr};
 use std::collections::HashMap;
 use std::num::NonZeroU32;
+
+/// The [`SecurityContext`] and [`FsUseType`] derived from some `fs_use_*` line of the policy.
+pub struct FsUseLabelAndType {
+    pub context: SecurityContext,
+    pub use_type: FsUseType,
+}
 
 /// An index for facilitating fast lookup of common abstractions inside parsed binary policy data
 /// structures. Typically, data is indexed by an enum that describes a well-known value and the
@@ -264,6 +270,22 @@ impl<PS: ParseStrategy> PolicyIndex<PS> {
     pub(super) fn initial_context(&self, id: crate::InitialSid) -> SecurityContext {
         // All [`InitialSid`] have already been verified as resolvable, by `new()`.
         self.resolve_initial_context(id).unwrap()
+    }
+
+    /// If there is an fs_use statement for the given filesystem type, returns the associated
+    /// [`SecurityContext`] and [`FsUseType`].
+    pub(super) fn fs_use_label_and_type(
+        &self,
+        fs_type: NullessByteStr<'_>,
+    ) -> Option<FsUseLabelAndType> {
+        self.parsed_policy
+            .fs_uses()
+            .iter()
+            .find(|fs_use| fs_use.fs_type() == fs_type.as_bytes())
+            .map(|fs_use| FsUseLabelAndType {
+                context: self.security_context_from_policy_context(fs_use.context()).unwrap(),
+                use_type: fs_use.behavior(),
+            })
     }
 
     /// Helper used to construct and validate well-known [`SecurityContext`] values.

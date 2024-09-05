@@ -15,7 +15,7 @@ use linux_uapi::XATTR_NAME_SELINUX;
 use selinux::{ClassPermission, InitialSid, Permission, ProcessPermission, SecurityPermission};
 use selinux_core::permission_check::{PermissionCheck, PermissionCheckResult};
 use selinux_core::security_server::SecurityServer;
-use selinux_core::SecurityId;
+use selinux_core::{FileSystemLabel, FileSystemLabelingScheme, FileSystemMountOptions, SecurityId};
 use starnix_logging::{log_warn, track_stub};
 use starnix_uapi::error;
 use starnix_uapi::errors::Errno;
@@ -62,35 +62,7 @@ fn ensure_fs_label<'a>(
 ) -> &'a FileSystemLabel {
     assert!(security_server.has_policy());
     fs.security_state.state.label.get_or_init(|| {
-        let mount_options = &fs.security_state.state.mount_options;
-        if let Some(context) = &mount_options.context {
-            let sid = security_server
-                .security_context_to_sid((&context).into())
-                .ok()
-                .unwrap_or(SecurityId::initial(InitialSid::Unlabeled));
-            return FileSystemLabel { sid, scheme: FileSystemLabelingScheme::Mountpoint };
-        }
-        let fs_sid = mount_options
-            .fs_context
-            .as_ref()
-            .and_then(|context| security_server.security_context_to_sid((&context).into()).ok())
-            .unwrap_or(SecurityId::initial(InitialSid::Unlabeled));
-        let root_sid = mount_options
-            .root_context
-            .as_ref()
-            .and_then(|context| security_server.security_context_to_sid((&context).into()).ok())
-            .unwrap_or(fs_sid);
-        let def_sid = mount_options
-            .def_context
-            .as_ref()
-            .and_then(|context| security_server.security_context_to_sid((&context).into()).ok())
-            .unwrap_or(SecurityId::initial(InitialSid::File));
-
-        FileSystemLabel {
-            sid: fs_sid,
-            // TODO: https://fxbug.dev/355628002 - Determine labeling scheme from policy.
-            scheme: FileSystemLabelingScheme::FsUse { def_sid, root_sid },
-        }
+        security_server.resolve_fs_label(fs.name().into(), &fs.security_state.state.mount_options)
     })
 }
 
@@ -293,7 +265,12 @@ pub fn file_system_init_security(
         return error!(EINVAL);
     }
 
-    let mount_options = FileSystemMountOptions { context, def_context, fs_context, root_context };
+    let mount_options = FileSystemMountOptions {
+        context: context.map(Into::into),
+        def_context: def_context.map(Into::into),
+        fs_context: fs_context.map(Into::into),
+        root_context: root_context.map(Into::into),
+    };
 
     Ok(FileSystemState { mount_options, label: OnceLock::new() })
 }
@@ -366,43 +343,6 @@ pub(super) struct FileSystemState {
     // need to be retained after the file system has been labeled.
     mount_options: FileSystemMountOptions,
     label: OnceLock<FileSystemLabel>,
-}
-
-#[derive(Clone, Debug, PartialEq)]
-struct FileSystemLabel {
-    sid: SecurityId,
-    scheme: FileSystemLabelingScheme,
-}
-
-#[derive(Clone, Debug, PartialEq)]
-enum FileSystemLabelingScheme {
-    /// This filesystem was mounted with "context=".
-    Mountpoint,
-    /// This filesystem has an "fs_use_xattr", "fs_use_task", or "fs_use_trans" entry in the
-    /// policy. `root_sid` identifies the context for the root of the filesystem and `def_sid`
-    /// identifies the context to use for unlabeled files in the filesystem (the "default
-    /// context").
-    FsUse { def_sid: SecurityId, root_sid: SecurityId },
-}
-
-/// SELinux security context-related filesystem mount options. These options are documented in the
-/// `context=context, fscontext=context, defcontext=context, and rootcontext=context` section of
-/// the `mount(8)` manpage.
-#[derive(Clone, Debug, PartialEq)]
-struct FileSystemMountOptions {
-    /// Specifies the effective security context to use for all nodes in the filesystem, and the
-    /// filesystem itself. If the filesystem already contains security attributes then these are
-    /// ignored. May not be combined with any of the other options.
-    context: Option<FsString>,
-    /// Specifies an effective security context to use for un-labeled nodes in the filesystem,
-    /// rather than falling-back to the policy-defined "file" context.
-    def_context: Option<FsString>,
-    /// The value of the `fscontext=[security-context]` mount option. This option is used to
-    /// label the filesystem (superblock) itself.
-    fs_context: Option<FsString>,
-    /// The value of the `rootcontext=[security-context]` mount option. This option is used to
-    /// (re)label the inode located at the filesystem mountpoint.
-    root_context: Option<FsString>,
 }
 
 /// Sets the cached security id associated with `fs_node` to `sid`. Storing the security id will

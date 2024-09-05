@@ -2,17 +2,19 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+pub mod arrays;
 pub mod error;
 pub mod index;
 pub mod metadata;
 pub mod parsed_policy;
 pub mod parser;
 
-mod arrays;
 mod extensible_bitmap;
 mod security_context;
 mod symbols;
 
+pub use arrays::FsUseType;
+pub use index::FsUseLabelAndType;
 pub use security_context::{SecurityContext, SecurityContextError};
 
 use crate::{self as sc, FileClass, NullessByteStr, ObjectClass};
@@ -228,6 +230,12 @@ impl<PS: ParseStrategy> Policy<PS> {
         );
 
         Ok(result)
+    }
+
+    /// If there is an fs_use statement for the given filesystem type, returns the associated
+    /// [`SecurityContext`] and [`FsUseType`].
+    pub fn fs_use_label_and_type(&self, fs_type: NullessByteStr<'_>) -> Option<FsUseLabelAndType> {
+        self.0.fs_use_label_and_type(fs_type)
     }
 
     /// Returns the [`SecurityContext`] defined by this policy for the specified
