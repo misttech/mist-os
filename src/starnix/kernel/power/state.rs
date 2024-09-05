@@ -107,7 +107,7 @@ impl BytesFileOps for PowerStateFile {
         {
             let manager = connect_to_protocol_sync::<frunner::ManagerMarker>()
                 .expect("Failed to connect to manager");
-            let _ = manager
+            manager
                 .suspend_container(
                     frunner::ManagerSuspendContainerRequest {
                         container_job: Some(
@@ -116,13 +116,15 @@ impl BytesFileOps for PowerStateFile {
                                 .expect("Failed to dup handle"),
                         ),
                         wake_event: current_task.kernel().hrtimer_manager.duplicate_timer_event(),
-                        wake_locks: None,
+                        wake_locks: Some(
+                            current_task.kernel().suspend_resume_manager.duplicate_lock_event(),
+                        ),
                         ..Default::default()
                     },
                     zx::Time::INFINITE,
                 )
-                .expect("Failed to suspend container.");
-            current_task.kernel().hrtimer_manager.reset_timer_event();
+                .map_err(|_| errno!(EINVAL))?
+                .map_err(|_| errno!(EINVAL))?;
         }
         Ok(())
     }

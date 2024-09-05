@@ -103,7 +103,7 @@ impl HrTimerManager {
     }
 
     /// Clears the `EVENT_SIGNALED` signal on the hrtimer event.
-    pub fn reset_timer_event(&self) {
+    fn reset_timer_event(&self) {
         if let Some(e) = self.timer_event.as_ref() {
             e.as_handle_ref()
                 .signal(zx::Signals::EVENT_SIGNALED, zx::Signals::NONE)
@@ -191,6 +191,11 @@ impl HrTimerManager {
                                     .lock()
                                     .timer_heap
                                     .retain(|t| !Arc::ptr_eq(&t.hr_timer, &hrtimer_ref));
+                                // The hrtimer client is responsible for clearing the timer fired
+                                // signal, so we clear it here right before starting the next
+                                // timer.
+                                self_ref.reset_timer_event();
+
                                 loop {
                                     // After the front HrTimer expires, we need to start the next
                                     // one in the heap.

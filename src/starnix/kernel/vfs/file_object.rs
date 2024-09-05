@@ -1825,7 +1825,7 @@ impl Releasable for FileObject {
             if let Ok(file) = current_task.files.get(epfd) {
                 if let Some(epoll_object) = file.downcast_file::<EpollFileObject>() {
                     if let Some(file_handle) = self.weak_handle.upgrade() {
-                        epoll_object.drop_lease(&file_handle);
+                        epoll_object.drop_lease(current_task, &file_handle);
                     }
                 }
             }
@@ -1858,7 +1858,9 @@ impl OnWakeOps for FileReleaser {
             if let Ok(file) = current_task.files.get(*epfd) {
                 if let Some(epoll_file) = file.downcast_file::<EpollFileObject>() {
                     if let Some(weak_handle) = self.weak_handle.upgrade() {
-                        if let Err(e) = epoll_file.activate_lease(&weak_handle, baton_lease) {
+                        if let Err(e) =
+                            epoll_file.activate_lease(current_task, &weak_handle, baton_lease)
+                        {
                             log_error!("Failed to activate wake lease in epoll control file: {e}");
                         }
                     }

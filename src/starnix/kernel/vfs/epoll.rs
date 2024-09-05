@@ -55,7 +55,7 @@ impl WaitObject {
 
 /// EpollKey acts as an key to a map of WaitObject.
 /// In reality it is a pointer to a FileHandle object.
-type EpollKey = usize;
+pub type EpollKey = usize;
 
 fn as_epoll_key(file: &FileHandle) -> EpollKey {
     Arc::as_ptr(file) as EpollKey
@@ -246,9 +246,9 @@ impl EpollFileObject {
         L: LockEqualOrBefore<FileOpsCore>,
     {
         let mut state = self.state.lock();
-        let key = as_epoll_key(file).into();
-        state.rearm_list.retain(|x| x.key != key);
-        match state.wait_objects.entry(key) {
+        let key = as_epoll_key(file);
+        state.rearm_list.retain(|x| x.key != key.into());
+        match state.wait_objects.entry(key.into()) {
             Entry::Occupied(mut entry) => {
                 let wait_object = entry.get_mut();
                 if let Some(wait_canceler) = wait_object.wait_canceler.take() {
@@ -262,8 +262,9 @@ impl EpollFileObject {
                     && !epoll_event.events().contains(FdEvents::EPOLLWAKEUP)
                 {
                     wait_object.wake_lease.take_lease();
+                    current_task.kernel().suspend_resume_manager.remove_epoll(key);
                 }
-                self.wait_on_file(locked, current_task, key, wait_object)
+                self.wait_on_file(locked, current_task, key.into(), wait_object)
             }
             Entry::Vacant(_) => error!(ENOENT),
         }
@@ -423,6 +424,9 @@ impl EpollFileObject {
                 let w = state.wait_objects.get_mut(&to_wait.key).unwrap();
                 // Drop the wake lease
                 w.wake_lease.take_lease();
+                if let ReadyItemKey::Usize(key) = to_wait.key {
+                    current_task.kernel().suspend_resume_manager.remove_epoll(key)
+                };
                 self.wait_on_file(locked, current_task, to_wait.key, w)?;
             }
         }
@@ -465,6 +469,9 @@ impl EpollFileObject {
                 // hold a wake lease until the next epoll_wait.
                 if wait.events.contains(FdEvents::EPOLLWAKEUP) {
                     wait.wake_lease.activate()?;
+                    if let ReadyItemKey::Usize(key) = pending_event.key {
+                        current_task.kernel().suspend_resume_manager.add_epoll(key)
+                    }
                 }
 
                 state.rearm_list.push(pending_event.clone());
@@ -480,11 +487,12 @@ impl EpollFileObject {
     }
 
     /// Drop the wake lease associated with the `file`.
-    pub fn drop_lease(&self, file: &FileHandle) {
+    pub fn drop_lease(&self, current_task: &CurrentTask, file: &FileHandle) {
         let mut guard = self.state.lock();
-        let key = as_epoll_key(file).into();
-        if let Entry::Occupied(entry) = guard.wait_objects.entry(key) {
+        let key = as_epoll_key(file);
+        if let Entry::Occupied(entry) = guard.wait_objects.entry(key.into()) {
             entry.get().wake_lease.take_lease();
+            current_task.kernel().suspend_resume_manager.remove_epoll(key);
         }
     }
 
@@ -494,14 +502,16 @@ impl EpollFileObject {
     /// this function returns.
     pub fn activate_lease(
         &self,
+        current_task: &CurrentTask,
         file: &FileHandle,
         _baton_lease: &zx::Channel,
     ) -> Result<(), Errno> {
+        let key = as_epoll_key(file);
         let mut guard = self.state.lock();
-        let key = as_epoll_key(file).into();
-        let Entry::Occupied(entry) = guard.wait_objects.entry(key) else {
+        let Entry::Occupied(entry) = guard.wait_objects.entry(key.into()) else {
             return error!(EINVAL);
         };
+        current_task.kernel().suspend_resume_manager.add_epoll(key);
         entry.get().wake_lease.activate()
     }
 }

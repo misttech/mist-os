@@ -4,6 +4,7 @@
 
 use crate::power::{listener, SuspendState, SuspendStats};
 use crate::task::CurrentTask;
+use crate::vfs::EpollKey;
 
 use std::collections::HashSet;
 use std::sync::{Arc, Condvar, Mutex as StdMutex};
@@ -13,6 +14,7 @@ use async_utils::hanging_get::client::HangingGetStream;
 use fidl::endpoints::create_sync_proxy;
 use fuchsia_component::client::{connect_to_protocol, connect_to_protocol_sync};
 use fuchsia_inspect_contrib::nodes::BoundedListNode;
+use fuchsia_zircon::{HandleBased, Peered};
 use futures::StreamExt;
 use once_cell::sync::OnceCell;
 use starnix_logging::{log_error, log_info, log_warn};
@@ -113,6 +115,23 @@ pub struct SuspendResumeManagerInner {
 
     suspend_waiter: Option<Arc<SuspendWaiter>>,
     inspect_node: BoundedListNode,
+
+    /// The currently active wake locks in the system. If non-empty, this prevents
+    /// the container from suspending.
+    active_locks: HashSet<String>,
+
+    /// The currently active EPOLLWAKEUPs in the system. If non-empty, this prevents
+    /// the container from suspending.
+    active_epolls: HashSet<EpollKey>,
+
+    /// The event pair that is passed to the Starnix runner so it can observe whether
+    /// or not any wake locks are active before completing a suspend operation.
+    active_lock_reader: zx::EventPair,
+
+    /// The event pair that is used by the Starnix kernel to signal when there are
+    /// active wake locks in the container. Note that the peer of the writer is the
+    /// object that is signaled.
+    active_lock_writer: zx::EventPair,
 }
 
 /// The inspect node ring buffer will keep at most this many entries.
@@ -120,6 +139,7 @@ const INSPECT_RING_BUFFER_CAPACITY: usize = 128;
 
 impl Default for SuspendResumeManagerInner {
     fn default() -> Self {
+        let (active_lock_reader, active_lock_writer) = zx::EventPair::create();
         Self {
             inspect_node: BoundedListNode::new(
                 inspect::component::inspector().root().create_child("suspend_events"),
@@ -129,7 +149,24 @@ impl Default for SuspendResumeManagerInner {
             sync_on_suspend_enabled: Default::default(),
             lease_control_channel: Default::default(),
             suspend_waiter: Default::default(),
+            active_locks: Default::default(),
+            active_epolls: Default::default(),
+            active_lock_reader,
+            active_lock_writer,
         }
+    }
+}
+
+impl SuspendResumeManagerInner {
+    /// Signals whether or not there are currently any active wake locks in the kernel.
+    fn signal_wake_events(&mut self) {
+        let (clear_mask, set_mask) =
+            if self.active_locks.is_empty() && self.active_epolls.is_empty() {
+                (zx::Signals::EVENT_SIGNALED, zx::Signals::empty())
+            } else {
+                (zx::Signals::empty(), zx::Signals::EVENT_SIGNALED)
+            };
+        self.active_lock_writer.signal_peer(clear_mask, set_mask).expect("Failed to signal peer");
     }
 }
 
@@ -260,6 +297,44 @@ impl SuspendResumeManager {
         };
 
         Ok(())
+    }
+
+    /// Adds a wake lock `name` to the active wake locks.
+    pub fn add_lock(&self, name: String) {
+        let mut state = self.lock();
+        state.active_locks.insert(name);
+        state.signal_wake_events();
+    }
+
+    /// Removes a wake lock `name` from the active wake locks.
+    pub fn remove_lock(&self, name: &str) {
+        let mut state = self.lock();
+        state.active_locks.remove(name);
+        state.signal_wake_events();
+    }
+
+    /// Adds a wake lock `key` to the active epoll wake locks.
+    pub fn add_epoll(&self, key: EpollKey) {
+        let mut state = self.lock();
+        state.active_epolls.insert(key);
+        state.signal_wake_events();
+    }
+
+    /// Removes a wake lock `key` from the active epoll wake locks.
+    pub fn remove_epoll(&self, key: EpollKey) {
+        let mut state = self.lock();
+        state.active_epolls.remove(&key);
+        state.signal_wake_events();
+    }
+
+    /// Returns a duplicate handle to the `EventPair` that is signaled when wake
+    /// locks are active.
+    pub fn duplicate_lock_event(&self) -> zx::EventPair {
+        let state = self.lock();
+        state
+            .active_lock_reader
+            .duplicate_handle(zx::Rights::SAME_RIGHTS)
+            .expect("Failed to duplicate handle")
     }
 
     fn update_stats(&self, stats: fsuspend::SuspendStats) {
