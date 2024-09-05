@@ -58,7 +58,7 @@ impl WakerList {
 
     /// Returns an iterator that will drain all wakers.  Whilst the drainer exists, a lock is held
     /// which will prevent new wakers from being added to the list, so depending on your use case,
-    /// you might wish to collect the waiters before calling `wake` on each waker.  NOTE: If the
+    /// you might wish to collect the wakers before calling `wake` on each waker.  NOTE: If the
     /// drainer is dropped, this will *not* drain elements not visited.
     pub fn drain(&self) -> Drainer<'_> {
         Drainer(self.0.lock().unwrap())
@@ -173,9 +173,9 @@ mod tests {
     use super::WakerList;
     use crate::TestExecutor;
     use assert_matches::assert_matches;
-    use futures::future::join_all;
+    use futures::stream::FuturesUnordered;
     use futures::task::noop_waker;
-    use futures::FutureExt;
+    use futures::{FutureExt, StreamExt};
     use std::future::poll_fn;
     use std::pin::pin;
     use std::sync::atomic::{AtomicU64, Ordering};
@@ -189,7 +189,10 @@ mod tests {
         static COUNT: u64 = 10;
 
         let counter = AtomicU64::new(0);
-        let mut futures = Vec::new();
+
+        // Use FuturesUnordered so that futures are only polled when explicitly woken.
+        let mut futures = FuturesUnordered::new();
+
         for _ in 0..COUNT {
             futures.push(
                 async {
@@ -208,9 +211,7 @@ mod tests {
             );
         }
 
-        let mut all_futures = join_all(futures);
-
-        assert_eq!(executor.run_until_stalled(&mut all_futures), Poll::Pending);
+        assert_eq!(executor.run_until_stalled(&mut futures.next()), Poll::Pending);
 
         assert_eq!(counter.load(Ordering::Relaxed), COUNT);
         assert_eq!(waker_list.len(), COUNT as usize);
@@ -222,7 +223,10 @@ mod tests {
             waker.wake();
         }
 
-        assert_matches!(executor.run_until_stalled(&mut all_futures), Poll::Ready(_));
+        assert_matches!(
+            executor.run_until_stalled(&mut futures.collect::<Vec<_>>()),
+            Poll::Ready(_)
+        );
         assert_eq!(counter.load(Ordering::Relaxed), COUNT * 2);
     }
 
