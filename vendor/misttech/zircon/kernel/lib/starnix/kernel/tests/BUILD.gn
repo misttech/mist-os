@@ -14,7 +14,7 @@ source_set("tests") {
     #"io_buffers-test.cc",
     #"kernel-test.cc",
     #"loader-test.cc",
-    #"locks-test.cc",
+    "locks-test.cc",
     #"memory_manager-test.cc",
     "path-test.cc",
 

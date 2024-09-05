@@ -102,6 +102,13 @@ class RwLockGuard : public Guard<BrwLockPi, Option> {
   __WARN_UNUSED_CONSTRUCTOR explicit RwLockGuard(RwLock<Data>* mtx)
       : Guard<BrwLockPi, Option>(&mtx->lock_), mtx_(mtx) {}
 
+  DISALLOW_COPY_AND_ASSIGN_ALLOW_MOVE(RwLockGuard);
+
+  RwLockGuard(RwLockGuard&& other) noexcept
+      : Guard<BrwLockPi, Option>(AdoptLock, ktl::move(other.take())), mtx_(other.mtx_) {
+    other.mtx_ = nullptr;
+  }
+
   Data* operator->() const { return &mtx_->data_; }
   Data& operator*() const { return mtx_->data_; }
 
