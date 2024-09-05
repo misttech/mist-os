@@ -99,7 +99,7 @@ impl ExtFilesystem {
         )?;
         let mut root = FsNode::new_root(ops);
         root.node_id = ROOT_INODE_NUM as ino_t;
-        fs.set_existing_root_node(root);
+        fs.set_root_node(root);
         pager.start_pager_threads(current_task);
 
         Ok(fs)

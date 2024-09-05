@@ -5,7 +5,7 @@
 use super::proc_directory::ProcDirectory;
 use crate::task::CurrentTask;
 use crate::vfs::{
-    CacheMode, FileSystem, FileSystemHandle, FileSystemOps, FileSystemOptions, FsNode, FsStr,
+    CacheMode, FileSystem, FileSystemHandle, FileSystemOps, FileSystemOptions, FsStr,
 };
 use starnix_sync::{Locked, Unlocked};
 use starnix_uapi::errors::Errno;
@@ -40,7 +40,7 @@ impl ProcFs {
         let kernel = current_task.kernel();
         let fs = FileSystem::new(kernel, CacheMode::Uncached, Arc::new(ProcFs), options)
             .expect("procfs constructed with valid options");
-        fs.set_root_node(FsNode::new_root(ProcDirectory::new(current_task, &fs)));
+        fs.set_root(ProcDirectory::new(current_task, &fs));
         fs
     }
 }

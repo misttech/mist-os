@@ -4,9 +4,9 @@
 
 use super::{selinux_hooks, FileSystemState, ResolvedElfState, TaskState};
 use crate::security::KernelState;
-use crate::task::{CurrentTask, Kernel, Task};
+use crate::task::{CurrentTask, Task};
 use crate::vfs::fs_args::MountParams;
-use crate::vfs::{FsNode, FsStr, FsString, NamespaceNode, ValueOrSize, XattrOp};
+use crate::vfs::{FsNode, FsNodeHandle, FsStr, FsString, NamespaceNode, ValueOrSize, XattrOp};
 use selinux::SecurityPermission;
 use selinux_core::security_server::SecurityServer;
 use starnix_uapi::errors::Errno;
@@ -92,33 +92,12 @@ pub struct FsNodeSecurityXattr {
     pub value: FsString,
 }
 
-/// Returns the security attribute with which to label the root node for a file
-/// system, when it is being created. This should not be called when re-creating
-/// the in-memory structures for the root node of persisted file systems.
-/// This is a separate hook for now because there is no `CurrentTask` during initial mounting
-/// of filesystems for container startup.
-// TODO: https://fxbug.dev/355809976 - Merge this into `fs_node_init_security_and_xattr()`.
-pub fn fs_node_init_root_security(
-    kernel: &Kernel,
-    root_node: &FsNode,
-) -> Option<FsNodeSecurityXattr> {
-    if let Some(security_server) = &kernel.security_state.server {
-        if !security_server.has_policy() {
-            return None;
-        }
-        selinux_hooks::fs_node_init_root_security(security_server, root_node)
-    } else {
-        None
-    }
-}
-
 /// Returns the security attribute to label a newly created inode with.
-/// Note that the root node of a file system is handled by the `fs_node_init_root_security()` hook.
 /// This is analogous to the `inode_init_security()` hook.
 pub fn fs_node_init_security_and_xattr(
     current_task: &CurrentTask,
-    new_node: &FsNode,
-    parent: &FsNode,
+    new_node: &FsNodeHandle,
+    parent: Option<&FsNodeHandle>,
 ) -> Result<Option<FsNodeSecurityXattr>, Errno> {
     run_if_selinux_else(
         current_task,
@@ -193,7 +172,7 @@ pub fn check_task_create_access(current_task: &CurrentTask) -> Result<(), Errno>
 /// Checks if exec is allowed.
 pub fn check_exec_access(
     current_task: &CurrentTask,
-    executable_node: &FsNode,
+    executable_node: &FsNodeHandle,
 ) -> Result<ResolvedElfState, Errno> {
     check_if_selinux_else(
         current_task,

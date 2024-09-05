@@ -1042,7 +1042,7 @@ impl OverlayStack {
             OverlayFs { stack },
             options,
         )?;
-        fs.set_existing_root_node(FsNode::new_root(OverlayNodeOps { node: root_node }));
+        fs.set_root(OverlayNodeOps { node: root_node });
         Ok(fs)
     }
 
@@ -1075,7 +1075,7 @@ impl OverlayStack {
             OverlayFs { stack },
             FileSystemOptions::default(),
         )?;
-        fs.set_existing_root_node(FsNode::new_root(OverlayNodeOps { node: root_node }));
+        fs.set_root(OverlayNodeOps { node: root_node });
         Ok(fs)
     }
 

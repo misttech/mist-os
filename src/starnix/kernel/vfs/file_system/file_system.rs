@@ -11,7 +11,7 @@ use crate::task::{CurrentTask, Kernel};
 use crate::vfs::fs_args::MountParams;
 use crate::vfs::{
     DirEntry, DirEntryHandle, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, FsString,
-    WeakFsNodeHandle,
+    WeakFsNodeHandle, XattrOp,
 };
 use linked_hash_map::LinkedHashMap;
 use once_cell::sync::OnceCell;
@@ -160,27 +160,12 @@ impl FileSystem {
         }))
     }
 
-    /// Set the newly-created `root` node as the root of this file system.
-    /// One-time initialization steps such as security-labeling will be applied.
-    ///
-    /// Panics if this filesystem already has a root node set, or root node initialization fails.
-    pub fn set_root_node(self: &FileSystemHandle, root: FsNode) {
-        self.set_existing_root_node(root);
-
-        // Initializing the root node's security label cannot fail, whether or not a policy has been
-        // loaded yet.
-        let kernel = self.kernel.upgrade().expect("setting root on a filesystem with no kernel");
-        let _xattr = security::fs_node_init_root_security(&kernel, &self.root().node);
-        // TODO: https://fxbug.dev/355809976 - If an xattr is returned then write it to the root
-        // node.
+    pub fn set_root(self: &FileSystemHandle, root: impl FsNodeOps) {
+        self.set_root_node(FsNode::new_root(root));
     }
 
-    /// Sets the pre-existing `root` node as the root of this filesystem. The node is assumed to
-    /// already have had one-time initialization such as security-labeling performed, e.g. by
-    /// persisting data to its extended attributes.
-    ///
-    /// Panics if this filesystem already has a root node set.
-    pub fn set_existing_root_node(self: &FileSystemHandle, root: FsNode) {
+    /// Set up the root of the filesystem. Must not be called more than once.
+    pub fn set_root_node(self: &FileSystemHandle, root: FsNode) {
         let root = self.insert_node(root);
         assert!(self.root.set(root).is_ok(), "FileSystem::set_root can't be called more than once");
     }
@@ -208,11 +193,26 @@ impl FileSystem {
     }
 
     /// Prepare a node for insertion in the node cache.
+    ///
+    /// Currently, apply the required selinux context if the selinux workaround is enabled on this
+    /// filesystem.
     fn prepare_node_for_insertion(
         &self,
-        _current_task: &CurrentTask,
+        current_task: &CurrentTask,
         node: &FsNodeHandle,
     ) -> WeakFsNodeHandle {
+        // TODO(b/355180447): Move this logic so the parent inode (if any) can be taken into account.
+        if let Some(xattr) =
+            security::fs_node_init_security_and_xattr(current_task, &node, None).unwrap_or(None)
+        {
+            let _ = node.ops().set_xattr(
+                node,
+                current_task,
+                xattr.name,
+                xattr.value.as_slice().into(),
+                XattrOp::Create,
+            );
+        }
         Arc::downgrade(node)
     }
 
