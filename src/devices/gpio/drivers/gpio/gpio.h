@@ -22,7 +22,8 @@
 namespace gpio {
 
 class GpioDevice : public fidl::WireServer<fuchsia_hardware_gpio::Gpio>,
-                   public fidl::WireServer<fuchsia_hardware_pin::Pin> {
+                   public fidl::WireServer<fuchsia_hardware_pin::Pin>,
+                   public fidl::WireServer<fuchsia_hardware_pin::Debug> {
  public:
   GpioDevice(fdf::WireSharedClient<fuchsia_hardware_pinimpl::PinImpl> pinimpl, uint32_t pin,
              uint32_t controller_id, std::string_view name)
@@ -41,7 +42,7 @@ class GpioDevice : public fidl::WireServer<fuchsia_hardware_gpio::Gpio>,
                          fdf::Logger& logger);
 
  private:
-  void DevfsConnect(fidl::ServerEnd<fuchsia_hardware_gpio::Gpio> server);
+  void DevfsConnect(fidl::ServerEnd<fuchsia_hardware_pin::Debug> server);
 
   void GetPin(GetPinCompleter::Sync& completer) override;
   void GetName(GetNameCompleter::Sync& completer) override;
@@ -69,6 +70,15 @@ class GpioDevice : public fidl::WireServer<fuchsia_hardware_gpio::Gpio>,
   void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_hardware_pin::Pin> metadata,
                              fidl::UnknownMethodCompleter::Sync& completer) override;
 
+  void GetProperties(GetPropertiesCompleter::Sync& completer) override;
+  void ConnectPin(fuchsia_hardware_pin::wire::DebugConnectPinRequest* request,
+                  ConnectPinCompleter::Sync& completer) override;
+  void ConnectGpio(fuchsia_hardware_pin::wire::DebugConnectGpioRequest* request,
+                   ConnectGpioCompleter::Sync& completer) override;
+
+  void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_hardware_pin::Debug> metadata,
+                             fidl::UnknownMethodCompleter::Sync& completer) override;
+
   std::string pin_name() const {
     char name[20];
     snprintf(name, sizeof(name), "gpio-%u", pin_);
@@ -83,9 +93,10 @@ class GpioDevice : public fidl::WireServer<fuchsia_hardware_gpio::Gpio>,
   fdf::WireSharedClient<fuchsia_hardware_pinimpl::PinImpl> pinimpl_;
   fidl::ServerBindingGroup<fuchsia_hardware_gpio::Gpio> gpio_bindings_;
   fidl::ServerBindingGroup<fuchsia_hardware_pin::Pin> pin_bindings_;
+  fidl::ServerBindingGroup<fuchsia_hardware_pin::Debug> debug_bindings_;
   compat::SyncInitializedDeviceServer compat_server_;
   fidl::ClientEnd<fuchsia_driver_framework::NodeController> controller_;
-  driver_devfs::Connector<fuchsia_hardware_gpio::Gpio> devfs_connector_;
+  driver_devfs::Connector<fuchsia_hardware_pin::Debug> devfs_connector_;
 };
 
 class GpioInitDevice {

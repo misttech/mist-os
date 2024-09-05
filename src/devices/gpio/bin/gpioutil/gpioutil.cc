@@ -169,48 +169,30 @@ zx::result<> ListGpios() {
 
   for (auto const& dir_entry : std::filesystem::directory_iterator(dev_class_dir)) {
     const char* gpio_path = dir_entry.path().c_str();
-    zx::result client_end = component::Connect<fuchsia_hardware_gpio::Gpio>(gpio_path);
+    zx::result client_end = component::Connect<fuchsia_hardware_pin::Debug>(gpio_path);
     if (client_end.is_error()) {
       fprintf(stderr, "Could not connect to client from %s: %s\n", gpio_path,
               client_end.status_string());
       return client_end.take_error();
     }
 
-    fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio> client(std::move(client_end.value()));
-    const fidl::WireResult result_pin = client->GetPin();
-    if (!result_pin.ok()) {
-      fprintf(stderr, "Could not get pin from %s: %s\n", gpio_path,
-              result_pin.FormatDescription().c_str());
-      return zx::error(result_pin.status());
-    }
-    const fit::result response_pin = result_pin.value();
-    if (response_pin.is_error()) {
-      fprintf(stderr, "Could not get pin from %s: %s\n", gpio_path,
-              zx_status_get_string(response_pin.error_value()));
-      return zx::error(result_pin.status());
-    }
-    const fidl::WireResult result_name = client->GetName();
-    if (!result_name.ok()) {
-      fprintf(stderr, "Could not get name from %s: %s\n", gpio_path,
-              result_name.FormatDescription().c_str());
-      return zx::error(result_name.status());
-    }
-    const fit::result response_name = result_name.value();
-    if (response_name.is_error()) {
-      fprintf(stderr, "Could not get name from %s: %s\n", gpio_path,
-              zx_status_get_string(response_name.error_value()));
-      return zx::error(result_name.status());
+    fidl::WireSyncClient<fuchsia_hardware_pin::Debug> client(std::move(client_end.value()));
+    const fidl::WireResult result = client->GetProperties();
+    if (!result.ok()) {
+      fprintf(stderr, "Could not get properties from %s: %s\n", gpio_path,
+              result.FormatDescription().c_str());
+      return zx::error(result.status());
     }
 
-    uint32_t pin = response_pin.value()->pin;
-    std::string_view name = response_name.value()->name.get();
+    uint32_t pin = result->pin();
+    std::string_view name = result->name().get();
     printf("[gpio-%d] %.*s\n", pin, static_cast<int>(name.length()), name.data());
   }
 
   return zx::ok();
 }
 
-zx::result<fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio>> FindGpioClientByName(
+zx::result<fidl::WireSyncClient<fuchsia_hardware_pin::Debug>> FindDebugClientByName(
     std::string_view name) {
   const char* dev_class_dir = kGpioDevClassNsDir;
   if (!std::filesystem::is_directory(dev_class_dir)) {
@@ -220,28 +202,22 @@ zx::result<fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio>> FindGpioClientByNa
   for (auto const& dir_entry : std::filesystem::directory_iterator(dev_class_dir)) {
     const char* gpio_path = dir_entry.path().c_str();
 
-    zx::result client_end = component::Connect<fuchsia_hardware_gpio::Gpio>(gpio_path);
+    zx::result client_end = component::Connect<fuchsia_hardware_pin::Debug>(gpio_path);
     if (client_end.is_error()) {
       fprintf(stderr, "Could not connect to client from %s: %s\n", gpio_path,
               client_end.status_string());
       return client_end.take_error();
     }
 
-    fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio> client(std::move(client_end.value()));
+    fidl::WireSyncClient<fuchsia_hardware_pin::Debug> client(std::move(client_end.value()));
 
-    const fidl::WireResult result_name = client->GetName();
+    const fidl::WireResult result_name = client->GetProperties();
     if (!result_name.ok()) {
-      fprintf(stderr, "Could not get name from %s: %s\n", gpio_path,
+      fprintf(stderr, "Could not get properties from %s: %s\n", gpio_path,
               result_name.FormatDescription().c_str());
       return zx::error(result_name.status());
     }
-    const fit::result response_name = result_name.value();
-    if (response_name.is_error()) {
-      fprintf(stderr, "Could not get name from %s: %s\n", gpio_path,
-              zx_status_get_string(response_name.error_value()));
-      return zx::error(result_name.status());
-    }
-    std::string_view gpio_name = response_name.value()->name.get();
+    std::string_view gpio_name = result_name->name().get();
     if (name == gpio_name) {
       return zx::ok(std::move(client));
     }
@@ -250,37 +226,35 @@ zx::result<fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio>> FindGpioClientByNa
   return zx::error(ZX_ERR_NOT_FOUND);
 }
 
-int ClientCall(fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio> client, GpioFunc func,
+int ClientCall(fidl::WireSyncClient<fuchsia_hardware_pin::Debug> client, GpioFunc func,
                uint8_t write_value, fuchsia_hardware_gpio::wire::GpioFlags in_flag,
                uint8_t out_value, uint64_t ds_ua, uint32_t interrupt_flags, uint64_t alt_function) {
-  switch (func) {
-    case GetName: {
-      auto result_pin = client->GetPin();
-      if (!result_pin.ok()) {
-        fprintf(stderr, "Call to get Pin failed: %s\n", result_pin.FormatDescription().c_str());
-        return -2;
-      }
-      if (result_pin->is_error()) {
-        fprintf(stderr, "Failed to get Pin: %s\n", zx_status_get_string(result_pin->error_value()));
-        return -2;
-      }
-      auto result_name = client->GetName();
-      if (!result_name.ok()) {
-        fprintf(stderr, "Call to get Name failed: %s\n", result_name.FormatDescription().c_str());
-        return -2;
-      }
-      if (result_name->is_error()) {
-        fprintf(stderr, "Failed to get Name: %s\n",
-                zx_status_get_string(result_name->error_value()));
-        return -2;
-      }
-      auto pin = result_pin->value()->pin;
-      auto name = result_name->value()->name.get();
-      printf("GPIO Name: [gpio-%d] %.*s\n", pin, static_cast<int>(name.length()), name.data());
-      break;
+  if (func == GetName) {
+    auto result = client->GetProperties();
+    if (!result.ok()) {
+      fprintf(stderr, "Call to get properties failed: %s\n", result.FormatDescription().c_str());
+      return -2;
     }
+    auto pin = result->pin();
+    auto name = result->name().get();
+    printf("GPIO Name: [gpio-%d] %.*s\n", pin, static_cast<int>(name.length()), name.data());
+    return 0;
+  }
+
+  auto [gpio_client_end, gpio_server_end] = fidl::Endpoints<fuchsia_hardware_gpio::Gpio>::Create();
+  fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio> gpio_client(std::move(gpio_client_end));
+
+  if (auto result = client->ConnectGpio(std::move(gpio_server_end)); !result.ok()) {
+    fprintf(stderr, "Call to connect GPIO failed: %s\n", result.FormatDescription().c_str());
+    return -2;
+  } else if (result->is_error()) {
+    fprintf(stderr, "Failed to connect GPIO: %s\n", zx_status_get_string(result->error_value()));
+    return -2;
+  }
+
+  switch (func) {
     case Read: {
-      auto result = client->Read();
+      auto result = gpio_client->Read();
       if (!result.ok()) {
         fprintf(stderr, "Call to read GPIO failed: %s\n", result.FormatDescription().c_str());
         return -2;
@@ -293,7 +267,7 @@ int ClientCall(fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio> client, GpioFun
       break;
     }
     case Write: {
-      auto result = client->Write(write_value);
+      auto result = gpio_client->Write(write_value);
       if (!result.ok()) {
         fprintf(stderr, "Call to write GPIO failed: %s\n", result.FormatDescription().c_str());
         return -2;
@@ -305,7 +279,7 @@ int ClientCall(fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio> client, GpioFun
       break;
     }
     case ConfigIn: {
-      auto result = client->ConfigIn(in_flag);
+      auto result = gpio_client->ConfigIn(in_flag);
       if (!result.ok()) {
         fprintf(stderr, "Call to configure GPIO as input failed: %s\n",
                 result.FormatDescription().c_str());
@@ -319,7 +293,7 @@ int ClientCall(fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio> client, GpioFun
       break;
     }
     case ConfigOut: {
-      auto result = client->ConfigOut(out_value);
+      auto result = gpio_client->ConfigOut(out_value);
       if (!result.ok()) {
         fprintf(stderr, "Call to configure GPIO as output failed: %s\n",
                 result.FormatDescription().c_str());
@@ -333,7 +307,7 @@ int ClientCall(fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio> client, GpioFun
       break;
     }
     case SetDriveStrength: {
-      auto result = client->SetDriveStrength(ds_ua);
+      auto result = gpio_client->SetDriveStrength(ds_ua);
       if (!result.ok()) {
         fprintf(stderr, "Call to set GPIO drive strength failed: %s\n",
                 result.FormatDescription().c_str());
@@ -348,7 +322,7 @@ int ClientCall(fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio> client, GpioFun
       break;
     }
     case GetDriveStrength: {
-      auto result = client->GetDriveStrength();
+      auto result = gpio_client->GetDriveStrength();
       if (!result.ok()) {
         fprintf(stderr, "Call to get GPIO drive strength failed: %s\n",
                 result.FormatDescription().c_str());
@@ -363,7 +337,7 @@ int ClientCall(fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio> client, GpioFun
       break;
     }
     case Interrupt: {
-      auto result = client->GetInterrupt(interrupt_flags);
+      auto result = gpio_client->GetInterrupt(interrupt_flags);
       if (!result.ok()) {
         fprintf(stderr, "Call to get GPIO interrupt failed: %s\n",
                 result.FormatDescription().c_str());
@@ -383,7 +357,7 @@ int ClientCall(fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio> client, GpioFun
 
       printf("Received interrupt at time %ld\n", timestamp.get());
 
-      auto release = client->ReleaseInterrupt();
+      auto release = gpio_client->ReleaseInterrupt();
       if (!release.ok()) {
         fprintf(stderr, "Call to release GPIO interrupt failed: %s\n",
                 release.FormatDescription().c_str());
@@ -397,7 +371,7 @@ int ClientCall(fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio> client, GpioFun
       break;
     }
     case AltFunction: {
-      auto result = client->SetAltFunction(alt_function);
+      auto result = gpio_client->SetAltFunction(alt_function);
       if (!result.ok()) {
         fprintf(stderr, "Call to set function failed: %s\n", result.FormatDescription().c_str());
         return -2;

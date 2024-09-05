@@ -106,7 +106,7 @@ int main(int argc, char** argv) {
   int ret = 0;
   if (access(argv[kArgDevice], F_OK) == 0) {
     // Access by device path
-    zx::result client_end = component::Connect<fuchsia_hardware_gpio::Gpio>(argv[kArgDevice]);
+    zx::result client_end = component::Connect<fuchsia_hardware_pin::Debug>(argv[kArgDevice]);
     if (client_end.is_error()) {
       fprintf(stderr, "Could not connect to client from %s: %s\n", argv[kArgDevice],
               client_end.status_string());
@@ -114,12 +114,12 @@ int main(int argc, char** argv) {
       return -1;
     }
 
-    fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio> client(std::move(client_end.value()));
+    fidl::WireSyncClient<fuchsia_hardware_pin::Debug> client(std::move(client_end.value()));
     ret = ClientCall(std::move(client), func, write_value, in_flag, out_value, ds_ua,
                      interrupt_flags, alt_function);
   } else {
     // Access by GPIO name
-    auto client = FindGpioClientByName(argv[kArgDevice]);
+    auto client = FindDebugClientByName(argv[kArgDevice]);
     if (client.is_error()) {
       fprintf(stderr, "Unable to connect GPIO by name '%s', st = %d\n\n", argv[kArgDevice],
               client.status_value());

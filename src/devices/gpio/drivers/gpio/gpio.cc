@@ -347,6 +347,35 @@ void GpioDevice::handle_unknown_method(
   FDF_LOG(ERROR, "Unknown Pin method ordinal: 0x%016lx", metadata.method_ordinal);
 }
 
+void GpioDevice::GetProperties(GetPropertiesCompleter::Sync& completer) {
+  fdf::Arena arena('GPIO');
+  auto properties = fuchsia_hardware_pin::wire::DebugGetPropertiesResponse::Builder(arena)
+                        .name(fidl::StringView::FromExternal(name_))
+                        .pin(pin_)
+                        .Build();
+  completer.Reply(properties);
+}
+
+void GpioDevice::ConnectPin(fuchsia_hardware_pin::wire::DebugConnectPinRequest* request,
+                            ConnectPinCompleter::Sync& completer) {
+  pin_bindings_.AddBinding(fidl_dispatcher_, std::move(request->server), this,
+                           fidl::kIgnoreBindingClosure);
+  completer.ReplySuccess();
+}
+
+void GpioDevice::ConnectGpio(fuchsia_hardware_pin::wire::DebugConnectGpioRequest* request,
+                             ConnectGpioCompleter::Sync& completer) {
+  gpio_bindings_.AddBinding(fidl_dispatcher_, std::move(request->server), this,
+                            fidl::kIgnoreBindingClosure);
+  completer.ReplySuccess();
+}
+
+void GpioDevice::handle_unknown_method(
+    fidl::UnknownMethodMetadata<fuchsia_hardware_pin::Debug> metadata,
+    fidl::UnknownMethodCompleter::Sync& completer) {
+  FDF_LOG(ERROR, "Unknown Debug method ordinal: 0x%016lx", metadata.method_ordinal);
+}
+
 zx::result<> GpioDevice::AddServices(const std::shared_ptr<fdf::Namespace>& incoming,
                                      const std::shared_ptr<fdf::OutgoingDirectory>& outgoing,
                                      const std::optional<std::string>& node_name) {
@@ -420,8 +449,9 @@ zx::result<> GpioDevice::AddDevice(fidl::UnownedClientEnd<fuchsia_driver_framewo
   return zx::ok();
 }
 
-void GpioDevice::DevfsConnect(fidl::ServerEnd<fuchsia_hardware_gpio::Gpio> server) {
-  gpio_bindings_.AddBinding(fidl_dispatcher_, std::move(server), this, fidl::kIgnoreBindingClosure);
+void GpioDevice::DevfsConnect(fidl::ServerEnd<fuchsia_hardware_pin::Debug> server) {
+  debug_bindings_.AddBinding(fidl_dispatcher_, std::move(server), this,
+                             fidl::kIgnoreBindingClosure);
 }
 
 void GpioRootDevice::Start(fdf::StartCompleter completer) {
