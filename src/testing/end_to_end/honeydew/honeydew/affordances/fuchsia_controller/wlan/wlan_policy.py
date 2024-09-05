@@ -178,6 +178,8 @@ class WlanPolicy(AsyncAdapter, wlan_policy.WlanPolicy):
     def create_client_controller(self) -> None:
         """Initializes the client controller.
 
+        See fuchsia.wlan.policy/ClientProvider.GetController().
+
         Raises:
             HoneydewWlanError: Error from WLAN stack.
         """
@@ -379,10 +381,13 @@ class WlanPolicy(AsyncAdapter, wlan_policy.WlanPolicy):
 
         Raises:
             HoneydewWlanError: Error from WLAN stack.
+            RuntimeError: A client controller has not been created yet
         """
         if self._client_controller is None:
-            self.create_client_controller()
-        assert self._client_controller is not None
+            raise RuntimeError(
+                "Client controller has not been initialized; call "
+                "create_client_controller() before start_client_connections()"
+            )
 
         try:
             resp = (
@@ -399,13 +404,35 @@ class WlanPolicy(AsyncAdapter, wlan_policy.WlanPolicy):
                 f"ClientController.StartClientConnections() error {status}"
             ) from status
 
-    def stop_client_connections(self) -> None:
+    @asyncmethod
+    # pylint: disable-next=invalid-overridden-method
+    async def stop_client_connections(self) -> None:
         """Disables device for initiating connections to networks.
+
+        See fuchsia.wlan.policy/ClientController.StopClientConnections().
 
         Raises:
             HoneydewWlanError: Error from WLAN stack.
+            RuntimeError: A client controller has not been created yet
         """
-        raise NotImplementedError()
+        if self._client_controller is None:
+            raise RuntimeError(
+                "Client controller has not been initialized; call "
+                "create_client_controller() before stop_client_connections()"
+            )
+
+        try:
+            resp = await self._client_controller.proxy.stop_client_connections()
+            status = RequestStatus.from_fidl(resp.status)
+            if status != RequestStatus.ACKNOWLEDGED:
+                raise errors.HoneydewWlanError(
+                    "ClientController.StopClientConnections() returned "
+                    f"request status {status}"
+                )
+        except ZxStatus as status:
+            raise errors.HoneydewWlanError(
+                f"ClientController.StopClientConnections() error {status}"
+            ) from status
 
 
 class ClientStateUpdatesImpl(f_wlan_policy.ClientStateUpdates.Server):

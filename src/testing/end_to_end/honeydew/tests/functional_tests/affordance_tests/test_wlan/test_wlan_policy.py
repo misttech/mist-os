@@ -223,11 +223,6 @@ class WlanPolicyTests(fuchsia_base_test.FuchsiaBaseTest):
         self.device.wlan_policy.start_client_connections()
         _wait_for_client_state(self.device, WlanClientState.CONNECTIONS_ENABLED)
 
-        if isinstance(self.device.wlan_policy, wlan_policy_fc.WlanPolicy):
-            # TODO(http://b/324139202): Remove this if statement once WLAN
-            # Policy FC affordance is implemented
-            return
-
         self.device.wlan_policy.stop_client_connections()
         _wait_for_client_state(
             self.device, WlanClientState.CONNECTIONS_DISABLED

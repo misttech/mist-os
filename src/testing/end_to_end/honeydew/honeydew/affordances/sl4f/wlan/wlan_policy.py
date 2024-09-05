@@ -84,7 +84,7 @@ class WlanPolicy(wlan_policy.WlanPolicy):
             A RequestStatus response to the connect request
 
         Raises:
-            errors.HoneydewWlanError: Sl4f run command failed.
+            HoneydewWlanError: Error from WLAN stack.
             TypeError: Return value not a string.
         """
         method_params = {
@@ -107,8 +107,10 @@ class WlanPolicy(wlan_policy.WlanPolicy):
     def create_client_controller(self) -> None:
         """Initializes the client controller.
 
+        See fuchsia.wlan.policy/ClientProvider.GetController().
+
         Raises:
-            errors.HoneydewWlanError: Sl4f run command failed.
+            HoneydewWlanError: Error from WLAN stack.
         """
         try:
             self._sl4f.run(method=_Sl4fMethods.CREATE_CLIENT_CONTROLLER)
@@ -124,7 +126,7 @@ class WlanPolicy(wlan_policy.WlanPolicy):
             A list of NetworkConfigs.
 
         Raises:
-            errors.HoneydewWlanError: Sl4f run command failed.
+            HoneydewWlanError: Error from WLAN stack.
             TypeError: Return values not correct types.
         """
         try:
@@ -180,7 +182,7 @@ class WlanPolicy(wlan_policy.WlanPolicy):
             ClientStateSummary struct given for updates.
 
         Raises:
-            errors.HoneydewWlanError: Sl4f run command failed.
+            HoneydewWlanError: Error from WLAN stack.
             TypeError: Return values not correct types.
         """
         try:
@@ -234,7 +236,7 @@ class WlanPolicy(wlan_policy.WlanPolicy):
         """Deletes all saved networks on the device.
 
         Raises:
-            errors.HoneydewWlanError: Sl4f run command failed.
+            HoneydewWlanError: Error from WLAN stack.
         """
         try:
             self._sl4f.run(method=_Sl4fMethods.REMOVE_ALL_NETWORKS)
@@ -258,7 +260,7 @@ class WlanPolicy(wlan_policy.WlanPolicy):
                 is equivalent to an empty string.
 
         Raises:
-            errors.HoneydewWlanError: Sl4f run command failed.
+            HoneydewWlanError: Error from WLAN stack.
         """
         if not target_pwd:
             target_pwd = ""
@@ -290,7 +292,7 @@ class WlanPolicy(wlan_policy.WlanPolicy):
                 is equivalent to an empty string.
 
         Raises:
-            errors.HoneydewWlanError: Sl4f run command failed.
+            HoneydewWlanError: Error from WLAN stack.
         """
         if not target_pwd:
             target_pwd = ""
@@ -314,7 +316,7 @@ class WlanPolicy(wlan_policy.WlanPolicy):
             A list of network SSIDs that can be connected to.
 
         Raises:
-            errors.HoneydewWlanError: Sl4f run command failed.
+            HoneydewWlanError: Error from WLAN stack.
             TypeError: Return value not a list.
         """
         try:
@@ -337,7 +339,7 @@ class WlanPolicy(wlan_policy.WlanPolicy):
         tests.
 
         Raises:
-            errors.HoneydewWlanError: Sl4f run command failed.
+            HoneydewWlanError: Error from WLAN stack.
         """
         try:
             self._sl4f.run(method=_Sl4fMethods.SET_NEW_UPDATE_LISTENER)
@@ -350,7 +352,8 @@ class WlanPolicy(wlan_policy.WlanPolicy):
         """Enables device to initiate connections to networks.
 
         Raises:
-            errors.HoneydewWlanError: Sl4f run command failed.
+            HoneydewWlanError: Error from WLAN stack.
+            RuntimeError: A client controller has not been created yet
         """
         try:
             self._sl4f.run(method=_Sl4fMethods.START_CLIENT_CONNECTIONS)
@@ -363,7 +366,8 @@ class WlanPolicy(wlan_policy.WlanPolicy):
         """Disables device for initiating connections to networks.
 
         Raises:
-            errors.HoneydewWlanError: Sl4f run command failed.
+            HoneydewWlanError: Error from WLAN stack.
+            RuntimeError: A client controller has not been created yet
         """
         try:
             self._sl4f.run(method=_Sl4fMethods.STOP_CLIENT_CONNECTIONS)

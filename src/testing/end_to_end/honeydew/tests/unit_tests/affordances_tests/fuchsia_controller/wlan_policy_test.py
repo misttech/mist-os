@@ -185,7 +185,7 @@ class WlanPolicyFCTests(unittest.TestCase):
 
     def test_get_update(self) -> None:
         """Test if get_update works."""
-        with self._mock_create_client_controller() as _client_controller:
+        with self._mock_create_client_controller():
             self.wlan_policy_obj.create_client_controller()
 
             self.assertIsNotNone(self.client_state_updates_proxy)
@@ -318,16 +318,20 @@ class WlanPolicyFCTests(unittest.TestCase):
     def test_start_client_connections_passes(self) -> None:
         """Test if start_client_connections passes as expected."""
         with self._mock_create_client_controller() as client_controller:
+            self.wlan_policy_obj.create_client_controller()
             client_controller.start_client_connections.return_value = _async_response(
                 f_wlan_policy.ClientControllerStartClientConnectionsResponse(
                     status=f_wlan_common.RequestStatus.ACKNOWLEDGED
                 )
             )
             self.wlan_policy_obj.start_client_connections()
+            client_controller.start_client_connections.assert_called_once_with()
 
     def test_start_client_connections_fails(self) -> None:
         """Test if start_client_connections fails in expected ways."""
         with self._mock_create_client_controller() as client_controller:
+            self.wlan_policy_obj.create_client_controller()
+
             for msg, resp in [
                 (
                     "not supported",
@@ -367,15 +371,92 @@ class WlanPolicyFCTests(unittest.TestCase):
                 ),
             ]:
                 with self.subTest(msg=msg, resp=resp):
+                    client_controller.start_client_connections.reset_mock()
                     client_controller.start_client_connections.return_value = (
                         resp
                     )
                     with self.assertRaises(HoneydewWlanError):
                         self.wlan_policy_obj.start_client_connections()
+                    client_controller.start_client_connections.assert_called_once_with()
+
+    def test_start_client_connections_fails_without_client_controller(
+        self,
+    ) -> None:
+        """Test if start_client_connections fails without a client controller."""
+        with self.assertRaises(RuntimeError):
+            self.wlan_policy_obj.start_client_connections()
 
     def test_stop_client_connections(self) -> None:
-        """Test if stop_client_connections works."""
-        with self.assertRaises(NotImplementedError):
+        """Test if stop_client_connections passes as expected."""
+        with self._mock_create_client_controller() as client_controller:
+            self.wlan_policy_obj.create_client_controller()
+            client_controller.stop_client_connections.return_value = (
+                _async_response(
+                    f_wlan_policy.ClientControllerStopClientConnectionsResponse(
+                        status=f_wlan_common.RequestStatus.ACKNOWLEDGED
+                    )
+                )
+            )
+            self.wlan_policy_obj.stop_client_connections()
+            client_controller.stop_client_connections.assert_called_once_with()
+
+    def test_stop_client_connections_fails(self) -> None:
+        """Test if stop_client_connections fails in expected ways."""
+        with self._mock_create_client_controller() as client_controller:
+            self.wlan_policy_obj.create_client_controller()
+
+            for msg, resp in [
+                (
+                    "not supported",
+                    _async_response(
+                        f_wlan_policy.ClientControllerStopClientConnectionsResponse(
+                            status=f_wlan_common.RequestStatus.REJECTED_NOT_SUPPORTED
+                        )
+                    ),
+                ),
+                (
+                    "incompatible mode",
+                    _async_response(
+                        f_wlan_policy.ClientControllerStopClientConnectionsResponse(
+                            status=f_wlan_common.RequestStatus.REJECTED_INCOMPATIBLE_MODE
+                        )
+                    ),
+                ),
+                (
+                    "already in use",
+                    _async_response(
+                        f_wlan_policy.ClientControllerStopClientConnectionsResponse(
+                            status=f_wlan_common.RequestStatus.REJECTED_ALREADY_IN_USE
+                        )
+                    ),
+                ),
+                (
+                    "duplicate request",
+                    _async_response(
+                        f_wlan_policy.ClientControllerStopClientConnectionsResponse(
+                            status=f_wlan_common.RequestStatus.REJECTED_DUPLICATE_REQUEST
+                        )
+                    ),
+                ),
+                (
+                    "internal error",
+                    _async_error(ZxStatus(ZxStatus.ZX_ERR_INTERNAL)),
+                ),
+            ]:
+                with self.subTest(msg=msg, resp=resp):
+                    client_controller.stop_client_connections.reset_mock()
+                    client_controller.stop_client_connections.return_value = (
+                        resp
+                    )
+                    with self.assertRaises(HoneydewWlanError):
+                        self.wlan_policy_obj.stop_client_connections()
+                    client_controller.stop_client_connections.assert_called_once_with()
+
+    def test_stop_client_connections_fails_without_client_controller(
+        self,
+    ) -> None:
+        """Test if stop_client_connections fails without a client controller."""
+        with self.assertRaises(RuntimeError):
             self.wlan_policy_obj.stop_client_connections()
 
 
