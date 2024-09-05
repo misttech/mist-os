@@ -33,6 +33,7 @@ common_board_configuration = {
     ":paver",
     ":vulkan_arm_mali",
     ":rtc_driver",
+    ":bazel_drivers",
   ]
 
   devicetree = "//src/devices/board/drivers/vim3-devicetree:vim3"
@@ -343,6 +344,12 @@ board_input_bundle("devicetree_board_driver") {
       driver_components = [ "meta/vim3-devicetree.cm" ]
     },
   ]
+}
+
+board_input_bundle("bazel_drivers") {
+  # This list is empty for now, after all the variations of vim3 board updated
+  # to use this BIB, we will move the bazel drivers to this list
+  drivers = []
 }
 
 board_input_bundle("vulkan_arm_mali") {
