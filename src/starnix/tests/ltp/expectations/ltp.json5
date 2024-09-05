@@ -243,9 +243,6 @@
 
                 // TODO(https://fxbug.dev/) fix upstream test and enable
                 "mmap04",
-
-                // TODO(https://fxbug.dev/364235635) Re-enable once flake is resolved
-                "inotify11",
             ],
         },
     ],
