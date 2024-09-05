@@ -93,6 +93,19 @@ class SecurityType(enum.StrEnum):
             case _:
                 raise TypeError(f"Unknown SecurityType: {fidl}")
 
+    def to_fidl(self) -> f_wlan_policy.SecurityType:
+        match self:
+            case SecurityType.NONE:
+                return f_wlan_policy.SecurityType.NONE
+            case SecurityType.WEP:
+                return f_wlan_policy.SecurityType.WEP
+            case SecurityType.WPA:
+                return f_wlan_policy.SecurityType.WPA
+            case SecurityType.WPA2:
+                return f_wlan_policy.SecurityType.WPA2
+            case SecurityType.WPA3:
+                return f_wlan_policy.SecurityType.WPA3
+
 
 class WlanClientState(enum.StrEnum):
     """Wlan operating state for client connections.

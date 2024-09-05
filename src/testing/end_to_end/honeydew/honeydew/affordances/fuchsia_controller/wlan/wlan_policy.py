@@ -43,6 +43,31 @@ _CLIENT_LISTENER_PROXY = FidlEndpoint(
     "core/wlancfg", "fuchsia.wlan.policy.ClientListener"
 )
 
+# Length of a pre-shared key (PSK) used as a password.
+_PSK_LENGTH = 64
+
+
+def _parse_password(password: str | None) -> f_wlan_policy.Credential:
+    """Parse a password into a Credential.
+
+    Args:
+        password: String password, pre-shared key in hex form with length 64, or
+            None/empty to represent open.
+
+    Return:
+        A fuchsia.wlan.policy/Credential union object.
+    """
+    credential = f_wlan_policy.Credential()
+
+    if not password:
+        credential.none = f_wlan_policy.Empty()
+    elif len(password) == _PSK_LENGTH:
+        credential.psk = list(bytes.fromhex(password))
+    else:
+        credential.password = list(password.encode("utf-8"))
+
+    return credential
+
 
 @dataclass
 class ClientControllerState:
@@ -291,7 +316,9 @@ class WlanPolicy(AsyncAdapter, wlan_policy.WlanPolicy):
         """
         raise NotImplementedError()
 
-    def save_network(
+    @asyncmethod
+    # pylint: disable-next=invalid-overridden-method
+    async def save_network(
         self,
         target_ssid: str,
         security_type: SecurityType,
@@ -307,8 +334,33 @@ class WlanPolicy(AsyncAdapter, wlan_policy.WlanPolicy):
 
         Raises:
             HoneydewWlanError: Error from WLAN stack.
+            RuntimeError: A client controller has not been created yet
         """
-        raise NotImplementedError()
+        if self._client_controller is None:
+            raise RuntimeError(
+                "Client controller has not been initialized; call "
+                "create_client_controller() before save_network()"
+            )
+
+        try:
+            res = await self._client_controller.proxy.save_network(
+                config=f_wlan_policy.NetworkConfig(
+                    id=f_wlan_policy.NetworkIdentifier(
+                        ssid=list(target_ssid.encode("utf-8")),
+                        type=security_type.to_fidl(),
+                    ),
+                    credential=_parse_password(target_pwd),
+                ),
+            )
+            if res.err:
+                raise errors.HoneydewWlanError(
+                    "ClientController.SaveNetworks() NetworkConfigChangeError "
+                    f"{res.err.name}"
+                )
+        except ZxStatus as status:
+            raise errors.HoneydewWlanError(
+                f"ClientController.SaveNetwork() error {status}"
+            ) from status
 
     def scan_for_networks(self) -> list[str]:
         """Scans for networks.
