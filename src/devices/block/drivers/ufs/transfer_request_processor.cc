@@ -66,37 +66,11 @@ std::tuple<uint16_t, uint32_t> TransferRequestProcessor::PreparePrdt<ScsiCommand
   return {prdt_offset, prdt_entry_count};
 }
 
-zx::result<std::unique_ptr<TransferRequestProcessor>> TransferRequestProcessor::Create(
-    Ufs &ufs, zx::unowned_bti bti, const fdf::MmioBuffer &mmio, uint8_t entry_count) {
-  if (entry_count > kMaxTransferRequestListSize) {
-    FDF_LOG(ERROR, "Request list size exceeded the maximum size of %d.",
-            kMaxTransferRequestListSize);
-    return zx::error(ZX_ERR_INVALID_ARGS);
-  }
-
-  zx::result<RequestList> request_list =
-      RequestList::Create(bti->borrow(), sizeof(TransferRequestDescriptor), entry_count);
-  if (request_list.is_error()) {
-    return request_list.take_error();
-  }
-
-  fbl::AllocChecker ac;
-  auto request_processor = fbl::make_unique_checked<TransferRequestProcessor>(
-      &ac, std::move(request_list.value()), ufs, std::move(bti), mmio, entry_count);
-  if (!ac.check()) {
-    FDF_LOG(ERROR, "Failed to allocate transfer request processor.");
-    return zx::error(ZX_ERR_NO_MEMORY);
-  }
-  return zx::ok(std::move(request_processor));
-}
-
 zx::result<> TransferRequestProcessor::Init() {
   zx_paddr_t paddr =
       request_list_.GetRequestDescriptorPhysicalAddress<TransferRequestDescriptor>(0);
   UtrListBaseAddressReg::Get().FromValue(paddr & 0xffffffff).WriteTo(&register_);
   UtrListBaseAddressUpperReg::Get().FromValue(paddr >> 32).WriteTo(&register_);
-
-  slot_mask_ = static_cast<uint32_t>(1UL << request_list_.GetSlotCount()) - 1;
 
   if (!HostControllerStatusReg::Get().ReadFrom(&register_).utp_transfer_request_list_ready()) {
     FDF_LOG(ERROR, "UTP transfer request list is not ready\n");
@@ -126,21 +100,6 @@ zx::result<uint8_t> TransferRequestProcessor::ReserveAdminSlot() {
     return zx::ok(kAdminCommandSlotNumber);
   }
   FDF_LOG(DEBUG, "Failed to reserve a admin request slot");
-  return zx::error(ZX_ERR_NO_RESOURCES);
-}
-
-zx::result<uint8_t> TransferRequestProcessor::ReserveSlot() {
-  for (uint8_t slot_num = 0; slot_num < request_list_.GetSlotCount(); ++slot_num) {
-    if (slot_num == kAdminCommandSlotNumber) {
-      continue;
-    }
-    RequestSlot &slot = request_list_.GetSlot(slot_num);
-    if (slot.state == SlotState::kFree) {
-      slot.state = SlotState::kReserved;
-      return zx::ok(slot_num);
-    }
-  }
-  FDF_LOG(DEBUG, "Failed to reserve a request slot");
   return zx::error(ZX_ERR_NO_RESOURCES);
 }
 
@@ -318,30 +277,6 @@ template zx::result<void *> TransferRequestProcessor::SendRequestUsingSlot<NopOu
     NopOutUpiu &request, uint8_t lun, uint8_t slot, std::optional<zx::unowned_vmo> data_vmo,
     IoCommand *io_cmd, bool is_sync);
 
-zx::result<> TransferRequestProcessor::RingRequestDoorbell(uint8_t slot_num) {
-  TRACE_DURATION("ufs", "RingRequestDoorbell", "slot", slot_num);
-
-  ZX_DEBUG_ASSERT_MSG(UtrListRunStopReg::Get().ReadFrom(&register_).value(),
-                      "Transfer request list is not running");
-
-  if (zx::result<> result = controller_.Notify(NotifyEvent::kSetupTransferRequestList, slot_num);
-      result.is_error()) {
-    return result.take_error();
-  }
-
-  RequestSlot &request_slot = request_list_.GetSlot(slot_num);
-  sync_completion_t *complete = &request_slot.complete;
-  sync_completion_reset(complete);
-  ZX_DEBUG_ASSERT(request_slot.state == SlotState::kReserved);
-  request_slot.state = SlotState::kScheduled;
-
-  // TODO(https://fxbug.dev/42075643): Set the UtrInterruptAggregationControlReg.
-
-  UtrListDoorBellReg::Get().FromValue(1 << slot_num).WriteTo(&register_);
-
-  return zx::ok();
-}
-
 zx::result<> TransferRequestProcessor::ScsiCompletion(uint8_t slot_num, RequestSlot &request_slot,
                                                       TransferRequestDescriptor *descriptor) {
   TRACE_DURATION("ufs", "ScsiCompletion", "slot", slot_num);
@@ -351,23 +286,6 @@ zx::result<> TransferRequestProcessor::ScsiCompletion(uint8_t slot_num, RequestS
 
   // TODO(https://fxbug.dev/42075643): Need to check if response.header.trans_code() is a kCommnad.
   return GetResponseStatus(descriptor, response, UpiuTransactionCodes::kCommand);
-}
-
-zx::result<> TransferRequestProcessor::ClearSlot(RequestSlot &request_slot) {
-  if (request_slot.pmt.is_valid()) {
-    if (zx_status_t status = request_slot.pmt.unpin(); status != ZX_OK) {
-      FDF_LOG(ERROR, "Failed to unpin IO buffer: %s", zx_status_get_string(status));
-      return zx::error(status);
-    }
-  }
-
-  request_slot.state = SlotState::kFree;
-  request_slot.io_cmd = nullptr;
-  request_slot.is_scsi_command = false;
-  request_slot.is_sync = false;
-  request_slot.result = ZX_OK;
-
-  return zx::ok();
 }
 
 uint32_t TransferRequestProcessor::RequestCompletion() {
@@ -388,7 +306,8 @@ uint32_t TransferRequestProcessor::RequestCompletion() {
           ResponseUpiu response(request_list_.GetDescriptorBuffer<ResponseUpiu>(
               slot_num, request_slot.response_upiu_offset));
           if (response.GetHeader().response != UpiuHeaderResponse::kTargetSuccess) {
-            FDF_LOG(ERROR, "Request command failure: response=%x", response.GetHeader().response);
+            FDF_LOG(ERROR, "Transfer request command failure: response=%x",
+                    response.GetHeader().response);
             result = zx::error(ZX_ERR_BAD_STATE);
           }
         }
@@ -440,6 +359,11 @@ zx::result<> TransferRequestProcessor::FillDescriptorAndSendRequest(
   descriptor->set_prdt_offset(prdt_offset / kDwordSize);
   descriptor->set_prdt_length(prdt_entry_count);
 
+  TRACE_DURATION("ufs", "RingRequestDoorbell", "slot", slot);
+  if (zx::result<> result = controller_.Notify(NotifyEvent::kSetupTransferRequestList, slot);
+      result.is_error()) {
+    return result.take_error();
+  }
   if (zx::result<> result = RingRequestDoorbell(slot); result.is_error()) {
     FDF_LOG(ERROR, "Failed to send cmd %s", result.status_string());
     return result.take_error();

@@ -26,6 +26,7 @@ zx::result<> Ufs::NotifyEventCallback(NotifyEvent event, uint64_t data) {
     case NotifyEvent::kPostLinkStartup:
     case NotifyEvent::kDeviceInitDone:
     case NotifyEvent::kSetupTransferRequestList:
+    case NotifyEvent::kSetupTaskManagementRequestList:
     case NotifyEvent::kPrePowerModeChange:
     case NotifyEvent::kPostPowerModeChange:
       return zx::ok();
@@ -241,12 +242,11 @@ zx::result<> Ufs::Isr() {
     sync_completion_signal(&io_signal_);
   }
   if (interrupt_status.utp_task_management_request_completion_status()) {
-    // TODO(https://fxbug.dev/42075643): Handle UTMR completion
-    FDF_LOG(ERROR, "UFS: UTMR completion not yet implemented");
     InterruptStatusReg::Get()
         .FromValue(0)
         .set_utp_task_management_request_completion_status(true)
         .WriteTo(&mmio);
+    task_management_request_processor_->RequestCompletion();
   }
   if (interrupt_status.uic_command_completion_status()) {
     // TODO(https://fxbug.dev/42075643): Handle UIC completion
@@ -593,19 +593,29 @@ zx::result<> Ufs::InitController() {
     return result.take_error();
   }
 
+  // Create Task Management Request Processor
   uint8_t number_of_task_management_request_slots = safemath::checked_cast<uint8_t>(
       CapabilityReg::Get().ReadFrom(&mmio).number_of_utp_task_management_request_slots() + 1);
   FDF_LOG(DEBUG, "number_of_task_management_request_slots=%d",
           number_of_task_management_request_slots);
-  // TODO(https://fxbug.dev/42075643): Create TaskManagementRequestProcessor
 
+  auto task_management_request_processor =
+      TaskManagementRequestProcessor::Create(*this, bti_.borrow(), mmio.View(0, mmio_buffer_size_),
+                                             number_of_task_management_request_slots);
+  if (task_management_request_processor.is_error()) {
+    FDF_LOG(ERROR, "Failed to create task management request processor %s",
+            task_management_request_processor.status_string());
+    return task_management_request_processor.take_error();
+  }
+  task_management_request_processor_ = std::move(*task_management_request_processor);
+
+  // Create Transfer Request Processor
   uint8_t number_of_transfer_request_slots = safemath::checked_cast<uint8_t>(
       CapabilityReg::Get().ReadFrom(&mmio).number_of_utp_transfer_request_slots() + 1);
   FDF_LOG(DEBUG, "number_of_transfer_request_slots=%d", number_of_transfer_request_slots);
 
   auto transfer_request_processor = TransferRequestProcessor::Create(
-      *this, bti_.borrow(), mmio,
-      safemath::checked_cast<uint8_t>(number_of_transfer_request_slots));
+      *this, bti_.borrow(), mmio.View(0, mmio_buffer_size_), number_of_transfer_request_slots);
   if (transfer_request_processor.is_error()) {
     FDF_LOG(ERROR, "Failed to create transfer request processor %s",
             transfer_request_processor.status_string());
@@ -686,7 +696,11 @@ zx::result<> Ufs::InitDeviceInterface(inspect::Node& controller_node) {
   }
   FDF_LOG(INFO, "UFS device found");
 
-  // TODO(https://fxbug.dev/42075643): Init task management request processor
+  if (zx::result<> result = task_management_request_processor_->Init(); result.is_error()) {
+    FDF_LOG(ERROR, "Failed to initialize task management request processor %s",
+            result.status_string());
+    return result.take_error();
+  }
 
   if (zx::result<> result = transfer_request_processor_->Init(); result.is_error()) {
     FDF_LOG(ERROR, "Failed to initialize transfer request processor %s", result.status_string());

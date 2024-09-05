@@ -69,12 +69,17 @@ zx_status_t UfsTest::DisableController() { return dut_->DisableHostController();
 
 zx_status_t UfsTest::EnableController() { return dut_->EnableHostController(); }
 
-zx::result<> UfsTest::FillDescriptorAndSendRequest(uint8_t slot, DataDirection ddir,
-                                                   uint16_t resp_offset, uint16_t resp_len,
-                                                   uint16_t prdt_offset,
-                                                   uint16_t prdt_entry_count) {
+zx::result<> UfsTest::TransferFillDescriptorAndSendRequest(uint8_t slot, DataDirection ddir,
+                                                           uint16_t resp_offset, uint16_t resp_len,
+                                                           uint16_t prdt_offset,
+                                                           uint16_t prdt_entry_count) {
   return dut_->GetTransferRequestProcessor().FillDescriptorAndSendRequest(
       slot, ddir, resp_offset, resp_len, prdt_offset, prdt_entry_count);
+}
+
+zx::result<> UfsTest::TaskManagementFillDescriptorAndSendRequest(
+    uint8_t slot, TaskManagementRequestUpiu &request) {
+  return dut_->GetTaskManagementRequestProcessor().FillDescriptorAndSendRequest(slot, request);
 }
 
 zx::result<> UfsTest::MapVmo(zx::unowned_vmo &vmo, fzl::VmoMapper &mapper, uint64_t offset,

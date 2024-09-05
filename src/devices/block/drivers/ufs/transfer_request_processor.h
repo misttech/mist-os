@@ -8,6 +8,8 @@
 #include <lib/trace/event.h>
 
 #include "request_processor.h"
+#include "src/devices/block/drivers/ufs/registers.h"
+#include "src/devices/block/drivers/ufs/transfer_request_descriptor.h"
 #include "src/devices/block/drivers/ufs/upiu/scsi_commands.h"
 
 namespace ufs {
@@ -26,21 +28,26 @@ constexpr uint8_t kAdminCommandSlotNumber = kMaxTransferRequestListSize - kAdmin
 class TransferRequestProcessor : public RequestProcessor {
  public:
   static zx::result<std::unique_ptr<TransferRequestProcessor>> Create(Ufs &ufs, zx::unowned_bti bti,
-                                                                      const fdf::MmioBuffer &mmio,
-                                                                      uint8_t entry_count);
+                                                                      const fdf::MmioView mmio,
+                                                                      uint8_t entry_count) {
+    if (entry_count > kMaxTransferRequestListSize) {
+      FDF_LOG(ERROR, "Request list size exceeded the maximum size of %d.",
+              kMaxTransferRequestListSize);
+      return zx::error(ZX_ERR_INVALID_ARGS);
+    }
+
+    return RequestProcessor::Create<TransferRequestProcessor, TransferRequestDescriptor>(
+        ufs, std::move(bti), mmio, entry_count);
+  }
   explicit TransferRequestProcessor(RequestList request_list, Ufs &ufs, zx::unowned_bti bti,
-                                    const fdf::MmioBuffer &mmio, uint32_t slot_count)
+                                    const fdf::MmioView mmio, uint32_t slot_count)
       : RequestProcessor(std::move(request_list), ufs, std::move(bti), mmio, slot_count) {}
   ~TransferRequestProcessor() override = default;
 
   zx::result<> Init() override;
-  // Allocate a slot to submit an I/O command. Use slots 0 ~ 30 to avoid conflicts with Admin
-  // commands.
-  zx::result<uint8_t> ReserveSlot() override;
   // Allocate a slot to submit an Admin command. Use slot 31 to avoid conflicts with I/O commands.
   zx::result<uint8_t> ReserveAdminSlot();
 
-  zx::result<> RingRequestDoorbell(uint8_t slot) override;
   uint32_t RequestCompletion() override;
 
   // |SendScsiUpiu| allocates a slot for SCSI command UPIU and calls SendRequestUsingSlot.
@@ -103,9 +110,13 @@ class TransferRequestProcessor : public RequestProcessor {
   zx::result<> ScsiCompletion(uint8_t slot_num, RequestSlot &request_slot,
                               TransferRequestDescriptor *descriptor);
 
-  zx::result<> ClearSlot(RequestSlot &request_slot);
+  zx::result<uint8_t> GetAdminCommandSlotNumber() override {
+    return zx::ok(kAdminCommandSlotNumber);
+  }
 
-  uint32_t slot_mask_;
+  void SetDoorBellRegister(uint8_t slot_num) override {
+    UtrListDoorBellReg::Get().FromValue(1 << slot_num).WriteTo(&register_);
+  }
 };
 
 }  // namespace ufs

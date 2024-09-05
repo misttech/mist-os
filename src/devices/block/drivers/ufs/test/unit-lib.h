@@ -161,9 +161,12 @@ class UfsTest : public inspect::InspectTestHelper, public zxtest::Test {
   zx_status_t EnableController();
 
   // Helper functions for accessing private functions.
-  zx::result<> FillDescriptorAndSendRequest(uint8_t slot, DataDirection ddir, uint16_t resp_offset,
-                                            uint16_t resp_len, uint16_t prdt_offset,
-                                            uint16_t prdt_entry_count);
+  zx::result<> TransferFillDescriptorAndSendRequest(uint8_t slot, DataDirection ddir,
+                                                    uint16_t resp_offset, uint16_t resp_len,
+                                                    uint16_t prdt_offset,
+                                                    uint16_t prdt_entry_count);
+  zx::result<> TaskManagementFillDescriptorAndSendRequest(uint8_t slot,
+                                                          TaskManagementRequestUpiu& request);
 
   // Map the data vmo to the address space and assign physical addresses. Currently, it only
   // supports 8KB vmo. So, we get two physical addresses. The return value is the physical address
@@ -177,6 +180,32 @@ class UfsTest : public inspect::InspectTestHelper, public zxtest::Test {
   zx::result<> WriteAttribute(Attributes attribute, uint32_t value, uint8_t index = 0);
 
   ufs_mock_device::UfsMockDevice mock_device_;
+
+  template <class T>
+  zx::result<uint8_t> ReserveSlot() {
+    return zx::error(ZX_ERR_NOT_SUPPORTED);
+  }
+  template <>
+  zx::result<uint8_t> ReserveSlot<TransferRequestProcessor>() {
+    return dut_->GetTransferRequestProcessor().ReserveSlot();
+  }
+  template <>
+  zx::result<uint8_t> ReserveSlot<TaskManagementRequestProcessor>() {
+    return dut_->GetTaskManagementRequestProcessor().ReserveSlot();
+  }
+
+  template <class T>
+  zx::result<> RingRequestDoorbell(uint8_t slot_num) {
+    return zx::error(ZX_ERR_NOT_SUPPORTED);
+  }
+  template <>
+  zx::result<> RingRequestDoorbell<TransferRequestProcessor>(uint8_t slot_num) {
+    return dut_->GetTransferRequestProcessor().RingRequestDoorbell(slot_num);
+  }
+  template <>
+  zx::result<> RingRequestDoorbell<TaskManagementRequestProcessor>(uint8_t slot_num) {
+    return dut_->GetTaskManagementRequestProcessor().RingRequestDoorbell(slot_num);
+  }
 
  protected:
   fdf_testing::DriverRuntime runtime_;

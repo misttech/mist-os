@@ -22,9 +22,11 @@
 #include <fbl/intrusive_double_list.h>
 #include <fbl/string_printf.h>
 
-#include "registers.h"
 #include "src/devices/block/drivers/ufs/device_manager.h"
-#include "transfer_request_processor.h"
+#include "src/devices/block/drivers/ufs/registers.h"
+#include "src/devices/block/drivers/ufs/request_processor.h"
+#include "src/devices/block/drivers/ufs/task_management_request_processor.h"
+#include "src/devices/block/drivers/ufs/transfer_request_processor.h"
 
 namespace ufs {
 
@@ -56,6 +58,7 @@ enum NotifyEvent {
   kPreLinkStartup,
   kPostLinkStartup,
   kSetupTransferRequestList,
+  kSetupTaskManagementRequestList,
   kDeviceInitDone,
   kPrePowerModeChange,
   kPostPowerModeChange,
@@ -121,6 +124,10 @@ class Ufs : public fdf::DriverBase, public scsi::Controller {
   TransferRequestProcessor &GetTransferRequestProcessor() const {
     ZX_DEBUG_ASSERT(transfer_request_processor_ != nullptr);
     return *transfer_request_processor_;
+  }
+  TaskManagementRequestProcessor &GetTaskManagementRequestProcessor() const {
+    ZX_DEBUG_ASSERT(task_management_request_processor_ != nullptr);
+    return *task_management_request_processor_;
   }
 
   // Queue an IO command to be performed asynchronously.
@@ -221,6 +228,7 @@ class Ufs : public fdf::DriverBase, public scsi::Controller {
 
   std::unique_ptr<DeviceManager> device_manager_;
   std::unique_ptr<TransferRequestProcessor> transfer_request_processor_;
+  std::unique_ptr<TaskManagementRequestProcessor> task_management_request_processor_;
 
   // Controller internal information.
   uint32_t logical_unit_count_ = 0;

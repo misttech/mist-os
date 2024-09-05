@@ -46,9 +46,8 @@ TEST_F(RequestProcessorTest, TransferRequestProcessorRingRequestDoorbell) {
   auto &slot = dut_->GetTransferRequestProcessor().GetRequestList().GetSlot(slot_num.value());
   ASSERT_EQ(slot.state, SlotState::kReserved);
 
-  ASSERT_EQ(
-      dut_->GetTransferRequestProcessor().RingRequestDoorbell(slot_num.value()).status_value(),
-      ZX_OK);
+  ASSERT_EQ(RingRequestDoorbell<ufs::TransferRequestProcessor>(slot_num.value()).status_value(),
+            ZX_OK);
   ASSERT_EQ(slot.state, SlotState::kScheduled);
   ASSERT_EQ(dut_->GetTransferRequestProcessor().RequestCompletion(), 1);
   ASSERT_EQ(slot.state, SlotState::kFree);
@@ -61,7 +60,7 @@ TEST_F(RequestProcessorTest, FillDescriptorAndSendRequest) {
       .set_utp_transfer_request_completion_enable(false)
       .WriteTo(mock_device_.GetRegisters());
 
-  auto slot_num = dut_->GetTransferRequestProcessor().ReserveSlot();
+  auto slot_num = ReserveSlot<ufs::TransferRequestProcessor>();
   ASSERT_TRUE(slot_num.is_ok());
 
   auto &slot = dut_->GetTransferRequestProcessor().GetRequestList().GetSlot(slot_num.value());
@@ -72,8 +71,8 @@ TEST_F(RequestProcessorTest, FillDescriptorAndSendRequest) {
   constexpr uint16_t response_length = 0x34;
   constexpr uint16_t prdt_offset = 0x56;
   constexpr uint16_t prdt_entry_count = 0x78;
-  ASSERT_EQ(FillDescriptorAndSendRequest(slot_num.value(), data_dir, response_offset,
-                                         response_length, prdt_offset, prdt_entry_count)
+  ASSERT_EQ(TransferFillDescriptorAndSendRequest(slot_num.value(), data_dir, response_offset,
+                                                 response_length, prdt_offset, prdt_entry_count)
                 .status_value(),
             ZX_OK);
 
@@ -248,7 +247,7 @@ TEST_F(RequestProcessorTest, SendRequestUpiuWithAdminSlotIsFull) {
 TEST_F(RequestProcessorTest, SendRequestUsingSlot) {
   constexpr uint8_t kTestLun = 0;
 
-  auto slot = dut_->GetTransferRequestProcessor().ReserveSlot();
+  auto slot = ReserveSlot<ufs::TransferRequestProcessor>();
   ASSERT_OK(slot);
 
   // Send scsi command with SendRequestUsingSlot()
@@ -285,7 +284,7 @@ TEST_F(RequestProcessorTest, SendRequestUsingSlotTimeout) {
 
   dut_->GetTransferRequestProcessor().SetTimeout(zx::msec(100));
 
-  auto slot = dut_->GetTransferRequestProcessor().ReserveSlot();
+  auto slot = ReserveSlot<ufs::TransferRequestProcessor>();
   ASSERT_OK(slot);
 
   // Send scsi command with SendRequestUsingSlot()
@@ -366,7 +365,7 @@ TEST_F(RequestProcessorTest, SendScsiUpiuWithSlotIsFull) {
 
   // Reserve all slots.
   for (uint32_t slot_num = 0; slot_num < kMaxSlotCount; ++slot_num) {
-    ASSERT_OK(dut_->GetTransferRequestProcessor().ReserveSlot());
+    ASSERT_OK(ReserveSlot<ufs::TransferRequestProcessor>());
   }
 
   IoCommand empty_io_cmd;

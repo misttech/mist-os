@@ -63,8 +63,8 @@ void RegisterMmioProcessor::DefaultHCEHandler(UfsMockDevice& mock_device, uint32
 }
 
 void RegisterMmioProcessor::DefaultUTRLDBRHandler(UfsMockDevice& mock_device, uint32_t value) {
-  ZX_ASSERT_MSG(UtrListRunStopReg::Get().ReadFrom(mock_device.GetRegisters()).value() == 1,
-                "UtrListRunStopReg value is not 1");
+  ZX_ASSERT_MSG(UtrListRunStopReg::Get().ReadFrom(mock_device.GetRegisters()).value() == true,
+                "UtrListRunStopReg value is not true");
 
   zx_paddr_t transfer_request_list_base_paddr =
       (static_cast<zx_paddr_t>(
@@ -117,6 +117,47 @@ void RegisterMmioProcessor::DefaultUTRLCNRHandler(UfsMockDevice& mock_device, ui
   UtrListCompletionNotificationReg::Get()
       .FromValue(notification)
       .WriteTo(mock_device.GetRegisters());
+}
+
+void RegisterMmioProcessor::DefaultUTMRLDBRHandler(UfsMockDevice& mock_device, uint32_t value) {
+  ZX_ASSERT_MSG(UtmrListRunStopReg::Get().ReadFrom(mock_device.GetRegisters()).value() == true,
+                "UtmrListRunStopReg value is not true");
+
+  zx_paddr_t transfer_request_list_base_paddr =
+      (static_cast<zx_paddr_t>(
+           UtmrListBaseAddressUpperReg::Get().ReadFrom(mock_device.GetRegisters()).address_upper())
+       << 32) |
+      UtmrListBaseAddressReg::Get().ReadFrom(mock_device.GetRegisters()).reg_value();
+  zx::result<zx_vaddr_t> transfer_request_list_base_addr =
+      mock_device.MapDmaPaddr(transfer_request_list_base_paddr);
+  ZX_ASSERT_MSG(transfer_request_list_base_addr.is_ok(), "Failed to map address.");
+
+  cpp20::span<TaskManagementRequestDescriptor> task_management_request_descriptors(
+      reinterpret_cast<TaskManagementRequestDescriptor*>(transfer_request_list_base_addr.value()),
+      UfsMockDevice::kNutrs);
+
+  std::bitset<32> slots = value;
+  for (uint32_t slot = 0; slot < slots.size(); ++slot) {
+    if (!slots.test(slot)) {
+      continue;
+    }
+
+    mock_device.GetTaskManagementRequestProcessor().HandleTaskManagementRequest(
+        task_management_request_descriptors[slot]);
+  }
+}
+
+void RegisterMmioProcessor::DefaultUTMRLRSRHandler(UfsMockDevice& mock_device, uint32_t value) {
+  ZX_ASSERT_MSG(value <= 1, "Invalid argument, UTMRLRSR register can only be set to 1 or 0. ");
+
+  if (HostControllerStatusReg::Get()
+          .ReadFrom(mock_device.GetRegisters())
+          .utp_task_management_request_list_ready()) {
+    UtmrListRunStopReg::Get()
+        .ReadFrom(mock_device.GetRegisters())
+        .set_value(value)
+        .WriteTo(mock_device.GetRegisters());
+  }
 }
 
 void RegisterMmioProcessor::DefaultUICCMDHandler(UfsMockDevice& mock_device, uint32_t value) {

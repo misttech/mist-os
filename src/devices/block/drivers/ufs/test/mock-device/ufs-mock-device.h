@@ -21,6 +21,7 @@
 #include "scsi-command-processor.h"
 #include "src/devices/block/drivers/ufs/ufs.h"
 #include "src/devices/lib/mmio/test-helper.h"
+#include "task-management-request-processor.h"
 #include "transfer-request-processor.h"
 #include "uiccmd-processor.h"
 
@@ -111,6 +112,7 @@ class UfsMockDevice {
       : register_mmio_processor_(*this),
         uiccmd_processor_(*this),
         transfer_request_processor_(*this),
+        task_management_request_processor_(*this),
         query_request_processor_(*this),
         scsi_command_processor_(*this) {}
   UfsMockDevice(const UfsMockDevice &) = delete;
@@ -156,6 +158,9 @@ class UfsMockDevice {
   RegisterMmioProcessor &GetRegisterMmioProcessor() { return register_mmio_processor_; }
   UicCmdProcessor &GetUicCmdProcessor() { return uiccmd_processor_; }
   TransferRequestProcessor &GetTransferRequestProcessor() { return transfer_request_processor_; }
+  TaskManagementRequestProcessor &GetTaskManagementRequestProcessor() {
+    return task_management_request_processor_;
+  }
   QueryRequestProcessor &GetQueryRequestProcessor() { return query_request_processor_; }
   ScsiCommandProcessor &GetScsiCommandProcessor() { return scsi_command_processor_; }
 
@@ -173,6 +178,7 @@ class UfsMockDevice {
   RegisterMmioProcessor register_mmio_processor_;
   UicCmdProcessor uiccmd_processor_;
   TransferRequestProcessor transfer_request_processor_;
+  TaskManagementRequestProcessor task_management_request_processor_;
   QueryRequestProcessor query_request_processor_;
   ScsiCommandProcessor scsi_command_processor_;
 
