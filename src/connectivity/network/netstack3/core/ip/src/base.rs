@@ -31,7 +31,7 @@ use netstack3_base::sync::{Mutex, PrimaryRc, RwLock, StrongRc, WeakRc};
 use netstack3_base::{
     AnyDevice, BroadcastIpExt, CoreTimerContext, Counter, CounterContext, DeviceIdContext,
     DeviceIdentifier as _, DeviceWithName, ErrorAndSerializer, EventContext, FrameDestination,
-    HandleableTimer, Inspectable, Inspector, InstantContext, IpExt, Matcher as _,
+    HandleableTimer, Inspectable, Inspector, InstantContext, IpDeviceAddr, IpExt, Matcher as _,
     NestedIntoCoreTimerCtx, NotFoundError, RngContext, SendFrameErrorReason,
     StrongDeviceIdentifier, TimerBindingsTypes, TimerContext, TimerHandler, TracingContext,
     WrapBroadcastMarker,
@@ -54,8 +54,7 @@ use crate::internal::device::state::{
     IpDeviceStateBindingsTypes, IpDeviceStateIpExt, Ipv6AddressFlags, Ipv6AddressState,
 };
 use crate::internal::device::{
-    self, IpAddressId as _, IpDeviceAddr, IpDeviceBindingsContext, IpDeviceIpExt,
-    IpDeviceSendContext,
+    self, IpAddressId as _, IpDeviceBindingsContext, IpDeviceIpExt, IpDeviceSendContext,
 };
 use crate::internal::gmp::GmpQueryHandler;
 use crate::internal::icmp::{
@@ -513,7 +512,7 @@ impl AddressStatus<Ipv4PresentAddressStatus> {
                     let dev_addr = addr_id.addr_sub();
                     let (dev_addr, subnet) = dev_addr.addr_subnet();
 
-                    if dev_addr == addr {
+                    if *dev_addr == addr {
                         Some(AddressStatus::Present(Ipv4PresentAddressStatus::Unicast))
                     } else if addr.get() == subnet.broadcast() {
                         Some(AddressStatus::Present(Ipv4PresentAddressStatus::SubnetBroadcast))
@@ -919,9 +918,9 @@ fn is_unicast_assigned<I: IpLayerIpExt>(status: &I::AddressStatus) -> bool {
 fn is_local_assigned_address<I: Ip + IpLayerIpExt, CC: IpDeviceStateContext<I>>(
     core_ctx: &mut CC,
     device: &CC::DeviceId,
-    addr: SpecifiedAddr<I::Addr>,
+    addr: IpDeviceAddr<I::Addr>,
 ) -> bool {
-    match core_ctx.address_status_for_device(addr, device) {
+    match core_ctx.address_status_for_device(addr.into(), device) {
         AddressStatus::Present(status) => is_unicast_assigned::<I>(&status),
         AddressStatus::Unassigned => false,
     }
@@ -929,7 +928,7 @@ fn is_local_assigned_address<I: Ip + IpLayerIpExt, CC: IpDeviceStateContext<I>>(
 
 fn get_device_with_assigned_address<A, BC, CC>(
     core_ctx: &mut CC,
-    addr: SpecifiedAddr<A>,
+    addr: IpDeviceAddr<A>,
 ) -> Option<CC::DeviceId>
 where
     A: IpAddress,
@@ -937,7 +936,7 @@ where
     BC: IpLayerBindingsContext<A::Version, CC::DeviceId>,
     CC: IpDeviceStateContext<A::Version> + IpDeviceContext<A::Version, BC>,
 {
-    core_ctx.with_address_statuses(addr, |mut it| {
+    core_ctx.with_address_statuses(addr.into(), |mut it| {
         it.find_map(|(device, status)| is_unicast_assigned::<A::Version>(&status).then_some(device))
     })
 }
@@ -958,7 +957,7 @@ fn get_local_addr<I: Ip + IpLayerIpExt, CC: IpDeviceStateContext<I>>(
     match local_ip_and_policy {
         Some((local_ip, NonLocalSrcAddrPolicy::Allow)) => Ok(local_ip),
         Some((local_ip, NonLocalSrcAddrPolicy::Deny)) => {
-            is_local_assigned_address(core_ctx, device, local_ip.into())
+            is_local_assigned_address(core_ctx, device, local_ip)
                 .then_some(local_ip)
                 .ok_or(ResolveRouteError::NoSrcAddr)
         }
@@ -1070,14 +1069,13 @@ pub fn resolve_output_route_to_destination<
     // allowing cross-device local delivery even when SO_BINDTODEVICE or
     // link-local addresses are involved, and this behavior may need to be
     // emulated.
-    let local_delivery_instructions: Option<LocalDelivery<RoutableIpAddr<I::Addr>, CC::DeviceId>> =
+    let local_delivery_instructions: Option<LocalDelivery<IpDeviceAddr<I::Addr>, CC::DeviceId>> = {
+        let dst_ip = dst_ip.and_then(IpDeviceAddr::new_from_socket_ip_addr);
         match (device, dst_ip) {
-            (Some(device), Some(dst_ip)) => {
-                is_local_assigned_address(core_ctx, device, dst_ip.into())
-                    .then_some(LocalDelivery::StrongForDevice(device.clone()))
-            }
+            (Some(device), Some(dst_ip)) => is_local_assigned_address(core_ctx, device, dst_ip)
+                .then_some(LocalDelivery::StrongForDevice(device.clone())),
             (None, Some(dst_ip)) => {
-                get_device_with_assigned_address(core_ctx, dst_ip.into()).map(|dst_device| {
+                get_device_with_assigned_address(core_ctx, dst_ip).map(|dst_device| {
                     // If either the source or destination addresses needs
                     // a zone ID, then use strong host to enforce that the
                     // source and destination addresses are assigned to the
@@ -1092,7 +1090,8 @@ pub fn resolve_output_route_to_destination<
                 })
             }
             (_, None) => None,
-        };
+        }
+    };
 
     if let Some(local_delivery) = local_delivery_instructions {
         let loopback = core_ctx.loopback_id().ok_or(ResolveRouteError::Unreachable)?;
@@ -1101,7 +1100,7 @@ pub fn resolve_output_route_to_destination<
             LocalDelivery::WeakLoopback { dst_ip, device } => {
                 let src_ip = match src_ip_and_policy {
                     Some((src_ip, NonLocalSrcAddrPolicy::Deny)) => {
-                        let _device = get_device_with_assigned_address(core_ctx, src_ip.into())
+                        let _device = get_device_with_assigned_address(core_ctx, src_ip)
                             .ok_or(ResolveRouteError::NoSrcAddr)?;
                         src_ip
                     }
@@ -1173,7 +1172,7 @@ pub fn resolve_output_route_to_destination<
     match result {
         ControlFlow::Break(RuleAction::Lookup(result)) => {
             result.map(|(Destination { device, next_hop }, src_addr)| ResolvedRoute {
-                src_addr,
+                src_addr: src_addr,
                 device,
                 local_delivery_device: None,
                 next_hop,

@@ -10,7 +10,7 @@ use core::hash::Hash;
 use net_types::ip::{GenericOverIp, Ip, IpAddress, Ipv4Addr, Ipv6Addr, Subnet, SubnetEither};
 use net_types::SpecifiedAddr;
 use netstack3_base::socket::SocketIpAddr;
-use netstack3_base::BroadcastIpExt;
+use netstack3_base::{BroadcastIpExt, IpDeviceAddr};
 
 /// The priority of a forwarding entry. Lower metrics are preferred.
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, PartialOrd, Ord)]
@@ -381,7 +381,7 @@ pub type RoutableIpAddr<A> = SocketIpAddr<A>;
 pub struct ResolvedRoute<I: BroadcastIpExt, D> {
     /// The source address to use when forwarding packets towards the
     /// destination.
-    pub src_addr: RoutableIpAddr<I::Addr>,
+    pub src_addr: IpDeviceAddr<I::Addr>,
     /// The device over which this destination can be reached.
     pub device: D,
     /// Present when `device` is loopback with the device that the destination

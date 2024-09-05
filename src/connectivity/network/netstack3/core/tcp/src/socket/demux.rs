@@ -18,8 +18,8 @@ use netstack3_base::socket::{
 };
 use netstack3_base::{
     trace_duration, BidirectionalConverter as _, Control, CounterContext, CtxPair, EitherDeviceId,
-    Mss, NotFoundError, Payload, Segment, SegmentHeader, SeqNum, StrongDeviceIdentifier as _,
-    WeakDeviceIdentifier,
+    IpDeviceAddr, Mss, NotFoundError, Payload, Segment, SegmentHeader, SeqNum,
+    StrongDeviceIdentifier as _, WeakDeviceIdentifier,
 };
 use netstack3_filter::TransportPacketSerializer;
 use netstack3_ip::socket::{IpSockCreationError, MmsError};
@@ -880,7 +880,7 @@ where
     let ip_sock = match core_ctx.new_ip_socket(
         bindings_ctx,
         bound_device,
-        Some(local_ip),
+        IpDeviceAddr::new_from_socket_ip_addr(local_ip),
         remote_ip,
         IpProto::Tcp.into(),
         false, /* transparent */
@@ -896,7 +896,7 @@ where
 
     let isn = isn.generate(
         bindings_ctx.now(),
-        (ip_sock.local_ip().clone(), local_port),
+        (ip_sock.local_ip().clone().into(), local_port),
         (ip_sock.remote_ip().clone(), remote_port),
     );
     let device_mms = match core_ctx.get_mms(bindings_ctx, &ip_sock) {

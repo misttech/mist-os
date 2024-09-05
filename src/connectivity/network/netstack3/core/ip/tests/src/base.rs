@@ -38,7 +38,7 @@ use test_case::test_case;
 use netstack3_base::testutil::{
     new_rng, set_logger_for_test, FakeInstant, TestIpExt, TEST_ADDRS_V4, TEST_ADDRS_V6,
 };
-use netstack3_base::{FrameDestination, InstantContext as _};
+use netstack3_base::{FrameDestination, InstantContext as _, IpDeviceAddr};
 use netstack3_core::device::{
     DeviceId, EthernetCreationProperties, EthernetLinkDevice, RecvEthernetFrameMeta,
 };
@@ -49,8 +49,8 @@ use netstack3_core::testutil::{
 use netstack3_core::{BindingsContext, IpExt, StackState};
 use netstack3_device::testutil::IPV6_MIN_IMPLIED_MAX_FRAME_SIZE;
 use netstack3_ip::device::{
-    IpDeviceAddr, IpDeviceConfigurationUpdate, Ipv4DeviceConfigurationUpdate,
-    Ipv6DeviceConfigurationUpdate, SlaacConfiguration,
+    IpDeviceConfigurationUpdate, Ipv4DeviceConfigurationUpdate, Ipv6DeviceConfigurationUpdate,
+    SlaacConfiguration,
 };
 use netstack3_ip::multicast_forwarding::{
     MulticastRoute, MulticastRouteKey, MulticastRouteTarget, MulticastRouteTargets,
@@ -1903,34 +1903,34 @@ fn do_route_lookup<I: IpExt>(
 #[ip_test(I)]
 #[test_case(None,
                 None,
-                Device::First.ip_address(),
+                Device::First.ip_address().into(),
                 false,
                 Ok(ResolvedRoute { src_addr: Device::First.ip_address(), device: Device::Loopback,
                     local_delivery_device: Some(Device::First), next_hop: NextHop::RemoteAsNeighbor
                 }); "local delivery")]
 #[test_case(Some(Device::First.ip_address()),
                 None,
-                Device::First.ip_address(),
+                Device::First.ip_address().into(),
                 false,
                 Ok(ResolvedRoute { src_addr: Device::First.ip_address(), device: Device::Loopback,
                     local_delivery_device: Some(Device::First), next_hop: NextHop::RemoteAsNeighbor
                 }); "local delivery specified local addr")]
 #[test_case(Some(Device::First.ip_address()),
                 Some(Device::First),
-                Device::First.ip_address(),
+                Device::First.ip_address().into(),
                 false,
                 Ok(ResolvedRoute { src_addr: Device::First.ip_address(), device: Device::Loopback,
                     local_delivery_device: Some(Device::First), next_hop: NextHop::RemoteAsNeighbor
                 }); "local delivery specified device and addr")]
 #[test_case(None,
                 Some(Device::Loopback),
-                Device::First.ip_address(),
+                Device::First.ip_address().into(),
                 false,
                 Err(ResolveRouteError::Unreachable);
                 "local delivery specified loopback device no addr")]
 #[test_case(None,
                 Some(Device::Loopback),
-                Device::Loopback.ip_address(),
+                Device::Loopback.ip_address().into(),
                 false,
                 Ok(ResolvedRoute { src_addr: Device::Loopback.ip_address(),
                     device: Device::Loopback, local_delivery_device: Some(Device::Loopback),
@@ -1938,18 +1938,18 @@ fn do_route_lookup<I: IpExt>(
                 }); "local delivery to loopback addr via specified loopback device no addr")]
 #[test_case(None,
                 Some(Device::Second),
-                Device::First.ip_address(),
+                Device::First.ip_address().into(),
                 false,
                 Err(ResolveRouteError::Unreachable);
                 "local delivery specified mismatched device no addr")]
 #[test_case(Some(Device::First.ip_address()),
                 Some(Device::Loopback),
-                Device::First.ip_address(),
+                Device::First.ip_address().into(),
                 false,
                 Err(ResolveRouteError::Unreachable); "local delivery specified loopback device")]
 #[test_case(Some(Device::First.ip_address()),
                 Some(Device::Second),
-                Device::First.ip_address(),
+                Device::First.ip_address().into(),
                 false,
                 Err(ResolveRouteError::Unreachable); "local delivery specified mismatched device")]
 #[test_case(None,
@@ -1975,7 +1975,7 @@ fn do_route_lookup<I: IpExt>(
 )]
 #[test_case(Some(remote_ip::<I>().try_into().unwrap()),
                 None,
-                Device::Loopback.ip_address(),
+                Device::Loopback.ip_address().into(),
                 true /* transparent */,
                 Ok(ResolvedRoute { src_addr: remote_ip::<I>().try_into().unwrap(),
                     device: Device::Loopback, local_delivery_device: Some(Device::Loopback),
@@ -1984,7 +1984,7 @@ fn do_route_lookup<I: IpExt>(
 )]
 #[test_case(Some(remote_ip::<I>().try_into().unwrap()),
                 None,
-                Device::First.ip_address(),
+                Device::First.ip_address().into(),
                 true /* transparent */,
                 Ok(ResolvedRoute { src_addr: remote_ip::<I>().try_into().unwrap(),
                     device: Device::Loopback, local_delivery_device: Some(Device::First),
@@ -2002,7 +2002,7 @@ fn do_route_lookup<I: IpExt>(
                 Err(ResolveRouteError::Unreachable); "remote delivery specified device no route")]
 #[test_case(Some(Device::Second.ip_address()),
                 None,
-                Device::First.ip_address(),
+                Device::First.ip_address().into(),
                 false,
                 Ok(ResolvedRoute {src_addr: Device::Second.ip_address(), device: Device::Loopback,
                     local_delivery_device: Some(Device::First),
@@ -2090,25 +2090,25 @@ fn lookup_route_multiple_devices_with_route<I: TestIpExt + IpExt>(
     assert_eq!(result, expected_result);
 }
 
-#[test_case(None, None, Device::Second.link_local_addr(),
+#[test_case(None, None, Device::Second.link_local_addr().into(),
                 Ok(ResolvedRoute { src_addr: Device::Second.link_local_addr(),
                     device: Device::Loopback, local_delivery_device: Some(Device::Second),
                     next_hop: NextHop::RemoteAsNeighbor });
                 "local delivery no local address to link-local")]
-#[test_case(Some(Device::Second.ip_address()), None, Device::Second.link_local_addr(),
+#[test_case(Some(Device::Second.ip_address()), None, Device::Second.link_local_addr().into(),
                 Ok(ResolvedRoute { src_addr: Device::Second.ip_address(), device: Device::Loopback,
                     local_delivery_device: Some(Device::Second),
                     next_hop: NextHop::RemoteAsNeighbor });
                 "local delivery same device to link-local")]
-#[test_case(Some(Device::Second.link_local_addr()), None, Device::Second.ip_address(),
+#[test_case(Some(Device::Second.link_local_addr()), None, Device::Second.ip_address().into(),
                 Ok(ResolvedRoute { src_addr: Device::Second.link_local_addr(),
                     device: Device::Loopback, local_delivery_device: Some(Device::Second),
                     next_hop: NextHop::RemoteAsNeighbor });
                 "local delivery same device from link-local")]
-#[test_case(Some(Device::First.ip_address()), None, Device::Second.link_local_addr(),
+#[test_case(Some(Device::First.ip_address()), None, Device::Second.link_local_addr().into(),
                 Err(ResolveRouteError::NoSrcAddr);
                 "local delivery cross device to link-local")]
-#[test_case(Some(Device::First.link_local_addr()), None, Device::Second.ip_address(),
+#[test_case(Some(Device::First.link_local_addr()), None, Device::Second.ip_address().into(),
                 Err(ResolveRouteError::NoSrcAddr);
                 "local delivery cross device from link-local")]
 fn lookup_route_v6only(

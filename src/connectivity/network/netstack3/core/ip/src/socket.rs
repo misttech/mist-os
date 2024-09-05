@@ -14,8 +14,8 @@ use net_types::{MulticastAddress, ScopeableAddress, SpecifiedAddr};
 use netstack3_base::socket::{SocketIpAddr, SocketIpAddrExt as _};
 use netstack3_base::{
     trace_duration, AnyDevice, CounterContext, DeviceIdContext, DeviceIdentifier, EitherDeviceId,
-    InstantContext, IpExt, Mms, SendFrameErrorReason, StrongDeviceIdentifier, TracingContext,
-    WeakDeviceIdentifier,
+    InstantContext, IpDeviceAddr, IpExt, Mms, SendFrameErrorReason, StrongDeviceIdentifier,
+    TracingContext, WeakDeviceIdentifier,
 };
 use netstack3_filter::{
     self as filter, FilterBindingsContext, FilterHandler as _, InterfaceProperties, RawIpBody,
@@ -31,7 +31,6 @@ use crate::internal::base::{
     SendIpPacketMeta,
 };
 use crate::internal::device::state::IpDeviceStateIpExt;
-use crate::internal::device::IpDeviceAddr;
 use crate::internal::routing::rules::RuleInput;
 use crate::internal::routing::PacketOrigin;
 use crate::internal::types::{ResolvedRoute, RoutableIpAddr};
@@ -57,7 +56,7 @@ pub trait IpSocketHandler<I: IpExt, BC>: DeviceIdContext<AnyDevice> {
         &mut self,
         bindings_ctx: &mut BC,
         device: Option<EitherDeviceId<&Self::DeviceId, &Self::WeakDeviceId>>,
-        local_ip: Option<SocketIpAddr<I::Addr>>,
+        local_ip: Option<IpDeviceAddr<I::Addr>>,
         remote_ip: SocketIpAddr<I::Addr>,
         proto: I::Proto,
         transparent: bool,
@@ -132,7 +131,7 @@ pub trait IpSocketHandler<I: IpExt, BC>: DeviceIdContext<AnyDevice> {
     where
         S: TransportPacketSerializer<I>,
         S::Buffer: BufferMut,
-        F: FnOnce(SocketIpAddr<I::Addr>) -> Result<S, E>,
+        F: FnOnce(IpDeviceAddr<I::Addr>) -> Result<S, E>,
         O: SendOptions<I>,
     {
         let tmp = self
@@ -149,7 +148,7 @@ pub trait IpSocketHandler<I: IpExt, BC>: DeviceIdContext<AnyDevice> {
         &mut self,
         bindings_ctx: &mut BC,
         device: Option<EitherDeviceId<&Self::DeviceId, &Self::WeakDeviceId>>,
-        local_ip: Option<SocketIpAddr<I::Addr>>,
+        local_ip: Option<IpDeviceAddr<I::Addr>>,
         remote_ip: SocketIpAddr<I::Addr>,
         proto: I::Proto,
         options: &O,
@@ -160,7 +159,7 @@ pub trait IpSocketHandler<I: IpExt, BC>: DeviceIdContext<AnyDevice> {
     where
         S: TransportPacketSerializer<I>,
         S::Buffer: BufferMut,
-        F: FnOnce(SocketIpAddr<I::Addr>) -> S,
+        F: FnOnce(IpDeviceAddr<I::Addr>) -> S,
         O: SendOptions<I>,
     {
         #[allow(unreachable_patterns)] // TODO(https://fxbug.dev/360335974)
@@ -327,7 +326,7 @@ pub struct IpSockDefinition<I: IpExt, D> {
     // issues arise: A) Does the unicast restriction still apply, and is that
     // even well-defined for IPv4 in the absence of a subnet? B) Presumably we
     // have to always bind to a particular interface?
-    pub local_ip: SocketIpAddr<I::Addr>,
+    pub local_ip: IpDeviceAddr<I::Addr>,
     /// The socket's bound output device.
     pub device: Option<D>,
     /// The IP protocol the socket is bound to.
@@ -341,7 +340,7 @@ pub struct IpSockDefinition<I: IpExt, D> {
 
 impl<I: IpExt, D> IpSock<I, D> {
     /// Returns the socket's local IP address.
-    pub fn local_ip(&self) -> &SocketIpAddr<I::Addr> {
+    pub fn local_ip(&self) -> &IpDeviceAddr<I::Addr> {
         &self.definition.local_ip
     }
     /// Returns the socket's remote IP address.
@@ -439,7 +438,7 @@ where
         &mut self,
         bindings_ctx: &mut BC,
         device: Option<EitherDeviceId<&CC::DeviceId, &CC::WeakDeviceId>>,
-        local_ip: Option<SocketIpAddr<I::Addr>>,
+        local_ip: Option<IpDeviceAddr<I::Addr>>,
         remote_ip: SocketIpAddr<I::Addr>,
         proto: I::Proto,
         transparent: bool,
@@ -848,7 +847,7 @@ pub(crate) mod ipv6_source_address_selection {
     use super::*;
 
     use crate::internal::device::state::Ipv6AddressFlags;
-    use crate::internal::device::Ipv6DeviceAddr;
+    use netstack3_base::Ipv6DeviceAddr;
 
     /// A source address selection candidate.
     pub struct SasCandidate<D> {
@@ -1285,7 +1284,7 @@ pub(crate) mod testutil {
             &mut self,
             _bindings_ctx: &mut BC,
             device: Option<EitherDeviceId<&Self::DeviceId, &Self::WeakDeviceId>>,
-            local_ip: Option<SocketIpAddr<I::Addr>>,
+            local_ip: Option<IpDeviceAddr<I::Addr>>,
             remote_ip: SocketIpAddr<I::Addr>,
             proto: I::Proto,
             transparent: bool,
@@ -1635,7 +1634,7 @@ pub(crate) mod testutil {
         fn new_ip_socket(
             &mut self,
             device: Option<EitherDeviceId<&D, &D::Weak>>,
-            local_ip: Option<SocketIpAddr<I::Addr>>,
+            local_ip: Option<IpDeviceAddr<I::Addr>>,
             remote_ip: SocketIpAddr<I::Addr>,
             proto: I::Proto,
             transparent: bool,
@@ -1677,7 +1676,7 @@ pub(crate) mod testutil {
             let local_ip = match local_ip {
                 None => {
                     let addr = addrs.next().ok_or(ResolveRouteError::NoSrcAddr)?;
-                    SocketIpAddr::new(addr.get()).expect("not valid socket addr")
+                    IpDeviceAddr::new(addr.get()).expect("not valid device addr")
                 }
                 Some(local_ip) => {
                     if !transparent {

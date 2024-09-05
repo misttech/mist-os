@@ -25,13 +25,13 @@ use net_types::ip::{
     AddrSubnet, GenericOverIp, Ip, IpAddress, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Ipv6SourceAddr, Mtu,
     Subnet,
 };
-use net_types::{MulticastAddr, NonMappedAddr, SpecifiedAddr, UnicastAddr, Witness};
-use netstack3_base::socket::SocketIpAddr;
+use net_types::{MulticastAddr, SpecifiedAddr, UnicastAddr, Witness};
 use netstack3_base::{
     AnyDevice, CounterContext, DeferredResourceRemovalContext, DeviceIdContext, EventContext,
     ExistsError, HandleableTimer, Inspectable, Instant, InstantBindingsTypes, InstantContext,
-    IpExt, NotFoundError, RemoveResourceResultWithContext, RngContext, SendFrameError,
-    StrongDeviceIdentifier, TimerBindingsTypes, TimerContext, TimerHandler, WeakDeviceIdentifier,
+    IpDeviceAddr, IpExt, Ipv4DeviceAddr, Ipv6DeviceAddr, NotFoundError,
+    RemoveResourceResultWithContext, RngContext, SendFrameError, StrongDeviceIdentifier,
+    TimerBindingsTypes, TimerContext, TimerHandler, WeakDeviceIdentifier,
 };
 use netstack3_filter::{IpPacket, ProofOfEgressCheck};
 use packet::{BufferMut, Serializer};
@@ -322,7 +322,7 @@ impl IpDeviceIpExt for Ipv4 {
     type State<BT: IpDeviceStateBindingsTypes> = Ipv4DeviceState<BT>;
     type Configuration = Ipv4DeviceConfiguration;
     type Timer<D: WeakDeviceIdentifier, A: IpAddressIdSpec> = Ipv4DeviceTimerId<D>;
-    type AssignedWitness = SpecifiedAddr<Ipv4Addr>;
+    type AssignedWitness = Ipv4DeviceAddr;
     type AddressConfig<I: Instant> = Ipv4AddrConfig<I>;
     type ManualAddressConfig<I: Instant> = Ipv4AddrConfig<I>;
     type AddressState<I: Instant> = Ipv4AddressState<I>;
@@ -382,16 +382,6 @@ impl IpDeviceIpExt for Ipv6 {
         addr_state.config.take()
     }
 }
-
-/// An Ip address that witnesses properties needed to be assigned to a device.
-pub type IpDeviceAddr<A> = SocketIpAddr<A>;
-
-/// An IPv6 address that witnesses properties needed to be assigned to a device.
-///
-/// Like [`IpDeviceAddr`] but with stricter witnesses that are permitted for
-/// IPv6 addresses.
-pub type Ipv6DeviceAddr = NonMappedAddr<UnicastAddr<Ipv6Addr>>;
-
 /// IP address assignment states.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum IpAddressState {
@@ -1458,7 +1448,7 @@ fn disable_ipv4_device_with_config<
 pub fn get_ipv4_addr_subnet<BT: IpDeviceStateBindingsTypes, CC: IpDeviceStateContext<Ipv4, BT>>(
     core_ctx: &mut CC,
     device_id: &CC::DeviceId,
-) -> Option<AddrSubnet<Ipv4Addr>> {
+) -> Option<AddrSubnet<Ipv4Addr, Ipv4DeviceAddr>> {
     core_ctx.with_address_ids(device_id, |mut addrs, _core_ctx| addrs.next().map(|a| a.addr_sub()))
 }
 
@@ -1689,7 +1679,7 @@ impl<CC: DeviceIdContext<AnyDevice>, BC: InstantBindingsTypes> IpAddressRemovalH
         &mut self,
         _bindings_ctx: &mut BC,
         _device_id: &Self::DeviceId,
-        _addr_sub: AddrSubnet<Ipv4Addr, SpecifiedAddr<Ipv4Addr>>,
+        _addr_sub: AddrSubnet<Ipv4Addr, Ipv4DeviceAddr>,
         _config: Ipv4AddrConfig<BC::Instant>,
         _reason: AddressRemovedReason,
     ) {
@@ -1904,7 +1894,7 @@ pub(crate) mod testutil {
         BT: IpDeviceStateBindingsTypes,
         CC: IpDeviceStateContext<Ipv4, BT>,
         O,
-        F: FnOnce(Box<dyn Iterator<Item = AddrSubnet<Ipv4Addr>> + '_>) -> O,
+        F: FnOnce(Box<dyn Iterator<Item = AddrSubnet<Ipv4Addr, Ipv4DeviceAddr>> + '_>) -> O,
     >(
         core_ctx: &mut CC,
         device_id: &CC::DeviceId,
@@ -1930,7 +1920,7 @@ pub(crate) mod testutil {
         BC: IpDeviceBindingsContext<Ipv6, CC::DeviceId>,
         CC: Ipv6DeviceContext<BC>,
         O,
-        F: FnOnce(Box<dyn Iterator<Item = AddrSubnet<Ipv6Addr>> + '_>) -> O,
+        F: FnOnce(Box<dyn Iterator<Item = AddrSubnet<Ipv6Addr, Ipv6DeviceAddr>> + '_>) -> O,
     >(
         core_ctx: &mut CC,
         device_id: &CC::DeviceId,
@@ -1947,7 +1937,7 @@ pub(crate) mod testutil {
                              config: _,
                          }| { *assigned },
                     )
-                    .then(|| addr_id.addr_sub().to_witness())
+                    .then(|| addr_id.addr_sub())
             })))
         })
     }
@@ -1981,8 +1971,8 @@ pub(crate) mod testutil {
             struct WrapIn<I: IpDeviceIpExt>(I::AssignedWitness);
             A::Version::map_ip(
                 WrapIn(self.addr()),
-                |WrapIn(v4_addr)| IpDeviceAddr::new_ipv4_specified(v4_addr),
-                |WrapIn(v6_addr)| IpDeviceAddr::new_from_ipv6_non_mapped_unicast(v6_addr),
+                |WrapIn(v4_addr)| IpDeviceAddr::new_from_witness(v4_addr),
+                |WrapIn(v6_addr)| IpDeviceAddr::new_from_ipv6_device_addr(v6_addr),
             )
         }
 

@@ -897,6 +897,12 @@ impl_nested_witness!(MappedAddress, NonMappedAddr, UnicastAddress, UnicastAddr, 
 impl_nested_witness!(MappedAddress, NonMappedAddr, MulticastAddress, MulticastAddr, new_multicast);
 impl_nested_witness!(MappedAddress, NonMappedAddr, BroadcastAddress, BroadcastAddr, new_broadcast);
 impl_nested_witness!(MappedAddress, NonMappedAddr, LinkLocalAddress, LinkLocalAddr, new_link_local);
+impl_into_specified_for_nested_witness!(
+    MappedAddress,
+    NonMappedAddr,
+    SpecifiedAddress,
+    SpecifiedAddr
+);
 impl_into_specified_for_nested_witness!(MappedAddress, NonMappedAddr, UnicastAddress, UnicastAddr);
 impl_into_specified_for_nested_witness!(
     MappedAddress,

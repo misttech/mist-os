@@ -5,9 +5,10 @@
 use core::fmt::Debug;
 
 use net_types::ip::{Ipv4, Ipv6};
-use net_types::{NonMappedAddr, SpecifiedAddr};
+use net_types::SpecifiedAddr;
 use netstack3_base::{
-    AnyDevice, DeviceIdContext, InstantBindingsTypes, RngContext, TimerBindingsTypes, TimerContext,
+    AnyDevice, DeviceIdContext, InstantBindingsTypes, IpDeviceAddr, RngContext, TimerBindingsTypes,
+    TimerContext,
 };
 use packet_formats::ip::IpExt;
 
@@ -65,7 +66,7 @@ pub trait NatContext<I: IpExt, BT: FilterBindingsTypes>:
         &mut self,
         device_id: &Self::DeviceId,
         remote: Option<SpecifiedAddr<I::Addr>>,
-    ) -> Option<NonMappedAddr<SpecifiedAddr<I::Addr>>>;
+    ) -> Option<IpDeviceAddr<I::Addr>>;
 }
 
 /// A context for mutably accessing all filtering state at once, to allow IPv4
@@ -118,7 +119,7 @@ pub(crate) mod testutil {
 
     #[derive(Default)]
     pub struct FakeNatCtx<I: IpExt> {
-        pub(crate) device_addrs: HashMap<FakeDeviceId, NonMappedAddr<SpecifiedAddr<I::Addr>>>,
+        pub(crate) device_addrs: HashMap<FakeDeviceId, IpDeviceAddr<I::Addr>>,
     }
 
     impl<I: IpExt> FakeCtx<I> {
@@ -174,7 +175,7 @@ pub(crate) mod testutil {
             &mut self,
             device_id: &Self::DeviceId,
             _remote: Option<SpecifiedAddr<I::Addr>>,
-        ) -> Option<NonMappedAddr<SpecifiedAddr<I::Addr>>> {
+        ) -> Option<IpDeviceAddr<I::Addr>> {
             self.device_addrs.get(device_id).cloned()
         }
     }

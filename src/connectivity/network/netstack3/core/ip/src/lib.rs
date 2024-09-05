@@ -76,12 +76,11 @@ pub mod device {
         is_ip_multicast_forwarding_enabled, is_ip_unicast_forwarding_enabled, join_ip_multicast,
         join_ip_multicast_with_config, leave_ip_multicast, leave_ip_multicast_with_config,
         receive_igmp_packet, AddressRemovedReason, DelIpAddr, IpAddressId, IpAddressIdSpec,
-        IpAddressIdSpecContext, IpAddressState, IpDeviceAddr, IpDeviceAddressContext,
-        IpDeviceAddressIdContext, IpDeviceBindingsContext, IpDeviceConfigurationContext,
-        IpDeviceEvent, IpDeviceIpExt, IpDeviceSendContext, IpDeviceStateContext, IpDeviceTimerId,
-        Ipv4DeviceTimerId, Ipv6DeviceAddr, Ipv6DeviceConfigurationContext, Ipv6DeviceContext,
-        Ipv6DeviceHandler, Ipv6DeviceTimerId, WithIpDeviceConfigurationMutInner,
-        WithIpv6DeviceConfigurationMutInner,
+        IpAddressIdSpecContext, IpAddressState, IpDeviceAddressContext, IpDeviceAddressIdContext,
+        IpDeviceBindingsContext, IpDeviceConfigurationContext, IpDeviceEvent, IpDeviceIpExt,
+        IpDeviceSendContext, IpDeviceStateContext, IpDeviceTimerId, Ipv4DeviceTimerId,
+        Ipv6DeviceConfigurationContext, Ipv6DeviceContext, Ipv6DeviceHandler, Ipv6DeviceTimerId,
+        WithIpDeviceConfigurationMutInner, WithIpv6DeviceConfigurationMutInner,
     };
 
     /// IP device test utilities.

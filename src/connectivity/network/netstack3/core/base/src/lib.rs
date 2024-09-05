@@ -37,6 +37,7 @@ pub use context::{BuildableCoreContext, ContextPair, ContextProvider, CtxPair};
 pub use convert::{BidirectionalConverter, OwnedOrRefsBidirectionalConverter};
 pub use counters::{Counter, CounterContext, ResourceCounterContext};
 pub use data_structures::token_bucket::TokenBucket;
+pub use device::address::{IpDeviceAddr, Ipv4DeviceAddr, Ipv6DeviceAddr};
 pub use device::link::{LinkAddress, LinkDevice, LinkUnicastAddress};
 pub use device::{
     AnyDevice, Device, DeviceIdAnyCompatContext, DeviceIdContext, DeviceIdentifier, DeviceWithName,

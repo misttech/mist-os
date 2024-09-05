@@ -14,8 +14,8 @@ use log::{debug, error};
 use net_types::ip::{AddrSubnet, Ip as _, Ipv4, Ipv4Addr};
 use net_types::{MulticastAddr, SpecifiedAddr, Witness};
 use netstack3_base::{
-    AnyDevice, CoreTimerContext, DeviceIdContext, HandleableTimer, Instant, TimerContext,
-    WeakDeviceIdentifier,
+    AnyDevice, CoreTimerContext, DeviceIdContext, HandleableTimer, Instant, Ipv4DeviceAddr,
+    TimerContext, WeakDeviceIdentifier,
 };
 use packet::{BufferMut, EmptyBuf, InnerPacketBuilder, Serializer};
 use packet_formats::igmp::messages::{
@@ -95,7 +95,10 @@ pub trait IgmpContext<BT: IgmpBindingsTypes>:
     ) -> O;
 
     /// Gets an IP address and subnet associated with this device.
-    fn get_ip_addr_subnet(&mut self, device: &Self::DeviceId) -> Option<AddrSubnet<Ipv4Addr>>;
+    fn get_ip_addr_subnet(
+        &mut self,
+        device: &Self::DeviceId,
+    ) -> Option<AddrSubnet<Ipv4Addr, Ipv4DeviceAddr>>;
 }
 
 /// A handler for incoming IGMP packets.
@@ -596,7 +599,7 @@ mod tests {
         gmp_state: GmpState<Ipv4, FakeBindingsCtx>,
         igmp_state: IgmpState<FakeBindingsCtx>,
         igmp_enabled: bool,
-        addr_subnet: Option<AddrSubnet<Ipv4Addr>>,
+        addr_subnet: Option<AddrSubnet<Ipv4Addr, Ipv4DeviceAddr>>,
         ip_counters: IpCounters<Ipv4>,
     }
 
@@ -650,7 +653,10 @@ mod tests {
             cb(GmpStateRef { enabled: *igmp_enabled, groups, gmp: gmp_state }, igmp_state)
         }
 
-        fn get_ip_addr_subnet(&mut self, _device: &FakeDeviceId) -> Option<AddrSubnet<Ipv4Addr>> {
+        fn get_ip_addr_subnet(
+            &mut self,
+            _device: &FakeDeviceId,
+        ) -> Option<AddrSubnet<Ipv4Addr, Ipv4DeviceAddr>> {
             self.state.addr_subnet
         }
     }
@@ -840,7 +846,7 @@ mod tests {
 
     fn setup_simple_test_environment_with_addr_subnet(
         seed: u128,
-        a: Option<AddrSubnet<Ipv4Addr>>,
+        a: Option<AddrSubnet<Ipv4Addr, Ipv4DeviceAddr>>,
     ) -> FakeCtx {
         let mut ctx = FakeCtx::with_default_bindings_ctx(|bindings_ctx| {
             FakeCoreCtx::with_state(FakeIgmpCtx {

@@ -52,8 +52,8 @@ use netstack3_base::sync::RwLock;
 use netstack3_base::{
     AnyDevice, BidirectionalConverter as _, ContextPair, Control, CoreTimerContext, CounterContext,
     CtxPair, DeferredResourceRemovalContext, DeviceIdContext, EitherDeviceId, ExistsError,
-    HandleableTimer, IcmpErrorCode, Inspector, InspectorDeviceExt, InstantBindingsTypes, IpExt,
-    LocalAddressError, Mss, OwnedOrRefsBidirectionalConverter, PortAllocImpl,
+    HandleableTimer, IcmpErrorCode, Inspector, InspectorDeviceExt, InstantBindingsTypes,
+    IpDeviceAddr, IpExt, LocalAddressError, Mss, OwnedOrRefsBidirectionalConverter, PortAllocImpl,
     ReferenceNotifiersExt as _, RemoveResourceResult, RngContext, Segment, SeqNum,
     StrongDeviceIdentifier as _, TimerBindingsTypes, TimerContext, TracingContext,
     WeakDeviceIdentifier, ZonedAddressError,
@@ -3264,7 +3264,7 @@ where
             .new_ip_socket(
                 bindings_ctx,
                 new_device.as_ref().map(EitherDeviceId::Strong),
-                Some(*local_ip),
+                IpDeviceAddr::new_from_socket_ip_addr(*local_ip),
                 *remote_ip,
                 IpProto::Tcp.into(),
                 false, /* transparent */
@@ -4925,7 +4925,7 @@ where
 {
     let (local_ip, bound_device, local_port) = match listener_addr {
         Some(ListenerAddr { ip: ListenerIpAddr { addr, identifier }, device }) => {
-            (addr, device, Some(identifier))
+            (addr.and_then(IpDeviceAddr::new_from_socket_ip_addr), device, Some(identifier))
         }
         None => (None, None, None),
     };
@@ -4961,7 +4961,7 @@ where
                 // should be enough here and avoids adding more dependencies.
                 || match netstack3_base::simple_randomized_port_alloc(
                     &mut bindings_ctx.rng(),
-                    &Some(*ip_sock.local_ip()),
+                    &Some(SocketIpAddr::from(*ip_sock.local_ip())),
                     &TcpPortAlloc(socketmap),
                     &Some(remote_port),
                 ) {
@@ -4975,7 +4975,7 @@ where
 
             let conn_addr = ConnAddr {
                 ip: ConnIpAddr {
-                    local: (*ip_sock.local_ip(), local_port),
+                    local: (SocketIpAddr::from(*ip_sock.local_ip()), local_port),
                     remote: (*ip_sock.remote_ip(), remote_port),
                 },
                 device: ip_sock.device().cloned(),
@@ -5196,7 +5196,7 @@ fn send_tcp_segment<'a, WireI, SockI, CC, BC, D>(
             core_ctx.send_oneshot_ip_packet(
                 bindings_ctx,
                 None,
-                Some(local_ip),
+                IpDeviceAddr::new_from_socket_ip_addr(local_ip),
                 remote_ip,
                 IpProto::Tcp.into(),
                 &DefaultSendOptions,
@@ -5638,7 +5638,7 @@ mod tests {
             &mut self,
             bindings_ctx: &mut BC,
             device: Option<EitherDeviceId<&Self::DeviceId, &Self::WeakDeviceId>>,
-            local_ip: Option<SocketIpAddr<I::Addr>>,
+            local_ip: Option<IpDeviceAddr<I::Addr>>,
             remote_ip: SocketIpAddr<I::Addr>,
             proto: I::Proto,
             transparent: bool,

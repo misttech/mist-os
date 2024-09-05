@@ -20,8 +20,8 @@ use netstack3_base::socket::{AddrIsMappedError, SocketIpAddr};
 use netstack3_base::sync::Mutex;
 use netstack3_base::{
     AnyDevice, Counter, CounterContext, DeviceIdContext, EitherDeviceId, FrameDestination,
-    IcmpIpExt, Icmpv4ErrorCode, Icmpv6ErrorCode, InstantBindingsTypes, InstantContext, IpExt,
-    RngContext, TokenBucket,
+    IcmpIpExt, Icmpv4ErrorCode, Icmpv6ErrorCode, InstantBindingsTypes, InstantContext,
+    IpDeviceAddr, IpExt, RngContext, TokenBucket,
 };
 use netstack3_filter::{self as filter, TransportPacketSerializer};
 use packet::{
@@ -1752,7 +1752,7 @@ fn send_icmp_reply<I, BC, CC, S, F>(
         .send_oneshot_ip_packet(
             bindings_ctx,
             None,
-            Some(original_dst_ip),
+            IpDeviceAddr::new_from_socket_ip_addr(original_dst_ip),
             original_src_ip,
             I::ICMP_IP_PROTO,
             &DefaultSendOptions,
@@ -3266,7 +3266,7 @@ mod tests {
             &mut self,
             bindings_ctx: &mut FakeIcmpBindingsCtx<I>,
             device: Option<EitherDeviceId<&Self::DeviceId, &Self::WeakDeviceId>>,
-            local_ip: Option<SocketIpAddr<I::Addr>>,
+            local_ip: Option<IpDeviceAddr<I::Addr>>,
             remote_ip: SocketIpAddr<I::Addr>,
             proto: I::Proto,
             transparent: bool,
@@ -3325,7 +3325,7 @@ mod tests {
             &mut self,
             _device_id: &Self::DeviceId,
             _remote: Option<SpecifiedAddr<Ipv6Addr>>,
-        ) -> Option<SocketIpAddr<Ipv6Addr>> {
+        ) -> Option<IpDeviceAddr<Ipv6Addr>> {
             unimplemented!()
         }
 

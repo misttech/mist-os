@@ -6,7 +6,7 @@ use explicit::UnreachableExt as _;
 use net_types::SpecifiedAddr;
 use netstack3_base::socket::SocketIpAddr;
 use netstack3_base::{
-    AnyDevice, DeviceIdContext, EitherDeviceId, IpExt, Mms, UninstantiableWrapper,
+    AnyDevice, DeviceIdContext, EitherDeviceId, IpDeviceAddr, IpExt, Mms, UninstantiableWrapper,
 };
 use netstack3_filter::Tuple;
 
@@ -44,7 +44,7 @@ impl<I: IpExt, C, P: DeviceIdContext<AnyDevice>> IpSocketHandler<I, C>
         &mut self,
         _ctx: &mut C,
         _device: Option<EitherDeviceId<&Self::DeviceId, &Self::WeakDeviceId>>,
-        _local_ip: Option<SocketIpAddr<I::Addr>>,
+        _local_ip: Option<IpDeviceAddr<I::Addr>>,
         _remote_ip: SocketIpAddr<I::Addr>,
         _proto: I::Proto,
         _transparent: bool,
