@@ -84,6 +84,12 @@ const (
 	// not exist if the build failed.
 	buildSuccessStampName = "last_ninja_build_success.stamp"
 	// LINT.ThenChange(//tools/devshell/build)
+
+	// LINT.IfChange
+	// lastNinjaBuildTargetsName is the name of a file that contains the
+	// list of Ninja targets passed to the last build invocation.
+	lastNinjaBuildTargetsName = "last_ninja_build_targets.txt"
+	// LINT.ThenChange(//tools/devshell/build)
 )
 
 var (
@@ -164,6 +170,19 @@ func subninjaLogIsRecent(log string, t time.Time) (bool, error) {
 	return t.Before(info.ModTime()), nil
 }
 
+func updateFileIfNeeded(filePath string, content []byte) error {
+	if checkFileExists(filePath) {
+		currentContent, err := os.ReadFile(filePath)
+		if err != nil {
+			return err
+		}
+		if bytes.Equal(currentContent, content) {
+			return nil
+		}
+	}
+	return os.WriteFile(filePath, content, 0o644)
+}
+
 // Build runs `ninja` given a static and context spec. It's intended to be
 // consumed as a library function.
 func Build(ctx context.Context, staticSpec *fintpb.Static, contextSpec *fintpb.Context) (*fintpb.BuildArtifacts, error) {
@@ -241,6 +260,9 @@ func buildImpl(
 			return nil, err
 		}
 	}
+
+	updateFileIfNeeded(filepath.Join(buildDir, lastNinjaBuildTargetsName),
+		[]byte(strings.Join(targets, " ")))
 
 	ninjaStartTime := time.Now()
 	var ninjaErr error

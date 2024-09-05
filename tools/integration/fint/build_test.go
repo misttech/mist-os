@@ -795,6 +795,11 @@ func TestBuild(t *testing.T) {
 			if checkFileExists(filepath.Join(buildDir, buildSuccessStampName)) {
 				if expectedBuildStampStatus == BuildSuccessStampMissing {
 					t.Errorf("Build success stamp file present in failed build!")
+				} else {
+					// Check the presence of the last ninja targets list file.
+					if !checkFileExists(filepath.Join(buildDir, lastNinjaBuildTargetsName)) {
+						t.Errorf("Last ninja build targets list file missing!")
+					}
 				}
 			} else {
 				if expectedBuildStampStatus == BuildSuccessStampExists {
