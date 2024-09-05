@@ -145,16 +145,19 @@ class ServerBase(object):
         return True
 
     async def _channel_read(self) -> FidlMessage:
-        try:
-            msg = self.channel.read()
-        except fc.ZxStatus as e:
-            if e.args[0] != fc.ZxStatus.ZX_ERR_SHOULD_WAIT:
+        while True:
+            try:
+                return self.channel.read()
+            except fc.ZxStatus as e:
+                # Any number of spurious wakeups are possible. Stay in the loop if the error
+                # is ZX_ERR_SHOULD_WAIT.
+                if e.args[0] == fc.ZxStatus.ZX_ERR_SHOULD_WAIT:
+                    _LOGGER.debug(f"{self} channel spurious wakeup")
+                    await self.channel_waker.wait_channel_ready(self.channel)
+                    continue
                 self.channel_waker.unregister(self.channel)
                 _LOGGER.warning(f"{self} channel received error: {e}")
                 raise e
-            await self.channel_waker.wait_channel_ready(self.channel)
-            msg = self.channel.read()
-        return msg
 
     async def _channel_read_and_parse(self):
         raw_msg = await self._channel_read()

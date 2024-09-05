@@ -169,6 +169,19 @@ class ServerTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(res.response, "foobar")
         server_task.cancel()
 
+    # TODO(https://fxbug.dev/364878315): This test sends many messages to AsyncEchoer which causes
+    # many spurious wakeups as a side-effect. Having this test ensures ServerBase is resilient
+    # to spurious wakeups, even several at a time.
+    async def test_echo_server_async_stress(self):
+        (tx, rx) = Channel.create()
+        server = AsyncEchoer(rx)
+        client = ffx.Echo.Client(tx)
+        server_task = asyncio.get_running_loop().create_task(server.serve())
+        for _ in range(12):
+            res = await client.echo_string(value="foobar")
+            self.assertEqual(res.response, "foobar")
+        server_task.cancel()
+
     async def test_not_implemented(self):
         (tx, rx) = Channel.create()
         server = ffx.Echo.Server(rx)
