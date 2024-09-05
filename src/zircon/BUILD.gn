@@ -7,7 +7,6 @@ group("tests") {
   deps = [
     "bin/hwstress:tests",
     "bin/role_manager/tests",
-    "bin/vsock_service:vsock_service-tests",
     "tests",
     "//zircon/kernel:tests",
     "//zircon/system/ulib:tests",

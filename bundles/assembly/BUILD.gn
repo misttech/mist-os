@@ -2906,7 +2906,7 @@ assembly_input_bundle("virtualization_support") {
 # valid build-types: all
 #
 assembly_input_bundle("paravirtualization_support") {
-  base_packages = [ "//src/zircon/bin/vsock_service:vsock_service" ]
+  base_packages = [ "//src/paravirtualization/vsock:vsock_service" ]
   compiled_packages = [
     {
       name = "core"
@@ -2914,7 +2914,7 @@ assembly_input_bundle("paravirtualization_support") {
         {
           component_name = "core"
           shards = [
-            "//src/zircon/bin/vsock_service/meta/vsock_service.core_shard.cml",
+            "//src/paravirtualization/vsock/meta/vsock_service.core_shard.cml",
           ]
         },
       ]
@@ -2923,7 +2923,7 @@ assembly_input_bundle("paravirtualization_support") {
 }
 
 assembly_input_bundle("paravirtualization_support_bootstrap") {
-  bootfs_packages = [ "//src/zircon/bin/vsock_service:vsock_service" ]
+  bootfs_packages = [ "//src/paravirtualization/vsock:vsock_service" ]
   compiled_packages = [
     {
       bootfs_package = true
@@ -2931,7 +2931,7 @@ assembly_input_bundle("paravirtualization_support_bootstrap") {
       components = [
         {
           component_name = "bootstrap"
-          shards = [ "//src/zircon/bin/vsock_service/meta/vsock_service.bootstrap_shard.cml" ]
+          shards = [ "//src/paravirtualization/vsock/meta/vsock_service.bootstrap_shard.cml" ]
         },
       ]
     },

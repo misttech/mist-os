@@ -87,6 +87,7 @@ config("allow_unused_results") {
     "//src/intl/*",
     "//src/lib/*",
     "//src/media/*",
+    "//src/paravirtualization/*",
     "//src/performance/*",
     "//src/power/*",
     "//src/recovery/*",
