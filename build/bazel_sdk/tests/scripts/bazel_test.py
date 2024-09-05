@@ -325,6 +325,13 @@ class BazelRepositoryMap(object):
                 fuchsia_sdk_dir / "common"
             )
 
+    def add_override(self, name: str, path: Path) -> None:
+        assert (
+            name not in self._overrides
+        ), f"Override is already registered for {name}: {self._overrides[name]} vs {path}"
+        self._overrides[name] = path
+        self._internal_overrides[name] = path
+
     def get_repository_overrides_flags(self) -> Sequence[str]:
         """Return a sequence command-line flags for overriding Bazel external repositories."""
         return [
@@ -346,7 +353,7 @@ class BazelRepositoryMap(object):
             repo_name = repo_name[1:]
             _repo_dir = self._internal_overrides.get(repo_name, None)
             assert _repo_dir, (
-                f"Unknown repository name in build file path: {bazel_path}\n"
+                f"Unknown repository name {repo_name} in build file path: {bazel_path}\n"
                 + f"Please modify {__file__} to handle it!"
             )
             repo_dir = _repo_dir
@@ -744,6 +751,17 @@ def main() -> int:
         workspace_dir=workspace_dir,
         output_base=output_base,
     )
+
+    if has_fuchsia_build_dir:
+        # If a @fuchsia_idk repository exists in the Fuchsia internal output_base, use it.
+        fuchsia_build_idk_repository = (
+            fuchsia_build_dir
+            / "gen/build/bazel/output_base/external/fuchsia_idk"
+        )
+        if fuchsia_build_idk_repository.is_dir():
+            bazel_repo_map.add_override(
+                "fuchsia_idk", fuchsia_build_idk_repository
+            )
 
     bazel_common_args += [
         # Prevent all downloads through a downloader configuration file.
