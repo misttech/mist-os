@@ -93,8 +93,8 @@ class Receiver final : public ReceiverBase {
 //     async::ReceiverMethod<Foo, &Foo::Handle> receiver_{this};
 // };
 template <class Class,
-          void (Class::*method)(async_dispatcher_t* dispatcher, async::ReceiverBase* receiver,
-                                zx_status_t status, const zx_packet_user_t* data)>
+          void (Class::* method)(async_dispatcher_t* dispatcher, async::ReceiverBase* receiver,
+                                 zx_status_t status, const zx_packet_user_t* data)>
 class ReceiverMethod final : public ReceiverBase {
  public:
   explicit ReceiverMethod(Class* instance)

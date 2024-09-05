@@ -77,9 +77,9 @@ not ok 138 fuchsia-pkg://fuchsia.com/wlan-hw-sim-test#meta/configure_legacy_priv
 [2105.735] 1054084.1055594>    #12   0x000021a1e2f916b4 in fidl::internal::MessageReader::ReadAndDispatchMessage(fidl::MessageBuffer*) ../../out/default/../../sdk/lib/fidl/cpp/internal/message_reader.cc:235 <<VMO#1055531=wlanphy.so>>+0x2ff6b4
 [2105.735] 1054084.1055594>    #13   0x000021a1e2f91bde in fidl::internal::MessageReader::OnHandleReady(async_dispatcher*, int, zx_packet_signal const*) ../../out/default/../../sdk/lib/fidl/cpp/internal/message_reader.cc:179 <<VMO#1055531=wlanphy.so>>+0x2ffbde
 [2105.735] 1054084.1055594>    #14   0x000021a1e2f8f13c in fidl::internal::MessageReader::CallHandler(async_dispatcher*, async_wait*, int, zx_packet_signal const*) ../../out/default/../../sdk/lib/fidl/cpp/internal/message_reader.cc:166 <<VMO#1055531=wlanphy.so>>+0x2fd13c
-[2105.735] 1054084.1055594>    #15.1 0x000021a1e3273e31 in async_loop_run_once ../../out/default/../../zircon/system/ulib/async-loop/loop.c:0 <<VMO#1055531=wlanphy.so>>+0x5e1e31
-[2105.735] 1054084.1055594>    #15   0x000021a1e3273e31 in async_loop_run ../../out/default/../../zircon/system/ulib/async-loop/loop.c:253 <<VMO#1055531=wlanphy.so>>+0x5e1e31
-[2105.735] 1054084.1055594>    #16   0x000021a1e3275b76 in async_loop_run_thread ../../out/default/../../zircon/system/ulib/async-loop/loop.c:799 <<VMO#1055531=wlanphy.so>>+0x5e3b76
+[2105.735] 1054084.1055594>    #15.1 0x000021a1e3273e31 in async_loop_run_once ../../out/default/../../sdk/lib/async-loop/loop.c:0 <<VMO#1055531=wlanphy.so>>+0x5e1e31
+[2105.735] 1054084.1055594>    #15   0x000021a1e3273e31 in async_loop_run ../../out/default/../../sdk/lib/async-loop/loop.c:253 <<VMO#1055531=wlanphy.so>>+0x5e1e31
+[2105.735] 1054084.1055594>    #16   0x000021a1e3275b76 in async_loop_run_thread ../../out/default/../../sdk/lib/async-loop/loop.c:799 <<VMO#1055531=wlanphy.so>>+0x5e3b76
 [2105.736] 1054084.1055594>    #17   0x000041f10d1f067e in start_c11 ../../out/default.zircon/../../zircon/third_party/ulib/musl/pthread/pthread_create.c:37 <libc.so>+0xaa67e
 [2105.736] 1054084.1055594>    #18   0x000041f10d3017ad in thread_trampoline ../../out/default.zircon/../../zircon/system/ulib/runtime/thread.c:93 <libc.so>+0x1bb7ad
 [2105.736] 1054084.1055594>

@@ -119,8 +119,8 @@ class Irq final : public IrqBase {
 //     async::IrqMethod<Foo, &Foo::Handle> irq_{this};
 // };
 template <class Class,
-          void (Class::*method)(async_dispatcher_t* dispatcher, async::IrqBase* irq,
-                                zx_status_t status, const zx_packet_interrupt_t* interrupt)>
+          void (Class::* method)(async_dispatcher_t* dispatcher, async::IrqBase* irq,
+                                 zx_status_t status, const zx_packet_interrupt_t* interrupt)>
 class IrqMethod final : public IrqBase {
  public:
   // Creates a irqMethod with options == 0.

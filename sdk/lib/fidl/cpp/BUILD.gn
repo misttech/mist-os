@@ -82,9 +82,9 @@ if (is_fuchsia) {
       "internal/natural_message_encoder.cc",
     ]
     public_deps = [
+      "//sdk/lib/async",
       "//sdk/lib/fidl/cpp:cpp_base",
       "//sdk/lib/fidl_base",
-      "//zircon/system/ulib/async",
     ]
   }
 }

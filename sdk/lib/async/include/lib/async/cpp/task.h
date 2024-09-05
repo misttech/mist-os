@@ -162,8 +162,8 @@ class Task final : public TaskBase {
 //     void Handle(async_dispatcher_t* dispatcher, async::TaskBase* task, zx_status_t status) { ...
 //     } async::TaskMethod<Foo, &Foo::Handle> task_{this};
 // };
-template <class Class, void (Class::*method)(async_dispatcher_t* dispatcher, async::TaskBase* task,
-                                             zx_status_t status)>
+template <class Class, void (Class::* method)(async_dispatcher_t* dispatcher, async::TaskBase* task,
+                                              zx_status_t status)>
 class TaskMethod final : public TaskBase {
  public:
   explicit TaskMethod(Class* instance) : TaskBase(&TaskMethod::CallHandler), instance_(instance) {}
@@ -208,7 +208,7 @@ class TaskClosure final : public TaskBase {
 //     void Handle() { ... }
 //     async::TaskClosureMethod<Foo, &Foo::Handle> trap_{this};
 // };
-template <class Class, void (Class::*method)()>
+template <class Class, void (Class::* method)()>
 class TaskClosureMethod final : public TaskBase {
  public:
   explicit TaskClosureMethod(Class* instance)

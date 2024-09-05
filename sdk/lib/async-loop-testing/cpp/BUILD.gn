@@ -30,13 +30,13 @@ sdk_source_set("cpp") {
     "//zircon/system/ulib/zx",
 
     # <real_loop.h> has #include <lib/async/cpp/executor.h>
-    "//zircon/system/ulib/async:async-cpp",
+    "//sdk/lib/async:async-cpp",
 
     # <real_loop.h> has #include <lib/async-loop/cpp/loop.h>
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-cpp",
 
     # <real_loop.h> has #include <lib/async-loop/default.h>
-    "//zircon/system/ulib/async-loop:async-loop-default",
+    "//sdk/lib/async-loop:async-loop-default",
   ]
 
   public_configs = [ ":include" ]

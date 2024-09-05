@@ -149,7 +149,7 @@ sdk_source_set("wire") {
     sources += [ "transport_channel_host.cc" ]
   }
 
-  deps = [ "//zircon/system/ulib/async:async-cpp" ]
+  deps = [ "//sdk/lib/async:async-cpp" ]
 
   public_deps = [
     # <lib/fidl/cpp/wire/wire_messaging.h> has #include <lib/fit/function.h>.
@@ -171,7 +171,7 @@ sdk_source_set("wire") {
   if (is_fuchsia) {
     public_deps += [
       # <lib/fidl/cpp/wire/async_binding.h> has #include <lib/async/dispatcher.h>
-      "//zircon/system/ulib/async",
+      "//sdk/lib/async",
 
       # <lib/fidl/cpp/wire/async_binding.h> has #include <lib/sync/completion.h>
       "//zircon/system/ulib/sync",

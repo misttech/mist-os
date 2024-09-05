@@ -101,8 +101,8 @@ class GuestBellTrap final : public GuestBellTrapBase {
 //     async::GuestBellTrapMethod<Foo, &Foo::Handle> trap_{this};
 // };
 template <class Class,
-          void (Class::*method)(async_dispatcher_t* dispatcher, async::GuestBellTrapBase* trap,
-                                zx_status_t status, const zx_packet_guest_bell_t* bell)>
+          void (Class::* method)(async_dispatcher_t* dispatcher, async::GuestBellTrapBase* trap,
+                                 zx_status_t status, const zx_packet_guest_bell_t* bell)>
 class GuestBellTrapMethod final : public GuestBellTrapBase {
  public:
   explicit GuestBellTrapMethod(Class* instance)

@@ -35,8 +35,7 @@ typedef struct {
   uintptr_t reserved[2];
 } async_state_t;
 
-#define ASYNC_STATE_INIT \
-  { 0u, 0u }
+#define ASYNC_STATE_INIT {0u, 0u}
 
 // Asynchronous dispatcher interface.
 //

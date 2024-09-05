@@ -66,6 +66,8 @@ foreach(test_name, test_names) {
     deps = [
       ":fidl_driver_transport_testing_lib",
       ":test.transport_cpp",
+      "//sdk/lib/async:async-cpp",
+      "//sdk/lib/async-loop:async-loop-default",
       "//sdk/lib/driver/runtime:driver_runtime_testing",
       "//sdk/lib/driver/runtime/testing/cpp",
       "//sdk/lib/fidl_driver",
@@ -73,8 +75,6 @@ foreach(test_name, test_names) {
       "//sdk/testing/fidl/protocols_tests:test.unknown.interactions_cpp",
       "//src/devices/bin/driver_runtime:driver_runtime_impl",
       "//src/devices/testing/driver-runtime-main:zxtest",
-      "//zircon/system/ulib/async:async-cpp",
-      "//zircon/system/ulib/async-loop:async-loop-default",
       "//zircon/system/ulib/sync:sync-cpp",
       "//zircon/system/ulib/zxtest",
     ]
@@ -96,6 +96,7 @@ test("fidl_driver_api_test_bin") {
   deps = [
     ":fidl_driver_transport_testing_lib",
     ":test.transport_cpp",
+    "//sdk/lib/async:async-cpp",
     "//sdk/lib/async_patterns/testing/cpp",
     "//sdk/lib/driver/runtime:driver_runtime_testing",
     "//sdk/lib/driver/runtime/testing/cpp",
@@ -106,7 +107,6 @@ test("fidl_driver_api_test_bin") {
     "//src/devices/testing/driver-runtime-main:gtest",
     "//src/lib/testing/predicates",
     "//third_party/googletest:gtest",
-    "//zircon/system/ulib/async:async-cpp",
     "//zircon/system/ulib/sync:sync-cpp",
   ]
 }

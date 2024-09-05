@@ -299,7 +299,7 @@ exploring some of these issues.
 for canceling synchronous operations on a handle avoiding handle resolution
 races.
 
-[async-loop key management](https://cs.opensource.google/fuchsia/fuchsia/+/main:zircon/system/ulib/async-loop/loop.c;l=589;drc=36e68808ae97fc54675be5c3f57484726577425c)
+[async-loop key management](https://cs.opensource.google/fuchsia/fuchsia/+/main:sdk/lib/async-loop/loop.c;l=589;drc=36e68808ae97fc54675be5c3f57484726577425c)
 
 [zxwait key management](https://cs.opensource.google/fuchsia/fuchsia/+/main:third_party/go/src/syscall/zx/zxwait/zxwait.go;l=72;drc=ae86e92e4a96a51b1de243443c4fbe744f8c7740)
 

@@ -93,6 +93,8 @@ executable("cpp_test") {
     "//sdk/fidl/fuchsia.device.fs:fuchsia.device.fs_hlcpp",
     "//sdk/fidl/fuchsia.io:fuchsia.io_hlcpp",
     "//sdk/fidl/fuchsia.logger:fuchsia.logger_hlcpp",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/async_patterns/testing/cpp",
     "//sdk/lib/component/outgoing/cpp",
     "//sdk/lib/driver/compat/cpp",
@@ -109,8 +111,6 @@ executable("cpp_test") {
     "//src/lib/testing/loop_fixture",
     "//src/lib/testing/predicates",
     "//third_party/rapidjson",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/zx",
   ]
 

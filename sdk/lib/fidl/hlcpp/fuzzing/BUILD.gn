@@ -15,15 +15,15 @@ source_set("fuzzing") {
     "include/lib/fidl/cpp/fuzzing/traits.h",
   ]
   public_deps = [
+    "//sdk/lib/async:async-cpp",
+    "//sdk/lib/async-default",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/fidl/cpp/wire",
     "//sdk/lib/fidl/hlcpp",
     "//sdk/lib/fuzzing/cpp",
     "//sdk/lib/fuzzing/cpp:traits",
     "//zircon/system/public",
-    "//zircon/system/ulib/async:async-cpp",
-    "//zircon/system/ulib/async-default",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
   ]
   public_configs = [
     "//sdk/config",

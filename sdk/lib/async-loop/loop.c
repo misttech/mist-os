@@ -120,7 +120,7 @@ static void async_loop_invoke_epilogue(async_loop_t* loop);
 static_assert(sizeof(list_node_t) <= sizeof(async_state_t), "async_state_t too small");
 
 #define TO_NODE(type, ptr) ((list_node_t*)&ptr->state)
-#define FROM_NODE(type, ptr) ((type*)((char*)(ptr)-offsetof(type, state)))
+#define FROM_NODE(type, ptr) ((type*)((char*)(ptr) - offsetof(type, state)))
 
 static inline list_node_t* wait_to_node(async_wait_t* wait) { return TO_NODE(async_wait_t, wait); }
 
@@ -736,10 +736,10 @@ static zx_status_t async_loop_cancel_paged_vmo(async_paged_vmo_t* paged_vmo) {
 }
 
 static void async_loop_insert_task_locked(async_loop_t* loop, async_task_t* task) {
-  // TODO(https://fxbug.dev/42105840): We assume that tasks are inserted in quasi-monotonic order and
-  // that insertion into the task queue will typically take no more than a few steps.
-  // If this assumption proves false and the cost of insertion becomes a problem, we
-  // should consider using a more efficient representation for maintaining order.
+  // TODO(https://fxbug.dev/42105840): We assume that tasks are inserted in quasi-monotonic order
+  // and that insertion into the task queue will typically take no more than a few steps. If this
+  // assumption proves false and the cost of insertion becomes a problem, we should consider using a
+  // more efficient representation for maintaining order.
   list_node_t* node;
   for (node = loop->task_list.prev; node != &loop->task_list; node = node->prev) {
     if (task->deadline >= node_to_task(node)->deadline)

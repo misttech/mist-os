@@ -18,7 +18,7 @@ trace_engine_headers = [
 
 trace_engine_header_deps = [
   # <trace-engine/handler.h> has #include <lib/async/dispatcher.h>.
-  "//zircon/system/ulib/async",
+  "//sdk/lib/async",
 ]
 
 template("trace_engine_library") {
@@ -40,7 +40,7 @@ template("trace_engine_library") {
       "nonce.cc",
     ]
     deps = [
-      "//zircon/system/ulib/async:async-cpp",
+      "//sdk/lib/async:async-cpp",
       "//zircon/system/ulib/fbl",
       "//zircon/system/ulib/zx",
     ]

@@ -18,13 +18,13 @@ test("fidl_cpp_dispatcher_tests_bin") {
   output_name = "fidl_cpp_dispatcher_tests"
   sources = [ "client_test.cc" ]
   deps = [
+    "//sdk/lib/async:async-cpp",
+    "//sdk/lib/async-loop",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/fidl/cpp",
     "//sdk/lib/stdcompat",
     "//src/lib/fidl/llcpp/tests/dispatcher:client_test_helpers",
-    "//zircon/system/ulib/async:async-cpp",
-    "//zircon/system/ulib/async-loop",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/zxtest",
   ]
 

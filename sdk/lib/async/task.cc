@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 #include <lib/async/cpp/task.h>
-
 #include <lib/async/cpp/time.h>
 #include <zircon/assert.h>
 

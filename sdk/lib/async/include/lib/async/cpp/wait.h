@@ -176,8 +176,8 @@ class WaitOnce final : public WaitBase {
 //                 const zx_packet_signal_t* signal) { ... }
 //     async::WaitMethod<Foo, &Foo::Handle> wait_{this};
 // };
-template <class Class, void (Class::*method)(async_dispatcher_t* dispatcher, async::WaitBase* wait,
-                                             zx_status_t status, const zx_packet_signal_t* signal)>
+template <class Class, void (Class::* method)(async_dispatcher_t* dispatcher, async::WaitBase* wait,
+                                              zx_status_t status, const zx_packet_signal_t* signal)>
 class WaitMethod final : public WaitBase {
  public:
   explicit WaitMethod(Class* instance, zx_handle_t object = ZX_HANDLE_INVALID,

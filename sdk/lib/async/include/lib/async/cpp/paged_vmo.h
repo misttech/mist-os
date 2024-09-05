@@ -105,8 +105,8 @@ class PagedVmo final : public PagedVmoBase {
 //   async::PagedVmoMethod<Foo, &Foo::Handle> paged_vmo_{this};
 // };
 template <class Class,
-          void (Class::*method)(async_dispatcher_t* dispatcher, async::PagedVmoBase* receiver,
-                                zx_status_t status, const zx_packet_page_request_t* page_request)>
+          void (Class::* method)(async_dispatcher_t* dispatcher, async::PagedVmoBase* receiver,
+                                 zx_status_t status, const zx_packet_page_request_t* page_request)>
 class PagedVmoMethod final : public PagedVmoBase {
  public:
   explicit PagedVmoMethod(Class* instance)

@@ -262,10 +262,10 @@ without necessarily starting operating system threads, is a recurring theme:
 tasks in Chrome][chrome].
 - The Java Platform added [virtual threads][java].
 
-[async-readme]: /zircon/system/ulib/async/README.md
-[async-loop]: /zircon/system/ulib/async-loop/include/lib/async-loop/loop.h
-[async-loop-cpp]: /zircon/system/ulib/async-loop/include/lib/async-loop/cpp/loop.h
-[async-wait]: /zircon/system/ulib/async/include/lib/async/cpp/wait.h
+[async-readme]: /sdk/lib/async/README.md
+[async-loop]: /sdk/lib/async-loop/include/lib/async-loop/loop.h
+[async-loop-cpp]: /sdk/lib/async-loop/include/lib/async-loop/cpp/loop.h
+[async-wait]: /sdk/lib/async/include/lib/async/cpp/wait.h
 [concurrency]: https://slikts.github.io/concurrency-glossary/?id=concurrent-order-independent-vs-sequential
 [dispatcher-bound]: /sdk/lib/async_patterns/cpp/dispatcher_bound.h
 [receiver]: /sdk/lib/async_patterns/cpp/receiver.h
@@ -279,5 +279,5 @@ tasks in Chrome][chrome].
 [chrome]: https://chromium.googlesource.com/chromium/src/+/master/docs/threading_and_tasks.md
 [java]: https://openjdk.org/jeps/425
 [golang]: https://go.dev/blog/codelab-share
-[synchronization-checker]: /zircon/system/ulib/async/include/lib/async/cpp/sequence_checker.h
+[synchronization-checker]: /sdk/lib/async/include/lib/async/cpp/sequence_checker.h
 [CppCon 2018: Geoffrey Romer “What do you mean "thread-safe"?”]: https://youtube.com/watch?v=s5PCh_FaMfM

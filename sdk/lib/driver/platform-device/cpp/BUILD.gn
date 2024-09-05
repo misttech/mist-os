@@ -31,14 +31,14 @@ test("driver-platform-device-test") {
   deps = [
     ":cpp",
     "//sdk/fidl/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_cpp_testing",
+    "//sdk/lib/async-default",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/async_patterns/testing/cpp",
     "//src/devices/bus/testing/fake-pdev",
     "//src/devices/lib/mmio:test_helper",
     "//src/devices/testing/fake-bti",
     "//src/devices/testing/fake-resource",
-    "//zircon/system/ulib/async-default",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/zxtest",
   ]
 }

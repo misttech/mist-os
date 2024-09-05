@@ -24,4 +24,4 @@ extern const async_loop_config_t kAsyncLoopConfigNoAttachToCurrentThread;
 
 __END_CDECLS
 
-#endif  // LIB_ASYNC_LOOP_LOOP_H_
+#endif  // LIB_ASYNC_LOOP_DEFAULT_H_

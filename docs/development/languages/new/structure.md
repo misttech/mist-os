@@ -53,7 +53,7 @@ using
 
 ### Examples
 
-* [async](/zircon/system/ulib/async)
+* [async](/sdk/lib/async)
   (C and C++)
 * [fuchsia-async](/src/lib/fuchsia-async/) (Rust)
 * [zxwait](https://fuchsia.googlesource.com/third_party/go/+/HEAD/src/syscall/zx/zxwait/) (Go)

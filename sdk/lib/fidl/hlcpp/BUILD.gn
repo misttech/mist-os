@@ -55,12 +55,12 @@ sdk_source_set("hlcpp") {
 
   public_deps = [
     ":hlcpp_sync",
+    "//sdk/lib/async",
+    "//sdk/lib/async-default",
     "//sdk/lib/fidl",
     "//sdk/lib/fit",
     "//sdk/lib/fit-promise",
     "//sdk/lib/stdcompat",
-    "//zircon/system/ulib/async",
-    "//zircon/system/ulib/async-default",
     "//zircon/system/ulib/zx",
   ]
 

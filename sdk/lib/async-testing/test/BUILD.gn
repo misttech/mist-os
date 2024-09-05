@@ -14,12 +14,12 @@ test("async-testing") {
   output_name = "async-testing-test"
   sources = [ "test_loop_tests.cc" ]
   deps = [
+    "//sdk/lib/async",
+    "//sdk/lib/async:async-cpp",
+    "//sdk/lib/async-default",
+    "//sdk/lib/async-testing",
     "//sdk/lib/fdio",
     "//sdk/lib/fit",
-    "//zircon/system/ulib/async",
-    "//zircon/system/ulib/async:async-cpp",
-    "//zircon/system/ulib/async-default",
-    "//zircon/system/ulib/async-testing",
     "//zircon/system/ulib/zx",
     "//zircon/system/ulib/zxtest",
   ]

@@ -95,8 +95,7 @@ TEST(TestLoopDispatcher, FakeClockTimeIsCorrect) {
 TEST(TestLoopTest, TasksAreDispatched) {
   async::TestLoop loop;
   bool called = false;
-  async::PostDelayedTask(
-      loop.dispatcher(), [&called] { called = true; }, zx::sec(2));
+  async::PostDelayedTask(loop.dispatcher(), [&called] { called = true; }, zx::sec(2));
 
   // t = 1: nothing should happen.
   loop.RunFor(zx::sec(1));
@@ -114,8 +113,7 @@ TEST(TestLoopTest, TasksAreDispatched) {
 
 TEST(TestLoopTest, QuitAndReset) {
   async::TestLoop loop;
-  async::PostDelayedTask(
-      loop.dispatcher(), [] {}, zx::sec(1));
+  async::PostDelayedTask(loop.dispatcher(), [] {}, zx::sec(1));
   loop.Quit();
 
   // Loop has quit, so time does not advance and no work is done.
@@ -140,8 +138,7 @@ TEST(TestLoopTest, QuitAndReset) {
 TEST(TestLoopTest, RunRepeatedly) {
   async::TestLoop loop;
   for (int i = 0; i <= 60; ++i) {
-    async::PostDelayedTask(
-        loop.dispatcher(), [] {}, zx::sec(i));
+    async::PostDelayedTask(loop.dispatcher(), [] {}, zx::sec(i));
   }
   // Run the loop repeatedly at ten second intervals until the delayed tasks
   // are all dispatched.
@@ -200,10 +197,7 @@ TEST(TestLoopTest, NestedTasksAreDispatched) {
   async::PostTask(loop.dispatcher(), [&] {
     async::PostDelayedTask(
         loop.dispatcher(),
-        [&] {
-          async::PostDelayedTask(
-              loop.dispatcher(), [&] { called = true; }, zx::min(25));
-        },
+        [&] { async::PostDelayedTask(loop.dispatcher(), [&] { called = true; }, zx::min(25)); },
         zx::min(35));
   });
 
@@ -298,8 +292,7 @@ TEST(TestLoopTest, WaitsAreDispatched) {
   bool called = false;
 
   ASSERT_EQ(ZX_OK, zx::event::create(0u, &event));
-  InitWait(
-      &wait, [&called] { called = true; }, event, ZX_USER_SIGNAL_0);
+  InitWait(&wait, [&called] { called = true; }, event, ZX_USER_SIGNAL_0);
   ASSERT_EQ(ZX_OK, wait.Begin(loop.dispatcher()));
 
   // |wait| has not yet been triggered.
@@ -336,8 +329,7 @@ TEST(TestLoopTest, NestedWaitsAreDispatched) {
         InitWait(
             &waitB,
             [&] {
-              InitWait(
-                  &waitC, [&] { calledC = true; }, event, ZX_USER_SIGNAL_2);
+              InitWait(&waitC, [&] { calledC = true; }, event, ZX_USER_SIGNAL_2);
               waitC.Begin(loop.dispatcher());
               calledB = true;
             },
@@ -388,12 +380,9 @@ TEST(TestLoopTest, WaitsAreCanceled) {
 
   ASSERT_EQ(ZX_OK, zx::event::create(0u, &event));
 
-  InitWait(
-      &waitA, [&calledA] { calledA = true; }, event, ZX_USER_SIGNAL_0);
-  InitWait(
-      &waitB, [&calledB] { calledB = true; }, event, ZX_USER_SIGNAL_0);
-  InitWait(
-      &waitC, [&calledC] { calledC = true; }, event, ZX_USER_SIGNAL_0);
+  InitWait(&waitA, [&calledA] { calledA = true; }, event, ZX_USER_SIGNAL_0);
+  InitWait(&waitB, [&calledB] { calledB = true; }, event, ZX_USER_SIGNAL_0);
+  InitWait(&waitC, [&calledC] { calledC = true; }, event, ZX_USER_SIGNAL_0);
 
   ASSERT_OK(waitA.Begin(loop.dispatcher()));
   ASSERT_OK(waitB.Begin(loop.dispatcher()));
@@ -493,8 +482,7 @@ TEST(TestLoopTest, HugeAmountOfTaskAreDispatched) {
   auto& waits = *waits_ptr;
 
   for (size_t i = 0; i < kPostCount; ++i) {
-    InitWait(
-        &waits[i], [&] { wait_count++; }, event, ZX_USER_SIGNAL_0);
+    InitWait(&waits[i], [&] { wait_count++; }, event, ZX_USER_SIGNAL_0);
     ASSERT_OK(waits[i].Begin(loop.dispatcher()));
   }
   ASSERT_OK(event.signal(0u, ZX_USER_SIGNAL_0));
@@ -521,11 +509,9 @@ TEST(TestLoopTest, TasksAreDispatchedOnManyLoops) {
   async::TaskClosure taskC([&calledC] { calledC = true; });
 
   async::PostTask(loopB->dispatcher(), [&calledB] { calledB = true; });
-  async::PostDelayedTask(
-      loop.dispatcher(), [&called] { called = true; }, zx::sec(1));
+  async::PostDelayedTask(loop.dispatcher(), [&called] { called = true; }, zx::sec(1));
   ASSERT_OK(taskC.PostDelayed(loopC->dispatcher(), zx::sec(1)));
-  async::PostDelayedTask(
-      loopA->dispatcher(), [&calledA] { calledA = true; }, zx::sec(2));
+  async::PostDelayedTask(loopA->dispatcher(), [&calledA] { calledA = true; }, zx::sec(2));
 
   loop.RunUntilIdle();
   EXPECT_FALSE(called);
@@ -564,14 +550,10 @@ TEST(TestLoopTest, WaitsAreDispatchedOnManyLoops) {
 
   ASSERT_EQ(ZX_OK, zx::event::create(0u, &event));
 
-  InitWait(
-      &wait, [&called] { called = true; }, event, ZX_USER_SIGNAL_0);
-  InitWait(
-      &waitA, [&calledA] { calledA = true; }, event, ZX_USER_SIGNAL_0);
-  InitWait(
-      &waitB, [&calledB] { calledB = true; }, event, ZX_USER_SIGNAL_0);
-  InitWait(
-      &waitC, [&calledC] { calledC = true; }, event, ZX_USER_SIGNAL_0);
+  InitWait(&wait, [&called] { called = true; }, event, ZX_USER_SIGNAL_0);
+  InitWait(&waitA, [&calledA] { calledA = true; }, event, ZX_USER_SIGNAL_0);
+  InitWait(&waitB, [&calledB] { calledB = true; }, event, ZX_USER_SIGNAL_0);
+  InitWait(&waitC, [&calledC] { calledC = true; }, event, ZX_USER_SIGNAL_0);
 
   ASSERT_OK(wait.Begin(loop.dispatcher()));
   ASSERT_OK(waitA.Begin(loopA->dispatcher()));
@@ -601,11 +583,9 @@ void DetermineDispatchOrder(std::unique_ptr<async::TestLoop> loop, int (*order)[
 
   ASSERT_OK(zx::event::create(0u, &event));
 
-  InitWait(
-      &wait, [&] { (*order)[0] = ++i; }, event, ZX_USER_SIGNAL_0);
+  InitWait(&wait, [&] { (*order)[0] = ++i; }, event, ZX_USER_SIGNAL_0);
   async::PostTask(loopA->dispatcher(), [&] { (*order)[1] = ++i; });
-  InitWait(
-      &waitB, [&] { (*order)[2] = ++i; }, event, ZX_USER_SIGNAL_0);
+  InitWait(&waitB, [&] { (*order)[2] = ++i; }, event, ZX_USER_SIGNAL_0);
   async::PostTask(loopC->dispatcher(), [&] { (*order)[3] = ++i; });
 
   ASSERT_OK(wait.Begin(loop->dispatcher()));

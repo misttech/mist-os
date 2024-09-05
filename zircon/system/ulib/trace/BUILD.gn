@@ -25,8 +25,8 @@ template("trace_library") {
       # <trace/observer.h> has #include <trace-engine/instrumentation.h> (already
       # covered, <lib/async/cpp/wait.h>, <fit/function.h>, and <lib/zx/event.h>.
       ":trace-headersonly",
+      "//sdk/lib/async:async-cpp",
       "//sdk/lib/fit",
-      "//zircon/system/ulib/async:async-cpp",
       "//zircon/system/ulib/zx",
     ]
 
@@ -37,9 +37,9 @@ template("trace_library") {
 
     # Source dependencies, not including the trace engine.
     deps = [
+      "//sdk/lib/async",
+      "//sdk/lib/async:async-cpp",
       "//sdk/lib/fit",
-      "//zircon/system/ulib/async",
-      "//zircon/system/ulib/async:async-cpp",
       "//zircon/system/ulib/zx",
     ]
   }
@@ -78,9 +78,9 @@ sdk_source_set("trace-headersonly") {
   ]
 
   public_deps = [
+    "//sdk/lib/async",
+    "//sdk/lib/async:async-cpp",
     "//sdk/lib/fit",
-    "//zircon/system/ulib/async",
-    "//zircon/system/ulib/async:async-cpp",
     "//zircon/system/ulib/trace-engine:trace-engine-headersonly",
     "//zircon/system/ulib/zx",
   ]

@@ -39,9 +39,9 @@ test("fidl_cpp_binding_group_tests_bin") {
   sources = [ "binding_group_test.cc" ]
   deps = [
     ":fidl.cpp.wire.bindinggroup.test_cpp",
-    "//zircon/system/ulib/async:async-cpp",
-    "//zircon/system/ulib/async-loop",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
+    "//sdk/lib/async:async-cpp",
+    "//sdk/lib/async-loop",
+    "//sdk/lib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/sync:sync-cpp",
     "//zircon/system/ulib/zxtest",
   ]
@@ -57,9 +57,9 @@ test("fidl_cpp_wire_interop_tests_bin") {
   deps = [
     ":fidl.cpp.wire.interop.test_cpp",
     ":fidl.cpp.wire.interop.test_cpp",
+    "//sdk/lib/async-loop",
+    "//sdk/lib/async-loop:async-loop-cpp",
     "//sdk/lib/stdcompat",
-    "//zircon/system/ulib/async-loop",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/zxtest",
   ]
 }
@@ -77,14 +77,14 @@ test("fidl_cpp_gen_api_tests_bin") {
   ]
   deps = [
     ":fidl.cpp.constraint.protocol.test_cpp",
+    "//sdk/lib/async:async-cpp",
+    "//sdk/lib/async-loop",
+    "//sdk/lib/async-loop:async-loop-cpp",
     "//sdk/testing/fidl/protocols_tests:test.basic.protocol_cpp",
     "//sdk/testing/fidl/protocols_tests:test.error.methods_cpp",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/predicates",
     "//src/sys/test_runners/gtest:death_test",
-    "//zircon/system/ulib/async:async-cpp",
-    "//zircon/system/ulib/async-loop",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/sync:sync-cpp",
   ]
 }
@@ -97,14 +97,14 @@ test("fidl_cpp_unknown_interactions_tests_bin") {
   output_name = "fidl_cpp_unknown_interactions_tests"
   sources = [ "unknown_interactions_tests.cc" ]
   deps = [
+    "//sdk/lib/async-loop",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/stdcompat",
     "//sdk/testing/fidl/protocols_tests:test.unknown.interactions_cpp",
     "//src/lib/fxl/test:gtest_main",
     "//third_party/googletest:gmock",
     "//third_party/googletest:gtest",
-    "//zircon/system/ulib/async-loop",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
   ]
 }
 

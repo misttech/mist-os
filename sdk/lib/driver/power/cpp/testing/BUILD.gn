@@ -22,8 +22,8 @@ source_set("fakes") {
     ":fidl_test_base_default",
     "//sdk/fidl/fuchsia.power.broker:fuchsia.power.broker_cpp",
     "//sdk/fidl/fuchsia.power.system:fuchsia.power.system_cpp",
+    "//sdk/lib/async:async-cpp",
     "//sdk/lib/fidl/hlcpp",
-    "//zircon/system/ulib/async:async-cpp",
   ]
 }
 
@@ -39,9 +39,9 @@ source_set("fidl_test_base_default") {
 source_set("scoped_background_loop") {
   public = [ "scoped_background_loop.h" ]
   public_deps = [
-    "//zircon/system/ulib/async",
-    "//zircon/system/ulib/async:async-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
+    "//sdk/lib/async",
+    "//sdk/lib/async:async-cpp",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
   ]
 }

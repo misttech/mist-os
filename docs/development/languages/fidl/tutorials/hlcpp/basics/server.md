@@ -174,8 +174,8 @@ This complete process is described in further detail in the
 
 This new code requires the following additional dependencies:
 
-* `"//zircon/system/ulib/async-loop:async-loop-cpp"` and
-  `"//zircon/system/ulib/async-loop:async-loop-default"`: These libraries contain
+* `"//sdk/lib/async-loop:async-loop-cpp"` and
+  `"//sdk/lib/async-loop:async-loop-default"`: These libraries contain
   the async loop code.
 * `"//sdk/lib/sys/cpp"`: The component framework C++ runtime, which contains
   utility code for interacting with the component's environment.
@@ -323,5 +323,5 @@ the [component instance tree][glossary.component-instance-tree]
 [pipeline]: /docs/development/api/fidl.md#request-pipelining
 [pipeline-tut]: /docs/development/languages/fidl/tutorials/hlcpp/topics/request-pipelining.md
 [compiling-fidl]: /docs/development/languages/fidl/tutorials/fidl.md
-[async-loop]: /zircon/system/ulib/async-loop/include/lib/async-loop/cpp/loop.h
+[async-loop]: /sdk/lib/async-loop/include/lib/async-loop/cpp/loop.h
 [overview]: /docs/development/languages/fidl/tutorials/overview.md

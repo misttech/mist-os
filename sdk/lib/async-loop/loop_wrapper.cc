@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 #include <lib/async-loop/cpp/loop.h>
-
 #include <zircon/assert.h>
 
 namespace async {

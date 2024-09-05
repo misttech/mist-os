@@ -33,7 +33,7 @@ sdk_shared_library("vfs_internal") {
 
   sdk_headers_for_internal_use = [ "libvfs_private.h" ]
 
-  public_deps = [ "//zircon/system/ulib/async" ]
+  public_deps = [ "//sdk/lib/async" ]
 
   deps = [
     "//sdk/fidl/fuchsia.io:fuchsia.io_cpp",

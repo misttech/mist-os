@@ -19,5 +19,5 @@
 go_tracing_include_dirs = [
   rebase_path("//zircon/system/ulib/trace-provider/include"),
   rebase_path("//zircon/system/ulib/trace-engine/include"),
-  rebase_path("//zircon/system/ulib/async/include"),
+  rebase_path("//sdk/lib/async/include"),
 ]

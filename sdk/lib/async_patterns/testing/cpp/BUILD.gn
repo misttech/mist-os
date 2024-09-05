@@ -13,8 +13,8 @@ sdk_source_set("cpp") {
   sources = [ "dispatcher_bound.h" ]
 
   public_deps = [
+    "//sdk/lib/async-loop:async-loop-cpp",
     "//sdk/lib/async_patterns/cpp",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
   ]
 
   public_configs = [ "//sdk/config" ]
