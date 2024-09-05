@@ -28,6 +28,7 @@
 #include "src/devices/block/drivers/ufs/request_processor.h"
 #include "src/devices/block/drivers/ufs/task_management_request_processor.h"
 #include "src/devices/block/drivers/ufs/transfer_request_processor.h"
+#include "src/devices/block/drivers/ufs/ufs_config.h"
 
 namespace ufs {
 
@@ -97,7 +98,8 @@ class Ufs : public fdf::DriverBase, public scsi::Controller {
   static constexpr fuchsia_power_broker::PowerLevel kPowerLevelOn = 1;
 
   Ufs(fdf::DriverStartArgs start_args, fdf::UnownedSynchronizedDispatcher dispatcher)
-      : fdf::DriverBase(kDriverName, std::move(start_args), std::move(dispatcher)) {}
+      : fdf::DriverBase(kDriverName, std::move(start_args), std::move(dispatcher)),
+        config_(take_config<ufs_config::Config>()) {}
   ~Ufs() override = default;
 
   zx::result<> Start() override;
@@ -112,6 +114,7 @@ class Ufs : public fdf::DriverBase, public scsi::Controller {
   async_dispatcher_t *driver_async_dispatcher() const { return dispatcher(); }
   const std::optional<std::string> &driver_node_name() const override { return node_name(); }
   fdf::Logger &driver_logger() override { return logger(); }
+  const ufs_config::Config &config() const { return config_; }
 
   size_t BlockOpSize() override { return sizeof(IoCommand); }
   zx_status_t ExecuteCommandSync(uint8_t target, uint16_t lun, iovec cdb, bool is_write,
@@ -300,6 +303,8 @@ class Ufs : public fdf::DriverBase, public scsi::Controller {
   bool qemu_quirk_ = false;
 
   std::mutex lock_;
+
+  ufs_config::Config config_;
 
   fidl::WireSyncClient<fuchsia_driver_framework::Node> parent_node_;
   fidl::WireSyncClient<fuchsia_driver_framework::Node> root_node_;

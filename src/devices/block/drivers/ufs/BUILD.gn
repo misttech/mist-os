@@ -7,7 +7,7 @@ import("//build/components.gni")
 import("//build/drivers.gni")
 import("//build/test.gni")
 
-driver_bind_rules("ufs_bind") {
+driver_bind_rules("ufs-bind") {
   rules = "meta/ufs.bind"
   tests = "meta/bind_tests.json"
   deps = [
@@ -21,14 +21,15 @@ driver_bind_rules("ufs_bind") {
 group("tests") {
   testonly = true
   deps = [
+    ":ufs-bind_test",
     ":ufs-tests",
-    ":ufs_bind_test",
     "test/e2e:tests",
   ]
 }
 
 _common_deps = [
-  ":ufs_bind",
+  ":ufs-bind",
+  ":ufs-config",
   "//sdk/fidl/fuchsia.hardware.block.driver:fuchsia.hardware.block.driver_banjo_cpp",
   "//sdk/fidl/fuchsia.hardware.pci:fuchsia.hardware.pci_cpp",
   "//sdk/fidl/fuchsia.hardware.power:fuchsia.hardware.power_cpp",
@@ -70,16 +71,33 @@ fuchsia_driver("ufs-driver") {
   deps = _common_deps
 }
 
+fuchsia_component_manifest("ufs-manifest") {
+  component_name = "ufs"
+  manifest = "meta/ufs.cml"
+}
+
 fuchsia_driver_component("ufs") {
   component_name = "ufs"
+  cm_label = ":ufs-manifest"
   deps = [ ":ufs-driver" ]
   info = "meta/ufs-info.json"
-  manifest = "meta/ufs.cml"
+}
+
+fuchsia_structured_config_cpp_elf_lib("ufs-config") {
+  cm_label = ":ufs-manifest"
+}
+
+fuchsia_structured_config_values("sc-values") {
+  cm_label = ":ufs-manifest"
+  values = {
+    enable_suspend = false
+  }
 }
 
 fuchsia_driver_package("pkg") {
   package_name = "ufs"
   driver_components = [ ":ufs" ]
+  deps = [ ":sc-values" ]
 }
 
 _test_deps = [

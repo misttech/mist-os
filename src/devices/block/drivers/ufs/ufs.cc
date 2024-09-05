@@ -1281,8 +1281,7 @@ zx::result<> Ufs::ConfigurePowerManagement() {
   const auto power_configs = fidl::ToWire(arena, GetAllPowerConfigs());
   if (power_configs.count() == 0) {
     FDF_LOGL(INFO, logger(), "No power configs found.");
-    // Do not fail driver initialization if there aren't any power configs.
-    return zx::success();
+    return zx::error(ZX_ERR_NOT_FOUND);
   }
 
   auto power_broker = driver_incoming()->Connect<fuchsia_power_broker::Topology>();
@@ -1308,11 +1307,9 @@ zx::result<> Ufs::ConfigurePowerManagement() {
 
     auto tokens = fdf_power::GetDependencyTokens(*driver_incoming(), config);
     if (tokens.is_error()) {
-      // TODO(https://fxbug.dev/42075643): Use fuchsia.power.SuspendEnabled config cap to determine
-      // whether to expect Power Framework
       FDF_LOG(ERROR, "Failed to get power dependency tokens: %u.",
               static_cast<uint8_t>(tokens.error_value()));
-      return zx::success();
+      return zx::error(ZX_ERR_INTERNAL);
     }
 
     fdf_power::ElementDesc description =
@@ -1533,10 +1530,8 @@ zx::result<> Ufs::Start() {
     return zx::error(status);
   }
 
-  // TODO(https://fxbug.dev/42075643): Use fuchsia.power.SuspendEnabled config cap to determine
-  // whether to expect Power Framework.
-  if (zx::result result = ConfigurePowerManagement(); !result.is_ok()) {
-    return result.take_error();
+  if (config().enable_suspend()) {
+    return ConfigurePowerManagement();
   }
 
   return zx::ok();
