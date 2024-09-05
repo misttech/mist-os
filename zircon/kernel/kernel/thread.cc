@@ -105,9 +105,6 @@ Thread::MigrateList Thread::migrate_list_;
 // master thread spinlock
 MonitoredSpinLock thread_lock __CPU_ALIGN_EXCLUSIVE{"thread_lock"_intern};
 
-// The global preempt disabled token singleton
-PreemptDisabledToken preempt_disabled_token;
-
 const char* ToString(enum thread_state state) {
   switch (state) {
     case THREAD_INITIAL:

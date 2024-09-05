@@ -11,6 +11,7 @@
 #include <arch.h>
 #include <debug.h>
 #include <lib/backtrace.h>
+#include <lib/concurrent/capability_token.h>
 #include <lib/fit/function.h>
 #include <lib/fxt/thread_ref.h>
 #include <lib/kconcurrent/chainlock.h>
@@ -672,6 +673,10 @@ class PreemptionState {
     PreemptReenable();
   }
 
+  static void AssertPreemptionDisabled() TA_ASSERT(preempt_disabled_token) {
+    preempt_disabled_token.AssertHeld();
+  }
+
   // PreemptReenableDelayFlush() decrements the preempt disable counter, but
   // deliberately does _not_ flush any pending local preemption operation.
   // Instead, if local preemption has become enabled again after the count
@@ -925,6 +930,10 @@ class PreemptionState {
 
  private:
   friend class PreemptDisableTestAccess;
+  friend concurrent::CapabilityToken<PreemptionState>;
+
+  // Implements the runtime assertion for concurrent::CapabilityToken<PreemptionState>::AssertHeld.
+  static void AssertCapabilityHeld(concurrent::CapabilityToken<PreemptionState>::TagType);
 
   static inline uint32_t EagerReschedDisableCount(uint32_t state) {
     return (state & kEagerReschedDisableMask) >> kEagerReschedDisableShift;
@@ -2084,7 +2093,8 @@ inline void WaitQueueCollection::MinRelativeDeadlineTraits::ResetBest(Thread& th
 #endif
 }
 
-inline void PreemptDisabledToken::AssertHeld() {
+inline void PreemptionState::AssertCapabilityHeld(
+    concurrent::CapabilityToken<PreemptionState>::TagType) {
   DEBUG_ASSERT(Thread::Current::preemption_state().PreemptIsEnabled() == false);
 }
 
