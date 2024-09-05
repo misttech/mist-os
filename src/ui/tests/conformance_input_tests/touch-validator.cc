@@ -43,23 +43,6 @@ constexpr double kPixelEpsilon = 0.5f;
 // Epsilon for floating error.
 constexpr double kEpsilon = 0.0001f;
 
-// TODO(https://fxbug.dev/42076606): Two coordinates (x/y) systems can differ in scale (size of
-// pixels).
-void ExpectLocationAndPhase(const std::string& scoped_message,
-                            const futi::TouchInputListenerReportTouchInputRequest& e,
-                            float expected_pixel_ratio, double expected_x, double expected_y,
-                            fup::EventPhase expected_phase, const uint32_t expected_pointer_id) {
-  SCOPED_TRACE(scoped_message);
-  auto pixel_scale = e.device_pixel_ratio().has_value() ? e.device_pixel_ratio().value() : 1;
-  EXPECT_NEAR(static_cast<double>(expected_pixel_ratio), pixel_scale, kEpsilon);
-  auto actual_x = pixel_scale * e.local_x().value();
-  auto actual_y = pixel_scale * e.local_y().value();
-  EXPECT_NEAR(expected_x, actual_x, kPixelEpsilon);
-  EXPECT_NEAR(expected_y, actual_y, kPixelEpsilon);
-  EXPECT_EQ(expected_phase, e.phase());
-  EXPECT_EQ(expected_pointer_id, e.pointer_id());
-}
-
 // Input stack does not guarantee the order of pointer in 1 contact report.
 // So tests sort the request vector by pointer id and keep the order of
 // event time.
@@ -150,10 +133,12 @@ class TouchConformanceTest : public ui_conformance_test_base::ConformanceTest,
       auto [client_end, server_end] = fidl::Endpoints<futi::TouchScreen>::Create();
       fake_touch_screen_ = fidl::SyncClient(std::move(client_end));
 
-      futi::RegistryRegisterTouchScreenRequest request;
+      futi::RegistryRegisterTouchScreenAndGetDeviceInfoRequest request;
       request.device(std::move(server_end));
       request.coordinate_unit(futi::CoordinateUnit::kPhysicalPixels);
-      ZX_ASSERT_OK(input_registry->RegisterTouchScreen(std::move(request)));
+      auto res = input_registry->RegisterTouchScreenAndGetDeviceInfo(std::move(request));
+      ZX_ASSERT_OK(res);
+      fake_touch_screen_device_id_ = res->device_id().value();
     }
 
     // Get display dimensions.
@@ -172,11 +157,31 @@ class TouchConformanceTest : public ui_conformance_test_base::ConformanceTest,
     }
   }
 
+  // TODO(https://fxbug.dev/42076606): Two coordinates (x/y) systems can differ in scale (size of
+  // pixels).
+  void ExpectLocationAndPhase(const std::string& scoped_message,
+                              const futi::TouchInputListenerReportTouchInputRequest& e,
+                              float expected_pixel_ratio, double expected_x, double expected_y,
+                              fup::EventPhase expected_phase,
+                              const uint32_t expected_pointer_id) const {
+    SCOPED_TRACE(scoped_message);
+    auto pixel_scale = e.device_pixel_ratio().has_value() ? e.device_pixel_ratio().value() : 1;
+    EXPECT_NEAR(static_cast<double>(expected_pixel_ratio), pixel_scale, kEpsilon);
+    auto actual_x = pixel_scale * e.local_x().value();
+    auto actual_y = pixel_scale * e.local_y().value();
+    EXPECT_NEAR(expected_x, actual_x, kPixelEpsilon);
+    EXPECT_NEAR(expected_y, actual_y, kPixelEpsilon);
+    EXPECT_EQ(expected_phase, e.phase());
+    EXPECT_EQ(expected_pointer_id, e.pointer_id());
+    EXPECT_EQ(fake_touch_screen_device_id_, e.device_id().value());
+  }
+
  protected:
   int32_t display_width_as_int() const { return static_cast<int32_t>(display_width_); }
   int32_t display_height_as_int() const { return static_cast<int32_t>(display_height_); }
 
   fidl::SyncClient<futi::TouchScreen> fake_touch_screen_;
+  uint32_t fake_touch_screen_device_id_;
   uint32_t display_width_ = 0;
   uint32_t display_height_ = 0;
 };

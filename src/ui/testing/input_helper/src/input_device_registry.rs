@@ -34,7 +34,7 @@ impl InputDeviceRegistry {
     /// A `input_device::InputDevice`, which can be used to send events to the
     /// `fuchsia.input.report.InputDevice` that has been registered with the
     /// `fuchsia.input.injection.InputDeviceRegistry` service.
-    pub fn add_touchscreen_device(
+    pub async fn add_touchscreen_device(
         &mut self,
         min_x: i64,
         max_x: i64,
@@ -79,6 +79,7 @@ impl InputDeviceRegistry {
             }),
             ..Default::default()
         })
+        .await
     }
 
     /// Registers a media buttons device.
@@ -86,7 +87,7 @@ impl InputDeviceRegistry {
     /// A `input_device::InputDevice`, which can be used to send events to the
     /// `fuchsia.input.report.InputDevice` that has been registered with the
     /// `fuchsia.input.injection.InputDeviceRegistry` service.
-    pub fn add_media_buttons_device(&mut self) -> Result<InputDevice, Error> {
+    pub async fn add_media_buttons_device(&mut self) -> Result<InputDevice, Error> {
         self.add_device(DeviceDescriptor {
             consumer_control: Some(ConsumerControlDescriptor {
                 input: Some(ConsumerControlInputDescriptor {
@@ -105,6 +106,7 @@ impl InputDeviceRegistry {
             }),
             ..Default::default()
         })
+        .await
     }
 
     /// Registers a keyboard device.
@@ -112,7 +114,7 @@ impl InputDeviceRegistry {
     /// An `input_device::InputDevice`, which can be used to send events to the
     /// `fuchsia.input.report.InputDevice` that has been registered with the
     /// `fuchsia.input.injection.InputDeviceRegistry` service.
-    pub fn add_keyboard_device(&mut self) -> Result<InputDevice, Error> {
+    pub async fn add_keyboard_device(&mut self) -> Result<InputDevice, Error> {
         // Generate a `Vec` of all known keys.
         // * Because there is no direct way to iterate over enum values, we iterate
         //   over the values corresponding to `Key::A` and `Key::MediaVolumeDecrement`.
@@ -137,9 +139,10 @@ impl InputDeviceRegistry {
             }),
             ..Default::default()
         })
+        .await
     }
 
-    pub fn add_mouse_device(&mut self) -> Result<InputDevice, Error> {
+    pub async fn add_mouse_device(&mut self) -> Result<InputDevice, Error> {
         self.add_device(DeviceDescriptor {
             // Required for DeviceDescriptor.
             device_information: Some(new_fake_device_info()),
@@ -180,6 +183,7 @@ impl InputDeviceRegistry {
             }),
             ..Default::default()
         })
+        .await
     }
 
     /// Adds a device to the `InputDeviceRegistry` FIDL server connected to this
@@ -189,57 +193,51 @@ impl InputDeviceRegistry {
     /// A `input_device::InputDevice`, which can be used to send events to the
     /// `fuchsia.input.report.InputDevice` that has been registered with the
     /// `fuchsia.input.injection.InputDeviceRegistry` service.
-    fn add_device(&self, descriptor: DeviceDescriptor) -> Result<InputDevice, Error> {
+    async fn add_device(&self, descriptor: DeviceDescriptor) -> Result<InputDevice, Error> {
         let (client_end, request_stream) = endpoints::create_request_stream::<InputDeviceMarker>()?;
-        self.proxy.register(client_end)?;
-        Ok(InputDevice::new(request_stream, descriptor, self.got_input_reports_reader.clone()))
+        let mut device: InputDevice =
+            InputDevice::new(request_stream, descriptor, self.got_input_reports_reader.clone());
+
+        let res = self.proxy.register_and_get_device_info(client_end).await?;
+        let device_id = res.device_id.expect("missing device_id");
+        device.device_id = device_id;
+
+        Ok(device)
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use anyhow::format_err;
-    use fidl_fuchsia_input_injection::{InputDeviceRegistryMarker, InputDeviceRegistryRequest};
+    use fidl_fuchsia_input_injection::{
+        InputDeviceRegistryMarker, InputDeviceRegistryRegisterAndGetDeviceInfoResponse,
+        InputDeviceRegistryRequest,
+    };
     use fidl_fuchsia_input_report::InputReportsReaderMarker;
     use fuchsia_async as fasync;
-    use futures::task::Poll;
-    use futures::{pin_mut, StreamExt};
+    use futures::StreamExt;
     use test_case::test_case;
 
-    #[test_case(&|registry| InputDeviceRegistry::add_touchscreen_device(registry, -1, 1, -1, 1);
-                "touchscreen_device")]
-    #[test_case(&|registry| InputDeviceRegistry::add_media_buttons_device(registry);
-                "media_buttons_device")]
-    #[test_case(&|registry| InputDeviceRegistry::add_keyboard_device(registry);
-                "keyboard_device")]
-    fn add_device_invokes_fidl_register_method_exactly_once(
-        add_device_method: &dyn Fn(&mut super::InputDeviceRegistry) -> Result<InputDevice, Error>,
-    ) -> Result<(), Error> {
-        let mut executor = fasync::TestExecutor::new();
-        let (proxy, request_stream) =
-            endpoints::create_proxy_and_stream::<InputDeviceRegistryMarker>()
-                .context("failed to create proxy and stream for InputDeviceRegistry")?;
-
-        add_device_method(&mut InputDeviceRegistry {
-            proxy,
-            got_input_reports_reader: AsyncEvent::new(),
-        })
-        .context("adding device")?;
-
-        let requests = match executor.run_until_stalled(&mut request_stream.collect::<Vec<_>>()) {
-            Poll::Ready(reqs) => reqs,
-            Poll::Pending => return Err(format_err!("request_stream did not terminate")),
-        };
-        assert_matches::assert_matches!(
-            requests.as_slice(),
-            [Ok(InputDeviceRegistryRequest::Register { .. })]
-        );
-
-        Ok(())
+    enum TestDeviceType {
+        TouchScreen,
+        MediaButtons,
+        Keyboard,
+        Mouse,
     }
 
-    #[test_case(&|registry| InputDeviceRegistry::add_touchscreen_device(registry, -1, 1, -1, 1) =>
+    async fn add_device_for_test(
+        registry: &mut InputDeviceRegistry,
+        ty: TestDeviceType,
+    ) -> Result<InputDevice, Error> {
+        match ty {
+            TestDeviceType::TouchScreen => registry.add_touchscreen_device(1, 1000, 1, 1000).await,
+            TestDeviceType::MediaButtons => registry.add_media_buttons_device().await,
+            TestDeviceType::Keyboard => registry.add_keyboard_device().await,
+            TestDeviceType::Mouse => registry.add_mouse_device().await,
+        }
+    }
+
+    #[test_case(TestDeviceType::TouchScreen =>
                 matches Ok(DeviceDescriptor {
                     touch: Some(TouchDescriptor {
                         input: Some(TouchInputDescriptor { .. }),
@@ -247,7 +245,7 @@ mod tests {
                     }),
                     .. });
                 "touchscreen_device")]
-    #[test_case(&|registry| InputDeviceRegistry::add_media_buttons_device(registry) =>
+    #[test_case(TestDeviceType::MediaButtons =>
                 matches Ok(DeviceDescriptor {
                     consumer_control: Some(ConsumerControlDescriptor {
                         input: Some(ConsumerControlInputDescriptor { .. }),
@@ -255,74 +253,87 @@ mod tests {
                     }),
                     .. });
                 "media_buttons_device")]
-    #[test_case(&|registry| InputDeviceRegistry::add_keyboard_device(registry) =>
+    #[test_case(TestDeviceType::Keyboard =>
                 matches Ok(DeviceDescriptor {
                     keyboard: Some(KeyboardDescriptor { .. }),
                     ..
                 });
                 "keyboard_device")]
-    #[test_case(&|registry| InputDeviceRegistry::add_mouse_device(registry) =>
+    #[test_case(TestDeviceType::Mouse =>
                 matches Ok(DeviceDescriptor {
                     mouse: Some(MouseDescriptor { .. }),
                     ..
                 });
                 "mouse_device")]
-    fn add_device_registers_correct_device_type(
-        add_device_method: &dyn Fn(&mut super::InputDeviceRegistry) -> Result<InputDevice, Error>,
+    #[fasync::run_singlethreaded(test)]
+    async fn add_device_registers_correct_device_type(
+        device_type: TestDeviceType,
     ) -> Result<DeviceDescriptor, Error> {
-        let mut executor = fasync::TestExecutor::new();
-        // Create an `InputDeviceRegistry`, and add a device to it.
         let (registry_proxy, mut registry_request_stream) =
             endpoints::create_proxy_and_stream::<InputDeviceRegistryMarker>()
-                .context("failed to create proxy and stream for InputDeviceRegistry")?;
+                .expect("failed to create proxy and stream for InputDeviceRegistry");
         let mut input_device_registry = InputDeviceRegistry {
             proxy: registry_proxy,
             got_input_reports_reader: AsyncEvent::new(),
         };
-        let input_device =
-            add_device_method(&mut input_device_registry).context("adding input device")?;
 
-        let test_fut = async {
+        let add_device_fut = add_device_for_test(&mut input_device_registry, device_type);
+
+        let input_device_proxy_fut = async {
             // `input_device_registry` should send a `Register` messgage to `registry_request_stream`.
             // Use `registry_request_stream` to grab the `ClientEnd` of the device added above,
             // and convert the `ClientEnd` into an `InputDeviceProxy`.
+            //
+            // Here only handle InputDeviceRegistryRequest once.
             let input_device_proxy = match registry_request_stream
                 .next()
                 .await
-                .context("stream read should yield Some")?
-                .context("fidl read")?
+                .expect("stream read should yield Some")
+                .expect("fidl read")
             {
-                InputDeviceRegistryRequest::Register { device, .. } => device,
-                InputDeviceRegistryRequest::RegisterAndGetDeviceInfo { device, .. } => device,
+                InputDeviceRegistryRequest::Register { .. } => {
+                    unreachable!("InputDeviceRegistryRequest::Register should not be called");
+                }
+                InputDeviceRegistryRequest::RegisterAndGetDeviceInfo {
+                    device, responder, ..
+                } => {
+                    responder
+                        .send(InputDeviceRegistryRegisterAndGetDeviceInfoResponse {
+                            device_id: Some(1),
+                            ..Default::default()
+                        })
+                        .expect("RegisterAndGetDeviceInfo send response failed");
+
+                    device
+                }
             }
             .into_proxy()
-            .context("converting client_end to proxy")?;
+            .expect("converting client_end to proxy");
 
-            // Send a `GetDescriptor` request to `input_device`, and verify that the device
-            // is the expected type.
-            let input_device_get_descriptor_fut = input_device_proxy.get_descriptor();
-            let input_device_server_fut = input_device.flush();
-
-            // Avoid unrelated `panic()`: `InputDevice` requires clients to get an input
-            // reports reader, to help debug integration test failures where no component
-            // read events from the fake device.
-            let (_input_reports_reader_proxy, input_reports_reader_server_end) =
-                endpoints::create_proxy::<InputReportsReaderMarker>()
-                    .context("internal error creating InputReportsReader proxy and server end")?;
-            let _ = input_device_proxy.get_input_reports_reader(input_reports_reader_server_end);
-
-            std::mem::drop(input_device_proxy); // Terminate stream served by `input_device_server_fut`.
-
-            let (_server_result, get_descriptor_result) =
-                futures::future::join(input_device_server_fut, input_device_get_descriptor_fut)
-                    .await;
-            get_descriptor_result.map_err(anyhow::Error::from)
+            input_device_proxy
         };
-        pin_mut!(test_fut);
 
-        match executor.run_until_stalled(&mut test_fut) {
-            Poll::Ready(r) => r,
-            Poll::Pending => Err(format_err!("test did not complete")),
-        }
+        let (add_device_res, input_device_proxy) =
+            futures::join!(add_device_fut, input_device_proxy_fut);
+
+        let input_device = add_device_res.expect("add_device failed");
+        assert_ne!(input_device.device_id, 0);
+
+        let input_device_get_descriptor = input_device_proxy.get_descriptor().await;
+
+        let input_device_server_fut = input_device.flush();
+
+        // Avoid unrelated `panic()`: `InputDevice` requires clients to get an input
+        // reports reader, to help debug integration test failures where no component
+        // read events from the fake device.
+        let (_input_reports_reader_proxy, input_reports_reader_server_end) =
+            endpoints::create_proxy::<InputReportsReaderMarker>()
+                .expect("internal error creating InputReportsReader proxy and server end");
+        let _ = input_device_proxy.get_input_reports_reader(input_reports_reader_server_end);
+
+        std::mem::drop(input_device_proxy); // Terminate stream served by `input_device_server_fut`.
+        input_device_server_fut.await;
+
+        input_device_get_descriptor.map_err(anyhow::Error::from)
     }
 }
