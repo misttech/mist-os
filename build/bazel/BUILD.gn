@@ -106,6 +106,9 @@ action("generate_main_workspace") {
   ]
 
   args = [
+    # rebased_clang_prefix points to bin under clang root.
+    "--clang_dir",
+    get_path_info(rebased_clang_prefix, "dir"),
     "--gn_output_dir",
     rebase_path(root_build_dir, root_build_dir),
     "--target_arch",
