@@ -3,14 +3,13 @@
 // found in the LICENSE file.
 
 #include <lib/mistos/starnix/kernel/sync/locks.h>
+#include <lib/unittest/unittest.h>
 
 #include <fbl/mutex.h>
-#include <zxtest/zxtest.h>
+#include <fbl/ref_counted.h>
+#include <fbl/ref_ptr.h>
 
-#include "fbl/ref_counted.h"
-#include "fbl/ref_ptr.h"
-
-namespace {
+#include <ktl/enforce.h>
 
 using namespace starnix;
 
@@ -22,40 +21,74 @@ struct DataRefPtr : public fbl::RefCounted<DataRefPtr> {
   int val;
 };
 
-TEST(Locks, MutexRaw) {
-  StarnixMutex<Data> m(std::move(Data()));
+bool test_mutex_raw() {
+  BEGIN_TEST;
+  StarnixMutex<Data> m(ktl::move(Data()));
   m.Lock()->val = 42;
   ASSERT_EQ(42, m.Lock()->val);
+  END_TEST;
 }
 
-TEST(Locks, MutexRefPtr) {
+bool test_mutex_ref_ptr() {
+  BEGIN_TEST;
   fbl::AllocChecker ac;
   fbl::RefPtr<DataRefPtr> obj = fbl::MakeRefCountedChecked<DataRefPtr>(&ac);
   ASSERT(ac.check());
 
-  StarnixMutex<fbl::RefPtr<DataRefPtr>> m(std::move(obj));
+  StarnixMutex<fbl::RefPtr<DataRefPtr>> m(ktl::move(obj));
   m.Lock()->get()->val = 42;
   ASSERT_EQ(42, m.Lock()->get()->val);
+  END_TEST;
 }
 
-TEST(Locks, RwLock) {
-  RwLock<Data> m(std::move(Data()));
+bool test_rwlock() {
+  BEGIN_TEST;
+  RwLock<Data> m(ktl::move(Data()));
   m.Write()->val = 42;
   ASSERT_EQ(42, m.Read()->val);
+  END_TEST;
 }
 
-TEST(Locks, RwLockRefPtr) {
+bool test_rwlock_ref_ptr() {
+  BEGIN_TEST;
   fbl::AllocChecker ac;
   fbl::RefPtr<DataRefPtr> obj = fbl::MakeRefCountedChecked<DataRefPtr>(&ac);
   ASSERT(ac.check());
 
-  RwLock<fbl::RefPtr<DataRefPtr>> m(std::move(obj));
+  RwLock<fbl::RefPtr<DataRefPtr>> m(ktl::move(obj));
   m.Write()->get()->val = 42;
 
   {
-    RwLockGuard<fbl::RefPtr<DataRefPtr>, BrwLockPi::Reader> reader_ = m.Read();
-    ASSERT_EQ(42, reader_->get()->val);
+    RwLockGuard<fbl::RefPtr<DataRefPtr>, BrwLockPi::Reader> reader = m.Read();
+    ASSERT_EQ(42, reader->get()->val);
   }
+  END_TEST;
 }
 
-}  // namespace
+void do_write(RwLock<fbl::RefPtr<DataRefPtr>>::RwLockWriteGuard wg) { wg->get()->val = 42; }
+
+bool test_rwlock_guard_move_write() {
+  BEGIN_TEST;
+  fbl::AllocChecker ac;
+  fbl::RefPtr<DataRefPtr> obj = fbl::MakeRefCountedChecked<DataRefPtr>(&ac);
+  ASSERT(ac.check());
+
+  RwLock<fbl::RefPtr<DataRefPtr>> m(ktl::move(obj));
+  m.Write()->get()->val = 0;
+
+  {
+    RwLock<fbl::RefPtr<DataRefPtr>>::RwLockWriteGuard wg = m.Write();
+    do_write(ktl::move(wg));
+  }
+
+  ASSERT_EQ(42, m.Read()->get()->val);
+  END_TEST;
+}
+
+UNITTEST_START_TESTCASE(starnix_sync)
+UNITTEST("test mutex raw", test_mutex_raw)
+UNITTEST("test mutex ref ptr", test_mutex_ref_ptr)
+UNITTEST("test rwlock", test_rwlock)
+UNITTEST("test rwlock ref ptr", test_rwlock_ref_ptr)
+UNITTEST("test rwlock guard move write", test_rwlock_guard_move_write)
+UNITTEST_END_TESTCASE(starnix_sync, "starnix_sync", "Tests for starnix sync")
