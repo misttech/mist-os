@@ -60,6 +60,12 @@
     },
     {
         "kind": "table/member",
+        "name": "fuchsia.ui.test.input/KeyboardInputListenerReportTextInputRequest.device_id",
+        "ordinal": "3",
+        "type": "uint32"
+    },
+    {
+        "kind": "table/member",
         "name": "fuchsia.ui.test.input/KeyboardInputListenerReportTextInputRequest.non_printable",
         "ordinal": "2",
         "type": "fuchsia.ui.input3/NonPrintableKey"
@@ -244,6 +250,12 @@
         "name": "fuchsia.ui.test.input/MouseInputListenerReportMouseInputRequest.component_name",
         "ordinal": "4",
         "type": "string:1024"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.ui.test.input/MouseInputListenerReportMouseInputRequest.device_id",
+        "ordinal": "10",
+        "type": "uint32"
     },
     {
         "kind": "table/member",
@@ -614,6 +626,12 @@
         "name": "fuchsia.ui.test.input/TouchInputListenerReportTouchInputRequest.component_name",
         "ordinal": "5",
         "type": "string:1024"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.ui.test.input/TouchInputListenerReportTouchInputRequest.device_id",
+        "ordinal": "8",
+        "type": "uint32"
     },
     {
         "kind": "table/member",

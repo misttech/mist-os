@@ -449,7 +449,9 @@ impl View {
             .expect("pointer sample missing position_in_viewport");
         let local_position =
             self.get_local_position(Point2D::new(position_in_viewport[0], position_in_viewport[1]));
-        let pointer_id = pointer_sample.interaction.expect("interaction id is missing").pointer_id;
+        let interact = pointer_sample.interaction.expect("interaction is missing");
+        let pointer_id = interact.pointer_id;
+        let device_id = interact.device_id;
 
         let local_x: f64 = local_position.x.try_into().expect("failed to convert to f64");
         let local_y: f64 = local_position.y.try_into().expect("failed to convert to f64");
@@ -470,6 +472,7 @@ impl View {
             pointer_id: Some(pointer_id),
             time_received: touch_event.timestamp,
             device_pixel_ratio: Some(self.device_pixel_ratio as f64),
+            device_id: Some(device_id),
             ..Default::default()
         }
     }
@@ -641,6 +644,7 @@ impl View {
             self.get_local_position(Point2D::new(position_in_viewport[0], position_in_viewport[1]));
         let local_x: f64 = local_position.x.try_into().expect("failed to convert to f64");
         let local_y: f64 = local_position.y.try_into().expect("failed to convert to f64");
+        let device_id = pointer_sample.device_id.expect("pointer sample missing device id");
 
         let buttons: Option<Vec<test_input::MouseButton>> = match &pointer_sample.pressed_buttons {
             None => None,
@@ -662,6 +666,7 @@ impl View {
             device_pixel_ratio: Some(self.device_pixel_ratio as f64),
             wheel_x_physical_pixel: pointer_sample.scroll_h_physical_pixel,
             wheel_y_physical_pixel: pointer_sample.scroll_v_physical_pixel,
+            device_id: Some(device_id),
             ..Default::default()
         }
     }

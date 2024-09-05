@@ -120,5 +120,9 @@ closed protocol MouseInputListener {
 
         /// The vertical wheel scroll delta in physical pixels.
         9: wheel_y_physical_pixel float64;
+
+        // Identifies the device originating this event.
+        @available(added=NEXT)
+        10: device_id uint32;
     });
 };
