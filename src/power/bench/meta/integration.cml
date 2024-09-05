@@ -5,6 +5,7 @@
     include: [
         "//src/power/bench/meta/share.cml",
         "//src/sys/test_runners/rust/default.shard.cml",
+        "trace/client.shard.cml",
     ],
     program: {
         binary: "bin/integration",

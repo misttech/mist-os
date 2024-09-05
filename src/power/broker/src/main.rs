@@ -524,6 +524,11 @@ impl CurrentLevelHandler {
                             &current_level
                         );
                         let mut broker = self.broker.borrow_mut();
+                        fuchsia_trace::counter!(
+                            c"power-broker", c"CurrentLevel.Update.Received", 0,
+                            &broker.lookup_name(&element_id).into_owned() => current_level as u32
+                        );
+
                         let current_level =
                             broker.get_level_index(&element_id, &current_level).unwrap().clone();
                         broker.update_current_level(&element_id, current_level);
@@ -607,6 +612,8 @@ impl StatusChannelHandler {
 #[fuchsia::main(logging = true)]
 async fn main() -> Result<(), anyhow::Error> {
     let mut service_fs = ServiceFs::new_local();
+
+    fuchsia_trace_provider::trace_provider_create_with_fdio();
 
     // Initialize inspect
     let _inspect_server = inspect_runtime::publish(

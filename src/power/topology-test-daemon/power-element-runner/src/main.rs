@@ -14,6 +14,7 @@ use {fidl_fuchsia_power_broker as fbroker, fuchsia_async as fasync};
 
 #[fuchsia::main]
 async fn main() -> Result<()> {
+    fuchsia_trace_provider::trace_provider_create_with_fdio();
     let mut fs = ServiceFs::new();
     fs.dir("svc").add_fidl_service(|stream: ControlRequestStream| stream);
     fs.take_and_serve_directory_handle()?;
@@ -84,6 +85,10 @@ fn run_power_element(
                         ?last_required_level,
                         "run_power_element: new level requested"
                     );
+                    fuchsia_trace::counter!(
+                        c"power-broker", c"required_level.watch.return", 0,
+                        &element_name => required_level as u32
+                    );
                     if required_level == last_required_level {
                         tracing::debug!(
                             ?element_name,
@@ -94,6 +99,10 @@ fn run_power_element(
                         continue;
                     }
 
+                    fuchsia_trace::counter!(
+                        c"power-broker", c"current_level.update.call", 0,
+                        &element_name => required_level as u32
+                    );
                     let res = current_level_proxy.update(required_level).await;
                     if let Err(error) = res {
                         tracing::warn!(?error, "update_fn: updating current level failed");
