@@ -5,6 +5,7 @@
 #ifndef SRC_DEVICES_POWER_DRIVERS_FUSB302_FUSB302_H_
 #define SRC_DEVICES_POWER_DRIVERS_FUSB302_FUSB302_H_
 
+#include <fidl/fuchsia.hardware.gpio/cpp/wire.h>
 #include <fidl/fuchsia.hardware.i2c/cpp/wire.h>
 #include <fidl/fuchsia.hardware.powersource/cpp/wire.h>
 #include <lib/async/cpp/irq.h>
@@ -37,9 +38,10 @@ namespace fusb302 {
 class Fusb302 : public fidl::WireServer<fuchsia_hardware_powersource::Source> {
  public:
   Fusb302(fdf::Dispatcher dispatcher, fidl::ClientEnd<fuchsia_hardware_i2c::Device> i2c,
-          zx::interrupt irq)
+          fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> gpio, zx::interrupt irq)
       : dispatcher_(std::move(dispatcher)),
         i2c_(std::move(i2c)),
+        gpio_(std::move(gpio)),
         irq_(std::move(irq)),
         identity_(i2c_, inspect_.GetRoot().CreateChild("Identity")),
         sensors_(i2c_, inspect_.GetRoot().CreateChild("Sensors")),
@@ -111,6 +113,7 @@ class Fusb302 : public fidl::WireServer<fuchsia_hardware_powersource::Source> {
   fdf::Dispatcher dispatcher_;
 
   fidl::ClientEnd<fuchsia_hardware_i2c::Device> i2c_;
+  fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> gpio_;
   zx::interrupt irq_;
   async::IrqMethod<Fusb302, &Fusb302::HandleIrq> irq_handler_{this};
   async::WaitOnce timeout_handler_;
