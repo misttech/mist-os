@@ -7,14 +7,14 @@
 use core::fmt::Display;
 
 use net_types::ip::{GenericOverIp, Ip, IpAddress, Ipv4Addr, Ipv6Addr, Ipv6SourceAddr};
-use net_types::{NonMappedAddr, SpecifiedAddr, UnicastAddr, Witness as _};
+use net_types::{NonMappedAddr, NonMulticastAddr, SpecifiedAddr, UnicastAddr, Witness as _};
 
 use crate::socket::SocketIpAddr;
 
 /// An IP address that witnesses properties needed to be assigned to a device.
 #[derive(Copy, Clone, Debug, Eq, GenericOverIp, Hash, PartialEq)]
 #[generic_over_ip(A, IpAddress)]
-pub struct IpDeviceAddr<A: IpAddress>(NonMappedAddr<SpecifiedAddr<A>>);
+pub struct IpDeviceAddr<A: IpAddress>(NonMulticastAddr<NonMappedAddr<SpecifiedAddr<A>>>);
 
 impl<A: IpAddress> Display for IpDeviceAddr<A> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
@@ -27,37 +27,40 @@ impl<A: IpAddress> IpDeviceAddr<A> {
     /// Returns the inner address, dropping all witnesses.
     pub fn addr(self) -> A {
         let Self(addr) = self;
-        **addr
+        ***addr
     }
 
     /// Returns the inner address, including all witness types.
-    pub fn into_inner(self) -> NonMappedAddr<SpecifiedAddr<A>> {
+    pub fn into_inner(self) -> NonMulticastAddr<NonMappedAddr<SpecifiedAddr<A>>> {
         let IpDeviceAddr(addr) = self;
         addr
     }
 
     /// Constructs an [`IpDeviceAddr`] if the address is compliant, else `None`.
     pub fn new(addr: A) -> Option<IpDeviceAddr<A>> {
-        Some(IpDeviceAddr(NonMappedAddr::new(SpecifiedAddr::new(addr)?)?))
+        Some(IpDeviceAddr(NonMulticastAddr::new(NonMappedAddr::new(SpecifiedAddr::new(addr)?)?)?))
     }
 
     /// Constructs an [`IpDeviceAddr`] from the inner witness.
-    pub fn new_from_witness(addr: NonMappedAddr<SpecifiedAddr<A>>) -> Self {
+    pub fn new_from_witness(addr: NonMulticastAddr<NonMappedAddr<SpecifiedAddr<A>>>) -> Self {
         Self(addr)
     }
 
     /// Attempts to constructs an [`IpDeviceAddr`] from a [`SocketIpAddr`].
     pub fn new_from_socket_ip_addr(addr: SocketIpAddr<A>) -> Option<Self> {
-        Some(Self(addr.into_inner()))
+        NonMulticastAddr::new(addr.into_inner()).map(Self)
     }
 }
 
 impl IpDeviceAddr<Ipv6Addr> {
     /// Constructs an [`IpDeviceAddr`] from the given [`Ipv6DeviceAddr`].
     pub fn new_from_ipv6_device_addr(addr: Ipv6DeviceAddr) -> Self {
-        let addr: UnicastAddr<NonMappedAddr<_>> = addr.transpose();
-        let addr: NonMappedAddr<SpecifiedAddr<_>> = addr.into_specified().transpose();
-        IpDeviceAddr(addr)
+        let addr: UnicastAddr<NonMappedAddr<Ipv6Addr>> = addr.transpose();
+        let addr: NonMappedAddr<SpecifiedAddr<Ipv6Addr>> = addr.into_specified().transpose();
+        // SAFETY: The address is known to be unicast, because it was provided
+        // as a `UnicastAddr`. A unicast address must be `NonMulticast`.
+        let addr = unsafe { NonMulticastAddr::new_unchecked(addr) };
+        Self(addr)
     }
 
     /// Constructs an [`IpDeviceAddr`] from the given [`Ipv6SourceAddr`].
@@ -71,7 +74,7 @@ impl IpDeviceAddr<Ipv6Addr> {
 
 impl<A: IpAddress> From<IpDeviceAddr<A>> for SpecifiedAddr<A> {
     fn from(addr: IpDeviceAddr<A>) -> Self {
-        *addr.into_inner()
+        **addr.into_inner()
     }
 }
 
@@ -84,20 +87,22 @@ impl<A: IpAddress> AsRef<SpecifiedAddr<A>> for IpDeviceAddr<A> {
 
 impl<A: IpAddress> From<IpDeviceAddr<A>> for SocketIpAddr<A> {
     fn from(addr: IpDeviceAddr<A>) -> Self {
-        SocketIpAddr::new_from_witness(addr.into_inner())
+        SocketIpAddr::new_from_witness(*addr.into_inner())
     }
 }
 
 #[derive(Debug)]
 pub enum IpDeviceAddrError {
     NotNonMapped,
+    NotNonMulticast,
 }
 
 impl<A: IpAddress> TryFrom<SpecifiedAddr<A>> for IpDeviceAddr<A> {
     type Error = IpDeviceAddrError;
     fn try_from(addr: SpecifiedAddr<A>) -> Result<Self, Self::Error> {
         Ok(IpDeviceAddr::new_from_witness(
-            NonMappedAddr::new(addr).ok_or(IpDeviceAddrError::NotNonMapped)?,
+            NonMulticastAddr::new(NonMappedAddr::new(addr).ok_or(IpDeviceAddrError::NotNonMapped)?)
+                .ok_or(IpDeviceAddrError::NotNonMulticast)?,
         ))
     }
 }
@@ -109,7 +114,7 @@ impl<A: IpAddress> TryFrom<SpecifiedAddr<A>> for IpDeviceAddr<A> {
 /// implement `Witness<Ipv4Addr>`. That implementation is not present for our
 /// new type [`IpDeviceAddr`] which wraps the true witnesses from the net-types
 /// crate.
-pub type Ipv4DeviceAddr = NonMappedAddr<SpecifiedAddr<Ipv4Addr>>;
+pub type Ipv4DeviceAddr = NonMulticastAddr<NonMappedAddr<SpecifiedAddr<Ipv4Addr>>>;
 
 /// An IPv6 address that witnesses properties needed to be assigned to a device.
 ///

@@ -512,7 +512,7 @@ impl AddressStatus<Ipv4PresentAddressStatus> {
                     let dev_addr = addr_id.addr_sub();
                     let (dev_addr, subnet) = dev_addr.addr_subnet();
 
-                    if *dev_addr == addr {
+                    if **dev_addr == addr {
                         Some(AddressStatus::Present(Ipv4PresentAddressStatus::Unicast))
                     } else if addr.get() == subnet.broadcast() {
                         Some(AddressStatus::Present(Ipv4PresentAddressStatus::SubnetBroadcast))
@@ -950,10 +950,6 @@ fn get_local_addr<I: Ip + IpLayerIpExt, CC: IpDeviceStateContext<I>>(
     device: &CC::DeviceId,
     remote_addr: Option<RoutableIpAddr<I::Addr>>,
 ) -> Result<IpDeviceAddr<I::Addr>, ResolveRouteError> {
-    // TODO(https://fxbug.dev/360187268): Use a witness type to prevent callers
-    // from providing a multicast local ip.
-    let local_ip_and_policy = local_ip_and_policy.filter(|(ip, _policy)| !ip.addr().is_multicast());
-
     match local_ip_and_policy {
         Some((local_ip, NonLocalSrcAddrPolicy::Allow)) => Ok(local_ip),
         Some((local_ip, NonLocalSrcAddrPolicy::Deny)) => {

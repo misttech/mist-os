@@ -299,7 +299,7 @@ impl_trait_for_witness!(UnicastAddress, is_unicast, NonMappedAddr);
 ///
 /// [multicast]: https://en.wikipedia.org/wiki/Multicast
 pub trait MulticastAddress {
-    /// Is this a unicast address?
+    /// Is this a multicast address?
     ///
     /// `is_multicast` must maintain the invariant that, if it is called twice
     /// on the same object, and in between those two calls, no code has operated
@@ -312,6 +312,11 @@ pub trait MulticastAddress {
     /// If this type also implements [`SpecifiedAddress`], then
     /// `a.is_multicast()` implies `a.is_specified()`.
     fn is_multicast(&self) -> bool;
+
+    /// Is this a non-multicast address? The inverse of `is_multicast()`.
+    fn is_non_multicast(&self) -> bool {
+        !self.is_multicast()
+    }
 }
 
 impl_trait_for_witness!(MulticastAddress, is_multicast, SpecifiedAddr);
@@ -637,18 +642,25 @@ guaranteed to be specified, so this conversion is infallible."),
 
 /// Implements [`Witness`] for a nested witness type.
 ///
-/// `impl_nested_witness` implements `Witness<A>` for
-/// `$outer_type<$inner_type<A>>`.
+/// Accepted Formats:
+/// * `impl_nested_witness!(trait1, type1, trait2, type2)`
+///     Implements `Witness<A>` for `type1<type2<A>>`.
+/// * `impl_nested_witness!(trait1, type1, trait2, type2, trait3, type3)`
+///     Implements `Witness<A>` for `type1<type2<type3<A>>>`.
+///
+/// Due to the nature of combinatorix, it is not advised to use this macro
+/// for all possible combinations of nested witnesses, only those that are
+/// actually instantiated in code.
 macro_rules! impl_nested_witness {
-    ($outer_trait:ident, $outer_type:ident, $inner_trait:ident, $inner_type:ident) => {
-        impl<A: $outer_trait + $inner_trait> Witness<A> for $outer_type<$inner_type<A>> {
+    ($trait1:ident, $type1:ident, $trait2:ident, $type2:ident) => {
+        impl<A: $trait1 + $trait2> Witness<A> for $type1<$type2<A>> {
             #[inline]
-            fn new(addr: A) -> Option<$outer_type<$inner_type<A>>> {
-                $inner_type::new(addr).and_then(Witness::<$inner_type<A>>::new)
+            fn new(addr: A) -> Option<$type1<$type2<A>>> {
+                $type2::new(addr).and_then(Witness::<$type2<A>>::new)
             }
 
-            unsafe fn new_unchecked(addr: A) -> $outer_type<$inner_type<A>> {
-                $outer_type($inner_type(addr))
+            unsafe fn new_unchecked(addr: A) -> $type1<$type2<A>> {
+                $type1($type2(addr))
             }
 
             #[inline]
@@ -657,7 +669,30 @@ macro_rules! impl_nested_witness {
             }
         }
 
-        impl<A: $outer_trait + $inner_trait> AsRef<A> for $outer_type<$inner_type<A>> {
+        impl<A: $trait1 + $trait2> AsRef<A> for $type1<$type2<A>> {
+            fn as_ref(&self) -> &A {
+                &self.0 .0
+            }
+        }
+    };
+    ($trait1:ident, $type1:ident, $trait2:ident, $type2:ident, $trait3:ident, $type3:ident) => {
+        impl<A: $trait1 + $trait2 + $trait3> Witness<A> for $type1<$type2<$type3<A>>> {
+            #[inline]
+            fn new(addr: A) -> Option<$type1<$type2<$type3<A>>>> {
+                $type3::new(addr).and_then(Witness::<$type3<A>>::new)
+            }
+
+            unsafe fn new_unchecked(addr: A) -> $type1<$type2<$type3<A>>> {
+                $type1($type2($type3(addr)))
+            }
+
+            #[inline]
+            fn into_addr(self) -> A {
+                self.0.into_addr()
+            }
+        }
+
+        impl<A: $trait1 + $trait2 + $trait3> AsRef<A> for $type1<$type2<$type3<A>>> {
             fn as_ref(&self) -> &A {
                 &self.0 .0
             }
@@ -665,14 +700,30 @@ macro_rules! impl_nested_witness {
     };
 }
 
-/// Implements `From<T> for SpecifiedAddr<A>` where `T` is the nested witness
-/// type `$outer_type<$inner_type<A>>`.
+/// Implements `From<T> or SpecifiedAddr<A>` where `T` is the nested witness.
+///
+/// Accepted Formats:
+/// * `impl_into_specified_for_nested_witness!(trait1, type1, trait2, type2)`
+///     Implements `From<type1<type2<A>>> for SpecifiedAddr<A>`.
+/// * `impl_nested_witness!(trait1, type1, trait2, type2, trait3, type3)`
+///     Implements `From<type1<type2<type3<<A>>>> for SpecifiedAddr<A>`.
+///
+/// Due to the nature of combinatorix, it is not advised to use this macro
+/// for all possible combinations of nested witnesses, only those that are
+/// actually instantiated in code.
 macro_rules! impl_into_specified_for_nested_witness {
-    ($outer_trait:ident, $outer_type:ident, $inner_trait:ident, $inner_type:ident) => {
-        impl<A: $outer_trait + $inner_trait + SpecifiedAddress> From<$outer_type<$inner_type<A>>>
+    ($trait1:ident, $type1:ident, $trait2:ident, $type2:ident) => {
+        impl<A: $trait1 + $trait2 + SpecifiedAddress> From<$type1<$type2<A>>> for SpecifiedAddr<A> {
+            fn from(addr: $type1<$type2<A>>) -> SpecifiedAddr<A> {
+                SpecifiedAddr(addr.into_addr())
+            }
+        }
+    };
+    ($trait1:ident, $type1:ident, $trait2:ident, $type2:ident, $trait3:ident, $type3:ident) => {
+        impl<A: $trait1 + $trait2 + $trait3 + SpecifiedAddress> From<$type1<$type2<$type3<A>>>>
             for SpecifiedAddr<A>
         {
-            fn from(addr: $outer_type<$inner_type<A>>) -> SpecifiedAddr<A> {
+            fn from(addr: $type1<$type2<$type3<A>>>) -> SpecifiedAddr<A> {
                 SpecifiedAddr(addr.into_addr())
             }
         }
@@ -769,6 +820,36 @@ impl<A: MulticastAddress + MappedAddress> MulticastAddr<A> {
         unsafe { NonMappedAddr::new_unchecked(self) }
     }
 }
+
+// NonMulticastAddr - An address known to not be multicast.
+//
+// Note this type is similar to `UnicastAddr`, but not identical: all
+// `UnicastAddr' can also be `NonMulticastAddr`, but not all `NonMulticastAddr`
+// can be `UnicastAddr`. E.g. an IPv4 Broadcast Addr is non-multicast but not
+// unicast.
+impl_witness!(NonMulticastAddr, "non-multicast", MulticastAddress, is_non_multicast);
+impl_nested_witness!(MulticastAddress, NonMulticastAddr, SpecifiedAddress, SpecifiedAddr);
+impl_nested_witness!(MulticastAddress, NonMulticastAddr, UnicastAddress, UnicastAddr);
+impl_nested_witness!(MulticastAddress, NonMulticastAddr, BroadcastAddress, BroadcastAddr);
+impl_nested_witness!(MulticastAddress, NonMulticastAddr, MappedAddress, NonMappedAddr);
+// NB: Implement nested witness to a depth of three, only for the types that are
+// actually used by consumers of this library.
+impl_nested_witness!(
+    MulticastAddress,
+    NonMulticastAddr,
+    MappedAddress,
+    NonMappedAddr,
+    SpecifiedAddress,
+    SpecifiedAddr
+);
+impl_into_specified_for_nested_witness!(
+    MulticastAddress,
+    NonMulticastAddr,
+    MappedAddress,
+    NonMappedAddr,
+    SpecifiedAddress,
+    SpecifiedAddr
+);
 
 // BroadcastAddr
 impl_witness!(BroadcastAddr, "broadcast", BroadcastAddress, is_broadcast);
