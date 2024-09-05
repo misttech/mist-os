@@ -38,8 +38,9 @@ template <CopyDir kDir, SyncOpt kSyncOpt, MaxTransferAligned kMaxTransferAligned
 void WellDefinedCopy(void* dst, const void* src, size_t size_bytes) {
   // To keep life simple, we demand that both the source and the destination
   // have the same alignment relative to our max transfer granularity.
-  ZX_DEBUG_ASSERT((reinterpret_cast<uintptr_t>(src) & (kMaxTransferGranularity - 1)) ==
-                  (reinterpret_cast<uintptr_t>(dst) & (kMaxTransferGranularity - 1)));
+  ZX_DEBUG_ASSERT_MSG((reinterpret_cast<uintptr_t>(src) & (kMaxTransferGranularity - 1)) ==
+                      (reinterpret_cast<uintptr_t>(dst) & (kMaxTransferGranularity - 1)),
+                      "src %p dst %p granularity %zu", src, dst, kMaxTransferGranularity);
 
   // In debug builds, make sure that src and dst obey the template specified
   // worst case alignment.
