@@ -282,10 +282,6 @@ assembly_input_bundle("bootstrap") {
       driver_components = [ "meta/spi.cm" ]
     },
     {
-      package_target = "//src/devices/sysmem/drivers/sysmem:package"
-      driver_components = [ "meta/sysmem.cm" ]
-    },
-    {
       package_target = "//src/devices/usb/drivers/usb-bus:package"
       driver_components = [ "meta/usb-bus.cm" ]
     },
