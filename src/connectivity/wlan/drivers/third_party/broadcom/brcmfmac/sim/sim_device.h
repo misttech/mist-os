@@ -77,6 +77,8 @@ class SimDevice final : public fdf::DriverBase, public Device {
 
   SimDataPath& DataPath() { return data_path_; }
 
+  inspect::Inspector& GetInspector() { return inspector().inspector(); }
+
  private:
   void ShutdownImpl();
 

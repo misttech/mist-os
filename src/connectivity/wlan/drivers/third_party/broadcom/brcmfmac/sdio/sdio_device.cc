@@ -65,14 +65,13 @@ void SdioDevice::Start(fdf::StartCompleter completer) {
       return zx::error(status);
     }
 
-    std::unique_ptr<DeviceInspect> inspect;
-    if (status = DeviceInspect::Create(fdf_dispatcher_get_async_dispatcher(GetDriverDispatcher()),
-                                       &inspect);
-        status != ZX_OK) {
+    zx::result<std::unique_ptr<DeviceInspect>> result = DeviceInspect::Create(
+        fdf_dispatcher_get_async_dispatcher(GetDriverDispatcher()), inspector().root());
+    if (result.is_error()) {
       BRCMF_ERR("Device Inspect create failed: %s", zx_status_get_string(status));
-      return zx::error(status);
+      return result.take_error();
     }
-    inspect_ = std::move(inspect);
+    inspect_ = std::move(*result);
     return zx::ok();
   }();
 

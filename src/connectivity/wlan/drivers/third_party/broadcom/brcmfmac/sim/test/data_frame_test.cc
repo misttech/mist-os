@@ -154,7 +154,7 @@ class DataFrameTest : public SimTest {
   void GetHighWmeRxErrorRateInspectCount(uint64_t* out_count) {
     ASSERT_NOT_NULL(out_count);
     WithSimDevice([&out_count](brcmfmac::SimDevice* device) {
-      auto hierarchy = FetchHierarchy(device->GetInspect()->inspector());
+      auto hierarchy = FetchHierarchy(device->GetInspector());
       auto* root = hierarchy.value().GetByPath({"brcmfmac-phy"});
       ASSERT_NE(nullptr, root);
       // Only verify the value of hourly counter here, the relationship between hourly counter and

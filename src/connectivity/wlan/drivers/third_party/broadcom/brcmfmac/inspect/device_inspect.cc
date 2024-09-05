@@ -19,54 +19,54 @@
 namespace wlan::brcmfmac {
 
 // static
-zx_status_t DeviceInspect::Create(async_dispatcher_t* dispatcher,
-                                  std::unique_ptr<DeviceInspect>* inspect_out) {
+zx::result<std::unique_ptr<DeviceInspect>> DeviceInspect::Create(async_dispatcher_t* dispatcher,
+                                                                 inspect::Node& root_node) {
   zx_status_t status = ZX_OK;
 
   // Initialize the inspector.
   std::unique_ptr<DeviceInspect> inspect(new DeviceInspect());
-  inspect->root_ = inspect->inspector_.GetRoot().CreateChild("brcmfmac-phy");
+  inspect->root_ = root_node.CreateChild("brcmfmac-phy");
 
   // Initialize metrics.
   inspect->tx_qfull_ = inspect->root_.CreateUint("tx_qfull", 0);
   if ((status = inspect->tx_qfull_24hrs_.Init(&inspect->root_, 24, "tx_qfull_24hrs", 0)) != ZX_OK) {
-    return status;
+    return zx::error(status);
   }
 
   inspect->fw_recovery_triggered_ = inspect->root_.CreateUint("fw_recovery_triggered", 0);
   if ((status = inspect->fw_recovery_triggered_24hrs_.Init(
            &inspect->root_, 24, "fw_recovery_triggered_24hrs", 0)) != ZX_OK) {
-    return status;
+    return zx::error(status);
   }
 
   inspect->fw_recovered_ = inspect->root_.CreateUint("fw_recovered", 0);
   if ((status = inspect->fw_recovered_24hrs_.Init(&inspect->root_, 24, "fw_recovered_24hrs", 0)) !=
       ZX_OK) {
-    return status;
+    return zx::error(status);
   }
 
   inspect->rx_freeze_ = inspect->root_.CreateUint("rx_freeze", 0);
   if ((status = inspect->rx_freeze_24hrs_.Init(&inspect->root_, 24, "rx_freeze_24hrs", 0)) !=
       ZX_OK) {
-    return status;
+    return zx::error(status);
   }
 
   inspect->sdio_max_tx_seq_err_ = inspect->root_.CreateUint("sdio_max_tx_seq_err", 0);
   if ((status = inspect->sdio_max_tx_seq_err_24hrs_.Init(
            &inspect->root_, 24, "sdio_max_tx_seq_err_24hrs", 0)) != ZX_OK) {
-    return status;
+    return zx::error(status);
   }
 
   inspect->ap_set_ssid_err_ = inspect->root_.CreateUint("ap_set_ssid_err", 0);
   if ((status = inspect->ap_set_ssid_err_24hrs_.Init(&inspect->root_, 24, "ap_set_ssid_err_24hrs",
                                                      0)) != ZX_OK) {
-    return status;
+    return zx::error(status);
   }
 
   inspect->high_wme_rx_error_rate_ = inspect->root_.CreateUint("high_wme_rx_error_rate", 0);
   if ((status = inspect->high_wme_rx_error_rate_24hrs_.Init(
            &inspect->root_, 24, "high_wme_rx_error_rate_24hrs", 0)) != ZX_OK) {
-    return status;
+    return zx::error(status);
   }
 
   DeviceConnMetrics& conn_metrics_ = inspect->conn_metrics_;
@@ -74,28 +74,28 @@ zx_status_t DeviceInspect::Create(async_dispatcher_t* dispatcher,
   conn_metrics_.success = conn_metrics_.root.CreateUint("success", 0);
   if ((status = conn_metrics_.success_24hrs.Init(&conn_metrics_.root, 24, "success_24hrs", 0)) !=
       ZX_OK) {
-    return status;
+    return zx::error(status);
   }
   conn_metrics_.no_network_fail = conn_metrics_.root.CreateUint("no_network_fail", 0);
   if ((status = conn_metrics_.no_network_fail_24hrs.Init(&conn_metrics_.root, 24,
                                                          "no_network_fail_24hrs", 0)) != ZX_OK) {
-    return status;
+    return zx::error(status);
   }
   conn_metrics_.auth_fail = conn_metrics_.root.CreateUint("auth_fail", 0);
   if ((status = conn_metrics_.auth_fail_24hrs.Init(&conn_metrics_.root, 24, "auth_fail_24hrs",
                                                    0)) != ZX_OK) {
-    return status;
+    return zx::error(status);
   }
   conn_metrics_.other_fail = conn_metrics_.root.CreateUint("other_fail", 0);
   if ((status = conn_metrics_.other_fail_24hrs.Init(&conn_metrics_.root, 24, "other_fail_24hrs",
                                                     0)) != ZX_OK) {
-    return status;
+    return zx::error(status);
   }
 
   inspect->low_data_rate_ = inspect->root_.CreateUint("low_data_rate", 0);
   if ((status = inspect->low_data_rate_24hrs_.Init(&inspect->root_, 24, "low_data_rate_24hrs",
                                                    0)) != ZX_OK) {
-    return status;
+    return zx::error(status);
   }
 
   // Start timers.
@@ -118,8 +118,7 @@ zx_status_t DeviceInspect::Create(async_dispatcher_t* dispatcher,
       Timer::Type::Periodic);
   inspect->timer_hr_->Start(zx::hour(1).get());
 
-  *inspect_out = std::move(inspect);
-  return ZX_OK;
+  return zx::ok(std::move(inspect));
 }
 
 void DeviceInspect::LogTxQueueFull() {
