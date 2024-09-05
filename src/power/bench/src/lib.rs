@@ -8,8 +8,10 @@
 mod daemon_work;
 mod sag_work;
 
-use anyhow::Result;
+use anyhow::{format_err, Error, Result};
 use argh::FromArgs;
+use diagnostics_hierarchy::DiagnosticsHierarchy;
+use diagnostics_reader::{ArchiveReader, Inspect};
 use std::time::Instant;
 
 #[derive(FromArgs, Debug)]
@@ -33,19 +35,24 @@ fn determine_loop_count() -> u32 {
 }
 
 #[fuchsia::test]
-fn test_sag_takewakelease() -> Result<()> {
+async fn test_sag_takewakelease() {
     let total: u32 = determine_loop_count();
 
     let sag_arc = sag_work::obtain_sag_proxy();
     let start = Instant::now();
-    for _ in 0..total {
+    for iteration in 0..total {
         sag_work::execute(&sag_arc);
+        if iteration > 0 && iteration % 1000 == 0 {
+            print_power_broker_inspect_stats(iteration).await;
+        }
     }
     let duration = start.elapsed();
     println!("Total execution time: {:?}", duration);
     println!("Average time for each call is {:?}", duration / total);
 
-    Ok(())
+    // Check how much PB Inspect VMO we used.
+    print_power_broker_inspect_stats(total).await;
+    ()
 }
 
 #[fuchsia::test]
@@ -61,4 +68,42 @@ fn test_topologytestdaemon_toggle() -> Result<()> {
     println!("Total execution time: {:?}", duration);
     println!("Average time for each call is {:?}", duration / total);
     Ok(())
+}
+
+async fn get_power_broker_inspect() -> Result<DiagnosticsHierarchy, Error> {
+    ArchiveReader::new()
+        .select_all_for_moniker("test-power-broker")
+        .snapshot::<Inspect>()
+        .await?
+        .into_iter()
+        .next()
+        .and_then(|result| result.payload)
+        .ok_or(format_err!("expected one inspect hierarchy"))
+}
+
+fn get_inspect_vmo_bytes(inspect: &DiagnosticsHierarchy) -> (u64, u64) {
+    let curr = inspect
+        .get_property_by_path(&vec!["fuchsia.inspect.Stats", "current_size"])
+        .unwrap()
+        .uint()
+        .unwrap();
+    let max = inspect
+        .get_property_by_path(&vec!["fuchsia.inspect.Stats", "maximum_size"])
+        .unwrap()
+        .uint()
+        .unwrap();
+    return (curr, max);
+}
+
+async fn print_power_broker_inspect_stats(iteration: u32) {
+    let pb_inspect = get_power_broker_inspect().await.expect("Inspect data");
+    let (used, max) = get_inspect_vmo_bytes(&pb_inspect);
+    println!(
+        "{} - Power Broker inspect used {} / {} bytes, {:.0} % utilization",
+        iteration,
+        used,
+        max,
+        (used as f64 / max as f64) * 100.0
+    );
+    ()
 }

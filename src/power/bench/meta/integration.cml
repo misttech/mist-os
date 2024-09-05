@@ -10,4 +10,7 @@
     program: {
         binary: "bin/integration",
     },
+    use: [
+        { protocol: "fuchsia.diagnostics.ArchiveAccessor" },
+    ],
 }

@@ -42,5 +42,15 @@
             from: "#test-power-broker",
             to: [ "#test-topology-test-daemon" ],
         },
+        {
+            protocol: "fuchsia.diagnostics.ArchiveAccessor",
+            from: "parent",
+            to: [ "#test-topology-test-daemon" ],
+        },
+        {
+            protocol: "fuchsia.inspect.InspectSink",
+            from: "parent",
+            to: [ "#test-power-broker" ],
+        },
     ],
 }
