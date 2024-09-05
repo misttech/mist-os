@@ -62,14 +62,6 @@ class StubFileServer(f_io.File.Server):
         return f_io.ReadableReadResponse(data=[1, 2, 3, 4])
 
 
-class FlexibleMethodTesterServer(fc_test.FlexibleMethodTester.Server):
-    def some_method(self):
-        # This should be handled internally, but right now there's not really
-        # a good way to force this interaction without making multiple FIDL
-        # versions run in this program simultaneously somehow.
-        return FrameworkError.UNKNOWN_METHOD
-
-
 class TestEventHandler(fc_othertest.CrossLibraryNoop.EventHandler):
     def __init__(
         self,
@@ -259,12 +251,29 @@ class ServerTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(res.y.integer, -2)
         server_task.cancel()
 
-    async def test_flexible_method_err(self):
+    async def test_flexible_method_framework_err(self):
+        class FlexibleMethodTesterServer(fc_test.FlexibleMethodTester.Server):
+            def some_method(self):
+                # This should be handled internally, but right now there's not really
+                # a good way to force this interaction without making multiple FIDL
+                # versions run in this program simultaneously somehow.
+                return FrameworkError.UNKNOWN_METHOD
+
+            def some_method_without_error(self):
+                return FrameworkError.UNKNOWN_METHOD
+
+            def some_method_just_error(self):
+                return FrameworkError.UNKNOWN_METHOD
+
         client, server = Channel.create()
         t_client = fc_test.FlexibleMethodTester.Client(client)
         t_server = FlexibleMethodTesterServer(server)
         server_task = asyncio.get_running_loop().create_task(t_server.serve())
         res = await t_client.some_method()
+        self.assertEqual(res.framework_err, FrameworkError.UNKNOWN_METHOD)
+        res = await t_client.some_method_without_error()
+        self.assertEqual(res.framework_err, FrameworkError.UNKNOWN_METHOD)
+        res = await t_client.some_method_just_error()
         self.assertEqual(res.framework_err, FrameworkError.UNKNOWN_METHOD)
         server_task.cancel()
 

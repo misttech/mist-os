@@ -75,7 +75,9 @@ class Method(dict):
         This is different from whether or not a method has a response, because a result is something
         that can return an error (technically it's a union with two different values).
         """
-        return bool(self["has_error"])
+        return bool(
+            self["has_error"] or (not self["strict"] and self["has_response"])
+        )
 
     def request_payload_identifier(self) -> str | None:
         """Attempts to lookup the payload identifier if it exists.
