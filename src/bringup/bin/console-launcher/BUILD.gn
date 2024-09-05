@@ -6,6 +6,7 @@ import("//build/components.gni")
 import("//build/dist/component_manifest_resources.gni")
 import("//build/test.gni")
 import("//build/testing/bootfs_test.gni")
+import("//build/testing/cc_test_executable.gni")
 
 group("tests") {
   testonly = true
@@ -96,7 +97,7 @@ fuchsia_package("package") {
   deps = [ ":component" ]
 }
 
-executable("unittests") {
+cc_test_executable("unittests") {
   output_name = "console-launcher_test"
   testonly = true
 
