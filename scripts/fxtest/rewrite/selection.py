@@ -127,9 +127,11 @@ async def select_tests(
     best_matches: dict[str, int] = defaultdict(lambda: NO_MATCH_DISTANCE)
     TRAILING_PATH = re.compile(r"/([\w\-_\.]+)$")
     COMPONENT_REGEX = re.compile(r"#meta/([\w\-_]+)\.cm")
+    TRAILING_LABEL_TOOLCHAIN = re.compile(r"\(\$[^\)]+\)$")
 
     def extract_label(entry: Test) -> str:
-        return entry.build.test.label
+        source_label = entry.build.test.label
+        return TRAILING_LABEL_TOOLCHAIN.sub("", source_label)
 
     def extract_name(entry: Test) -> str:
         return entry.name()
@@ -197,17 +199,24 @@ async def select_tests(
                     )
                 else:
                     # In exact mode, don't match names against
-                    # anything but the name field itself.
+                    # anything but the name and label fields.
                     #
                     # For host tests, still allow exact matches against last
                     # segment of the name for more succinct selections.
-                    tasks = [
-                        name.distances(n, recorder, id, exact=True)
-                        for n in group.names
-                    ] + [
-                        trailing_path.distances(n, recorder, id, exact=True)
-                        for n in group.names
-                    ]
+                    tasks = (
+                        [
+                            label.distances(n, recorder, id, exact=True)
+                            for n in group.names
+                        ]
+                        + [
+                            name.distances(n, recorder, id, exact=True)
+                            for n in group.names
+                        ]
+                        + [
+                            trailing_path.distances(n, recorder, id, exact=True)
+                            for n in group.names
+                        ]
+                    )
                 results: list[list[_TestDistance]] = await asyncio.gather(
                     *tasks
                 )

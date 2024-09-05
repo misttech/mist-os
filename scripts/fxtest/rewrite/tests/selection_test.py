@@ -556,6 +556,18 @@ class SelectTestsTest(unittest.IsolatedAsyncioTestCase):
             selection.PERFECT_MATCH_DISTANCE,
         )
 
+        # Test that selecting by label works in exact mode.
+        label_exact = await selection.select_tests(
+            tests,
+            ["//src/other-tests:binary_test"],
+            exact_match=True,
+        )
+        self.assertEqual(1, len(label_exact.selected))
+        self.assertEqual(
+            label_exact.best_score["host_x64/binary_test"],
+            selection.PERFECT_MATCH_DISTANCE,
+        )
+
     async def test_perfect_match_omits_approximate_match(self) -> None:
         """Test that fuzzy matching is not used if there is a perfect match."""
 
