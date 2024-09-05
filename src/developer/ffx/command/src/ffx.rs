@@ -285,6 +285,33 @@ pub struct Ffx {
     pub core: bool,
 }
 
+#[derive(thiserror::Error, Debug)]
+enum CoreCheckError {
+    #[error("Command line flags unsatisfactory for core mode:{}", format_core_check_error_enums(.0))]
+    User(Vec<CoreCheckErrorEnum>),
+}
+
+#[derive(thiserror::Error, Debug, Clone)]
+enum CoreCheckErrorEnum {
+    #[error("ffx core requires that the machine writer be specified")]
+    MustHaveMachineSpecified,
+    #[error("ffx core requries that the target be explicetly specified")]
+    MustHaveTarget,
+    #[error("Core mode requires at most one --config flag to be passed. Actually passed: {}", .0)]
+    MustHaveOneConfigArg(usize),
+    #[error("When running in core mode, config flags must be passed as a path to a file. Path: {} is not a file", .0)]
+    ConfigArgMustBeFile(String),
+}
+
+fn format_core_check_error_enums(errors: &Vec<CoreCheckErrorEnum>) -> String {
+    if errors.len() < 1 {
+        return "An error occurred formatting the list of CoreCheckError's. Expected more than 1 error. Got 0".to_string();
+    }
+    let error_string =
+        errors.clone().into_iter().map(|e| e.to_string()).collect::<Vec<_>>().join("\n\t");
+    "\n\t".to_owned() + &error_string
+}
+
 /// When a tool is run in "core" mode there are certain constraints on passed
 /// arguments. This ensures they are all satisfied
 pub fn check_core_constraints(ffx: &Ffx) -> Result<()> {
@@ -293,24 +320,29 @@ pub fn check_core_constraints(ffx: &Ffx) -> Result<()> {
         return Ok(());
     }
 
+    let mut errors = vec![];
+
     if ffx.machine.is_none() {
-        return_user_error!("ffx core requires that the machine schema be specified");
+        errors.push(CoreCheckErrorEnum::MustHaveMachineSpecified);
     }
+
     if ffx.target.is_none() {
-        return_user_error!("ffx core requries that the target be explicetly specified");
+        errors.push(CoreCheckErrorEnum::MustHaveTarget);
     }
 
     if ffx.config.len() > 1 {
-        return_user_error!("Core mode requires at most one --config flag to be passed");
+        errors.push(CoreCheckErrorEnum::MustHaveOneConfigArg(ffx.config.len()));
     }
 
     for potential_config in ffx.config.iter() {
         let try_path = Path::new(potential_config);
         if !try_path.is_file() {
-            return_user_error!(
-                "When running in core mode, config flags must be passed as a path to a file"
-            );
+            errors.push(CoreCheckErrorEnum::ConfigArgMustBeFile(potential_config.clone()));
         }
+    }
+
+    if errors.len() > 0 {
+        return_user_error!(CoreCheckError::User(errors));
     }
 
     Ok(())
