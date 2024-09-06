@@ -231,6 +231,7 @@
                 "fuchsia.hardware.cpu.ctrl.Service",
                 "fuchsia.hardware.rtc.Service",
                 "fuchsia.hardware.sockettunnel.Service",
+                "fuchsia.hardware.spmi.Service",
                 "fuchsia.power.broker.ElementInfoProviderService",
             ],
             from: "#bootstrap",

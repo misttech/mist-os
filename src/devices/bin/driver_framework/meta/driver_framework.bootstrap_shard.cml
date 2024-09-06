@@ -377,6 +377,10 @@
             from: "#boot-drivers",
         },
         {
+            service: "fuchsia.hardware.spmi.Service",
+            from: "#boot-drivers",
+        },
+        {
             directory: [
                 "dev-builtin",
                 "dev-class",

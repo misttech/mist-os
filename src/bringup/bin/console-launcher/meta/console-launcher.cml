@@ -166,6 +166,10 @@
             availability: "optional",
         },
         {
+            service: "fuchsia.hardware.spmi.Service",
+            availability: "optional",
+        },
+        {
             protocol: [
                 "fuchsia.kernel.Counter",
                 "fuchsia.kernel.DebugBroker",
