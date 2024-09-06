@@ -32,7 +32,7 @@ FakeCompositeRingBuffer::FakeCompositeRingBuffer(FakeComposite* parent, ElementI
       format_(std::move(format)),
       bytes_per_frame_(format_.number_of_channels() * format_.bytes_per_sample()),
       active_channels_bitmask_((1u << format_.number_of_channels()) - 1u),
-      active_channels_set_time_(zx::clock::get_monotonic()) {
+      set_active_channels_completed_at_(zx::clock::get_monotonic()) {
   ADR_LOG_METHOD(kLogFakeCompositeRingBuffer);
   AllocateRingBuffer(element_id_, ring_buffer_allocated_size);
 
@@ -133,9 +133,9 @@ void FakeCompositeRingBuffer::SetActiveChannels(SetActiveChannelsRequest& reques
   }
   if (active_channels_bitmask_ != request.active_channels_bitmask()) {
     active_channels_bitmask_ = request.active_channels_bitmask();
-    active_channels_set_time_ = zx::clock::get_monotonic();
+    set_active_channels_completed_at_ = zx::clock::get_monotonic();
   }
-  completer.Reply(zx::ok(active_channels_set_time_.get()));
+  completer.Reply(zx::ok(set_active_channels_completed_at_.get()));
 }
 
 void FakeCompositeRingBuffer::WatchDelayInfo(WatchDelayInfoCompleter::Sync& completer) {

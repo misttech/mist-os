@@ -259,9 +259,9 @@ class FakeComposite final
     FX_CHECK(is_ring_buffer(element_id));
     return ring_buffers_.find(element_id)->second->active_channels_bitmask();
   }
-  zx::time active_channels_set_time(ElementId element_id) const {
+  zx::time set_active_channels_completed_at(ElementId element_id) const {
     FX_CHECK(is_ring_buffer(element_id));
-    return ring_buffers_.find(element_id)->second->active_channels_set_time();
+    return ring_buffers_.find(element_id)->second->set_active_channels_completed_at();
   }
   bool started(ElementId element_id) const {
     FX_CHECK(is_ring_buffer(element_id));

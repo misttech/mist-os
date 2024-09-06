@@ -2407,12 +2407,12 @@ TEST_F(StreamConfigTest, CreateRingBuffer) {
   ASSERT_TRUE(SetControl(device));
 
   auto connected_to_ring_buffer_fidl = device->CreateRingBuffer(
-      ring_buffer_id(), kDefaultRingBufferFormat, 2000,
+      ring_buffer_id(), kDefaultRingBufferFormat, kDefaultRequestedRingBufferBytes,
       [](const fit::result<fad::ControlCreateRingBufferError, Device::RingBufferInfo>& result) {
         ASSERT_TRUE(result.is_ok()) << fidl::ToUnderlying(result.error_value());
         auto& info = *result;
         ASSERT_TRUE(info.ring_buffer.buffer());
-        EXPECT_GT(info.ring_buffer.buffer()->size(), 2000u);
+        EXPECT_GT(info.ring_buffer.buffer()->size(), kDefaultRequestedRingBufferBytes);
 
         EXPECT_TRUE(info.ring_buffer.format());
         EXPECT_TRUE(info.ring_buffer.producer_bytes());
@@ -2454,12 +2454,12 @@ TEST_F(StreamConfigTest, BasicStartAndStop) {
   ASSERT_TRUE(SetControl(device));
 
   auto connected_to_ring_buffer_fidl = device->CreateRingBuffer(
-      ring_buffer_id(), kDefaultRingBufferFormat, 2000,
+      ring_buffer_id(), kDefaultRingBufferFormat, kDefaultRequestedRingBufferBytes,
       [](const fit::result<fad::ControlCreateRingBufferError, Device::RingBufferInfo>& result) {
         ASSERT_TRUE(result.is_ok());
         auto& info = *result;
         ASSERT_TRUE(info.ring_buffer.buffer());
-        EXPECT_GT(info.ring_buffer.buffer()->size(), 2000u);
+        EXPECT_GT(info.ring_buffer.buffer()->size(), kDefaultRequestedRingBufferBytes);
 
         EXPECT_TRUE(info.ring_buffer.format());
         EXPECT_TRUE(info.ring_buffer.producer_bytes());
@@ -2482,7 +2482,7 @@ TEST_F(StreamConfigTest, WatchDelayInfoInitial) {
 
   auto created_ring_buffer = false;
   auto connected_to_ring_buffer_fidl = device->CreateRingBuffer(
-      ring_buffer_id(), kDefaultRingBufferFormat, 2000,
+      ring_buffer_id(), kDefaultRingBufferFormat, kDefaultRequestedRingBufferBytes,
       [&created_ring_buffer](
           const fit::result<fad::ControlCreateRingBufferError, Device::RingBufferInfo>& result) {
         EXPECT_TRUE(result.is_ok());
@@ -2512,7 +2512,7 @@ TEST_F(StreamConfigTest, WatchDelayInfoUpdate) {
   ASSERT_TRUE(SetControl(device));
   auto created_ring_buffer = false;
   auto connected_to_ring_buffer_fidl = device->CreateRingBuffer(
-      ring_buffer_id(), kDefaultRingBufferFormat, 2000,
+      ring_buffer_id(), kDefaultRingBufferFormat, kDefaultRequestedRingBufferBytes,
       [&created_ring_buffer](
           const fit::result<fad::ControlCreateRingBufferError, Device::RingBufferInfo>& result) {
         EXPECT_TRUE(result.is_ok());
@@ -2546,8 +2546,9 @@ TEST_F(StreamConfigTest, WatchDelayInfoUpdate) {
   EXPECT_EQ(*notify()->delay_info()->external_delay(), 654'321);
 }
 
-// This checks the Device's active-channels state after the low-level CreateRingBuffer call.
-// (This maps directly to the driver FIDL interface, as opposed to ConnectRingBufferFidl.)
+// These SetActiveChannels tests check the Device's active-channels state after the high-level
+// CreateRingBuffer call. This connects to the driver FIDL interface, retrieves RingBufferProperties
+// and DelayInfo, and establishes the RingBufferRecord bookkeeping for this ring buffer instance.
 TEST_F(StreamConfigTest, ReportsThatItSupportsSetActiveChannels) {
   auto fake_driver = MakeFakeStreamConfigInput();
   auto device = InitializeDeviceForFakeStreamConfig(fake_driver);
@@ -2557,12 +2558,12 @@ TEST_F(StreamConfigTest, ReportsThatItSupportsSetActiveChannels) {
   ASSERT_TRUE(SetControl(device));
 
   auto connected_to_ring_buffer_fidl = device->CreateRingBuffer(
-      ring_buffer_id(), kDefaultRingBufferFormat, 2000,
+      ring_buffer_id(), kDefaultRingBufferFormat, kDefaultRequestedRingBufferBytes,
       [](const fit::result<fad::ControlCreateRingBufferError, Device::RingBufferInfo>& result) {
         ASSERT_TRUE(result.is_ok());
         auto& info = *result;
         ASSERT_TRUE(info.ring_buffer.buffer());
-        EXPECT_GT(info.ring_buffer.buffer()->size(), 2000u);
+        EXPECT_GT(info.ring_buffer.buffer()->size(), kDefaultRequestedRingBufferBytes);
 
         EXPECT_TRUE(info.ring_buffer.format());
         EXPECT_TRUE(info.ring_buffer.producer_bytes());
@@ -2576,23 +2577,21 @@ TEST_F(StreamConfigTest, ReportsThatItSupportsSetActiveChannels) {
   EXPECT_TRUE(device->supports_set_active_channels(ring_buffer_id()).value_or(true));
 }
 
-// This checks the Device's active-channels state after the low-level CreateRingBuffer call.
-// (This maps directly to the driver FIDL interface, as opposed to ConnectRingBufferFidl.)
 TEST_F(StreamConfigTest, ReportsThatItDoesNotSupportSetActiveChannels) {
   auto fake_driver = MakeFakeStreamConfigOutput();
-  auto device = InitializeDeviceForFakeStreamConfig(fake_driver);
   fake_driver->set_active_channels_supported(false);
+  auto device = InitializeDeviceForFakeStreamConfig(fake_driver);
   ASSERT_TRUE(device->is_operational());
   fake_driver->AllocateRingBuffer(8192);
   ASSERT_TRUE(SetControl(device));
 
   auto connected_to_ring_buffer_fidl = device->CreateRingBuffer(
-      ring_buffer_id(), kDefaultRingBufferFormat, 2000,
+      ring_buffer_id(), kDefaultRingBufferFormat, kDefaultRequestedRingBufferBytes,
       [](const fit::result<fad::ControlCreateRingBufferError, Device::RingBufferInfo>& result) {
         ASSERT_TRUE(result.is_ok());
         auto& info = *result;
         ASSERT_TRUE(info.ring_buffer.buffer());
-        EXPECT_GT(info.ring_buffer.buffer()->size(), 2000u);
+        EXPECT_GT(info.ring_buffer.buffer()->size(), kDefaultRequestedRingBufferBytes);
 
         EXPECT_TRUE(info.ring_buffer.format());
         EXPECT_TRUE(info.ring_buffer.producer_bytes());
@@ -2606,16 +2605,32 @@ TEST_F(StreamConfigTest, ReportsThatItDoesNotSupportSetActiveChannels) {
   EXPECT_FALSE(device->supports_set_active_channels(ring_buffer_id()).value_or(false));
 }
 
-// This checks the Device's active-channels state after ConnectToRingBufferAndExpectValidClient,
-// which includes additional object setup beyond the direct CreateRingBuffer call.
 TEST_F(StreamConfigTest, SetActiveChannelsNoChange) {
   auto fake_driver = MakeFakeStreamConfigInput();
+  fake_driver->set_active_channels_supported(true);
   auto device = InitializeDeviceForFakeStreamConfig(fake_driver);
   ASSERT_TRUE(device->is_operational());
   fake_driver->AllocateRingBuffer(8192);
-  fake_driver->set_active_channels_supported(true);
   ASSERT_TRUE(SetControl(device));
-  ConnectToRingBufferAndExpectValidClient(device, ring_buffer_id());
+
+  auto connected_to_ring_buffer_fidl = device->CreateRingBuffer(
+      ring_buffer_id(), kDefaultRingBufferFormat, kDefaultRequestedRingBufferBytes,
+      [](const fit::result<fad::ControlCreateRingBufferError, Device::RingBufferInfo>& result) {
+        ASSERT_TRUE(result.is_ok()) << fidl::ToUnderlying(result.error_value());
+        auto& info = *result;
+        ASSERT_TRUE(info.ring_buffer.buffer());
+        EXPECT_GT(info.ring_buffer.buffer()->size(), kDefaultRequestedRingBufferBytes);
+
+        EXPECT_TRUE(info.ring_buffer.format());
+        EXPECT_TRUE(info.ring_buffer.producer_bytes());
+        EXPECT_TRUE(info.ring_buffer.consumer_bytes());
+        EXPECT_TRUE(info.ring_buffer.reference_clock());
+      });
+  EXPECT_TRUE(connected_to_ring_buffer_fidl);
+
+  // Wait for RingBuffer initialization to complete.
+  ExpectRingBufferReady(device, ring_buffer_id());
+
   // Device may not have tried this yet, so we allow an unset value.
   ExpectActiveChannelsOrUnset(device, ring_buffer_id(), 0x0003);
   // Ensure that the device has a known channel activation state.

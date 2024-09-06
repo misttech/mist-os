@@ -143,7 +143,7 @@ class FakeStreamConfig final : public fuchsia::hardware::audio::StreamConfig,
 
   void set_active_channels_supported(bool supported) { active_channels_supported_ = supported; }
   uint64_t active_channels_bitmask() const { return active_channels_bitmask_; }
-  zx::time active_channels_set_time() const { return active_channels_set_time_; }
+  zx::time set_active_channels_completed_at() const { return set_active_channels_completed_at_; }
 
   // Explicitly trigger a change notification, for the current values of gain/plug/delay.
   void InjectDelayUpdate(std::optional<zx::duration> internal_delay,
@@ -269,7 +269,7 @@ class FakeStreamConfig final : public fuchsia::hardware::audio::StreamConfig,
 
   bool active_channels_supported_ = true;
   uint64_t active_channels_bitmask_;
-  zx::time active_channels_set_time_{0};
+  zx::time set_active_channels_completed_at_{0};
 
   bool started_ = false;
   zx::time mono_start_time_{0};

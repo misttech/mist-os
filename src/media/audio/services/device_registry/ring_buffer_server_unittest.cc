@@ -293,7 +293,7 @@ TEST_F(RingBufferServerCompositeTest, DriverSupportsSetActiveChannels) {
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback);
   EXPECT_EQ(fake_driver->active_channels_bitmask(element_id), 0x0u);
-  EXPECT_GT(fake_driver->active_channels_set_time(element_id), before_set_active_channels);
+  EXPECT_GT(fake_driver->set_active_channels_completed_at(element_id), before_set_active_channels);
   EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
   EXPECT_FALSE(control_fidl_error_status().has_value()) << *control_fidl_error_status();
 }
@@ -903,7 +903,7 @@ TEST_F(RingBufferServerStreamConfigTest, DriverSupportsSetActiveChannels) {
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback);
   EXPECT_EQ(fake_driver->active_channels_bitmask(), 0x0u);
-  EXPECT_GT(fake_driver->active_channels_set_time(), before_set_active_channels);
+  EXPECT_GT(fake_driver->set_active_channels_completed_at(), before_set_active_channels);
   EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
   EXPECT_FALSE(control_fidl_error_status().has_value()) << *control_fidl_error_status();
 }

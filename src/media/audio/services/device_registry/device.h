@@ -501,7 +501,7 @@ class Device : public std::enable_shared_from_this<Device> {
 
     std::optional<bool> supports_set_active_channels;
     std::optional<uint64_t> active_channels_bitmask;
-    std::optional<zx::time> active_channels_set_time;
+    std::optional<zx::time> set_active_channels_completed_at;
 
     std::optional<zx::time> start_time;
   };

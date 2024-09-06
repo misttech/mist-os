@@ -533,7 +533,7 @@ void Device::DropRingBuffer(ElementId element_id) {
   rb_record.ring_buffer_consumer_bytes = 0;
 
   rb_record.active_channels_bitmask.reset();  // ... and SetActiveChannels.
-  rb_record.active_channels_set_time.reset();
+  rb_record.set_active_channels_completed_at.reset();
 
   // Clear our FIDL connection to the driver RingBuffer.
   (void)rb_record.ring_buffer_client->UnbindMaybeGetEndpoint();
@@ -2649,10 +2649,10 @@ bool Device::SetActiveChannels(
 
         ring_buffer.supports_set_active_channels = true;
         ring_buffer.active_channels_bitmask = channel_bitmask;
-        ring_buffer.active_channels_set_time = zx::time(result->set_time());
-        callback(zx::ok(*ring_buffer.active_channels_set_time));
+        ring_buffer.set_active_channels_completed_at = zx::time(result->set_time());
+        callback(zx::ok(*ring_buffer.set_active_channels_completed_at));
         LogActiveChannels(*ring_buffer.active_channels_bitmask,
-                          *ring_buffer.active_channels_set_time);
+                          *ring_buffer.set_active_channels_completed_at);
       });
   TRACE_INSTANT("power-audio", "ADR::Device::SetActiveChannels exit", TRACE_SCOPE_PROCESS, "reason",
                 "Waiting for async response", "bitmask", channel_bitmask);

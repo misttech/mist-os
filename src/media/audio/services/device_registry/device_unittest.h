@@ -498,6 +498,7 @@ class StreamConfigTest : public DeviceTestBase {
           .frame_rate = 48000,
       }},
   }};
+  static constexpr uint32_t kDefaultRequestedRingBufferBytes = 2000;
 
   std::shared_ptr<FakeStreamConfig> MakeFakeStreamConfigInput() {
     return MakeFakeStreamConfig(true);
@@ -596,19 +597,19 @@ class StreamConfigTest : public DeviceTestBase {
     auto& ring_buffer = device->ring_buffer_map_.find(element_id)->second;
     bool callback_received = false;
 
-    auto succeeded =
-        device->SetActiveChannels(element_id, expected_bitmask,
-                                  [&ring_buffer, &callback_received](zx::result<zx::time> result) {
-                                    EXPECT_TRUE(result.is_ok()) << result.status_string();
-                                    ASSERT_TRUE(ring_buffer.active_channels_set_time.has_value());
-                                    EXPECT_EQ(*result, *ring_buffer.active_channels_set_time);
-                                    callback_received = true;
-                                  });
+    auto succeeded = device->SetActiveChannels(
+        element_id, expected_bitmask,
+        [&ring_buffer, &callback_received](zx::result<zx::time> result) {
+          EXPECT_TRUE(result.is_ok()) << result.status_string();
+          ASSERT_TRUE(ring_buffer.set_active_channels_completed_at.has_value());
+          EXPECT_EQ(*result, *ring_buffer.set_active_channels_completed_at);
+          callback_received = true;
+        });
 
     RunLoopUntilIdle();
     ASSERT_TRUE(succeeded);
-    ASSERT_TRUE(ring_buffer.active_channels_set_time.has_value());
-    EXPECT_GT(*ring_buffer.active_channels_set_time, now);
+    ASSERT_TRUE(ring_buffer.set_active_channels_completed_at.has_value());
+    EXPECT_GT(*ring_buffer.set_active_channels_completed_at, now);
     ExpectActiveChannels(device, element_id, expected_bitmask);
   }
 
@@ -618,24 +619,25 @@ class StreamConfigTest : public DeviceTestBase {
                                           ElementId element_id, uint64_t expected_bitmask) {
     ASSERT_TRUE(RingBufferIsCreatingOrStopped(device, element_id));
     auto& ring_buffer = device->ring_buffer_map_.find(element_id)->second;
-    ASSERT_TRUE(ring_buffer.active_channels_set_time.has_value())
+    ASSERT_TRUE(ring_buffer.set_active_channels_completed_at.has_value())
         << "SetActiveChannels has not yet been called";
-    auto previous_active_channels_set_time = *ring_buffer.active_channels_set_time;
+    auto previous_set_active_channels_completed_at = *ring_buffer.set_active_channels_completed_at;
     bool callback_received = false;
 
-    auto succeeded =
-        device->SetActiveChannels(element_id, expected_bitmask,
-                                  [&ring_buffer, &callback_received](zx::result<zx::time> result) {
-                                    EXPECT_TRUE(result.is_ok()) << result.status_string();
-                                    ASSERT_TRUE(ring_buffer.active_channels_set_time.has_value());
-                                    EXPECT_EQ(*result, *ring_buffer.active_channels_set_time);
-                                    callback_received = true;
-                                  });
+    auto succeeded = device->SetActiveChannels(
+        element_id, expected_bitmask,
+        [&ring_buffer, &callback_received](zx::result<zx::time> result) {
+          EXPECT_TRUE(result.is_ok()) << result.status_string();
+          ASSERT_TRUE(ring_buffer.set_active_channels_completed_at.has_value());
+          EXPECT_EQ(*result, *ring_buffer.set_active_channels_completed_at);
+          callback_received = true;
+        });
 
     RunLoopUntilIdle();
     ASSERT_TRUE(succeeded);
-    ASSERT_TRUE(ring_buffer.active_channels_set_time.has_value());
-    EXPECT_EQ(*ring_buffer.active_channels_set_time, previous_active_channels_set_time);
+    ASSERT_TRUE(ring_buffer.set_active_channels_completed_at.has_value());
+    EXPECT_EQ(*ring_buffer.set_active_channels_completed_at,
+              previous_set_active_channels_completed_at);
     ExpectActiveChannels(device, element_id, expected_bitmask);
   }
 
