@@ -25,6 +25,7 @@
 #include <sparse_format.h>
 
 #include <numeric>
+#include <optional>
 // Clean up the unhelpful defines from sparse_format.h
 #undef error
 
@@ -464,6 +465,15 @@ class PaverServiceSkipBlockTest : public PaverServiceTest {
   void TestQueryConfigurationLastSetActive(fuchsia_paver::wire::Configuration this_slot,
                                            fuchsia_paver::wire::Configuration other_slot);
 
+  void TestQueryConfigurationStatus(AbrData abr_data,
+                                    fuchsia_paver::wire::Configuration configuration,
+                                    fuchsia_paver::wire::ConfigurationStatus expected_status);
+
+  void TestQueryConfigurationStatusAndBootAttempts(
+      AbrData abr_data, fuchsia_paver::wire::Configuration configuration,
+      fuchsia_paver::wire::ConfigurationStatus expected_status,
+      std::optional<uint8_t> expected_boot_attempts);
+
   fidl::WireSyncClient<fuchsia_paver::BootManager> boot_manager_;
   fidl::WireSyncClient<fuchsia_paver::DataSink> data_sink_;
   fidl::WireSyncClient<fuchsia_paver::Sysconfig> sysconfig_;
@@ -744,49 +754,125 @@ TEST_F(PaverServiceSkipBlockTest, QueryCurrentConfigurationSlotInvalid) {
   ASSERT_STATUS(result, ZX_ERR_PEER_CLOSED);
 }
 
-TEST_F(PaverServiceSkipBlockTest, QueryConfigurationStatusHealthy) {
+// Registers the given `abr_data`, calls `BootManager::QueryConfigurationStatus`, and checks that
+// the resulting status matches `expected_status`.
+void PaverServiceSkipBlockTest::TestQueryConfigurationStatus(
+    AbrData abr_data, fuchsia_paver::wire::Configuration configuration,
+    fuchsia_paver::wire::ConfigurationStatus expected_status) {
   ASSERT_NO_FATAL_FAILURE(InitializeRamNand());
 
-  auto abr_data = kAbrData;
   ComputeCrc(&abr_data);
   SetAbr(abr_data);
 
   ASSERT_NO_FATAL_FAILURE(FindBootManager());
 
-  auto result = boot_manager_->QueryConfigurationStatus(fuchsia_paver::wire::Configuration::kB);
+  auto result = boot_manager_->QueryConfigurationStatus(configuration);
   ASSERT_OK(result.status());
   ASSERT_TRUE(result->is_ok());
-  ASSERT_EQ(result->value()->status, fuchsia_paver::wire::ConfigurationStatus::kHealthy);
+  ASSERT_EQ((*result)->status, expected_status);
+}
+
+// Registers the given `abr_data`, calls `BootManager::QueryConfigurationStatusAndBootAttempts`, and
+// checks that the resulting status matches `expected_status` and boot attempts matches
+// `expected_boot_attempts`.
+void PaverServiceSkipBlockTest::TestQueryConfigurationStatusAndBootAttempts(
+    AbrData abr_data, fuchsia_paver::wire::Configuration configuration,
+    fuchsia_paver::wire::ConfigurationStatus expected_status,
+    std::optional<uint8_t> expected_boot_attempts) {
+  ASSERT_NO_FATAL_FAILURE(InitializeRamNand());
+
+  ComputeCrc(&abr_data);
+  SetAbr(abr_data);
+
+  ASSERT_NO_FATAL_FAILURE(FindBootManager());
+
+  auto result = boot_manager_->QueryConfigurationStatusAndBootAttempts(configuration);
+  ASSERT_OK(result.status());
+  ASSERT_TRUE(result->is_ok());
+  ASSERT_TRUE((*result)->has_status());
+  ASSERT_EQ((*result)->status(), expected_status);
+  if (expected_boot_attempts.has_value()) {
+    ASSERT_TRUE((*result)->has_boot_attempts());
+    ASSERT_EQ((*result)->boot_attempts(), expected_boot_attempts.value());
+  } else {
+    ASSERT_FALSE((*result)->has_boot_attempts());
+  }
+}
+
+TEST_F(PaverServiceSkipBlockTest, QueryConfigurationStatusHealthy) {
+  TestQueryConfigurationStatus(kAbrData, fuchsia_paver::wire::Configuration::kB,
+                               fuchsia_paver::wire::ConfigurationStatus::kHealthy);
+}
+
+TEST_F(PaverServiceSkipBlockTest, QueryConfigurationStatusAndBootAttemptsHealthy) {
+  TestQueryConfigurationStatusAndBootAttempts(kAbrData, fuchsia_paver::wire::Configuration::kB,
+                                              fuchsia_paver::wire::ConfigurationStatus::kHealthy,
+                                              std::nullopt);
 }
 
 TEST_F(PaverServiceSkipBlockTest, QueryConfigurationStatusPending) {
-  ASSERT_NO_FATAL_FAILURE(InitializeRamNand());
   AbrData abr_data = kAbrData;
   abr_data.slot_data[1].successful_boot = 0;
   abr_data.slot_data[1].tries_remaining = 1;
-  ComputeCrc(&abr_data);
-  SetAbr(abr_data);
 
-  ASSERT_NO_FATAL_FAILURE(FindBootManager());
+  TestQueryConfigurationStatus(abr_data, fuchsia_paver::wire::Configuration::kB,
+                               fuchsia_paver::wire::ConfigurationStatus::kPending);
+}
 
-  auto result = boot_manager_->QueryConfigurationStatus(fuchsia_paver::wire::Configuration::kB);
-  ASSERT_OK(result.status());
-  ASSERT_TRUE(result->is_ok());
-  ASSERT_EQ(result->value()->status, fuchsia_paver::wire::ConfigurationStatus::kPending);
+TEST_F(PaverServiceSkipBlockTest, QueryConfigurationStatusAndBootAttemptsPendingNoAttempts) {
+  AbrData abr_data = kAbrData;
+  abr_data.slot_data[1].successful_boot = 0;
+  abr_data.slot_data[1].tries_remaining = kAbrMaxTriesRemaining;
+
+  TestQueryConfigurationStatusAndBootAttempts(abr_data, fuchsia_paver::wire::Configuration::kB,
+                                              fuchsia_paver::wire::ConfigurationStatus::kPending,
+                                              0);
+}
+
+TEST_F(PaverServiceSkipBlockTest, QueryConfigurationStatusAndBootAttemptsPendingSomeAttempts) {
+  AbrData abr_data = kAbrData;
+  abr_data.slot_data[1].successful_boot = 0;
+  abr_data.slot_data[1].tries_remaining = 1;
+
+  TestQueryConfigurationStatusAndBootAttempts(abr_data, fuchsia_paver::wire::Configuration::kB,
+                                              fuchsia_paver::wire::ConfigurationStatus::kPending,
+                                              kAbrMaxTriesRemaining - 1);
+}
+
+TEST_F(PaverServiceSkipBlockTest, QueryConfigurationStatusAndBootAttemptsPendingAllAttempts) {
+  AbrData abr_data = kAbrData;
+  abr_data.slot_data[1].successful_boot = 0;
+  abr_data.slot_data[1].tries_remaining = 0;
+
+  // The A/B/R data gets fixed up on load, which automatically moves a 0-tries pending state into
+  // an unbootable state instead. This behavior is part of the FIDL documentation so make sure to
+  // update the docs if this ever changes.
+  TestQueryConfigurationStatusAndBootAttempts(abr_data, fuchsia_paver::wire::Configuration::kB,
+                                              fuchsia_paver::wire::ConfigurationStatus::kUnbootable,
+                                              std::nullopt);
 }
 
 TEST_F(PaverServiceSkipBlockTest, QueryConfigurationStatusUnbootable) {
-  ASSERT_NO_FATAL_FAILURE(InitializeRamNand());
+  TestQueryConfigurationStatus(kAbrData, fuchsia_paver::wire::Configuration::kA,
+                               fuchsia_paver::wire::ConfigurationStatus::kUnbootable);
+}
+
+TEST_F(PaverServiceSkipBlockTest, QueryConfigurationStatusAndBootAttemptsUnbootable) {
+  TestQueryConfigurationStatusAndBootAttempts(kAbrData, fuchsia_paver::wire::Configuration::kA,
+                                              fuchsia_paver::wire::ConfigurationStatus::kUnbootable,
+                                              std::nullopt);
+}
+
+TEST_F(PaverServiceSkipBlockTest, QueryConfigurationStatusAndBootAttemptsInvalidBootAttempts) {
   AbrData abr_data = kAbrData;
-  ComputeCrc(&abr_data);
-  SetAbr(abr_data);
+  abr_data.slot_data[1].successful_boot = 0;
+  abr_data.slot_data[1].tries_remaining = kAbrMaxTriesRemaining + 1;  // Invalid tries remaining.
 
-  ASSERT_NO_FATAL_FAILURE(FindBootManager());
-
-  auto result = boot_manager_->QueryConfigurationStatus(fuchsia_paver::wire::Configuration::kA);
-  ASSERT_OK(result.status());
-  ASSERT_TRUE(result->is_ok());
-  ASSERT_EQ(result->value()->status, fuchsia_paver::wire::ConfigurationStatus::kUnbootable);
+  // The A/B/R data gets fixed up on load, so even though the on-disk data was invalid it should now
+  // be snapped into the valid range.
+  TestQueryConfigurationStatusAndBootAttempts(abr_data, fuchsia_paver::wire::Configuration::kB,
+                                              fuchsia_paver::wire::ConfigurationStatus::kPending,
+                                              0);
 }
 
 TEST_F(PaverServiceSkipBlockTest, SetConfigurationActive) {

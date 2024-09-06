@@ -94,35 +94,74 @@ void FakePaver::QueryConfigurationLastSetActive(
   }
 }
 
+namespace {
+
+// Returns the `ConfigurationStatus` and boot attempts for the requested `configuration`.
+// The boot attempts is only valid for configuration status == `kPending`, and will be 0 otherwise.
+zx::result<std::pair<fuchsia_paver::wire::ConfigurationStatus, uint8_t>> GetConfigurationSlotData(
+    const AbrData& abr_data, fuchsia_paver::wire::Configuration configuration) {
+  AbrSlotData slot_data;
+  switch (configuration) {
+    case fuchsia_paver::wire::Configuration::kA:
+      slot_data = abr_data.slot_a;
+      break;
+
+    case fuchsia_paver::wire::Configuration::kB:
+      slot_data = abr_data.slot_b;
+      break;
+
+    case fuchsia_paver::wire::Configuration::kRecovery:
+      return zx::error(ZX_ERR_INVALID_ARGS);
+  }
+
+  if (slot_data.unbootable) {
+    return zx::ok(std::make_pair(fuchsia_paver::wire::ConfigurationStatus::kUnbootable, 0));
+  }
+  if (!slot_data.healthy) {
+    return zx::ok(std::make_pair(fuchsia_paver::wire::ConfigurationStatus::kPending,
+                                 slot_data.boot_attempts));
+  }
+  return zx::ok(std::make_pair(fuchsia_paver::wire::ConfigurationStatus::kHealthy, 0));
+}
+
+}  // namespace
+
 void FakePaver::QueryConfigurationStatus(QueryConfigurationStatusRequestView request,
                                          QueryConfigurationStatusCompleter::Sync& completer) {
   fbl::AutoLock al(&lock_);
   AppendCommand(Command::kQueryConfigurationStatus);
-  AbrSlotData slot_data;
-  zx_status_t status;
-  switch (request->configuration) {
-    case fuchsia_paver::wire::Configuration::kA:
-      slot_data = abr_data_.slot_a;
-      break;
 
-    case fuchsia_paver::wire::Configuration::kB:
-      slot_data = abr_data_.slot_b;
-      status = ZX_OK;
-      break;
+  auto slot_data = GetConfigurationSlotData(abr_data_, request->configuration);
+  if (slot_data.is_error()) {
+    completer.ReplyError(slot_data.error_value());
+    return;
+  }
+  completer.ReplySuccess(slot_data->first);
+}
 
-    case fuchsia_paver::wire::Configuration::kRecovery:
-      status = ZX_ERR_INVALID_ARGS;
-      completer.ReplyError(status);
-      return;
+void FakePaver::QueryConfigurationStatusAndBootAttempts(
+    QueryConfigurationStatusAndBootAttemptsRequestView request,
+    QueryConfigurationStatusAndBootAttemptsCompleter::Sync& completer) {
+  fbl::AutoLock al(&lock_);
+  AppendCommand(Command::kQueryConfigurationStatusAndBootAttempts);
+
+  auto slot_data = GetConfigurationSlotData(abr_data_, request->configuration);
+  if (slot_data.is_error()) {
+    completer.ReplyError(slot_data.error_value());
+    return;
   }
 
-  if (slot_data.unbootable) {
-    completer.ReplySuccess(fuchsia_paver::wire::ConfigurationStatus::kUnbootable);
-  } else if (!slot_data.healthy) {
-    completer.ReplySuccess(fuchsia_paver::wire::ConfigurationStatus::kPending);
-  } else {
-    completer.ReplySuccess(fuchsia_paver::wire::ConfigurationStatus::kHealthy);
+  fidl::Arena arena;
+  auto builder =
+      fuchsia_paver::wire::BootManagerQueryConfigurationStatusAndBootAttemptsResponse::Builder(
+          arena);
+
+  const auto& [status, boot_attempts] = *slot_data;
+  builder.status(status);
+  if (status == fuchsia_paver::wire::ConfigurationStatus::kPending) {
+    builder.boot_attempts(boot_attempts);
   }
+  completer.ReplySuccess(builder.Build());
 }
 
 void FakePaver::SetConfigurationActive(SetConfigurationActiveRequestView request,
@@ -137,6 +176,7 @@ void FakePaver::SetConfigurationActive(SetConfigurationActiveRequestView request
 
       abr_data_.slot_a.unbootable = false;
       abr_data_.slot_a.healthy = false;
+      abr_data_.slot_a.boot_attempts = 0;
       abr_data_.last_set_active = fuchsia_paver::Configuration::kA;
       status = ZX_OK;
       break;
@@ -147,6 +187,7 @@ void FakePaver::SetConfigurationActive(SetConfigurationActiveRequestView request
 
       abr_data_.slot_b.unbootable = false;
       abr_data_.slot_b.healthy = false;
+      abr_data_.slot_b.boot_attempts = 0;
       abr_data_.last_set_active = fuchsia_paver::Configuration::kB;
       status = ZX_OK;
       break;
@@ -403,6 +444,23 @@ void FakePaver::set_supported_firmware_type(std::string type) {
 void FakePaver::set_expected_device(std::string expected) {
   fbl::AutoLock al(&lock_);
   expected_block_device_ = std::move(expected);
+}
+
+void FakePaver::set_boot_attempts(fuchsia_paver::wire::Configuration configuration,
+                                  uint8_t boot_attempts) {
+  fbl::AutoLock al(&lock_);
+  switch (configuration) {
+    case fuchsia_paver::wire::Configuration::kA:
+      abr_data_.slot_a.boot_attempts = boot_attempts;
+      break;
+
+    case fuchsia_paver::wire::Configuration::kB:
+      abr_data_.slot_b.boot_attempts = boot_attempts;
+      break;
+
+    case fuchsia_paver::wire::Configuration::kRecovery:
+      break;
+  }
 }
 
 AbrData FakePaver::abr_data() {

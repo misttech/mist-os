@@ -34,6 +34,16 @@ type ConfigurationStatus = strict enum {
     UNBOOTABLE = 3;
 };
 
+/// The maximum number of times the firmware will attempt to boot into a `PENDING` configuration.
+///
+/// If the boot attempts are all exhausted without the configuration being updated to `HEALTHY`,
+/// the configuration will switch to `UNBOOTABLE` which will cause the next boot to fall back to
+/// the next usable slot.
+///
+/// `HEALTHY` and `UNBOOTABLE` configurations do not count boot attempts; it is assumed that once a
+/// device is in these states it will remain so until the configuration is manually modified.
+const MAX_PENDING_BOOT_ATTEMPTS uint8 = 7;
+
 type ReadInfo = struct {
     /// Offset into VMO where read data starts.
     offset zx.Off;
@@ -296,15 +306,38 @@ closed protocol BootManager {
     /// Queries status of `configuration`.
     ///
     /// Returns `ZX_ERR_INVALID_ARGS` if `Configuration.RECOVERY` is passed in via `configuration`.
+    // We may want to migrate users over to `QueryConfigurationStatusAndBootAttempts` at some point
+    // and delete this, but it's not hard to support both.
     strict QueryConfigurationStatus(struct {
         configuration Configuration;
     }) -> (struct {
         status ConfigurationStatus;
     }) error zx.Status;
 
+    /// Queries status of `configuration`.
+    ///
+    /// The returned table will always contain the current `ConfigurationStatus`. Additionally, if
+    /// the status is `ConfigurationStatus::PENDING`, the table will also contain the number of
+    /// times this configuration has attempted to boot.
+    ///
+    /// If `boot_attempts` is provided, it will be in the range `[0, MAX_PENDING_BOOT_ATTEMPTS)`.
+    /// 0 indicates the configuration was just set active and has not attempted any boots yet, but
+    /// `MAX_PENDING_BOOT_ATTEMPTS` will never be returned because on the final boot attempt the
+    /// state instead becomes `ConfigurationStatus::UNBOOTABLE`.
+    ///
+    /// Returns `ZX_ERR_INVALID_ARGS` if `Configuration.RECOVERY` is passed in via `configuration`.
+    strict QueryConfigurationStatusAndBootAttempts(struct {
+        configuration Configuration;
+    }) -> (table {
+        1: status ConfigurationStatus;
+        2: boot_attempts uint8;
+    }) error zx.Status;
+
     /// Updates persistent metadata identifying which configuration should be selected as 'primary'
     /// for booting purposes. Should only be called after `KERNEL` as well as optional
     /// `VERIFIED_BOOT_METADATA` assets for specified `configuration` were written successfully.
+    ///
+    /// Also resets the boot attempts count for the given `Configuration`.
     ///
     /// Returns `ZX_ERR_INVALID_ARGS` if `Configuration.RECOVERY` is passed in via `configuration`.
     strict SetConfigurationActive(struct {

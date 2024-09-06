@@ -52,6 +52,7 @@ pub enum PaverEvent {
     QueryConfigurationLastSetActive,
     QueryCurrentConfiguration,
     QueryConfigurationStatus { configuration: paver::Configuration },
+    QueryConfigurationStatusAndBootAttempts { configuration: paver::Configuration },
     SetConfigurationHealthy { configuration: paver::Configuration },
     SetConfigurationActive { configuration: paver::Configuration },
     SetConfigurationUnbootable { configuration: paver::Configuration },
@@ -111,6 +112,12 @@ impl PaverEvent {
             paver::BootManagerRequest::QueryConfigurationStatus { configuration, .. } => {
                 PaverEvent::QueryConfigurationStatus { configuration: configuration.to_owned() }
             }
+            paver::BootManagerRequest::QueryConfigurationStatusAndBootAttempts {
+                configuration,
+                ..
+            } => PaverEvent::QueryConfigurationStatusAndBootAttempts {
+                configuration: configuration.to_owned(),
+            },
             paver::BootManagerRequest::SetConfigurationHealthy { configuration, .. } => {
                 PaverEvent::SetConfigurationHealthy { configuration: configuration.to_owned() }
             }
@@ -196,6 +203,10 @@ pub mod hooks {
                     paver::BootManagerRequest::QueryConfigurationStatus { responder, .. } => {
                         responder.send(Err(status.into_raw()))
                     }
+                    paver::BootManagerRequest::QueryConfigurationStatusAndBootAttempts {
+                        responder,
+                        ..
+                    } => responder.send(Err(status.into_raw())),
                     paver::BootManagerRequest::SetConfigurationHealthy { responder, .. } => {
                         responder.send(status.into_raw())
                     }
@@ -730,6 +741,13 @@ impl MockPaverService {
                 }
                 paver::BootManagerRequest::QueryConfigurationStatus { responder, .. } => {
                     responder.send(Ok(paver::ConfigurationStatus::Healthy))
+                }
+                paver::BootManagerRequest::QueryConfigurationStatusAndBootAttempts {
+                    responder,
+                    ..
+                } => {
+                    // Nothing uses this yet, wait to implement until we need it.
+                    responder.send(Err(Status::NOT_SUPPORTED.into_raw()))
                 }
                 paver::BootManagerRequest::SetConfigurationHealthy {
                     configuration,
