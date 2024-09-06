@@ -261,6 +261,7 @@ group("bazel_action_allowlist") {
   visibility += [ "//vendor/*" ]
 
   visibility += [
+    "//boards/vim3:bazel_drivers",
     "//examples/drivers/template:bazel_package.bazel_build",
     "//examples/drivers/template:template-test.bazel_build",
     "//sdk/lib/driver/devicetree/examples/example-board:bazel_package.bazel_build",

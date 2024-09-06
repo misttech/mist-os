@@ -4,6 +4,7 @@
 
 import("//build/assembly/board_configuration.gni")
 import("//build/assembly/board_input_bundle.gni")
+import("//build/bazel/assembly/bazel_board_input_bundle.gni")
 
 assert(current_toolchain == default_toolchain,
        "The vim3 board can only be defined in the default toolchain.")
@@ -172,29 +173,14 @@ board_input_bundle("main_bundle") {
       driver_components = [ "meta/aml-sdmmc.cm" ]
     },
     {
-      package_target = "//src/devices/clock/drivers/vim3-clk:bazel_package"
-      package_set = "bootfs"
-      driver_components = [ "meta/vim3-clk.cm" ]
-    },
-    {
       package_target = "//src/devices/cpu/drivers/aml-cpu:package"
       package_set = "bootfs"
       driver_components = [ "meta/aml-cpu.cm" ]
     },
     {
-      package_target = "//src/devices/gpio/drivers/aml-gpio:bazel_package"
-      package_set = "bootfs"
-      driver_components = [ "meta/aml-gpio.cm" ]
-    },
-    {
       package_target = "//src/devices/gpio/drivers/ti-tca6408a:package"
       package_set = "bootfs"
       driver_components = [ "meta/ti-tca6408a.cm" ]
-    },
-    {
-      package_target = "//src/devices/i2c/drivers/aml-i2c:bazel_package"
-      package_set = "bootfs"
-      driver_components = [ "meta/aml-i2c.cm" ]
     },
     {
       package_target = "//src/devices/mcu/drivers/vim3-mcu:package"
@@ -257,11 +243,6 @@ board_input_bundle("main_bundle") {
       driver_components = [ "meta/dwc2.cm" ]
     },
     {
-      package_target = "//src/devices/usb/drivers/aml-usb-phy:bazel_package"
-      package_set = "bootfs"
-      driver_components = [ "meta/aml-usb-phy.cm" ]
-    },
-    {
       package_target = "//src/graphics/display/drivers/aml-canvas:package"
       package_set = "bootfs"
       driver_components = [ "meta/aml-canvas.cm" ]
@@ -283,19 +264,9 @@ board_input_bundle("main_bundle") {
       driver_components = [ "meta/aml-gpu.cm" ]
     },
     {
-      package_target = "//src/media/audio/drivers/aml-g12-tdm:aml-g12-composite-bazel-package"
-      package_set = "bootfs"
-      driver_components = [ "meta/aml-g12-composite.cm" ]
-    },
-    {
       package_target = "//src/ui/backlight/drivers/vim3-pwm-backlight:package"
       package_set = "bootfs"
       driver_components = [ "meta/vim3-pwm-backlight.cm" ]
-    },
-    {
-      package_target = "//src/ui/input/drivers/adc-buttons:bazel_package"
-      package_set = "bootfs"
-      driver_components = [ "meta/adc-buttons.cm" ]
     },
     {
       package_target = "//src/ui/input/drivers/focaltech:package"
@@ -336,20 +307,11 @@ board_input_bundle("devicetree_board_driver") {
       "//src/devices/sysmem/format_costs/video_decoder_nv12",
     ]
   }
-  drivers = [
-    {
-      package_target =
-          "//src/devices/board/drivers/vim3-devicetree:bazel_package"
-      package_set = "bootfs"
-      driver_components = [ "meta/vim3-devicetree.cm" ]
-    },
-  ]
+  drivers = []
 }
 
-board_input_bundle("bazel_drivers") {
-  # This list is empty for now, after all the variations of vim3 board updated
-  # to use this BIB, we will move the bazel drivers to this list
-  drivers = []
+bazel_board_input_bundle("bazel_drivers") {
+  bazel_board_input_bundle_target = "//boards/vim3:bazel_drivers"
 }
 
 board_input_bundle("vulkan_arm_mali") {
