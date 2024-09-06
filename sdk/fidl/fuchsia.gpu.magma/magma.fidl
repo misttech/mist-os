@@ -471,3 +471,37 @@ closed protocol DependencyInjection {
         provider client_end:fuchsia.memorypressure.Provider;
     });
 };
+
+/// Each element of this enum represents a high-level goal of a specific power state.
+@available(added=HEAD)
+type PowerGoalType = flexible enum : uint64 {
+    /// The hardware is powered on, but idle and ready to immediately process work.
+    ON_READY_FOR_WORK = 1;
+    /// The hardware is in a high-performance state for gaming or other intensive activities.
+    HIGH_PERFORMANCE = 2;
+    /// The hardware is in a mode that provides a consistent level of performance for a long period
+    /// of time.
+    SUSTAINED_PERFORMANCE = 3;
+};
+
+/// This table represents a specific power goal. The client must acquire a lease on the token to
+/// activate the state.
+@available(added=HEAD)
+type PowerGoal = resource table {
+    /// Required.
+    1: type PowerGoalType;
+    /// Required. The fuchsia.power.broker.DependencyToken that must be leased at level 1 to achieve
+    /// the goal.
+    // TODO(https://fxbug.dev/364610203): Convert to fuchsia.power.broker.DependencyToken once
+    // that's in the SDK.
+    2: token zx.Handle:EVENT;
+};
+
+/// This protocol is used to retrieve information on the power levels that this driver provides.
+@available(added=HEAD)
+open protocol PowerElementProvider {
+    /// Retrieve a list of power goals that the hardware can attempt to achieve.
+    flexible GetPowerGoals() -> (resource struct {
+        goals vector<PowerGoal>:MAX;
+    });
+};
