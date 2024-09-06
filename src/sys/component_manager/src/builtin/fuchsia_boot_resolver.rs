@@ -668,18 +668,6 @@ mod tests {
         assert_matches!(err, ResolverError::ConfigValuesIo { .. });
     }
 
-    macro_rules! test_resolve_error {
-        ($resolver:ident, $url:expr, $target:ident, $resolver_error_expected:ident) => {
-            let url = $url.parse().unwrap();
-            let res =
-                $resolver.resolve(&ComponentAddress::from(&url, &$target).await.unwrap()).await;
-            match res.err().expect("unexpected success") {
-                ResolverError::$resolver_error_expected { .. } => {}
-                e => panic!("unexpected error {:?}", e),
-            }
-        };
-    }
-
     #[fuchsia::test]
     async fn resolve_errors_test() {
         let manifest_encoded = persist(&fdecl::Component {
@@ -707,6 +695,8 @@ mod tests {
             "fuchsia-boot:///#meta/root.cm".parse().unwrap(),
         )
         .await;
-        test_resolve_error!(resolver, "fuchsia-boot:///#meta/invalid.cm", root, ManifestInvalid);
+        let url = "fuchsia-boot:///#meta/invalid.cm".parse().unwrap();
+        let res = resolver.resolve(&ComponentAddress::from(&url, &root).await.unwrap()).await;
+        assert_matches!(res, Err(ResolverError::ManifestInvalid { .. }));
     }
 }
