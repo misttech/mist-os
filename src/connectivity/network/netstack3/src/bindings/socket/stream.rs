@@ -26,8 +26,8 @@ use netstack3_core::tcp::{
     self, AcceptError, BindError, BoundInfo, Buffer, BufferLimits, BufferSizes, ConnectError,
     ConnectionError, ConnectionInfo, FragmentedPayload, IntoBuffers, ListenError, ListenerNotifier,
     NoConnection, OriginalDestinationError, Payload, PayloadLen, ReceiveBuffer, RingBuffer,
-    SendBuffer, SetReuseAddrError, SocketAddr, SocketInfo, SocketOptions, Takeable,
-    TcpBindingsTypes, UnboundInfo,
+    SendBuffer, SetReuseAddrError, SocketAddr, SocketInfo, SocketOptions, TcpBindingsTypes,
+    UnboundInfo,
 };
 use netstack3_core::IpExt;
 use once_cell::sync::Lazy;
@@ -78,13 +78,6 @@ impl IntoBuffers<ReceiveBufferWithZirconSocket, SendBufferWithZirconSocket>
             ReceiveBufferWithZirconSocket::new(Arc::clone(&socket), receive),
             SendBufferWithZirconSocket::new(socket, notifier, send),
         )
-    }
-}
-
-impl Takeable for LocalZirconSocketAndNotifier {
-    fn take(&mut self) -> Self {
-        let Self(socket, notifier) = self;
-        Self(Arc::clone(&socket), notifier.clone())
     }
 }
 
@@ -143,10 +136,7 @@ impl TcpBindingsTypes for BindingsCtx {
 #[derive(Debug)]
 pub(crate) struct ReceiveBufferWithZirconSocket {
     /// The Zircon socket whose other end is held by the peer.
-    ///
-    /// This is an Option so that [`Takeable::take`] can leave a sentinel value
-    /// in its place. Otherwise it should always have a value.
-    socket: Option<Arc<zx::Socket>>,
+    socket: Arc<zx::Socket>,
     zx_socket_capacity: usize,
     // Invariant: `out_of_order` can never hold more bytes than
     // `zx_socket_capacity`.
@@ -172,20 +162,7 @@ impl ReceiveBufferWithZirconSocket {
         let ring_buffer_size =
             usize::min(usize::max(target_capacity, Self::MIN_CAPACITY), zx_socket_capacity);
         let out_of_order = RingBuffer::new(ring_buffer_size);
-        Self { zx_socket_capacity, socket: Some(socket), out_of_order }
-    }
-}
-
-impl Takeable for ReceiveBufferWithZirconSocket {
-    fn take(&mut self) -> Self {
-        core::mem::replace(
-            self,
-            Self {
-                zx_socket_capacity: self.zx_socket_capacity,
-                socket: None,
-                out_of_order: RingBuffer::new(0),
-            },
-        )
+        Self { zx_socket_capacity, socket, out_of_order }
     }
 }
 
@@ -205,7 +182,7 @@ impl Buffer for ReceiveBufferWithZirconSocket {
             *zx_socket_capacity
         );
 
-        let info = socket.as_ref().expect("is valid").info().expect("failed to get socket info");
+        let info = socket.as_ref().info().expect("failed to get socket info");
         let len = info.tx_buf_size;
         // Ensure that capacity is always at least as large as the length, but
         // also reflects the requested capacity.
@@ -239,7 +216,7 @@ impl ReceiveBuffer for ReceiveBufferWithZirconSocket {
             let mut total = 0;
             for chunk in avail {
                 trace_duration!(c"zx::Socket::write");
-                let written = match self.socket.as_ref().expect("is valid").write(*chunk) {
+                let written = match self.socket.as_ref().write(*chunk) {
                     Ok(n) => n,
                     Err(zx::Status::BAD_STATE | zx::Status::PEER_CLOSED) => {
                         // These two status codes correspond two possible cases
@@ -281,14 +258,12 @@ impl Drop for ReceiveBufferWithZirconSocket {
     fn drop(&mut self) {
         // Make sure the FDIO is aware that we are not writing anymore so that
         // it can transition into the right state.
-        if let Some(socket) = self.socket.as_ref() {
-            socket
-                .set_disposition(
-                    /* disposition */ Some(zx::SocketWriteDisposition::Disabled),
-                    /* peer_disposition */ None,
-                )
-                .expect("failed to set socket disposition");
-        }
+        self.socket
+            .set_disposition(
+                /* disposition */ Some(zx::SocketWriteDisposition::Disabled),
+                /* peer_disposition */ None,
+            )
+            .expect("failed to set socket disposition");
     }
 }
 
@@ -338,18 +313,6 @@ impl Buffer for SendBufferWithZirconSocket {
 
         // Eagerly pull more data out of the Zircon socket into the ring buffer.
         self.poll()
-    }
-}
-
-impl Takeable for SendBufferWithZirconSocket {
-    fn take(&mut self) -> Self {
-        let Self { zx_socket_capacity, socket, ready_to_send: data, notifier } = self;
-        Self {
-            zx_socket_capacity: *zx_socket_capacity,
-            socket: Arc::clone(socket),
-            ready_to_send: std::mem::replace(data, RingBuffer::new(0)),
-            notifier: notifier.clone(),
-        }
     }
 }
 

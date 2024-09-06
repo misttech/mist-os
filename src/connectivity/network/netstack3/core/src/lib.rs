@@ -202,8 +202,8 @@ pub mod tcp {
         AcceptError, BindError, BoundInfo, Buffer, BufferLimits, BufferSizes, ConnectError,
         ConnectionError, ConnectionInfo, IntoBuffers, ListenError, ListenerNotifier, NoConnection,
         OriginalDestinationError, ReceiveBuffer, RingBuffer, SendBuffer, SetDeviceError,
-        SetReuseAddrError, SocketAddr, SocketInfo, SocketOptions, Takeable, TcpBindingsTypes,
-        TcpSocketId, UnboundInfo, DEFAULT_FIN_WAIT2_TIMEOUT,
+        SetReuseAddrError, SocketAddr, SocketInfo, SocketOptions, TcpBindingsTypes, TcpSocketId,
+        UnboundInfo, DEFAULT_FIN_WAIT2_TIMEOUT,
     };
 }
 

@@ -18,10 +18,9 @@ use either::Either;
 use packet::InnerPacketBuilder;
 
 use crate::internal::base::BufferSizes;
-use crate::internal::state::Takeable;
 
 /// Common super trait for both sending and receiving buffer.
-pub trait Buffer: Takeable + Debug + Sized {
+pub trait Buffer: Debug + Sized {
     /// Returns the capacity range `(min, max)` for this buffer type.
     fn capacity_range() -> (usize, usize);
 

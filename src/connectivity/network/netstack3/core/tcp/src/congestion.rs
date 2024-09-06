@@ -209,10 +209,6 @@ impl<I: Instant> CongestionControl<I> {
         }
     }
 
-    pub(super) fn take(&mut self) -> Self {
-        core::mem::replace(self, Self::cubic_with_mss(self.mss()))
-    }
-
     pub(super) fn mss(&self) -> Mss {
         self.params.mss
     }

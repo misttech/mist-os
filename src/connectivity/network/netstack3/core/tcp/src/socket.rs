@@ -75,7 +75,9 @@ use crate::internal::buffer::{Buffer, IntoBuffers, ReceiveBuffer, SendBuffer};
 use crate::internal::socket::accept_queue::{AcceptQueue, ListenerNotifier};
 use crate::internal::socket::demux::tcp_serialize_segment;
 use crate::internal::socket::isn::IsnGenerator;
-use crate::internal::state::{CloseError, CloseReason, Closed, Initial, State, Takeable};
+use crate::internal::state::{
+    CloseError, CloseReason, Closed, Initial, State, Takeable, TakeableRef,
+};
 
 /// A marker trait for dual-stack socket features.
 ///
@@ -461,8 +463,6 @@ pub trait TcpBindingsTypes: InstantBindingsTypes + TimerBindingsTypes + 'static 
     /// was used as a listener and it will be used to provide buffers if used
     /// to establish connections.
     type ListenerNotifierOrProvidedBuffers: Debug
-        + Takeable
-        + Clone
         + IntoBuffers<Self::ReceiveBuffer, Self::SendBuffer>
         + ListenerNotifier
         + Send
@@ -1484,14 +1484,14 @@ impl<S: SpecSocketId> SocketMapAddrStateSpec for ConnAddrState<S> {
     }
 }
 
-#[derive(Debug, Derivative, Clone)]
+#[derive(Debug, Clone)]
 #[cfg_attr(test, derive(PartialEq))]
 pub struct Unbound<D, Extra> {
     bound_device: Option<D>,
     buffer_sizes: BufferSizes,
     socket_options: SocketOptions,
     sharing: SharingState,
-    socket_extra: Extra,
+    socket_extra: Takeable<Extra>,
 }
 
 type ReferenceState<I, D, BT> = RwLock<TcpSocketState<I, D, BT>>;
@@ -1813,7 +1813,7 @@ impl<I: DualStackIpExt, D: WeakDeviceIdentifier, BT: TcpBindingsTypes> Listener<
 pub struct BoundState<Extra> {
     buffer_sizes: BufferSizes,
     socket_options: SocketOptions,
-    socket_extra: Extra,
+    socket_extra: Takeable<Extra>,
 }
 
 /// Represents either a bound socket or a listener socket.
@@ -2182,11 +2182,11 @@ where
     ) -> TcpApiSocketId<I, C> {
         self.core_ctx().with_all_sockets_mut(|all_sockets| {
             let (sock, primary) = TcpSocketId::new(TcpSocketStateInner::Unbound(Unbound {
-                buffer_sizes: C::BindingsContext::default_buffer_sizes(),
                 bound_device: Default::default(),
+                buffer_sizes: C::BindingsContext::default_buffer_sizes(),
                 sharing: Default::default(),
                 socket_options: Default::default(),
-                socket_extra,
+                socket_extra: Takeable::new(socket_extra),
             }));
             assert_matches::assert_matches!(
                 all_sockets.insert(sock.clone(), TcpSocketSetEntry::Primary(primary)),
@@ -2250,12 +2250,6 @@ where
                     TcpSocketStateInner::Unbound(u) => u,
                     TcpSocketStateInner::Bound(_) => return Err(BindError::AlreadyBound),
                 };
-
-            let bound_state = BoundState {
-                buffer_sizes: buffer_sizes.clone(),
-                socket_options: socket_options.clone(),
-                socket_extra: socket_extra.clone(),
-            };
 
             let (listener_addr, sharing) = match core_ctx {
                 MaybeDualStack::NotDualStack((core_ctx, converter)) => match bind_addr {
@@ -2415,6 +2409,12 @@ where
                 },
             };
 
+            let bound_state = BoundState {
+                buffer_sizes: buffer_sizes.clone(),
+                socket_options: socket_options.clone(),
+                socket_extra: Takeable::from_ref(socket_extra.to_ref()),
+            };
+
             *socket_state = TcpSocketStateInner::Bound(BoundSocketState::Listener((
                 MaybeListener::Bound(bound_state),
                 sharing,
@@ -2470,7 +2470,7 @@ where
                         backlog,
                         buffer_sizes.clone(),
                         socket_options.clone(),
-                        socket_extra.clone(),
+                        socket_extra.to_ref().take(),
                     ));
                 }
                 MaybeListener::Listener(_) => {
@@ -2605,7 +2605,7 @@ where
                             *sharing,
                             *socket_options,
                             *buffer_sizes,
-                            socket_extra.clone(),
+                            socket_extra.to_ref(),
                         ),
                         TcpSocketStateInner::Bound(BoundSocketState::Listener((
                             listener,
@@ -2658,7 +2658,7 @@ where
                                     *sharing,
                                     *socket_options,
                                     *buffer_sizes,
-                                    socket_extra.clone(),
+                                    socket_extra.to_ref(),
                                 ),
                                 MaybeListener::Listener(_) => return Err(ConnectError::Listener),
                             }
@@ -2675,26 +2675,28 @@ where
                         MaybeDualStack::NotDualStack((core_ctx, converter)),
                         (local_addr_this_stack, None),
                         DualStackRemoteIp::ThisStack(remote_ip),
-                    ) => connect_inner(
-                        core_ctx,
-                        bindings_ctx,
-                        id,
-                        isn,
-                        local_addr_this_stack.clone(),
-                        remote_ip,
-                        remote_port,
-                        socket_extra,
-                        buffer_sizes,
-                        socket_options,
-                        sharing,
-                        SingleStackDemuxStateAccessor(
-                            &I::into_demux_socket_id(id.clone()),
-                            local_addr_this_stack,
-                        ),
-                        |conn, addr| converter.convert_back((conn, addr)),
-                        <C::CoreContext as CoreTimerContext<_, _>>::convert_timer,
-                        socket_state,
-                    ),
+                    ) => {
+                        *socket_state = connect_inner(
+                            core_ctx,
+                            bindings_ctx,
+                            id,
+                            isn,
+                            local_addr_this_stack.clone(),
+                            remote_ip,
+                            remote_port,
+                            socket_extra,
+                            buffer_sizes,
+                            socket_options,
+                            sharing,
+                            SingleStackDemuxStateAccessor(
+                                &I::into_demux_socket_id(id.clone()),
+                                local_addr_this_stack,
+                            ),
+                            |conn, addr| converter.convert_back((conn, addr)),
+                            <C::CoreContext as CoreTimerContext<_, _>>::convert_timer,
+                        )?;
+                        Ok(())
+                    }
                     // If dual stack, we can perform a this-stack only
                     // connection as long as we're not *only* bound in the other
                     // stack.
@@ -2703,26 +2705,30 @@ where
                         (local_addr_this_stack, local_addr_other_stack @ None)
                         | (local_addr_this_stack @ Some(_), local_addr_other_stack @ Some(_)),
                         DualStackRemoteIp::ThisStack(remote_ip),
-                    ) => connect_inner(
-                        core_ctx,
-                        bindings_ctx,
-                        id,
-                        isn,
-                        local_addr_this_stack.clone(),
-                        remote_ip,
-                        remote_port,
-                        socket_extra,
-                        buffer_sizes,
-                        socket_options,
-                        sharing,
-                        DualStackDemuxStateAccessor(
+                    ) => {
+                        *socket_state = connect_inner(
+                            core_ctx,
+                            bindings_ctx,
                             id,
-                            DualStackTuple::new(local_addr_this_stack, local_addr_other_stack),
-                        ),
-                        |conn, addr| converter.convert_back(EitherStack::ThisStack((conn, addr))),
-                        <C::CoreContext as CoreTimerContext<_, _>>::convert_timer,
-                        socket_state,
-                    ),
+                            isn,
+                            local_addr_this_stack.clone(),
+                            remote_ip,
+                            remote_port,
+                            socket_extra,
+                            buffer_sizes,
+                            socket_options,
+                            sharing,
+                            DualStackDemuxStateAccessor(
+                                id,
+                                DualStackTuple::new(local_addr_this_stack, local_addr_other_stack),
+                            ),
+                            |conn, addr| {
+                                converter.convert_back(EitherStack::ThisStack((conn, addr)))
+                            },
+                            <C::CoreContext as CoreTimerContext<_, _>>::convert_timer,
+                        )?;
+                        Ok(())
+                    }
                     // If dual stack, we can perform an other-stack only
                     // connection as long as we're not *only* bound in this
                     // stack.
@@ -2735,7 +2741,7 @@ where
                         if !core_ctx.dual_stack_enabled(ip_options) {
                             return Err(ConnectError::NoRoute);
                         }
-                        connect_inner(
+                        *socket_state = connect_inner(
                             core_ctx,
                             bindings_ctx,
                             id,
@@ -2755,8 +2761,8 @@ where
                                 converter.convert_back(EitherStack::OtherStack((conn, addr)))
                             },
                             <C::CoreContext as CoreTimerContext<_, _>>::convert_timer,
-                            socket_state,
-                        )
+                        )?;
+                        Ok(())
                     }
                     // Not possible for a non-dual-stack socket to bind in the other
                     // stack.
@@ -2925,7 +2931,7 @@ where
                                         let bound_state = BoundState {
                                             buffer_sizes,
                                             socket_options,
-                                            socket_extra,
+                                            socket_extra: Takeable::new(socket_extra),
                                         };
                                         (MaybeListener::Bound(bound_state), Some(pending))
                                     }
@@ -3218,8 +3224,11 @@ where
                                 } = assert_matches!(maybe_listener,
                             MaybeListener::Listener(l) => l, "must be a listener");
                                 let (pending, socket_extra) = accept_queue.close();
-                                let bound_state =
-                                    BoundState { buffer_sizes, socket_options, socket_extra };
+                                let bound_state = BoundState {
+                                    buffer_sizes,
+                                    socket_options,
+                                    socket_extra: Takeable::new(socket_extra),
+                                };
                                 (MaybeListener::Bound(bound_state), pending)
                             });
 
@@ -4902,7 +4911,7 @@ fn connect_inner<CC, BC, SockI, WireI, Demux>(
     listener_addr: Option<ListenerAddr<ListenerIpAddr<WireI::Addr, NonZeroU16>, CC::WeakDeviceId>>,
     remote_ip: ZonedAddr<SocketIpAddr<WireI::Addr>, CC::DeviceId>,
     remote_port: NonZeroU16,
-    netstack_buffers: BC::ListenerNotifierOrProvidedBuffers,
+    active_open: TakeableRef<'_, BC::ListenerNotifierOrProvidedBuffers>,
     buffer_sizes: BufferSizes,
     socket_options: SocketOptions,
     sharing: SharingState,
@@ -4912,8 +4921,7 @@ fn connect_inner<CC, BC, SockI, WireI, Demux>(
         ConnAddr<ConnIpAddr<WireI::Addr, NonZeroU16, NonZeroU16>, CC::WeakDeviceId>,
     ) -> SockI::ConnectionAndAddr<CC::WeakDeviceId, BC>,
     convert_timer: impl FnOnce(WeakTcpSocketId<SockI, CC::WeakDeviceId, BC>) -> BC::DispatchId,
-    socket_state: &mut TcpSocketStateInner<SockI, CC::WeakDeviceId, BC>,
-) -> Result<(), ConnectError>
+) -> Result<TcpSocketStateInner<SockI, CC::WeakDeviceId, BC>, ConnectError>
 where
     SockI: DualStackIpExt,
     WireI: DualStackIpExt,
@@ -5005,48 +5013,52 @@ where
     );
 
     let now = bindings_ctx.now();
-    let (syn_sent, syn) = Closed::<Initial>::connect(
-        isn,
-        now,
-        netstack_buffers,
-        buffer_sizes,
-        Mss::from_mms::<WireI>(device_mms).ok_or(ConnectError::NoRoute)?,
-        Mss::default::<WireI>(),
-        &socket_options,
-    );
-    let state = State::<_, BC::ReceiveBuffer, BC::SendBuffer, _>::SynSent(syn_sent);
-    let poll_send_at = state.poll_send_at().expect("no retrans timer");
+    let mms = Mss::from_mms::<WireI>(device_mms).ok_or(ConnectError::NoRoute)?;
 
-    // Send first SYN packet.
-    send_tcp_segment(
-        core_ctx,
-        bindings_ctx,
-        Some(&sock_id),
-        Some(&ip_sock),
-        conn_addr.ip,
-        syn.into_empty(),
-    );
+    // No more errors can occur after here, because we're taking active_open
+    // buffers out. Use a closure to guard against bad evolution.
+    let active_open = active_open.take();
+    Ok((move || {
+        let (syn_sent, syn) = Closed::<Initial>::connect(
+            isn,
+            now,
+            active_open,
+            buffer_sizes,
+            mms,
+            Mss::default::<WireI>(),
+            &socket_options,
+        );
+        let state = State::<_, BC::ReceiveBuffer, BC::SendBuffer, _>::SynSent(syn_sent);
+        let poll_send_at = state.poll_send_at().expect("no retrans timer");
 
-    let mut timer = bindings_ctx.new_timer(convert_timer(sock_id.downgrade()));
-    assert_eq!(bindings_ctx.schedule_timer_instant(poll_send_at, &mut timer), None);
+        // Send first SYN packet.
+        send_tcp_segment(
+            core_ctx,
+            bindings_ctx,
+            Some(&sock_id),
+            Some(&ip_sock),
+            conn_addr.ip,
+            syn.into_empty(),
+        );
 
-    let conn = convert_back_op(
-        Connection {
-            accept_queue: None,
-            state,
-            ip_sock,
-            defunct: false,
-            socket_options,
-            soft_error: None,
-            handshake_status: HandshakeStatus::Pending,
-        },
-        conn_addr,
-    );
-    *socket_state =
-        TcpSocketStateInner::Bound(BoundSocketState::Connected { conn, sharing, timer });
+        let mut timer = bindings_ctx.new_timer(convert_timer(sock_id.downgrade()));
+        assert_eq!(bindings_ctx.schedule_timer_instant(poll_send_at, &mut timer), None);
 
-    core_ctx.increment(|counters| &counters.active_connection_openings);
-    Ok(())
+        let conn = convert_back_op(
+            Connection {
+                accept_queue: None,
+                state,
+                ip_sock,
+                defunct: false,
+                socket_options,
+                soft_error: None,
+                handshake_status: HandshakeStatus::Pending,
+            },
+            conn_addr,
+        );
+        core_ctx.increment(|counters| &counters.active_connection_openings);
+        TcpSocketStateInner::Bound(BoundSocketState::Connected { conn, sharing, timer })
+    })())
 }
 
 /// Information about a socket.
