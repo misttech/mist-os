@@ -415,10 +415,8 @@ zx_status_t capture_setup(Display& display) {
   }
   // TODO(https://fxbug.dev/42180237) Consider handling the error instead of ignoring it.
   (void)token->Sync();
-  auto import_resp =
-      dc->ImportBufferCollection(display::ToFidlBufferCollectionId(kBufferCollectionId),
-                                 fidl::ClientEnd<fuchsia_sysmem::BufferCollectionToken>(
-                                     display_token.TakeClientEnd().TakeChannel()));
+  auto import_resp = dc->ImportBufferCollection(
+      display::ToFidlBufferCollectionId(kBufferCollectionId), display_token.TakeClientEnd());
   if (import_resp.status() != ZX_OK) {
     printf("Could not import token: %s\n", import_resp.FormatDescription().c_str());
     return import_resp.status();

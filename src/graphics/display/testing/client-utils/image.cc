@@ -115,9 +115,8 @@ Image* Image::Create(const fidl::WireSyncClient<fhd::Coordinator>& dc, uint32_t 
 
   fuchsia_hardware_display::wire::BufferCollectionId fidl_buffer_collection_id =
       display::ToFidlBufferCollectionId(buffer_collection_id);
-  auto import_result = dc->ImportBufferCollection(
-      fidl_buffer_collection_id,
-      fidl::ClientEnd<fuchsia_sysmem::BufferCollectionToken>(display_token_handle.TakeChannel()));
+  auto import_result =
+      dc->ImportBufferCollection(fidl_buffer_collection_id, std::move(display_token_handle));
   if (!import_result.ok() || import_result.value().is_error()) {
     fprintf(stderr, "Failed to import buffer collection\n");
     return nullptr;

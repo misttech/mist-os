@@ -65,7 +65,7 @@ class EngineDriverClient {
                                                          uint32_t index);
   zx::result<> ImportBufferCollection(
       DriverBufferCollectionId collection_id,
-      fidl::ClientEnd<fuchsia_sysmem::BufferCollectionToken> collection_token);
+      fidl::ClientEnd<fuchsia_sysmem2::BufferCollectionToken> collection_token);
   zx::result<> ReleaseBufferCollection(DriverBufferCollectionId collection_id);
   zx::result<> SetBufferCollectionConstraints(const ImageBufferUsage& usage,
                                               DriverBufferCollectionId collection_id);

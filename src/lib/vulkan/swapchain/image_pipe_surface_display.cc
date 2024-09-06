@@ -267,9 +267,7 @@ bool ImagePipeSurfaceDisplay::CreateImage(VkDevice device, VkLayerDispatchTable*
   constexpr fuchsia::hardware::display::BufferCollectionId kBufferCollectionId = {.value = 1};
 
   display_coordinator_->ImportBufferCollection(
-      kBufferCollectionId,
-      fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken>(
-          display_token.Unbind().TakeChannel()),
+      kBufferCollectionId, display_token.Unbind(),
       [this,
        &status](fuchsia::hardware::display::Coordinator_ImportBufferCollection_Result result) {
         status = result.is_err() ? result.err() : ZX_OK;

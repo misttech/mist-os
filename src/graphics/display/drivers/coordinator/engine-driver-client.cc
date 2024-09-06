@@ -256,7 +256,7 @@ zx::result<DriverCaptureImageId> EngineDriverClient::ImportImageForCapture(
 
 zx::result<> EngineDriverClient::ImportBufferCollection(
     DriverBufferCollectionId collection_id,
-    fidl::ClientEnd<fuchsia_sysmem::BufferCollectionToken> collection_token) {
+    fidl::ClientEnd<fuchsia_sysmem2::BufferCollectionToken> collection_token) {
   if (use_engine_) {
     return zx::error(ZX_ERR_NOT_SUPPORTED);
   }

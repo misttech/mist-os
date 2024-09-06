@@ -6,7 +6,7 @@ library fuchsia.hardware.display;
 using fuchsia.hardware.display.types;
 using fuchsia.images2;
 using fuchsia.math;
-using fuchsia.sysmem;
+using fuchsia.sysmem2;
 using zx;
 
 /// Maximum number of fences supported by
@@ -509,7 +509,7 @@ closed protocol Coordinator {
     // already be in use.
     strict ImportBufferCollection(resource struct {
         buffer_collection_id BufferCollectionId;
-        buffer_collection_token client_end:fuchsia.sysmem.BufferCollectionToken;
+        buffer_collection_token client_end:fuchsia.sysmem2.BufferCollectionToken;
     }) -> () error zx.Status;
 
     // Release an imported buffer collection.

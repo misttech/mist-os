@@ -23,7 +23,7 @@ fidl("fuchsia.hardware.display") {
     "//sdk/fidl/fuchsia.hardware.display.types",
     "//sdk/fidl/fuchsia.images2",
     "//sdk/fidl/fuchsia.math",
-    "//sdk/fidl/fuchsia.sysmem",
+    "//sdk/fidl/fuchsia.sysmem2",
   ]
 
   enable_hlcpp = true

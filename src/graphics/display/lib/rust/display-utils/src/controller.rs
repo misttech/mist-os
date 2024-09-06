@@ -284,7 +284,7 @@ impl Coordinator {
     /// API calls to refer to the imported collection.
     pub(crate) async fn import_buffer_collection(
         &self,
-        token: ClientEnd<fidl_fuchsia_sysmem::BufferCollectionTokenMarker>,
+        token: ClientEnd<fidl_fuchsia_sysmem2::BufferCollectionTokenMarker>,
     ) -> Result<BufferCollectionId> {
         let id = self.inner.write().next_free_collection_id()?;
         let proxy = self.proxy();
