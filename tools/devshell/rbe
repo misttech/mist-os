@@ -1,0 +1,111 @@
+#!/bin/bash
+# Copyright 2022 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+#### CATEGORY=Build
+### check remote build configuration
+
+## usage:
+##  fx rbe auth
+##       Verify authentication to RBE services through reclient and bazel.
+##
+
+set -e
+
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"/lib/vars.sh || exit $?
+source "${FUCHSIA_DIR}/tools/devshell/lib/style.sh" || exit $?
+
+readonly reproxy_wrap="$FUCHSIA_DIR/build/rbe/fuchsia-reproxy-wrap.sh"
+
+reclient_auth_test=("$reproxy_wrap" -- echo "re-client+RBE authentication successful")
+
+function usage {
+  fx-command-help
+}
+
+fx-standard-switches "$@"
+set -- "${FX_ARGV[@]}"
+
+if [[ $# -lt 1 ]]; then
+  fx-error Invalid syntax
+  fx-command-help
+  exit 1
+fi
+
+action="$1"
+shift
+action_args=("$@")
+
+function is_googler() {
+  which gcert > /dev/null 2>&1
+}
+
+gcloud=
+
+function ensure_gcloud() {
+  # go/gcloud-cli#getting-started
+  gcloud="$(which gcloud)" || {
+    echo "gcloud not found."
+    if is_googler
+    then
+      _cmd=(sudo apt install -y google-cloud-cli)
+      echo "Install gcloud with the following command?: ${_cmd[@]}"
+      select yn in "y" "n" "Y" "N"
+      do
+        case "$yn" in
+          [yY] ) "${_cmd[@]}" && gcloud="$(which gcloud)" ; return "$?" ;;
+          [nN] ) echo "Follow the instructions at go/gcloud-cli#getting-started"
+            ;;
+        esac
+      done
+    else
+      echo "Follow the instructions at https://cloud.google.com/sdk/docs/install"
+    fi
+    return 1
+  }
+}
+
+function gcloud_auth() {
+  readonly auth_args=(auth login --update-adc)
+  ensure_gcloud &&
+    echo "running: gcloud ${auth_args[@]}" &&
+    echo "If you see a warning about running on a \"Google Compute Engine virtual machine\", hit Y to continue to use a personal account." &&
+    "$gcloud" "${auth_args[@]}"
+}
+
+function reclient_auth() {
+  until "${reclient_auth_test[@]}"
+  do
+    # gcert only works in environments that get unrestricted LOAS credentials
+    # whereas gcloud auth will always work.
+    # https://fuchsia.dev/internal/intree/concepts/remote-builds#authentication
+    gcloud_auth || {
+      echo "Failed to authenticate with gcloud."
+      return 1
+    }
+  done
+}
+
+function bazel_auth() {
+  # TODO(b/363284694): setup minimal workspace and bazel build to test
+  gcloud_auth
+}
+
+case "$action" in
+  -h|--help)
+    usage
+    exit 0
+    ;;
+
+  auth)
+    bazel_auth && reclient_auth && style::echo --bold --green "You can now 'fx build' with RBE."
+    exit "$?"
+    ;;
+
+  *)
+    fx-error Invalid syntax
+    fx-command-help
+    exit 1
+    ;;
+esac
