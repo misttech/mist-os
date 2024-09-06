@@ -321,7 +321,7 @@ mod tests {
     use proptest::proptest;
     use proptest::strategy::{Just, Strategy};
     use proptest::test_runner::Config;
-    use proptest_support::failed_seeds;
+    use proptest_support::failed_seeds_no_std;
     use test_case::test_case;
 
     use super::super::segment::MAX_PAYLOAD_AND_CONTROL_LEN;
@@ -357,7 +357,7 @@ mod tests {
     proptest! {
         #![proptest_config(Config {
             // Add all failed seeds here.
-            failure_persistence: failed_seeds!(),
+            failure_persistence: failed_seeds_no_std!(),
             ..Config::default()
         })]
 

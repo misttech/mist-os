@@ -658,7 +658,7 @@ mod tests {
     proptest::proptest! {
         #![proptest_config(proptest::test_runner::Config {
             // Add all failed seeds here.
-            failure_persistence: proptest_support::failed_seeds!(),
+            failure_persistence: proptest_support::failed_seeds_no_std!(),
             ..proptest::test_runner::Config::default()
         })]
 

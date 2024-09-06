@@ -258,7 +258,7 @@ mod test {
     use packet::Serializer as _;
     use proptest::proptest;
     use proptest::test_runner::Config;
-    use proptest_support::failed_seeds;
+    use proptest_support::failed_seeds_no_std;
     use test_case::test_case;
 
     const EXAMPLE_DATA: [u8; 10] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
@@ -323,7 +323,7 @@ mod test {
     proptest! {
         #![proptest_config(Config {
             // Add all failed seeds here.
-            failure_persistence: failed_seeds!(),
+            failure_persistence: failed_seeds_no_std!(),
             ..Config::default()
         })]
 

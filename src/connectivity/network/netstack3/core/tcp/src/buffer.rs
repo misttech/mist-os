@@ -804,7 +804,7 @@ mod test {
     use proptest::proptest;
     use proptest::strategy::{Just, Strategy};
     use proptest::test_runner::Config;
-    use proptest_support::failed_seeds;
+    use proptest_support::failed_seeds_no_std;
     use test_case::test_case;
 
     use super::*;
@@ -813,7 +813,7 @@ mod test {
     proptest! {
         #![proptest_config(Config {
             // Add all failed seeds here.
-            failure_persistence: failed_seeds!(
+            failure_persistence: failed_seeds_no_std!(
                 "cc f621ca7d3a2b108e0dc41f7169ad028f4329b79e90e73d5f68042519a9f63999",
                 "cc c449aebed201b4ec4f137f3c224f20325f4cfee0b7fd596d9285176b6d811aa9"
             ),
