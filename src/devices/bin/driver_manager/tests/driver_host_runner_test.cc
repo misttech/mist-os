@@ -30,7 +30,7 @@ namespace frunner = fuchsia_component_runner;
 
 class DriverHostRunnerTest : public gtest::TestLoopFixture {
   void SetUp() {
-    loader_ = driver_loader::Loader::Create();
+    loader_ = driver_loader::Loader::Create(dispatcher());
     driver_host_runner_ =
         std::make_unique<driver_manager::DriverHostRunner>(dispatcher(), ConnectToRealm());
   }
@@ -83,11 +83,13 @@ void DriverHostRunnerTest::StartDriverHost(std::string_view driver_host_path,
   // TODO(https://fxbug.dev/340928556): we should pass a channel to the loader rather than the
   // entire thing.
   bool got_cb = false;
-  driver_host_runner_->StartDriverHost(loader_.get(), std::move(bootstrap_receiver),
-                                       [&](zx::result<> result) {
-                                         ASSERT_EQ(ZX_OK, result.status_value());
-                                         got_cb = true;
-                                       });
+  driver_host_runner_->StartDriverHost(
+      loader_.get(), std::move(bootstrap_receiver),
+      [&](zx::result<fidl::ClientEnd<fuchsia_driver_loader::DriverHost>> result) {
+        ASSERT_EQ(ZX_OK, result.status_value());
+        ASSERT_TRUE(result->is_valid());
+        got_cb = true;
+      });
 
   ASSERT_TRUE(RunLoopUntilIdle());
   ASSERT_TRUE(created_component);
@@ -174,7 +176,7 @@ TEST_F(DynamicLinkingTest, StartRootDriver) {
   auto driver_host_runner =
       std::make_unique<driver_manager::DriverHostRunner>(dispatcher(), ConnectToRealm());
 
-  SetupDriverRunnerWithDynamicLinker(std::move(driver_host_runner));
+  SetupDriverRunnerWithDynamicLinker(dispatcher(), std::move(driver_host_runner));
 
   auto start = driver_runner().StartRootDriver(driver_runner::root_driver_url);
   ASSERT_FALSE(start.is_error());

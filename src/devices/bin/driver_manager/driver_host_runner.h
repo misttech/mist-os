@@ -9,6 +9,7 @@
 #include <fidl/fuchsia.component.runner/cpp/fidl.h>
 #include <fidl/fuchsia.component/cpp/fidl.h>
 #include <fidl/fuchsia.component/cpp/wire.h>
+#include <fidl/fuchsia.driver.loader/cpp/wire.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/fit/function.h>
 #include <lib/zx/result.h>
@@ -24,7 +25,8 @@ namespace driver_manager {
 
 class DriverHostRunner : public fidl::WireServer<fuchsia_component_runner::ComponentRunner> {
  public:
-  using StartDriverHostCallback = fit::callback<void(zx::result<>)>;
+  using StartDriverHostCallback =
+      fit::callback<void(zx::result<fidl::ClientEnd<fuchsia_driver_loader::DriverHost>>)>;
 
   class DriverHost : public fbl::DoublyLinkedListable<std::unique_ptr<DriverHost>> {
    public:
@@ -73,9 +75,9 @@ class DriverHostRunner : public fidl::WireServer<fuchsia_component_runner::Compo
   void StartDriverHostComponent(std::string_view moniker, std::string_view url,
                                 StartComponentCallback callback);
 
-  zx::result<> LoadDriverHost(driver_loader::Loader* loader,
-                              const fuchsia_component_runner::ComponentStartInfo& start_info,
-                              std::string_view name, zx::channel bootstrap_receiver);
+  zx::result<fidl::ClientEnd<fuchsia_driver_loader::DriverHost>> LoadDriverHost(
+      driver_loader::Loader* loader, const fuchsia_component_runner::ComponentStartInfo& start_info,
+      std::string_view name, zx::channel bootstrap_receiver);
 
   // Creates the process and starting thread for a driver host.
   zx::result<DriverHost*> CreateDriverHost(std::string_view name);

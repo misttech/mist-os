@@ -221,6 +221,7 @@ class DriverRunnerTest : public gtest::TestLoopFixture {
   void SetupDriverRunner(FakeDriverIndex driver_index);
 
   void SetupDriverRunnerWithDynamicLinker(
+      async_dispatcher_t* loader_dispatcher,
       std::unique_ptr<driver_manager::DriverHostRunner> driver_host_runner);
 
   void SetupDriverRunner();

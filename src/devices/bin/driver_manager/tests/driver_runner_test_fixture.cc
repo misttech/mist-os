@@ -68,8 +68,8 @@ zx::result<fidl::ClientEnd<fuchsia_ldsvc::Loader>> LoaderFactory() {
   return zx::ok(std::move(endpoints->client));
 }
 
-std::unique_ptr<driver_loader::Loader> DynamicLinkerFactory() {
-  return driver_loader::Loader::Create();
+std::unique_ptr<driver_loader::Loader> DynamicLinkerFactory(async_dispatcher_t* dispatcher) {
+  return driver_loader::Loader::Create(dispatcher);
 }
 
 fdecl::ChildRef CreateChildRef(std::string name, std::string collection) {
@@ -253,12 +253,14 @@ void DriverRunnerTest::SetupDriverRunner(FakeDriverIndex driver_index) {
 }
 
 void DriverRunnerTest::SetupDriverRunnerWithDynamicLinker(
+    async_dispatcher_t* loader_dispatcher,
     std::unique_ptr<driver_manager::DriverHostRunner> driver_host_runner) {
   driver_index_.emplace(CreateDriverIndex());
-  driver_runner_.emplace(ConnectToRealm(), driver_index_->Connect(), inspect(), &LoaderFactory,
-                         dispatcher(), false,
-                         driver_manager::DriverRunner::DynamicLinkerArgs{
-                             &DynamicLinkerFactory, std::move(driver_host_runner)});
+  driver_runner_.emplace(
+      ConnectToRealm(), driver_index_->Connect(), inspect(), &LoaderFactory, dispatcher(), false,
+      driver_manager::DriverRunner::DynamicLinkerArgs{
+          [dispatcher = loader_dispatcher]() { return DynamicLinkerFactory(dispatcher); },
+          std::move(driver_host_runner)});
   SetupDevfs();
 }
 

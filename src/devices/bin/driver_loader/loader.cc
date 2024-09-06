@@ -47,37 +47,36 @@ zx::result<zx::vmo> GetStubLdVmo() {
 namespace driver_loader {
 
 // static
-std::unique_ptr<Loader> Loader::Create() {
+std::unique_ptr<Loader> Loader::Create(async_dispatcher_t* dispatcher) {
   zx::result<zx::vmo> stub_ld_vmo = GetStubLdVmo();
   if (stub_ld_vmo.is_error()) {
     LOGF(ERROR, "Failed to get stub ld vmo for loader: %s", stub_ld_vmo.status_string());
     return nullptr;
   }
   auto diag = MakeDiagnostics();
-  return std::unique_ptr<Loader>(new Loader(diag, std::move(*stub_ld_vmo)));
+  return std::unique_ptr<Loader>(new Loader(dispatcher, diag, std::move(*stub_ld_vmo)));
 }
 
-zx_status_t Loader::Start(zx::process process, zx::thread thread, zx::vmar root_vmar,
-                          zx::vmo exec_vmo, zx::vmo vdso_vmo,
-                          fidl::ClientEnd<fuchsia_io::Directory> lib_dir,
-                          zx::channel bootstrap_receiver) {
+zx::result<fidl::ClientEnd<fuchsia_driver_loader::DriverHost>> Loader::Start(
+    zx::process process, zx::thread thread, zx::vmar root_vmar, zx::vmo exec_vmo, zx::vmo vdso_vmo,
+    fidl::ClientEnd<fuchsia_io::Directory> lib_dir, zx::channel bootstrap_receiver) {
   auto diag = MakeDiagnostics();
 
   Linker linker;
   linker.set_abi_stub(remote_abi_stub_);
   if (!linker.abi_stub()) {
-    return ZX_ERR_INTERNAL;
+    return zx::error(ZX_ERR_INTERNAL);
   }
 
   Linker::Module::DecodedPtr decoded_executable =
       Linker::Module::Decoded::Create(diag, std::move(exec_vmo), kPageSize);
   if (!decoded_executable) {
-    return ZX_ERR_INVALID_ARGS;
+    return zx::error(ZX_ERR_INVALID_ARGS);
   }
   Linker::Module::DecodedPtr decoded_vdso =
       Linker::Module::Decoded::Create(diag, std::move(vdso_vmo), kPageSize);
   if (!decoded_vdso) {
-    return ZX_ERR_INVALID_ARGS;
+    return zx::error(ZX_ERR_INVALID_ARGS);
   }
 
   auto init_result = linker.Init(diag,
@@ -85,7 +84,7 @@ zx_status_t Loader::Start(zx::process process, zx::thread thread, zx::vmar root_
                                   Linker::Implicit(std::move(decoded_vdso))},
                                  GetDepFunction(diag, std::move(lib_dir)));
   if (!init_result) {
-    return ZX_ERR_INTERNAL;
+    return zx::error(ZX_ERR_INTERNAL);
   }
 
   // We expect this to be equal to the size of the initial_modules list passed to |linker.Init|.
@@ -95,7 +94,7 @@ zx_status_t Loader::Start(zx::process process, zx::thread thread, zx::vmar root_
 
   // Allocate new child vmars.
   if (!linker.Allocate(diag, root_vmar.borrow())) {
-    return ZX_ERR_INTERNAL;
+    return zx::error(ZX_ERR_INTERNAL);
   }
 
   const Linker::Module& loaded_vdso = *init_result->back();
@@ -107,43 +106,53 @@ zx_status_t Loader::Start(zx::process process, zx::thread thread, zx::vmar root_
 
   // Apply relocations to segment VMOs.
   if (!linker.Relocate(diag)) {
-    return ZX_ERR_INTERNAL;
+    return zx::error(ZX_ERR_INTERNAL);
   }
 
   if (diag.errors() != 0) {
     LOGF(ERROR, "Linker diagnostics reported %u errors, skipping loading", diag.errors());
-    return ZX_ERR_INTERNAL;
+    return zx::error(ZX_ERR_INTERNAL);
   }
 
   // Load the segments into the allocated vmars.
   if (!linker.Load(diag)) {
-    return ZX_ERR_INTERNAL;
+    return zx::error(ZX_ERR_INTERNAL);
   }
 
   if (diag.errors() != 0) {
     LOGF(ERROR, "Linker diagnostics reported %u errors, skipping linker.Commit", diag.errors());
-    return ZX_ERR_INTERNAL;
+    return zx::error(ZX_ERR_INTERNAL);
   }
 
   // Commit the VMARs and mappings.
   linker.Commit();
 
   // Start the process.
-  auto process_state = ProcessState::Create(std::move(process), std::move(thread),
+  auto process_state = ProcessState::Create(remote_abi_stub_, std::move(process), std::move(thread),
                                             std::move(root_vmar), std::move(process_start_args));
   if (process_state.is_error()) {
     LOGF(ERROR, "Failed to create process state: %s", process_state.status_string());
-    return process_state.status_value();
+    return process_state.take_error();
   }
-  zx_status_t status = process_state->Start(std::move(bootstrap_receiver));
+
+  auto [client_end, server_end] = fidl::Endpoints<fuchsia_driver_loader::DriverHost>::Create();
+  zx_status_t status = process_state->BindServer(dispatcher_, std::move(server_end));
+  if (status != ZX_OK) {
+    LOGF(ERROR, "Failed to bind server endpoint to process state: %s",
+         zx_status_get_string(status));
+    return zx::error(status);
+  }
+
+  status = process_state->Start(std::move(bootstrap_receiver));
   if (status != ZX_OK) {
     LOGF(ERROR, "Failed to start process: %s", zx_status_get_string(status));
-    return status;
+    return zx::error(status);
   }
   started_processes_.push_back(std::move(*process_state));
-  return ZX_OK;
+  return zx::ok(std::move(client_end));
 }
 
+// static
 zx::result<zx::vmo> Loader::GetDepVmo(fidl::UnownedClientEnd<fuchsia_io::Directory> lib_dir,
                                       const char* libname) {
   auto [client_end, server_end] = fidl::Endpoints<fio::File>::Create();
@@ -165,9 +174,11 @@ zx::result<zx::vmo> Loader::GetDepVmo(fidl::UnownedClientEnd<fuchsia_io::Directo
 
 // static
 zx::result<std::unique_ptr<Loader::ProcessState>> Loader::ProcessState::Create(
-    zx::process process, zx::thread thread, zx::vmar root_vmar, const ProcessStartArgs& args) {
-  auto process_state = std::unique_ptr<ProcessState>(new ProcessState(
-      std::move(process), std::move(thread), std::move(root_vmar), std::move(args)));
+    ld::RemoteAbiStub<>::Ptr remote_abi_stub, zx::process process, zx::thread thread,
+    zx::vmar root_vmar, const ProcessStartArgs& args) {
+  auto process_state = std::unique_ptr<ProcessState>(
+      new ProcessState(std::move(remote_abi_stub), std::move(process), std::move(thread),
+                       std::move(root_vmar), std::move(args)));
   zx_status_t status = process_state->AllocateStack();
   if (status != ZX_OK) {
     return zx::error(status);
@@ -214,9 +225,24 @@ zx_status_t Loader::ProcessState::AllocateStack() {
   return ZX_OK;
 }
 
+zx_status_t Loader::ProcessState::BindServer(
+    async_dispatcher_t* dispatcher, fidl::ServerEnd<fuchsia_driver_loader::DriverHost> server_end) {
+  if (binding_.has_value()) {
+    return ZX_ERR_ALREADY_BOUND;
+  }
+  binding_.emplace(dispatcher, std::move(server_end), this, fidl::kIgnoreBindingClosure);
+  return ZX_OK;
+}
+
 zx_status_t Loader::ProcessState::Start(zx::channel bootstrap_receiver) {
   return process_.start(thread_, process_start_args_.entry, initial_stack_pointer_,
                         std::move(bootstrap_receiver), process_start_args_.vdso_base);
+}
+
+void Loader::ProcessState::LoadDriver(LoadDriverRequestView request,
+                                      LoadDriverCompleter::Sync& completer) {
+  // TODO(https://fxbug.dev/341998660): implement this.
+  completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
 }
 
 }  // namespace driver_loader

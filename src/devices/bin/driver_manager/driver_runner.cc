@@ -533,8 +533,8 @@ void DriverRunner::CreateDriverHostDynamicLinker(
   dynamic_linker_args_->driver_host_runner->StartDriverHost(
       dynamic_linker_service_client.get(), std::move(bootstrap_receiver),
       [this, linker = std::move(dynamic_linker_service_client),
-       bootstrap_sender = std::move(bootstrap_sender),
-       completion_cb = std::move(completion_cb)](zx::result<> result) mutable {
+       bootstrap_sender = std::move(bootstrap_sender), completion_cb = std::move(completion_cb)](
+          zx::result<fidl::ClientEnd<fuchsia_driver_loader::DriverHost>> result) mutable {
         if (result.is_error()) {
           completion_cb(result.take_error());
           return;
