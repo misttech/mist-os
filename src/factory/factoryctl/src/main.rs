@@ -79,7 +79,7 @@ where
     let out = match cmd {
         FactoryStoreCmd::List => list_files(&dir_proxy).await?,
         FactoryStoreCmd::Dump { name } => {
-            let file = fuchsia_fs::directory::open_file_no_describe(
+            let file = fuchsia_fs::directory::open_file_no_describe_deprecated(
                 &dir_proxy,
                 &name,
                 fio::OpenFlags::RIGHT_READABLE,

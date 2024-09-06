@@ -41,7 +41,7 @@ fn new_data_user_mock<T: Into<String>, U: Into<String>>(
             let data_handle =
                 mock_handles.clone_from_namespace("data").expect("data directory not available");
 
-            let file = fuchsia_fs::directory::open_file_no_describe(
+            let file = fuchsia_fs::directory::open_file_no_describe_deprecated(
                 &data_handle,
                 &filename_clone,
                 fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::CREATE,
@@ -130,7 +130,7 @@ async fn single_storage_user() {
         .await
         .expect("Error reading directory");
     assert_eq!(filenames, hashset! {"file".to_string()});
-    let file = fuchsia_fs::directory::open_file_no_describe(
+    let file = fuchsia_fs::directory::open_file_no_describe_deprecated(
         &dir_proxy,
         "file",
         fio::OpenFlags::RIGHT_READABLE,

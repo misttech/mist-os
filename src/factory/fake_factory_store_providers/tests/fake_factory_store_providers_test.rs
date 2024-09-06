@@ -27,7 +27,7 @@ async fn read_file_from_proxy<'a>(
     dir_proxy: &'a fio::DirectoryProxy,
     file_path: &'a str,
 ) -> Result<Vec<u8>, Error> {
-    let file = fuchsia_fs::directory::open_file_no_describe(
+    let file = fuchsia_fs::directory::open_file_no_describe_deprecated(
         &dir_proxy,
         file_path,
         fuchsia_fs::OpenFlags::RIGHT_READABLE,

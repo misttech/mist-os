@@ -183,8 +183,10 @@ async fn process_watch_event(
 }
 
 pub async fn watch_power_device(battery_manager: Arc<BatteryManager>) -> Result<(), Error> {
-    let dir_proxy =
-        fuchsia_fs::directory::open_in_namespace(POWER_DEVICE, OpenFlags::RIGHT_READABLE)?;
+    let dir_proxy = fuchsia_fs::directory::open_in_namespace_deprecated(
+        POWER_DEVICE,
+        OpenFlags::RIGHT_READABLE,
+    )?;
     let mut stream = device_watcher::watch_for_files(&dir_proxy)
         .await
         .with_context(|| format!("Watching for files in {}", POWER_DEVICE))?;

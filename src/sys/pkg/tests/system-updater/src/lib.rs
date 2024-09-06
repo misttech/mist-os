@@ -194,12 +194,12 @@ impl TestEnvBuilder {
         }
 
         let mut fs = ServiceFs::new();
-        let data = fuchsia_fs::directory::open_in_namespace(
+        let data = fuchsia_fs::directory::open_in_namespace_deprecated(
             data_path.to_str().unwrap(),
             fuchsia_fs::OpenFlags::RIGHT_READABLE | fuchsia_fs::OpenFlags::RIGHT_WRITABLE,
         )
         .unwrap();
-        let build_info = fuchsia_fs::directory::open_in_namespace(
+        let build_info = fuchsia_fs::directory::open_in_namespace_deprecated(
             build_info_path.to_str().unwrap(),
             fuchsia_fs::OpenFlags::RIGHT_READABLE,
         )
@@ -213,7 +213,7 @@ impl TestEnvBuilder {
             create_dir(&system_image_path).expect("crate system-image dir");
             let mut meta = File::create(system_image_path.join("meta")).unwrap();
             let () = meta.write_all(hash.to_string().as_bytes()).unwrap();
-            let system = fuchsia_fs::directory::open_in_namespace(
+            let system = fuchsia_fs::directory::open_in_namespace_deprecated(
                 system_image_path.to_str().unwrap(),
                 fuchsia_fs::OpenFlags::RIGHT_READABLE,
             )

@@ -70,7 +70,7 @@ impl TestEnvBuilder {
         }
 
         let mut fs = ServiceFs::new();
-        let config_data_proxy = fuchsia_fs::directory::open_in_namespace(
+        let config_data_proxy = fuchsia_fs::directory::open_in_namespace_deprecated(
             config_data.path().to_str().unwrap(),
             fuchsia_fs::OpenFlags::RIGHT_READABLE | fuchsia_fs::OpenFlags::RIGHT_WRITABLE,
         )

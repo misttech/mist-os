@@ -224,7 +224,7 @@ impl NonMetaStorage for fio::DirectoryProxy {
         &self,
         hash: &fuchsia_hash::Hash,
     ) -> Result<zx::Vmo, NonMetaStorageError> {
-        let proxy = fuchsia_fs::directory::open_file(
+        let proxy = fuchsia_fs::directory::open_file_deprecated(
             self,
             &hash.to_string(),
             fio::OpenFlags::RIGHT_READABLE,

@@ -69,8 +69,10 @@ impl Config {
 
         // If we are just given a directory, try to infer the full path.
         let spinel_device_setup_proxy = if Path::new(path).is_dir() {
-            let directory_proxy =
-                fuchsia_fs::directory::open_in_namespace(path, fuchsia_fs::OpenFlags::empty())?;
+            let directory_proxy = fuchsia_fs::directory::open_in_namespace_deprecated(
+                path,
+                fuchsia_fs::OpenFlags::empty(),
+            )?;
 
             let entries = fuchsia_fs::directory::readdir(&directory_proxy).await?;
 

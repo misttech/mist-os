@@ -45,13 +45,14 @@ mod tests {
         let data = "abc".repeat(10000);
         fs::write(tempdir.path().join("myfile"), &data).expect("failed writing file");
 
-        let dir = crate::directory::open_in_namespace(
+        let dir = crate::directory::open_in_namespace_deprecated(
             tempdir.path().to_str().unwrap(),
             OpenFlags::RIGHT_READABLE,
         )
         .expect("could not open tmp dir");
-        let file = directory::open_file_no_describe(&dir, "myfile", OpenFlags::RIGHT_READABLE)
-            .expect("could not open file");
+        let file =
+            directory::open_file_no_describe_deprecated(&dir, "myfile", OpenFlags::RIGHT_READABLE)
+                .expect("could not open file");
         let contents = file::read_to_string(&file).await.expect("could not read file");
         assert_eq!(&contents, &data, "File contents did not match");
     }
@@ -60,7 +61,7 @@ mod tests {
     async fn open_and_write_file_test() {
         // Create temp dir for test.
         let tempdir = TempDir::new().expect("failed to create tmp dir");
-        let dir = crate::directory::open_in_namespace(
+        let dir = crate::directory::open_in_namespace_deprecated(
             tempdir.path().to_str().unwrap(),
             OpenFlags::RIGHT_READABLE | OpenFlags::RIGHT_WRITABLE,
         )
@@ -69,7 +70,7 @@ mod tests {
         // Write contents.
         let file_name = Path::new("myfile");
         let data = "abc".repeat(10000);
-        let file = directory::open_file_no_describe(
+        let file = directory::open_file_no_describe_deprecated(
             &dir,
             file_name.to_str().unwrap(),
             OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::CREATE,
@@ -98,7 +99,7 @@ mod tests {
         let tempdir = TempDir::new().expect("failed to create tmp dir");
         std::fs::write(tempdir.path().join("read_write"), "rw/read_write")
             .expect("failed to write file");
-        let dir = crate::directory::open_in_namespace(
+        let dir = crate::directory::open_in_namespace_deprecated(
             tempdir.path().to_str().unwrap(),
             OpenFlags::RIGHT_READABLE | OpenFlags::RIGHT_WRITABLE,
         )
@@ -128,7 +129,8 @@ mod tests {
             ("rw/read_write", OpenFlags::RIGHT_WRITABLE, true),
         ] {
             let file_proxy =
-                directory::open_file_no_describe(&example_dir_proxy, file_name, flags).unwrap();
+                directory::open_file_no_describe_deprecated(&example_dir_proxy, file_name, flags)
+                    .unwrap();
             match (should_succeed, file_proxy.query().await) {
                 (true, Ok(_)) => (),
                 (false, Err(_)) => continue,

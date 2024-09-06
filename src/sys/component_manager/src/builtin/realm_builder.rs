@@ -121,8 +121,11 @@ impl BuiltinRunnerFactory for RealmBuilderRunnerFactory {
     ) -> Result<(), zx::Status> {
         open_request.prepend_path(&"fuchsia.component.runner.RealmBuilder".try_into().unwrap());
         open_request.open_remote(remote_dir(
-            fuchsia_fs::directory::open_in_namespace("/svc", fio::OpenFlags::RIGHT_READABLE)
-                .unwrap(),
+            fuchsia_fs::directory::open_in_namespace_deprecated(
+                "/svc",
+                fio::OpenFlags::RIGHT_READABLE,
+            )
+            .unwrap(),
         ))
     }
 }

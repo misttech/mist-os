@@ -172,7 +172,7 @@ async fn create_trampolines(pkg_dirs: &Vec<PkgDir>) -> Result<Trampolines, Launc
             }
             None => {
                 // Read the package binaries.
-                let bin_dir = fuchsia_fs::directory::open_directory(
+                let bin_dir = fuchsia_fs::directory::open_directory_deprecated(
                     &pkg_dir.dir,
                     "bin",
                     fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,
@@ -301,7 +301,7 @@ mod tests {
     use assert_matches::assert_matches;
     use fidl::endpoints::create_proxy_and_stream;
     use fio::OpenFlags;
-    use fuchsia_fs::directory::open_file;
+    use fuchsia_fs::directory::open_file_deprecated;
     use fuchsia_fs::file::read_to_string;
     use futures::StreamExt;
     use std::fmt;
@@ -636,8 +636,9 @@ mod tests {
     #[fuchsia::test]
     async fn make_trampoline_vfs_test() {
         async fn contents_of(path: &str, dir: &fio::DirectoryProxy) -> String {
-            let file =
-                open_file(dir, path, OpenFlags::RIGHT_READABLE).await.expect("could not open file");
+            let file = open_file_deprecated(dir, path, OpenFlags::RIGHT_READABLE)
+                .await
+                .expect("could not open file");
             read_to_string(&file)
                 .await
                 .unwrap_or_else(|e| panic!("could not open file: {}: {:?}", path, e))

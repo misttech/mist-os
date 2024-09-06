@@ -54,7 +54,7 @@ async fn is_sparse_fvm(
 /// Waits for a sparse FVM to appear.
 /// Returns the path to the partition with the sparse FVM once one is found.
 async fn wait_for_sparse_fvm() -> Result<String, Error> {
-    let dir = fuchsia_fs::directory::open_in_namespace(
+    let dir = fuchsia_fs::directory::open_in_namespace_deprecated(
         "/dev/class/block",
         fuchsia_fs::OpenFlags::RIGHT_READABLE,
     )

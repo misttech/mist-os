@@ -23,8 +23,9 @@ const BOOTFS_EXECUTABLE_NON_LIB_FILES: &[&str] = &["/boot/bin/component_manager"
 #[fuchsia::test]
 async fn basic_filenode_test() -> Result<(), Error> {
     // Open the known good file as a node, and check its attributes.
-    let node = node::open_in_namespace(SAMPLE_UTF8_READONLY_FILE, OpenFlags::RIGHT_READABLE)
-        .context("failed to open as a readable node")?;
+    let node =
+        node::open_in_namespace_deprecated(SAMPLE_UTF8_READONLY_FILE, OpenFlags::RIGHT_READABLE)
+            .context("failed to open as a readable node")?;
 
     // This node should be a readonly file, the inode should not be unknown,
     // and creation and modification times should be 0 since system UTC
@@ -37,8 +38,9 @@ async fn basic_filenode_test() -> Result<(), Error> {
     node::close(node).await?;
 
     // Reopen the known good file as a file to make use of the helper functions.
-    let file = file::open_in_namespace(SAMPLE_UTF8_READONLY_FILE, OpenFlags::RIGHT_READABLE)
-        .context("failed to open as a readable file")?;
+    let file =
+        file::open_in_namespace_deprecated(SAMPLE_UTF8_READONLY_FILE, OpenFlags::RIGHT_READABLE)
+            .context("failed to open as a readable file")?;
 
     // Check for data corruption. This file should contain a single utf-8 string which can
     // be converted into a non-zero unsigned integer.
@@ -58,7 +60,7 @@ async fn basic_filenode_test() -> Result<(), Error> {
 #[fuchsia::test]
 async fn basic_directory_test() -> Result<(), Error> {
     // Open the known good file as a node, and check its attributes.
-    let node = node::open_in_namespace(
+    let node = node::open_in_namespace_deprecated(
         SAMPLE_REQUIRED_DIRECTORY,
         OpenFlags::RIGHT_READABLE | OpenFlags::RIGHT_EXECUTABLE,
     )
@@ -79,7 +81,7 @@ async fn basic_directory_test() -> Result<(), Error> {
 
 #[fuchsia::test]
 async fn check_kernel_vmos() -> Result<(), Error> {
-    let directory = directory::open_in_namespace(
+    let directory = directory::open_in_namespace_deprecated(
         KERNEL_VDSO_DIRECTORY,
         OpenFlags::RIGHT_READABLE | OpenFlags::RIGHT_EXECUTABLE,
     )
@@ -95,9 +97,11 @@ async fn check_kernel_vmos() -> Result<(), Error> {
     // All VDSOs should have execution rights.
     for vdso in vdsos {
         let name = format!("{}/{}", KERNEL_VDSO_DIRECTORY, vdso.name);
-        let file =
-            file::open_in_namespace(&name, OpenFlags::RIGHT_READABLE | OpenFlags::RIGHT_EXECUTABLE)
-                .context("failed to open file")?;
+        let file = file::open_in_namespace_deprecated(
+            &name,
+            OpenFlags::RIGHT_READABLE | OpenFlags::RIGHT_EXECUTABLE,
+        )
+        .context("failed to open file")?;
         let data = file::read_num_bytes(&file, 1).await.context(format!(
             "failed to read a single byte from a vdso opened as read-execute: {}",
             name
@@ -113,7 +117,7 @@ async fn check_kernel_vmos() -> Result<(), Error> {
 async fn check_executable_files() -> Result<(), Error> {
     // Sanitizers nest lib files within '/boot/lib/asan' or '/boot/lib/asan-ubsan' etc., so
     // we need to just search recursively for these files instead.
-    let directory = directory::open_in_namespace(
+    let directory = directory::open_in_namespace_deprecated(
         "/boot/lib",
         OpenFlags::RIGHT_READABLE | OpenFlags::RIGHT_EXECUTABLE,
     )
@@ -143,9 +147,11 @@ async fn check_executable_files() -> Result<(), Error> {
     .concat();
 
     for path in paths {
-        let file =
-            file::open_in_namespace(&path, OpenFlags::RIGHT_READABLE | OpenFlags::RIGHT_EXECUTABLE)
-                .context("failed to open file")?;
+        let file = file::open_in_namespace_deprecated(
+            &path,
+            OpenFlags::RIGHT_READABLE | OpenFlags::RIGHT_EXECUTABLE,
+        )
+        .context("failed to open file")?;
         let data = file::read_num_bytes(&file, 1).await.context(format!(
             "failed to read a single byte from a file opened as read-execute: {}",
             path
@@ -162,7 +168,7 @@ async fn check_readonly_files() -> Result<(), Error> {
     // There is a large variation in what different products have in the data directory, so
     // just search it during the test time and find some files. Every file in the data directory
     // should be readonly.
-    let directory = directory::open_in_namespace(
+    let directory = directory::open_in_namespace_deprecated(
         BOOTFS_DATA_DIRECTORY,
         OpenFlags::RIGHT_READABLE | OpenFlags::RIGHT_EXECUTABLE,
     )
@@ -182,15 +188,17 @@ async fn check_readonly_files() -> Result<(), Error> {
 
     for path in paths {
         // A readonly file should not be usable when opened as executable.
-        let mut file =
-            file::open_in_namespace(&path, OpenFlags::RIGHT_READABLE | OpenFlags::RIGHT_EXECUTABLE)
-                .context("failed to open file")?;
+        let mut file = file::open_in_namespace_deprecated(
+            &path,
+            OpenFlags::RIGHT_READABLE | OpenFlags::RIGHT_EXECUTABLE,
+        )
+        .context("failed to open file")?;
         let result = file::read_num_bytes(&file, 1).await;
         assert!(result.is_err());
         // Don't close the file proxy -- the access error above has already closed the channel.
 
         // Reopen as readonly, and confirm that it can be read from.
-        file = file::open_in_namespace(&path, OpenFlags::RIGHT_READABLE)
+        file = file::open_in_namespace_deprecated(&path, OpenFlags::RIGHT_READABLE)
             .context("failed to open file")?;
         let data = file::read_num_bytes(&file, 1).await.context(format!(
             "failed to read a single byte from a file opened as readonly: {}",

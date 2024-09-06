@@ -37,7 +37,7 @@ macro_rules! open_and_get_vmo_benchmark {
                 let timer = OperationTimer::start();
                 let file = {
                     storage_trace::duration!(c"benchmark", c"open-file");
-                    fuchsia_fs::directory::open_file(
+                    fuchsia_fs::directory::open_file_deprecated(
                         pkgdir,
                         &self.resource_path,
                         fio::OpenFlags::RIGHT_READABLE,

@@ -164,7 +164,7 @@ pub(crate) async fn new(
 #[cfg(test)]
 pub(crate) async fn new_test(blobfs: blobfs::Client) -> (RootDirFactory, RootDirCache) {
     let bootfs_dir = tempfile::tempdir().unwrap();
-    let bootfs_proxy = fuchsia_fs::directory::open_in_namespace(
+    let bootfs_proxy = fuchsia_fs::directory::open_in_namespace_deprecated(
         bootfs_dir.path().to_str().unwrap(),
         fio::OpenFlags::RIGHT_READABLE,
     )

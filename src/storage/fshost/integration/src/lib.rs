@@ -283,21 +283,37 @@ impl TestFixture {
         file.get_attr().await.expect("get_attr failed");
 
         let data = self.dir("data", fio::OpenFlags::RIGHT_READABLE);
-        fuchsia_fs::directory::open_file(&data, ".testdata", fio::OpenFlags::RIGHT_READABLE)
-            .await
-            .unwrap();
+        fuchsia_fs::directory::open_file_deprecated(
+            &data,
+            ".testdata",
+            fio::OpenFlags::RIGHT_READABLE,
+        )
+        .await
+        .unwrap();
 
-        fuchsia_fs::directory::open_directory(&data, "ssh", fio::OpenFlags::RIGHT_READABLE)
-            .await
-            .unwrap();
-        fuchsia_fs::directory::open_directory(&data, "ssh/config", fio::OpenFlags::RIGHT_READABLE)
-            .await
-            .unwrap();
-        fuchsia_fs::directory::open_directory(&data, "problems", fio::OpenFlags::RIGHT_READABLE)
-            .await
-            .unwrap();
+        fuchsia_fs::directory::open_directory_deprecated(
+            &data,
+            "ssh",
+            fio::OpenFlags::RIGHT_READABLE,
+        )
+        .await
+        .unwrap();
+        fuchsia_fs::directory::open_directory_deprecated(
+            &data,
+            "ssh/config",
+            fio::OpenFlags::RIGHT_READABLE,
+        )
+        .await
+        .unwrap();
+        fuchsia_fs::directory::open_directory_deprecated(
+            &data,
+            "problems",
+            fio::OpenFlags::RIGHT_READABLE,
+        )
+        .await
+        .unwrap();
 
-        let authorized_keys = fuchsia_fs::directory::open_file(
+        let authorized_keys = fuchsia_fs::directory::open_file_deprecated(
             &data,
             "ssh/authorized_keys",
             fio::OpenFlags::RIGHT_READABLE,

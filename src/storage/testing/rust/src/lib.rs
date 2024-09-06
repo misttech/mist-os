@@ -96,8 +96,10 @@ impl BlockDeviceMatcher<'_> {
 pub async fn wait_for_block_device(matchers: &[BlockDeviceMatcher<'_>]) -> Result<PathBuf> {
     const DEV_CLASS_BLOCK: &str = "/dev/class/block";
     assert!(!matchers.is_empty());
-    let block_dev_dir =
-        fuchsia_fs::directory::open_in_namespace(DEV_CLASS_BLOCK, fio::OpenFlags::RIGHT_READABLE)?;
+    let block_dev_dir = fuchsia_fs::directory::open_in_namespace_deprecated(
+        DEV_CLASS_BLOCK,
+        fio::OpenFlags::RIGHT_READABLE,
+    )?;
     let mut watcher = Watcher::new(&block_dev_dir).await?;
     while let Some(msg) = watcher.try_next().await? {
         if msg.event != WatchEvent::ADD_FILE && msg.event != WatchEvent::EXISTING {
@@ -127,8 +129,10 @@ pub async fn wait_for_block_device(matchers: &[BlockDeviceMatcher<'_>]) -> Resul
 pub async fn find_block_device(matchers: &[BlockDeviceMatcher<'_>]) -> Result<PathBuf> {
     const DEV_CLASS_BLOCK: &str = "/dev/class/block";
     assert!(!matchers.is_empty());
-    let block_dev_dir =
-        fuchsia_fs::directory::open_in_namespace(DEV_CLASS_BLOCK, fio::OpenFlags::RIGHT_READABLE)?;
+    let block_dev_dir = fuchsia_fs::directory::open_in_namespace_deprecated(
+        DEV_CLASS_BLOCK,
+        fio::OpenFlags::RIGHT_READABLE,
+    )?;
     let entries = fuchsia_fs::directory::readdir(&block_dev_dir)
         .await
         .context("Failed to readdir /dev/class/block")?;

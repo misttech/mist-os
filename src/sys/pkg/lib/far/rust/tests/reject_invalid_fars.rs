@@ -43,7 +43,7 @@ macro_rules! tests {
                     let mut filename = stringify!($fn).replace("_", "-");
                     filename.push_str(".far");
                     let path = Path::new("/pkg/data/invalid-fars").join(filename);
-                    let file = fuchsia_fs::file::open_in_namespace(
+                    let file = fuchsia_fs::file::open_in_namespace_deprecated(
                         path.to_str().unwrap(),
                         fio::OpenFlags::RIGHT_READABLE,
                     )

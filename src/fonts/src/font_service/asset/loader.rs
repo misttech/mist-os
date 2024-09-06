@@ -115,7 +115,7 @@ impl AssetLoader for AssetLoaderImpl {
             cause,
         };
 
-        let file_proxy = fuchsia_fs::directory::open_file_no_describe(
+        let file_proxy = fuchsia_fs::directory::open_file_no_describe_deprecated(
             &directory_proxy,
             &file_name,
             io::OpenFlags::RIGHT_READABLE,

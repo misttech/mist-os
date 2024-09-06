@@ -265,7 +265,7 @@ mod tests {
         let file_generator = FileGenerator::new(0, migration.id(), Clone::clone(&directory));
         assert_matches!(migration.migrate(file_generator).await, Ok(()));
 
-        let file = fuchsia_fs::directory::open_file(
+        let file = fuchsia_fs::directory::open_file_deprecated(
             &directory,
             "light_info_1653667208.pfidl",
             OpenFlags::RIGHT_READABLE,

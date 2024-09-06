@@ -150,7 +150,7 @@ mod tests {
         // Set up a new library loader and provide it to the loader service
         let (ll_client_chan, ll_service_chan) = zx::Channel::create();
         library_loader::start(
-            Arc::new(fuchsia_fs::directory::open_in_namespace(
+            Arc::new(fuchsia_fs::directory::open_in_namespace_deprecated(
                 "/pkg/lib",
                 fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,
             )?),
@@ -163,7 +163,7 @@ mod tests {
         launcher_proxy.add_handles(handle_infos).context("failed to add loader service handle")?;
 
         // Load the executable into a vmo
-        let executable_file_proxy = fuchsia_fs::file::open_in_namespace(
+        let executable_file_proxy = fuchsia_fs::file::open_in_namespace_deprecated(
             "/pkg/bin/panic_on_start",
             fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,
         )?;

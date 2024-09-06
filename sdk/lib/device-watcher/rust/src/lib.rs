@@ -138,7 +138,7 @@ where
         let file = file.to_str().unwrap();
         let () = wait_for_file(&dir, file).await?;
         if components.peek().is_some() {
-            dir = fuchsia_fs::directory::open_directory_no_describe(&dir, file, flags)?;
+            dir = fuchsia_fs::directory::open_directory_no_describe_deprecated(&dir, file, flags)?;
         } else {
             break Ok(op(&dir, file, flags));
         }
@@ -169,7 +169,7 @@ pub async fn recursive_wait_and_open_directory(
         Clone::clone(dir),
         name,
         fio::OpenFlags::DIRECTORY,
-        fuchsia_fs::directory::open_no_describe::<fio::DirectoryMarker>,
+        fuchsia_fs::directory::open_no_describe_deprecated::<fio::DirectoryMarker>,
     )
     .await
     .and_then(|res| res.map_err(Into::into))
@@ -187,7 +187,7 @@ pub async fn recursive_wait_and_open<P: fidl::endpoints::ProtocolMarker>(
         Clone::clone(dir),
         name,
         fio::OpenFlags::empty(),
-        fuchsia_fs::directory::open_no_describe::<P>,
+        fuchsia_fs::directory::open_no_describe_deprecated::<P>,
     )
     .await
     .and_then(|res| res.map_err(Into::into))

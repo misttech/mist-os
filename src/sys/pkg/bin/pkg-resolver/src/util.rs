@@ -17,7 +17,7 @@ pub async fn do_with_atomic_file<F>(
 where
     F: Future<Output = Result<(), anyhow::Error>>,
 {
-    let file = fuchsia_fs::directory::open_file(
+    let file = fuchsia_fs::directory::open_file_deprecated(
         dir_proxy,
         temp_filename,
         fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::CREATE | fio::OpenFlags::TRUNCATE,
@@ -54,7 +54,7 @@ mod tests {
     #[fasync::run_singlethreaded(test)]
     async fn test_do_with_atomic_file() {
         let dir = tempfile::tempdir().unwrap();
-        let dir_proxy = fuchsia_fs::directory::open_in_namespace(
+        let dir_proxy = fuchsia_fs::directory::open_in_namespace_deprecated(
             dir.path().to_str().unwrap(),
             fio::OpenFlags::RIGHT_WRITABLE,
         )

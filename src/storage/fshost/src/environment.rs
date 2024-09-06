@@ -188,7 +188,7 @@ impl Filesystem {
         &mut self,
         serving_fs: Option<&mut ServingMultiVolumeFilesystem>,
     ) -> Result<fio::DirectoryProxy, Error> {
-        let root = fuchsia_fs::directory::open_directory_no_describe(
+        let root = fuchsia_fs::directory::open_directory_no_describe_deprecated(
             &self.exposed_dir(serving_fs).context("failed to get exposed dir")?,
             "root",
             fio::OpenFlags::RIGHT_READABLE
@@ -408,7 +408,7 @@ impl FshostEnvironment {
         let root = filesystem.root(None)?;
 
         // Read desired format from fs_switch, use config as default.
-        let desired_format = match fuchsia_fs::directory::open_file(
+        let desired_format = match fuchsia_fs::directory::open_file_deprecated(
             &root,
             "fs_switch",
             fio::OpenFlags::RIGHT_READABLE,
@@ -626,7 +626,7 @@ impl Environment for FshostEnvironment {
     ) -> Result<Vec<String>, Error> {
         // Attach the FVM driver and connect to the VolumeManager.
         self.attach_driver(device, FVM_DRIVER_PATH).await?;
-        let fvm_dir = fuchsia_fs::directory::open_in_namespace(
+        let fvm_dir = fuchsia_fs::directory::open_in_namespace_deprecated(
             &device.topological_path(),
             fuchsia_fs::OpenFlags::RIGHT_READABLE,
         )?;
@@ -641,7 +641,7 @@ impl Environment for FshostEnvironment {
             .context("get_info failed")?;
 
         let fvm_topo_path = format!("{}/fvm", device.topological_path());
-        let fvm_dir = fuchsia_fs::directory::open_in_namespace(
+        let fvm_dir = fuchsia_fs::directory::open_in_namespace_deprecated(
             &fvm_topo_path,
             fuchsia_fs::OpenFlags::RIGHT_READABLE,
         )?;
@@ -888,7 +888,7 @@ impl Environment for FshostEnvironment {
             self.data.volume("unencrypted")
         }
         .context("Failed to find unencrypted volume")?;
-        let dir = fuchsia_fs::directory::open_directory(
+        let dir = fuchsia_fs::directory::open_directory_deprecated(
             unencrypted.root(),
             "keys",
             fio::OpenFlags::RIGHT_WRITABLE,
@@ -1116,7 +1116,7 @@ impl FilesystemLauncher {
         ignore_paths: &mut HashSet<String>,
     ) -> Result<Box<dyn Device>, Error> {
         tracing::info!(path = fvm_topo_path, "Resetting fvm partitions");
-        let fvm_directory_proxy = fuchsia_fs::directory::open_in_namespace(
+        let fvm_directory_proxy = fuchsia_fs::directory::open_in_namespace_deprecated(
             &fvm_topo_path,
             fio::OpenFlags::RIGHT_READABLE,
         )?;
@@ -1205,7 +1205,7 @@ impl FilesystemLauncher {
 
         // We expect the startup protocol to work with fxblob. There are no options for
         // reformatting the entire fxfs partition now that blobfs is one of the volumes.
-        let volumes_dir = fuchsia_fs::directory::open_directory(
+        let volumes_dir = fuchsia_fs::directory::open_directory_deprecated(
             serving_multi_vol_fs.exposed_dir(),
             "volumes",
             fuchsia_fs::OpenFlags::empty(),
@@ -1257,7 +1257,7 @@ impl FilesystemLauncher {
         serving_multi_vol_fs: &mut ServingMultiVolumeFilesystem,
     ) -> Result<Filesystem, Error> {
         // Reset fxfs volumes before reinitializing.
-        let volumes_dir = fuchsia_fs::directory::open_directory_no_describe(
+        let volumes_dir = fuchsia_fs::directory::open_directory_no_describe_deprecated(
             serving_multi_vol_fs.exposed_dir(),
             "volumes",
             fuchsia_fs::OpenFlags::empty(),

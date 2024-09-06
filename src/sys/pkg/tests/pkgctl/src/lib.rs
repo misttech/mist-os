@@ -140,7 +140,7 @@ impl TestEnv {
     }
 
     async fn run_pkgctl<'a>(&'a self, args: Vec<&'a str>) -> ProcessOutput {
-        let repo_config_arg_dir = fuchsia_fs::directory::open_in_namespace(
+        let repo_config_arg_dir = fuchsia_fs::directory::open_in_namespace_deprecated(
             &self.repo_config_arg_path.display().to_string(),
             fio::OpenFlags::RIGHT_READABLE,
         )

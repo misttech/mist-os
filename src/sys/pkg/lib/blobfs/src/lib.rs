@@ -120,7 +120,7 @@ impl ClientBuilder {
         if self.executable {
             flags |= fio::OpenFlags::RIGHT_EXECUTABLE
         }
-        let dir = fuchsia_fs::directory::open_in_namespace("/blob", flags)?;
+        let dir = fuchsia_fs::directory::open_in_namespace_deprecated("/blob", flags)?;
         let reader = match self.use_reader {
             Reader::DontUse => None,
             Reader::Use { use_vmex } => {
@@ -257,7 +257,7 @@ impl Client {
                 .map_err(GetBlobVmoError::Fidl)?
                 .map_err(|s| GetBlobVmoError::GetVmo(Status::from_raw(s)))
         } else {
-            let blob = fuchsia_fs::directory::open_file(
+            let blob = fuchsia_fs::directory::open_file_deprecated(
                 &self.dir,
                 &hash.to_string(),
                 fio::OpenFlags::RIGHT_READABLE,
@@ -388,11 +388,13 @@ impl Client {
             | fio::OpenFlags::RIGHT_READABLE;
 
         let path = delivery_blob::delivery_blob_path(blob);
-        fuchsia_fs::directory::open_file(&self.dir, &path, flags).await.map_err(|e| match e {
-            fuchsia_fs::node::OpenError::OpenError(Status::ACCESS_DENIED) => {
-                CreateError::AlreadyExists
+        fuchsia_fs::directory::open_file_deprecated(&self.dir, &path, flags).await.map_err(|e| {
+            match e {
+                fuchsia_fs::node::OpenError::OpenError(Status::ACCESS_DENIED) => {
+                    CreateError::AlreadyExists
+                }
+                other => CreateError::Io(other),
             }
-            other => CreateError::Io(other),
         })
     }
 
@@ -408,7 +410,7 @@ impl Client {
             // TODO(https://fxbug.dev/295552228): Use faster API for determining blob presence.
             matches!(reader.get_vmo(blob).await, Ok(Ok(_)))
         } else {
-            let file = match fuchsia_fs::directory::open_file_no_describe(
+            let file = match fuchsia_fs::directory::open_file_no_describe_deprecated(
                 &self.dir,
                 &blob.to_string(),
                 fio::OpenFlags::DESCRIBE | fio::OpenFlags::RIGHT_READABLE,

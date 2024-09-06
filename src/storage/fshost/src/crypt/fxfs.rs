@@ -83,7 +83,7 @@ pub async fn unlock_data_volume<'a>(
         .open_volume("unencrypted", MountOptions::default())
         .await
         .context("Failed to open unencrypted")?;
-    let keybag_dir = fuchsia_fs::directory::open_directory(
+    let keybag_dir = fuchsia_fs::directory::open_directory_deprecated(
         root_vol.root(),
         "keys",
         fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
@@ -129,7 +129,7 @@ pub async fn init_data_volume<'a>(
         .create_volume("unencrypted", MountOptions::default())
         .await
         .context("Failed to create unencrypted")?;
-    let keybag_dir = fuchsia_fs::directory::create_directory(
+    let keybag_dir = fuchsia_fs::directory::create_directory_deprecated(
         root_vol.root(),
         "keys",
         fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,

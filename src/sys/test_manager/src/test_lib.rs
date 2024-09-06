@@ -808,7 +808,7 @@ impl FidlSuiteEventProcessor {
                                 .await
                                 .expect("read custom artifact directory");
                         for entry in entries.into_iter() {
-                            let file = fuchsia_fs::directory::open_file_no_describe(
+                            let file = fuchsia_fs::directory::open_file_no_describe_deprecated(
                                 &directory,
                                 &entry.name,
                                 fio::OpenFlags::RIGHT_READABLE,
@@ -1017,7 +1017,7 @@ impl FidlSuiteEventProcessor {
                                     .await
                                     .expect("read custom artifact directory");
                             for entry in entries.into_iter() {
-                                let file = fuchsia_fs::directory::open_file_no_describe(
+                                let file = fuchsia_fs::directory::open_file_no_describe_deprecated(
                                     &directory,
                                     &entry.name,
                                     fio::OpenFlags::RIGHT_READABLE,

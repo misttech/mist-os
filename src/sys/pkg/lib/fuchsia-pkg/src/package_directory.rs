@@ -99,7 +99,10 @@ impl PackageDirectory {
     /// Returns the current component's package directory.
     #[cfg(target_os = "fuchsia")]
     pub fn open_from_namespace() -> Result<Self, OpenError> {
-        let dir = fuchsia_fs::directory::open_in_namespace("/pkg", fio::OpenFlags::RIGHT_READABLE)?;
+        let dir = fuchsia_fs::directory::open_in_namespace_deprecated(
+            "/pkg",
+            fio::OpenFlags::RIGHT_READABLE,
+        )?;
         Ok(Self::from_proxy(dir))
     }
 

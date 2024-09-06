@@ -23,7 +23,7 @@ async fn main() -> Result<(), Error> {
 
     // back /data provided to test using fx_fs
     std::fs::create_dir(DATA_FOR_TESTS_PATH).context("Create data for test directory")?;
-    let data_directory = fuchsia_fs::directory::open_in_namespace(
+    let data_directory = fuchsia_fs::directory::open_in_namespace_deprecated(
         DATA_FOR_TESTS_PATH,
         fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
     )?;

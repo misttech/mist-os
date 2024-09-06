@@ -21,10 +21,13 @@ pub enum HashError {
 }
 
 pub(crate) async fn hash(proxy: &fio::DirectoryProxy) -> Result<Hash, HashError> {
-    let meta =
-        fuchsia_fs::directory::open_file(proxy, "meta", fuchsia_fs::OpenFlags::RIGHT_READABLE)
-            .await
-            .map_err(HashError::Open)?;
+    let meta = fuchsia_fs::directory::open_file_deprecated(
+        proxy,
+        "meta",
+        fuchsia_fs::OpenFlags::RIGHT_READABLE,
+    )
+    .await
+    .map_err(HashError::Open)?;
     let contents = fuchsia_fs::file::read_to_string(&meta).await.map_err(HashError::Read)?;
     contents.parse::<Hash>().map_err(HashError::Parse)
 }
@@ -34,7 +37,7 @@ mod tests {
     use super::*;
     use assert_matches::assert_matches;
     use fuchsia_async as fasync;
-    use fuchsia_fs::directory::open_in_namespace;
+    use fuchsia_fs::directory::open_in_namespace_deprecated;
     use std::fs::File;
     use std::io::Write as _;
     use tempfile::tempdir;
@@ -42,7 +45,7 @@ mod tests {
     #[fasync::run_singlethreaded(test)]
     async fn open_error() {
         let temp_dir = tempdir().expect("/tmp to exist");
-        let proxy = open_in_namespace(
+        let proxy = open_in_namespace_deprecated(
             temp_dir.path().to_str().unwrap(),
             fuchsia_fs::OpenFlags::RIGHT_READABLE,
         )
@@ -55,7 +58,7 @@ mod tests {
     async fn parse_error() {
         let temp_dir = tempdir().expect("/tmp to exist");
         File::create(temp_dir.path().join("meta")).unwrap();
-        let proxy = open_in_namespace(
+        let proxy = open_in_namespace_deprecated(
             temp_dir.path().to_str().unwrap(),
             fuchsia_fs::OpenFlags::RIGHT_READABLE,
         )
@@ -70,7 +73,7 @@ mod tests {
         let mut meta = File::create(temp_dir.path().join("meta")).unwrap();
         let hex = "0000000000000000000000000000000000000000000000000000000000000000";
         meta.write_all(hex.as_bytes()).unwrap();
-        let proxy = open_in_namespace(
+        let proxy = open_in_namespace_deprecated(
             temp_dir.path().to_str().unwrap(),
             fuchsia_fs::OpenFlags::RIGHT_READABLE,
         )

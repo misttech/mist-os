@@ -220,7 +220,7 @@ impl RepositoryManager {
 
             // TODO(https://fxbug.dev/42164009): We need to reopen because `resolve_succeeds_with_broken_minfs`
             // expects it, this should be removed once the test is fixed.
-            let data_proxy = fuchsia_fs::directory::open_directory(
+            let data_proxy = fuchsia_fs::directory::open_directory_deprecated(
                 data_proxy,
                 ".",
                 fio::OpenFlags::RIGHT_WRITABLE,
@@ -480,7 +480,7 @@ impl RepositoryManagerBuilder<UnsetCobaltSender, UnsetInspectNode> {
     where
         P: Into<String>,
     {
-        let proxy = fuchsia_fs::directory::open_in_namespace(
+        let proxy = fuchsia_fs::directory::open_in_namespace_deprecated(
             data_dir.path().to_str().unwrap(),
             fuchsia_fs::OpenFlags::RIGHT_READABLE | fuchsia_fs::OpenFlags::RIGHT_WRITABLE,
         )
@@ -711,14 +711,17 @@ async fn load_configs_file_from_proxy(
     proxy: &fio::DirectoryProxy,
     path: &str,
 ) -> Result<Vec<RepositoryConfig>, LoadError> {
-    let file =
-        match fuchsia_fs::directory::open_file(proxy, path, fuchsia_fs::OpenFlags::RIGHT_READABLE)
-            .await
-        {
-            Ok(file) => file,
-            Err(fuchsia_fs::node::OpenError::OpenError(Status::NOT_FOUND)) => return Ok(vec![]),
-            Err(error) => return Err(LoadError::Open { path: path.into(), error }),
-        };
+    let file = match fuchsia_fs::directory::open_file_deprecated(
+        proxy,
+        path,
+        fuchsia_fs::OpenFlags::RIGHT_READABLE,
+    )
+    .await
+    {
+        Ok(file) => file,
+        Err(fuchsia_fs::node::OpenError::OpenError(Status::NOT_FOUND)) => return Ok(vec![]),
+        Err(error) => return Err(LoadError::Open { path: path.into(), error }),
+    };
     let buf = fuchsia_fs::file::read(&file)
         .await
         .map_err(|error| LoadError::Read { path: path.into(), error })?;

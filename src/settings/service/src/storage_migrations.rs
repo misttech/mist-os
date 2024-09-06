@@ -62,7 +62,7 @@ mod tests {
 
     // Opens a FIDL connection to a `TempDir`.
     pub(crate) fn open_tempdir(tempdir: &tempfile::TempDir) -> DirectoryProxy {
-        fuchsia_fs::directory::open_in_namespace(
+        fuchsia_fs::directory::open_in_namespace_deprecated(
             tempdir.path().to_str().expect("tempdir path is not valid UTF-8"),
             OpenFlags::RIGHT_READABLE | OpenFlags::RIGHT_WRITABLE,
         )

@@ -665,7 +665,7 @@ impl DiskBuilder {
     ///   |   |- config (directory, empty)
     ///   |- problems (directory, empty (no problems))
     async fn write_test_data(&self, root: &fio::DirectoryProxy) {
-        fuchsia_fs::directory::open_file(
+        fuchsia_fs::directory::open_file_deprecated(
             root,
             ".testdata",
             fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::CREATE,
@@ -673,14 +673,14 @@ impl DiskBuilder {
         .await
         .unwrap();
 
-        let ssh_dir = fuchsia_fs::directory::create_directory(
+        let ssh_dir = fuchsia_fs::directory::create_directory_deprecated(
             root,
             "ssh",
             fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
         )
         .await
         .unwrap();
-        let authorized_keys = fuchsia_fs::directory::open_file(
+        let authorized_keys = fuchsia_fs::directory::open_file_deprecated(
             &ssh_dir,
             "authorized_keys",
             fio::OpenFlags::RIGHT_READABLE
@@ -690,16 +690,24 @@ impl DiskBuilder {
         .await
         .unwrap();
         fuchsia_fs::file::write(&authorized_keys, "public key!").await.unwrap();
-        fuchsia_fs::directory::create_directory(&ssh_dir, "config", fio::OpenFlags::RIGHT_READABLE)
-            .await
-            .unwrap();
+        fuchsia_fs::directory::create_directory_deprecated(
+            &ssh_dir,
+            "config",
+            fio::OpenFlags::RIGHT_READABLE,
+        )
+        .await
+        .unwrap();
 
-        fuchsia_fs::directory::create_directory(&root, "problems", fio::OpenFlags::RIGHT_READABLE)
-            .await
-            .unwrap();
+        fuchsia_fs::directory::create_directory_deprecated(
+            &root,
+            "problems",
+            fio::OpenFlags::RIGHT_READABLE,
+        )
+        .await
+        .unwrap();
 
         if let Some(content) = &self.fs_switch {
-            let fs_switch = fuchsia_fs::directory::open_file(
+            let fs_switch = fuchsia_fs::directory::open_file_deprecated(
                 &root,
                 "fs_switch",
                 fio::OpenFlags::RIGHT_READABLE

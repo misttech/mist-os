@@ -19,9 +19,11 @@ async fn main() -> Result<(), Error> {
     tracing::info!("Starting vsock service");
 
     const DEV_CLASS_VSOCK: &str = "/dev/class/vsock";
-    let vsock_dir =
-        fuchsia_fs::directory::open_in_namespace(DEV_CLASS_VSOCK, OpenFlags::RIGHT_READABLE)
-            .context("Open vsock dir")?;
+    let vsock_dir = fuchsia_fs::directory::open_in_namespace_deprecated(
+        DEV_CLASS_VSOCK,
+        OpenFlags::RIGHT_READABLE,
+    )
+    .context("Open vsock dir")?;
     let path = device_watcher::watch_for_files(&vsock_dir)
         .await
         .with_context(|| format!("Watching for files in {}", DEV_CLASS_VSOCK))?

@@ -27,7 +27,10 @@ async fn main() -> Result<(), Error> {
     let Args { directory, device } = argh::from_env();
 
     // open directory
-    let dir = fuchsia_fs::directory::open_in_namespace(&directory, fio::OpenFlags::RIGHT_READABLE)?;
+    let dir = fuchsia_fs::directory::open_in_namespace_deprecated(
+        &directory,
+        fio::OpenFlags::RIGHT_READABLE,
+    )?;
 
     // open block device
     let proxy = fuchsia_component::client::connect_to_protocol_at_path::<BlockMarker>(&device)

@@ -27,9 +27,12 @@ use crate::default::DefaultConfigurator;
 async fn main() -> Result<(), anyhow::Error> {
     component::health().set_ok();
     tracing::trace!("Initialized.");
-    let codec_proxy =
-        fuchsia_fs::directory::open_in_namespace("/dev/class/codec", OpenFlags::empty())?;
-    let dai_proxy = fuchsia_fs::directory::open_in_namespace("/dev/class/dai", OpenFlags::empty())?;
+    let codec_proxy = fuchsia_fs::directory::open_in_namespace_deprecated(
+        "/dev/class/codec",
+        OpenFlags::empty(),
+    )?;
+    let dai_proxy =
+        fuchsia_fs::directory::open_in_namespace_deprecated("/dev/class/dai", OpenFlags::empty())?;
     let mut config = Config::new()?;
     config.load()?;
     let configurator = Arc::new(Mutex::new(DefaultConfigurator::new(config)?));

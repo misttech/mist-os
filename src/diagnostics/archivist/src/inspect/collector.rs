@@ -121,7 +121,7 @@ async fn populate_data_map_from_dir(inspect_proxy: &fio::DirectoryProxy) -> Insp
             continue;
         }
 
-        let file_proxy = match fuchsia_fs::directory::open_file_no_describe(
+        let file_proxy = match fuchsia_fs::directory::open_file_no_describe_deprecated(
             inspect_proxy,
             &entry.name,
             fuchsia_fs::OpenFlags::RIGHT_READABLE,
@@ -290,7 +290,7 @@ mod tests {
 
             executor.run_singlethreaded(async {
                 let inspect_proxy = Arc::new(InspectHandle::directory(
-                    fuchsia_fs::directory::open_in_namespace(
+                    fuchsia_fs::directory::open_in_namespace_deprecated(
                         &format!("{path}/diagnostics"),
                         fuchsia_fs::OpenFlags::RIGHT_READABLE,
                     )

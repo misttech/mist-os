@@ -23,7 +23,7 @@ impl Directory {
         flags: fio::OpenFlags,
     ) -> Result<Directory, Status> {
         let path = path.as_ref().to_str().unwrap();
-        match fuchsia_fs::directory::open_in_namespace(path, flags) {
+        match fuchsia_fs::directory::open_in_namespace_deprecated(path, flags) {
             Ok(proxy) => Ok(Directory { proxy }),
             Err(OpenError::OpenError(s)) => {
                 debug!(%path, status = %s, "from_namespace failed");
@@ -48,7 +48,7 @@ impl Directory {
         filename: &str,
         flags: fio::OpenFlags,
     ) -> Result<Directory, Status> {
-        match fuchsia_fs::directory::open_directory(&self.proxy, filename, flags).await {
+        match fuchsia_fs::directory::open_directory_deprecated(&self.proxy, filename, flags).await {
             Ok(proxy) => Ok(Directory { proxy }),
             Err(OpenError::OpenError(s)) => {
                 debug!(%filename, ?flags, status = %s, "open_directory failed");
@@ -68,7 +68,7 @@ impl Directory {
 
     // Open a file in the parent dir with the given |filename|.
     pub async fn open_file(&self, filename: &str, flags: fio::OpenFlags) -> Result<File, Status> {
-        match fuchsia_fs::directory::open_file(&self.proxy, filename, flags).await {
+        match fuchsia_fs::directory::open_file_deprecated(&self.proxy, filename, flags).await {
             Ok(proxy) => Ok(File { proxy }),
             Err(OpenError::OpenError(s)) => {
                 debug!(%filename, ?flags, status = %s, "open_file failed");
@@ -92,7 +92,8 @@ impl Directory {
         filename: &str,
         flags: fio::OpenFlags,
     ) -> Result<Directory, Status> {
-        match fuchsia_fs::directory::create_directory(&self.proxy, filename, flags).await {
+        match fuchsia_fs::directory::create_directory_deprecated(&self.proxy, filename, flags).await
+        {
             Ok(proxy) => Ok(Directory { proxy }),
             Err(OpenError::OpenError(s)) => {
                 debug!(%filename, ?flags, status = %s, "create_directory failed");

@@ -677,21 +677,21 @@ mod test {
         let root = CFDirectory::new_root(query);
         let proxy = vfs::directory::spawn_directory(root);
 
-        let root_file = fuchsia_fs::directory::open_file(
+        let root_file = fuchsia_fs::directory::open_file_deprecated(
             &proxy,
             "/core/foo/:ns/root_file",
             fio::OpenFlags::RIGHT_READABLE,
         )
         .await
         .unwrap();
-        let top_dir_file = fuchsia_fs::directory::open_file(
+        let top_dir_file = fuchsia_fs::directory::open_file_deprecated(
             &proxy,
             "/core/foo/:ns/top_dir/top_dir_file",
             fio::OpenFlags::RIGHT_READABLE,
         )
         .await
         .unwrap();
-        let bottom_dir_file = fuchsia_fs::directory::open_file(
+        let bottom_dir_file = fuchsia_fs::directory::open_file_deprecated(
             &proxy,
             "/core/foo/:ns/top_dir/bottom_dir/bottom_dir_file",
             fio::OpenFlags::RIGHT_READABLE,
@@ -756,7 +756,7 @@ mod test {
 
         for instance in &instances {
             let instance_moniker = instance.moniker.as_deref().unwrap();
-            let proxy = fuchsia_fs::directory::open_directory(
+            let proxy = fuchsia_fs::directory::open_directory_deprecated(
                 &proxy,
                 instance_moniker,
                 fio::OpenFlags::RIGHT_READABLE,
@@ -817,7 +817,7 @@ mod test {
             assert!(items.is_empty());
 
             let fuchsia_fs::node::OpenError::OpenError(url_isnt_a_folder) =
-                fuchsia_fs::directory::open_file(
+                fuchsia_fs::directory::open_file_deprecated(
                     &proxy,
                     ".url/foo",
                     fio::OpenFlags::RIGHT_READABLE,
@@ -829,13 +829,16 @@ mod test {
             };
             assert_eq!(Status::NOT_DIR, url_isnt_a_folder);
 
-            let url =
-                fuchsia_fs::directory::open_file(&proxy, ".url", fio::OpenFlags::RIGHT_READABLE)
-                    .await
-                    .unwrap();
+            let url = fuchsia_fs::directory::open_file_deprecated(
+                &proxy,
+                ".url",
+                fio::OpenFlags::RIGHT_READABLE,
+            )
+            .await
+            .unwrap();
             assert_eq!(instance.url, fuchsia_fs::file::read_to_string(&url).await.ok());
 
-            let environment = fuchsia_fs::directory::open_file(
+            let environment = fuchsia_fs::directory::open_file_deprecated(
                 &proxy,
                 ".environment",
                 fio::OpenFlags::RIGHT_READABLE,
@@ -847,7 +850,7 @@ mod test {
                 fuchsia_fs::file::read_to_string(&environment).await.ok()
             );
 
-            let instance_id = fuchsia_fs::directory::open_file(
+            let instance_id = fuchsia_fs::directory::open_file_deprecated(
                 &proxy,
                 ".instance_id",
                 fio::OpenFlags::RIGHT_READABLE,

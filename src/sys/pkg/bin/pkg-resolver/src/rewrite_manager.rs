@@ -82,7 +82,7 @@ impl RewriteManager {
         let result = async {
             // TODO(https://fxbug.dev/42164009): We need to reopen because `resolve_succeeds_with_broken_minfs`
             // expects it, this should be removed once the test is fixed.
-            let data_proxy = fuchsia_fs::directory::open_directory(
+            let data_proxy = fuchsia_fs::directory::open_directory_deprecated(
                 data_proxy,
                 ".",
                 fio::OpenFlags::RIGHT_WRITABLE,
@@ -334,9 +334,12 @@ impl<N> RewriteManagerBuilder<N> {
         let dir_proxy = dir_proxy
             .as_ref()
             .ok_or_else(|| LoadRulesError::DirOpen(anyhow!("failed to open config directory")))?;
-        let file_proxy =
-            fuchsia_fs::directory::open_file(dir_proxy, path, fio::OpenFlags::RIGHT_READABLE)
-                .await?;
+        let file_proxy = fuchsia_fs::directory::open_file_deprecated(
+            dir_proxy,
+            path,
+            fio::OpenFlags::RIGHT_READABLE,
+        )
+        .await?;
         let contents = fuchsia_fs::file::read_to_string(&file_proxy)
             .await
             .map_err(Into::into)
@@ -444,7 +447,7 @@ pub(crate) mod tests {
     ) -> (Option<fio::DirectoryProxy>, Option<String>) {
         let filename = Some(path.file_name().unwrap().to_str().unwrap().to_string());
         let dir = path.parent().unwrap().to_str().unwrap().to_string();
-        let proxy = fuchsia_fs::directory::open_in_namespace(
+        let proxy = fuchsia_fs::directory::open_in_namespace_deprecated(
             &dir,
             fuchsia_fs::OpenFlags::RIGHT_READABLE | fuchsia_fs::OpenFlags::RIGHT_WRITABLE,
         )

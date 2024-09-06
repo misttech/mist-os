@@ -177,7 +177,7 @@ async fn migration_error_does_not_cause_early_exit() {
     let fs = tempfile::tempdir().expect("failed to create tempdir");
     std::fs::write(fs.path().join(MIGRATION_FILE_NAME), UNKNOWN_ID.to_string())
         .expect("failed to write migration file");
-    let directory = fuchsia_fs::directory::open_in_namespace(
+    let directory = fuchsia_fs::directory::open_in_namespace_deprecated(
         fs.path().to_str().expect("tempdir path is not valid UTF-8"),
         OpenFlags::RIGHT_READABLE | OpenFlags::RIGHT_WRITABLE,
     )

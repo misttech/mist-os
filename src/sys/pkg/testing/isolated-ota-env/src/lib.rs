@@ -258,7 +258,7 @@ impl<R> TestEnvBuilder<R> {
             (
                 config,
                 Some(served_repo),
-                fuchsia_fs::directory::open_in_namespace(
+                fuchsia_fs::directory::open_in_namespace_deprecated(
                     TEST_CERTS_PATH,
                     fio::OpenFlags::RIGHT_READABLE,
                 )
@@ -272,7 +272,7 @@ impl<R> TestEnvBuilder<R> {
             (
                 self.repo_config.unwrap(),
                 None,
-                fuchsia_fs::directory::open_in_namespace(
+                fuchsia_fs::directory::open_in_namespace_deprecated(
                     GLOBAL_SSL_CERTS_PATH,
                     fio::OpenFlags::RIGHT_READABLE,
                 )

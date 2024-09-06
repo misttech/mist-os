@@ -124,7 +124,7 @@ async fn enumerate_tee_devices() -> Result<Vec<PathBuf>, Error> {
 }
 
 async fn create_watcher(path: &str) -> Result<vfs::Watcher, Error> {
-    let dir = fuchsia_fs::directory::open_in_namespace(path, OpenFlags::RIGHT_READABLE)?;
+    let dir = fuchsia_fs::directory::open_in_namespace_deprecated(path, OpenFlags::RIGHT_READABLE)?;
     let watcher = vfs::Watcher::new(&dir).await?;
     Ok(watcher)
 }

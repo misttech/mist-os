@@ -370,7 +370,7 @@ mod tests {
     use fidl_fuchsia_data::{Dictionary, DictionaryEntry, DictionaryValue};
     use fidl_fuchsia_io::{self as fio, DirectoryProxy};
     use fidl_fuchsia_process as fprocess;
-    use fuchsia_fs::directory::open_channel_in_namespace;
+    use fuchsia_fs::directory::open_channel_in_namespace_deprecated;
     use fuchsia_runtime::{HandleInfo, HandleType};
     use futures::channel::{self, oneshot};
     use moniker::Moniker;
@@ -464,7 +464,12 @@ mod tests {
 
         // Start the ELF runner.
         let (svc, svc_server_end) = fidl::endpoints::create_endpoints();
-        open_channel_in_namespace("/svc", fio::OpenFlags::RIGHT_READABLE, svc_server_end).unwrap();
+        open_channel_in_namespace_deprecated(
+            "/svc",
+            fio::OpenFlags::RIGHT_READABLE,
+            svc_server_end,
+        )
+        .unwrap();
         let (start_info, outgoing_dir) = make_start_info("elf_runner", svc);
         client.start(start_info, server_end).unwrap();
 
@@ -477,7 +482,7 @@ mod tests {
 
         // Open the current package which contains a `signal-then-hang` component.
         let (pkg, server_end) = fidl::endpoints::create_endpoints();
-        open_channel_in_namespace(
+        open_channel_in_namespace_deprecated(
             "/pkg",
             fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,
             server_end,
@@ -584,7 +589,12 @@ mod tests {
             .unwrap();
         let (controller, server_end) = fidl::endpoints::create_proxy().unwrap();
         let (svc, svc_server_end) = fidl::endpoints::create_endpoints();
-        open_channel_in_namespace("/svc", fio::OpenFlags::RIGHT_READABLE, svc_server_end).unwrap();
+        open_channel_in_namespace_deprecated(
+            "/svc",
+            fio::OpenFlags::RIGHT_READABLE,
+            svc_server_end,
+        )
+        .unwrap();
         let (start_info, _outgoing_dir) = make_start_info("foobar", svc);
         client.start(start_info, server_end).unwrap();
         let event = controller.take_event_stream().try_next().await;

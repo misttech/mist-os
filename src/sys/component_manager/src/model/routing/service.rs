@@ -1326,7 +1326,7 @@ mod tests {
 
         // Open one of the entries.
         {
-            let instance_dir = fuchsia_fs::directory::open_directory(
+            let instance_dir = fuchsia_fs::directory::open_directory_deprecated(
                 &dir_proxy,
                 instance_names.iter().next().expect("failed to get instance name"),
                 fio::OpenFlags::empty(),
@@ -1549,7 +1549,7 @@ mod tests {
             .expect("failed to read directory entries");
         assert_eq!(dir_contents.len(), 6);
         for entry in &dir_contents {
-            let instance_dir = fuchsia_fs::directory::open_directory(
+            let instance_dir = fuchsia_fs::directory::open_directory_deprecated(
                 &dir_proxy,
                 &entry.name,
                 fio::OpenFlags::empty(),
@@ -1656,7 +1656,7 @@ mod tests {
             .expect("failed to read directory entries");
         assert_eq!(dir_contents.len(), 2);
         for entry in &dir_contents {
-            let instance_dir = fuchsia_fs::directory::open_directory(
+            let instance_dir = fuchsia_fs::directory::open_directory_deprecated(
                 &dir_proxy,
                 &entry.name,
                 fio::OpenFlags::empty(),
@@ -1774,7 +1774,7 @@ mod tests {
             .expect("failed to read directory entries");
         assert_eq!(dir_contents.len(), 2);
         for entry in &dir_contents {
-            let instance_dir = fuchsia_fs::directory::open_directory(
+            let instance_dir = fuchsia_fs::directory::open_directory_deprecated(
                 &dir_proxy,
                 &entry.name,
                 fio::OpenFlags::empty(),
@@ -1957,7 +1957,7 @@ mod tests {
 
         // Open one of the entries.
         {
-            let instance_dir = fuchsia_fs::directory::open_directory(
+            let instance_dir = fuchsia_fs::directory::open_directory_deprecated(
                 &dir_proxy,
                 instance_names.iter().next().unwrap(),
                 fio::OpenFlags::empty(),

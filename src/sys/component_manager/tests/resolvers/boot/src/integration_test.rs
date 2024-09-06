@@ -32,7 +32,7 @@ async fn boot_resolver_can_be_routed_from_component_manager() {
                 let scope = vfs::execution_scope::ExecutionScope::new();
                 let () = vfs::pseudo_directory! {
                     "boot" => vfs::remote::remote_dir(
-                        fuchsia_fs::directory::open_in_namespace(
+                        fuchsia_fs::directory::open_in_namespace_deprecated(
                             "/pkg",
                             fuchsia_fs::OpenFlags::RIGHT_READABLE | fuchsia_fs::OpenFlags::RIGHT_EXECUTABLE,
                         )

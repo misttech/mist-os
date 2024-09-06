@@ -97,18 +97,17 @@ async fn open_storage_root(
             .await?;
     } else {
         // If storage_source_info.storage_provider is None, the directory comes from component_manager's namespace
-        fuchsia_fs::directory::open_channel_in_namespace(&path, FLAGS, local_server_end).map_err(
-            |e| {
+        fuchsia_fs::directory::open_channel_in_namespace_deprecated(&path, FLAGS, local_server_end)
+            .map_err(|e| {
                 ModelError::from(StorageError::open_root(
                     None,
                     storage_source_info.backing_directory_path.clone(),
                     e,
                 ))
-            },
-        )?;
+            })?;
     }
     if !storage_source_info.storage_subdir.is_dot() {
-        dir_proxy = fuchsia_fs::directory::create_directory_recursive(
+        dir_proxy = fuchsia_fs::directory::create_directory_recursive_deprecated(
             &dir_proxy,
             &storage_source_info.storage_subdir.to_string(),
             FLAGS,
@@ -197,7 +196,7 @@ pub async fn open_isolated_storage(
         None => generate_moniker_based_storage_path(&moniker),
     };
 
-    fuchsia_fs::directory::create_directory_recursive(
+    fuchsia_fs::directory::create_directory_recursive_deprecated(
         &root_dir,
         storage_path.to_str().expect("must be utf-8"),
         FLAGS,
@@ -223,7 +222,7 @@ pub async fn open_isolated_storage_by_id(
     let root_dir = open_storage_root(storage_source_info).await?;
     let storage_path = generate_instance_id_based_storage_path(instance_id);
 
-    fuchsia_fs::directory::create_directory_recursive(
+    fuchsia_fs::directory::create_directory_recursive_deprecated(
         &root_dir,
         storage_path.to_str().expect("must be utf-8"),
         FLAGS,
@@ -268,16 +267,20 @@ pub async fn delete_isolated_storage(
         let dir = if parent_path_str.is_empty() {
             root_dir
         } else {
-            fuchsia_fs::directory::open_directory_no_describe(&root_dir, parent_path_str, FLAGS)
-                .map_err(|e| {
-                    StorageError::open(
-                        storage_source_info.storage_provider.as_ref().map(|r| r.moniker().clone()),
-                        storage_source_info.backing_directory_path.clone(),
-                        moniker.clone(),
-                        None,
-                        e,
-                    )
-                })?
+            fuchsia_fs::directory::open_directory_no_describe_deprecated(
+                &root_dir,
+                parent_path_str,
+                FLAGS,
+            )
+            .map_err(|e| {
+                StorageError::open(
+                    storage_source_info.storage_provider.as_ref().map(|r| r.moniker().clone()),
+                    storage_source_info.backing_directory_path.clone(),
+                    moniker.clone(),
+                    None,
+                    e,
+                )
+            })?
         };
         (dir, file_name)
     } else {
@@ -297,7 +300,7 @@ pub async fn delete_isolated_storage(
         let dir = if dir_path.parent().is_none() {
             root_dir
         } else {
-            fuchsia_fs::directory::open_directory_no_describe(
+            fuchsia_fs::directory::open_directory_no_describe_deprecated(
                 &root_dir,
                 dir_path.to_str().unwrap(),
                 FLAGS,

@@ -78,7 +78,7 @@ async fn main() {
         .unwrap()
         .unwrap();
     let exposed_dir = fio::DirectoryProxy::new(exposed_dir.into_channel().unwrap());
-    let memfs_dir = fuchsia_fs::directory::open_directory(
+    let memfs_dir = fuchsia_fs::directory::open_directory_deprecated(
         &exposed_dir,
         "memfs",
         fio::OpenFlags::RIGHT_READABLE,

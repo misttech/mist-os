@@ -74,7 +74,7 @@ impl FactoryStoreFacade {
         let req: ReadFileRequest = from_value(args)?;
         let dir_proxy = self.get_directory_for_provider(req.provider)?;
 
-        let file = fuchsia_fs::directory::open_file_no_describe(
+        let file = fuchsia_fs::directory::open_file_no_describe_deprecated(
             &dir_proxy,
             &req.filename,
             fio::OpenFlags::RIGHT_READABLE,

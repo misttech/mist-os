@@ -4,7 +4,7 @@
 
 use anyhow::{anyhow, Context, Error};
 use fidl_fuchsia_io::{DirectoryProxy, NodeAttributes, OpenFlags};
-use fuchsia_fs::directory::{open_directory, open_file, readdir, DirentKind};
+use fuchsia_fs::directory::{open_directory_deprecated, open_file_deprecated, readdir, DirentKind};
 use fuchsia_zircon as zx;
 use futures::future::BoxFuture;
 use futures::{FutureExt, TryFutureExt};
@@ -92,8 +92,12 @@ fn record_tree_size(
             match dir_entry.kind {
                 DirentKind::File => {
                     let child = node.create_child(&dir_entry.name);
-                    let file_proxy =
-                        open_file(&dir_proxy, &dir_entry.name, OpenFlags::RIGHT_READABLE).await?;
+                    let file_proxy = open_file_deprecated(
+                        &dir_proxy,
+                        &dir_entry.name,
+                        OpenFlags::RIGHT_READABLE,
+                    )
+                    .await?;
                     let attrs = file_proxy
                         .get_attr()
                         .await
@@ -105,10 +109,13 @@ fn record_tree_size(
                 }
                 DirentKind::Directory => {
                     let child = node.create_child(&dir_entry.name);
-                    let directory_proxy =
-                        open_directory(&dir_proxy, &dir_entry.name, OpenFlags::RIGHT_READABLE)
-                            .await
-                            .context("open_directory failed")?;
+                    let directory_proxy = open_directory_deprecated(
+                        &dir_proxy,
+                        &dir_entry.name,
+                        OpenFlags::RIGHT_READABLE,
+                    )
+                    .await
+                    .context("open_directory failed")?;
                     let size = record_tree_size(child.clone_weak(), directory_proxy).await?;
                     total += size;
                     node.record(child);

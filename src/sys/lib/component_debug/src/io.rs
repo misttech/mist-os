@@ -10,7 +10,8 @@ use async_trait::async_trait;
 use fidl::endpoints::{create_endpoints, ClientEnd};
 use fidl_fuchsia_io as fio;
 use fuchsia_fs::directory::{
-    clone_no_describe, open_directory_no_describe, open_file_no_describe, readdir, DirEntry,
+    clone_no_describe, open_directory_no_describe_deprecated, open_file_no_describe_deprecated,
+    readdir, DirEntry,
 };
 use fuchsia_fs::file::{close, read, read_to_string, write};
 use fuchsia_zircon_status::Status;
@@ -192,8 +193,10 @@ impl RemoteDirectory {
             .as_os_str()
             .to_str()
             .ok_or_else(|| format_err!("could not convert path to string"))?;
-        let proxy =
-            fuchsia_fs::directory::open_in_namespace(path_str, fio::OpenFlags::RIGHT_READABLE)?;
+        let proxy = fuchsia_fs::directory::open_in_namespace_deprecated(
+            path_str,
+            fio::OpenFlags::RIGHT_READABLE,
+        )?;
         let path = path.as_ref().to_path_buf();
         Ok(Self { path, proxy, readdir_mutex: Mutex::new(()) })
     }
@@ -235,7 +238,7 @@ impl RemoteDirectory {
             Some(relative_path) => relative_path,
             None => return Err(format_err!("could not convert relative path to &str")),
         };
-        match open_directory_no_describe(&self.proxy, relative_path, flags) {
+        match open_directory_no_describe_deprecated(&self.proxy, relative_path, flags) {
             Ok(proxy) => Ok(Self { path, proxy, readdir_mutex: Mutex::new(()) }),
             Err(e) => Err(format_err!("could not open dir `{}`: {}", path.as_path().display(), e)),
         }
@@ -270,18 +273,20 @@ impl Directory for RemoteDirectory {
             None => return Err(format_err!("relative path is not valid unicode")),
         };
 
-        let proxy =
-            match open_file_no_describe(&self.proxy, relative_path, fio::OpenFlags::RIGHT_READABLE)
-            {
-                Ok(proxy) => proxy,
-                Err(e) => {
-                    return Err(format_err!(
-                        "could not open file `{}`: {}",
-                        path.as_path().display(),
-                        e
-                    ))
-                }
-            };
+        let proxy = match open_file_no_describe_deprecated(
+            &self.proxy,
+            relative_path,
+            fio::OpenFlags::RIGHT_READABLE,
+        ) {
+            Ok(proxy) => proxy,
+            Err(e) => {
+                return Err(format_err!(
+                    "could not open file `{}`: {}",
+                    path.as_path().display(),
+                    e
+                ))
+            }
+        };
 
         match read_to_string(&proxy).await {
             Ok(data) => Ok(data),
@@ -300,18 +305,20 @@ impl Directory for RemoteDirectory {
             None => return Err(format_err!("relative path is not valid unicode")),
         };
 
-        let proxy =
-            match open_file_no_describe(&self.proxy, relative_path, fio::OpenFlags::RIGHT_READABLE)
-            {
-                Ok(proxy) => proxy,
-                Err(e) => {
-                    return Err(format_err!(
-                        "could not open file `{}`: {}",
-                        path.as_path().display(),
-                        e
-                    ))
-                }
-            };
+        let proxy = match open_file_no_describe_deprecated(
+            &self.proxy,
+            relative_path,
+            fio::OpenFlags::RIGHT_READABLE,
+        ) {
+            Ok(proxy) => proxy,
+            Err(e) => {
+                return Err(format_err!(
+                    "could not open file `{}`: {}",
+                    path.as_path().display(),
+                    e
+                ))
+            }
+        };
 
         match read(&proxy).await {
             Ok(data) => Ok(data),
@@ -384,7 +391,7 @@ impl Directory for RemoteDirectory {
             None => return Err(format_err!("relative path is not valid unicode")),
         };
 
-        let file = match open_file_no_describe(
+        let file = match open_file_no_describe_deprecated(
             &self.proxy,
             relative_path,
             fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::CREATE,
@@ -436,18 +443,20 @@ impl Directory for RemoteDirectory {
             None => return Err(format_err!("relative path is not valid unicode")),
         };
 
-        let file =
-            match open_file_no_describe(&self.proxy, relative_path, fio::OpenFlags::RIGHT_READABLE)
-            {
-                Ok(proxy) => proxy,
-                Err(e) => {
-                    return Err(format_err!(
-                        "could not open file `{}`: {}",
-                        path.as_path().display(),
-                        e
-                    ))
-                }
-            };
+        let file = match open_file_no_describe_deprecated(
+            &self.proxy,
+            relative_path,
+            fio::OpenFlags::RIGHT_READABLE,
+        ) {
+            Ok(proxy) => proxy,
+            Err(e) => {
+                return Err(format_err!(
+                    "could not open file `{}`: {}",
+                    path.as_path().display(),
+                    e
+                ))
+            }
+        };
 
         match file.get_attr().await {
             Ok((raw_status_code, attr)) => {

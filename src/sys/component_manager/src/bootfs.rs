@@ -419,7 +419,9 @@ mod tests {
     }
 
     async fn open_file_to_read(dir: &fio::DirectoryProxy, name: &str) -> fio::FileProxy {
-        fuchsia_fs::directory::open_file(&dir, &name, fio::OpenFlags::RIGHT_READABLE).await.unwrap()
+        fuchsia_fs::directory::open_file_deprecated(&dir, &name, fio::OpenFlags::RIGHT_READABLE)
+            .await
+            .unwrap()
     }
 
     fn parsed_payload(entry: &BootfsEntry) -> String {
@@ -447,7 +449,7 @@ mod tests {
             .create_and_bind_vfs()
             .unwrap();
 
-        let boot_proxy = fuchsia_fs::directory::open_in_namespace(
+        let boot_proxy = fuchsia_fs::directory::open_in_namespace_deprecated(
             "/boot",
             fuchsia_fs::OpenFlags::RIGHT_READABLE,
         )
@@ -501,7 +503,7 @@ mod tests {
             .create_and_bind_vfs()
             .unwrap();
 
-        let boot_proxy = fuchsia_fs::directory::open_in_namespace(
+        let boot_proxy = fuchsia_fs::directory::open_in_namespace_deprecated(
             "/boot",
             fuchsia_fs::OpenFlags::RIGHT_READABLE,
         )
@@ -545,7 +547,7 @@ mod tests {
             .create_and_bind_vfs()
             .unwrap();
 
-        let boot_proxy = fuchsia_fs::directory::open_in_namespace(
+        let boot_proxy = fuchsia_fs::directory::open_in_namespace_deprecated(
             "/boot",
             fuchsia_fs::OpenFlags::RIGHT_READABLE,
         )

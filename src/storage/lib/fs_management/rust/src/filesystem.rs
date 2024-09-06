@@ -572,7 +572,7 @@ impl ServingMultiVolumeFilesystem {
             return Ok(true);
         }
         let path = format!("volumes/{}", volume);
-        fuchsia_fs::directory::open_node(
+        fuchsia_fs::directory::open_node_deprecated(
             self.exposed_dir.as_ref().unwrap(),
             &path,
             fio::OpenFlags::NODE_REFERENCE,
@@ -807,7 +807,7 @@ mod tests {
         let content = String::from("test content").into_bytes();
 
         {
-            let test_file = fuchsia_fs::directory::open_file(
+            let test_file = fuchsia_fs::directory::open_file_deprecated(
                 serving.root(),
                 merkle,
                 fio::OpenFlags::CREATE | fio::OpenFlags::RIGHT_WRITABLE,
@@ -838,7 +838,7 @@ mod tests {
         serving.shutdown().await.expect("failed to shutdown blobfs the first time");
         let serving = blobfs.serve().await.expect("failed to serve blobfs the second time");
         {
-            let test_file = fuchsia_fs::directory::open_file(
+            let test_file = fuchsia_fs::directory::open_file_deprecated(
                 serving.root(),
                 merkle,
                 fio::OpenFlags::RIGHT_READABLE,
@@ -941,7 +941,7 @@ mod tests {
         let content = String::from("test content").into_bytes();
 
         {
-            let test_file = fuchsia_fs::directory::open_file(
+            let test_file = fuchsia_fs::directory::open_file_deprecated(
                 serving.root(),
                 filename,
                 fio::OpenFlags::CREATE | fio::OpenFlags::RIGHT_WRITABLE,
@@ -967,7 +967,7 @@ mod tests {
         let serving = minfs.serve().await.expect("failed to serve minfs the second time");
 
         {
-            let test_file = fuchsia_fs::directory::open_file(
+            let test_file = fuchsia_fs::directory::open_file_deprecated(
                 serving.root(),
                 filename,
                 fio::OpenFlags::RIGHT_READABLE,
@@ -1032,7 +1032,7 @@ mod tests {
 
         let fs = minfs.serve().await.expect("failed to serve fxfs");
         let file = {
-            let file = fuchsia_fs::directory::open_file(
+            let file = fuchsia_fs::directory::open_file_deprecated(
                 fs.root(),
                 test_file_name,
                 fio::OpenFlags::CREATE
@@ -1043,7 +1043,7 @@ mod tests {
             .unwrap();
             fuchsia_fs::file::write(&file, test_content).await.unwrap();
             file.close().await.expect("close fidl error").expect("close error");
-            fuchsia_fs::directory::open_file(
+            fuchsia_fs::directory::open_file_deprecated(
                 fs.root(),
                 test_file_name,
                 fio::OpenFlags::RIGHT_READABLE,
@@ -1092,7 +1092,7 @@ mod tests {
         let content = String::from("test content").into_bytes();
 
         {
-            let test_file = fuchsia_fs::directory::open_file(
+            let test_file = fuchsia_fs::directory::open_file_deprecated(
                 serving.root(),
                 filename,
                 fio::OpenFlags::CREATE | fio::OpenFlags::RIGHT_WRITABLE,
@@ -1120,7 +1120,7 @@ mod tests {
         let serving = f2fs.serve().await.expect("failed to serve f2fs the second time");
 
         {
-            let test_file = fuchsia_fs::directory::open_file(
+            let test_file = fuchsia_fs::directory::open_file_deprecated(
                 serving.root(),
                 filename,
                 fio::OpenFlags::RIGHT_READABLE,
@@ -1249,7 +1249,7 @@ mod tests {
                 .create_volume("foo", MountOptions::default())
                 .await
                 .expect("Create volume failed");
-            let file = fuchsia_fs::directory::open_file(
+            let file = fuchsia_fs::directory::open_file_deprecated(
                 vol.root(),
                 test_file_name,
                 fio::OpenFlags::CREATE
@@ -1260,7 +1260,7 @@ mod tests {
             .unwrap();
             fuchsia_fs::file::write(&file, test_content).await.unwrap();
             file.close().await.expect("close fidl error").expect("close error");
-            fuchsia_fs::directory::open_file(
+            fuchsia_fs::directory::open_file_deprecated(
                 vol.root(),
                 test_file_name,
                 fio::OpenFlags::RIGHT_READABLE,

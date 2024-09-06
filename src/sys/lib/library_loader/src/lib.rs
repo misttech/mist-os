@@ -135,7 +135,7 @@ pub fn parse_config_string(
     };
     let mut search_dirs = vec![];
     for dir_proxy in lib_dirs {
-        let sub_dir_proxy = fuchsia_fs::directory::open_directory_no_describe(
+        let sub_dir_proxy = fuchsia_fs::directory::open_directory_no_describe_deprecated(
             dir_proxy,
             config,
             fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,
@@ -164,7 +164,7 @@ mod tests {
         // whether an asan subdirectory is present, and use it instead if so.
         // TODO(https://fxbug.dev/42061196): Replace conditional logic with a pseudo-directory using Rust VFS.
         let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE;
-        let mut pkg_lib = fuchsia_fs::directory::open_in_namespace("/pkg/lib", rights)?;
+        let mut pkg_lib = fuchsia_fs::directory::open_in_namespace_deprecated("/pkg/lib", rights)?;
         let entries = list_directory(&pkg_lib).await;
         if let Some(name) = [
             "asan",
@@ -179,7 +179,9 @@ mod tests {
         .iter()
         .find(|&&name| entries.iter().any(|f| f == name))
         {
-            pkg_lib = fuchsia_fs::directory::open_directory_no_describe(&pkg_lib, name, rights)?;
+            pkg_lib = fuchsia_fs::directory::open_directory_no_describe_deprecated(
+                &pkg_lib, name, rights,
+            )?;
         }
         let (loader_proxy, loader_service) = fidl::endpoints::create_proxy::<LoaderMarker>()?;
         start(pkg_lib.into(), loader_service.into_channel());
@@ -221,7 +223,7 @@ mod tests {
         // which contains 'hippos' and a file 'bar/baz' (that is, baz in a subdirectory bar) which
         // contains 'rule'.
         // TODO(https://fxbug.dev/42061196): Replace conditional logic with a pseudo-directory using Rust VFS.
-        let pkg_lib = fuchsia_fs::directory::open_in_namespace(
+        let pkg_lib = fuchsia_fs::directory::open_in_namespace_deprecated(
             "/pkg/lib/config_test/",
             fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,
         )?;
@@ -270,11 +272,11 @@ mod tests {
         // which contains 'hippos' and a file 'bar/baz' (that is, baz in a subdirectory bar) which
         // contains 'rule'.
         // TODO(https://fxbug.dev/42061196): Replace conditional logic with a pseudo-directory using Rust VFS.
-        let pkg_lib_1 = fuchsia_fs::directory::open_in_namespace(
+        let pkg_lib_1 = fuchsia_fs::directory::open_in_namespace_deprecated(
             "/pkg/lib/config_test/",
             fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,
         )?;
-        let pkg_lib_2 = fuchsia_fs::directory::open_in_namespace(
+        let pkg_lib_2 = fuchsia_fs::directory::open_in_namespace_deprecated(
             "/pkg/lib/config_test/bar",
             fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,
         )?;

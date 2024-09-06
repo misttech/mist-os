@@ -48,7 +48,7 @@ impl Fake {
     }
 
     fn root_proxy(&self) -> fio::DirectoryProxy {
-        fuchsia_fs::directory::open_in_namespace(
+        fuchsia_fs::directory::open_in_namespace_deprecated(
             self.root.path().to_str().unwrap(),
             fuchsia_fs::OpenFlags::RIGHT_READABLE,
         )

@@ -47,8 +47,10 @@ pub async fn find_partition(
     matcher: PartitionMatcher,
     timeout: Duration,
 ) -> Result<ControllerProxy, Error> {
-    let dir =
-        fuchsia_fs::directory::open_in_namespace(BLOCK_DEV_PATH, fuchsia_fs::OpenFlags::empty())?;
+    let dir = fuchsia_fs::directory::open_in_namespace_deprecated(
+        BLOCK_DEV_PATH,
+        fuchsia_fs::OpenFlags::empty(),
+    )?;
     find_partition_in(&dir, matcher, timeout).await
 }
 

@@ -948,7 +948,7 @@ impl RealmBuilder {
         };
         let pkg_dir_proxy = match params.pkg_dir_proxy {
             Some(p) => p,
-            None => fuchsia_fs::directory::open_in_namespace(
+            None => fuchsia_fs::directory::open_in_namespace_deprecated(
                 "/pkg",
                 fuchsia_fs::OpenFlags::RIGHT_READABLE | fuchsia_fs::OpenFlags::RIGHT_EXECUTABLE,
             )

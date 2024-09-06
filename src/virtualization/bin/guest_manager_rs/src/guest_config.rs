@@ -83,7 +83,7 @@ struct JsonConfig<'a> {
 
 fn open_as_client_end<M: ProtocolMarker>(path: &str) -> Result<ClientEnd<M>, Error> {
     let (client_end, server_end) = fidl::Channel::create();
-    file::open_channel_in_namespace(
+    file::open_channel_in_namespace_deprecated(
         path,
         OpenFlags::RIGHT_READABLE,
         ServerEnd::<fio::FileMarker>::new(server_end),
@@ -269,7 +269,7 @@ mod tests {
         let kernel_content = "this is not a kernel";
         let cfg = format!(r#"{{"linux": "kernel.img"}}"#,);
         // Create file to ensure error comes from missing directory.
-        let flinux = file::open_in_namespace(
+        let flinux = file::open_in_namespace_deprecated(
             linux.to_str().unwrap(),
             OpenFlags::RIGHT_WRITABLE | OpenFlags::CREATE,
         )
@@ -312,7 +312,7 @@ mod tests {
         let fcontent = "hello, this is a test";
         let tmpdir = tempdir().unwrap();
         let fpath = tmpdir.path().join(&fname);
-        let tmpfile = file::open_in_namespace(
+        let tmpfile = file::open_in_namespace_deprecated(
             fpath.to_str().unwrap(),
             OpenFlags::RIGHT_WRITABLE | OpenFlags::CREATE,
         )?;
@@ -343,7 +343,7 @@ mod tests {
     "cpus": {cpus}}}"#,
         );
 
-        let flinux = file::open_in_namespace(
+        let flinux = file::open_in_namespace_deprecated(
             tmpdir.path().join(linux).to_str().unwrap(),
             OpenFlags::RIGHT_WRITABLE | OpenFlags::CREATE,
         )?;
@@ -371,7 +371,7 @@ mod tests {
             .map(|fs| tmpdir.path().join(fs))
             .collect::<Vec<PathBuf>>();
         for fs in fss.iter() {
-            file::open_in_namespace(
+            file::open_in_namespace_deprecated(
                 fs.to_str().unwrap(),
                 OpenFlags::RIGHT_WRITABLE | OpenFlags::CREATE,
             )?;
@@ -398,7 +398,7 @@ mod tests {
         // Merge two configs without repeated fields.
         let tmpdir = tempdir().unwrap();
         let kernel = "kernel.img";
-        file::open_in_namespace(
+        file::open_in_namespace_deprecated(
             tmpdir.path().join(kernel).to_str().unwrap(),
             OpenFlags::RIGHT_WRITABLE | OpenFlags::CREATE,
         )?;

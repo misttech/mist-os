@@ -33,7 +33,7 @@ async fn read_file_from_proxy<'a>(
     dir_proxy: &'a fio::DirectoryProxy,
     file_path: &'a str,
 ) -> Result<Vec<u8>, Error> {
-    let file = fuchsia_fs::directory::open_file_no_describe(
+    let file = fuchsia_fs::directory::open_file_no_describe_deprecated(
         &dir_proxy,
         file_path,
         fuchsia_fs::OpenFlags::RIGHT_READABLE,
@@ -46,7 +46,7 @@ async fn wait_for_ramdisk() -> Result<(), Error> {
         tracing::info!("{} doesn't exist. Assuming none ext4 test", FACTORY_DEVICE_CONFIG);
         return Ok(());
     }
-    let dev = fuchsia_fs::directory::open_in_namespace("/dev", fio::OpenFlags::empty())?;
+    let dev = fuchsia_fs::directory::open_in_namespace_deprecated("/dev", fio::OpenFlags::empty())?;
     device_watcher::recursive_wait(&dev, RAMDISK_DEV_BLOCK_PATH).await?;
     Ok(())
 }
@@ -245,7 +245,7 @@ async fn read_factory_files_from_alpha_store_reports_correct_size() -> Result<()
     let expected_contents =
         fs::read(&path).unwrap_or_else(|e| panic!("Unable to read expected file {}: {}", &path, e));
 
-    let file = fuchsia_fs::directory::open_file_no_describe(
+    let file = fuchsia_fs::directory::open_file_no_describe_deprecated(
         &dir_proxy,
         "alpha",
         fuchsia_fs::OpenFlags::RIGHT_READABLE,

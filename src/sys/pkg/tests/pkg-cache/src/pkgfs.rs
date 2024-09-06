@@ -36,7 +36,7 @@ async fn expose_pkgfs_ctl_validation_missing_file() {
         .build()
         .await;
 
-    let missing = fuchsia_fs::directory::open_file(
+    let missing = fuchsia_fs::directory::open_file_deprecated(
         &env.proxies.pkgfs,
         "ctl/validation/missing",
         fio::OpenFlags::RIGHT_READABLE,

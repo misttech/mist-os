@@ -134,10 +134,13 @@ impl CapabilityProvider for NamespaceCapabilityProvider {
 
         open_request
             .open_remote(remote_dir(
-                fuchsia_fs::directory::open_in_namespace(dir, OPEN_FLAGS_MAX_POSSIBLE_RIGHTS)
-                    .map_err(|e| CapabilityProviderError::CmNamespaceError {
-                        err: ClonableError::from(anyhow::Error::from(e)),
-                    })?,
+                fuchsia_fs::directory::open_in_namespace_deprecated(
+                    dir,
+                    OPEN_FLAGS_MAX_POSSIBLE_RIGHTS,
+                )
+                .map_err(|e| CapabilityProviderError::CmNamespaceError {
+                    err: ClonableError::from(anyhow::Error::from(e)),
+                })?,
             ))
             .map_err(|e| CapabilityProviderError::CmNamespaceError {
                 err: ClonableError::from(anyhow::Error::from(e)),

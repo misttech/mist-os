@@ -91,11 +91,12 @@ impl Package {
     /// Builds and returns the package located at the given path in the current namespace.
     pub async fn from_dir(root: impl AsRef<Path>) -> Result<Self, Error> {
         let root = root.as_ref();
-        let package_directory =
-            fuchsia_pkg::PackageDirectory::from_proxy(fuchsia_fs::directory::open_in_namespace(
+        let package_directory = fuchsia_pkg::PackageDirectory::from_proxy(
+            fuchsia_fs::directory::open_in_namespace_deprecated(
                 root.to_str().unwrap(),
                 fuchsia_fs::OpenFlags::RIGHT_READABLE,
-            )?);
+            )?,
+        );
 
         let meta_package = package_directory.meta_package().await.context("read meta/package")?;
         let abi_revision = package_directory.abi_revision().await.context("read abi revision")?;
@@ -931,7 +932,7 @@ mod tests {
         // Verify the generated package's merkle root is the same as this test package's merkle root.
         assert_eq!(pkg.meta_far_merkle, fs::read_to_string("/pkg/meta")?.parse()?);
 
-        let this_pkg_dir = fuchsia_fs::directory::open_in_namespace(
+        let this_pkg_dir = fuchsia_fs::directory::open_in_namespace_deprecated(
             "/pkg",
             fuchsia_fs::OpenFlags::RIGHT_READABLE,
         )?;
@@ -939,7 +940,7 @@ mod tests {
 
         let pkg_dir = make_this_package_dir()?;
 
-        let this_pkg_dir = fuchsia_fs::directory::open_in_namespace(
+        let this_pkg_dir = fuchsia_fs::directory::open_in_namespace_deprecated(
             pkg_dir.path().to_str().unwrap(),
             fuchsia_fs::OpenFlags::RIGHT_READABLE,
         )?;
@@ -956,7 +957,7 @@ mod tests {
 
         fs::write(pkg_dir.path().join("unexpected"), "unexpected file".as_bytes())?;
 
-        let pkg_dir_proxy = fuchsia_fs::directory::open_in_namespace(
+        let pkg_dir_proxy = fuchsia_fs::directory::open_in_namespace_deprecated(
             pkg_dir.path().to_str().unwrap(),
             fuchsia_fs::OpenFlags::RIGHT_READABLE,
         )?;
@@ -975,7 +976,7 @@ mod tests {
 
         fs::write(pkg_dir.path().join("meta/unexpected"), "unexpected file".as_bytes())?;
 
-        let pkg_dir_proxy = fuchsia_fs::directory::open_in_namespace(
+        let pkg_dir_proxy = fuchsia_fs::directory::open_in_namespace_deprecated(
             pkg_dir.path().to_str().unwrap(),
             fuchsia_fs::OpenFlags::RIGHT_READABLE,
         )?;
@@ -994,7 +995,7 @@ mod tests {
 
         fs::remove_file(pkg_dir.path().join("bin/fuchsia_pkg_testing_lib_test"))?;
 
-        let pkg_dir_proxy = fuchsia_fs::directory::open_in_namespace(
+        let pkg_dir_proxy = fuchsia_fs::directory::open_in_namespace_deprecated(
             pkg_dir.path().to_str().unwrap(),
             fuchsia_fs::OpenFlags::RIGHT_READABLE,
         )?;
@@ -1013,7 +1014,7 @@ mod tests {
 
         fs::write(pkg_dir.path().join("bin/fuchsia_pkg_testing_lib_test"), "broken".as_bytes())?;
 
-        let pkg_dir_proxy = fuchsia_fs::directory::open_in_namespace(
+        let pkg_dir_proxy = fuchsia_fs::directory::open_in_namespace_deprecated(
             pkg_dir.path().to_str().unwrap(),
             fuchsia_fs::OpenFlags::RIGHT_READABLE,
         )?;

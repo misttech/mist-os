@@ -154,7 +154,7 @@ impl FactoryFileLoader {
 #[async_trait(?Send)]
 impl FileLoader for FactoryFileLoader {
     async fn load_file(&self, file_path: &str) -> Result<String, Error> {
-        let file_proxy = fuchsia_fs::directory::open_file_no_describe(
+        let file_proxy = fuchsia_fs::directory::open_file_no_describe_deprecated(
             &self.directory_proxy,
             file_path,
             OpenFlags::NOT_DIRECTORY | OpenFlags::RIGHT_READABLE,

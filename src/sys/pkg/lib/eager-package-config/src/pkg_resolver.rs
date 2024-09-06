@@ -41,7 +41,7 @@ impl EagerPackageConfigs {
     }
 
     async fn from_path(path: &str) -> Result<Self, EagerPackageConfigsError> {
-        let proxy = fuchsia_fs::file::open_in_namespace(
+        let proxy = fuchsia_fs::file::open_in_namespace_deprecated(
             path,
             fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DESCRIBE,
         )?;

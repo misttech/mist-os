@@ -18,7 +18,7 @@ pub async fn get_binary_and_loader_from_pkg_dir(
     zx::Status,
 > {
     // Open the binary from the package dir as an executable VMO
-    let binary = fuchsia_fs::directory::open_file(
+    let binary = fuchsia_fs::directory::open_file_deprecated(
         pkg_dir,
         bin_path,
         fio::OpenFlags::RIGHT_EXECUTABLE | fio::OpenFlags::RIGHT_READABLE,
@@ -42,7 +42,7 @@ pub async fn get_binary_and_loader_from_pkg_dir(
         })?;
 
     // Construct a loader from the package library dir
-    let ldsvc = match fuchsia_fs::directory::open_directory(
+    let ldsvc = match fuchsia_fs::directory::open_directory_deprecated(
         pkg_dir,
         "lib",
         fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,

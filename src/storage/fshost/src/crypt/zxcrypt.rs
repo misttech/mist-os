@@ -18,7 +18,7 @@ use {fidl_fuchsia_io as fio, fuchsia_zircon as zx};
 
 /// Fetches a FIDL proxy for accessing zxcrypt management protocol for a given Device.
 async fn device_to_device_manager_proxy(device: &dyn Device) -> Result<DeviceManagerProxy, Error> {
-    let controller = fuchsia_fs::directory::open_in_namespace(
+    let controller = fuchsia_fs::directory::open_in_namespace_deprecated(
         device.topological_path(),
         fio::OpenFlags::empty(),
     )?;

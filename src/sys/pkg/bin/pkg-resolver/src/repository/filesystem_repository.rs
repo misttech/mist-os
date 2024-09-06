@@ -39,7 +39,7 @@ where
     #[cfg(test)]
     fn from_temp_dir(temp: &tempfile::TempDir) -> Self {
         Self::new(
-            fuchsia_fs::directory::open_in_namespace(
+            fuchsia_fs::directory::open_in_namespace_deprecated(
                 temp.path().to_str().unwrap(),
                 fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
             )
@@ -52,7 +52,7 @@ where
         path: String,
         not_found_err: tuf::Error,
     ) -> tuf::Result<Box<dyn AsyncRead + Send + Unpin + 'a>> {
-        let file_proxy = fuchsia_fs::directory::open_file(
+        let file_proxy = fuchsia_fs::directory::open_file_deprecated(
             &self.repo_proxy,
             &path,
             fio::OpenFlags::RIGHT_READABLE,
@@ -81,7 +81,7 @@ where
             // This is needed because if there's no "/" in `path`, .parent() will return Some("")
             // instead of None.
             if !parent.as_os_str().is_empty() {
-                let _sub_dir = fuchsia_fs::directory::create_directory_recursive(
+                let _sub_dir = fuchsia_fs::directory::create_directory_recursive_deprecated(
                     &self.repo_proxy,
                     parent.to_str().ok_or_else(|| make_opaque_error(anyhow!("Invalid path")))?,
                     fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
@@ -92,7 +92,7 @@ where
             }
         }
 
-        let (temp_path, temp_proxy) = fuchsia_fs::directory::create_randomly_named_file(
+        let (temp_path, temp_proxy) = fuchsia_fs::directory::create_randomly_named_file_deprecated(
             &self.repo_proxy,
             &path,
             fio::OpenFlags::RIGHT_WRITABLE,

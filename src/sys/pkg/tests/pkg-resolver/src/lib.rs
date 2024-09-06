@@ -292,10 +292,11 @@ pub enum DirOrProxy {
 impl DirOrProxy {
     fn to_proxy(&self, rights: fio::OpenFlags) -> fio::DirectoryProxy {
         match &self {
-            DirOrProxy::Dir(d) => {
-                fuchsia_fs::directory::open_in_namespace(d.path().to_str().unwrap(), rights)
-                    .unwrap()
-            }
+            DirOrProxy::Dir(d) => fuchsia_fs::directory::open_in_namespace_deprecated(
+                d.path().to_str().unwrap(),
+                rights,
+            )
+            .unwrap(),
             DirOrProxy::Proxy(p) => clone_directory_proxy(p, rights),
         }
     }
@@ -523,7 +524,7 @@ where
                     mounts.pkg_resolver_config_data.to_proxy(fio::OpenFlags::RIGHT_READABLE)
                 ),
                 "ssl" => vfs::remote::remote_dir(
-                    fuchsia_fs::directory::open_in_namespace(
+                    fuchsia_fs::directory::open_in_namespace_deprecated(
                         "/pkg/data/ssl",
                         fio::OpenFlags::RIGHT_READABLE
                     ).unwrap()

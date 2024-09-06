@@ -111,13 +111,13 @@ pub struct NamespaceBuildInfo;
 
 impl NamespaceBuildInfo {
     async fn read_file(&self, name: &str) -> Result<Option<String>, Error> {
-        let build_info = fuchsia_fs::directory::open_in_namespace(
+        let build_info = fuchsia_fs::directory::open_in_namespace_deprecated(
             "/config/build-info",
             fuchsia_fs::OpenFlags::RIGHT_READABLE,
         )
         .context("while opening /config/build-info")?;
 
-        let file = match fuchsia_fs::directory::open_file(
+        let file = match fuchsia_fs::directory::open_file_deprecated(
             &build_info,
             name,
             fuchsia_fs::OpenFlags::RIGHT_READABLE,
@@ -156,9 +156,10 @@ pub struct NamespaceSystemInfo;
 #[async_trait]
 impl SystemInfo for NamespaceSystemInfo {
     async fn system_image_hash(&self) -> Result<Option<fuchsia_hash::Hash>, Error> {
-        let proxy = if let Ok(proxy) =
-            fuchsia_fs::directory::open_in_namespace("/system", fio::OpenFlags::RIGHT_READABLE)
-        {
+        let proxy = if let Ok(proxy) = fuchsia_fs::directory::open_in_namespace_deprecated(
+            "/system",
+            fio::OpenFlags::RIGHT_READABLE,
+        ) {
             proxy
         } else {
             // system-updater will always have /system in its namespace because its manifest

@@ -10,7 +10,7 @@ use fidl_fuchsia_test_manager::LaunchError;
 use fuchsia_component::client::connect_to_protocol;
 use fuchsia_component::server::ServiceFs;
 use fuchsia_component_test::LocalComponentHandles;
-use fuchsia_fs::directory::open_channel_in_namespace;
+use fuchsia_fs::directory::open_channel_in_namespace_deprecated;
 use fuchsia_fs::OpenFlags;
 use futures::channel::mpsc;
 use futures::future::FutureExt;
@@ -118,7 +118,7 @@ impl DebugDataProcessor {
         };
 
         let (directory_proxy, server_end) = create_endpoints::<fio::DirectoryMarker>();
-        open_channel_in_namespace(
+        open_channel_in_namespace_deprecated(
             &debug_directory_path,
             OpenFlags::RIGHT_READABLE | OpenFlags::RIGHT_WRITABLE,
             server_end,
@@ -170,7 +170,7 @@ impl DebugDataProcessor {
         };
 
         let (directory_proxy, server_end) = create_endpoints::<fio::DirectoryMarker>();
-        open_channel_in_namespace(
+        open_channel_in_namespace_deprecated(
             &debug_directory_path,
             OpenFlags::RIGHT_READABLE | OpenFlags::RIGHT_WRITABLE,
             server_end,
@@ -354,7 +354,7 @@ mod test {
         }
 
         for ftest_debug::DebugVmo { data_sink, test_url, .. } in collected_vmos {
-            let file = fuchsia_fs::directory::open_file_no_describe(
+            let file = fuchsia_fs::directory::open_file_no_describe_deprecated(
                 &dir,
                 &data_sink,
                 OpenFlags::CREATE | OpenFlags::RIGHT_WRITABLE,
