@@ -51,6 +51,7 @@ pub const HIDDEN_PROBABILITY_HIGH: f32 =
 // assume a network to be hidden iff we connect only after observing the network in an active scan,
 // not a passive scan.
 pub const PROB_IS_HIDDEN: f32 = PROB_HIDDEN_IF_CONNECT_ACTIVE;
+pub const NUM_SCANS_TO_DECIDE_LIKELY_SINGLE_BSS: usize = 4;
 
 pub type SaveError = fidl_policy::NetworkConfigChangeError;
 
@@ -86,6 +87,21 @@ impl PerformanceStats {
             connect_failures: HistoricalListsByBssid::new(),
             past_connections: HistoricalListsByBssid::new(),
         }
+    }
+}
+
+/// Data about scans involving this network. It is used to determine whether or not a network is
+/// likely multi-BSS or single-BSS, since one BSS could be missed, off, or out of range.
+#[derive(Clone, Debug, PartialEq)]
+struct ScanStats {
+    pub have_seen_multi_bss: bool,
+    /// The number of scans that have been performed for this metric.
+    pub num_scans: usize,
+}
+
+impl ScanStats {
+    pub fn new() -> Self {
+        Self { have_seen_multi_bss: false, num_scans: 0 }
     }
 }
 
@@ -247,6 +263,9 @@ pub struct NetworkConfig {
     hidden_probability_stats: HiddenProbabilityStats,
     /// Used to estimate quality to determine whether we want to choose this network.
     pub perf_stats: PerformanceStats,
+    /// Used to determine whether the BSS is likely a single-BSS network, so that roam scans
+    /// happen much less if it is single-BSS.
+    scan_stats: ScanStats,
 }
 
 impl NetworkConfig {
@@ -267,6 +286,7 @@ impl NetworkConfig {
             hidden_probability: PROB_HIDDEN_DEFAULT,
             hidden_probability_stats: HiddenProbabilityStats::new(),
             perf_stats: PerformanceStats::new(),
+            scan_stats: ScanStats::new(),
         })
     }
 
@@ -310,6 +330,18 @@ impl NetworkConfig {
 
     pub fn is_hidden(&self) -> bool {
         self.hidden_probability >= PROB_IS_HIDDEN
+    }
+
+    pub fn update_seen_multiple_bss(&mut self, multi_bss: bool) {
+        self.scan_stats.have_seen_multi_bss = self.scan_stats.have_seen_multi_bss || multi_bss;
+        self.scan_stats.num_scans = self.scan_stats.num_scans + 1;
+    }
+
+    /// We say that a BSS is likely a single-BSS network if only 1 BSS has ever been seen at a time
+    /// for the network and there have been at least some number of scans for the network.
+    pub fn is_likely_single_bss(&self) -> bool {
+        return !self.scan_stats.have_seen_multi_bss
+            && self.scan_stats.num_scans > NUM_SCANS_TO_DECIDE_LIKELY_SINGLE_BSS;
     }
 }
 
@@ -803,7 +835,7 @@ pub fn select_authentication_method(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::util::testing::random_connection_data;
+    use crate::util::testing::{generate_string, random_connection_data};
     use std::collections::VecDeque;
     use test_case::test_case;
     use wlan_common::assert_variant;
@@ -832,7 +864,8 @@ mod tests {
                 has_ever_connected: false,
                 hidden_probability: PROB_HIDDEN_DEFAULT,
                 hidden_probability_stats: HiddenProbabilityStats::new(),
-                perf_stats: PerformanceStats::new()
+                perf_stats: PerformanceStats::new(),
+                scan_stats: ScanStats::new(),
             }
         );
     }
@@ -857,7 +890,8 @@ mod tests {
                 has_ever_connected: false,
                 hidden_probability: PROB_HIDDEN_DEFAULT,
                 hidden_probability_stats: HiddenProbabilityStats::new(),
-                perf_stats: PerformanceStats::new()
+                perf_stats: PerformanceStats::new(),
+                scan_stats: ScanStats::new(),
             }
         );
         assert!(network_config.perf_stats.connect_failures.0.is_empty());
@@ -883,7 +917,8 @@ mod tests {
                 has_ever_connected: false,
                 hidden_probability: PROB_HIDDEN_DEFAULT,
                 hidden_probability_stats: HiddenProbabilityStats::new(),
-                perf_stats: PerformanceStats::new()
+                perf_stats: PerformanceStats::new(),
+                scan_stats: ScanStats::new(),
             }
         );
     }
@@ -1564,5 +1599,62 @@ mod tests {
             SecurityType::Wpa2 => {}
             SecurityType::Wpa3 => {}
         }
+    }
+
+    #[fuchsia::test]
+    fn test_is_likely_single_bss() {
+        let ssid = generate_string();
+        let mut network_config = NetworkConfig::new(
+            NetworkIdentifier::try_from(&ssid, SecurityType::None).unwrap(),
+            Credential::None,
+            false,
+        )
+        .expect("Failed to create network config");
+
+        // Record that the network was seen with 1 BSS a few times.
+        for _ in 0..5 {
+            network_config.update_seen_multiple_bss(false);
+        }
+
+        // Verify the network is considered single BSS.
+        assert!(network_config.is_likely_single_bss());
+    }
+
+    #[fuchsia::test]
+    fn test_is_not_single_bss() {
+        let ssid = generate_string();
+        let mut network_config = NetworkConfig::new(
+            NetworkIdentifier::try_from(&ssid, SecurityType::None).unwrap(),
+            Credential::None,
+            false,
+        )
+        .expect("Failed to create network config");
+
+        // Record that the network was seen with multiple BSS a few times then one BSS once.
+        for _ in 0..5 {
+            network_config.update_seen_multiple_bss(true);
+        }
+        network_config.update_seen_multiple_bss(false);
+
+        // Verify the network is not considered single BSS.
+        assert!(!network_config.is_likely_single_bss());
+    }
+
+    #[fuchsia::test]
+    fn test_cannot_yet_determine_single_bss() {
+        let ssid = generate_string();
+        let mut network_config = NetworkConfig::new(
+            NetworkIdentifier::try_from(&ssid, SecurityType::None).unwrap(),
+            Credential::None,
+            false,
+        )
+        .expect("Failed to create network config");
+
+        // Record that the network was seen with a single BSS only a couple times.
+        network_config.update_seen_multiple_bss(false);
+        network_config.update_seen_multiple_bss(false);
+
+        // Verify the network is not considered likely single BSS.
+        assert!(!network_config.is_likely_single_bss());
     }
 }

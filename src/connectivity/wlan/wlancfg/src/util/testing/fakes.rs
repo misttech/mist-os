@@ -10,6 +10,7 @@ use crate::config_management::{
     Credential, NetworkConfig, NetworkConfigError, NetworkIdentifier, PastConnectionData,
     PastConnectionList, SavedNetworksManagerApi,
 };
+use anyhow::format_err;
 use async_trait::async_trait;
 use futures::channel::mpsc;
 use futures::lock::Mutex;
@@ -39,6 +40,7 @@ pub struct FakeSavedNetworksManager {
         >,
     >,
     pub past_connections_response: PastConnectionList,
+    pub is_network_single_bss_resp: Option<bool>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -87,6 +89,7 @@ impl FakeSavedNetworksManager {
             lookup_compatible_response: Mutex::new(LookupCompatibleResponse::new()),
             scan_result_records: Arc::new(Mutex::new(vec![])),
             past_connections_response: PastConnectionList::default(),
+            is_network_single_bss_resp: None,
         }
     }
 
@@ -116,6 +119,7 @@ impl FakeSavedNetworksManager {
             lookup_compatible_response: Mutex::new(LookupCompatibleResponse::new()),
             scan_result_records: Arc::new(Mutex::new(vec![])),
             past_connections_response: PastConnectionList::default(),
+            is_network_single_bss_resp: None,
         }
     }
 
@@ -267,6 +271,19 @@ impl SavedNetworksManagerApi for FakeSavedNetworksManager {
     ) {
         let mut records = self.scan_result_records.lock().await;
         records.push((target_ssids, results.clone()));
+    }
+
+    /// This is currently used for roaming scan decisions. If it is not set in the
+    /// FakeSavedNetworksManager, an error will returned to avoid tests failing down the line
+    /// because of the value returned here.
+    async fn is_network_single_bss(
+        &self,
+        _id: &NetworkIdentifier,
+        _credential: &Credential,
+    ) -> Result<bool, anyhow::Error> {
+        return self.is_network_single_bss_resp.ok_or_else(|| {
+            format_err!("is_network_single_bss response is not set for FakeSavedNetworksManager")
+        });
     }
 
     async fn get_networks(&self) -> Vec<NetworkConfig> {
