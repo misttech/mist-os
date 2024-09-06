@@ -38,6 +38,7 @@ ash = { version = "0.37.0", features = ["linked"], default-features = false }
 assert_matches = "1.5.0"
 async-channel = "1.8.0"
 async-lock = "2.3"
+async-ringbuf  = "0.3.1"
 async-stream = "0.3.5"
 async-trait = "0.1.71"
 atty = "0.2.11"

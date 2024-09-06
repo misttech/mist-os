@@ -253,6 +253,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "async-ringbuf"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "32690af15155711360e74119b99605416c9e4dfd45b0859bd9af795a50693bec"
+dependencies = [
+ "futures",
+ "ringbuf",
+]
+
+[[package]]
 name = "async-stream"
 version = "0.3.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1229,6 +1239,7 @@ dependencies = [
  "async-io",
  "async-lock",
  "async-net",
+ "async-ringbuf",
  "async-stream",
  "async-trait",
  "atty",
@@ -3473,6 +3484,15 @@ dependencies = [
  "untrusted",
  "web-sys",
  "winapi",
+]
+
+[[package]]
+name = "ringbuf"
+version = "0.4.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "46f7f1b88601a8ee13cabf203611ccdf64345dc1c5d24de8b11e1a678ee619b6"
+dependencies = [
+ "crossbeam-utils",
 ]
 
 [[package]]

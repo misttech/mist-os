@@ -93,6 +93,10 @@ if (!(current_os == "fuchsia")) {
   }
 }
 
+group("async-ringbuf") {
+  public_deps = [ ":async-ringbuf-v0_3_1" ]
+}
+
 group("async-stream") {
   public_deps = [ ":async-stream-v0_3_5" ]
 }
@@ -2027,6 +2031,41 @@ rust_library("async-net-v1_7_0") {
   visibility = [ ":*" ]
 
   applicable_licenses = [ ":async-net-v1_7_0.license" ]
+}
+
+license("async-ringbuf-v0_3_1.license") {
+  public_package_name = "async_ringbuf"
+  license_files = [
+    "//third_party/rust_crates/vendor/async-ringbuf-0.3.1/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/async-ringbuf-0.3.1/LICENSE-MIT",
+  ]
+}
+
+rust_library("async-ringbuf-v0_3_1") {
+  crate_name = "async_ringbuf"
+  crate_root = "//third_party/rust_crates/vendor/async-ringbuf-0.3.1/src/lib.rs"
+  output_name = "async_ringbuf-1fe58b18451ee650"
+  configs -= [ "//build/config/rust:2018_idioms" ]
+
+  deps = []
+  deps += [ ":futures-v0_3_30" ]
+  deps += [ ":ringbuf-v0_4_4" ]
+
+  rustenv = []
+
+  rustflags = [
+    "--cap-lints=allow",
+    "--edition=2021",
+    "-Cmetadata=1fe58b18451ee650",
+    "-Cextra-filename=-1fe58b18451ee650",
+    "--cfg=feature=\"alloc\"",
+    "--cfg=feature=\"default\"",
+    "--cfg=feature=\"std\"",
+  ]
+
+  visibility = [ ":*" ]
+
+  applicable_licenses = [ ":async-ringbuf-v0_3_1.license" ]
 }
 
 license("async-stream-v0_3_5.license") {
@@ -12410,6 +12449,40 @@ rust_library("ring-v0_16_20") {
   visibility += [ ":webpki-v0_21_0.rustdoc.transdeps" ]
 
   applicable_licenses = [ ":ring-v0_16_20.license" ]
+}
+
+license("ringbuf-v0_4_4.license") {
+  public_package_name = "ringbuf"
+  license_files = [
+    "//third_party/rust_crates/vendor/ringbuf-0.4.4/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/ringbuf-0.4.4/LICENSE-MIT",
+  ]
+}
+
+rust_library("ringbuf-v0_4_4") {
+  crate_name = "ringbuf"
+  crate_root = "//third_party/rust_crates/vendor/ringbuf-0.4.4/src/lib.rs"
+  output_name = "ringbuf-7d6059660fb2ecdc"
+  configs -= [ "//build/config/rust:2018_idioms" ]
+
+  deps = []
+  deps += [ ":crossbeam-utils-v0_8_14" ]
+
+  rustenv = []
+
+  rustflags = [
+    "--cap-lints=allow",
+    "--edition=2021",
+    "-Cmetadata=7d6059660fb2ecdc",
+    "-Cextra-filename=-7d6059660fb2ecdc",
+    "--cfg=feature=\"alloc\"",
+    "--cfg=feature=\"default\"",
+    "--cfg=feature=\"std\"",
+  ]
+
+  visibility = [ ":*" ]
+
+  applicable_licenses = [ ":ringbuf-v0_4_4.license" ]
 }
 
 license("rust_icu_common-v5_0_0.license") {
