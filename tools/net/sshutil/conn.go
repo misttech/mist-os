@@ -118,7 +118,7 @@ func connect(ctx context.Context, resolver Resolver, config *ssh.ClientConfig, b
 	}, nil)
 
 	var netErr net.Error
-	if errors.As(err, &netErr) && netErr.Timeout() {
+	if (errors.As(err, &netErr) && netErr.Timeout()) || errors.Is(err, context.DeadlineExceeded) {
 		duration := time.Now().Sub(startTime).Truncate(time.Second)
 		return nil, ConnectionError{fmt.Errorf("%s after %v: %w", constants.TimedOutConnectingMsg, duration, err)}
 	} else if err != nil {
