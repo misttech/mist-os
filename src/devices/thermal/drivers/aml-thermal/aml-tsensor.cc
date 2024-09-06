@@ -445,9 +445,14 @@ zx_status_t AmlTSensor::InitSensor(fuchsia_hardware_thermal::wire::ThermalDevice
 }
 
 AmlTSensor::~AmlTSensor() {
+  // Signal the IRQ thread to cancel.
   running_.store(false);
-  thrd_join(irq_thread_, NULL);
+
+  // Unblock the IRQ thread which might be waiting on the IRQ object.
   tsensor_irq_.destroy();
+
+  // Wait for the IRQ thread to join.
+  thrd_join(irq_thread_, NULL);
 }
 
 }  // namespace thermal
