@@ -313,6 +313,9 @@ mod tests {
                             .close_with_epitaph(component_controller_epitaph)
                             .expect("Could not close with epitaph");
                     }
+                    frunner::ComponentRunnerRequest::_UnknownMethod { ordinal, .. } => {
+                        tracing::warn!(%ordinal, "Unknown ComponentRunner request");
+                    }
                 }
             }
         })

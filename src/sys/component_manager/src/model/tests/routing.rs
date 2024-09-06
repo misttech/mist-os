@@ -1806,6 +1806,9 @@ async fn use_resolver_from_parent_environment() {
                             .send(Err(fresolution::ResolverError::Internal))
                             .expect("failed to send resolve response");
                     }
+                    fresolution::ResolverRequest::_UnknownMethod { .. } => {
+                        panic!("unknown resolver request");
+                    }
                 }
             }
         }
@@ -1903,6 +1906,9 @@ async fn use_resolver_from_grandparent_environment() {
                         responder
                             .send(Err(fresolution::ResolverError::Internal))
                             .expect("failed to send resolve response");
+                    }
+                    fresolution::ResolverRequest::_UnknownMethod { .. } => {
+                        panic!("unknown resolver request");
                     }
                 }
             }
@@ -2005,6 +2011,9 @@ async fn resolver_is_not_available() {
                         responder
                             .send(Err(fresolution::ResolverError::Internal))
                             .expect("failed to send resolve response");
+                    }
+                    fresolution::ResolverRequest::_UnknownMethod { .. } => {
+                        panic!("unknown resolver request");
                     }
                 }
             }
@@ -2113,6 +2122,9 @@ async fn resolver_component_decl_is_validated() {
                         responder
                             .send(Err(fresolution::ResolverError::Internal))
                             .expect("failed to send resolve response");
+                    }
+                    fresolution::ResolverRequest::_UnknownMethod { .. } => {
+                        panic!("unknown resolver request");
                     }
                 }
             }

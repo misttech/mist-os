@@ -222,7 +222,10 @@ pub async fn wait_for_runner_request(
     recv: &mut Receiver<fcrunner::ComponentRunnerRequest>,
 ) -> fcrunner::ComponentStartInfo {
     let fcrunner::ComponentRunnerRequest::Start { start_info, .. } =
-        recv.next().await.expect("Channel closed before request was received.");
+        recv.next().await.expect("Channel closed before request was received.")
+    else {
+        panic!("unknown runner request");
+    };
     start_info
 }
 

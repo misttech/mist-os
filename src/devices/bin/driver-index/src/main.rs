@@ -740,6 +740,9 @@ mod tests {
                             .send(Err(fresolution::ResolverError::Internal))
                             .context("error sending response")?;
                     }
+                    fresolution::ResolverRequest::_UnknownMethod { ordinal, .. } => {
+                        tracing::warn!(%ordinal, "Unknown Resolver request");
+                    }
                 }
                 Ok(())
             })

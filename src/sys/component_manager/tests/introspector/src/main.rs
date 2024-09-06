@@ -102,6 +102,9 @@ impl MockRunner {
                         }
                     }
                 }
+                fcrunner::ComponentRunnerRequest::_UnknownMethod { .. } => {
+                    panic!("Unknown ComponentRunner request");
+                }
             }
         }
     }
@@ -219,7 +222,9 @@ async fn moniker_relative_to_scope() {
     let Fixture { introspector, .. } = fixture;
     let mut main_start_request = mock_runner.main_realm_start().await;
 
-    let fcrunner::ComponentRunnerRequest::Start { start_info, .. } = &mut main_start_request;
+    let fcrunner::ComponentRunnerRequest::Start { start_info, .. } = &mut main_start_request else {
+        panic!("unexpected runner request");
+    };
     let component_instance = start_info.component_instance.take().unwrap();
 
     let moniker = introspector.get_moniker(component_instance).await.unwrap().unwrap();
@@ -236,7 +241,10 @@ async fn moniker_out_of_scope() {
     let Fixture { introspector, .. } = fixture;
     let mut unrelated_start_request = mock_runner.unrelated_realm_start().await;
 
-    let fcrunner::ComponentRunnerRequest::Start { start_info, .. } = &mut unrelated_start_request;
+    let fcrunner::ComponentRunnerRequest::Start { start_info, .. } = &mut unrelated_start_request
+    else {
+        panic!("unexpected runner request");
+    };
     let component_instance = start_info.component_instance.take().unwrap();
 
     // The token corresponds to "./unrelated_realm/unrelated_realm_child". However, the framework
@@ -264,7 +272,10 @@ async fn valid_when_stopped() {
 
     let component_instance = {
         let mut main_start_request = mock_runner.main_realm_start().await;
-        let fcrunner::ComponentRunnerRequest::Start { start_info, .. } = &mut main_start_request;
+        let fcrunner::ComponentRunnerRequest::Start { start_info, .. } = &mut main_start_request
+        else {
+            panic!("unexpected runner request");
+        };
         let component_instance = start_info.component_instance.take().unwrap();
 
         let moniker = introspector
@@ -321,7 +332,10 @@ async fn invalidate_when_destroyed() {
 
     let component_instance = {
         let mut main_start_request = mock_runner.main_realm_start().await;
-        let fcrunner::ComponentRunnerRequest::Start { start_info, .. } = &mut main_start_request;
+        let fcrunner::ComponentRunnerRequest::Start { start_info, .. } = &mut main_start_request
+        else {
+            panic!("unexpected runner request");
+        };
         let component_instance = start_info.component_instance.take().unwrap();
 
         let moniker = introspector

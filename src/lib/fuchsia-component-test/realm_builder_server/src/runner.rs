@@ -140,6 +140,10 @@ impl Runner {
                         }
                     }
                 }
+                #[cfg(fuchsia_api_level_at_least = "NEXT")]
+                fcrunner::ComponentRunnerRequest::_UnknownMethod { ordinal, .. } => {
+                    warn!(%ordinal, "Unknown ComponentRunner request");
+                }
             }
         }
         Ok(())

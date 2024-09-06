@@ -237,6 +237,9 @@ async fn handle_runner_request(
                 }
             }
         }
+        frunner::ComponentRunnerRequest::_UnknownMethod { ordinal, .. } => {
+            warn!(%ordinal, "Unknown ComponentRunner request");
+        }
     }
     Ok(())
 }

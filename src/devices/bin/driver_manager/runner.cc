@@ -4,6 +4,7 @@
 
 #include "src/devices/bin/driver_manager/runner.h"
 
+#include <lib/syslog/cpp/macros.h>
 #include <zircon/processargs.h>
 
 #include "src/devices/lib/log/log.h"
@@ -172,6 +173,12 @@ void Runner::Start(StartRequestView request, StartCompleter::Sync& completer) {
     LOGF(ERROR, "Failed to start driver '%s', unknown request for driver", url.c_str());
     completer.Close(ZX_ERR_UNAVAILABLE);
   }
+}
+
+void Runner::handle_unknown_method(
+    fidl::UnknownMethodMetadata<fuchsia_component_runner::ComponentRunner> metadata,
+    fidl::UnknownMethodCompleter::Sync& completer) {
+  FX_LOG_KV(WARNING, "Unknown ComponentRunner request", FX_KV("ordinal", metadata.method_ordinal));
 }
 
 zx::result<> Runner::CallCallback(zx_koid_t koid, zx::result<StartedComponent> component) {

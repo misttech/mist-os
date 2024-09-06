@@ -61,6 +61,9 @@ pub async fn serve_component_runner(
                         log_error!("failed to start component: {:?}", e);
                     }
                 }
+                frunner::ComponentRunnerRequest::_UnknownMethod { ordinal, .. } => {
+                    log_warn!("Unknown ComponentRunner request: {ordinal}");
+                }
             }
             Ok(())
         })

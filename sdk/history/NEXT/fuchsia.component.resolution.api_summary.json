@@ -102,7 +102,7 @@
     {
         "kind": "protocol",
         "name": "fuchsia.component.resolution/Resolver",
-        "openness": "closed",
+        "openness": "open",
         "transport": "channel"
     },
     {

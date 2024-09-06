@@ -9,7 +9,7 @@ use fidl::endpoints::Proxy as _;
 use futures::stream::TryStreamExt as _;
 use std::collections::HashMap;
 use std::sync::Arc;
-use tracing::error;
+use tracing::{error, warn};
 use version_history::AbiRevision;
 use {
     fidl_fuchsia_component_decl as fcomponent_decl,
@@ -80,6 +80,9 @@ pub(crate) async fn serve_request_stream(
                     .context(
                         "sending fuchsia.component.resolution/Resolver.ResolveWithContext response",
                     )?;
+            }
+            fcomponent_resolution::ResolverRequest::_UnknownMethod { ordinal, .. } => {
+                warn!(%ordinal, "Unknown Resolver request");
             }
         }
     }

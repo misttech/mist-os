@@ -224,6 +224,9 @@ impl FuchsiaBootResolver {
                     // context, but should still resolve absolute URLs.
                     responder.send(self.resolve_async(&component_url).await)?;
                 }
+                fresolution::ResolverRequest::_UnknownMethod { ordinal, .. } => {
+                    tracing::warn!(%ordinal, "Unknown Resolver request");
+                }
             }
         }
         Ok(())

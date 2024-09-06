@@ -33,6 +33,12 @@ class FakeComponentResolver final
       : boot_dir_(std::move(boot_dir)), base_dir_(std::move(base_dir)) {}
 
  private:
+  void handle_unknown_method(
+      fidl::UnknownMethodMetadata<fuchsia_component_resolution::Resolver> metadata,
+      fidl::UnknownMethodCompleter::Sync& completer) override {
+    FX_LOG_KV(WARNING, "Unknown Resolver request", FX_KV("ordinal", metadata.method_ordinal));
+  }
+
   void Resolve(ResolveRequestView request, ResolveCompleter::Sync& completer) override {
     std::string_view kTestPackagePrefix = "dtr-test-pkg://fuchsia.com/";
     std::string_view kBootPrefix = "fuchsia-boot:///";

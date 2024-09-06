@@ -357,6 +357,12 @@ void DriverHostRunner::Start(StartRequestView request, StartCompleter::Sync& com
   }
 }
 
+void DriverHostRunner::handle_unknown_method(
+    fidl::UnknownMethodMetadata<fuchsia_component_runner::ComponentRunner> metadata,
+    fidl::UnknownMethodCompleter::Sync& completer) {
+  LOGF(WARNING, "Unknown ComponentRunner request: %llu", metadata.method_ordinal);
+}
+
 zx::result<> DriverHostRunner::CallCallback(zx_koid_t koid,
                                             zx::result<StartedComponent> component) {
   auto it = start_requests_.find(koid);

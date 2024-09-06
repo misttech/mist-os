@@ -41,6 +41,8 @@ class IcdRunnerImpl : public fidl::Server<fuchsia_component_runner::ComponentRun
                           component::OutgoingDirectory& outgoing);
 
   void Start(StartRequest& request, StartCompleter::Sync& completer) override;
+  void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_component_runner::ComponentRunner>,
+                             fidl::UnknownMethodCompleter::Sync&) override {}
 
  private:
   async_dispatcher_t* const dispatcher_;

@@ -515,9 +515,14 @@ impl ScopedElfRunner {
         let checker = self.checker.clone();
         fasync::Task::spawn(async move {
             while let Ok(Some(request)) = stream.try_next().await {
-                let fcrunner::ComponentRunnerRequest::Start { start_info, controller, .. } =
-                    request;
-                start(&runner, checker.clone(), start_info, controller).await;
+                match request {
+                    fcrunner::ComponentRunnerRequest::Start { start_info, controller, .. } => {
+                        start(&runner, checker.clone(), start_info, controller).await;
+                    }
+                    fcrunner::ComponentRunnerRequest::_UnknownMethod { ordinal, .. } => {
+                        warn!(%ordinal, "Unknown ComponentRunner request");
+                    }
+                }
             }
         })
         .detach();

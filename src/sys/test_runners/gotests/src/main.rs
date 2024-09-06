@@ -53,6 +53,9 @@ async fn start_runner(
                     warn!("Cannot start component '{}': {:?}", url, e);
                 }
             }
+            fcrunner::ComponentRunnerRequest::_UnknownMethod { ordinal, .. } => {
+                warn!(%ordinal, "Unknown ComponentRunner request");
+            }
         }
     }
     Ok(())

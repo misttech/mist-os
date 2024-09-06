@@ -378,6 +378,9 @@ impl LocalComponentRunner {
                         }
                     });
                 }
+                fcrunner::ComponentRunnerRequest::_UnknownMethod { ordinal, .. } => {
+                    warn!(%ordinal, "Unknown ComponentController request");
+                }
             }
         }
         Ok(())

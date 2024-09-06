@@ -184,18 +184,23 @@ impl BuiltinRunnerFactory for BuiltinRunner {
             let mut stream = fcrunner::ComponentRunnerRequestStream::from_channel(server_end);
             runner.clone().task_group.spawn(async move {
                 while let Ok(Some(request)) = stream.try_next().await {
-                    let fcrunner::ComponentRunnerRequest::Start { start_info, controller, .. } =
-                        request;
-                    match runner.clone().start(start_info) {
-                        Ok((program, on_exit)) => {
-                            let (stream, control) =
-                                controller.into_stream_and_control_handle().unwrap();
-                            let controller = Controller::new(program, stream, control);
-                            runner.task_group.spawn(controller.serve(on_exit));
-                        }
-                        Err(err) => {
-                            warn!("Builtin runner failed to run component: {err}");
-                            let _ = controller.close_with_epitaph(err.into());
+                    match request {
+                        fcrunner::ComponentRunnerRequest::Start {
+                            start_info, controller, ..
+                        } => match runner.clone().start(start_info) {
+                            Ok((program, on_exit)) => {
+                                let (stream, control) =
+                                    controller.into_stream_and_control_handle().unwrap();
+                                let controller = Controller::new(program, stream, control);
+                                runner.task_group.spawn(controller.serve(on_exit));
+                            }
+                            Err(err) => {
+                                warn!("Builtin runner failed to run component: {err}");
+                                let _ = controller.close_with_epitaph(err.into());
+                            }
+                        },
+                        fcrunner::ComponentRunnerRequest::_UnknownMethod { ordinal, .. } => {
+                            warn!(%ordinal, "Unknown ComponentRunner request");
                         }
                     }
                 }
@@ -316,32 +321,41 @@ impl Inner {
         mut stream: fcrunner::ComponentRunnerRequestStream,
     ) -> Result<(), anyhow::Error> {
         while let Ok(Some(request)) = stream.try_next().await {
-            let fcrunner::ComponentRunnerRequest::Start { mut start_info, controller, .. } =
-                request;
-            let Some(token) = start_info.component_instance.take() else {
-                warn!(
-                    "When calling the ComponentRunner protocol of an ELF runner, \
-                    one must provide the ComponentStartInfo.component_instance field."
-                );
-                _ = controller.close_with_epitaph(zx::Status::INVALID_ARGS);
-                continue;
-            };
-            let token = InstanceToken::from(token);
-            let Some(target_moniker) = self.resources.instance_registry.get(&token) else {
-                warn!(
-                    "The provided ComponentStartInfo.component_instance  token is invalid. \
-                    The component has either already been destroyed, or the token is not minted by \
-                    component_manager."
-                );
-                _ = controller.close_with_epitaph(zx::Status::NOT_SUPPORTED);
-                continue;
-            };
-            start_info.component_instance = Some(token.into());
-            let checker = ScopedPolicyChecker::new(
-                self.resources.security_policy.clone(),
-                target_moniker.clone(),
-            );
-            self.elf_runner.clone().get_scoped_runner(checker).start(start_info, controller).await;
+            match request {
+                fcrunner::ComponentRunnerRequest::Start { mut start_info, controller, .. } => {
+                    let Some(token) = start_info.component_instance.take() else {
+                        warn!(
+                            "When calling the ComponentRunner protocol of an ELF runner, \
+                            one must provide the ComponentStartInfo.component_instance field."
+                        );
+                        _ = controller.close_with_epitaph(zx::Status::INVALID_ARGS);
+                        continue;
+                    };
+                    let token = InstanceToken::from(token);
+                    let Some(target_moniker) = self.resources.instance_registry.get(&token) else {
+                        warn!(
+                            "The provided ComponentStartInfo.component_instance token is invalid. \
+                            The component has either already been destroyed, or the token is not \
+                            minted by component_manager."
+                        );
+                        _ = controller.close_with_epitaph(zx::Status::NOT_SUPPORTED);
+                        continue;
+                    };
+                    start_info.component_instance = Some(token.into());
+                    let checker = ScopedPolicyChecker::new(
+                        self.resources.security_policy.clone(),
+                        target_moniker.clone(),
+                    );
+                    self.elf_runner
+                        .clone()
+                        .get_scoped_runner(checker)
+                        .start(start_info, controller)
+                        .await;
+                }
+                fcrunner::ComponentRunnerRequest::_UnknownMethod { ordinal, .. } => {
+                    warn!(%ordinal, "Unknown ComponentRunner request");
+                }
+            }
         }
         Ok(())
     }

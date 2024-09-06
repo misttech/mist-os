@@ -312,6 +312,9 @@ pub async fn create_component_from_stream(
                 });
                 return Ok((container, service_config));
             }
+            frunner::ComponentRunnerRequest::_UnknownMethod { ordinal, .. } => {
+                log_warn!("Unknown ComponentRunner request: {ordinal}");
+            }
         }
     }
     bail!("did not receive Start request");

@@ -66,6 +66,9 @@ class DriverHostRunner : public fidl::WireServer<fuchsia_component_runner::Compo
 
   // fidl::WireServer<fuchsia_component_runner::ComponentRunner>
   void Start(StartRequestView request, StartCompleter::Sync& completer) override;
+  void handle_unknown_method(
+      fidl::UnknownMethodMetadata<fuchsia_component_runner::ComponentRunner> metadata,
+      fidl::UnknownMethodCompleter::Sync& completer) override;
 
   void StartDriverHostComponent(std::string_view moniker, std::string_view url,
                                 StartComponentCallback callback);

@@ -23,7 +23,7 @@ use starnix_core::task::{CurrentTask, ExitStatus, Task};
 use starnix_core::vfs::{
     FdNumber, FdTable, FileSystemOptions, FsString, LookupContext, NamespaceNode, WhatToMount,
 };
-use starnix_logging::{log_error, log_info};
+use starnix_logging::{log_error, log_info, log_warn};
 use starnix_sync::{FileOpsCore, LockBefore, Locked, Mutex};
 use starnix_uapi::auth::{Capabilities, Credentials};
 use starnix_uapi::device_type::DeviceType;
@@ -303,8 +303,7 @@ async fn serve_component_controller(
                     return;
                 }
                 Ok(ComponentControllerRequest::_UnknownMethod { ordinal, .. }) => {
-                    log_info!("Unknown method received: {ordinal}");
-                    return;
+                    log_warn!("Unknown ComponentController request: {ordinal}");
                 }
                 Err(_) => {
                     return;

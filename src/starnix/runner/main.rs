@@ -80,6 +80,9 @@ async fn serve_component_runner(
             frunner::ComponentRunnerRequest::Start { start_info, controller, .. } => {
                 kernels.start(start_info, controller).await?;
             }
+            frunner::ComponentRunnerRequest::_UnknownMethod { ordinal, .. } => {
+                warn!(%ordinal, "Unknown ComponentRunner request");
+            }
         }
     }
     Ok(())

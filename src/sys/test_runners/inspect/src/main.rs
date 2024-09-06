@@ -11,7 +11,7 @@ use fuchsia_component::server::ServiceFs;
 use futures::prelude::*;
 use test_server::TestServer;
 use thiserror::Error;
-use tracing::{error, info};
+use tracing::{error, info, warn};
 use {fidl_fuchsia_component_runner as fcrunner, fuchsia_async as fasync};
 
 #[fuchsia::main(logging = true)]
@@ -49,6 +49,9 @@ async fn start_runner(
                 if let Ok(server) = TestServer::new(start_info, controller) {
                     fasync::Task::local(async move { server.execute().await }).detach();
                 }
+            }
+            fcrunner::ComponentRunnerRequest::_UnknownMethod { ordinal, .. } => {
+                warn!(%ordinal, "Unknown ComponentRunner request");
             }
         }
     }
