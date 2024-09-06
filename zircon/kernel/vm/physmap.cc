@@ -62,13 +62,15 @@ void physmap_protect_gap(vaddr_t base, size_t size) {
   // on peripherals being mapped in.
   //
   // TODO(https://fxbug.dev/42124648): Remove these regions completely.
+  if (gap_mmu_flags & (ARCH_MMU_FLAG_PERM_READ | ARCH_MMU_FLAG_PERM_WRITE)) {
+    printf("WARNING physmap not fully unmapping non arena area [%#lx, %#lx)\n", base, base + size);
+  }
   physmap_modify_region(base, size, gap_mmu_flags);
 }
 
 }  // namespace
 
 void physmap_preserve_gaps_for_mmio() {
-  printf("physmap: preserving gaps for mmio\n");
   gap_mmu_flags =
       ARCH_MMU_FLAG_PERM_READ | ARCH_MMU_FLAG_PERM_WRITE | ARCH_MMU_FLAG_UNCACHED_DEVICE;
 }
