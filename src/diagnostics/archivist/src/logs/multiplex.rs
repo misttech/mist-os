@@ -20,9 +20,11 @@ pub type PinStream<I> = Pin<Box<dyn DebugStream<Item = I> + Send + 'static>>;
 
 static MULTIPLEXER_ID: std::sync::atomic::AtomicUsize = AtomicUsize::new(0);
 
-/// A Multiplexer takes multiple possibly-ordered streams and attempts to impose a sensible ordering
-/// over the yielded items without risking starvation. New streams can be added to the multiplexer
-/// by sending them on a channel.
+/// Stream-ordering multiplexer
+///
+/// A Multiplexer takes multiple possibly-ordered streams and attempts to impose
+/// a sensible ordering over the yielded items without risking starvation. New
+/// streams can be added to the multiplexer by sending them on a channel.
 pub struct Multiplexer<I> {
     // TODO(https://fxbug.dev/42147260) explore using a BinaryHeap for sorting substreams
     current: Vec<SubStream<I>>,

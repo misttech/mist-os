@@ -79,6 +79,8 @@ const DEFAULT_SUBNET: net_types::ip::Subnet<Ipv4Addr> = net_declare::net_subnet_
 /// `fuchsia.net.routes.RouteV4` while applying newly-discovered routers.
 pub const DEFAULT_ADDR_PREFIX: fnet::Ipv4AddressWithPrefix = fidl_ip_v4_with_prefix!("0.0.0.0/0");
 
+/// Applies a new set of routers
+///
 /// Applies a new set of routers to a given `fuchsia.net.stack.Stack` and
 /// set of configured routers by deleting forwarding entries for
 /// newly-absent routers and adding forwarding entries for newly-present

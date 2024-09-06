@@ -16,10 +16,12 @@ use std::collections::{BTreeMap, BTreeSet};
 use crate::common::{DriverDetails, PackageName};
 use crate::product_config::ProductConfig;
 
-/// Configuration for a Product Assembly operation.  This is a high-level operation
-/// that takes a more abstract description of what is desired in the assembled
-/// product images, and then generates the complete Image Assembly configuration
-/// (`crate::config::ImageAssemblyConfig`) from that.
+/// Configuration for a Product Assembly operation.
+///
+/// This is a high-level operation that takes a more abstract description of
+/// what is desired in the assembled product images, and then generates the
+/// complete Image Assembly configuration (`crate::config::ImageAssemblyConfig`)
+/// from that.
 #[derive(Debug, Deserialize, Serialize, JsonSchema, SupportsFileRelativePaths)]
 #[serde(deny_unknown_fields)]
 pub struct AssemblyConfig {

@@ -266,6 +266,7 @@ pub fn serve(
 }
 
 /// Serves a sub-`path` of a package directory for the package with hash `meta_far` on `server_end`.
+///
 /// The connection rights are set by `flags`, used the same as the `flags` parameter of
 ///   fuchsia.io/Directory.Open.
 /// On error while loading the package metadata, closes the provided server end, sending an OnOpen

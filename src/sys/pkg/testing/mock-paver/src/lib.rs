@@ -126,9 +126,11 @@ impl PaverEvent {
     }
 }
 
-/// A Hook gives tests the opportunity to directly respond to a request, mock-style. If a Hook wants
-/// to respond to a request, it should send a response on the request's Responder, and then return
-/// None. If the Hook wants to pass the request on to the next Hook, it should do so by returning
+/// A Hook gives tests the opportunity to directly respond to a request, mock-style.
+///
+/// If a Hook wants to respond to a request, it should send a response
+/// on the request's Responder, and then return None. If the Hook wants
+/// to pass the request on to the next Hook, it should do so by returning
 /// Some(the_request_it_got).
 ///
 /// Unimplemented methods pass on all requests.
@@ -152,9 +154,11 @@ pub trait Hook: Sync {
 pub mod hooks {
     use super::*;
 
-    /// A Hook for the specific case where you want to return an error. If the callback returns
-    /// Status::OK, the Hook will pass the request off to the next Hook. Responds to both
-    /// BootManagerRequests and DataSinkRequests.
+    /// A Hook for the specific case where you want to return an error.
+    ///
+    /// If the callback returns Status::OK, the Hook will pass the request
+    /// off to the next Hook. Responds to both BootManagerRequests and
+    /// DataSinkRequests.
     pub fn return_error<F>(callback: F) -> ReturnError<F>
     where
         F: Fn(&PaverEvent) -> Status,

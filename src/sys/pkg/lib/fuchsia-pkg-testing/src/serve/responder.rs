@@ -265,9 +265,9 @@ impl<H: HttpResponder> ForPathPrefix<H> {
     }
 }
 
-/// Responder that overrides all the requests that end with the given request path using the
-/// given responder. Useful for hitting all versions of versioned TUF metadata (e.g.
-/// X.targets.json).
+/// Responder that overrides all the requests that end with the given request path using the given responder.
+///
+/// Useful for hitting all versions of versioned TUF metadata (e.g. X.targets.json).
 /// TODO(ampearce): change ForPathSuffix and ForPathPrefix to use string matches rather than path.
 pub struct ForPathSuffix<H: HttpResponder> {
     suffix: PathBuf,
@@ -842,7 +842,8 @@ impl HttpResponder for Chain {
 }
 
 /// Fails all requests with NOT_FOUND.
-/// All requests made to the first requested path are failed immmediately.
+///
+/// All requests made to the first requested path are failed immediately.
 /// All requests to subsequent paths are blocked until the `unblocker` returned by
 ///   new() is used, at which point all requests (pending and future) fail immediately.
 pub struct FailOneThenTemporarilyBlock {
