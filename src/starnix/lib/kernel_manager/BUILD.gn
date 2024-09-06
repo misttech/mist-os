@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 import("//build/rust/rustc_library.gni")
+import("//src/starnix/kernel/args.gni")
 
 rustc_library("kernel_manager") {
   edition = "2021"
@@ -29,9 +30,13 @@ rustc_library("kernel_manager") {
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:rand",
-    "//third_party/rust_crates:slab",
     "//third_party/rust_crates:tracing",
   ]
 
   configs += [ "//src/starnix/config:starnix_clippy_lints" ]
+
+  if (starnix_enable_wake_locks) {
+    features = [ "wake_locks" ]
+    deps += [ "//sdk/fidl/fuchsia.power.system:fuchsia.power.system_rust" ]
+  }
 }

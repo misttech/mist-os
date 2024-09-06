@@ -34,7 +34,11 @@ const KERNEL_COLLECTION: &str = "kernels";
 /// running component inside the container.
 const CONTAINER_RUNNER_PROTOCOL: &str = "fuchsia.starnix.container.Runner";
 
+#[allow(dead_code)]
 pub struct StarnixKernel {
+    /// The name of the kernel intsance in the kernels collection.
+    name: String,
+
     /// The controller used to control the kernel component's lifecycle.
     ///
     /// The kernel runs in a "kernels" collection within that realm.
@@ -50,6 +54,9 @@ pub struct StarnixKernel {
 
     /// The job the kernel lives under.
     job: Arc<zx::Job>,
+
+    /// The currently active wake lease for the container.
+    wake_lease: Mutex<Option<zx::EventPair>>,
 }
 
 impl StarnixKernel {
@@ -117,7 +124,14 @@ impl StarnixKernel {
             anyhow::bail!("expected to find job in ControllerGetJobHandleResponse");
         };
 
-        let kernel = Self { controller_proxy, exposed_dir, component_instance, job: Arc::new(job) };
+        let kernel = Self {
+            name: kernel_name,
+            controller_proxy,
+            exposed_dir,
+            component_instance,
+            job: Arc::new(job),
+            wake_lease: Default::default(),
+        };
         let on_stop = async move {
             _ = execution_controller_proxy.into_channel().unwrap().on_closed().await;
         };
@@ -250,6 +264,7 @@ pub async fn serve_starnix_manager(
                     };
                 }
 
+                kernels.drop_wake_lease(&container_job)?;
                 if let Some(wake_event) = wake_event {
                     match wake_event
                         .wait_handle(zx::Signals::EVENT_SIGNALED, zx::MonotonicTime::INFINITE)
@@ -260,6 +275,7 @@ pub async fn serve_starnix_manager(
                         }
                     };
                 }
+                kernels.acquire_wake_lease(&container_job).await?;
 
                 if let Err(e) = responder.send(Ok(())) {
                     warn!("error responding to suspend request {:?}", e);
