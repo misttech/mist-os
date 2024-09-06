@@ -202,11 +202,61 @@ zx::result<> DriverHostComponent::InstallLoader(
   return zx::ok();
 }
 
+DynamicLinkerDriverHostComponent::DynamicLinkerDriverHostComponent(
+    fidl::ClientEnd<fuchsia_driver_loader::DriverHost> client, async_dispatcher_t* dispatcher,
+    zx::channel bootstrap_sender, std::unique_ptr<driver_loader::Loader> loader,
+    fbl::DoublyLinkedList<std::unique_ptr<DynamicLinkerDriverHostComponent>>* driver_hosts)
+    : dispatcher_(dispatcher),
+      driver_host_loader_(std::move(client), dispatcher),
+      bootstrap_sender_(std::move(bootstrap_sender)),
+      loader_(std::move(loader)),
+      bootstrap_close_listener_(bootstrap_sender_.get(), ZX_CHANNEL_PEER_CLOSED) {
+  bootstrap_close_listener_.set_handler(
+      [this, driver_hosts](async_dispatcher_t* dispatcher, async::Wait* wait, zx_status_t status,
+                           const zx_packet_signal_t* signal) { driver_hosts->erase(*this); });
+}
+
 void DynamicLinkerDriverHostComponent::StartWithDynamicLinker(
     std::string_view driver_soname, zx::vmo driver, fidl::ClientEnd<fuchsia_io::Directory> lib_dir,
-    fidl::ServerEnd<fuchsia_driver_host::Driver> driver_server_end, StartCallback cb) {
-  // TODO(https://fxbug.dev/341998660): call dynamic linker.
-  cb(zx::error(ZX_ERR_NOT_SUPPORTED));
+    fidl::ServerEnd<fuchsia_driver_host::Driver> driver_host_server_end, StartCallback cb) {
+  // TODO(https://fxbug.dev/357854682): pass this to the started driver host once
+  // fuchsia_driver_host.DriverHost is implemented. Store it here for now so the node doesn't think
+  // the driver host has died prematurely.
+  endpoints_for_driver_hosts_.push_back(std::move(driver_host_server_end));
+
+  fidl::Arena arena;
+  auto args = fuchsia_driver_loader::wire::DriverHostLoadDriverRequest::Builder(arena)
+                  .driver_soname(fidl::StringView::FromExternal(driver_soname))
+                  .driver_binary(std::move(driver))
+                  .driver_libs(std::move(lib_dir))
+                  .Build();
+
+  driver_host_loader_->LoadDriver(args).ThenExactlyOnce([this,
+                                                         cb = std::move(cb)](auto& result) mutable {
+    if (!result.ok()) {
+      LOGF(ERROR, "Failed to start driver in driver host: %s", result.FormatDescription().c_str());
+      cb(zx::error(result.status()));
+      return;
+    }
+    if (result->is_error()) {
+      LOGF(ERROR, "Failed to start driver in driver host: %s",
+           zx_status_get_string(result->error_value()));
+      cb(result->take_error());
+      return;
+    }
+
+    auto driver_start_addr = result.value()->runtime_load_address();
+    // TODO(https://fxbug.dev/355291912): we should replace this with an actual protocol.
+    // Currently we are temporarily using it to send the driver's start function pointer to the
+    // driver host.
+    zx_status_t status =
+        bootstrap_sender_.write(0, &driver_start_addr, sizeof(driver_start_addr), nullptr, 0);
+    if (status != ZX_OK) {
+      cb(zx::error(status));
+      return;
+    }
+    cb(zx::ok());
+  });
 }
 
 }  // namespace driver_manager

@@ -540,7 +540,19 @@ void DriverRunner::CreateDriverHostDynamicLinker(
           return;
         }
         auto driver_host = std::make_unique<DynamicLinkerDriverHostComponent>(
-            std::move(bootstrap_sender), std::move(linker));
+            std::move(*result), dispatcher_, std::move(bootstrap_sender), std::move(linker),
+            &dynamic_linker_driver_hosts_);
+
+        // This listens for when the driver host closes it's bootstrap channel,
+        // so that the driver host component object can remove itself from the
+        // |dynamic_linker_driver_hosts_| list.
+        // This is safe to do before adding it to the list, as the listener is
+        // registered to the same dispatcher that the driver runner is running on.
+        zx_status_t status = driver_host->StartBootstrapCloseListener();
+        if (status != ZX_OK) {
+          completion_cb(zx::error(status));
+          return;
+        }
 
         auto driver_host_ptr = driver_host.get();
         dynamic_linker_driver_hosts_.push_back(std::move(driver_host));

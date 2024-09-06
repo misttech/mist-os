@@ -15,6 +15,7 @@ group("modules") {
   testonly = true
   deps = [
     ":fake_driver_host",
+    ":fake_driver_host_with_bootstrap",
     ":fake_root_driver",
   ]
 }
@@ -71,4 +72,22 @@ loadable_module("fake_root_driver") {
 shared_library("fake_root_driver_deps") {
   sources = [ "fake_root_driver_deps.cc" ]
   deps = [ "//zircon/system/public" ]
+}
+
+executable("fake_driver_host_with_bootstrap") {
+  output_name = "fake_driver_host_with_bootstrap"
+  sources = [ "fake_driver_host_with_bootstrap.cc" ]
+  deps = [
+    ":dh-deps-a",
+    ":entry_point",
+    "//src/zircon/lib/zircon",
+    "//zircon/system/public",
+    "//zircon/system/ulib/zx",
+  ]
+
+  # The user.basic environment doesn't use toolchain-provided instrumentation
+  # runtimes that wouldn't be compatible.  But it supports variants like ubsan
+  # that require plumbing a custom runtime, which isn't handled for this
+  # experimental test stub binary.
+  exclude_toolchain_tags = [ "custom-runtime" ]
 }

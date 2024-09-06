@@ -154,7 +154,7 @@ class DynamicLinkingTest : public driver_runner::DriverRunnerTest {};
 
 TEST_F(DynamicLinkingTest, StartRootDriver) {
   // Where the driver host binary is located in the test package.
-  constexpr std::string_view kDriverHostTestPkgPath = "/pkg/bin/fake_driver_host";
+  constexpr std::string_view kDriverHostTestPkgPath = "/pkg/bin/fake_driver_host_with_bootstrap";
   // Libs that need to be loaded with the driver host.
   const std::vector<std::string_view> kDriverHostExpectedLibs = {
       "libdh-deps-a.so",
