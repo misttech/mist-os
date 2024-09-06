@@ -4,7 +4,6 @@
 
 #include "src/devices/power/drivers/fusb302/fusb302.h"
 
-#include <fidl/fuchsia.hardware.gpio/cpp/wire.h>
 #include <lib/driver/component/cpp/driver_export.h>
 #include <lib/stdcompat/span.h>
 #include <lib/zx/profile.h>
@@ -131,6 +130,7 @@ zx::result<> Fusb302::WaitAsyncForTimer(zx::timer& timer) {
 zx::result<> Fusb302Device::Start() {
   // Map hardware resources.
   fidl::ClientEnd<fuchsia_hardware_i2c::Device> i2c;
+  fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> gpio;
   zx::interrupt irq;
   {
     zx::result result = incoming()->Connect<fuchsia_hardware_i2c::Service::Device>("i2c");
@@ -147,14 +147,14 @@ zx::result<> Fusb302Device::Start() {
       return result.take_error();
     }
 
-    auto gpio = fidl::WireSyncClient(std::move(result.value()));
-    if (auto result = gpio->ConfigIn(fuchsia_hardware_gpio::GpioFlags::kPullUp);
+    gpio = std::move(result.value());
+    if (auto result = fidl::WireCall(gpio)->ConfigIn(fuchsia_hardware_gpio::GpioFlags::kPullUp);
         !result.ok() || result->is_error()) {
       FDF_LOG(ERROR, "GPIO ConfigIn() failed: %s",
               result.ok() ? zx_status_get_string(result->error_value())
                           : result.FormatDescription().c_str());
     }
-    if (auto result = gpio->GetInterrupt(ZX_INTERRUPT_MODE_LEVEL_LOW);
+    if (auto result = fidl::WireCall(gpio)->GetInterrupt(ZX_INTERRUPT_MODE_LEVEL_LOW);
         !result.ok() || result->is_error()) {
       FDF_LOG(ERROR, "GPIO GetInterrupt() failed: %s",
               result.ok() ? zx_status_get_string(result->error_value())
@@ -170,7 +170,7 @@ zx::result<> Fusb302Device::Start() {
                 zx_status_get_string(fusb302_dispatcher.status_value()));
 
   device_ = std::make_unique<fusb302::Fusb302>(std::move(*fusb302_dispatcher), std::move(i2c),
-                                               std::move(irq));
+                                               std::move(gpio), std::move(irq));
   auto status = device_->Init();
   if (status != ZX_OK) {
     FDF_LOG(ERROR, "Init() failed: %s", zx_status_get_string(status));
