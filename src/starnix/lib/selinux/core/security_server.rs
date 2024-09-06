@@ -398,14 +398,15 @@ impl SecurityServer {
                 }
             } else {
                 // The name of the filesystem type was not recognized.
-                let unrecognized_filesystem_type_sid =
-                    // TODO: https://fxbug.dev/363215797 - verify that this default is correct.
-                    SecurityId::initial(InitialSid::File);
+                //
+                // TODO: https://fxbug.dev/363215797 - verify that these defaults are correct.
+                let unrecognized_filesystem_type_sid = SecurityId::initial(InitialSid::File);
+                let unrecognized_filesystem_type_fs_use_type = FsUseType::Xattr;
+
                 FileSystemLabel {
                     sid: fs_sid_from_mount_option.unwrap_or(unrecognized_filesystem_type_sid),
                     scheme: FileSystemLabelingScheme::FsUse {
-                        // TODO: https://fxbug.dev/363215797 - verify that this default is correct.
-                        fs_use_type: FsUseType::Xattr,
+                        fs_use_type: unrecognized_filesystem_type_fs_use_type,
                         def_sid: def_sid_from_mount_option
                             .unwrap_or(unrecognized_filesystem_type_sid),
                         root_sid: root_sid_from_mount_option
@@ -418,15 +419,15 @@ impl SecurityServer {
 
     /// Computes the precise access vector for `source_sid` targeting `target_sid` as class
     /// `target_class`.
+    //
+    // TODO(http://b/305722921): Implement complete access decision logic. For now, the security
+    // server abides by explicit `allow [source] [target]:[class] [permissions..];` statements.
     pub fn compute_access_vector(
         &self,
         source_sid: SecurityId,
         target_sid: SecurityId,
         target_class: AbstractObjectClass,
     ) -> AccessVector {
-        // TODO(http://b/305722921): Implement complete access decision logic. For now, the security
-        // server abides by explicit `allow [source] [target]:[class] [permissions..];` statements.
-
         let state = self.state.lock();
 
         let policy = match &state.policy {
