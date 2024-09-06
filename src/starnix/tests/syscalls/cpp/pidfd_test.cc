@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <lib/fit/defer.h>
 #include <sys/poll.h>
 #include <sys/syscall.h>
 #include <unistd.h>
@@ -64,9 +65,16 @@ TEST(PidFdTest, CanPollProcessExit) {
   ASSERT_EQ(poll(&pfd, 1, 0), 0);
 
   // Verify that poll returns POLLIN when the process stops running.
-  close(w_fd);
-  ASSERT_EQ(poll(&pfd, 1, -1), 1);
-  EXPECT_EQ(pfd.revents, POLLIN);
+  {
+    // Do not let SIGCHLD interrupt our poll() call.
+    test_helper::SignalMaskHelper signal_mask_helper;
+    signal_mask_helper.blockSignal(SIGCHLD);
+    auto restorer = fit::defer([&]() { signal_mask_helper.restoreSigmask(); });
+
+    close(w_fd);
+    ASSERT_EQ(poll(&pfd, 1, -1), 1);
+    EXPECT_EQ(pfd.revents, POLLIN);
+  }
 
   // Verify that poll returns POLLIN even if the wait starts after the process has exited.
   ASSERT_EQ(poll(&pfd, 1, -1), 1);
@@ -105,9 +113,16 @@ TEST(PidFdTest, PollWaitsForSecondaryThreadsToo) {
   ASSERT_EQ(poll(&pfd, 1, 500), 0);
 
   // Verify that poll returns POLLIN when the secondary thread stops running.
-  close(w_fd);
-  ASSERT_EQ(poll(&pfd, 1, -1), 1);
-  EXPECT_EQ(pfd.revents, POLLIN);
+  {
+    // Do not let SIGCHLD interrupt our poll() call.
+    test_helper::SignalMaskHelper signal_mask_helper;
+    signal_mask_helper.blockSignal(SIGCHLD);
+    auto restorer = fit::defer([&]() { signal_mask_helper.restoreSigmask(); });
+
+    close(w_fd);
+    ASSERT_EQ(poll(&pfd, 1, -1), 1);
+    EXPECT_EQ(pfd.revents, POLLIN);
+  }
 
   close(pid_fd);
   helper.WaitForChildren();
