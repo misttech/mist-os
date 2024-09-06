@@ -48,6 +48,7 @@ if (is_host) {
 
   binary_deps = [
     "dataparse",
+    "//scripts/fxtest/scripts:install",
     "//scripts/lib/async_utils",
     "//scripts/lib/statusinfo",
     "//scripts/lib/termout",
