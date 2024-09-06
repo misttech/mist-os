@@ -60,14 +60,8 @@ def main() -> None:
     replay_mode: bool = False
 
     # Special utility mode handling
-    if real_flags.print_logs:
-        assert_no_selection(real_flags, "-pr log")
-        warning_message = "WARNING: --print-logs is deprecated and will be removed. Use `--previous log`"
-        print(warning_message, "\n")
-        ret = do_print_logs(real_flags)
-        print(warning_message)
-        sys.exit(ret)
-    elif real_flags.previous == args.PrevOption.REPLAY:
+    if real_flags.previous == args.PrevOption.REPLAY:
+        assert_no_selection(real_flags, "-pr replay")
         replay_mode = True
     elif real_flags.previous is not None:
         sys.exit(do_process_previous(real_flags))

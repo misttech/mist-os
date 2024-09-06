@@ -53,7 +53,6 @@ class Flags:
     dry: bool
     list: bool
     previous: PrevOption | None
-    print_logs: bool
 
     build: bool
     updateifinbase: bool
@@ -246,12 +245,6 @@ def parse_args(
         type=PrevOption,
         choices=list(PrevOption),
         help=f"Do not actually run tests. Instead print information from the previous run. Input is read from the last log file, and it respects the value of --logpath.",
-    )
-    utility.add_argument(
-        "--print-logs",
-        action="store_true",
-        default=False,
-        help="This argument is deprecated and will be removed. Please use --previous log",
     )
     build = parser.add_argument_group("Build Options")
     build.add_argument(
