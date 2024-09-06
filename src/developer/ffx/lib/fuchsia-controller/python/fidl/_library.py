@@ -585,6 +585,28 @@ def union_type(ir, root_ir, recurse_guard=None) -> type:
         setattr(ctor, "__doc__", docstring(member))
         setattr(base, member_constructor_name, ctor)
         setattr(base, member_name, None)
+
+    if ir["is_result"]:
+
+        def unwrap(self):
+            """Returns the response if result does not contain an error. Otherwise, raises an exception."""
+            if (
+                hasattr(self, "framework_err")
+                and self.framework_err is not None
+            ):
+                raise RuntimeError(
+                    f"{self.__fidl_raw_type__} framework error {self.framework_err}"
+                )
+            if hasattr(self, "err") and self.err is not None:
+                raise RuntimeError(f"{self.__fidl_raw_type__} error {self.err}")
+            if hasattr(self, "response"):
+                return self.response
+            raise RuntimeError(
+                f"Failed to unwrap {self.__fidl_raw_type__} with no error or response."
+            )
+
+        setattr(base, "unwrap", unwrap)
+
     return base
 
 
