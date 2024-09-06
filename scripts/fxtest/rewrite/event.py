@@ -438,8 +438,10 @@ class EventRecorder:
     everywhere events are emitted or read.
     """
 
-    def __init__(self) -> None:
-        """Initialize a new EventRecorder."""
+    def __init__(
+        self,
+    ) -> None:
+        """Initialize a new EventRecorder"""
 
         # Keep track of the system time corresponding to the below monotonic
         # time. This represents the beginning of this EventRecorder's execution.

@@ -19,6 +19,7 @@ LOG_TO_STDOUT_OPTION = "-"
 class PrevOption(enum.StrEnum):
     LOG = "log"
     PATH = "path"
+    REPLAY = "replay"
     HELP = "help"
 
     def help(self) -> str:
@@ -34,6 +35,8 @@ class PrevOption(enum.StrEnum):
             return "Print all test logs from the previous run. Logs are grouped by test suite."
         elif self is PrevOption.PATH:
             return "Print the path of the log from the previous run."
+        elif self is PrevOption.REPLAY:
+            return "Replay the previous run, using new display options."
         elif self is PrevOption.HELP:
             return "Print this help output."
         else:
@@ -98,6 +101,7 @@ class Flags:
     artifact_output_directory: str | None
     slow: float
     quiet: bool
+    replay_speed: float
 
     def validate(self) -> None:
         """Validate incoming flags, raising an exception on failure.
@@ -132,6 +136,8 @@ class Flags:
             raise FlagError(
                 "--break-on-failure and --breakpoint flags are not supported with host tests."
             )
+        if self.replay_speed <= 0:
+            raise FlagError("--replay-speed must be a positive number")
 
         if not termout.is_valid() and self.status:
             raise FlagError(
@@ -550,6 +556,12 @@ def parse_args(
         action="store_true",
         default=False,
         help="Silence INFO and INSTRUCTION messages from the tool",
+    )
+    output.add_argument(
+        "--replay-speed",
+        type=float,
+        default=1,
+        help="Speed up replays by this amount. Can be less than 1 for slow motion.",
     )
 
     if defaults is not None:

@@ -79,7 +79,9 @@ class TestConsole(unittest.IsolatedAsyncioTestCase):
             default_flags = args.parse_args(test_args.args)
             status_event = asyncio.Event()
             printer_task = asyncio.create_task(
-                console.console_printer(recorder, default_flags, status_event)
+                console.ConsoleOutput().console_printer(
+                    recorder, default_flags, status_event
+                )
             )
             status_event.set()
 

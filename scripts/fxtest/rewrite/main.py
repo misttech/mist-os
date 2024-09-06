@@ -18,7 +18,9 @@ import subprocess
 import sys
 import tempfile
 import textwrap
+import time
 import typing
+import zlib
 
 import async_utils.command as command
 import async_utils.signals as signals
@@ -55,6 +57,8 @@ def main() -> None:
         print(f"Failed to parse command line: {e.message}")
         sys.exit(1)
 
+    replay_mode: bool = False
+
     # Special utility mode handling
     if real_flags.print_logs:
         assert_no_selection(real_flags, "-pr log")
@@ -63,12 +67,16 @@ def main() -> None:
         ret = do_print_logs(real_flags)
         print(warning_message)
         sys.exit(ret)
-    if real_flags.previous is not None:
+    elif real_flags.previous == args.PrevOption.REPLAY:
+        replay_mode = True
+    elif real_flags.previous is not None:
         sys.exit(do_process_previous(real_flags))
 
     # No special modes, proceed with async execution.
     fut = asyncio.ensure_future(
-        async_main_wrapper(real_flags, config_file=config_file)
+        async_main_wrapper(
+            real_flags, config_file=config_file, replay_mode=replay_mode
+        )
     )
     signals.register_on_terminate_signal(fut.cancel)  # type: ignore[arg-type]
     try:
@@ -84,6 +92,7 @@ async def async_main_wrapper(
     flags: args.Flags,
     recorder: event.EventRecorder | None = None,
     config_file: config.ConfigFile | None = None,
+    replay_mode: bool = False,
 ) -> int:
     """Wrapper for the main logic of fx test.
 
@@ -97,6 +106,8 @@ async def async_main_wrapper(
             use this event recorder. Used for testing.
         config_file (config.ConfigFile, optional): If set, record
             that this configuration was loaded to set default flags.
+        replay_mode (bool, optional): If set, load and replay the most recent log
+            instead of running tests.
 
     Returns:
         The return code of the program.
@@ -105,8 +116,13 @@ async def async_main_wrapper(
     if recorder is None:
         recorder = event.EventRecorder()
 
-    ret = await async_main(flags, tasks, recorder, config_file)
+    ret = await async_main(flags, tasks, recorder, config_file, replay_mode)
 
+    if not tasks:
+        # Nothing to clean up, return.
+        return ret
+
+    # Ensure that queues tasks are cleaned up before returning.
     to_wait = asyncio.Task(asyncio.wait(tasks), name="Drain tasks")
     timeout_seconds = 5
     try:
@@ -188,11 +204,115 @@ def do_print_logs(flags: args.Flags) -> int:
     return 0
 
 
+async def do_replay_log(
+    flags: args.Flags, event_signal_for_printer: asyncio.Event
+) -> int:
+    env = environment.ExecutionEnvironment.initialize_from_args(
+        flags, create_log_file=False
+    )
+
+    content: list[event.Event] = []
+    try:
+        log_path = env.get_most_recent_log()
+        with gzip.open(log_path, "rt") as f:
+            for line in f:
+                content.append(event.Event.from_dict(json.loads(line)))  # type: ignore
+    except environment.EnvironmentError as e:
+        print(f"Failed to read log: {e}", file=sys.stderr)
+        return 1
+    except gzip.BadGzipFile as e:
+        print(f"File does not appear to be a gzip file. ({e})", file=sys.stderr)
+        return 1
+    except json.JSONDecodeError as e:
+        print(
+            f"Found invalid JSON data, skipping the rest and proceeding. ({e})",
+            file=sys.stderr,
+        )
+        content.append(event.Event())
+    except (EOFError, zlib.error) as e:
+        print(
+            f"Unexpected end of log, ignoring and proceeding. ({e})",
+            file=sys.stderr,
+        )
+
+    real_monotonic = time.monotonic()
+    if not content:
+        print("Log file was empty.", file=sys.stderr)
+        return 1
+    if content[0].id != event.GLOBAL_RUN_ID:
+        print(
+            "BUG: Invalid log file, expected to start with a global run identifier.",
+            file=sys.stderr,
+        )
+        return 1
+    log_monotonic_start = content[0].timestamp
+
+    def simulated_monotonic_time() -> float:
+        real_offset = time.monotonic() - real_monotonic
+        return log_monotonic_start + real_offset * flags.replay_speed
+
+    async def wait_until_simulated_time(
+        desired_simulated_timestamp: float,
+    ) -> None:
+        current_simulated_timestamp = simulated_monotonic_time()
+        if current_simulated_timestamp < desired_simulated_timestamp:
+            simulated_diff = (
+                desired_simulated_timestamp - current_simulated_timestamp
+            )
+            real_diff = simulated_diff / flags.replay_speed
+            await asyncio.sleep(real_diff)
+
+    recorder = event.EventRecorder()
+    output_future = console.ConsoleOutput(
+        monotonic_time_source=simulated_monotonic_time
+    ).console_printer(recorder, flags, event_signal_for_printer)
+
+    async def pump_events() -> None:
+        test_suite_ids: set[event.Id] = set()
+        test_suite_child_ids: set[event.Id] = set()
+        for event in content:
+            # Wait until it is time to emit this event.
+            await wait_until_simulated_time(event.timestamp)
+
+            # Keep track of which programs are part of test suites.
+            # We need to override the "print_verbatim" parameter
+            # to match the current setting of output for those events.
+            if event.parent in test_suite_ids and event.id is not None:
+                test_suite_child_ids.add(event.id)
+            if (
+                event.payload is not None
+                and event.payload.test_suite_started is not None
+                and event.id is not None
+            ):
+                test_suite_ids.add(event.id)
+            if (
+                event.id in test_suite_child_ids
+                and event.payload is not None
+                and (output_payload := event.payload.program_output) is not None
+            ):
+                output_payload.print_verbatim = flags.output
+            recorder._emit(event)
+        recorder.end()
+
+    tasks = [
+        asyncio.create_task(pump_events()),
+        asyncio.create_task(output_future),
+    ]
+    await asyncio.wait(tasks)
+
+    print(
+        f"\nReplay complete: {len(content)} events from {env.get_most_recent_log()}"
+    )
+
+    return 0
+
+
 async def async_main(
     flags: args.Flags,
     tasks: list[asyncio.Task[None]],
     recorder: event.EventRecorder,
     config_file: config.ConfigFile | None = None,
+    replay_mode: bool = False,
 ) -> int:
     """Main logic of fx test.
 
@@ -201,6 +321,8 @@ async def async_main(
         tasks (List[asyncio.Tasks]): List to add tasks to that must be awaited before termination.
         recorder (event.Recorder): The recorder for events.
         config_file (config.ConfigFile, optional): The loaded config, if one was set.
+        replay_mode (bool, optional): If set, load and replay the most recent log instead
+            of running tests.
 
     Returns:
         The return code of the program.
@@ -209,32 +331,38 @@ async def async_main(
 
     do_output_to_stdout = flags.logpath == args.LOG_TO_STDOUT_OPTION
 
-    if not do_output_to_stdout:
+    if not do_output_to_stdout and not replay_mode:
         tasks.append(
             asyncio.create_task(
-                console.console_printer(
+                console.ConsoleOutput().console_printer(
                     recorder, flags, do_status_output_signal
                 )
             )
         )
 
     # Initialize event recording.
-    recorder.emit_init()
+    if not replay_mode:
+        recorder.emit_init()
 
     # Try to parse the flags. Emit one event before and another
     # after flag post processing.
     try:
         if config_file is not None and config_file.is_loaded():
-            recorder.emit_load_config(
-                config_file.path or "UNKNOWN PATH",
-                config_file.default_flags.__dict__,
-                config_file.command_line,
-            )
-        recorder.emit_parse_flags(flags.__dict__)
+            if not replay_mode:
+                recorder.emit_load_config(
+                    config_file.path or "UNKNOWN PATH",
+                    config_file.default_flags.__dict__,
+                    config_file.command_line,
+                )
+            recorder.emit_parse_flags(flags.__dict__)
         flags.validate()
-        recorder.emit_parse_flags(flags.__dict__)
+        if not replay_mode:
+            recorder.emit_parse_flags(flags.__dict__)
     except args.FlagError as e:
-        recorder.emit_end(f"Flags are invalid: {e}")
+        if not replay_mode:
+            recorder.emit_end(f"Flags are invalid: {e}")
+        else:
+            print(f"Failed to load real flags")
         return 1
 
     recorder.emit_verbatim_message(
@@ -245,6 +373,9 @@ async def async_main(
     if flags.status and not do_output_to_stdout:
         do_status_output_signal.set()
         termout.init()
+
+    if replay_mode:
+        return await do_replay_log(flags, do_status_output_signal)
 
     # Process and initialize the incoming environment.
     exec_env: environment.ExecutionEnvironment
