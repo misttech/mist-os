@@ -9,7 +9,7 @@ import os
 import tempfile
 import unittest
 
-import fuzzy_matcher
+import search_tests
 
 
 class PreserveEnvAndCaptureOutputTestCase(unittest.TestCase):
@@ -31,7 +31,7 @@ class TestSearchLocations(PreserveEnvAndCaptureOutputTestCase):
         del os.environ["FUCHSIA_DIR"]
 
         with self.assertRaises(Exception) as ex:
-            fuzzy_matcher.create_search_locations()
+            search_tests.create_search_locations()
 
         self.assertEqual(
             str(ex.exception), "Environment variable FUCHSIA_DIR must be set"
@@ -45,7 +45,7 @@ class TestSearchLocations(PreserveEnvAndCaptureOutputTestCase):
             os.environ["FUCHSIA_DIR"] = str(path)
 
             with self.assertRaises(Exception) as ex:
-                fuzzy_matcher.create_search_locations()
+                search_tests.create_search_locations()
 
             self.assertEqual(
                 str(ex.exception), f"Path {path} should be a directory"
@@ -61,7 +61,7 @@ class TestSearchLocations(PreserveEnvAndCaptureOutputTestCase):
             os.environ["FUCHSIA_DIR"] = str(dir)
 
             with self.assertRaises(Exception) as ex:
-                fuzzy_matcher.create_search_locations()
+                search_tests.create_search_locations()
 
             expected = os.path.join(dir, "out", "other", "tests.json")
 
@@ -82,7 +82,7 @@ class TestSearchLocations(PreserveEnvAndCaptureOutputTestCase):
 
             os.environ["FUCHSIA_DIR"] = str(dir)
 
-            locations = fuzzy_matcher.create_search_locations()
+            locations = search_tests.create_search_locations()
             self.assertEqual(locations.fuchsia_directory, dir)
             self.assertEqual(
                 locations.tests_json_file,
@@ -109,8 +109,8 @@ class TestTestsFileMatcher(unittest.TestCase):
     def test_empty_file(self) -> None:
         with tempfile.TemporaryDirectory() as dir:
             path = self._write_names(dir, [])
-            tests_matcher = fuzzy_matcher.TestsFileMatcher(path)
-            matcher = fuzzy_matcher.Matcher(threshold=0.75)
+            tests_matcher = search_tests.TestsFileMatcher(path)
+            matcher = search_tests.Matcher(threshold=0.75)
             self.assertEqual(tests_matcher.find_matches("foo", matcher), [])
 
     def test_exact_matches(self) -> None:
@@ -122,8 +122,8 @@ class TestTestsFileMatcher(unittest.TestCase):
                     "host_test/my-host-test",
                 ],
             )
-            tests_matcher = fuzzy_matcher.TestsFileMatcher(path)
-            matcher = fuzzy_matcher.Matcher(threshold=1)
+            tests_matcher = search_tests.TestsFileMatcher(path)
+            matcher = search_tests.Matcher(threshold=1)
             self.assertEqual(
                 [
                     val.matched_name
@@ -161,8 +161,8 @@ class TestTestsFileMatcher(unittest.TestCase):
                     ),
                 ],
             )
-            tests_matcher = fuzzy_matcher.TestsFileMatcher(path)
-            matcher = fuzzy_matcher.Matcher(threshold=0.7)
+            tests_matcher = search_tests.TestsFileMatcher(path)
+            matcher = search_tests.Matcher(threshold=0.7)
             self.assertEqual(
                 [
                     val.matched_name
@@ -248,8 +248,8 @@ class TestBuildFileMatcher(unittest.TestCase):
                     )
                 )
 
-            build_matcher = fuzzy_matcher.BuildFileMatcher(dir)
-            matcher = fuzzy_matcher.Matcher(threshold=1)
+            build_matcher = search_tests.BuildFileMatcher(dir)
+            matcher = search_tests.Matcher(threshold=1)
 
             self.assertEqual(
                 [
@@ -302,8 +302,8 @@ class TestBuildFileMatcher(unittest.TestCase):
                     )
                 )
 
-            build_matcher = fuzzy_matcher.BuildFileMatcher(dir)
-            matcher = fuzzy_matcher.Matcher(threshold=0.4)
+            build_matcher = search_tests.BuildFileMatcher(dir)
+            matcher = search_tests.Matcher(threshold=0.4)
 
             self.assertEqual(
                 [
@@ -337,8 +337,8 @@ class TestBuildFileMatcher(unittest.TestCase):
                     )
                 )
 
-            build_matcher = fuzzy_matcher.BuildFileMatcher(dir)
-            matcher = fuzzy_matcher.Matcher(threshold=1)
+            build_matcher = search_tests.BuildFileMatcher(dir)
+            matcher = search_tests.Matcher(threshold=1)
 
             self.assertEqual(
                 [
@@ -386,8 +386,8 @@ class TestBuildFileMatcher(unittest.TestCase):
                     )
                 )
 
-            build_matcher = fuzzy_matcher.BuildFileMatcher(dir)
-            matcher = fuzzy_matcher.Matcher(threshold=1)
+            build_matcher = search_tests.BuildFileMatcher(dir)
+            matcher = search_tests.Matcher(threshold=1)
 
             self.assertEqual(
                 [
@@ -412,23 +412,23 @@ class TestBuildFileMatcher(unittest.TestCase):
 
 class TestTimingTracker(PreserveEnvAndCaptureOutputTestCase):
     def test_timing(self) -> None:
-        fuzzy_matcher.TimingTracker.reset()
+        search_tests.TimingTracker.reset()
 
-        with fuzzy_matcher.TimingTracker("Test timings"):
+        with search_tests.TimingTracker("Test timings"):
             pass
-        with fuzzy_matcher.TimingTracker("Test again"):
+        with search_tests.TimingTracker("Test again"):
             pass
 
-        fuzzy_matcher.TimingTracker.print_timings()
+        search_tests.TimingTracker.print_timings()
 
         lines = self.stdout.getvalue().strip().split("\n")
         self.assertEqual(lines[0], "Debug timings:")
         self.assertRegex(lines[1], r"\s+Test timings\s+\d+\.\d\d\dms$")
         self.assertRegex(lines[2], r"\s+Test again\s+\d+\.\d\d\dms$")
 
-        with fuzzy_matcher.TimingTracker("In progress"):
+        with search_tests.TimingTracker("In progress"):
             # Ensure we omit in progress readings
-            fuzzy_matcher.TimingTracker.print_timings()
+            search_tests.TimingTracker.print_timings()
             lines2 = self.stdout.getvalue().strip().split("\n")
             self.assertListEqual(lines, lines2[len(lines) :])
 
@@ -481,20 +481,20 @@ class TestCommand(PreserveEnvAndCaptureOutputTestCase):
 
     def test_bad_arguments(self) -> None:
         with self.assertRaises(Exception) as ex:
-            fuzzy_matcher.main(["foo", "--threshold", "3"])
+            search_tests.main(["foo", "--threshold", "3"])
         self.assertEqual(
             str(ex.exception), "--threshold must be between 0 and 1"
         )
 
     def test_without_matches(self) -> None:
-        fuzzy_matcher.main(["afkdjsflkejkgh"])
+        search_tests.main(["afkdjsflkejkgh"])
         self.assertTrue(
             "No matching tests" in self.stdout.getvalue(),
             "Could not find expected string in " + self.stdout.getvalue(),
         )
 
     def test_component_match(self) -> None:
-        fuzzy_matcher.main(
+        search_tests.main(
             ["foo-test-component", "--threshold", "1", "--no-color"]
         )
 
@@ -507,7 +507,7 @@ foo-test-component (100.00% similar)
         )
 
     def test_package_match(self) -> None:
-        fuzzy_matcher.main(["kernel", "--threshold", ".75", "--no-color"])
+        search_tests.main(["kernel", "--threshold", ".75", "--no-color"])
 
         self.assertEqual(
             self.stdout.getvalue().strip(),
@@ -518,7 +518,7 @@ kernel-tests (90.00% similar)
         )
 
     def test_multi_match(self) -> None:
-        fuzzy_matcher.main(
+        search_tests.main(
             ["tests", "--threshold", ".2", "--no-color", "--max-results=3"]
         )
 
@@ -536,10 +536,10 @@ integration-tests (59.22% similar)
         )
 
     def test_with_without_tests_json_match(self) -> None:
-        fuzzy_matcher.main(
+        search_tests.main(
             ["foo-test-component", "--threshold", "1", "--no-color"]
         )
-        fuzzy_matcher.main(
+        search_tests.main(
             [
                 "foo-test-component",
                 "--threshold",
