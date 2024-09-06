@@ -54,8 +54,8 @@ locally with the environment variable
 this:
 
 ```sh
-FUCHSIA_EXPECTED_METRIC_NAMES_DEST_DIR=$(pwd)/src/tests/end_to_end/perf/expected_metric_names/ \
-    fx test --e2e -o host_x64/fidlc_microbenchmarks_test
+fx test --e2e -o perf_publish_example_test \
+    --env FUCHSIA_EXPECTED_METRIC_NAMES_DEST_DIR=$(pwd)/src/tests/end_to_end/perf/expected_metric_names/
 ```
 
 When this environment variable is set, the test will write an updated
