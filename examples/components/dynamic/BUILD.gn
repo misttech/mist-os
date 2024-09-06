@@ -47,13 +47,11 @@ rustc_binary("bin") {
 fuchsia_component("dynamic-create-child-child") {
   manifest = "meta/dynamic_create_child_child.cml"
   deps = [ ":bin" ]
-  restricted_features = [ "dictionaries" ]
 }
 
 fuchsia_test_component("dynamic-create-child-test") {
   manifest = "meta/dynamic_create_child_test.cml"
   deps = [ ":test_bin" ]
-  restricted_features = [ "dictionaries" ]
 }
 
 # Run with `fx test dynamic-create-child-example`
