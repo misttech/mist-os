@@ -4,14 +4,13 @@
 
 //! Declares types and functionality related to multicast-forwarding state.
 
-use core::marker::PhantomData;
-
 use alloc::collections::BTreeMap;
 use derivative::Derivative;
 use lock_order::lock::{OrderedLockAccess, OrderedLockRef};
 use netstack3_base::sync::{Mutex, RwLock};
 use netstack3_base::{AnyDevice, DeviceIdContext, StrongDeviceIdentifier};
 
+use crate::internal::multicast_forwarding::packet_queue::MulticastForwardingPendingPackets;
 use crate::internal::multicast_forwarding::route::{MulticastRoute, MulticastRouteKey};
 use crate::IpLayerIpExt;
 
@@ -49,7 +48,7 @@ pub struct MulticastForwardingEnabledState<I: IpLayerIpExt, D: StrongDeviceIdent
     /// The stack's table of pending multicast packets.
     ///
     /// Keys here must not be present in `route_table`.
-    pending_table: Mutex<MulticastForwardingPendingPackets<I, D>>,
+    pending_table: Mutex<MulticastForwardingPendingPackets<I, D::Weak>>,
 }
 
 impl<I: IpLayerIpExt, D: StrongDeviceIdentifier> MulticastForwardingEnabledState<I, D> {
@@ -60,23 +59,13 @@ impl<I: IpLayerIpExt, D: StrongDeviceIdentifier> MulticastForwardingEnabledState
     }
     // Helper function to circumvent lock ordering, for tests.
     #[cfg(test)]
-    pub(super) fn pending_table(&self) -> &Mutex<MulticastForwardingPendingPackets<I, D>> {
+    pub(super) fn pending_table(&self) -> &Mutex<MulticastForwardingPendingPackets<I, D::Weak>> {
         &self.pending_table
     }
 }
 
 /// A table of multicast routes specifying how to forward multicast packets.
 pub type MulticastRouteTable<I, D> = BTreeMap<MulticastRouteKey<I>, MulticastRoute<D>>;
-
-/// A table of pending multicast packets that have not yet been forwarded.
-///
-/// Packets are placed in this table when, during forwarding, there is no route
-/// in the [`MulticastRouteTable`] via which to forward them. If/when such a
-/// route is installed, the packets stored here can be forwarded accordingly.
-// TODO(https://fxbug.dev/353328975): Use a real table.
-#[derive(Debug, Derivative)]
-#[derivative(Default(bound = ""))]
-pub struct MulticastForwardingPendingPackets<I: IpLayerIpExt, D>(PhantomData<(I, D)>);
 
 impl<I: IpLayerIpExt, D: StrongDeviceIdentifier> OrderedLockAccess<MulticastRouteTable<I, D>>
     for MulticastForwardingEnabledState<I, D>
@@ -88,10 +77,10 @@ impl<I: IpLayerIpExt, D: StrongDeviceIdentifier> OrderedLockAccess<MulticastRout
 }
 
 impl<I: IpLayerIpExt, D: StrongDeviceIdentifier>
-    OrderedLockAccess<MulticastForwardingPendingPackets<I, D>>
+    OrderedLockAccess<MulticastForwardingPendingPackets<I, D::Weak>>
     for MulticastForwardingEnabledState<I, D>
 {
-    type Lock = Mutex<MulticastForwardingPendingPackets<I, D>>;
+    type Lock = Mutex<MulticastForwardingPendingPackets<I, D::Weak>>;
     fn ordered_lock_access(&self) -> OrderedLockRef<'_, Self::Lock> {
         OrderedLockRef::new(&self.pending_table)
     }
@@ -158,7 +147,7 @@ pub trait MulticastForwardingPendingPacketsContext<I: IpLayerIpExt>:
     /// Provides mutable access to the table of pending packets.
     fn with_pending_table_mut<
         O,
-        F: FnOnce(&mut MulticastForwardingPendingPackets<I, Self::DeviceId>) -> O,
+        F: FnOnce(&mut MulticastForwardingPendingPackets<I, Self::WeakDeviceId>) -> O,
     >(
         &mut self,
         state: &MulticastForwardingEnabledState<I, Self::DeviceId>,

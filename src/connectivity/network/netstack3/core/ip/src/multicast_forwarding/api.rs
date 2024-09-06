@@ -85,23 +85,27 @@ where
         self.core_ctx().with_state_mut(|state, ctx| {
             let state = state.enabled().ok_or(MulticastForwardingDisabledError {})?;
             ctx.with_route_table_mut(state, |route_table, ctx| {
-                let orig_route = route_table.insert(key, route);
+                let orig_route = route_table.insert(key.clone(), route);
                 // NB: Only try to send pending packets if the route was newly
                 // installed. Any existing route would not have pending packets,
                 // as per the key-invariant on the route table.
                 match &orig_route {
-                    Some(_route) => {
+                    Some(_route) =>
+                    {
                         #[cfg(debug_assertions)]
-                        ctx.with_pending_table_mut(state, |_pending_table| {
-                            // TODO(https://fxbug.dev/353328975): Debug assert
-                            // that `key` is absent in the pending table.
+                        ctx.with_pending_table_mut(state, |pending_table| {
+                            debug_assert!(!pending_table.contains(&key));
                         })
                     }
                     None => {
-                        ctx.with_pending_table_mut(state, |_pending_table| {
-                            // TODO(https://fxbug.dev/353328975): Send any
-                            // pending packets that were waiting for this route
-                            // to be installed.
+                        ctx.with_pending_table_mut(state, |pending_table| {
+                            match pending_table.remove(&key) {
+                                // No pending packets need to be sent.
+                                None => {}
+                                // TODO(https://fxbug.dev/353328975): Send the
+                                // packets.
+                                Some(_packet_queue) => {}
+                            }
                         });
                     }
                 }
@@ -184,8 +188,10 @@ mod tests {
     use ip_test_macro::ip_test;
     use netstack3_base::testutil::MultipleDevicesId;
     use netstack3_base::StrongDeviceIdentifier;
+    use packet::ParseBuffer;
 
     use crate::internal::multicast_forwarding;
+    use crate::internal::multicast_forwarding::packet_queue::QueuePacketOutcome;
     use crate::internal::multicast_forwarding::testutil::TestIpExt;
     use crate::multicast_forwarding::{MulticastRoute, MulticastRouteKey, MulticastRouteTarget};
 
@@ -258,6 +264,48 @@ mod tests {
         assert_eq!(api.add_multicast_route(key2.clone(), forward_to_c.clone()), Ok(None));
         assert_eq!(api.remove_multicast_route(&key1), Ok(Some(forward_to_b)));
         assert_eq!(api.remove_multicast_route(&key2), Ok(Some(forward_to_c)));
+    }
+
+    #[ip_test(I)]
+    fn add_route_with_pending_packets<I: TestIpExt>() {
+        let right_key = MulticastRouteKey::new(I::SRC1, I::DST1).unwrap();
+        let wrong_key = MulticastRouteKey::new(I::SRC2, I::DST2).unwrap();
+        let route = MulticastRoute::new_forward(
+            MultipleDevicesId::A,
+            [MulticastRouteTarget { output_interface: MultipleDevicesId::B, min_ttl: 0 }].into(),
+        )
+        .unwrap();
+
+        let mut api = multicast_forwarding::testutil::new_api::<I>();
+        assert!(api.enable());
+
+        // Setup a queued packet for `right_key`.
+        multicast_forwarding::testutil::with_pending_table(api.core_ctx(), |pending_table| {
+            let buf = multicast_forwarding::testutil::new_ip_packet_buf::<I>(I::SRC1, I::DST1);
+            let mut buf_ref = buf.as_ref();
+            let packet = buf_ref.parse::<I::Packet<_>>().expect("parse should succeed");
+            assert_eq!(
+                pending_table.try_queue_packet(right_key.clone(), &packet, &MultipleDevicesId::A),
+                QueuePacketOutcome::QueuedInNewQueue,
+            );
+        });
+
+        // Add a route with the wrong key and expect that the packet queue is
+        // unaffected.
+        assert_eq!(api.add_multicast_route(wrong_key, route.clone()), Ok(None));
+        assert!(multicast_forwarding::testutil::with_pending_table(
+            api.core_ctx(),
+            |pending_table| pending_table.contains(&right_key)
+        ));
+
+        // Add a route with the right key and expect that the packet queue is
+        // removed.
+        assert_eq!(api.add_multicast_route(right_key.clone(), route), Ok(None));
+        assert!(multicast_forwarding::testutil::with_pending_table(
+            api.core_ctx(),
+            |pending_table| !pending_table.contains(&right_key)
+        ));
+        // TODO(https://fxbug.dev/353328975) Verify the packet was sent.
     }
 
     #[ip_test(I)]

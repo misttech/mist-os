@@ -14,6 +14,7 @@
 //! routing table(s).
 
 pub(crate) mod api;
+pub(crate) mod packet_queue;
 pub(crate) mod route;
 pub(crate) mod state;
 
@@ -104,12 +105,13 @@ mod testutil {
     use alloc::collections::HashSet;
     use alloc::rc::Rc;
     use core::cell::RefCell;
-
     use derivative::Derivative;
     use net_declare::{net_ip_v4, net_ip_v6};
     use net_types::ip::{Ipv4, Ipv4Addr, Ipv6, Ipv6Addr};
     use netstack3_base::testutil::{FakeStrongDeviceId, MultipleDevicesId};
     use netstack3_base::CtxPair;
+    use packet::{InnerPacketBuilder, Serializer};
+    use packet_formats::ip::{IpPacketBuilder, IpProto};
 
     use crate::multicast_forwarding::{
         MulticastForwardingApi, MulticastForwardingEnabledState, MulticastForwardingPendingPackets,
@@ -137,6 +139,21 @@ mod testutil {
         const SRC2: Ipv6Addr = net_ip_v6!("2001:0DB8::2");
         const DST1: Ipv6Addr = net_ip_v6!("ff0e::1");
         const DST2: Ipv6Addr = net_ip_v6!("ff0e::2");
+    }
+
+    /// Constructs a buffer containing an IP packet with sensible defaults.
+    pub(crate) fn new_ip_packet_buf<I: IpLayerIpExt>(
+        src_addr: I::Addr,
+        dst_addr: I::Addr,
+    ) -> impl AsRef<[u8]> {
+        const TTL: u8 = 255;
+        /// Arbitrary data to put inside of an IP packet.
+        const IP_BODY: [u8; 10] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
+        IP_BODY
+            .into_serializer()
+            .encapsulate(I::PacketBuilder::new(src_addr, dst_addr, TTL, IpProto::Udp.into()))
+            .serialize_vec_outer()
+            .unwrap()
     }
 
     #[derive(Derivative)]
@@ -223,7 +240,7 @@ mod testutil {
     {
         fn with_pending_table_mut<
             O,
-            F: FnOnce(&mut MulticastForwardingPendingPackets<I, Self::DeviceId>) -> O,
+            F: FnOnce(&mut MulticastForwardingPendingPackets<I, Self::WeakDeviceId>) -> O,
         >(
             &mut self,
             state: &MulticastForwardingEnabledState<I, Self::DeviceId>,
@@ -249,6 +266,25 @@ mod testutil {
             Default::default(),
         )))
     }
+
+    /// A test helper to access the [`MulticastForwardingPendingPackets`] table.
+    ///
+    /// # Panics
+    ///
+    /// Panics if multicast forwarding is disabled.
+    pub(crate) fn with_pending_table<I, O, F, CC>(core_ctx: &mut CC, cb: F) -> O
+    where
+        I: IpLayerIpExt,
+        CC: MulticastForwardingStateContext<I>,
+        F: FnOnce(&mut MulticastForwardingPendingPackets<I, CC::WeakDeviceId>) -> O,
+    {
+        core_ctx.with_state(|state, ctx| {
+            let state = state.enabled().unwrap();
+            ctx.with_route_table(state, |_routing_table, ctx| {
+                ctx.with_pending_table_mut(state, |pending_table| cb(pending_table))
+            })
+        })
+    }
 }
 
 #[cfg(test)]
@@ -257,27 +293,11 @@ mod tests {
 
     use ip_test_macro::ip_test;
     use netstack3_base::testutil::MultipleDevicesId;
-    use packet::{InnerPacketBuilder, ParseBuffer, Serializer};
-    use packet_formats::ip::{IpPacketBuilder, IpProto};
-
-    use crate::multicast_forwarding::MulticastRouteTarget;
+    use packet::ParseBuffer;
     use test_case::test_case;
     use testutil::TestIpExt;
 
-    /// Constructs a buffer containing an IP packet with sensible defaults.
-    fn new_ip_packet_buf<I: IpLayerIpExt>(
-        src_addr: I::Addr,
-        dst_addr: I::Addr,
-    ) -> impl AsRef<[u8]> {
-        const TTL: u8 = 255;
-        /// Arbitrary data to put inside of an IP packet.
-        const IP_BODY: [u8; 10] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
-        IP_BODY
-            .into_serializer()
-            .encapsulate(I::PacketBuilder::new(src_addr, dst_addr, TTL, IpProto::Udp.into()))
-            .serialize_vec_outer()
-            .unwrap()
-    }
+    use crate::multicast_forwarding::MulticastRouteTarget;
 
     struct LookupTestCase {
         // Whether multicast forwarding is enabled for the netstack.
@@ -302,7 +322,7 @@ mod tests {
         let LookupTestCase { enabled, dev_enabled, right_key, right_dev } = test_case;
         let mut api = testutil::new_api::<I>();
 
-        let buf = new_ip_packet_buf::<I>(I::SRC1, I::DST1);
+        let buf = testutil::new_ip_packet_buf::<I>(I::SRC1, I::DST1);
         let mut buf_ref = buf.as_ref();
         let packet = buf_ref.parse::<I::Packet<_>>().expect("parse should succeed");
 

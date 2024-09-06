@@ -8,7 +8,7 @@
 use lock_order::lock::LockLevelFor;
 use lock_order::relation::LockBefore;
 use lock_order::wrap::LockedWrapperApi;
-use netstack3_device::DeviceId;
+use netstack3_device::{DeviceId, WeakDeviceId};
 use netstack3_ip::multicast_forwarding::{
     MulticastForwardingEnabledState, MulticastForwardingPendingPackets,
     MulticastForwardingPendingPacketsContext, MulticastForwardingState,
@@ -97,7 +97,7 @@ impl<
 {
     fn with_pending_table_mut<
         O,
-        F: FnOnce(&mut MulticastForwardingPendingPackets<I, Self::DeviceId>) -> O,
+        F: FnOnce(&mut MulticastForwardingPendingPackets<I, Self::WeakDeviceId>) -> O,
     >(
         &mut self,
         state: &MulticastForwardingEnabledState<I, Self::DeviceId>,
@@ -119,5 +119,5 @@ impl<I: IpExt, BT: BindingsTypes> LockLevelFor<MulticastForwardingEnabledState<I
 impl<I: IpExt, BT: BindingsTypes> LockLevelFor<MulticastForwardingEnabledState<I, DeviceId<BT>>>
     for lock_ordering::IpMulticastForwardingPendingPackets<I>
 {
-    type Data = MulticastForwardingPendingPackets<I, DeviceId<BT>>;
+    type Data = MulticastForwardingPendingPackets<I, WeakDeviceId<BT>>;
 }

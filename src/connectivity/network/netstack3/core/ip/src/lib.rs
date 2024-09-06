@@ -187,14 +187,15 @@ pub mod multicast_forwarding {
     pub use crate::internal::multicast_forwarding::api::{
         MulticastForwardingApi, MulticastForwardingDisabledError,
     };
+    pub use crate::internal::multicast_forwarding::packet_queue::MulticastForwardingPendingPackets;
     pub use crate::internal::multicast_forwarding::route::{
         ForwardMulticastRouteError, MulticastRoute, MulticastRouteKey, MulticastRouteTarget,
         MulticastRouteTargets,
     };
     pub use crate::internal::multicast_forwarding::state::{
-        MulticastForwardingEnabledState, MulticastForwardingPendingPackets,
-        MulticastForwardingPendingPacketsContext, MulticastForwardingState,
-        MulticastForwardingStateContext, MulticastRouteTable, MulticastRouteTableContext,
+        MulticastForwardingEnabledState, MulticastForwardingPendingPacketsContext,
+        MulticastForwardingState, MulticastForwardingStateContext, MulticastRouteTable,
+        MulticastRouteTableContext,
     };
     pub use crate::internal::multicast_forwarding::MulticastForwardingDeviceContext;
 }

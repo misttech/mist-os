@@ -55,8 +55,9 @@ pub fn todo_unused(attrs: TokenStream, input: TokenStream) -> TokenStream {
     }
 
     let input = proc_macro2::TokenStream::from(input);
+    // Note: Allows code to be unused in non-test configurations.
     quote! {
-        #[cfg(test)]
+        #[cfg_attr(not(test), allow(unused))]
         #input
     }
     .into()
