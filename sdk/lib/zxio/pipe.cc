@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <lib/zxio/cpp/transitional.h>
 #include <lib/zxio/fault_catcher.h>
 #include <lib/zxio/null.h>
 #include <lib/zxio/ops.h>
@@ -10,6 +11,42 @@
 
 #include "sdk/lib/zxio/private.h"
 #include "sdk/lib/zxio/vector.h"
+
+namespace {
+// Partial implementation of getsockopt for zx::Socket interpreted as Unix
+// domain socket.
+zx_status_t getsockopt(uint32_t so_type, zxio_t* io, int level, int optname, void* optval,
+                       socklen_t* optlen, int16_t* out_code) {
+  if (optval == nullptr || optlen == nullptr) {
+    *out_code = EFAULT;
+    return ZX_ERR_INVALID_ARGS;
+  }
+  if (*optlen < sizeof(uint32_t) || level != SOL_SOCKET) {
+    *out_code = EINVAL;
+    return ZX_ERR_INVALID_ARGS;
+  }
+  switch (optname) {
+    case SO_DOMAIN:
+      *static_cast<uint32_t*>(optval) = AF_UNIX;
+      *optlen = sizeof(uint32_t);
+      break;
+    case SO_TYPE:
+      *static_cast<uint32_t*>(optval) = so_type;
+      *optlen = sizeof(uint32_t);
+      break;
+    case SO_PROTOCOL:
+      *static_cast<uint32_t*>(optval) = 0;
+      *optlen = sizeof(uint32_t);
+      break;
+    default:
+      *out_code = EINVAL;
+      return ZX_ERR_INVALID_ARGS;
+  }
+
+  *out_code = 0;
+  return ZX_OK;
+}
+}  // namespace
 
 static zxio_pipe_t& zxio_get_pipe(zxio_t* io) { return *reinterpret_cast<zxio_pipe_t*>(io); }
 
@@ -133,6 +170,18 @@ static constexpr zxio_ops_t zxio_pipe_ops = []() {
     return zxio_get_pipe(io).socket.set_disposition(disposition, disposition_peer);
   };
 
+  ops.recvmsg = [](zxio_t* io, struct msghdr* msg, int flags, size_t* out_actual,
+                   int16_t* out_code) {
+    *out_code = 0;
+    return zxio_recvmsg_inner(io, msg, flags, out_actual);
+  };
+
+  ops.sendmsg = [](zxio_t* io, const struct msghdr* msg, int flags, size_t* out_actual,
+                   int16_t* out_code) {
+    *out_code = 0;
+    return zxio_sendmsg_inner(io, msg, flags, out_actual);
+  };
+
   return ops;
 }();
 
@@ -203,6 +252,11 @@ static constexpr zxio_ops_t zxio_datagram_pipe_ops = []() {
     return zxio_get_pipe(io).socket.write(0, buf.get(), total, out_actual);
   };
 
+  ops.getsockopt = [](zxio_t* io, int level, int optname, void* optval, socklen_t* optlen,
+                      int16_t* out_code) {
+    return getsockopt(SOCK_DGRAM, io, level, optname, optval, optlen, out_code);
+  };
+
   return ops;
 }();
 
@@ -237,6 +291,10 @@ static constexpr zxio_ops_t zxio_stream_pipe_ops = []() {
         });
   };
 
+  ops.getsockopt = [](zxio_t* io, int level, int optname, void* optval, socklen_t* optlen,
+                      int16_t* out_code) {
+    return getsockopt(SOCK_STREAM, io, level, optname, optval, optlen, out_code);
+  };
   return ops;
 }();
 
