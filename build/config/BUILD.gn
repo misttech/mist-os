@@ -1346,10 +1346,14 @@ config("werror") {
     "-Dunused-must-use",
   ]
 
-  # TODO(https://fxbug.dev/327271893) Remove blanket allow once lint is actionable.
   rustflags += [
     "-Aunknown_lints",
+
+    # TODO(https://fxbug.dev/327271893) Remove blanket allow once lint is actionable.
     "-Anon_local_definitions",
+
+    # TODO(https://fxbug.dev/365108268) Remove blanket allow once lint is actionable.
+    "-Aelided_named_lifetimes",
   ]
 
   if (deny_warnings) {
