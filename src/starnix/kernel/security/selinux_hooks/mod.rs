@@ -240,22 +240,11 @@ fn check_self_permission(
 }
 
 /// Return security state to associate with a filesystem based on the supplied mount options.
-pub fn file_system_init_security(
-    _fs_type: &FsStr,
-    mount_params: &MountParams,
-) -> Result<FileSystemState, Errno> {
+pub fn file_system_init_security(mount_params: &MountParams) -> Result<FileSystemState, Errno> {
     let context = mount_params.get(FsStr::new(b"context")).cloned();
     let def_context = mount_params.get(FsStr::new(b"defcontext")).cloned();
     let fs_context = mount_params.get(FsStr::new(b"fscontext")).cloned();
     let root_context = mount_params.get(FsStr::new(b"rootcontext")).cloned();
-
-    #[cfg(not(test))]
-    // TODO: https://fxbug.dev/355628002 - Remove this as soon as `fs_use_*` Contexts are being determine from policy.
-    let def_context = if **_fs_type == *b"tmpfs" && def_context.is_none() && context.is_none() {
-        Some(b"u:object_r:tmpfs:s0".into())
-    } else {
-        def_context
-    };
 
     // If a "context" is specified then it is used for all nodes in the filesystem, so none of the other
     // security context options would be meaningful to combine with it.

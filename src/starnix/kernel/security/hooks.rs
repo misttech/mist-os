@@ -79,11 +79,8 @@ pub fn kernel_init_security(enabled: bool) -> KernelState {
 
 /// Return security state to associate with a filesystem based on the supplied mount options.
 /// This sits somewhere between `fs_context_parse_param()` and `sb_set_mnt_opts()` in function.
-pub fn file_system_init_security(
-    fs_type: &FsStr,
-    mount_params: &MountParams,
-) -> Result<FileSystemState, Errno> {
-    Ok(FileSystemState { state: selinux_hooks::file_system_init_security(fs_type, mount_params)? })
+pub fn file_system_init_security(mount_params: &MountParams) -> Result<FileSystemState, Errno> {
+    Ok(FileSystemState { state: selinux_hooks::file_system_init_security(mount_params)? })
 }
 
 /// Used to return an extended attribute name and value to apply to a [`crate::vfs::FsNode`].
