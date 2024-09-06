@@ -9,6 +9,7 @@ import re
 import stat
 import subprocess
 import time
+import types
 from importlib.resources import as_file, files
 from typing import Any, Iterable, Self
 
@@ -51,6 +52,7 @@ ENV_SMART_INTEGRATION_GIT_COMMIT: str = "SMART_INTEGRATION_GIT_COMMIT"
 def publish_fuchsiaperf(
     fuchsia_perf_file_paths: Iterable[str | os.PathLike[str]],
     expected_metric_names_filename: str | os.PathLike[str],
+    test_data_module: types.ModuleType | None = None,
     env: dict[str, str] = dict(os.environ),
     runtime_deps_dir: str | os.PathLike[str] | None = None,
 ) -> None:
@@ -61,6 +63,7 @@ def publish_fuchsiaperf(
             will be summarized into a single fuchsiaperf.json file.
         expected_metric_names_filename: file name or path to file containing
             expected metric names to validate the actual metrics against.
+        test_data_module: Python module containing the expected metric names file as a data file.
         env: map holding the environment variables.
         runtime_deps_dir: directory in which to look for necessary dependencies such as the expected
              metric names file, catapult converter, etc. Defaults to the test runtime_deps dir.
@@ -68,6 +71,7 @@ def publish_fuchsiaperf(
     converter = CatapultConverter.from_env(
         fuchsia_perf_file_paths,
         expected_metric_names_filename,
+        test_data_module=test_data_module,
         env=env,
         runtime_deps_dir=runtime_deps_dir,
     )
@@ -79,6 +83,7 @@ class CatapultConverter:
         self,
         fuchsia_perf_file_paths: Iterable[str | os.PathLike[str]],
         expected_metric_names_filename: str | os.PathLike[str],
+        test_data_module: types.ModuleType | None = None,
         master: str | None = None,
         bot: str | None = None,
         build_bucket_id: str | None = None,
@@ -102,6 +107,11 @@ class CatapultConverter:
             expected_metric_names_filename:
                 File name or path to file containing expected metric names to
                 validate the actual metrics against.
+
+            test_data_module:
+                Python module containing the expected metric names file as
+                a data file.  This should be created by the build system
+                using the data_packages mechanism.
 
             integration_internal_git_commit:
                 The internal integration.git revision which produced these data
@@ -187,17 +197,13 @@ class CatapultConverter:
         fuchsia_perf_file_paths = self._check_extension_and_relocate(
             fuchsia_perf_file_paths
         )
-        # TODO(b/340319757): Remove after //v/g has migrated to data resources.
-        # os.path.join() supports both file name or absolute path to be
-        # provided in "expected_metric_names_file" to allow for soft-transition.
-        expected_metric_names_file: str = os.path.join(
-            self._runtime_deps_dir, expected_metric_names_filename
-        )
 
         _LOGGER.debug("Checking metrics naming")
         should_summarize: bool = self._check_fuchsia_perf_metrics_naming(
-            expected_metric_names_file,
+            expected_metric_names_filename,
             fuchsia_perf_file_paths,
+            test_data_module=test_data_module,
+            runtime_deps_dir=self._runtime_deps_dir,
         )
 
         self._results_path = os.path.join(
@@ -262,6 +268,7 @@ class CatapultConverter:
         cls,
         fuchsia_perf_file_paths: Iterable[str | os.PathLike[str]],
         expected_metric_names_filename: str | os.PathLike[str],
+        test_data_module: types.ModuleType | None = None,
         env: dict[str, str] = dict(os.environ),
         runtime_deps_dir: str | os.PathLike[str] | None = None,
         current_time: int | None = None,
@@ -274,6 +281,7 @@ class CatapultConverter:
             expected_metric_names_filename: file name or path to file containing expected metric names to
             validate the actual metrics against.
             env: map holding the environment variables.
+            test_data_module: Python module containing the expected metric names file as a data file.
             current_time: the current time, useful for testing. Defaults to time.time.
             runtime_deps_dir: directory in which to look for necessary dependencies such as the expected
                 metric names file, catapult converter, etc. Defaults to the test runtime_deps dir.
@@ -283,6 +291,7 @@ class CatapultConverter:
         return cls(
             fuchsia_perf_file_paths,
             expected_metric_names_filename,
+            test_data_module=test_data_module,
             master=env.get(ENV_CATAPULT_DASHBOARD_MASTER),
             bot=env.get(ENV_CATAPULT_DASHBOARD_BOT),
             build_bucket_id=env.get(ENV_BUILDBUCKET_ID),
@@ -320,12 +329,27 @@ class CatapultConverter:
         self,
         expected_metric_names_file: str | os.PathLike[str],
         input_files: list[str],
+        test_data_module: types.ModuleType | None,
+        runtime_deps_dir: str | os.PathLike[str],
     ) -> bool:
         metrics = self._extract_perf_file_metrics(input_files)
         if self._fuchsia_expected_metric_names_dest_dir is None:
-            metric_allowlist = metrics_allowlist.MetricsAllowlist(
-                expected_metric_names_file
-            )
+            # TODO(b/340319757): Remove this conditional and make the case
+            # where test_data_module is passed the only supported case.
+            # That can be done after all tests have been changed to use
+            # this case.
+            if test_data_module:
+                assert isinstance(expected_metric_names_file, str)
+                with as_file(
+                    files(test_data_module).joinpath(expected_metric_names_file)
+                ) as filepath:
+                    metric_allowlist = metrics_allowlist.MetricsAllowlist(
+                        filepath
+                    )
+            else:
+                metric_allowlist = metrics_allowlist.MetricsAllowlist(
+                    os.path.join(runtime_deps_dir, expected_metric_names_file)
+                )
             metric_allowlist.check(metrics)
             return metric_allowlist.should_summarize
         else:
