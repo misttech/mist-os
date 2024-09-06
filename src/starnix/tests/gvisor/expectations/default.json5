@@ -656,8 +656,6 @@
                 "ProcNetSnmp.Stat",
                 "ProcSysNetIpv4Recovery.Exists",
                 "ProcSysNetIpv4IpForward.DefaultValueEqZero",
-                "ProcSysNetPortRange.CanReadAndWrite",
-                "ProcSysNetIpv4IpForward.CanReadAndWrite",
                 "ProcSysNetIpv4Sack.CanReadAndWrite",
                 "ProcSysNetIpv4Recovery.CanReadAndWrite",
 
@@ -1193,6 +1191,10 @@
 
                 // TODO(https://fxbug.dev/358626000) deflake
                 "AllInetTests/SimpleTcpSocketTest.ListenConnectParallel/*",
+
+                // TODO(https://fxbug.dev/365094116): Investigate and re-enable
+                "ProcSysNetIpv4IpForward.CanReadAndWrite",
+                "ProcSysNetPortRange.CanReadAndWrite",
             ],
         },
     ],
