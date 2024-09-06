@@ -41,11 +41,16 @@ class BuildApiFilter(object):
             "images",
             "package-repositories",
             "platform_artifacts",
-            "product_bundles",
             "sdk_archives",
             "tool_paths",
         ):
             return self._filter_json_scopes(json_content, "path")
+
+        if api_module == "product_bundles":
+            # Do not filter on "path" which is a directory that does not appear
+            # directly as a Ninja output. Use "json" field which points to the
+            # product bundle's JSON manifest file instead.See https://fxbug.dev/365039385.
+            return self._filter_json_scopes(json_content, "json")
 
         if api_module == "assembly_manifests":
             return self._filter_json_scopes(

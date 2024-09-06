@@ -24,7 +24,11 @@ class BuildApiModulesFilterTest(unittest.TestCase):
             )
 
     def test_filter(self):
-        ninja_artifacts = ["obj/foo", "gen/bar"]
+        ninja_artifacts = [
+            "obj/foo",
+            "gen/bar",
+            "obj/build/images/fuchsia/product_bundle/product_bundle.json",
+        ]
         module_filter = build_api_filter.BuildApiFilter(ninja_artifacts)
 
         _TEST_CASES = [
@@ -66,6 +70,42 @@ class BuildApiModulesFilterTest(unittest.TestCase):
                         {
                             "label": "//bundles/assembly:embeddable.tgz(//build/toolchain/fuchsia:x64)",
                             "path": "obj/foo",
+                        },
+                    ],
+                ),
+                "product_bundles": (  # See https://fxbug.dev/365039385
+                    [
+                        {
+                            "cpu": "x64",
+                            "json": "obj/build/images/fuchsia/product_bundle/product_bundle.json",
+                            "label": "//build/images/fuchsia:product_bundle(//build/toolchain/fuchsia:x64)",
+                            "name": "terminal.x64",
+                            "path": "obj/build/images/fuchsia/product_bundle",
+                            "product_version": "24.99991231.0.1",
+                            "transfer_manifest_path": "obj/build/images/fuchsia/terminal.x64.transfer.json",
+                            "transfer_manifest_url": "file://obj/build/images/fuchsia/terminal.x64.transfer.json",
+                        },
+                        {
+                            "cpu": "x64",
+                            "json": "obj/src/bringup/lib/mexec/tests/mexec-entropy-test.product_bundle/product_bundle.json",
+                            "label": "//src/bringup/lib/mexec/tests:mexec-entropy-test.product_bundle(//build/toolchain/fuchsia:x64)",
+                            "name": "mexec-entropy-test",
+                            "path": "obj/src/bringup/lib/mexec/tests/mexec-entropy-test.product_bundle",
+                            "product_version": "24.99991231.0.1",
+                            "transfer_manifest_path": "obj/src/bringup/lib/mexec/tests/mexec-entropy-test.transfer.json",
+                            "transfer_manifest_url": "file://obj/src/bringup/lib/mexec/tests/mexec-entropy-test.transfer.json",
+                        },
+                    ],
+                    [
+                        {
+                            "cpu": "x64",
+                            "json": "obj/build/images/fuchsia/product_bundle/product_bundle.json",
+                            "label": "//build/images/fuchsia:product_bundle(//build/toolchain/fuchsia:x64)",
+                            "name": "terminal.x64",
+                            "path": "obj/build/images/fuchsia/product_bundle",
+                            "product_version": "24.99991231.0.1",
+                            "transfer_manifest_path": "obj/build/images/fuchsia/terminal.x64.transfer.json",
+                            "transfer_manifest_url": "file://obj/build/images/fuchsia/terminal.x64.transfer.json",
                         },
                     ],
                 ),
