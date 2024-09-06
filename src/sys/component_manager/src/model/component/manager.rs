@@ -10,6 +10,7 @@ use errors::RebootError;
 use fidl::endpoints::{self};
 use fuchsia_component::client;
 use std::sync::{Arc, Mutex};
+use tracing::warn;
 use vfs::directory::entry::OpenRequest;
 use vfs::path::Path;
 use vfs::ToObjectRequest;
@@ -102,6 +103,10 @@ impl ComponentManagerInstance {
                     .map_err(|s| RebootError::AdminError(zx::Status::from_raw(s)))
             }
             .await;
+            if let Err(RebootError::AdminError(zx::Status::ALREADY_EXISTS)) = res {
+                warn!("Reboot in progress but trigger_reboot is called again. Something else is going on.");
+                return;
+            }
             if let Err(e) = res {
                 // TODO(https://fxbug.dev/42161535): Instead of panicking, we could fall back more gently by
                 // triggering component_manager's shutdown.
