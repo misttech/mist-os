@@ -919,6 +919,24 @@ assembly_input_bundle("core_realm_networking") {
   ]
 }
 
+# If config allows, timekeeper will be given some persistent storage to use.
+# Should only be allowed in eng builds.
+assembly_input_bundle("timekeeper_persistence") {
+  compiled_packages = [
+    {
+      name = "core"
+      components = [
+        {
+          component_name = "core"
+          shards = [
+            "//src/sys/time/timekeeper/timekeeper-persistence.core_shard.cml",
+          ]
+        },
+      ]
+    },
+  ]
+}
+
 # Network realm definition.
 #
 # This AIB defines the base network package, which lays out the network realm.

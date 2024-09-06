@@ -47,6 +47,13 @@
             rights: [ "r*" ],
             path: "/dev/class/rtc",
         },
+        {
+            storage: "data",
+            path: "/data",
+
+            // Only used if `serve_test_protocols: true`.
+            availability: "optional",
+        },
     ],
     offer: [
         {
