@@ -54,6 +54,8 @@ class FakePlatformDevice : public fidl::WireServer<fuchsia_hardware_platform_dev
       completer.ReplyError(status);
       return;
     }
+    // Trigger the interrupt so that the test can wait on it.
+    irq.trigger(0, {});
     completer.ReplySuccess(std::move(irq));
   }
 
@@ -66,6 +68,7 @@ class FakePlatformDevice : public fidl::WireServer<fuchsia_hardware_platform_dev
       completer.ReplyError(status);
       return;
     }
+    irq.trigger(0, {});
     completer.ReplySuccess(std::move(irq));
   }
 
@@ -870,6 +873,40 @@ TEST_F(S905d2AmlGpioTest, ExtraInterruptOptions) {
     runtime_.Quit();
   });
   runtime_.Run();
+
+  mmio().VerifyAll();
+  ao_mmio().VerifyAll();
+  interrupt_mmio().VerifyAll();
+}
+
+TEST_F(A113AmlGpioTest, DestroyInterruptOnRelease) {
+  interrupt_mmio()[0x3c21 * sizeof(uint32_t)]
+      .ExpectRead(0x00000000)
+      .ExpectWrite(0x00000048);  // modify
+  interrupt_mmio()[0x3c20 * sizeof(uint32_t)].ExpectRead(0x00010001);
+  interrupt_mmio()[0x3c23 * sizeof(uint32_t)].ExpectRead(0x00000000).ExpectWrite(0x00000007);
+
+  fdf::Arena arena('GPIO');
+
+  zx::interrupt interrupt{};
+  client_.buffer(arena)->GetInterrupt(0x0B, {}).Then([&](auto& result) {
+    ASSERT_TRUE(result.ok());
+    ASSERT_TRUE(result->is_ok());
+    interrupt = std::move(result->value()->interrupt);
+  });
+  runtime_.RunUntilIdle();
+
+  // FakePlatformDevice triggered the interrupt -- wait on it to make sure we have a working handle.
+  EXPECT_EQ(interrupt.wait(nullptr), ZX_OK);
+
+  client_.buffer(arena)->ReleaseInterrupt(0x0B).Then([&](auto& result) {
+    ASSERT_TRUE(result.ok());
+    EXPECT_TRUE(result->is_ok());
+  });
+  runtime_.RunUntilIdle();
+
+  // AmlGpio should have called zx_interrupt_destroy in the interrupt for this pin.
+  EXPECT_EQ(interrupt.wait(nullptr), ZX_ERR_CANCELED);
 
   mmio().VerifyAll();
   ao_mmio().VerifyAll();

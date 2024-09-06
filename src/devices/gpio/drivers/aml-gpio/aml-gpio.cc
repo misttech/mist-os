@@ -231,12 +231,12 @@ void AmlGpioDriver::AddNode(uint32_t pid, uint32_t irq_count, std::vector<fdf::M
 
   fbl::AllocChecker ac;
 
-  fbl::Array<uint16_t> irq_info(new (&ac) uint16_t[irq_count], irq_count);
+  fbl::Array<AmlGpio::InterruptInfo> irq_info(new (&ac) AmlGpio::InterruptInfo[irq_count],
+                                              irq_count);
   if (!ac.check()) {
     FDF_LOG(ERROR, "irq_info alloc failed");
     return completer(zx::error(ZX_ERR_NO_MEMORY));
   }
-  std::fill(irq_info.begin(), irq_info.end(), AmlGpio::kMaxGpioIndex + 1);  // initialize irq_info
 
   zx::result pdev_client = incoming()->Connect<fuchsia_hardware_platform_device::Service::Device>();
   if (pdev_client.is_error()) {
@@ -387,8 +387,8 @@ void AmlGpio::GetInterrupt(fuchsia_hardware_pinimpl::wire::PinImplGetInterruptRe
     return completer.buffer(arena).ReplyError(ZX_ERR_NO_RESOURCES);
   }
 
-  for (uint16_t irq : irq_info_) {
-    if (irq == request->pin) {
+  for (const InterruptInfo& irq : irq_info_) {
+    if (irq.pin == request->pin) {
       FDF_LOG(ERROR, "GPIO Interrupt already configured for this pin %u", (int)index);
       return completer.buffer(arena).ReplyError(ZX_ERR_ALREADY_EXISTS);
     }
@@ -450,14 +450,14 @@ void AmlGpio::GetInterrupt(fuchsia_hardware_pinimpl::wire::PinImplGetInterruptRe
 
   // Hold this IRQ index while the GetInterrupt call is pending.
   irq_status_ |= static_cast<uint8_t>(1 << index);
-  irq_info_[index] = static_cast<uint16_t>(request->pin);
+  irq_info_[index].pin = static_cast<uint16_t>(request->pin);
 
   pdev_->GetInterruptById(index, flags)
       .Then([this, index, irq_index = request->pin,
              completer = completer.ToAsync()](auto& out_irq) mutable {
         fdf::Arena arena('GPIO');
         // ReleaseInterrupt was called before we got the interrupt from platform bus.
-        if (irq_info_[index] != irq_index) {
+        if (irq_info_[index].pin != irq_index) {
           FDF_LOG(WARNING, "Pin %u interrupt released before it could be returned to the client",
                   irq_index);
           return completer.buffer(arena).ReplyError(ZX_ERR_CANCELED);
@@ -466,7 +466,7 @@ void AmlGpio::GetInterrupt(fuchsia_hardware_pinimpl::wire::PinImplGetInterruptRe
         // The call failed, release this IRQ index.
         if (!out_irq.ok() || out_irq->is_error()) {
           irq_status_ &= static_cast<uint8_t>(~(1 << index));
-          irq_info_[index] = kMaxGpioIndex + 1;
+          irq_info_[index] = InterruptInfo{};
         }
 
         if (!out_irq.ok()) {
@@ -474,11 +474,21 @@ void AmlGpio::GetInterrupt(fuchsia_hardware_pinimpl::wire::PinImplGetInterruptRe
           return completer.buffer(arena).ReplyError(out_irq.status());
         }
         if (out_irq->is_error()) {
-          FDF_LOG(ERROR, "pdev_get_interrupt failed: %s", out_irq.status_string());
+          FDF_LOG(ERROR, "pdev_get_interrupt failed: %s",
+                  zx_status_get_string(out_irq->error_value()));
           return completer.buffer(arena).Reply(out_irq->take_error());
         }
 
-        completer.buffer(arena).ReplySuccess(std::move(out_irq->value()->irq));
+        zx_status_t status =
+            out_irq->value()->irq.duplicate(ZX_RIGHT_SAME_RIGHTS, &irq_info_[index].interrupt);
+        if (status == ZX_OK) {
+          completer.buffer(arena).ReplySuccess(std::move(out_irq->value()->irq));
+        } else {
+          FDF_LOG(ERROR, "Failed to duplicate interrupt handle: %s", zx_status_get_string(status));
+          irq_status_ &= static_cast<uint8_t>(~(1 << index));
+          irq_info_[index] = InterruptInfo{};
+          completer.buffer(arena).ReplyError(status);
+        }
       });
 }
 
@@ -501,7 +511,7 @@ void AmlGpio::ConfigureInterrupt(
   // Configure the interrupt for this pin if there is one. If not, the mode is saved and will be
   // applied when an interrupt is created for this pin.
   for (uint32_t i = 0; i < irq_info_.size(); i++) {
-    if (irq_info_[i] == request->pin) {
+    if (irq_info_[i].pin == request->pin) {
       SetInterruptMode(i, request->config.mode());
       return completer.buffer(arena).ReplySuccess();
     }
@@ -515,9 +525,12 @@ void AmlGpio::ReleaseInterrupt(
     fuchsia_hardware_pinimpl::wire::PinImplReleaseInterruptRequest* request, fdf::Arena& arena,
     ReleaseInterruptCompleter::Sync& completer) {
   for (uint32_t i = 0; i < irq_info_.size(); i++) {
-    if (irq_info_[i] == request->pin) {
+    if (irq_info_[i].pin == request->pin) {
       irq_status_ &= static_cast<uint8_t>(~(1 << i));
-      irq_info_[i] = kMaxGpioIndex + 1;
+      // Destroy the interrupt so that platform-bus will be able to create a new one for this vector
+      // the next time we need it.
+      irq_info_[i].interrupt.destroy();
+      irq_info_[i] = InterruptInfo{};
       return completer.buffer(arena).ReplySuccess();
     }
   }
