@@ -98,23 +98,6 @@ class InstanceDeviceTest : public zxtest::Test {
     fake_root_->AddFidlService(fuchsia_hardware_goldfish_pipe::Service::Name,
                                std::move(endpoints->client), "goldfish-pipe");
 
-    endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-    ASSERT_OK(endpoints.status_value());
-
-    ASSERT_OK(outgoing_.AddService<fuchsia_hardware_sysmem::Service>(
-        fuchsia_hardware_sysmem::Service::InstanceHandler({
-            .sysmem =
-                [](fidl::ServerEnd<fuchsia_hardware_sysmem::Sysmem> request) {
-                  // The device connects to the protocol in its constructor but does not
-                  // otherwise use it, so we don't need to bind a server here.
-                },
-        })));
-
-    ASSERT_OK(outgoing_.Serve(std::move(endpoints->server)).status_value());
-
-    fake_root_->AddFidlService(fuchsia_hardware_sysmem::Service::Name, std::move(endpoints->client),
-                               "sysmem");
-
     dut_.emplace(pipe_device_.get(), loop_.dispatcher());
 
     {

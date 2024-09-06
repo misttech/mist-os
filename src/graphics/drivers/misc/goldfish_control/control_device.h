@@ -126,8 +126,6 @@ class Control : public ControlType {
   fuchsia_hardware_goldfish_pipe::Service::InstanceHandler
   CreateGoldfishPipeServiceInstanceHandler();
 
-  fuchsia_hardware_sysmem::Service::InstanceHandler CreateSysmemServiceInstanceHandler();
-
   fbl::Mutex lock_;
   fidl::WireSyncClient<fuchsia_hardware_goldfish_pipe::GoldfishPipe> pipe_;
   fidl::WireSyncClient<fuchsia_hardware_goldfish::AddressSpaceDevice> address_space_;
