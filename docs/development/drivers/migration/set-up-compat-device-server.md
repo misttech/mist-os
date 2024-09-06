@@ -397,7 +397,7 @@ if (!metadata.is_ok()) {
           metadata.error_value().FormatDescription().data());
   return zx::error(metadata.error_value().status());
 }
-compat_server->AddMetadata(DEVICE_METADATA_I2C_DEVICE, metadata.value().data(),
+compat_server->AddMetadata(DEVICE_METADATA_PRIVATE, metadata.value().data(),
                            metadata.value().size());
 
 ```
