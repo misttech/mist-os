@@ -83,12 +83,12 @@ open protocol CoordinatorListener {
 /// Performing illegal actions on the interface will result in the interface
 /// being closed.
 closed protocol Coordinator {
-    // Event fired when displays are added or removed. This event will be fired
-    // when the callback is registered if there are any connected displays.
-    //
-    // A display change always invalidates the current configuration. When a
-    // client receives this event, they must either apply a new configuration
-    // or revalidate and reapply their current configuration.
+    /// Event fired when displays are added or removed. This event will be fired
+    /// when the callback is registered if there are any connected displays.
+    ///
+    /// A display change always invalidates the current configuration. When a
+    /// client receives this event, they must either apply a new configuration
+    /// or revalidate and reapply their current configuration.
     strict -> OnDisplaysChanged(struct {
         added vector<Info>:MAX;
         removed vector<fuchsia.hardware.display.types.DisplayId>:MAX;
@@ -155,58 +155,58 @@ closed protocol Coordinator {
         id EventId;
     });
 
-    // Creates a new layer.
-    //
-    // Layers are not associated with a particular display, but they can only be
-    // shown on at most one display at any given time.  A layer is considered in
-    // use from the time it is passed to SetDisplayLayers until a subsequent
-    // configuration is applied which does not include the layer or until its
-    // display is removed.
+    /// Creates a new layer.
+    ///
+    /// Layers are not associated with a particular display, but they can only be
+    /// shown on at most one display at any given time.  A layer is considered in
+    /// use from the time it is passed to SetDisplayLayers until a subsequent
+    /// configuration is applied which does not include the layer or until its
+    /// display is removed.
     strict CreateLayer() -> (struct {
         layer_id LayerId;
     }) error zx.Status;
 
-    // Destroys the given layer.
-    //
-    // It is illegal to destroy a layer which does not exist or which is in use.
+    /// Destroys the given layer.
+    ///
+    /// It is illegal to destroy a layer which does not exist or which is in use.
     strict DestroyLayer(struct {
         layer_id LayerId;
     });
 
-    // Sets the display mode for the given display.
-    //
-    // It is illegal to pass a display mode which was not part of the display's Info.
+    /// Sets the display mode for the given display.
+    ///
+    /// It is illegal to pass a display mode which was not part of the display's Info.
     strict SetDisplayMode(struct {
         display_id fuchsia.hardware.display.types.DisplayId;
         mode Mode;
     });
 
-    // Set the color conversion applied to the display. The conversion is applied to
-    // to each pixel according to the formula:
-    //
-    // (coefficients * (pixel + preoffsets)) + postoffsets
-    //
-    // where pixel is a column vector consisting of the pixel's 3 components.
-    //
-    // `coefficients` is passed in row-major order. If the first entry of an array is NaN, the
-    // array is treated as the identity element for the relevant operation.
-    // Hardware that support color correction generally accept a limited range of coefficient
-    // values. Coefficients in the range of [-2, 2] inclusive will be accepted by most
-    // hardware. The hardware driver will clamp values that are outside its acceptable range.
-    //
-    // `preoffsets`, `postoffsets`: Clients are encourged to produce color correction values that
-    // do not depend on pre and post offsets since some hardware do not have support for that.
-    // For cases where pre and post offset values need to be used, the range should be limited to
-    // (-1, 1) exclusive as confirmed by CheckConfig API. Values outside this range will be
-    // rejected.
-    //
-    // Clients are encouraged to use the CheckConfig API to confirm support for correction and to
-    // validate their color correction input values.
-    //
-    // This a stateful call. Once color conversion values have been succesfully applied via a call
-    // to ApplyConfig() they will remain in place until changed and another ApplyConfig() call is
-    // successful. If SetDisplayColorConversion() is called and then the config is discarded, then
-    // the last successfully applied state is restored.
+    /// Set the color conversion applied to the display. The conversion is applied to
+    /// to each pixel according to the formula:
+    ///
+    /// (coefficients * (pixel + preoffsets)) + postoffsets
+    ///
+    /// where pixel is a column vector consisting of the pixel's 3 components.
+    ///
+    /// `coefficients` is passed in row-major order. If the first entry of an array is NaN, the
+    /// array is treated as the identity element for the relevant operation.
+    /// Hardware that support color correction generally accept a limited range of coefficient
+    /// values. Coefficients in the range of [-2, 2] inclusive will be accepted by most
+    /// hardware. The hardware driver will clamp values that are outside its acceptable range.
+    ///
+    /// `preoffsets`, `postoffsets`: Clients are encourged to produce color correction values that
+    /// do not depend on pre and post offsets since some hardware do not have support for that.
+    /// For cases where pre and post offset values need to be used, the range should be limited to
+    /// (-1, 1) exclusive as confirmed by CheckConfig API. Values outside this range will be
+    /// rejected.
+    ///
+    /// Clients are encouraged to use the CheckConfig API to confirm support for correction and to
+    /// validate their color correction input values.
+    ///
+    /// This a stateful call. Once color conversion values have been succesfully applied via a call
+    /// to ApplyConfig() they will remain in place until changed and another ApplyConfig() call is
+    /// successful. If SetDisplayColorConversion() is called and then the config is discarded, then
+    /// the last successfully applied state is restored.
     strict SetDisplayColorConversion(struct {
         display_id fuchsia.hardware.display.types.DisplayId;
         preoffsets array<float32, 3>;
@@ -214,25 +214,25 @@ closed protocol Coordinator {
         postoffsets array<float32, 3>;
     });
 
-    // Sets which layers are on a display. The list is in increasing z-order.
-    //
-    // It is illegal to use a layer on multiple displays concurrently. If a layer
-    // needs to be moved between displays, it must be removed from the first display's
-    // pending config before being added to the second display's pending config. It
-    // is also illegal to pass an invalid layer id.
+    /// Sets which layers are on a display. The list is in increasing z-order.
+    ///
+    /// It is illegal to use a layer on multiple displays concurrently. If a layer
+    /// needs to be moved between displays, it must be removed from the first display's
+    /// pending config before being added to the second display's pending config. It
+    /// is also illegal to pass an invalid layer id.
     strict SetDisplayLayers(struct {
         display_id fuchsia.hardware.display.types.DisplayId;
         layer_ids vector<LayerId>:MAX;
     });
 
-    // Configures the layer as a primary layer with no image and the default
-    // config (no src_frame cropping, the identity transform, positioned in the
-    // top-left corner of the composed output, and no scaling).
-    //
-    // See the documentation on SetLayerImage for details on how this method
-    // affects the layer's contents.
-    //
-    // It is illegal to pass an invalid layer id.
+    /// Configures the layer as a primary layer with no image and the default
+    /// config (no src_frame cropping, the identity transform, positioned in the
+    /// top-left corner of the composed output, and no scaling).
+    ///
+    /// See the documentation on SetLayerImage for details on how this method
+    /// affects the layer's contents.
+    ///
+    /// It is illegal to pass an invalid layer id.
     strict SetLayerPrimaryConfig(struct {
         layer_id LayerId;
         image_metadata fuchsia.hardware.display.types.ImageMetadata;
@@ -286,74 +286,74 @@ closed protocol Coordinator {
         display_destination fuchsia.math.RectU;
     });
 
-    // Sets the alpha mode of the plane.
-    //
-    // If `mode` == DISABLED, the layer is opaque and `val` is ignored.
-    //
-    // If `mode` == PREMULTIPLIED or HW_MULTIPLY and `val` is NaN, the alpha
-    // used when blending is determined by the per-pixel alpha channel.
-    //
-    // If `mode` == PREMULTIPLIED or HW_MULTIPLY and `val` is not NaN, the
-    // alpha used when blending is the product of `val` and any per-pixel
-    // alpha. Additionally, if `mode` == PREMULTIPLIED, then the hardware
-    // premultiplies the color channel with `val` before blending.
-    //
-    // It is illegal to call this on a non-primary layer, to pass an
-    // invalid mode, or to pass a value of `val` which is not NaN or
-    // in the range [0, 1].
+    /// Sets the alpha mode of the plane.
+    ///
+    /// If `mode` == DISABLED, the layer is opaque and `val` is ignored.
+    ///
+    /// If `mode` == PREMULTIPLIED or HW_MULTIPLY and `val` is NaN, the alpha
+    /// used when blending is determined by the per-pixel alpha channel.
+    ///
+    /// If `mode` == PREMULTIPLIED or HW_MULTIPLY and `val` is not NaN, the
+    /// alpha used when blending is the product of `val` and any per-pixel
+    /// alpha. Additionally, if `mode` == PREMULTIPLIED, then the hardware
+    /// premultiplies the color channel with `val` before blending.
+    ///
+    /// It is illegal to call this on a non-primary layer, to pass an
+    /// invalid mode, or to pass a value of `val` which is not NaN or
+    /// in the range [0, 1].
     strict SetLayerPrimaryAlpha(struct {
         layer_id LayerId;
         mode fuchsia.hardware.display.types.AlphaMode;
         val float32;
     });
 
-    // Configures the layer as a color layer with the given color in
-    // `pixel_format`.
-    //
-    // `color_bytes` vector is little-endian and of the exact size of one pixel
-    // in `pixel_format`.
-    //
-    // It is illegal to call this on an invalid layer or for the length of
-    // color_bytes to mismatch the size of the supplied format.
+    /// Configures the layer as a color layer with the given color in
+    /// `pixel_format`.
+    ///
+    /// `color_bytes` vector is little-endian and of the exact size of one pixel
+    /// in `pixel_format`.
+    ///
+    /// It is illegal to call this on an invalid layer or for the length of
+    /// color_bytes to mismatch the size of the supplied format.
     strict SetLayerColorConfig(struct {
         layer_id LayerId;
         pixel_format fuchsia.images2.PixelFormat;
         color_bytes vector<uint8>:MAX;
     });
 
-    // Sets the image for the layer.
-    //
-    // If wait_event_id corresponds to an imported event, the driver will
-    // wait for ZX_EVENT_SIGNALED on the object before presenting the image.
-    //
-    // If signal_event_id is valid, then the driver will signal the event with
-    // ZX_EVENT_SIGNALED when the image is no longer being presented.
-    //
-    // A layer's active image is the most recently applied image which either has
-    // no wait event or whose wait event has been signaled. Whenever a new image
-    // becomes active, any older images which never became active are dropped, and
-    // their signal events will be fired as soon as their wait events are
-    // signaled. The driver also does not have any concept like 'target vsync',
-    // meaning that if multiple images become active within one vsync period, then
-    // only the last image will actually be displayed.
-    //
-    // By default, the driver retains an active image until a new image becomes
-    // active. However, setting a layer's ImageConfig with SetLayerPrimaryConfig
-    // resets the layer's active and pending images, even if the new ImageConfig
-    // matches the old ImageConfig.
-    //
-    // An image cannot be used for multiple layers simultaneously, nor can an
-    // image be given back to the display coordinator while it is still in use.
-    // An image is considered in use when it is part of a pending configuration
-    // or from when its configuration is applied until its signal_event_id is
-    // signaled.
-    //
-    // It is illegal to call this with an invalid layer or image id, to
-    // call it on a color layer, or to call it with an image and layer whose
-    // ImageConfigs do not match. It is illegal to apply a configuration
-    // with an image layer that has no image (note that is is not illegal to
-    // validate such a configuration). It is illegal to reuse a wait event which
-    // another layer that has not been presented is waiting on.
+    /// Sets the image for the layer.
+    ///
+    /// If wait_event_id corresponds to an imported event, the driver will
+    /// wait for ZX_EVENT_SIGNALED on the object before presenting the image.
+    ///
+    /// If signal_event_id is valid, then the driver will signal the event with
+    /// ZX_EVENT_SIGNALED when the image is no longer being presented.
+    ///
+    /// A layer's active image is the most recently applied image which either has
+    /// no wait event or whose wait event has been signaled. Whenever a new image
+    /// becomes active, any older images which never became active are dropped, and
+    /// their signal events will be fired as soon as their wait events are
+    /// signaled. The driver also does not have any concept like 'target vsync',
+    /// meaning that if multiple images become active within one vsync period, then
+    /// only the last image will actually be displayed.
+    ///
+    /// By default, the driver retains an active image until a new image becomes
+    /// active. However, setting a layer's ImageConfig with SetLayerPrimaryConfig
+    /// resets the layer's active and pending images, even if the new ImageConfig
+    /// matches the old ImageConfig.
+    ///
+    /// An image cannot be used for multiple layers simultaneously, nor can an
+    /// image be given back to the display coordinator while it is still in use.
+    /// An image is considered in use when it is part of a pending configuration
+    /// or from when its configuration is applied until its signal_event_id is
+    /// signaled.
+    ///
+    /// It is illegal to call this with an invalid layer or image id, to
+    /// call it on a color layer, or to call it with an image and layer whose
+    /// ImageConfigs do not match. It is illegal to apply a configuration
+    /// with an image layer that has no image (note that is is not illegal to
+    /// validate such a configuration). It is illegal to reuse a wait event which
+    /// another layer that has not been presented is waiting on.
     strict SetLayerImage(struct {
         layer_id LayerId;
         image_id ImageId;
@@ -361,17 +361,17 @@ closed protocol Coordinator {
         signal_event_id EventId;
     });
 
-    // Attempts to validate the current configuration.
-    //
-    // When CheckConfig is called, the driver will validate the pending
-    // configuration. If res is UNSUPPORTED_CONFIG, then ops will be
-    // non-empty.
-    //
-    // Most SetX operations require revalidating the configuration. The
-    // following operations do not require revalidation.
-    // * SetLayerImage()
-    //
-    // If discard is true, the pending changes will be discarded after validation.
+    /// Attempts to validate the current configuration.
+    ///
+    /// When CheckConfig is called, the driver will validate the pending
+    /// configuration. If res is UNSUPPORTED_CONFIG, then ops will be
+    /// non-empty.
+    ///
+    /// Most SetX operations require revalidating the configuration. The
+    /// following operations do not require revalidation.
+    /// * SetLayerImage()
+    ///
+    /// If discard is true, the pending changes will be discarded after validation.
     strict CheckConfig(struct {
         discard bool;
     }) -> (struct {
@@ -379,12 +379,12 @@ closed protocol Coordinator {
         ops vector<ClientCompositionOp>:MAX;
     });
 
-    // Applies any pending changes to the current configuration. This will
-    // not apply pending changes to layers which are not on any display.
-    //
-    // If the pending configuration cannot be applied, this call will silently
-    // fail, so the client should ensure its configuration is valid with
-    // CheckConfig.
+    /// Applies any pending changes to the current configuration. This will
+    /// not apply pending changes to layers which are not on any display.
+    ///
+    /// If the pending configuration cannot be applied, this call will silently
+    /// fail, so the client should ensure its configuration is valid with
+    /// CheckConfig.
     strict ApplyConfig();
 
     // TODO(https://fxbug.dev/42152065): This is a temporary solution to support old
@@ -434,16 +434,16 @@ closed protocol Coordinator {
         signal_fences vector<zx.Handle:EVENT>:APPLY_CONFIG_MAX_SIGNAL_FENCES;
     });
 
-    // Sets whether or not vsync events will be given to this client. Defaults
-    // to false.
+    /// Sets whether or not vsync events will be given to this client. Defaults
+    /// to false.
     strict EnableVsync(struct {
         enable bool;
     });
 
-    // This API is used by the client to acknowledge receipt of vsync messages.
-    // The cookie sent should match the cookie received via vsync message (OnVsync).
-    // A cookie can only be acknowledged once. Using invalid cookies, or previously
-    // acknowledged cookies will not be accepted by the driver.
+    /// This API is used by the client to acknowledge receipt of vsync messages.
+    /// The cookie sent should match the cookie received via vsync message (OnVsync).
+    /// A cookie can only be acknowledged once. Using invalid cookies, or previously
+    /// acknowledged cookies will not be accepted by the driver.
     strict AcknowledgeVsync(struct {
         cookie uint64;
     });
@@ -497,28 +497,28 @@ closed protocol Coordinator {
         mode VirtconMode;
     });
 
-    // Event fired when the client gains or loses ownership of the displays.
-    //
-    // New clients should assume they do not have ownership of the display
-    // until this event informs them otherwise.
+    /// Event fired when the client gains or loses ownership of the displays.
+    ///
+    /// New clients should assume they do not have ownership of the display
+    /// until this event informs them otherwise.
     strict -> OnClientOwnershipChange(struct {
         has_ownership bool;
     });
 
-    // Import a sysmem buffer collection token. `buffer_collection_id` must not
-    // already be in use.
+    /// Import a sysmem buffer collection token. `buffer_collection_id` must not
+    /// already be in use.
     strict ImportBufferCollection(resource struct {
         buffer_collection_id BufferCollectionId;
         buffer_collection_token client_end:fuchsia.sysmem2.BufferCollectionToken;
     }) -> () error zx.Status;
 
-    // Release an imported buffer collection.
+    /// Release an imported buffer collection.
     strict ReleaseBufferCollection(struct {
         buffer_collection_id BufferCollectionId;
     });
 
-    // Takes an imported buffer collection and sets the constraints
-    // on it so that it can be imported with a specific config.
+    /// Takes an imported buffer collection and sets the constraints
+    /// on it so that it can be imported with a specific config.
     // TODO(https://fxbug.dev/42166207): Update this API to better support
     // optional fields.
     strict SetBufferCollectionConstraints(struct {
