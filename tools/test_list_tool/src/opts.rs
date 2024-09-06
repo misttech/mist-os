@@ -32,6 +32,11 @@ pub struct Opt {
     /// This is experimental as we are just prototyping
     /// TODO(b/294567466): Eventually this will replace test-list.json.
     pub test_config_output: Option<Utf8PathBuf>,
+
+    #[structopt(long = "ignore-device-test-errors")]
+    /// If set, do not fail if there are errors with device tests.
+    /// This may be desired for use from scripts that prefer to simply skip those tests.
+    pub ignore_device_test_errors: bool,
 }
 
 impl Opt {

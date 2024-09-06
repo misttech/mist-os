@@ -54,6 +54,7 @@ if (is_host) {
     "//scripts/lib/termout",
     "//third_party/colorama",
     "//third_party/jellyfish",
+    "//tools/test_list_tool:install",
   ]
 
   # Main executable target.

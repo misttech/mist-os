@@ -109,11 +109,7 @@ class TestExecution:
         if self._use_test_interface():
             # assert for mypy
             assert self._test.build.test.new_path is not None
-            return [
-                os.path.join(
-                    self._exec_env.out_dir, self._test.build.test.new_path
-                )
-            ]
+            return [os.path.join(self._test.build.test.new_path)]
         elif self._test.info.execution is not None:
             execution = self._test.info.execution
 
@@ -174,9 +170,7 @@ class TestExecution:
                 + suffix_args
             )
         elif self._test.build.test.path:
-            return [
-                os.path.join(self._exec_env.out_dir, self._test.build.test.path)
-            ] + self._flags.extra_args
+            return [self._test.build.test.path] + self._flags.extra_args
         else:
             raise TestCouldNotRun(
                 f"We do not know how to run this test: {str(self._test)}"

@@ -474,6 +474,7 @@ async def generate_test_list(
             out_path,
             "--test-components",
             os.path.join(exec_env.out_dir, "test_components.json"),
+            "--ignore-device-test-errors",
             recorder=recorder,
         )
         if result is None or result.return_code != 0:

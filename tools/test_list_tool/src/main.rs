@@ -424,13 +424,13 @@ fn run_tool() -> Result<(), Error> {
         })
         .partition(Result::is_ok);
 
-    if !errors.is_empty() {
+    if !errors.is_empty() && !opt.ignore_device_test_errors {
         let error_message: String = errors
             .into_iter()
             .map(Result::unwrap_err)
             .map(|err| err.to_string())
             .collect::<Vec<String>>()
-            .join("; ");
+            .join("\n");
         return Err(format_err!("{}", error_message));
     }
 
