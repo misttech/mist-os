@@ -16,6 +16,8 @@ group("blackout_all") {
     ":blackout_emulator_stable",
     ":blackout_emulator_unstable",
     ":blackout_fail",
+    ":blackout_starnix_arm64_stable",
+    ":blackout_starnix_arm64_unstable",
     ":blackout_starnix_vim3_stable",
     ":blackout_starnix_vim3_unstable",
     ":blackout_workbench_vim3_stable",
@@ -65,6 +67,20 @@ group("blackout_starnix_vim3_unstable") {
 }
 
 group("blackout_starnix_vim3_stable") {
+  testonly = true
+  deps = []
+}
+
+group("blackout_starnix_arm64_unstable") {
+  testonly = true
+  deps = [
+    # Fxfs tests
+    ":blackout_fxfs_tree_idle_suspend_timer_resume($host_toolchain)",
+    "//src/storage/blackout/target/fs-tree:blackout-fxfs-tree",
+  ]
+}
+
+group("blackout_starnix_arm64_stable") {
   testonly = true
   deps = []
 }
