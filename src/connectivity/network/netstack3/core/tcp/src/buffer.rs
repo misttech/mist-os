@@ -801,14 +801,16 @@ pub(crate) mod testutil {
 
 #[cfg(test)]
 mod test {
-    use proptest::proptest;
+    use alloc::format;
+
+    use netstack3_base::WindowSize;
     use proptest::strategy::{Just, Strategy};
     use proptest::test_runner::Config;
+    use proptest::{prop_assert, prop_assert_eq, proptest};
     use proptest_support::failed_seeds_no_std;
     use test_case::test_case;
 
     use super::*;
-    use netstack3_base::WindowSize;
 
     proptest! {
         #![proptest_config(Config {
@@ -835,18 +837,20 @@ mod test {
                 }
                 // assert that it's impossible to have more entries than the
                 // number of insertions performed.
-                assert!(assembler.outstanding.len() <= num_insertions_performed);
+                prop_assert!(assembler.outstanding.len() <= num_insertions_performed);
                 assembler.insert_inner(start..end);
                 num_insertions_performed += 1;
 
                 // assert that the ranges are sorted and don't overlap with
                 // each other.
                 for i in 1..assembler.outstanding.len() {
-                    assert!(assembler.outstanding[i-1].end.before(assembler.outstanding[i].start));
+                    prop_assert!(
+                        assembler.outstanding[i-1].end.before(assembler.outstanding[i].start)
+                    );
                 }
             }
-            assert_eq!(assembler.outstanding.first().unwrap().start, min_seq);
-            assert_eq!(assembler.outstanding.last().unwrap().end, max_seq);
+            prop_assert_eq!(assembler.outstanding.first().unwrap().start, min_seq);
+            prop_assert_eq!(assembler.outstanding.last().unwrap().end, max_seq);
         }
 
         #[test]
@@ -858,40 +862,40 @@ mod test {
             rb.make_readable(avail);
             // Assert that length is updated but everything else is unchanged.
             let RingBuffer { storage, head, len, shrink } = rb;
-            assert_eq!(len, old_len + avail);
-            assert_eq!(head, old_head);
-            assert_eq!(storage, old_storage);
-            assert_eq!(shrink, old_shrink);
+            prop_assert_eq!(len, old_len + avail);
+            prop_assert_eq!(head, old_head);
+            prop_assert_eq!(storage, old_storage);
+            prop_assert_eq!(shrink, old_shrink);
         }
 
         #[test]
         fn ring_buffer_write_at((mut rb, offset, data) in ring_buffer::with_offset_data()) {
             let old_head = rb.head;
             let old_len = rb.limits().len;
-            assert_eq!(rb.write_at(offset, &&data[..]), data.len());
-            assert_eq!(rb.head, old_head);
-            assert_eq!(rb.limits().len, old_len);
+            prop_assert_eq!(rb.write_at(offset, &&data[..]), data.len());
+            prop_assert_eq!(rb.head, old_head);
+            prop_assert_eq!(rb.limits().len, old_len);
             for i in 0..data.len() {
                 let masked = (rb.head + rb.len + offset + i) % rb.storage.len();
                 // Make sure that data are written.
-                assert_eq!(rb.storage[masked], data[i]);
+                prop_assert_eq!(rb.storage[masked], data[i]);
                 rb.storage[masked] = 0;
             }
             // And the other parts of the storage are untouched.
-            assert_eq!(rb.storage, vec![0; rb.storage.len()])
+            prop_assert_eq!(&rb.storage, &vec![0; rb.storage.len()]);
         }
 
         #[test]
         fn ring_buffer_read_with((mut rb, expected, consume) in ring_buffer::with_read_data()) {
-            assert_eq!(rb.limits().len, expected.len());
+            prop_assert_eq!(rb.limits().len, expected.len());
             let nread = rb.read_with(|readable| {
                 assert!(readable.len() == 1 || readable.len() == 2);
                 let got = readable.concat();
                 assert_eq!(got, expected);
                 consume
             });
-            assert_eq!(nread, consume);
-            assert_eq!(rb.limits().len, expected.len() - consume);
+            prop_assert_eq!(nread, consume);
+            prop_assert_eq!(rb.limits().len, expected.len() - consume);
         }
 
         #[test]
@@ -915,27 +919,28 @@ mod test {
                 acc
             });
             for (i, x) in new_writable.iter().enumerate().take(written) {
-                assert_eq!(*x, BYTE_TO_WRITE, "i={}, rb={:?}", i, rb);
+                prop_assert_eq!(*x, BYTE_TO_WRITE, "i={}, rb={:?}", i, rb);
             }
-            assert!(new_writable.len() >= written);
+            prop_assert!(new_writable.len() >= written);
 
             let RingBuffer { storage, head, len, shrink } = rb;
-            assert_eq!(len, old_len - readable);
+            prop_assert_eq!(len, old_len - readable);
             let shrank = old_shrink.is_some() && shrink.is_none();
             if !shrank {
-                assert_eq!(head, (old_head + readable) % old_storage.len());
-                assert_eq!(storage, old_storage);
+                prop_assert_eq!(head, (old_head + readable) % old_storage.len());
+                prop_assert_eq!(storage, old_storage);
             }
 
         }
 
         #[test]
         fn ring_buffer_peek_with((mut rb, expected, offset) in ring_buffer::with_read_data()) {
-            assert_eq!(rb.limits().len, expected.len());
-            let () = rb.peek_with(offset, |readable| {
-                assert_eq!(readable.to_vec(), &expected[offset..]);
-            });
-            assert_eq!(rb.limits().len, expected.len());
+            prop_assert_eq!(rb.limits().len, expected.len());
+            rb.peek_with(offset, |readable| {
+                prop_assert_eq!(readable.to_vec(), &expected[offset..]);
+                Ok(())
+            })?;
+            prop_assert_eq!(rb.limits().len, expected.len());
         }
 
         #[test]
@@ -946,7 +951,7 @@ mod test {
                 acc + slice.len()
             });
             let BufferLimits {len, capacity} = rb.limits();
-            assert_eq!(writable_len + len, capacity);
+            prop_assert_eq!(writable_len + len, capacity);
             for i in 0..capacity {
                 let expected = if i < len {
                     0
@@ -954,7 +959,7 @@ mod test {
                     BYTE_TO_WRITE
                 };
                 let idx = (rb.head + i) % rb.storage.len();
-                assert_eq!(rb.storage[idx], expected);
+                prop_assert_eq!(rb.storage[idx], expected);
             }
         }
 
@@ -969,17 +974,17 @@ mod test {
             let old_len = rb.limits().len;
             rb.set_target_size(new_cap);
 
-            assert_eq!(rb.limits().len, old_len);
+            prop_assert_eq!(rb.limits().len, old_len);
             let new_writable = rb.writable_regions().into_iter().fold(Vec::new(), |mut acc, slice| {
                 acc.extend_from_slice(slice);
                 acc
             });
             let BufferLimits {len, capacity} = rb.limits();
-            assert_eq!(new_writable.len() + len, capacity);
-            assert!(new_writable.len() >= written);
+            prop_assert_eq!(new_writable.len() + len, capacity);
+            prop_assert!(new_writable.len() >= written);
             for (i, x) in new_writable.iter().enumerate() {
                 let expected = (i < written).then_some(BYTE_TO_WRITE).unwrap_or(0);
-                assert_eq!(*x, expected, "i={}, rb={:?}", i, rb);
+                prop_assert_eq!(*x, expected, "i={}, rb={:?}", i, rb);
             }
         }
     }

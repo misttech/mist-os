@@ -413,10 +413,11 @@ impl<'d, T, const INLINE_SIZE: usize> IntoIterator for &'d DescendantCounts<T, I
 
 #[cfg(test)]
 mod tests {
-    use alloc::vec;
     use alloc::vec::Vec;
+    use alloc::{format, vec};
 
     use assert_matches::assert_matches;
+    use proptest::prop_assert_eq;
     use proptest::strategy::Strategy;
 
     use super::*;
@@ -627,7 +628,10 @@ mod tests {
         )
     }
 
-    fn validate_map(map: TestSocketMap<u8>, reference: HashMap<Address, TV<u8, u8>>) {
+    fn validate_map(
+        map: TestSocketMap<u8>,
+        reference: HashMap<Address, TV<u8, u8>>,
+    ) -> Result<(), proptest::test_runner::TestCaseError> {
         let map_values: HashMap<_, _> = map.iter().map(|(a, v)| (*a, *v)).collect();
         assert_eq!(map_values, reference);
         let TestSocketMap { len, map: _ } = map;
@@ -647,12 +651,14 @@ mod tests {
             });
 
             let MapValue { descendant_counts, value: _ } = entry;
-            assert_eq!(
+            prop_assert_eq!(
                 expected_tag_counts,
                 descendant_counts.into_iter().as_map(),
-                "key = {key:?}"
+                "key = {:?}",
+                key
             );
         }
+        Ok(())
     }
 
     proptest::proptest! {
@@ -672,7 +678,7 @@ mod tests {
 
             // After all operations have completed, check invariants for
             // SocketMap.
-            validate_map(map, reference);
+            validate_map(map, reference)?;
         }
 
     }

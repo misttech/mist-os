@@ -254,10 +254,11 @@ impl<'a, const N: usize> InnerPacketBuilder for FragmentedPayload<'a, N> {
 #[cfg(test)]
 mod test {
     use super::*;
+    use alloc::format;
 
     use packet::Serializer as _;
-    use proptest::proptest;
     use proptest::test_runner::Config;
+    use proptest::{prop_assert_eq, proptest};
     use proptest_support::failed_seeds_no_std;
     use test_case::test_case;
 
@@ -329,12 +330,12 @@ mod test {
 
         #[test]
         fn fragmented_payload_to_vec(payload in fragmented_payload::with_payload()) {
-            assert_eq!(payload.to_vec(), &TEST_BYTES[..]);
+            prop_assert_eq!(payload.to_vec(), &TEST_BYTES[..]);
         }
 
         #[test]
         fn fragmented_payload_len(payload in fragmented_payload::with_payload()) {
-            assert_eq!(payload.len(), TEST_BYTES.len())
+            prop_assert_eq!(payload.len(), TEST_BYTES.len())
         }
 
         #[test]
@@ -342,7 +343,7 @@ mod test {
             let want = &TEST_BYTES[start..end];
             let start = u32::try_from(start).unwrap();
             let end = u32::try_from(end).unwrap();
-            assert_eq!(payload.clone().slice(start..end).to_vec(), want);
+            prop_assert_eq!(payload.clone().slice(start..end).to_vec(), want);
         }
 
         #[test]
@@ -350,7 +351,7 @@ mod test {
             let mut buffer = [0; TEST_BYTES.len()];
             let buffer = &mut buffer[0..(end-start)];
             payload.partial_copy(start, buffer);
-            assert_eq!(buffer, &TEST_BYTES[start..end]);
+            prop_assert_eq!(buffer, &TEST_BYTES[start..end]);
         }
     }
 

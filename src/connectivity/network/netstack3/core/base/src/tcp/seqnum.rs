@@ -317,10 +317,12 @@ mod testutils {
 
 #[cfg(test)]
 mod tests {
+    use alloc::format;
+
     use proptest::arbitrary::any;
-    use proptest::proptest;
     use proptest::strategy::{Just, Strategy};
     use proptest::test_runner::Config;
+    use proptest::{prop_assert, prop_assert_eq, proptest};
     use proptest_support::failed_seeds_no_std;
     use test_case::test_case;
 
@@ -363,67 +365,67 @@ mod tests {
 
         #[test]
         fn seqnum_ord_is_reflexive(a in arb_seqnum()) {
-            assert_eq!(a, a)
+            prop_assert_eq!(a, a)
         }
 
         #[test]
         fn seqnum_ord_is_total(a in arb_seqnum(), b in arb_seqnum()) {
             if a == b {
-                assert!(!a.before(b) && !b.before(a))
+                prop_assert!(!a.before(b) && !b.before(a))
             } else {
-                assert!(a.before(b) ^ b.before(a))
+                prop_assert!(a.before(b) ^ b.before(a))
             }
         }
 
         #[test]
         fn seqnum_ord_is_transitive((a, b, c) in arb_seqnum_trans_tripple()) {
-            assert!(a.before(b) && b.before(c) && a.before(c));
+            prop_assert!(a.before(b) && b.before(c) && a.before(c));
         }
 
         #[test]
         fn seqnum_add_positive_greater(a in arb_seqnum(), b in 1..=i32::MAX) {
-            assert!(a.before(a + b))
+            prop_assert!(a.before(a + b))
         }
 
         #[test]
         fn seqnum_add_negative_smaller(a in arb_seqnum(), b in i32::MIN..=-1) {
-            assert!(a.after(a + b))
+            prop_assert!(a.after(a + b))
         }
 
         #[test]
         fn seqnum_sub_positive_smaller(a in arb_seqnum(), b in 1..=i32::MAX) {
-            assert!(a.after(a - b))
+            prop_assert!(a.after(a - b))
         }
 
         #[test]
         fn seqnum_sub_negative_greater(a in arb_seqnum(), b in i32::MIN..=-1) {
-            assert!(a.before(a - b))
+            prop_assert!(a.before(a - b))
         }
 
         #[test]
         fn seqnum_zero_identity(a in arb_seqnum()) {
-            assert_eq!(a, a + 0)
+            prop_assert_eq!(a, a + 0)
         }
 
         #[test]
         fn seqnum_before_after_inverse(a in arb_seqnum(), b in arb_seqnum()) {
-            assert_eq!(a.after(b), b.before(a))
+            prop_assert_eq!(a.after(b), b.before(a))
         }
 
         #[test]
         fn seqnum_wraps_around_at_max_length(a in arb_seqnum()) {
-            assert!(a.before(a + MAX_PAYLOAD_AND_CONTROL_LEN));
-            assert!(a.after(a + MAX_PAYLOAD_AND_CONTROL_LEN + 1));
+            prop_assert!(a.before(a + MAX_PAYLOAD_AND_CONTROL_LEN));
+            prop_assert!(a.after(a + MAX_PAYLOAD_AND_CONTROL_LEN + 1));
         }
 
         #[test]
         fn window_size_less_than_or_eq_to_max(wnd in 0..=WindowSize::MAX.0) {
-            assert_eq!(WindowSize::from_u32(wnd), Some(WindowSize(wnd)));
+            prop_assert_eq!(WindowSize::from_u32(wnd), Some(WindowSize(wnd)));
         }
 
         #[test]
         fn window_size_greater_than_max(wnd in WindowSize::MAX.0+1..=u32::MAX) {
-            assert_eq!(WindowSize::from_u32(wnd), None);
+            prop_assert_eq!(WindowSize::from_u32(wnd), None);
         }
     }
 }
