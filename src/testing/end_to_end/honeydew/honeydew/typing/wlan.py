@@ -79,6 +79,7 @@ class SecurityType(enum.StrEnum):
 
     @staticmethod
     def from_fidl(fidl: f_wlan_policy.SecurityType) -> "SecurityType":
+        """Parse from a fuchsia.wlan.policy/SecurityType."""
         match int(fidl):
             case f_wlan_policy.SecurityType.NONE:
                 return SecurityType.NONE
@@ -94,6 +95,7 @@ class SecurityType(enum.StrEnum):
                 raise TypeError(f"Unknown SecurityType: {fidl}")
 
     def to_fidl(self) -> f_wlan_policy.SecurityType:
+        """Convert to a fuchsia.wlan.policy/SecurityType."""
         match self:
             case SecurityType.NONE:
                 return f_wlan_policy.SecurityType.NONE
@@ -118,6 +120,7 @@ class WlanClientState(enum.StrEnum):
 
     @staticmethod
     def from_fidl(fidl: f_wlan_policy.WlanClientState) -> "WlanClientState":
+        """Parse from a fuchsia.wlan.policy/WlanClientState."""
         match int(fidl):
             case f_wlan_policy.WlanClientState.CONNECTIONS_DISABLED:
                 return WlanClientState.CONNECTIONS_DISABLED
@@ -140,6 +143,7 @@ class ConnectionState(enum.StrEnum):
 
     @staticmethod
     def from_fidl(fidl: f_wlan_policy.ConnectionState) -> "ConnectionState":
+        """Parse from a fuchsia.wlan.policy/ConnectionState."""
         match int(fidl):
             case f_wlan_policy.ConnectionState.FAILED:
                 return ConnectionState.FAILED
@@ -166,6 +170,7 @@ class DisconnectStatus(enum.StrEnum):
 
     @staticmethod
     def from_fidl(fidl: f_wlan_policy.DisconnectStatus) -> "DisconnectStatus":
+        """Parse from a fuchsia.wlan.policy/DisconnectStatus."""
         match int(fidl):
             case f_wlan_policy.DisconnectStatus.TIMED_OUT:
                 return DisconnectStatus.TIMED_OUT
@@ -193,6 +198,7 @@ class RequestStatus(enum.StrEnum):
 
     @staticmethod
     def from_fidl(fidl: f_wlan_common.RequestStatus) -> "RequestStatus":
+        """Parse from a fuchsia.wlan.common/RequestStatus."""
         match int(fidl):
             case f_wlan_common.RequestStatus.ACKNOWLEDGED:
                 return RequestStatus.ACKNOWLEDGED
@@ -225,6 +231,7 @@ class WlanMacRole(enum.StrEnum):
 
     @staticmethod
     def from_fidl(fidl: f_wlan_common.WlanMacRole) -> "WlanMacRole":
+        """Parse from a fuchsia.wlan.common/WlanMacRole."""
         match int(fidl):
             case 1:
                 return WlanMacRole.CLIENT
@@ -236,6 +243,7 @@ class WlanMacRole(enum.StrEnum):
                 raise TypeError(f"Unknown WlanMacRole: {fidl}")
 
     def to_fidl(self) -> f_wlan_common.WlanMacRole:
+        """Convert to a fuchsia.wlan.common/WlanMacRole."""
         match self:
             case WlanMacRole.CLIENT:
                 return f_wlan_common.WlanMacRole.CLIENT
@@ -367,6 +375,7 @@ class Protection(enum.IntEnum):
 
     @staticmethod
     def from_fidl(fidl: f_wlan_sme.Protection) -> "Protection":
+        """Parse from a fuchsia.wlan.sme/Protection."""
         match fidl:
             case p if isinstance(p, f_wlan_sme.Protection) and (
                 int(p) >= 0 and int(p) <= 11
@@ -405,6 +414,8 @@ class NetworkIdentifier:
 
     @staticmethod
     def from_fidl(fidl: f_wlan_policy.NetworkIdentifier) -> "NetworkIdentifier":
+        """Parse from a fuchsia.wlan.policy/NetworkIdentifier."""
+
         return NetworkIdentifier(
             ssid=bytes(fidl.ssid).decode("utf-8"),
             security_type=SecurityType.from_fidl(fidl.type),
@@ -427,6 +438,7 @@ class NetworkState:
 
     @staticmethod
     def from_fidl(fidl: f_wlan_policy.NetworkState) -> "NetworkState":
+        """Parse from a fuchsia.wlan.policy/NetworkState."""
         return NetworkState(
             network_identifier=NetworkIdentifier.from_fidl(fidl.id),
             connection_state=ConnectionState.from_fidl(fidl.state),
@@ -456,6 +468,7 @@ class ClientStateSummary:
     def from_fidl(
         fidl: f_wlan_policy.ClientStateSummary,
     ) -> "ClientStateSummary":
+        """Parse from a fuchsia.wlan.policy/ClientStateSummary."""
         return ClientStateSummary(
             state=WlanClientState.from_fidl(fidl.state),
             networks=[NetworkState.from_fidl(n) for n in fidl.networks],
@@ -482,6 +495,7 @@ class WlanChannel:
 
     @staticmethod
     def from_fidl(fidl: f_wlan_common.WlanChannel) -> "WlanChannel":
+        """Parse from a fuchsia.wlan.common/WlanChannel."""
         return WlanChannel(
             primary=fidl.primary,
             cbw=ChannelBandwidth.from_fidl(fidl.cbw),
@@ -489,6 +503,7 @@ class WlanChannel:
         )
 
     def to_fidl(self) -> f_wlan_common.WlanChannel:
+        """Convert to a fuchsia.wlan.common/WlanChannel."""
         return WlanChannel(
             primary=self.primary,
             cbw=self.cbw.to_fidl(),
@@ -513,7 +528,7 @@ class QueryIfaceResponse:
     def from_fidl(
         fidl: f_wlan_device_service.QueryIfaceResponse,
     ) -> "QueryIfaceResponse":
-        """Create a QueryIFaceResponse from the FIDL equivalent."""
+        """Parse from a fuchsia.wlan.device.service/QueryIfaceResponse."""
         return QueryIfaceResponse(
             role=WlanMacRole.from_fidl(fidl.role),
             id=fidl.id,
@@ -557,6 +572,7 @@ class BssDescription:
 
     @staticmethod
     def from_fidl(fidl: f_wlan_internal.BssDescription) -> "BssDescription":
+        """Parse from a fuchsia.wlan.internal/BssDescription."""
         return BssDescription(
             bssid=list(fidl.bssid),
             bss_type=BssType.from_fidl(fidl.bss_type),
@@ -569,6 +585,7 @@ class BssDescription:
         )
 
     def to_fidl(self) -> f_wlan_internal.BssDescription:
+        """Convert to a fuchsia.wlan.internal/BssDescription."""
         return f_wlan_internal.BssDescription(
             bssid=self.bssid,
             bss_type=self.bss_type.to_fidl(),
@@ -631,7 +648,7 @@ class ClientStatusResponse(Protocol):
     def from_fidl(
         fidl: f_wlan_sme.ClientStatusResponse,
     ) -> "ClientStatusResponse":
-        """Convert a ClientStatusResponse FIDL to the corresponding type."""
+        """Parse from a fuchsia.wlan.sme/ClientStatusResponse."""
         if fidl.connected:
             ap: f_wlan_sme.ServingApInfo = fidl.connected
             return ClientStatusConnected(
