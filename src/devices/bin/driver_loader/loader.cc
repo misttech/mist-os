@@ -73,6 +73,7 @@ zx::result<fidl::ClientEnd<fuchsia_driver_loader::DriverHost>> Loader::Start(
   if (!decoded_executable) {
     return zx::error(ZX_ERR_INVALID_ARGS);
   }
+  // TODO(https://fxbug.dev/365122208): we should cache the decoded ptr per vdso version.
   Linker::Module::DecodedPtr decoded_vdso =
       Linker::Module::Decoded::Create(diag, std::move(vdso_vmo), kPageSize);
   if (!decoded_vdso) {
@@ -84,6 +85,11 @@ zx::result<fidl::ClientEnd<fuchsia_driver_loader::DriverHost>> Loader::Start(
                                   Linker::Implicit(std::move(decoded_vdso))},
                                  GetDepFunction(diag, std::move(lib_dir)));
   if (!init_result) {
+    // We usually do not expect this to fail. It's possible that there are errors
+    // reported to the diagnostics (such as for missing deps), but |init_result| will still be
+    // true. For non fatal errors, we will try to proceed as far as possible in order to catch as
+    // many issues as possible.
+    LOGF(ERROR, "Linker init failed, probably due to a very invalid module");
     return zx::error(ZX_ERR_INTERNAL);
   }
 
@@ -94,6 +100,10 @@ zx::result<fidl::ClientEnd<fuchsia_driver_loader::DriverHost>> Loader::Start(
 
   // Allocate new child vmars.
   if (!linker.Allocate(diag, root_vmar.borrow())) {
+    // As |Init| has succeeded, |Allocate| should only fail due to system errors such as resource
+    // constraints, rather than issues with the module itself. This may be due to kernel OOM, or
+    // that there are too many existing mappings.
+    LOGF(ERROR, "Linker failed to allocate in vmar, address space may be full");
     return zx::error(ZX_ERR_INTERNAL);
   }
 
@@ -109,27 +119,38 @@ zx::result<fidl::ClientEnd<fuchsia_driver_loader::DriverHost>> Loader::Start(
     return zx::error(ZX_ERR_INTERNAL);
   }
 
-  if (diag.errors() != 0) {
-    LOGF(ERROR, "Linker diagnostics reported %u errors, skipping loading", diag.errors());
-    return zx::error(ZX_ERR_INTERNAL);
+  // Since |DiagnosticsFlags::multiple_errors| is set to true, we would not have returned early
+  // for non-fatal errors or warnings. Check now before attempting to continue loading.
+  auto check_errors = [&diag](std::string_view what, std::string_view error_msg) -> zx::result<> {
+    if ((diag.errors() != 0) || (diag.warnings() != 0)) {
+      LOGF(ERROR, "Linker diagnostics reported %u errors, %u warnings during %s, %s aborted. %s.",
+           diag.errors(), diag.warnings(), what, what, error_msg);
+      return zx::error(ZX_ERR_INTERNAL);
+    }
+    return zx::ok();
+  };
+
+  if (auto result = check_errors("relocation", "This is likely due to a bad driver host package");
+      result.is_error()) {
+    return result.take_error();
   }
 
   // Load the segments into the allocated vmars.
   if (!linker.Load(diag)) {
     return zx::error(ZX_ERR_INTERNAL);
   }
-
-  if (diag.errors() != 0) {
-    LOGF(ERROR, "Linker diagnostics reported %u errors, skipping linker.Commit", diag.errors());
-    return zx::error(ZX_ERR_INTERNAL);
+  if (auto result = check_errors("loading", "This is an unexpected error"); result.is_error()) {
+    return result.take_error();
   }
 
   // Commit the VMARs and mappings.
   linker.Commit();
 
+  auto preloaded_modules = linker.PreloadedImplicit(*init_result);
   // Start the process.
   auto process_state = ProcessState::Create(remote_abi_stub_, std::move(process), std::move(thread),
-                                            std::move(root_vmar), std::move(process_start_args));
+                                            std::move(root_vmar), std::move(process_start_args),
+                                            std::move(preloaded_modules));
   if (process_state.is_error()) {
     LOGF(ERROR, "Failed to create process state: %s", process_state.status_string());
     return process_state.take_error();
@@ -175,10 +196,16 @@ zx::result<zx::vmo> Loader::GetDepVmo(fidl::UnownedClientEnd<fuchsia_io::Directo
 // static
 zx::result<std::unique_ptr<Loader::ProcessState>> Loader::ProcessState::Create(
     ld::RemoteAbiStub<>::Ptr remote_abi_stub, zx::process process, zx::thread thread,
-    zx::vmar root_vmar, const ProcessStartArgs& args) {
-  auto process_state = std::unique_ptr<ProcessState>(
-      new ProcessState(std::move(remote_abi_stub), std::move(process), std::move(thread),
-                       std::move(root_vmar), std::move(args)));
+    zx::vmar root_vmar, const ProcessStartArgs& args, Linker::InitModuleList preloaded_modules) {
+  auto process_state = std::unique_ptr<ProcessState>(new ProcessState());
+
+  process_state->remote_abi_stub_ = std::move(remote_abi_stub);
+  process_state->process_ = std::move(process);
+  process_state->thread_ = std::move(thread);
+  process_state->root_vmar_ = std::move(root_vmar);
+  process_state->process_start_args_ = std::move(args);
+  process_state->preloaded_modules_ = std::move(preloaded_modules);
+
   zx_status_t status = process_state->AllocateStack();
   if (status != ZX_OK) {
     return zx::error(status);
@@ -241,8 +268,104 @@ zx_status_t Loader::ProcessState::Start(zx::channel bootstrap_receiver) {
 
 void Loader::ProcessState::LoadDriver(LoadDriverRequestView request,
                                       LoadDriverCompleter::Sync& completer) {
-  // TODO(https://fxbug.dev/341998660): implement this.
-  completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+  auto result =
+      LoadDriverModule(std::string(request->driver_soname().get()),
+                       std::move(request->driver_binary()), std::move(request->driver_libs()));
+  if (result.is_error()) {
+    completer.ReplyError(result.status_value());
+    return;
+  }
+  fidl::Arena arena;
+  completer.ReplySuccess(fuchsia_driver_loader::wire::DriverHostLoadDriverResponse::Builder(arena)
+                             .runtime_load_address(*result)
+                             .Build());
+}
+
+zx::result<Loader::ProcessState::DriverStartAddr> Loader::ProcessState::LoadDriverModule(
+    std::string driver_name, zx::vmo driver_module,
+    fidl::ClientEnd<fuchsia_io::Directory> lib_dir) {
+  auto diag = MakeDiagnostics();
+
+  Linker::Soname root_module_name{driver_name};
+
+  Linker linker;
+  linker.set_abi_stub(remote_abi_stub_);
+
+  Linker::Module::DecodedPtr decoded_module =
+      Linker::Module::Decoded::Create(diag, std::move(driver_module), kPageSize);
+  if (!decoded_module) {
+    LOGF(ERROR, "Failed to decode driver module for %s", root_module_name.c_str());
+    return zx::error(ZX_ERR_INVALID_ARGS);
+  }
+
+  // Make a copy of the list of driver host initial modules that will be in the
+  // driver's dynamic linking namespace - this is the driver host (libdriver.so) and the vDSO.
+  Linker::InitModuleList initial_modules = preloaded_modules_;
+  initial_modules.emplace_back(Linker::RootModule(decoded_module, root_module_name));
+
+  auto init_result =
+      linker.Init(diag, std::move(initial_modules), GetDepFunction(diag, std::move(lib_dir)));
+  if (!init_result) {
+    // We usually do not expect this to fail. It's possible that there are errors
+    // reported to the diagnostics (such as for missing deps), but |init_result| will still be
+    // true. For non fatal errors, we will try to proceed as far as possible in order to catch as
+    // many issues as possible.
+    LOGF(ERROR, "Linker init failed, probably due to a very invalid module");
+    return zx::error(ZX_ERR_INVALID_ARGS);
+  }
+
+  ZX_ASSERT_MSG(init_result->size() == 3u,
+                "Linker.Init returned an unexpected number of elements, want %u got %lu", 3u,
+                init_result->size());
+
+  if (!linker.Allocate(diag, root_vmar_.borrow())) {
+    // As |Init| has succeeded, |Allocate| should only fail due to system errors such as resource
+    // constraints, rather than issues with the module itself. This may be due to kernel OOM, or
+    // that there are too many existing mappings.
+    LOGF(ERROR, "Linker failed to allocate in vmar, address space may be full");
+    return zx::error(ZX_ERR_INTERNAL);
+  }
+
+  if (!linker.Relocate(diag)) {
+    return zx::error(ZX_ERR_INTERNAL);
+  }
+
+  // Since |DiagnosticsFlags::multiple_errors| is set to true, we would not have returned early
+  // for non-fatal errors or warnings. Check now before attempting to continue loading.
+  auto check_errors = [&diag](std::string_view what, std::string_view error_msg) -> zx::result<> {
+    if ((diag.errors() != 0) || (diag.warnings() != 0)) {
+      LOGF(ERROR, "Linker diagnostics reported %u errors, %u warnings during %s, %s aborted. %s.",
+           diag.errors(), diag.warnings(), what, what, error_msg);
+      return zx::error(ZX_ERR_INTERNAL);
+    }
+    return zx::ok();
+  };
+
+  if (auto result = check_errors("relocation", "This is likely due to a bad driver host package");
+      result.is_error()) {
+    return result.take_error();
+  }
+
+  if (!linker.Load(diag)) {
+    return zx::error(ZX_ERR_INTERNAL);
+  }
+  if (auto result = check_errors("loading", "This is an unexpected error"); result.is_error()) {
+    return result.take_error();
+  }
+
+  linker.Commit();
+
+  // Look up the module's entry-point symbol.
+  // TODO(https://fxbug.dev/365155458): we should return abi_vaddr() instead.
+  constexpr elfldltl::SymbolName kDriverStart{kDriverStartSymbol};
+  auto* symbol = kDriverStart.Lookup(linker.main_module().module().symbols);
+  if (!symbol) {
+    LOGF(ERROR, "Could not find driver start symbol");
+    return zx::error(ZX_ERR_NOT_FOUND);
+  }
+  DriverStartAddr addr = symbol->value + linker.main_module().load_bias();
+  ZX_ASSERT_MSG(addr != 0u, "Got null for driver start address");
+  return zx::ok(addr);
 }
 
 }  // namespace driver_loader

@@ -28,6 +28,11 @@ namespace fdecl = fuchsia_component_decl;
 namespace fio = fuchsia::io;
 namespace frunner = fuchsia_component_runner;
 
+// Returns the exit status of the process.
+// TODO(https://fxbug.dev/349913885): this will eventually be included in the bootstrap halper
+// library.
+int64_t WaitForProcessExit(const zx::process& process);
+
 class DriverHostRunnerTest : public gtest::TestLoopFixture {
   void SetUp() {
     loader_ = driver_loader::Loader::Create(dispatcher());
@@ -47,9 +52,6 @@ class DriverHostRunnerTest : public gtest::TestLoopFixture {
                        const std::vector<std::string_view> expected_libs);
 
   fidl::ClientEnd<fuchsia_component::Realm> ConnectToRealm();
-
-  // Returns the exit status of the process.
-  int64_t WaitForProcessExit(const zx::process& process);
 
   driver_runner::TestRealm& realm() { return realm_; }
 
@@ -116,7 +118,7 @@ fidl::ClientEnd<fuchsia_component::Realm> DriverHostRunnerTest::ConnectToRealm()
   return std::move(realm_endpoints.client);
 }
 
-int64_t DriverHostRunnerTest::WaitForProcessExit(const zx::process& process) {
+int64_t WaitForProcessExit(const zx::process& process) {
   int64_t result = -1;
 
   auto wait_for_termination = [&process, &result]() {
@@ -197,9 +199,7 @@ TEST_F(DynamicLinkingTest, StartRootDriver) {
   test_utils::TestPkg driver_host_test_pkg(std::move(driver_host_pkg_endpoints.server),
                                            kDriverHostTestPkgPath, "bin/driver_host2",
                                            kDriverHostExpectedLibs);
-  // TODO(https://fxbug.dev/341998660): currently starting the driver has not been
-  // completely implemented, so the returned StartDriverResult is not very useful.
-  [[maybe_unused]] auto root_driver = StartDriver(
+  auto root_driver = StartDriver(
       {
           .url = driver_runner::root_driver_url,
           .binary = kRootDriverBinary,
@@ -211,6 +211,12 @@ TEST_F(DynamicLinkingTest, StartRootDriver) {
   std::unordered_set<const driver_manager::DriverHostRunner::DriverHost*> driver_hosts =
       driver_runner().driver_host_runner_for_tests()->DriverHosts();
   ASSERT_EQ(1u, driver_hosts.size());
+
+  const zx::process& process = (*driver_hosts.begin())->process();
+  ASSERT_EQ(24, WaitForProcessExit(process));
+
+  StopDriverComponent(std::move(root_driver.controller));
+  realm().AssertDestroyedChildren({driver_runner::CreateChildRef("dev", "boot-drivers")});
 }
 
 }  // namespace

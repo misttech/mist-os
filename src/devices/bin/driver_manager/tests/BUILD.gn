@@ -297,14 +297,6 @@ fuchsia_test_package("driver-manager-tests") {
 }
 
 fuchsia_test_package("driver-host-runner-tests") {
-  # TODO(https://fxbug.dev/341998660): the StartRootDriver test will log an error until we
-  # finish implementing the driver loading.
-  test_specs = {
-    log_settings = {
-      max_severity = "ERROR"
-    }
-  }
-
   test_components = [ ":driver-host-runner-test" ]
   deps = [
     "modules:modules.basic",

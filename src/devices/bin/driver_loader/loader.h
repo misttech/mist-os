@@ -57,7 +57,8 @@ class Loader {
 
     static zx::result<std::unique_ptr<ProcessState>> Create(
         ld::RemoteAbiStub<>::Ptr remote_abi_stub, zx::process process, zx::thread thread,
-        zx::vmar root_vmar, const ProcessStartArgs& process_start_args);
+        zx::vmar root_vmar, const ProcessStartArgs& process_start_args,
+        Linker::InitModuleList preloaded_modules);
 
     // fidl::WireServer<fuchsia_driver_loader::DriverHost>
     void LoadDriver(LoadDriverRequestView request, LoadDriverCompleter::Sync& completer) override;
@@ -74,14 +75,19 @@ class Loader {
     zx_status_t Start(zx::channel bootstrap_receiver);
 
    private:
+    using DriverStartAddr = Linker::size_type;
+
+    // TODO(https://fxbug.dev/357948288): this is a placeholder until we can sub in
+    // the actual start function signature.
+    static constexpr std::string_view kDriverStartSymbol = "DriverStart";
+
     // Use |Create| instead.
-    ProcessState(ld::RemoteAbiStub<>::Ptr remote_abi_stub, zx::process process, zx::thread thread,
-                 zx::vmar root_vmar, ProcessStartArgs process_start_args)
-        : remote_abi_stub_(std::move(remote_abi_stub)),
-          process_(std::move(process)),
-          thread_(std::move(thread)),
-          root_vmar_(std::move(root_vmar)),
-          process_start_args_(std::move(process_start_args)) {}
+    ProcessState() = default;
+
+    // Loads a driver module into the driver host process.
+    // Returns the start address of the driver.
+    zx::result<DriverStartAddr> LoadDriverModule(std::string driver_name, zx::vmo driver_module,
+                                                 fidl::ClientEnd<fuchsia_io::Directory> lib_dir);
 
     // Allocates the stack for the initial thread of the process.
     zx_status_t AllocateStack();
@@ -99,6 +105,7 @@ class Loader {
     uintptr_t initial_stack_pointer_ = 0;
 
     std::optional<fidl::ServerBinding<fuchsia_driver_loader::DriverHost>> binding_;
+    Linker::InitModuleList preloaded_modules_;
   };
 
   // Use |Create| instead.
