@@ -41,14 +41,6 @@ pub enum PrivacyExplicitOption<T> {
 pub struct ComponentAllowlist(ComponentAllowlistState);
 
 impl ComponentAllowlist {
-    pub fn filtering_enabled(&self) -> bool {
-        match self.0 {
-            ComponentAllowlistState::FilteringEnabled { .. }
-            | ComponentAllowlistState::AllFilteredOut => true,
-            ComponentAllowlistState::FilteringDisabled => false,
-        }
-    }
-
     pub fn all_filtered_out(&self) -> bool {
         matches!(self.0, ComponentAllowlistState::AllFilteredOut)
     }
@@ -88,6 +80,14 @@ impl ComponentAllowlist {
 
 #[cfg(test)]
 impl ComponentAllowlist {
+    pub fn filtering_enabled(&self) -> bool {
+        match self.0 {
+            ComponentAllowlistState::FilteringEnabled { .. }
+            | ComponentAllowlistState::AllFilteredOut => true,
+            ComponentAllowlistState::FilteringDisabled => false,
+        }
+    }
+
     pub fn new_disabled() -> Self {
         ComponentAllowlist(ComponentAllowlistState::FilteringDisabled)
     }
@@ -158,13 +158,6 @@ enum StaticHierarchyAllowlistState {
 pub struct StaticHierarchyAllowlist(StaticHierarchyAllowlistState);
 
 impl StaticHierarchyAllowlist {
-    pub fn filtering_enabled(&self) -> bool {
-        match self.0 {
-            StaticHierarchyAllowlistState::FilteringEnabled { .. } => true,
-            StaticHierarchyAllowlistState::FilteringDisabled => false,
-        }
-    }
-
     /// Get the allowlist for the given moniker.
     ///
     /// The component must be added via `Self::add_component` before attempting
@@ -233,6 +226,13 @@ impl StaticHierarchyAllowlist {
 
 #[cfg(test)]
 impl StaticHierarchyAllowlist {
+    pub fn filtering_enabled(&self) -> bool {
+        match self.0 {
+            StaticHierarchyAllowlistState::FilteringEnabled { .. } => true,
+            StaticHierarchyAllowlistState::FilteringDisabled => false,
+        }
+    }
+
     pub fn component_was_added(&self, moniker: &ExtendedMoniker) -> bool {
         match &self.0 {
             StaticHierarchyAllowlistState::FilteringEnabled { component_allowlists, .. } => {
