@@ -2,10 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use bredr::PSM_RFCOMM;
 use bt_map::{Error as MapError, *};
 use bt_obex::profile::{
     goep_l2cap_psm_attribute, parse_obex_search_result, GOEP_L2CAP_PSM_ATTRIBUTE,
 };
+use bt_obex::server::TransportType;
 use fuchsia_bluetooth::profile::*;
 use fuchsia_bluetooth::types::Uuid;
 use profile_client::ProfileClient;
@@ -207,6 +209,19 @@ impl MasConfig {
             features,
         };
         Ok(config)
+    }
+}
+
+/// Returns the transport type from the list of protocol descriptors.
+pub(crate) fn transport_type_from_protocol(
+    descriptors: &Vec<ProtocolDescriptor>,
+) -> Result<TransportType, MapError> {
+    match psm_from_protocol(&descriptors) {
+        Some(psm) if u16::from(psm) == PSM_RFCOMM => Ok(TransportType::Rfcomm),
+        Some(_) => Ok(TransportType::L2cap),
+        None => Err(MapError::other(format!(
+            "can't determine TransportType from protocols {descriptors:?}"
+        ))),
     }
 }
 
