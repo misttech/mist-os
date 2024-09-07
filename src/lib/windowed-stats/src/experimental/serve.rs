@@ -97,7 +97,7 @@ impl TimeMatrixClient {
 }
 
 #[derive(Derivative)]
-#[derivative(Debug)]
+#[derivative(Debug, Clone)]
 pub struct InspectedTimeMatrix<T> {
     name: String,
     #[derivative(Debug = "ignore")]
@@ -111,9 +111,7 @@ impl<T> InspectedTimeMatrix<T> {
     ) -> Self {
         Self { name: name.into(), time_matrix }
     }
-}
 
-impl<T> InspectedTimeMatrix<T> {
     pub fn fold(&self, sample: TimedSample<T>) -> Result<(), FoldError> {
         self.time_matrix.lock().fold(sample)
     }
@@ -157,7 +155,7 @@ mod tests {
     use futures::task::Poll;
     use std::pin::pin;
 
-    use crate::experimental::series::{Interpolator, RoundRobinSampler, Sampler};
+    use crate::experimental::testing::{MockTimeMatrix, TimeMatrixCall};
 
     #[test]
     fn test_serve_time_matrices() {
@@ -169,75 +167,34 @@ mod tests {
             serve_time_matrix_inspection(inspector.root().create_child("time_series"));
         let mut test_fut = pin!(test_fut);
 
-        let time_matrix = MockTimeMatrix::new();
-        let _time_matrix_ref = manager.inspect_time_matrix("blah_blah", time_matrix.clone());
+        let time_matrix = MockTimeMatrix::<u64>::default();
+        let _inspected_time_matrix = manager.inspect_time_matrix("blah_blah", time_matrix.clone());
 
         let Poll::Pending = exec.run_until_stalled(&mut test_fut) else {
             panic!("test_fut has terminated");
         };
-        assert_eq!(&time_matrix.lock().calls[..], &[]);
+        assert_eq!(&time_matrix.drain_calls()[..], &[]);
 
         exec.set_fake_time(fasync::Time::from_nanos(300_000_000_000));
         let Poll::Pending = exec.run_until_stalled(&mut test_fut) else {
             panic!("test_fut has terminated");
         };
         assert_eq!(
-            &time_matrix.lock().calls[..],
-            &[TimeMatrixCall::Interpolate(Timestamp::from_nanos(300_000_000_000)),]
+            &time_matrix.drain_calls()[..],
+            &[TimeMatrixCall::Interpolate(Timestamp::from_nanos(300_000_000_000))]
         );
     }
 
     #[test]
-    fn test_time_matrix_ref_fold() {
+    fn test_inspected_time_matrix_fold() {
         let _exec = fasync::TestExecutor::new_with_fake_time();
 
         let inspector = Inspector::default();
         let (manager, _test_fut) =
             serve_time_matrix_inspection(inspector.root().create_child("time_series"));
-        let time_matrix = MockTimeMatrix::new();
-        let time_matrix_ref = manager.inspect_time_matrix("blah_blah", time_matrix.clone());
-        assert!(time_matrix_ref.fold(TimedSample::now(1)).is_ok());
-        assert_eq!(&time_matrix.lock().calls[..], &[TimeMatrixCall::Fold(TimedSample::now(1))]);
+        let time_matrix = MockTimeMatrix::<u64>::default();
+        let inspected_time_matrix = manager.inspect_time_matrix("blah_blah", time_matrix.clone());
+        assert!(inspected_time_matrix.fold(TimedSample::now(1)).is_ok());
+        assert_eq!(&time_matrix.drain_calls()[..], &[TimeMatrixCall::Fold(TimedSample::now(1))]);
     }
-
-    #[derive(Debug, PartialEq)]
-    enum TimeMatrixCall {
-        Fold(TimedSample<u64>),
-        Interpolate(Timestamp),
-    }
-
-    struct MockTimeMatrix {
-        calls: Vec<TimeMatrixCall>,
-    }
-
-    impl MockTimeMatrix {
-        fn new() -> Arc<Mutex<Self>> {
-            Arc::new(Mutex::new(Self { calls: vec![] }))
-        }
-    }
-
-    impl Sampler<TimedSample<u64>> for Arc<Mutex<MockTimeMatrix>> {
-        type Error = FoldError;
-        fn fold(&mut self, sample: TimedSample<u64>) -> Result<(), Self::Error> {
-            self.lock().calls.push(TimeMatrixCall::Fold(sample));
-            Ok(())
-        }
-    }
-
-    impl Interpolator for Arc<Mutex<MockTimeMatrix>> {
-        type Error = FoldError;
-        fn interpolate(&mut self, timestamp: Timestamp) -> Result<(), Self::Error> {
-            self.lock().calls.push(TimeMatrixCall::Interpolate(timestamp));
-            Ok(())
-        }
-        fn interpolate_and_get_buffers(
-            &mut self,
-            timestamp: Timestamp,
-        ) -> Result<Vec<u8>, Self::Error> {
-            self.interpolate(timestamp)?;
-            Ok(vec![])
-        }
-    }
-
-    impl RoundRobinSampler<u64> for Arc<Mutex<MockTimeMatrix>> {}
 }
