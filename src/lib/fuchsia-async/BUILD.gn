@@ -103,6 +103,7 @@ rustc_library("fuchsia-async") {
       "src/handle/emulated/socket.rs",
       "src/net/portable/mod.rs",
       "src/runtime/portable.rs",
+      "src/runtime/portable/scope.rs",
     ]
   }
 }

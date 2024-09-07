@@ -709,7 +709,7 @@ impl Task {
         this
     }
 
-    fn wake(self: &Arc<Self>) {
+    pub(super) fn wake(self: &Arc<Self>) {
         if self.future.mark_ready() {
             self.scope.executor().ready_tasks.push(self.clone());
             self.scope.executor().notify_task_ready();

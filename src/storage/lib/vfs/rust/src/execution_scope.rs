@@ -18,17 +18,14 @@
 
 use crate::token_registry::TokenRegistry;
 
-use futures::channel::oneshot;
-use futures::task::{self, Context, Poll, Waker};
+use fuchsia_async::{Scope, Task};
+use futures::task::{self, Poll};
 use futures::Future;
-use pin_project::pin_project;
-use slab::Slab;
-use std::future::poll_fn;
-use std::pin::Pin;
-use std::sync::{Arc, Mutex};
+use std::future::{pending, poll_fn};
+use std::sync::{Arc, Mutex, OnceLock};
 
 #[cfg(target_os = "fuchsia")]
-use {fuchsia_async::EHandle, std::sync::OnceLock};
+use fuchsia_async::EHandle;
 
 pub type SpawnError = task::SpawnError;
 
@@ -50,22 +47,19 @@ pub struct ExecutionScope {
 struct Executor {
     inner: Mutex<Inner>,
     token_registry: TokenRegistry,
-    #[cfg(target_os = "fuchsia")]
-    async_executor: OnceLock<EHandle>,
+    scope: OnceLock<Scope>,
 }
 
 struct Inner {
-    /// Registered tasks that are to be shut down when shutting down the executor.
-    registered: Slab<Waker>,
-
-    /// Waiters waiting for all tasks to be terminated.
-    waiters: std::vec::Vec<oneshot::Sender<()>>,
-
     /// Records the kind of shutdown that has been called on the executor.
     shutdown_state: ShutdownState,
 
     /// The number of active tasks preventing shutdown.
     active_count: usize,
+
+    /// A fake active task that we use when there are no other tasks yet there's still an an active
+    /// count.
+    fake_active_task: Option<Task<()>>,
 }
 
 #[derive(Copy, Clone, PartialEq)]
@@ -73,51 +67,6 @@ enum ShutdownState {
     Active,
     Shutdown,
     ForceShutdown,
-}
-
-impl Inner {
-    // If there are no active tasks, and we are terminating, the tasks are woken and they should
-    // terminate. If there are no active tasks and no registered tasks, wake any tasks that might
-    // be waiting for that.
-    fn check_active_count(&mut self) {
-        if self.active_count == 0 {
-            // If shutting down, wake all registered tasks which will cause them to terminate.
-            if self.shutdown_state == ShutdownState::Shutdown {
-                for (_, waker) in &self.registered {
-                    waker.wake_by_ref();
-                }
-            }
-            if self.registered.is_empty() {
-                for waiter in self.waiters.drain(..) {
-                    let _ = waiter.send(());
-                }
-            }
-        }
-    }
-
-    fn task_did_finish(&mut self, task_id: usize) {
-        // If the task was never registered, then we must balance the increment to `active_count` in
-        // `spawn`.
-        if task_id == usize::MAX {
-            self.active_count -= 1;
-        } else {
-            self.registered.remove(task_id);
-        }
-        self.check_active_count();
-    }
-
-    // Registers a task. If task_id == usize, it means this is the first time the task has been
-    // registered.
-    fn register_task(&mut self, task_id: &mut usize, waker: std::task::Waker) {
-        if *task_id == usize::MAX {
-            // Balance the increment to `active_count` in `spawn`.
-            self.active_count -= 1;
-            *task_id = self.registered.insert(waker);
-            self.check_active_count();
-        } else {
-            *self.registered.get_mut(*task_id).unwrap() = waker;
-        }
-    }
 }
 
 impl ExecutionScope {
@@ -146,24 +95,29 @@ impl ExecutionScope {
     /// This way `ExecutionScope` can actually also implement [`futures::task::Spawn`] - it just was
     /// not necessary for now.
     pub fn spawn(&self, task: impl Future<Output = ()> + Send + 'static) {
-        // We consider the task as active until it first runs. Otherwise, it is possible to shut
-        // down the executor before the task has been dropped which would deny it the opportunity to
-        // correctly spawn a task in its drop function.
-        self.executor.inner.lock().unwrap().active_count += 1;
-
-        // TODO(https://fxbug.dev/42182949): Make fasync implement a single API that can handle
-        // both of these cases.
-        #[cfg(target_os = "fuchsia")]
-        self.executor.async_executor().spawn_detached(TaskRunner {
-            task,
-            task_state: TaskState { executor: self.executor.clone(), task_id: usize::MAX },
-        });
-        #[cfg(not(target_os = "fuchsia"))]
-        fuchsia_async::Task::spawn(TaskRunner {
-            task,
-            task_state: TaskState { executor: self.executor.clone(), task_id: usize::MAX },
-        })
-        .detach();
+        let executor = self.executor.clone();
+        self.executor
+            .scope()
+            .spawn(async move {
+                let mut task = std::pin::pin!(task);
+                poll_fn(|cx| {
+                    let shutdown_state = executor.inner.lock().unwrap().shutdown_state;
+                    match task.as_mut().poll(cx) {
+                        Poll::Ready(()) => Poll::Ready(()),
+                        Poll::Pending => match shutdown_state {
+                            ShutdownState::Active => Poll::Pending,
+                            ShutdownState::Shutdown
+                                if executor.inner.lock().unwrap().active_count > 0 =>
+                            {
+                                Poll::Pending
+                            }
+                            _ => Poll::Ready(()),
+                        },
+                    }
+                })
+                .await;
+            })
+            .detach();
     }
 
     pub fn token_registry(&self) -> &TokenRegistry {
@@ -178,9 +132,7 @@ impl ExecutionScope {
     pub fn force_shutdown(&self) {
         let mut inner = self.executor.inner.lock().unwrap();
         inner.shutdown_state = ShutdownState::ForceShutdown;
-        for (_, waker) in &inner.registered {
-            waker.wake_by_ref();
-        }
+        self.executor.scope().wake_all();
     }
 
     /// Restores the executor so that it is no longer in the shut-down state.  Any tasks
@@ -191,18 +143,17 @@ impl ExecutionScope {
 
     /// Wait for all tasks to complete.
     pub async fn wait(&self) {
-        let receiver = {
-            let mut this = self.executor.inner.lock().unwrap();
-            if this.registered.is_empty() && this.active_count == 0 {
-                None
-            } else {
-                let (sender, receiver) = oneshot::channel::<()>();
-                this.waiters.push(sender);
-                Some(receiver)
+        loop {
+            self.executor.scope().on_no_tasks().await;
+            let mut inner = self.executor.inner.lock().unwrap();
+            if inner.active_count == 0 {
+                break;
             }
-        };
-        if let Some(receiver) = receiver {
-            receiver.await.unwrap();
+            // There are no tasks but there's an active count and we must only finish when there are
+            // no tasks *and* the active count is zero.  To address this, we spawn a fake task so
+            // that we can just use `on_no_tasks`, and then we'll cancel the task when the active
+            // count drops to zero.
+            inner.fake_active_task = Some(self.executor.scope().spawn(pending::<()>()));
         }
     }
 
@@ -258,83 +209,40 @@ impl ExecutionScopeParams {
             executor: Arc::new(Executor {
                 token_registry: TokenRegistry::new(),
                 inner: Mutex::new(Inner {
-                    registered: Slab::new(),
-                    waiters: Vec::new(),
                     shutdown_state: ShutdownState::Active,
                     active_count: 0,
+                    fake_active_task: None,
                 }),
                 #[cfg(target_os = "fuchsia")]
-                async_executor: self.async_executor.map_or_else(|| OnceLock::new(), |e| e.into()),
+                scope: self
+                    .async_executor
+                    .map_or_else(|| OnceLock::new(), |e| e.root_scope().new_child().into()),
+                #[cfg(not(target_os = "fuchsia"))]
+                scope: OnceLock::new(),
             }),
         }
     }
 }
 
-struct TaskState {
-    executor: Arc<Executor>,
-    task_id: usize,
-}
-
-impl Drop for TaskState {
-    fn drop(&mut self) {
-        self.executor
-            .inner
-            .lock()
-            .unwrap()
-            .task_did_finish(std::mem::replace(&mut self.task_id, usize::MAX));
-    }
-}
-
-#[pin_project]
-// The debugger knows how to get to `task`. If this changes, or its fully-qualified name changes,
-// the debugger will need updating.
-// LINT.IfChange
-struct TaskRunner<F> {
-    #[pin]
-    task: F,
-    // Must be dropped *after* task above.
-    task_state: TaskState,
-}
-// LINT.ThenChange(//src/developer/debug/zxdb/console/commands/verb_async_backtrace.cc)
-
-impl<F: 'static + Future<Output = ()> + Send> Future for TaskRunner<F> {
-    type Output = ();
-
-    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        let this = self.project();
-        let shutdown_state = {
-            let mut executor = this.task_state.executor.inner.lock().unwrap();
-            executor.register_task(&mut this.task_state.task_id, cx.waker().clone());
-            executor.shutdown_state
-        };
-        match this.task.poll(cx) {
-            Poll::Ready(()) => Poll::Ready(()),
-            Poll::Pending => match shutdown_state {
-                ShutdownState::Active => Poll::Pending,
-                ShutdownState::Shutdown
-                    if this.task_state.executor.inner.lock().unwrap().active_count > 0 =>
-                {
-                    Poll::Pending
-                }
-                _ => Poll::Ready(()),
-            },
-        }
-    }
-}
-
 impl Executor {
-    #[cfg(target_os = "fuchsia")]
-    fn async_executor(&self) -> &EHandle {
+    fn scope(&self) -> &Scope {
         // We lazily initialize the executor rather than at construction time as there are currently
         // a few tests that create the ExecutionScope before the async executor has been initialized
         // (which means we cannot call EHandle::local()).
-        self.async_executor.get_or_init(|| EHandle::local())
+        self.scope.get_or_init(|| Scope::new())
     }
 
     fn shutdown(&self) {
-        let mut inner = self.inner.lock().unwrap();
-        inner.shutdown_state = ShutdownState::Shutdown;
-        inner.check_active_count();
+        let wake_all = {
+            let mut inner = self.inner.lock().unwrap();
+            inner.shutdown_state = ShutdownState::Shutdown;
+            inner.active_count == 0
+        };
+        if wake_all {
+            if let Some(scope) = self.scope.get() {
+                scope.wake_all();
+            }
+        }
     }
 }
 
@@ -349,9 +257,19 @@ pub struct ActiveGuard(Arc<Executor>);
 
 impl Drop for ActiveGuard {
     fn drop(&mut self) {
-        let mut inner = self.0.inner.lock().unwrap();
-        inner.active_count -= 1;
-        inner.check_active_count();
+        let wake_all = {
+            let mut inner = self.0.inner.lock().unwrap();
+            inner.active_count -= 1;
+            if inner.active_count == 0 {
+                if let Some(task) = inner.fake_active_task.take() {
+                    let _ = task.cancel();
+                }
+            }
+            inner.active_count == 0 && inner.shutdown_state == ShutdownState::Shutdown
+        };
+        if wake_all {
+            self.0.scope().wake_all();
+        }
     }
 }
 

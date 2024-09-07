@@ -10,11 +10,14 @@ thread_local!(
     static LOCAL_EXECUTOR: RefCell<Option<Rc<LocalSet>>> = RefCell::new(None)
 );
 
+pub mod scope;
+
 pub mod task {
     use super::LOCAL_EXECUTOR;
     use core::task::{Context, Poll};
     use std::future::Future;
     use std::pin::Pin;
+    use tokio::task::AbortHandle;
 
     use futures::FutureExt;
 
@@ -87,6 +90,10 @@ pub mod task {
                     }
                 }
             }
+        }
+
+        pub(crate) fn abort_handle(&self) -> AbortHandle {
+            self.task.abort_handle()
         }
     }
 
