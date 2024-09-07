@@ -64,7 +64,7 @@ pub async fn connect_to_rcs(
     rcs_connector: &Connector<rc::RemoteControlProxy>,
 ) -> Result<rc::RemoteControlProxy> {
     rcs_connector
-        .try_connect(|target| {
+        .try_connect(|target, _err| {
             eprintln!("Waiting for {target:?}...");
             Ok(())
         })

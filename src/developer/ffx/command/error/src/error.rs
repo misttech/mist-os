@@ -4,6 +4,11 @@
 
 use errors::FfxError;
 
+/// Represents a recoverable error. Intended to be embedded in `Error`.
+#[derive(thiserror::Error, Debug)]
+#[error("non-fatal error encountered: {}", .0)]
+pub struct NonFatalError(#[source] pub anyhow::Error);
+
 /// A top level error type for ffx tool results
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
@@ -30,6 +35,26 @@ pub enum Error {
     Config(#[source] anyhow::Error),
     /// Exit with a specific error code but no output
     ExitWithCode(i32),
+}
+
+impl Error {
+    /// Attempts to downcast this error into something non-fatal, returning `Ok(e)`
+    /// if able to downcast to something non-fatal, else returning the original error.
+    pub fn downcast_non_fatal(self) -> Result<anyhow::Error, Self> {
+        fn try_downcast(err: anyhow::Error) -> Result<anyhow::Error, anyhow::Error> {
+            match err.downcast::<NonFatalError>() {
+                Ok(NonFatalError(e)) => Ok(e),
+                Err(e) => Err(e),
+            }
+        }
+
+        match self {
+            Self::Help { .. } | Self::ExitWithCode(_) => Err(self),
+            Self::User(e) => try_downcast(e).map_err(Self::User),
+            Self::Unexpected(e) => try_downcast(e).map_err(Self::Unexpected),
+            Self::Config(e) => try_downcast(e).map_err(Self::Config),
+        }
+    }
 }
 
 /// Writes a detailed description of an anyhow error to the formatter
@@ -203,5 +228,35 @@ mod tests {
         let err = Error::from_early_exit(&command, early_exit);
         assert_eq!(err.exit_code(), code);
         assert_matches!(err, Error::Config(err) if format!("{err}") == output);
+    }
+
+    #[test]
+    fn test_downcast_recasts_types() {
+        let err = Error::User(anyhow!("boom"));
+        assert_matches!(err.downcast_non_fatal(), Err(Error::User(_)));
+
+        let err = Error::Unexpected(anyhow!("boom"));
+        assert_matches!(err.downcast_non_fatal(), Err(Error::Unexpected(_)));
+
+        let err = Error::Config(anyhow!("boom"));
+        assert_matches!(err.downcast_non_fatal(), Err(Error::Config(_)));
+
+        let err =
+            Error::Help { command: vec!["foobar".to_owned()], output: "blorp".to_owned(), code: 1 };
+        assert_matches!(err.downcast_non_fatal(), Err(Error::Help { .. }));
+
+        let err = Error::ExitWithCode(2);
+        assert_matches!(err.downcast_non_fatal(), Err(Error::ExitWithCode(2)));
+    }
+
+    #[test]
+    fn test_downcast_non_fatal_recovers_non_fatal_error() {
+        static ERR_STR: &'static str = "Oh look it's non fatal";
+        let constructors = vec![Error::User, Error::Unexpected, Error::Config];
+        for c in constructors.into_iter() {
+            let err = c(NonFatalError(anyhow!(ERR_STR)).into());
+            let res = err.downcast_non_fatal().expect("expected non-fatal downcast");
+            assert_eq!(res.to_string(), ERR_STR.to_owned());
+        }
     }
 }

@@ -211,7 +211,7 @@ async fn inner_connect_loop(
     let mut target_spec_from_rcs_proxy: Option<String> = None;
     let rcs_proxy = timeout(
         connect_timeout,
-        rcs_proxy.try_connect(|target| {
+        rcs_proxy.try_connect(|target, _err| {
             tracing::info!(
                 "RCS proxy: Waiting for target '{}' to return",
                 match target {
@@ -235,7 +235,7 @@ async fn inner_connect_loop(
     };
     let mut target_spec_from_target_proxy: Option<String> = None;
     let target_proxy = target_proxy
-        .try_connect(|target| {
+        .try_connect(|target, _err| {
             tracing::info!(
                 "Target proxy: Waiting for target '{}' to return",
                 match target {

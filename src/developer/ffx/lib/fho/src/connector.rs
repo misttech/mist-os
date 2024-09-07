@@ -3,22 +3,20 @@
 // found in the LICENSE file.
 
 use crate::{FfxContext, Result};
-use async_lock::Mutex;
+use async_lock::{Mutex, MutexGuard};
 use ffx_config::EnvironmentContext;
-use ffx_target::connection::Connection;
+use ffx_target::connection::{Connection, ConnectionError};
 use ffx_target::ssh_connector::SshConnector;
 use ffx_target::{OvernetConnector, Resolution};
 use fidl_fuchsia_developer_remotecontrol::RemoteControlProxy;
 use futures::future::LocalBoxFuture;
 use std::fmt::Debug;
+use std::net::SocketAddr;
 use std::sync::Arc;
 
 /// An object used for connecting to a Fuchsia Device. This represents the entire underlying
 /// connection to a fuchsia device. If this object is dropped, then all FIDL protocols will be
 /// closed with `PEER_CLOSED` errors as a result.
-///
-/// TODO(b/361423475): Support reconnecting (for `ffx target echo` for example) in the event of
-/// failure.
 pub trait DirectConnector: Debug {
     // A note on the shape of this trait: the object must _not_ be sized in order for it to be used as
     // a trait object, due to the bounds around object safety in rust. Furthermore, a safe trait object
@@ -27,7 +25,8 @@ pub trait DirectConnector: Debug {
     // team is moving away from its usage where possible.
 
     /// Attempts to connect to the Fuchsia device. This function can be run until it succeeds, but
-    /// once it succeeds running this function again is a no-op.
+    /// once it succeeds running this function again will takes the current connection, tear it
+    /// down, then create a new connection.
     fn connect(&self) -> LocalBoxFuture<'_, Result<()>>;
 
     /// Gets the RCS proxy from the device via the underlying connector. Starts a connection if one
@@ -41,23 +40,37 @@ pub trait DirectConnector: Debug {
     ///
     /// In the event that `Some(_)` the enclosed vector will always be of size 1 or larger.
     fn wrap_connection_errors(&self, e: crate::Error) -> LocalBoxFuture<'_, crate::Error>;
+
+    /// Returns the device address (if there currently is one).
+    fn device_address(&self) -> LocalBoxFuture<'_, Option<SocketAddr>>;
+
+    /// Returns the spec of the target to which we are connecting/connected.
+    fn target_spec(&self) -> Option<String>;
 }
 
 pub trait TryFromEnvContext: Sized + Debug {
     fn try_from_env_context<'a>(env: &'a EnvironmentContext) -> LocalBoxFuture<'a, Result<Self>>;
 }
 
+// This is an implementation for the "target_spec", which is just an `Option<String>` (it should
+// really just be a newtype, but that requires a lot of existing code to change).
+impl TryFromEnvContext for Option<String> {
+    fn try_from_env_context<'a>(env: &'a EnvironmentContext) -> LocalBoxFuture<'a, Result<Self>> {
+        Box::pin(async { ffx_target::get_target_specifier(env).await.bug().map_err(Into::into) })
+    }
+}
+
 impl TryFromEnvContext for ffx_target::Resolution {
     fn try_from_env_context<'a>(env: &'a EnvironmentContext) -> LocalBoxFuture<'a, Result<Self>> {
         Box::pin(async {
-            let target_spec: Option<String> = ffx_target::get_target_specifier(env).await.bug()?;
+            let target_spec = Option::<String>::try_from_env_context(env).await?;
             let target_spec_unwrapped = target_spec.as_ref().ok_or(ffx_command::user_error!(
                 "You must specify a target via `-t <target_name>` before any command arguments"
             ))?;
             tracing::trace!("resolving target spec address from {}", target_spec_unwrapped);
             let resolution = ffx_target::resolve_target_address(&target_spec, env)
                 .await
-                .map_err(ffx_command::Error::User)?;
+                .map_err(|e| ffx_command::Error::User(crate::NonFatalError(e).into()))?;
             Ok(resolution)
         })
     }
@@ -74,7 +87,7 @@ impl TryFromEnvContext for SshConnector {
                 )
             })?;
             tracing::debug!("connecting to address {res}");
-            SshConnector::new(res, env).await.map_err(Into::into)
+            SshConnector::new(res, env).await.bug().map_err(Into::into)
         })
     }
 }
@@ -85,34 +98,60 @@ impl TryFromEnvContext for SshConnector {
 pub struct Overnet<T: TryFromEnvContext + OvernetConnector> {
     env: EnvironmentContext,
     connection: Arc<Mutex<Option<Connection>>>,
+    target_spec: Option<String>,
     _t: std::marker::PhantomData<T>,
+}
+
+async fn connect_helper<T: TryFromEnvContext + OvernetConnector + 'static>(
+    env: &EnvironmentContext,
+    conn: &mut MutexGuard<'_, Option<Connection>>,
+) -> Result<()> {
+    match **conn {
+        Some(_) => Ok(()),
+        None => {
+            let overnet_connector = T::try_from_env_context(env).await?;
+            let c = match Connection::new(overnet_connector).await {
+                Ok(c) => Ok(c),
+                Err(ConnectionError::ConnectionStartError(cmd_info, error)) => {
+                    tracing::info!("connector encountered start error: {cmd_info}, '{error}'");
+                    Err(crate::user_error!(
+                        "Unable to connect to device via {}: {error}",
+                        <T as OvernetConnector>::CONNECTION_TYPE
+                    ))
+                }
+                Err(e) => Err(crate::bug!("{e}")),
+            }?;
+            **conn = Some(c);
+            Ok(())
+        }
+    }
+}
+
+impl<T: TryFromEnvContext + OvernetConnector + 'static> Overnet<T> {
+    /// Attempts to connect. If already connected, this is a no-op.
+    fn maybe_connect(&self) -> LocalBoxFuture<'_, Result<()>> {
+        Box::pin(async {
+            let mut conn = self.connection.lock().await;
+            connect_helper::<T>(&self.env, &mut conn).await
+        })
+    }
 }
 
 impl<T: TryFromEnvContext + OvernetConnector + 'static> DirectConnector for Overnet<T> {
     fn connect(&self) -> LocalBoxFuture<'_, Result<()>> {
         Box::pin(async {
-            // Something to consider here is whether or not we decide to reconnect. It's possible
-            // that when an error occurs this whole object is just thrown out, and the process
-            // starts anew, rather than having to remake a connection again.
             let mut conn = self.connection.lock().await;
-            match *conn {
-                Some(_) => Ok(()),
-                None => {
-                    let overnet_connector = T::try_from_env_context(&self.env).await?;
-                    *conn = Some(
-                        Connection::new(overnet_connector)
-                            .await
-                            .map_err(|e| crate::bug!("{e:?}"))?,
-                    );
-                    Ok(())
-                }
+            if conn.is_some() {
+                tracing::info!("Dropping current connection and reconnecting.");
             }
+            drop(conn.take());
+            connect_helper::<T>(&self.env, &mut conn).await
         })
     }
 
     fn rcs_proxy(&self) -> LocalBoxFuture<'_, Result<RemoteControlProxy>> {
         Box::pin(async {
-            self.connect().await?;
+            self.maybe_connect().await?;
             let conn = self.connection.lock().await;
             (*conn)
                 .as_ref()
@@ -120,6 +159,7 @@ impl<T: TryFromEnvContext + OvernetConnector + 'static> DirectConnector for Over
                 .rcs_proxy()
                 .await
                 .bug()
+                .map_err(Into::into)
         })
     }
 
@@ -133,11 +173,25 @@ impl<T: TryFromEnvContext + OvernetConnector + 'static> DirectConnector for Over
             }
         })
     }
+
+    fn device_address(&self) -> LocalBoxFuture<'_, Option<SocketAddr>> {
+        Box::pin(async { self.connection.lock().await.as_ref().and_then(|c| c.device_address()) })
+    }
+
+    fn target_spec(&self) -> Option<String> {
+        self.target_spec.clone()
+    }
 }
 
 impl<T: TryFromEnvContext + OvernetConnector> Overnet<T> {
     pub async fn new(env: &EnvironmentContext) -> Result<Self> {
-        Ok(Self { env: env.clone(), connection: Default::default(), _t: Default::default() })
+        let target_spec = Option::<String>::try_from_env_context(env).await?;
+        Ok(Self {
+            env: env.clone(),
+            connection: Default::default(),
+            target_spec,
+            _t: Default::default(),
+        })
     }
 }
 
@@ -153,6 +207,8 @@ mod tests {
     struct RegularFakeOvernet(FakeOvernet);
 
     impl OvernetConnector for RegularFakeOvernet {
+        const CONNECTION_TYPE: &'static str = "fake";
+
         async fn connect(&mut self) -> Result<OvernetConnection, OvernetConnectionError> {
             self.0.connect().await
         }
@@ -197,6 +253,7 @@ mod tests {
     struct FromContextFailer(FakeOvernet);
 
     impl OvernetConnector for FromContextFailer {
+        const CONNECTION_TYPE: &'static str = "fake";
         async fn connect(&mut self) -> Result<OvernetConnection, OvernetConnectionError> {
             self.0.connect().await
         }
@@ -206,7 +263,9 @@ mod tests {
         fn try_from_env_context<'a>(
             _env: &'a EnvironmentContext,
         ) -> LocalBoxFuture<'_, Result<Self>> {
-            Box::pin(async { Err(crate::Error::Unexpected(anyhow::anyhow!("Oh no it broke!"))) })
+            Box::pin(async {
+                Err(crate::Error::Unexpected(anyhow::anyhow!("Oh no it broke!")).into())
+            })
         }
     }
 

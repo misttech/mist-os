@@ -26,6 +26,9 @@ pub enum OvernetConnectionError {
 }
 
 pub trait OvernetConnector: Debug {
+    /// A debugging label for the type of connection. Intended to be for error formatting.
+    const CONNECTION_TYPE: &'static str;
+
     /// Attempts a connection to an Overnet device. This function, if it fails and returns a
     /// `NonFatal` error, should be capable of running again. It will be the caller's responsibility
     /// to determine whether and how often to re-attempt connecting when receiving a NonFatal
@@ -33,6 +36,10 @@ pub trait OvernetConnector: Debug {
     fn connect(
         &mut self,
     ) -> impl Future<Output = Result<OvernetConnection, OvernetConnectionError>>;
+
+    fn device_address(&self) -> Option<std::net::SocketAddr> {
+        None
+    }
 }
 
 pub struct OvernetConnection {

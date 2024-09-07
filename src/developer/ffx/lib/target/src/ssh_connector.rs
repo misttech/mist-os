@@ -96,6 +96,8 @@ async fn try_ssh_cmd_cleanup(mut cmd: Child) -> Result<()> {
 }
 
 impl OvernetConnector for SshConnector {
+    const CONNECTION_TYPE: &'static str = "ssh";
+
     async fn connect(&mut self) -> Result<OvernetConnection, OvernetConnectionError> {
         self.cmd = Some(start_ssh_command(self.target, &self.env_context).await?);
         let cmd = self.cmd.as_mut().unwrap();
@@ -119,7 +121,7 @@ impl OvernetConnector for SshConnector {
                         self.cmd.take().expect("ssh command must have started")
                     )
                     .await?;
-                    return Err(ffx_ssh::ssh::extract_ssh_error(&mut stderr, true, &self.env_context).await.into());
+                    return Err(ffx_ssh::ssh::SshError::from(e.to_string()).into());
                 }
             };
         let stdin = cmd.stdin.take().expect("process should have stdin");
@@ -141,6 +143,10 @@ impl OvernetConnector for SshConnector {
             compat,
             main_task,
         })
+    }
+
+    fn device_address(&self) -> Option<SocketAddr> {
+        Some(self.target.clone())
     }
 }
 
