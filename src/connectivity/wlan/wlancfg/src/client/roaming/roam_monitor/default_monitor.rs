@@ -21,8 +21,10 @@ impl DefaultRoamMonitor {
     }
 }
 
+use async_trait::async_trait;
+#[async_trait]
 impl RoamMonitorApi for DefaultRoamMonitor {
-    fn handle_roam_trigger_data(
+    async fn handle_roam_trigger_data(
         &mut self,
         _data: RoamTriggerData,
     ) -> Result<RoamTriggerDataOutcome, anyhow::Error> {
@@ -52,9 +54,11 @@ mod test {
 
         // Send each type of trigger data and verify the default monitor always returns noop.
         assert_variant!(
-            monitor.handle_roam_trigger_data(RoamTriggerData::SignalReportInd(
-                fidl_internal::SignalReportIndication { rssi_dbm: -100, snr_db: 0 },
-            )),
+            monitor
+                .handle_roam_trigger_data(RoamTriggerData::SignalReportInd(
+                    fidl_internal::SignalReportIndication { rssi_dbm: -100, snr_db: 0 },
+                ))
+                .await,
             Ok(RoamTriggerDataOutcome::Noop)
         );
     }

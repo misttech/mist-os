@@ -317,6 +317,7 @@ async fn run_all_futures() -> Result<(), Error> {
         roam_service_request_receiver,
         connection_selection_requester.clone(),
         telemetry_sender.clone(),
+        saved_networks.clone(),
     );
     let roam_manager = RoamManager::new(roam_service_request_sender);
 

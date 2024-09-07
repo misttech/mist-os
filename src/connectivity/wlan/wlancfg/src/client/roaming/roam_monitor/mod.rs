@@ -8,6 +8,7 @@ use crate::client::roaming::lib::{RoamTriggerData, RoamTriggerDataOutcome};
 use crate::client::types;
 use crate::telemetry::{TelemetryEvent, TelemetrySender};
 use anyhow::{format_err, Error};
+use async_trait::async_trait;
 use fidl_fuchsia_wlan_internal as fidl_internal;
 use futures::channel::mpsc;
 use futures::future::BoxFuture;
@@ -35,11 +36,12 @@ impl RoamDataSender {
     }
 }
 /// Trait for creating different roam monitors based on roaming profiles.
+#[async_trait]
 pub trait RoamMonitorApi: Send + Sync + Any {
     // Handles trigger data and evaluates current state. Returns an outcome to be taken (e.g. if
     // roam search is warranted). All roam monitors MUST handle all trigger data types, even if
     // they always take no action.
-    fn handle_roam_trigger_data(
+    async fn handle_roam_trigger_data(
         &mut self,
         data: RoamTriggerData,
     ) -> Result<RoamTriggerDataOutcome, anyhow::Error>;
@@ -69,7 +71,7 @@ pub async fn serve_roam_monitor(
         select! {
             // Handle incoming trigger data.
             trigger_data = trigger_data_receiver.next() => if let Some(data) = trigger_data {
-                match roam_monitor.handle_roam_trigger_data(data) {
+                match roam_monitor.handle_roam_trigger_data(data).await {
                     Ok(RoamTriggerDataOutcome::RoamSearch(network_identifier, credential)) => {
                         telemetry_sender.send(TelemetryEvent::RoamingScan);
                         info!("Performing scan to find proactive local roaming candidates.");

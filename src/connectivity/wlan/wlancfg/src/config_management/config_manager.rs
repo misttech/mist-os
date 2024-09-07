@@ -280,6 +280,11 @@ impl SavedNetworksManagerApi for SavedNetworksManager {
         self.saved_networks.lock().await.values().flatten().count()
     }
 
+    /// Return the network configs that have this network identifier. The configs may be different
+    /// because of their credentials. Note that these are copies of the current data, so if data
+    /// could have changed it should be looked up again. For example, data about roam scans change
+    /// throughout a connection so callers cannot keep using the same network config for that data
+    /// throughout the connection.
     async fn lookup(&self, id: &NetworkIdentifier) -> Vec<NetworkConfig> {
         self.saved_networks.lock().await.get(id).cloned().unwrap_or_default()
     }
@@ -1980,11 +1985,10 @@ mod tests {
             security_type: types::SecurityTypeDetailed::Wpa2Personal,
         };
         let scan_results = HashMap::from([(
-            id_detailed,
+            id_detailed.clone(),
             vec![types::Bss { observation: ScanObservation::Passive, ..generate_random_bss() }],
         )]);
 
-        // Record the scan multiple times, since multiple scans are needed to decide the network
         // likely has one BSS
         for _ in 0..5 {
             saved_networks.record_scan_result(vec![id.ssid.clone()], &scan_results).await;

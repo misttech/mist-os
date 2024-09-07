@@ -40,7 +40,7 @@ pub struct FakeSavedNetworksManager {
         >,
     >,
     pub past_connections_response: PastConnectionList,
-    pub is_network_single_bss_resp: Option<bool>,
+    pub is_network_single_bss_resp: Mutex<Option<bool>>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -89,7 +89,7 @@ impl FakeSavedNetworksManager {
             lookup_compatible_response: Mutex::new(LookupCompatibleResponse::new()),
             scan_result_records: Arc::new(Mutex::new(vec![])),
             past_connections_response: PastConnectionList::default(),
-            is_network_single_bss_resp: None,
+            is_network_single_bss_resp: Mutex::new(None),
         }
     }
 
@@ -119,7 +119,7 @@ impl FakeSavedNetworksManager {
             lookup_compatible_response: Mutex::new(LookupCompatibleResponse::new()),
             scan_result_records: Arc::new(Mutex::new(vec![])),
             past_connections_response: PastConnectionList::default(),
-            is_network_single_bss_resp: None,
+            is_network_single_bss_resp: Mutex::new(None),
         }
     }
 
@@ -157,6 +157,13 @@ impl FakeSavedNetworksManager {
     pub fn set_lookup_compatible_response(&self, response: Vec<NetworkConfig>) {
         self.lookup_compatible_response.try_lock().expect("failed to get lock").inner =
             Some(response);
+    }
+
+    pub fn set_is_single_bss_response(&self, resp: bool) {
+        *self
+            .is_network_single_bss_resp
+            .try_lock()
+            .expect("failed to get is_network_single_bss_resp lock") = Some(resp);
     }
 }
 
@@ -281,9 +288,15 @@ impl SavedNetworksManagerApi for FakeSavedNetworksManager {
         _id: &NetworkIdentifier,
         _credential: &Credential,
     ) -> Result<bool, anyhow::Error> {
-        return self.is_network_single_bss_resp.ok_or_else(|| {
-            format_err!("is_network_single_bss response is not set for FakeSavedNetworksManager")
-        });
+        return self
+            .is_network_single_bss_resp
+            .try_lock()
+            .expect("failed to get is_network_single_bss_resp lock")
+            .ok_or_else(|| {
+                format_err!(
+                    "is_network_single_bss response is not set for FakeSavedNetworksManager"
+                )
+            });
     }
 
     async fn get_networks(&self) -> Vec<NetworkConfig> {
@@ -407,8 +420,9 @@ impl FakeRoamMonitor {
     }
 }
 
+#[async_trait]
 impl RoamMonitorApi for FakeRoamMonitor {
-    fn handle_roam_trigger_data(
+    async fn handle_roam_trigger_data(
         &mut self,
         data: RoamTriggerData,
     ) -> Result<RoamTriggerDataOutcome, anyhow::Error> {

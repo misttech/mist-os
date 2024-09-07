@@ -7,6 +7,7 @@ use crate::client::connection_selection::ConnectionSelectionRequester;
 use crate::client::roaming::lib::*;
 use crate::client::roaming::roam_monitor;
 use crate::client::types;
+use crate::config_management::SavedNetworksManagerApi;
 use crate::telemetry::TelemetrySender;
 use anyhow::Error;
 use futures::channel::mpsc;
@@ -14,6 +15,7 @@ use futures::future::BoxFuture;
 use futures::stream::FuturesUnordered;
 use futures::{select, StreamExt};
 use std::convert::Infallible;
+use std::sync::Arc;
 use tracing::{debug, error};
 
 // Create a roam monitor implementation based on the roaming profile.
@@ -23,6 +25,7 @@ fn create_roam_monitor(
     network_identifier: types::NetworkIdentifier,
     credential: Credential,
     telemetry_sender: TelemetrySender,
+    saved_networks: Arc<dyn SavedNetworksManagerApi>,
 ) -> Box<dyn roam_monitor::RoamMonitorApi> {
     match roaming_policy {
         RoamingPolicy::Enabled { profile: RoamingProfile::Stationary, .. } => {
@@ -31,6 +34,7 @@ fn create_roam_monitor(
                 network_identifier,
                 credential,
                 telemetry_sender.clone(),
+                saved_networks,
             ))
         }
         RoamingPolicy::Disabled => {
@@ -93,6 +97,7 @@ pub async fn serve_local_roam_manager_requests(
     mut roam_service_request_receiver: mpsc::Receiver<RoamServiceRequest>,
     connection_selection_requester: ConnectionSelectionRequester,
     telemetry_sender: TelemetrySender,
+    saved_networks: Arc<dyn SavedNetworksManagerApi>,
 ) -> Result<Infallible, Error> {
     // Queue of created monitor futures.
     let mut monitor_futs: FuturesUnordered<BoxFuture<'static, Result<(), anyhow::Error>>> =
@@ -106,7 +111,7 @@ pub async fn serve_local_roam_manager_requests(
                     // Create and start a roam monitor future, passing in handles from caller. This
                     // ensures that new data is initialized for every new caller (e.g. connected_state).
                     RoamServiceRequest::InitializeRoamMonitor { ap_state, network_identifier, credential, roam_sender, roam_trigger_data_receiver }=> {
-                        let monitor = create_roam_monitor(roaming_policy, ap_state, network_identifier, credential, telemetry_sender.clone());
+                        let monitor = create_roam_monitor(roaming_policy, ap_state, network_identifier, credential, telemetry_sender.clone(), saved_networks.clone());
                         let monitor_fut = roam_monitor::serve_roam_monitor(monitor, roam_trigger_data_receiver, connection_selection_requester.clone(), roam_sender.clone(), telemetry_sender.clone());
                         monitor_futs.push(Box::pin(monitor_fut));
                     }
@@ -126,7 +131,7 @@ mod tests {
     use crate::telemetry::TelemetryEvent;
     use crate::util::testing::{
         generate_random_ap_state, generate_random_network_identifier, generate_random_password,
-        generate_random_roaming_connection_data,
+        generate_random_roaming_connection_data, FakeSavedNetworksManager,
     };
     use fidl_fuchsia_wlan_internal::SignalReportIndication;
     use fuchsia_async::TestExecutor;
@@ -140,6 +145,7 @@ mod tests {
         connection_selection_requester: ConnectionSelectionRequester,
         roam_manager: RoamManager,
         roam_service_request_receiver: mpsc::Receiver<RoamServiceRequest>,
+        saved_networks: Arc<FakeSavedNetworksManager>,
     }
 
     fn setup_test() -> RoamManagerServiceTestValues {
@@ -150,11 +156,13 @@ mod tests {
             ConnectionSelectionRequester::new(connection_selection_request_sender);
         let (roam_service_request_sender, roam_service_request_receiver) = mpsc::channel(100);
         let roam_manager = RoamManager::new(roam_service_request_sender);
+        let saved_networks = Arc::new(FakeSavedNetworksManager::new());
         RoamManagerServiceTestValues {
             telemetry_sender,
             connection_selection_requester,
             roam_manager,
             roam_service_request_receiver,
+            saved_networks,
         }
     }
 
@@ -165,12 +173,14 @@ mod tests {
         let _exec = TestExecutor::new();
         let (telemetry_sender, _) = mpsc::channel::<TelemetryEvent>(100);
         let telemetry_sender = TelemetrySender::new(telemetry_sender);
+        let saved_networks = Arc::new(FakeSavedNetworksManager::new());
         let monitor = create_roam_monitor(
             roaming_policy,
             generate_random_ap_state(),
             generate_random_network_identifier(),
             generate_random_password(),
             telemetry_sender.clone(),
+            saved_networks.clone(),
         );
         match roaming_policy {
             RoamingPolicy::Disabled => {
@@ -185,6 +195,7 @@ mod tests {
                         generate_random_network_identifier(),
                         generate_random_password(),
                         telemetry_sender.clone(),
+                        saved_networks,
                     ));
 
                 assert_eq!(stationary_monitor.type_id(), monitor.type_id());
@@ -203,6 +214,7 @@ mod tests {
             test_values.roam_service_request_receiver,
             test_values.connection_selection_requester.clone(),
             test_values.telemetry_sender.clone(),
+            test_values.saved_networks,
         ));
         assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
 
@@ -234,6 +246,7 @@ mod tests {
             test_values.roam_service_request_receiver,
             test_values.connection_selection_requester.clone(),
             test_values.telemetry_sender.clone(),
+            test_values.saved_networks,
         ));
         assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
 
