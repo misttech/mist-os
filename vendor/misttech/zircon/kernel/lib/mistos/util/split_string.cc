@@ -5,6 +5,7 @@
 
 #include "lib/mistos/util/strings/split_string.h"
 
+#include <lib/mistos/util/bstring.h>
 #include <lib/mistos/util/strings/trim.h>
 #include <zircon/assert.h>
 
@@ -22,8 +23,8 @@ OutputType PieceToOutputType(ktl::string_view view) {
 }
 
 template <>
-fbl::String PieceToOutputType<fbl::String>(ktl::string_view view) {
-  return fbl::String(view);
+BString PieceToOutputType<BString>(ktl::string_view view) {
+  return BString(view.data(), view.size());
 }
 
 size_t FindFirstOf(ktl::string_view view, char c, size_t pos) { return view.find(c, pos); }
@@ -65,14 +66,14 @@ fbl::Vector<OutputStringType> SplitStringT(Str src, DelimiterType delimiter,
 
 }  // namespace
 
-fbl::Vector<fbl::String> SplitStringCopy(ktl::string_view input, ktl::string_view separators,
-                                         WhiteSpaceHandling whitespace, SplitResult result_type) {
+fbl::Vector<BString> SplitStringCopy(ktl::string_view input, ktl::string_view separators,
+                                     WhiteSpaceHandling whitespace, SplitResult result_type) {
   if (separators.size() == 1) {
-    return SplitStringT<ktl::string_view, fbl::String, char>(input, separators[0], whitespace,
-                                                             result_type);
+    return SplitStringT<ktl::string_view, BString, char>(input, separators[0], whitespace,
+                                                         result_type);
   }
-  return SplitStringT<ktl::string_view, fbl::String, ktl::string_view>(input, separators,
-                                                                       whitespace, result_type);
+  return SplitStringT<ktl::string_view, BString, ktl::string_view>(input, separators, whitespace,
+                                                                   result_type);
 }
 fbl::Vector<ktl::string_view> SplitString(ktl::string_view input, ktl::string_view separators,
                                           WhiteSpaceHandling whitespace, SplitResult result_type) {

@@ -5,9 +5,8 @@
 #ifndef ZIRCON_KERNEL_LIB_MISTOS_UTIL_INCLUDE_LIB_MISTOS_UTIL_ONECELL_H_
 #define ZIRCON_KERNEL_LIB_MISTOS_UTIL_INCLUDE_LIB_MISTOS_UTIL_ONECELL_H_
 
-#include <optional>
-
 #include <kernel/mutex.h>
+#include <ktl/optional.h>
 
 template <typename T>
 class OnceCell {
@@ -40,14 +39,15 @@ class OnceCell {
     return *value_;
   }
 
-  std::optional<T> take() {
+  ktl::optional<T> take() {
     Guard<Mutex> lock(&mtx_);
     return std::move(value_);
   }
 
  private:
   mutable DECLARE_MUTEX(OnceCell) mtx_;
-  std::optional<T> value_ __TA_GUARDED(mtx_);
+
+  ktl::optional<T> value_ __TA_GUARDED(mtx_);
 };
 
 #endif  // ZIRCON_KERNEL_LIB_MISTOS_UTIL_INCLUDE_LIB_MISTOS_UTIL_ONECELL_H_
