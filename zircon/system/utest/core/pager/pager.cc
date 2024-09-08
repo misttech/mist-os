@@ -2324,6 +2324,14 @@ TEST(Pager, FailEarlyWake) {
   // Supply the first page, this should wake up the internal kernel request and process that page.
   ASSERT_TRUE(pager.SupplyPages(vmo, 0, 1, 0));
 
+  // Wait for the thread to have completed processing that page and be blocked again. This ensures
+  // that we do not race by failing the pages before it blocks, causing it to keep waiting. This
+  // race, and the resulting waiting, is not a kernel bug as we are intentionally *not* providing a
+  // status of the third page in order to test the early wake optimization. In practice if this race
+  // were to occur, the user would be failing all the remaining pages, which would cause the request
+  // to unblock in all scenarios.
+  ASSERT_TRUE(t.WaitForBlocked());
+
   // Fail the second page, although this isn't the first page in the request, due to the early wake
   // from the first request it is the next page to be processed and so should complete and fail the
   // request, even though we have not supplied or failed the third page.
