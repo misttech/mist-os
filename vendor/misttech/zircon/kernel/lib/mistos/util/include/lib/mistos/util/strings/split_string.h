@@ -6,7 +6,8 @@
 #ifndef ZIRCON_KERNEL_LIB_MISTOS_UTIL_INCLUDE_LIB_MISTOS_UTIL_STRINGS_SPLIT_STRING_H_
 #define ZIRCON_KERNEL_LIB_MISTOS_UTIL_INCLUDE_LIB_MISTOS_UTIL_STRINGS_SPLIT_STRING_H_
 
-#include <fbl/string.h>
+#include <lib/mistos/util/bstring.h>
+
 #include <fbl/vector.h>
 #include <ktl/string_view.h>
 
@@ -27,8 +28,8 @@ enum SplitResult {
 
 // Split the given string on ANY of the given separators, returning copies of
 // the result
-fbl::Vector<fbl::String> SplitStringCopy(ktl::string_view input, ktl::string_view separators,
-                                         WhiteSpaceHandling whitespace, SplitResult result_type);
+fbl::Vector<BString> SplitStringCopy(ktl::string_view input, ktl::string_view separators,
+                                     WhiteSpaceHandling whitespace, SplitResult result_type);
 
 // Like SplitStringCopy above except it returns a vector of std::string_views which
 // reference the original buffer without copying.
