@@ -83,6 +83,10 @@ int Nelson::Thread() {
     zxlogf(ERROR, "ButtonsInit failed: %d", status);
   }
 
+  if ((status = BrownoutProtectionInit()) != ZX_OK) {
+    zxlogf(ERROR, "BrownoutProtectionInit failed: %d", status);
+  }
+
   // ClkInit() must be called after other subsystems that bind to clock have had a chance to add
   // their init steps.
   if ((status = ClkInit()) != ZX_OK) {

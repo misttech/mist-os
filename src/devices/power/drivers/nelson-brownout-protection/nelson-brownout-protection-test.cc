@@ -255,8 +255,7 @@ TEST_F(NelsonBrownoutProtectionTest, Test) {
 
   std::vector alert_gpio_states = alert_gpio().SyncCall(&fake_gpio::FakeGpio::GetStateLog);
   ASSERT_GE(alert_gpio_states.size(), 1);
-  ASSERT_EQ(fake_gpio::ReadSubState{.flags = fuchsia_hardware_gpio::GpioFlags::kNoPull},
-            alert_gpio_states[0].sub_state);
+  ASSERT_EQ(fake_gpio::ReadSubState{}, alert_gpio_states[0].sub_state);
 }
 
 }  // namespace brownout_protection

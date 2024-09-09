@@ -111,6 +111,7 @@ class Nelson : public NelsonType {
   zx_status_t MaliInit();
   zx_status_t OtRadioInit();
   zx_status_t PowerInit();
+  zx_status_t BrownoutProtectionInit();
   zx_status_t PwmInit();
   zx_status_t RegistersInit();
   zx_status_t SdioInit();

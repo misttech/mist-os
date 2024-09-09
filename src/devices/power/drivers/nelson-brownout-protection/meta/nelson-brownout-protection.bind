@@ -24,3 +24,7 @@ node "alert-gpio" {
   fuchsia.hardware.gpio.Service == fuchsia.hardware.gpio.Service.ZirconTransport;
   fuchsia.gpio.FUNCTION == fuchsia.gpio.FUNCTION.GPIO_ALERT_PWR_L;
 }
+
+node "gpio-init" {
+  fuchsia.BIND_INIT_STEP == fuchsia.gpio.BIND_INIT_STEP.GPIO;
+}
