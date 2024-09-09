@@ -26,54 +26,41 @@ if (is_host) {
 if (is_fuchsia) {
   assert(current_toolchain == default_toolchain,
          "//build/images/* are only valid in the Fuchsia toolchain")
+  assert(!bootfs_only,
+         "The recovery image is only valid for products other than bringup.")
 
   group("recovery") {
     testonly = true
     public_deps = [ ":recovery-fdr" ]
   }
 
-  _core_realm_deps = [
-    "//src/diagnostics/realm:core_shard",
-    "//src/firmware/fastboot-tcp:fastboot-tcp-core-shard",
-    "//src/firmware/fastboot-usb:fastboot-usb-core-shard",
-    "//src/recovery/factory_reset:factory_reset_core_shard",
-    "//src/ui/bin/brightness_manager:auto-brightness_core_shard",
-  ]
-
   core_realm_definition("core") {
-    deps = _core_realm_deps +
-           [ "//src/recovery/system:system_recovery_fdr_core_shard" ]
+    deps = [
+      "//src/recovery/factory_reset:factory_reset_core_shard",
+      "//src/recovery/system:system_recovery_fdr_core_shard",
+    ]
   }
 
-  recovery_packages = board_recovery_package_labels + [
-                        "//src/recovery/factory_reset",
-                        "//src/ui/bin/brightness_manager:auto-brightness",
+  product_assembly_configuration("for-fdr") {
+    platform = {
+      build_type = "eng"
+      feature_set_level = "utility"
+      graphics = {
+        enable_virtual_console = false
+      }
 
-                        # Flattened from //src/sys/pkg:recovery
-                        "//src/sys/pkg/bin/omaha-client",
-                        "//src/sys/pkg/bin/system-updater",
-
-                        # system-update-committer is a dependency of pkg-cache,
-                        # but we don't want to do any verification in recovery
-                        # mode, so we completely disable it.
-                        "//src/sys/pkg/bin/system-update-committer:disable",
-                      ]
-
-  recovery_fdr_packages = recovery_packages
-  recovery_fdr_packages += [ "//src/recovery/system:system_recovery_fdr" ]
-
-  _storage_config = {
-  }
-  if (!fxfs_blob) {
-    _storage_config = {
-      storage = {
-        filesystems = {
-          volume = {
-            fvm = {
-              data = {
-                data_filesystem_format = data_filesystem_format
-              }
-              blob = {
+      # Use the same data filesystem format as the "main" product assembly.  The default is fxfs, so
+      # this only needs to be set if it's not that.
+      if (!fxfs_blob) {
+        storage = {
+          filesystems = {
+            volume = {
+              fvm = {
+                data = {
+                  data_filesystem_format = data_filesystem_format
+                }
+                blob = {
+                }
               }
             }
           }
@@ -82,40 +69,35 @@ if (is_fuchsia) {
     }
   }
 
-  product_assembly_configuration("for-fdr") {
-    platform = {
-      # This uses eng so that the serial console is available for running as a test image.
-      build_type = "eng"
-      feature_set_level = "utility"
-      graphics = {
-        enable_virtual_console = false
-      }
-      forward_variables_from(_storage_config, "*")
-    }
-    product = {
-    }
-  }
-
   assembled_system("recovery-fdr") {
     image_name = "fuchsia"
     namespace = "recovery-fdr"
 
-    base_packages = recovery_fdr_packages
-    core_realm_definition = ":core"
-    generate_vbmeta = use_vbmeta
-
-    if (!fxfs_blob) {
-      generate_fvm = true
-    } else {
-      generate_fxfs = true
-    }
+    testonly = true
+    allow_eng_platform_bundle_use = true
 
     ramdisk_in_zbi = true
 
-    cmdline = []
+    base_packages = board_recovery_package_labels + [
+                      "//src/recovery/factory_reset",
+                      "//src/recovery/system:system_recovery_fdr",
+
+                      # system-update-committer is a dependency of pkg-cache,
+                      # but we don't want to do any verification in recovery
+                      # mode, so we completely disable it.
+                      "//src/sys/pkg/bin/system-update-committer:disable",
+                    ]
+    core_realm_definition = ":core"
 
     product_assembly_config_label = ":for-fdr"
     board_config_label = recovery_board_configuration_label
+
+    # Use the same filesystem settings as the "main" product assembly.
+    generate_fxfs = fxfs_blob
+    generate_fvm = !fxfs_blob
+
+    # The following are set to match the board's configuration
+    generate_vbmeta = use_vbmeta
 
     if (custom_signing_script != "") {
       inputs = custom_signing_script_inputs
