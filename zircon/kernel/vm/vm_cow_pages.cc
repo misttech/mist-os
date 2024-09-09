@@ -707,11 +707,11 @@ bool VmCowPages::DedupZeroPage(vm_page_t* page, uint64_t offset) {
     __UNINITIALIZED StackOwnedLoanedPagesInterval raii_interval;
 
     // Replace the slot with a marker.
-    VmPageOrMarker new_marker = VmPageOrMarker::Marker();
-    VmPageOrMarker old_page;
-    zx_status_t status =
-        AddPageLocked(&new_marker, offset, CanOverwriteContent::NonZero, &old_page);
-    DEBUG_ASSERT(status == ZX_OK);
+    __UNINITIALIZED auto result =
+        BeginAddPageWithSlotLocked(offset, page_or_marker, CanOverwriteContent::NonZero);
+    DEBUG_ASSERT(result.is_ok());
+    VmPageOrMarker old_page = CompleteAddPageLocked(*result, VmPageOrMarker::Marker(),
+                                                    /*do_range_update=*/true);
     DEBUG_ASSERT(old_page.IsPage());
 
     // Free the old page.
@@ -1844,34 +1844,38 @@ uint64_t VmCowPages::CountAttributedAncestorBytesLocked(uint64_t offset, uint64_
   return attributed;
 }
 
-zx_status_t VmCowPages::AddPageLocked(VmPageOrMarker* p, uint64_t offset,
-                                      CanOverwriteContent overwrite, VmPageOrMarker* released_page,
-                                      bool do_range_update) {
+VmPageOrMarker VmCowPages::AddPageTransaction::Complete(VmPageOrMarker p) {
+  VmPageOrMarker ret = slot_.SwapContent(ktl::move(p));
+  slot_ = VmPageOrMarkerRef();
+  return ret;
+}
+
+void VmCowPages::AddPageTransaction::Cancel(VmPageList& pl) {
+  DEBUG_ASSERT(slot_);
+  if (slot_->IsEmpty()) {
+    pl.ReturnEmptySlot(offset_);
+  }
+  slot_ = VmPageOrMarkerRef();
+}
+
+zx::result<VmCowPages::AddPageTransaction> VmCowPages::BeginAddPageWithSlotLocked(
+    uint64_t offset, VmPageOrMarkerRef slot, CanOverwriteContent overwrite) {
   canary_.Assert();
-
-  // Pages can be added as part of Init, but not once we transition to dead.
-  DEBUG_ASSERT(life_cycle_ != LifeCycle::Dead);
-
-  if (p->IsPage()) {
-    LTRACEF("vmo %p, offset %#" PRIx64 ", page %p (%#" PRIxPTR ")\n", this, offset, p->Page(),
-            p->Page()->paddr());
-  } else if (p->IsReference()) {
-    [[maybe_unused]] const uint64_t cookie = p->Reference().value();
-    LTRACEF("vmo %p, offset %#" PRIx64 ", reference %#" PRIx64 "\n", this, offset, cookie);
-  } else {
-    DEBUG_ASSERT(p->IsMarker());
-    LTRACEF("vmo %p, offset %#" PRIx64 ", marker\n", this, offset);
+  zx_status_t status = CheckOverwriteConditionsLocked(offset, slot, overwrite);
+  if (unlikely(status != ZX_OK)) {
+    return zx::error(status);
   }
+  // Do additinoal checks. The IsOffsetInZeroInterval check is expensive, but the assumption is that
+  // this method is not used when is_source_preserving_page_content is true, so the assertion should
+  // short circuit.
+  DEBUG_ASSERT(!is_source_preserving_page_content() || !slot->IsEmpty() ||
+               !page_list_.IsOffsetInZeroInterval(offset));
+  return zx::ok(AddPageTransaction(slot, offset, overwrite));
+}
 
-  if (released_page != nullptr) {
-    *released_page = VmPageOrMarker::Empty();
-  }
-
-  if (offset >= size_) {
-    return ZX_ERR_OUT_OF_RANGE;
-  }
-
-  VmPageOrMarker* page;
+zx::result<VmCowPages::AddPageTransaction> VmCowPages::BeginAddPageLocked(
+    uint64_t offset, CanOverwriteContent overwrite) {
+  canary_.Assert();
   auto interval_handling = VmPageList::IntervalHandling::NoIntervals;
   // If we're backed by a page source that preserves content (user pager), we cannot directly update
   // empty slots in the page list. An empty slot might lie in a sparse zero interval, which would
@@ -1892,26 +1896,35 @@ zx_status_t VmCowPages::AddPageLocked(VmPageOrMarker* p, uint64_t offset,
       // that cannot be overwritten, even if that slot was already populated (by an interval
       // sentinel).
       DEBUG_ASSERT(!slot);
-      return ZX_ERR_ALREADY_EXISTS;
+      return zx::error(ZX_ERR_ALREADY_EXISTS);
     }
     // If offset was in an interval, we should have an interval slot to overwrite at this point.
     DEBUG_ASSERT(slot && slot->IsIntervalSlot());
   }
-  page = slot;
 
-  if (!page) {
-    return ZX_ERR_NO_MEMORY;
+  if (unlikely(!slot)) {
+    return zx::error(ZX_ERR_NO_MEMORY);
   }
-  // The slot might have started empty and in error paths we will not fill it, so make sure it gets
-  // returned in that case.
-  auto return_slot = fit::defer([page, offset, this] {
-    // If we started with an interval slot to manipulate, we should have been able to overwrite it.
-    DEBUG_ASSERT(!page->IsIntervalSlot());
-    if (unlikely(page->IsEmpty())) {
-      AssertHeld(lock_ref());
+
+  zx_status_t status = CheckOverwriteConditionsLocked(offset, VmPageOrMarkerRef(slot), overwrite);
+  if (unlikely(status != ZX_OK)) {
+    if (slot->IsEmpty()) {
       page_list_.ReturnEmptySlot(offset);
     }
-  });
+    return zx::error(status);
+  }
+
+  return zx::ok(AddPageTransaction(VmPageOrMarkerRef(slot), offset, overwrite));
+}
+
+zx_status_t VmCowPages::CheckOverwriteConditionsLocked(uint64_t offset, VmPageOrMarkerRef slot,
+                                                       CanOverwriteContent overwrite) {
+  // Pages can be added as part of Init, but not once we transition to dead.
+  DEBUG_ASSERT(life_cycle_ != LifeCycle::Dead);
+
+  if (offset >= size_) {
+    return ZX_ERR_OUT_OF_RANGE;
+  }
 
   // We cannot overwrite any kind of content.
   if (overwrite == CanOverwriteContent::None) {
@@ -1922,7 +1935,7 @@ zx_status_t VmCowPages::AddPageLocked(VmPageOrMarker* p, uint64_t offset,
     }
     // This VMO is backed by a page source, so empty slots represent absence of content. Fail if the
     // slot is not empty.
-    if (!page->IsEmpty()) {
+    if (!slot->IsEmpty()) {
       return ZX_ERR_ALREADY_EXISTS;
     }
   }
@@ -1939,27 +1952,32 @@ zx_status_t VmCowPages::AddPageLocked(VmPageOrMarker* p, uint64_t offset,
   //  markers (supplied by the user pager), or by sparse zero intervals (supplied by the kernel).
   //  Therefore the only content type that cannot be overwritten in this case as well is an actual
   //  page.
-  if (overwrite == CanOverwriteContent::Zero && page->IsPageOrRef()) {
+  if (overwrite == CanOverwriteContent::Zero && slot->IsPageOrRef()) {
     // If we have a page source, the page source should be able to validate the page.
     // Note that having a page source implies that any content must be an actual page and so
     // although we return an error for any kind of content, the debug check only gets run for page
     // sources where it will be a real page.
-    DEBUG_ASSERT(!page_source_ || page_source_->DebugIsPageOk(page->Page(), offset));
+    DEBUG_ASSERT(!page_source_ || page_source_->DebugIsPageOk(slot->Page(), offset));
     return ZX_ERR_ALREADY_EXISTS;
   }
+  // If the old entry and actual content then we should be permitted to overwrite any kind of
+  // content (zero or non-zero).
+  DEBUG_ASSERT(overwrite == CanOverwriteContent::NonZero || !slot->IsPageOrRef());
+  return ZX_OK;
+}
 
-  // If the old entry is actual content, release it.
-  if (page->IsPageOrRef()) {
-    if (page->IsReference()) {
-      // If the old entry is a reference then we know that there can be no mappings to it, since a
-      // reference cannot be mapped in, and we can skip the range update.
-      do_range_update = false;
-    }
-    // We should be permitted to overwrite any kind of content (zero or non-zero).
-    DEBUG_ASSERT(overwrite == CanOverwriteContent::NonZero);
-    // The caller should have passed in an optional to hold the released page.
-    DEBUG_ASSERT(released_page != nullptr);
-    *released_page = ktl::move(*page);
+VmPageOrMarker VmCowPages::CompleteAddPageLocked(AddPageTransaction& transaction,
+                                                 VmPageOrMarker&& p, bool do_range_update) {
+  if (p.IsPage()) {
+    LTRACEF("vmo %p, offset %#" PRIx64 ", page %p (%#" PRIxPTR ")\n", this, transaction.offset(),
+            p.Page(), p.Page()->paddr());
+  } else if (p.IsReference()) {
+    [[maybe_unused]] const uint64_t cookie = p.Reference().value();
+    LTRACEF("vmo %p, offset %#" PRIx64 ", reference %#" PRIx64 "\n", this, transaction.offset(),
+            cookie);
+  } else {
+    DEBUG_ASSERT(p.IsMarker());
+    LTRACEF("vmo %p, offset %#" PRIx64 ", marker\n", this, transaction.offset());
   }
 
   // If the new page is an actual page and we have a page source, the page source should be able to
@@ -1967,30 +1985,53 @@ zx_status_t VmCowPages::AddPageLocked(VmPageOrMarker* p, uint64_t offset,
   // Note that having a page source implies that any content must be an actual page and so
   // although we return an error for any kind of content, the debug check only gets run for page
   // sources where it will be a real page.
-  DEBUG_ASSERT(!p->IsPageOrRef() || !page_source_ ||
-               page_source_->DebugIsPageOk(p->Page(), offset));
+  DEBUG_ASSERT(!p.IsPageOrRef() || !page_source_ ||
+               page_source_->DebugIsPageOk(p.Page(), transaction.offset()));
 
   // If this is actually a real page, we need to place it into the appropriate queue.
-  if (p->IsPage()) {
-    vm_page_t* low_level_page = p->Page();
+  if (p.IsPage()) {
+    vm_page_t* low_level_page = p.Page();
     DEBUG_ASSERT(low_level_page->state() == vm_page_state::OBJECT);
     DEBUG_ASSERT(low_level_page->object.pin_count == 0);
-    SetNotPinnedLocked(low_level_page, offset);
+    SetNotPinnedLocked(low_level_page, transaction.offset());
   }
-  *page = ktl::move(*p);
+  VmPageOrMarker old = transaction.Complete(ktl::move(p));
 
   if (do_range_update) {
-    // other mappings may have covered this offset into the vmo, so unmap those ranges
-    RangeChangeUpdateLocked(offset, PAGE_SIZE,
-                            overwrite == CanOverwriteContent::NonZero
-                                ? RangeChangeOp::Unmap
-                                : RangeChangeOp::UnmapZeroPage);
+    // If the old entry is a reference then we know that there can be no mappings to it, since a
+    // reference cannot be mapped in, and we can skip the range update.
+    if (!old.IsReference()) {
+      // other mappings may have covered this offset into the vmo, so unmap those ranges
+      RangeChangeUpdateLocked(transaction.offset(), PAGE_SIZE,
+                              transaction.overwrite() == CanOverwriteContent::NonZero
+                                  ? RangeChangeOp::Unmap
+                                  : RangeChangeOp::UnmapZeroPage);
+    }
   }
 
   VMO_VALIDATION_ASSERT(DebugValidatePageSplitsHierarchyLocked());
   VMO_FRUGAL_VALIDATION_ASSERT(DebugValidateVmoPageBorrowingLocked());
   VMO_VALIDATION_ASSERT(DebugValidateZeroIntervalsLocked());
-  return ZX_OK;
+  return old;
+}
+
+void VmCowPages::CancelAddPageLocked(AddPageTransaction& transaction) {
+  transaction.Cancel(page_list_);
+}
+
+zx::result<VmPageOrMarker> VmCowPages::AddPageLocked(uint64_t offset, VmPageOrMarker&& p,
+                                                     CanOverwriteContent overwrite,
+                                                     bool do_range_update) {
+  __UNINITIALIZED auto result = BeginAddPageLocked(offset, overwrite);
+  if (unlikely(result.is_error())) {
+    if (p.IsPage()) {
+      FreePageLocked(p.ReleasePage(), true);
+    } else if (p.IsReference()) {
+      FreeReference(p.ReleaseReference());
+    }
+    return result.take_error();
+  }
+  return zx::ok(CompleteAddPageLocked(*result, ktl::move(p), do_range_update));
 }
 
 zx_status_t VmCowPages::AddNewPageLocked(uint64_t offset, vm_page_t* page,
@@ -1999,7 +2040,23 @@ zx_status_t VmCowPages::AddNewPageLocked(uint64_t offset, vm_page_t* page,
                                          bool do_range_update) {
   canary_.Assert();
 
-  DEBUG_ASSERT(IS_PAGE_ALIGNED(offset));
+  __UNINITIALIZED auto result = BeginAddPageLocked(offset, overwrite);
+  if (result.is_error()) {
+    return result.status_value();
+  }
+  VmPageOrMarker old = CompleteAddNewPageLocked(*result, page, zero, do_range_update);
+  if (released_page) {
+    *released_page = ktl::move(old);
+  } else {
+    DEBUG_ASSERT(!old.IsPageOrRef());
+  }
+  return ZX_OK;
+}
+
+VmPageOrMarker VmCowPages::CompleteAddNewPageLocked(AddPageTransaction& transaction,
+                                                    vm_page_t* page, bool zero,
+                                                    bool do_range_update) {
+  DEBUG_ASSERT(IS_PAGE_ALIGNED(transaction.offset()));
 
   InitializeVmPage(page);
   if (zero) {
@@ -2012,20 +2069,9 @@ zx_status_t VmCowPages::AddNewPageLocked(uint64_t offset, vm_page_t* page,
   if (is_source_preserving_page_content()) {
     // Only zero pages can be added as new pages to pager backed VMOs.
     DEBUG_ASSERT(zero || IsZeroPage(page));
-    UpdateDirtyStateLocked(page, offset, DirtyState::Clean, /*is_pending_add=*/true);
+    UpdateDirtyStateLocked(page, transaction.offset(), DirtyState::Clean, /*is_pending_add=*/true);
   }
-
-  VmPageOrMarker p = VmPageOrMarker::Page(page);
-  zx_status_t status = AddPageLocked(&p, offset, overwrite, released_page, do_range_update);
-
-  if (status != ZX_OK) {
-    // Release the page from 'p', as we are returning failure 'page' is still owned by the caller.
-    // Store the result in a temporary as we are required to use the result of ReleasePage.
-    [[maybe_unused]] vm_page_t* unused = p.ReleasePage();
-  }
-  VMO_VALIDATION_ASSERT(DebugValidatePageSplitsHierarchyLocked());
-  VMO_FRUGAL_VALIDATION_ASSERT(DebugValidateVmoPageBorrowingLocked());
-  return status;
+  return CompleteAddPageLocked(transaction, VmPageOrMarker::Page(page), do_range_update);
 }
 
 zx_status_t VmCowPages::AddNewPagesLocked(uint64_t start_offset, list_node_t* pages,
@@ -2161,26 +2207,17 @@ zx_status_t VmCowPages::CloneCowPageLocked(uint64_t offset, list_node_t* alloc_l
     // page later it does not encounter an allocation failure in the page list. We need to do this
     // *before* we've made any changes to the |target_page_owner| page list so that we do not need
     // to roll back in case of a failed migration.
-    auto [slot, is_in_interval] =
-        cur->page_list_.LookupOrAllocate(cur_offset, VmPageList::IntervalHandling::NoIntervals);
-    DEBUG_ASSERT(!is_in_interval);
-    // Bail if we could not allocate the slot.
-    if (!slot) {
+    __UNINITIALIZED auto page_transaction =
+        cur->BeginAddPageLocked(cur_offset, CanOverwriteContent::Zero);
+    if (page_transaction.is_error()) {
       *out_page = nullptr;
-      return ZX_ERR_NO_MEMORY;
+      return page_transaction.status_value();
     }
-    // We should not be trying to fork at this offset if something already existed.
-    DEBUG_ASSERT(slot->IsEmpty());
 
-    // From this point on, we should ensure that the slot gets used to hold a page, or it is
-    // returned if empty.
-    const VmPageOrMarker* cur_page = slot;
-    auto return_empty_slot = fit::defer([cur, cur_offset, cur_page] {
-      if (!cur_page->IsPage()) {
-        AssertHeld(cur->lock_ref());
-        // If we did not use the slot to hold a page, it could only have remained empty.
-        cur->page_list_.ReturnEmptySlot(cur_offset);
-      }
+    // From this point on, we should ensure that the transaction either gets completed or canceled.
+    auto cancel_transaction = fit::defer([cur, &page_transaction] {
+      AssertHeld(cur->lock_ref());
+      cur->CancelAddPageLocked(*page_transaction);
     });
 
     if (target_page_owner->IsUniAccessibleLocked(target_page, target_page_offset)) {
@@ -2232,12 +2269,11 @@ zx_status_t VmCowPages::CloneCowPageLocked(uint64_t offset, list_node_t* alloc_l
     // Skip the automatic range update so we can do it ourselves more efficiently. This gets handled
     // either in the next code block below for the subtree we do not walk, or by the
     // complete_range_update deferred method for our target subtree.
-    VmPageOrMarker add_page = VmPageOrMarker::Page(target_page);
-    zx_status_t status =
-        cur->AddPageLocked(&add_page, cur_offset, CanOverwriteContent::Zero, nullptr, false);
-    // Since we have allocated the slot already, we know this cannot fail.
-    DEBUG_ASSERT_MSG(status == ZX_OK, "AddPageLocked returned %d\n", status);
-    DEBUG_ASSERT(cur_page->Page() == target_page);
+    [[maybe_unused]] VmPageOrMarker prev_content = cur->CompleteAddPageLocked(
+        *page_transaction, VmPageOrMarker::Page(target_page), /*do_range_update=*/false);
+    cancel_transaction.cancel();
+    // We should not have been trying to fork at this offset if something already existed.
+    DEBUG_ASSERT(prev_content.IsEmpty());
 
     if (!skip_range_update) {
       if (cur != this) {
@@ -2293,16 +2329,10 @@ zx_status_t VmCowPages::CloneCowPageAsZeroLocked(uint64_t offset, list_node_t* f
   // fail below. In the scenario where |slot| is empty, we do not need to worry about calling
   // ReturnEmptySlot, since there are no failure paths from here and we are guaranteed to fill the
   // slot.
-  auto [slot, is_in_interval] =
-      page_list_.LookupOrAllocate(offset, VmPageList::IntervalHandling::NoIntervals);
-  DEBUG_ASSERT(!is_in_interval);
-
-  if (!slot) {
-    return ZX_ERR_NO_MEMORY;
+  __UNINITIALIZED auto page_transaction = BeginAddPageLocked(offset, CanOverwriteContent::Zero);
+  if (page_transaction.is_error()) {
+    return page_transaction.status_value();
   }
-
-  // We cannot be forking a page to here if there's already something.
-  DEBUG_ASSERT(slot->IsEmpty());
 
   bool left = this == &(parent_locked().left_child_locked());
   // Page is in our parent. Check if its uni accessible, if so we can free it.
@@ -2331,15 +2361,12 @@ zx_status_t VmCowPages::CloneCowPageAsZeroLocked(uint64_t offset, list_node_t* f
     }
   }
   // Insert the zero marker.
-  VmPageOrMarker new_marker = VmPageOrMarker::Marker();
   // We know that the slot is empty, so we know we won't be overwriting an actual page.
   // We expect the caller to update any mappings.
-  zx_status_t status = AddPageLocked(&new_marker, offset, CanOverwriteContent::Zero, nullptr,
-                                     /*do_range_update=*/false);
-  // Absent bugs, AddPageLocked() can only return ZX_ERR_NO_MEMORY, but that failure can only
-  // occur if we had to allocate a slot in the page list. Since we allocated a slot above, we
-  // know that can't be the case.
-  DEBUG_ASSERT(status == ZX_OK);
+  [[maybe_unused]] VmPageOrMarker old =
+      CompleteAddPageLocked(*page_transaction, VmPageOrMarker::Marker(), /*do_range_update=*/false);
+  // We cannot be forking a page to here if there's already something.
+  DEBUG_ASSERT(old.IsEmpty());
   return ZX_OK;
 }
 
@@ -2802,16 +2829,33 @@ VmCowPages::LookupCursor::TargetAllocateCopyPageAsResult(vm_page_t* source, Dirt
     target_->UpdateDirtyStateLocked(out_page, offset_, dirty_state,
                                     /*is_pending_add=*/true);
   }
-  VmPageOrMarker insert = VmPageOrMarker::Page(out_page);
-  status = target_->AddPageLocked(&insert, offset_, CanOverwriteContent::Zero, nullptr);
-  if (status != ZX_OK) {
-    // AddPageLocked failing for any other reason is a programming error.
-    DEBUG_ASSERT_MSG(status == ZX_ERR_NO_MEMORY, "status=%d\n", status);
+
+  // For efficiently we would like to use the slot we already have in our cursor if possible,
+  // however that can only be done if all of the following hold:
+  //  * owner_ == target_ - If not true then we do not even have a cursor (and hence slot) for where
+  //    the insertion is happening.
+  //  * owner_pl_cursor_.current() != nullptr - Must be an actual node and slot already allocated,
+  //    it is just Empty()
+  //  * !is_source_preserving_page_content() - A source preserving page content may have intervals,
+  //    which are zeroes that we could be overwriting here, but the slot itself we have found could
+  //    be empty and the interval may need splitting. For simplicity we do not attempt to check for
+  //    and handle interval splitting, and just skip reusing our slot in this case.
+  const bool can_reuse_slot = (owner_ == target_ && owner_pl_cursor_.current() &&
+                               !owner_->is_source_preserving_page_content());
+  __UNINITIALIZED auto page_transaction =
+      can_reuse_slot ? target_->BeginAddPageWithSlotLocked(offset_, owner_pl_cursor_.current(),
+                                                           CanOverwriteContent::Zero)
+                     : target_->BeginAddPageLocked(offset_, CanOverwriteContent::Zero);
+  if (page_transaction.is_error()) {
     // We are freeing a page we just got from the PMM (or from the alloc_list), so we do not own
     // it yet.
-    target_->FreePageLocked(insert.ReleasePage(), /*freeing_owned_page=*/false);
-    return zx::error(status);
+    target_->FreePageLocked(out_page, /*freeing_owned_page=*/false);
+    return page_transaction.take_error();
   }
+
+  [[maybe_unused]] VmPageOrMarker old = target_->CompleteAddPageLocked(
+      *page_transaction, VmPageOrMarker::Page(out_page), /*do_range_update=*/true);
+  DEBUG_ASSERT(!old.IsPageOrRef());
   target_->IncrementHierarchyGenerationCountLocked();
 
   // If asked to explicitly mark zero forks, and this is actually fork of the zero page, move to the
@@ -3935,14 +3979,13 @@ zx_status_t VmCowPages::ZeroPagesLocked(uint64_t page_start_base, uint64_t page_
         if (status != ZX_OK) {
           return status;
         }
-        VmPageOrMarker new_page = VmPageOrMarker::Page(p);
-        status = AddPageLocked(&new_page, offset, CanOverwriteContent::Zero, nullptr,
-                               /*do_range_update=*/false);
+        auto result = AddPageLocked(offset, VmPageOrMarker::Page(p), CanOverwriteContent::Zero,
+                                    /*do_range_update=*/false);
         // Absent bugs, AddPageLocked() can only return ZX_ERR_NO_MEMORY.
-        if (status == ZX_ERR_NO_MEMORY) {
-          return status;
+        if (result.is_error()) {
+          ASSERT(result.status_value() == ZX_ERR_NO_MEMORY);
         }
-        DEBUG_ASSERT(status == ZX_OK);
+        DEBUG_ASSERT(!result->IsPageOrRef());
         return ZX_ERR_NEXT;
       }
 
@@ -3991,15 +4034,14 @@ zx_status_t VmCowPages::ZeroPagesLocked(uint64_t page_start_base, uint64_t page_
     }
 
     // Remove any page that could be hanging around in the slot and replace it with a marker.
-    VmPageOrMarker new_marker = VmPageOrMarker::Marker();
-    VmPageOrMarker released_page;
-    zx_status_t status = AddPageLocked(&new_marker, offset, CanOverwriteContent::NonZero,
-                                       &released_page, /*do_range_update=*/false);
+    auto result = AddPageLocked(offset, VmPageOrMarker::Marker(), CanOverwriteContent::NonZero,
+                                /*do_range_update=*/false);
     // Absent bugs, AddPageLocked() can only return ZX_ERR_NO_MEMORY.
-    if (status == ZX_ERR_NO_MEMORY) {
-      return status;
+    if (result.is_error()) {
+      ASSERT(result.status_value() == ZX_ERR_NO_MEMORY);
+      return result.status_value();
     }
-    DEBUG_ASSERT(status == ZX_OK);
+    VmPageOrMarker& released_page = *result;
     // Free the old page.
     if (released_page.IsPage()) {
       vm_page_t* page = released_page.ReleasePage();
@@ -5238,23 +5280,25 @@ zx_status_t VmCowPages::TakePagesWithParentLocked(uint64_t offset, uint64_t len,
       }
     });
 
-    // Once we have a zero page ready to go, require an owned page at the current position.
-    auto result = cursor->RequireOwnedPage(true, static_cast<uint>((end - position) / PAGE_SIZE),
-                                           page_request);
-    if (result.is_error()) {
-      status = result.error_value();
-      break;
+    {
+      // Once we have a zero page ready to go, require an owned page at the current position.
+      auto result = cursor->RequireOwnedPage(true, static_cast<uint>((end - position) / PAGE_SIZE),
+                                             page_request);
+      if (result.is_error()) {
+        status = result.error_value();
+        break;
+      }
     }
 
     // Replace the content at `position` with the zeroed out page.
-    VmPageOrMarker content;
-    status = AddPageLocked(&zeroed_out_page, position, CanOverwriteContent::NonZero, &content,
-                           /*do_range_update=*/false);
-    // Absent bugs, AddPageLocked() can only return ZX_ERR_NO_MEMORY.
-    if (status != ZX_OK) {
-      DEBUG_ASSERT(status == ZX_ERR_NO_MEMORY);
+    auto result = AddPageLocked(position, ktl::move(zeroed_out_page), CanOverwriteContent::NonZero,
+                                /*do_range_update=*/false);
+    if (result.is_error()) {
+      // Absent bugs, AddPageLocked() can only return ZX_ERR_NO_MEMORY.
+      DEBUG_ASSERT(result.status_value() == ZX_ERR_NO_MEMORY);
       break;
     }
+    VmPageOrMarker& content = *result;
     new_pages_len += PAGE_SIZE;
     ASSERT(!content.IsInterval());
 
@@ -5558,8 +5602,12 @@ zx_status_t VmCowPages::SupplyPagesLocked(uint64_t offset, uint64_t len, VmPageS
       // so we use AddPageLocked().
       // We only want to populate offsets that have true absence of content, so do not overwrite
       // anything in the page list.
-      status = AddPageLocked(&src_page, offset, overwrite_policy, &old_page,
-                             /*do_range_update=*/false);
+      auto result = AddPageLocked(offset, ktl::move(src_page), overwrite_policy,
+                                  /*do_range_update=*/false);
+      status = result.status_value();
+      if (status == ZX_OK) {
+        old_page = ktl::move(*result);
+      }
     }
 
     // If the content overwrite policy was None, the old page should be empty.
@@ -6758,25 +6806,22 @@ void VmCowPages::SwapPageLocked(uint64_t offset, vm_page_t* old_page, vm_page_t*
   // unmap before removing old page
   RangeChangeUpdateLocked(offset, PAGE_SIZE, RangeChangeOp::Unmap);
 
-  const VmPageOrMarker* p = page_list_.Lookup(offset);
+  // The caller is required to have provided us a page that exists, so this can never fail.
+  VmPageOrMarkerRef p = page_list_.LookupMutable(offset);
   DEBUG_ASSERT(p);
   DEBUG_ASSERT(p->IsPage());
 
   CopyPageForReplacementLocked(new_page, old_page);
 
   // Add replacement page in place of old page.
-  //
-  // We could optimize this by doing what's needed to *p directly, but for now call this
-  // common code.
-  VmPageOrMarker new_vm_page = VmPageOrMarker::Page(new_page);
-  VmPageOrMarker released_page;
-  zx_status_t status = AddPageLocked(&new_vm_page, offset, CanOverwriteContent::NonZero,
-                                     &released_page, /*do_range_update=*/false);
-  // Absent bugs, AddPageLocked() can only return ZX_ERR_NO_MEMORY, but that failure can only occur
-  // if page_list_ had to allocate.  Here, page_list_ hasn't yet had a chance to clean up any
-  // internal structures, so AddPageLocked() didn't need to allocate, so we know that
-  // AddPageLocked() will succeed.
-  DEBUG_ASSERT(status == ZX_OK);
+  __UNINITIALIZED auto result = BeginAddPageWithSlotLocked(offset, p, CanOverwriteContent::NonZero);
+  // Absent bugs, BeginAddPageWithSlotLocked() can only return ZX_ERR_NO_MEMORY, but that failure
+  // can only occur if page_list_ had to allocate.  Here, page_list_ hasn't yet had a chance to
+  // clean up any internal structures, so BeginAddPageWithSlotLocked() didn't need to allocate, so
+  // we know that BeginAddPageWithSlotLocked() will succeed.
+  DEBUG_ASSERT(result.is_ok());
+  VmPageOrMarker released_page =
+      CompleteAddPageLocked(*result, VmPageOrMarker::Page(new_page), /*do_range_update=*/false);
   // The page released was the old page.
   DEBUG_ASSERT(released_page.IsPage() && released_page.Page() == old_page);
   // Need to take the page out of |released_page| to avoid a [[nodiscard]] error. Since we just
