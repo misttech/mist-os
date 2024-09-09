@@ -2129,6 +2129,26 @@ assembly_input_bundle("bluetooth_hfp_ag") {
   ]
 }
 
+# Bluetooth profile support: MAP - MCE
+#
+# feature_set_levels: minimal
+# build-types: all
+#
+assembly_input_bundle("bluetooth_map_mce") {
+  flexible_packages = [ "//src/connectivity/bluetooth/profiles/bt-map-mce" ]
+  compiled_packages = [
+    {
+      name = "core"
+      components = [
+        {
+          component_name = "core"
+          shards = [ "//src/connectivity/bluetooth/profiles/bt-map-mce/meta/bt-map-mce.core_shard.cml" ]
+        },
+      ]
+    },
+  ]
+}
+
 # Bluetooth snoop support
 #
 # feature_set_levels: minimal

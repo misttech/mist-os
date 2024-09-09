@@ -43,6 +43,15 @@ pub struct HfpConfig {
     pub enabled: bool,
 }
 
+/// Configuration options for Bluetooth message access profile (bt-map)
+/// client equipment role.
+#[derive(Clone, Copy, Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema)]
+pub struct MapConfig {
+    /// Enable message access client equipment (`bt-map-mce`).
+    #[serde(default)]
+    pub mce_enabled: bool,
+}
+
 /// Platform configuration to enable Bluetooth profiles.
 #[derive(Clone, Copy, Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema)]
 pub struct BluetoothProfilesConfig {
@@ -57,6 +66,10 @@ pub struct BluetoothProfilesConfig {
     /// Specifies the configuration for `bt-hfp`.
     #[serde(default)]
     pub hfp: HfpConfig,
+
+    /// Specifies the configuration for `bt-map`.
+    #[serde(default)]
+    pub map: MapConfig,
 }
 
 /// Platform configuration for Bluetooth core features.
@@ -162,6 +175,7 @@ mod tests {
             a2dp: A2dpConfig { enabled: true },
             avrcp: AvrcpConfig { enabled: true },
             hfp: HfpConfig { enabled: true },
+            map: MapConfig { mce_enabled: false },
         };
         let expected_core = BluetoothCoreConfig { legacy_pairing_enabled: true };
         let expected = BluetoothConfig::Standard {

@@ -62,6 +62,9 @@ impl DefineSubsystemConfiguration<BluetoothConfig> for BluetoothSubsystemConfig 
         if profiles.hfp.enabled {
             builder.platform_bundle("bluetooth_hfp_ag");
         }
+        if profiles.map.mce_enabled {
+            builder.platform_bundle("bluetooth_map_mce");
+        }
 
         if *context.feature_set_level == FeatureSupportLevel::Standard
             && *context.build_type == BuildType::Eng

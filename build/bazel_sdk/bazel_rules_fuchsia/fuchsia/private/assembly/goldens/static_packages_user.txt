@@ -10,6 +10,7 @@
 ?bt-hfp-audio-gateway-default
 ?bt-host
 ?bt-init
+?bt-map-mce
 ?bt-rfcomm
 ?bt-snoop
 ?build-info
