@@ -413,7 +413,7 @@ ffx inspect show "bootstrap/*-drivers*:[name=sysmem]root
 or
 
 ```
-ffx inspect show --manifiest sysmem.cm
+ffx inspect show --manifest sysmem.cm
 ```
 
 ## (Optional) Implement your own load_firmware method {:#implement-your-own-load-firmware-method}
