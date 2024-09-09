@@ -240,7 +240,7 @@ modified U-Boot from source:
 
    Important: When working with Fuchsia, remember to use the
    [in-tree][glossary.in-tree] version of `fastboot` at
-   `~/fuchsia/prebuild/third_party/fastboot/fastboot`. The `fastboot` protocol
+   `~/fuchsia/prebuilt/third_party/fastboot/fastboot`. The `fastboot` protocol
    allows arbitrary vendor protocol extensions and Fuchsia may rely on this
    functionality in the future.
 
