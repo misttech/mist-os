@@ -21,6 +21,7 @@ test("common-test") {
   sources = [ "common-test.cc" ]
   deps = [
     ":common",
+    "//sdk/lib/driver/testing/cpp:scoped_global_logger",
     "//zircon/system/ulib/zxtest",
   ]
 }
