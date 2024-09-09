@@ -22,7 +22,9 @@ use netlink_packet_route::address::{AddressAttribute, AddressMessage};
 use netlink_packet_route::link::{LinkAttribute, LinkFlags, LinkMessage};
 use netlink_packet_route::{AddressFamily, RouteNetlinkMessage};
 use starnix_logging::{log_warn, track_stub};
-use starnix_sync::{FileOpsCore, LockBefore, LockEqualOrBefore, Locked, Mutex, Unlocked};
+use starnix_sync::{
+    FileOpsCore, FileOpsToHandle, LockBefore, LockEqualOrBefore, Locked, Mutex, Unlocked,
+};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::as_any::AsAny;
 use starnix_uapi::auth::CAP_NET_RAW;
@@ -214,6 +216,18 @@ pub trait SocketOps: Send + Sync + AsAny {
         arg: SyscallArg,
     ) -> Result<SyscallResult, Errno> {
         default_ioctl(file, locked, current_task, request, arg)
+    }
+
+    /// Return a handle that allows access to this file descritor through the zxio protocols.
+    ///
+    /// If None is returned, the file will be proxied.
+    fn to_handle(
+        &self,
+        _locked: &mut Locked<'_, FileOpsToHandle>,
+        _socket: &Socket,
+        _current_task: &CurrentTask,
+    ) -> Result<Option<zx::Handle>, Errno> {
+        Ok(None)
     }
 }
 
@@ -789,6 +803,15 @@ impl Socket {
 
     pub fn close(&self) {
         self.ops.close(self)
+    }
+
+    pub fn to_handle(
+        &self,
+        locked: &mut Locked<'_, FileOpsToHandle>,
+        _file: &FileObject,
+        current_task: &CurrentTask,
+    ) -> Result<Option<zx::Handle>, Errno> {
+        self.ops.to_handle(locked, self, current_task)
     }
 }
 

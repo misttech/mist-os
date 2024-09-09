@@ -6,6 +6,7 @@ use fuchsia_zircon as zx;
 
 use crate::task::{CurrentTask, EventHandler, WaitCanceler, Waiter};
 use crate::vfs::buffers::{AncillaryData, InputBuffer, MessageReadInfo, OutputBuffer};
+use crate::vfs::file_server::serve_file;
 use crate::vfs::socket::{
     Socket, SocketAddress, SocketDomain, SocketHandle, SocketMessageFlags, SocketProtocol,
     SocketType,
@@ -13,7 +14,8 @@ use crate::vfs::socket::{
 use crate::vfs::{
     fileops_impl_nonseekable, fileops_impl_noop_sync, FileHandle, FileObject, FileOps,
 };
-use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked, Unlocked};
+use fuchsia_zircon::HandleBased;
+use starnix_sync::{FileOpsCore, FileOpsToHandle, LockEqualOrBefore, Locked, Unlocked};
 use starnix_syscalls::{SyscallArg, SyscallResult};
 use starnix_uapi::error;
 use starnix_uapi::errors::Errno;
@@ -107,6 +109,22 @@ impl FileOps for SocketFile {
 
     fn close(&self, _file: &FileObject, _current_task: &CurrentTask) {
         self.socket.close();
+    }
+
+    /// Return a handle that allows access to this file descritor through the zxio protocols.
+    ///
+    /// If None is returned, the file will act as if it was a fd to `/dev/null`.
+    fn to_handle(
+        &self,
+        locked: &mut Locked<'_, FileOpsToHandle>,
+        file: &FileObject,
+        current_task: &CurrentTask,
+    ) -> Result<Option<zx::Handle>, Errno> {
+        if let Some(handle) = self.socket.to_handle(locked, file, current_task)? {
+            Ok(Some(handle))
+        } else {
+            serve_file(locked, current_task, file).map(|c| Some(c.0.into_handle()))
+        }
     }
 }
 
