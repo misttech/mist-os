@@ -262,8 +262,8 @@ zx::result<std::pair<nid_t, block_t>> SegmentManager::CheckDnode(const Summary &
   nid_t nid = LeToCpu(sum.nid);
   uint16_t ofs_in_node = LeToCpu(sum.ofs_in_node);
 
-  LockedPage node_page;
-  if (auto err = fs_->GetNodeManager().GetNodePage(nid, &node_page); err != ZX_OK) {
+  LockedPage locked_page;
+  if (auto err = fs_->GetNodeManager().GetNodePage(nid, &locked_page); err != ZX_OK) {
     return zx::error(err);
   }
 
@@ -276,13 +276,18 @@ zx::result<std::pair<nid_t, block_t>> SegmentManager::CheckDnode(const Summary &
 
   fs_->GetNodeManager().CheckNidRange(dnode_info.ino);
 
-  zx::result vnode_or = fs_->GetVnode(dnode_info.ino);
+  fbl::RefPtr<NodePage> node_page = fbl::RefPtr<NodePage>::Downcast(locked_page.CopyRefPtr());
+  LockedPage inode_page;
+  if (node_page->IsInode()) {
+    inode_page = std::move(locked_page);
+  }
+  zx::result vnode_or = fs_->GetVnode(dnode_info.ino, std::move(inode_page));
   if (vnode_or.is_error()) {
     return vnode_or.take_error();
   }
 
-  auto start_bidx = node_page.GetPage<NodePage>().StartBidxOfNode(vnode_or->GetAddrsPerInode());
-  block_t source_blkaddr = node_page.GetPage<NodePage>().GetBlockAddr(ofs_in_node);
+  auto start_bidx = node_page->StartBidxOfNode(vnode_or->GetAddrsPerInode());
+  block_t source_blkaddr = node_page->GetBlockAddr(ofs_in_node);
   if (source_blkaddr != blkaddr) {
     return zx::error(ZX_ERR_BAD_STATE);
   }
@@ -339,13 +344,15 @@ zx_status_t SegmentManager::GcDataSegment(const SummaryBlock &sum_blk, unsigned 
     // supply a vmo and dirty it again.
     if (zx::result dirty_or = data_page.SetVmoDirty(); dirty_or.is_error()) {
       vnode_or->VmoRead(offset, kBlockSize);
+      ZX_ASSERT(data_page.SetVmoDirty().is_ok());
     }
-    ZX_ASSERT(data_page.SetVmoDirty().is_ok());
     if (!vnode_or->IsValid()) {
-      // When victim blocks belongs to orphans, we load and keep them on paged_vmo until the orphans
-      // close or kernel reclaims the pages.
+      // When victim blocks belong to a orphan, we load and keep them on paged_vmo instead of
+      // migration. They are available until there is no connection to the orphan or kernel reclaims
+      // the pages.
+      size_t start = data_page->GetKey();
       data_page.reset();
-      vnode_or->TruncateHole(offset, offset + kBlockSize, false);
+      vnode_or->TruncateHole(start, start + 1, false);
       continue;
     }
     data_page.SetDirty();

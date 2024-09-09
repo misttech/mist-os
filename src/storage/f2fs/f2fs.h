@@ -104,7 +104,7 @@ class F2fs final {
   zx::result<fs::FilesystemInfo> GetFilesystemInfo();
   InspectTree &GetInspectTree() { return *inspect_tree_; }
 
-  zx::result<fbl::RefPtr<VnodeF2fs>> GetVnode(ino_t ino);
+  zx::result<fbl::RefPtr<VnodeF2fs>> GetVnode(ino_t ino, LockedPage inode_page = {});
   zx::result<fbl::RefPtr<VnodeF2fs>> CreateNewVnode(umode_t mode,
                                                     std::optional<gid_t> gid = std::nullopt);
 

@@ -468,7 +468,7 @@ void F2fs::ClearVnodeSet() {
   vnode_set_.clear();
 }
 
-zx::result<fbl::RefPtr<VnodeF2fs>> F2fs::GetVnode(ino_t ino) {
+zx::result<fbl::RefPtr<VnodeF2fs>> F2fs::GetVnode(ino_t ino, LockedPage node_page) {
   if (ino < superblock_info_->GetRootIno() || !node_manager_->CheckNidRange(ino)) {
     return zx::error(ZX_ERR_NOT_FOUND);
   }
@@ -481,9 +481,10 @@ zx::result<fbl::RefPtr<VnodeF2fs>> F2fs::GetVnode(ino_t ino) {
     return zx::ok(std::move(vnode));
   }
 
-  LockedPage node_page;
-  if (zx_status_t status = node_manager_->GetNodePage(ino, &node_page); status != ZX_OK) {
-    return zx::error(status);
+  if (!node_page) {
+    if (zx_status_t status = node_manager_->GetNodePage(ino, &node_page); status != ZX_OK) {
+      return zx::error(status);
+    }
   }
 
   umode_t mode = LeToCpu(node_page->GetAddress<Node>()->i.i_mode);

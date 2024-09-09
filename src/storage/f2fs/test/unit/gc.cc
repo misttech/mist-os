@@ -260,6 +260,61 @@ TEST_F(GcTest, OrphanFileGc) {
 
   // Make file orphan
   FileTester::DeleteChild(root_dir_.get(), "test", false);
+  ASSERT_NE(file->GetBlocks(), 0U);
+
+  // Do gc
+  ASSERT_EQ(GcTester::DoGarbageCollect(fs_->GetSegmentManager(), target_segno, GcType::kFgGc),
+            ZX_OK);
+
+  // Check if gc purges the metadata when the victim blocks belong to an orphan
+  ASSERT_EQ(file->GetBlocks(), 0U);
+
+  // Check victim seg is clean
+  ASSERT_FALSE(dirty_info->dirty_segmap[static_cast<int>(DirtyType::kDirty)].GetOne(target_segno));
+
+  // Check if the paged vmo keeps data
+  uint8_t read[kPageSize] = {
+      0,
+  };
+  FileTester::ReadFromFile(file.get(), read, sizeof(read), 0);
+  ASSERT_EQ(std::memcmp(buffer, read, sizeof(read)), 0);
+
+  ASSERT_EQ(file->Close(), ZX_OK);
+  file = nullptr;
+}
+
+TEST_F(GcTest, ReadVmoDuringGc) {
+  DirtySeglistInfo *dirty_info = &fs_->GetSegmentManager().GetDirtySegmentInfo();
+  FreeSegmapInfo *free_info = &fs_->GetSegmentManager().GetFreeSegmentInfo();
+
+  zx::result vn = root_dir_->Create("test", fs::CreationType::kFile);
+  ASSERT_TRUE(vn.is_ok()) << vn.status_string();
+  auto file = fbl::RefPtr<File>::Downcast(*std::move(vn));
+
+  uint8_t buffer[kPageSize] = {
+      0xAA,
+  };
+  FileTester::AppendToFile(file.get(), buffer, kPageSize);
+  WritebackOperation op = {.bSync = true};
+  file->Writeback(op);
+
+  fs_->GetSegmentManager().AllocateNewSegments();
+  fs_->SyncFs();
+
+  auto block_or = file->FindDataBlkAddr(0);
+  ASSERT_TRUE(block_or.is_ok());
+
+  // gc target segno
+  auto target_segno = fs_->GetSegmentManager().GetSegmentNumber(block_or.value());
+
+  // Check victim seg is dirty
+  ASSERT_TRUE(dirty_info->dirty_segmap[static_cast<int>(DirtyType::kDirty)].GetOne(target_segno));
+  ASSERT_TRUE(free_info->free_segmap.GetOne(target_segno));
+
+  // Evict |file| to delete paged_vmo
+  ASSERT_EQ(file->Close(), ZX_OK);
+  ASSERT_EQ(fs_->GetVCache().Evict(file.get()), ZX_OK);
+  file.reset();
 
   // Do gc
   ASSERT_EQ(GcTester::DoGarbageCollect(fs_->GetSegmentManager(), target_segno, GcType::kFgGc),
@@ -268,7 +323,10 @@ TEST_F(GcTest, OrphanFileGc) {
   // Check victim seg is clean
   ASSERT_FALSE(dirty_info->dirty_segmap[static_cast<int>(DirtyType::kDirty)].GetOne(target_segno));
 
-  // Check if the data is valid while the orphan |file| opens
+  fbl::RefPtr<fs::Vnode> vnode;
+  FileTester::Lookup(root_dir_.get(), "test", &vnode);
+  file = fbl::RefPtr<File>::Downcast(std::move(vnode));
+  // Check data after gc
   uint8_t read[kPageSize] = {
       0,
   };
