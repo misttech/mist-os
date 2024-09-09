@@ -68,7 +68,9 @@ use crate::internal::multicast_forwarding::route::{
 use crate::internal::multicast_forwarding::state::{
     MulticastForwardingState, MulticastForwardingStateContext,
 };
-use crate::internal::multicast_forwarding::MulticastForwardingDeviceContext;
+use crate::internal::multicast_forwarding::{
+    MulticastForwardingBindingsTypes, MulticastForwardingDeviceContext, MulticastForwardingTimerId,
+};
 use crate::internal::path_mtu::{PmtuBindingsTypes, PmtuCache, PmtuTimerId};
 use crate::internal::raw::counters::RawIpSocketCounters;
 use crate::internal::raw::{RawIpSocketHandler, RawIpSocketMap, RawIpSocketsBindingsTypes};
@@ -877,7 +879,7 @@ pub trait IpLayerContext<
 >:
     IpStateContext<I>
     + IpDeviceContext<I, BC>
-    + MulticastForwardingStateContext<I>
+    + MulticastForwardingStateContext<I, BC>
     + MulticastForwardingDeviceContext<I>
 {
 }
@@ -887,7 +889,7 @@ impl<
         BC: IpLayerBindingsContext<I, <CC as DeviceIdContext<AnyDevice>>::DeviceId>,
         CC: IpStateContext<I>
             + IpDeviceContext<I, BC>
-            + MulticastForwardingStateContext<I>
+            + MulticastForwardingStateContext<I, BC>
             + MulticastForwardingDeviceContext<I>,
     > IpLayerContext<I, BC> for CC
 {
@@ -1499,9 +1501,9 @@ impl<I: IpLayerIpExt, D: StrongDeviceIdentifier> OrderedLockAccess<RoutingTable<
 }
 
 impl<I: IpLayerIpExt, D: StrongDeviceIdentifier, BT: IpLayerBindingsTypes>
-    OrderedLockAccess<MulticastForwardingState<I, D>> for IpStateInner<I, D, BT>
+    OrderedLockAccess<MulticastForwardingState<I, D, BT>> for IpStateInner<I, D, BT>
 {
-    type Lock = RwLock<MulticastForwardingState<I, D>>;
+    type Lock = RwLock<MulticastForwardingState<I, D, BT>>;
     fn ordered_lock_access(&self) -> OrderedLockRef<'_, Self::Lock> {
         OrderedLockRef::new(&self.multicast_forwarding)
     }
@@ -1630,11 +1632,19 @@ impl Inspectable for Ipv6RxCounters {
 
 /// Marker trait for the bindings types required by the IP layer's inner state.
 pub trait IpStateBindingsTypes:
-    PmtuBindingsTypes + FragmentBindingsTypes + RawIpSocketsBindingsTypes + FilterBindingsTypes
+    PmtuBindingsTypes
+    + FragmentBindingsTypes
+    + RawIpSocketsBindingsTypes
+    + FilterBindingsTypes
+    + MulticastForwardingBindingsTypes
 {
 }
 impl<BT> IpStateBindingsTypes for BT where
-    BT: PmtuBindingsTypes + FragmentBindingsTypes + RawIpSocketsBindingsTypes + FilterBindingsTypes
+    BT: PmtuBindingsTypes
+        + FragmentBindingsTypes
+        + RawIpSocketsBindingsTypes
+        + FilterBindingsTypes
+        + MulticastForwardingBindingsTypes
 {
 }
 
@@ -1693,7 +1703,7 @@ pub struct IpStateInner<I: IpLayerIpExt, D: StrongDeviceIdentifier, BT: IpStateB
     rules_table: RwLock<RulesTable<I, D>>,
     // TODO(https://fxbug.dev/355059838): Explore the option to let Bindings create the main table.
     main_table_id: RoutingTableId<I, D>,
-    multicast_forwarding: RwLock<MulticastForwardingState<I, D>>,
+    multicast_forwarding: RwLock<MulticastForwardingState<I, D, BT>>,
     fragment_cache: Mutex<IpPacketFragmentCache<I, BT>>,
     pmtu_cache: Mutex<PmtuCache<I, BT>>,
     counters: IpCounters<I>,
@@ -1777,6 +1787,10 @@ pub enum IpLayerTimerId {
     FilterTimerv4(FilterTimerId<Ipv4>),
     /// A timer event for IPv6 filtering timers.
     FilterTimerv6(FilterTimerId<Ipv6>),
+    /// A timer event for IPv4 Multicast forwarding timers.
+    MulticastForwardingTimerv4(MulticastForwardingTimerId<Ipv4>),
+    /// A timer event for IPv6 Multicast forwarding timers.
+    MulticastForwardingTimerv6(MulticastForwardingTimerId<Ipv6>),
 }
 
 impl<I: Ip> From<FragmentTimerId<I>> for IpLayerTimerId {
@@ -1797,6 +1811,16 @@ impl<I: Ip> From<FilterTimerId<I>> for IpLayerTimerId {
     }
 }
 
+impl<I: Ip> From<MulticastForwardingTimerId<I>> for IpLayerTimerId {
+    fn from(timer: MulticastForwardingTimerId<I>) -> IpLayerTimerId {
+        I::map_ip(
+            timer,
+            IpLayerTimerId::MulticastForwardingTimerv4,
+            IpLayerTimerId::MulticastForwardingTimerv6,
+        )
+    }
+}
+
 impl<CC, BC> HandleableTimer<CC, BC> for IpLayerTimerId
 where
     CC: TimerHandler<BC, FragmentTimerId<Ipv4>>
@@ -1804,7 +1828,9 @@ where
         + TimerHandler<BC, PmtuTimerId<Ipv4>>
         + TimerHandler<BC, PmtuTimerId<Ipv6>>
         + TimerHandler<BC, FilterTimerId<Ipv4>>
-        + TimerHandler<BC, FilterTimerId<Ipv6>>,
+        + TimerHandler<BC, FilterTimerId<Ipv6>>
+        + TimerHandler<BC, MulticastForwardingTimerId<Ipv4>>
+        + TimerHandler<BC, MulticastForwardingTimerId<Ipv6>>,
     BC: TimerBindingsTypes,
 {
     fn handle(self, core_ctx: &mut CC, bindings_ctx: &mut BC, timer: BC::UniqueTimerId) {
@@ -1819,6 +1845,12 @@ where
             IpLayerTimerId::PmtuTimeoutv6(id) => core_ctx.handle_timer(bindings_ctx, id, timer),
             IpLayerTimerId::FilterTimerv4(id) => core_ctx.handle_timer(bindings_ctx, id, timer),
             IpLayerTimerId::FilterTimerv6(id) => core_ctx.handle_timer(bindings_ctx, id, timer),
+            IpLayerTimerId::MulticastForwardingTimerv4(id) => {
+                core_ctx.handle_timer(bindings_ctx, id, timer)
+            }
+            IpLayerTimerId::MulticastForwardingTimerv6(id) => {
+                core_ctx.handle_timer(bindings_ctx, id, timer)
+            }
         }
     }
 }
@@ -2758,7 +2790,7 @@ pub fn receive_ipv4_packet<
     // we need below.
     drop(filter);
 
-    let action = receive_ipv4_packet_action(core_ctx, device, &packet);
+    let action = receive_ipv4_packet_action(core_ctx, bindings_ctx, device, &packet);
     match action {
         ReceivePacketAction::MulticastForward { targets, address_status, dst_ip } => {
             let src_ip = packet.src_ip();
@@ -3112,7 +3144,7 @@ pub fn receive_ipv6_packet<
         return;
     };
 
-    match receive_ipv6_packet_action(core_ctx, device, &packet) {
+    match receive_ipv6_packet_action(core_ctx, bindings_ctx, device, &packet) {
         ReceivePacketAction::MulticastForward { targets, address_status, dst_ip } => {
             // TOOD(https://fxbug.dev/364242513): Support connection tracking of
             // the multiplexed flows created by multicast forwarding. Here, we
@@ -3329,6 +3361,7 @@ pub fn receive_ipv4_packet_action<
     B: ByteSlice,
 >(
     core_ctx: &mut CC,
+    bindings_ctx: &mut BC,
     device: &CC::DeviceId,
     packet: &Ipv4Packet<B>,
 ) -> ReceivePacketAction<Ipv4, CC::DeviceId> {
@@ -3368,6 +3401,7 @@ pub fn receive_ipv4_packet_action<
         Some(address_status @ Ipv4PresentAddressStatus::Multicast) => {
             receive_ip_multicast_packet_action(
                 core_ctx,
+                bindings_ctx,
                 device,
                 packet,
                 Some(address_status),
@@ -3381,7 +3415,13 @@ pub fn receive_ipv4_packet_action<
             core_ctx.increment(|counters| &counters.version_rx.deliver_broadcast);
             ReceivePacketAction::Deliver { address_status }
         }
-        None => receive_ip_packet_action_common::<Ipv4, _, _, _>(core_ctx, dst_ip, device, packet),
+        None => receive_ip_packet_action_common::<Ipv4, _, _, _>(
+            core_ctx,
+            bindings_ctx,
+            dst_ip,
+            device,
+            packet,
+        ),
     }
 }
 
@@ -3392,6 +3432,7 @@ pub fn receive_ipv6_packet_action<
     B: ByteSlice,
 >(
     core_ctx: &mut CC,
+    bindings_ctx: &mut BC,
     device: &CC::DeviceId,
     packet: &Ipv6Packet<B>,
 ) -> ReceivePacketAction<Ipv6, CC::DeviceId> {
@@ -3450,6 +3491,7 @@ pub fn receive_ipv6_packet_action<
         Some(address_status @ Ipv6PresentAddressStatus::Multicast) => {
             receive_ip_multicast_packet_action(
                 core_ctx,
+                bindings_ctx,
                 device,
                 packet,
                 Some(address_status),
@@ -3494,7 +3536,13 @@ pub fn receive_ipv6_packet_action<
             core_ctx.increment(|counters| &counters.version_rx.drop_for_tentative);
             ReceivePacketAction::Drop { reason: DropReason::Tentative }
         }
-        None => receive_ip_packet_action_common::<Ipv6, _, _, _>(core_ctx, dst_ip, device, packet),
+        None => receive_ip_packet_action_common::<Ipv6, _, _, _>(
+            core_ctx,
+            bindings_ctx,
+            dst_ip,
+            device,
+            packet,
+        ),
     }
 }
 
@@ -3507,12 +3555,18 @@ fn receive_ip_multicast_packet_action<
     CC: IpLayerContext<I, BC> + CounterContext<IpCounters<I>>,
 >(
     core_ctx: &mut CC,
+    bindings_ctx: &mut BC,
     device: &CC::DeviceId,
     packet: &I::Packet<B>,
     address_status: Option<I::AddressStatus>,
     dst_ip: SpecifiedAddr<I::Addr>,
 ) -> ReceivePacketAction<I, CC::DeviceId> {
-    let targets = multicast_forwarding::lookup_multicast_route_for_packet(core_ctx, packet, device);
+    let targets = multicast_forwarding::lookup_multicast_route_for_packet(
+        core_ctx,
+        bindings_ctx,
+        packet,
+        device,
+    );
     match (targets, address_status) {
         (Some(targets), address_status) => {
             if address_status.is_some() {
@@ -3551,12 +3605,20 @@ fn receive_ip_packet_action_common<
     CC: IpLayerContext<I, BC> + CounterContext<IpCounters<I>>,
 >(
     core_ctx: &mut CC,
+    bindings_ctx: &mut BC,
     dst_ip: SpecifiedAddr<I::Addr>,
     device_id: &CC::DeviceId,
     packet: &I::Packet<B>,
 ) -> ReceivePacketAction<I, CC::DeviceId> {
     if dst_ip.is_multicast() {
-        return receive_ip_multicast_packet_action(core_ctx, device_id, packet, None, dst_ip);
+        return receive_ip_multicast_packet_action(
+            core_ctx,
+            bindings_ctx,
+            device_id,
+            packet,
+            None,
+            dst_ip,
+        );
     }
 
     // The packet is not destined locally, so we attempt to forward it.

@@ -168,6 +168,16 @@ impl<I: MulticastRouteIpExt> MulticastRouteKey<I> {
             },
         )
     }
+
+    #[cfg(test)]
+    pub(crate) fn src_addr(&self) -> I::Addr {
+        I::map_ip(self, |key| key.src_addr.addr, |key| key.src_addr.addr)
+    }
+
+    #[cfg(test)]
+    pub(crate) fn dst_addr(&self) -> I::Addr {
+        I::map_ip(self, |key| key.dst_addr.addr, |key| key.dst_addr.addr)
+    }
 }
 
 /// All attributes of a multicast route, excluding the [`MulticastRouteKey`].

@@ -774,7 +774,7 @@ impl<I: IpLayerIpExt, BT: BindingsTypes> LockLevelFor<RoutingTableId<I, DeviceId
 }
 
 impl<I: IpLayerIpExt, BT: BindingsTypes>
-    DelegatedOrderedLockAccess<MulticastForwardingState<I, DeviceId<BT>>> for StackState<BT>
+    DelegatedOrderedLockAccess<MulticastForwardingState<I, DeviceId<BT>, BT>> for StackState<BT>
 {
     type Inner = IpStateInner<I, DeviceId<BT>, BT>;
     fn delegate_ordered_lock_access(&self) -> &Self::Inner {
@@ -785,7 +785,7 @@ impl<I: IpLayerIpExt, BT: BindingsTypes>
 impl<I: IpLayerIpExt, BT: BindingsTypes> LockLevelFor<StackState<BT>>
     for crate::lock_ordering::IpMulticastForwardingState<I>
 {
-    type Data = MulticastForwardingState<I, DeviceId<BT>>;
+    type Data = MulticastForwardingState<I, DeviceId<BT>, BT>;
 }
 
 impl<I: IpLayerIpExt, BT: BindingsTypes>

@@ -5,12 +5,15 @@
 //! Declares the API for configuring multicast forwarding within the netstack.
 
 use net_types::ip::{Ip, IpVersionMarker};
-use netstack3_base::{AnyDevice, ContextPair, DeviceIdContext};
+use netstack3_base::{AnyDevice, ContextPair, CoreTimerContext, DeviceIdContext};
 
 use crate::internal::multicast_forwarding::route::{Action, MulticastRoute, MulticastRouteKey};
 use crate::internal::multicast_forwarding::state::{
-    MulticastForwardingPendingPacketsContext as _, MulticastForwardingState,
-    MulticastForwardingStateContext, MulticastRouteTableContext as _,
+    MulticastForwardingEnabledState, MulticastForwardingPendingPacketsContext as _,
+    MulticastForwardingState, MulticastForwardingStateContext, MulticastRouteTableContext as _,
+};
+use crate::internal::multicast_forwarding::{
+    MulticastForwardingBindingsContext, MulticastForwardingTimerId,
 };
 use crate::IpLayerIpExt;
 
@@ -34,21 +37,31 @@ impl<I: Ip, C> MulticastForwardingApi<I, C> {
 impl<I: IpLayerIpExt, C> MulticastForwardingApi<I, C>
 where
     C: ContextPair,
-    C::CoreContext: MulticastForwardingStateContext<I>,
+    C::CoreContext: MulticastForwardingStateContext<I, C::BindingsContext>
+        + CoreTimerContext<MulticastForwardingTimerId<I>, C::BindingsContext>,
+    C::BindingsContext: MulticastForwardingBindingsContext,
 {
     pub(crate) fn core_ctx(&mut self) -> &mut C::CoreContext {
         let Self { ctx, _ip_mark } = self;
         ctx.core_ctx()
     }
 
+    pub(crate) fn contexts(&mut self) -> (&mut C::CoreContext, &mut C::BindingsContext) {
+        let Self { ctx, _ip_mark } = self;
+        ctx.contexts()
+    }
+
     /// Enables multicast forwarding.
     ///
     /// Returns whether multicast forwarding was newly enabled.
     pub fn enable(&mut self) -> bool {
-        self.core_ctx().with_state_mut(|state, _ctx| match state {
+        let (core_ctx, bindings_ctx) = self.contexts();
+        core_ctx.with_state_mut(|state, _ctx| match state {
             MulticastForwardingState::Enabled(_) => false,
             MulticastForwardingState::Disabled => {
-                *state = MulticastForwardingState::Enabled(Default::default());
+                *state = MulticastForwardingState::Enabled(MulticastForwardingEnabledState::new::<
+                    C::CoreContext,
+                >(bindings_ctx));
                 true
             }
         })
@@ -82,7 +95,8 @@ where
         Option<MulticastRoute<<C::CoreContext as DeviceIdContext<AnyDevice>>::DeviceId>>,
         MulticastForwardingDisabledError,
     > {
-        self.core_ctx().with_state_mut(|state, ctx| {
+        let (core_ctx, bindings_ctx) = self.contexts();
+        core_ctx.with_state_mut(|state, ctx| {
             let state = state.enabled().ok_or(MulticastForwardingDisabledError {})?;
             ctx.with_route_table_mut(state, |route_table, ctx| {
                 let orig_route = route_table.insert(key.clone(), route);
@@ -99,7 +113,7 @@ where
                     }
                     None => {
                         ctx.with_pending_table_mut(state, |pending_table| {
-                            match pending_table.remove(&key) {
+                            match pending_table.remove(&key, bindings_ctx) {
                                 // No pending packets need to be sent.
                                 None => {}
                                 // TODO(https://fxbug.dev/353328975): Send the
@@ -280,12 +294,18 @@ mod tests {
         assert!(api.enable());
 
         // Setup a queued packet for `right_key`.
-        multicast_forwarding::testutil::with_pending_table(api.core_ctx(), |pending_table| {
+        let (core_ctx, bindings_ctx) = api.contexts();
+        multicast_forwarding::testutil::with_pending_table(core_ctx, |pending_table| {
             let buf = multicast_forwarding::testutil::new_ip_packet_buf::<I>(I::SRC1, I::DST1);
             let mut buf_ref = buf.as_ref();
             let packet = buf_ref.parse::<I::Packet<_>>().expect("parse should succeed");
             assert_eq!(
-                pending_table.try_queue_packet(right_key.clone(), &packet, &MultipleDevicesId::A),
+                pending_table.try_queue_packet(
+                    bindings_ctx,
+                    right_key.clone(),
+                    &packet,
+                    &MultipleDevicesId::A
+                ),
                 QueuePacketOutcome::QueuedInNewQueue,
             );
         });

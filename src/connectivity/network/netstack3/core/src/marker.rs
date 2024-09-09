@@ -22,7 +22,10 @@ use netstack3_ip::device::{
     IpDeviceIpExt,
 };
 use netstack3_ip::icmp::{IcmpBindingsContext, IcmpBindingsTypes};
-use netstack3_ip::multicast_forwarding::MulticastForwardingStateContext;
+use netstack3_ip::multicast_forwarding::{
+    MulticastForwardingBindingsContext, MulticastForwardingBindingsTypes,
+    MulticastForwardingStateContext,
+};
 use netstack3_ip::nud::{NudBindingsContext, NudContext};
 use netstack3_ip::raw::{
     RawIpSocketMapContext, RawIpSocketStateContext, RawIpSocketsBindingsContext,
@@ -80,7 +83,7 @@ pub trait CoreContext<I, BC>:
         WeakDeviceId = EthernetWeakDeviceId<BC>,
     > + RawIpSocketMapContext<I, BC>
     + RawIpSocketStateContext<I, BC>
-    + MulticastForwardingStateContext<I>
+    + MulticastForwardingStateContext<I, BC>
 where
     I: IpExt,
     BC: IpBindingsContext<I>,
@@ -108,7 +111,7 @@ where
             WeakDeviceId = EthernetWeakDeviceId<BC>,
         > + RawIpSocketMapContext<I, BC>
         + RawIpSocketStateContext<I, BC>
-        + MulticastForwardingStateContext<I>,
+        + MulticastForwardingStateContext<I, BC>,
 {
 }
 
@@ -121,6 +124,7 @@ pub trait BindingsTypes:
     + FilterBindingsTypes
     + IcmpEchoBindingsTypes
     + IcmpBindingsTypes
+    + MulticastForwardingBindingsTypes
     + RawIpSocketsBindingsTypes
     + UdpBindingsTypes
     + TimerBindingsTypes<DispatchId = TimerId<Self>>
@@ -134,6 +138,7 @@ impl<O> BindingsTypes for O where
         + FilterBindingsTypes
         + IcmpEchoBindingsTypes
         + IcmpBindingsTypes
+        + MulticastForwardingBindingsTypes
         + RawIpSocketsBindingsTypes
         + UdpBindingsTypes
         + TimerBindingsTypes<DispatchId = TimerId<Self>>
@@ -149,6 +154,7 @@ pub trait IpBindingsContext<I: IpExt>:
     + FilterBindingsContext
     + IcmpBindingsContext
     + IcmpEchoBindingsContext<I, DeviceId<Self>>
+    + MulticastForwardingBindingsContext
     + RawIpSocketsBindingsContext<I, DeviceId<Self>>
     + IpDeviceBindingsContext<I, DeviceId<Self>>
     + IpLayerBindingsContext<I, DeviceId<Self>>
@@ -171,6 +177,7 @@ where
         + FilterBindingsContext
         + IcmpBindingsContext
         + IcmpEchoBindingsContext<I, DeviceId<Self>>
+        + MulticastForwardingBindingsContext
         + RawIpSocketsBindingsContext<I, DeviceId<Self>>
         + IpDeviceBindingsContext<I, DeviceId<Self>>
         + IpLayerBindingsContext<I, DeviceId<Self>>
