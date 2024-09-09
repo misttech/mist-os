@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 //! A "prelude" of common FIDL traits, to be used like `use fidl::prelude::*;`.
+//!
 //! This module re-exports traits using the `as _` syntax, so the glob import
 //! only brings traits into scope for resolving methods and constants. It does
 //! not import the trait names themselves.

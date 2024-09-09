@@ -7,8 +7,8 @@ use fidl_fuchsia_component::{
     CreateChildArgs, ExecutionControllerEvent, RealmMarker, StartChildArgs, StoppedPayload,
 };
 use fidl_fuchsia_tracing_controller::{
-    ControllerMarker as TracingControllerMarker, ControllerProxy as TracingControllerProxy,
-    StartOptions, TerminateOptions, TraceConfig,
+    ProvisionerMarker as TracingProvisionerMarker, SessionMarker as TracingSessionMarker,
+    SessionProxy as TracingSessionProxy, StartOptions, TraceConfig,
 };
 use fuchsia_async::{Socket as AsyncSocket, Task};
 use fuchsia_component::client::connect_to_protocol;
@@ -445,7 +445,7 @@ struct PerProcessRecords {
 }
 
 struct TraceSession {
-    tracing_controller: TracingControllerProxy,
+    tracing_controller: Option<TracingSessionProxy>,
     collect_trace: Task<Vec<fxt::TraceRecord>>,
     drain_trace: Task<Vec<fxt::ParseWarning>>,
 }
@@ -453,11 +453,14 @@ struct TraceSession {
 impl TraceSession {
     async fn start() -> Self {
         info!("initializing tracing...");
-        let tracing_controller = connect_to_protocol::<TracingControllerMarker>().unwrap();
+        let trace_provisioner = connect_to_protocol::<TracingProvisionerMarker>().unwrap();
+        let (tracing_controller, server_end) =
+            fidl::endpoints::create_proxy::<TracingSessionMarker>().unwrap();
         let (tracing_socket, tracing_socket_write) = Socket::create_stream();
         let tracing_socket = AsyncSocket::from_socket(tracing_socket);
-        tracing_controller
+        trace_provisioner
             .initialize_tracing(
+                server_end,
                 &TraceConfig {
                     categories: Some(TRACE_CATEGORIES.iter().map(|c| c.to_string()).collect()),
                     ..Default::default()
@@ -477,18 +480,12 @@ impl TraceSession {
             .expect("starting tracing FIDL")
             .expect("start tracing");
 
-        Self { tracing_controller, collect_trace, drain_trace }
+        Self { tracing_controller: Some(tracing_controller), collect_trace, drain_trace }
     }
 
-    async fn terminate(self) -> (Vec<fxt::TraceRecord>, Vec<fxt::ParseWarning>) {
+    async fn terminate(mut self) -> (Vec<fxt::TraceRecord>, Vec<fxt::ParseWarning>) {
         info!("terminating trace...");
-        self.tracing_controller
-            .terminate_tracing(&TerminateOptions {
-                write_results: Some(true),
-                ..Default::default()
-            })
-            .await
-            .unwrap();
+        self.tracing_controller = None;
 
         info!("waiting for socket collection and parsing to complete...");
         (self.collect_trace.await, self.drain_trace.await)

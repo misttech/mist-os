@@ -17,7 +17,7 @@
 
 #include <gmock/gmock.h>
 #include <rapidjson/ostreamwrapper.h>
-#include <rapidjson/writer.h>
+#include <rapidjson/prettywriter.h>
 #include <src/lib/files/file.h>
 #include <src/lib/files/glob.h>
 
@@ -149,13 +149,13 @@ MATCHER_P(IsNumber, matcher,
 namespace rapidjson {
 void PrintTo(const Value& value, ::std::ostream* os) {
   OStreamWrapper osw(*os);
-  Writer<OStreamWrapper> writer(osw);
+  PrettyWriter<OStreamWrapper> writer(osw);
   value.Accept(writer);
 }
 
 void PrintTo(const Document& value, ::std::ostream* os) {
   OStreamWrapper osw(*os);
-  Writer<OStreamWrapper> writer(osw);
+  PrettyWriter<OStreamWrapper> writer(osw);
   value.Accept(writer);
 }
 

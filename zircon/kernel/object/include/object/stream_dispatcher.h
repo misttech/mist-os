@@ -27,7 +27,8 @@ class StreamDispatcher final : public SoloDispatcher<StreamDispatcher, ZX_DEFAUL
   static zx_status_t parse_create_syscall_flags(uint32_t flags, uint32_t* out_flags,
                                                 zx_rights_t* out_required_vmo_rights);
 
-  static zx_status_t Create(uint32_t options, fbl::RefPtr<VmObjectDispatcher> vmo, zx_off_t seek,
+  static zx_status_t Create(uint32_t options, fbl::RefPtr<VmObjectPaged> vmo,
+                            fbl::RefPtr<ContentSizeManager> csm, zx_off_t seek,
                             KernelHandle<StreamDispatcher>* handle, zx_rights_t* rights);
   ~StreamDispatcher();
 
@@ -45,16 +46,27 @@ class StreamDispatcher final : public SoloDispatcher<StreamDispatcher, ZX_DEFAUL
   void GetInfo(zx_info_stream_t* info) const;
 
  private:
-  explicit StreamDispatcher(uint32_t options, fbl::RefPtr<VmObjectDispatcher> vmo, zx_off_t seek);
+  explicit StreamDispatcher(uint32_t options, fbl::RefPtr<VmObjectPaged> vmo,
+                            fbl::RefPtr<ContentSizeManager> content_size_mgr, zx_off_t seek);
 
   zx_status_t CreateWriteOpAndExpandVmo(size_t total_capacity, zx_off_t offset,
                                         uint64_t* out_length,
                                         ktl::optional<uint64_t>* out_prev_content_size,
                                         ContentSizeManager::Operation* out_op);
 
+  // Tries to expand the VMO to a requested (byte-aligned) size, if the VMO is smaller than that
+  // size. Whether the VMO can be expanded is controlled by |can_resize_vmo|. Note that this will
+  // not modify the content size.
+  //
+  // Returns the actual size of the VMO in |out_actual| after attempting to expand. This value is
+  // set, even in the case of a failure.
+  zx_status_t ExpandIfNecessary(uint64_t requested_vmo_size, bool can_resize_vmo,
+                                uint64_t* out_actual);
+
   uint32_t options_ TA_GUARDED(get_lock());
 
-  const fbl::RefPtr<VmObjectDispatcher> vmo_;
+  fbl::RefPtr<VmObjectPaged> const vmo_;
+  fbl::RefPtr<ContentSizeManager> const content_size_mgr_;
 
   // The seek_lock_ is used to make vmo_ operations and updates to seek atomic.
   mutable DECLARE_MUTEX(StreamDispatcher, lockdep::LockFlagsActiveListDisabled) seek_lock_;

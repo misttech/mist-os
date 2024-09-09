@@ -212,10 +212,9 @@ class PageQueues {
   // not modified.
   ktl::optional<VmoBacklink> PeekReclaim(size_t lowest_queue);
 
-  // Called while the loaning VmCowPages is known referenced. The owning_cow parameter can be
-  // nullptr, if the caller doesn't care to exclude the owning cow from being returned, or if there
-  // isn't an owning cow.
-  ktl::optional<VmoBacklink> GetCowWithReplaceablePage(vm_page_t* page, VmCowPages* owning_cow);
+  // Can be called while the |page| is known to be in the loaned state. This method checks if it is
+  // in the page queues, and if so returns a reference to the cow pages that owns it.
+  ktl::optional<VmoBacklink> GetCowForLoanedPage(vm_page_t* page);
 
   // Helper struct to group reclaimable queue length counts returned by GetReclaimCounts.
   struct ReclaimCounts {

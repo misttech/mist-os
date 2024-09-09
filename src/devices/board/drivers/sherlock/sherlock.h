@@ -64,7 +64,6 @@ class Sherlock : public SherlockType {
 
   zx_status_t Start();
   zx::result<> AdcInit();
-  zx_status_t SysmemInit();
   zx_status_t GpioInit();
   zx_status_t RegistersInit();
   zx_status_t CanvasInit();

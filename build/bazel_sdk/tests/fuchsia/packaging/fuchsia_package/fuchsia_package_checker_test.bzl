@@ -37,7 +37,7 @@ def _fuchsia_package_checker_test_impl(ctx):
                 args.append("--blobs={}={}".format(dest, resource.src.short_path))
                 runfiles.append(resource.src)
             else:
-                fail("Expected blob {} does not match expected filename {}".format(dest, name))
+                fail("Expected blob {} does not match expected filename {}, got {}".format(dest, name, src_path))
         else:
             fail("Expected blob {} not in resources {}".format(dest, dest_to_resource))
 

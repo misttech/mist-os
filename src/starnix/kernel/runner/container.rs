@@ -11,13 +11,8 @@ use crate::{
 };
 #[cfg(feature = "starnix_lite")]
 use crate::{
-    create_filesystem_from_spec, expose_root, parse_features, parse_numbered_handles,
-    run_container_features, serve_component_runner, serve_container_controller, Features, MountAction
-};
-#[cfg(feature = "starnix_lite")]
-use crate::{
-    create_filesystem_from_spec, expose_root, parse_features, parse_numbered_handles,
-    run_container_features, serve_component_runner, serve_container_controller, Features,
+    expose_root, parse_features, parse_numbered_handles, run_container_features,
+    serve_component_runner, serve_container_controller, Features, MountAction,
 };
 use anyhow::{anyhow, bail, Error};
 use bstr::BString;
@@ -57,7 +52,7 @@ use starnix_modules_layeredfs::LayeredFs;
 #[cfg(not(feature = "starnix_lite"))]
 use starnix_modules_magma::get_magma_params;
 use starnix_modules_overlayfs::OverlayStack;
-use starnix_sync::{DeviceOpen, FileOpsCore, LockBefore, Locked, Unlocked};
+use starnix_sync::{Locked, Unlocked};
 use starnix_uapi::errors::{SourceContext, ENOENT};
 use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::resource_limits::Resource;
@@ -346,6 +341,9 @@ pub async fn create_component_from_stream(
                     }
                 });
                 return Ok((container, service_config));
+            }
+            frunner::ComponentRunnerRequest::_UnknownMethod { ordinal, .. } => {
+                log_warn!("Unknown ComponentRunner request: {ordinal}");
             }
         }
     }

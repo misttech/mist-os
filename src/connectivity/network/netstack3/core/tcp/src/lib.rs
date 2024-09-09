@@ -40,7 +40,6 @@ pub use internal::socket::{
     TcpDemuxContext, TcpDualStackContext, TcpIpTransportContext, TcpSocketId, TcpSocketSet,
     TcpSocketState, TcpTimerId, UnboundInfo, WeakTcpSocketId,
 };
-pub use internal::state::Takeable;
 
 /// TCP test utilities.
 #[cfg(any(test, feature = "testutils"))]

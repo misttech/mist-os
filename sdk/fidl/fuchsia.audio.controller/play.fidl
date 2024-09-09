@@ -63,6 +63,11 @@ open protocol Player {
         /// Optional. If not specified, use unity gain unmuted, and no other gain
         /// processing enabled.
         3: gain_settings GainSettings;
+
+        /// Channels to enable during playback.
+        ///
+        /// Optional. If not specified, the active-channels configuration is not changed.
+        4: active_channels_bitmask uint64;
     }) -> (resource table {
         /// Total number of bytes sent to destination.
         1: bytes_processed uint64;

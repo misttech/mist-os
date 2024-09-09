@@ -590,7 +590,7 @@ async fn fuchsia_install(
 
 /// Wait for a display to become available.
 async fn wait_for_display() -> Result<(), Error> {
-    let dir = fuchsia_fs::directory::open_in_namespace(
+    let dir = fuchsia_fs::directory::open_in_namespace_deprecated(
         "/dev/class/display-coordinator",
         fuchsia_fs::OpenFlags::empty(),
     )
@@ -628,7 +628,7 @@ async fn check_is_interactive() -> Result<bool, Error> {
 
 /// Wait for an installation source to become present on the system.
 async fn wait_for_install_disk() -> Result<(), Error> {
-    let dir = fuchsia_fs::directory::open_in_namespace(
+    let dir = fuchsia_fs::directory::open_in_namespace_deprecated(
         "/dev/class/block",
         fuchsia_fs::OpenFlags::empty(),
     )

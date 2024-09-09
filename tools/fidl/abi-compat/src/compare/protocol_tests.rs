@@ -423,23 +423,17 @@ fn discoverable_contradiction() {
         "#
     )
     .has_problems(vec![
-        ProblemPattern::error()
+        ProblemPattern::warning()
             .path(Contains("ExternalServer.TakeServerEnd"))
             .message(Contains("ExternalClient(@1) used as a external server")),
-        ProblemPattern::error()
+        ProblemPattern::warning()
             .path(Contains("ExternalServer.ReturnClientEnd"))
             .message(Contains("ExternalClient(@1) used as a external server")),
-        ProblemPattern::error()
+        ProblemPattern::warning()
             .path(Contains("ExternalServer.TakeServerEnd"))
             .message(Contains("ExternalClient(@1,2,NEXT,HEAD) used as a platform client")),
-        ProblemPattern::error()
+        ProblemPattern::warning()
             .path(Contains("ExternalServer.ReturnClientEnd"))
             .message(Contains("ExternalClient(@1,2,NEXT,HEAD) used as a platform client")),
-        ProblemPattern::error()
-            .path(Contains("ExternalServer.TakeServerEnd"))
-            .message(Begins("Incompatible request types")),
-        ProblemPattern::error()
-            .path(Contains("ExternalServer.ReturnClientEnd"))
-            .message(Begins("Incompatible response types"))
     ]));
 }

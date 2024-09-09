@@ -124,7 +124,7 @@ impl LocalComponentHandles {
             .namespace
             .get("/svc")
             .ok_or(format_err!("the component's namespace doesn't have a /svc directory"))?;
-        fuchsia_fs::directory::open_directory_no_describe(
+        fuchsia_fs::directory::open_directory_no_describe_deprecated(
             &svc_dir_proxy,
             name,
             fuchsia_fs::OpenFlags::empty(),
@@ -157,7 +157,7 @@ impl LocalComponentHandles {
         instance_name: &str,
     ) -> Result<S::Proxy, Error> {
         let service_dir = self.open_named_service(service_name)?;
-        let directory_proxy = fuchsia_fs::directory::open_directory_no_describe(
+        let directory_proxy = fuchsia_fs::directory::open_directory_no_describe_deprecated(
             &service_dir,
             instance_name,
             fuchsia_fs::OpenFlags::empty(),
@@ -178,7 +178,7 @@ impl LocalComponentHandles {
     /// ```
     /// let data_dir = handles.clone_from_namespace("data")?;
     /// let assets_dir =
-    ///     fuchsia_fs::directory::open_directory_no_describe(&data_dir, "assets", ...)?;
+    ///     fuchsia_fs::directory::open_directory_no_describe_deprecated(&data_dir, "assets", ...)?;
     /// ```
     pub fn clone_from_namespace(&self, directory_name: &str) -> Result<fio::DirectoryProxy, Error> {
         let dir_proxy = self.namespace.get(&format!("/{}", directory_name)).ok_or(format_err!(
@@ -377,6 +377,9 @@ impl LocalComponentRunner {
                             };
                         }
                     });
+                }
+                fcrunner::ComponentRunnerRequest::_UnknownMethod { ordinal, .. } => {
+                    warn!(%ordinal, "Unknown ComponentController request");
                 }
             }
         }

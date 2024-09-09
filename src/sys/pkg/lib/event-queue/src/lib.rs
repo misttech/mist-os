@@ -62,6 +62,8 @@ use barrier::{Barrier, BarrierBlock};
 
 const DEFAULT_EVENTS_LIMIT: usize = 10;
 
+/// EventQueue event trait
+///
 /// The event type need to implement this trait to tell the event queue whether two consecutive
 /// pending events can be merged into a single event, if `can_merge` returns true, the event queue
 /// will replace the last event in the queue with the latest event.

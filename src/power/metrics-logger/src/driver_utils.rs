@@ -78,7 +78,7 @@ async fn get_driver_topological_path(path: &str) -> Result<String> {
 }
 
 pub async fn list_drivers(path: &str) -> Vec<String> {
-    let dir = match fuchsia_fs::directory::open_in_namespace(
+    let dir = match fuchsia_fs::directory::open_in_namespace_deprecated(
         path,
         fuchsia_fs::OpenFlags::RIGHT_READABLE,
     ) {

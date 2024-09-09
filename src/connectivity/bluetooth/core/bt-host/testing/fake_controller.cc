@@ -1582,6 +1582,32 @@ void FakeController::OnLESetExtendedScanParameters(
                              pwemb::StatusCode::SUCCESS);
 }
 
+void FakeController::OnLESetHostFeature(
+    const pwemb::LESetHostFeatureCommandView& params) {
+  // We only support setting the CIS Host Support Bit
+  if (params.bit_number().Read() !=
+      static_cast<uint8_t>(hci_spec::LESupportedFeatureBitPos::
+                               kConnectedIsochronousStreamHostSupport)) {
+    RespondWithCommandComplete(
+        hci_spec::kLESetHostFeature,
+        pwemb::StatusCode::UNSUPPORTED_FEATURE_OR_PARAMETER);
+    return;
+  }
+  if (params.bit_value().Read() ==
+      pw::bluetooth::emboss::GenericEnableParam::ENABLE) {
+    SetBit(
+        &settings_.le_features,
+        hci_spec::LESupportedFeature::kConnectedIsochronousStreamHostSupport);
+  } else {
+    UnsetBit(
+        &settings_.le_features,
+        hci_spec::LESupportedFeature::kConnectedIsochronousStreamHostSupport);
+  }
+
+  RespondWithCommandComplete(hci_spec::kLESetHostFeature,
+                             pwemb::StatusCode::SUCCESS);
+}
+
 void FakeController::OnReadLocalExtendedFeatures(
     const pwemb::ReadLocalExtendedFeaturesCommandView& params) {
   hci_spec::ReadLocalExtendedFeaturesReturnParams out_params;
@@ -1626,14 +1652,15 @@ void FakeController::OnLESetEventMask(
 }
 
 void FakeController::OnLEReadBufferSizeV1() {
-  hci_spec::LEReadBufferSizeV1ReturnParams params;
-  params.status = pwemb::StatusCode::SUCCESS;
-  params.hc_le_acl_data_packet_length = pw::bytes::ConvertOrderTo(
-      cpp20::endian::little, settings_.le_acl_data_packet_length);
-  params.hc_total_num_le_acl_data_packets =
-      settings_.le_total_num_acl_data_packets;
-  RespondWithCommandComplete(hci_spec::kLEReadBufferSizeV1,
-                             BufferView(&params, sizeof(params)));
+  auto packet = hci::EmbossEventPacket::New<
+      pwemb::LEReadBufferSizeV1CommandCompleteEventWriter>(
+      hci_spec::kCommandCompleteEventCode);
+  auto view = packet.view_t();
+  view.status().Write(pwemb::StatusCode::SUCCESS);
+  view.le_acl_data_packet_length().Write(settings_.le_acl_data_packet_length);
+  view.total_num_le_acl_data_packets().Write(
+      settings_.le_total_num_acl_data_packets);
+  RespondWithCommandComplete(pwemb::OpCode::LE_READ_BUFFER_SIZE_V1, &packet);
 }
 
 void FakeController::OnLEReadBufferSizeV2() {
@@ -1799,11 +1826,13 @@ void FakeController::OnWriteInquiryMode(
 }
 
 void FakeController::OnReadInquiryMode() {
-  hci_spec::ReadInquiryModeReturnParams params;
-  params.status = pwemb::StatusCode::SUCCESS;
-  params.inquiry_mode = inquiry_mode_;
-  RespondWithCommandComplete(hci_spec::kReadInquiryMode,
-                             BufferView(&params, sizeof(params)));
+  auto event_packet = hci::EmbossEventPacket::New<
+      pwemb::ReadInquiryModeCommandCompleteEventWriter>(
+      hci_spec::kCommandCompleteEventCode);
+  auto view = event_packet.view_t();
+  view.status().Write(pwemb::StatusCode::SUCCESS);
+  view.inquiry_mode().Write(inquiry_mode_);
+  RespondWithCommandComplete(pwemb::OpCode::READ_INQUIRY_MODE, &event_packet);
 }
 
 void FakeController::OnWriteClassOfDevice(
@@ -3307,8 +3336,8 @@ void FakeController::OnLEReadNumberOfSupportedAdvertisingSets() {
 }
 
 void FakeController::OnLERemoveAdvertisingSet(
-    const hci_spec::LERemoveAdvertisingSetCommandParams& params) {
-  hci_spec::AdvertisingHandle handle = params.adv_handle;
+    const pwemb::LERemoveAdvertisingSetCommandView& params) {
+  hci_spec::AdvertisingHandle handle = params.advertising_handle().Read();
 
   if (!IsValidAdvertisingHandle(handle)) {
     bt_log(ERROR, "fake-hci", "advertising handle outside range: %d", handle);
@@ -3383,12 +3412,16 @@ void FakeController::OnLEReadAdvertisingChannelTxPower() {
 void FakeController::SendLEAdvertisingSetTerminatedEvent(
     hci_spec::ConnectionHandle conn_handle,
     hci_spec::AdvertisingHandle adv_handle) {
-  hci_spec::LEAdvertisingSetTerminatedSubeventParams params;
-  params.status = pwemb::StatusCode::SUCCESS;
-  params.connection_handle = conn_handle;
-  params.adv_handle = adv_handle;
-  SendLEMetaEvent(hci_spec::kLEAdvertisingSetTerminatedSubeventCode,
-                  BufferView(&params, sizeof(params)));
+  auto packet = hci::EmbossEventPacket::New<
+      pwemb::LEAdvertisingSetTerminatedSubeventWriter>(
+      hci_spec::kLEMetaEventCode);
+  auto view = packet.view_t();
+  view.le_meta_event().subevent_code().Write(
+      hci_spec::kLEAdvertisingSetTerminatedSubeventCode);
+  view.status().Write(pwemb::StatusCode::SUCCESS);
+  view.connection_handle().Write(conn_handle);
+  view.advertising_handle().Write(adv_handle);
+  SendCommandChannelPacket(packet.data());
 }
 
 void FakeController::SendAndroidLEMultipleAdvertisingStateChangeSubevent(
@@ -4181,13 +4214,6 @@ void FakeController::HandleReceivedCommandPacket(
       OnReadLocalSupportedFeatures();
       break;
     }
-    case hci_spec::kLERemoveAdvertisingSet: {
-      const auto& params =
-          command_packet
-              .payload<hci_spec::LERemoveAdvertisingSetCommandParams>();
-      OnLERemoveAdvertisingSet(params);
-      break;
-    }
     case hci_spec::kReadBDADDR: {
       OnReadBRADDR();
       break;
@@ -4272,6 +4298,7 @@ void FakeController::HandleReceivedCommandPacket(
     case hci_spec::kLEReadMaximumAdvertisingDataLength:
     case hci_spec::kLEReadNumSupportedAdvertisingSets:
     case hci_spec::kLEReadRemoteFeatures:
+    case hci_spec::kLERemoveAdvertisingSet:
     case hci_spec::kLESetAdvertisingData:
     case hci_spec::kLESetAdvertisingEnable:
     case hci_spec::kLESetAdvertisingParameters:
@@ -4283,6 +4310,7 @@ void FakeController::HandleReceivedCommandPacket(
     case hci_spec::kLESetExtendedScanEnable:
     case hci_spec::kLESetExtendedScanParameters:
     case hci_spec::kLESetExtendedScanResponseData:
+    case hci_spec::kLESetHostFeature:
     case hci_spec::kLESetRandomAddress:
     case hci_spec::kLESetScanEnable:
     case hci_spec::kLESetScanParameters:
@@ -4399,6 +4427,12 @@ void FakeController::HandleReceivedCommandPacket(
           command_packet
               .view<pwemb::LESetExtendedAdvertisingEnableCommandView>();
       OnLESetExtendedAdvertisingEnable(params);
+      break;
+    }
+    case hci_spec::kLERemoveAdvertisingSet: {
+      const auto params =
+          command_packet.view<pwemb::LERemoveAdvertisingSetCommandView>();
+      OnLERemoveAdvertisingSet(params);
       break;
     }
     case hci_spec::kLinkKeyRequestNegativeReply: {
@@ -4642,6 +4676,12 @@ void FakeController::HandleReceivedCommandPacket(
           command_packet
               .view<pwemb::LESetExtendedScanResponseDataCommandView>();
       OnLESetExtendedScanResponseData(params);
+      break;
+    }
+    case hci_spec::kLESetHostFeature: {
+      const auto& params =
+          command_packet.view<pwemb::LESetHostFeatureCommandView>();
+      OnLESetHostFeature(params);
       break;
     }
     case hci_spec::kLEReadMaximumAdvertisingDataLength: {

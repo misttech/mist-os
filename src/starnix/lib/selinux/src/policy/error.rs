@@ -84,9 +84,9 @@ pub enum ValidateError {
     MissingInitialSid { initial_sid: crate::InitialSid },
     #[error(
         "invalid SELinux fs_use type; expected one of {:?}, but found {value}",
-        [FsUseType::FsUseXattr as u32,
-        FsUseType::FsUseTrans as u32,
-        FsUseType::FsUseTask as u32]
+        [FsUseType::Xattr as u32,
+        FsUseType::Trans as u32,
+        FsUseType::Task as u32]
     )]
     InvalidFsUseType { value: u32 },
     #[error("non-optional Id field is zero")]

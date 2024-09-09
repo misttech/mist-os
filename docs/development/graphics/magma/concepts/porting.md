@@ -377,7 +377,7 @@ the system driver using the Zircon DDK.
 [new-cpp-fidl]: /docs/development/languages/fidl/tutorials/cpp/README.md
 [syslog]: /zircon/system/ulib/syslog/
 [syslog-structured-backend]: /sdk/lib/syslog/structured_backend/
-[async-default]: /zircon/system/ulib/async-default/
+[async-default]: /sdk/lib/async-default/
 [libtrace-engine]: /zircon/system/ulib/trace-engine/
 [libsvc]: /sdk/lib/svc
 [icd_conformance]: /src/graphics/tests/icd_conformance/icd_conformance.cc

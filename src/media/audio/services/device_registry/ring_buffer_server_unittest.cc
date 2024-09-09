@@ -9,6 +9,7 @@
 #include <fidl/fuchsia.audio/cpp/common_types.h>
 #include <fidl/fuchsia.hardware.audio/cpp/fidl.h>
 #include <lib/fidl/cpp/wire/internal/transport_channel.h>
+#include <lib/fidl/cpp/wire/unknown_interaction_handler.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/zx/clock.h>
 #include <zircon/errors.h>
@@ -47,6 +48,11 @@ class RingBufferServerTest : public AudioDeviceRegistryServerTestBase,
             fidl::Client<fad::RingBuffer>>
   SetupForCleanShutdownTesting(ElementId element_id = fad::kDefaultRingBufferElementId,
                                const fad::RingBufferOptions& options = kDefaultRingBufferOptions);
+
+  void handle_unknown_event(fidl::UnknownEventMetadata<fad::RingBuffer> metadata) override {
+    FAIL() << "RingBufferServerWarningTest: unknown event (RingBuffer) ordinal "
+           << metadata.event_ordinal;
+  }
 };
 
 std::optional<TokenId> RingBufferServerTest::WaitForAddedDeviceTokenId(
@@ -287,7 +293,7 @@ TEST_F(RingBufferServerCompositeTest, DriverSupportsSetActiveChannels) {
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback);
   EXPECT_EQ(fake_driver->active_channels_bitmask(element_id), 0x0u);
-  EXPECT_GT(fake_driver->active_channels_set_time(element_id), before_set_active_channels);
+  EXPECT_GT(fake_driver->set_active_channels_completed_at(element_id), before_set_active_channels);
   EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
   EXPECT_FALSE(control_fidl_error_status().has_value()) << *control_fidl_error_status();
 }
@@ -897,7 +903,7 @@ TEST_F(RingBufferServerStreamConfigTest, DriverSupportsSetActiveChannels) {
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback);
   EXPECT_EQ(fake_driver->active_channels_bitmask(), 0x0u);
-  EXPECT_GT(fake_driver->active_channels_set_time(), before_set_active_channels);
+  EXPECT_GT(fake_driver->set_active_channels_completed_at(), before_set_active_channels);
   EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
   EXPECT_FALSE(control_fidl_error_status().has_value()) << *control_fidl_error_status();
 }

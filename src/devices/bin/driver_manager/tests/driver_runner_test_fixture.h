@@ -90,7 +90,7 @@ class TestRealm : public fidl::testing::TestBase<fuchsia_component::Realm> {
   std::vector<fdecl::ChildRef> destroyed_children_;
 };
 
-class TestDirectory : public fidl::testing::TestBase<fio::Directory> {
+class TestDirectory final : public fidl::testing::TestBase<fio::Directory> {
  public:
   using OpenHandler =
       fit::function<void(const std::string& path, fidl::ServerEnd<fio::Node> object)>;
@@ -105,6 +105,9 @@ class TestDirectory : public fidl::testing::TestBase<fio::Directory> {
   void Clone(CloneRequest& request, CloneCompleter::Sync& completer) override;
 
   void Open(OpenRequest& request, OpenCompleter::Sync& completer) override;
+
+  void handle_unknown_method(fidl::UnknownMethodMetadata<fio::Directory>,
+                             fidl::UnknownMethodCompleter::Sync&) override;
 
   void NotImplemented_(const std::string& name, fidl::CompleterBase& completer) override {
     printf("Not implemented: Directory::%s\n", name.c_str());
@@ -188,6 +191,11 @@ class TestDriverHost : public fidl::testing::TestBase<fdh::DriverHost> {
   StartHandler start_handler_;
 };
 
+// Calls the driver host runner's component Start implementation.
+void DriverHostComponentStart(driver_runner::TestRealm& realm,
+                              driver_manager::DriverHostRunner& driver_host_runner,
+                              fidl::ClientEnd<fuchsia_io::Directory> driver_host_pkg);
+
 fidl::AnyTeardownObserver TeardownWatcher(size_t index, std::vector<size_t>& indices);
 fdecl::ChildRef CreateChildRef(std::string name, std::string collection);
 
@@ -213,6 +221,7 @@ class DriverRunnerTest : public gtest::TestLoopFixture {
   void SetupDriverRunner(FakeDriverIndex driver_index);
 
   void SetupDriverRunnerWithDynamicLinker(
+      async_dispatcher_t* loader_dispatcher,
       std::unique_ptr<driver_manager::DriverHostRunner> driver_host_runner);
 
   void SetupDriverRunner();
@@ -237,9 +246,14 @@ class DriverRunnerTest : public gtest::TestLoopFixture {
 
   // If |ns_pkg| is set, it will be provided as the /pkg directory in the driver component's
   // namespace.
+  // If a new driver host is required to be started (i.e. the driver is not colocated),
+  // and dynamic linking is enabled, |driver_host_pkg| will be provided as the /pkg directory in the
+  // driver host component's namespace.
   StartDriverResult StartDriver(
       Driver driver, std::optional<StartDriverHandler> start_handler = std::nullopt,
-      fidl::ClientEnd<fuchsia_io::Directory> ns_pkg = fidl::ClientEnd<fuchsia_io::Directory>());
+      fidl::ClientEnd<fuchsia_io::Directory> ns_pkg = fidl::ClientEnd<fuchsia_io::Directory>(),
+      fidl::ClientEnd<fuchsia_io::Directory> driver_host_pkg =
+          fidl::ClientEnd<fuchsia_io::Directory>());
 
   zx::result<StartDriverResult> StartRootDriver();
 

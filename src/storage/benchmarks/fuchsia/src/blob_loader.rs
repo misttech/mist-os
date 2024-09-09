@@ -3,7 +3,8 @@
 // found in the LICENSE file.
 
 use fuchsia_fs::directory::{
-    open_file_no_describe, open_in_namespace, readdir_recursive, DirEntry, DirentKind,
+    open_file_no_describe_deprecated, open_in_namespace_deprecated, readdir_recursive, DirEntry,
+    DirentKind,
 };
 use fuchsia_fs::OpenFlags;
 use futures::StreamExt as _;
@@ -30,8 +31,9 @@ impl Drop for BlobLoader {
 }
 
 async fn collect_pkg_vmos() -> Vec<(zx::Vmo, u64)> {
-    let dir = open_in_namespace("/pkg", OpenFlags::RIGHT_READABLE | OpenFlags::DIRECTORY)
-        .expect("Failed to open /pkg directory");
+    let dir =
+        open_in_namespace_deprecated("/pkg", OpenFlags::RIGHT_READABLE | OpenFlags::DIRECTORY)
+            .expect("Failed to open /pkg directory");
     let mut vmos = Vec::new();
     let mut entries = readdir_recursive(&dir, None);
     while let Some(entry) = entries.next().await {
@@ -39,7 +41,8 @@ async fn collect_pkg_vmos() -> Vec<(zx::Vmo, u64)> {
         if kind != DirentKind::File {
             continue;
         }
-        let file = open_file_no_describe(&dir, &name, OpenFlags::RIGHT_READABLE).unwrap();
+        let file =
+            open_file_no_describe_deprecated(&dir, &name, OpenFlags::RIGHT_READABLE).unwrap();
         let vmo =
             file.get_backing_memory(fio::VmoFlags::READ).await.unwrap().map_err(zx::ok).unwrap();
         let size = vmo.get_size().unwrap();

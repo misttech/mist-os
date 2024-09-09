@@ -18,6 +18,18 @@ class WlanPolicy(abc.ABC):
 
     # List all the public methods
     @abc.abstractmethod
+    def close(self) -> None:
+        """Release handle on client controller.
+
+        This needs to be called on test class teardown otherwise the device may
+        be left in an inoperable state where no other components or tests can
+        access state-changing WLAN Policy APIs.
+
+        This is idempotent and irreversible. No other methods should be called
+        after this one.
+        """
+
+    @abc.abstractmethod
     def connect(
         self, target_ssid: str, security_type: SecurityType
     ) -> RequestStatus:
@@ -30,11 +42,21 @@ class WlanPolicy(abc.ABC):
 
         Returns:
             A RequestStatus response to the connect request
+
+        Raises:
+            HoneydewWlanError: Error from WLAN stack.
+            TypeError: Return value not a string.
         """
 
     @abc.abstractmethod
     def create_client_controller(self) -> None:
-        """Initializes the client controller."""
+        """Initializes the client controller.
+
+        See fuchsia.wlan.policy/ClientProvider.GetController().
+
+        Raises:
+            HoneydewWlanError: Error from WLAN stack.
+        """
 
     @abc.abstractmethod
     def get_saved_networks(self) -> list[NetworkConfig]:
@@ -42,6 +64,10 @@ class WlanPolicy(abc.ABC):
 
         Returns:
             A list of NetworkConfigs.
+
+        Raises:
+            HoneydewWlanError: Error from WLAN stack.
+            TypeError: Return values not correct types.
         """
 
     @abc.abstractmethod
@@ -62,12 +88,23 @@ class WlanPolicy(abc.ABC):
                 return. By default it is set to None (which means timeout is
                 disabled)
 
-        Returns: ClientStateSummary
+        Returns:
+            An update of connection status. If there is no error, the result is
+            a WlanPolicyUpdate with a structure that matches the FIDL
+            ClientStateSummary struct given for updates.
+
+        Raises:
+            HoneydewWlanError: Error from WLAN stack.
+            TypeError: Return values not correct types.
         """
 
     @abc.abstractmethod
     def remove_all_networks(self) -> None:
-        """Deletes all saved networks on the device."""
+        """Deletes all saved networks on the device.
+
+        Raises:
+            HoneydewWlanError: Error from WLAN stack.
+        """
 
     @abc.abstractmethod
     def remove_network(
@@ -83,6 +120,9 @@ class WlanPolicy(abc.ABC):
             security_type: The security protocol of the network.
             target_pwd: The credential being saved with the network. No password
                 is equivalent to an empty string.
+
+        Raises:
+            HoneydewWlanError: Error from WLAN stack.
         """
 
     @abc.abstractmethod
@@ -99,6 +139,9 @@ class WlanPolicy(abc.ABC):
             security_type: The security protocol of the network.
             target_pwd: The credential being saved with the network. No password
                 is equivalent to an empty string.
+
+        Raises:
+            HoneydewWlanError: Error from WLAN stack.
         """
 
     @abc.abstractmethod
@@ -107,6 +150,10 @@ class WlanPolicy(abc.ABC):
 
         Returns:
             A list of network SSIDs that can be connected to.
+
+        Raises:
+            HoneydewWlanError: Error from WLAN stack.
+            TypeError: Return value not a list.
         """
 
     @abc.abstractmethod
@@ -116,12 +163,29 @@ class WlanPolicy(abc.ABC):
         This causes updates to be reset. Intended to be used between tests so
         that the behaviour of updates in a test is independent from previous
         tests.
+
+        Raises:
+            HoneydewWlanError: Error from WLAN stack.
         """
 
     @abc.abstractmethod
     def start_client_connections(self) -> None:
-        """Enables device to initiate connections to networks."""
+        """Enables device to initiate connections to networks.
+
+        See fuchsia.wlan.policy/ClientController.StartClientConnections().
+
+        Raises:
+            HoneydewWlanError: Error from WLAN stack.
+            RuntimeError: A client controller has not been created yet
+        """
 
     @abc.abstractmethod
     def stop_client_connections(self) -> None:
-        """Disables device for initiating connections to networks."""
+        """Disables device for initiating connections to networks.
+
+        See fuchsia.wlan.policy/ClientController.StopClientConnections().
+
+        Raises:
+            HoneydewWlanError: Error from WLAN stack.
+            RuntimeError: A client controller has not been created yet
+        """

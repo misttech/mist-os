@@ -24,10 +24,10 @@ use netstack3_core::device::{DeviceId, WeakDeviceId};
 use netstack3_core::socket::ShutdownType;
 use netstack3_core::tcp::{
     self, AcceptError, BindError, BoundInfo, Buffer, BufferLimits, BufferSizes, ConnectError,
-    ConnectionError, ConnectionInfo, IntoBuffers, ListenError, ListenerNotifier, NoConnection,
-    OriginalDestinationError, Payload, PayloadLen, ReceiveBuffer, RingBuffer, SendBuffer,
-    SendPayload, SetReuseAddrError, SocketAddr, SocketInfo, SocketOptions, Takeable,
-    TcpBindingsTypes, UnboundInfo,
+    ConnectionError, ConnectionInfo, FragmentedPayload, IntoBuffers, ListenError, ListenerNotifier,
+    NoConnection, OriginalDestinationError, Payload, PayloadLen, ReceiveBuffer, RingBuffer,
+    SendBuffer, SetReuseAddrError, SocketAddr, SocketInfo, SocketOptions, TcpBindingsTypes,
+    UnboundInfo,
 };
 use netstack3_core::IpExt;
 use once_cell::sync::Lazy;
@@ -78,13 +78,6 @@ impl IntoBuffers<ReceiveBufferWithZirconSocket, SendBufferWithZirconSocket>
             ReceiveBufferWithZirconSocket::new(Arc::clone(&socket), receive),
             SendBufferWithZirconSocket::new(socket, notifier, send),
         )
-    }
-}
-
-impl Takeable for LocalZirconSocketAndNotifier {
-    fn take(&mut self) -> Self {
-        let Self(socket, notifier) = self;
-        Self(Arc::clone(&socket), notifier.clone())
     }
 }
 
@@ -143,10 +136,7 @@ impl TcpBindingsTypes for BindingsCtx {
 #[derive(Debug)]
 pub(crate) struct ReceiveBufferWithZirconSocket {
     /// The Zircon socket whose other end is held by the peer.
-    ///
-    /// This is an Option so that [`Takeable::take`] can leave a sentinel value
-    /// in its place. Otherwise it should always have a value.
-    socket: Option<Arc<zx::Socket>>,
+    socket: Arc<zx::Socket>,
     zx_socket_capacity: usize,
     // Invariant: `out_of_order` can never hold more bytes than
     // `zx_socket_capacity`.
@@ -172,20 +162,7 @@ impl ReceiveBufferWithZirconSocket {
         let ring_buffer_size =
             usize::min(usize::max(target_capacity, Self::MIN_CAPACITY), zx_socket_capacity);
         let out_of_order = RingBuffer::new(ring_buffer_size);
-        Self { zx_socket_capacity, socket: Some(socket), out_of_order }
-    }
-}
-
-impl Takeable for ReceiveBufferWithZirconSocket {
-    fn take(&mut self) -> Self {
-        core::mem::replace(
-            self,
-            Self {
-                zx_socket_capacity: self.zx_socket_capacity,
-                socket: None,
-                out_of_order: RingBuffer::new(0),
-            },
-        )
+        Self { zx_socket_capacity, socket, out_of_order }
     }
 }
 
@@ -205,7 +182,7 @@ impl Buffer for ReceiveBufferWithZirconSocket {
             *zx_socket_capacity
         );
 
-        let info = socket.as_ref().expect("is valid").info().expect("failed to get socket info");
+        let info = socket.as_ref().info().expect("failed to get socket info");
         let len = info.tx_buf_size;
         // Ensure that capacity is always at least as large as the length, but
         // also reflects the requested capacity.
@@ -239,7 +216,7 @@ impl ReceiveBuffer for ReceiveBufferWithZirconSocket {
             let mut total = 0;
             for chunk in avail {
                 trace_duration!(c"zx::Socket::write");
-                let written = match self.socket.as_ref().expect("is valid").write(*chunk) {
+                let written = match self.socket.as_ref().write(*chunk) {
                     Ok(n) => n,
                     Err(zx::Status::BAD_STATE | zx::Status::PEER_CLOSED) => {
                         // These two status codes correspond two possible cases
@@ -281,14 +258,12 @@ impl Drop for ReceiveBufferWithZirconSocket {
     fn drop(&mut self) {
         // Make sure the FDIO is aware that we are not writing anymore so that
         // it can transition into the right state.
-        if let Some(socket) = self.socket.as_ref() {
-            socket
-                .set_disposition(
-                    /* disposition */ Some(zx::SocketWriteDisposition::Disabled),
-                    /* peer_disposition */ None,
-                )
-                .expect("failed to set socket disposition");
-        }
+        self.socket
+            .set_disposition(
+                /* disposition */ Some(zx::SocketWriteDisposition::Disabled),
+                /* peer_disposition */ None,
+            )
+            .expect("failed to set socket disposition");
     }
 }
 
@@ -338,18 +313,6 @@ impl Buffer for SendBufferWithZirconSocket {
 
         // Eagerly pull more data out of the Zircon socket into the ring buffer.
         self.poll()
-    }
-}
-
-impl Takeable for SendBufferWithZirconSocket {
-    fn take(&mut self) -> Self {
-        let Self { zx_socket_capacity, socket, ready_to_send: data, notifier } = self;
-        Self {
-            zx_socket_capacity: *zx_socket_capacity,
-            socket: Arc::clone(socket),
-            ready_to_send: std::mem::replace(data, RingBuffer::new(0)),
-            notifier: notifier.clone(),
-        }
     }
 }
 
@@ -409,7 +372,7 @@ impl SendBufferWithZirconSocket {
 }
 
 impl SendBuffer for SendBufferWithZirconSocket {
-    type Payload<'a> = SendPayload<'a>;
+    type Payload<'a> = FragmentedPayload<'a, 2>;
 
     fn mark_read(&mut self, count: usize) {
         self.ready_to_send.mark_read(count);
@@ -418,7 +381,7 @@ impl SendBuffer for SendBufferWithZirconSocket {
 
     fn peek_with<'a, F, R>(&'a mut self, offset: usize, f: F) -> R
     where
-        F: FnOnce(SendPayload<'a>) -> R,
+        F: FnOnce(FragmentedPayload<'a, 2>) -> R,
     {
         self.poll();
         let Self { ready_to_send, zx_socket_capacity: _, notifier: _, socket: _ } = self;
@@ -428,7 +391,7 @@ impl SendBuffer for SendBufferWithZirconSocket {
         // request that would result in an out-of-bounds peek.
         let BufferLimits { len, capacity: _ } = ready_to_send.limits();
         if offset >= len {
-            f(SendPayload::Contiguous(&[]))
+            f(FragmentedPayload::new_empty())
         } else {
             ready_to_send.peek_with(offset, f)
         }
@@ -1645,7 +1608,6 @@ where
 
 #[cfg(test)]
 mod tests {
-    use assert_matches::assert_matches;
     use test_case::test_case;
 
     use super::*;
@@ -1675,14 +1637,14 @@ mod tests {
         assert_eq!(peer.write(TEST_BYTES), Ok(TEST_BYTES.len()));
         assert_eq!(sbuf.limits().len, TEST_BYTES.len());
         sbuf.peek_with(0, |avail| {
-            assert_eq!(avail, SendPayload::Contiguous(TEST_BYTES));
+            assert_eq!(avail, FragmentedPayload::new_contiguous(TEST_BYTES));
         });
         assert_eq!(peer.write(TEST_BYTES), Ok(TEST_BYTES.len()));
         assert_eq!(sbuf.limits().len, TEST_BYTES.len() * 2);
         sbuf.mark_read(TEST_BYTES.len());
         assert_eq!(sbuf.limits().len, TEST_BYTES.len());
         sbuf.peek_with(0, |avail| {
-            assert_eq!(avail, SendPayload::Contiguous(TEST_BYTES));
+            assert_eq!(avail, FragmentedPayload::new_contiguous(TEST_BYTES));
         });
     }
 
@@ -1723,7 +1685,7 @@ mod tests {
 
         // Peeking past the end of the ring buffer should not cause a crash.
         sbuf.peek_with(SendBufferWithZirconSocket::MIN_CAPACITY, |payload| {
-            assert_matches!(payload, SendPayload::Contiguous(&[]))
+            assert_eq!(payload, FragmentedPayload::new_empty())
         })
     }
 

@@ -126,7 +126,7 @@ group("minimal_vim3_staging_tests") {
 }
 
 # starnix.vim3
-# Note: This will be run on internal builder, hence using `starnix` here
+# Note: This will be run on *.vim3 internal builder, hence using `starnix` here
 # instead of internal `<PRODUCT>` name.
 group_with_no_dir_target_deps("starnix_vim3_stable_tests") {
   testonly = true
@@ -143,6 +143,28 @@ group("starnix_vim3_staging_tests") {
   public_deps = [
     ":starnix_vim3_stable_tests",
     ":starnix_vim3_unstable_tests",
+  ]
+}
+
+# starnix.arm64
+# Note: This will be run on internal *.arm64 builder, hence using `starnix` here
+# instead of internal `<PRODUCT>` name.
+group_with_no_dir_target_deps("starnix_arm64_stable_tests") {
+  testonly = true
+  public_deps = [ "//src/storage/blackout/host:blackout_starnix_arm64_stable" ]
+}
+
+group_with_no_dir_target_deps("starnix_arm64_unstable_tests") {
+  testonly = true
+  public_deps =
+      [ "//src/storage/blackout/host:blackout_starnix_arm64_unstable" ]
+}
+
+group("starnix_arm64_staging_tests") {
+  testonly = true
+  public_deps = [
+    ":starnix_arm64_stable_tests",
+    ":starnix_arm64_unstable_tests",
   ]
 }
 ############################## Test groups - End ###############################

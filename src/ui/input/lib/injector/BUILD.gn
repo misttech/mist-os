@@ -28,7 +28,7 @@ source_set("lib") {
 
   deps = [
     ":injector_config_setup",
-    "//sdk/lib/fidl/cpp",
+    "//sdk/lib/fidl/hlcpp",
     "//sdk/lib/sys/cpp",
     "//sdk/lib/syslog/cpp",
     "//src/lib/fostr/fidl/fuchsia.input.report",

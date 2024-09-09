@@ -19,7 +19,6 @@ using ::fuchsia::virtualization::GuestConfig;
 using ::fuchsia::virtualization::GuestManagerError;
 
 constexpr std::string_view kLinuxEnvironmentName("termina");
-constexpr size_t kBytesToWipe = 1ul * 1024 * 1024;  // 1 MiB
 
 void NotifyClient(fidl::Binding<fuchsia::virtualization::LinuxManager>& binding,
                   GuestInfo& current_info) {
@@ -50,20 +49,16 @@ std::string GuestManagerErrorToString(fuchsia::virtualization::GuestManagerError
 
 }  // namespace
 
-TerminaGuestManager::TerminaGuestManager(async_dispatcher_t* dispatcher,
-                                         fit::function<void()> stop_manager_callback)
+TerminaGuestManager::TerminaGuestManager(async_dispatcher_t* dispatcher)
     : TerminaGuestManager(dispatcher, sys::ComponentContext::CreateAndServeOutgoingDirectory(),
-                          termina_config::Config::TakeFromStartupHandle(),
-                          std::move(stop_manager_callback)) {}
+                          termina_config::Config::TakeFromStartupHandle()) {}
 
 TerminaGuestManager::TerminaGuestManager(async_dispatcher_t* dispatcher,
                                          std::unique_ptr<sys::ComponentContext> context,
-                                         termina_config::Config structured_config,
-                                         fit::function<void()> stop_manager_callback)
+                                         termina_config::Config structured_config)
     : GuestManager(dispatcher, context.get()),
       context_(std::move(context)),
       structured_config_(std::move(structured_config)),
-      stop_manager_callback_(std::move(stop_manager_callback)),
       dispatcher_(dispatcher) {
   guest_ = CreateGuest();
   context_->outgoing()->AddPublicService<fuchsia::virtualization::LinuxManager>(
@@ -150,13 +145,6 @@ void TerminaGuestManager::OnGuestLaunched() {
 void TerminaGuestManager::OnGuestStopped() {
   info_ = std::nullopt;
   guest_ = CreateGuest();
-
-  if (structured_config_.stateful_partition_type() == "fvm") {
-    // The termina guest manager is dropping access to /dev preventing further accesses, so we
-    // can't restart the guest without restarting the guest manager component unless using fxfs.
-    // Eventually we will only be using fxfs, and this check can go away.
-    stop_manager_callback_();
-  }
 }
 
 void TerminaGuestManager::StartAndGetLinuxGuestInfo(std::string label,
@@ -197,15 +185,7 @@ void TerminaGuestManager::WipeData(WipeDataCallback callback) {
     callback(fuchsia::virtualization::LinuxManager_WipeData_Result::WithErr(ZX_ERR_BAD_STATE));
     return;
   }
-  // We zero out some bytes at the beginning of the partition to corrupt any filesystem data-
-  // structures stored there.
-  zx::result<> status = WipeStatefulPartition(kBytesToWipe);
-  if (status.is_error()) {
-    callback(fuchsia::virtualization::LinuxManager_WipeData_Result::WithErr(status.status_value()));
-  } else {
-    callback(fuchsia::virtualization::LinuxManager_WipeData_Result::WithResponse(
-        fuchsia::virtualization::LinuxManager_WipeData_Response()));
-  }
+  callback(fuchsia::virtualization::LinuxManager_WipeData_Result::WithErr(ZX_ERR_NOT_SUPPORTED));
 }
 
 void TerminaGuestManager::GracefulShutdown() {

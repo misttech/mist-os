@@ -21,11 +21,10 @@ rustc_binary("manager") {
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-component",
+    "//src/tee/manager-config",
     "//src/tee/tee_internal_api:tee_internal",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:futures",
-    "//third_party/rust_crates:serde",
-    "//third_party/rust_crates:serde_json",
     "//third_party/rust_crates:tracing",
   ]
 

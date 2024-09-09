@@ -17,9 +17,6 @@ from pathlib import Path
 
 
 def symlink(src, dest: str):
-    outs = []
-    ins = []
-
     src = os.path.normpath(src)
     dest = os.path.normpath(dest)
 

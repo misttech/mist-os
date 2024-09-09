@@ -184,18 +184,23 @@ impl BuiltinRunnerFactory for BuiltinRunner {
             let mut stream = fcrunner::ComponentRunnerRequestStream::from_channel(server_end);
             runner.clone().task_group.spawn(async move {
                 while let Ok(Some(request)) = stream.try_next().await {
-                    let fcrunner::ComponentRunnerRequest::Start { start_info, controller, .. } =
-                        request;
-                    match runner.clone().start(start_info) {
-                        Ok((program, on_exit)) => {
-                            let (stream, control) =
-                                controller.into_stream_and_control_handle().unwrap();
-                            let controller = Controller::new(program, stream, control);
-                            runner.task_group.spawn(controller.serve(on_exit));
-                        }
-                        Err(err) => {
-                            warn!("Builtin runner failed to run component: {err}");
-                            let _ = controller.close_with_epitaph(err.into());
+                    match request {
+                        fcrunner::ComponentRunnerRequest::Start {
+                            start_info, controller, ..
+                        } => match runner.clone().start(start_info) {
+                            Ok((program, on_exit)) => {
+                                let (stream, control) =
+                                    controller.into_stream_and_control_handle().unwrap();
+                                let controller = Controller::new(program, stream, control);
+                                runner.task_group.spawn(controller.serve(on_exit));
+                            }
+                            Err(err) => {
+                                warn!("Builtin runner failed to run component: {err}");
+                                let _ = controller.close_with_epitaph(err.into());
+                            }
+                        },
+                        fcrunner::ComponentRunnerRequest::_UnknownMethod { ordinal, .. } => {
+                            warn!(%ordinal, "Unknown ComponentRunner request");
                         }
                     }
                 }
@@ -316,32 +321,41 @@ impl Inner {
         mut stream: fcrunner::ComponentRunnerRequestStream,
     ) -> Result<(), anyhow::Error> {
         while let Ok(Some(request)) = stream.try_next().await {
-            let fcrunner::ComponentRunnerRequest::Start { mut start_info, controller, .. } =
-                request;
-            let Some(token) = start_info.component_instance.take() else {
-                warn!(
-                    "When calling the ComponentRunner protocol of an ELF runner, \
-                    one must provide the ComponentStartInfo.component_instance field."
-                );
-                _ = controller.close_with_epitaph(zx::Status::INVALID_ARGS);
-                continue;
-            };
-            let token = InstanceToken::from(token);
-            let Some(target_moniker) = self.resources.instance_registry.get(&token) else {
-                warn!(
-                    "The provided ComponentStartInfo.component_instance  token is invalid. \
-                    The component has either already been destroyed, or the token is not minted by \
-                    component_manager."
-                );
-                _ = controller.close_with_epitaph(zx::Status::NOT_SUPPORTED);
-                continue;
-            };
-            start_info.component_instance = Some(token.into());
-            let checker = ScopedPolicyChecker::new(
-                self.resources.security_policy.clone(),
-                target_moniker.clone(),
-            );
-            self.elf_runner.clone().get_scoped_runner(checker).start(start_info, controller).await;
+            match request {
+                fcrunner::ComponentRunnerRequest::Start { mut start_info, controller, .. } => {
+                    let Some(token) = start_info.component_instance.take() else {
+                        warn!(
+                            "When calling the ComponentRunner protocol of an ELF runner, \
+                            one must provide the ComponentStartInfo.component_instance field."
+                        );
+                        _ = controller.close_with_epitaph(zx::Status::INVALID_ARGS);
+                        continue;
+                    };
+                    let token = InstanceToken::from(token);
+                    let Some(target_moniker) = self.resources.instance_registry.get(&token) else {
+                        warn!(
+                            "The provided ComponentStartInfo.component_instance token is invalid. \
+                            The component has either already been destroyed, or the token is not \
+                            minted by component_manager."
+                        );
+                        _ = controller.close_with_epitaph(zx::Status::NOT_SUPPORTED);
+                        continue;
+                    };
+                    start_info.component_instance = Some(token.into());
+                    let checker = ScopedPolicyChecker::new(
+                        self.resources.security_policy.clone(),
+                        target_moniker.clone(),
+                    );
+                    self.elf_runner
+                        .clone()
+                        .get_scoped_runner(checker)
+                        .start(start_info, controller)
+                        .await;
+                }
+                fcrunner::ComponentRunnerRequest::_UnknownMethod { ordinal, .. } => {
+                    warn!(%ordinal, "Unknown ComponentRunner request");
+                }
+            }
         }
         Ok(())
     }
@@ -370,7 +384,7 @@ mod tests {
     use fidl_fuchsia_data::{Dictionary, DictionaryEntry, DictionaryValue};
     use fidl_fuchsia_io::{self as fio, DirectoryProxy};
     use fidl_fuchsia_process as fprocess;
-    use fuchsia_fs::directory::open_channel_in_namespace;
+    use fuchsia_fs::directory::open_channel_in_namespace_deprecated;
     use fuchsia_runtime::{HandleInfo, HandleType};
     use futures::channel::{self, oneshot};
     use moniker::Moniker;
@@ -464,7 +478,12 @@ mod tests {
 
         // Start the ELF runner.
         let (svc, svc_server_end) = fidl::endpoints::create_endpoints();
-        open_channel_in_namespace("/svc", fio::OpenFlags::RIGHT_READABLE, svc_server_end).unwrap();
+        open_channel_in_namespace_deprecated(
+            "/svc",
+            fio::OpenFlags::RIGHT_READABLE,
+            svc_server_end,
+        )
+        .unwrap();
         let (start_info, outgoing_dir) = make_start_info("elf_runner", svc);
         client.start(start_info, server_end).unwrap();
 
@@ -477,7 +496,7 @@ mod tests {
 
         // Open the current package which contains a `signal-then-hang` component.
         let (pkg, server_end) = fidl::endpoints::create_endpoints();
-        open_channel_in_namespace(
+        open_channel_in_namespace_deprecated(
             "/pkg",
             fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,
             server_end,
@@ -584,7 +603,12 @@ mod tests {
             .unwrap();
         let (controller, server_end) = fidl::endpoints::create_proxy().unwrap();
         let (svc, svc_server_end) = fidl::endpoints::create_endpoints();
-        open_channel_in_namespace("/svc", fio::OpenFlags::RIGHT_READABLE, svc_server_end).unwrap();
+        open_channel_in_namespace_deprecated(
+            "/svc",
+            fio::OpenFlags::RIGHT_READABLE,
+            svc_server_end,
+        )
+        .unwrap();
         let (start_info, _outgoing_dir) = make_start_info("foobar", svc);
         client.start(start_info, server_end).unwrap();
         let event = controller.take_event_stream().try_next().await;

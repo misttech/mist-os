@@ -12,6 +12,8 @@
 #include <lib/syslog/cpp/macros.h>
 #include <lib/ui/scenic/cpp/view_creation_tokens.h>
 
+#include <cstdint>
+
 #include <src/ui/testing/util/zxtest_helpers.h>
 #include <src/ui/tests/conformance_input_tests/conformance-test-base.h>
 #include <zxtest/zxtest.h>
@@ -81,9 +83,13 @@ class MouseConformanceTest : public ui_conformance_test_base::ConformanceTest,
       auto [client_end, server_end] = fidl::Endpoints<futi::Mouse>::Create();
       fake_mouse_ = fidl::SyncClient(std::move(client_end));
 
-      futi::RegistryRegisterMouseRequest request;
+      futi::RegistryRegisterMouseAndGetDeviceInfoRequest request;
       request.device(std::move(server_end));
-      ZX_ASSERT_OK(input_registry->RegisterMouse(std::move(request)));
+
+      auto res = input_registry->RegisterMouseAndGetDeviceInfo(std::move(request));
+      ZX_ASSERT_OK(res);
+
+      fake_mouse_device_id_ = res->device_id().value();
     }
 
     // Get display dimensions.
@@ -173,6 +179,7 @@ class MouseConformanceTest : public ui_conformance_test_base::ConformanceTest,
       ASSERT_TRUE(e.buttons().has_value());
       EXPECT_EQ(expected_buttons, e.buttons().value());
     }
+    EXPECT_EQ(fake_mouse_device_id_, e.device_id().value());
   }
 
  protected:
@@ -182,6 +189,7 @@ class MouseConformanceTest : public ui_conformance_test_base::ConformanceTest,
   fidl::SyncClient<futc::PuppetFactory> puppet_factory_;
 
   fidl::SyncClient<futi::Mouse> fake_mouse_;
+  uint32_t fake_mouse_device_id_ = 0;
   MousePuppet puppet_;
   uint32_t display_width_ = 0;
   uint32_t display_height_ = 0;

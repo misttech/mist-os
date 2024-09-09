@@ -275,7 +275,7 @@ at [`//examples/fidl/cpp/server/wire`][cpp-wire-server-src].
 [products]: /docs/development/build/build_system/boards_and_products.md
 [protocol-open]: /docs/concepts/components/v2/capabilities/life_of_a_protocol_open.md#binding_to_a_component_and_sending_a_protocol_channel
 [compiling-fidl]: /docs/development/languages/fidl/tutorials/fidl.md
-[async-loop]: /zircon/system/ulib/async-loop/include/lib/async-loop/cpp/loop.h
+[async-loop]: /sdk/lib/async-loop/include/lib/async-loop/cpp/loop.h
 [overview]: /docs/development/languages/fidl/tutorials/overview.md
 [concepts]: /docs/concepts/fidl/overview.md
 [responding-asynchronously]: /docs/development/languages/fidl/tutorials/cpp/topics/async-completer.md

@@ -275,6 +275,10 @@ group("non_hermetic_deps") {
 # See: https://fuchsia.dev/fuchsia-src/contribute/open_projects/build/zx_wrappers_deprecation
 group("deprecated_zx_wrapper_allowlist") {
   visibility = [
+    "//sdk/lib/async:*",
+    "//sdk/lib/async-default:*",
+    "//sdk/lib/async-loop:*",
+    "//sdk/lib/async-testing:*",
     "//sdk/lib/fdio:*",
     "//sdk/lib/fit:*",
     "//sdk/lib/fit-promise:*",
@@ -338,10 +342,6 @@ group("deprecated_zx_wrapper_allowlist") {
     "//zircon/kernel/phys/lib/memalloc:*",
     "//zircon/system/ulib/abs_clock:*",
     "//zircon/system/ulib/affine:*",
-    "//zircon/system/ulib/async:*",
-    "//zircon/system/ulib/async-default:*",
-    "//zircon/system/ulib/async-loop:*",
-    "//zircon/system/ulib/async-testing:*",
     "//zircon/system/ulib/bitmap:*",
     "//zircon/system/ulib/closure-queue:*",
     "//zircon/system/ulib/cmdline:*",

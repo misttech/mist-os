@@ -7,6 +7,7 @@
 
 #include <fidl/fuchsia.audio.device/cpp/common_types.h>
 #include <fidl/fuchsia.audio.device/cpp/natural_types.h>
+#include <lib/fidl/cpp/wire/unknown_interaction_handler.h>
 
 #include <memory>
 #include <optional>
@@ -116,6 +117,11 @@ class AudioDeviceRegistryServerTestBase : public gtest::TestLoopFixture {
       LogFidlClientError(error, "Provider");
       parent()->provider_fidl_error_status_ = error.status();
     }
+    void handle_unknown_event(
+        fidl::UnknownEventMetadata<fuchsia_audio_device::Provider> metadata) override {
+      FX_LOGS(WARNING) << "ProviderFidlHandler: unknown method (Provider) ordinal "
+                       << metadata.event_ordinal;
+    }
   };
   std::optional<zx_status_t>& provider_fidl_error_status() { return provider_fidl_error_status_; }
 
@@ -137,6 +143,11 @@ class AudioDeviceRegistryServerTestBase : public gtest::TestLoopFixture {
       LogFidlClientError(error, "Registry");
       parent()->registry_fidl_error_status_ = error.status();
     }
+    void handle_unknown_event(
+        fidl::UnknownEventMetadata<fuchsia_audio_device::Registry> metadata) override {
+      FX_LOGS(WARNING) << "RegistryFidlHandler: unknown method (Registry) ordinal "
+                       << metadata.event_ordinal;
+    }
   };
   std::optional<zx_status_t>& registry_fidl_error_status() { return registry_fidl_error_status_; }
 
@@ -150,6 +161,11 @@ class AudioDeviceRegistryServerTestBase : public gtest::TestLoopFixture {
     void on_fidl_error(fidl::UnbindInfo error) override {
       LogFidlClientError(error, "ControlCreator");
       parent()->control_creator_fidl_error_status_ = error.status();
+    }
+    void handle_unknown_event(
+        fidl::UnknownEventMetadata<fuchsia_audio_device::ControlCreator> metadata) override {
+      FX_LOGS(WARNING) << "ControlCreatorFidlHandler: unknown method (ControlCreator) ordinal "
+                       << metadata.event_ordinal;
     }
   };
   std::unique_ptr<TestServerAndNaturalAsyncClient<ControlCreatorServer>>
@@ -187,7 +203,9 @@ class AudioDeviceRegistryServerTestBase : public gtest::TestLoopFixture {
       LogFidlClientError(error, "Observer");
       parent()->observer_fidl_error_status_ = error.status();
     }
-    void handle_unknown_event(fidl::UnknownEventMetadata<fuchsia_audio_device::Observer>) override {
+    void handle_unknown_event(
+        fidl::UnknownEventMetadata<fuchsia_audio_device::Observer> metadata) override {
+      FAIL() << "ObserverFidlHandler: unknown event (Observer) ordinal " << metadata.event_ordinal;
     }
   };
   const std::unique_ptr<ObserverFidlHandler>& observer_fidl_handler() {
@@ -215,7 +233,10 @@ class AudioDeviceRegistryServerTestBase : public gtest::TestLoopFixture {
       LogFidlClientError(error, "Control");
       parent()->control_fidl_error_status_ = error.status();
     }
-    void handle_unknown_event(fidl::UnknownEventMetadata<fuchsia_audio_device::Control>) override {}
+    void handle_unknown_event(
+        fidl::UnknownEventMetadata<fuchsia_audio_device::Control> metadata) override {
+      FAIL() << "ControlFidlHandler: unknown event (Control) ordinal " << metadata.event_ordinal;
+    }
   };
   const std::unique_ptr<ControlFidlHandler>& control_fidl_handler() {
     return control_fidl_handler_;
@@ -232,6 +253,11 @@ class AudioDeviceRegistryServerTestBase : public gtest::TestLoopFixture {
     void on_fidl_error(fidl::UnbindInfo error) override {
       LogFidlClientError(error, "RingBuffer");
       parent()->ring_buffer_fidl_error_status_ = error.status();
+    }
+    void handle_unknown_event(
+        fidl::UnknownEventMetadata<fuchsia_audio_device::RingBuffer> metadata) override {
+      FX_LOGS(WARNING) << "RingBufferFidlHandler: unknown method (RingBuffer) ordinal "
+                       << metadata.event_ordinal;
     }
   };
   const std::unique_ptr<RingBufferFidlHandler>& ring_buffer_fidl_handler() {

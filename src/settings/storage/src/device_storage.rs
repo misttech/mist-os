@@ -66,6 +66,8 @@ struct CachedStorage {
     stash_proxy: StoreAccessorProxy,
 }
 
+/// Structs that can be stored in device storage
+///
 /// Structs that can be stored in device storage should derive the Serialize, Deserialize, and
 /// Clone traits, as well as provide constants.
 /// KEY should be unique the struct, usually the name of the struct itself.
@@ -102,6 +104,8 @@ pub trait DeviceStorageCompatible:
     const KEY: &'static str;
 }
 
+/// Types that can be converted into a storable type.
+///
 /// This trait represents types that can be converted into a storable type. It's also important
 /// that the type it is transformed into can also be converted back into this type. This reverse
 /// conversion is used to populate the fields of the original type with the stored values plus

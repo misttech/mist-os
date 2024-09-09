@@ -30,7 +30,6 @@ fuchsia_driver("qemu-arm64-driver") {
     "qemu-bus.cc",
     "qemu-kpci.cc",
     "qemu-rtc.cc",
-    "qemu-sysmem.cc",
   ]
   deps = [
     ":qemu-arm64_bind",

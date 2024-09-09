@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 import("//build/components/fuchsia_unittest_package.gni")
+import("//build/testing/cc_test_executable.gni")
 
 group("numerics") {
   public_deps = [ ":rational" ]
@@ -19,7 +20,7 @@ source_set("rational") {
   public = [ "rational.h" ]
 }
 
-executable("numerics-unittest-bin") {
+cc_test_executable("numerics-unittest-bin") {
   visibility = [ ":*" ]
   testonly = true
   sources = [ "numerics-unittest.cc" ]

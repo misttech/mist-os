@@ -38,6 +38,7 @@ rustc_library("fuchsia-async") {
     "src/runtime/stub.rs",
     "src/runtime/task_group.rs",
     "src/test_support.rs",
+    "src/waker_list.rs",
   ]
   test_deps = [ "//third_party/rust_crates:futures-test" ]
   if (is_fuchsia || is_mistos) {
@@ -102,6 +103,7 @@ rustc_library("fuchsia-async") {
       "src/handle/emulated/socket.rs",
       "src/net/portable/mod.rs",
       "src/runtime/portable.rs",
+      "src/runtime/portable/scope.rs",
     ]
   }
 }

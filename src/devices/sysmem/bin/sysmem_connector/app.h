@@ -7,7 +7,7 @@
 
 #include <memory>
 
-#include "src/devices/sysmem/drivers/sysmem/device.h"
+#include "src/devices/sysmem/drivers/sysmem/sysmem.h"
 #include "src/lib/fxl/macros.h"
 
 class App {
@@ -18,7 +18,7 @@ class App {
  private:
   async_dispatcher_t* dispatcher_ = nullptr;
 
-  std::unique_ptr<sysmem_service::Device> device_;
+  std::unique_ptr<sysmem_service::Sysmem> device_;
 
   FXL_DISALLOW_COPY_AND_ASSIGN(App);
 };

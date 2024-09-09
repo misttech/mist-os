@@ -34,10 +34,10 @@ StorageBufferPool::StorageBufferPool(BcacheMapper *bcache_mapper, size_t default
       bcache_mapper_(bcache_mapper) {
   ZX_ASSERT(num_pager_threads > 0);
   for (size_t i = 0; i < num_buffers_; ++i) {
-    std::string str = "StorgaeBuffer_" + std::to_string(buffer_size_) + "_" + std::to_string(i);
+    std::string str = "StorageBuffer_" + std::to_string(buffer_size_) + "_" + std::to_string(i);
     buffers(buffer_size_)
         .push_back(std::make_unique<StorageBuffer>(bcache_mapper, buffer_size_, str));
-    str = "StorgaeBuffer_" + std::to_string(large_buffer_size_) + "_" + std::to_string(i);
+    str = "StorageBuffer_" + std::to_string(large_buffer_size_) + "_" + std::to_string(i);
     buffers(large_buffer_size_)
         .push_back(std::make_unique<StorageBuffer>(bcache_mapper, large_buffer_size_, str));
   }

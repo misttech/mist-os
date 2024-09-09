@@ -1120,9 +1120,13 @@ mod tests {
             let ns = ns.remove(1);
             assert_eq!(ns.path.to_string(), "/svc");
             let svc_dir = ns.directory.into_proxy().unwrap();
-            fuchsia_fs::directory::open_directory(&svc_dir, "foo.bar", fio::OpenFlags::empty())
-                .await
-                .unwrap();
+            fuchsia_fs::directory::open_directory_deprecated(
+                &svc_dir,
+                "foo.bar",
+                fio::OpenFlags::empty(),
+            )
+            .await
+            .unwrap();
         }
 
         let targets = &[fsys::RouteTarget {

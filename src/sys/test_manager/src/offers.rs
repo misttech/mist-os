@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::constants::{HERMETIC_RESOLVER_REALM_NAME, TEST_ROOT_COLLECTION, WRAPPER_REALM_NAME};
-use anyhow::{format_err, Error};
+use anyhow::Error;
 use fuchsia_component_test::error::Error as RealmBuilderError;
 use fuchsia_component_test::{Capability, RealmBuilder, Ref, Route, SubRealmBuilder};
 use {fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_component_test as ftest};
@@ -45,12 +45,20 @@ pub(crate) fn map_offers(offers: Vec<fdecl::Offer>) -> Result<Vec<ftest::Capabil
             }) => {
                 capabilities.push(Capability::event_stream(target_name.clone()).into());
             }
-            fdecl::Offer::Service(fdecl::OfferService { .. })
-            | fdecl::Offer::Runner(fdecl::OfferRunner { .. })
-            | fdecl::Offer::Resolver(fdecl::OfferResolver { .. }) => {
-                return Err(format_err!(
-                    "Services, runners, and resolvers are not supported by realm builder"
-                ));
+            fdecl::Offer::Service(fdecl::OfferService {
+                target_name: Some(target_name), ..
+            }) => {
+                capabilities.push(
+                    Capability::service_by_name(target_name).availability_same_as_target().into(),
+                );
+            }
+            fdecl::Offer::Runner(fdecl::OfferRunner { target_name: Some(target_name), .. }) => {
+                capabilities.push(Capability::runner(target_name).into());
+            }
+            fdecl::Offer::Resolver(fdecl::OfferResolver {
+                target_name: Some(target_name), ..
+            }) => {
+                capabilities.push(Capability::resolver(target_name).into());
             }
             _ => {
                 // Ignore anything else that is routed to the test collection

@@ -22,6 +22,7 @@
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gap/low_energy_connection_manager.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gap/low_energy_discovery_manager.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gap/peer.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci-spec/constants.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci-spec/util.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci-spec/vendor_protocol.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci/android_extended_low_energy_advertiser.h"
@@ -1201,17 +1202,17 @@ void AdapterImpl::InitializeStep2() {
         hci::EmbossCommandPacket::New<
             pw::bluetooth::emboss::LEReadBufferSizeCommandV1View>(
             hci_spec::kLEReadBufferSizeV1),
-        [this](const hci::EventPacket& cmd_complete) {
+        [this](const hci::EmbossEventPacket& cmd_complete) {
           if (hci_is_error(
                   cmd_complete, WARN, "gap", "LE read buffer size failed")) {
             return;
           }
           auto params =
               cmd_complete
-                  .return_params<hci_spec::LEReadBufferSizeV1ReturnParams>();
-          uint16_t mtu = pw::bytes::ConvertOrderFrom(
-              cpp20::endian::little, params->hc_le_acl_data_packet_length);
-          uint8_t max_count = params->hc_total_num_le_acl_data_packets;
+                  .view<pw::bluetooth::emboss::
+                            LEReadBufferSizeV1CommandCompleteEventView>();
+          uint16_t mtu = params.le_acl_data_packet_length().Read();
+          uint8_t max_count = params.total_num_le_acl_data_packets().Read();
           if (mtu && max_count) {
             state_.low_energy_state.acl_data_buffer_info_ =
                 hci::DataBufferInfo(mtu, max_count);
@@ -1320,6 +1321,30 @@ void AdapterImpl::InitializeStep3() {
     bt_log(ERROR, "gap", "Failed to initialize ACLDataChannel (step 3)");
     CompleteInitialization(/*success=*/false);
     return;
+  }
+
+  if (!state_.low_energy_state.IsFeatureSupported(
+          hci_spec::LESupportedFeature::
+              kConnectedIsochronousStreamPeripheral)) {
+    bt_log(INFO, "gap", "CIS Peripheral is not supported");
+  } else {
+    bt_log(INFO,
+           "gap",
+           "Connected Isochronous Stream Peripheral is supported. "
+           "Enabling ConnectedIsochronousStream (Host Support)");
+    auto cmd_packet = hci::EmbossCommandPacket::New<
+        pw::bluetooth::emboss::LESetHostFeatureCommandWriter>(
+        hci_spec::kLESetHostFeature);
+    auto params = cmd_packet.view_t();
+    params.bit_number().Write(
+        static_cast<uint8_t>(hci_spec::LESupportedFeatureBitPos::
+                                 kConnectedIsochronousStreamHostSupport));
+    params.bit_value().Write(pw::bluetooth::emboss::GenericEnableParam::ENABLE);
+    init_seq_runner_->QueueCommand(
+        std::move(cmd_packet), [](const hci::EventPacket& event) {
+          hci_is_error(
+              event, WARN, "gap", "Set Host Feature (ISO support) failed");
+        });
   }
 
   // The controller may not support SCO flow control (as implied by not

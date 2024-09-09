@@ -5,7 +5,6 @@
 use chrono::NaiveDateTime;
 use fuchsia_bluetooth::types::Uuid;
 use packet_encoding::{decodable_enum, Decodable, Encodable};
-use std::collections::HashMap;
 use tracing::trace;
 
 pub use self::header_set::HeaderSet;
@@ -161,8 +160,8 @@ impl TagLengthValue {
     /// Minimum data length of a single triplet includes the tag and length byte.
     const MIN_TRIPLET_LENGTH_BYTES: usize = 2;
 
-    pub fn map(&self) -> HashMap<u8, Vec<u8>> {
-        self.0.iter().cloned().collect()
+    pub fn iter(&self) -> std::slice::Iter<'_, (u8, Vec<u8>)> {
+        self.0.iter()
     }
 }
 

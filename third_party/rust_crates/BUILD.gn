@@ -93,6 +93,10 @@ if (!(current_os == "fuchsia" || current_os == "mistos")) {
   }
 }
 
+group("async-ringbuf") {
+  public_deps = [ ":async-ringbuf-v0_3_1" ]
+}
+
 group("async-stream") {
   public_deps = [ ":async-stream-v0_3_5" ]
 }
@@ -516,6 +520,10 @@ group("mockall") {
   public_deps = [ ":mockall-v0_9_0" ]
 }
 
+group("munge") {
+  public_deps = [ ":munge-v0_4_1" ]
+}
+
 import("//src/lib/fuchsia_nix/nix_visibility.gni")
 
 group("nix") {
@@ -657,7 +665,7 @@ if (!(current_os == "fuchsia" || current_os == "mistos")) {
 }
 
 group("proptest") {
-  public_deps = [ ":proptest-v1_4_0" ]
+  public_deps = [ ":proptest-v1_5_0" ]
 }
 
 group("proptest-derive") {
@@ -710,6 +718,10 @@ group("regex") {
 
 group("regex-syntax") {
   public_deps = [ ":regex-syntax-v0_8_3" ]
+}
+
+group("rend") {
+  public_deps = [ ":rend-v0_5_0-pre6" ]
 }
 
 group("ring") {
@@ -924,16 +936,12 @@ group("structopt") {
   public_deps = [ ":structopt-v0_2_14" ]
 }
 
-if (!(current_os == "fuchsia" || current_os == "mistos")) {
-  group("strum") {
-    public_deps = [ ":strum-v0_25_0" ]
-  }
+group("strum") {
+  public_deps = [ ":strum-v0_25_0" ]
 }
 
-if (!(current_os == "fuchsia" || current_os == "mistos")) {
-  group("strum_macros") {
-    public_deps = [ ":strum_macros-v0_25_3($host_toolchain)" ]
-  }
+group("strum_macros") {
+  public_deps = [ ":strum_macros-v0_25_3($host_toolchain)" ]
 }
 
 if (!(current_os == "fuchsia" || current_os == "mistos")) {
@@ -2025,6 +2033,41 @@ rust_library("async-net-v1_7_0") {
   applicable_licenses = [ ":async-net-v1_7_0.license" ]
 }
 
+license("async-ringbuf-v0_3_1.license") {
+  public_package_name = "async_ringbuf"
+  license_files = [
+    "//third_party/rust_crates/vendor/async-ringbuf-0.3.1/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/async-ringbuf-0.3.1/LICENSE-MIT",
+  ]
+}
+
+rust_library("async-ringbuf-v0_3_1") {
+  crate_name = "async_ringbuf"
+  crate_root = "//third_party/rust_crates/vendor/async-ringbuf-0.3.1/src/lib.rs"
+  output_name = "async_ringbuf-1fe58b18451ee650"
+  configs -= [ "//build/config/rust:2018_idioms" ]
+
+  deps = []
+  deps += [ ":futures-v0_3_30" ]
+  deps += [ ":ringbuf-v0_4_4" ]
+
+  rustenv = []
+
+  rustflags = [
+    "--cap-lints=allow",
+    "--edition=2021",
+    "-Cmetadata=1fe58b18451ee650",
+    "-Cextra-filename=-1fe58b18451ee650",
+    "--cfg=feature=\"alloc\"",
+    "--cfg=feature=\"default\"",
+    "--cfg=feature=\"std\"",
+  ]
+
+  visibility = [ ":*" ]
+
+  applicable_licenses = [ ":async-ringbuf-v0_3_1.license" ]
+}
+
 license("async-stream-v0_3_5.license") {
   public_package_name = "async_stream"
   license_files =
@@ -2802,7 +2845,7 @@ rust_library("camino-v1_1_1") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":proptest-v1_4_0" ]
+  deps += [ ":proptest-v1_5_0" ]
   deps += [ ":serde-v1_0_204" ]
 
   rustenv = []
@@ -8464,6 +8507,65 @@ rust_library("multimap-v0_8_3") {
   applicable_licenses = [ ":multimap-v0_8_3.license" ]
 }
 
+license("munge-v0_4_1.license") {
+  public_package_name = "munge"
+  license_files = [ "//third_party/rust_crates/vendor/munge-0.4.1/LICENSE" ]
+}
+
+rust_library("munge-v0_4_1") {
+  crate_name = "munge"
+  crate_root = "//third_party/rust_crates/vendor/munge-0.4.1/src/lib.rs"
+  output_name = "munge-74906358e355fb86"
+  configs -= [ "//build/config/rust:2018_idioms" ]
+
+  deps = []
+  deps += [ ":munge_macro-v0_4_1($host_toolchain)" ]
+
+  rustenv = []
+
+  rustflags = [
+    "--cap-lints=allow",
+    "--edition=2021",
+    "-Cmetadata=74906358e355fb86",
+    "-Cextra-filename=-74906358e355fb86",
+  ]
+
+  visibility = [ ":*" ]
+
+  applicable_licenses = [ ":munge-v0_4_1.license" ]
+}
+
+license("munge_macro-v0_4_1.license") {
+  public_package_name = "munge_macro"
+  license_files =
+      [ "//third_party/rust_crates/vendor/munge_macro-0.4.1/LICENSE" ]
+}
+
+rust_proc_macro("munge_macro-v0_4_1") {
+  crate_name = "munge_macro"
+  crate_root = "//third_party/rust_crates/vendor/munge_macro-0.4.1/src/lib.rs"
+  output_name = "munge_macro-2c8cbd7a937e6983"
+  configs -= [ "//build/config/rust:2018_idioms" ]
+
+  deps = []
+  deps += [ ":proc-macro2-v1_0_86" ]
+  deps += [ ":quote-v1_0_35" ]
+  deps += [ ":syn-v2_0_69" ]
+
+  rustenv = []
+
+  rustflags = [
+    "--cap-lints=allow",
+    "--edition=2021",
+    "-Cmetadata=2c8cbd7a937e6983",
+    "-Cextra-filename=-2c8cbd7a937e6983",
+  ]
+
+  visibility = [ ":*" ]
+
+  applicable_licenses = [ ":munge_macro-v0_4_1.license" ]
+}
+
 license("nix-v0_26_2.license") {
   public_package_name = "nix"
   license_files = [ "//third_party/rust_crates/vendor/nix-0.26.2/LICENSE" ]
@@ -10792,18 +10894,18 @@ rust_proc_macro("proc-macro-error-attr-v1_0_4") {
   applicable_licenses = [ ":proc-macro-error-attr-v1_0_4.license" ]
 }
 
-license("proptest-v1_4_0.license") {
+license("proptest-v1_5_0.license") {
   public_package_name = "proptest"
   license_files = [
-    "//third_party/rust_crates/vendor/proptest-1.4.0/LICENSE-APACHE",
-    "//third_party/rust_crates/vendor/proptest-1.4.0/LICENSE-MIT",
+    "//third_party/rust_crates/vendor/proptest-1.5.0/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/proptest-1.5.0/LICENSE-MIT",
   ]
 }
 
-rust_library("proptest-v1_4_0") {
+rust_library("proptest-v1_5_0") {
   crate_name = "proptest"
-  crate_root = "//third_party/rust_crates/vendor/proptest-1.4.0/src/lib.rs"
-  output_name = "proptest-60c7a54e1a2dc821"
+  crate_root = "//third_party/rust_crates/vendor/proptest-1.5.0/src/lib.rs"
+  output_name = "proptest-7bbe8284cc55184d"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
@@ -10825,8 +10927,8 @@ rust_library("proptest-v1_4_0") {
   rustflags = [
     "--cap-lints=allow",
     "--edition=2018",
-    "-Cmetadata=60c7a54e1a2dc821",
-    "-Cextra-filename=-60c7a54e1a2dc821",
+    "-Cmetadata=7bbe8284cc55184d",
+    "-Cextra-filename=-7bbe8284cc55184d",
     "--cfg=feature=\"bit-set\"",
     "--cfg=feature=\"default\"",
     "--cfg=feature=\"fork\"",
@@ -10840,7 +10942,7 @@ rust_library("proptest-v1_4_0") {
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":proptest-v1_4_0.license" ]
+  applicable_licenses = [ ":proptest-v1_5_0.license" ]
 }
 
 license("proptest-derive-v0_3_0.license") {
@@ -12211,6 +12313,34 @@ rust_library("remove_dir_all-v0_5_1") {
   applicable_licenses = [ ":remove_dir_all-v0_5_1.license" ]
 }
 
+license("rend-v0_5_0-pre6.license") {
+  public_package_name = "rend"
+  license_files = [ "//third_party/rust_crates/vendor/rend-0.5.0-pre6/LICENSE" ]
+}
+
+rust_library("rend-v0_5_0-pre6") {
+  crate_name = "rend"
+  crate_root = "//third_party/rust_crates/vendor/rend-0.5.0-pre6/src/lib.rs"
+  output_name = "rend-929feff604f4cad"
+  configs -= [ "//build/config/rust:2018_idioms" ]
+
+  deps = []
+
+  rustenv = []
+
+  rustflags = [
+    "--cap-lints=allow",
+    "--edition=2021",
+    "-Cmetadata=929feff604f4cad",
+    "-Cextra-filename=-929feff604f4cad",
+    "--cfg=feature=\"default\"",
+  ]
+
+  visibility = [ ":*" ]
+
+  applicable_licenses = [ ":rend-v0_5_0-pre6.license" ]
+}
+
 license("rfc6979-v0_3_1.license") {
   public_package_name = "rfc6979"
   license_files = [
@@ -12319,6 +12449,40 @@ rust_library("ring-v0_16_20") {
   visibility += [ ":webpki-v0_21_0.rustdoc.transdeps" ]
 
   applicable_licenses = [ ":ring-v0_16_20.license" ]
+}
+
+license("ringbuf-v0_4_4.license") {
+  public_package_name = "ringbuf"
+  license_files = [
+    "//third_party/rust_crates/vendor/ringbuf-0.4.4/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/ringbuf-0.4.4/LICENSE-MIT",
+  ]
+}
+
+rust_library("ringbuf-v0_4_4") {
+  crate_name = "ringbuf"
+  crate_root = "//third_party/rust_crates/vendor/ringbuf-0.4.4/src/lib.rs"
+  output_name = "ringbuf-7d6059660fb2ecdc"
+  configs -= [ "//build/config/rust:2018_idioms" ]
+
+  deps = []
+  deps += [ ":crossbeam-utils-v0_8_14" ]
+
+  rustenv = []
+
+  rustflags = [
+    "--cap-lints=allow",
+    "--edition=2021",
+    "-Cmetadata=7d6059660fb2ecdc",
+    "-Cextra-filename=-7d6059660fb2ecdc",
+    "--cfg=feature=\"alloc\"",
+    "--cfg=feature=\"default\"",
+    "--cfg=feature=\"std\"",
+  ]
+
+  visibility = [ ":*" ]
+
+  applicable_licenses = [ ":ringbuf-v0_4_4.license" ]
 }
 
 license("rust_icu_common-v5_0_0.license") {

@@ -23,6 +23,7 @@ pub fn board_input_bundle(args: BoardInputBundleArgs) -> Result<()> {
         drivers,
         base_packages,
         bootfs_packages,
+        energy_model_config,
         kernel_boot_args,
         power_manager_config,
         system_power_mode_config,
@@ -75,6 +76,13 @@ pub fn board_input_bundle(args: BoardInputBundleArgs) -> Result<()> {
     // Copy the configuration files provided, if any
     let cpu_manager_config =
         copy_optional_config_file(&cpu_manager_config, "cpu_manager.json5", &config_files_dir)?;
+
+    let energy_model_config = copy_optional_config_file(
+        &energy_model_config,
+        "energy_model_config.json",
+        &config_files_dir,
+    )?;
+
     let power_manager_config =
         copy_optional_config_file(&power_manager_config, "power_manager.json5", &config_files_dir)?;
     let system_power_mode_config = copy_optional_config_file(
@@ -164,6 +172,7 @@ pub fn board_input_bundle(args: BoardInputBundleArgs) -> Result<()> {
         packages,
         kernel_boot_args: kernel_boot_args.into_iter().collect(),
         configuration: if cpu_manager_config.is_some()
+            || energy_model_config.is_some()
             || power_manager_config.is_some()
             || power_metrics_recorder_config.is_some()
             || system_power_mode_config.is_some()
@@ -173,6 +182,7 @@ pub fn board_input_bundle(args: BoardInputBundleArgs) -> Result<()> {
         {
             Some(BoardProvidedConfig {
                 cpu_manager: cpu_manager_config,
+                energy_model: energy_model_config,
                 power_manager: power_manager_config,
                 power_metrics_recorder: power_metrics_recorder_config,
                 system_power_mode: system_power_mode_config,

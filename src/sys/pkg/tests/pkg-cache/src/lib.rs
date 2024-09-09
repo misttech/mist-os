@@ -836,7 +836,7 @@ where
                 .root
                 .connect_to_protocol_at_exposed_dir::<fpkg::RetainedPackagesMarker>()
                 .expect("connect to retained packages"),
-            pkgfs: fuchsia_fs::directory::open_directory_no_describe(
+            pkgfs: fuchsia_fs::directory::open_directory_no_describe_deprecated(
                 realm_instance.root.get_exposed_dir(),
                 "pkgfs",
                 fio::OpenFlags::RIGHT_READABLE
@@ -985,7 +985,7 @@ impl<B: Blobfs> TestEnv<B> {
     /// This proxy is not stored in Proxies because the directory is not served when there is no
     /// system_image package.
     async fn system_dir(&self) -> fio::DirectoryProxy {
-        fuchsia_fs::directory::open_directory(
+        fuchsia_fs::directory::open_directory_deprecated(
             self.apps.realm_instance.root.get_exposed_dir(),
             "system",
             fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,

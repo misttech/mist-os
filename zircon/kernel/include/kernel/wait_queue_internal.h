@@ -51,7 +51,7 @@ inline zx_status_t WaitQueue::BlockEtcPreamble(Thread* const current_thread,
                                                const Deadline& deadline, uint signal_mask,
                                                ResourceOwnership reason,
                                                Interruptible interruptible)
-    TA_REQ(lock_, GetThreadsLock(current_thread)) {
+    TA_REQ(get_lock(), current_thread->get_lock()) {
   DEBUG_ASSERT(current_thread == Thread::Current::Get());
 
   if (deadline.when() != ZX_TIME_INFINITE && deadline.when() <= current_time()) {
@@ -83,7 +83,7 @@ inline zx_status_t WaitQueue::BlockEtcPreamble(Thread* const current_thread,
 
 inline zx_status_t WaitQueue::BlockEtcPostamble(Thread* const current_thread,
                                                 const Deadline& deadline)
-    TA_REQ(current_thread->get_lock()) TA_EXCL(lock_) {
+    TA_REQ(current_thread->get_lock()) TA_EXCL(get_lock()) {
   DEBUG_ASSERT(current_thread == Thread::Current::Get());
   Timer timer;
 

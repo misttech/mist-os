@@ -30,11 +30,4 @@ fit::result<std::string, std::vector<fuchsia::virtualization::BlockSpec>> GetBlo
 
 void DropDevNamespace();
 
-enum class VolumeAction {
-  KEEP,
-  REMOVE,
-};
-zx::result<> WipeStatefulPartition(size_t bytes_to_zero, uint8_t value = 0,
-                                   VolumeAction = VolumeAction::REMOVE);
-
 #endif  // SRC_VIRTUALIZATION_BIN_TERMINA_GUEST_MANAGER_BLOCK_DEVICES_H_

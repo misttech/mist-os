@@ -149,7 +149,7 @@ impl Archivist {
         }
 
         // TODO(https://fxbug.dev/324494668): remove this when Netstack2 is gone.
-        if let Ok(dir) = fuchsia_fs::directory::open_in_namespace(
+        if let Ok(dir) = fuchsia_fs::directory::open_in_namespace_deprecated(
             "/netstack-diagnostics",
             fuchsia_fs::OpenFlags::RIGHT_READABLE,
         ) {
@@ -404,6 +404,7 @@ mod tests {
             bind_services: vec![],
             allow_serial_logs: vec![],
             deny_serial_log_tags: vec![],
+            component_initial_interests: vec![],
             per_component_batch_timeout_seconds: -1,
         };
 

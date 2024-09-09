@@ -101,7 +101,7 @@ Behind some build-time flag(s) the following code will need to be updated:
 *   `//zircon/system/host/fidl/lib/flat_ast.cpp` (update `StringType::Shape`)
 *   `//zircon/system/host/fidl/lib/c_generator.cpp` (update
     `EmitLinerarizeMessage`, `ProduceInterfaceClientImplementation`, etc)
-*   `//sdk/lib/fidl/cpp/string.cc`
+*   `//sdk/lib/fidl/hlcpp/string.cc`
 *   `//garnet/public/lib/fidl/rust/fidl/src/encoding.rs`
 *   `//third_party/go/src/syscall/zx/fidl/encoding.go` (update `marshalString`,
     `unmarshalString`)

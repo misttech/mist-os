@@ -32,9 +32,6 @@ typedef struct {
   fdf::WireSyncClient<fuchsia_hardware_platform_bus::PlatformBus> client;
 } machina_board_t;
 
-// machina-sysmem.c
-zx_status_t machina_sysmem_init(machina_board_t *bus);
-
 }  // namespace machina
 
 #endif  // SRC_DEVICES_BOARD_DRIVERS_MACHINA_MACHINA_H_

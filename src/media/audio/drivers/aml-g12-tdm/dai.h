@@ -12,6 +12,7 @@
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/async/cpp/task.h>
+#include <lib/ddk/debug.h>
 #include <lib/device-protocol/pdev-fidl.h>
 #include <lib/fidl/cpp/binding.h>
 #include <lib/fzl/pinned-vmo.h>
@@ -84,7 +85,9 @@ class AmlG12TdmDai : public AmlG12TdmDaiDeviceType,
                          SetActiveChannelsCallback callback) override {
     callback(fpromise::error(ZX_ERR_NOT_SUPPORTED));
   }
-  void handle_unknown_method(uint64_t ordinal, bool method_has_response) override {}
+  void handle_unknown_method(uint64_t ordinal, bool method_has_response) override {
+    zxlogf(ERROR, "AmlG12TdmDai unknown method with ordinal %zd", ordinal);
+  }
 
   zx_status_t InitBuffer(size_t size);
   void ProcessRingNotification();

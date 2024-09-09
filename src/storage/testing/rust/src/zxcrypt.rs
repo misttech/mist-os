@@ -45,7 +45,7 @@ pub async fn set_up_insecure_zxcrypt(
     zx::ok(zxcrypt.unseal(&[0u8; 32], 0).await.context("zxcrypt unseal fidl failure")?)
         .context("zxcrypt unseal returned error")?;
 
-    let zxcrypt_dir = fuchsia_fs::directory::open_directory_no_describe(
+    let zxcrypt_dir = fuchsia_fs::directory::open_directory_no_describe_deprecated(
         block_device,
         ZXCRYPT_DEVICE_NAME,
         fio::OpenFlags::empty(),

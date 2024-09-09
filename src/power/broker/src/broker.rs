@@ -12,6 +12,7 @@ use fidl_fuchsia_power_broker::{
 use fuchsia_inspect::{InspectType as IType, Node as INode};
 use futures::channel::mpsc::{unbounded, UnboundedReceiver, UnboundedSender};
 use itertools::Itertools;
+use std::borrow::Cow;
 use std::cmp::max;
 use std::collections::{HashMap, HashSet};
 use std::fmt::{self, Debug};
@@ -24,7 +25,7 @@ use crate::fpb::PowerLevel;
 use crate::topology::*;
 
 /// Max value for inspect event history.
-const INSPECT_GRAPH_EVENT_BUFFER_SIZE: usize = 512;
+const INSPECT_GRAPH_EVENT_BUFFER_SIZE: usize = 8192;
 
 // Below are a series of type aliases for convenience
 type LevelHangingGet<T> =
@@ -105,6 +106,7 @@ pub struct Broker {
     in_transition: HashMap<ElementID, IndexedPowerLevel>,
     // The level for each element required by the topology.
     required: HashMap<ElementID, LevelAdmin<RequiredLevelWatchResponder>>,
+    lease_counter: HashMap<ElementID, HashMap<PowerLevel, i64>>,
     _inspect_node: INode,
 }
 
@@ -116,8 +118,13 @@ impl Broker {
             current: HashMap::new(),
             in_transition: HashMap::new(),
             required: HashMap::new(),
+            lease_counter: HashMap::new(),
             _inspect_node: inspect,
         }
+    }
+
+    pub fn lookup_name(&self, element_id: &ElementID) -> Cow<'_, str> {
+        self.catalog.topology.element_name(&element_id)
     }
 
     fn lookup_credentials(&self, token: &Token) -> Option<Credential> {
@@ -454,6 +461,12 @@ impl Broker {
         if let Some(elem_inspect) = self.catalog.topology.inspect_for_element(element_id) {
             elem_inspect.borrow_mut().meta().set("current_level", level.level);
         }
+
+        fuchsia_trace::counter!(
+            c"power-broker", c"current_level", 0,
+            &self.lookup_name(&element_id) => level.level as u32
+        );
+
         if let Some(transit_level) = self.in_transition.get(element_id) {
             if *transit_level == level {
                 tracing::debug!(
@@ -510,7 +523,29 @@ impl Broker {
         if let Some(elem_inspect) = self.catalog.topology.inspect_for_element(element_id) {
             elem_inspect.borrow_mut().meta().set("required_level", level.level);
         }
+        fuchsia_trace::counter!(
+            c"power-broker", c"required_level", 0,
+            &self.lookup_name(&element_id) => level.level as u32
+        );
+
         previous
+    }
+
+    fn adjust_lease_counter(&mut self, element_id: &ElementID, level: PowerLevel, adj: i64) -> i64 {
+        if let Some(inner_map) = self.lease_counter.get_mut(&element_id) {
+            if let Some(counter) = inner_map.get_mut(&level) {
+                *counter += adj;
+                return *counter;
+            } else {
+                inner_map.insert(level, adj);
+                return adj;
+            }
+        } else {
+            let mut inner_map = HashMap::new();
+            inner_map.insert(level, adj);
+            self.lease_counter.insert(element_id.clone(), inner_map);
+            return adj;
+        }
     }
 
     pub fn acquire_lease(
@@ -519,6 +554,12 @@ impl Broker {
         level: IndexedPowerLevel,
     ) -> Result<Lease, fpb::LeaseError> {
         tracing::debug!("acquire_lease({element_id}@{level})");
+        let counter = self.adjust_lease_counter(element_id, level.level, 1) as i64;
+        fuchsia_trace::counter!(
+            c"power-broker", c"LeaseCounter", level.level.into(),
+            &self.lookup_name(element_id) => counter
+        );
+
         let (lease, assertive_claims) = self.catalog.create_lease_and_claims(element_id, level);
         if self.is_lease_contingent(&lease.id) {
             // Lease is blocked on opportunistic claims, update status and return.
@@ -616,6 +657,16 @@ impl Broker {
     pub fn drop_lease(&mut self, lease_id: &LeaseID) -> Result<(), Error> {
         // Drop the lease to mark all the relevant claims as deactivated.
         let (lease, assertive_claims, opportunistic_claims) = self.catalog.drop(lease_id)?;
+        let counter = self.adjust_lease_counter(
+            &lease.underlying_element_id,
+            lease.underlying_element_level.level,
+            -1,
+        ) as i64;
+        fuchsia_trace::counter!(
+            c"power-broker", c"LeaseCounter", lease.underlying_element_level.level.into(),
+            &self.lookup_name(&lease.underlying_element_id) => counter
+        );
+
         // Find the set of claims that can be dropped immediately.
         let assertive_claims_dropped = self.find_claims_to_drop_or_deactivate(&assertive_claims);
         let opportunistic_claims_dropped =
@@ -2180,6 +2231,7 @@ mod tests {
                 vec![],
             )
             .expect("add_element failed");
+        assert_eq!(broker.lookup_name(&latinum), "Latinum".to_string());
         assert_eq!(
             broker.get_current_level(&latinum),
             Some(IndexedPowerLevel { level: 7, index: 2 })
@@ -2750,6 +2802,42 @@ mod tests {
     }
 
     #[fuchsia::test]
+    fn test_broker_adjust_lease_counter() {
+        // Create a broker that has nothing since the test is just about the counter
+        let inspect = fuchsia_inspect::component::inspector();
+        let inspect_node = inspect.root().create_child("test");
+        let mut broker = Broker::new(inspect_node);
+
+        let a = broker
+            .add_element("a", OFF.level, BINARY_POWER_LEVELS.to_vec(), vec![], vec![], vec![])
+            .expect("add_element failed");
+
+        let b = broker
+            .add_element("b", OFF.level, BINARY_POWER_LEVELS.to_vec(), vec![], vec![], vec![])
+            .expect("add_element failed");
+
+        assert_eq!(broker.adjust_lease_counter(&a, 5, 1), 1);
+        // a:5: 1
+        assert_eq!(broker.adjust_lease_counter(&a, 5, 1), 2);
+        // a:5: 2
+        assert_eq!(broker.adjust_lease_counter(&b, 6, 1), 1);
+        // a:5: 2 b:6:1
+        assert_eq!(broker.adjust_lease_counter(&a, 15, 1), 1);
+        // a:5: 2 a:15:1 b:6:1
+
+        assert_eq!(broker.adjust_lease_counter(&a, 5, 1), 3);
+        // a:5: 3 a:15:1 b:6:1
+        assert_eq!(broker.adjust_lease_counter(&a, 5, -1), 2);
+        // a:5: 2 a:15:1 b:6:1
+        assert_eq!(broker.adjust_lease_counter(&b, 6, -1), 0);
+        // a:5: 2 a:15:1 b:6:0
+        assert_eq!(broker.adjust_lease_counter(&a, 5, -1), 1);
+        // a:5: 1 a:15:1 b:6:0
+        assert_eq!(broker.adjust_lease_counter(&a, 15, -1), 0);
+        // a:5: 1 a:15:0 b:6:0
+    }
+
+    #[fuchsia::test]
     fn test_broker_lease_direct() {
         // Create a topology of a child element with two direct assertive dependencies.
         // P1 <= C => P2
@@ -2888,6 +2976,8 @@ mod tests {
         broker_status.lease.update(&lease.id, LeaseStatus::Pending, false);
         broker_status.assert_matches(&broker);
 
+        assert_eq!(broker.adjust_lease_counter(&child, ON.level, 0), 1);
+
         // Update P1's current level to ON.
         // C's required level should not change, as it also requires P2.
         broker.update_current_level(&parent1, ON);
@@ -3002,6 +3092,8 @@ mod tests {
         broker_status.required_level.update(&child, OFF);
         broker_status.lease.remove(&lease.id);
         broker_status.assert_matches(&broker);
+
+        assert_eq!(broker.adjust_lease_counter(&child, ON.level, 0), 0);
 
         // Drop C's level to OFF.
         // P1's required level should become OFF, as no lease requires it.

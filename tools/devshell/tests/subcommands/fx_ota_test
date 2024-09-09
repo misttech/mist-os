@@ -64,7 +64,7 @@ EOF
 setup_ffx() {
   local ffx="$(btf::make_installed_hosttools_mock ffx)"
   cat > "${ffx}.mock_side_effects" <<EOF
-   if [[ "\$@" == "--config target_update=true target update check-now --monitor" ]]; then
+   if [[ "\$@" == "target update check-now --monitor" ]]; then
      $trigger_update "\$@"
      return
    else
@@ -151,7 +151,7 @@ TEST_ota_update_failed() {
 
   local ffx="$(btf::make_installed_hosttools_mock ffx)"
   cat > "${ffx}.mock_side_effects" << EOF
-if [[ "\$@" == "--config target_update=true target update check-now --monitor" ]]; then
+if [[ "\$@" == "target update check-now --monitor" ]]; then
  $trigger_update "\$@"
 elif [[ "\$@" == "ffx component select capability fuchsia.update.Manager" ]]; then
   echo "/core/system-update/omaha-client-service"

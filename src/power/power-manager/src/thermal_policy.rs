@@ -896,7 +896,6 @@ pub mod tests {
         stepper.iterate_policy();
     }
 
-    #[allow(clippy::unit_cmp)] // TODO(https://fxbug.dev/42176998)
     /// Tests that the ThermalPolicy node populates the correct temperature sensor name in its
     /// UpdateThermalLoad messages.
     #[fasync::run_singlethreaded(test)]
@@ -933,10 +932,9 @@ pub mod tests {
         // When `process_thermal_load` runs, the new ThermalLoad value will be sent to the
         // ThermalLoadNotify node. The mock will verify the correct sensor name is found in the
         // UpdateThermalLoad message.
-        assert_eq!(node.process_thermal_load(ThermalLoad(20)).await.unwrap(), ());
+        node.process_thermal_load(ThermalLoad(20)).await.unwrap();
     }
 
-    #[allow(clippy::unit_cmp)] // TODO(https://fxbug.dev/42176998)
     /// Tests that each of the configured `thermal_load_notify_nodes` nodes receive an
     /// UpdateThermalLoad message as expected.
     #[fasync::run_singlethreaded(test)]
@@ -977,7 +975,7 @@ pub mod tests {
             msg_eq!(UpdateThermalLoad(ThermalLoad(20), "Sensor1".to_string())),
             msg_ok_return!(UpdateThermalLoad),
         ));
-        assert_eq!(node.process_thermal_load(ThermalLoad(20)).await.unwrap(), ());
+        node.process_thermal_load(ThermalLoad(20)).await.unwrap();
 
         // Even if thermal load is unchanged, the nodes should still be updated
         mock_notify1.add_msg_response_pair((
@@ -988,10 +986,9 @@ pub mod tests {
             msg_eq!(UpdateThermalLoad(ThermalLoad(20), "Sensor1".to_string())),
             msg_ok_return!(UpdateThermalLoad),
         ));
-        assert_eq!(node.process_thermal_load(ThermalLoad(20)).await.unwrap(), ());
+        node.process_thermal_load(ThermalLoad(20)).await.unwrap();
     }
 
-    #[allow(clippy::unit_cmp)] // TODO(https://fxbug.dev/42176998)
     /// Tests that each of the configured `cpu_thermal_load_notify_node` node receive an
     /// UpdateCpuThermalLoad message as expected.
     #[fasync::run_singlethreaded(test)]
@@ -1032,7 +1029,7 @@ pub mod tests {
             msg_eq!(UpdateCpuThermalLoad(ThermalLoad(20))),
             msg_ok_return!(UpdateCpuThermalLoad),
         ));
-        assert_eq!(node.process_thermal_load(ThermalLoad(20)).await.unwrap(), ());
+        node.process_thermal_load(ThermalLoad(20)).await.unwrap();
 
         // Even if thermal load is unchanged, the nodes should still be updated
         mock_notify.add_msg_response_pair((
@@ -1043,6 +1040,6 @@ pub mod tests {
             msg_eq!(UpdateCpuThermalLoad(ThermalLoad(20))),
             msg_ok_return!(UpdateCpuThermalLoad),
         ));
-        assert_eq!(node.process_thermal_load(ThermalLoad(20)).await.unwrap(), ());
+        node.process_thermal_load(ThermalLoad(20)).await.unwrap();
     }
 }

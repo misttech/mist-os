@@ -297,6 +297,7 @@ class CxxRemoteAction(object):
             remote_inputs.extend(
                 fuchsia.remote_clang_compiler_toolchain_inputs(
                     clang_path_rel=self.remote_compiler,
+                    target=self.cxx_action.target,
                     sanitizers=frozenset(self.cxx_action.sanitizers),
                 )
             )

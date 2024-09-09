@@ -211,7 +211,7 @@ async fn inner_connect_loop(
     let mut target_spec_from_rcs_proxy: Option<String> = None;
     let rcs_proxy = timeout(
         connect_timeout,
-        rcs_proxy.try_connect(|target| {
+        rcs_proxy.try_connect(|target, _err| {
             tracing::info!(
                 "RCS proxy: Waiting for target '{}' to return",
                 match target {
@@ -235,7 +235,7 @@ async fn inner_connect_loop(
     };
     let mut target_spec_from_target_proxy: Option<String> = None;
     let target_proxy = target_proxy
-        .try_connect(|target| {
+        .try_connect(|target, _err| {
             tracing::info!(
                 "Target proxy: Waiting for target '{}' to return",
                 match target {
@@ -454,6 +454,14 @@ pub fn serve_impl_validate_args(
         }
     };
 
+    if let Some(package_manifest) = &cmd.auto_publish {
+        if !package_manifest.exists() {
+            let msg = format!("package manifest {package_manifest:?} does not exist");
+            tracing::error!("{msg}");
+            return_user_error!("{msg}");
+        }
+    }
+
     // Compare against running instances.
     let instance_root =
         context.get("repository.process_dir").map_err(|e: ffx_config::api::ConfigError| bug!(e))?;
@@ -636,6 +644,38 @@ pub async fn serve_impl<W: Write + 'static>(
     });
     start_signal_monitoring(loop_stop_tx.clone(), server_stop_tx.clone());
 
+    // If auto-publishing, start the task in the background.
+    if let Some(package_manifest) = &cmd.auto_publish {
+        let publish_cmd = RepoPublishCommand {
+            signing_keys: None,
+            trusted_keys: None,
+            trusted_root: cmd.trusted_root.clone(),
+            package_manifests: vec![],
+            package_list_manifests: vec![package_manifest.clone()],
+            package_archives: vec![],
+            product_bundle: vec![],
+            time_versioning: true,
+            metadata_current_time: chrono::Utc::now(),
+            refresh_root: false,
+            clean: false,
+            depfile: None,
+            copy_mode: fuchsia_repo::repository::CopyMode::Copy,
+            delivery_blob_type: 1,
+            watch: true,
+            ignore_missing_packages: true,
+            blob_manifest: None,
+            blob_repo_dir: None,
+            repo_path: repo_path.clone(),
+        };
+
+        let auto_publisher = fasync::Task::local(async move {
+            let publish_result = cmd_repo_publish(publish_cmd).await;
+            tracing::warn!("Auto-publishing exited: {publish_result:?}");
+        });
+
+        auto_publisher.detach();
+    }
+
     let result = if cmd.no_device {
         let s = format!("Serving repository '{repo_path}' over address '{}'.", server_addr);
         writeln!(writer, "{}", s).map_err(|e| anyhow!("Failed to write to output: {:?}", e))?;
@@ -676,7 +716,7 @@ mod test {
     use ffx_config::{ConfigLevel, TestEnv};
     use fho::macro_deps::ffx_writer::TestBuffer;
     use fho::testing::ToolEnv;
-    use fho::TryFromEnv;
+    use fho::{user_error, TryFromEnv};
     use fidl::endpoints::DiscoverableProtocolMarker;
     use fidl_fuchsia_developer_ffx::{
         RemoteControlState, RepositoryRegistrationAliasConflictMode, SshHostAddrInfo,
@@ -698,6 +738,7 @@ mod test {
     use fuchsia_repo::test_utils;
     use futures::channel::mpsc;
     use futures::TryStreamExt;
+    use pkg::{RegistrationConflictMode, RepoStorageType};
     use std::collections::BTreeSet;
     use std::sync::Mutex;
     use std::time;
@@ -712,8 +753,6 @@ mod test {
     const DEVICE_PORT: u16 = 5;
     const HOST_ADDR: &str = "1.2.3.4";
     const TARGET_NODENAME: &str = "some-target";
-    const EMPTY_REPO_PATH: &str =
-        concat!(env!("ROOT_OUT_DIR"), "/test_data/ffx_lib_pkg/empty-repo");
 
     macro_rules! rule {
         ($host_match:expr => $host_replacement:expr,
@@ -1045,6 +1084,322 @@ mod test {
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
+    async fn test_serve_impl_validate_args() {
+        let env = get_test_env().await;
+
+        let test_cases: Vec<(ServeCommand, Result<Option<PkgServerInfo>>)> = vec![
+            (
+                ServeCommand {
+                    repository: None,
+                    trusted_root: None,
+                    address: (REPO_IPV4_ADDR, REPO_PORT).into(),
+                    repo_path: Some("/some/repo/path".into()),
+                    product_bundle: Some("/some/product/bundle".into()),
+                    alias: vec![],
+                    storage_type: None,
+                    alias_conflict_mode: RepositoryRegistrationAliasConflictMode::ErrorOut,
+                    port_path: None,
+                    no_device: false,
+                    refresh_metadata: false,
+                    auto_publish: None,
+                },
+                Err(user_error!("Cannot specify both --repo-path and --product-bundle")),
+            ),
+            (
+                ServeCommand {
+                    repository: Some("repo-with-name".into()),
+                    trusted_root: None,
+                    address: (REPO_IPV4_ADDR, REPO_PORT).into(),
+                    repo_path: None,
+                    product_bundle: Some("/some/product/bundle".into()),
+                    alias: vec![],
+                    storage_type: None,
+                    alias_conflict_mode: RepositoryRegistrationAliasConflictMode::ErrorOut,
+                    port_path: None,
+                    no_device: false,
+                    refresh_metadata: false,
+                    auto_publish: None,
+                },
+                Err(user_error!("--repository is not supported with --product-bundle")),
+            ),
+            (
+                ServeCommand {
+                    repository: None,
+                    trusted_root: None,
+                    address: (REPO_IPV4_ADDR, REPO_PORT).into(),
+                    repo_path: None,
+                    product_bundle: Some("/missing/product/bundle".into()),
+                    alias: vec![],
+                    storage_type: None,
+                    alias_conflict_mode: RepositoryRegistrationAliasConflictMode::ErrorOut,
+                    port_path: None,
+                    no_device: false,
+                    refresh_metadata: false,
+                    auto_publish: None,
+                },
+                Err(user_error!("product bundle \"/missing/product/bundle\" does not exist")),
+            ),
+            (
+                ServeCommand {
+                    repository: None,
+                    trusted_root: None,
+                    address: (REPO_IPV4_ADDR, REPO_PORT).into(),
+                    repo_path: Some("/missing/repo/path".into()),
+                    product_bundle: None,
+                    alias: vec![],
+                    storage_type: None,
+                    alias_conflict_mode: RepositoryRegistrationAliasConflictMode::ErrorOut,
+                    port_path: None,
+                    no_device: false,
+                    refresh_metadata: false,
+                    auto_publish: None,
+                },
+                Err(user_error!("repo-path \"/missing/repo/path\" does not exist")),
+            ),
+            (
+                ServeCommand {
+                    repository: None,
+                    trusted_root: None,
+                    address: (REPO_IPV4_ADDR, REPO_PORT).into(),
+                    repo_path: None,
+                    product_bundle: None,
+                    alias: vec![],
+                    storage_type: None,
+                    alias_conflict_mode: RepositoryRegistrationAliasConflictMode::ErrorOut,
+                    port_path: None,
+                    no_device: false,
+                    refresh_metadata: false,
+                    auto_publish: None,
+                },
+                Err(user_error!("Either --repo-path or --product-bundle need to be specified")),
+            ),
+            (
+                ServeCommand {
+                    repository: None,
+                    trusted_root: None,
+                    address: (REPO_IPV4_ADDR, REPO_PORT).into(),
+                    repo_path: None,
+                    product_bundle: Some(
+                        Utf8PathBuf::from_path_buf(env.isolate_root.path().to_path_buf())
+                            .expect("pb path"),
+                    ),
+                    alias: vec![],
+                    storage_type: None,
+                    alias_conflict_mode: RepositoryRegistrationAliasConflictMode::ErrorOut,
+                    port_path: None,
+                    no_device: false,
+                    refresh_metadata: false,
+                    auto_publish: Some(Utf8PathBuf::from("/missing/package-list")),
+                },
+                Err(user_error!("package manifest \"/missing/package-list\" does not exist")),
+            ),
+            (
+                ServeCommand {
+                    repository: None,
+                    trusted_root: None,
+                    address: (REPO_IPV4_ADDR, REPO_PORT).into(),
+                    repo_path: Some(
+                        Utf8PathBuf::from_path_buf(env.isolate_root.path().to_path_buf())
+                            .expect("repo path"),
+                    ),
+                    product_bundle: None,
+                    alias: vec![],
+                    storage_type: None,
+                    alias_conflict_mode: RepositoryRegistrationAliasConflictMode::ErrorOut,
+                    port_path: None,
+                    no_device: false,
+                    refresh_metadata: false,
+                    auto_publish: Some(Utf8PathBuf::from("/missing/package-list")),
+                },
+                Err(user_error!("package manifest \"/missing/package-list\" does not exist")),
+            ),
+        ];
+
+        for (cmd, expected) in test_cases {
+            let result = serve_impl_validate_args(&cmd, &env.context);
+            match expected {
+                Ok(Some(pkg_server_info)) => {
+                    if let Some(actual_info) = result.ok().expect("Ok result") {
+                        assert_eq!(actual_info, pkg_server_info)
+                    } else {
+                        assert!(false, "Expected {pkg_server_info:?}, got None");
+                    }
+                }
+                Ok(None) => {
+                    if let Some(actual_info) = result.ok().expect("Ok result") {
+                        assert!(false, "Expected None, got {actual_info:?}");
+                    }
+                }
+                Err(e) => {
+                    if let Some(actual_err) = result.as_ref().err() {
+                        assert_eq!(actual_err.to_string(), e.to_string())
+                    } else {
+                        assert!(false, "Expected {e}, got no error: {result:?}")
+                    }
+                }
+            };
+        }
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn test_serve_impl_validate_args_in_tree() {
+        let build_dir = tempfile::tempdir().expect("temp dir");
+        let env = ffx_config::test_init_in_tree(build_dir.path()).await.expect("in-tree test env");
+        let cmd = ServeCommand {
+            repository: None,
+            trusted_root: None,
+            address: (REPO_IPV4_ADDR, REPO_PORT).into(),
+            repo_path: None,
+            product_bundle: None,
+            alias: vec![],
+            storage_type: None,
+            alias_conflict_mode: RepositoryRegistrationAliasConflictMode::ErrorOut,
+            port_path: None,
+            no_device: false,
+            refresh_metadata: false,
+            auto_publish: None,
+        };
+        let expected: Result<Option<PkgServerInfo>> = Err(user_error!(
+            "build directory relative path {:?} does not exist",
+            build_dir.path().join("amber-files")
+        ));
+
+        let result = serve_impl_validate_args(&cmd, &env.context);
+        match expected {
+            Ok(Some(pkg_server_info)) => {
+                if let Some(actual_info) = result.ok().expect("Ok result") {
+                    assert_eq!(actual_info, pkg_server_info)
+                } else {
+                    assert!(false, "Expected {pkg_server_info:?}, got None");
+                }
+            }
+            Ok(None) => {
+                if let Some(actual_info) = result.ok().expect("Ok result") {
+                    assert!(false, "Expected None, got {actual_info:?}");
+                }
+            }
+            Err(e) => {
+                if let Some(actual_err) = result.as_ref().err() {
+                    assert_eq!(actual_err.to_string(), e.to_string())
+                } else {
+                    assert!(false, "Expected {e}, got no error: {result:?}")
+                }
+            }
+        };
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn test_serve_impl_validate_args_running_servers() {
+        let env = get_test_env().await;
+
+        let instance_root = env.isolate_root.path().join("repo_instances");
+        fs::create_dir_all(&instance_root).expect("instance root dir");
+
+        let repo_path = env.isolate_root.path().join("repo_path");
+        fs::create_dir_all(&repo_path).expect("repo path dir");
+
+        env.context
+            .query("repository.process_dir")
+            .level(Some(ConfigLevel::User))
+            .set(instance_root.to_string_lossy().into())
+            .await
+            .expect("setting instance root config");
+
+        let server_info = PkgServerInfo {
+            name: "devhost".into(),
+            address: (REPO_IPV4_ADDR, REPO_PORT).into(),
+            repo_path: repo_path.as_path().into(),
+            registration_aliases: vec![],
+            registration_storage_type: RepoStorageType::Ephemeral,
+            registration_alias_conflict_mode: RegistrationConflictMode::ErrorOut,
+            server_mode: ServerMode::Background,
+            pid: std::process::id(),
+        };
+
+        let mgr = PkgServerInstances::new(instance_root);
+        mgr.write_instance(&server_info).expect("test instance written");
+
+        let test_cases: Vec<(ServeCommand, Result<Option<PkgServerInfo>>)> = vec![
+            (
+         ServeCommand {
+            repository: Some("another-name".into()),
+            trusted_root: None,
+            address: (REPO_IPV4_ADDR, REPO_PORT).into(),
+            repo_path: Some(Utf8PathBuf::from_path_buf(repo_path.clone()).expect("utf8 repo_path")),
+            product_bundle: None,
+            alias: vec![],
+            storage_type: None,
+            alias_conflict_mode: RepositoryRegistrationAliasConflictMode::ErrorOut,
+            port_path: None,
+            no_device: false,
+            refresh_metadata: false,
+            auto_publish: None,
+        },
+            Err(user_error!("repository server is already running on 127.0.0.1:0: named \"devhost\"  serving {:?}\n Use `ffx  repository server list` to list running servers", repo_path))
+    ),
+    (
+        ServeCommand {
+           repository: Some("devhost".into()),
+           trusted_root: None,
+           address: (REPO_IPV4_ADDR, REPO_PORT).into(),
+           repo_path: Some(Utf8PathBuf::from_path_buf(repo_path.clone()).expect("utf8 repo_path")),
+           product_bundle: None,
+           alias: vec![],
+           storage_type: None,
+           alias_conflict_mode: RepositoryRegistrationAliasConflictMode::ErrorOut,
+           port_path: None,
+           no_device: false,
+           refresh_metadata: false,
+           auto_publish: None,
+       },
+           Ok(Some(server_info))
+   ),
+   (
+    ServeCommand {
+       repository: Some("devhost".into()),
+       trusted_root: None,
+       address: (REPO_IPV4_ADDR, 8888).into(),
+       repo_path: Some(Utf8PathBuf::from_path_buf(repo_path.clone()).expect("utf8 repo_path")),
+       product_bundle: None,
+       alias: vec![],
+       storage_type: None,
+       alias_conflict_mode: RepositoryRegistrationAliasConflictMode::ErrorOut,
+       port_path: None,
+       no_device: false,
+       refresh_metadata: false,
+       auto_publish: None,
+   },
+       Err(user_error!("repository server named \"devhost\" is already running: 127.0.0.1:0 serving {:?}\n Use `ffx  repository server list` to list running servers", repo_path))
+)
+    ];
+
+        for (cmd, expected) in test_cases {
+            let result = serve_impl_validate_args(&cmd, &env.context);
+            match expected {
+                Ok(Some(pkg_server_info)) => {
+                    if let Some(actual_info) = result.ok().expect("Ok result") {
+                        assert_eq!(actual_info, pkg_server_info)
+                    } else {
+                        assert!(false, "Expected {pkg_server_info:?}, got None");
+                    }
+                }
+                Ok(None) => {
+                    if let Some(actual_info) = result.ok().expect("Ok result") {
+                        assert!(false, "Expected None, got {actual_info:?}");
+                    }
+                }
+                Err(e) => {
+                    if let Some(actual_err) = result.as_ref().err() {
+                        assert_eq!(actual_err.to_string(), e.to_string())
+                    } else {
+                        assert!(false, "Expected {e}, got no error: {result:?}")
+                    }
+                }
+            };
+        }
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
     async fn test_start_register() {
         async fn run_test_start_register(refresh_metadata: bool) {
             let test_env = get_test_env().await;
@@ -1079,12 +1434,17 @@ mod test {
 
             let tmp_port_file = tempfile::NamedTempFile::new().unwrap();
 
+            // Use a tmp repo to allow metadata updates
+            let tmp_repo = tempfile::tempdir().unwrap();
+            let tmp_repo_path = Utf8Path::from_path(tmp_repo.path()).unwrap();
+            test_utils::make_empty_pm_repo_dir(tmp_repo_path);
+
             let serve_tool = ServeTool {
                 cmd: ServeCommand {
                     repository: Some(REPO_NAME.to_string()),
                     trusted_root: None,
                     address: (REPO_IPV4_ADDR, REPO_PORT).into(),
-                    repo_path: Some(EMPTY_REPO_PATH.into()),
+                    repo_path: Some(tmp_repo_path.into()),
                     product_bundle: None,
                     alias: vec!["example.com".into(), "fuchsia.com".into()],
                     storage_type: Some(RepositoryStorageType::Ephemeral),
@@ -1092,6 +1452,7 @@ mod test {
                     port_path: Some(tmp_port_file.path().to_owned()),
                     no_device: false,
                     refresh_metadata: refresh_metadata,
+                    auto_publish: None,
                 },
                 context: env.context.clone(),
                 target_proxy_connector: Connector::try_from_env(&env)
@@ -1220,6 +1581,11 @@ mod test {
 
         // Run main in background
         let _task = fasync::Task::local(async move {
+            // Use a tmp repo to allow metadata updates
+            let tmp_repo = tempfile::tempdir().unwrap();
+            let tmp_repo_path = Utf8Path::from_path(tmp_repo.path()).unwrap();
+            test_utils::make_empty_pm_repo_dir(tmp_repo_path);
+
             serve_impl(
                 Connector::try_from_env(&env)
                     .await
@@ -1229,7 +1595,7 @@ mod test {
                     repository: Some(REPO_NAME.to_string()),
                     trusted_root: None,
                     address: (REPO_IPV4_ADDR, REPO_PORT).into(),
-                    repo_path: Some(EMPTY_REPO_PATH.into()),
+                    repo_path: Some(tmp_repo_path.into()),
                     product_bundle: None,
                     alias: vec!["example.com".into(), "fuchsia.com".into()],
                     storage_type: Some(RepositoryStorageType::Ephemeral),
@@ -1237,6 +1603,7 @@ mod test {
                     port_path: Some(tmp_port_file_path),
                     no_device: false,
                     refresh_metadata: false,
+                    auto_publish: None,
                 },
                 env.context.clone(),
                 writer,
@@ -1361,6 +1728,11 @@ mod test {
 
         // Run main in background
         let _task = fasync::Task::local(async move {
+            // Use a tmp repo to allow metadata updates
+            let tmp_repo = tempfile::tempdir().unwrap();
+            let tmp_repo_path = Utf8Path::from_path(tmp_repo.path()).unwrap();
+            test_utils::make_empty_pm_repo_dir(tmp_repo_path);
+
             serve_impl(
                 Connector::try_from_env(&env)
                     .await
@@ -1370,7 +1742,7 @@ mod test {
                     repository: Some(REPO_NAME.to_string()),
                     trusted_root: None,
                     address: (REPO_IPV4_ADDR, REPO_PORT).into(),
-                    repo_path: Some(EMPTY_REPO_PATH.into()),
+                    repo_path: Some(tmp_repo_path.into()),
                     product_bundle: None,
                     alias: vec!["example.com".into(), "fuchsia.com".into()],
                     storage_type: Some(RepositoryStorageType::Ephemeral),
@@ -1378,6 +1750,7 @@ mod test {
                     port_path: Some(tmp_port_file_path),
                     no_device: false,
                     refresh_metadata: false,
+                    auto_publish: None,
                 },
                 env.context.clone(),
                 writer,
@@ -1519,6 +1892,7 @@ mod test {
                     port_path: Some(tmp_port_file_path),
                     no_device: false,
                     refresh_metadata: false,
+                    auto_publish: None,
                 },
                 test_env.context.clone(),
                 writer,
@@ -1664,6 +2038,7 @@ mod test {
             port_path: Some(tmp_port_file.path().to_owned()),
             no_device: true,
             refresh_metadata: false,
+            auto_publish: None,
         };
         let mut serve_cmd_with_root = serve_cmd_without_root.clone();
         serve_cmd_with_root.trusted_root = trusted_root_path.clone().into();

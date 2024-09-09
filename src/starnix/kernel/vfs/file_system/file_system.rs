@@ -139,7 +139,7 @@ impl FileSystem {
         ops: impl FileSystemOps,
         options: FileSystemOptions,
     ) -> Result<FileSystemHandle, Errno> {
-        let security_state = security::file_system_init_security(ops.name(), &options.params)?;
+        let security_state = security::file_system_init_security(&options.params)?;
         Ok(Arc::new(FileSystem {
             kernel: Arc::downgrade(kernel),
             root: OnceCell::new(),

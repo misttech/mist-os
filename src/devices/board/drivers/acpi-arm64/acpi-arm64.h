@@ -29,8 +29,6 @@ class AcpiArm64 : public DeviceType {
   void DdkInit(ddk::InitTxn txn);
   void DdkRelease() { delete this; }
 
-  zx::result<> SysmemInit();
-
  private:
   zx::result<> SmbiosInit();
 

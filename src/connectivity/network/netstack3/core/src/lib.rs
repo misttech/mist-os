@@ -131,6 +131,10 @@ pub mod ip {
         Ipv6DeviceConfigurationUpdate, Lifetime, SetIpAddressPropertiesError, SlaacConfiguration,
         StableIidSecret, TemporarySlaacAddressConfiguration, UpdateIpConfigurationError,
     };
+    pub use netstack3_ip::multicast_forwarding::{
+        ForwardMulticastRouteError, MulticastForwardingDisabledError, MulticastRoute,
+        MulticastRouteKey, MulticastRouteTarget,
+    };
     pub use netstack3_ip::raw::{
         RawIpSocketIcmpFilter, RawIpSocketIcmpFilterError, RawIpSocketId, RawIpSocketProtocol,
         RawIpSocketSendToError, RawIpSocketsBindingsContext, RawIpSocketsBindingsTypes,
@@ -193,13 +197,13 @@ pub mod sync {
 
 /// Methods for dealing with TCP sockets.
 pub mod tcp {
-    pub use netstack3_base::{Payload, PayloadLen, SendPayload};
+    pub use netstack3_base::{FragmentedPayload, Payload, PayloadLen};
     pub use netstack3_tcp::{
         AcceptError, BindError, BoundInfo, Buffer, BufferLimits, BufferSizes, ConnectError,
         ConnectionError, ConnectionInfo, IntoBuffers, ListenError, ListenerNotifier, NoConnection,
         OriginalDestinationError, ReceiveBuffer, RingBuffer, SendBuffer, SetDeviceError,
-        SetReuseAddrError, SocketAddr, SocketInfo, SocketOptions, Takeable, TcpBindingsTypes,
-        TcpSocketId, UnboundInfo, DEFAULT_FIN_WAIT2_TIMEOUT,
+        SetReuseAddrError, SocketAddr, SocketInfo, SocketOptions, TcpBindingsTypes, TcpSocketId,
+        UnboundInfo, DEFAULT_FIN_WAIT2_TIMEOUT,
     };
 }
 

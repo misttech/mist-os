@@ -32,7 +32,7 @@ async fn main() {
     info!(?args, "Initalizing fake_boot_arguments");
 
     let system_image = fuchsia_fs::file::read(
-        &fuchsia_fs::file::open_in_namespace(
+        &fuchsia_fs::file::open_in_namespace_deprecated(
             system_image_path.as_str(),
             fio::OpenFlags::RIGHT_READABLE,
         )

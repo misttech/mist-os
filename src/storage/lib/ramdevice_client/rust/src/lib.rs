@@ -86,7 +86,7 @@ impl RamdiskClientBuilder {
 
         if use_v2 {
             // Pick the first service instance we find.
-            let ramdisk_service_dir = fuchsia_fs::directory::open_in_namespace(
+            let ramdisk_service_dir = fuchsia_fs::directory::open_in_namespace_deprecated(
                 &format!("/svc/{}", fidl_fuchsia_hardware_ramdisk::ServiceMarker::SERVICE_NAME),
                 fio::OpenFlags::empty(),
             )?;
@@ -132,8 +132,11 @@ impl RamdiskClientBuilder {
             let dev_root = if let Some(dev_root) = dev_root {
                 dev_root
             } else {
-                fuchsia_fs::directory::open_in_namespace(DEV_PATH, fio::OpenFlags::RIGHT_READABLE)
-                    .with_context(|| format!("open {}", DEV_PATH))?
+                fuchsia_fs::directory::open_in_namespace_deprecated(
+                    DEV_PATH,
+                    fio::OpenFlags::RIGHT_READABLE,
+                )
+                .with_context(|| format!("open {}", DEV_PATH))?
             };
             let ramdisk_controller = device_watcher::recursive_wait_and_open::<
                 RamdiskControllerMarker,
@@ -448,10 +451,12 @@ mod tests {
 
     #[fuchsia::test]
     async fn create_with_dev_root_and_guid_get_dir_proxy_destroy() {
-        let dev_root =
-            fuchsia_fs::directory::open_in_namespace(DEV_PATH, fio::OpenFlags::RIGHT_READABLE)
-                .with_context(|| format!("open {}", DEV_PATH))
-                .expect("failed to create directory proxy");
+        let dev_root = fuchsia_fs::directory::open_in_namespace_deprecated(
+            DEV_PATH,
+            fio::OpenFlags::RIGHT_READABLE,
+        )
+        .with_context(|| format!("open {}", DEV_PATH))
+        .expect("failed to create directory proxy");
         let ramdisk = RamdiskClient::builder(512, 2048)
             .dev_root(dev_root)
             .guid(TEST_GUID)

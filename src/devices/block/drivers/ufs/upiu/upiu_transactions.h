@@ -234,13 +234,30 @@ class CommandUpiu : public AbstractRequestUpiu<CommandUpiuData, ResponseUpiuData
   friend class UfsTest;
 };
 
+enum class TaskManagementFunction : uint8_t {
+  kAbortTask = 0x01,
+  kAbortTaskSet = 0x02,
+  kClearTaskSet = 0x04,
+  kLogicalUnitReset = 0x08,
+  kQueryTask = 0x80,
+  kQueryTaskSet = 0x81,
+};
+
+enum class TaskManagementServiceResponse : uint8_t {
+  kTaskManagementFunctionComplete = 0x00,
+  kTaskManagementFunctionNotSupported = 0x04,
+  kTaskManagementFunctionFailed = 0x05,
+  kTaskManagementFunctionSucceeded = 0x08,
+  kIncorrectLogicalUnitNumber = 0x09,
+};
+
 struct TaskManagementResponseUpiuData {
   // dword 0 ~ 2
   UpiuHeader header;
   // dword 3
-  uint32_t param1 = 0;  // (Big-endian)
+  uint32_t output_param1 = 0;  // (Big-endian)
   // dword 4
-  uint32_t param2 = 0;  // (Big-endian)
+  uint32_t output_param2 = 0;  // (Big-endian)
   // dword 5 ~ 7
   uint8_t reserved[12] = {0};
 } __PACKED;
@@ -263,11 +280,11 @@ struct TaskManagementRequestUpiuData {
   // dword 0 ~ 2
   UpiuHeader header;
   // dword 3
-  uint32_t param1 = 0;  // (Big-endian)
+  uint32_t input_param1 = 0;  // (Big-endian)
   // dword 4
-  uint32_t param2 = 0;  // (Big-endian)
+  uint32_t input_param2 = 0;  // (Big-endian)
   // dword 5
-  uint32_t param3 = 0;  // (Big-endian)
+  uint32_t input_param3 = 0;  // (Big-endian)
   // dword 6 ~ 7
   uint8_t reserved[8] = {0};
 } __PACKED;
@@ -282,8 +299,13 @@ static_assert(sizeof(TaskManagementRequestUpiuData) % kUpiuAlignment == 0,
 class TaskManagementRequestUpiu
     : public AbstractRequestUpiu<TaskManagementRequestUpiuData, TaskManagementResponseUpiuData> {
  public:
-  explicit TaskManagementRequestUpiu() {
+  explicit TaskManagementRequestUpiu(TaskManagementFunction function, uint32_t lun,
+                                     uint32_t task_tag) {
     GetHeader().set_trans_code(UpiuTransactionCodes::kTaskManagementRequest);
+    GetHeader().function = static_cast<uint8_t>(function);
+
+    GetData<TaskManagementRequestUpiuData>()->input_param1 = lun;
+    GetData<TaskManagementRequestUpiuData>()->input_param2 = task_tag;
   }
 
   ~TaskManagementRequestUpiu() override = default;

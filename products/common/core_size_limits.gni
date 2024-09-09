@@ -224,7 +224,7 @@ size_checker_input = {
         "fuzzctl",
         "run_test_suite",
       ]
-      limit = 12582912  # 12 MiB
+      limit = 13107200  # 12.5 MiB
       creep_limit = 122880  # 120.0 KiB
     },
     {

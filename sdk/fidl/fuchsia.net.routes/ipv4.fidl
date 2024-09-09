@@ -126,10 +126,10 @@ type InstalledRuleV4 = struct {
     /// Rules within a rule set are locally ordered, together with the rule set
     /// priority, this defines a global order for all installed rules.
     rule_index RuleIndex;
-    /// The selector part of the rule, the rule is a no-op if the selector does
+    /// The matcher part of the rule, the rule is a no-op if the matcher does
     /// not match the packet.
-    selector RuleSelectorV4;
-    /// The action part of the rule that describes what to do if the selector
+    matcher RuleMatcherV4;
+    /// The action part of the rule that describes what to do if the matcher
     /// matches the packet.
     action RuleAction;
 };
@@ -166,15 +166,15 @@ closed protocol RuleWatcherV4 {
     });
 };
 
-/// The selector part of the rule that is used to match packets.
+/// The matcher part of the rule that is used to match packets.
 ///
-/// A selector matches a packet if all of the present fields match the
+/// A matcher matches a packet if all of the present fields match the
 /// corresponding properties.
 @available(added=HEAD)
-type RuleSelectorV4 = table {
+type RuleMatcherV4 = table {
     /// Matches whether the source address of the packet is from the subnet.
     1: from fuchsia.net.Ipv4AddressWithPrefix;
-    /// The rest of the selectors that is common between IP versions.
-    2: base BaseSelector;
+    /// The rest of the matcher that is common between IP versions.
+    2: base BaseMatcher;
 };
 // LINT.ThenChange(ipv6.fidl)

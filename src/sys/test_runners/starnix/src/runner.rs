@@ -35,6 +35,9 @@ pub async fn handle_runner_requests(
                 })
                 .detach();
             }
+            fcrunner::ComponentRunnerRequest::_UnknownMethod { ordinal, .. } => {
+                tracing::warn!(%ordinal, "Unknown ComponentRunner request");
+            }
         }
     }
 

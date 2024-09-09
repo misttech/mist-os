@@ -79,6 +79,9 @@ async fn serve(mut stream: fresolution::ResolverRequestStream) -> anyhow::Result
                         });
                 responder.send(result).context("failed sending response")?;
             }
+            fresolution::ResolverRequest::_UnknownMethod { ordinal, .. } => {
+                warn!(%ordinal, "Unknown Resolver request");
+            }
         }
     }
     Ok(())

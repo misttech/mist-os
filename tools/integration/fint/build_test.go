@@ -48,6 +48,18 @@ func (m fakeBuildModules) PrebuiltBinarySets() []build.PrebuiltBinarySet { retur
 func (m fakeBuildModules) TestSpecs() []build.TestSpec                   { return m.testSpecs }
 func (m fakeBuildModules) Tools() build.Tools                            { return m.tools }
 
+// An enum type describing the presence of a build success stamp file
+// after a build. The BuildSuccessStampAuto value is the default and
+// corresponds to BuildSuccessTampExists for a successful build,
+// or BuildSuccessStampMissing for a failed one.
+type BuildSuccessStampExpectation int32
+
+const (
+	BuildSuccessStampAuto BuildSuccessStampExpectation = iota
+	BuildSuccessStampExists
+	BuildSuccessStampMissing
+)
+
 func TestGetSubbuildSubdirs(t *testing.T) {
 	tmpDir := t.TempDir()
 	subbuildJSONFile := filepath.Join(tmpDir, "subbuilds.json")
@@ -137,6 +149,10 @@ func TestBuild(t *testing.T) {
 		expectedTargets   []string
 		expectedArtifacts *fintpb.BuildArtifacts
 		expectErr         bool
+		// A value that indicates whether a build success stamp file is expected.
+		// Default is an empty string, which models that the file should only exist
+		// if expectErr is false. Other values are "yes" or "no"
+		expectBuildSuccessStamp BuildSuccessStampExpectation
 	}{
 		{
 			name:              "empty spec produces no ninja targets",
@@ -352,7 +368,8 @@ func TestBuild(t *testing.T) {
 			runnerFunc: func(cmd []string, _ io.Writer) error {
 				return nil
 			},
-			expectErr: true,
+			expectErr:               true,
+			expectBuildSuccessStamp: BuildSuccessStampExists,
 			expectedArtifacts: &fintpb.BuildArtifacts{
 				FailureSummary: ninjaNoopFailureMessage(platform, ""),
 				DebugFiles: []*fintpb.DebugFile{
@@ -763,6 +780,32 @@ func TestBuild(t *testing.T) {
 				}
 			} else if tc.expectErr {
 				t.Fatal("Expected an error but got nil")
+			}
+
+			// Check the status of the build success stamp file.
+			expectedBuildStampStatus := tc.expectBuildSuccessStamp
+			if expectedBuildStampStatus == BuildSuccessStampAuto {
+				if tc.expectErr {
+					expectedBuildStampStatus = BuildSuccessStampMissing
+				} else {
+					expectedBuildStampStatus = BuildSuccessStampExists
+
+				}
+			}
+			if checkFileExists(filepath.Join(buildDir, buildSuccessStampName)) {
+				if expectedBuildStampStatus == BuildSuccessStampMissing {
+					t.Errorf("Build success stamp file present in failed build!")
+				} else {
+					// Check the presence of the last ninja targets list file.
+					if !checkFileExists(filepath.Join(buildDir, lastNinjaBuildTargetsName)) {
+						t.Errorf("Last ninja build targets list file missing!")
+					}
+				}
+			} else {
+				if expectedBuildStampStatus == BuildSuccessStampExists {
+					t.Errorf("Build success stamp file missing after successful build!")
+				}
+
 			}
 
 			ninjaTargets := findNinjaTargets(runner.commandsRun)

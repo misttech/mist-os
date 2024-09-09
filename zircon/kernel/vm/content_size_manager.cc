@@ -10,15 +10,13 @@
 #include <ktl/move.h>
 
 // static
-zx_status_t ContentSizeManager::Create(uint64_t content_size,
-                                       fbl::RefPtr<ContentSizeManager>* content_size_manager) {
+zx::result<fbl::RefPtr<ContentSizeManager>> ContentSizeManager::Create(uint64_t content_size) {
   fbl::AllocChecker ac;
   fbl::RefPtr<ContentSizeManager> csm = fbl::AdoptRef(new (&ac) ContentSizeManager(content_size));
   if (!ac.check()) {
-    return ZX_ERR_NO_MEMORY;
+    return zx::error(ZX_ERR_NO_MEMORY);
   }
-  *content_size_manager = ktl::move(csm);
-  return ZX_OK;
+  return zx::ok(csm);
 }
 
 uint64_t ContentSizeManager::Operation::GetSizeLocked() const {

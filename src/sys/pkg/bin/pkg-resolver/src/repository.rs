@@ -236,7 +236,7 @@ async fn get_local_repo(
                 ));
             };
 
-            let repos_proxy = fuchsia_fs::directory::open_directory(
+            let repos_proxy = fuchsia_fs::directory::open_directory_deprecated(
                 &data_proxy,
                 persisted_repos_dir,
                 fio::OpenFlags::RIGHT_READABLE
@@ -246,7 +246,7 @@ async fn get_local_repo(
             .await
             .with_context(|| format!("opening {persisted_repos_dir}"))?;
             let host = config.repo_url().host();
-            let proxy = fuchsia_fs::directory::open_directory(
+            let proxy = fuchsia_fs::directory::open_directory_deprecated(
                 &repos_proxy,
                 host,
                 fio::OpenFlags::RIGHT_READABLE
@@ -367,7 +367,7 @@ mod tests {
         async fn repo(&self, config: &pkg::RepositoryConfig) -> Result<Repository, anyhow::Error> {
             let (sender, _) = futures::channel::mpsc::channel(0);
             let cobalt_sender = ProtocolSender::new(sender);
-            let proxy = fuchsia_fs::directory::open_in_namespace(
+            let proxy = fuchsia_fs::directory::open_in_namespace_deprecated(
                 self.data_dir.path().to_str().unwrap(),
                 fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
             )

@@ -299,7 +299,7 @@ impl_trait_for_witness!(UnicastAddress, is_unicast, NonMappedAddr);
 ///
 /// [multicast]: https://en.wikipedia.org/wiki/Multicast
 pub trait MulticastAddress {
-    /// Is this a unicast address?
+    /// Is this a multicast address?
     ///
     /// `is_multicast` must maintain the invariant that, if it is called twice
     /// on the same object, and in between those two calls, no code has operated
@@ -312,6 +312,11 @@ pub trait MulticastAddress {
     /// If this type also implements [`SpecifiedAddress`], then
     /// `a.is_multicast()` implies `a.is_specified()`.
     fn is_multicast(&self) -> bool;
+
+    /// Is this a non-multicast address? The inverse of `is_multicast()`.
+    fn is_non_multicast(&self) -> bool {
+        !self.is_multicast()
+    }
 }
 
 impl_trait_for_witness!(MulticastAddress, is_multicast, SpecifiedAddr);
@@ -637,31 +642,25 @@ guaranteed to be specified, so this conversion is infallible."),
 
 /// Implements [`Witness`] for a nested witness type.
 ///
-/// `impl_nested_witness` implements `Witness<A>` for
-/// `$outer_type<$inner_type<A>>`.
+/// Accepted Formats:
+/// * `impl_nested_witness!(trait1, type1, trait2, type2)`
+///     Implements `Witness<A>` for `type1<type2<A>>`.
+/// * `impl_nested_witness!(trait1, type1, trait2, type2, trait3, type3)`
+///     Implements `Witness<A>` for `type1<type2<type3<A>>>`.
+///
+/// Due to the nature of combinatorix, it is not advised to use this macro
+/// for all possible combinations of nested witnesses, only those that are
+/// actually instantiated in code.
 macro_rules! impl_nested_witness {
-    ($outer_trait:ident, $outer_type:ident, $inner_trait:ident, $inner_type:ident, $constructor:ident) => {
-        impl<A: $outer_trait + $inner_trait> $outer_type<$inner_type<A>> {
-            doc_comment! {
-                concat!("Constructs a new `", stringify!($outer_type), "<", stringify!($inner_type), "<A>>`.
-
-`", stringify!($constructor), "(addr)` is equivalent to `", stringify!($inner_type),
-"::new(addr).and_then(", stringify!($outer_type), "::new))`."),
-                #[inline]
-                pub fn $constructor(addr: A) -> Option<$outer_type<$inner_type<A>>> {
-                    $inner_type::new(addr).and_then($outer_type::new)
-                }
-            }
-        }
-
-        impl<A: $outer_trait + $inner_trait> Witness<A> for $outer_type<$inner_type<A>> {
+    ($trait1:ident, $type1:ident, $trait2:ident, $type2:ident) => {
+        impl<A: $trait1 + $trait2> Witness<A> for $type1<$type2<A>> {
             #[inline]
-            fn new(addr: A) -> Option<$outer_type<$inner_type<A>>> {
-                $inner_type::new(addr).and_then(Witness::<$inner_type<A>>::new)
+            fn new(addr: A) -> Option<$type1<$type2<A>>> {
+                $type2::new(addr).and_then(Witness::<$type2<A>>::new)
             }
 
-            unsafe fn new_unchecked(addr: A) -> $outer_type<$inner_type<A>> {
-                $outer_type($inner_type(addr))
+            unsafe fn new_unchecked(addr: A) -> $type1<$type2<A>> {
+                $type1($type2(addr))
             }
 
             #[inline]
@@ -670,39 +669,61 @@ macro_rules! impl_nested_witness {
             }
         }
 
-        impl<A: $outer_trait + $inner_trait> AsRef<A> for $outer_type<$inner_type<A>> {
+        impl<A: $trait1 + $trait2> AsRef<A> for $type1<$type2<A>> {
             fn as_ref(&self) -> &A {
                 &self.0 .0
             }
         }
+    };
+    ($trait1:ident, $type1:ident, $trait2:ident, $type2:ident, $trait3:ident, $type3:ident) => {
+        impl<A: $trait1 + $trait2 + $trait3> Witness<A> for $type1<$type2<$type3<A>>> {
+            #[inline]
+            fn new(addr: A) -> Option<$type1<$type2<$type3<A>>>> {
+                $type3::new(addr).and_then(Witness::<$type3<A>>::new)
+            }
 
-        impl<A: $outer_trait + $inner_trait> TryFrom<$inner_type<A>> for $outer_type<$inner_type<A>> {
-            type Error = ();
-            fn try_from(addr: $inner_type<A>) -> Result<$outer_type<$inner_type<A>>, ()> {
-                $outer_type::new(addr).ok_or(())
+            unsafe fn new_unchecked(addr: A) -> $type1<$type2<$type3<A>>> {
+                $type1($type2($type3(addr)))
+            }
+
+            #[inline]
+            fn into_addr(self) -> A {
+                self.0.into_addr()
             }
         }
-        impl<A: $outer_trait + $inner_trait> TryFrom<$outer_type<A>> for $outer_type<$inner_type<A>> {
-            type Error = ();
-            fn try_from(addr: $outer_type<A>) -> Result<$outer_type<$inner_type<A>>, ()> {
-                // Note that `.map($outer_type)` is sound because we're
-                // guaranteed by `addr: $outer_type<A>` that
-                // `$inner_type::new(addr.into_addr())` satisfies the
-                // `$outer_trait` property.
-                $inner_type::new(addr.into_addr()).map($outer_type).ok_or(())
+
+        impl<A: $trait1 + $trait2 + $trait3> AsRef<A> for $type1<$type2<$type3<A>>> {
+            fn as_ref(&self) -> &A {
+                &self.0 .0
             }
         }
     };
 }
 
-/// Implements `From<T> for SpecifiedAddr<A>` where `T` is the nested witness
-/// type `$outer_type<$inner_type<A>>`.
+/// Implements `From<T> or SpecifiedAddr<A>` where `T` is the nested witness.
+///
+/// Accepted Formats:
+/// * `impl_into_specified_for_nested_witness!(trait1, type1, trait2, type2)`
+///     Implements `From<type1<type2<A>>> for SpecifiedAddr<A>`.
+/// * `impl_nested_witness!(trait1, type1, trait2, type2, trait3, type3)`
+///     Implements `From<type1<type2<type3<<A>>>> for SpecifiedAddr<A>`.
+///
+/// Due to the nature of combinatorix, it is not advised to use this macro
+/// for all possible combinations of nested witnesses, only those that are
+/// actually instantiated in code.
 macro_rules! impl_into_specified_for_nested_witness {
-    ($outer_trait:ident, $outer_type:ident, $inner_trait:ident, $inner_type:ident) => {
-        impl<A: $outer_trait + $inner_trait + SpecifiedAddress> From<$outer_type<$inner_type<A>>>
+    ($trait1:ident, $type1:ident, $trait2:ident, $type2:ident) => {
+        impl<A: $trait1 + $trait2 + SpecifiedAddress> From<$type1<$type2<A>>> for SpecifiedAddr<A> {
+            fn from(addr: $type1<$type2<A>>) -> SpecifiedAddr<A> {
+                SpecifiedAddr(addr.into_addr())
+            }
+        }
+    };
+    ($trait1:ident, $type1:ident, $trait2:ident, $type2:ident, $trait3:ident, $type3:ident) => {
+        impl<A: $trait1 + $trait2 + $trait3 + SpecifiedAddress> From<$type1<$type2<$type3<A>>>>
             for SpecifiedAddr<A>
         {
-            fn from(addr: $outer_type<$inner_type<A>>) -> SpecifiedAddr<A> {
+            fn from(addr: $type1<$type2<$type3<A>>>) -> SpecifiedAddr<A> {
                 SpecifiedAddr(addr.into_addr())
             }
         }
@@ -743,8 +764,8 @@ impl_try_from_witness!(
 // UnicastAddr
 impl_witness!(UnicastAddr, "unicast", UnicastAddress, is_unicast);
 impl_into_specified!(UnicastAddr, UnicastAddress, is_unicast);
-impl_nested_witness!(UnicastAddress, UnicastAddr, LinkLocalAddress, LinkLocalAddr, new_link_local);
-impl_nested_witness!(UnicastAddress, UnicastAddr, MappedAddress, NonMappedAddr, new_non_mapped);
+impl_nested_witness!(UnicastAddress, UnicastAddr, LinkLocalAddress, LinkLocalAddr);
+impl_nested_witness!(UnicastAddress, UnicastAddr, MappedAddress, NonMappedAddr);
 impl_into_specified_for_nested_witness!(
     UnicastAddress,
     UnicastAddr,
@@ -765,14 +786,8 @@ impl_try_from_witness!(
 // MulticastAddr
 impl_witness!(MulticastAddr, "multicast", MulticastAddress, is_multicast);
 impl_into_specified!(MulticastAddr, MulticastAddress, is_multicast);
-impl_nested_witness!(
-    MulticastAddress,
-    MulticastAddr,
-    LinkLocalAddress,
-    LinkLocalAddr,
-    new_link_local
-);
-impl_nested_witness!(MulticastAddress, MulticastAddr, MappedAddress, NonMappedAddr, new_non_mapped);
+impl_nested_witness!(MulticastAddress, MulticastAddr, LinkLocalAddress, LinkLocalAddr);
+impl_nested_witness!(MulticastAddress, MulticastAddr, MappedAddress, NonMappedAddr);
 impl_into_specified_for_nested_witness!(
     MulticastAddress,
     MulticastAddr,
@@ -806,17 +821,41 @@ impl<A: MulticastAddress + MappedAddress> MulticastAddr<A> {
     }
 }
 
+// NonMulticastAddr - An address known to not be multicast.
+//
+// Note this type is similar to `UnicastAddr`, but not identical: all
+// `UnicastAddr' can also be `NonMulticastAddr`, but not all `NonMulticastAddr`
+// can be `UnicastAddr`. E.g. an IPv4 Broadcast Addr is non-multicast but not
+// unicast.
+impl_witness!(NonMulticastAddr, "non-multicast", MulticastAddress, is_non_multicast);
+impl_nested_witness!(MulticastAddress, NonMulticastAddr, SpecifiedAddress, SpecifiedAddr);
+impl_nested_witness!(MulticastAddress, NonMulticastAddr, UnicastAddress, UnicastAddr);
+impl_nested_witness!(MulticastAddress, NonMulticastAddr, BroadcastAddress, BroadcastAddr);
+impl_nested_witness!(MulticastAddress, NonMulticastAddr, MappedAddress, NonMappedAddr);
+// NB: Implement nested witness to a depth of three, only for the types that are
+// actually used by consumers of this library.
+impl_nested_witness!(
+    MulticastAddress,
+    NonMulticastAddr,
+    MappedAddress,
+    NonMappedAddr,
+    SpecifiedAddress,
+    SpecifiedAddr
+);
+impl_into_specified_for_nested_witness!(
+    MulticastAddress,
+    NonMulticastAddr,
+    MappedAddress,
+    NonMappedAddr,
+    SpecifiedAddress,
+    SpecifiedAddr
+);
+
 // BroadcastAddr
 impl_witness!(BroadcastAddr, "broadcast", BroadcastAddress, is_broadcast);
 impl_into_specified!(BroadcastAddr, BroadcastAddress, is_broadcast);
-impl_nested_witness!(
-    BroadcastAddress,
-    BroadcastAddr,
-    LinkLocalAddress,
-    LinkLocalAddr,
-    new_link_local
-);
-impl_nested_witness!(BroadcastAddress, BroadcastAddr, MappedAddress, NonMappedAddr, new_non_mapped);
+impl_nested_witness!(BroadcastAddress, BroadcastAddr, LinkLocalAddress, LinkLocalAddr);
+impl_nested_witness!(BroadcastAddress, BroadcastAddr, MappedAddress, NonMappedAddr);
 impl_into_specified_for_nested_witness!(
     BroadcastAddress,
     BroadcastAddr,
@@ -842,22 +881,10 @@ impl_try_from_witness!(
 // LinkLocalAddr
 impl_witness!(LinkLocalAddr, "link-local", LinkLocalAddress, is_link_local);
 impl_into_specified!(LinkLocalAddr, LinkLocalAddress, is_link_local);
-impl_nested_witness!(LinkLocalAddress, LinkLocalAddr, UnicastAddress, UnicastAddr, new_unicast);
-impl_nested_witness!(
-    LinkLocalAddress,
-    LinkLocalAddr,
-    MulticastAddress,
-    MulticastAddr,
-    new_multicast
-);
-impl_nested_witness!(
-    LinkLocalAddress,
-    LinkLocalAddr,
-    BroadcastAddress,
-    BroadcastAddr,
-    new_broadcast
-);
-impl_nested_witness!(LinkLocalAddress, LinkLocalAddr, MappedAddress, NonMappedAddr, new_non_mapped);
+impl_nested_witness!(LinkLocalAddress, LinkLocalAddr, UnicastAddress, UnicastAddr);
+impl_nested_witness!(LinkLocalAddress, LinkLocalAddr, MulticastAddress, MulticastAddr);
+impl_nested_witness!(LinkLocalAddress, LinkLocalAddr, BroadcastAddress, BroadcastAddr);
+impl_nested_witness!(LinkLocalAddress, LinkLocalAddr, MappedAddress, NonMappedAddr);
 impl_into_specified_for_nested_witness!(
     LinkLocalAddress,
     LinkLocalAddr,
@@ -892,11 +919,17 @@ impl_try_from_witness!(
 
 // NonMappedAddr
 impl_witness!(NonMappedAddr, "non_mapped", MappedAddress, is_non_mapped);
-impl_nested_witness!(MappedAddress, NonMappedAddr, SpecifiedAddress, SpecifiedAddr, new_specified);
-impl_nested_witness!(MappedAddress, NonMappedAddr, UnicastAddress, UnicastAddr, new_unicast);
-impl_nested_witness!(MappedAddress, NonMappedAddr, MulticastAddress, MulticastAddr, new_multicast);
-impl_nested_witness!(MappedAddress, NonMappedAddr, BroadcastAddress, BroadcastAddr, new_broadcast);
-impl_nested_witness!(MappedAddress, NonMappedAddr, LinkLocalAddress, LinkLocalAddr, new_link_local);
+impl_nested_witness!(MappedAddress, NonMappedAddr, SpecifiedAddress, SpecifiedAddr);
+impl_nested_witness!(MappedAddress, NonMappedAddr, UnicastAddress, UnicastAddr);
+impl_nested_witness!(MappedAddress, NonMappedAddr, MulticastAddress, MulticastAddr);
+impl_nested_witness!(MappedAddress, NonMappedAddr, BroadcastAddress, BroadcastAddr);
+impl_nested_witness!(MappedAddress, NonMappedAddr, LinkLocalAddress, LinkLocalAddr);
+impl_into_specified_for_nested_witness!(
+    MappedAddress,
+    NonMappedAddr,
+    SpecifiedAddress,
+    SpecifiedAddr
+);
 impl_into_specified_for_nested_witness!(MappedAddress, NonMappedAddr, UnicastAddress, UnicastAddr);
 impl_into_specified_for_nested_witness!(
     MappedAddress,
@@ -1447,9 +1480,9 @@ mod tests {
     }
 
     macro_rules! test_nested {
-        ($new:expr, $($input:ident => $output:expr,)*) => {
+        ($outer:ident, $inner:ident, $($input:ident => $output:expr,)*) => {
             $(
-                assert_eq!($new(Address::$input), $output);
+                assert_eq!($inner::new(Address::$input).and_then($outer::new), $output);
             )*
         };
     }
@@ -1462,7 +1495,8 @@ mod tests {
 
         // Unicast
         test_nested!(
-            UnicastAddr::new_link_local,
+            UnicastAddr,
+            LinkLocalAddr,
             Unspecified => None,
             GlobalUnicast => None,
             GlobalMulticast => None,
@@ -1472,7 +1506,9 @@ mod tests {
         );
 
         // Multicast
-        test_nested!(MulticastAddr::new_link_local,
+        test_nested!(
+            MulticastAddr,
+            LinkLocalAddr,
             Unspecified => None,
             GlobalUnicast => None,
             GlobalMulticast => None,
@@ -1482,7 +1518,9 @@ mod tests {
         );
 
         // Broadcast
-        test_nested!(BroadcastAddr::new_link_local,
+        test_nested!(
+            BroadcastAddr,
+            LinkLocalAddr,
             Unspecified => None,
             GlobalUnicast => None,
             GlobalMulticast => None,
@@ -1492,7 +1530,9 @@ mod tests {
         );
 
         // Link-local
-        test_nested!(LinkLocalAddr::new_unicast,
+        test_nested!(
+            LinkLocalAddr,
+            UnicastAddr,
             Unspecified => None,
             GlobalUnicast => None,
             GlobalMulticast => None,
@@ -1500,7 +1540,9 @@ mod tests {
             LinkLocalMulticast => None,
             LinkLocalBroadcast => None,
         );
-        test_nested!(LinkLocalAddr::new_multicast,
+        test_nested!(
+            LinkLocalAddr,
+            MulticastAddr,
             Unspecified => None,
             GlobalUnicast => None,
             GlobalMulticast => None,
@@ -1508,7 +1550,9 @@ mod tests {
             LinkLocalMulticast => Some(LinkLocalAddr(MulticastAddr(Address::LinkLocalMulticast))),
             LinkLocalBroadcast => None,
         );
-        test_nested!(LinkLocalAddr::new_broadcast,
+        test_nested!(
+            LinkLocalAddr,
+            BroadcastAddr,
             Unspecified => None,
             GlobalUnicast => None,
             GlobalMulticast => None,
@@ -1526,7 +1570,9 @@ mod tests {
         //   BroadcastAddr<NonMappedAddr>, NonMappedAddr<BroadcastAddr>,
 
         // Unicast
-        test_nested!(UnicastAddr::new_non_mapped,
+        test_nested!(
+            UnicastAddr,
+            NonMappedAddr,
             Unspecified => None,
             LinkLocalUnicast => Some(UnicastAddr(NonMappedAddr(Address::LinkLocalUnicast))),
             LinkLocalMulticast => None,
@@ -1537,7 +1583,9 @@ mod tests {
         );
 
         // Multicast
-        test_nested!(MulticastAddr::new_non_mapped,
+        test_nested!(
+            MulticastAddr,
+            NonMappedAddr,
             Unspecified => None,
             LinkLocalUnicast => None,
             LinkLocalMulticast => Some(MulticastAddr(NonMappedAddr(Address::LinkLocalMulticast))),
@@ -1548,7 +1596,9 @@ mod tests {
         );
 
         // Broadcast
-        test_nested!(BroadcastAddr::new_non_mapped,
+        test_nested!(
+            BroadcastAddr,
+            NonMappedAddr,
             Unspecified => None,
             LinkLocalUnicast => None,
             LinkLocalMulticast => None,
@@ -1559,7 +1609,9 @@ mod tests {
         );
 
         // non-mapped
-        test_nested!(NonMappedAddr::new_unicast,
+        test_nested!(
+            NonMappedAddr,
+            UnicastAddr,
             Unspecified => None,
             LinkLocalUnicast => Some(NonMappedAddr(UnicastAddr(Address::LinkLocalUnicast))),
             LinkLocalMulticast => None,
@@ -1568,7 +1620,9 @@ mod tests {
             MappedMulticast => None,
             MappedBroadcast => None,
         );
-        test_nested!(NonMappedAddr::new_multicast,
+        test_nested!(
+            NonMappedAddr,
+            MulticastAddr,
             Unspecified => None,
             LinkLocalUnicast => None,
             LinkLocalMulticast => Some(NonMappedAddr(MulticastAddr(Address::LinkLocalMulticast))),
@@ -1577,7 +1631,9 @@ mod tests {
             MappedMulticast => None,
             MappedBroadcast => None,
         );
-        test_nested!(NonMappedAddr::new_broadcast,
+        test_nested!(
+            NonMappedAddr,
+            BroadcastAddr,
             Unspecified => None,
             LinkLocalUnicast => None,
             LinkLocalMulticast => None,

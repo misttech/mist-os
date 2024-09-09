@@ -8,7 +8,6 @@ import datetime
 import glob
 import os
 import re
-import sys
 import textwrap
 from dataclasses import asdict, dataclass
 from pathlib import Path

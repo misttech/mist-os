@@ -24,5 +24,8 @@ static_library("usb_bulk") {
   configs += [
     # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings
     "//build/config:Wno-conversion",
+
+    # TODO(https://fxbug.dev/363080585): delete the below and fix the compiler warnings
+    "//build/config:Wno-deprecated-anon-enum-enum-conversion",
   ]
 }

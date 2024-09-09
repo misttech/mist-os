@@ -36,7 +36,7 @@ source_set("lib") {
     "//sdk/fidl/fuchsia.tracing:fuchsia.tracing_hlcpp",
     "//sdk/fidl/fuchsia.tracing.controller:fuchsia.tracing.controller_hlcpp",
     "//sdk/fidl/fuchsia.tracing.provider:fuchsia.tracing.provider_hlcpp",
-    "//sdk/lib/fidl/cpp",
+    "//sdk/lib/fidl/hlcpp",
     "//sdk/lib/fit",
     "//sdk/lib/sys/cpp",
     "//src/lib/fxl:fxl_cli",

@@ -18,7 +18,7 @@
         }
     },
     "input_bundles": [
-        "input_bundles/testing_board_input_bundle_out",
+        "input_bundles/testing_board_input_bundle",
         "input_bundles/empty_bib"
     ],
     "kernel": {

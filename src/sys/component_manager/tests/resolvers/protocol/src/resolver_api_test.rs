@@ -139,6 +139,9 @@ async fn local_resolver_impl(
                             .context("failed sending response")
                             .unwrap()
                     }
+                    fcresolution::ResolverRequest::_UnknownMethod { .. } => {
+                        panic!("unknown resolver request");
+                    }
                 }
             }
         })

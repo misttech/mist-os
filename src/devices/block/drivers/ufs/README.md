@@ -38,7 +38,6 @@ and provides reliable data transfer through the M-PHY physical layer.
 
 ## TODO
 * Support RPMB logical unit
-* Support Utp Task Management Request
 * Support write protect
 * Support runtime suspend
 * Support background operation

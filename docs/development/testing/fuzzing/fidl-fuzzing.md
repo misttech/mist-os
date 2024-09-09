@@ -17,7 +17,7 @@ instance of the server to be fuzzed.
 1. Add `fuzzers = {protocol = "fully.qualified.fidl.ProtocolName"}` to your `fidl()` GN target.
 1. Depending on the language you are using:
     * At the C++ level (easy mode):
-      Use the `FIDL_FUZZER_DEFINITION()` macro in `//sdk/lib/fidl/cpp/fuzzing/server_provider.h` to
+      Use the `FIDL_FUZZER_DEFINITION()` macro in `//sdk/lib/fidl/hlcpp/fuzzing/include/lib/fidl/cpp/fuzzing/server_provider.h` to
       define a server provider for your interface and server implementation class. This will
       automatically define the C symbols described below. See
       `//examples/fuzzers/fidl` for a reference example.

@@ -17,47 +17,13 @@
 #include <fbl/ref_ptr.h>
 #include <gtest/gtest.h>
 
+#include "test-helper.h"
+
 namespace {
 
 using power_management::PowerDomain;
 using power_management::PowerDomainRegistry;
 using power_management::PowerModel;
-
-template <typename... Cpus>
-zx_cpu_set_t MakeCpuSet(Cpus... cpus) {
-  zx_cpu_set_t set = {};
-  auto set_bit = [&set](size_t num_cpu) {
-    set.mask[num_cpu / ZX_CPU_SET_BITS_PER_WORD] |= uint64_t(1)
-                                                    << num_cpu % ZX_CPU_SET_BITS_PER_WORD;
-    return true;
-  };
-  (set_bit(cpus) && ...);
-  return set;
-}
-
-auto MakePowerDomain(uint32_t id, zx_cpu_set_t cpus) {
-  return fbl::MakeRefCounted<PowerDomain>(id, cpus, PowerModel{});
-}
-
-template <typename... Cpus>
-auto MakePowerDomainHelper(uint32_t id, Cpus... cpus) {
-  return MakePowerDomain(id, MakeCpuSet(cpus...));
-}
-
-template <typename CpuVisitor>
-void ForEachCpuIn(zx_cpu_set_t cpus, CpuVisitor&& visitor) {
-  for (size_t i = 0; i < ZX_CPU_SET_MAX_CPUS / ZX_CPU_SET_BITS_PER_WORD; ++i) {
-    if (cpus.mask[i] == 0) {
-      continue;
-    }
-    for (size_t j = 0; j < ZX_CPU_SET_BITS_PER_WORD; ++j) {
-      if ((cpus.mask[i] & (static_cast<uint64_t>(1) << j)) == 0) {
-        continue;
-      }
-      visitor(i * ZX_CPU_SET_BITS_PER_WORD + j);
-    }
-  }
-}
 
 TEST(PowerLevelTest, Ctor) {
   constexpr zx_processor_power_level_t kLevel = {
@@ -118,7 +84,7 @@ TEST(PowerLevelTransitionTest, Ctor) {
   power_management::PowerLevelTransition transition(kTransition);
 
   EXPECT_EQ(transition.latency(), zx::duration(kTransition.latency));
-  EXPECT_EQ(transition.energy_cost(), kTransition.energy_nj);
+  EXPECT_EQ(transition.energy_cost_nj(), kTransition.energy_nj);
 }
 
 TEST(PowerModelTest, Create) {
@@ -292,7 +258,7 @@ TEST(PowerModelTest, Create) {
       auto transition = transitions[i][j];
       auto og_transition = get_original_transition(i, j);
       EXPECT_EQ(transition.latency(), og_transition.latency());
-      EXPECT_EQ(transition.energy_cost(), og_transition.energy_cost());
+      EXPECT_EQ(transition.energy_cost_nj(), og_transition.energy_cost_nj());
     }
   }
 
@@ -328,6 +294,7 @@ TEST(PowerDomainRegistryTest, RegisterUniquePowerDomains) {
   };
 
   for (auto [domain_id, domain] : registed_domains) {
+    EXPECT_EQ(domain->total_normalized_utilization(), 0u);
     ASSERT_TRUE(registry.Register(domain, domain_update).is_ok());
   }
 

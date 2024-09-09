@@ -7,7 +7,6 @@ use core::cell::RefCell;
 
 use assert_matches::assert_matches;
 use ip_test_macro::ip_test;
-use netstack3_base::socket::SocketIpAddr;
 use netstack3_base::testutil::{MultipleDevicesId, TestIpExt};
 use netstack3_base::{CtxPair, SubnetMatcher};
 use packet::InnerPacketBuilder as _;
@@ -122,7 +121,7 @@ impl<I: IpLayerIpExt> IpDeviceStateContext<I> for FakeCoreCtx<I> {
         &mut self,
         _device_id: &Self::DeviceId,
         _remote: Option<SpecifiedAddr<I::Addr>>,
-    ) -> Option<SocketIpAddr<I::Addr>> {
+    ) -> Option<IpDeviceAddr<I::Addr>> {
         unimplemented!()
     }
 

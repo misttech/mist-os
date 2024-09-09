@@ -498,7 +498,7 @@ To migrate these metadata functions to DFv2, do the following:
 * {DFv1}
 
   ```cpp
-  zx_status_t status = dev->DdkAddMetadata(DEVICE_METADATA_I2C_DEVICE,
+  zx_status_t status = dev->DdkAddMetadata(DEVICE_METADATA_PRIVATE,
       metadata.value().data(), sizeof(metadata.value());
   if (status != ZX_OK) {
     zxlogf(ERROR, "DdkAddMetadata failed: %s", zx_status_get_string(status));
@@ -508,7 +508,7 @@ To migrate these metadata functions to DFv2, do the following:
 * {DFv2}
 
   ```cpp
-  compat_server->inner().AddMetadata(DEVICE_METADATA_I2C_DEVICE,
+  compat_server->inner().AddMetadata(DEVICE_METADATA_PRIVATE,
       metadata.value().data(), sizeof(metadata.value()));
   ```
 

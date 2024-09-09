@@ -175,6 +175,10 @@ type Capability = flexible union {
     7: config Config;
     @available(added=HEAD)
     8: dictionary Dictionary;
+    @available(added=NEXT)
+    9: resolver Resolver;
+    @available(added=NEXT)
+    10: runner Runner;
 };
 
 /// A protocol capability
@@ -378,6 +382,50 @@ type Dictionary = table {
     /// Optional. If set, the path to the dictionary routed by `from` which contains
     /// the capability.
     5: from_dictionary string:MAX;
+};
+
+/// A resolver capability
+@available(added=NEXT)
+type Resolver = table {
+    /// The name of the resolver.
+    1: name fuchsia.component.name;
+
+    /// A rename of the resolver, which can be set when routing to another
+    /// component. This field is optional.
+    2: as fuchsia.component.name;
+
+    /// Override the path in which the resolver is installed. Instead of
+    /// `/svc/{name}`, this value will be used. Path should begin with a
+    /// leading slash and omit a trailing slash, e.g.
+    /// `/foo/fuchsia.logger.LogSink`. This field is optional.
+    3: path string:fuchsia.component.MAX_PATH_LENGTH;
+
+    /// Optional. If set, the path to the dictionary routed by `from` which contains
+    /// the capability.
+    @available(added=HEAD)
+    4: from_dictionary string:MAX;
+};
+
+/// A runner capability
+@available(added=NEXT)
+type Runner = table {
+    /// The name of the runner.
+    1: name fuchsia.component.name;
+
+    /// A rename of the runner, which can be set when routing to another
+    /// component. This field is optional.
+    2: as fuchsia.component.name;
+
+    /// Override the path in which the runner is installed. Instead of
+    /// `/svc/{name}`, this value will be used. Path should begin with a
+    /// leading slash and omit a trailing slash, e.g.
+    /// `/foo/fuchsia.logger.LogSink`. This field is optional.
+    3: path string:fuchsia.component.MAX_PATH_LENGTH;
+
+    /// Optional. If set, the path to the dictionary routed by `from` which contains
+    /// the capability.
+    @available(added=HEAD)
+    4: from_dictionary string:MAX;
 };
 
 

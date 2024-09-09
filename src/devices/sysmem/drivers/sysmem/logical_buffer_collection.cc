@@ -43,13 +43,13 @@
 #include "buffer_collection.h"
 #include "buffer_collection_token.h"
 #include "buffer_collection_token_group.h"
-#include "device.h"
 #include "koid_util.h"
 #include "logging.h"
 #include "macros.h"
 #include "node_properties.h"
 #include "orphaned_node.h"
 #include "src/lib/memory_barriers/memory_barriers.h"
+#include "sysmem.h"
 #include "usage_pixel_format_cost.h"
 
 using safemath::CheckAdd;
@@ -497,9 +497,9 @@ bool IsSecureRequired(const fuchsia_sysmem2::BufferCollectionConstraints& constr
 
 // static
 fbl::RefPtr<LogicalBufferCollection> LogicalBufferCollection::CommonCreate(
-    Device* parent_device, const ClientDebugInfo* client_debug_info) {
+    Sysmem* parent_sysmem, const ClientDebugInfo* client_debug_info) {
   fbl::RefPtr<LogicalBufferCollection> logical_buffer_collection =
-      fbl::AdoptRef<LogicalBufferCollection>(new LogicalBufferCollection(parent_device));
+      fbl::AdoptRef<LogicalBufferCollection>(new LogicalBufferCollection(parent_sysmem));
   // The existence of a channel-owned BufferCollectionToken adds a
   // fbl::RefPtr<> ref to LogicalBufferCollection.
   logical_buffer_collection->LogInfo(FROM_HERE, "LogicalBufferCollection::Create()");
@@ -510,10 +510,10 @@ fbl::RefPtr<LogicalBufferCollection> LogicalBufferCollection::CommonCreate(
 
 // static
 void LogicalBufferCollection::CreateV1(TokenServerEndV1 buffer_collection_token_request,
-                                       Device* parent_device,
+                                       Sysmem* parent_sysmem,
                                        const ClientDebugInfo* client_debug_info) {
   fbl::RefPtr<LogicalBufferCollection> logical_buffer_collection =
-      LogicalBufferCollection::CommonCreate(parent_device, client_debug_info);
+      LogicalBufferCollection::CommonCreate(parent_sysmem, client_debug_info);
   logical_buffer_collection->CreateBufferCollectionTokenV1(
       logical_buffer_collection, logical_buffer_collection->root_.get(),
       std::move(buffer_collection_token_request));
@@ -521,10 +521,10 @@ void LogicalBufferCollection::CreateV1(TokenServerEndV1 buffer_collection_token_
 
 // static
 void LogicalBufferCollection::CreateV2(TokenServerEndV2 buffer_collection_token_request,
-                                       Device* parent_device,
+                                       Sysmem* parent_sysmem,
                                        const ClientDebugInfo* client_debug_info) {
   fbl::RefPtr<LogicalBufferCollection> logical_buffer_collection =
-      LogicalBufferCollection::CommonCreate(parent_device, client_debug_info);
+      LogicalBufferCollection::CommonCreate(parent_sysmem, client_debug_info);
   logical_buffer_collection->CreateBufferCollectionTokenV2(
       logical_buffer_collection, logical_buffer_collection->root_.get(),
       std::move(buffer_collection_token_request));
@@ -532,7 +532,7 @@ void LogicalBufferCollection::CreateV2(TokenServerEndV2 buffer_collection_token_
 
 // static
 fit::result<zx_status_t, BufferCollectionToken*> LogicalBufferCollection::CommonConvertToken(
-    Device* parent_device, zx::channel buffer_collection_token,
+    Sysmem* parent_sysmem, zx::channel buffer_collection_token,
     const ClientDebugInfo* client_debug_info, const char* fidl_message_name) {
   ZX_DEBUG_ASSERT(buffer_collection_token);
 
@@ -546,7 +546,7 @@ fit::result<zx_status_t, BufferCollectionToken*> LogicalBufferCollection::Common
     return fit::error(ZX_ERR_INVALID_ARGS);
   }
 
-  BufferCollectionToken* token = parent_device->FindTokenByServerChannelKoid(token_server_koid);
+  BufferCollectionToken* token = parent_sysmem->FindTokenByServerChannelKoid(token_server_koid);
   if (!token) {
     // The most likely scenario for why the token was not found is that Sync() was not called on
     // either the BufferCollectionToken or the BufferCollection.
@@ -608,7 +608,7 @@ LogicalBufferCollection::DupCloseWeakAsapClientEnd(uint32_t buffer_index) {
 // So this method will close the buffer_collection_token and when it closes via
 // normal FIDL processing path, the token will remember the
 // buffer_collection_request to essentially convert itself into.
-void LogicalBufferCollection::BindSharedCollection(Device* parent_device,
+void LogicalBufferCollection::BindSharedCollection(Sysmem* parent_device,
                                                    zx::channel buffer_collection_token,
                                                    CollectionServerEnd buffer_collection_request,
                                                    const ClientDebugInfo* client_debug_info) {
@@ -645,7 +645,7 @@ void LogicalBufferCollection::BindSharedCollection(Device* parent_device,
   // ~buffer_collection_token
 }
 
-zx_status_t LogicalBufferCollection::ValidateBufferCollectionToken(Device* parent_device,
+zx_status_t LogicalBufferCollection::ValidateBufferCollectionToken(Sysmem* parent_device,
                                                                    zx_koid_t token_server_koid) {
   BufferCollectionToken* token = parent_device->FindTokenByServerChannelKoid(token_server_koid);
   return token ? ZX_OK : ZX_ERR_NOT_FOUND;
@@ -950,7 +950,7 @@ void LogicalBufferCollection::SetName(uint32_t priority, std::string name) {
 void LogicalBufferCollection::SetDebugTimeoutLogDeadline(int64_t deadline) {
   creation_timer_.Cancel();
   zx_status_t status =
-      creation_timer_.PostForTime(parent_device_->loop_dispatcher(), zx::time(deadline));
+      creation_timer_.PostForTime(parent_sysmem_->loop_dispatcher(), zx::time(deadline));
   ZX_ASSERT(status == ZX_OK);
 }
 
@@ -976,8 +976,8 @@ AllocationResult LogicalBufferCollection::allocation_result() {
   };
 }
 
-LogicalBufferCollection::LogicalBufferCollection(Device* parent_device)
-    : parent_device_(parent_device), create_time_monotonic_(zx::clock::get_monotonic()) {
+LogicalBufferCollection::LogicalBufferCollection(Sysmem* parent_device)
+    : parent_sysmem_(parent_device), create_time_monotonic_(zx::clock::get_monotonic()) {
   TRACE_DURATION("gfx", "LogicalBufferCollection::LogicalBufferCollection", "this", this);
   LogInfo(FROM_HERE, "LogicalBufferCollection::LogicalBufferCollection()");
 
@@ -994,11 +994,11 @@ LogicalBufferCollection::LogicalBufferCollection(Device* parent_device)
   ZX_DEBUG_ASSERT(buffer_collection_id_ != ZX_KOID_INVALID);
   ZX_DEBUG_ASSERT(buffer_collection_id_ != ZX_KOID_KERNEL);
 
-  parent_device_->AddLogicalBufferCollection(this);
+  parent_sysmem_->AddLogicalBufferCollection(this);
   inspect_node_ =
-      parent_device_->collections_node().CreateChild(CreateUniqueName("logical-collection-"));
+      parent_sysmem_->collections_node().CreateChild(CreateUniqueName("logical-collection-"));
 
-  status = creation_timer_.PostDelayed(parent_device_->loop_dispatcher(), zx::sec(5));
+  status = creation_timer_.PostDelayed(parent_sysmem_->loop_dispatcher(), zx::sec(5));
   ZX_ASSERT(status == ZX_OK);
   // nothing else to do here
 }
@@ -1024,7 +1024,7 @@ LogicalBufferCollection::~LogicalBufferCollection() {
     memory_allocator_->RemoveDestroyCallback(reinterpret_cast<intptr_t>(this));
   }
 
-  parent_device_->RemoveLogicalBufferCollection(this);
+  parent_sysmem_->RemoveLogicalBufferCollection(this);
 }
 
 void LogicalBufferCollection::LogAndFailRootNode(Location location, Error error, const char* format,
@@ -1032,8 +1032,8 @@ void LogicalBufferCollection::LogAndFailRootNode(Location location, Error error,
   ZX_DEBUG_ASSERT(format);
   va_list args;
   va_start(args, format);
-  vLog(::fuchsia_logging::LOG_WARNING, location.file(), location.line(), "LogicalBufferCollection",
-       format, args);
+  vLog(FUCHSIA_LOG_WARNING, location.file(), location.line(), "LogicalBufferCollection", format,
+       args);
   va_end(args);
   FailRootNode(error);
 }
@@ -1053,7 +1053,7 @@ void LogicalBufferCollection::LogAndFailDownFrom(Location location, NodeProperti
   va_list args;
   va_start(args, format);
   bool is_root = (tree_to_fail == root_.get());
-  vLog(::fuchsia_logging::LOG_INFO, location.file(), location.line(),
+  vLog(FUCHSIA_LOG_INFO, location.file(), location.line(),
        is_root ? "LogicalBufferCollection root fail" : "LogicalBufferCollection sub-tree fail",
        format, args);
   va_end(args);
@@ -1097,7 +1097,7 @@ void LogicalBufferCollection::LogAndFailNode(Location location, NodeProperties* 
   va_list args;
   va_start(args, format);
   bool is_root = (tree_to_fail == root_.get());
-  vLog(::fuchsia_logging::LOG_INFO, location.file(), location.line(),
+  vLog(FUCHSIA_LOG_INFO, location.file(), location.line(),
        is_root ? "LogicalBufferCollection root fail" : "LogicalBufferCollection sub-tree fail",
        format, args);
   va_end(args);
@@ -1116,7 +1116,7 @@ void LogErrorInternal(Location location, const char* format, ...) {
   va_list args;
   va_start(args, format);
 
-  vLog(::fuchsia_logging::LOG_ERROR, location.file(), location.line(), nullptr, format, args);
+  vLog(FUCHSIA_LOG_ERROR, location.file(), location.line(), nullptr, format, args);
 
   va_end(args);
 }
@@ -1126,11 +1126,11 @@ void LogicalBufferCollection::LogInfo(Location location, const char* format, ...
   va_list args;
   va_start(args, format);
 
-  ::fuchsia_logging::LogSeverity severity;
+  FuchsiaLogSeverity severity;
   if (is_verbose_logging()) {
-    severity = ::fuchsia_logging::LOG_INFO;
+    severity = FUCHSIA_LOG_INFO;
   } else {
-    severity = ::fuchsia_logging::LOG_DEBUG;
+    severity = FUCHSIA_LOG_DEBUG;
   }
 
   vLog(severity, location.file(), location.line(), nullptr, format, args);
@@ -1627,8 +1627,8 @@ fpromise::result<fuchsia_sysmem2::BufferCollectionInfo, Error> LogicalBufferColl
       break;
     }
   }
-  if (is_secure_required && !parent_device_->is_secure_mem_ready()) {
-    // parent_device_ will call OnDependencyReady when all secure heaps/allocators are ready
+  if (is_secure_required && !parent_sysmem_->is_secure_mem_ready()) {
+    // parent_sysmem_ will call OnDependencyReady when all secure heaps/allocators are ready
     LogInfo(FROM_HERE, "secure_required && !is_secure_mem_ready");
     waiting_for_secure_allocators_ready_ = true;
     return fpromise::error(Error::kPending);
@@ -2361,8 +2361,8 @@ LogicalBufferCollection::CombineConstraints(ConstraintsList* constraints_list) {
 
   ZX_DEBUG_ASSERT_MSG(
       !acc.buffer_memory_constraints().value().secure_required().value() ||
-          parent_device_->is_secure_mem_ready(),
-      "CombineConstraints called too soon before parent_device_->is_secure_mem_ready()");
+          parent_sysmem_->is_secure_mem_ready(),
+      "CombineConstraints called too soon before parent_sysmem_->is_secure_mem_ready()");
 
   if (!CheckSanitizeBufferCollectionConstraints(CheckSanitizeStage::kAggregated, acc)) {
     return fpromise::error();
@@ -2431,10 +2431,16 @@ bool LogicalBufferCollection::CheckSanitizeBufferUsage(CheckSanitizeStage stage,
                    "A participant indicating 'none' usage can't specify any other usage.");
           return false;
         }
+        if ((*buffer_usage.none() & fuchsia_sysmem2::kNoneUsagePermitAllocation) &&
+            !(*buffer_usage.none() & fuchsia_sysmem2::kNoneUsage)) {
+          LogError(FROM_HERE, "NONE_USAGE_PERMIT_ALLOCATION requires NONE_USAGE");
+          return false;
+        }
       }
       break;
     case CheckSanitizeStage::kAggregated:
-      if (*buffer_usage.cpu() == 0 && *buffer_usage.vulkan() == 0 && *buffer_usage.display() == 0 &&
+      if (!IsNoneUsagePermitAllocation(buffer_usage) && *buffer_usage.cpu() == 0 &&
+          *buffer_usage.vulkan() == 0 && *buffer_usage.display() == 0 &&
           *buffer_usage.video() == 0) {
         LogError(FROM_HERE,
                  "At least one non-'none' usage bit must be set across all participants.");
@@ -2763,8 +2769,8 @@ bool LogicalBufferCollection::CheckSanitizeBufferMemoryConstraints(
   // is_secure_mem_ready() becomes true (as called during CombineConstraints which only gets called
   // with !secure_required() || is_secure_mem_ready()).
   ZX_DEBUG_ASSERT(stage != CheckSanitizeStage::kAggregated ||
-                  (!*constraints.secure_required() || parent_device_->is_secure_mem_ready()));
-  if (*constraints.secure_required() && parent_device_->is_secure_mem_ready() &&
+                  (!*constraints.secure_required() || parent_sysmem_->is_secure_mem_ready()));
+  if (*constraints.secure_required() && parent_sysmem_->is_secure_mem_ready() &&
       !IsSecurePermitted(constraints)) {
     LogError(FROM_HERE, "secure memory required but not permitted");
     return false;
@@ -3419,7 +3425,7 @@ bool LogicalBufferCollection::IsColorSpaceEqual(const fuchsia_images2::ColorSpac
 }
 
 fpromise::result<fuchsia_sysmem2::Heap, zx_status_t> LogicalBufferCollection::GetHeap(
-    const fuchsia_sysmem2::BufferMemoryConstraints& constraints, Device* device) {
+    const fuchsia_sysmem2::BufferMemoryConstraints& constraints, Sysmem* sysmem) {
   if (*constraints.secure_required()) {
     // If two different secure heaps are mutually supported among all participants of a collection
     // (rare outside of tests), we pick the one with alphabetically lower bind string. As needed, we
@@ -3427,7 +3433,7 @@ fpromise::result<fuchsia_sysmem2::Heap, zx_status_t> LogicalBufferCollection::Ge
     // (either in PlatformSysmemConfig -> structured config, or in fuchsia.sysmem2.Config).
     ZX_DEBUG_ASSERT(IsSecurePermitted(constraints));
     std::optional<fuchsia_sysmem2::Heap> best_heap;
-    parent_device_->ForeachSecureHeap([&constraints, &best_heap](
+    parent_sysmem_->ForeachSecureHeap([&constraints, &best_heap](
                                           const fuchsia_sysmem2::Heap& secure_heap) -> bool {
       if (!IsPermittedHeap(constraints, secure_heap)) {
         // keep going
@@ -3451,7 +3457,7 @@ fpromise::result<fuchsia_sysmem2::Heap, zx_status_t> LogicalBufferCollection::Ge
 
   for (size_t i = 0; i < constraints.permitted_heaps()->size(); ++i) {
     auto& heap = constraints.permitted_heaps()->at(i);
-    const auto* heap_properties = device->GetHeapProperties(heap);
+    const auto* heap_properties = sysmem->GetHeapProperties(heap);
     if (!heap_properties) {
       continue;
     }
@@ -3564,7 +3570,7 @@ LogicalBufferCollection::GenerateUnpopulatedBufferCollectionInfo(
   ZX_DEBUG_ASSERT(!*buffer_constraints.secure_required() || IsSecurePermitted(buffer_constraints));
   buffer_settings.is_secure() = *buffer_constraints.secure_required();
 
-  auto result_get_heap = GetHeap(buffer_constraints, parent_device_);
+  auto result_get_heap = GetHeap(buffer_constraints, parent_sysmem_);
   if (!result_get_heap.is_ok()) {
     LogError(FROM_HERE, "Can not find a heap permitted by buffer constraints, error %d",
              result_get_heap.error());
@@ -3578,7 +3584,7 @@ LogicalBufferCollection::GenerateUnpopulatedBufferCollectionInfo(
   max_size_bytes = *buffer_constraints.max_size_bytes();
 
   // Get memory allocator for settings.
-  MemoryAllocator* allocator = parent_device_->GetAllocator(buffer_settings);
+  MemoryAllocator* allocator = parent_sysmem_->GetAllocator(buffer_settings);
   if (!allocator) {
     LogError(FROM_HERE, "No memory allocator for buffer settings");
     return fpromise::error(ZX_ERR_NO_MEMORY);
@@ -3744,7 +3750,7 @@ LogicalBufferCollection::GenerateUnpopulatedBufferCollectionInfo(
   // allocated buffers to be large enough.
   buffer_settings.size_bytes() = safe_cast<uint32_t>(min_size_bytes);
 
-  if (*buffer_settings.size_bytes() > parent_device_->settings().max_allocation_size) {
+  if (*buffer_settings.size_bytes() > parent_sysmem_->settings().max_allocation_size) {
     // This is different than max_size_bytes.  While max_size_bytes is part of the constraints,
     // max_allocation_size isn't part of the constraints.  The latter is used for simulating OOM or
     // preventing unpredictable memory pressure caused by a fuzzer or similar source of
@@ -3753,7 +3759,7 @@ LogicalBufferCollection::GenerateUnpopulatedBufferCollectionInfo(
              "GenerateUnpopulatedBufferCollectionInfo() failed because size %" PRIu64
              " > "
              "max_allocation_size %ld",
-             *buffer_settings.size_bytes(), parent_device_->settings().max_allocation_size);
+             *buffer_settings.size_bytes(), parent_sysmem_->settings().max_allocation_size);
     return fpromise::error(ZX_ERR_NO_MEMORY);
   }
 
@@ -3777,7 +3783,7 @@ fpromise::result<fuchsia_sysmem2::BufferCollectionInfo, Error> LogicalBufferColl
   fuchsia_sysmem2::BufferMemorySettings& buffer_settings = *settings.buffer_settings();
 
   // Get memory allocator for settings.
-  MemoryAllocator* allocator = parent_device_->GetAllocator(buffer_settings);
+  MemoryAllocator* allocator = parent_sysmem_->GetAllocator(buffer_settings);
   if (!allocator) {
     LogError(FROM_HERE, "No memory allocator for buffer settings");
     return fpromise::error(Error::kNoMemory);
@@ -3828,7 +3834,7 @@ fpromise::result<fuchsia_sysmem2::BufferCollectionInfo, Error> LogicalBufferColl
   inspect_node_.CreateUint("allocation_timestamp_ns", zx::clock::get_monotonic().get(),
                            &vmo_properties_);
 
-  ZX_DEBUG_ASSERT(*buffer_settings.size_bytes() <= parent_device_->settings().max_allocation_size);
+  ZX_DEBUG_ASSERT(*buffer_settings.size_bytes() <= parent_sysmem_->settings().max_allocation_size);
 
   auto cleanup_buffers = fit::defer([this] { ClearBuffers(); });
 
@@ -4543,7 +4549,7 @@ void LogicalBuffer::ComplainLoudlyAboutStillExistingWeakVmoHandles() {
     auto* client_debug_info = weak_parent->get_client_debug_info();
     ZX_DEBUG_ASSERT(client_debug_info);
 
-    logical_buffer_collection_->parent_device_->metrics().LogCloseWeakAsapTakingTooLong();
+    logical_buffer_collection_->parent_sysmem_->metrics().LogCloseWeakAsapTakingTooLong();
 
     // The client may have created a child VMO based on the handed-out VMO and closed the handed-out
     // VMO, which still counts as failure to close the handed-out weak VMO in a timely manner; the
@@ -4579,7 +4585,7 @@ void LogicalBufferCollection::DecStrongNodeTally() {
 
 void LogicalBufferCollection::CheckForZeroStrongNodes() {
   if (strong_node_count_ == 0) {
-    parent_device_->PostTask([this, ref_this = fbl::RefPtr(this)] {
+    parent_sysmem_->PostTask([this, ref_this = fbl::RefPtr(this)] {
       if (allocation_result_info_.has_value()) {
         // Regardless of whether we'd allocated by the time of posting, we've allocated by the
         // time of running the posted task.
@@ -4637,7 +4643,7 @@ void LogicalBufferCollection::DecStrongParentVmoCount() {
 
 void LogicalBufferCollection::CheckForZeroStrongParentVmoCount() {
   if (strong_parent_vmo_count_ == 0) {
-    parent_device_->PostTask([this, ref_this = fbl::RefPtr(this)] {
+    parent_sysmem_->PostTask([this, ref_this = fbl::RefPtr(this)] {
       FailRootNode(Error::kUnspecified);
       // ~ref_this
     });
@@ -4830,7 +4836,7 @@ void LogicalBufferCollection::LogSummary(IndentTracker& indent_tracker) {
 
 bool LogicalBufferCollection::IsSecureHeap(const fuchsia_sysmem2::Heap& heap) {
   bool found_in_secure_heaps = false;
-  parent_device_->ForeachSecureHeap(
+  parent_sysmem_->ForeachSecureHeap(
       [&heap, &found_in_secure_heaps](const fuchsia_sysmem2::Heap& secure_heap) -> bool {
         if (heap == secure_heap) {
           found_in_secure_heaps = true;
@@ -4847,13 +4853,13 @@ bool LogicalBufferCollection::IsSecurePermitted(
     const fuchsia_sysmem2::BufferMemoryConstraints& constraints) {
   // Without this, we don't know about all the expected secure heaps yet, so can't determine if the
   // constraints are permitting a secure heap that is missing currently but will be present shortly.
-  ZX_DEBUG_ASSERT_MSG(parent_device_->is_secure_mem_ready(),
+  ZX_DEBUG_ASSERT_MSG(parent_sysmem_->is_secure_mem_ready(),
                       "IsSecurePermitted called before is_secure_mem_ready");
   if (!*constraints.inaccessible_domain_supported()) {
     return false;
   }
   bool found_permitted_secure_heap = false;
-  parent_device_->ForeachSecureHeap([&constraints, &found_permitted_secure_heap](
+  parent_sysmem_->ForeachSecureHeap([&constraints, &found_permitted_secure_heap](
                                         const fuchsia_sysmem2::Heap secure_heap) -> bool {
     if (IsPermittedHeap(constraints, secure_heap)) {
       found_permitted_secure_heap = true;
@@ -4896,7 +4902,7 @@ LogicalBuffer::LogicalBuffer(fbl::RefPtr<LogicalBufferCollection> logical_buffer
   auto complain_about_leaked_weak_timer_task_scope =
       std::make_shared<std::optional<async_patterns::TaskScope>>();
   complain_about_leaked_weak_timer_task_scope->emplace(
-      logical_buffer_collection_->parent_device_->loop_dispatcher());
+      logical_buffer_collection_->parent_sysmem_->loop_dispatcher());
 
   zx_info_vmo_t info;
   zx_status_t status = parent_vmo.get_info(ZX_INFO_VMO, &info, sizeof(info), nullptr, nullptr);
@@ -4982,7 +4988,7 @@ LogicalBuffer::LogicalBuffer(fbl::RefPtr<LogicalBufferCollection> logical_buffer
         if (close_weak_asap_time_.has_value()) {
           zx::duration close_weak_asap_duration =
               zx::clock::get_monotonic() - *close_weak_asap_time_;
-          logical_buffer_collection_->parent_device_->metrics().LogCloseWeakAsapDuration(
+          logical_buffer_collection_->parent_sysmem_->metrics().LogCloseWeakAsapDuration(
               close_weak_asap_duration);
         }
 
@@ -5025,7 +5031,7 @@ LogicalBuffer::LogicalBuffer(fbl::RefPtr<LogicalBufferCollection> logical_buffer
       [this, complain_about_leaked_weak_timer_task_scope](
           TrackedParentVmo* tracked_strong_parent_vmo) mutable {
         if (tracked_strong_parent_vmo->child_koid().has_value()) {
-          logical_buffer_collection_->parent_device_->RemoveVmoKoid(
+          logical_buffer_collection_->parent_sysmem_->RemoveVmoKoid(
               *tracked_strong_parent_vmo->child_koid());
         }
 
@@ -5082,13 +5088,13 @@ LogicalBuffer::LogicalBuffer(fbl::RefPtr<LogicalBufferCollection> logical_buffer
     return;
   }
 
-  logical_buffer_collection_->parent_device_->AddVmoKoid(strong_child_vmo_koid, false, *this);
+  logical_buffer_collection_->parent_sysmem_->AddVmoKoid(strong_child_vmo_koid, false, *this);
   strong_parent_vmo_->set_child_koid(strong_child_vmo_koid);
 
   TRACE_INSTANT("gfx", "Child VMO created", TRACE_SCOPE_THREAD, "koid", strong_child_vmo_koid);
 
   // Now that we know at least one child of parent_vmo_ exists, we can StartWait().
-  status = parent_vmo_->StartWait(logical_buffer_collection_->parent_device_->loop_dispatcher());
+  status = parent_vmo_->StartWait(logical_buffer_collection_->parent_sysmem_->loop_dispatcher());
   if (status != ZX_OK) {
     logical_buffer_collection_->LogError(FROM_HERE,
                                          "tracked_parent->StartWait() failed - status: %d", status);
@@ -5098,7 +5104,7 @@ LogicalBuffer::LogicalBuffer(fbl::RefPtr<LogicalBufferCollection> logical_buffer
 
   // Now that we know at least one child of strong_parent_vmo_ exists, we can StartWait().
   status =
-      strong_parent_vmo_->StartWait(logical_buffer_collection_->parent_device_->loop_dispatcher());
+      strong_parent_vmo_->StartWait(logical_buffer_collection_->parent_sysmem_->loop_dispatcher());
   if (status != ZX_OK) {
     logical_buffer_collection_->LogError(FROM_HERE,
                                          "tracked_parent->StartWait() failed - status: %d", status);
@@ -5156,7 +5162,7 @@ fit::result<zx_status_t, std::optional<zx::vmo>> LogicalBuffer::CreateWeakVmo(
       fbl::RefPtr(logical_buffer_collection_), std::move(per_sent_weak_parent), buffer_index_,
       [this](TrackedParentVmo* tracked_sent_weak_parent_vmo) mutable {
         if (tracked_sent_weak_parent_vmo->child_koid().has_value()) {
-          logical_buffer_collection_->parent_device_->RemoveVmoKoid(
+          logical_buffer_collection_->parent_sysmem_->RemoveVmoKoid(
               *tracked_sent_weak_parent_vmo->child_koid());
         }
         // This erase can fail if ~tracked_sent_weak_parent_vmo in an error path before added to
@@ -5186,11 +5192,11 @@ fit::result<zx_status_t, std::optional<zx::vmo>> LogicalBuffer::CreateWeakVmo(
   }
 
   tracked_sent_weak_parent_vmo->set_child_koid(child_info.koid);
-  logical_buffer_collection_->parent_device_->AddVmoKoid(child_info.koid, true, *this);
+  logical_buffer_collection_->parent_sysmem_->AddVmoKoid(child_info.koid, true, *this);
 
   // Now that there's a child VMO of tracked_sent_weak_parent_vmo, we can StartWait().
   status = tracked_sent_weak_parent_vmo->StartWait(
-      logical_buffer_collection_->parent_device_->loop_dispatcher());
+      logical_buffer_collection_->parent_sysmem_->loop_dispatcher());
   if (status != ZX_OK) {
     logical_buffer_collection_->LogError(FROM_HERE, "StartWait failed: %d", status);
     return fit::error(status);

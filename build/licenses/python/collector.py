@@ -17,7 +17,7 @@ from gn_license_metadata import (
     GnApplicableLicensesMetadata,
     GnLicenseMetadataDB,
 )
-from readme_fuchsia import Readme, ReadmesDB
+from readme_fuchsia import ReadmesDB
 
 
 @dataclasses.dataclass(frozen=True, order=True)
@@ -477,7 +477,6 @@ class Collector:
                     "3p group target %s doesn't need licenses, as it has no unlicensed resources.",
                     label,
                 )
-                pass
             else:
                 self._add_error(
                     CollectorError(

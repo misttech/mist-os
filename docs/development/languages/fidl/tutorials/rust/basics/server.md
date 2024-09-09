@@ -374,6 +374,6 @@ the [component instance tree][glossary.component-instance-tree]
 [component-manager]: /docs/concepts/components/v2/component_manager.md
 [protocol-open]: /docs/concepts/components/v2/capabilities/life_of_a_protocol_open.md#binding_to_a_component_and_sending_a_protocol_channel
 [compiling-fidl]: /docs/development/languages/fidl/tutorials/fidl.md
-[async-loop]: /zircon/system/ulib/async-loop/include/lib/async-loop/cpp/loop.h
+[async-loop]: /sdk/lib/async-loop/include/lib/async-loop/cpp/loop.h
 [overview]: /docs/development/languages/fidl/tutorials/overview.md
 [try-for-each]: https://docs.rs/futures/0.3.5/futures/stream/trait.TryStreamExt.html#method.try_for_each

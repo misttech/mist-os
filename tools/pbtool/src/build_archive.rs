@@ -201,9 +201,12 @@ impl GenerateBuildArchive {
         }
 
         // Write the images manifest with the rebased image paths.
-        let images_manifest = AssemblyManifest { images };
+        let images_manifest = AssemblyManifest {
+            images,
+            board_name: product_bundle.partitions.hardware_revision.clone(),
+        };
         let images_manifest_path = self.out_dir.join("images.json");
-        images_manifest.write(images_manifest_path).context("Writing images manifest")?;
+        images_manifest.write_old(images_manifest_path).context("Writing images manifest")?;
 
         if let Some(path) = self.fastboot {
             let input = File::open(&path).context("Could not read fastboot file")?;

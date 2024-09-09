@@ -551,6 +551,11 @@
             from: "parent",
             to: "#sshd-host",
         },
+        {
+            service: [ "fuchsia.hardware.spmi.Service" ],
+            from: "parent",
+            to: "#sshd-host",
+        },
 
         // Others
         {

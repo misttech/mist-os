@@ -18,7 +18,7 @@
 
 #include "src/devices/bus/testing/fake-pdev/fake-pdev.h"
 #include "src/devices/sysmem/drivers/sysmem/allocator.h"
-#include "src/devices/sysmem/drivers/sysmem/device.h"
+#include "src/devices/sysmem/drivers/sysmem/sysmem.h"
 
 namespace display {
 
@@ -34,9 +34,9 @@ FakeSysmemDeviceHierarchy::FakeSysmemDeviceHierarchy()
 
   libsync::Completion done;
   zx_status_t post_status = async::PostTask(loop_.dispatcher(), [this, &done] {
-    sysmem_service::Device::CreateArgs create_args;
-    auto create_result = sysmem_service::Device::Create(loop_.dispatcher(), create_args);
-    ZX_ASSERT_MSG(create_result.is_ok(), "sysmem_service::Device::Create() failed: %s",
+    sysmem_service::Sysmem::CreateArgs create_args;
+    auto create_result = sysmem_service::Sysmem::Create(loop_.dispatcher(), create_args);
+    ZX_ASSERT_MSG(create_result.is_ok(), "sysmem_service::Sysmem::Create() failed: %s",
                   create_result.status_string());
     sysmem_service_ = std::move(create_result.value());
     done.Signal();

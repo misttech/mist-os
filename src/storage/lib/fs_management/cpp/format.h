@@ -19,6 +19,7 @@ constexpr std::string_view kFxfsComponentUrl = "#meta/fxfs.cm";
 constexpr std::string_view kMinfsComponentUrl = "#meta/minfs.cm";
 constexpr std::string_view kF2fsComponentUrl = "#meta/f2fs.cm";
 constexpr std::string_view kFatfsComponentUrl = "#meta/fatfs.cm";
+constexpr std::string_view kFvmComponentUrl = "#meta/fvm2.cm";
 
 enum DiskFormat {
   kDiskFormatUnknown = 0,

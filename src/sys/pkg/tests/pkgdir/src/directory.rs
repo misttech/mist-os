@@ -7,7 +7,7 @@ use anyhow::{anyhow, Context as _, Error};
 use assert_matches::assert_matches;
 use fidl::endpoints::{create_proxy, Proxy as _};
 use fidl::AsHandleRef as _;
-use fuchsia_fs::directory::{open_directory, DirEntry, DirentKind};
+use fuchsia_fs::directory::{open_directory_deprecated, DirEntry, DirentKind};
 use futures::future::Future;
 use futures::StreamExt;
 use itertools::Itertools as _;
@@ -452,7 +452,7 @@ async fn open_parent(package_root: &fio::DirectoryProxy, parent_path: &str) -> f
     } else {
         fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE
     };
-    fuchsia_fs::directory::open_directory(package_root, parent_path, parent_rights)
+    fuchsia_fs::directory::open_directory_deprecated(package_root, parent_path, parent_rights)
         .await
         .expect("open parent directory")
 }
@@ -536,6 +536,9 @@ async fn verify_directory_opened(node: fio::NodeProxy, flag: fio::OpenFlags) -> 
             event @ fio::NodeEvent::OnRepresentation { .. } => {
                 return Err(anyhow!("unexpected event returned: {:?}", event));
             }
+            fio::NodeEvent::_UnknownEvent { ordinal, .. } => {
+                return Err(anyhow!("unknown event returned: {:?}", ordinal))
+            }
         }
     };
     Ok(())
@@ -578,6 +581,9 @@ async fn verify_content_file_opened(
                 event @ fio::NodeEvent::OnRepresentation { .. } => {
                     return Err(anyhow!("unexpected event returned: {:?}", event));
                 }
+                fio::NodeEvent::_UnknownEvent { ordinal, .. } => {
+                    return Err(anyhow!("unknown event returned: {:?}", ordinal))
+                }
             }
         }
     } else {
@@ -619,6 +625,9 @@ async fn verify_content_file_opened(
                 event @ fio::NodeEvent::OnRepresentation { .. } => {
                     return Err(anyhow!("unexpected event returned: {:?}", event));
                 }
+                fio::NodeEvent::_UnknownEvent { ordinal, .. } => {
+                    return Err(anyhow!("unknown event returned: {:?}", ordinal))
+                }
             }
         }
     }
@@ -654,6 +663,9 @@ async fn verify_meta_as_file_opened(
             }
             event @ fio::NodeEvent::OnRepresentation { .. } => {
                 return Err(anyhow!("unexpected event returned: {:?}", event));
+            }
+            fio::NodeEvent::_UnknownEvent { ordinal, .. } => {
+                return Err(anyhow!("unknown event returned: {:?}", ordinal))
             }
         }
     }
@@ -800,7 +812,7 @@ async fn assert_clone_directory_no_overflow(
     flags: fio::OpenFlags,
     expected_dirents: Vec<DirEntry>,
 ) {
-    let parent = open_directory(
+    let parent = open_directory_deprecated(
         package_root,
         path,
         flags & (fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE),
@@ -857,9 +869,13 @@ async fn read_dirents_per_package_source(source: PackageSource) {
     )
     .await;
     assert_read_dirents_overflow(
-        &fuchsia_fs::directory::open_directory(&root_dir, "meta", fio::OpenFlags::empty())
-            .await
-            .expect("open meta as dir"),
+        &fuchsia_fs::directory::open_directory_deprecated(
+            &root_dir,
+            "meta",
+            fio::OpenFlags::empty(),
+        )
+        .await
+        .expect("open meta as dir"),
         vec![
             DirEntry { name: "contents".to_string(), kind: DirentKind::File },
             DirEntry { name: "dir".to_string(), kind: DirentKind::Directory },
@@ -877,7 +893,7 @@ async fn read_dirents_per_package_source(source: PackageSource) {
     )
     .await;
     assert_read_dirents_overflow(
-        &fuchsia_fs::directory::open_directory(
+        &fuchsia_fs::directory::open_directory_deprecated(
             &root_dir,
             "dir_overflow_readdirents",
             fio::OpenFlags::empty(),
@@ -888,7 +904,7 @@ async fn read_dirents_per_package_source(source: PackageSource) {
     )
     .await;
     assert_read_dirents_overflow(
-        &fuchsia_fs::directory::open_directory(
+        &fuchsia_fs::directory::open_directory_deprecated(
             &root_dir,
             "meta/dir_overflow_readdirents",
             fio::OpenFlags::empty(),
@@ -901,9 +917,13 @@ async fn read_dirents_per_package_source(source: PackageSource) {
 
     // Handle no-overflow cases (e.g. when size of total dirents does not exceed MAX_BUF).
     assert_read_dirents_no_overflow(
-        &fuchsia_fs::directory::open_directory(&root_dir, "dir", fio::OpenFlags::empty())
-            .await
-            .expect("open dir"),
+        &fuchsia_fs::directory::open_directory_deprecated(
+            &root_dir,
+            "dir",
+            fio::OpenFlags::empty(),
+        )
+        .await
+        .expect("open dir"),
         vec![
             DirEntry { name: "dir".to_string(), kind: DirentKind::Directory },
             DirEntry { name: "file".to_string(), kind: DirentKind::File },
@@ -911,9 +931,13 @@ async fn read_dirents_per_package_source(source: PackageSource) {
     )
     .await;
     assert_read_dirents_no_overflow(
-        &fuchsia_fs::directory::open_directory(&root_dir, "meta/dir", fio::OpenFlags::empty())
-            .await
-            .expect("open meta/dir"),
+        &fuchsia_fs::directory::open_directory_deprecated(
+            &root_dir,
+            "meta/dir",
+            fio::OpenFlags::empty(),
+        )
+        .await
+        .expect("open meta/dir"),
         vec![
             DirEntry { name: "dir".to_string(), kind: DirentKind::Directory },
             DirEntry { name: "file".to_string(), kind: DirentKind::File },
@@ -987,9 +1011,13 @@ async fn rewind_per_package_source(source: PackageSource) {
     let root_dir = source.dir;
     // Handle overflow cases.
     for path in [".", "meta", "dir_overflow_readdirents", "meta/dir_overflow_readdirents"] {
-        let dir = fuchsia_fs::directory::open_directory(&root_dir, path, fio::OpenFlags::empty())
-            .await
-            .unwrap();
+        let dir = fuchsia_fs::directory::open_directory_deprecated(
+            &root_dir,
+            path,
+            fio::OpenFlags::empty(),
+        )
+        .await
+        .unwrap();
         assert_rewind_overflow_when_seek_offset_at_end(&dir).await;
         assert_rewind_overflow_when_seek_offset_in_middle(&dir).await;
     }
@@ -997,9 +1025,13 @@ async fn rewind_per_package_source(source: PackageSource) {
     // Handle non-overflow cases.
     for path in ["dir", "meta/dir"] {
         assert_rewind_no_overflow(
-            &fuchsia_fs::directory::open_directory(&root_dir, path, fio::OpenFlags::empty())
-                .await
-                .unwrap(),
+            &fuchsia_fs::directory::open_directory_deprecated(
+                &root_dir,
+                path,
+                fio::OpenFlags::empty(),
+            )
+            .await
+            .unwrap(),
         )
         .await;
     }
@@ -1074,9 +1106,13 @@ async fn get_token() {
 async fn get_token_per_package_source(source: PackageSource) {
     let root_dir = &source.dir;
     for path in [".", "dir", "meta", "meta/dir"] {
-        let dir = fuchsia_fs::directory::open_directory(root_dir, path, fio::OpenFlags::empty())
-            .await
-            .unwrap();
+        let dir = fuchsia_fs::directory::open_directory_deprecated(
+            root_dir,
+            path,
+            fio::OpenFlags::empty(),
+        )
+        .await
+        .unwrap();
 
         let (status, token) = dir.get_token().await.unwrap();
         let status = zx::Status::ok(status);
@@ -1118,7 +1154,7 @@ async fn assert_get_flags_directory_calls(
     expected_rights: fio::OpenFlags,
 ) {
     let package_root = &source.dir;
-    let dir = fuchsia_fs::directory::open_directory(
+    let dir = fuchsia_fs::directory::open_directory_deprecated(
         package_root,
         path,
         fio::OpenFlags::RIGHT_READABLE
@@ -1163,7 +1199,7 @@ async fn assert_unsupported_directory_calls(
     parent_path: &str,
     child_base_path: &str,
 ) {
-    let parent = fuchsia_fs::directory::open_directory(
+    let parent = fuchsia_fs::directory::open_directory_deprecated(
         &source.dir,
         parent_path,
         fio::OpenFlags::RIGHT_READABLE,

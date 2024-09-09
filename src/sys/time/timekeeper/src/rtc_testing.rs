@@ -80,7 +80,7 @@ pub fn read_and_update_state<P: AsRef<Path>>(path: P) -> State {
         .as_ref()
         .map(|s| {
             serde_json::from_str(s)
-                .map_err(|e| error!("while deserializing: {:?}", e))
+                .map_err(|e| error!("while deserializing: {:?}: {:?}", path, e))
                 .unwrap_or(Default::default())
         })
         .map_err(|e| debug!("while reading: {:?}", e))
@@ -97,15 +97,15 @@ pub fn read_and_update_state<P: AsRef<Path>>(path: P) -> State {
     state
 }
 
-/// Write the persistent state.
+/// Write the persistent state to mutable persistent storage.
 pub fn write_state<P: AsRef<Path>>(path: P, state: &State) {
     let path = path.as_ref();
-    debug!("write persistent state: {:?}", state);
+    debug!("writing persistent state: {:?} to {:?}", state, path);
     serde_json::to_string(state)
         .map(|s| {
             fs::write(path, s)
-                .map_err(|e| error!("while writing persistent state: {:?}", &e))
-                .map_err(|e| error!("while serializing: {:?}", e))
+                .map_err(|e| error!("while writing persistent state: {:?}: {:?}", path, e))
+                .map_err(|e| error!("while serializing state from: {:?}: {:?}", path, e))
                 .unwrap_or(())
         })
         .unwrap_or(())

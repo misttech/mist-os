@@ -183,6 +183,7 @@ mod tests {
                 Image::FVM("path/to/a/fvm.blk".into()),
                 Image::FVMFastboot("path/to/a/fvm.fastboot.blk".into()),
             ],
+            board_name: "my_board".into(),
         };
         let images_b = AssemblyManifest {
             images: vec![
@@ -191,6 +192,7 @@ mod tests {
                 Image::FVM("path/to/b/fvm.blk".into()),
                 Image::FVMFastboot("path/to/b/fvm.fastboot.blk".into()),
             ],
+            board_name: "my_board".into(),
         };
         let images_r = AssemblyManifest {
             images: vec![
@@ -199,6 +201,7 @@ mod tests {
                 Image::FVM("path/to/r/fvm.blk".into()),
                 Image::FVMFastboot("path/to/r/fvm.fastboot.blk".into()),
             ],
+            board_name: "my_board".into(),
         };
         let mut mapper = PartitionImageMapper::new(partitions);
         mapper.map_images_to_slot(&images_a.images, Slot::A);
@@ -259,6 +262,7 @@ mod tests {
                 Image::FVM("path/to/a/fvm.blk".into()),
                 Image::FVMFastboot("path/to/a/fvm.fastboot.blk".into()),
             ],
+            board_name: "my_board".into(),
         };
         let images_b = AssemblyManifest {
             images: vec![
@@ -267,6 +271,7 @@ mod tests {
                 Image::FVM("path/to/b/fvm.blk".into()),
                 Image::FVMFastboot("path/to/b/fvm.fastboot.blk".into()),
             ],
+            board_name: "my_board".into(),
         };
         let images_r = AssemblyManifest {
             images: vec![
@@ -275,6 +280,7 @@ mod tests {
                 Image::FVM("path/to/r/fvm.blk".into()),
                 Image::FVMFastboot("path/to/r/fvm.fastboot.blk".into()),
             ],
+            board_name: "my_board".into(),
         };
         let mut mapper = PartitionImageMapper::new(partitions);
         mapper.map_images_to_slot(&images_a.images, Slot::A);
@@ -334,6 +340,7 @@ mod tests {
                     contents: BlobfsContents::default(),
                 },
             ],
+            board_name: "my_board".into(),
         };
         let images_b = AssemblyManifest {
             images: vec![
@@ -344,6 +351,7 @@ mod tests {
                     contents: BlobfsContents::default(),
                 },
             ],
+            board_name: "my_board".into(),
         };
         let images_r = AssemblyManifest {
             images: vec![
@@ -354,6 +362,7 @@ mod tests {
                     contents: BlobfsContents::default(),
                 },
             ],
+            board_name: "my_board".into(),
         };
         let mut mapper = PartitionImageMapper::new(partitions);
         mapper.map_images_to_slot(&images_a.images, Slot::A);
@@ -403,6 +412,7 @@ mod tests {
                 Image::FVM("path/to/a/fvm.blk".into()),
                 Image::FVMFastboot("path/to/a/fvm.fastboot.blk".into()),
             ],
+            board_name: "my_board".into(),
         };
         let mut mapper = PartitionImageMapper::new(partitions);
         mapper.map_images_to_slot(&images_a.images, Slot::A);
@@ -426,6 +436,7 @@ mod tests {
                 Image::FVM("path/to/a/fvm.blk".into()),
                 Image::FVMFastboot("path/to/a/fvm.fastboot.blk".into()),
             ],
+            board_name: "my_board".into(),
         };
         let images_b = AssemblyManifest {
             images: vec![
@@ -434,6 +445,7 @@ mod tests {
                 Image::FVM("path/to/b/fvm.blk".into()),
                 Image::FVMFastboot("path/to/b/fvm.fastboot.blk".into()),
             ],
+            board_name: "my_board".into(),
         };
         let images_r = AssemblyManifest {
             images: vec![
@@ -442,6 +454,7 @@ mod tests {
                 Image::FVM("path/to/r/fvm.blk".into()),
                 Image::FVMFastboot("path/to/r/fvm.fastboot.blk".into()),
             ],
+            board_name: "my_board".into(),
         };
         let mut mapper = PartitionImageMapper::new(partitions);
         mapper.map_images_to_slot(&images_a.images, Slot::A);
@@ -487,6 +500,7 @@ mod tests {
                 Image::FVM("path/to/a/fvm.blk".into()),
                 Image::FVMFastboot("path/to/a/fvm.fastboot.blk".into()),
             ],
+            board_name: "my_board".into(),
         };
         let images_r = AssemblyManifest {
             images: vec![
@@ -495,6 +509,7 @@ mod tests {
                 Image::FVM("path/to/r/fvm.blk".into()),
                 Image::FVMFastboot("path/to/r/fvm.fastboot.blk".into()),
             ],
+            board_name: "my_board".into(),
         };
         let mut mapper = PartitionImageMapper::new(partitions);
         mapper.map_images_to_slot(&images_a.images, Slot::A);
@@ -551,6 +566,7 @@ mod tests {
                 Image::FVM("path/to/a/fvm.blk".into()),
                 Image::FVMFastboot("path/to/a/fvm.fastboot.blk".into()),
             ],
+            board_name: "my_board".into(),
         };
         let mut mapper = PartitionImageMapper::new(partitions);
         mapper.map_images_to_slot(&images_a.images, Slot::A);

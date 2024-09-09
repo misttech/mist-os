@@ -57,8 +57,9 @@ async fn is_cr50(dir: &fio::DirectoryProxy, name: &str) -> Result<Option<TpmDevi
 
 async fn find_cr50() -> Result<TpmDeviceProxy, Error> {
     let tpm_path = "/dev/class/tpm";
-    let proxy = fuchsia_fs::directory::open_in_namespace(tpm_path, OpenFlags::RIGHT_READABLE)
-        .context("Opening TPM directory")?;
+    let proxy =
+        fuchsia_fs::directory::open_in_namespace_deprecated(tpm_path, OpenFlags::RIGHT_READABLE)
+            .context("Opening TPM directory")?;
 
     let mut stream = Box::pin(
         device_watcher::watch_for_files(&proxy).await.context("Starting watch for TPM devices")?,

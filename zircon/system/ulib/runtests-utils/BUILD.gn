@@ -23,7 +23,7 @@ zx_library("runtests-utils") {
   public_deps = [
     # <runtests-utils/log-exporter.h> has #include <lib/fidl/cpp/message_buffer.h>.
     # <runtests-utils/runtests-utils.h> has #include <lib/zircon-internal/fnv1hash.h>.
-    "//sdk/lib/fidl/cpp:cpp_base",
+    "//sdk/lib/fidl/hlcpp:hlcpp_base",
     "//zircon/system/ulib/zircon-internal",
 
     # <runtests-utils/log-exporter.h> has #include <fidl/fuchsia.logger/cpp/wire.h>.

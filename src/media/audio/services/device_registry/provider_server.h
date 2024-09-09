@@ -7,6 +7,7 @@
 
 #include <fidl/fuchsia.audio.device/cpp/markers.h>
 #include <fidl/fuchsia.audio.device/cpp/type_conversions.h>
+#include <lib/fidl/cpp/wire/unknown_interaction_handler.h>
 
 #include <cstdint>
 #include <memory>
@@ -31,6 +32,8 @@ class ProviderServer
 
   // fuchsia.audio.device.Provider implementation
   void AddDevice(AddDeviceRequest& request, AddDeviceCompleter::Sync& completer) override;
+  void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_audio_device::Provider> metadata,
+                             fidl::UnknownMethodCompleter::Sync& completer) override;
 
   // Static object count, for debugging purposes.
   static inline uint64_t count() { return count_; }

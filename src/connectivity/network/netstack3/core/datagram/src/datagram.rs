@@ -30,8 +30,8 @@ use netstack3_base::socket::{
 use netstack3_base::sync::{self, RwLock};
 use netstack3_base::{
     AnyDevice, BidirectionalConverter, ContextPair, DeviceIdContext, DeviceIdentifier,
-    EitherDeviceId, ExistsError, Inspector, InspectorDeviceExt, LocalAddressError, NotFoundError,
-    OwnedOrRefsBidirectionalConverter, ReferenceNotifiers, ReferenceNotifiersExt,
+    EitherDeviceId, ExistsError, Inspector, InspectorDeviceExt, IpDeviceAddr, LocalAddressError,
+    NotFoundError, OwnedOrRefsBidirectionalConverter, ReferenceNotifiers, ReferenceNotifiersExt,
     RemoteAddressError, RemoveResourceResultWithContext, RngContext, SocketError,
     StrongDeviceIdentifier as _, WeakDeviceIdentifier, ZonedAddressError,
 };
@@ -2611,7 +2611,7 @@ fn connect_inner<
         core_ctx,
         bindings_ctx,
         socket_device.as_ref().map(|d| d.as_ref()),
-        local_ip.map(SocketIpAddr::into),
+        local_ip.and_then(IpDeviceAddr::new_from_socket_ip_addr),
         remote_ip,
         S::ip_proto::<WireI>(),
         ip_options.transparent(),
@@ -2623,7 +2623,7 @@ fn connect_inner<
             sockets,
             bindings_ctx,
             DatagramFlowId {
-                local_ip: *ip_sock.local_ip(),
+                local_ip: SocketIpAddr::from(*ip_sock.local_ip()),
                 remote_ip: *ip_sock.remote_ip(),
                 remote_id: remote_port.clone(),
             },
@@ -2632,7 +2632,7 @@ fn connect_inner<
     };
     let conn_addr = ConnAddr {
         ip: ConnIpAddr {
-            local: (*ip_sock.local_ip(), local_port),
+            local: (SocketIpAddr::from(*ip_sock.local_ip()), local_port),
             remote: (*ip_sock.remote_ip(), remote_port),
         },
         device: ip_sock.device().cloned(),
@@ -3398,14 +3398,17 @@ fn send_oneshot<I: IpExt, S: DatagramSocketSpec, CC: IpSocketHandler<I, BC>, BC,
         .send_oneshot_ip_packet_with_fallible_serializer(
             bindings_ctx,
             device.as_ref().map(|d| d.as_ref()),
-            local_ip,
+            local_ip.and_then(IpDeviceAddr::new_from_socket_ip_addr),
             remote_ip,
             S::ip_proto::<I>(),
             socket_options,
             |local_ip| {
                 S::make_packet::<I, _>(
                     body,
-                    &ConnIpAddr { local: (local_ip, local_id), remote: (remote_ip, remote_id) },
+                    &ConnIpAddr {
+                        local: (local_ip.into(), local_id),
+                        remote: (remote_ip, remote_id),
+                    },
                 )
             },
             None,
@@ -3522,7 +3525,7 @@ fn set_bound_device_single_stack<
                 .new_ip_socket(
                     bindings_ctx,
                     new_device.map(EitherDeviceId::Strong),
-                    Some(local_ip.clone()),
+                    IpDeviceAddr::new_from_socket_ip_addr(local_ip.clone()),
                     remote_ip.clone(),
                     socket.proto(),
                     ip_options.transparent(),

@@ -31,7 +31,7 @@ use netstack3_base::sync::{Mutex, PrimaryRc, RwLock, StrongRc, WeakRc};
 use netstack3_base::{
     AnyDevice, BroadcastIpExt, CoreTimerContext, Counter, CounterContext, DeviceIdContext,
     DeviceIdentifier as _, DeviceWithName, ErrorAndSerializer, EventContext, FrameDestination,
-    HandleableTimer, Inspectable, Inspector, InstantContext, IpExt, Matcher as _,
+    HandleableTimer, Inspectable, Inspector, InstantContext, IpDeviceAddr, IpExt, Matcher as _,
     NestedIntoCoreTimerCtx, NotFoundError, RngContext, SendFrameErrorReason,
     StrongDeviceIdentifier, TimerBindingsTypes, TimerContext, TimerHandler, TracingContext,
     WrapBroadcastMarker,
@@ -54,8 +54,7 @@ use crate::internal::device::state::{
     IpDeviceStateBindingsTypes, IpDeviceStateIpExt, Ipv6AddressFlags, Ipv6AddressState,
 };
 use crate::internal::device::{
-    self, IpAddressId as _, IpDeviceAddr, IpDeviceBindingsContext, IpDeviceIpExt,
-    IpDeviceSendContext,
+    self, IpAddressId as _, IpDeviceBindingsContext, IpDeviceIpExt, IpDeviceSendContext,
 };
 use crate::internal::gmp::GmpQueryHandler;
 use crate::internal::icmp::{
@@ -63,7 +62,9 @@ use crate::internal::icmp::{
     Icmpv4State, Icmpv4StateBuilder, Icmpv6ErrorKind, Icmpv6State, Icmpv6StateBuilder,
 };
 use crate::internal::ipv6::Ipv6PacketAction;
-use crate::internal::multicast_forwarding::route::{MulticastRouteIpExt, MulticastRouteTargets};
+use crate::internal::multicast_forwarding::route::{
+    MulticastRouteIpExt, MulticastRouteTarget, MulticastRouteTargets,
+};
 use crate::internal::multicast_forwarding::state::{
     MulticastForwardingState, MulticastForwardingStateContext,
 };
@@ -134,6 +135,10 @@ impl TransportReceiveError {
 }
 
 /// Sidecar metadata passed along with the packet.
+///
+/// Note: This metadata may be regenerated when packet handling requires
+/// performing multiple actions (e.g. sending the packet out multiple interfaces
+/// as part of multicast forwarding).
 #[derive(Derivative)]
 #[derivative(Default(bound = ""))]
 pub struct IpLayerPacketMetadata<I: packet_formats::ip::IpExt, BT: FilterBindingsTypes> {
@@ -329,18 +334,6 @@ pub trait BaseTransportIpContext<I: IpExt, BC>: DeviceIdContext<AnyDevice> {
     /// Otherwise the system defaults are returned.
     fn get_default_hop_limits(&mut self, device: Option<&Self::DeviceId>) -> HopLimits;
 
-    /// Confirms the provided destination is reachable.
-    ///
-    /// Implementations must retrieve the next hop given the provided
-    /// destination and confirm neighbor reachability for the resolved target
-    /// device.
-    fn confirm_reachable_with_destination(
-        &mut self,
-        bindings_ctx: &mut BC,
-        dst: SpecifiedAddr<I::Addr>,
-        device: Option<&Self::DeviceId>,
-    );
-
     /// Gets the original destination for the tracked connection indexed by
     /// `tuple`, which includes the source and destination addresses and
     /// transport-layer ports as well as the transport protocol number.
@@ -460,45 +453,6 @@ impl<
         }
     }
 
-    fn confirm_reachable_with_destination(
-        &mut self,
-        bindings_ctx: &mut BC,
-        dst: SpecifiedAddr<I::Addr>,
-        device: Option<&Self::DeviceId>,
-    ) {
-        match lookup_route_table(
-            self,
-            dst.get(),
-            // TODO(https://fxbug.dev/361817008): This will be broken by PBRs with custom rules. We
-            // need to make sure we confirm the reachability with the correct neighbor.
-            PacketOrigin::Local { bound_address: None, bound_device: device },
-        ) {
-            Some(Destination { next_hop, device }) => {
-                let neighbor = match next_hop {
-                    NextHop::RemoteAsNeighbor => dst,
-                    NextHop::Gateway(gateway) => gateway,
-                    NextHop::Broadcast(marker) => {
-                        I::map_ip::<_, ()>(
-                            WrapBroadcastMarker(marker),
-                            |WrapBroadcastMarker(())| {
-                                debug!(
-                                    "can't confirm {dst:?}@{device:?} as reachable: \
-                                                 dst is a broadcast address"
-                                );
-                            },
-                            |WrapBroadcastMarker(never)| match never {},
-                        );
-                        return;
-                    }
-                };
-                self.confirm_reachable(bindings_ctx, &device, neighbor);
-            }
-            None => {
-                debug!("can't confirm {dst:?}@{device:?} as reachable: no route");
-            }
-        }
-    }
-
     fn get_original_destination(&mut self, tuple: &Tuple<I>) -> Option<(I::Addr, u16)> {
         self.with_filter_state(|state| {
             let conn = state.conntrack.get_connection(&tuple)?;
@@ -558,7 +512,7 @@ impl AddressStatus<Ipv4PresentAddressStatus> {
                     let dev_addr = addr_id.addr_sub();
                     let (dev_addr, subnet) = dev_addr.addr_subnet();
 
-                    if dev_addr == addr {
+                    if **dev_addr == addr {
                         Some(AddressStatus::Present(Ipv4PresentAddressStatus::Unicast))
                     } else if addr.get() == subnet.broadcast() {
                         Some(AddressStatus::Present(Ipv4PresentAddressStatus::SubnetBroadcast))
@@ -964,9 +918,9 @@ fn is_unicast_assigned<I: IpLayerIpExt>(status: &I::AddressStatus) -> bool {
 fn is_local_assigned_address<I: Ip + IpLayerIpExt, CC: IpDeviceStateContext<I>>(
     core_ctx: &mut CC,
     device: &CC::DeviceId,
-    addr: SpecifiedAddr<I::Addr>,
+    addr: IpDeviceAddr<I::Addr>,
 ) -> bool {
-    match core_ctx.address_status_for_device(addr, device) {
+    match core_ctx.address_status_for_device(addr.into(), device) {
         AddressStatus::Present(status) => is_unicast_assigned::<I>(&status),
         AddressStatus::Unassigned => false,
     }
@@ -974,7 +928,7 @@ fn is_local_assigned_address<I: Ip + IpLayerIpExt, CC: IpDeviceStateContext<I>>(
 
 fn get_device_with_assigned_address<A, BC, CC>(
     core_ctx: &mut CC,
-    addr: SpecifiedAddr<A>,
+    addr: IpDeviceAddr<A>,
 ) -> Option<CC::DeviceId>
 where
     A: IpAddress,
@@ -982,7 +936,7 @@ where
     BC: IpLayerBindingsContext<A::Version, CC::DeviceId>,
     CC: IpDeviceStateContext<A::Version> + IpDeviceContext<A::Version, BC>,
 {
-    core_ctx.with_address_statuses(addr, |mut it| {
+    core_ctx.with_address_statuses(addr.into(), |mut it| {
         it.find_map(|(device, status)| is_unicast_assigned::<A::Version>(&status).then_some(device))
     })
 }
@@ -996,14 +950,10 @@ fn get_local_addr<I: Ip + IpLayerIpExt, CC: IpDeviceStateContext<I>>(
     device: &CC::DeviceId,
     remote_addr: Option<RoutableIpAddr<I::Addr>>,
 ) -> Result<IpDeviceAddr<I::Addr>, ResolveRouteError> {
-    // TODO(https://fxbug.dev/360187268): Use a witness type to prevent callers
-    // from providing a multicast local ip.
-    let local_ip_and_policy = local_ip_and_policy.filter(|(ip, _policy)| !ip.addr().is_multicast());
-
     match local_ip_and_policy {
         Some((local_ip, NonLocalSrcAddrPolicy::Allow)) => Ok(local_ip),
         Some((local_ip, NonLocalSrcAddrPolicy::Deny)) => {
-            is_local_assigned_address(core_ctx, device, local_ip.into())
+            is_local_assigned_address(core_ctx, device, local_ip)
                 .then_some(local_ip)
                 .ok_or(ResolveRouteError::NoSrcAddr)
         }
@@ -1115,14 +1065,13 @@ pub fn resolve_output_route_to_destination<
     // allowing cross-device local delivery even when SO_BINDTODEVICE or
     // link-local addresses are involved, and this behavior may need to be
     // emulated.
-    let local_delivery_instructions: Option<LocalDelivery<RoutableIpAddr<I::Addr>, CC::DeviceId>> =
+    let local_delivery_instructions: Option<LocalDelivery<IpDeviceAddr<I::Addr>, CC::DeviceId>> = {
+        let dst_ip = dst_ip.and_then(IpDeviceAddr::new_from_socket_ip_addr);
         match (device, dst_ip) {
-            (Some(device), Some(dst_ip)) => {
-                is_local_assigned_address(core_ctx, device, dst_ip.into())
-                    .then_some(LocalDelivery::StrongForDevice(device.clone()))
-            }
+            (Some(device), Some(dst_ip)) => is_local_assigned_address(core_ctx, device, dst_ip)
+                .then_some(LocalDelivery::StrongForDevice(device.clone())),
             (None, Some(dst_ip)) => {
-                get_device_with_assigned_address(core_ctx, dst_ip.into()).map(|dst_device| {
+                get_device_with_assigned_address(core_ctx, dst_ip).map(|dst_device| {
                     // If either the source or destination addresses needs
                     // a zone ID, then use strong host to enforce that the
                     // source and destination addresses are assigned to the
@@ -1137,7 +1086,8 @@ pub fn resolve_output_route_to_destination<
                 })
             }
             (_, None) => None,
-        };
+        }
+    };
 
     if let Some(local_delivery) = local_delivery_instructions {
         let loopback = core_ctx.loopback_id().ok_or(ResolveRouteError::Unreachable)?;
@@ -1146,7 +1096,7 @@ pub fn resolve_output_route_to_destination<
             LocalDelivery::WeakLoopback { dst_ip, device } => {
                 let src_ip = match src_ip_and_policy {
                     Some((src_ip, NonLocalSrcAddrPolicy::Deny)) => {
-                        let _device = get_device_with_assigned_address(core_ctx, src_ip.into())
+                        let _device = get_device_with_assigned_address(core_ctx, src_ip)
                             .ok_or(ResolveRouteError::NoSrcAddr)?;
                         src_ip
                     }
@@ -1218,7 +1168,7 @@ pub fn resolve_output_route_to_destination<
     match result {
         ControlFlow::Break(RuleAction::Lookup(result)) => {
             result.map(|(Destination { device, next_hop }, src_addr)| ResolvedRoute {
-                src_addr,
+                src_addr: src_addr,
                 device,
                 local_delivery_device: None,
                 next_hop,
@@ -1289,6 +1239,39 @@ impl<
 
     fn get_loopback_device(&mut self) -> Option<Self::DeviceId> {
         device::IpDeviceConfigurationContext::<I, _>::loopback_id(self)
+    }
+
+    fn confirm_reachable(
+        &mut self,
+        bindings_ctx: &mut BC,
+        dst: SpecifiedAddr<I::Addr>,
+        input: RuleInput<'_, I, Self::DeviceId>,
+    ) {
+        match lookup_route_table(self, dst.get(), input) {
+            Some(Destination { next_hop, device }) => {
+                let neighbor = match next_hop {
+                    NextHop::RemoteAsNeighbor => dst,
+                    NextHop::Gateway(gateway) => gateway,
+                    NextHop::Broadcast(marker) => {
+                        I::map_ip::<_, ()>(
+                            WrapBroadcastMarker(marker),
+                            |WrapBroadcastMarker(())| {
+                                debug!(
+                                    "can't confirm {dst:?}@{device:?} as reachable: \
+                                    dst is a broadcast address"
+                                );
+                            },
+                            |WrapBroadcastMarker(never)| match never {},
+                        );
+                        return;
+                    }
+                };
+                IpDeviceContext::confirm_reachable(self, bindings_ctx, &device, neighbor);
+            }
+            None => {
+                debug!("can't confirm {dst:?} as reachable: no route");
+            }
+        }
     }
 }
 
@@ -1930,7 +1913,8 @@ fn dispatch_receive_ipv4_packet<
     frame_dst: Option<FrameDestination>,
     mut packet: Ipv4Packet<&'a mut [u8]>,
     mut packet_metadata: IpLayerPacketMetadata<Ipv4, BC>,
-    meta: ReceiveIpPacketMeta<Ipv4>,
+    transparent_override: Option<TransparentLocalDelivery<Ipv4>>,
+    broadcast_marker: Option<<Ipv4 as BroadcastIpExt>::BroadcastMarker>,
 ) -> Result<(), IcmpErrorSender<'b, Ipv4, CC::DeviceId>> {
     core_ctx.increment(|counters| &counters.dispatch_receive_ip_packet);
 
@@ -1974,6 +1958,12 @@ fn dispatch_receive_ipv4_packet<
     };
 
     core_ctx.deliver_packet_to_raw_ip_sockets(bindings_ctx, &packet, &device);
+
+    let meta = ReceiveIpPacketMeta {
+        broadcast: broadcast_marker,
+        transparent_override,
+        dscp_and_ecn: packet.dscp_and_ecn(),
+    };
 
     let buffer = Buf::new(packet.body_mut(), ..);
 
@@ -2233,6 +2223,7 @@ fn determine_ip_packet_forwarding_action<'a, 'b, I, BC, CC, B>(
     core_ctx: &'a mut CC,
     mut packet: I::Packet<&'a mut [u8]>,
     mut packet_meta: IpLayerPacketMetadata<I, BC>,
+    minimum_ttl: Option<u8>,
     inbound_device: &'b CC::DeviceId,
     outbound_device: &'b CC::DeviceId,
     destination: IpPacketDestination<I, &'b CC::DeviceId>,
@@ -2247,13 +2238,36 @@ where
     B: BufferMut,
     I::Packet<&'a mut [u8]>: netstack3_filter::IpPacket<I>,
 {
+    // When forwarding, if a datagram's TTL is one or zero, discard it, as
+    // decrementing the TTL would put it below the allowed minimum value.
+    // For IPv4, see "TTL" section, https://tools.ietf.org/html/rfc791#page-14.
+    // For IPv6, see "Hop Limit" section, https://datatracker.ietf.org/doc/html/rfc2460#page-5.
+    const DEFAULT_MINIMUM_FORWARDING_TTL: u8 = 2;
+    let minimum_ttl = minimum_ttl.unwrap_or(DEFAULT_MINIMUM_FORWARDING_TTL);
+
     let ttl = packet.ttl();
-    if ttl <= 1 {
-        // TTL is 0 or would become 0 after decrement.
-        // For IPv4, see "TTL" section, https://tools.ietf.org/html/rfc791#page-14.
-        // For IPv6, see "Hop Limit" section, https://datatracker.ietf.org/doc/html/rfc2460#page-5.
+    if ttl < minimum_ttl {
+        debug!(
+            "{} packet not forwarded due to inadequate TTL: got={ttl} minimum={minimum_ttl}",
+            I::NAME
+        );
+        // As per RFC 792's specification of the Time Exceeded Message:
+        //     If the gateway processing a datagram finds the time to live
+        //     field is zero it must discard the datagram. The gateway may
+        //     also notify the source host via the time exceeded message.
+        // And RFC 4443 section 3.3:
+        //    If a router receives a packet with a Hop Limit of zero, or if
+        //    a router decrements a packet's Hop Limit to zero, it MUST
+        //    discard the packet and originate an ICMPv6 Time Exceeded
+        //    message with Code 0 to the source of the packet.
+        // Don't send a Time Exceeded Message in cases where the netstack is
+        // enforcing a higher minimum TTL (e.g. as part of a multicast route).
+        if ttl > 1 {
+            packet_meta.acknowledge_drop();
+            return ForwardingAction::SilentlyDrop;
+        }
+
         core_ctx.increment(|counters: &IpCounters<I>| &counters.ttl_expired);
-        debug!("{} packet not forwarded due to expired TTL", I::NAME);
 
         // Only send an ICMP error if the src_ip is specified.
         let Some(src_ip) = I::received_source_as_icmp_source(src_ip) else {
@@ -2541,6 +2555,31 @@ macro_rules! try_parse_ip_packet {
     }};
 }
 
+/// Clone an IP packet so that it may be delivered to a multicast route target.
+///
+/// Note: We must copy the underlying data here, as the filtering
+/// engine may uniquely modify each instance as part of
+/// performing forwarding.
+///
+/// In the future there are potential optimizations we could
+/// pursue, including:
+///   * Copy-on-write semantics for the buffer/packet so that
+///     copies of the underlying data are done on an as-needed
+///     basis.
+///   * Avoid reparsing the IP packet. Because we're parsing an
+///     exact copy of a known good packet, it would be safe to
+///     adopt the data as an IP packet without performing any
+///     validation.
+// NB: This is a macro, not a function, because Rust's "move" semantics prevent
+// us from returning both a buffer and a packet referencing that buffer.
+macro_rules! clone_packet_for_mcast_forwarding {
+    {let ($new_data:ident, $new_buffer:ident, $new_packet:ident) = $packet:ident} => {
+        let mut $new_data = $packet.to_vec();
+        let mut $new_buffer: Buf<&mut [u8]> = Buf::new($new_data.as_mut(), ..);
+        let $new_packet = try_parse_ip_packet!($new_buffer).unwrap();
+    };
+}
+
 /// Receive an IPv4 packet from a device.
 ///
 /// `frame_dst` specifies how this packet was received; see [`FrameDestination`]
@@ -2696,11 +2735,7 @@ pub fn receive_ipv4_packet<
             // It's possible that the packet was actually sent to a broadcast
             // address, but it doesn't matter here since it's being delivered
             // to a transparent proxy.
-            let meta = ReceiveIpPacketMeta {
-                broadcast: None,
-                transparent_override: Some(TransparentLocalDelivery { addr, port }),
-                dscp_and_ecn: packet.dscp_and_ecn(),
-            };
+            let broadcast_marker = None;
 
             // Short-circuit the routing process and override local demux, providing a local
             // address and port to which the packet should be transparently delivered at the
@@ -2712,7 +2747,8 @@ pub fn receive_ipv4_packet<
                 frame_dst,
                 packet,
                 packet_metadata,
-                meta,
+                Some(TransparentLocalDelivery { addr, port }),
+                broadcast_marker,
             )
             .unwrap_or_else(|err| err.respond_with_icmp_error(core_ctx, bindings_ctx, buffer));
             return;
@@ -2724,21 +2760,50 @@ pub fn receive_ipv4_packet<
 
     let action = receive_ipv4_packet_action(core_ctx, device, &packet);
     match action {
-        // TODO(https://fxbug.dev/353329136): Actually forward the packet to
-        // the targets. For now, at least deliver it locally.
-        ReceivePacketAction::MulticastForward { targets: _, address_status: None } => {}
-        ReceivePacketAction::MulticastForward {
-            targets: _,
-            address_status: Some(address_status),
-        }
-        | ReceivePacketAction::Deliver { address_status } => {
-            trace!("receive_ipv4_packet: delivering locally");
-            let meta = ReceiveIpPacketMeta {
-                broadcast: address_status.to_broadcast_marker(),
-                transparent_override: None,
-                dscp_and_ecn: packet.dscp_and_ecn(),
-            };
+        ReceivePacketAction::MulticastForward { targets, address_status, dst_ip } => {
+            let src_ip = packet.src_ip();
+            // TOOD(https://fxbug.dev/364242513): Support connection tracking of
+            // the multiplexed flows created by multicast forwarding. Here, we
+            // use the existing metadata for the first action taken, and then
+            // a default instance for each subsequent action. The first action
+            // will populate the conntrack table with an entry, which will then
+            // be used by all subsequent forwards.
+            let mut packet_metadata = Some(packet_metadata);
+            for MulticastRouteTarget { output_interface, min_ttl } in targets.as_ref() {
+                clone_packet_for_mcast_forwarding! {
+                    let (copy_of_data, copy_of_buffer, copy_of_packet) = packet
+                };
+                determine_ip_packet_forwarding_action::<Ipv4, _, _, B>(
+                    core_ctx,
+                    copy_of_packet,
+                    packet_metadata.take().unwrap_or_default(),
+                    Some(*min_ttl),
+                    device,
+                    &output_interface,
+                    IpPacketDestination::from_addr(dst_ip),
+                    frame_dst,
+                    src_ip,
+                    dst_ip,
+                )
+                .perform_action_with_buffer(core_ctx, bindings_ctx, copy_of_buffer);
+            }
 
+            // If we also have an interest in the packet, deliver it locally.
+            if let Some(address_status) = address_status {
+                dispatch_receive_ipv4_packet(
+                    core_ctx,
+                    bindings_ctx,
+                    device,
+                    frame_dst,
+                    packet,
+                    packet_metadata.take().unwrap_or_default(),
+                    None,
+                    address_status.to_broadcast_marker(),
+                )
+                .unwrap_or_else(|err| err.respond_with_icmp_error(core_ctx, bindings_ctx, buffer));
+            }
+        }
+        ReceivePacketAction::Deliver { address_status } => {
             dispatch_receive_ipv4_packet(
                 core_ctx,
                 bindings_ctx,
@@ -2746,7 +2811,8 @@ pub fn receive_ipv4_packet<
                 frame_dst,
                 packet,
                 packet_metadata,
-                meta,
+                None,
+                address_status.to_broadcast_marker(),
             )
             .unwrap_or_else(|err| err.respond_with_icmp_error(core_ctx, bindings_ctx, buffer));
         }
@@ -2759,6 +2825,7 @@ pub fn receive_ipv4_packet<
                 core_ctx,
                 packet,
                 packet_metadata,
+                None,
                 device,
                 &dst_device,
                 IpPacketDestination::from_next_hop(next_hop, original_dst),
@@ -3046,11 +3113,48 @@ pub fn receive_ipv6_packet<
     };
 
     match receive_ipv6_packet_action(core_ctx, device, &packet) {
-        // TODO(https://fxbug.dev/353329136): Actually forward the packet to
-        // the targets. For now, at least deliver it locally.
-        ReceivePacketAction::MulticastForward { targets: _, address_status: None } => {}
-        ReceivePacketAction::MulticastForward { targets: _, address_status: Some(_) }
-        | ReceivePacketAction::Deliver { address_status: _ } => {
+        ReceivePacketAction::MulticastForward { targets, address_status, dst_ip } => {
+            // TOOD(https://fxbug.dev/364242513): Support connection tracking of
+            // the multiplexed flows created by multicast forwarding. Here, we
+            // use the existing metadata for the first action taken, and then
+            // a default instance for each subsequent action. The first action
+            // will populate the conntrack table with an entry, which will then
+            // be used by all subsequent forwards.
+            let mut packet_metadata = Some(packet_metadata);
+            for MulticastRouteTarget { output_interface, min_ttl } in targets.as_ref() {
+                clone_packet_for_mcast_forwarding! {
+                    let (copy_of_data, copy_of_buffer, copy_of_packet) = packet
+                };
+                determine_ip_packet_forwarding_action::<Ipv6, _, _, B>(
+                    core_ctx,
+                    copy_of_packet,
+                    packet_metadata.take().unwrap_or_default(),
+                    Some(*min_ttl),
+                    device,
+                    &output_interface,
+                    IpPacketDestination::from_addr(dst_ip),
+                    frame_dst,
+                    src_ip,
+                    dst_ip,
+                )
+                .perform_action_with_buffer(core_ctx, bindings_ctx, copy_of_buffer);
+            }
+
+            // If we also have an interest in the packet, deliver it locally.
+            if let Some(_) = address_status {
+                dispatch_receive_ipv6_packet(
+                    core_ctx,
+                    bindings_ctx,
+                    device,
+                    frame_dst,
+                    packet,
+                    packet_metadata.take().unwrap_or_default(),
+                    ReceiveIpPacketMeta::default(),
+                )
+                .unwrap_or_else(|err| err.respond_with_icmp_error(core_ctx, bindings_ctx, buffer));
+            }
+        }
+        ReceivePacketAction::Deliver { address_status: _ } => {
             trace!("receive_ipv6_packet: delivering locally");
 
             let action = if let Some(action) = delivery_extension_header_action {
@@ -3104,6 +3208,7 @@ pub fn receive_ipv6_packet<
                 core_ctx,
                 packet,
                 packet_metadata,
+                None,
                 device,
                 &dst_device,
                 IpPacketDestination::from_next_hop(next_hop, original_dst),
@@ -3176,6 +3281,8 @@ pub enum ReceivePacketAction<I: BroadcastIpExt + IpLayerIpExt, DeviceId: StrongD
         /// Some if the host is a member of the multicast group and the packet
         /// should be delivered locally (in addition to forwarding).
         address_status: Option<I::AddressStatus>,
+        /// The multicast address the packet should be forwarded to.
+        dst_ip: SpecifiedAddr<I::Addr>,
     },
 
     /// Send a Destination Unreachable ICMP error message to the packet's sender
@@ -3259,7 +3366,13 @@ pub fn receive_ipv4_packet_action<
             ReceivePacketAction::Deliver { address_status }
         }
         Some(address_status @ Ipv4PresentAddressStatus::Multicast) => {
-            receive_ip_multicast_packet_action(core_ctx, device, packet, Some(address_status))
+            receive_ip_multicast_packet_action(
+                core_ctx,
+                device,
+                packet,
+                Some(address_status),
+                dst_ip,
+            )
         }
         Some(
             address_status @ (Ipv4PresentAddressStatus::LimitedBroadcast
@@ -3335,7 +3448,13 @@ pub fn receive_ipv6_packet_action<
     };
     match highest_priority {
         Some(address_status @ Ipv6PresentAddressStatus::Multicast) => {
-            receive_ip_multicast_packet_action(core_ctx, device, packet, Some(address_status))
+            receive_ip_multicast_packet_action(
+                core_ctx,
+                device,
+                packet,
+                Some(address_status),
+                dst_ip,
+            )
         }
         Some(address_status @ Ipv6PresentAddressStatus::UnicastAssigned) => {
             core_ctx.increment(|counters| &counters.deliver_unicast);
@@ -3391,6 +3510,7 @@ fn receive_ip_multicast_packet_action<
     device: &CC::DeviceId,
     packet: &I::Packet<B>,
     address_status: Option<I::AddressStatus>,
+    dst_ip: SpecifiedAddr<I::Addr>,
 ) -> ReceivePacketAction<I, CC::DeviceId> {
     let targets = multicast_forwarding::lookup_multicast_route_for_packet(core_ctx, packet, device);
     match (targets, address_status) {
@@ -3399,7 +3519,7 @@ fn receive_ip_multicast_packet_action<
                 core_ctx.increment(|counters| &counters.deliver_multicast);
             }
             // TODO(https://fxbug.dev/352570820): Increment Counters.
-            ReceivePacketAction::MulticastForward { targets, address_status }
+            ReceivePacketAction::MulticastForward { targets, address_status, dst_ip }
         }
         (None, Some(address_status)) => {
             // If the address was present on the device (e.g. the host is a
@@ -3436,7 +3556,7 @@ fn receive_ip_packet_action_common<
     packet: &I::Packet<B>,
 ) -> ReceivePacketAction<I, CC::DeviceId> {
     if dst_ip.is_multicast() {
-        return receive_ip_multicast_packet_action(core_ctx, device_id, packet, None);
+        return receive_ip_multicast_packet_action(core_ctx, device_id, packet, None, dst_ip);
     }
 
     // The packet is not destined locally, so we attempt to forward it.
@@ -3468,7 +3588,9 @@ fn receive_ip_packet_action_common<
     match lookup_route_table(
         core_ctx,
         *dst_ip,
-        PacketOrigin::NonLocal { source_address, incoming_device: device_id },
+        RuleInput {
+            packet_origin: PacketOrigin::NonLocal { source_address, incoming_device: device_id },
+        },
     ) {
         Some(dst) => {
             core_ctx.increment(|counters| &counters.forward);
@@ -3485,13 +3607,12 @@ fn receive_ip_packet_action_common<
 fn lookup_route_table<I: IpLayerIpExt, CC: IpStateContext<I>>(
     core_ctx: &mut CC,
     dst_ip: I::Addr,
-    packet_origin: PacketOrigin<I, &CC::DeviceId>,
+    rule_input: RuleInput<'_, I, CC::DeviceId>,
 ) -> Option<Destination<I::Addr, CC::DeviceId>> {
-    let bound_device = match packet_origin {
+    let bound_device = match rule_input.packet_origin {
         PacketOrigin::Local { bound_address: _, bound_device } => bound_device,
         PacketOrigin::NonLocal { source_address: _, incoming_device: _ } => None,
     };
-    let rule_input = RuleInput { packet_origin };
     match walk_rules(core_ctx, (), &rule_input, |(), core_ctx, table| {
         match table.lookup(core_ctx, bound_device, dst_ip) {
             Some(dst) => ControlFlow::Break(Some(dst)),

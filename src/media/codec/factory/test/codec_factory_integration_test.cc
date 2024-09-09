@@ -8,6 +8,7 @@
 #include <fuchsia/sysinfo/cpp/fidl_test_base.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
+#include <lib/fidl/cpp/binding_set.h>
 #include <lib/fit/defer.h>
 #include <lib/sys/component/cpp/testing/realm_builder.h>
 #include <lib/vfs/cpp/pseudo_dir.h>
@@ -15,7 +16,6 @@
 
 #include <gtest/gtest.h>
 
-#include "sdk/lib/fidl/cpp/binding_set.h"
 #include "src/lib/testing/loop_fixture/real_loop_fixture.h"
 #include "src/storage/lib/vfs/cpp/pseudo_dir.h"
 #include "src/storage/lib/vfs/cpp/service.h"

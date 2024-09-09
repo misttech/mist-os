@@ -877,12 +877,14 @@ mod tests {
         let test_data_path = "/pkg/data/testfile.txt";
         let expected_contents = std::fs::read(test_data_path).unwrap();
 
-        let txt_channel: zx::Channel =
-            fuchsia_fs::file::open_in_namespace(test_data_path, fio::OpenFlags::RIGHT_READABLE)
-                .unwrap()
-                .into_channel()
-                .unwrap()
-                .into();
+        let txt_channel: zx::Channel = fuchsia_fs::file::open_in_namespace_deprecated(
+            test_data_path,
+            fio::OpenFlags::RIGHT_READABLE,
+        )
+        .unwrap()
+        .into_channel()
+        .unwrap()
+        .into();
 
         spawn_kernel_and_run(move |locked, current_task| {
             let backing_file =
@@ -912,12 +914,14 @@ mod tests {
             [expected_offset as usize..(expected_offset + expected_size_limit) as usize]
             .to_vec();
 
-        let txt_channel: zx::Channel =
-            fuchsia_fs::file::open_in_namespace(&test_data_path, fio::OpenFlags::RIGHT_READABLE)
-                .unwrap()
-                .into_channel()
-                .unwrap()
-                .into();
+        let txt_channel: zx::Channel = fuchsia_fs::file::open_in_namespace_deprecated(
+            &test_data_path,
+            fio::OpenFlags::RIGHT_READABLE,
+        )
+        .unwrap()
+        .into_channel()
+        .unwrap()
+        .into();
 
         spawn_kernel_and_run(move |locked, current_task| {
             let backing_file =

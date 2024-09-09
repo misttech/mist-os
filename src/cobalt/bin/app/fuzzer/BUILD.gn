@@ -11,8 +11,8 @@ source_set("logger_factory_server_provider") {
 
   public_deps = [
     "//sdk/fidl/fuchsia.metrics:fuchsia.metrics_hlcpp",
-    "//sdk/lib/fidl/cpp",
-    "//sdk/lib/fidl/cpp/fuzzing",
+    "//sdk/lib/fidl/hlcpp",
+    "//sdk/lib/fidl/hlcpp/fuzzing",
     "//sdk/lib/sys/cpp",
     "//src/cobalt/bin/app:lib",
     "//src/cobalt/bin/utils:base64",
@@ -26,8 +26,8 @@ source_set("logger_server_provider") {
 
   public_deps = [
     "//sdk/fidl/fuchsia.metrics:fuchsia.metrics_hlcpp",
-    "//sdk/lib/fidl/cpp",
-    "//sdk/lib/fidl/cpp/fuzzing",
+    "//sdk/lib/fidl/hlcpp",
+    "//sdk/lib/fidl/hlcpp/fuzzing",
     "//sdk/lib/sys/cpp",
     "//src/cobalt/bin/app:lib",
     "//src/cobalt/bin/utils:base64",
@@ -41,8 +41,8 @@ source_set("system_data_updater_server_provider") {
 
   public_deps = [
     "//sdk/fidl/fuchsia.cobalt:fuchsia.cobalt_hlcpp",
-    "//sdk/lib/fidl/cpp",
-    "//sdk/lib/fidl/cpp/fuzzing",
+    "//sdk/lib/fidl/hlcpp",
+    "//sdk/lib/fidl/hlcpp/fuzzing",
     "//sdk/lib/sys/cpp",
     "//src/cobalt/bin/app:lib",
     "//zircon/system/ulib/inspect",

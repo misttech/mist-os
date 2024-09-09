@@ -21,7 +21,7 @@ source_set("test_view") {
   deps = [
     "//sdk/fidl/fuchsia.ui.app:fuchsia.ui.app_cpp",
     "//sdk/fidl/fuchsia.ui.views:fuchsia.ui.views_cpp",
-    "//sdk/lib/fidl/cpp",
+    "//sdk/lib/fidl/hlcpp",
     "//sdk/lib/sys/component/cpp/testing:cpp",
     "//sdk/lib/syslog/cpp",
     "//sdk/lib/ui/scenic/cpp",

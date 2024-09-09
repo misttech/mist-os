@@ -2,8 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::visitor::{BpfVisitor, DataWidth, ProgramCounter, Register, Source};
-use crate::{BpfValue, EbpfProgram, EbpfRunContext, BPF_STACK_SIZE, GENERAL_REGISTER_COUNT};
+use crate::visitor::{BpfVisitor, ProgramCounter, Register, Source};
+use crate::{
+    BpfValue, DataWidth, EbpfProgram, EbpfRunContext, BPF_STACK_SIZE, GENERAL_REGISTER_COUNT,
+};
 use byteorder::{BigEndian, ByteOrder, LittleEndian};
 use std::mem::MaybeUninit;
 use std::pin::Pin;
@@ -61,7 +63,7 @@ fn execute_impl<C: EbpfRunContext>(
 }
 
 impl BpfValue {
-    fn add(&self, offset: u64) -> Self {
+    pub fn add(&self, offset: u64) -> Self {
         Self::from(self.as_u64().overflowing_add(offset).0)
     }
 }
@@ -884,6 +886,36 @@ impl<C: EbpfRunContext> BpfVisitor for ComputationContext<'_, C> {
     ) -> Result<(), String> {
         self.jump_with_offset(jump_offset);
         self.set_reg(dst, value.into());
+        Ok(())
+    }
+
+    fn load_from_sk_buf_data<'a>(
+        &mut self,
+        context: &mut Self::Context<'a>,
+        dst: Register,
+        src: Register,
+        offset: u16,
+        register_offset: Option<Register>,
+        width: DataWidth,
+    ) -> Result<(), String> {
+        let Some(offset) =
+            register_offset.map(|r| self.reg(r).as_u16()).unwrap_or(0).checked_add(offset)
+        else {
+            // Offset overflowed. Exit.
+            self.result = Some(self.reg(0).as_u64());
+            return Ok(());
+        };
+        if let Some(value) = self.program.packet_accessor.as_ref().unwrap().run(
+            context,
+            self.reg(src),
+            offset,
+            width,
+        ) {
+            self.next();
+            self.set_reg(dst, value.into());
+        } else {
+            self.result = Some(self.reg(0).as_u64());
+        }
         Ok(())
     }
 

@@ -39,7 +39,7 @@ source_set("lib") {
   ]
   deps = [
     ":usb_video_bind",
-    "//sdk/lib/fidl/cpp",
+    "//sdk/lib/fidl/hlcpp",
     "//src/devices/lib/driver",
     "//src/lib/listnode",
     "//zircon/system/ulib/affine",

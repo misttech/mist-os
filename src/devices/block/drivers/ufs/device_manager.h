@@ -86,17 +86,24 @@ class DeviceManager {
   zx::result<> InitReferenceClock(inspect::Node &controller_node);
   zx::result<> InitUniproAttributes(inspect::Node &unipro_node);
   zx::result<> InitUicPowerMode(inspect::Node &unipro_node);
-  zx::result<> InitUfsPowerMode(inspect::Node &controller_node, inspect::Node &attributes_node);
+  zx::result<> InitUfsPowerMode(inspect::Node &controller_node, inspect::Node &attributes_node)
+      TA_EXCL(power_lock_);
 
-  zx::result<> Suspend();
-  zx::result<> Resume();
+  zx::result<> SuspendPower();
+  zx::result<> ResumePower();
 
-  bool IsSuspended() const { return current_power_mode_ != UfsPowerMode::kActive; }
+  bool IsResumed() TA_EXCL(power_lock_) {
+    std::lock_guard<std::mutex> lock(power_lock_);
+    return current_power_mode_ == UfsPowerMode::kActive &&
+           current_power_condition_ == scsi::PowerCondition::kActive &&
+           current_link_state_ == LinkState::kActive;
+  }
 
   GeometryDescriptor &GetGeometryDescriptor() { return geometry_descriptor_; }
 
   // This function is only used for the QEMU quirk case.
-  void SetCurrentPowerMode(UfsPowerMode power_mode) {
+  void SetCurrentPowerMode(UfsPowerMode power_mode) TA_EXCL(power_lock_) {
+    std::lock_guard<std::mutex> lock(power_lock_);
     current_power_mode_ = power_mode;
     current_power_condition_ = power_mode_map_[power_mode].first;
     current_link_state_ = power_mode_map_[power_mode].second;
@@ -107,9 +114,18 @@ class DeviceManager {
   // for test
   DeviceDescriptor &GetDeviceDescriptor() { return device_descriptor_; }
   PowerModeMap &GetPowerModeMap() { return power_mode_map_; }
-  UfsPowerMode GetCurrentPowerMode() const { return current_power_mode_; }
-  scsi::PowerCondition GetCurrentPowerCondition() const { return current_power_condition_; }
-  LinkState GetCurrentLinkState() const { return current_link_state_; }
+  UfsPowerMode GetCurrentPowerMode() TA_EXCL(power_lock_) {
+    std::lock_guard<std::mutex> lock(power_lock_);
+    return current_power_mode_;
+  }
+  scsi::PowerCondition GetCurrentPowerCondition() TA_EXCL(power_lock_) {
+    std::lock_guard<std::mutex> lock(power_lock_);
+    return current_power_condition_;
+  }
+  LinkState GetCurrentLinkState() TA_EXCL(power_lock_) {
+    std::lock_guard<std::mutex> lock(power_lock_);
+    return current_link_state_;
+  }
 
  private:
   friend class UfsTest;
@@ -120,7 +136,7 @@ class DeviceManager {
   zx::result<uint32_t> DmePeerGet(uint16_t mbi_attribute);
   zx::result<> DmeSet(uint16_t mbi_attribute, uint32_t value);
 
-  zx::result<> SetPowerCondition(scsi::PowerCondition power_condition);
+  zx::result<> SetPowerCondition(scsi::PowerCondition power_condition) TA_REQ(power_lock_);
 
   zx::result<bool> IsWriteBoosterBufferLifeTimeLeft();
   zx::result<> EnableWriteBooster(inspect::Node &wb_node);
@@ -144,9 +160,11 @@ class DeviceManager {
   uint32_t write_booster_flush_threshold_ = 4;  // 40% of the available buffer size.
 
   // Power management
-  UfsPowerMode current_power_mode_ = UfsPowerMode::kIdle;
-  scsi::PowerCondition current_power_condition_ = scsi::PowerCondition::kIdle;
-  LinkState current_link_state_ = LinkState::kOff;
+  std::mutex power_lock_;
+  UfsPowerMode current_power_mode_ TA_GUARDED(power_lock_) = UfsPowerMode::kPowerDown;
+  scsi::PowerCondition current_power_condition_ TA_GUARDED(power_lock_) =
+      scsi::PowerCondition::kIdle;
+  LinkState current_link_state_ TA_GUARDED(power_lock_) = LinkState::kOff;
 
   // There are 3 power modes for UFS devices: UFS power mode, SCSI power condition, and Unipro link
   // state. We need to relate and use them appropriately.

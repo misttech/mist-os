@@ -39,14 +39,14 @@ void SimDevice::ShutdownImpl() {
 zx::result<> SimDevice::Start() {
   parent_node_.Bind(std::move(node()), dispatcher());
 
-  std::unique_ptr<DeviceInspect> inspect;
-  zx_status_t status = DeviceInspect::Create(dispatcher(), &inspect);
-  if (status != ZX_OK) {
-    FDF_LOG(ERROR, "ERROR calling DeviceInspect::Create(): %s", zx_status_get_string(status));
-    return zx::error(status);
+  zx::result<std::unique_ptr<DeviceInspect>> result =
+      DeviceInspect::Create(dispatcher(), inspector().root());
+  if (result.is_error()) {
+    FDF_LOG(ERROR, "ERROR calling DeviceInspect::Create(): %s", result.status_string());
+    return result.take_error();
   }
 
-  inspect_ = std::move(inspect);
+  inspect_ = std::move(*result);
   wlan::drivers::log::Instance::Init(Debug::kBrcmfMsgFilter);
   return zx::ok();
 }

@@ -72,6 +72,7 @@ pub struct ServiceClass(u32);
 
 impl ServiceClass {
     const LIMITED_DISCOVERABLE_MODE: u32 = 1;
+    const LE_AUDIO: u32 = 1 << 1;
     const POSITIONING: u32 = 1 << 3;
     const NETWORKING: u32 = 1 << 4;
     const RENDERING: u32 = 1 << 5;
@@ -93,6 +94,7 @@ where
         for input in self {
             let value = match &*input.to_uppercase() {
                 "LIMITED_DISCOVERABLE_MODE" => ServiceClass::LIMITED_DISCOVERABLE_MODE,
+                "LE_AUDIO" => ServiceClass::LE_AUDIO,
                 "POSITIONING" => ServiceClass::POSITIONING,
                 "NETWORKING" => ServiceClass::NETWORKING,
                 "RENDERING" => ServiceClass::RENDERING,

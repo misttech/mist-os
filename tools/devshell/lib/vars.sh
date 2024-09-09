@@ -259,6 +259,14 @@ function fx-build-config-load {
     HOST_OUT_DIR="${FUCHSIA_BUILD_DIR}/${HOST_OUT_DIR}"
   fi
 
+  # Set the device specified at the build directory level, if any.
+  if [[ -z "${FUCHSIA_NODENAME}" ]]; then
+    if [[ -f "${FUCHSIA_BUILD_DIR}.device" ]]; then
+      FUCHSIA_NODENAME="$(<"${FUCHSIA_BUILD_DIR}.device")"
+    fi
+    export FUCHSIA_NODENAME
+  fi
+
   return 0
 }
 
@@ -394,67 +402,11 @@ function json-config-get {
   fi
 }
 
-function get-device-pair {
-  # Get the ffx configured device
-  local ffx_build_device=$(json-config-get "${FUCHSIA_BUILD_DIR}.json" target.default)
-  # And the older fx-written device
-  # TODO(123887): Remove checking this after some time has passed.
-  # Note: Uses a file outside the build dir so that it is not removed by `gn clean`
-  local pairfile="${FUCHSIA_BUILD_DIR}.device"
-  local fx_build_device=""
-  if [[ -f "${pairfile}" ]]; then
-    fx_build_device="$(<"${pairfile}")"
-  fi
-  # If only one is set, use that. If both are set, make sure they're the same.
-  # If they're not, tell the user to resolve the ambiguity by re-running
-  # `fx set-device` but use the one from ffx.
-  if [[ -n "${ffx_build_device}" && -z "${fx_build_device}" ]] ; then
-    echo "${ffx_build_device}"
-    return 0
-  elif [[ -z "${ffx_build_device}" && -n "${fx_build_device}" ]] ; then
-    echo "${fx_build_device}"
-    return 0
-  elif [[ -n "${ffx_build_device}" && -n "${fx_build_device}" ]] ; then
-    if [[ "${ffx_build_device}" == "${fx_build_device}" ]]; then
-      echo "${ffx_build_device}"
-      return 0
-    else
-      fx-warn "Mismatch between fx and ffx build-level default device"
-      fx-warn "configurations ('${fx_build_device}' vs. '${ffx_build_device}')."
-      fx-warn "Re-run 'fx set-device' with the correct device to resolve the"
-      fx-warn "ambiguity and clear this warning."
-      fx-warn "Using ffx-set '${ffx_build_device}' by default."
-      echo "${ffx_build_device}"
-      return 0
-    fi
-  fi
-  return 1
-}
-
-function get-global-default-device {
-  local ffx_global_device=$(fx-command-run host-tool ffx --config fuchsia.analytics.ffx_invoker=fx target default get --build-dir "${FUCHSIA_BUILD_DIR}")
-  if [[ -n ${ffx_global_device} ]] ; then
-    echo "${ffx_global_device}"
-    return 0
-  fi
-  return 1
-}
-
 function get-device-raw {
   fx-config-read
   local device=""
-  # If DEVICE_NAME was passed in fx -d, use it
-  if [[ "${FUCHSIA_DEVICE_NAME+isset}" == "isset" ]]; then
-    if is-remote-workflow-device && [[ -z "${FX_REMOTE_INVOCATION}" ]]; then
-      fx-warn "The -d flag does not work on this end of the remote workflow"
-      fx-warn "in order to adjust target devices in the remote workflow, use"
-      fx-warn "-d or fx set-device on the local side of the configuration"
-      fx-warn "and restart serve-remote"
-    fi
-    device="${FUCHSIA_DEVICE_NAME}"
-  else
-    device=$(get-device-pair || get-global-default-device)
-  fi
+  device="$(ffx target default get)"
+
   if ! is-valid-device "${device}"; then
     fx-error "Invalid device name or address: '${device}'. Some valid examples are:
       strut-wind-ahead-turf, 192.168.3.1:8022, [fe80::7:8%eth0], [fe80::7:8%eth0]:5222, [::1]:22"
@@ -478,7 +430,7 @@ function is-valid-device {
 export _FX_REMOTE_WORKFLOW_DEVICE_ADDR='[::1]:8022'
 
 function is-remote-workflow-device {
-  [[ $(get-device-pair 2>/dev/null) == "${_FX_REMOTE_WORKFLOW_DEVICE_ADDR}" ]]
+  [[ $(get-device-raw 2>/dev/null) == "${_FX_REMOTE_WORKFLOW_DEVICE_ADDR}" ]]
 }
 
 # fx-export-device-address is "public API" to commands that wish to
@@ -506,8 +458,23 @@ function get-device-name {
   local device
   device="$(get-device-raw)" || exit $?
   # remove ssh port if present
-  if [[ "${device}" =~ ^(.*):[0-9]{1,5}$ ]]; then
-    device="${BASH_REMATCH[1]}"
+  if _looks_like_hostname "${device}" || _looks_like_ipv4 "${device}"; then
+    if [[ "${device}" =~ ^(.*):[0-9]{1,5}$ ]]; then
+      device="${BASH_REMATCH[1]}"
+    fi
+  elif _looks_like_ipv6 "${device}"; then
+    # parse the address into parts.
+    local expression='^\[([0-9a-fA-F:]+(%[0-9a-zA-Z-]{1,})?)\](:[0-9]{1,5})?$'
+    if ! [[ "$device" =~ ${expression} ]]; then
+      # try again but wrap the arg in "[]"
+      local wrapped="[${device}]"
+      if ! [[ "$device" =~ ${expression} ]]; then
+        echo "$device"
+        return
+      fi
+    fi
+    device="[${BASH_REMATCH[1]}]"
+
   fi
   echo "${device}"
 }
@@ -649,19 +616,19 @@ function fx-target-finder-resolve {
     fx-error "Invalid arguments to fx-target-finder-resolve: [$*]"
     return 1
   fi
-  ffx --config fuchsia.analytics.ffx_invoker=fx target list --format a "$1"
+  ffx target list --format a "$1"
 }
 
 function fx-target-finder-list {
-  ffx --config fuchsia.analytics.ffx_invoker=fx target list --format a
+  ffx target list --format a
 }
 
 function fx-target-finder-info {
-  ffx --config fuchsia.analytics.ffx_invoker=fx target list --format s
+  ffx target list --format s
 }
 
 function fx-target-ssh-address {
-  ffx --config fuchsia.analytics.ffx_invoker=fx target get-ssh-address
+  ffx target get-ssh-address
 }
 
 function multi-device-fail {

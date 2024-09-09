@@ -11,8 +11,11 @@
 #include <lib/trace-provider/provider.h>
 
 #include <filesystem>
+#include <memory>
 #include <system_error>
 
+#include "src/developer/memory/metrics/capture.h"
+#include "src/developer/memory/metrics/capture_strategy.h"
 #include "src/developer/memory/monitor/monitor.h"
 #include "src/lib/fxl/command_line.h"
 #include "src/lib/fxl/log_settings_command_line.h"
@@ -61,10 +64,18 @@ int main(int argc, const char** argv) {
   zx_status_t status = fuchsia_scheduler::SetRoleForThisThread("fuchsia.memory-monitor.main");
   FX_CHECK(status == ZX_OK) << "Set scheduler role status: " << zx_status_get_string(status);
 
-  monitor::Monitor app(std::move(startup_context), command_line, loop.dispatcher(),
-                       true /* send_metrics */, true /* watch_memory_pressure */,
-                       SendCriticalMemoryPressureCrashReports(),
-                       memory_monitor_config::Config::TakeFromStartupHandle());
+  auto maker_result = memory::CaptureMaker::Create(
+      memory::CreateDefaultOS(), std::make_unique<memory::StarnixCaptureStrategy>());
+  if (maker_result.is_error()) {
+    FX_LOGS(ERROR) << "Error getting capture state: "
+                   << zx_status_get_string(maker_result.error_value());
+    exit(EXIT_FAILURE);
+  }
+
+  monitor::Monitor app(
+      std::move(startup_context), command_line, loop.dispatcher(), true /* send_metrics */,
+      true /* watch_memory_pressure */, SendCriticalMemoryPressureCrashReports(),
+      memory_monitor_config::Config::TakeFromStartupHandle(), std::move(maker_result.value()));
   SetRamDevice(&app);
   loop.Run();
 

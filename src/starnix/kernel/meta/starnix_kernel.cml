@@ -101,6 +101,7 @@
                 "fuchsia.power.suspend.Stats",
                 "fuchsia.power.system.ActivityGovernor",
                 "fuchsia.scheduler.RoleManager",
+                "fuchsia.starnix.runner.Manager",
                 "fuchsia.sysinfo.SysInfo",
                 "fuchsia.sysmem.Allocator",
                 "fuchsia.sysmem2.Allocator",

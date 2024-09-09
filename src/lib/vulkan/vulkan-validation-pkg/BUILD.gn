@@ -17,7 +17,7 @@ executable("validation-server-bin") {
 
   deps = [
     "//sdk/lib/fdio",
-    "//sdk/lib/fidl/cpp",
+    "//sdk/lib/fidl/hlcpp",
     "//sdk/lib/sys/cpp",
     "//sdk/lib/vfs/cpp",
     "//src/lib/fxl",

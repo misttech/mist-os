@@ -483,7 +483,7 @@ TEST_F(BlockOpTest, MultiQueueDepthWriteTest) {
     ASSERT_OK(dut_->WaitWithTimeout(wait_for_completion, kMultiQueueTimeoutUs,
                                     completion_timeout_message));
 
-    dut_->ProcessCompletions();
+    dut_->ProcessIoCompletions();
     ASSERT_EQ(GetSlotStateCount(SlotState::kFree),
               dut_->GetTransferRequestProcessor().GetRequestList().GetSlotCount());
 

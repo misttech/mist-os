@@ -3,10 +3,12 @@
 // found in the LICENSE file.
 
 #include <fidl/fuchsia.wlan.phyimpl/cpp/driver/wire.h>
+#include <fidl/fuchsia.wlan.phyimpl/cpp/wire_types.h>
 #include <fuchsia/wlan/common/cpp/fidl.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/async/cpp/task.h>
+#include <lib/async/default.h>
 #include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
 #include <lib/component/incoming/cpp/service.h>
 #include <lib/driver/incoming/cpp/namespace.h>
@@ -20,11 +22,9 @@
 #include <lib/sys/cpp/testing/component_context_provider.h>
 #include <netinet/if_ether.h>
 #include <zircon/errors.h>
-#include <zircon/system/ulib/async-default/include/lib/async/default.h>
 
 #include <gtest/gtest.h>
 
-#include "fidl/fuchsia.wlan.phyimpl/cpp/wire_types.h"
 #include "src/connectivity/wlan/drivers/wlanphy/device.h"
 #include "src/devices/bin/driver_runtime/dispatcher.h"
 

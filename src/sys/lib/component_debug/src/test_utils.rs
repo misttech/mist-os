@@ -165,7 +165,10 @@ pub fn serve_realm_query(
                     let moniker = Moniker::parse_str(&moniker).unwrap().to_string();
                     if let Some(dir) = dirs.get(&(moniker, dir_type)) {
                         let path = dir.path().join(path).display().to_string();
-                        fuchsia_fs::node::open_channel_in_namespace(&path, flags, object).unwrap();
+                        fuchsia_fs::node::open_channel_in_namespace_deprecated(
+                            &path, flags, object,
+                        )
+                        .unwrap();
                         responder.send(Ok(())).unwrap();
                     } else {
                         responder.send(Err(fsys::OpenError::NoSuchDir)).unwrap();

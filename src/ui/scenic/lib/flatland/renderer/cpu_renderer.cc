@@ -244,16 +244,9 @@ void CpuRenderer::Render(const allocation::ImageMetadata& render_target,
         [&image_map_itr_, image, render_target, image_pixels_per_row, render_target_pixels_per_row,
          image_type, render_type](uint8_t* render_target_ptr, uint32_t render_target_num_bytes) {
           MapHostPointer(image_map_itr_->second.first, HostPointerAccessMode::kReadOnly,
-                         [render_target_ptr, render_target_num_bytes, image, render_target,
-                          image_pixels_per_row, render_target_pixels_per_row, image_type,
+                         [render_target_ptr, image, render_target, image_pixels_per_row,
+                          render_target_pixels_per_row, image_type,
                           render_type](const uint8_t* image_ptr, uint32_t image_num_bytes) {
-                           // This is conservative, e.g. it will trigger if we have a 4-byte image
-                           // format and a 2-byte target format like RGB565.  The code below already
-                           // handles this case via `Pixel::FromVmo()` and `Pixel::ToFormat()`, so
-                           // if we trigger this CHECK we can simply relax this condition (after
-                           // verifying that we have sufficient test coverage).
-                           FX_CHECK(image_num_bytes <= render_target_num_bytes);
-
                            uint32_t min_height = std::min(image.height, render_target.height);
                            uint32_t min_width = std::min(image.width, render_target.width);
 

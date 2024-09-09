@@ -53,8 +53,10 @@ enum IncomingServices {
 async fn find_block_device_filepath(partition_path: &str) -> Result<String, Error> {
     const DEV_CLASS_BLOCK: &str = "/dev/class/block";
 
-    let dir =
-        fuchsia_fs::directory::open_in_namespace(DEV_CLASS_BLOCK, fio::OpenFlags::RIGHT_READABLE)?;
+    let dir = fuchsia_fs::directory::open_in_namespace_deprecated(
+        DEV_CLASS_BLOCK,
+        fio::OpenFlags::RIGHT_READABLE,
+    )?;
     device_watcher::wait_for_device_with(
         &dir,
         |device_watcher::DeviceInfo { filename, topological_path }| {
@@ -110,7 +112,7 @@ async fn read_file_from_proxy<'a>(
     dir_proxy: &'a fio::DirectoryProxy,
     file_path: &'a str,
 ) -> Result<Vec<u8>, Error> {
-    let file = fuchsia_fs::directory::open_file_no_describe(
+    let file = fuchsia_fs::directory::open_file_no_describe_deprecated(
         &dir_proxy,
         file_path,
         fuchsia_fs::OpenFlags::RIGHT_READABLE,

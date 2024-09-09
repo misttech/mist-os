@@ -3,12 +3,13 @@
 // found in the LICENSE file.
 
 use crate::{
-    BPF_ADD, BPF_ALU, BPF_ALU64, BPF_AND, BPF_ARSH, BPF_ATOMIC, BPF_B, BPF_CALL, BPF_CLS_MASK,
-    BPF_CMPXCHG, BPF_DIV, BPF_DW, BPF_END, BPF_EXIT, BPF_FETCH, BPF_H, BPF_JA, BPF_JEQ, BPF_JGE,
-    BPF_JGT, BPF_JLE, BPF_JLT, BPF_JMP, BPF_JMP32, BPF_JNE, BPF_JSET, BPF_JSGE, BPF_JSGT, BPF_JSLE,
-    BPF_JSLT, BPF_LD, BPF_LDDW, BPF_LDX, BPF_LOAD_STORE_MASK, BPF_LSH, BPF_MEM, BPF_MOD, BPF_MOV,
-    BPF_MUL, BPF_NEG, BPF_OR, BPF_RSH, BPF_SIZE_MASK, BPF_SRC_MASK, BPF_SRC_REG, BPF_ST, BPF_STX,
-    BPF_SUB, BPF_SUB_OP_MASK, BPF_TO_BE, BPF_W, BPF_XCHG, BPF_XOR,
+    DataWidth, BPF_ABS, BPF_ADD, BPF_ALU, BPF_ALU64, BPF_AND, BPF_ARSH, BPF_ATOMIC, BPF_B,
+    BPF_CALL, BPF_CLS_MASK, BPF_CMPXCHG, BPF_DIV, BPF_DW, BPF_END, BPF_EXIT, BPF_FETCH, BPF_H,
+    BPF_IND, BPF_JA, BPF_JEQ, BPF_JGE, BPF_JGT, BPF_JLE, BPF_JLT, BPF_JMP, BPF_JMP32, BPF_JNE,
+    BPF_JSET, BPF_JSGE, BPF_JSGT, BPF_JSLE, BPF_JSLT, BPF_LD, BPF_LDDW, BPF_LDX,
+    BPF_LOAD_STORE_MASK, BPF_LSH, BPF_MEM, BPF_MOD, BPF_MOV, BPF_MUL, BPF_NEG, BPF_OR, BPF_RSH,
+    BPF_SIZE_MASK, BPF_SRC_MASK, BPF_SRC_REG, BPF_ST, BPF_STX, BPF_SUB, BPF_SUB_OP_MASK, BPF_TO_BE,
+    BPF_W, BPF_XCHG, BPF_XOR,
 };
 use linux_uapi::bpf_insn;
 
@@ -30,52 +31,6 @@ impl From<&bpf_insn> for Source {
             Self::Reg(instruction.src_reg())
         } else {
             Self::Value(instruction.imm as u64)
-        }
-    }
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum DataWidth {
-    U8,
-    U16,
-    U32,
-    U64,
-}
-
-impl DataWidth {
-    pub fn bits(&self) -> usize {
-        match self {
-            Self::U8 => 8,
-            Self::U16 => 16,
-            Self::U32 => 32,
-            Self::U64 => 64,
-        }
-    }
-
-    pub fn bytes(&self) -> usize {
-        match self {
-            Self::U8 => 1,
-            Self::U16 => 2,
-            Self::U32 => 4,
-            Self::U64 => 8,
-        }
-    }
-
-    pub fn str(&self) -> &'static str {
-        match self {
-            Self::U8 => "b",
-            Self::U16 => "h",
-            Self::U32 => "w",
-            Self::U64 => "dw",
-        }
-    }
-
-    pub fn instruction_bits(&self) -> u8 {
-        match self {
-            Self::U8 => BPF_B,
-            Self::U16 => BPF_H,
-            Self::U32 => BPF_W,
-            Self::U64 => BPF_DW,
         }
     }
 }
@@ -530,6 +485,16 @@ pub trait BpfVisitor {
         dst: Register,
         value: u64,
         jump_offset: i16,
+    ) -> Result<(), String>;
+
+    fn load_from_sk_buf_data<'a>(
+        &mut self,
+        context: &mut Self::Context<'a>,
+        dst: Register,
+        src: Register,
+        offset: u16,
+        register_offset: Option<Register>,
+        width: DataWidth,
     ) -> Result<(), String>;
 
     fn store<'a>(
@@ -991,8 +956,31 @@ pub trait BpfVisitor {
                         | (((next_instruction.imm as u32) as u64) << 32);
                     return self.load64(context, instruction.dst_reg(), value, 1);
                 }
-                // Other ld are not supported.
-                return invalid_op_code();
+                let width = match instruction.code & BPF_SIZE_MASK {
+                    BPF_B => DataWidth::U8,
+                    BPF_H => DataWidth::U16,
+                    BPF_W => DataWidth::U32,
+                    BPF_DW => DataWidth::U64,
+                    _ => unreachable!(),
+                };
+                let register_offset = match instruction.code & BPF_LOAD_STORE_MASK {
+                    BPF_ABS => None,
+                    BPF_IND => Some(instruction.src_reg()),
+                    _ => return invalid_op_code(),
+                };
+                if instruction.off < 0 {
+                    return Err(format!("negative offset for load packet"));
+                }
+                return self.load_from_sk_buf_data(
+                    context,
+                    // Store the result in r0
+                    0,
+                    // Read the packet from r6
+                    6,
+                    instruction.off as u16,
+                    register_offset,
+                    width,
+                );
             }
             BPF_STX | BPF_ST | BPF_LDX => {
                 let width = match instruction.code & BPF_SIZE_MASK {

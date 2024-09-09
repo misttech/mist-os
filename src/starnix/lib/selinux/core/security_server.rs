@@ -3,16 +3,17 @@
 // found in the LICENSE file.
 
 use crate::access_vector_cache::{Manager as AvcManager, Query, QueryMut};
-use crate::permission_check::{PermissionCheck, PermissionCheckImpl};
+use crate::permission_check::PermissionCheck;
 use crate::seq_lock::SeqLock;
-use crate::SecurityId;
+use crate::{FileSystemLabel, FileSystemLabelingScheme, FileSystemMountOptions, SecurityId};
 
 use anyhow::Context as _;
 use fuchsia_zircon::{self as zx};
 use selinux::policy::metadata::HandleUnknown;
 use selinux::policy::parser::ByValue;
 use selinux::policy::{
-    parse_policy_by_value, AccessVector, AccessVectorComputer, Policy, SecurityContext,
+    parse_policy_by_value, AccessVector, AccessVectorComputer, FsUseLabelAndType, FsUseType,
+    Policy, SecurityContext,
 };
 use selinux::{
     AbstractObjectClass, ClassPermission, FileClass, InitialSid, NullessByteStr, ObjectClass,
@@ -182,8 +183,8 @@ impl SecurityServer {
 
     /// Converts a shared pointer to [`SecurityServer`] to a [`PermissionCheck`] without consuming
     /// the pointer.
-    pub fn as_permission_check<'a>(self: &'a Self) -> impl PermissionCheck + 'a {
-        PermissionCheckImpl::new(self, self.avc_manager.get_shared_cache())
+    pub fn as_permission_check<'a>(self: &'a Self) -> PermissionCheck<'a> {
+        PermissionCheck::new(self, self.avc_manager.get_shared_cache())
     }
 
     /// Returns the security ID mapped to `security_context`, creating it if it does not exist.
@@ -356,11 +357,71 @@ impl SecurityServer {
         locked_state.policy.as_ref().unwrap().parsed.find_class_permissions_by_name(name)
     }
 
+    /// Determines the appropriate [`FileSystemLabel`] for a mounted filesystem given this security
+    /// server's loaded policy, the name of the filesystem type ("ext4" or "tmpfs", for example),
+    /// and the security-relevant mount options passed for the mount operation.
+    pub fn resolve_fs_label(
+        &self,
+        fs_type: NullessByteStr<'_>,
+        mount_options: &FileSystemMountOptions,
+    ) -> FileSystemLabel {
+        let mut locked_state = self.state.lock();
+
+        let mountpoint_sid_from_mount_option =
+            sid_from_mount_option(&mut locked_state, &mount_options.context);
+        let fs_sid_from_mount_option =
+            sid_from_mount_option(&mut locked_state, &mount_options.fs_context);
+        let def_sid_from_mount_option =
+            sid_from_mount_option(&mut locked_state, &mount_options.def_context);
+        let root_sid_from_mount_option =
+            sid_from_mount_option(&mut locked_state, &mount_options.root_context);
+
+        // If `mount_options.context` is set then the file-system and the nodes it contains
+        // have the specified read-only security label set.
+        if let Some(mountpoint_sid) = mountpoint_sid_from_mount_option {
+            FileSystemLabel { sid: mountpoint_sid, scheme: FileSystemLabelingScheme::Mountpoint }
+        } else {
+            // Check for an `fs_use` entry for this file-system type, in the policy.
+            if let Some(FsUseLabelAndType { context, use_type }) =
+                locked_state.policy.as_ref().unwrap().parsed.fs_use_label_and_type(fs_type)
+            {
+                let fs_sid_from_policy = locked_state.security_context_to_sid(context);
+                let fs_sid = fs_sid_from_mount_option.unwrap_or(fs_sid_from_policy);
+                FileSystemLabel {
+                    sid: fs_sid,
+                    scheme: FileSystemLabelingScheme::FsUse {
+                        fs_use_type: use_type,
+                        def_sid: def_sid_from_mount_option
+                            .unwrap_or(SecurityId::initial(InitialSid::File)),
+                        root_sid: root_sid_from_mount_option.unwrap_or(fs_sid),
+                    },
+                }
+            } else {
+                // The name of the filesystem type was not recognized.
+                //
+                // TODO: https://fxbug.dev/363215797 - verify that these defaults are correct.
+                let unrecognized_filesystem_type_sid = SecurityId::initial(InitialSid::File);
+                let unrecognized_filesystem_type_fs_use_type = FsUseType::Xattr;
+
+                FileSystemLabel {
+                    sid: fs_sid_from_mount_option.unwrap_or(unrecognized_filesystem_type_sid),
+                    scheme: FileSystemLabelingScheme::FsUse {
+                        fs_use_type: unrecognized_filesystem_type_fs_use_type,
+                        def_sid: def_sid_from_mount_option
+                            .unwrap_or(unrecognized_filesystem_type_sid),
+                        root_sid: root_sid_from_mount_option
+                            .unwrap_or(unrecognized_filesystem_type_sid),
+                    },
+                }
+            }
+        }
+    }
+
     /// Computes the precise access vector for `source_sid` targeting `target_sid` as class
     /// `target_class`.
-    ///
-    /// TODO(http://b/305722921): Implement complete access decision logic. For now, the security
-    /// server abides by explicit `allow [source] [target]:[class] [permissions..];` statements.
+    //
+    // TODO(http://b/305722921): Implement complete access decision logic. For now, the security
+    // server abides by explicit `allow [source] [target]:[class] [permissions..];` statements.
     pub fn compute_access_vector(
         &self,
         source_sid: SecurityId,
@@ -556,6 +617,28 @@ struct SeLinuxStatusValue {
     policyload: u32,
     /// `0` means allow and `1` means deny unknown object classes/permissions.
     deny_unknown: u32,
+}
+
+/// Computes a [`SecurityId`] given a non-[`None`] value for one of the four
+/// "context" mount options (https://man7.org/linux/man-pages/man8/mount.8.html).
+fn sid_from_mount_option(
+    state: &mut SecurityServerState,
+    mount_option: &Option<Vec<u8>>,
+) -> Option<SecurityId> {
+    if let Some(label) = mount_option.as_ref() {
+        Some(
+            if let Some(context) =
+                state.policy.as_ref().unwrap().parsed.parse_security_context(label.into()).ok()
+            {
+                state.security_context_to_sid(context)
+            } else {
+                // The mount option is present-but-not-valid: we use `Unlabeled`.
+                SecurityId::initial(InitialSid::Unlabeled)
+            },
+        )
+    } else {
+        None
+    }
 }
 
 #[cfg(test)]
@@ -1059,28 +1142,28 @@ mod tests {
         let permission_check = security_server.as_permission_check();
 
         // Test policy allows "type0" the process getsched capability to "unlabeled_t".
-        assert!(permission_check.has_permission(
-            valid_sid,
-            unlabeled_sid,
-            ProcessPermission::GetSched
-        ));
-        assert!(!permission_check.has_permission(
-            valid_sid,
-            unlabeled_sid,
-            ProcessPermission::SetSched
-        ));
+        assert!(
+            permission_check
+                .has_permission(valid_sid, unlabeled_sid, ProcessPermission::GetSched)
+                .permit
+        );
+        assert!(
+            !permission_check
+                .has_permission(valid_sid, unlabeled_sid, ProcessPermission::SetSched)
+                .permit
+        );
 
         // Test policy allows "unlabeled_t" the process setsched capability to "type0".
-        assert!(!permission_check.has_permission(
-            unlabeled_sid,
-            valid_sid,
-            ProcessPermission::GetSched
-        ));
-        assert!(permission_check.has_permission(
-            unlabeled_sid,
-            valid_sid,
-            ProcessPermission::SetSched
-        ));
+        assert!(
+            !permission_check
+                .has_permission(unlabeled_sid, valid_sid, ProcessPermission::GetSched)
+                .permit
+        );
+        assert!(
+            permission_check
+                .has_permission(unlabeled_sid, valid_sid, ProcessPermission::SetSched)
+                .permit
+        );
     }
 
     #[fuchsia::test]
@@ -1094,11 +1177,11 @@ mod tests {
         let permission_check = security_server.as_permission_check();
 
         // Test policy grants "type0" the process-fork permission to itself.
-        assert!(permission_check.has_permission(sid, sid, ProcessPermission::Fork));
+        assert!(permission_check.has_permission(sid, sid, ProcessPermission::Fork).permit);
 
         // Test policy does not grant "type0" the process-getrlimit permission to itself, but
         // the security server is configured to be permissive.
-        assert!(permission_check.has_permission(sid, sid, ProcessPermission::GetRlimit));
+        assert!(permission_check.has_permission(sid, sid, ProcessPermission::GetRlimit).permit);
     }
 
     #[fuchsia::test]
@@ -1112,9 +1195,9 @@ mod tests {
         let permission_check = security_server.as_permission_check();
 
         // Test policy grants "type0" the process-fork permission to itself.
-        assert!(permission_check.has_permission(sid, sid, ProcessPermission::Fork));
+        assert!(permission_check.has_permission(sid, sid, ProcessPermission::Fork).permit);
 
         // Test policy does not grant "type0" the process-getrlimit permission to itself.
-        assert!(!permission_check.has_permission(sid, sid, ProcessPermission::GetRlimit));
+        assert!(!permission_check.has_permission(sid, sid, ProcessPermission::GetRlimit).permit);
     }
 }

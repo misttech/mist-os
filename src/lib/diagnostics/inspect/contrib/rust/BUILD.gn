@@ -25,6 +25,7 @@ rustc_library("fuchsia-inspect-contrib") {
   ]
 
   test_deps = [
+    "//src/lib/diagnostics/inspect/format/rust",
     "//src/lib/diagnostics/testing/diagnostics-assertions/rust:diagnostics-assertions",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",

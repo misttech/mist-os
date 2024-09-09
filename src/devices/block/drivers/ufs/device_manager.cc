@@ -34,6 +34,10 @@ zx::result<> DeviceManager::SendLinkStartUp() {
     FDF_LOG(ERROR, "Failed to startup UFS link: %s", result.status_string());
     return result.take_error();
   }
+
+  std::lock_guard<std::mutex> lock(power_lock_);
+  current_link_state_ = LinkState::kActive;
+
   return zx::ok();
 }
 
@@ -652,16 +656,21 @@ zx::result<> DeviceManager::SetPowerCondition(scsi::PowerCondition target_power_
   return zx::ok();
 }
 
-zx::result<> DeviceManager::Suspend() {
+zx::result<> DeviceManager::SuspendPower() {
   const UfsPowerMode target_power_mode = UfsPowerMode::kSleep;
   const scsi::PowerCondition target_power_condition = power_mode_map_[target_power_mode].first;
   const LinkState target_link_state = power_mode_map_[target_power_mode].second;
 
-  if (current_power_mode_ == target_power_mode) {
+  std::lock_guard<std::mutex> lock(power_lock_);
+  if (current_power_mode_ == target_power_mode &&
+      current_power_condition_ == target_power_condition &&
+      current_link_state_ == target_link_state) {
     return zx::ok();
   }
 
-  if (current_power_mode_ != UfsPowerMode::kActive || current_link_state_ != LinkState::kActive) {
+  if (current_power_mode_ != UfsPowerMode::kActive ||
+      current_power_condition_ != scsi::PowerCondition::kActive ||
+      current_link_state_ != LinkState::kActive) {
     return zx::error(ZX_ERR_BAD_STATE);
   }
 
@@ -703,19 +712,25 @@ zx::result<> DeviceManager::Suspend() {
   }
 
   current_power_mode_ = target_power_mode;
+  FDF_LOG(INFO, "Power suspended.");
   return zx::ok();
 }
 
-zx::result<> DeviceManager::Resume() {
+zx::result<> DeviceManager::ResumePower() {
   const UfsPowerMode target_power_mode = UfsPowerMode::kActive;
   const scsi::PowerCondition target_power_condition = power_mode_map_[target_power_mode].first;
   const LinkState target_link_state = power_mode_map_[target_power_mode].second;
 
-  if (current_power_mode_ == target_power_mode) {
+  std::lock_guard<std::mutex> lock(power_lock_);
+  if (current_power_mode_ == target_power_mode &&
+      current_power_condition_ == target_power_condition &&
+      current_link_state_ == target_link_state) {
     return zx::ok();
   }
 
-  if (current_power_mode_ != UfsPowerMode::kSleep || current_link_state_ != LinkState::kHibernate) {
+  if (current_power_mode_ != UfsPowerMode::kSleep ||
+      current_power_condition_ != scsi::PowerCondition::kIdle ||
+      current_link_state_ != LinkState::kHibernate) {
     return zx::error(ZX_ERR_BAD_STATE);
   }
 
@@ -741,11 +756,14 @@ zx::result<> DeviceManager::Resume() {
   }
 
   current_power_mode_ = target_power_mode;
+  FDF_LOG(INFO, "Power resumed.");
   return zx::ok();
 }
 
 zx::result<> DeviceManager::InitUfsPowerMode(inspect::Node &controller_node,
                                              inspect::Node &attributes_node) {
+  std::lock_guard<std::mutex> lock(power_lock_);
+
   // Read current power mode (bCurrentPowerMode, bActiveIccLevel)
   zx::result<uint32_t> power_mode = ReadAttribute(Attributes::bCurrentPowerMode);
   if (power_mode.is_error()) {

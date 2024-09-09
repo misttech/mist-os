@@ -26,6 +26,16 @@ impl DefineSubsystemConfiguration<PowerConfig> for PowerManagementSubsystem {
                 .context("Adding cpu_manager config file")?;
         }
 
+        if let Some(energy_model_config) = &context.board_info.configuration.energy_model {
+            builder
+                .bootfs()
+                .file(FileEntry {
+                    source: energy_model_config.as_utf8_pathbuf().into(),
+                    destination: BootfsDestination::EnergyModelConfig,
+                })
+                .context("Adding energy model config file for processor power management")?;
+        }
+
         if let Some(power_manager_config) = &context.board_info.configuration.power_manager {
             builder
                 .bootfs()
@@ -86,6 +96,16 @@ impl DefineSubsystemConfiguration<PowerConfig> for PowerManagementSubsystem {
                 source: config.as_utf8_pathbuf().into(),
                 destination: "config.json".to_string(),
             })?;
+        }
+
+        // Include fake-battery driver through a platform AIB.
+        if context.board_info.provides_feature("fuchsia::fake_battery") {
+            // We only need this driver feature in the utility / standard feature set levels.
+            if *context.feature_set_level == FeatureSupportLevel::Standard
+                || *context.feature_set_level == FeatureSupportLevel::Utility
+            {
+                builder.platform_bundle("fake_battery_driver");
+            }
         }
 
         Ok(())

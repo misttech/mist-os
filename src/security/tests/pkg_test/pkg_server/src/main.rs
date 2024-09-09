@@ -97,7 +97,7 @@ impl RequestHandler {
         path_chars.next();
         let path = path_chars.as_str();
 
-        match directory::open_file_no_describe(
+        match directory::open_file_no_describe_deprecated(
             &self.repository_dir,
             path,
             fio::OpenFlags::RIGHT_READABLE,
@@ -190,7 +190,7 @@ async fn main() {
         .boxed();
 
     let make_service = make_service_fn(|_| {
-        let repository_dir = fuchsia_fs::directory::open_in_namespace(
+        let repository_dir = fuchsia_fs::directory::open_in_namespace_deprecated(
             repository_path,
             fio::OpenFlags::RIGHT_READABLE,
         )

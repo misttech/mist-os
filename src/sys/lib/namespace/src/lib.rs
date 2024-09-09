@@ -392,10 +392,13 @@ mod tests {
         async fn verify(entry: Entry) {
             assert_eq!(entry.path.to_string(), "/data");
             let dir = entry.directory.into_proxy().unwrap();
-            let file =
-                fuchsia_fs::directory::open_file(&dir, "foo/bar", fio::OpenFlags::RIGHT_READABLE)
-                    .await
-                    .unwrap();
+            let file = fuchsia_fs::directory::open_file_deprecated(
+                &dir,
+                "foo/bar",
+                fio::OpenFlags::RIGHT_READABLE,
+            )
+            .await
+            .unwrap();
             let content = fuchsia_fs::file::read(&file).await.unwrap();
             assert_eq!(content, b"Fuchsia");
         }

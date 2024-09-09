@@ -143,9 +143,7 @@ func (c *Context) BindStartupHandle(ctx fidl.Context) {
 	}); directoryRequest.IsValid() {
 		if err := (&DirectoryWrapper{
 			Directory: directory,
-		}).addConnection(ctx, 0, 0, io.NodeWithCtxInterfaceRequest{
-			Channel: zx.Channel(directoryRequest),
-		}); err != nil {
+		}).addConnection(0, zx.Channel(directoryRequest)); err != nil {
 			panic(err)
 		}
 	}

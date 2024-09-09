@@ -13,7 +13,7 @@ These locations include:
 * [//build/fuzzing](/build/fuzzing): GN templates for building fuzzers.
 * [//docs/development/testing/fuzzing](/docs/development/testing/fuzzing): Fuzzer documentation.
 * [//examples/fuzzers](/examples/fuzzers): Illustrative sample fuzzers for reference.
-* [//sdk/lib/fuzzing](/sdk/lib/fuzzing), [//sdk/lib/fidl/cpp/fuzzing](/sdk/lib/fidl/cpp/fuzzing):
+* [//sdk/lib/fuzzing](/sdk/lib/fuzzing), [//sdk/lib/fidl/hlcpp/fuzzing](/sdk/lib/fidl/hlcpp/fuzzing):
   Library support for [FIDL protocol fuzzers](/docs/development/testing/fuzzing/fidl-fuzzing.md).
 * [//src/developer/ffx/plugins/fuzz](/src/developer/ffx/plugins/fuzz): `ffx fuzz` tool used to
   manage v2 fuzzers.

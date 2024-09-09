@@ -59,8 +59,6 @@ class IsolatedDevmgr {
     return fidl::ClientEnd<fuchsia_io::Directory>(root.TakeChannel());
   }
 
-  zx_status_t SuspendDriverManager();
-
   std::string RealmChildName() const { return realm_->component().GetChildName(); }
 
  private:

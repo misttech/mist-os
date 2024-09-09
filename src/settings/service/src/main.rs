@@ -93,7 +93,7 @@ fn main() -> Result<(), Error> {
         Arc::new(Mutex::new(stash_inspect_logger)),
     );
 
-    let storage_dir = fuchsia_fs::directory::open_in_namespace(
+    let storage_dir = fuchsia_fs::directory::open_in_namespace_deprecated(
         "/data/storage",
         OpenFlags::RIGHT_READABLE | OpenFlags::RIGHT_WRITABLE | OpenFlags::CREATE,
     )

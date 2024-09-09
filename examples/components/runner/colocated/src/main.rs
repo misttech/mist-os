@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::{Context, Result};
+use anyhow::{bail, Context, Result};
 use attribution_server::{AttributionServer, AttributionServerHandle, Observer, Publisher};
 use fidl::endpoints::{ControlHandle, RequestStream};
 use fuchsia_component::server::ServiceFs;
@@ -83,7 +83,9 @@ async fn handle_runner_request(
     while let Some(request) =
         stream.try_next().await.context("failed to serve ComponentRunner protocol")?
     {
-        let fcrunner::ComponentRunnerRequest::Start { start_info, controller, .. } = request;
+        let fcrunner::ComponentRunnerRequest::Start { start_info, controller, .. } = request else {
+            bail!("Unexpected runner request");
+        };
         let url = start_info.resolved_url.clone().unwrap_or_else(|| "unknown url".to_string());
         info!("Colocated runner is going to start component {url}");
         let (stream, control) = controller.into_stream_and_control_handle().unwrap();

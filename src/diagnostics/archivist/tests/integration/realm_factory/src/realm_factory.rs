@@ -91,6 +91,7 @@ impl ArchivistRealmFactory {
             .capability(Capability::configuration("fuchsia.diagnostics.NumThreads"))
             .capability(Capability::configuration("fuchsia.diagnostics.AllowSerialLogs"))
             .capability(Capability::configuration("fuchsia.diagnostics.DenySerialLogs"))
+            .capability(Capability::configuration("fuchsia.diagnostics.ComponentInitialInterests"))
             .capability(Capability::configuration("fuchsia.diagnostics.LogToDebuglog"));
 
         let logs_max_cached_original_bytes_config_capability =

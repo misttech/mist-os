@@ -61,6 +61,8 @@ import("//src/developer/ffx/build/ffx_action.gni")
 #    - power_metrics_recorder: configuration for power_metrics_recorder system.
 #    - system_power_mode: configuration of the system power modes.
 #    - thermal: configuration of the thermal management system.
+#    - energy_model: configuration of the energy model for processor power
+#      management.
 #    - thread_roles: files defining thread roles
 #    - sysmem_format_costs: configuration of format costs for sysmem. This is a
 #      list of build targets. Each outputs a .format_costs_persistent_fidl
@@ -257,6 +259,14 @@ template("board_input_bundle") {
       creation_args += [
         "--cpu-manager-config",
         rebase_path(configuration.cpu_manager, root_build_dir),
+      ]
+    }
+
+    if (defined(configuration.energy_model)) {
+      creation_inputs += [ configuration.energy_model ]
+      creation_args += [
+        "--energy-model-config",
+        rebase_path(configuration.energy_model, root_build_dir),
       ]
     }
 

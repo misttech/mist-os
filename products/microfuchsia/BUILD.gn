@@ -27,6 +27,7 @@ bazel_product_bundle("microfuchsia_eng.${target_cpu}") {
     "//build/images/flash:esp.bazel_input",
     "//build/images/fuchsia:fuchsia.bazel_legacy_aib",
     "//build/images/zedboot:zedboot.bazel_legacy_aib",
+    "//src/tee/ta/noop:ta-noop_for_bazel",
 
     # Add the board configuration as a dependency via the GN arg, as vendor-
     # repo boards can shadow the ones in //boards.
@@ -53,6 +54,7 @@ if (target_cpu == "x64" || target_cpu == "arm64") {
       "//build/images/flash:esp.bazel_input",
       "//build/images/fuchsia:fuchsia.bazel_legacy_aib",
       "//boards/pkvm:${target_cpu}.bazel_input",
+      "//src/tee/ta/noop:ta-noop_for_bazel",
     ]
   }
 }

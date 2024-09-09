@@ -14,5 +14,5 @@ sdk_source_set("types") {
     "type_converters.h",
   ]
 
-  public_deps = [ "//sdk/lib/fidl/cpp" ]
+  public_deps = [ "//sdk/lib/fidl/hlcpp" ]
 }

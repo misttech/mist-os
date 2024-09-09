@@ -5,13 +5,13 @@
 #ifndef SRC_DEVELOPER_MEMORY_METRICS_CAPTURE_STRATEGY_H_
 #define SRC_DEVELOPER_MEMORY_METRICS_CAPTURE_STRATEGY_H_
 
+#include <lib/zx/result.h>
 #include <zircon/syscalls/object.h>
 #include <zircon/types.h>
 
 #include <tuple>
 #include <unordered_set>
 
-#include "lib/zx/result.h"
 #include "src/developer/memory/metrics/capture.h"
 
 namespace memory {
@@ -20,9 +20,9 @@ const char STARNIX_KERNEL_PROCESS_NAME[] = "starnix_kernel.cm";
 
 // A simple CaptureStrategy that retrieves the list of VMOs for each process through the
 // |ZX_INFO_PROCESS_VMOS| zx_object_info topic.
-class BaseCaptureStrategy : public memory::CaptureStrategy {
+class BaseCaptureStrategy : public CaptureStrategy {
  public:
-  explicit BaseCaptureStrategy();
+  explicit BaseCaptureStrategy() = default;
 
   zx_status_t OnNewProcess(OS& os, Process process, zx::handle process_handle) override;
 
@@ -43,7 +43,7 @@ class BaseCaptureStrategy : public memory::CaptureStrategy {
 //  - Handles of unmapped VMOs are attributed to the process |process_name|;
 //  - Handles of mapped VMOs are not taken into account (their mapping is).
 // For all other processes, this delegates to |BaseCaptureStrategy|.
-class StarnixCaptureStrategy : public memory::CaptureStrategy {
+class StarnixCaptureStrategy : public CaptureStrategy {
  public:
   explicit StarnixCaptureStrategy(std::string process_name = STARNIX_KERNEL_PROCESS_NAME);
 

@@ -74,7 +74,7 @@ FramebufferDisplayDriver::CreateAndInitializeFramebufferDisplay() {
   DisplayProperties display_properties = std::move(display_properties_result).value();
 
   zx::result<fidl::ClientEnd<fuchsia_hardware_sysmem::Sysmem>> hardware_sysmem_result =
-      incoming()->Connect<fuchsia_hardware_sysmem::Service::Sysmem>("sysmem");
+      incoming()->Connect<fuchsia_hardware_sysmem::Sysmem>();
   if (hardware_sysmem_result.is_error()) {
     FDF_LOG(ERROR, "Failed to get hardware sysmem protocol: %s",
             hardware_sysmem_result.status_string());

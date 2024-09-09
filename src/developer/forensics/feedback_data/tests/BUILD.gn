@@ -26,7 +26,7 @@ executable("data_provider_unittest_exe") {
     "//sdk/fidl/fuchsia.images:fuchsia.images_hlcpp",
     "//sdk/fidl/fuchsia.logger:fuchsia.logger_hlcpp",
     "//sdk/fidl/fuchsia.math:fuchsia.math_hlcpp",
-    "//sdk/lib/fidl/cpp",
+    "//sdk/lib/fidl/hlcpp",
     "//src/developer/forensics/feedback/attachments",
     "//src/developer/forensics/feedback_data:constants",
     "//src/developer/forensics/feedback_data:data_provider",

@@ -58,7 +58,9 @@ async fn get_attributes_per_package_source(source: PackageSource) {
     }
 
     async fn verify_get_attributes(root_dir: &fio::DirectoryProxy, path: &str, args: Args) {
-        let node = fuchsia_fs::directory::open_node(root_dir, path, args.open_flags).await.unwrap();
+        let node = fuchsia_fs::directory::open_node_deprecated(root_dir, path, args.open_flags)
+            .await
+            .unwrap();
         let (_, immut_attrs) = node
             .get_attributes(fio::NodeAttributesQuery::all())
             .await
@@ -183,7 +185,7 @@ async fn close() {
 async fn close_per_package_source(source: PackageSource) {
     let root_dir = source.dir;
     async fn verify_close(root_dir: &fio::DirectoryProxy, path: &str, flags: fio::OpenFlags) {
-        let node = fuchsia_fs::directory::open_node(
+        let node = fuchsia_fs::directory::open_node_deprecated(
             root_dir,
             path,
             flags | fio::OpenFlags::RIGHT_READABLE,
@@ -232,10 +234,13 @@ async fn describe_per_package_source(source: PackageSource) {
 
 async fn assert_query_directory(package_root: &fio::DirectoryProxy, path: &str) {
     for flag in [fio::OpenFlags::empty(), fio::OpenFlags::NODE_REFERENCE] {
-        let node =
-            fuchsia_fs::directory::open_node(package_root, path, flag | fio::OpenFlags::DIRECTORY)
-                .await
-                .unwrap();
+        let node = fuchsia_fs::directory::open_node_deprecated(
+            package_root,
+            path,
+            flag | fio::OpenFlags::DIRECTORY,
+        )
+        .await
+        .unwrap();
 
         if let Err(e) = verify_query_directory(node, flag).await {
             panic!(
@@ -262,7 +267,8 @@ async fn verify_query_directory(node: fio::NodeProxy, flag: fio::OpenFlags) -> R
 
 async fn assert_describe_file(package_root: &fio::DirectoryProxy, path: &str) {
     for flag in [fio::OpenFlags::RIGHT_READABLE, fio::OpenFlags::NODE_REFERENCE] {
-        let node = fuchsia_fs::directory::open_node(package_root, path, flag).await.unwrap();
+        let node =
+            fuchsia_fs::directory::open_node_deprecated(package_root, path, flag).await.unwrap();
         if let Err(e) = verify_describe_file(node, flag).await {
             panic!(
                 "failed to verify describe. path: {path:?}, flag: {flag:?}, \
@@ -301,7 +307,8 @@ async fn verify_describe_file(node: fio::NodeProxy, flag: fio::OpenFlags) -> Res
 
 async fn assert_describe_meta_file(package_root: &fio::DirectoryProxy, path: &str) {
     for flag in [fio::OpenFlags::empty(), fio::OpenFlags::NODE_REFERENCE] {
-        let node = fuchsia_fs::directory::open_node(package_root, path, flag).await.unwrap();
+        let node =
+            fuchsia_fs::directory::open_node_deprecated(package_root, path, flag).await.unwrap();
         if let Err(e) = verify_describe_file(node, flag).await {
             panic!(
                 "failed to verify describe. path: {path:?}, flag: {flag:?}, \
@@ -330,7 +337,8 @@ async fn get_flags_per_package_source(source: PackageSource) {
 
 /// Opens a file and verifies the result of GetFlags().
 async fn assert_get_flags(root_dir: &fio::DirectoryProxy, path: &str, open_flags: fio::OpenFlags) {
-    let node = fuchsia_fs::directory::open_node(root_dir, path, open_flags).await.unwrap();
+    let node =
+        fuchsia_fs::directory::open_node_deprecated(root_dir, path, open_flags).await.unwrap();
 
     // The flags returned by GetFlags() do NOT always match the flags the node is opened with
     // because GetFlags only returns those flags that are meaningful after the Open call (instead
@@ -478,7 +486,7 @@ async fn do_set_flags<'a>(
     flags: fio::OpenFlags,
     argument: fio::OpenFlags,
 ) -> SetFlagsOutcome<'a> {
-    let node = fuchsia_fs::directory::open_node(
+    let node = fuchsia_fs::directory::open_node_deprecated(
         package_root,
         path,
         flags | fio::OpenFlags::RIGHT_READABLE,
@@ -548,7 +556,8 @@ async fn set_attr_per_package_source(source: PackageSource) {
 }
 
 async fn assert_set_attr(package_root: &fio::DirectoryProxy, path: &str, flags: fio::OpenFlags) {
-    let node = fuchsia_fs::directory::open_node(package_root, path, flags).await.unwrap();
+    let node =
+        fuchsia_fs::directory::open_node_deprecated(package_root, path, flags).await.unwrap();
 
     if let Err(e) = verify_set_attr(node).await {
         panic!("set_attr failed. path: {path:?}, error: {e:#}");
@@ -598,7 +607,8 @@ async fn sync_per_package_source(source: PackageSource) {
 }
 
 async fn assert_sync(package_root: &fio::DirectoryProxy, path: &str, flags: fio::OpenFlags) {
-    let node = fuchsia_fs::directory::open_node(package_root, path, flags).await.unwrap();
+    let node =
+        fuchsia_fs::directory::open_node_deprecated(package_root, path, flags).await.unwrap();
 
     if let Err(e) = verify_sync(node).await {
         panic!("sync failed. path: {path:?}, error: {e:#}");

@@ -31,6 +31,7 @@
             config: [
                 "fuchsia.diagnostics.AllowSerialLogs",
                 "fuchsia.diagnostics.BindServices",
+                "fuchsia.diagnostics.ComponentInitialInterests",
                 "fuchsia.diagnostics.DenySerialLogs",
                 "fuchsia.diagnostics.ExceptionHandlerAvailable",
                 "fuchsia.diagnostics.LogsMaxCachedOriginalBytes",
@@ -45,7 +46,6 @@
                 "fuchsia.driver.EnableDriverLoadFuzzer",
                 "fuchsia.driver.EnableEphemeralDrivers",
                 "fuchsia.driver.manager.DelayFallbackUntilBaseDriversLoaded",
-                "fuchsia.driver.manager.DriverHostCrashPolicy",
                 "fuchsia.driver.manager.EnableTestShutdownDelays",
                 "fuchsia.driver.manager.RootDriver",
                 "fuchsia.driver.UseHardwareIommu",

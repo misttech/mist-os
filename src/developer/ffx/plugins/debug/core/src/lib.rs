@@ -11,7 +11,9 @@ use fho::{FfxContext, FfxMain, FfxTool, SimpleWriter};
 use fidl_fuchsia_developer_remotecontrol::RemoteControlProxy;
 use fidl_fuchsia_io as fio;
 use fuchsia_async::unblock;
-use fuchsia_fs::directory::{open_directory_no_describe, open_file_no_describe};
+use fuchsia_fs::directory::{
+    open_directory_no_describe_deprecated, open_file_no_describe_deprecated,
+};
 use fuchsia_zircon_status::Status;
 use futures::StreamExt;
 use std::io::{BufRead, Write};
@@ -131,8 +133,9 @@ async fn list_minidumps(rcs: &RemoteControlProxy, capability: &str) -> Result<Ve
         .map_err(|e| anyhow!("Could not open component storage: {:?}", e))?;
 
     // NOTE: This is the implementation detail of feedback.cm and is subject to change.
-    let reports_dir = open_directory_no_describe(&root_dir, "reports", fio::OpenFlags::empty())
-        .context("Could not open the \"reports\" directory")?;
+    let reports_dir =
+        open_directory_no_describe_deprecated(&root_dir, "reports", fio::OpenFlags::empty())
+            .context("Could not open the \"reports\" directory")?;
     let reports_dir_ref = &reports_dir;
 
     futures::future::try_join_all(
@@ -147,8 +150,11 @@ async fn list_minidumps(rcs: &RemoteControlProxy, capability: &str) -> Result<Ve
                     && entry.name.ends_with("/minidump.dmp")
             })
             .map(|entry| async move {
-                let proxy =
-                    open_file_no_describe(reports_dir_ref, &entry.name, fio::OpenFlags::empty())?;
+                let proxy = open_file_no_describe_deprecated(
+                    reports_dir_ref,
+                    &entry.name,
+                    fio::OpenFlags::empty(),
+                )?;
                 let (status, fio::NodeAttributes { modification_time, .. }) =
                     proxy.get_attr().await.context("FIDL error in get_attr")?;
 

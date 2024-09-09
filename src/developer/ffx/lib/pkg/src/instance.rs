@@ -65,7 +65,7 @@ impl Display for ServerMode {
 /// the startup information for a running package server.
 /// This includes the process id, which is intended for
 /// use to troubleshoot and stop running instances.
-#[derive(Clone, Debug, JsonSchema, Deserialize, Serialize)]
+#[derive(Clone, Debug, JsonSchema, Deserialize, Serialize, PartialEq)]
 pub struct PkgServerInfo {
     pub name: String,
     pub address: SocketAddr,

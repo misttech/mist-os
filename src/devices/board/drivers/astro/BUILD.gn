@@ -50,7 +50,6 @@ fuchsia_driver("astro-driver") {
     "astro-registers.cc",
     "astro-sdio.cc",
     "astro-securemem.cc",
-    "astro-sysmem.cc",
     "astro-tee.cc",
     "astro-thermal.cc",
     "astro-thermistor.cc",

@@ -120,6 +120,28 @@ class DataclassesJsonLite(unittest.TestCase):
             "missing 1 required positional argument: 'age'", str(ctx.exception)
         )
 
+    def test_composition(self) -> None:
+        self.assertEquals(
+            MyComposedClass.from_dict(  # type: ignore[attr-defined]
+                dict(opt_sub=dict(list_sub=[]), list_sub=[dict(list_sub=[])])
+            ),
+            MyComposedClass(
+                opt_sub=MyComposedClass(
+                    list_sub=[],
+                ),
+                list_sub=[MyComposedClass(list_sub=[])],
+            ),
+        )
+
+
+@dataclass_json()
+@dataclass
+class MyComposedClass:
+    """This class needs to be in the module scope so that it can be resolved."""
+
+    list_sub: List["MyComposedClass"]
+    opt_sub: Optional["MyComposedClass"] = None
+
 
 if __name__ == "__main__":
     unittest.main()

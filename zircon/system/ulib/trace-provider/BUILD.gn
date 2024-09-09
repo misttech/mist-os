@@ -26,7 +26,7 @@ template("trace_provider_library") {
 
     public_deps += [
       # <trace-provider/provider.h> has #include <lib/async/dispatcher.h>.
-      "//zircon/system/ulib/async",
+      "//sdk/lib/async",
 
       # <trace-provider/provider.h> has #include <lib/zx/channel.h>.
       "//zircon/system/ulib/zx",
@@ -47,9 +47,9 @@ template("trace_provider_library") {
     # Source dependencies, not including the trace engine.
     deps += [
       "//sdk/fidl/fuchsia.tracing.provider:fuchsia.tracing.provider_cpp",
+      "//sdk/lib/async:async-cpp",
       "//sdk/lib/fidl",
       "//sdk/lib/fidl_base",
-      "//zircon/system/ulib/async:async-cpp",
       "//zircon/system/ulib/zx",
     ]
 

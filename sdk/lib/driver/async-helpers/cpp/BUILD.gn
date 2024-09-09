@@ -24,10 +24,10 @@ source_set("cpp") {
     "include/lib/driver/async-helpers/cpp/task_group.h",
   ]
   public_deps = [
+    "//sdk/lib/async:async-cpp",
     "//sdk/lib/driver/runtime:driver_runtime_cpp",
     "//sdk/lib/fit",
     "//src/devices/bin/driver_runtime",
-    "//zircon/system/ulib/async:async-cpp",
   ]
   public_configs = [ ":includes" ]
 }

@@ -12,12 +12,10 @@ use derivative::Derivative;
 use log::debug;
 use net_types::ip::{GenericOverIp, Ip, IpVersionMarker};
 use net_types::{SpecifiedAddr, ZonedAddr};
-use netstack3_base::socket::{
-    DualStackIpExt, DualStackRemoteIp, SocketIpAddr, SocketZonedAddrExt as _,
-};
+use netstack3_base::socket::{DualStackIpExt, DualStackRemoteIp, SocketZonedAddrExt as _};
 use netstack3_base::sync::{PrimaryRc, StrongRc, WeakRc};
 use netstack3_base::{
-    AnyDevice, ContextPair, DeviceIdContext, Inspector, InspectorDeviceExt, IpExt,
+    AnyDevice, ContextPair, DeviceIdContext, Inspector, InspectorDeviceExt, IpDeviceAddr, IpExt,
     ReferenceNotifiers, ReferenceNotifiersExt as _, RemoveResourceResultWithContext,
     ResourceCounterContext, StrongDeviceIdentifier, WeakDeviceIdentifier, ZonedAddressError,
 };
@@ -174,7 +172,7 @@ where
             let send_options = RawIpSocketSendOptions { hop_limits: &hop_limits };
 
             let build_packet_fn =
-                |src_ip: SocketIpAddr<I::Addr>| -> Result<RawIpBody<_, _>, RawIpSocketSendToError> {
+                |src_ip: IpDeviceAddr<I::Addr>| -> Result<RawIpBody<_, _>, RawIpSocketSendToError> {
                     if *system_checksums {
                         let buf = SliceBufViewMut::new(body.as_mut());
                         if !checksum::populate_checksum::<I, _>(

@@ -46,6 +46,7 @@ test("power-test") {
   ]
   deps = [
     ":cpp",
+    "testing",
     "//sdk/fidl/fuchsia.component.runner:fuchsia.component.runner_cpp",
     "//sdk/fidl/fuchsia.hardware.power:fuchsia.hardware.power_cpp",
     "//sdk/fidl/fuchsia.power.broker:fuchsia.power.broker_cpp",

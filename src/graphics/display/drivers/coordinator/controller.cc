@@ -925,6 +925,17 @@ void Controller::Stop() {
     ++controller_stamp_;
     const config_stamp_t banjo_config_stamp = ToBanjoConfigStamp(controller_stamp_);
     engine_driver_client_->ApplyConfiguration(&empty_config, 0, &banjo_config_stamp);
+
+    // It's possible that the Vsync with the null configuration is never
+    // triggered when drivers are shut down. We should proactively retire
+    // all images on all displays.
+    for (DisplayInfo& display : displays_) {
+      while (fbl::RefPtr<Image> image = display.images.pop_front()) {
+        AssertMtxAliasHeld(*image->mtx());
+        image->StartRetire();
+        image->OnRetire();
+      }
+    }
   }
 }
 

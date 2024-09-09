@@ -144,6 +144,8 @@ class FuchsiaDevice(
 
         self._on_device_boot_fns: list[Callable[[], None]] = []
 
+        self._wlan_policy: wlan_policy_fc.WlanPolicy | None = None
+
         self.health_check()
 
         _LOGGER.debug("Initialized Fuchsia-Controller based FuchsiaDevice")
@@ -445,12 +447,13 @@ class FuchsiaDevice(
         Returns:
             wlan_policy.WlanPolicy object
         """
-        return wlan_policy_fc.WlanPolicy(
+        self._wlan_policy = wlan_policy_fc.WlanPolicy(
             device_name=self.device_name,
             ffx=self.ffx,
             fuchsia_controller=self.fuchsia_controller,
             reboot_affordance=self,
         )
+        return self._wlan_policy
 
     @properties.Affordance
     def wlan(self) -> wlan.Wlan:
@@ -481,7 +484,8 @@ class FuchsiaDevice(
     # List all the public methods
     def close(self) -> None:
         """Clean up method."""
-        return
+        if self._wlan_policy:
+            self._wlan_policy.close()
 
     def health_check(self) -> None:
         """Ensure device is healthy.

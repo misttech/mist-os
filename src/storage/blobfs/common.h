@@ -85,6 +85,28 @@ VmoNameBuffer FormatWritingBlobDataVmoName(const Digest& digest);
 // Pretty-print formatter for Blobfs Superblock fields.
 std::ostream& operator<<(std::ostream& stream, const Superblock& info);
 
+// On the stress builders, the out of space log messages can take up a lot of space, so we only log
+// every 60 seconds.
+class OutOfSpaceLogSite {
+ public:
+  bool ShouldLog() {
+#ifdef __Fuchsia__
+    zx::ticks now = zx::ticks::now();
+    if (now < ignore_before_)
+      return false;
+    zx::ticks ignore_duration = zx::ticks::per_second();
+    ignore_duration *= 60;  // 60 seconds
+    ignore_before_ = now + ignore_duration;
+#endif
+    return true;
+  }
+
+#ifdef __Fuchsia__
+ private:
+  zx::ticks ignore_before_;
+#endif
+};
+
 }  // namespace blobfs
 
 #endif  // SRC_STORAGE_BLOBFS_COMMON_H_

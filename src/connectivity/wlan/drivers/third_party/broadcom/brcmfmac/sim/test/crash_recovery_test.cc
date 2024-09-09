@@ -103,9 +103,8 @@ void CrashRecoveryTest::GetInspectCount(uint64_t* out_count, std::string propert
   ASSERT_NOT_NULL(out_count);
 
   fpromise::result<inspect::Hierarchy> hierarchy;
-  WithSimDevice([&](brcmfmac::SimDevice* device) {
-    hierarchy = FetchHierarchy(device->GetInspect()->inspector());
-  });
+  WithSimDevice(
+      [&](brcmfmac::SimDevice* device) { hierarchy = FetchHierarchy(device->GetInspector()); });
 
   auto* root = hierarchy.value().GetByPath({"brcmfmac-phy"});
   ASSERT_NOT_NULL(root);

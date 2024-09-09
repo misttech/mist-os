@@ -9,6 +9,7 @@
 #include <assert.h>
 #include <debug.h>
 #include <inttypes.h>
+#include <lib/arch/intrin.h>
 #include <lib/counters.h>
 #include <lib/kconcurrent/chainlock.h>
 #include <lib/kconcurrent/chainlock_transaction.h>
@@ -50,7 +51,6 @@
 #include <ktl/enforce.h>
 
 using ffl::Round;
-using ::kconcurrent::SchedulerUtils;
 
 // Counts the number of times we set the preemption timer to fire at a point
 // that's prior to the time at which the CPU last entered the scheduler.  See
@@ -240,61 +240,66 @@ void Scheduler::Dump(FILE* output_target) {
   //
   // TODO(https://fxbug.dev/331847876): Remove this hack once we have a better
   // solution to scheduler re-entrancy issues.
-  ChainLockTransactionNoIrqSave clt{CLT_TAG("Scheduler::Dump")};
-  Guard<MonitoredSpinLock, NoIrqSave> queue_guard{&queue_lock_, SOURCE_TAG};
+  const auto do_transaction =
+      [&]() TA_REQ(chainlock_transaction_token) -> ChainLockTransaction::Result<> {
+    Guard<MonitoredSpinLock, NoIrqSave> queue_guard{&queue_lock_, SOURCE_TAG};
 
-  fprintf(output_target,
-          "\ttweight=%s nfair=%d ndeadline=%d vtime=%" PRId64 " period=%" PRId64 " tema=%" PRId64
-          " tutil=%s\n",
-          Format(weight_total_).c_str(), runnable_fair_task_count_, runnable_deadline_task_count_,
-          virtual_time_.raw_value(), scheduling_period_grans_.raw_value(),
-          total_expected_runtime_ns_.raw_value(), Format(total_deadline_utilization_).c_str());
+    fprintf(output_target,
+            "\ttweight=%s nfair=%d ndeadline=%d vtime=%" PRId64 " period=%" PRId64 " tema=%" PRId64
+            " tutil=%s\n",
+            Format(weight_total_).c_str(), runnable_fair_task_count_, runnable_deadline_task_count_,
+            virtual_time_.raw_value(), scheduling_period_grans_.raw_value(),
+            total_expected_runtime_ns_.raw_value(), Format(total_deadline_utilization_).c_str());
 
-  if (active_thread_ != nullptr) {
-    AssertInScheduler(*active_thread_);
-    const SchedulerState& state = const_cast<const Thread*>(active_thread_)->scheduler_state();
-    const EffectiveProfile& ep = state.effective_profile();
-    if (ep.IsFair()) {
+    if (active_thread_ != nullptr) {
+      AssertInScheduler(*active_thread_);
+      const SchedulerState& state = const_cast<const Thread*>(active_thread_)->scheduler_state();
+      const EffectiveProfile& ep = state.effective_profile();
+      if (ep.IsFair()) {
+        fprintf(output_target,
+                "\t-> name=%s weight=%s start=%" PRId64 " finish=%" PRId64 " ts=%" PRId64
+                " ema=%" PRId64 "\n",
+                active_thread_->name(), Format(ep.fair.weight).c_str(),
+                state.start_time_.raw_value(), state.finish_time_.raw_value(),
+                state.time_slice_ns_.raw_value(), state.expected_runtime_ns_.raw_value());
+      } else {
+        fprintf(output_target,
+                "\t-> name=%s deadline=(%" PRId64 ", %" PRId64 ") start=%" PRId64 " finish=%" PRId64
+                " ts=%" PRId64 " ema=%" PRId64 "\n",
+                active_thread_->name(), ep.deadline.capacity_ns.raw_value(),
+                ep.deadline.deadline_ns.raw_value(), state.start_time_.raw_value(),
+                state.finish_time_.raw_value(), state.time_slice_ns_.raw_value(),
+                state.expected_runtime_ns_.raw_value());
+      }
+    }
+
+    for (const Thread& thread : deadline_run_queue_) {
+      AssertInScheduler(thread);
+      const SchedulerState& state = thread.scheduler_state();
+      const EffectiveProfile& ep = state.effective_profile();
       fprintf(output_target,
-              "\t-> name=%s weight=%s start=%" PRId64 " finish=%" PRId64 " ts=%" PRId64
-              " ema=%" PRId64 "\n",
-              active_thread_->name(), Format(ep.fair.weight).c_str(), state.start_time_.raw_value(),
-              state.finish_time_.raw_value(), state.time_slice_ns_.raw_value(),
-              state.expected_runtime_ns_.raw_value());
-    } else {
-      fprintf(output_target,
-              "\t-> name=%s deadline=(%" PRId64 ", %" PRId64 ") start=%" PRId64 " finish=%" PRId64
+              "\t   name=%s deadline=(%" PRId64 ", %" PRId64 ") start=%" PRId64 " finish=%" PRId64
               " ts=%" PRId64 " ema=%" PRId64 "\n",
-              active_thread_->name(), ep.deadline.capacity_ns.raw_value(),
+              thread.name(), ep.deadline.capacity_ns.raw_value(),
               ep.deadline.deadline_ns.raw_value(), state.start_time_.raw_value(),
               state.finish_time_.raw_value(), state.time_slice_ns_.raw_value(),
               state.expected_runtime_ns_.raw_value());
     }
-  }
 
-  for (const Thread& thread : deadline_run_queue_) {
-    AssertInScheduler(thread);
-    const SchedulerState& state = thread.scheduler_state();
-    const EffectiveProfile& ep = state.effective_profile();
-    fprintf(output_target,
-            "\t   name=%s deadline=(%" PRId64 ", %" PRId64 ") start=%" PRId64 " finish=%" PRId64
-            " ts=%" PRId64 " ema=%" PRId64 "\n",
-            thread.name(), ep.deadline.capacity_ns.raw_value(), ep.deadline.deadline_ns.raw_value(),
-            state.start_time_.raw_value(), state.finish_time_.raw_value(),
-            state.time_slice_ns_.raw_value(), state.expected_runtime_ns_.raw_value());
-  }
-
-  for (const Thread& thread : fair_run_queue_) {
-    AssertInScheduler(thread);
-    const SchedulerState& state = thread.scheduler_state();
-    const EffectiveProfile& ep = state.effective_profile();
-    fprintf(output_target,
-            "\t   name=%s weight=%s start=%" PRId64 " finish=%" PRId64 " ts=%" PRId64
-            " ema=%" PRId64 "\n",
-            thread.name(), Format(ep.fair.weight).c_str(), state.start_time_.raw_value(),
-            state.finish_time_.raw_value(), state.time_slice_ns_.raw_value(),
-            state.expected_runtime_ns_.raw_value());
-  }
+    for (const Thread& thread : fair_run_queue_) {
+      AssertInScheduler(thread);
+      const SchedulerState& state = thread.scheduler_state();
+      const EffectiveProfile& ep = state.effective_profile();
+      fprintf(output_target,
+              "\t   name=%s weight=%s start=%" PRId64 " finish=%" PRId64 " ts=%" PRId64
+              " ema=%" PRId64 "\n",
+              thread.name(), Format(ep.fair.weight).c_str(), state.start_time_.raw_value(),
+              state.finish_time_.raw_value(), state.time_slice_ns_.raw_value(),
+              state.expected_runtime_ns_.raw_value());
+    }
+    return ChainLockTransaction::Done;
+  };
+  ChainLockTransaction::UntilDone(NoIrqSaveOption, CLT_TAG("Scheduler::Dump"), do_transaction);
 }
 
 void Scheduler::DumpActiveThread(FILE* output_target) {
@@ -302,22 +307,27 @@ void Scheduler::DumpActiveThread(FILE* output_target) {
   //
   // TODO(https://fxbug.dev/331847876): Remove this hack once we have a better
   // solution to scheduler re-entrancy issues.
-  ChainLockTransactionNoIrqSave clt{CLT_TAG("Scheduler::DumpActiveThread")};
-  Guard<MonitoredSpinLock, NoIrqSave> queue_guard{&queue_lock_, SOURCE_TAG};
+  const auto do_transaction =
+      [&]() TA_REQ(chainlock_transaction_token) -> ChainLockTransaction::Result<> {
+    Guard<MonitoredSpinLock, NoIrqSave> queue_guard{&queue_lock_, SOURCE_TAG};
 
-  if (active_thread_ != nullptr) {
-    AssertInScheduler(*active_thread_);
-    fprintf(output_target, "thread: pid=%lu tid=%lu\n", active_thread_->pid(),
-            active_thread_->tid());
-    ThreadDispatcher* user_thread = active_thread_->user_thread();
-    if (user_thread != nullptr) {
-      ProcessDispatcher* process = user_thread->process();
-      char name[ZX_MAX_NAME_LEN]{};
-      [[maybe_unused]] zx_status_t status = process->get_name(name);
-      DEBUG_ASSERT(status == ZX_OK);
-      fprintf(output_target, "process: name=%s\n", name);
+    if (active_thread_ != nullptr) {
+      AssertInScheduler(*active_thread_);
+      fprintf(output_target, "thread: pid=%lu tid=%lu\n", active_thread_->pid(),
+              active_thread_->tid());
+      ThreadDispatcher* user_thread = active_thread_->user_thread();
+      if (user_thread != nullptr) {
+        ProcessDispatcher* process = user_thread->process();
+        char name[ZX_MAX_NAME_LEN]{};
+        [[maybe_unused]] zx_status_t status = process->get_name(name);
+        DEBUG_ASSERT(status == ZX_OK);
+        fprintf(output_target, "process: name=%s\n", name);
+      }
     }
-  }
+    return ChainLockTransaction::Done;
+  };
+  ChainLockTransaction::UntilDone(NoIrqSaveOption, CLT_TAG("Scheduler::DumpActiveThread"),
+                                  do_transaction);
 }
 
 SchedWeight Scheduler::GetTotalWeight() const {
@@ -726,7 +736,14 @@ Thread* Scheduler::StealWork(SchedTime now, SchedPerformanceScale scale_up_facto
     ChainLockTransaction& active_clt = ChainLockTransaction::ActiveRef();
     active_clt.Restart(CLT_TAG("Scheduler::StealWork (restart)"));
 
-    UnconditionalChainLockGuard thread_guard{thread->get_lock()};
+    // Acquire the lock without backing off using an explicit retry loop because the current
+    // thread's lock is held and ChainLock::Acquire asserts that no chain locks are currently
+    // held to avoid misuse in the general case.
+    ChainLockGuard thread_guard{thread->get_lock(), ChainLockGuard::Defer};
+    while (!thread_guard.TryAcquire(ChainLock::AllowFinalized::No, ChainLock::RecordBackoff::No)) {
+      arch::Yield();
+    }
+
     active_clt.Finalize();
     Guard<MonitoredSpinLock, NoIrqSave> queue_guard{&queue_lock_, SOURCE_TAG};
 
@@ -1010,7 +1027,16 @@ Thread* Scheduler::EvaluateNextThread(SchedTime now, Thread* current_thread, boo
         ChainLockTransaction& active_clt = ChainLockTransaction::ActiveRef();
 
         active_clt.Restart(CLT_TAG("Scheduler::EvaluateNextThread (restart)"));
-        UnconditionalChainLockGuard next_thread_guard{next_thread->get_lock()};
+
+        // Acquire the lock without backing off using an explicit retry loop because the current
+        // thread's lock is held and ChainLock::Acquire asserts that no chain locks are currently
+        // held to avoid misuse in the general case.
+        ChainLockGuard next_thread_guard{next_thread->get_lock(), ChainLockGuard::Defer};
+        while (!next_thread_guard.TryAcquire(ChainLock::AllowFinalized::No,
+                                             ChainLock::RecordBackoff::No)) {
+          arch::Yield();
+        }
+
         active_clt.Finalize();
         next_thread->CallMigrateFnLocked(Thread::MigrateStage::Save);
 
@@ -1248,8 +1274,8 @@ void Scheduler::RescheduleCommon(Thread* const current_thread, SchedTime now,
   // order to guarantee that we will win arbitration with other active
   // transactions which are not reschedule operations.  We will restore this
   // context at the end of the operation (whether we context switched or not).
-  const kconcurrent::RescheduleContext orig_chainlock_context =
-      SchedulerUtils::PrepareForReschedule();
+  const auto saved_transaction_state = ChainLockTransaction::SaveStateAndUseReservedToken();
+  current_thread->get_lock().SyncToken();
 
   Guard<MonitoredSpinLock, NoIrqSave> queue_guard{&queue_lock_, SOURCE_TAG};
   UpdateTimeline(now);
@@ -1475,7 +1501,13 @@ void Scheduler::RescheduleCommon(Thread* const current_thread, SchedTime now,
     // longer the correct thread) we will pick a new best thread.
     queue_guard.CallUnlocked([next_thread]() TA_ACQ(next_thread->get_lock()) {
       ChainLockTransaction::AssertActive();
-      next_thread->get_lock().AcquireUnconditionally();
+      // Acquire the lock without backing off using an explicit retry loop because the current
+      // thread's lock is held and ChainLock::Acquire asserts that no chain locks are currently
+      // held to avoid misuse in the general case.
+      while (!next_thread->get_lock().TryAcquire(ChainLock::AllowFinalized::No,
+                                                 ChainLock::RecordBackoff::No)) {
+        arch::Yield();
+      }
     });
 
     // Now we have all of the locks we need for the reschedule operation.  Go
@@ -1792,7 +1824,7 @@ void Scheduler::RescheduleCommon(Thread* const current_thread, SchedTime now,
     // next_thread's lock using a no-op assert (we don't actually want to
     // examine the state of the lock in any way, since next thread is no longer
     // valid).
-    Scheduler::LockHandoffInternal(orig_chainlock_context, current_thread);
+    Scheduler::LockHandoffInternal(saved_transaction_state, current_thread);
     next_thread->get_lock().MarkReleased();
   } else {
     // No context switch was needed.  Our current thread should have been
@@ -1803,15 +1835,51 @@ void Scheduler::RescheduleCommon(Thread* const current_thread, SchedTime now,
     current_thread->scheduler_queue_state().transient_state = TransientState::None;
 
     // Restore our reschedule context and drop our queue guard before unwinding.
-    SchedulerUtils::RestoreRescheduleContext(orig_chainlock_context);
+    ChainLockTransaction::RestoreState(saved_transaction_state);
+    current_thread->get_lock().SyncToken();
     queue_guard.Release();
   }
 }
 
-void Scheduler::TrampolineLockHandoff() { SchedulerUtils::TrampolineLockHandoff(); }
+void Scheduler::TrampolineLockHandoff() {
+  ChainLockTransaction::AssertActive();
 
-void Scheduler::LockHandoffInternal(const kconcurrent::RescheduleContext& ctx,
-                                    Thread* const current_thread) {
+  // Construct the fake chainlock transaction we will be restoring.  It should:
+  //
+  // 1) Not attempt to register itself with the per-cpu data structure.  There
+  //    should already be a registered CLT, and attempting to instantiate a new
+  //    one using the typical constructor would trigger an ASSERT.  This should
+  //    look like a transaction which had been sitting on a stack, but swapped
+  //    out using PrepareForReschedule at some point in the past.
+  // 2) Report that there are currently two locks held (because there are).
+  //    We have the previously running thread's lock, and the current (new)
+  //    thread's lock held (obtained by Scheduler::RescheduleCommon).
+  // 3) Report that the transaction has been finalized, as it would have been
+  //    had we come in via RescheduleCommon.
+  //
+  ChainLockTransaction transaction =
+      ChainLockTransaction::MakeBareTransaction(CLT_TAG("Trampoline"), 2, true);
+  // Assert that the current thread's lock was "acquired" here.  It was
+  // actually acquired during the context switch from
+  // Scheduler::RescheduleCommon, but we now need to release it before letting
+  // the new thread run.  The currently registered CLT should be using the
+  // scheduler token that was used to acquire the new thread's lock during
+  // reschedule common.
+  Thread* const current_thread = Thread::Current::Get();
+  current_thread->get_lock().AssertAcquired();
+
+  // Now perform our lock handoff.  This will release our previous
+  // thread's lock, and restore the transaction we just instantiated as
+  // the active transaction, and replace the current thread's lock's
+  // token with the new non-scheduler token.
+  Scheduler::LockHandoffInternal(transaction.SaveStateInitial(), current_thread);
+
+  // Finally, we just need to release the current thread's lock and we
+  // are finished.
+  current_thread->get_lock().Release();
+}
+
+void Scheduler::LockHandoffInternal(SavedState saved_state, Thread* const current_thread) {
   DEBUG_ASSERT(arch_ints_disabled());
   Scheduler* scheduler = Scheduler::Get();
   Thread* const previous_thread = scheduler->previous_thread_;
@@ -1819,7 +1887,11 @@ void Scheduler::LockHandoffInternal(const kconcurrent::RescheduleContext& ctx,
 
   scheduler->previous_thread_ = nullptr;
   previous_thread->get_lock().AssertAcquired();
-  SchedulerUtils::PostContextSwitchLockHandoff(ctx, previous_thread);
+  ChainLockTransaction::Active()->AssertNumLocksHeld(2);
+  ChainLockTransaction::RestoreState(saved_state);
+  current_thread->get_lock().SyncToken();
+  previous_thread->get_lock().SyncToken();
+  previous_thread->get_lock().Release();
 }
 
 void Scheduler::UpdatePeriod() {
@@ -2239,7 +2311,7 @@ void Scheduler::ValidateInvariantsUnconditional() const {
       if (t.get_lock().is_held()) {
         t.get_lock().MarkHeld();
         ExtraChecks();
-      } else if (t.get_lock().TryAcquire<ChainLock::FinalizedTransactionAllowed::Yes>()) {
+      } else if (t.get_lock().TryAcquire(ChainLock::AllowFinalized::Yes)) {
         ExtraChecks();
         t.get_lock().Release();
       }
@@ -2277,7 +2349,7 @@ void Scheduler::ValidateInvariantsUnconditional() const {
       if (t.get_lock().is_held()) {
         t.get_lock().MarkHeld();
         ExtraChecks();
-      } else if (t.get_lock().TryAcquire<ChainLock::FinalizedTransactionAllowed::Yes>()) {
+      } else if (t.get_lock().TryAcquire(ChainLock::AllowFinalized::Yes)) {
         ExtraChecks();
         t.get_lock().Release();
       }
@@ -2417,8 +2489,8 @@ void Scheduler::Yield(Thread* const current_thread) {
 
 void Scheduler::Preempt() {
   Thread* current_thread = Thread::Current::Get();
-  SingletonChainLockGuardIrqSave thread_guard{current_thread->get_lock(),
-                                              CLT_TAG("Scheduler::Preempt")};
+  SingleChainLockGuard thread_guard{IrqSaveOption, current_thread->get_lock(),
+                                    CLT_TAG("Scheduler::Preempt")};
   PreemptLocked(current_thread);
 }
 
@@ -2659,8 +2731,8 @@ void Scheduler::MigrateUnpinnedThreads() {
   // arriving at a new one.
   while (!migrating_threads.is_empty()) {
     Thread* thread = migrating_threads.pop_front();
-    SingletonChainLockGuardIrqSave guard{thread->get_lock(),
-                                         CLT_TAG("Scheduler::MigrateUnpinnedThreads")};
+    SingleChainLockGuard guard{IrqSaveOption, thread->get_lock(),
+                               CLT_TAG("Scheduler::MigrateUnpinnedThreads")};
 
     // Call the Save stage of the thread's migration function as it leaves
     // this CPU.
@@ -2775,9 +2847,10 @@ cpu_mask_t Scheduler::SetCpuAffinity(Thread& thread, cpu_mask_t affinity) {
   // Acquire the thread's lock unconditionally, and without using a guard.  The
   // call to Scheduler::Migrate will drop the lock for us before potentially
   // rescheduling.
-  ChainLockTransactionIrqSave clt{CLT_TAG("Scheduler::SetCpuAffinity")};
-  for (;; clt.Relax()) {
-    thread.get_lock().AcquireUnconditionally();
+  cpu_mask_t previous_affinity;
+  const auto do_transaction =
+      [&]() TA_REQ(chainlock_transaction_token) -> ChainLockTransaction::Result<> {
+    thread.get_lock().AcquireFirstInChain();
 
     // set the affinity mask.  Note: to mutate the scheduler state (instead of
     // just reading it), we need to hold both the thread's lock, as well as the
@@ -2785,12 +2858,11 @@ cpu_mask_t Scheduler::SetCpuAffinity(Thread& thread, cpu_mask_t affinity) {
     //
     // TODO(johngro): It is really easy to mess this requirement up.  Is there a
     // better way to statically assert these requirements?
-    cpu_mask_t previous_affinity;
     if ((thread.state() == THREAD_RUNNING) || (thread.state() == THREAD_READY)) {
       // We are assigned to a scheduler, we need to hold its lock while mutate
       // our affinity.  That said, we have all of the chain locks we need, so go
       // ahead and finalize our transaction now.
-      clt.Finalize();
+      ChainLockTransaction::Finalize();
       SchedulerState& ss = thread.scheduler_state();
       DEBUG_ASSERT(ss.curr_cpu() != INVALID_CPU);
       Scheduler* scheduler = Scheduler::Get(ss.curr_cpu());
@@ -2802,18 +2874,17 @@ cpu_mask_t Scheduler::SetCpuAffinity(Thread& thread, cpu_mask_t affinity) {
       WaitQueue* wq = thread.wait_queue_state().blocking_wait_queue_;
       DEBUG_ASSERT(wq != nullptr);
 
-      if (wq->get_lock().Acquire() == ChainLock::Result::Backoff) {
+      if (!wq->get_lock().AcquireOrBackoff()) {
         thread.get_lock().Release();
-        continue;
+        return ChainLockTransaction::Action::Backoff;
       }
 
-      clt.Finalize();
-      wq->get_lock().AssertAcquired();
+      ChainLockTransaction::Finalize();
       previous_affinity = AssignAffinity(thread, affinity);
       wq->get_lock().Release();
     } else {
       // No container, we have all the locks we need.
-      clt.Finalize();
+      ChainLockTransaction::Finalize();
       previous_affinity = AssignAffinity(thread, affinity);
     }
 
@@ -2826,8 +2897,12 @@ cpu_mask_t Scheduler::SetCpuAffinity(Thread& thread, cpu_mask_t affinity) {
       thread.get_lock().Release();
     }
 
-    return previous_affinity;
-  }
+    return ChainLockTransaction::Done;
+  };
+
+  ChainLockTransaction::UntilDone(IrqSaveOption, CLT_TAG("Scheduler::SetCpuAffinity"),
+                                  do_transaction);
+  return previous_affinity;
 }
 
 template cpu_mask_t Scheduler::SetCpuAffinity<Affinity::Hard>(Thread& thread, cpu_mask_t affinity);

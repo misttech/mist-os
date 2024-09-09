@@ -26,7 +26,7 @@ sdk_source_set("driver_runtime") {
   public_configs = [ ":include" ]
   public_deps = [
     # <lib/fdf/channel_read.h> and <lib/fdf/dispatcher.h> have #include <lib/async/dispatcher.h>.
-    "//zircon/system/ulib/async",
+    "//sdk/lib/async",
   ]
   deps = [
     "//zircon/system/ulib/sync",

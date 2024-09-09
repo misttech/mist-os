@@ -8,6 +8,7 @@
 #include <lib/driver/component/cpp/driver_base.h>
 #include <lib/inspect/cpp/inspect.h>
 #include <lib/trace/event_args.h>
+#include <lib/zx/time.h>
 #include <zircon/errors.h>
 
 #include <algorithm>
@@ -17,6 +18,7 @@
 #include <fbl/algorithm.h>
 
 #include "src/lib/memory_barriers/memory_barriers.h"
+#include "src/media/audio/drivers/aml-g12-tdm/recorder.h"
 
 namespace audio::aml_g12 {
 
@@ -48,13 +50,13 @@ AudioCompositeServer::AudioCompositeServer(
     fidl::WireSyncClient<fuchsia_hardware_clock::Clock> clock_gate_client,
     fidl::WireSyncClient<fuchsia_hardware_clock::Clock> pll_client,
     std::vector<fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio>> gpio_sclk_clients,
-    inspect::Node& inspect_root)
+    std::unique_ptr<Recorder> recorder)
     : dispatcher_(dispatcher),
       bti_(std::move(bti)),
       clock_gate_(std::move(clock_gate_client)),
       pll_(std::move(pll_client)),
       gpio_sclk_clients_(std::move(gpio_sclk_clients)),
-      inspect_root_(inspect_root) {
+      recorder_(std::move(recorder)) {
   for (const fuchsia_hardware_audio::ElementId& dai : kDaiIds) {
     element_completers_[dai].first_response_sent = false;
     element_completers_[dai].completer = {};
@@ -84,7 +86,6 @@ AudioCompositeServer::AudioCompositeServer(
         supported_dai_formats_[i].bits_per_sample()[0]);
   }
 
-  PopulateInspectNodes();
   ZX_ASSERT(StartSocPower(/*wait_for_completion*/ true) == ZX_OK);
 
   // Output engines.
@@ -108,26 +109,6 @@ AudioCompositeServer::AudioCompositeServer(
   // Make sure that all reads/writes have gone through.
   BarrierBeforeRelease();
   ZX_ASSERT(bti_.release_quarantine() == ZX_OK);
-}
-
-void AudioCompositeServer::PopulateInspectNodes() {
-  power_transitions_node_ = inspect_root_.CreateChild("power transitions");
-  dai_root_node_ = inspect_root_.CreateChild("DAIs");
-  for (size_t idx = 0u; idx < kNumberOfPipelines; ++idx) {
-    auto dai_node = dai_root_node_.CreateChild("pipeline #" + std::to_string(idx));
-    DaiEntry dai_entry{std::move(dai_node), kDaiIds[idx]};
-    dai_entries_.emplace_back(std::move(dai_entry));
-  }
-  ring_buffers_root_node_ = inspect_root_.CreateChild("ring buffers");
-  for (size_t idx = 0u; idx < kNumberOfTdmEngines; ++idx) {
-    auto ring_buffer_spec_node =
-        ring_buffers_root_node_.CreateChild("tdm engine #" + std::to_string(idx));
-    RingBufferSpecification ring_buffer_spec{std::move(ring_buffer_spec_node), kRingBufferIds[idx],
-                                             /*supports_active_channels=*/true,
-                                             /*outgoing=*/idx < 3};
-    ring_buffer_specs_.emplace_back(std::move(ring_buffer_spec));
-  }
-  current_power_state_ = inspect_root_.CreateBool("current power state", true);
 }
 
 zx_status_t AudioCompositeServer::ConfigEngine(size_t index, size_t dai_index, bool input,
@@ -583,7 +564,7 @@ zx_status_t AudioCompositeServer::StartSocPower(bool wait_for_completion) {
                 "status", ZX_OK, "reason", "Successfully powered up");
   soc_power_started_ = true;
   last_started_time_ = zx::clock::get_monotonic();
-  RecordSocPowerUp(call_time, last_started_time_);
+  device_inspect()->RecordSocPowerUp(call_time, last_started_time_);
 
   return ZX_OK;
 }
@@ -662,7 +643,7 @@ zx_status_t AudioCompositeServer::StopSocPower() {
   TRACE_ASYNC_BEGIN("aml-g12-composite", "suspend", trace_async_id_);
   soc_power_started_ = false;
   last_stopped_time_ = zx::clock::get_monotonic();
-  RecordSocPowerDown(call_time, last_stopped_time_);
+  device_inspect()->RecordSocPowerDown(call_time, last_stopped_time_);
 
   return ZX_OK;
 }
@@ -684,21 +665,10 @@ RingBufferServer::RingBufferServer(async_dispatcher_t* dispatcher, AudioComposit
       owner_(owner),
       binding_(fidl::ServerBinding<fuchsia_hardware_audio::RingBuffer>(
           dispatcher, std::move(ring_buffer), this,
-          std::mem_fn(&RingBufferServer::OnRingBufferClosed))) {
-  PopulateInstanceNode(engine_index);
+          std::mem_fn(&RingBufferServer::OnRingBufferClosed))),
+      ring_buffer_recorder_(
+          device_inspect()->CreateRingBufferInstance(engine_index_, zx::clock::get_monotonic())) {
   ResetRingBuffer();
-}
-
-void RingBufferServer::PopulateInstanceNode(size_t ring_buffer_index) {
-  auto instance_number = owner_.next_ring_buffer_instance_index(ring_buffer_index);
-  instance_node_ = owner_.ring_buffer_specs_[ring_buffer_index].node().CreateChild(
-      "instance " + std::to_string(instance_number));
-
-  created_at_ =
-      instance_node_.CreateInt("ring_buffer ctor time ", zx::clock::get_monotonic().get());
-  destroyed_at_ = instance_node_.CreateInt("ring_buffer dtor time ", 0);
-  active_channels_calls_root_ = instance_node_.CreateChild("set_active_channels calls");
-  running_intervals_root_ = instance_node_.CreateChild("running intervals");
 }
 
 void RingBufferServer::OnRingBufferClosed(fidl::UnbindInfo info) {
@@ -710,9 +680,11 @@ void RingBufferServer::OnRingBufferClosed(fidl::UnbindInfo info) {
       FDF_LOG(ERROR, "Client connection unbound: %s", info.status_string());
     }
   }
-  RecordDestructionTime(zx::clock::get_monotonic().get());
+  ring_buffer_inspect().RecordDestructionTime(zx::clock::get_monotonic());
   ResetRingBuffer();
 }
+
+std::unique_ptr<Recorder>& RingBufferServer::device_inspect() { return owner_.device_inspect(); }
 
 void RingBufferServer::ResetRingBuffer() {
   delay_completer_.first_response_sent = false;
@@ -825,7 +797,7 @@ void RingBufferServer::Start(StartCompleter::Sync& completer) {
     notification_period_ = {};
   }
   completer.Reply(start_time);
-  RecordStartTime(start_time);
+  ring_buffer_inspect().RecordStartTime(zx::time(start_time));
 }
 
 void RingBufferServer::Stop(StopCompleter::Sync& completer) {
@@ -842,11 +814,11 @@ void RingBufferServer::Stop(StopCompleter::Sync& completer) {
   notification_period_ = {};
 
   engine_.device->Stop();
-  auto stop_time = zx::clock::get_monotonic().get();
+  auto stop_time = zx::clock::get_monotonic();
   started_ = false;
 
   completer.Reply();
-  RecordStopTime(stop_time);
+  ring_buffer_inspect().RecordStopTime(stop_time);
 }
 
 zx_status_t RingBufferServer::InitBuffer(size_t size) {
@@ -954,8 +926,8 @@ void RingBufferServer::SetActiveChannels(
     TRACE_INSTANT("power-audio", "aml-g12-audio-composite::SetActiveChannels exit",
                   TRACE_SCOPE_PROCESS, "status", ZX_OK, "reason", "Successfully enabled channels");
     completer.Reply(zx::ok(owner_.last_started_time_.get()));
-    RecordActiveChannelsCall(request.active_channels_bitmask(), call_time.get(),
-                             owner_.last_started_time_.get());
+    ring_buffer_inspect().RecordActiveChannelsCall(request.active_channels_bitmask(), call_time,
+                                                   owner_.last_started_time_);
     return;
   }
 
@@ -969,13 +941,16 @@ void RingBufferServer::SetActiveChannels(
   TRACE_INSTANT("power-audio", "aml-g12-audio-composite::SetActiveChannels exit",
                 TRACE_SCOPE_PROCESS, "status", ZX_OK, "reason", "Successfully disabled channels");
   completer.Reply(zx::ok(owner_.last_stopped_time_.get()));
-  RecordActiveChannelsCall(request.active_channels_bitmask(), call_time.get(),
-                           owner_.last_stopped_time_.get());
+  ring_buffer_inspect().RecordActiveChannelsCall(request.active_channels_bitmask(), call_time,
+                                                 owner_.last_stopped_time_);
 }
 
 void RingBufferServer::handle_unknown_method(
-    fidl::UnknownMethodMetadata<fuchsia_hardware_audio::RingBuffer>,
-    fidl::UnknownMethodCompleter::Sync&) {}
+    fidl::UnknownMethodMetadata<fuchsia_hardware_audio::RingBuffer> metadata,
+    fidl::UnknownMethodCompleter::Sync& completer) {
+  FDF_LOG(ERROR, "RingBufferServer::handle_unknown_method (RingBuffer) ordinal %zu",
+          metadata.method_ordinal);
+}
 
 void AudioCompositeServer::GetElements(GetElementsCompleter::Sync& completer) {
   std::vector<fuchsia_hardware_audio_signalprocessing::Element> elements;
@@ -1121,6 +1096,11 @@ void AudioCompositeServer::SetTopology(SetTopologyRequest& request,
 }
 
 void AudioCompositeServer::handle_unknown_method(
-    fidl::UnknownMethodMetadata<typename fuchsia_hardware_audio_signalprocessing::SignalProcessing>,
-    fidl::UnknownMethodCompleter::Sync&) {}
+    fidl::UnknownMethodMetadata<typename fuchsia_hardware_audio_signalprocessing::SignalProcessing>
+        metadata,
+    fidl::UnknownMethodCompleter::Sync& completer) {
+  FDF_LOG(ERROR, "AudioCompositeServer::handle_unknown_method (SignalProcessing) ordinal %zu",
+          metadata.method_ordinal);
+}
+
 }  // namespace audio::aml_g12

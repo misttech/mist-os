@@ -246,7 +246,7 @@ impl ServingFilesystem {
         match self {
             Self::SingleVolume(_) => Ok(None),
             Self::MultiVolume(_) => Ok(Some(
-                fuchsia_fs::directory::open_directory_no_describe(
+                fuchsia_fs::directory::open_directory_no_describe_deprecated(
                     self.exposed_dir()?,
                     "svc",
                     fio::OpenFlags::RIGHT_READABLE,

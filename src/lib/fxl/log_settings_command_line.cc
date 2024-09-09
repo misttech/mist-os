@@ -5,6 +5,7 @@
 #include "src/lib/fxl/log_settings_command_line.h"
 
 #include <lib/syslog/cpp/macros.h>
+#include <lib/syslog/structured_backend/fuchsia_syslog.h>
 
 #include "lib/syslog/cpp/log_settings.h"
 #include "src/lib/fxl/command_line.h"
@@ -20,25 +21,25 @@ bool ParseLogSettingsInternal(const fxl::CommandLine& command_line, T* out_setti
   // Don't clobber existing settings, but ensure min log level is initialized.
   // Note that legacy INFO level is also 0.
   if (settings.min_log_level == 0) {
-    settings.min_log_level = fuchsia_logging::DefaultLogLevel;
+    settings.min_log_level = fuchsia_logging::kDefaultLogLevel;
   }
 
   // --severity=<TRACE|DEBUG|INFO|WARNING|ERROR|FATAL>
   std::string severity;
   if (command_line.GetOptionValue("severity", &severity)) {
-    fuchsia_logging::LogSeverity level;
+    FuchsiaLogSeverity level;
     if (severity == "TRACE") {
-      level = fuchsia_logging::LOG_TRACE;
+      level = FUCHSIA_LOG_TRACE;
     } else if (severity == "DEBUG") {
-      level = fuchsia_logging::LOG_DEBUG;
+      level = FUCHSIA_LOG_DEBUG;
     } else if (severity == "INFO") {
-      level = fuchsia_logging::LOG_INFO;
+      level = FUCHSIA_LOG_INFO;
     } else if (severity == "WARNING") {
-      level = fuchsia_logging::LOG_WARNING;
+      level = FUCHSIA_LOG_WARNING;
     } else if (severity == "ERROR") {
-      level = fuchsia_logging::LOG_ERROR;
+      level = FUCHSIA_LOG_ERROR;
     } else if (severity == "FATAL") {
-      level = fuchsia_logging::LOG_FATAL;
+      level = FUCHSIA_LOG_FATAL;
     } else {
       FX_LOGS(ERROR) << "Error parsing --severity option:" << severity;
       return false;
@@ -73,8 +74,7 @@ bool ParseLogSettingsInternal(const fxl::CommandLine& command_line, T* out_setti
       level = 3;
     }
     settings.min_log_level =
-        fuchsia_logging::LOG_INFO +
-        static_cast<fuchsia_logging::LogSeverity>(level * fuchsia_logging::LogSeverityStepSize);
+        FUCHSIA_LOG_INFO + static_cast<FuchsiaLogSeverity>(level * FUCHSIA_LOG_SEVERITY_STEP_SIZE);
   }
 
   *out_settings = settings;
@@ -157,18 +157,17 @@ bool SetLogSettingsFromCommandLine(const fxl::CommandLine& command_line,
 std::vector<std::string> LogSettingsToArgv(const LogSettings& settings) {
   std::vector<std::string> result;
 
-  if (settings.min_log_level != fuchsia_logging::LOG_INFO) {
+  if (settings.min_log_level != FUCHSIA_LOG_INFO) {
     std::string arg;
-    if (settings.min_log_level < fuchsia_logging::LOG_INFO &&
-        settings.min_log_level > fuchsia_logging::LOG_DEBUG) {
-      arg = StringPrintf("--verbose=%d", (fuchsia_logging::LOG_INFO - settings.min_log_level));
-    } else if (settings.min_log_level == fuchsia_logging::LOG_TRACE) {
+    if (settings.min_log_level < FUCHSIA_LOG_INFO && settings.min_log_level > FUCHSIA_LOG_DEBUG) {
+      arg = StringPrintf("--verbose=%d", (FUCHSIA_LOG_INFO - settings.min_log_level));
+    } else if (settings.min_log_level == FUCHSIA_LOG_TRACE) {
       arg = "--severity=TRACE";
-    } else if (settings.min_log_level == fuchsia_logging::LOG_DEBUG) {
+    } else if (settings.min_log_level == FUCHSIA_LOG_DEBUG) {
       arg = "--severity=DEBUG";
-    } else if (settings.min_log_level == fuchsia_logging::LOG_WARNING) {
+    } else if (settings.min_log_level == FUCHSIA_LOG_WARNING) {
       arg = "--severity=WARNING";
-    } else if (settings.min_log_level == fuchsia_logging::LOG_ERROR) {
+    } else if (settings.min_log_level == FUCHSIA_LOG_ERROR) {
       arg = "--severity=ERROR";
     } else {
       arg = "--severity=FATAL";

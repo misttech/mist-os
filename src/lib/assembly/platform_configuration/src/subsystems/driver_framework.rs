@@ -5,7 +5,7 @@
 use crate::subsystems::prelude::*;
 use assembly_config_capabilities::{Config, ConfigNestedValueType, ConfigValueType};
 use assembly_config_schema::platform_config::driver_framework_config::{
-    DriverFrameworkConfig, DriverHostCrashPolicy, TestFuzzingConfig,
+    DriverFrameworkConfig, TestFuzzingConfig,
 };
 
 pub(crate) struct DriverFrameworkSubsystemConfig;
@@ -85,18 +85,6 @@ impl DefineSubsystemConfiguration<DriverFrameworkConfig> for DriverFrameworkSubs
             ),
         )?;
 
-        let driver_host_crash_policy = driver_framework_config
-            .driver_host_crash_policy
-            .as_ref()
-            .unwrap_or(&DriverHostCrashPolicy::RestartDriverHost);
-
-        builder.set_config_capability(
-            "fuchsia.driver.manager.DriverHostCrashPolicy",
-            Config::new(
-                ConfigValueType::String { max_size: 20 },
-                format!("{driver_host_crash_policy}").into(),
-            ),
-        )?;
         builder.set_config_capability(
             "fuchsia.driver.manager.RootDriver",
             Config::new(

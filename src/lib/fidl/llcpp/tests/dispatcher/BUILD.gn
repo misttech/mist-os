@@ -28,7 +28,7 @@ source_set("client_test_helpers") {
   testonly = true
   visibility = [
     ":*",
-    "//src/lib/fidl/cpp/tests/*",
+    "//sdk/lib/fidl/cpp/tests/*",
   ]
   public_deps = [
     "//sdk/lib/fidl/cpp/wire",

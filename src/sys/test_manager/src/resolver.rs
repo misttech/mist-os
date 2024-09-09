@@ -178,6 +178,9 @@ async fn serve_resolver(
                     warn!("Failed sending load response for {}: {}", component_url, e);
                 }
             }
+            fresolution::ResolverRequest::_UnknownMethod { ordinal, .. } => {
+                warn!(%ordinal, "Unknown Resolver request");
+            }
         }
     }
 }
@@ -388,6 +391,9 @@ mod tests {
                         _ => responder.send(Err(fresolution::ResolverError::PackageNotFound)),
                     }
                     .expect("failed sending response");
+                }
+                fresolution::ResolverRequest::_UnknownMethod { .. } => {
+                    panic!("Unknown Resolver request");
                 }
             }
         }

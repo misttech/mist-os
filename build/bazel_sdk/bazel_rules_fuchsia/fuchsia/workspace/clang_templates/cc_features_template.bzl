@@ -12,7 +12,6 @@ load(
     "flag_set",
     "with_feature_set",
 )
-load("@fuchsia_sdk_common//:toolchains/clang/sanitizer.bzl", _sanitizer_features = "sanitizer_features")
 
 _all_actions = [
     ACTION_NAMES.assemble,
@@ -99,7 +98,7 @@ _flag_groups = struct(
         cflags = ["-fPIC"],
     ),
     language = _make_flag_group_struct(
-        ccflags = ["-std=c++17"],
+        ccflags = ["-std=c++20"],
     ),
     no_frame_pointers = _make_flag_group_struct(
         cflags = ["-fomit-frame-pointer"],
@@ -412,6 +411,9 @@ _coverage_feature = feature(
                         # This flag will get applied after the default
                         # set of flags so we can think of this as an override
                         "-O1",
+                        "-mllvm",
+                        # Enable coverage from system headers in Fuchsia.
+                        "-system-headers-coverage",
                     ],
                 ),
             ],
@@ -421,7 +423,14 @@ _coverage_feature = feature(
             flag_groups = _iter_ldflags([
                 # The statically-linked profiling runtime depends on libzircon.
                 _flag_groups.link_zircon,
-            ]),
+            ]) + [
+                flag_group(
+                    flags = [
+                        "-Wl",
+                        "-dynamic-linker=coverage/ld.so.1",
+                    ],
+                ),
+            ],
         ),
     ],
 )
@@ -522,4 +531,9 @@ features = struct(
 )
 
 # Redefine the features here so that we can share with the in-tree definitions.
-sanitizer_features = _sanitizer_features
+# This content is pulled from the fuchsia_sdk_common rules and is inserted when
+# the fuchsia_clang_repository rules runs. To see the content of this template
+# look at @fuchsia_sdk//common/toolchains/clang/sanitizer.bzl
+# It is important to have the '#' before the '{{}}' because buildifier will
+# fail if we don't. When the file name is updated we can remove this.
+#{{SANITIZER_FEATURES}}

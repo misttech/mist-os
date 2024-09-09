@@ -24,6 +24,7 @@
 #include <kernel/mp.h>
 #include <kernel/scheduler.h>
 #include <kernel/thread.h>
+#include <phys/handoff.h>
 #include <pretty/cpp/sizes.h>
 #include <vm/phys/arena.h>
 #include <vm/physmap.h>
@@ -83,6 +84,7 @@ zx_status_t PmmNode::Init(ktl::span<const memalloc::Range> ranges) TA_NO_THREAD_
   bool allocation_excluded = false;
   auto record_error = [&allocation_excluded](const PmmArenaSelectionError& error) {
     bool allocated = memalloc::IsAllocatedType(error.range.type);
+    allocation_excluded = allocation_excluded || allocated;
 
     // If we have to throw out less than two pages of free RAM, don't regard
     // that as a full blown error.
@@ -95,7 +97,6 @@ zx_status_t PmmNode::Init(ktl::span<const memalloc::Range> ranges) TA_NO_THREAD_
            error.range.addr, error.range.end(),                     //
            static_cast<int>(range_type.size()), range_type.data(),  //
            static_cast<int>(reason.size()), reason.data());
-    allocation_excluded = allocation_excluded || allocated;
   };
 
   SelectPmmArenas<PAGE_SIZE>(ranges, init_arena, record_error);
@@ -109,68 +110,38 @@ zx_status_t PmmNode::Init(ktl::span<const memalloc::Range> ranges) TA_NO_THREAD_
 
   // Now mark all pre-PMM allocations and holes within our arenas as reserved.
   ktl::span arenas = active_arenas();
-  auto arena = arenas.begin();
-  ktl::optional<uint64_t> last_ram_end, last_reserved_end;
-  for (const memalloc::Range& range : ranges) {
-    // Non-RAM ranges (i.e., peripheral or unknown) should be treated as holes.
-    if (!memalloc::IsRamType(range.type)) {
-      continue;
-    }
-
-    // Page-align on both sides to ensure that any non-aligned subrange ends up
-    // as reserved.
-    uint64_t start = range.addr & -PAGE_SIZE;
-    uint64_t size = ROUNDUP_PAGE_SIZE((range.addr - start) + range.size);
-
-    // If there are adjacent reserved ranges, we might have previously aligned
-    // the end of the first past the start of the second, so account for that.
-    if (last_reserved_end && *last_reserved_end > start) {
-      size -= *last_reserved_end - start;
-      start = *last_reserved_end;
-    }
-    if (size == 0) {
-      continue;
-    }
-
+  auto reserve_range = [this, arena{arenas.begin()},
+                        end{arenas.end()}](const memalloc::Range& range) mutable {
+    // Find the first arena encompassing this range.
+    //
     // Note that trying to include `range` in an arena may have resulted in an
-    // error. If we encounter a range not in an arena, just skip it.
-    while (arena != arenas.end() && arena->end() <= start) {
+    // error during the selection process. If we do encounter a range not in an
+    // arena, just skip it.
+    while (arena != end && arena->end() <= range.addr) {
       ++arena;
     }
-    if (arena == arenas.end()) {
-      // In this case the tail of ranges did not end up in any arenas.
-      break;
+    if (arena == end) {
+      // In this case the tail of ranges did not end up in any arenas, so we can
+      // just short-circuit.
+      return false;
     }
-    if (!arena->address_in_arena(start)) {
-      continue;
+    if (!arena->address_in_arena(range.addr)) {
+      return true;
     }
 
-    if (last_ram_end && arena->address_in_arena(*last_ram_end) && *last_ram_end < start) {
-      // Found a hole between RAM.
-      InitReservedRange(memalloc::Range{
-          .addr = *last_ram_end,
-          .size = start - *last_ram_end,
-          .type = memalloc::Type::kReserved,
-      });
-      last_reserved_end = start;
-    }
-    last_ram_end = start + size;
-
-    if (!memalloc::IsAllocatedType(range.type)) {
-      continue;
-    }
-    InitReservedRange(memalloc::Range{
-        .addr = start,
-        .size = size,
-        .type = range.type,
-    });
-    last_reserved_end = last_ram_end;
-  }
+    DEBUG_ASSERT(arena->address_in_arena(range.end() - 1));
+    InitReservedRange(range);
+    return true;
+  };
+  ForEachAlignedAllocationOrHole<PAGE_SIZE>(ranges, reserve_range);
 
   return ZX_OK;
 }
 
-void PmmNode::EndHandoff() { FreeList(&phys_handoff_temporary_list_); }
+void PmmNode::EndHandoff() {
+  FreeList(&phys_handoff_temporary_list_);
+  ZX_ASSERT(list_is_empty(&phys_handoff_vmo_list_));
+}
 
 zx_status_t PmmNode::GetArenaInfo(size_t count, uint64_t i, pmm_arena_info_t* buffer,
                                   size_t buffer_size) {
@@ -645,9 +616,14 @@ void PmmNode::InitReservedRange(const memalloc::Range& range) {
     p->set_state(vm_page_state::WIRED);
   }
 
-  list_node_t* list = range.type == memalloc::Type::kTemporaryPhysHandoff
-                          ? &phys_handoff_temporary_list_
-                          : &permanently_reserved_list_;
+  list_node_t* list;
+  if (range.type == memalloc::Type::kTemporaryPhysHandoff) {
+    list = &phys_handoff_temporary_list_;
+  } else if (PhysHandoff::IsPhysVmoType(range.type)) {
+    list = &phys_handoff_vmo_list_;
+  } else {
+    list = &permanently_reserved_list_;
+  }
   if (list_is_empty(list)) {
     list_move(&reserved, list);
   } else {

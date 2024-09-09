@@ -48,7 +48,7 @@ impl RemoteControlService {
     }
 
     async fn load_moniker_map() -> HashMap<String, String> {
-        let f = match fuchsia_fs::file::open_in_namespace(
+        let f = match fuchsia_fs::file::open_in_namespace_deprecated(
             "/pkg/data/moniker-map.json",
             io::OpenFlags::RIGHT_READABLE,
         ) {
@@ -348,10 +348,13 @@ async fn check_entry_exists(
         Some(dir_idx) => {
             let dirname = &capability_name[0..dir_idx];
             let basename = &capability_name[dir_idx + 1..];
-            let nested_dir =
-                fuchsia_fs::directory::open_directory(dir, dirname, fio::OpenFlags::RIGHT_READABLE)
-                    .await
-                    .map_err(|_| rcs::ConnectCapabilityError::NoMatchingCapabilities)?;
+            let nested_dir = fuchsia_fs::directory::open_directory_deprecated(
+                dir,
+                dirname,
+                fio::OpenFlags::RIGHT_READABLE,
+            )
+            .await
+            .map_err(|_| rcs::ConnectCapabilityError::NoMatchingCapabilities)?;
             let entries = fuchsia_fs::directory::readdir(&nested_dir)
                 .await
                 .map_err(|_| rcs::ConnectCapabilityError::CapabilityConnectFailed)?;

@@ -6,6 +6,7 @@
 #define SRC_DEVICES_BLOCK_DRIVERS_UFS_UFS_H_
 
 #include <fidl/fuchsia.hardware.pci/cpp/wire.h>
+#include <fidl/fuchsia.power.broker/cpp/fidl.h>
 #include <fuchsia/hardware/block/driver/cpp/banjo.h>
 #include <lib/driver/component/cpp/driver_base.h>
 #include <lib/fdf/cpp/dispatcher.h>
@@ -22,9 +23,12 @@
 #include <fbl/intrusive_double_list.h>
 #include <fbl/string_printf.h>
 
-#include "registers.h"
 #include "src/devices/block/drivers/ufs/device_manager.h"
-#include "transfer_request_processor.h"
+#include "src/devices/block/drivers/ufs/registers.h"
+#include "src/devices/block/drivers/ufs/request_processor.h"
+#include "src/devices/block/drivers/ufs/task_management_request_processor.h"
+#include "src/devices/block/drivers/ufs/transfer_request_processor.h"
+#include "src/devices/block/drivers/ufs/ufs_config.h"
 
 namespace ufs {
 
@@ -56,6 +60,7 @@ enum NotifyEvent {
   kPreLinkStartup,
   kPostLinkStartup,
   kSetupTransferRequestList,
+  kSetupTaskManagementRequestList,
   kDeviceInitDone,
   kPrePowerModeChange,
   kPostPowerModeChange,
@@ -85,9 +90,16 @@ using HostControllerCallback = fit::function<zx::result<>(NotifyEvent, uint64_t 
 class Ufs : public fdf::DriverBase, public scsi::Controller {
  public:
   static constexpr char kDriverName[] = "ufs";
+  static constexpr char kHardwarePowerElementName[] = "ufs-hardware";
+  static constexpr char kSystemWakeOnRequestPowerElementName[] = "ufs-system-wake-on-request";
+  // Common to hardware power and wake-on-request power elements.
+  // TODO(https://fxbug.dev/42075643): We need to add sleep(low-power) level
+  static constexpr fuchsia_power_broker::PowerLevel kPowerLevelOff = 0;
+  static constexpr fuchsia_power_broker::PowerLevel kPowerLevelOn = 1;
 
   Ufs(fdf::DriverStartArgs start_args, fdf::UnownedSynchronizedDispatcher dispatcher)
-      : fdf::DriverBase(kDriverName, std::move(start_args), std::move(dispatcher)) {}
+      : fdf::DriverBase(kDriverName, std::move(start_args), std::move(dispatcher)),
+        config_(take_config<ufs_config::Config>()) {}
   ~Ufs() override = default;
 
   zx::result<> Start() override;
@@ -99,8 +111,10 @@ class Ufs : public fdf::DriverBase, public scsi::Controller {
   std::string_view driver_name() const override { return name(); }
   const std::shared_ptr<fdf::Namespace> &driver_incoming() const override { return incoming(); }
   std::shared_ptr<fdf::OutgoingDirectory> &driver_outgoing() override { return outgoing(); }
+  async_dispatcher_t *driver_async_dispatcher() const { return dispatcher(); }
   const std::optional<std::string> &driver_node_name() const override { return node_name(); }
   fdf::Logger &driver_logger() override { return logger(); }
+  const ufs_config::Config &config() const { return config_; }
 
   size_t BlockOpSize() override { return sizeof(IoCommand); }
   zx_status_t ExecuteCommandSync(uint8_t target, uint16_t lun, iovec cdb, bool is_write,
@@ -122,22 +136,26 @@ class Ufs : public fdf::DriverBase, public scsi::Controller {
     ZX_DEBUG_ASSERT(transfer_request_processor_ != nullptr);
     return *transfer_request_processor_;
   }
+  TaskManagementRequestProcessor &GetTaskManagementRequestProcessor() const {
+    ZX_DEBUG_ASSERT(task_management_request_processor_ != nullptr);
+    return *task_management_request_processor_;
+  }
 
   // Queue an IO command to be performed asynchronously.
   void QueueIoCommand(IoCommand *io_cmd);
 
   // Convert block operations to UPIU commands and submit them asynchronously.
   void ProcessIoSubmissions();
-  // Find the completed commands in the Request List and handle their completion.
-  void ProcessCompletions();
+  // Find the completed Admin commands in the Request List and handle their completion.
+  void ProcessAdminCompletions();
+  // Find the completed IO commands in the Request List and handle their completion.
+  void ProcessIoCompletions();
 
   // Used to register a platform-specific NotifyEventCallback, which handles variants and quirks for
   // each host interface platform.
   void SetHostControllerCallback(HostControllerCallback callback) {
     host_controller_callback_ = std::move(callback);
   }
-
-  bool IsDriverShutdown() const { return driver_shutdown_; }
 
   // Defines a callback function to perform when an |event| occurs.
   static zx::result<> NotifyEventCallback(NotifyEvent event, uint64_t data);
@@ -160,7 +178,9 @@ class Ufs : public fdf::DriverBase, public scsi::Controller {
     return well_known_lun_set_.find(lun) != well_known_lun_set_.end();
   }
 
-  bool IsSuspended() const { return device_manager_->IsSuspended(); }
+  bool IsResumed() const { return device_manager_->IsResumed(); }
+
+  const inspect::Inspector &inspect() { return inspector().inspector(); }
 
  protected:
   // Initialize the UFS controller and bind the logical units.
@@ -174,6 +194,10 @@ class Ufs : public fdf::DriverBase, public scsi::Controller {
  private:
   friend class UfsTest;
   int IrqLoop();
+  // IoLoop() cannot process SCSI commands when the UFS device is suspended. The SCSI StartStopUnit
+  // admin command is required to resume UFS device, so AdminLoop() is required to handle the
+  // completion of the admin command even in a suspended state.
+  int AdminLoop();
   int IoLoop();
 
   // Interrupt service routine. Check that the request is complete.
@@ -194,6 +218,34 @@ class Ufs : public fdf::DriverBase, public scsi::Controller {
 
   zx::result<> AllocatePages(zx::vmo &vmo, fzl::VmoMapper &mapper, size_t size);
 
+  // TODO(b/309152899): Once fuchsia.power.SuspendEnabled config cap is available, have this method
+  // return failure if power management could not be configured. Use fuchsia.power.SuspendEnabled to
+  // ignore this failure when expected.
+  // Register power configs from the board driver with Power Broker, and begin the continuous
+  // power level adjustment of hardware. For boards/products that don't support the Power Framework,
+  // this method simply returns success.
+  zx::result<> ConfigurePowerManagement();
+
+  // Acquires a lease on a power element via the supplied |lessor_client|, returning the resulting
+  // lease control client end.
+  zx::result<fidl::ClientEnd<fuchsia_power_broker::LeaseControl>> AcquireLease(
+      const fidl::WireSyncClient<fuchsia_power_broker::Lessor> &lessor_client);
+
+  // Informs Power Broker of the updated |power_level| via the supplied |current_level_client|.
+  void UpdatePowerLevel(
+      const fidl::WireSyncClient<fuchsia_power_broker::CurrentLevel> &current_level_client,
+      fuchsia_power_broker::PowerLevel power_level);
+
+  // Watches the required hardware power level and adjusts it accordingly. Also serves requests that
+  // were delayed because they were received during suspended state. Communicates power level
+  // transitions to the Power Broker.
+  void WatchHardwareRequiredLevel();
+
+  // Watches the required wake-on-request power level and replies to the Power Broker accordingly.
+  // Does not directly effect any real power level change of storage hardware. (That happens in
+  // WatchHardwareRequiredLevel().)
+  void WatchWakeOnRequestRequiredLevel();
+
   fidl::WireSyncClient<fuchsia_hardware_pci::Device> pci_;
   zx::vmo mmio_buffer_vmo_;
   uint64_t mmio_buffer_size_ = 0;
@@ -209,18 +261,26 @@ class Ufs : public fdf::DriverBase, public scsi::Controller {
   // waiting for IO to start.
   list_node_t pending_commands_ TA_GUARDED(commands_lock_);
 
+  // Notifies AdminThread() that it has work to do. Signaled from QueueIoCommand() or the IRQ
+  // handler.
+  sync_completion_t admin_signal_;
   // Notifies IoThread() that it has work to do. Signaled from QueueIoCommand() or the IRQ handler.
   sync_completion_t io_signal_;
 
   // Dispatcher for processing queued block requests.
   fdf::Dispatcher irq_worker_dispatcher_;
   fdf::Dispatcher io_worker_dispatcher_;
+  fdf::Dispatcher admin_worker_dispatcher_;
   // Signaled when worker_dispatcher_ is shut down.
   libsync::Completion irq_worker_shutdown_completion_;
   libsync::Completion io_worker_shutdown_completion_;
+  libsync::Completion admin_worker_shutdown_completion_;
+  // Signaled when power has been resumed.
+  libsync::Completion wait_for_power_resumed_;
 
   std::unique_ptr<DeviceManager> device_manager_;
   std::unique_ptr<TransferRequestProcessor> transfer_request_processor_;
+  std::unique_ptr<TaskManagementRequestProcessor> task_management_request_processor_;
 
   // Controller internal information.
   uint32_t logical_unit_count_ = 0;
@@ -231,8 +291,10 @@ class Ufs : public fdf::DriverBase, public scsi::Controller {
   // Callback function to perform when the host controller is notified.
   HostControllerCallback host_controller_callback_;
 
-  bool driver_shutdown_ = false;
+  bool driver_shutdown_ TA_GUARDED(lock_) = false;
   bool disable_completion_ = false;
+
+  uint32_t wake_on_request_count_ = 0;
 
   // The maximum transfer size supported by UFSHCI spec is 65535 * 256 KiB. However, we limit the
   // maximum transfer size to 1MiB for performance reason.
@@ -240,9 +302,30 @@ class Ufs : public fdf::DriverBase, public scsi::Controller {
 
   bool qemu_quirk_ = false;
 
+  std::mutex lock_;
+
+  ufs_config::Config config_;
+
   fidl::WireSyncClient<fuchsia_driver_framework::Node> parent_node_;
   fidl::WireSyncClient<fuchsia_driver_framework::Node> root_node_;
   fidl::WireSyncClient<fuchsia_driver_framework::NodeController> node_controller_;
+
+  std::vector<zx::event> assertive_power_dep_tokens_;
+  std::vector<zx::event> opportunistic_power_dep_tokens_;
+
+  fidl::WireSyncClient<fuchsia_power_broker::ElementControl> hardware_power_element_control_client_;
+  fidl::WireSyncClient<fuchsia_power_broker::Lessor> hardware_power_lessor_client_;
+  fidl::WireSyncClient<fuchsia_power_broker::CurrentLevel> hardware_power_current_level_client_;
+  fidl::WireClient<fuchsia_power_broker::RequiredLevel> hardware_power_required_level_client_;
+  zx::event hardware_power_assertive_token_;
+
+  fidl::WireSyncClient<fuchsia_power_broker::ElementControl>
+      wake_on_request_element_control_client_;
+  fidl::WireSyncClient<fuchsia_power_broker::Lessor> wake_on_request_lessor_client_;
+  fidl::WireSyncClient<fuchsia_power_broker::CurrentLevel> wake_on_request_current_level_client_;
+  fidl::WireClient<fuchsia_power_broker::RequiredLevel> wake_on_request_required_level_client_;
+
+  fidl::ClientEnd<fuchsia_power_broker::LeaseControl> hardware_power_lease_control_client_end_;
 };
 
 }  // namespace ufs

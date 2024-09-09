@@ -3,14 +3,14 @@
 // found in the LICENSE file.
 #![cfg(test)]
 
-use crate::client::roaming::lib::{RoamTriggerData, RoamingConnectionData};
+use crate::client::roaming::lib::{RoamTriggerData, RoamTriggerDataOutcome};
 use crate::client::roaming::roam_monitor::RoamMonitorApi;
 use crate::client::{scan, types as client_types};
 use crate::config_management::{
     Credential, NetworkConfig, NetworkConfigError, NetworkIdentifier, PastConnectionData,
     PastConnectionList, SavedNetworksManagerApi,
 };
-use crate::util::testing::generate_random_roaming_connection_data;
+use anyhow::format_err;
 use async_trait::async_trait;
 use futures::channel::mpsc;
 use futures::lock::Mutex;
@@ -40,6 +40,7 @@ pub struct FakeSavedNetworksManager {
         >,
     >,
     pub past_connections_response: PastConnectionList,
+    pub is_network_single_bss_resp: Mutex<Option<bool>>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -88,6 +89,7 @@ impl FakeSavedNetworksManager {
             lookup_compatible_response: Mutex::new(LookupCompatibleResponse::new()),
             scan_result_records: Arc::new(Mutex::new(vec![])),
             past_connections_response: PastConnectionList::default(),
+            is_network_single_bss_resp: Mutex::new(None),
         }
     }
 
@@ -117,6 +119,7 @@ impl FakeSavedNetworksManager {
             lookup_compatible_response: Mutex::new(LookupCompatibleResponse::new()),
             scan_result_records: Arc::new(Mutex::new(vec![])),
             past_connections_response: PastConnectionList::default(),
+            is_network_single_bss_resp: Mutex::new(None),
         }
     }
 
@@ -154,6 +157,13 @@ impl FakeSavedNetworksManager {
     pub fn set_lookup_compatible_response(&self, response: Vec<NetworkConfig>) {
         self.lookup_compatible_response.try_lock().expect("failed to get lock").inner =
             Some(response);
+    }
+
+    pub fn set_is_single_bss_response(&self, resp: bool) {
+        *self
+            .is_network_single_bss_resp
+            .try_lock()
+            .expect("failed to get is_network_single_bss_resp lock") = Some(resp);
     }
 }
 
@@ -270,6 +280,25 @@ impl SavedNetworksManagerApi for FakeSavedNetworksManager {
         records.push((target_ssids, results.clone()));
     }
 
+    /// This is currently used for roaming scan decisions. If it is not set in the
+    /// FakeSavedNetworksManager, an error will returned to avoid tests failing down the line
+    /// because of the value returned here.
+    async fn is_network_single_bss(
+        &self,
+        _id: &NetworkIdentifier,
+        _credential: &Credential,
+    ) -> Result<bool, anyhow::Error> {
+        return self
+            .is_network_single_bss_resp
+            .try_lock()
+            .expect("failed to get is_network_single_bss_resp lock")
+            .ok_or_else(|| {
+                format_err!(
+                    "is_network_single_bss response is not set for FakeSavedNetworksManager"
+                )
+            });
+    }
+
     async fn get_networks(&self) -> Vec<NetworkConfig> {
         self.saved_networks.lock().await.values().flat_map(|cfgs| cfgs.clone()).collect()
     }
@@ -371,9 +400,8 @@ impl scan::ScanRequestApi for FakeScanRequester {
 #[derive(Clone)]
 pub struct FakeRoamMonitor {
     pub trigger_data_queue: VecDeque<RoamTriggerData>,
-    pub response_to_should_roam_scan: bool,
+    pub response_to_should_roam_scan: RoamTriggerDataOutcome,
     pub response_to_should_send_roam_request: bool,
-    pub response_to_get_roam_data: RoamingConnectionData,
 }
 
 impl Default for FakeRoamMonitor {
@@ -386,25 +414,25 @@ impl FakeRoamMonitor {
     pub fn new() -> Self {
         Self {
             trigger_data_queue: VecDeque::new(),
-            response_to_should_roam_scan: false,
+            response_to_should_roam_scan: RoamTriggerDataOutcome::Noop,
             response_to_should_send_roam_request: false,
-            response_to_get_roam_data: generate_random_roaming_connection_data(),
         }
     }
 }
 
+#[async_trait]
 impl RoamMonitorApi for FakeRoamMonitor {
-    fn should_roam_search(&mut self, data: RoamTriggerData) -> Result<bool, anyhow::Error> {
+    async fn handle_roam_trigger_data(
+        &mut self,
+        data: RoamTriggerData,
+    ) -> Result<RoamTriggerDataOutcome, anyhow::Error> {
         self.trigger_data_queue.push_back(data);
-        Ok(self.response_to_should_roam_scan)
+        Ok(self.response_to_should_roam_scan.clone())
     }
     fn should_send_roam_request(
         &self,
         _candidate: client_types::ScannedCandidate,
     ) -> Result<bool, anyhow::Error> {
         Ok(self.response_to_should_send_roam_request)
-    }
-    fn get_roam_data(&self) -> Result<RoamingConnectionData, anyhow::Error> {
-        Ok(self.response_to_get_roam_data.clone())
     }
 }

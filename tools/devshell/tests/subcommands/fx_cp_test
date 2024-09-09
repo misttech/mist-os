@@ -19,17 +19,26 @@ BT_MOCKED_TOOLS=(
   "tools/devshell/sftp"
 )
 
-declare fx sftp
+declare fx ffx sftp
 
 BT_SET_UP() {
   source "${BT_TEMP_DIR}/tools/devshell/tests/lib/fuchsia-mock.sh"
   fx="$(btf::setup_fx)"
-  btf::make_installed_hosttools_mock "ffx" > /dev/null
   sftp="${BT_TEMP_DIR}/tools/devshell/sftp"
+  ffx="$(btf::make_installed_hosttools_mock ffx)"
+  btf::make_mock "${BT_TEMP_DIR}/tools/devshell/host-tool"
+  cat > "${BT_TEMP_DIR}/tools/devshell/host-tool.mock_side_effects" <<EOF
+    if [[ "\$2" == "ffx" ]]; then
+      shift
+      "${ffx}" "\$@"
+    fi
+EOF
+
 }
 
 # ensure that "fx -d ipv4:port cp" calls sftp with expected address and port number
 TEST_cp_ipv4_port() {
+  echo "127.0.0.1:8022" > "${ffx}.mock_stdout"
   BT_EXPECT ${fx} -d "127.0.0.1:8022" cp --to-host /tmp/file_in_fuchsia_target /tmp/file_in_host
   BT_EXPECT btf::does-mock-args-contain "${sftp}.mock_state" "-P" "8022"
   BT_EXPECT btf::does-mock-args-contain "${sftp}.mock_state" "[127.0.0.1]"
@@ -37,6 +46,7 @@ TEST_cp_ipv4_port() {
 
 # ensure that "fx -d [ipv6]:port cp" calls sftp with expected address and port number
 TEST_cp_ipv6_port() {
+  echo "[fe80::7:8%eth0]:222" > "${ffx}.mock_stdout"
   BT_EXPECT ${fx} -d "[fe80::7:8%eth0]:222" cp --to-host /tmp/file_in_fuchsia_target /tmp/file_in_host
   BT_EXPECT btf::does-mock-args-contain "${sftp}.mock_state" "-P" "222"
   BT_EXPECT btf::does-mock-args-contain "${sftp}.mock_state" "[fe80::7:8%eth0]"
@@ -44,6 +54,7 @@ TEST_cp_ipv6_port() {
 
 # ensure that "fx -d addr cp" calls sftp with expected address and no port number
 TEST_cp_addr() {
+  echo "127.0.0.1" > "${ffx}.mock_stdout"
   BT_EXPECT ${fx} -d "127.0.0.1" cp --to-host /tmp/file_in_fuchsia_target /tmp/file_in_host
   BT_EXPECT btf::does-mock-args-contain "${sftp}.mock_state" "[127.0.0.1]"
   BT_EXPECT btf::does-mock-args-not-contain "${sftp}.mock_state" "-P"

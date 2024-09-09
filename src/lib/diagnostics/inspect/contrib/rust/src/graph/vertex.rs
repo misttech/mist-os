@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use super::edge::WeakEdgeRef;
 use super::events::GraphObjectEventTracker;
 use super::types::VertexMarker;
 use super::{Edge, Metadata, VertexGraphMetadata, VertexId};
@@ -15,9 +16,10 @@ use std::sync::atomic::{AtomicU64, Ordering};
 pub struct Vertex<I: VertexId> {
     _node: inspect::Node,
     metadata: VertexGraphMetadata<I>,
-    pub(crate) incoming_edges: BTreeMap<u64, inspect::Node>,
+    incoming_edges: BTreeMap<u64, WeakEdgeRef>,
+    outgoing_edges: BTreeMap<u64, WeakEdgeRef>,
     pub(crate) outgoing_edges_node: inspect::Node,
-    pub(crate) internal_id: u64,
+    internal_id: u64,
 }
 
 static NEXT_ID: AtomicU64 = AtomicU64::new(0);
@@ -48,17 +50,32 @@ where
                 outgoing_edges_node,
                 metadata,
                 incoming_edges: BTreeMap::new(),
+                outgoing_edges: BTreeMap::new(),
             }
         })
     }
 
     /// Add a new edge to the graph originating at this vertex and going to the vertex `to` with the
     /// given metadata.
-    pub fn add_edge<'a, M>(&self, to: &mut Vertex<I>, initial_metadata: M) -> Edge
+    pub fn add_edge<'a, M>(&mut self, to: &mut Vertex<I>, initial_metadata: M) -> Edge
     where
         M: IntoIterator<Item = Metadata<'a>>,
     {
-        Edge::new(self, to, initial_metadata, self.metadata.events_tracker().map(|e| e.for_edge()))
+        let edge = Edge::new(
+            self,
+            to,
+            initial_metadata,
+            self.metadata.events_tracker().map(|e| e.for_edge()),
+        );
+
+        let weak_ref = edge.weak_ref();
+
+        self.incoming_edges.retain(|_, n| n.is_valid());
+        to.outgoing_edges.retain(|_, n| n.is_valid());
+
+        to.incoming_edges.insert(self.internal_id, weak_ref.clone());
+        self.outgoing_edges.insert(to.internal_id, weak_ref.clone());
+        edge
     }
 
     /// Get an exclusive reference to the metadata to modify it.
@@ -76,6 +93,8 @@ where
     I: VertexId,
 {
     fn drop(&mut self) {
+        self.outgoing_edges.iter().for_each(|(_, n)| n.mark_as_gone());
+        self.incoming_edges.iter().for_each(|(_, n)| n.mark_as_gone());
         if let Some(ref events_tracker) = self.metadata.events_tracker() {
             events_tracker.record_removed(self.id().get_id().as_ref())
         }

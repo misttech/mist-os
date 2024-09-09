@@ -105,17 +105,17 @@ void ReadElfJobId(fidl::Client<fuchsia_io::Directory> runtime_dir, const std::st
 
 std::string SeverityToString(int32_t severity) {
   switch (severity) {
-    case fuchsia_logging::LOG_TRACE:
+    case FUCHSIA_LOG_TRACE:
       return "TRACE";
-    case fuchsia_logging::LOG_DEBUG:
+    case FUCHSIA_LOG_DEBUG:
       return "DEBUG";
-    case fuchsia_logging::LOG_INFO:
+    case FUCHSIA_LOG_INFO:
       return "INFO";
-    case fuchsia_logging::LOG_WARNING:
+    case FUCHSIA_LOG_WARNING:
       return "WARNING";
-    case fuchsia_logging::LOG_ERROR:
+    case FUCHSIA_LOG_ERROR:
       return "ERROR";
-    case fuchsia_logging::LOG_FATAL:
+    case FUCHSIA_LOG_FATAL:
       return "FATAL";
   }
   return "INVALID";

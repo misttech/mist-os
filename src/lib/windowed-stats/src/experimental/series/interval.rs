@@ -12,7 +12,7 @@ use std::{cmp, iter};
 
 use crate::experimental::clock::{Duration, DurationExt as _, Quanta, QuantaExt as _, Tick};
 use crate::experimental::series::interpolation::InterpolationState;
-use crate::experimental::series::statistic::Statistic;
+use crate::experimental::series::statistic::{Statistic, StatisticExt as _};
 use crate::experimental::Vec1;
 
 /// An interval that has elapsed during a [`Tick`].
@@ -44,7 +44,7 @@ impl ElapsedInterval {
         let fill = interpolation.sample();
 
         statistic.fill(fill, fill_sample_count)?;
-        Ok(statistic.aggregation().inspect(|aggregation| {
+        Ok(statistic.get_aggregation_and_reset().inspect(|aggregation| {
             interpolation.fold_aggregation(aggregation.clone());
         }))
     }
@@ -423,6 +423,9 @@ impl From<SamplingInterval> for SamplingProfile {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    use std::sync::mpsc::{self, Receiver, Sender};
+
     use crate::experimental::clock::{ObservationTime, Timestamp};
     use crate::experimental::series::{Counter, Fill, Sampler};
 
@@ -516,14 +519,17 @@ mod tests {
     enum MockStatisticCall {
         Fill { sample: u64, n: usize },
         Fold { sample: u64 },
+        Reset,
         Aggregation,
     }
 
     #[derive(Clone, Debug)]
-    struct MockStatistic(Vec<MockStatisticCall>);
+    struct MockStatistic(Sender<MockStatisticCall>);
+
     impl MockStatistic {
-        fn new() -> Self {
-            Self(vec![])
+        pub fn channel() -> (Self, Receiver<MockStatisticCall>) {
+            let (tx, rx) = mpsc::channel();
+            (Self(tx), rx)
         }
     }
 
@@ -532,23 +538,28 @@ mod tests {
         type Sample = u64;
         type Aggregation = u64;
 
-        fn aggregation(&mut self) -> Option<Self::Aggregation> {
-            self.0.push(MockStatisticCall::Aggregation);
+        fn reset(&mut self) {
+            self.0.send(MockStatisticCall::Reset).unwrap();
+        }
+
+        fn aggregation(&self) -> Option<Self::Aggregation> {
+            self.0.send(MockStatisticCall::Aggregation).unwrap();
             Some(100)
         }
     }
 
     impl Fill<u64> for MockStatistic {
         fn fill(&mut self, sample: u64, n: usize) -> Result<(), Self::Error> {
-            self.0.push(MockStatisticCall::Fill { sample, n });
+            self.0.send(MockStatisticCall::Fill { sample, n }).unwrap();
             Ok(())
         }
     }
 
     impl Sampler<u64> for MockStatistic {
         type Error = ();
+
         fn fold(&mut self, sample: u64) -> Result<(), Self::Error> {
-            self.0.push(MockStatisticCall::Fold { sample });
+            self.0.send(MockStatisticCall::Fold { sample }).unwrap();
             Ok(())
         }
     }
@@ -561,6 +572,7 @@ mod tests {
 
     #[derive(Clone, Debug)]
     struct MockInterpolationState(Vec<MockInterpolationStateCall>);
+
     impl MockInterpolationState {
         fn new() -> Self {
             Self(vec![])
@@ -569,6 +581,7 @@ mod tests {
 
     impl InterpolationState<u64> for MockInterpolationState {
         type FillSample = u64;
+
         fn sample(&self) -> Self::FillSample {
             42u64
         }
@@ -583,33 +596,34 @@ mod tests {
     #[test]
     fn elapsed_interval_interpolate_and_get_aggregation() {
         let interval = ElapsedInterval { fill_sample_count: 6 };
-        let mut statistic = MockStatistic::new();
+        let (mut statistic, calls) = MockStatistic::channel();
         let mut interpolation = MockInterpolationState::new();
         let result = interval.interpolate_and_get_aggregation(&mut statistic, &mut interpolation);
         assert!(result.is_ok());
         assert_eq!(
-            statistic.0,
-            vec![MockStatisticCall::Fill { sample: 42, n: 6 }, MockStatisticCall::Aggregation,]
+            calls.try_iter().collect::<Vec<_>>(),
+            &[
+                MockStatisticCall::Fill { sample: 42, n: 6 },
+                MockStatisticCall::Aggregation,
+                MockStatisticCall::Reset,
+            ],
         );
         assert_eq!(
             interpolation.0,
-            vec![MockInterpolationStateCall::FoldAggregation { aggregation: 100 }]
+            vec![MockInterpolationStateCall::FoldAggregation { aggregation: 100 }],
         );
     }
 
     #[test]
     fn pending_interval_fold() {
         let interval = PendingInterval { fill_sample_count: 6, sample: 50u64 };
-        let mut statistic = MockStatistic::new();
+        let (mut statistic, calls) = MockStatistic::channel();
         let mut interpolation = MockInterpolationState::new();
         let result = interval.fold(&mut statistic, &mut interpolation);
         assert!(result.is_ok());
         assert_eq!(
-            statistic.0,
-            vec![
-                MockStatisticCall::Fill { sample: 42, n: 6 },
-                MockStatisticCall::Fold { sample: 50 },
-            ]
+            calls.try_iter().collect::<Vec<_>>(),
+            &[MockStatisticCall::Fill { sample: 42, n: 6 }, MockStatisticCall::Fold { sample: 50 }],
         );
         assert_eq!(interpolation.0, vec![MockInterpolationStateCall::FoldSample { sample: 50 }]);
     }

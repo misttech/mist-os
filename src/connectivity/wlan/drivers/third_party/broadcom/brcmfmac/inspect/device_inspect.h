@@ -16,6 +16,7 @@
 
 #include <lib/async/dispatcher.h>
 #include <lib/inspect/cpp/inspect.h>
+#include <lib/zx/result.h>
 #include <lib/zx/vmo.h>
 #include <zircon/types.h>
 
@@ -42,12 +43,9 @@ struct DeviceConnMetrics {
 class DeviceInspect {
  public:
   // Factory creation function.
-  static zx_status_t Create(async_dispatcher_t* dispatcher,
-                            std::unique_ptr<DeviceInspect>* inspect_out);
+  static zx::result<std::unique_ptr<DeviceInspect>> Create(async_dispatcher_t* dispatcher,
+                                                           inspect::Node& root_node);
   ~DeviceInspect() = default;
-
-  // State accessors.
-  inspect::Inspector inspector() { return inspector_; }
 
   // Metrics APIs.
   void LogTxQueueFull();
@@ -67,7 +65,6 @@ class DeviceInspect {
   // Only constructible through Create().
   DeviceInspect() = default;
 
-  inspect::Inspector inspector_;
   inspect::Node root_;
   std::unique_ptr<Timer> timer_hr_;
 

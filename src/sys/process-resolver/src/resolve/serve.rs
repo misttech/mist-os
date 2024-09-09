@@ -88,7 +88,7 @@ mod tests {
 
             // Return the test's own pkg directory. This is guaranteed to support
             // the readable + executable rights needed by this test.
-            fuchsia_fs::directory::open_channel_in_namespace(
+            fuchsia_fs::directory::open_channel_in_namespace_deprecated(
                 "/pkg",
                 fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,
                 dir,

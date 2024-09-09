@@ -37,7 +37,7 @@ async fn watch_directory_async(
     dir: PathBuf,
     app_sender: UnboundedSender<MessageInternal>,
 ) -> Result<(), Error> {
-    let dir_proxy = fuchsia_fs::directory::open_in_namespace(
+    let dir_proxy = fuchsia_fs::directory::open_in_namespace_deprecated(
         dir.to_str().expect("to_str"),
         OpenFlags::empty(),
     )?;

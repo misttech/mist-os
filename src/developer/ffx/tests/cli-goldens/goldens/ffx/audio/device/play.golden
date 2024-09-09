@@ -34,6 +34,18 @@
       "short": null,
       "description": "signal processing element ID, for an Endpoint element of type RingBuffer",
       "hidden": false
+    },
+    {
+      "kind": {
+        "Option": {
+          "arg_name": "channels"
+        }
+      },
+      "optionality": "optional",
+      "long": "--channels",
+      "short": null,
+      "description": "bitmask of channels to activate (deactivate the others). If not specified, activate all channels present in the playback format",
+      "hidden": false
     }
   ],
   "notes": [],

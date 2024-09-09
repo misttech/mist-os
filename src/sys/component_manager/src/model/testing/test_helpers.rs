@@ -179,7 +179,7 @@ pub async fn list_directory_recursive<'a>(root_proxy: &'a fio::DirectoryProxy) -
 }
 
 pub async fn write_file<'a>(root_proxy: &'a fio::DirectoryProxy, path: &'a str, contents: &'a str) {
-    let file_proxy = fuchsia_fs::directory::open_file_no_describe(
+    let file_proxy = fuchsia_fs::directory::open_file_no_describe_deprecated(
         &root_proxy,
         path,
         fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::CREATE,
@@ -222,7 +222,10 @@ pub async fn wait_for_runner_request(
     recv: &mut Receiver<fcrunner::ComponentRunnerRequest>,
 ) -> fcrunner::ComponentStartInfo {
     let fcrunner::ComponentRunnerRequest::Start { start_info, .. } =
-        recv.next().await.expect("Channel closed before request was received.");
+        recv.next().await.expect("Channel closed before request was received.")
+    else {
+        panic!("unknown runner request");
+    };
     start_info
 }
 

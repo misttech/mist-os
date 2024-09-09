@@ -168,12 +168,13 @@ def _wait_for_client_state(
             continue
         else:
             return True
-    else:
-        _LOGGER.info(
-            f"Client state did not converge to the expected state: {expected_state}"
-            f" Waited:{timeout_sec}s"
-        )
-        return False
+
+    _LOGGER.info(
+        "Timed out waiting %ss for client state to converge to the expected state: %s",
+        timeout_sec,
+        expected_state,
+    )
+    return False
 
 
 class WlanPolicyTests(fuchsia_base_test.FuchsiaBaseTest):
@@ -189,11 +190,7 @@ class WlanPolicyTests(fuchsia_base_test.FuchsiaBaseTest):
         """
         super().setup_class()
         self.device: fuchsia_device.FuchsiaDevice = self.fuchsia_devices[0]
-
-        if not isinstance(self.device.wlan_policy, wlan_policy_fc.WlanPolicy):
-            # TODO(http://b/361562197): Remove this if statement once WLAN
-            # Policy FC affordance is implemented
-            self.device.wlan_policy.create_client_controller()
+        self.device.wlan_policy.create_client_controller()
 
         self.access_points: list[
             access_point.AccessPoint
@@ -205,6 +202,10 @@ class WlanPolicyTests(fuchsia_base_test.FuchsiaBaseTest):
             )
 
         self.access_point: access_point.AccessPoint = self.access_points[0]
+
+    def teardown_class(self) -> None:
+        self.device.wlan_policy.close()
+        return super().teardown_class()
 
     def test_client_methods(self) -> None:
         """Test case for wlan_policy client methods.
@@ -219,13 +220,9 @@ class WlanPolicyTests(fuchsia_base_test.FuchsiaBaseTest):
             * wlan_policy.start_client_connections()
             * wlan_policy.stop_client_connections()
         """
-        if isinstance(self.device.wlan_policy, wlan_policy_fc.WlanPolicy):
-            # TODO(http://b/324139202): Remove this if statement once WLAN
-            # Policy FC affordance is implemented
-            return
-
         self.device.wlan_policy.start_client_connections()
         _wait_for_client_state(self.device, WlanClientState.CONNECTIONS_ENABLED)
+
         self.device.wlan_policy.stop_client_connections()
         _wait_for_client_state(
             self.device, WlanClientState.CONNECTIONS_DISABLED
@@ -251,11 +248,6 @@ class WlanPolicyTests(fuchsia_base_test.FuchsiaBaseTest):
             * wlan_policy.remove_all_networks()
             * wlan_policy.get_saved_networks()
         """
-        if isinstance(self.device.wlan_policy, wlan_policy_fc.WlanPolicy):
-            # TODO(http://b/324139202): Remove this if statement once WLAN
-            # Policy FC affordance is implemented
-            return
-
         test_ssid = "test"
         access_point.setup_ap(
             access_point=self.access_point,
@@ -267,7 +259,13 @@ class WlanPolicyTests(fuchsia_base_test.FuchsiaBaseTest):
 
         self.device.wlan_policy.start_client_connections()
         _wait_for_client_state(self.device, WlanClientState.CONNECTIONS_ENABLED)
+
         self.device.wlan_policy.save_network(test_ssid, SecurityType.NONE)
+
+        if isinstance(self.device.wlan_policy, wlan_policy_fc.WlanPolicy):
+            # TODO(http://b/324139202): Remove this if statement once WLAN
+            # Policy FC affordance is implemented
+            return
 
         scan_results = self.device.wlan_policy.scan_for_networks()
         asserts.assert_equal(sorted(scan_results), sorted(expected_networks))

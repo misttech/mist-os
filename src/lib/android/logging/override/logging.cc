@@ -33,19 +33,19 @@ std::string format(const char* fmt, va_list args) {
 fuchsia_logging::LogSeverity GetSeverity(int prio) {
   switch (prio) {
     case ANDROID_LOG_VERBOSE:
-      return ::fuchsia_logging::LOG_TRACE;
+      return FUCHSIA_LOG_TRACE;
     case ANDROID_LOG_DEBUG:
-      return ::fuchsia_logging::LOG_DEBUG;
+      return FUCHSIA_LOG_DEBUG;
     case ANDROID_LOG_INFO:
-      return ::fuchsia_logging::LOG_INFO;
+      return FUCHSIA_LOG_INFO;
     case ANDROID_LOG_WARN:
-      return ::fuchsia_logging::LOG_WARNING;
+      return FUCHSIA_LOG_WARNING;
     case ANDROID_LOG_ERROR:
-      return ::fuchsia_logging::LOG_ERROR;
+      return FUCHSIA_LOG_ERROR;
     case ANDROID_LOG_FATAL:
-      return ::fuchsia_logging::LOG_FATAL;
+      return FUCHSIA_LOG_FATAL;
     default:
-      return ::fuchsia_logging::LOG_ERROR;
+      return FUCHSIA_LOG_ERROR;
   }
 }
 }  // namespace

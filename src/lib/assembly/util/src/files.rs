@@ -45,6 +45,8 @@ pub enum BootfsDestination {
     ComponentManagerConfig,
     /// The cpu manager node config.
     CpuManagerNodeConfig,
+    /// The energy model config file for processor power management.
+    EnergyModelConfig,
     /// The power manager node config.
     PowerManagerNodeConfig,
     /// The power manager thermal config.
@@ -75,6 +77,7 @@ impl std::fmt::Display for BootfsDestination {
                 Self::ComponentIdIndex => "config/component_id_index",
                 Self::ComponentManagerConfig => "config/component_manager",
                 Self::CpuManagerNodeConfig => "config/cpu_manager/node_config.json",
+                Self::EnergyModelConfig => "config/cpu_manager/energy_model_config.json",
                 Self::PowerManagerNodeConfig => "config/power_manager/node_config.json",
                 Self::PowerManagerThermalConfig => "config/power_manager/thermal_config.json",
                 Self::SystemPowerModeConfig => "config/power_manager/system_power_mode_config.json",
@@ -147,6 +150,8 @@ pub enum BootfsPackageDestination {
     Config,
     /// Sysmem configuration.
     SysmemConfig,
+    /// The ta-manager configuration.
+    TaManagerConfig,
     /// Variant specifically for making tests easier.
     ForTest,
     /// Any package that came from an AIB.
@@ -168,6 +173,7 @@ impl std::fmt::Display for BootfsPackageDestination {
                 Self::ArchivistPipelines => "archivist-pipelines",
                 Self::Config => "config",
                 Self::SysmemConfig => "sysmem-config",
+                Self::TaManagerConfig => "ta-manager-config",
                 Self::ForTest => "for-test",
             }
         )

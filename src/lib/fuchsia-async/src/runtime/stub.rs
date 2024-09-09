@@ -141,3 +141,9 @@ pub mod timer {
         }
     }
 }
+
+pub mod scope {
+    struct Scope;
+    struct ScopeRef;
+    struct WeakScopeRef;
+}

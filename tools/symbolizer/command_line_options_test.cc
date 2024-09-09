@@ -14,6 +14,7 @@ TEST(CommandLineOptionsTest, ValidOptions) {
   CommandLineOptions options;
   const char* argv[] = {"", "--ids-txt=path/to/ids.txt", "-s", "/symbol/path"};
 
+  setenv("DEBUGINFOD_URLS", "", 1);
   const Error error = ParseCommandLine(sizeof(argv) / sizeof(char*), argv, &options);
   ASSERT_TRUE(error.empty());
   ASSERT_TRUE(options.symbol_servers.empty());
@@ -21,6 +22,50 @@ TEST(CommandLineOptionsTest, ValidOptions) {
   ASSERT_EQ(options.ids_txts[0], "path/to/ids.txt");
   ASSERT_EQ(options.symbol_paths.size(), 1UL);
   ASSERT_EQ(options.symbol_paths[0], "/symbol/path");
+}
+
+TEST(CommandLineOptionsTest, SingleServerFromEnv) {
+  CommandLineOptions options;
+  const char* argv[] = {""};
+
+  setenv("DEBUGINFOD_URLS", "gs://foo", 1);
+  const Error error = ParseCommandLine(sizeof(argv) / sizeof(char*), argv, &options);
+  ASSERT_TRUE(error.empty());
+  ASSERT_EQ(options.symbol_servers.size(), 1UL);
+  ASSERT_EQ(options.symbol_servers[0], "gs://foo");
+}
+
+TEST(CommandLineOptionsTest, MultipleServersFromEnv) {
+  CommandLineOptions options;
+  const char* argv[] = {""};
+
+  setenv("DEBUGINFOD_URLS", "gs://foo gs://bar", 1);
+  const Error error = ParseCommandLine(sizeof(argv) / sizeof(char*), argv, &options);
+  ASSERT_TRUE(error.empty());
+  ASSERT_EQ(options.symbol_servers.size(), 2UL);
+  ASSERT_EQ(options.symbol_servers[0], "gs://foo");
+  ASSERT_EQ(options.symbol_servers[1], "gs://bar");
+}
+
+TEST(CommandLineOptionsTest, DuplicateServerInEnvAndArgs) {
+  CommandLineOptions options;
+  const char* argv[] = {"", "--symbol-server", "gs://foo"};
+
+  setenv("DEBUGINFOD_URLS", "gs://foo", 1);
+  const Error error = ParseCommandLine(sizeof(argv) / sizeof(char*), argv, &options);
+  ASSERT_TRUE(error.empty());
+  ASSERT_EQ(options.symbol_servers.size(), 1UL);
+  ASSERT_EQ(options.symbol_servers[0], "gs://foo");
+}
+
+TEST(CommandLineOptionsTest, NoServerInEnvVar) {
+  CommandLineOptions options;
+  const char* argv[] = {""};
+
+  unsetenv("DEBUGINFOD_URLS");
+  const Error error = ParseCommandLine(sizeof(argv) / sizeof(char*), argv, &options);
+  ASSERT_TRUE(error.empty());
+  ASSERT_TRUE(options.symbol_servers.empty());
 }
 
 TEST(CommandLineOptionsTest, InvalidOptions) {

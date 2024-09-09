@@ -9,7 +9,6 @@ use crate::security::selinux_hooks::{
 use crate::security::{Arc, ProcAttr, ResolvedElfState, SecurityServer};
 use crate::task::{CurrentTask, Task};
 use selinux::{FilePermission, NullessByteStr, ObjectClass};
-use starnix_logging::log_debug;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::signals::{Signal, SIGCHLD, SIGKILL, SIGSTOP};
 use starnix_uapi::{errno, error};
@@ -39,7 +38,7 @@ pub fn task_alloc(parent: &Task, _clone_flags: u64) -> TaskAttrs {
 
 /// Checks if creating a task is allowed.
 pub fn check_task_create_access(
-    permission_check: &impl PermissionCheck,
+    permission_check: &PermissionCheck<'_>,
     current_task: &CurrentTask,
 ) -> Result<(), Errno> {
     let task_sid = current_task.read().security_state.attrs.current_sid;
@@ -68,33 +67,34 @@ pub fn check_exec_access(
             .compute_new_sid(current_sid, executable_sid, ObjectClass::Process)
             .map_err(|_| errno!(EACCES))?
     };
+    let permission_check = security_server.as_permission_check();
     if current_sid == new_sid {
         // To `exec()` a binary in the caller's domain, the caller must be granted
         // "execute_no_trans" permission to the binary.
-        if !security_server.has_permission(
+        // TODO(http://b/330904217): once filesystems are labeled, deny access.
+        let _ = check_permission(
+            &permission_check,
             current_sid,
             executable_sid,
             FilePermission::ExecuteNoTrans,
-        ) {
-            // TODO(http://b/330904217): once filesystems are labeled, deny access.
-            log_debug!("execute_no_trans permission is denied, ignoring.");
-        }
+        );
     } else {
-        // Domain transition, check that transition is allowed.
-        if !security_server.has_permission(current_sid, new_sid, ProcessPermission::Transition) {
-            return error!(EACCES);
-        }
+        // Check that the domain transition is allowed.
+        check_permission(&permission_check, current_sid, new_sid, ProcessPermission::Transition)?;
+
         // Check that the executable file has an entry point into the new domain.
-        if !security_server.has_permission(new_sid, executable_sid, FilePermission::Entrypoint) {
-            // TODO(http://b/330904217): once filesystems are labeled, deny access.
-            log_debug!("entrypoint permission is denied, ignoring.");
-        }
+        // TODO(http://b/330904217): once filesystems are labeled, deny access.
+        let _ = check_permission(
+            &permission_check,
+            new_sid,
+            executable_sid,
+            FilePermission::Entrypoint,
+        );
+
         // Check that ptrace permission is allowed if the process is traced.
         if let Some(ptracer) = current_task.ptracer_task().upgrade() {
             let tracer_sid = ptracer.read().security_state.attrs.current_sid;
-            if !security_server.has_permission(tracer_sid, new_sid, ProcessPermission::Ptrace) {
-                return error!(EACCES);
-            }
+            check_permission(&permission_check, tracer_sid, new_sid, ProcessPermission::Ptrace)?;
         }
     }
     Ok(ResolvedElfState { sid: Some(new_sid) })
@@ -104,7 +104,7 @@ pub fn check_exec_access(
 /// `target_sid` according to SELinux server status `status` and permission checker
 /// `permission`.
 pub fn check_getsched_access(
-    permission_check: &impl PermissionCheck,
+    permission_check: &PermissionCheck<'_>,
     current_task: &CurrentTask,
     target: &Task,
 ) -> Result<(), Errno> {
@@ -116,7 +116,7 @@ pub fn check_getsched_access(
 /// Checks if the task with `source_sid` is allowed to set scheduling parameters for the task with
 /// `target_sid`.
 pub fn check_setsched_access(
-    permission_check: &impl PermissionCheck,
+    permission_check: &PermissionCheck<'_>,
     current_task: &CurrentTask,
     target: &Task,
 ) -> Result<(), Errno> {
@@ -128,7 +128,7 @@ pub fn check_setsched_access(
 /// Checks if the task with `source_sid` is allowed to get the process group ID of the task with
 /// `target_sid`.
 pub fn check_getpgid_access(
-    permission_check: &impl PermissionCheck,
+    permission_check: &PermissionCheck<'_>,
     current_task: &CurrentTask,
     target: &Task,
 ) -> Result<(), Errno> {
@@ -140,7 +140,7 @@ pub fn check_getpgid_access(
 /// Checks if the task with `source_sid` is allowed to set the process group ID of the task with
 /// `target_sid`.
 pub fn check_setpgid_access(
-    permission_check: &impl PermissionCheck,
+    permission_check: &PermissionCheck<'_>,
     current_task: &CurrentTask,
     target: &Task,
 ) -> Result<(), Errno> {
@@ -152,7 +152,7 @@ pub fn check_setpgid_access(
 /// Checks if the task with `source_sid` has permission to read the session Id from a task with `target_sid`.
 /// Corresponds to the `task_getsid` LSM hook.
 pub fn check_task_getsid(
-    permission_check: &impl PermissionCheck,
+    permission_check: &PermissionCheck<'_>,
     current_task: &CurrentTask,
     target: &Task,
 ) -> Result<(), Errno> {
@@ -163,7 +163,7 @@ pub fn check_task_getsid(
 
 /// Checks if the task with `source_sid` is allowed to send `signal` to the task with `target_sid`.
 pub fn check_signal_access(
-    permission_check: &impl PermissionCheck,
+    permission_check: &PermissionCheck<'_>,
     current_task: &CurrentTask,
     target: &Task,
     signal: Signal,
@@ -201,7 +201,7 @@ pub fn task_get_context(
 
 /// Checks if the task with `source_sid` has the permission to get and/or set limits on the task with `target_sid`.
 pub fn task_prlimit(
-    permission_check: &impl PermissionCheck,
+    permission_check: &PermissionCheck<'_>,
     current_task: &CurrentTask,
     target: &Task,
     check_get_rlimit: bool,
@@ -220,7 +220,7 @@ pub fn task_prlimit(
 
 /// Checks if the task with `source_sid` is allowed to trace the task with `target_sid`.
 pub fn ptrace_access_check(
-    permission_check: &impl PermissionCheck,
+    permission_check: &PermissionCheck<'_>,
     current_task: &CurrentTask,
     tracee: &Task,
 ) -> Result<(), Errno> {

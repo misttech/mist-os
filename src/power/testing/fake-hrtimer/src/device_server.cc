@@ -100,9 +100,6 @@ void DeviceServer::Start(StartRequest& request, StartCompleter::Sync& completer)
 }
 
 void DeviceServer::Stop(StopRequest& _request, StopCompleter::Sync& completer) {
-  if (event_) {
-    event_->reset();
-  }
   completer.Reply(zx::ok());
 }
 
@@ -152,6 +149,10 @@ void DeviceServer::StartAndWait(StartAndWaitRequest& request,
 
         fuchsia_hardware_hrtimer::DeviceStartAndWaitResponse response;
         response.keep_alive(lease_control.TakeClientEnd());
+
+        if (event_) {
+          event_->signal(0, ZX_EVENT_SIGNALED);
+        }
         return zx::ok(std::move(response));
       });
   auto response = fut.get();

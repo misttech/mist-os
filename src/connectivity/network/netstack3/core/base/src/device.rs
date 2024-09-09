@@ -20,6 +20,7 @@ use core::borrow::Borrow;
 use core::fmt::Debug;
 use core::hash::Hash;
 
+pub(crate) mod address;
 pub(crate) mod link;
 
 /// An identifier for a device.

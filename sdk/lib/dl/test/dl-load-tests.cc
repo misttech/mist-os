@@ -953,53 +953,6 @@ TYPED_TEST(DlTests, RootPrecedenceInDepResolution) {
 
 // These are test scenarios that test symbol resolution with RTLD_GLOBAL.
 
-// Test that a previously loaded global module symbol won't affect relative
-// relocations in dlopen-ed module.
-// dlopen RTLD_GLOBAL foo-v1 -> foo() returns 2
-// dlopen relative-reloc-foo -> foo() returns 17
-// call foo() from relative-reloc-foo and expect 17.
-TYPED_TEST(DlTests, RelativeRelocPrecedence) {
-  const auto kFile1 = TestShlib("libld-dep-foo-v1");
-  const auto kFile2 = TestModule("relative-reloc-foo");
-  constexpr int64_t kReturnValueFromGlobal = 2;
-  constexpr int64_t kReturnValueFromRelativeReloc = 17;
-
-  if constexpr (!TestFixture::kSupportsGlobalMode) {
-    GTEST_SKIP() << "test requires that fixture supports RTLD_GLOBAL";
-  }
-
-  // TODO(https://fxbug.dev/354043838): Fold into ExpectRootModule/Needed API.
-  this->ExpectNeededNotLoaded({kFile1});
-  this->ExpectRootModuleNotLoaded(kFile2);
-
-  this->Needed({kFile1});
-
-  auto res1 = this->DlOpen(kFile1.c_str(), RTLD_NOW | RTLD_GLOBAL);
-  ASSERT_TRUE(res1.is_ok()) << res1.error_value();
-  EXPECT_TRUE(res1.value());
-
-  auto sym1 = this->DlSym(res1.value(), TestSym("foo").c_str());
-  ASSERT_TRUE(sym1.is_ok()) << sym1.error_value();
-  ASSERT_TRUE(sym1.value());
-
-  EXPECT_EQ(RunFunction<int64_t>(sym1.value()), kReturnValueFromGlobal);
-
-  this->ExpectRootModule(kFile2);
-
-  auto res2 = this->DlOpen(kFile2.c_str(), RTLD_NOW | RTLD_LOCAL);
-  ASSERT_TRUE(res2.is_ok()) << res2.error_value();
-  EXPECT_TRUE(res2.value());
-
-  auto sym2 = this->DlSym(res2.value(), TestSym("foo").c_str());
-  ASSERT_TRUE(sym2.is_ok()) << sym2.error_value();
-  ASSERT_TRUE(sym2.value());
-
-  EXPECT_EQ(RunFunction<int64_t>(sym2.value()), kReturnValueFromRelativeReloc);
-
-  ASSERT_TRUE(this->DlClose(res1.value()).is_ok());
-  ASSERT_TRUE(this->DlClose(res2.value()).is_ok());
-}
-
 // Test that loaded global module will take precedence over dependency ordering.
 // dlopen RTLD_GLOBAL foo-v2 -> foo() returns 7
 // dlopen has-foo-v1:

@@ -4,12 +4,18 @@
 
 use async_trait::async_trait;
 
-use crate::header::HeaderSet;
+use crate::header::{Header, HeaderSet};
 use crate::operation::ResponseCode;
 
 /// An operation can be rejected with a `ResponseCode` and optional headers describing the
-/// reason for rejection.
+/// reason for rejection.w
 pub type ObexOperationError = (ResponseCode, HeaderSet);
+
+/// Helper function for creating an [ObexOperationError] with the specified [ResponseCode]
+/// and a [Header::Description] with the reason.
+pub fn new_operation_error(code: ResponseCode, reason: &str) -> ObexOperationError {
+    (code, HeaderSet::from_header(Header::Description(reason.into())))
+}
 
 pub type ObexResult<T> = Result<T, ObexOperationError>;
 

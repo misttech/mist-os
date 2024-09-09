@@ -27,7 +27,7 @@ cpp17::string_view StripDots(cpp17::string_view path) {
   return pos == cpp17::string_view::npos ? path : path.substr(pos + 3);
 }
 
-void BeginRecordLegacy(LogBuffer* buffer, fuchsia_logging::LogSeverity severity,
+void BeginRecordLegacy(LogBuffer* buffer, FuchsiaLogSeverity severity,
                        cpp17::optional<cpp17::string_view> file, unsigned int line,
                        cpp17::optional<cpp17::string_view> msg,
                        cpp17::optional<cpp17::string_view> condition) {
@@ -129,25 +129,25 @@ void EndRecordLegacy(LogBuffer* buffer) {}
 
 }  // namespace
 namespace internal {
-const std::string GetNameForLogSeverity(fuchsia_logging::LogSeverity severity) {
+const std::string GetNameForLogSeverity(FuchsiaLogSeverity severity) {
   switch (severity) {
-    case fuchsia_logging::LOG_TRACE:
+    case FUCHSIA_LOG_TRACE:
       return "TRACE";
-    case fuchsia_logging::LOG_DEBUG:
+    case FUCHSIA_LOG_DEBUG:
       return "DEBUG";
-    case fuchsia_logging::LOG_INFO:
+    case FUCHSIA_LOG_INFO:
       return "INFO";
-    case fuchsia_logging::LOG_WARNING:
+    case FUCHSIA_LOG_WARNING:
       return "WARNING";
-    case fuchsia_logging::LOG_ERROR:
+    case FUCHSIA_LOG_ERROR:
       return "ERROR";
-    case fuchsia_logging::LOG_FATAL:
+    case FUCHSIA_LOG_FATAL:
       return "FATAL";
   }
 
-  if (severity > fuchsia_logging::LOG_DEBUG && severity < fuchsia_logging::LOG_INFO) {
+  if (severity > FUCHSIA_LOG_DEBUG && severity < FUCHSIA_LOG_INFO) {
     std::ostringstream stream;
-    stream << "VLOG(" << (fuchsia_logging::LOG_INFO - severity) << ")";
+    stream << "VLOG(" << (FUCHSIA_LOG_INFO - severity) << ")";
     return stream.str();
   }
 
@@ -156,7 +156,7 @@ const std::string GetNameForLogSeverity(fuchsia_logging::LogSeverity severity) {
 }  // namespace internal
 namespace {
 void SetLogSettings(const fuchsia_logging::LogSettings& settings) {
-  g_log_settings.min_log_level = std::min(fuchsia_logging::LOG_FATAL, settings.min_log_level);
+  g_log_settings.min_log_level = std::min(FUCHSIA_LOG_FATAL, settings.min_log_level);
 
   if (g_log_settings.log_file != settings.log_file) {
     if (!settings.log_file.empty()) {
@@ -182,13 +182,11 @@ void SetLogTags(const std::initializer_list<std::string>& tags) {
   // Global tags aren't supported on host.
 }
 
-fuchsia_logging::LogSeverity GetMinLogSeverity() {
-  return syslog_runtime::g_log_settings.min_log_level;
-}
+FuchsiaLogSeverity GetMinLogSeverity() { return syslog_runtime::g_log_settings.min_log_level; }
 
-void BeginRecord(LogBuffer* buffer, fuchsia_logging::LogSeverity severity,
-                 internal::NullSafeStringView file, unsigned int line,
-                 internal::NullSafeStringView msg, internal::NullSafeStringView condition) {
+void BeginRecord(LogBuffer* buffer, FuchsiaLogSeverity severity, internal::NullSafeStringView file,
+                 unsigned int line, internal::NullSafeStringView msg,
+                 internal::NullSafeStringView condition) {
   BeginRecordLegacy(buffer, severity, file, line, msg, condition);
 }
 
@@ -225,8 +223,8 @@ bool LogBuffer::Flush() {
   return true;
 }
 
-void WriteLog(fuchsia_logging::LogSeverity severity, const char* file, unsigned int line,
-              const char* tag, const char* condition, const std::string& msg) {
+void WriteLog(FuchsiaLogSeverity severity, const char* file, unsigned int line, const char* tag,
+              const char* condition, const std::string& msg) {
   if (tag)
     std::cerr << "[" << tag << "] ";
 
@@ -253,14 +251,12 @@ namespace fuchsia_logging {
 
 // Sets the default log severity. If not explicitly set,
 // this defaults to INFO, or to the value specified by Archivist.
-LogSettingsBuilder& LogSettingsBuilder::WithMinLogSeverity(LogSeverity min_log_level) {
+LogSettingsBuilder& LogSettingsBuilder::WithMinLogSeverity(FuchsiaLogSeverity min_log_level) {
   settings_.min_log_level = min_log_level;
   return *this;
 }
 
-fuchsia_logging::LogSeverity GetMinLogSeverity() {
-  return syslog_runtime::g_log_settings.min_log_level;
-}
+FuchsiaLogSeverity GetMinLogSeverity() { return syslog_runtime::g_log_settings.min_log_level; }
 
 // Sets the log file.
 LogSettingsBuilder& LogSettingsBuilder::WithLogFile(const std::string_view& log_file) {

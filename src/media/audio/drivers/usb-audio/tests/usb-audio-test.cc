@@ -5,6 +5,7 @@
 #include <fuchsia/hardware/usb/composite/cpp/banjo.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
+#include <lib/async/default.h>
 #include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/inspect/testing/cpp/zxtest/inspect.h>
@@ -22,7 +23,6 @@
 #include "../usb-audio-stream.h"
 #include "src/devices/testing/mock-ddk/mock-device.h"
 #include "src/devices/usb/lib/usb-endpoint/testing/fake-usb-endpoint-server.h"
-#include "zircon/system/ulib/async-default/include/lib/async/default.h"
 
 namespace {
 namespace audio_fidl = fuchsia_hardware_audio;

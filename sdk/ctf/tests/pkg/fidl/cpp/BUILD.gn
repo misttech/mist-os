@@ -47,7 +47,7 @@ source_set("host_test_sources") {
 
   deps = [
     ":test_util",
-    "//sdk/lib/fidl/cpp:cpp_base",
+    "//sdk/lib/fidl/hlcpp:hlcpp_base",
     "//sdk/lib/stdcompat",
     "//sdk/testing/fidl:fidl_test_hlcpp",
     "//zircon/system/ulib/zxtest",
@@ -85,7 +85,7 @@ source_set("test_sources") {
   deps = [
     ":test_util",
     ":union_migration_test_fidl_hlcpp",
-    "//sdk/lib/fidl/cpp",
+    "//sdk/lib/fidl/hlcpp",
     "//sdk/lib/fit-promise",
     "//sdk/testing/fidl:collision_test_hlcpp",
     "//sdk/testing/fidl:fidl_test_handles_hlcpp",
@@ -219,7 +219,7 @@ source_set("test_util") {
 
   public_configs = [ "//sdk/config" ]
 
-  public_deps = [ "//sdk/lib/fidl/cpp:cpp_base" ]
+  public_deps = [ "//sdk/lib/fidl/hlcpp:hlcpp_base" ]
 }
 
 source_set("handle_util") {

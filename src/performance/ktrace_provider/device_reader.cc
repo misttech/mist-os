@@ -4,13 +4,12 @@
 
 #include "src/performance/ktrace_provider/device_reader.h"
 
+#include <lib/component/incoming/cpp/protocol.h>
 #include <lib/syslog/cpp/macros.h>
 #include <limits.h>
 #include <sys/stat.h>
 #include <unistd.h>
 #include <zircon/status.h>
-
-#include <algorithm>
 
 #include <src/lib/files/eintr_wrapper.h>
 
@@ -18,8 +17,15 @@ namespace ktrace_provider {
 
 DeviceReader::DeviceReader() : Reader(buffer_, kChunkSize) {}
 
-zx_status_t DeviceReader::Init(const std::shared_ptr<sys::ServiceDirectory>& svc) {
-  return svc->Connect(ktrace_reader_.NewRequest());
+zx_status_t DeviceReader::Init() {
+  zx::result client_end = component::Connect<fuchsia_tracing_kernel::Reader>();
+  if (!client_end.is_ok()) {
+    FX_PLOGS(ERROR, client_end.status_value()) << "Failed to connect to fuchsia.tracing.kernel";
+    return client_end.error_value();
+  }
+  ktrace_reader_ = fidl::SyncClient(std::move(*client_end));
+
+  return ZX_OK;
 }
 
 void DeviceReader::ReadMoreData() {
@@ -28,15 +34,17 @@ void DeviceReader::ReadMoreData() {
 
   while (new_marker < end_) {
     size_t read_size = std::distance(const_cast<const char*>(new_marker), end_);
-    read_size = std::clamp(read_size, 0lu, static_cast<size_t>(fuchsia::tracing::kernel::MAX_BUF));
-    zx_status_t out_status;
-    std::vector<uint8_t> buf;
-    auto status = ktrace_reader_->ReadAt(read_size, offset_, &out_status, &buf);
-    if (status != ZX_OK || out_status != ZX_OK) {
-      FX_LOGS(ERROR) << "Failed to read from ktrace reader status:" << status
-                     << "out_status:" << out_status;
+    read_size = std::clamp(read_size, 0lu, static_cast<size_t>(fuchsia_tracing_kernel::kMaxBuf));
+    auto status = ktrace_reader_->ReadAt({{.count = read_size, .offset = offset_}});
+    if (status.is_error()) {
+      FX_LOGS(ERROR) << "Failed to read from ktrace reader status: "
+                     << status.error_value().status_string();
+    }
+    if (status->status() != ZX_OK) {
+      FX_PLOGS(ERROR, status->status()) << "Failed to read from ktrace reader";
       break;
     }
+    std::vector<uint8_t>& buf = status->data();
 
     if (buf.empty()) {
       break;

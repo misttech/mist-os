@@ -169,7 +169,9 @@ class TestCodecWithSignalProcessing final : public SimpleCodecServer,
   GainState GetGainState() override { return gain_state_; }
   void SetGainState(GainState state) override { gain_state_ = state; }
 
-  void handle_unknown_method(uint64_t ordinal, bool method_has_response) override {}
+  void handle_unknown_method(uint64_t ordinal, bool method_has_response) override {
+    zxlogf(ERROR, "Unknown method with ordinal %zd", ordinal);
+  }
 
   bool agl_mode() { return agl_mode_; }
   inspect::Inspector& inspect() { return SimpleCodecServer::inspect(); }

@@ -44,3 +44,9 @@ bool IsAnyUsage(const fuchsia_sysmem2::BufferUsage& buffer_usage) {
   uint32_t video = buffer_usage.video().has_value() ? buffer_usage.video().value() : 0;
   return cpu || vulkan || display || video;
 }
+
+bool IsNoneUsagePermitAllocation(const fuchsia_sysmem2::BufferUsage& buffer_usage) {
+  uint32_t none = buffer_usage.none().has_value() ? buffer_usage.none().value() : 0;
+  uint32_t none_permit_allocation = none & fuchsia_sysmem2::kNoneUsagePermitAllocation;
+  return !!none_permit_allocation;
+}

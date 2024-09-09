@@ -1153,13 +1153,13 @@ async fn nested_component_manager_with_passthrough_directory() -> Result<(), Err
     lifecycle_controller.start_instance(".", binder_server).await.unwrap().unwrap();
 
     // Exercise the directory exposed by nested component manager passthrough.
-    let rw_dir_proxy = fuchsia_fs::directory::open_directory(
+    let rw_dir_proxy = fuchsia_fs::directory::open_directory_deprecated(
         cm_instance.root.get_exposed_dir(),
         "read_write",
         fuchsia_fs::OpenFlags::RIGHT_READABLE | fuchsia_fs::OpenFlags::RIGHT_WRITABLE,
     )
     .await?;
-    let (name, _file_proxy) = fuchsia_fs::directory::create_randomly_named_file(
+    let (name, _file_proxy) = fuchsia_fs::directory::create_randomly_named_file_deprecated(
         &rw_dir_proxy,
         "test-file",
         fuchsia_fs::OpenFlags::empty(),
@@ -1541,7 +1541,7 @@ async fn route_storage() -> Result<(), Error> {
                 let mut send_storage_used = send_storage_used.clone();
                 async move {
                     let data_dir = handles.clone_from_namespace("data")?;
-                    let example_file = fuchsia_fs::directory::open_file(
+                    let example_file = fuchsia_fs::directory::open_file_deprecated(
                         &data_dir,
                         "example_file",
                         fio::OpenFlags::RIGHT_READABLE
@@ -1730,7 +1730,7 @@ async fn read_only_directory() -> Result<(), Error> {
     let local_component_impl = |mut send_file_contents: mpsc::Sender<String>,
                                 handles: LocalComponentHandles| async move {
         let config_dir = handles.clone_from_namespace("config").expect("failed to open /config");
-        let config_file = fuchsia_fs::directory::open_file(
+        let config_file = fuchsia_fs::directory::open_file_deprecated(
             &config_dir,
             "config.txt",
             fuchsia_fs::OpenFlags::RIGHT_READABLE,
@@ -1787,7 +1787,7 @@ async fn read_only_directory() -> Result<(), Error> {
     assert_eq!(receive_b_file_contents.next().await, Some("b".to_string()),);
 
     let exposed_dir = instance.root.get_exposed_dir();
-    let config_file = fuchsia_fs::directory::open_file(
+    let config_file = fuchsia_fs::directory::open_file_deprecated(
         &exposed_dir,
         "config/config.txt",
         fuchsia_fs::OpenFlags::RIGHT_READABLE,
@@ -1808,7 +1808,7 @@ async fn from_fragment() -> Result<(), Error> {
     )
     .await?;
 
-    let echo_client_decl_file = fuchsia_fs::file::open_in_namespace(
+    let echo_client_decl_file = fuchsia_fs::file::open_in_namespace_deprecated(
         "/pkg/meta/echo_client.cm",
         fuchsia_fs::OpenFlags::RIGHT_READABLE,
     )?;
@@ -1820,7 +1820,7 @@ async fn from_fragment() -> Result<(), Error> {
         echo_client_decl.fidl_into_native()
     );
 
-    let echo_server_decl_file = fuchsia_fs::file::open_in_namespace(
+    let echo_server_decl_file = fuchsia_fs::file::open_in_namespace_deprecated(
         "/pkg/meta/echo_server.cm",
         fuchsia_fs::OpenFlags::RIGHT_READABLE,
     )?;
@@ -1832,7 +1832,7 @@ async fn from_fragment() -> Result<(), Error> {
         echo_server_decl.fidl_into_native()
     );
 
-    let echo_realm_decl_file = fuchsia_fs::file::open_in_namespace(
+    let echo_realm_decl_file = fuchsia_fs::file::open_in_namespace_deprecated(
         "/pkg/meta/echo_realm.cm",
         fuchsia_fs::OpenFlags::RIGHT_READABLE,
     )?;

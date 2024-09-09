@@ -353,12 +353,12 @@ async fn rule_list() {
     fnet_routes_ext::rules::add_rule::<Ipv6>(
         &rule_set_v6,
         RULE_INDEX.into(),
-        fnet_routes_ext::rules::RuleSelector {
+        fnet_routes_ext::rules::RuleMatcher {
             from: Some(net_declare::net_subnet_v6!("::1:2:3:4/128")),
             locally_generated: None,
             bound_device: None,
-            mark_1_selector: None,
-            mark_2_selector: None,
+            mark_1: None,
+            mark_2: None,
         },
         fnet_routes_ext::rules::RuleAction::Lookup(table_id),
     )
@@ -372,8 +372,8 @@ async fn rule_list() {
         "from": "::1:2:3:4/128",
         "index": RULE_INDEX,
         "locally_generated": null,
-        "mark_1_selector": null,
-        "mark_2_selector": null,
+        "mark_1": null,
+        "mark_2": null,
         "rule_set_priority": RULE_SET_PRIORITY,
     });
 
@@ -403,12 +403,12 @@ async fn rule_list() {
     fnet_routes_ext::rules::add_rule::<Ipv4>(
         &rule_set_v4,
         RULE_INDEX.into(),
-        fnet_routes_ext::rules::RuleSelector {
+        fnet_routes_ext::rules::RuleMatcher {
             from: Some(net_declare::net_subnet_v4!("1.2.3.4/32")),
             locally_generated: None,
             bound_device: None,
-            mark_1_selector: None,
-            mark_2_selector: None,
+            mark_1: None,
+            mark_2: None,
         },
         fnet_routes_ext::rules::RuleAction::Lookup(table_id),
     )
@@ -422,8 +422,8 @@ async fn rule_list() {
         "from": "1.2.3.4/32",
         "index": RULE_INDEX,
         "locally_generated": null,
-        "mark_1_selector": null,
-        "mark_2_selector": null,
+        "mark_1": null,
+        "mark_2": null,
         "rule_set_priority": RULE_SET_PRIORITY,
     });
 

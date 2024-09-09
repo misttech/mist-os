@@ -17,6 +17,7 @@
 
 #include "src/devices/bin/driver_loader/loader.h"
 #include "src/devices/bin/driver_manager/tests/driver_runner_test_fixture.h"
+#include "src/devices/bin/driver_manager/tests/test_pkg.h"
 
 namespace {
 
@@ -27,158 +28,14 @@ namespace fdecl = fuchsia_component_decl;
 namespace fio = fuchsia::io;
 namespace frunner = fuchsia_component_runner;
 
-void CallComponentStart(driver_runner::TestRealm& realm,
-                        driver_manager::DriverHostRunner& driver_host_runner,
-                        std::string_view driver_host_path,
-                        const std::vector<std::string_view> expected_libs);
-
-class TestTransaction : public fidl::Transaction {
- private:
-  std::unique_ptr<Transaction> TakeOwnership() override {
-    return std::make_unique<TestTransaction>();
-  }
-
-  zx_status_t Reply(fidl::OutgoingMessage* message, fidl::WriteOptions write_options) override {
-    EXPECT_TRUE(false);
-    return ZX_OK;
-  }
-
-  void Close(zx_status_t epitaph) override { EXPECT_TRUE(false); }
-};
-
-class TestFile : public fio::testing::File_TestBase {
- public:
-  explicit TestFile(std::string_view path) : path_(std::move(path)) {}
-
- private:
-  void GetBackingMemory(fio::VmoFlags flags, GetBackingMemoryCallback callback) override {
-    EXPECT_EQ(fio::VmoFlags::READ | fio::VmoFlags::EXECUTE | fio::VmoFlags::PRIVATE_CLONE, flags);
-    auto endpoints = fidl::Endpoints<fuchsia_io::File>::Create();
-    EXPECT_EQ(ZX_OK, fdio_open(path_.data(),
-                               static_cast<uint32_t>(fio::OpenFlags::RIGHT_READABLE |
-                                                     fio::OpenFlags::RIGHT_EXECUTABLE),
-                               endpoints.server.channel().release()));
-
-    fidl::WireSyncClient<fuchsia_io::File> file(std::move(endpoints.client));
-    fidl::WireResult result = file->GetBackingMemory(fuchsia_io::wire::VmoFlags(uint32_t(flags)));
-    EXPECT_TRUE(result.ok()) << result.FormatDescription();
-    auto* res = result.Unwrap();
-    if (res->is_error()) {
-      callback(fio::File_GetBackingMemory_Result::WithErr(std::move(res->error_value())));
-      return;
-    }
-    callback(fio::File_GetBackingMemory_Result::WithResponse(
-        fio::File_GetBackingMemory_Response(std::move(res->value()->vmo))));
-  }
-
-  void NotImplemented_(const std::string& name) override {
-    printf("Not implemented: File::%s\n", name.data());
-  }
-
-  std::string path_;
-};
-
-class TestDirectory : public fio::testing::Directory_TestBase {
- public:
-  using OpenHandler = fit::function<void(fio::OpenFlags flags, std::string path,
-                                         fidl::InterfaceRequest<fio::Node> object)>;
-
-  void SetOpenHandler(OpenHandler open_handler) { open_handler_ = std::move(open_handler); }
-
- private:
-  void Open(fio::OpenFlags flags, fio::ModeType mode, std::string path,
-            fidl::InterfaceRequest<fio::Node> object) override {
-    open_handler_(flags, std::move(path), std::move(object));
-  }
-
-  void NotImplemented_(const std::string& name) override {
-    printf("Not implemented: Directory::%s\n", name.data());
-  }
-
-  OpenHandler open_handler_;
-};
-
-// Implementation of a /pkg directory that can be passed as a component namespace entry
-// for the started driver host or driver component.
-class TestPkg {
- public:
-  // |server| is the channel that will be served by |TestPkg|.
-  //
-  // |module_test_pkg_path| is where the module is located in the test's package. e.g.
-  // /pkg/bin/driver_host2.
-  //
-  // |module_open_path| is the path that will be requested to the /pkg open
-  // handler for the module. e.g. bin/driver_host2.
-  //
-  // |expected_libs| holds that names of the libraries that are needed by the module.
-  // This list will be used to construct the test files that the driver host runner
-  // or driver runner expects to be present in the "/pkg/libs" dir that will be passed
-  // to the dynamic linker. No additional validation is done on the strings in |expected_libs|.
-  TestPkg(fidl::ServerEnd<fuchsia_io::Directory> server, std::string_view module_test_pkg_path,
-          std::string_view module_open_path, const std::vector<std::string_view> expected_libs);
-
-  ~TestPkg() {
-    loop_.Quit();
-    loop_.JoinThreads();
-  }
-
- private:
-  static constexpr std::string_view kLibPathPrefix = "/pkg/lib/";
-
-  async::Loop loop_{&kAsyncLoopConfigNoAttachToCurrentThread};
-
-  TestDirectory pkg_dir_;
-  fidl::Binding<fio::Directory> pkg_binding_{&pkg_dir_};
-
-  TestDirectory lib_dir_;
-  fidl::Binding<fio::Directory> lib_dir_binding_{&lib_dir_};
-  std::map<std::string, TestFile> libname_to_file_;
-  std::vector<std::unique_ptr<fidl::Binding<fio::File>>> lib_file_bindings_;
-
-  TestFile module_;
-  fidl::Binding<fio::File> module_binding_{&module_};
-};
-
-TestPkg::TestPkg(fidl::ServerEnd<fuchsia_io::Directory> server,
-                 std::string_view module_test_pkg_path, std::string_view module_open_path,
-                 const std::vector<std::string_view> expected_libs)
-    : module_(module_test_pkg_path) {
-  EXPECT_EQ(ZX_OK, loop_.StartThread());
-
-  // Construct the test files for the expected libs.
-  for (auto name : expected_libs) {
-    auto path = std::string(kLibPathPrefix).append(name);
-    libname_to_file_.emplace(std::piecewise_construct, std::forward_as_tuple(name),
-                             std::forward_as_tuple(path.c_str()));
-  }
-
-  lib_dir_.SetOpenHandler([this](fio::OpenFlags flags, std::string path, auto object) {
-    EXPECT_EQ(fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE, flags);
-    auto it = libname_to_file_.find(path);
-    EXPECT_NE(it, libname_to_file_.end());
-    lib_file_bindings_.push_back(std::make_unique<fidl::Binding<fio::File>>(
-        &(it->second), object.TakeChannel(), loop_.dispatcher()));
-  });
-
-  pkg_binding_.Bind(server.TakeChannel(), loop_.dispatcher());
-  pkg_dir_.SetOpenHandler([this, module_open_path = std::string(module_open_path)](
-                              fio::OpenFlags flags, std::string path, auto object) {
-    if (strcmp(path.c_str(), "lib") == 0) {
-      EXPECT_EQ(fio::OpenFlags::DIRECTORY | fio::OpenFlags::RIGHT_READABLE |
-                    fio::OpenFlags::RIGHT_EXECUTABLE,
-                flags);
-      lib_dir_binding_.Bind(object.TakeChannel(), loop_.dispatcher());
-
-    } else if (strcmp(path.c_str(), module_open_path.c_str()) == 0) {
-      EXPECT_EQ(fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE, flags);
-      module_binding_.Bind(object.TakeChannel(), loop_.dispatcher());
-    }
-  });
-}
+// Returns the exit status of the process.
+// TODO(https://fxbug.dev/349913885): this will eventually be included in the bootstrap halper
+// library.
+int64_t WaitForProcessExit(const zx::process& process);
 
 class DriverHostRunnerTest : public gtest::TestLoopFixture {
   void SetUp() {
-    loader_ = driver_loader::Loader::Create();
+    loader_ = driver_loader::Loader::Create(dispatcher());
     driver_host_runner_ =
         std::make_unique<driver_manager::DriverHostRunner>(dispatcher(), ConnectToRealm());
   }
@@ -195,9 +52,6 @@ class DriverHostRunnerTest : public gtest::TestLoopFixture {
                        const std::vector<std::string_view> expected_libs);
 
   fidl::ClientEnd<fuchsia_component::Realm> ConnectToRealm();
-
-  // Returns the exit status of the process.
-  int64_t WaitForProcessExit(const zx::process& process);
 
   driver_runner::TestRealm& realm() { return realm_; }
 
@@ -231,17 +85,22 @@ void DriverHostRunnerTest::StartDriverHost(std::string_view driver_host_path,
   // TODO(https://fxbug.dev/340928556): we should pass a channel to the loader rather than the
   // entire thing.
   bool got_cb = false;
-  driver_host_runner_->StartDriverHost(loader_.get(), std::move(bootstrap_receiver),
-                                       [&](zx::result<> result) {
-                                         ASSERT_EQ(ZX_OK, result.status_value());
-                                         got_cb = true;
-                                       });
+  driver_host_runner_->StartDriverHost(
+      loader_.get(), std::move(bootstrap_receiver),
+      [&](zx::result<fidl::ClientEnd<fuchsia_driver_loader::DriverHost>> result) {
+        ASSERT_EQ(ZX_OK, result.status_value());
+        ASSERT_TRUE(result->is_valid());
+        got_cb = true;
+      });
 
   ASSERT_TRUE(RunLoopUntilIdle());
   ASSERT_TRUE(created_component);
 
-  ASSERT_NO_FATAL_FAILURE(
-      CallComponentStart(realm(), *driver_host_runner_, driver_host_path, expected_libs));
+  auto pkg_endpoints = fidl::Endpoints<fuchsia_io::Directory>::Create();
+  test_utils::TestPkg test_pkg(std::move(pkg_endpoints.server), driver_host_path,
+                               "bin/driver_host2", expected_libs);
+  ASSERT_NO_FATAL_FAILURE(driver_runner::DriverHostComponentStart(realm(), *driver_host_runner_,
+                                                                  std::move(pkg_endpoints.client)));
   ASSERT_TRUE(got_cb);
 
   std::unordered_set<const driver_manager::DriverHostRunner::DriverHost*> driver_hosts =
@@ -259,46 +118,7 @@ fidl::ClientEnd<fuchsia_component::Realm> DriverHostRunnerTest::ConnectToRealm()
   return std::move(realm_endpoints.client);
 }
 
-void CallComponentStart(driver_runner::TestRealm& realm,
-                        driver_manager::DriverHostRunner& driver_host_runner,
-                        std::string_view driver_host_path,
-                        const std::vector<std::string_view> expected_libs) {
-  fidl::Arena arena;
-
-  fidl::VectorView<fdata::wire::DictionaryEntry> program_entries(arena, 1);
-  program_entries[0].key.Set(arena, "binary");
-  program_entries[0].value = fdata::wire::DictionaryValue::WithStr(arena, "bin/driver_host2");
-  auto program_builder = fdata::wire::Dictionary::Builder(arena);
-  program_builder.entries(program_entries);
-
-  auto pkg_endpoints = fidl::Endpoints<fuchsia_io::Directory>::Create();
-  TestPkg test_pkg(std::move(pkg_endpoints.server), driver_host_path, "bin/driver_host2",
-                   expected_libs);
-
-  fidl::VectorView<frunner::wire::ComponentNamespaceEntry> ns_entries(arena, 1);
-  ns_entries[0] = frunner::wire::ComponentNamespaceEntry::Builder(arena)
-                      .path("/pkg")
-                      .directory(std::move(pkg_endpoints.client))
-                      .Build();
-
-  auto start_info_builder = frunner::wire::ComponentStartInfo::Builder(arena);
-  start_info_builder.resolved_url("fuchsia-boot:///driver_host2#meta/driver_host2.cm")
-      .program(program_builder.Build())
-      .ns(ns_entries)
-      .numbered_handles(realm.TakeHandles(arena));
-
-  auto controller_endpoints = fidl::Endpoints<frunner::ComponentController>::Create();
-  TestTransaction transaction;
-  {
-    fidl::WireServer<frunner::ComponentRunner>::StartCompleter::Sync completer(&transaction);
-    fidl::WireRequest<frunner::ComponentRunner::Start> request{
-        start_info_builder.Build(), std::move(controller_endpoints.server)};
-    static_cast<fidl::WireServer<frunner::ComponentRunner>&>(driver_host_runner)
-        .Start(&request, completer);
-  }
-}
-
-int64_t DriverHostRunnerTest::WaitForProcessExit(const zx::process& process) {
+int64_t WaitForProcessExit(const zx::process& process) {
   int64_t result = -1;
 
   auto wait_for_termination = [&process, &result]() {
@@ -336,7 +156,7 @@ class DynamicLinkingTest : public driver_runner::DriverRunnerTest {};
 
 TEST_F(DynamicLinkingTest, StartRootDriver) {
   // Where the driver host binary is located in the test package.
-  constexpr std::string_view kDriverHostTestPkgPath = "/pkg/bin/fake_driver_host";
+  constexpr std::string_view kDriverHostTestPkgPath = "/pkg/bin/fake_driver_host_with_bootstrap";
   // Libs that need to be loaded with the driver host.
   const std::vector<std::string_view> kDriverHostExpectedLibs = {
       "libdh-deps-a.so",
@@ -358,15 +178,15 @@ TEST_F(DynamicLinkingTest, StartRootDriver) {
   auto driver_host_runner =
       std::make_unique<driver_manager::DriverHostRunner>(dispatcher(), ConnectToRealm());
 
-  SetupDriverRunnerWithDynamicLinker(std::move(driver_host_runner));
+  SetupDriverRunnerWithDynamicLinker(dispatcher(), std::move(driver_host_runner));
 
   auto start = driver_runner().StartRootDriver(driver_runner::root_driver_url);
   ASSERT_FALSE(start.is_error());
   EXPECT_TRUE(RunLoopUntilIdle());
 
   auto pkg_endpoints = fidl::Endpoints<fuchsia_io::Directory>::Create();
-  TestPkg test_pkg(std::move(pkg_endpoints.server), kRootDriverTestPkgPath, kRootDriverBinary,
-                   kDriverExpectedLibs);
+  test_utils::TestPkg test_pkg(std::move(pkg_endpoints.server), kRootDriverTestPkgPath,
+                               kRootDriverBinary, kDriverExpectedLibs);
 
   StartDriverHandler start_handler = [kRootDriverBinary](driver_runner::TestDriver* driver,
                                                          fdfw::DriverStartArgs start_args) {
@@ -374,23 +194,29 @@ TEST_F(DynamicLinkingTest, StartRootDriver) {
                     "false" /* host_restart_on_crash */, "false" /* use_next_vdso */,
                     "true" /* use_dynamic_linker */);
   };
-  // TODO(https://fxbug.dev/341998660): currently starting the driver has not been
-  // completely implemented, so the returned StartDriverResult is not very useful.
-  [[maybe_unused]] auto root_driver = StartDriver(
+
+  auto driver_host_pkg_endpoints = fidl::Endpoints<fuchsia_io::Directory>::Create();
+  test_utils::TestPkg driver_host_test_pkg(std::move(driver_host_pkg_endpoints.server),
+                                           kDriverHostTestPkgPath, "bin/driver_host2",
+                                           kDriverHostExpectedLibs);
+  auto root_driver = StartDriver(
       {
           .url = driver_runner::root_driver_url,
           .binary = kRootDriverBinary,
           .use_dynamic_linker = true,
       },
-      std::move(start_handler), std::move(pkg_endpoints.client));
-
-  ASSERT_NO_FATAL_FAILURE(CallComponentStart(realm(),
-                                             *driver_runner().driver_host_runner_for_tests(),
-                                             kDriverHostTestPkgPath, kDriverHostExpectedLibs));
+      std::move(start_handler), std::move(pkg_endpoints.client),
+      std::move(driver_host_pkg_endpoints.client));
 
   std::unordered_set<const driver_manager::DriverHostRunner::DriverHost*> driver_hosts =
       driver_runner().driver_host_runner_for_tests()->DriverHosts();
   ASSERT_EQ(1u, driver_hosts.size());
+
+  const zx::process& process = (*driver_hosts.begin())->process();
+  ASSERT_EQ(24, WaitForProcessExit(process));
+
+  StopDriverComponent(std::move(root_driver.controller));
+  realm().AssertDestroyedChildren({driver_runner::CreateChildRef("dev", "boot-drivers")});
 }
 
 }  // namespace

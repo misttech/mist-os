@@ -12,7 +12,7 @@ group("tests") {
 }
 
 sdk_source_set("cpp") {
-  category = "internal"
+  category = "partner"
   sdk_name = "driver_fake_object_cpp"
   include_base = "//sdk"
   testonly = true

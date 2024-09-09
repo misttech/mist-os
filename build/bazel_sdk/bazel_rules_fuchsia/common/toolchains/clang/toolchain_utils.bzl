@@ -126,6 +126,9 @@ def compute_clang_features(clang_info, target_os, target_cpu):
         ],
     )
 
+    is_linux = target_os == "linux"
+    is_fuchsia = target_os == "fuchsia"
+
     coverage_feature = feature(
         name = "coverage",
         flag_sets = [
@@ -142,14 +145,52 @@ def compute_clang_features(clang_info, target_os, target_cpu):
                         flags = [
                             "-fprofile-instr-generate",
                             "-fcoverage-mapping",
-                            # Apply some optimizations so tests are fast,
-                            # but not too much so that coverage is inaccurate.
-                            "-O1",
                         ],
                     ),
                 ],
             ),
-        ],
+            flag_set(
+                actions = [
+                    ACTION_NAMES.c_compile,
+                    ACTION_NAMES.cpp_compile,
+                    ACTION_NAMES.cpp_module_compile,
+                ],
+                flag_groups = [
+                    flag_group(
+                        flags = [
+                            # This flag will get applied after the default
+                            # set of flags so we can think of this as an override
+                            "-O1",
+                            "-mllvm",
+                        ] + [
+                            # Enable runtime counter relocation in Linux.
+                            "-runtime-counter-relocation",
+                        ] if is_linux else [
+                            # Enable coverage from system headers in Fuchsia.
+                            "-system-headers-coverage",
+                        ] if is_fuchsia else [],
+                    ),
+                ],
+            ),
+        ] + [
+            flag_set(
+                actions = [
+                    ACTION_NAMES.cpp_link_dynamic_library,
+                    ACTION_NAMES.cpp_link_executable,
+                    ACTION_NAMES.cpp_link_nodeps_dynamic_library,
+                ],
+                flag_groups = [
+                    flag_group(
+                        flags = [
+                            # The statically-linked profiling runtime depends on libzircon.
+                            "-lzircon",
+                            "-Wl",
+                            "-dynamic-linker=coverage/ld.so.1",
+                        ],
+                    ),
+                ],
+            ),
+        ] if is_fuchsia else [],
     )
 
     is_macos = target_os in ("osx", "macos")

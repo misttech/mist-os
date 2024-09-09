@@ -45,130 +45,6 @@ class DurationInfo:
     hide_children: bool = False
 
 
-class ConsoleState:
-    """Holder for all console output state.
-
-    Attributes:
-        active_durations: Map from Id to DurationInfo for durations
-            that have not yet ended.
-        complete_durations: Map from Id to DurationInfo for durations
-            that have ended.
-        end_duration: The elapsed time for the entire run, measured
-            as the difference between the start and end of GLOBAL_RUN_ID.
-            Only set after the global run has ended.
-        test_results: Map from status to a set of tests with that
-            status. This is the canonical result list for all tests.
-        exec_env: Parsed environment for this run.
-    """
-
-    def __init__(self) -> None:
-        self.active_durations: dict[event.Id, DurationInfo] = dict()
-        self.complete_durations: dict[event.Id, DurationInfo] = dict()
-        self.end_duration: float | None = None
-        self.test_results: dict[
-            event.TestSuiteStatus, typing.Set[str]
-        ] = defaultdict(set)
-        self.exec_env: environment.ExecutionEnvironment | None = None
-
-
-async def console_printer(
-    recorder: event.EventRecorder,
-    flags: args.Flags,
-    do_status_output_event: asyncio.Event,
-) -> None:
-    """Asynchronous future that implements console printing.
-
-    Continually reads events from the given recorder and presents status
-    updates to the terminal. This is the main output routine for fx test.
-
-    Output is controlled by the given flags.
-
-    This routine implements continual clearing and updating of a status
-    bar at the bottom of the user's terminal. This behavior is controlled
-    by the `do_status_output_event` asyncio.Event, which is set only when
-    continual status output is both desired and available.
-
-    Args:
-        recorder (event.EventRecorder): Source of events to display.
-        flags (args.Flags): Command line flags to control formatting.
-        do_status_output_event (asyncio.Event): Display updating
-            status bar only if this is set.
-    """
-
-    state = ConsoleState()
-    print_queue: asyncio.Queue[list[str]] = asyncio.Queue()
-
-    # Spawn an asynchronous task to actually process incoming events.
-    # The rest of this method simply displays the status output and prints
-    # lines that are requested by the other task.
-    event_loop = asyncio.create_task(
-        _console_event_loop(recorder, flags, state, print_queue)
-    )
-
-    # Keep pumping events until there will be no more.
-    while not event_loop.done() or not print_queue.empty():
-        # First try to get some lines that need to be printed.
-        # If there is nothing to print by the time we need to refresh, timeout
-        # and refresh the output.
-        try:
-            lines_to_print = await asyncio.wait_for(
-                print_queue.get(), flags.status_delay
-            )
-        except asyncio.TimeoutError:
-            lines_to_print = []
-
-        if do_status_output_event.is_set():
-            status_lines = _create_status_lines_from_state(flags, state)
-
-            # Print status output, leaving an extra line to separate
-            # from prepended lines.
-            termout.write_lines(
-                [""] + status_lines[: flags.status_lines], lines_to_print
-            )
-        elif lines_to_print:
-            print("\n".join(lines_to_print))
-
-    # We are done with all events, clean up and exit.
-
-    if do_status_output_event.is_set():
-        # Clear status output.
-        termout.write_lines([], [])
-
-    if state.test_results:
-        passed = len(state.test_results[event.TestSuiteStatus.PASSED])
-        failed = (
-            len(state.test_results[event.TestSuiteStatus.FAILED])
-            + len(state.test_results[event.TestSuiteStatus.TIMEOUT])
-            + len(state.test_results[event.TestSuiteStatus.FAILED_TO_START])
-        )
-        skipped = len(state.test_results[event.TestSuiteStatus.SKIPPED])
-        passed_text = pass_format(passed, flags.style)
-        failed_text = fail_format(failed, flags.style)
-        skipped_text = skip_format(skipped, flags.style)
-
-        print(
-            f"\nRAN: {passed+failed} {passed_text} {failed_text} {skipped_text}"
-        )
-
-    print(
-        statusinfo.dim(
-            f"\nCompleted in {state.end_duration:.3f}s",
-            style=flags.style,
-        )
-    )
-
-    if state.active_durations:
-        print(
-            statusinfo.error_highlight(
-                "BUG: Durations still active at exit:", style=flags.style
-            )
-        )
-        for id, duration in state.active_durations.items():
-            print(f" {id} = {duration.__dict__}")
-
-    await event_loop
-
-
 @dataclass
 class DurationPrintInfo:
     """Wrap information needed to print the status of a task duration."""
@@ -207,180 +83,336 @@ class TaskStatus:
         )
 
 
-def _create_status_lines_from_state(
-    flags: args.Flags, state: ConsoleState
-) -> list[str]:
-    """Process the overall console state into a list of lines to present to the user.
+class ConsoleState:
+    """Holder for all console output state.
 
-    Args:
-        flags (args.Flags): Flags controlling output format.
-        state (ConsoleState): The console state to process.
-
-    Returns:
-        list[str]: List of lines to present to the user.
+    Attributes:
+        active_durations: Map from Id to DurationInfo for durations
+            that have not yet ended.
+        complete_durations: Map from Id to DurationInfo for durations
+            that have ended.
+        end_duration: The elapsed time for the entire run, measured
+            as the difference between the start and end of GLOBAL_RUN_ID.
+            Only set after the global run has ended.
+        test_results: Map from status to a set of tests with that
+            status. This is the canonical result list for all tests.
+        exec_env: Parsed environment for this run.
     """
 
-    # Process the state
-    task_status = _produce_task_status_from_state(state)
-
-    # Current time for duration displays.
-    monotonic = time.monotonic()
-
-    # Format the computed data as lines to print out.
-    status_lines = _format_duration_lines(flags, task_status)
-
-    # Show an overall duration timer if the global run is started.
-    if event.GLOBAL_RUN_ID in state.active_durations:
-        run_duration = f"[duration: {statusinfo.format_duration(datetime.timedelta(seconds=monotonic - state.active_durations[event.GLOBAL_RUN_ID].start_monotonic).total_seconds())}]"
-    else:
-        run_duration = ""
-
-    # Show pass/fail counts if tests have started completing.
-    pass_fail = ""
-    if state.test_results:
-        passed = len(state.test_results[event.TestSuiteStatus.PASSED])
-        failed = (
-            len(state.test_results[event.TestSuiteStatus.FAILED])
-            + len(state.test_results[event.TestSuiteStatus.TIMEOUT])
-            + len(state.test_results[event.TestSuiteStatus.FAILED_TO_START])
-        )
-        skipped = len(state.test_results[event.TestSuiteStatus.SKIPPED])
-        passed_text = pass_format(passed, flags.style)
-        failed_text = fail_format(failed, flags.style)
-        skipped_text = skip_format(skipped, flags.style)
-
-        pass_fail = (
-            statusinfo.dim(" [tests: ", style=flags.style)
-            + f"{passed_text} {failed_text} {skipped_text}"
-            + statusinfo.dim("] ", style=flags.style)
-        )
-
-    # Print out the duration lines if they are present.
-    if status_lines:
-        status_lines = [
-            statusinfo.green("Status: ", style=flags.style)
-            + statusinfo.dim(f"{run_duration}", style=flags.style)
-            + ("" if not pass_fail else pass_fail)
-        ] + status_lines
-
-    return status_lines
+    def __init__(self) -> None:
+        self.active_durations: dict[event.Id, DurationInfo] = dict()
+        self.complete_durations: dict[event.Id, DurationInfo] = dict()
+        self.end_duration: float | None = None
+        self.test_results: dict[
+            event.TestSuiteStatus, typing.Set[str]
+        ] = defaultdict(set)
+        self.exec_env: environment.ExecutionEnvironment | None = None
 
 
-def _produce_task_status_from_state(state: ConsoleState) -> TaskStatus:
-    # Generate a mapping of each duration to its children.
-    duration_children: dict[event.Id, list[event.Id]] = defaultdict(list)
-    all_durations: dict[event.Id, DurationInfo] = dict()
-
-    for id, duration in chain(
-        state.active_durations.items(), state.complete_durations.items()
+class ConsoleOutput:
+    def __init__(
+        self,
+        monotonic_time_source: typing.Callable[
+            [], float
+        ] = lambda: time.monotonic(),
     ):
-        if id != event.GLOBAL_RUN_ID:
-            duration_children[duration.parent or event.GLOBAL_RUN_ID].append(id)
-        all_durations[id] = duration
+        """A wrapper for console output routines.
 
-    # Calculate counts of how many tasks are in what state.
-    tasks_running = len(state.active_durations)
-    tasks_complete = len(state.complete_durations)
-    tasks_queued_but_not_running = 0
-    for id, children in duration_children.items():
-        expected = all_durations[id].expected_child_tasks
-        if expected and expected >= len(children):
-            tasks_queued_but_not_running += expected - len(children)
+        Args:
+            monotonic_time_source (Callable[[], float]): Source of monotonic time,
+                injectable for test and replay scenarios.
+        """
+        self._monotonic_time_source = monotonic_time_source
 
-    # Process the active durations into DurationPrintInfo, which
-    # contains information on how to print the duration state.
-    # We perform an in-order tree traversal over all durations
-    # starting from the root, taking account only of those
-    # durations that are active and sorting by descending
-    # timestamp.
-    duration_print_infos: list[DurationPrintInfo] = []
-    assert event.GLOBAL_RUN_ID in all_durations
+    async def console_printer(
+        self,
+        recorder: event.EventRecorder,
+        flags: args.Flags,
+        do_status_output_event: asyncio.Event,
+    ) -> None:
+        """Asynchronous future that implements console printing.
 
-    # Stack of duration event.Ids to process. Second
-    # element of the tuple tracks indent level.
-    work_stack: list[tuple[event.Id, int]] = [(event.GLOBAL_RUN_ID, 0)]
-    while work_stack:
-        id, indent = work_stack.pop()
-        info: DurationInfo | None = None
+        Continually reads events from the given recorder and presents status
+        updates to the terminal. This is the main output routine for fx test.
 
-        if id == event.GLOBAL_RUN_ID:
-            pass
-        elif id not in state.active_durations:
-            continue
+        Output is controlled by the given flags.
+
+        This routine implements continual clearing and updating of a status
+        bar at the bottom of the user's terminal. This behavior is controlled
+        by the `do_status_output_event` asyncio.Event, which is set only when
+        continual status output is both desired and available.
+
+        Args:
+            recorder (event.EventRecorder): Source of events to display.
+            flags (args.Flags): Command line flags to control formatting.
+            do_status_output_event (asyncio.Event): Display updating
+                status bar only if this is set.
+        """
+
+        state = ConsoleState()
+        print_queue: asyncio.Queue[list[str]] = asyncio.Queue()
+
+        # Spawn an asynchronous task to actually process incoming events.
+        # The rest of this method simply displays the status output and prints
+        # lines that are requested by the other task.
+        event_loop = asyncio.create_task(
+            _console_event_loop(recorder, flags, state, print_queue)
+        )
+
+        # Keep pumping events until there will be no more.
+        while not event_loop.done() or not print_queue.empty():
+            # First try to get some lines that need to be printed.
+            # If there is nothing to print by the time we need to refresh, timeout
+            # and refresh the output.
+            try:
+                lines_to_print = await asyncio.wait_for(
+                    print_queue.get(), flags.status_delay
+                )
+            except asyncio.TimeoutError:
+                lines_to_print = []
+
+            if do_status_output_event.is_set():
+                status_lines = self._create_status_lines_from_state(
+                    flags, state
+                )
+
+                # Print status output, leaving an extra line to separate
+                # from prepended lines.
+                termout.write_lines(
+                    [""] + status_lines[: flags.status_lines], lines_to_print
+                )
+            elif lines_to_print:
+                print("\n".join(lines_to_print))
+
+        # We are done with all events, clean up and exit.
+
+        if do_status_output_event.is_set():
+            # Clear status output.
+            termout.write_lines([], [])
+
+        if state.test_results:
+            passed = len(state.test_results[event.TestSuiteStatus.PASSED])
+            failed = (
+                len(state.test_results[event.TestSuiteStatus.FAILED])
+                + len(state.test_results[event.TestSuiteStatus.TIMEOUT])
+                + len(state.test_results[event.TestSuiteStatus.FAILED_TO_START])
+            )
+            skipped = len(state.test_results[event.TestSuiteStatus.SKIPPED])
+            passed_text = pass_format(passed, flags.style)
+            failed_text = fail_format(failed, flags.style)
+            skipped_text = skip_format(skipped, flags.style)
+
+            print(
+                f"\nRAN: {passed+failed} {passed_text} {failed_text} {skipped_text}"
+            )
+
+        print(
+            statusinfo.dim(
+                f"\nCompleted in {state.end_duration:.3f}s",
+                style=flags.style,
+            )
+        )
+
+        if state.active_durations:
+            print(
+                statusinfo.error_highlight(
+                    "BUG: Durations still active at exit:", style=flags.style
+                )
+            )
+            for id, duration in state.active_durations.items():
+                print(f" {id} = {duration.__dict__}")
+
+        await event_loop
+
+    def _create_status_lines_from_state(
+        self, flags: args.Flags, state: ConsoleState
+    ) -> list[str]:
+        """Process the overall console state into a list of lines to present to the user.
+
+        Args:
+            flags (args.Flags): Flags controlling output format.
+            state (ConsoleState): The console state to process.
+
+        Returns:
+            list[str]: List of lines to present to the user.
+        """
+
+        # Process the state
+        task_status = self._produce_task_status_from_state(state)
+
+        # Current time for duration displays.
+        monotonic = self._monotonic_time_source()
+
+        # Format the computed data as lines to print out.
+        status_lines = self._format_duration_lines(flags, task_status)
+
+        # Show an overall duration timer if the global run is started.
+        if event.GLOBAL_RUN_ID in state.active_durations:
+            run_duration = f"[duration: {statusinfo.format_duration(datetime.timedelta(seconds=monotonic - state.active_durations[event.GLOBAL_RUN_ID].start_monotonic).total_seconds())}]"
         else:
-            progress = None
-            info = state.active_durations[id]
-            if info.expected_child_tasks:
-                progress = min(
-                    1.0,
-                    sum(
-                        [
-                            1 if child_id in state.complete_durations else 0
-                            for child_id in duration_children.get(id, [])
-                        ]
+            run_duration = ""
+
+        # Show pass/fail counts if tests have started completing.
+        pass_fail = ""
+        if state.test_results:
+            passed = len(state.test_results[event.TestSuiteStatus.PASSED])
+            failed = (
+                len(state.test_results[event.TestSuiteStatus.FAILED])
+                + len(state.test_results[event.TestSuiteStatus.TIMEOUT])
+                + len(state.test_results[event.TestSuiteStatus.FAILED_TO_START])
+            )
+            skipped = len(state.test_results[event.TestSuiteStatus.SKIPPED])
+            passed_text = pass_format(passed, flags.style)
+            failed_text = fail_format(failed, flags.style)
+            skipped_text = skip_format(skipped, flags.style)
+
+            pass_fail = (
+                statusinfo.dim(" [tests: ", style=flags.style)
+                + f"{passed_text} {failed_text} {skipped_text}"
+                + statusinfo.dim("] ", style=flags.style)
+            )
+
+        # Print out the duration lines if they are present.
+        if status_lines:
+            status_lines = [
+                (
+                    (
+                        ""
+                        if not flags.previous == args.PrevOption.REPLAY
+                        else statusinfo.highlight(
+                            "[REPLAY] ", style=flags.style
+                        )
                     )
-                    / info.expected_child_tasks,
+                    + statusinfo.green("Status: ", style=flags.style)
+                    + statusinfo.dim(f"{run_duration}", style=flags.style)
+                    + ("" if not pass_fail else pass_fail)
                 )
-            duration_print_infos.append(
-                DurationPrintInfo(info, indent, progress)
-            )
+            ] + status_lines
 
-        if info is not None and info.hide_children:
-            # Skip processing children of this duration for display.
-            continue
+        return status_lines
 
-        for child_id in duration_children.get(id, []):
-            children = []
-            if child_id in state.active_durations:
-                children.append(child_id)
-            # Put children in the work stack in ascending
-            # order, so that they will be popped in descending
-            # order.
-            children.sort(key=lambda x: all_durations[x].start_monotonic)
-            work_stack.extend([(child_id, indent + 1) for child_id in children])
+    def _produce_task_status_from_state(
+        self, state: ConsoleState
+    ) -> TaskStatus:
+        # Generate a mapping of each duration to its children.
+        duration_children: dict[event.Id, list[event.Id]] = defaultdict(list)
+        all_durations: dict[event.Id, DurationInfo] = dict()
 
-    return TaskStatus(
-        tasks_running=tasks_running,
-        tasks_complete=tasks_complete,
-        tasks_queued_but_not_running=tasks_queued_but_not_running,
-        duration_infos=duration_print_infos,
-    )
+        for id, duration in chain(
+            state.active_durations.items(), state.complete_durations.items()
+        ):
+            if id != event.GLOBAL_RUN_ID:
+                duration_children[
+                    duration.parent or event.GLOBAL_RUN_ID
+                ].append(id)
+            all_durations[id] = duration
 
+        # Calculate counts of how many tasks are in what state.
+        tasks_running = len(state.active_durations)
+        tasks_complete = len(state.complete_durations)
+        tasks_queued_but_not_running = 0
+        for id, children in duration_children.items():
+            expected = all_durations[id].expected_child_tasks
+            if expected and expected >= len(children):
+                tasks_queued_but_not_running += expected - len(children)
 
-def _format_duration_lines(flags: args.Flags, status: TaskStatus) -> list[str]:
-    """Given the processed status for all tasks, format output based
-    on the flags.
+        # Process the active durations into DurationPrintInfo, which
+        # contains information on how to print the duration state.
+        # We perform an in-order tree traversal over all durations
+        # starting from the root, taking account only of those
+        # durations that are active and sorting by descending
+        # timestamp.
+        duration_print_infos: list[DurationPrintInfo] = []
+        assert event.GLOBAL_RUN_ID in all_durations
 
-    Args:
-        flags (args.Flags): Flags to control output format.
-        status (TaskStatus): Processed task status.
+        # Stack of duration event.Ids to process. Second
+        # element of the tuple tracks indent level.
+        work_stack: list[tuple[event.Id, int]] = [(event.GLOBAL_RUN_ID, 0)]
+        while work_stack:
+            id, indent = work_stack.pop()
+            info: DurationInfo | None = None
 
-    Returns:
-        list[str]: A list of lines to present to the user.
-    """
-    monotonic = time.monotonic()
-    duration_lines: list[str] = []
-    for print_info in status.duration_infos:
-        prefix = " " * (print_info.indent * 2)
-        if print_info.progress is not None:
-            duration_lines.append(
-                statusinfo.status_progress(
-                    prefix + print_info.info.name,
-                    print_info.progress,
-                    style=flags.style,
+            if id == event.GLOBAL_RUN_ID:
+                pass
+            elif id not in state.active_durations:
+                continue
+            else:
+                progress = None
+                info = state.active_durations[id]
+                if info.expected_child_tasks:
+                    progress = min(
+                        1.0,
+                        sum(
+                            [
+                                1 if child_id in state.complete_durations else 0
+                                for child_id in duration_children.get(id, [])
+                            ]
+                        )
+                        / info.expected_child_tasks,
+                    )
+                duration_print_infos.append(
+                    DurationPrintInfo(info, indent, progress)
                 )
-            )
-        else:
-            duration_lines.append(
-                statusinfo.duration_progress(
-                    prefix + print_info.info.name,
-                    datetime.timedelta(
-                        seconds=monotonic - print_info.info.start_monotonic
-                    ),
-                    style=flags.style,
+
+            if info is not None and info.hide_children:
+                # Skip processing children of this duration for display.
+                continue
+
+            for child_id in duration_children.get(id, []):
+                children = []
+                if child_id in state.active_durations:
+                    children.append(child_id)
+                # Put children in the work stack in ascending
+                # order, so that they will be popped in descending
+                # order.
+                children.sort(key=lambda x: all_durations[x].start_monotonic)
+                work_stack.extend(
+                    [(child_id, indent + 1) for child_id in children]
                 )
-            )
-    return duration_lines
+
+        return TaskStatus(
+            tasks_running=tasks_running,
+            tasks_complete=tasks_complete,
+            tasks_queued_but_not_running=tasks_queued_but_not_running,
+            duration_infos=duration_print_infos,
+        )
+
+    def _format_duration_lines(
+        self, flags: args.Flags, status: TaskStatus
+    ) -> list[str]:
+        """Given the processed status for all tasks, format output based
+        on the flags.
+
+        Args:
+            flags (args.Flags): Flags to control output format.
+            status (TaskStatus): Processed task status.
+
+        Returns:
+            list[str]: A list of lines to present to the user.
+        """
+        monotonic = self._monotonic_time_source()
+        duration_lines: list[str] = []
+        for print_info in status.duration_infos:
+            prefix = " " * (print_info.indent * 2)
+            if print_info.progress is not None:
+                duration_lines.append(
+                    statusinfo.status_progress(
+                        prefix + print_info.info.name,
+                        print_info.progress,
+                        style=flags.style,
+                    )
+                )
+            else:
+                duration_lines.append(
+                    statusinfo.duration_progress(
+                        prefix + print_info.info.name,
+                        datetime.timedelta(
+                            seconds=monotonic - print_info.info.start_monotonic
+                        ),
+                        style=flags.style,
+                    )
+                )
+        return duration_lines
 
 
 class TestExecutionInfo:

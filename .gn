@@ -12,6 +12,10 @@ buildconfig = "//build/config/BUILDCONFIG.gn"
 # can not be placed directly in the source tree, e.g. for third party source trees.
 secondary_source = "//build/secondary/"
 
+# https://fxbug.dev/363930634: set this to true once all actions in the build have been fixed,
+# of if we decide to create depfile parent directories in Ninja.
+no_stamp_files = false
+
 # Only instantiate targets in the default toolchain that are dependencies
 # of any target defined in //BUILD.gn, to significantly reduce the size of the
 # GN build graph and of the Ninja build plan.

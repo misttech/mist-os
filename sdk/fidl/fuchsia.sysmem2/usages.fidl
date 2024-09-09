@@ -34,6 +34,15 @@ type BufferUsage = table {
 // that the participant hasn't forgotten to set usage.
 @available(added=19)
 const NONE_USAGE uint32 = 1;
+// Flag for "none" usage, indicating that allocation should proceed even if all participants are
+// setting "none" usage. If at least one participant also sets this flag, allocation will still be
+// attempted despite the "none" usage, and this flag will count as a reason to provide VMOs to the
+// participants setting this flag. This is mainly useful for tests.
+//
+// This flag is only valid in combination with NONE_USAGE. Allocation will fail if a participant
+// specifies this flag without NONE_USAGE.
+@available(added=HEAD)
+const NONE_USAGE_PERMIT_ALLOCATION uint32 = 2;
 
 // Flags for "cpu" usage.
 // The "often" variants prefer cacheable memory.

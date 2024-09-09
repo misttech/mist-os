@@ -174,7 +174,7 @@ Resulting product is not supported and may misbehave!
 
     // Now that all the configuration has been determined, create the builder
     // and start doing the work of creating the image assembly config.
-    let mut builder = ImageAssemblyConfigBuilder::new(platform.build_type);
+    let mut builder = ImageAssemblyConfigBuilder::new(platform.build_type, board_info.name.clone());
 
     // Set the developer overrides, if any.
     if let Some(developer_overrides) = developer_overrides {

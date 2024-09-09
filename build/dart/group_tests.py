@@ -6,7 +6,6 @@
 import argparse
 import os
 import stat
-import string
 import sys
 
 

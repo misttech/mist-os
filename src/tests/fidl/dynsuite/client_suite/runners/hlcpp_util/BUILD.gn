@@ -7,7 +7,7 @@ source_set("hlcpp_util") {
   sources = [ "error_util.h" ]
   public_deps = [
     "//sdk/lib/fidl",
-    "//src/lib/fidl/cpp",
+    "//sdk/lib/fidl/cpp",
     "//src/tests/fidl/dynsuite/client_suite/fidl:fidl.clientsuite_hlcpp",
   ]
 }

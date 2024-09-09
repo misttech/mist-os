@@ -352,7 +352,8 @@ void RestartDriver(uint32_t gpu_vendor_id) {
   if (!driver_url.empty()) {
     magma::TestDeviceBase::RestartDFv2Driver(driver_url, gpu_vendor_id);
   } else {
-    magma::TestDeviceBase::RebindParentDeviceFromId(gpu_vendor_id);
+    // Only dfv2 drivers are supported
+    ASSERT_TRUE(false);
   }
 }
 

@@ -116,6 +116,7 @@ TEST(DebugDataTests, PublishDataWithBadSvc) {
 // instead defines a local set of a few constants and structure definition in
 // fuchsia-io-constants.h to call fuchsia.io.Directory/Open(). Confirm that the
 // local copy matches the canonical definition here.
+// TODO(https://fxbug.dev/324111518): Migrate this to fuchsia.io/Directory.Open3.
 static_assert(fuchsia_io_DirectoryOpenOrdinal ==
               fidl::internal::WireOrdinal<fuchsia_io::Directory::Open>::value);
 static_assert(fidl::TypeTraits<fidl::internal::TransactionalRequest<fuchsia_io::Directory::Open>>::

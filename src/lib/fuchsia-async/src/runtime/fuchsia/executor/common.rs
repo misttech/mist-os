@@ -5,7 +5,7 @@
 use super::super::timer::{TimeWaker, TimerHandle, TimerHeap};
 use super::instrumentation::{Collector, LocalCollector, WakeupReason};
 use super::packets::{PacketReceiver, PacketReceiverMap, ReceiverRegistration};
-use super::scope::{ScopeRef, ScopeWaker};
+use super::scope::ScopeRef;
 use super::time::Time;
 use crate::atomic_future::{AtomicFuture, AttemptPollResult};
 use crossbeam::queue::SegQueue;
@@ -556,29 +556,9 @@ impl Executor {
                 self.ready_tasks.push(task.clone());
                 false
             }
-            AttemptPollResult::IFinished => {
-                let mut task_waker = None;
-                let mut scope_waker = ScopeWaker::empty();
+            AttemptPollResult::IFinished | AttemptPollResult::Cancelled => {
                 let mut scope = task.scope.lock();
-                if !task.future.is_detached() {
-                    task_waker = scope.join_wakers.remove(&task.id);
-                } else {
-                    scope_waker = scope.remove_task(task.id);
-                }
-                scope_waker.wake_and_release(scope);
-                // Call task waker once the scope lock is released so we don't risk a deadlock.
-                if let Some(waker) = task_waker {
-                    waker.wake();
-                }
-                true
-            }
-            AttemptPollResult::Cancelled => {
-                let mut scope = task.scope.lock();
-                let waker = scope.join_wakers.remove(&task.id);
-                scope.remove_task(task.id).wake_and_release(scope);
-                if let Some(waker) = waker {
-                    waker.wake();
-                }
+                scope.task_did_finish(task.id).wake_and_release(scope);
                 true
             }
             _ => false,
@@ -729,7 +709,7 @@ impl Task {
         this
     }
 
-    fn wake(self: &Arc<Self>) {
+    pub(super) fn wake(self: &Arc<Self>) {
         if self.future.mark_ready() {
             self.scope.executor().ready_tasks.push(self.clone());
             self.scope.executor().notify_task_ready();
@@ -841,7 +821,7 @@ mod tests {
             }
         });
 
-        assert!(e.ehandle.root_scope.lock().join_wakers.is_empty());
+        assert!(e.ehandle.root_scope.lock().join_results.is_empty());
     }
 
     #[test]
@@ -892,7 +872,7 @@ mod tests {
             assert_eq!(task.cancel().await, Some(()));
         });
 
-        assert!(e.ehandle.root_scope.lock().join_wakers.is_empty());
+        assert!(e.ehandle.root_scope.lock().join_results.is_empty());
     }
 
     #[test]
@@ -957,7 +937,7 @@ mod tests {
             let scope = ehandle.root_scope();
 
             // The only way of testing for this is to poll.
-            while scope.lock().all_tasks().len() > 1 || scope.lock().join_wakers.len() > 0 {
+            while scope.lock().all_tasks().len() > 1 || scope.lock().join_results.len() > 0 {
                 Timer::new(std::time::Duration::from_millis(1)).await;
             }
 

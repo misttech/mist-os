@@ -48,9 +48,10 @@ pub enum UpdateUrlSource {
     UseDefault,
 }
 
-/// Installs all packages and writes the Fuchsia ZBI from the latest build on the given channel. Has
-/// the same arguments as `download_and_apply_update`, but allows passing in pre-configured
-/// components for testing.
+/// Installs all packages and writes the Fuchsia ZBI from the latest build on the given channel.
+///
+/// Has the same arguments as `download_and_apply_update`, but allows passing in
+/// pre-configured components for testing.
 pub async fn download_and_apply_update_with_updater(
     mut updater: Updater,
     channel_name: &str,

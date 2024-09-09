@@ -21,10 +21,11 @@ use test_case::test_case;
 
 use netstack3_base::socket::SocketIpAddr;
 use netstack3_base::testutil::{set_logger_for_test, TestAddrs, TestIpExt};
-use netstack3_base::{EitherDeviceId, Mms};
+use netstack3_base::{EitherDeviceId, IpDeviceAddr, Mms};
 use netstack3_core::device::{DeviceId, EthernetLinkDevice};
 use netstack3_core::testutil::{CtxPairExt as _, FakeBindingsCtx, FakeCtx, FakeCtxBuilder};
 use netstack3_core::IpExt;
+use netstack3_ip::device::IpDeviceIpExt;
 use netstack3_ip::socket::{
     DefaultSendOptions, DeviceIpSocketHandler, IpSockCreationError, IpSockDefinition,
     IpSockSendError, IpSocketHandler, MmsError, SendOptions,
@@ -108,7 +109,9 @@ fn remove_all_local_addrs<I: IpExt>(ctx: &mut FakeCtx) {
     for device in devices {
         #[derive(GenericOverIp)]
         #[generic_over_ip(I, Ip)]
-        struct WrapVecAddrSubnet<I: Ip>(Vec<AddrSubnet<I::Addr>>);
+        struct WrapVecAddrSubnet<I: Ip + IpDeviceIpExt>(
+            Vec<AddrSubnet<I::Addr, I::AssignedWitness>>,
+        );
 
         let WrapVecAddrSubnet(subnets) = I::map_ip_out(
             (&mut ctx.core_ctx(), &device),
@@ -128,10 +131,10 @@ fn remove_all_local_addrs<I: IpExt>(ctx: &mut FakeCtx) {
             assert_eq!(
                 ctx.core_api()
                     .device_ip::<I>()
-                    .del_ip_addr(&device, subnet.addr())
+                    .del_ip_addr(&device, subnet.addr().into())
                     .expect("failed to remove addr from device")
                     .into_removed(),
-                subnet
+                subnet.to_witness()
             );
         }
     }
@@ -283,7 +286,7 @@ fn test_new<I: IpSocketIpExt + IpExt>(test_case: NewSocketTestCase) {
     let weak_local_device = local_device.as_ref().map(|d| d.downgrade());
     let template = IpSockDefinition {
         remote_ip: SocketIpAddr::try_from(to_ip).unwrap(),
-        local_ip: SocketIpAddr::try_from(expected_from_ip).unwrap(),
+        local_ip: IpDeviceAddr::try_from(expected_from_ip).unwrap(),
         device: weak_local_device.clone(),
         proto,
         transparent,
@@ -293,7 +296,7 @@ fn test_new<I: IpSocketIpExt + IpExt>(test_case: NewSocketTestCase) {
         &mut core_ctx.context(),
         bindings_ctx,
         weak_local_device.as_ref().map(EitherDeviceId::Weak),
-        from_ip.map(|a| SocketIpAddr::try_from(a).unwrap()),
+        from_ip.map(|a| IpDeviceAddr::try_from(a).unwrap()),
         SocketIpAddr::try_from(to_ip).unwrap(),
         proto,
         transparent,
@@ -362,7 +365,7 @@ fn test_send_local<I: IpSocketIpExt + IpExt>(
         &mut core_ctx.context(),
         bindings_ctx,
         None,
-        from_ip.map(|a| SocketIpAddr::try_from(a).unwrap()),
+        from_ip.map(|a| IpDeviceAddr::try_from(a).unwrap()),
         SocketIpAddr::try_from(to_ip).unwrap(),
         I::ICMP_IP_PROTO,
         false, /* transparent */

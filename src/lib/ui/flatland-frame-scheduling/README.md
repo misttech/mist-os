@@ -4,7 +4,7 @@ This library contains a couple of example implementations of how to use Flatland
 API (`fuchsia.ui.composition.Flatland`). They're available to be copied as a basis for writing your
 own scheduler, or for use as-is.
 
-For an example of usage, look at `src/ui/examples/flatland-view-provider/main.rs`.
+For an example of usage, look at `src/ui/examples/flatland-rainbow/main.rs`.
 
 ## Schedulers
 

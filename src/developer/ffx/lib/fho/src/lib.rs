@@ -18,7 +18,8 @@ pub use fho_metadata::*;
 // Re-expose the Error, Result, and FfxContext types from ffx_command
 // so you don't have to pull both in all the time.
 pub use ffx_command::{
-    bug, exit_with_code, return_bug, return_user_error, user_error, Error, FfxContext, Result,
+    bug, exit_with_code, return_bug, return_user_error, user_error, Error, FfxContext,
+    NonFatalError, Result,
 };
 
 // Re-expose the ffx_writer::Writer as the 'simple writer'

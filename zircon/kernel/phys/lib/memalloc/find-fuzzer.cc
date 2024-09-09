@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 #include <lib/memalloc/range.h>
+#include <lib/memalloc/testing/range.h>
 #include <lib/stdcompat/span.h>
 #include <zircon/assert.h>
 
@@ -52,7 +53,8 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
     memalloc::FindNormalizedRamRanges(ranges, find_ram);
     ZX_ASSERT_MSG(std::is_sorted(ram.begin(), ram.end()),
                   "output RAM ranges are not sorted:\n%s\noriginal ranges:\n%s",
-                  ToString(ram).c_str(), ToString(ranges).c_str());
+                  memalloc::testing::ToString(ram).c_str(),
+                  memalloc::testing::ToString(ranges).c_str());
   }
 
   // Whether we are to exercise FindNormalizedRanges().
@@ -69,8 +71,9 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
       return 0;
     }
     ZX_ASSERT_MSG(std::is_sorted(all.begin(), all.end()),
-                  "output ranges are not sorted:\n%s\noriginal ranges:\n%s", ToString(all).c_str(),
-                  ToString(ranges).c_str());
+                  "output ranges are not sorted:\n%s\noriginal ranges:\n%s",
+                  memalloc::testing::ToString(all).c_str(),
+                  memalloc::testing::ToString(ranges).c_str());
   }
 
   // Whether we have exercised both FindNormalizedRamRanges() and
@@ -80,7 +83,9 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
       ZX_ASSERT_MSG(Contains(all, range),
                     "normalized RAM range (%s) not found among all normalized "
                     "ranges:\n%s\noriginal ranges:\n%s",
-                    ToString(range).c_str(), ToString(all).c_str(), ToString(ranges).c_str());
+                    memalloc::testing::ToString(range).c_str(),
+                    memalloc::testing::ToString(all).c_str(),
+                    memalloc::testing::ToString(ranges).c_str());
     }
   }
 

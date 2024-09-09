@@ -23,7 +23,7 @@ pub async fn ping(
     }
 
     const I2C_DEV_PATH: &str = "class/i2c";
-    let dir = fuchsia_fs::directory::open_directory_no_describe(
+    let dir = fuchsia_fs::directory::open_directory_no_describe_deprecated(
         dev,
         I2C_DEV_PATH,
         fio::OpenFlags::empty(),

@@ -7,10 +7,11 @@ use fuchsia_inspect_derive::Unit;
 // use itertools::Itertools;
 use std::collections::VecDeque;
 
-/// Wrapper around [std::collections::VecDeque] that only holds [String]. Implements
-/// [fuchsia_inspect_derive::Unit], which allows it to be written to inspect as a single property
-/// with its value being a comma-separated list that's concatenation of all of the items in the
-/// VecDeque.
+/// Wrapper around [std::collections::VecDeque] that only holds [String].
+///
+/// Implements [fuchsia_inspect_derive::Unit], which allows it to be written
+/// to inspect as a single property with its value being a comma-separated list
+/// that's concatenation of all of the items in the VecDeque.
 ///
 /// To use this in a a structure that implements [fuchsia_inspect_derive::Inspect], wrap this in the
 /// [fuchsia_inspect_derive::IValue] smart pointer and it will automatically update the value of the

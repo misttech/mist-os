@@ -12,7 +12,6 @@ config("fat-lto-objects") {
   if (fat_lto_objects) {
     # TODO(https://fxbug.dev/340553826): - Add FatLTO support for Mach-O and COFF file formats
     # Currently, FatLTO requires ELF, so its only valid on non-EFI Fuchsia and Linux
-    is_elf = current_os != "mac" && current_os != "win"
     if (is_elf) {
       cflags = [ "-ffat-lto-objects" ]
       ldflags = cflags

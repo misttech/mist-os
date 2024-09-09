@@ -515,9 +515,14 @@ impl ScopedElfRunner {
         let checker = self.checker.clone();
         fasync::Task::spawn(async move {
             while let Ok(Some(request)) = stream.try_next().await {
-                let fcrunner::ComponentRunnerRequest::Start { start_info, controller, .. } =
-                    request;
-                start(&runner, checker.clone(), start_info, controller).await;
+                match request {
+                    fcrunner::ComponentRunnerRequest::Start { start_info, controller, .. } => {
+                        start(&runner, checker.clone(), start_info, controller).await;
+                    }
+                    fcrunner::ComponentRunnerRequest::_UnknownMethod { ordinal, .. } => {
+                        warn!(%ordinal, "Unknown ComponentRunner request");
+                    }
+                }
             }
         })
         .detach();
@@ -722,7 +727,7 @@ mod tests {
     fn namespace_entry(path: &str, flags: fio::OpenFlags) -> fcrunner::ComponentNamespaceEntry {
         // Get a handle to /pkg
         let ns_path = path.to_string();
-        let ns_dir = fuchsia_fs::directory::open_in_namespace(path, flags).unwrap();
+        let ns_dir = fuchsia_fs::directory::open_in_namespace_deprecated(path, flags).unwrap();
         // TODO(https://fxbug.dev/42060182): Use Proxy::into_client_end when available.
         let client_end = ClientEnd::new(
             ns_dir.into_channel().expect("could not convert proxy to channel").into_zx_channel(),
@@ -880,7 +885,7 @@ mod tests {
     // TODO(https://fxbug.dev/42073224): A variation of this is used in a couple of places. We should consider
     // refactoring this into a test util file.
     async fn read_file<'a>(root_proxy: &'a fio::DirectoryProxy, path: &'a str) -> String {
-        let file_proxy = fuchsia_fs::directory::open_file_no_describe(
+        let file_proxy = fuchsia_fs::directory::open_file_no_describe_deprecated(
             &root_proxy,
             path,
             fuchsia_fs::OpenFlags::RIGHT_READABLE,

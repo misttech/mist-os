@@ -81,125 +81,134 @@ StackOwnedLoanedPagesInterval* StackOwnedLoanedPagesInterval::maybe_current() {
 
 // static
 void StackOwnedLoanedPagesInterval::WaitUntilContiguousPageNotStackOwned(vm_page_t* page) {
-  // Due to not holding the PmmNode lock, we can't check loaned directly, and it may have been unset
-  // recently in any case, but in that case we'll notice via !is_stack_owned() instead.
-  //
-  // Need to take lock at this point, because avoiding deletion of the OwnedWaitQueue
-  // requires holding the lock while applying kObjectOrStackOwnerHasWaiter to the page, to
-  // prevent the StackOwnedLoanedPagesInterval thread from removing the stack_owner from the page
-  // and deleting the OwnedWaitQueue.
-  //
-  // Before we acquire the lock we do a check whether a stack_owner is still set. This is
-  // just to avoid acquiring the lock on the off chance that the stack ownership interval
-  // is already over.  This isn't particularly likely to be the case, and we'd be fine without
-  // this check.  But since we're about to take the lock, let's avoid an unnecessary acquire
-  // if we can.
-  if (!page->object.is_stack_owned()) {
-    // StackOwnedLoanedPagesInterval is already removed from the page, so no need to
-    // acquire the lock.  Go around and observe the new page state.
-    return;
-  }
+  const auto do_transaction = [&]()
+                                  TA_REQ(chainlock_transaction_token,
+                                         preempt_disabled_token) -> ChainLockTransaction::Result<> {
+    // Due to not holding the PmmNode lock, we can't check loaned directly, and it may have been
+    // unset recently in any case, but in that case we'll notice via !is_stack_owned() instead.
+    //
+    // Need to take lock at this point, because avoiding deletion of the OwnedWaitQueue
+    // requires holding the lock while applying kObjectOrStackOwnerHasWaiter to the page, to
+    // prevent the StackOwnedLoanedPagesInterval thread from removing the stack_owner from the page
+    // and deleting the OwnedWaitQueue.
+    //
+    // Before we acquire the lock we do a check whether a stack_owner is still set. This is
+    // just to avoid acquiring the lock on the off chance that the stack ownership interval
+    // is already over.  This isn't particularly likely to be the case, and we'd be fine without
+    // this check.  But since we're about to take the lock, let's avoid an unnecessary acquire
+    // if we can.
+    if (!page->object.is_stack_owned()) {
+      // StackOwnedLoanedPagesInterval is already removed from the page, so no need to
+      // acquire the lock.  Go around and observe the new page state.
+      return ChainLockTransaction::Done;
+    }
 
-  // Acquire StackOwnedLoanedPagesInterval lock, and attempt to flag this page's
-  // interval-owner as having a waiter.  If we fail, it means that the page's
-  // assigned StackOwnedLoanedPagesInterval was cleared, and we can skip
-  // the wait operation.  If we succeed, however, then we know that the
-  // stack-owner will need to obtain the SOLPI locks before it can clear the
-  // owner of the page.
-  AnnotatedAutoPreemptDisabler aapd;
-  InterruptDisableGuard irqd;
-  Guard<SpinLock, NoIrqSave> solpi_guard{&lock_};
+    // Acquire StackOwnedLoanedPagesInterval lock, and attempt to flag this page's
+    // interval-owner as having a waiter.  If we fail, it means that the page's
+    // assigned StackOwnedLoanedPagesInterval was cleared, and we can skip
+    // the wait operation.  If we succeed, however, then we know that the
+    // stack-owner will need to obtain the SOLPI locks before it can clear the
+    // owner of the page.
+    Guard<SpinLock, NoIrqSave> solpi_guard{&lock_};
 
-  auto maybe_try_set_has_waiter_result = page->object.try_set_has_waiter();
-  if (!maybe_try_set_has_waiter_result) {
-    // stack_owner was cleared; no need to wait.
-    return;
-  }
+    auto maybe_try_set_has_waiter_result = page->object.try_set_has_waiter();
+    if (!maybe_try_set_has_waiter_result) {
+      // stack_owner was cleared; no need to wait.
+      return ChainLockTransaction::Done;
+    }
 
-  auto& try_set_has_waiter_result = maybe_try_set_has_waiter_result.value();
-  auto& stack_owner = *try_set_has_waiter_result.stack_owner;
-  // By doing PrepareForWaiter() only when necessary, we avoid pressure on the thread_lock in the
-  // case where there's no page reclaiming thread needing to wait / transmit priority.
-  if (try_set_has_waiter_result.first_setter) {
-    stack_owner.PrepareForWaiter();
-  }
-  // PrepareForWaiter() was called previously, either by this thread or a different thread.
-  DEBUG_ASSERT(stack_owner.is_ready_for_waiter_.load(ktl::memory_order_acquire));
+    auto& try_set_has_waiter_result = maybe_try_set_has_waiter_result.value();
+    auto& stack_owner = *try_set_has_waiter_result.stack_owner;
+    // By doing PrepareForWaiter() only when necessary, we avoid pressure on the thread_lock in the
+    // case where there's no page reclaiming thread needing to wait / transmit priority.
+    if (try_set_has_waiter_result.first_setter) {
+      stack_owner.PrepareForWaiter();
+    }
+    // PrepareForWaiter() was called previously, either by this thread or a different thread.
+    DEBUG_ASSERT(stack_owner.is_ready_for_waiter_.load(ktl::memory_order_acquire));
 
-  // At this point we know that the stack_owner won't be changed on the page while we hold
-  // lock, which means the OwnedWaitQueue can't be deleted yet either, since deletion is
-  // after uninstalling from the page.  So now we just need to block on the OwnedWaitQueue.
-  //
-  // Obtain all of the locks needed for a block-and-assign-owner operation, then
-  // we can drop the SOLPI lock.  When the stack-owner of the pages comes along
-  // later on and wants to clear the owner, they will:
-  //
-  // 1)  Notice that the has waiters bit has been set.
-  // 2)  Obtain the SOLPI lock.
-  // 3)  Clear the owner of the pages it owns, preventing any new waiters.  These
-  //     pages are no longer owned.
-  // 4)  Drop the SOLPI lock.  By acquiring and dropping the lock in order to
-  //     clear the owner state, they are guaranteed of one of two things.
-  // 4a) A waiter thread made it into the SOLPI lock, but after the stack-owner
-  //     did.  By the time they made it into the lock, the discovered that the page
-  //     they were interested no longer had an owner, and the unwound without
-  //     waiting.
-  // 4b) The waiter thread made it into the SOLPI lock first.  It marked the
-  //     page's owner state as having waiters, and marked the SOLPI instance as
-  //     having waiters as well.  It then traded the SOLPI lock for the locks
-  //     required to block in the OWQ, and then blocked.
-  // 5)  Later on, when the owner finally destroys their outer-most SOLPI
-  //     instance, they will notice that the instance has waiters if any thread
-  //     ever made it to step 4b.  They will then need to obtain the OWQ lock in
-  //     order to wake all of the waiters.  Since the waiting thread obtained the
-  //     OWQ lock and committed to waiting before dropping the SOLPI lock, it
-  //     should be impossible for owner thread to attempt a wake operation before
-  //     any thread who committed to blocking made it into the queue.
+    // At this point we know that the stack_owner won't be changed on the page while we hold
+    // lock, which means the OwnedWaitQueue can't be deleted yet either, since deletion is
+    // after uninstalling from the page.  So now we just need to block on the OwnedWaitQueue.
+    //
+    // Obtain all of the locks needed for a block-and-assign-owner operation, then
+    // we can drop the SOLPI lock.  When the stack-owner of the pages comes along
+    // later on and wants to clear the owner, they will:
+    //
+    // 1)  Notice that the has waiters bit has been set.
+    // 2)  Obtain the SOLPI lock.
+    // 3)  Clear the owner of the pages it owns, preventing any new waiters.  These
+    //     pages are no longer owned.
+    // 4)  Drop the SOLPI lock.  By acquiring and dropping the lock in order to
+    //     clear the owner state, they are guaranteed of one of two things.
+    // 4a) A waiter thread made it into the SOLPI lock, but after the stack-owner
+    //     did.  By the time they made it into the lock, the discovered that the page
+    //     they were interested no longer had an owner, and the unwound without
+    //     waiting.
+    // 4b) The waiter thread made it into the SOLPI lock first.  It marked the
+    //     page's owner state as having waiters, and marked the SOLPI instance as
+    //     having waiters as well.  It then traded the SOLPI lock for the locks
+    //     required to block in the OWQ, and then blocked.
+    // 5)  Later on, when the owner finally destroys their outer-most SOLPI
+    //     instance, they will notice that the instance has waiters if any thread
+    //     ever made it to step 4b.  They will then need to obtain the OWQ lock in
+    //     order to wake all of the waiters.  Since the waiting thread obtained the
+    //     OWQ lock and committed to waiting before dropping the SOLPI lock, it
+    //     should be impossible for owner thread to attempt a wake operation before
+    //     any thread who committed to blocking made it into the queue.
 
-  Thread* const current_thread = Thread::Current::Get();
-  ChainLockTransactionNoIrqSave clt{
-      CLT_TAG("StackOwnedLoanedPagesInterval::WaitUntilContiguousPageNotStackOwned")};
-  const OwnedWaitQueue::BAAOLockingDetails details =
-      stack_owner.owned_wait_queue_->LockForBAAOOperation(current_thread,
-                                                          stack_owner.owning_thread_);
-  clt.Finalize();
+    Thread* const current_thread = Thread::Current::Get();
+    OwnedWaitQueue::BAAOLockingDetails details;
+    if (!stack_owner.owned_wait_queue_->LockForBAAOOperationOrBackoff(
+            current_thread, stack_owner.owning_thread_, details)) {
+      return ChainLockTransaction::Action::Backoff;
+    }
 
-  // Now that we have the page annotated to indicate that it has a waiter in
-  // this StackOwnedLoanedPagesInterval, we know that the current stack-owner of
-  // these pages is going to have to attempt to wake up all of the thread's
-  // waiting in this SOLPI's OWQ.  We now hold that OWQ's lock as well, so we
-  // can go ahead and drop the global SOLPI lock.  The current stack-owner is
-  // going to have to grab that lock to wake us up, so it cannot stop us from
-  // blocking in the queue at this point.  We can go ahead and drop the SOLPI
-  // lock now.
-  solpi_guard.Release();
+    ChainLockTransaction::Finalize();
 
-  // If this is the first thread blocking in the OWQ, we expect the queue's
-  // owner to be nullptr. For subsequent blocking threads, we expect it to match
-  // our owning_thread_.
-  DEBUG_ASSERT((stack_owner.owned_wait_queue_->owner() == nullptr) ||
-               (stack_owner.owned_wait_queue_->owner() == stack_owner.owning_thread_));
-  DEBUG_ASSERT(stack_owner.owned_wait_queue_->owner() != Thread::Current::Get());
+    // Now that we have the page annotated to indicate that it has a waiter in
+    // this StackOwnedLoanedPagesInterval, we know that the current stack-owner of
+    // these pages is going to have to attempt to wake up all of the thread's
+    // waiting in this SOLPI's OWQ.  We now hold that OWQ's lock as well, so we
+    // can go ahead and drop the global SOLPI lock.  The current stack-owner is
+    // going to have to grab that lock to wake us up, so it cannot stop us from
+    // blocking in the queue at this point.  We can go ahead and drop the SOLPI
+    // lock now.
+    solpi_guard.Release();
 
-  // This is a brief wait that's guaranteed not to get stuck (short of bugs elsewhere), with
-  // priority inheritance propagated to the owning thread.  So no need for a deadline or
-  // interruptible.
-  //
-  // Dropping into the block operation will release all of the locks we obtained
-  // during LockForBAAOOperation involved in PI propagation, including this
-  // queue's lock.  It will drop the current thread's lock as the thread becomes
-  // de-scheduled (and a new thread is chosen), but will re-obtain the current
-  // thread's lock later on once the thread has become re-scheduled, so we will
-  // need to explicitly drop the current thread's lock on the way out after we
-  // wake up.
-  zx_status_t block_status = stack_owner.owned_wait_queue_->BlockAndAssignOwnerLocked(
-      current_thread, Deadline::infinite(), details, ResourceOwnership::Normal, Interruptible::No);
-  current_thread->get_lock().Release();
+    // If this is the first thread blocking in the OWQ, we expect the queue's
+    // owner to be nullptr. For subsequent blocking threads, we expect it to match
+    // our owning_thread_.
+    DEBUG_ASSERT((stack_owner.owned_wait_queue_->owner() == nullptr) ||
+                 (stack_owner.owned_wait_queue_->owner() == stack_owner.owning_thread_));
+    DEBUG_ASSERT(stack_owner.owned_wait_queue_->owner() != Thread::Current::Get());
 
-  // For this wait queue, no other status is possible since no other status is ever passed to
-  // OwnedWaitQueue::WakeAll() for this wait queue and Block() doesn't have any other sources of
-  // failures assuming no bugs here.
-  DEBUG_ASSERT(block_status == ZX_OK);
+    // This is a brief wait that's guaranteed not to get stuck (short of bugs elsewhere), with
+    // priority inheritance propagated to the owning thread.  So no need for a deadline or
+    // interruptible.
+    //
+    // Dropping into the block operation will release all of the locks we obtained
+    // during LockForBAAOOperation involved in PI propagation, including this
+    // queue's lock.  It will drop the current thread's lock as the thread becomes
+    // de-scheduled (and a new thread is chosen), but will re-obtain the current
+    // thread's lock later on once the thread has become re-scheduled, so we will
+    // need to explicitly drop the current thread's lock on the way out after we
+    // wake up.
+    zx_status_t block_status = stack_owner.owned_wait_queue_->BlockAndAssignOwnerLocked(
+        current_thread, Deadline::infinite(), details, ResourceOwnership::Normal,
+        Interruptible::No);
+    current_thread->get_lock().Release();
+
+    // For this wait queue, no other status is possible since no other status is ever passed to
+    // OwnedWaitQueue::WakeAll() for this wait queue and Block() doesn't have any other sources of
+    // failures assuming no bugs here.
+    DEBUG_ASSERT(block_status == ZX_OK);
+    return ChainLockTransaction::Done;
+  };
+  ChainLockTransaction::UntilDone(
+      PreemptDisableAndIrqSaveOption,
+      CLT_TAG("StackOwnedLoanedPagesInterval::WaitUntilContiguousPageNotStackOwned"),
+      do_transaction);
 }
 
 void StackOwnedLoanedPagesInterval::WakeWaitersAndClearOwner(Thread* current_thread) {

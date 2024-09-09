@@ -73,6 +73,7 @@ class Interrupter {
 
  private:
   zx_status_t StartIrqThread();
+  void HandleWakeLease();
 
   fdf::SynchronizedDispatcher dispatcher_;
 
@@ -82,6 +83,8 @@ class Interrupter {
   EventRing event_ring_;
   async::Irq irq_handler_;
   libsync::Completion irq_shutdown_completion_;
+
+  async::Task lease_timeout_;
 
   // published inspect data
   inspect::Node inspect_root_;

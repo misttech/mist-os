@@ -31,7 +31,7 @@ def main():
     if args.compression_level:
         try:
             compression_level = int(args.compression_level)
-        except ValueError as e:
+        except ValueError:
             compression_level = -1
         if compression_level < 0 or compression_level > 9:
             parser.error(
@@ -41,7 +41,12 @@ def main():
     # Get source files list.
     source_files = []
     for root, dirs, files in os.walk(args.source_dir):
-        source_files.extend(os.path.join(root, f) for f in files)
+        source_files.extend(
+            os.path.join(root, f)
+            for f in files
+            # exclude cache files for determinism
+            if not ("__pycache__" in root or f.endswith(".pyc"))
+        )
 
     # Create zip archive.
     source_dir_prefix = args.source_dir

@@ -21,9 +21,6 @@ declare_args() {
   # Point this to the location of external files to be included as extras
   termina_user_extras = []
 
-  # Whether to use Fxfs for the stateful image
-  termina_fxfs_stateful_image = false
-
   # Default stateful image size (40GiB).
   #
   # If you change this value you will need to rebuild the guest partition using
@@ -48,11 +45,7 @@ fuchsia_component_manifest("manifest") {
 fuchsia_structured_config_values("default_config") {
   cm_label = ":manifest"
   values = {
-    if (termina_fxfs_stateful_image) {
-      stateful_partition_type = "block-file"
-    } else {
-      stateful_partition_type = "fvm"
-    }
+    stateful_partition_type = "block-file"
 
     stateful_partition_size = termina_stateful_partition_size_bytes
     additional_read_only_mounts = []
@@ -109,7 +102,6 @@ source_set("lib") {
     "//sdk/lib/sys/cpp",
     "//src/lib/fsl",
     "//src/lib/fxl",
-    "//src/storage/lib/block_client/cpp",
     "//src/storage/lib/vfs/cpp",
     "//src/virtualization/bin/guest_manager:lib",
     "//src/virtualization/lib/grpc",
@@ -122,6 +114,7 @@ source_set("lib") {
     "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/fdio-caller",
     "//zircon/system/ulib/fzl",
+    "//zircon/system/ulib/trace",
     "//zircon/system/ulib/trace-provider",
     "//zircon/system/ulib/zx",
   ]
@@ -130,10 +123,8 @@ source_set("lib") {
   if (termina_volatile_block) {
     defines += [ "USE_VOLATILE_BLOCK" ]
   }
-  if (termina_fxfs_stateful_image) {
-    assert(!defined(data_filesystem_format) || data_filesystem_format == "fxfs",
-           "data_filesystem_format is set to something other than fxfs")
-  }
+  assert(!defined(data_filesystem_format) || data_filesystem_format == "fxfs",
+         "data_filesystem_format is set to something other than fxfs")
 }
 
 romfs_image("extras") {
@@ -189,14 +180,10 @@ executable("termina_guest_manager_unittests") {
   visibility = [ ":*" ]
   testonly = true
 
-  sources = [
-    "block_devices_unittest.cc",
-    "termina_guest_manager_unittest.cc",
-  ]
+  sources = [ "termina_guest_manager_unittest.cc" ]
 
   deps = [
     ":lib",
-    "//sdk/fidl/fuchsia.hardware.block.partition:fuchsia.hardware.block.partition_hlcpp",
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/fdio",
     "//sdk/lib/sys/cpp/testing:unit",
@@ -204,18 +191,11 @@ executable("termina_guest_manager_unittests") {
     "//src/lib/files",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/loop_fixture",
-    "//src/storage/testing:storage_driver_test_support",
   ]
 }
 
 fuchsia_unittest_package("termina_guest_manager_tests") {
-  deps = [
-    ":termina_guest_manager_unittests",
-
-    # Use the storage_driver_test_realm to provide access to a ramdisk driver for testing.
-    "//src/storage/testing:storage_driver_test_realm",
-    "//src/storage/testing:storage_test_includes",
-  ]
+  deps = [ ":termina_guest_manager_unittests" ]
 }
 
 group("tests") {

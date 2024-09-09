@@ -4,7 +4,7 @@
 
 #include <fidl/fuchsia.hardware.sysmem/cpp/fidl.h>
 
-#include "src/devices/sysmem/drivers/sysmem/device.h"
+#include "src/devices/sysmem/drivers/sysmem/sysmem.h"
 #include "src/graphics/display/drivers/fake/fake-sysmem-device-hierarchy.h"
 #include "sysmem_fuzz_common.h"
 

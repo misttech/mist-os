@@ -22,7 +22,6 @@ fuchsia_structured_config_values("driver_manager_config_default") {
     delay_fallback_until_base_drivers_indexed = true
     suspend_timeout_fallback = true
     verbose = false
-    driver_host_crash_policy = "restart-driver-host"
     root_driver = "fuchsia-boot:///platform-bus#meta/platform-bus.cm"
     enable_test_shutdown_delays = false
   }
@@ -35,12 +34,12 @@ source_set("inspect") {
     "inspect.h",
   ]
   public_deps = [
-    "//sdk/fidl/fuchsia.inspect:fuchsia.inspect_cpp",
     "//sdk/lib/inspect/component/cpp",
     "//src/lib/ddk",
     "//src/storage/lib/vfs/cpp",
     "//zircon/system/ulib/fbl",
   ]
+  deps = [ "//sdk/lib/inspect/component/cpp" ]
 }
 
 source_set("driver_host_loader_service") {

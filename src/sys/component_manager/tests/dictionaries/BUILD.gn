@@ -44,17 +44,13 @@ fuchsia_unittest_package("dictionaries_integration_test") {
     "//src/sys/component_manager/tests/collections:trigger_a",
     "//src/sys/component_manager/tests/collections:trigger_b",
   ]
-  restricted_features = [ "dictionaries" ]
 }
 
 fuchsia_component("trigger_c") {
   testonly = true
   deps = [ ":dict_trigger_bin" ]
   manifest = "meta/trigger_c.cml"
-  restricted_features = [
-    "dictionaries",
-    "dynamic_dictionaries",
-  ]
+  restricted_features = [ "dynamic_dictionaries" ]
 }
 
 group("tests") {

@@ -83,7 +83,7 @@ fuchsia_product_size_check = rule(
     toolchains = ["@fuchsia_sdk//fuchsia:toolchain"],
     attrs = {
         "product_image": attr.label(
-            doc = "fuchsia_product_image target to check the size of.",
+            doc = "fuchsia_product target to check the size of.",
             providers = [FuchsiaProductImageInfo],
             mandatory = True,
         ),

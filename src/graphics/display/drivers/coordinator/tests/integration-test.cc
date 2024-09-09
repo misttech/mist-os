@@ -77,6 +77,10 @@ class IntegrationTest : public TestBase, public testing::WithParamInterface<bool
   void SendVsyncAfterUnbind(std::unique_ptr<TestFidlClient> client, DisplayId display_id) {
     fbl::AutoLock l(controller()->mtx());
     // Reseting client will *start* client tear down.
+    //
+    // ~MockCoordinatorListener fences the server-side dispatcher thread (consistent with the
+    // threading model of its fidl server binding), but that doesn't sync with the client end
+    // (intentionally).
     client.reset();
     ClientProxy* client_ptr = controller()->active_client_;
     EXPECT_OK(sync_completion_wait(client_ptr->handler_.fidl_unbound(), zx::sec(1).get()));

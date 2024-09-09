@@ -25,6 +25,15 @@ impl GetItemAttributesCommand {
     const MIN_PACKET_SIZE: usize = 12;
 
     #[cfg(test)]
+    pub fn new(
+        scope: Scope,
+        uid: u64,
+        uid_counter: u16,
+        attributes: Vec<MediaAttributeId>,
+    ) -> Self {
+        Self { scope, uid, uid_counter, attributes }
+    }
+
     pub fn uid(&self) -> u64 {
         self.uid
     }
@@ -32,6 +41,10 @@ impl GetItemAttributesCommand {
     #[cfg(test)]
     pub fn uid_counter(&self) -> u16 {
         self.uid_counter
+    }
+
+    pub fn scope(&self) -> Scope {
+        self.scope
     }
 
     pub fn from_now_playing_list(

@@ -13,6 +13,7 @@
     include: [
         "inspect/client.shard.cml",
         "syslog/client.shard.cml",
+        "trace/client.shard.cml",
     ],
 
     // Information about the program to run.

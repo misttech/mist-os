@@ -66,7 +66,7 @@ Note: worktrees are incompatible with several tools used by fuchsia. In a
 worktree checkout, you can't use `jiri` at all (although you can still get
 updates via `./multifuchsia rebase`), you have to turn off version stamping by
 setting the `kernel_version_string` gn argument to a placeholder value, and `fx
-bazel` doesn't work. I think all these limitations could be lifted with focused
+bazel` doesn't work. Probably all these limitations could be lifted with focused
 effort, but ordinary snapshot checkouts might be a bit less brittle, for now.
 
 benefits of worktree checkouts:
@@ -98,8 +98,8 @@ enter` environment, which will see their own mount). This is handy for vscode
 remote sessions, or for running tools which don't work well inside the isolated
 environment.
 
-Note1: it also creates the checkout if it doesn't already exist, but I'm not
-sure if I want to keep that behavior. Maybe that should only be for `mfcd`?
+Note1: it also creates the checkout if it doesn't already exist, but this might
+not be the desired / expected behavior. Maybe that should only be for `mfcd`?
 
 Note2: `./multifuchsia mount` fails if it can't unmount what is already mounted
 on the mountpoint. The most common problem is a shell which is `cd`ed into the
@@ -153,10 +153,10 @@ copy-pastable command for deleting them. (It does not delete anything on it's
 own)
 
 Note: the dirty working directory detection is built on `git status` which means
-it ignores `.gitignore`d files. While this is certainly what you want ("I have
-ever done a build in this checkout" does not mean I want to keep it), it's worth
-keeping it in mind in case you have files in `out/` or another ignored directory
-that you might want to keep.
+it ignores `.gitignore`d files. While this is most likely what you want (Having
+ever completed a build in a checkout does not imply it should be kept forever.),
+it is worth keeping it in mind, in case you have files in `out/` or another
+ignored directory that you might want to keep.
 
 ### `./multifuchsia pack`
 
@@ -214,7 +214,7 @@ Although it's a bit more colorful in person.
 ### bash/zsh aliases
 
 `mfcd $name`: does `./multifuchsia mount $name` and then `cd $MOUNTPOINT`. Even
-if we change mount to not auto-create new checkouts, I think `mfcd` should still
+if we change mount to not auto-create new checkouts, `mfcd` maybe should still
 auto-create checkouts. There's also tab-completion for the checkout names, and
 you can run it from anywhere. Also, `mfcd` with no arguments takes you to
 `$MULTIFUCHSIA_ROOT`, which is handy.
@@ -227,7 +227,7 @@ OR names, I'll probably just delete this
 
 Both of these aliases feature tab completion for checkout names.
 
-Please let me know if you can help port these to your shell of choice.
+Please consider contributing aliases for your shell of choice.
 
 ## Setup Instructions
 
@@ -359,7 +359,7 @@ Please let me know if you can help port these to your shell of choice.
     $ echo 'eval "$("'"$MULTIFUCHSIA_ROOT"'/multifuchsia" env zsh)"' >> ~/.zshrc
     ```
 
-    If you use a different shell, consider sending me a patch with support for
+    If you use a different shell, please consider contributing patch with support for
     your preferred shell.
 
 Extra notes:

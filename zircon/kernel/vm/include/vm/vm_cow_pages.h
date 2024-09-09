@@ -609,7 +609,7 @@ class VmCowPages final : public VmHierarchyBase,
   // Eviction wrapper, unlike ReclaimPage this wrapper can assume it just needs to evict, and has no
   // requirements on updating any reclamation lists. Exposed for the physical page provider to
   // reclaim loaned pages.
-  bool ReclaimPageForEviction(vm_page_t* page, uint64_t offset);
+  void ReclaimPageForEviction(vm_page_t* page, uint64_t offset);
 
   // Potentially transitions from Alive->Dead if the cow pages is unreachable (i.e. has no
   // paged_ref_ and no children). Used by the VmObjectPaged when it unlinks the paged_ref_, but

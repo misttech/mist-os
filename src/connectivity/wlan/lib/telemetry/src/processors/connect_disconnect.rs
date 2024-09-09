@@ -19,9 +19,7 @@ use tracing::warn;
 use windowed_stats::experimental::clock::{TimedSample, Timestamp};
 use windowed_stats::experimental::series::interpolation::Constant;
 use windowed_stats::experimental::series::statistic::Union;
-use windowed_stats::experimental::series::{
-    RoundRobinSampler, Sampler, SamplingProfile, TimeMatrix,
-};
+use windowed_stats::experimental::series::{Interpolator, Sampler, SamplingProfile, TimeMatrix};
 use wlan_common::bss::BssDescription;
 use wlan_common::channel::Channel;
 use {

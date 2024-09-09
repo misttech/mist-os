@@ -153,7 +153,7 @@ if (is_mistos) {
       "//src/devices/bus/drivers/platform:platform-bus",
 
       # TODO: Move this to bootstrap after fixing pci to not depend on it.
-      "//src/devices/sysmem/drivers/sysmem",
+      #"//src/devices/sysmem/drivers/sysmem",
       #"//src/devices/sysmem/drivers/sysmem:config_values",
 
       # Virtio

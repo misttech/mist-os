@@ -47,6 +47,10 @@ pub struct ProductConfig {
     /// Components which depend on trusted applications running in the TEE.
     #[serde(default)]
     pub tee_clients: Vec<TeeClient>,
+
+    /// Components which should run as trusted applications in Fuchsia.
+    #[serde(default)]
+    pub trusted_apps: Vec<TrustedApp>,
 }
 
 /// Packages provided by the product, to add to the assembled images.
@@ -201,6 +205,15 @@ pub struct TeeClient {
     /// Additional features required for the component to function.
     #[serde(default)]
     pub additional_required_features: TeeClientFeatures,
+}
+
+/// Configuration for how to run a trusted application in Fuchsia.
+#[derive(Clone, Debug, Deserialize, Serialize, JsonSchema)]
+pub struct TrustedApp {
+    /// The URL of the component.
+    pub component_url: String,
+    /// The GUID that identifies this trusted app for clients.
+    pub guid: String,
 }
 
 #[cfg(test)]

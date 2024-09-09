@@ -5,6 +5,8 @@
 import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.driver.metadata") {
+  sdk_category = "partner"
+  sdk_area = "Driver SDK"
   sources = [ "fuchsia.driver.metadata.fidl" ]
 
   public_deps = [ "//zircon/vdso/zx" ]

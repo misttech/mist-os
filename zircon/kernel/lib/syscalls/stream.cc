@@ -39,15 +39,16 @@ zx_status_t sys_stream_create(uint32_t options, zx_handle_t vmo_handle, zx_off_t
   }
 
   auto up = ProcessDispatcher::GetCurrent();
-  fbl::RefPtr<VmObjectDispatcher> vmo;
+  fbl::RefPtr<VmObjectDispatcher> disp;
   zx_rights_t actual_vmo_rights = ZX_RIGHT_NONE;
-  status = up->handle_table().GetDispatcherWithRights(*up, vmo_handle, desired_vmo_rights, &vmo,
+  status = up->handle_table().GetDispatcherWithRights(*up, vmo_handle, desired_vmo_rights, &disp,
                                                       &actual_vmo_rights);
   if (status != ZX_OK)
     return status;
 
   // Cannot create a stream from a physical or contiguous VMO.
-  if (vmo->vmo()->is_contiguous() || !vmo->vmo()->is_paged()) {
+  fbl::RefPtr<VmObjectPaged> vmo = DownCastVmObject<VmObjectPaged>(disp->vmo());
+  if (!vmo || vmo->is_contiguous()) {
     return ZX_ERR_WRONG_TYPE;
   }
 
@@ -60,9 +61,15 @@ zx_status_t sys_stream_create(uint32_t options, zx_handle_t vmo_handle, zx_off_t
     stream_options |= StreamDispatcher::kCanResizeVmo;
   }
 
+  auto result = disp->content_size_manager();
+  if (result.is_error()) {
+    return result.status_value();
+  }
+
   KernelHandle<StreamDispatcher> new_handle;
   zx_rights_t rights;
-  status = StreamDispatcher::Create(stream_options, ktl::move(vmo), seek, &new_handle, &rights);
+  status = StreamDispatcher::Create(stream_options, ktl::move(vmo), ktl::move(*result), seek,
+                                    &new_handle, &rights);
   if (status != ZX_OK)
     return status;
   return up->MakeAndAddHandle(ktl::move(new_handle), rights, out_stream);

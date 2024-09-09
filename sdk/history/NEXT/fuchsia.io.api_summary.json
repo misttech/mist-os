@@ -385,7 +385,7 @@
     {
         "kind": "protocol",
         "name": "fuchsia.io/Directory",
-        "openness": "closed",
+        "openness": "open",
         "transport": "channel"
     },
     {
@@ -500,7 +500,7 @@
     {
         "kind": "protocol",
         "name": "fuchsia.io/Directory1",
-        "openness": "closed",
+        "openness": "open",
         "transport": "channel"
     },
     {
@@ -781,7 +781,7 @@
     {
         "kind": "protocol",
         "name": "fuchsia.io/Directory2",
-        "openness": "closed",
+        "openness": "open",
         "transport": "channel"
     },
     {
@@ -1253,7 +1253,7 @@
     {
         "kind": "protocol",
         "name": "fuchsia.io/File",
-        "openness": "closed",
+        "openness": "open",
         "transport": "channel"
     },
     {
@@ -2039,7 +2039,7 @@
     {
         "kind": "protocol",
         "name": "fuchsia.io/Node",
-        "openness": "closed",
+        "openness": "open",
         "transport": "channel"
     },
     {
@@ -2103,7 +2103,7 @@
     {
         "kind": "protocol",
         "name": "fuchsia.io/Node1",
-        "openness": "closed",
+        "openness": "open",
         "transport": "channel"
     },
     {

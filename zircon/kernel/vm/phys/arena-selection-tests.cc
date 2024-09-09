@@ -6,6 +6,7 @@
 
 #include <inttypes.h>
 #include <lib/memalloc/range.h>
+#include <lib/memalloc/testing/range.h>
 #include <lib/stdcompat/span.h>
 
 #include <gtest/gtest.h>
@@ -101,6 +102,16 @@ void ExpectArenasInPractice(cpp20::span<const memalloc::Range> ranges,
                             cpp20::span<const PmmArenaSelection> expected,
                             cpp20::span<const PmmArenaSelectionError> expected_errors = {}) {
   ExpectArenas(ranges, expected, expected_errors, kMaxWastedArenaBytes);
+}
+
+void ExpectAlignedAllocationsOrHoles(cpp20::span<const memalloc::Range> input_ranges,
+                                     cpp20::span<const memalloc::Range> expected) {
+  std::vector<memalloc::Range> actual;
+  ForEachAlignedAllocationOrHole<kPageSize>(input_ranges, [&actual](const memalloc::Range& range) {
+    actual.push_back(range);
+    return true;
+  });
+  memalloc::testing::CompareRanges(expected, actual);
 }
 
 //
@@ -729,6 +740,173 @@ TEST(PmmArenaSelectionTests, Nelson) {
   };
 
   ExpectArenasInPractice({kRanges}, {kExpected});
+}
+
+TEST(ForEachAlignedAllocationOrHoleTests, Empty) { ExpectAlignedAllocationsOrHoles({}, {}); }
+
+TEST(ForEachAlignedAllocationOrHoleTests, AlreadyAlignedRegions) {
+  constexpr memalloc::Range kInputRanges[] = {
+      {
+          .addr = 0x0000,
+          .size = 0x1000,
+          .type = memalloc::Type::kDataZbi,
+      },
+      {
+          .addr = 0x2000,
+          .size = 0x1000,
+          .type = memalloc::Type::kFreeRam,
+      },
+      {
+          .addr = 0x3000,
+          .size = 0x1000,
+          .type = memalloc::Type::kKernel,
+      },
+  };
+  constexpr memalloc::Range kExpected[] = {
+      {
+          .addr = 0x0000,
+          .size = 0x1000,
+          .type = memalloc::Type::kDataZbi,
+      },
+      {
+          .addr = 0x1000,
+          .size = 0x1000,
+          .type = memalloc::Type::kReserved,
+      },
+      {
+          .addr = 0x3000,
+          .size = 0x1000,
+          .type = memalloc::Type::kKernel,
+      },
+  };
+  ExpectAlignedAllocationsOrHoles({kInputRanges}, {kExpected});
+}
+
+TEST(ForEachAlignedAllocationOrHoleTests, HoleAndFreeRamInSamePage) {
+  // (RAM, hole) in page 1; RAM in page 2; (hole, RAM) in page 3
+  constexpr memalloc::Range kInputRanges[] = {
+      // free RAM: [0, 0x800)
+      {
+          .addr = 0x0000,
+          .size = 0x0800,
+          .type = memalloc::Type::kFreeRam,
+      },
+      // hole: [0x800, 0x1000)
+      // free RAM: [0x1000, 0x2000)
+      {
+          .addr = 0x1000,
+          .size = 0x1000,
+          .type = memalloc::Type::kFreeRam,
+      },
+      // hole: [0x2000, 0x2800)
+      // free RAM: [0x2800, 0x3000)
+      {
+          .addr = 0x2800,
+          .size = 0x0800,
+          .type = memalloc::Type::kFreeRam,
+      },
+  };
+  constexpr memalloc::Range kExpected[] = {
+      {
+          .addr = 0x0000,
+          .size = 0x1000,
+          .type = memalloc::Type::kReserved,
+      },
+      {
+          .addr = 0x2000,
+          .size = 0x1000,
+          .type = memalloc::Type::kReserved,
+      },
+  };
+  ExpectAlignedAllocationsOrHoles({kInputRanges}, {kExpected});
+}
+
+TEST(ForEachAlignedAllocationOrHoleTests, AllocationAndFreeRamInSamePage) {
+  // (RAM, allocation) in page 1; RAM in page 2; (allocation, RAM) in page 3
+  constexpr memalloc::Range kInputRanges[] = {
+      // free RAM: [0, 0x800)
+      {
+          .addr = 0x0000,
+          .size = 0x0800,
+          .type = memalloc::Type::kFreeRam,
+      },
+      // phys log: [0x800, 0x1000)
+      {
+          .addr = 0x0800,
+          .size = 0x0800,
+          .type = memalloc::Type::kPhysLog,
+      },
+      // free RAM: [0x1000, 0x2000)
+      {
+          .addr = 0x1000,
+          .size = 0x1000,
+          .type = memalloc::Type::kFreeRam,
+      },
+      // temporary hand-off: [0x2000, 0x2800)
+      {
+          .addr = 0x2000,
+          .size = 0x0800,
+          .type = memalloc::Type::kTemporaryPhysHandoff,
+      },
+      // free RAM: [0x2800, 0x3000)
+      {
+          .addr = 0x2800,
+          .size = 0x0800,
+          .type = memalloc::Type::kFreeRam,
+      },
+  };
+  constexpr memalloc::Range kExpected[] = {
+      {
+          .addr = 0x0000,
+          .size = 0x1000,
+          .type = memalloc::Type::kPhysLog,
+      },
+      {
+          .addr = 0x2000,
+          .size = 0x1000,
+          .type = memalloc::Type::kTemporaryPhysHandoff,
+      },
+  };
+  ExpectAlignedAllocationsOrHoles({kInputRanges}, {kExpected});
+}
+
+TEST(ForEachAlignedAllocationOrHoleTests, HoleAndAllocationInSamePage) {
+  // (allocation, hole) in page 1; RAM in page 2; (hole, allocation) in page 3
+  constexpr memalloc::Range kInputRanges[] = {
+      // phys log: [0, 0x800)
+      {
+          .addr = 0x0000,
+          .size = 0x0800,
+          .type = memalloc::Type::kPhysLog,
+      },
+      // hole: [0x800, 0x1000)
+      // free RAM: [0x1000, 0x2000)
+      {
+          .addr = 0x1000,
+          .size = 0x1000,
+          .type = memalloc::Type::kFreeRam,
+      },
+      // hole: [0x2000, 0x2800)
+      // temporary hand-off: [0x2800, 0x3000)
+      {
+          .addr = 0x2800,
+          .size = 0x0800,
+          .type = memalloc::Type::kTemporaryPhysHandoff,
+      },
+  };
+  constexpr memalloc::Range kExpected[] = {
+      {
+          .addr = 0x0000,
+          .size = 0x1000,
+          .type = memalloc::Type::kPhysLog,
+      },
+      {
+          .addr = 0x2000,
+          .size = 0x1000,
+          .type = memalloc::Type::kTemporaryPhysHandoff,
+      },
+  };
+  ExpectAlignedAllocationsOrHoles({kInputRanges}, {kExpected});
 }
 
 }  // namespace

@@ -25,7 +25,7 @@ struct LogSettings {
   //
   // Log messages for FX_VLOGS(x) (from macros.h) log verbosities in
   // the range between INFO and DEBUG
-  fuchsia_logging::LogSeverity min_log_level = fuchsia_logging::DefaultLogLevel;
+  FuchsiaLogSeverity min_log_level = fuchsia_logging::kDefaultLogLevel;
 #ifndef __Fuchsia__
   // The name of a file to which the log should be written.
   // When non-empty, the previous log output is closed and logging is

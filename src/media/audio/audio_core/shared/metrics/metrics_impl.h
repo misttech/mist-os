@@ -8,7 +8,7 @@
 #include <fidl/fuchsia.io/cpp/markers.h>
 #include <fidl/fuchsia.metrics/cpp/fidl.h>
 
-#include "src/lib/fidl/cpp/contrib/connection/service_hub_connector.h"
+#include "src/lib/fidl/contrib/connection/service_hub_connector.h"
 #include "src/media/audio/audio_core/shared/metrics/metrics.h"
 
 namespace media::audio {

@@ -15,8 +15,11 @@ pub async fn open_file_data(
     parent: &fio::DirectoryProxy,
     path: &str,
 ) -> Result<fmem::Data, FileError> {
-    let file =
-        fuchsia_fs::directory::open_file_no_describe(parent, path, fio::OpenFlags::RIGHT_READABLE)?;
+    let file = fuchsia_fs::directory::open_file_no_describe_deprecated(
+        parent,
+        path,
+        fio::OpenFlags::RIGHT_READABLE,
+    )?;
     match file
         .get_backing_memory(fio::VmoFlags::READ)
         .await

@@ -102,6 +102,8 @@ pub struct KernelOptions {
     pub command_line_args: Vec<String>,
 }
 
+/// A path to a "node" in the json configuration
+///
 /// A path to a "node" in the json configuration, which has one or more fields
 /// which are paths to a developer-provided file, and therefore need to be
 /// resolved correctly, based on the developer overrides file location, before

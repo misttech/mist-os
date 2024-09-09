@@ -60,8 +60,8 @@ static bool event_signal_result_after_wait_test() {
     {
       // Check if the waiter thread is in the blocked state, indicating that the event
       // has latched.
-      SingletonChainLockGuardIrqSave guard{waiter->get_lock(),
-                                           CLT_TAG("event_signal_result_after_wait_test")};
+      SingleChainLockGuard guard{IrqSaveOption, waiter->get_lock(),
+                                 CLT_TAG("event_signal_result_after_wait_test")};
       if (waiter->state() == THREAD_BLOCKED) {
         break;
       }

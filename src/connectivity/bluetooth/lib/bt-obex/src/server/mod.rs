@@ -19,7 +19,7 @@ pub use crate::transport::TransportType;
 /// Defines an interface for handling OBEX requests. All profiles & services should implement this
 /// interface.
 mod handler;
-pub use handler::{ObexOperationError, ObexServerHandler};
+pub use handler::{new_operation_error, ObexOperationError, ObexServerHandler};
 
 /// Implements the OBEX GET operation.
 mod get;

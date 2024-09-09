@@ -50,7 +50,7 @@ source_set("lib") {
     "//src/developer/forensics/exceptions:constants",
     "//src/developer/forensics/utils:errors",
     "//src/developer/forensics/utils:promise_timeout",
-    "//src/lib/fidl/cpp/contrib/fpromise:fpromise",
+    "//src/lib/fidl/contrib/fpromise:fpromise",
     "//src/lib/fsl",
   ]
 }

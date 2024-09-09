@@ -36,9 +36,7 @@ import difflib
 import errno
 import json
 import os
-import shutil
 import stat
-import subprocess
 import sys
 from pathlib import Path
 from typing import Any, Callable, Sequence
@@ -557,6 +555,10 @@ def main() -> int:
         default="toplevel",
     )
     parser.add_argument(
+        "--clang_dir",
+        help="Path to clang toolchain directory. Defaults to {fuchsia_dir}/prebuilt/third_party/clang/{host_tag}",
+    )
+    parser.add_argument(
         "--verbose", action="count", default=1, help="Increase verbosity"
     )
     parser.add_argument(
@@ -694,8 +696,6 @@ def main() -> int:
 
     def create_workspace_symlink(path: str, target_path: str) -> None:
         generated.add_symlink(os.path.join("workspace", path), target_path)
-
-    script_path = os.path.relpath(__file__, fuchsia_dir)
 
     templates_dir = os.path.join(fuchsia_dir, "build", "bazel", "templates")
 
@@ -871,13 +871,16 @@ common --enable_bzlmod=false
     # Content hash file for @prebuilt_clang, fuchsia_clang, keep in sync with
     # generate_prebuilt_clang_toolchain_repository() in
     # //build/bazel_sdk/bazel_rules_fuchsia/fuchsia/workspace/fuchsia_clang_repository.bzl
-    clang_content_files = list(
-        find_clang_content_files(
-            os.path.join(
-                fuchsia_dir, "prebuilt", "third_party", "clang", host_tag
-            )
+
+    clang_dir = (
+        args.clang_dir
+        if args.clang_dir
+        else os.path.join(
+            fuchsia_dir, "prebuilt", "third_party", "clang", host_tag
         )
     )
+
+    clang_content_files = list(find_clang_content_files(clang_dir))
 
     rules_fuchsia_dir = os.path.join(
         fuchsia_dir, "build", "bazel_sdk", "bazel_rules_fuchsia"
@@ -1008,7 +1011,11 @@ common --enable_bzlmod=false
 
     # LINT.IfChange
     generated_repositories_inputs["fuchsia_sdk"] = all_fuchsia_idk_metas
-    # LINT.ThenChange(../templates/template.WORKSPACE.bazel)
+    # LINT.ThenChange(../toplevel.WORKSPACE.bazel)
+
+    # LINT.IfChange
+    generated_repositories_inputs["fuchsia_idk"] = all_fuchsia_idk_metas
+    # LINT.ThenChange(../toplevel.WORKSPACE.bazel)
 
     # LINT.IfChange
     generated_repositories_inputs["bazel_rules_fuchsia"] = list(

@@ -5,7 +5,6 @@
 """Converts a distribution manifest to the Fuchsia INI format."""
 
 import argparse
-import json
 
 import distribution_manifest
 

@@ -4,6 +4,7 @@
 
 #include <fidl/fuchsia.audio.device/cpp/common_types.h>
 #include <fidl/fuchsia.audio.device/cpp/natural_types.h>
+#include <lib/fidl/cpp/wire/unknown_interaction_handler.h>
 #include <zircon/errors.h>
 
 #include <memory>
@@ -39,7 +40,10 @@ class ObserverServerWarningTest : public AudioDeviceRegistryServerTestBase,
     return added_device_id;
   }
 
-  void handle_unknown_event(fidl::UnknownEventMetadata<fad::Observer>) override {}
+  void handle_unknown_event(fidl::UnknownEventMetadata<fad::Observer> metadata) override {
+    FAIL() << "ObserverServerWarningTest: unknown event (Observer) ordinal "
+           << metadata.event_ordinal;
+  }
 };
 
 class ObserverServerCodecWarningTest : public ObserverServerWarningTest {

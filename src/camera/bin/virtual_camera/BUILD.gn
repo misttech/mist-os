@@ -4,6 +4,7 @@
 
 import("//build/components.gni")
 import("//build/fidl/fidl.gni")
+import("//build/testing/cc_test_executable.gni")
 
 group("tests") {
   testonly = true
@@ -27,7 +28,7 @@ source_set("virtual_camera_hal_controller") {
   public_deps = [
     ":stream_storage",
     "//sdk/fidl/fuchsia.camera2.hal:fuchsia.camera2.hal_hlcpp",
-    "//sdk/lib/fidl/cpp",
+    "//sdk/lib/fidl/hlcpp",
   ]
   deps = [ "//sdk/lib/syslog/cpp" ]
 }
@@ -85,7 +86,7 @@ fuchsia_package("virtual_camera_pkg") {
   package_name = "virtual_camera"
 }
 
-executable("virtual_camera_agent_unittest_bin") {
+cc_test_executable("virtual_camera_agent_unittest_bin") {
   testonly = true
   sources = [ "virtual_camera_agent_unittest.cc" ]
   deps = [
@@ -104,7 +105,7 @@ fuchsia_unittest_package("virtual_camera_agent_unittest") {
   deps = [ ":virtual_camera_agent_unittest_bin" ]
 }
 
-executable("stream_storage_unittest_bin") {
+cc_test_executable("stream_storage_unittest_bin") {
   testonly = true
   sources = [ "stream_storage_unittest.cc" ]
   deps = [

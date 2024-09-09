@@ -16,7 +16,7 @@ use fidl_fuchsia_update_installer::{
 use fidl_test_security_pkg::PackageServer_Marker;
 use fuchsia_async::Task;
 use fuchsia_component::client::connect_to_protocol;
-use fuchsia_fs::directory::{open_file, readdir};
+use fuchsia_fs::directory::{open_file_deprecated, readdir};
 use fuchsia_fs::file;
 use fuchsia_hash::Hash;
 use fuchsia_merkle::MerkleTree;
@@ -256,7 +256,7 @@ impl AccessCheckRequest {
         &self,
         package_directory_proxy: &fio::DirectoryProxy,
     ) -> Result<Box<Buffer>> {
-        let bin_file = open_file(
+        let bin_file = open_file_deprecated(
             package_directory_proxy,
             &self.config.packaged_binary_path,
             fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,
@@ -275,7 +275,7 @@ impl AccessCheckRequest {
     }
 
     async fn attempt_readable(&self, package_directory_proxy: &fio::DirectoryProxy) -> Result<()> {
-        let bin_file = open_file(
+        let bin_file = open_file_deprecated(
             package_directory_proxy,
             &self.config.packaged_binary_path,
             fio::OpenFlags::RIGHT_READABLE,

@@ -1,10 +1,9 @@
 # `hwstress`
 
-`hwstress` is a tool for exercising hardware components, such as CPU, RAM, and
-flash. It can be used both to test that hardware is correctly functioning
-(revealing bad RAM, bad flash, or system heating problems), and also as a system
-load generator (for example, running the CPU at 50% utilization and consuming
-50% of RAM).
+`hwstress` is a tool for exercising hardware components, such as CPU, RAM. It can be used both to
+test that hardware is correctly functioning (revealing bad RAM, or system heating problems), and
+also as a system load generator (for example, running the CPU at 50% utilization and consuming 50%
+of RAM).
 
 ## Usage
 
@@ -15,7 +14,6 @@ Attempts to stress hardware components by placing them under high load.
 
 Subcommands:
   cpu                    Perform a CPU stress test.
-  flash                  Perform a flash stress test.
   light                  Perform a device light / LED stress test.
   memory                 Perform a RAM stress test.
 
@@ -41,17 +39,6 @@ CPU test options:
                          CPU cores to run the test on. A comma separated list
                          of CPU indices. If not specified all the CPUs will be
                          tested.
-
-Flash test options:
-  -c, --cleanup-test-partitions
-                         Cleanup all existing flash test partitions in the
-                         system, and then exit without testing. Can be used
-                         to clean up persistent test partitions left over from
-                         previous flash tests which did not exit cleanly.
-  -f, --fvm-path=<path>  Path to Fuchsia Volume Manager.
-  -i, --iterations=<number>
-                         Number of full write/read cycles to perform before finishing the test.
-  -m, --memory=<size>    Amount of flash memory to test, in megabytes.
 
 Light test options:
   --light-on-time=<seconds>
@@ -85,33 +72,6 @@ The RAM stress tests attempt to:
 *   Find RAM affected by the [Row hammer][rowhammer] vulnerability.
 
 [rowhammer]: https://en.wikipedia.org/wiki/Row_hammer
-
-### Flash
-
-The flash stress tests writes unique values to each sector of flash, and
-verifies that the written data can be correctly read back again.
-
-The flash tests create a raw partition to allow direct communication to the
-flash device, bypassing Fuchsia's filesystem layers. To do this safely, the test
-will only exercise block devices managed by [FVM][fvm]. The test will create a
-raw partition, exercise the partition, and then remove the partition when
-finished:
-
-```sh
-# Create and test a 100MiB partition on block device 000.
-hwstress flash --fvm-path=/dev/class/block/000/fvm --memory=100
-```
-
-If the test is aborted before finishing, the test partition may not be cleaned
-up, and the space allocated to the partition not freed. The partition will be
-removed if the system is rebooted, or by running:
-
-```sh
-# Remove all hwstress test partitions in the system.
-hwstress flash --cleanup-test-partitions
-```
-
-[fvm]: https://fuchsia.dev/fuchsia-src/glossary#fuchsia-volume-manager
 
 ## See also
 

@@ -130,5 +130,9 @@ closed protocol TouchInputListener {
         /// is responsible for assembling the fingers as needed
         @available(added=12)
         7: pointer_id uint32;
+
+        // Identifies the device originating this event.
+        @available(added=NEXT)
+        8: device_id uint32;
     });
 };

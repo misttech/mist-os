@@ -98,7 +98,7 @@ void TimelineCounters(unsigned int level) {
 // This can happen really any time after the platform clock is configured.
 LK_INIT_HOOK(TimelineCounters, TimelineCounters, LK_INIT_LEVEL_PLATFORM)
 
-Handle* CreateVmoHandle(fbl::RefPtr<VmObjectPaged> vmo, size_t content_size, bool readonly) {
+Handle* CreateVmoHandle(fbl::RefPtr<VmObjectPaged> vmo, size_t content_size, bool writable) {
   zx_rights_t rights;
   KernelHandle<VmObjectDispatcher> handle;
   zx_status_t status =
@@ -106,66 +106,42 @@ Handle* CreateVmoHandle(fbl::RefPtr<VmObjectPaged> vmo, size_t content_size, boo
                                  VmObjectDispatcher::InitialMutability::kMutable, &handle, &rights);
   ASSERT(status == ZX_OK);
 
-  if (readonly) {
+  if (writable) {
+    rights |= ZX_RIGHT_WRITE;
+  } else {
     rights &= ~ZX_RIGHT_WRITE;
   }
   return Handle::Make(ktl::move(handle), rights).release();
 }
 
-void LogVmo(ktl::string_view name, zx_paddr_t paddr, size_t size) {
-  dprintf(INFO, "handing off VMO from phys: %.*s @ [%#" PRIx64 ", %#" PRIx64 ")\n",
-          static_cast<int>(name.size()), name.data(), paddr, paddr + size);
+Handle* CreateStubVmo() {
+  fbl::RefPtr<VmObjectPaged> vmo;
+  zx_status_t status = VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY, 0, 0, &vmo);
+  ASSERT(status == ZX_OK);
+  return CreateVmoHandle(ktl::move(vmo), 0, /*writable=*/false);
 }
 
-// If an input with empty contents is supplied, a handle to a stub VMO is
-// returned.
-Handle* CreatePhysVmo(const PhysVmo& phys_vmo) {
-  ktl::span contents = phys_vmo.data.get();
+Handle* CreatePhysVmo(const PhysVmo& phys_vmo, bool writable = false) {
   ktl::string_view name{phys_vmo.name.data(), phys_vmo.name.size()};
   name = name.substr(0, name.find_first_of('\0'));
-
-  fbl::RefPtr<VmObjectPaged> vmo;
-  uint64_t aligned_size;
-  zx_status_t status = VmObject::RoundSize(contents.size(), &aligned_size);
-  ASSERT(status == ZX_OK);
-
-  status = VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY, 0, aligned_size, &vmo);
-  ASSERT(status == ZX_OK);
-
-  if (!contents.empty()) {
-    // Non-empty contents should have a non-empty name.
-    DEBUG_ASSERT(!name.empty());
-
-    status = vmo->set_name(name.data(), name.size());
-    DEBUG_ASSERT(status == ZX_OK);
-
-    status = vmo->Write(contents.data(), 0, contents.size_bytes());
-    DEBUG_ASSERT(status == ZX_OK);
-
-    zx_paddr_t paddr = physmap_to_paddr(contents.data());
-    LogVmo(name, paddr, contents.size());
-  }
-  return CreateVmoHandle(ktl::move(vmo), contents.size(), /*readonly=*/true);
-}
-
-Handle* CreateVmoFromWiredPages(zx_paddr_t paddr, size_t size, ktl::string_view name,
-                                bool readonly) {
-  DEBUG_ASSERT(IS_PAGE_ALIGNED(paddr));
   DEBUG_ASSERT(!name.empty());
 
-  uint64_t aligned_size;
-  zx_status_t status = VmObject::RoundSize(size, &aligned_size);
-  ASSERT(status == ZX_OK);
+  DEBUG_ASSERT(IS_PAGE_ALIGNED(phys_vmo.addr));
+  DEBUG_ASSERT(IS_PAGE_ALIGNED(phys_vmo.size_bytes()));
 
   fbl::RefPtr<VmObjectPaged> vmo;
-  status = VmObjectPaged::CreateFromWiredPages(paddr_to_physmap(paddr), aligned_size, true, &vmo);
+  zx_status_t status = VmObjectPaged::CreateFromWiredPages(paddr_to_physmap(phys_vmo.addr),
+                                                           phys_vmo.size_bytes(), true, &vmo);
   ASSERT(status == ZX_OK);
 
   status = vmo->set_name(name.data(), name.size());
   DEBUG_ASSERT(status == ZX_OK);
 
-  LogVmo(name, paddr, size);
-  return CreateVmoHandle(ktl::move(vmo), size, readonly);
+  dprintf(INFO, "handing off VMO from phys: %.*s @ [%#" PRIx64 ", %#" PRIx64 ")\n",
+          static_cast<int>(name.size()), name.data(), phys_vmo.addr,
+          phys_vmo.addr + phys_vmo.content_size);
+
+  return CreateVmoHandle(ktl::move(vmo), phys_vmo.content_size, writable);
 }
 
 }  // namespace
@@ -189,23 +165,19 @@ void HandoffFromPhys(paddr_t handoff_paddr) {
 }
 
 HandoffEnd EndHandoff() {
-  ASSERT(gPhysHandoff->zbi.addr != 0);
   HandoffEnd end{
       // Userboot expects the ZBI as writable.
-      .zbi = CreateVmoFromWiredPages(gPhysHandoff->zbi.addr, gPhysHandoff->zbi.size, "zbi"sv,
-                                     /*readonly=*/false),
+      .zbi = CreatePhysVmo(gPhysHandoff->zbi, /*writable=*/true),
   };
 
   // If the number of extra VMOs from physboot is less than the number of VMOs
   // the userboot protocol expects, fill the rest with empty VMOs.
   ktl::span<const PhysVmo> phys_vmos = gPhysHandoff->extra_vmos.get();
   for (size_t i = 0; i < phys_vmos.size(); ++i) {
-    ktl::string_view name{phys_vmos[i].name.data(), phys_vmos[i].name.size()};
-    name = name.substr(0, name.find_first_of('\0'));
     end.extra_phys_vmos[i] = CreatePhysVmo(phys_vmos[i]);
   }
   for (size_t i = phys_vmos.size(); i < PhysVmo::kMaxExtraHandoffPhysVmos; ++i) {
-    end.extra_phys_vmos[i] = CreatePhysVmo({});
+    end.extra_phys_vmos[i] = CreateStubVmo();
   }
 
   // Point of temporary hand-off memory expiration. The PMM maintains the list

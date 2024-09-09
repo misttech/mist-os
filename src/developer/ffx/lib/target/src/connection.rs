@@ -9,6 +9,7 @@ use async_lock::Mutex;
 use compat_info::CompatibilityInfo;
 use fidl::prelude::*;
 use fidl_fuchsia_developer_remotecontrol::{RemoteControlMarker, RemoteControlProxy};
+use std::net::SocketAddr;
 use std::sync::Arc;
 
 /// Represents a direct (no daemon) connection to a Fuchsia target.
@@ -87,6 +88,11 @@ impl Connection {
 
     pub fn compatibility_info(&self) -> Option<CompatibilityInfo> {
         self.fidl_pipe.compatibility_info()
+    }
+
+    /// The device to which we are connected.
+    pub fn device_address(&self) -> Option<SocketAddr> {
+        self.fidl_pipe.device_address()
     }
 }
 
@@ -213,6 +219,7 @@ pub mod testing {
     }
 
     impl OvernetConnector for FakeOvernet {
+        const CONNECTION_TYPE: &'static str = "fake";
         async fn connect(&mut self) -> Result<OvernetConnection, OvernetConnectionError> {
             if let FakeOvernetBehavior::FailNonFatalOnce = self.behavior {
                 if !self.already_failed {

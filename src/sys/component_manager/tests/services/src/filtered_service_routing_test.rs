@@ -351,7 +351,7 @@ async fn aggregate_open_as_not_directory_test() {
     .expect("Failed to get child expose directory.");
 
     // Open the `regular_echo` protocol in the `default` instance with the NOT_DIRECTORY flag.
-    let echo = fuchsia_fs::directory::open_no_describe::<fexamples::EchoMarker>(
+    let echo = fuchsia_fs::directory::open_no_describe_deprecated::<fexamples::EchoMarker>(
         &exposed_dir,
         vec![fexamples::EchoServiceMarker::SERVICE_NAME, "default", "regular_echo"]
             .join("/")

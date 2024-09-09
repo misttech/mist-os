@@ -19,7 +19,7 @@ executable("thermal_test_control_bin") {
   ]
   deps = [
     "//sdk/fidl/fuchsia.thermal:fuchsia.thermal_hlcpp",
-    "//sdk/lib/fidl/cpp",
+    "//sdk/lib/fidl/hlcpp",
     "//sdk/lib/sys/cpp",
     "//sdk/lib/syslog/cpp",
     "//src/power/fidl/testing:test.thermal_hlcpp",

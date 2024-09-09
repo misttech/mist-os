@@ -1945,7 +1945,7 @@ impl<'a> NetCfg<'a> {
         anyhow::Error,
     > {
         let installer = self.installer.clone();
-        let directory = fuchsia_fs::directory::open_in_namespace(
+        let directory = fuchsia_fs::directory::open_in_namespace_deprecated(
             devices::NetworkDeviceInstance::PATH,
             OpenFlags::RIGHT_READABLE,
         )

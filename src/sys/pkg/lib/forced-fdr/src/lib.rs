@@ -75,11 +75,13 @@ impl ForcedFDR {
     }
 }
 
-/// Performs a Factory Data Reset(FDR) on the device "if necessary." Necessity
-/// is determined by comparing the index stored in `forced-fdr-channel-indices.config`
-/// for the device's ota channel against an index written into storage that
-/// represents the last successful FDR. `forced-fdr-channel-indices.config` is
-/// provided on a per board basis using config-data.
+/// Performs a Factory Data Reset(FDR) on the device "if necessary."
+///
+/// Necessity is determined by comparing the index stored in
+/// `forced-fdr-channel-indices.config` for the device's ota channel against
+/// an index written into storage that represents the last successful FDR.
+/// `forced-fdr-channel-indices.config` is provided on a per board basis using
+/// config-data.
 ///
 /// # Errors
 ///

@@ -34,6 +34,10 @@ struct Args {
     #[argh(switch, short = 't')]
     tear_off: bool,
 
+    /// treat discoverable context contradictions as errors
+    #[argh(switch)]
+    fatal_contradictions: bool,
+
     /// paths to a JSON files with ABI surface definitions.
     #[argh(positional)]
     json: Vec<PathBuf>,
@@ -41,17 +45,18 @@ struct Args {
 
 pub struct Configuration {
     pub tear_off: bool,
+    pub fatal_contradictions: bool,
 }
 
 impl Configuration {
     fn new(args: &Args) -> Self {
-        Self { tear_off: args.tear_off }
+        Self { tear_off: args.tear_off, fatal_contradictions: args.fatal_contradictions }
     }
 }
 
 impl Default for Configuration {
     fn default() -> Self {
-        Self { tear_off: true }
+        Self { tear_off: true, fatal_contradictions: false }
     }
 }
 
@@ -85,8 +90,8 @@ impl Version {
         assert!(!api_levels.is_empty());
         if api_levels.len() == 1 {
             let api_level = api_levels[0].as_ref();
-            assert!(api_level == "NEXT" || !api_level.chars().any(|c| !c.is_digit(10)),
-                "External API levels must either be NEXT or a single decimal integer. Got: {api_level:?}");
+            assert!(api_level == "NEXT" || api_level == "HEAD" || !api_level.chars().any(|c| !c.is_digit(10)),
+                "External API levels must either be HEAD, NEXT or a single decimal integer. Got: {api_level:?}");
             Self { scope: Scope::External, version: FlyStr::new(api_level) }
         } else {
             assert!(

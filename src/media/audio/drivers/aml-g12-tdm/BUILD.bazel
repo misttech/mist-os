@@ -44,6 +44,8 @@ fuchsia_cc_driver(
         "composite.h",
         "composite-server.cc",
         "composite-server.h",
+        "recorder.cc",
+        "recorder.h",
     ],
     defines = [
         "ZX_ASSERT_LEVEL=2",
@@ -99,6 +101,8 @@ fuchsia_cc_test(
         "composite.h",
         "composite-server.cc",
         "composite-server.h",
+        "recorder.cc",
+        "recorder.h",
         "test/composite-test.cc",
     ],
     copts = [

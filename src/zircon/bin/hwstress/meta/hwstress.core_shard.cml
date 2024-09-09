@@ -12,10 +12,6 @@
             url: "fuchsia-pkg://fuchsia.com/hwstress_v2_pkg#meta/memory_v2.cm",
         },
         {
-            name: "flash_v2",
-            url: "fuchsia-pkg://fuchsia.com/hwstress_v2_pkg#meta/flash_v2.cm",
-        },
-        {
             name: "led_v2",
             url: "fuchsia-pkg://fuchsia.com/hwstress_v2_pkg#meta/led_v2.cm",
         },
@@ -34,7 +30,6 @@
             from: "parent",
             to: [
                 "#cpu_v2",
-                "#flash_v2",
                 "#hwstress_v2",
                 "#led_v2",
                 "#memory_v2",
@@ -45,7 +40,6 @@
             from: "parent",
             to: [
                 "#cpu_v2",
-                "#flash_v2",
                 "#hwstress_v2",
                 "#led_v2",
                 "#memory_v2",

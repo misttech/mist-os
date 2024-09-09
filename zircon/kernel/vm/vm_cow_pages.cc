@@ -2200,6 +2200,8 @@ zx_status_t VmCowPages::CloneCowPageLocked(uint64_t offset, list_node_t* alloc_l
       VmPageOrMarker removed = target_page_owner->page_list_.RemoveContent(target_page_offset);
       // We know this is a true page since it is just our |target_page|, which is a true page.
       vm_page* removed_page = removed.ReleasePage();
+      // Cannot have loaned pages in hidden node.
+      DEBUG_ASSERT(!removed_page->is_loaned());
       pmm_page_queues()->Remove(removed_page);
       DEBUG_ASSERT(removed_page == target_page);
     } else {
@@ -2313,6 +2315,8 @@ zx_status_t VmCowPages::CloneCowPageAsZeroLocked(uint64_t offset, list_node_t* f
     vm_page* removed =
         parent_locked().page_list_.RemoveContent(offset + parent_offset_).ReleasePage();
     DEBUG_ASSERT(removed == page);
+    // Cannot have loaned pages in hidden nodes.
+    DEBUG_ASSERT(!removed->is_loaned());
     pmm_page_queues()->Remove(removed);
     DEBUG_ASSERT(!list_in_list(&removed->queue_node));
     list_add_tail(freed_list, &removed->queue_node);
@@ -2808,8 +2812,9 @@ VmCowPages::LookupCursor::TargetAllocateCopyPageAsResult(vm_page_t* source, Dirt
   target_->IncrementHierarchyGenerationCountLocked();
 
   // If asked to explicitly mark zero forks, and this is actually fork of the zero page, move to the
-  // correct queue.
-  if (zero_fork_ && source == vm_get_zero_page()) {
+  // correct queue. Discardable pages are not considered zero forks as they are always in the
+  // reclaimable page queues.
+  if (zero_fork_ && source == vm_get_zero_page() && !target_->is_discardable()) {
     pmm_page_queues()->MoveToAnonymousZeroFork(out_page);
   }
 
@@ -3996,6 +4001,9 @@ zx_status_t VmCowPages::ZeroPagesLocked(uint64_t page_start_base, uint64_t page_
     if (released_page.IsPage()) {
       vm_page_t* page = released_page.ReleasePage();
       DEBUG_ASSERT(page->object.pin_count == 0);
+      // Already handled pager backed VMOs previously, and loaned pages cannot appear in anonymous
+      // VMOs.
+      DEBUG_ASSERT(!page->is_loaned());
       pmm_page_queues()->Remove(page);
       DEBUG_ASSERT(!list_in_list(&page->queue_node));
       list_add_tail(&freed_list, &page->queue_node);
@@ -4031,6 +4039,9 @@ zx_status_t VmCowPages::ZeroPagesLocked(uint64_t page_start_base, uint64_t page_
                                          !is_root_source_user_pager_backed_locked()))) {
           if (slot->IsPage()) {
             vm_page_t* page = slot->ReleasePage();
+            // Already handled pager backed VMOs previously, and loaned pages cannot appear in
+            // anonymous VMOs.
+            DEBUG_ASSERT(!page->is_loaned());
             pmm_page_queues()->Remove(page);
             DEBUG_ASSERT(!list_in_list(&page->queue_node));
             list_add_tail(&freed_list, &page->queue_node);
@@ -5249,6 +5260,8 @@ zx_status_t VmCowPages::TakePagesWithParentLocked(uint64_t offset, uint64_t len,
     // 2. Is not a temporary reference.
     if (content.IsPage()) {
       DEBUG_ASSERT(content.Page()->object.pin_count == 0);
+      // Cannot be taking pages from a pager backed VMO, hence cannot be taking a loaned page.
+      DEBUG_ASSERT(!content.Page()->is_loaned());
       pmm_page_queues()->Remove(content.Page());
     } else if (content.IsReference()) {
       if (auto page = compression->MoveReference(content.Reference())) {
@@ -5331,6 +5344,8 @@ zx_status_t VmCowPages::TakePagesLocked(uint64_t offset, uint64_t len, VmPageSpl
         ASSERT(!p->IsInterval());
         if (p->IsPage()) {
           DEBUG_ASSERT(p->Page()->object.pin_count == 0);
+          // Cannot be taking pages from a pager backed VMO, hence cannot be taking a loaned page.
+          DEBUG_ASSERT(!p->Page()->is_loaned());
           pmm_page_queues()->Remove(p->Page());
         } else if (p->IsReference()) {
           // A regular reference we can move are permitted in the VmPageSpliceList, it is up to the
@@ -5557,6 +5572,9 @@ zx_status_t VmCowPages::SupplyPagesLocked(uint64_t offset, uint64_t len, VmPageS
     // 4. Marker: There are no resources to free here, so do nothing.
     if (old_page.IsPage()) {
       vm_page_t* released_page = old_page.ReleasePage();
+      // We do not overwrite content in pager backed VMOs, the only place where loaned pages can be,
+      // so any old page must never have been loaned.
+      DEBUG_ASSERT(!released_page->is_loaned());
       pmm_page_queues()->Remove(released_page);
       DEBUG_ASSERT(!list_in_list(&released_page->queue_node));
       list_add_tail(&freed_list, &released_page->queue_node);
@@ -6464,7 +6482,7 @@ void VmCowPages::RangeChangeUpdateLocked(uint64_t offset, uint64_t len, RangeCha
   RangeChangeUpdateListLocked(&list, op);
 }
 
-bool VmCowPages::ReclaimPageForEviction(vm_page_t* page, uint64_t offset) {
+void VmCowPages::ReclaimPageForEviction(vm_page_t* page, uint64_t offset) {
   canary_.Assert();
 
   Guard<CriticalMutex> guard{lock()};
@@ -6472,14 +6490,14 @@ bool VmCowPages::ReclaimPageForEviction(vm_page_t* page, uint64_t offset) {
   // Check this page is still a part of this VMO.
   const VmPageOrMarker* page_or_marker = page_list_.Lookup(offset);
   if (!page_or_marker || !page_or_marker->IsPage() || page_or_marker->Page() != page) {
-    return false;
+    return;
   }
 
   // We shouldn't have been asked to evict a pinned page.
   ASSERT(page->object.pin_count == 0);
 
   // Ignore any hints, we were asked directly to evict.
-  return ReclaimPageForEvictionLocked(page, offset, EvictionHintAction::Ignore).Total() != 0;
+  ReclaimPageForEvictionLocked(page, offset, EvictionHintAction::Ignore);
 }
 
 VmCowPages::ReclaimCounts VmCowPages::ReclaimPageForEvictionLocked(vm_page_t* page, uint64_t offset,

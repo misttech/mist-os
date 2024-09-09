@@ -11,9 +11,9 @@
 #include <lib/sys/component/cpp/testing/realm_builder.h>
 
 #include <gtest/gtest.h>
+#include <sdk/lib/driver/power/cpp/testing/scoped_background_loop.h>
 #include <src/lib/testing/loop_fixture/real_loop_fixture.h>
 
-#include "examples/power/cpp/testing/scoped_background_loop.h"
 #include "examples/power/cpp/unmanaged_element.h"
 
 namespace {
@@ -27,7 +27,7 @@ using component_testing::Route;
 using diagnostics::reader::ArchiveReader;
 using diagnostics::reader::InspectData;
 using examples::power::UnmanagedElement;
-using examples::power::testing::ScopedBackgroundLoop;
+using fdf_power::testing::ScopedBackgroundLoop;
 using fuchsia_power_broker::BinaryPowerLevel;
 using fuchsia_power_broker::PowerLevel;
 using fuchsia_power_broker::Status;

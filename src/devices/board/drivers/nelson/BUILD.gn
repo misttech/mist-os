@@ -68,7 +68,6 @@ fuchsia_driver("nelson-module-driver") {
     "nelson-sdio.cc",
     "nelson-securemem.cc",
     "nelson-spi.cc",
-    "nelson-sysmem.cc",
     "nelson-tee.cc",
     "nelson-thermal.cc",
     "nelson-thermistor.cc",

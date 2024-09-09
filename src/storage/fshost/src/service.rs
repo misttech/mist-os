@@ -22,7 +22,9 @@ use fs_management::partition::{
     find_partition, fvm_allocate_partition, partition_matches_with_proxy, PartitionMatcher,
 };
 use fs_management::{filesystem, Blobfs, F2fs, Fxfs, Minfs};
-use fuchsia_fs::directory::{clone_onto_no_describe, create_directory_recursive, open_file};
+use fuchsia_fs::directory::{
+    clone_onto_no_describe, create_directory_recursive_deprecated, open_file_deprecated,
+};
 use fuchsia_fs::file::write;
 use fuchsia_runtime::HandleType;
 use fuchsia_zircon::sys::{zx_handle_t, zx_status_t};
@@ -74,8 +76,10 @@ async fn find_data_partition(ramdisk_prefix: Option<String>) -> Result<Controlle
         .map_err(zx::Status::from_raw)
         .context("fvm get_topo_path returned error")?;
 
-    let fvm_dir =
-        fuchsia_fs::directory::open_in_namespace(&fvm_path, fuchsia_fs::OpenFlags::empty())?;
+    let fvm_dir = fuchsia_fs::directory::open_in_namespace_deprecated(
+        &fvm_path,
+        fuchsia_fs::OpenFlags::empty(),
+    )?;
     let fvm_volume_manager_proxy = recursive_wait_and_open::<VolumeManagerMarker>(&fvm_dir, "/fvm")
         .await
         .context("failed to connect to the VolumeManager")?;
@@ -85,7 +89,7 @@ async fn find_data_partition(ramdisk_prefix: Option<String>) -> Result<Controlle
     zx::ok(fvm_volume_manager_proxy.get_info().await.context("transport error on get_info")?.0)
         .context("get_info failed")?;
 
-    let fvm_dir = fuchsia_fs::directory::open_in_namespace(
+    let fvm_dir = fuchsia_fs::directory::open_in_namespace_deprecated(
         &format!("{fvm_path}/fvm"),
         fuchsia_fs::OpenFlags::RIGHT_READABLE,
     )?;
@@ -260,8 +264,9 @@ async fn wipe_storage_fvm(
     tracing::info!("Binding and waiting for FVM driver.");
     fvm_controller.bind(constants::FVM_DRIVER_PATH).await?.map_err(zx::Status::from_raw)?;
 
-    let fvm_dir = fuchsia_fs::directory::open_in_namespace(&fvm_path, OpenFlags::empty())
-        .context("Failed to open the fvm directory")?;
+    let fvm_dir =
+        fuchsia_fs::directory::open_in_namespace_deprecated(&fvm_path, OpenFlags::empty())
+            .context("Failed to open the fvm directory")?;
 
     let fvm_volume_manager_proxy =
         device_watcher::recursive_wait_and_open::<VolumeManagerMarker>(&fvm_dir, "fvm")
@@ -434,7 +439,7 @@ async fn write_data_file(
     let data_root = data.root(filesystem.as_mut()).context("Failed to get data root")?;
     let (directory_proxy, file_path) = match filename.rsplit_once("/") {
         Some((directory_path, relative_file_path)) => {
-            let directory_proxy = create_directory_recursive(
+            let directory_proxy = create_directory_recursive_deprecated(
                 &data_root,
                 directory_path,
                 OpenFlags::CREATE | OpenFlags::RIGHT_READABLE | OpenFlags::RIGHT_WRITABLE,
@@ -446,7 +451,7 @@ async fn write_data_file(
         None => (data_root, filename),
     };
 
-    let file_proxy = open_file(
+    let file_proxy = open_file_deprecated(
         &directory_proxy,
         file_path,
         OpenFlags::CREATE | OpenFlags::RIGHT_READABLE | OpenFlags::RIGHT_WRITABLE,
@@ -533,7 +538,7 @@ async fn shred_data_volume(
             tracing::error!("Failed to find unencrypted volume");
             zx::Status::NOT_FOUND
         })?;
-        let dir = fuchsia_fs::directory::open_directory(
+        let dir = fuchsia_fs::directory::open_directory_deprecated(
             unencrypted.root(),
             "keys",
             fio::OpenFlags::RIGHT_WRITABLE,

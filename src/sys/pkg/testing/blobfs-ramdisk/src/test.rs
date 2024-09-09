@@ -93,6 +93,7 @@ async fn open_blob(
                 "ConnectionInfo from fio::FileEventStream to be File variant with event: {other:?}"
             ),
         },
+        fio::FileEvent::_UnknownEvent { ordinal, .. } => panic!("Unknown file event {ordinal}"),
     };
     Ok((file, event))
 }

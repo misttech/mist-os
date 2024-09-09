@@ -24,7 +24,7 @@ source_set("mocks") {
     "//sdk/lib/sys/cpp/testing:unit",
   ]
   deps = [
-    "//sdk/lib/fidl/cpp",
+    "//sdk/lib/fidl/hlcpp",
     "//sdk/lib/sys/cpp",
     "//src/lib/fxl",
     "//src/ui/a11y/lib/annotation/tests/mocks",

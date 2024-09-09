@@ -96,6 +96,12 @@ open protocol FlexibleMethodTester {
     flexible SomeMethod() -> (struct {
         some_bool_value bool;
     }) error zx.Status;
+
+    flexible SomeMethodWithoutError() -> (struct {
+        some_bool_value bool;
+    });
+
+    flexible SomeMethodJustError() -> () error zx.Status;
 };
 
 alias AliasOfArray = array<int16, 3>;

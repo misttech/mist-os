@@ -18,6 +18,10 @@ rustc_library("fable-lib") {
   with_unit_tests = true
   sources = [ "src/lib.rs" ]
   test_deps = [ "//sdk/fidl/fuchsia.intl:fuchsia.intl_rust" ]
+  visibility = [
+    ":*",
+    "//src/intl/time_zone_info_service/tests:*",
+  ]
 }
 
 fuchsia_unittest_package("fable-lib-unit-tests") {

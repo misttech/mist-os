@@ -8,7 +8,9 @@
 //! FIDL APIs onto a single API surface that is generic over IP version.
 
 use fidl_fuchsia_net_ext::IntoExt as _;
-use fidl_fuchsia_net_multicast_admin as fnet_multicast_admin;
+use fidl_fuchsia_net_multicast_admin::{self as fnet_multicast_admin, TableControllerCloseReason};
+use futures::stream::TryStream;
+use futures::{Stream, StreamExt, TryFutureExt};
 use net_types::ip::{Ip, Ipv4, Ipv6};
 
 /// A type capable of responding to FIDL requests.
@@ -17,15 +19,54 @@ pub trait FidlResponder<R> {
     fn try_send(self, response: R) -> Result<(), fidl::Error>;
 }
 
+/// A FIDL ControlHandle that can send a terminal event.
+pub trait TerminalEventControlHandle<E> {
+    /// Send the given terminal event
+    fn send_terminal_event(&self, terminal_event: E) -> Result<(), fidl::Error>;
+}
+
+/// A FIDL multicast routing table controller Proxy.
+///
+/// An IP generic abstraction over
+/// [`fnet_multicast_admin::Ipv4RoutingTableControllerProxy`], and
+/// [`fnet_multicast_admin::Ipv6RoutingTableControllerProxy`].
+pub trait TableControllerProxy<I: FidlMulticastAdminIpExt> {
+    fn take_event_stream(
+        &self,
+    ) -> impl Stream<Item = Result<TableControllerCloseReason, fidl::Error>> + std::marker::Unpin;
+
+    fn add_route(
+        &self,
+        addresses: UnicastSourceAndMulticastDestination<I>,
+        route: &fnet_multicast_admin::Route,
+    ) -> impl futures::Future<Output = Result<Result<(), AddRouteError>, fidl::Error>>;
+
+    fn del_route(
+        &self,
+        addresses: UnicastSourceAndMulticastDestination<I>,
+    ) -> impl futures::Future<Output = Result<Result<(), DelRouteError>, fidl::Error>>;
+
+    // TODO(https://fxbug.dev/361052435): Expand to include `GetRouteStats` and
+    // `WatchRoutingEvents`.
+}
+
 /// An IP extension providing functionality for `fuchsia_net_multicast_admin`.
 pub trait FidlMulticastAdminIpExt: Ip {
     /// Protocol Marker for the multicast routing table controller.
-    type TableControllerMarker: fidl::endpoints::DiscoverableProtocolMarker;
+    type TableControllerMarker: fidl::endpoints::DiscoverableProtocolMarker<
+        RequestStream = Self::TableControllerRequestStream,
+        Proxy = Self::TableControllerProxy,
+    >;
     /// Request Stream for the multicast routing table controller.
     type TableControllerRequestStream: fidl::endpoints::RequestStream<
         Ok: Send + Into<TableControllerRequest<Self>>,
-        ControlHandle: Send,
+        ControlHandle: Send + TerminalEventControlHandle<TableControllerCloseReason>,
+        Item = Result<
+            <Self::TableControllerRequestStream as TryStream>::Ok,
+            <Self::TableControllerRequestStream as TryStream>::Error,
+        >,
     >;
+    type TableControllerProxy: fidl::endpoints::Proxy + TableControllerProxy<Self>;
     /// The Unicast Source and Multicast Destination address tuple.
     type Addresses: Into<UnicastSourceAndMulticastDestination<Self>>;
     /// A [`FidlResponder`] for multicast routing table AddRoute requests.
@@ -45,6 +86,7 @@ impl FidlMulticastAdminIpExt for Ipv4 {
     type TableControllerMarker = fnet_multicast_admin::Ipv4RoutingTableControllerMarker;
     type TableControllerRequestStream =
         fnet_multicast_admin::Ipv4RoutingTableControllerRequestStream;
+    type TableControllerProxy = fnet_multicast_admin::Ipv4RoutingTableControllerProxy;
     type Addresses = fnet_multicast_admin::Ipv4UnicastSourceAndMulticastDestination;
     type AddRouteResponder = fnet_multicast_admin::Ipv4RoutingTableControllerAddRouteResponder;
     type DelRouteResponder = fnet_multicast_admin::Ipv4RoutingTableControllerDelRouteResponder;
@@ -58,6 +100,7 @@ impl FidlMulticastAdminIpExt for Ipv6 {
     type TableControllerMarker = fnet_multicast_admin::Ipv6RoutingTableControllerMarker;
     type TableControllerRequestStream =
         fnet_multicast_admin::Ipv6RoutingTableControllerRequestStream;
+    type TableControllerProxy = fnet_multicast_admin::Ipv6RoutingTableControllerProxy;
     type Addresses = fnet_multicast_admin::Ipv6UnicastSourceAndMulticastDestination;
     type AddRouteResponder = fnet_multicast_admin::Ipv6RoutingTableControllerAddRouteResponder;
     type DelRouteResponder = fnet_multicast_admin::Ipv6RoutingTableControllerDelRouteResponder;
@@ -65,6 +108,82 @@ impl FidlMulticastAdminIpExt for Ipv6 {
         fnet_multicast_admin::Ipv6RoutingTableControllerGetRouteStatsResponder;
     type WatchRoutingEventsResponder =
         fnet_multicast_admin::Ipv6RoutingTableControllerWatchRoutingEventsResponder;
+}
+
+impl TerminalEventControlHandle<TableControllerCloseReason>
+    for fnet_multicast_admin::Ipv4RoutingTableControllerControlHandle
+{
+    fn send_terminal_event(
+        &self,
+        terminal_event: TableControllerCloseReason,
+    ) -> Result<(), fidl::Error> {
+        self.send_on_close(terminal_event)
+    }
+}
+
+impl TerminalEventControlHandle<TableControllerCloseReason>
+    for fnet_multicast_admin::Ipv6RoutingTableControllerControlHandle
+{
+    fn send_terminal_event(
+        &self,
+        terminal_event: TableControllerCloseReason,
+    ) -> Result<(), fidl::Error> {
+        self.send_on_close(terminal_event)
+    }
+}
+
+impl TableControllerProxy<Ipv4> for fnet_multicast_admin::Ipv4RoutingTableControllerProxy {
+    fn take_event_stream(
+        &self,
+    ) -> impl Stream<Item = Result<TableControllerCloseReason, fidl::Error>> {
+        self.take_event_stream().map(|e| {
+            e.map(|e| match e {
+                fnet_multicast_admin::Ipv4RoutingTableControllerEvent::OnClose { error } => error,
+            })
+        })
+    }
+
+    fn add_route(
+        &self,
+        addresses: UnicastSourceAndMulticastDestination<Ipv4>,
+        route: &fnet_multicast_admin::Route,
+    ) -> impl futures::Future<Output = Result<Result<(), AddRouteError>, fidl::Error>> {
+        self.add_route(&addresses.into(), route).map_ok(|inner| inner.map_err(AddRouteError::from))
+    }
+
+    fn del_route(
+        &self,
+        addresses: UnicastSourceAndMulticastDestination<Ipv4>,
+    ) -> impl futures::Future<Output = Result<Result<(), DelRouteError>, fidl::Error>> {
+        self.del_route(&addresses.into()).map_ok(|inner| inner.map_err(DelRouteError::from))
+    }
+}
+
+impl TableControllerProxy<Ipv6> for fnet_multicast_admin::Ipv6RoutingTableControllerProxy {
+    fn take_event_stream(
+        &self,
+    ) -> impl Stream<Item = Result<TableControllerCloseReason, fidl::Error>> {
+        self.take_event_stream().map(|e| {
+            e.map(|e| match e {
+                fnet_multicast_admin::Ipv6RoutingTableControllerEvent::OnClose { error } => error,
+            })
+        })
+    }
+
+    fn add_route(
+        &self,
+        addresses: UnicastSourceAndMulticastDestination<Ipv6>,
+        route: &fnet_multicast_admin::Route,
+    ) -> impl futures::Future<Output = Result<Result<(), AddRouteError>, fidl::Error>> {
+        self.add_route(&addresses.into(), route).map_ok(|inner| inner.map_err(AddRouteError::from))
+    }
+
+    fn del_route(
+        &self,
+        addresses: UnicastSourceAndMulticastDestination<Ipv6>,
+    ) -> impl futures::Future<Output = Result<Result<(), DelRouteError>, fidl::Error>> {
+        self.del_route(&addresses.into()).map_ok(|inner| inner.map_err(DelRouteError::from))
+    }
 }
 
 /// An IP generic version of
@@ -94,18 +213,18 @@ impl From<fnet_multicast_admin::Ipv4RoutingTableControllerRequest>
     for TableControllerRequest<Ipv4>
 {
     fn from(request: fnet_multicast_admin::Ipv4RoutingTableControllerRequest) -> Self {
-        use fnet_multicast_admin::Ipv4RoutingTableControllerRequest::*;
+        use fnet_multicast_admin::Ipv4RoutingTableControllerRequest as R;
         match request {
-            AddRoute { addresses, route, responder } => {
+            R::AddRoute { addresses, route, responder } => {
                 TableControllerRequest::AddRoute { addresses: addresses.into(), route, responder }
             }
-            DelRoute { addresses, responder } => {
+            R::DelRoute { addresses, responder } => {
                 TableControllerRequest::DelRoute { addresses: addresses.into(), responder }
             }
-            GetRouteStats { addresses, responder } => {
+            R::GetRouteStats { addresses, responder } => {
                 TableControllerRequest::GetRouteStats { addresses: addresses.into(), responder }
             }
-            WatchRoutingEvents { responder } => {
+            R::WatchRoutingEvents { responder } => {
                 TableControllerRequest::WatchRoutingEvents { responder }
             }
         }
@@ -116,18 +235,18 @@ impl From<fnet_multicast_admin::Ipv6RoutingTableControllerRequest>
     for TableControllerRequest<Ipv6>
 {
     fn from(request: fnet_multicast_admin::Ipv6RoutingTableControllerRequest) -> Self {
-        use fnet_multicast_admin::Ipv6RoutingTableControllerRequest::*;
+        use fnet_multicast_admin::Ipv6RoutingTableControllerRequest as R;
         match request {
-            AddRoute { addresses, route, responder } => {
+            R::AddRoute { addresses, route, responder } => {
                 TableControllerRequest::AddRoute { addresses: addresses.into(), route, responder }
             }
-            DelRoute { addresses, responder } => {
+            R::DelRoute { addresses, responder } => {
                 TableControllerRequest::DelRoute { addresses: addresses.into(), responder }
             }
-            GetRouteStats { addresses, responder } => {
+            R::GetRouteStats { addresses, responder } => {
                 TableControllerRequest::GetRouteStats { addresses: addresses.into(), responder }
             }
-            WatchRoutingEvents { responder } => {
+            R::WatchRoutingEvents { responder } => {
                 TableControllerRequest::WatchRoutingEvents { responder }
             }
         }
@@ -211,28 +330,54 @@ pub enum AddRouteError {
     DuplicateOutput,
 }
 
+impl From<fnet_multicast_admin::Ipv4RoutingTableControllerAddRouteError> for AddRouteError {
+    fn from(error: fnet_multicast_admin::Ipv4RoutingTableControllerAddRouteError) -> Self {
+        use fnet_multicast_admin::Ipv4RoutingTableControllerAddRouteError as E;
+        match error {
+            E::InvalidAddress => AddRouteError::InvalidAddress,
+            E::RequiredRouteFieldsMissing => AddRouteError::RequiredRouteFieldsMissing,
+            E::InterfaceNotFound => AddRouteError::InterfaceNotFound,
+            E::InputCannotBeOutput => AddRouteError::InputCannotBeOutput,
+            E::DuplicateOutput => AddRouteError::DuplicateOutput,
+        }
+    }
+}
+
+impl From<fnet_multicast_admin::Ipv6RoutingTableControllerAddRouteError> for AddRouteError {
+    fn from(error: fnet_multicast_admin::Ipv6RoutingTableControllerAddRouteError) -> Self {
+        use fnet_multicast_admin::Ipv6RoutingTableControllerAddRouteError as E;
+        match error {
+            E::InvalidAddress => AddRouteError::InvalidAddress,
+            E::RequiredRouteFieldsMissing => AddRouteError::RequiredRouteFieldsMissing,
+            E::InterfaceNotFound => AddRouteError::InterfaceNotFound,
+            E::InputCannotBeOutput => AddRouteError::InputCannotBeOutput,
+            E::DuplicateOutput => AddRouteError::DuplicateOutput,
+        }
+    }
+}
+
 impl From<AddRouteError> for fnet_multicast_admin::Ipv4RoutingTableControllerAddRouteError {
     fn from(error: AddRouteError) -> Self {
-        use fnet_multicast_admin::Ipv4RoutingTableControllerAddRouteError::*;
+        use fnet_multicast_admin::Ipv4RoutingTableControllerAddRouteError as E;
         match error {
-            AddRouteError::InvalidAddress => InvalidAddress,
-            AddRouteError::RequiredRouteFieldsMissing => RequiredRouteFieldsMissing,
-            AddRouteError::InterfaceNotFound => InterfaceNotFound,
-            AddRouteError::InputCannotBeOutput => InputCannotBeOutput,
-            AddRouteError::DuplicateOutput => DuplicateOutput,
+            AddRouteError::InvalidAddress => E::InvalidAddress,
+            AddRouteError::RequiredRouteFieldsMissing => E::RequiredRouteFieldsMissing,
+            AddRouteError::InterfaceNotFound => E::InterfaceNotFound,
+            AddRouteError::InputCannotBeOutput => E::InputCannotBeOutput,
+            AddRouteError::DuplicateOutput => E::DuplicateOutput,
         }
     }
 }
 
 impl From<AddRouteError> for fnet_multicast_admin::Ipv6RoutingTableControllerAddRouteError {
     fn from(error: AddRouteError) -> Self {
-        use fnet_multicast_admin::Ipv6RoutingTableControllerAddRouteError::*;
+        use fnet_multicast_admin::Ipv6RoutingTableControllerAddRouteError as E;
         match error {
-            AddRouteError::InvalidAddress => InvalidAddress,
-            AddRouteError::RequiredRouteFieldsMissing => RequiredRouteFieldsMissing,
-            AddRouteError::InterfaceNotFound => InterfaceNotFound,
-            AddRouteError::InputCannotBeOutput => InputCannotBeOutput,
-            AddRouteError::DuplicateOutput => DuplicateOutput,
+            AddRouteError::InvalidAddress => E::InvalidAddress,
+            AddRouteError::RequiredRouteFieldsMissing => E::RequiredRouteFieldsMissing,
+            AddRouteError::InterfaceNotFound => E::InterfaceNotFound,
+            AddRouteError::InputCannotBeOutput => E::InputCannotBeOutput,
+            AddRouteError::DuplicateOutput => E::DuplicateOutput,
         }
     }
 }
@@ -262,22 +407,42 @@ pub enum DelRouteError {
     NotFound,
 }
 
+impl From<fnet_multicast_admin::Ipv4RoutingTableControllerDelRouteError> for DelRouteError {
+    fn from(error: fnet_multicast_admin::Ipv4RoutingTableControllerDelRouteError) -> Self {
+        use fnet_multicast_admin::Ipv4RoutingTableControllerDelRouteError as E;
+        match error {
+            E::InvalidAddress => DelRouteError::InvalidAddress,
+            E::NotFound => DelRouteError::NotFound,
+        }
+    }
+}
+
+impl From<fnet_multicast_admin::Ipv6RoutingTableControllerDelRouteError> for DelRouteError {
+    fn from(error: fnet_multicast_admin::Ipv6RoutingTableControllerDelRouteError) -> Self {
+        use fnet_multicast_admin::Ipv6RoutingTableControllerDelRouteError as E;
+        match error {
+            E::InvalidAddress => DelRouteError::InvalidAddress,
+            E::NotFound => DelRouteError::NotFound,
+        }
+    }
+}
+
 impl From<DelRouteError> for fnet_multicast_admin::Ipv4RoutingTableControllerDelRouteError {
     fn from(error: DelRouteError) -> Self {
-        use fnet_multicast_admin::Ipv4RoutingTableControllerDelRouteError::*;
+        use fnet_multicast_admin::Ipv4RoutingTableControllerDelRouteError as E;
         match error {
-            DelRouteError::InvalidAddress => InvalidAddress,
-            DelRouteError::NotFound => NotFound,
+            DelRouteError::InvalidAddress => E::InvalidAddress,
+            DelRouteError::NotFound => E::NotFound,
         }
     }
 }
 
 impl From<DelRouteError> for fnet_multicast_admin::Ipv6RoutingTableControllerDelRouteError {
     fn from(error: DelRouteError) -> Self {
-        use fnet_multicast_admin::Ipv6RoutingTableControllerDelRouteError::*;
+        use fnet_multicast_admin::Ipv6RoutingTableControllerDelRouteError as E;
         match error {
-            DelRouteError::InvalidAddress => InvalidAddress,
-            DelRouteError::NotFound => NotFound,
+            DelRouteError::InvalidAddress => E::InvalidAddress,
+            DelRouteError::NotFound => E::NotFound,
         }
     }
 }
@@ -311,10 +476,10 @@ impl From<GetRouteStatsError>
     for fnet_multicast_admin::Ipv4RoutingTableControllerGetRouteStatsError
 {
     fn from(error: GetRouteStatsError) -> Self {
-        use fnet_multicast_admin::Ipv4RoutingTableControllerGetRouteStatsError::*;
+        use fnet_multicast_admin::Ipv4RoutingTableControllerGetRouteStatsError as E;
         match error {
-            GetRouteStatsError::InvalidAddress => InvalidAddress,
-            GetRouteStatsError::NotFound => NotFound,
+            GetRouteStatsError::InvalidAddress => E::InvalidAddress,
+            GetRouteStatsError::NotFound => E::NotFound,
         }
     }
 }
@@ -323,10 +488,10 @@ impl From<GetRouteStatsError>
     for fnet_multicast_admin::Ipv6RoutingTableControllerGetRouteStatsError
 {
     fn from(error: GetRouteStatsError) -> Self {
-        use fnet_multicast_admin::Ipv6RoutingTableControllerGetRouteStatsError::*;
+        use fnet_multicast_admin::Ipv6RoutingTableControllerGetRouteStatsError as E;
         match error {
-            GetRouteStatsError::InvalidAddress => InvalidAddress,
-            GetRouteStatsError::NotFound => NotFound,
+            GetRouteStatsError::InvalidAddress => E::InvalidAddress,
+            GetRouteStatsError::NotFound => E::NotFound,
         }
     }
 }
@@ -386,6 +551,53 @@ impl<'a> FidlResponder<WatchRoutingEventsResponse<'a, Ipv6>>
     }
 }
 
+/// The types of errors that may occur when creating [`Route`] from FIDL.
+#[derive(Debug, PartialEq)]
+pub enum RouteConversionError {
+    RequiredFieldMissing,
+}
+
+impl From<RouteConversionError> for AddRouteError {
+    fn from(route_conversion_error: RouteConversionError) -> AddRouteError {
+        match route_conversion_error {
+            RouteConversionError::RequiredFieldMissing => AddRouteError::RequiredRouteFieldsMissing,
+        }
+    }
+}
+
+/// A sanitized `fnet_multicast_admin::Route`.
+///
+/// All required fields are verified to be present.
+#[derive(Debug, PartialEq)]
+pub struct Route {
+    pub expected_input_interface: u64,
+    pub action: fnet_multicast_admin::Action,
+}
+
+impl TryFrom<fnet_multicast_admin::Route> for Route {
+    type Error = RouteConversionError;
+    fn try_from(fidl: fnet_multicast_admin::Route) -> Result<Self, Self::Error> {
+        let fnet_multicast_admin::Route { expected_input_interface, action, __source_breaking } =
+            fidl;
+        if let (Some(expected_input_interface), Some(action)) = (expected_input_interface, action) {
+            Ok(Route { expected_input_interface, action })
+        } else {
+            Err(RouteConversionError::RequiredFieldMissing)
+        }
+    }
+}
+
+impl From<Route> for fnet_multicast_admin::Route {
+    fn from(route: Route) -> fnet_multicast_admin::Route {
+        let Route { expected_input_interface, action } = route;
+        fnet_multicast_admin::Route {
+            expected_input_interface: Some(expected_input_interface),
+            action: Some(action),
+            __source_breaking: fidl::marker::SourceBreaking,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -428,97 +640,117 @@ mod tests {
     }
 
     #[test_case(
-        AddRouteError::InvalidAddress =>
+        AddRouteError::InvalidAddress,
         fnet_multicast_admin::Ipv4RoutingTableControllerAddRouteError::InvalidAddress;
         "invalid_address"
     )]
     #[test_case(
-        AddRouteError::RequiredRouteFieldsMissing =>
+        AddRouteError::RequiredRouteFieldsMissing,
         fnet_multicast_admin::Ipv4RoutingTableControllerAddRouteError::RequiredRouteFieldsMissing;
         "required_route_fields_missing"
     )]
     #[test_case(
-        AddRouteError::InterfaceNotFound =>
+        AddRouteError::InterfaceNotFound,
         fnet_multicast_admin::Ipv4RoutingTableControllerAddRouteError::InterfaceNotFound;
         "interface_not_found"
     )]
     #[test_case(
-        AddRouteError::InputCannotBeOutput =>
+        AddRouteError::InputCannotBeOutput,
         fnet_multicast_admin::Ipv4RoutingTableControllerAddRouteError::InputCannotBeOutput;
         "input_cannot_be_output"
     )]
     #[test_case(
-        AddRouteError::DuplicateOutput =>
+        AddRouteError::DuplicateOutput,
         fnet_multicast_admin::Ipv4RoutingTableControllerAddRouteError::DuplicateOutput;
         "duplicate_output"
     )]
     fn ipv4_add_route_error(
         err: AddRouteError,
-    ) -> fnet_multicast_admin::Ipv4RoutingTableControllerAddRouteError {
-        fnet_multicast_admin::Ipv4RoutingTableControllerAddRouteError::from(err)
+        fidl: fnet_multicast_admin::Ipv4RoutingTableControllerAddRouteError,
+    ) {
+        assert_eq!(
+            fnet_multicast_admin::Ipv4RoutingTableControllerAddRouteError::from(err.clone()),
+            fidl
+        );
+        assert_eq!(AddRouteError::from(fidl), err);
     }
 
     #[test_case(
-        AddRouteError::InvalidAddress =>
+        AddRouteError::InvalidAddress,
         fnet_multicast_admin::Ipv6RoutingTableControllerAddRouteError::InvalidAddress;
         "invalid_address"
     )]
     #[test_case(
-        AddRouteError::RequiredRouteFieldsMissing =>
+        AddRouteError::RequiredRouteFieldsMissing,
         fnet_multicast_admin::Ipv6RoutingTableControllerAddRouteError::RequiredRouteFieldsMissing;
         "required_route_fields_missing"
     )]
     #[test_case(
-        AddRouteError::InterfaceNotFound =>
+        AddRouteError::InterfaceNotFound,
         fnet_multicast_admin::Ipv6RoutingTableControllerAddRouteError::InterfaceNotFound;
         "interface_not_found"
     )]
     #[test_case(
-        AddRouteError::InputCannotBeOutput =>
+        AddRouteError::InputCannotBeOutput,
         fnet_multicast_admin::Ipv6RoutingTableControllerAddRouteError::InputCannotBeOutput;
         "input_cannot_be_output"
     )]
     #[test_case(
-        AddRouteError::DuplicateOutput =>
+        AddRouteError::DuplicateOutput,
         fnet_multicast_admin::Ipv6RoutingTableControllerAddRouteError::DuplicateOutput;
         "duplicate_output"
     )]
     fn ipv6_add_route_error(
         err: AddRouteError,
-    ) -> fnet_multicast_admin::Ipv6RoutingTableControllerAddRouteError {
-        fnet_multicast_admin::Ipv6RoutingTableControllerAddRouteError::from(err)
+        fidl: fnet_multicast_admin::Ipv6RoutingTableControllerAddRouteError,
+    ) {
+        assert_eq!(
+            fnet_multicast_admin::Ipv6RoutingTableControllerAddRouteError::from(err.clone()),
+            fidl
+        );
+        assert_eq!(AddRouteError::from(fidl), err);
     }
 
     #[test_case(
-        DelRouteError::InvalidAddress =>
+        DelRouteError::InvalidAddress,
         fnet_multicast_admin::Ipv4RoutingTableControllerDelRouteError::InvalidAddress;
         "invalid_address"
     )]
     #[test_case(
-        DelRouteError::NotFound =>
+        DelRouteError::NotFound,
         fnet_multicast_admin::Ipv4RoutingTableControllerDelRouteError::NotFound;
         "not_found"
     )]
     fn ipv4_del_route_error(
         err: DelRouteError,
-    ) -> fnet_multicast_admin::Ipv4RoutingTableControllerDelRouteError {
-        fnet_multicast_admin::Ipv4RoutingTableControllerDelRouteError::from(err)
+        fidl: fnet_multicast_admin::Ipv4RoutingTableControllerDelRouteError,
+    ) {
+        assert_eq!(
+            fnet_multicast_admin::Ipv4RoutingTableControllerDelRouteError::from(err.clone()),
+            fidl
+        );
+        assert_eq!(DelRouteError::from(fidl), err);
     }
 
     #[test_case(
-        DelRouteError::InvalidAddress =>
+        DelRouteError::InvalidAddress,
         fnet_multicast_admin::Ipv6RoutingTableControllerDelRouteError::InvalidAddress;
         "invalid_address"
     )]
     #[test_case(
-        DelRouteError::NotFound =>
+        DelRouteError::NotFound,
         fnet_multicast_admin::Ipv6RoutingTableControllerDelRouteError::NotFound;
         "not_found"
     )]
     fn ipv6_del_route_error(
         err: DelRouteError,
-    ) -> fnet_multicast_admin::Ipv6RoutingTableControllerDelRouteError {
-        fnet_multicast_admin::Ipv6RoutingTableControllerDelRouteError::from(err)
+        fidl: fnet_multicast_admin::Ipv6RoutingTableControllerDelRouteError,
+    ) {
+        assert_eq!(
+            fnet_multicast_admin::Ipv6RoutingTableControllerDelRouteError::from(err.clone()),
+            fidl
+        );
+        assert_eq!(DelRouteError::from(fidl), err);
     }
 
     #[test_case(
@@ -551,5 +783,45 @@ mod tests {
         err: GetRouteStatsError,
     ) -> fnet_multicast_admin::Ipv6RoutingTableControllerGetRouteStatsError {
         fnet_multicast_admin::Ipv6RoutingTableControllerGetRouteStatsError::from(err)
+    }
+
+    #[test_case(
+        fnet_multicast_admin::Route {
+            expected_input_interface: Some(1),
+            action: Some(fnet_multicast_admin::Action::OutgoingInterfaces(vec![])),
+            __source_breaking: fidl::marker::SourceBreaking,
+        },
+        Ok(Route {
+            expected_input_interface: 1,
+            action: fnet_multicast_admin::Action::OutgoingInterfaces(vec![]),
+        });
+        "success"
+    )]
+    #[test_case(
+        fnet_multicast_admin::Route {
+            expected_input_interface: None,
+            action: Some(fnet_multicast_admin::Action::OutgoingInterfaces(vec![])),
+            __source_breaking: fidl::marker::SourceBreaking,
+        },
+        Err(RouteConversionError::RequiredFieldMissing);
+        "missing input interface"
+    )]
+    #[test_case(
+        fnet_multicast_admin::Route {
+            expected_input_interface: Some(1),
+            action: None,
+            __source_breaking: fidl::marker::SourceBreaking,
+        },
+        Err(RouteConversionError::RequiredFieldMissing);
+        "missing action"
+    )]
+    fn route_conversion(
+        fidl: fnet_multicast_admin::Route,
+        expected_result: Result<Route, RouteConversionError>,
+    ) {
+        assert_eq!(Route::try_from(fidl.clone()), expected_result);
+        if let Ok(route) = expected_result {
+            assert_eq!(fnet_multicast_admin::Route::from(route), fidl);
+        }
     }
 }

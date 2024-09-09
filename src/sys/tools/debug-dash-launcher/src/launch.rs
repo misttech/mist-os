@@ -152,7 +152,7 @@ async fn create_launch_info(
     job: &zx::Job,
 ) -> Result<fproc::LaunchInfo, LauncherError> {
     // Load `/pkg/bin/sh` as an executable VMO and pass it to the Launcher.
-    let dash_file = fuchsia_fs::file::open_in_namespace(
+    let dash_file = fuchsia_fs::file::open_in_namespace_deprecated(
         "/pkg/bin/sh",
         fio::OpenFlags::RIGHT_EXECUTABLE | fio::OpenFlags::RIGHT_READABLE,
     )

@@ -14,7 +14,7 @@ source_set("magnifier") {
   ]
 
   public_deps = [
-    "//sdk/lib/fidl/cpp",
+    "//sdk/lib/fidl/hlcpp",
     "//src/lib/callback",
     "//src/lib/fxl",
     "//src/ui/a11y/lib/gesture_manager",

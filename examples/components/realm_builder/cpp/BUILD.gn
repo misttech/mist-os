@@ -13,7 +13,7 @@ test("bin") {
 
     # [START_EXCLUDE]
     "//examples/components/routing/fidl:echo_hlcpp",
-    "//sdk/lib/fidl/cpp",
+    "//sdk/lib/fidl/hlcpp",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/loop_fixture:gtest",
     "//zircon/system/ulib/async:async-cpp",

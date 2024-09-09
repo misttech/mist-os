@@ -122,6 +122,11 @@ impl<A: IpAddress> SocketIpAddr<A> {
         Some(SocketIpAddr(NonMappedAddr::new(SpecifiedAddr::new(addr)?)?))
     }
 
+    /// Constructs a [`SocketIpAddr`] from the inner witness.
+    pub fn new_from_witness(addr: NonMappedAddr<SpecifiedAddr<A>>) -> Self {
+        Self(addr)
+    }
+
     /// Constructs a [`SocketIpAddr`] without verify the address's properties.
     ///
     ///

@@ -153,7 +153,7 @@ async fn open_sysrq_trigger(realm: &RealmInstance) -> FileProxy {
     // [0] https://cs.android.com/android/platform/superproject/main/+/main:system/core/init/reboot.cpp;l=391;drc=97047b54e952e2d08b10e6d37d510ca653cace00
     // [1] https://cs.android.com/android/platform/superproject/main/+/main:system/libbase/file.cpp;l=274;drc=4b992a8da56ea5777f9364033a85ad89af680e10
     let flags = OpenFlags::RIGHT_WRITABLE | OpenFlags::CREATE | OpenFlags::TRUNCATE;
-    fuchsia_fs::directory::open_file(
+    fuchsia_fs::directory::open_file_deprecated(
         realm.root.get_exposed_dir(),
         "/fs_root/proc/sysrq-trigger",
         flags,

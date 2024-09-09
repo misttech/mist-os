@@ -353,9 +353,10 @@ template("assembly_developer_overrides") {
     }
   }
 
-  bazel_input_file("${labels.target_name}.bazel_input") {
+  bazel_input_directory("${labels.target_name}.bazel_input") {
     forward_variables_from(invoker, [ "testonly" ])
     generator = ":${labels.target_name}"
+    output_directory = files.outdir
   }
 }
 

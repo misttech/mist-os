@@ -25,7 +25,7 @@ class ConcurrentCopyFixture : public zxtest::Test {
   static constexpr size_t kTestBufferSize = 256;
 
   template <typename T>
-  struct SimpleObj {
+  struct alignas(concurrent::internal::kMaxTransferGranularity) SimpleObj {
     SimpleObj() = default;
     explicit SimpleObj(T val) : val(val) {}
     T val{0};

@@ -84,7 +84,7 @@ impl Emulator {
         let dev = self.dev.as_ref().expect("emulator device accessed after it was destroyed!");
         let topo = dev.get_topological_path().await?;
         let TestDevice { dev_directory, controller: _, emulator: _ } = dev;
-        let hci_dir = fuchsia_fs::directory::open_directory_no_describe(
+        let hci_dir = fuchsia_fs::directory::open_directory_no_describe_deprecated(
             dev_directory,
             HCI_DEVICE_DIR,
             fuchsia_fs::OpenFlags::empty(),
@@ -167,7 +167,7 @@ impl TestDevice {
                 format_err!("name absent from EmulatorController::Create FIDL response")
             })?;
 
-        let emulator_dir = fuchsia_fs::directory::open_directory_no_describe(
+        let emulator_dir = fuchsia_fs::directory::open_directory_no_describe_deprecated(
             &dev_directory,
             EMULATOR_DEVICE_DIR,
             fuchsia_fs::OpenFlags::empty(),
@@ -183,7 +183,7 @@ impl TestDevice {
                 let topological_path = topological_path.strip_prefix('/')?;
                 let topological_path = topological_path.strip_prefix(&name)?;
                 let _: &str = topological_path;
-                Some(fuchsia_fs::directory::open_directory_no_describe(
+                Some(fuchsia_fs::directory::open_directory_no_describe_deprecated(
                     &emulator_dir,
                     filename,
                     fuchsia_fs::OpenFlags::empty(),
@@ -269,7 +269,7 @@ mod tests {
         let TestDevice { dev_directory, controller: _, emulator: _ } = dev;
 
         // A bt-emulator device should already exist by now.
-        let emulator_dir = fuchsia_fs::directory::open_directory_no_describe(
+        let emulator_dir = fuchsia_fs::directory::open_directory_no_describe_deprecated(
             &dev_directory,
             EMULATOR_DEVICE_DIR,
             fuchsia_fs::OpenFlags::empty(),

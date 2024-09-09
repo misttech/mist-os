@@ -19,9 +19,11 @@ pub struct NewPhyDevice {
 pub fn watch_phy_devices<'a>(
     device_directory: &'a str,
 ) -> Result<impl Stream<Item = Result<NewPhyDevice, anyhow::Error>> + 'a, anyhow::Error> {
-    let directory =
-        fuchsia_fs::directory::open_in_namespace(device_directory, fio::OpenFlags::empty())
-            .context("open directory")?;
+    let directory = fuchsia_fs::directory::open_in_namespace_deprecated(
+        device_directory,
+        fio::OpenFlags::empty(),
+    )
+    .context("open directory")?;
     Ok(async move {
         let watcher = Watcher::new(&directory).await.context("create watcher")?;
         Ok(watcher.err_into().try_filter_map(move |WatchMessage { event, filename }| {

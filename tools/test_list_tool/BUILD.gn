@@ -37,12 +37,9 @@ rustc_binary("test_list_tool") {
     "src/opts.rs",
     "src/test_config.rs",
   ]
-
-  testonly = true
 }
 
 install_host_tools("install") {
-  testonly = true
   deps = [ ":test_list_tool" ]
   outputs = [ "test_list_tool" ]
 }

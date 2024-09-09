@@ -25,7 +25,7 @@ executable("echo_gtest_client") {
 
   deps = [
     "//examples/components/routing/fidl:echo_hlcpp",
-    "//sdk/lib/fidl/cpp",
+    "//sdk/lib/fidl/hlcpp",
     "//sdk/lib/sys/cpp",
     "//src/lib/fxl/test:gtest_main",
     "//zircon/system/ulib/async-default",
@@ -163,7 +163,7 @@ executable("concurrency_test_driver_gtest") {
 
   deps = [
     "//examples/components/routing/fidl:echo_hlcpp",
-    "//sdk/lib/fidl/cpp",
+    "//sdk/lib/fidl/hlcpp",
     "//sdk/lib/sys/cpp",
     "//src/lib/fxl/test:gtest_main",
     "//zircon/system/ulib/async-default",

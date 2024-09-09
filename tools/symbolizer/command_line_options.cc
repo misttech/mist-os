@@ -7,8 +7,7 @@
 #include <lib/cmdline/args_parser.h>
 
 #include <filesystem>
-
-#include "src/lib/fxl/strings/string_printf.h"
+#include <string>
 
 namespace symbolizer {
 
@@ -135,6 +134,18 @@ Error ParseCommandLine(int argc, const char* argv[], CommandLineOptions* options
         std::error_code ec;
         if (std::filesystem::exists(path, ec)) {
           options->symbol_index_files.push_back(path);
+        }
+      }
+    }
+  }
+  const char* raw_urls = std::getenv("DEBUGINFOD_URLS");
+  if (raw_urls) {
+    if (std::istringstream urls(raw_urls); !urls.str().empty()) {
+      std::string url;
+      while (std::getline(urls, url, ' ')) {
+        if (std::find(options->symbol_servers.begin(), options->symbol_servers.end(), url) ==
+            options->symbol_servers.end()) {
+          options->symbol_servers.push_back(url);
         }
       }
     }

@@ -17,9 +17,11 @@ pub enum MemorySize {
     Percent(u8),
 }
 
-/// Platform configuration options for sysmem. This config exists in both board
-/// and platform configs, to allow board config to override static defaults,
-/// and to allow platform config to override board config.
+/// Platform configuration options for sysmem.
+///
+/// This config exists in both board and platform configs, to allow board config
+/// to override static defaults, and to allow platform config to override board
+/// config.
 #[derive(
     Clone, Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema, SupportsFileRelativePaths,
 )]
@@ -74,10 +76,11 @@ pub struct PlatformSysmemConfig {
     pub format_costs: Vec<FileRelativePathBuf>,
 }
 
-/// Board configuration options for sysmem. The settings in this struct can be
-/// overriden by settings in PlatformSysmemConfig. See also
-/// BoardProvidedConfig.sysmem_format_costs which can also be specified for the
-/// board.
+/// Board configuration options for sysmem.
+///
+/// The settings in this struct can be overridden by settings in
+/// PlatformSysmemConfig. See also BoardProvidedConfig.sysmem_format_costs which
+/// can also be specified for the board.
 #[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct BoardSysmemConfig {

@@ -6,6 +6,7 @@
 #define SRC_DEVICES_USB_LIB_USB_ENDPOINT_TESTING_FAKE_USB_ENDPOINT_SERVER_H_
 
 #include <fidl/fuchsia.hardware.usb.endpoint/cpp/fidl.h>
+#include <lib/async/default.h>
 #include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
 
@@ -13,8 +14,6 @@
 
 #include <fbl/auto_lock.h>
 #include <zxtest/zxtest.h>
-
-#include "zircon/system/ulib/async-default/include/lib/async/default.h"
 
 namespace fake_usb_endpoint {
 

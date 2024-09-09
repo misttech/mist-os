@@ -16,15 +16,15 @@ namespace sysmem_service {
 
 using Error = fuchsia_sysmem2::Error;
 
-Allocator::Allocator(Device* parent_device)
-    : LoggingMixin("allocator"), parent_device_(parent_device) {
+Allocator::Allocator(Sysmem* parent_sysmem)
+    : LoggingMixin("allocator"), parent_sysmem_(parent_sysmem) {
   // nothing else to do here
 }
 
 Allocator::~Allocator() {}
 
 // static
-void Allocator::CreateOwnedV1(fidl::ServerEnd<fuchsia_sysmem::Allocator> server_end, Device* device,
+void Allocator::CreateOwnedV1(fidl::ServerEnd<fuchsia_sysmem::Allocator> server_end, Sysmem* device,
                               fidl::ServerBindingGroup<fuchsia_sysmem::Allocator>& binding_group) {
   auto allocator = std::unique_ptr<Allocator>(new Allocator(device));
   auto v1_server = std::make_unique<V1>(std::move(allocator));
@@ -37,7 +37,7 @@ void Allocator::CreateOwnedV1(fidl::ServerEnd<fuchsia_sysmem::Allocator> server_
 }
 
 void Allocator::CreateOwnedV2(fidl::ServerEnd<fuchsia_sysmem2::Allocator> server_end,
-                              Device* device,
+                              Sysmem* device,
                               fidl::ServerBindingGroup<fuchsia_sysmem2::Allocator>& binding_group,
                               std::optional<ClientDebugInfo> client_debug_info) {
   auto allocator = std::unique_ptr<Allocator>(new Allocator(device));
@@ -106,10 +106,10 @@ void Allocator::V1::AllocateNonSharedCollection(
   // goes to BindSharedCollection().  The BindSharedCollection() will figure
   // out which token we're talking about based on the koid(s), as usual.
   LogicalBufferCollection::CreateV1(
-      std::move(token_server), allocator_->parent_device_,
+      std::move(token_server), allocator_->parent_sysmem_,
       allocator_->client_debug_info_.has_value() ? &*allocator_->client_debug_info_ : nullptr);
   LogicalBufferCollection::BindSharedCollection(
-      allocator_->parent_device_, token_client.TakeChannel(),
+      allocator_->parent_sysmem_, token_client.TakeChannel(),
       std::move(request.collection_request()),
       allocator_->client_debug_info_.has_value() ? &*allocator_->client_debug_info_ : nullptr);
 
@@ -141,10 +141,10 @@ void Allocator::V2::AllocateNonSharedCollection(
   // goes to BindSharedCollection().  The BindSharedCollection() will figure
   // out which token we're talking about based on the koid(s), as usual.
   LogicalBufferCollection::CreateV2(
-      std::move(token_server), allocator_->parent_device_,
+      std::move(token_server), allocator_->parent_sysmem_,
       allocator_->client_debug_info_.has_value() ? &*allocator_->client_debug_info_ : nullptr);
   LogicalBufferCollection::BindSharedCollection(
-      allocator_->parent_device_, token_client.TakeChannel(),
+      allocator_->parent_sysmem_, token_client.TakeChannel(),
       std::move(request.collection_request().value()),
       allocator_->client_debug_info_.has_value() ? &*allocator_->client_debug_info_ : nullptr);
 
@@ -170,7 +170,7 @@ void Allocator::V1::AllocateSharedCollection(AllocateSharedCollectionRequest& re
   // LogicalBufferCollection associates all the BufferCollectionToken and
   // BufferCollection bindings to the same LogicalBufferCollection.
   LogicalBufferCollection::CreateV1(
-      std::move(request.token_request()), allocator_->parent_device_,
+      std::move(request.token_request()), allocator_->parent_sysmem_,
       allocator_->client_debug_info_.has_value() ? &*allocator_->client_debug_info_ : nullptr);
 }
 
@@ -196,7 +196,7 @@ void Allocator::V2::AllocateSharedCollection(AllocateSharedCollectionRequest& re
   // LogicalBufferCollection associates all the BufferCollectionToken and
   // BufferCollection bindings to the same LogicalBufferCollection.
   LogicalBufferCollection::CreateV2(
-      std::move(request.token_request().value()), allocator_->parent_device_,
+      std::move(request.token_request().value()), allocator_->parent_sysmem_,
       allocator_->client_debug_info_.has_value() ? &*allocator_->client_debug_info_ : nullptr);
 }
 
@@ -212,7 +212,7 @@ void Allocator::V1::BindSharedCollection(BindSharedCollectionRequest& request,
   // LogicalBufferCollection, so delegate over to LogicalBufferCollection for
   // this request.
   LogicalBufferCollection::BindSharedCollection(
-      allocator_->parent_device_, request.token().TakeChannel(),
+      allocator_->parent_sysmem_, request.token().TakeChannel(),
       std::move(request.buffer_collection_request()),
       allocator_->client_debug_info_.has_value() ? &*allocator_->client_debug_info_ : nullptr);
 }
@@ -241,7 +241,7 @@ void Allocator::V2::BindSharedCollection(BindSharedCollectionRequest& request,
   // LogicalBufferCollection, so delegate over to LogicalBufferCollection for
   // this request.
   LogicalBufferCollection::BindSharedCollection(
-      allocator_->parent_device_, request.token()->TakeChannel(),
+      allocator_->parent_sysmem_, request.token()->TakeChannel(),
       std::move(request.buffer_collection_request().value()),
       allocator_->client_debug_info_.has_value() ? &*allocator_->client_debug_info_ : nullptr);
 }
@@ -250,7 +250,7 @@ void Allocator::V1::ValidateBufferCollectionToken(
     ValidateBufferCollectionTokenRequest& request,
     ValidateBufferCollectionTokenCompleter::Sync& completer) {
   zx_status_t status = LogicalBufferCollection::ValidateBufferCollectionToken(
-      allocator_->parent_device_, request.token_server_koid());
+      allocator_->parent_sysmem_, request.token_server_koid());
   ZX_DEBUG_ASSERT(status == ZX_OK || status == ZX_ERR_NOT_FOUND);
   completer.Reply(status == ZX_OK);
 }
@@ -264,7 +264,7 @@ void Allocator::V2::ValidateBufferCollectionToken(
     return;
   }
   zx_status_t status = LogicalBufferCollection::ValidateBufferCollectionToken(
-      allocator_->parent_device_, request.token_server_koid().value());
+      allocator_->parent_sysmem_, request.token_server_koid().value());
   ZX_DEBUG_ASSERT(status == ZX_OK || status == ZX_ERR_NOT_FOUND);
   fuchsia_sysmem2::AllocatorValidateBufferCollectionTokenResponse response;
   response.is_known().emplace(status == ZX_OK);
@@ -298,8 +298,8 @@ void Allocator::V2::SetDebugClientInfo(SetDebugClientInfoRequest& request,
 void Allocator::V1::ConnectToSysmem2Allocator(ConnectToSysmem2AllocatorRequest& request,
                                               ConnectToSysmem2AllocatorCompleter::Sync& completer) {
   std::optional<ClientDebugInfo> client_debug_info_copy = allocator_->client_debug_info_;
-  Allocator::CreateOwnedV2(std::move(request.allocator_request()), allocator_->parent_device_,
-                           allocator_->parent_device_->v2_allocators(),
+  Allocator::CreateOwnedV2(std::move(request.allocator_request()), allocator_->parent_sysmem_,
+                           allocator_->parent_sysmem_->v2_allocators(),
                            std::move(client_debug_info_copy));
 }
 
@@ -338,7 +338,7 @@ void Allocator::V2::GetVmoInfo(GetVmoInfoRequest& request, GetVmoInfoCompleter::
     return;
   }
   zx_koid_t vmo_koid = basic_info.koid;
-  auto logical_buffer_result = allocator_->parent_device_->FindLogicalBufferByVmoKoid(vmo_koid);
+  auto logical_buffer_result = allocator_->parent_sysmem_->FindLogicalBufferByVmoKoid(vmo_koid);
   if (!logical_buffer_result.logical_buffer) {
     // We don't log anything in this path because a client may just be checking if a VMO is a
     // sysmem VMO, which could make a LogInfo() here noisy.

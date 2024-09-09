@@ -4,7 +4,6 @@
 # found in the LICENSE file.
 
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"/../../lib/vars.sh || exit $?
-source "${BT_TEMP_DIR}/tools/devshell/tests/lib/fuchsia-mock.sh"
 
 BT_FILE_DEPS=(
   "prebuilt/third_party/jq/${HOST_PLATFORM}/bin/jq"
@@ -24,6 +23,7 @@ fx-gen() {
 }
 
 BT_SET_UP() {
+  source "${BT_TEMP_DIR}/tools/devshell/tests/lib/fuchsia-mock.sh"
   local _BUILD_DIR="out/default"
   echo "${_BUILD_DIR}" > "${BT_TEMP_DIR}/.fx-build-dir"
   _create_build_dir "$_BUILD_DIR"
@@ -193,7 +193,8 @@ TEST_fx-getdeviceraw-and-isvaliddevice() {
       "::1" "::1:22" "fe80::7:8%eth0")
   for valid in "${valids[@]}"; do
     BT_EXPECT is-valid-device "${valid}"
-    BT_EXPECT "(" FUCHSIA_DEVICE_NAME="$valid" get-device-raw ")" > /dev/null
+    echo "${valid}" > "${ffx}.mock_stdout"
+    BT_EXPECT "(" get-device-raw ")" > /dev/null
   done
   local invalids=(
       # no brackets but has a port
@@ -207,48 +208,103 @@ TEST_fx-getdeviceraw-and-isvaliddevice() {
     )
   for invalid in "${invalids[@]}"; do
     BT_EXPECT_FAIL is-valid-device "${invalid}"
-    BT_EXPECT_FAIL "(" FUCHSIA_DEVICE_NAME="${invalid}" get-device-raw ")" 2> /dev/null
+    echo "${invalid}" > "${ffx}.mock_stdout"
+    BT_EXPECT_FAIL "("get-device-raw ")" 2> /dev/null
   done
 }
 
 # Test extracting port from device name passed to "fx -d"
 TEST_fx-get-device-ssh-port() {
-  BT_EXPECT_EQ "$(FUCHSIA_DEVICE_NAME="127.0.0.1" get-device-ssh-port)" ""
-  BT_EXPECT_EQ "$(FUCHSIA_DEVICE_NAME="127.0.0.1:8811" get-device-ssh-port)" "8811"
-  BT_EXPECT_EQ "$(FUCHSIA_DEVICE_NAME=":8812" get-device-ssh-port)" "8812"
-  BT_EXPECT_EQ "$(FUCHSIA_DEVICE_NAME="[::1]" get-device-ssh-port)" ""
-  BT_EXPECT_EQ "$(FUCHSIA_DEVICE_NAME="[::1]:22" get-device-ssh-port)" "22"
-  BT_EXPECT_EQ "$(FUCHSIA_DEVICE_NAME="strut-wind-ahead-turf:822" get-device-ssh-port)" "822"
-  BT_EXPECT_EQ "$(FUCHSIA_DEVICE_NAME="[2001:db8:aaaa:bbbb:cccc:dddd:0:44f%enx44070ba0044e]" get-device-ssh-port)" ""
+
+  FUCHSIA_NODENAME="127.0.0.1"
+  echo "${FUCHSIA_NODENAME}" > "${ffx}.mock_stdout"
+  BT_EXPECT_EQ "$(get-device-ssh-port)" ""
+
+  FUCHSIA_NODENAME="127.0.0.1:8811"
+  echo "${FUCHSIA_NODENAME}" > "${ffx}.mock_stdout"
+  BT_EXPECT_EQ "$(get-device-ssh-port)" "8811"
+
+  FUCHSIA_NODENAME=":8812"
+  echo "${FUCHSIA_NODENAME}" > "${ffx}.mock_stdout"
+  BT_EXPECT_EQ "$(get-device-ssh-port)" "8812"
+
+  FUCHSIA_NODENAME="[::1]"
+  echo "${FUCHSIA_NODENAME}" > "${ffx}.mock_stdout"
+  BT_EXPECT_EQ "$(get-device-ssh-port)" ""
+
+  FUCHSIA_NODENAME="[::1]:22"
+  echo "${FUCHSIA_NODENAME}" > "${ffx}.mock_stdout"
+  BT_EXPECT_EQ "$(get-device-ssh-port)" "22"
+
+  FUCHSIA_NODENAME="strut-wind-ahead-turf:822"
+  echo "${FUCHSIA_NODENAME}" > "${ffx}.mock_stdout"
+  BT_EXPECT_EQ "$(get-device-ssh-port)" "822"
+
+  FUCHSIA_NODENAME="[2001:db8:aaaa:bbbb:cccc:dddd:0:44f%enx44070ba0044e]"
+  echo "${FUCHSIA_NODENAME}" > "${ffx}.mock_stdout"
+  BT_EXPECT_EQ "$(get-device-ssh-port)" ""
 
   # seven colons inside the brackets plus the one prefixing the port, so 8 total
-  BT_EXPECT_EQ "$(FUCHSIA_DEVICE_NAME="[2001:db8:aaaa:bbbb:cccc:dddd:0:44f%enx44070ba0044e]:22" get-device-ssh-port)" "22"
+  FUCHSIA_NODENAME="[2001:db8:aaaa:bbbb:cccc:dddd:0:44f%enx44070ba0044e]:22"
+  echo "${FUCHSIA_NODENAME}" > "${ffx}.mock_stdout"
+  BT_EXPECT_EQ "$(get-device-ssh-port)" "22"
 }
 
 TEST_fx-get-device-addr-resource() {
-  BT_EXPECT_EQ "$(FUCHSIA_DEVICE_NAME="127.0.0.1" get-device-addr-resource)" "127.0.0.1"
-  BT_EXPECT_EQ "$(FUCHSIA_DEVICE_NAME="127.0.0.1:8811" get-device-addr-resource)" "127.0.0.1"
-  BT_EXPECT_EQ "$(FUCHSIA_DEVICE_NAME="[::1]" get-device-addr-resource)" "[::1]"
-  BT_EXPECT_EQ "$(FUCHSIA_DEVICE_NAME="[::1]:22" get-device-addr-resource)" "[::1]"
-  BT_EXPECT_EQ "$(FUCHSIA_DEVICE_NAME="[2001:db8:aaaa:bbbb:cccc:dddd:0:44f%enx44070ba0044e]" get-device-addr-resource)" "[2001:db8:aaaa:bbbb:cccc:dddd:0:44f%enx44070ba0044e]"
+
+  FUCHSIA_NODENAME="127.0.0.1"
+  echo "${FUCHSIA_NODENAME}" > "${ffx}.mock_stdout"
+  BT_EXPECT_EQ "$(get-device-addr-resource)" "127.0.0.1"
+
+  FUCHSIA_NODENAME="127.0.0.1:8811"
+  echo "${FUCHSIA_NODENAME}" > "${ffx}.mock_stdout"
+  BT_EXPECT_EQ "$(get-device-addr-resource)" "127.0.0.1"
+
+  FUCHSIA_NODENAME="[::1]"
+  echo "${FUCHSIA_NODENAME}" > "${ffx}.mock_stdout"
+  BT_EXPECT_EQ "$(get-device-addr-resource)" "[::1]"
+
+  FUCHSIA_NODENAME="[::1]:22"
+  echo "${FUCHSIA_NODENAME}" > "${ffx}.mock_stdout"
+  BT_EXPECT_EQ "$(get-device-addr-resource)" "[::1]"
+
+  FUCHSIA_NODENAME="[2001:db8:aaaa:bbbb:cccc:dddd:0:44f%enx44070ba0044e]"
+  echo "${FUCHSIA_NODENAME}" > "${ffx}.mock_stdout"
+  BT_EXPECT_EQ "$(get-device-addr-resource)" "[2001:db8:aaaa:bbbb:cccc:dddd:0:44f%enx44070ba0044e]"
 }
 
 TEST_fx-get-device-addr-url() {
-  BT_EXPECT_EQ "$(FUCHSIA_DEVICE_NAME="127.0.0.1" get-device-addr-url)" "127.0.0.1"
-  BT_EXPECT_EQ "$(FUCHSIA_DEVICE_NAME="127.0.0.1:8811" get-device-addr-url)" "127.0.0.1"
-  BT_EXPECT_EQ "$(FUCHSIA_DEVICE_NAME="[::1]" get-device-addr-url)" "[::1]"
-  BT_EXPECT_EQ "$(FUCHSIA_DEVICE_NAME="[::1]:22" get-device-addr-url)" "[::1]"
-  BT_EXPECT_EQ "$(FUCHSIA_DEVICE_NAME="[2001:db8:aaaa:bbbb:cccc:dddd:0:44f%enx44070ba0044e]" get-device-addr-url)" "[2001:db8:aaaa:bbbb:cccc:dddd:0:44f%25enx44070ba0044e]"
+  FUCHSIA_NODENAME="127.0.0.1"
+  echo "${FUCHSIA_NODENAME}" > "${ffx}.mock_stdout"
+  BT_EXPECT_EQ "$(get-device-addr-url)" "127.0.0.1"
+
+  FUCHSIA_NODENAME="127.0.0.1:8811"
+  echo "${FUCHSIA_NODENAME}" > "${ffx}.mock_stdout"
+  BT_EXPECT_EQ "$(get-device-addr-url)" "127.0.0.1"
+
+  FUCHSIA_NODENAME="[::1]"
+  echo "${FUCHSIA_NODENAME}" > "${ffx}.mock_stdout"
+  BT_EXPECT_EQ "$(get-device-addr-url)" "[::1]"
+
+ FUCHSIA_NODENAME="[::1]:22"
+  echo "${FUCHSIA_NODENAME}" > "${ffx}.mock_stdout"
+  BT_EXPECT_EQ "$(get-device-addr-url)" "[::1]"
+
+ FUCHSIA_NODENAME="[2001:db8:aaaa:bbbb:cccc:dddd:0:44f%enx44070ba0044e]"
+  echo "${FUCHSIA_NODENAME}" > "${ffx}.mock_stdout"
+  BT_EXPECT_EQ "$(get-device-addr-url)" "[2001:db8:aaaa:bbbb:cccc:dddd:0:44f%25enx44070ba0044e]"
 }
 
 TEST_fx-export-device-address() {
-  unset FUCHSIA_DEVICE_NAME
+  unset FUCHSIA_NODENAME
   unset FX_DEVICE_NAME
   unset FX_DEVICE_ADDR
   unset FX_SSH_ADDR
   unset FX_SSH_PORT
 
-  export FUCHSIA_DEVICE_NAME="[::2%lo0]:1234"
+  export FUCHSIA_NODENAME="[::2%lo0]:1234"
+  echo "${FUCHSIA_NODENAME}" > "${ffx}.mock_stdout"
+
   fx-export-device-address
 
   BT_EXPECT_EQ "${FX_DEVICE_NAME}" "[::2%lo0]"
@@ -261,7 +317,8 @@ TEST_fx-export-device-address() {
     echo "::3%lo0"
   }
 
-  export FUCHSIA_DEVICE_NAME="foo-bar-baz-quux:1234"
+  export FUCHSIA_NODENAME="foo-bar-baz-quux:1234"
+  echo "${FUCHSIA_NODENAME}" > "${ffx}.mock_stdout"
   fx-export-device-address
 
   BT_EXPECT_EQ "${FX_DEVICE_NAME}" "foo-bar-baz-quux"

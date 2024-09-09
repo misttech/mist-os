@@ -9,7 +9,7 @@ use core::num::NonZeroU16;
 use core::ops::{ControlFlow, RangeInclusive};
 
 use log::{error, warn};
-use net_types::{SpecifiedAddr, Witness as _};
+use net_types::SpecifiedAddr;
 use netstack3_base::Inspectable;
 use once_cell::sync::OnceCell;
 use packet_formats::ip::IpExt;
@@ -153,7 +153,7 @@ impl<I: IpExt> NatHook<I> for IngressHook {
         let interface = ingress.expect("must have ingress interface in ingress hook");
         core_ctx
             .get_local_addr_for_remote(interface, SpecifiedAddr::new(packet.src_addr()))
-            .map(|addr| addr.get())
+            .map(|addr| addr.addr())
             .or_else(|| {
                 warn!(
                     "cannot redirect because there is no address assigned to the incoming \
@@ -500,8 +500,7 @@ mod tests {
     use const_unwrap::const_unwrap_option;
     use ip_test_macro::ip_test;
     use net_types::ip::Ipv4;
-    use net_types::NonMappedAddr;
-    use netstack3_base::IntoCoreTimerCtx;
+    use netstack3_base::{IntoCoreTimerCtx, IpDeviceAddr};
     use test_case::test_case;
 
     use super::*;
@@ -811,7 +810,7 @@ mod tests {
         let mut core_ctx = FakeNatCtx {
             device_addrs: HashMap::from([(
                 ethernet_interface(),
-                NonMappedAddr::new(SpecifiedAddr::new(I::DST_IP_2).unwrap()).unwrap(),
+                IpDeviceAddr::new(I::DST_IP_2).unwrap(),
             )]),
         };
 

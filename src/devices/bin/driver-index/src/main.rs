@@ -696,14 +696,14 @@ mod tests {
         component_url: &str,
     ) -> Result<fresolution::Component, anyhow::Error> {
         let (client_end, server_end) = fidl::endpoints::create_endpoints();
-        fuchsia_fs::directory::open_channel_in_namespace(
+        fuchsia_fs::directory::open_channel_in_namespace_deprecated(
             "/pkg",
             fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,
             server_end,
         )?;
         let proxy = client_end.into_proxy()?;
         let component_url = url::Url::parse(component_url)?;
-        let decl_file = fuchsia_fs::directory::open_file_no_describe(
+        let decl_file = fuchsia_fs::directory::open_file_no_describe_deprecated(
             &proxy,
             component_url.fragment().unwrap(),
             fio::OpenFlags::RIGHT_READABLE,
@@ -739,6 +739,9 @@ mod tests {
                         responder
                             .send(Err(fresolution::ResolverError::Internal))
                             .context("error sending response")?;
+                    }
+                    fresolution::ResolverRequest::_UnknownMethod { ordinal, .. } => {
+                        tracing::warn!(%ordinal, "Unknown Resolver request");
                     }
                 }
                 Ok(())

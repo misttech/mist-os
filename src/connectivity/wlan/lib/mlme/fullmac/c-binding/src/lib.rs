@@ -4,7 +4,7 @@
 
 use tracing::error;
 use wlan_fullmac_mlme::device::FullmacDevice;
-use wlan_fullmac_mlme::{FullmacMlme, FullmacMlmeHandle};
+use wlan_fullmac_mlme::{start_and_serve_on_separate_thread, FullmacMlmeHandle};
 use {fidl_fuchsia_wlan_fullmac as fidl_fullmac, fuchsia_zircon as zx};
 
 #[no_mangle]
@@ -19,7 +19,7 @@ pub extern "C" fn start_fullmac_mlme(
         fidl_fullmac::WlanFullmacImpl_SynchronousProxy::new(channel)
     };
     let device = FullmacDevice::new(fullmac_impl_sync_proxy);
-    match FullmacMlme::start(device) {
+    match start_and_serve_on_separate_thread(device) {
         Ok(mlme) => Box::into_raw(Box::new(mlme)),
         Err(e) => {
             error!("Failed to start FullMAC MLME: {}", e);

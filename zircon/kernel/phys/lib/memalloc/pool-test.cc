@@ -7,6 +7,7 @@
 #include <lib/fit/defer.h>
 #include <lib/memalloc/pool.h>
 #include <lib/memalloc/range.h>
+#include <lib/memalloc/testing/range.h>
 #include <lib/stdcompat/array.h>
 #include <lib/stdcompat/span.h>
 #include <lib/zbi-format/zbi.h>
@@ -57,7 +58,7 @@ void TestPoolInit(Pool& pool, cpp20::span<Range> input, std::optional<uint64_t> 
 void TestPoolContents(const Pool& pool, cpp20::span<const Range> expected) {
   EXPECT_EQ(expected.size(), pool.size());
   std::vector<Range> actual(pool.begin(), pool.end());
-  ASSERT_NO_FATAL_FAILURE(CompareRanges(expected, {actual}));
+  ASSERT_NO_FATAL_FAILURE(memalloc::testing::CompareRanges(expected, {actual}));
 }
 
 void TestPoolPrintOut(const Pool& pool, const char* prefix, std::string_view expected) {
@@ -2082,7 +2083,7 @@ TEST(MemallocPoolTests, OutOfMemory) {
   // Now, after the failed operations, verify that the contents remain
   // unmodified.
   std::vector<Range> after(ctx.pool.begin(), ctx.pool.end());
-  ASSERT_NO_FATAL_FAILURE(CompareRanges(before, after));
+  ASSERT_NO_FATAL_FAILURE(memalloc::testing::CompareRanges(before, after));
 }
 
 TEST(MemallocPoolTests, MarkAsPeripheralBeforeFirstRange) {

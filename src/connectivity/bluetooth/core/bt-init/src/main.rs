@@ -125,7 +125,8 @@ async fn create_bt_host(realm: &RealmProxy, filename: String) -> Result<(), Erro
 /// Continuously watch the file system for bt vendor devices being added or removed
 async fn run_device_watcher() -> Result<(), Error> {
     let dir = format!("{}/{}", DEV_DIR, HCI_DEVICE_DIR);
-    let directory = fuchsia_fs::directory::open_in_namespace(&dir, fuchsia_fs::OpenFlags::empty())?;
+    let directory =
+        fuchsia_fs::directory::open_in_namespace_deprecated(&dir, fuchsia_fs::OpenFlags::empty())?;
     let watcher = fuchsia_fs::directory::Watcher::new(&directory).await?;
 
     let realm = client::connect_to_protocol::<RealmMarker>()

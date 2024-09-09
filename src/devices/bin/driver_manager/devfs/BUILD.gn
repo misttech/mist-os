@@ -25,7 +25,7 @@ source_set("devfs") {
 
   deps = [
     "//sdk/lib/fidl",
-    "//sdk/lib/fidl/cpp",
+    "//sdk/lib/fidl/hlcpp",
     "//src/devices/lib/log",
     "//src/lib/fxl",
   ]

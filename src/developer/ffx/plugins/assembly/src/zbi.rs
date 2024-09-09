@@ -255,7 +255,8 @@ mod tests {
         let tools = FakeToolProvider::default();
         let zbi_tool = tools.get_tool("zbi").unwrap();
 
-        let mut assembly_manifest = AssemblyManifest::default();
+        let mut assembly_manifest =
+            AssemblyManifest { images: Default::default(), board_name: "my_board".into() };
         construct_zbi(
             zbi_tool,
             &mut assembly_manifest,
@@ -281,7 +282,8 @@ mod tests {
         let tools = FakeToolProvider::default();
         let zbi_tool = tools.get_tool("zbi").unwrap();
 
-        let mut assembly_manifest = AssemblyManifest::default();
+        let mut assembly_manifest =
+            AssemblyManifest { images: Default::default(), board_name: "my_board".into() };
         construct_zbi(
             zbi_tool,
             &mut assembly_manifest,
@@ -353,7 +355,8 @@ mod tests {
         // Sign the zbi.
         let tools = FakeToolProvider::default();
         let signing_tool = tools.get_tool("fake").unwrap();
-        let mut assembly_manifest = AssemblyManifest::default();
+        let mut assembly_manifest =
+            AssemblyManifest { images: Default::default(), board_name: "my_board".into() };
         let signed_zbi_path =
             vendor_sign_zbi(signing_tool, &mut assembly_manifest, dir, &zbi, &zbi_path).unwrap();
         assert_eq!(signed_zbi_path, expected_output);

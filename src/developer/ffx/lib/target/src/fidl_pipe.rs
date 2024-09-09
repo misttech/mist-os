@@ -10,6 +10,7 @@ use fuchsia_async::Task;
 use futures::FutureExt;
 use futures_lite::stream::StreamExt;
 use std::io;
+use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::io::{AsyncRead, AsyncWrite};
@@ -23,6 +24,7 @@ pub struct FidlPipe {
     task: Option<Task<()>>,
     error_queue: Receiver<anyhow::Error>,
     compat: Option<CompatibilityInfo>,
+    device_address: Option<SocketAddr>,
 }
 
 pub fn create_overnet_socket(
@@ -95,7 +97,9 @@ impl FidlPipe {
                 Err(e) => match e {
                     OvernetConnectionError::Fatal(e) => return Err(e),
                     OvernetConnectionError::NonFatal(e) => {
-                        tracing::debug!("non-fatal error connecting to overnet. Retrying again after {wait_duration:?}: {e:?}");
+                        let error = format!("non-fatal error connecting to device. Retrying again after {wait_duration:?}: {e:?}");
+                        tracing::debug!(error);
+                        eprintln!("{}", error);
                         async_io::Timer::after(wait_duration).await;
                         wait_duration *= 2;
                         continue;
@@ -103,6 +107,7 @@ impl FidlPipe {
                 },
             };
         };
+        let device_address = connector.device_address();
         let (error_sender, error_queue) = async_channel::unbounded();
         let compat = overnet_connection.compat.clone();
         let main_task = async move {
@@ -110,7 +115,7 @@ impl FidlPipe {
             // Explicit drop to force the struct into the closure.
             drop(connector);
         };
-        Ok(Self { task: Some(Task::local(main_task)), error_queue, compat })
+        Ok(Self { task: Some(Task::local(main_task)), error_queue, compat, device_address })
     }
 
     pub fn error_stream(&self) -> Receiver<anyhow::Error> {
@@ -126,6 +131,10 @@ impl FidlPipe {
             return None;
         }
         Some(pipe_errors)
+    }
+
+    pub fn device_address(&self) -> Option<SocketAddr> {
+        self.device_address.clone()
     }
 }
 
@@ -150,6 +159,8 @@ mod test {
     }
 
     impl OvernetConnector for FailOnceThenSucceedConnector {
+        const CONNECTION_TYPE: &'static str = "fake";
+
         async fn connect(&mut self) -> Result<OvernetConnection, OvernetConnectionError> {
             if !self.should_succeed {
                 self.should_succeed = true;
@@ -174,6 +185,7 @@ mod test {
     struct AutoFailConnector;
 
     impl OvernetConnector for AutoFailConnector {
+        const CONNECTION_TYPE: &'static str = "fake";
         async fn connect(&mut self) -> Result<OvernetConnection, OvernetConnectionError> {
             let (sock1, sock2) = fidl::Socket::create_stream();
             let sock1 = fidl::AsyncSocket::from_socket(sock1);
@@ -196,6 +208,7 @@ mod test {
     struct DoNothingConnector;
 
     impl OvernetConnector for DoNothingConnector {
+        const CONNECTION_TYPE: &'static str = "fake";
         async fn connect(&mut self) -> Result<OvernetConnection, OvernetConnectionError> {
             let (sock1, sock2) = fidl::Socket::create_stream();
             let sock1 = fidl::AsyncSocket::from_socket(sock1);

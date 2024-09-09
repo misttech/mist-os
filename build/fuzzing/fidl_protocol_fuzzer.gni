@@ -67,7 +67,7 @@ template("fidl_protocol_fuzzer") {
                              ])
       deps += [
         "${invoker.fidl}_libfuzzer_${protocol_suffix}",
-        "//sdk/lib/fidl/cpp/fuzzing",
+        "//sdk/lib/fidl/hlcpp/fuzzing",
       ]
     }
   }

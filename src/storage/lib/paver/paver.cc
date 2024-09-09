@@ -6,6 +6,7 @@
 
 #include <dirent.h>
 #include <fuchsia/hardware/block/driver/c/banjo.h>
+#include <lib/abr/data.h>
 #include <lib/component/incoming/cpp/clone.h>
 #include <lib/component/incoming/cpp/protocol.h>
 #include <lib/fdio/cpp/caller.h>
@@ -30,6 +31,7 @@
 
 #include <cstdarg>
 #include <memory>
+#include <optional>
 #include <string_view>
 #include <utility>
 
@@ -53,6 +55,7 @@ namespace {
 using fuchsia_paver::wire::Asset;
 using fuchsia_paver::wire::Configuration;
 using fuchsia_paver::wire::ConfigurationStatus;
+using fuchsia_paver::wire::kMaxPendingBootAttempts;
 using fuchsia_paver::wire::WriteFirmwareResult;
 
 Partition PartitionType(Configuration configuration, Asset asset) {
@@ -744,23 +747,79 @@ void BootManager::QueryConfigurationLastSetActive(
   completer.ReplySuccess(SlotIndexToConfiguration(status.value()));
 }
 
+namespace {
+
+// Reads the status for the given `configuration`.
+//
+// Returns a pair containing:
+//   1. The `ConfigurationStatus`
+//   2. If status is pending, the number of boots attempted; otherwise, nullopt.
+zx::result<std::pair<ConfigurationStatus, std::optional<uint8_t>>> GetConfigurationStatus(
+    abr::Client& abr_client, Configuration configuration) {
+  auto slot_index = ConfigurationToSlotIndex(configuration);
+  if (!slot_index) {
+    return zx::error(ZX_ERR_INVALID_ARGS);
+  }
+
+  auto slot_info = abr_client.GetSlotInfo(*slot_index);
+  if (slot_info.is_error()) {
+    ERROR("Failed to get slot info %d\n", static_cast<uint32_t>(configuration));
+    return slot_info.take_error();
+  }
+
+  if (!slot_info->is_bootable) {
+    return zx::ok(std::make_pair(ConfigurationStatus::kUnbootable, std::nullopt));
+  }
+
+  if (slot_info->is_marked_successful) {
+    return zx::ok(std::make_pair(ConfigurationStatus::kHealthy, std::nullopt));
+  }
+
+  // Bootable but not successful = pending, and we also provide boot attempts.
+  static_assert(kAbrMaxTriesRemaining == kMaxPendingBootAttempts,
+                "Paver max attempts constant does not match libabr");
+  if (slot_info->num_tries_remaining > kMaxPendingBootAttempts) {
+    // Error in libabr; num_tries_remaining should never exceed the max attempts.
+    ERROR("Invalid slot %d num_tries_remaining: %u\n", configuration,
+          slot_info->num_tries_remaining);
+    return zx::error(ZX_ERR_INTERNAL);
+  }
+  return zx::ok(std::make_pair(ConfigurationStatus::kPending,
+                               kMaxPendingBootAttempts - slot_info->num_tries_remaining));
+}
+
+}  // namespace
+
 void BootManager::QueryConfigurationStatus(QueryConfigurationStatusRequestView request,
                                            QueryConfigurationStatusCompleter::Sync& completer) {
-  auto slot_index = ConfigurationToSlotIndex(request->configuration);
-  auto status = slot_index ? abr_client_->GetSlotInfo(*slot_index) : zx::error(ZX_ERR_INVALID_ARGS);
-  if (status.is_error()) {
-    ERROR("Failed to get slot info %d\n", static_cast<uint32_t>(request->configuration));
-    completer.ReplyError(status.error_value());
-    return;
-  }
-  const AbrSlotInfo& slot = status.value();
+  auto result = GetConfigurationStatus(*abr_client_, request->configuration);
 
-  if (!slot.is_bootable) {
-    completer.ReplySuccess(ConfigurationStatus::kUnbootable);
-  } else if (slot.is_marked_successful == 0) {
-    completer.ReplySuccess(ConfigurationStatus::kPending);
+  if (result.is_error()) {
+    completer.ReplyError(result.error_value());
   } else {
-    completer.ReplySuccess(ConfigurationStatus::kHealthy);
+    completer.ReplySuccess(result->first);
+  }
+}
+
+void BootManager::QueryConfigurationStatusAndBootAttempts(
+    QueryConfigurationStatusAndBootAttemptsRequestView request,
+    QueryConfigurationStatusAndBootAttemptsCompleter::Sync& completer) {
+  auto result = GetConfigurationStatus(*abr_client_, request->configuration);
+
+  if (result.is_error()) {
+    completer.ReplyError(result.error_value());
+  } else {
+    fidl::Arena arena;
+    auto builder =
+        fuchsia_paver::wire::BootManagerQueryConfigurationStatusAndBootAttemptsResponse::Builder(
+            arena);
+
+    const auto& [status, boot_attempts] = *result;
+    builder.status(status);
+    if (boot_attempts) {
+      builder.boot_attempts(*boot_attempts);
+    }
+    completer.ReplySuccess(builder.Build());
   }
 }
 

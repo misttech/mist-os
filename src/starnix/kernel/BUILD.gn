@@ -180,7 +180,6 @@ rustc_library("starnix_core") {
     "security/hooks.rs",
     "security/mod.rs",
     "security/selinux_hooks/mod.rs",
-    "security/selinux_hooks/selinuxfs.rs",
     "security/selinux_hooks/task.rs",
     "security/selinux_hooks/testing.rs",
     "signals/mod.rs",
@@ -480,6 +479,7 @@ rustc_library("starnix_core") {
   }
   if (starnix_enable_wake_locks) {
     features += [ "wake_locks" ]
+    deps += [ "//sdk/fidl/fuchsia.starnix.runner:fuchsia.starnix.runner_rust" ]
   }
   inputs = [
     "//src/starnix/lib/selinux/testdata/micro_policies/hooks_tests_policy.pp",

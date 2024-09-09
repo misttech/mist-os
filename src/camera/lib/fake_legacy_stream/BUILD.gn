@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
+import("//build/testing/cc_test_executable.gni")
 
 group("fake_legacy_stream") {
   testonly = true
@@ -23,7 +24,7 @@ source_set("lib") {
     "fake_legacy_stream.h",
   ]
   deps = [
-    "//sdk/lib/fidl/cpp",
+    "//sdk/lib/fidl/hlcpp",
     "//sdk/lib/syslog/cpp",
     "//zircon/system/ulib/async",
   ]
@@ -33,7 +34,7 @@ source_set("lib") {
   ]
 }
 
-executable("fake_legacy_stream_unittest_bin") {
+cc_test_executable("fake_legacy_stream_unittest_bin") {
   testonly = true
   sources = [ "fake_legacy_stream_unittest.cc" ]
   deps = [

@@ -66,6 +66,7 @@ use devices::{
     StaticCommonInfo, StaticNetdeviceInfo, TxTaskState,
 };
 use interfaces_watcher::{InterfaceEventProducer, InterfaceProperties, InterfaceUpdate};
+use multicast_admin::{MulticastAdminEventSinks, MulticastAdminWorkers};
 use resource_removal::{ResourceRemovalSink, ResourceRemovalWorker};
 
 use crate::bindings::interfaces_watcher::AddressPropertiesUpdate;
@@ -143,9 +144,13 @@ mod ctx {
         fn new(
             routes_change_sink: routes::ChangeSink,
             resource_removal: ResourceRemovalSink,
+            multicast_admin: MulticastAdminEventSinks,
         ) -> Self {
-            let mut bindings_ctx =
-                BindingsCtx(Arc::new(BindingsCtxInner::new(routes_change_sink, resource_removal)));
+            let mut bindings_ctx = BindingsCtx(Arc::new(BindingsCtxInner::new(
+                routes_change_sink,
+                resource_removal,
+                multicast_admin,
+            )));
             let core_ctx = Arc::new(StackState::new(&mut bindings_ctx));
             Self { bindings_ctx, core_ctx }
         }
@@ -199,6 +204,7 @@ mod ctx {
         pub(crate) neighbor_worker: neighbor_worker::Worker,
         pub(crate) neighbor_watcher_sink: mpsc::Sender<neighbor_worker::NewWatcher>,
         pub(crate) resource_removal_worker: ResourceRemovalWorker,
+        pub(crate) multicast_admin_workers: MulticastAdminWorkers,
     }
 
     impl Default for NetstackSeed {
@@ -207,7 +213,9 @@ mod ctx {
                 interfaces_watcher::Worker::new();
             let (routes_change_sink, routes_change_runner) = routes::create_sink_and_runner();
             let (resource_removal_worker, resource_removal_sink) = ResourceRemovalWorker::new();
-            let ctx = Ctx::new(routes_change_sink, resource_removal_sink);
+            let (multicast_admin_workers, multicast_admin_sinks) =
+                multicast_admin::new_workers_and_sinks();
+            let ctx = Ctx::new(routes_change_sink, resource_removal_sink, multicast_admin_sinks);
             let (neighbor_worker, neighbor_watcher_sink, neighbor_event_sink) =
                 neighbor_worker::new_worker();
             Self {
@@ -218,6 +226,7 @@ mod ctx {
                 neighbor_worker,
                 neighbor_watcher_sink,
                 resource_removal_worker,
+                multicast_admin_workers,
             }
         }
     }
@@ -297,15 +306,21 @@ pub(crate) struct BindingsCtxInner {
     devices: Devices<DeviceId<BindingsCtx>>,
     routes: routes::ChangeSink,
     resource_removal: ResourceRemovalSink,
+    multicast_admin: MulticastAdminEventSinks,
 }
 
 impl BindingsCtxInner {
-    fn new(routes_change_sink: routes::ChangeSink, resource_removal: ResourceRemovalSink) -> Self {
+    fn new(
+        routes_change_sink: routes::ChangeSink,
+        resource_removal: ResourceRemovalSink,
+        multicast_admin: MulticastAdminEventSinks,
+    ) -> Self {
         Self {
             timers: Default::default(),
             devices: Default::default(),
             routes: routes_change_sink,
             resource_removal,
+            multicast_admin,
         }
     }
 }
@@ -1209,6 +1224,7 @@ impl NetstackSeed {
             neighbor_worker,
             neighbor_watcher_sink,
             resource_removal_worker,
+            mut multicast_admin_workers,
         } = self;
 
         // Start servicing timers.
@@ -1230,6 +1246,14 @@ impl NetstackSeed {
 
         let routes_change_task_fut = routes_change_task.into_future().fuse();
         let mut routes_change_task_fut = pin!(routes_change_task_fut);
+
+        // Start running the multicast admin worker.
+        let multicast_admin_task = NamedTask::spawn("multicast_admin", {
+            let ctx = netstack.ctx.clone();
+            async move { multicast_admin_workers.run(ctx).await }
+        });
+        let multicast_admin_task_fut = multicast_admin_task.into_future().fuse();
+        let mut multicast_admin_task_fut = pin!(multicast_admin_task_fut);
 
         // Start executing delayed resource removal.
         let resource_removal_task =
@@ -1280,6 +1304,7 @@ impl NetstackSeed {
                 name = no_finish_tasks_fut => name,
                 name = routes_change_task_fut => Some(name),
                 name = resource_removal_task_fut => Some(name),
+                name = multicast_admin_task_fut => Some(name),
             };
             match name {
                 Some(name) => panic!("task {name} ended unexpectedly"),
@@ -1544,20 +1569,24 @@ impl NetstackSeed {
                                 "serving {}",
                                 fnet_multicast_admin::Ipv4RoutingTableControllerMarker::PROTOCOL_NAME
                             );
-                            multicast_admin::serve_table_controller::<Ipv4>(
-                                netstack.ctx.clone(),
-                                controller
-                            ).await;
+                            netstack
+                                .ctx
+                                .bindings_ctx()
+                                .multicast_admin
+                                .sink::<Ipv4>()
+                                .serve_multicast_admin_client(controller);
                         }
                         Service::MulticastAdminV6(controller) => {
                             debug!(
                                 "serving {}",
                                 fnet_multicast_admin::Ipv6RoutingTableControllerMarker::PROTOCOL_NAME
                             );
-                            multicast_admin::serve_table_controller::<Ipv6>(
-                                netstack.ctx.clone(),
-                                controller
-                            ).await;
+                            netstack
+                                .ctx
+                                .bindings_ctx()
+                                .multicast_admin
+                                .sink::<Ipv6>()
+                                .serve_multicast_admin_client(controller);
                         }
                         Service::DebugInterfaces(debug_interfaces) => {
                             debug_interfaces
@@ -1658,8 +1687,18 @@ impl NetstackSeed {
         no_finish_tasks.map(|name| info!("{name} finished")).collect::<()>().await;
 
         // Stop the routes change runner.
+        // NB: All devices must be removed before stopping the routes change
+        // runner, otherwise device removal will fail when purging references
+        // from the routing table.
         ctx.bindings_ctx().routes.close_senders();
         let _task_name: &str = routes_change_task_fut.await;
+
+        // Stop the multicast admin worker.
+        // NB: All devices must be removed before stopping the multicast admin
+        // worker, otherwise device removal will fail when purging references
+        // from the multicast routing table.
+        ctx.bindings_ctx().multicast_admin.close();
+        let _task_name: &str = multicast_admin_task_fut.await;
 
         // Stop the resource removal worker.
         ctx.bindings_ctx().resource_removal.close();

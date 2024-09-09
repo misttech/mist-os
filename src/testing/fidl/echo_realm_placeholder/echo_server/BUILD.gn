@@ -11,7 +11,7 @@ source_set("lib") {
   ]
 
   public_deps = [
-    "//sdk/lib/fidl/cpp",
+    "//sdk/lib/fidl/hlcpp",
     "//sdk/lib/sys/cpp",
     "//src/testing/fidl:placeholders_hlcpp",
   ]

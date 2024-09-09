@@ -78,9 +78,11 @@ impl PathSource {
     ) -> Result<stream::BoxStream<'static, Box<dyn Device>>, Error> {
         let path = self.path;
         let source_type = self.source_type;
-        let dir_proxy =
-            fuchsia_fs::directory::open_in_namespace(path, fuchsia_fs::OpenFlags::empty())
-                .with_context(|| format!("Failed to open directory at {path}"))?;
+        let dir_proxy = fuchsia_fs::directory::open_in_namespace_deprecated(
+            path,
+            fuchsia_fs::OpenFlags::empty(),
+        )
+        .with_context(|| format!("Failed to open directory at {path}"))?;
         let watcher = fuchsia_fs::directory::Watcher::new(&dir_proxy)
             .await
             .with_context(|| format!("Failed to watch {path}"))?;

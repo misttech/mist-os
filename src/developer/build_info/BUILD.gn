@@ -15,7 +15,7 @@ executable("bin") {
 
   deps = [
     "//sdk/fidl/fuchsia.buildinfo:fuchsia.buildinfo_hlcpp",
-    "//sdk/lib/fidl/cpp",
+    "//sdk/lib/fidl/hlcpp",
     "//sdk/lib/sys/cpp",
     "//src/lib/fsl",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
@@ -65,7 +65,7 @@ executable("test-bin") {
 
   deps = [
     "//sdk/fidl/fuchsia.buildinfo:fuchsia.buildinfo_hlcpp",
-    "//sdk/lib/fidl/cpp",
+    "//sdk/lib/fidl/hlcpp",
     "//sdk/lib/sys/cpp",
     "//sdk/lib/sys/cpp/testing:unit",
     "//sdk/lib/syslog/cpp",

@@ -61,6 +61,7 @@ zx_library("vm") {
     "//zircon/kernel/lib/page_cache",
     "//zircon/kernel/lib/user_copy",
     "//zircon/kernel/lib/userabi",
+    "//zircon/kernel/phys:handoff",
     "//zircon/kernel/phys/lib/memalloc:range",
     "//zircon/system/ulib/affine",
     "//zircon/system/ulib/lazy_init",

@@ -16,8 +16,7 @@ from honeydew.typing import custom_types
 _LOGGER = logging.getLogger(__name__)
 
 EXAMPLE_URL = (
-    "fuchsia-pkg://fuchsia.com/flatland-examples#meta/"
-    "flatland-view-provider.cm"
+    "fuchsia-pkg://fuchsia.com/flatland-examples#meta/flatland-rainbow.cm"
 )
 
 

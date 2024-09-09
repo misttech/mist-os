@@ -1,0 +1,84 @@
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/bazel/bazel_build_action.gni")
+
+# A GN wrapper for a Bazel board input bundle target. This template is useful
+# for GN board target that can consume the created BIB directory.
+#
+# Parameters
+#
+#  bazel_board_input_bundle_target (required)
+#    The Bazel board input bundle target to build.
+#    Type: label (from BUILD.bazel)
+#
+#  bazel_inputs_from_gn (optional)
+#    The Bazel input targets (defined by bazel_input_xxx GN templates) used to
+#    plumb outputs from GN/Ninja to Bazel. This list should include all GN
+#    targets producing outputs used in the Bazel board input bundle. This is
+#    usually GN defined configurations, GN defined drivers, etc.
+#    Type: list(label)
+#
+#  deps
+#  metadata
+#  testonly
+#  visibility
+#
+template("bazel_board_input_bundle") {
+  assert(defined(invoker.bazel_board_input_bundle_target),
+         "bazel_board_input_bundle_target is required")
+
+  board_input_bundle_target = target_name
+  board_input_bundle_out = "${target_out_dir}/${board_input_bundle_target}"
+  bazel_target = invoker.bazel_board_input_bundle_target
+
+  bazel_build_action(board_input_bundle_target) {
+    forward_variables_from(invoker,
+                           [
+                             "deps",
+                             "metadata",
+                             "testonly",
+                             "visibility",
+                             "inputs",
+                             "bazel_inputs_from_gn",
+                             "remote_build",
+                           ])
+
+    bazel_target = bazel_target
+    if (defined(bazel_inputs_from_gn)) {
+      if (!defined(deps)) {
+        deps = []
+      }
+      if (defined(bazel_inputs_from_gn)) {
+        deps += bazel_inputs_from_gn
+      }
+    }
+
+    # Directory outputs are OK because `board_input_bundle.json` correctly
+    # represents the freshness of all outputs.
+    directory_outputs = [
+      {
+        bazel_dir = "{{BAZEL_TARGET_OUT_DIR}}/{{BAZEL_TARGET_NAME}}"
+        ninja_dir = board_input_bundle_target
+        tracked_files = [ "board_input_bundle.json" ]
+      },
+    ]
+
+    metadata = {
+      board_input_bundles = [
+        {
+          label = get_label_info(":${board_input_bundle_target}",
+                                 "label_with_toolchain")
+          outdir = rebase_path(board_input_bundle_out, root_build_dir)
+        },
+      ]
+      board_assembly_artifacts = [
+        {
+          source = rebase_path(board_input_bundle_out, root_build_dir)
+          destination = "built/artifacts/$source"
+        },
+      ]
+    }
+  }
+}

@@ -31,11 +31,6 @@
 // Forward declarations.
 struct percpu;
 
-namespace kconcurrent {
-struct RescheduleContext;
-struct SchedulerUtils;
-}  // namespace kconcurrent
-
 // Ensure this define has a value when not defined globally by the build system.
 #ifndef SCHEDULER_TRACING_LEVEL
 #define SCHEDULER_TRACING_LEVEL 0
@@ -245,7 +240,7 @@ class Scheduler {
   // have been managed at the WaitQueue level, perhaps eventually propagating to
   // the scheduler via UpstreamThreadBaseProfileChanged.
   static void ThreadBaseProfileChanged(Thread& thread)
-      TA_REQ(chainlock_transaction_token, thread.get_lock(), preempt_disabled_token);
+      TA_REQ(chainlock_transaction_token, ChainLockable::GetLock(thread), preempt_disabled_token);
 
   // Called when the base profile of a thread (|upstream|) which exists upstream
   // of |target| has changed its base profile.  It is possible for the rules
@@ -256,8 +251,8 @@ class Scheduler {
   // handled separately using two different methods.
   template <typename TargetType>
   static void UpstreamThreadBaseProfileChanged(Thread& upstream, TargetType& target)
-      TA_REQ(chainlock_transaction_token, upstream.get_lock(), internal::GetPiNodeLock(target),
-             preempt_disabled_token);
+      TA_REQ(chainlock_transaction_token, ChainLockable::GetLock(upstream),
+             ChainLockable::GetLock(target), preempt_disabled_token);
 
   // Called when a thread (|upstream|) blocks in an OwnedWaitQueue, and the
   // target of that OWQ (|target|) is running or runnable.  At the point that
@@ -269,8 +264,8 @@ class Scheduler {
   // needed because of the join operation.
   template <typename UpstreamType, typename TargetType>
   static void JoinNodeToPiGraph(UpstreamType& upstream, TargetType& target)
-      TA_REQ(chainlock_transaction_token, internal::GetPiNodeLock(upstream),
-             internal::GetPiNodeLock(target), preempt_disabled_token);
+      TA_REQ(chainlock_transaction_token, ChainLockable::GetLock(upstream),
+             ChainLockable::GetLock(target), preempt_disabled_token);
 
   // Called when a thread (|upstream|) unblocks from an OwnedWaitQueue and
   // leaves the PI graph whose running or runnable target is |target|.
@@ -283,8 +278,8 @@ class Scheduler {
   // both |target| and |upstream| as needed because of the split operation.
   template <typename UpstreamType, typename TargetType>
   static void SplitNodeFromPiGraph(UpstreamType& upstream, TargetType& target)
-      TA_REQ(chainlock_transaction_token, internal::GetPiNodeLock(upstream),
-             internal::GetPiNodeLock(target), preempt_disabled_token);
+      TA_REQ(chainlock_transaction_token, ChainLockable::GetLock(upstream),
+             ChainLockable::GetLock(target), preempt_disabled_token);
 
   // Updates the performance scales of the requested CPUs and returns the
   // effective values in place, which may be different than the requested values
@@ -395,7 +390,6 @@ class Scheduler {
   class PiNodeAdapter;
 
   friend struct Thread;
-  friend struct ::kconcurrent::SchedulerUtils;
 
   // Allow percpu to init our cpu number and performance scale.
   friend struct percpu;
@@ -416,8 +410,9 @@ class Scheduler {
   using EffectiveProfile = SchedulerState::EffectiveProfile;
   using BaseProfile = SchedulerState::BaseProfile;
 
-  static void LockHandoffInternal(const kconcurrent::RescheduleContext& ctx,
-                                  Thread* const current_thread)
+  using SavedState = concurrent::ChainLockTransactionCommon::SavedState;
+
+  static void LockHandoffInternal(SavedState saved_state, Thread* current_thread)
       TA_REQ(chainlock_transaction_token, current_thread->get_lock());
 
   // Sets the initial values of the CPU performance scales for this Scheduler
@@ -902,7 +897,7 @@ class Scheduler {
     [&]() TA_NO_THREAD_SAFETY_ANALYSIS {
       // TODO(johngro): Come back here and remove the `&t == active_thread_`
       // clause once other system-wide invariants have been cleaned up.  See
-      // http://fxbug.dev/340551498 for details.
+      // https://fxbug.dev/340551498 for details.
       DEBUG_ASSERT_MSG((t.scheduler_state().curr_cpu() == this_cpu_) || (&t == active_thread_),
                        "Thread %lu expected to be a member of scheduler %u, but curr_cpu says %u",
                        t.tid(), this_cpu_, t.scheduler_state().curr_cpu());

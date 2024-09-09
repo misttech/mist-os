@@ -173,6 +173,40 @@ fuchsia::component::test::Capability ConvertToFidl(Capability capability) {
 #endif
   }
 
+  if ([[maybe_unused]] auto resolver = cpp17_get_if<Resolver>(&capability)) {
+#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+    fuchsia::component::test::Resolver fidl_capability;
+
+    fidl_capability.set_name(std::string(resolver->name));
+    ZX_COMPONENT_ADD_STR_IF_PRESENT(resolver, as, fidl_capability);
+    ZX_COMPONENT_ADD_STR_IF_PRESENT(resolver, path, fidl_capability);
+#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
+    ZX_COMPONENT_ADD_STR_IF_PRESENT(resolver, from_dictionary, fidl_capability);
+#endif
+
+    return fuchsia::component::test::Capability::WithResolver(std::move(fidl_capability));
+#else
+    ZX_PANIC("Resolver capabilities are not supported in this API level.");
+#endif
+  }
+
+  if ([[maybe_unused]] auto runner = cpp17_get_if<Runner>(&capability)) {
+#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+    fuchsia::component::test::Runner fidl_capability;
+
+    fidl_capability.set_name(std::string(runner->name));
+    ZX_COMPONENT_ADD_STR_IF_PRESENT(runner, as, fidl_capability);
+    ZX_COMPONENT_ADD_STR_IF_PRESENT(runner, path, fidl_capability);
+#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
+    ZX_COMPONENT_ADD_STR_IF_PRESENT(runner, from_dictionary, fidl_capability);
+#endif
+
+    return fuchsia::component::test::Capability::WithRunner(std::move(fidl_capability));
+#else
+    ZX_PANIC("Runner capabilities are not supported in this API level.");
+#endif
+  }
+
   ZX_PANIC("ConvertToFidl(Capability) reached unreachable block!");
 }
 

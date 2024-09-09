@@ -212,7 +212,7 @@ async fn route() {
 
 async fn expected_foo_manifest() -> cm_rust::ComponentDecl {
     use cm_rust::FidlIntoNative;
-    let foo_cm = fuchsia_fs::file::open_in_namespace(
+    let foo_cm = fuchsia_fs::file::open_in_namespace_deprecated(
         "/pkg/meta/foo.cm",
         fuchsia_fs::OpenFlags::RIGHT_READABLE,
     )

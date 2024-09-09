@@ -52,6 +52,8 @@ struct OtherHashState {
   typename OtherHashTraits<PtrType>::BucketStateType bucket_state_;
 };
 
+// Traits for a HashTable with a template-defined number of DoublyLinkedList
+// buckets.
 template <typename PtrType, NodeOptions kNodeOptions = NodeOptions::None>
 class HTDLLTraits {
  public:
@@ -93,6 +95,8 @@ class HTDLLTraits {
   using TaggedType3 = HashTable<size_t, PtrType, DoublyLinkedList<PtrType, Tag3>>;
 };
 
+// Traits for a HashTable with a dynamic number of DoublyLinkedList buckets,
+// defined at object construction time.
 template <typename PtrType, NodeOptions kNodeOptions = NodeOptions::None>
 class DHTDLLTraits {
  public:
@@ -103,6 +107,67 @@ class DHTDLLTraits {
     DynamicHashTableWrapper()
         : DynamicHashTableType{std::unique_ptr<BucketType[]>(new BucketType[BucketCount]),
                                BucketCount} {}
+    ~DynamicHashTableWrapper() = default;
+  };
+
+  // clang-format off
+  using ObjType = typename ::fbl::internal::ContainerPtrTraits<PtrType>::ValueType;
+
+  using ContainerType           = DynamicHashTableWrapper
+                                    <HashTable<size_t,
+                                               PtrType,
+                                               DoublyLinkedList<PtrType>,
+                                               size_t,
+                                               kDynamicBucketCount>,
+                                     37>;
+  using ContainableBaseClass    = DoublyLinkedListable<PtrType, kNodeOptions>;
+  using ContainerStateType      = DoublyLinkedListNodeState<PtrType, kNodeOptions>;
+  using KeyType                 = typename ContainerType::KeyType;
+  using HashType                = typename ContainerType::HashType;
+
+  using OtherContainerTraits    = OtherHashTraits<PtrType>;
+  using OtherContainerStateType = OtherHashState<PtrType>;
+  using OtherBucketType         = DoublyLinkedListCustomTraits<PtrType, OtherContainerTraits>;
+  using OtherContainerType      = DynamicHashTableWrapper<
+                                    HashTable<OtherKeyType,
+                                              PtrType,
+                                              OtherBucketType,
+                                              OtherHashType,
+                                              kDynamicBucketCount,
+                                              OtherContainerTraits,
+                                              OtherContainerTraits>,
+                                    kOtherNumBuckets>;
+
+  using TestObjBaseType  = HashedTestObjBase<typename ContainerType::KeyType,
+                                             typename ContainerType::HashType>;
+  // clang-format on
+
+  struct Tag1 {};
+  struct Tag2 {};
+  struct Tag3 {};
+
+  using TaggedContainableBaseClasses =
+      fbl::ContainableBaseClasses<TaggedDoublyLinkedListable<PtrType, Tag1>,
+                                  TaggedDoublyLinkedListable<PtrType, Tag2>,
+                                  TaggedDoublyLinkedListable<PtrType, Tag3>>;
+
+  using TaggedType1 = HashTable<size_t, PtrType, DoublyLinkedList<PtrType, Tag1>>;
+  using TaggedType2 = HashTable<size_t, PtrType, DoublyLinkedList<PtrType, Tag2>>;
+  using TaggedType3 = HashTable<size_t, PtrType, DoublyLinkedList<PtrType, Tag3>>;
+};
+
+// Traits for a HashTable with a dynamic number of DoublyLinkedList buckets,
+// defined at after construction time but before use (eg; DelayedInit).
+template <typename PtrType, NodeOptions kNodeOptions = NodeOptions::None>
+class DIDHTDLLTraits {
+ public:
+  template <typename DynamicHashTableType, size_t BucketCount>
+  class DynamicHashTableWrapper : public DynamicHashTableType {
+   public:
+    using BucketType = typename DynamicHashTableType::BucketType;
+    DynamicHashTableWrapper() : DynamicHashTableType{HashTableOption::DelayedInit} {
+      this->Init(std::unique_ptr<BucketType[]>(new BucketType[BucketCount]), BucketCount);
+    }
     ~DynamicHashTableWrapper() = default;
   };
 
@@ -167,11 +232,12 @@ TEST(DoublyLinkedHashTableTest, NoRemoveFromContainer) {
 #endif
 }
 
-// Small helper which will generate tests for both the static and dynamic
-// versions of the HashTable
+// Small helper which will generate tests for static, dynamic, and
+// dynamic-delayed-init versions of the HashTable
 #define RUN_HT_ZXTEST(_group, _flavor, _test) \
   RUN_ZXTEST(_group, _flavor, _test)          \
-  RUN_ZXTEST(_group, D##_flavor, _test)
+  RUN_ZXTEST(_group, D##_flavor, _test)       \
+  RUN_ZXTEST(_group, DID##_flavor, _test)
 
 // clang-format off
 // Statically sized hashtable
@@ -187,6 +253,13 @@ using DUMTE   = DEFINE_TEST_THUNK(Associative, DHTDLL, Unmanaged);
 using DUPDDTE = DEFINE_TEST_THUNK(Associative, DHTDLL, UniquePtrDefaultDeleter);
 using DUPCDTE = DEFINE_TEST_THUNK(Associative, DHTDLL, UniquePtrCustomDeleter);
 using DRPTE   = DEFINE_TEST_THUNK(Associative, DHTDLL, RefPtr);
+
+// Dynamically sized hashtable, with delayed initialization
+DEFINE_TEST_OBJECTS(DIDHTDLL);
+using DIDUMTE   = DEFINE_TEST_THUNK(Associative, DIDHTDLL, Unmanaged);
+using DIDUPDDTE = DEFINE_TEST_THUNK(Associative, DIDHTDLL, UniquePtrDefaultDeleter);
+using DIDUPCDTE = DEFINE_TEST_THUNK(Associative, DIDHTDLL, UniquePtrCustomDeleter);
+using DIDRPTE   = DEFINE_TEST_THUNK(Associative, DIDHTDLL, RefPtr);
 
 // Versions of the test objects which support clear_unsafe.
 template <typename PtrType>

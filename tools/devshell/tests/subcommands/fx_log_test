@@ -8,7 +8,6 @@
 
 BT_FILE_DEPS=(
   "scripts/fx"
-  "tools/devshell/contrib/ffx"
   "tools/devshell/lib/fx-cmd-locator.sh"
   "tools/devshell/lib/fx-optional-features.sh"
   "tools/devshell/lib/generate-ssh-config.sh"
@@ -28,21 +27,22 @@ BT_MOCKED_TOOLS=(
 declare fx ffx
 
 BT_SET_UP() {
+  source "${BT_TEMP_DIR}/tools/devshell/lib/vars.sh"
   source "${BT_TEMP_DIR}/tools/devshell/tests/lib/fuchsia-mock.sh"
   fx="$(btf::setup_fx)"
-  ffx="$(btf::make_hosttools_mock ffx)"
+  fx-config-read
+  ffx="$(btf::make_installed_hosttools_mock ffx)"
 }
 
 TEST_log_raw() {
   BT_EXPECT ${fx} -d testing log --legacy --raw
-  BT_EXPECT_FILE_DOES_NOT_EXIST "${ffx}.mock_state" \
-    "ffx should not have been called when using fx log --raw"
+   btf::expect-mock-args "${ffx}.mock_state" --config fuchsia.analytics.ffx_invoker=fx target default get
+
 }
 
 TEST_log() {
   BT_EXPECT ${fx} -d testing log --flag1 --flag2
-  source "${ffx}.mock_state"
-  BT_EXPECT_STRING_CONTAINS_SUBSTRING "${BT_MOCK_ARGS[@]}" "log --flag1 --flag2"
+  btf::expect-mock-args "${ffx}.mock_state.1" log --flag1 --flag2
 }
 
 BT_RUN_TESTS "$@"

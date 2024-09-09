@@ -17,7 +17,7 @@ source_set("adapter-client") {
     "corpus.h",
   ]
   public_deps = [
-    "//sdk/lib/fidl/cpp",
+    "//sdk/lib/fidl/hlcpp",
     "//src/lib/fxl",
     "//src/sys/fuzzing/common",
     "//src/sys/fuzzing/fidl:fuchsia.fuzzer_hlcpp",
@@ -52,7 +52,7 @@ source_set("engine-lib") {
   ]
   public_deps = [
     ":adapter-client",
-    "//sdk/lib/fidl/cpp",
+    "//sdk/lib/fidl/hlcpp",
     "//sdk/lib/fit",
     "//src/lib/fxl",
     "//src/sys/fuzzing/common",

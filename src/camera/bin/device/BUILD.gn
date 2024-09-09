@@ -4,6 +4,7 @@
 
 import("//build/components.gni")
 import("//build/info/info.gni")
+import("//build/testing/cc_test_executable.gni")
 import("//src/camera/debug.gni")
 
 group("device") {
@@ -49,7 +50,7 @@ source_set("lib") {
     "//sdk/fidl/fuchsia.sysmem2:fuchsia.sysmem2_cpp_hlcpp_conversion",
     "//sdk/fidl/fuchsia.sysmem2:fuchsia.sysmem2_hlcpp",
     "//sdk/fidl/fuchsia.ui.policy:fuchsia.ui.policy_hlcpp",
-    "//sdk/lib/fidl/cpp",
+    "//sdk/lib/fidl/hlcpp",
     "//sdk/lib/fit-promise",
     "//sdk/lib/inspect/component/cpp",
     "//sdk/lib/sys/cpp",
@@ -84,7 +85,7 @@ fuchsia_package_with_single_component("camera_device") {
   deps = [ ":camera_device_bin" ]
 }
 
-executable("camera_device_unittest_bin") {
+cc_test_executable("camera_device_unittest_bin") {
   testonly = true
   sources = [
     "device_impl_unittest.cc",

@@ -10,7 +10,7 @@ use fidl_fuchsia_power_broker::{self as fbroker, LeaseStatus};
 use fuchsia_component::client::connect_to_protocol;
 use fuchsia_zircon::{self as zx, AsHandleRef, HandleBased};
 use futures::channel::mpsc;
-use futures::{FutureExt, StreamExt};
+use futures::StreamExt;
 use power_broker_client::{basic_update_fn_factory, run_power_element, PowerElementContext};
 use realm_proxy_client::RealmProxyClient;
 use std::collections::HashMap;
@@ -345,6 +345,7 @@ async fn test_activity_governor_increments_suspend_success_on_application_activi
             suspend_events: {
             },
             wake_leases: {},
+            unhandled_suspend_failures: 0u64,
             "fuchsia.inspect.Health": contains {
                 status: "OK",
             },
@@ -407,6 +408,7 @@ async fn test_activity_governor_increments_suspend_success_on_application_activi
                 },
             },
             wake_leases: {},
+            unhandled_suspend_failures: 0u64,
             "fuchsia.inspect.Health": contains {
                 status: "OK",
             },
@@ -454,6 +456,7 @@ async fn test_activity_governor_increments_suspend_success_on_application_activi
                 },
             },
             wake_leases: {},
+            unhandled_suspend_failures: 0u64,
             "fuchsia.inspect.Health": contains {
                 status: "OK",
             },
@@ -523,6 +526,7 @@ async fn test_activity_governor_increments_suspend_success_on_application_activi
                 },
             },
             wake_leases: {},
+            unhandled_suspend_failures: 0u64,
             "fuchsia.inspect.Health": contains {
                 status: "OK",
             },
@@ -610,6 +614,7 @@ async fn test_activity_governor_raises_execution_state_power_level_on_wake_handl
                 },
             },
             wake_leases: {},
+            unhandled_suspend_failures: 0u64,
             "fuchsia.inspect.Health": contains {
                 status: "OK",
             },
@@ -673,6 +678,7 @@ async fn test_activity_governor_raises_execution_state_power_level_on_wake_handl
                 },
             },
             wake_leases: {},
+            unhandled_suspend_failures: 0u64,
             "fuchsia.inspect.Health": contains {
                 status: "OK",
             },
@@ -760,6 +766,7 @@ async fn test_activity_governor_raises_execution_state_power_level_on_full_wake_
                 },
             },
             wake_leases: {},
+            unhandled_suspend_failures: 0u64,
             "fuchsia.inspect.Health": contains {
                 status: "OK",
             },
@@ -823,6 +830,7 @@ async fn test_activity_governor_raises_execution_state_power_level_on_full_wake_
                 },
             },
             wake_leases: {},
+            unhandled_suspend_failures: 0u64,
             "fuchsia.inspect.Health": contains {
                 status: "OK",
             },
@@ -889,7 +897,8 @@ async fn test_activity_governor_shows_resume_latency_in_inspect() -> Result<()> 
                 suspend_events: {
                 },
                 wake_leases: {},
-                "fuchsia.inspect.Health": contains {
+                unhandled_suspend_failures: 0u64,
+            "fuchsia.inspect.Health": contains {
                     status: "OK",
                 },
             }
@@ -958,6 +967,7 @@ async fn test_activity_governor_forwards_resume_latency_to_suspender() -> Result
             suspend_events: {
             },
             wake_leases: {},
+            unhandled_suspend_failures: 0u64,
             "fuchsia.inspect.Health": contains {
                 status: "OK",
             },
@@ -1019,6 +1029,7 @@ async fn test_activity_governor_forwards_resume_latency_to_suspender() -> Result
                 },
             },
             wake_leases: {},
+            unhandled_suspend_failures: 0u64,
             "fuchsia.inspect.Health": contains {
                 status: "OK",
             },
@@ -1087,6 +1098,7 @@ async fn test_activity_governor_increments_fail_count_on_suspend_error() -> Resu
             suspend_events: {
             },
             wake_leases: {},
+            unhandled_suspend_failures: 0u64,
             "fuchsia.inspect.Health": contains {
                 status: "OK",
             },
@@ -1139,8 +1151,196 @@ async fn test_activity_governor_increments_fail_count_on_suspend_error() -> Resu
                 },
             },
             wake_leases: {},
+            unhandled_suspend_failures: 1u64,
             "fuchsia.inspect.Health": contains {
                 status: "OK",
+            },
+        }
+    );
+
+    Ok(())
+}
+
+#[fuchsia::test]
+async fn test_activity_governor_suspends_successfully_after_failure() -> Result<()> {
+    let suspend_states = vec![
+        fhsuspend::SuspendState { resume_latency: Some(430), ..Default::default() },
+        fhsuspend::SuspendState { resume_latency: Some(320), ..Default::default() },
+        fhsuspend::SuspendState { resume_latency: Some(21), ..Default::default() },
+    ];
+    let (realm, activity_governor_moniker) = create_realm().await?;
+    let suspend_device = realm.connect_to_protocol::<tsc::DeviceMarker>().await?;
+    suspend_device
+        .set_suspend_states(&tsc::DeviceSetSuspendStatesRequest {
+            suspend_states: Some(suspend_states),
+            ..Default::default()
+        })
+        .await
+        .unwrap()
+        .unwrap();
+
+    let suspend_controller = create_suspend_topology(&realm).await?;
+    let suspend_lease_control = lease(&suspend_controller, 1).await?;
+
+    let expected_latencies = vec![430i64, 320i64, 21i64];
+    let expected_index = 1;
+    let erl_controller = create_latency_topology(&realm, &expected_latencies).await?;
+    let _erl_lease_control = lease(&erl_controller, expected_index).await?;
+
+    block_until_inspect_matches!(
+        activity_governor_moniker,
+        root: {
+            booting: false,
+            power_elements: {
+                execution_state: {
+                    power_level: 2u64,
+                },
+                application_activity: {
+                    power_level: 1u64,
+                },
+                full_wake_handling: {
+                    power_level: 0u64,
+                },
+                wake_handling: {
+                    power_level: 0u64,
+                },
+                execution_resume_latency: {
+                    power_level: 1u64,
+                    resume_latency: 320u64,
+                    resume_latencies: expected_latencies.clone(),
+                },
+            },
+            suspend_stats: {
+                success_count: 0u64,
+                fail_count: 0u64,
+                last_failed_error: 0u64,
+                last_time_in_suspend: -1i64,
+                last_time_in_suspend_operations: -1i64,
+            },
+            suspend_events: {
+            },
+            wake_leases: {},
+            unhandled_suspend_failures: 0u64,
+            "fuchsia.inspect.Health": contains {
+                status: "OK",
+            },
+        }
+    );
+
+    drop(suspend_lease_control);
+    assert_eq!(
+        expected_index as u64,
+        suspend_device.await_suspend().await.unwrap().unwrap().state_index.unwrap()
+    );
+    suspend_device.resume(&tsc::DeviceResumeRequest::Error(7)).await.unwrap().unwrap();
+
+    block_until_inspect_matches!(
+        activity_governor_moniker,
+        root: {
+            booting: false,
+            power_elements: {
+                execution_state: {
+                    power_level: 0u64,
+                },
+                application_activity: {
+                    power_level: 0u64,
+                },
+                full_wake_handling: {
+                    power_level: 0u64,
+                },
+                wake_handling: {
+                    power_level: 0u64,
+                },
+                execution_resume_latency: {
+                    power_level: 1u64,
+                    resume_latency: 320u64,
+                    resume_latencies: expected_latencies.clone(),
+                },
+            },
+            suspend_stats: {
+                success_count: 0u64,
+                fail_count: 1u64,
+                last_failed_error: 7u64,
+                last_time_in_suspend: -1i64,
+                last_time_in_suspend_operations: -1i64,
+            },
+            suspend_events: {
+                "0": {
+                    suspended: AnyProperty,
+                },
+                "1": {
+                    suspend_failed: AnyProperty,
+                },
+            },
+            wake_leases: {},
+            unhandled_suspend_failures: 1u64,
+            "fuchsia.inspect.Health": contains {
+                status: "OK",
+            },
+        }
+    );
+
+    // Lease and drop to allow suspend again.
+    lease(&suspend_controller, 1).await?;
+
+    assert_eq!(
+        expected_index as u64,
+        suspend_device.await_suspend().await.unwrap().unwrap().state_index.unwrap()
+    );
+    suspend_device
+        .resume(&tsc::DeviceResumeRequest::Result(tsc::SuspendResult {
+            suspend_duration: Some(2i64),
+            suspend_overhead: Some(1i64),
+            ..Default::default()
+        }))
+        .await
+        .unwrap()
+        .unwrap();
+
+    block_until_inspect_matches!(
+        activity_governor_moniker,
+        root: contains {
+            booting: false,
+            power_elements: {
+                execution_state: {
+                    power_level: 0u64,
+                },
+                application_activity: {
+                    power_level: 0u64,
+                },
+                full_wake_handling: {
+                    power_level: 0u64,
+                },
+                wake_handling: {
+                    power_level: 0u64,
+                },
+                execution_resume_latency: {
+                    power_level: 1u64,
+                    resume_latency: 320u64,
+                    resume_latencies: expected_latencies.clone(),
+                },
+            },
+            suspend_stats: {
+                success_count: 1u64,
+                fail_count: 1u64,
+                last_failed_error: 7u64,
+                last_time_in_suspend: 2u64,
+                last_time_in_suspend_operations: 1u64,
+            },
+            suspend_events: {
+                "0": {
+                    suspended: AnyProperty,
+                },
+                "1": {
+                    suspend_failed: AnyProperty,
+                },
+                "2": {
+                    suspended: AnyProperty,
+                },
+                "3": {
+                    resumed: AnyProperty,
+                    duration: 2u64,
+                },
             },
         }
     );
@@ -1272,6 +1472,7 @@ async fn test_activity_governor_suspends_after_listener_hanging_on_resume() -> R
                 },
             },
             wake_leases: {},
+            unhandled_suspend_failures: 0u64,
             "fuchsia.inspect.Health": contains {
                 status: "OK",
             },
@@ -1282,7 +1483,7 @@ async fn test_activity_governor_suspends_after_listener_hanging_on_resume() -> R
 }
 
 #[fuchsia::test]
-async fn test_activity_governor_does_not_suspend_while_on_suspend_started_hangs() -> Result<()> {
+async fn test_activity_governor_still_suspends_if_on_suspend_started_hangs() -> Result<()> {
     let (realm, _) = create_realm().await?;
     let suspend_device = realm.connect_to_protocol::<tsc::DeviceMarker>().await?;
     set_up_default_suspender(&suspend_device).await;
@@ -1332,25 +1533,18 @@ async fn test_activity_governor_does_not_suspend_while_on_suspend_started_hangs(
     })
     .detach();
 
-    // Queue up a callback from `suspend_device`, to let us know when
-    // SAG requests to suspend the hardware.
-    let await_suspend = suspend_device.await_suspend();
-
     // Cycle execution_state power level to make SAG start suspending.
     {
         let suspend_controller = create_suspend_topology(&realm).await?;
         lease(&suspend_controller, 1).await?;
     }
 
-    // Wait to receive the OnSuspendStarted() callback.
+    // Ensure that the OnSuspendStarted callback begins.
     on_suspend_started_rx.next().await.unwrap();
 
-    // Give SAG some time to take any further suspend actions.
-    fasync::Timer::new(fasync::Duration::from_millis(1000)).await;
+    // Verify that SAG does not block indefinitely on OnSuspendStarted.
+    assert_eq!(0, suspend_device.await_suspend().await.unwrap().unwrap().state_index.unwrap());
 
-    // Verify that SAG did _not_ suspend the hardware (because we did not
-    // respond to the callback).
-    assert!(await_suspend.now_or_never().is_none());
     Ok(())
 }
 
@@ -1459,6 +1653,7 @@ async fn test_activity_governor_handles_listener_raising_power_levels() -> Resul
                 },
             },
             wake_leases: {},
+            unhandled_suspend_failures: 0u64,
             "fuchsia.inspect.Health": contains {
                 status: "OK",
             },
@@ -1528,6 +1723,7 @@ async fn test_activity_governor_handles_listener_raising_power_levels() -> Resul
                 },
             },
             wake_leases: {},
+            unhandled_suspend_failures: 0u64,
             "fuchsia.inspect.Health": contains {
                 status: "OK",
             },
@@ -1641,6 +1837,7 @@ async fn test_activity_governor_handles_suspend_failure() -> Result<()> {
                 },
             },
             wake_leases: {},
+            unhandled_suspend_failures: 0u64,
             "fuchsia.inspect.Health": contains {
                 status: "OK",
             },
@@ -1822,6 +2019,7 @@ async fn test_activity_governor_handles_boot_signal() -> Result<()> {
             suspend_events: {
             },
             wake_leases: {},
+            unhandled_suspend_failures: 0u64,
             "fuchsia.inspect.Health": contains {
                 status: "OK",
             },
@@ -1867,6 +2065,7 @@ async fn test_activity_governor_handles_boot_signal() -> Result<()> {
                 }
             },
             wake_leases: {},
+            unhandled_suspend_failures: 0u64,
             "fuchsia.inspect.Health": contains {
                 status: "OK",
             },

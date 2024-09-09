@@ -86,9 +86,9 @@ TEST_F(PowerSystemIntegration, SuspendResume) {
                                                            "topology", mali_gpu_element_id.value(),
                                                            "meta",     "current_level"};
 
-  // All drivers expose their Inspect under driver manager
+  // Driver monikers are unstable, so wildcard the moniker and use a tree name
   const std::string msd_arm_mali_inspect_tree_name = "mali";
-  const std::string msd_arm_mali_moniker = "bootstrap/driver_manager";
+  const std::string msd_arm_mali_moniker = "bootstrap/*-drivers*";
   const std::vector<std::string> msd_arm_mali_power_lease_active = {"root", "msd-arm-mali",
                                                                     "device", "power_lease_active"};
   const std::vector<std::string> msd_arm_mali_required_power_level = {

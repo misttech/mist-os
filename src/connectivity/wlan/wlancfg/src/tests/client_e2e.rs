@@ -210,6 +210,7 @@ fn test_setup(
             roam_service_request_receiver,
             connection_selection_requester.clone(),
             telemetry_sender.clone(),
+            saved_networks.clone(),
         )
         .map(|_| {
             let result: Result<Infallible, Error> =

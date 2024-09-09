@@ -77,6 +77,8 @@ mod fuchsia {
         }
     }
 
+    /// *DEPRECATED* - Use [`open_in_namespace`] instead.
+    ///
     /// Opens the given `path` from the current namespace as a [`FileProxy`].
     ///
     /// The target is assumed to implement fuchsia.io.File but this isn't verified. To connect to a
@@ -87,13 +89,52 @@ mod fuchsia {
     /// error. However, if incorrect flags are sent, or if the rest of the path sent to the
     /// filesystem server doesn't exist, this will still return success. Instead, the returned
     /// FileProxy channel pair will be closed with an epitaph.
-    pub fn open_in_namespace(
+    // TODO(https://fxbug.dev/361450366): Migrate to [`open_in_namespace`] and remove this.
+    pub fn open_in_namespace_deprecated(
         path: &str,
         flags: fio::OpenFlags,
     ) -> Result<fio::FileProxy, OpenError> {
         let (node, request) = fidl::endpoints::create_proxy().map_err(OpenError::CreateProxy)?;
+        open_channel_in_namespace_deprecated(path, flags, request)?;
+        Ok(node)
+    }
+
+    /// Opens the given `path` from the current namespace as a [`FileProxy`].
+    ///
+    /// The target is assumed to implement fuchsia.io.File but this isn't verified. To connect to a
+    /// filesystem node which doesn't implement fuchsia.io.File, use the functions in
+    /// [`fuchsia_component::client`] instead.
+    ///
+    /// If the namespace path doesn't exist, or we fail to make the channel pair, this returns an
+    /// error. However, if incorrect flags are sent, or if the rest of the path sent to the
+    /// filesystem server doesn't exist, this will still return success. Instead, the returned
+    /// FileProxy channel pair will be closed with an epitaph.
+    pub fn open_in_namespace(path: &str, flags: fio::Flags) -> Result<fio::FileProxy, OpenError> {
+        let (node, request) = fidl::endpoints::create_proxy().map_err(OpenError::CreateProxy)?;
         open_channel_in_namespace(path, flags, request)?;
         Ok(node)
+    }
+
+    /// *DEPRECATED* - Use [`open_channel_in_namespace`] instead.
+    ///
+    /// Asynchronously opens the given [`path`] in the current namespace, serving the connection
+    /// over [`request`]. Once the channel is connected, any calls made prior are serviced.
+    ///
+    /// The target is assumed to implement fuchsia.io.File but this isn't verified. To connect to a
+    /// filesystem node which doesn't implement fuchsia.io.File, use the functions in
+    /// [`fuchsia_component::client`] instead.
+    ///
+    /// If the namespace path doesn't exist, this returns an error. However, if incorrect flags are
+    /// sent, or if the rest of the path sent to the filesystem server doesn't exist, this will
+    /// still return success. Instead, the [`request`] channel will be closed with an epitaph.
+    // TODO(https://fxbug.dev/361450366): Migrate to [`open_channel_in_namespace`] and remove this.
+    pub fn open_channel_in_namespace_deprecated(
+        path: &str,
+        flags: fio::OpenFlags,
+        request: fidl::endpoints::ServerEnd<fio::FileMarker>,
+    ) -> Result<(), OpenError> {
+        let namespace = fdio::Namespace::installed().map_err(OpenError::Namespace)?;
+        namespace.open(path, flags, request.into_channel()).map_err(OpenError::Namespace)
     }
 
     /// Asynchronously opens the given [`path`] in the current namespace, serving the connection
@@ -108,11 +149,11 @@ mod fuchsia {
     /// still return success. Instead, the [`request`] channel will be closed with an epitaph.
     pub fn open_channel_in_namespace(
         path: &str,
-        flags: fio::OpenFlags,
+        flags: fio::Flags,
         request: fidl::endpoints::ServerEnd<fio::FileMarker>,
     ) -> Result<(), OpenError> {
         let namespace = fdio::Namespace::installed().map_err(OpenError::Namespace)?;
-        namespace.open(path, flags, request.into_channel()).map_err(OpenError::Namespace)
+        namespace.open3(path, flags, request.into_channel()).map_err(OpenError::Namespace)
     }
 
     /// Write the given data into a file at `path` in the current namespace. The path must be an
@@ -126,7 +167,8 @@ mod fuchsia {
         async {
             let flags =
                 fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::CREATE | fio::OpenFlags::TRUNCATE;
-            let file = open_in_namespace(path, flags)?;
+            // TODO(https://fxbug.dev/361450366): Use [`open_in_namespace`].
+            let file = open_in_namespace_deprecated(path, flags)?;
 
             write(&file, data).await?;
 
@@ -155,7 +197,8 @@ mod fuchsia {
     /// absolute path.
     pub async fn read_in_namespace(path: &str) -> Result<Vec<u8>, ReadNamedError> {
         async {
-            let file = open_in_namespace(
+            // TODO(https://fxbug.dev/361450366): Use [`open_in_namespace`].
+            let file = open_in_namespace_deprecated(
                 path,
                 fio::OpenFlags::DESCRIBE
                     | fio::OpenFlags::RIGHT_READABLE
@@ -212,6 +255,8 @@ mod fuchsia {
                     actual: Kind::kind_of2(&representation),
                 }),
             },
+            #[cfg(fuchsia_api_level_at_least = "NEXT")]
+            fio::FileEvent::_UnknownEvent { .. } => Ok(None),
         }
     }
 
@@ -427,13 +472,13 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn open_in_namespace_opens_real_file() {
-        let exists = open_in_namespace("/pkg/data/file", OpenFlags::RIGHT_READABLE).unwrap();
+        let exists = open_in_namespace("/pkg/data/file", fio::Flags::PERM_READ).unwrap();
         assert_matches!(close(exists).await, Ok(()));
     }
 
     #[fasync::run_singlethreaded(test)]
     async fn open_in_namespace_opens_fake_file_under_of_root_namespace_entry() {
-        let notfound = open_in_namespace("/pkg/fake", OpenFlags::RIGHT_READABLE).unwrap();
+        let notfound = open_in_namespace("/pkg/fake", fio::Flags::PERM_READ).unwrap();
         // The open error is not detected until the proxy is interacted with.
         assert_matches!(close(notfound).await, Err(_));
     }
@@ -441,7 +486,7 @@ mod tests {
     #[fasync::run_singlethreaded(test)]
     async fn open_in_namespace_rejects_fake_root_namespace_entry() {
         assert_matches!(
-            open_in_namespace("/fake", OpenFlags::RIGHT_READABLE),
+            open_in_namespace("/fake", fio::Flags::PERM_READ),
             Err(OpenError::Namespace(zx_status::Status::NOT_FOUND))
         );
     }
@@ -496,7 +541,7 @@ mod tests {
     #[fasync::run_singlethreaded(test)]
     async fn write_writes_to_file() {
         let tempdir = TempDir::new().unwrap();
-        let dir = directory::open_in_namespace(
+        let dir = directory::open_in_namespace_deprecated(
             tempdir.path().to_str().unwrap(),
             OpenFlags::RIGHT_READABLE | OpenFlags::RIGHT_WRITABLE,
         )
@@ -504,7 +549,7 @@ mod tests {
 
         // Write contents.
         let flags = fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::CREATE;
-        let file = directory::open_file(&dir, "file", flags).await.unwrap();
+        let file = directory::open_file_deprecated(&dir, "file", flags).await.unwrap();
         let data = b"\x80"; // Non UTF-8 data: a continuation byte as the first byte.
         write(&file, data).await.unwrap();
 
@@ -516,7 +561,7 @@ mod tests {
     #[fasync::run_singlethreaded(test)]
     async fn write_writes_to_file_in_chunks_if_needed() {
         let tempdir = TempDir::new().unwrap();
-        let dir = directory::open_in_namespace(
+        let dir = directory::open_in_namespace_deprecated(
             tempdir.path().to_str().unwrap(),
             OpenFlags::RIGHT_READABLE | OpenFlags::RIGHT_WRITABLE,
         )
@@ -524,7 +569,7 @@ mod tests {
 
         // Write contents.
         let flags = fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::CREATE;
-        let file = directory::open_file(&dir, "file", flags).await.unwrap();
+        let file = directory::open_file_deprecated(&dir, "file", flags).await.unwrap();
         let data = "abc".repeat(10000);
         write(&file, &data).await.unwrap();
 
@@ -536,7 +581,7 @@ mod tests {
     #[fasync::run_singlethreaded(test)]
     async fn write_appends_to_file() {
         let tempdir = TempDir::new().unwrap();
-        let dir = directory::open_in_namespace(
+        let dir = directory::open_in_namespace_deprecated(
             tempdir.path().to_str().unwrap(),
             OpenFlags::RIGHT_READABLE | OpenFlags::RIGHT_WRITABLE,
         )
@@ -544,7 +589,7 @@ mod tests {
 
         // Create and write to the file.
         let flags = fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::CREATE;
-        let file = directory::open_file(&dir, "file", flags).await.unwrap();
+        let file = directory::open_file_deprecated(&dir, "file", flags).await.unwrap();
         write(&file, "Hello ").await.unwrap();
         write(&file, "World!\n").await.unwrap();
         close(file).await.unwrap();
@@ -558,7 +603,7 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn read_reads_to_end_of_file() {
-        let file = open_in_namespace("/pkg/data/file", OpenFlags::RIGHT_READABLE).unwrap();
+        let file = open_in_namespace("/pkg/data/file", fio::Flags::PERM_READ).unwrap();
 
         let contents = read(&file).await.unwrap();
         assert_eq!(&contents[..], DATA_FILE_CONTENTS.as_bytes());
@@ -566,7 +611,7 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn read_reads_from_current_position() {
-        let file = open_in_namespace("/pkg/data/file", OpenFlags::RIGHT_READABLE).unwrap();
+        let file = open_in_namespace("/pkg/data/file", fio::Flags::PERM_READ).unwrap();
 
         // Advance past the first byte.
         let _: Vec<u8> = file.read(1).await.unwrap().unwrap();
@@ -599,7 +644,7 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn read_to_string_reads_data_file() {
-        let file = open_in_namespace("/pkg/data/file", OpenFlags::RIGHT_READABLE).unwrap();
+        let file = open_in_namespace("/pkg/data/file", fio::Flags::PERM_READ).unwrap();
         assert_eq!(read_to_string(&file).await.unwrap(), DATA_FILE_CONTENTS);
     }
 
@@ -618,7 +663,7 @@ mod tests {
     #[fasync::run_singlethreaded(test)]
     async fn write_fidl_writes_to_file() {
         let tempdir = TempDir::new().unwrap();
-        let dir = directory::open_in_namespace(
+        let dir = directory::open_in_namespace_deprecated(
             tempdir.path().to_str().unwrap(),
             OpenFlags::RIGHT_READABLE | OpenFlags::RIGHT_WRITABLE,
         )
@@ -626,7 +671,7 @@ mod tests {
 
         // Write contents.
         let flags = fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::CREATE;
-        let file = directory::open_file(&dir, "file", flags).await.unwrap();
+        let file = directory::open_file_deprecated(&dir, "file", flags).await.unwrap();
 
         let mut data = DataTable1 {
             num: Some(42),
@@ -646,7 +691,7 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn read_fidl_reads_from_file() {
-        let file = open_in_namespace("/pkg/data/fidl_file", OpenFlags::RIGHT_READABLE).unwrap();
+        let file = open_in_namespace("/pkg/data/fidl_file", fio::Flags::PERM_READ).unwrap();
 
         let contents = read_fidl::<DataTable2>(&file).await.unwrap();
 

@@ -80,6 +80,7 @@ source_set("fake-usb-endpoint-server") {
   public = [ "testing/fake-usb-endpoint-server.h" ]
   sources = [ "testing/fake-usb-endpoint-server.h" ]
   public_deps = [
+    "//sdk/lib/async-default",
     "//sdk/lib/async_patterns/testing/cpp",
     "//sdk/lib/component/outgoing/cpp",
   ]

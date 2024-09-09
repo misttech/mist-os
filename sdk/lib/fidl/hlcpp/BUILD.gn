@@ -1,0 +1,159 @@
+# Copyright 2018 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/components.gni")
+import("//build/cpp/sdk_source_set.gni")
+import("//build/fidl/fidl.gni")
+import("//build/test.gni")
+import("//sdk/ctf/build/ctf.gni")
+import("//tools/fidl/gidl/gidl.gni")
+
+# The complete high-level C++ bindings library supporting both asynchronous
+# and synchronous APIs.
+sdk_source_set("hlcpp") {
+  category = "partner"
+
+  sdk_name = "fidl_cpp"
+
+  sources = [
+    "include/lib/fidl/cpp/binding.h",
+    "include/lib/fidl/cpp/binding_set.h",
+    "include/lib/fidl/cpp/event_sender.h",
+    "include/lib/fidl/cpp/interface_ptr.h",
+    "include/lib/fidl/cpp/interface_ptr_set.h",
+    "include/lib/fidl/cpp/internal/header.h",
+    "include/lib/fidl/cpp/internal/implementation.h",
+    "include/lib/fidl/cpp/internal/message_handler.h",
+    "include/lib/fidl/cpp/internal/message_reader.h",
+    "include/lib/fidl/cpp/internal/pending_response.h",
+    "include/lib/fidl/cpp/internal/proxy.h",
+    "include/lib/fidl/cpp/internal/proxy_controller.h",
+    "include/lib/fidl/cpp/internal/stub.h",
+    "include/lib/fidl/cpp/internal/stub_controller.h",
+    "include/lib/fidl/cpp/internal/unknown_interactions_table.h",
+    "include/lib/fidl/cpp/internal/weak_stub_controller.h",
+    "include/lib/fidl/cpp/member_connector.h",
+    "include/lib/fidl/cpp/service_connector.h",
+    "include/lib/fidl/cpp/service_handler_base.h",
+    "include/lib/fidl/cpp/type_converter.h",
+    "include/lib/fidl/cpp/unknown_interactions_hlcpp.h",
+    "internal/message_handler.cc",
+    "internal/message_reader.cc",
+    "internal/pending_response.cc",
+    "internal/proxy.cc",
+    "internal/proxy_controller.cc",
+    "internal/stub.cc",
+    "internal/stub_controller.cc",
+    "internal/unknown_interactions_table.c",
+    "internal/weak_stub_controller.cc",
+    "unknown_interactions_hlcpp.cc",
+  ]
+
+  include_base = "//sdk/lib/fidl/hlcpp/include"
+  stable = true
+
+  public_deps = [
+    ":hlcpp_sync",
+    "//sdk/lib/async",
+    "//sdk/lib/async-default",
+    "//sdk/lib/fidl",
+    "//sdk/lib/fit",
+    "//sdk/lib/fit-promise",
+    "//sdk/lib/stdcompat",
+    "//zircon/system/ulib/zx",
+  ]
+
+  public_configs = [ "//sdk/config" ]
+}
+
+# The synchronous high-level C++ bindings library.
+sdk_source_set("hlcpp_sync") {
+  category = "partner"
+
+  sdk_name = "fidl_cpp_sync"
+  stable = true
+
+  sources = [
+    "include/lib/fidl/cpp/internal/logging.h",
+    "include/lib/fidl/cpp/internal/message_sender.h",
+    "include/lib/fidl/cpp/internal/synchronous_proxy.h",
+    "include/lib/fidl/cpp/synchronous_interface_ptr.h",
+    "internal/logging.cc",
+    "internal/message_sender.cc",
+    "internal/synchronous_proxy.cc",
+  ]
+
+  include_base = "//sdk/lib/fidl/hlcpp/include"
+
+  public_configs = [ "//sdk/config" ]
+
+  public_deps = [
+    ":hlcpp_base",
+    "//sdk/lib/fidl",
+    "//sdk/lib/fit",
+    "//zircon/system/ulib/zx",
+  ]
+}
+
+# The base library used to implement the natural domain-object types.
+# It should not contain message dispatching functionality.
+sdk_source_set("hlcpp_base") {
+  category = "partner"
+
+  sdk_name = "fidl_cpp_base"
+  stable = true
+
+  sources = [
+    "clone.cc",
+    "decoder.cc",
+    "encoder.cc",
+    "include/lib/fidl/cpp/clone.h",
+    "include/lib/fidl/cpp/coding_traits.h",
+    "include/lib/fidl/cpp/comparison.h",
+    "include/lib/fidl/cpp/decoder.h",
+    "include/lib/fidl/cpp/encoder.h",
+    "include/lib/fidl/cpp/enum.h",
+    "include/lib/fidl/cpp/internal/bitset.h",
+    "include/lib/fidl/cpp/internal/natural_types_header.h",
+    "include/lib/fidl/cpp/internal/natural_types_implementation.h",
+    "include/lib/fidl/cpp/message.h",
+    "include/lib/fidl/cpp/message_buffer.h",
+    "include/lib/fidl/cpp/message_part.h",
+    "include/lib/fidl/cpp/string.h",
+    "include/lib/fidl/cpp/traits.h",
+    "include/lib/fidl/cpp/types.h",
+    "include/lib/fidl/cpp/vector.h",
+    "message.cc",
+    "message_buffer.cc",
+  ]
+
+  include_base = "//sdk/lib/fidl/hlcpp/include"
+
+  public_configs = [
+    "//sdk/config",
+    "//sdk/lib/fidl/hlcpp:config",
+  ]
+
+  public_deps = [
+    "//sdk/lib/fidl_base",
+    "//sdk/lib/fit",
+    "//sdk/lib/fit-promise",
+    "//sdk/lib/stdcompat",
+  ]
+
+  if (is_fuchsia || is_mistos) {
+    sources += [
+      "include/lib/fidl/cpp/interface_handle.h",
+      "include/lib/fidl/cpp/interface_request.h",
+    ]
+    public_deps += [
+      "//sdk/lib/fidl",
+      "//zircon/system/ulib/zx",
+    ]
+  }
+}
+
+config("config") {
+  include_dirs = [ "include" ]
+}

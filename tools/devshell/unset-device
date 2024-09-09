@@ -11,19 +11,12 @@
 ## Unset the default device to work with for the active build directory. See "fx set-device"
 ## for more information.
 
-set -e
+set -e -o pipefail
 
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"/lib/vars.sh || exit $?
 fx-standard-switches "$@"
 fx-config-read
 
-device_name=$(get-device-raw)
-if [[ -n ${device_name} ]]; then
-  fx-command-run ffx target default unset --level build --build-dir "${FUCHSIA_BUILD_DIR}"
-  fx-command-run ffx target remove ${device_name}
-fi
-
 if [[ -n "${FUCHSIA_BUILD_DIR}" ]]; then
   rm -f "${FUCHSIA_BUILD_DIR}.device"
-  json-config-del "${FUCHSIA_BUILD_DIR}.json" target.default
 fi

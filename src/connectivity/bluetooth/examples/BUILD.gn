@@ -30,5 +30,6 @@ group("tests") {
     "bt-fastpair-client:tests",
     "bt-le-battery-monitor:tests",
     "bt-le-battery-service:tests",
+    "bt-opp-client:tests",
   ]
 }

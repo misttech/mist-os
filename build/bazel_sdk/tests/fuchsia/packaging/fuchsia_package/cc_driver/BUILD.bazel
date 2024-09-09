@@ -33,14 +33,26 @@ fuchsia_driver_bind_bytecode(
     ],
 )
 
+# TODO: Try doing this with no srcs
+
 fuchsia_cc_driver(
     name = "test_driver",
     srcs = [
         "cc_test_driver.cc",
         "cc_test_driver.h",
     ],
-    # name the driver like this to make sure out extension stripping works
+
+    # The linkopts and linkshared attributes are here to test for backwards
+    # compatability because some older drivers passed these in when we were
+    # still using cc_binary.
+    linkopts = [],
+    linkshared = False,
+
+    # name the driver like this to make sure our extension stripping works
     output_name = "test_driver_so",
+
+    # Make sure we are honoring the user's link flags they pass in.
+    user_link_flags = [],
     deps = [
         ":driver-config",
         "@fuchsia_sdk//pkg/driver_component_cpp",

@@ -57,6 +57,7 @@ test("test") {
     ":cpp",
     ":logging",
     "//sdk/lib/driver/testing/cpp",
+    "//sdk/lib/driver/testing/cpp:scoped_global_logger",
     "//src/storage/lib/vfs/cpp",
     "//zircon/system/ulib/zxtest",
   ]
@@ -65,6 +66,11 @@ test("test") {
 fuchsia_unittest_package("test-package") {
   package_name = "compat-lib-test"
   deps = [ ":test" ]
+  test_specs = {
+    log_settings = {
+      max_severity = "ERROR"
+    }
+  }
 }
 
 group("tests") {

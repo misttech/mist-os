@@ -23,6 +23,7 @@
             from: "parent",
             to: [
                 "#cpu_manager",
+                "#power-broker",
                 "#power_manager",
             ],
             availability: "optional",

@@ -318,7 +318,7 @@ void FakeStreamConfig::CreateRingBuffer(
   selected_format_ = format.pcm_format();
 
   active_channels_bitmask_ = (1 << selected_format_->number_of_channels) - 1;
-  active_channels_set_time_ = zx::clock::get_monotonic();
+  set_active_channels_completed_at_ = zx::clock::get_monotonic();
 }
 
 // For now, don't do anything with this. No response is needed so this should be OK even if called.
@@ -454,12 +454,12 @@ void FakeStreamConfig::SetActiveChannels(uint64_t active_channels_bitmask,
   if (active_channels_supported_) {
     if (active_channels_bitmask != active_channels_bitmask_) {
       active_channels_bitmask_ = active_channels_bitmask;
-      active_channels_set_time_ = zx::clock::get_monotonic();
+      set_active_channels_completed_at_ = zx::clock::get_monotonic();
     }
     FX_LOGS(DEBUG) << __FUNCTION__ << " active_channels_bitmask_ 0x" << std::hex
                    << active_channels_bitmask_ << ", active_channels_supported_ "
                    << active_channels_supported_;
-    callback(fpromise::ok(active_channels_set_time_.get()));
+    callback(fpromise::ok(set_active_channels_completed_at_.get()));
   } else {
     callback(fpromise::error(ZX_ERR_NOT_SUPPORTED));
   }
@@ -479,8 +479,8 @@ void FakeStreamConfig::WatchDelayInfo(WatchDelayInfoCallback callback) {
     }
 
     delay_has_changed_ = false;
-    callback(fuchsia::hardware::audio::RingBuffer_WatchDelayInfo_Result::WithResponse(
-        fuchsia::hardware::audio::RingBuffer_WatchDelayInfo_Response(std::move(delay_info))));
+    callback(fha::RingBuffer_WatchDelayInfo_Result::WithResponse(
+        fha::RingBuffer_WatchDelayInfo_Response(std::move(delay_info))));
   } else {
     pending_delay_callback_ = std::move(callback);
   }

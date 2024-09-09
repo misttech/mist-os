@@ -91,8 +91,9 @@ class Server final
                        SetElementStateCompleter::Sync& completer) override;
   void SetTopology(SetTopologyRequestView request, SetTopologyCompleter::Sync& completer) override;
   void handle_unknown_method(
-      fidl::UnknownMethodMetadata<fuchsia_hardware_audio_signalprocessing::SignalProcessing>,
-      fidl::UnknownMethodCompleter::Sync&) override;
+      fidl::UnknownMethodMetadata<fuchsia_hardware_audio_signalprocessing::SignalProcessing>
+          metadata,
+      fidl::UnknownMethodCompleter::Sync& completer) override;
 
   void MaybeCompleteWatchElementState();
 

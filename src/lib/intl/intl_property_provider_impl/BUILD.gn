@@ -54,7 +54,7 @@ icu_source_set("intl_property_provider_impl") {
   deps = [
     "//sdk/fidl/fuchsia.intl:fuchsia.intl_cpp",
     "//sdk/fidl/fuchsia.settings:fuchsia.settings_cpp",
-    "//sdk/lib/fidl/cpp",
+    "//sdk/lib/fidl/hlcpp",
     "//sdk/lib/inspect/component/cpp",
     "//sdk/lib/sys/cpp",
     "//sdk/lib/sys/service/cpp",

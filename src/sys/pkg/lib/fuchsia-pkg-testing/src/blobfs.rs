@@ -9,6 +9,7 @@ use fuchsia_hash::Hash;
 use tempfile::TempDir;
 
 /// A fake blobfs backed by temporary storage.
+///
 /// The name of the blob file is not guaranteed to match the merkle root of the content.
 /// Be aware that this implementation does not send USER_0 signal, so `has_blob()` will always
 /// return false.
@@ -47,7 +48,7 @@ impl Fake {
     }
 
     fn root_proxy(&self) -> fio::DirectoryProxy {
-        fuchsia_fs::directory::open_in_namespace(
+        fuchsia_fs::directory::open_in_namespace_deprecated(
             self.root.path().to_str().unwrap(),
             fuchsia_fs::OpenFlags::RIGHT_READABLE,
         )

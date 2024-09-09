@@ -141,7 +141,7 @@ test("optee-client-test-bin") {
   output_name = "optee-client-test"
   deps = [
     ":optee_lib",
-    "//sdk/lib/fidl/cpp",
+    "//sdk/lib/fidl/hlcpp",
     "//src/devices/testing/fake-bti",
     "//src/devices/testing/fake-resource",
     "//src/devices/testing/mock-ddk",

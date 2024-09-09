@@ -26,21 +26,116 @@ class HashTableChecker;
 }  // namespace intrusive_containers
 }  // namespace tests
 
-// A sentinel value which can be used in a HashTable's template arguments to
-// configure the HashTable to use a number of buckets determined at runtime
-// instead of compile time.
+// Static vs. Dynamic bucket initialization.
 //
-// HashTables configured to use a dynamic bucket count must have their buckets
-// provided to them as a `std::unique_ptr<BucketType[]>` at construction time.
-// Default construction is not an option.
+// fbl::HashTables may have their bucket counts and bucket storage determined
+// "statically" (at compile time) or "dynamically" (determined at runtime).
+// There are some important differences between the two, which this comment
+// will explain.
 //
-// Additionally, elements stored in dynamic hash tables do not need to
-// necessarily return a HashValue which is in the range [0, bucket_count).
-// Dynamic hash tables will always perform a div/mod operation on their hash
-// values in order to ensure that an out-of-range bucket index will never be
-// selected.
+// * Declaration and Initialization *
+//
+// The first primary difference between the two comes in how they are declared
+// and initialized.  In order to declare a HashTable with static bucket storage,
+// we provide the number of buckets to use as a template parameter of the type.
+// For example, declaring a HashTable using `SinglyLinkedLists` of
+// `std::unique_ptr<Foo>`s for buckets, and 107 bucket, would look something
+// like this.
+//
+// ```
+// using KeyType = size_t;
+// using PtrType = std::unique_ptr<Foo>;
+// using BucketType = SinglyLinkedList<PtrType>;
+// using HashType = size_t;
+// using MyHashTable =
+//   fbl::HashTable<KeyType, PtrType, BucketType, HashType, 107>;
+//
+// MyHashTable ht{};
+// /* Do things with ht */
+// ```
+//
+// The storage for the buckets is part of the HashTable itself, meaning that the
+// object will be rather large, but it can always be default constructed without
+// any fear of allocation failure.  Additionally, the HashTable is always
+// "valid"; there is never an invalid state for the HashTable instance to be in.
+//
+// The bucket count for a HashTable may also be configured at runtime,
+// supporting use cases where the proper "tuned" size of the HashTable's bucket
+// array may not be known until runtime.  To do this, we simply pass the
+// `kDynamicBucketCount` (see below) value to the type definition of the
+// HashTable, and then provide storage for the buckets during construction.  For
+// example:
+//
+// ```
+// using KeyType = size_t;
+// using PtrType = std::unique_ptr<Foo>;
+// using BucketType = SinglyLinkedList<PtrType>;
+// using HashType = size_t;
+// using MyHashTable =
+//   fbl::HashTable<KeyType, PtrType, BucketType, HashType, kDynamicBucketCount>;
+//
+// const size_t cnt = GetBucketCount();
+// auto storage = std::unique_ptr<BucketType[]>(new BucketType[cnt]);
+// fbl::HashTable ht{std::move(storage), cnt};
+// ```
+//
+// Once again, this HashTable is _always_ valid, there is never an invalid state
+// for it because its storage was supplied at construction time and can never be
+// released until destruction time.  In order to achieve this, however, we need
+// to demand that the storage *must* be provided at construction time, which can
+// be inconvenient for some patterns.  For these situations, one more option is
+// provided; dynamic HashTables with delayed initialization.  As with all
+// dynamically initialized HashTables, users must specify `kDynamicBucketCount`
+// as the number of buckets in the template definition, but they must also opt
+// into delayed initialization by passing `HashTableOptions::DelayedInit` to the
+// constructor.  Afterwards, before using the instance in *any* way, users
+// *must* call the Init method on the HashTable instance to provide bucket
+// storage.  Following construction, the HashTable instance is "invalid" until
+// it has been properly initialized.  Initialization is *not* an idempotent
+// operation and must be performed exactly once before use.  For example...
+//
+// ```
+// using KeyType = size_t;
+// using PtrType = std::unique_ptr<Foo>;
+// using BucketType = SinglyLinkedList<PtrType>;
+// using HashType = size_t;
+// using MyHashTable =
+//   fbl::HashTable<KeyType, PtrType, BucketType, HashType, kDynamicBucketCount>;
+//
+// const size_t cnt = GetBucketCount();
+// auto storage = std::unique_ptr<BucketType[]>(new BucketType[cnt]);
+// fbl::HashTable ht{HashTableOptions::DelayedInit), cnt};
+// ht.Init(std::move(storage), cnt);
+// ```
+//
+// * Hash function requirements and performance implications *
+//
+// There are two ways users may use to specify the bucket that their object
+// belongs in for a HashTable.  The easiest way is to make sure that their
+// objects have a GetHash function defined which returns what amounts to a
+// "large number".  The default implementation of the hash-traits for the
+// HashTable will use the value returned from this function modulo the bucket
+// count for the hash table to determine the bucket index that the item belongs
+// in.  This is true regardless of whether or not the buckets for the hash table
+// are statically or dynamically defined.
+//
+// If a user can define a hash function which is guaranteed to always produce a
+// valid bucket index, they can skip the modulus operation by defining their own
+// hash traits for their hash table instance.  That said, this currently only
+// works for hash tables with statically defined bucket storage.  _HashTables
+// with dynamically defined bucket storage will always perform the modulus
+// operation, regardless of whether or not the user defined custom hash traits
+// for their hash table_.
+//
+// Finally, because HashTables with dynamically defined storage possess an
+// invalid state (whereas, HashTables with statically defined bucket storage do
+// not), a validity check in the form of a ZX_DEBUG_ASSERT will be made on the
+// bucket storage for every public facing operation.  These checks may or may
+// not be present in the final build depending on the specific build
+// configuration.  See the ZX_DEBUG_ASSERT docs for details.
 //
 inline constexpr size_t kDynamicBucketCount = 0;
+enum class HashTableOption { DelayedInit };
 
 namespace internal {
 inline constexpr size_t kDefaultNumBuckets = 37;
@@ -61,6 +156,9 @@ class BucketStorage {
   const BucketType* begin() const { return &buckets_[0]; }
   const BucketType* end() const { return &buckets_[NumBuckets]; }
 
+  // Static bucket storage is always valid.
+  constexpr void AssertValid() const {}
+
  private:
   static_assert(NumBuckets > 0, "Hash tables must have at least one bucket");
   static_assert(NumBuckets <= std::numeric_limits<HashType>::max(),
@@ -73,8 +171,6 @@ class BucketStorage<HashType, BucketType, kDynamicBucketCount> {
  public:
   BucketStorage(std::unique_ptr<BucketType[]> buckets, size_t bucket_count)
       : buckets_(std::move(buckets)), bucket_count_(static_cast<HashType>(bucket_count)) {
-    ZX_DEBUG_ASSERT(buckets_.get() != nullptr);
-    ZX_DEBUG_ASSERT(bucket_count_ > 0);
     ZX_DEBUG_ASSERT(bucket_count_ <= std::numeric_limits<HashType>::max());
   }
   ~BucketStorage() = default;
@@ -89,9 +185,24 @@ class BucketStorage<HashType, BucketType, kDynamicBucketCount> {
   const BucketType* begin() const { return &buckets_[0]; }
   const BucketType* end() const { return &buckets_[bucket_count_]; }
 
+  // Support for late init.
+  void Init(std::unique_ptr<BucketType[]> buckets, size_t bucket_count) {
+    ZX_DEBUG_ASSERT(buckets_.get() == nullptr);
+    ZX_DEBUG_ASSERT(bucket_count_ == 0);
+
+    ZX_DEBUG_ASSERT(buckets.get() != nullptr);
+    ZX_DEBUG_ASSERT(bucket_count > 0);
+    ZX_DEBUG_ASSERT(bucket_count <= std::numeric_limits<HashType>::max());
+
+    buckets_ = std::move(buckets);
+    bucket_count_ = static_cast<HashType>(bucket_count);
+  }
+
+  void AssertValid() const { ZX_DEBUG_ASSERT(buckets_.get() != nullptr); }
+
  private:
   std::unique_ptr<BucketType[]> buckets_;
-  const HashType bucket_count_;
+  HashType bucket_count_;
 };
 
 }  // namespace internal
@@ -184,42 +295,34 @@ class __POINTER(_KeyType) HashTable {
   static_assert(std::is_unsigned_v<HashType>, "HashTypes must be unsigned integers");
 
   constexpr HashTable() noexcept {
-    using NodeState = internal::node_state_t<NodeTraits, RefType>;
-
     static_assert(NumBuckets != kDynamicBucketCount,
-                  "Constant HashTable constructor used with dynamic bucket count!");
+                  "Constant default HashTable constructor cannot be used with "
+                  "dynamic bucket count!.  Either explicitly pass bucket storage "
+                  "to the constructor, or pass HashTableOption::DelayedInit and then "
+                  "provide storage via Init before use.");
 
-    // Make certain that the type of pointer we are expected to manage matches
-    // the type of pointer that our Node type expects to manage.  In theory, our
-    // bucket has already performed this check for us, but extra checks are
-    // always welcome.
-    static_assert(std::is_same_v<PtrType, typename NodeState::PtrType>,
-                  "HashTable's pointer type must match its Node's pointer type");
-
-    // HashTable does not currently support direct remove-from-container (but
-    // could do so if it did not track size)
-    static_assert(!(NodeState::kNodeOptions & NodeOptions::AllowRemoveFromContainer),
-                  "HashTable does not support nodes which allow RemoveFromContainer.");
+    CommonStaticAsserts();
   }
 
-  constexpr HashTable(std::unique_ptr<BucketType[]> buckets_storage, size_t bucket_count) noexcept
+  HashTable(std::unique_ptr<BucketType[]> buckets_storage, size_t bucket_count) noexcept
       : buckets_{std::move(buckets_storage), bucket_count} {
-    using NodeState = internal::node_state_t<NodeTraits, RefType>;
-
     static_assert(NumBuckets == kDynamicBucketCount,
                   "Dynamic HashTable constructor used with template defined bucket count!");
 
-    // Make certain that the type of pointer we are expected to manage matches
-    // the type of pointer that our Node type expects to manage.  In theory, our
-    // bucket has already performed this check for us, but extra checks are
-    // always welcome.
-    static_assert(std::is_same_v<PtrType, typename NodeState::PtrType>,
-                  "HashTable's pointer type must match its Node's pointer type");
+    CommonStaticAsserts();
+  }
 
-    // HashTable does not currently support direct remove-from-container (but
-    // could do so if it did not track size)
-    static_assert(!(NodeState::kNodeOptions & NodeOptions::AllowRemoveFromContainer),
-                  "HashTable does not support nodes which allow RemoveFromContainer.");
+  explicit constexpr HashTable(HashTableOption) noexcept : buckets_{nullptr, 0} {
+    static_assert(NumBuckets == kDynamicBucketCount,
+                  "Dynamic HashTable constructor used with template defined bucket count!");
+
+    CommonStaticAsserts();
+  }
+
+  void Init(std::unique_ptr<BucketType[]> buckets_storage, size_t bucket_count) {
+    static_assert(NumBuckets == kDynamicBucketCount,
+                  "HashTable::Init cannot be used with template defined bucket count!");
+    buckets_.Init(std::move(buckets_storage), bucket_count);
   }
 
   ~HashTable() { ZX_DEBUG_ASSERT(PtrTraits::IsManaged || is_empty()); }
@@ -235,10 +338,12 @@ class __POINTER(_KeyType) HashTable {
 
   // make_iterator : construct an iterator out of a reference to an object.
   iterator make_iterator(ValueType& obj) {
+    buckets_.AssertValid();
     HashType ndx = GetHash(KeyTraits::GetKey(obj));
     return iterator(this, ndx, buckets_[ndx].make_iterator(obj));
   }
   const_iterator make_iterator(const ValueType& obj) const {
+    buckets_.AssertValid();
     HashType ndx = GetHash(KeyTraits::GetKey(obj));
     return const_iterator(this, ndx, buckets_[ndx].make_iterator(obj));
   }
@@ -246,6 +351,8 @@ class __POINTER(_KeyType) HashTable {
   void insert(const PtrType& ptr) { insert(PtrType(ptr)); }
   void insert(PtrType&& ptr) {
     ZX_DEBUG_ASSERT(ptr != nullptr);
+    buckets_.AssertValid();
+
     KeyType key = KeyTraits::GetKey(*ptr);
     BucketType& bucket = GetBucket(key);
 
@@ -277,6 +384,8 @@ class __POINTER(_KeyType) HashTable {
 
   bool insert_or_find(PtrType&& ptr, iterator* iter = nullptr) {
     ZX_DEBUG_ASSERT(ptr != nullptr);
+    buckets_.AssertValid();
+
     KeyType key = KeyTraits::GetKey(*ptr);
     HashType ndx = GetHash(key);
     auto& bucket = buckets_[ndx];
@@ -306,6 +415,8 @@ class __POINTER(_KeyType) HashTable {
 
   PtrType insert_or_replace(PtrType&& ptr) {
     ZX_DEBUG_ASSERT(ptr != nullptr);
+    buckets_.AssertValid();
+
     KeyType key = KeyTraits::GetKey(*ptr);
     HashType ndx = GetHash(key);
     auto& bucket = buckets_[ndx];
@@ -327,6 +438,8 @@ class __POINTER(_KeyType) HashTable {
   }
 
   iterator find(const KeyType& key) {
+    buckets_.AssertValid();
+
     HashType ndx = GetHash(key);
     auto& bucket = buckets_[ndx];
     auto bucket_iter = FindInBucket(bucket, key);
@@ -335,6 +448,8 @@ class __POINTER(_KeyType) HashTable {
   }
 
   const_iterator find(const KeyType& key) const {
+    buckets_.AssertValid();
+
     HashType ndx = GetHash(key);
     const auto& bucket = buckets_[ndx];
     auto bucket_iter = FindInBucket(bucket, key);
@@ -344,6 +459,8 @@ class __POINTER(_KeyType) HashTable {
   }
 
   PtrType erase(const KeyType& key) {
+    buckets_.AssertValid();
+
     BucketType& bucket = GetBucket(key);
 
     PtrType ret = internal::KeyEraseUtils<BucketType, KeyTraits>::erase(bucket, key);
@@ -354,6 +471,8 @@ class __POINTER(_KeyType) HashTable {
   }
 
   PtrType erase(const iterator& iter) {
+    buckets_.AssertValid();
+
     if (!iter.IsValid())
       return PtrType(nullptr);
 
@@ -368,6 +487,8 @@ class __POINTER(_KeyType) HashTable {
   // this will release all references held by the hashtable to the objects
   // which were in it.
   void clear() {
+    // No need to assert that delayed-init buckets are valid here; clearing a
+    // non-initialized set of delayed-init buckets is a safe operation.
     for (auto& e : buckets_)
       e.clear();
     count_ = 0;
@@ -379,6 +500,8 @@ class __POINTER(_KeyType) HashTable {
   // zero.  See comments in fbl/intrusive_single_list.h
   // Think carefully before calling this!
   void clear_unsafe() {
+    // No need to assert that delayed-init buckets are valid here; clearing a
+    // non-initialized set of delayed-init buckets is a safe operation.
     static_assert(PtrTraits::IsManaged == false,
                   "clear_unsafe is not allowed for containers of managed pointers");
     static_assert(NodeTraits::NodeState::kNodeOptions & NodeOptions::AllowClearUnsafe,
@@ -403,8 +526,11 @@ class __POINTER(_KeyType) HashTable {
   // predicate.
   template <typename UnaryFn>
   PtrType erase_if(UnaryFn fn) {
-    if (is_empty())
+    buckets_.AssertValid();
+
+    if (is_empty()) {
       return PtrType(nullptr);
+    }
 
     for (HashType i = 0; i < buckets_.size(); ++i) {
       auto& bucket = buckets_[i];
@@ -427,18 +553,26 @@ class __POINTER(_KeyType) HashTable {
   // satisfies the predicate.
   template <typename UnaryFn>
   const_iterator find_if(UnaryFn fn) const {
-    for (auto iter = begin(); iter.IsValid(); ++iter)
-      if (fn(*iter))
+    buckets_.AssertValid();
+
+    for (auto iter = begin(); iter.IsValid(); ++iter) {
+      if (fn(*iter)) {
         return iter;
+      }
+    }
 
     return end();
   }
 
   template <typename UnaryFn>
   iterator find_if(UnaryFn fn) {
-    for (auto iter = begin(); iter.IsValid(); ++iter)
-      if (fn(*iter))
+    buckets_.AssertValid();
+
+    for (auto iter = begin(); iter.IsValid(); ++iter) {
+      if (fn(*iter)) {
         return iter;
+      }
+    }
 
     return end();
   }
@@ -575,16 +709,21 @@ class __POINTER(_KeyType) HashTable {
 
     iterator_impl(const ContainerType* hash_table, BeginTag)
         : hash_table_(hash_table), bucket_ndx_(0), iter_(IterTraits::BucketBegin(GetBucket(0))) {
+      hash_table_->buckets_.AssertValid();
       advance_if_invalid_iter();
     }
 
     iterator_impl(const ContainerType* hash_table, EndTag)
         : hash_table_(hash_table),
           bucket_ndx_(last_bucket_ndx()),
-          iter_(IterTraits::BucketEnd(GetBucket(last_bucket_ndx()))) {}
+          iter_(IterTraits::BucketEnd(GetBucket(last_bucket_ndx()))) {
+      hash_table_->buckets_.AssertValid();
+    }
 
     iterator_impl(const ContainerType* hash_table, HashType bucket_ndx, const IterType& iter)
-        : hash_table_(hash_table), bucket_ndx_(bucket_ndx), iter_(iter) {}
+        : hash_table_(hash_table), bucket_ndx_(bucket_ndx), iter_(iter) {
+      hash_table_->buckets_.AssertValid();
+    }
 
     BucketType& GetBucket(HashType ndx) {
       return const_cast<ContainerType*>(hash_table_)->buckets_[ndx];
@@ -636,6 +775,22 @@ class __POINTER(_KeyType) HashTable {
     return bucket.find_if([key](const ValueType& other) -> bool {
       return KeyTraits::EqualTo(key, KeyTraits::GetKey(other));
     });
+  }
+
+  static void CommonStaticAsserts() {
+    using NodeState = internal::node_state_t<NodeTraits, RefType>;
+
+    // Make certain that the type of pointer we are expected to manage matches
+    // the type of pointer that our Node type expects to manage.  In theory, our
+    // bucket has already performed this check for us, but extra checks are
+    // always welcome.
+    static_assert(std::is_same_v<PtrType, typename NodeState::PtrType>,
+                  "HashTable's pointer type must match its Node's pointer type");
+
+    // HashTable does not currently support direct remove-from-container (but
+    // could do so if it did not track size).
+    static_assert(!(NodeState::kNodeOptions & NodeOptions::AllowRemoveFromContainer),
+                  "HashTable does not support nodes which allow RemoveFromContainer.");
   }
 
   // The test framework's 'checker' class is our friend.

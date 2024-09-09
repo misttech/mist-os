@@ -5,7 +5,7 @@
 #ifndef SRC_DEVICES_GPIO_BIN_GPIOUTIL_GPIOUTIL_H_
 #define SRC_DEVICES_GPIO_BIN_GPIOUTIL_GPIOUTIL_H_
 
-#include <fidl/fuchsia.hardware.gpio/cpp/wire.h>
+#include <fidl/fuchsia.hardware.pin/cpp/wire.h>
 #include <lib/zx/result.h>
 #include <stdio.h>
 
@@ -36,10 +36,10 @@ int ParseArgs(int argc, char** argv, GpioFunc* func, uint8_t* write_value,
 
 zx::result<> ListGpios();
 
-zx::result<fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio>> FindGpioClientByName(
+zx::result<fidl::WireSyncClient<fuchsia_hardware_pin::Debug>> FindDebugClientByName(
     std::string_view name);
 
-int ClientCall(fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio> client, GpioFunc func,
+int ClientCall(fidl::WireSyncClient<fuchsia_hardware_pin::Debug> client, GpioFunc func,
                uint8_t write_value, fuchsia_hardware_gpio::wire::GpioFlags in_flag,
                uint8_t out_value, uint64_t ds_ua, uint32_t interrupt_flags, uint64_t alt_function);
 

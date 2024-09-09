@@ -35,9 +35,11 @@ impl Test for IntegrationTest {
         }
 
         // Make sure we have access to /dev
-        let proxy =
-            fuchsia_fs::directory::open_in_namespace("/dev", fuchsia_fs::OpenFlags::RIGHT_READABLE)
-                .expect("failed to open /dev");
+        let proxy = fuchsia_fs::directory::open_in_namespace_deprecated(
+            "/dev",
+            fuchsia_fs::OpenFlags::RIGHT_READABLE,
+        )
+        .expect("failed to open /dev");
         let _: Vec<_> = proxy.query().await?;
 
         Ok(())

@@ -7,19 +7,16 @@ use fidl::endpoints::{ControlHandle, RequestStream};
 use fuchsia_component::client::connect_to_protocol_sync;
 use fuchsia_component::server::ServiceFs;
 use fuchsia_sync::Mutex;
-use fuchsia_zircon::{HandleBased, Task};
 use futures::{StreamExt, TryStreamExt};
+use kernel_manager::kernels::Kernels;
+use kernel_manager::serve_starnix_manager;
 use std::sync::Arc;
-use tracing::{debug, info, warn};
-use zx::AsHandleRef;
+use tracing::{info, warn};
 use {
     fidl_fuchsia_component_runner as frunner, fidl_fuchsia_memory_attribution as fattribution,
     fidl_fuchsia_settings as fsettings, fidl_fuchsia_starnix_runner as fstarnixrunner,
     fuchsia_zircon as zx,
 };
-
-mod kernels;
-use crate::kernels::Kernels;
 
 enum Services {
     ComponentRunner(frunner::ComponentRunnerRequestStream),
@@ -83,50 +80,12 @@ async fn serve_component_runner(
             frunner::ComponentRunnerRequest::Start { start_info, controller, .. } => {
                 kernels.start(start_info, controller).await?;
             }
-        }
-    }
-    Ok(())
-}
-
-async fn serve_starnix_manager(
-    mut stream: fstarnixrunner::ManagerRequestStream,
-    suspended_processes: Arc<Mutex<Vec<zx::Handle>>>,
-    kernels: &Kernels,
-) -> Result<(), Error> {
-    while let Some(event) = stream.try_next().await? {
-        match event {
-            fstarnixrunner::ManagerRequest::Suspend { responder, .. } => {
-                suspend_kernels(kernels, &suspended_processes, responder).await
+            frunner::ComponentRunnerRequest::_UnknownMethod { ordinal, .. } => {
+                warn!(%ordinal, "Unknown ComponentRunner request");
             }
-            fstarnixrunner::ManagerRequest::Resume { .. } => resume_kernels(&suspended_processes),
-            _ => {}
         }
     }
     Ok(())
-}
-
-async fn suspend_kernels(
-    kernels: &Kernels,
-    suspended_processes: &Mutex<Vec<zx::Handle>>,
-    responder: fstarnixrunner::ManagerSuspendResponder,
-) {
-    fuchsia_trace::duration!(c"starnix_runner", c"suspend_kernels");
-
-    debug!("suspending processes...");
-    for job in kernels.all_jobs() {
-        suspended_processes.lock().append(&mut suspend_kernel(&job).await);
-    }
-    debug!("...done suspending processes");
-    if let Err(e) = responder.send() {
-        warn!("error replying to suspend request: {e}");
-    }
-}
-
-fn resume_kernels(suspended_processes: &Mutex<Vec<zx::Handle>>) {
-    debug!("requesting resume...");
-    // Drop all the suspend handles to resume the kernel.
-    *suspended_processes.lock() = vec![];
-    debug!("...requested resume (completes asynchronously)");
 }
 
 async fn serve_attribution_provider(
@@ -146,56 +105,4 @@ async fn serve_attribution_provider(
         }
     }
     Ok(())
-}
-
-/// Suspends `kernel` by suspending all the processes in the kernel's job.
-async fn suspend_kernel(kernel_job: &zx::Job) -> Vec<zx::Handle> {
-    let mut handles = std::collections::HashMap::<zx::Koid, zx::Handle>::new();
-    loop {
-        let process_koids = kernel_job.processes().expect("failed to get processes");
-        let mut found_new_process = false;
-        let mut processes = vec![];
-
-        for process_koid in process_koids {
-            if handles.get(&process_koid).is_some() {
-                continue;
-            }
-
-            found_new_process = true;
-
-            if let Ok(process_handle) =
-                kernel_job.get_child(&process_koid, zx::Rights::SAME_RIGHTS.bits())
-            {
-                let process = zx::Process::from_handle(process_handle);
-                if let Ok(suspend_handle) = process.suspend() {
-                    handles.insert(process_koid, suspend_handle);
-                }
-                processes.push(process);
-            }
-        }
-
-        for process in processes {
-            let threads = process.threads().expect("failed to get threads");
-            for thread_koid in &threads {
-                if let Ok(thread_handle) =
-                    process.get_child(&thread_koid, zx::Rights::SAME_RIGHTS.bits())
-                {
-                    let thread = zx::Thread::from_handle(thread_handle);
-                    match thread.wait_handle(
-                        zx::Signals::THREAD_SUSPENDED,
-                        zx::MonotonicTime::after(zx::Duration::INFINITE),
-                    ) {
-                        Err(e) => tracing::warn!("Error waiting for task suspension: {:?}", e),
-                        _ => {}
-                    }
-                }
-            }
-        }
-
-        if !found_new_process {
-            break;
-        }
-    }
-
-    handles.into_values().collect()
 }

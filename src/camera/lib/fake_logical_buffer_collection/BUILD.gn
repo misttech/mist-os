@@ -18,7 +18,7 @@ source_set("fake_logical_buffer_collection") {
     "//zircon/system/ulib/image-format",
   ]
   public_deps = [
-    "//sdk/lib/fidl/cpp",
+    "//sdk/lib/fidl/hlcpp",
     "//sdk/lib/sys/cpp",
     "//src/lib/fxl",
     "//zircon/system/ulib/fzl",

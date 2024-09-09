@@ -8,7 +8,6 @@ import json
 import os
 import subprocess
 import unittest
-from typing import List
 from unittest import mock
 
 import submit

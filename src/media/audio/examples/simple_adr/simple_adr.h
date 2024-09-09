@@ -11,9 +11,11 @@
 #include <fidl/fuchsia.hardware.audio/cpp/fidl.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/fidl/cpp/client.h>
+#include <lib/fidl/cpp/wire/unknown_interaction_handler.h>
 #include <lib/fit/function.h>
 #include <lib/fzl/vmo-mapper.h>
 
+#include <iostream>
 #include <string_view>
 
 namespace examples {
@@ -30,12 +32,25 @@ class FidlHandler : public fidl::AsyncEventHandler<ProtocolT> {
   MediaApp* parent_;
   std::string_view name_;
 };
+class ControlFidlHandler : public FidlHandler<fuchsia_audio_device::Control> {
+ public:
+  ControlFidlHandler(MediaApp* parent, std::string_view name) : FidlHandler(parent, name) {}
+  void handle_unknown_event(
+      fidl::UnknownEventMetadata<fuchsia_audio_device::Control> metadata) override {
+    std::cout << "ControlFidlHandler: unknown event (Control) ordinal " << metadata.event_ordinal;
+  }
+};
 
-class MediaApp : public fidl::AsyncEventHandler<fuchsia_audio_device::Registry>,
-                 public fidl::AsyncEventHandler<fuchsia_audio_device::Observer>,
-                 public fidl::AsyncEventHandler<fuchsia_audio_device::ControlCreator>,
-                 public fidl::AsyncEventHandler<fuchsia_audio_device::Control>,
-                 public fidl::AsyncEventHandler<fuchsia_audio_device::RingBuffer> {
+class ObserverFidlHandler : public FidlHandler<fuchsia_audio_device::Observer> {
+ public:
+  ObserverFidlHandler(MediaApp* parent, std::string_view name) : FidlHandler(parent, name) {}
+  void handle_unknown_event(
+      fidl::UnknownEventMetadata<fuchsia_audio_device::Observer> metadata) override {
+    std::cout << "ObserverFidlHandler: unknown event (Observer) ordinal " << metadata.event_ordinal;
+  }
+};
+
+class MediaApp {
   // Display device metadata received from AudioDeviceRegistry, for each device
   static inline constexpr bool kLogDeviceInfo = false;
 
@@ -95,9 +110,9 @@ class MediaApp : public fidl::AsyncEventHandler<fuchsia_audio_device::Registry>,
   size_t channels_per_frame_ = 0;
 
   FidlHandler<fuchsia_audio_device::Registry> reg_handler_{this, "Registry"};
-  FidlHandler<fuchsia_audio_device::Observer> obs_handler_{this, "Observer"};
-  FidlHandler<fuchsia_audio_device::Control> ctl_handler_{this, "Control"};
   FidlHandler<fuchsia_audio_device::RingBuffer> rb_handler_{this, "RingBuffer"};
+  ControlFidlHandler ctl_handler_{this, "Control"};
+  ObserverFidlHandler obs_handler_{this, "Observer"};
 };
 
 }  // namespace examples

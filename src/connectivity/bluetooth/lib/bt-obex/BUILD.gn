@@ -16,6 +16,7 @@ rustc_library("bt-obex") {
     "//src/connectivity/bluetooth/lib/bt-rfcomm",
     "//src/connectivity/bluetooth/lib/fuchsia-bluetooth",
     "//src/connectivity/bluetooth/lib/packet-encoding",
+    "//src/lib/fuchsia-sync",
     "//src/lib/zircon/rust:fuchsia-zircon",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:async-trait",
@@ -31,7 +32,6 @@ rustc_library("bt-obex") {
     "//src/lib/async-utils",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-async",
-    "//src/lib/fuchsia-sync",
     "//third_party/rust_crates:assert_matches",
   ]
 

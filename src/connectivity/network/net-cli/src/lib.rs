@@ -989,10 +989,10 @@ async fn do_rule_list<C: NetCliDepsConnector>(
     let v4_rules = v4_rules.context("failed to collect all existing IPv4 rules")?;
     let v6_rules = v6_rules.context("failed to collect all existing IPv6 rules")?;
 
-    fn format_selector(selector: froutes_ext::rules::MarkSelector) -> Cow<'static, str> {
-        match selector {
-            froutes_ext::rules::MarkSelector::Unmarked => Cow::Borrowed("unmarked"),
-            froutes_ext::rules::MarkSelector::Marked { mask, between } => {
+    fn format_matcher(matcher: froutes_ext::rules::MarkMatcher) -> Cow<'static, str> {
+        match matcher {
+            froutes_ext::rules::MarkMatcher::Unmarked => Cow::Borrowed("unmarked"),
+            froutes_ext::rules::MarkMatcher::Marked { mask, between } => {
                 format!("{mask:#010x}:{:#010x}..{:#010x}", between.start(), between.end()).into()
             }
         }
@@ -1004,8 +1004,8 @@ async fn do_rule_list<C: NetCliDepsConnector>(
         from: Option<String>,
         locally_generated: Option<String>,
         bound_device: Option<String>,
-        mark_1_selector: Option<Cow<'static, str>>,
-        mark_2_selector: Option<Cow<'static, str>>,
+        mark_1: Option<Cow<'static, str>>,
+        mark_2: Option<Cow<'static, str>>,
         action: Cow<'static, str>,
     }
 
@@ -1014,13 +1014,13 @@ async fn do_rule_list<C: NetCliDepsConnector>(
             let froutes_ext::rules::InstalledRule {
                 priority: rule_set_priority,
                 index,
-                selector:
-                    froutes_ext::rules::RuleSelector {
+                matcher:
+                    froutes_ext::rules::RuleMatcher {
                         from,
                         locally_generated,
                         bound_device,
-                        mark_1_selector,
-                        mark_2_selector,
+                        mark_1,
+                        mark_2,
                     },
                 action,
             } = rule;
@@ -1030,9 +1030,9 @@ async fn do_rule_list<C: NetCliDepsConnector>(
             let from = from.map(|from| from.to_string());
             let locally_generated = locally_generated.map(|x| x.to_string());
             let bound_device =
-                bound_device.map(|froutes_ext::rules::InterfaceSelector::DeviceName(name)| name);
-            let mark_1_selector = mark_1_selector.map(format_selector);
-            let mark_2_selector = mark_2_selector.map(format_selector);
+                bound_device.map(|froutes_ext::rules::InterfaceMatcher::DeviceName(name)| name);
+            let mark_1 = mark_1.map(format_matcher);
+            let mark_2 = mark_2.map(format_matcher);
             let action = match action {
                 froutes_ext::rules::RuleAction::Unreachable => Cow::Borrowed("unreachable"),
                 froutes_ext::rules::RuleAction::Lookup(table_id) => {
@@ -1046,8 +1046,8 @@ async fn do_rule_list<C: NetCliDepsConnector>(
                 from,
                 locally_generated,
                 bound_device,
-                mark_1_selector,
-                mark_2_selector,
+                mark_1,
+                mark_2,
                 action,
             }
         }
@@ -1061,8 +1061,8 @@ async fn do_rule_list<C: NetCliDepsConnector>(
                 from,
                 locally_generated,
                 bound_device,
-                mark_1_selector,
-                mark_2_selector,
+                mark_1,
+                mark_2,
                 action,
             } = FormatRule::from(rule);
 
@@ -1072,8 +1072,8 @@ async fn do_rule_list<C: NetCliDepsConnector>(
                 "from": from,
                 "locally_generated": locally_generated,
                 "bound_device": bound_device,
-                "mark_1_selector": mark_1_selector,
-                "mark_2_selector": mark_2_selector,
+                "mark_1": mark_1,
+                "mark_2": mark_2,
                 "action": action,
             })
         }
@@ -1093,8 +1093,8 @@ async fn do_rule_list<C: NetCliDepsConnector>(
             "From",
             "LocallyGenerated",
             "BoundDevice",
-            "Mark1Selector",
-            "Mark2Selector",
+            "Mark1Matcher",
+            "Mark2Matcher",
             "Action"
         ]);
 
@@ -1109,8 +1109,8 @@ async fn do_rule_list<C: NetCliDepsConnector>(
                 from,
                 locally_generated,
                 bound_device,
-                mark_1_selector,
-                mark_2_selector,
+                mark_1,
+                mark_2,
                 action,
             } = FormatRule::from(rule);
 
@@ -1122,8 +1122,8 @@ async fn do_rule_list<C: NetCliDepsConnector>(
                     option(&from),
                     option(&locally_generated),
                     option(&bound_device),
-                    option(&mark_1_selector),
-                    option(&mark_2_selector),
+                    option(&mark_1),
+                    option(&mark_2),
                     action,
                 ],
             );

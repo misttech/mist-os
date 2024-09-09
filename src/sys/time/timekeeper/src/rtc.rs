@@ -54,7 +54,7 @@ pub trait Rtc: Send + Sync {
 }
 
 fn get_dir() -> Result<fio::DirectoryProxy, fuchsia_fs::node::OpenError> {
-    directory::open_in_namespace(
+    directory::open_in_namespace_deprecated(
         RTC_PATH,
         fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY,
     )

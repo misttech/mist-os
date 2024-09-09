@@ -97,6 +97,16 @@ impl PowerElement {
             .await
             .unwrap();
 
+        builder
+            .add_route(
+                Route::new()
+                    .capability(Capability::protocol_by_name("fuchsia.tracing.provider.Registry"))
+                    .from(Ref::parent())
+                    .to(&child_ref),
+            )
+            .await
+            .unwrap();
+
         Ok(Self {
             element_control,
             lessor,

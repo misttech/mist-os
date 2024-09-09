@@ -367,13 +367,6 @@ if (current_cpu == "arm64") {
   }
 }
 
-# TODO(https://fxbug.dev/42170495): Remove once migration is complete.
-core_tests("core-tests-serial-migration") {
-  args = [ "kernel.experimental.serial_migration=true" ]
-  environments = [ qemu_env ]
-}
-boot_tests += [ ":core-tests-serial-migration" ]
-
 group("boot_tests") {
   testonly = true
   deps = boot_tests

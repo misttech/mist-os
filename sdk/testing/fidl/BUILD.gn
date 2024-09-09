@@ -33,7 +33,7 @@ source_set("test") {
 
   public_deps = [ ":frobinator_hlcpp" ]
 
-  deps = [ "//sdk/lib/fidl/cpp" ]
+  deps = [ "//sdk/lib/fidl/hlcpp" ]
 
   public_configs = [ "//sdk/config" ]
 }

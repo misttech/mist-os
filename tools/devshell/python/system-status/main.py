@@ -4,7 +4,6 @@
 
 import argparse
 import typing
-from dataclasses import dataclass
 
 import ffx_cmd
 import statusinfo

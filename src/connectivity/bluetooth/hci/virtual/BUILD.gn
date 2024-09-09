@@ -81,6 +81,7 @@ executable("tests_executable") {
   deps = [
     ":common",
     "//sdk/lib/driver/testing/cpp",
+    "//sdk/lib/driver/testing/cpp:scoped_global_logger",
     "//src/connectivity/bluetooth/core/bt-host/testing:gtest_main",
   ]
 }

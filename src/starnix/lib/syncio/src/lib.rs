@@ -1396,6 +1396,7 @@ fn directory_open(
         fio::NodeEvent::OnRepresentation { payload } => {
             Ok(DescribedNode { node, kind: NodeKind::from2(&payload) })
         }
+        fio::NodeEvent::_UnknownEvent { .. } => Err(zx::Status::NOT_SUPPORTED),
     }
 }
 
@@ -1540,7 +1541,7 @@ mod test {
     use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
     fn open_pkg() -> fio::DirectorySynchronousProxy {
-        let pkg_proxy = directory::open_in_namespace(
+        let pkg_proxy = directory::open_in_namespace_deprecated(
             "/pkg",
             fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,
         )
@@ -1619,7 +1620,7 @@ mod test {
 
     #[fasync::run_singlethreaded(test)]
     async fn test_directory_open_zxio_async() -> Result<(), Error> {
-        let pkg_proxy = directory::open_in_namespace(
+        let pkg_proxy = directory::open_in_namespace_deprecated(
             "/pkg",
             fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,
         )
@@ -1644,7 +1645,7 @@ mod test {
 
     #[fuchsia::test]
     async fn test_directory_enumerate() -> Result<(), Error> {
-        let pkg_dir_handle = directory::open_in_namespace(
+        let pkg_dir_handle = directory::open_in_namespace_deprecated(
             "/pkg",
             fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,
         )

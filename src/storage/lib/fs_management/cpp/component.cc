@@ -12,7 +12,9 @@ namespace fs_management {
 
 namespace {
 
-constexpr bool IsMultiVolume(DiskFormat df) { return df == kDiskFormatFxfs; }
+constexpr bool IsMultiVolume(DiskFormat df) {
+  return df == kDiskFormatFxfs || df == kDiskFormatFvm;
+}
 
 std::string GenerateUniqueName() {
   static std::atomic<int> instance = 0;

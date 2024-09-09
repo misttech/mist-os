@@ -6,6 +6,7 @@
 #define SRC_DEVICES_I2C_DRIVERS_I2C_I2C_TEST_ENV_H_
 
 #include <fidl/fuchsia.scheduler/cpp/wire_test_base.h>
+#include <lib/ddk/metadata.h>
 #include <lib/driver/testing/cpp/driver_test.h>
 
 #include "src/devices/i2c/drivers/i2c/fake-i2c-impl.h"

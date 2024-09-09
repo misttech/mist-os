@@ -676,15 +676,7 @@ async fn dad_assigns_when_echoed<N: Netstack>(name: &str) {
     let (_network, _realm, iface, fake_ep) =
         setup_network::<N>(&sandbox, name, None).await.expect("error setting up network");
 
-    let arbitrary_num_solicitations = match N::VERSION {
-        // Netstack2 does not support setting the number of DAD transmits.
-        NetstackVersion::Netstack2 { .. } | NetstackVersion::ProdNetstack2 => 1u16,
-        NetstackVersion::Netstack3 | NetstackVersion::ProdNetstack3 => 16u16,
-    };
-
     let control = iface.control();
-    let _: Option<u16> =
-        iface.set_dad_transmits(arbitrary_num_solicitations).await.expect("set dad transmits");
 
     let mut state_stream =
         add_address_for_dad(&iface, &fake_ep, &control, true, |fake_ep, ns| async move {
@@ -700,7 +692,8 @@ async fn dad_assigns_when_echoed<N: Netstack>(name: &str) {
 
     // NB: we've already seen one probe from the above `add_address_for_dad` invocation.
     let mut got_num_probes = 1usize;
-    let want_num_probes = usize::from(arbitrary_num_solicitations) + 3;
+    // 1 solicitation by default + 3 additional solicitations due to the looped-back probe.
+    let want_num_probes = 4usize;
 
     let echo_ns_fut = async {
         while got_num_probes < want_num_probes {

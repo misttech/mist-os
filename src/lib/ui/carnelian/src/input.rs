@@ -463,7 +463,7 @@ pub(crate) async fn listen_for_user_input(internal_sender: InternalSender) -> Re
             _ => (),
         }
     }
-    let dir_proxy = fuchsia_fs::directory::open_in_namespace(
+    let dir_proxy = fuchsia_fs::directory::open_in_namespace_deprecated(
         input_devices_directory,
         OpenFlags::RIGHT_READABLE,
     )?;

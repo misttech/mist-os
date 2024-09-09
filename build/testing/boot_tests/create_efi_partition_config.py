@@ -5,7 +5,6 @@
 
 import argparse
 import json
-import os
 import sys
 
 USAGE = """Creates simple partition config that specifies an EFI disk (or

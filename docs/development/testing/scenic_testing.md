@@ -162,36 +162,36 @@ applications to see if there is any regression.
 
 There are some examples available:
 
-* **flatland-view-provider**
-  - Basic example of serving `ViewProvider` and creating a UI using Flatland commands.
-  - **Source:** [`//src/ui/examples/flatland-view-provider`](/src/ui/examples/flatland-view-provider)
-  - **Build dependency:** `//src/ui/examples/flatland-view-provider`
-  - **Package URI:** `fuchsia-pkg://fuchsia.com/flatland-examples#meta/flatland-view-provider.cm`
+* **flatland-rainbow**
+  - Basic example of creating a UI using Flatland commands, and connecting it to
+    the scene graph using one of two approaches:
+    - connecting to `fuchsia.element.GraphicalPresenter`
+    - (legacy) serving `fuchsia.ui.app.ViewProvider`
+  - **Source:** [`//src/ui/examples/flatland-rainbow`](/src/ui/examples/flatland-rainbow)
+  - **Build dependency:** `//src/ui/examples/flatland-rainbow`
+  - **Package URIs:**
+    - `fuchsia-pkg://fuchsia.com/flatland-examples#meta/flatland-rainbow.cm`
+    - `fuchsia-pkg://fuchsia.com/flatland-examples#meta/flatland-rainbow-vulkan.cm`
 
 To run these applications, you need to include the following dependency in your `fx set`
 configuration:
 
 ```shell
-fx set workstation_eng.x64 --with "//src/ui/examples"
+fx set workbench_eng.x64 --with "//src/ui/examples"
 ```
 
 ### Running UI examples
 
-#### Running in shell
+#### Running in session
 
-You can launch the stories (modules) in any shell you are in:
-
-* In Ermine shell, you can run modules by typing in the package name (e.g. `flatland-view-provider`) in the \[ASK\] bar to run modules.
-
-* Or, use command `ffx session add <component_name>` command to launch a component in the shell.
-
-  From your host workstation, run:
+You can launch the stories (modules) in any session you are in, via
+`ffx session add <component_name>`.  From your host workstation, run:
 
   ```shell
-  fx session add "fuchsia-pkg://fuchsia.com/flatland_examples#meta/flatland-view-provider.cm"
+  fx session add "fuchsia-pkg://fuchsia.com/flatland_examples#meta/flatland-rainbow.cm"
   ```
 
-  to present the `View` provided in `flatland-view-provider` component.
+  to present the `View` created in the `flatland-rainbow` component.
 
 <!-- Reference links -->
 

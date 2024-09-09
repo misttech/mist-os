@@ -47,18 +47,41 @@ TEST(FindLine, GetAllLineTableMatchesInUnit) {
   rows.push_back(MockLineTable::MakeEndSequenceRow(0x1009, 1, 98));
 
   MockLineTable table(files, rows);
+  MockSymbolFactory symbol_factory;
+
+  constexpr uint64_t kFnBegin = 0x1000;
+  constexpr uint64_t kFnEnd = 0x2000;
+  auto fn1 = fxl::MakeRefCounted<Function>(DwarfTag::kSubprogram);
+  fn1->set_code_ranges(AddressRanges(AddressRange(kFnBegin, kFnEnd)));
+  symbol_factory.SetMockSymbol(0x12345678, fn1);
+  table.SetSymbolForRow(rows[0], fn1);
+
+  auto fn2 = fxl::MakeRefCounted<Function>(DwarfTag::kSubprogram);
+  fn2->set_code_ranges(AddressRanges(AddressRange(kFnBegin + 100, kFnEnd + 100)));
+  symbol_factory.SetMockSymbol(0x12345778, fn2);
+  table.SetSymbolForRow(rows[3], fn2);
 
   // There are two exact matches for line 1.
   auto out = GetAllLineTableMatchesInUnit(table, "file1.cc", 1);
   ASSERT_EQ(2u, out.size());
-  EXPECT_EQ(LineMatch(0x1000, 1, 0), out[0]);
-  EXPECT_EQ(LineMatch(0x1003, 1, 0), out[1]);
+  EXPECT_EQ(LineMatch(0x1000, 1, fn1->GetLazySymbol()), out[0]);
+  EXPECT_EQ(LineMatch(0x1003, 1, fn2->GetLazySymbol()), out[1]);
+
+  auto fn3 = fxl::MakeRefCounted<Function>(DwarfTag::kSubprogram);
+  fn3->set_code_ranges(AddressRanges(AddressRange(kFnBegin + 200, kFnEnd + 200)));
+  symbol_factory.SetMockSymbol(0x12345878, fn3);
+  table.SetSymbolForRow(rows[5], fn3);
+
+  auto fn4 = fxl::MakeRefCounted<Function>(DwarfTag::kSubprogram);
+  fn4->set_code_ranges(AddressRanges(AddressRange(kFnBegin + 300, kFnEnd + 300)));
+  symbol_factory.SetMockSymbol(0x12345978, fn4);
+  table.SetSymbolForRow(rows[7], fn4);
 
   // Searching for line 99 should catch both the 90->100 and the 95->100 transitions.
   out = GetAllLineTableMatchesInUnit(table, "file1.cc", 99);
   ASSERT_EQ(2u, out.size());
-  EXPECT_EQ(LineMatch(0x1005, 100, 0), out[0]);
-  EXPECT_EQ(LineMatch(0x1007, 100, 0), out[1]);
+  EXPECT_EQ(LineMatch(0x1005, 100, fn3->GetLazySymbol()), out[0]);
+  EXPECT_EQ(LineMatch(0x1007, 100, fn4->GetLazySymbol()), out[1]);
 
   // Searching for something greater than 100 should fail.
   out = GetAllLineTableMatchesInUnit(table, "file1.cc", 101);
@@ -79,10 +102,72 @@ TEST(FindLine, GetAllLineTableMatchesInUnit_Reverse) {
   rows.push_back(MockLineTable::MakeEndSequenceRow(0x1004, 1, 103));
 
   MockLineTable table(files, rows);
+  MockSymbolFactory symbol_factory;
+
+  constexpr uint64_t kFnBegin = 0x1000;
+  constexpr uint64_t kFnEnd = 0x2000;
+  auto fn1 = fxl::MakeRefCounted<Function>(DwarfTag::kSubprogram);
+  fn1->set_code_ranges(AddressRanges(AddressRange(kFnBegin, kFnEnd)));
+  symbol_factory.SetMockSymbol(0x12345678, fn1);
+  table.SetSymbolForRow(rows[1], fn1);
 
   auto out = GetAllLineTableMatchesInUnit(table, "file1.cc", 100);
   ASSERT_EQ(1u, out.size());
-  EXPECT_EQ(LineMatch(0x1001, 101, 0), out[0]);
+  EXPECT_EQ(LineMatch(0x1001, 101, fn1->GetLazySymbol()), out[0]);
+}
+
+TEST(FindLine, GetAllLineTableMatchesInUnitIgnoreInvalidFunctions) {
+  MockLineTable::FileNameVector files = {"file1.cc"};
+
+  MockLineTable::RowVector rows;
+  rows.push_back(MockLineTable::MakeStatementRow(0x1000, 1, 1));  // File #1, line 1.
+  rows.push_back(MockLineTable::MakeStatementRow(0x1001, 1, 2));
+  rows.push_back(MockLineTable::MakeStatementRow(0x1002, 1, 1));  // Dupe for file #1, line 1, but
+                                                                  // has no function symbol.
+  rows.push_back(MockLineTable::MakeStatementRow(0x1003, 1, 3));
+  rows.push_back(MockLineTable::MakeEndSequenceRow(0x1004, 1, 3));
+
+  MockLineTable table(files, rows);
+  MockSymbolFactory symbol_factory;
+
+  constexpr uint64_t kFnBegin = 0x1000;
+  constexpr uint64_t kFnEnd = 0x2000;
+  auto fn1 = fxl::MakeRefCounted<Function>(DwarfTag::kSubprogram);
+  fn1->set_code_ranges(AddressRanges(AddressRange(kFnBegin, kFnEnd)));
+  symbol_factory.SetMockSymbol(0x12345678, fn1);
+  table.SetSymbolForRow(rows[0], fn1);
+
+  // We will only have one match, because only one row has a valid function symbol.
+  auto out = GetAllLineTableMatchesInUnit(table, "file1.cc", 1);
+  ASSERT_EQ(1u, out.size());
+  EXPECT_EQ(LineMatch(0x1000, 1, fn1->GetLazySymbol()), out[0]);
+}
+
+TEST(FindLine, GetAllLineTableMatchesInUnitIgnoreInvalidFunctions_Reverse) {
+  MockLineTable::FileNameVector files = {"file1.cc"};
+
+  MockLineTable::RowVector rows;
+  rows.push_back(MockLineTable::MakeStatementRow(0x1000, 1, 1));  // File #1, line 1.
+  rows.push_back(MockLineTable::MakeStatementRow(0x1001, 1, 2));
+  rows.push_back(MockLineTable::MakeStatementRow(0x1002, 1, 1));  // Dupe for file #1, line 1, but
+                                                                  // this one has a function symbol.
+  rows.push_back(MockLineTable::MakeStatementRow(0x1003, 1, 3));
+  rows.push_back(MockLineTable::MakeEndSequenceRow(0x1004, 1, 3));
+
+  MockLineTable table(files, rows);
+  MockSymbolFactory symbol_factory;
+
+  constexpr uint64_t kFnBegin = 0x1000;
+  constexpr uint64_t kFnEnd = 0x2000;
+  auto fn1 = fxl::MakeRefCounted<Function>(DwarfTag::kSubprogram);
+  fn1->set_code_ranges(AddressRanges(AddressRange(kFnBegin, kFnEnd)));
+  symbol_factory.SetMockSymbol(0x12345678, fn1);
+  table.SetSymbolForRow(rows[2], fn1);
+
+  // We will only have one match, because only one row has a valid function symbol.
+  auto out = GetAllLineTableMatchesInUnit(table, "file1.cc", 1);
+  ASSERT_EQ(1u, out.size());
+  EXPECT_EQ(LineMatch(0x1002, 1, fn1->GetLazySymbol()), out[0]);
 }
 
 TEST(FindLine, AppendLineMatchesForInlineCalls) {

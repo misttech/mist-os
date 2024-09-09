@@ -72,19 +72,14 @@ class VmObjectDispatcher final : public SoloDispatcher<VmObjectDispatcher, ZX_DE
   // Dispatcher implementation.
   void on_zero_handles() final;
 
-  ContentSizeManager* content_size_manager() const { return content_size_mgr_.get(); }
+  zx::result<fbl::RefPtr<ContentSizeManager>> content_size_manager() TA_EXCL(get_lock());
 
   // VmObjectDispatcher own methods.
   zx_status_t Read(user_out_ptr<char> user_data, uint64_t offset, size_t length,
                    size_t* out_actual);
-  zx_status_t ReadVector(user_out_iovec_t user_data, uint64_t offset, size_t length,
-                         size_t* out_actual);
   zx_status_t Write(user_in_ptr<const char> user_data, uint64_t offset, size_t length,
                     size_t* out_actual,
                     VmObject::OnWriteBytesTransferredCallback on_bytes_transferred = nullptr);
-  zx_status_t WriteVector(user_in_iovec_t user_data, uint64_t offset, size_t length,
-                          VmObjectReadWriteOptions options, size_t* out_actual,
-                          VmObject::OnWriteBytesTransferredCallback on_bytes_transferred = nullptr);
   zx_status_t SetSize(uint64_t);
   zx_status_t GetSize(uint64_t* size);
   zx_status_t RangeOp(uint32_t op, uint64_t offset, uint64_t size, user_inout_ptr<void> buffer,
@@ -99,15 +94,6 @@ class VmObjectDispatcher final : public SoloDispatcher<VmObjectDispatcher, ZX_DE
   zx_status_t SetContentSize(uint64_t);
   zx_status_t SetStreamSize(uint64_t);
   uint64_t GetContentSize() const;
-
-  // Tries to expand the VMO to a requested (byte-aligned) size, if the VMO is smaller than that
-  // size. Whether the VMO can be expanded is controlled by |can_resize_vmo|. Note that this will
-  // not modify the content size.
-  //
-  // Returns the actual size of the VMO in |out_actual| after attempting to expand. This value is
-  // set, even in the case of a failure.
-  zx_status_t ExpandIfNecessary(uint64_t requested_vmo_size, bool can_resize_vmo,
-                                uint64_t* out_actual);
 
   const fbl::RefPtr<VmObject>& vmo() const { return vmo_; }
   zx_koid_t pager_koid() const { return pager_koid_; }
@@ -126,8 +112,12 @@ class VmObjectDispatcher final : public SoloDispatcher<VmObjectDispatcher, ZX_DE
   fbl::RefPtr<VmObject> const vmo_;
 
   // Manages the content size associated with this VMO. The content size is used by streams created
-  // against this VMO.
-  fbl::RefPtr<ContentSizeManager> const content_size_mgr_;
+  // against this VMO. The content size manager is lazily created, hence this field is guarded by
+  // the lock, however once created it can be assumed to be constant.
+  // Creating the content size manager can be deferred as long as the content is exactly the vmo
+  // size, and there are no streams or other operations that implicitly require a content size
+  // manager to exist.
+  fbl::RefPtr<ContentSizeManager> content_size_mgr_ TA_GUARDED(get_lock());
 
   // The koid of the related pager object, or ZX_KOID_INVALID if
   // there is no related pager.

@@ -200,7 +200,7 @@ impl Environment {
 #[cfg(test)]
 fn init_storage_dir() -> DirectoryProxy {
     let tempdir = tempfile::tempdir().expect("failed to create tempdir");
-    fuchsia_fs::directory::open_in_namespace(
+    fuchsia_fs::directory::open_in_namespace_deprecated(
         tempdir.path().to_str().expect("tempdir path is not valid UTF-8"),
         OpenFlags::RIGHT_READABLE | OpenFlags::RIGHT_WRITABLE,
     )

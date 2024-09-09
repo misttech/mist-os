@@ -19,10 +19,8 @@ class TestTerminaGuestManager : public TerminaGuestManager {
  public:
   TestTerminaGuestManager(async_dispatcher_t* dispatcher,
                           std::unique_ptr<sys::ComponentContext> context,
-                          termina_config::Config structured_config,
-                          fit::function<void()> stop_manager_callback, ConfigResult config_result)
-      : TerminaGuestManager(dispatcher, std::move(context), std::move(structured_config),
-                            std::move(stop_manager_callback)),
+                          termina_config::Config structured_config, ConfigResult config_result)
+      : TerminaGuestManager(dispatcher, std::move(context), std::move(structured_config)),
         config_result_(std::move(config_result)) {}
 
   ConfigResult GetDefaultGuestConfig() { return std::move(config_result_); }
@@ -38,8 +36,8 @@ TEST_F(TerminaGuestManagerTest, LaunchFail) {
   sys::testing::ComponentContextProvider provider;
 
   ConfigResult config = fit::error(::fuchsia::virtualization::GuestManagerError::BAD_CONFIG);
-  TestTerminaGuestManager manager(
-      dispatcher(), provider.TakeContext(), std::move(structured_config), [] {}, std::move(config));
+  TestTerminaGuestManager manager(dispatcher(), provider.TakeContext(),
+                                  std::move(structured_config), std::move(config));
 
   fuchsia::virtualization::LinuxManagerPtr linux_manager;
   provider.ConnectToPublicService(linux_manager.NewRequest());

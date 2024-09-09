@@ -20,10 +20,9 @@
 #include <kernel/scheduler.h>
 #include <kernel/thread.h>
 #include <kernel/timer.h>
+#include <kernel/wait_queue_internal.h>
 #include <ktl/algorithm.h>
 #include <ktl/move.h>
-
-#include "kernel/wait_queue_internal.h"
 
 #include <ktl/enforce.h>
 
@@ -104,50 +103,47 @@ void WaitQueue::TimeoutHandler(Timer* timer, zx_time_t now, void* arg) {
   // there will be no PI consequences to deal with.  It should be sufficient to
   // simply lock the thread and the wait queue following it, and remove the
   // thread from the queue.
-  ChainLockTransactionPreemptDisableAndIrqSave clt{CLT_TAG("WaitQueue::TimeoutHandler")};
-  for (;; clt.Relax()) {
-    if (timer->TrylockOrCancel(thread.get_lock())) {
-      clt.Finalize();
-      return;
+  const auto try_lock_or_cancel = [timer](ChainLock& lock) TA_TRY_ACQ(true, lock) {
+    return timer->TrylockOrCancel(lock) == ZX_OK;
+  };
+
+  // If the timeout has not been cancelled, handle the following:
+  // 1. The thread is still sitting in its wait queue, it has not been
+  //    explicitly unblocked yet. Its state must be either BLOCKED or
+  //    BLOCKED_READ_LOCK. Finish locking, and then unblock the thread.
+  // 2. The thread has been explicitly unblocked, but it has not become
+  //    scheduled yet. The thread will have no blocking wait queue, and its
+  //    state must be READY. It will eventually become scheduled, and as it
+  //    unwinds, it will attempt to cancel this timer (which is currently on
+  //    its stack).
+  const auto do_transaction = [&]()
+                                  TA_REQ(chainlock_transaction_token,
+                                         preempt_disabled_token) -> ChainLockTransaction::Result<> {
+    ChainLockGuard thread_guard{thread.get_lock(), ChainLockGuard::Defer};
+    if (!thread_guard.TryAcquireWith(try_lock_or_cancel)) {
+      return ChainLockTransaction::Done;
     }
 
-    // Our timeout handler has not been canceled yet, and we are holding the
-    // thread's lock.  There two scenarios to consider now.
-    //
-    // 1) The thread is still sitting in its wait queue, it has not been
-    //    explicitly unblocked yet. Its state must be either BLOCKED or
-    //    BLOCKED_READ_LOCK.  We need to finish locking, and then unblock the
-    //    thread.
-    // 2) The thread has been explicitly unblocked, but it has not become
-    //    scheduled yet.  The thread will have no blocking wait queue, and its
-    //    state must be READY.  It will eventually become scheduled, and as it
-    //    unwinds, it will attempt to cancel this timer (which is currently on
-    //    its stack)
     WaitQueue* wq = thread.wait_queue_state().blocking_wait_queue_;
     if (wq == nullptr) {
       DEBUG_ASSERT(thread.state() == THREAD_READY);
-      thread.get_lock().Release();
-      return;
+      return ChainLockTransaction::Done;
     }
 
-    // We are still in a queue, our state should indicate that we are blocked.
     DEBUG_ASSERT((thread.state() == THREAD_BLOCKED) ||
                  (thread.state() == THREAD_BLOCKED_READ_LOCK));
-
-    // Now attempt to lock the rest of the chain.
-    if (const ChainLock::Result res = OwnedWaitQueue::LockPiChain(thread);
-        res == ChainLock::Result::Backoff) {
-      thread.get_lock().Release();
-      continue;
+    if (OwnedWaitQueue::LockPiChain(thread) == ChainLock::Result::Backoff) {
+      return ChainLockTransaction::Action::Backoff;
     }
-    wq->lock_.AssertAcquired();
+    wq->get_lock().AssertAcquired();
 
-    // Ok, now we have locked all of the things.  Make sure local preemption is
-    // disabled until after Unblock finishes dropping all of our locks for us.
-    clt.Finalize();
+    ChainLockTransaction::Finalize();
+    thread_guard.Unguard();
     wq->UnblockThread(&thread, ZX_ERR_TIMED_OUT);
-    break;
-  }
+    return ChainLockTransaction::Done;
+  };
+  ChainLockTransaction::UntilDone(PreemptDisableAndIrqSaveOption,
+                                  CLT_TAG("WaitQueue::TimeoutHandler"), do_transaction);
 }
 
 // Remove a thread from a wait queue, maintain the wait queue's internal count,
@@ -308,27 +304,22 @@ void WaitQueueCollection::Remove(Thread* thread) {
 
 ChainLock::Result WaitQueueCollection::LockAll() {
   for (Thread& t : threads_) {
-    const ChainLock::Result res = t.get_lock().Acquire();
-
     // If we hit a conflict, we need to unlock everything and start again,
     // unwinding completely out of this function as we go.
     //
     // Note that this method relies on the enumeration order of the collection
     // being deterministic, which should always be the case for a fbl::WAVLTree.
-    if (res == ChainLock::Result::Backoff) {
+    if (!t.get_lock().AcquireOrBackoff()) {
       for (Thread& unlock_me : threads_) {
         if (unlock_me.get_lock().MarkNeedsReleaseIfHeld()) {
           unlock_me.get_lock().Release();
         } else {
-          return res;
+          break;
         }
       }
+      return ChainLock::Result::Backoff;
     }
-
-    // We should never detect any cycles during this operation.  Assert this.
-    DEBUG_ASSERT_MSG(res == ChainLock::Result::Ok,
-                     "Unexpected Result during WaitQueueCollection::LockAll (%u)",
-                     static_cast<uint32_t>(res));
+    t.get_lock().MarkReleased();
   }
 
   return ChainLock::Result::Ok;
@@ -386,7 +377,7 @@ zx_status_t WaitQueue::BlockEtc(Thread* const current_thread, const Deadline& de
   // (handled by BlockEtcPostamble), or it failed to join the queue (because of
   // a timeout, or something similar).  Either way, we should no longer be
   // holding the queue lock.
-  lock_.Release();
+  get_lock().Release();
 
   // If we failed to join the queue, propagate the error up (while still holding
   // the thread's lock).  Otherwise, enter the scheduler while holding the
@@ -433,9 +424,10 @@ bool WaitQueue::WakeOne(zx_status_t wait_queue_error) {
   // after the preempt disabler has gone out of scope, after we have dropped all
   // of our locks.
   //
-  ChainLockTransactionPreemptDisableAndIrqSave clt{CLT_TAG("WaitQueue::WakeOne")};
-  for (;; clt.Relax()) {
-    UnconditionalChainLockGuard guard{lock_};
+  const auto do_transaction = [&]() TA_REQ(
+                                  chainlock_transaction_token,
+                                  preempt_disabled_token) -> ChainLockTransaction::Result<bool> {
+    ChainLockGuard guard{get_lock()};
 
     // Note(johngro): No one should ever calling wait_queue_wake_one on an
     // instance of an OwnedWaitQueue.  OwnedWaitQueues need to deal with
@@ -451,12 +443,10 @@ bool WaitQueue::WakeOne(zx_status_t wait_queue_error) {
     // fail.
     Thread* t = Peek(current_time());
     if (t) {
-      if (const ChainLock::Result lock_result = t->get_lock().Acquire();
-          lock_result == ChainLock::Result::Backoff) {
-        continue;
+      if (!t->get_lock().AcquireOrBackoff()) {
+        return ChainLockTransaction::Action::Backoff;
       }
-      t->get_lock().AssertAcquired();
-      clt.Finalize();
+      ChainLockTransaction::Finalize();
 
       // Remove the thread from the queue and drop the queue lock.  We no longer
       // need to hold it once the thread has been removed.
@@ -469,12 +459,12 @@ bool WaitQueue::WakeOne(zx_status_t wait_queue_error) {
       // thread and added it to the proper scheduler instance.
       Scheduler::Unblock(t);
       return true;
-    } else {
-      clt.Finalize();
     }
 
     return false;
-  }
+  };
+  return ChainLockTransaction::UntilDone(PreemptDisableAndIrqSaveOption,
+                                         CLT_TAG("WaitQueue::WakeOne"), do_transaction);
 }
 
 // Same as WakeOne, but called with the queue's lock already held.  This call
@@ -496,11 +486,9 @@ ktl::optional<bool> WaitQueue::WakeOneLocked(zx_status_t wait_queue_error) {
     // There is!  Try to lock it so we can actually wake it up.  If we can't, we
     // will need to unwind to allow the caller to release our lock before trying
     // again.
-    if (const ChainLock::Result lock_result = t->get_lock().Acquire();
-        lock_result == ChainLock::Result::Backoff) {
+    if (!t->get_lock().AcquireOrBackoff()) {
       return ktl::nullopt;
     }
-    t->get_lock().AssertAcquired();
 
     // We now have all of the locks we need for the wake operation to proceed.
     // Make sure we mark the active ChainLockTransaction as finalized.
@@ -559,9 +547,10 @@ void WaitQueue::WakeAll(zx_status_t wait_queue_error) {
   // too?  Seems like it might be wise given that we could be waking a lot of
   // threads.  Then again, we drop the thread's locks as soon as we can, so it
   // might not be required.
-  ChainLockTransactionPreemptDisableAndIrqSave clt{CLT_TAG("WaitQueue::WakeAll")};
-  for (;; clt.Relax()) {
-    lock_.AcquireUnconditionally();
+  const auto do_transaction = [&]()
+                                  TA_REQ(chainlock_transaction_token,
+                                         preempt_disabled_token) -> ChainLockTransaction::Result<> {
+    get_lock().AcquireFirstInChain();
 
     // Note(johngro): See the note in wake_one.  On one should ever be calling
     // this method on an OwnedWaitQueue
@@ -572,30 +561,28 @@ void WaitQueue::WakeAll(zx_status_t wait_queue_error) {
 
     // If the collection is empty, there is nothing left to do.
     if (collection_.IsEmpty()) {
-      lock_.Release();
-      ChainLockTransaction::ActiveRef().Finalize();
-      return;
+      get_lock().Release();
+      return ChainLockTransaction::Done;
     }
 
     ktl::optional<Thread::UnblockList> maybe_unblock_list =
         WaitQueueLockOps::LockForWakeAll(*this, wait_queue_error);
     // Whether we locked our threads and got a list back or not, we can drop the queue lock.  We are
     // going to either unblock our threads, or loop back around to try again.
-    lock_.Release();
+    get_lock().Release();
 
     if (maybe_unblock_list.has_value()) {
       // Now that we have all of the threads locked, we are committed to the
       // WakeAll operation and can unblock our threads. Unlike the standard
       // WakeAll, we need to continue to hold onto the queue lock to satisfy our
       // caller's requirements.
-      ChainLockTransaction::ActiveRef().Finalize();
+      ChainLockTransaction::Finalize();
       Scheduler::Unblock(ktl::move(maybe_unblock_list).value());
-      return;
     }
-
-    // Looks like we are going to try again.
-    continue;
-  }
+    return ChainLockTransaction::Done;
+  };
+  ChainLockTransaction::UntilDone(PreemptDisableAndIrqSaveOption, CLT_TAG("WaitQueue::WakeAll"),
+                                  do_transaction);
 }
 
 ktl::optional<uint32_t> WaitQueue::WakeAllLocked(zx_status_t wait_queue_error) {
@@ -715,7 +702,7 @@ zx_status_t WaitQueue::UnblockThread(Thread* t, zx_status_t wait_queue_error) {
     // held as well.  Static analysis gets confused here, because it does not
     // know that the OWQ returned by DowncastToOwq is the same queue as the
     // WaitQueue passed to it.
-    owq->lock_.MarkHeld();
+    owq->get_lock().MarkHeld();
     owq->UpdateSchedStateStorageThreadRemoved(*t);
     OwnedWaitQueue::BeginPropagate(*t, *owq, OwnedWaitQueue::RemoveSingleEdgeOp);
   }
@@ -775,8 +762,7 @@ ktl::optional<BrwLockOps::LockForWakeResult> BrwLockOps::LockForWake(WaitQueue& 
     }
 
     // Looks like we want to wake this thread.  Try to lock it.
-    ChainLock::Result lock_result = t->get_lock().Acquire();
-    if (lock_result == ChainLock::Result::Backoff) {
+    if (!t->get_lock().AcquireOrBackoff()) {
       // Put each of the threads back where they belong before returning
       // nothing, unlocking them as we go.  Make sure to set the thread's
       // blocking wait queue pointer back to ourselves.
@@ -794,10 +780,11 @@ ktl::optional<BrwLockOps::LockForWakeResult> BrwLockOps::LockForWake(WaitQueue& 
     // We got the thread's lock.  Move it from the collection to our list of
     // threads to wake, clearing the blocking queue and setting the block result
     // as we go.
-    t->get_lock().AssertHeld();
     queue.DequeueThread(t, ZX_OK);
     result.list.push_back(t);
     ++result.count;
+
+    t->get_lock().MarkReleased();
 
     // If we just locked a writer for wake, we are done.  We can only wake one writer at a time.
     if (is_reader == false) {
@@ -843,16 +830,17 @@ ktl::optional<Thread::UnblockList> WaitQueueLockOps::LockForWakeOne(WaitQueue& q
   DEBUG_ASSERT_MAGIC_AND_NOT_OWQ(&queue);
 
   if (Thread* t = queue.collection_.Peek(current_time()); t != nullptr) {
-    if (const ChainLock::Result res = t->get_lock().Acquire(); res == ChainLock::Result::Backoff) {
+    if (!t->get_lock().AcquireOrBackoff()) {
       return ktl::nullopt;
     }
 
     Thread::UnblockList unblock_list;
-    t->get_lock().AssertHeld();
     queue.Dequeue(t, wait_queue_error);
     unblock_list.push_back(t);
+    t->get_lock().MarkReleased();
+
     return unblock_list;
-  } else {
-    return Thread::UnblockList{};
   }
+
+  return Thread::UnblockList{};
 }

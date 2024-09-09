@@ -10,8 +10,8 @@ use std::pin::pin;
 use component_events::events::{EventStream, ExitStatus, Stopped, StoppedPayload};
 use component_events::matcher::EventMatcher;
 use fidl_fuchsia_net_filter_ext::{
-    Action, ControllerId, Domain, Matchers, Namespace, NamespaceId, Resource, Routine, RoutineId,
-    RoutineType, Rule, RuleId,
+    Action, ControllerId, Domain, Matchers, Namespace, NamespaceId, Resource, ResourceId, Routine,
+    RoutineId, RoutineType, Rule, RuleId,
 };
 use fuchsia_component_test::{RealmBuilder, RealmBuilderParams, RealmInstance};
 use test_case::test_case;
@@ -84,54 +84,39 @@ async fn create_chain(table: &'static str, routine_type: RoutineType) {
         .expect("connect to protocol");
     let stream = fnet_filter_ext::event_stream_from_state(state).expect("get filter event stream");
     let mut stream = pin!(stream);
-    let mut observed: HashMap<_, _> =
+    let observed: HashMap<_, _> =
         fnet_filter_ext::get_existing_resources(&mut stream).await.expect("get resources");
+    let starnix = observed
+        .get(&ControllerId(String::from("starnix")))
+        .expect("starnix should create controller");
 
     let namespace = namespace_id_for_ipv4_table(table);
     let routine = RoutineId { namespace: namespace.clone(), name: String::from("test") };
+    let rule = RuleId { routine: routine.clone(), index: 0 };
     let expected = [
-        Resource::Namespace(Namespace { id: namespace, domain: Domain::Ipv4 }),
-        Resource::Routine(Routine { id: routine.clone(), routine_type }),
-        Resource::Rule(Rule {
-            id: RuleId { routine, index: 1 },
-            matchers: Matchers::default(),
-            action: Action::Return,
-        }),
+        (
+            ResourceId::Namespace(namespace.clone()),
+            Resource::Namespace(Namespace { id: namespace, domain: Domain::Ipv4 }),
+        ),
+        (
+            ResourceId::Routine(routine.clone()),
+            Resource::Routine(Routine { id: routine, routine_type }),
+        ),
+        (
+            ResourceId::Rule(rule.clone()),
+            Resource::Rule(Rule {
+                id: rule,
+                matchers: Matchers::default(),
+                action: Action::Return,
+            }),
+        ),
     ];
-    let starnix = observed
-        .get_mut(&ControllerId(String::from("starnix")))
-        .expect("starnix should create controller");
 
-    // TODO(https://fxbug.dev/354763810): once iptables assigns deterministic indices
-    // to rules, assert on equality of both resource IDs and resources.
-    for expected_resource in expected {
-        let to_remove = starnix.iter().find_map(|(id, observed_resource)| {
-            match &expected_resource {
-                Resource::Namespace(_) | Resource::Routine(_) => {
-                    if &expected_resource == observed_resource {
-                        return Some(id.clone());
-                    }
-                }
-                Resource::Rule(Rule {
-                    // TODO(https://fxbug.dev/354763810): assert on the rule's index once iptables
-                    // assigns indices based on a rule's position in a routine rather than the index
-                    // of the `ipt_entry`.
-                    id: _,
-                    matchers,
-                    action,
-                }) => {
-                    if let Resource::Rule(ref rule) = observed_resource {
-                        if matchers == &rule.matchers && action == &rule.action {
-                            return Some(id.clone());
-                        }
-                    }
-                }
-            }
-            None
-        });
-        let id = to_remove
+    for (expected_id, expected_resource) in expected {
+        let observed_resource = starnix
+            .get(&expected_id)
             .expect("expected resource {expected_resource:#?}; did not find in {starnix:#?}");
-        let _resource = starnix.remove(&id).expect("remove observed resource");
+        assert_eq!(observed_resource, &expected_resource);
     }
 }
 

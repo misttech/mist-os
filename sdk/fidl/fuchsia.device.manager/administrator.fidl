@@ -23,8 +23,4 @@ closed protocol Administrator {
     strict UnregisterSystemStorageForShutdown() -> (struct {
         status zx.Status;
     });
-
-    /// Tell DriverManager to go through the suspend process, but don't exit
-    /// afterwards. This is used in tests to check that suspend works correctly.
-    strict SuspendWithoutExit();
 };

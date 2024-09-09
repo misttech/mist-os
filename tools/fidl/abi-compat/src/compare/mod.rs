@@ -377,9 +377,14 @@ impl Protocol {
         let client_ordinals: BTreeSet<u64> = client.methods.keys().cloned().collect();
         let server_ordinals: BTreeSet<u64> = server.methods.keys().cloned().collect();
 
+        // Is there a contradiction between how this is declared and how it's used?
+        let mut scope_contradiction = false;
+
         if let Some(disco) = &client.discoverable {
             if !disco.client.contains(client.path.scope()) {
-                problems.error(
+                scope_contradiction = true;
+                problems.add(
+                    !config.fatal_contradictions,
                     [&client.path, &server.path],
                     format!(
                         "Protocol {}(@{}) used as a {} client, contradicting its {}.",
@@ -394,7 +399,9 @@ impl Protocol {
 
         if let Some(disco) = &server.discoverable {
             if !disco.server.contains(server.path.scope()) {
-                problems.error(
+                scope_contradiction = true;
+                problems.add(
+                    !config.fatal_contradictions,
                     [&client.path, &server.path],
                     format!(
                         "Protocol {}(@{}) used as a {} server, contradicting its {}.",
@@ -405,6 +412,13 @@ impl Protocol {
                     ),
                 );
             }
+        }
+
+        if scope_contradiction {
+            // If we've already found a contradiction, that means that:
+            // (a) this is discoverable so we'll be checking it elsewhere
+            // (b) any more checks we do are kind of moot.
+            return problems;
         }
 
         // Compare common interactions

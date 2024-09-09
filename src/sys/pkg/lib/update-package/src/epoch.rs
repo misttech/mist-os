@@ -24,14 +24,17 @@ pub enum ParseEpochError {
 }
 
 pub(crate) async fn epoch(proxy: &fio::DirectoryProxy) -> Result<Option<u64>, ParseEpochError> {
-    let file =
-        match fuchsia_fs::directory::open_file(proxy, "epoch.json", fio::OpenFlags::RIGHT_READABLE)
-            .await
-        {
-            Ok(file) => file,
-            Err(fuchsia_fs::node::OpenError::OpenError(Status::NOT_FOUND)) => return Ok(None),
-            Err(e) => return Err(ParseEpochError::OpenFile(e)),
-        };
+    let file = match fuchsia_fs::directory::open_file_deprecated(
+        proxy,
+        "epoch.json",
+        fio::OpenFlags::RIGHT_READABLE,
+    )
+    .await
+    {
+        Ok(file) => file,
+        Err(fuchsia_fs::node::OpenError::OpenError(Status::NOT_FOUND)) => return Ok(None),
+        Err(e) => return Err(ParseEpochError::OpenFile(e)),
+    };
     let contents =
         fuchsia_fs::file::read_to_string(&file).await.map_err(ParseEpochError::ReadFile)?;
     match serde_json::from_str(&contents).map_err(|e| ParseEpochError::Deserialize(contents, e))? {

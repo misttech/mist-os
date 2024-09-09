@@ -6,7 +6,6 @@ import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.settings.storage") {
   sdk_category = "excluded"
-  api = "fuchsia.settings.storage"
 
   sources = [ "lights.fidl" ]
 

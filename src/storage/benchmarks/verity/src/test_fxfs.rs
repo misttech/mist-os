@@ -5,7 +5,7 @@ use fidl::endpoints::Proxy;
 use fidl_fuchsia_fxfs_test::{TestFxfsAdminRequest, TestFxfsAdminRequestStream};
 use fidl_fuchsia_io as fio;
 use fuchsia_component::server::ServiceFs;
-use fuchsia_fs::directory::open_in_namespace;
+use fuchsia_fs::directory::open_in_namespace_deprecated;
 use fuchsia_storage_benchmarks_lib::block_devices::FvmVolumeFactory;
 use fuchsia_storage_benchmarks_lib::filesystems::fxfs::Fxfs;
 use futures::StreamExt;
@@ -22,7 +22,7 @@ async fn main() {
     let fvm_volume_factory = FvmVolumeFactory::new().await.unwrap();
     let mut fs = Fxfs::new(20 * 1024 * 1024).start_filesystem(&fvm_volume_factory).await;
     let mut svc = ServiceFs::new();
-    let root_dir = open_in_namespace(
+    let root_dir = open_in_namespace_deprecated(
         &fs.benchmark_dir().to_string_lossy(),
         fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::RIGHT_READABLE,
     )
@@ -49,7 +49,7 @@ async fn main() {
                             // is pointing to the new valid /data handle at that point, the Starnix
                             // component can safely use the /data handle it acquires in its
                             // namespace.
-                            let root_dir_for_starnix = open_in_namespace(
+                            let root_dir_for_starnix = open_in_namespace_deprecated(
                                 &fs.benchmark_dir().to_string_lossy(),
                                 fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::RIGHT_READABLE,
                             )

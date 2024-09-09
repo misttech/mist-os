@@ -252,6 +252,11 @@ The following `COMMAND`s are implemented:
 
 - `log` prints the command line and output for each test recorded
 in the log file.
+- `path` prints the path to the most recent log file.
+- `replay` will replay the previous run, using new display options.
+The speed of the replay can be controlled using the --replay-speed
+argument. Values > 1 speed up output, and values < 1 show the run
+in slow motion.
 - `help` prints a summary of available commands.
 
 ### Build options

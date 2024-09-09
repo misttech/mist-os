@@ -68,11 +68,15 @@ async fn echo_impl(
         // reachable as far as this command is concerned, but daemonless is
         // experimental/unimplemented as of now so this isn't tested.
         let rcs_proxy = rcs_proxy_connector
-            .try_connect(|target| {
+            .try_connect(|target, connect_err| {
+                let err_string = connect_err
+                    .as_ref()
+                    .map(|e| format!(". Error encountered: {e}"))
+                    .unwrap_or(".".to_owned());
                 let message = if let Some(target) = &target {
-                    format!("Waiting for target {target} to return")
+                    format!("Waiting for target {target} to return{err_string}")
                 } else {
-                    "Waiting for target to return".to_string()
+                    format!("Waiting for target to return{err_string}")
                 };
                 writer
                     .machine_or(&EchoMessage::Waiting(message.clone()), message)

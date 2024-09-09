@@ -32,7 +32,6 @@ package_set_budgets: size limit that applies to one or more packages. It has the
 import argparse
 import collections
 import json
-import os
 import sys
 from typing import Any
 

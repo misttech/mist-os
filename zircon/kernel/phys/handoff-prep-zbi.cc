@@ -42,7 +42,9 @@
 #include <ktl/enforce.h>
 
 void HandoffPrep::SummarizeMiscZbiItems(ktl::span<ktl::byte> zbi) {
-  handoff_->zbi = {reinterpret_cast<uintptr_t>(zbi.data()), zbi.size()};
+  size_t zbi_size = zbi.size_bytes();
+  handoff_->zbi =
+      MakePhysVmo({zbi.data(), (zbi_size + ZX_PAGE_SIZE - 1) & -ZX_PAGE_SIZE}, "zbi"sv, zbi_size);
 
   // Allocate some pages to fill up with the ZBI items to save for mexec.
   // TODO(https://fxbug.dev/42164859): Currently this is in scratch space and gets

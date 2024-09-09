@@ -23,7 +23,7 @@
         }
     },
     "proxy": {
-        "timeout_secs": 10.0
+        "timeout_secs": 10.1
     },
     "target": {
         "default": [

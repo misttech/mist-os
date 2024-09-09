@@ -10,6 +10,7 @@
 #include <fidl/fuchsia.hardware.audio.signalprocessing/cpp/test_base.h>
 #include <fidl/fuchsia.hardware.audio/cpp/natural_types.h>
 #include <fidl/fuchsia.hardware.audio/cpp/test_base.h>
+#include <lib/fidl/cpp/wire/unknown_interaction_handler.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/zx/channel.h>
 #include <lib/zx/time.h>
@@ -205,8 +206,12 @@ class FakeCodec final
     completer.Reply(fit::error(ZX_ERR_NOT_SUPPORTED));
   }
   void handle_unknown_method(
-      fidl::UnknownMethodMetadata<fuchsia_hardware_audio_signalprocessing::SignalProcessing>,
-      fidl::UnknownMethodCompleter::Sync&) final {}
+      fidl::UnknownMethodMetadata<fuchsia_hardware_audio_signalprocessing::SignalProcessing>
+          metadata,
+      fidl::UnknownMethodCompleter::Sync& completer) final {
+    ADR_WARN_METHOD() << "(SignalProcessing) ordinal " << metadata.method_ordinal;
+    completer.Close(ZX_ERR_NOT_SUPPORTED);
+  }
 
   bool CheckDaiFormatSupported(const fuchsia_hardware_audio::DaiFormat& candidate);
 

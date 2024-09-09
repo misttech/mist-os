@@ -240,6 +240,11 @@
             to: "#console-launcher",
         },
         {
+            service: "fuchsia.hardware.spmi.Service",
+            from: "#boot-drivers",
+            to: "#console-launcher",
+        },
+        {
             protocol: "fuchsia.paver.Paver",
             from: "#paver",
             to: "#console-launcher",

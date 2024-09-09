@@ -4,5 +4,11 @@
 
 #include "deps.h"
 #include "driver_entry_point.h"
+#include "fake_runtime.h"
 
-int64_t DriverStart() { return 0; }
+// This calls the fake runtime function, as well as the implementation of a()
+// defined in fake_root_driver_deps.cc
+//
+// runtime_get_id() -> 14
+// In this driver's domain a() -> 10.
+int64_t DriverStart() { return runtime_get_id() + a(); }

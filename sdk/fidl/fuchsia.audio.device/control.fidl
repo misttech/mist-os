@@ -66,9 +66,9 @@ type DelayInfo = table {
 /// A `ControlCreator` interface creates `Control` instances. Each `Control` binds
 /// to a single device. A device can only be bound to one `Control` at any time.
 @discoverable
-closed protocol ControlCreator {
+open protocol ControlCreator {
     /// Create a `Control` for the specified device.
-    strict Create(resource table {
+    flexible Create(resource table {
         /// The token id for the device to be controlled.
         ///
         /// Required.
@@ -117,7 +117,7 @@ open protocol Control {
     //
     // TODO(https://fxbug.dev/42052918): Remove legacy gain aspects once driver API does.
     // Going forward, gain will be handled by `SignalProcessing`.
-    strict SetGain(table {
+    flexible SetGain(table {
         /// The gain state to be set.
         ///
         /// Required.
@@ -128,7 +128,7 @@ open protocol Control {
     /// Composite, then the targeted RING_BUFFER ENDPOINT must be identified by `element_id`.
     ///
     /// Should only be called for Composite and StreamConfig devices.
-    strict CreateRingBuffer(resource table {
+    flexible CreateRingBuffer(resource table {
         /// The element ID for an `ENDPOINT` of type `RING_BUFFER`.
         ///
         /// Required for Composite; ignored for StreamConfig.
@@ -159,7 +159,7 @@ open protocol Control {
     /// by `element_id`.
     ///
     /// Should only be called for Codec and Composite devices.
-    strict SetDaiFormat(table {
+    flexible SetDaiFormat(table {
         /// The element ID for an `ENDPOINT` of type `DAI_INTERCONNECT`.
         ///
         /// Required for Composite; ignored for Codec.
@@ -175,7 +175,7 @@ open protocol Control {
     /// must be set (by a successful `SetDaiFormat` call) before calling this method.
     ///
     /// Should only be called for Codec devices.
-    strict CodecStart() -> (table {
+    flexible CodecStart() -> (table {
         1: start_time zx.Time;
     }) error ControlCodecStartError;
 
@@ -184,7 +184,7 @@ open protocol Control {
     /// must be set (by a successful `SetDaiFormat` call) before calling this method.
     ///
     /// Should only be called for Codec devices.
-    strict CodecStop() -> (table {
+    flexible CodecStop() -> (table {
         1: stop_time zx.Time;
     }) error ControlCodecStopError;
 
@@ -200,7 +200,7 @@ open protocol Control {
     /// As applicable, `SetTopology` and `SetElementState` must also be called.
     ///
     /// Should only be called for Codec and Composite devices.
-    strict Reset() -> (table {}) error ControlResetError;
+    flexible Reset() -> (table {}) error ControlResetError;
 };
 
 /// Errors returned by `Control/SetGain`.
@@ -345,7 +345,7 @@ type ControlResetError = flexible enum {
 };
 
 /// A `RingBuffer` instance controls data flow for the associated audio stream.
-closed protocol RingBuffer {
+open protocol RingBuffer {
     /// Request that specific individual channels be powered down/up, if the
     /// device supports this. This is intended for idle power conservation.
     ///
@@ -360,7 +360,7 @@ closed protocol RingBuffer {
     /// still be played.
     ///
     /// If not called, then by default all channels will be active.
-    strict SetActiveChannels(table {
+    flexible SetActiveChannels(table {
         /// The channels to be activated (all others should be deactivated). No
         /// bit should be set above the `channel_count` specified in the ring
         /// buffer format (e.g. for a four-channel stream, `channel_bitmask`
@@ -377,7 +377,7 @@ closed protocol RingBuffer {
     }) error RingBufferSetActiveChannelsError;
 
     /// Start the ring buffer, beginning at the first frame of the ring buffer.
-    strict Start(table {}) -> (table {
+    flexible Start(table {}) -> (table {
         /// The CLOCK_MONOTONIC time when the stream was started.
         ///
         /// Required.
@@ -385,13 +385,13 @@ closed protocol RingBuffer {
     }) error RingBufferStartError;
 
     /// Stop the ring buffer.
-    strict Stop(table {}) -> (table {}) error RingBufferStopError;
+    flexible Stop(table {}) -> (table {}) error RingBufferStopError;
 
     /// Request delay information via a hanging get. The RingBuffer will respond
     /// immediately to the first `WatchDelayInfo` call. Subsequent calls will
     /// only be completed when the delay info has changed from previously
     /// communicated values.
-    strict WatchDelayInfo() -> (table {
+    flexible WatchDelayInfo() -> (table {
         /// Required.
         1: delay_info DelayInfo;
     }) error RingBufferWatchDelayInfoError;

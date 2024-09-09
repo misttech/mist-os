@@ -5,6 +5,7 @@
 import("//build/cipd.gni")
 import("//build/components.gni")
 import("//build/fidl/toolchain.gni")
+import("//build/testing/cc_test_executable.gni")
 import("//src/camera/bin/camera-gym/assets/convert_image.gni")
 import("//src/camera/debug.gni")
 
@@ -163,7 +164,7 @@ fuchsia_package("camera_gym_pkg") {
   ]
 }
 
-executable("camera_gym_test_bin") {
+cc_test_executable("camera_gym_test_bin") {
   testonly = true
   sources = [ "camera_gym_test.cc" ]
   deps = [
@@ -180,7 +181,7 @@ fuchsia_unittest_package("camera_gym_test") {
   test_type = "system"
 }
 
-executable("stream_cycler_test_bin") {
+cc_test_executable("stream_cycler_test_bin") {
   testonly = true
   sources = [ "stream_cycler_test.cc" ]
   deps = [

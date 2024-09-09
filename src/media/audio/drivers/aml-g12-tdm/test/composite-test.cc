@@ -140,9 +140,14 @@ class FakePlatformDevice : public fidl::Server<fuchsia_hardware_platform_device:
     completer.Reply(zx::error(ZX_ERR_NOT_SUPPORTED));
   }
 
+  // This test should use the same SDK version as the driver (unless specifically engineered to be
+  // otherwise), so receiving an unknown method should trigger a failure.
   void handle_unknown_method(
       fidl::UnknownMethodMetadata<fuchsia_hardware_platform_device::Device> metadata,
-      fidl::UnknownMethodCompleter::Sync& completer) override {}
+      fidl::UnknownMethodCompleter::Sync& completer) override {
+    FAIL() << "unknown method (fuchsia_hardware_platform_device::Device) ordinal "
+           << metadata.method_ordinal;
+  }
 
   void MapMmio() { EXPECT_EQ(ZX_OK, mapped_mmio_.Map(mmio_)); }
 
@@ -234,7 +239,7 @@ class FakeGpio : public fidl::testing::WireTestBase<fuchsia_hardware_gpio::Gpio>
   void GetName(GetNameCompleter::Sync& completer) override { completer.ReplySuccess("Test"); }
   void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_hardware_gpio::Gpio> metadata,
                              fidl::UnknownMethodCompleter::Sync& completer) override {
-    FAIL();
+    FAIL() << "unknown method (Gpio) ordinal " << metadata.method_ordinal;
   }
 
   void NotImplemented_(const std::string& name, fidl::CompleterBase& completer) override {

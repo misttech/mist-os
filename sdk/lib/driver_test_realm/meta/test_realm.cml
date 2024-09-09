@@ -93,7 +93,6 @@
             to: "#driver_manager",
             config: [
                 "fuchsia.driver.DelayFallbackUntilBaseDriversIndexed",
-                "fuchsia.driver.manager.DriverHostCrashPolicy",
                 "fuchsia.driver.manager.EnableTestShutdownDelays",
             ],
             availability: "optional",
@@ -245,7 +244,6 @@
                 "fuchsia.device.manager.Administrator",
                 "fuchsia.driver.development.Manager",
                 "fuchsia.driver.framework.CompositeNodeManager",
-                "fuchsia.inspect.InspectSink",
             ],
             from: "#driver_manager",
         },

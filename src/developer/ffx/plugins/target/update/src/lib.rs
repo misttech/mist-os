@@ -4,7 +4,7 @@
 
 use anyhow::{Context as _, Error};
 use async_trait::async_trait;
-use fho::{deferred, moniker, AvailabilityFlag, Deferred, FfxMain, FfxTool, SimpleWriter};
+use fho::{deferred, moniker, Deferred, FfxMain, FfxTool, SimpleWriter};
 use fidl_fuchsia_update::{
     CheckOptions, Initiator, ManagerProxy, MonitorMarker, MonitorRequest, MonitorRequestStream,
 };
@@ -16,7 +16,6 @@ use futures::prelude::*;
 use {ffx_update_args as args, fidl_fuchsia_update_installer_ext as installer};
 
 #[derive(FfxTool)]
-#[check(AvailabilityFlag("target_update"))]
 pub struct UpdateTool {
     #[command]
     cmd: args::Update,

@@ -77,8 +77,10 @@ std::vector<LineMatch> GetAllLineTableMatchesInUnit(const LineTable& line_table,
             result.clear();
           }
           if (row_line == best_line) {
-            // Accumulate all matching results.
-            result.emplace_back(row.Address.Address, row_line, line_table.GetFunctionForRow(row));
+            // Accumulate all matching results, do not insert invalid symbols.
+            if (auto lazy_symbol = line_table.GetFunctionForRow(row); lazy_symbol.is_valid()) {
+              result.emplace_back(row.Address.Address, row_line, lazy_symbol);
+            }
           }
         }
       }

@@ -32,6 +32,7 @@ enum class Command {
   kQueryActiveConfiguration,
   kQueryConfigurationLastSetActive,
   kQueryConfigurationStatus,
+  kQueryConfigurationStatusAndBootAttempts,
   kSetConfigurationActive,
   kSetConfigurationUnbootable,
   kSetConfigurationHealthy,
@@ -52,6 +53,7 @@ struct AbrSlotData {
   bool unbootable;
   bool active;
   bool healthy;
+  uint8_t boot_attempts;
 };
 
 struct AbrData {
@@ -66,12 +68,14 @@ constexpr AbrData kInitAbrData = {
             .unbootable = false,
             .active = false,
             .healthy = false,
+            .boot_attempts = 0,
         },
     .slot_b =
         {
             .unbootable = false,
             .active = false,
             .healthy = false,
+            .boot_attempts = 0,
         },
     .last_set_active = std::nullopt,
 };
@@ -104,6 +108,10 @@ class FakePaver : public fidl::WireServer<fuchsia_paver::Paver>,
 
   void QueryConfigurationStatus(QueryConfigurationStatusRequestView request,
                                 QueryConfigurationStatusCompleter::Sync& completer) override;
+
+  void QueryConfigurationStatusAndBootAttempts(
+      QueryConfigurationStatusAndBootAttemptsRequestView request,
+      QueryConfigurationStatusAndBootAttemptsCompleter::Sync& completer) override;
 
   void SetConfigurationActive(SetConfigurationActiveRequestView request,
                               SetConfigurationActiveCompleter::Sync& completer) override;
@@ -160,6 +168,8 @@ class FakePaver : public fidl::WireServer<fuchsia_paver::Paver>,
   void set_abr_supported(bool supported) { abr_supported_ = supported; }
   void set_wait_for_start_signal(bool wait) { wait_for_start_signal_ = wait; }
   void set_expected_device(std::string expected);
+  // Sets the boot attempts for the given configuration. No-op if configuration is R.
+  void set_boot_attempts(fuchsia_paver::wire::Configuration configuration, uint8_t boot_attempts);
 
   AbrData abr_data();
 

@@ -48,7 +48,7 @@ template("engine_library") {
     ]
 
     deps = [
-      "//sdk/lib/fidl/cpp",
+      "//sdk/lib/fidl/hlcpp",
       "//sdk/lib/sys/cpp",
     ]
 

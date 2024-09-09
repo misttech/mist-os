@@ -5,13 +5,12 @@
 // https://opensource.org/licenses/MIT
 
 #include <lib/memalloc/range.h>
+#include <lib/memalloc/testing/range.h>
 #include <lib/stdcompat/span.h>
 
 #include <vector>
 
 #include <gtest/gtest.h>
-
-#include "test.h"
 
 namespace {
 
@@ -106,7 +105,7 @@ TEST(MemallocRangeTests, NormalizeRanges) {
             .type = Type::kFreeRam,
         },
     };
-    CompareRanges(cpp20::span{kExpected}, {normalized});
+    memalloc::testing::CompareRanges(cpp20::span{kExpected}, {normalized});
   }
 
   // Discard RAM.
@@ -130,7 +129,7 @@ TEST(MemallocRangeTests, NormalizeRanges) {
             .type = Type::kPeripheral,
         },
     };
-    CompareRanges(cpp20::span{kExpected}, {normalized});
+    memalloc::testing::CompareRanges(cpp20::span{kExpected}, {normalized});
   }
 
   // Just keep pool test payloads and bookkeeping.
@@ -165,7 +164,7 @@ TEST(MemallocRangeTests, NormalizeRanges) {
             .type = Type::kPoolTestPayload,
         },
     };
-    CompareRanges(cpp20::span{kExpected}, {normalized});
+    memalloc::testing::CompareRanges(cpp20::span{kExpected}, {normalized});
   }
 }
 

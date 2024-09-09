@@ -4,8 +4,8 @@
 
 #include "src/connectivity/bluetooth/hci/virtual/loopback.h"
 
-#include <lib/driver/logging/cpp/logger.h>
 #include <lib/driver/testing/cpp/driver_runtime.h>
+#include <lib/driver/testing/cpp/scoped_global_logger.h>
 
 #include "gtest/gtest.h"
 
@@ -46,7 +46,6 @@ class LoopbackTest : public ::testing::Test,
     loopback_chan_wait_.Cancel();
     fdf_testing_run_until_idle();
     runtime_.ShutdownAllDispatchers(fdf::Dispatcher::GetCurrent()->get());
-    fdf::Logger::SetGlobalInstance(nullptr);
   }
 
   async_dispatcher_t* dispatcher() { return fdf::Dispatcher::GetCurrent()->async_dispatcher(); }
@@ -143,14 +142,6 @@ class LoopbackTest : public ::testing::Test,
     // Create Namespace object from the entries.
     auto ns = fdf::Namespace::Create(entries);
     ZX_ASSERT(ns.is_ok());
-
-    // Create Logger with dispatcher and namespace.
-    auto logger = fdf::Logger::Create(*ns, dispatcher(), "vendor-hci-logger");
-    ZX_ASSERT(logger.is_ok());
-
-    logger_ = std::move(logger.value());
-
-    fdf::Logger::SetGlobalInstance(logger_.get());
   }
 
   void OnChannelReady(async_dispatcher_t*, async::WaitBase* wait, zx_status_t status,
@@ -184,7 +175,7 @@ class LoopbackTest : public ::testing::Test,
 
   // Attaches a foreground dispatcher for us automatically.
   fdf_testing::DriverRuntime runtime_;
-  std::unique_ptr<fdf::Logger> logger_;
+  fdf_testing::ScopedGlobalLogger logger_;
 
   zx::channel loopback_chan_;
   LoopbackDevice loopback_device_;

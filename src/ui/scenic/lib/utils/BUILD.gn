@@ -59,7 +59,7 @@ source_set("utils") {
     "//sdk/fidl/fuchsia.ui.views:fuchsia.ui.views_hlcpp",
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/sys/cpp",
-    "//src/lib/fidl/cpp/contrib/connection:service_hub_connector",
+    "//src/lib/fidl/contrib/connection:service_hub_connector",
     "//src/ui/lib/escher",
     "//src/ui/scenic/lib/scheduling:frame_metrics_registry_cc",
     "//third_party/glm",
@@ -70,7 +70,7 @@ source_set("utils") {
 
   deps = [
     "//sdk/lib/fdio",
-    "//sdk/lib/fidl/cpp:cpp_base",
+    "//sdk/lib/fidl/hlcpp:hlcpp_base",
     "//sdk/lib/fit",
     "//sdk/lib/syslog/cpp",
     "//src/lib/fsl",

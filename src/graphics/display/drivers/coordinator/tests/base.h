@@ -24,7 +24,7 @@ namespace display {
 
 class TestBase : public testing::Test {
  public:
-  TestBase() : loop_(&kAsyncLoopConfigAttachToCurrentThread) {}
+  TestBase() : loop_(&kAsyncLoopConfigNeverAttachToThread) {}
 
   void SetUp() override;
   void TearDown() override;

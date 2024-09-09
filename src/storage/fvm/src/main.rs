@@ -36,6 +36,9 @@ use {fidl_fuchsia_hardware_block_volume as fvolume, fidl_fuchsia_io as fio, fuch
 // See //src/storage/fvm/format.h for a detailed description of the FVM format.
 
 static MAGIC: u64 = 0x54524150204d5646;
+
+// Whilst this is the block size that FVM uses to round up certain structures, FVM still supports
+// I/O at a smaller size than this (it will pass along the block size from the underlying device).
 const BLOCK_SIZE: u64 = 8192;
 
 // This is the maximum slice count which means the maximum slice offset is one less than this.
@@ -150,7 +153,14 @@ struct Fvm {
 struct Inner {
     slot: u8,
     metadata: Metadata,
-    mappings: HashMap<u16, Vec<Mapping>>,
+    partition_state: HashMap<u16, PartitionState>,
+    assigned_slice_count: u64,
+}
+
+#[derive(Default)]
+struct PartitionState {
+    mappings: Vec<Mapping>,
+    slice_limit: u64,
 }
 
 #[derive(Debug)]
@@ -327,6 +337,8 @@ impl Metadata {
 impl Fvm {
     /// Opens the FVM device.
     pub async fn open(device: DeviceHolder) -> Result<Self, Error> {
+        ensure!(device.block_size() <= BLOCK_SIZE as u32, zx::Status::NOT_SUPPORTED);
+
         let mut metadata = Vec::new();
         {
             let mut header_block = device.allocate_buffer(BLOCK_SIZE as usize).await;
@@ -351,7 +363,8 @@ impl Fvm {
         })?;
 
         // Build the mappings.
-        let mut mappings = HashMap::new();
+        let mut partition_state = HashMap::<u16, PartitionState>::new();
+        let mut assigned_slice_count = 0;
         for (physical_slice, allocation) in metadata.allocations.iter().enumerate() {
             let partition_index = allocation.partition_index();
             let slice = allocation.logical_slice();
@@ -363,7 +376,8 @@ impl Fvm {
                 warn!("Slice entry points to free partition: 0x{:x?}", allocation.0);
                 continue;
             };
-            let mappings = mappings.entry(partition_index).or_insert_with(|| Vec::new());
+            assigned_slice_count += 1;
+            let mappings = &mut partition_state.entry(partition_index).or_default().mappings;
             let mut bad_mapping = false;
             match mappings.binary_search_by(|m: &Mapping| m.logical_slice.cmp(&slice)) {
                 Ok(_) => bad_mapping = true,
@@ -403,8 +417,17 @@ impl Fvm {
 
         Ok(Self {
             device,
-            inner: async_lock::RwLock::new(Inner { slot: slot as u8, metadata, mappings }),
+            inner: async_lock::RwLock::new(Inner {
+                slot: slot as u8,
+                metadata,
+                partition_state,
+                assigned_slice_count,
+            }),
         })
+    }
+
+    fn block_size(&self) -> u32 {
+        self.device.block_size()
     }
 
     fn pick_metadata(
@@ -425,7 +448,7 @@ impl Fvm {
 
     async fn read(
         &self,
-        partition: u16,
+        partition_index: u16,
         device_block_offset: u64,
         block_count: u32,
         vmo: &Arc<zx::Vmo>,
@@ -445,7 +468,7 @@ impl Fvm {
                 vmo.write(buf, vmo_offset)
             }
         }
-        self.do_io::<Read>(partition, device_block_offset, block_count, vmo, vmo_offset)
+        self.do_io::<Read>(partition_index, device_block_offset, block_count, vmo, vmo_offset)
             .await
             .map_err(|error| {
                 warn!(?error, "Read failed");
@@ -455,7 +478,7 @@ impl Fvm {
 
     async fn write(
         &self,
-        partition: u16,
+        partition_index: u16,
         device_block_offset: u64,
         block_count: u32,
         vmo: &Arc<zx::Vmo>,
@@ -474,7 +497,7 @@ impl Fvm {
                 device.write(offset, buf.into_ref())
             }
         }
-        self.do_io::<Write>(partition, device_block_offset, block_count, vmo, vmo_offset)
+        self.do_io::<Write>(partition_index, device_block_offset, block_count, vmo, vmo_offset)
             .await
             .map_err(|error| {
                 warn!(?error, "Write failed");
@@ -484,14 +507,15 @@ impl Fvm {
 
     async fn do_io<Io: IoTrait>(
         &self,
-        partition: u16,
+        partition_index: u16,
         device_block_offset: u64,
         block_count: u32,
         vmo: &Arc<zx::Vmo>,
         mut vmo_offset: u64,
     ) -> Result<(), Error> {
         let inner = self.inner.read().await;
-        let Some(mappings) = inner.mappings.get(&partition) else {
+        let Some(PartitionState { mappings, .. }) = inner.partition_state.get(&partition_index)
+        else {
             bail!(zx::Status::INTERNAL);
         };
 
@@ -499,12 +523,13 @@ impl Fvm {
 
         const BUFFER_SIZE: usize = 1048576;
         let mut buffer = self.device.allocate_buffer(BUFFER_SIZE).await;
+        let block_size = self.block_size() as u64;
         let mut offset = device_block_offset
-            .checked_mul(BLOCK_SIZE)
+            .checked_mul(block_size)
             .ok_or(zx::Status::OUT_OF_RANGE)
             .with_context(|| format!("Bad offset ({device_block_offset})"))?;
         let mut total_len = (block_count as u64)
-            .checked_mul(BLOCK_SIZE)
+            .checked_mul(block_size)
             .ok_or(zx::Status::OUT_OF_RANGE)
             .with_context(|| format!("Bad count ({block_count})"))?;
 
@@ -604,7 +629,8 @@ impl Fvm {
             .partitions
             .insert(proposed, PartitionEntry { type_guid, guid, slices: 0, flags: 0, name });
 
-        let mappings = new_metadata.allocate_slices(proposed, 0, slices as u64, max_slice)?;
+        let slices = slices as u64;
+        let mappings = new_metadata.allocate_slices(proposed, 0, slices, max_slice)?;
 
         new_metadata.header.generation = new_metadata
             .header
@@ -621,7 +647,8 @@ impl Fvm {
 
         inner.slot = new_slot;
         inner.metadata = new_metadata;
-        inner.mappings.insert(proposed, mappings);
+        inner.assigned_slice_count = inner.assigned_slice_count.checked_add(slices).unwrap();
+        inner.partition_state.insert(proposed, PartitionState { mappings, slice_limit: 0 });
 
         Ok(proposed)
     }
@@ -658,6 +685,7 @@ struct Component {
     scope: ExecutionScope,
     fvm: Mutex<Option<Arc<Fvm>>>,
     mounted: Mutex<HashMap<u16, Arc<BlockServer<SessionManager<PartitionInterface>>>>>,
+    volumes_directory: Arc<vfs::directory::immutable::Simple>,
 }
 
 impl Component {
@@ -667,6 +695,7 @@ impl Component {
             scope: ExecutionScope::new(),
             fvm: Mutex::default(),
             mounted: Mutex::default(),
+            volumes_directory: vfs::directory::immutable::simple(),
         }
     }
 
@@ -740,31 +769,43 @@ impl Component {
         let device_holder = DeviceHolder::new(BlockDevice::new(Box::new(client), false).await?);
         let mut fvm = Fvm::open(device_holder).await?;
 
-        let volumes_directory = vfs::directory::immutable::simple();
-
         for (&index, partition) in &fvm.inner.get_mut().metadata.partitions {
-            let weak = Arc::downgrade(self);
-            volumes_directory.add_entry(
-                partition.name(),
-                vfs::service::host(move |requests| {
-                    let weak = weak.clone();
-                    async move {
-                        if let Some(me) = weak.upgrade() {
-                            let _ = me.handle_volume_requests(requests, index).await;
-                        }
-                    }
-                }),
-            )?;
+            self.add_volume_to_volumes_directory(index, &partition.name())?;
         }
 
         self.export_dir.add_entry_may_overwrite(
             "volumes",
-            volumes_directory,
+            self.volumes_directory.clone(),
             /* overwrite: */ true,
         )?;
 
         *self.fvm.lock().unwrap() = Some(Arc::new(fvm));
         Ok(())
+    }
+
+    fn add_volume_to_volumes_directory(
+        self: &Arc<Self>,
+        index: u16,
+        name: &str,
+    ) -> Result<(), Error> {
+        let weak = Arc::downgrade(self);
+        self.volumes_directory.add_entry(
+            name,
+            vfs::service::host(move |requests| {
+                let weak = weak.clone();
+                async move {
+                    if let Some(me) = weak.upgrade() {
+                        let _ = me.handle_volume_requests(requests, index).await;
+                    }
+                }
+            }),
+        )?;
+        Ok(())
+    }
+
+    // NOTE: Only safe after `handle_start` has been called.
+    fn fvm(&self) -> Arc<Fvm> {
+        self.fvm.lock().unwrap().as_ref().unwrap().clone()
     }
 
     async fn handle_volumes_requests(
@@ -803,7 +844,7 @@ impl Component {
     async fn handle_volume_requests(
         self: Arc<Self>,
         mut requests: VolumeRequestStream,
-        partition: u16,
+        partition_index: u16,
     ) -> Result<(), Error> {
         while let Some(request) = requests.try_next().await? {
             match request {
@@ -811,20 +852,26 @@ impl Component {
                     responder.send(Err(zx::Status::NOT_SUPPORTED.into_raw()))?;
                 }
                 VolumeRequest::Mount { responder, outgoing_directory, options } => responder.send(
-                    self.handle_mount(partition, outgoing_directory, options).await.map_err(
+                    self.handle_mount(partition_index, outgoing_directory, options).await.map_err(
                         |error| {
-                            error!(?error, partition, "Failed to mount volume");
+                            error!(?error, partition_index, "Failed to mount volume");
                             map_to_raw_status(error)
                         },
                     ),
                 )?,
-                VolumeRequest::SetLimit { responder, .. } => {
-                    // TODO(https://fxbug.dev/357467643): Implement this.
-                    responder.send(Err(zx::Status::NOT_SUPPORTED.into_raw()))?;
+                VolumeRequest::SetLimit { responder, bytes } => {
+                    let fvm = self.fvm();
+                    let mut inner = fvm.inner.write().await;
+                    // slice_size cannot be zero since we check it when we first mount.
+                    inner.partition_state.get_mut(&partition_index).unwrap().slice_limit =
+                        bytes / inner.metadata.header.slice_size;
+                    responder.send(Ok(()))?;
                 }
                 VolumeRequest::GetLimit { responder } => {
-                    // TODO(https://fxbug.dev/357467643): Implement this.
-                    responder.send(Err(zx::Status::NOT_SUPPORTED.into_raw()))?;
+                    let fvm = self.fvm();
+                    let inner = fvm.inner.read().await;
+                    responder.send(Ok(inner.partition_state[&partition_index].slice_limit
+                        * inner.metadata.header.slice_size))?;
                 }
             }
         }
@@ -852,14 +899,14 @@ impl Component {
                 }
             }),
         )?;
-        let fvm = self.fvm.lock().unwrap().as_ref().unwrap().clone();
+        let fvm = self.fvm();
         let partition_info = {
             let inner = fvm.inner.read().await;
             let partition =
                 &inner.metadata.partitions.get(&partition_index).ok_or(zx::Status::INTERNAL)?;
             PartitionInfo {
                 block_count: u32::MAX as u64, // Minfs has a 32 bit limit on the block count.
-                block_size: BLOCK_SIZE as u32,
+                block_size: fvm.block_size(),
                 type_guid: partition.type_guid,
                 instance_guid: partition.guid,
                 name: partition.name().to_string(),
@@ -886,10 +933,10 @@ impl Component {
 
     async fn handle_volume(
         self: Arc<Self>,
-        partition: u16,
+        partition_index: u16,
         requests: fvolume::VolumeRequestStream,
     ) -> Result<(), Error> {
-        let partition = self.mounted.lock().unwrap().get(&partition).unwrap().clone();
+        let partition = self.mounted.lock().unwrap()[&partition_index].clone();
         partition.handle_requests(requests).await
     }
 
@@ -916,12 +963,17 @@ impl Component {
             None => 1,
         };
         let partition_index = fvm.create_partition(inner, type_guid, guid, slices, name).await?;
-        self.handle_mount(partition_index, outgoing_directory, mount_options).await.map_err(
-            |error| {
-                warn!(?error, "Created partition {name}, but failed to mount");
-                error
-            },
-        )
+
+        async move {
+            self.add_volume_to_volumes_directory(partition_index, name)?;
+
+            self.handle_mount(partition_index, outgoing_directory, mount_options).await
+        }
+        .await
+        .map_err(|error| {
+            warn!(?error, "Created partition {name}, but failed to mount");
+            error
+        })
     }
 }
 
@@ -974,8 +1026,7 @@ impl Interface for PartitionInterface {
             fvolume::VolumeManagerInfo {
                 slice_size: inner.metadata.header.slice_size,
                 slice_count,
-                // TODO(https://fxbug.dev/357467643): Return accurate assigned slice count.
-                assigned_slice_count: 0,
+                assigned_slice_count: inner.assigned_slice_count,
                 maximum_slice_count: slice_count,
                 max_virtual_slice: MAX_SLICE_COUNT,
             },
@@ -986,7 +1037,7 @@ impl Interface for PartitionInterface {
                     .get(&self.partition_index)
                     .unwrap()
                     .slices as u64,
-                slice_limit: 0,
+                slice_limit: inner.partition_state[&self.partition_index].slice_limit,
             },
         ))
     }
@@ -996,7 +1047,7 @@ impl Interface for PartitionInterface {
         start_slices: &[u64],
     ) -> Result<Vec<fvolume::VsliceRange>, zx::Status> {
         let inner = self.fvm.inner.read().await;
-        let mappings = inner.mappings.get(&self.partition_index).unwrap();
+        let mappings = &inner.partition_state[&self.partition_index].mappings;
         let mut results = Vec::new();
         for &slice in start_slices {
             if slice >= MAX_SLICE_COUNT {
@@ -1044,7 +1095,8 @@ impl Interface for PartitionInterface {
     async fn extend(&self, start_slice: u64, slice_count: u64) -> Result<(), zx::Status> {
         let inner = self.fvm.inner.upgradable_read().await;
 
-        let mappings = inner.mappings.get(&self.partition_index).unwrap();
+        let partition_state = &inner.partition_state[&self.partition_index];
+        let mappings = &partition_state.mappings;
 
         let get_mapping_index =
             || match mappings.binary_search_by(|m: &Mapping| m.logical_slice.cmp(&start_slice)) {
@@ -1065,6 +1117,14 @@ impl Interface for PartitionInterface {
             warn!("Attempt to allocate vslice {start_slice} that is already allocated.");
             e
         })?;
+
+        if partition_state.slice_limit > 0
+            && (inner.metadata.partitions[&self.partition_index].slices as u64)
+                .checked_add(slice_count)
+                .map_or(true, |s| s > partition_state.slice_limit)
+        {
+            return Err(zx::Status::NO_SPACE);
+        }
 
         let mut new_metadata = inner.metadata.clone();
         let max_slice = self.fvm.max_slice(&new_metadata);
@@ -1088,8 +1148,9 @@ impl Interface for PartitionInterface {
 
         inner.slot = new_slot;
         inner.metadata = new_metadata;
+        inner.assigned_slice_count = inner.assigned_slice_count.checked_add(slice_count).unwrap();
 
-        let mappings = inner.mappings.get_mut(&self.partition_index).unwrap();
+        let mappings = &mut inner.partition_state.get_mut(&self.partition_index).unwrap().mappings;
         for mapping in new_mappings {
             mappings.insert(mapping_index, mapping);
             mapping_index += 1;
@@ -1098,9 +1159,9 @@ impl Interface for PartitionInterface {
         Ok(())
     }
 
-    async fn shrink(&self, start_slice: u64, mut slice_count: u64) -> Result<(), zx::Status> {
+    async fn shrink(&self, start_slice: u64, slice_count: u64) -> Result<(), zx::Status> {
         let inner = self.fvm.inner.upgradable_read().await;
-        let mappings = inner.mappings.get(&self.partition_index).unwrap();
+        let mappings = &inner.partition_state[&self.partition_index].mappings;
 
         // When we're updating the mappings, we might need to update the first and last mapping
         // in the range and then delete the mappings between.
@@ -1122,6 +1183,7 @@ impl Interface for PartitionInterface {
 
         let mut index = start_index;
         let mut slice = start_slice;
+        let mut count = slice_count;
         loop {
             let mapping = &mappings[index];
             if mapping.logical_slice > slice || mapping.end_slice() <= slice {
@@ -1129,12 +1191,12 @@ impl Interface for PartitionInterface {
             }
             let offset = slice - mapping.logical_slice;
             let start_physical_slice = (mapping.physical_slice + offset) as usize;
-            let count = std::cmp::min(slice_count, mapping.slice_count - offset);
-            new_metadata.allocations[start_physical_slice..start_physical_slice + count as usize]
+            let amount = std::cmp::min(count, mapping.slice_count - offset);
+            new_metadata.allocations[start_physical_slice..start_physical_slice + amount as usize]
                 .fill(SliceEntry(0));
-            slice += count;
-            slice_count -= count;
-            if slice_count == 0 {
+            slice += amount;
+            count -= amount;
+            if count == 0 {
                 break;
             }
             index += 1;
@@ -1146,6 +1208,9 @@ impl Interface for PartitionInterface {
         new_metadata.header.generation =
             new_metadata.header.generation.checked_add(1).ok_or(zx::Status::BAD_STATE)?;
 
+        let slices = &mut new_metadata.partitions.get_mut(&self.partition_index).unwrap().slices;
+        *slices = slices.saturating_sub(slice_count as u32);
+
         let new_slot = 1 - inner.slot;
         new_metadata
             .write(self.fvm.device.as_ref(), new_metadata.header.offset_for_slot(new_slot))
@@ -1156,8 +1221,9 @@ impl Interface for PartitionInterface {
 
         inner.slot = new_slot;
         inner.metadata = new_metadata;
+        inner.assigned_slice_count = inner.assigned_slice_count.checked_sub(slice_count).unwrap();
 
-        let mappings = inner.mappings.get_mut(&self.partition_index).unwrap();
+        let mappings = &mut inner.partition_state.get_mut(&self.partition_index).unwrap().mappings;
         let delete_end = if mappings[index].end_slice() == slice { index + 1 } else { index };
         if delete_end > delete_start {
             mappings.drain(delete_start..delete_end);
@@ -1235,8 +1301,8 @@ mod tests {
     use fake_block_server::FakeServer;
     use fidl::endpoints::RequestStream;
     use fidl_fuchsia_fs_startup::{
-        CompressionAlgorithm, CreateOptions, EvictionPolicyOverride, MountOptions, StartOptions,
-        StartupMarker, VolumeMarker, VolumesMarker,
+        CheckOptions, CompressionAlgorithm, CreateOptions, EvictionPolicyOverride, MountOptions,
+        StartOptions, StartupMarker, VolumeMarker, VolumesMarker,
     };
     use fidl_fuchsia_hardware_block::BlockMarker;
     use fuchsia_component::client::{
@@ -1254,12 +1320,14 @@ mod tests {
         fake_server: Arc<FakeServer>,
     }
 
+    const BLOCK_SIZE: u32 = 512;
+
     impl Fixture {
         async fn new(extra_space: u64) -> Self {
             let contents = std::fs::read("/pkg/data/golden-fvm.blk").unwrap();
             let fake_server = Arc::new(FakeServer::new(
-                (contents.len() as u64 + extra_space) / 8192,
-                8192,
+                (contents.len() as u64 + extra_space) / BLOCK_SIZE as u64,
+                BLOCK_SIZE,
                 &contents,
             ));
             Self::from_fake_server(fake_server).await
@@ -1325,6 +1393,10 @@ mod tests {
         let block_proxy =
             connect_to_protocol_at_dir_svc::<fvolume::VolumeMarker>(&dir_proxy).unwrap();
         let client = RemoteBlockClient::new(block_proxy).await.unwrap();
+
+        // Make sure FVM passes through the right block size.
+        assert_eq!(client.block_size(), BLOCK_SIZE);
+
         let mut buf = vec![0; 8192];
         client.read_at(MutableBufferSlice::Memory(&mut buf), 0).await.unwrap();
 
@@ -1427,6 +1499,20 @@ mod tests {
                 client.read_at(MutableBufferSlice::Memory(&mut read_buf), offset).await.unwrap();
                 assert_eq!(&buf, &read_buf);
             }
+
+            // Make sure the volume appears in the volumes directory.
+            let volume_proxy = connect_to_named_protocol_at_dir_root::<VolumeMarker>(
+                &fixture.outgoing_dir,
+                "volumes/foo",
+            )
+            .unwrap();
+
+            // Check we connected by calling the Check method (even though it's unsupported).
+            assert_eq!(
+                volume_proxy.check(CheckOptions::default()).await.unwrap(),
+                Err(zx::sys::ZX_ERR_NOT_SUPPORTED)
+            );
+
             fixture.fake_server
         };
 
@@ -1553,8 +1639,9 @@ mod tests {
             Some(fvolume::VolumeManagerInfo {
                 slice_size: 32768,
                 max_virtual_slice: MAX_SLICE_COUNT,
+                assigned_slice_count,
                 ..
-            })
+            }) if *assigned_slice_count > 0
         );
         assert_matches!(
             volume_info.as_deref(),
@@ -1680,11 +1767,45 @@ mod tests {
     async fn test_shrink() {
         let final_checks;
 
+        /// Returns the number of assigned slices for the individual volume and the whole FVM
+        /// volume.
+        async fn get_counts(proxy: &fvolume::VolumeProxy) -> (u64, u64) {
+            let (status, manager_info, volume_info) = proxy.get_volume_info().await.unwrap();
+            assert_eq!(status, zx::sys::ZX_OK);
+            (manager_info.unwrap().assigned_slice_count, volume_info.unwrap().partition_slice_count)
+        }
+
+        let initial_counts;
+
         let fake_server = {
             let fixture = Fixture::new(23 * 32768).await;
 
             let volumes_proxy =
                 connect_to_protocol_at_dir_svc::<VolumesMarker>(&fixture.outgoing_dir).unwrap();
+
+            // Mount the blobfs partition.
+            let blobfs_volume = connect_to_named_protocol_at_dir_root::<VolumeMarker>(
+                &fixture.outgoing_dir,
+                "volumes/blobfs",
+            )
+            .unwrap();
+
+            let (dir_proxy, dir_server_end) =
+                fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
+                    .expect("Create proxy to succeed");
+            blobfs_volume
+                .mount(dir_server_end, MountOptions::default())
+                .await
+                .expect("mount failed (FIDL)")
+                .expect("mount failed");
+
+            let blobfs_volume_proxy =
+                connect_to_protocol_at_dir_svc::<fvolume::VolumeMarker>(&dir_proxy).unwrap();
+
+            // Record the initial assigned slice count via the blobfs_volume.
+            let blobfs_initial_counts = get_counts(&blobfs_volume_proxy).await;
+
+            // Create a new volume.
 
             let (dir_proxy, dir_server_end) =
                 fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
@@ -1707,24 +1828,9 @@ mod tests {
             let volume_proxy =
                 connect_to_protocol_at_dir_svc::<fvolume::VolumeMarker>(&dir_proxy).unwrap();
 
-            // Mount the blobfs partition.
-            let blobfs_volume = connect_to_named_protocol_at_dir_root::<VolumeMarker>(
-                &fixture.outgoing_dir,
-                "volumes/blobfs",
-            )
-            .unwrap();
-
-            let (dir_proxy, dir_server_end) =
-                fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
-                    .expect("Create proxy to succeed");
-            blobfs_volume
-                .mount(dir_server_end, MountOptions::default())
-                .await
-                .expect("mount failed (FIDL)")
-                .expect("mount failed");
-
-            let blobfs_volume_proxy =
-                connect_to_protocol_at_dir_svc::<fvolume::VolumeMarker>(&dir_proxy).unwrap();
+            let get_counts = || get_counts(&volume_proxy);
+            initial_counts = get_counts().await;
+            assert_eq!(initial_counts, (blobfs_initial_counts.0 + 5, 5));
 
             // Extend the blobfs volume so we get some fragmentation
             assert_eq!(
@@ -1732,11 +1838,15 @@ mod tests {
                 zx::sys::ZX_OK
             );
 
+            assert_eq!(get_counts().await, (initial_counts.0 + 1, 5));
+
             // Extend the volume we created by another 5 slices.
             assert_eq!(
                 volume_proxy.extend(5, 5).await.expect("extend failed (FIDL)"),
                 zx::sys::ZX_OK
             );
+
+            assert_eq!(get_counts().await, (initial_counts.0 + 6, 10));
 
             // And again...
             assert_eq!(
@@ -1758,6 +1868,8 @@ mod tests {
                 zx::sys::ZX_OK
             );
 
+            assert_eq!(get_counts().await, (initial_counts.0 + 18, 20));
+
             // Write to every slice.
             let client = RemoteBlockClient::new(&volume_proxy).await.unwrap();
             for i in 0..20 {
@@ -1770,6 +1882,8 @@ mod tests {
                 volume_proxy.shrink(4, 7).await.expect("shrink failed (FIDL)"),
                 zx::sys::ZX_OK
             );
+
+            assert_eq!(get_counts().await, (initial_counts.0 + 11, 13));
 
             let (status, ranges, range_count) =
                 volume_proxy.query_slices(&[0, 4, 11]).await.unwrap();
@@ -1790,6 +1904,8 @@ mod tests {
                 zx::sys::ZX_OK
             );
 
+            assert_eq!(get_counts().await, (initial_counts.0 + 6, 8));
+
             let (status, ranges, range_count) =
                 volume_proxy.query_slices(&[0, 4, 11, 15]).await.unwrap();
             assert_eq!(status, zx::sys::ZX_OK);
@@ -1809,6 +1925,8 @@ mod tests {
                 volume_proxy.shrink(1, 2).await.expect("shrink failed (FIDL)"),
                 zx::sys::ZX_OK
             );
+
+            assert_eq!(get_counts().await, (initial_counts.0 + 4, 6));
 
             // Some checks that we also want to perform after reopening.
             final_checks = |volume_proxy: fvolume::VolumeProxy| async move {
@@ -1864,6 +1982,67 @@ mod tests {
         let volume_proxy =
             connect_to_protocol_at_dir_svc::<fvolume::VolumeMarker>(&dir_proxy).unwrap();
 
+        assert_eq!(get_counts(&volume_proxy).await, (initial_counts.0 + 4, 6));
+
         final_checks(volume_proxy).await;
+    }
+
+    #[fuchsia::test]
+    async fn test_limits() {
+        let fixture = Fixture::new(10 * 32768).await;
+
+        // Mount the blobfs partition.
+        let blobfs_volume = connect_to_named_protocol_at_dir_root::<VolumeMarker>(
+            &fixture.outgoing_dir,
+            "volumes/blobfs",
+        )
+        .unwrap();
+
+        let (dir_proxy, dir_server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
+            .expect("Create proxy to succeed");
+        blobfs_volume
+            .mount(dir_server_end, MountOptions::default())
+            .await
+            .expect("mount failed (FIDL)")
+            .expect("mount failed");
+
+        let volume_proxy =
+            connect_to_protocol_at_dir_svc::<fvolume::VolumeMarker>(&dir_proxy).unwrap();
+
+        let (status, manager_info, volume_info) = volume_proxy.get_volume_info().await.unwrap();
+        assert_eq!(status, zx::sys::ZX_OK);
+
+        // Set the limit for Blobfs to be just one more slice.
+        let limit =
+            (volume_info.unwrap().partition_slice_count + 1) * manager_info.unwrap().slice_size;
+        blobfs_volume
+            .set_limit(limit)
+            .await
+            .expect("set_limit FIDL failed")
+            .expect("set_limit failed");
+
+        assert_eq!(
+            blobfs_volume
+                .get_limit()
+                .await
+                .expect("get_limit FIDL failed")
+                .expect("get_limmit_failed"),
+            limit
+        );
+
+        // Try and extend by two slices and it should fail with out-of-space.
+        assert_eq!(
+            volume_proxy.extend(1, 2).await.expect("extend failed (FIDL)"),
+            zx::sys::ZX_ERR_NO_SPACE
+        );
+
+        // But one should be fine.
+        assert_eq!(volume_proxy.extend(1, 1).await.expect("extend failed (FIDL)"), zx::sys::ZX_OK);
+
+        // And then another one should fail.
+        assert_eq!(
+            volume_proxy.extend(2, 1).await.expect("extend failed (FIDL)"),
+            zx::sys::ZX_ERR_NO_SPACE
+        );
     }
 }

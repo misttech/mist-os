@@ -2,13 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-using fuchsia.hardware.gpioimpl;
 using fuchsia.hardware.pinimpl;
 
-if fuchsia.hardware.gpioimpl.Service == fuchsia.hardware.gpioimpl.Service.DriverTransport {
-  true;
-} else if fuchsia.hardware.pinimpl.Service == fuchsia.hardware.pinimpl.Service.DriverTransport {
-  true;
-} else {
-  false;
-}
+fuchsia.hardware.pinimpl.Service == fuchsia.hardware.pinimpl.Service.DriverTransport;

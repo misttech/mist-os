@@ -18,7 +18,6 @@ use net_types::ip::{
     AddrSubnet, GenericOverIp, Ip, IpAddress, IpMarked, IpVersionMarker, Ipv4, Ipv4Addr, Ipv6,
     Ipv6Addr,
 };
-use net_types::SpecifiedAddr;
 use netstack3_base::sync::{Mutex, PrimaryRc, RwLock, StrongRc, WeakRc};
 use netstack3_base::{
     BroadcastIpExt, CoreTimerContext, ExistsError, Inspectable, InspectableValue, Inspector,
@@ -32,8 +31,8 @@ use crate::internal::device::route_discovery::Ipv6RouteDiscoveryState;
 use crate::internal::device::router_solicitation::RsState;
 use crate::internal::device::slaac::{SlaacConfiguration, SlaacState};
 use crate::internal::device::{
-    IpAddressId, IpAddressIdSpec, IpDeviceAddr, IpDeviceTimerId, Ipv4DeviceTimerId, Ipv6DeviceAddr,
-    Ipv6DeviceTimerId, WeakIpAddressId,
+    IpAddressId, IpAddressIdSpec, IpDeviceAddr, IpDeviceTimerId, Ipv4DeviceAddr, Ipv4DeviceTimerId,
+    Ipv6DeviceAddr, Ipv6DeviceTimerId, WeakIpAddressId,
 };
 use crate::internal::gmp::igmp::{IgmpGroupState, IgmpState, IgmpTimerId};
 use crate::internal::gmp::mld::{MldGroupState, MldTimerId};
@@ -106,10 +105,10 @@ impl<BT: IpDeviceStateBindingsTypes> IpAddressId<Ipv4Addr> for StrongRc<Ipv4Addr
     }
 
     fn addr(&self) -> IpDeviceAddr<Ipv4Addr> {
-        IpDeviceAddr::new_ipv4_specified(self.addr_sub.addr())
+        IpDeviceAddr::new_from_witness(self.addr_sub.addr())
     }
 
-    fn addr_sub(&self) -> AddrSubnet<Ipv4Addr> {
+    fn addr_sub(&self) -> AddrSubnet<Ipv4Addr, Ipv4DeviceAddr> {
         self.addr_sub
     }
 }
@@ -129,7 +128,7 @@ impl<BT: IpDeviceStateBindingsTypes> IpAddressId<Ipv6Addr> for StrongRc<Ipv6Addr
     }
 
     fn addr(&self) -> IpDeviceAddr<Ipv6Addr> {
-        IpDeviceAddr::new_from_ipv6_non_mapped_unicast(self.addr_sub.addr())
+        IpDeviceAddr::new_from_ipv6_device_addr(self.addr_sub.addr())
     }
 
     fn addr_sub(&self) -> AddrSubnet<Ipv6Addr, Ipv6DeviceAddr> {
@@ -170,13 +169,13 @@ pub trait AssignedAddress<A: IpAddress> {
 
 impl<BT: IpDeviceStateBindingsTypes> AssignedAddress<Ipv4Addr> for Ipv4AddressEntry<BT> {
     fn addr(&self) -> IpDeviceAddr<Ipv4Addr> {
-        IpDeviceAddr::new_ipv4_specified(self.addr_sub().addr())
+        IpDeviceAddr::new_from_witness(self.addr_sub().addr())
     }
 }
 
 impl<BT: IpDeviceStateBindingsTypes> AssignedAddress<Ipv6Addr> for Ipv6AddressEntry<BT> {
     fn addr(&self) -> IpDeviceAddr<Ipv6Addr> {
-        IpDeviceAddr::new_from_ipv6_non_mapped_unicast(self.addr_sub().addr())
+        IpDeviceAddr::new_from_ipv6_device_addr(self.addr_sub().addr())
     }
 }
 
@@ -864,24 +863,22 @@ impl<I> Default for Ipv4AddrConfig<I> {
 #[derive(Derivative)]
 #[derivative(Debug)]
 pub struct Ipv4AddressEntry<BT: IpDeviceStateBindingsTypes> {
-    addr_sub: AddrSubnet<Ipv4Addr>,
+    addr_sub: AddrSubnet<Ipv4Addr, Ipv4DeviceAddr>,
     state: RwLock<Ipv4AddressState<BT::Instant>>,
 }
 
 impl<BT: IpDeviceStateBindingsTypes> Ipv4AddressEntry<BT> {
     /// Constructs a new `Ipv4AddressEntry`.
-    pub fn new(addr_sub: AddrSubnet<Ipv4Addr>, config: Ipv4AddrConfig<BT::Instant>) -> Self {
+    pub fn new(
+        addr_sub: AddrSubnet<Ipv4Addr, Ipv4DeviceAddr>,
+        config: Ipv4AddrConfig<BT::Instant>,
+    ) -> Self {
         Self { addr_sub, state: RwLock::new(Ipv4AddressState { config: Some(config) }) }
     }
 
     /// This entry's address and subnet.
-    pub fn addr_sub(&self) -> &AddrSubnet<Ipv4Addr> {
+    pub fn addr_sub(&self) -> &AddrSubnet<Ipv4Addr, Ipv4DeviceAddr> {
         &self.addr_sub
-    }
-
-    /// This entry's address.
-    pub fn addr(&self) -> SpecifiedAddr<Ipv4Addr> {
-        self.addr_sub.addr()
     }
 }
 

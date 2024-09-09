@@ -273,7 +273,7 @@ mod tests {
         let tmp_dir = tempdir().unwrap();
         let _ = File::create(tmp_dir.path().join("file1")).unwrap();
 
-        let dir = crate::directory::open_in_namespace(
+        let dir = crate::directory::open_in_namespace_deprecated(
             tmp_dir.path().to_str().unwrap(),
             OpenFlags::RIGHT_READABLE,
         )
@@ -296,7 +296,7 @@ mod tests {
     async fn test_add() {
         let tmp_dir = tempdir().unwrap();
 
-        let dir = crate::directory::open_in_namespace(
+        let dir = crate::directory::open_in_namespace_deprecated(
             tmp_dir.path().to_str().unwrap(),
             OpenFlags::RIGHT_READABLE,
         )
@@ -326,7 +326,7 @@ mod tests {
         let filepath = tmp_dir.path().join(filename);
         let _ = File::create(&filepath).unwrap();
 
-        let dir = crate::directory::open_in_namespace(
+        let dir = crate::directory::open_in_namespace_deprecated(
             tmp_dir.path().to_str().unwrap(),
             OpenFlags::RIGHT_READABLE,
         )

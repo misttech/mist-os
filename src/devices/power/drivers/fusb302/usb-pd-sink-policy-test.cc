@@ -4,7 +4,7 @@
 
 #include "src/devices/power/drivers/fusb302/usb-pd-sink-policy.h"
 
-#include <lib/driver/logging/cpp/logger.h>
+#include <lib/driver/testing/cpp/scoped_global_logger.h>
 #include <lib/stdcompat/span.h>
 
 #include <cstdint>
@@ -37,14 +37,8 @@ uint32_t FixedPowerSupply(int32_t voltage_mv, int32_t current_ma) {
 }
 
 class SinkPolicyTest : public zxtest::Test {
- public:
-  void SetUp() override { fdf::Logger::SetGlobalInstance(&logger_); }
-
-  void TearDown() override { fdf::Logger::SetGlobalInstance(nullptr); }
-
  private:
-  fdf::Logger logger_{"usb-pd-sink-policy-test", FUCHSIA_LOG_DEBUG, zx::socket{},
-                      fidl::WireClient<fuchsia_logger::LogSink>()};
+  fdf_testing::ScopedGlobalLogger logger_;
 };
 
 TEST_F(SinkPolicyTest, GetPowerRequestCommonFields) {

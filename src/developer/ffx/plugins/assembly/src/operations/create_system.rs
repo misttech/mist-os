@@ -48,7 +48,10 @@ pub async fn create_system(args: CreateSystemArgs) -> Result<()> {
     // Get the tool set.
     let tools = SdkToolProvider::try_new()?;
 
-    let mut assembly_manifest = AssemblyManifest::default();
+    let mut assembly_manifest = AssemblyManifest {
+        images: Default::default(),
+        board_name: image_assembly_config.board_name.clone(),
+    };
     assembly_manifest
         .images
         .push(assembly_manifest::Image::QemuKernel(image_assembly_config.qemu_kernel.clone()));

@@ -89,7 +89,7 @@ pub async fn run_starnix_benchmark(
         converter(&test_data, &test_suite).context("converting test output to fuchsiaperf")?;
 
     // Write JSON to custom artifacts directory where perf test infra expects it.
-    let file_proxy = fuchsia_fs::directory::open_file(
+    let file_proxy = fuchsia_fs::directory::open_file_deprecated(
         &custom_artifacts,
         "results.fuchsiaperf.json",
         fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::CREATE,
@@ -219,7 +219,7 @@ pub fn add_output_dir_to_namespace(
 
     let test_data_path = format!("{}/{}", TEST_DATA_DIR, uuid::Uuid::new_v4());
     std::fs::create_dir_all(&test_data_path).expect("cannot create test output directory.");
-    let data_dir_proxy = fuchsia_fs::directory::open_in_namespace(
+    let data_dir_proxy = fuchsia_fs::directory::open_in_namespace_deprecated(
         &test_data_path,
         fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
     )
@@ -232,9 +232,11 @@ pub fn add_output_dir_to_namespace(
         ..Default::default()
     });
 
-    let test_data_dir =
-        fuchsia_fs::directory::open_in_namespace(&test_data_path, fio::OpenFlags::RIGHT_READABLE)
-            .expect("Cannot open test data directory.");
+    let test_data_dir = fuchsia_fs::directory::open_in_namespace_deprecated(
+        &test_data_path,
+        fio::OpenFlags::RIGHT_READABLE,
+    )
+    .expect("Cannot open test data directory.");
     Ok(test_data_dir)
 }
 
@@ -319,7 +321,7 @@ pub fn parse_test_definition(test_def: &str) -> TestDefinition {
 }
 
 pub async fn read_file_from_dir(dir: &fio::DirectoryProxy, path: &str) -> Result<String, Error> {
-    let file_proxy = fuchsia_fs::directory::open_file_no_describe(
+    let file_proxy = fuchsia_fs::directory::open_file_no_describe_deprecated(
         &dir,
         path,
         fuchsia_fs::OpenFlags::RIGHT_READABLE,

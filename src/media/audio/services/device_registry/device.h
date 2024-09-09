@@ -10,6 +10,7 @@
 #include <fidl/fuchsia.hardware.audio.signalprocessing/cpp/natural_types.h>
 #include <fidl/fuchsia.hardware.audio/cpp/fidl.h>
 #include <lib/fidl/cpp/client.h>
+#include <lib/fidl/cpp/wire/unknown_interaction_handler.h>
 #include <lib/fit/function.h>
 #include <lib/zx/clock.h>
 #include <lib/zx/result.h>
@@ -28,6 +29,7 @@
 #include "src/media/audio/services/device_registry/basic_types.h"
 #include "src/media/audio/services/device_registry/control_notify.h"
 #include "src/media/audio/services/device_registry/device_presence_watcher.h"
+#include "src/media/audio/services/device_registry/logging.h"
 #include "src/media/audio/services/device_registry/observer_notify.h"
 
 namespace media_audio {
@@ -50,7 +52,10 @@ class Device : public std::enable_shared_from_this<Device> {
         : device_(device), element_id_(element_id), name_(std::move(name)) {}
     RingBufferFidlErrorHandler() = default;
     void on_fidl_error(fidl::UnbindInfo info) override;
-    void handle_unknown_event(fidl::UnknownEventMetadata<ProtocolT> metadata) override {}
+    void handle_unknown_event(fidl::UnknownEventMetadata<ProtocolT> metadata) override {
+      ADR_WARN_METHOD() << "RingBufferFidlErrorHandler: unknown event with ordinal "
+                        << metadata.event_ordinal;
+    }
 
    protected:
     Device* device() const { return device_; }
@@ -81,7 +86,10 @@ class Device : public std::enable_shared_from_this<Device> {
   template <typename ProtocolT>
   class FidlOpenErrorHandler : public FidlErrorHandler<ProtocolT> {
     using FidlErrorHandler<ProtocolT>::FidlErrorHandler;
-    void handle_unknown_event(fidl::UnknownEventMetadata<ProtocolT> metadata) override {}
+    void handle_unknown_event(fidl::UnknownEventMetadata<ProtocolT> metadata) override {
+      ADR_WARN_METHOD() << "FidlOpenErrorHandler: unknown event with ordinal "
+                        << metadata.event_ordinal;
+    }
   };
 
   void Initialize();
@@ -492,8 +500,8 @@ class Device : public std::enable_shared_from_this<Device> {
     uint64_t ring_buffer_consumer_bytes = 0u;
 
     std::optional<bool> supports_set_active_channels;
-    uint64_t active_channels_bitmask = 0u;
-    std::optional<zx::time> active_channels_set_time;
+    std::optional<uint64_t> active_channels_bitmask;
+    std::optional<zx::time> set_active_channels_completed_at;
 
     std::optional<zx::time> start_time;
   };

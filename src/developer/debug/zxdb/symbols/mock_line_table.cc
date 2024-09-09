@@ -26,8 +26,16 @@ std::optional<std::string> MockLineTable::GetFileNameByIndex(uint64_t file_id) c
 }
 
 LazySymbol MockLineTable::GetFunctionForRow(const llvm::DWARFDebugLine::Row& row) const {
-  // For now, don't support subroutine lookup in the mock.
+  if (const auto& found = fn_for_row_.find(row.Address.Address); found != fn_for_row_.end()) {
+    return found->second->GetLazySymbol();
+  }
+
   return LazySymbol();
+}
+
+void MockLineTable::SetSymbolForRow(const llvm::DWARFDebugLine::Row& row,
+                                    fxl::RefPtr<Symbol> symbol) {
+  fn_for_row_[row.Address.Address] = std::move(symbol);
 }
 
 // static

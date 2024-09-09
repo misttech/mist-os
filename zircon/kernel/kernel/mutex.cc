@@ -340,11 +340,12 @@ __NO_INLINE bool Mutex::AcquireContendedMutex(
   // preempt disabling to the CLT so preemption can be properly re-enabled
   // during a back-off and relax event?
   preempt_disabler.Disable();
-  ChainLockTransactionIrqSave clt{CLT_TAG("Mutex::AcquireContendedMutex")};
-  for (;; clt.Relax()) {
+  const auto do_transaction =
+      [&]() TA_REQ(chainlock_transaction_token) -> ChainLockTransaction::Result<bool> {
+    preempt_disabled_token.AssertHeld();
     // we contended with someone else, will probably need to block.  Hold the
     // OWQ's lock while we check.
-    wait_.get_lock().AcquireUnconditionally();
+    wait_.get_lock().AcquireFirstInChain();
 
     // Check if the contested flag is currently set. The contested flag can only be changed
     // whilst the OWQ's lock is held, so we know we aren't racing with anyone here. This
@@ -365,7 +366,7 @@ __NO_INLINE bool Mutex::AcquireContendedMutex(
         // just take the mutex, and remove the queued flag.  Relaxed semantic
         // are fine here, we already observed the state with acquire semantics
         // during the fetch_or.
-        clt.Finalize();
+        ChainLockTransaction::Finalize();
         val_.store(new_mutex_state, ktl::memory_order_relaxed);
         RecordInitialAssignedCpu();
         wait_.get_lock().Release();
@@ -392,9 +393,8 @@ __NO_INLINE bool Mutex::AcquireContendedMutex(
     DEBUG_ASSERT(cur_owner != current_thread);
 
     // Attempt to obtain the locks we need to block in the mutex.
-    ktl::optional<OwnedWaitQueue::BAAOLockingDetails> details =
-        wait_.LockForBAAOOperationLocked(current_thread, cur_owner);
-    if (!details.has_value()) {
+    OwnedWaitQueue::BAAOLockingDetails details;
+    if (!wait_.TryLockForBAAOOperationLocked(current_thread, cur_owner, details)) {
       // We failed to lock what we needed to lock in order to block.  Drop our
       // queue lock so that we can try again, but do _not_ put the lock state
       // back to the way it was before.  We just observed that the lock was
@@ -403,14 +403,14 @@ __NO_INLINE bool Mutex::AcquireContendedMutex(
       // been set (while holding the queue lock), only the owner of the lock is
       // allowed to clear the flag".
       wait_.get_lock().Release();
-      continue;
+      return ChainLockTransaction::Action::Backoff;
     }
 
     // Ok, we are now committed.  Our state has been updated to indicate the
     // proper owner of the mutex, and we hold all of the locks we need in order
     // to block.  Drop into the block operation, releasing all of the locks we
     // hold as we do so.
-    clt.Finalize();
+    ChainLockTransaction::Finalize();
 
     // Log the trace data now that we are committed to blocking.
     const uint64_t flow_id = current_thread->TakeNextLockFlowId();
@@ -420,10 +420,8 @@ __NO_INLINE bool Mutex::AcquireContendedMutex(
     // Block the thread.  This will drop all of the PI related locks we have
     // been holding up until now.
     preempt_disabler.AssertDisabled();
-    current_thread->get_lock().AssertAcquired();
-    zx_status_t ret =
-        wait_.BlockAndAssignOwnerLocked(current_thread, Deadline::infinite(), details.value(),
-                                        ResourceOwnership::Normal, Interruptible::No);
+    zx_status_t ret = wait_.BlockAndAssignOwnerLocked(current_thread, Deadline::infinite(), details,
+                                                      ResourceOwnership::Normal, Interruptible::No);
 
     if (unlikely(ret < ZX_OK)) {
       // mutexes are not interruptible and cannot time out, so it
@@ -443,13 +441,14 @@ __NO_INLINE bool Mutex::AcquireContendedMutex(
     // blocked, but it was re-obtained for us when we unblocked and became
     // re-scheduled.
     current_thread->get_lock().Release();
-    break;
-  }
 
-  if constexpr (TimesliceExtensionEnabled) {
-    return Thread::Current::preemption_state().SetTimesliceExtension(timeslice_extension.value);
-  }
-  return false;
+    if constexpr (TimesliceExtensionEnabled) {
+      return Thread::Current::preemption_state().SetTimesliceExtension(timeslice_extension.value);
+    }
+    return false;
+  };
+  return ChainLockTransaction::UntilDone(IrqSaveOption, CLT_TAG("Mutex::AcquireContendedMutex"),
+                                         do_transaction);
 }
 
 inline uintptr_t Mutex::TryRelease(Thread* current_thread) {
@@ -478,109 +477,120 @@ __NO_INLINE void Mutex::ReleaseContendedMutex(Thread* current_thread, uintptr_t 
   // WakeThreads() if it is assigned to this CPU. If the woken thread is
   // assigned to a different CPU, the thread lock prevents it from observing
   // the inconsistent owner before the correct owner is recorded.
-  ChainLockTransactionPreemptDisableAndIrqSave clt{CLT_TAG("Mutex::ReleaseContendedMutex")};
-  Thread::UnblockList wake_me = wait_.LockForWakeOperation(1u, default_hooks);
-  clt.Finalize();
-
-  // Pre-flight checks.  In order to get here, the mutex's state should indicate
-  // that we are the owner and that the mutex is currently contested.  This may
-  // not actually turn out to be the state (perhaps the thread contesting the
-  // mutex has timed out), but once the contested flag has been set, this should
-  // be the only place it can be cleared.
-  if (LK_DEBUGLEVEL > 0) {
-    uintptr_t expected_state = reinterpret_cast<uintptr_t>(current_thread) | STATE_FLAG_CONTESTED;
-
-    if (unlikely(old_mutex_state != expected_state)) {
-      auto other_holder = reinterpret_cast<Thread*>(old_mutex_state & ~STATE_FLAG_CONTESTED);
-      panic(
-          "Mutex::ReleaseContendedMutex: consistency check failure.  Thread %p (%s) tried to release "
-          "mutex %p.  Expected state (%lx) != observed state (%lx).  Other holder (%s)\n",
-          current_thread, current_thread->name(), this, expected_state, old_mutex_state,
-          other_holder ? other_holder->name() : "<none>");
+  const auto do_transaction = [&]()
+                                  TA_REQ(chainlock_transaction_token,
+                                         preempt_disabled_token) -> ChainLockTransaction::Result<> {
+    Thread::UnblockList wake_me;
+    if (!wait_.LockForWakeOperationOrBackoff(1u, default_hooks, wake_me)) {
+      return ChainLockTransaction::Action::Backoff;
     }
-  }
 
-  // If there is no one to wake, we should be able to assert that the OWQ has no
-  // owner, and we should be able to we can simply set our state to FREE and get
-  // out.  Otherwise, we need to change the state of the queue to indicate it is
-  // now owned by the thread we are waking, wake the thread, and make sure that
-  // it is declared as the owner of the mutex's OWQ.
-  //
-  // We need to make sure that we set the state before we wake the thread.  As
-  // soon as the thread wakes, it is on the hotpath out, and it needs the
-  // mutex's state to be updated already in order to perform operations such as
-  // Release, or AssertHeld on the mutex.
-  KTracer tracer;
-  const bool do_wake = !wake_me.is_empty();
-  uintptr_t new_mutex_state;
-  Thread* new_owner;
-  uint32_t still_waiting;
+    ChainLockTransaction::Finalize();
 
-  if (do_wake) {
-    DEBUG_ASSERT(wait_.Count() >= 1);
-    new_owner = &wake_me.front();
-    new_mutex_state = reinterpret_cast<uintptr_t>(new_owner);
-    still_waiting = wait_.Count() - 1;
-    if (still_waiting) {
-      new_mutex_state |= STATE_FLAG_CONTESTED;
+    // Pre-flight checks.  In order to get here, the mutex's state should indicate
+    // that we are the owner and that the mutex is currently contested.  This may
+    // not actually turn out to be the state (perhaps the thread contesting the
+    // mutex has timed out), but once the contested flag has been set, this should
+    // be the only place it can be cleared.
+    if (LK_DEBUGLEVEL > 0) {
+      uintptr_t expected_state = reinterpret_cast<uintptr_t>(current_thread) | STATE_FLAG_CONTESTED;
+
+      if (unlikely(old_mutex_state != expected_state)) {
+        auto other_holder = reinterpret_cast<Thread*>(old_mutex_state & ~STATE_FLAG_CONTESTED);
+        panic(
+            "Mutex::ReleaseContendedMutex: consistency check failure.  Thread %p (%s) tried to release "
+            "mutex %p.  Expected state (%lx) != observed state (%lx).  Other holder (%s)\n",
+            current_thread, current_thread->name(), this, expected_state, old_mutex_state,
+            other_holder ? other_holder->name() : "<none>");
+      }
     }
-  } else {
-    DEBUG_ASSERT(wait_.owner() == nullptr);
-    new_owner = nullptr;
-    still_waiting = 0;
-    new_mutex_state = STATE_FREE;
-  }
 
-  // It should be safe to pass `new_owner` to the tracer at this point in time.
-  // We have not woken the thread yet, and we hold its lock (as well as its
-  // queue's lock) meaning that it cannot successfully be woken (and therefore
-  // must still be alive) until after we release the lock.
-  tracer.KernelMutexWake(this, new_owner, still_waiting);
+    // If there is no one to wake, we should be able to assert that the OWQ has no
+    // owner, and we should be able to we can simply set our state to FREE and get
+    // out.  Otherwise, we need to change the state of the queue to indicate it is
+    // now owned by the thread we are waking, wake the thread, and make sure that
+    // it is declared as the owner of the mutex's OWQ.
+    //
+    // We need to make sure that we set the state before we wake the thread.  As
+    // soon as the thread wakes, it is on the hotpath out, and it needs the
+    // mutex's state to be updated already in order to perform operations such as
+    // Release, or AssertHeld on the mutex.
+    KTracer tracer;
+    const bool do_wake = !wake_me.is_empty();
+    uintptr_t new_mutex_state;
+    Thread* new_owner;
+    uint32_t still_waiting;
 
-  // Update our state with release semantics.
-  if (unlikely(!val_.compare_exchange_strong(old_mutex_state, new_mutex_state,
-                                             ktl::memory_order_release,
-                                             ktl::memory_order_relaxed))) {
-    panic("bad state (%lx != %lx) in mutex release %p, current thread %p\n",
-          reinterpret_cast<uintptr_t>(current_thread) | STATE_FLAG_CONTESTED, old_mutex_state, this,
-          current_thread);
-  }
-
-  // Now that our state is updated, actually perform our wake operation if we
-  // need to, then drop the queue lock and get out.
-  if (do_wake) {
-    [[maybe_unused]] const OwnedWaitQueue::WakeThreadsResult wake_result = wait_.WakeThreadsLocked(
-        ktl::move(wake_me), default_hooks, OwnedWaitQueue::WakeOption::AssignOwner);
-    DEBUG_ASSERT(wake_result.woken == 1);
-    if (wake_result.still_waiting > 0) {
-      DEBUG_ASSERT(wake_result.owner == new_owner);
-      DEBUG_ASSERT(wait_.owner() == new_owner);
+    if (do_wake) {
+      DEBUG_ASSERT(wait_.Count() >= 1);
+      new_owner = &wake_me.front();
+      new_mutex_state = reinterpret_cast<uintptr_t>(new_owner);
+      still_waiting = wait_.Count() - 1;
+      if (still_waiting) {
+        new_mutex_state |= STATE_FLAG_CONTESTED;
+      }
     } else {
-      DEBUG_ASSERT(wake_result.owner == nullptr);
       DEBUG_ASSERT(wait_.owner() == nullptr);
+      new_owner = nullptr;
+      still_waiting = 0;
+      new_mutex_state = STATE_FREE;
     }
-    LOCK_TRACE_FLOW_STEP("contend_mutex", new_owner->lock_flow_id());
-  }
 
-  // Finally release the OWQ's lock and we are finished.  Note: there are a few
-  // tricky lifecycle issues here.  Immediately after the compare and exchange
-  // strong (above), we have either set our Mutex state to be FREE, or to be
-  // owned by the thread that we are about to wake.  Either immediately after we
-  // set the state to FREE, or immediately after we wake the thread we assigned
-  // ownership to, it is possible for the Mutex to become destroyed, even if
-  // external code bounces through a Mutex acquire/release cycle before
-  // destroying it (If there is no contention on the lock at that point, other
-  // threads will not synchronize on the wait queue's lock before allowing the
-  // object to become destroyed).
-  //
-  // We prevent this potential use after free by spinning in the Mutex's
-  // destructor until it observes the inner queue lock as being unlocked state
-  // before proceeding with destruction.  This will guarantee that any thread at
-  // this point in the code will hold off destruction until it is past the point
-  // where it will ever touch the object's memory. Additionally, it guarantees
-  // that anything destroying the object is certain to see all of the changes
-  // made to the inner OWQ before destruction is allowed to start.
-  wait_.get_lock().Release();
+    // It should be safe to pass `new_owner` to the tracer at this point in time.
+    // We have not woken the thread yet, and we hold its lock (as well as its
+    // queue's lock) meaning that it cannot successfully be woken (and therefore
+    // must still be alive) until after we release the lock.
+    tracer.KernelMutexWake(this, new_owner, still_waiting);
+
+    // Update our state with release semantics.
+    if (unlikely(!val_.compare_exchange_strong(old_mutex_state, new_mutex_state,
+                                               ktl::memory_order_release,
+                                               ktl::memory_order_relaxed))) {
+      panic("bad state (%lx != %lx) in mutex release %p, current thread %p\n",
+            reinterpret_cast<uintptr_t>(current_thread) | STATE_FLAG_CONTESTED, old_mutex_state,
+            this, current_thread);
+    }
+
+    // Now that our state is updated, actually perform our wake operation if we
+    // need to, then drop the queue lock and get out.
+    if (do_wake) {
+      [[maybe_unused]] const OwnedWaitQueue::WakeThreadsResult wake_result =
+          wait_.WakeThreadsLocked(ktl::move(wake_me), default_hooks,
+                                  OwnedWaitQueue::WakeOption::AssignOwner);
+      DEBUG_ASSERT(wake_result.woken == 1);
+      if (wake_result.still_waiting > 0) {
+        DEBUG_ASSERT(wake_result.owner == new_owner);
+        DEBUG_ASSERT(wait_.owner() == new_owner);
+      } else {
+        DEBUG_ASSERT(wake_result.owner == nullptr);
+        DEBUG_ASSERT(wait_.owner() == nullptr);
+      }
+      LOCK_TRACE_FLOW_STEP("contend_mutex", new_owner->lock_flow_id());
+    }
+
+    // Finally release the OWQ's lock and we are finished.  Note: there are a few
+    // tricky lifecycle issues here.  Immediately after the compare and exchange
+    // strong (above), we have either set our Mutex state to be FREE, or to be
+    // owned by the thread that we are about to wake.  Either immediately after we
+    // set the state to FREE, or immediately after we wake the thread we assigned
+    // ownership to, it is possible for the Mutex to become destroyed, even if
+    // external code bounces through a Mutex acquire/release cycle before
+    // destroying it (If there is no contention on the lock at that point, other
+    // threads will not synchronize on the wait queue's lock before allowing the
+    // object to become destroyed).
+    //
+    // We prevent this potential use after free by spinning in the Mutex's
+    // destructor until it observes the inner queue lock as being unlocked state
+    // before proceeding with destruction.  This will guarantee that any thread at
+    // this point in the code will hold off destruction until it is past the point
+    // where it will ever touch the object's memory. Additionally, it guarantees
+    // that anything destroying the object is certain to see all of the changes
+    // made to the inner OWQ before destruction is allowed to start.
+    wait_.get_lock().Release();
+    return ChainLockTransaction::Done;
+  };
+  ChainLockTransaction::UntilDone(PreemptDisableAndIrqSaveOption,
+                                  CLT_TAG("Mutex::ReleaseContendedMutex"), do_transaction);
 }
 
 void Mutex::ReleaseInternal() {

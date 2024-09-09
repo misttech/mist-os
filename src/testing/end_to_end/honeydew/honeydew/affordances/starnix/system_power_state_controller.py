@@ -870,10 +870,10 @@ class SystemPowerStateController(
         #     {
         #         "data_source": "Inspect",
         #         "metadata": {
-        #             "component_url": "fuchsia-boot:///driver_manager#meta/driver_manager.cm",
+        #             "component_url": "fuchsia-boot:///aml-suspend#meta/aml-suspend.cm",
         #             "timestamp": 372140515750,
         #         },
-        #         "moniker": "'bootstrap/driver_manager'",
+        #         "moniker": "'bootstrap/boot-drivers:dev.sys.platform.pt.suspend'",
         #         "payload": {
         #             'root': {
         #                 'suspend_events': {
@@ -889,7 +889,7 @@ class SystemPowerStateController(
             inspect_data_collection: fuchsia_inspect.InspectDataCollection = (
                 self._insect.get_data(
                     selectors=[
-                        "bootstrap/driver_manager:[name=aml-suspend]root"
+                        "bootstrap/boot-drivers*:[name=aml-suspend]root"
                     ],
                 )
             )

@@ -266,9 +266,7 @@ zx::result<ImageId> TestFidlClient::ImportImageWithSysmemLocked(
 
   const fuchsia_hardware_display::wire::BufferCollectionId fidl_display_collection_id =
       ToFidlBufferCollectionId(display_collection_id);
-  const auto result = dc_->ImportBufferCollection(
-      fidl_display_collection_id,
-      fidl::ClientEnd<sysmem1::BufferCollectionToken>(client.TakeChannel()));
+  const auto result = dc_->ImportBufferCollection(fidl_display_collection_id, std::move(client));
   if (!result.ok()) {
     FDF_LOG(ERROR, "Failed to call FIDL ImportBufferCollection %lu (%s)",
             display_collection_id.value(), result.status_string());

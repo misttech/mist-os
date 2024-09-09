@@ -19,9 +19,7 @@ pub //garnet/public/lib/ui/views/fidl/views.fidl: //garnet/public/lib/media/fidl
 
 import ast
 import optparse
-import os
 import sys
-import zipfile
 
 
 # for some reason, gn seems to tack on an extra element in the directory

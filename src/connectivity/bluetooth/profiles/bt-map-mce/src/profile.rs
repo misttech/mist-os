@@ -2,17 +2,26 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::Error;
+use bredr::PSM_RFCOMM;
 use bt_map::{Error as MapError, *};
 use bt_obex::profile::{
     goep_l2cap_psm_attribute, parse_obex_search_result, GOEP_L2CAP_PSM_ATTRIBUTE,
 };
+use bt_obex::server::TransportType;
 use fuchsia_bluetooth::profile::*;
 use fuchsia_bluetooth::types::Uuid;
 use profile_client::ProfileClient;
 use std::collections::HashSet;
-use tracing::info;
+use tracing::trace;
 use {fidl_fuchsia_bluetooth as fidl_bt, fidl_fuchsia_bluetooth_bredr as bredr};
+
+/// Arbitrary PSM value based on the dynamic range described in
+/// Bluetooth Core spec v5.3 Vol 3 Part A Section 4.2.
+/// This PSM value will be used for MNS connection.
+/// All PSM values shall have the least significant bit of the most
+/// significant octet equal to 0 and the least significant bit of all
+/// other octets equal to 1.
+const MNS_PSM: u16 = 0x1033;
 
 const PROFILE_MAJOR_VERSION: u8 = 1;
 const PROFILE_MINOR_VERSION: u8 = 4;
@@ -42,11 +51,43 @@ pub struct MasConfig {
     instance_id: u8, // ID that identifies this MAS instance.
     name: String,
     supported_message_types: HashSet<MessageType>,
-    connection: bredr::ConnectParameters,
+    connection_params: bredr::ConnectParameters,
     features: MapSupportedFeatures,
 }
 
 impl MasConfig {
+    pub fn new(
+        instance_id: u8,
+        name: impl ToString,
+        supported_message_types: Vec<MessageType>,
+        connection_params: bredr::ConnectParameters,
+        features: MapSupportedFeatures,
+    ) -> Self {
+        Self {
+            instance_id,
+            name: name.to_string(),
+            supported_message_types: HashSet::from_iter(supported_message_types.into_iter()),
+            connection_params,
+            features,
+        }
+    }
+
+    pub fn instance_id(&self) -> u8 {
+        self.instance_id
+    }
+
+    pub fn features(&self) -> MapSupportedFeatures {
+        self.features
+    }
+
+    pub fn supported_message_types(&self) -> &HashSet<MessageType> {
+        &self.supported_message_types
+    }
+
+    pub fn connection_params(&self) -> &bredr::ConnectParameters {
+        &self.connection_params
+    }
+
     /// Cross checks the profile search result with the service definition for
     /// Message Access Service as listed in MAP v1.4.2 section 7.1.1.
     pub fn from_search_result(
@@ -84,6 +125,7 @@ impl MasConfig {
             .map(|p| ProtocolDescriptor::try_from(p))
             .collect::<Result<Vec<_>, _>>()
             .map_err(|_| MapError::InvalidParameters)?;
+
         let attributes = attributes
             .iter()
             .map(|a| Attribute::try_from(a))
@@ -111,7 +153,7 @@ impl MasConfig {
         let name = attributes
             .iter()
             .find_map(|a| {
-                // TODO(b/328074442): once getting languaged-based
+                // TODO(https://fxbug.dev/328074442): once getting languaged-based
                 // attributes is supported, get the attributes through
                 // that instead.
                 if a.id != ATTR_SERVICE_NAME {
@@ -159,19 +201,37 @@ impl MasConfig {
             })
             .ok_or(MapError::InvalidSdp(ServiceRecordItem::MapSupportedFeatures))?;
 
-        let config =
-            MasConfig { instance_id: id, name, supported_message_types, connection, features };
+        let config = MasConfig {
+            instance_id: id,
+            name,
+            supported_message_types,
+            connection_params: connection,
+            features,
+        };
         Ok(config)
     }
 }
 
-fn default_map_supported_features() -> MapSupportedFeatures {
+/// Returns the transport type from the list of protocol descriptors.
+pub(crate) fn transport_type_from_protocol(
+    descriptors: &Vec<ProtocolDescriptor>,
+) -> Result<TransportType, MapError> {
+    match psm_from_protocol(&descriptors) {
+        Some(psm) if u16::from(psm) == PSM_RFCOMM => Ok(TransportType::Rfcomm),
+        Some(_) => Ok(TransportType::L2cap),
+        None => Err(MapError::other(format!(
+            "can't determine TransportType from protocols {descriptors:?}"
+        ))),
+    }
+}
+
+/// Features supported by the MNS server side implementation of the MCE
+/// role.
+pub(crate) fn mns_supported_features() -> MapSupportedFeatures {
     MapSupportedFeatures::NOTIFICATION_REGISTRATION
         | MapSupportedFeatures::NOTIFICATION
-        | MapSupportedFeatures::BROWSING
         | MapSupportedFeatures::EXTENDED_EVENT_REPORT_1_1
         | MapSupportedFeatures::MESSAGES_LISTING_FORMAT_VERSION_1_1
-        | MapSupportedFeatures::MAPSUPPORTEDFEATURES_IN_CONNECT_REQUEST
 }
 
 /// Service definition for Message Notification Service on the MCE device.
@@ -194,7 +254,7 @@ fn build_mns_service_definition() -> ServiceDefinition {
         ],
         information: vec![Information {
             language: "en".to_string(),
-            // TODO(b/328115144): consider making this configurable
+            // TODO(https://fxbug.dev/328115144): consider making this configurable
             // through structured configs.
             name: Some(MNS_SERVICE_NAME.to_string()),
             description: None,
@@ -207,18 +267,19 @@ fn build_mns_service_definition() -> ServiceDefinition {
             ..Default::default()
         }],
         additional_attributes: vec![
-            // Request a dynamic PSM to be assigned by the profile service.
-            goep_l2cap_psm_attribute(Psm::new(bredr::PSM_DYNAMIC)),
+            // TODO(https://fxbug.dev/352169266): request a dynamic PSM to be assigned by
+            // bt-host once it's implemented.
+            goep_l2cap_psm_attribute(Psm::new(MNS_PSM)),
             Attribute {
                 id: ATTR_MAP_SUPPORTED_FEATURES,
-                element: DataElement::Uint32(default_map_supported_features().bits()),
+                element: DataElement::Uint32(mns_supported_features().bits()),
             },
         ],
         ..Default::default()
     }
 }
 
-pub fn connect_and_advertise(profile_svc: bredr::ProfileProxy) -> Result<ProfileClient, Error> {
+pub fn connect_and_advertise(profile_svc: bredr::ProfileProxy) -> Result<ProfileClient, MapError> {
     // Attributes to search for in SDP record for the Message Access Service on a MSE device.
     let search_attributes = vec![
         bredr::ATTR_SERVICE_CLASS_ID_LIST,
@@ -231,7 +292,8 @@ pub fn connect_and_advertise(profile_svc: bredr::ProfileProxy) -> Result<Profile
         ATTR_MAP_SUPPORTED_FEATURES,
     ];
 
-    let service_defs = vec![(&build_mns_service_definition()).try_into()?];
+    let service_defs =
+        vec![(&build_mns_service_definition()).try_into().map_err(MapError::other)?];
     let channel_parameters = fidl_bt::ChannelParameters {
         channel_mode: Some(fidl_bt::ChannelMode::EnhancedRetransmission),
         ..Default::default()
@@ -239,15 +301,17 @@ pub fn connect_and_advertise(profile_svc: bredr::ProfileProxy) -> Result<Profile
 
     // MCE device advertises the MNS on it and and searches for MAS on remote peers.
     let mut profile_client =
-        ProfileClient::advertise(profile_svc.clone(), service_defs, channel_parameters)?;
+        ProfileClient::advertise(profile_svc.clone(), service_defs, channel_parameters)
+            .map_err(MapError::other)?;
 
-    profile_client.add_search(
-        bredr::ServiceClassProfileIdentifier::MessageAccessServer,
-        Some(search_attributes),
-    )?;
+    profile_client
+        .add_search(
+            bredr::ServiceClassProfileIdentifier::MessageAccessServer,
+            Some(search_attributes),
+        )
+        .map_err(MapError::other)?;
 
-    info!("Registered service search & advertisement");
-
+    trace!("Registered service search & advertisement");
     Ok(profile_client)
 }
 
@@ -332,7 +396,7 @@ mod tests {
         let config = MasConfig::from_search_result(test_protocols(), test_attributes())
             .expect("should succeed");
 
-        match config.connection {
+        match config.connection_params {
             bredr::ConnectParameters::L2cap(_) => panic!("should not be L2cap"),
             bredr::ConnectParameters::Rfcomm(chan) => assert_eq!(chan.channel, Some(8)),
         };
@@ -382,7 +446,7 @@ mod tests {
 
         let config = MasConfig::from_search_result(protocols, attributes).expect("should succeed");
 
-        match config.connection {
+        match config.connection_params {
             bredr::ConnectParameters::L2cap(chan) => assert_eq!(chan.psm, Some(0x1007)),
             bredr::ConnectParameters::Rfcomm(_) => panic!("should not be Rfcomm"),
         };

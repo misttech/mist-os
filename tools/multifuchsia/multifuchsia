@@ -623,7 +623,10 @@ function cmd_status() {
   if [ ! -L "$WORKDIR/snapshots/update.success" ]; then
     git -C "$WORKDIR/snapshots/update.success/integration" log HEAD^..HEAD --abbrev-commit --color=always --pretty="tformat:snapshots/update.success/integration: %C(auto)%h %ar %s"
   fi
-  systemctl --user status "$(find_service_unit)"
+  local service_unit=$(find_service_unit)
+  if [ ! -z "${service_unit}" ]; then
+    systemctl --user status "$service_unit"
+  fi
 }
 
 function main() {

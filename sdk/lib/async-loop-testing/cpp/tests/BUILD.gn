@@ -11,14 +11,14 @@ executable("bin") {
   sources = [ "real_loop_test.cc" ]
 
   deps = [
+    "//sdk/lib/async:async-cpp",
+    "//sdk/lib/async-default",
     "//sdk/lib/async-loop-testing/cpp",
     "//sdk/lib/fit-promise",
     "//src/lib/fxl",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/fxl/test:test_settings",
     "//src/lib/testing/predicates",
-    "//zircon/system/ulib/async:async-cpp",
-    "//zircon/system/ulib/async-default",
     "//zircon/system/ulib/sync:sync-cpp",
   ]
 

@@ -27,7 +27,7 @@ class Puppet : public fuchsia::validate::logs::LogSinkPuppet {
 
   void StopInterestListener(StopInterestListenerCallback callback) override {
     fuchsia_logging::LogSettingsBuilder log_settings;
-    log_settings.WithMinLogSeverity(fuchsia_logging::LOG_TRACE)
+    log_settings.WithMinLogSeverity(FUCHSIA_LOG_TRACE)
         .DisableInterestListener()
         .BuildAndInitialize();
     callback();

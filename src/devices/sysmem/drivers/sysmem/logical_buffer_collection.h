@@ -24,10 +24,10 @@
 #include <fbl/string_printf.h>
 
 #include "src/devices/sysmem/drivers/sysmem/allocation_result.h"
-#include "src/devices/sysmem/drivers/sysmem/device.h"
 #include "src/devices/sysmem/drivers/sysmem/indent.h"
 #include "src/devices/sysmem/drivers/sysmem/logging.h"
 #include "src/devices/sysmem/drivers/sysmem/node_properties.h"
+#include "src/devices/sysmem/drivers/sysmem/sysmem.h"
 #include "src/devices/sysmem/drivers/sysmem/usage_pixel_format_cost.h"
 #include "src/devices/sysmem/drivers/sysmem/utils.h"
 #include "src/devices/sysmem/drivers/sysmem/versions.h"
@@ -228,9 +228,9 @@ class LogicalBufferCollection : public fbl::RefCounted<LogicalBufferCollection> 
 
   ~LogicalBufferCollection();
 
-  static void CreateV1(TokenServerEndV1 buffer_collection_token_request, Device* parent_device,
+  static void CreateV1(TokenServerEndV1 buffer_collection_token_request, Sysmem* parent_device,
                        const ClientDebugInfo* client_debug_info);
-  static void CreateV2(TokenServerEndV2 buffer_collection_token_request, Device* parent_device,
+  static void CreateV2(TokenServerEndV2 buffer_collection_token_request, Sysmem* parent_device,
                        const ClientDebugInfo* client_debug_info);
 
   // |parent_device| the Device* that the calling allocator is part of.  The
@@ -245,13 +245,13 @@ class LogicalBufferCollection : public fbl::RefCounted<LogicalBufferCollection> 
   // |buffer_collection_request| the server end of a BufferCollection channel
   // to be served by the LogicalBufferCollection associated with
   // buffer_collection_token.
-  static void BindSharedCollection(Device* parent_device, zx::channel buffer_collection_token,
+  static void BindSharedCollection(Sysmem* parent_device, zx::channel buffer_collection_token,
                                    CollectionServerEnd buffer_collection_request,
                                    const ClientDebugInfo* client_debug_info);
 
   // ZX_OK if the token is known to the server.
   // ZX_ERR_NOT_FOUND if the token isn't known to the server.
-  static zx_status_t ValidateBufferCollectionToken(Device* parent_device,
+  static zx_status_t ValidateBufferCollectionToken(Sysmem* parent_device,
                                                    zx_koid_t token_server_koid);
 
   // This is used to create the initial BufferCollectionToken, and also used
@@ -304,7 +304,7 @@ class LogicalBufferCollection : public fbl::RefCounted<LogicalBufferCollection> 
   void VLogClientError(Location location, const NodeProperties* node_properties, const char* format,
                        va_list args) const;
 
-  Device* parent_device() const { return parent_device_; }
+  Sysmem* parent_sysmem() const { return parent_sysmem_; }
 
   // For tests.
   std::vector<const BufferCollection*> collection_views() const;
@@ -337,7 +337,7 @@ class LogicalBufferCollection : public fbl::RefCounted<LogicalBufferCollection> 
   uint64_t buffer_collection_id() const { return buffer_collection_id_; }
 
   static fit::result<zx_status_t, BufferCollectionToken*> CommonConvertToken(
-      Device* parent_device, zx::channel buffer_collection_token,
+      Sysmem* parent_device, zx::channel buffer_collection_token,
       const ClientDebugInfo* client_debug_info, const char* fidl_message_name);
 
   fit::result<zx_status_t, std::optional<zx::vmo>> CreateWeakVmo(
@@ -389,10 +389,10 @@ class LogicalBufferCollection : public fbl::RefCounted<LogicalBufferCollection> 
     std::string name;
   };
 
-  explicit LogicalBufferCollection(Device* parent_device);
+  explicit LogicalBufferCollection(Sysmem* parent_device);
 
   const UsagePixelFormatCost& usage_pixel_format_cost() {
-    return parent_device_->usage_pixel_format_cost();
+    return parent_sysmem_->usage_pixel_format_cost();
   }
 
   // Will log an error, and then FailRoot().
@@ -820,7 +820,7 @@ class LogicalBufferCollection : public fbl::RefCounted<LogicalBufferCollection> 
       NodeProperties& subtree, fit::function<bool(const NodeProperties&)> visit_keep) const;
 
   static fbl::RefPtr<LogicalBufferCollection> CommonCreate(
-      Device* parent_device, const ClientDebugInfo* client_debug_info);
+      Sysmem* parent_device, const ClientDebugInfo* client_debug_info);
 
   bool CommonCreateBufferCollectionTokenStage1(fbl::RefPtr<LogicalBufferCollection> self,
                                                NodeProperties* new_node_properties,
@@ -847,9 +847,9 @@ class LogicalBufferCollection : public fbl::RefCounted<LogicalBufferCollection> 
   bool IsSecureHeap(const fuchsia_sysmem2::Heap& heap);
   bool IsSecurePermitted(const fuchsia_sysmem2::BufferMemoryConstraints& constraints);
   fpromise::result<fuchsia_sysmem2::Heap, zx_status_t> GetHeap(
-      const fuchsia_sysmem2::BufferMemoryConstraints& constraints, Device* device);
+      const fuchsia_sysmem2::BufferMemoryConstraints& constraints, Sysmem* device);
 
-  Device* parent_device_ = nullptr;
+  Sysmem* parent_sysmem_ = nullptr;
 
   // This owns the current tree of BufferCollectionToken, BufferCollection, OrphanedNode.  The
   // Location in the tree is determined by creation path.  Child Node(s) are children because they

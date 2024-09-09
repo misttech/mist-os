@@ -15,6 +15,28 @@
 
 namespace minfs {
 
+// On the stress builders, the out of space log messages can take up a lot of space, so we only log
+// every 60 seconds.
+class OutOfSpaceLogSite {
+ public:
+  bool ShouldLog() {
+#ifdef __Fuchsia__
+    zx::ticks now = zx::ticks::now();
+    if (now < ignore_before_)
+      return false;
+    zx::ticks ignore_duration = zx::ticks::per_second();
+    ignore_duration *= 60;  // 60 seconds
+    ignore_before_ = now + ignore_duration;
+#endif
+    return true;
+  }
+
+#ifdef __Fuchsia__
+ private:
+  zx::ticks ignore_before_;
+#endif
+};
+
 PersistentStorage::PersistentStorage(block_client::BlockDevice* device, SuperblockManager* sb,
                                      size_t unit_size, GrowHandler grow_cb,
                                      AllocatorMetadata metadata, uint32_t block_size)
@@ -65,8 +87,11 @@ zx::result<> PersistentStorage::Extend(PendingWork* write_transaction, WriteData
 
   zx_status_t status = device_->VolumeExtend(offset, length);
   if (status != ZX_OK) {
-    FX_LOGS(WARNING) << "Failed to extend volume from " << data_slices << " slices to "
-                     << data_slices_new << " slices, error " << status;
+    static OutOfSpaceLogSite site;
+    if (site.ShouldLog()) {
+      FX_LOGS(WARNING) << "Failed to extend volume from " << data_slices << " slices to "
+                       << data_slices_new << " slices, error " << status;
+    }
     return zx::error(status);
   }
 

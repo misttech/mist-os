@@ -102,7 +102,7 @@ class FakeFtdiFunction : public DeviceType {
   bool configured_ = false;
   bool active_ = false;
   thrd_t thread_ = {};
-  std::atomic<int> pending_request_count_;
+  std::atomic<int> pending_request_count_ = 0;
 };
 
 void FakeFtdiFunction::CompletionCallback(usb_request_t* req) {
@@ -273,7 +273,7 @@ zx_status_t FakeFtdiFunction::Bind() {
   };
 
   active_ = true;
-  atomic_init(&pending_request_count_, 0);
+  pending_request_count_ = 0;
 
   parent_req_size_ = function_.GetRequestSize();
 

@@ -40,6 +40,9 @@ class Runner : public fidl::WireServer<fuchsia_component_runner::ComponentRunner
  private:
   // fidl::WireServer<fuchsia_component_runner::ComponentRunner>
   void Start(StartRequestView request, StartCompleter::Sync& completer) override;
+  void handle_unknown_method(
+      fidl::UnknownMethodMetadata<fuchsia_component_runner::ComponentRunner> metadata,
+      fidl::UnknownMethodCompleter::Sync& completer) override;
 
   zx::result<> CallCallback(zx_koid_t koid, zx::result<StartedComponent> component);
 

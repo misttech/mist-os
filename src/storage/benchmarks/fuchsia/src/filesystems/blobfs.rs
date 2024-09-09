@@ -32,7 +32,7 @@ impl FilesystemConfig for Blobfs {
             /*as_blob=*/ false,
         )
         .await;
-        let root = fuchsia_fs::directory::open_in_namespace(
+        let root = fuchsia_fs::directory::open_in_namespace_deprecated(
             blobfs.benchmark_dir().to_str().unwrap(),
             fuchsia_fs::OpenFlags::RIGHT_WRITABLE | fuchsia_fs::OpenFlags::RIGHT_READABLE,
         )
@@ -65,7 +65,7 @@ impl Filesystem for BlobfsInstance {
 impl CacheClearableFilesystem for BlobfsInstance {
     async fn clear_cache(&mut self) {
         let () = self.blobfs.clear_cache().await;
-        self.root = fuchsia_fs::directory::open_in_namespace(
+        self.root = fuchsia_fs::directory::open_in_namespace_deprecated(
             self.blobfs.benchmark_dir().to_str().unwrap(),
             fuchsia_fs::OpenFlags::RIGHT_WRITABLE | fuchsia_fs::OpenFlags::RIGHT_READABLE,
         )
@@ -76,7 +76,7 @@ impl CacheClearableFilesystem for BlobfsInstance {
 #[async_trait]
 impl BlobFilesystem for BlobfsInstance {
     async fn get_vmo(&self, blob: &DeliveryBlob) -> zx::Vmo {
-        let blob = fuchsia_fs::directory::open_file(
+        let blob = fuchsia_fs::directory::open_file_deprecated(
             &self.root,
             &delivery_blob_path(blob.name),
             fuchsia_fs::OpenFlags::RIGHT_READABLE,
@@ -87,7 +87,7 @@ impl BlobFilesystem for BlobfsInstance {
     }
 
     async fn write_blob(&self, blob: &DeliveryBlob) {
-        let blob_proxy = fuchsia_fs::directory::open_file(
+        let blob_proxy = fuchsia_fs::directory::open_file_deprecated(
             &self.root,
             &delivery_blob_path(blob.name),
             fuchsia_fs::OpenFlags::CREATE | fuchsia_fs::OpenFlags::RIGHT_WRITABLE,

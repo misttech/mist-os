@@ -48,7 +48,7 @@ class NamespaceBinding {
   // the binding (if it was set).
   std::string Release();
 
-  std::string_view path() { return path_; }
+  const std::string& path() const { return path_; }
 
  private:
   explicit NamespaceBinding(std::string path) : path_(std::move(path)) {}
@@ -183,6 +183,7 @@ class __EXPORT StartedMultiVolumeFilesystem {
   // Returns a pointer to the volume if it was created.  The lifetime of the pointer is less than
   // this object.
   zx::result<MountedVolume*> CreateVolume(std::string_view name,
+                                          fuchsia_fs_startup::wire::CreateOptions create_options,
                                           fuchsia_fs_startup::wire::MountOptions options);
 
   // Verifies the integrity of a volume.  |crypt_client| is an optional connection to a crypt

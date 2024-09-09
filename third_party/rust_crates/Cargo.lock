@@ -253,6 +253,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "async-ringbuf"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "32690af15155711360e74119b99605416c9e4dfd45b0859bd9af795a50693bec"
+dependencies = [
+ "futures",
+ "ringbuf",
+]
+
+[[package]]
 name = "async-stream"
 version = "0.3.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1229,6 +1239,7 @@ dependencies = [
  "async-io",
  "async-lock",
  "async-net",
+ "async-ringbuf",
  "async-stream",
  "async-trait",
  "atty",
@@ -1325,6 +1336,7 @@ dependencies = [
  "mio 0.8.9",
  "mock-omaha-server",
  "mockall",
+ "munge",
  "nix 0.26.2",
  "nom",
  "nom_locate",
@@ -1368,6 +1380,7 @@ dependencies = [
  "ref-cast",
  "regex",
  "regex-syntax 0.8.3",
+ "rend",
  "ring",
  "rust_icu_common",
  "rust_icu_sys",
@@ -2267,7 +2280,7 @@ dependencies = [
  "argh",
  "derive_builder",
  "futures",
- "hex",
+ "hex 0.3.2",
  "hyper",
  "omaha_client",
  "p256",
@@ -2311,6 +2324,26 @@ name = "multimap"
 version = "0.8.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e5ce46fe64a9d73be07dcbe690a38ce1b293be448fd8ce1e6c1b8062c9f72c6a"
+
+[[package]]
+name = "munge"
+version = "0.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "64142d38c84badf60abf06ff9bd80ad2174306a5b11bd4706535090a30a419df"
+dependencies = [
+ "munge_macro",
+]
+
+[[package]]
+name = "munge_macro"
+version = "0.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1bb5c1d8184f13f7d0ccbeeca0def2f9a181bce2624302793005f5ca8aa62e5e"
+dependencies = [
+ "proc-macro2 1.0.86",
+ "quote 1.0.35",
+ "syn 2.0.69",
+]
 
 [[package]]
 name = "nix"
@@ -2996,9 +3029,9 @@ dependencies = [
 
 [[package]]
 name = "proptest"
-version = "1.4.0"
+version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "31b476131c3c86cb68032fdc5cb6d5a1045e3e42d96b69fa599fd77701e1f5bf"
+checksum = "b4c2511913b88df1637da85cc8d96ec8e43a3f8bb8ccb71ee1ac240d6f3df58d"
 dependencies = [
  "bit-set",
  "bit-vec",
@@ -3422,6 +3455,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "rend"
+version = "0.5.0-pre6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7f02fc3227b019649985d2f89e254e345f027cc58af7bbf5faa4f3f7271bc4cc"
+
+[[package]]
 name = "rfc6979"
 version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3445,6 +3484,15 @@ dependencies = [
  "untrusted",
  "web-sys",
  "winapi",
+]
+
+[[package]]
+name = "ringbuf"
+version = "0.4.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "46f7f1b88601a8ee13cabf203611ccdf64345dc1c5d24de8b11e1a678ee619b6"
+dependencies = [
+ "crossbeam-utils",
 ]
 
 [[package]]

@@ -47,10 +47,15 @@ struct AmlGpioInterrupt {
 // TODO(42082459): Rename to AmlPin now that it implements the pinimpl protocol.
 class AmlGpio : public fdf::WireServer<fuchsia_hardware_pinimpl::PinImpl> {
  public:
+  struct InterruptInfo {
+    uint16_t pin = kMaxGpioIndex + 1;
+    zx::interrupt interrupt;
+  };
+
   AmlGpio(fidl::ClientEnd<fuchsia_hardware_platform_device::Device> pdev, fdf::MmioBuffer mmio_gpio,
           fdf::MmioBuffer mmio_gpio_ao, fdf::MmioBuffer mmio_interrupt,
           cpp20::span<const AmlGpioBlock> gpio_blocks, const AmlGpioInterrupt* gpio_interrupt,
-          uint32_t pid, fbl::Array<uint16_t> irq_info)
+          uint32_t pid, fbl::Array<InterruptInfo> irq_info)
       : pdev_(std::move(pdev), fdf::Dispatcher::GetCurrent()->async_dispatcher()),
         mmios_{std::move(mmio_gpio), std::move(mmio_gpio_ao)},
         mmio_interrupt_(std::move(mmio_interrupt)),
@@ -108,7 +113,7 @@ class AmlGpio : public fdf::WireServer<fuchsia_hardware_pinimpl::PinImpl> {
   const cpp20::span<const AmlGpioBlock> gpio_blocks_;
   const AmlGpioInterrupt* gpio_interrupt_;
   const uint32_t pid_;
-  fbl::Array<uint16_t> irq_info_;
+  fbl::Array<InterruptInfo> irq_info_;
   uint8_t irq_status_{};
   std::array<std::optional<fuchsia_hardware_gpio::InterruptMode>, kMaxGpioIndex + 1> pin_irq_modes_;
   fdf::ServerBindingGroup<fuchsia_hardware_pinimpl::PinImpl> bindings_;

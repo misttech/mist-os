@@ -16,7 +16,7 @@ executable("configuration_tests") {
 
   deps = [
     "//sdk/fidl/fuchsia.accessibility:fuchsia.accessibility_cpp",
-    "//sdk/lib/fidl/cpp",
+    "//sdk/lib/fidl/hlcpp",
     "//sdk/lib/sys/cpp",
     "//sdk/lib/sys/cpp/testing:unit",
     "//sdk/lib/syslog/cpp",

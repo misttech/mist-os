@@ -3,7 +3,7 @@
 # found in the LICENSE file.
 
 import collections
-from typing import Any, Dict, Iterable, List, Set, Tuple
+from typing import Any, Dict, Iterable, Tuple
 
 
 def multidict(

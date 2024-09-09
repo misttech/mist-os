@@ -224,7 +224,7 @@ impl NonMetaStorage for fio::DirectoryProxy {
         &self,
         hash: &fuchsia_hash::Hash,
     ) -> Result<zx::Vmo, NonMetaStorageError> {
-        let proxy = fuchsia_fs::directory::open_file(
+        let proxy = fuchsia_fs::directory::open_file_deprecated(
             self,
             &hash.to_string(),
             fio::OpenFlags::RIGHT_READABLE,
@@ -266,6 +266,7 @@ pub fn serve(
 }
 
 /// Serves a sub-`path` of a package directory for the package with hash `meta_far` on `server_end`.
+///
 /// The connection rights are set by `flags`, used the same as the `flags` parameter of
 ///   fuchsia.io/Directory.Open.
 /// On error while loading the package metadata, closes the provided server end, sending an OnOpen

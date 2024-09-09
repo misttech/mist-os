@@ -16,15 +16,14 @@
 #include <string>
 
 #include <gtest/gtest.h>
+#include <sdk/lib/driver/power/cpp/testing/fake_activity_governor.h>
 #include <src/lib/testing/loop_fixture/real_loop_fixture.h>
 
-#include "examples/power/cpp/testing/fidl_test_base_default.h"
 #include "examples/power/cpp/wake_lease.h"
-#include "lib/fidl/cpp/wire/internal/transport.h"
 
 namespace {
 
-using examples::power::testing::FidlTestBaseDefault;
+using fdf_power::testing::FakeActivityGovernorListener;
 using fuchsia_power_broker::CurrentLevel;
 using fuchsia_power_broker::DependencyToken;
 using fuchsia_power_broker::DependencyType;
@@ -49,28 +48,6 @@ class WakeLeaseIntegrationTest : public gtest::RealLoopFixture {
     EXPECT_TRUE(result.is_ok()) << result.status_string();
     return fidl::Client(std::move(*result), dispatcher());
   }
-};
-
-class TestActivityGovernorListener : public FidlTestBaseDefault<ActivityGovernorListener> {
- public:
-  explicit TestActivityGovernorListener(async_dispatcher_t* dispatcher,
-                                        fidl::ServerEnd<ActivityGovernorListener> server_end)
-      : binding_(dispatcher, std::move(server_end), this,
-                 [](fidl::UnbindInfo) { FAIL() << "Unexpected close"; }) {}
-
-  bool SuspendStarted() const { return suspend_started_; }
-
- private:
-  void OnSuspendStarted(OnSuspendStartedCompleter::Sync& completer) override {
-    suspend_started_ = true;
-    completer.Reply();
-  }
-
-  // These completers must also reply for expected operation.
-  void OnResume(OnResumeCompleter::Sync& completer) override { completer.Reply(); }
-
-  fidl::ServerBinding<ActivityGovernorListener> binding_;
-  bool suspend_started_ = false;
 };
 
 class ApplicationActivityElement {
@@ -149,7 +126,7 @@ TEST_F(WakeLeaseIntegrationTest, DISABLED_WakeLeaseBlocksSuspend) {
 
   // Register a Listener on System Activity Governor to check for suspend callbacks.
   auto endpoints = fidl::CreateEndpoints<ActivityGovernorListener>().value();
-  TestActivityGovernorListener listener(dispatcher(), std::move(endpoints.server));
+  FakeActivityGovernorListener listener(dispatcher(), std::move(endpoints.server));
   bool register_listener_completed = false;
   activity_governor
       ->RegisterListener({{.listener = std::make_optional(std::move(endpoints.client))}})

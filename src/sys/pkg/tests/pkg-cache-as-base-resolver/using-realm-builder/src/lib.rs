@@ -312,7 +312,7 @@ impl TestEnv {
     }
 
     fn shell_commands_bin(&self) -> fio::DirectoryProxy {
-        fuchsia_fs::directory::open_directory_no_describe(
+        fuchsia_fs::directory::open_directory_no_describe_deprecated(
             self.realm_instance.root.get_exposed_dir(),
             SHELL_COMMANDS_BIN_PATH,
             fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,
@@ -565,7 +565,7 @@ async fn shell_commands_bin_dir() {
 
     assert_eq!(
         fuchsia_fs::file::read(
-            &fuchsia_fs::directory::open_file(
+            &fuchsia_fs::directory::open_file_deprecated(
                 &env.shell_commands_bin(),
                 "a-file",
                 fio::OpenFlags::RIGHT_READABLE

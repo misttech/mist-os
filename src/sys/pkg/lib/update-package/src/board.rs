@@ -26,7 +26,7 @@ pub(crate) async fn verify_board(
     proxy: &fio::DirectoryProxy,
     expected_contents: &str,
 ) -> Result<(), VerifyBoardError> {
-    let file = match fuchsia_fs::directory::open_file(
+    let file = match fuchsia_fs::directory::open_file_deprecated(
         proxy,
         "board",
         fio::OpenFlags::RIGHT_READABLE,

@@ -169,8 +169,8 @@ RecurringCallback g_threadload_callback([]() {
     const Thread& idle_power_thread = percpu::Get(i).idle_power_thread.thread();
     struct cpu_stats stats;
 
-    SingletonChainLockGuardIrqSave thread_guard{idle_power_thread.get_lock(),
-                                                CLT_TAG("g_threadload_callback")};
+    SingleChainLockGuard thread_guard{IrqSaveOption, idle_power_thread.get_lock(),
+                                      CLT_TAG("g_threadload_callback")};
     using optional_duration = ktl::optional<zx_duration_t>;
     auto maybe_idle_time = Scheduler::RunInLockedScheduler(i, [&]() -> optional_duration {
       // dont display time for inactive cpus

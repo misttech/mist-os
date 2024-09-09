@@ -25,13 +25,13 @@ test("test") {
   sources = [ "test.cc" ]
   deps = [
     ":cpp",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/driver_test_realm/simple",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/predicates",
     "//src/storage/lib/vfs/cpp",
     "//third_party/googletest:gmock",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/sync:sync-cpp",
   ]

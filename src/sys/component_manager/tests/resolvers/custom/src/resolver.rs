@@ -77,6 +77,9 @@ async fn serve_resolver(mut stream: fresolution::ResolverRequestStream) -> Resul
                     },
                 )?;
             }
+            fresolution::ResolverRequest::_UnknownMethod { ordinal, .. } => {
+                warn!(%ordinal, "Unknown Resolver request");
+            }
         }
     }
     Ok(())

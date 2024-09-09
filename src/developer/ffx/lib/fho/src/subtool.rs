@@ -6,8 +6,8 @@ use crate::{FhoEnvironment, FhoToolMetadata, ToolIO, TryFromEnv};
 use argh::{ArgsInfo, CommandInfo, FromArgs, SubCommand, SubCommands};
 use async_trait::async_trait;
 use ffx_command::{
-    analytics_command, send_enhanced_analytics, user_error, Error, FfxCommandLine, FfxContext,
-    MetricsSession, Result, ToolRunner, ToolSuite,
+    analytics_command, check_core_constraints, send_enhanced_analytics, user_error, Error,
+    FfxCommandLine, FfxContext, MetricsSession, Result, ToolRunner, ToolSuite,
 };
 use ffx_config::environment::ExecutableKind;
 use ffx_config::EnvironmentContext;
@@ -155,6 +155,8 @@ impl<T: FfxTool> FhoTool<T> {
         ffx: FfxCommandLine,
         tool: T::Command,
     ) -> Result<Box<Self>> {
+        check_core_constraints(&ffx.global)?;
+
         let is_machine_output = ffx.global.machine.is_some();
         let build_info = context.build_info();
         let injector = Injection::initialize_overnet(

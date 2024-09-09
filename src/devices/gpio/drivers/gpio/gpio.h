@@ -6,7 +6,7 @@
 #define SRC_DEVICES_GPIO_DRIVERS_GPIO_GPIO_H_
 
 #include <fidl/fuchsia.hardware.gpio/cpp/wire.h>
-#include <fidl/fuchsia.hardware.gpioimpl/cpp/driver/wire.h>
+#include <fidl/fuchsia.hardware.pin/cpp/wire.h>
 #include <fidl/fuchsia.hardware.pinimpl/cpp/driver/wire.h>
 #include <lib/driver/compat/cpp/compat.h>
 #include <lib/driver/component/cpp/driver_base.h>
@@ -16,25 +16,22 @@
 #include <optional>
 #include <string>
 #include <string_view>
-#include <variant>
 
 #include <ddk/metadata/gpio.h>
 
 namespace gpio {
 
-class GpioDevice : public fidl::WireServer<fuchsia_hardware_gpio::Gpio> {
- private:
-  using GpioClient = fdf::WireSharedClient<fuchsia_hardware_gpioimpl::GpioImpl>;
-  using PinClient = fdf::WireSharedClient<fuchsia_hardware_pinimpl::PinImpl>;
-  using ImplType = std::variant<std::monostate, GpioClient, PinClient>;
-
+class GpioDevice : public fidl::WireServer<fuchsia_hardware_gpio::Gpio>,
+                   public fidl::WireServer<fuchsia_hardware_pin::Pin>,
+                   public fidl::WireServer<fuchsia_hardware_pin::Debug> {
  public:
-  GpioDevice(ImplType impl, uint32_t pin, uint32_t controller_id, std::string_view name)
+  GpioDevice(fdf::WireSharedClient<fuchsia_hardware_pinimpl::PinImpl> pinimpl, uint32_t pin,
+             uint32_t controller_id, std::string_view name)
       : fidl_dispatcher_(fdf::Dispatcher::GetCurrent()->async_dispatcher()),
         pin_(pin),
         controller_id_(controller_id),
         name_(name),
-        impl_(std::move(impl)),
+        pinimpl_(std::move(pinimpl)),
         devfs_connector_(fit::bind_member<&GpioDevice::DevfsConnect>(this)) {}
 
   zx::result<> AddServices(const std::shared_ptr<fdf::Namespace>& incoming,
@@ -45,7 +42,7 @@ class GpioDevice : public fidl::WireServer<fuchsia_hardware_gpio::Gpio> {
                          fdf::Logger& logger);
 
  private:
-  void DevfsConnect(fidl::ServerEnd<fuchsia_hardware_gpio::Gpio> server);
+  void DevfsConnect(fidl::ServerEnd<fuchsia_hardware_pin::Debug> server);
 
   void GetPin(GetPinCompleter::Sync& completer) override;
   void GetName(GetNameCompleter::Sync& completer) override;
@@ -67,6 +64,21 @@ class GpioDevice : public fidl::WireServer<fuchsia_hardware_gpio::Gpio> {
   void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_hardware_gpio::Gpio> metadata,
                              fidl::UnknownMethodCompleter::Sync& completer) override;
 
+  void Configure(fuchsia_hardware_pin::wire::PinConfigureRequest* request,
+                 ConfigureCompleter::Sync& completer) override;
+
+  void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_hardware_pin::Pin> metadata,
+                             fidl::UnknownMethodCompleter::Sync& completer) override;
+
+  void GetProperties(GetPropertiesCompleter::Sync& completer) override;
+  void ConnectPin(fuchsia_hardware_pin::wire::DebugConnectPinRequest* request,
+                  ConnectPinCompleter::Sync& completer) override;
+  void ConnectGpio(fuchsia_hardware_pin::wire::DebugConnectGpioRequest* request,
+                   ConnectGpioCompleter::Sync& completer) override;
+
+  void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_hardware_pin::Debug> metadata,
+                             fidl::UnknownMethodCompleter::Sync& completer) override;
+
   std::string pin_name() const {
     char name[20];
     snprintf(name, sizeof(name), "gpio-%u", pin_);
@@ -78,26 +90,23 @@ class GpioDevice : public fidl::WireServer<fuchsia_hardware_gpio::Gpio> {
   const uint32_t controller_id_;
   const std::string name_;
 
-  ImplType impl_;
-  fidl::ServerBindingGroup<fuchsia_hardware_gpio::Gpio> bindings_;
+  fdf::WireSharedClient<fuchsia_hardware_pinimpl::PinImpl> pinimpl_;
+  fidl::ServerBindingGroup<fuchsia_hardware_gpio::Gpio> gpio_bindings_;
+  fidl::ServerBindingGroup<fuchsia_hardware_pin::Pin> pin_bindings_;
+  fidl::ServerBindingGroup<fuchsia_hardware_pin::Debug> debug_bindings_;
   compat::SyncInitializedDeviceServer compat_server_;
   fidl::ClientEnd<fuchsia_driver_framework::NodeController> controller_;
-  driver_devfs::Connector<fuchsia_hardware_gpio::Gpio> devfs_connector_;
+  driver_devfs::Connector<fuchsia_hardware_pin::Debug> devfs_connector_;
 };
 
 class GpioInitDevice {
  public:
-  template <typename T>
   static std::unique_ptr<GpioInitDevice> Create(
       const std::shared_ptr<fdf::Namespace>& incoming,
       fidl::UnownedClientEnd<fuchsia_driver_framework::Node> node, fdf::Logger& logger,
-      uint32_t controller_id, fdf::WireSharedClient<T>& impl);
+      uint32_t controller_id, fdf::WireSharedClient<fuchsia_hardware_pinimpl::PinImpl>& pinimpl);
 
  private:
-  static zx_status_t ConfigureGpios(
-      const fidl::VectorView<fuchsia_hardware_pinimpl::wire::InitStep>& init_steps,
-      fdf::WireSharedClient<fuchsia_hardware_gpioimpl::GpioImpl>& gpio);
-
   static zx_status_t ConfigureGpios(
       const fidl::VectorView<fuchsia_hardware_pinimpl::wire::InitStep>& init_steps,
       fdf::WireSharedClient<fuchsia_hardware_pinimpl::PinImpl>& pinimpl);
@@ -144,7 +153,6 @@ class GpioRootDevice : public fdf::DriverBase {
 
   std::optional<fdf::PrepareStopCompleter> stop_completer_;
   std::optional<fdf::SynchronizedDispatcher> fidl_dispatcher_;
-  fdf::WireSharedClient<fuchsia_hardware_gpioimpl::GpioImpl> gpio_;
   fdf::WireSharedClient<fuchsia_hardware_pinimpl::PinImpl> pinimpl_;
   std::vector<std::unique_ptr<GpioDevice>> children_;
   std::unique_ptr<GpioInitDevice> init_device_;

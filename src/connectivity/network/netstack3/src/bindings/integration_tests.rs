@@ -8,6 +8,7 @@ use std::sync::{Arc, Once};
 
 use assert_matches::assert_matches;
 use fidl_fuchsia_net_ext::IntoExt as _;
+use fidl_fuchsia_net_interfaces_ext::admin::TerminalError;
 use futures::channel::mpsc;
 use futures::{StreamExt as _, TryFutureExt as _};
 use ip_test_macro::ip_test;
@@ -254,6 +255,22 @@ impl TestStack {
                 continue;
             }
             break BindingId::try_from(id.expect("missing id")).expect("bad id");
+        }
+    }
+
+    pub(crate) async fn remove_interface(&self, id: u64) {
+        let control = self.get_interface_control(id);
+        control
+            .remove()
+            .await
+            .expect("remove request should be sent successfully")
+            .expect("remove request should succeed");
+        match control.wait_termination().await {
+            TerminalError::Terminal(fnet_interfaces_admin::InterfaceRemovedReason::User) => {}
+            TerminalError::Terminal(reason) => {
+                panic!("interface control terminated with unexpected reason: {reason:?}")
+            }
+            TerminalError::Fidl(e) => panic!("observed FIDL error while removing interface: {e:?}"),
         }
     }
 

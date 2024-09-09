@@ -390,15 +390,17 @@ async fn set_data_and_blob_max_bytes_zero() {
         fio::OpenFlags::CREATE | fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE;
 
     let data_root = fixture.dir("data", flags);
-    let file = fuchsia_fs::directory::open_file(&data_root, "file", flags).await.unwrap();
+    let file =
+        fuchsia_fs::directory::open_file_deprecated(&data_root, "file", flags).await.unwrap();
     fuchsia_fs::file::write(&file, "file contents!").await.unwrap();
 
     let blob_contents = vec![0; 8192];
     let hash = fuchsia_merkle::from_slice(&blob_contents).root();
 
     let blob_root = fixture.dir("blob", flags);
-    let blob =
-        fuchsia_fs::directory::open_file(&blob_root, &format!("{}", hash), flags).await.unwrap();
+    let blob = fuchsia_fs::directory::open_file_deprecated(&blob_root, &format!("{}", hash), flags)
+        .await
+        .unwrap();
     blob.resize(blob_contents.len() as u64)
         .await
         .expect("FIDL call failed")
@@ -422,7 +424,8 @@ async fn set_data_and_blob_max_bytes_zero_new_write_api() {
         fio::OpenFlags::CREATE | fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE;
 
     let data_root = fixture.dir("data", flags);
-    let file = fuchsia_fs::directory::open_file(&data_root, "file", flags).await.unwrap();
+    let file =
+        fuchsia_fs::directory::open_file_deprecated(&data_root, "file", flags).await.unwrap();
     fuchsia_fs::file::write(&file, "file contents!").await.unwrap();
 
     let blob_contents = vec![0; 8192];
@@ -650,7 +653,7 @@ async fn shred_data_volume_when_mounted() {
 
     let vmo = fixture.ramdisk_vmo().unwrap().duplicate_handle(zx::Rights::SAME_RIGHTS).unwrap();
 
-    fuchsia_fs::directory::open_file(
+    fuchsia_fs::directory::open_file_deprecated(
         &fixture.dir("data", fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE),
         "test-file",
         fio::OpenFlags::CREATE,
@@ -677,7 +680,7 @@ async fn shred_data_volume_when_mounted() {
     // If we try and open the same test file, it shouldn't exist because the data volume should have
     // been shredded.
     assert_matches!(
-        fuchsia_fs::directory::open_file(
+        fuchsia_fs::directory::open_file_deprecated(
             &fixture.dir("data", fio::OpenFlags::RIGHT_READABLE),
             "test-file",
             fio::OpenFlags::RIGHT_READABLE
@@ -699,7 +702,7 @@ async fn shred_data_volume_from_recovery() {
 
     let vmo = fixture.ramdisk_vmo().unwrap().duplicate_handle(zx::Rights::SAME_RIGHTS).unwrap();
 
-    fuchsia_fs::directory::open_file(
+    fuchsia_fs::directory::open_file_deprecated(
         &fixture.dir("data", fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE),
         "test-file",
         fio::OpenFlags::CREATE,
@@ -736,7 +739,7 @@ async fn shred_data_volume_from_recovery() {
     // If we try and open the same test file, it shouldn't exist because the data volume should have
     // been shredded.
     assert_matches!(
-        fuchsia_fs::directory::open_file(
+        fuchsia_fs::directory::open_file_deprecated(
             &fixture.dir("data", fio::OpenFlags::RIGHT_READABLE),
             "test-file",
             fio::OpenFlags::RIGHT_READABLE
@@ -785,7 +788,7 @@ async fn reset_fvm_partitions() {
     fixture.check_fs_type("blob", blob_fs_type()).await;
     fixture.check_fs_type("data", data_fs_type()).await;
 
-    let fvm_proxy = fuchsia_fs::directory::open_directory(
+    let fvm_proxy = fuchsia_fs::directory::open_directory_deprecated(
         &fixture.dir("dev-topological", fio::OpenFlags::empty()),
         "sys/platform/ram-disk/ramctl/ramdisk-0/block/fvm",
         fio::OpenFlags::empty(),
@@ -879,7 +882,7 @@ async fn reset_fvm_partitions_no_existing_data_partition() {
     fixture.check_fs_type("blob", blob_fs_type()).await;
     fixture.check_fs_type("data", data_fs_type()).await;
 
-    let fvm_proxy = fuchsia_fs::directory::open_directory(
+    let fvm_proxy = fuchsia_fs::directory::open_directory_deprecated(
         &fixture.dir("dev-topological", fio::OpenFlags::empty()),
         "sys/platform/ram-disk/ramctl/ramdisk-0/block/fvm",
         fio::OpenFlags::empty(),
@@ -1057,7 +1060,7 @@ async fn delivery_blob_support() {
     // `data` is highly compressible, so we should be able to transfer it in one write call.
     assert!((payload.len() as u64) < fio::MAX_TRANSFER_SIZE, "Payload exceeds max transfer size!");
     // Now attempt to write `payload` as we would any other blob, but using the delivery path.
-    let blob = fuchsia_fs::directory::open_file(
+    let blob = fuchsia_fs::directory::open_file_deprecated(
         &fixture.dir("blob", fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE),
         &delivery_blob_path(HASH),
         fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::CREATE,
@@ -1072,7 +1075,7 @@ async fn delivery_blob_support() {
     blob.close().await.unwrap().map_err(zx::Status::from_raw).unwrap();
 
     // We should now be able to open the blob by its hash and read the contents back.
-    let blob = fuchsia_fs::directory::open_file(
+    let blob = fuchsia_fs::directory::open_file_deprecated(
         &fixture.dir("blob", fio::OpenFlags::RIGHT_READABLE),
         HASH,
         fio::OpenFlags::RIGHT_READABLE,
@@ -1145,7 +1148,7 @@ async fn data_persists() {
 
     let data_root =
         fixture.dir("data", fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::RIGHT_READABLE);
-    let file = fuchsia_fs::directory::open_file(
+    let file = fuchsia_fs::directory::open_file_deprecated(
         &data_root,
         "file",
         fio::OpenFlags::RIGHT_WRITABLE
@@ -1165,9 +1168,13 @@ async fn data_persists() {
     fixture.check_fs_type("data", data_fs_type()).await;
 
     let data_root = fixture.dir("data", fio::OpenFlags::RIGHT_READABLE);
-    let file = fuchsia_fs::directory::open_file(&data_root, "file", fio::OpenFlags::RIGHT_READABLE)
-        .await
-        .unwrap();
+    let file = fuchsia_fs::directory::open_file_deprecated(
+        &data_root,
+        "file",
+        fio::OpenFlags::RIGHT_READABLE,
+    )
+    .await
+    .unwrap();
     assert_eq!(&fuchsia_fs::file::read(&file).await.unwrap()[..], b"file contents!");
 
     fixture.tear_down().await;

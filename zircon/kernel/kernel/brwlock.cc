@@ -9,11 +9,13 @@
 #include <lib/affine/ratio.h>
 #include <lib/affine/utils.h>
 #include <lib/arch/intrin.h>
+#include <lib/kconcurrent/chainlock.h>
 #include <lib/kconcurrent/chainlock_transaction.h>
 #include <lib/zircon-internal/macros.h>
 
 #include <kernel/auto_preempt_disabler.h>
 #include <kernel/lock_trace.h>
+#include <kernel/preempt_disabled_token.h>
 #include <kernel/task_runtime_timers.h>
 #include <ktl/limits.h>
 
@@ -32,16 +34,14 @@ ktl::optional<BlockOpLockDetails<PI>> BrwLock<PI>::LockForBlock() {
 
   if constexpr (PI == BrwLockEnablePi::Yes) {
     Thread* const new_owner = ktl::atomic_ref(state_.writer_).load(ktl::memory_order_relaxed);
-    ktl::optional<OwnedWaitQueue::BAAOLockingDetails> maybe_lock_details =
-        wait_.LockForBAAOOperationLocked(current_thread, new_owner);
-
-    if (maybe_lock_details.has_value()) {
-      return BlockOpLockDetails<PI>{maybe_lock_details.value()};
+    OwnedWaitQueue::BAAOLockingDetails lock_details;
+    if (wait_.TryLockForBAAOOperationLocked(current_thread, new_owner, lock_details)) {
+      current_thread->get_lock().MarkReleased();
+      return BlockOpLockDetails<PI>{lock_details};
     }
   } else {
-    ChainLock::Result lock_res = current_thread->get_lock().Acquire();
-    if (lock_res != ChainLock::Result::Backoff) {
-      current_thread->get_lock().AssertHeld();
+    if (current_thread->get_lock().AcquireOrBackoff()) {
+      current_thread->get_lock().MarkReleased();
       return BlockOpLockDetails<PI>{};
     }
   }
@@ -306,16 +306,16 @@ void BrwLock<PI>::ContendedReadAcquire() {
 
   // Enter our wait queue's lock and figure out what to do next.  We don't really know what we need
   // to do yet, so we need to be prepared for needing to back off and try again.
-  ChainLockTransactionEagerReschedDisableAndIrqSave clt{
-      CLT_TAG("BrwLock<PI>::ContendedReadAcquire")};
-  for (;; clt.Relax()) {
-    wait_.get_lock().AcquireUnconditionally();
+  const auto do_transaction = [&]()
+                                  TA_REQ(chainlock_transaction_token,
+                                         preempt_disabled_token) -> ChainLockTransaction::Result<> {
+    wait_.get_lock().AcquireFirstInChain();
 
     auto TryBlock = [&]() TA_REQ(chainlock_transaction_token) TA_REL(wait_.get_lock()) -> bool {
       ktl::optional<BlockOpLockDetails<PI>> maybe_lock_details = LockForBlock();
 
       if (maybe_lock_details.has_value()) {
-        clt.Finalize();
+        ChainLockTransaction::Finalize();
         current_thread->get_lock().AssertAcquired();
         Block(current_thread, ktl::move(maybe_lock_details).value(), false);
         return true;
@@ -338,11 +338,11 @@ void BrwLock<PI>::ContendedReadAcquire() {
       // Try to grab all of our needed locks and block.  If we succeed, return, otherwise loop
       // around and try again.
       if (TryBlock()) {
-        return;
+        return ChainLockTransaction::Done;
       }
       // Make sure to convert our waiter back to an optimistic reader
       ktl::atomic_ref(state_.state_).fetch_add(kWaiterToReader, ktl::memory_order_relaxed);
-      continue;
+      return ChainLockTransaction::Action::Backoff;
     }
 
     // If we raced and there is in fact no one waiting then we can switch to
@@ -350,7 +350,7 @@ void BrwLock<PI>::ContendedReadAcquire() {
     if (!StateHasWaiters(prev)) {
       ktl::atomic_ref(state_.state_).fetch_add(kWaiterToReader, ktl::memory_order_relaxed);
       wait_.get_lock().Release();
-      return;
+      return ChainLockTransaction::Done;
     }
 
     // If there are no current readers then we need to wake somebody up
@@ -367,7 +367,7 @@ void BrwLock<PI>::ContendedReadAcquire() {
         if (maybe_ownership.value() == ResourceOwnership::Reader) {
           ktl::atomic_ref(state_.state_).fetch_add(kWaiterToReader, ktl::memory_order_acquire);
           wait_.get_lock().Release();
-          return;
+          return ChainLockTransaction::Done;
         }
       }
 
@@ -377,9 +377,10 @@ void BrwLock<PI>::ContendedReadAcquire() {
       ktl::atomic_ref(state_.state_).fetch_add(kWaiterToReader, ktl::memory_order_relaxed);
       wait_.get_lock().Release();
       if (woke_someone) {
-        clt.Restart(CLT_TAG("BrwLock<PI>::ContendedReadAcquire (restart)"));
+        // clt.Restart(CLT_TAG("BrwLock<PI>::ContendedReadAcquire (restart)"));
+        return ChainLockTransaction::Action::Restart;
       }
-      continue;
+      return ChainLockTransaction::Action::Backoff;
     }
 
     // So, at this point, we know that when we converted our optimistic reader count to a writer,
@@ -394,12 +395,15 @@ void BrwLock<PI>::ContendedReadAcquire() {
     // needed.
 
     if (TryBlock()) {
-      return;
+      return ChainLockTransaction::Done;
     }
 
     // We failed to block, restore our optimistic reader count, drop our locks, and try again.
     ktl::atomic_ref(state_.state_).fetch_add(kWaiterToReader, ktl::memory_order_relaxed);
-  }
+    return ChainLockTransaction::Action::Backoff;
+  };
+  ChainLockTransaction::UntilDone(EagerReschedDisableAndIrqSaveOption,
+                                  CLT_TAG("BrwLock<PI>::ContendedReadAcquire"), do_transaction);
 }
 
 template <BrwLockEnablePi PI>
@@ -437,9 +441,10 @@ void BrwLock<PI>::ContendedWriteAcquire() {
 
   // Enter our wait queue's lock and figure out what to do next.  We don't really know what we need
   // to do yet, so we need to be prepared for needing to back off and try again.
-  ChainLockTransactionPreemptDisableAndIrqSave clt{CLT_TAG("BrwLock<PI>::ContendedWriteAcquire")};
-  for (;; clt.Relax()) {
-    wait_.get_lock().AcquireUnconditionally();
+  const auto do_transaction = [&]()
+                                  TA_REQ(chainlock_transaction_token,
+                                         preempt_disabled_token) -> ChainLockTransaction::Result<> {
+    wait_.get_lock().AcquireFirstInChain();
 
     auto TryBlock = [&]() TA_REQ(chainlock_transaction_token) TA_REL(wait_.get_lock()) -> bool {
       ktl::optional<BlockOpLockDetails<PI>> maybe_lock_details = LockForBlock();
@@ -448,7 +453,7 @@ void BrwLock<PI>::ContendedWriteAcquire() {
         // We got all of the locks we need, and are already marked as waiting.
         // Drop into the block operation, when we wake again, the lock should
         // have been assigned to us.
-        clt.Finalize();
+        ChainLockTransaction::Finalize();
         current_thread->get_lock().AssertAcquired();
         Block(current_thread, ktl::move(maybe_lock_details).value(), true);
         return true;
@@ -473,16 +478,16 @@ void BrwLock<PI>::ContendedWriteAcquire() {
     // again.  TryBlock has already dropped the queue lock.
     if (StateHasWriter(prev) || StateHasReaders(prev)) {
       if (TryBlock()) {
-        return;
+        return ChainLockTransaction::Done;
       }
-      continue;
+      return ChainLockTransaction::Action::Backoff;
     }
 
     // OK, there were no readers, no writers.  Were there waiters when we tried
     // to add ourselves to the waiter pool?
     if (!StateHasWaiters(prev)) {
       // There were no waiters, we are done acquiring locks.
-      clt.Finalize();
+      ChainLockTransaction::Finalize();
 
       // Since we have flagged ourselves as a speculative waiter, no one else
       // can currently grab the lock for write without following the slow path
@@ -495,7 +500,7 @@ void BrwLock<PI>::ContendedWriteAcquire() {
       ktl::atomic_ref(state_.state_)
           .fetch_add(kBrwLockWriter - kBrwLockWaiter, ktl::memory_order_acq_rel);
       wait_.get_lock().Release();
-      return;
+      return ChainLockTransaction::Done;
     }
 
     // OK, it looks like there were no readers or writers, but there were
@@ -510,9 +515,10 @@ void BrwLock<PI>::ContendedWriteAcquire() {
       // obtaining the locks needed to wake up a thread.  We are still holding
       // the wait queue's lock, but we need to restart the transaction before
       // attempting to block (which will require holding a new set of locks).
-      clt.Restart(CLT_TAG("BrwLock<PI>::ContendedWriteAcquire (restart)"));
+      ChainLockTransaction::ActiveRef().Restart(
+          CLT_TAG("BrwLock<PI>::ContendedWriteAcquire (restart)"));
       if (TryBlock()) {
-        return;
+        return ChainLockTransaction::Done;
       }
 
       // We didn't manage to block, but TryBlock has removed our speculative
@@ -524,7 +530,10 @@ void BrwLock<PI>::ContendedWriteAcquire() {
       ktl::atomic_ref(state_.state_).fetch_sub(kBrwLockWaiter, ktl::memory_order_relaxed);
       wait_.get_lock().Release();
     }
-  }
+    return ChainLockTransaction::Action::Backoff;
+  };
+  ChainLockTransaction::UntilDone(PreemptDisableAndIrqSaveOption,
+                                  CLT_TAG("BrwLock<PI>::ContendedWriteAcquire"), do_transaction);
 }
 
 template <BrwLockEnablePi PI>
@@ -586,11 +595,11 @@ void BrwLock<PI>::ReleaseWakeup() {
   //
   // See the comment in BrwLock<PI>::Block for why this eager reschedule
   // disabled is important.
-  ChainLockTransactionEagerReschedDisableAndIrqSave clt{
-      CLT_TAG("BrwLock<PI>::ContendedReadAcquire")};
-  for (;; clt.Relax()) {
+  const auto do_transaction = [&]()
+                                  TA_REQ(chainlock_transaction_token,
+                                         preempt_disabled_token) -> ChainLockTransaction::Result<> {
     bool finished{false};
-    wait_.get_lock().AcquireUnconditionally();
+    wait_.get_lock().AcquireFirstInChain();
 
     const uint64_t count = ktl::atomic_ref(state_.state_).load(ktl::memory_order_relaxed);
     if (StateHasWaiters(count) && !StateHasWriter(count) && !StateHasReaders(count)) {
@@ -598,15 +607,19 @@ void BrwLock<PI>::ReleaseWakeup() {
       // obtains all of the locks it needs.
       finished = TryWake().has_value();
     } else {
-      clt.Finalize();
+      ChainLockTransaction::Finalize();
       finished = true;
     }
 
     wait_.get_lock().Release();
     if (finished) {
-      break;
+      return ChainLockTransaction::Done;
     }
-  }
+
+    return ChainLockTransaction::Action::Backoff;
+  };
+  ChainLockTransaction::UntilDone(EagerReschedDisableAndIrqSaveOption,
+                                  CLT_TAG("BrwLock<PI>::ContendedReadAcquire"), do_transaction);
 }
 
 template <BrwLockEnablePi PI>
@@ -615,13 +628,11 @@ void BrwLock<PI>::ContendedReadUpgrade() {
   Thread* const current_thread = Thread::Current::Get();
   ContentionTimer timer(current_thread, current_ticks());
 
-  ChainLockTransactionPreemptDisableAndIrqSave clt{CLT_TAG("BrwLock<PI>::ContendedReadUpgrade")};
-
   auto TryBlock = [&]() TA_REQ(chainlock_transaction_token) TA_REL(wait_.get_lock()) -> bool {
     ktl::optional<BlockOpLockDetails<PI>> maybe_lock_details = LockForBlock();
 
     if (maybe_lock_details.has_value()) {
-      clt.Finalize();
+      ChainLockTransaction::Finalize();
       current_thread->get_lock().AssertAcquired();
       Block(current_thread, ktl::move(maybe_lock_details).value(), true);
       return true;
@@ -635,8 +646,10 @@ void BrwLock<PI>::ContendedReadUpgrade() {
     }
   };
 
-  for (;; clt.Relax()) {
-    wait_.get_lock().AcquireUnconditionally();
+  const auto do_transaction = [&]()
+                                  TA_REQ(chainlock_transaction_token,
+                                         preempt_disabled_token) -> ChainLockTransaction::Result<> {
+    wait_.get_lock().AcquireFirstInChain();
 
     // Convert reading state into waiting.  This way, if anyone else attempts to
     // claim the BRW lock, they will encounter contention and need to obtain our
@@ -656,14 +669,18 @@ void BrwLock<PI>::ContendedReadUpgrade() {
           .fetch_add(-kBrwLockWaiter + kBrwLockWriter, ktl::memory_order_acquire);
 
       wait_.get_lock().Release();
-      return;
+      return ChainLockTransaction::Done;
     }
 
     // Looks like we were not the only reader, so we need to try to block instead.
     if (TryBlock()) {
-      return;
+      return ChainLockTransaction::Done;
     }
-  }
+
+    return ChainLockTransaction::Action::Backoff;
+  };
+  ChainLockTransaction::UntilDone(PreemptDisableAndIrqSaveOption,
+                                  CLT_TAG("BrwLock<PI>::ContendedReadUpgrade"), do_transaction);
 }
 
 template class BrwLock<BrwLockEnablePi::Yes>;

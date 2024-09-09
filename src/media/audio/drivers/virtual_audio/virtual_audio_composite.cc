@@ -763,11 +763,19 @@ void VirtualAudioComposite::SetTopology(SetTopologyRequest& request,
   }
 }
 
+// Complain loudly but don't close the connection, since it is possible for this test fixture to be
+// used with a client that is built with a newer SDK version.
 void VirtualAudioComposite::handle_unknown_method(
-    fidl::UnknownMethodMetadata<fuchsia_hardware_audio::RingBuffer>,
-    fidl::UnknownMethodCompleter::Sync&) {}
+    fidl::UnknownMethodMetadata<fuchsia_hardware_audio::RingBuffer> metadata,
+    fidl::UnknownMethodCompleter::Sync& completer) {
+  zxlogf(ERROR, "VirtualAudioComposite::handle_unknown_method (RingBuffer) ordinal %zu",
+         metadata.method_ordinal);
+}
 void VirtualAudioComposite::handle_unknown_method(
-    fidl::UnknownMethodMetadata<fuchsia_hardware_audio_signalprocessing::SignalProcessing>,
-    fidl::UnknownMethodCompleter::Sync&) {}
+    fidl::UnknownMethodMetadata<fuchsia_hardware_audio_signalprocessing::SignalProcessing> metadata,
+    fidl::UnknownMethodCompleter::Sync& completer) {
+  zxlogf(ERROR, "VirtualAudioComposite::handle_unknown_method (SignalProcessing) ordinal %zu",
+         metadata.method_ordinal);
+}
 
 }  // namespace virtual_audio

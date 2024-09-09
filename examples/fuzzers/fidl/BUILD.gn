@@ -11,8 +11,8 @@ source_set("echo_server_provider") {
 
   public_deps = [
     "//examples/fidl/fuchsia.examples:fuchsia.examples_hlcpp",
-    "//sdk/lib/fidl/cpp",
-    "//sdk/lib/fidl/cpp/fuzzing",
+    "//sdk/lib/fidl/hlcpp",
+    "//sdk/lib/fidl/hlcpp/fuzzing",
     "//sdk/lib/sys/cpp",
   ]
 }

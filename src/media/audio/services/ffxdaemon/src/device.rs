@@ -265,6 +265,7 @@ impl Device {
         &mut self,
         element_id: fadevice::ElementId,
         mut socket: WavSocket,
+        active_channels_bitmask: Option<u64>,
     ) -> Result<fac::PlayerPlayResponse, ControllerError> {
         let spec = socket.read_header().await?;
         let format = Format::from(spec);
@@ -297,7 +298,18 @@ impl Device {
             .into());
         }
 
-        let t_zero = ring_buffer.start().await?;
+        let mut active_channels_set_time = None;
+        if let Some(active_channels_bitmask) = active_channels_bitmask {
+            active_channels_set_time =
+                Some(ring_buffer.set_active_channels(active_channels_bitmask).await?);
+        }
+
+        let start_time = ring_buffer.start().await?;
+
+        let t_zero = zx::MonotonicTime::from_nanos(std::cmp::max(
+            active_channels_set_time.unwrap_or(zx::MonotonicTime::from_nanos(0)).into_nanos(),
+            start_time.into_nanos(),
+        ));
 
         // To start, wait until at least t0 + (wakeup_interval) so we can start writing at
         // the first bytes in the ring buffer.

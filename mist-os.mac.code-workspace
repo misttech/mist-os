@@ -124,6 +124,13 @@
       100
     ],
 
+    // Disable graph visualization of incoming/outgoing changes. This feature
+    // does not work well on Fuchsia git repositories with deep and complex
+    // histories. If left enabled, this would otherwise cause infinite loading
+    // in the "Source Control" tab.
+    "scm.showHistoryGraph": false,
+
+
     ////////
     // Rust
     //

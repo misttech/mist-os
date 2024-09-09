@@ -6,8 +6,10 @@ package fint
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/url"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -69,4 +71,9 @@ func saveLogs(artifactDir string, artifacts *fintpb.BuildArtifacts, logs map[str
 		artifacts.LogFiles[name] = f.Name()
 	}
 	return nil
+}
+
+func checkFileExists(filePath string) bool {
+	_, error := os.Stat(filePath)
+	return !errors.Is(error, os.ErrNotExist)
 }

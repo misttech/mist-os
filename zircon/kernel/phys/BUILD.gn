@@ -714,6 +714,9 @@ source_set("handoff") {
     # handoff.h has #include <lib/arch/ticks.h>.
     "//zircon/kernel/lib/arch",
 
+    # handoff.h has #include <lib/memalloc/range.h>
+    "//zircon/kernel/phys/lib/memalloc:range.headers",
+
     # handoff.h has #include <lib/uart/all.h>.
     "//zircon/system/ulib/uart",
 

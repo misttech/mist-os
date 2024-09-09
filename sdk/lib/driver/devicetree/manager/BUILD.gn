@@ -72,6 +72,7 @@ source_set("manager-test-helper") {
     ":manager",
     "//sdk/lib/async_patterns/testing/cpp",
     "//sdk/lib/driver/testing/cpp",
+    "//sdk/lib/driver/testing/cpp:scoped_global_logger",
     "//sdk/lib/syslog/cpp",
     "//src/devices/bin/driver_runtime",
   ]

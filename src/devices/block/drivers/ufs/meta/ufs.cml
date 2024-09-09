@@ -10,12 +10,21 @@
     program: {
         runner: "driver",
         binary: "driver/ufs.so",
-        bind: "meta/bind/ufs_bind.bindbc",
+        bind: "meta/bind/ufs-bind.bindbc",
         colocate: "false",
         default_dispatcher_opts: [ "allow_sync_calls" ],
         fallback: "false",
     },
     use: [
+        {
+            config: "fuchsia.power.SuspendEnabled",
+            key: "enable_suspend",
+            type: "bool",
+        },
+        { protocol: "fuchsia.power.broker.Topology" },
+
+        // Used by //sdk/lib/driver/power/cpp
+        { protocol: "fuchsia.power.system.ActivityGovernor" },
         { service: "fuchsia.hardware.pci.Service" },
     ],
 }

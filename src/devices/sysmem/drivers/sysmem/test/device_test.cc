@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/devices/sysmem/drivers/sysmem/device.h"
-
 #include <fidl/fuchsia.sysmem/cpp/fidl.h>
 #include <fidl/fuchsia.sysmem/cpp/natural_types.h>
 #include <fidl/fuchsia.sysmem2/cpp/fidl.h>
@@ -23,8 +21,8 @@
 #include "src/devices/sysmem/bin/sysmem_connector/sysmem_config.h"
 #include "src/devices/sysmem/drivers/sysmem/allocator.h"
 #include "src/devices/sysmem/drivers/sysmem/buffer_collection.h"
-#include "src/devices/sysmem/drivers/sysmem/device.h"
 #include "src/devices/sysmem/drivers/sysmem/logical_buffer_collection.h"
+#include "src/devices/sysmem/drivers/sysmem/sysmem.h"
 
 namespace sysmem_service {
 
@@ -43,9 +41,9 @@ class FakeDdkSysmem : public ::testing::Test {
 
     libsync::Completion done;
     zx_status_t post_status = async::PostTask(loop_.dispatcher(), [this, &done]() mutable {
-      sysmem_service::Device::CreateArgs create_args;
-      auto create_result = sysmem_service::Device::Create(loop_.dispatcher(), create_args);
-      ZX_ASSERT_MSG(create_result.is_ok(), "sysmem_service::Device::Create() failed: %s",
+      sysmem_service::Sysmem::CreateArgs create_args;
+      auto create_result = sysmem_service::Sysmem::Create(loop_.dispatcher(), create_args);
+      ZX_ASSERT_MSG(create_result.is_ok(), "sysmem_service::Sysmem::Create() failed: %s",
                     create_result.status_string());
       device_ = std::move(create_result.value());
       done.Signal();
@@ -90,7 +88,7 @@ class FakeDdkSysmem : public ::testing::Test {
 
  protected:
   async::Loop loop_;
-  std::unique_ptr<sysmem_service::Device> device_;
+  std::unique_ptr<sysmem_service::Sysmem> device_;
 };
 
 TEST_F(FakeDdkSysmem, Lifecycle) {

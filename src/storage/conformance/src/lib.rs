@@ -46,6 +46,9 @@ pub async fn get_open_status(node_proxy: &fio::NodeProxy) -> zx::Status {
             fio::NodeEvent::OnRepresentation { .. } => panic!(
                 "This function should only be used with fuchsia.io/Directory.Open, *not* Open3!"
             ),
+            fio::NodeEvent::_UnknownEvent { .. } => {
+                panic!("This function should only be used with fuchsia.io/Directory.Open")
+            }
         }
     } else {
         zx::Status::PEER_CLOSED

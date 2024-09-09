@@ -25,6 +25,16 @@ fuchsia_test_component("iptables") {
   test_type = "starnix"
 }
 
+fuchsia_test_component("iptables-restore") {
+  manifest = "meta/iptables-restore.cml"
+  test_type = "starnix"
+}
+
+fuchsia_test_component("ip6tables-restore") {
+  manifest = "meta/ip6tables-restore.cml"
+  test_type = "starnix"
+}
+
 group("tests") {
   testonly = true
   deps = [
@@ -35,7 +45,9 @@ group("tests") {
     # We don't include the `iptables-test` component as it is a realm builder
     # that is intended to be included as part of a test package that pulls in
     # additional dependencies it needs at runtime.
+    ":ip6tables-restore",
     ":iptables",
+    ":iptables-restore",
     ":iptables_test",
   ]
 }

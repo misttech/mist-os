@@ -157,7 +157,7 @@ pub fn generate_content(seed: u64) -> Vec<u8> {
 /// Find the device in /dev/class/block that represents a given topological path. Returns the full
 /// path of the device in /dev/class/block.
 pub async fn find_dev(dev: &str) -> Result<String> {
-    let dev_class_block = fuchsia_fs::directory::open_in_namespace(
+    let dev_class_block = fuchsia_fs::directory::open_in_namespace_deprecated(
         "/dev/class/block",
         fuchsia_fs::OpenFlags::RIGHT_READABLE,
     )?;
@@ -175,12 +175,15 @@ pub async fn find_dev(dev: &str) -> Result<String> {
 
 /// Returns a directory proxy connected to /dev.
 pub fn dev() -> fio::DirectoryProxy {
-    fuchsia_fs::directory::open_in_namespace("/dev", fuchsia_fs::OpenFlags::RIGHT_READABLE)
-        .expect("failed to open /dev")
+    fuchsia_fs::directory::open_in_namespace_deprecated(
+        "/dev",
+        fuchsia_fs::OpenFlags::RIGHT_READABLE,
+    )
+    .expect("failed to open /dev")
 }
 
 fn dev_class_block() -> fio::DirectoryProxy {
-    fuchsia_fs::directory::open_in_namespace(
+    fuchsia_fs::directory::open_in_namespace_deprecated(
         "/dev/class/block",
         fuchsia_fs::OpenFlags::RIGHT_READABLE,
     )
@@ -241,7 +244,7 @@ pub async fn set_up_partition(
                         .map_err(zx::Status::from_raw)
                         .context("unbind children returned error")?;
                     device_controller = Some(fvm_controller);
-                    owned_device_dir = Some(fuchsia_fs::directory::open_in_namespace(
+                    owned_device_dir = Some(fuchsia_fs::directory::open_in_namespace_deprecated(
                         &fvm_path,
                         fuchsia_fs::OpenFlags::empty(),
                     )?);
@@ -310,7 +313,7 @@ pub async fn find_partition(
     device_dir: Option<&fio::DirectoryProxy>,
 ) -> Result<ControllerProxy> {
     if let Some(device_dir) = device_dir {
-        match fuchsia_fs::directory::open_no_describe::<ControllerMarker>(
+        match fuchsia_fs::directory::open_no_describe_deprecated::<ControllerMarker>(
             device_dir,
             &format!("/fvm/{}-p-1/block/device_controller", partition_label),
             fuchsia_fs::OpenFlags::empty(),

@@ -13,6 +13,7 @@ use fho::{AvailabilityFlag, FfxMain, FfxTool, MachineWriter};
 use fidl::endpoints::create_proxy;
 use fidl_fuchsia_developer_remotecontrol::RemoteControlProxy;
 use fidl_fuchsia_memory_heapdump_client as fheapdump_client;
+use prettytable::format::FormatBuilder;
 use prettytable::{cell, row, Table};
 use serde::Serialize;
 
@@ -93,6 +94,13 @@ async fn list(
         writer.machine(&stored_snapshots)?;
     } else {
         let mut table = Table::new();
+
+        // Make the table formatting standard with other ffx commands
+        let padl = 0;
+        let padr = 1;
+        let table_format = FormatBuilder::new().padding(padl, padr).build();
+        table.set_format(table_format);
+
         table.set_titles(row!["ID", "NAME", "PROCESS"]);
 
         for elem in stored_snapshots {

@@ -11,9 +11,14 @@ use fidl_fuchsia_input_report::{
 };
 use fidl_fuchsia_ui_input::KeyboardReport;
 use fidl_fuchsia_ui_test_input::{
-    CoordinateUnit, KeyboardRequest, KeyboardRequestStream, MediaButtonsDeviceRequest,
-    MediaButtonsDeviceRequestStream, MouseRequest, MouseRequestStream, RegistryRequest,
-    RegistryRequestStream, TouchScreenRequest, TouchScreenRequestStream,
+    CoordinateUnit, KeyboardMarker, KeyboardRequest, KeyboardRequestStream,
+    MediaButtonsDeviceMarker, MediaButtonsDeviceRequest, MediaButtonsDeviceRequestStream,
+    MouseMarker, MouseRequest, MouseRequestStream,
+    RegistryRegisterKeyboardAndGetDeviceInfoResponse,
+    RegistryRegisterMediaButtonsDeviceAndGetDeviceInfoResponse,
+    RegistryRegisterMouseAndGetDeviceInfoResponse,
+    RegistryRegisterTouchScreenAndGetDeviceInfoResponse, RegistryRequest, RegistryRequestStream,
+    TouchScreenMarker, TouchScreenRequest, TouchScreenRequestStream,
 };
 use fuchsia_component::client::connect_to_protocol;
 use futures::{StreamExt, TryStreamExt};
@@ -128,6 +133,116 @@ fn convert_keyboard_report_to_keys(report: &KeyboardReport) -> Vec<Key> {
         .collect()
 }
 
+async fn register_touch_screen(
+    mut registry: input_device_registry::InputDeviceRegistry,
+    task_group: &mut fasync::TaskGroup,
+    device_server_end: fidl::endpoints::ServerEnd<TouchScreenMarker>,
+    got_input_reports_reader: AsyncEvent,
+    min_x: i64,
+    max_x: i64,
+    min_y: i64,
+    max_y: i64,
+) -> input_device::DeviceId {
+    let device = registry
+        .add_touchscreen_device(min_x, max_x, min_y, max_y)
+        .await
+        .expect("failed to create fake touchscreen device");
+    let device_id = device.device_id;
+
+    task_group.spawn(async move {
+        handle_touchscreen_request_stream(
+            device,
+            device_server_end
+                .into_stream()
+                .expect("failed to convert touchscreen device to stream"),
+        )
+        .await;
+    });
+
+    info!("wait for input-pipeline setup input-reader");
+    let _ = got_input_reports_reader.wait().await;
+    info!("input-pipeline setup input-reader.");
+
+    device_id
+}
+
+async fn register_media_button(
+    mut registry: input_device_registry::InputDeviceRegistry,
+    task_group: &mut fasync::TaskGroup,
+    device_server_end: fidl::endpoints::ServerEnd<MediaButtonsDeviceMarker>,
+    got_input_reports_reader: AsyncEvent,
+) -> input_device::DeviceId {
+    let device = registry
+        .add_media_buttons_device()
+        .await
+        .expect("failed to create fake media buttons device");
+    let device_id = device.device_id;
+
+    task_group.spawn(async move {
+        handle_media_buttons_device_request_stream(
+            device,
+            device_server_end
+                .into_stream()
+                .expect("failed to convert media buttons device to stream"),
+        )
+        .await;
+    });
+
+    info!("wait for input-pipeline setup input-reader");
+    let _ = got_input_reports_reader.wait().await;
+    info!("input-pipeline setup input-reader.");
+
+    device_id
+}
+
+async fn register_keyboard(
+    mut registry: input_device_registry::InputDeviceRegistry,
+    task_group: &mut fasync::TaskGroup,
+    device_server_end: fidl::endpoints::ServerEnd<KeyboardMarker>,
+    got_input_reports_reader: AsyncEvent,
+) -> input_device::DeviceId {
+    let device = registry.add_keyboard_device().await.expect("failed to create fake keyboard");
+    let device_id = device.device_id;
+
+    task_group.spawn(async move {
+        handle_keyboard_request_stream(
+            device,
+            device_server_end.into_stream().expect("failed to convert keyboard to stream"),
+        )
+        .await;
+    });
+
+    info!("wait for input-pipeline setup input-reader");
+    let _ = got_input_reports_reader.wait().await;
+    info!("input-pipeline setup input-reader.");
+
+    device_id
+}
+
+async fn register_mouse(
+    mut registry: input_device_registry::InputDeviceRegistry,
+    task_group: &mut fasync::TaskGroup,
+    device_server_end: fidl::endpoints::ServerEnd<MouseMarker>,
+    got_input_reports_reader: AsyncEvent,
+) -> input_device::DeviceId {
+    let device = registry.add_mouse_device().await.expect("failed to create fake mouse");
+    let device_id = device.device_id;
+
+    task_group.spawn(async move {
+        handle_mouse_request_stream(
+            device,
+            device_server_end.into_stream().expect("failed to convert media mouse to stream"),
+        )
+        .await;
+    });
+
+    info!("wait for input-pipeline setup input-reader");
+    let _ = got_input_reports_reader.wait().await;
+    info!("input-pipeline setup input-reader.");
+
+    device_id
+}
+
 /// Serves `fuchsia.ui.test.input.Registry`.
 pub async fn handle_registry_request_stream(request_stream: RegistryRequestStream) {
     request_stream
@@ -136,7 +251,7 @@ pub async fn handle_registry_request_stream(request_stream: RegistryRequestStrea
                 .expect("connect to input_device_registry");
             let got_input_reports_reader = AsyncEvent::new();
 
-            let mut registry = input_device_registry::InputDeviceRegistry::new(
+            let registry = input_device_registry::InputDeviceRegistry::new(
                 input_device_registry,
                 got_input_reports_reader.clone(),
             );
@@ -169,111 +284,168 @@ pub async fn handle_registry_request_stream(request_stream: RegistryRequestStrea
                         _ => (-1000, 1000, -1000, 1000),
                     };
 
-                    task_group.spawn(async move {
-                        let touchscreen_device = registry
-                            .add_touchscreen_device(min_x, max_x, min_y, max_y)
-                            .expect("failed to create fake touchscreen device");
-
-                        handle_touchscreen_request_stream(
-                            touchscreen_device,
-                            device
-                                .into_stream()
-                                .expect("failed to convert touchscreen device to stream"),
-                        )
-                        .await;
-                    });
-
-                    info!("wait for input-pipeline setup input-reader");
-                    let _ = got_input_reports_reader.wait().await;
-                    info!("input-pipeline setup input-reader");
+                    register_touch_screen(
+                        registry,
+                        &mut task_group,
+                        device,
+                        got_input_reports_reader,
+                        min_x,
+                        max_x,
+                        min_y,
+                        max_y,
+                    )
+                    .await;
 
                     responder.send().expect("Failed to respond to RegisterTouchScreen request");
                 }
-                RegistryRequest::RegisterTouchScreenAndGetDeviceInfo { .. } => {}
+                RegistryRequest::RegisterTouchScreenAndGetDeviceInfo {
+                    payload, responder, ..
+                } => {
+                    info!("register touchscreen");
+                    let device = payload
+                        .device
+                        .expect("no touchscreen device provided in registration request");
+                    let (min_x, max_x, min_y, max_y) = match payload.coordinate_unit {
+                        Some(CoordinateUnit::PhysicalPixels) => {
+                            let display_info_proxy =
+                                connect_to_protocol::<display_info::InfoMarker>()
+                                    .expect("failed to connect to display info service");
+                            let display_dimensions = display_info_proxy
+                                .get_metrics()
+                                .await
+                                .expect("failed to get display metrics")
+                                .extent_in_px
+                                .expect("display metrics missing extent in px");
+                            (
+                                0,
+                                display_dimensions.width as i64,
+                                0,
+                                display_dimensions.height as i64,
+                            )
+                        }
+                        _ => (-1000, 1000, -1000, 1000),
+                    };
+
+                    let device_id = register_touch_screen(
+                        registry,
+                        &mut task_group,
+                        device,
+                        got_input_reports_reader,
+                        min_x,
+                        max_x,
+                        min_y,
+                        max_y,
+                    )
+                    .await;
+
+                    responder
+                        .send(RegistryRegisterTouchScreenAndGetDeviceInfoResponse {
+                            device_id: Some(device_id),
+                            ..Default::default()
+                        })
+                        .expect("Failed to respond to RegisterTouchScreenAndGetDeviceInfo request");
+                }
                 RegistryRequest::RegisterMediaButtonsDevice { payload, responder, .. } => {
                     info!("register media buttons device");
+                    let device = payload
+                        .device
+                        .expect("no media buttons device provided in registration request");
 
-                    if let Some(device) = payload.device {
-                        task_group.spawn(async move {
-                            let media_buttons_device = registry
-                                .add_media_buttons_device()
-                                .expect("failed to create fake media buttons device");
-                            handle_media_buttons_device_request_stream(
-                                media_buttons_device,
-                                device
-                                    .into_stream()
-                                    .expect("failed to convert media buttons device to stream"),
-                            )
-                            .await;
-                        });
-                    } else {
-                        error!("no media buttons device provided in registration request");
-                    }
-
-                    info!("wait for input-pipeline setup input-reader");
-                    let _ = got_input_reports_reader.wait().await;
-                    info!("input-pipeline setup input-reader");
+                    register_media_button(
+                        registry,
+                        &mut task_group,
+                        device,
+                        got_input_reports_reader,
+                    )
+                    .await;
 
                     responder
                         .send()
                         .expect("Failed to respond to RegisterMediaButtonsDevice request");
                 }
-                RegistryRequest::RegisterMediaButtonsDeviceAndGetDeviceInfo { .. } => {}
+                RegistryRequest::RegisterMediaButtonsDeviceAndGetDeviceInfo {
+                    payload,
+                    responder,
+                    ..
+                } => {
+                    info!("register media buttons device");
+                    let device = payload
+                        .device
+                        .expect("no media buttons device provided in registration request");
+
+                    let device_id = register_media_button(
+                        registry,
+                        &mut task_group,
+                        device,
+                        got_input_reports_reader,
+                    )
+                    .await;
+
+                    responder.send(RegistryRegisterMediaButtonsDeviceAndGetDeviceInfoResponse {
+                        device_id: Some(device_id),
+                        ..Default::default()
+                    }).expect(
+                        "Failed to respond to RegisterMediaButtonsDeviceAndGetDeviceInfo request",
+                    );
+                }
                 RegistryRequest::RegisterKeyboard { payload, responder, .. } => {
                     info!("register keyboard device");
+                    let device = payload
+                        .device
+                        .expect("no keyboard device provided in registration request");
 
-                    if let Some(device) = payload.device {
-                        task_group.spawn(async move {
-                            let keyboard_device = registry
-                                .add_keyboard_device()
-                                .expect("failed to create fake keyboard device");
-                            handle_keyboard_request_stream(
-                                keyboard_device,
-                                device
-                                    .into_stream()
-                                    .expect("failed to convert keyboard device to stream"),
-                            )
-                            .await;
-                        });
-                    } else {
-                        error!("no keyboard device provided in registration request");
-                    }
-
-                    info!("wait for input-pipeline setup input-reader");
-                    let _ = got_input_reports_reader.wait().await;
-                    info!("input-pipeline setup input-reader");
+                    register_keyboard(registry, &mut task_group, device, got_input_reports_reader)
+                        .await;
 
                     responder.send().expect("Failed to respond to RegisterKeyboard request");
                 }
-                RegistryRequest::RegisterKeyboardAndGetDeviceInfo { .. } => {}
+                RegistryRequest::RegisterKeyboardAndGetDeviceInfo {
+                    payload, responder, ..
+                } => {
+                    info!("register keyboard device");
+                    let device = payload
+                        .device
+                        .expect("no keyboard device provided in registration request");
+
+                    let device_id = register_keyboard(
+                        registry,
+                        &mut task_group,
+                        device,
+                        got_input_reports_reader,
+                    )
+                    .await;
+
+                    responder
+                        .send(RegistryRegisterKeyboardAndGetDeviceInfoResponse {
+                            device_id: Some(device_id),
+                            ..Default::default()
+                        })
+                        .expect("Failed to respond to RegisterKeyboardAndGetDeviceInfo request");
+                }
                 RegistryRequest::RegisterMouse { payload, responder } => {
                     info!("register mouse device");
+                    let device = payload.device.expect("no mouse provided in registration request");
 
-                    if let Some(device) = payload.device {
-                        task_group.spawn(async move {
-                            let mouse_device = registry
-                                .add_mouse_device()
-                                .expect("failed to create fake mouse device");
-
-                            handle_mouse_request_stream(
-                                mouse_device,
-                                device
-                                    .into_stream()
-                                    .expect("failed to convert mouse device to stream"),
-                            )
-                            .await;
-                        });
-                    } else {
-                        error!("no mouse device provided in registration request");
-                    }
-
-                    info!("wait for input-pipeline setup input-reader");
-                    let _ = got_input_reports_reader.wait().await;
-                    info!("input-pipeline setup input-reader");
+                    register_mouse(registry, &mut task_group, device, got_input_reports_reader)
+                        .await;
 
                     responder.send().expect("Failed to respond to RegisterMouse request");
                 }
-                RegistryRequest::RegisterMouseAndGetDeviceInfo { .. } => {}
+                RegistryRequest::RegisterMouseAndGetDeviceInfo { payload, responder } => {
+                    info!("register mouse device");
+                    let device = payload.device.expect("no mouse provided in registration request");
+
+                    let device_id =
+                        register_mouse(registry, &mut task_group, device, got_input_reports_reader)
+                            .await;
+
+                    responder
+                        .send(RegistryRegisterMouseAndGetDeviceInfoResponse {
+                            device_id: Some(device_id),
+                            ..Default::default()
+                        })
+                        .expect("Failed to respond to RegisterMouse request");
+                }
             }
 
             task_group.join().await;

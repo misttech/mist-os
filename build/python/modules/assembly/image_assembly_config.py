@@ -58,6 +58,7 @@ class ImageAssemblyConfig:
     board_driver_arguments: Optional[BoardDriverArguments] = None
     devicetree: Optional[FilePath] = None
     netboot_mode: bool = False
+    board_name: str = None
 
     # TODO:  Flesh out the images_config with the actual types, if it's needed.
     images_config: Dict[str, List[str]] = field(default_factory=dict)

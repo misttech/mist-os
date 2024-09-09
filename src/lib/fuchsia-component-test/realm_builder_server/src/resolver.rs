@@ -218,6 +218,10 @@ impl Registry {
                     warn!("The RealmBuilder resolver does not resolve relative path component URLs with a context. Cannot resolve {} with context {:?}.", component_url, context);
                     responder.send(Err(fresolution::ResolverError::InvalidArgs))?;
                 }
+                #[cfg(fuchsia_api_level_at_least = "NEXT")]
+                fresolution::ResolverRequest::_UnknownMethod { ordinal, .. } => {
+                    warn!(%ordinal, "Unknown Resolver request");
+                }
             }
         }
         Ok(())
@@ -321,7 +325,7 @@ impl Registry {
         let component = component_decls_guard
             .get(&parsed_url)
             .ok_or(fresolution::ResolverError::ManifestNotFound)?;
-        let manifest_file = fuchsia_fs::directory::open_file_no_describe(
+        let manifest_file = fuchsia_fs::directory::open_file_no_describe_deprecated(
             &component.package_dir,
             &fragment,
             fio::OpenFlags::RIGHT_READABLE,

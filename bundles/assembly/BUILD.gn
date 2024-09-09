@@ -282,10 +282,6 @@ assembly_input_bundle("bootstrap") {
       driver_components = [ "meta/spi.cm" ]
     },
     {
-      package_target = "//src/devices/sysmem/drivers/sysmem:package"
-      driver_components = [ "meta/sysmem.cm" ]
-    },
-    {
       package_target = "//src/devices/usb/drivers/usb-bus:package"
       driver_components = [ "meta/usb-bus.cm" ]
     },
@@ -448,6 +444,40 @@ assembly_input_bundle("bus_pci_driver") {
 
 # AIB for the realtek-8211f driver
 assembly_input_bundle("realtek_8211f_driver") {
+  boot_driver_packages = [
+    {
+      package_target =
+          "//src/connectivity/ethernet/drivers/realtek-8211f:package"
+      driver_components = [ "meta/realtek-8211f.cm" ]
+    },
+  ]
+}
+
+# AIB for the fake-battery driver
+assembly_input_bundle("fake_battery_driver") {
+  base_driver_packages = [
+    {
+      package_target = "//src/power/fake-powersource:fake-battery"
+      driver_components = [ "meta/fake_battery.cm" ]
+    },
+  ]
+}
+
+# TA Manager is capable of running Trusted Apps (TAs) on fuchsia.
+assembly_input_bundle("ta_manager") {
+  bootfs_packages = [ "//src/tee/manager:ta-manager" ]
+  compiled_packages = [
+    {
+      bootfs_package = true
+      name = "bootstrap"
+      components = [
+        {
+          component_name = "bootstrap"
+          shards = [ "//src/tee/manager/meta/ta-manager.bootstrap_shard.cml" ]
+        },
+      ]
+    },
+  ]
 }
 
 # The most minimal AIB that is included in eng assembled systems that are meant
@@ -471,6 +501,7 @@ assembly_input_bundle("bootstrap_eng") {
     "//src/devices/ram/bin/ram-info:bootfs",
     "//src/devices/registers/bin/register-util:bootfs",
     "//src/devices/spi/bin/spiutil:bootfs",
+    "//src/devices/spmi/bin/spmi-ctl:bootfs",
     "//src/devices/thermal/bin/temperature-cli:bootfs",
     "//src/devices/thermal/bin/thermal-cli:bootfs",
     "//src/devices/usb/bin/lsusb:bootfs",
@@ -885,6 +916,24 @@ assembly_input_bundle("core_realm_networking") {
 
     # Other
     "//src/sys/stash:pkg",
+  ]
+}
+
+# If config allows, timekeeper will be given some persistent storage to use.
+# Should only be allowed in eng builds.
+assembly_input_bundle("timekeeper_persistence") {
+  compiled_packages = [
+    {
+      name = "core"
+      components = [
+        {
+          component_name = "core"
+          shards = [
+            "//src/sys/time/timekeeper/timekeeper-persistence.core_shard.cml",
+          ]
+        },
+      ]
+    },
   ]
 }
 
@@ -2876,7 +2925,7 @@ assembly_input_bundle("virtualization_support") {
 # valid build-types: all
 #
 assembly_input_bundle("paravirtualization_support") {
-  base_packages = [ "//src/zircon/bin/vsock_service:vsock_service" ]
+  base_packages = [ "//src/paravirtualization/vsock:vsock_service" ]
   compiled_packages = [
     {
       name = "core"
@@ -2884,7 +2933,7 @@ assembly_input_bundle("paravirtualization_support") {
         {
           component_name = "core"
           shards = [
-            "//src/zircon/bin/vsock_service/meta/vsock_service.core_shard.cml",
+            "//src/paravirtualization/vsock/meta/vsock_service.core_shard.cml",
           ]
         },
       ]
@@ -2893,7 +2942,7 @@ assembly_input_bundle("paravirtualization_support") {
 }
 
 assembly_input_bundle("paravirtualization_support_bootstrap") {
-  bootfs_packages = [ "//src/zircon/bin/vsock_service:vsock_service" ]
+  bootfs_packages = [ "//src/paravirtualization/vsock:vsock_service" ]
   compiled_packages = [
     {
       bootfs_package = true
@@ -2901,7 +2950,7 @@ assembly_input_bundle("paravirtualization_support_bootstrap") {
       components = [
         {
           component_name = "bootstrap"
-          shards = [ "//src/zircon/bin/vsock_service/meta/vsock_service.bootstrap_shard.cml" ]
+          shards = [ "//src/paravirtualization/vsock/meta/vsock_service.bootstrap_shard.cml" ]
         },
       ]
     },

@@ -69,6 +69,7 @@ executable("bin") {
     "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_cpp",
     "//sdk/fidl/fuchsia.pkg:fuchsia.pkg_cpp",
     "//sdk/fidl/fuchsia.pkg:fuchsia.pkg_cpp",
+    "//sdk/lib/async-loop:async-loop-cpp",
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/component/outgoing/cpp",
     "//sdk/lib/sys/component/cpp/testing:cpp",
@@ -79,7 +80,6 @@ executable("bin") {
     "//src/lib/files",
     "//src/storage/lib/vfs/cpp",
     "//third_party/rapidjson",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
   ]
 }
 
@@ -116,11 +116,11 @@ executable("fake_resolver_bin") {
     "//sdk/fidl/fuchsia.component.resolution:fuchsia.component.resolution_cpp",
     "//sdk/fidl/fuchsia.driver.test:fuchsia.driver.test_cpp",
     "//sdk/fidl/fuchsia.io:fuchsia.io_cpp",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/component/outgoing/cpp",
     "//sdk/lib/syslog/cpp",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
   ]
 }
 
@@ -141,7 +141,6 @@ fuchsia_structured_config_values("test_config") {
     delay_fallback_until_base_drivers_indexed = true
     suspend_timeout_fallback = true
     verbose = false
-    driver_host_crash_policy = "restart-driver-host"
     root_driver = "fuchsia-boot:///dtr#meta/test-parent-sys.cm"
     enable_test_shutdown_delays = false
   }

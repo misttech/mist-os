@@ -14,6 +14,7 @@
 #include <lib/component/incoming/cpp/clone.h>
 #include <lib/component/incoming/cpp/protocol.h>
 #include <lib/fdio/cpp/caller.h>
+#include <lib/fdio/directory.h>
 #include <lib/fdio/vfs.h>
 #include <lib/syslog/cpp/macros.h>
 #include <stdio.h>
@@ -31,7 +32,9 @@
 #include <gtest/gtest.h>
 #include <ramdevice-client/ramdisk.h>
 
+#include "src/storage/lib/block_server/fake_server.h"
 #include "src/storage/lib/fs_management/cpp/admin.h"
+#include "src/storage/lib/fs_management/cpp/fvm.h"
 #include "src/storage/testing/fvm.h"
 #include "src/storage/testing/ram_disk.h"
 
@@ -286,6 +289,76 @@ TEST_F(PartitionOverFvmWithRamdiskCase, MkfsMinfsWithMinFvmSlices) {
   DiskFormat actual_format = DetectDiskFormat(
       fidl::UnownedClientEnd<fuchsia_hardware_block::Block>(volume.value().channel().borrow()));
   ASSERT_EQ(actual_format, kDiskFormatMinfs);
+}
+
+TEST(FvmTest, Basic) {
+  block_server::FakeServer fake_server(block_server::PartitionInfo{
+      .block_count = 4096,
+      .block_size = 512,
+      .type_guid = {1, 2, 3, 4},
+      .instance_guid = {5, 6, 7, 8},
+      .name = "block-device",
+  });
+
+  auto endpoints = fidl::Endpoints<fuchsia_hardware_block_volume::Volume>::Create();
+  fake_server.Serve(std::move(endpoints.server));
+
+  fidl::ClientEnd<fuchsia_hardware_block::Block> client(endpoints.client.TakeChannel());
+
+  constexpr int kSliceSize = 32768;
+  ASSERT_EQ(FvmInit(client, kSliceSize), ZX_OK);
+
+  auto check_volume = [](MountedVolume* volume) {
+    auto volume_endpoints = fidl::Endpoints<fuchsia_hardware_block_volume::Volume>::Create();
+    ASSERT_EQ(fdio_service_connect_at(
+                  volume->ExportRoot().channel().get(),
+                  (std::string("svc/") +
+                   fidl::DiscoverableProtocolName<fuchsia_hardware_block_volume::Volume>)
+                      .c_str(),
+                  volume_endpoints.server.TakeChannel().get()),
+              ZX_OK);
+
+    const fidl::WireResult result = fidl::WireCall(volume_endpoints.client)->GetInfo();
+    ASSERT_EQ(result.status(), ZX_OK);
+
+    ASSERT_TRUE(result.value().is_ok()) << zx_status_get_string(result.value().error_value());
+
+    ASSERT_EQ(result.value()->info.block_size, 512u);
+  };
+
+  {
+    auto component = FsComponent::FromDiskFormat(fs_management::kDiskFormatFvm);
+
+    auto fs = MountMultiVolume(std::move(client), component, fs_management::MountOptions());
+    ASSERT_EQ(fs.status_value(), ZX_OK);
+
+    fidl::Arena arena;
+    zx::result volume = fs->CreateVolume("test",
+                                         fuchsia_fs_startup::wire::CreateOptions::Builder(arena)
+                                             .type_guid(fidl::Array<uint8_t, 16>{1, 2, 3, 4})
+                                             .initial_size(16 * kSliceSize)
+                                             .Build(),
+                                         fuchsia_fs_startup::wire::MountOptions());
+    ASSERT_EQ(volume.status_value(), ZX_OK);
+
+    check_volume(*volume);
+  }
+
+  // Bind again and check we can mount the volume we created.
+  endpoints = fidl::Endpoints<fuchsia_hardware_block_volume::Volume>::Create();
+  fake_server.Serve(std::move(endpoints.server));
+
+  auto component = FsComponent::FromDiskFormat(fs_management::kDiskFormatFvm);
+
+  auto fs = MountMultiVolume(
+      fidl::ClientEnd<fuchsia_hardware_block::Block>(endpoints.client.TakeChannel()), component,
+      fs_management::MountOptions());
+  ASSERT_EQ(fs.status_value(), ZX_OK);
+
+  zx::result volume = fs->OpenVolume("test", fuchsia_fs_startup::wire::MountOptions());
+  ASSERT_EQ(volume.status_value(), ZX_OK);
+
+  check_volume(*volume);
 }
 
 }  // namespace

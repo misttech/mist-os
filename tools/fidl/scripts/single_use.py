@@ -8,10 +8,9 @@ Looks for types that are never used or are used only once, as a field within
 another type.
 """
 
-import sys
 from collections import defaultdict
 
-from ir import DeclState, Enum, Libraries, Struct
+from ir import Libraries
 
 fidl_libraries = Libraries()
 

@@ -498,6 +498,7 @@ class StreamConfigTest : public DeviceTestBase {
           .frame_rate = 48000,
       }},
   }};
+  static constexpr uint32_t kDefaultRequestedRingBufferBytes = 2000;
 
   std::shared_ptr<FakeStreamConfig> MakeFakeStreamConfigInput() {
     return MakeFakeStreamConfig(true);
@@ -558,7 +559,8 @@ class StreamConfigTest : public DeviceTestBase {
     device->RetrieveRingBufferProperties(element_id);
 
     RunLoopUntilIdle();
-    ASSERT_TRUE(device->ring_buffer_map_.find(element_id)->second.ring_buffer_properties);
+    ASSERT_TRUE(
+        device->ring_buffer_map_.find(element_id)->second.ring_buffer_properties.has_value());
     EXPECT_TRUE(RingBufferIsCreatingOrStopped(device, element_id));
   }
 
@@ -569,7 +571,7 @@ class StreamConfigTest : public DeviceTestBase {
     device->RetrieveDelayInfo(element_id);
 
     RunLoopUntilIdle();
-    ASSERT_TRUE(device->ring_buffer_map_.find(element_id)->second.delay_info);
+    ASSERT_TRUE(device->ring_buffer_map_.find(element_id)->second.delay_info.has_value());
     EXPECT_EQ(
         device->ring_buffer_map_.find(element_id)->second.delay_info->internal_delay().value_or(0),
         internal_delay.value_or(0));
@@ -588,33 +590,71 @@ class StreamConfigTest : public DeviceTestBase {
     EXPECT_TRUE(RingBufferIsCreatingOrStopped(device, element_id));
   }
 
-  void SetInitialActiveChannelsAndExpect(const std::shared_ptr<Device>& device,
-                                         ElementId element_id, uint64_t expected_bitmask) {
+  void SetActiveChannelsAndExpect(const std::shared_ptr<Device>& device, ElementId element_id,
+                                  uint64_t expected_bitmask) {
     ASSERT_TRUE(RingBufferIsCreatingOrStopped(device, element_id));
     const auto now = zx::clock::get_monotonic();
     auto& ring_buffer = device->ring_buffer_map_.find(element_id)->second;
     bool callback_received = false;
 
-    auto succeeded =
-        device->SetActiveChannels(element_id, expected_bitmask,
-                                  [&ring_buffer, &callback_received](zx::result<zx::time> result) {
-                                    EXPECT_TRUE(result.is_ok()) << result.status_string();
-                                    ASSERT_TRUE(ring_buffer.active_channels_set_time);
-                                    EXPECT_EQ(*result, *ring_buffer.active_channels_set_time);
-                                    callback_received = true;
-                                  });
+    auto succeeded = device->SetActiveChannels(
+        element_id, expected_bitmask,
+        [&ring_buffer, &callback_received](zx::result<zx::time> result) {
+          EXPECT_TRUE(result.is_ok()) << result.status_string();
+          ASSERT_TRUE(ring_buffer.set_active_channels_completed_at.has_value());
+          EXPECT_EQ(*result, *ring_buffer.set_active_channels_completed_at);
+          callback_received = true;
+        });
 
     RunLoopUntilIdle();
     ASSERT_TRUE(succeeded);
-    ASSERT_TRUE(ring_buffer.active_channels_set_time);
-    EXPECT_GT(*ring_buffer.active_channels_set_time, now);
+    ASSERT_TRUE(ring_buffer.set_active_channels_completed_at.has_value());
+    EXPECT_GT(*ring_buffer.set_active_channels_completed_at, now);
+    ExpectActiveChannels(device, element_id, expected_bitmask);
+  }
+
+  // This driver supports SetActiveChannels, and a channel config has already been set. This
+  // SetActiveChannels() represents no change and should succeed; the set-time should not change.
+  void SetActiveChannelsAndExpectNoUpdate(const std::shared_ptr<Device>& device,
+                                          ElementId element_id, uint64_t expected_bitmask) {
+    ASSERT_TRUE(RingBufferIsCreatingOrStopped(device, element_id));
+    auto& ring_buffer = device->ring_buffer_map_.find(element_id)->second;
+    ASSERT_TRUE(ring_buffer.set_active_channels_completed_at.has_value())
+        << "SetActiveChannels has not yet been called";
+    auto previous_set_active_channels_completed_at = *ring_buffer.set_active_channels_completed_at;
+    bool callback_received = false;
+
+    auto succeeded = device->SetActiveChannels(
+        element_id, expected_bitmask,
+        [&ring_buffer, &callback_received](zx::result<zx::time> result) {
+          EXPECT_TRUE(result.is_ok()) << result.status_string();
+          ASSERT_TRUE(ring_buffer.set_active_channels_completed_at.has_value());
+          EXPECT_EQ(*result, *ring_buffer.set_active_channels_completed_at);
+          callback_received = true;
+        });
+
+    RunLoopUntilIdle();
+    ASSERT_TRUE(succeeded);
+    ASSERT_TRUE(ring_buffer.set_active_channels_completed_at.has_value());
+    EXPECT_EQ(*ring_buffer.set_active_channels_completed_at,
+              previous_set_active_channels_completed_at);
     ExpectActiveChannels(device, element_id, expected_bitmask);
   }
 
   static void ExpectActiveChannels(const std::shared_ptr<Device>& device, ElementId element_id,
                                    uint64_t expected_bitmask) {
-    EXPECT_EQ(device->ring_buffer_map_.find(element_id)->second.active_channels_bitmask,
+    ASSERT_TRUE(device->ring_buffer_map_.find(element_id) != device->ring_buffer_map_.end());
+    ASSERT_TRUE(
+        device->ring_buffer_map_.find(element_id)->second.active_channels_bitmask.has_value());
+    EXPECT_EQ(*device->ring_buffer_map_.find(element_id)->second.active_channels_bitmask,
               expected_bitmask);
+  }
+
+  static void ExpectActiveChannelsOrUnset(const std::shared_ptr<Device>& device,
+                                          ElementId element_id, uint64_t expected_bitmask) {
+    ASSERT_TRUE(device->ring_buffer_map_.find(element_id) != device->ring_buffer_map_.end());
+    auto bitmask = device->ring_buffer_map_.find(element_id)->second.active_channels_bitmask;
+    EXPECT_TRUE(!bitmask.has_value() || *bitmask == expected_bitmask);
   }
 
   void ExpectRingBufferReady(const std::shared_ptr<Device>& device, ElementId element_id) {
@@ -631,12 +671,12 @@ class StreamConfigTest : public DeviceTestBase {
 
     device->StartRingBuffer(element_id, [&ring_buffer](zx::result<zx::time> result) {
       EXPECT_TRUE(result.is_ok()) << result.status_string();
-      ASSERT_TRUE(ring_buffer.start_time);
+      ASSERT_TRUE(ring_buffer.start_time.has_value());
       EXPECT_EQ(*result, *ring_buffer.start_time);
     });
 
     RunLoopUntilIdle();
-    ASSERT_TRUE(ring_buffer.start_time);
+    ASSERT_TRUE(ring_buffer.start_time.has_value());
     EXPECT_GT(ring_buffer.start_time->get(), now);
     EXPECT_TRUE(RingBufferIsStarted(device, element_id));
   }
@@ -648,7 +688,7 @@ class StreamConfigTest : public DeviceTestBase {
 
     RunLoopUntilIdle();
     auto& ring_buffer = device->ring_buffer_map_.find(element_id)->second;
-    ASSERT_FALSE(ring_buffer.start_time);
+    ASSERT_FALSE(ring_buffer.start_time.has_value());
     EXPECT_TRUE(RingBufferIsStopped(device, element_id));
   }
 

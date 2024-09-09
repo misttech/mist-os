@@ -8,6 +8,7 @@
 #include <fidl/fuchsia.hardware.audio/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.audio/cpp/test_base.h>
 #include <lib/fidl/cpp/wire/internal/transport_channel.h>
+#include <lib/fidl/cpp/wire/unknown_interaction_handler.h>
 
 #include <cstddef>
 #include <cstdint>
@@ -52,8 +53,9 @@ class FakeCompositeRingBuffer final
   void WatchDelayInfo(WatchDelayInfoCompleter::Sync& completer) override;
   void WatchClockRecoveryPositionInfo(
       WatchClockRecoveryPositionInfoCompleter::Sync& completer) override;
-  void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_hardware_audio::RingBuffer>,
-                             fidl::UnknownMethodCompleter::Sync&) override;
+  void handle_unknown_method(
+      fidl::UnknownMethodMetadata<fuchsia_hardware_audio::RingBuffer> metadata,
+      fidl::UnknownMethodCompleter::Sync& completer) override;
 
   void NotImplemented_(const std::string& name, ::fidl::CompleterBase& completer) override;
 
@@ -69,7 +71,7 @@ class FakeCompositeRingBuffer final
   bool started() const { return started_; }
   zx::time mono_start_time() const { return mono_start_time_; }
   uint64_t active_channels_bitmask() const { return active_channels_bitmask_; }
-  zx::time active_channels_set_time() const { return active_channels_set_time_; }
+  zx::time set_active_channels_completed_at() const { return set_active_channels_completed_at_; }
 
   // For configuring the object before it starts being used.
   void enable_active_channels_support() { supports_active_channels_ = true; }
@@ -109,7 +111,7 @@ class FakeCompositeRingBuffer final
   // SetActiveChannels
   bool supports_active_channels_ = kDefaultSupportsActiveChannels;
   uint64_t active_channels_bitmask_;
-  zx::time active_channels_set_time_;
+  zx::time set_active_channels_completed_at_;
 
   // WatchDelayInfo
   std::optional<WatchDelayInfoCompleter::Async> watch_delay_info_completer_;

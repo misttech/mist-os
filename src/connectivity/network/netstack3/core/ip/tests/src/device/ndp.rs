@@ -17,7 +17,7 @@ use net_declare::net::{mac, subnet_v6};
 use net_types::ethernet::Mac;
 use net_types::ip::{AddrSubnet, Ip as _, Ipv6, Ipv6Addr, Ipv6Scope, Mtu, Subnet};
 use net_types::{NonMappedAddr, ScopeableAddress as _, UnicastAddr, Witness as _};
-use netstack3_base::LinkAddress;
+use netstack3_base::{Ipv6DeviceAddr, LinkAddress};
 use packet::{Buf, EmptyBuf, InnerPacketBuilder as _, Serializer as _};
 use packet_formats::ethernet::EthernetFrameLengthCheck;
 use packet_formats::icmp::ndp::options::{NdpOption, NdpOptionBuilder, PrefixInformation};
@@ -53,12 +53,11 @@ use netstack3_ip::device::testutil::with_assigned_ipv6_addr_subnets;
 use netstack3_ip::device::{
     get_ipv6_hop_limit, InnerSlaacTimerId, IpAddressId as _, IpDeviceBindingsContext,
     IpDeviceConfigurationUpdate, IpDeviceStateContext, Ipv4DeviceConfigurationUpdate,
-    Ipv6AddrConfig, Ipv6AddressFlags, Ipv6AddressState, Ipv6DeviceAddr,
-    Ipv6DeviceConfigurationContext, Ipv6DeviceConfigurationUpdate, Ipv6DeviceHandler,
-    Ipv6DeviceTimerId, Lifetime, OpaqueIid, OpaqueIidNonce, SlaacBindingsContext, SlaacConfig,
-    SlaacConfiguration, SlaacContext, SlaacTimerId, StableIidSecret,
-    TemporarySlaacAddressConfiguration, TemporarySlaacConfig, MAX_RTR_SOLICITATION_DELAY,
-    RTR_SOLICITATION_INTERVAL,
+    Ipv6AddrConfig, Ipv6AddressFlags, Ipv6AddressState, Ipv6DeviceConfigurationContext,
+    Ipv6DeviceConfigurationUpdate, Ipv6DeviceHandler, Ipv6DeviceTimerId, Lifetime, OpaqueIid,
+    OpaqueIidNonce, SlaacBindingsContext, SlaacConfig, SlaacConfiguration, SlaacContext,
+    SlaacTimerId, StableIidSecret, TemporarySlaacAddressConfiguration, TemporarySlaacConfig,
+    MAX_RTR_SOLICITATION_DELAY, RTR_SOLICITATION_INTERVAL,
 };
 use netstack3_ip::icmp::REQUIRED_NDP_IP_PACKET_HOP_LIMIT;
 use netstack3_ip::{self as ip, IpPacketDestination, SendIpPacketMeta};

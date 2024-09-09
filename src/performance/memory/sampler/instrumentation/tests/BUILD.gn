@@ -18,7 +18,7 @@ executable("tests_bin") {
     "..:recorder",
     "..:scoped_reentrancy_guard",
     "//sdk/fidl/fuchsia.memory.sampler:fuchsia.memory.sampler_cpp_testing",
-    "//sdk/lib/fidl/cpp",
+    "//sdk/lib/fidl/hlcpp",
     "//sdk/lib/sys/cpp",
     "//sdk/lib/sys/cpp/testing:unit",
     "//src/lib/fxl/test:gtest_main",

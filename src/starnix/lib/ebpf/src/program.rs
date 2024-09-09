@@ -7,7 +7,7 @@ use crate::executor::{execute, execute_with_arguments};
 use crate::verifier::{
     verify, CallingContext, FunctionSignature, NullVerifierLogger, Type, VerifierLogger,
 };
-use crate::{EbpfError, MapSchema, MemoryId};
+use crate::{DataWidth, EbpfError, MapSchema, MemoryId};
 use linux_uapi::{bpf_insn, sock_filter};
 use std::collections::HashMap;
 use std::fmt::Formatter;
@@ -149,6 +149,50 @@ impl BpfValue {
     }
 }
 
+/// Wrapper around the helper function needed to access the content of a packet.
+pub struct PacketAccessor<C: EbpfRunContext>(
+    Arc<dyn Fn(&mut C::Context<'_>, BpfValue, u16, DataWidth) -> Option<BpfValue> + Send + Sync>,
+);
+
+impl<C: EbpfRunContext> PacketAccessor<C> {
+    /// Run the helper function.
+    pub fn run(
+        &self,
+        context: &mut C::Context<'_>,
+        sk_buf_ptr: BpfValue,
+        offset: u16,
+        width: DataWidth,
+    ) -> Option<BpfValue> {
+        self.0(context, sk_buf_ptr, offset, width)
+    }
+}
+
+impl<C: EbpfRunContext> PacketAccessor<C> {
+    pub fn new(
+        f: impl Fn(&mut C::Context<'_>, BpfValue, u16, DataWidth) -> Option<BpfValue>
+            + Send
+            + Sync
+            + 'static,
+    ) -> Self {
+        Self(Arc::new(f))
+    }
+}
+
+impl<C: EbpfRunContext> std::fmt::Debug for PacketAccessor<C> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
+        f.debug_struct("PacketAccessor").finish()
+    }
+}
+
+/// Data required to be able to validate and run operation that load the content of a network
+/// packet.
+pub struct PacketDescriptor<C: EbpfRunContext> {
+    /// The id of the structure that represents a network packet.
+    pub packet_memory_id: MemoryId,
+    /// The helper function needed to access the content of a packet.
+    pub packet_accessor: PacketAccessor<C>,
+}
+
 pub struct EbpfHelper<C: EbpfRunContext> {
     pub index: u32,
     pub name: &'static str,
@@ -183,12 +227,17 @@ impl<C: EbpfRunContext> std::fmt::Debug for EbpfHelper<C> {
 
 pub struct EbpfProgramBuilder<C: EbpfRunContext> {
     helpers: HashMap<u32, EbpfHelper<C>>,
+    packet_accessor: Option<PacketAccessor<C>>,
     calling_context: CallingContext,
 }
 
 impl<C: EbpfRunContext> Default for EbpfProgramBuilder<C> {
     fn default() -> Self {
-        Self { helpers: Default::default(), calling_context: Default::default() }
+        Self {
+            helpers: Default::default(),
+            packet_accessor: Default::default(),
+            calling_context: Default::default(),
+        }
     }
 }
 
@@ -210,6 +259,11 @@ impl<C: EbpfRunContext> EbpfProgramBuilder<C> {
         self.calling_context.set_args(args);
     }
 
+    pub fn set_packet_descriptor(&mut self, packet_descriptor: PacketDescriptor<C>) {
+        self.calling_context.set_packet_memory_id(packet_descriptor.packet_memory_id);
+        self.packet_accessor = Some(packet_descriptor.packet_accessor);
+    }
+
     // This function signature will need more parameters eventually. The client needs to be able to
     // supply a real callback and it's type. The callback will be needed to actually call the
     // callback. The type will be needed for the verifier.
@@ -225,7 +279,7 @@ impl<C: EbpfRunContext> EbpfProgramBuilder<C> {
         logger: &mut dyn VerifierLogger,
     ) -> Result<EbpfProgram<C>, EbpfError> {
         let code = verify(code, self.calling_context, logger)?;
-        Ok(EbpfProgram { code, helpers: self.helpers })
+        Ok(EbpfProgram { code, helpers: self.helpers, packet_accessor: self.packet_accessor })
     }
 }
 
@@ -234,6 +288,7 @@ impl<C: EbpfRunContext> EbpfProgramBuilder<C> {
 pub struct EbpfProgram<C: EbpfRunContext> {
     pub code: Vec<bpf_insn>,
     pub helpers: HashMap<u32, EbpfHelper<C>>,
+    pub packet_accessor: Option<PacketAccessor<C>>,
 }
 
 impl<C: EbpfRunContext> EbpfProgram<C> {

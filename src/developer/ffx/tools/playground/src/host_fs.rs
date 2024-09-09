@@ -534,7 +534,7 @@ mod test {
         let _ = std::fs::File::create(sub_path.join("B")).unwrap();
         let _ = std::fs::File::create(sub_path.join("C")).unwrap();
         let client = vfs::directory::spawn_directory(HostDirectory::new(tmp_dir.path()));
-        let sub_dir = fuchsia_fs::directory::open_directory(
+        let sub_dir = fuchsia_fs::directory::open_directory_deprecated(
             &client,
             "subdir",
             fio::OpenFlags::RIGHT_READABLE,
@@ -559,9 +559,13 @@ mod test {
             b"I literally can't leave this room, so I'm just going to ignore my feelings.";
         f.write_all(test_str).unwrap();
         let client = vfs::directory::spawn_directory(HostDirectory::new(tmp_dir.path()));
-        let file = fuchsia_fs::directory::open_file(&client, "A", fio::OpenFlags::RIGHT_READABLE)
-            .await
-            .unwrap();
+        let file = fuchsia_fs::directory::open_file_deprecated(
+            &client,
+            "A",
+            fio::OpenFlags::RIGHT_READABLE,
+        )
+        .await
+        .unwrap();
 
         let got = fuchsia_fs::file::read(&file).await.unwrap();
         assert_eq!(test_str, got.as_slice());
@@ -575,9 +579,13 @@ mod test {
             b"I literally can't leave this room, so I'm just going to ignore my feelings.";
         f.write_all(test_str).unwrap();
         let client = vfs::directory::spawn_directory(HostDirectory::new(tmp_dir.path()));
-        let file = fuchsia_fs::directory::open_file(&client, "A", fio::OpenFlags::RIGHT_READABLE)
-            .await
-            .unwrap();
+        let file = fuchsia_fs::directory::open_file_deprecated(
+            &client,
+            "A",
+            fio::OpenFlags::RIGHT_READABLE,
+        )
+        .await
+        .unwrap();
 
         let split_len = test_str.len() / 2;
 

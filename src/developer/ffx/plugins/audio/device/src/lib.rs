@@ -114,6 +114,7 @@ impl FfxMain for DeviceTool {
                     self.play_controller,
                     selector,
                     play_command.element_id,
+                    play_command.channels,
                     play_local,
                     play_remote,
                     reader,
@@ -222,6 +223,7 @@ async fn device_play(
     player_controller: fac::PlayerProxy,
     selector: Selector,
     ring_buffer_element_id: Option<fadevice::ElementId>,
+    channel_bitmask: Option<u64>,
     play_local: fidl::Socket,
     play_remote: fidl::Socket,
     input_reader: Box<dyn Read + Send + 'static>,
@@ -247,6 +249,7 @@ async fn device_play(
             gain: None, // TODO(https://fxbug.dev/42072218)
             ..Default::default()
         }),
+        active_channels_bitmask: channel_bitmask,
         ..Default::default()
     };
 
@@ -391,6 +394,7 @@ mod tests {
         });
 
         let ring_buffer_element_id = Some(fadevice::DEFAULT_RING_BUFFER_ELEMENT_ID);
+        let ring_buffer_active_channels_bitmask = Some(1);
 
         let (play_remote, play_local) = fidl::Socket::create_datagram();
         let mut async_play_local = fidl::AsyncSocket::from_socket(
@@ -403,6 +407,7 @@ mod tests {
             audio_player,
             selector,
             ring_buffer_element_id,
+            ring_buffer_active_channels_bitmask,
             play_local,
             play_remote,
             Box::new(&ffx_audio_common::tests::WAV_HEADER_EXT[..]),
@@ -449,11 +454,13 @@ mod tests {
         });
 
         let element_id = Some(fadevice::DEFAULT_RING_BUFFER_ELEMENT_ID);
+        let active_channels_bitmask = Some(1);
 
         device_play(
             audio_player,
             selector,
             element_id,
+            active_channels_bitmask,
             play_local,
             play_remote,
             Box::new(file_reader),

@@ -185,7 +185,7 @@ async fn main_inner() -> Result<(), Error> {
     let cobalt_fut = Task::spawn(cobalt_fut);
 
     let (root_dir_factory, open_packages) = root_dir::new(
-        fuchsia_fs::directory::open_in_namespace(
+        fuchsia_fs::directory::open_in_namespace_deprecated(
             "/bootfs-blobs",
             fuchsia_fs::OpenFlags::RIGHT_READABLE | fuchsia_fs::OpenFlags::RIGHT_EXECUTABLE,
         )

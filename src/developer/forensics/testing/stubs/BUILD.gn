@@ -95,7 +95,7 @@ source_set("data_provider") {
     ":fidl_server_hlcpp",
     "//sdk/fidl/fuchsia.feedback:fuchsia.feedback_hlcpp",
     "//sdk/fidl/fuchsia.images:fuchsia.images_hlcpp",
-    "//sdk/lib/fidl/cpp",
+    "//sdk/lib/fidl/hlcpp",
     "//src/developer/forensics/feedback_data:data_provider",
     "//src/lib/fxl",
     "//zircon/system/ulib/zx",
@@ -166,7 +166,7 @@ source_set("fidl_server_hlcpp") {
   sources = [ "fidl_server_hlcpp.h" ]
 
   public_deps = [
-    "//sdk/lib/fidl/cpp",
+    "//sdk/lib/fidl/hlcpp",
     "//sdk/lib/syslog/cpp",
     "//src/lib/fxl",
   ]
@@ -281,7 +281,7 @@ source_set("power_broker") {
   public_deps = [
     ":fidl_server",
     "//sdk/fidl/fuchsia.power.broker:fuchsia.power.broker_cpp",
-    "//sdk/lib/fidl/cpp:cpp",
+    "//sdk/lib/fidl/hlcpp",
     "//sdk/lib/fit",
     "//sdk/lib/syslog/cpp",
     "//src/developer/forensics/exceptions:constants",

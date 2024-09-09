@@ -17,16 +17,16 @@ executable("bin") {
   ]
 
   deps = [
+    "//sdk/lib/async:async-cpp",
+    "//sdk/lib/async-loop:async-loop-cpp",
     "//sdk/lib/async-loop-testing/cpp",
+    "//sdk/lib/async-testing",
     "//sdk/lib/async_patterns/cpp",
     "//sdk/lib/stdcompat",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/predicates",
     "//src/sys/test_runners/gtest:death_test",
     "//third_party/googletest:gtest",
-    "//zircon/system/ulib/async:async-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-testing",
     "//zircon/system/ulib/sync:sync-cpp",
   ]
 

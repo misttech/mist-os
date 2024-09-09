@@ -1,0 +1,25 @@
+// Copyright 2024 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+library fuchsia.driver.loader;
+
+using fuchsia.io;
+using zx;
+
+/// Protocol through which drivers can be loaded into a driver host process
+/// using out-of-process dynamic linking.
+@discoverable
+open protocol DriverHost {
+    /// Loads a driver into the driver host.
+    flexible LoadDriver(resource table {
+        /// Soname of the driver.
+        1: driver_soname string:fuchsia.io.MAX_NAME_LENGTH;
+        /// Binary to load.
+        2: driver_binary zx.Handle:VMO;
+        /// Library dependencies of the driver.
+        3: driver_libs client_end:fuchsia.io.Directory;
+    }) -> (table {
+        /// Entry address for the driver returned by the dynamic linker.
+        1: runtime_load_address uint64;
+    }) error zx.Status;
+};

@@ -80,8 +80,4 @@ board_input_bundle("main_bundle") {
   } else {
     assert("Unsupported target_cpu ${target_cpu}.")
   }
-
-  # Flag controlling kernel's uart implementation.
-  # TODO(https://fxbug.dev/326669461): Remove when migration is complete.
-  kernel_cmdline = [ "kernel.experimental.serial_migration=true" ]
 }

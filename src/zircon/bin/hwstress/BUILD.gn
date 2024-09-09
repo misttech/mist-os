@@ -11,7 +11,6 @@ source_set("lib") {
     "cpu_stressor.cc",
     "cpu_workloads.cc",
     "device.cc",
-    "flash_stress.cc",
     "hwstress.cc",
     "light_stress.cc",
     "memory_patterns.cc",
@@ -77,7 +76,6 @@ _hwstress_binaries = [
   "hwstress",
   "cpu",
   "memory",
-  "flash",
   "led",
 ]
 
@@ -105,7 +103,6 @@ executable("hwstress_v2_test") {
     "cpu_stress_test.cc",
     "cpu_stressor_test.cc",
     "cpu_workloads_test.cc",
-    "flash_stress_test.cc",
     "hwstress_test.cc",
     "light_stress_test.cc",
     "memory_patterns_test.cc",

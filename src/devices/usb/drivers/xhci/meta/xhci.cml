@@ -24,7 +24,10 @@
             type: "bool",
         },
         {
-            protocol: [ "fuchsia.scheduler.RoleManager" ],
+            protocol: [
+                "fuchsia.power.system.ActivityGovernor",
+                "fuchsia.scheduler.RoleManager",
+            ],
         },
         {
             service: [

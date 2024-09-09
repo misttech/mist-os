@@ -196,12 +196,14 @@ zx::result<MountedVolume*> StartedMultiVolumeFilesystem::OpenVolume(
 
 __EXPORT
 zx::result<MountedVolume*> StartedMultiVolumeFilesystem::CreateVolume(
-    std::string_view name, fuchsia_fs_startup::wire::MountOptions options) {
+    std::string_view name, fuchsia_fs_startup::wire::CreateOptions create_options,
+    fuchsia_fs_startup::wire::MountOptions options) {
   if (volumes_.find(name) != volumes_.end()) {
     return zx::error(ZX_ERR_ALREADY_BOUND);
   }
   auto [client, server] = fidl::Endpoints<fuchsia_io::Directory>::Create();
-  auto res = fs_management::CreateVolume(exposed_dir_, name, std::move(server), std::move(options));
+  auto res = fs_management::CreateVolume(exposed_dir_, name, std::move(server),
+                                         std::move(create_options), std::move(options));
   if (res.is_error()) {
     return res.take_error();
   }

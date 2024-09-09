@@ -20,7 +20,6 @@
                 "IPv4UDPSockets/IPv4UDPUnboundSocketTest.SetSocketSendBuf/*",
                 "IPv4UDPSockets/IPv4UDPUnboundSocketTest.TestBindToBcastThenReceive/*",
                 "IPv4UDPSockets/IPv4UDPUnboundSocketTest.TestBindToBcastThenSend/*",
-                "IPv4UDPSockets/IPv4UDPUnboundSocketTest.TestBindToMcastThenSend/*",
                 "IPv6UDPSockets/IPv6UDPUnboundSocketTest.SetAndReceiveIPReceiveOrigDstAddr/*",
 
                 // TODO(https://fxbug.dev/42175797): Support Raw IP sockets.

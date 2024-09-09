@@ -171,9 +171,9 @@ driver’s additional dispatchers before the driver’s `Stop()` hook is called.
 [driver-framework]: /docs/concepts/drivers/driver_framework.md
 [fdf-dispatcher]: https://cs.opensource.google/fuchsia/fuchsia/+/main:sdk/lib/driver/runtime/include/lib/fdf/cpp/dispatcher.h
 [driver-transport]: /docs/development/languages/fidl/tutorials/cpp/topics/driver-transport.md
-[async-lib]: https://cs.opensource.google/fuchsia/fuchsia/+/main:/zircon/system/ulib/async/README.md
+[async-lib]: https://cs.opensource.google/fuchsia/fuchsia/+/main:/sdk/lib/async/README.md
 [driver-runtime]: /docs/concepts/drivers/driver_framework.md#driver_runtime
-[async-cpp-task]: http://cs/fuchsia/zircon/system/ulib/async/include/lib/async/cpp/task.h
-[async-cpp-wait]: http://cs/fuchsia/zircon/system/ulib/async/include/lib/async/cpp/wait.h
+[async-cpp-task]: http://cs/fuchsia/sdk/lib/async/include/lib/async/cpp/task.h
+[async-cpp-wait]: http://cs/fuchsia/sdk/lib/async/include/lib/async/cpp/wait.h
 [driver-hook]: http://cs/fuchsia/src/lib/ddk/include/lib/ddk/driver.h
 [device-hook]: http://cs/fuchsia/src/lib/ddk/include/lib/ddk/device.h

@@ -198,9 +198,11 @@ void App::UpdateScreenReaderState() {
 
   if (state_.screen_reader_enabled()) {
     if (!screen_reader_) {
+      FX_LOGS(INFO) << "Initializing screen reader.";
       screen_reader_ = InitializeScreenReader();
     }
-  } else {
+  } else if (screen_reader_) {
+    FX_LOGS(INFO) << "Resetting screen reader.";
     screen_reader_.reset();
   }
 }
@@ -259,6 +261,7 @@ bool App::GestureState::operator==(GestureState o) const {
 }
 
 void App::SetuiWatchCallback(fuchsia::settings::AccessibilitySettings settings) {
+  FX_LOGS(INFO) << "Updating fuchsia.settings.AccessibilitySettings";
   SetState(state_.withSettings(settings));
   WatchSetui();
 }

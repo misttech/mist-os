@@ -64,7 +64,7 @@ impl FuchsiaBootResolver {
             return Ok(None);
         }
 
-        let boot_proxy = fuchsia_fs::directory::open_in_namespace(
+        let boot_proxy = fuchsia_fs::directory::open_in_namespace_deprecated(
             bootfs_dir.to_str().unwrap(),
             fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,
         )?;
@@ -89,7 +89,7 @@ impl FuchsiaBootResolver {
         let namespace_root = ".";
 
         // Set up the fuchsia-boot path as the component's "package" namespace.
-        let path_proxy = fuchsia_fs::directory::open_directory_no_describe(
+        let path_proxy = fuchsia_fs::directory::open_directory_no_describe_deprecated(
             &self.boot_proxy,
             namespace_root,
             fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,
@@ -224,6 +224,9 @@ impl FuchsiaBootResolver {
                     // context, but should still resolve absolute URLs.
                     responder.send(self.resolve_async(&component_url).await)?;
                 }
+                fresolution::ResolverRequest::_UnknownMethod { ordinal, .. } => {
+                    tracing::warn!(%ordinal, "Unknown Resolver request");
+                }
             }
         }
         Ok(())
@@ -286,7 +289,7 @@ impl BootPackageResolver {
             return Ok(None);
         }
 
-        let boot_blob_storage = fuchsia_fs::directory::open_directory_no_describe(
+        let boot_blob_storage = fuchsia_fs::directory::open_directory_no_describe_deprecated(
             &proxy,
             BOOTFS_BLOB_DIR,
             fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,
@@ -308,7 +311,7 @@ impl BootPackageResolver {
     async fn extract_bootfs_index(
         boot_proxy: &fio::DirectoryProxy,
     ) -> Result<PathHashMapping<Bootfs>, Error> {
-        let bootfs_package_index = fuchsia_fs::directory::open_file_no_describe(
+        let bootfs_package_index = fuchsia_fs::directory::open_file_no_describe_deprecated(
             &boot_proxy,
             BOOT_PACKAGE_INDEX,
             fio::OpenFlags::RIGHT_READABLE,
@@ -413,7 +416,7 @@ mod tests {
     use fidl::endpoints::{create_endpoints, create_proxy};
     use fidl::persist;
     use fuchsia_async::Task;
-    use fuchsia_fs::directory::open_in_namespace;
+    use fuchsia_fs::directory::open_in_namespace_deprecated;
     use routing::bedrock::structured_dict::ComponentInput;
     use std::sync::Weak;
     use vfs::directory::entry::OpenRequest;
@@ -441,7 +444,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn hello_world_test() -> Result<(), Error> {
-        let bootfs = open_in_namespace(
+        let bootfs = open_in_namespace_deprecated(
             "/pkg",
             fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,
         )
@@ -494,7 +497,7 @@ mod tests {
 
         let dir_proxy = package_dir.into_proxy().unwrap();
         let path = "meta/hello-world-rust.cm";
-        let file_proxy = fuchsia_fs::directory::open_file_no_describe(
+        let file_proxy = fuchsia_fs::directory::open_file_no_describe_deprecated(
             &dir_proxy,
             path,
             fio::OpenFlags::RIGHT_READABLE,
@@ -523,7 +526,7 @@ mod tests {
     #[fuchsia::test]
     async fn capability_provider_test() {
         // Create a CapabilityProvider to serve fuchsia boot resolver requests.
-        let bootfs = open_in_namespace(
+        let bootfs = open_in_namespace_deprecated(
             "/pkg",
             fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,
         )
@@ -665,18 +668,6 @@ mod tests {
         assert_matches!(err, ResolverError::ConfigValuesIo { .. });
     }
 
-    macro_rules! test_resolve_error {
-        ($resolver:ident, $url:expr, $target:ident, $resolver_error_expected:ident) => {
-            let url = $url.parse().unwrap();
-            let res =
-                $resolver.resolve(&ComponentAddress::from(&url, &$target).await.unwrap()).await;
-            match res.err().expect("unexpected success") {
-                ResolverError::$resolver_error_expected { .. } => {}
-                e => panic!("unexpected error {:?}", e),
-            }
-        };
-    }
-
     #[fuchsia::test]
     async fn resolve_errors_test() {
         let manifest_encoded = persist(&fdecl::Component {
@@ -704,6 +695,8 @@ mod tests {
             "fuchsia-boot:///#meta/root.cm".parse().unwrap(),
         )
         .await;
-        test_resolve_error!(resolver, "fuchsia-boot:///#meta/invalid.cm", root, ManifestInvalid);
+        let url = "fuchsia-boot:///#meta/invalid.cm".parse().unwrap();
+        let res = resolver.resolve(&ComponentAddress::from(&url, &root).await.unwrap()).await;
+        assert_matches!(res, Err(ResolverError::ManifestInvalid { .. }));
     }
 }

@@ -42,14 +42,17 @@ the [Drivers][dfv2-concepts] section under _Fundamentals_.
 
   - [Set up the compat device server in a DFv2 driver][set-up-compat-device-server]
   - [Serve Banjo protocols in a DFv2 driver][serve-banjo-protocols]
+  - [Set up devfs in a DFv2 driver][set-up-devfs]
 
 ### DFv2 driver development
 
 - [Write a minimal DFv2 driver][write-a-minimal-driver]
+- [Troubleshoot common issues in DFv2 driver development][troubleshoot-common-issues]
+- [Driver examples][driver-examples]
 - [Composite nodes][composite-nodes]
 - [Driver stack performance][driver-stack-performance]
 - [VMO Registration Pattern][vmo-registration-pattern]
-- [DMA][dma]
+- [DMA (Direct Memory Access)][dma]
 - Tutorials
 
   - [Bind rules tutorial][bind-rules-tutorial]
@@ -199,3 +202,6 @@ the [Drivers][dfv2-concepts] section under _Fundamentals_.
 [set-up-compat-device-server]: migration/set-up-compat-device-server.md
 [write-a-minimal-driver]: developer_guide/write-a-minimal-dfv2-driver.md
 [serve-banjo-protocols]: migration/serve-banjo-protocols.md
+[set-up-devfs]: migration/set-up-devfs.md
+[troubleshoot-common-issues]: developer_guide/troubleshoot-common-issues.md
+[driver-examples]: developer_guide/driver-examples.md

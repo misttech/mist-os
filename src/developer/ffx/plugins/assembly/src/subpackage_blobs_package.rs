@@ -155,6 +155,7 @@ mod tests {
                 path: "does-not-exist".into(),
                 contents: blobfs_contents,
             }],
+            board_name: "my_board".into(),
         };
 
         // Construct the subpackage blobs package.

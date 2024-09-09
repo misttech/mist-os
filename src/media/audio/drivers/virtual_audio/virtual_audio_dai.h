@@ -90,8 +90,9 @@ class VirtualAudioDai final : public VirtualAudioDaiDeviceType,
   void WatchDelayInfo(WatchDelayInfoCompleter::Sync& completer) override;
   void SetActiveChannels(fuchsia_hardware_audio::RingBufferSetActiveChannelsRequest& request,
                          SetActiveChannelsCompleter::Sync& completer) override;
-  void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_hardware_audio::RingBuffer>,
-                             fidl::UnknownMethodCompleter::Sync&) override;
+  void handle_unknown_method(
+      fidl::UnknownMethodMetadata<fuchsia_hardware_audio::RingBuffer> metadata,
+      fidl::UnknownMethodCompleter::Sync& completer) override;
 
  private:
   void ResetRingBuffer();

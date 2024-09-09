@@ -188,7 +188,7 @@ mod tests {
         let open_and_read_file = move |file_path: &'static str| {
             let outgoing_dir_proxy = Clone::clone(&outgoing_dir_proxy);
             async move {
-                let file_proxy = fuchsia_fs::directory::open_file(
+                let file_proxy = fuchsia_fs::directory::open_file_deprecated(
                     &outgoing_dir_proxy,
                     file_path,
                     fuchsia_fs::OpenFlags::RIGHT_READABLE,

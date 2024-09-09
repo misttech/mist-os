@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fidl::endpoints::ClientEnd;
 use fsysmem2::{
     AllocatorAllocateSharedCollectionRequest, AllocatorBindSharedCollectionRequest,
     AllocatorSetDebugClientInfoRequest, BufferCollectionSetConstraintsRequest,
@@ -218,16 +217,7 @@ async fn allocate_image_buffer(
     };
 
     // Register the collection with the display driver.
-    //
-    // A sysmem token channel serves both sysmem(1) and sysmem2, so we can convert here until this
-    // protocol has a field for a sysmem2 token.
-    let id = coordinator
-        .import_buffer_collection(
-            ClientEnd::<fidl_fuchsia_sysmem::BufferCollectionTokenMarker>::new(
-                display_duplicate.into_channel(),
-            ),
-        )
-        .await?;
+    let id = coordinator.import_buffer_collection(display_duplicate).await?;
 
     // Tell sysmem to perform the buffer allocation and wait for the result. Clean up on error.
     match allocate_image_buffer_helper(params, allocator, collection_token).await {

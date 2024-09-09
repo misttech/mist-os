@@ -10,6 +10,7 @@ use super::network_config::{
 use super::stash_conversion::*;
 use crate::client::types::{self, ScanObservation};
 use crate::telemetry::{TelemetryEvent, TelemetrySender};
+use anyhow::format_err;
 use async_trait::async_trait;
 use futures::lock::Mutex;
 use rand::Rng;
@@ -109,6 +110,12 @@ pub trait SavedNetworksManagerApi: Send + Sync {
         target_ssids: Vec<types::Ssid>,
         results: &HashMap<types::NetworkIdentifierDetailed, Vec<types::Bss>>,
     );
+
+    async fn is_network_single_bss(
+        &self,
+        id: &NetworkIdentifier,
+        credential: &Credential,
+    ) -> Result<bool, anyhow::Error>;
 
     // Return a list of every network config that has been saved.
     async fn get_networks(&self) -> Vec<NetworkConfig>;
@@ -273,6 +280,11 @@ impl SavedNetworksManagerApi for SavedNetworksManager {
         self.saved_networks.lock().await.values().flatten().count()
     }
 
+    /// Return the network configs that have this network identifier. The configs may be different
+    /// because of their credentials. Note that these are copies of the current data, so if data
+    /// could have changed it should be looked up again. For example, data about roam scans change
+    /// throughout a connection so callers cannot keep using the same network config for that data
+    /// throughout the connection.
     async fn lookup(&self, id: &NetworkIdentifier) -> Vec<NetworkConfig> {
         self.saved_networks.lock().await.get(id).cloned().unwrap_or_default()
     }
@@ -449,9 +461,14 @@ impl SavedNetworksManagerApi for SavedNetworksManager {
         let mut saved_networks = self.saved_networks.lock().await;
 
         for (network, bss_list) in results {
+            // If there are BSSs seen with the same SSID but different security, it will be
+            // recorded as multi BSS. But this is fine since the network will just not get the
+            //  improvement to scan less.
+            let has_multiple_bss = bss_list.len() > 1;
             // Determine if any BSSs seen for this network were observed passively.
             if bss_list.iter().any(|bss| bss.observation == ScanObservation::Passive) {
-                // Look for compatible configs and record them as "SeenPassive"
+                // Look for compatible configs and record them as "SeenPassive" and with single
+                // or multi BSS data.
                 for security in compatible_policy_securities(&network.security_type) {
                     let configs = match saved_networks
                         .get_mut(&NetworkIdentifier::new(network.ssid.clone(), security))
@@ -465,7 +482,8 @@ impl SavedNetworksManagerApi for SavedNetworksManager {
                         security_is_compatible(&network.security_type, &config.credential)
                     });
                     for config in compatible_configs {
-                        config.update_hidden_prob(HiddenProbEvent::SeenPassive)
+                        config.update_hidden_prob(HiddenProbEvent::SeenPassive);
+                        config.update_seen_multiple_bss(has_multiple_bss)
                     }
                 }
             }
@@ -491,6 +509,30 @@ impl SavedNetworksManagerApi for SavedNetworksManager {
             }
         }
         // TODO(60619): Update persistent storage with new probability if it has changed
+    }
+
+    /// Returns whether or not the network likely has only one BSS based on previous scans. This
+    /// should be used instead of the network config if the network config may have been updated.
+    /// For example, when making roam scan decisions this should be used instead of a network
+    /// config obtained at the time of connecting.
+    async fn is_network_single_bss(
+        &self,
+        id: &NetworkIdentifier,
+        credential: &Credential,
+    ) -> Result<bool, anyhow::Error> {
+        let saved_networks_guard = self.saved_networks.lock().await;
+        let possible_configs = saved_networks_guard.get(id).ok_or_else(|| {
+            format_err!(
+                "error checking if network is single BSS; no config with matching identifier"
+            )
+        })?;
+        let config =
+            possible_configs.iter().find(|c| &c.credential == credential).ok_or_else(|| {
+                format_err!(
+                    "error checking if network is single BSS; no config with matching credential"
+                )
+            })?;
+        return Ok(config.is_likely_single_bss());
     }
 
     async fn get_networks(&self) -> Vec<NetworkConfig> {
@@ -1922,6 +1964,122 @@ mod tests {
 
         // Check that a config was not saved for the identifier that was not saved before.
         assert!(saved_networks.lookup(&id_3).await.is_empty());
+    }
+
+    #[fuchsia::test]
+    async fn test_update_scan_stats_for_single_bss() {
+        // Record multiple scans for a network where there is only 1 BSS for the network. The
+        // config should be considered likely single BSS.
+        let saved_networks = SavedNetworksManager::new_for_test().await;
+
+        let id = NetworkIdentifier::try_from("foo", SecurityType::Wpa).unwrap();
+        let credential = Credential::Password(b"some_password".to_vec());
+        assert!(saved_networks
+            .store(id.clone(), credential.clone())
+            .await
+            .expect("failed to store network")
+            .is_none());
+
+        let id_detailed = types::NetworkIdentifierDetailed {
+            ssid: id.ssid.clone(),
+            security_type: types::SecurityTypeDetailed::Wpa2Personal,
+        };
+        let scan_results = HashMap::from([(
+            id_detailed.clone(),
+            vec![types::Bss { observation: ScanObservation::Passive, ..generate_random_bss() }],
+        )]);
+
+        // likely has one BSS
+        for _ in 0..5 {
+            saved_networks.record_scan_result(vec![id.ssid.clone()], &scan_results).await;
+        }
+
+        let is_single_bss = saved_networks
+            .is_network_single_bss(&id, &credential)
+            .await
+            .expect("failed to lookup if network is single BSS");
+        assert!(is_single_bss);
+    }
+
+    #[fuchsia::test]
+    async fn test_update_scan_stats_for_multiple_bss_at_least_once() {
+        // Record multiple scans for a network where there are multiple BSS. The network config
+        // should say that the network is not single BSS.
+        let saved_networks = SavedNetworksManager::new_for_test().await;
+
+        let id = NetworkIdentifier::try_from("foo", SecurityType::Wpa).unwrap();
+        let credential = Credential::Password(b"some_password".to_vec());
+        assert!(saved_networks
+            .store(id.clone(), credential.clone())
+            .await
+            .expect("failed to store network")
+            .is_none());
+
+        let id_detailed = types::NetworkIdentifierDetailed {
+            ssid: id.ssid.clone(),
+            security_type: types::SecurityTypeDetailed::Wpa2Personal,
+        };
+        let scan_results_single = HashMap::from([(
+            id_detailed.clone(),
+            vec![types::Bss { observation: ScanObservation::Passive, ..generate_random_bss() }],
+        )]);
+
+        let scan_results_multi = HashMap::from([(
+            id_detailed.clone(),
+            vec![
+                types::Bss { observation: ScanObservation::Passive, ..generate_random_bss() },
+                types::Bss { observation: ScanObservation::Passive, ..generate_random_bss() },
+            ],
+        )]);
+
+        // Record some scan results with one BSS, and record once with multiple BSS.
+        for _ in 0..2 {
+            saved_networks.record_scan_result(vec![id.ssid.clone()], &scan_results_single).await;
+        }
+
+        saved_networks.record_scan_result(vec![id.ssid.clone()], &scan_results_multi).await;
+        saved_networks.record_scan_result(vec![id.ssid.clone()], &scan_results_single).await;
+
+        // The one scan with multiple BSS results should make the network determined to be
+        // multi BSS.
+        let is_single_bss = saved_networks
+            .is_network_single_bss(&id, &credential)
+            .await
+            .expect("failed to lookup if network is single BSS");
+        assert!(!is_single_bss);
+    }
+
+    #[fuchsia::test]
+    async fn test_record_scan_more_than_once_to_decide_single_bss() {
+        // Test that a network is not decided to be single BSS after only one scan.
+        let saved_networks = SavedNetworksManager::new_for_test().await;
+
+        let id = NetworkIdentifier::try_from("foo", SecurityType::Wpa).unwrap();
+        let credential = Credential::Password(b"some_password".to_vec());
+        assert!(saved_networks
+            .store(id.clone(), credential.clone())
+            .await
+            .expect("failed to store network")
+            .is_none());
+
+        let id_detailed = types::NetworkIdentifierDetailed {
+            ssid: id.ssid.clone(),
+            security_type: types::SecurityTypeDetailed::Wpa2Personal,
+        };
+        let scan_results = HashMap::from([(
+            id_detailed,
+            vec![types::Bss { observation: ScanObservation::Passive, ..generate_random_bss() }],
+        )]);
+
+        // Record the scan multiple times, since multiple scans are needed to decide the network
+        // likely has one BSS
+        saved_networks.record_scan_result(vec![id.ssid.clone()], &scan_results).await;
+
+        let is_single_bss = saved_networks
+            .is_network_single_bss(&id, &credential)
+            .await
+            .expect("failed to lookup if network is single BSS");
+        assert!(!is_single_bss);
     }
 
     #[fuchsia::test]

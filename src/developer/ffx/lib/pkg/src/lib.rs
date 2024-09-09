@@ -21,7 +21,7 @@ pub use instance::{
 /// This mirrors the fidl type RepositoryStorageType, since
 /// we need JSON serialization.
 ///
-#[derive(Clone, Debug, Deserialize, Serialize, JsonSchema)]
+#[derive(Clone, Debug, Deserialize, Serialize, JsonSchema, PartialEq)]
 pub enum RepoStorageType {
     Ephemeral,
     Persistent,
@@ -41,7 +41,7 @@ impl From<RepositoryStorageType> for RepoStorageType {
 /// This mirrors the fidl type RepositoryRegistrationAliasConflictMode, since
 /// we need JSON serialization.
 ///
-#[derive(Clone, Debug, Deserialize, Serialize, JsonSchema)]
+#[derive(Clone, Debug, Deserialize, Serialize, JsonSchema, PartialEq)]
 pub enum RegistrationConflictMode {
     ErrorOut,
     Replace,

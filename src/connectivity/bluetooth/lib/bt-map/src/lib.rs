@@ -37,22 +37,25 @@ pub enum Error {
     #[error("Invalid parameters")]
     InvalidParameters,
 
-    #[error("Repository does not exist: (id {:?})", .0)]
-    RepoDoesNotExist(u8),
+    #[error("MAS instance does not exist: (id {:?})", .0)]
+    MasInstanceDoesNotExist(u8),
 
     #[error("Feature is not supported by the remote peer")]
     NotSupported,
 
-    #[error("Invalid MAP session")]
-    InvalidMapSession,
+    #[error("Invalid Message Notification Service state")]
+    InvalidMnsState,
+
+    #[error("Not connected to any Message Access Service instances")]
+    MasUnavailable,
 
     #[error(transparent)]
     Other(#[from] anyhow::Error),
 }
 
 impl Error {
-    pub fn other(error_msg: String) -> Self {
-        Error::Other(anyhow::format_err!("{error_msg}"))
+    pub fn other(error_msg: impl std::fmt::Debug) -> Self {
+        Error::Other(anyhow::format_err!("{error_msg:?}"))
     }
 }
 
@@ -64,9 +67,10 @@ impl From<&Error> for fidl_bt_map::Error {
             &Error::InvalidSdp(_) => fidl_bt_map::Error::Unavailable,
             &Error::NotGoepInteroperable => fidl_bt_map::Error::Unavailable,
             &Error::InvalidParameters => fidl_bt_map::Error::BadRequest,
-            &Error::RepoDoesNotExist(_) => fidl_bt_map::Error::NotFound,
+            &Error::MasInstanceDoesNotExist(_) => fidl_bt_map::Error::NotFound,
             &Error::NotSupported => fidl_bt_map::Error::NotSupported,
-            &Error::InvalidMapSession => fidl_bt_map::Error::BadRequest,
+            &Error::InvalidMnsState => fidl_bt_map::Error::BadRequest,
+            &Error::MasUnavailable => fidl_bt_map::Error::Unavailable,
             &Error::Other(_) => fidl_bt_map::Error::Unknown,
         }
     }
@@ -121,6 +125,8 @@ bitflags! {
         const CONVERSATION_LISTING                          = 0x00100000;
         const OWNER_STATUS                                  = 0x00200000;
         const MESSAGE_FORWARDING                            = 0x00400000;
+
+        const SUPPORTS_NOTIFICATION = Self::NOTIFICATION.bits() | Self::NOTIFICATION_REGISTRATION.bits();
     }
 }
 
@@ -224,5 +230,21 @@ mod tests {
             features,
             MapSupportedFeatures::NOTIFICATION_REGISTRATION | MapSupportedFeatures::OWNER_STATUS
         );
+    }
+
+    #[test]
+    fn supports_notification() {
+        // Has notification (bit 0) and registration (bit 1).
+        let features = MapSupportedFeatures::from_bits_truncate(0x3);
+        assert!(features.contains(MapSupportedFeatures::SUPPORTS_NOTIFICATION));
+
+        let features = MapSupportedFeatures::NOTIFICATION;
+        assert!(!features.contains(MapSupportedFeatures::SUPPORTS_NOTIFICATION));
+
+        let features = MapSupportedFeatures::NOTIFICATION_REGISTRATION;
+        assert!(!features.contains(MapSupportedFeatures::SUPPORTS_NOTIFICATION));
+
+        let features = MapSupportedFeatures::MESSAGE_FORWARDING;
+        assert!(!features.contains(MapSupportedFeatures::SUPPORTS_NOTIFICATION));
     }
 }

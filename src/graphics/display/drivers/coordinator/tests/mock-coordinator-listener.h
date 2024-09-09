@@ -60,6 +60,7 @@ class MockCoordinatorListener
   const OnVsyncCallback on_vsync_callback_;
   const OnClientOwnershipChangeCallback on_client_ownership_change_callback_;
 
+  async_dispatcher_t* binding_dispatcher_ = nullptr;
   std::optional<fidl::ServerBindingRef<fuchsia_hardware_display::CoordinatorListener>> binding_;
 };
 

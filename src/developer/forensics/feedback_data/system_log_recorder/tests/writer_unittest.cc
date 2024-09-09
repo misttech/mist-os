@@ -41,7 +41,7 @@ namespace {
 
 // Only change "X" for one character. i.e. X -> 12 is not allowed.
 const auto kMaxLogLineSize =
-    StorageSize::Bytes(Format(BuildLogMessage(fuchsia_logging::LOG_INFO, "line X").value()).size());
+    StorageSize::Bytes(Format(BuildLogMessage(FUCHSIA_LOG_INFO, "line X").value()).size());
 
 const auto kMaxDecompressedSize = StorageSize::Kilobytes(256);
 
@@ -102,23 +102,23 @@ TEST(WriterTest, VerifyFileOrdering) {
   SystemLogWriter writer(kWriteDirectory, 4u, &store);
 
   // Written to file 0
-  EXPECT_TRUE(store.Add(BuildLogMessage(fuchsia_logging::LOG_INFO, "line 1")));
+  EXPECT_TRUE(store.Add(BuildLogMessage(FUCHSIA_LOG_INFO, "line 1")));
   writer.Write();
 
   // Written to file 1
-  EXPECT_TRUE(store.Add(BuildLogMessage(fuchsia_logging::LOG_INFO, "line 2")));
+  EXPECT_TRUE(store.Add(BuildLogMessage(FUCHSIA_LOG_INFO, "line 2")));
   writer.Write();
 
   // Written to file 2
-  EXPECT_TRUE(store.Add(BuildLogMessage(fuchsia_logging::LOG_INFO, "line 3")));
+  EXPECT_TRUE(store.Add(BuildLogMessage(FUCHSIA_LOG_INFO, "line 3")));
   writer.Write();
 
   // Written to file 3
-  EXPECT_TRUE(store.Add(BuildLogMessage(fuchsia_logging::LOG_INFO, "line 4")));
+  EXPECT_TRUE(store.Add(BuildLogMessage(FUCHSIA_LOG_INFO, "line 4")));
   writer.Write();
 
   // Written to file 4
-  EXPECT_TRUE(store.Add(BuildLogMessage(fuchsia_logging::LOG_INFO, "line 5")));
+  EXPECT_TRUE(store.Add(BuildLogMessage(FUCHSIA_LOG_INFO, "line 5")));
   writer.Write();
 
   memfs_manager.Create(kReadDirectory);
@@ -165,12 +165,12 @@ TEST(WriterTest, VerifyEncoderInput) {
   store.TurnOnRateLimiting();
   SystemLogWriter writer(kWriteDirectory, 2u, &store);
 
-  EXPECT_TRUE(store.Add(BuildLogMessage(fuchsia_logging::LOG_INFO, "line 1")));
+  EXPECT_TRUE(store.Add(BuildLogMessage(FUCHSIA_LOG_INFO, "line 1")));
   writer.Write();
-  EXPECT_TRUE(store.Add(BuildLogMessage(fuchsia_logging::LOG_INFO, "line 2")));
+  EXPECT_TRUE(store.Add(BuildLogMessage(FUCHSIA_LOG_INFO, "line 2")));
   writer.Write();
-  EXPECT_TRUE(store.Add(BuildLogMessage(fuchsia_logging::LOG_INFO, "line 3")));
-  EXPECT_TRUE(store.Add(BuildLogMessage(fuchsia_logging::LOG_INFO, "line 4")));
+  EXPECT_TRUE(store.Add(BuildLogMessage(FUCHSIA_LOG_INFO, "line 3")));
+  EXPECT_TRUE(store.Add(BuildLogMessage(FUCHSIA_LOG_INFO, "line 4")));
   writer.Write();
 
   std::vector<std::string> input = encoder_ptr->GetInput();
@@ -196,9 +196,9 @@ TEST(WriterTest, WritesMessages) {
   store.TurnOnRateLimiting();
   SystemLogWriter writer(kWriteDirectory, 2u, &store);
 
-  EXPECT_TRUE(store.Add(BuildLogMessage(fuchsia_logging::LOG_INFO, "line 0")));
-  EXPECT_TRUE(store.Add(BuildLogMessage(fuchsia_logging::LOG_INFO, "line 1")));
-  EXPECT_FALSE(store.Add(BuildLogMessage(fuchsia_logging::LOG_INFO, "line 2")));
+  EXPECT_TRUE(store.Add(BuildLogMessage(FUCHSIA_LOG_INFO, "line 0")));
+  EXPECT_TRUE(store.Add(BuildLogMessage(FUCHSIA_LOG_INFO, "line 1")));
+  EXPECT_FALSE(store.Add(BuildLogMessage(FUCHSIA_LOG_INFO, "line 2")));
   writer.Write();
 
   memfs_manager.Create(kReadDirectory);
@@ -216,8 +216,8 @@ TEST(WriterTest, WritesMessages) {
 !!! DROPPED 1 MESSAGES !!!
 )");
 
-  EXPECT_TRUE(store.Add(BuildLogMessage(fuchsia_logging::LOG_INFO, "line 3")));
-  EXPECT_TRUE(store.Add(BuildLogMessage(fuchsia_logging::LOG_INFO, "line 4")));
+  EXPECT_TRUE(store.Add(BuildLogMessage(FUCHSIA_LOG_INFO, "line 3")));
+  EXPECT_TRUE(store.Add(BuildLogMessage(FUCHSIA_LOG_INFO, "line 4")));
   writer.Write();
 
   ASSERT_TRUE(Concatenate(kWriteDirectory, kMaxDecompressedSize, &decoder, kOutputFile,
@@ -240,9 +240,9 @@ TEST(WriterTest, VerifyCompressionRatio) {
   store.TurnOnRateLimiting();
   SystemLogWriter writer(kWriteDirectory, 2u, &store);
 
-  EXPECT_TRUE(store.Add(BuildLogMessage(fuchsia_logging::LOG_INFO, "line 0")));
-  EXPECT_TRUE(store.Add(BuildLogMessage(fuchsia_logging::LOG_INFO, "line 1")));
-  EXPECT_TRUE(store.Add(BuildLogMessage(fuchsia_logging::LOG_INFO, "line 2")));
+  EXPECT_TRUE(store.Add(BuildLogMessage(FUCHSIA_LOG_INFO, "line 0")));
+  EXPECT_TRUE(store.Add(BuildLogMessage(FUCHSIA_LOG_INFO, "line 1")));
+  EXPECT_TRUE(store.Add(BuildLogMessage(FUCHSIA_LOG_INFO, "line 2")));
   writer.Write();
 
   memfs_manager.Create(kReadDirectory);
@@ -265,11 +265,11 @@ TEST(WriterTest, VerifyProductionEcoding) {
   store.TurnOnRateLimiting();
   SystemLogWriter writer(kWriteDirectory, 2u, &store);
 
-  EXPECT_TRUE(store.Add(BuildLogMessage(fuchsia_logging::LOG_INFO, "line 0")));
-  EXPECT_TRUE(store.Add(BuildLogMessage(fuchsia_logging::LOG_INFO, "line 1")));
-  EXPECT_TRUE(store.Add(BuildLogMessage(fuchsia_logging::LOG_INFO, "line 2")));
-  EXPECT_TRUE(store.Add(BuildLogMessage(fuchsia_logging::LOG_INFO, "line 3")));
-  EXPECT_TRUE(store.Add(BuildLogMessage(fuchsia_logging::LOG_INFO, "line 4")));
+  EXPECT_TRUE(store.Add(BuildLogMessage(FUCHSIA_LOG_INFO, "line 0")));
+  EXPECT_TRUE(store.Add(BuildLogMessage(FUCHSIA_LOG_INFO, "line 1")));
+  EXPECT_TRUE(store.Add(BuildLogMessage(FUCHSIA_LOG_INFO, "line 2")));
+  EXPECT_TRUE(store.Add(BuildLogMessage(FUCHSIA_LOG_INFO, "line 3")));
+  EXPECT_TRUE(store.Add(BuildLogMessage(FUCHSIA_LOG_INFO, "line 4")));
   writer.Write();
 
   memfs_manager.Create(kReadDirectory);
@@ -303,8 +303,8 @@ TEST(WriterTest, FilesAlreadyPresent) {
 
     SystemLogWriter writer(kWriteDirectory, 2u, &store);
 
-    EXPECT_TRUE(store.Add(BuildLogMessage(fuchsia_logging::LOG_INFO, "line 0")));
-    EXPECT_TRUE(store.Add(BuildLogMessage(fuchsia_logging::LOG_INFO, "line 1")));
+    EXPECT_TRUE(store.Add(BuildLogMessage(FUCHSIA_LOG_INFO, "line 0")));
+    EXPECT_TRUE(store.Add(BuildLogMessage(FUCHSIA_LOG_INFO, "line 1")));
     writer.Write();
   }
   {
@@ -316,8 +316,8 @@ TEST(WriterTest, FilesAlreadyPresent) {
 
     SystemLogWriter writer(kWriteDirectory, 2u, &store);
 
-    EXPECT_TRUE(store.Add(BuildLogMessage(fuchsia_logging::LOG_INFO, "line 2")));
-    EXPECT_TRUE(store.Add(BuildLogMessage(fuchsia_logging::LOG_INFO, "line 3")));
+    EXPECT_TRUE(store.Add(BuildLogMessage(FUCHSIA_LOG_INFO, "line 2")));
+    EXPECT_TRUE(store.Add(BuildLogMessage(FUCHSIA_LOG_INFO, "line 3")));
     writer.Write();
   }
 
@@ -353,9 +353,9 @@ TEST(WriterTest, FailCreateDirectory) {
   // writes.
   memfs_manager.Create(kRootDirectory);
 
-  EXPECT_TRUE(store.Add(BuildLogMessage(fuchsia_logging::LOG_INFO, "line 0")));
-  EXPECT_TRUE(store.Add(BuildLogMessage(fuchsia_logging::LOG_INFO, "line 1")));
-  EXPECT_FALSE(store.Add(BuildLogMessage(fuchsia_logging::LOG_INFO, "line 2")));
+  EXPECT_TRUE(store.Add(BuildLogMessage(FUCHSIA_LOG_INFO, "line 0")));
+  EXPECT_TRUE(store.Add(BuildLogMessage(FUCHSIA_LOG_INFO, "line 1")));
+  EXPECT_FALSE(store.Add(BuildLogMessage(FUCHSIA_LOG_INFO, "line 2")));
   writer.Write();
 
   memfs_manager.Create(kReadDirectory);
@@ -368,8 +368,8 @@ TEST(WriterTest, FailCreateDirectory) {
   std::string contents;
   EXPECT_FALSE(files::ReadFileToString(kOutputFile, &contents));
 
-  EXPECT_TRUE(store.Add(BuildLogMessage(fuchsia_logging::LOG_INFO, "line 3")));
-  EXPECT_TRUE(store.Add(BuildLogMessage(fuchsia_logging::LOG_INFO, "line 4")));
+  EXPECT_TRUE(store.Add(BuildLogMessage(FUCHSIA_LOG_INFO, "line 3")));
+  EXPECT_TRUE(store.Add(BuildLogMessage(FUCHSIA_LOG_INFO, "line 4")));
   writer.Write();
 
   ASSERT_TRUE(Concatenate(kWriteDirectory, kMaxDecompressedSize, &decoder, kOutputFile,
@@ -396,9 +396,9 @@ TEST(WriterTest, DirectoryDisappears) {
   // Destroy kWriteDirectory so the next set of writes fail and the directory is recreated.
   ASSERT_TRUE(files::DeletePath(kWriteDirectory, /*recursive=*/true));
 
-  EXPECT_TRUE(store.Add(BuildLogMessage(fuchsia_logging::LOG_INFO, "line 0")));
-  EXPECT_TRUE(store.Add(BuildLogMessage(fuchsia_logging::LOG_INFO, "line 1")));
-  EXPECT_FALSE(store.Add(BuildLogMessage(fuchsia_logging::LOG_INFO, "line 2")));
+  EXPECT_TRUE(store.Add(BuildLogMessage(FUCHSIA_LOG_INFO, "line 0")));
+  EXPECT_TRUE(store.Add(BuildLogMessage(FUCHSIA_LOG_INFO, "line 1")));
+  EXPECT_FALSE(store.Add(BuildLogMessage(FUCHSIA_LOG_INFO, "line 2")));
   writer.Write();
 
   memfs_manager.Create(kReadDirectory);
@@ -411,8 +411,8 @@ TEST(WriterTest, DirectoryDisappears) {
   std::string contents;
   EXPECT_FALSE(files::ReadFileToString(kOutputFile, &contents));
 
-  EXPECT_TRUE(store.Add(BuildLogMessage(fuchsia_logging::LOG_INFO, "line 3")));
-  EXPECT_TRUE(store.Add(BuildLogMessage(fuchsia_logging::LOG_INFO, "line 4")));
+  EXPECT_TRUE(store.Add(BuildLogMessage(FUCHSIA_LOG_INFO, "line 3")));
+  EXPECT_TRUE(store.Add(BuildLogMessage(FUCHSIA_LOG_INFO, "line 4")));
   writer.Write();
 
   ASSERT_TRUE(Concatenate(kWriteDirectory, kMaxDecompressedSize, &decoder, kOutputFile,

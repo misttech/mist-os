@@ -687,9 +687,6 @@ pub async fn handle_input_device_registry_request_streams(
     injected_devices_node: inspect::Node,
     metrics_logger: metrics::MetricsLogger,
 ) {
-    // Use a high value device id to avoid conflicting device ids.
-    let mut device_id = u32::MAX;
-
     while let Some(stream) = stream_receiver.next().await {
         let input_device_types_clone = input_device_types.clone();
         let input_event_sender_clone = input_event_sender.clone();
@@ -708,7 +705,6 @@ pub async fn handle_input_device_registry_request_streams(
                 &input_device_types_clone,
                 &input_event_sender_clone,
                 &input_device_bindings_clone,
-                device_id,
                 &node_clone,
                 metrics_logger_clone,
             )
@@ -725,7 +721,6 @@ pub async fn handle_input_device_registry_request_streams(
             }
         })
         .detach();
-        device_id -= 1;
     }
 }
 

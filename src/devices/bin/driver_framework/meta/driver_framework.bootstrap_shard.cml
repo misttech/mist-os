@@ -72,7 +72,6 @@
             to: "#driver_manager",
             config: [
                 "fuchsia.driver.DelayFallbackUntilBaseDriversIndexed",
-                "fuchsia.driver.manager.DriverHostCrashPolicy",
                 "fuchsia.driver.manager.EnableTestShutdownDelays",
                 "fuchsia.driver.manager.RootDriver",
             ],
@@ -333,22 +332,13 @@
             source_availability: "unknown",
         },
         {
-            protocol: [ "fuchsia.inspect.InspectSink" ],
-            from: "#driver_manager",
-            to: "#boot-drivers",
-        },
-        {
-            protocol: [ "fuchsia.logger.LogSink" ],
-            from: "#archivist",
-            to: "#boot-drivers",
-        },
-        {
             protocol: [
                 "fuchsia.inspect.InspectSink",
                 "fuchsia.logger.LogSink",
             ],
             from: "#archivist",
             to: [
+                "#boot-drivers",
                 "#devfs",
                 "#devfs-with-pkg",
                 "#driver-hosts",
@@ -384,6 +374,10 @@
                 "fuchsia.hardware.rtc.Service",
                 "fuchsia.hardware.sockettunnel.Service",
             ],
+            from: "#boot-drivers",
+        },
+        {
+            service: "fuchsia.hardware.spmi.Service",
             from: "#boot-drivers",
         },
         {

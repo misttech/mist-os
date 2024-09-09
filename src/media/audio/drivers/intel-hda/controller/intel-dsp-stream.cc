@@ -138,8 +138,11 @@ void IntelDspStream::WatchDelayInfo(WatchDelayInfoCompleter::Sync& completer) {
 }
 
 void IntelDspStream::handle_unknown_method(
-    fidl::UnknownMethodMetadata<fuchsia_hardware_audio::RingBuffer>,
-    fidl::UnknownMethodCompleter::Sync&) {}
+    fidl::UnknownMethodMetadata<fuchsia_hardware_audio::RingBuffer> metadata,
+    fidl::UnknownMethodCompleter::Sync& completer) {
+  LOG(ERROR, "IntelDspStream::handle_unknown_method (RingBuffer) ordinal %zu",
+      metadata.method_ordinal);
+}
 
 void IntelDspStream::OnResetLocked() {
   // TODO(https://fxbug.dev/42165215): As part of redesign SST implement the ability to recover via

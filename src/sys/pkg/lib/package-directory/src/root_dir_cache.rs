@@ -9,6 +9,7 @@ use std::collections::HashMap;
 use std::sync::{Arc, Weak};
 
 /// `RootDirCache` is a cache of `Arc<RootDir>`s indexed by their hash.
+///
 /// The cache internally stores `Weak<RootDir>`s and installs a custom `dropper` in its managed
 /// `RootDir`s that removes the corresponding entry when dropped, so it is a cache of
 /// `Arc<RootDir>`s that are actively in use by its clients. This is useful for deduplicating

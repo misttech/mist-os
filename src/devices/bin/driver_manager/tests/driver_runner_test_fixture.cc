@@ -68,8 +68,8 @@ zx::result<fidl::ClientEnd<fuchsia_ldsvc::Loader>> LoaderFactory() {
   return zx::ok(std::move(endpoints->client));
 }
 
-std::unique_ptr<driver_loader::Loader> DynamicLinkerFactory() {
-  return driver_loader::Loader::Create();
+std::unique_ptr<driver_loader::Loader> DynamicLinkerFactory(async_dispatcher_t* dispatcher) {
+  return driver_loader::Loader::Create(dispatcher);
 }
 
 fdecl::ChildRef CreateChildRef(std::string name, std::string collection) {
@@ -143,6 +143,40 @@ class TestTransaction : public fidl::Transaction {
 
   bool close_;
 };
+
+void DriverHostComponentStart(driver_runner::TestRealm& realm,
+                              driver_manager::DriverHostRunner& driver_host_runner,
+                              fidl::ClientEnd<fuchsia_io::Directory> driver_host_pkg) {
+  fidl::Arena arena;
+
+  fidl::VectorView<fdata::wire::DictionaryEntry> program_entries(arena, 1);
+  program_entries[0].key.Set(arena, "binary");
+  program_entries[0].value = fdata::wire::DictionaryValue::WithStr(arena, "bin/driver_host2");
+  auto program_builder = fdata::wire::Dictionary::Builder(arena);
+  program_builder.entries(program_entries);
+
+  fidl::VectorView<frunner::wire::ComponentNamespaceEntry> ns_entries(arena, 1);
+  ns_entries[0] = frunner::wire::ComponentNamespaceEntry::Builder(arena)
+                      .path("/pkg")
+                      .directory(std::move(driver_host_pkg))
+                      .Build();
+
+  auto start_info_builder = frunner::wire::ComponentStartInfo::Builder(arena);
+  start_info_builder.resolved_url("fuchsia-boot:///driver_host2#meta/driver_host2.cm")
+      .program(program_builder.Build())
+      .ns(ns_entries)
+      .numbered_handles(realm.TakeHandles(arena));
+
+  auto controller_endpoints = fidl::Endpoints<frunner::ComponentController>::Create();
+  TestTransaction transaction(false);
+  {
+    fidl::WireServer<frunner::ComponentRunner>::StartCompleter::Sync completer(&transaction);
+    fidl::WireRequest<frunner::ComponentRunner::Start> request{
+        start_info_builder.Build(), std::move(controller_endpoints.server)};
+    static_cast<fidl::WireServer<frunner::ComponentRunner>&>(driver_host_runner)
+        .Start(&request, completer);
+  }
+}
 
 fidl::ClientEnd<fuchsia_component::Realm> DriverRunnerTest::ConnectToRealm() {
   auto realm_endpoints = fidl::Endpoints<fcomponent::Realm>::Create();
@@ -219,12 +253,14 @@ void DriverRunnerTest::SetupDriverRunner(FakeDriverIndex driver_index) {
 }
 
 void DriverRunnerTest::SetupDriverRunnerWithDynamicLinker(
+    async_dispatcher_t* loader_dispatcher,
     std::unique_ptr<driver_manager::DriverHostRunner> driver_host_runner) {
   driver_index_.emplace(CreateDriverIndex());
-  driver_runner_.emplace(ConnectToRealm(), driver_index_->Connect(), inspect(), &LoaderFactory,
-                         dispatcher(), false,
-                         driver_manager::DriverRunner::DynamicLinkerArgs{
-                             &DynamicLinkerFactory, std::move(driver_host_runner)});
+  driver_runner_.emplace(
+      ConnectToRealm(), driver_index_->Connect(), inspect(), &LoaderFactory, dispatcher(), false,
+      driver_manager::DriverRunner::DynamicLinkerArgs{
+          [dispatcher = loader_dispatcher]() { return DynamicLinkerFactory(dispatcher); },
+          std::move(driver_host_runner)});
   SetupDevfs();
 }
 
@@ -292,7 +328,8 @@ void DriverRunnerTest::StopDriverComponent(
 }
 DriverRunnerTest::StartDriverResult DriverRunnerTest::StartDriver(
     Driver driver, std::optional<StartDriverHandler> start_handler,
-    fidl::ClientEnd<fuchsia_io::Directory> ns_pkg) {
+    fidl::ClientEnd<fuchsia_io::Directory> ns_pkg,
+    fidl::ClientEnd<fuchsia_io::Directory> driver_host_pkg) {
   std::unique_ptr<TestDriver> started_driver;
   driver_host().SetStartHandler(
       [&started_driver, dispatcher = dispatcher(), start_handler = std::move(start_handler)](
@@ -368,6 +405,16 @@ DriverRunnerTest::StartDriverResult DriverRunnerTest::StartDriver(
         .Start(&request, completer);
   }
   RunLoopUntilIdle();
+
+  // The driver manager is waiting for the component framework to call the driver
+  // host runner's component Start implementation. We need to call it
+  // now to continue with starting the driver host and subsequently the driver.
+  if (!driver.colocate && driver.use_dynamic_linker) {
+    DriverHostComponentStart(realm(), *driver_runner().driver_host_runner_for_tests(),
+                             std::move(driver_host_pkg));
+    RunLoopUntilIdle();
+  }
+
   return {std::move(started_driver), std::move(controller_endpoints.client)};
 }
 zx::result<DriverRunnerTest::StartDriverResult> DriverRunnerTest::StartRootDriver() {
@@ -475,6 +522,8 @@ void TestDirectory::Clone(CloneRequest& request, CloneCompleter::Sync& completer
 void TestDirectory::Open(OpenRequest& request, OpenCompleter::Sync& completer) {
   open_handler_(request.path(), std::move(request.object()));
 }
+void TestDirectory::handle_unknown_method(fidl::UnknownMethodMetadata<fio::Directory>,
+                                          fidl::UnknownMethodCompleter::Sync&) {}
 void TestDriver::Stop(StopCompleter::Sync& completer) {
   stop_handler_();
   if (!dont_close_binding_in_stop_) {

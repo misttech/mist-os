@@ -441,6 +441,37 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(any(["bar_test" in v[0] for v in call_prefixes]))
         self.assertTrue(any(["baz_test" in v[0] for v in call_prefixes]))
 
+        # Try running again, but this time replay the previous execution.
+        output = mock.MagicMock(wraps=io.StringIO())
+        output.fileno = lambda: -1
+        with contextlib.redirect_stdout(output):
+            ret = await main.async_main_wrapper(
+                args.parse_args(
+                    [
+                        "--simple",
+                        "-q",
+                        "--previous",
+                        "replay",
+                        "--replay-speed",
+                        "5",
+                    ]
+                ),
+                replay_mode=True,
+            )
+            self.assertEqual(0, ret)
+
+        contents = list(map(str.strip, output.getvalue().split("\n")))
+        contents_for_printing = "\n ".join(contents)
+        self.assertTrue(
+            {
+                "PASSED: host_x64/bar_test",
+                "PASSED: fuchsia-pkg://fuchsia.com/foo-test#meta/foo_test.cm",
+                "PASSED: host_x64/baz_test",
+                "SKIPPED: host_x64/example_e2e_test",
+            }.issubset(set(contents)),
+            f"Contents were:\n {contents_for_printing}",
+        )
+
     async def test_build_e2e(self) -> None:
         """Test that we build an updates package for e2e tests"""
 

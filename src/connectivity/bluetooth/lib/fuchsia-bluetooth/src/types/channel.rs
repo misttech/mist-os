@@ -211,6 +211,10 @@ impl Channel {
         close_wait.map_ok(|_o| ())
     }
 
+    pub fn is_closed<'a>(&'a self) -> bool {
+        self.socket.is_closed()
+    }
+
     pub fn poll_datagram(
         &self,
         cx: &mut Context<'_>,
@@ -422,10 +426,12 @@ mod tests {
         let mut closed_fut = pin!(closed_fut);
 
         assert!(exec.run_until_stalled(&mut closed_fut).is_pending());
+        assert!(!recv.is_closed());
 
         drop(send);
 
         assert!(exec.run_until_stalled(&mut closed_fut).is_ready());
+        assert!(recv.is_closed());
     }
 
     #[test]

@@ -50,7 +50,7 @@ namespace {
 namespace fio = fuchsia_io;
 
 template <typename FOnOpen, typename FOnRepresentation>
-class EventHandler : public fidl::WireSyncEventHandler<fuchsia_io::Directory> {
+class EventHandler final : public fidl::WireSyncEventHandler<fuchsia_io::Directory> {
  public:
   explicit EventHandler(FOnOpen on_open, FOnRepresentation on_representation)
       : on_open_(std::move(on_open)), on_representation_(std::move(on_representation)) {}
@@ -60,6 +60,8 @@ class EventHandler : public fidl::WireSyncEventHandler<fuchsia_io::Directory> {
   void OnRepresentation(fidl::WireEvent<fuchsia_io::Directory::OnRepresentation>* event) override {
     on_representation_(event);
   }
+
+  void handle_unknown_event(fidl::UnknownEventMetadata<fuchsia_io::Directory> metadata) override {}
 
  private:
   FOnOpen on_open_;

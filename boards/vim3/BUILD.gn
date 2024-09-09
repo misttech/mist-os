@@ -4,6 +4,7 @@
 
 import("//build/assembly/board_configuration.gni")
 import("//build/assembly/board_input_bundle.gni")
+import("//build/bazel/assembly/bazel_board_input_bundle.gni")
 
 assert(current_toolchain == default_toolchain,
        "The vim3 board can only be defined in the default toolchain.")
@@ -16,6 +17,7 @@ common_board_configuration = {
   provided_features = [
     "fuchsia::bt_transport_uart",
     "fuchsia::bus_pci",
+    "fuchsia::fake_battery",
     "fuchsia::fan",
     "fuchsia::mali_gpu",
     "fuchsia::paver",
@@ -32,6 +34,7 @@ common_board_configuration = {
     ":paver",
     ":vulkan_arm_mali",
     ":rtc_driver",
+    ":bazel_drivers",
   ]
 
   devicetree = "//src/devices/board/drivers/vim3-devicetree:vim3"
@@ -160,12 +163,6 @@ board_input_bundle("main_bundle") {
       driver_components = [ "meta/dwmac.cm" ]
     },
     {
-      package_target =
-          "//src/connectivity/ethernet/drivers/realtek-8211f:package"
-      package_set = "bootfs"
-      driver_components = [ "meta/realtek-8211f.cm" ]
-    },
-    {
       package_target = "//src/devices/adc/drivers/aml-saradc:package"
       package_set = "bootfs"
       driver_components = [ "meta/aml-saradc.cm" ]
@@ -176,29 +173,14 @@ board_input_bundle("main_bundle") {
       driver_components = [ "meta/aml-sdmmc.cm" ]
     },
     {
-      package_target = "//src/devices/clock/drivers/vim3-clk:bazel_package"
-      package_set = "bootfs"
-      driver_components = [ "meta/vim3-clk.cm" ]
-    },
-    {
       package_target = "//src/devices/cpu/drivers/aml-cpu:package"
       package_set = "bootfs"
       driver_components = [ "meta/aml-cpu.cm" ]
     },
     {
-      package_target = "//src/devices/gpio/drivers/aml-gpio:bazel_package"
-      package_set = "bootfs"
-      driver_components = [ "meta/aml-gpio.cm" ]
-    },
-    {
       package_target = "//src/devices/gpio/drivers/ti-tca6408a:package"
       package_set = "bootfs"
       driver_components = [ "meta/ti-tca6408a.cm" ]
-    },
-    {
-      package_target = "//src/devices/i2c/drivers/aml-i2c:bazel_package"
-      package_set = "bootfs"
-      driver_components = [ "meta/aml-i2c.cm" ]
     },
     {
       package_target = "//src/devices/mcu/drivers/vim3-mcu:package"
@@ -261,11 +243,6 @@ board_input_bundle("main_bundle") {
       driver_components = [ "meta/dwc2.cm" ]
     },
     {
-      package_target = "//src/devices/usb/drivers/aml-usb-phy:bazel_package"
-      package_set = "bootfs"
-      driver_components = [ "meta/aml-usb-phy.cm" ]
-    },
-    {
       package_target = "//src/graphics/display/drivers/aml-canvas:package"
       package_set = "bootfs"
       driver_components = [ "meta/aml-canvas.cm" ]
@@ -287,19 +264,9 @@ board_input_bundle("main_bundle") {
       driver_components = [ "meta/aml-gpu.cm" ]
     },
     {
-      package_target = "//src/media/audio/drivers/aml-g12-tdm:aml-g12-composite-bazel-package"
-      package_set = "bootfs"
-      driver_components = [ "meta/aml-g12-composite.cm" ]
-    },
-    {
       package_target = "//src/ui/backlight/drivers/vim3-pwm-backlight:package"
       package_set = "bootfs"
       driver_components = [ "meta/vim3-pwm-backlight.cm" ]
-    },
-    {
-      package_target = "//src/ui/input/drivers/adc-buttons:bazel_package"
-      package_set = "bootfs"
-      driver_components = [ "meta/adc-buttons.cm" ]
     },
     {
       package_target = "//src/ui/input/drivers/focaltech:package"
@@ -325,16 +292,7 @@ board_input_bundle("main_bundle") {
       package_set = "base"
       driver_components = [ "meta/libmsd_vsi.cm" ]
     },
-    {
-      package_target = "//src/power/fake-powersource:fake-battery"
-      package_set = "base"
-      driver_components = [ "meta/fake_battery.cm" ]
-    },
   ]
-
-  # Flag controlling kernel's uart implementation.
-  # TODO(https://fxbug.dev/326669461): Remove when migration is complete.
-  kernel_cmdline = [ "kernel.experimental.serial_migration=true" ]
 }
 
 board_input_bundle("devicetree_board_driver") {
@@ -349,14 +307,11 @@ board_input_bundle("devicetree_board_driver") {
       "//src/devices/sysmem/format_costs/video_decoder_nv12",
     ]
   }
-  drivers = [
-    {
-      package_target =
-          "//src/devices/board/drivers/vim3-devicetree:bazel_package"
-      package_set = "bootfs"
-      driver_components = [ "meta/vim3-devicetree.cm" ]
-    },
-  ]
+  drivers = []
+}
+
+bazel_board_input_bundle("bazel_drivers") {
+  bazel_board_input_bundle_target = "//boards/vim3:bazel_drivers"
 }
 
 board_input_bundle("vulkan_arm_mali") {

@@ -49,8 +49,8 @@ zx_status_t platform_halt_secondary_cpus(zx_time_t deadline) {
   // Ensure the current thread is pinned to the boot CPU.
   {
     Thread* current_thread = Thread::Current::Get();
-    SingletonChainLockGuardIrqSave guard{current_thread->get_lock(),
-                                         CLT_TAG("platform_halt_secondary_cpus")};
+    SingleChainLockGuard guard{IrqSaveOption, current_thread->get_lock(),
+                               CLT_TAG("platform_halt_secondary_cpus")};
     DEBUG_ASSERT(current_thread->scheduler_state().hard_affinity() == cpu_num_to_mask(BOOT_CPU_ID));
   }
 

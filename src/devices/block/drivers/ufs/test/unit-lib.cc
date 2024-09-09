@@ -22,7 +22,7 @@ void UfsTest::InitMockDevice() {
   ZX_ASSERT(mock_device_.AddLun(0) == ZX_OK);
 }
 
-void UfsTest::StartDriver() {
+void UfsTest::StartDriver(bool supply_power_framework) {
   // Initialize driver test environment.
   fuchsia_driver_framework::DriverStartArgs start_args;
   fidl::ClientEnd<fuchsia_io::Directory> outgoing_directory_client;
@@ -33,17 +33,42 @@ void UfsTest::StartDriver() {
     outgoing_directory_client = std::move(start_args_result->outgoing_directory_client);
 
     ASSERT_OK(incoming->env.Initialize(std::move(start_args_result->incoming_directory_server)));
-  });
 
-  // Serve (fake) pci_server.
-  incoming_.SyncCall([&](IncomingNamespace *incoming) mutable {
+    // Serve (fake) pci_server.
     {
       auto result = incoming->env.incoming_directory().AddService<fuchsia_hardware_pci::Service>(
           std::move(incoming->pci_server.GetInstanceHandler()), "pci");
       ASSERT_TRUE(result.is_ok());
     }
     incoming->pci_server.SetMockDevice(&mock_device_);
+
+    // Server Power Framework
+    if (supply_power_framework) {
+      // Serve (fake) system_activity_governor.
+      {
+        auto result = incoming->env.incoming_directory()
+                          .component()
+                          .AddUnmanagedProtocol<fuchsia_power_system::ActivityGovernor>(
+                              incoming->system_activity_governor->CreateHandler());
+        ASSERT_TRUE(result.is_ok());
+      }
+
+      // Serve (fake) power_broker.
+      {
+        auto result = incoming->env.incoming_directory()
+                          .component()
+                          .AddUnmanagedProtocol<fuchsia_power_broker::Topology>(
+                              incoming->power_broker.CreateHandler());
+        ASSERT_TRUE(result.is_ok());
+      }
+    }
   });
+
+  {
+    ufs_config::Config fake_config;
+    fake_config.enable_suspend() = supply_power_framework;
+    start_args.config(fake_config.ToVmo());
+  }
 
   // Start dut_.
   TestUfs::SetMockDevice(&mock_device_);
@@ -52,7 +77,7 @@ void UfsTest::StartDriver() {
 
 void UfsTest::SetUp() {
   InitMockDevice();
-  StartDriver();
+  StartDriver(/*supply_power_framework=*/false);
 }
 
 void UfsTest::TearDown() {
@@ -69,12 +94,17 @@ zx_status_t UfsTest::DisableController() { return dut_->DisableHostController();
 
 zx_status_t UfsTest::EnableController() { return dut_->EnableHostController(); }
 
-zx::result<> UfsTest::FillDescriptorAndSendRequest(uint8_t slot, DataDirection ddir,
-                                                   uint16_t resp_offset, uint16_t resp_len,
-                                                   uint16_t prdt_offset,
-                                                   uint16_t prdt_entry_count) {
+zx::result<> UfsTest::TransferFillDescriptorAndSendRequest(uint8_t slot, DataDirection ddir,
+                                                           uint16_t resp_offset, uint16_t resp_len,
+                                                           uint16_t prdt_offset,
+                                                           uint16_t prdt_entry_count) {
   return dut_->GetTransferRequestProcessor().FillDescriptorAndSendRequest(
       slot, ddir, resp_offset, resp_len, prdt_offset, prdt_entry_count);
+}
+
+zx::result<> UfsTest::TaskManagementFillDescriptorAndSendRequest(
+    uint8_t slot, TaskManagementRequestUpiu &request) {
+  return dut_->GetTaskManagementRequestProcessor().FillDescriptorAndSendRequest(slot, request);
 }
 
 zx::result<> UfsTest::MapVmo(zx::unowned_vmo &vmo, fzl::VmoMapper &mapper, uint64_t offset,

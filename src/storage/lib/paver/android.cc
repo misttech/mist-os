@@ -5,6 +5,7 @@
 #include "src/storage/lib/paver/android.h"
 
 #include <fidl/fuchsia.device.manager/cpp/common_types.h>
+#include <lib/fidl/cpp/channel.h>
 #include <lib/zx/result.h>
 #include <zircon/process.h>
 #include <zircon/processargs.h>
@@ -15,7 +16,6 @@
 #include <string>
 
 #include <fbl/algorithm.h>
-#include <src/lib/fidl/cpp/include/lib/fidl/cpp/channel.h>
 #include <src/lib/uuid/uuid.h>
 
 #include "src/storage/lib/paver/boot_control_definition.h"

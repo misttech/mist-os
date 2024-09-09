@@ -197,7 +197,7 @@ void CreateSoftAPTest::DeleteInterface() {
 void CreateSoftAPTest::GetApSetSsidErrInspectCount(uint64_t* out_count) {
   ASSERT_NOT_NULL(out_count);
   WithSimDevice([&](brcmfmac::SimDevice* device) {
-    auto hierarchy = FetchHierarchy(device->GetInspect()->inspector());
+    auto hierarchy = FetchHierarchy(device->GetInspector());
     auto* root = hierarchy.value().GetByPath({"brcmfmac-phy"});
     ASSERT_NOT_NULL(root);
     // Only verify the value of hourly counter here, the relationship between hourly counter and

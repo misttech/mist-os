@@ -34,8 +34,6 @@ TEST(Pipe, UnsupportedOps) {
   ASSERT_ERRNO(ENOTSOCK);
   ASSERT_EQ(getpeername(read_end.get(), nullptr, nullptr), -1);
   ASSERT_ERRNO(ENOTSOCK);
-  ASSERT_EQ(getsockopt(read_end.get(), 0, 0, nullptr, nullptr), -1);
-  ASSERT_ERRNO(ENOTSOCK);
   ASSERT_EQ(setsockopt(read_end.get(), 0, 0, nullptr, 0), -1);
   ASSERT_ERRNO(ENOTSOCK);
 }

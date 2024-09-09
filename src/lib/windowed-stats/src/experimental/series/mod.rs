@@ -4,7 +4,7 @@
 
 //! Round-robin multi-resolution time series.
 
-mod buffer;
+pub(crate) mod buffer;
 mod interval;
 
 pub mod interpolation;
@@ -66,6 +66,23 @@ pub trait Fill<T>: Sampler<T> {
     fn fill(&mut self, sample: T, n: usize) -> Result<(), Self::Error>;
 }
 
+pub trait Interpolator {
+    type Error;
+
+    /// Interpolates samples to the given timestamp.
+    ///
+    /// This function queries the aggregations of the series. Typically, the timestamp is the
+    /// current time.
+    fn interpolate(&mut self, timestamp: Timestamp) -> Result<(), Self::Error>;
+
+    /// Interpolates samples to the given timestamp and gets the serialized aggregation buffers.
+    ///
+    /// This function queries the aggregations of the series. Typically, the timestamp is the
+    /// current time.
+    fn interpolate_and_get_buffers(&mut self, timestamp: Timestamp)
+        -> Result<Vec<u8>, Self::Error>;
+}
+
 /// A buffered round-robin sampler over [timed samples][`TimedSample`] (e.g., a [`TimeMatrix`]).
 ///
 /// Round-robin samplers aggregate samples into buffered time series and produce a serialized
@@ -73,21 +90,9 @@ pub trait Fill<T>: Sampler<T> {
 ///
 /// [`TimedSample`]: crate::experimental::clock::TimedSample
 /// [`TimeMatrix`]: crate::experimental::series::TimeMatrix
-pub trait RoundRobinSampler<T>: Sampler<TimedSample<T>, Error = FoldError> {
-    /// Interpolates samples to the given timestamp.
-    ///
-    /// This function queries the aggregations of the series. Typically, the timestamp is the
-    /// current time.
-    fn interpolate(&mut self, timestamp: impl Into<Timestamp>) -> Result<(), Self::Error>;
-
-    /// Interpolates samples to the given timestamp and gets the serialized aggregation buffers.
-    ///
-    /// This function queries the aggregations of the series. Typically, the timestamp is the
-    /// current time.
-    fn interpolate_and_get_buffers(
-        &mut self,
-        timestamp: impl Into<Timestamp>,
-    ) -> Result<Vec<u8>, Self::Error>;
+pub trait RoundRobinSampler<T>:
+    Interpolator<Error = FoldError> + Sampler<TimedSample<T>, Error = FoldError>
+{
 }
 
 /// A type that describes the semantics of data folded by `Sampler`s.
@@ -488,13 +493,15 @@ where
     }
 }
 
-impl<F, P> RoundRobinSampler<F::Sample> for TimeMatrix<F, P>
+impl<F, P> Interpolator for TimeMatrix<F, P>
 where
     FoldError: From<F::Error>,
     F: BufferStrategy<F::Aggregation, P> + Statistic,
     P: Interpolation<FillSample<F> = F::Sample>,
 {
-    fn interpolate(&mut self, timestamp: impl Into<Timestamp>) -> Result<(), Self::Error> {
+    type Error = FoldError;
+
+    fn interpolate(&mut self, timestamp: Timestamp) -> Result<(), Self::Error> {
         let tick = self.last.tick(timestamp.into(), false)?;
         Ok(for buffer in self.buffers.iter_mut() {
             buffer.interpolate(tick)?;
@@ -503,8 +510,8 @@ where
 
     fn interpolate_and_get_buffers(
         &mut self,
-        timestamp: impl Into<Timestamp>,
-    ) -> Result<Vec<u8>, FoldError> {
+        timestamp: Timestamp,
+    ) -> Result<Vec<u8>, Self::Error> {
         self.interpolate(timestamp)?;
         let series_buffers = self
             .buffers
@@ -531,6 +538,14 @@ where
     }
 }
 
+impl<F, P> RoundRobinSampler<F::Sample> for TimeMatrix<F, P>
+where
+    FoldError: From<F::Error>,
+    F: BufferStrategy<F::Aggregation, P> + Statistic,
+    P: Interpolation<FillSample<F> = F::Sample>,
+{
+}
+
 #[cfg(test)]
 mod tests {
     use fuchsia_async as fasync;
@@ -540,7 +555,9 @@ mod tests {
     use crate::experimental::series::statistic::{
         ArithmeticMean, LatchMax, Max, PostAggregation, Sum, Transform, Union,
     };
-    use crate::experimental::series::{RoundRobinSampler, Sampler, SamplingProfile, TimeMatrix};
+    use crate::experimental::series::{
+        Interpolator, RoundRobinSampler, Sampler, SamplingProfile, TimeMatrix,
+    };
 
     fn fold_and_interpolate_f32(sampler: &mut impl RoundRobinSampler<f32>) {
         sampler.fold(TimedSample::now(0.0)).unwrap();

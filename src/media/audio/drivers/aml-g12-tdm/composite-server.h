@@ -4,16 +4,17 @@
 #ifndef SRC_MEDIA_AUDIO_DRIVERS_AML_G12_TDM_COMPOSITE_SERVER_H_
 #define SRC_MEDIA_AUDIO_DRIVERS_AML_G12_TDM_COMPOSITE_SERVER_H_
 
+#include <fidl/fuchsia.hardware.audio.signalprocessing/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.audio/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.clock/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.gpio/cpp/fidl.h>
 #include <lib/async/cpp/task.h>
 #include <lib/fzl/pinned-vmo.h>
-#include <lib/inspect/cpp/inspect.h>
 #include <lib/trace/event.h>
 #include <lib/zx/result.h>
 
 #include "src/media/audio/drivers/aml-g12-tdm/aml-tdm-config-device.h"
+#include "src/media/audio/drivers/aml-g12-tdm/recorder.h"
 
 namespace audio::aml_g12 {
 
@@ -55,8 +56,12 @@ class RingBufferServer final : public fidl::Server<fuchsia_hardware_audio::RingB
   void WatchDelayInfo(WatchDelayInfoCompleter::Sync& completer) override;
   void SetActiveChannels(fuchsia_hardware_audio::RingBufferSetActiveChannelsRequest& request,
                          SetActiveChannelsCompleter::Sync& completer) override;
-  void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_hardware_audio::RingBuffer>,
-                             fidl::UnknownMethodCompleter::Sync&) override;
+  void handle_unknown_method(
+      fidl::UnknownMethodMetadata<fuchsia_hardware_audio::RingBuffer> metadata,
+      fidl::UnknownMethodCompleter::Sync& completer) override;
+
+  RingBufferRecorder& ring_buffer_inspect() { return ring_buffer_recorder_; }
+  std::unique_ptr<Recorder>& device_inspect();
 
  private:
   void OnRingBufferClosed(fidl::UnbindInfo info);
@@ -89,74 +94,7 @@ class RingBufferServer final : public fidl::Server<fuchsia_hardware_audio::RingB
   };
   DelayCompleter delay_completer_;
 
-  // Inspect-related
-  //
-  void PopulateInstanceNode(size_t ring_buffer_index);
-
-  class ActiveChannelsCall {
-   public:
-    ActiveChannelsCall(inspect::Node node, uint64_t channel_mask, zx_time_t call_time,
-                       zx_time_t completion_time)
-        : node_(std::move(node)) {
-      channel_mask_ = node_.CreateUint("channel bitmask", channel_mask);
-      call_time_ = node_.CreateUint("called at      ", call_time);
-      completion_time_ = node_.CreateUint("effective at   ", completion_time);
-    }
-    inspect::Node& node() { return node_; }
-
-   private:
-    inspect::Node node_;
-    inspect::UintProperty channel_mask_;
-    inspect::UintProperty call_time_;
-    inspect::UintProperty completion_time_;
-  };
-  std::vector<ActiveChannelsCall> active_channels_calls_;
-
-  class RunningInterval {
-   public:
-    RunningInterval(inspect::Node node, zx_time_t start_time) : node_(std::move(node)) {
-      start_time_ = node_.CreateUint("started at", start_time);
-      stop_time_ = node_.CreateUint("stopped at", 0);
-    }
-    inspect::Node& node() { return node_; }
-    void SetStopTime(zx_time_t stop_time) { stop_time_.Set(stop_time); }
-
-   private:
-    inspect::Node node_;
-    inspect::UintProperty start_time_;
-    inspect::UintProperty stop_time_;
-  };
-  std::vector<RunningInterval> running_intervals_;
-
-  // updaters
-  void RecordDestructionTime(zx_time_t destruction_time) { destroyed_at_.Set(destruction_time); }
-
-  void RecordStartTime(zx_time_t start_time) {
-    RunningInterval running_interval{
-        running_intervals_root_.CreateChild(std::to_string(running_intervals_.size())), start_time};
-    running_intervals_.emplace_back(std::move(running_interval));
-  }
-  void RecordStopTime(zx_time_t stop_time) { running_intervals_.rbegin()->SetStopTime(stop_time); }
-
-  void RecordActiveChannelsCall(uint64_t active_channels_bitmask,
-                                zx_time_t set_active_channels_call_time,
-                                zx_time_t active_channels_time_complete) {
-    ActiveChannelsCall active_channels_call{
-        active_channels_calls_root_.CreateChild(std::to_string(active_channels_calls_.size())),
-        active_channels_bitmask, set_active_channels_call_time, active_channels_time_complete};
-    active_channels_calls_.emplace_back(std::move(active_channels_call));
-  }
-
-  inspect::Node instance_node_;
-  inspect::Node active_channels_calls_root_;
-  inspect::Node running_intervals_root_;
-  inspect::IntProperty created_at_;
-  inspect::IntProperty started_at_;
-  inspect::IntProperty set_active_channels_called_at_;
-  inspect::UintProperty current_active_channels_bitmask_;
-  inspect::IntProperty set_active_channels_completed_at_;
-  inspect::IntProperty stopped_at_;
-  inspect::IntProperty destroyed_at_;
+  RingBufferRecorder& ring_buffer_recorder_;
 };
 
 class AudioCompositeServer final
@@ -171,16 +109,13 @@ class AudioCompositeServer final
       fidl::WireSyncClient<fuchsia_hardware_clock::Clock> clock_gate_client,
       fidl::WireSyncClient<fuchsia_hardware_clock::Clock> pll_client,
       std::vector<fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio>> gpio_sclk_clients,
-      inspect::Node& inspect_root);
+      std::unique_ptr<Recorder> recorder);
 
   async_dispatcher_t* dispatcher() { return dispatcher_; }
   zx::bti& bti() { return bti_; }
   fuchsia_hardware_audio::DaiFormat& current_dai_formats(size_t dai_index) {
     ZX_ASSERT(current_dai_formats_[dai_index].has_value());
     return *current_dai_formats_[dai_index];
-  }
-  size_t next_ring_buffer_instance_index(size_t engine_index) {
-    return ring_buffer_instance_count_[engine_index]++;
   }
 
  protected:
@@ -207,12 +142,16 @@ class AudioCompositeServer final
   void GetTopologies(GetTopologiesCompleter::Sync& completer) override;
   void WatchTopology(WatchTopologyCompleter::Sync& completer) override;
   void SetTopology(SetTopologyRequest& request, SetTopologyCompleter::Sync& completer) override;
-  void handle_unknown_method(
-      fidl::UnknownMethodMetadata<
-          typename fuchsia_hardware_audio_signalprocessing::SignalProcessing>,
-      fidl::UnknownMethodCompleter::Sync&) override;
+  void handle_unknown_method(fidl::UnknownMethodMetadata<
+                                 typename fuchsia_hardware_audio_signalprocessing::SignalProcessing>
+                                 metadata,
+                             fidl::UnknownMethodCompleter::Sync& completer) override;
+
+  std::unique_ptr<Recorder>& device_inspect() { return recorder_; }
 
  private:
+  friend void Recorder::PopulateInspectNodes();
+
   static constexpr std::array<fuchsia_hardware_audio::ElementId, kNumberOfPipelines> kDaiIds = {
       1, 2, 3};
   static constexpr std::array<fuchsia_hardware_audio::ElementId, kNumberOfTdmEngines>
@@ -267,83 +206,7 @@ class AudioCompositeServer final
   trace_async_id_t trace_async_id_;
 
   // Inspect-related
-  //
-  class PowerTransition {
-   public:
-    PowerTransition(inspect::Node node, bool state, const zx::time& call_time,
-                    const zx::time& completion_time)
-        : node_(std::move(node)) {
-      state_ = node_.CreateBool("power state ", state);
-      call_time_ = node_.CreateUint("called at   ", call_time.get());
-      completion_time_ = node_.CreateUint("effective at", completion_time.get());
-    }
-
-   private:
-    inspect::Node node_;
-    inspect::BoolProperty state_;
-    inspect::UintProperty call_time_;
-    inspect::UintProperty completion_time_;
-  };
-
-  class RingBufferSpecification {
-   public:
-    RingBufferSpecification(inspect::Node node, uint64_t element_id, bool supports_active_channels,
-                            bool outgoing)
-        : node_(std::move(node)) {
-      element_id_ = node_.CreateUint("element id           ", element_id);
-      supports_active_channels_ =
-          node_.CreateBool("supports active_chans", supports_active_channels);
-      outgoing_ = node_.CreateBool("is outgoing stream   ", outgoing);
-    }
-    inspect::Node& node() { return node_; }
-
-   private:
-    inspect::Node node_;
-    inspect::UintProperty element_id_;
-    inspect::BoolProperty supports_active_channels_;
-    inspect::BoolProperty outgoing_;
-  };
-
-  class DaiEntry {
-   public:
-    DaiEntry(inspect::Node node, uint64_t element_id) : node_(std::move(node)) {
-      element_id_ = node_.CreateUint("element id", element_id);
-    }
-    inspect::Node& node() { return node_; }
-
-   private:
-    inspect::Node node_;
-    inspect::UintProperty element_id_;
-  };
-
-  void PopulateInspectNodes();
-
-  // updaters
-  void RecordSocPowerUp(const zx::time& call_time, const zx::time& completion_time) {
-    current_power_state_.Set(true);
-    power_transitions_.emplace_back(
-        power_transitions_node_.CreateChild(std::to_string(power_transitions_.size())), true,
-        call_time, completion_time);
-  }
-  void RecordSocPowerDown(const zx::time& call_time, const zx::time& completion_time) {
-    current_power_state_.Set(false);
-    power_transitions_.emplace_back(
-        power_transitions_node_.CreateChild(std::to_string(power_transitions_.size())), false,
-        call_time, completion_time);
-  }
-
-  inspect::Node& inspect_root_;
-  inspect::BoolProperty current_power_state_;
-
-  inspect::Node dai_root_node_;
-  std::vector<DaiEntry> dai_entries_;
-
-  inspect::Node ring_buffers_root_node_;
-  std::vector<RingBufferSpecification> ring_buffer_specs_;
-  std::array<size_t, kNumberOfTdmEngines> ring_buffer_instance_count_{0};
-
-  inspect::Node power_transitions_node_;
-  std::vector<PowerTransition> power_transitions_;
+  std::unique_ptr<Recorder> recorder_;
 };
 
 }  // namespace audio::aml_g12

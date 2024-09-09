@@ -19,7 +19,6 @@ use display_utils::{
     INVALID_LAYER_ID,
 };
 use euclid::size2;
-use fidl::endpoints::ClientEnd;
 use fidl_fuchsia_hardware_display::{CoordinatorListenerRequest, CoordinatorProxy};
 use fidl_fuchsia_hardware_display_types::{ImageBufferUsage, ImageMetadata, INVALID_DISP_ID};
 use fuchsia_async::{self as fasync, OnSignals};
@@ -319,12 +318,7 @@ impl DisplayDirectViewStrategy {
         // display has an import_buffer_collection that takes a sysmem2 token.
         display
             .coordinator
-            .import_buffer_collection(
-                &collection_id.into(),
-                ClientEnd::<fidl_fuchsia_sysmem::BufferCollectionTokenMarker>::new(
-                    coordinator_token.into_channel(),
-                ),
-            )
+            .import_buffer_collection(&collection_id.into(), coordinator_token)
             .await?
             .map_err(zx::Status::from_raw)?;
         display

@@ -760,7 +760,9 @@ zx_status_t Blobfs::AddBlocks(size_t nblocks, RawBitmap* block_map) {
   bool failed_to_extend = (status != ZX_OK);
   inspect_tree_.UpdateFvmData(*Device(), failed_to_extend);
   if (failed_to_extend) {
-    FX_PLOGS(ERROR, status) << ":AddBlocks FVM Extend failure";
+    static OutOfSpaceLogSite site;
+    if (site.ShouldLog())
+      FX_PLOGS(ERROR, status) << ":AddBlocks FVM Extend failure";
     return status;
   }
 

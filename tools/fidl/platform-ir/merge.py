@@ -3,8 +3,6 @@
 # found in the LICENSE file.
 
 import json
-import os
-import sys
 import typing
 
 # kinds of FIDL declaration

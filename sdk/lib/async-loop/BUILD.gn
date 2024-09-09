@@ -1,0 +1,56 @@
+# Copyright 2019 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/zircon/zx_library.gni")
+
+zx_library("async-loop") {
+  sdk = "source"
+  sdk_publishable = "partner"
+  stable = true
+  sdk_headers = [ "lib/async-loop/loop.h" ]
+  configs += [ "//build/config:all_source" ]
+  sources = [ "loop.c" ]
+  public_deps = [
+    # <lib/async-loop/loop.h> has #include <lib/async/dispatcher.h>.
+    "//sdk/lib/async",
+  ]
+  deps = [ "//sdk/lib/async" ]
+}
+
+zx_library("async-loop-cpp") {
+  sdk = "source"
+  sdk_publishable = "partner"
+  stable = true
+  sdk_headers = [ "lib/async-loop/cpp/loop.h" ]
+  sources = [ "loop_wrapper.cc" ]
+  deps = [
+    ":async-loop",
+    "//sdk/lib/async",
+  ]
+  public_deps = [
+    ":async-loop",
+
+    # <lib/async-loop/cpp/loop.h> has #include <lib/zx/time.h>.
+    "//zircon/system/ulib/zx",
+  ]
+}
+
+zx_library("async-loop-default") {
+  sdk = "static"
+  sdk_publishable = "partner"
+  sdk_headers = [ "lib/async-loop/default.h" ]
+
+  sources = [ "default.c" ]
+  deps = [ "//sdk/lib/async-default" ]
+  public_deps = [
+    # <lib/async-loop/default.h> has #include <lib/async-loop/loop.h>.
+    ":async-loop",
+  ]
+  runtime_deps = [ "//sdk/lib/async-default:async-default_sdk" ]
+}
+
+group("tests") {
+  testonly = true
+  deps = [ "test:async-loop-test-pkg" ]
+}

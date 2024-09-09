@@ -50,14 +50,15 @@ __EXPORT
 zx::result<> CreateVolume(fidl::UnownedClientEnd<fuchsia_io::Directory> exposed_dir,
                           std::string_view name,
                           fidl::ServerEnd<fuchsia_io::Directory> outgoing_dir,
+                          fuchsia_fs_startup::wire::CreateOptions create_options,
                           fuchsia_fs_startup::wire::MountOptions options) {
   auto client = component::ConnectAt<fuchsia_fs_startup::Volumes>(exposed_dir);
   if (client.is_error())
     return client.take_error();
 
-  auto result = fidl::WireCall(*client)->Create(
-      fidl::StringView::FromExternal(name), std::move(outgoing_dir),
-      fuchsia_fs_startup::wire::CreateOptions(), std::move(options));
+  auto result =
+      fidl::WireCall(*client)->Create(fidl::StringView::FromExternal(name), std::move(outgoing_dir),
+                                      create_options, std::move(options));
   if (!result.ok())
     return zx::error(result.error().status());
   if (result->is_error())

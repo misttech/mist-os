@@ -6,7 +6,7 @@ use explicit::UnreachableExt as _;
 use net_types::SpecifiedAddr;
 use netstack3_base::socket::SocketIpAddr;
 use netstack3_base::{
-    AnyDevice, DeviceIdContext, EitherDeviceId, IpExt, Mms, UninstantiableWrapper,
+    AnyDevice, DeviceIdContext, EitherDeviceId, IpDeviceAddr, IpExt, Mms, UninstantiableWrapper,
 };
 use netstack3_filter::Tuple;
 
@@ -32,14 +32,6 @@ impl<I: IpExt, C, P: DeviceIdContext<AnyDevice>> BaseTransportIpContext<I, C>
     fn get_default_hop_limits(&mut self, _device: Option<&Self::DeviceId>) -> HopLimits {
         self.uninstantiable_unreachable()
     }
-    fn confirm_reachable_with_destination(
-        &mut self,
-        _ctx: &mut C,
-        _dst: SpecifiedAddr<I::Addr>,
-        _device: Option<&Self::DeviceId>,
-    ) {
-        self.uninstantiable_unreachable()
-    }
     fn get_original_destination(&mut self, _tuple: &Tuple<I>) -> Option<(I::Addr, u16)> {
         self.uninstantiable_unreachable()
     }
@@ -52,7 +44,7 @@ impl<I: IpExt, C, P: DeviceIdContext<AnyDevice>> IpSocketHandler<I, C>
         &mut self,
         _ctx: &mut C,
         _device: Option<EitherDeviceId<&Self::DeviceId, &Self::WeakDeviceId>>,
-        _local_ip: Option<SocketIpAddr<I::Addr>>,
+        _local_ip: Option<IpDeviceAddr<I::Addr>>,
         _remote_ip: SocketIpAddr<I::Addr>,
         _proto: I::Proto,
         _transparent: bool,
@@ -72,6 +64,14 @@ impl<I: IpExt, C, P: DeviceIdContext<AnyDevice>> IpSocketHandler<I, C>
         S::Buffer: BufferMut,
         O: SendOptions<I>,
     {
+        self.uninstantiable_unreachable()
+    }
+
+    fn confirm_reachable(
+        &mut self,
+        _bindings_ctx: &mut C,
+        _socket: &IpSock<I, Self::WeakDeviceId>,
+    ) {
         self.uninstantiable_unreachable()
     }
 }

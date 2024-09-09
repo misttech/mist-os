@@ -15,7 +15,6 @@
 
 #include "args.h"
 #include "cpu_stress.h"
-#include "flash_stress.h"
 #include "light_stress.h"
 #include "memory_stress.h"
 #include "util.h"
@@ -59,14 +58,6 @@ int Run(int argc, const char** argv) {
   switch (args.subcommand) {
     case StressTest::kCpu:
       success = StressCpu(&status, args, duration, sensor.get());
-      break;
-    case StressTest::kFlash:
-      if (args.destroy_partitions) {
-        DestroyFlashTestPartitions(&status);
-        success = true;
-      } else {
-        success = StressFlash(&status, args, duration);
-      }
       break;
     case StressTest::kLight:
       success = StressLight(&status, args, duration);

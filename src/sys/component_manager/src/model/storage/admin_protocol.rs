@@ -380,7 +380,7 @@ impl StorageAdmin {
             match Self::is_storage_dir(path) {
                 // Open the storage directory and then create a task to delete
                 (DirType::ComponentStorage, ..) => {
-                    match ffs_dir::open_directory(
+                    match ffs_dir::open_directory_deprecated(
                         root_storage,
                         entry.name.as_str(),
                         fuchsia_fs::OpenFlags::RIGHT_READABLE
@@ -706,7 +706,7 @@ mod tests {
     }
 
     async fn create_file(directory: &fio::DirectoryProxy, file_name: &str, contents: &str) {
-        let file = fuchsia_fs::directory::open_file(
+        let file = fuchsia_fs::directory::open_file_deprecated(
             directory,
             file_name,
             fio::OpenFlags::CREATE
@@ -723,7 +723,7 @@ mod tests {
         directory: &fio::DirectoryProxy,
         directory_name: &str,
     ) -> fio::DirectoryProxy {
-        fuchsia_fs::directory::create_directory(
+        fuchsia_fs::directory::create_directory_deprecated(
             directory,
             directory_name,
             fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
@@ -733,7 +733,7 @@ mod tests {
     }
 
     fn open_tempdir(tempdir: &tempfile::TempDir) -> fio::DirectoryProxy {
-        fuchsia_fs::directory::open_in_namespace(
+        fuchsia_fs::directory::open_in_namespace_deprecated(
             tempdir.path().to_str().unwrap(),
             fio::OpenFlags::DIRECTORY
                 | fio::OpenFlags::RIGHT_READABLE

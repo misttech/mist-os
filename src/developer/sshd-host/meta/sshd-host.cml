@@ -320,5 +320,10 @@
             from: "parent",
             to: "#shell",
         },
+        {
+            service: [ "fuchsia.hardware.spmi.Service" ],
+            from: "parent",
+            to: "#shell",
+        },
     ],
 }

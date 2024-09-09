@@ -389,7 +389,10 @@ impl MockRunner {
         mut stream: fcrunner::ComponentRunnerRequestStream,
     ) {
         while let Ok(Some(request)) = stream.try_next().await {
-            let fcrunner::ComponentRunnerRequest::Start { start_info, controller, .. } = request;
+            let fcrunner::ComponentRunnerRequest::Start { start_info, controller, .. } = request
+            else {
+                panic!("unknown runner request");
+            };
             self.start(start_info, controller);
         }
     }
@@ -553,7 +556,9 @@ impl MockController {
                             break;
                         }
                     }
-                    fcrunner::ComponentControllerRequest::_UnknownMethod { .. } => (),
+                    fcrunner::ComponentControllerRequest::_UnknownMethod { .. } => {
+                        panic!("unknown controller request");
+                    }
                 }
             }
         }

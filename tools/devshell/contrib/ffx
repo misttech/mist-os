@@ -4,30 +4,11 @@
 # found in the LICENSE file.
 
 #### CATEGORY=Other
-### execute ffx - future fx
+### execute ffx - developer tools for fuchsia devices.
 ## See fx ffx help for more information.
 
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"/../lib/vars.sh || exit $?
-source "$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"/../lib/updates.sh || exit $?
 fx-config-read
 
-# If this was invoked as `fx ffx`, we want the help output to say `fx ffx` instead
-# of just `ffx`, but if something that called this already overrode the wrapper name,
-# don't double-override it. Specifically, the .jiri_root/ffx script in most people's
-# environment will set it for us.
-FFX_WRAPPER_INVOKE=${FFX_WRAPPER_INVOKE:-fx ffx}
-export FFX_WRAPPER_INVOKE
 
-declare -a device
-# If DEVICE_NAME was passed in fx -d, pass it in as a config arg to ffx
-if [[ "${FUCHSIA_DEVICE_NAME+isset}" == "isset" ]]; then
-  if is-remote-workflow-device && [[ -z "${FX_REMOTE_INVOCATION}" ]]; then
-    fx-warn "The -d flag does not work on this end of the remote workflow"
-    fx-warn "in order to adjust target devices in the remote workflow, use"
-    fx-warn "-d or fx set-device on the local side of the configuration"
-    fx-warn "and restart serve-remote"
-  fi
-  device=("--config" "target.default=${FUCHSIA_DEVICE_NAME}")
-fi
-
-fx-command-exec host-tool ffx "${device[@]}" "$@"
+fx-command-exec host-tool ffx  "$@"

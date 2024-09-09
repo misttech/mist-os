@@ -293,7 +293,7 @@ impl Node for LidShutdown {
 async fn find_lid_sensor() -> Result<DeviceProxy, Error> {
     info!("Trying to find lid device");
 
-    let dir_proxy = fuchsia_fs::directory::open_in_namespace(
+    let dir_proxy = fuchsia_fs::directory::open_in_namespace_deprecated(
         INPUT_DEVICES_DIRECTORY,
         OpenFlags::RIGHT_READABLE,
     )?;

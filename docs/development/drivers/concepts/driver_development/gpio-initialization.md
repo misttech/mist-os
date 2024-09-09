@@ -130,5 +130,5 @@ the driver at runtime.
 ## GPIO initialization options
 
 See the full list of initialization options and their explanations in the
-[fuchsia.hardware.gpioimpl](/sdk/fidl/fuchsia.hardware.gpioimpl/metadata.fidl) FIDL
+[fuchsia.hardware.pinimpl](/sdk/fidl/fuchsia.hardware.pinimpl/metadata.fidl) FIDL
 specification.

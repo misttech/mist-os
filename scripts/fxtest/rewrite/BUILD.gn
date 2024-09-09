@@ -48,11 +48,13 @@ if (is_host) {
 
   binary_deps = [
     "dataparse",
+    "//scripts/fxtest/scripts:install",
     "//scripts/lib/async_utils",
     "//scripts/lib/statusinfo",
     "//scripts/lib/termout",
     "//third_party/colorama",
     "//third_party/jellyfish",
+    "//tools/test_list_tool:install",
   ]
 
   # Main executable target.

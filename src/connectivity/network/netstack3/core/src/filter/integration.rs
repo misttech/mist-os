@@ -5,7 +5,8 @@
 use lock_order::lock::{DelegatedOrderedLockAccess, LockLevelFor};
 use lock_order::relation::LockBefore;
 use net_types::ip::{Ip, Ipv4, Ipv6};
-use net_types::{NonMappedAddr, SpecifiedAddr};
+use net_types::SpecifiedAddr;
+use netstack3_base::IpDeviceAddr;
 use netstack3_device::DeviceId;
 use netstack3_filter::{FilterContext, FilterImpl, FilterIpContext, NatContext, State};
 use netstack3_ip::{FilterHandlerProvider, IpDeviceStateContext, IpLayerIpExt, IpStateInner};
@@ -48,9 +49,8 @@ impl<I: IpExt, BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpState<
         &mut self,
         device_id: &Self::DeviceId,
         remote: Option<SpecifiedAddr<<I as Ip>::Addr>>,
-    ) -> Option<NonMappedAddr<SpecifiedAddr<<I as Ip>::Addr>>> {
+    ) -> Option<IpDeviceAddr<<I as Ip>::Addr>> {
         IpDeviceStateContext::<I>::get_local_addr_for_remote(self, device_id, remote)
-            .map(|addr| addr.into_inner())
     }
 }
 

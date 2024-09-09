@@ -951,6 +951,24 @@
 			phy-names = "xhci-phy";
 			phys = <0x1e>;
 			reg = <0x00 0xff500000 0x00 0x100000>;
+
+			power-elements {
+
+				xhci-wake-element {
+
+					power-levels {
+
+						off-level {
+							level = <0x00>;
+						};
+
+						on-level {
+							level = <0x01>;
+							level-dependencies = <0x17 0x01>;
+						};
+					};
+				};
+			};
 		};
 
 		video-decoder@ffd00000 {

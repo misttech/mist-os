@@ -5,7 +5,7 @@ use anyhow::{anyhow, Error};
 use block_protocol::{BlockFifoRequest, BlockFifoResponse};
 use fidl_fuchsia_hardware_block_driver::{BlockIoFlag, BlockOpcode};
 use futures::stream::FuturesUnordered;
-use futures::{Future, StreamExt as _};
+use futures::{Future, StreamExt as _, TryStreamExt as _};
 use std::collections::btree_map::Entry;
 use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex};
@@ -160,15 +160,14 @@ impl<SM: SessionManager> BlockServer<SM> {
         &self,
         requests: fvolume::VolumeRequestStream,
     ) -> Result<(), Error> {
-        let mut requests = requests.fuse();
+        let mut requests =
+            std::pin::pin!(requests.err_into().and_then(|r| self.handle_request(r)).fuse());
         let mut sessions = FuturesUnordered::new();
         loop {
             futures::select! {
-                request = requests.next() => {
-                    if let Some(request) = request {
-                        if let Some(session) = self.handle_request(request?).await? {
-                            sessions.push(session);
-                        }
+                maybe_session = requests.try_next() => {
+                    if let Some(Some(session)) = maybe_session? {
+                        sessions.push(session);
                     }
                 }
                 _ = sessions.select_next_some() => {}
@@ -512,6 +511,7 @@ mod tests {
     use futures::future::BoxFuture;
     use futures::FutureExt as _;
     use std::future::poll_fn;
+    use std::pin::pin;
     use std::sync::atomic::{AtomicU64, Ordering};
     use std::sync::{Arc, Mutex};
     use std::task::{Context, Poll};
@@ -569,6 +569,14 @@ mod tests {
             _device_block_offset: u64,
             _block_count: u32,
         ) -> Result<(), zx::Status> {
+            unreachable!();
+        }
+
+        async fn get_volume_info(
+            &self,
+        ) -> Result<(fvolume::VolumeManagerInfo, fvolume::VolumeInfo), zx::Status> {
+            // Hang forever for the test_requests_dont_block_sessions test.
+            let () = std::future::pending().await;
             unreachable!();
         }
     }
@@ -1533,5 +1541,78 @@ mod tests {
                 assert_eq!(response.group, 1);
             }
         );
+    }
+
+    #[fuchsia::test(allow_stalls = false)]
+    async fn test_requests_dont_block_sessions() {
+        let (proxy, stream) =
+            fidl::endpoints::create_proxy_and_stream::<fvolume::VolumeMarker>().unwrap();
+
+        let (tx, rx) = oneshot::channel();
+
+        fasync::Task::local(async move {
+            let rx = Mutex::new(Some(rx));
+            let block_server = BlockServer::new(
+                test_partition_info(),
+                Arc::new(MockInterface {
+                    read_hook: Some(Box::new(move |_, _, _, _| {
+                        let rx = rx.lock().unwrap().take().unwrap();
+                        Box::pin(async {
+                            let _ = rx.await;
+                            Ok(())
+                        })
+                    })),
+                }),
+            );
+            block_server.handle_requests(stream).await.unwrap();
+        })
+        .detach();
+
+        let mut fut = pin!(async {
+            let (session_proxy, server) = fidl::endpoints::create_proxy().unwrap();
+
+            proxy.open_session(server).unwrap();
+
+            let vmo = zx::Vmo::create(zx::system_get_page_size() as u64).unwrap();
+            let vmo_id = session_proxy
+                .attach_vmo(vmo.duplicate_handle(zx::Rights::SAME_RIGHTS).unwrap())
+                .await
+                .unwrap()
+                .unwrap();
+
+            let fifo = fasync::Fifo::from_fifo(session_proxy.get_fifo().await.unwrap().unwrap());
+
+            fifo.write_entries(&BlockFifoRequest {
+                command: BlockFifoCommand {
+                    opcode: BlockOpcode::Read.into_primitive(),
+                    flags: (BlockIoFlag::GROUP_ITEM | BlockIoFlag::GROUP_LAST).bits(),
+                    ..Default::default()
+                },
+                reqid: 1,
+                group: 1,
+                vmoid: vmo_id.id,
+                length: 1,
+                ..Default::default()
+            })
+            .await
+            .unwrap();
+
+            let response: BlockFifoResponse = fifo.read_entry().await.unwrap();
+            assert_eq!(response.status, zx::sys::ZX_OK);
+        });
+
+        // The response won't come back until we send on `tx`.
+        assert!(fasync::TestExecutor::poll_until_stalled(&mut fut).await.is_pending());
+
+        let mut fut2 = pin!(proxy.get_volume_info());
+
+        // get_volume_info is set up to stall forever.
+        assert!(fasync::TestExecutor::poll_until_stalled(&mut fut2).await.is_pending());
+
+        // If we now free up the first future, it should resolve; the stalled call to
+        // get_volume_info should not block the fifo response.
+        let _ = tx.send(());
+
+        assert!(fasync::TestExecutor::poll_until_stalled(&mut fut).await.is_ready());
     }
 }

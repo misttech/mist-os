@@ -7,7 +7,7 @@ use fidl_fuchsia_net_routes_ext::rules::close_rule_set;
 use fidl_fuchsia_net_routes_ext::{self as fnet_routes_ext, FidlRouteIpExt};
 use fnet_routes_ext::rules::{
     add_rule, new_rule_set, remove_rule, FidlRuleAdminIpExt, FidlRuleIpExt, InstalledRule,
-    RuleAction, RuleEvent, RuleIndex, RuleSelector,
+    RuleAction, RuleEvent, RuleIndex, RuleMatcher,
 };
 use futures::TryStreamExt as _;
 use net_types::ip::Ip;
@@ -33,7 +33,7 @@ async fn rule_watcher_add_remove<I: Ip + FidlRouteIpExt + FidlRuleIpExt + FidlRu
     const RULE_INDEX_0: RuleIndex = RuleIndex::new(0);
     const RULE_INDEX_1: RuleIndex = RuleIndex::new(1);
 
-    add_rule::<I>(&rule_set, RULE_INDEX_0, RuleSelector::default(), RuleAction::Unreachable)
+    add_rule::<I>(&rule_set, RULE_INDEX_0, RuleMatcher::default(), RuleAction::Unreachable)
         .await
         .expect("fidl error")
         .expect("failed to add a new rule");
@@ -54,14 +54,14 @@ async fn rule_watcher_add_remove<I: Ip + FidlRouteIpExt + FidlRuleIpExt + FidlRu
         InstalledRule {
             priority,
             index: RULE_INDEX_0,
-            selector: RuleSelector::default(),
+            matcher: RuleMatcher::default(),
             action: RuleAction::Unreachable,
         }
     );
 
     assert_matches!(event_stream.try_next().await, Ok(Some(RuleEvent::Idle)));
 
-    add_rule::<I>(&rule_set, RULE_INDEX_1, RuleSelector::default(), RuleAction::Unreachable)
+    add_rule::<I>(&rule_set, RULE_INDEX_1, RuleMatcher::default(), RuleAction::Unreachable)
         .await
         .expect("fidl error")
         .expect("failed to add a new rule");
@@ -75,7 +75,7 @@ async fn rule_watcher_add_remove<I: Ip + FidlRouteIpExt + FidlRuleIpExt + FidlRu
         InstalledRule {
             priority,
             index: RULE_INDEX_1,
-            selector: RuleSelector::default(),
+            matcher: RuleMatcher::default(),
             action: RuleAction::Unreachable,
         }
     );
@@ -93,7 +93,7 @@ async fn rule_watcher_add_remove<I: Ip + FidlRouteIpExt + FidlRuleIpExt + FidlRu
         InstalledRule {
             priority,
             index: RULE_INDEX_0,
-            selector: RuleSelector::default(),
+            matcher: RuleMatcher::default(),
             action: RuleAction::Unreachable,
         }
     );
@@ -108,7 +108,7 @@ async fn rule_watcher_add_remove<I: Ip + FidlRouteIpExt + FidlRuleIpExt + FidlRu
         InstalledRule {
             priority,
             index: RULE_INDEX_1,
-            selector: RuleSelector::default(),
+            matcher: RuleMatcher::default(),
             action: RuleAction::Unreachable,
         }
     )

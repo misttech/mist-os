@@ -781,6 +781,20 @@ impl From<MediaAttributeEntries> for fidl_avrcp::MediaAttributes {
     }
 }
 
+impl From<fidl_avrcp::MediaAttributes> for MediaAttributeEntries {
+    fn from(src: fidl_avrcp::MediaAttributes) -> Self {
+        Self {
+            title: src.title.clone(),
+            artist_name: src.artist_name.clone(),
+            album_name: src.album_name.clone(),
+            total_number_of_tracks: src.total_number_of_tracks.clone(),
+            genre: src.genre.clone(),
+            playing_time: src.playing_time.clone(),
+            ..Default::default()
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -930,6 +944,36 @@ mod tests {
         // Emtry attributes.
         let attributes = MediaAttributeEntries::default();
         let expected = fidl::MediaAttributes::default();
+        assert_eq!(expected, attributes.into());
+
+        // Attributes with some fields.
+        let attributes = MediaAttributeEntries {
+            title: Some("avrcp".to_string()),
+            artist_name: Some("bluetooth".to_string()),
+            ..Default::default()
+        };
+        let expected = fidl::MediaAttributes {
+            title: Some("avrcp".to_string()),
+            artist_name: Some("bluetooth".to_string()),
+            ..Default::default()
+        };
+        assert_eq!(expected, attributes.into());
+
+        // Attributes with default cover art field.
+        let attributes = MediaAttributeEntries {
+            title: Some("avrcp".to_string()),
+            artist_name: Some("bluetooth".to_string()),
+            default_cover_art: Some("should be omitted".to_string()),
+            ..Default::default()
+        };
+        assert_eq!(expected, attributes.into());
+    }
+
+    #[fuchsia::test]
+    fn media_attribute_entries_from_fidl() {
+        // Emtry attributes.
+        let attributes = fidl::MediaAttributes::default();
+        let expected = MediaAttributeEntries::default();
         assert_eq!(expected, attributes.into());
 
         // Attributes with some fields.

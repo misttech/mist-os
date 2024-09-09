@@ -49,7 +49,7 @@ void Log::AppendToLog(ktl::string_view str) {
     const size_t expand_size = (needed + kPageSize - 1) & -kPageSize;
     fbl::AllocChecker ac;
 
-    // TODO(https://fxbug.dev/347766366): While trampoline booting is in effect
+    // TODO(https://fxbug.dev/42164859): While trampoline booting is in effect
     // in the x86 codepath, care needs to be taken with `Allocation`s made
     // before the fixed-address image recharacterization that TrampolineBoot
     // does. In particular, we do not want to absent-mindedly free a region
@@ -60,7 +60,13 @@ void Log::AppendToLog(ktl::string_view str) {
     // the buffer reaches a page boundary and amounts to an infrequently
     // exercised wart in the meantime. Once we can, go back to using
     // Allocation::Resize().
-    Allocation new_buffer = Allocation::New(ac, memalloc::Type::kPhysLog,
+    //
+    // We also use kPhysScratch over kPhysLog in the meantime for related
+    // reasons: kPhysLog is a type meant to survive into hand-off, but since
+    // we're leaking prior allocations we don't want those to actually be
+    // handed off. A copy of this buffer of kPhysLog type will be allocated
+    // prior to hand-off.
+    Allocation new_buffer = Allocation::New(ac, memalloc::Type::kPhysScratch,
                                             buffer_.size_bytes() + expand_size, kPageSize);
     if (!ac.check()) {
       RestoreStdout();

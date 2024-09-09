@@ -123,7 +123,7 @@ fuchsia_driver("aml-g12-tdm-dai-driver") {
     "//zircon/system/ulib/fzl",
     "//zircon/system/ulib/zx",
 
-    # TODO(andresoportus): Remove depedency on TLS (maybe done by C++ bindings unification).
+    # TODO(andresoportus): Remove dependency on TLS (maybe done by C++ bindings unification).
     "//zircon/system/ulib/async-loop:async-loop-default",
   ]
 }
@@ -151,6 +151,8 @@ bazel_driver_package("aml-g12-composite-bazel-package") {
     "composite.h",
     "composite-server.cc",
     "composite-server.h",
+    "recorder.cc",
+    "recorder.h",
   ]
 }
 
@@ -178,6 +180,8 @@ bazel_fuchsia_test_package("aml-g12-composite-test-package") {
     "composite.h",
     "composite-server.cc",
     "composite-server.h",
+    "recorder.cc",
+    "recorder.h",
     "test/composite-test.cc",
   ]
   test_component_names = [ "aml-g12-composite-test-bin" ]

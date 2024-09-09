@@ -41,6 +41,7 @@ rustc_library("lib") {
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-async",
     "//third_party/rust_crates:async-channel",
+    "//third_party/rust_crates:mockall",
     "//third_party/rust_crates:tempfile",
   ]
 

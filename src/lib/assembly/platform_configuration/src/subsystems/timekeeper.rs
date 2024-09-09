@@ -14,11 +14,6 @@ impl DefineSubsystemConfiguration<TimekeeperConfig> for TimekeeperSubsystem {
         config: &TimekeeperConfig,
         builder: &mut dyn ConfigurationBuilder,
     ) -> Result<()> {
-        let mut config_builder = builder
-            .package("timekeeper")
-            .component("meta/timekeeper.cm")
-            .context("while finding the timekeeper component")?;
-
         // This is an experimental feature that we want to deploy with care.
         // We originally wanted to deploy on eng builds as well, but it proved
         // to be confusing for debugging.
@@ -40,14 +35,23 @@ impl DefineSubsystemConfiguration<TimekeeperConfig> for TimekeeperSubsystem {
 
         // See:
         // https://fuchsia.dev/fuchsia-src/contribute/governance/rfcs/0115_build_types?hl=en#definitions
-        if serve_test_protocols && *context.build_type != BuildType::Eng {
-            return Err(anyhow!(
-                "`serve_test_protocols==true` is only allowed in `eng` builds, see RFC 0115"
-            ));
+        if serve_test_protocols {
+            if *context.build_type != BuildType::Eng {
+                return Err(anyhow!(
+                    "`serve_test_protocols==true` is only allowed in `eng` builds, see RFC 0115"
+                ));
+            }
+            // Gives Timekeeper some mutable persistent storage ("data").
+            builder.platform_bundle("timekeeper_persistence");
         }
 
         // Allows Timekeeper to short-circuit RTC driver detection at startup.
         let has_real_time_clock = context.board_info.provides_feature("fuchsia::real_time_clock");
+
+        let mut config_builder = builder
+            .package("timekeeper")
+            .component("meta/timekeeper.cm")
+            .context("while finding the timekeeper component")?;
 
         // Refer to //src/sys/time/timekeeper/config.shard.cml
         // for details.

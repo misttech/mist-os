@@ -39,6 +39,8 @@ pub struct StorageConfig {
     pub mutable_storage_garbage_collection: bool,
 }
 
+/// Platform configuration options for the component id index
+///
 /// Platform configuration options for the component id index which describes
 /// consistent storage IDs to use for component monikers. If the monikers
 /// change, the IDs can stay consistent, ensuring that the storage does not

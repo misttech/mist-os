@@ -321,7 +321,8 @@ impl MapStore {
             }
             bpf_map_type_BPF_MAP_TYPE_HASH => Ok(MapStore::Hash(HashStorage::new(&schema)?)),
 
-            // These types are in use, but not yet implemented. Incorrectly use Hash for these
+            // These types are in use, but not yet implemented. Incorrectly use Array or Hash for
+            // these
             bpf_map_type_BPF_MAP_TYPE_DEVMAP_HASH => {
                 track_stub!(TODO("https://fxbug.dev/323847465"), "BPF_MAP_TYPE_DEVMAP_HASH");
                 Ok(MapStore::Hash(HashStorage::new(&schema)?))
@@ -331,6 +332,17 @@ impl MapStore {
                     return error!(EINVAL);
                 }
                 Ok(MapStore::RingBuffer(RingBufferStorage::new(schema.max_entries as usize)?))
+            }
+            bpf_map_type_BPF_MAP_TYPE_PERCPU_ARRAY => {
+                track_stub!(TODO("https://fxbug.dev/323847465"), "BPF_MAP_TYPE_PERCPU_ARRAY");
+                // From <https://man7.org/linux/man-pages/man2/bpf.2.html>:
+                //   The key is an array index, and must be exactly four
+                //   bytes.
+                if schema.key_size != 4 {
+                    return error!(EINVAL);
+                }
+                let buffer_size = compute_storage_size(schema)?;
+                Ok(MapStore::Array(new_pinned_buffer(buffer_size)))
             }
 
             // Unimplemented types
@@ -348,10 +360,6 @@ impl MapStore {
             }
             bpf_map_type_BPF_MAP_TYPE_PERCPU_HASH => {
                 track_stub!(TODO("https://fxbug.dev/323847465"), "BPF_MAP_TYPE_PERCPU_HASH");
-                error!(EINVAL)
-            }
-            bpf_map_type_BPF_MAP_TYPE_PERCPU_ARRAY => {
-                track_stub!(TODO("https://fxbug.dev/323847465"), "BPF_MAP_TYPE_PERCPU_ARRAY");
                 error!(EINVAL)
             }
             bpf_map_type_BPF_MAP_TYPE_STACK_TRACE => {

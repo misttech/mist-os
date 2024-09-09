@@ -55,10 +55,19 @@ impl FailurePersistence for FailedSeeds {
 }
 
 #[macro_export]
-macro_rules! failed_seeds {
+macro_rules! failed_seeds_no_std {
     ($($seed:literal),*) => {
         Some({
             use alloc::{boxed::Box, vec};
+            Box::new(proptest_support::FailedSeeds(vec![$($seed),*]))
+        })
+    }
+}
+
+#[macro_export]
+macro_rules! failed_seeds {
+    ($($seed:literal),*) => {
+        Some({
             Box::new(proptest_support::FailedSeeds(vec![$($seed),*]))
         })
     }

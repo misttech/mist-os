@@ -21,7 +21,6 @@ rustc_binary("starnix_runner_bin") {
   source_root = "main.rs"
   deps = [
     ":starnix_runner_config",
-    "//sdk/fidl/fuchsia.component:fuchsia.component_rust",
     "//sdk/fidl/fuchsia.component.runner:fuchsia.component.runner_rust",
     "//sdk/fidl/fuchsia.memory.attribution:fuchsia.memory.attribution_rust",
     "//sdk/fidl/fuchsia.settings:fuchsia.settings_rust",
@@ -30,22 +29,15 @@ rustc_binary("starnix_runner_bin") {
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-component",
     "//src/lib/fuchsia-sync",
-    "//src/lib/trace/rust:trace",
     "//src/lib/trace/rust:trace-provider",
     "//src/lib/zircon/rust:fuchsia-zircon",
-    "//src/performance/memory/attribution/server",
     "//src/starnix/lib/kernel_manager",
-    "//src/storage/lib/vfs/rust:vfs",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:futures",
-    "//third_party/rust_crates:slab",
     "//third_party/rust_crates:tracing",
   ]
 
-  sources = [
-    "kernels.rs",
-    "main.rs",
-  ]
+  sources = [ "main.rs" ]
 
   configs += [ "//src/starnix/config:starnix_clippy_lints" ]
 }

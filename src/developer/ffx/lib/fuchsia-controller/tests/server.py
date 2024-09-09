@@ -62,14 +62,6 @@ class StubFileServer(f_io.File.Server):
         return f_io.ReadableReadResponse(data=[1, 2, 3, 4])
 
 
-class FlexibleMethodTesterServer(fc_test.FlexibleMethodTester.Server):
-    def some_method(self):
-        # This should be handled internally, but right now there's not really
-        # a good way to force this interaction without making multiple FIDL
-        # versions run in this program simultaneously somehow.
-        return FrameworkError.UNKNOWN_METHOD
-
-
 class TestEventHandler(fc_othertest.CrossLibraryNoop.EventHandler):
     def __init__(
         self,
@@ -177,6 +169,19 @@ class ServerTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(res.response, "foobar")
         server_task.cancel()
 
+    # TODO(https://fxbug.dev/364878315): This test sends many messages to AsyncEchoer which causes
+    # many spurious wakeups as a side-effect. Having this test ensures ServerBase is resilient
+    # to spurious wakeups, even several at a time.
+    async def test_echo_server_async_stress(self):
+        (tx, rx) = Channel.create()
+        server = AsyncEchoer(rx)
+        client = ffx.Echo.Client(tx)
+        server_task = asyncio.get_running_loop().create_task(server.serve())
+        for _ in range(12):
+            res = await client.echo_string(value="foobar")
+            self.assertEqual(res.response, "foobar")
+        server_task.cancel()
+
     async def test_not_implemented(self):
         (tx, rx) = Channel.create()
         server = ffx.Echo.Server(rx)
@@ -259,13 +264,88 @@ class ServerTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(res.y.integer, -2)
         server_task.cancel()
 
-    async def test_flexible_method_err(self):
+    async def test_flexible_method_framework_err(self):
+        class FlexibleMethodTesterServer(fc_test.FlexibleMethodTester.Server):
+            def some_method(self):
+                # This should be handled internally, but right now there's not really
+                # a good way to force this interaction without making multiple FIDL
+                # versions run in this program simultaneously somehow.
+                return FrameworkError.UNKNOWN_METHOD
+
+            def some_method_without_error(self):
+                return FrameworkError.UNKNOWN_METHOD
+
+            def some_method_just_error(self):
+                return FrameworkError.UNKNOWN_METHOD
+
         client, server = Channel.create()
         t_client = fc_test.FlexibleMethodTester.Client(client)
         t_server = FlexibleMethodTesterServer(server)
         server_task = asyncio.get_running_loop().create_task(t_server.serve())
         res = await t_client.some_method()
         self.assertEqual(res.framework_err, FrameworkError.UNKNOWN_METHOD)
+        res = await t_client.some_method_without_error()
+        self.assertEqual(res.framework_err, FrameworkError.UNKNOWN_METHOD)
+        res = await t_client.some_method_just_error()
+        self.assertEqual(res.framework_err, FrameworkError.UNKNOWN_METHOD)
+        server_task.cancel()
+
+    async def test_flexible_method_unwrap_response(self):
+        class FlexibleMethodTesterServer(fc_test.FlexibleMethodTester.Server):
+            def some_method(self):
+                return fc_test.FlexibleMethodTesterSomeMethodResponse(
+                    some_bool_value=True
+                )
+
+            def some_method_without_error(self):
+                return (
+                    fc_test.FlexibleMethodTesterSomeMethodWithoutErrorResponse(
+                        some_bool_value=False
+                    )
+                )
+
+            def some_method_just_error(self):
+                return fc_test.FlexibleMethodTesterSomeMethodJustErrorResponse()
+
+        client, server = Channel.create()
+        t_client = fc_test.FlexibleMethodTester.Client(client)
+        t_server = FlexibleMethodTesterServer(server)
+        server_task = asyncio.get_running_loop().create_task(t_server.serve())
+        res = await t_client.some_method()
+        self.assertTrue(res.unwrap().some_bool_value)
+        res = await t_client.some_method_without_error()
+        self.assertFalse(res.unwrap().some_bool_value)
+        res = await t_client.some_method_just_error()
+        self.assertEqual(
+            res.unwrap(),
+            fc_test.FlexibleMethodTesterSomeMethodJustErrorResponse(),
+        )
+        server_task.cancel()
+
+    async def test_flexible_method_unwrap_error(self):
+        class FlexibleMethodTesterServer(fc_test.FlexibleMethodTester.Server):
+            def some_method(self):
+                return DomainError(error=ZxStatus.ZX_ERR_INTERNAL)
+
+            def some_method_without_error(self):
+                return FrameworkError.UNKNOWN_METHOD
+
+            def some_method_just_error(self):
+                return DomainError(error=ZxStatus.ZX_ERR_INTERNAL)
+
+        client, server = Channel.create()
+        t_client = fc_test.FlexibleMethodTester.Client(client)
+        t_server = FlexibleMethodTesterServer(server)
+        server_task = asyncio.get_running_loop().create_task(t_server.serve())
+        res = await t_client.some_method()
+        with self.assertRaisesRegex(RuntimeError, "Result error"):
+            res.unwrap()
+        res = await t_client.some_method_without_error()
+        with self.assertRaisesRegex(RuntimeError, "Result framework error"):
+            res.unwrap()
+        res = await t_client.some_method_just_error()
+        with self.assertRaisesRegex(RuntimeError, "Result error"):
+            res.unwrap()
         server_task.cancel()
 
     async def test_sending_and_receiving_event(self):

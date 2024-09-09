@@ -189,7 +189,7 @@ async fn copy_custom_artifact_directory(
 
     let futs = FuturesUnordered::new();
     paths.iter().for_each(|path| {
-        let file = fuchsia_fs::directory::open_file_no_describe(
+        let file = fuchsia_fs::directory::open_file_no_describe_deprecated(
             &directory,
             path,
             fuchsia_fs::OpenFlags::RIGHT_READABLE,

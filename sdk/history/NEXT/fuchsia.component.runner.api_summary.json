@@ -66,7 +66,7 @@
     {
         "kind": "protocol",
         "name": "fuchsia.component.runner/ComponentRunner",
-        "openness": "closed",
+        "openness": "open",
         "transport": "channel"
     },
     {

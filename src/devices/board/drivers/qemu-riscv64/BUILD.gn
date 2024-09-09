@@ -30,7 +30,6 @@ fuchsia_driver("qemu-riscv64-driver") {
     "pciroot.cc",
     "qemu-riscv64.cc",
     "rtc.cc",
-    "sysmem.cc",
   ]
   deps = [
     ":qemu-riscv64_bind",

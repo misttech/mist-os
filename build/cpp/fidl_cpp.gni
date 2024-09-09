@@ -407,9 +407,9 @@ template("fidl_cpp_family") {
                              ])
       forward_variables_from(hlcpp_options, "*")
       if (is_fuchsia || is_mistos) {
-        additional_public_deps = [ "//sdk/lib/fidl/cpp" ]
+        additional_public_deps = [ "//sdk/lib/fidl/hlcpp" ]
       } else {
-        additional_public_deps = [ "//sdk/lib/fidl/cpp:cpp_base" ]
+        additional_public_deps = [ "//sdk/lib/fidl/hlcpp:hlcpp_base" ]
       }
 
       if (!defined(visibility) && !(defined(testonly) && testonly)) {
@@ -468,10 +468,10 @@ template("fidl_cpp_family") {
         "fidl/$library_name/cpp/wire_types.cc",
       ]
       additional_public_deps = [
+        "//sdk/lib/fidl/cpp:cpp_base",
+        "//sdk/lib/fidl/cpp:natural_ostream",
         "//sdk/lib/fidl/cpp/wire",
         "//sdk/lib/fit",
-        "//src/lib/fidl/cpp:cpp_base",
-        "//src/lib/fidl/cpp:natural_ostream",
       ]
       if (is_fuchsia || is_mistos) {
         generated_headers += [
@@ -484,7 +484,7 @@ template("fidl_cpp_family") {
         ]
         additional_public_deps += [
           "//sdk/lib/fidl",
-          "//src/lib/fidl/cpp",
+          "//sdk/lib/fidl/cpp",
         ]
       }
       if (defined(invoker.contains_drivers) && invoker.contains_drivers) {
@@ -559,7 +559,7 @@ template("fidl_cpp_family") {
       additional_public_deps = [
         ":${_cpp_target}",
         ":${_hlcpp_target}",
-        "//src/lib/fidl/cpp:hlcpp_conversion",
+        "//sdk/lib/fidl/cpp:hlcpp_conversion",
       ]
     }
   }
@@ -660,7 +660,7 @@ template("fidl_cpp_family") {
       forward_variables_from(libfuzzer_options, "*")
       testonly = true
       additional_public_deps = [
-        "//sdk/lib/fidl/cpp/fuzzing",
+        "//sdk/lib/fidl/hlcpp/fuzzing",
         "//zircon/system/ulib/async-default",
         "//zircon/system/ulib/async-loop:async-loop-cpp",
         "//zircon/system/ulib/async-loop:async-loop-default",

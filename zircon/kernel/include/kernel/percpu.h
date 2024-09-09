@@ -27,10 +27,8 @@
 #include <lockdep/thread_lock_state.h>
 #include <vm/page_state.h>
 
-// Fwd decl.  Concrete definition is in lib/kconcurrent/chain_lock.h
-namespace kconcurrent {
+// Fwd decl.  Concrete definition is in lib/kconcurrent/chainlock_transaction.h
 class ChainLockTransaction;
-}
 
 struct percpu {
   explicit percpu(cpu_num_t cpu_num);
@@ -57,7 +55,7 @@ struct percpu {
 
   // The state of the currently active chain-lock transaction if any, nullptr
   // otherwise.
-  kconcurrent::ChainLockTransaction* active_cl_transaction{nullptr};
+  ChainLockTransaction* active_cl_transaction{nullptr};
 
   // The chainlock conflict ID generator for this CPU.  This field is used by
   // threads to know when to retry a ChainLockTransaction when a conflict is

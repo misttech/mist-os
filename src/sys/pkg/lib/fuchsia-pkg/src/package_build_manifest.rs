@@ -11,6 +11,8 @@ use std::io::{self, Read};
 use std::path::Path;
 use walkdir::WalkDir;
 
+/// Package file list
+///
 /// A `PackageBuildManifest` lists the files that should be included in a Fuchsia package. Both
 /// `external_contents` and `far_contents` are maps from package resource paths in the to-be-created
 /// package to paths on the local filesystem. Package resource paths start with "meta/" if and only

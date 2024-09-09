@@ -6,24 +6,39 @@
 #### CATEGORY=Device discovery
 ### set the default device to interact with
 
-## usage: fx set-device DEVICE[:SSH_PORT]
+## usage: fx set-device [DEVICE[:SSH_PORT]]
 ##
 ## fx set-device is used to specify the default device to target for
-## fx commands that communicate with a Fuchsia device.
-## A device is set within the scope of a build directory (i.e. out/arm64 may
+## the current Fuchsia build directory, i.e. $FUCHSIA_BUILD_DIR.
+## This means a device is set within the scope of a build directory (i.e. out/arm64 may
 ## have a different default device than out/x64).
 ##
 ## If no device name is given, set-device will attempt to discover devices. If
 ## one device is found, that device is set as the default for the current build
-## directory. If more than one device is found, the user must select one and
-## provide it to a subsequent invocation of the command.
+## directory. If more than one device is found, the user must select one.
 ##
-## If specified, DEVICE may be a Fuchsia device name that will be resolved
-## using ffx or an IP address. An IPv4 address must be specified
-## directly, while IPv6 need to be surrounded by brackets.
+## If specified, DEVICE may be a Fuchsia device name or network address that will be resolved
+## using ffx.
 ##
-## SSH_PORT, if specified, will be used for all commands that rely on SSH to
-## connect to the device, instead of the default SSH port (22).
+## The default device resolution is performed by ffx using
+## a prioritized list of configuration to resolve the default target.
+## Once there is a value, the remainder of the list is ignored.
+##
+## * Specify the target on the ffx command line with --target.
+## * If configured, use the user level configuration set by ffx target default set.
+##   This user level configuration is stored relative to $HOME. This is controlled by
+##   running `ffx target default set`.
+## * The default configuration compiled into ffx checks two environment variables:
+##     "$FUCHSIA_DEVICE_ADDR"
+##     "$FUCHSIA_NODENAME"
+##    These are used by Fuchsia infra jobs to specify which target should be used
+##     when running a specific test FUCHSIA_NODENAME is also set to any
+##     build-directory default target set by `fx set-device`.
+## * If only one device is discovered
+##
+## If there is still no target device identified, or if there are multiple devices discovered,
+## an error is returned indicating a specific device needs to be identified as the default device
+## for that command.
 ##
 ## Examples:
 ##   fx set-device strut-wind-ahead-turf
@@ -36,7 +51,9 @@
 ##
 ## To unset, use `fx unset-device`.
 
-set -e
+# -e exit immediately on commmand failure
+# -o pipefail the return value is the value of rightmost command in a pipeline.
+set -e -o pipefail
 
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"/lib/vars.sh || exit $?
 fx-standard-switches "$@"
@@ -82,6 +99,6 @@ if [[ ! -d "${FUCHSIA_BUILD_DIR}" ]]; then
   exit 1
 fi
 
-echo "New default device for '${FUCHSIA_BUILD_DIR}': ${device}"
+echo "Default device for '${FUCHSIA_BUILD_DIR}' is now ${device}"
 echo "$device" > "${FUCHSIA_BUILD_DIR}.device"
-json-config-set "${FUCHSIA_BUILD_DIR}.json" target.default "$device"
+

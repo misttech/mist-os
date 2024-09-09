@@ -6,10 +6,8 @@
 files as well as a wrapper script named 'bazel'."""
 
 import argparse
-import datetime
 import os
 import shutil
-import stat
 import subprocess
 import sys
 import tempfile
@@ -36,7 +34,7 @@ class OutputTree(object):
 
         try:
             do_copy()
-        except PermissionError as e:
+        except PermissionError:
             os.unlink(copy_dst)
             do_copy()
 

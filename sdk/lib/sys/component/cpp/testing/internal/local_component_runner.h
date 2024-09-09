@@ -118,6 +118,10 @@ class LocalComponentRunner final : fuchsia::component::runner::ComponentRunner {
   class Builder;
 
  private:
+#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+  void handle_unknown_method(uint64_t ordinal, bool method_has_response) override {}
+#endif
+
   // Returns true if the runner has a component with the given name that is
   // ready to be started (either it has not started, or it has stopped and
   // can be started again).

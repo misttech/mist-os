@@ -15,9 +15,9 @@ sdk_source_set("cpp") {
   ]
 
   public_deps = [
+    "//sdk/lib/async:async-cpp",
     "//sdk/lib/async_patterns/testing/cpp",
     "//sdk/lib/fit",
-    "//zircon/system/ulib/async:async-cpp",
   ]
 
   public_configs = [ "//sdk/config" ]

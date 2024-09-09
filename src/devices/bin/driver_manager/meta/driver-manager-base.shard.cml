@@ -18,7 +18,6 @@
                 "fuchsia.device.manager.Administrator",
                 "fuchsia.driver.development.Manager",
                 "fuchsia.driver.framework.CompositeNodeManager",
-                "fuchsia.inspect.InspectSink",
             ],
         },
         { service: "fuchsia.driver.compat.Service" },
@@ -72,13 +71,6 @@
             type: "bool",
         },
         {
-            config: "fuchsia.driver.manager.DriverHostCrashPolicy",
-            key: "driver_host_crash_policy",
-            availability: "optional",
-            type: "string",
-            max_size: 20,
-        },
-        {
             config: "fuchsia.driver.manager.RootDriver",
             key: "root_driver",
             availability: "optional",
@@ -104,7 +96,6 @@
                 "fuchsia.device.manager.Administrator",
                 "fuchsia.driver.development.Manager",
                 "fuchsia.driver.framework.CompositeNodeManager",
-                "fuchsia.inspect.InspectSink",
             ],
             from: "self",
         },
@@ -135,19 +126,6 @@
 
         // If true, set the verbosity level to log all logs.
         verbose: { type: "bool" },
-
-        // Sets the policy for what action to take when a driver host crash is observed by
-        // the driver manager.
-        //
-        // Valid options include:
-        //
-        // * `restart-driver-host` : Restarts the driver host (up to 3 times).
-        // * `reboot-system` : Reboots the system.
-        // * `do-nothing` : Take no action on observed crash.
-        driver_host_crash_policy: {
-            type: "string",
-            max_size: 20,
-        },
 
         // URL for the root driver to load.
         root_driver: {

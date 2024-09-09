@@ -5,11 +5,19 @@
 use crate::task::CurrentTask;
 use crate::vfs::{BytesFile, BytesFileOps, FsNodeOps};
 use fidl_fuchsia_power_broker::PowerLevel;
+#[cfg(feature = "wake_locks")]
+use fuchsia_zircon as zx;
 use itertools::Itertools;
+#[cfg(not(feature = "wake_locks"))]
 use starnix_logging::log_warn;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::{errno, error};
 use std::borrow::Cow;
+
+#[cfg(feature = "wake_locks")]
+use fidl_fuchsia_starnix_runner as frunner;
+#[cfg(feature = "wake_locks")]
+use fuchsia_component::client::connect_to_protocol_sync;
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
 pub enum SuspendState {
@@ -90,7 +98,34 @@ impl BytesFileOps for PowerStateFile {
             return error!(EINVAL);
         }
         fuchsia_trace::duration!(c"power", c"starnix-sysfs:suspend");
-        power_manager.suspend(state).inspect_err(|e| log_warn!("Suspend failed: {e}"))?;
+        #[cfg(not(feature = "wake_locks"))]
+        {
+            power_manager.suspend(state).inspect_err(|e| log_warn!("Suspend failed: {e}"))?;
+        }
+
+        #[cfg(feature = "wake_locks")]
+        {
+            let manager = connect_to_protocol_sync::<frunner::ManagerMarker>()
+                .expect("Failed to connect to manager");
+            manager
+                .suspend_container(
+                    frunner::ManagerSuspendContainerRequest {
+                        container_job: Some(
+                            fuchsia_runtime::job_default()
+                                .duplicate(zx::Rights::SAME_RIGHTS)
+                                .expect("Failed to dup handle"),
+                        ),
+                        wake_event: current_task.kernel().hrtimer_manager.duplicate_timer_event(),
+                        wake_locks: Some(
+                            current_task.kernel().suspend_resume_manager.duplicate_lock_event(),
+                        ),
+                        ..Default::default()
+                    },
+                    zx::Time::INFINITE,
+                )
+                .map_err(|_| errno!(EINVAL))?
+                .map_err(|_| errno!(EINVAL))?;
+        }
         Ok(())
     }
 

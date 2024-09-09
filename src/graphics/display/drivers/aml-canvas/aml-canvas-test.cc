@@ -7,6 +7,7 @@
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/driver/logging/cpp/logger.h>
 #include <lib/driver/testing/cpp/driver_runtime.h>
+#include <lib/driver/testing/cpp/scoped_global_logger.h>
 #include <lib/fake-bti/bti.h>
 
 #include <vector>
@@ -44,10 +45,6 @@ constexpr int kCanvasLutAddressOffset = 0x0014 * 4;
 class AmlCanvasTest : public testing::Test {
  public:
   void SetUp() override {
-    logger_ = std::make_unique<fdf::Logger>("aml-canvas-test", FUCHSIA_LOG_INFO, zx::socket{},
-                                            fidl::WireClient<fuchsia_logger::LogSink>{});
-    fdf::Logger::SetGlobalInstance(logger_.get());
-
     zx::bti bti;
     EXPECT_OK(fake_bti_create(bti.reset_and_get_address()));
 
@@ -205,7 +202,7 @@ class AmlCanvasTest : public testing::Test {
   }
 
   fdf_testing::DriverRuntime runtime_;
-  std::unique_ptr<fdf::Logger> logger_;
+  fdf_testing::ScopedGlobalLogger logger_;
 
   std::vector<uint8_t> canvas_indices_;
 

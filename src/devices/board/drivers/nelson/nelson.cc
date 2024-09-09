@@ -39,12 +39,6 @@ namespace fhgpio = fuchsia_hardware_gpio;
 int Nelson::Thread() {
   zx_status_t status;
 
-  // Sysmem is started early so zx_vmo_create_contiguous() works.
-  if ((status = SysmemInit()) != ZX_OK) {
-    zxlogf(ERROR, "%s: SysmemInit() failed: %d", __func__, status);
-    return status;
-  }
-
   if ((status = I2cInit()) != ZX_OK) {
     zxlogf(ERROR, "I2cInit failed: %d", status);
   }

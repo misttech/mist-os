@@ -44,6 +44,7 @@ power
 power-manager
 pwm
 ramdisk
+?realtek-8211f
 registers
 rndis-function
 role_manager
@@ -55,8 +56,8 @@ spi
 startup
 sysinfo
 ?sysmem-config
-sysmem-driver
 sysmem_connector
+?ta-manager-config
 ums-function
 usb-audio
 usb-bus

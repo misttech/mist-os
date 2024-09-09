@@ -18,14 +18,13 @@ use netstack3_base::socket::{
 };
 use netstack3_base::{
     trace_duration, BidirectionalConverter as _, Control, CounterContext, CtxPair, EitherDeviceId,
-    Mss, NotFoundError, Payload, Segment, SegmentHeader, SeqNum, StrongDeviceIdentifier as _,
-    WeakDeviceIdentifier,
+    IpDeviceAddr, Mss, NotFoundError, Payload, Segment, SegmentHeader, SeqNum,
+    StrongDeviceIdentifier as _, WeakDeviceIdentifier,
 };
 use netstack3_filter::TransportPacketSerializer;
 use netstack3_ip::socket::{IpSockCreationError, MmsError};
 use netstack3_ip::{
-    BaseTransportIpContext, IpTransportContext, ReceiveIpPacketMeta, TransportIpContext,
-    TransportReceiveError,
+    IpTransportContext, ReceiveIpPacketMeta, TransportIpContext, TransportReceiveError,
 };
 use packet::{BufferMut, BufferView as _, EmptyBuf, InnerPacketBuilder, Serializer as _};
 use packet_formats::error::ParseError;
@@ -622,19 +621,8 @@ where
         state.on_segment::<_, BC>(counters, incoming, bindings_ctx.now(), socket_options, *defunct)
     });
 
-    let mut confirm_reachable = || {
-        let remote_ip = *ip_sock.remote_ip();
-        let device = ip_sock.device().and_then(|weak| weak.upgrade());
-        <DC as BaseTransportIpContext<WireI, _>>::confirm_reachable_with_destination(
-            core_ctx,
-            bindings_ctx,
-            remote_ip.into(),
-            device.as_ref(),
-        );
-    };
-
     match data_acked {
-        DataAcked::Yes => confirm_reachable(),
+        DataAcked::Yes => core_ctx.confirm_reachable(bindings_ctx, ip_sock),
         DataAcked::No => {}
     }
 
@@ -655,7 +643,7 @@ where
             if handshake_status
                 .update_if_pending(HandshakeStatus::Completed { reported: accept_queue.is_some() })
             {
-                confirm_reachable();
+                core_ctx.confirm_reachable(bindings_ctx, ip_sock);
             }
         }
         State::Closed(Closed { reason }) => {
@@ -892,7 +880,7 @@ where
     let ip_sock = match core_ctx.new_ip_socket(
         bindings_ctx,
         bound_device,
-        Some(local_ip),
+        IpDeviceAddr::new_from_socket_ip_addr(local_ip),
         remote_ip,
         IpProto::Tcp.into(),
         false, /* transparent */
@@ -908,7 +896,7 @@ where
 
     let isn = isn.generate(
         bindings_ctx.now(),
-        (ip_sock.local_ip().clone(), local_port),
+        (ip_sock.local_ip().clone().into(), local_port),
         (ip_sock.remote_ip().clone(), remote_port),
     );
     let device_mms = match core_ctx.get_mms(bindings_ctx, &ip_sock) {
@@ -1115,7 +1103,7 @@ mod test {
     use const_unwrap::const_unwrap_option;
     use ip_test_macro::ip_test;
     use netstack3_base::testutil::TestIpExt;
-    use netstack3_base::{Options, SendPayload, UnscaledWindowSize};
+    use netstack3_base::{Options, UnscaledWindowSize};
     use packet::ParseBuffer as _;
     use test_case::test_case;
 
@@ -1129,12 +1117,8 @@ mod test {
     #[test_case(Segment::syn(SEQ, UnscaledWindowSize::from(u16::MAX), Options { mss: None, window_scale: None }), &[]; "syn")]
     #[test_case(Segment::syn(SEQ, UnscaledWindowSize::from(u16::MAX), Options { mss: Some(Mss(const_unwrap_option(NonZeroU16::new(1440 as u16)))), window_scale: None }), &[]; "syn with mss")]
     #[test_case(Segment::ack(SEQ, ACK, UnscaledWindowSize::from(u16::MAX)), &[]; "ack")]
-    #[test_case(Segment::with_fake_data(SEQ, ACK, FAKE_DATA, false), FAKE_DATA; "contiguous data")]
-    #[test_case(Segment::with_fake_data(SEQ, ACK, FAKE_DATA, true), FAKE_DATA; "split data")]
-    fn tcp_serialize_segment<I: TestIpExt>(
-        segment: Segment<SendPayload<'_>>,
-        expected_body: &[u8],
-    ) {
+    #[test_case(Segment::with_fake_data(SEQ, ACK, FAKE_DATA), FAKE_DATA; "data")]
+    fn tcp_serialize_segment<I: TestIpExt>(segment: Segment<&[u8]>, expected_body: &[u8]) {
         const SOURCE_PORT: NonZeroU16 = const_unwrap_option(NonZeroU16::new(1111));
         const DEST_PORT: NonZeroU16 = const_unwrap_option(NonZeroU16::new(2222));
 

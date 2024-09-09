@@ -44,18 +44,6 @@ TEST(Args, ParseDuration) {
   EXPECT_TRUE(ParseArgs({{"hwstress", "cpu", "-d", "-3"}}).is_error());
 }
 
-TEST(Args, ParseFlash) {
-  // Flash subcommand given with FVM path provided
-  EXPECT_EQ(ParseArgs({{"hwstress", "flash", "-f", "/path"}})->subcommand, StressTest::kFlash);
-  EXPECT_EQ(ParseArgs({{"hwstress", "flash", "--fvm-path", "/path"}})->subcommand,
-            StressTest::kFlash);
-  EXPECT_EQ(ParseArgs({{"hwstress", "flash", "-f", "/path/to/fvm"}})->fvm_path, "/path/to/fvm");
-  EXPECT_EQ(ParseArgs({{"hwstress", "flash", "--fvm-path", "/fvm/path"}})->fvm_path, "/fvm/path");
-
-  // Flash subcommand given without FVM path
-  EXPECT_TRUE(ParseArgs({{"hwstress", "flash"}}).is_error());
-}
-
 TEST(Args, ParseMemory) {
   // No optional arguments.
   CommandLineArgs args = ParseArgs({{"hwstress", "memory"}}).value();
@@ -118,19 +106,6 @@ TEST(Args, ParseLight) {
 
   EXPECT_TRUE(ParseArgs({{"hwstress", "light", "--light-on-time=-3"}}).is_error());
   EXPECT_TRUE(ParseArgs({{"hwstress", "light", "--light-off-time=-3"}}).is_error());
-}
-
-TEST(Args, ParseIterations) {
-  EXPECT_EQ(ParseArgs({{"hwstress", "flash", "--fvm-path=abc"}})->iterations,
-            static_cast<uint64_t>(0));
-  EXPECT_EQ(ParseArgs({{"hwstress", "flash", "--fvm-path=abc", "--iterations=7"}})->iterations,
-            static_cast<uint64_t>(7));
-  EXPECT_EQ(ParseArgs({{"hwstress", "flash", "--fvm-path=abc", "-i", "11"}})->iterations,
-            static_cast<uint64_t>(11));
-
-  EXPECT_TRUE(ParseArgs({{"hwstress", "flash", "--fvm-path=abc", "--iterations=1", "--duration=2"}})
-                  .is_error());
-  EXPECT_TRUE(ParseArgs({{"hwstress", "flash", "--fvm-path=abc", "--iterations=1.5"}}).is_error());
 }
 
 TEST(Args, ParseCores) {

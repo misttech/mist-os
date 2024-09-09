@@ -48,10 +48,6 @@ void riscv64_init_percpu() {
   riscv64_csr_write(RISCV64_CSR_SCOUNTEREN, RISCV64_CSR_SCOUNTEREN_CY | RISCV64_CSR_SCOUNTEREN_TM |
                                                 RISCV64_CSR_SCOUNTEREN_IR);
 
-  // allow userspace to perform FLUSH and CLEAN operations, but forbid INVAL
-  riscv64_csr_write(RISCV64_CSR_SENVCFG,
-                    RISCV64_CSR_SENVCFG_CBCFE | RISCV64_CSR_SENVCFG_CBIE_ILLEGAL);
-
   // Zero out the fpu state, and set to initial
   riscv64_fpu_zero();
 }
@@ -98,6 +94,17 @@ void arch_late_init_percpu() {
   // vector feature bit to have been set.
   if (gRiscvFeatures[arch::RiscvFeature::kVector]) {
     riscv64_vector_zero();
+  }
+
+  if (gRiscvFeatures[arch::RiscvFeature::kZicbom]) {
+    // allow userspace to perform FLUSH and CLEAN operations, but forbid INVAL
+    riscv64_csr_set(RISCV64_CSR_SENVCFG, RISCV64_CSR_SENVCFG_CBCFE);
+    riscv64_csr_clear(RISCV64_CSR_SENVCFG, RISCV64_CSR_SENVCFG_CBIE_MASK);
+    riscv64_csr_set(RISCV64_CSR_SENVCFG, RISCV64_CSR_SENVCFG_CBIE_ILLEGAL);
+  }
+  if (gRiscvFeatures[arch::RiscvFeature::kZicboz]) {
+    // Allow user space to perform zeroing
+    riscv64_csr_set(RISCV64_CSR_SENVCFG, RISCV64_CSR_SENVCFG_CBZE);
   }
 
   // per cpu on each secondary (and the boot cpu a second time)

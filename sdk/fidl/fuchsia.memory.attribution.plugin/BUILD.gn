@@ -1,0 +1,30 @@
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/fidl/fidl.gni")
+import("//tools/fidl/measure-tape/measure_tape.gni")
+
+import("//build/fidl/fidl.gni")
+import("//tools/fidl/measure-tape/measure_tape.gni")
+
+fidl("fuchsia.memory.attribution.plugin") {
+  sdk_category = "public"
+  sources = [ "plugin.fidl" ]
+  sdk_area = "Diagnostics"
+
+  public_deps = [
+    "//sdk/fidl/fuchsia.kernel",
+    "//zircon/vdso/zx",
+  ]
+
+  # TODO: https://fxbug.dev/307580082 - This protocol is under construction.
+  visibility = [
+    "//examples/components/runner/colocated/*",
+    "//src/developer/ffx/plugins/profile/memory/*",
+    "//src/developer/memory/*",
+    "//src/performance/memory/*",
+    "//src/sys/component_manager/*",
+    "//src/sys/lib/elf_runner/*",
+  ]
+}

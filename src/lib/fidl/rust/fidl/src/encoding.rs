@@ -2852,7 +2852,11 @@ struct TlsBuf {
 
 impl TlsBuf {
     fn new() -> TlsBuf {
-        TlsBuf { bytes: Vec::new(), encode_handles: Vec::new(), decode_handles: Vec::new() }
+        TlsBuf {
+            bytes: Vec::with_capacity(MIN_TLS_BUF_BYTES_SIZE),
+            encode_handles: Vec::new(),
+            decode_handles: Vec::new(),
+        }
     }
 }
 
@@ -2870,9 +2874,6 @@ pub fn with_tls_encode_buf<R>(
     TLS_BUF.with(|buf| {
         let (mut bytes, mut handles) =
             RefMut::map_split(buf.borrow_mut(), |b| (&mut b.bytes, &mut b.encode_handles));
-        if bytes.capacity() == 0 {
-            bytes.reserve(MIN_TLS_BUF_BYTES_SIZE);
-        }
         let res = f(&mut bytes, &mut handles);
         bytes.clear();
         handles.clear();
@@ -2888,9 +2889,6 @@ pub fn with_tls_decode_buf<R>(f: impl FnOnce(&mut Vec<u8>, &mut Vec<HandleInfo>)
     TLS_BUF.with(|buf| {
         let (mut bytes, mut handles) =
             RefMut::map_split(buf.borrow_mut(), |b| (&mut b.bytes, &mut b.decode_handles));
-        if bytes.capacity() == 0 {
-            bytes.reserve(MIN_TLS_BUF_BYTES_SIZE);
-        }
         let res = f(&mut bytes, &mut handles);
         bytes.clear();
         handles.clear();

@@ -24,7 +24,7 @@ fuchsia_driver("mock-device-driver") {
     ":mock-device-bind",
     "//sdk/banjo/fuchsia.hardware.test:fuchsia.hardware.test_banjo_cpp",
     "//sdk/lib/fidl",
-    "//sdk/lib/fidl/cpp:cpp_base",
+    "//sdk/lib/fidl/hlcpp:hlcpp_base",
     "//src/devices/lib/driver",
     "//src/lib/ddk",
     "//src/lib/ddktl",

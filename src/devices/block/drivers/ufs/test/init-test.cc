@@ -71,42 +71,6 @@ TEST_F(InitTest, UnitAttentionClear) {
   ASSERT_NO_FATAL_FAILURE(StartDriver());
 }
 
-// TODO(https://fxbug.dev/42075643): We should change Suspend/Resume to DFv2.
-// TEST_F(InitTest, SuspendAndResume) {
-//   // ASSERT_NO_FATAL_FAILURE(StartDriver());
-
-//   ASSERT_FALSE(dut_->IsSuspended());
-//   UfsPowerMode power_mode = UfsPowerMode::kActive;
-//   ASSERT_EQ(dut_->GetDeviceManager().GetCurrentPowerMode(), power_mode);
-//   ASSERT_EQ(dut_->GetDeviceManager().GetCurrentPowerCondition(),
-//             dut_->GetDeviceManager().GetPowerModeMap()[power_mode].first);
-//   ASSERT_EQ(dut_->GetDeviceManager().GetCurrentLinkState(),
-//             dut_->GetDeviceManager().GetPowerModeMap()[power_mode].second);
-
-//   // Issue DdkSuspend and verify that errors are returned for subsequent operations.
-//   ddk::SuspendTxn suspend_txn(device_, 0, false, DEVICE_SUSPEND_REASON_REBOOT);
-//   dut_->DdkSuspend(std::move(suspend_txn));
-//   fake_root_->GetLatestChild()->WaitUntilSuspendReplyCalled();
-//   ASSERT_TRUE(dut_->IsSuspended());
-//   power_mode = UfsPowerMode::kSleep;
-//   ASSERT_EQ(dut_->GetDeviceManager().GetCurrentPowerMode(), power_mode);
-//   ASSERT_EQ(dut_->GetDeviceManager().GetCurrentPowerCondition(),
-//             dut_->GetDeviceManager().GetPowerModeMap()[power_mode].first);
-//   ASSERT_EQ(dut_->GetDeviceManager().GetCurrentLinkState(),
-//             dut_->GetDeviceManager().GetPowerModeMap()[power_mode].second);
-
-//   ddk::ResumeTxn resume_txn(device_, 0);
-//   dut_->DdkResume(std::move(resume_txn));
-//   fake_root_->GetLatestChild()->WaitUntilResumeReplyCalled();
-//   ASSERT_FALSE(dut_->IsSuspended());
-//   power_mode = UfsPowerMode::kActive;
-//   ASSERT_EQ(dut_->GetDeviceManager().GetCurrentPowerMode(), power_mode);
-//   ASSERT_EQ(dut_->GetDeviceManager().GetCurrentPowerCondition(),
-//             dut_->GetDeviceManager().GetPowerModeMap()[power_mode].first);
-//   ASSERT_EQ(dut_->GetDeviceManager().GetCurrentLinkState(),
-//             dut_->GetDeviceManager().GetPowerModeMap()[power_mode].second);
-// }
-
 TEST_F(InitTest, Inspect) {
   ASSERT_NO_FATAL_FAILURE(StartDriver());
   ASSERT_NO_FATAL_FAILURE(ReadInspect(dut_->GetInspector().inspector().DuplicateVmo()));

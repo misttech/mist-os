@@ -22,7 +22,7 @@ use net_types::{LinkLocalUnicastAddr, MulticastAddr, SpecifiedAddr, UnicastAddr,
 use netstack3_base::sync::WeakRc;
 use netstack3_base::{
     AnyDevice, CoreEventContext, CoreTimerContext, CounterContext, DeviceIdContext, ExistsError,
-    NotFoundError, RemoveResourceResultWithContext,
+    IpDeviceAddr, Ipv4DeviceAddr, Ipv6DeviceAddr, NotFoundError, RemoveResourceResultWithContext,
 };
 use netstack3_device::{DeviceId, WeakDeviceId};
 use netstack3_filter::FilterImpl;
@@ -32,15 +32,15 @@ use netstack3_ip::device::{
     join_ip_multicast_with_config, leave_ip_multicast_with_config, AddressRemovedReason,
     DadAddressContext, DadAddressStateRef, DadContext, DadEvent, DadStateRef, DadTimerId,
     DefaultHopLimit, DelIpAddr, DualStackIpDeviceState, IpAddressId, IpAddressIdSpec,
-    IpAddressIdSpecContext, IpAddressState, IpDeviceAddr, IpDeviceAddresses, IpDeviceConfiguration,
+    IpAddressIdSpecContext, IpAddressState, IpDeviceAddresses, IpDeviceConfiguration,
     IpDeviceEvent, IpDeviceFlags, IpDeviceIpExt, IpDeviceMulticastGroups,
     IpDeviceStateBindingsTypes, IpDeviceStateContext, IpDeviceStateIpExt, IpDeviceTimerId,
     Ipv4AddressEntry, Ipv4AddressState, Ipv4DeviceConfiguration, Ipv6AddrConfig, Ipv6AddressEntry,
-    Ipv6AddressFlags, Ipv6AddressState, Ipv6DadState, Ipv6DeviceAddr, Ipv6DeviceConfiguration,
-    Ipv6DeviceTimerId, Ipv6DiscoveredRoute, Ipv6DiscoveredRoutesContext,
-    Ipv6NetworkLearnedParameters, Ipv6RouteDiscoveryContext, Ipv6RouteDiscoveryState, RsContext,
-    RsState, SlaacAddressEntry, SlaacAddressEntryMut, SlaacAddresses, SlaacAddrsMutAndConfig,
-    SlaacConfig, SlaacContext, SlaacCounters, SlaacState,
+    Ipv6AddressFlags, Ipv6AddressState, Ipv6DadState, Ipv6DeviceConfiguration, Ipv6DeviceTimerId,
+    Ipv6DiscoveredRoute, Ipv6DiscoveredRoutesContext, Ipv6NetworkLearnedParameters,
+    Ipv6RouteDiscoveryContext, Ipv6RouteDiscoveryState, RsContext, RsState, SlaacAddressEntry,
+    SlaacAddressEntryMut, SlaacAddresses, SlaacAddrsMutAndConfig, SlaacConfig, SlaacContext,
+    SlaacCounters, SlaacState,
 };
 use netstack3_ip::gmp::{
     GmpQueryHandler, GmpStateRef, IgmpContext, IgmpGroupState, IgmpState, IgmpStateContext,
@@ -1238,7 +1238,10 @@ impl<'a, Config: Borrow<Ipv4DeviceConfiguration>, BC: BindingsContext> IgmpConte
         cb(GmpStateRef { enabled, groups, gmp }, gmp_proto)
     }
 
-    fn get_ip_addr_subnet(&mut self, device: &Self::DeviceId) -> Option<AddrSubnet<Ipv4Addr>> {
+    fn get_ip_addr_subnet(
+        &mut self,
+        device: &Self::DeviceId,
+    ) -> Option<AddrSubnet<Ipv4Addr, Ipv4DeviceAddr>> {
         let Self { config: _, core_ctx } = self;
         ip::device::get_ipv4_addr_subnet(core_ctx, device)
     }

@@ -410,10 +410,13 @@ mod tests {
     use fidl_fuchsia_pkg::ResolveError;
 
     async fn read_file(dir_proxy: &fio::DirectoryProxy, path: &str) -> String {
-        let file_proxy =
-            fuchsia_fs::directory::open_file(dir_proxy, path, fio::OpenFlags::RIGHT_READABLE)
-                .await
-                .unwrap();
+        let file_proxy = fuchsia_fs::directory::open_file_deprecated(
+            dir_proxy,
+            path,
+            fio::OpenFlags::RIGHT_READABLE,
+        )
+        .await
+        .unwrap();
 
         fuchsia_fs::file::read_to_string(&file_proxy).await.unwrap()
     }

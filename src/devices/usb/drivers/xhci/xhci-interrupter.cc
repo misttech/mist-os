@@ -82,6 +82,33 @@ fpromise::promise<void, zx_status_t> Interrupter::Timeout(zx::time deadline) {
   return bridge.consumer.promise().box();
 }
 
+void Interrupter::HandleWakeLease() {
+  // TODO(b/362759606): For now, release the lease after a timeout. In the future, this should be
+  // passed up the USB stack in "baton-passing" manner.
+  if (!hci_->activity_governer().is_valid()) {
+    return;
+  }
+
+  if (lease_timeout_.has_handler()) {
+    // If already holding a lease, cancel the current timeout.
+    lease_timeout_.Cancel();
+  } else {
+    // If not holding a lease, get one.
+    auto result_lease = hci_->activity_governer()->TakeWakeLease({"xhci-wake"});
+    lease_timeout_.set_handler(
+        [this, lease = std::move(result_lease->token()), start_time = zx::clock::get_monotonic()](
+            async_dispatcher_t*, async::Task*, zx_status_t) mutable {
+          // Drops the lease and resets handler
+          lease.reset();
+          lease_timeout_.set_handler({});
+        });
+  }
+
+  // Start timeout.
+  const zx::duration kLeaseTimeout = zx::msec(500);
+  lease_timeout_.PostDelayed(dispatcher_.async_dispatcher(), kLeaseTimeout);
+}
+
 zx_status_t Interrupter::StartIrqThread() {
   irq_handler_.set_object(irq_.get());
   irq_handler_.set_handler([&](async_dispatcher_t* dispatcher, async::Irq* irq, zx_status_t status,
@@ -92,6 +119,8 @@ zx_status_t Interrupter::StartIrqThread() {
     if (status != ZX_OK) {
       return;
     }
+
+    HandleWakeLease();
 
     if (event_ring_.HandleIRQ() != ZX_OK) {
       FDF_LOG(ERROR, "Error handling IRQ. Exiting async loop.");

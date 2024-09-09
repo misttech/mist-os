@@ -9,15 +9,6 @@ group("lavapipe-vulkan") {
   public_deps = [ ":lavapipe_pkg" ]
 }
 
-shared_library("libvulkan_lavapipe_fake") {
-  sources = [ "lavapipe_icd_fake.cc" ]
-  deps = [
-    "//sdk/lib/fdio",
-    "//src/lib/vulkan",
-    "//zircon/system/ulib/zx",
-  ]
-}
-
 shared_library("libvulkan_lavapipe") {
   deps = [
     "//sdk/lib/fdio",

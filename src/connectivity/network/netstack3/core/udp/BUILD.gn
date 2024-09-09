@@ -115,8 +115,13 @@ fuchsia_unittest_package("netstack3-core-udp-test") {
 group("tests") {
   testonly = true
   deps = [
-    ":netstack3-core-udp-test",
     ":netstack3-udp-instrumented_test($host_toolchain)",
     "tests",
   ]
+
+  # TODO(https://fxbug.dev/360004388): These tests are causing ssh connect
+  # error on core.arm64-coverage-qemu_kvm. Fix the issue and enable them back.
+  if (!is_coverage || target_cpu != "arm64") {
+    deps += [ ":netstack3-core-udp-test" ]
+  }
 }

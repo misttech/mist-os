@@ -150,17 +150,30 @@ class RemoteClangCompilerToolchainInputsTests(unittest.TestCase):
     def _fake_clangdir(self) -> Path:
         return self._fake_path / "lib" / "clang" / "66"
 
+    @property
+    def _fake_target(self) -> str:
+        return "risky-unknown-future"
+
     def test_no_sanitizers(self) -> None:
         with mock.patch.object(
             fuchsia, "_versioned_libclang_dir", return_value=self._fake_clangdir
         ) as mock_clangdir:
             inputs = list(
                 fuchsia.remote_clang_compiler_toolchain_inputs(
-                    self._fake_path, frozenset()
+                    self._fake_path, self._fake_target, frozenset()
                 )
             )
-        self.assertEqual(inputs, [])
-        mock_clangdir.assert_called_once_with(self._fake_path)
+        self.assertEqual(
+            inputs,
+            [
+                # Only needed for b/354016617.
+                self._fake_clangdir
+                / "lib"
+                / self._fake_target
+                / "clang_rt.builtins.a",
+            ],
+        )
+        mock_clangdir.assert_called_with(self._fake_path)
 
     def test_asan(self) -> None:
         with mock.patch.object(
@@ -168,13 +181,13 @@ class RemoteClangCompilerToolchainInputsTests(unittest.TestCase):
         ) as mock_clangdir:
             inputs = list(
                 fuchsia.remote_clang_compiler_toolchain_inputs(
-                    self._fake_path, frozenset({"address"})
+                    self._fake_path, self._fake_target, frozenset({"address"})
                 )
             )
         self.assertIn(
             self._fake_clangdir / "share" / "asan_ignorelist.txt", inputs
         )
-        mock_clangdir.assert_called_once_with(self._fake_path)
+        mock_clangdir.assert_called_with(self._fake_path)
 
     def test_hwasan(self) -> None:
         with mock.patch.object(
@@ -182,13 +195,13 @@ class RemoteClangCompilerToolchainInputsTests(unittest.TestCase):
         ) as mock_clangdir:
             inputs = list(
                 fuchsia.remote_clang_compiler_toolchain_inputs(
-                    self._fake_path, frozenset({"hwaddress"})
+                    self._fake_path, self._fake_target, frozenset({"hwaddress"})
                 )
             )
         self.assertIn(
             self._fake_clangdir / "share" / "hwasan_ignorelist.txt", inputs
         )
-        mock_clangdir.assert_called_once_with(self._fake_path)
+        mock_clangdir.assert_called_with(self._fake_path)
 
     def test_asan_memory(self) -> None:
         with mock.patch.object(
@@ -196,13 +209,13 @@ class RemoteClangCompilerToolchainInputsTests(unittest.TestCase):
         ) as mock_clangdir:
             inputs = list(
                 fuchsia.remote_clang_compiler_toolchain_inputs(
-                    self._fake_path, frozenset({"memory"})
+                    self._fake_path, self._fake_target, frozenset({"memory"})
                 )
             )
         self.assertIn(
             self._fake_clangdir / "share" / "msan_ignorelist.txt", inputs
         )
-        mock_clangdir.assert_called_once_with(self._fake_path)
+        mock_clangdir.assert_called_with(self._fake_path)
 
 
 class RemoteClangLinkerToolchainInputsTests(unittest.TestCase):

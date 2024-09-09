@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-pub(super) mod selinuxfs;
 pub(super) mod task;
 pub(super) mod testing;
 
@@ -13,11 +12,11 @@ use crate::vfs::{
     FileSystem, FsNode, FsNodeHandle, FsStr, FsString, NamespaceNode, ValueOrSize, XattrOp,
 };
 use linux_uapi::XATTR_NAME_SELINUX;
-use selinux::{ClassPermission, InitialSid, Permission, ProcessPermission};
-use selinux_core::permission_check::PermissionCheck;
+use selinux::{ClassPermission, InitialSid, Permission, ProcessPermission, SecurityPermission};
+use selinux_core::permission_check::{PermissionCheck, PermissionCheckResult};
 use selinux_core::security_server::SecurityServer;
-use selinux_core::SecurityId;
-use starnix_logging::track_stub;
+use selinux_core::{FileSystemLabel, FileSystemLabelingScheme, FileSystemMountOptions, SecurityId};
+use starnix_logging::{log_warn, track_stub};
 use starnix_uapi::error;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::mount_flags::MountFlags;
@@ -31,7 +30,7 @@ const SECURITY_SELINUX_XATTR_VALUE_MAX_SIZE: usize = 4096;
 /// Checks if the task with `_source_sid` has the permission to mount at `_path` the object specified by
 /// `_dev_name` of type `_fs_type`, with the mounting flags `_flags` and filesystem data `_data`.
 pub(super) fn sb_mount(
-    _permission_check: &impl PermissionCheck,
+    _permission_check: &PermissionCheck<'_>,
     _current_task: &CurrentTask,
     _dev_name: &bstr::BStr,
     _path: &NamespaceNode,
@@ -46,7 +45,7 @@ pub(super) fn sb_mount(
 /// Checks if the task with `_source_sid` has the permission to unmount the filesystem mounted on
 /// `_node` using the unmount flags `_flags`.
 pub(super) fn sb_umount(
-    _permission_check: &impl PermissionCheck,
+    _permission_check: &PermissionCheck<'_>,
     _current_task: &CurrentTask,
     _node: &NamespaceNode,
     _flags: UnmountFlags,
@@ -63,35 +62,7 @@ fn ensure_fs_label<'a>(
 ) -> &'a FileSystemLabel {
     assert!(security_server.has_policy());
     fs.security_state.state.label.get_or_init(|| {
-        let mount_options = &fs.security_state.state.mount_options;
-        if let Some(context) = &mount_options.context {
-            let sid = security_server
-                .security_context_to_sid((&context).into())
-                .ok()
-                .unwrap_or(SecurityId::initial(InitialSid::Unlabeled));
-            return FileSystemLabel { sid, scheme: FileSystemLabelingScheme::Mountpoint };
-        }
-        let fs_sid = mount_options
-            .fs_context
-            .as_ref()
-            .and_then(|context| security_server.security_context_to_sid((&context).into()).ok())
-            .unwrap_or(SecurityId::initial(InitialSid::Unlabeled));
-        let root_sid = mount_options
-            .root_context
-            .as_ref()
-            .and_then(|context| security_server.security_context_to_sid((&context).into()).ok())
-            .unwrap_or(fs_sid);
-        let def_sid = mount_options
-            .def_context
-            .as_ref()
-            .and_then(|context| security_server.security_context_to_sid((&context).into()).ok())
-            .unwrap_or(SecurityId::initial(InitialSid::File));
-
-        FileSystemLabel {
-            sid: fs_sid,
-            // TODO: https://fxbug.dev/355628002 - Determine labeling scheme from policy.
-            scheme: FileSystemLabelingScheme::FsUse { def_sid, root_sid },
-        }
+        security_server.resolve_fs_label(fs.name().into(), &fs.security_state.state.mount_options)
     })
 }
 
@@ -220,45 +191,60 @@ fn fs_node_resolve_security_label(
     sid
 }
 
-/// Checks if `permissions` are allowed from the task with `source_sid` to the task with `target_sid`.
+/// Checks whether `source_sid` is allowed the specified `permission` on `target_sid`.
 fn check_permission<P: ClassPermission + Into<Permission> + Clone + 'static>(
-    permission_check: &impl PermissionCheck,
+    permission_check: &PermissionCheck<'_>,
     source_sid: SecurityId,
     target_sid: SecurityId,
-    permissions: P,
+    permission: P,
 ) -> Result<(), Errno> {
-    match permission_check.has_permission(source_sid, target_sid, permissions) {
-        true => Ok(()),
-        false => error!(EACCES),
+    let PermissionCheckResult { permit, audit } =
+        permission_check.has_permission(source_sid, target_sid, permission.clone());
+
+    if audit {
+        use bstr::BStr;
+
+        // TODO: https://fxbug.dev/362707360 - Add details to audit logging.
+        let result = if permit { "allowed" } else { "denied" };
+        let tclass = permission.class().name();
+        let permission_name = permission.into().name();
+        let security_server = permission_check.security_server();
+        let scontext = security_server
+            .sid_to_security_context(source_sid)
+            .unwrap_or_else(|| b"<invalid>".to_vec());
+        let scontext = BStr::new(&scontext);
+        let tcontext = security_server
+            .sid_to_security_context(target_sid)
+            .unwrap_or_else(|| b"<invalid>".to_vec());
+        let tcontext = BStr::new(&tcontext);
+
+        // See the SELinux Project's "AVC Audit Events" description (at
+        // https://selinuxproject.org/page/NB_AL) for details of the format and fields.
+        log_warn!("avc: {result} {{ {permission_name} }} scontext={scontext} tcontext={tcontext} tclass={tclass}");
+    }
+
+    if permit {
+        Ok(())
+    } else {
+        error!(EACCES)
     }
 }
 
-/// Checks that `subject_sid` has the specified process `permissions` on `self`.
+/// Checks that `subject_sid` has the specified process `permission` on `self`.
 fn check_self_permission(
-    permission_check: &impl PermissionCheck,
+    permission_check: &PermissionCheck<'_>,
     subject_sid: SecurityId,
-    permissions: ProcessPermission,
+    permission: ProcessPermission,
 ) -> Result<(), Errno> {
-    check_permission(permission_check, subject_sid, subject_sid, permissions)
+    check_permission(permission_check, subject_sid, subject_sid, permission)
 }
 
 /// Return security state to associate with a filesystem based on the supplied mount options.
-pub fn file_system_init_security(
-    _fs_type: &FsStr,
-    mount_params: &MountParams,
-) -> Result<FileSystemState, Errno> {
+pub fn file_system_init_security(mount_params: &MountParams) -> Result<FileSystemState, Errno> {
     let context = mount_params.get(FsStr::new(b"context")).cloned();
     let def_context = mount_params.get(FsStr::new(b"defcontext")).cloned();
     let fs_context = mount_params.get(FsStr::new(b"fscontext")).cloned();
     let root_context = mount_params.get(FsStr::new(b"rootcontext")).cloned();
-
-    #[cfg(not(test))]
-    // TODO: https://fxbug.dev/355628002 - Remove this as soon as `fs_use_*` Contexts are being determine from policy.
-    let def_context = if **_fs_type == *b"tmpfs" && def_context.is_none() && context.is_none() {
-        Some(b"u:object_r:tmpfs:s0".into())
-    } else {
-        def_context
-    };
 
     // If a "context" is specified then it is used for all nodes in the filesystem, so none of the other
     // security context options would be meaningful to combine with it.
@@ -268,9 +254,28 @@ pub fn file_system_init_security(
         return error!(EINVAL);
     }
 
-    let mount_options = FileSystemMountOptions { context, def_context, fs_context, root_context };
+    let mount_options = FileSystemMountOptions {
+        context: context.map(Into::into),
+        def_context: def_context.map(Into::into),
+        fs_context: fs_context.map(Into::into),
+        root_context: root_context.map(Into::into),
+    };
 
     Ok(FileSystemState { mount_options, label: OnceLock::new() })
+}
+
+/// Used by the "selinuxfs" module to perform checks on SELinux API file accesses.
+pub(super) fn selinuxfs_check_access(
+    security_server: &SecurityServer,
+    current_task: &CurrentTask,
+    node: &FsNode,
+    permission: SecurityPermission,
+) -> Result<(), Errno> {
+    let source_sid = current_task.read().security_state.attrs.current_sid;
+    let target_sid = fs_node_effective_sid(&security_server, current_task, node);
+    let permission_check = security_server.as_permission_check();
+    // TODO: https://fxbug.dev/349117435 - Enable as soon as selinuxfs is labeled (via genfscon).
+    check_permission(&permission_check, source_sid, target_sid, permission).or(Ok(()))
 }
 
 /// The SELinux security structure for `ThreadGroup`.
@@ -327,43 +332,6 @@ pub(super) struct FileSystemState {
     // need to be retained after the file system has been labeled.
     mount_options: FileSystemMountOptions,
     label: OnceLock<FileSystemLabel>,
-}
-
-#[derive(Clone, Debug, PartialEq)]
-struct FileSystemLabel {
-    sid: SecurityId,
-    scheme: FileSystemLabelingScheme,
-}
-
-#[derive(Clone, Debug, PartialEq)]
-enum FileSystemLabelingScheme {
-    /// This filesystem was mounted with "context=".
-    Mountpoint,
-    /// This filesystem has an "fs_use_xattr", "fs_use_task", or "fs_use_trans" entry in the
-    /// policy. `root_sid` identifies the context for the root of the filesystem and `def_sid`
-    /// identifies the context to use for unlabeled files in the filesystem (the "default
-    /// context").
-    FsUse { def_sid: SecurityId, root_sid: SecurityId },
-}
-
-/// SELinux security context-related filesystem mount options. These options are documented in the
-/// `context=context, fscontext=context, defcontext=context, and rootcontext=context` section of
-/// the `mount(8)` manpage.
-#[derive(Clone, Debug, PartialEq)]
-struct FileSystemMountOptions {
-    /// Specifies the effective security context to use for all nodes in the filesystem, and the
-    /// filesystem itself. If the filesystem already contains security attributes then these are
-    /// ignored. May not be combined with any of the other options.
-    context: Option<FsString>,
-    /// Specifies an effective security context to use for un-labeled nodes in the filesystem,
-    /// rather than falling-back to the policy-defined "file" context.
-    def_context: Option<FsString>,
-    /// The value of the `fscontext=[security-context]` mount option. This option is used to
-    /// label the filesystem (superblock) itself.
-    fs_context: Option<FsString>,
-    /// The value of the `rootcontext=[security-context]` mount option. This option is used to
-    /// (re)label the inode located at the filesystem mountpoint.
-    root_context: Option<FsString>,
 }
 
 /// Sets the cached security id associated with `fs_node` to `sid`. Storing the security id will

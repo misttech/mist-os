@@ -22,7 +22,7 @@ executable("fake-display-coordinator-connector-unittest-bin") {
   sources = [ "fake-display-coordinator-connector-unittest.cc" ]
 
   deps = [
-    "//sdk/lib/fidl/cpp",
+    "//sdk/lib/fidl/hlcpp",
     "//src/graphics/display/testing/fake-coordinator-connector:service",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/loop_fixture",
@@ -48,7 +48,7 @@ test("fake-display-coordinator-connector-integration-test-bin") {
     "//sdk/fidl/fuchsia.hardware.display:fuchsia.hardware.display_cpp",
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/device-watcher/cpp",
-    "//sdk/lib/fidl/cpp",
+    "//sdk/lib/fidl/hlcpp",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/predicates",
     "//third_party/googletest:gtest",

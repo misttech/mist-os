@@ -5,8 +5,7 @@
 #ifndef SRC_PERFORMANCE_KTRACE_PROVIDER_DEVICE_READER_H_
 #define SRC_PERFORMANCE_KTRACE_PROVIDER_DEVICE_READER_H_
 
-#include <fuchsia/tracing/kernel/cpp/fidl.h>
-#include <lib/sys/cpp/service_directory.h>
+#include <fidl/fuchsia.tracing.kernel/cpp/fidl.h>
 
 #include "src/performance/ktrace_provider/reader.h"
 
@@ -16,14 +15,14 @@ class DeviceReader : public Reader {
  public:
   DeviceReader();
 
-  zx_status_t Init(const std::shared_ptr<sys::ServiceDirectory>& svc);
+  zx_status_t Init();
 
  private:
   static constexpr size_t kChunkSize{16 * 4 * 1024};
 
   void ReadMoreData() override;
 
-  fuchsia::tracing::kernel::ReaderSyncPtr ktrace_reader_;
+  fidl::SyncClient<fuchsia_tracing_kernel::Reader> ktrace_reader_;
   uint32_t offset_ = 0;
 
   // We read data into this buffer in byte sized chunks, but we want to read out aligned 8 byte

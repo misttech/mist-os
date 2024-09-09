@@ -215,6 +215,7 @@ mod tests {
         };
         let mut assembly_manifest = AssemblyManifest {
             images: vec![Image::VBMeta("a/b/c".into()), Image::FVM("x/y/z".into())],
+            board_name: "my_board".into(),
         };
         assert_eq!(extract_blob_contents(&assembly_manifest), None);
         assembly_manifest

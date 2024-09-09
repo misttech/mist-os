@@ -159,7 +159,7 @@ zx_koid_t Node::server_koid() const {
   return server_koid_;
 }
 
-Device* Node::parent_device() const { return logical_buffer_collection_->parent_device(); }
+Sysmem* Node::parent_sysmem() const { return logical_buffer_collection_->parent_sysmem(); }
 
 void Node::CloseChannel(Error error) {
   // This essentially converts the OnUnboundFn semantic of getting called regardless of channel-fail

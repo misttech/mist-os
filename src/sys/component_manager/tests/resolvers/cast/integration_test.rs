@@ -95,6 +95,9 @@ async fn resolver_component(
                         responder.send(Ok(new_fresolution_component())).unwrap();
                         success_sender.send(()).await.expect("failed to send results");
                     }
+                    fresolution::ResolverRequest::_UnknownMethod { .. } => {
+                        panic!("unknown resolver request");
+                    }
                 }
             }
         }));

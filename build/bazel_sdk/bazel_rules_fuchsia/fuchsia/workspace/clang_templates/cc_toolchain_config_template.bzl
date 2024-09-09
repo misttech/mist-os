@@ -90,7 +90,7 @@ def _cc_toolchain_config_impl(ctx):
     ] + sanitizer_features
 
     # TODO(https://fxbug.dev/356347441): Remove this once Bazel has been fixed.
-    cc_features += [features.no_dotd_file]
+    cc_features.append(features.no_dotd_file)
 
     return cc_common.create_cc_toolchain_config_info(
         ctx = ctx,
@@ -106,10 +106,10 @@ def _cc_toolchain_config_impl(ctx):
         # Implicit dependencies for Fuchsia system functionality
         cxx_builtin_include_directories = [
             "%sysroot%/include",  # Platform parts of libc.
-            "%{CROSSTOOL_ROOT}/include/" + ctx.attr.cpu + "-unknown-fuchsia/c++/v1",  # Platform libc++.
-            "%{CROSSTOOL_ROOT}/include/c++/v1",  # Platform libc++.
-            "%{CROSSTOOL_ROOT}/lib/clang/%{CLANG_VERSION}/include",  # Platform libc++.
-            "%{CROSSTOOL_ROOT}/lib/clang/%{CLANG_VERSION}/share",  # Platform libc++.
+            "$sysroot$/../include/%s-unknown-fuchsia/c++/v1" % ctx.attr.cpu,  # Platform libc++.
+            "$sysroot$/../include/c++/v1",  # Platform libc++.
+            "$sysroot$/../lib/clang/%{CLANG_VERSION}/include",  # Platform libc++.
+            "$sysroot$/../lib/clang/%{CLANG_VERSION}/share",  # Platform libc++.
         ],
         builtin_sysroot = "%{SYSROOT_PATH_PREFIX}" + ctx.attr.cpu,
         cc_target_os = "fuchsia",

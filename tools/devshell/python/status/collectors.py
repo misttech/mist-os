@@ -119,7 +119,7 @@ async def environment_collector() -> list[data.Result]:
 
     device_name: str | None = None
     device_notes: str | None = None
-    if (from_env := os.environ.get("FUCHSIA_DEVICE")) is not None:
+    if (from_env := os.environ.get("FUCHSIA_NODENAME")) is not None:
         device_name = from_env
         device_notes = "set by fx -d"
     elif current_build_dir is not None:

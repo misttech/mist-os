@@ -149,7 +149,10 @@ async fn get_temperature_driver_proxy_from_dir(
     dir_path: &str,
     required_sensor_name: &str,
 ) -> Result<ftemperature::DeviceProxy, Error> {
-    let dir = fuchsia_fs::directory::open_in_namespace(dir_path, fio::OpenFlags::RIGHT_READABLE)?;
+    let dir = fuchsia_fs::directory::open_in_namespace_deprecated(
+        dir_path,
+        fio::OpenFlags::RIGHT_READABLE,
+    )?;
 
     let mut watcher = fuchsia_fs::directory::Watcher::new(&dir).await.map_err(|e| {
         anyhow::anyhow!("Failed to create watcher for directory {:?}: {:?}", dir_path, e)

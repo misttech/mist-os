@@ -13,7 +13,7 @@ executable("parent_bin") {
   deps = [
     "//examples/fidl/fuchsia.examples:fuchsia.examples_cpp",
     "//sdk/lib/component/incoming/cpp",
-    "//sdk/lib/fidl/cpp",
+    "//sdk/lib/fidl/hlcpp",
     "//sdk/lib/syslog/cpp",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/async-loop:async-loop-default",
@@ -28,7 +28,7 @@ executable("child_bin") {
   deps = [
     "//examples/fidl/fuchsia.examples:fuchsia.examples_cpp",
     "//sdk/lib/component/outgoing/cpp",
-    "//sdk/lib/fidl/cpp",
+    "//sdk/lib/fidl/hlcpp",
     "//sdk/lib/syslog/cpp",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/async-loop:async-loop-default",

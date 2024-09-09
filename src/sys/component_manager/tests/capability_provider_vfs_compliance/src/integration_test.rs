@@ -65,7 +65,7 @@ async fn validate_open_with_node_reference_and_describe(path: &str) -> Result<()
     // VFS implementation of the io protocol.
     // TODO(https://fxbug.dev/42055559): If the rust VFS interpretation of the DESCRIBE
     // flag behavior on service nodes is incorrect, update this call.
-    let node = fuchsia_fs::node::open_in_namespace(
+    let node = fuchsia_fs::node::open_in_namespace_deprecated(
         path,
         fio::OpenFlags::DESCRIBE | fio::OpenFlags::NODE_REFERENCE,
     )?;
@@ -85,15 +85,20 @@ async fn validate_open_with_node_reference_and_describe(path: &str) -> Result<()
         event @ fio::NodeEvent::OnRepresentation { payload: _ } => {
             panic!("Compliance test got unexpected event: {:?}", event)
         }
+        fio::NodeEvent::_UnknownEvent { ordinal, .. } => {
+            panic!("Compliance test got unexpected unknown: {ordinal:?}")
+        }
     }
 
     Ok(())
 }
 
 async fn validate_open_with_extra_path_should_fail(path: &str) {
-    let node =
-        fuchsia_fs::node::open_in_namespace(&format!("{}/extra", path), fio::OpenFlags::empty())
-            .unwrap();
+    let node = fuchsia_fs::node::open_in_namespace_deprecated(
+        &format!("{}/extra", path),
+        fio::OpenFlags::empty(),
+    )
+    .unwrap();
     let mut events = node.take_event_stream();
     let event = events.next().await.unwrap();
     event.expect_err("Opening a protocol with a non-empty relative path should fail.");

@@ -104,6 +104,9 @@ impl ComponentResolver {
                                 .await
                                 .expect("failed to send results");
                         }
+                        fresolution::ResolverRequest::_UnknownMethod { .. } => {
+                            panic!("unknown resolver request");
+                        }
                     }
                 }
             }));

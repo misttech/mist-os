@@ -8,13 +8,14 @@
 
 #include <lib/counters.h>
 #include <lib/fit/defer.h>
-#include <lib/kconcurrent/chainlock.h>
+#include <lib/kconcurrent/chainlock_transaction.h>
 #include <zircon/compiler.h>
 
 #include <arch/mp.h>
 #include <fbl/algorithm.h>
 #include <fbl/enum_bits.h>
 #include <kernel/auto_preempt_disabler.h>
+#include <kernel/preempt_disabled_token.h>
 #include <kernel/scheduler.h>
 #include <kernel/wait_queue_internal.h>
 #include <ktl/algorithm.h>
@@ -128,8 +129,8 @@ inline bool IpvsAreConsequential(const SchedulerState::InheritedProfileValues* i
 
 template <typename UpstreamType, typename DownstreamType>
 void Propagate(UpstreamType& upstream, DownstreamType& downstream, AddSingleEdgeTag)
-    TA_REQ(chainlock_transaction_token, internal::GetPiNodeLock(upstream),
-           internal::GetPiNodeLock(downstream), preempt_disabled_token) {
+    TA_REQ(chainlock_transaction_token, ChainLockable::GetLock(upstream),
+           ChainLockable::GetLock(downstream), preempt_disabled_token) {
   Scheduler::JoinNodeToPiGraph(upstream, downstream);
   if constexpr (ktl::is_same_v<DownstreamType, Thread>) {
     pi_promotions.Add(1u);
@@ -138,8 +139,8 @@ void Propagate(UpstreamType& upstream, DownstreamType& downstream, AddSingleEdge
 
 template <typename UpstreamType, typename DownstreamType>
 void Propagate(UpstreamType& upstream, DownstreamType& downstream, RemoveSingleEdgeTag)
-    TA_REQ(chainlock_transaction_token, internal::GetPiNodeLock(upstream),
-           internal::GetPiNodeLock(downstream), preempt_disabled_token) {
+    TA_REQ(chainlock_transaction_token, ChainLockable::GetLock(upstream),
+           ChainLockable::GetLock(downstream), preempt_disabled_token) {
   Scheduler::SplitNodeFromPiGraph(upstream, downstream);
   if constexpr (ktl::is_same_v<DownstreamType, Thread>) {
     pi_demotions.Add(1u);
@@ -148,8 +149,8 @@ void Propagate(UpstreamType& upstream, DownstreamType& downstream, RemoveSingleE
 
 template <typename UpstreamType, typename DownstreamType>
 void Propagate(UpstreamType& upstream, DownstreamType& downstream, BaseProfileChangedTag)
-    TA_REQ(chainlock_transaction_token, internal::GetPiNodeLock(upstream),
-           internal::GetPiNodeLock(downstream), preempt_disabled_token) {
+    TA_REQ(chainlock_transaction_token, ChainLockable::GetLock(upstream),
+           ChainLockable::GetLock(downstream), preempt_disabled_token) {
   Scheduler::UpstreamThreadBaseProfileChanged(upstream, downstream);
   if constexpr (ktl::is_same_v<DownstreamType, Thread>) {
     pi_bp_changed.Add(1u);
@@ -165,14 +166,14 @@ OwnedWaitQueue::~OwnedWaitQueue() {
 }
 
 void OwnedWaitQueue::DisownAllQueues(Thread* t) {
-  ChainLockTransactionIrqSave clt{CLT_TAG("OwnedWaitQueue::DisownAllQueues")};
-  for (;; clt.Relax()) {
+  const auto do_transaction =
+      [&]() TA_REQ(chainlock_transaction_token) -> ChainLockTransaction::Result<> {
     // We should have cleared the "can own wait queues" flag by now, which
     // should guarantee that we cannot possibly become the owner of any new
     // queues.  Our state, however, should still be "RUNNING".  Once we have
     // finally emptied the our list of owned queues, the exiting thread can
     // fully transition to the DEATH state.
-    UnconditionalChainLockGuard guard{t->lock_};
+    ChainLockGuard guard{t->get_lock()};
     DEBUG_ASSERT(t->can_own_wait_queues_ == false);
     DEBUG_ASSERT(t->scheduler_state().state() == THREAD_RUNNING);
     DEBUG_ASSERT(t->wait_queue_state_.blocking_wait_queue_ == nullptr);
@@ -180,21 +181,19 @@ void OwnedWaitQueue::DisownAllQueues(Thread* t) {
     while (!t->wait_queue_state_.owned_wait_queues_.is_empty()) {
       OwnedWaitQueue& queue = t->wait_queue_state_.owned_wait_queues_.front();
 
-      if (queue.get_lock().Acquire() == ChainLock::Result::Backoff) {
-        break;
+      if (!queue.get_lock().AcquireOrBackoff()) {
+        return ChainLockTransaction::Action::Backoff;
       }
 
-      queue.get_lock().AssertAcquired();
       t->wait_queue_state_.owned_wait_queues_.pop_front();
       queue.owner_ = nullptr;
       queue.get_lock().Release();
     }
 
-    if (t->wait_queue_state_.owned_wait_queues_.is_empty()) {
-      break;
-    }
-  }
-  clt.Finalize();
+    return ChainLockTransaction::Done;
+  };
+  ChainLockTransaction::UntilDone(IrqSaveOption, CLT_TAG("OwnedWaitQueue::DisownAllQueues"),
+                                  do_transaction);
 }
 
 OwnedWaitQueue::WakeThreadsResult OwnedWaitQueue::WakeThreadsLocked(Thread::UnblockList threads,
@@ -664,25 +663,23 @@ void OwnedWaitQueue::FinishPropagate(UpstreamNodeType& upstream_node,
   }
 }
 
-Thread::UnblockList OwnedWaitQueue::LockForWakeOperation(uint32_t max_wake,
-                                                         IWakeRequeueHook& wake_hooks) {
-  ChainLockTransaction& active_clt = ChainLockTransaction::ActiveRef();
-  for (;; active_clt.Relax()) {
-    // Grab our lock first.
-    get_lock().AcquireUnconditionally();
+bool OwnedWaitQueue::LockForWakeOperationOrBackoff(uint32_t max_wake, IWakeRequeueHook& wake_hooks,
+                                                   Thread::UnblockList& unblock_list_out) {
+  // Grab our lock first.
+  get_lock().AcquireFirstInChain();
 
-    // Try to lock all of the other things we need to lock.
-    ktl::optional<Thread::UnblockList> maybe_unblock_list =
-        LockForWakeOperationLocked(max_wake, wake_hooks);
-    if (!maybe_unblock_list.has_value()) {
-      // Failure; unlock, back off, and try again.
-      get_lock().Release();
-      continue;
-    }
-
-    // Success!  Return the list of locked threads ready to be woken.
-    return ktl::move(maybe_unblock_list).value();
+  // Try to lock all of the other things we need to lock.
+  ktl::optional<Thread::UnblockList> maybe_unblock_list =
+      LockForWakeOperationLocked(max_wake, wake_hooks);
+  if (!maybe_unblock_list.has_value()) {
+    // Failure; unlock, back off, and try again.
+    get_lock().Release();
+    return false;
   }
+
+  // Success!  Return the list of locked threads ready to be woken.
+  unblock_list_out = ktl::move(maybe_unblock_list).value();
+  return true;
 }
 
 ktl::optional<Thread::UnblockList> OwnedWaitQueue::LockForWakeOperationLocked(
@@ -723,246 +720,206 @@ ktl::optional<Thread::UnblockList> OwnedWaitQueue::LockForWakeOperationLocked(
   return ktl::move(maybe_unblock_list).value();
 }
 
-OwnedWaitQueue::RequeueLockingDetails OwnedWaitQueue::LockForRequeueOperation(
+bool OwnedWaitQueue::LockForRequeueOperationOrBackoff(
     OwnedWaitQueue& requeue_target, Thread* new_requeue_target_owner, uint32_t max_wake,
-    uint32_t max_requeue, IWakeRequeueHook& wake_hooks, IWakeRequeueHook& requeue_hooks) {
-  ChainLockTransaction& active_clt = ChainLockTransaction::ActiveRef();
-  for (;; active_clt.Relax()) {
-    // Start by locking the this queue and the requeue target.
-    if (const ChainLock::Result lock_res =
-            AcquireChainLockSet(ktl::array{&get_lock(), &requeue_target.get_lock()});
-        lock_res == ChainLock::Result::Backoff) {
-      continue;
+    uint32_t max_requeue, IWakeRequeueHook& wake_hooks, IWakeRequeueHook& requeue_hooks,
+    RequeueLockingDetails& requeue_locking_details_out) {
+  // Start by locking the this queue and the requeue target.
+  if (!AcquireBothOrBackoff(get_lock(), requeue_target.get_lock())) {
+    return false;
+  }
+
+  // Next, the threads we plan to wake/requeue, placing them on two different lists.
+  RequeueLockingDetails res;
+  {
+    ktl::optional<WakeRequeueThreadDetails> maybe_threads = LockAndMakeWakeRequeueThreadListsLocked(
+        current_time(), max_wake, wake_hooks, max_requeue, requeue_hooks);
+
+    if (!maybe_threads.has_value()) {
+      get_lock().Release();
+      requeue_target.get_lock().Release();
+      return false;
     }
 
-    get_lock().AssertAcquired();
-    requeue_target.get_lock().AssertAcquired();
+    res.threads = ktl::move(maybe_threads).value();
+  }
 
-    // Next, the threads we plan to wake/requeue, placing them on two different lists.
-    RequeueLockingDetails res;
-    {
-      ktl::optional<WakeRequeueThreadDetails> maybe_threads =
-          LockAndMakeWakeRequeueThreadListsLocked(current_time(), max_wake, wake_hooks, max_requeue,
-                                                  requeue_hooks);
+  // Helpers which will release the locks for the threads we just locked,
+  // taking them off their unblock lists in the process, if we have to backoff
+  // and retry.
+  auto UnlockAndClearThreadList = [](Thread::UnblockList list) TA_REQ(chainlock_transaction_token) {
+    while (!list.is_empty()) {
+      Thread* t = list.pop_front();
+      t->get_lock().AssertAcquired();
+      t->get_lock().Release();
+    }
+  };
 
-      if (!maybe_threads.has_value()) {
+  auto UnlockLockedThreads = [&]() TA_REQ(chainlock_transaction_token) {
+    UnlockAndClearThreadList(ktl::move(res.threads.wake_threads));
+    UnlockAndClearThreadList(ktl::move(res.threads.requeue_threads));
+  };
+
+  // A helper which we can use to unlock owner chains we may be holding during
+  // a backoff situation.
+  auto UnlockOwnerChain = [](Thread* owner, const void* stop) TA_REQ(chainlock_transaction_token) {
+    if ((owner != nullptr) && (owner != stop)) {
+      owner->get_lock().AssertAcquired();
+      UnlockPiChainCommon(*owner, stop);
+    }
+  };
+
+  // Next, lock the proposed new owner of the requeue target (if any),
+  // validating the choice of owner in the process.  We need to reject this
+  // new owner selection if it is not allowed to own wait queues (in the
+  // process of exiting) or if it would form a cycle after this operation.  A
+  // cycle can be formed if the new owner chain passes through a thread
+  // already in the requeue target (stopping at the requeue target queue
+  // itself), or if it passes through any of the threads we intend to requeue.
+  if (new_requeue_target_owner) {
+    const auto variant_res =
+        LockPiChainCommon<LockingBehavior::StopAtCycle>(*new_requeue_target_owner);
+
+    // Since we chose the "StopAtCycle" behavior, if we got a ChainLock::Result back,
+    // then we either succeeded locking the chain, or we need to back off.
+    if (ktl::holds_alternative<ChainLock::Result>(variant_res)) {
+      if (ktl::get<ChainLock::Result>(variant_res) == ChainLock::Result::Backoff) {
+        UnlockLockedThreads();
         get_lock().Release();
         requeue_target.get_lock().Release();
-        continue;
+        return false;
       }
-
-      res.threads = ktl::move(maybe_threads).value();
-    }
-
-    // Helpers which will release the locks for the threads we just locked,
-    // taking them off their unblock lists in the process, if we have to backoff
-    // and retry.
-    auto UnlockAndClearThreadList = [](Thread::UnblockList list)
-                                        TA_REQ(chainlock_transaction_token) {
-                                          while (!list.is_empty()) {
-                                            Thread* t = list.pop_front();
-                                            t->get_lock().AssertAcquired();
-                                            t->get_lock().Release();
-                                          }
-                                        };
-
-    auto UnlockLockedThreads = [&]() TA_REQ(chainlock_transaction_token) {
-      UnlockAndClearThreadList(ktl::move(res.threads.wake_threads));
-      UnlockAndClearThreadList(ktl::move(res.threads.requeue_threads));
-    };
-
-    // A helper which we can use to unlock owner chains we may be holding during
-    // a backoff situation.
-    auto UnlockOwnerChain = [](Thread* owner, const void* stop)
-                                TA_REQ(chainlock_transaction_token) {
-                                  if ((owner != nullptr) && (owner != stop)) {
-                                    owner->get_lock().AssertAcquired();
-                                    UnlockPiChainCommon(*owner, stop);
-                                  }
-                                };
-
-    // Next, lock the proposed new owner of the requeue target (if any),
-    // validating the choice of owner in the process.  We need to reject this
-    // new owner selection if it is not allowed to own wait queues (in the
-    // process of exiting) or if it would form a cycle after this operation.  A
-    // cycle can be formed if the new owner chain passes through a thread
-    // already in the requeue target (stopping at the requeue target queue
-    // itself), or if it passes through any of the threads we intend to requeue.
-    if (new_requeue_target_owner) {
-      const auto variant_res =
-          LockPiChainCommon<LockingBehavior::StopAtCycle>(*new_requeue_target_owner);
-
-      // Since we chose the "StopAtCycle" behavior, if we got a ChainLock::Result back,
-      // then we either succeeded locking the chain, or we need to back off.
-      if (ktl::holds_alternative<ChainLock::Result>(variant_res)) {
-        if (ktl::get<ChainLock::Result>(variant_res) == ChainLock::Result::Backoff) {
-          UnlockLockedThreads();
-          get_lock().Release();
-          requeue_target.get_lock().Release();
-          continue;
+      res.new_requeue_target_owner = new_requeue_target_owner;
+      DEBUG_ASSERT(ktl::get<ChainLock::Result>(variant_res) == ChainLock::Result::Ok);
+    } else {
+      // if we found a stopping point, and that stopping point is not the
+      // wake-queue, or a thread we plan to wake, we need to deny the new
+      // owner, dropping the locks we just obtained in the process.
+      const void* const stop = ktl::get<const void*>(variant_res);
+      const bool accept = [&]() {
+        // If we hit nothing, or we hit the wake-queue, we can accept this owner.
+        if ((stop == nullptr) || (stop == this)) {
+          return true;
         }
-        res.new_requeue_target_owner = new_requeue_target_owner;
-        DEBUG_ASSERT(ktl::get<ChainLock::Result>(variant_res) == ChainLock::Result::Ok);
-      } else {
-        // if we found a stopping point, and that stopping point is not the
-        // wake-queue, or a thread we plan to wake, we need to deny the new
-        // owner, dropping the locks we just obtained in the process.
-        const void* const stop = ktl::get<const void*>(variant_res);
-        const bool accept = [&]() {
-          // If we hit nothing, or we hit the wake-queue, we can accept this owner.
-          if ((stop == nullptr) || (stop == this)) {
+
+        // If we anything in the set of threads to wake, we can accept this
+        // owner.
+        for (const Thread& t : res.threads.wake_threads) {
+          if (stop == &t) {
             return true;
           }
-
-          // If we anything in the set of threads to wake, we can accept this
-          // owner.
-          for (const Thread& t : res.threads.wake_threads) {
-            if (stop == &t) {
-              return true;
-            }
-          }
-
-          // We hit a lock we already hold, but it was not the wake-queue or a
-          // thread to be woken.  It must have been either a thread being
-          // requeued or the requeue target itself, and we cannot accept this
-          // new requeue owner.
-          return false;
-        }();
-
-        // If we can accept this new owner, stash it and its stop point in the
-        // result we plan to return.  Otherwise, unlock what we have locked and
-        // stash nothing.  Note: We don't want to unlock anything if the stop
-        // point is the same as the proposed new owner.  This can happen if the
-        // proposed new owner is one of the threads which is being requeued.
-        if (accept) {
-          res.new_requeue_target_owner = new_requeue_target_owner;
-          res.new_requeue_target_owner_stop_point = stop;
-        } else {
-          UnlockOwnerChain(new_requeue_target_owner, stop);
         }
-      }
 
-      // Reject the proposed new owner if it isn't allowed to own wait queues.
-      if (res.new_requeue_target_owner) {
-        res.new_requeue_target_owner->get_lock().AssertHeld();
-        if (res.new_requeue_target_owner->can_own_wait_queues_ == false) {
-          UnlockOwnerChain(res.new_requeue_target_owner, res.new_requeue_target_owner_stop_point);
-          res.new_requeue_target_owner = nullptr;
-          res.new_requeue_target_owner_stop_point = nullptr;
-        }
-      }
-    }
+        // We hit a lock we already hold, but it was not the wake-queue or a
+        // thread to be woken.  It must have been either a thread being
+        // requeued or the requeue target itself, and we cannot accept this
+        // new requeue owner.
+        return false;
+      }();
 
-    // Now, if the requeue-target has a current owner, and that owner is
-    // changing, lock its chain. It is OK if this chain hits any of the locks we
-    // already hold.
-    if ((requeue_target.owner_ != nullptr) &&
-        (requeue_target.owner_ != res.new_requeue_target_owner)) {
-      const auto variant_res =
-          LockPiChainCommon<LockingBehavior::StopAtCycle>(*requeue_target.owner_);
-
-      // If we have a result, we either succeeded or need to back off.
-      if (ktl::holds_alternative<ChainLock::Result>(variant_res)) {
-        if (ktl::get<ChainLock::Result>(variant_res) == ChainLock::Result::Backoff) {
-          UnlockOwnerChain(res.new_requeue_target_owner, res.new_requeue_target_owner_stop_point);
-          UnlockLockedThreads();
-          get_lock().Release();
-          requeue_target.get_lock().Release();
-          continue;
-        }
-        DEBUG_ASSERT(ktl::get<ChainLock::Result>(variant_res) == ChainLock::Result::Ok);
+      // If we can accept this new owner, stash it and its stop point in the
+      // result we plan to return.  Otherwise, unlock what we have locked and
+      // stash nothing.  Note: We don't want to unlock anything if the stop
+      // point is the same as the proposed new owner.  This can happen if the
+      // proposed new owner is one of the threads which is being requeued.
+      if (accept) {
+        res.new_requeue_target_owner = new_requeue_target_owner;
+        res.new_requeue_target_owner_stop_point = stop;
       } else {
-        // Record the stopping point.
-        res.old_requeue_target_owner_stop_point = ktl::get<const void*>(variant_res);
+        UnlockOwnerChain(new_requeue_target_owner, stop);
       }
     }
 
-    // Finally, lock the exiting owner chain for the wake-queue.  It is OK if
-    // this chain hits any of the locks we already hold.
-    if (this->owner_ != nullptr) {
-      const auto variant_res = LockPiChainCommon<LockingBehavior::StopAtCycle>(*this->owner_);
-
-      // If we have a result, we either succeeded or need to back off.
-      if (ktl::holds_alternative<ChainLock::Result>(variant_res)) {
-        if (ktl::get<ChainLock::Result>(variant_res) == ChainLock::Result::Backoff) {
-          UnlockOwnerChain(requeue_target.owner_, res.old_requeue_target_owner_stop_point);
-          UnlockOwnerChain(res.new_requeue_target_owner, res.new_requeue_target_owner_stop_point);
-          UnlockLockedThreads();
-          get_lock().Release();
-          requeue_target.get_lock().Release();
-          continue;
-        }
-        DEBUG_ASSERT(ktl::get<ChainLock::Result>(variant_res) == ChainLock::Result::Ok);
-      } else {
-        // Record the stopping point.
-        res.old_wake_queue_owner_stop_point = ktl::get<const void*>(variant_res);
+    // Reject the proposed new owner if it isn't allowed to own wait queues.
+    if (res.new_requeue_target_owner) {
+      res.new_requeue_target_owner->get_lock().AssertHeld();
+      if (res.new_requeue_target_owner->can_own_wait_queues_ == false) {
+        UnlockOwnerChain(res.new_requeue_target_owner, res.new_requeue_target_owner_stop_point);
+        res.new_requeue_target_owner = nullptr;
+        res.new_requeue_target_owner_stop_point = nullptr;
       }
     }
-
-    // Success!
-    return res;
   }
+
+  // Now, if the requeue-target has a current owner, and that owner is
+  // changing, lock its chain. It is OK if this chain hits any of the locks we
+  // already hold.
+  if ((requeue_target.owner_ != nullptr) &&
+      (requeue_target.owner_ != res.new_requeue_target_owner)) {
+    const auto variant_res =
+        LockPiChainCommon<LockingBehavior::StopAtCycle>(*requeue_target.owner_);
+
+    // If we have a result, we either succeeded or need to back off.
+    if (ktl::holds_alternative<ChainLock::Result>(variant_res)) {
+      if (ktl::get<ChainLock::Result>(variant_res) == ChainLock::Result::Backoff) {
+        UnlockOwnerChain(res.new_requeue_target_owner, res.new_requeue_target_owner_stop_point);
+        UnlockLockedThreads();
+        get_lock().Release();
+        requeue_target.get_lock().Release();
+        return false;
+      }
+      DEBUG_ASSERT(ktl::get<ChainLock::Result>(variant_res) == ChainLock::Result::Ok);
+    } else {
+      // Record the stopping point.
+      res.old_requeue_target_owner_stop_point = ktl::get<const void*>(variant_res);
+    }
+  }
+
+  // Finally, lock the exiting owner chain for the wake-queue.  It is OK if
+  // this chain hits any of the locks we already hold.
+  if (this->owner_ != nullptr) {
+    const auto variant_res = LockPiChainCommon<LockingBehavior::StopAtCycle>(*this->owner_);
+
+    // If we have a result, we either succeeded or need to back off.
+    if (ktl::holds_alternative<ChainLock::Result>(variant_res)) {
+      if (ktl::get<ChainLock::Result>(variant_res) == ChainLock::Result::Backoff) {
+        UnlockOwnerChain(requeue_target.owner_, res.old_requeue_target_owner_stop_point);
+        UnlockOwnerChain(res.new_requeue_target_owner, res.new_requeue_target_owner_stop_point);
+        UnlockLockedThreads();
+        get_lock().Release();
+        requeue_target.get_lock().Release();
+        return false;
+      }
+      DEBUG_ASSERT(ktl::get<ChainLock::Result>(variant_res) == ChainLock::Result::Ok);
+    } else {
+      // Record the stopping point.
+      res.old_wake_queue_owner_stop_point = ktl::get<const void*>(variant_res);
+    }
+  }
+
+  // Success!
+  requeue_locking_details_out = ktl::move(res);
+  return true;
 }
 
-OwnedWaitQueue::BAAOLockingDetails OwnedWaitQueue::LockForBAAOOperation(
-    Thread* const current_thread, Thread* new_owner) {
+bool OwnedWaitQueue::LockForBAAOOperationOrBackoff(Thread* const current_thread, Thread* new_owner,
+                                                   BAAOLockingDetails& details_out) {
   DEBUG_ASSERT(current_thread == Thread::Current::Get());
+  // Start by locking this queue.
+  get_lock().AcquireFirstInChain();
 
-  ChainLockTransaction& active_clt = ChainLockTransaction::ActiveRef();
-  for (;; active_clt.Relax()) {
-    // Start by unconditionally locking this queue.
-    get_lock().AcquireUnconditionally();
-
-    // Now try to lock the rest of the things we need to lock, adjusting the
-    // proposed owner as needed to prevent any cycles which might otherwise form.
-    ktl::optional<BAAOLockingDetails> maybe_lock_details =
-        LockForBAAOOperationLocked(current_thread, new_owner);
-
-    // If we got details back, then we are done.  We should be holding all of the
-    // locks we need to hold (including the current thread's lock).
-    if (maybe_lock_details.has_value()) {
-      current_thread->get_lock().AssertAcquired();
-      return maybe_lock_details.value();
-    }
-
-    // We encountered some form of backoff error.  Drop the queue lock and try again.
-    get_lock().Release();
+  // Now try to lock the rest of the things we need to lock, adjusting the
+  // proposed owner as needed to prevent any cycles which might otherwise form.
+  // If we got details back, then we are done.  We should be holding all of the
+  // locks we need to hold (including the current thread's lock).
+  if (TryLockForBAAOOperationLocked(current_thread, new_owner, details_out)) {
+    return true;
   }
+
+  // We encountered some form of backoff error.  Drop the queue lock and try again.
+  get_lock().Release();
+  return false;
 }
 
-ktl::optional<OwnedWaitQueue::BAAOLockingDetails> OwnedWaitQueue::LockForBAAOOperationLocked(
-    Thread* const current_thread, Thread* new_owner) {
+bool OwnedWaitQueue::TryLockForBAAOOperationLocked(
+    Thread* const current_thread, Thread* new_owner,
+    OwnedWaitQueue::BAAOLockingDetails& details_out) {
   DEBUG_ASSERT(current_thread == Thread::Current::Get());
 
   // Start by trying to obtain the current thread's lock.
-  if (const ChainLock::Result lock_res = current_thread->get_lock().Acquire();
-      lock_res == ChainLock::Result::Backoff) {
-    return ktl::nullopt;
+  if (!current_thread->get_lock().AcquireOrBackoff()) {
+    return false;
   }
-
-  // Note: Ideally this would be an AssertAcquired, not an AssertHeld.
-  // Unfortunately, this method may or may not end up acquiring the current
-  // thread's lock (in addition to others).  Because of this, there are no
-  // annotations guaranteeing whether or not we successfully acquired the lock.
-  //
-  // If we AssertAcquired here, then things work well for the failure case; we
-  // are forced to release our lock as we should be forced to.  In the success
-  // case, however, where we are supposed to obtain the current thread's lock,
-  // we will trigger an error in the static analysis if we attempt to do this;
-  // specifically that we are holding the current threads lock when we exit
-  // (which is as it should be).  So, for now, we just AssertHeld instead of
-  // AssertAcquired.  This will allow us to release the lock when we need to
-  // back off and try again, but will not trigger an error in the case that we
-  // succeed and exit holding the lock.  The downside of this approach is that
-  // we can forget to release the lock in the failure case, and the compiler
-  // will not call us out on the mistake.
-  //
-  // TODO(johngro): Look into a better way to do this.  Can we use the implicit
-  // coercion of an optional into a bool to use the TRY_ACQUIRE annotation?
-  // Failing that, perhaps we could add a "fake release" method to the ChainLock
-  // which will allow us to lie to the compiler and tell it that we released the
-  // lock on the success path when we actually didn't?
-  current_thread->get_lock().AssertHeld();
 
   // Now attempt to lock the rest of the old owner/new owner chain, backing
   // off if we have to.  This common code path with automatically deal with
@@ -975,11 +932,12 @@ ktl::optional<OwnedWaitQueue::BAAOLockingDetails> OwnedWaitQueue::LockForBAAOOpe
     // instead of an "OK" ChainLock::Result.
     DEBUG_ASSERT(ktl::get<ChainLock::Result>(variant_res) == ChainLock::Result::Backoff);
     current_thread->get_lock().Release();
-    return ktl::nullopt;
+    return false;
   }
 
   // Success, return the locking details.
-  return ktl::get<ReplaceOwnerLockingDetails>(variant_res);
+  details_out = ktl::get<ReplaceOwnerLockingDetails>(variant_res);
+  return true;
 }
 
 ktl::variant<ChainLock::Result, OwnedWaitQueue::ReplaceOwnerLockingDetails>
@@ -1395,16 +1353,24 @@ ktl::optional<Thread::UnblockList> OwnedWaitQueue::TryLockAndMakeWaiterListLocke
     }
 
     // Does our caller approve of this thread?  If not, stop here.
-    const bool stop = [&]() TA_REQ(this->get_lock()) {
+    const bool stop = [&]() TA_REQ(chainlock_transaction_token, this->get_lock()) {
       AssertInWaitQueue(*t, *this);
+      // This lock is not actually held, but hooks.Allow requires the lock to be
+      // held for shared (i.e. read only) access. There is a special rule that
+      // allows read only access without holding the lock, provided another lock
+      // (i.e. the owned wait queue lock that IS held) prevents mutations and
+      // provides memory synchronization. There is an improved annotation
+      // strategy under development that will replace this kludge.
+      t->get_lock().MarkHeld();
       return !hooks.Allow(*t);
     }();
+
     if (stop) {
       break;
     }
 
     // We need to back off.  Drop any locks we have acquired so far.
-    if (t->get_lock().Acquire() == ChainLock::Result::Backoff) {
+    if (!t->get_lock().AcquireOrBackoff()) {
       if (!list.is_empty()) {
         UnlockAndClearWaiterListLocked(ktl::move(list));
       }
@@ -1414,9 +1380,9 @@ ktl::optional<Thread::UnblockList> OwnedWaitQueue::TryLockAndMakeWaiterListLocke
     // Cycles should be impossible at this point, so assert that we are holding
     // the lock, then add the thread to the list of threads we have locked.
     // Then, move on to locking more threads if we need to.
-    t->get_lock().AssertHeld();
     collection_.Remove(t);
     list.push_back(t);
+    t->get_lock().MarkReleased();
   }
 
   // Success!  Do not attempt to put our threads back just yet.  If we are
@@ -1463,24 +1429,23 @@ ktl::variant<ChainLock::Result, const void*> OwnedWaitQueue::LockPiChainCommon(
     // behavior.  We always propagate Backoff error codes.  In the case of a
     // detected cycle, we either propagate the error, or we leave the current
     // path locked and report the location of the cycle in our return code.
-    if (const ChainLock::Result res = next_thread->get_lock().Acquire();
-        res != ChainLock::Result::Ok) {
+    if (ChainLock::Result result; !next_thread->get_lock().AcquireOrResult(result)) {
       if constexpr (Behavior == LockingBehavior::StopAtCycle) {
-        if (res == ChainLock::Result::Cycle) {
+        if (result == ChainLock::Result::Cycle) {
           return static_cast<const void*>(next_thread);
         }
       }
 
-      if (internal::GetPiNodeLock(start).MarkNeedsReleaseIfHeld()) {
+      if (start.get_lock().MarkNeedsReleaseIfHeld()) {
         UnlockPiChainCommon(start, next_thread);
       }
 
-      return res;
+      return result;
     }
     // We just checked for success, skip the assert and just mark this lock as
     // held for the static analyzer's sake.
-    next_thread->get_lock().MarkHeld();
     next_wq = next_thread->wait_queue_state().blocking_wait_queue_;
+    next_thread->get_lock().MarkReleased();
     next_thread = nullptr;
 
   [[maybe_unused]] start_from_next_wq:
@@ -1489,23 +1454,22 @@ ktl::variant<ChainLock::Result, const void*> OwnedWaitQueue::LockPiChainCommon(
       return ChainLock::Result::Ok;
     }
 
-    if (const ChainLock::Result res = next_wq->get_lock().Acquire(); res != ChainLock::Result::Ok) {
+    if (ChainLock::Result result; !next_wq->get_lock().AcquireOrResult(result)) {
       if constexpr (Behavior == LockingBehavior::StopAtCycle) {
-        if (res == ChainLock::Result::Cycle) {
+        if (result == ChainLock::Result::Cycle) {
           return static_cast<const void*>(next_wq);
         }
       }
 
-      if (internal::GetPiNodeLock(start).MarkNeedsReleaseIfHeld()) {
+      if (start.get_lock().MarkNeedsReleaseIfHeld()) {
         UnlockPiChainCommon(start, next_wq);
       }
 
-      return res;
+      return result;
     }
-    // We just checked for success, skip the assert and just mark this lock as
-    // held for the static analyzer's sake.
-    next_wq->get_lock().MarkHeld();
+
     next_thread = GetQueueOwner(next_wq);
+    next_wq->get_lock().MarkReleased();
     next_wq = nullptr;
   }
 }
@@ -1610,21 +1574,21 @@ void OwnedWaitQueue::SetThreadBaseProfileAndPropagate(Thread& thread,
                                                       const SchedulerState::BaseProfile& profile) {
   // To change this thread's base profile, we need to start by locking the
   // entire PI chain starting from this thread.
-  ChainLockTransactionEagerReschedDisableAndIrqSave clt{
-      CLT_TAG("OwnedWaitQueue::SetThreadBaseProfileAndPropagate")};
-  for (;; clt.Relax()) {
-    thread.get_lock().AcquireUnconditionally();
+  const auto do_transaction = [&]()
+                                  TA_REQ(chainlock_transaction_token,
+                                         preempt_disabled_token) -> ChainLockTransaction::Result<> {
+    thread.get_lock().AcquireFirstInChain();
     WaitQueue* wq = thread.wait_queue_state().blocking_wait_queue_;
     OwnedWaitQueue* owq = DowncastToOwq(wq);
 
     // Lock the rest of the PI chain, restarting if we need to.
     if (LockPiChain(thread) == ChainLock::Result::Backoff) {
       thread.get_lock().Release();
-      continue;  // Drop all locks and try again.
+      return ChainLockTransaction::Action::Backoff;
     }
 
     // Finished obtaining locks.  We can now propagate.
-    clt.Finalize();
+    ChainLockTransaction::Finalize();
 
     // If our thread is blocked in an owned wait queue, we need observe the
     // thread's transmitted IPVs before and after the base profile change in order
@@ -1658,16 +1622,19 @@ void OwnedWaitQueue::SetThreadBaseProfileAndPropagate(Thread& thread,
     // Finished, drop the locks we are holding and make sure we break out of the
     // retry loop.
     UnlockPiChainCommon(thread);
-    break;
-  }
+    return ChainLockTransaction::Done;
+  };
+  ChainLockTransaction::UntilDone(EagerReschedDisableAndIrqSaveOption,
+                                  CLT_TAG("OwnedWaitQueue::SetThreadBaseProfileAndPropagate"),
+                                  do_transaction);
 }
 
 zx_status_t OwnedWaitQueue::AssignOwner(Thread* new_owner) {
   DEBUG_ASSERT(magic() == kOwnedMagic);
-
-  ChainLockTransactionEagerReschedDisableAndIrqSave clt{CLT_TAG("OwnedWaitQueue::AssignOwner")};
-  for (;; clt.Relax()) {
-    UnconditionalChainLockGuard guard{get_lock()};
+  const auto do_transaction =
+      [&]() TA_REQ(chainlock_transaction_token,
+                   preempt_disabled_token) -> ChainLockTransaction::Result<zx_status_t> {
+    ChainLockGuard guard{get_lock()};
 
     // If the owner is not changing, we are already done.
     if (owner_ == new_owner) {
@@ -1688,7 +1655,7 @@ zx_status_t OwnedWaitQueue::AssignOwner(Thread* new_owner) {
       // again.  If we had succeeded, we would have gotten back locking details
       // instead.
       DEBUG_ASSERT(lock_res == ChainLock::Result::Backoff);
-      continue;
+      return ChainLockTransaction::Action::Backoff;
     }
 
     // Go ahead and perform the assignment.  Start by removing any current
@@ -1713,38 +1680,39 @@ zx_status_t OwnedWaitQueue::AssignOwner(Thread* new_owner) {
     // We are finished.  We will drop our queue lock and re-enable preemption as
     // we unwind.
     return ZX_OK;
-  }
+  };
+  return ChainLockTransaction::UntilDone(EagerReschedDisableAndIrqSaveOption,
+                                         CLT_TAG("OwnedWaitQueue::AssignOwner"), do_transaction);
 }
 
 void OwnedWaitQueue::ResetOwnerIfNoWaiters() {
   DEBUG_ASSERT(magic() == kOwnedMagic);
-
-  ChainLockTransactionEagerReschedDisableAndIrqSave clt{
-      CLT_TAG("OwnedWaitQueue::ResetOwnerIfNoWaiters")};
-  for (;; clt.Relax()) {
-    UnconditionalChainLockGuard guard{get_lock()};
+  const auto do_transaction = [&]()
+                                  TA_REQ(chainlock_transaction_token,
+                                         preempt_disabled_token) -> ChainLockTransaction::Result<> {
+    ChainLockGuard guard{get_lock()};
 
     // If we have no owner, or we have waiters, we are finished.
     if (!IsEmpty() || (owner_ == nullptr)) {
-      return;
+      return ChainLockTransaction::Done;
     }
 
     // We have an owner, but no waiters behind us.  We need to lock our owner in
     // order to clear out its bookkeeping, but there is nothing to propagate
     // down the PI chain since we are not inheriting anything.
-    if (owner_->get_lock().Acquire() == ChainLock::Result::Backoff) {
-      // try again
-      continue;
+    if (!owner_->get_lock().AcquireOrBackoff()) {
+      return ChainLockTransaction::Action::Backoff;
     }
 
-    clt.Finalize();
-
-    owner_->get_lock().AssertAcquired();
+    ChainLockTransaction::Finalize();
     owner_->wait_queue_state_.owned_wait_queues_.erase(*this);
     owner_->get_lock().Release();
     owner_ = nullptr;
-    return;
-  }
+
+    return ChainLockTransaction::Done;
+  };
+  ChainLockTransaction::UntilDone(EagerReschedDisableAndIrqSaveOption,
+                                  CLT_TAG("OwnedWaitQueue::ResetOwnerIfNoWaiters"), do_transaction);
 }
 
 void OwnedWaitQueue::AssignOwnerInternal(Thread* new_owner) {
@@ -1773,16 +1741,23 @@ zx_status_t OwnedWaitQueue::BlockAndAssignOwner(const Deadline& deadline, Thread
                                                 ResourceOwnership resource_ownership,
                                                 Interruptible interruptible) {
   Thread* const current_thread = Thread::Current::Get();
-
-  ChainLockTransactionIrqSave clt{CLT_TAG("OwnedWaitQueue::BlockAndAssignOwner")};
-  const BAAOLockingDetails details = LockForBAAOOperation(current_thread, new_owner);
-  clt.Finalize();
-  const zx_status_t ret = BlockAndAssignOwnerLocked(current_thread, deadline, details,
-                                                    resource_ownership, interruptible);
-  // After the block operation, our thread is going to be locked.  Make sure to
-  // drop the lock before exiting.
-  current_thread->get_lock().Release();
-  return ret;
+  const auto do_transaction =
+      [&]() TA_REQ(chainlock_transaction_token) -> ChainLockTransaction::Result<zx_status_t> {
+    preempt_disabled_token.AssertHeld();
+    if (BAAOLockingDetails details;
+        LockForBAAOOperationOrBackoff(current_thread, new_owner, details)) {
+      ChainLockTransaction::Finalize();
+      const zx_status_t result = BlockAndAssignOwnerLocked(current_thread, deadline, details,
+                                                           resource_ownership, interruptible);
+      // After the block operation, our thread is going to be locked.  Make sure to
+      // drop the lock before exiting.
+      current_thread->get_lock().Release();
+      return result;
+    }
+    return ChainLockTransaction::Action::Backoff;
+  };
+  return ChainLockTransaction::UntilDone(
+      IrqSaveOption, CLT_TAG("OwnedWaitQueue::BlockAndAssignOwner"), do_transaction);
 }
 
 zx_status_t OwnedWaitQueue::BlockAndAssignOwnerLocked(Thread* const current_thread,
@@ -1994,22 +1969,40 @@ void OwnedWaitQueue::CancelBAAOOperationLocked(Thread* const current_thread,
 
 OwnedWaitQueue::WakeThreadsResult OwnedWaitQueue::WakeThreads(uint32_t wake_count,
                                                               IWakeRequeueHook& wake_hooks) {
-  ChainLockTransactionPreemptDisableAndIrqSave clt{CLT_TAG("OwnedWaitQueue::WakeThreadsResult")};
-  Thread::UnblockList threads = LockForWakeOperation(wake_count, wake_hooks);
-  clt.Finalize();
-  WakeThreadsResult result = WakeThreadsLocked(ktl::move(threads), wake_hooks);
-  get_lock().Release();
+  WakeThreadsResult result;
+  const auto do_transaction = [&]()
+                                  TA_REQ(chainlock_transaction_token,
+                                         preempt_disabled_token) -> ChainLockTransaction::Result<> {
+    if (Thread::UnblockList threads;
+        LockForWakeOperationOrBackoff(wake_count, wake_hooks, threads)) {
+      ChainLockTransaction::Finalize();
+      result = WakeThreadsLocked(ktl::move(threads), wake_hooks);
+      get_lock().Release();
+      return ChainLockTransaction::Done;
+    }
+    return ChainLockTransaction::Action::Backoff;
+  };
+  ChainLockTransaction::UntilDone(PreemptDisableAndIrqSaveOption,
+                                  CLT_TAG("OwnedWaitQueue::WakeThreadsResult"), do_transaction);
   return result;
 }
 
 OwnedWaitQueue::WakeThreadsResult OwnedWaitQueue::WakeThreadAndAssignOwner(
     IWakeRequeueHook& wake_hooks) {
-  ChainLockTransactionPreemptDisableAndIrqSave clt{CLT_TAG("OwnedWaitQueue::WakeThreadsResult")};
-  Thread::UnblockList threads = LockForWakeOperation(1, wake_hooks);
-  clt.Finalize();
-  WakeThreadsResult result =
-      WakeThreadsLocked(ktl::move(threads), wake_hooks, WakeOption::AssignOwner);
-  get_lock().Release();
+  WakeThreadsResult result;
+  const auto do_transaction = [&]()
+                                  TA_REQ(chainlock_transaction_token,
+                                         preempt_disabled_token) -> ChainLockTransaction::Result<> {
+    if (Thread::UnblockList threads; LockForWakeOperationOrBackoff(1, wake_hooks, threads)) {
+      ChainLockTransaction::Finalize();
+      result = WakeThreadsLocked(ktl::move(threads), wake_hooks, WakeOption::AssignOwner);
+      get_lock().Release();
+      return ChainLockTransaction::Done;
+    }
+    return ChainLockTransaction::Action::Backoff;
+  };
+  ChainLockTransaction::UntilDone(PreemptDisableAndIrqSaveOption,
+                                  CLT_TAG("OwnedWaitQueue::WakeThreadsResult"), do_transaction);
   return result;
 }
 
@@ -2017,11 +2010,23 @@ OwnedWaitQueue::WakeThreadsResult OwnedWaitQueue::WakeAndRequeue(
     OwnedWaitQueue& requeue_target, Thread* new_requeue_owner, uint32_t wake_count,
     uint32_t requeue_count, IWakeRequeueHook& wake_hooks, IWakeRequeueHook& requeue_hooks,
     WakeOption wake_option) {
-  ChainLockTransactionPreemptDisableAndIrqSave clt{CLT_TAG("OwnedWaitQueue::WakeAndRequeue")};
-  RequeueLockingDetails details = LockForRequeueOperation(
-      requeue_target, new_requeue_owner, wake_count, requeue_count, wake_hooks, requeue_hooks);
-  clt.Finalize();
-  return WakeAndRequeueInternal(details, requeue_target, wake_hooks, requeue_hooks, wake_option);
+  WakeThreadsResult result;
+  const auto do_transaction = [&]()
+                                  TA_REQ(chainlock_transaction_token,
+                                         preempt_disabled_token) -> ChainLockTransaction::Result<> {
+    if (RequeueLockingDetails details;
+        LockForRequeueOperationOrBackoff(requeue_target, new_requeue_owner, wake_count,
+                                         requeue_count, wake_hooks, requeue_hooks, details)) {
+      ChainLockTransaction::Finalize();
+      result =
+          WakeAndRequeueInternal(details, requeue_target, wake_hooks, requeue_hooks, wake_option);
+      return ChainLockTransaction::Done;
+    }
+    return ChainLockTransaction::Action::Backoff;
+  };
+  ChainLockTransaction::UntilDone(PreemptDisableAndIrqSaveOption,
+                                  CLT_TAG("OwnedWaitQueue::WakeAndRequeue"), do_transaction);
+  return result;
 }
 
 OwnedWaitQueue::WakeThreadsResult OwnedWaitQueue::WakeAndRequeueInternal(

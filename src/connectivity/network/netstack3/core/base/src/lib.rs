@@ -37,6 +37,7 @@ pub use context::{BuildableCoreContext, ContextPair, ContextProvider, CtxPair};
 pub use convert::{BidirectionalConverter, OwnedOrRefsBidirectionalConverter};
 pub use counters::{Counter, CounterContext, ResourceCounterContext};
 pub use data_structures::token_bucket::TokenBucket;
+pub use device::address::{IpDeviceAddr, Ipv4DeviceAddr, Ipv6DeviceAddr};
 pub use device::link::{LinkAddress, LinkDevice, LinkUnicastAddress};
 pub use device::{
     AnyDevice, Device, DeviceIdAnyCompatContext, DeviceIdContext, DeviceIdentifier, DeviceWithName,
@@ -63,7 +64,7 @@ pub use resource_references::{
     RemoveResourceResult, RemoveResourceResultWithContext,
 };
 pub use rng::RngContext;
-pub use tcp::base::{Control, Mss, SendPayload};
+pub use tcp::base::{Control, FragmentedPayload, Mss};
 pub use tcp::segment::{Options, Payload, PayloadLen, Segment, SegmentHeader};
 pub use tcp::seqnum::{SeqNum, UnscaledWindowSize, WindowScale, WindowSize};
 pub use time::local_timer_heap::LocalTimerHeap;

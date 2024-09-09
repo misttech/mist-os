@@ -7,7 +7,7 @@ import("//build/components.gni")
 import("//build/drivers.gni")
 import("//build/test.gni")
 
-driver_bind_rules("ufs_bind") {
+driver_bind_rules("ufs-bind") {
   rules = "meta/ufs.bind"
   tests = "meta/bind_tests.json"
   deps = [
@@ -21,18 +21,23 @@ driver_bind_rules("ufs_bind") {
 group("tests") {
   testonly = true
   deps = [
+    ":ufs-bind_test",
     ":ufs-tests",
-    ":ufs_bind_test",
     "test/e2e:tests",
   ]
 }
 
 _common_deps = [
-  ":ufs_bind",
+  ":ufs-bind",
+  ":ufs-config",
   "//sdk/fidl/fuchsia.hardware.block.driver:fuchsia.hardware.block.driver_banjo_cpp",
   "//sdk/fidl/fuchsia.hardware.pci:fuchsia.hardware.pci_cpp",
+  "//sdk/fidl/fuchsia.hardware.power:fuchsia.hardware.power_cpp",
+  "//sdk/fidl/fuchsia.power.broker:fuchsia.power.broker_cpp",
+  "//sdk/fidl/fuchsia.power.system:fuchsia.power.system_cpp",
   "//sdk/lib/driver/compat/cpp",
   "//sdk/lib/driver/component/cpp:cpp",
+  "//sdk/lib/driver/power/cpp",
   "//sdk/lib/driver/runtime:driver_runtime_cpp",
   "//src/devices/bin/driver_runtime",
   "//src/devices/block/lib/common:common",
@@ -40,6 +45,7 @@ _common_deps = [
   "//src/devices/lib/dev-operation",
   "//src/devices/lib/dma-buffer",
   "//src/devices/lib/mmio",
+  "//src/devices/power/lib/from-fidl/cpp",
   "//zircon/system/ulib/fzl",
   "//zircon/system/ulib/hwreg",
   "//zircon/system/ulib/inspect",
@@ -55,6 +61,8 @@ fuchsia_driver("ufs-driver") {
   sources = [
     "device_manager.cc",
     "request_list.cc",
+    "request_processor.cc",
+    "task_management_request_processor.cc",
     "transfer_request_processor.cc",
     "ufs-export.cc",
     "ufs.cc",
@@ -63,16 +71,33 @@ fuchsia_driver("ufs-driver") {
   deps = _common_deps
 }
 
+fuchsia_component_manifest("ufs-manifest") {
+  component_name = "ufs"
+  manifest = "meta/ufs.cml"
+}
+
 fuchsia_driver_component("ufs") {
   component_name = "ufs"
+  cm_label = ":ufs-manifest"
   deps = [ ":ufs-driver" ]
   info = "meta/ufs-info.json"
-  manifest = "meta/ufs.cml"
+}
+
+fuchsia_structured_config_cpp_elf_lib("ufs-config") {
+  cm_label = ":ufs-manifest"
+}
+
+fuchsia_structured_config_values("sc-values") {
+  cm_label = ":ufs-manifest"
+  values = {
+    enable_suspend = false
+  }
 }
 
 fuchsia_driver_package("pkg") {
   package_name = "ufs"
   driver_components = [ ":ufs" ]
+  deps = [ ":sc-values" ]
 }
 
 _test_deps = [
@@ -94,19 +119,24 @@ test("ufs-unit-tests-bin") {
   sources = [
     "device_manager.cc",
     "request_list.cc",
+    "request_processor.cc",
+    "task_management_request_processor.cc",
     "test/block-op-test.cc",
     "test/init-test.cc",
     "test/mock-device/fake-dma-handler.cc",
     "test/mock-device/query-request-processor.cc",
     "test/mock-device/register-mmio-processor.cc",
     "test/mock-device/scsi-command-processor.cc",
+    "test/mock-device/task-management-request-processor.cc",
     "test/mock-device/transfer-request-processor.cc",
     "test/mock-device/ufs-mock-device.cc",
     "test/mock-device/uiccmd-processor.cc",
+    "test/power-test.cc",
     "test/query-request-test.cc",
     "test/register-test.cc",
     "test/request-processor-test.cc",
     "test/scsi-command-test.cc",
+    "test/task-management-request-processor-test.cc",
     "test/uic-test.cc",
     "test/unit-lib.cc",
     "transfer_request_processor.cc",

@@ -136,11 +136,11 @@ closed protocol RuleSetV6 {
     /// is returned.
     ///
     /// + request `index` where to insert the rule.
-    /// + request `selector` the selector of the rule.
+    /// + request `matcher` the matcher of the rule.
     /// + request `action` action of the rule.
     strict AddRule(resource struct {
         index fuchsia.net.routes.RuleIndex;
-        selector fuchsia.net.routes.RuleSelectorV6;
+        matcher fuchsia.net.routes.RuleMatcherV6;
         action fuchsia.net.routes.RuleAction;
     }) -> () error RuleSetError;
 };

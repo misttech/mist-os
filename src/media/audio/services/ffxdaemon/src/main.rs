@@ -78,7 +78,7 @@ pub async fn handle_play_request(
             let device_control = device_control_connector.lock().unwrap().connect(selector).await?;
             let mut device = Device::new(device_control);
 
-            device.play(ring_buffer_element_id, wav_socket).await
+            device.play(ring_buffer_element_id, wav_socket, request.active_channels_bitmask).await
         }
         fac::PlayDestinationUnknown!() => Err(ControllerError::new(
             fac::Error::InvalidArguments,

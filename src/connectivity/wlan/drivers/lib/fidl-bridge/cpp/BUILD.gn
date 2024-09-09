@@ -8,19 +8,19 @@ config("config") {
 source_set("cpp") {
   public_configs = [ ":config" ]
   public_deps = [
+    "//sdk/lib/fidl/cpp",
     "//sdk/lib/fidl_driver",
     "//sdk/lib/stdcompat",
     "//src/connectivity/wlan/drivers/lib/log/cpp",
-    "//src/lib/fidl/cpp",
   ]
 }
 
 source_set("dfv2") {
   public_configs = [ ":config" ]
   public_deps = [
+    "//sdk/lib/fidl/cpp",
     "//sdk/lib/fidl_driver",
     "//sdk/lib/stdcompat",
     "//src/connectivity/wlan/drivers/lib/log/cpp:dfv2",
-    "//src/lib/fidl/cpp",
   ]
 }

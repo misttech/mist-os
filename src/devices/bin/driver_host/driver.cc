@@ -38,7 +38,7 @@ std::string_view GetFilename(std::string_view path) {
 
 std::string_view GetManifest(std::string_view url) { return GetFilename(url); }
 
-class FileEventHandler : public fidl::AsyncEventHandler<fio::File> {
+class FileEventHandler final : public fidl::AsyncEventHandler<fio::File> {
  public:
   explicit FileEventHandler(std::string url) : url_(std::move(url)) {}
 
@@ -46,6 +46,8 @@ class FileEventHandler : public fidl::AsyncEventHandler<fio::File> {
     LOGF(ERROR, "Failed to start driver '%s'; could not open library: %s", url_.c_str(),
          info.FormatDescription().c_str());
   }
+
+  void handle_unknown_event(fidl::UnknownEventMetadata<fio::File>) override {}
 
  private:
   std::string url_;

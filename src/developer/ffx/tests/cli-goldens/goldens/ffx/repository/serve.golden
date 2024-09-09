@@ -134,6 +134,18 @@
       "short": null,
       "description": "refresh repository metadata during startup. Note that this is not necessary if package-tool runs in the background taking care of it, e.g. as part of `fx serve`. Default is `false`.",
       "hidden": false
+    },
+    {
+      "kind": {
+        "Option": {
+          "arg_name": "auto-publish"
+        }
+      },
+      "optionality": "optional",
+      "long": "--auto-publish",
+      "short": null,
+      "description": "auto publish packages listed in the given manifest. This uses time based versioning when publishing and ignores missing packages. The manifest is a json file a single member \"content\", which contains a list named \"manifest\". The list is a list of package manifests, relative paths are relative to the directory of the auto-publish manifest.",
+      "hidden": false
     }
   ],
   "notes": [],

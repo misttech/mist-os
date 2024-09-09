@@ -10,8 +10,6 @@
 #include "src/lib/fxl/log_settings_command_line.h"
 #include "src/performance/ktrace_provider/app.h"
 
-using namespace ktrace_provider;
-
 int main(int argc, const char** argv) {
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
   auto command_line = fxl::CommandLineFromArgcArgv(argc, argv);
@@ -20,9 +18,9 @@ int main(int argc, const char** argv) {
 
   trace::TraceProviderWithFdio trace_provider(loop.dispatcher(), "ktrace_provider");
   trace_provider.SetGetKnownCategoriesCallback(
-      []() { return fpromise::make_ok_promise(GetKnownCategories()); });
+      []() { return fpromise::make_ok_promise(ktrace_provider::GetKnownCategories()); });
 
-  App app(command_line);
+  ktrace_provider::App app(command_line);
   loop.Run();
   return 0;
 }

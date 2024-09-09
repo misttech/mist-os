@@ -18,15 +18,6 @@
 #include <ktl/optional.h>
 #include <ktl/variant.h>
 
-// Helpers used to identify which locks need to be held for various templated PI
-// interactions which could be operating on a Thread->Thread, Thread->OWQ,
-// OWQ->Thread or OWQ->OWQ.
-namespace internal {
-inline const ChainLock& GetPiNodeLock(const Thread& node);
-inline const ChainLock& GetPiNodeLock(const WaitQueue& node);
-inline const ChainLock& GetPiNodeLock(const OwnedWaitQueue& node);
-}  // namespace internal
-
 // fwd decl so we can be friends with our tests.
 struct OwnedWaitQueueTopologyTests;
 
@@ -114,9 +105,10 @@ class OwnedWaitQueue : protected WaitQueue, public fbl::DoublyLinkedListable<Own
   // prepare for a BlockAndAssignOwner operation.  See the comments in
   // LockForBAAOOperation for details.
   struct BAAOLockingDetails {
+    BAAOLockingDetails() = default;
     explicit BAAOLockingDetails(Thread* initial_new_owner) : new_owner{initial_new_owner} {}
 
-    Thread* new_owner;
+    Thread* new_owner{nullptr};
     const void* stop_point{nullptr};
   };
 
@@ -257,7 +249,7 @@ class OwnedWaitQueue : protected WaitQueue, public fbl::DoublyLinkedListable<Own
                                   ResourceOwnership resource_ownership, Interruptible interruptible)
       TA_EXCL(chainlock_transaction_token) TA_REQ(preempt_disabled_token);
 
-  zx_status_t BlockAndAssignOwnerLocked(Thread* const current_thread, const Deadline& deadline,
+  zx_status_t BlockAndAssignOwnerLocked(Thread* current_thread, const Deadline& deadline,
                                         const BAAOLockingDetails& details,
                                         ResourceOwnership resource_ownership,
                                         Interruptible interruptible)
@@ -266,13 +258,14 @@ class OwnedWaitQueue : protected WaitQueue, public fbl::DoublyLinkedListable<Own
 
   // Cancel a block and assign owner operation that we have already locked for.
   // Basically, just drop all of the locks and get out.
-  void CancelBAAOOperationLocked(Thread* const current_thread, const BAAOLockingDetails& details)
+  void CancelBAAOOperationLocked(Thread* current_thread, const BAAOLockingDetails& details)
       TA_REQ(chainlock_transaction_token) TA_REL(get_lock(), current_thread->get_lock());
 
   // Obtain all of the locks needed for a BlockAndAssignOwner operation,
   // handling the special case of new+old owner which share a PI graph target.
-  BAAOLockingDetails LockForBAAOOperation(Thread* const current_thread, Thread* new_owner)
-      TA_REQ(chainlock_transaction_token) TA_ACQ(get_lock(), current_thread->get_lock());
+  bool LockForBAAOOperationOrBackoff(Thread* current_thread, Thread* new_owner,
+                                     BAAOLockingDetails& details_out)
+      TA_REQ(chainlock_transaction_token) TA_TRY_ACQ(true, get_lock(), current_thread->get_lock());
 
   // Attempt to obtain all of the locks needed for a BAAO operation while
   // already holding this queue's lock.  On success, the current thread's lock
@@ -280,9 +273,9 @@ class OwnedWaitQueue : protected WaitQueue, public fbl::DoublyLinkedListable<Own
   // which are needed, and the details of the locking operation will be
   // returned.  On failure, returns ktl::nullopt after dropping any locks which
   // had been obtained.
-  ktl::optional<BAAOLockingDetails> LockForBAAOOperationLocked(Thread* const current_thread,
-                                                               Thread* new_owner)
-      TA_REQ(chainlock_transaction_token, get_lock());
+  bool TryLockForBAAOOperationLocked(Thread* current_thread, Thread* new_owner,
+                                     BAAOLockingDetails& details_out)
+      TA_REQ(chainlock_transaction_token, get_lock()) TA_TRY_ACQ(true, current_thread->get_lock());
 
   // Wake the up to specified number of threads from the wait queue, removing
   // any current queue owner in the process.
@@ -300,8 +293,9 @@ class OwnedWaitQueue : protected WaitQueue, public fbl::DoublyLinkedListable<Own
       TA_REQ(chainlock_transaction_token, get_lock(), preempt_disabled_token);
 
   // Obtain all of the locks needed for a WakeThreads operation.
-  Thread::UnblockList LockForWakeOperation(uint32_t max_wake, IWakeRequeueHook& wake_hooks)
-      TA_REQ(chainlock_transaction_token) TA_ACQ(get_lock());
+  bool LockForWakeOperationOrBackoff(uint32_t max_wake, IWakeRequeueHook& wake_hooks,
+                                     Thread::UnblockList& unblock_list_out)
+      TA_REQ(chainlock_transaction_token) TA_TRY_ACQ(true, get_lock());
 
   ktl::optional<Thread::UnblockList> LockForWakeOperationLocked(uint32_t max_wake,
                                                                 IWakeRequeueHook& wake_hooks)
@@ -486,8 +480,8 @@ class OwnedWaitQueue : protected WaitQueue, public fbl::DoublyLinkedListable<Own
                               const SchedulerState::InheritedProfileValues* added_ipv,
                               const SchedulerState::InheritedProfileValues* lost_ipv,
                               PropagateOpTag<Op>)
-      TA_REQ(chainlock_transaction_token, internal::GetPiNodeLock(upstream_node),
-             internal::GetPiNodeLock(downstream_node), preempt_disabled_token);
+      TA_REQ(chainlock_transaction_token, ChainLockable::GetLock(upstream_node),
+             ChainLockable::GetLock(downstream_node), preempt_disabled_token);
 
   // Upcast from a WaitQueue to an OwnedWaitQueue if possible, using the magic
   // number to detect the underlying nature of the object.  Returns nullptr if
@@ -511,11 +505,12 @@ class OwnedWaitQueue : protected WaitQueue, public fbl::DoublyLinkedListable<Own
     return nullptr;
   }
 
-  RequeueLockingDetails LockForRequeueOperation(OwnedWaitQueue& requeue_target,
-                                                Thread* new_requeue_target_owner, uint32_t max_wake,
-                                                uint32_t max_requeue, IWakeRequeueHook& wake_hooks,
-                                                IWakeRequeueHook& requeue_hooks)
-      TA_REQ(chainlock_transaction_token) TA_ACQ(get_lock(), requeue_target.get_lock());
+  bool LockForRequeueOperationOrBackoff(OwnedWaitQueue& requeue_target,
+                                        Thread* new_requeue_target_owner, uint32_t max_wake,
+                                        uint32_t max_requeue, IWakeRequeueHook& wake_hooks,
+                                        IWakeRequeueHook& requeue_hooks,
+                                        RequeueLockingDetails& requeue_locking_details_out)
+      TA_REQ(chainlock_transaction_token) TA_TRY_ACQ(true, get_lock(), requeue_target.get_lock());
 
   ktl::variant<ChainLock::Result, ReplaceOwnerLockingDetails> LockForOwnerReplacement(
       Thread* new_owner, const Thread* blocking_thread = nullptr,
@@ -551,7 +546,7 @@ class OwnedWaitQueue : protected WaitQueue, public fbl::DoublyLinkedListable<Own
 
   template <typename StartNodeType>
   static void UnlockPiChainCommon(StartNodeType& start, const void* stop_point = nullptr)
-      TA_REQ(chainlock_transaction_token) TA_REL(internal::GetPiNodeLock(start));
+      TA_REQ(chainlock_transaction_token) TA_REL(start);
 
   TA_GUARDED(get_lock()) Thread* owner_ = nullptr;
 
@@ -584,17 +579,5 @@ class OwnedWaitQueue : protected WaitQueue, public fbl::DoublyLinkedListable<Own
   //
   SchedulerState::WaitQueueInheritedSchedulerState* inherited_scheduler_state_storage_{nullptr};
 };
-
-namespace internal {
-inline const ChainLock& GetPiNodeLock(const Thread& node) TA_RET_CAP(node.get_lock()) {
-  return node.get_lock();
-}
-inline const ChainLock& GetPiNodeLock(const WaitQueue& node) TA_RET_CAP(node.get_lock()) {
-  return node.get_lock();
-}
-inline const ChainLock& GetPiNodeLock(const OwnedWaitQueue& node) TA_RET_CAP(node.get_lock()) {
-  return node.get_lock();
-}
-}  // namespace internal
 
 #endif  // ZIRCON_KERNEL_INCLUDE_KERNEL_OWNED_WAIT_QUEUE_H_

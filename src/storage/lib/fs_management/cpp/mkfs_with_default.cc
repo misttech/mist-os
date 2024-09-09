@@ -34,7 +34,8 @@ zx::result<> MkfsWithDefault(const char* device_path, FsComponent& component,
   auto mount_options = fuchsia_fs_startup::wire::MountOptions::Builder(arena)
                            .crypt(fidl::ClientEnd<fuchsia_fxfs::Crypt>(std::move(crypt_client)))
                            .Build();
-  auto volume = fs->CreateVolume("default", mount_options);
+  auto volume =
+      fs->CreateVolume("default", fuchsia_fs_startup::wire::CreateOptions(), mount_options);
   if (volume.is_error()) {
     std::cerr << "Failed to create default volume: " << volume.status_string() << std::endl;
     return volume.take_error();

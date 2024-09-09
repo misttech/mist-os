@@ -91,7 +91,7 @@ func (p Protocol) WithHlMessaging() protocolWithHlMessaging {
 }
 
 // These correspond to templated classes and functions forward-declared in
-// /src/lib/fidl/cpp/include/lib/fidl/cpp/unified_messaging.h
+// /sdk/lib/fidl/cpp/include/lib/fidl/cpp/unified_messaging.h
 var (
 	NaturalRequest           = fidlNs.member("Request")
 	NaturalResponse          = fidlNs.member("Response")

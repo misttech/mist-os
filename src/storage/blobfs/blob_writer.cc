@@ -210,8 +210,11 @@ zx::result<> Blob::Writer::SpaceAllocate() {
     status = blobfs().GetAllocator()->ReserveBlocks(block_count, &extents);
   }
   if (status != ZX_OK) {
-    FX_LOGS(ERROR) << "Failed to allocate " << blob_layout_->TotalBlockCount()
-                   << " blocks for blob: " << zx_status_get_string(status);
+    static OutOfSpaceLogSite site;
+    if (site.ShouldLog()) {
+      FX_LOGS(ERROR) << "Failed to allocate " << blob_layout_->TotalBlockCount()
+                     << " blocks for blob: " << zx_status_get_string(status);
+    }
     return zx::error(status);
   }
   if (extents.size() > kMaxExtentsPerBlob) {
@@ -407,7 +410,13 @@ zx::result<std::optional<Blob::WrittenBlob>> Blob::Writer::WriteInternal(Blob& b
   if (streaming_write_) {
     // Stream buffered data to disk.
     if (zx::result status = StreamBufferedData(); status.is_error()) {
-      FX_LOGS(ERROR) << "Failed to perform streaming write: " << status.status_string();
+      if (status.status_value() == ZX_ERR_NO_SPACE) {
+        static OutOfSpaceLogSite site;
+        if (site.ShouldLog())
+          FX_LOGS(ERROR) << "Failed to perform streaming write: " << status.status_string();
+      } else {
+        FX_LOGS(ERROR) << "Failed to perform streaming write: " << status.status_string();
+      }
       return status.take_error();
     }
   }

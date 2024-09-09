@@ -18,7 +18,7 @@ impl FakeUpdatePackage {
     #[allow(clippy::new_without_default)]
     pub fn new() -> Self {
         let temp_dir = tempfile::tempdir().expect("/tmp to exist");
-        let update_pkg_proxy = fuchsia_fs::directory::open_in_namespace(
+        let update_pkg_proxy = fuchsia_fs::directory::open_in_namespace_deprecated(
             temp_dir.path().to_str().unwrap(),
             fuchsia_fs::OpenFlags::RIGHT_READABLE,
         )
@@ -87,6 +87,8 @@ pub fn make_packages_json<'a>(urls: impl AsRef<[&'a str]>) -> String {
     .to_string()
 }
 
+/// Integration test source epoch
+///
 /// We specifically make the integration tests dependent on this (rather than e.g. u64::MAX) so that
 /// when we bump the epoch, most of the integration tests will fail. To fix this, simply bump this
 /// constant to match the SOURCE epoch. This will encourage developers to think critically about

@@ -4,6 +4,7 @@
 
 #include <lib/memalloc/pool.h>
 #include <lib/memalloc/range.h>
+#include <lib/memalloc/testing/range.h>
 #include <lib/stdcompat/bit.h>
 #include <zircon/assert.h>
 
@@ -15,6 +16,7 @@
 
 #include <fuzzer/FuzzedDataProvider.h>
 
+#include "algorithm.h"
 #include "test.h"
 
 namespace {
@@ -63,7 +65,8 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
 
   ZX_ASSERT_MSG(std::is_sorted(ctx.pool.begin(), ctx.pool.end()),
                 "pool ranges are not sorted:\n%s\noriginal ranges:\n%s",
-                ToString(ctx.pool.begin(), ctx.pool.end()).c_str(), ToString(ranges).c_str());
+                memalloc::testing::ToString(ctx.pool.begin(), ctx.pool.end()).c_str(),
+                memalloc::testing::ToString(ranges).c_str());
 
   // Tracks the non-bookkeeping allocations made that have yet to be partially
   // freed; this will serve as a means of generating valid inputs to Free().

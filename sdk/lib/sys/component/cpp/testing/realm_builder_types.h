@@ -97,9 +97,32 @@ struct Dictionary final {
   cpp17::optional<std::string_view> from_dictionary = cpp17::nullopt;
 };
 
+// A resolver capability.
+// See: https://fuchsia.dev/fuchsia-src/concepts/components/v2/capabilities/resolver.
+struct Resolver final {
+  std::string_view name;
+  cpp17::optional<std::string_view> as = cpp17::nullopt;
+  cpp17::optional<std::string_view> path = cpp17::nullopt;
+#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
+  cpp17::optional<std::string_view> from_dictionary = cpp17::nullopt;
+#endif
+};
+
+// A runner capability.
+// See: https://fuchsia.dev/fuchsia-src/concepts/components/v2/capabilities/runner.
+struct Runner final {
+  std::string_view name;
+  cpp17::optional<std::string_view> as = cpp17::nullopt;
+  cpp17::optional<std::string_view> path = cpp17::nullopt;
+#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
+  cpp17::optional<std::string_view> from_dictionary = cpp17::nullopt;
+#endif
+};
+
 // A capability to be routed from one component to another.
 // See: https://fuchsia.dev/fuchsia-src/concepts/components/v2/capabilities
-using Capability = cpp17::variant<Protocol, Service, Directory, Storage, Config, Dictionary>;
+using Capability =
+    cpp17::variant<Protocol, Service, Directory, Storage, Config, Dictionary, Resolver, Runner>;
 
 // [START mock_handles_cpp]
 // Handles provided to mock component.

@@ -1154,16 +1154,11 @@ bool Controller::CalculateMinimumAllocations(
         // are supported and hardcode the bytes-per-pixel value to avoid pixel
         // format check and stride calculation (which requires holding the GTT
         // lock). This may change when we need to support non-RGBA/BGRA images.
-        // Note that this may be used by CheckConfiguration() where the handle
-        // of primary->image is not propagated yet. CheckConfiguration() may
-        // need to populate the image_t.handle of pending layers first so that
-        // the image of primary layer can be correctly resolved.
-        constexpr int bytes_per_pixel = 4;
-        const display::DriverImageId primary_image_id(primary->image_handle);
-        if (primary_image_id != display::kInvalidDriverImageId) {
-          ZX_DEBUG_ASSERT(bytes_per_pixel == ImageFormatStrideBytesPerWidthPixel(
-                                                 GetImportedImagePixelFormat(primary_image_id)));
-        }
+        //
+        // There is currently no good way to enforce this by assertions,
+        // because the image handle provided in `banjo_display_configs` can be
+        // invalid or obsolete when `CheckConfiguration()` calls this method.
+        static constexpr int bytes_per_pixel = 4;
 
         if (primary->image_source_transformation == COORDINATE_TRANSFORMATION_IDENTITY ||
             primary->image_source_transformation == COORDINATE_TRANSFORMATION_ROTATE_CCW_180) {

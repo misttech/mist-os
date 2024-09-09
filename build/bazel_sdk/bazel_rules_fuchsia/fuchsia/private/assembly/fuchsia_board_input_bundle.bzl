@@ -95,7 +95,7 @@ def _fuchsia_board_input_bundle_impl(ctx):
 
     # Create Board Input Bundle
     ffx_tool = fuchsia_toolchain.ffx_assembly
-    board_input_bundle_dir = ctx.actions.declare_directory(ctx.label.name + "_out")
+    board_input_bundle_dir = ctx.actions.declare_directory(ctx.label.name)
     ffx_isolate_dir = ctx.actions.declare_directory(ctx.label.name + "_ffx_isolate_dir")
     ffx_invocation = [
         ffx_tool.path,

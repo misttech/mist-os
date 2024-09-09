@@ -120,13 +120,10 @@ TEST_F(DeviceEnumerationTest, NelsonTest) {
   };
   VerifyOneOf(kTouchscreenNodeMonikers);
 
-  // TODO(b/324268831): Remove these once devfs is deprecated.
-  static const char* kDevFsPaths[] = {
-      "class/thermal/000", "class/adc/000",         "class/adc/001",         "class/adc/002",
-      "class/adc/003",     "class/temperature/000", "class/temperature/001",
-  };
-  ASSERT_NO_FATAL_FAILURE(TestRunner(kDevFsPaths, std::size(kDevFsPaths)));
   ASSERT_NO_FATAL_FAILURE(device_enumeration::WaitForClassDeviceCount("class/power-sensor", 2));
+  ASSERT_NO_FATAL_FAILURE(device_enumeration::WaitForClassDeviceCount("class/thermal", 1));
+  ASSERT_NO_FATAL_FAILURE(device_enumeration::WaitForClassDeviceCount("class/adc", 4));
+  ASSERT_NO_FATAL_FAILURE(device_enumeration::WaitForClassDeviceCount("class/temperature", 2));
 }
 
 }  // namespace

@@ -1,152 +1,115 @@
-# Copyright 2018 The Fuchsia Authors. All rights reserved.
+# Copyright 2021 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//build/components.gni")
 import("//build/cpp/sdk_source_set.gni")
-import("//build/fidl/fidl.gni")
-import("//build/test.gni")
-import("//sdk/ctf/build/ctf.gni")
-import("//tools/fidl/gidl/gidl.gni")
 
-# The complete high-level C++ bindings library supporting both asynchronous
-# and synchronous APIs.
-sdk_source_set("cpp") {
-  category = "partner"
-
-  sdk_name = "fidl_cpp"
-
-  sources = [
-    "binding.h",
-    "binding_set.h",
-    "event_sender.h",
-    "interface_ptr.h",
-    "interface_ptr_set.h",
-    "internal/header.h",
-    "internal/implementation.h",
-    "internal/message_handler.cc",
-    "internal/message_handler.h",
-    "internal/message_reader.cc",
-    "internal/message_reader.h",
-    "internal/pending_response.cc",
-    "internal/pending_response.h",
-    "internal/proxy.cc",
-    "internal/proxy.h",
-    "internal/proxy_controller.cc",
-    "internal/proxy_controller.h",
-    "internal/stub.cc",
-    "internal/stub.h",
-    "internal/stub_controller.cc",
-    "internal/stub_controller.h",
-    "internal/unknown_interactions_table.c",
-    "internal/unknown_interactions_table.h",
-    "internal/weak_stub_controller.cc",
-    "internal/weak_stub_controller.h",
-    "member_connector.h",
-    "service_connector.h",
-    "service_handler_base.h",
-    "type_converter.h",
-    "unknown_interactions_hlcpp.cc",
-    "unknown_interactions_hlcpp.h",
-  ]
-
-  include_base = "//sdk"
-  stable = true
-
-  public_deps = [
-    ":cpp_sync",
-    "//sdk/lib/fidl",
-    "//sdk/lib/fit",
-    "//sdk/lib/fit-promise",
-    "//sdk/lib/stdcompat",
-    "//zircon/system/ulib/async",
-    "//zircon/system/ulib/async-default",
-    "//zircon/system/ulib/zx",
-  ]
-
-  public_configs = [ "//sdk/config" ]
-}
-
-# The synchronous high-level C++ bindings library.
-sdk_source_set("cpp_sync") {
-  category = "partner"
-
-  sdk_name = "fidl_cpp_sync"
-  stable = true
-
-  sources = [
-    "internal/logging.cc",
-    "internal/logging.h",
-    "internal/message_sender.cc",
-    "internal/message_sender.h",
-    "internal/synchronous_proxy.cc",
-    "internal/synchronous_proxy.h",
-    "synchronous_interface_ptr.h",
-  ]
-
-  include_base = "//sdk"
-
-  public_configs = [ "//sdk/config" ]
-
-  public_deps = [
-    ":cpp_base",
-    "//sdk/lib/fidl",
-    "//sdk/lib/fit",
-    "//zircon/system/ulib/zx",
-  ]
-}
-
-# The base library used to implement the natural domain-object types.
-# It should not contain message dispatching functionality.
+# The base library that supports domain objects.
+#
+# It works on host and Fuchsia.
 sdk_source_set("cpp_base") {
   category = "partner"
 
-  sdk_name = "fidl_cpp_base"
+  # TODO(https://fxbug.dev/42055960): Rename SDK element to "fidl_cpp_base".
+  api = "fidl_cpp_base_v2.api"
+  sdk_name = "fidl_cpp_base_v2"
   stable = true
 
+  # TODO(https://fxbug.dev/42172264): We should represent the library as a
+  # `sdk_static_library` when supported.
+  build_as_static = true
+
+  public = [
+    "include/lib/fidl/cpp/box.h",
+    "include/lib/fidl/cpp/internal/framework_err.h",
+    "include/lib/fidl/cpp/internal/natural_types.h",
+    "include/lib/fidl/cpp/natural_coding_traits.h",
+    "include/lib/fidl/cpp/natural_decoder.h",
+    "include/lib/fidl/cpp/natural_encoder.h",
+    "include/lib/fidl/cpp/natural_types.h",
+    "include/lib/fidl/cpp/wire_natural_conversions.h",
+  ]
   sources = [
-    "clone.cc",
-    "clone.h",
-    "coding_traits.h",
-    "comparison.h",
-    "decoder.cc",
-    "decoder.h",
-    "encoder.cc",
-    "encoder.h",
-    "enum.h",
-    "internal/bitset.h",
-    "internal/natural_types_header.h",
-    "internal/natural_types_implementation.h",
-    "message.cc",
-    "message.h",
-    "message_buffer.cc",
-    "message_buffer.h",
-    "message_part.h",
-    "string.h",
-    "traits.h",
-    "types.h",
-    "vector.h",
+    "natural_coding_traits.cc",
+    "natural_decoder.cc",
+    "natural_encoder.cc",
+    "natural_types.cc",
   ]
-
-  include_base = "//sdk"
-
-  public_configs = [ "//sdk/config" ]
-
   public_deps = [
-    "//sdk/lib/fidl_base",
-    "//sdk/lib/fit",
-    "//sdk/lib/fit-promise",
+    "//sdk/lib/fidl/cpp/wire",
     "//sdk/lib/stdcompat",
+    "//zircon/system/ulib/zx",
   ]
+  deps = [ "//sdk/lib/fidl_base" ]
+  public_configs = [ ":cpp_base.headers" ]
+}
 
-  if (is_fuchsia || is_mistos) {
-    sources += [
-      "interface_handle.h",
-      "interface_request.h",
+config("cpp_base.headers") {
+  include_dirs = [ "include" ]
+}
+
+# The IPC library that adds messaging APIs on top of domain objects.
+#
+# It is Fuchsia-only.
+if (is_fuchsia || is_mistos) {
+  sdk_source_set("cpp") {
+    category = "partner"
+    stable = true
+
+    # TODO(https://fxbug.dev/42055960): Rename SDK element to "fidl_cpp".
+    api = "fidl_cpp_v2.api"
+    sdk_name = "fidl_cpp_v2"
+
+    # TODO(https://fxbug.dev/42172264): We should represent the library as a
+    # `sdk_static_library` when supported.
+    build_as_static = true
+
+    public = [
+      "include/lib/fidl/cpp/any_error_in.h",
+      "include/lib/fidl/cpp/channel.h",
+      "include/lib/fidl/cpp/client.h",
+      "include/lib/fidl/cpp/internal/channel_endpoint_conversions.h",
+      "include/lib/fidl/cpp/internal/client_details.h",
+      "include/lib/fidl/cpp/internal/make_response_context.h",
+      "include/lib/fidl/cpp/internal/natural_client_base.h",
+      "include/lib/fidl/cpp/internal/natural_message_encoder.h",
+      "include/lib/fidl/cpp/internal/thenable.h",
+      "include/lib/fidl/cpp/unified_messaging.h",
+      "include/lib/fidl/cpp/unified_messaging_declarations.h",
     ]
-    public_deps += [
-      "//sdk/lib/fidl",
-      "//zircon/system/ulib/zx",
+    sources = [
+      "any_error_in.cc",
+      "internal/natural_message_encoder.cc",
+    ]
+    public_deps = [
+      "//sdk/lib/async",
+      "//sdk/lib/fidl/cpp:cpp_base",
+      "//sdk/lib/fidl_base",
     ]
   }
+}
+
+# The support header for HLCPP / Natural conversion
+sdk_source_set("hlcpp_conversion") {
+  category = "partner"
+  stable = true
+  api = "fidl_cpp_hlcpp_conversion.api"
+  sdk_name = "fidl_cpp_hlcpp_conversion"
+  public = [ "include/lib/fidl/cpp/hlcpp_conversion.h" ]
+  public_configs = [ ":cpp_base.headers" ]
+  public_deps = [
+    "//sdk/lib/fidl/cpp:cpp_base",
+    "//sdk/lib/fidl/hlcpp:hlcpp_base",
+  ]
+}
+
+# The support header for Natural type printing
+sdk_source_set("natural_ostream") {
+  category = "partner"
+  stable = true
+  api = "fidl_cpp_natural_ostream.api"
+  sdk_name = "fidl_cpp_natural_ostream"
+  public = [ "include/lib/fidl/cpp/natural_ostream.h" ]
+  public_deps = [ "//sdk/lib/fidl/cpp:cpp_base" ]
+  public_configs = [ ":cpp_base.headers" ]
 }

@@ -4,6 +4,15 @@
 
 //go:build !build_with_native_toolchain
 
+// This library implements a *very basic* fuchsia.io implementation for directories, files, and
+// services. Most functionality is not available, nor does this library enforce any kind of
+// connection rights. However, nodes are read-only from a client perspective (e.g. writing to files
+// is not supported), and no new nodes can be created by clients.
+
+// TODO(https://fxbug.dev/356225729): This library does not perform any rights checks, nor does it
+// enforce hierarchal rights. This is mainly used for publishing services and read-only directory
+// entries from components.
+
 package component
 
 import (
@@ -26,7 +35,7 @@ import (
 	"fidl/fuchsia/unknown"
 )
 
-func respond(ctx fidl.Context, flags io.OpenFlags, req io.NodeWithCtxInterfaceRequest, err error, node Node) error {
+func respondDeprecated(flags io.OpenFlags, req io.NodeWithCtxInterfaceRequest, err error, node Node) error {
 	if err != nil {
 		defer func() {
 			_ = req.Close()
@@ -36,10 +45,7 @@ func respond(ctx fidl.Context, flags io.OpenFlags, req io.NodeWithCtxInterfaceRe
 		proxy := io.NodeEventProxy{Channel: req.Channel}
 		switch err := err.(type) {
 		case nil:
-			info, err := node.DescribeDeprecated(ctx)
-			if err != nil {
-				panic(err)
-			}
+			info := node.DescribeDeprecated()
 			return proxy.OnOpen(int32(zx.ErrOk), &info)
 		case *zx.Error:
 			return proxy.OnOpen(int32(err.Status), nil)
@@ -56,8 +62,10 @@ func logError(err error) {
 
 type Node interface {
 	getIO() (io.NodeWithCtx, func() error, error)
-	addConnection(ctx fidl.Context, flags io.OpenFlags, mode io.ModeType, req io.NodeWithCtxInterfaceRequest) error
-	DescribeDeprecated(fidl.Context) (io.NodeInfoDeprecated, error)
+	addConnection(flags io.Flags, channel zx.Channel) error
+	Representation() io.Representation
+	addConnectionDeprecated(flags io.OpenFlags, mode io.ModeType, req io.NodeWithCtxInterfaceRequest) error
+	DescribeDeprecated() io.NodeInfoDeprecated
 }
 
 func noop() error {
@@ -77,44 +85,58 @@ func (s *Service) getIO() (io.NodeWithCtx, func() error, error) {
 	return s, noop, nil
 }
 
-func (s *Service) addConnection(ctx fidl.Context, flags io.OpenFlags, mode io.ModeType, req io.NodeWithCtxInterfaceRequest) error {
-	// TODO(https://fxbug.dev/42108808): this does not implement the node protocol correctly,
-	// but matches the behaviour of SDK VFS.
+func (s *Service) addConnection(flags io.Flags, channel zx.Channel) error {
+	if flags&io.FlagsProtocolNode != 0 {
+		stub := io.NodeWithCtxStub{Impl: s}
+		go Serve(context.Background(), &stub, channel, ServeOptions{
+			OnError: logError,
+		})
+		if flags&io.FlagsFlagSendRepresentation != 0 {
+			proxy := io.NodeEventProxy{Channel: channel}
+			return proxy.OnRepresentation(s.Representation())
+		}
+		return nil
+	}
+	return s.AddFn(context.Background(), channel)
+}
+
+func (s *Service) addConnectionDeprecated(flags io.OpenFlags, mode io.ModeType, req io.NodeWithCtxInterfaceRequest) error {
 	if flags&io.OpenFlagsNodeReference != 0 {
 		stub := io.NodeWithCtxStub{Impl: s}
 		go Serve(context.Background(), &stub, req.Channel, ServeOptions{
 			OnError: logError,
 		})
-		return respond(ctx, flags, req, nil, s)
+		return respondDeprecated(flags, req, nil, s)
 	}
-	return respond(ctx, flags, req, s.AddFn(context.Background(), req.Channel), s)
+	return respondDeprecated(flags, req, s.AddFn(context.Background(), req.Channel), s)
 }
 
 func (s *Service) Clone(ctx fidl.Context, flags io.OpenFlags, req io.NodeWithCtxInterfaceRequest) error {
-	return s.addConnection(ctx, flags, 0, req)
+	return s.addConnectionDeprecated(flags, 0, req)
 }
 
 func (s *Service) Reopen(ctx fidl.Context, rights io.RightsRequest, req io.NodeWithCtxInterfaceRequest) error {
-	// TODO(https://fxbug.dev/42157659): implement.
-	_ = req.Close()
-	return nil
+	return s.addConnection(io.Flags(0), req.ToChannel())
 }
 
 func (*Service) Close(fidl.Context) (unknown.CloseableCloseResult, error) {
 	return unknown.CloseableCloseResultWithResponse(unknown.CloseableCloseResponse{}), nil
 }
 
-func (*Service) DescribeDeprecated(fidl.Context) (io.NodeInfoDeprecated, error) {
+func (*Service) DescribeDeprecated() io.NodeInfoDeprecated {
 	var nodeInfo io.NodeInfoDeprecated
 	nodeInfo.SetService(io.Service{})
-	return nodeInfo, nil
+	return nodeInfo
+}
+
+func (*Service) Representation() io.Representation {
+	var repr io.Representation
+	repr.SetConnector(io.ConnectorInfo{})
+	return repr
 }
 
 func (*Service) GetConnectionInfo(fidl.Context) (io.ConnectionInfo, error) {
 	var connectionInfo io.ConnectionInfo
-	// TODO(https://fxbug.dev/42157659): Populate the rights requested by the client at connection.
-	// This might require separating Service from the VFS implementation so that the latter can
-	// hold these rights.
 	connectionInfo.SetRights(io.OperationsConnect)
 	return connectionInfo, nil
 }
@@ -136,18 +158,18 @@ func (*Service) SetAttr(fidl.Context, io.NodeAttributeFlags, io.NodeAttributes) 
 }
 
 func (*Service) GetAttributes(fidl.Context, io.NodeAttributesQuery) (io.Node2GetAttributesResult, error) {
-	// TODO(https://fxbug.dev/42157659): implement.
-	return io.Node2GetAttributesResultWithErr(int32(zx.ErrNotSupported)), nil
+	attrs := io.NodeAttributes2{}
+	attrs.ImmutableAttributes.SetProtocols(io.NodeProtocolKindsConnector)
+	attrs.ImmutableAttributes.SetAbilities(io.OperationsConnect)
+	return io.Node2GetAttributesResultWithResponse(attrs), nil
 }
 
 func (*Service) UpdateAttributes(fidl.Context, io.MutableNodeAttributes) (io.Node2UpdateAttributesResult, error) {
-	// TODO(https://fxbug.dev/42157659): implement.
 	return io.Node2UpdateAttributesResultWithErr(int32(zx.ErrNotSupported)), nil
 }
 
 func (*Service) ListExtendedAttributes(_ fidl.Context, request io.ExtendedAttributeIteratorWithCtxInterfaceRequest) error {
-	_ = request.Close()
-	return nil
+	return CloseWithEpitaph(request.Channel, zx.ErrNotSupported)
 }
 
 func (*Service) GetExtendedAttribute(fidl.Context, []uint8) (io.Node2GetExtendedAttributeResult, error) {
@@ -243,13 +265,26 @@ func (dir *DirectoryWrapper) getIO() (io.NodeWithCtx, func() error, error) {
 	return dir.GetDirectory(), noop, nil
 }
 
-func (dir *DirectoryWrapper) addConnection(ctx fidl.Context, flags io.OpenFlags, mode io.ModeType, req io.NodeWithCtxInterfaceRequest) error {
+func (dir *DirectoryWrapper) addConnection(flags io.Flags, channel zx.Channel) error {
+	ioDir := dir.GetDirectory()
+	stub := io.DirectoryWithCtxStub{Impl: ioDir}
+	go Serve(context.Background(), &stub, channel, ServeOptions{
+		OnError: logError,
+	})
+	if flags&io.FlagsFlagSendRepresentation != 0 {
+		proxy := io.NodeEventProxy{Channel: channel}
+		return proxy.OnRepresentation(dir.Representation())
+	}
+	return nil
+}
+
+func (dir *DirectoryWrapper) addConnectionDeprecated(flags io.OpenFlags, mode io.ModeType, req io.NodeWithCtxInterfaceRequest) error {
 	ioDir := dir.GetDirectory()
 	stub := io.DirectoryWithCtxStub{Impl: ioDir}
 	go Serve(context.Background(), &stub, req.Channel, ServeOptions{
 		OnError: logError,
 	})
-	return respond(ctx, flags, req, nil, dir)
+	return respondDeprecated(flags, req, nil, dir)
 }
 
 var _ io.DirectoryWithCtx = (*directoryState)(nil)
@@ -262,28 +297,31 @@ type directoryState struct {
 }
 
 func (dirState *directoryState) Clone(ctx fidl.Context, flags io.OpenFlags, req io.NodeWithCtxInterfaceRequest) error {
-	return dirState.addConnection(ctx, flags, 0, req)
+	return dirState.addConnectionDeprecated(flags, 0, req)
 }
 
 func (dirState *directoryState) Reopen(ctx fidl.Context, rights io.RightsRequest, req io.NodeWithCtxInterfaceRequest) error {
-	// TODO(https://fxbug.dev/42157659): implement.
-	_ = req.Close()
-	return nil
+	return dirState.addConnection(io.Flags(0), req.ToChannel())
 }
 
 func (*directoryState) Close(fidl.Context) (unknown.CloseableCloseResult, error) {
 	return unknown.CloseableCloseResultWithResponse(unknown.CloseableCloseResponse{}), nil
 }
 
-func (*DirectoryWrapper) DescribeDeprecated(fidl.Context) (io.NodeInfoDeprecated, error) {
+func (*DirectoryWrapper) Representation() io.Representation {
+	var repr io.Representation
+	repr.SetDirectory(io.DirectoryInfo{})
+	return repr
+}
+
+func (*DirectoryWrapper) DescribeDeprecated() io.NodeInfoDeprecated {
 	var nodeInfo io.NodeInfoDeprecated
 	nodeInfo.SetDirectory(io.DirectoryObject{})
-	return nodeInfo, nil
+	return nodeInfo
 }
 
 func (*directoryState) GetConnectionInfo(fidl.Context) (io.ConnectionInfo, error) {
 	var connectionInfo io.ConnectionInfo
-	// TODO(https://fxbug.dev/42157659): Populate the rights requested by the client at connection.
 	rights := io.RStarDir
 	connectionInfo.SetRights(rights)
 	return connectionInfo, nil
@@ -306,18 +344,18 @@ func (*directoryState) SetAttr(fidl.Context, io.NodeAttributeFlags, io.NodeAttri
 }
 
 func (*directoryState) GetAttributes(fidl.Context, io.NodeAttributesQuery) (io.Node2GetAttributesResult, error) {
-	// TODO(https://fxbug.dev/42157659): implement.
-	return io.Node2GetAttributesResultWithErr(int32(zx.ErrNotSupported)), nil
+	attrs := io.NodeAttributes2{}
+	attrs.ImmutableAttributes.SetProtocols(io.NodeProtocolKindsDirectory)
+	attrs.ImmutableAttributes.SetAbilities(io.RStarDir)
+	return io.Node2GetAttributesResultWithResponse(attrs), nil
 }
 
 func (*directoryState) UpdateAttributes(fidl.Context, io.MutableNodeAttributes) (io.Node2UpdateAttributesResult, error) {
-	// TODO(https://fxbug.dev/42157659): implement.
 	return io.Node2UpdateAttributesResultWithErr(int32(zx.ErrNotSupported)), nil
 }
 
 func (*directoryState) ListExtendedAttributes(_ fidl.Context, request io.ExtendedAttributeIteratorWithCtxInterfaceRequest) error {
-	_ = request.Close()
-	return nil
+	return CloseWithEpitaph(request.Channel, zx.ErrNotSupported)
 }
 
 func (*directoryState) GetExtendedAttribute(fidl.Context, []uint8) (io.Node2GetExtendedAttributeResult, error) {
@@ -336,7 +374,7 @@ const dot = "."
 
 func (dirState *directoryState) Open(ctx fidl.Context, flags io.OpenFlags, mode io.ModeType, path string, req io.NodeWithCtxInterfaceRequest) error {
 	if path == dot {
-		return dirState.addConnection(ctx, flags, mode, req)
+		return dirState.addConnectionDeprecated(flags, mode, req)
 	}
 	const slash = "/"
 	if strings.HasSuffix(path, slash) {
@@ -353,13 +391,13 @@ func (dirState *directoryState) Open(ctx fidl.Context, flags io.OpenFlags, mode 
 			if dir, ok := proxy.(io.DirectoryWithCtx); ok {
 				return dir.Open(ctx, flags, mode, path[i+len(slash):], req)
 			}
-			return respond(ctx, flags, req, &zx.Error{Status: zx.ErrNotDir}, node)
+			return respondDeprecated(flags, req, &zx.Error{Status: zx.ErrNotDir}, node)
 		}
 	} else if node, ok := dirState.Directory.Get(path); ok {
-		return node.addConnection(ctx, flags, mode, req)
+		return node.addConnectionDeprecated(flags, mode, req)
 	}
 
-	return respond(ctx, flags, req, &zx.Error{Status: zx.ErrNotFound}, dirState)
+	return respondDeprecated(flags, req, &zx.Error{Status: zx.ErrNotFound}, dirState)
 }
 
 func (dirState *directoryState) Open2(ctx fidl.Context, path string, protocols io.ConnectionProtocols, channel zx.Channel) error {
@@ -368,8 +406,30 @@ func (dirState *directoryState) Open2(ctx fidl.Context, path string, protocols i
 }
 
 func (dirState *directoryState) Open3(ctx fidl.Context, path string, flags io.Flags, options io.Options, channel zx.Channel) error {
-	// TODO(https://fxbug.dev/348698584): Implement.
-	return CloseWithEpitaph(channel, zx.ErrNotSupported)
+	if path == dot {
+		return dirState.addConnection(flags, channel)
+	}
+	const slash = "/"
+	if strings.HasSuffix(path, slash) {
+		path = path[:len(path)-len(slash)]
+	}
+
+	if i := strings.Index(path, slash); i != -1 {
+		if node, ok := dirState.Directory.Get(path[:i]); ok {
+			proxy, cleanup, err := node.getIO()
+			if err != nil {
+				return err
+			}
+			defer cleanup()
+			if dir, ok := proxy.(io.DirectoryWithCtx); ok {
+				return dir.Open3(ctx, path[i+len(slash):], flags, options, channel)
+			}
+			return CloseWithEpitaph(channel, zx.ErrNotDir)
+		}
+	} else if node, ok := dirState.Directory.Get(path); ok {
+		return node.addConnection(flags, channel)
+	}
+	return CloseWithEpitaph(channel, zx.ErrNotFound)
 }
 
 func (*directoryState) Unlink(fidl.Context, string, io.UnlinkOptions) (io.Directory2UnlinkResult, error) {
@@ -551,7 +611,26 @@ func (file *FileWrapper) getIO() (io.NodeWithCtx, func() error, error) {
 	return state, state.reader.Close, nil
 }
 
-func (file *FileWrapper) addConnection(ctx fidl.Context, flags io.OpenFlags, mode io.ModeType, req io.NodeWithCtxInterfaceRequest) error {
+func (file *FileWrapper) addConnection(flags io.Flags, channel zx.Channel) error {
+	ioFile, err := file.getFileState()
+	if err != nil {
+		return err
+	}
+	stub := io.FileWithCtxStub{Impl: ioFile}
+	go func() {
+		defer ioFile.reader.Close()
+		Serve(context.Background(), &stub, channel, ServeOptions{
+			OnError: logError,
+		})
+	}()
+	if flags&io.FlagsFlagSendRepresentation != 0 {
+		proxy := io.NodeEventProxy{Channel: channel}
+		return proxy.OnRepresentation(file.Representation())
+	}
+	return nil
+}
+
+func (file *FileWrapper) addConnectionDeprecated(flags io.OpenFlags, mode io.ModeType, req io.NodeWithCtxInterfaceRequest) error {
 	ioFile, err := file.getFileState()
 	if err != nil {
 		return err
@@ -563,7 +642,7 @@ func (file *FileWrapper) addConnection(ctx fidl.Context, flags io.OpenFlags, mod
 			OnError: logError,
 		})
 	}()
-	return respond(ctx, flags, req, nil, ioFile)
+	return respondDeprecated(flags, req, nil, ioFile)
 }
 
 var _ io.FileWithCtx = (*fileState)(nil)
@@ -618,23 +697,27 @@ type fileState struct {
 }
 
 func (fState *fileState) Clone(ctx fidl.Context, flags io.OpenFlags, req io.NodeWithCtxInterfaceRequest) error {
-	return fState.addConnection(ctx, flags, 0, req)
+	return fState.addConnectionDeprecated(flags, 0, req)
 }
 
 func (fState *fileState) Reopen(ctx fidl.Context, rights io.RightsRequest, req io.NodeWithCtxInterfaceRequest) error {
-	// TODO(https://fxbug.dev/42157659): implement.
-	_ = req.Close()
-	return nil
+	return fState.addConnection(io.Flags(0), req.ToChannel())
 }
 
 func (fState *fileState) Close(fidl.Context) (unknown.CloseableCloseResult, error) {
 	return unknown.CloseableCloseResultWithResponse(unknown.CloseableCloseResponse{}), fState.reader.Close()
 }
 
-func (*FileWrapper) DescribeDeprecated(fidl.Context) (io.NodeInfoDeprecated, error) {
+func (*FileWrapper) Representation() io.Representation {
+	var repr io.Representation
+	repr.SetFile(io.FileInfo{})
+	return repr
+}
+
+func (*FileWrapper) DescribeDeprecated() io.NodeInfoDeprecated {
 	var nodeInfo io.NodeInfoDeprecated
 	nodeInfo.SetFile(io.FileObject{})
-	return nodeInfo, nil
+	return nodeInfo
 }
 
 func (fState *fileState) Describe(fidl.Context) (io.FileInfo, error) {
@@ -648,7 +731,6 @@ func (*fileState) LinkInto(fidl.Context, zx.Event, string) (io.LinkableLinkIntoR
 
 func (fState *fileState) GetConnectionInfo(fidl.Context) (io.ConnectionInfo, error) {
 	var connectionInfo io.ConnectionInfo
-	// TODO(https://fxbug.dev/42157659): Populate the rights requested by the client at connection.
 	rights := io.RStarDir
 	connectionInfo.SetRights(rights)
 	return connectionInfo, nil
@@ -672,18 +754,18 @@ func (*fileState) SetAttr(fidl.Context, io.NodeAttributeFlags, io.NodeAttributes
 }
 
 func (*fileState) GetAttributes(fidl.Context, io.NodeAttributesQuery) (io.Node2GetAttributesResult, error) {
-	// TODO(https://fxbug.dev/42157659): implement.
-	return io.Node2GetAttributesResultWithErr(int32(zx.ErrNotSupported)), nil
+	attrs := io.NodeAttributes2{}
+	attrs.ImmutableAttributes.SetProtocols(io.NodeProtocolKindsFile)
+	attrs.ImmutableAttributes.SetAbilities(io.OperationsReadBytes | io.OperationsGetAttributes)
+	return io.Node2GetAttributesResultWithResponse(attrs), nil
 }
 
 func (*fileState) UpdateAttributes(fidl.Context, io.MutableNodeAttributes) (io.Node2UpdateAttributesResult, error) {
-	// TODO(https://fxbug.dev/42157659): implement.
 	return io.Node2UpdateAttributesResultWithErr(int32(zx.ErrNotSupported)), nil
 }
 
 func (*fileState) ListExtendedAttributes(_ fidl.Context, request io.ExtendedAttributeIteratorWithCtxInterfaceRequest) error {
-	_ = request.Close()
-	return nil
+	return CloseWithEpitaph(request.Channel, zx.ErrNotSupported)
 }
 
 func (*fileState) GetExtendedAttribute(fidl.Context, []uint8) (io.Node2GetExtendedAttributeResult, error) {
@@ -778,7 +860,8 @@ func (fState *fileState) AdvisoryLock(fidl.Context, io.AdvisoryLockRequest) (io.
 
 func (fState *fileState) GetBackingMemory(fidl.Context, io.VmoFlags) (io.FileGetBackingMemoryResult, error) {
 	if vmo := fState.reader.GetVMO(); vmo != nil {
-		// TODO(https://fxbug.dev/42157659): The rights on this VMO should be capped at the connection's.
+		// TODO(https://fxbug.dev/356225729): The rights on the VMO we return here should be capped at
+		// the intersection of the rights in the request and those on this connection.
 		h, err := vmo.Handle().Duplicate(zx.RightSameRights)
 		switch err := err.(type) {
 		case nil:

@@ -17,17 +17,21 @@
     },
     capabilities: [
         { service: "fuchsia.hardware.gpio.Service" },
+        { service: "fuchsia.hardware.pin.Service" },
     ],
     use: [
         {
             protocol: [ "fuchsia.scheduler.RoleManager" ],
         },
-        { service: 'fuchsia.hardware.gpioimpl.Service' },
         { service: 'fuchsia.hardware.pinimpl.Service' },
     ],
     expose: [
         {
             service: "fuchsia.hardware.gpio.Service",
+            from: "self",
+        },
+        {
+            service: "fuchsia.hardware.pin.Service",
             from: "self",
         },
     ],

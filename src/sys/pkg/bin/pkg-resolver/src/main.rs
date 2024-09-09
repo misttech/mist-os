@@ -127,7 +127,7 @@ async fn main_inner_async(startup_time: Instant) -> Result<(), Error> {
     .serve_and_log_errors();
     futures.push(cobalt_fut.boxed_local());
 
-    let data_proxy = match fuchsia_fs::directory::open_in_namespace(
+    let data_proxy = match fuchsia_fs::directory::open_in_namespace_deprecated(
         "/data",
         fuchsia_fs::OpenFlags::RIGHT_READABLE | fuchsia_fs::OpenFlags::RIGHT_WRITABLE,
     ) {
@@ -143,7 +143,7 @@ async fn main_inner_async(startup_time: Instant) -> Result<(), Error> {
         namespace.unbind("/data").context("failed to unbind /data from default namespace")?;
     }
 
-    let config_proxy = match fuchsia_fs::directory::open_in_namespace(
+    let config_proxy = match fuchsia_fs::directory::open_in_namespace_deprecated(
         "/config/data",
         fuchsia_fs::OpenFlags::RIGHT_READABLE,
     ) {

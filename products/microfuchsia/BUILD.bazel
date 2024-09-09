@@ -36,10 +36,6 @@ fuchsia_product_bundle(
     main = ":microfuchsia_eng.x64",
     partitions_config = "//build/bazel/assembly/partitions_configurations:x64",
     product_bundle_name = "microfuchsia_eng",
-    recovery = "//products/zedboot:x64",
-    repository_keys = "//src/sys/pkg/repositories/devhost/keys",
-    update_epoch = "1",
-    update_version_file = "//build/info:version",
     virtual_devices = [
         ":microfuchsia_emu_x64",
     ],
@@ -50,11 +46,8 @@ fuchsia_product_bundle(
     board_name = "pkvm-x64",
     default_virtual_device = ":microfuchsia_emu_x64",
     main = ":microfuchsia_eng.pkvm-x64",
-    partitions_config = "//build/bazel/assembly/partitions_configurations:x64",
+    partitions_config = "//build/bazel/assembly/partitions_configurations:pkvm-x64",
     product_bundle_name = "microfuchsia_eng",
-    repository_keys = "//src/sys/pkg/repositories/devhost/keys",
-    update_epoch = "1",
-    update_version_file = "//build/info:version",
     virtual_devices = [
         ":microfuchsia_emu_x64",
     ],
@@ -66,10 +59,6 @@ fuchsia_product_bundle(
     main = ":microfuchsia_eng.arm64",
     partitions_config = "//build/bazel/assembly/partitions_configurations:arm64",
     product_bundle_name = "microfuchsia_eng",
-    recovery = "//products/zedboot:arm64",
-    repository_keys = "//src/sys/pkg/repositories/devhost/keys",
-    update_epoch = "1",
-    update_version_file = "//build/info:version",
 )
 
 fuchsia_product_bundle(
@@ -77,11 +66,8 @@ fuchsia_product_bundle(
     board_name = "pkvm-arm64",
     default_virtual_device = ":microfuchsia_emu_arm64",
     main = ":microfuchsia_eng.pkvm-arm64",
-    partitions_config = "//build/bazel/assembly/partitions_configurations:arm64",
+    partitions_config = "//build/bazel/assembly/partitions_configurations:pkvm-arm64",
     product_bundle_name = "microfuchsia_eng",
-    repository_keys = "//src/sys/pkg/repositories/devhost/keys",
-    update_epoch = "1",
-    update_version_file = "//build/info:version",
     virtual_devices = [
         ":microfuchsia_emu_arm64",
     ],
@@ -119,6 +105,7 @@ fuchsia_product(
 
 fuchsia_product_configuration(
     name = "assembly_config_eng",
+    base_packages = ["//src/tee/ta/noop:ta-noop"],
     product_config_json = {
         "platform": {
             "build_type": BUILD_TYPES.ENG,
@@ -141,6 +128,14 @@ fuchsia_product_configuration(
             "diagnostics": {
                 "archivist": "low-mem",
             },
+        },
+        "product": {
+            "trusted_apps": [
+                {
+                    "component_url": "fuchsia-pkg://fuchsia.com/ta-noop#meta/ta-runtime.cm",
+                    "guid": "185d0391-bb47-495a-ba57-d6c6b808bfae",
+                },
+            ],
         },
     },
 )

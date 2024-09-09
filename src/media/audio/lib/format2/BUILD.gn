@@ -34,8 +34,8 @@ source_set("format2") {
     "//sdk/fidl/fuchsia.mediastreams:fuchsia.mediastreams_cpp",
     "//sdk/fidl/fuchsia.mediastreams:fuchsia.mediastreams_cpp",
     "//sdk/lib/fidl/cpp",
+    "//sdk/lib/fidl/hlcpp",
     "//sdk/lib/fit-promise",
-    "//src/lib/fidl/cpp",
     "//src/media/audio/lib/timeline",
   ]
 

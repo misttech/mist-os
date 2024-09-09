@@ -65,7 +65,7 @@ class Semaphore {
   //
   // This should only be used for testing/diagnostic purposes.
   uint64_t num_waiters() const TA_EXCL(chainlock_transaction_token, waitq_.get_lock()) {
-    SingletonChainLockGuardIrqSave guard{waitq_.get_lock(), CLT_TAG("Semaphore:num_waiters")};
+    SingleChainLockGuard guard{IrqSaveOption, waitq_.get_lock(), CLT_TAG("Semaphore:num_waiters")};
     return waitq_.Count();
   }
 

@@ -6,6 +6,7 @@
 #include <fidl/fuchsia.audio.device/cpp/markers.h>
 #include <fidl/fuchsia.hardware.audio/cpp/fidl.h>
 #include <lib/fidl/cpp/wire/internal/transport_channel.h>
+#include <lib/fidl/cpp/wire/unknown_interaction_handler.h>
 #include <lib/zx/clock.h>
 
 #include <gtest/gtest.h>
@@ -59,6 +60,11 @@ class RingBufferServerWarningTest : public AudioDeviceRegistryServerTestBase,
     auto ring_buffer_client =
         fidl::Client<fad::RingBuffer>(std::move(ring_buffer_client_end), dispatcher(), this);
     return std::make_pair(std::move(ring_buffer_client), std::move(ring_buffer_server_end));
+  }
+
+  void handle_unknown_event(fidl::UnknownEventMetadata<fad::RingBuffer> metadata) override {
+    FAIL() << "RingBufferServerWarningTest: unknown event (RingBuffer) ordinal "
+           << metadata.event_ordinal;
   }
 };
 

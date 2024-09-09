@@ -29,6 +29,9 @@ group("tests") {
     ":mem_digest_test($host_toolchain)",
     "dataclasses_json_lite:tests",
     "debug_json:tests",
+    "images_json:tests",
     "multidict:tests",
+    "smaps:tests",
+    "snapshots:tests",
   ]
 }

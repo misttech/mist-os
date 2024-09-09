@@ -95,7 +95,7 @@ impl CachedStorage {
     async fn sync(&mut self, storage_dir: &DirectoryProxy) -> Result<(), Error> {
         // Scope is important. file_proxy needs to be out-of-scope when the directory is renamed.
         {
-            let file_proxy = fuchsia_fs::directory::open_file(
+            let file_proxy = fuchsia_fs::directory::open_file_deprecated(
                 storage_dir,
                 &self.temp_file_path,
                 OpenFlags::CREATE
@@ -307,7 +307,7 @@ impl FidlStorage {
         let cached_value = match cached_storage.current_data.as_ref() {
             Some(cached_value) => Some(cached_value),
             None => {
-                let file_proxy = fuchsia_fs::directory::open_file(
+                let file_proxy = fuchsia_fs::directory::open_file_deprecated(
                     &self.storage_dir,
                     &cached_storage.file_path,
                     OpenFlags::RIGHT_READABLE,
@@ -366,7 +366,7 @@ impl FidlStorage {
             .unwrap_or_else(|| panic!("Invalid data keyed by {key}"));
         let mut cached_storage = typed_storage.cached_storage.lock().await;
         if cached_storage.current_data.is_none() || !self.caching_enabled {
-            if let Some(file_proxy) = match fuchsia_fs::directory::open_file(
+            if let Some(file_proxy) = match fuchsia_fs::directory::open_file_deprecated(
                 &self.storage_dir,
                 &cached_storage.file_path,
                 OpenFlags::RIGHT_READABLE,
@@ -487,7 +487,7 @@ mod tests {
     }
 
     fn open_tempdir(tempdir: &tempfile::TempDir) -> fio::DirectoryProxy {
-        fuchsia_fs::directory::open_in_namespace(
+        fuchsia_fs::directory::open_in_namespace_deprecated(
             tempdir.path().to_str().expect("tempdir path is not valid UTF-8"),
             fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
         )
@@ -686,8 +686,11 @@ mod tests {
         directory: &fio::DirectoryProxy,
         file_name: &str,
     ) {
-        let open_fut =
-            fuchsia_fs::directory::open_file(directory, file_name, OpenFlags::RIGHT_READABLE);
+        let open_fut = fuchsia_fs::directory::open_file_deprecated(
+            directory,
+            file_name,
+            OpenFlags::RIGHT_READABLE,
+        );
         let result = run_until_ready(executor, open_fut);
         assert_matches!(result, Result::Err(e) if e.is_not_found_error());
     }

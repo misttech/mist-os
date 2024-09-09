@@ -14,4 +14,8 @@ source "$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"/lib/vars.
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"/lib/dart_utils.sh || exit $?
 fx-config-read
 
-run-dart-tool status "$@"
+if is_feature_enabled "legacy_fxstatus"; then
+  run-dart-tool status "$@"
+else
+  fx-command-run host-tool status2 "$@"
+fi

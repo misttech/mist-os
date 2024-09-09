@@ -25,6 +25,7 @@ source_set("paver-core") {
     "sparse.cc",
     "stream-reader.cc",
     "sysconfig-fidl.cc",
+    "system_shutdown_state.cc",
     "utils.cc",
     "validation.cc",
   ]
@@ -52,6 +53,7 @@ source_set("paver-core") {
     "//zircon/third_party/ulib/safemath",
   ]
   public_deps = [
+    "//sdk/fidl/fuchsia.device.manager:fuchsia.device.manager_cpp",
     "//sdk/fidl/fuchsia.fshost:fuchsia.fshost_cpp",
     "//sdk/fidl/fuchsia.hardware.block:fuchsia.hardware.block_cpp",
     "//sdk/fidl/fuchsia.hardware.block.partition:fuchsia.hardware.block.partition_cpp",
@@ -135,7 +137,6 @@ source_set("kola") {
   public_deps = [
     ":gpt",
     ":paver-core",
-    "//sdk/fidl/fuchsia.device.manager:fuchsia.device.manager_cpp",
     "//src/lib/uuid",
     "//src/storage/gpt",
   ]
@@ -164,14 +165,10 @@ source_set("vim3") {
 }
 
 source_set("x64") {
-  sources = [
-    "system_shutdown_state.cc",
-    "x64.cc",
-  ]
+  sources = [ "x64.cc" ]
   public_deps = [
     ":gpt",
     ":paver-core",
-    "//sdk/fidl/fuchsia.device.manager:fuchsia.device.manager_cpp",
     "//src/lib/uuid",
   ]
 }
@@ -184,7 +181,6 @@ source_set("android") {
   public_deps = [
     ":gpt",
     ":paver-core",
-    "//sdk/fidl/fuchsia.device.manager:fuchsia.device.manager_cpp",
     "//src/lib/uuid",
   ]
   deps = [ "//zircon/third_party/ulib/cksum" ]

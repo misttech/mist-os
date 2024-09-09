@@ -310,7 +310,10 @@ while [[ $# -ne 0 ]]; do
         fx-error "Invalid device: $1. See valid values in 'fx help set-device'"
         exit 1
       fi
-      export FUCHSIA_DEVICE_NAME="$1"
+      # This name needs to be coordinated with ffx default configuration
+      # LINT.IfChange
+      export FUCHSIA_NODENAME="$1"
+      # LINT.ThenChange(/src/developer/ffx/data/config.json)
       ;;
     -i)
       declare iterative=1

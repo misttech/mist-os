@@ -51,7 +51,11 @@ struct PropertyTestUnit {
 
 class DeviceInspectTest : public gtest::TestLoopFixture {
  public:
-  void SetUp() override { ASSERT_EQ(ZX_OK, DeviceInspect::Create(dispatcher(), &device_inspect_)); }
+  void SetUp() override {
+    auto result = DeviceInspect::Create(dispatcher(), inspector_.GetRoot());
+    ASSERT_TRUE(result.is_ok());
+    device_inspect_ = std::move(*result);
+  }
 
   void LogTxQfull() { device_inspect_->LogTxQueueFull(); }
   void LogFwRcvrTgr() { device_inspect_->LogFwRecoveryTriggered(); }
@@ -69,7 +73,7 @@ class DeviceInspectTest : public gtest::TestLoopFixture {
   void GetUintProperty(const std::vector<std::string>& path, std::string name,
                        uint64_t* out_property) {
     ASSERT_THAT(out_property, NotNull());
-    auto hierarchy = FetchHierarchy(device_inspect_->inspector());
+    auto hierarchy = FetchHierarchy(inspector_);
     auto* root = hierarchy.value().GetByPath(path);
     ASSERT_THAT(root, NotNull());
     auto* uint_property = root->node().get_property<inspect::UintPropertyValue>(name);
@@ -77,6 +81,7 @@ class DeviceInspectTest : public gtest::TestLoopFixture {
     *out_property = uint_property->value();
   }
 
+  inspect::Inspector inspector_;
   fdf_testing::ScopedGlobalLogger logging_;
   std::unique_ptr<DeviceInspect> device_inspect_;
   // Defining properties which will be covered in the test cases.
@@ -133,7 +138,7 @@ class DeviceInspectTest : public gtest::TestLoopFixture {
 };
 
 TEST_F(DeviceInspectTest, HierarchyCreation) {
-  auto hierarchy = FetchHierarchy(device_inspect_->inspector());
+  auto hierarchy = FetchHierarchy(inspector_);
   ASSERT_TRUE(hierarchy.is_ok());
 }
 

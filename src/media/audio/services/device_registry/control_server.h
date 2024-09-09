@@ -9,6 +9,7 @@
 #include <fidl/fuchsia.hardware.audio.signalprocessing/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.audio/cpp/fidl.h>
 #include <lib/fidl/cpp/wire/internal/transport_channel.h>
+#include <lib/fidl/cpp/wire/unknown_interaction_handler.h>
 
 #include <cstdint>
 #include <memory>
@@ -79,8 +80,8 @@ class ControlServer
   void Reset(ResetCompleter::Sync& completer) final;
   void CodecStart(CodecStartCompleter::Sync& completer) final;
   void CodecStop(CodecStopCompleter::Sync& completer) final;
-  void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_audio_device::Control>,
-                             fidl::UnknownMethodCompleter::Sync&) final;
+  void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_audio_device::Control> metadata,
+                             fidl::UnknownMethodCompleter::Sync& completer) final;
 
   // fuchsia.hardware.audio.signalprocessing.SignalProcessing support
   //

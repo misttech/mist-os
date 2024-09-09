@@ -23,9 +23,9 @@
 #include <fbl/ref_ptr.h>
 
 #include "allocation_result.h"
-#include "device.h"
 #include "koid_util.h"
 #include "logical_buffer_collection.h"
+#include "sysmem.h"
 #include "versions.h"
 
 namespace sysmem_service {
@@ -127,7 +127,7 @@ class Node : public fbl::RefCounted<Node> {
   void set_unfound_node() { was_unfound_node_ = true; }
   bool was_unfound_node() const { return was_unfound_node_; }
 
-  Device* parent_device() const;
+  Sysmem* parent_sysmem() const;
 
   void SetDebugClientInfoInternal(ClientDebugInfo debug_info);
 

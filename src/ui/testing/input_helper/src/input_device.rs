@@ -15,6 +15,8 @@ use fuchsia_async as fasync;
 use futures::channel::mpsc;
 use futures::{future, pin_mut, StreamExt, TryFutureExt};
 
+pub type DeviceId = u32;
+
 /// Implements the server side of the
 /// `fuchsia.input.report.InputDevice` FIDL protocol. This struct also enables users to inject
 /// input reports `as fuchsia.ui.input.InputReport`.
@@ -38,6 +40,9 @@ pub(crate) struct InputDevice {
 
     /// `Task` to keep serving the `fuchsia.input.report.InputDevice` protocol.
     _input_device_task: fasync::Task<()>,
+
+    /// The device_id of the InputDevice.
+    pub device_id: DeviceId,
 }
 
 impl InputDevice {
@@ -59,7 +64,7 @@ impl InputDevice {
             got_input_reports_reader,
         ));
 
-        Self { report_sender, _input_device_task: input_device_task }
+        Self { report_sender, _input_device_task: input_device_task, device_id: 0 }
     }
 
     /// Enqueues an input report, to be read by the input reports reader.
@@ -77,7 +82,7 @@ impl InputDevice {
     /// channel to the FIDL peer.
     #[cfg(test)]
     pub(super) async fn flush(self) {
-        let Self { _input_device_task: input_device_task, report_sender } = self;
+        let Self { _input_device_task: input_device_task, report_sender, .. } = self;
         std::mem::drop(report_sender); // Drop `report_sender` to close channel.
         input_device_task.await
     }
@@ -104,6 +109,11 @@ impl InputDevice {
     ) {
         // Process `fuchsia.input.report.InputDevice` requests, waiting for the `InputDevice`
         // client to provide a `ServerEnd<InputReportsReader>` by calling `GetInputReportsReader()`.
+        //
+        // `filter_map` creates a new stream `input_reports_reader_server_end_stream` for
+        // `request_stream` baesd on the result of `handle_device_request`, only
+        // `GetInputReportsReader` requests enter `input_reports_reader_server_end_stream`
+        // for following process.
         let mut input_reports_reader_server_end_stream = request_stream.filter_map(|r| {
             future::ready(Self::handle_device_request(
                 r,
@@ -111,6 +121,9 @@ impl InputDevice {
                 got_input_reports_reader.clone(),
             ))
         });
+
+        // Create a `Future` to serve `GetInputReportsReader()` and extract the inpur reader
+        // server_end from the request.
         let input_reports_reader_fut = {
             let reader_server_end = input_reports_reader_server_end_stream
                 .next()

@@ -120,8 +120,10 @@ impl Device for NandDevice {
 
     async fn get_child(&self, suffix: &str) -> Result<Box<dyn Device>, Error> {
         const DEV_CLASS_NAND: &str = "/dev/class/nand";
-        let dev_class_nand =
-            fuchsia_fs::directory::open_in_namespace(DEV_CLASS_NAND, OpenFlags::RIGHT_READABLE)?;
+        let dev_class_nand = fuchsia_fs::directory::open_in_namespace_deprecated(
+            DEV_CLASS_NAND,
+            OpenFlags::RIGHT_READABLE,
+        )?;
         let child_path = device_watcher::wait_for_device_with(
             &dev_class_nand,
             |device_watcher::DeviceInfo { filename, topological_path }| {
@@ -341,8 +343,10 @@ impl Device for BlockDevice {
 
     async fn get_child(&self, suffix: &str) -> Result<Box<dyn Device>, Error> {
         const DEV_CLASS_BLOCK: &str = "/dev/class/block";
-        let dev_class_block =
-            fuchsia_fs::directory::open_in_namespace(DEV_CLASS_BLOCK, OpenFlags::RIGHT_READABLE)?;
+        let dev_class_block = fuchsia_fs::directory::open_in_namespace_deprecated(
+            DEV_CLASS_BLOCK,
+            OpenFlags::RIGHT_READABLE,
+        )?;
         let child_path = device_watcher::wait_for_device_with(
             &dev_class_block,
             |device_watcher::DeviceInfo { filename, topological_path }| {

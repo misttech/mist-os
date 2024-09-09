@@ -152,6 +152,65 @@ class DHTSLLTraits {
   using TaggedType3 = TaggedHashTable<size_t, PtrType, Tag3>;
 };
 
+// Traits for a HashTable with a dynamic number of SinglyLinkedList buckets,
+// defined at after construction time but before use (eg; DelayedInit).
+template <typename PtrType, NodeOptions kNodeOptions = NodeOptions::None>
+class DIDHTSLLTraits {
+ public:
+  template <typename DynamicHashTableType, size_t BucketCount>
+  class DynamicHashTableWrapper : public DynamicHashTableType {
+   public:
+    using BucketType = typename DynamicHashTableType::BucketType;
+    DynamicHashTableWrapper() : DynamicHashTableType{HashTableOption::DelayedInit} {
+      this->Init(std::unique_ptr<BucketType[]>(new BucketType[BucketCount]), BucketCount);
+    }
+    ~DynamicHashTableWrapper() = default;
+  };
+
+  // clang-format off
+  using ContainerType           = DynamicHashTableWrapper<
+                                    HashTable<size_t,
+                                              PtrType,
+                                              SinglyLinkedList<PtrType>,
+                                              size_t,
+                                              kDynamicBucketCount>,
+                                    37>;
+  using ContainableBaseClass    = SinglyLinkedListable<PtrType, kNodeOptions>;
+  using ContainerStateType      = SinglyLinkedListNodeState<PtrType, kNodeOptions>;
+  using KeyType                 = typename ContainerType::KeyType;
+  using HashType                = typename ContainerType::HashType;
+
+  using OtherContainerTraits    = OtherHashTraits<PtrType>;
+  using OtherContainerStateType = OtherHashState<PtrType>;
+  using OtherBucketType         = SinglyLinkedListCustomTraits<PtrType, OtherContainerTraits>;
+  using OtherContainerType      = DynamicHashTableWrapper<
+                                    HashTable<OtherKeyType,
+                                              PtrType,
+                                              OtherBucketType,
+                                              OtherHashType,
+                                              kDynamicBucketCount,
+                                              OtherContainerTraits,
+                                              OtherContainerTraits>,
+                                    kOtherNumBuckets>;
+
+  using TestObjBaseType =
+      HashedTestObjBase<typename ContainerType::KeyType, typename ContainerType::HashType>;
+  // clang-format on
+
+  struct Tag1 {};
+  struct Tag2 {};
+  struct Tag3 {};
+
+  using TaggedContainableBaseClasses =
+      fbl::ContainableBaseClasses<TaggedSinglyLinkedListable<PtrType, Tag1>,
+                                  TaggedSinglyLinkedListable<PtrType, Tag2>,
+                                  TaggedSinglyLinkedListable<PtrType, Tag3>>;
+
+  using TaggedType1 = TaggedHashTable<size_t, PtrType, Tag1>;
+  using TaggedType2 = TaggedHashTable<size_t, PtrType, Tag2>;
+  using TaggedType3 = TaggedHashTable<size_t, PtrType, Tag3>;
+};
+
 // Negative compilation test which make sure that we cannot try to use a node
 // flagged with AllowRemoveFromContainer with a hashtable with singly linked
 // list buckets.
@@ -168,7 +227,8 @@ TEST(SinglyLinkedHashTableTest, NoRemoveFromContainer) {
 // versions of the HashTable
 #define RUN_HT_ZXTEST(_group, _flavor, _test) \
   RUN_ZXTEST(_group, _flavor, _test)          \
-  RUN_ZXTEST(_group, D##_flavor, _test)
+  RUN_ZXTEST(_group, D##_flavor, _test)       \
+  RUN_ZXTEST(_group, DID##_flavor, _test)
 
 // clang-format off
 // Statically sized hashtable
@@ -184,6 +244,13 @@ using DUMTE   = DEFINE_TEST_THUNK(Associative, DHTSLL, Unmanaged);
 using DUPDDTE = DEFINE_TEST_THUNK(Associative, DHTSLL, UniquePtrDefaultDeleter);
 using DUPCDTE = DEFINE_TEST_THUNK(Associative, DHTSLL, UniquePtrCustomDeleter);
 using DRPTE   = DEFINE_TEST_THUNK(Associative, DHTSLL, RefPtr);
+
+// Dynamically sized hashtable, with delayed initialization
+DEFINE_TEST_OBJECTS(DIDHTSLL);
+using DIDUMTE   = DEFINE_TEST_THUNK(Associative, DIDHTSLL, Unmanaged);
+using DIDUPDDTE = DEFINE_TEST_THUNK(Associative, DIDHTSLL, UniquePtrDefaultDeleter);
+using DIDUPCDTE = DEFINE_TEST_THUNK(Associative, DIDHTSLL, UniquePtrCustomDeleter);
+using DIDRPTE   = DEFINE_TEST_THUNK(Associative, DIDHTSLL, RefPtr);
 
 // Versions of the test objects which support clear_unsafe.
 template <typename PtrType>

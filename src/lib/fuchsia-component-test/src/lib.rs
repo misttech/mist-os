@@ -321,6 +321,16 @@ impl Capability {
     pub fn dictionary(name: impl Into<String>) -> DictionaryCapability {
         DictionaryCapability { name: name.into(), as_: None, availability: None }
     }
+
+    /// Creates a new resolver capability.
+    pub fn resolver(name: impl Into<String>) -> ResolverCapability {
+        ResolverCapability { name: name.into(), as_: None, path: None }
+    }
+
+    /// Creates a new runner capability.
+    pub fn runner(name: impl Into<String>) -> RunnerCapability {
+        RunnerCapability { name: name.into(), as_: None, path: None }
+    }
 }
 
 /// A protocol capability, which may be routed between components. Created by
@@ -646,6 +656,80 @@ impl Into<ftest::Capability> for DictionaryCapability {
     }
 }
 
+/// A resolver capability, which may be routed between components. Created by
+/// `Capability::resolver`.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ResolverCapability {
+    name: String,
+    as_: Option<String>,
+    path: Option<String>,
+}
+
+impl ResolverCapability {
+    /// The name the targets will see the dictionary capability as.
+    pub fn as_(mut self, as_: impl Into<String>) -> Self {
+        self.as_ = Some(as_.into());
+        self
+    }
+
+    /// The path at which this protocol capability will be provided or used. Only relevant if the
+    /// route's source or target is a local component, as these are the only components
+    /// that realm builder will generate a modern component manifest for.
+    pub fn path(mut self, path: impl Into<String>) -> Self {
+        self.path = Some(path.into());
+        self
+    }
+}
+
+#[cfg(fuchsia_api_level_at_least = "NEXT")]
+impl Into<ftest::Capability> for ResolverCapability {
+    fn into(self) -> ftest::Capability {
+        ftest::Capability::Resolver(ftest::Resolver {
+            name: Some(self.name),
+            as_: self.as_,
+            path: self.path,
+            ..Default::default()
+        })
+    }
+}
+
+/// A runner capability, which may be routed between components. Created by
+/// `Capability::runner`.
+#[derive(Debug, Clone, PartialEq)]
+pub struct RunnerCapability {
+    name: String,
+    as_: Option<String>,
+    path: Option<String>,
+}
+
+impl RunnerCapability {
+    /// The name the targets will see the dictionary capability as.
+    pub fn as_(mut self, as_: impl Into<String>) -> Self {
+        self.as_ = Some(as_.into());
+        self
+    }
+
+    /// The path at which this protocol capability will be provided or used. Only relevant if the
+    /// route's source or target is a local component, as these are the only components
+    /// that realm builder will generate a modern component manifest for.
+    pub fn path(mut self, path: impl Into<String>) -> Self {
+        self.path = Some(path.into());
+        self
+    }
+}
+
+#[cfg(fuchsia_api_level_at_least = "NEXT")]
+impl Into<ftest::Capability> for RunnerCapability {
+    fn into(self) -> ftest::Capability {
+        ftest::Capability::Runner(ftest::Runner {
+            name: Some(self.name),
+            as_: self.as_,
+            path: self.path,
+            ..Default::default()
+        })
+    }
+}
+
 /// A route of one or more capabilities from one point in the realm to one or more targets.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Route {
@@ -864,7 +948,7 @@ impl RealmBuilder {
         };
         let pkg_dir_proxy = match params.pkg_dir_proxy {
             Some(p) => p,
-            None => fuchsia_fs::directory::open_in_namespace(
+            None => fuchsia_fs::directory::open_in_namespace_deprecated(
                 "/pkg",
                 fuchsia_fs::OpenFlags::RIGHT_READABLE | fuchsia_fs::OpenFlags::RIGHT_EXECUTABLE,
             )
@@ -1653,6 +1737,12 @@ impl SubRealmBuilder {
                         c.from_dictionary = Some(from_dictionary.clone());
                     }
                     ftest::Capability::Dictionary(c) => {
+                        c.from_dictionary = Some(from_dictionary.clone());
+                    }
+                    ftest::Capability::Resolver(c) => {
+                        c.from_dictionary = Some(from_dictionary.clone());
+                    }
+                    ftest::Capability::Runner(c) => {
                         c.from_dictionary = Some(from_dictionary.clone());
                     }
                     ftest::Capability::Storage(_)

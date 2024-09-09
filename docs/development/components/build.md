@@ -1085,8 +1085,8 @@ using [Inspect][doc-inspect]:
           "//sdk/lib/sys/cpp",
           {{ '<strong>' }}# This library requires "inspect/client.shard.cml" {{ '</strong>' }}
           {{ '<strong>' }}"//sdk/lib/inspect/component/cpp", {{ '</strong>' }}
-          "//zircon/system/ulib/async-loop:async-loop-cpp",
-          "//zircon/system/ulib/async-loop:async-loop-default",
+          "//sdk/lib/async-loop:async-loop-cpp",
+          "//sdk/lib/async-loop:async-loop-default",
         ]
       }
       ```

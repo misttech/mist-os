@@ -107,10 +107,10 @@ pub struct InstalledRule<I: Ip> {
     /// Rules within a rule set are locally ordered, together with the rule set
     /// priority, this defines a global order for all installed rules.
     pub index: RuleIndex,
-    /// The selector part of the rule, the rule is a no-op if the selector does
+    /// The matcher part of the rule, the rule is a no-op if the matcher does
     /// not match the packet.
-    pub selector: RuleSelector<I>,
-    /// The action part of the rule that describes what to do if the selector
+    pub matcher: RuleMatcher<I>,
+    /// The action part of the rule that describes what to do if the matcher
     /// matches the packet.
     pub action: RuleAction,
 }
@@ -121,14 +121,14 @@ impl TryFrom<fnet_routes::InstalledRuleV4> for InstalledRule<Ipv4> {
         fnet_routes::InstalledRuleV4 {
         rule_set_priority,
         rule_index,
-        selector,
+        matcher,
         action,
     }: fnet_routes::InstalledRuleV4,
     ) -> Result<Self, Self::Error> {
         Ok(Self {
             priority: rule_set_priority.into(),
             index: rule_index.into(),
-            selector: selector.try_into()?,
+            matcher: matcher.try_into()?,
             action: action.into(),
         })
     }
@@ -140,36 +140,36 @@ impl TryFrom<fnet_routes::InstalledRuleV6> for InstalledRule<Ipv6> {
         fnet_routes::InstalledRuleV6 {
         rule_set_priority,
         rule_index,
-        selector,
+        matcher,
         action,
     }: fnet_routes::InstalledRuleV6,
     ) -> Result<Self, Self::Error> {
         Ok(Self {
             priority: rule_set_priority.into(),
             index: rule_index.into(),
-            selector: selector.try_into()?,
+            matcher: matcher.try_into()?,
             action: action.into(),
         })
     }
 }
 
 impl From<InstalledRule<Ipv4>> for fnet_routes::InstalledRuleV4 {
-    fn from(InstalledRule { priority, index, selector, action }: InstalledRule<Ipv4>) -> Self {
+    fn from(InstalledRule { priority, index, matcher, action }: InstalledRule<Ipv4>) -> Self {
         Self {
             rule_set_priority: priority.into(),
             rule_index: index.into(),
-            selector: selector.into(),
+            matcher: matcher.into(),
             action: action.into(),
         }
     }
 }
 
 impl From<InstalledRule<Ipv6>> for fnet_routes::InstalledRuleV6 {
-    fn from(InstalledRule { priority, index, selector, action }: InstalledRule<Ipv6>) -> Self {
+    fn from(InstalledRule { priority, index, matcher, action }: InstalledRule<Ipv6>) -> Self {
         Self {
             rule_set_priority: priority.into(),
             rule_index: index.into(),
-            selector: selector.into(),
+            matcher: matcher.into(),
             action: action.into(),
         }
     }
@@ -368,8 +368,8 @@ impl_responder!(
 pub enum RuleFidlConversionError {
     /// A required field was unset. The provided string is the human-readable
     /// name of the unset field.
-    #[error("BaseSelector is missing from the RuleSelector")]
-    BaseSelectorMissing,
+    #[error("BaseMatcher is missing from the RuleMatcher")]
+    BaseMatcherMissing,
     /// Destination Subnet conversion failed.
     #[error("failed to convert `destination` to net_types subnet: {0:?}")]
     DestinationSubnet(net_types::ip::SubnetError),
@@ -420,19 +420,19 @@ impl From<u32> for RuleIndex {
 
 /// How the interface of a packet should be matched against a rule.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum InterfaceSelector {
+pub enum InterfaceMatcher {
     /// Match on the name of the device.
     DeviceName(String),
 }
 
-impl TryFrom<fnet_routes::InterfaceSelector> for InterfaceSelector {
+impl TryFrom<fnet_routes::InterfaceMatcher> for InterfaceMatcher {
     type Error = RuleFidlConversionError;
-    fn try_from(selector: fnet_routes::InterfaceSelector) -> Result<Self, Self::Error> {
-        match selector {
-            fnet_routes::InterfaceSelector::DeviceName(name) => Ok(Self::DeviceName(name)),
-            fnet_routes::InterfaceSelector::__SourceBreaking { unknown_ordinal } => {
+    fn try_from(matcher: fnet_routes::InterfaceMatcher) -> Result<Self, Self::Error> {
+        match matcher {
+            fnet_routes::InterfaceMatcher::DeviceName(name) => Ok(Self::DeviceName(name)),
+            fnet_routes::InterfaceMatcher::__SourceBreaking { unknown_ordinal } => {
                 Err(RuleFidlConversionError::UnknownOrdinal {
-                    name: "InterfaceSelector",
+                    name: "InterfaceMatcher",
                     unknown_ordinal,
                 })
             }
@@ -440,81 +440,75 @@ impl TryFrom<fnet_routes::InterfaceSelector> for InterfaceSelector {
     }
 }
 
-impl From<InterfaceSelector> for fnet_routes::InterfaceSelector {
-    fn from(selector: InterfaceSelector) -> Self {
-        match selector {
-            InterfaceSelector::DeviceName(name) => fnet_routes::InterfaceSelector::DeviceName(name),
+impl From<InterfaceMatcher> for fnet_routes::InterfaceMatcher {
+    fn from(matcher: InterfaceMatcher) -> Self {
+        match matcher {
+            InterfaceMatcher::DeviceName(name) => fnet_routes::InterfaceMatcher::DeviceName(name),
         }
     }
 }
 
-/// The selector part of the rule that is used to match packets.
+/// The matcher part of the rule that is used to match packets.
 ///
-/// The default selector is the one that matches every packets, i.e., all the
+/// The default matcher is the one that matches every packets, i.e., all the
 /// fields are none.
 #[derive(Debug, Clone, Default, Hash, PartialEq, Eq)]
-pub struct RuleSelector<I: Ip> {
+pub struct RuleMatcher<I: Ip> {
     /// Matches whether the source address of the packet is from the subnet.
     pub from: Option<Subnet<I::Addr>>,
     /// Matches the packet iff the packet was locally generated.
     pub locally_generated: Option<bool>,
     /// Matches the packet iff the socket that was bound to the device using
     /// `SO_BINDTODEVICE`.
-    pub bound_device: Option<InterfaceSelector>,
-    /// The selector for the MARK_1 domain.
-    pub mark_1_selector: Option<MarkSelector>,
-    /// The selector for the MARK_2 domain.
-    pub mark_2_selector: Option<MarkSelector>,
+    pub bound_device: Option<InterfaceMatcher>,
+    /// The matcher for the MARK_1 domain.
+    pub mark_1: Option<MarkMatcher>,
+    /// The matcher for the MARK_2 domain.
+    pub mark_2: Option<MarkMatcher>,
 }
 
-impl TryFrom<fnet_routes::RuleSelectorV4> for RuleSelector<Ipv4> {
+impl TryFrom<fnet_routes::RuleMatcherV4> for RuleMatcher<Ipv4> {
     type Error = RuleFidlConversionError;
     fn try_from(
-        fnet_routes::RuleSelectorV4 {
+        fnet_routes::RuleMatcherV4 {
             from,
             base,
             __source_breaking: fidl::marker::SourceBreaking,
-        }: fnet_routes::RuleSelectorV4,
+        }: fnet_routes::RuleMatcherV4,
     ) -> Result<Self, Self::Error> {
-        let fnet_routes::BaseSelector {
+        let fnet_routes::BaseMatcher {
             locally_generated,
             bound_device,
-            mark_1_selector,
-            mark_2_selector,
+            mark_1,
+            mark_2,
             __source_breaking: fidl::marker::SourceBreaking,
-        } = base.ok_or(RuleFidlConversionError::BaseSelectorMissing)?;
+        } = base.ok_or(RuleFidlConversionError::BaseMatcherMissing)?;
         Ok(Self {
             from: from
                 .map(|from| from.try_into_ext().map_err(RuleFidlConversionError::DestinationSubnet))
                 .transpose()?,
             locally_generated,
-            bound_device: bound_device.map(InterfaceSelector::try_from).transpose()?,
-            mark_1_selector: mark_1_selector.map(MarkSelector::try_from).transpose()?,
-            mark_2_selector: mark_2_selector.map(MarkSelector::try_from).transpose()?,
+            bound_device: bound_device.map(InterfaceMatcher::try_from).transpose()?,
+            mark_1: mark_1.map(MarkMatcher::try_from).transpose()?,
+            mark_2: mark_2.map(MarkMatcher::try_from).transpose()?,
         })
     }
 }
 
-impl From<RuleSelector<Ipv4>> for fnet_routes::RuleSelectorV4 {
+impl From<RuleMatcher<Ipv4>> for fnet_routes::RuleMatcherV4 {
     fn from(
-        RuleSelector {
-            from,
-            locally_generated,
-            bound_device,
-            mark_1_selector,
-            mark_2_selector,
-        }: RuleSelector<Ipv4>,
+        RuleMatcher { from, locally_generated, bound_device, mark_1, mark_2 }: RuleMatcher<Ipv4>,
     ) -> Self {
-        fnet_routes::RuleSelectorV4 {
+        fnet_routes::RuleMatcherV4 {
             from: from.map(|from| fnet::Ipv4AddressWithPrefix {
                 addr: from.network().into_ext(),
                 prefix_len: from.prefix(),
             }),
-            base: Some(fnet_routes::BaseSelector {
+            base: Some(fnet_routes::BaseMatcher {
                 locally_generated,
-                bound_device: bound_device.map(fnet_routes::InterfaceSelector::from),
-                mark_1_selector: mark_1_selector.map(Into::into),
-                mark_2_selector: mark_2_selector.map(Into::into),
+                bound_device: bound_device.map(fnet_routes::InterfaceMatcher::from),
+                mark_1: mark_1.map(Into::into),
+                mark_2: mark_2.map(Into::into),
                 __source_breaking: fidl::marker::SourceBreaking,
             }),
             __source_breaking: fidl::marker::SourceBreaking,
@@ -522,54 +516,48 @@ impl From<RuleSelector<Ipv4>> for fnet_routes::RuleSelectorV4 {
     }
 }
 
-impl TryFrom<fnet_routes::RuleSelectorV6> for RuleSelector<Ipv6> {
+impl TryFrom<fnet_routes::RuleMatcherV6> for RuleMatcher<Ipv6> {
     type Error = RuleFidlConversionError;
     fn try_from(
-        fnet_routes::RuleSelectorV6 {
+        fnet_routes::RuleMatcherV6 {
             from,
             base,
             __source_breaking: fidl::marker::SourceBreaking,
-        }: fnet_routes::RuleSelectorV6,
+        }: fnet_routes::RuleMatcherV6,
     ) -> Result<Self, Self::Error> {
-        let fnet_routes::BaseSelector {
+        let fnet_routes::BaseMatcher {
             locally_generated,
             bound_device,
-            mark_1_selector,
-            mark_2_selector,
+            mark_1,
+            mark_2,
             __source_breaking: fidl::marker::SourceBreaking,
-        } = base.ok_or(RuleFidlConversionError::BaseSelectorMissing)?;
+        } = base.ok_or(RuleFidlConversionError::BaseMatcherMissing)?;
         Ok(Self {
             from: from
                 .map(|from| from.try_into_ext().map_err(RuleFidlConversionError::DestinationSubnet))
                 .transpose()?,
             locally_generated,
-            bound_device: bound_device.map(InterfaceSelector::try_from).transpose()?,
-            mark_1_selector: mark_1_selector.map(MarkSelector::try_from).transpose()?,
-            mark_2_selector: mark_2_selector.map(MarkSelector::try_from).transpose()?,
+            bound_device: bound_device.map(InterfaceMatcher::try_from).transpose()?,
+            mark_1: mark_1.map(MarkMatcher::try_from).transpose()?,
+            mark_2: mark_2.map(MarkMatcher::try_from).transpose()?,
         })
     }
 }
 
-impl From<RuleSelector<Ipv6>> for fnet_routes::RuleSelectorV6 {
+impl From<RuleMatcher<Ipv6>> for fnet_routes::RuleMatcherV6 {
     fn from(
-        RuleSelector {
-            from,
-            locally_generated,
-            bound_device,
-            mark_1_selector,
-            mark_2_selector,
-        }: RuleSelector<Ipv6>,
+        RuleMatcher { from, locally_generated, bound_device, mark_1, mark_2 }: RuleMatcher<Ipv6>,
     ) -> Self {
-        fnet_routes::RuleSelectorV6 {
+        fnet_routes::RuleMatcherV6 {
             from: from.map(|from| fnet::Ipv6AddressWithPrefix {
                 addr: from.network().into_ext(),
                 prefix_len: from.prefix(),
             }),
-            base: Some(fnet_routes::BaseSelector {
+            base: Some(fnet_routes::BaseMatcher {
                 locally_generated,
-                bound_device: bound_device.map(fnet_routes::InterfaceSelector::from),
-                mark_1_selector: mark_1_selector.map(Into::into),
-                mark_2_selector: mark_2_selector.map(Into::into),
+                bound_device: bound_device.map(fnet_routes::InterfaceMatcher::from),
+                mark_1: mark_1.map(Into::into),
+                mark_2: mark_2.map(Into::into),
                 __source_breaking: fidl::marker::SourceBreaking,
             }),
             __source_breaking: fidl::marker::SourceBreaking,
@@ -578,8 +566,8 @@ impl From<RuleSelector<Ipv6>> for fnet_routes::RuleSelectorV6 {
 }
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
-/// A selector to be used against the mark value.
-pub enum MarkSelector {
+/// A matcher to be used against the mark value.
+pub enum MarkMatcher {
     /// This mark domain does not have a mark.
     Unmarked,
     /// This mark domain has a mark.
@@ -591,21 +579,19 @@ pub enum MarkSelector {
     },
 }
 
-impl TryFrom<fnet_routes::MarkSelector> for MarkSelector {
+impl TryFrom<fnet_routes::MarkMatcher> for MarkMatcher {
     type Error = RuleFidlConversionError;
 
-    fn try_from(sel: fnet_routes::MarkSelector) -> Result<Self, Self::Error> {
+    fn try_from(sel: fnet_routes::MarkMatcher) -> Result<Self, Self::Error> {
         match sel {
-            fnet_routes::MarkSelector::Unmarked(fnet_routes::Unmarked) => {
-                Ok(MarkSelector::Unmarked)
-            }
-            fnet_routes::MarkSelector::Marked(fnet_routes::Marked {
+            fnet_routes::MarkMatcher::Unmarked(fnet_routes::Unmarked) => Ok(MarkMatcher::Unmarked),
+            fnet_routes::MarkMatcher::Marked(fnet_routes::Marked {
                 mask,
                 between: fnet_routes::Between { start, end },
-            }) => Ok(MarkSelector::Marked { mask, between: RangeInclusive::new(start, end) }),
-            fnet_routes::MarkSelector::__SourceBreaking { unknown_ordinal } => {
+            }) => Ok(MarkMatcher::Marked { mask, between: RangeInclusive::new(start, end) }),
+            fnet_routes::MarkMatcher::__SourceBreaking { unknown_ordinal } => {
                 Err(RuleFidlConversionError::UnknownOrdinal {
-                    name: "MarkSelector",
+                    name: "MarkMatcher",
                     unknown_ordinal,
                 })
             }
@@ -613,13 +599,13 @@ impl TryFrom<fnet_routes::MarkSelector> for MarkSelector {
     }
 }
 
-impl From<MarkSelector> for fnet_routes::MarkSelector {
-    fn from(sel: MarkSelector) -> Self {
+impl From<MarkMatcher> for fnet_routes::MarkMatcher {
+    fn from(sel: MarkMatcher) -> Self {
         match sel {
-            MarkSelector::Unmarked => fnet_routes::MarkSelector::Unmarked(fnet_routes::Unmarked),
-            MarkSelector::Marked { mask, between } => {
+            MarkMatcher::Unmarked => fnet_routes::MarkMatcher::Unmarked(fnet_routes::Unmarked),
+            MarkMatcher::Marked { mask, between } => {
                 let (start, end) = between.into_inner();
-                fnet_routes::MarkSelector::Marked(fnet_routes::Marked {
+                fnet_routes::MarkMatcher::Marked(fnet_routes::Marked {
                     mask,
                     between: fnet_routes::Between { start, end },
                 })
@@ -629,7 +615,7 @@ impl From<MarkSelector> for fnet_routes::MarkSelector {
 }
 
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
-/// Actions of a rule if the selector matches.
+/// Actions of a rule if the matcher matches.
 pub enum RuleAction {
     /// Return network is unreachable.
     Unreachable,
@@ -647,7 +633,7 @@ impl From<fnet_routes::RuleAction> for RuleAction {
                 RuleAction::Unreachable
             }
             fnet_routes::RuleAction::__SourceBreaking { unknown_ordinal } => {
-                panic!("unexpected mark selector variant, unknown ordinal: {unknown_ordinal}")
+                panic!("unexpected mark matcher variant, unknown ordinal: {unknown_ordinal}")
             }
         }
     }
@@ -711,8 +697,8 @@ pub enum RuleSetRequest<I: FidlRuleAdminIpExt> {
     AddRule {
         /// The index of the rule to be added.
         index: RuleIndex,
-        /// The selector of the rule.
-        selector: Result<RuleSelector<I>, RuleFidlConversionError>,
+        /// The matcher of the rule.
+        matcher: Result<RuleMatcher<I>, RuleFidlConversionError>,
         /// The action of the rule.
         action: RuleAction,
         /// The responder for this request.
@@ -744,10 +730,10 @@ pub enum RuleSetRequest<I: FidlRuleAdminIpExt> {
 impl From<fnet_routes_admin::RuleSetV4Request> for RuleSetRequest<Ipv4> {
     fn from(value: fnet_routes_admin::RuleSetV4Request) -> Self {
         match value {
-            fnet_routes_admin::RuleSetV4Request::AddRule { index, selector, action, responder } => {
+            fnet_routes_admin::RuleSetV4Request::AddRule { index, matcher, action, responder } => {
                 RuleSetRequest::AddRule {
                     index: RuleIndex(index),
-                    selector: selector.try_into(),
+                    matcher: matcher.try_into(),
                     action: action.into(),
                     responder,
                 }
@@ -769,10 +755,10 @@ impl From<fnet_routes_admin::RuleSetV4Request> for RuleSetRequest<Ipv4> {
 impl From<fnet_routes_admin::RuleSetV6Request> for RuleSetRequest<Ipv6> {
     fn from(value: fnet_routes_admin::RuleSetV6Request) -> Self {
         match value {
-            fnet_routes_admin::RuleSetV6Request::AddRule { index, selector, action, responder } => {
+            fnet_routes_admin::RuleSetV6Request::AddRule { index, matcher, action, responder } => {
                 RuleSetRequest::AddRule {
                     index: RuleIndex(index),
-                    selector: selector.try_into(),
+                    matcher: matcher.try_into(),
                     action: action.into(),
                     responder,
                 }
@@ -862,7 +848,7 @@ pub async fn authenticate_for_route_table<I: Ip + FidlRuleAdminIpExt>(
 pub async fn add_rule<I: Ip + FidlRuleAdminIpExt>(
     rule_set: &<I::RuleSetMarker as ProtocolMarker>::Proxy,
     index: RuleIndex,
-    selector: RuleSelector<I>,
+    matcher: RuleMatcher<I>,
     action: RuleAction,
 ) -> Result<Result<(), fnet_routes_admin::RuleSetError>, fidl::Error> {
     #[derive(GenericOverIp)]
@@ -870,17 +856,17 @@ pub async fn add_rule<I: Ip + FidlRuleAdminIpExt>(
     struct AddRuleInput<'a, I: FidlRuleAdminIpExt> {
         rule_set: &'a <I::RuleSetMarker as ProtocolMarker>::Proxy,
         index: RuleIndex,
-        selector: RuleSelector<I>,
+        matcher: RuleMatcher<I>,
         action: RuleAction,
     }
 
     I::map_ip_in(
-        AddRuleInput { rule_set, index, selector, action },
-        |AddRuleInput { rule_set, index, selector, action }| {
-            Either::Left(rule_set.add_rule(index.into(), &selector.into(), &action.into()))
+        AddRuleInput { rule_set, index, matcher, action },
+        |AddRuleInput { rule_set, index, matcher, action }| {
+            Either::Left(rule_set.add_rule(index.into(), &matcher.into(), &action.into()))
         },
-        |AddRuleInput { rule_set, index, selector, action }| {
-            Either::Right(rule_set.add_rule(index.into(), &selector.into(), &action.into()))
+        |AddRuleInput { rule_set, index, matcher, action }| {
+            Either::Right(rule_set.add_rule(index.into(), &matcher.into(), &action.into()))
         },
     )
     .await
@@ -1096,110 +1082,110 @@ pub async fn collect_rules_until_idle<I: FidlRuleIpExt, C: Extend<InstalledRule<
 #[cfg(test)]
 mod tests {
     use assert_matches::assert_matches;
-    use fnet_routes::BaseSelector;
+    use fnet_routes::BaseMatcher;
 
     use super::*;
 
     #[test]
-    fn missing_base_selector_v4() {
-        let fidl_selector = fidl_fuchsia_net_routes::RuleSelectorV4 {
+    fn missing_base_matcher_v4() {
+        let fidl_matcher = fidl_fuchsia_net_routes::RuleMatcherV4 {
             from: None,
             base: None,
             __source_breaking: fidl::marker::SourceBreaking,
         };
         assert_matches!(
-            RuleSelector::try_from(fidl_selector),
-            Err(RuleFidlConversionError::BaseSelectorMissing)
+            RuleMatcher::try_from(fidl_matcher),
+            Err(RuleFidlConversionError::BaseMatcherMissing)
         );
     }
 
     #[test]
-    fn missing_base_selector_v6() {
-        let fidl_selector = fidl_fuchsia_net_routes::RuleSelectorV6 {
+    fn missing_base_matcher_v6() {
+        let fidl_matcher = fidl_fuchsia_net_routes::RuleMatcherV6 {
             from: None,
             base: None,
             __source_breaking: fidl::marker::SourceBreaking,
         };
         assert_matches!(
-            RuleSelector::try_from(fidl_selector),
-            Err(RuleFidlConversionError::BaseSelectorMissing)
+            RuleMatcher::try_from(fidl_matcher),
+            Err(RuleFidlConversionError::BaseMatcherMissing)
         );
     }
 
     #[test]
     fn invalid_destination_subnet_v4() {
-        let fidl_selector = fidl_fuchsia_net_routes::RuleSelectorV4 {
+        let fidl_matcher = fidl_fuchsia_net_routes::RuleMatcherV4 {
             // Invalid, because subnets should not have the "host bits" set.
             from: Some(net_declare::fidl_ip_v4_with_prefix!("192.168.0.1/24")),
-            base: Some(BaseSelector::default()),
+            base: Some(BaseMatcher::default()),
             __source_breaking: fidl::marker::SourceBreaking,
         };
         assert_matches!(
-            RuleSelector::try_from(fidl_selector),
+            RuleMatcher::try_from(fidl_matcher),
             Err(RuleFidlConversionError::DestinationSubnet(_))
         );
     }
 
     #[test]
     fn invalid_destination_subnet_v6() {
-        let fidl_selector = fidl_fuchsia_net_routes::RuleSelectorV6 {
+        let fidl_matcher = fidl_fuchsia_net_routes::RuleMatcherV6 {
             // Invalid, because subnets should not have the "host bits" set.
             from: Some(net_declare::fidl_ip_v6_with_prefix!("fe80::1/64")),
-            base: Some(BaseSelector::default()),
+            base: Some(BaseMatcher::default()),
             __source_breaking: fidl::marker::SourceBreaking,
         };
         assert_matches!(
-            RuleSelector::try_from(fidl_selector),
+            RuleMatcher::try_from(fidl_matcher),
             Err(RuleFidlConversionError::DestinationSubnet(_))
         );
     }
 
     #[test]
-    fn all_unspecified_selector_v4() {
-        let fidl_selector = fidl_fuchsia_net_routes::RuleSelectorV4 {
+    fn all_unspecified_matcher_v4() {
+        let fidl_matcher = fidl_fuchsia_net_routes::RuleMatcherV4 {
             from: None,
-            base: Some(BaseSelector {
+            base: Some(BaseMatcher {
                 locally_generated: None,
                 bound_device: None,
-                mark_1_selector: None,
-                mark_2_selector: None,
+                mark_1: None,
+                mark_2: None,
                 __source_breaking: fidl::marker::SourceBreaking,
             }),
             __source_breaking: fidl::marker::SourceBreaking,
         };
         assert_matches!(
-            RuleSelector::try_from(fidl_selector),
-            Ok(RuleSelector {
+            RuleMatcher::try_from(fidl_matcher),
+            Ok(RuleMatcher {
                 from: None,
                 locally_generated: None,
                 bound_device: None,
-                mark_1_selector: None,
-                mark_2_selector: None,
+                mark_1: None,
+                mark_2: None,
             })
         );
     }
 
     #[test]
-    fn all_unspecified_selector_v6() {
-        let fidl_selector = fidl_fuchsia_net_routes::RuleSelectorV6 {
+    fn all_unspecified_matcher_v6() {
+        let fidl_matcher = fidl_fuchsia_net_routes::RuleMatcherV6 {
             from: None,
-            base: Some(BaseSelector {
+            base: Some(BaseMatcher {
                 locally_generated: None,
                 bound_device: None,
-                mark_1_selector: None,
-                mark_2_selector: None,
+                mark_1: None,
+                mark_2: None,
                 __source_breaking: fidl::marker::SourceBreaking,
             }),
             __source_breaking: fidl::marker::SourceBreaking,
         };
         assert_matches!(
-            RuleSelector::try_from(fidl_selector),
-            Ok(RuleSelector {
+            RuleMatcher::try_from(fidl_matcher),
+            Ok(RuleMatcher {
                 from: None,
                 locally_generated: None,
                 bound_device: None,
-                mark_1_selector: None,
-                mark_2_selector: None,
+                mark_1: None,
+                mark_2: None,
             })
         );
     }

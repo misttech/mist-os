@@ -652,7 +652,10 @@ void Server::SetTopology(SetTopologyRequestView request, SetTopologyCompleter::S
 }
 
 void Server::handle_unknown_method(
-    fidl::UnknownMethodMetadata<fuchsia_hardware_audio_signalprocessing::SignalProcessing>,
-    fidl::UnknownMethodCompleter::Sync&) {}
+    fidl::UnknownMethodMetadata<fuchsia_hardware_audio_signalprocessing::SignalProcessing> metadata,
+    fidl::UnknownMethodCompleter::Sync& completer) {
+  DA7219_LOG(ERROR, "Server::handle_unknown_method (SignalProcessing) ordinal %zu",
+             metadata.method_ordinal);
+}
 
 }  // namespace audio::da7219

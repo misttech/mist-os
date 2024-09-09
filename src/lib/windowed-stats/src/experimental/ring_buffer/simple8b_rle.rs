@@ -37,6 +37,7 @@ impl PackedU4VecDeque {
             if self.head_index == 0 {
                 self.u8_buffer.pop_front();
             }
+            self.len -= 1;
         }
         val
     }
@@ -529,6 +530,7 @@ mod tests {
 
     const MIN_SAMPLES: usize = 120;
 
+    #[test]
     fn test_ring_buffer_rotates_out_old_values() {
         let mut ring_buffer = Simple8bRleRingBuffer::with_min_samples(2);
         ring_buffer.push(u64::MAX);
@@ -556,7 +558,7 @@ mod tests {
             0xee, // first block: 64-bit selector
             // Note that because selector head index is 1, the first block selector is at
             // bits 4-7. Bits 0-3 above are ignored.
-            0x00, // second block: RLE selector
+            0x0f, // second block: RLE selector
             0xfe, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, // first block
             1, 0, 0, 0, 0, 0, // second block: value
             1, 0, // second block: length
@@ -568,9 +570,9 @@ mod tests {
         ring_buffer.serialize(&mut buffer).expect("serialize should succeed");
         let expected_bytes = &[
             2, 0, // length
-            1, 0,    // selector head index
+            0, 0,    // selector head index
             1,    // last block's # of values
-            0xe0, // first block: RLE selector, second block: 64-bit selector
+            0xef, // first block: RLE selector, second block: 64-bit selector
             1, 0, 0, 0, 0, 0, // first block: value
             1, 0, // first block: length
             0xfd, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, // second block

@@ -27,8 +27,7 @@ bool ImportBufferCollection(
 
   fidl::Result import_buffer_collection_result = display_coordinator->ImportBufferCollection({{
       .buffer_collection_id = display_buffer_collection_id,
-      .buffer_collection_token =
-          fidl::ClientEnd<fuchsia_sysmem::BufferCollectionToken>(token.TakeChannel()),
+      .buffer_collection_token = std::move(token),
   }});
   if (import_buffer_collection_result.is_error()) {
     FX_LOGS(ERROR) << "Failed to call FIDL ImportBufferCollection: "

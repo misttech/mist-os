@@ -51,13 +51,14 @@ if (zircon_toolchain != false) {
 config("language") {
   cflags_c = [ "-std=c11" ]
   cflags_cc = [ "-std=c++$fuchsia_cxx_version" ]
+  defines = []
 
   if (fuchsia_cxx_version < 20) {
     # TODO(https://fxbug.dev/42064981): libc++ now marks the C++20
     # synchronization primitives as deprecated in older C++ standards which
     # affects Fuchsia since we use these primitives across the codebase. We
     # temporarily suppress these warnings until C++20 becomes the default.
-    defines = [ "_LIBCPP_DISABLE_DEPRECATION_WARNINGS" ]
+    defines += [ "_LIBCPP_DISABLE_DEPRECATION_WARNINGS" ]
   }
 
   if (current_os == "mac") {
@@ -71,6 +72,10 @@ config("language") {
     # toolchain's static libc++ anyway.
     defines += [ "_LIBCPP_DISABLE_AVAILABILITY" ]
   }
+
+  # Pass the same C/C++ flags to the Objective-C/C++ compiler.
+  cflags_objc = cflags_c
+  cflags_objcc = cflags_cc
 }
 
 config("color_diagnostics") {
@@ -164,8 +169,17 @@ config("cpu_baseline") {
 # These flags are enabled by default in Fuchsia's Clang toolchain, but we set
 # them explicitly to support other Clang toolchains and Clang-based tools.
 config("clang_defaults") {
-  if (current_cpu == "x64") {
+  # Set relax relocations flag only for x64 ELF targets.
+  if (current_cpu == "x64" && is_elf) {
     asmflags = [ "-Wa,--mrelax-relocations=yes" ]
+  }
+  if (current_os == "linux") {
+    cflags_cc = [ "-stdlib=libc++" ]
+    ldflags = [
+      "-stdlib=libc++",
+      "-unwindlib=libunwind",
+      "-rtlib=compiler-rt",
+    ]
   }
 }
 
@@ -955,6 +969,7 @@ config("Wno-conversion") {
   # To trim this list:
   # $ scripts/gn/trim_visibility.py --target="//build/config:Wno-conversion"
   visibility = [
+    "//sdk/lib/fidl/cpp/tests/dispatcher:*",
     "//sdk/lib/media/audio/cpp:*",
     "//sdk/lib/media/cpp:*",
     "//sdk/lib/sys/cpp/tests:*",
@@ -1048,7 +1063,6 @@ config("Wno-conversion") {
     "//src/lib/containers/cpp:*",
     "//src/lib/ddk:*",
     "//src/lib/elflib:*",
-    "//src/lib/fidl/cpp/tests/dispatcher:*",
     "//src/lib/fidl/llcpp/tests:*",
     "//src/lib/fidl/llcpp/tests/conformance:*",
     "//src/lib/fidl/llcpp/tests/integration:*",
@@ -1247,7 +1261,10 @@ config("Wno-missing-declarations") {
 
 config("Wno-deprecated-anon-enum-enum-conversion") {
   cflags = [ "-Wno-deprecated-anon-enum-enum-conversion" ]
-  visibility = [ "//vendor/*" ]
+  visibility = [
+    "//src/lib/usb_bulk/cpp:usb_bulk",
+    "//vendor/*",
+  ]
 }
 
 config("symbol_visibility_hidden") {
@@ -1336,10 +1353,14 @@ config("werror") {
     "-Dunused-must-use",
   ]
 
-  # TODO(https://fxbug.dev/327271893) Remove blanket allow once lint is actionable.
   rustflags += [
     "-Aunknown_lints",
+
+    # TODO(https://fxbug.dev/327271893) Remove blanket allow once lint is actionable.
     "-Anon_local_definitions",
+
+    # TODO(https://fxbug.dev/365108268) Remove blanket allow once lint is actionable.
+    "-Aelided_named_lifetimes",
   ]
 
   if (deny_warnings) {

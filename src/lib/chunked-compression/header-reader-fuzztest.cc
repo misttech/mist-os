@@ -54,7 +54,7 @@ fbl::Array<uint8_t> CopyAndFixChecksum(const uint8_t *data, size_t size) {
 extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
   // Parse errors are logged at LOG_ERROR, so squelch them to avoid log spam.
   fuchsia_logging::LogSettingsBuilder builder;
-  builder.WithMinLogSeverity(fuchsia_logging::LOG_FATAL).BuildAndInitialize();
+  builder.WithMinLogSeverity(FUCHSIA_LOG_FATAL).BuildAndInitialize();
 
   if (size < kChunkArchiveMinHeaderSize) {
     return 0;

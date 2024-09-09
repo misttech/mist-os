@@ -1,10 +1,7 @@
 # Encoding structured records
 
-Fuchsia is in the process of migrating to a wire format for structured logs inspired by its
-[trace format]. This new transmission format for logs allows consumption and propagation of
-arbitrary data structures as log records.
-
-<!-- TODO(https://fxbug.dev/42110256) update this when more implementations have landed -->
+Fuchsia uses a wire format for structured logs inspired by its [trace format]. This transmission
+format allows consumption and propagation of arbitrary data structures as log records.
 
 ## Validation
 
@@ -235,7 +232,10 @@ Components that call [`LogSink.Connect`] are expected to pass a socket in "datag
 opposed to "streaming") and to write the ["legacy" wire format] into it. This uses little endian
 integers and a mix of length-prefixed and null-terminated UTF-8 strings.
 
+At the moment, this is only used by the [Go logger] implementation.
+
 [bitfield-diagram]: /docs/reference/platform-spec/diagnostics/bitfield-diagram.md
+[Go logger]: /src/lib/syslog/go/logger.go
 [`zx_clock_get_monotonic`]: /reference/syscalls/clock_get_monotonic.md
 [`LogSink.Connect`]: https://fuchsia.dev/reference/fidl/fuchsia.logger#Connect
 ["legacy" wire format]: /zircon/system/ulib/syslog/include/lib/syslog/wire_format.h

@@ -1277,6 +1277,8 @@ struct AddMulticastRouteTestOptions {
     source_address: DeviceAddress,
     #[derivative(Default(value = "IpAddrType::Multicast"))]
     destination_address: IpAddrType,
+    #[derivative(Default(value = "false"))]
+    send_before_route: bool,
 }
 
 #[netstack_test]
@@ -1292,6 +1294,20 @@ struct AddMulticastRouteTestOptions {
     vec![Server::A],
     AddMulticastRouteTestOptions::default();
     "success"
+)]
+#[test_case(
+    "success_with_pending_packet",
+    ClientConfig {
+        route_min_ttl: 1,
+        expect_forwarded_packet: true,
+    },
+    Ok(()),
+    vec![Server::A],
+    AddMulticastRouteTestOptions {
+        send_before_route: true,
+        ..Default::default()
+    };
+    "success with pending packet"
 )]
 #[test_case(
     "unexpected_input_interface",
@@ -1495,6 +1511,7 @@ async fn add_multicast_route<I: Ip, N: Netstack>(
         action,
         source_address,
         destination_address,
+        send_before_route,
     } = options;
 
     let test_name = format!("{}_{}", name, case_name);
@@ -1523,10 +1540,6 @@ async fn add_multicast_route<I: Ip, N: Netstack>(
         destination_address.address(I::VERSION),
     );
 
-    // Queue a packet that could potentially be forwarded once a multicast route
-    // is installed.
-    test_network.send_multicast_packet().await;
-
     let get_interface_id = |interface| -> u64 {
         match interface {
             RouterInterface::Server(server) => {
@@ -1538,6 +1551,12 @@ async fn add_multicast_route<I: Ip, N: Netstack>(
             RouterInterface::Other(id) => id,
         }
     };
+
+    if send_before_route {
+        // Queue a packet that could potentially be forwarded once a multicast route
+        // is installed.
+        test_network.send_multicast_packet().await;
+    }
 
     let route_action = action.and_then(|action| {
         let outgoing_interfaces = match action {
@@ -1559,6 +1578,10 @@ async fn add_multicast_route<I: Ip, N: Netstack>(
     };
 
     assert_eq!(controller.add_route(addresses, route).await, expected_add_route_result);
+
+    if !send_before_route {
+        test_network.send_multicast_packet().await;
+    }
 
     test_network
         .receive_multicast_packet(hashmap! {

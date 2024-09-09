@@ -4,6 +4,7 @@
 
 import("//build/components.gni")
 import("//build/fidl/fidl.gni")
+import("//build/testing/cc_test_executable.gni")
 import("//build/testing/environments.gni")
 import("//src/camera/debug.gni")
 
@@ -34,7 +35,7 @@ source_set("lib") {
     "//sdk/fidl/fuchsia.io:fuchsia.io_hlcpp",
     "//sdk/fidl/fuchsia.process:fuchsia.process_hlcpp",
     "//sdk/lib/component/outgoing/cpp",
-    "//sdk/lib/fidl/cpp",
+    "//sdk/lib/fidl/hlcpp",
     "//sdk/lib/fit-promise",
     "//sdk/lib/sys/cpp",
     "//sdk/lib/syslog/cpp",
@@ -70,13 +71,13 @@ fuchsia_package("camera_device_watcher") {
   deps = [ ":camera_device_watcher_cmp" ]
 }
 
-executable("camera_device_watcher_unittest_bin") {
+cc_test_executable("camera_device_watcher_unittest_bin") {
   testonly = true
   sources = [ "device_watcher_unittest.cc" ]
   deps = [
     ":fuchsia.camera.test_hlcpp",
     ":lib",
-    "//sdk/lib/fidl/cpp",
+    "//sdk/lib/fidl/hlcpp",
     "//sdk/lib/sys/cpp/testing:unit",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/loop_fixture",

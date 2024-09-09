@@ -6,9 +6,12 @@
 #define SRC_MEDIA_AUDIO_SERVICES_DEVICE_REGISTRY_OBSERVER_SERVER_H_
 
 #include <fidl/fuchsia.audio.device/cpp/fidl.h>
+#include <lib/fidl/cpp/wire/unknown_interaction_handler.h>
+#include <zircon/errors.h>
 
 #include "src/media/audio/services/common/base_fidl_server.h"
 #include "src/media/audio/services/device_registry/device.h"
+#include "src/media/audio/services/device_registry/logging.h"
 #include "src/media/audio/services/device_registry/observer_notify.h"
 
 namespace media_audio {
@@ -42,8 +45,11 @@ class ObserverServer
   void WatchGainState(WatchGainStateCompleter::Sync& completer) final;
   void WatchPlugState(WatchPlugStateCompleter::Sync& completer) final;
   void GetReferenceClock(GetReferenceClockCompleter::Sync& completer) final;
-  void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_audio_device::Observer>,
-                             fidl::UnknownMethodCompleter::Sync&) final {}
+  // We complain but don't close the connection, to accommodate older and newer clients.
+  void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_audio_device::Observer> metadata,
+                             fidl::UnknownMethodCompleter::Sync& completer) final {
+    ADR_WARN_METHOD() << "(Observer) ordinal " << metadata.method_ordinal;
+  }
 
   // fuchsia.hardware.audio.signal_processing.Reader implementation
   void GetElements(GetElementsCompleter::Sync& completer) final;
