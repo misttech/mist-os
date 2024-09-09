@@ -51,6 +51,20 @@ std::thread send_thread(const fbl::unique_fd& fd) {
   });
 }
 
+TEST_P(SocketPair, GetSockOpt) {
+  int optval;
+  socklen_t optlen = sizeof(optval);
+
+  ASSERT_EQ(getsockopt(fds()[0].get(), SOL_SOCKET, SO_DOMAIN, &optval, &optlen), 0);
+  ASSERT_EQ(optval, AF_UNIX);
+
+  ASSERT_EQ(getsockopt(fds()[0].get(), SOL_SOCKET, SO_TYPE, &optval, &optlen), 0);
+  ASSERT_EQ(optval, GetParam());
+
+  ASSERT_EQ(getsockopt(fds()[0].get(), SOL_SOCKET, SO_PROTOCOL, &optval, &optlen), 0);
+  ASSERT_EQ(optval, 0);
+}
+
 TEST_P(SocketPair, Control) {
   // write() and read() should work.
   constexpr char buf[] = "abc";
