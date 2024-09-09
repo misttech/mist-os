@@ -187,7 +187,7 @@ def copy_binary_sources(
         src_map[dest] = source
         shutil.copy2(source, dest)
 
-    if data_sources:
+    if data_sources or data_package_name:
         if data_package_name is None:
             print(
                 "--data_package_name must be provided if data sources exist.",
