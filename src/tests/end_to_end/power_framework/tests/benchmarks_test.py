@@ -87,11 +87,7 @@ class PowerBenchmarksTest(fuchsia_base_test.FuchsiaBaseTest):
         with open(test_perf_file, "w") as f:
             json.dump(fuchsiaperf_data, f, indent=4)
 
-        with as_file(files(test_data).joinpath("fuchsia.power.txt")) as f:
-            publish.publish_fuchsiaperf(
-                [test_perf_file],
-                str(f),
-            )
+        publish.publish_fuchsiaperf([test_perf_file], ...)
         """
 
 
