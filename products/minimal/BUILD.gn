@@ -101,26 +101,6 @@ if (current_cpu == "riscv64") {
   }
 }
 
-# The board input bundles that minimal products needs to ship
-generated_file("board_assembly_artifacts") {
-  deps = [
-    # Include all the board input bundles for this arch.
-    "//boards:boards",
-  ]
-  data_keys = [ "board_assembly_artifacts" ]
-  output_conversion = "json"
-  outputs = [ "${target_gen_dir}/board_assembly_artifacts.json" ]
-
-  metadata = {
-    assembly_inputs = [
-      {
-        path = rebase_path(outputs[0], root_build_dir)
-      },
-    ]
-    assembly_inputs_barrier = []
-  }
-}
-
 group("devicetree") {
   deps = []
   if (current_cpu == "arm64") {

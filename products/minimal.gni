@@ -39,15 +39,11 @@ discoverable_package_labels = [ "//src/developer/debug/debug_agent" ]
 
 # These targets used to flow through GN assembly. Now add them explicitly to
 # Bazel assebmly to make sure they can be built for CIPD uploads.
-extra_bazel_assembly_targets = [
-  "//build/images/fuchsia:assembly_inputs",
-  "//products/minimal:board_assembly_artifacts",
-]
+extra_bazel_assembly_targets = [ "//build/images/fuchsia:assembly_inputs" ]
 
 # List all artifacts to upload to CIPD.
 cipd_assembly_artifact_targets = [
   "//build/images/fuchsia:assembly_inputs",
-  "//products/minimal:board_assembly_artifacts",
   "//products/minimal:devicetree",
 ]
 
