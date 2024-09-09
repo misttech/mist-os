@@ -4,7 +4,7 @@
 
 """Rule for assembling a Fuchsia product."""
 
-load("//fuchsia/private:ffx_tool.bzl", "get_ffx_assembly_inputs")
+load("//fuchsia/private:ffx_tool.bzl", "get_ffx_assembly_args", "get_ffx_assembly_inputs")
 load(
     ":providers.bzl",
     "FuchsiaAssemblyDeveloperOverridesInfo",
@@ -28,8 +28,7 @@ PACKAGE_MODE = struct(
 _CREATE_SYSTEM_RUNNER_SH_TEMPLATE = """
 set -e
 mkdir -p $FFX_ISOLATE_DIR
-$FFX \
-    --config "assembly_enabled=true,sdk.root=$SDK_ROOT" \
+{ffx_assembly_args} \
     --isolate-dir $FFX_ISOLATE_DIR \
     assembly \
     create-system \
@@ -94,9 +93,7 @@ def _fuchsia_product_assembly_impl(ctx):
     ffx_inputs += platform_artifacts.files
     ffx_isolate_dir = ctx.actions.declare_directory(ctx.label.name + "_ffx_isolate_dir")
 
-    ffx_invocation = [
-        ffx_tool.path,
-        "--config \"assembly_enabled=true,sdk.root=" + ctx.attr._sdk_manifest.label.workspace_root + "\"",
+    ffx_invocation = get_ffx_assembly_args(fuchsia_toolchain) + [
         "--isolate-dir",
         ffx_isolate_dir.path,
         "assembly",
@@ -256,12 +253,11 @@ def _fuchsia_product_create_system_impl(ctx):
     ffx_isolate_dir = ctx.actions.declare_directory(ctx.label.name + "_ffx_isolate_dir")
 
     shell_src = _CREATE_SYSTEM_RUNNER_SH_TEMPLATE.format(
+        ffx_assembly_args = " ".join(get_ffx_assembly_args(fuchsia_toolchain)),
         mode_arg = "--mode " + ctx.attr.package_mode if ctx.attr.package_mode else "",
     )
 
     shell_env = {
-        "FFX": ffx_tool.path,
-        "SDK_ROOT": ctx.attr._sdk_manifest.label.workspace_root,
         "FFX_ISOLATE_DIR": ffx_isolate_dir.path,
         "OUTDIR": out_dir.path,
         "PRODUCT_ASSEMBLY_OUTDIR": product_assembly_out.path,
