@@ -33,29 +33,10 @@ fn wait_socket_empty(socket: &fasync::Socket) {
 
 async fn test_read_write<'a>(
     socket: &'a mut fasync::Socket,
-    con: &'a ConnectionProxy,
+    _con: &'a ConnectionProxy,
 ) -> Result<(), Error> {
     let data = Box::new([42u8; TEST_DATA_LEN as usize]);
 
-    socket.write_all(&*data).await?;
-    wait_socket_empty(&socket);
-
-    // Send two back to back vmos
-    let vmo = zx::Vmo::create(TEST_DATA_LEN)?;
-    let complete1 = con.send_vmo(
-        vmo.create_child(zx::VmoChildOptions::SNAPSHOT, 0, TEST_DATA_LEN)?,
-        0,
-        TEST_DATA_LEN,
-    );
-    let complete2 = con.send_vmo(
-        vmo.create_child(zx::VmoChildOptions::SNAPSHOT, 0, TEST_DATA_LEN)?,
-        0,
-        TEST_DATA_LEN,
-    );
-    complete1.await?;
-    complete2.await?;
-
-    // Now write into the socket again
     socket.write_all(&*data).await?;
     wait_socket_empty(&socket);
 

@@ -65,8 +65,6 @@ class SocketDevice : public Device,
   void SendResponse(::fuchsia_hardware_vsock::wire::DeviceSendResponseRequest* request,
                     SendResponseCompleter::Sync& completer) override;
   void GetCid(GetCidCompleter::Sync& completer) override;
-  void SendVmo(::fuchsia_hardware_vsock::wire::DeviceSendVmoRequest* request,
-               SendVmoCompleter::Sync& completer) override;
 
   zx_status_t Init() override;
 

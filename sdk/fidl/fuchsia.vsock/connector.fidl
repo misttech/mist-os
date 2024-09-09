@@ -23,15 +23,6 @@ closed protocol Connection {
     /// once shutdown is complete. Shutdown has an implicit barrier as any already
     /// queued sends will complete, but any additional sends will generate errors
     strict Shutdown();
-    /// Send a VMO. The reply indicates that the VMO send has finished and that
-    /// data may be queued on the socket again without causing races.
-    strict SendVmo(resource struct {
-        vmo zx.Handle:VMO;
-        off uint64;
-        len uint64;
-    }) -> (struct {
-        status zx.Status;
-    });
 };
 
 /// Interface presented by a listener to accept or reject connections

@@ -42,10 +42,6 @@ closed protocol Callbacks {
     strict TransportReset(struct {
         new_cid uint32;
     }) -> ();
-    // Indicates that a previous Device.SendVmo request has completed.
-    strict SendVmoComplete(struct {
-        addr Addr;
-    });
 };
 
 // Low level vsock device operations. Users of this interface are responsible for
@@ -106,19 +102,5 @@ closed protocol Device {
     // and you would like to send them your CID to then establish a vsock connection on.
     strict GetCid() -> (struct {
         local_cid uint32;
-    });
-    // Send the contents of a vmo over an already established connection. A
-    // connection may only have a single outstanding vmo at a time, and trying
-    // to send whilst one is already in progress will generate an error. If there
-    // is pending data to transmit in the `data` socket of a connection and there
-    // is a vmo pending then it is undefined which one will be sent. Once the vmo
-    // contents have finished sending Callbacks.SendVmoComplete will be called.
-    strict SendVmo(resource struct {
-        addr Addr;
-        vmo zx.Handle:VMO;
-        off uint64;
-        len uint64;
-    }) -> (struct {
-        status zx.Status;
     });
 };
