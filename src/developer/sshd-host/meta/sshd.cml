@@ -206,6 +206,7 @@
                 "fuchsia.bluetooth.hfp.Hfp",
                 "fuchsia.bluetooth.hfp.test.HfpTest",
                 "fuchsia.bluetooth.internal.a2dp.Controller",
+                "fuchsia.bluetooth.map.MessagingClient",
                 "fuchsia.bluetooth.rfcomm.test.RfcommTest",
                 "fuchsia.bluetooth.snoop.Snoop",
                 "fuchsia.bluetooth.sys.Bootstrap",

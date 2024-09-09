@@ -15,3 +15,7 @@ To run the tests:
 ```
 fx test bt-map-mce-unittests
 ```
+
+## Testing the component
+
+Use the [`bt-map-mce-tool` command line tool](https://cs.opensource.google/fuchsia/fuchsia/+/main:src/connectivity/bluetooth/tools/bt-map-mce-tool) to test the component.
