@@ -288,6 +288,7 @@ impl Accessor {
         }
     }
 
+    #[allow(dead_code)]
     pub fn peer_id(&self) -> PeerId {
         self.peer_id
     }
