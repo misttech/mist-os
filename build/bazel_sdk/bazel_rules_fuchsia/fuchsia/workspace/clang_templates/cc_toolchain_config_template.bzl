@@ -40,10 +40,8 @@ def _cc_toolchain_config_impl(ctx):
 
     cc_features = [
         features.default_compile_flags,
-        features.dbg,
         features.target_system_name(target_system_name),
         features.supports_pic,
-        features.static_cpp_standard_library,
         features.no_runtime_library_search_directories,
     ]
     cc_features += compute_clang_features(

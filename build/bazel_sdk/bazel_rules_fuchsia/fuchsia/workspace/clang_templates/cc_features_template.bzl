@@ -232,11 +232,6 @@ _flag_groups = struct(
 ## Begin feature definitions
 #
 
-# Automatically turned on when we build with -c dbg
-_dbg_feature = feature(
-    name = "dbg",
-)
-
 def _target_system_name_feature(target_system_name):
     return feature(
         name = "fuchsia_target_system_name",
@@ -355,25 +350,6 @@ _supports_pic_feature = feature(
     enabled = True,
 )
 
-_static_cpp_standard_library_feature = feature(
-    name = "static_cpp_standard_library",
-    flag_sets = [
-        flag_set(
-            actions = _all_link_actions,
-            flag_groups = [
-                flag_group(
-                    flags = [
-                        "-stdlib=libc++",
-                        "-unwindlib=libunwind",
-                        "-static-libstdc++",
-                        "-static-libgcc",
-                    ],
-                ),
-            ],
-        ),
-    ],
-)
-
 # This feature adds an RPATH entry into the final binary. We do not want this
 # because it is not valid for fuchsia since we install all of our libraries
 # in /lib of our package. Enabling this just adds size to our binaries.
@@ -384,9 +360,7 @@ _no_runtime_library_search_directories_feature = feature(
 
 features = struct(
     default_compile_flags = _default_compile_flags_feature,
-    dbg = _dbg_feature,
     target_system_name = _target_system_name_feature,
     supports_pic = _supports_pic_feature,
-    static_cpp_standard_library = _static_cpp_standard_library_feature,
     no_runtime_library_search_directories = _no_runtime_library_search_directories_feature,
 )

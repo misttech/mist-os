@@ -21,6 +21,47 @@ load("//:toolchains/clang/providers.bzl", "ClangInfo")
 load("//:toolchains/clang/sanitizer.bzl", "sanitizer_features")
 load("//platforms:utils.bzl", "to_fuchsia_cpu_name", "to_fuchsia_os_name")
 
+_all_actions = [
+    ACTION_NAMES.assemble,
+    ACTION_NAMES.preprocess_assemble,
+    ACTION_NAMES.c_compile,
+    ACTION_NAMES.cpp_compile,
+    ACTION_NAMES.cpp_module_compile,
+    ACTION_NAMES.objc_compile,
+    ACTION_NAMES.objcpp_compile,
+    ACTION_NAMES.cpp_header_parsing,
+    ACTION_NAMES.clif_match,
+]
+
+_all_compile_actions = [
+    ACTION_NAMES.assemble,
+    ACTION_NAMES.preprocess_assemble,
+    ACTION_NAMES.linkstamp_compile,
+    ACTION_NAMES.c_compile,
+    ACTION_NAMES.cpp_compile,
+    ACTION_NAMES.cpp_header_parsing,
+    ACTION_NAMES.cpp_module_compile,
+    ACTION_NAMES.cpp_module_codegen,
+    ACTION_NAMES.lto_backend,
+    ACTION_NAMES.clif_match,
+]
+
+_all_cpp_compile_actions = [
+    ACTION_NAMES.linkstamp_compile,
+    ACTION_NAMES.cpp_compile,
+    ACTION_NAMES.cpp_header_parsing,
+    ACTION_NAMES.cpp_module_compile,
+    ACTION_NAMES.cpp_module_codegen,
+    ACTION_NAMES.lto_backend,
+    ACTION_NAMES.clif_match,
+]
+
+_all_link_actions = [
+    ACTION_NAMES.cpp_link_executable,
+    ACTION_NAMES.cpp_link_dynamic_library,
+    ACTION_NAMES.cpp_link_nodeps_dynamic_library,
+]
+
 def compute_clang_features(host_os, host_cpu, target_os, target_cpu):
     """Compute list of C++ toolchain features required by Clang.
 
@@ -73,17 +114,7 @@ def compute_clang_features(host_os, host_cpu, target_os, target_cpu):
         enabled = True,
         flag_sets = [
             flag_set(
-                actions = [
-                    ACTION_NAMES.assemble,
-                    ACTION_NAMES.preprocess_assemble,
-                    ACTION_NAMES.c_compile,
-                    ACTION_NAMES.cpp_compile,
-                    ACTION_NAMES.cpp_module_compile,
-                    ACTION_NAMES.objc_compile,
-                    ACTION_NAMES.objcpp_compile,
-                    ACTION_NAMES.cpp_header_parsing,
-                    ACTION_NAMES.clif_match,
-                ],
+                actions = _all_actions,
                 flag_groups = [
                     flag_group(
                         flags = ["-MMD", "-MF", "%{dependency_file}"],
@@ -179,11 +210,7 @@ def compute_clang_features(host_os, host_cpu, target_os, target_cpu):
         ] + (
             [
                 flag_set(
-                    actions = [
-                        ACTION_NAMES.cpp_link_dynamic_library,
-                        ACTION_NAMES.cpp_link_executable,
-                        ACTION_NAMES.cpp_link_nodeps_dynamic_library,
-                    ],
+                    actions = _all_link_actions,
                     flag_groups = [
                         flag_group(
                             flags = [
@@ -206,11 +233,7 @@ def compute_clang_features(host_os, host_cpu, target_os, target_cpu):
         enabled = True,
         flag_sets = [
             flag_set(
-                actions = [
-                    ACTION_NAMES.cpp_link_executable,
-                    ACTION_NAMES.cpp_link_dynamic_library,
-                    ACTION_NAMES.cpp_link_nodeps_dynamic_library,
-                ],
+                actions = _all_link_actions,
                 flag_groups = [
                     flag_group(
                         flags = [
@@ -223,12 +246,38 @@ def compute_clang_features(host_os, host_cpu, target_os, target_cpu):
         ],
     )
 
+    # Automatically turned on when we build with -c dbg
+    dbg_feature = feature(
+        name = "dbg",
+    )
+
+    static_cpp_standard_library_feature = feature(
+        name = "static_cpp_standard_library",
+        flag_sets = [
+            flag_set(
+                actions = _all_link_actions,
+                flag_groups = [
+                    flag_group(
+                        flags = [
+                            "-stdlib=libc++",
+                            "-unwindlib=libunwind",
+                            "-static-libstdc++",
+                            "-static-libgcc",
+                        ],
+                    ),
+                ],
+            ),
+        ],
+    )
+
     features = [
-        opt_feature,
-        dependency_file_feature,
-        ml_inliner_feature,
         coverage_feature,
+        dbg_feature,
+        dependency_file_feature,
         generate_linkmap_feature,
+        ml_inliner_feature,
+        opt_feature,
+        static_cpp_standard_library_feature,
     ] + sanitizer_features
 
     # TODO(https://fxbug.dev/356347441): Remove this once Bazel has been fixed.
