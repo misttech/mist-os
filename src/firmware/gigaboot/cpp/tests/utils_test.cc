@@ -4,6 +4,8 @@
 #include "utils.h"
 
 #include <algorithm>
+#include <memory>
+#include <string_view>
 
 #include <efi/global-variable.h>
 #include <efi/types.h>
@@ -76,63 +78,176 @@ EFIAPI efi_status test_get_secureboot_fail(char16_t*, efi_guid*, uint32_t*, size
   return EFI_NOT_FOUND;
 }
 
-TEST(GigabootTest, GetCommandlineRebootModeDefault) {
-  MockStubService stub_service;
-  Device image_device({});
-  auto cleanup = SetupEfiGlobalState(stub_service, image_device);
+// Handles common boilerplate for commandline reboot mode tests.
+class CommandlineRebootModeTest : public testing::Test {
+ public:
+  // Sets up the EFI test environment.
+  //
+  // Call this once at the beginning of the test, and retain the result until the end of the test.
+  auto SetupEfiState() {
+    stub_service_ = std::make_unique<MockStubService>();
+    image_device_ = std::make_unique<Device>(std::vector<std::string_view>({"disk0", "image"}));
+
+    auto cleanup = SetupEfiGlobalState(*stub_service_, *image_device_);
+    gEfiLoadedImage->LoadOptions = nullptr;
+    return cleanup;
+  }
+
+  // Sets the EFI Loaded Image command line.
+  //
+  // `contents` are not copied, and must remain valid until EFI cleanup.
+  static void SetImageCommandline(void* contents, size_t size) {
+    ASSERT_NE(gEfiLoadedImage, nullptr);
+
+    gEfiLoadedImage->LoadOptions = contents;
+    gEfiLoadedImage->LoadOptionsSize = static_cast<uint32_t>(size);
+  }
+
+  // Initializes the fake disk with a GPT.
+  //
+  // `block_device_path` defaults to a path matching the loaded image.
+  //
+  // Can only be called once per test, and only after `SetupEfiState()`.
+  void InitDiskGpt(std::string_view block_device_path = "disk0") {
+    ASSERT_TRUE(stub_service_);
+    ASSERT_TRUE(image_device_);
+    ASSERT_FALSE(block_device_);
+
+    block_device_ =
+        std::make_unique<BlockDevice>(std::vector<std::string_view>({block_device_path}), 1024);
+    stub_service_->AddDevice(image_device_.get());
+    stub_service_->AddDevice(block_device_.get());
+
+    block_device_->InitializeGpt();
+  }
+
+  // Sets the on-disk command line. This automatically calls `InitDiskGpt()` as well.
+  //
+  // `contents` are copied internally so do not need to stay valid.
+  // `block_device_path` defaults to a path matching the loaded image.
+  void SetDiskCommandline(const char* contents, std::string_view block_device_path = "disk0") {
+    InitDiskGpt(block_device_path);
+
+    // Add the `kDiskCommandlinePartitionName` partition.
+    gpt_entry_t partition{{}, {}, kGptFirstUsableBlocks, kGptFirstUsableBlocks + 5, 0, {}};
+    SetGptEntryName(kDiskCommandlinePartitionName, partition);
+    block_device_->AddGptPartition(partition);
+
+    // Write the contents to the fake backing storage.
+    ASSERT_LT(strlen(contents) + 1, (partition.last - partition.first + 1) * kBlockSize);
+    auto part_data =
+        &block_device_->fake_disk_io_protocol().contents(0)[partition.first * kBlockSize];
+    strcpy(reinterpret_cast<char*>(part_data), contents);
+  }
+
+ private:
+  // unique_ptr<> to allow deferred initialization so test can supply custom parameters if needed.
+  std::unique_ptr<MockStubService> stub_service_;
+  std::unique_ptr<Device> image_device_;
+  std::unique_ptr<BlockDevice> block_device_;
+};
+
+TEST_F(CommandlineRebootModeTest, GetCommandlineRebootModeDefault) {
+  auto cleanup = SetupEfiState();
+
   char16_t args[] = u"foo bar=baz";
-  gEfiLoadedImage->LoadOptions = args;
-  gEfiLoadedImage->LoadOptionsSize = sizeof(args);
+  SetImageCommandline(args, sizeof(args));
 
-  ASSERT_EQ(GetCommandlineRebootMode(), std::nullopt);
+  ASSERT_EQ(GetCommandlineRebootMode(false), std::nullopt);
 }
 
-TEST(GigabootTest, GetCommandlineRebootModeFastboot) {
-  MockStubService stub_service;
-  Device image_device({});
-  auto cleanup = SetupEfiGlobalState(stub_service, image_device);
+TEST_F(CommandlineRebootModeTest, GetCommandlineRebootModeFastboot) {
+  auto cleanup = SetupEfiState();
+
   char16_t args[] = u"foo bar=baz boot_mode=fastboot 123abc";
-  gEfiLoadedImage->LoadOptions = args;
-  gEfiLoadedImage->LoadOptionsSize = sizeof(args);
+  SetImageCommandline(args, sizeof(args));
 
-  ASSERT_EQ(GetCommandlineRebootMode(), std::optional(RebootMode::kBootloader));
+  ASSERT_EQ(GetCommandlineRebootMode(false), std::optional(RebootMode::kBootloader));
 }
 
-TEST(GigabootTest, GetCommandlineRebootModeNoLoadedImage) {
+TEST_F(CommandlineRebootModeTest, GetCommandlineRebootModeNoLoadedImage) {
   gEfiLoadedImage = nullptr;
 
-  ASSERT_EQ(GetCommandlineRebootMode(), std::nullopt);
+  ASSERT_EQ(GetCommandlineRebootMode(false), std::nullopt);
 }
 
-TEST(GigabootTest, GetCommandlineRebootModeNoLoadOptions) {
-  MockStubService stub_service;
-  Device image_device({});
-  auto cleanup = SetupEfiGlobalState(stub_service, image_device);
-  gEfiLoadedImage->LoadOptions = nullptr;
+TEST_F(CommandlineRebootModeTest, GetCommandlineRebootModeNoLoadOptions) {
+  auto cleanup = SetupEfiState();
 
-  ASSERT_EQ(GetCommandlineRebootMode(), std::nullopt);
+  ASSERT_EQ(GetCommandlineRebootMode(false), std::nullopt);
 }
 
-TEST(GigabootTest, GetCommandlineRebootModeNotUcs2Alignment) {
-  MockStubService stub_service;
-  Device image_device({});
-  auto cleanup = SetupEfiGlobalState(stub_service, image_device);
+TEST_F(CommandlineRebootModeTest, GetCommandlineRebootModeNotUcs2Alignment) {
+  auto cleanup = SetupEfiState();
+
   char16_t args[] = u"abc";
-  gEfiLoadedImage->LoadOptions = reinterpret_cast<uint8_t*>(args) + 1;
-  gEfiLoadedImage->LoadOptionsSize = sizeof(args) - 1;
+  SetImageCommandline(reinterpret_cast<uint8_t*>(args) + 1, sizeof(args) - 1);
 
-  ASSERT_EQ(GetCommandlineRebootMode(), std::nullopt);
+  ASSERT_EQ(GetCommandlineRebootMode(false), std::nullopt);
 }
 
-TEST(GigabootTest, GetCommandlineRebootModeNotUcs2Contents) {
-  MockStubService stub_service;
-  Device image_device({});
-  auto cleanup = SetupEfiGlobalState(stub_service, image_device);
-  char16_t args[] = u"abc";
-  gEfiLoadedImage->LoadOptions = args;
-  gEfiLoadedImage->LoadOptionsSize = 3;  // 3 bytes is never a valid UCS-2 length.
+TEST_F(CommandlineRebootModeTest, GetCommandlineRebootModeNotUcs2Contents) {
+  auto cleanup = SetupEfiState();
 
-  ASSERT_EQ(GetCommandlineRebootMode(), std::nullopt);
+  char16_t args[] = u"abc";
+  SetImageCommandline(args, 3);  // 3 bytes is never a valid UCS-2 length.
+
+  ASSERT_EQ(GetCommandlineRebootMode(false), std::nullopt);
+}
+
+TEST_F(CommandlineRebootModeTest, GetCommandlineRebootModeFromDiskDefault) {
+  auto cleanup = SetupEfiState();
+
+  SetDiskCommandline("foo bar=baz");
+
+  ASSERT_EQ(GetCommandlineRebootMode(true), std::nullopt);
+}
+
+TEST_F(CommandlineRebootModeTest, GetCommandlineRebootModeFromDiskFastboot) {
+  auto cleanup = SetupEfiState();
+
+  SetDiskCommandline("boot_mode=fastboot");
+
+  ASSERT_EQ(GetCommandlineRebootMode(true), RebootMode::kBootloader);
+}
+
+TEST_F(CommandlineRebootModeTest, GetCommandlineRebootModeFromDiskFastbootNoTermination) {
+  auto cleanup = SetupEfiState();
+
+  // We should apply termination internally to avoid buffer overflow even if the partition fails
+  // to include the terminator within the first `kDiskCommandlineMaxSize` bytes.
+  std::string contents("boot_mode=fastboot");
+  contents.append(kDiskCommandlineMaxSize, 'a');
+  SetDiskCommandline(contents.c_str());
+
+  // In the current simple string-matching implementation, we should be able to detect the fastboot
+  // parameter even without input termination.
+  ASSERT_EQ(GetCommandlineRebootMode(true), RebootMode::kBootloader);
+}
+
+TEST_F(CommandlineRebootModeTest, GetCommandlineRebootModeFromDiskNoMatchingDisk) {
+  auto cleanup = SetupEfiState();
+
+  // We should only look on the block device we loaded from, so this block device should be ignored.
+  SetDiskCommandline("boot_mode=fastboot", "non-matching-disk");
+
+  ASSERT_EQ(GetCommandlineRebootMode(true), std::nullopt);
+}
+
+TEST_F(CommandlineRebootModeTest, GetCommandlineRebootModeFromDiskNoGpt) {
+  auto cleanup = SetupEfiState();
+
+  // Default empty disk has no GPT.
+  ASSERT_EQ(GetCommandlineRebootMode(true), std::nullopt);
+}
+
+TEST_F(CommandlineRebootModeTest, GetCommandlineRebootModeFromDiskNoCommandlinePartition) {
+  auto cleanup = SetupEfiState();
+
+  // Setup the fake disk GPT, but don't add the commandline partition.
+  InitDiskGpt();
+
+  ASSERT_EQ(GetCommandlineRebootMode(true), std::nullopt);
 }
 
 TEST(GigabootTest, IsSecureBootOnReturnsFalseOnError) {

@@ -142,8 +142,20 @@ constexpr uint8_t RebootModeToByte(RebootMode m) { return static_cast<uint8_t>(m
 // Set reboot mode. Returns true if succeeds, false otherwise.
 bool SetRebootMode(RebootMode mode);
 
+constexpr const char* kDiskCommandlinePartitionName = "qemu-commandline";
+constexpr size_t kDiskCommandlineMaxSize = 1024;
+
 // Gets the reboot mode indicated by the commandline, or std::nullopt if none was found.
-std::optional<RebootMode> GetCommandlineRebootMode();
+//
+// If `allow_disk_fallback` is set, then if this function doesn't find a commandline it will also
+// search the disk for a commandline to use, as follows:
+//   1. locate the boot disk (i.e. the disk that Gigaboot itself came from)
+//   2. read the GPT and locate a partition named `kDiskCommandlinePartitionName`
+//   3. read `kDiskCommandlineMaxSize` bytes from the partition
+//   4. the commandline will be these UTF-8 contents up until the first `\0` terminator
+// WARNING: This is unsafe on real devices as these contents are not verified in any way, and should
+// only be used for testing with emulators.
+std::optional<RebootMode> GetCommandlineRebootMode(bool allow_disk_fallback);
 
 // Get the reboot mode indicated by |one_shot_flags| and/or the bootbyte data.
 // Returns std::nullopt on failure

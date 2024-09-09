@@ -96,7 +96,10 @@ bool ResetRebootMode(gigaboot::RebootMode reboot_mode, const AbrOps& abr_ops) {
 //
 // If any one-shot flags are used, they are also reset by this function.
 gigaboot::RebootMode LoadRebootMode() {
-  if (auto reboot_mode = gigaboot::GetCommandlineRebootMode(); reboot_mode.has_value()) {
+  // Only allow reading raw commandline from disk for testing on QEMU.
+  bool allow_disk_fallback = IsQemu();
+  if (auto reboot_mode = gigaboot::GetCommandlineRebootMode(allow_disk_fallback);
+      reboot_mode.has_value()) {
     return reboot_mode.value();
   }
 
