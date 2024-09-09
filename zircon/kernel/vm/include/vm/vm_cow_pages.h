@@ -524,6 +524,9 @@ class VmCowPages final : public VmHierarchyBase,
   // Different operations that RangeChangeUpdate* can perform against any VmMappings that are found.
   enum class RangeChangeOp {
     Unmap,
+    // Specialized case of Unmap where the caller is stating that it knows that any pages that might
+    // need to be unmapped are all read instances of the shared zero page.
+    UnmapZeroPage,
     RemoveWrite,
     // Unpin is not a 'real' operation in that it does not cause any actions, and is simply used as
     // a mechanism to allow the VmCowPages to trigger a search for any kernel mappings that are

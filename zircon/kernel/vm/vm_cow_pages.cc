@@ -1981,7 +1981,10 @@ zx_status_t VmCowPages::AddPageLocked(VmPageOrMarker* p, uint64_t offset,
 
   if (do_range_update) {
     // other mappings may have covered this offset into the vmo, so unmap those ranges
-    RangeChangeUpdateLocked(offset, PAGE_SIZE, RangeChangeOp::Unmap);
+    RangeChangeUpdateLocked(offset, PAGE_SIZE,
+                            overwrite == CanOverwriteContent::NonZero
+                                ? RangeChangeOp::Unmap
+                                : RangeChangeOp::UnmapZeroPage);
   }
 
   VMO_VALIDATION_ASSERT(DebugValidatePageSplitsHierarchyLocked());
