@@ -27,7 +27,7 @@ $ fx build
 
 Register the driver by running this command
 ```bash
-$ ffx driver register fuchsia-pkg://fuchsia.com/simple_driver#meta/simple.cm
+$ ffx driver register fuchsia-pkg://fuchsia.com/simple_driver#meta/simple_driver.cm
 ```
 
 Verify that `fuchsia-pkg://fuchsia.com/simple_driver#meta/simple_driver.cc` shows up in this command
@@ -84,7 +84,7 @@ $ fx build
 
 Run unit tests with the command:
 ```bash
-$ fx test simple_driver_test
+$ fx test simple-driver-test
 ```
 
 The unit test runs the simple DFv2 driver and then verifies to see if
