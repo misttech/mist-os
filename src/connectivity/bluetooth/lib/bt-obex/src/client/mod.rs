@@ -145,7 +145,6 @@ impl ObexClient {
     }
 
     fn max_packet_size(&self) -> u16 {
-        // We have no opinion on the preferred max packet size, so just use the peer's.
         *self.max_packet_size.lock()
     }
 
