@@ -5,7 +5,6 @@
 pub mod access_vector_cache;
 pub mod permission_check;
 pub mod security_server;
-pub mod seq_lock;
 
 use selinux::policy::arrays::FsUseType;
 pub use selinux::InitialSid;
@@ -60,4 +59,20 @@ pub struct FileSystemMountOptions {
     /// The value of the `rootcontext=[security-context]` mount option. This option is used to
     /// (re)label the inode located at the filesystem mountpoint.
     pub root_context: Option<Vec<u8>>,
+}
+
+/// Status information parameter for the [`StatusHolder`] interface.
+pub struct PolicyStatus {
+    /// SELinux-wide enforcing vs. permissive mode  bit.
+    pub is_enforcing: bool,
+    /// Number of times the policy has been changed since SELinux started.
+    pub change_count: u32,
+    /// Bit indicating whether operations unknonwn SELinux abstractions will be denied.
+    pub deny_unknown: bool,
+}
+
+/// Interface for security server to interact with selinuxfs status file.
+pub trait StatusHolder: Send {
+    /// Sets the value part of the associated selinuxfs status file.
+    fn set_value(&mut self, policy_status: PolicyStatus);
 }

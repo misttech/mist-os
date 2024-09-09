@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fuchsia_zircon::{self as zx, AsHandleRef, HandleBased};
+use fuchsia_zircon::{self as zx, AsHandleRef as _, HandleBased as _};
 use std::marker::PhantomData;
 use std::mem::{align_of, size_of};
 use std::sync::atomic::{AtomicU32, Ordering};
@@ -17,8 +17,7 @@ pub struct SeqLock<H: AsBytes + NoCell, T: AsBytes + NoCell> {
     map_addr: usize,
     readonly_vmo: Arc<zx::Vmo>,
     writable_vmo: zx::Vmo,
-    _phantom_header: PhantomData<H>,
-    _phantom_value: PhantomData<T>,
+    _phantom_data: PhantomData<(H, T)>,
 }
 
 impl<H: AsBytes + Default + NoCell, T: AsBytes + Default + NoCell> SeqLock<H, T> {
@@ -76,8 +75,7 @@ impl<H: AsBytes + NoCell, T: AsBytes + NoCell> SeqLock<H, T> {
             )?,
             readonly_vmo: readonly_vmo,
             writable_vmo: writable_vmo,
-            _phantom_header: PhantomData,
-            _phantom_value: PhantomData,
+            _phantom_data: PhantomData,
         };
 
         Ok(status)

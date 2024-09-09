@@ -4,6 +4,10 @@
 
 #![recursion_limit = "512"]
 
+mod seq_lock;
+
+use seq_lock::SeqLock;
+
 use starnix_core::mm::memory::MemoryObject;
 use starnix_core::security;
 use starnix_core::task::CurrentTask;
@@ -17,12 +21,11 @@ use starnix_core::vfs::{
     StaticDirectoryBuilder, VecDirectory, VecDirectoryEntry,
 };
 
-use fuchsia_zircon as zx;
-use fuchsia_zircon::HandleBased;
+use fuchsia_zircon::{self as zx, HandleBased as _};
 use selinux::policy::SUPPORTED_POLICY_VERSION;
 use selinux::SecurityPermission;
 use selinux_core::security_server::SecurityServer;
-use selinux_core::{InitialSid, SecurityId};
+use selinux_core::{InitialSid, PolicyStatus, SecurityId, StatusHolder};
 use starnix_logging::{impossible_error, log_error, log_info, track_stub};
 use starnix_sync::{FileOpsCore, Locked, Unlocked};
 use starnix_uapi::device_type::DeviceType;
@@ -34,6 +37,52 @@ use starnix_uapi::{errno, error, off_t, statfs, SELINUX_MAGIC};
 use std::borrow::Cow;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
+use zerocopy::{AsBytes, NoCell};
+
+/// The version of the SELinux "status" file this implementation implements.
+pub const SELINUX_STATUS_VERSION: u32 = 1;
+
+/// Header of the C-style struct exposed via the /sys/fs/selinux/status file,
+/// to userspace. Defined here (instead of imported through bindgen) as selinux
+/// headers are not exposed through  kernel uapi headers.
+#[derive(AsBytes, Copy, Clone, NoCell)]
+#[repr(C, align(4))]
+pub struct SeLinuxStatusHeader {
+    /// Version number of this structure (1).
+    version: u32,
+}
+
+impl Default for SeLinuxStatusHeader {
+    fn default() -> Self {
+        Self { version: SELINUX_STATUS_VERSION }
+    }
+}
+
+/// Value part of the C-style struct exposed via the /sys/fs/selinux/status file,
+/// to userspace. Defined here (instead of imported through bindgen) as selinux
+/// headers are not exposed through  kernel uapi headers.
+#[derive(AsBytes, Copy, Clone, Default, NoCell)]
+#[repr(C, align(4))]
+struct SeLinuxStatusValue {
+    /// `0` means permissive mode, `1` means enforcing mode.
+    enforcing: u32,
+    /// The number of times the selinux policy has been reloaded.
+    policyload: u32,
+    /// `0` means allow and `1` means deny unknown object classes/permissions.
+    deny_unknown: u32,
+}
+
+type SeLinuxStatus = SeqLock<SeLinuxStatusHeader, SeLinuxStatusValue>;
+
+impl StatusHolder for SeLinuxStatus {
+    fn set_value(&mut self, policy_status: PolicyStatus) {
+        (self as &mut SeLinuxStatus).set_value(SeLinuxStatusValue {
+            enforcing: policy_status.is_enforcing as u32,
+            policyload: policy_status.change_count,
+            deny_unknown: policy_status.deny_unknown as u32,
+        })
+    }
+}
 
 struct SeLinuxFs;
 impl FileSystemOps for SeLinuxFs {
@@ -104,21 +153,22 @@ impl SeLinuxFs {
             BytesFile::new_node(format!("{}", SUPPORTED_POLICY_VERSION).into_bytes()),
             mode!(IFREG, 0o444),
         );
+
+        // The status file needs to be mmap-able, so use a VMO-backed file. When the selinux state
+        // changes in the future, the way to update this data (and communicate updates with
+        // userspace) is to use the ["seqlock"](https://en.wikipedia.org/wiki/Seqlock) technique.
+        let status_holder = SeLinuxStatus::new_default().map_err(|e| errno!(ENODEV, e))?;
+        let status_file = status_holder
+            .get_readonly_vmo()
+            .duplicate_handle(zx::Rights::SAME_RIGHTS)
+            .map_err(impossible_error)?;
         dir.entry(
             current_task,
             "status",
-            // The status file needs to be mmap-able, so use a VMO-backed file.
-            // When the selinux state changes in the future, the way to update this data (and
-            // communicate updates with userspace) is to use the
-            // ["seqlock"](https://en.wikipedia.org/wiki/Seqlock) technique.
-            MemoryFileNode::from_memory(Arc::new(MemoryObject::from(
-                security_server
-                    .get_status_vmo()
-                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
-                    .map_err(impossible_error)?,
-            ))),
+            MemoryFileNode::from_memory(Arc::new(MemoryObject::from(status_file))),
             mode!(IFREG, 0o444),
         );
+        security_server.set_status_holder(Box::new(status_holder));
 
         // Write-only files used to configure and query SELinux.
         dir.entry(current_task, "access", AccessApi::new_node(), mode!(IFREG, 0o666));
@@ -762,4 +812,91 @@ pub fn selinux_fs(
         .selinux_fs
         .get_or_try_init(|| SeLinuxFs::new_fs(current_task, options))
         .cloned()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use fuchsia_zircon::{self as zx, AsHandleRef as _};
+    use selinux_core::security_server::SecurityServer;
+    use zerocopy::{FromBytes, FromZeroes};
+
+    #[fuchsia::test]
+    fn status_vmo_has_correct_size_and_rights() {
+        // The current version of the "status" file contains five packed
+        // u32 values.
+        const STATUS_T_SIZE: usize = size_of::<u32>() * 5;
+
+        let status_holder = SeLinuxStatus::new_default().unwrap();
+        let status_vmo = status_holder.get_readonly_vmo();
+
+        // Verify the content and actual size of the structure are as expected.
+        let content_size = status_vmo.get_content_size().unwrap() as usize;
+        assert_eq!(content_size, STATUS_T_SIZE);
+        let actual_size = status_vmo.get_size().unwrap() as usize;
+        assert!(actual_size >= STATUS_T_SIZE);
+
+        // Ensure the returned handle is read-only and non-resizable.
+        let rights = status_vmo.basic_info().unwrap().rights;
+        assert_eq!((rights & zx::Rights::MAP), zx::Rights::MAP);
+        assert_eq!((rights & zx::Rights::READ), zx::Rights::READ);
+        assert_eq!((rights & zx::Rights::GET_PROPERTY), zx::Rights::GET_PROPERTY);
+        assert_eq!((rights & zx::Rights::WRITE), zx::Rights::NONE);
+        assert_eq!((rights & zx::Rights::RESIZE), zx::Rights::NONE);
+    }
+
+    #[derive(FromBytes, FromZeroes)]
+    #[repr(C, align(4))]
+    struct TestSeLinuxStatusT {
+        version: u32,
+        sequence: u32,
+        enforcing: u32,
+        policyload: u32,
+        deny_unknown: u32,
+    }
+
+    fn with_status_t<R>(
+        status_vmo: &Arc<zx::Vmo>,
+        do_test: impl FnOnce(&TestSeLinuxStatusT) -> R,
+    ) -> R {
+        let flags = zx::VmarFlags::PERM_READ
+            | zx::VmarFlags::ALLOW_FAULTS
+            | zx::VmarFlags::REQUIRE_NON_RESIZABLE;
+        let map_addr = fuchsia_runtime::vmar_root_self()
+            .map(0, status_vmo, 0, size_of::<TestSeLinuxStatusT>(), flags)
+            .unwrap();
+        let mapped_status = unsafe { &mut *(map_addr as *mut TestSeLinuxStatusT) };
+        let result = do_test(mapped_status);
+        unsafe {
+            fuchsia_runtime::vmar_root_self()
+                .unmap(map_addr, size_of::<TestSeLinuxStatusT>())
+                .unwrap()
+        };
+        result
+    }
+
+    #[fuchsia::test]
+    fn status_file_layout() {
+        let security_server = SecurityServer::new();
+        let status_holder = SeLinuxStatus::new_default().unwrap();
+        let status_vmo = status_holder.get_readonly_vmo();
+        security_server.set_status_holder(Box::new(status_holder));
+        security_server.set_enforcing(false);
+        let mut seq_no: u32 = 0;
+        with_status_t(&status_vmo, |status| {
+            assert_eq!(status.version, SELINUX_STATUS_VERSION);
+            assert_eq!(status.enforcing, 0);
+            seq_no = status.sequence;
+            assert_eq!(seq_no % 2, 0);
+        });
+        security_server.set_enforcing(true);
+        with_status_t(&status_vmo, |status| {
+            assert_eq!(status.version, SELINUX_STATUS_VERSION);
+            assert_eq!(status.enforcing, 1);
+            assert_ne!(status.sequence, seq_no);
+            seq_no = status.sequence;
+            assert_eq!(seq_no % 2, 0);
+        });
+    }
 }

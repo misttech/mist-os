@@ -4,11 +4,12 @@
 
 use crate::access_vector_cache::{Manager as AvcManager, Query, QueryMut};
 use crate::permission_check::PermissionCheck;
-use crate::seq_lock::SeqLock;
-use crate::{FileSystemLabel, FileSystemLabelingScheme, FileSystemMountOptions, SecurityId};
+use crate::{
+    FileSystemLabel, FileSystemLabelingScheme, FileSystemMountOptions, PolicyStatus, SecurityId,
+    StatusHolder,
+};
 
 use anyhow::Context as _;
-use fuchsia_zircon::{self as zx};
 use selinux::policy::metadata::HandleUnknown;
 use selinux::policy::parser::ByValue;
 use selinux::policy::{
@@ -24,10 +25,6 @@ use std::collections::HashMap;
 use std::num::NonZeroU32;
 use std::ops::DerefMut;
 use std::sync::Arc;
-use zerocopy::{AsBytes, NoCell};
-
-/// The version of the SELinux "status" file this implementation implements.
-const SELINUX_STATUS_VERSION: u32 = 1;
 
 struct LoadedPolicy {
     /// Parsed policy structure.
@@ -36,8 +33,6 @@ struct LoadedPolicy {
     /// The binary policy that was previously passed to `load_policy()`.
     binary: Vec<u8>,
 }
-
-type SeLinuxStatus = SeqLock<SeLinuxStatusHeader, SeLinuxStatusValue>;
 
 #[derive(Default)]
 struct SeLinuxBooleans {
@@ -88,9 +83,8 @@ struct SecurityServerState {
     /// Holds active and pending states for each boolean defined by policy.
     booleans: SeLinuxBooleans,
 
-    /// Encapsulates the security server "status" fields, which are exposed to
-    /// userspace as a C-layout structure, and updated with the SeqLock pattern.
-    status: SeLinuxStatus,
+    /// Write-only interface to the data stored in the selinuxfs status file.
+    status: Option<Box<dyn StatusHolder>>,
 
     /// True if hooks should enforce policy-based access decisions.
     enforcing: bool,
@@ -161,13 +155,12 @@ pub struct SecurityServer {
 impl SecurityServer {
     pub fn new() -> Arc<Self> {
         let avc_manager = AvcManager::new();
-        let status = SeLinuxStatus::new_default().expect("Failed to create SeLinuxStatus");
         let state = Mutex::new(SecurityServerState {
             sids: HashMap::new(),
             next_sid: NonZeroU32::new(FIRST_UNUSED_SID).unwrap(),
             policy: None,
             booleans: SeLinuxBooleans::default(),
-            status,
+            status: None,
             enforcing: false,
             policy_change_count: 0,
         });
@@ -223,7 +216,7 @@ impl SecurityServer {
         // parsed policy is not valid.
         let policy = Arc::new(LoadedPolicy { parsed, binary });
 
-        // Replace any existing policy and update the [`SeLinuxStatus`].
+        // Replace any existing policy and update the status value in `state.status`.
         self.with_state_and_update_status(|state| {
             // Remap any existing Security Contexts to use Ids defined by the new policy.
             // TODO(b/330677360): Replace serialize/parse with an efficient implementation.
@@ -525,9 +518,9 @@ impl SecurityServer {
             .map_or(false, |policy| policy.parsed.is_bounded_by(bounded_type, parent_type))
     }
 
-    /// Returns a read-only VMO containing the SELinux "status" structure.
-    pub fn get_status_vmo(&self) -> Arc<zx::Vmo> {
-        self.state.lock().status.get_readonly_vmo()
+    pub fn set_status_holder(&self, status_holder: Box<dyn StatusHolder>) {
+        let mut state = self.state.lock();
+        state.status = Some(status_holder);
     }
 
     /// Returns a reference to the shared access vector cache that delebates cache misses to `self`.
@@ -542,16 +535,19 @@ impl SecurityServer {
         self.avc_manager.new_thread_local_cache()
     }
 
-    // Runs the supplied function with locked `self`, and then updates the [`SeLinuxStatus`].
+    /// Runs the supplied function with locked `self`, and then updates the SELinux status file
+    /// associated with `self.state.status`, if any.
     fn with_state_and_update_status(&self, f: impl FnOnce(&mut SecurityServerState)) {
         let mut state = self.state.lock();
         f(state.deref_mut());
-        let new_value = SeLinuxStatusValue {
-            enforcing: state.enforcing as u32,
-            policyload: state.policy_change_count,
-            deny_unknown: state.deny_unknown() as u32,
+        let new_value = PolicyStatus {
+            is_enforcing: state.enforcing,
+            change_count: state.policy_change_count,
+            deny_unknown: state.deny_unknown(),
         };
-        state.status.set_value(new_value);
+        if let Some(ref mut status) = &mut state.status {
+            status.set_value(new_value);
+        }
     }
 }
 
@@ -589,36 +585,6 @@ impl AccessVectorComputer for SecurityServer {
     }
 }
 
-/// Header of the C-style struct exposed via the /sys/fs/selinux/status file,
-/// to userspace. Defined here (instead of imported through bindgen) as selinux
-/// headers are not exposed through  kernel uapi headers.
-#[derive(AsBytes, Copy, Clone, NoCell)]
-#[repr(C, align(4))]
-struct SeLinuxStatusHeader {
-    /// Version number of this structure (1).
-    version: u32,
-}
-
-impl Default for SeLinuxStatusHeader {
-    fn default() -> Self {
-        Self { version: SELINUX_STATUS_VERSION }
-    }
-}
-
-/// Value part of the C-style struct exposed via the /sys/fs/selinux/status file,
-/// to userspace. Defined here (instead of imported through bindgen) as selinux
-/// headers are not exposed through  kernel uapi headers.
-#[derive(AsBytes, Copy, Clone, Default, NoCell)]
-#[repr(C, align(4))]
-struct SeLinuxStatusValue {
-    /// `0` means permissive mode, `1` means enforcing mode.
-    enforcing: u32,
-    /// The number of times the selinux policy has been reloaded.
-    policyload: u32,
-    /// `0` means allow and `1` means deny unknown object classes/permissions.
-    deny_unknown: u32,
-}
-
 /// Computes a [`SecurityId`] given a non-[`None`] value for one of the four
 /// "context" mount options (https://man7.org/linux/man-pages/man8/mount.8.html).
 fn sid_from_mount_option(
@@ -645,10 +611,7 @@ fn sid_from_mount_option(
 mod tests {
     use super::*;
 
-    use fuchsia_zircon::AsHandleRef as _;
     use selinux::ProcessPermission;
-    use std::mem::size_of;
-    use zerocopy::{FromBytes, FromZeroes};
 
     const TESTSUITE_BINARY_POLICY: &[u8] = include_bytes!("../testdata/policies/selinux_testsuite");
     const TESTS_BINARY_POLICY: &[u8] =
@@ -796,81 +759,6 @@ mod tests {
         let (final_active, final_pending) = security_server.get_boolean(boolean).unwrap();
         assert_eq!(final_active, pending, "Pending value should be active after commit");
         assert_eq!(final_active, final_pending, "Active and pending are the same after commit");
-    }
-
-    #[fuchsia::test]
-    fn status_vmo_has_correct_size_and_rights() {
-        // The current version of the "status" file contains five packed
-        // u32 values.
-        const STATUS_T_SIZE: usize = size_of::<u32>() * 5;
-
-        let security_server = SecurityServer::new();
-        let status_vmo = security_server.get_status_vmo();
-
-        // Verify the content and actual size of the structure are as expected.
-        let content_size = status_vmo.get_content_size().unwrap() as usize;
-        assert_eq!(content_size, STATUS_T_SIZE);
-        let actual_size = status_vmo.get_size().unwrap() as usize;
-        assert!(actual_size >= STATUS_T_SIZE);
-
-        // Ensure the returned handle is read-only and non-resizable.
-        let rights = status_vmo.basic_info().unwrap().rights;
-        assert_eq!((rights & zx::Rights::MAP), zx::Rights::MAP);
-        assert_eq!((rights & zx::Rights::READ), zx::Rights::READ);
-        assert_eq!((rights & zx::Rights::GET_PROPERTY), zx::Rights::GET_PROPERTY);
-        assert_eq!((rights & zx::Rights::WRITE), zx::Rights::NONE);
-        assert_eq!((rights & zx::Rights::RESIZE), zx::Rights::NONE);
-    }
-
-    #[derive(FromBytes, FromZeroes)]
-    #[repr(C, align(4))]
-    struct TestSeLinuxStatusT {
-        version: u32,
-        sequence: u32,
-        enforcing: u32,
-        policyload: u32,
-        deny_unknown: u32,
-    }
-
-    fn with_status_t<R>(
-        security_server: &SecurityServer,
-        do_test: impl FnOnce(&TestSeLinuxStatusT) -> R,
-    ) -> R {
-        let flags = zx::VmarFlags::PERM_READ
-            | zx::VmarFlags::ALLOW_FAULTS
-            | zx::VmarFlags::REQUIRE_NON_RESIZABLE;
-        let map_addr = fuchsia_runtime::vmar_root_self()
-            .map(0, &security_server.get_status_vmo(), 0, size_of::<TestSeLinuxStatusT>(), flags)
-            .unwrap();
-        let mapped_status = unsafe { &mut *(map_addr as *mut TestSeLinuxStatusT) };
-        let result = do_test(mapped_status);
-        unsafe {
-            fuchsia_runtime::vmar_root_self()
-                .unmap(map_addr, size_of::<TestSeLinuxStatusT>())
-                .unwrap()
-        };
-        result
-    }
-
-    #[fuchsia::test]
-    fn status_file_layout() {
-        let security_server = SecurityServer::new();
-        security_server.set_enforcing(false);
-        let mut seq_no: u32 = 0;
-        with_status_t(&security_server, |status| {
-            assert_eq!(status.version, SELINUX_STATUS_VERSION);
-            assert_eq!(status.enforcing, 0);
-            seq_no = status.sequence;
-            assert_eq!(seq_no % 2, 0);
-        });
-        security_server.set_enforcing(true);
-        with_status_t(&security_server, |status| {
-            assert_eq!(status.version, SELINUX_STATUS_VERSION);
-            assert_eq!(status.enforcing, 1);
-            assert_ne!(status.sequence, seq_no);
-            seq_no = status.sequence;
-            assert_eq!(seq_no % 2, 0);
-        });
     }
 
     #[fuchsia::test]

@@ -11,6 +11,7 @@ group("tests") {
     "input:tests",
     "layeredfs:tests",
     "loop:tests",
+    "selinuxfs:tests",
     "tracefs:tests",
   ]
 }
