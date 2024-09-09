@@ -38,7 +38,6 @@
 #include <linux/fs.h>
 #include <linux/fscrypt.h>
 #include <linux/fsverity.h>
-#include <linux/fuse.h>
 #include <linux/futex.h>
 #include <linux/if_arp.h>
 #include <linux/if_packet.h>
@@ -97,6 +96,9 @@
 #include <linux/vm_sockets.h>
 #include <linux/wait.h>
 #include <linux/xattr.h>
+
+// Specific fuse header to use android specific extensions
+#include "src/starnix/lib/linux_uapi/third_party/fuse_kernel.h"
 
 // Data shared between Starnix and a vDSO implementation.
 #include "src/starnix/kernel/vdso/vvar-data.h"
