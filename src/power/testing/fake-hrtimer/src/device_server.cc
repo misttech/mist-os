@@ -56,14 +56,6 @@ DeviceServer::DeviceServer() {
                    << current_level_endpoints.status_string();
     return;
   }
-  auto required_level_endpoints = fidl::CreateEndpoints<fuchsia_power_broker::RequiredLevel>();
-  if (!required_level_endpoints.is_ok()) {
-    FX_LOGS(ERROR) << "error creating RequiredLevel endpoints: "
-                   << required_level_endpoints.status_string();
-    return;
-  }
-  auto level_control_endpoints = fuchsia_power_broker::LevelControlChannels(
-      std::move(current_level_endpoints->server), std::move(required_level_endpoints->server));
 
   fuchsia_power_broker::ElementSchema schema;
   schema.element_name(std::string("fake-hrtimer"))
@@ -73,8 +65,7 @@ DeviceServer::DeviceServer() {
           fidl::ToUnderlying(fuchsia_power_broker::BinaryPowerLevel::kOn),
       }))
       .lessor_channel(std::move(lessor_endpoints->server))
-      .element_control(std::move(element_control_endpoints->server))
-      .level_control_channels(std::move(level_control_endpoints));
+      .element_control(std::move(element_control_endpoints->server));
 
   fidl::Result<fuchsia_power_broker::Topology::AddElement> element =
       topology->AddElement(std::move(schema));
@@ -86,7 +77,6 @@ DeviceServer::DeviceServer() {
 
   element_control_client_ = std::move(element_control_endpoints->client);
   current_level_ = fidl::SyncClient(std::move(current_level_endpoints->client));
-  required_level_ = fidl::SyncClient(std::move(required_level_endpoints->client));
   lessor_ = fidl::SyncClient{std::move(lessor_endpoints->client)};
 }
 
@@ -135,17 +125,6 @@ void DeviceServer::StartAndWait(StartAndWaitRequest& request,
 
         fidl::SyncClient<fuchsia_power_broker::LeaseControl> lease_control(
             std::move(result_lease->lease_control()));
-        auto level = fuchsia_power_broker::BinaryPowerLevel::kOff;
-        do {
-          auto result = required_level_.value()->Watch();
-          if (result.is_error()) {
-            FX_LOGS(ERROR) << "Power RequiredLevel Watch returned error: "
-                           << result.error_value().FormatDescription().c_str();
-            return zx::error(ZX_ERR_BAD_STATE);
-          }
-          level = fuchsia_power_broker::BinaryPowerLevel(result->required_level());
-          current_level_.value()->Update(result->required_level());
-        } while (level != fuchsia_power_broker::BinaryPowerLevel::kOn);
 
         fuchsia_hardware_hrtimer::DeviceStartAndWaitResponse response;
         response.keep_alive(lease_control.TakeClientEnd());
