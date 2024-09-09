@@ -49,10 +49,14 @@ class GpioDevice : public fidl::WireServer<fuchsia_hardware_gpio::Gpio>,
   void ConfigIn(ConfigInRequestView request, ConfigInCompleter::Sync& completer) override;
   void ConfigOut(ConfigOutRequestView request, ConfigOutCompleter::Sync& completer) override;
   void Read(ReadCompleter::Sync& completer) override;
+  void SetBufferMode(SetBufferModeRequestView request,
+                     SetBufferModeCompleter::Sync& completer) override;
   void Write(WriteRequestView request, WriteCompleter::Sync& completer) override;
   void SetDriveStrength(SetDriveStrengthRequestView request,
                         SetDriveStrengthCompleter::Sync& completer) override;
   void GetDriveStrength(GetDriveStrengthCompleter::Sync& completer) override;
+  void GetInterrupt2(GetInterrupt2RequestView request,
+                     GetInterrupt2Completer::Sync& completer) override;
   void GetInterrupt(GetInterruptRequestView request,
                     GetInterruptCompleter::Sync& completer) override;
   void ConfigureInterrupt(fuchsia_hardware_gpio::wire::GpioConfigureInterruptRequest* request,

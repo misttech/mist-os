@@ -137,6 +137,24 @@ void GpioDevice::Read(ReadCompleter::Sync& completer) {
           }));
 }
 
+void GpioDevice::SetBufferMode(SetBufferModeRequestView request,
+                               SetBufferModeCompleter::Sync& completer) {
+  fdf::Arena arena('GPIO');
+  pinimpl_.buffer(arena)
+      ->SetBufferMode(pin_, request->mode)
+      .ThenExactlyOnce(
+          fit::inline_callback<
+              void(fdf::WireUnownedResult<fuchsia_hardware_pinimpl::PinImpl::SetBufferMode>&),
+              sizeof(SetBufferModeCompleter::Async)>(
+              [completer = completer.ToAsync()](auto& result) mutable {
+                if (result.ok()) {
+                  completer.Reply(*result);
+                } else {
+                  completer.ReplyError(result.status());
+                }
+              }));
+}
+
 void GpioDevice::Write(WriteRequestView request, WriteCompleter::Sync& completer) {
   fdf::Arena arena('GPIO');
   pinimpl_.buffer(arena)
@@ -198,6 +216,26 @@ void GpioDevice::GetDriveStrength(GetDriveStrengthCompleter::Sync& completer) {
               completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
             }
           }));
+}
+
+void GpioDevice::GetInterrupt2(GetInterrupt2RequestView request,
+                               GetInterrupt2Completer::Sync& completer) {
+  fdf::Arena arena('GPIO');
+  pinimpl_.buffer(arena)
+      ->GetInterrupt(pin_, request->options)
+      .ThenExactlyOnce(
+          fit::inline_callback<
+              void(fdf::WireUnownedResult<fuchsia_hardware_pinimpl::PinImpl::GetInterrupt>&),
+              sizeof(GetInterrupt2Completer::Async)>(
+              [completer = completer.ToAsync()](auto& result) mutable {
+                if (!result.ok()) {
+                  completer.ReplyError(result.status());
+                } else if (result->is_error()) {
+                  completer.ReplyError(result->error_value());
+                } else {
+                  completer.ReplySuccess(std::move(result->value()->interrupt));
+                }
+              }));
 }
 
 void GpioDevice::GetInterrupt(GetInterruptRequestView request,
@@ -424,6 +462,7 @@ zx::result<> GpioDevice::AddDevice(fidl::UnownedClientEnd<fuchsia_driver_framewo
                                    fdf::Logger& logger) {
   std::vector<fuchsia_driver_framework::Offer> offers = compat_server_.CreateOffers2();
   offers.push_back(fdf::MakeOffer2<fuchsia_hardware_gpio::Service>(pin_name()));
+  offers.push_back(fdf::MakeOffer2<fuchsia_hardware_pin::Service>(pin_name()));
 
   std::vector<fuchsia_driver_framework::NodeProperty> props{
       fdf::MakeProperty(bind_fuchsia::GPIO_PIN, pin_),

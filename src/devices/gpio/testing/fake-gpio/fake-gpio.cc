@@ -45,6 +45,31 @@ FakeGpio::FakeGpio() : write_callback_(DefaultWriteCallback) {
   interrupt_ = zx::ok(std::move(interrupt));
 }
 
+void FakeGpio::GetInterrupt2(GetInterrupt2RequestView request,
+                             GetInterrupt2Completer::Sync& completer) {
+  if (interrupt_.is_error()) {
+    completer.ReplyError(interrupt_.error_value());
+    return;
+  }
+
+  if (interrupt_used_.exchange(/*desired=*/true, std::memory_order_relaxed)) {
+    completer.ReplyError(ZX_ERR_ALREADY_BOUND);
+    return;
+  }
+
+  auto sub_state = state_log_.empty()
+                       ? ReadSubState{.flags = fuchsia_hardware_gpio::GpioFlags::kNoPull}
+                       : state_log_.back().sub_state;
+  state_log_.emplace_back(State{
+      .interrupt_options = request->options,
+      .sub_state = sub_state,
+  });
+
+  zx::interrupt interrupt;
+  ZX_ASSERT(interrupt_.value().duplicate(ZX_RIGHT_SAME_RIGHTS, &interrupt) == ZX_OK);
+  completer.ReplySuccess(std::move(interrupt));
+}
+
 void FakeGpio::GetInterrupt(GetInterruptRequestView request,
                             GetInterruptCompleter::Sync& completer) {
   if (interrupt_.is_ok()) {
@@ -95,6 +120,30 @@ void FakeGpio::ConfigIn(ConfigInRequestView request, ConfigInCompleter::Sync& co
 void FakeGpio::ConfigOut(ConfigOutRequestView request, ConfigOutCompleter::Sync& completer) {
   state_log_.emplace_back(State{.interrupt_mode = GetCurrentInterruptMode(),
                                 .sub_state = WriteSubState{.value = request->initial_value}});
+  completer.ReplySuccess();
+}
+
+void FakeGpio::SetBufferMode(SetBufferModeRequestView request,
+                             SetBufferModeCompleter::Sync& completer) {
+  switch (request->mode) {
+    case fuchsia_hardware_gpio::BufferMode::kInput:
+      if (state_log_.empty() ||
+          !std::holds_alternative<ReadSubState>(state_log_.back().sub_state)) {
+        state_log_.emplace_back(
+            State{.interrupt_mode = GetCurrentInterruptMode(), .sub_state = ReadSubState{}});
+      }
+      break;
+    case fuchsia_hardware_gpio::BufferMode::kOutputLow:
+    case fuchsia_hardware_gpio::BufferMode::kOutputHigh:
+      state_log_.emplace_back(State{
+          .interrupt_mode = GetCurrentInterruptMode(),
+          .sub_state = WriteSubState{.value = request->mode ==
+                                              fuchsia_hardware_gpio::BufferMode::kOutputHigh}});
+      break;
+    default:
+      ZX_ASSERT_MSG(false, "Unepxected BufferMode value");
+  }
+
   completer.ReplySuccess();
 }
 

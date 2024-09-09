@@ -51,6 +51,7 @@ bool operator==(const SubState& sub_state1, const T& sub_state2) {
 }
 
 struct State {
+  fuchsia_hardware_gpio::InterruptOptions interrupt_options;
   fuchsia_hardware_gpio::InterruptMode interrupt_mode;
   SubState sub_state;
 };
@@ -66,6 +67,8 @@ class FakeGpio : public fidl::testing::WireTestBase<fuchsia_hardware_gpio::Gpio>
   FakeGpio();
 
   // fidl::testing::WireTestBase<fuchsia_hardware_gpu::Gpio>
+  void GetInterrupt2(GetInterrupt2RequestView request,
+                     GetInterrupt2Completer::Sync& completer) override;
   void GetInterrupt(GetInterruptRequestView request,
                     GetInterruptCompleter::Sync& completer) override;
   void ConfigureInterrupt(ConfigureInterruptRequestView request,
@@ -74,6 +77,8 @@ class FakeGpio : public fidl::testing::WireTestBase<fuchsia_hardware_gpio::Gpio>
                       SetAltFunctionCompleter::Sync& completer) override;
   void ConfigIn(ConfigInRequestView request, ConfigInCompleter::Sync& completer) override;
   void ConfigOut(ConfigOutRequestView request, ConfigOutCompleter::Sync& completer) override;
+  void SetBufferMode(SetBufferModeRequestView request,
+                     SetBufferModeCompleter::Sync& completer) override;
   void Write(WriteRequestView request, WriteCompleter::Sync& completer) override;
   void Read(ReadCompleter::Sync& completer) override;
   void ReleaseInterrupt(ReleaseInterruptCompleter::Sync& completer) override;

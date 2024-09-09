@@ -78,6 +78,8 @@ class FakeGpio : public fidl::WireServer<Gpio>,
     mock_read_.Call();
     completer.ReplySuccess(true);
   }
+  void SetBufferMode(SetBufferModeRequestView request,
+                     SetBufferModeCompleter::Sync& completer) override {}
   void Write(WriteRequestView request, WriteCompleter::Sync& completer) override {
     if (request->value != 7) {
       completer.ReplyError(ZX_ERR_INVALID_ARGS);
@@ -99,6 +101,8 @@ class FakeGpio : public fidl::WireServer<Gpio>,
     mock_get_drive_strength_.Call();
     completer.ReplySuccess(2000);
   }
+  void GetInterrupt2(GetInterrupt2RequestView request,
+                     GetInterrupt2Completer::Sync& completer) override {}
   void GetInterrupt(GetInterruptRequestView request,
                     GetInterruptCompleter::Sync& completer) override {
     if (client_got_interrupt_) {
