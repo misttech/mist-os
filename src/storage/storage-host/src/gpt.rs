@@ -124,8 +124,8 @@ fn convert_partition_info(
     block_server::PartitionInfo {
         block_count: info.num_blocks,
         block_size,
-        type_guid: info.type_guid.as_bytes().to_owned(),
-        instance_guid: info.instance_guid.as_bytes().to_owned(),
+        type_guid: info.type_guid.to_bytes(),
+        instance_guid: info.instance_guid.to_bytes(),
         name: info.label.clone(),
     }
 }
