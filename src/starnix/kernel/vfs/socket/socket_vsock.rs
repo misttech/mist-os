@@ -29,7 +29,7 @@ struct VsockSocketInner {
     // WaitQueue for listening sockets.
     waiters: WaitQueue,
 
-    // handle to a RemotePipeObject
+    // state of the vsock. Contains a handle to a ZxioBackedSocket when connected.
     state: VsockSocketState,
 }
 
@@ -40,7 +40,7 @@ enum VsockSocketState {
     /// The socket has had `listen` called and can accept incoming connections.
     Listening(AcceptQueue),
 
-    /// The socket is connected to a RemotePipeObject.
+    /// The socket is connected to a ZxioBackedSocket.
     Connected(FileHandle),
 
     /// The socket is closed.
