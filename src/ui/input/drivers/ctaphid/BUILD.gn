@@ -28,13 +28,13 @@ source_set("driver-internals") {
     ":ctaphid_bind",
     "//sdk/fidl/fuchsia.fido.report:fuchsia.fido.report_cpp",
     "//sdk/fidl/fuchsia.hardware.input:fuchsia.hardware.input_cpp",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//src/devices/lib/driver:driver_runtime",
     "//src/lib/ddk",
     "//src/lib/ddktl",
     "//src/ui/input/lib/hid",
     "//src/ui/input/lib/hid-parser",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/fbl",
   ]
 }
@@ -64,13 +64,13 @@ test("ctaphid-test-bin") {
   deps = [
     ":driver-internals",
     "//sdk/fidl/fuchsia.fido.report:fuchsia.fido.report_hlcpp",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/async_patterns/testing/cpp",
     "//sdk/lib/sys/cpp",
     "//sdk/testing/fidl:fidl_test_hlcpp",
     "//src/devices/testing/mock-ddk",
     "//src/ui/input/lib/hid",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/zxtest",
   ]
 }

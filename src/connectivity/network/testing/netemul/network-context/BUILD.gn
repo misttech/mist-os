@@ -10,13 +10,13 @@ executable("bin") {
   sources = [ "main.cc" ]
   deps = [
     "lib:network_service",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/component/outgoing/cpp",
     "//sdk/lib/device-watcher/cpp",
     "//sdk/lib/fidl/hlcpp",
     "//sdk/lib/sys/cpp",
     "//sdk/lib/syslog/cpp",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/fdio-caller",
   ]
 }

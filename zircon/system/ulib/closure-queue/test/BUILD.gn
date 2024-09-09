@@ -9,9 +9,9 @@ test("closure-queue") {
   output_name = "closure-queue-test"
   sources = [ "closure-queue-test.cc" ]
   deps = [
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/fdio",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/closure-queue",
     "//zircon/system/ulib/zxtest",
   ]

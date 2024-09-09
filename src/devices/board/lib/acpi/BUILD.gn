@@ -40,8 +40,8 @@ shared_public_deps = [
 shared_defines = [ "ACPI_FLEX_ARRAY(TYPE, NAME)=TYPE NAME[0]" ]
 
 shared_fuchsia_public_deps = [
+  "//sdk/lib/async-loop:async-loop-cpp",
   "//sdk/lib/component/outgoing/cpp",
-  "//zircon/system/ulib/async-loop:async-loop-cpp",
   "//zircon/system/ulib/svc",
 ]
 

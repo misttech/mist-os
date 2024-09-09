@@ -9,6 +9,8 @@ executable("bin") {
   sources = [ "calc_integration_test.cc" ]
   deps = [
     "//examples/fidl/calculator/fidl:calculator_cpp",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/fidl/hlcpp",
     "//sdk/lib/sys/cpp",
@@ -17,8 +19,6 @@ executable("bin") {
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/loop_fixture",
     "//third_party/googletest:gtest",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
   ]
   testonly = true
 }

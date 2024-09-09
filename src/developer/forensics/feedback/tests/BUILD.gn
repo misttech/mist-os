@@ -32,6 +32,7 @@ executable("attachment_manager_unittest_exe") {
   deps = [
     "//sdk/fidl/fuchsia.hwinfo:fuchsia.hwinfo_hlcpp",
     "//sdk/fidl/fuchsia.intl:fuchsia.intl_hlcpp",
+    "//sdk/lib/async:async-cpp",
     "//sdk/lib/fit-promise",
     "//src/developer/forensics/feedback/attachments",
     "//src/developer/forensics/feedback_data:constants",
@@ -54,7 +55,6 @@ executable("attachment_manager_unittest_exe") {
     "//src/lib/timekeeper:testing",
     "//third_party/googletest:gmock",
     "//third_party/googletest:gtest",
-    "//zircon/system/ulib/async:async-cpp",
     "//zircon/system/ulib/zx",
   ]
 }

@@ -40,6 +40,7 @@ source_set("igc_core") {
 
   deps = [
     "//sdk/fidl/fuchsia.hardware.network:fuchsia.hardware.network_cpp",
+    "//sdk/lib/async:async-cpp",
     "//sdk/lib/driver/compat/cpp:logging",  # Used by io-buffer lib for zxlogf
     "//sdk/lib/driver/component/cpp",
     "//src/connectivity/network/drivers/network-device/device:shared_lock",
@@ -47,7 +48,6 @@ source_set("igc_core") {
     "//src/devices/pci/lib/device-protocol-pci",
     "//src/devices/pci/lib/pci",
     "//src/lib/listnode",
-    "//zircon/system/ulib/async:async-cpp",
   ]
 }
 

@@ -34,11 +34,11 @@ source_set("core") {
   public_deps = [
     ":bind",
     "//sdk/fidl/fuchsia.hardware.google.ec:fuchsia.hardware.google.ec_cpp",
+    "//sdk/lib/async-loop:async-loop-cpp",
     "//sdk/lib/fit-promise",
     "//src/devices/lib/acpi",
     "//src/devices/lib/driver",
     "//src/lib/ddktl",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/inspect",
     "//zircon/system/ulib/svc",

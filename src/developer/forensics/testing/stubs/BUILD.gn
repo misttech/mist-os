@@ -186,8 +186,8 @@ source_set("intl_provider") {
   ]
 
   deps = [
-    "//zircon/system/ulib/async",
-    "//zircon/system/ulib/async:async-cpp",
+    "//sdk/lib/async",
+    "//sdk/lib/async:async-cpp",
   ]
 }
 
@@ -281,12 +281,12 @@ source_set("power_broker") {
   public_deps = [
     ":fidl_server",
     "//sdk/fidl/fuchsia.power.broker:fuchsia.power.broker_cpp",
+    "//sdk/lib/async:async-cpp",
     "//sdk/lib/fidl/hlcpp",
     "//sdk/lib/fit",
     "//sdk/lib/syslog/cpp",
     "//src/developer/forensics/exceptions:constants",
     "//src/lib/fxl",
-    "//zircon/system/ulib/async:async-cpp",
   ]
 
   deps = [ "//third_party/googletest:gtest" ]

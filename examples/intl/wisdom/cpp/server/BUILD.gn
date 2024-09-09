@@ -46,8 +46,8 @@ executable("intl_wisdom_server") {
 
   deps = [
     ":lib",
-    "//zircon/system/ulib/async-default",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
+    "//sdk/lib/async-default",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
   ]
 }

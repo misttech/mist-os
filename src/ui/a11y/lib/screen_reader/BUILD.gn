@@ -53,6 +53,8 @@ icu_source_set("screen_reader") {
   ]
 
   deps = [
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/fidl/hlcpp",
     "//sdk/lib/sys/cpp",
     "//sdk/lib/syslog/cpp",
@@ -64,7 +66,5 @@ icu_source_set("screen_reader") {
     "//src/ui/a11y/lib/tts",
     "//src/ui/a11y/lib/view",
     "//third_party/glm",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
   ]
 }

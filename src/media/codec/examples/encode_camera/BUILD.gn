@@ -20,14 +20,14 @@ executable("encode_camera") {
     "//sdk/fidl/fuchsia.mediacodec:fuchsia.mediacodec_hlcpp",
     "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_cpp_hlcpp_conversion",
     "//sdk/fidl/fuchsia.sysmem2:fuchsia.sysmem2_cpp_hlcpp_conversion",
+    "//sdk/lib/async",
+    "//sdk/lib/async:async-cpp",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/fit-promise",
     "//sdk/lib/sys/cpp",
     "//src/lib/fxl:fxl_cli",
     "//src/media/lib/test:codec_buffer",
-    "//zircon/system/ulib/async",
-    "//zircon/system/ulib/async:async-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/sysmem-version",
   ]
 }

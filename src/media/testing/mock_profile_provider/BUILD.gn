@@ -10,11 +10,11 @@ executable("bin") {
 
   deps = [
     "//sdk/fidl/fuchsia.media:fuchsia.media_hlcpp",
+    "//sdk/lib/async-default",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/fidl/hlcpp",
     "//sdk/lib/sys/cpp",
-    "//zircon/system/ulib/async-default",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
   ]
 }
 

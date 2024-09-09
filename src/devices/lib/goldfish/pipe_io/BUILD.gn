@@ -18,12 +18,12 @@ source_set("pipe_io") {
   public_deps = [
     "//sdk/fidl/fuchsia.hardware.goldfish:fuchsia.hardware.goldfish_cpp",
     "//sdk/fidl/fuchsia.hardware.goldfish.pipe:fuchsia.hardware.goldfish.pipe_cpp",
+    "//sdk/lib/async:async-cpp",
     "//src/devices/lib/dma-buffer",
     "//src/devices/lib/goldfish/pipe_headers",
     "//src/graphics/display/lib/driver-framework-migration-utils/logging:zxlogf",
     "//src/lib/ddk",
     "//src/lib/fxl",
-    "//zircon/system/ulib/async:async-cpp",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/fzl",
     "//zircon/system/ulib/zircon-internal",
@@ -39,13 +39,13 @@ test("pipe_io_unittest") {
   sources = [ "tests/pipe_io_test.cc" ]
   deps = [
     ":pipe_io",
+    "//sdk/lib/async-loop:async-loop-cpp",
     "//src/devices/testing/goldfish/fake_pipe",
     "//src/devices/testing/no_ddk",
     "//src/graphics/display/lib/driver-framework-migration-utils/logging:logging-dfv1",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/loop_fixture",
     "//third_party/googletest:gtest",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/sync",
     "//zircon/system/ulib/zircon-internal",
     "//zircon/system/ulib/zx",

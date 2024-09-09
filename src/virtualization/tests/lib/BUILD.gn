@@ -56,9 +56,9 @@ source_set("socket_logger") {
   ]
   public_deps = [
     ":logger",
+    "//sdk/lib/async:async-cpp",
+    "//sdk/lib/async-loop:async-loop-cpp",
     "//src/lib/fsl",
-    "//zircon/system/ulib/async:async-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/zx",
   ]
 }
@@ -105,14 +105,14 @@ source_set("fake_netstack") {
     "//sdk/fidl/fuchsia.hardware.network:fuchsia.hardware.network_hlcpp",
     "//sdk/fidl/fuchsia.net.interfaces:fuchsia.net.interfaces_hlcpp",
     "//sdk/fidl/fuchsia.net.virtualization:fuchsia.net.virtualization_hlcpp",
+    "//sdk/lib/async:async-cpp",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/sys/component/cpp/testing:cpp",
     "//sdk/lib/syslog/cpp",
     "//src/connectivity/lib/network-device/cpp",
     "//src/lib/inet",
     "//third_party/googletest:gtest",
-    "//zircon/system/ulib/async:async-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
   ]
   public_deps = [
     "//sdk/fidl/fuchsia.net:fuchsia.net_hlcpp",
@@ -201,14 +201,14 @@ source_set("lib") {
   public_deps = [
     ":fake_memory_pressure_provider",
     ":fake_netstack",
+    "//sdk/lib/async:async-cpp",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//src/ui/testing/ui_test_manager",
     "//src/virtualization/lib/grpc",
     "//src/virtualization/lib/vsh:client",
     "//src/virtualization/third_party/vm_tools:vm_cc_proto",
     "//third_party/googletest:gtest",
-    "//zircon/system/ulib/async:async-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/zx",
   ]
   data_deps = [ "//src/ui/testing/test_graphical_presenter" ]

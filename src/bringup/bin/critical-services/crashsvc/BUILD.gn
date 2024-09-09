@@ -14,13 +14,13 @@ source_set("crashsvc") {
 
   deps = [
     "//sdk/fidl/fuchsia.exception:fuchsia.exception_cpp",
+    "//sdk/lib/async",
+    "//sdk/lib/async:async-cpp",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/component/incoming/cpp",
     "//src/lib/debug:backtrace-request-utils",
     "//src/lib/fsl",
-    "//zircon/system/ulib/async",
-    "//zircon/system/ulib/async:async-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/inspector",
   ]
@@ -34,12 +34,12 @@ test("crashsvc-test") {
   deps = [
     ":crashsvc",
     "//sdk/fidl/fuchsia.exception:fuchsia.exception_cpp",
+    "//sdk/lib/async:async-cpp",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/async-loop-testing/cpp",
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/component/outgoing/cpp",
-    "//zircon/system/ulib/async:async-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/mini-process",
     "//zircon/system/ulib/zxtest",
   ]

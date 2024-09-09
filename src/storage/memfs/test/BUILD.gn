@@ -10,6 +10,8 @@ import("//src/storage/fs_test/suite.gni")
 test("memfs-test") {
   sources = [ "memfs-tests.cc" ]
   deps = [
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/fdio",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/predicates",
@@ -17,8 +19,6 @@ test("memfs-test") {
     "//src/storage/memfs:lib",
     "//third_party/googletest:gmock",
     "//third_party/googletest:gtest",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/sync",
   ]
 }
@@ -31,9 +31,9 @@ shared_library("memfs_fs_test") {
   testonly = true
   sources = [ "memfs_fs_test.cc" ]
   deps = [
+    "//sdk/lib/async-loop:async-loop-cpp",
     "//src/storage/fs_test",
     "//src/storage/memfs:lib",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
   ]
 }
 
@@ -64,17 +64,17 @@ test("memfs-legacy-test") {
   deps = [
     "//sdk/fidl/fuchsia.io:fuchsia.io_cpp",
     "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_cpp",
+    "//sdk/lib/async",
+    "//sdk/lib/async:async-cpp",
+    "//sdk/lib/async-default",
+    "//sdk/lib/async-loop",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/fdio",
     "//src/storage/lib/vfs/cpp",
     "//src/storage/memfs:cpp",
     "//src/storage/memfs:lib",
-    "//zircon/system/ulib/async",
-    "//zircon/system/ulib/async:async-cpp",
-    "//zircon/system/ulib/async-default",
-    "//zircon/system/ulib/async-loop",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/fdio-caller",
     "//zircon/system/ulib/fzl",

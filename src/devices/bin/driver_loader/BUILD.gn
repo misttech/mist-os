@@ -15,11 +15,11 @@ source_set("driver_loader") {
   ]
   public_deps = [
     "//sdk/fidl/fuchsia.driver.loader:fuchsia.driver.loader_cpp",
+    "//sdk/lib/async",
     "//sdk/lib/ld:abi-headers",
     "//sdk/lib/ld:headers",
     "//src/devices/lib/log",
     "//src/lib/elfldltl",
-    "//zircon/system/ulib/async",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/zircon-internal",
     "//zircon/system/ulib/zx",

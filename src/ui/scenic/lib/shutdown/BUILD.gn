@@ -16,5 +16,5 @@ source_set("shutdown") {
     "//src/lib/fxl",
   ]
 
-  deps = [ "//zircon/system/ulib/async:async-cpp" ]
+  deps = [ "//sdk/lib/async:async-cpp" ]
 }

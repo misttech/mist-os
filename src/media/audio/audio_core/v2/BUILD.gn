@@ -51,12 +51,12 @@ source_set("audio_core_lib") {
     "//sdk/fidl/fuchsia.media2:fuchsia.media2_cpp_hlcpp_conversion",
     "//sdk/fidl/fuchsia.scheduler:fuchsia.scheduler_hlcpp",
     "//sdk/fidl/fuchsia.ultrasound:fuchsia.ultrasound_cpp",
+    "//sdk/lib/async-loop:async-loop-cpp",
     "//sdk/lib/fit",
     "//sdk/lib/sys/cpp",
     "//sdk/lib/syslog/cpp",
     "//src/media/audio/audio_core/shared",
     "//src/media/audio/services/common",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/trace",
     "//zircon/system/ulib/trace-provider",
   ]
@@ -67,12 +67,12 @@ source_set("audio_core_main") {
 
   deps = [
     ":audio_core_lib",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/sys/cpp",
     "//sdk/lib/syslog/cpp",
     "//src/lib/fxl:fxl_cli",
     "//src/media/audio/services/common",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/trace-provider",
   ]
 }
@@ -95,6 +95,9 @@ executable("unittest_bin") {
   deps = [
     ":audio_core_lib",
     "testing",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
+    "//sdk/lib/async-testing",
     "//src/lib/fxl/test:gtest_main",
     "//src/media/audio/effects/test_effects:test_effects_v2",
     "//src/media/audio/lib/format",
@@ -103,9 +106,6 @@ executable("unittest_bin") {
     "//src/media/audio/services/common/testing",
     "//third_party/googletest:gmock",
     "//third_party/googletest:gtest",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
-    "//zircon/system/ulib/async-testing",
   ]
 }
 

@@ -45,12 +45,12 @@ source_set("common") {
 
   deps = [
     ":bt_hci_intel_bind",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/driver/compat/cpp",
     "//sdk/lib/driver/component/cpp",
     "//sdk/lib/driver/devfs/cpp:cpp",
     "//src/devices/lib/driver:driver_runtime",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/sync",
     "//zircon/system/ulib/sync:sync-cpp",

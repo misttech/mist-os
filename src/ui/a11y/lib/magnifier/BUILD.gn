@@ -14,6 +14,7 @@ source_set("magnifier") {
   ]
 
   public_deps = [
+    "//sdk/lib/async:async-cpp",
     "//sdk/lib/fidl/hlcpp",
     "//src/lib/callback",
     "//src/lib/fxl",
@@ -21,14 +22,13 @@ source_set("magnifier") {
     "//src/ui/a11y/lib/gesture_manager/arena",
     "//src/ui/a11y/lib/gesture_manager/gesture_util",
     "//third_party/glm",
-    "//zircon/system/ulib/async:async-cpp",
     "//zircon/system/ulib/zx",
   ]
 
   deps = [
+    "//sdk/lib/async-default",
     "//sdk/lib/syslog/cpp",
     "//src/ui/a11y/lib/gesture_manager:util",
-    "//zircon/system/ulib/async-default",
     "//zircon/system/ulib/fbl",
   ]
 }

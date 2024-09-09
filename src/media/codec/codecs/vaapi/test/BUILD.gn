@@ -39,10 +39,10 @@ executable("vaapi_tests") {
     ":vaapi_stubs",
     "..:codec_runner_vaapi",
     "../../test:test_codec_packets",
+    "//sdk/lib/async-loop:async-loop-cpp",
     "//src/lib/files",
     "//src/lib/fxl/test:gtest_main",
     "//third_party/googletest:gtest",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
   ]
 }
 

@@ -25,12 +25,12 @@ executable("bin") {
     "//sdk/fidl/fuchsia.ui.policy:fuchsia.ui.policy_cpp",
     "//sdk/fidl/fuchsia.ui.test.input:fuchsia.ui.test.input_cpp",
     "//sdk/fidl/fuchsia.ui.test.scene:fuchsia.ui.test.scene_cpp",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/sys/cpp",
     "//sdk/lib/syslog/cpp",
     "//src/ui/a11y/testing/fidl:test.accessibility_cpp",
     "//src/ui/testing/ui_test_realm",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
   ]
 }
 

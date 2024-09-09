@@ -30,6 +30,7 @@ executable("adb-file-sync") {
     ":adb-file-sync-config",
     "//sdk/fidl/fuchsia.hardware.adb:fuchsia.hardware.adb_cpp",
     "//sdk/fidl/fuchsia.sys2:fuchsia.sys2_cpp",
+    "//sdk/lib/async-loop:async-loop-cpp",
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/component/outgoing/cpp",
     "//sdk/lib/fdio",
@@ -37,7 +38,6 @@ executable("adb-file-sync") {
     "//sdk/lib/syslog/cpp",
     "//sdk/lib/zxio",
     "//src/developer/adb/third_party/adb-file-sync",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/zx",
   ]

@@ -73,6 +73,8 @@ source_set("lib") {
     "//sdk/fidl/fuchsia.metrics:fuchsia.metrics_hlcpp",
     "//sdk/fidl/fuchsia.process.lifecycle:fuchsia.process.lifecycle_hlcpp",
     "//sdk/fidl/fuchsia.update.channel:fuchsia.update.channel_cpp",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/inspect/component/cpp",
     "//sdk/lib/sys/cpp",
     "//sdk/lib/syslog/cpp",
@@ -96,8 +98,6 @@ source_set("lib") {
     "//third_party/cobalt/src/public/lib/statusor",
     "//third_party/cobalt/src/system_data",
     "//third_party/cobalt/src/system_data:configuration_data",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
   ]
   deps = [
     "//sdk/lib/component/incoming/cpp:cpp",

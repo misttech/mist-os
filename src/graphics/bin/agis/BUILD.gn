@@ -10,13 +10,13 @@ executable("test-bin") {
   sources = [ "test.cc" ]
   deps = [
     "//sdk/fidl/fuchsia.gpu.agis:fuchsia.gpu.agis_hlcpp",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/sys/cpp",
     "//sdk/lib/syslog/cpp",
     "//sdk/lib/zxio",
     "//sdk/lib/zxio:create_with_type",
     "//third_party/googletest:gtest",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
   ]
 }
 
@@ -25,12 +25,12 @@ executable("vtc-test-bin") {
   sources = [ "vtc_test.cc" ]
   deps = [
     "//sdk/fidl/fuchsia.gpu.agis:fuchsia.gpu.agis_hlcpp",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/sys/cpp",
     "//sdk/lib/syslog/cpp",
     "//sdk/lib/zxio",
     "//sdk/lib/zxio:create_with_type",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
   ]
 }
 
@@ -46,11 +46,11 @@ executable("agis-bin") {
   sources = [ "agis.cc" ]
   deps = [
     "//sdk/fidl/fuchsia.gpu.agis:fuchsia.gpu.agis_hlcpp",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/fidl/hlcpp",
     "//sdk/lib/sys/cpp",
     "//sdk/lib/syslog/cpp",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/fbl:fbl",
   ]
 }

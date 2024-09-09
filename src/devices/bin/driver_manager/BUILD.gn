@@ -94,6 +94,7 @@ source_set("driver_runner") {
   ]
 
   deps = [
+    "//sdk/lib/async-loop:async-loop-cpp",
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/component/outgoing/cpp",
     "//sdk/lib/driver/component/cpp:cpp",
@@ -105,7 +106,6 @@ source_set("driver_runner") {
     "//src/lib/fsl",
     "//src/lib/fxl",
     "//src/lib/zbitl",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
   ]
 
   public_deps = [
@@ -181,6 +181,7 @@ fuchsia_component("component") {
 # List of shared libraries used by drivers.
 group("driver_shared_libraries") {
   deps = [
+    "//sdk/lib/async-default",
     "//sdk/lib/fdio",
     "//sdk/lib/svc",
     "//sdk/lib/syslog/cpp:backend_fuchsia_globals",
@@ -189,7 +190,6 @@ group("driver_shared_libraries") {
     "//src/security/lib/tee/tee-client-api",
     "//third_party/boringssl:crypto-shared",
     "//third_party/boringssl:ssl-shared",
-    "//zircon/system/ulib/async-default",
     "//zircon/system/ulib/syslog",
     "//zircon/system/ulib/trace-engine",
   ]

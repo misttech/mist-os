@@ -23,11 +23,11 @@ executable("bin") {
   deps = [
     ":config",
     "//examples/fidl/new/key_value_store/support_exports/fidl:examples.keyvaluestore.supportexports_cpp",
+    "//sdk/lib/async-loop",
+    "//sdk/lib/async-loop:async-loop-cpp",
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/syslog/cpp",
     "//src/lib/files:files",
     "//src/lib/fxl",
-    "//zircon/system/ulib/async-loop",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
   ]
 }

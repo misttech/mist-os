@@ -85,6 +85,10 @@ source_set("test_sources") {
   deps = [
     ":test_util",
     ":union_migration_test_fidl_hlcpp",
+    "//sdk/lib/async:async-cpp",
+    "//sdk/lib/async-loop",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/fidl/hlcpp",
     "//sdk/lib/fit-promise",
     "//sdk/testing/fidl:collision_test_hlcpp",
@@ -93,10 +97,6 @@ source_set("test_sources") {
     "//sdk/testing/fidl:test",
     "//sdk/testing/fidl:test_support",
     "//sdk/testing/fidl/protocols_tests:test.unknown.interactions_hlcpp",
-    "//zircon/system/ulib/async:async-cpp",
-    "//zircon/system/ulib/async-loop",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/zxtest",
   ]
 
@@ -111,10 +111,10 @@ executable("fidl-hlcpp-conformance-tests_bin") {
 
   # TODO(75000): Add GIDL to the CTS archive.
   deps = gidl_deps + [
+           "//sdk/lib/async-loop:async-loop-cpp",
+           "//sdk/lib/async-loop:async-loop-default",
            "//sdk/testing/fidl:test",
            "//sdk/testing/fidl:test_support",
-           "//zircon/system/ulib/async-loop:async-loop-cpp",
-           "//zircon/system/ulib/async-loop:async-loop-default",
            "//zircon/system/ulib/zxtest",
          ]
 }
@@ -136,10 +136,10 @@ executable("fidl-hlcpp-unit-tests_bin") {
   deps = [
     ":host_test_sources",
     ":test_sources",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//sdk/testing/fidl:test",
     "//sdk/testing/fidl:test_support",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/zxtest",
   ]
 }

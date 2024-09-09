@@ -39,12 +39,12 @@ source_set("lib") {
   ]
   deps = [
     ":usb_video_bind",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/fidl/hlcpp",
     "//src/devices/lib/driver",
     "//src/lib/listnode",
     "//zircon/system/ulib/affine",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/zircon-internal",
   ]
   public_deps = [

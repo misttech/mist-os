@@ -57,9 +57,9 @@ test("sealer-test") {
   deps = [
     ":geometry",
     ":sealer",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//src/lib/digest",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/zx",
     "//zircon/system/ulib/zxtest",
@@ -83,9 +83,9 @@ test("block-verifier-test") {
   deps = [
     ":block-verifier",
     ":geometry",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//src/lib/digest",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/zx",
     "//zircon/system/ulib/zxtest",

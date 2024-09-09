@@ -52,10 +52,10 @@ test("core-unittest-bin") {
   ]
   deps = [
     ":shared",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/fdio",
     "//src/devices/testing/mock-ddk",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/fzl",
     "//zircon/system/ulib/io-scheduler",
     "//zircon/system/ulib/sync",

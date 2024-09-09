@@ -4,6 +4,10 @@
 
 group("async-testing") {
   public_deps = [ "//sdk/lib/async-testing" ]
+  visibility = [
+    "//third_party/*",
+    "//vendor/*",
+  ]
 }
 
 group("tests") {

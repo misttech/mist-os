@@ -35,12 +35,12 @@ executable("device-name-provider") {
     ":args",
     ":device_name_provider_config",
     "//sdk/fidl/fuchsia.device:fuchsia.device_cpp",
+    "//sdk/lib/async-default",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/component/outgoing/cpp",
     "//sdk/lib/fdio",
     "//src/bringup/bin/netsvc:netifc-discover",
-    "//zircon/system/ulib/async-default",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
   ]
 }
 

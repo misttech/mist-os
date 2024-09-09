@@ -46,13 +46,13 @@ source_set("codec_impl_tests") {
 
   deps = [
     "//sdk/fidl/fuchsia.sysmem2:fuchsia.sysmem2_hlcpp",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/stdcompat",
     "//src/lib/testing/loop_fixture",
     "//src/media/lib/codec_impl",
     "//src/media/lib/codec_impl/test_utils",
     "//third_party/googletest:gtest",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/zx",
   ]
 }
@@ -65,6 +65,8 @@ executable("decryptor_adapter_tests_bin") {
 
   deps = [
     "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_hlcpp",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/fit",
     "//sdk/lib/inspect/testing/cpp",
     "//sdk/lib/sys/cpp",
@@ -73,8 +75,6 @@ executable("decryptor_adapter_tests_bin") {
     "//src/lib/testing/loop_fixture:gtest",
     "//src/media/lib/codec_impl",
     "//third_party/googletest:gtest",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/zx",
   ]
 

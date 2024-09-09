@@ -10,9 +10,9 @@ executable("ptysvc") {
   sources = [ "main.cc" ]
   deps = [
     ":common",
+    "//sdk/lib/async-loop:async-loop-cpp",
     "//sdk/lib/component/outgoing/cpp",
     "//src/sys/lib/stdout-to-debuglog/cpp",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
   ]
 }
 
@@ -40,10 +40,10 @@ test("ptysvc-test") {
   deps = [
     ":common",
     "//sdk/fidl/fuchsia.io:fuchsia.io_cpp",
+    "//sdk/lib/async:async-cpp",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/fit",
-    "//zircon/system/ulib/async:async-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/sync",
     "//zircon/system/ulib/zxtest",
   ]

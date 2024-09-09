@@ -67,14 +67,14 @@ executable("driver_runner_death_test") {
     "//sdk/fidl/fuchsia.driver.framework:fuchsia.driver.framework_cpp_testing",
     "//sdk/fidl/fuchsia.driver.host:fuchsia.driver.host_cpp_testing",
     "//sdk/fidl/fuchsia.io:fuchsia.io_cpp_testing",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/inspect/testing/cpp",
     "//sdk/lib/sys/cpp/testing:unit",
     "//src/devices/bin/driver_manager:driver_runner",
     "//src/devices/bind/fuchsia.platform:fuchsia.platform_cpp",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/loop_fixture",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
   ]
 }
 
@@ -229,11 +229,11 @@ test("driver_host_runner_test") {
   ]
   deps = [
     ":driver_runner_test_fixture",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//src/devices/bin/driver_loader:driver_loader",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/loop_fixture",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
   ]
 }
 

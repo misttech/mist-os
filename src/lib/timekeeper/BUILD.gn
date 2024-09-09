@@ -35,9 +35,9 @@ source_set("testing") {
 
   public_deps = [
     ":timekeeper",
+    "//sdk/lib/async:async-cpp",
+    "//sdk/lib/async-testing",
     "//sdk/lib/fit",
-    "//zircon/system/ulib/async:async-cpp",
-    "//zircon/system/ulib/async-testing",
   ]
 }
 
@@ -53,10 +53,10 @@ executable("timekeeper_lib_unittests") {
   deps = [
     ":system",
     ":testing",
+    "//sdk/lib/async-testing",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/loop_fixture",
     "//third_party/googletest:gtest",
-    "//zircon/system/ulib/async-testing",
   ]
 }
 

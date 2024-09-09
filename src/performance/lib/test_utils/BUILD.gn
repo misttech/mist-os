@@ -13,11 +13,11 @@ source_set("test_utils") {
   ]
 
   public_deps = [
+    "//sdk/lib/async-loop:async-loop-cpp",
     "//sdk/lib/fdio",
     "//sdk/lib/sys/cpp",
     "//src/lib/fxl",
     "//src/lib/fxl:cli",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/zx",
   ]
 

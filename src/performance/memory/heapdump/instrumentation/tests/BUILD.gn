@@ -9,9 +9,9 @@ executable("bind") {
   sources = [ "bind_test.cc" ]
   deps = [
     "//sdk/fidl/fuchsia.memory.heapdump.process:fuchsia.memory.heapdump.process_cpp",
+    "//sdk/lib/async-loop:async-loop-cpp",
     "//src/lib/fxl/test:gtest_main",
     "//src/performance/memory/heapdump/instrumentation",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/zx",
   ]
 }

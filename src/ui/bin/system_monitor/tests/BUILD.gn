@@ -20,12 +20,12 @@ executable("system_monitor_integration_test_bin") {
   sources = [ "system_monitor_integration_test.cc" ]
 
   deps = [
+    "//sdk/lib/async:async",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/sys/cpp",
     "//src/lib/fxl/test:gtest_main",
     "//src/ui/bin/system_monitor:lib",
-    "//zircon/system/ulib/async:async",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
   ]
 }
 

@@ -122,6 +122,7 @@ executable("screenshot_unittest_exe") {
 
   deps = [
     "//sdk/fidl/fuchsia.images:fuchsia.images_hlcpp",
+    "//sdk/lib/async:async-cpp",
     "//src/developer/forensics/feedback_data:screenshot",
     "//src/developer/forensics/testing:gtest_with_syslog_main",
     "//src/developer/forensics/testing:unit_test_fixture",
@@ -129,7 +130,6 @@ executable("screenshot_unittest_exe") {
     "//src/lib/fxl",
     "//third_party/googletest:gmock",
     "//third_party/googletest:gtest",
-    "//zircon/system/ulib/async:async-cpp",
     "//zircon/system/ulib/zx",
   ]
 }

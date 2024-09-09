@@ -26,10 +26,10 @@ executable("hwinfo-test-bin") {
 
   deps = [
     "//sdk/fidl/fuchsia.hwinfo:fuchsia.hwinfo_hlcpp",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/sys/cpp",
     "//sdk/testing/fidl:fidl_test_hlcpp",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/zxtest",
   ]
 }

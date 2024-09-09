@@ -10,6 +10,8 @@ executable("bin") {
 
   deps = [
     "//sdk/fidl/fuchsia.media:fuchsia.media_hlcpp",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/media/audio/cpp",
     "//sdk/lib/sys/cpp",
     "//src/lib/fxl:fxl_cli",
@@ -18,8 +20,6 @@ executable("bin") {
     "//src/media/audio/lib/format",
     "//src/media/audio/lib/logging:cli",
     "//src/media/audio/lib/wav",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/fzl",
   ]
 }

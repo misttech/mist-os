@@ -43,6 +43,9 @@ source_set("codec_client") {
 
   deps = [
     "//sdk/fidl/fuchsia.mediacodec:fuchsia.mediacodec_hlcpp",
+    "//sdk/lib/async:async-cpp",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/syslog/cpp",
     "//src/devices/bind/fuchsia.amlogic.platform.sysmem.heap:fuchsia.amlogic.platform.sysmem.heap_cpp",
     "//src/devices/bind/fuchsia.sysmem.heap:fuchsia.sysmem.heap_cpp",
@@ -50,9 +53,6 @@ source_set("codec_client") {
     "//src/lib/fxl",
     "//src/media/lib/test:codec_buffer",
     "//src/media/lib/test:one_shot_event",
-    "//zircon/system/ulib/async:async-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
   ]
 }
 

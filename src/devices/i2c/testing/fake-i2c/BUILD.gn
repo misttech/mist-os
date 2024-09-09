@@ -9,5 +9,5 @@ zx_library("fake-i2c") {
   sdk_headers = [ "lib/fake-i2c/fake-i2c.h" ]
   testonly = true
   sources = []
-  public_deps = [ "//zircon/system/ulib/async-default:async-default" ]
+  public_deps = [ "//sdk/lib/async-default:async-default" ]
 }

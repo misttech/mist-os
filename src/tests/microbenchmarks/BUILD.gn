@@ -99,13 +99,13 @@ fuchsia_microbenchmark_deps = [
 if (is_fuchsia) {
   fuchsia_microbenchmark_deps += [
     ":fuchsia.zircon.benchmarks_hlcpp",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/fdio",
     "//sdk/lib/scheduler/cpp",
     "//src/lib/fsl",
     "//src/storage/lib/vfs/cpp",
     "//src/zircon/lib/zircon",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/inspect",
     "//zircon/system/ulib/trace",
     "//zircon/system/ulib/zx",
@@ -179,14 +179,14 @@ if (is_fuchsia) {
     ]
     deps = [
       ":fuchsia.zircon.benchmarks_hlcpp",
+      "//sdk/lib/async-loop:async-loop-cpp",
+      "//sdk/lib/async-loop:async-loop-default",
       "//sdk/lib/fdio",
       "//sdk/lib/scheduler/cpp",
       "//sdk/lib/syslog/cpp",
       "//src/lib/fxl",
       "//src/storage/lib/vfs/cpp",
       "//src/zircon/lib/zircon",
-      "//zircon/system/ulib/async-loop:async-loop-cpp",
-      "//zircon/system/ulib/async-loop:async-loop-default",
       "//zircon/system/ulib/inspect",
       "//zircon/system/ulib/perftest",
       "//zircon/system/ulib/zx",

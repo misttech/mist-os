@@ -123,11 +123,11 @@ test("virtio-block-test-bin") {
   sources = [ "block_test.cc" ]
   deps = [
     ":block_lib",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//src/devices/bus/lib/virtio",
     "//src/devices/testing/fake-bti",
     "//src/devices/testing/mock-ddk",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/zxtest",
   ]
 }
@@ -143,11 +143,11 @@ test("virtio-scsi-test-bin") {
   sources = [ "scsi_test.cc" ]
   deps = [
     ":scsi_lib",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//src/devices/bus/lib/virtio",
     "//src/devices/testing/fake-bti",
     "//src/devices/testing/mock-ddk",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/zxtest",
   ]
 }

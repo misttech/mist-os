@@ -63,8 +63,8 @@ source_set("log_sink") {
   deps = [
     ":pw_log",
     "//sdk/fidl/fuchsia.logger:fuchsia.logger_cpp",
+    "//sdk/lib/async:async-cpp",
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/syslog/structured_backend",
-    "//zircon/system/ulib/async:async-cpp",
   ]
 }

@@ -126,6 +126,7 @@ if (platform_enable_user_pci) {
       "//sdk/banjo/fuchsia.hardware.pciroot:fuchsia.hardware.pciroot_banjo_cpp",
       "//sdk/fidl/fuchsia.hardware.pci:fuchsia.hardware.pci_bindlib_cpp",
       "//sdk/fidl/fuchsia.hardware.pci:fuchsia.hardware.pci_cpp",
+      "//sdk/lib/async-loop:async-loop-cpp",
       "//sdk/lib/component/outgoing/cpp",
       "//sdk/lib/driver/runtime:driver_runtime_cpp",
       "//sdk/lib/fidl",
@@ -138,7 +139,6 @@ if (platform_enable_user_pci) {
       "//src/devices/pci/lib/pci",
       "//src/lib/ddk",
       "//src/lib/ddktl",
-      "//zircon/system/ulib/async-loop:async-loop-cpp",
       "//zircon/system/ulib/pretty",
     ]
 

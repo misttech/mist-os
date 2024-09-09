@@ -18,11 +18,11 @@ source_set("testing") {
   ]
 
   public_deps = [
+    "//sdk/lib/async-testing",
     "//sdk/lib/fidl/cpp",
     "//sdk/lib/fidl/cpp/wire",
     "//sdk/lib/syslog/cpp",
     "//src/media/audio/services/common",
-    "//zircon/system/ulib/async-testing",
     "//zircon/system/ulib/zx",
   ]
 }

@@ -65,10 +65,10 @@ test("chromeos-acpi-tests-bin") {
     "unit-tests.cc",
   ]
   deps = common_deps + [
+           "//sdk/lib/async-loop:async-loop-cpp",
            "//sdk/lib/inspect/testing/cpp:zxtest",
            "//src/devices/lib/acpi/mock:mock-acpi",
            "//src/devices/testing/mock-ddk",
-           "//zircon/system/ulib/async-loop:async-loop-cpp",
            "//zircon/system/ulib/zxtest",
          ]
 }

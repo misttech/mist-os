@@ -35,13 +35,13 @@ test("components_test") {
   ]
   public_deps = [
     ":support",
+    "//sdk/lib/async:async-cpp",
     "//sdk/lib/driver/testing/cpp",
     "//sdk/lib/driver/testing/cpp:minimal_compat_environment",
     "//src/connectivity/wlan/drivers/lib/components:cpp",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/predicates",
     "//third_party/googletest:gmock",
-    "//zircon/system/ulib/async:async-cpp",
   ]
 }
 

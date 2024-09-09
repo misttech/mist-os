@@ -91,14 +91,14 @@ cc_test_executable("imx227_unittest_bin") {
     "//sdk/banjo/fuchsia.hardware.mipicsi:fuchsia.hardware.mipicsi_banjo_cpp_mock",
     "//sdk/fidl/fuchsia.hardware.clock:fuchsia.hardware.clock_cpp_testing",
     "//sdk/fidl/fuchsia.hardware.i2c:fuchsia.hardware.i2c_cpp",
+    "//sdk/lib/async:async-cpp",
+    "//sdk/lib/async-default",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/async_patterns/testing/cpp",
     "//src/devices/gpio/testing/fake-gpio",
     "//src/devices/i2c/testing/mock-i2c",
     "//src/devices/testing/mock-ddk",
-    "//zircon/system/ulib/async:async-cpp",
-    "//zircon/system/ulib/async-default",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/zxtest",
   ]
 }

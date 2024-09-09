@@ -42,11 +42,11 @@ source_set("reporter") {
   ]
 
   deps = [
+    "//sdk/lib/async:async-cpp",
     "//sdk/lib/syslog/cpp",
     "//src/lib/files",
     "//src/lib/fsl",
     "//src/lib/fxl",
-    "//zircon/system/ulib/async:async-cpp",
     "//zircon/system/ulib/zx",
   ]
 }

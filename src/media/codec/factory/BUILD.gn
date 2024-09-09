@@ -31,6 +31,8 @@ source_set("factory_source") {
     "//sdk/fidl/fuchsia.metrics:fuchsia.metrics_hlcpp",
     "//sdk/fidl/fuchsia.sys2:fuchsia.sys2_hlcpp",
     "//sdk/fidl/fuchsia.sysinfo:fuchsia.sysinfo_hlcpp",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/inspect/component/cpp",
     "//sdk/lib/svc",
     "//sdk/lib/sys/cpp",
@@ -38,8 +40,6 @@ source_set("factory_source") {
     "//sdk/lib/syslog/cpp",
     "//src/lib/fsl",
     "//src/lib/fxl",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/trace-provider",
   ]
 
@@ -133,13 +133,13 @@ executable("codec_factory_integration_test_exe") {
     "//sdk/fidl/fuchsia.gpu.magma:fuchsia.gpu.magma_hlcpp",
     "//sdk/fidl/fuchsia.mediacodec:fuchsia.mediacodec_hlcpp",
     "//sdk/fidl/fuchsia.sysinfo:fuchsia.sysinfo_hlcpp",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/sys/component/cpp/testing:cpp",
     "//sdk/lib/vfs/cpp",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/loop_fixture",
     "//src/storage/lib/vfs/cpp",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
   ]
 }
 
@@ -153,11 +153,11 @@ executable("fake_codec_factory_bin") {
     "//sdk/fidl/fuchsia.gpu.magma:fuchsia.gpu.magma_hlcpp",
     "//sdk/fidl/fuchsia.media:fuchsia.media_hlcpp",
     "//sdk/fidl/fuchsia.mediacodec:fuchsia.mediacodec_hlcpp",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/sys/cpp",
     "//sdk/lib/syslog/cpp",
     "//src/lib/fxl:fxl_cli",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
   ]
 }
 

@@ -21,9 +21,9 @@ sdk_static_library("fsl") {
   ]
 
   runtime_deps = [
+    "//sdk/lib/async-default:async-default_sdk",
     "//sdk/lib/fdio:fdio_sdk",
     "//sdk/lib/syslog/cpp:backend_fuchsia_globals_sdk",
-    "//zircon/system/ulib/async-default:async-default_sdk",
   ]
 }
 

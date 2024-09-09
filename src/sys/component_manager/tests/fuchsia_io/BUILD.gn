@@ -10,7 +10,7 @@ test("bin") {
   output_name = "cm_fuchsia_io"
   sources = [ "test.cc" ]
   deps = [
-    "//zircon/system/ulib/async-default",
+    "//sdk/lib/async-default",
     "//zircon/system/ulib/zxtest",
   ]
 }

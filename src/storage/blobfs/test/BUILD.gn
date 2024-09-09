@@ -56,12 +56,12 @@ source_set("test_utils") {
     "//zircon/third_party/ulib/safemath",
   ]
   public_deps = [
+    "//sdk/lib/async-loop",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//src/storage/blobfs",
     "//src/storage/blobfs:decompressor_impl",
     "//src/storage/lib/block_client/cpp:fake_device",
-    "//zircon/system/ulib/async-loop",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/id_allocator",
   ]
 }
@@ -99,6 +99,7 @@ test("blobfs_unittest") {
   ]
   deps = [
     ":test_utils",
+    "//sdk/lib/async-loop:async-loop-cpp",
     "//sdk/lib/inspect/component/cpp",
     "//src/lib/chunked-compression",
     "//src/lib/fxl/test:gtest_main",
@@ -111,7 +112,6 @@ test("blobfs_unittest") {
     "//src/storage/lib/fs_management",
     "//third_party/googletest:gmock",
     "//third_party/googletest:gtest",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/storage/buffer",
     "//zircon/system/ulib/storage/operation",
     "//zircon/system/ulib/sync",
@@ -159,10 +159,10 @@ fuchsia_library_fuzzer("blob-fuzzer") {
   sources = [ "unit/blob_fuzzer.cc" ]
   deps = [
     ":test_utils",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//src/storage/blobfs",
     "//src/storage/lib/block_client/cpp:fake_device",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
   ]
 }
 

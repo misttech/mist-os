@@ -59,15 +59,15 @@ source_set("common") {
   public_deps = [
     "../fidl:fuchsia.fuzzer_hlcpp",
     "//sdk/fidl/fuchsia.mem:fuchsia.mem_hlcpp",
+    "//sdk/lib/async:async-cpp",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/sys/cpp",
     "//sdk/lib/syslog/cpp",
     "//src/lib/debug:backtrace-request",
     "//src/lib/fxl",
     "//src/lib/pkg_url",
     "//third_party/re2",
-    "//zircon/system/ulib/async:async-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/sync",
     "//zircon/system/ulib/zx",
   ]

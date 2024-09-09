@@ -39,11 +39,11 @@ source_set("command_buffer_helper_cpp") {
 
   public_deps = [
     ":platform_msd_device_helper",
+    "//sdk/lib/async:async-cpp",
+    "//sdk/lib/async-loop:async-loop-cpp",
     "//src/graphics/magma/lib/magma/platform:device",
     "//src/graphics/magma/lib/magma/platform:semaphore",
     "//src/graphics/magma/lib/magma_service/sys_driver",
-    "//zircon/system/ulib/async:async-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
   ]
 
   sources = [ "command_buffer_helper_cpp.h" ]

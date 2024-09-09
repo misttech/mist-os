@@ -434,13 +434,13 @@ template("escher_library") {
       public_deps += [
         "//sdk/fidl/fuchsia.images:fuchsia.images_hlcpp",
         "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_hlcpp",
+        "//sdk/lib/async-loop:async-loop-cpp",
+        "//sdk/lib/async-loop:async-loop-default",
         "//sdk/lib/fidl/hlcpp",
         "//sdk/lib/fit",
         "//sdk/lib/syslog/cpp",
         "//sdk/lib/vfs/cpp",
         "//zircon/system/public",
-        "//zircon/system/ulib/async-loop:async-loop-cpp",
-        "//zircon/system/ulib/async-loop:async-loop-default",
         "//zircon/system/ulib/trace-vthread",
       ]
       deps += [ "//zircon/system/ulib/trace" ]

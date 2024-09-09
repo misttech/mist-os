@@ -242,11 +242,11 @@ device_test("virtio_net_device_tests") {
     "//sdk/fidl/fuchsia.net.virtualization:fuchsia.net.virtualization_hlcpp",
     "//sdk/fidl/fuchsia.scheduler:fuchsia.scheduler_hlcpp",
     "//sdk/fidl/fuchsia.tracing.provider:fuchsia.tracing.provider_hlcpp",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/fit-promise",
     "//sdk/lib/sys/component/cpp/testing:cpp",
     "//src/connectivity/lib/network-device/cpp",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/trace-provider",
     "//zircon/system/ulib/virtio",
   ]

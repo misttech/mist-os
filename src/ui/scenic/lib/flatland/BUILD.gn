@@ -44,6 +44,7 @@ source_set("flatland") {
 
     # TODO(https://fxbug.dev/42134663): this dependency should be broken down into smaller libraries,
     # since it is currently only used for escher::FenceQueue.
+    "//sdk/lib/async-default",
     "//sdk/lib/fit",
     "//src/ui/lib/escher",
     "//src/ui/scenic/lib/display",
@@ -51,7 +52,6 @@ source_set("flatland") {
     "//src/ui/scenic/lib/utils",
     "//src/ui/scenic/lib/view_tree:view_tree_snapshot",
     "//third_party/glm",
-    "//zircon/system/ulib/async-default",
     "//zircon/system/ulib/zircon-internal",
   ]
 

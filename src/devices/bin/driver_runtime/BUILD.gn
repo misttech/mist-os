@@ -38,8 +38,8 @@ source_set("driver_runtime_impl") {
   ]
   public_configs = [ ":include" ]
   public_deps = [
+    "//sdk/lib/async-loop:async-loop-cpp",
     "//sdk/lib/driver/runtime:driver_runtime",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
   ]
   deps = [
     "//sdk/fidl/fuchsia.scheduler:fuchsia.scheduler_cpp",
@@ -83,6 +83,8 @@ test("driver_runtime_test") {
   ]
   deps = [
     ":driver_runtime_impl",
+    "//sdk/lib/async:async-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/driver/component/cpp",
     "//sdk/lib/driver/runtime:driver_runtime",
     "//sdk/lib/driver/runtime:driver_runtime_cpp",
@@ -93,8 +95,6 @@ test("driver_runtime_test") {
     "//sdk/lib/driver/testing/cpp:cpp",
     "//sdk/lib/fidl/cpp/wire",
     "//sdk/lib/fidl_driver:fidl_driver_transport",
-    "//zircon/system/ulib/async:async-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/sync",
     "//zircon/system/ulib/sync:sync-cpp",
     "//zircon/system/ulib/zx",
@@ -106,12 +106,12 @@ test("driver_runtime_scheduler_role_test") {
   sources = [ "scheduler_role_test.cc" ]
   deps = [
     ":driver_runtime_impl",
+    "//sdk/lib/async:async-cpp",
     "//sdk/lib/driver/runtime:driver_runtime",
     "//sdk/lib/driver/runtime:driver_runtime_cpp",
     "//sdk/lib/driver/runtime:driver_runtime_env_cpp",
     "//sdk/lib/driver/runtime:driver_runtime_testing",
     "//sdk/lib/driver/testing/cpp:cpp",
-    "//zircon/system/ulib/async:async-cpp",
     "//zircon/system/ulib/sync",
     "//zircon/system/ulib/sync:sync-cpp",
     "//zircon/system/ulib/zx",

@@ -45,6 +45,8 @@ fuchsia_driver("virtual_audio_driver-driver") {
     ":virtual_audio_bind",
     "//sdk/fidl/fuchsia.hardware.audio:fuchsia.hardware.audio_cpp",
     "//sdk/fidl/fuchsia.virtualaudio:fuchsia.virtualaudio_cpp",
+    "//sdk/lib/async:async-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/driver/runtime:driver_runtime_cpp",
     "//src/devices/lib/driver",
     "//src/devices/lib/driver:driver_runtime",
@@ -54,8 +56,6 @@ fuchsia_driver("virtual_audio_driver-driver") {
     "//src/media/audio/drivers/lib/audio-proto-utils",
     "//src/media/audio/lib/simple-audio-stream",
     "//zircon/system/ulib/affine",
-    "//zircon/system/ulib/async:async-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/fzl",
   ]
 }

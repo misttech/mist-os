@@ -11,12 +11,12 @@ test("branch-bin") {
     "//examples/components/services/fidl:fuchsia.examples.services_hlcpp",
     "//sdk/fidl/fuchsia.component:fuchsia.component_hlcpp",
     "//sdk/fidl/fuchsia.component.decl:fuchsia.component.decl_hlcpp",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/sys/cpp",
     "//sdk/lib/syslog/cpp",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/loop_fixture:gtest",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
   ]
   sources = [ "branch.cc" ]
 }
@@ -25,10 +25,10 @@ executable("provider-bin") {
   output_name = "provider_bin_cpp"
   deps = [
     "//examples/components/services/fidl:fuchsia.examples.services_cpp",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/component/outgoing/cpp",
     "//sdk/lib/syslog/cpp",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
   ]
   sources = [ "provider.cc" ]
 }

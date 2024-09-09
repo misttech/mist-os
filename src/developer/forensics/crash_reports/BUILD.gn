@@ -72,6 +72,8 @@ source_set("crash_reporter") {
     ":reporting_policy_watcher",
     ":snapshot_collector",
     "//sdk/fidl/fuchsia.feedback:fuchsia.feedback_hlcpp",
+    "//sdk/lib/async",
+    "//sdk/lib/async:async-cpp",
     "//sdk/lib/fit-promise",
     "//sdk/lib/sys/cpp",
     "//src/developer/forensics/crash_reports/info",
@@ -81,8 +83,6 @@ source_set("crash_reporter") {
     "//src/developer/forensics/utils:utc_clock_ready_watcher",
     "//src/developer/forensics/utils:utc_time_provider",
     "//src/lib/timekeeper",
-    "//zircon/system/ulib/async",
-    "//zircon/system/ulib/async:async-cpp",
   ]
 
   deps = [
@@ -184,17 +184,17 @@ source_set("queue") {
     ":report_id",
     ":reporting_policy_watcher",
     ":store",
+    "//sdk/lib/async",
     "//src/developer/forensics/crash_reports/info",
     "//src/lib/backoff",
     "//src/lib/fxl",
-    "//zircon/system/ulib/async",
   ]
 
   deps = [
     ":constants",
     ":report",
+    "//sdk/lib/async:async-cpp",
     "//sdk/lib/syslog/cpp",
-    "//zircon/system/ulib/async:async-cpp",
   ]
 }
 
@@ -222,10 +222,10 @@ source_set("reporting_policy_watcher") {
 
   public_deps = [
     "//sdk/fidl/fuchsia.settings:fuchsia.settings_hlcpp",
+    "//sdk/lib/async",
     "//sdk/lib/fit",
     "//sdk/lib/sys/cpp",
     "//src/lib/backoff",
-    "//zircon/system/ulib/async",
     "//zircon/system/ulib/zx",
   ]
 
@@ -311,12 +311,12 @@ source_set("snapshot_collector") {
     ":constants",
     ":queue",
     ":store",
+    "//sdk/lib/async",
     "//sdk/lib/fit-promise",
     "//sdk/lib/sys/cpp",
     "//src/developer/forensics/feedback_data:data_provider",
     "//src/developer/forensics/utils:storage_size",
     "//src/lib/timekeeper",
-    "//zircon/system/ulib/async",
     "//zircon/system/ulib/zx",
   ]
 

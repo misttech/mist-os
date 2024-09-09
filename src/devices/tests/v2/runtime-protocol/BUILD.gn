@@ -71,11 +71,11 @@ fuchsia_driver("leaf-driver") {
     ":fuchsia.runtime.test_cpp",
     ":runtime-protocol-leaf-bind",
     "//sdk/fidl/fuchsia.driver.framework:fuchsia.driver.framework_cpp",
+    "//sdk/lib/async:async-cpp",
     "//sdk/lib/driver/component/cpp:cpp",
     "//sdk/lib/driver/runtime:driver_runtime",
     "//sdk/lib/driver/runtime:driver_runtime_cpp",
     "//src/devices/lib/driver:driver_runtime",
-    "//zircon/system/ulib/async:async-cpp",
   ]
 }
 

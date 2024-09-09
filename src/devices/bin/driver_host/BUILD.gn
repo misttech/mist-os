@@ -36,10 +36,10 @@ source_set("driver") {
 
   public_deps = [
     "//sdk/fidl/fuchsia.driver.host:fuchsia.driver.host_cpp",
+    "//sdk/lib/async:async-cpp",
     "//sdk/lib/async_patterns/cpp",
     "//sdk/lib/driver/component/cpp:cpp",
     "//sdk/lib/driver/runtime:driver_runtime_cpp",
-    "//zircon/system/ulib/async:async-cpp",
   ]
 }
 
@@ -54,6 +54,7 @@ source_set("lib") {
     "//sdk/fidl/fuchsia.device.manager:fuchsia.device.manager_cpp",
     "//sdk/fidl/fuchsia.driver.host:fuchsia.driver.host_cpp",
     "//sdk/fidl/fuchsia.io:fuchsia.io_cpp",
+    "//sdk/lib/async-loop:async-loop-cpp",
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/component/outgoing/cpp",
     "//sdk/lib/driver/component/cpp:cpp",
@@ -62,7 +63,6 @@ source_set("lib") {
     "//sdk/lib/syslog/cpp",
     "//src/devices/lib/driver:driver_runtime",
     "//src/storage/lib/vfs/cpp",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/inspect",
     "//zircon/system/ulib/zx",
   ]
@@ -122,14 +122,14 @@ executable("unittests") {
     ":fuchsia.driverhost.test_cpp",
     ":lib",
     "//sdk/fidl/fuchsia.io:fuchsia.io_hlcpp",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/driver/runtime:driver_runtime_env_cpp",
     "//sdk/lib/driver/runtime:driver_runtime_internal",
     "//sdk/lib/inspect/testing/cpp",
     "//src/devices/lib/driver:driver_runtime",
     "//src/lib/fxl/test:gtest_main",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
   ]
 
   # TODO(https://fxbug.dev/42176699): This target uses mutable tables which are deprecated,
@@ -159,6 +159,7 @@ executable("bin") {
   deps = [
     ":lib",
     "//sdk/fidl/fuchsia.inspect:fuchsia.inspect_cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/component/outgoing/cpp",
     "//sdk/lib/driver/runtime:driver_runtime_env",
     "//sdk/lib/inspect/component/cpp",
@@ -166,7 +167,6 @@ executable("bin") {
     "//sdk/lib/vfs/cpp",
     "//src/devices/lib/log",
     "//src/sys/lib/stdout-to-debuglog/cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/trace-provider",
   ]
 }

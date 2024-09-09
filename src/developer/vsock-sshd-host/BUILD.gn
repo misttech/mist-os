@@ -27,8 +27,8 @@ source_set("service") {
   public_deps = [
     "//sdk/fidl/fuchsia.component:fuchsia.component_cpp",
     "//sdk/fidl/fuchsia.vsock:fuchsia.vsock_cpp",
+    "//sdk/lib/async",
     "//sdk/lib/component/incoming/cpp",
-    "//zircon/system/ulib/async",
   ]
 }
 
@@ -55,10 +55,10 @@ executable("bin") {
   deps = [
     ":data_dir",
     ":service",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/syslog/cpp",
     "//src/storage/lib/vfs/cpp",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
   ]
 }
 
@@ -110,12 +110,12 @@ executable("test") {
   deps = [
     ":service",
     "//sdk/fidl/fuchsia.boot:fuchsia.boot_cpp",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/sys/cpp",
     "//sdk/lib/sys/cpp/testing:unit",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/loop_fixture",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/zx",
   ]
 }

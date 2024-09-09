@@ -11,6 +11,8 @@ source_set("lib") {
   ]
 
   public_deps = [
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/fidl/hlcpp",
     "//sdk/lib/sys/cpp",
     "//sdk/lib/syslog/cpp",
@@ -18,8 +20,6 @@ source_set("lib") {
     "//src/camera/bin/camera-gym/fidl:controller_hlcpp",
     "//src/lib/fxl:fxl_cli",
     "//third_party/re2",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
   ]
 }
 
@@ -30,10 +30,10 @@ executable("bin") {
 
   deps = [
     ":lib",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/sys/cpp",
     "//src/camera/bin/camera-gym/controller_parser:lib",
     "//src/lib/fxl:fxl_cli",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
   ]
 }

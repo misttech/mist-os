@@ -20,8 +20,8 @@ test("mock-registers-test") {
   sources = [ "mock-registers-test.cc" ]
   deps = [
     ":mock-registers",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//zircon/system/ulib/zx",
     "//zircon/system/ulib/zxtest",
   ]

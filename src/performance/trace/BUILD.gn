@@ -34,6 +34,8 @@ source_set("trace_app") {
 
   public_deps = [
     "//sdk/fidl/fuchsia.tracing.controller:fuchsia.tracing.controller_cpp",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/fdio",
     "//sdk/lib/fit",
@@ -42,8 +44,6 @@ source_set("trace_app") {
     "//src/lib/fxl:fxl_cli",
     "//src/performance/lib/trace_converters:chromium",
     "//third_party/zlib:zfstream",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/trace-reader",
   ]
 

@@ -58,6 +58,9 @@ executable("bin") {
     ":lib",
     "//sdk/fidl/fuchsia.device:fuchsia.device_cpp",
     "//sdk/fidl/fuchsia.virtualconsole:fuchsia.virtualconsole_cpp",
+    "//sdk/lib/async:async-cpp",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/device-watcher/cpp",
     "//sdk/lib/fdio",
@@ -66,9 +69,6 @@ executable("bin") {
     "//src/lib/loader_service",
     "//src/storage/lib/vfs/cpp",
     "//src/sys/lib/stdout-to-debuglog/cpp",
-    "//zircon/system/ulib/async:async-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/fdio-caller",
     "//zircon/system/ulib/sync:sync-cpp",
     "//zircon/system/ulib/zx",
@@ -105,8 +105,8 @@ cc_test_executable("unittests") {
 
   deps = [
     ":lib",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//zircon/system/ulib/mock-boot-arguments",
     "//zircon/system/ulib/zxtest",
   ]

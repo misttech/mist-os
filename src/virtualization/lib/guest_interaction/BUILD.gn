@@ -76,9 +76,9 @@ source_set("operation_test_lib") {
   testonly = true
   sources = [ "test/operation_test_lib.h" ]
   deps = [
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//src/lib/fxl/test:gtest_main",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
   ]
   public_deps = [
     ":proto",
@@ -121,12 +121,12 @@ executable("client_operation_test") {
     ":client_lib",
     ":fuchsia.virtualization.guest.interaction_hlcpp",
     ":operation_test_lib",
+    "//sdk/lib/async-loop:async-loop-cpp",
     "//sdk/lib/sys/cpp",
     "//src/lib/fxl",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/predicates",
     "//src/virtualization/lib/grpc",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
   ]
 }
 
@@ -137,11 +137,11 @@ executable("server_operation_test") {
     ":operation_test_lib",
     ":proto",
     ":server_lib",
+    "//sdk/lib/async-loop:async-loop-cpp",
     "//sdk/lib/sys/cpp",
     "//sdk/lib/syslog/cpp",
     "//src/lib/fxl/test:gtest_main",
     "//third_party/grpc:grpc++",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
   ]
 }
 

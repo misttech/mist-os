@@ -9,14 +9,14 @@ executable("fidl_bridge_test_bin") {
   sources = [ "fidl_bridge_test.cc" ]
   deps = [
     "./fidl:test.wlan.fidlbridge_cpp",
+    "//sdk/lib/async",
+    "//sdk/lib/async-loop:async-loop-cpp",
     "//sdk/lib/driver/runtime:driver_runtime_cpp",
     "//sdk/lib/driver/runtime:driver_runtime_env_cpp",
     "//sdk/lib/driver/testing/cpp:scoped_global_logger",
     "//src/connectivity/wlan/drivers/lib/fidl-bridge/cpp:dfv2",
     "//src/devices/testing/driver-runtime-main:gtest",
     "//third_party/googletest:gtest",
-    "//zircon/system/ulib/async",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/sync:sync-cpp",
   ]
 }

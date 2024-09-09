@@ -29,6 +29,8 @@ executable("screen_reader_tests") {
   ]
 
   deps = [
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/sys/cpp",
     "//sdk/lib/sys/cpp/testing:unit",
     "//src/lib/fxl/test:gtest_main",
@@ -59,8 +61,6 @@ executable("screen_reader_tests") {
     "//src/ui/a11y/lib/view/tests/mocks",
     "//third_party/glm",
     "//third_party/googletest:gmock",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
   ]
 
   # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings

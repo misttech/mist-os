@@ -109,12 +109,12 @@ source_set("src") {
     "//sdk/fidl/fuchsia.hardware.gpu.mali:fuchsia.hardware.gpu.mali_cpp",
     "//sdk/fidl/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_cpp",
     "//sdk/fidl/fuchsia.power.broker:fuchsia.power.broker_cpp",
+    "//sdk/lib/async-loop:async-loop-cpp",
     "//sdk/lib/driver/incoming/cpp",
     "//src/graphics/magma:msd",
     "//src/graphics/magma/lib/magma/platform:interrupt_header",
     "//src/graphics/magma/lib/magma/platform:mmio_header",
     "//src/graphics/magma/lib/magma/util:short_macros",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/hwreg",
     "//zircon/system/ulib/inspect",
   ]

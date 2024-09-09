@@ -17,15 +17,15 @@ source_set("callback") {
   ]
 
   public_deps = [
+    "//sdk/lib/async-default",
     "//sdk/lib/fit",
     "//sdk/lib/syslog/cpp",
     "//src/lib/fxl",
-    "//zircon/system/ulib/async-default",
     "//zircon/system/ulib/trace",
     "//zircon/system/ulib/zx",
   ]
 
-  deps = [ "//zircon/system/ulib/async:async-cpp" ]
+  deps = [ "//sdk/lib/async:async-cpp" ]
 }
 
 executable("callback_unittests") {
@@ -41,11 +41,11 @@ executable("callback_unittests") {
 
   deps = [
     ":callback",
+    "//sdk/lib/async-testing",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/loop_fixture",
     "//third_party/googletest:gmock",
     "//third_party/googletest:gtest",
-    "//zircon/system/ulib/async-testing",
   ]
 }
 

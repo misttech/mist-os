@@ -75,14 +75,14 @@ source_set("file_reader") {
 
   public_deps = [
     "//sdk/fidl/fuchsia.hardware.sensors:fuchsia.hardware.sensors_cpp",
+    "//sdk/lib/async:async-cpp",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/fdio",
     "//sdk/lib/fit",
     "//sdk/lib/fit-promise",
     "//sdk/lib/syslog/cpp",
     "//src/camera/lib/actor:actor_base",
-    "//zircon/system/ulib/async:async-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/zx",
   ]
 }
@@ -100,13 +100,13 @@ source_set("playback_controller") {
 
   public_deps = [
     "//sdk/fidl/fuchsia.hardware.sensors:fuchsia.hardware.sensors_cpp",
+    "//sdk/lib/async:async-cpp",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/fit",
     "//sdk/lib/fit-promise",
     "//sdk/lib/syslog/cpp",
     "//src/camera/lib/actor:actor_base",
-    "//zircon/system/ulib/async:async-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/zx",
   ]
 }
@@ -121,13 +121,13 @@ source_set("driver_impl") {
 
   public_deps = [
     "//sdk/fidl/fuchsia.hardware.sensors:fuchsia.hardware.sensors_cpp",
+    "//sdk/lib/async:async-cpp",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/fit",
     "//sdk/lib/fit-promise",
     "//sdk/lib/syslog/cpp",
     "//src/camera/lib/actor:actor_base",
-    "//zircon/system/ulib/async:async-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/zx",
   ]
 }
@@ -142,13 +142,13 @@ source_set("playback_impl") {
 
   public_deps = [
     "//sdk/fidl/fuchsia.hardware.sensors:fuchsia.hardware.sensors_cpp",
+    "//sdk/lib/async:async-cpp",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/fit",
     "//sdk/lib/fit-promise",
     "//sdk/lib/syslog/cpp",
     "//src/camera/lib/actor:actor_base",
-    "//zircon/system/ulib/async:async-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/zx",
   ]
 }
@@ -160,11 +160,11 @@ executable("sensors_playback_bin") {
     ":driver_impl",
     ":playback_controller",
     ":playback_impl",
+    "//sdk/lib/async:async-cpp",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/component/outgoing/cpp",
     "//sdk/lib/syslog/cpp",
-    "//zircon/system/ulib/async:async-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
   ]
 }
 
@@ -200,6 +200,8 @@ executable("playback_integration_test_bin") {
     "//sdk/fidl/fuchsia.component:fuchsia.component_cpp",
     "//sdk/fidl/fuchsia.component.sandbox:fuchsia.component.sandbox_cpp",
     "//sdk/fidl/fuchsia.hardware.sensors:fuchsia.hardware.sensors_cpp",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/sys/cpp",
     "//sdk/lib/sys/cpp/testing:unit",
@@ -207,8 +209,6 @@ executable("playback_integration_test_bin") {
     "//src/lib/fxl/test:gtest_main",
     "//src/sensors/playback/realm_factory/fidl:fuchsia.hardware.sensors.realm_cpp",
     "//third_party/googletest:gtest",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/zx",
   ]
 }

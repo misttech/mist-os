@@ -28,13 +28,13 @@ template("weavestack_lib") {
       "//sdk/fidl/fuchsia.lowpan.device:fuchsia.lowpan.device_hlcpp",
       "//sdk/fidl/fuchsia.net.interfaces:fuchsia.net.interfaces_hlcpp",
       "//sdk/fidl/fuchsia.weave:fuchsia.weave_hlcpp",
+      "//sdk/lib/async-loop:async-loop-cpp",
+      "//sdk/lib/async-loop:async-loop-default",
       "//sdk/lib/sys/cpp",
       "//sdk/lib/syslog/cpp",
       "//src/connectivity/weave/lib/core",
       "//src/lib/files",
       "//src/lib/fsl",
-      "//zircon/system/ulib/async-loop:async-loop-cpp",
-      "//zircon/system/ulib/async-loop:async-loop-default",
       "//zircon/system/ulib/zx",
     ]
 

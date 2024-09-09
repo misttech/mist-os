@@ -10,9 +10,9 @@ executable("tracee_bin") {
   testonly = true
   sources = [ "tracee.cc" ]
   deps = [
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/syslog/cpp:cpp",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/trace",
     "//zircon/system/ulib/trace-provider",
   ]
@@ -30,11 +30,11 @@ executable("trace_system_benchmarks_bin") {
   sources = [ "streaming_throughput.cc" ]
   deps = [
     "//sdk/fidl/fuchsia.tracing.controller:fuchsia.tracing.controller_cpp",
+    "//sdk/lib/async:async-cpp",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/syslog/cpp:cpp",
-    "//zircon/system/ulib/async:async-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/perftest",
     "//zircon/system/ulib/trace",
     "//zircon/system/ulib/zx",
@@ -47,11 +47,11 @@ executable("trace_system_benchmarks_many_providers_bin") {
   sources = [ "configure.cc" ]
   deps = [
     "//sdk/fidl/fuchsia.tracing.controller:fuchsia.tracing.controller_cpp",
+    "//sdk/lib/async:async-cpp",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/syslog/cpp:cpp",
-    "//zircon/system/ulib/async:async-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/perftest",
     "//zircon/system/ulib/trace",
     "//zircon/system/ulib/zx",

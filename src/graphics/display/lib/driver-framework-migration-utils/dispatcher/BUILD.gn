@@ -29,9 +29,9 @@ source_set("loop-backed-dispatcher") {
 
   public_deps = [
     ":dispatcher",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//src/lib/ddk",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
   ]
 
   deps = [ "//zircon/system/ulib/fbl" ]

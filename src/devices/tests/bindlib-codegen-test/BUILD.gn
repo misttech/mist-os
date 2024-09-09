@@ -28,6 +28,7 @@ test("test") {
     "//sdk/fidl/fuchsia.device.test:fuchsia.device.test_cpp",
     "//sdk/fidl/fuchsia.driver.development:fuchsia.driver.development_hlcpp",
     "//sdk/fidl/fuchsia.driver.test:fuchsia.driver.test_hlcpp",
+    "//sdk/lib/async-loop:async-loop-cpp",
     "//sdk/lib/device-watcher/cpp",
     "//sdk/lib/driver_test_realm/realm_builder/cpp",
     "//sdk/lib/fdio",
@@ -37,7 +38,6 @@ test("test") {
     "//src/lib/ddk",
     "//src/lib/fxl",
     "//src/lib/fxl/test:gtest_main",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/fbl",
   ]
 }

@@ -19,12 +19,12 @@ executable("thermal_test_control_bin") {
   ]
   deps = [
     "//sdk/fidl/fuchsia.thermal:fuchsia.thermal_hlcpp",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/fidl/hlcpp",
     "//sdk/lib/sys/cpp",
     "//sdk/lib/syslog/cpp",
     "//src/power/fidl/testing:test.thermal_hlcpp",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
   ]
 }
 

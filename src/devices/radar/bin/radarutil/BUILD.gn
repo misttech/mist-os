@@ -6,8 +6,8 @@ import("//build/components.gni")
 
 common_deps = [
   "//sdk/fidl/fuchsia.hardware.radar:fuchsia.hardware.radar_cpp",
+  "//sdk/lib/async-loop:async-loop-cpp",
   "//sdk/lib/component/incoming/cpp",
-  "//zircon/system/ulib/async-loop:async-loop-cpp",
   "//zircon/system/ulib/fbl",
 ]
 

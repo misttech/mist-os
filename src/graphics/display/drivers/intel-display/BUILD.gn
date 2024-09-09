@@ -102,6 +102,7 @@ source_set("common_srcs") {
     "//sdk/fidl/fuchsia.hardware.sysmem:fuchsia.hardware.sysmem_cpp",
     "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_cpp",
     "//sdk/fidl/fuchsia.sysmem2:fuchsia.sysmem2_cpp",
+    "//sdk/lib/async-loop:async-loop-cpp",
     "//sdk/lib/driver/compat/cpp",
     "//sdk/lib/driver/component/cpp",
     "//sdk/lib/driver/incoming/cpp",
@@ -121,7 +122,6 @@ source_set("common_srcs") {
     "//src/lib/ddk:ddk-hw-headers",
     "//src/lib/fxl",
     "//src/lib/zbitl",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/hwreg",
     "//zircon/system/ulib/image-format",
@@ -202,6 +202,8 @@ test("intel-display-tests") {
     "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_cpp",
     "//sdk/fidl/fuchsia.sysmem2:fuchsia.sysmem2_cpp",
     "//sdk/fidl/fuchsia.sysmem2:fuchsia.sysmem2_cpp_testing",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/async-loop-testing/cpp",
     "//sdk/lib/async_patterns/testing/cpp",
     "//sdk/lib/component/outgoing/cpp",
@@ -224,8 +226,6 @@ test("intel-display-tests") {
     "//src/lib/testing/predicates",
     "//third_party/googletest:gmock",
     "//third_party/googletest:gtest",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/mmio-ptr:mmio-ptr-fake",
   ]
 }

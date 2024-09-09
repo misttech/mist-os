@@ -15,14 +15,14 @@ executable("wav_player_bin") {
   deps = [
     "//sdk/fidl/fuchsia.media:fuchsia.media_hlcpp",
     "//sdk/fidl/fuchsia.ultrasound:fuchsia.ultrasound_hlcpp",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/sys/cpp",
     "//src/lib/fsl",
     "//src/lib/fxl:fxl_cli",
     "//src/media/audio/lib/clock",
     "//src/media/audio/lib/logging:cli",
     "//src/media/audio/lib/wav",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/fzl",
   ]
 }

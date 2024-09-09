@@ -27,14 +27,14 @@ source_set("network_service") {
 
   deps = [
     "//sdk/fidl/fuchsia.driver.test:fuchsia.driver.test_cpp",
+    "//sdk/lib/async:async-cpp",
+    "//sdk/lib/async-default",
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/device-watcher/cpp",
     "//sdk/lib/fdio",
     "//sdk/lib/fit",
     "//src/lib/fostr",
     "//src/lib/fxl",
-    "//zircon/system/ulib/async:async-cpp",
-    "//zircon/system/ulib/async-default",
     "//zircon/system/ulib/fbl",
   ]
 

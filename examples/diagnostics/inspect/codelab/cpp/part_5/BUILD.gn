@@ -22,10 +22,10 @@ executable("bin") {
 
   deps = [
     ":lib",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/sys/cpp",
     "//sdk/lib/syslog/cpp",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
   ]
 }
 
@@ -41,12 +41,12 @@ executable("unittests") {
 
   deps = [
     ":lib",
+    "//sdk/lib/async:async-cpp",
     "//sdk/lib/fit-promise",
     "//sdk/lib/inspect/testing/cpp",
     "//sdk/lib/sys/cpp",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/loop_fixture",
-    "//zircon/system/ulib/async:async-cpp",
   ]
 }
 

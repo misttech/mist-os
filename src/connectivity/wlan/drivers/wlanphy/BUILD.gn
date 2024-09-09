@@ -16,15 +16,15 @@ wlanphy_deps = [
   ":wlanphy_bind",
   "//sdk/fidl/fuchsia.wlan.device:fuchsia.wlan.device_cpp",
   "//sdk/fidl/fuchsia.wlan.phyimpl:fuchsia.wlan.phyimpl_cpp",
+  "//sdk/lib/async:async-cpp",
+  "//sdk/lib/async-loop:async-loop-cpp",
+  "//sdk/lib/async-loop:async-loop-default",
   "//sdk/lib/driver/component/cpp",
   "//sdk/lib/driver/devfs/cpp",
   "//sdk/lib/driver/runtime:driver_runtime_cpp",
   "//src/connectivity/wlan/drivers/lib/log/cpp:dfv2",
   "//src/connectivity/wlan/lib/common/cpp:common",
   "//src/devices/lib/driver:driver_runtime",
-  "//zircon/system/ulib/async:async-cpp",
-  "//zircon/system/ulib/async-loop:async-loop-cpp",
-  "//zircon/system/ulib/async-loop:async-loop-default",
   "//zircon/system/ulib/sync:sync-cpp",
 ]
 

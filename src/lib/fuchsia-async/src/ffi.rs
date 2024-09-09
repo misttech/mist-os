@@ -220,13 +220,13 @@ impl Executor {
     }
 }
 
-/// Duplicated from //zircon/system/ulib/async/include/lib/async/dispatcher.h
+/// Duplicated from //sdk/lib/async/include/lib/async/dispatcher.h
 #[repr(C)]
 struct async_state_t {
     _reserved: [usize; 2],
 }
 
-/// Duplicated from //zircon/system/ulib/async/include/lib/async/wait.h
+/// Duplicated from //sdk/lib/async/include/lib/async/wait.h
 #[repr(C)]
 pub(crate) struct async_wait_t {
     _state: async_state_t,
@@ -241,7 +241,7 @@ pub(crate) struct async_wait_t {
     options: u32,
 }
 
-/// Duplicated from //zircon/system/ulib/async/include/lib/async/task.h
+/// Duplicated from //sdk/lib/async/include/lib/async/task.h
 #[repr(C)]
 struct async_task_t {
     _state: async_state_t,

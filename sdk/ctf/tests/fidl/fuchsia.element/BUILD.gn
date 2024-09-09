@@ -27,10 +27,10 @@ executable("element-manager-test-bin") {
     "//sdk/fidl/fuchsia.component:fuchsia.component_hlcpp",
     "//sdk/fidl/fuchsia.component.sandbox:fuchsia.component.sandbox_hlcpp",
     "//sdk/fidl/fuchsia.element:fuchsia.element_hlcpp",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/sys/cpp",
     "//sdk/testing/fidl:fidl_test_hlcpp",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/zxtest",
   ]
 }

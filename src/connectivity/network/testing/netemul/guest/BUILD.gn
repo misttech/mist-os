@@ -15,12 +15,12 @@ source_set("controller") {
   ]
   deps = [
     ":guest",
+    "//sdk/lib/async-loop:async-loop-cpp",
     "//sdk/lib/fdio",
     "//sdk/lib/syslog/cpp",
     "//src/connectivity/network/testing/netemul/network-context/fidl:network_cpp",
     "//src/lib/fxl:fxl",
     "//src/virtualization/tests/lib:guest_console",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/fbl",
   ]
 
@@ -37,6 +37,7 @@ source_set("guest") {
     "src/guest.h",
   ]
   deps = [
+    "//sdk/lib/async-loop:async-loop-cpp",
     "//sdk/lib/fdio",
     "//sdk/lib/syslog/cpp",
     "//src/connectivity/network/testing/netemul/network-context/fidl:network_cpp",
@@ -44,7 +45,6 @@ source_set("guest") {
     "//src/virtualization/lib/guest_interaction:common",
     "//src/virtualization/lib/guest_interaction:guest_interaction_client",
     "//src/virtualization/lib/guest_interaction:platform_interface_posix",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/fbl",
   ]
 
@@ -67,10 +67,10 @@ executable("bin") {
     ":controller",
     ":guest",
     "//sdk/fidl/fuchsia.virtualization:fuchsia.virtualization_cpp",
+    "//sdk/lib/async-loop:async-loop-cpp",
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/component/outgoing/cpp",
     "//sdk/lib/syslog/cpp",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/fbl",
   ]
 }

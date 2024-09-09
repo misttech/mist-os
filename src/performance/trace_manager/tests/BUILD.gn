@@ -29,6 +29,8 @@ executable("trace_manager_tests_bin") {
   ]
 
   deps = [
+    "//sdk/lib/async-default",
+    "//sdk/lib/async-loop:async-loop-cpp",
     "//sdk/lib/fdio",
     "//sdk/lib/sys/cpp",
     "//sdk/lib/sys/cpp/testing:unit",
@@ -36,8 +38,6 @@ executable("trace_manager_tests_bin") {
     "//src/lib/testing/loop_fixture",
     "//src/performance/trace_manager:lib",
     "//third_party/googletest:gmock",
-    "//zircon/system/ulib/async-default",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/trace-provider",
   ]
 }

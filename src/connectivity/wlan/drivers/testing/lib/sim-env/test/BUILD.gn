@@ -12,10 +12,10 @@ executable("event_unittests") {
   sources = [ "event_unittests.cc" ]
 
   deps = [
+    "//sdk/lib/async",
     "//src/connectivity/wlan/drivers/testing/lib/sim-env",
     "//src/lib/fxl/test:gtest_main",
     "//zircon/system/public",
-    "//zircon/system/ulib/async",
   ]
 
   # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings

@@ -18,13 +18,13 @@ executable("test_bin") {
     "//sdk/fidl/fuchsia.io:fuchsia.io_cpp",
     "//sdk/fidl/fuchsia.sys2:fuchsia.sys2_cpp",
     "//sdk/fidl/fuchsia.vulkan.loader:fuchsia.vulkan.loader_cpp",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/fdio",
     "//sdk/lib/sys/component/cpp/testing:cpp",
     "//src/lib/fxl:fxl_cli",
     "//src/lib/fxl/test:gtest_main",
     "//third_party/googletest:gtest",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/fzl",
   ]
@@ -38,14 +38,14 @@ executable("unittest_bin") {
     "..:app",
     "//sdk/fidl/fuchsia.io:fuchsia.io_cpp",
     "//sdk/fidl/fuchsia.vulkan.loader:fuchsia.vulkan.loader_cpp",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/fdio",
     "//src/lib/fxl:fxl_cli",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/json_parser",
     "//src/storage/lib/vfs/cpp",
     "//third_party/googletest:gtest",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
   ]
 }
 
@@ -59,11 +59,11 @@ executable("pkg-server-bin") {
     "//sdk/fidl/fuchsia.gpu.magma:fuchsia.gpu.magma_cpp",
     "//sdk/fidl/fuchsia.io:fuchsia.io_cpp",
     "//sdk/fidl/fuchsia.process.lifecycle:fuchsia.process.lifecycle_cpp",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/syslog/cpp",
     "//src/lib/fxl:fxl_cli",
     "//src/storage/lib/vfs/cpp",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
   ]
 }
 

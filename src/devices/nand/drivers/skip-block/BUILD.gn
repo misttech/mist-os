@@ -67,9 +67,9 @@ test("skip-block-test-bin") {
   include_dirs = [ "." ]
   deps = [
     ":common",
+    "//sdk/lib/async-loop:async-loop-cpp",
     "//sdk/lib/fdio",
     "//src/devices/testing/mock-ddk",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/fzl",
     "//zircon/system/ulib/zxtest",

@@ -10,7 +10,7 @@ executable("bin") {
   sources = [ "src/main.cc" ]
   deps = [
     ":config_lib",
-    "//zircon/system/ulib/async-default",
+    "//sdk/lib/async-default",
   ]
 }
 

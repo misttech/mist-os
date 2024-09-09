@@ -47,9 +47,9 @@ source_set("common") {
     "//sdk/fidl/fuchsia.wlan.mlme:fuchsia.wlan.mlme_hlcpp",
     "//sdk/fidl/fuchsia.wlan.phyimpl:fuchsia.wlan.phyimpl_cpp",
     "//sdk/fidl/fuchsia.wlan.stats:fuchsia.wlan.stats_hlcpp",
-    "//zircon/system/ulib/async:async-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
+    "//sdk/lib/async:async-cpp",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/zx",
   ]

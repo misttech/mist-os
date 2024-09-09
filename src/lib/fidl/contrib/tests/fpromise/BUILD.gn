@@ -15,13 +15,13 @@ test("fidl_cpp_fpromise_tests_bin") {
   output_name = "fidl_cpp_fpromise_tests"
   sources = [ "client_test.cc" ]
   deps = [
+    "//sdk/lib/async:async-cpp",
+    "//sdk/lib/async-loop:async-loop-cpp",
     "//sdk/lib/fit-promise",
     "//sdk/lib/stdcompat",
     "//sdk/testing/fidl/protocols_tests:test.basic.protocol_cpp",
     "//sdk/testing/fidl/protocols_tests:test.error.methods_cpp",
     "//src/lib/fidl/contrib/fpromise",
-    "//zircon/system/ulib/async:async-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/zxtest",
   ]
 }

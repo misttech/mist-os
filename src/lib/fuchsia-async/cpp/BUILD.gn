@@ -12,8 +12,8 @@ source_set("cpp") {
   ]
 
   public_deps = [
+    "//sdk/lib/async",
     "//src/lib/fuchsia-async:fuchsia-async-staticlib",
-    "//zircon/system/ulib/async",
   ]
 }
 

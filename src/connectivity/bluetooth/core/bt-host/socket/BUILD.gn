@@ -17,8 +17,8 @@ source_set("socket") {
   ]
 
   public_deps = [
+    "//sdk/lib/async-default",
     "//sdk/lib/fit",
-    "//zircon/system/ulib/async-default",
     "//zircon/system/ulib/zx",
   ]
 }
@@ -34,6 +34,7 @@ source_set("tests") {
 
   deps = [
     ":socket",
+    "//sdk/lib/async-loop:async-loop-cpp",
     "//src/connectivity/bluetooth/core/bt-host/gap",
     "//src/connectivity/bluetooth/core/bt-host/l2cap:channel_manager_mock_controller_test_fixture",
     "//src/connectivity/bluetooth/core/bt-host/l2cap:testing",
@@ -41,7 +42,6 @@ source_set("tests") {
     "//src/connectivity/bluetooth/core/bt-host/testing:loop_fixture",
     "//src/connectivity/bluetooth/core/bt-host/transport:testing",
     "//third_party/pigweed/backends/pw_async_fuchsia:dispatcher",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
   ]
 
   # TODO(https://fxbug.dev/42085293): delete the below and fix compiler warnings

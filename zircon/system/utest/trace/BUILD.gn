@@ -21,12 +21,12 @@ source_set("common") {
     "record_tests.cc",
   ]
   deps = [
-    "//zircon/system/ulib/async",
-    "//zircon/system/ulib/async:async-cpp",
-    "//zircon/system/ulib/async-default",
-    "//zircon/system/ulib/async-loop",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
+    "//sdk/lib/async",
+    "//sdk/lib/async:async-cpp",
+    "//sdk/lib/async-default",
+    "//sdk/lib/async-loop",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/trace",
 

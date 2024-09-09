@@ -17,10 +17,10 @@ executable("bt-le-heart-rate-peripheral") {
 
   deps = [
     "//sdk/fidl/fuchsia.bluetooth.le:fuchsia.bluetooth.le_hlcpp",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/sys/cpp",
     "//src/lib/fsl",
     "//src/lib/fxl:fxl_cli",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
   ]
 }

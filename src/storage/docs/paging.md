@@ -34,7 +34,7 @@ For general setup:
     [paged_vfs.cc](/src/storage/lib/vfs/cpp/pager-backed.cc) implementation.
 
   * Create a thread or pool of threads to respond to paging requests. You can use the
-    [async loop](/zircon/system/ulib/async/include/lib/async/cpp/paged_vmo.h), but if all your
+    [async loop](/sdk/lib/async/include/lib/async/cpp/paged_vmo.h), but if all your
     thread does is respond to paging requests, it can be simpler to create a port and wait on it
     manually. An example is in
     [pager\_thread\_pool.cc](/src/storage/lib/vfs/cpp/pager_thread_pool.cc) implementation.

@@ -21,15 +21,15 @@ executable("unittests") {
     ":mocks",
     "//sdk/fidl/fuchsia.hardware.display:fuchsia.hardware.display_cpp",
     "//sdk/fidl/fuchsia.images2:fuchsia.images2_cpp",
+    "//sdk/lib/async:async-cpp",
+    "//sdk/lib/async-default",
+    "//sdk/lib/async-testing",
     "//src/lib/fsl",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/loop_fixture:gtest",
     "//src/ui/scenic/lib/display",
     "//src/ui/scenic/lib/display:singleton_display_service",
     "//third_party/googletest:gmock",
-    "//zircon/system/ulib/async:async-cpp",
-    "//zircon/system/ulib/async-default",
-    "//zircon/system/ulib/async-testing",
     "//zircon/system/ulib/inspect",
   ]
   public_deps = [ "//sdk/fidl/fuchsia.hardware.display.types:fuchsia.hardware.display.types_cpp" ]

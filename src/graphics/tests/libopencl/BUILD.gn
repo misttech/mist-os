@@ -13,14 +13,14 @@ source_set("src") {
   sources = [ "libopencl_test.cc" ]
   public_deps = [
     "//sdk/fidl/fuchsia.io",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/fdio",
     "//sdk/lib/sys/cpp",
     "//src/lib/fxl/test:test_settings",
     "//third_party/OpenCL-Headers:opencl_headers",
     "//third_party/OpenCL-ICD-Loader",
     "//third_party/googletest:gtest",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
   ]
 }
 
@@ -41,10 +41,10 @@ executable("fake_opencl_loader_bin") {
 
   deps = [
     "//sdk/fidl/fuchsia.opencl.loader",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/sys/cpp",
     "//src/lib/fxl",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
   ]
 
   deps += [

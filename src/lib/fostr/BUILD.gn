@@ -60,6 +60,8 @@ test("fostr-test-bin") {
   deps = [
     ":fostr",
     "//sdk/fidl/fuchsia.boot:fuchsia.boot_cpp",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/fidl/hlcpp",
     "//src/lib/fostr/fidl/fuchsia.example.fostr",
@@ -67,8 +69,6 @@ test("fostr-test-bin") {
     "//src/lib/fsl",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/predicates",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
   ]
 }
 

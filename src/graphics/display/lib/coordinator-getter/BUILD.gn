@@ -18,11 +18,11 @@ source_set("client") {
   ]
   deps = [
     "//sdk/fidl/fuchsia.io:fuchsia.io_cpp",
+    "//sdk/lib/async-default",
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/fdio",
     "//sdk/lib/syslog/cpp",
     "//src/lib/files",
-    "//zircon/system/ulib/async-default",
     "//zircon/system/ulib/trace",
     "//zircon/system/ulib/zx",
   ]

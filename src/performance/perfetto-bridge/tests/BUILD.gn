@@ -12,14 +12,14 @@ executable("perfetto_bridge_integration_test_bin") {
 
   deps = [
     "//sdk/fidl/fuchsia.tracing.controller:fuchsia.tracing.controller_cpp",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/syslog/cpp",
     "//src/lib/fxl/test:gtest_main",
     "//src/performance/lib/test_utils",
     "//third_party/googletest:gtest",
     "//third_party/perfetto:libperfetto_client_experimental",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/trace-test-utils",
   ]
 }
@@ -43,6 +43,8 @@ executable("perfetto_producer_bin") {
 
   deps = [
     "//sdk/fidl/fuchsia.tracing.perfetto:fuchsia.tracing.perfetto_cpp",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/component/outgoing/cpp",
     "//sdk/lib/syslog/cpp",
@@ -51,8 +53,6 @@ executable("perfetto_producer_bin") {
     "//third_party/perfetto/src/base",
     "//third_party/perfetto/src/tracing/ipc:common",
     "//third_party/perfetto/src/tracing/ipc/service",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
   ]
 }
 

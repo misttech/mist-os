@@ -22,11 +22,11 @@ executable("crasher_exe") {
   cflags = [ "-fstack-protector-all" ]
   deps = [
     "//sdk/fidl/fuchsia.feedback:fuchsia.feedback_cpp",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/fdio",
     "//sdk/lib/syslog/cpp",
     "//src/zircon/lib/zircon",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
   ]
 
   # TODO(https://fxbug.dev/42176699): This target uses mutable tables which are deprecated,

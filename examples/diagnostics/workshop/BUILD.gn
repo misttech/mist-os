@@ -19,9 +19,9 @@ source_set("lib") {
 
   public_deps = [
     "fidl:fuchsia.examples.diagnostics_hlcpp",
+    "//sdk/lib/async:async-cpp",
     "//src/lib/files",
     "//src/lib/json_parser",
-    "//zircon/system/ulib/async:async-cpp",
   ]
 }
 
@@ -30,12 +30,12 @@ executable("example_profile_store_bin") {
 
   deps = [
     ":lib",
+    "//sdk/lib/async:async-cpp",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/fidl/hlcpp",
     "//sdk/lib/sys/cpp",
     "//src/lib/fxl:fxl_cli",
-    "//zircon/system/ulib/async:async-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
   ]
 }
 
@@ -44,13 +44,13 @@ executable("example_profile_writer") {
 
   deps = [
     "fidl:fuchsia.examples.diagnostics_hlcpp",
+    "//sdk/lib/async:async-cpp",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/fidl/hlcpp",
     "//sdk/lib/sys/cpp",
     "//sdk/lib/syslog/cpp",
     "//src/lib/fxl:fxl_cli",
-    "//zircon/system/ulib/async:async-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
   ]
 }
 
@@ -59,13 +59,13 @@ executable("example_profile_reader") {
 
   deps = [
     "fidl:fuchsia.examples.diagnostics_hlcpp",
+    "//sdk/lib/async:async-cpp",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/fidl/hlcpp",
     "//sdk/lib/sys/cpp",
     "//sdk/lib/syslog/cpp",
     "//src/lib/fxl:fxl_cli",
-    "//zircon/system/ulib/async:async-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
   ]
 }
 

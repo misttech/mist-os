@@ -24,11 +24,11 @@ source_set("lib") {
   ]
 
   public_deps = [
+    "//sdk/lib/async",
+    "//sdk/lib/async:async-cpp",
     "//sdk/lib/inspect/component/cpp",
     "//sdk/lib/sys/cpp",
     "//sdk/lib/syslog/cpp",
-    "//zircon/system/ulib/async",
-    "//zircon/system/ulib/async:async-cpp",
   ]
 }
 
@@ -39,9 +39,9 @@ executable("bin") {
 
   deps = [
     ":lib",
-    "//zircon/system/ulib/async-default",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
+    "//sdk/lib/async-default",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
   ]
 }
 
@@ -64,11 +64,11 @@ executable("unittests") {
 
   deps = [
     ":lib",
+    "//sdk/lib/async-default",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//src/lib/fxl/test:gtest_main",
     "//third_party/googletest:gtest",
-    "//zircon/system/ulib/async-default",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
   ]
 }
 

@@ -457,7 +457,7 @@ constexpr auto kIgnoreBindingClosure = ::fidl::internal::IgnoreBindingClosureTyp
 // threading checks.
 //
 // [synchronization-guarantees]:
-// https://fuchsia.googlesource.com/fuchsia/+/refs/heads/main/zircon/system/ulib/async/README.md#verifying-synchronization-requirements
+// https://fuchsia.googlesource.com/fuchsia/+/refs/heads/main/sdk/lib/async/README.md#verifying-synchronization-requirements
 template <typename FidlProtocol>
 class ServerBinding final : public internal::ServerBindingBase<FidlProtocol> {
  private:

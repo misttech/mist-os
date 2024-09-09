@@ -14,6 +14,8 @@ executable("bin") {
   deps = [
     ":base_deps",
     "//sdk/fidl/fuchsia.vulkan.loader:fuchsia.vulkan.loader_hlcpp",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/fit-promise",
     "//sdk/lib/inspect/component/cpp",
     "//sdk/lib/scheduler/cpp",
@@ -37,8 +39,6 @@ executable("bin") {
     "//src/ui/scenic/lib/view_tree:view_ref_installed",
     "//src/ui/scenic/lib/view_tree:view_tree_snapshot",
     "//third_party/rapidjson",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/inspect",
   ]
 
@@ -52,6 +52,7 @@ executable("bin") {
 
 source_set("base_deps") {
   public_deps = [
+    "//sdk/lib/async:async-cpp",
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/fidl/hlcpp",
     "//sdk/lib/fit",
@@ -60,7 +61,6 @@ source_set("base_deps") {
     "//src/lib/fxl:fxl_cli",
     "//src/ui/scenic/lib/flatland",
     "//src/ui/scenic/lib/scheduling:frame_scheduler",
-    "//zircon/system/ulib/async:async-cpp",
     "//zircon/system/ulib/trace-provider",
   ]
 }

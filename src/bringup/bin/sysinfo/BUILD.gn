@@ -11,10 +11,10 @@ executable("sysinfo") {
   sources = [ "main.cc" ]
   deps = [
     "//sdk/fidl/fuchsia.sysinfo:fuchsia.sysinfo_cpp",
+    "//sdk/lib/async-loop:async-loop-cpp",
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/component/outgoing/cpp",
     "//src/sys/lib/stdout-to-debuglog/cpp",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
   ]
 }
 

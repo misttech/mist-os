@@ -106,6 +106,9 @@ foreach(test, fidl_compatibility_tests_categories) {
       ":hlcpp_client_app",
       "fidl:fidl_service_cpp",
       "fidl:fidl_service_hlcpp",
+      "//sdk/lib/async-default",
+      "//sdk/lib/async-loop:async-loop-cpp",
+      "//sdk/lib/async-loop:async-loop-default",
       "//sdk/lib/component/incoming/cpp",
       "//sdk/lib/fidl/hlcpp",
       "//sdk/lib/sys/component/cpp/testing:cpp",
@@ -115,9 +118,6 @@ foreach(test, fidl_compatibility_tests_categories) {
       "//src/lib/fxl/test:test_settings",
       "//third_party/googletest:gtest",
       "//third_party/re2",
-      "//zircon/system/ulib/async-default",
-      "//zircon/system/ulib/async-loop:async-loop-cpp",
-      "//zircon/system/ulib/async-loop:async-loop-default",
     ]
   }
 

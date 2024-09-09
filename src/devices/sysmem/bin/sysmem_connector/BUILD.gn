@@ -61,11 +61,11 @@ executable("sysmem_connector_executable") {
     "//sdk/fidl/fuchsia.metrics:fuchsia.metrics_cpp",
     "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_cpp",
     "//sdk/fidl/fuchsia.sysmem2:fuchsia.sysmem2_cpp",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/sys/cpp",
     "//sdk/lib/vfs/cpp",
     "//src/devices/sysmem/drivers/sysmem:sysmem_common_srcs",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/sysmem-connector",
     "//zircon/system/ulib/trace-provider",
   ]

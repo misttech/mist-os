@@ -55,6 +55,9 @@ executable("unittests-bin") {
   ]
 
   deps = [
+    "//sdk/lib/async:async-cpp",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/sys/cpp",
     "//sdk/lib/sys/cpp/testing:unit",
     "//sdk/lib/syslog/cpp",
@@ -63,9 +66,6 @@ executable("unittests-bin") {
     "//src/lib/testing/loop_fixture",
     "//third_party/googletest:gtest",
     "//third_party/openthread:lib-ot-core",
-    "//zircon/system/ulib/async:async-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/zx",
   ]
 
@@ -86,13 +86,13 @@ executable("bootstrap-unittests-bin") {
   ]
 
   deps = [
+    "//sdk/lib/async:async-cpp",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//src/connectivity/openthread/third_party/openthread/platform",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/loop_fixture",
     "//third_party/googletest:gtest",
-    "//zircon/system/ulib/async:async-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/svc",
     "//zircon/system/ulib/zx",
   ]

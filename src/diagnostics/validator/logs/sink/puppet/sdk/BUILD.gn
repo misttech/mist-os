@@ -11,12 +11,12 @@ executable("sdk-puppet") {
 
   deps = [
     "//sdk/fidl/fuchsia.logger:fuchsia.logger_hlcpp",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/fidl",
     "//sdk/lib/sys/cpp",
     "//sdk/lib/syslog/structured_backend",
     "//src/diagnostics/validator/logs/sink/fidl:sink-puppet_hlcpp",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
   ]
 }
 

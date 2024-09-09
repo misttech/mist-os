@@ -74,8 +74,8 @@ source_set("present_helpers") {
     "present2_helper.h",
   ]
   deps = [
+    "//sdk/lib/async-default",
     "//sdk/lib/syslog/cpp",
-    "//zircon/system/ulib/async-default",
     "//zircon/system/ulib/trace",
   ]
   public_deps = [
