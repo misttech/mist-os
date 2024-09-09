@@ -152,7 +152,7 @@ filegroup(
             ":cc-compiler-prebuilts",
             ":libunwind-headers",
             ":libcxx-headers-" + cpu,
-            ":fuchsia-sysroot-headers-" + cpu,
+            "@fuchsia_sdk//:fuchsia-sysroot-headers-" + cpu,
         ],
     )
     for cpu in TARGET_CPUS
@@ -207,7 +207,7 @@ filegroup(
         name = "link-" + cpu,
         srcs = [
             ":cc-linker-prebuilts",
-            ":fuchsia-sysroot-libraries-" + cpu,
+            "@fuchsia_sdk//:fuchsia-sysroot-libraries-" + cpu,
             ":libcxx-libraries-" + cpu,
             ":runtime-" + cpu,
         ],
