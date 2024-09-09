@@ -4,8 +4,6 @@
 
 #include "src/storage/blobfs/component_runner.h"
 
-#include <fidl/fuchsia.device.manager/cpp/markers.h>
-#include <fidl/fuchsia.device.manager/cpp/wire_messaging.h>
 #include <fidl/fuchsia.fs.startup/cpp/wire.h>
 #include <fidl/fuchsia.fs/cpp/wire.h>
 #include <fidl/fuchsia.fxfs/cpp/markers.h>
@@ -77,25 +75,6 @@ ComponentRunner::~ComponentRunner() {
   TearDown();
 }
 
-void ComponentRunner::RemoveSystemDrivers(fit::callback<void(zx_status_t)> callback) {
-  // If we don't have a connection to Driver Manager, just return ZX_OK.
-  if (!driver_admin_.is_valid()) {
-    FX_LOGS(INFO) << "blobfs doesn't have driver manager connection; assuming test environment";
-    callback(ZX_OK);
-    return;
-  }
-
-  using Unregister = fuchsia_device_manager::Administrator::UnregisterSystemStorageForShutdown;
-  driver_admin_->UnregisterSystemStorageForShutdown().ThenExactlyOnce(
-      [callback = std::move(callback)](fidl::WireUnownedResult<Unregister>& result) mutable {
-        if (!result.ok()) {
-          callback(result.status());
-          return;
-        }
-        callback(result.value().status);
-      });
-}
-
 void ComponentRunner::Shutdown(fs::FuchsiaVfs::ShutdownCallback cb) {
   {
     std::lock_guard l(shutdown_lock_);
@@ -123,30 +102,20 @@ void ComponentRunner::Shutdown(fs::FuchsiaVfs::ShutdownCallback cb) {
   // Not including above book keeping to avoid tracing shutdown calls that don't actually do any
   // work.
   TRACE_DURATION("blobfs", "ComponentRunner::Shutdown");
-  // Before shutting down blobfs, we need to try to shut down any drivers that are running out of
-  // it, because right now those drivers don't have an explicit dependency on blobfs in the
-  // component hierarchy so they don't get shut down before us yet.
-  RemoveSystemDrivers([this, cb = std::move(final_cb)](zx_status_t status) mutable {
-    // If we failed to notify the driver stack about the impending shutdown, log a warning, but
-    // continue the shutdown.
-    if (status != ZX_OK) {
-      FX_PLOGS(WARNING, status) << "failed to send shutdown signal to driver manager";
-    }
-    // Shutdown all external connections to blobfs.
-    ManagedVfs::Shutdown([this, cb = std::move(cb)](zx_status_t status) mutable {
-      async::PostTask(dispatcher(), [this, status, cb = std::move(cb)]() mutable {
-        // Manually destroy the filesystem. The promise of Shutdown is that no
-        // connections are active, and destroying the Runner object
-        // should terminate all background workers.
-        blobfs_ = nullptr;
+  // Shutdown all external connections to blobfs.
+  ManagedVfs::Shutdown([this, cb = std::move(final_cb)](zx_status_t status) mutable {
+    async::PostTask(dispatcher(), [this, status, cb = std::move(cb)]() mutable {
+      // Manually destroy the filesystem. The promise of Shutdown is that no
+      // connections are active, and destroying the Runner object
+      // should terminate all background workers.
+      blobfs_ = nullptr;
 
-        // Tell the mounting thread that the filesystem has terminated.
-        loop_.Quit();
+      // Tell the mounting thread that the filesystem has terminated.
+      loop_.Quit();
 
-        // Tell the unmounting channel that we've completed teardown. This *must* be the last thing
-        // we do because after this, the caller can assume that it's safe to destroy the runner.
-        cb(status);
-      });
+      // Tell the unmounting channel that we've completed teardown. This *must* be the last thing
+      // we do because after this, the caller can assume that it's safe to destroy the runner.
+      cb(status);
     });
   });
 }
@@ -157,9 +126,7 @@ zx::result<fs::FilesystemInfo> ComponentRunner::GetFilesystemInfo() {
 
 zx::result<> ComponentRunner::ServeRoot(
     fidl::ServerEnd<fuchsia_io::Directory> root,
-    fidl::ServerEnd<fuchsia_process_lifecycle::Lifecycle> lifecycle,
-    fidl::ClientEnd<fuchsia_device_manager::Administrator> driver_admin_client,
-    zx::resource vmex_resource) {
+    fidl::ServerEnd<fuchsia_process_lifecycle::Lifecycle> lifecycle, zx::resource vmex_resource) {
   LifecycleServer::Create(
       loop_.dispatcher(),
       [this](fs::FuchsiaVfs::ShutdownCallback cb) {
@@ -167,13 +134,6 @@ zx::result<> ComponentRunner::ServeRoot(
         this->Shutdown(std::move(cb));
       },
       std::move(lifecycle));
-
-  fidl::WireSharedClient<fuchsia_device_manager::Administrator> driver_admin;
-  if (driver_admin_client.is_valid()) {
-    driver_admin = fidl::WireSharedClient<fuchsia_device_manager::Administrator>(
-        std::move(driver_admin_client), loop_.dispatcher());
-  }
-  driver_admin_ = std::move(driver_admin);
 
   // Make dangling endpoints for the root directory and the service directory. Creating the
   // endpoints and putting them into the filesystem tree has the effect of queuing incoming

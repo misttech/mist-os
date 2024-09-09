@@ -6,10 +6,7 @@ import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.device.manager") {
   sdk_category = "internal"
-  sources = [
-    "administrator.fidl",
-    "system-state-transition.fidl",
-  ]
+  sources = [ "system-state-transition.fidl" ]
   public_deps = [ "//zircon/vdso/zx" ]
   enable_hlcpp = true
 }
