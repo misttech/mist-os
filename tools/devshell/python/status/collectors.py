@@ -119,17 +119,16 @@ async def environment_collector() -> list[data.Result]:
 
     device_name: str | None = None
     device_notes: str | None = None
+
+    # FUCHSIA_NODENAME is unconditionally set for all fx invocations.
     if (from_env := os.environ.get("FUCHSIA_NODENAME")) is not None:
         device_name = from_env
-        device_notes = "set by fx -d"
-    elif current_build_dir is not None:
-        # The device file for out/default is out/default.device, not out/device/.device.
-        # Directly append to the path to find an adjacent file.
-        file_path = current_build_dir.as_posix() + ".device"
-        if os.path.isfile(file_path):
-            with open(file_path) as f:
-                device_name = f.readline().strip()
-                device_notes = "set by `fx set-device`"
+
+        # Use a separate environment variable to determine the source of FUCHSIA_NODENAME
+        if os.environ.get("FUCHSIA_NODENAME_IS_FROM_FILE") == "true":
+            device_notes = "set by `fx set-device`"
+        else:
+            device_notes = "set by fx -d"
 
     if device_name:
         results.append(
