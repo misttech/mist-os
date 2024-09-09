@@ -7,16 +7,21 @@
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/ddk/metadata.h>
+#include <lib/fpromise/single_threaded_executor.h>
+#include <lib/inspect/cpp/hierarchy.h>
 #include <lib/inspect/cpp/inspect.h>
-#include <lib/inspect/testing/cpp/zxtest/inspect.h>
-#include <lib/mock-i2c/mock-i2c.h>
+#include <lib/inspect/cpp/reader.h>
+#include <lib/inspect/testing/cpp/inspect.h>
+#include <lib/mock-i2c/mock-i2c-gtest.h>
 #include <lib/simple-codec/simple-codec-client.h>
 #include <lib/simple-codec/simple-codec-helper.h>
 #include <lib/sync/completion.h>
 
-#include <zxtest/zxtest.h>
+#include <gmock/gmock.h>
+#include <gtest/gtest.h>
 
 #include "src/devices/testing/mock-ddk/mock-device.h"
+#include "src/lib/testing/predicates/status.h"
 
 namespace audio {
 
@@ -32,7 +37,7 @@ audio::DaiFormat GetDefaultDaiFormat() {
   };
 }
 
-struct Tas5720Test : public inspect::InspectTestHelper, public zxtest::Test {
+struct Tas5720Test : public ::testing::Test {
   void SetUp() override {
     // Reset by the TAS driver initialization.
     mock_i2c_.ExpectWrite({0x01})
@@ -71,7 +76,7 @@ struct Tas5720Test : public inspect::InspectTestHelper, public zxtest::Test {
     return std::move(endpoints->client);
   }
 
-  mock_i2c::MockI2c mock_i2c_;
+  mock_i2c::MockI2cGtest mock_i2c_;
   async::Loop loop_{&kAsyncLoopConfigNeverAttachToThread};
 };
 
@@ -103,7 +108,7 @@ TEST_F(Tas5720Test, CodecInitGood) {
 
   ASSERT_OK(SimpleCodecServer::CreateAndAddToDdk<Tas5720Codec>(fake_parent.get(), GetI2cClient()));
   auto* child_dev = fake_parent->GetLatestChild();
-  ASSERT_NOT_NULL(child_dev);
+  ASSERT_TRUE(child_dev);
 
   // Shutdown.
   mock_i2c_.ExpectWrite({0x08}).ExpectReadStop({0x00});
@@ -113,12 +118,12 @@ TEST_F(Tas5720Test, CodecInitGood) {
   mock_i2c_.VerifyAndClear();
 }
 
-TEST(Tas5720Test, CodecInitBad) {
+TEST(Tas5720CustomEnvTest, CodecInitBad) {
   auto fake_parent = MockDevice::FakeRootParent();
   uint32_t instance_count = 0;
   fake_parent->SetMetadata(DEVICE_METADATA_PRIVATE, &instance_count, sizeof(instance_count));
 
-  mock_i2c::MockI2c mock_i2c;
+  mock_i2c::MockI2cGtest mock_i2c;
 
   async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
 
@@ -149,7 +154,7 @@ TEST_F(Tas5720Test, CodecGetInfo) {
 
   ASSERT_OK(SimpleCodecServer::CreateAndAddToDdk<Tas5720Codec>(fake_parent.get(), GetI2cClient()));
   auto* child_dev = fake_parent->GetLatestChild();
-  ASSERT_NOT_NULL(child_dev);
+  ASSERT_TRUE(child_dev);
   auto codec = child_dev->GetDeviceContext<Tas5720Codec>();
   zx::result<fidl::ClientEnd<fuchsia_hardware_audio::Codec>> codec_client = codec->GetClient();
   ASSERT_OK(codec_client.status_value());
@@ -208,7 +213,7 @@ TEST_F(Tas5720Test, CodecReset) {
 
   ASSERT_OK(SimpleCodecServer::CreateAndAddToDdk<Tas5720Codec>(fake_parent.get(), GetI2cClient()));
   auto* child_dev = fake_parent->GetLatestChild();
-  ASSERT_NOT_NULL(child_dev);
+  ASSERT_TRUE(child_dev);
   auto codec = child_dev->GetDeviceContext<Tas5720Codec>();
   zx::result<fidl::ClientEnd<fuchsia_hardware_audio::Codec>> codec_client = codec->GetClient();
   ASSERT_OK(codec_client.status_value());
@@ -227,7 +232,7 @@ TEST_F(Tas5720Test, CodecDaiFormat) {
 
   ASSERT_OK(SimpleCodecServer::CreateAndAddToDdk<Tas5720Codec>(fake_parent.get(), GetI2cClient()));
   auto* child_dev = fake_parent->GetLatestChild();
-  ASSERT_NOT_NULL(child_dev);
+  ASSERT_TRUE(child_dev);
   auto codec = child_dev->GetDeviceContext<Tas5720Codec>();
   zx::result<fidl::ClientEnd<fuchsia_hardware_audio::Codec>> codec_client = codec->GetClient();
   ASSERT_OK(codec_client.status_value());
@@ -256,20 +261,20 @@ TEST_F(Tas5720Test, CodecDaiFormat) {
   // Check getting DAI formats.
   {
     auto formats = client.GetDaiFormats();
-    ASSERT_EQ(formats.value().number_of_channels.size(), 1);
-    ASSERT_EQ(formats.value().number_of_channels[0], 2);
-    ASSERT_EQ(formats.value().sample_formats.size(), 1);
+    ASSERT_EQ(formats.value().number_of_channels.size(), 1u);
+    ASSERT_EQ(formats.value().number_of_channels[0], 2u);
+    ASSERT_EQ(formats.value().sample_formats.size(), 1u);
     ASSERT_EQ(formats.value().sample_formats[0], SampleFormat::PCM_SIGNED);
-    ASSERT_EQ(formats.value().frame_formats.size(), 2);
+    ASSERT_EQ(formats.value().frame_formats.size(), 2u);
     ASSERT_EQ(formats.value().frame_formats[0], FrameFormat::STEREO_LEFT);
     ASSERT_EQ(formats.value().frame_formats[1], FrameFormat::I2S);
-    ASSERT_EQ(formats.value().frame_rates.size(), 2);
-    ASSERT_EQ(formats.value().frame_rates[0], 48000);
-    ASSERT_EQ(formats.value().frame_rates[1], 96000);
-    ASSERT_EQ(formats.value().bits_per_slot.size(), 1);
-    ASSERT_EQ(formats.value().bits_per_slot[0], 32);
-    ASSERT_EQ(formats.value().bits_per_sample.size(), 1);
-    ASSERT_EQ(formats.value().bits_per_sample[0], 16);
+    ASSERT_EQ(formats.value().frame_rates.size(), 2u);
+    ASSERT_EQ(formats.value().frame_rates[0], 48000u);
+    ASSERT_EQ(formats.value().frame_rates[1], 96000u);
+    ASSERT_EQ(formats.value().bits_per_slot.size(), 1u);
+    ASSERT_EQ(formats.value().bits_per_slot[0], 32u);
+    ASSERT_EQ(formats.value().bits_per_sample.size(), 1u);
+    ASSERT_EQ(formats.value().bits_per_sample[0], 16u);
   }
 
   // Check setting DAI formats.
@@ -311,7 +316,7 @@ TEST_F(Tas5720Test, CodecDaiFormat) {
     format.frame_rate = 192'000;
     auto formats = client.GetDaiFormats();
     ASSERT_FALSE(IsDaiFormatSupported(format, formats.value()));
-    ASSERT_NOT_OK(client.SetDaiFormat(std::move(format)));
+    ASSERT_TRUE(client.SetDaiFormat(std::move(format)).is_error());
   }
 
   child_dev->ReleaseOp();
@@ -325,7 +330,7 @@ TEST_F(Tas5720Test, CodecGain) {
 
   ASSERT_OK(SimpleCodecServer::CreateAndAddToDdk<Tas5720Codec>(fake_parent.get(), GetI2cClient()));
   auto* child_dev = fake_parent->GetLatestChild();
-  ASSERT_NOT_NULL(child_dev);
+  ASSERT_TRUE(child_dev);
   auto codec = child_dev->GetDeviceContext<Tas5720Codec>();
   zx::result<fidl::ClientEnd<fuchsia_hardware_audio::Codec>> codec_client = codec->GetClient();
   ASSERT_OK(codec_client.status_value());
@@ -406,7 +411,7 @@ TEST_F(Tas5720Test, CodecPlugState) {
 
   ASSERT_OK(SimpleCodecServer::CreateAndAddToDdk<Tas5720Codec>(fake_parent.get(), GetI2cClient()));
   auto* child_dev = fake_parent->GetLatestChild();
-  ASSERT_NOT_NULL(child_dev);
+  ASSERT_TRUE(child_dev);
   auto codec = child_dev->GetDeviceContext<Tas5720Codec>();
   zx::result<fidl::ClientEnd<fuchsia_hardware_audio::Codec>> codec_client = codec->GetClient();
   ASSERT_OK(codec_client.status_value());
@@ -421,13 +426,13 @@ TEST_F(Tas5720Test, CodecPlugState) {
   mock_i2c_.VerifyAndClear();
 }
 
-TEST(Tas5720Test, InstanceCount) {
+TEST(Tas5720CustomEnvTest, InstanceCount) {
   auto fake_parent = MockDevice::FakeRootParent();
   uint32_t instance_count = 2;
   fake_parent->SetMetadata(DEVICE_METADATA_PRIVATE, &instance_count, sizeof(instance_count));
 
   // Reset by the TAS driver initialization setting slot to 2.
-  mock_i2c::MockI2c mock_i2c;
+  mock_i2c::MockI2cGtest mock_i2c;
 
   async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
 
@@ -462,7 +467,7 @@ TEST(Tas5720Test, InstanceCount) {
   ASSERT_OK(SimpleCodecServer::CreateAndAddToDdk<Tas5720Codec>(fake_parent.get(),
                                                                std::move(endpoints.client)));
   auto* child_dev = fake_parent->GetLatestChild();
-  ASSERT_NOT_NULL(child_dev);
+  ASSERT_TRUE(child_dev);
 
   // Shutdown.
   mock_i2c.ExpectWrite({0x08}).ExpectReadStop({0x00});
@@ -479,19 +484,25 @@ TEST_F(Tas5720Test, FaultNotSeen) {
 
   ASSERT_OK(SimpleCodecServer::CreateAndAddToDdk<Tas5720Codec>(fake_parent.get(), GetI2cClient()));
   auto* child_dev = fake_parent->GetLatestChild();
-  ASSERT_NOT_NULL(child_dev);
+  ASSERT_TRUE(child_dev);
   auto codec = child_dev->GetDeviceContext<Tas5720Codec>();
 
   mock_i2c_.ExpectWrite({0x08}).ExpectReadStop({0x00});
   codec->PollFaults(/*periodic=*/false);
 
-  ASSERT_NO_FATAL_FAILURE(ReadInspect(codec->inspect().DuplicateVmo()));
-  auto* fault_root = hierarchy().GetByPath({"tas5720"});
-  ASSERT_TRUE(fault_root);
-  auto& faults = fault_root->children();
-  ASSERT_EQ(faults.size(), 1);
-  ASSERT_NO_FATAL_FAILURE(
-      CheckProperty(faults[0].node(), "state", inspect::StringPropertyValue("No fault")));
+  fpromise::result<inspect::Hierarchy> hierarchy_result =
+      fpromise::run_single_threaded(inspect::ReadFromInspector(codec->inspect()));
+  ASSERT_TRUE(hierarchy_result.is_ok());
+
+  inspect::Hierarchy hierarchy = std::move(hierarchy_result.value());
+  const inspect::Hierarchy* codec_root = hierarchy.GetByPath({"tas5720"});
+  ASSERT_TRUE(codec_root);
+
+  auto& faults = codec_root->children();
+  ASSERT_EQ(faults.size(), 1u);
+
+  EXPECT_THAT(faults[0].node(), inspect::testing::PropertyList(testing::Contains(
+                                    inspect::testing::StringIs("state", "No fault"))));
 
   // Shutdown.
   mock_i2c_.ExpectWrite({0x08}).ExpectReadStop({0x00});
@@ -508,7 +519,7 @@ TEST_F(Tas5720Test, FaultPollI2CError) {
 
   ASSERT_OK(SimpleCodecServer::CreateAndAddToDdk<Tas5720Codec>(fake_parent.get(), GetI2cClient()));
   auto* child_dev = fake_parent->GetLatestChild();
-  ASSERT_NOT_NULL(child_dev);
+  ASSERT_TRUE(child_dev);
   auto codec = child_dev->GetDeviceContext<Tas5720Codec>();
 
   // Repeat I2C timeout 3 times.
@@ -517,13 +528,19 @@ TEST_F(Tas5720Test, FaultPollI2CError) {
   mock_i2c_.ExpectWrite({0x08}).ExpectReadStop({0xFF}, ZX_ERR_TIMED_OUT);
   codec->PollFaults(/*periodic=*/false);
 
-  ASSERT_NO_FATAL_FAILURE(ReadInspect(codec->inspect().DuplicateVmo()));
-  auto* fault_root = hierarchy().GetByPath({"tas5720"});
-  ASSERT_TRUE(fault_root);
-  auto& faults = fault_root->children();
-  ASSERT_EQ(faults.size(), 1);
-  ASSERT_NO_FATAL_FAILURE(
-      CheckProperty(faults[0].node(), "state", inspect::StringPropertyValue("I2C error")));
+  fpromise::result<inspect::Hierarchy> hierarchy_result =
+      fpromise::run_single_threaded(inspect::ReadFromInspector(codec->inspect()));
+  ASSERT_TRUE(hierarchy_result.is_ok());
+
+  inspect::Hierarchy hierarchy = std::move(hierarchy_result.value());
+  const inspect::Hierarchy* codec_root = hierarchy.GetByPath({"tas5720"});
+  ASSERT_TRUE(codec_root);
+
+  auto& faults = codec_root->children();
+  ASSERT_EQ(faults.size(), 1u);
+
+  EXPECT_THAT(faults[0].node(), inspect::testing::PropertyList(testing::Contains(
+                                    inspect::testing::StringIs("state", "I2C error"))));
 
   // Shutdown.
   mock_i2c_.ExpectWrite({0x08}).ExpectReadStop({0x00});
@@ -540,19 +557,25 @@ TEST_F(Tas5720Test, FaultPollClockFault) {
 
   ASSERT_OK(SimpleCodecServer::CreateAndAddToDdk<Tas5720Codec>(fake_parent.get(), GetI2cClient()));
   auto* child_dev = fake_parent->GetLatestChild();
-  ASSERT_NOT_NULL(child_dev);
+  ASSERT_TRUE(child_dev);
   auto codec = child_dev->GetDeviceContext<Tas5720Codec>();
 
   mock_i2c_.ExpectWrite({0x08}).ExpectReadStop({0x08});
   codec->PollFaults(/*periodic=*/false);
 
-  ASSERT_NO_FATAL_FAILURE(ReadInspect(codec->inspect().DuplicateVmo()));
-  auto* fault_root = hierarchy().GetByPath({"tas5720"});
-  ASSERT_TRUE(fault_root);
-  auto& faults = fault_root->children();
-  ASSERT_EQ(faults.size(), 1);
-  ASSERT_NO_FATAL_FAILURE(CheckProperty(faults[0].node(), "state",
-                                        inspect::StringPropertyValue("SAIF clock error, 08")));
+  fpromise::result<inspect::Hierarchy> hierarchy_result =
+      fpromise::run_single_threaded(inspect::ReadFromInspector(codec->inspect()));
+  ASSERT_TRUE(hierarchy_result.is_ok());
+
+  inspect::Hierarchy hierarchy = std::move(hierarchy_result.value());
+  const inspect::Hierarchy* codec_root = hierarchy.GetByPath({"tas5720"});
+  ASSERT_TRUE(codec_root);
+
+  auto& faults = codec_root->children();
+  ASSERT_EQ(faults.size(), 1u);
+
+  EXPECT_THAT(faults[0].node(), inspect::testing::PropertyList(testing::Contains(
+                                    inspect::testing::StringIs("state", "SAIF clock error, 08"))));
 
   // Shutdown.
   mock_i2c_.ExpectWrite({0x08}).ExpectReadStop({0x00});
@@ -574,7 +597,7 @@ TEST_F(Tas5720Test, FaultsAgeOut) {
 
   ASSERT_OK(SimpleCodecServer::CreateAndAddToDdk<Tas5720Codec>(fake_parent.get(), GetI2cClient()));
   auto* child_dev = fake_parent->GetLatestChild();
-  ASSERT_NOT_NULL(child_dev);
+  ASSERT_TRUE(child_dev);
   auto codec = child_dev->GetDeviceContext<Tas5720Codec>();
 
   zx_time_t time_threshold = 0;
@@ -594,11 +617,15 @@ TEST_F(Tas5720Test, FaultsAgeOut) {
 
   // We should have ten events seen, and all of them should be
   // timestamped after time_threshold.
-  ASSERT_NO_FATAL_FAILURE(ReadInspect(codec->inspect().DuplicateVmo()));
-  auto* fault_root = hierarchy().GetByPath({"tas5720"});
+  fpromise::result<inspect::Hierarchy> hierarchy_result =
+      fpromise::run_single_threaded(inspect::ReadFromInspector(codec->inspect()));
+  ASSERT_TRUE(hierarchy_result.is_ok());
+
+  inspect::Hierarchy hierarchy = std::move(hierarchy_result.value());
+  const inspect::Hierarchy* fault_root = hierarchy.GetByPath({"tas5720"});
   ASSERT_TRUE(fault_root);
   auto& faults = fault_root->children();
-  ASSERT_EQ(faults.size(), 10);
+  ASSERT_EQ(faults.size(), 10u);
   for (int event_count = 0; event_count < 10; event_count++) {
     const auto* first_seen_property =
         faults[event_count].node().get_property<inspect::IntPropertyValue>("first_seen");
