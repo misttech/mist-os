@@ -504,4 +504,43 @@ open protocol PowerElementProvider {
     flexible GetPowerGoals() -> (resource struct {
         goals vector<PowerGoal>:MAX;
     });
+
+    /// Get a power level that represents the GPU clock being set to at least a target frequency.
+    /// The power level may allow the GPU to idle or turn off, as long as the clock frequency
+    /// remains the same.
+    flexible GetClockSpeedLevel(table {
+        /// Required. The target frequency.
+        1: hz uint64;
+        /// If true and `hz` is greater than the maximum clock frequency, then the level
+        /// corresponding to the greatest supported frequency will be returned. If not true (or not
+        /// specified), this call will return `ZX_ERR_OUT_OF_RANGE` if `hz` is greater than the
+        /// maximum clock frequency.
+        2: allow_max bool;
+    }) -> (resource table {
+        /// Required. The fuchsia.power.broker.DependencyToken that must be leased.
+        // TODO(https://fxbug.dev/364610203): Convert to fuchsia.power.broker.DependencyToken once
+        // that's in the SDK.
+        1: token zx.Handle:EVENT;
+        /// Required. The level to lease `token` at.
+        // TODO(https://fxbug.dev/364610203): Convert to fuchsia.power.broker.PowerLevel once
+        // that's in the SDK.
+        2: level uint8;
+        /// Required. The target frequency that the level represents. If `allow_max==false' (or
+        /// allow_max isn't set) then this must be >= `hz`; otherwise, it can be any value relative
+        /// to `hz`.
+        3: actual_hz uint64;
+    }) error zx.Status;
+
+    /// Limit the clock to at most a specific frequency.
+    flexible SetClockLimit(table {
+        /// Required. The target frequency
+        1: hz uint64;
+    }) -> (resource table {
+        /// Required. A handle representing this request; the clock limit will be honored as long as
+        /// the handle is open.
+        1: handle zx.Handle:EVENTPAIR;
+        /// Required. The actual frequency the clock is limited to. This may be more or less than
+        /// `hz`.
+        2: actual_hz uint64;
+    }) error zx.Status;
 };
