@@ -427,8 +427,8 @@ TEST_F(DriverTest, Properties) {
   ASSERT_EQ(result->properties().timers_properties()->size(), std::size_t{9});
   auto& timers = result->properties().timers_properties().value();
 
-  // Timers id 0 to 8 inclusive, except timer id 4.
-  for (uint64_t i = 0; i < 9; ++i) {
+  // Resolutions and range for all timers, except timer id 4.
+  for (auto& i : kTimersAll) {
     ASSERT_TRUE(timers[i].id());
     if (timers[i].id().value() == 4) {
       continue;
@@ -460,9 +460,8 @@ TEST_F(DriverTest, Properties) {
 }
 
 TEST_F(DriverTest, StartTimerNoticks) {
-  // Timers id 0 to 8 inclusive are able to take a 0 ticks expiration request for durations 1, 10,
-  // and 100 usecs.
-  for (uint64_t i = 0; i < 9; ++i) {
+  // All timers are able to take a 0 ticks expiration request for durations 1, 10, and 100 usecs.
+  for (auto& i : kTimersAll) {
     auto result0 =
         client_->Start({i, fuchsia_hardware_hrtimer::Resolution::WithDuration(1'000ULL), 0});
     ASSERT_FALSE(result0.is_error());
@@ -493,9 +492,9 @@ TEST_F(DriverTest, StartTimerNoticks) {
 }
 
 TEST_F(DriverTest, StartTimerMaxTicks) {
-  // Timers id 0 to 8 inclusive are able to take a up to 0xffff ticks expiration request for
-  // durations 1, 10, and 100 usecs.
-  for (uint64_t i = 0; i < 9; ++i) {
+  // All timers are able to take a up to 0xffff ticks expiration request for durations 1, 10, and
+  // 100 usecs.
+  for (auto& i : kTimersAll) {
     auto result0 =
         client_->Start({i, fuchsia_hardware_hrtimer::Resolution::WithDuration(1'000ULL), 0xffff});
     ASSERT_FALSE(result0.is_error());
@@ -536,8 +535,8 @@ TEST_F(DriverTest, StartTimerMaxTicks) {
 }
 
 TEST_F(DriverTest, StartStop) {
-  // Timers id 0 to 8 inclusive but not 4 support events.
-  for (uint64_t i = 0; i < 9; ++i) {
+  // All timers support start/stop.
+  for (auto& i : kTimersAll) {
     auto result_start =
         client_->Start({i, fuchsia_hardware_hrtimer::Resolution::WithDuration(1'000ULL), 1});
     ASSERT_FALSE(result_start.is_error());
@@ -549,7 +548,7 @@ TEST_F(DriverTest, StartStop) {
     ASSERT_EQ(env.platform_device().mmio()[0x3c64], 0x000f'0000UL);  // Timers F, G, H and I.
   });
 
-  for (uint64_t i = 0; i < 9; ++i) {
+  for (auto& i : kTimersAll) {
     auto result_stop = client_->Stop(i);
     ASSERT_FALSE(result_stop.is_error());
   }
@@ -562,12 +561,8 @@ TEST_F(DriverTest, StartStop) {
 }
 
 TEST_F(DriverTest, EventTriggering) {
-  // Timers id 0 to 8 inclusive but not 4 support events (via IRQ notification).
-  zx::event events[9];
-  for (uint64_t i = 0; i < 9; ++i) {
-    if (i == 4) {
-      continue;
-    }
+  zx::event events[kNumberOfTimers];
+  for (auto& i : kTimersSupportWait) {
     ASSERT_EQ(zx::event::create(0, &events[i]), ZX_OK);
     zx::event duplicate_event;
     events[i].duplicate(ZX_RIGHT_SAME_RIGHTS, &duplicate_event);
@@ -581,10 +576,7 @@ TEST_F(DriverTest, EventTriggering) {
   driver_test().RunInEnvironmentTypeContext(
       [](TestEnvironment& env) { env.platform_device().TriggerAllIrqs(); });
 
-  for (uint64_t i = 0; i < 9; ++i) {
-    if (i == 4) {
-      continue;
-    }
+  for (auto& i : kTimersSupportWait) {
     zx_signals_t signals = {};
     ASSERT_EQ(events[i].wait_one(ZX_EVENT_SIGNALED, zx::time::infinite(), &signals), ZX_OK);
   }
@@ -640,8 +632,8 @@ TEST_F(DriverTest, GetTicksTimer4) {
   auto result_start = client_->Start(
       {4, fuchsia_hardware_hrtimer::Resolution::WithDuration(1'000ULL), kArbitraryTicksRequest});
   ASSERT_FALSE(result_start.is_error());
-  // We set the amount read after starting the timer since starting the timer writes to the register
-  // we read upon GetTicksLeft.
+  // We set the amount read after starting the timer since starting the timer writes to the
+  // register we read upon GetTicksLeft.
   constexpr uint64_t kArbitraryCount64bits = 0x1234'5678'0000'0000;
   driver_test().RunInEnvironmentTypeContext([](TestEnvironment& env) {
     env.platform_device().mmio()[0x3c62] =
@@ -823,11 +815,7 @@ TEST_F(DriverTest, WaitTriggering) {
   driver_test().RunInEnvironmentTypeContext(
       [](TestEnvironment& env) { env.platform_device().TriggerAllIrqs(); });
 
-  // Timers id 0 to 8 inclusive but not 4 support wait (via IRQ notification).
-  for (uint64_t i = 0; i < 9; ++i) {
-    if (i == 4) {
-      continue;
-    }
+  for (auto& i : kTimersSupportWait) {
     auto result_start =
         client_->StartAndWait({i, fuchsia_hardware_hrtimer::Resolution::WithDuration(1'000ULL), 0});
     ASSERT_FALSE(result_start.is_error());
@@ -882,11 +870,7 @@ TEST_F(DriverTest, LeaseError) {
     env.platform_device().TriggerAllIrqs();
   });
 
-  // Timers id 0 to 8 inclusive but not 4 support wait (via IRQ notification).
-  for (uint64_t i = 0; i < 9; ++i) {
-    if (i == 4) {
-      continue;
-    }
+  for (auto& i : kTimersSupportWait) {
     auto result_start =
         client_->StartAndWait({i, fuchsia_hardware_hrtimer::Resolution::WithDuration(1'000ULL), 0});
     ASSERT_TRUE(result_start.is_error());
@@ -897,11 +881,7 @@ TEST_F(DriverTest, LeaseError) {
 }
 
 TEST_F(DriverTest, WaitStop) {
-  // Timers id 0 to 8 inclusive but not 4 support wait (via IRQ notification).
-  for (uint64_t i = 0; i < 9; ++i) {
-    if (i == 4) {
-      continue;
-    }
+  for (auto& i : kTimersSupportWait) {
     std::thread thread([this, i]() {
       auto result_start = client_->StartAndWait(
           {i, fuchsia_hardware_hrtimer::Resolution::WithDuration(1'000ULL), 0});
@@ -958,12 +938,8 @@ class DriverTestNoAutoStop : public ::testing::Test {
 
 TEST_F(DriverTestNoAutoStop, CancelOnDriverStop) {
   std::vector<std::thread> threads;
-  zx::event events[9];
-  // Timers id 0 to 8 inclusive but not 4 support events and wait (via IRQ notification).
-  for (uint64_t i = 0; i < 9; ++i) {
-    if (i == 4) {
-      continue;
-    }
+  zx::event events[kNumberOfTimers];
+  for (auto& i : kTimersSupportWait) {
     ASSERT_EQ(zx::event::create(0, &events[i]), ZX_OK);
     zx::event duplicate_event;
     events[i].duplicate(ZX_RIGHT_SAME_RIGHTS, &duplicate_event);
@@ -1072,11 +1048,7 @@ TEST_F(DriverTestNoPower, WaitTriggeringNoPower) {
   driver_test().RunInEnvironmentTypeContext(
       [](TestEnvironmentNoPower& env) { env.platform_device().TriggerAllIrqs(); });
 
-  // Timers id 0 to 8 inclusive but not 4 support wait (via IRQ notification).
-  for (uint64_t i = 0; i < 9; ++i) {
-    if (i == 4) {
-      continue;
-    }
+  for (auto& i : kTimersSupportWait) {
     auto result_start =
         client_->StartAndWait({i, fuchsia_hardware_hrtimer::Resolution::WithDuration(1'000ULL), 0});
     ASSERT_TRUE(result_start.is_error());  // Must fail, no power configuration.

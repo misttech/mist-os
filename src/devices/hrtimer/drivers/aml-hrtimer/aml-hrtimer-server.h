@@ -16,6 +16,9 @@
 #include <optional>
 
 namespace hrtimer {
+constexpr size_t kTimersAll[] = {0, 1, 2, 3, 4, 5, 6, 7, 8};
+constexpr size_t kTimersSupportWait[] = {0, 1, 2, 3, 5, 6, 7, 8};
+static constexpr size_t kNumberOfTimers = std::size(kTimersAll);
 
 class AmlHrtimerServer : public fidl::Server<fuchsia_hardware_hrtimer::Device> {
  public:
@@ -94,8 +97,6 @@ class AmlHrtimerServer : public fidl::Server<fuchsia_hardware_hrtimer::Device> {
     uint64_t start_ticks_left = 0;
     uint64_t last_ticks = 0;
   };
-
-  static constexpr size_t kNumberOfTimers = 9;
 
   static size_t TimerIndexFromId(uint64_t id) { return id; }
 
