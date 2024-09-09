@@ -4211,6 +4211,11 @@ assembly_input_bundle("kernel_oom_behavior_jobkill") {
   kernel_cmdline = [ "kernel.oom.behavior=jobkill" ]
 }
 
+# Disable kernel oom handling behavior.
+assembly_input_bundle("kernel_oom_behavior_disable") {
+  kernel_cmdline = [ "kernel.oom.enable=false" ]
+}
+
 # Enables log output to legacy serial console.
 assembly_input_bundle("kernel_serial_legacy") {
   kernel_cmdline = [ "kernel.serial=legacy" ]

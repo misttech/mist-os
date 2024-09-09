@@ -26,6 +26,9 @@ impl DefineSubsystemConfiguration<PlatformKernelConfig> for KernelSubsystem {
             (&BuildType::Eng, OOMBehavior::JobKill) => {
                 builder.platform_bundle("kernel_oom_behavior_jobkill")
             }
+            (&BuildType::Eng, OOMBehavior::Disable) => {
+                builder.platform_bundle("kernel_oom_behavior_disable")
+            }
             (&BuildType::UserDebug | &BuildType::User, _) => {
                 anyhow::bail!("'kernel.oom_behavior' can only be set on 'build_type=\"eng\"");
             }

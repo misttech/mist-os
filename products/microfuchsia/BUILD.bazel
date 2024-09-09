@@ -113,6 +113,16 @@ fuchsia_product_configuration(
             "paravirtualization": {
                 "enabled": "required",
             },
+            "kernel": {
+                # Use a smaller amount of entropy to reduce page table overhead.
+                # TODO(https://fxbug.dev/356417234): Select ASLR value for this configuration.
+                "aslr_entropy_bits": 8,
+
+                # The kernel's OOM monitoring mechanism does not work well with a "machine" (VM)
+                # that has tens of MB of headroom. Disable until we have a chance to tune it.
+                # TODO(https://fxbug.dev/337041626): Define OOM policy for this configuration.
+                "oom_behavior": "disable",
+            },
             "development_support": {
                 "authorized_ssh_keys_path": "LABEL(%s)" % authorized_ssh_keys_label if authorized_ssh_keys_label else None,
                 "vsock_development": True,
