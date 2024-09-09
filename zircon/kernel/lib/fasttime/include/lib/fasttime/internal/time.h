@@ -66,10 +66,16 @@ inline zx_ticks_t compute_monotonic_ticks(const TimeValues& tvalues) {
       return ZX_TIME_INFINITE_PAST;
     }
   }
-  // TODO(https://fxbug.dev/341785588): This code should be made resilient to a changing
-  // mono_ticks_offset once we start pausing the clock during system suspension.
-  return internal::get_raw_ticks(tvalues) +
-         tvalues.mono_ticks_offset.load(std::memory_order_relaxed);
+  while (true) {
+    // TODO(https://fxbug.dev/341785588): The get_raw_ticks call here does not correctly
+    // enforce ordering. This should be fixed before we suspend the system.
+    const zx_ticks_t obs1 = tvalues.mono_ticks_offset.load(std::memory_order_relaxed);
+    const zx_ticks_t raw_ticks = internal::get_raw_ticks(tvalues);
+    const zx_ticks_t obs2 = tvalues.mono_ticks_offset.load(std::memory_order_relaxed);
+    if (obs1 == obs2) {
+      return raw_ticks + obs1;
+    }
+  }
 }
 
 template <FasttimeVerificationMode kVerificationMode = FasttimeVerificationMode::kNormal>
