@@ -189,7 +189,7 @@ import("//src/developer/ffx/build/ffx_action.gni")
 #
 #   generate_fxfs (optional; default: false)
 #     [bool] Whether a fxfs image will be generated.
-#     Exclusive with generate_fvm and generate_fvm_*. EXPERIMENTAL.
+#     Exclusive with generate_fvm and generate_fvm_*.
 #
 #
 # Optional copy() for the images:
@@ -219,6 +219,8 @@ template("assembled_system") {
   if (defined(invoker.generate_fxfs)) {
     _generate_fxfs = invoker.generate_fxfs
   }
+  assert(!_generate_fvm || !_generate_fxfs,
+         "Only one of Fxfs and FVM can host blobs")
 
   _include_assembly_inputs = false
   if (defined(invoker.include_assembly_inputs)) {
@@ -358,6 +360,12 @@ template("assembled_system") {
     if (defined(invoker.generate_vbmeta)) {
       _generate_vbmeta = invoker.generate_vbmeta
     }
+
+    ramdisk_in_zbi = false
+    if (defined(invoker.ramdisk_in_zbi)) {
+      ramdisk_in_zbi = invoker.ramdisk_in_zbi && _supports_blobs
+    }
+
     _generate_fvm_fastboot = false
     if (defined(invoker.generate_fvm_fastboot)) {
       _generate_fvm_fastboot = invoker.generate_fvm_fastboot
@@ -366,13 +374,17 @@ template("assembled_system") {
     if (defined(invoker.generate_fvm_nand)) {
       _generate_fvm_nand = invoker.generate_fvm_nand
     }
-    assert(!(_generate_fvm || _generate_fvm_fastboot || _generate_fvm_nand) ||
-               !_generate_fxfs,
-           "Only one of Fxfs and FVM can host blobs")
 
-    ramdisk_in_zbi = false
-    if (defined(invoker.ramdisk_in_zbi)) {
-      ramdisk_in_zbi = invoker.ramdisk_in_zbi && _supports_blobs
+    if (_generate_fvm_fastboot || _generate_fvm_nand) {
+      assert(_generate_fvm,
+             "The 'generate_fvm_*' options require 'generate_fvm' to be true")
+    }
+
+    # These shouldn't be set when ramdisk_in_zbi is set
+    if (ramdisk_in_zbi) {
+      assert(
+          !_generate_fvm_fastboot && !_generate_fvm_nand,
+          "The 'generate_fvm_*'' options cannot be used whem 'ramdisk_in_zbi' is true.")
     }
 
     forward_variables_from(invoker, [ "image_metadata_overrides" ])

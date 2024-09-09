@@ -390,9 +390,15 @@ impl ImagesConfig {
     }
 
     /// Merge a product and board to construct an ImagesConfig.
+    ///
+    /// The 'zbi_only' parameter says whether or not the final image is only a zbi (such as for
+    /// recovery or bringup images).  This is used to tell Image Assembly not to create other
+    /// fvm images aside from the intermediate that's needed to embed an FVM in the ZBI, if a FVM
+    /// is needed at all.
     pub fn from_product_and_board(
         product: &pfc::ProductFilesystemConfig,
         board: &bfc::BoardFilesystemConfig,
+        zbi_only: bool,
     ) -> Result<Self> {
         let mut images = vec![];
 
@@ -461,43 +467,49 @@ impl ImagesConfig {
                         resize_image_file_to_fit: false,
                         truncate_to_length: board.fvm.truncate_to_length.clone(),
                     }));
-                    if let Some(sparse) = &board.fvm.sparse_output {
-                        outputs.push(FvmOutput::Sparse(SparseFvm {
-                            name: "fvm.sparse".into(),
-                            filesystems: filesystem_names.clone(),
-                            max_disk_size: sparse.max_disk_size.clone(),
-                        }));
-                    }
-                    if board.fvm.fastboot_output.is_some() && board.fvm.nand_output.is_some() {
-                        bail!("A board may only build either a fastboot or nand FVM but not both");
-                    }
-                    if let Some(fastboot) = &board.fvm.fastboot_output {
-                        outputs.push(FvmOutput::Standard(StandardFvm {
-                            name: "fvm.fastboot".into(),
-                            filesystems: filesystem_names.clone(),
-                            compress: fastboot.compress,
-                            resize_image_file_to_fit: true,
-                            truncate_to_length: fastboot.truncate_to_length.clone(),
-                        }));
-                    } else if let Some(nand) = &board.fvm.nand_output {
-                        let bfc::NandFvmConfig {
-                            max_disk_size,
-                            compress,
-                            block_count,
-                            oob_size,
-                            page_size,
-                            pages_per_block,
-                        } = nand.clone();
-                        outputs.push(FvmOutput::Nand(NandFvm {
-                            name: "fvm.fastboot".into(),
-                            filesystems: filesystem_names.clone(),
-                            max_disk_size,
-                            compress,
-                            block_count,
-                            oob_size,
-                            page_size,
-                            pages_per_block,
-                        }));
+                    if !zbi_only {
+                        //  Only create these FVM variants if this isn't a zbi-only image.
+
+                        if let Some(sparse) = &board.fvm.sparse_output {
+                            outputs.push(FvmOutput::Sparse(SparseFvm {
+                                name: "fvm.sparse".into(),
+                                filesystems: filesystem_names.clone(),
+                                max_disk_size: sparse.max_disk_size.clone(),
+                            }));
+                        }
+                        if board.fvm.fastboot_output.is_some() && board.fvm.nand_output.is_some() {
+                            bail!(
+                                "A board may only build either a fastboot or nand FVM but not both"
+                            );
+                        }
+                        if let Some(fastboot) = &board.fvm.fastboot_output {
+                            outputs.push(FvmOutput::Standard(StandardFvm {
+                                name: "fvm.fastboot".into(),
+                                filesystems: filesystem_names.clone(),
+                                compress: fastboot.compress,
+                                resize_image_file_to_fit: true,
+                                truncate_to_length: fastboot.truncate_to_length.clone(),
+                            }));
+                        } else if let Some(nand) = &board.fvm.nand_output {
+                            let bfc::NandFvmConfig {
+                                max_disk_size,
+                                compress,
+                                block_count,
+                                oob_size,
+                                page_size,
+                                pages_per_block,
+                            } = nand.clone();
+                            outputs.push(FvmOutput::Nand(NandFvm {
+                                name: "fvm.fastboot".into(),
+                                filesystems: filesystem_names.clone(),
+                                max_disk_size,
+                                compress,
+                                block_count,
+                                oob_size,
+                                page_size,
+                                pages_per_block,
+                            }));
+                        }
                     }
 
                     // Add the FVM images.
@@ -608,7 +620,7 @@ mod tests {
             ..Default::default()
         };
 
-        let images = ImagesConfig::from_product_and_board(&product, &board).unwrap();
+        let images = ImagesConfig::from_product_and_board(&product, &board, false).unwrap();
         assert_eq!(
             images,
             ImagesConfig {
@@ -646,7 +658,7 @@ mod tests {
             ..Default::default()
         };
 
-        let images = ImagesConfig::from_product_and_board(&product, &board).unwrap();
+        let images = ImagesConfig::from_product_and_board(&product, &board, false).unwrap();
         assert_eq!(
             images,
             ImagesConfig {
@@ -692,7 +704,7 @@ mod tests {
             ..Default::default()
         };
 
-        let images = ImagesConfig::from_product_and_board(&product, &board).unwrap();
+        let images = ImagesConfig::from_product_and_board(&product, &board, false).unwrap();
         assert_eq!(
             images,
             ImagesConfig {
@@ -788,7 +800,7 @@ mod tests {
             ..Default::default()
         };
 
-        let images = ImagesConfig::from_product_and_board(&product, &board).unwrap();
+        let images = ImagesConfig::from_product_and_board(&product, &board, false).unwrap();
         assert_eq!(
             images,
             ImagesConfig {
@@ -861,6 +873,80 @@ mod tests {
                                 pages_per_block: 4,
                             }),
                         ],
+                    }),
+                ],
+            }
+        );
+    }
+
+    #[test]
+    fn from_product_and_board_zbi_only_doesnt_produce_fvm_variants() {
+        let board = test_board_config_nand();
+        let product = pfc::ProductFilesystemConfig {
+            image_name: pfc::ImageName("a-product".into()),
+            watch_for_nand: false,
+            format_data_on_corruption: pfc::FormatDataOnCorruption(true),
+            no_zxcrypt: false,
+            image_mode: pfc::FilesystemImageMode::Partition,
+            volume: pfc::VolumeConfig::Fvm(pfc::FvmVolumeConfig {
+                data: Some(pfc::DataFvmVolumeConfig {
+                    use_disk_based_minfs_migration: true,
+                    data_filesystem_format: pfc::DataFilesystemFormat::Minfs,
+                }),
+                blob: Some(pfc::BlobFvmVolumeConfig { blob_layout: BlobfsLayout::Compact }),
+                reserved: Some(pfc::ReservedFvmVolumeConfig { reserved_slices: 7 }),
+            }),
+            ..Default::default()
+        };
+
+        let images = ImagesConfig::from_product_and_board(&product, &board, true).unwrap();
+        assert_eq!(
+            images,
+            ImagesConfig {
+                images: vec![
+                    Image::Zbi(Zbi {
+                        name: "a-product".into(),
+                        compression: bfc::ZbiCompression::ZStd,
+                        postprocessing_script: Some(bfc::PostProcessingScript {
+                            path: Some("path/to/script".into()),
+                            board_script_path: None,
+                            args: vec!["arg1".into(), "arg2".into()],
+                        }),
+                    }),
+                    Image::VBMeta(VBMeta {
+                        name: "a-product".into(),
+                        key: "path/to/key".into(),
+                        key_metadata: "path/to/metadata".into(),
+                        additional_descriptors: vec![],
+                    }),
+                    Image::Fvm(Fvm {
+                        slice_size: 5678,
+                        filesystems: vec![
+                            FvmFilesystem::EmptyData(EmptyData { name: "empty-data".into() }),
+                            FvmFilesystem::BlobFS(BlobFS {
+                                name: "blob".into(),
+                                layout: BlobfsLayout::Compact,
+                                maximum_bytes: Some(34),
+                                minimum_inodes: Some(56),
+                                minimum_data_bytes: Some(78),
+                                maximum_contents_size: Some(12),
+                            }),
+                            FvmFilesystem::Reserved(Reserved {
+                                name: "internal".into(),
+                                slices: 7,
+                            }),
+                        ],
+                        outputs: vec![FvmOutput::Standard(StandardFvm {
+                            name: "fvm".into(),
+                            filesystems: vec![
+                                "empty-data".to_string(),
+                                "blob".to_string(),
+                                "internal".to_string(),
+                            ],
+                            compress: false,
+                            resize_image_file_to_fit: false,
+                            truncate_to_length: None,
+                        }),],
                     }),
                 ],
             }
