@@ -65,23 +65,36 @@ def _instantiate_from_local_fuchsia_tree(ctx):
     _instantiate_from_local_dir(ctx, local_clang_arch)
 
 def _fuchsia_clang_repository_impl(ctx):
-    # Pre-evaluate paths of templated output files so that the repository does not need to be
-    # re-fetched after potentially talking to the network
+    # Pre-evaluate paths of templated output files so that the repository does
+    # not need to be re-fetched after potentially talking to the network
     ctx.path("BUILD.bazel")
     ctx.path("cc_toolchain_config.bzl")
 
+    # Claim dependency on the templates.
     crosstool_template = Label("//fuchsia/workspace/clang_templates:crosstool.BUILD.template")
     toolchain_config_template = Label("//fuchsia/workspace/clang_templates:cc_toolchain_config_template.bzl")
     cc_features_template_file = Label("//fuchsia/workspace/clang_templates:cc_features_template.bzl")
     defs_template_file = Label("//fuchsia/workspace/clang_templates:defs.bzl")
 
-    sanitizer_file = Label("//common:toolchains/clang/sanitizer.bzl")
-
     ctx.path(crosstool_template)
     ctx.path(toolchain_config_template)
     ctx.path(cc_features_template_file)
     ctx.path(defs_template_file)
-    ctx.path(sanitizer_file)
+
+    # Symlink in common toolchain helpers.
+    _common_helpers = [
+        "platforms/BUILD.bazel",
+        "platforms/utils.bzl",
+        "toolchains/clang/clang_utils.bzl",
+        "toolchains/clang/providers.bzl",
+        "toolchains/clang/repository_utils.bzl",
+        "toolchains/clang/sanitizer.bzl",
+        "toolchains/clang/toolchain_utils.bzl",
+    ]
+    for p in _common_helpers:
+        l = Label("//common:{}".format(p))
+        ctx.path(l)
+        ctx.symlink(l, p)
 
     # Hack to get the path to the sysroot directory, see
     # https://github.com/bazelbuild/bazel/issues/3901
@@ -97,7 +110,6 @@ def _fuchsia_clang_repository_impl(ctx):
     normalized_os = normalize_os(ctx)
     normalized_arch = normalize_arch(ctx)
 
-    ctx.symlink(sanitizer_file, "sanitizer.bzl")
     ctx.template(
         "cc_features.bzl",
         cc_features_template_file,
@@ -220,9 +232,8 @@ def _fuchsia_clang_repository_impl(ctx):
         substitutions = {
             "%{SYSROOT_PATH_PREFIX}": sysroot_path_prefix,
             "%{CLANG_VERSION}": clang_version,
-            "%{SDK_ROOT}": ctx.attr.sdk_root_label.workspace_name,
             "%{HOST_OS}": normalized_os,
-            "%{HOST_CPU}": ctx.os.arch,
+            "%{HOST_CPU}": normalized_arch,
         },
     )
 

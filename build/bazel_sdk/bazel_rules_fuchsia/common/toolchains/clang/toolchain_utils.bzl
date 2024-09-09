@@ -19,14 +19,16 @@ load(
 )
 load("//:toolchains/clang/providers.bzl", "ClangInfo")
 load("//:toolchains/clang/sanitizer.bzl", "sanitizer_features")
+load("//platforms:utils.bzl", "to_fuchsia_cpu_name", "to_fuchsia_os_name")
 
-def compute_clang_features(clang_info, target_os, target_cpu):
+def compute_clang_features(host_os, host_cpu, target_os, target_cpu):
     """Compute list of C++ toolchain features required by Clang.
 
     Args:
-      clang_info: A ClangInfo provider value.
-      target_os: Target OS, following Bazel conventions.
-      target_cpu: Target CPU, following Bazel conventions.
+      host_os: Host OS, following Fuchsia conventions.
+      host_cpu: Host CPU, following Fuchsia conventions.
+      target_os: Target OS, following Fuchsia conventions.
+      target_cpu: Target CPU, following Fuchsia conventions.
 
     Returns:
       A list of feature() objects.
@@ -93,7 +95,7 @@ def compute_clang_features(clang_info, target_os, target_cpu):
     )
 
     # https://fxbug.dev/42082246: ML inliner is unsupported on mac-arm64
-    fuchsia_host_tag = "{}-{}".format(clang_info.fuchsia_host_os, clang_info.fuchsia_host_arch)
+    fuchsia_host_tag = "{}-{}".format(host_os, host_cpu)
     use_ml_inliner = fuchsia_host_tag != "mac-arm64"
 
     opt_feature = feature(
@@ -162,38 +164,42 @@ def compute_clang_features(clang_info, target_os, target_cpu):
                             # set of flags so we can think of this as an override
                             "-O1",
                             "-mllvm",
-                        ] + [
-                            # Enable runtime counter relocation in Linux.
-                            "-runtime-counter-relocation",
-                        ] if is_linux else [
-                            # Enable coverage from system headers in Fuchsia.
-                            "-system-headers-coverage",
-                        ] if is_fuchsia else [],
+                        ] + (
+                            [
+                                # Enable runtime counter relocation in Linux.
+                                "-runtime-counter-relocation",
+                            ] if is_linux else [
+                                # Enable coverage from system headers in Fuchsia.
+                                "-system-headers-coverage",
+                            ] if is_fuchsia else []
+                        ),
                     ),
                 ],
             ),
-        ] + [
-            flag_set(
-                actions = [
-                    ACTION_NAMES.cpp_link_dynamic_library,
-                    ACTION_NAMES.cpp_link_executable,
-                    ACTION_NAMES.cpp_link_nodeps_dynamic_library,
-                ],
-                flag_groups = [
-                    flag_group(
-                        flags = [
-                            # The statically-linked profiling runtime depends on libzircon.
-                            "-lzircon",
-                            "-Wl",
-                            "-dynamic-linker=coverage/ld.so.1",
-                        ],
-                    ),
-                ],
-            ),
-        ] if is_fuchsia else [],
+        ] + (
+            [
+                flag_set(
+                    actions = [
+                        ACTION_NAMES.cpp_link_dynamic_library,
+                        ACTION_NAMES.cpp_link_executable,
+                        ACTION_NAMES.cpp_link_nodeps_dynamic_library,
+                    ],
+                    flag_groups = [
+                        flag_group(
+                            flags = [
+                                # The statically-linked profiling runtime depends on libzircon.
+                                "-lzircon",
+                                "-Wl",
+                                "-dynamic-linker=coverage/ld.so.1",
+                            ],
+                        ),
+                    ],
+                ),
+            ] if is_fuchsia else []
+        ),
     )
 
-    is_macos = target_os in ("osx", "macos")
+    is_macos = target_os == "mac"
 
     generate_linkmap_feature = feature(
         name = "generate_linkmap",
@@ -208,7 +214,7 @@ def compute_clang_features(clang_info, target_os, target_cpu):
                 flag_groups = [
                     flag_group(
                         flags = [
-                            "-Wl,-map=%{output_execpath}.map" if is_macos else "-Wl,--Map=%{output_execpath}",
+                            "-Wl,-Map=%{output_execpath}.map" if (is_macos or is_fuchsia) else "-Wl,--Map=%{output_execpath}",
                         ],
                         expand_if_available = "output_execpath",
                     ),
@@ -365,7 +371,12 @@ def _prebuilt_clang_cc_toolchain_config_impl(ctx):
     clang_info = ctx.attr.clang_info[ClangInfo]
 
     # TODO(digit): Change features list based on build variants
-    features = compute_clang_features(clang_info, ctx.attr.target_os, ctx.attr.target_arch)
+    features = compute_clang_features(
+        clang_info.fuchsia_host_os,
+        clang_info.fuchsia_host_arch,
+        to_fuchsia_os_name(ctx.attr.target_os),
+        to_fuchsia_cpu_name(ctx.attr.target_arch),
+    )
 
     return cc_common.create_cc_toolchain_config_info(
         ctx = ctx,
