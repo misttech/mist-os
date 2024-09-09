@@ -7,18 +7,18 @@
 ## set timeout 30
 
 # TODO(https://fxbug.dev/42077983): attach shouldn't be necessary.
-[zxdb] attach hello_starnix
-Waiting for process matching "hello_starnix".
+[zxdb] attach starnix_proc
+Waiting for process matching "starnix_proc".
 
-[zxdb] b hello_starnix.cc:9
-Created Breakpoint 1 @ hello_starnix.cc:9
+[zxdb] b starnix_proc.cc:9
+Created Breakpoint 1 @ starnix_proc.cc:9
 
-[zxdb] run-test --realm /core/testing:system-tests fuchsia-pkg://fuchsia.com/zxdb_e2e_inferiors#meta/hello_starnix.cm
-Attached Process 1 state=Running koid=?? name=data/bin/hello_starnix component=starnix_kernel.cm
-🛑 on bp 1 main() • hello_starnix.cc:9
+[zxdb] run-test --realm /core/testing:system-tests fuchsia-pkg://fuchsia.com/zxdb_e2e_inferiors#meta/starnix_proc.cm
+Attached Process 1 state=Running koid=?? name=data/bin/starnix_proc component=starnix_kernel.cm
+🛑 on bp 1 main() • starnix_proc.cc:9
 
 [zxdb] next
-🛑 main() • hello_starnix.cc:10
+🛑 main() • starnix_proc.cc:10
 
 # TODO(https://fxbug.dev/42081338): We should use hardware breakpoints here but they don't work on arm64.
 [zxdb] b sys_exit_group
@@ -32,7 +32,7 @@ Created Breakpoint 2 @ sys_exit_group
 # When optimization is on, there might be other inlined frame so we only check
 # the existence of sys_exit_group and main function in the backtrace.
 sys_exit_group
-main() • hello_starnix.cc
+main() • starnix_proc.cc
 
 [zxdb] bp rm
 Removed Breakpoint 2 @ sys_exit_group

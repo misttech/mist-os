@@ -104,8 +104,8 @@ if (is_host && has_board) {
     # once they are stable.
     if (target_cpu == "arm64") {
       sources += [
-        "scripts/hello_starnix_exception.script",
-        "scripts/hello_starnix_hardware_breakpoint.script",
+        "scripts/starnix_proc_exception.script",
+        "scripts/starnix_proc_hardware_breakpoint.script",
       ]
     } else {
       sources += [
