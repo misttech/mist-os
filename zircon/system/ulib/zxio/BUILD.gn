@@ -5,4 +5,5 @@
 # Do not use this target directly, instead depend on //sdk/lib/zxio:zxio.
 group("zxio") {
   public_deps = [ "//sdk/lib/zxio:zxio" ]
+  visibility = [ "//third_party/*" ]
 }
