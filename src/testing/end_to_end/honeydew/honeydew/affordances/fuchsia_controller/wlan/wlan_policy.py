@@ -362,7 +362,9 @@ class WlanPolicy(AsyncAdapter, wlan_policy.WlanPolicy):
                 f"ClientController.SaveNetwork() error {status}"
             ) from status
 
-    def scan_for_networks(self) -> list[str]:
+    @asyncmethod
+    # pylint: disable-next=invalid-overridden-method
+    async def scan_for_networks(self) -> list[str]:
         """Scans for networks.
 
         Returns:
@@ -371,8 +373,49 @@ class WlanPolicy(AsyncAdapter, wlan_policy.WlanPolicy):
         Raises:
             HoneydewWlanError: Error from WLAN stack.
             TypeError: Return value not a list.
+            RuntimeError: Client controller has not been initialized
         """
-        raise NotImplementedError()
+        if self._client_controller is None:
+            raise RuntimeError(
+                "Client controller has not been initialized; call "
+                "create_client_controller() before scan_for_networks()"
+            )
+
+        client, server = Channel.create()
+        iterator = f_wlan_policy.ScanResultIterator.Client(client.take())
+
+        try:
+            self._client_controller.proxy.scan_for_networks(
+                iterator=server,
+            )
+        except ZxStatus as status:
+            raise errors.HoneydewWlanError(
+                f"ClientController.ScanForNetworks() error {status}"
+            ) from status
+
+        # Collect results from iterator until the channel is closed.
+        ssids: set[str] = set()
+
+        while True:
+            try:
+                res = await iterator.get_next()
+                if res.err:
+                    raise errors.HoneydewWlanError(
+                        f"ScanResultIterator.GetNext() ScanErrorCode {res.err}"
+                    )
+            except ZxStatus as status:
+                if status.raw() == ZxStatus.ZX_ERR_PEER_CLOSED:
+                    # The server closed the channel, signifying the end of
+                    # elements.
+                    break
+                raise errors.HoneydewWlanError(
+                    f"ScanResultIterator.GetNext() error {status}"
+                ) from status
+
+            for scan_result in res.response.scan_results:
+                ssids.add(bytes(scan_result.id.ssid).decode("utf-8"))
+
+        return list(ssids)
 
     def set_new_update_listener(self) -> None:
         """Sets the update listener stream of the facade to a new stream.

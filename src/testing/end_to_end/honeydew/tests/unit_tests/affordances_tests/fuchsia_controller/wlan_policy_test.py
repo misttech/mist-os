@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 """Unit tests for honeydew.affordances.fuchsia_controller.wlan.wlan_policy."""
 
+import asyncio
 import unittest
 from collections.abc import Iterator
 from contextlib import contextmanager
@@ -28,6 +29,27 @@ from honeydew.typing.wlan import (
 )
 
 _TEST_SSID = "ThepromisedLAN"
+
+_TEST_MAC_ADDRESS_BYTES = bytes([1, 35, 69, 103, 137, 171])  # 01:23:45:67:89:ab
+
+
+def _make_scan_result(ssid: str) -> f_wlan_policy.ScanResult:
+    return f_wlan_policy.ScanResult(
+        id=f_wlan_policy.NetworkIdentifier(
+            ssid=list(ssid.encode("utf-8")),
+            type=f_wlan_policy.SecurityType.WPA2,
+        ),
+        entries=[
+            f_wlan_policy.Bss(
+                bssid=list(_TEST_MAC_ADDRESS_BYTES),
+                rssi=0,
+                frequency=0,
+                timestamp_nanos=0,
+            ),
+        ],
+        compatibility=f_wlan_policy.Compatibility.SUPPORTED,
+    )
+
 
 _T = TypeVar("_T")
 
@@ -73,6 +95,7 @@ class WlanPolicyFCTests(unittest.TestCase):
         self.client_state_updates_proxy: (
             f_wlan_policy.ClientStateUpdatesClient | None
         ) = None
+        self.scan_result_iterator: asyncio.Task[None] | None = None
 
     def tearDown(self) -> None:
         self.wlan_policy_obj.close()
@@ -319,8 +342,44 @@ class WlanPolicyFCTests(unittest.TestCase):
 
     def test_scan_for_networks(self) -> None:
         """Test if scan_for_networks works."""
-        with self.assertRaises(NotImplementedError):
-            self.wlan_policy_obj.scan_for_networks()
+        with self._mock_create_client_controller() as client_controller:
+            self.wlan_policy_obj.create_client_controller()
+
+            def scan_for_networks(iterator: Channel) -> None:
+                server = TestScanResultIteratorImpl(
+                    iterator,
+                    items=[
+                        [
+                            _TEST_SSID,
+                            _TEST_SSID + "2",
+                        ],
+                        [
+                            _TEST_SSID,
+                            _TEST_SSID + "3",
+                        ],
+                    ],
+                )
+                self.scan_result_iterator = (
+                    self.wlan_policy_obj.loop().create_task(server.serve())
+                )
+
+            client_controller.scan_for_networks = mock.Mock(
+                wraps=scan_for_networks
+            )
+
+            networks = self.wlan_policy_obj.scan_for_networks()
+            networks.sort()  # order does not matter
+            self.assertEqual(
+                networks,
+                [
+                    _TEST_SSID,
+                    _TEST_SSID + "2",
+                    _TEST_SSID + "3",
+                ],
+            )
+
+            assert self.scan_result_iterator is not None
+            self.wlan_policy_obj._cancel_task(self.scan_result_iterator)
 
     def test_set_new_update_listener_without_client_controller(self) -> None:
         """Test if set_new_update_listener creates a client controller if it
@@ -505,6 +564,24 @@ class WlanPolicyFCTests(unittest.TestCase):
         """Test if stop_client_connections fails without a client controller."""
         with self.assertRaises(RuntimeError):
             self.wlan_policy_obj.stop_client_connections()
+
+
+class TestScanResultIteratorImpl(f_wlan_policy.ScanResultIterator.Server):
+    """Iterator for scan results."""
+
+    def __init__(self, server: Channel, items: list[list[str]]) -> None:
+        super().__init__(server)
+        self._items = items
+
+    def get_next(self) -> f_wlan_policy.ScanResultIteratorGetNextResponse:
+        """Get next set of scan result SSIDs."""
+        if len(self._items) == 0:
+            raise ZxStatus(ZxStatus.ZX_ERR_PEER_CLOSED)
+        return f_wlan_policy.ScanResultIteratorGetNextResponse(
+            scan_results=[
+                _make_scan_result(ssid) for ssid in self._items.pop(0)
+            ],
+        )
 
 
 if __name__ == "__main__":
