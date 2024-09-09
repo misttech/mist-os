@@ -11,6 +11,8 @@
 
 #include <gtest/gtest.h>
 
+#include "src/lib/files/file.h"
+#include "src/lib/fxl/strings/string_number_conversions.h"
 #include "src/starnix/tests/syscalls/cpp/test_helper.h"
 
 namespace {
@@ -24,6 +26,26 @@ std::pair<int, int> CreatePipe() {
   int pipe_fds[2];
   SAFE_SYSCALL(pipe(pipe_fds));
   return {pipe_fds[0], pipe_fds[1]};
+}
+
+// Waits until the given process' main thread becomes a zombie.
+void WaitUntilMainThreadIsZombie(pid_t pid) {
+  std::string stat_path =
+      "/proc/" + fxl::NumberToString(pid) + "/task/" + fxl::NumberToString(pid) + "/stat";
+
+  while (true) {
+    std::string contents;
+    ASSERT_TRUE(files::ReadFileToString(stat_path, &contents));
+
+    char state;
+    ASSERT_EQ(sscanf(contents.c_str(), "%*d %*s %c", &state), 1) << contents;
+
+    if (state == 'Z') {
+      return;  // thread is a Zombie, we're done waiting!
+    }
+
+    usleep(10000);  // check again in 10 ms.
+  }
 }
 
 TEST(PidFdTest, ProcessCanBeOpened) {
@@ -104,6 +126,10 @@ TEST(PidFdTest, PollWaitsForSecondaryThreadsToo) {
 
   close(r_fd);
 
+  // Wait for the main thread to exit.
+  ASSERT_NO_FATAL_FAILURE(WaitUntilMainThreadIsZombie(pid));
+
+  // Open a pidfd using the main thread's pid.
   int pid_fd = DoPidFdOpen(pid);
   ASSERT_GE(pid_fd, 0);
 

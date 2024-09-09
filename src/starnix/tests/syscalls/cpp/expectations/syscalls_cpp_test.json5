@@ -65,6 +65,9 @@
                 "FusePathWalkRefreshDirEntryTest/FusePathWalkRefreshDirEntryTest.PathWalkRefreshDirEntry/5",
                 "FusePathWalkRefreshDirEntryTest/FusePathWalkRefreshDirEntryTest.PathWalkRefreshDirEntry/6",
                 "FusePathWalkRefreshDirEntryTest/FusePathWalkRefreshDirEntryTest.PathWalkRefreshDirEntry/7",
+
+                // TODO(https://fxbug.dev/365540067)
+                "PidFdTest.PollWaitsForSecondaryThreadsToo",
             ],
         },
         {
