@@ -279,7 +279,8 @@ TEST_F(ExtentCacheTest, GcConsistency) {
     SummaryBlock *sum_blk = sum_page->GetAddress<SummaryBlock>();
     ASSERT_EQ(GetSumType((&sum_blk->footer)), kSumTypeData);
 
-    ASSERT_EQ(GcTester::GcDataSegment(fs_->GetGcManager(), *sum_blk, segno, GcType::kFgGc), ZX_OK);
+    ASSERT_EQ(GcTester::GcDataSegment(fs_->GetSegmentManager(), *sum_blk, segno, GcType::kFgGc),
+              ZX_OK);
   }
 
   // Check extent cache after gc

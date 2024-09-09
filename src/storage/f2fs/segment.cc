@@ -389,23 +389,6 @@ bool SegmentManager::HasNotEnoughFreeSecs(uint32_t freed, uint32_t needed) {
          fs_->GetFreeSectionsForDirtyPages() + ReservedSections() + needed_sec;
 }
 
-// This function balances dirty node and dentry pages.
-// In addition, it controls garbage collection.
-void SegmentManager::BalanceFs(uint32_t num_blocks) {
-  if (fs_->IsOnRecovery()) {
-    return;
-  }
-
-  // If there is not enough memory, wait for writeback.
-  fs_->WaitForAvailableMemory();
-  if (HasNotEnoughFreeSecs(0, num_blocks)) {
-    if (auto ret = fs_->GetGcManager().Run(); ret.is_error()) {
-      // Run() returns ZX_ERR_UNAVAILABLE when there is no available victim section, otherwise BUG
-      ZX_DEBUG_ASSERT(ret.error_value() == ZX_ERR_UNAVAILABLE);
-    }
-  }
-}
-
 void SegmentManager::LocateDirtySegment(uint32_t segno, DirtyType dirty_type) {
   // need not be added
   if (IsCurSeg(segno)) {

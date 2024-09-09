@@ -27,7 +27,6 @@ static_library("f2fs") {
     "file_cache.h",
     "fsck.cc",
     "gc.cc",
-    "gc.h",
     "inline.cc",
     "memory_watcher.cc",
     "memory_watcher.h",

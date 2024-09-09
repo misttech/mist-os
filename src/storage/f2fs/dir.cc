@@ -481,7 +481,7 @@ void Dir::DeleteEntry(const DentryInfo &info, fbl::RefPtr<Page> &page, VnodeF2fs
   page_lock.reset();
 
   if (bit_pos == kNrDentryInBlock) {
-    TruncateHole(page->GetIndex(), page->GetIndex() + 1, true);
+    TruncateHoleUnsafe(page->GetIndex(), page->GetIndex() + 1, true);
   }
 }
 

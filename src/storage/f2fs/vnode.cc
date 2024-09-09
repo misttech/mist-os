@@ -528,6 +528,11 @@ zx_status_t VnodeF2fs::TruncateBlocks(uint64_t from) {
 }
 
 zx_status_t VnodeF2fs::TruncateHole(pgoff_t pg_start, pgoff_t pg_end, bool zero) {
+  fs::SharedLock lock(f2fs::GetGlobalLock());
+  return TruncateHoleUnsafe(pg_start, pg_end, zero);
+}
+
+zx_status_t VnodeF2fs::TruncateHoleUnsafe(pgoff_t pg_start, pgoff_t pg_end, bool zero) {
   InvalidatePages(pg_start, pg_end, zero);
   for (pgoff_t index = pg_start; index < pg_end; ++index) {
     auto path_or = GetNodePath(*this, index);
