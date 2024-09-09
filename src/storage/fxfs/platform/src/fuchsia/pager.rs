@@ -529,7 +529,7 @@ async fn page_in_chunk<P: PagerBacked>(
 
 /// Represents a dirty range of page aligned bytes within a pager backed VMO.
 #[repr(C)]
-#[derive(Debug, Copy, Clone, Default)]
+#[derive(Debug, Copy, Clone, Default, PartialEq, Eq)]
 pub struct VmoDirtyRange {
     offset: u64,
     length: u64,
@@ -824,6 +824,8 @@ mod tests {
         vmo: zx::Vmo,
         pager_packet_receiver_registration: PagerPacketReceiverRegistration<Self>,
         pager: Arc<Pager>,
+        /// page in requests get logged so we can compare actual calls to to expectations.
+        page_in_requests: Mutex<Vec<Range<u64>>>,
     }
 
     impl MockFile {
@@ -831,7 +833,35 @@ mod tests {
             let (vmo, pager_packet_receiver_registration) = pager
                 .create_vmo(page_size(), zx::VmoOptions::RESIZABLE | zx::VmoOptions::TRAP_DIRTY)
                 .unwrap();
-            Self { pager, vmo, pager_packet_receiver_registration }
+            Self {
+                pager,
+                vmo,
+                pager_packet_receiver_registration,
+                page_in_requests: Default::default(),
+            }
+        }
+        fn new_with_size_and_type(
+            pager: Arc<Pager>,
+            size: u64,
+            vmo_type: fuchsia_zircon::VmoOptions,
+        ) -> Self {
+            let (vmo, pager_packet_receiver_registration) =
+                pager.create_vmo(size, vmo_type | zx::VmoOptions::TRAP_DIRTY).unwrap();
+            Self {
+                pager,
+                vmo,
+                pager_packet_receiver_registration,
+                page_in_requests: Default::default(),
+            }
+        }
+
+        // Returns the page_in requests received for this file.
+        fn page_in_requests(&self, reset: bool) -> Vec<Range<u64>> {
+            if reset {
+                std::mem::take(&mut *self.page_in_requests.lock().unwrap())
+            } else {
+                self.page_in_requests.lock().unwrap().clone()
+            }
         }
     }
 
@@ -876,6 +906,7 @@ mod tests {
 
         fn page_in(self: Arc<Self>, range: PageInRange<Self>) {
             let aux_vmo = zx::Vmo::create(range.len()).unwrap();
+            self.page_in_requests.lock().unwrap().push(range.range());
             range.supply_pages(&aux_vmo, 0);
         }
 
@@ -1496,5 +1527,107 @@ mod tests {
         // will succeed and the second page will be dropped.
         let err = file.vmo.read(&mut data, page_size()).unwrap_err();
         assert_eq!(err, zx::Status::BAD_STATE);
+    }
+
+    #[fuchsia::test(threads = 2)]
+    async fn test_grow_zeroes_new_bytes() {
+        // We expect that when we grow a file, the pages between the old and the new size
+        // are zeroed. Reads and writes to these pages after growing a file should NOT
+        // trigger any page-in requests.
+        let scope = ExecutionScope::new();
+        let pager = Arc::new(Pager::new(scope.clone()).unwrap());
+        let page_size = page_size();
+        let vmo_size: u64 = page_size * 2;
+        let file_a = Arc::new(MockFile::new_with_size_and_type(
+            pager.clone(),
+            vmo_size,
+            zx::VmoOptions::RESIZABLE,
+        ));
+        let file_b = Arc::new(MockFile::new_with_size_and_type(
+            pager.clone(),
+            vmo_size,
+            zx::VmoOptions::UNBOUNDED,
+        ));
+        let mut buffer = vec![VmoDirtyRange::default(); 3];
+        pager.register_file(&file_a);
+        pager.register_file(&file_b);
+
+        assert_eq!(file_a.vmo().get_content_size().unwrap(), page_size * 2);
+        assert_eq!(file_b.vmo().get_content_size().unwrap(), page_size * 2);
+
+        // Page in is expected.
+        let mut read_buf = vec![0u8; page_size as usize];
+        file_a.vmo().read(&mut read_buf, page_size).expect("read a");
+        assert_eq!(file_a.page_in_requests(true), vec![page_size..page_size * 2]);
+        file_b.vmo().read(&mut read_buf, page_size).expect("read b");
+        assert_eq!(file_b.page_in_requests(true), vec![page_size..page_size * 2]);
+
+        // Grow the VMO size and confirm intermediate pages (2..8) are zero.
+        let vmo_size = page_size * 8;
+        file_a.vmo().set_size(vmo_size).unwrap();
+        file_b.vmo().set_content_size(&(vmo_size)).unwrap();
+
+        assert_eq!(
+            pager.query_dirty_ranges(file_a.vmo(), 0..vmo_size, &mut buffer).unwrap(),
+            (1, 0)
+        );
+        assert_eq!(
+            buffer[0],
+            VmoDirtyRange { offset: page_size * 2, length: page_size * 6, options: 1 },
+        );
+        // Note: A growing set_content_size() doesn't zero ranges. Ideally it would.
+        // In Fxfs with RESIZABLE VMO, we always grow with set_size and shrink with
+        // set_content_size() so this doesn't affect us with RESIZABLE VMO.
+        assert_eq!(
+            pager.query_dirty_ranges(file_b.vmo(), 0..vmo_size, &mut buffer).unwrap(),
+            (0, 0)
+        );
+        assert_eq!(
+            buffer[0],
+            VmoDirtyRange { offset: page_size * 2, length: page_size * 6, options: 1 },
+        );
+
+        // The extra pages are all zero. We shouldn't see any page_in requests.
+        let mut read_buf = vec![0u8; page_size as usize * 6];
+        file_a.vmo().read(&mut read_buf, page_size * 2).expect("read a");
+        assert_eq!(file_a.page_in_requests(true), vec![]);
+
+        // Note: Currently set_content_size won't zero when growing. This is not ideal for us.
+        file_b.vmo().read(&mut read_buf, page_size * 2).expect("read b");
+        assert_eq!(file_b.page_in_requests(true), vec![page_size * 2..vmo_size]);
+
+        scope.wait().await;
+    }
+
+    #[fuchsia::test(threads = 2)]
+    async fn test_pathological_shrink_unbounded_vmo() {
+        let scope = ExecutionScope::new();
+        let pager = Arc::new(Pager::new(scope.clone()).unwrap());
+        let page_size = page_size();
+        let vmo_size: u64 = page_size * 25600; // 100MiB
+        let file = Arc::new(MockFile::new_with_size_and_type(
+            pager.clone(),
+            vmo_size,
+            zx::VmoOptions::UNBOUNDED,
+        ));
+        let mut buffer = vec![VmoDirtyRange::default(); 10];
+        pager.register_file(&file);
+
+        assert_eq!(file.vmo().get_content_size().unwrap(), vmo_size);
+
+        for i in (0..25600u64 / 1024).rev() {
+            file.vmo().set_content_size(&(i + page_size / 2)).unwrap();
+        }
+
+        assert_eq!(pager.query_dirty_ranges(file.vmo(), 0..vmo_size, &mut buffer).unwrap(), (2, 0));
+        assert_eq!(
+            buffer[0..2],
+            [
+                VmoDirtyRange { offset: 0, length: page_size, options: 0 },
+                VmoDirtyRange { offset: page_size, length: vmo_size - page_size, options: 1 },
+            ]
+        );
+
+        scope.wait().await;
     }
 }
