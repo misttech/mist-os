@@ -598,7 +598,7 @@ void ProfileServer::Advertise(fuchsia::bluetooth::bredr::ProfileAdvertiseRequest
     auto rec = fidl_helpers::ServiceDefinitionToServiceRecord(definition);
     // Drop the receiver on error.
     if (rec.is_error()) {
-      bt_log(WARN, "fidl", "%s: Failed to create service record from service defintion",
+      bt_log(WARN, "fidl", "%s: Failed to create service record from service definition",
              __FUNCTION__);
       callback(fpromise::error(fuchsia::bluetooth::ErrorCode::INVALID_ARGUMENTS));
       return;

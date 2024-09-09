@@ -21,7 +21,7 @@ class BrEdrConnectionServer : public ServerBase<fuchsia::bluetooth::Channel> {
   static constexpr size_t kDefaultReceiveQueueLimit = 20;
 
   // `channel` is the Channel that this Connection corresponds to. BrEdrConnection server will
-  // activate and manage the lifetime of this chanel. `closed_callback` will be called when either
+  // activate and manage the lifetime of this channel. `closed_callback` will be called when either
   // the Connection protocol or the L2CAP channel closes. Returns nullptr on failure (failure to
   // activate the Channel).
   static std::unique_ptr<BrEdrConnectionServer> Create(

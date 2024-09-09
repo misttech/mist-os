@@ -526,7 +526,7 @@ void HostServer::Connect(fbt::PeerId peer_id, ConnectCallback callback) {
 
 // Attempt to disconnect the peer identified by |peer_id| from all transports.
 // If the peer is already not connected, return success. If the peer is
-// disconnected succesfully, return success.
+// disconnected successfully, return success.
 void HostServer::Disconnect(fbt::PeerId peer_id, DisconnectCallback callback) {
   bt::PeerId id{peer_id.value};
   bt_log(INFO, "fidl", "%s: (peer: %s)", __FUNCTION__, bt_str(id));
