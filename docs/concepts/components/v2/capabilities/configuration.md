@@ -205,6 +205,71 @@ Vector example:
 a component can `optionally` use a configuration capability. For more information, please see
 [consuming optional capabilities][consuming-optional-capabilities]
 
+### Default values
+
+If a config capability is routed optionally, then a route from `void` means that
+it will be given a default value. It is an error to specify an optional
+configuration capability without providing a default value.
+
+There are two ways to specify a default value.
+
+#### Defining the default value in the CML file
+
+The simplest way to define a default value is to specify it in CML with the
+`default` keyword.
+
+For example:
+
+```json5
+{
+    use: {
+        config: "fuchsia.config.MyInt",
+        key: "my_int",
+        type: "int8",
+        availability: "optional",
+        default: 42,
+    }
+}
+```
+
+The `fuchsia.config.MyInt` will receive a default value of `42` if it is routed
+from `void`.
+
+The CML file default value will always be taken over the Structured
+Configuration default value defined in the next section.
+
+#### (Legacy) Structured Configuration as a default value
+
+A legacy way to define a default value is to include it in the component's
+package as structured configuration.
+
+For example:
+
+```json5
+{
+    use: {
+        config: "fuchsia.config.MyInt",
+        key: "my_int",
+        type: "int8",
+        availability: "optional",
+    }
+    config: {
+        my_int: {
+            type: "int8"
+        },
+    }
+}
+```
+
+In the above example, `fuchsia.config.MyInt` is being used as `my_int` which
+matches a configuration value in the `config` block. The developer can then use
+existing [structured configuration][structured-configuration] tools to create a
+configuration file in the component's package that will be used as the default
+value.
+
+Note that this approach is always overriden by specifying `default:` directly in
+the CML file.
+
 ## Resolving routes and broken routes
 
 Structured configuration values are handed to a component when it starts up.
