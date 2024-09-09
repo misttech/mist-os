@@ -5554,13 +5554,50 @@ zx_status_t VmCowPages::SupplyPagesLocked(uint64_t offset, uint64_t len, VmPageS
                              /*is_pending_add=*/true);
     }
 
-    if (can_borrow_locked() && src_page.IsPage() &&
+    // Defer individual range updates so we can do them in blocks.
+    const CanOverwriteContent overwrite_policy = options == SupplyOptions::TransferData
+                                                     ? CanOverwriteContent::NonZero
+                                                     : CanOverwriteContent::None;
+    auto page_transaction = BeginAddPageLocked(offset, overwrite_policy);
+    if (page_transaction.is_error()) {
+      // Unable to insert anything at this slot, cleanup any existing src_page and handle a
+      // completed run.
+      if (src_page.IsPageOrRef()) {
+        DEBUG_ASSERT(src_page.IsPage());
+        vm_page_t* page = src_page.ReleasePage();
+        DEBUG_ASSERT(!list_in_list(&page->queue_node));
+        list_add_tail(&freed_list, &page->queue_node);
+      }
+
+      if (likely(page_transaction.status_value() == ZX_ERR_ALREADY_EXISTS)) {
+        // We hit the end of a run of absent pages, so notify the page source
+        // of any new pages that were added and reset the tracking variables.
+        if (new_pages_len) {
+          RangeChangeUpdateLocked(new_pages_start, new_pages_len, RangeChangeOp::Unmap);
+          if (page_source_) {
+            page_source_->OnPagesSupplied(new_pages_start, new_pages_len);
+          }
+        }
+        new_pages_start = offset + PAGE_SIZE;
+        new_pages_len = 0;
+        offset += PAGE_SIZE;
+        continue;
+      } else {
+        // Only cause for this should be an out of memory from the kernel heap when attempting to
+        // allocate a page list node.
+        status = page_transaction.status_value();
+        ASSERT(status == ZX_ERR_NO_MEMORY);
+        break;
+      }
+    }
+    VmPageOrMarker old_page;
+    if (options != SupplyOptions::PhysicalPageProvider && can_borrow_locked() &&
+        src_page.IsPage() &&
         pmm_physical_page_borrowing_config()->is_borrowing_in_supplypages_enabled()) {
       // Assert some things we implicitly know are true (currently).  We can avoid explicitly
       // checking these in the if condition for now.
       DEBUG_ASSERT(!is_source_supplying_specific_physical_pages());
       DEBUG_ASSERT(!src_page.Page()->is_loaned());
-      DEBUG_ASSERT(options != SupplyOptions::PhysicalPageProvider);
       // Try to replace src_page with a loaned page.  We allocate the loaned page one page at a time
       // to avoid failing the allocation due to asking for more loaned pages than there are free
       // loaned pages.
@@ -5571,48 +5608,35 @@ zx_status_t VmCowPages::SupplyPagesLocked(uint64_t offset, uint64_t len, VmPageS
       // !is_borrowing_in_supplypages_enabled().
       if (alloc_status == ZX_OK) {
         CopyPageForReplacementLocked(new_page, src_page.Page());
-        vm_page_t* old_page = src_page.ReleasePage();
-        list_add_tail(&freed_list, &old_page->queue_node);
-        src_page = VmPageOrMarker::Page(new_page);
+        vm_page_t* free_page = src_page.ReleasePage();
+        list_add_tail(&freed_list, &free_page->queue_node);
+        old_page = CompleteAddPageLocked(*page_transaction, VmPageOrMarker::Page(new_page),
+                                         /*do_range_update=*/false);
+      } else {
+        old_page = CompleteAddPageLocked(*page_transaction, ktl::move(src_page),
+                                         /*do_range_update=*/false);
       }
-      DEBUG_ASSERT(src_page.IsPage());
-    }
-
-    // Defer individual range updates so we can do them in blocks.
-    const CanOverwriteContent overwrite_policy = options == SupplyOptions::TransferData
-                                                     ? CanOverwriteContent::NonZero
-                                                     : CanOverwriteContent::None;
-    VmPageOrMarker old_page;
-    if (options == SupplyOptions::PhysicalPageProvider) {
+    } else if (options == SupplyOptions::PhysicalPageProvider) {
       // When being called from the physical page provider, we need to call InitializeVmPage(),
       // which AddNewPageLocked() will do.
       // We only want to populate offsets that have true absence of content, so do not overwrite
       // anything in the page list.
-      DEBUG_ASSERT(src_page.IsPage());
-      status = AddNewPageLocked(offset, src_page.Page(), overwrite_policy, &old_page,
-                                /*zero=*/false, /*do_range_update=*/false);
-      if (status == ZX_OK) {
-        // The page was successfully added, but we still have a copy in the src_page, so we need to
-        // release it, however need to store the result in a temporary as we are required to use the
-        // result of ReleasePage.
-        [[maybe_unused]] vm_page_t* unused = src_page.ReleasePage();
-      }
+      old_page = CompleteAddNewPageLocked(*page_transaction, src_page.Page(),
+                                          /*zero=*/false, /*do_range_update=*/false);
+      // The page was successfully added, but we still have a copy in the src_page, so we need to
+      // release it, however need to store the result in a temporary as we are required to use the
+      // result of ReleasePage.
+      [[maybe_unused]] vm_page_t* unused = src_page.ReleasePage();
     } else {
       // When not being called from the physical page provider, we don't need InitializeVmPage(),
       // so we use AddPageLocked().
       // We only want to populate offsets that have true absence of content, so do not overwrite
       // anything in the page list.
-      auto result = AddPageLocked(offset, ktl::move(src_page), overwrite_policy,
-                                  /*do_range_update=*/false);
-      status = result.status_value();
-      if (status == ZX_OK) {
-        old_page = ktl::move(*result);
-      }
+      old_page = CompleteAddPageLocked(*page_transaction, ktl::move(src_page),
+                                       /*do_range_update=*/false);
     }
-
     // If the content overwrite policy was None, the old page should be empty.
     DEBUG_ASSERT(overwrite_policy != CanOverwriteContent::None || old_page.IsEmpty());
-
     // Clean up the old_page if necessary. The action taken is different depending on the state of
     // old_page:
     // 1. Page: If old_page is backed by an actual page, remove it from the page queues and free
@@ -5631,42 +5655,13 @@ zx_status_t VmCowPages::SupplyPagesLocked(uint64_t offset, uint64_t len, VmPageS
       list_add_tail(&freed_list, &released_page->queue_node);
     } else if (old_page.IsReference()) {
       FreeReference(old_page.ReleaseReference());
-    }
-    DEBUG_ASSERT(!old_page.IsInterval());
-
-    if (status == ZX_OK) {
-      new_pages_len += PAGE_SIZE;
     } else {
-      if (src_page.IsPageOrRef()) {
-        DEBUG_ASSERT(src_page.IsPage());
-        vm_page_t* page = src_page.ReleasePage();
-        DEBUG_ASSERT(!list_in_list(&page->queue_node));
-        list_add_tail(&freed_list, &page->queue_node);
-      }
-
-      if (likely(status == ZX_ERR_ALREADY_EXISTS)) {
-        status = ZX_OK;
-
-        // We hit the end of a run of absent pages, so notify the page source
-        // of any new pages that were added and reset the tracking variables.
-        if (new_pages_len) {
-          RangeChangeUpdateLocked(new_pages_start, new_pages_len, RangeChangeOp::Unmap);
-          if (page_source_) {
-            page_source_->OnPagesSupplied(new_pages_start, new_pages_len);
-          }
-        }
-        new_pages_start = offset + PAGE_SIZE;
-        new_pages_len = 0;
-      } else {
-        // Only cause for this should be an out of memory from the kernel heap when attempting to
-        // allocate a page list node.
-        ASSERT(status == ZX_ERR_NO_MEMORY);
-        break;
-      }
+      DEBUG_ASSERT(!old_page.IsInterval());
     }
-    offset += PAGE_SIZE;
-
+    new_pages_len += PAGE_SIZE;
     DEBUG_ASSERT(new_pages_start + new_pages_len <= end);
+
+    offset += PAGE_SIZE;
   }
   // Unless there was an error and we exited the loop early, then there should have been the correct
   // number of pages in the splice list.
