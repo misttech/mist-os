@@ -168,6 +168,8 @@ type MediaButtonsEvent = table {
     5: power bool;
     @available(added=20)
     6: function bool;
+    @available(added=NEXT)
+    7: device_id uint32;
 };
 
 type InputEvent = strict union {

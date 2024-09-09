@@ -1,6 +1,12 @@
 [
     {
         "kind": "table/member",
+        "name": "fuchsia.ui.input3/KeyEvent.device_id",
+        "ordinal": "8",
+        "type": "uint32"
+    },
+    {
+        "kind": "table/member",
         "name": "fuchsia.ui.input3/KeyEvent.key",
         "ordinal": "3",
         "type": "fuchsia.input/Key"

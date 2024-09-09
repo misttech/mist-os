@@ -682,6 +682,12 @@
     },
     {
         "kind": "table/member",
+        "name": "fuchsia.ui.input/MediaButtonsEvent.device_id",
+        "ordinal": "7",
+        "type": "uint32"
+    },
+    {
+        "kind": "table/member",
         "name": "fuchsia.ui.input/MediaButtonsEvent.function",
         "ordinal": "6",
         "type": "bool"
