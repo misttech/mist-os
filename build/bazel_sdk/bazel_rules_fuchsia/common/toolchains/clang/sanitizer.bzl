@@ -14,10 +14,6 @@ load(
     "flag_set",
 )
 
-# This marker allows this fragment to be merged into the cc_features_template
-# in the fuchsia_clang repository
-# __BEGIN_FUCHSIA_SDK_INCLUDE__
-
 sanitizer_feature = feature(
     name = "sanitizer",
     flag_sets = [
@@ -110,5 +106,3 @@ sanitizer_features = [
     _sanitizer_feature("msan", "memory"),
     _sanitizer_feature("tsan", "thread"),
 ]
-
-# __END_FUCHSIA_SDK_INCLUDE__

@@ -94,29 +94,16 @@ def _fuchsia_clang_repository_impl(ctx):
         "defs.bzl",
     )
 
-    # The following pulls the sanitizer features out of the common rules
-    sanitizer_file_content = ctx.read(sanitizer_file).split("\n")
-    start, end = [
-        i
-        for i, s in enumerate(sanitizer_file_content)
-        if "__BEGIN_FUCHSIA_SDK_INCLUDE__" in s or
-           "__END_FUCHSIA_SDK_INCLUDE__" in s
-    ]
-    sanitizer_file_fragment = "\n".join(
-        sanitizer_file_content[start:end + 1],
-    )
-
     normalized_os = normalize_os(ctx)
     normalized_arch = normalize_arch(ctx)
 
+    ctx.symlink(sanitizer_file, "sanitizer.bzl")
     ctx.template(
         "cc_features.bzl",
         cc_features_template_file,
         substitutions = {
             "%{HOST_OS}": normalized_os,
             "%{HOST_ARCH}": normalized_arch,
-            # Note we need to keep the '#' here to prevent buildifier from failing.
-            "#{{SANITIZER_FEATURES}}": sanitizer_file_fragment,
         },
         executable = False,
     )

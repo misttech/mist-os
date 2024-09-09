@@ -16,7 +16,8 @@ load(
     "find_cpp_toolchain",
     "use_cpp_toolchain",
 )
-load("@fuchsia_clang//:cc_features.bzl", "features", "sanitizer_features")
+load("@fuchsia_clang//:cc_features.bzl", "features")
+load("@fuchsia_clang//:sanitizer.bzl", "sanitizer_features")
 
 def _cc_toolchain_config_impl(ctx):
     target_system_name = ctx.attr.cpu + "-unknown-fuchsia"
