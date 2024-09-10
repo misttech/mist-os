@@ -96,7 +96,7 @@ typedef uint32_t magma_cache_policy_t;
 
 typedef uint32_t magma_format_t;
 
-// Values must match fuchsia.sysmem.PixelFormatType
+// Values must match corresponding fuchsia.images2.PixelFormat values.
 #define MAGMA_FORMAT_INVALID ((magma_format_t)0)
 #define MAGMA_FORMAT_R8G8B8A8 ((magma_format_t)1)
 #define MAGMA_FORMAT_BGRA32 ((magma_format_t)101)
@@ -115,7 +115,8 @@ typedef uint32_t magma_format_t;
 #define MAGMA_FORMAT_R8G8 ((magma_format_t)114)
 
 typedef uint64_t magma_format_modifier_t;
-// These must match the fuchsia.sysmem format modifier values.
+// These must match the corresponding fuchsia.images2.PixelFormatModifier or
+// fuchsia.images2.FORMAT_MODIFIER_* values.
 #define MAGMA_FORMAT_MODIFIER_LINEAR ((magma_format_modifier_t)0x0000000000000000)
 
 #define MAGMA_FORMAT_MODIFIER_INTEL_X_TILED ((magma_format_modifier_t)0x0100000000000001)
