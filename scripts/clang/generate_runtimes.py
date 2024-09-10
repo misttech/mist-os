@@ -73,7 +73,9 @@ def read_soname_and_build_id(readelf, filename):
     outs, _ = p.communicate()
     if p.returncode != 0:
         raise Exception("failed to read notes")
-    match = re.search(r"Library soname: \[([a-zA-Z0-9.+_-]+)\]", outs.decode())
+    match = re.search(
+        r"Library soname: \[?([a-zA-Z0-9.+_-]+)\]?", outs.decode()
+    )
     soname = match.group(1) if match else None
     match = re.search(r"Build ID: ([a-zA-Z0-9_-]+)", outs.decode())
     if not match:
