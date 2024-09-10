@@ -10,9 +10,8 @@ use crate::client::protection::{build_protection_ie, Protection, ProtectionIe, S
 use crate::client::{
     report_connect_finished, report_roam_finished, AssociationFailure, ClientConfig,
     ClientSmeStatus, ConnectResult, ConnectTransactionEvent, ConnectTransactionSink,
-    EstablishRsnaFailure, EstablishRsnaFailureReason, ReassociationFailure,
-    RoamEstablishRsnaFailure, RoamFailure, RoamResult, RoamResultMalformedFailure,
-    RoamSelectNetworkFailure, RoamStartMalformedFailure, ServingApInfo,
+    EstablishRsnaFailure, EstablishRsnaFailureReason, RoamFailure, RoamFailureType, RoamResult,
+    ServingApInfo,
 };
 use crate::{mlme_event_name, MlmeRequest, MlmeSink};
 use anyhow::bail;
@@ -660,10 +659,14 @@ impl Associated {
                     cfg: self.cfg,
                     action: PostDisconnectAction::ReportRoamFinished {
                         sink: self.connect_txn_sink,
-                        result: RoamStartMalformedFailure {
-                            selected_bssid: ind.selected_bssid.clone().into(),
+                        result: RoamFailure {
+                            failure_type: RoamFailureType::RoamStartMalformedFailure,
                             selected_bss: None,
                             disconnect_info,
+                            selected_bssid: ind.selected_bssid.clone().into(),
+                            auth_method: self.auth_method,
+                            status_code: fidl_ieee80211::StatusCode::RefusedReasonUnspecified,
+                            establish_rsna_failure_reason: None,
                         }
                         .into(),
                     },
@@ -710,7 +713,16 @@ impl Associated {
                     cfg: self.cfg,
                     action: PostDisconnectAction::ReportRoamFinished {
                         sink: self.connect_txn_sink,
-                        result: RoamSelectNetworkFailure { selected_bss, disconnect_info }.into(),
+                        result: RoamFailure {
+                            status_code: fidl_ieee80211::StatusCode::RefusedReasonUnspecified,
+                            failure_type: RoamFailureType::SelectNetworkFailure,
+                            selected_bssid: selected_bss.bssid.clone(),
+                            disconnect_info,
+                            auth_method: self.auth_method,
+                            selected_bss: Some(selected_bss),
+                            establish_rsna_failure_reason: None,
+                        }
+                        .into(),
                     },
                     timeout_id,
                 });
@@ -913,12 +925,15 @@ impl Roaming {
                 reason_code: ind.reason_code,
             }),
         };
-        let failure = RoamFailure::ReassociationFailure(ReassociationFailure {
-            selected_bss: *self.cmd.bss.clone(),
-            bss_protection: (*self.cmd.bss).protection(),
-            code: fidl_ieee80211::StatusCode::SpuriousDeauthOrDisassoc,
+        let failure = RoamFailure {
+            failure_type: RoamFailureType::ReassociationFailure,
+            selected_bss: Some(*self.cmd.bss.clone()),
             disconnect_info,
-        });
+            selected_bssid: self.cmd.bss.bssid,
+            auth_method: self.auth_method,
+            status_code: fidl_ieee80211::StatusCode::SpuriousDeauthOrDisassoc,
+            establish_rsna_failure_reason: None,
+        };
         Err(Self::to_disconnecting(
             msg,
             failure,
@@ -951,12 +966,15 @@ impl Roaming {
                 reason_code: ind.reason_code,
             }),
         };
-        let failure = RoamFailure::ReassociationFailure(ReassociationFailure {
-            selected_bss: *self.cmd.bss.clone(),
-            bss_protection: (*self.cmd.bss).protection(),
-            code: fidl_ieee80211::StatusCode::SpuriousDeauthOrDisassoc,
+        let failure = RoamFailure {
+            failure_type: RoamFailureType::ReassociationFailure,
+            selected_bss: Some(*self.cmd.bss.clone()),
             disconnect_info,
-        });
+            selected_bssid: self.cmd.bss.bssid,
+            auth_method: self.auth_method,
+            status_code: fidl_ieee80211::StatusCode::SpuriousDeauthOrDisassoc,
+            establish_rsna_failure_reason: None,
+        };
         Err(self.to_idle(msg, failure, state_change_ctx))
     }
 
@@ -982,13 +1000,15 @@ impl Roaming {
                     reason_code: fidl_ieee80211::ReasonCode::UnspecifiedReason,
                 }),
             };
-            let failure = RoamFailure::RoamResultMalformedFailure(RoamResultMalformedFailure {
-                // Note: the failure will have the roam start's target BSSID; and because we know
-                // that the result is malformed, a deauth will be sent to the target BSS regardless
-                // of the value in `target_bss_authenticated`.
-                selected_bssid: self.cmd.bss.bssid.into(),
+            let failure = RoamFailure {
+                failure_type: RoamFailureType::RoamResultMalformedFailure,
+                selected_bss: None,
                 disconnect_info,
-            });
+                selected_bssid: self.cmd.bss.bssid,
+                auth_method: self.auth_method,
+                status_code: fidl_ieee80211::StatusCode::RefusedReasonUnspecified,
+                establish_rsna_failure_reason: None,
+            };
             return Err(AfterRoamFailureState::Disconnecting(Self::to_disconnecting(
                 msg.to_owned(),
                 failure,
@@ -1017,13 +1037,15 @@ impl Roaming {
                                 },
                             ),
                         };
-                        let failure =
-                            RoamFailure::RoamEstablishRsnaFailure(RoamEstablishRsnaFailure {
-                                selected_bss: *self.cmd.bss.clone(),
-                                auth_method: self.auth_method,
-                                reason: failure_reason,
-                                disconnect_info,
-                            });
+                        let failure = RoamFailure {
+                            failure_type: RoamFailureType::EstablishRsnaFailure,
+                            selected_bss: Some(*self.cmd.bss.clone()),
+                            disconnect_info,
+                            selected_bssid: self.cmd.bss.bssid,
+                            auth_method: self.auth_method,
+                            status_code: fidl_ieee80211::StatusCode::EstablishRsnaFailure,
+                            establish_rsna_failure_reason: Some(failure_reason),
+                        };
 
                         if ind.target_bss_authenticated {
                             return Err(AfterRoamFailureState::Disconnecting(
@@ -1081,12 +1103,15 @@ impl Roaming {
                         },
                     ),
                 };
-                let failure = RoamFailure::ReassociationFailure(ReassociationFailure {
-                    selected_bss: *self.cmd.bss.clone(),
-                    bss_protection: (*self.cmd.bss).protection(),
-                    code: ind.status_code,
+                let failure = RoamFailure {
+                    failure_type: RoamFailureType::ReassociationFailure,
+                    selected_bss: Some(*self.cmd.bss.clone()),
                     disconnect_info,
-                });
+                    selected_bssid: self.cmd.bss.bssid,
+                    auth_method: self.auth_method,
+                    status_code: ind.status_code,
+                    establish_rsna_failure_reason: None,
+                };
 
                 if ind.target_bss_authenticated {
                     Err(AfterRoamFailureState::Disconnecting(Self::to_disconnecting(
@@ -1149,12 +1174,15 @@ impl Roaming {
                 };
                 // Send ReassociationFailure here, similar to the AssociationFailure returned by SAE
                 // timeout handler in connect path.
-                let failure = RoamFailure::ReassociationFailure(ReassociationFailure {
-                    selected_bss: *self.cmd.bss.clone(),
-                    bss_protection: (*self.cmd.bss).protection(),
-                    code: fidl_ieee80211::StatusCode::RefusedReasonUnspecified,
+                let failure = RoamFailure {
+                    failure_type: RoamFailureType::ReassociationFailure,
+                    selected_bss: Some(*self.cmd.bss.clone()),
                     disconnect_info,
-                });
+                    selected_bssid: self.cmd.bss.bssid,
+                    auth_method: self.auth_method,
+                    status_code: fidl_ieee80211::StatusCode::RefusedReasonUnspecified,
+                    establish_rsna_failure_reason: None,
+                };
 
                 // In the unlikely case that we are authenticated but the last frame was dropped,
                 // send a deauth.
@@ -1177,10 +1205,10 @@ impl Roaming {
         warn!("{}", msg);
         _ = state_change_ctx.replace(StateChangeContext::Disconnect {
             msg,
-            disconnect_source: failure.disconnect_info().disconnect_source,
+            disconnect_source: failure.disconnect_info.disconnect_source,
         });
 
-        send_deauthenticate_request(&failure.selected_bssid(), &context.mlme_sink);
+        send_deauthenticate_request(&failure.selected_bssid, &context.mlme_sink);
         let timeout_id = context.timer.schedule(event::DeauthenticateTimeout);
 
         Disconnecting {
@@ -1199,7 +1227,7 @@ impl Roaming {
         warn!("{}", msg);
         _ = state_change_ctx.replace(StateChangeContext::Disconnect {
             msg,
-            disconnect_source: failure.disconnect_info().disconnect_source,
+            disconnect_source: failure.disconnect_info.disconnect_source,
         });
         report_roam_finished(&mut self.cmd.connect_txn_sink, failure.into());
         Idle { cfg: self.cfg }
@@ -1917,11 +1945,7 @@ mod tests {
         create_connect_conf, create_on_wmm_status_resp, expect_stream_empty, fake_wmm_param,
         mock_psk_supplicant, MockSupplicant, MockSupplicantController,
     };
-    use crate::client::RoamFailure::{
-        ReassociationFailure, RoamResultMalformedFailure, RoamSelectNetworkFailure,
-        RoamStartMalformedFailure,
-    };
-    use crate::client::{inspect, ConnectTransactionStream};
+    use crate::client::{inspect, ConnectTransactionStream, RoamFailureType};
     use crate::test_utils::{self, make_wpa1_ie};
     use crate::MlmeStream;
 
@@ -3428,6 +3452,25 @@ mod tests {
         });
     }
 
+    fn expect_roam_failure_emitted(
+        failure_type: RoamFailureType,
+        status_code: fidl_ieee80211::StatusCode,
+        selected_bssid: [u8; 6],
+        mlme_event_name: fidl_sme::DisconnectMlmeEventName,
+        connect_txn_stream: &mut ConnectTransactionStream,
+    ) {
+        assert_variant!(connect_txn_stream.try_next(), Ok(Some(ConnectTransactionEvent::OnRoamResult { result })) => {
+            assert_variant!(result, RoamResult::Failed(failure) => {
+                assert_eq!(failure.failure_type, failure_type);
+                assert_eq!(failure.status_code, status_code);
+                assert_eq!(failure.selected_bssid, selected_bssid.into());
+                assert_variant!(failure.disconnect_info.disconnect_source, fidl_sme::DisconnectSource::Mlme(cause) => {
+                    assert_eq!(cause.mlme_event_name, mlme_event_name);
+                });
+            });
+        });
+    }
+
     #[test]
     fn malformed_roam_start_ind_causes_disconnect() {
         let mut h = TestHelper::new();
@@ -3473,18 +3516,13 @@ mod tests {
         let state = state.on_mlme_event(deauth_conf, &mut h.context);
         assert_idle(state);
 
-        // User should be notified that the roam attempt failed.
-        assert_variant!(connect_txn_stream.try_next(), Ok(Some(ConnectTransactionEvent::OnRoamResult { result })) => {
-            assert_variant!(result, RoamResult::Failed(RoamStartMalformedFailure(_)));
-            assert_variant!(result, RoamResult::Failed(failure) => {
-                assert_eq!(failure.status_code(), fidl_ieee80211::StatusCode::RefusedReasonUnspecified);
-                assert_eq!(failure.selected_bssid(), selected_bssid.into());
-                assert_variant!(failure.disconnect_info().disconnect_source, fidl_sme::DisconnectSource::Mlme(fidl_sme::DisconnectCause {
-                    mlme_event_name: fidl_sme::DisconnectMlmeEventName::RoamStartIndication,
-                    ..
-                }));
-            });
-        });
+        expect_roam_failure_emitted(
+            RoamFailureType::RoamStartMalformedFailure,
+            fidl_ieee80211::StatusCode::RefusedReasonUnspecified,
+            selected_bssid,
+            fidl_sme::DisconnectMlmeEventName::RoamStartIndication,
+            &mut connect_txn_stream,
+        );
 
         assert_data_tree!(h.inspector, root: contains {
             usme: contains {
@@ -3540,18 +3578,13 @@ mod tests {
         let state = state.on_mlme_event(deauth_conf, &mut h.context);
         assert_idle(state);
 
-        // User should be notified that the roam attempt failed
-        assert_variant!(connect_txn_stream.try_next(), Ok(Some(ConnectTransactionEvent::OnRoamResult { result })) => {
-            assert_variant!(result, RoamResult::Failed(RoamSelectNetworkFailure(_)));
-            assert_variant!(result, RoamResult::Failed(failure) => {
-                assert_eq!(failure.status_code(), fidl_ieee80211::StatusCode::RefusedReasonUnspecified);
-                assert_eq!(failure.selected_bssid(), selected_bssid.into());
-                assert_variant!(failure.disconnect_info().disconnect_source, fidl_sme::DisconnectSource::Mlme(fidl_sme::DisconnectCause {
-                    mlme_event_name: fidl_sme::DisconnectMlmeEventName::RoamStartIndication,
-                    ..
-                }));
-            });
-        });
+        expect_roam_failure_emitted(
+            RoamFailureType::SelectNetworkFailure,
+            fidl_ieee80211::StatusCode::RefusedReasonUnspecified,
+            selected_bssid,
+            fidl_sme::DisconnectMlmeEventName::RoamStartIndication,
+            &mut connect_txn_stream,
+        );
 
         assert_data_tree!(h.inspector, root: contains {
             usme: contains {
@@ -3671,18 +3704,13 @@ mod tests {
         let state = state.on_mlme_event(deauth_conf, &mut h.context);
         assert_idle(state);
 
-        // User should be notified that the roam attempt failed.
-        assert_variant!(connect_txn_stream.try_next(), Ok(Some(ConnectTransactionEvent::OnRoamResult { result })) => {
-            assert_variant!(result, RoamResult::Failed(ReassociationFailure(_)));
-            assert_variant!(result, RoamResult::Failed(failure) => {
-                assert_eq!(failure.status_code(), status_code);
-                assert_eq!(failure.selected_bssid(), selected_bssid.into());
-                assert_variant!(failure.disconnect_info().disconnect_source, fidl_sme::DisconnectSource::Mlme(fidl_sme::DisconnectCause {
-                    mlme_event_name: fidl_sme::DisconnectMlmeEventName::RoamResultIndication,
-                    ..
-                }));
-            });
-        });
+        expect_roam_failure_emitted(
+            RoamFailureType::ReassociationFailure,
+            status_code,
+            selected_bssid,
+            fidl_sme::DisconnectMlmeEventName::RoamResultIndication,
+            &mut connect_txn_stream,
+        );
 
         assert_data_tree!(h.inspector, root: contains {
             usme: contains {
@@ -3737,20 +3765,13 @@ mod tests {
         let state = state.on_mlme_event(deauth_conf, &mut h.context);
         assert_idle(state);
 
-        // User should be notified that the roam attempt failed.
-        assert_variant!(connect_txn_stream.try_next(), Ok(Some(ConnectTransactionEvent::OnRoamResult { result })) => {
-            assert_variant!(result, RoamResult::Failed(RoamResultMalformedFailure(_)));
-            assert_variant!(result, RoamResult::Failed(failure) => {
-                // Failure status code will be overwritten, rather than using malformed result status.
-                assert_eq!(failure.status_code(), fidl_ieee80211::StatusCode::RefusedReasonUnspecified);
-                // Failure will have original target BSSID, not malformed result target BSSID.
-                assert_eq!(failure.selected_bssid(), selected_bssid.into());
-                assert_variant!(failure.disconnect_info().disconnect_source, fidl_sme::DisconnectSource::Mlme(fidl_sme::DisconnectCause {
-                    mlme_event_name: fidl_sme::DisconnectMlmeEventName::RoamResultIndication,
-                    ..
-                }));
-            });
-        });
+        expect_roam_failure_emitted(
+            RoamFailureType::RoamResultMalformedFailure,
+            fidl_ieee80211::StatusCode::RefusedReasonUnspecified,
+            selected_bssid,
+            fidl_sme::DisconnectMlmeEventName::RoamResultIndication,
+            &mut connect_txn_stream,
+        );
 
         assert_data_tree!(h.inspector, root: contains {
             usme: contains {

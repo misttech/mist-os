@@ -404,185 +404,66 @@ impl ConnectFailure {
 }
 
 #[derive(Debug, PartialEq)]
-pub enum RoamFailure {
-    RoamSelectNetworkFailure(RoamSelectNetworkFailure),
-    RoamStartMalformedFailure(RoamStartMalformedFailure),
-    RoamResultMalformedFailure(RoamResultMalformedFailure),
-    ReassociationFailure(ReassociationFailure),
-    RoamEstablishRsnaFailure(RoamEstablishRsnaFailure),
+pub enum RoamFailureType {
+    SelectNetworkFailure,
+    RoamStartMalformedFailure,
+    RoamResultMalformedFailure,
+    ReassociationFailure,
+    EstablishRsnaFailure,
+}
+
+#[derive(Debug, PartialEq)]
+pub struct RoamFailure {
+    failure_type: RoamFailureType,
+    pub selected_bssid: Bssid,
+    pub status_code: fidl_ieee80211::StatusCode,
+    pub disconnect_info: fidl_sme::DisconnectInfo,
+    auth_method: Option<auth::MethodName>,
+    pub selected_bss: Option<BssDescription>,
+    establish_rsna_failure_reason: Option<EstablishRsnaFailureReason>,
 }
 
 impl RoamFailure {
-    pub fn selected_bssid(&self) -> Bssid {
-        match self {
-            RoamFailure::RoamSelectNetworkFailure(RoamSelectNetworkFailure {
-                selected_bss,
-                ..
-            })
-            | RoamFailure::ReassociationFailure(ReassociationFailure { selected_bss, .. })
-            | RoamFailure::RoamEstablishRsnaFailure(RoamEstablishRsnaFailure {
-                selected_bss,
-                ..
-            }) => selected_bss.bssid,
-            RoamFailure::RoamResultMalformedFailure(RoamResultMalformedFailure {
-                selected_bssid,
-                ..
-            })
-            | RoamFailure::RoamStartMalformedFailure(RoamStartMalformedFailure {
-                selected_bssid,
-                ..
-            }) => *selected_bssid,
-        }
-    }
-
-    pub fn selected_bss(&self) -> Option<BssDescription> {
-        match self {
-            RoamFailure::RoamSelectNetworkFailure(RoamSelectNetworkFailure {
-                selected_bss,
-                ..
-            })
-            | RoamFailure::ReassociationFailure(ReassociationFailure { selected_bss, .. })
-            | RoamFailure::RoamEstablishRsnaFailure(RoamEstablishRsnaFailure {
-                selected_bss,
-                ..
-            }) => Some(selected_bss.clone()),
-            RoamFailure::RoamResultMalformedFailure(_) => None,
-            RoamFailure::RoamStartMalformedFailure(RoamStartMalformedFailure {
-                selected_bss,
-                ..
-            }) => selected_bss.clone(),
-        }
-    }
-
-    pub fn status_code(&self) -> fidl_ieee80211::StatusCode {
-        match self {
-            RoamFailure::ReassociationFailure(ReassociationFailure { code, .. }) => *code,
-            RoamFailure::RoamEstablishRsnaFailure(_) => {
-                fidl_ieee80211::StatusCode::EstablishRsnaFailure
-            }
-            RoamFailure::RoamResultMalformedFailure(_)
-            | RoamFailure::RoamSelectNetworkFailure(_)
-            | RoamFailure::RoamStartMalformedFailure(_) => {
-                fidl_ieee80211::StatusCode::RefusedReasonUnspecified
-            }
-        }
-    }
-
-    pub fn disconnect_info(&self) -> fidl_sme::DisconnectInfo {
-        match self {
-            RoamFailure::RoamSelectNetworkFailure(RoamSelectNetworkFailure {
-                disconnect_info,
-                ..
-            })
-            | RoamFailure::ReassociationFailure(ReassociationFailure { disconnect_info, .. })
-            | RoamFailure::RoamEstablishRsnaFailure(RoamEstablishRsnaFailure {
-                disconnect_info,
-                ..
-            })
-            | RoamFailure::RoamResultMalformedFailure(RoamResultMalformedFailure {
-                disconnect_info,
-                ..
-            })
-            | RoamFailure::RoamStartMalformedFailure(RoamStartMalformedFailure {
-                disconnect_info,
-                ..
-            }) => *disconnect_info,
-        }
-    }
-
     /// Returns true if failure was likely caused by rejected credentials.
     /// Very similar to `ConnectFailure::likely_due_to_credential_rejected`.
     pub fn likely_due_to_credential_rejected(&self) -> bool {
-        match self {
-            // WPA1 and WPA2.
-            RoamFailure::RoamEstablishRsnaFailure(RoamEstablishRsnaFailure {
-                auth_method: Some(auth::MethodName::Psk),
-                reason:
-                    EstablishRsnaFailureReason::RsnaResponseTimeout(
+        match self.failure_type {
+            // WPA1 and WPA2
+            RoamFailureType::EstablishRsnaFailure => match self.auth_method {
+                Some(auth::MethodName::Psk) => match self.establish_rsna_failure_reason {
+                    Some(EstablishRsnaFailureReason::RsnaResponseTimeout(
                         wlan_rsn::Error::LikelyWrongCredential,
-                    ),
-                ..
-            })
-            | RoamFailure::RoamEstablishRsnaFailure(RoamEstablishRsnaFailure {
-                auth_method: Some(auth::MethodName::Psk),
-                reason:
-                    EstablishRsnaFailureReason::RsnaCompletionTimeout(
+                    ))
+                    | Some(EstablishRsnaFailureReason::RsnaCompletionTimeout(
                         wlan_rsn::Error::LikelyWrongCredential,
-                    ),
-                ..
-            }) => true,
-
-            // WEP.
-            RoamFailure::ReassociationFailure(ReassociationFailure {
-                bss_protection: BssProtection::Wep,
-                code: fidl_ieee80211::StatusCode::RefusedUnauthenticatedAccessNotSupported,
-                ..
-            }) => true,
-
-            // WPA3.
-            RoamFailure::ReassociationFailure(ReassociationFailure {
-                bss_protection: BssProtection::Wpa3Personal,
-                code: fidl_ieee80211::StatusCode::RejectedSequenceTimeout,
-                ..
-            })
-            | RoamFailure::ReassociationFailure(ReassociationFailure {
-                bss_protection: BssProtection::Wpa2Wpa3Personal,
-                code: fidl_ieee80211::StatusCode::RejectedSequenceTimeout,
-                ..
-            }) => true,
+                    )) => true,
+                    _ => false,
+                },
+                _ => false,
+            },
+            RoamFailureType::ReassociationFailure => {
+                match &self.selected_bss {
+                    Some(selected_bss) => match selected_bss.protection() {
+                        // WEP
+                        BssProtection::Wep => match self.status_code {
+                            fidl_ieee80211::StatusCode::RefusedUnauthenticatedAccessNotSupported => true,
+                            _ => false,
+                        },
+                        // WPA3
+                        BssProtection::Wpa3Personal
+                        | BssProtection::Wpa2Wpa3Personal => match self.status_code {
+                            fidl_ieee80211::StatusCode::RejectedSequenceTimeout => true,
+                            _ => false,
+                        },
+                        _ => false,
+                    },
+                    // If selected_bss is unavailable, there's a bigger problem with the roam
+                    // attempt than just a rejected credential.
+                    None => false,
+                }
+            }
             _ => false,
         }
-    }
-}
-
-#[derive(Debug, PartialEq)]
-pub struct RoamSelectNetworkFailure {
-    pub selected_bss: BssDescription,
-    pub disconnect_info: fidl_sme::DisconnectInfo,
-}
-
-impl From<RoamSelectNetworkFailure> for RoamFailure {
-    fn from(failure: RoamSelectNetworkFailure) -> Self {
-        RoamFailure::RoamSelectNetworkFailure(failure)
-    }
-}
-
-#[derive(Debug, PartialEq)]
-pub struct RoamResultMalformedFailure {
-    pub selected_bssid: Bssid,
-    pub disconnect_info: fidl_sme::DisconnectInfo,
-}
-
-impl From<RoamResultMalformedFailure> for RoamFailure {
-    fn from(failure: RoamResultMalformedFailure) -> Self {
-        RoamFailure::RoamResultMalformedFailure(failure)
-    }
-}
-
-#[derive(Debug, PartialEq)]
-pub struct RoamStartMalformedFailure {
-    pub selected_bssid: Bssid,
-    pub selected_bss: Option<BssDescription>,
-    pub disconnect_info: fidl_sme::DisconnectInfo,
-}
-
-impl From<RoamStartMalformedFailure> for RoamFailure {
-    fn from(failure: RoamStartMalformedFailure) -> Self {
-        RoamFailure::RoamStartMalformedFailure(failure)
-    }
-}
-
-#[derive(Debug, PartialEq)]
-pub struct ReassociationFailure {
-    pub selected_bss: BssDescription,
-    pub bss_protection: BssProtection,
-    pub code: fidl_ieee80211::StatusCode,
-    pub disconnect_info: fidl_sme::DisconnectInfo,
-}
-
-impl From<ReassociationFailure> for RoamFailure {
-    fn from(failure: ReassociationFailure) -> Self {
-        RoamFailure::ReassociationFailure(failure)
     }
 }
 
@@ -628,20 +509,6 @@ pub enum EstablishRsnaFailureReason {
 impl From<EstablishRsnaFailure> for ConnectFailure {
     fn from(failure: EstablishRsnaFailure) -> Self {
         ConnectFailure::EstablishRsnaFailure(failure)
-    }
-}
-
-#[derive(Debug, PartialEq)]
-pub struct RoamEstablishRsnaFailure {
-    pub selected_bss: BssDescription,
-    pub auth_method: Option<auth::MethodName>,
-    pub reason: EstablishRsnaFailureReason,
-    pub disconnect_info: fidl_sme::DisconnectInfo,
-}
-
-impl From<RoamEstablishRsnaFailure> for RoamFailure {
-    fn from(failure: RoamEstablishRsnaFailure) -> Self {
-        RoamFailure::RoamEstablishRsnaFailure(failure)
     }
 }
 
@@ -1314,19 +1181,86 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_detection_of_rejected_wpa1_or_wpa2_credentials() {
+    #[test_case(EstablishRsnaFailureReason::RsnaResponseTimeout(
+        wlan_rsn::Error::LikelyWrongCredential
+    ))]
+    #[test_case(EstablishRsnaFailureReason::RsnaCompletionTimeout(
+        wlan_rsn::Error::LikelyWrongCredential
+    ))]
+    fn test_connect_detection_of_rejected_wpa1_or_wpa2_credentials(
+        reason: EstablishRsnaFailureReason,
+    ) {
         let failure = ConnectFailure::EstablishRsnaFailure(EstablishRsnaFailure {
             auth_method: Some(auth::MethodName::Psk),
-            reason: EstablishRsnaFailureReason::RsnaCompletionTimeout(
-                wlan_rsn::Error::LikelyWrongCredential,
-            ),
+            reason,
         });
         assert!(failure.likely_due_to_credential_rejected());
     }
 
+    #[test_case(fake_bss_description!(Wpa1), EstablishRsnaFailureReason::RsnaResponseTimeout(wlan_rsn::Error::LikelyWrongCredential))]
+    #[test_case(fake_bss_description!(Wpa1), EstablishRsnaFailureReason::RsnaCompletionTimeout(wlan_rsn::Error::LikelyWrongCredential))]
+    #[test_case(fake_bss_description!(Wpa1Wpa2TkipOnly), EstablishRsnaFailureReason::RsnaResponseTimeout(wlan_rsn::Error::LikelyWrongCredential))]
+    #[test_case(fake_bss_description!(Wpa1Wpa2TkipOnly), EstablishRsnaFailureReason::RsnaCompletionTimeout(wlan_rsn::Error::LikelyWrongCredential))]
+    #[test_case(fake_bss_description!(Wpa2), EstablishRsnaFailureReason::RsnaResponseTimeout(wlan_rsn::Error::LikelyWrongCredential))]
+    #[test_case(fake_bss_description!(Wpa2), EstablishRsnaFailureReason::RsnaCompletionTimeout(wlan_rsn::Error::LikelyWrongCredential))]
+    fn test_roam_detection_of_rejected_wpa1_or_wpa2_credentials(
+        selected_bss: BssDescription,
+        failure_reason: EstablishRsnaFailureReason,
+    ) {
+        let disconnect_info = fidl_sme::DisconnectInfo {
+            is_sme_reconnecting: false,
+            disconnect_source: fidl_sme::DisconnectSource::Mlme(fidl_sme::DisconnectCause {
+                mlme_event_name: fidl_sme::DisconnectMlmeEventName::RoamResultIndication,
+                reason_code: fidl_ieee80211::ReasonCode::UnspecifiedReason,
+            }),
+        };
+        let failure = RoamFailure {
+            status_code: fidl_ieee80211::StatusCode::RefusedUnauthenticatedAccessNotSupported,
+            failure_type: RoamFailureType::EstablishRsnaFailure,
+            selected_bssid: selected_bss.bssid.clone(),
+            disconnect_info,
+            auth_method: Some(auth::MethodName::Psk),
+            establish_rsna_failure_reason: Some(failure_reason),
+            selected_bss: Some(selected_bss),
+        };
+        assert!(failure.likely_due_to_credential_rejected());
+    }
+
     #[test]
-    fn test_detection_of_rejected_wep_credentials() {
+    fn test_connect_detection_of_rejected_wpa3_credentials() {
+        let bss = fake_bss_description!(Wpa3);
+        let failure = ConnectFailure::AssociationFailure(AssociationFailure {
+            bss_protection: bss.protection(),
+            code: fidl_ieee80211::StatusCode::RejectedSequenceTimeout,
+        });
+
+        assert!(failure.likely_due_to_credential_rejected());
+    }
+
+    #[test]
+    fn test_roam_detection_of_rejected_wpa3_credentials() {
+        let selected_bss = fake_bss_description!(Wpa3);
+        let disconnect_info = fidl_sme::DisconnectInfo {
+            is_sme_reconnecting: false,
+            disconnect_source: fidl_sme::DisconnectSource::Mlme(fidl_sme::DisconnectCause {
+                mlme_event_name: fidl_sme::DisconnectMlmeEventName::RoamResultIndication,
+                reason_code: fidl_ieee80211::ReasonCode::UnspecifiedReason,
+            }),
+        };
+        let failure = RoamFailure {
+            status_code: fidl_ieee80211::StatusCode::RejectedSequenceTimeout,
+            failure_type: RoamFailureType::ReassociationFailure,
+            selected_bssid: selected_bss.bssid.clone(),
+            disconnect_info,
+            auth_method: Some(auth::MethodName::Sae),
+            establish_rsna_failure_reason: None,
+            selected_bss: Some(selected_bss),
+        };
+        assert!(failure.likely_due_to_credential_rejected());
+    }
+
+    #[test]
+    fn test_connect_detection_of_rejected_wep_credentials() {
         let failure = ConnectFailure::AssociationFailure(AssociationFailure {
             bss_protection: BssProtection::Wep,
             code: fidl_ieee80211::StatusCode::RefusedUnauthenticatedAccessNotSupported,
@@ -1335,7 +1269,29 @@ mod tests {
     }
 
     #[test]
-    fn test_no_detection_of_rejected_wpa1_or_wpa2_credentials() {
+    fn test_roam_detection_of_rejected_wep_credentials() {
+        let selected_bss = fake_bss_description!(Wep);
+        let disconnect_info = fidl_sme::DisconnectInfo {
+            is_sme_reconnecting: false,
+            disconnect_source: fidl_sme::DisconnectSource::Mlme(fidl_sme::DisconnectCause {
+                mlme_event_name: fidl_sme::DisconnectMlmeEventName::RoamResultIndication,
+                reason_code: fidl_ieee80211::ReasonCode::UnspecifiedReason,
+            }),
+        };
+        let failure = RoamFailure {
+            status_code: fidl_ieee80211::StatusCode::RefusedUnauthenticatedAccessNotSupported,
+            failure_type: RoamFailureType::ReassociationFailure,
+            selected_bssid: selected_bss.bssid.clone(),
+            disconnect_info,
+            auth_method: Some(auth::MethodName::Psk),
+            establish_rsna_failure_reason: None,
+            selected_bss: Some(selected_bss),
+        };
+        assert!(failure.likely_due_to_credential_rejected());
+    }
+
+    #[test]
+    fn test_connect_no_detection_of_rejected_wpa1_or_wpa2_credentials() {
         let failure = ConnectFailure::ScanFailure(fidl_mlme::ScanResultCode::InternalError);
         assert!(!failure.likely_due_to_credential_rejected());
 
@@ -1343,6 +1299,93 @@ mod tests {
             bss_protection: BssProtection::Wpa2Personal,
             code: fidl_ieee80211::StatusCode::RefusedUnauthenticatedAccessNotSupported,
         });
+        assert!(!failure.likely_due_to_credential_rejected());
+    }
+
+    #[test_case(fake_bss_description!(Wpa1))]
+    #[test_case(fake_bss_description!(Wpa1Wpa2TkipOnly))]
+    #[test_case(fake_bss_description!(Wpa2))]
+    fn test_roam_no_detection_of_rejected_wpa1_or_wpa2_credentials(selected_bss: BssDescription) {
+        let disconnect_info = fidl_sme::DisconnectInfo {
+            is_sme_reconnecting: false,
+            disconnect_source: fidl_sme::DisconnectSource::Mlme(fidl_sme::DisconnectCause {
+                mlme_event_name: fidl_sme::DisconnectMlmeEventName::RoamResultIndication,
+                reason_code: fidl_ieee80211::ReasonCode::UnspecifiedReason,
+            }),
+        };
+        let failure = RoamFailure {
+            status_code: fidl_ieee80211::StatusCode::RefusedUnauthenticatedAccessNotSupported,
+            failure_type: RoamFailureType::EstablishRsnaFailure,
+            selected_bssid: selected_bss.bssid.clone(),
+            disconnect_info,
+            auth_method: Some(auth::MethodName::Psk),
+            establish_rsna_failure_reason: Some(EstablishRsnaFailureReason::StartSupplicantFailed),
+            selected_bss: Some(selected_bss),
+        };
+        assert!(!failure.likely_due_to_credential_rejected());
+    }
+
+    #[test]
+    fn test_connect_no_detection_of_rejected_wpa3_credentials() {
+        let bss = fake_bss_description!(Wpa3);
+        let failure = ConnectFailure::AssociationFailure(AssociationFailure {
+            bss_protection: bss.protection(),
+            code: fidl_ieee80211::StatusCode::RefusedUnauthenticatedAccessNotSupported,
+        });
+
+        assert!(!failure.likely_due_to_credential_rejected());
+    }
+
+    #[test]
+    fn test_roam_no_detection_of_rejected_wpa3_credentials() {
+        let selected_bss = fake_bss_description!(Wpa3);
+        let disconnect_info = fidl_sme::DisconnectInfo {
+            is_sme_reconnecting: false,
+            disconnect_source: fidl_sme::DisconnectSource::Mlme(fidl_sme::DisconnectCause {
+                mlme_event_name: fidl_sme::DisconnectMlmeEventName::RoamResultIndication,
+                reason_code: fidl_ieee80211::ReasonCode::UnspecifiedReason,
+            }),
+        };
+        let failure = RoamFailure {
+            status_code: fidl_ieee80211::StatusCode::RefusedUnauthenticatedAccessNotSupported,
+            failure_type: RoamFailureType::ReassociationFailure,
+            selected_bssid: selected_bss.bssid.clone(),
+            disconnect_info,
+            auth_method: Some(auth::MethodName::Sae),
+            establish_rsna_failure_reason: None,
+            selected_bss: Some(selected_bss),
+        };
+        assert!(!failure.likely_due_to_credential_rejected());
+    }
+
+    #[test]
+    fn test_connect_no_detection_of_rejected_wep_credentials() {
+        let failure = ConnectFailure::AssociationFailure(AssociationFailure {
+            bss_protection: BssProtection::Wep,
+            code: fidl_ieee80211::StatusCode::InvalidParameters,
+        });
+        assert!(!failure.likely_due_to_credential_rejected());
+    }
+
+    #[test]
+    fn test_roam_no_detection_of_rejected_wep_credentials() {
+        let selected_bss = fake_bss_description!(Wep);
+        let disconnect_info = fidl_sme::DisconnectInfo {
+            is_sme_reconnecting: false,
+            disconnect_source: fidl_sme::DisconnectSource::Mlme(fidl_sme::DisconnectCause {
+                mlme_event_name: fidl_sme::DisconnectMlmeEventName::RoamResultIndication,
+                reason_code: fidl_ieee80211::ReasonCode::UnspecifiedReason,
+            }),
+        };
+        let failure = RoamFailure {
+            status_code: fidl_ieee80211::StatusCode::StatusInvalidElement,
+            failure_type: RoamFailureType::ReassociationFailure,
+            selected_bssid: selected_bss.bssid.clone(),
+            disconnect_info,
+            auth_method: Some(auth::MethodName::Psk),
+            establish_rsna_failure_reason: None,
+            selected_bss: Some(selected_bss),
+        };
         assert!(!failure.likely_due_to_credential_rejected());
     }
 

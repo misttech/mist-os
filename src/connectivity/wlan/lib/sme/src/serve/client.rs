@@ -275,17 +275,17 @@ fn convert_roam_result(result: &RoamResult) -> fidl_sme::RoamResult {
         }
         RoamResult::Failed(failure) => {
             fidl_sme::RoamResult {
-                bssid: failure.selected_bssid().to_array(),
-                status_code: failure.status_code(),
+                bssid: failure.selected_bssid.to_array(),
+                status_code: failure.status_code,
                 // Current implementation assumes that all roam attempts incur disassociation from the
                 // original BSS. When this changes (e.g. due to Fast BSS Transition support), this
                 // hard-coded field should be set from the RoamResult enum.
                 original_association_maintained: false,
-                bss_description: match failure.selected_bss() {
+                bss_description: match &failure.selected_bss {
                     Some(bss) => Some(Box::new(bss.clone().into())),
                     None => None,
                 },
-                disconnect_info: Some(Box::new(failure.disconnect_info())),
+                disconnect_info: Some(Box::new(failure.disconnect_info)),
                 is_credential_rejected: failure.likely_due_to_credential_rejected(),
             }
         }
