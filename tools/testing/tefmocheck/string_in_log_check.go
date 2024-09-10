@@ -796,5 +796,16 @@ func infraToolLogChecks() []FailureModeCheck {
 			String: "Termination Signal Type: FuchsiaDeviceError",
 			Type:   swarmingOutputType,
 		},
+		// For https://fxbug.dev/350541791
+		// This is most often caused by an ffx daemon delay due to
+		// I/O contention on the Cavium
+		&stringInLogCheck{
+			String:             "Failed to create remote control proxy",
+			Type:               swarmingOutputType,
+			SkipAllPassedTests: true,
+			IgnoreFlakes:       true,
+			AttributeToTest:    true,
+			AddTag:             true,
+		},
 	}
 }
