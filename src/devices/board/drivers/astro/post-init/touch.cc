@@ -2,12 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <fidl/fuchsia.hardware.pin/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.platform.bus/cpp/driver/fidl.h>
 #include <fidl/fuchsia.hardware.platform.bus/cpp/fidl.h>
 #include <lib/ddk/metadata.h>
 #include <lib/driver/component/cpp/composite_node_spec.h>
 #include <lib/driver/component/cpp/node_add_args.h>
 #include <lib/focaltech/focaltech.h>
+
+#include <string>
 
 #include <bind/fuchsia/amlogic/platform/s905d2/cpp/bind.h>
 #include <bind/fuchsia/cpp/bind.h>
@@ -20,6 +23,31 @@
 #include <bind/fuchsia/platform/cpp/bind.h>
 
 #include "src/devices/board/drivers/astro/post-init/post-init.h"
+namespace {
+
+zx::result<> SetPull(std::shared_ptr<fdf::Namespace> incoming, std::string_view node_name,
+                     fuchsia_hardware_pin::Pull pull) {
+  zx::result pin = incoming->Connect<fuchsia_hardware_pin::Service::Device>(node_name);
+  if (pin.is_error()) {
+    FDF_LOG(ERROR, "Failed to connect to pin node: %s", pin.status_string());
+    return pin.take_error();
+  }
+
+  fidl::Arena arena;
+  auto config = fuchsia_hardware_pin::wire::Configuration::Builder(arena).pull(pull).Build();
+  fidl::WireResult result = fidl::WireCall(*pin)->Configure(config);
+  if (!result.ok()) {
+    FDF_LOG(ERROR, "Call to Configure failed: %s", result.FormatDescription().c_str());
+    return zx::error(result.status());
+  }
+  if (result->is_error()) {
+    FDF_LOG(ERROR, "Configure failed: %s", result.FormatDescription().c_str());
+    return result->take_error();
+  }
+  return zx::ok();
+}
+
+}  // namespace
 
 namespace astro {
 namespace fpbus = fuchsia_hardware_platform_bus;
@@ -169,6 +197,17 @@ zx::result<> PostInit::InitTouch() {
   */
 
   if (display_id_) {
+    // The Goodix touch driver expects the interrupt line to be pulled up and the reset line to be
+    // pulled down.
+    if (auto result = SetPull(incoming(), "touch-interrupt", fuchsia_hardware_pin::Pull::kUp);
+        result.is_error()) {
+      return result;
+    }
+    if (auto result = SetPull(incoming(), "touch-reset", fuchsia_hardware_pin::Pull::kDown);
+        result.is_error()) {
+      return result;
+    }
+
     const std::vector<fuchsia_driver_framework::ParentSpec> goodix_parents{
         {{kGoodixI2cRules, kGoodixI2cProperties}},
         {{kGoodixInterruptRules, kGoodixInterruptProperties}},

@@ -34,3 +34,13 @@ node "disp-soc-vid" {
   fuchsia.hardware.gpio.Service == fuchsia.hardware.gpio.Service.ZirconTransport;
   fuchsia.BIND_GPIO_PIN == fuchsia.amlogic.platform.s905d2.GPIOH_PIN_ID.PIN_5;
 }
+
+node "touch-interrupt" {
+  fuchsia.hardware.gpio.Service == fuchsia.hardware.gpio.Service.ZirconTransport;
+  fuchsia.BIND_GPIO_PIN == fuchsia.amlogic.platform.s905d2.GPIOZ_PIN_ID.PIN_4;
+}
+
+node "touch-reset" {
+  fuchsia.hardware.gpio.Service == fuchsia.hardware.gpio.Service.ZirconTransport;
+  fuchsia.BIND_GPIO_PIN == fuchsia.amlogic.platform.s905d2.GPIOZ_PIN_ID.PIN_9;
+}

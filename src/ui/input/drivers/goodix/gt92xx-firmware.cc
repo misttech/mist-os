@@ -55,32 +55,36 @@ constexpr uint8_t kEnableDspCodeDownloadCommand = 0x99;
 
 namespace goodix {
 
-#define CONFIG_IN(gpio, flags)                                                                   \
-  ({                                                                                             \
-    fidl::WireResult result = (gpio)->ConfigIn(flags);                                           \
-    if (!result.ok()) {                                                                          \
-      zxlogf(ERROR, "Failed to send ConfigIn request to " #gpio ": %s", result.status_string()); \
-      return result.status();                                                                    \
-    }                                                                                            \
-    if (result->is_error()) {                                                                    \
-      zxlogf(ERROR, "Failed to configure interrupt " #gpio " to input: %s",                      \
-             zx_status_get_string(result->error_value()));                                       \
-      return result->error_value();                                                              \
-    }                                                                                            \
+#define INPUT(gpio)                                                                             \
+  ({                                                                                            \
+    fidl::WireResult result = (gpio)->SetBufferMode(fuchsia_hardware_gpio::BufferMode::kInput); \
+    if (!result.ok()) {                                                                         \
+      zxlogf(ERROR, "Failed to send SetBufferMode request to " #gpio ": %s",                    \
+             result.status_string());                                                           \
+      return result.status();                                                                   \
+    }                                                                                           \
+    if (result->is_error()) {                                                                   \
+      zxlogf(ERROR, "Failed to configure interrupt " #gpio " to input: %s",                     \
+             zx_status_get_string(result->error_value()));                                      \
+      return result->error_value();                                                             \
+    }                                                                                           \
   })
 
-#define CONFIG_OUT(gpio, initial_value)                                                           \
-  ({                                                                                              \
-    fidl::WireResult result = (gpio)->ConfigOut(initial_value);                                   \
-    if (!result.ok()) {                                                                           \
-      zxlogf(ERROR, "Failed to send ConfigOut request to " #gpio ": %s", result.status_string()); \
-      return result.status();                                                                     \
-    }                                                                                             \
-    if (result->is_error()) {                                                                     \
-      zxlogf(ERROR, "Failed to configure interrupt " #gpio " to output: %s",                      \
-             zx_status_get_string(result->error_value()));                                        \
-      return result->error_value();                                                               \
-    }                                                                                             \
+#define OUTPUT(gpio, initial_value)                                                             \
+  ({                                                                                            \
+    fidl::WireResult result =                                                                   \
+        (gpio)->SetBufferMode((initial_value) ? fuchsia_hardware_gpio::BufferMode::kOutputHigh  \
+                                              : fuchsia_hardware_gpio::BufferMode::kOutputLow); \
+    if (!result.ok()) {                                                                         \
+      zxlogf(ERROR, "Failed to send SetBufferMode request to " #gpio ": %s",                    \
+             result.status_string());                                                           \
+      return result.status();                                                                   \
+    }                                                                                           \
+    if (result->is_error()) {                                                                   \
+      zxlogf(ERROR, "Failed to configure interrupt " #gpio " to output: %s",                    \
+             zx_status_get_string(result->error_value()));                                      \
+      return result->error_value();                                                             \
+    }                                                                                           \
   })
 
 void Gt92xxDevice::LogFirmwareStatus() {
@@ -283,11 +287,11 @@ bool Gt92xxDevice::IsFirmwareApplicable(const fzl::VmoMapper& firmware_mapper) {
 }
 
 zx_status_t Gt92xxDevice::EnterUpdateMode() {
-  CONFIG_OUT(reset_gpio_, 0);                      // 1. Reset output low
+  OUTPUT(reset_gpio_, 0);                          // 1. Reset output low
   zx::nanosleep(zx::deadline_after(zx::msec(2)));  // 2. Sleep 2ms
-  CONFIG_OUT(int_gpio_, 0);  // 3. INT output low (assuming address isn't 0x14)
+  OUTPUT(int_gpio_, 0);  // 3. INT output low (assuming address isn't 0x14)
   zx::nanosleep(zx::deadline_after(zx::msec(2)));  // 4. Sleep 2ms
-  CONFIG_OUT(reset_gpio_, 1);                      //  5. Reset output high
+  OUTPUT(reset_gpio_, 1);                          //  5. Reset output high
   zx::nanosleep(zx::deadline_after(zx::msec(5)));  // 6. Sleep 5ms
 
   zx_status_t status = HoldSs51AndDsp();  // 7. Hold SS51 and DSP, verify the result
@@ -312,24 +316,24 @@ zx_status_t Gt92xxDevice::EnterUpdateMode() {
 }
 
 zx_status_t Gt92xxDevice::LeaveUpdateMode() {
-  CONFIG_IN(int_gpio_, fuchsia_hardware_gpio::GpioFlags::kPullUp);  // 1. INT input
+  INPUT(int_gpio_);  // 1. INT input
 
   // General reset
 
-  CONFIG_OUT(reset_gpio_, 0);                       // 2.1. Reset output low
+  OUTPUT(reset_gpio_, 0);                           // 2.1. Reset output low
   zx::nanosleep(zx::deadline_after(zx::msec(20)));  // 2.2. Sleep 20ms
 
-  CONFIG_OUT(int_gpio_, 0);  // 2.3. INT output low (assuming address isn't 0x14)
+  OUTPUT(int_gpio_, 0);  // 2.3. INT output low (assuming address isn't 0x14)
   zx::nanosleep(zx::deadline_after(zx::msec(2)));  // 2.4. Sleep 2ms
 
-  CONFIG_OUT(reset_gpio_, 1);                      // 2.5. Reset output high
+  OUTPUT(reset_gpio_, 1);                          // 2.5. Reset output high
   zx::nanosleep(zx::deadline_after(zx::msec(6)));  // 2.6. Sleep 6ms
 
-  CONFIG_IN(reset_gpio_, fuchsia_hardware_gpio::GpioFlags::kPullDown);  // 2.7. Reset input
-  CONFIG_OUT(int_gpio_, 0);                                             // 2.8. INT output low
-  zx::nanosleep(zx::deadline_after(zx::msec(50)));                      // 2.9. Sleep 50ms
+  INPUT(reset_gpio_);                               // 2.7. Reset input
+  OUTPUT(int_gpio_, 0);                             // 2.8. INT output low
+  zx::nanosleep(zx::deadline_after(zx::msec(50)));  // 2.9. Sleep 50ms
 
-  CONFIG_IN(int_gpio_, fuchsia_hardware_gpio::GpioFlags::kPullUp);  // 2.10. INT input
+  INPUT(int_gpio_);  // 2.10. INT input
 
   // Device requires 50ms delay between setting INT to input and sending config (per datasheet)
   zx::nanosleep(zx::deadline_after(zx::msec(50)));

@@ -79,8 +79,7 @@ class Gt92xxTest : public zxtest::Test {
     std::vector intr_states = intr_gpio_.SyncCall(&fake_gpio::FakeGpio::GetStateLog);
     ASSERT_GE(intr_states.size(), 2);
     ASSERT_EQ(fake_gpio::WriteSubState{.value = 0}, intr_states[0].sub_state);
-    ASSERT_EQ(fake_gpio::ReadSubState{.flags = fuchsia_hardware_gpio::GpioFlags::kPullUp},
-              intr_states[1].sub_state);
+    ASSERT_EQ(fake_gpio::ReadSubState{}, intr_states[1].sub_state);
   }
 
   fidl::WireClient<fuchsia_input_report::InputReportsReader> GetReader() {
