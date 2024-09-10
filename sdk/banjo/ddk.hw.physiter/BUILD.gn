@@ -5,8 +5,6 @@
 import("//build/fidl/fidl.gni")
 
 fidl("ddk.hw.physiter") {
-  sdk_category = "internal"
-  versioned = "fuchsia"
   sources = [ "phys-iter.fidl" ]
   excluded_checks = [ "wrong-prefix-for-platform-source-library" ]
   enable_banjo = true
