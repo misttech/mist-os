@@ -254,7 +254,7 @@ pub async fn serve_starnix_manager(
                             // There were wake locks active after suspending all processes, resume
                             // and fail the suspend call.
                             if let Err(e) =
-                                responder.send(Err(fstarnixrunner::SuspendError::SuspendFailure))
+                                responder.send(Err(fstarnixrunner::SuspendError::WakeLocksExist))
                             {
                                 warn!("error responding to suspend request {:?}", e);
                             }
