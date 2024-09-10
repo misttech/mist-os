@@ -27,7 +27,6 @@ source_set("generic-arm") {
     "//zircon/kernel/dev/power/motmot",
     "//zircon/kernel/dev/psci",
     "//zircon/kernel/dev/timer/arm_generic",
-    "//zircon/kernel/dev/uart/dw8250",
     "//zircon/kernel/dev/uart/motmot",
     "//zircon/kernel/lib/arch",
     "//zircon/kernel/lib/boot-options",
