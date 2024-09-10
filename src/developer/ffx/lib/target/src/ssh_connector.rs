@@ -110,9 +110,9 @@ impl OvernetConnector for SshConnector {
             cmd.stderr.take().expect("process should have stderr"),
         );
         let (_addr, compat) =
-            // This function returns a PipeError on error, which is then ignored and followed by an
-            // extraction of a actual SSH error parsing. All PipeError's require terminating the
-            // ssh command.
+            // This function returns a PipeError on error, which necessitates terminating the SSH
+            // command. This error must be converted into an `SshError` in order to be presentable
+            // to the user.
             match ffx_ssh::parse::parse_ssh_output(&mut stdout, &mut stderr, false, &self.env_context).await {
                 Ok(res) => res,
                 Err(e) => {
