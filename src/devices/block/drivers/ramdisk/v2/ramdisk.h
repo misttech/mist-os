@@ -37,7 +37,6 @@ class Ramdisk : public fidl::WireServer<fuchsia_hardware_ramdisk::Ramdisk>,
   void Wake(WakeCompleter::Sync& completer) override;
   void SleepAfter(SleepAfterRequestView request, SleepAfterCompleter::Sync& completer) override;
   void GetBlockCounts(GetBlockCountsCompleter::Sync& completer) override;
-  void Grow(GrowRequestView request, GrowCompleter::Sync& completer) override;
 
  private:
   Ramdisk(fdf::DriverBase* controller, fzl::OwnedVmoMapper mapping,

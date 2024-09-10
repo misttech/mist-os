@@ -109,10 +109,6 @@ void Ramdisk::GetBlockCounts(GetBlockCountsCompleter::Sync& completer) {
   completer.Reply(block_counts_);
 }
 
-void Ramdisk::Grow(GrowRequestView request, GrowCompleter::Sync& completer) {
-  completer.Reply(zx::error(ZX_ERR_NOT_SUPPORTED));
-}
-
 void Ramdisk::StartThread(block_server::Thread thread) {
   constexpr std::string_view dispatcher_name = "Block Server";
   fdf_dispatcher_t* dispatcher;

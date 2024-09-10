@@ -56,7 +56,6 @@ class Ramdisk : public RamdiskDeviceType,
   void Wake(WakeCompleter::Sync& completer);
   void SleepAfter(SleepAfterRequestView request, SleepAfterCompleter::Sync& completer);
   void GetBlockCounts(GetBlockCountsCompleter::Sync& completer);
-  void Grow(GrowRequestView request, GrowCompleter::Sync& completer);
 
   // Partition Protocol
   zx_status_t BlockPartitionGetGuid(guidtype_t guid_type, guid_t* out_guid);

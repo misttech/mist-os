@@ -1,7 +1,7 @@
 // Copyright 2019 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-@available(added=15)
+@available(added=HEAD)
 library fuchsia.hardware.ramdisk;
 
 using fuchsia.io;
@@ -55,14 +55,6 @@ closed protocol Ramdisk {
             failed uint64;
         };
     });
-
-    /// Causes the ramdisk size to grow to `required_size` in bytes.
-    /// If `required_size` is smaller than the current size an error will be
-    /// returned. `required_size` must be a multiple of `block_size`.
-    @available(removed=22)
-    strict Grow(struct {
-        new_size uint64;
-    }) -> () error zx.Status;
 };
 
 // TODO(smklein): Deduplicate GUID declarations with other FIDL interfaces.
@@ -110,7 +102,6 @@ closed protocol RamdiskController {
 
 /// Options for creating a ram-disk.  Some combinations are invalid and will
 /// result in ZX_ERR_INVALID_ARGS.
-@available(added=HEAD)
 type Options = resource table {
     /// If unspecified, the system page size is used.
     1: block_size uint32;
@@ -125,7 +116,6 @@ type Options = resource table {
     4: vmo zx.Handle:VMO;
 };
 
-@available(added=HEAD)
 open protocol Controller {
     /// Initializes a new Ramdisk instance with the specified options.  Returns an outgoing
     /// directory for the ramdisk which will export the Ramdisk and
@@ -140,7 +130,6 @@ open protocol Controller {
 };
 
 /// The v2 ramdisk driver will expose this service.
-@available(added=HEAD)
 service Service {
     controller client_end:Controller;
 };
