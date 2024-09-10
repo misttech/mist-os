@@ -231,22 +231,11 @@ Use your `DeviceServer` object's `CreateOffers2()` function to set the `offers2`
 field in the `NodeAddArgs` struct, for example:
 
 ```cpp {:.devsite-disable-click-to-copy}
-fuchsia_driver_framework::NodeAddArgs args{
-    {
-        .name = std::string(child_name),
-        .properties = {
-            {
-                fdf::MakeProperty(BIND_PROTOCOL, ZX_PROTOCOL_SERIAL_IMPL_ASYNC),
-            }
-        },
-        .offers2 = compat_server_.CreateOffers2(),
-    },
-};
-
-fidl::Arena arena;
-node_client_
-    ->AddChild(fidl::ToWire(arena, std::move(args)),
-                std::move(node_controller->server));
+auto properties = std::vector{fdf::MakeProperty(BIND_PROTOCOL, ZX_PROTOCOL_SERIAL_IMPL_ASYNC)};
+zx::result child_result = AddChild(child_name, properties, compat_server_.CreateOffers2());
+if (child_result.is_error()) {
+  return child_result.take_error();
+}
 ```
 
 If there are any additional offers, add them to the `DeviceServer` object's
@@ -254,25 +243,14 @@ offers before setting the `offers2` field in the `NodeAddArgs` struct, for
 example:
 
 ```cpp {:.devsite-disable-click-to-copy}
-auto offers = device_server_.CreateOffers2();
+auto offers = compat_server_.CreateOffers2();
 offers.push_back(fdf::MakeOffer2<fuchsia_hardware_serialimpl::Service>(child_name));
 
-fuchsia_driver_framework::NodeAddArgs args{
-    {
-        .name = std::string(child_name),
-        .properties = {
-            {
-                fdf::MakeProperty(BIND_PROTOCOL, ZX_PROTOCOL_SERIAL_IMPL_ASYNC),
-            }
-        },
-        .offers2 = std::move(offers),
-    },
-};
-
-fidl::Arena arena;
-node_client_
-    ->AddChild(fidl::ToWire(arena, std::move(args)),
-                std::move(node_controller->server));
+auto properties = std::vector{fdf::MakeProperty(BIND_PROTOCOL, ZX_PROTOCOL_SERIAL_IMPL_ASYNC)};
+zx::result child_result = AddChild(child_name, properties, std::move(offers));
+if (child_result.is_error()) {
+  return child_result.take_error();
+}
 ```
 
 If your compat device server is initialized synchronously, you need to perform

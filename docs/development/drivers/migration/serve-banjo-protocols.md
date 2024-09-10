@@ -1,4 +1,4 @@
-# Serve Banjo protocols in a DFv2 driver
+# Connect and serve Banjo protocols in a DFv2 driver
 
 This guide walks through the tasks of serving Banjo protocols in a DFv2 driver
 and connecting to its Banjo server from a DFv1 child driver.
