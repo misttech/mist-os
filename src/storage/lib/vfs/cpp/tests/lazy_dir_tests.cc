@@ -5,7 +5,7 @@
 #include <utility>
 
 #include <fbl/vector.h>
-#include <zxtest/zxtest.h>
+#include <gtest/gtest.h>
 
 #include "src/storage/lib/vfs/cpp/lazy_dir.h"
 #include "src/storage/lib/vfs/cpp/pseudo_file.h"
@@ -74,7 +74,7 @@ TEST(LazyDir, ApiTest) {
 
     fbl::RefPtr<fs::Vnode> out;
     EXPECT_EQ(test.Lookup("test", &out), ZX_OK);
-    EXPECT_EQ(1, test.last_id);
+    EXPECT_EQ(test.last_id, 1u);
     EXPECT_TRUE(strcmp("test", test.last_name.c_str()) == 0);
     EXPECT_EQ(out.get(), test.last_output_file.get());
 
@@ -95,7 +95,7 @@ TEST(LazyDir, ApiTest) {
 
     fbl::RefPtr<fs::Vnode> out;
     EXPECT_EQ(test.Lookup("aaaa", &out), ZX_OK);
-    EXPECT_EQ(33, test.last_id);
+    EXPECT_EQ(test.last_id, 33u);
     EXPECT_TRUE(strcmp("aaaa", test.last_name.c_str()) == 0);
     EXPECT_EQ(out.get(), test.last_output_file.get());
   }

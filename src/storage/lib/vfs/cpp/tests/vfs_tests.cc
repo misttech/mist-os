@@ -7,13 +7,16 @@
 #include <lib/async-loop/default.h>
 #include <lib/async-testing/test_loop.h>
 
-#include <zxtest/zxtest.h>
+#include <gmock/gmock.h>
+#include <gtest/gtest.h>
 
 #include "src/storage/lib/vfs/cpp/managed_vfs.h"
 #include "src/storage/lib/vfs/cpp/pseudo_dir.h"
 #include "src/storage/lib/vfs/cpp/synchronous_vfs.h"
 
 namespace {
+
+using ::testing::_;
 
 // Simple vnode implementation that provides a way to query whether the vfs pointer is set.
 class TestNode : public fs::Vnode {
@@ -37,7 +40,7 @@ class TestNode : public fs::Vnode {
 TEST(ManagedVfs, CantSetDispatcher) {
   async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
   fs::ManagedVfs vfs(loop.dispatcher());
-  ASSERT_DEATH([&]() { vfs.SetDispatcher(loop.dispatcher()); });
+  ASSERT_DEATH(vfs.SetDispatcher(loop.dispatcher()), _);
 }
 
 TEST(SynchronousVfs, CanOnlySetDispatcherOnce) {
@@ -45,24 +48,25 @@ TEST(SynchronousVfs, CanOnlySetDispatcherOnce) {
   async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
   vfs.SetDispatcher(loop.dispatcher());
 
-  ASSERT_DEATH([&]() { vfs.SetDispatcher(loop.dispatcher()); });
+  ASSERT_DEATH(vfs.SetDispatcher(loop.dispatcher()), _);
 }
 
 static void CheckClosesConnection(fs::FuchsiaVfs* vfs, async::TestLoop* loop) {
   zx::result a = fidl::CreateEndpoints<fuchsia_io::Directory>();
   zx::result b = fidl::CreateEndpoints<fuchsia_io::Directory>();
-  ASSERT_OK(a.status_value());
-  ASSERT_OK(b.status_value());
+  ASSERT_EQ(a.status_value(), ZX_OK);
+  ASSERT_EQ(b.status_value(), ZX_OK);
 
   auto dir_a = fbl::MakeRefCounted<fs::PseudoDir>();
   auto dir_b = fbl::MakeRefCounted<fs::PseudoDir>();
-  ASSERT_OK(vfs->ServeDirectory(dir_a, std::move(a->server)));
-  ASSERT_OK(vfs->ServeDirectory(dir_b, std::move(b->server)));
+  ASSERT_EQ(vfs->ServeDirectory(dir_a, std::move(a->server)), ZX_OK);
+  ASSERT_EQ(vfs->ServeDirectory(dir_b, std::move(b->server)), ZX_OK);
   bool callback_called = false;
   vfs->CloseAllConnectionsForVnode(*dir_a, [&callback_called]() { callback_called = true; });
   loop->RunUntilIdle();
   zx_signals_t signals;
-  ASSERT_OK(a->client.channel().wait_one(ZX_CHANNEL_PEER_CLOSED, zx::time::infinite(), &signals));
+  ASSERT_EQ(a->client.channel().wait_one(ZX_CHANNEL_PEER_CLOSED, zx::time::infinite(), &signals),
+            ZX_OK);
   ASSERT_TRUE(signals & ZX_CHANNEL_PEER_CLOSED);
   ASSERT_EQ(ZX_ERR_TIMED_OUT,
             b->client.channel().wait_one(ZX_CHANNEL_PEER_CLOSED, zx::time(0), &signals));

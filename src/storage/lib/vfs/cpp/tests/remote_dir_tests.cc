@@ -4,7 +4,7 @@
 
 #include <utility>
 
-#include <zxtest/zxtest.h>
+#include <gtest/gtest.h>
 
 #include "src/storage/lib/vfs/cpp/remote_dir.h"
 

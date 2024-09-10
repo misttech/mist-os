@@ -20,7 +20,7 @@
 
 #include <fbl/condition_variable.h>
 #include <fbl/unique_fd.h>
-#include <zxtest/zxtest.h>
+#include <gtest/gtest.h>
 
 #include "src/storage/lib/vfs/cpp/connection/connection.h"
 #include "src/storage/lib/vfs/cpp/paged_vfs.h"
@@ -98,7 +98,7 @@ class PagingTestFile : public PagedVnode {
       ASSERT_TRUE(vfs.has_value());
       const zx::result result =
           vfs.value().get().ReportPagerError(paged_vmo(), offset, length, ZX_ERR_IO_DATA_INTEGRITY);
-      ASSERT_OK(result.status_value());
+      ASSERT_EQ(result.status_value(), ZX_OK);
       return;
     }
 
@@ -108,7 +108,7 @@ class PagingTestFile : public PagedVnode {
       ASSERT_TRUE(vfs.has_value());
       const zx::result result =
           vfs.value().get().ReportPagerError(paged_vmo(), offset, length, ZX_ERR_BAD_STATE);
-      ASSERT_OK(result.status_value());
+      ASSERT_EQ(result.status_value(), ZX_OK);
     }
 
     transfer.write(&data_[offset], 0, std::min(data_.size() - offset, length));
@@ -116,7 +116,7 @@ class PagingTestFile : public PagedVnode {
     ASSERT_TRUE(vfs.has_value());
     const zx::result result =
         vfs.value().get().SupplyPages(paged_vmo(), offset, length, transfer, 0);
-    ASSERT_OK(result.status_value());
+    ASSERT_EQ(result.status_value(), ZX_OK);
   }
 
   void VmoDirty(uint64_t offset, uint64_t length) override {
@@ -128,14 +128,14 @@ class PagingTestFile : public PagedVnode {
       ASSERT_TRUE(vfs.has_value());
       const zx::result result =
           vfs.value().get().ReportPagerError(paged_vmo(), offset, length, ZX_ERR_IO_DATA_INTEGRITY);
-      ASSERT_OK(result.status_value());
+      ASSERT_EQ(result.status_value(), ZX_OK);
       return;
     }
 
     std::optional vfs = this->vfs();
     ASSERT_TRUE(vfs.has_value());
     const zx::result result = vfs.value().get().DirtyPages(paged_vmo(), offset, length);
-    ASSERT_OK(result.status_value());
+    ASSERT_EQ(result.status_value(), ZX_OK);
   }
 
   // Vnode implementation:
@@ -206,7 +206,7 @@ constexpr size_t kFile1Size = 4096 * 17 + 87;
 const char kFileErrName[] = "file_err";
 const char kFileDirtyErrName[] = "file_dirty_err";
 
-class PagingTest : public zxtest::Test {
+class PagingTest : public testing::Test {
  public:
   PagingTest()
       : main_loop_(&kAsyncLoopConfigNoAttachToCurrentThread),
@@ -275,7 +275,8 @@ class PagingTest : public zxtest::Test {
 
     // Convert to an FD.
     int root_dir_fd = -1;
-    EXPECT_OK(fdio_fd_create(directory_endpoints.client.TakeChannel().release(), &root_dir_fd));
+    EXPECT_EQ(fdio_fd_create(directory_endpoints.client.TakeChannel().release(), &root_dir_fd),
+              ZX_OK);
 
     return root_dir_fd;
   }

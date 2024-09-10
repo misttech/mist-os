@@ -6,14 +6,9 @@
 #include <string_view>
 
 #include <fbl/vector.h>
-#include <zxtest/zxtest.h>
+#include <gtest/gtest.h>
 
 #include "src/storage/lib/vfs/cpp/pseudo_file.h"
-
-#define EXPECT_FSTREQ(expected, actual)                                                   \
-  EXPECT_BYTES_EQ(reinterpret_cast<const uint8_t*>(expected.c_str()),                     \
-                  reinterpret_cast<const uint8_t*>(actual.c_str()), expected.size() + 1u, \
-                  "unequal fbl::String")
 
 namespace {
 
@@ -69,8 +64,8 @@ void CheckRead(const fbl::RefPtr<fs::Vnode>& file, zx_status_t status, size_t le
   size_t actual = 0u;
   EXPECT_EQ(status, file->Read(buf.data(), length, offset, &actual));
   EXPECT_EQ(expected.size(), actual);
-  EXPECT_BYTES_EQ(reinterpret_cast<const uint8_t*>(expected.data()), buf.data(), expected.size(),
-                  "");
+  EXPECT_EQ(memcmp(reinterpret_cast<const uint8_t*>(expected.data()), buf.data(), expected.size()),
+            0);
 }
 
 void CheckWrite(const fbl::RefPtr<fs::Vnode>& file, zx_status_t status, size_t offset,
@@ -564,12 +559,12 @@ TEST(PseudoFile, WriteBuffered) {
   }
 
   EXPECT_EQ(6u, writer.strings().size());
-  EXPECT_FSTREQ(writer.strings()[0], fbl::String("first"));
-  EXPECT_FSTREQ(writer.strings()[1], fbl::String("second"));
-  EXPECT_FSTREQ(writer.strings()[2], fbl::String(""));
-  EXPECT_FSTREQ(writer.strings()[3], fbl::String("third"));
-  EXPECT_FSTREQ(writer.strings()[4], fbl::String("null\0null", 9u));
-  EXPECT_FSTREQ(writer.strings()[5], fbl::String("too-long-o"));
+  EXPECT_EQ(writer.strings()[0], fbl::String("first"));
+  EXPECT_EQ(writer.strings()[1], fbl::String("second"));
+  EXPECT_EQ(writer.strings()[2], fbl::String(""));
+  EXPECT_EQ(writer.strings()[3], fbl::String("third"));
+  EXPECT_EQ(writer.strings()[4], fbl::String("null\0null", 9u));
+  EXPECT_EQ(writer.strings()[5], fbl::String("too-long-o"));
 }
 
 TEST(PseudoFile, WriteUnbuffered) {
@@ -646,16 +641,16 @@ TEST(PseudoFile, WriteUnbuffered) {
   }
 
   EXPECT_EQ(10u, writer.strings().size());
-  EXPECT_FSTREQ(writer.strings()[0], fbl::String("first"));
-  EXPECT_FSTREQ(writer.strings()[1], fbl::String("second"));
-  EXPECT_FSTREQ(writer.strings()[2], fbl::String(""));
-  EXPECT_FSTREQ(writer.strings()[3], fbl::String("third"));
-  EXPECT_FSTREQ(writer.strings()[4], fbl::String("null\0null", 9u));
-  EXPECT_FSTREQ(writer.strings()[5], fbl::String(""));
-  EXPECT_FSTREQ(writer.strings()[6], fbl::String("fourth"));
-  EXPECT_FSTREQ(writer.strings()[7], fbl::String("fifth"));
-  EXPECT_FSTREQ(writer.strings()[8], fbl::String(""));
-  EXPECT_FSTREQ(writer.strings()[9], fbl::String("a long string"));
+  EXPECT_EQ(writer.strings()[0], fbl::String("first"));
+  EXPECT_EQ(writer.strings()[1], fbl::String("second"));
+  EXPECT_EQ(writer.strings()[2], fbl::String(""));
+  EXPECT_EQ(writer.strings()[3], fbl::String("third"));
+  EXPECT_EQ(writer.strings()[4], fbl::String("null\0null", 9u));
+  EXPECT_EQ(writer.strings()[5], fbl::String(""));
+  EXPECT_EQ(writer.strings()[6], fbl::String("fourth"));
+  EXPECT_EQ(writer.strings()[7], fbl::String("fifth"));
+  EXPECT_EQ(writer.strings()[8], fbl::String(""));
+  EXPECT_EQ(writer.strings()[9], fbl::String("a long string"));
 }
 
 }  // namespace

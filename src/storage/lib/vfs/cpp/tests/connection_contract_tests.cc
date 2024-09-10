@@ -7,14 +7,17 @@
 
 #include <utility>
 
+#include <gmock/gmock.h>
+#include <gtest/gtest.h>
 #include <sanitizer/lsan_interface.h>
-#include <zxtest/zxtest.h>
 
 #include "src/storage/lib/vfs/cpp/connection/connection.h"
 #include "src/storage/lib/vfs/cpp/fuchsia_vfs.h"
 #include "src/storage/lib/vfs/cpp/pseudo_dir.h"
 
 namespace {
+
+using testing::_;
 
 // Base class used to define fake Vfs objects to test |Connection::Bind|.
 class NoOpVfs : public fs::FuchsiaVfs {
@@ -26,10 +29,12 @@ class NoOpVfs : public fs::FuchsiaVfs {
   fbl::DoublyLinkedList<fs::internal::Connection*> connections_;
 
  private:
-  void Shutdown(ShutdownCallback handler) override { FAIL("Should never be reached in this test"); }
+  void Shutdown(ShutdownCallback handler) override {
+    FAIL() << "Should never be reached in this test";
+  }
   void CloseAllConnectionsForVnode(const fs::Vnode& node,
                                    CloseAllConnectionsForVnodeCallback callback) final {
-    FAIL("Should never be reached in this test");
+    FAIL() << "Should never be reached in this test";
   }
 };
 
@@ -70,29 +75,31 @@ template <typename VfsType>
 void RunTest(async::Loop* loop, VfsType&& vfs) {
   auto root = fbl::MakeRefCounted<fs::PseudoDir>();
   auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-  ASSERT_OK(endpoints.status_value());
+  ASSERT_EQ(endpoints.status_value(), ZX_OK);
 
-  ASSERT_OK(vfs.ServeDirectory(root, std::move(endpoints->server), fuchsia_io::kRStarDir));
+  ASSERT_EQ(vfs.ServeDirectory(root, std::move(endpoints->server), fuchsia_io::kRStarDir), ZX_OK);
   loop->RunUntilIdle();
 }
 
-TEST(ConnectionTest, BindRequiresVfsManagingConnection_Positive) {
+TEST(ConnectionContractTest, BindRequiresVfsManagingConnectionPositive) {
   async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
   RunTest(&loop, NoOpVfsGood(loop.dispatcher()));
 }
 
-TEST(ConnectionDeathTest, BindRequiresVfsManagingConnection_Negative) {
+TEST(ConnectionDeathTest, BindRequiresVfsManagingConnectionNegative) {
   // Bind requires registering the connection in a list first.
   if (ZX_DEBUG_ASSERT_IMPLEMENTED) {
     async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
-    ASSERT_DEATH([&] {
+    ASSERT_DEATH(
+        {
 #if __has_feature(address_sanitizer) || __has_feature(leak_sanitizer) || \
     __has_feature(hwaddress_sanitizer)
-      // Disable LSAN, this thread is expected to leak by way of a crash.
-      __lsan::ScopedDisabler _;
+          // Disable LSAN, this thread is expected to leak by way of a crash.
+          __lsan::ScopedDisabler _;
 #endif
-      RunTest(&loop, NoOpVfsBad(loop.dispatcher()));
-    });
+          RunTest(&loop, NoOpVfsBad(loop.dispatcher()));
+        },
+        _);
   }
 }
 

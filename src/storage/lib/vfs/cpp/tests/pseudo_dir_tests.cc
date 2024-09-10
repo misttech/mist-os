@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <zxtest/zxtest.h>
+#include <gtest/gtest.h>
 
 #include "src/storage/lib/vfs/cpp/pseudo_dir.h"
 #include "src/storage/lib/vfs/cpp/pseudo_file.h"
@@ -37,7 +37,7 @@ TEST(PseudoDir, ApiTest) {
   auto validated_options = dir->ValidateOptions(options_directory);
   EXPECT_TRUE(validated_options.is_ok());
   EXPECT_EQ(ZX_OK, dir->Open(&redirect));
-  EXPECT_NULL(redirect);
+  EXPECT_EQ(redirect, nullptr);
 
   // verify node protocol type
   EXPECT_EQ(dir->GetProtocols(), fuchsia_io::NodeProtocolKinds::kDirectory);
