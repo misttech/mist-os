@@ -17968,6 +17968,9 @@ pub type ino_t = __kernel_ino_t;
 pub type mode_t = __kernel_mode_t;
 pub type off_t = __kernel_off_t;
 pub const TUNSETIFF: __u32 = 1074025674;
+pub const FUSE_DEV_IOC_PASSTHROUGH_OPEN_V0: __u32 = 1074849025;
+pub const FUSE_DEV_IOC_PASSTHROUGH_OPEN_V1: __u32 = 1074849151;
+pub const FUSE_DEV_IOC_PASSTHROUGH_OPEN_V2: __u32 = 1074062718;
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
 pub struct xt_match {
