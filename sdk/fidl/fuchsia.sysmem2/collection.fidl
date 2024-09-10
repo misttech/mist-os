@@ -684,7 +684,7 @@ open protocol BufferCollectionToken {
         1: group_request server_end:BufferCollectionTokenGroup;
     });
 };
-// LINT.ThenChange(//src/devices/sysmem/drivers/sysmem/combined_token.fidl)
+// LINT.ThenChange(//src/sysmem/drivers/sysmem/combined_token.fidl)
 
 /// [`fuchsia.sysmem2/BufferCollection`] is a connection directly from a
 /// participant to sysmem re. a buffer collection; often the buffer collection

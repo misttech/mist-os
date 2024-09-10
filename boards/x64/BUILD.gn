@@ -158,7 +158,7 @@ board_input_bundle("x64_common") {
   configuration = {
     power_manager =
         "//src/power/power-manager/node_config/base_node_config.json5"
-    sysmem_format_costs = [ "//src/devices/sysmem/format_costs/intel" ]
+    sysmem_format_costs = [ "//src/sysmem/format_costs/intel" ]
   }
 
   drivers = [

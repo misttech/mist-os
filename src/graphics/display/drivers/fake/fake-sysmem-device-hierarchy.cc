@@ -17,8 +17,8 @@
 #include <fbl/alloc_checker.h>
 
 #include "src/devices/bus/testing/fake-pdev/fake-pdev.h"
-#include "src/devices/sysmem/drivers/sysmem/allocator.h"
-#include "src/devices/sysmem/drivers/sysmem/sysmem.h"
+#include "src/sysmem/drivers/sysmem/allocator.h"
+#include "src/sysmem/drivers/sysmem/sysmem.h"
 
 namespace display {
 

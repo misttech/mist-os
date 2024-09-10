@@ -7,8 +7,9 @@ import("//build/compiled_action.gni")
 import("//build/rust/rustc_binary.gni")
 
 # the binary expects a single arg which is the path of the output file
-rustc_binary("generate_format_costs_intel") {
+rustc_binary("deprecated_generate_format_costs_intel") {
   edition = "2021"
+  configs -= [ "//build/config/rust/lints:allow_unused_results" ]
   sources = [ "src/main.rs" ]
   deps = [
     "//sdk/fidl/fuchsia.images2:fuchsia.images2_rust",
@@ -25,7 +26,7 @@ rustc_binary("generate_format_costs_intel") {
 # but the sysmem tests rely on these or similar format costs for the tests to
 # pass
 compiled_action("intel") {
-  tool = ":generate_format_costs_intel"
+  tool = ":deprecated_generate_format_costs_intel"
   _output = "${target_out_dir}/${target_name}.format_costs_persistent_fidl"
   args = [
     "--output",

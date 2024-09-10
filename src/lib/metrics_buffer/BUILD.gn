@@ -25,10 +25,10 @@ source_set("metrics_buffer") {
 
   visibility = [
     ":metrics_buffer_unittests",
-    "//src/devices/sysmem/drivers/sysmem:sysmem_common_srcs",
     "//src/lib",
     "//src/media/drivers/amlogic_decoder:sources",
     "//src/media/lib/codec_impl",
+    "//src/sysmem/drivers/sysmem:sysmem_common_srcs",
   ]
 }
 

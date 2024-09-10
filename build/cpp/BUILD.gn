@@ -120,11 +120,11 @@ config("fidl-wire-deprecated-mutable-tables") {
 
     #------------------
     #------------------
-    "//src/devices/sysmem/drivers/sysmem:sysmem-unittest-bin",
+    "//src/sysmem/drivers/sysmem:sysmem-unittest-bin",
 
     #------------------
     #------------------
-    "//src/devices/sysmem/drivers/sysmem:sysmem_common_srcs",
+    "//src/sysmem/drivers/sysmem:sysmem_common_srcs",
 
     #------------------
     #------------------

@@ -164,7 +164,7 @@ assembly_input_bundle("bootstrap") {
   bootfs_packages = [
     "//src/bringup/bin/device-name-provider:package",
     "//src/bringup/bin/sysinfo:package",
-    "//src/devices/sysmem/bin/sysmem_connector:pkg",
+    "//src/sysmem/bin/sysmem_connector:pkg",
     "//src/zircon/bin/role_manager:package",
   ]
 
@@ -178,7 +178,7 @@ assembly_input_bundle("bootstrap") {
           shards = [
             "//src/bringup/bin/paver/meta/paver.bootstrap_shard.cml",
             "//src/bringup/bin/sysinfo/meta/sysinfo.shard.cml",
-            "//src/devices/sysmem/bin/sysmem_connector/meta/sysmem_connector.bootstrap_shard.cml",
+            "//src/sysmem/bin/sysmem_connector/meta/sysmem_connector.bootstrap_shard.cml",
             "//src/bringup/bin/device-name-provider/meta/device-name-provider.bootstrap_shard.cml",
             "//src/zircon/bin/role_manager/meta/role_manager.bootstrap_shard.cml",
           ]

@@ -65,7 +65,7 @@ impl DefineSubsystemConfiguration<PlatformSysmemConfig> for SysmemConfig {
             // All the fields are Option<T>. If a field is still None after overrides from
             // board_info and platform config have been applied, the config capability will be
             // absent and the default value of the field will be as specified in
-            // src/devices/sysmem/drivers/sysmem/BUILD.gn.
+            // src/sysmem/drivers/sysmem/BUILD.gn.
             settings.format_costs.append(&mut platform_sysmem_config.format_costs.clone());
 
             // Please don't use ..Default::default() here; we want this to fail to build when new field(s)
