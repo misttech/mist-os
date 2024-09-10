@@ -266,7 +266,6 @@ TEST_F(ServerTest, FuaWrite) {
   };
   RequestOneAndWaitResponse(req, ZX_OK);
 
-  // If there is no volatile write cache in the device, pre flush command and  is not delivered.
   auto commands = blkdev_.GetCommandSequence();
   ASSERT_EQ(commands.size(), 2);
   ASSERT_EQ(commands[0].opcode, BLOCK_OPCODE_WRITE);
@@ -294,21 +293,20 @@ TEST_F(ServerTest, FuaWriteWithFua) {
   };
   RequestOneAndWaitResponse(req, ZX_OK);
 
-  // If there is no volatile write cache in the device, pre flush command is not delivered.
   auto commands = blkdev_.GetCommandSequence();
   ASSERT_EQ(commands.size(), 1);
   ASSERT_EQ(commands[0].opcode, BLOCK_OPCODE_WRITE);
   ASSERT_EQ(commands[0].flags, BLOCK_IO_FLAG_FORCE_ACCESS);  // FUA write
 }
 
-TEST_F(ServerTest, PreflushWrite) {
+TEST_F(ServerTest, Postflush) {
   block_info_t block_info = {
       .block_count = kBlockCount, .block_size = kBlockSize, .max_transfer_size = kBlockSize};
   CreateServer(block_info);
   AttachVmo(/*do_fill=*/true);
 
   block_fifo_request_t req = {
-      .command = {.opcode = BLOCK_OPCODE_WRITE, .flags = BLOCK_IO_FLAG_PREFLUSH},  // Write preflush
+      .command = {.opcode = BLOCK_OPCODE_WRITE, .flags = BLOCK_IO_FLAG_FORCE_ACCESS},  // FUA
       .reqid = 0x100,
       .group = 0,
       .vmoid = vmoid_,
@@ -318,87 +316,24 @@ TEST_F(ServerTest, PreflushWrite) {
   };
   RequestOneAndWaitResponse(req, ZX_OK);
 
-  // If there is no volatile write cache in the device, pre flush command is not delivered.
+  // If the device has a volatile write cache but FUA command is not supported, the post flush
+  // commands are delivered.
   auto commands = blkdev_.GetCommandSequence();
   ASSERT_EQ(commands.size(), 2);
-  ASSERT_EQ(commands[0].opcode, BLOCK_OPCODE_FLUSH);  // Pre flush
-  ASSERT_EQ(commands[0].flags, 0);
-  ASSERT_EQ(commands[1].opcode, BLOCK_OPCODE_WRITE);  // Write
+  ASSERT_EQ(commands[0].opcode, BLOCK_OPCODE_WRITE);
+  ASSERT_EQ(commands[0].flags, 0);                    // FUA flag is removed
+  ASSERT_EQ(commands[1].opcode, BLOCK_OPCODE_FLUSH);  // Post flush
   ASSERT_EQ(commands[1].flags, 0);
 }
 
-TEST_F(ServerTest, PreflushAndFuaWriteWithFua) {
-  block_info_t block_info = {.block_count = kBlockCount,
-                             .block_size = kBlockSize,
-                             .max_transfer_size = kBlockSize,
-                             .flags = FLAG_FUA_SUPPORT};
-  CreateServer(block_info);
-  AttachVmo(/*do_fill=*/true);
-
-  block_fifo_request_t req = {
-      .command = {.opcode = BLOCK_OPCODE_WRITE,
-                  .flags =
-                      BLOCK_IO_FLAG_PREFLUSH | BLOCK_IO_FLAG_FORCE_ACCESS},  // Write flush and FUA
-      .reqid = 0x100,
-      .group = 0,
-      .vmoid = vmoid_,
-      .length = 1,
-      .vmo_offset = 0,
-      .dev_offset = 0,
-  };
-  RequestOneAndWaitResponse(req, ZX_OK);
-
-  // If the device has a volatile write cache and FUA command is supported, the pre flush command is
-  // delivered.
-  auto commands = blkdev_.GetCommandSequence();
-  ASSERT_EQ(commands.size(), 2);
-  ASSERT_EQ(commands[0].opcode, BLOCK_OPCODE_FLUSH);  // Pre flush
-  ASSERT_EQ(commands[0].flags, 0);
-  ASSERT_EQ(commands[1].opcode, BLOCK_OPCODE_WRITE);
-  ASSERT_EQ(commands[1].flags, BLOCK_IO_FLAG_FORCE_ACCESS);  // FUA write
-}
-
-TEST_F(ServerTest, PreflushAndPostflush) {
+TEST_F(ServerTest, PostflushException) {
   block_info_t block_info = {
       .block_count = kBlockCount, .block_size = kBlockSize, .max_transfer_size = kBlockSize};
   CreateServer(block_info);
   AttachVmo(/*do_fill=*/true);
 
   block_fifo_request_t req = {
-      .command = {.opcode = BLOCK_OPCODE_WRITE,
-                  .flags =
-                      BLOCK_IO_FLAG_PREFLUSH | BLOCK_IO_FLAG_FORCE_ACCESS},  // Write flush and FUA
-      .reqid = 0x100,
-      .group = 0,
-      .vmoid = vmoid_,
-      .length = 1,
-      .vmo_offset = 0,
-      .dev_offset = 0,
-  };
-  RequestOneAndWaitResponse(req, ZX_OK);
-
-  // If the device has a volatile write cache but FUA command is not supported, the pre flush and
-  // post flush commands are delivered.
-  auto commands = blkdev_.GetCommandSequence();
-  ASSERT_EQ(commands.size(), 3);
-  ASSERT_EQ(commands[0].opcode, BLOCK_OPCODE_FLUSH);  // Pre flush
-  ASSERT_EQ(commands[0].flags, 0);
-  ASSERT_EQ(commands[1].opcode, BLOCK_OPCODE_WRITE);
-  ASSERT_EQ(commands[1].flags, 0);                    // FUA flag is removed
-  ASSERT_EQ(commands[2].opcode, BLOCK_OPCODE_FLUSH);  // Post flush
-  ASSERT_EQ(commands[2].flags, 0);
-}
-
-TEST_F(ServerTest, PreflushAndPostflushException) {
-  block_info_t block_info = {
-      .block_count = kBlockCount, .block_size = kBlockSize, .max_transfer_size = kBlockSize};
-  CreateServer(block_info);
-  AttachVmo(/*do_fill=*/true);
-
-  block_fifo_request_t req = {
-      .command = {.opcode = BLOCK_OPCODE_WRITE,
-                  .flags =
-                      BLOCK_IO_FLAG_PREFLUSH | BLOCK_IO_FLAG_FORCE_ACCESS},  // Write flush and FUA
+      .command = {.opcode = BLOCK_OPCODE_WRITE, .flags = BLOCK_IO_FLAG_FORCE_ACCESS},  // FUA
       .reqid = 0x100,
       .group = 0,
       .vmoid = vmoid_,
@@ -407,61 +342,43 @@ TEST_F(ServerTest, PreflushAndPostflushException) {
       .dev_offset = 0,
   };
 
-  // If the device has a volatile write cache but FUA command is not supported, the pre flush and
-  // post flush commands are delivered.
-  // (I/O sequence = Pre flush -> Write -> Post flush)
+  // If the device has a volatile write cache but FUA command is not supported, the post flush
+  // commands are delivered.
+  // (I/O sequence = Write -> Post flush)
   auto& commands = blkdev_.GetCommandSequence();
-  {
-    // I/O error occurs on preflush
-    blkdev_.set_callback([&](const block_op_t& block_op) {
-      if (commands.size() == 1 && block_op.command.opcode == BLOCK_OPCODE_FLUSH) {
-        return ZX_ERR_IO;
-      }
-      return ZX_OK;
-    });
-    RequestOneAndWaitResponse(req, ZX_ERR_IO);
-    ASSERT_EQ(commands.size(), 1);  // Error is reported after preflush transfered
-    ASSERT_EQ(commands[0].opcode, BLOCK_OPCODE_FLUSH);  // Pre flush
-    ASSERT_EQ(commands[0].flags, 0);
-    commands.clear();
-  }
   {
     // I/O error occurs on write
     blkdev_.set_callback([&](const block_op_t& block_op) {
-      if (commands.size() == 2 && block_op.command.opcode == BLOCK_OPCODE_WRITE) {
+      if (commands.size() == 1 && block_op.command.opcode == BLOCK_OPCODE_WRITE) {
         return ZX_ERR_IO;
       }
       return ZX_OK;
     });
     RequestOneAndWaitResponse(req, ZX_ERR_IO);
-    ASSERT_EQ(commands.size(), 2);                      // Error is reported after write transfered
-    ASSERT_EQ(commands[0].opcode, BLOCK_OPCODE_FLUSH);  // Pre flush
-    ASSERT_EQ(commands[0].flags, 0);
-    ASSERT_EQ(commands[1].opcode, BLOCK_OPCODE_WRITE);
-    ASSERT_EQ(commands[1].flags, 0);  // FUA flag is removed
+    ASSERT_EQ(commands.size(), 1);  // Error is reported after write transfered
+    ASSERT_EQ(commands[0].opcode, BLOCK_OPCODE_WRITE);
+    ASSERT_EQ(commands[0].flags, 0);  // FUA flag is removed
     commands.clear();
   }
   {
     // I/O error occurs on postflush
     blkdev_.set_callback([&](const block_op_t& block_op) {
-      if (commands.size() == 3 && block_op.command.opcode == BLOCK_OPCODE_FLUSH) {
+      if (commands.size() == 2 && block_op.command.opcode == BLOCK_OPCODE_FLUSH) {
         return ZX_ERR_IO;
       }
       return ZX_OK;
     });
     RequestOneAndWaitResponse(req, ZX_ERR_IO);
-    ASSERT_EQ(commands.size(), 3);  // Error is reported after postflush transfered
-    ASSERT_EQ(commands[0].opcode, BLOCK_OPCODE_FLUSH);  // Pre flush
-    ASSERT_EQ(commands[0].flags, 0);
-    ASSERT_EQ(commands[1].opcode, BLOCK_OPCODE_WRITE);
-    ASSERT_EQ(commands[1].flags, 0);                    // FUA flag is removed
-    ASSERT_EQ(commands[2].opcode, BLOCK_OPCODE_FLUSH);  // Post flush
-    ASSERT_EQ(commands[2].flags, 0);
+    ASSERT_EQ(commands.size(), 2);  // Error is reported after postflush transfered
+    ASSERT_EQ(commands[0].opcode, BLOCK_OPCODE_WRITE);
+    ASSERT_EQ(commands[0].flags, 0);                    // FUA flag is removed
+    ASSERT_EQ(commands[1].opcode, BLOCK_OPCODE_FLUSH);  // Post flush
+    ASSERT_EQ(commands[1].flags, 0);
     commands.clear();
   }
 }
 
-TEST_F(ServerTest, PreflushAndFuaWriteWithLargeGroupedTransaction) {
+TEST_F(ServerTest, FuaWriteWithLargeGroupedTransaction) {
   // Restrict max_transfer_size so that the server has to split up our request.
   block_info_t block_info = {.block_count = kBlockCount,
                              .block_size = kBlockSize,
@@ -471,9 +388,7 @@ TEST_F(ServerTest, PreflushAndFuaWriteWithLargeGroupedTransaction) {
   AttachVmo(/*do_fill=*/true);
 
   block_fifo_request_t req = {
-      .command = {.opcode = BLOCK_OPCODE_WRITE,
-                  .flags =
-                      BLOCK_IO_FLAG_PREFLUSH | BLOCK_IO_FLAG_FORCE_ACCESS},  // Write flush and FUA
+      .command = {.opcode = BLOCK_OPCODE_WRITE, .flags = BLOCK_IO_FLAG_FORCE_ACCESS},
       .reqid = 0x100,
       .group = 0,
       .vmoid = vmoid_,
@@ -483,19 +398,17 @@ TEST_F(ServerTest, PreflushAndFuaWriteWithLargeGroupedTransaction) {
   };
   RequestOneAndWaitResponse(req, ZX_OK);
 
-  // If the device has a volatile write cache but FUA command is not supported, the pre flush and
-  // post flush commands are delivered.
+  // If the device has a volatile write cache but FUA command is not supported, the post flush
+  // commands are delivered.
   auto commands = blkdev_.GetCommandSequence();
-  ASSERT_EQ(commands.size(), 6);
-  ASSERT_EQ(commands[0].opcode, BLOCK_OPCODE_FLUSH);  // Pre flush
-  ASSERT_EQ(commands[0].flags, 0);
-  for (int i = 1; i <= 5; ++i) {
+  ASSERT_EQ(commands.size(), 5);
+  for (int i = 0; i < 5; ++i) {
     ASSERT_EQ(commands[i].opcode, BLOCK_OPCODE_WRITE);
     ASSERT_EQ(commands[i].flags, BLOCK_IO_FLAG_FORCE_ACCESS);  // FUA write
   }
 }
 
-TEST_F(ServerTest, PreflushAndPostflushWithLargeGroupedTransaction) {
+TEST_F(ServerTest, PostflushWithLargeGroupedTransaction) {
   // Restrict max_transfer_size so that the server has to split up our request.
   block_info_t block_info = {
       .block_count = kBlockCount, .block_size = kBlockSize, .max_transfer_size = kBlockSize};
@@ -503,9 +416,7 @@ TEST_F(ServerTest, PreflushAndPostflushWithLargeGroupedTransaction) {
   AttachVmo(/*do_fill=*/true);
 
   block_fifo_request_t req = {
-      .command = {.opcode = BLOCK_OPCODE_WRITE,
-                  .flags =
-                      BLOCK_IO_FLAG_PREFLUSH | BLOCK_IO_FLAG_FORCE_ACCESS},  // Write flush and FUA
+      .command = {.opcode = BLOCK_OPCODE_WRITE, .flags = BLOCK_IO_FLAG_FORCE_ACCESS},
       .reqid = 0x100,
       .group = 0,
       .vmoid = vmoid_,
@@ -515,21 +426,19 @@ TEST_F(ServerTest, PreflushAndPostflushWithLargeGroupedTransaction) {
   };
   RequestOneAndWaitResponse(req, ZX_OK);
 
-  // If the device has a volatile write cache but FUA command is not supported, the pre flush and
-  // post flush commands are delivered.
+  // If the device has a volatile write cache but FUA command is not supported, the post flush
+  // commands are delivered.
   auto commands = blkdev_.GetCommandSequence();
-  ASSERT_EQ(commands.size(), 7);
-  ASSERT_EQ(commands[0].opcode, BLOCK_OPCODE_FLUSH);  // Pre flush
-  ASSERT_EQ(commands[0].flags, 0);
-  for (int i = 1; i <= 5; ++i) {
+  ASSERT_EQ(commands.size(), 6);
+  for (int i = 0; i < 5; ++i) {
     ASSERT_EQ(commands[i].opcode, BLOCK_OPCODE_WRITE);
     ASSERT_EQ(commands[i].flags, 0);  // FUA flag is removed
   }
-  ASSERT_EQ(commands[6].opcode, BLOCK_OPCODE_FLUSH);  // Post flush
-  ASSERT_EQ(commands[6].flags, 0);
+  ASSERT_EQ(commands[5].opcode, BLOCK_OPCODE_FLUSH);  // Post flush
+  ASSERT_EQ(commands[5].flags, 0);
 }
 
-TEST_F(ServerTest, PreflushAndPostflushWithLargeGroupedTransactionException) {
+TEST_F(ServerTest, PostflushWithLargeGroupedTransactionException) {
   // Restrict max_transfer_size so that the server has to split up our request.
   block_info_t block_info = {
       .block_count = kBlockCount, .block_size = kBlockSize, .max_transfer_size = kBlockSize};
@@ -538,8 +447,7 @@ TEST_F(ServerTest, PreflushAndPostflushWithLargeGroupedTransactionException) {
 
   block_fifo_request_t req = {
       .command = {.opcode = BLOCK_OPCODE_WRITE,
-                  .flags =
-                      BLOCK_IO_FLAG_PREFLUSH | BLOCK_IO_FLAG_FORCE_ACCESS},  // Write flush and FUA
+                  .flags = BLOCK_IO_FLAG_FORCE_ACCESS},  // Write flush and FUA
       .reqid = 0x100,
       .group = 0,
       .vmoid = vmoid_,
@@ -548,37 +456,21 @@ TEST_F(ServerTest, PreflushAndPostflushWithLargeGroupedTransactionException) {
       .dev_offset = 0,
   };
 
-  // If the device has a volatile write cache but FUA command is not supported, the pre flush and
-  // post flush commands are delivered.
-  // (I/O Sequence = Pre flush -> Write -> Post flush)
+  // If the device has a volatile write cache but FUA command is not supported, the post flush
+  // commands are delivered.
+  // (I/O Sequence = Write -> Post flush)
   auto& commands = blkdev_.GetCommandSequence();
-  {
-    // I/O error occurs on preflush
-    blkdev_.set_callback([&](const block_op_t& block_op) {
-      if (commands.size() == 1 && block_op.command.opcode == BLOCK_OPCODE_FLUSH) {
-        return ZX_ERR_IO;
-      }
-      return ZX_OK;
-    });
-    RequestOneAndWaitResponse(req, ZX_ERR_IO);
-    ASSERT_EQ(commands.size(), 1);  // Error is reported after preflush transfered
-    ASSERT_EQ(commands[0].opcode, BLOCK_OPCODE_FLUSH);  // Pre flush
-    ASSERT_EQ(commands[0].flags, 0);
-    commands.clear();
-  }
   {
     // I/O error occurs on write
     blkdev_.set_callback([&](const block_op_t& block_op) {
-      if (commands.size() == 2 && block_op.command.opcode == BLOCK_OPCODE_WRITE) {
+      if (commands.size() == 1 && block_op.command.opcode == BLOCK_OPCODE_WRITE) {
         return ZX_ERR_IO;
       }
       return ZX_OK;
     });
     RequestOneAndWaitResponse(req, ZX_ERR_IO);
-    ASSERT_EQ(commands.size(), 6);                      // Error is reported after write transfered
-    ASSERT_EQ(commands[0].opcode, BLOCK_OPCODE_FLUSH);  // Pre flush
-    ASSERT_EQ(commands[0].flags, 0);
-    for (int i = 1; i <= 5; ++i) {
+    ASSERT_EQ(commands.size(), 5);  // Error is reported after write transfered
+    for (int i = 0; i < 5; ++i) {
       ASSERT_EQ(commands[i].opcode, BLOCK_OPCODE_WRITE);
       ASSERT_EQ(commands[i].flags, 0);  // FUA flag is removed
     }
@@ -587,21 +479,19 @@ TEST_F(ServerTest, PreflushAndPostflushWithLargeGroupedTransactionException) {
   {
     // I/O error occurs on postflush
     blkdev_.set_callback([&](const block_op_t& block_op) {
-      if (commands.size() == 7 && block_op.command.opcode == BLOCK_OPCODE_FLUSH) {
+      if (commands.size() == 6 && block_op.command.opcode == BLOCK_OPCODE_FLUSH) {
         return ZX_ERR_IO;
       }
       return ZX_OK;
     });
     RequestOneAndWaitResponse(req, ZX_ERR_IO);
-    ASSERT_EQ(commands.size(), 7);  // Error is reported after postflush transfered
-    ASSERT_EQ(commands[0].opcode, BLOCK_OPCODE_FLUSH);  // Pre flush
-    ASSERT_EQ(commands[0].flags, 0);
-    for (int i = 1; i <= 5; ++i) {
+    ASSERT_EQ(commands.size(), 6);  // Error is reported after postflush transfered
+    for (int i = 0; i < 5; ++i) {
       ASSERT_EQ(commands[i].opcode, BLOCK_OPCODE_WRITE);
       ASSERT_EQ(commands[i].flags, 0);  // FUA flag is removed
     }
-    ASSERT_EQ(commands[6].opcode, BLOCK_OPCODE_FLUSH);  // Post flush
-    ASSERT_EQ(commands[6].flags, 0);
+    ASSERT_EQ(commands[5].opcode, BLOCK_OPCODE_FLUSH);  // Post flush
+    ASSERT_EQ(commands[5].flags, 0);
     commands.clear();
   }
 }
@@ -640,8 +530,8 @@ TEST_F(ServerTest, PostflushMustBeIssuedOnlyAfterGroupLast) {
   RequestOne(reqs[0]);
   RequestOneAndWaitResponse(reqs[1], ZX_OK, /*expected_response_count=*/2);
 
-  // If the device has a volatile write cache but FUA command is not supported, the pre flush and
-  // post flush commands are delivered.
+  // If the device has a volatile write cache but FUA command is not supported, the post flush
+  // commands are delivered.
   auto commands = blkdev_.GetCommandSequence();
   ASSERT_EQ(commands.size(), 6);
   for (int i = 0; i < 4; ++i) {

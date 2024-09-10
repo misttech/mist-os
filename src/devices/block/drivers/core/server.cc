@@ -225,7 +225,18 @@ void Server::GetFifo(GetFifoCompleter::Sync& completer) {
   completer.ReplySuccess(std::move(fifo.value()));
 }
 
-zx_status_t Server::ProcessReadWriteRequest(block_fifo_request_t* request, bool do_postflush) {
+zx_status_t Server::ProcessReadWriteRequest(block_fifo_request_t* request) {
+  bool do_postflush = false;
+
+  // If the underlying device doesn't support FUA, we need to simulate it.
+  if ((request->command.flags & BLOCK_IO_FLAG_FORCE_ACCESS) && !(info_.flags & FLAG_FUA_SUPPORT)) {
+    // If the device does not support the FUA command, clear the BLOCK_IO_FLAG_FORCE_ACCESS flag and
+    // send the (Post)Flush command. A completion for the request must be sent after the last
+    // (Post)Flush is completed.
+    request->command.flags &= ~BLOCK_IO_FLAG_FORCE_ACCESS;
+    do_postflush = true;
+  }
+
   fbl::RefPtr<IoBuffer> iobuf;
   {
     fbl::AutoLock lock(&server_lock_);
@@ -381,57 +392,6 @@ zx_status_t Server::ProcessReadWriteRequest(block_fifo_request_t* request, bool 
   return ZX_OK;
 }
 
-zx_status_t Server::ProcessReadWriteRequestWithFlush(block_fifo_request_t* request) {
-  // PREFLUSH|FORCE_ACCESS request must operate differently depending on the device's writeback
-  // cache and FUA command support. There are two cases.
-  // 1. Device has writeback cache and support FUA command
-  //    => Issue (Pre)Flush + FUA(w/ completion) write commands
-  // 2. Device has writeback cache but doesn't support FUA command
-  //    => Issue (Pre)Flush + Write + (Post)Flush(w/ completion) commands
-  bool need_preflush = false, need_postflush = false;
-  if (request->command.flags & BLOCK_IO_FLAG_PREFLUSH) {
-    // The BLOCK_IO_FLAG_PREFLUSH flag is not used by the device. Therefore, clear the
-    // BLOCK_IO_FLAG_PREFLUSH flag.
-    request->command.flags &= ~BLOCK_IO_FLAG_PREFLUSH;
-    need_preflush = true;
-  }
-
-  if ((request->command.flags & BLOCK_IO_FLAG_FORCE_ACCESS) && !(info_.flags & FLAG_FUA_SUPPORT)) {
-    // If the device does not support the FUA command, clear the BLOCK_IO_FLAG_FORCE_ACCESS flag and
-    // send the (Post)Flush command. A completion for the request must be sent after the last
-    // (Post)Flush is completed.
-    request->command.flags &= ~BLOCK_IO_FLAG_FORCE_ACCESS;
-    need_postflush = true;
-  }
-
-  if (need_preflush) {
-    auto preflush_completer = [this, need_postflush](zx_status_t preflush_status,
-                                                     block_fifo_request_t& req) {
-      if (preflush_status != ZX_OK) {
-        FinishTransaction(preflush_status, req.reqid, req.group);
-        return;
-      }
-      if (zx_status_t status = ProcessReadWriteRequest(&req, need_postflush); status != ZX_OK) {
-        FinishTransaction(status, req.reqid, req.group);
-      }
-    };
-
-    // Issue (Pre)Flush command
-    if (zx_status_t status =
-            IssueFlushCommand(request, std::move(preflush_completer), /*internal_cmd=*/true);
-        status != ZX_OK) {
-      zxlogf(ERROR, "ProcessReadWriteRequestWithFlush: (Pre)Flush command issue failed, %s",
-             zx_status_get_string(status));
-      return status;
-    }
-  } else {
-    if (zx_status_t status = ProcessReadWriteRequest(request, need_postflush); status != ZX_OK) {
-      return status;
-    }
-  }
-  return ZX_OK;
-}
-
 zx_status_t Server::ProcessCloseVmoRequest(block_fifo_request_t* request) {
   fbl::AutoLock lock(&server_lock_);
   auto iobuf = tree_.find(request->vmoid);
@@ -503,7 +463,7 @@ void Server::ProcessRequest(block_fifo_request_t* request) {
   switch (request->command.opcode) {
     case BLOCK_OPCODE_READ:
     case BLOCK_OPCODE_WRITE:
-      if (zx_status_t status = ProcessReadWriteRequestWithFlush(request); status != ZX_OK) {
+      if (zx_status_t status = ProcessReadWriteRequest(request); status != ZX_OK) {
         FinishTransaction(status, request->reqid, request->group);
       }
       break;

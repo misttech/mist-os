@@ -320,47 +320,4 @@ TEST(BufferedOperationsBuilderTest, TwoRequestDifferentVmoOffset) {
   EXPECT_EQ(2u, requests[1].op.length);
 }
 
-TEST(BufferedOperationsBuilderTest, WriteRequestRequiringFlush) {
-  BufferedOperationsBuilder builder;
-
-  MockVmoidRegistry registry;
-  VmoBuffer buffer;
-  buffer.Initialize(&registry, kCapacity, kBlockSize, kLabel);
-
-  Operation operation;
-  operation.type = OperationType::kWrite;
-  operation.vmo_offset = 0;
-  operation.dev_offset = 0;
-  operation.length = 1;
-  builder.Add(operation, &buffer);
-
-  operation.type = OperationType::kWritePreflushAndFua;
-  operation.vmo_offset = 1;
-  operation.dev_offset = 1;
-  builder.Add(operation, &buffer);
-
-  operation.type = OperationType::kWriteFua;
-  operation.vmo_offset = 2;
-  operation.dev_offset = 2;
-  builder.Add(operation, &buffer);
-
-  auto requests = builder.TakeOperations();
-  ASSERT_EQ(3u, requests.size());
-  EXPECT_EQ(kVmoid1, requests[0].vmoid);
-  EXPECT_EQ(kVmoid1, requests[1].vmoid);
-  EXPECT_EQ(kVmoid1, requests[2].vmoid);
-  EXPECT_EQ(OperationType::kWrite, requests[0].op.type);
-  EXPECT_EQ(OperationType::kWritePreflushAndFua, requests[1].op.type);
-  EXPECT_EQ(OperationType::kWriteFua, requests[2].op.type);
-  EXPECT_EQ(0u, requests[0].op.vmo_offset);
-  EXPECT_EQ(0u, requests[0].op.dev_offset);
-  EXPECT_EQ(1u, requests[0].op.length);
-  EXPECT_EQ(1u, requests[1].op.vmo_offset);
-  EXPECT_EQ(1u, requests[1].op.dev_offset);
-  EXPECT_EQ(1u, requests[2].op.length);
-  EXPECT_EQ(2u, requests[2].op.vmo_offset);
-  EXPECT_EQ(2u, requests[2].op.dev_offset);
-  EXPECT_EQ(1u, requests[1].op.length);
-}
-
 }  // namespace

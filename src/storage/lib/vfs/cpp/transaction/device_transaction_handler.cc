@@ -42,10 +42,6 @@ zx_status_t DeviceTransactionHandler::RunRequests(
         case storage::OperationType::kWriteFua:
           request.command = {.opcode = BLOCK_OPCODE_WRITE, .flags = BLOCK_IO_FLAG_FORCE_ACCESS};
           break;
-        case storage::OperationType::kWritePreflushAndFua:
-          request.command = {.opcode = BLOCK_OPCODE_WRITE,
-                             .flags = BLOCK_IO_FLAG_PREFLUSH | BLOCK_IO_FLAG_FORCE_ACCESS};
-          break;
         default:
           ZX_DEBUG_ASSERT_MSG(false, "Unsupported operation");
       }
