@@ -13,6 +13,7 @@
 #include "src/developer/debug/zxdb/client/mock_process.h"
 #include "src/developer/debug/zxdb/client/mock_symbol_server.h"
 #include "src/developer/debug/zxdb/client/session.h"
+#include "src/developer/debug/zxdb/client/symbol_server_impl.h"
 #include "src/developer/debug/zxdb/client/target_impl.h"
 #include "src/developer/debug/zxdb/common/host_util.h"
 #include "src/developer/debug/zxdb/common/test_with_loop.h"
@@ -102,6 +103,22 @@ TEST_F(SymbolServerTest, DownloadTypes) {
   EXPECT_FALSE(saw_weird_module);
   EXPECT_FALSE(saw_binary_request);
   EXPECT_TRUE(saw_symbol_request);
+}
+
+TEST(SymbolServerImplTest, PublicServerRequiresNoCredentials) {
+  unsetenv("HOME");
+  unsetenv("XDG_CACHE_HOME");
+  unsetenv("GCE_METADATA_HOST");
+
+  Session session;
+
+  // We test the actual impl here to make sure the state transitions correctly without requiring any
+  // actual remote requests.
+  auto symbol_server = std::make_unique<SymbolServerImpl>(&session, "gs://fake_url", false);
+
+  // A server that does not require authentication should never require any initialization before
+  // becoming ready.
+  ASSERT_EQ(symbol_server->state(), SymbolServer::State::kReady);
 }
 
 }  // namespace zxdb
