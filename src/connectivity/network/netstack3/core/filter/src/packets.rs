@@ -32,6 +32,47 @@ use packet_formats::tcp::{TcpParseArgs, TcpSegment, TcpSegmentBuilderWithOptions
 use packet_formats::udp::{UdpPacket, UdpPacketBuilder, UdpPacketRaw, UdpParseArgs};
 use zerocopy::{ByteSlice, ByteSliceMut};
 
+/// An IP extension trait for the filtering crate.
+pub trait FilterIpExt: IpExt {
+    /// A marker type to add an [`IpPacket`] bound to [`Self::Packet`].
+    type FilterIpPacket<B: ByteSliceMut>: IpPacket<Self>;
+
+    /// A no-op conversion to help the compiler identify that [`Self::Packet`]
+    /// actually implements [`IpPacket`].
+    fn as_filter_packet<B: ByteSliceMut>(packet: Self::Packet<B>) -> Self::FilterIpPacket<B>;
+
+    /// The reciprocal of [`Self::as_filter_ip_packet`].
+    fn as_ip_packet<B: ByteSliceMut>(packet: Self::FilterIpPacket<B>) -> Self::Packet<B>;
+}
+
+impl FilterIpExt for Ipv4 {
+    type FilterIpPacket<B: ByteSliceMut> = Ipv4Packet<B>;
+
+    #[inline]
+    fn as_filter_packet<B: ByteSliceMut>(packet: Ipv4Packet<B>) -> Ipv4Packet<B> {
+        packet
+    }
+
+    #[inline]
+    fn as_ip_packet<B: ByteSliceMut>(packet: Ipv4Packet<B>) -> Ipv4Packet<B> {
+        packet
+    }
+}
+
+impl FilterIpExt for Ipv6 {
+    type FilterIpPacket<B: ByteSliceMut> = Ipv6Packet<B>;
+
+    #[inline]
+    fn as_filter_packet<B: ByteSliceMut>(packet: Ipv6Packet<B>) -> Ipv6Packet<B> {
+        packet
+    }
+
+    #[inline]
+    fn as_ip_packet<B: ByteSliceMut>(packet: Ipv6Packet<B>) -> Ipv6Packet<B> {
+        packet
+    }
+}
+
 /// An IP packet that provides header inspection.
 pub trait IpPacket<I: IpExt> {
     /// The type that provides access to transport-layer header inspection, if a

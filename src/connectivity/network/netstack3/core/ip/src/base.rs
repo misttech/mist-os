@@ -38,8 +38,9 @@ use netstack3_base::{
 };
 use netstack3_filter::{
     self as filter, ConntrackConnection, FilterBindingsContext, FilterBindingsTypes,
-    FilterHandler as _, FilterIpContext, FilterIpMetadata, FilterTimerId, ForwardedPacket,
-    IngressVerdict, IpPacket, NatType, NestedWithInnerIpPacket, TransportPacketSerializer, Tuple,
+    FilterHandler as _, FilterIpContext, FilterIpExt, FilterIpMetadata, FilterTimerId,
+    ForwardedPacket, IngressVerdict, IpPacket, NatType, NestedWithInnerIpPacket,
+    TransportPacketSerializer, Tuple,
 };
 use packet::{Buf, BufferMut, GrowBuffer, ParseBufferMut, ParseMetadata, Serializer};
 use packet_formats::error::IpParseError;
@@ -611,7 +612,7 @@ pub enum Ipv6PresentAddressStatus {
 }
 
 /// An extension trait providing IP layer properties.
-pub trait IpLayerIpExt: IpExt + MulticastRouteIpExt + IcmpHandlerIpExt {
+pub trait IpLayerIpExt: IpExt + MulticastRouteIpExt + IcmpHandlerIpExt + FilterIpExt {
     /// IP Address status.
     type AddressStatus: Debug;
     /// IP Address state.
@@ -2248,9 +2249,9 @@ where
 }
 
 /// Determine which [`ForwardingAction`] should be taken for an IP packet.
-fn determine_ip_packet_forwarding_action<'a, 'b, I, BC, CC, B>(
+fn determine_ip_packet_forwarding_action<'a, 'b, I, BC, CC>(
     core_ctx: &'a mut CC,
-    mut packet: I::Packet<&'a mut [u8]>,
+    packet: I::Packet<&'a mut [u8]>,
     mut packet_meta: IpLayerPacketMetadata<I, BC>,
     minimum_ttl: Option<u8>,
     inbound_device: &'b CC::DeviceId,
@@ -2264,8 +2265,6 @@ where
     I: IpLayerIpExt,
     BC: IpLayerBindingsContext<I, CC::DeviceId>,
     CC: IpLayerIngressContext<I, BC> + CounterContext<IpCounters<I>>,
-    B: BufferMut,
-    I::Packet<&'a mut [u8]>: netstack3_filter::IpPacket<I>,
 {
     // When forwarding, if a datagram's TTL is one or zero, discard it, as
     // decrementing the TTL would put it below the allowed minimum value.
@@ -2373,6 +2372,7 @@ where
         }
     };
 
+    let mut packet = I::as_filter_packet(packet);
     match core_ctx.filter_handler().forwarding_hook(
         &mut packet,
         inbound_device,
@@ -2387,6 +2387,7 @@ where
         filter::Verdict::Accept => {}
     }
 
+    let mut packet = I::as_ip_packet(packet);
     packet.set_ttl(ttl - 1);
     let (_, _, proto, parse_meta): (I::Addr, I::Addr, _, _) = packet.into_metadata();
     ForwardingAction::Forward(IpPacketForwarder {
@@ -2802,7 +2803,7 @@ pub fn receive_ipv4_packet<
                 clone_packet_for_mcast_forwarding! {
                     let (copy_of_data, copy_of_buffer, copy_of_packet) = packet
                 };
-                determine_ip_packet_forwarding_action::<Ipv4, _, _, B>(
+                determine_ip_packet_forwarding_action::<Ipv4, _, _>(
                     core_ctx,
                     copy_of_packet,
                     packet_metadata.take().unwrap_or_default(),
@@ -2850,7 +2851,7 @@ pub fn receive_ipv4_packet<
             dst: Destination { device: dst_device, next_hop },
         } => {
             let src_ip = packet.src_ip();
-            determine_ip_packet_forwarding_action::<Ipv4, _, _, B>(
+            determine_ip_packet_forwarding_action::<Ipv4, _, _>(
                 core_ctx,
                 packet,
                 packet_metadata,
@@ -3154,7 +3155,7 @@ pub fn receive_ipv6_packet<
                 clone_packet_for_mcast_forwarding! {
                     let (copy_of_data, copy_of_buffer, copy_of_packet) = packet
                 };
-                determine_ip_packet_forwarding_action::<Ipv6, _, _, B>(
+                determine_ip_packet_forwarding_action::<Ipv6, _, _>(
                     core_ctx,
                     copy_of_packet,
                     packet_metadata.take().unwrap_or_default(),
@@ -3233,7 +3234,7 @@ pub fn receive_ipv6_packet<
             original_dst,
             dst: Destination { device: dst_device, next_hop },
         } => {
-            determine_ip_packet_forwarding_action::<Ipv6, _, _, B>(
+            determine_ip_packet_forwarding_action::<Ipv6, _, _>(
                 core_ctx,
                 packet,
                 packet_metadata,
