@@ -272,6 +272,8 @@ typedef struct zxio_node_attr {
   uint8_t* fsverity_root_hash;
   bool fsverity_enabled;
 
+  bool casefold;
+
   // The type of the zxio object if known. If the type is unknown or non
   // standard, the value will be ZXIO_OBJECT_TYPE_NONE.
   zxio_object_type_t object_type;
@@ -301,6 +303,7 @@ typedef struct zxio_node_attr {
     bool fsverity_root_hash;
     bool fsverity_enabled;
     bool object_type;
+    bool casefold;
 
 #ifdef __cplusplus
     constexpr bool operator==(const zxio_node_attr_has_t& other) const {
@@ -380,6 +383,9 @@ typedef struct zxio_node_attr {
       return false;
     }
     if (has.object_type && (object_type != other.object_type)) {
+      return false;
+    }
+    if (has.casefold && casefold != other.casefold) {
       return false;
     }
     return true;

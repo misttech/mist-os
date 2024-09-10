@@ -6,7 +6,7 @@ use assert_matches::assert_matches;
 use fidl::endpoints::{create_endpoints, ServerEnd};
 use fsverity_merkle::{FsVerityHasher, FsVerityHasherOptions, MerkleTreeBuilder};
 use fuchsia_zircon::{self as zx, HandleBased, Status};
-use fxfs_testing::{close_file_checked, open_file_checked, TestFixture};
+use fxfs_testing::{close_file_checked, open_dir_checked, open_file_checked, TestFixture};
 use std::sync::Arc;
 use syncio::{
     zxio, zxio_fsverity_descriptor_t, zxio_node_attr_has_t, zxio_node_attributes_t, SeekOrigin,
@@ -1057,6 +1057,78 @@ async fn test_open3_node() {
             .expect("open_node failed");
         assert_eq!(attr.protocols, zxio::ZXIO_NODE_PROTOCOL_FILE);
         assert_eq!(attr.content_size, 5);
+    })
+    .await;
+
+    fixture.close().await;
+}
+
+#[fuchsia::test]
+async fn test_casefold() {
+    let fixture = TestFixture::new().await;
+    let root = fixture.root();
+    let test_directory = open_dir_checked(
+        root,
+        fio::OpenFlags::RIGHT_READABLE
+            | fio::OpenFlags::RIGHT_WRITABLE
+            | fio::OpenFlags::DIRECTORY
+            | fio::OpenFlags::CREATE,
+        "test_dir",
+    )
+    .await;
+
+    let (dir_client, dir_server) = zx::Channel::create();
+    test_directory
+        .clone(fio::OpenFlags::CLONE_SAME_RIGHTS, dir_server.into())
+        .expect("clone failed");
+
+    fasync::unblock(move || {
+        let dir_zxio = Zxio::create(dir_client.into_handle()).expect("create failed");
+        let attr = zxio_node_attributes_t {
+            gid: 111,
+            modification_time: 333,
+            casefold: true,
+            has: zxio_node_attr_has_t {
+                gid: true,
+                modification_time: true,
+                casefold: true,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        dir_zxio.attr_set(&attr).expect("attr_set failed");
+
+        let query = zxio_node_attr_has_t {
+            gid: true,
+            modification_time: true,
+            casefold: true,
+            ..Default::default()
+        };
+
+        let attributes = dir_zxio.attr_get(query).expect("attr_get failed");
+        assert_eq!(attributes.gid, 111);
+        assert_eq!(attributes.modification_time, 333);
+        assert_eq!(attributes.casefold, true);
+
+        let _file = dir_zxio
+            .open3(
+                "foo",
+                fio::Flags::FLAG_MUST_CREATE
+                    | fio::Flags::PROTOCOL_FILE
+                    | fio::Flags::PERM_READ
+                    | fio::Flags::PERM_WRITE,
+                Default::default(),
+            )
+            .expect("open3 failed");
+
+        let _file = dir_zxio
+            .open3(
+                "FOO",
+                fio::Flags::PROTOCOL_FILE | fio::Flags::PERM_READ | fio::Flags::PERM_WRITE,
+                Default::default(),
+            )
+            .expect("open3 failed");
     })
     .await;
 

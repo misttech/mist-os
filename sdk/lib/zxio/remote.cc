@@ -628,6 +628,8 @@ constexpr fio::NodeAttributesQuery BuildAttributeQuery(
     query |= fio::NodeAttributesQuery::kRootHash;
   if (attr_has.fsverity_enabled)
     query |= fio::NodeAttributesQuery::kVerityEnabled;
+  if (attr_has.casefold)
+    query |= fio::NodeAttributesQuery::kCasefold;
 
   return query;
 }
@@ -669,6 +671,9 @@ zx::result<fio::wire::MutableNodeAttributes> BuildMutableAttributes(
   if (mutable_attrs->has.rdev) {
     builder.rdev(
         fidl::ObjectView<uint64_t>::FromExternal(const_cast<uint64_t*>(&mutable_attrs->rdev)));
+  }
+  if (mutable_attrs->has.casefold) {
+    builder.casefold(mutable_attrs->casefold);
   }
   return zx::ok(builder.Build());
 }
@@ -1557,7 +1562,8 @@ class Directory : public Remote<fio::Directory, ZXIO_OBJECT_TYPE_DIR> {
     }
     // If any of the attributes that exist only in io2 are requested, we call GetAttributes (io2)
     if (inout_attr->has.mode || inout_attr->has.uid || inout_attr->has.gid ||
-        inout_attr->has.rdev || inout_attr->has.access_time || inout_attr->has.change_time) {
+        inout_attr->has.rdev || inout_attr->has.access_time || inout_attr->has.change_time ||
+        inout_attr->has.casefold) {
       return AttributesGetCommon(client(), inout_attr);
     }
     return AttrGetCommon(client(), ToZxioAbilitiesForDirectory(), inout_attr);
@@ -1568,7 +1574,7 @@ class Directory : public Remote<fio::Directory, ZXIO_OBJECT_TYPE_DIR> {
     // If these attributes are set, call `update_attributes` (io2) otherwise, we can fall back to
     // `SetAttr` to only update creation and modification time.
     if (attr->has.mode || attr->has.uid || attr->has.gid || attr->has.rdev ||
-        attr->has.access_time) {
+        attr->has.access_time || attr->has.casefold) {
       return AttributesSetCommon(client(), attr);
     }
 #endif
@@ -2109,6 +2115,12 @@ zx_status_t zxio_attr_from_wire(const fio::wire::NodeAttributes2& in, zxio_node_
     out->rdev = in.mutable_attributes.rdev();
   } else {
     out->has.rdev = false;
+  }
+
+  if (out->has.casefold && in.mutable_attributes.has_casefold()) {
+    out->casefold = in.mutable_attributes.casefold();
+  } else {
+    out->has.casefold = false;
   }
 
   return ZX_OK;
