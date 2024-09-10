@@ -228,10 +228,6 @@ static void init_uart() {
 }
 
 void X86UartInitEarly(const uart::all::Driver& serial) {
-  if (gBootOptions->experimental_serial_migration) {
-    return;
-  }
-
   // Updates gDebugPort with the provided UART metadata, given by a variant of
   // libuart driver types, each with methods to indicate the ZBI item type and
   // payload.
@@ -275,10 +271,6 @@ void X86UartInitEarly(const uart::all::Driver& serial) {
 }
 
 void X86UartInitLate() {
-  if (gBootOptions->experimental_serial_migration) {
-    return;
-  }
-
   // At this stage, we have threads, interrupts, the heap, and virtual memory
   // available to us, which wasn't available at earlier stages.
   //

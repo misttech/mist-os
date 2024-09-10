@@ -79,15 +79,9 @@ void UartInitLate(uint32_t extra) {
 }  // namespace
 
 void PlatformUartDriverHandoffEarly(const uart::all::Driver& serial) {
-  if (gBootOptions->experimental_serial_migration) {
-    return;
-  }
   ktl::visit([](const auto& uart) { UartInitEarly(uart.extra(), uart.config()); }, serial);
 }
 
 void PlatformUartDriverHandoffLate(const uart::all::Driver& serial) {
-  if (gBootOptions->experimental_serial_migration) {
-    return;
-  }
   ktl::visit([](const auto& uart) { UartInitLate(uart.extra()); }, serial);
 }

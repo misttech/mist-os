@@ -960,15 +960,6 @@ Zircon exception is raised in the process that crosses the limit. This value sho
 that well behaved programs will not hit the limit, but low enough to terminate misbehaving programs
 before they impact the system.
 
-### kernel.experimental.serial_migration=\<bool>
-
-**Default:** `true`
-
-**TODO(https://fxbug.dev/42170495)**
-
-Temporary flag to assist on serial driver migration from kernel's implementation to
-ulib/uart implementation.
-
 ### kernel.select=\<string>
 
 **Default:** `zircon`

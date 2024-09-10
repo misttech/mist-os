@@ -391,8 +391,7 @@ syscall, even if the hardware cycle counter registers are accessible from
 user-mode.
 )""")
 
-DEFINE_OPTION("vdso.clock_get_force_syscall", bool,
-              vdso_clock_get_force_syscall, {false}, R"""(
+DEFINE_OPTION("vdso.clock_get_force_syscall", bool, vdso_clock_get_force_syscall, {false}, R"""(
 If this option is set, the `zx_clock_get_monotonic` and `zx_clock_get_boot` vDSO calls will be
 forced to be a true syscall, instead of simply performing a transformation of the tick
 counter in user-mode.
@@ -729,7 +728,8 @@ corruption.  Values must be one of:
    - A fatal kernel panic will occur when corruption is detected.
 )""")
 
-DEFINE_OPTION("kernel.pmm-checker.enable", CheckerEnable, pmm_checker_enabled, {CheckerEnable::kFalse},
+DEFINE_OPTION("kernel.pmm-checker.enable", CheckerEnable, pmm_checker_enabled,
+              {CheckerEnable::kFalse},
               R"""(
 This controls whether the PMM's use-after-free checker is enabled.
 The PMM checker can be expensive and is intended for use in debug and
@@ -824,14 +824,6 @@ Specifies the maximum number of observers any single port may have. When this li
 Zircon exception is raised in the process that crosses the limit. This value should be high enough
 that well behaved programs will not hit the limit, but low enough to terminate misbehaving programs
 before they impact the system.
-)""")
-
-DEFINE_OPTION("kernel.experimental.serial_migration", bool, experimental_serial_migration, {true},
-              R"""(
-**TODO(https://fxbug.dev/42170495)**
-
-Temporary flag to assist on serial driver migration from kernel's implementation to
-ulib/uart implementation.
 )""")
 
 DEFINE_OPTION("kernel.select", SmallString, select, {"zircon"}, R"""(
