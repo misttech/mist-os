@@ -34,7 +34,6 @@
 #include <ktl/variant.h>
 #include <lockdep/guard.h>
 #include <platform/debug.h>
-#include <platform/legacy_debug.h>
 #include <platform/uart.h>
 
 #include "platform.h"

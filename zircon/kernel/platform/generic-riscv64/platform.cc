@@ -447,54 +447,6 @@ static void platform_init_postvm(uint level) {}
 
 LK_INIT_HOOK(platform_postvm, platform_init_postvm, LK_INIT_LEVEL_VM)
 
-void legacy_platform_dputs_thread(const char* str, size_t len) {
-  if (uart_disabled) {
-    return;
-  }
-  uart_puts(str, len, true);
-}
-
-void legacy_platform_dputs_irq(const char* str, size_t len) {
-  if (uart_disabled) {
-    return;
-  }
-  uart_puts(str, len, false);
-}
-
-int legacy_platform_dgetc(char* c, bool wait) {
-  if (uart_disabled) {
-    return ZX_ERR_NOT_SUPPORTED;
-  }
-  int ret = uart_getc(wait);
-  // uart_getc returns ZX_ERR_INTERNAL if no input was read
-  if (!wait && ret == ZX_ERR_INTERNAL)
-    return 0;
-  if (ret < 0)
-    return ret;
-  *c = static_cast<char>(ret);
-  return 1;
-}
-
-void legacy_platform_pputc(char c) {
-  if (uart_disabled) {
-    return;
-  }
-  uart_pputc(c);
-}
-
-int legacy_platform_pgetc(char* c) {
-  if (uart_disabled) {
-    return ZX_ERR_NOT_SUPPORTED;
-  }
-  int r = uart_pgetc();
-  if (r < 0) {
-    return r;
-  }
-
-  *c = static_cast<char>(r);
-  return 0;
-}
-
 void platform_specific_halt(platform_halt_action suggested_action, zircon_crash_reason_t reason,
                             bool halt_on_panic) {
   TRACEF("suggested_action %u, reason %u, halt_on_panic %d\n", suggested_action,

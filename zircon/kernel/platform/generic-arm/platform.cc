@@ -53,7 +53,6 @@
 #include <phys/handoff.h>
 #include <platform/crashlog.h>
 #include <platform/debug.h>
-#include <platform/legacy_debug.h>
 #include <vm/kstack.h>
 #include <vm/physmap.h>
 #include <vm/vm.h>
@@ -372,56 +371,6 @@ zx_status_t platform_mp_prep_cpu_unplug(cpu_num_t cpu_id) {
 }
 
 zx_status_t platform_mp_cpu_unplug(cpu_num_t cpu_id) { return arch_mp_cpu_unplug(cpu_id); }
-
-void legacy_platform_dputs_thread(const char* str, size_t len) {
-  if (uart_disabled) {
-    return;
-  }
-  uart_puts(str, len, true);
-}
-
-void legacy_platform_dputs_irq(const char* str, size_t len) {
-  if (uart_disabled) {
-    return;
-  }
-  uart_puts(str, len, false);
-}
-
-int legacy_platform_dgetc(char* c, bool wait) {
-  if (uart_disabled) {
-    return ZX_ERR_NOT_SUPPORTED;
-  }
-
-  int ret = uart_getc(wait);
-  if (ret >= 0) {
-    *c = static_cast<char>(ret);
-    return 1;
-  }
-  if (ret == ZX_ERR_SHOULD_WAIT) {
-    return 0;
-  }
-  return ret;
-}
-
-void legacy_platform_pputc(char c) {
-  if (uart_disabled) {
-    return;
-  }
-  uart_pputc(c);
-}
-
-int legacy_platform_pgetc(char* c) {
-  if (uart_disabled) {
-    return ZX_ERR_NOT_SUPPORTED;
-  }
-  int r = uart_pgetc();
-  if (r < 0) {
-    return r;
-  }
-
-  *c = static_cast<char>(r);
-  return 0;
-}
 
 void platform_specific_halt(platform_halt_action suggested_action, zircon_crash_reason_t reason,
                             bool halt_on_panic) {
