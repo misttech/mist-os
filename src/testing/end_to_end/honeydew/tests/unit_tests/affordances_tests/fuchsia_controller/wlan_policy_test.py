@@ -437,8 +437,52 @@ class WlanPolicyFCTests(unittest.TestCase):
 
     def test_remove_all_networks(self) -> None:
         """Test if remove_all_networks works."""
-        with self.assertRaises(NotImplementedError):
+        with self._mock_create_client_controller() as client_controller:
+            self.wlan_policy_obj.create_client_controller()
+
+            # Mock get_saved_networks
+            def get_saved_networks(iterator: Channel) -> None:
+                server = TestNetworkConfigIteratorImpl(
+                    iterator,
+                    items=[
+                        [
+                            _TEST_NETWORK_CONFIG_NONE_FIDL,
+                            _TEST_NETWORK_CONFIG_PASSWORD_FIDL,
+                            _TEST_NETWORK_CONFIG_PSK_FIDL,
+                        ],
+                    ],
+                )
+                self.network_config_iterator = (
+                    self.wlan_policy_obj.loop().create_task(server.serve())
+                )
+
+            client_controller.get_saved_networks = mock.Mock(
+                wraps=get_saved_networks
+            )
+
+            # Mock remove_network, which should be called once for each saved
+            # network.
+            res = f_wlan_policy.ClientControllerRemoveNetworkResult()
+            res.response = f_wlan_policy.ClientControllerRemoveNetworkResponse()
+            client_controller.remove_network.side_effect = [
+                _async_response(res),
+                _async_response(res),
+                _async_response(res),
+            ]
+
+            # Remove all networks
             self.wlan_policy_obj.remove_all_networks()
+            client_controller.remove_network.assert_has_calls(
+                [
+                    mock.call(config=_TEST_NETWORK_CONFIG_NONE_FIDL),
+                    mock.call(config=_TEST_NETWORK_CONFIG_PASSWORD_FIDL),
+                    mock.call(config=_TEST_NETWORK_CONFIG_PSK_FIDL),
+                ]
+            )
+
+            # Cleanup
+            assert self.network_config_iterator is not None
+            self.wlan_policy_obj._cancel_task(self.network_config_iterator)
 
     def test_remove_network_passes(self) -> None:
         """Test if remove_network works."""

@@ -363,8 +363,20 @@ class WlanPolicy(AsyncAdapter, wlan_policy.WlanPolicy):
 
         Raises:
             HoneydewWlanError: Error from WLAN stack.
+            RuntimeError: A client controller has not been created yet
         """
-        raise NotImplementedError()
+        if self._client_controller is None:
+            raise RuntimeError(
+                "Client controller has not been initialized; call "
+                "create_client_controller() before remove_all_networks()"
+            )
+
+        for network in self.get_saved_networks():
+            self.remove_network(
+                target_ssid=network.ssid,
+                security_type=network.security_type,
+                target_pwd=network.credential_value,
+            )
 
     @asyncmethod
     # pylint: disable-next=invalid-overridden-method

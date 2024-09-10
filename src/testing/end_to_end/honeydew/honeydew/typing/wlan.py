@@ -409,7 +409,7 @@ class NetworkConfig:
             ssid=identifier.ssid,
             security_type=identifier.security_type,
             credential_type=credential.type(),
-            credential_value=credential.value() or "",
+            credential_value=credential.value(),
         )
 
     def __lt__(self, other: NetworkConfig) -> bool:
