@@ -8,13 +8,10 @@
 
 #include "src/developer/memory/metrics/capture.h"
 #include "src/developer/memory/metrics/capture_strategy.h"
+#include "src/developer/memory/metrics/tests/test_utils.h"
 
-#define ASSERT_OK_AND_ASSIGN(name, result)                                                 \
-  auto name##_result = result;                                                             \
-  ASSERT_TRUE(name##_result.is_ok()) << zx_status_get_string(name##_result.error_value()); \
-  auto name = result.value();
-
-namespace memory::test {
+namespace memory {
+namespace test {
 
 // These tests are exercising the real system services. As such we can't assume much about exactly
 // what is running and what the memory looks like. We're just vetting whether they return any data
@@ -22,23 +19,23 @@ namespace memory::test {
 using CaptureSystemTest = testing::Test;
 
 TEST_F(CaptureSystemTest, KMEM) {
-  ASSERT_OK_AND_ASSIGN(
-      capture_maker, memory::CaptureMaker::Create(CreateDefaultOS(),
-                                                  std::make_unique<memory::BaseCaptureStrategy>()));
+  CaptureState state;
+  auto ret = Capture::GetCaptureState(&state);
+  ASSERT_EQ(ZX_OK, ret);
   Capture c;
-  auto ret = capture_maker->GetCapture(&c, CaptureLevel::KMEM);
+  ret = Capture::GetCapture(&c, state, CaptureLevel::KMEM, std::make_unique<BaseCaptureStrategy>());
   ASSERT_EQ(ZX_OK, ret) << zx_status_get_string(ret);
   EXPECT_LT(0U, c.kmem().free_bytes);
   EXPECT_LT(0U, c.kmem().total_bytes);
 }
 
 // TODO(https://fxbug.dev/42059717): deflake and reenable.
-TEST_F(CaptureSystemTest, VMO) {
-  ASSERT_OK_AND_ASSIGN(
-      capture_maker, memory::CaptureMaker::Create(CreateDefaultOS(),
-                                                  std::make_unique<memory::BaseCaptureStrategy>()));
+TEST_F(CaptureSystemTest, DISABLED_VMO) {
+  CaptureState state;
+  auto ret = Capture::GetCaptureState(&state);
+  ASSERT_EQ(ZX_OK, ret) << zx_status_get_string(ret);
   Capture c;
-  auto ret = capture_maker->GetCapture(&c, CaptureLevel::VMO);
+  ret = Capture::GetCapture(&c, state, CaptureLevel::VMO, std::make_unique<BaseCaptureStrategy>());
   ASSERT_EQ(ZX_OK, ret) << zx_status_get_string(ret);
   EXPECT_LT(0U, c.kmem().free_bytes);
   EXPECT_LT(0U, c.kmem().total_bytes);
@@ -46,4 +43,5 @@ TEST_F(CaptureSystemTest, VMO) {
   ASSERT_LT(0U, c.koid_to_process().size());
 }
 
-}  // namespace memory::test
+}  // namespace test
+}  // namespace memory

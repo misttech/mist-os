@@ -38,8 +38,7 @@ class Monitor : public fuchsia::memory::inspection::Collector {
  public:
   Monitor(std::unique_ptr<sys::ComponentContext> context, const fxl::CommandLine& command_line,
           async_dispatcher_t* dispatcher, bool send_metrics, bool watch_memory_pressure,
-          bool send_critical_pressure_crash_reports, memory_monitor_config::Config config,
-          std::unique_ptr<memory::CaptureMaker> capture_maker);
+          bool send_critical_pressure_crash_reports, memory_monitor_config::Config config);
   ~Monitor();
 
   // For memory bandwidth measurement, SetRamDevice should be called once
@@ -74,10 +73,15 @@ class Monitor : public fuchsia::memory::inspection::Collector {
   static void PrintHelp();
   inspect::Inspector Inspect(const std::vector<memory::BucketMatch>& bucket_matches);
 
+  // Overridable for testing purpose.
+  virtual zx_status_t GetCapture(memory::Capture* capture,
+                                 const memory::CaptureState& capture_state,
+                                 memory::CaptureLevel level,
+                                 std::unique_ptr<memory::CaptureStrategy> strategy);
   void GetDigest(const memory::Capture& capture, memory::Digest* digest);
   void PressureLevelChanged(Level level);
 
-  std::unique_ptr<memory::CaptureMaker> capture_maker_;
+  memory::CaptureState capture_state_;
   std::unique_ptr<HighWater> high_water_;
   uint64_t prealloc_size_;
   zx::vmo prealloc_vmo_;

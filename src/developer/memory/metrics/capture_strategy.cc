@@ -17,32 +17,7 @@
 #include "src/developer/memory/metrics/capture.h"
 
 namespace memory {
-namespace {
-// GetInfoVector executes an OS::GetInfo call that outputs a list of element inside |buffer|,
-// ensuring that |buffer| is big enough to receive the list of elements. |GetInfoVector| returns
-// the status of the call and the number of elements effectively returned.
-template <typename T>
-zx::result<size_t> GetInfoVector(OS& os, zx_handle_t handle, uint32_t topic,
-                                 std::vector<T>& buffer) {
-  size_t num_entries = 0, available_entries = 0;
-  zx_status_t s = os.GetInfo(handle, topic, buffer.data(), buffer.size() * sizeof(T), &num_entries,
-                             &available_entries);
-  if (s != ZX_OK) {
-    return zx::error(s);
-  }
-  if (num_entries == available_entries) {
-    return zx::ok(num_entries);
-  }
-  buffer.resize(available_entries);
-  s = os.GetInfo(handle, topic, buffer.data(), buffer.size() * sizeof(T), &num_entries,
-                 &available_entries);
-  if (s != ZX_OK) {
-    return zx::error(s);
-  }
-  return zx::ok(num_entries);
-}
-
-}  // namespace
+BaseCaptureStrategy::BaseCaptureStrategy() {}
 
 zx_status_t BaseCaptureStrategy::OnNewProcess(OS& os, Process process, zx::handle process_handle) {
   TRACE_DURATION_BEGIN("memory_metrics", "BaseCaptureStrategy::OnNewProcess::GetVMOs");
@@ -55,19 +30,19 @@ zx_status_t BaseCaptureStrategy::OnNewProcess(OS& os, Process process, zx::handl
   TRACE_DURATION_END("memory_metrics", "BaseCaptureStrategy::OnNewProcess::GetVMOs");
 
   TRACE_DURATION_BEGIN("memory_metrics", "BaseCaptureStrategy::OnNewProcess::UniqueProcessVMOs");
-  std::unordered_map<zx_koid_t, const zx_info_vmo_t&> unique_vmos;
+  std::unordered_map<zx_koid_t, const zx_info_vmo_t*> unique_vmos;
   unique_vmos.reserve(num_vmos);
   for (size_t i = 0; i < num_vmos; i++) {
-    const auto& vmo_info = vmos_[i];
-    unique_vmos.try_emplace(vmo_info.koid, vmo_info);
+    const auto* vmo_info = vmos_.data() + i;
+    unique_vmos.try_emplace(vmo_info->koid, vmo_info);
   }
   TRACE_DURATION_END("memory_metrics", "BaseCaptureStrategy::OnNewProcess::UniqueProcessVMOs");
 
   TRACE_DURATION_BEGIN("memory_metrics", "BaseCaptureStrategy::OnNewProcess::UniqueVMOs");
   process.vmos.reserve(unique_vmos.size());
-  for (const auto& [vmo_koid, vmo] : unique_vmos) {
-    koid_to_vmo_.try_emplace(vmo_koid, vmo);
-    process.vmos.push_back(vmo_koid);
+  for (const auto& [koid, vmo] : unique_vmos) {
+    koid_to_vmo_.try_emplace(koid, *vmo);
+    process.vmos.push_back(koid);
   }
   TRACE_DURATION_END("memory_metrics", "BaseCaptureStrategy::OnNewProcess::UniqueVMOs");
 
@@ -126,8 +101,7 @@ StarnixCaptureStrategy::Finalize(OS& os) {
           GetInfoVector(os, process_handles_[process.koid].get(), ZX_INFO_PROCESS_VMOS, vmos);
       if (result.status_value() == ZX_ERR_BAD_STATE) {
         continue;
-      }
-      if (result.is_error()) {
+      } else if (result.is_error()) {
         return result.take_error();
       }
       starnix_proc->second.vmos_retrieved = true;
@@ -151,8 +125,7 @@ StarnixCaptureStrategy::Finalize(OS& os) {
         GetInfoVector(os, process_handles_[process.koid].get(), ZX_INFO_PROCESS_MAPS, mappings_);
     if (result.status_value() == ZX_ERR_BAD_STATE) {
       continue;
-    }
-    if (result.is_error()) {
+    } else if (result.is_error()) {
       return result.take_error();
     }
 

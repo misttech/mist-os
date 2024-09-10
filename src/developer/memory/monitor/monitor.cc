@@ -28,7 +28,6 @@
 #include <trace-vthread/event_vthread.h>
 
 #include "lib/fpromise/result.h"
-#include "lib/zx/result.h"
 #include "src/developer/memory/metrics/bucket_match.h"
 #include "src/developer/memory/metrics/capture.h"
 #include "src/developer/memory/metrics/capture_strategy.h"
@@ -45,6 +44,7 @@ namespace monitor {
 
 using memory::Capture;
 using memory::CaptureLevel;
+using memory::CaptureStrategy;
 using memory::Digest;
 using memory::Digester;
 using memory::Printer;
@@ -132,10 +132,8 @@ std::vector<memory::BucketMatch> CreateBucketMatchesFromConfigData() {
 Monitor::Monitor(std::unique_ptr<sys::ComponentContext> context,
                  const fxl::CommandLine& command_line, async_dispatcher_t* dispatcher,
                  bool send_metrics, bool watch_memory_pressure,
-                 bool send_critical_pressure_crash_reports, memory_monitor_config::Config config,
-                 std::unique_ptr<memory::CaptureMaker> capture_maker)
-    : capture_maker_(std::move(capture_maker)),
-      prealloc_size_(0),
+                 bool send_critical_pressure_crash_reports, memory_monitor_config::Config config)
+    : prealloc_size_(0),
       logging_(command_line.HasOption("log")),
       tracing_(false),
       delay_(zx::sec(1)),
@@ -145,15 +143,26 @@ Monitor::Monitor(std::unique_ptr<sys::ComponentContext> context,
       inspector_(dispatcher_, {}),
       logger_(
           dispatcher_,
-          [this](Capture* c) { return capture_maker_->GetCapture(c, CaptureLevel::VMO); },
+          [this](Capture* c) {
+            auto strategy = std::make_unique<StarnixCaptureStrategy>();
+            return GetCapture(c, capture_state_, CaptureLevel::VMO, std::move(strategy));
+          },
           [this](const Capture& c, Digest* d) { GetDigest(c, d); }, &config_),
       level_(Level::kNumLevels) {
   auto bucket_matches = CreateBucketMatchesFromConfigData();
   digester_ = std::make_unique<Digester>(Digester(bucket_matches));
   high_water_ = std::make_unique<HighWater>(
       "/cache", kHighWaterPollFrequency, kHighWaterThreshold, dispatcher,
-      [this](Capture* c, CaptureLevel l) { return capture_maker_->GetCapture(c, l); },
+      [this](Capture* c, CaptureLevel l) {
+        auto strategy = std::make_unique<StarnixCaptureStrategy>();
+        return GetCapture(c, capture_state_, l, std::move(strategy));
+      },
       [this](const Capture& c, Digest* d) { digester_->Digest(c, d); });
+  auto s = Capture::GetCaptureState(&capture_state_);
+  if (s != ZX_OK) {
+    FX_LOGS(ERROR) << "Error getting capture state: " << zx_status_get_string(s);
+    exit(EXIT_FAILURE);
+  }
 
   if (send_metrics)
     CreateMetrics(bucket_matches);
@@ -215,7 +224,7 @@ Monitor::Monitor(std::unique_ptr<sys::ComponentContext> context,
   if (logging_) {
     Capture capture;
     auto strategy = std::make_unique<StarnixCaptureStrategy>();
-    auto s = capture_maker_->GetCapture(&capture, CaptureLevel::KMEM);
+    auto s = GetCapture(&capture, capture_state_, CaptureLevel::KMEM, std::move(strategy));
     if (s != ZX_OK) {
       FX_LOGS(ERROR) << "Error getting capture: " << zx_status_get_string(s);
       exit(EXIT_FAILURE);
@@ -265,7 +274,10 @@ void Monitor::CreateMetrics(const std::vector<memory::BucketMatch>& bucket_match
 
   metrics_ = std::make_unique<Metrics>(
       bucket_matches, kMetricsPollFrequency, dispatcher_, &inspector_, metric_event_logger_.get(),
-      [this](Capture* c) { return capture_maker_->GetCapture(c, CaptureLevel::VMO); },
+      [this](Capture* c) {
+        auto strategy = std::make_unique<StarnixCaptureStrategy>();
+        return GetCapture(c, capture_state_, CaptureLevel::VMO, std::move(strategy));
+      },
       [this](const Capture& c, Digest* d) { GetDigest(c, d); });
 }
 
@@ -286,7 +298,7 @@ void Monitor::CollectJsonStatsWithOptions(zx::socket socket) {
 
   zx_status_t capture_status;
   auto strategy = std::make_unique<StarnixCaptureStrategy>();
-  capture_status = capture_maker_->GetCapture(&capture, CaptureLevel::VMO);
+  capture_status = GetCapture(&capture, capture_state_, CaptureLevel::VMO, std::move(strategy));
 
   if (capture_status != ZX_OK) {
     FX_LOGS(ERROR) << "Error getting capture: " << zx_status_get_string(capture_status);
@@ -324,12 +336,8 @@ inspect::Inspector Monitor::Inspect(const std::vector<memory::BucketMatch>& buck
   inspect::Inspector inspector(inspect::InspectSettings{.maximum_size = 1024ul * 1024});
   auto& root = inspector.GetRoot();
   Capture capture;
-
-  zx_status_t rc = capture_maker_->GetCapture(&capture, CaptureLevel::VMO);
-  if (rc != ZX_OK) {
-    FX_LOGS(ERROR) << "Failed to create capture with error: " << zx_status_get_string(rc);
-    return inspector;
-  }
+  auto strategy = std::make_unique<StarnixCaptureStrategy>();
+  GetCapture(&capture, capture_state_, CaptureLevel::VMO, std::move(strategy));
 
   Summary summary(capture, Summary::kNameMatches);
   std::ostringstream summary_stream;
@@ -429,7 +437,8 @@ inspect::Inspector Monitor::Inspect(const std::vector<memory::BucketMatch>& buck
 void Monitor::SampleAndPost() {
   if (logging_ || tracing_) {
     Capture capture;
-    auto s = capture_maker_->GetCapture(&capture, CaptureLevel::KMEM);
+    auto strategy = std::make_unique<StarnixCaptureStrategy>();
+    auto s = GetCapture(&capture, capture_state_, CaptureLevel::KMEM, std::move(strategy));
     if (s != ZX_OK) {
       FX_LOGS(ERROR) << "Error getting capture: " << zx_status_get_string(s);
       return;
@@ -557,7 +566,8 @@ void Monitor::UpdateState() {
       FX_LOGS(INFO) << "Tracing started";
       if (!tracing_) {
         Capture capture;
-        auto s = capture_maker_->GetCapture(&capture, CaptureLevel::KMEM);
+        auto strategy = std::make_unique<StarnixCaptureStrategy>();
+        auto s = GetCapture(&capture, capture_state_, CaptureLevel::KMEM, std::move(strategy));
         if (s != ZX_OK) {
           FX_LOGS(ERROR) << "Error getting capture: " << zx_status_get_string(s);
           return;
@@ -582,6 +592,12 @@ void Monitor::UpdateState() {
   }
 }
 
+zx_status_t Monitor::GetCapture(memory::Capture* capture, const memory::CaptureState& capture_state,
+                                CaptureLevel level, std::unique_ptr<CaptureStrategy> strategy) {
+  return Capture::GetCapture(capture, capture_state, level, std::move(strategy),
+                             Capture::kDefaultRootedVmoNames);
+}
+
 void Monitor::GetDigest(const memory::Capture& capture, memory::Digest* digest) {
   std::lock_guard<std::mutex> lock(digester_mutex_);
   digester_->Digest(capture, digest);
@@ -592,7 +608,7 @@ void Monitor::PressureLevelChanged(Level level) {
     // Force the current state to be written as the high_waters. Later is better.
     memory::Capture c;
     auto strategy = std::make_unique<StarnixCaptureStrategy>();
-    auto s = capture_maker_->GetCapture(&c, CaptureLevel::VMO);
+    auto s = GetCapture(&c, capture_state_, CaptureLevel::VMO, std::move(strategy));
     if (s == ZX_OK) {
       high_water_->RecordHighWater(c);
       high_water_->RecordHighWaterDigest(c);

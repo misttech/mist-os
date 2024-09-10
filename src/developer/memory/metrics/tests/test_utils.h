@@ -63,7 +63,7 @@ struct OsResponses {
 class CaptureSupplier {
  public:
   explicit CaptureSupplier(std::vector<CaptureTemplate> templates)
-      : templates_(std::move(templates)) {}
+      : templates_(std::move(templates)), index_(0) {}
 
   zx_status_t GetCapture(Capture* capture, CaptureLevel level,
                          bool use_capture_supplier_time = false);
@@ -71,7 +71,7 @@ class CaptureSupplier {
 
  private:
   std::vector<CaptureTemplate> templates_;
-  size_t index_ = 0;
+  size_t index_;
 };
 
 class MockOS : public OS {
