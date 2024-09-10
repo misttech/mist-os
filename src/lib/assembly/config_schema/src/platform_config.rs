@@ -107,7 +107,6 @@ pub struct PlatformConfig {
 
     /// Platform configuration options for recovery.
     #[serde(default)]
-    #[file_relative_paths]
     pub recovery: recovery_config::RecoveryConfig,
 
     /// Platform configuration options for the session.

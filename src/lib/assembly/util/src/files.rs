@@ -106,8 +106,6 @@ pub enum PackageDestination {
     ShellCommands,
     /// The network provisioning configuration.
     NetcfgConfig,
-    /// The configuration for the system-recovery package.
-    SystemRecoveryConfig,
     /// Variant specifically for making tests easier.
     ForTest,
     /// Any package that came from an AIB.
@@ -136,7 +134,6 @@ impl std::fmt::Display for PackageDestination {
                 Self::ConfigData => "config-data",
                 Self::ShellCommands => "shell-commands",
                 Self::NetcfgConfig => "netcfg-config",
-                Self::SystemRecoveryConfig => "system-recovery-config",
                 Self::ForTest => "for-test",
             }
         )

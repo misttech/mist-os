@@ -43,9 +43,6 @@ if (is_fuchsia) {
       }
       recovery = {
         system_recovery = "fdr"
-        instructions = rebase_path("//src/recovery/system/res/instructions.txt",
-                                   root_build_dir)
-        check_for_managed_mode = true
       }
 
       # Use the same data filesystem format as the "main" product assembly.  The default is fxfs, so

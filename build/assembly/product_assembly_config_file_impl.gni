@@ -95,13 +95,6 @@ template("product_assembly_config_file") {
       fields = [ "netcfg_config_path" ]
     },
     {
-      node_path = "platform.recovery"
-      fields = [
-        "logo",
-        "instructions",
-      ]
-    },
-    {
       node_path = "product.build_info"
       fields = [
         "version",
