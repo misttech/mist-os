@@ -440,10 +440,57 @@ class WlanPolicyFCTests(unittest.TestCase):
         with self.assertRaises(NotImplementedError):
             self.wlan_policy_obj.remove_all_networks()
 
-    def test_remove_network(self) -> None:
+    def test_remove_network_passes(self) -> None:
         """Test if remove_network works."""
-        with self.assertRaises(NotImplementedError):
-            self.wlan_policy_obj.remove_network("", SecurityType.NONE)
+        with self._mock_create_client_controller() as client_controller:
+            self.wlan_policy_obj.create_client_controller()
+
+            res = f_wlan_policy.ClientControllerRemoveNetworkResult()
+            res.response = f_wlan_policy.ClientControllerRemoveNetworkResponse()
+            client_controller.remove_network.return_value = _async_response(res)
+
+            self.wlan_policy_obj.remove_network(
+                _TEST_SSID, SecurityType.NONE, None
+            )
+            client_controller.remove_network.assert_called_with(
+                config=_TEST_NETWORK_CONFIG_NONE_FIDL
+            )
+
+    def test_remove_network_fails(self) -> None:
+        """Test if remove_network throws HoneydewWlanError as expected."""
+        with self._mock_create_client_controller() as client_controller:
+            self.wlan_policy_obj.create_client_controller()
+
+            with self.subTest(msg="NetworkConfigChangeError"):
+                res = f_wlan_policy.ClientControllerRemoveNetworkResult()
+                res.err = (
+                    f_wlan_policy.NetworkConfigChangeError.CREDENTIAL_LEN_ERROR
+                )
+                client_controller.remove_network.return_value = _async_response(
+                    res
+                )
+
+                with self.assertRaises(HoneydewWlanError):
+                    self.wlan_policy_obj.remove_network(
+                        _TEST_SSID, SecurityType.NONE, None
+                    )
+                client_controller.remove_network.assert_called_once()
+
+            with self.subTest(msg="ZxStatus"):
+                res = f_wlan_policy.ClientControllerRemoveNetworkResult()
+                res.err = (
+                    f_wlan_policy.NetworkConfigChangeError.CREDENTIAL_LEN_ERROR
+                )
+                client_controller.remove_network.reset_mock()
+                client_controller.remove_network.return_value = _async_error(
+                    ZxStatus(ZxStatus.ZX_ERR_INTERNAL)
+                )
+
+                with self.assertRaises(HoneydewWlanError):
+                    self.wlan_policy_obj.remove_network(
+                        _TEST_SSID, SecurityType.NONE, None
+                    )
+                client_controller.remove_network.assert_called_once()
 
     def test_save_network_passes(self) -> None:
         """Test if save_network works."""

@@ -366,7 +366,9 @@ class WlanPolicy(AsyncAdapter, wlan_policy.WlanPolicy):
         """
         raise NotImplementedError()
 
-    def remove_network(
+    @asyncmethod
+    # pylint: disable-next=invalid-overridden-method
+    async def remove_network(
         self,
         target_ssid: str,
         security_type: SecurityType,
@@ -382,8 +384,33 @@ class WlanPolicy(AsyncAdapter, wlan_policy.WlanPolicy):
 
         Raises:
             HoneydewWlanError: Error from WLAN stack.
+            RuntimeError: A client controller has not been created yet
         """
-        raise NotImplementedError()
+        if self._client_controller is None:
+            raise RuntimeError(
+                "Client controller has not been initialized; call "
+                "create_client_controller() before remove_network()"
+            )
+
+        try:
+            res = await self._client_controller.proxy.remove_network(
+                config=f_wlan_policy.NetworkConfig(
+                    id=f_wlan_policy.NetworkIdentifier(
+                        ssid=list(target_ssid.encode("utf-8")),
+                        type=security_type.to_fidl(),
+                    ),
+                    credential=Credential.from_password(target_pwd).to_fidl(),
+                ),
+            )
+            if res.err:
+                raise errors.HoneydewWlanError(
+                    "ClientController.SaveNetworks() NetworkConfigChangeError "
+                    f"{res.err.name}"
+                )
+        except ZxStatus as status:
+            raise errors.HoneydewWlanError(
+                f"ClientController.SaveNetwork() error {status}"
+            ) from status
 
     @asyncmethod
     # pylint: disable-next=invalid-overridden-method
