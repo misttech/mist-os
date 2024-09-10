@@ -25,13 +25,6 @@
             from: "parent",
         },
     ],
-    offer: [
-        {
-            protocol: "fuchsia.logger.LogSink",
-            from: "parent",
-            to: "#echo_server",
-        },
-    ],
     expose: [
         {
             protocol: "fidl.examples.routing.echo.Echo",

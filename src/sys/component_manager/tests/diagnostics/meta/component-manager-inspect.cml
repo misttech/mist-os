@@ -5,6 +5,7 @@
     include: [
         "//src/sys/component_manager/tests/meta/elf_runner_and_environment.shard.cml",
         "inspect/offer.shard.cml",
+        "syslog/offer.shard.cml",
     ],
     children: [
         {
@@ -26,18 +27,8 @@
             to: "#reporter",
         },
         {
-            protocol: [ "fuchsia.logger.LogSink" ],
-            from: "parent",
-            to: "#archivist",
-        },
-        {
             protocol: "fidl.examples.routing.echo.Echo",
             from: "framework",
-            to: "#reporter",
-        },
-        {
-            protocol: [ "fuchsia.logger.LogSink" ],
-            from: "parent",
             to: "#reporter",
         },
         {

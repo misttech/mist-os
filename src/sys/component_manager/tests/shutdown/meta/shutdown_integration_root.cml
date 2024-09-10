@@ -7,6 +7,7 @@
     include: [
         "//src/sys/component_manager/tests/meta/elf_runner_and_environment.shard.cml",
         "inspect/offer.shard.cml",
+        "syslog/offer.shard.cml",
     ],
     children: [
         {
@@ -18,10 +19,7 @@
     ],
     offer: [
         {
-            protocol: [
-                "fuchsia.logger.LogSink",
-                "fuchsia.sys2.SystemController",
-            ],
+            protocol: [ "fuchsia.sys2.SystemController" ],
             from: "parent",
             to: "#power_switch",
         },

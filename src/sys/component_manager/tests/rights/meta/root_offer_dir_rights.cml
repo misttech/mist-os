@@ -8,6 +8,7 @@
     include: [
         "//src/sys/component_manager/tests/meta/elf_runner_and_environment.shard.cml",
         "inspect/offer.shard.cml",
+        "syslog/offer.shard.cml",
     ],
     children: [
         {
@@ -53,14 +54,6 @@
             from: "#expose_dir_rights",
             to: "#use_dir_rights",
             rights: [ "r*" ],
-        },
-        {
-            protocol: "fuchsia.logger.LogSink",
-            from: "parent",
-            to: [
-                "#expose_dir_rights",
-                "#use_dir_rights",
-            ],
         },
     ],
     expose: [
