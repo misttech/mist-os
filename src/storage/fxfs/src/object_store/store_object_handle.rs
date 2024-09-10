@@ -348,9 +348,11 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
         let store = self.store();
         store.device_write_ops.fetch_add(1, Ordering::Relaxed);
         let mut checksums = Vec::new();
+        // LINT.IfChange(fxfs_write_stall)
         let _watchdog = Watchdog::new(10, |count| {
             warn!("Write has been stalled for {} seconds", count * 10);
         });
+        // LINT.ThenChange(/tools/testing/tefmocheck/string_in_log_check.go:fxfs_write_stall)
         try_join!(store.device.write(device_offset, buf), async {
             if !self.options.skip_checksums {
                 let block_size = self.block_size();
@@ -554,9 +556,11 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
         let store = self.store();
         store.device_read_ops.fetch_add(1, Ordering::Relaxed);
         let ((), keys) = {
+            // LINT.IfChange(fxfs_read_stall)
             let _watchdog = Watchdog::new(10, |count| {
                 warn!("Read has been stalled for {} seconds", count * 10);
             });
+            // LINT.ThenChange(/tools/testing/tefmocheck/string_in_log_check.go:fxfs_read_stall)
             futures::future::try_join(
                 store.device.read(device_offset, buffer.reborrow()),
                 self.get_keys(),
