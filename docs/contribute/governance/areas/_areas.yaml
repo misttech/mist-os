@@ -353,7 +353,7 @@
     - fidl: 'fuchsia.session.power'
 
 - name: 'Software Delivery'
-  api_primary: 'kevinwells@google.com'
+  api_primary: 'galbanum@google.com'
   api_secondary: 'etryzelaar@google.com'
   description: |
     <p>
