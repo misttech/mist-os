@@ -11,7 +11,6 @@
 #include <dev/init.h>
 #include <dev/interrupt/arm_gicv2_init.h>
 #include <dev/interrupt/plic.h>
-#include <dev/uart/motmot/init.h>
 #include <ktl/type_traits.h>
 #include <ktl/variant.h>
 #include <phys/arch/arch-handoff.h>
@@ -40,33 +39,6 @@ void PlatformDriverHandoffLate(const ArchPhysHandoff& arch_handoff) {
   }
 }
 
-namespace {
+void PlatformUartDriverHandoffEarly(const uart::all::Driver& serial) {}
 
-// Overloads for early UART initialization below.
-void UartInitEarly(uint32_t extra, const uart::null::Driver::config_type& config) {}
-
-void UartInitEarly(uint32_t extra, const zbi_dcfg_simple_t& config) {
-  switch (extra) {
-    case ZBI_KERNEL_DRIVER_MOTMOT_UART:
-      MotmotUartInitEarly(config);
-      break;
-  }
-}
-
-void UartInitLate(uint32_t extra) {
-  switch (extra) {
-    case ZBI_KERNEL_DRIVER_MOTMOT_UART:
-      MotmotUartInitLate();
-      break;
-  }
-}
-
-}  // namespace
-
-void PlatformUartDriverHandoffEarly(const uart::all::Driver& serial) {
-  ktl::visit([](const auto& uart) { UartInitEarly(uart.extra(), uart.config()); }, serial);
-}
-
-void PlatformUartDriverHandoffLate(const uart::all::Driver& serial) {
-  ktl::visit([](const auto& uart) { UartInitLate(uart.extra()); }, serial);
-}
+void PlatformUartDriverHandoffLate(const uart::all::Driver& serial) {}
