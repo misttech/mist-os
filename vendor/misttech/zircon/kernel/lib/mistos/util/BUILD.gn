@@ -7,21 +7,12 @@ import("//build/zircon/migrated_targets.gni")
 zx_library("util") {
   sources = [
     "bstring.cc",
-    "cprng.cc",
     "split_string.cc",
     "third_party/icu/icu_utf.cc",
     "trim.cc",
     "utf_codecs.cc",
-    "zx_clock_get_monotonic.cc",
-    "zx_cprng_draw.cc",
-    "zx_deadline_after.cc",
     "zx_status_get_string.cc",
-    "zx_system_get_page_size.cc",
   ]
 
-  deps = [
-    "//vendor/misttech/zircon/kernel/lib/mistos/zx_syscalls",
-    "//zircon/kernel/object",
-    "//zircon/system/ulib/explicit-memory",
-  ]
+  deps = [ "//zircon/system/ulib/explicit-memory" ]
 }
