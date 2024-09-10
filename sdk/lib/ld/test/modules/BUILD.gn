@@ -148,7 +148,9 @@ config("semantic-interposition") {
 # look first in the directory containing the original dlopen'd module.
 config("runpath-origin") {
   visibility = [ ":*" ]
-  ldflags = [ "-Wl,--enable-new-dtags,-rpath,\$ORIGIN" ]
+  if (!is_fuchsia) {
+    ldflags = [ "-Wl,--enable-new-dtags,-rpath,\$ORIGIN" ]
+  }
 }
 
 template("_test_non_executable") {
@@ -428,6 +430,7 @@ foreach(in_process,
     ]
     public_deps = [ "//sdk/lib/ld:standalone" ]
     public_configs = [
+      ":runpath-origin",
       ":semantic-interposition",
       "//build/config:frame_pointers",
     ]
@@ -455,10 +458,6 @@ foreach(in_process,
       # test_executable() is built, after variant selection.  So it gets the
       # right version of ld-startup installed where the test needs to find it.
       data_deps = [ "..:ld-startup.test-data($shlib_toolchain)" ]
-    } else if (!is_fuchsia) {
-      # Make sure a system dlopen loading the module will look for its
-      # dependencies adjacent to it.
-      public_configs += [ ":runpath-origin" ]
     }
   }
 }
