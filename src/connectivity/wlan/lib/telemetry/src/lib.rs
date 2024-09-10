@@ -5,9 +5,10 @@ use anyhow::{format_err, Context as _, Error};
 use fuchsia_inspect::Node as InspectNode;
 use fuchsia_inspect_contrib::auto_persist;
 use futures::channel::mpsc;
-use futures::{select, Future, StreamExt};
+use futures::{future, select, Future, StreamExt, TryFutureExt};
 use std::boxed::Box;
 use tracing::error;
+use windowed_stats::experimental::serve::serve_time_matrix_inspection;
 use wlan_common::bss::BssDescription;
 use {
     fidl_fuchsia_diagnostics_persist, fidl_fuchsia_metrics,
@@ -15,7 +16,6 @@ use {
     fuchsia_zircon as zx, wlan_legacy_metrics_registry as metrics,
 };
 
-mod inspect_time_series;
 mod processors;
 pub(crate) mod util;
 pub use crate::processors::connect_disconnect::DisconnectInfo;
@@ -106,36 +106,26 @@ pub fn serve_telemetry(
     let inspect_metadata_node = inspect_node.create_child("metadata");
     let inspect_time_series_node = inspect_node.create_child("time_series");
 
-    // Vector to hold all the time series sets
-    let mut time_series = vec![];
+    let (time_matrix_client, time_series_fut) =
+        serve_time_matrix_inspection(inspect_time_series_node);
 
     // Create and initialize modules
-    let (connect_disconnect, connect_disconnect_time_series) =
-        processors::connect_disconnect::ConnectDisconnectLogger::new(
-            cobalt_1dot1_proxy.clone(),
-            &inspect_node,
-            &inspect_metadata_node,
-            persistence_req_sender,
-        );
-    time_series.push(connect_disconnect_time_series);
+    let connect_disconnect = processors::connect_disconnect::ConnectDisconnectLogger::new(
+        cobalt_1dot1_proxy.clone(),
+        &inspect_node,
+        &inspect_metadata_node,
+        persistence_req_sender,
+        &time_matrix_client,
+    );
 
     let mut toggle_logger =
         processors::toggle_events::ToggleLogger::new(cobalt_1dot1_proxy, &inspect_node);
-
-    // Attach time series properties lazily onto the Inspect time_series node
-    for i in 0..time_series.len() {
-        inspect_time_series::inspect_attach_values(
-            &inspect_time_series_node,
-            &format!("{}", i),
-            time_series[i].clone(),
-        );
-    }
 
     let fut = async move {
         // Prevent the inspect nodes from being dropped while the loop is running.
         let _inspect_node = inspect_node;
         let _inspect_metadata_node = inspect_metadata_node;
-        let _inspect_time_series_node = inspect_time_series_node;
+        let _time_matrix_client = time_matrix_client;
 
         let mut telemetry_interval = fasync::Interval::new(TELEMETRY_QUERY_INTERVAL);
         loop {
@@ -160,17 +150,10 @@ pub fn serve_telemetry(
                 }
                 _ = telemetry_interval.next() => {
                     connect_disconnect.handle_periodic_telemetry();
-
-                    // Update all the time series. We do this periodically so that when they
-                    // are requested via Inspect, the time series that have not had a new data
-                    // point in a while don't need to have so many new buckets inserted at once
-                    // to have their views up-to-date.
-                    for ts in &time_series {
-                        ts.lock().interpolate_data();
-                    }
                 }
             }
         }
     };
+    let fut = future::try_join(fut, time_series_fut).map_ok(|((), ())| ());
     (sender, fut)
 }

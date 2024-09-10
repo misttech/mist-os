@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::inspect_time_series::TimeSeriesStats;
 use crate::util::cobalt_logger::log_cobalt_1dot1_batch;
 use crate::util::inspect_bounded_set::InspectBoundedSetNode;
 use fidl_fuchsia_metrics::{MetricEvent, MetricEventPayload};
@@ -15,11 +14,11 @@ use fuchsia_inspect_contrib::{inspect_insert, inspect_log};
 use fuchsia_inspect_derive::Unit;
 use fuchsia_sync::Mutex;
 use std::sync::Arc;
-use tracing::warn;
-use windowed_stats::experimental::clock::{TimedSample, Timestamp};
+use windowed_stats::experimental::clock::TimedSample;
 use windowed_stats::experimental::series::interpolation::Constant;
 use windowed_stats::experimental::series::statistic::Union;
-use windowed_stats::experimental::series::{Interpolator, Sampler, SamplingProfile, TimeMatrix};
+use windowed_stats::experimental::series::{SamplingProfile, TimeMatrix};
+use windowed_stats::experimental::serve::{InspectedTimeMatrix, TimeMatrixClient};
 use wlan_common::bss::BssDescription;
 use wlan_common::channel::Channel;
 use {
@@ -151,7 +150,7 @@ pub struct ConnectDisconnectLogger {
     connect_events_node: Mutex<AutoPersist<BoundedListNode>>,
     disconnect_events_node: Mutex<AutoPersist<BoundedListNode>>,
     inspect_metadata_node: Mutex<InspectMetadataNode>,
-    time_series_stats: Arc<Mutex<dyn ConnectDisconnectTimeSeries>>,
+    time_series_stats: ConnectDisconnectTimeSeries,
 }
 
 impl ConnectDisconnectLogger {
@@ -160,16 +159,15 @@ impl ConnectDisconnectLogger {
         inspect_node: &InspectNode,
         inspect_metadata_node: &InspectNode,
         persistence_req_sender: auto_persist::PersistenceReqSender,
-    ) -> (Self, Arc<Mutex<dyn TimeSeriesStats>>) {
-        let time_series_stats = Arc::new(Mutex::new(ConnectDisconnectTimeSeriesImpl::new()));
-        let logger = Self::new_helper(
+        time_matrix_client: &TimeMatrixClient,
+    ) -> Self {
+        Self::new_helper(
             cobalt_1dot1_proxy,
             inspect_node,
             inspect_metadata_node,
             persistence_req_sender,
-            time_series_stats.clone(),
-        );
-        (logger, time_series_stats)
+            ConnectDisconnectTimeSeries::new(&time_matrix_client),
+        )
     }
 
     fn new_helper(
@@ -177,7 +175,7 @@ impl ConnectDisconnectLogger {
         inspect_node: &InspectNode,
         inspect_metadata_node: &InspectNode,
         persistence_req_sender: auto_persist::PersistenceReqSender,
-        time_series_stats: Arc<Mutex<dyn ConnectDisconnectTimeSeries>>,
+        time_series_stats: ConnectDisconnectTimeSeries,
     ) -> Self {
         let connect_events = inspect_node.create_child("connect_events");
         let disconnect_events = inspect_node.create_child("disconnect_events");
@@ -222,7 +220,7 @@ impl ConnectDisconnectLogger {
             .lock()
             .wlan_connectivity_states
             .record_item(wlan_connectivity_state);
-        self.time_series_stats.lock().log_wlan_connectivity_state(1 << wlan_connectivity_state_id);
+        self.time_series_stats.log_wlan_connectivity_state(1 << wlan_connectivity_state_id);
     }
 
     pub fn handle_periodic_telemetry(&self) {
@@ -249,8 +247,7 @@ impl ConnectDisconnectLogger {
             let connected_network_id =
                 inspect_metadata_node.connected_networks.record_item(connected_network);
 
-            let mut time_series_stats = self.time_series_stats.lock();
-            time_series_stats.log_connected_networks(1 << connected_network_id);
+            self.time_series_stats.log_connected_networks(1 << connected_network_id);
 
             inspect_log!(self.connect_events_node.lock().get_mut(), {
                 network_id: connected_network_id,
@@ -285,9 +282,8 @@ impl ConnectDisconnectLogger {
             channel: format!("{}", info.current_channel),
         });
 
-        let mut time_series_stats = self.time_series_stats.lock();
-        time_series_stats.log_disconnected_networks(1 << connected_network_id);
-        time_series_stats.log_disconnect_sources(1 << disconnect_source_id);
+        self.time_series_stats.log_disconnected_networks(1 << connected_network_id);
+        self.time_series_stats.log_disconnect_sources(1 << disconnect_source_id);
     }
 }
 
@@ -329,97 +325,54 @@ impl InspectMetadataNode {
     }
 }
 
-// Trait to help with unit testing
-trait ConnectDisconnectTimeSeries: std::fmt::Debug + Send {
-    fn log_wlan_connectivity_state(&mut self, data: u64);
-    fn log_connected_networks(&mut self, data: u64);
-    fn log_disconnected_networks(&mut self, data: u64);
-    fn log_disconnect_sources(&mut self, data: u64);
+#[derive(Debug, Clone)]
+struct ConnectDisconnectTimeSeries {
+    wlan_connectivity_states: InspectedTimeMatrix<u64>,
+    connected_networks: InspectedTimeMatrix<u64>,
+    disconnected_networks: InspectedTimeMatrix<u64>,
+    disconnect_sources: InspectedTimeMatrix<u64>,
 }
 
-#[derive(Debug)]
-struct ConnectDisconnectTimeSeriesImpl {
-    wlan_connectivity_states: TimeMatrix<Union<u64>, Constant>,
-    connected_networks: TimeMatrix<Union<u64>, Constant>,
-    disconnected_networks: TimeMatrix<Union<u64>, Constant>,
-    disconnect_sources: TimeMatrix<Union<u64>, Constant>,
-}
-
-impl ConnectDisconnectTimeSeriesImpl {
-    pub fn new() -> Self {
-        Self {
-            wlan_connectivity_states: TimeMatrix::new(
+impl ConnectDisconnectTimeSeries {
+    pub fn new(manager: &TimeMatrixClient) -> Self {
+        let wlan_connectivity_states = manager.inspect_time_matrix(
+            "wlan_connectivity_states",
+            TimeMatrix::<Union<u64>, Constant>::new(
                 SamplingProfile::highly_granular(),
                 Constant::default(),
             ),
-            connected_networks: TimeMatrix::default(),
-            disconnected_networks: TimeMatrix::default(),
-            disconnect_sources: TimeMatrix::default(),
-        }
-    }
-}
-
-impl ConnectDisconnectTimeSeries for ConnectDisconnectTimeSeriesImpl {
-    fn log_wlan_connectivity_state(&mut self, data: u64) {
-        if let Err(e) = self.wlan_connectivity_states.fold(TimedSample::now(data)) {
-            warn!("Failed logging wlan_connectivity_states sample: {:?}", e);
-        };
-    }
-
-    fn log_connected_networks(&mut self, data: u64) {
-        if let Err(e) = self.connected_networks.fold(TimedSample::now(data)) {
-            warn!("Failed logging connected_networks sample: {:?}", e);
-        };
-    }
-
-    fn log_disconnected_networks(&mut self, data: u64) {
-        if let Err(e) = self.disconnected_networks.fold(TimedSample::now(data)) {
-            warn!("Failed logging disconnected_networks sample: {:?}", e);
-        };
-    }
-
-    fn log_disconnect_sources(&mut self, data: u64) {
-        if let Err(e) = self.disconnect_sources.fold(TimedSample::now(data)) {
-            warn!("Failed logging disconnect_sources sample: {:?}", e);
-        };
-    }
-}
-
-impl TimeSeriesStats for ConnectDisconnectTimeSeriesImpl {
-    fn interpolate_data(&mut self) {
-        let now = Timestamp::now();
-        if let Err(e) = self.wlan_connectivity_states.interpolate(now) {
-            warn!("Failed to interpolate wlan_connectivity_states: {:?}", e);
-        }
-        if let Err(e) = self.connected_networks.interpolate(now) {
-            warn!("Failed to interpolate connected_networks: {:?}", e);
-        }
-        if let Err(e) = self.disconnected_networks.interpolate(now) {
-            warn!("Failed to interpolate disconnected_networks: {:?}", e);
-        }
-        if let Err(e) = self.disconnect_sources.interpolate(now) {
-            warn!("Failed to interpolate disconnect_sources: {:?}", e);
+        );
+        let connected_networks = manager.inspect_time_matrix(
+            "connected_networks",
+            TimeMatrix::<Union<u64>, Constant>::default(),
+        );
+        let disconnected_networks = manager.inspect_time_matrix(
+            "disconnected_networks",
+            TimeMatrix::<Union<u64>, Constant>::default(),
+        );
+        let disconnect_sources = manager.inspect_time_matrix(
+            "disconnect_sources",
+            TimeMatrix::<Union<u64>, Constant>::default(),
+        );
+        Self {
+            wlan_connectivity_states,
+            connected_networks,
+            disconnected_networks,
+            disconnect_sources,
         }
     }
 
-    fn log_inspect(&mut self, node: &InspectNode) {
-        let now = Timestamp::now();
-        match self.wlan_connectivity_states.interpolate_and_get_buffers(now) {
-            Ok(bytes) => node.record_bytes("wlan_connectivity_states", bytes),
-            Err(e) => node.record_string("wlan_connectivity_states_error", format!("{:?}", e)),
-        }
-        match self.connected_networks.interpolate_and_get_buffers(now) {
-            Ok(bytes) => node.record_bytes("connected_networks", bytes),
-            Err(e) => node.record_string("connected_networks_error", format!("{:?}", e)),
-        }
-        match self.disconnected_networks.interpolate_and_get_buffers(now) {
-            Ok(bytes) => node.record_bytes("disconnected_networks", bytes),
-            Err(e) => node.record_string("disconnected_networks_error", format!("{:?}", e)),
-        }
-        match self.disconnect_sources.interpolate_and_get_buffers(now) {
-            Ok(bytes) => node.record_bytes("disconnect_sources", bytes),
-            Err(e) => node.record_string("disconnect_sources_error", format!("{:?}", e)),
-        }
+    fn log_wlan_connectivity_state(&self, data: u64) {
+        self.wlan_connectivity_states.fold_or_log_error(TimedSample::now(data));
+    }
+    fn log_connected_networks(&self, data: u64) {
+        self.connected_networks.fold_or_log_error(TimedSample::now(data));
+    }
+    fn log_disconnected_networks(&self, data: u64) {
+        self.disconnected_networks.fold_or_log_error(TimedSample::now(data));
+    }
+    fn log_disconnect_sources(&self, data: u64) {
+        self.disconnect_sources.fold_or_log_error(TimedSample::now(data));
     }
 }
 
@@ -435,19 +388,21 @@ mod tests {
     use ieee80211_testutils::{BSSID_REGEX, SSID_REGEX};
     use rand::Rng;
     use std::pin::pin;
+    use windowed_stats::experimental::serve::serve_time_matrix_inspection;
+    use windowed_stats::experimental::testing::{MockTimeMatrix, TimeMatrixCall};
     use wlan_common::channel::{Cbw, Channel};
     use wlan_common::{fake_bss_description, random_bss_description};
 
     #[fuchsia::test]
     fn test_inspect_metadata_initialized() {
         let mut test_helper = setup_test();
-        let time_series = Arc::new(Mutex::new(ConnectDisconnectTimeSeriesTestImpl::default()));
+        let time_series = MockConnectDisconnectTimeSeries::default();
         let _logger = ConnectDisconnectLogger::new_helper(
             test_helper.cobalt_1dot1_proxy.clone(),
             &test_helper.inspect_node,
             &test_helper.inspect_metadata_node,
             test_helper.persistence_sender.clone(),
-            time_series.clone(),
+            time_series.build(),
         );
 
         let data = test_helper.get_inspect_data_tree();
@@ -473,21 +428,21 @@ mod tests {
         });
 
         assert_eq!(
-            &time_series.lock().calls[..],
-            &[ConnectDisconnectTimeSeriesCall::LogWlanConnectivityState(1 << 0)]
+            &time_series.wlan_connectivity_states.drain_calls()[..],
+            &[TimeMatrixCall::Fold(TimedSample::now(1 << 0))]
         );
     }
 
     #[fuchsia::test]
     fn test_log_connect_attempt_inspect() {
         let mut test_helper = setup_test();
-        let time_series = Arc::new(Mutex::new(ConnectDisconnectTimeSeriesTestImpl::default()));
+        let time_series = MockConnectDisconnectTimeSeries::default();
         let logger = ConnectDisconnectLogger::new_helper(
             test_helper.cobalt_1dot1_proxy.clone(),
             &test_helper.inspect_node,
             &test_helper.inspect_metadata_node,
             test_helper.persistence_sender.clone(),
-            time_series.clone(),
+            time_series.build(),
         );
 
         // Log the event
@@ -532,23 +487,29 @@ mod tests {
         });
 
         assert_eq!(
-            &time_series.lock().calls[..],
+            &time_series.wlan_connectivity_states.drain_calls()[..],
             &[
-                ConnectDisconnectTimeSeriesCall::LogWlanConnectivityState(1 << 0),
-                ConnectDisconnectTimeSeriesCall::LogWlanConnectivityState(1 << 2),
-                ConnectDisconnectTimeSeriesCall::LogConnectedNetworks(1 << 0),
+                TimeMatrixCall::Fold(TimedSample::now(1 << 0)),
+                TimeMatrixCall::Fold(TimedSample::now(1 << 2)),
             ]
+        );
+        assert_eq!(
+            &time_series.connected_networks.drain_calls()[..],
+            &[TimeMatrixCall::Fold(TimedSample::now(1 << 0)),]
         );
     }
 
     #[fuchsia::test]
     fn test_log_connect_attempt_cobalt() {
         let mut test_helper = setup_test();
-        let (logger, _time_series) = ConnectDisconnectLogger::new(
+        let (time_matrix_client, _fut) =
+            serve_time_matrix_inspection(test_helper.inspect_node.create_child("time_series"));
+        let logger = ConnectDisconnectLogger::new(
             test_helper.cobalt_1dot1_proxy.clone(),
             &test_helper.inspect_node,
             &test_helper.inspect_metadata_node,
             test_helper.persistence_sender.clone(),
+            &time_matrix_client,
         );
 
         // Generate BSS Description
@@ -579,13 +540,13 @@ mod tests {
     #[fuchsia::test]
     fn test_log_disconnect_inspect() {
         let mut test_helper = setup_test();
-        let time_series = Arc::new(Mutex::new(ConnectDisconnectTimeSeriesTestImpl::default()));
+        let time_series = MockConnectDisconnectTimeSeries::default();
         let logger = ConnectDisconnectLogger::new_helper(
             test_helper.cobalt_1dot1_proxy.clone(),
             &test_helper.inspect_node,
             &test_helper.inspect_metadata_node,
             test_helper.persistence_sender.clone(),
-            time_series.clone(),
+            time_series.build(),
         );
 
         // Log the event
@@ -661,41 +622,42 @@ mod tests {
             }
         });
         assert_eq!(
-            &time_series.lock().calls[..],
+            &time_series.wlan_connectivity_states.drain_calls()[..],
             &[
-                ConnectDisconnectTimeSeriesCall::LogWlanConnectivityState(1 << 0),
-                ConnectDisconnectTimeSeriesCall::LogWlanConnectivityState(1 << 1),
-                ConnectDisconnectTimeSeriesCall::LogDisconnectedNetworks(1 << 0),
-                ConnectDisconnectTimeSeriesCall::LogDisconnectSources(1 << 0),
+                TimeMatrixCall::Fold(TimedSample::now(1 << 0)),
+                TimeMatrixCall::Fold(TimedSample::now(1 << 1)),
             ]
+        );
+        assert_eq!(
+            &time_series.disconnected_networks.drain_calls()[..],
+            &[TimeMatrixCall::Fold(TimedSample::now(1 << 0)),]
+        );
+        assert_eq!(
+            &time_series.disconnect_sources.drain_calls()[..],
+            &[TimeMatrixCall::Fold(TimedSample::now(1 << 0)),]
         );
     }
 
-    #[derive(Debug, PartialEq)]
-    enum ConnectDisconnectTimeSeriesCall {
-        LogWlanConnectivityState(u64),
-        LogConnectedNetworks(u64),
-        LogDisconnectedNetworks(u64),
-        LogDisconnectSources(u64),
-    }
-
     #[derive(Debug, Default)]
-    struct ConnectDisconnectTimeSeriesTestImpl {
-        calls: Vec<ConnectDisconnectTimeSeriesCall>,
+    struct MockConnectDisconnectTimeSeries {
+        wlan_connectivity_states: MockTimeMatrix<u64>,
+        connected_networks: MockTimeMatrix<u64>,
+        disconnected_networks: MockTimeMatrix<u64>,
+        disconnect_sources: MockTimeMatrix<u64>,
     }
 
-    impl ConnectDisconnectTimeSeries for ConnectDisconnectTimeSeriesTestImpl {
-        fn log_wlan_connectivity_state(&mut self, data: u64) {
-            self.calls.push(ConnectDisconnectTimeSeriesCall::LogWlanConnectivityState(data));
-        }
-        fn log_connected_networks(&mut self, data: u64) {
-            self.calls.push(ConnectDisconnectTimeSeriesCall::LogConnectedNetworks(data));
-        }
-        fn log_disconnected_networks(&mut self, data: u64) {
-            self.calls.push(ConnectDisconnectTimeSeriesCall::LogDisconnectedNetworks(data));
-        }
-        fn log_disconnect_sources(&mut self, data: u64) {
-            self.calls.push(ConnectDisconnectTimeSeriesCall::LogDisconnectSources(data));
+    impl MockConnectDisconnectTimeSeries {
+        fn build(&self) -> ConnectDisconnectTimeSeries {
+            ConnectDisconnectTimeSeries {
+                wlan_connectivity_states: self
+                    .wlan_connectivity_states
+                    .build_ref("wlan_connectivity_states"),
+                connected_networks: self.connected_networks.build_ref("connected_networks"),
+                disconnected_networks: self
+                    .disconnected_networks
+                    .build_ref("disconnected_networks"),
+                disconnect_sources: self.disconnect_sources.build_ref("disconnect_sources"),
+            }
         }
     }
 }
