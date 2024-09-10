@@ -12,14 +12,4 @@ pub struct RecoveryConfig {
     /// Whether to include the factory-reset-trigger package.
     #[serde(default)]
     pub factory_reset_trigger: bool,
-
-    /// Which system_recovery implementation to include
-    pub system_recovery: Option<SystemRecovery>,
-}
-
-/// Which system recovery implementation to include in the image
-#[derive(Debug, Deserialize, Serialize, PartialEq, JsonSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum SystemRecovery {
-    Fdr,
 }

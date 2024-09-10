@@ -8,6 +8,7 @@ import("//build/dist/resource.gni")
 import("//build/rust/rustc_binary.gni")
 import("//build/rust/rustc_library.gni")
 import("//build/testing/environments.gni")
+import("//src/recovery/system/system_recovery_args.gni")
 import("//src/sys/core/build/core_shard.gni")
 
 # Generate rust library for the config
@@ -86,22 +87,22 @@ if (current_toolchain == default_toolchain) {
 }
 
 resource("recovery_logo") {
-  sources = [ "//src/recovery/system/res/fuchsia-logo.riv" ]
+  sources = [ recovery_logo_path ]
   outputs = [ "data/logo.riv" ]
 }
 
 resource("icons") {
-  sources = [ "//src/recovery/system/res/ota_icons.riv" ]
+  sources = [ icons_path ]
   outputs = [ "data/ota_icons.riv" ]
 }
 
 resource("instructions") {
-  sources = [ "//src/recovery/system/res/instructions.txt" ]
+  sources = [ instructions_path ]
   outputs = [ "data/instructions.txt" ]
 }
 
 resource("qr_codes") {
-  sources = [ "//src/recovery/system/res/qr_codes.riv" ]
+  sources = [ qr_codes_path ]
   outputs = [ "data/qr_codes.riv" ]
 }
 
@@ -230,12 +231,14 @@ rustc_binary("bin") {
     "http_setup_server",
   ]
   sources = [ "src/main.rs" ]
-  deps += [
-    ":icons",
-    ":qr_codes",
-  ]
-  features += [ "ota_ui" ]
-  sources += [ "src/ui_v2.rs" ]
+  if (enable_recovery_ui_v2) {
+    deps += [
+      ":icons",
+      ":qr_codes",
+    ]
+    features += [ "ota_ui" ]
+    sources += [ "src/ui_v2.rs" ]
+  }
 }
 
 rustc_binary("bin_ota") {

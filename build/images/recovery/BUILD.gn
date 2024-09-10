@@ -34,15 +34,19 @@ if (is_fuchsia) {
     public_deps = [ ":recovery-fdr" ]
   }
 
+  core_realm_definition("core") {
+    deps = [
+      "//src/recovery/factory_reset:factory_reset_core_shard",
+      "//src/recovery/system:system_recovery_fdr_core_shard",
+    ]
+  }
+
   product_assembly_configuration("for-fdr") {
     platform = {
       build_type = "eng"
       feature_set_level = "utility"
       graphics = {
         enable_virtual_console = false
-      }
-      recovery = {
-        system_recovery = "fdr"
       }
 
       # Use the same data filesystem format as the "main" product assembly.  The default is fxfs, so
@@ -74,7 +78,16 @@ if (is_fuchsia) {
 
     ramdisk_in_zbi = true
 
-    base_packages = board_recovery_package_labels
+    base_packages = board_recovery_package_labels + [
+                      "//src/recovery/factory_reset",
+                      "//src/recovery/system:system_recovery_fdr",
+
+                      # system-update-committer is a dependency of pkg-cache,
+                      # but we don't want to do any verification in recovery
+                      # mode, so we completely disable it.
+                      "//src/sys/pkg/bin/system-update-committer:disable",
+                    ]
+    core_realm_definition = ":core"
 
     product_assembly_config_label = ":for-fdr"
     board_config_label = recovery_board_configuration_label
