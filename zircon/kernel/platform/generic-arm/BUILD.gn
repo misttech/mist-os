@@ -6,7 +6,6 @@
 
 source_set("generic-arm") {
   sources = [
-    "dev-init-uart.cc",
     "dev-init.cc",
     "efi.cc",
     "platform.cc",

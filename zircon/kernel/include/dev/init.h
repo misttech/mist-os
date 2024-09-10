@@ -36,11 +36,4 @@ void UartDriverHandoffLate(const uart::all::Driver& serial);
 void PlatformDriverHandoffEarly(const ArchPhysHandoff& arch_handoff);
 void PlatformDriverHandoffLate(const ArchPhysHandoff& arch_handoff);
 
-// Further platform-specific subroutines for the UART.
-//
-// TODO(https://fxbug.dev/42170495): These will go away when the UART driver can dealt
-// with directly as a platform-agnostic libuart type.
-void PlatformUartDriverHandoffEarly(const uart::all::Driver& serial);
-void PlatformUartDriverHandoffLate(const uart::all::Driver& serial);
-
 #endif  // ZIRCON_KERNEL_INCLUDE_DEV_INIT_H_

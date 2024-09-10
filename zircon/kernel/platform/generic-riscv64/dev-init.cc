@@ -38,7 +38,3 @@ void PlatformDriverHandoffLate(const ArchPhysHandoff& arch_handoff) {
     ArmGicInitLate(arch_handoff.gic_driver.value());
   }
 }
-
-void PlatformUartDriverHandoffEarly(const uart::all::Driver& serial) {}
-
-void PlatformUartDriverHandoffLate(const uart::all::Driver& serial) {}
