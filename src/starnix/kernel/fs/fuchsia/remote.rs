@@ -163,7 +163,7 @@ impl FileSystemOps for RemoteFs {
     }
 
     fn name(&self) -> &'static FsStr {
-        "remote".into()
+        "remotefs".into()
     }
 
     fn generate_node_ids(&self) -> bool {
