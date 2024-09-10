@@ -60,7 +60,7 @@ def main() -> None:
     replay_mode: bool = False
 
     # Special utility mode handling
-    if real_flags.previous == args.PrevOption.REPLAY:
+    if real_flags.is_replay():
         assert_no_selection(real_flags, "-pr replay")
         replay_mode = True
     elif real_flags.previous is not None:

@@ -166,6 +166,14 @@ class Flags:
         """
         return bool(self.break_on_failure or self.breakpoints)
 
+    def is_replay(self) -> bool:
+        """Determine if these flags specify that replay mode is active.
+
+        Returns:
+            bool: True if replay mode is active, False otherwise.
+        """
+        return self.previous == PrevOption.REPLAY
+
     def computed_env(self) -> dict[str, str]:
         """Compute and return the environment denoted by --env flags.
 

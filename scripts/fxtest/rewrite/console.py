@@ -206,14 +206,29 @@ class ConsoleOutput:
                 f"\nRAN: {passed+failed} {passed_text} {failed_text} {skipped_text}"
             )
 
-        print(
-            statusinfo.dim(
-                f"\nCompleted in {state.end_duration:.3f}s",
-                style=flags.style,
+        if state.end_duration is not None:
+            print(
+                statusinfo.dim(
+                    f"\nCompleted in {state.end_duration:.3f}s",
+                    style=flags.style,
+                )
             )
-        )
+        else:
+            prefix = (
+                statusinfo.highlight("[REPLAY] ", style=flags.style)
+                if flags.is_replay()
+                else ""
+            )
+            print(
+                "\n"
+                + prefix
+                + statusinfo.error_highlight(
+                    "Execution cancelled.",
+                    style=flags.style,
+                )
+            )
 
-        if state.active_durations:
+        if state.active_durations and not flags.is_replay():
             print(
                 statusinfo.error_highlight(
                     "BUG: Durations still active at exit:", style=flags.style
@@ -278,7 +293,7 @@ class ConsoleOutput:
                 (
                     (
                         ""
-                        if not flags.previous == args.PrevOption.REPLAY
+                        if not flags.is_replay()
                         else statusinfo.highlight(
                             "[REPLAY] ", style=flags.style
                         )
