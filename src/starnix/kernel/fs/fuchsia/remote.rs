@@ -305,30 +305,34 @@ pub fn new_remote_file(
             ..Default::default()
         })
         .map_err(|status| from_status_like_fdio!(status))?;
-    let ops: Box<dyn FileOps> = match (handle_type, attrs.object_type) {
-        (_, ZXIO_OBJECT_TYPE_DIR) => Box::new(RemoteDirectoryObject::new(zxio)),
-        (zx::ObjectType::VMO, _)
-        | (zx::ObjectType::DEBUGLOG, _)
-        | (_, ZXIO_OBJECT_TYPE_FILE)
-        | (_, ZXIO_OBJECT_TYPE_NONE) => Box::new(RemoteFileObject::new(zxio)),
-        (zx::ObjectType::SOCKET, _)
-        | (_, ZXIO_OBJECT_TYPE_SYNCHRONOUS_DATAGRAM_SOCKET)
-        | (_, ZXIO_OBJECT_TYPE_DATAGRAM_SOCKET)
-        | (_, ZXIO_OBJECT_TYPE_STREAM_SOCKET)
-        | (_, ZXIO_OBJECT_TYPE_RAW_SOCKET)
-        | (_, ZXIO_OBJECT_TYPE_PACKET_SOCKET) => {
-            let socket_ops = ZxioBackedSocket::new_with_zxio(zxio);
-            let socket = Socket::new_with_ops(Box::new(socket_ops))?;
-            Box::new(SocketFile::new(socket))
-        }
-        _ => return error!(ENOTSUP),
-    };
+    let (ops, socket): (Box<dyn FileOps>, Option<Arc<Socket>>) =
+        match (handle_type, attrs.object_type) {
+            (_, ZXIO_OBJECT_TYPE_DIR) => (Box::new(RemoteDirectoryObject::new(zxio)), None),
+            (zx::ObjectType::VMO, _)
+            | (zx::ObjectType::DEBUGLOG, _)
+            | (_, ZXIO_OBJECT_TYPE_FILE)
+            | (_, ZXIO_OBJECT_TYPE_NONE) => (Box::new(RemoteFileObject::new(zxio)), None),
+            (zx::ObjectType::SOCKET, _)
+            | (_, ZXIO_OBJECT_TYPE_SYNCHRONOUS_DATAGRAM_SOCKET)
+            | (_, ZXIO_OBJECT_TYPE_DATAGRAM_SOCKET)
+            | (_, ZXIO_OBJECT_TYPE_STREAM_SOCKET)
+            | (_, ZXIO_OBJECT_TYPE_RAW_SOCKET)
+            | (_, ZXIO_OBJECT_TYPE_PACKET_SOCKET) => {
+                let socket_ops = ZxioBackedSocket::new_with_zxio(zxio);
+                let socket = Socket::new_with_ops(Box::new(socket_ops))?;
+                (Box::new(SocketFile::new(socket.clone())), Some(socket))
+            }
+            _ => return error!(ENOTSUP),
+        };
     let mode = get_mode(&attrs);
     let file_handle = Anon::new_file_extended(current_task, ops, flags, |id| {
         let mut info = FsNodeInfo::new(id, mode, FsCred::root());
         update_info_from_attrs(&mut info, &attrs);
         info
     });
+    if let Some(socket) = socket {
+        file_handle.node().set_socket(socket);
+    }
     Ok(file_handle)
 }
 
