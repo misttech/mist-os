@@ -281,12 +281,8 @@ Resulting product is not supported and may misbehave!
         builder.add_product_packages(additional_packages).context("Adding additional packages")?;
     }
 
-    // Add devicetree binary
-    if let Some(devicetree_path) = &board_info.devicetree {
-        builder
-            .add_devicetree(devicetree_path.as_utf8_pathbuf())
-            .context("Adding devicetree binary")?;
-    }
+    // Get the tool set.
+    let tools = SdkToolProvider::try_new()?;
 
     // Serialize the builder state for forensic use.
     let builder_forensics_file_path = outdir.join("assembly_builder_forensics.json");
@@ -311,18 +307,19 @@ Resulting product is not supported and may misbehave!
     serde_json::to_writer_pretty(board_forensics_file, &board_info)
         .with_context(|| format!("Writing board forensics file to: {board_forensics_file_path}"))?;
 
-    // Get the tool set.
-    let tools = SdkToolProvider::try_new()?;
+    // Add devicetree binary
+    if let Some(devicetree_path) = &board_info.devicetree {
+        builder
+            .add_devicetree(devicetree_path.as_utf8_pathbuf())
+            .context("Adding devicetree binary")?;
+    }
 
     // Do the actual building of everything for the Image Assembly config.
     let mut image_assembly =
         builder.build(&outdir, &tools).context("Building Image Assembly config")?;
-
-    let zbi_only = mode != PackageMode::DiskImage;
     let images = ImagesConfig::from_product_and_board(
         &platform.storage.filesystems,
         &board_info.filesystems,
-        zbi_only,
     )
     .context("Constructing images config")?;
     image_assembly.images_config = images;
