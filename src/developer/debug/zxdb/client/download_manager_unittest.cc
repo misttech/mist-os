@@ -15,7 +15,6 @@
 #include "src/developer/debug/zxdb/client/process_impl.h"
 #include "src/developer/debug/zxdb/client/remote_api_test.h"
 #include "src/developer/debug/zxdb/client/session.h"
-#include "src/developer/debug/zxdb/common/host_util.h"
 #include "src/developer/debug/zxdb/symbols/loaded_module_symbols.h"
 #include "src/developer/debug/zxdb/symbols/mock_module_symbols.h"
 #include "src/developer/debug/zxdb/symbols/module_symbols.h"
@@ -66,11 +65,6 @@ class DownloadManagerTest : public DownloadObserver, public RemoteAPITest {
  private:
   void SetUp() override {
     RemoteAPITest::SetUp();
-
-    static auto fake_home =
-        std::filesystem::path(GetSelfPath()).parent_path() / "test_data" / "zxdb" / "fake_home";
-    setenv("HOME", fake_home.string().c_str(), true);
-
 
     session().AddDownloadObserver(this);
 

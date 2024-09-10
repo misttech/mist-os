@@ -10,7 +10,6 @@
 #include "src/developer/debug/zxdb/client/mock_remote_api.h"
 #include "src/developer/debug/zxdb/client/mock_symbol_server.h"
 #include "src/developer/debug/zxdb/client/process.h"
-#include "src/developer/debug/zxdb/common/host_util.h"
 #include "src/developer/debug/zxdb/console/console_test.h"
 #include "src/developer/debug/zxdb/symbols/loaded_module_symbols.h"
 #include "src/developer/debug/zxdb/symbols/mock_source_file_provider.h"
@@ -34,10 +33,6 @@ class VerbSymStat : public ConsoleTest {
 }  // namespace
 
 TEST_F(VerbSymStat, SymStat) {
-  static auto fake_home =
-      std::filesystem::path(GetSelfPath()).parent_path() / "test_data" / "zxdb" / "fake_home";
-  setenv("HOME", fake_home.string().c_str(), true);
-
   // Make our own process since the default one set up by ConsoleTest::SetUp already has symbols
   // loaded by default.
   constexpr uint64_t kProcessKoid = 0x1234;

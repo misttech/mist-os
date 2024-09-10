@@ -94,21 +94,19 @@ fxl::WeakPtr<ConsoleImpl> ConsoleImpl::GetImplWeakPtr() { return impl_weak_facto
 void ConsoleImpl::Init() { LoadHistoryFile(); }
 
 void ConsoleImpl::LoadHistoryFile() {
-  if (auto home = std::getenv("HOME")) {
-    std::filesystem::path path(home);
-    if (path.empty())
-      return;
-    path /= kHistoryFilename;
+  std::filesystem::path path(getenv("HOME"));
+  if (path.empty())
+    return;
+  path /= kHistoryFilename;
 
-    std::string data;
-    if (!files::ReadFileToString(path, &data))
-      return;
+  std::string data;
+  if (!files::ReadFileToString(path, &data))
+    return;
 
-    auto history = fxl::SplitStringCopy(data, "\n", fxl::kTrimWhitespace, fxl::kSplitWantNonEmpty);
+  auto history = fxl::SplitStringCopy(data, "\n", fxl::kTrimWhitespace, fxl::kSplitWantNonEmpty);
 
-    for (const std::string& cmd : history)
-      line_input_.AddToHistory(cmd);
-  }
+  for (const std::string& cmd : history)
+    line_input_.AddToHistory(cmd);
 }
 
 bool ConsoleImpl::SaveHistoryFile() {

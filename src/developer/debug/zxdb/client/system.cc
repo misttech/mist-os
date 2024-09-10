@@ -637,10 +637,7 @@ void System::OnSettingChanged(const SettingStore& store, const std::string& sett
       build_id_index.AddIdsTxt(path);
     }
     for (const std::string& url : store.GetList(ClientSettings::System::kSymbolServers)) {
-      // If a server requires authentication, then it must come from the symbol index. Specifying
-      // server URLs via command line arguments or DEBUGINFOD_URLS environment variables are always
-      // assumed to not require authentication.
-      build_id_index.AddSymbolServer(url, false);
+      build_id_index.AddSymbolServer(url);
     }
 
     // Cache directory.
