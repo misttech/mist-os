@@ -9,4 +9,7 @@ package(default_visibility = ["//visibility:public"])
 fuchsia_prebuilt_package(
     name = "sdhci",
     archive = "@gn_targets//src/devices/block/drivers/sdhci:package",
+    drivers = [
+        "meta/sdhci.cm",
+    ],
 )

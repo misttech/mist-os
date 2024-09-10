@@ -9,4 +9,7 @@ package(default_visibility = ["//visibility:public"])
 fuchsia_prebuilt_package(
     name = "dwc3",
     archive = "@gn_targets//src/devices/usb/drivers/dwc3:package",
+    drivers = [
+        "meta/dwc3.cm",
+    ],
 )
