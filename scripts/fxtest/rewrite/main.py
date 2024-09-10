@@ -555,6 +555,7 @@ async def load_test_list(
     """
 
     # Load the tests.json file.
+    parse_id: event.Id | None = None
     try:
         parse_id = recorder.emit_start_file_parsing(
             exec_env.relative_to_root(exec_env.test_json_file),
@@ -603,6 +604,7 @@ async def generate_test_list(
             recorder=recorder,
         )
         if result is None or result.return_code != 0:
+            suffix = ""
             if result is not None:
                 suffix = f":\n{result.stdout}\n{result.stderr}"
             raise RuntimeError(
@@ -1188,7 +1190,9 @@ async def run_all_tests(
             test_suite_id = recorder.emit_test_suite_started(
                 to_run.exec.name(), not was_non_hermetic, parent=test_group
             )
-            status: event.TestSuiteStatus
+            status: event.TestSuiteStatus = (
+                event.TestSuiteStatus.FAILED_TO_START
+            )
             message: str | None = None
             try:
                 if not to_run.abort_group.is_set():
