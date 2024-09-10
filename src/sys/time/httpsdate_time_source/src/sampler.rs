@@ -114,7 +114,7 @@ impl<C: HttpsDateClient + Send> HttpsSampler for HttpsSamplerImpl<'_, C> {
                             // Bounds might fail to combine if e.g. the device went to sleep and
                             // monotonic time was not updated. We assume the most recent poll is
                             // most accurate and discard accumulated information.
-                            // TODO(satsukiu): report this event to Cobalt
+                            // TODO(b/365667080): report this event to Cobalt
                             polls.clear();
                             warn!("Unable to combine time bound, time may have moved.");
                             new_bound
