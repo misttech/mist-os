@@ -2,6 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/bazel/export_fuchsia_package_to_bazel.gni")
 import("//build/bind/bind.gni")
 import("//build/components.gni")
 import("//build/drivers.gni")
@@ -110,4 +111,8 @@ group("tests") {
     ":dwc3-test",
     ":dwc3_bind_test",
   ]
+}
+
+export_fuchsia_package_to_bazel("package_for_bazel") {
+  package = ":package"
 }
