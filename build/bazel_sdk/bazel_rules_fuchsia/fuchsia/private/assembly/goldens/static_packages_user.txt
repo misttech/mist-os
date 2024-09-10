@@ -74,6 +74,7 @@ pkg-resolver
 ?soundplayer
 ?starnix
 ?stash
+?system-recovery-config
 system-update-committer
 ?system-update-configurator
 ?system-update-realm

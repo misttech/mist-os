@@ -8,11 +8,23 @@
         "inspect/client.shard.cml",
         "syslog/client.shard.cml",
     ],
+    children: [
+        {
+            name: "system-recovery-config",
+            url: "fuchsia-pkg://fuchsia.com/system-recovery-config#meta/system-recovery-config.cm",
+        },
+    ],
     use: [
         {
             directory: "config-data",
             rights: [ "r*" ],
             path: "/config/data",
+        },
+        {
+            directory: "system-recovery-config",
+            from: "#system-recovery-config",
+            rights: [ "r*" ],
+            path: "/system-recovery-config",
         },
         {
             directory: "dev-class-block",

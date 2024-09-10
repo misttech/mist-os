@@ -363,8 +363,6 @@ fuchsia_structured_config_values("values_from_gn_fdr") {
 fuchsia_package("system_recovery_fdr") {
   deps = [
     ":component_fdr",
-    ":instructions",
-    ":recovery_logo",
     ":roboto_regular",
     ":values_from_gn_fdr",
   ]
