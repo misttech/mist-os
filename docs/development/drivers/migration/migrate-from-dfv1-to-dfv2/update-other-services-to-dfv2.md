@@ -407,7 +407,7 @@ bootstrap/*-drivers*:[name=sysmem]root
 To access a driver's Inspect during debugging, you can use all the normal tools, such as
 
 ```
-ffx inspect show "bootstrap/*-drivers*:[name=sysmem]root
+ffx inspect show "bootstrap/*-drivers*:[name=sysmem]root"
 ```
 
 or
