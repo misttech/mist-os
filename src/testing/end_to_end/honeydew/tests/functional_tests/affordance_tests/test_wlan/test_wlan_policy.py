@@ -265,11 +265,6 @@ class WlanPolicyTests(fuchsia_base_test.FuchsiaBaseTest):
         scan_results = self.device.wlan_policy.scan_for_networks()
         asserts.assert_equal(sorted(scan_results), sorted(expected_networks))
 
-        if isinstance(self.device.wlan_policy, wlan_policy_fc.WlanPolicy):
-            # TODO(http://b/324139202): Remove this if statement once WLAN
-            # Policy FC affordance is implemented
-            return
-
         connect_resp = self.device.wlan_policy.connect(
             test_ssid, SecurityType.NONE
         )
@@ -277,6 +272,11 @@ class WlanPolicyTests(fuchsia_base_test.FuchsiaBaseTest):
         _wait_for_network_state(
             self.device, test_ssid, ConnectionState.CONNECTED
         )
+
+        if isinstance(self.device.wlan_policy, wlan_policy_fc.WlanPolicy):
+            # TODO(http://b/324139202): Remove this if statement once WLAN
+            # Policy FC affordance is implemented
+            return
 
         self.device.wlan_policy.remove_network(test_ssid, SecurityType.NONE)
         networks = self.device.wlan_policy.get_saved_networks()

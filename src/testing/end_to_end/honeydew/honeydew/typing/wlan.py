@@ -436,6 +436,13 @@ class NetworkIdentifier:
             security_type=SecurityType.from_fidl(fidl.type),
         )
 
+    def to_fidl(self) -> f_wlan_policy.NetworkIdentifier:
+        """Convert to a fuchsia.wlan.policy/NetworkIdentifier."""
+        return f_wlan_policy.NetworkIdentifier(
+            ssid=list(self.ssid.encode("utf-8")),
+            type=self.security_type.to_fidl(),
+        )
+
     def __lt__(self, other: NetworkIdentifier) -> bool:
         return self.ssid < other.ssid
 

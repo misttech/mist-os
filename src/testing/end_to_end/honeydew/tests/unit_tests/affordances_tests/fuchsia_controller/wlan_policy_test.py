@@ -25,6 +25,7 @@ from honeydew.typing.wlan import (
     NetworkConfig,
     NetworkIdentifier,
     NetworkState,
+    RequestStatus,
     SecurityType,
     WlanClientState,
 )
@@ -222,8 +223,75 @@ class WlanPolicyFCTests(unittest.TestCase):
 
     def test_connect(self) -> None:
         """Test if connect works."""
-        with self.assertRaises(NotImplementedError):
-            self.wlan_policy_obj.connect("", SecurityType.NONE)
+        with self._mock_create_client_controller() as client_controller:
+            self.wlan_policy_obj.create_client_controller()
+
+            for msg, resp, expected in [
+                (
+                    "acknowledged",
+                    _async_response(
+                        f_wlan_policy.ClientControllerConnectResponse(
+                            status=f_wlan_common.RequestStatus.ACKNOWLEDGED
+                        )
+                    ),
+                    RequestStatus.ACKNOWLEDGED,
+                ),
+                (
+                    "not supported",
+                    _async_response(
+                        f_wlan_policy.ClientControllerConnectResponse(
+                            status=f_wlan_common.RequestStatus.REJECTED_NOT_SUPPORTED
+                        )
+                    ),
+                    RequestStatus.REJECTED_NOT_SUPPORTED,
+                ),
+                (
+                    "incompatible mode",
+                    _async_response(
+                        f_wlan_policy.ClientControllerConnectResponse(
+                            status=f_wlan_common.RequestStatus.REJECTED_INCOMPATIBLE_MODE
+                        )
+                    ),
+                    RequestStatus.REJECTED_INCOMPATIBLE_MODE,
+                ),
+                (
+                    "already in use",
+                    _async_response(
+                        f_wlan_policy.ClientControllerConnectResponse(
+                            status=f_wlan_common.RequestStatus.REJECTED_ALREADY_IN_USE
+                        )
+                    ),
+                    RequestStatus.REJECTED_ALREADY_IN_USE,
+                ),
+                (
+                    "duplicate request",
+                    _async_response(
+                        f_wlan_policy.ClientControllerConnectResponse(
+                            status=f_wlan_common.RequestStatus.REJECTED_DUPLICATE_REQUEST
+                        )
+                    ),
+                    RequestStatus.REJECTED_DUPLICATE_REQUEST,
+                ),
+                (
+                    "internal error",
+                    _async_error(ZxStatus(ZxStatus.ZX_ERR_INTERNAL)),
+                    None,
+                ),
+            ]:
+                with self.subTest(msg=msg, resp=resp, expected=expected):
+                    client_controller.connect.reset_mock()
+                    client_controller.connect.return_value = resp
+                    if expected:
+                        resp = self.wlan_policy_obj.connect(
+                            _TEST_SSID, SecurityType.NONE
+                        )
+                        self.assertEqual(resp, expected)
+                    else:
+                        with self.assertRaises(HoneydewWlanError):
+                            self.wlan_policy_obj.connect(
+                                _TEST_SSID, SecurityType.NONE
+                            )
+                    client_controller.connect.assert_called_once()
 
     def test_create_client_controller(self) -> None:
         """Test if create_client_controller works."""

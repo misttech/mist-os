@@ -24,6 +24,7 @@ from honeydew.typing.wlan import (
     ClientStateSummary,
     Credential,
     NetworkConfig,
+    NetworkIdentifier,
     RequestStatus,
     SecurityType,
 )
@@ -207,7 +208,9 @@ class WlanPolicy(AsyncAdapter, wlan_policy.WlanPolicy):
             self._fc_transport.connect_device_proxy(_CLIENT_PROVIDER_PROXY)
         )
 
-    def connect(
+    @asyncmethod
+    # pylint: disable-next=invalid-overridden-method
+    async def connect(
         self, target_ssid: str, security_type: SecurityType
     ) -> RequestStatus:
         """Triggers connection to a network.
@@ -223,8 +226,23 @@ class WlanPolicy(AsyncAdapter, wlan_policy.WlanPolicy):
         Raises:
             HoneydewWlanError: Error from WLAN stack.
             TypeError: Return value not a string.
+            RuntimeError: Client controller has not been initialized
         """
-        raise NotImplementedError()
+        if self._client_controller is None:
+            raise RuntimeError(
+                "Client controller has not been initialized; call "
+                "create_client_controller() before connect()"
+            )
+
+        try:
+            resp = await self._client_controller.proxy.connect(
+                id=NetworkIdentifier(target_ssid, security_type).to_fidl(),
+            )
+            return RequestStatus.from_fidl(resp.status)
+        except ZxStatus as status:
+            raise errors.HoneydewWlanError(
+                f"ClientController.Connect() error {status}"
+            ) from status
 
     def create_client_controller(self) -> None:
         """Initializes the client controller.
