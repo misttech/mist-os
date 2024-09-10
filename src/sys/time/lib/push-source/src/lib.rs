@@ -59,7 +59,6 @@ pub trait UpdateAlgorithm {
 
     /// Generate updates asynchronously and push them to |sink|. This method may run
     /// indefinitely. This method may generate duplicate updates.
-    // TODO(satsukiu) - use a generator library instead once one is available
     async fn generate_updates(&self, sink: Sender<Update>) -> Result<()>;
 }
 
