@@ -5,8 +5,9 @@
 #ifndef ZIRCON_KERNEL_LIB_MISTOS_UTIL_INCLUDE_LIB_MISTOS_UTIL_BITFLAGS_V2_H_
 #define ZIRCON_KERNEL_LIB_MISTOS_UTIL_INCLUDE_LIB_MISTOS_UTIL_BITFLAGS_V2_H_
 
-#include <optional>
 #include <type_traits>
+
+#include <ktl/optional.h>
 
 template <typename Enum>
 struct Flag {
@@ -49,9 +50,9 @@ struct Flags {
   inline Bits bits() const { return bits_; }
   Enum to_enum() const { return static_cast<Enum>(bits_); }
 
-  static std::optional<Flags> from_bits(Bits bits) {
+  static ktl::optional<Flags> from_bits(Bits bits) {
     auto truncated = from_bits_truncate(bits);
-    return truncated.bits() == bits ? std::make_optional(truncated) : std::nullopt;
+    return truncated.bits() == bits ? ktl::make_optional(truncated) : ktl::nullopt;
   }
 
   static Flags from_bits_truncate(Bits bits) { return from_bits_retain(bits & all().bits()); }
