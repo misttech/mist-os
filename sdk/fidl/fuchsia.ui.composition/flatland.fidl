@@ -329,11 +329,11 @@ type PresentArgs = resource table {
     4: unsquashable bool;
 
     /// Unused.  Originally intended to be a renaming of `acquire_fences`, but was never hooked up.
-    @available(deprecated=HEAD)
+    @available(removed=NEXT)
     5: server_wait_fences vector<zx.Handle:EVENT>:MAX_PRESENT_ARGS_FENCE_COUNT;
 
     /// Unused.  Originally intended to be a renaming of `release_fences`, but was never hooked up.
-    @available(deprecated=HEAD)
+    @available(removed=NEXT)
     6: server_signal_fences vector<zx.Handle:EVENT>:MAX_PRESENT_ARGS_FENCE_COUNT;
 };
 

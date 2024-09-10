@@ -1272,18 +1272,6 @@
     },
     {
         "kind": "table/member",
-        "name": "fuchsia.ui.composition/PresentArgs.server_signal_fences",
-        "ordinal": "6",
-        "type": "vector<zx/Handle:EVENT>:16"
-    },
-    {
-        "kind": "table/member",
-        "name": "fuchsia.ui.composition/PresentArgs.server_wait_fences",
-        "ordinal": "5",
-        "type": "vector<zx/Handle:EVENT>:16"
-    },
-    {
-        "kind": "table/member",
         "name": "fuchsia.ui.composition/PresentArgs.unsquashable",
         "ordinal": "4",
         "type": "bool"
