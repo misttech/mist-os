@@ -288,6 +288,14 @@ impl Vmo {
         ok(status)
     }
 
+    /// Attempt to set the stream size of a virtual memory object.
+    ///
+    /// Wraps the `zx_vmo_set_stream_size` syscall.
+    pub fn set_stream_size(&self, size: u64) -> Result<(), Status> {
+        let status = unsafe { sys::zx_vmo_set_stream_size(self.raw_handle(), size) };
+        ok(status)
+    }
+
     /// Attempt to change the cache policy of a virtual memory object.
     ///
     /// Wraps the `zx_vmo_set_cache_policy` syscall.
