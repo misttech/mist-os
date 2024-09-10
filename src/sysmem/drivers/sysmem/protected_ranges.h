@@ -442,6 +442,10 @@ class ProtectedRanges {
   explicit ProtectedRanges(ProtectedRangesControl* ranges_control, bool disable_dynamic);
   ~ProtectedRanges();
 
+  // If the SecureMem driver cleanly disconnects, we know that all protected ranges are gone. This
+  // allows ~ProtectedRanges to run without asserting.
+  void DiscardAllRanges();
+
   uint64_t max_logical_ranges();
 
   // This method attempts to add an additional range to the set of requested protected ranges.  The

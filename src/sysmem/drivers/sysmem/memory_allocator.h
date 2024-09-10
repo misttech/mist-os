@@ -93,6 +93,7 @@ class MemoryAllocator {
   // secure/protected.  The default SetReady() implementation panics, and the
   // default is_ready() just returns true.
   virtual void set_ready();
+  virtual void clear_ready();
   virtual bool is_ready();
 
   void AddDestroyCallback(intptr_t key, fit::callback<void()> callback);

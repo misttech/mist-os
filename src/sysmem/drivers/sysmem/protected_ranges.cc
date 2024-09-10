@@ -275,6 +275,8 @@ ProtectedRanges::ProtectedRanges(ProtectedRangesControl* ranges_control, bool di
 
 ProtectedRanges::~ProtectedRanges() { ZX_ASSERT(ranges_.empty()); }
 
+void ProtectedRanges::DiscardAllRanges() {ranges_.clear();}
+
 uint64_t ProtectedRanges::max_logical_ranges() { return max_logical_range_count_; }
 
 bool ProtectedRanges::AddRange(const Range& range_param) {

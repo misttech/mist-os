@@ -213,6 +213,14 @@ class Sysmem final : public MemoryAllocator::Owner,
     return is_secure_mem_ready_;
   }
 
+  bool was_secure_mem_ready() const {
+    std::lock_guard checker(*loop_checker_);
+    if (!is_secure_mem_expected()) {
+      return true;
+    }
+    return was_secure_mem_ready_;
+  }
+
   template <typename F>
   void PostTask(F to_run) {
     // This either succeeds, or fails because we're shutting down a test. We never actually shut
@@ -471,6 +479,7 @@ class Sysmem final : public MemoryAllocator::Owner,
   bool protected_ranges_disable_dynamic_ __TA_GUARDED(*loop_checker_) = false;
 
   bool is_secure_mem_ready_ __TA_GUARDED(*loop_checker_) = false;
+  bool was_secure_mem_ready_ __TA_GUARDED(*loop_checker_) = false;
 
   async::TaskMethod<Sysmem, &Sysmem::LogCollectionsTimer> log_all_collections_{this};
 

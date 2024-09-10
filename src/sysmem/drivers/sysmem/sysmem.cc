@@ -983,6 +983,7 @@ zx_status_t Sysmem::RegisterSecureMemInternal(
     }
 
     is_secure_mem_ready_ = true;
+    was_secure_mem_ready_ = true;
 
     // At least for now, we just call all the LogicalBufferCollection(s), regardless of which
     // are waiting on secure mem (if any). The extra calls are required (by semantics of
@@ -1013,6 +1014,10 @@ zx_status_t Sysmem::UnregisterSecureMemInternal() {
     std::lock_guard checker(*loop_checker_);
     LOG(DEBUG, "begin UnregisterSecureMem()");
     secure_mem_.reset();
+    for (const auto& [heap_type, allocator] : secure_allocators_) {
+      allocator->clear_ready();
+    }
+    is_secure_mem_ready_ = false;
     LOG(DEBUG, "end UnregisterSecureMem()");
   });
   return ZX_OK;

@@ -23,7 +23,10 @@ MemoryAllocator::~MemoryAllocator() {
   }
 }
 
+// only called on secure allocators
 void MemoryAllocator::set_ready() { ZX_PANIC("not implemented"); }
+// only called on secure allocators
+void MemoryAllocator::clear_ready() { ZX_PANIC("not implemented"); }
 
 bool MemoryAllocator::is_ready() { return true; }
 

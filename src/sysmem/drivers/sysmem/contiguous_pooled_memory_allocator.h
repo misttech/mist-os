@@ -78,6 +78,7 @@ class ContiguousPooledMemoryAllocator : public MemoryAllocator {
   void set_heap(fuchsia_sysmem2::Heap heap);
 
   void set_ready() override;
+  void clear_ready() override;
   bool is_ready() override;
 
   const zx::vmo& GetPoolVmoForTest() { return contiguous_vmo_; }

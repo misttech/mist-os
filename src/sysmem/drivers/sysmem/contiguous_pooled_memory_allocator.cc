@@ -607,6 +607,7 @@ void ContiguousPooledMemoryAllocator::set_heap(fuchsia_sysmem2::Heap heap) {
 }
 
 void ContiguousPooledMemoryAllocator::set_ready() {
+  ZX_ASSERT(!is_ready_);
   if (!is_always_cpu_accessible_) {
     protected_ranges_control_.emplace(this);
     if (is_ever_cpu_accessible_) {
@@ -616,6 +617,19 @@ void ContiguousPooledMemoryAllocator::set_ready() {
     }
   }
   is_ready_ = true;
+  is_ready_property_.Set(is_ready_);
+}
+
+void ContiguousPooledMemoryAllocator::clear_ready() {
+  ZX_ASSERT(is_ready_);
+  if (!is_always_cpu_accessible_) {
+    protected_ranges_control_.reset();
+    if (is_ever_cpu_accessible_) {
+      protected_ranges_->DiscardAllRanges();
+      protected_ranges_.reset();
+    }
+  }
+  is_ready_ = false;
   is_ready_property_.Set(is_ready_);
 }
 

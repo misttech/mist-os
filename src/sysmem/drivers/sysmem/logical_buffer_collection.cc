@@ -1628,10 +1628,19 @@ fpromise::result<fuchsia_sysmem2::BufferCollectionInfo, Error> LogicalBufferColl
     }
   }
   if (is_secure_required && !parent_sysmem_->is_secure_mem_ready()) {
-    // parent_sysmem_ will call OnDependencyReady when all secure heaps/allocators are ready
-    LogInfo(FROM_HERE, "secure_required && !is_secure_mem_ready");
-    waiting_for_secure_allocators_ready_ = true;
-    return fpromise::error(Error::kPending);
+    if (!parent_sysmem_->was_secure_mem_ready()) {
+      // parent_sysmem_ will call OnDependencyReady when all secure heaps/allocators are ready
+      LogInfo(FROM_HERE, "secure_required && !is_secure_mem_ready");
+      waiting_for_secure_allocators_ready_ = true;
+      return fpromise::error(Error::kPending);
+    } else {
+      // In normal operation this won't happen, but if the SecureMem driver has cleanly disconnected
+      // from sysmem, we'll have was_secure_mem_ready true, which means we don't necessarily expect
+      // the securemem to be ready again any time soon (if ever). So in this case, don't try again
+      // later and just fail now instead.
+      LogError(FROM_HERE, "secure_required && !is_secure_mem_ready && was_secure_mem_ready");
+      return fpromise::error(Error::kUnspecified);
+    }
   }
 
   auto combine_result = CombineConstraints(&constraints_list);
