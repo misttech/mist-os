@@ -298,7 +298,12 @@ fuchsia_component_manifest("manifest") {
 
 fuchsia_component("component") {
   cm_label = ":manifest"
-  deps = [ ":bin" ]
+  deps = [
+    ":bin",
+    ":instructions",
+    ":recovery_logo",
+    ":roboto_regular",
+  ]
 }
 
 fuchsia_structured_config_values("values_from_gn") {
@@ -312,9 +317,6 @@ fuchsia_package("system_recovery") {
   deps = [
     ":component",
     ":component_ota",
-    ":instructions",
-    ":recovery_logo",
-    ":roboto_regular",
     ":values_from_gn",
   ]
 }
@@ -353,7 +355,12 @@ fuchsia_component_manifest("manifest_fdr") {
 
 fuchsia_component("component_fdr") {
   cm_label = ":manifest_fdr"
-  deps = [ ":bin_fdr" ]
+  deps = [
+    ":bin_fdr",
+    ":instructions",
+    ":recovery_logo",
+    ":roboto_regular",
+  ]
 }
 
 fuchsia_structured_config_values("values_from_gn_fdr") {
@@ -366,9 +373,6 @@ fuchsia_structured_config_values("values_from_gn_fdr") {
 fuchsia_package("system_recovery_fdr") {
   deps = [
     ":component_fdr",
-    ":instructions",
-    ":recovery_logo",
-    ":roboto_regular",
     ":values_from_gn_fdr",
   ]
 }
@@ -438,7 +442,12 @@ fuchsia_component_manifest("manifest_installer") {
 
 fuchsia_component("component_installer") {
   cm_label = ":manifest_installer"
-  deps = [ ":bin_installer" ]
+  deps = [
+    ":bin_installer",
+    ":instructions",
+    ":recovery_logo",
+    ":roboto_regular",
+  ]
 }
 
 fuchsia_structured_config_values("values_from_gn_installer") {
@@ -451,9 +460,6 @@ fuchsia_structured_config_values("values_from_gn_installer") {
 fuchsia_package("system_recovery_installer") {
   deps = [
     ":component_installer",
-    ":instructions",
-    ":recovery_logo",
-    ":roboto_regular",
     ":values_from_gn_installer",
   ]
 }
