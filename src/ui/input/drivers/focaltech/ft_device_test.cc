@@ -262,8 +262,7 @@ class FocaltechTest : public testing::Test {
     incoming_.SyncCall([](IncomingNamespace* infra) mutable {
       std::vector interrupt_states = infra->interrupt_gpio_.GetStateLog();
       ASSERT_GE(interrupt_states.size(), size_t(1));
-      ASSERT_EQ(fake_gpio::ReadSubState{.flags = fuchsia_hardware_gpio::GpioFlags::kNoPull},
-                interrupt_states[0].sub_state);
+      ASSERT_EQ(fake_gpio::ReadSubState{}, interrupt_states[0].sub_state);
 
       std::vector reset_states = infra->reset_gpio_.GetStateLog();
       ASSERT_GE(reset_states.size(), size_t(2));

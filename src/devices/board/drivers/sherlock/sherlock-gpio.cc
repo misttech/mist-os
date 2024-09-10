@@ -220,6 +220,9 @@ zx_status_t Sherlock::GpioInit() {
   static_assert(std::size(gpio_pins) + std::size(gpio_c_pins) == GPIO_PIN_COUNT,
                 "Incorrect pin count.");
 
+  // The Focaltech touch driver expects the interrupt line to be driven by the touch controller.
+  gpio_init_steps_.push_back(GpioPull(GPIO_TOUCH_INTERRUPT, fuchsia_hardware_pin::Pull::kNone));
+
   fuchsia_hardware_pinimpl::Metadata metadata{{std::move(gpio_init_steps_)}};
   gpio_init_steps_.clear();
 

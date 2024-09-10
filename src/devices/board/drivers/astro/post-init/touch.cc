@@ -67,31 +67,6 @@ const std::vector kFocaltechI2cProperties = std::vector{
                       bind_fuchsia_focaltech_platform::BIND_I2C_ADDRESS_TOUCH),
 };
 
-const std::vector kFocaltechInterruptRules = std::vector{
-    fdf::MakeAcceptBindRule(bind_fuchsia_hardware_gpio::SERVICE,
-                            bind_fuchsia_hardware_gpio::SERVICE_ZIRCONTRANSPORT),
-    fdf::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN,
-                            bind_fuchsia_amlogic_platform_s905d2::GPIOZ_PIN_ID_PIN_4),
-};
-
-const std::vector kFocaltechInterruptProperties = std::vector{
-    fdf::MakeProperty(bind_fuchsia_hardware_gpio::SERVICE,
-                      bind_fuchsia_hardware_gpio::SERVICE_ZIRCONTRANSPORT),
-    fdf::MakeProperty(bind_fuchsia_gpio::FUNCTION, bind_fuchsia_gpio::FUNCTION_TOUCH_INTERRUPT)};
-
-const std::vector kFocaltechResetRules = std::vector{
-    fdf::MakeAcceptBindRule(bind_fuchsia_hardware_gpio::SERVICE,
-                            bind_fuchsia_hardware_gpio::SERVICE_ZIRCONTRANSPORT),
-    fdf::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN,
-                            bind_fuchsia_amlogic_platform_s905d2::GPIOZ_PIN_ID_PIN_9),
-};
-
-const std::vector kFocaltechResetProperties = std::vector{
-    fdf::MakeProperty(bind_fuchsia_hardware_gpio::SERVICE,
-                      bind_fuchsia_hardware_gpio::SERVICE_ZIRCONTRANSPORT),
-    fdf::MakeProperty(bind_fuchsia_gpio::FUNCTION, bind_fuchsia_gpio::FUNCTION_TOUCH_RESET),
-};
-
 const std::vector kGoodixI2cRules = std::vector{
     fdf::MakeAcceptBindRule(bind_fuchsia_hardware_i2c::SERVICE,
                             bind_fuchsia_hardware_i2c::SERVICE_ZIRCONTRANSPORT),
@@ -107,29 +82,37 @@ const std::vector kGoodixI2cProperties = std::vector{
                       bind_fuchsia_goodix_platform::BIND_I2C_ADDRESS_TOUCH),
 };
 
-const std::vector kGoodixInterruptRules = std::vector{
+const std::vector kInterruptRules = std::vector{
     fdf::MakeAcceptBindRule(bind_fuchsia_hardware_gpio::SERVICE,
                             bind_fuchsia_hardware_gpio::SERVICE_ZIRCONTRANSPORT),
     fdf::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN,
                             bind_fuchsia_amlogic_platform_s905d2::GPIOZ_PIN_ID_PIN_4),
 };
 
-const std::vector kGoodixInterruptProperties = std::vector{
+const std::vector kInterruptProperties = std::vector{
     fdf::MakeProperty(bind_fuchsia_hardware_gpio::SERVICE,
                       bind_fuchsia_hardware_gpio::SERVICE_ZIRCONTRANSPORT),
     fdf::MakeProperty(bind_fuchsia_gpio::FUNCTION, bind_fuchsia_gpio::FUNCTION_TOUCH_INTERRUPT)};
 
-const std::vector kGoodixResetRules = std::vector{
+const std::vector kResetRules = std::vector{
     fdf::MakeAcceptBindRule(bind_fuchsia_hardware_gpio::SERVICE,
                             bind_fuchsia_hardware_gpio::SERVICE_ZIRCONTRANSPORT),
     fdf::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN,
                             bind_fuchsia_amlogic_platform_s905d2::GPIOZ_PIN_ID_PIN_9),
 };
 
-const std::vector kGoodixResetProperties = std::vector{
+const std::vector kResetProperties = std::vector{
     fdf::MakeProperty(bind_fuchsia_hardware_gpio::SERVICE,
                       bind_fuchsia_hardware_gpio::SERVICE_ZIRCONTRANSPORT),
     fdf::MakeProperty(bind_fuchsia_gpio::FUNCTION, bind_fuchsia_gpio::FUNCTION_TOUCH_RESET),
+};
+
+const std::vector kGpioInitRules = std::vector{
+    fdf::MakeAcceptBindRule(bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
+};
+
+const std::vector kGpioInitProperties = std::vector{
+    fdf::MakeProperty(bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
 };
 
 zx::result<> AddFocaltechTouch(
@@ -159,12 +142,16 @@ zx::result<> AddFocaltechTouch(
           .properties = kFocaltechI2cProperties,
       }},
       fuchsia_driver_framework::ParentSpec{{
-          .bind_rules = kFocaltechInterruptRules,
-          .properties = kFocaltechInterruptProperties,
+          .bind_rules = kInterruptRules,
+          .properties = kInterruptProperties,
       }},
       fuchsia_driver_framework::ParentSpec{{
-          .bind_rules = kFocaltechResetRules,
-          .properties = kFocaltechResetProperties,
+          .bind_rules = kResetRules,
+          .properties = kResetProperties,
+      }},
+      fuchsia_driver_framework::ParentSpec{{
+          .bind_rules = kGpioInitRules,
+          .properties = kGpioInitProperties,
       }},
   };
 
@@ -210,8 +197,8 @@ zx::result<> PostInit::InitTouch() {
 
     const std::vector<fuchsia_driver_framework::ParentSpec> goodix_parents{
         {{kGoodixI2cRules, kGoodixI2cProperties}},
-        {{kGoodixInterruptRules, kGoodixInterruptProperties}},
-        {{kGoodixResetRules, kGoodixResetProperties}},
+        {{kInterruptRules, kInterruptProperties}},
+        {{kResetRules, kResetProperties}},
     };
 
     const fuchsia_driver_framework::CompositeNodeSpec goodix_node_spec{{
@@ -231,6 +218,12 @@ zx::result<> PostInit::InitTouch() {
       }
     }
   } else {
+    // The Focaltech touch driver expects the interrupt line to be driven by the touch controller.
+    if (auto result = SetPull(incoming(), "touch-interrupt", fuchsia_hardware_pin::Pull::kNone);
+        result.is_error()) {
+      return result;
+    }
+
     auto status = AddFocaltechTouch(pbus_);
     if (!status.is_ok()) {
       FDF_LOG(ERROR, "ft3x27: DdkAddCompositeNodeSpec failed: %s", status.status_string());

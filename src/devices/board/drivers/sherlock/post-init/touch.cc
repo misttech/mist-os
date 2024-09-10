@@ -62,6 +62,14 @@ const std::vector kResetProperties = std::vector{
     fdf::MakeProperty(bind_fuchsia_gpio::FUNCTION, bind_fuchsia_gpio::FUNCTION_TOUCH_RESET),
 };
 
+const std::vector kGpioInitRules = std::vector{
+    fdf::MakeAcceptBindRule(bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
+};
+
+const std::vector kGpioInitProperties = std::vector{
+    fdf::MakeProperty(bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
+};
+
 zx::result<> PostInit::InitTouch() {
   static const FocaltechMetadata device_info = {
       .device_id = FOCALTECH_DEVICE_FT5726,
@@ -96,6 +104,10 @@ zx::result<> PostInit::InitTouch() {
       fuchsia_driver_framework::ParentSpec{{
           .bind_rules = kResetRules,
           .properties = kResetProperties,
+      }},
+      fuchsia_driver_framework::ParentSpec{{
+          .bind_rules = kGpioInitRules,
+          .properties = kGpioInitProperties,
       }},
   };
 

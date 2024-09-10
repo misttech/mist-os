@@ -40,3 +40,7 @@ node "pdev" {
     }
   }
 }
+
+node "gpio-init" {
+  fuchsia.BIND_INIT_STEP == fuchsia.gpio.BIND_INIT_STEP.GPIO;
+}

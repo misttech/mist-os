@@ -218,6 +218,14 @@
 		function = <0 0>;
 	};
 
+	touch_pins: touch-pins {
+		pins = <A311D_GPIOA(5)>;
+		input-enable;
+		/* The Focaltech touch driver expects the interrupt line to be driven by the touch
+		 * controller.
+		 */
+		bias-disable;
+	};
 };
 
 &i2c_AO {
@@ -256,5 +264,6 @@
 		gpios = <&gpio A311D_GPIOA(5) 0>,
 				<&gpio_expander 6 0>;
 		gpio-names = "TOUCH_INTERRUPT", "TOUCH_RESET";
+		pinctrl-0 = <&touch_pins>;
 	};
 };

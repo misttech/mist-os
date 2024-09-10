@@ -169,9 +169,9 @@ zx_status_t FtDevice::Init() {
   reset_gpio_.Bind(std::move(reset_gpio_client.value()));
 
   {
-    fidl::WireResult result = int_gpio_->ConfigIn(fuchsia_hardware_gpio::GpioFlags::kNoPull);
+    fidl::WireResult result = int_gpio_->SetBufferMode(fuchsia_hardware_gpio::BufferMode::kInput);
     if (!result.ok()) {
-      zxlogf(ERROR, "Failed to send ConfigIn request to int gpio: %s", result.status_string());
+      zxlogf(ERROR, "Failed to send SetBufferMode request to int gpio: %s", result.status_string());
       return result.status();
     }
     if (result->is_error()) {
@@ -181,7 +181,25 @@ zx_status_t FtDevice::Init() {
     }
   }
 
-  fidl::WireResult interrupt = int_gpio_->GetInterrupt(ZX_INTERRUPT_MODE_EDGE_LOW);
+  {
+    fidl::Arena arena;
+    auto config = fuchsia_hardware_gpio::wire::InterruptConfiguration::Builder(arena)
+                      .mode(fuchsia_hardware_gpio::InterruptMode::kEdgeLow)
+                      .Build();
+    fidl::WireResult result = int_gpio_->ConfigureInterrupt(config);
+    if (!result.ok()) {
+      zxlogf(ERROR, "Failed to send ConfigureInterrupt request to int gpio: %s",
+             result.status_string());
+      return result.status();
+    }
+    if (result->is_error()) {
+      zxlogf(ERROR, "Failed to configure int gpio: %s",
+             zx_status_get_string(result->error_value()));
+      return result->error_value();
+    }
+  }
+
+  fidl::WireResult interrupt = int_gpio_->GetInterrupt2({});
   if (!interrupt.ok()) {
     zxlogf(ERROR, "Failed to send GetInterrupt request to int gpio: %s", interrupt.status_string());
     return interrupt.status();
@@ -191,7 +209,7 @@ zx_status_t FtDevice::Init() {
            zx_status_get_string(interrupt->error_value()));
     return interrupt->error_value();
   }
-  irq_ = std::move(interrupt.value()->irq);
+  irq_ = std::move(interrupt.value()->interrupt);
   irq_handler_.set_object(irq_.get());
   irq_handler_.Begin(dispatcher_);
 
@@ -232,9 +250,11 @@ zx_status_t FtDevice::Init() {
   // Reset the chip -- should be low for at least 1ms, and the chip should take at most 200ms to
   // initialize.
   {
-    fidl::WireResult result = reset_gpio_->ConfigOut(0);
+    fidl::WireResult result =
+        reset_gpio_->SetBufferMode(fuchsia_hardware_gpio::BufferMode::kOutputLow);
     if (!result.ok()) {
-      zxlogf(ERROR, "Failed to send ConfigOut request to reset gpio: %s", result.status_string());
+      zxlogf(ERROR, "Failed to send SetBufferMode request to reset gpio: %s",
+             result.status_string());
       return result.status();
     }
     if (result->is_error()) {
@@ -245,7 +265,8 @@ zx_status_t FtDevice::Init() {
   }
   zx::nanosleep(zx::deadline_after(zx::msec(5)));
   {
-    fidl::WireResult result = reset_gpio_->Write(1);
+    fidl::WireResult result =
+        reset_gpio_->SetBufferMode(fuchsia_hardware_gpio::BufferMode::kOutputHigh);
     if (!result.ok()) {
       zxlogf(ERROR, "Failed to send Write request to reset gpio: %s", result.status_string());
       return result.status();
