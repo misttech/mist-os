@@ -11,6 +11,7 @@
 #include <poll.h>
 #include <sys/ioctl.h>
 #include <sys/socket.h>
+#include <sys/un.h>
 #include <unistd.h>
 
 #include <array>
@@ -63,6 +64,19 @@ TEST_P(SocketPair, GetSockOpt) {
 
   ASSERT_EQ(getsockopt(fds()[0].get(), SOL_SOCKET, SO_PROTOCOL, &optval, &optlen), 0);
   ASSERT_EQ(optval, 0);
+}
+
+TEST_P(SocketPair, GetPeerAndSockName) {
+  struct sockaddr_un addr;
+  socklen_t addrlen = sizeof(addr);
+  ASSERT_EQ(getsockname(fds()[0].get(), reinterpret_cast<struct sockaddr*>(&addr), &addrlen), 0);
+  ASSERT_EQ(addr.sun_family, AF_UNIX);
+  ASSERT_EQ(addrlen, sizeof(sa_family_t));
+
+  addrlen = sizeof(addr);
+  ASSERT_EQ(getpeername(fds()[0].get(), reinterpret_cast<struct sockaddr*>(&addr), &addrlen), 0);
+  ASSERT_EQ(addr.sun_family, AF_UNIX);
+  ASSERT_EQ(addrlen, sizeof(sa_family_t));
 }
 
 TEST_P(SocketPair, Control) {

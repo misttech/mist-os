@@ -9,6 +9,8 @@
 #include <sys/stat.h>
 #include <zircon/compiler.h>
 
+#include <algorithm>
+
 #include "sdk/lib/zxio/private.h"
 #include "sdk/lib/zxio/vector.h"
 
@@ -181,6 +183,20 @@ static constexpr zxio_ops_t zxio_pipe_ops = []() {
     *out_code = 0;
     return zxio_sendmsg_inner(io, msg, flags, out_actual);
   };
+
+  ops.getsockname = [](zxio_t* io, struct sockaddr* addr, socklen_t* addrlen, int16_t* out_code) {
+    if (addrlen == nullptr || (*addrlen != 0 && addr == nullptr)) {
+      *out_code = EFAULT;
+      return ZX_OK;
+    }
+    struct sockaddr response;
+    response.sa_family = AF_UNIX;
+    memcpy(addr, &response, std::min(static_cast<size_t>(*addrlen), sizeof(struct sockaddr)));
+    *addrlen = sizeof(sa_family_t);
+    *out_code = 0;
+    return ZX_OK;
+  };
+  ops.getpeername = ops.getsockname;
 
   return ops;
 }();
