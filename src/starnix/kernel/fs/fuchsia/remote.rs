@@ -760,6 +760,7 @@ impl FsNodeOps for RemoteNode {
             uid: info.uid,
             gid: info.gid,
             rdev: info.rdev.bits(),
+            casefold: info.casefold,
             has,
             ..Default::default()
         };

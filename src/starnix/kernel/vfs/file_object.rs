@@ -38,10 +38,10 @@ use starnix_uapi::seal_flags::SealFlags;
 use starnix_uapi::user_address::UserAddress;
 use starnix_uapi::vfs::FdEvents;
 use starnix_uapi::{
-    errno, error, fsxattr, off_t, pid_t, uapi, FIONBIO, FIONREAD, FS_IOC_ENABLE_VERITY,
-    FS_IOC_FSGETXATTR, FS_IOC_FSSETXATTR, FS_IOC_GETFLAGS, FS_IOC_MEASURE_VERITY,
-    FS_IOC_READ_VERITY_METADATA, FS_IOC_SETFLAGS, FS_VERITY_FL, SEEK_CUR, SEEK_DATA, SEEK_END,
-    SEEK_HOLE, SEEK_SET, TCGETS,
+    errno, error, fsxattr, off_t, pid_t, uapi, FIONBIO, FIONREAD, FS_CASEFOLD_FL,
+    FS_IOC_ENABLE_VERITY, FS_IOC_FSGETXATTR, FS_IOC_FSSETXATTR, FS_IOC_GETFLAGS,
+    FS_IOC_MEASURE_VERITY, FS_IOC_READ_VERITY_METADATA, FS_IOC_SETFLAGS, FS_VERITY_FL, SEEK_CUR,
+    SEEK_DATA, SEEK_END, SEEK_HOLE, SEEK_SET, TCGETS,
 };
 use std::collections::HashSet;
 use std::fmt;
@@ -804,7 +804,7 @@ pub use {
 
 pub fn default_ioctl(
     file: &FileObject,
-    _locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     request: u32,
     arg: SyscallArg,
@@ -853,13 +853,20 @@ pub fn default_ioctl(
             if matches!(*file.node().fsverity.lock(), FsVerityState::FsVerity) {
                 flags |= FS_VERITY_FL;
             }
+            if file.node().info().casefold {
+                flags |= FS_CASEFOLD_FL;
+            }
             current_task.write_object(arg, &flags)?;
             Ok(SUCCESS)
         }
         FS_IOC_SETFLAGS => {
             track_stub!(TODO("https://fxbug.dev/322875367"), "FS_IOC_SETFLAGS");
             let arg = UserAddress::from(arg).into();
-            let _: u32 = current_task.read_object(arg)?;
+            let flags: u32 = current_task.read_object(arg)?;
+            file.node().update_attributes(locked, current_task, |info| {
+                info.casefold = flags & FS_CASEFOLD_FL != 0;
+                Ok(())
+            })?;
             Ok(SUCCESS)
         }
         FS_IOC_ENABLE_VERITY => {
