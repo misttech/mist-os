@@ -8,6 +8,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from dataclasses import dataclass
+from typing import Protocol, TypeVar
 
 import fidl.fuchsia_wlan_policy as f_wlan_policy
 from fuchsia_controller_py import Channel, ZxStatus
@@ -21,6 +22,7 @@ from honeydew.interfaces.transports import fuchsia_controller as fc_transport
 from honeydew.typing.custom_types import FidlEndpoint
 from honeydew.typing.wlan import (
     ClientStateSummary,
+    Credential,
     NetworkConfig,
     RequestStatus,
     SecurityType,
@@ -43,30 +45,54 @@ _CLIENT_LISTENER_PROXY = FidlEndpoint(
     "core/wlancfg", "fuchsia.wlan.policy.ClientListener"
 )
 
-# Length of a pre-shared key (PSK) used as a password.
-_PSK_LENGTH = 64
+
+_T_co = TypeVar("_T_co", covariant=True)
 
 
-def _parse_password(password: str | None) -> f_wlan_policy.Credential:
-    """Parse a password into a Credential.
+class AsyncIterator(Protocol[_T_co]):
+    """A FIDL iterator."""
+
+    async def get_next(self) -> _T_co:
+        """Get the next element."""
+
+
+async def collect_iterator(iterator: AsyncIterator[_T_co]) -> list[_T_co]:
+    """Collect all elements from a FIDL iterator.
+
+    Will check for errors during collection.
 
     Args:
-        password: String password, pre-shared key in hex form with length 64, or
-            None/empty to represent open.
+        iterator: Iterator to collect elements from.
 
-    Return:
-        A fuchsia.wlan.policy/Credential union object.
+    Returns:
+        All elements collected from iterator.
+
+    Raises:
+        HoneydewWlanError: Error from WLAN stack.
     """
-    credential = f_wlan_policy.Credential()
+    elements: list[_T_co] = []
+    while True:
+        try:
+            res = await iterator.get_next()
+        except ZxStatus as status:
+            if status.raw() == ZxStatus.ZX_ERR_PEER_CLOSED:
+                # The server closed the channel, signifying the end of elements.
+                break
+            else:
+                raise errors.HoneydewWlanError(
+                    f"{type(iterator).__name__}.GetNext() error {status}"
+                ) from status
 
-    if not password:
-        credential.none = f_wlan_policy.Empty()
-    elif len(password) == _PSK_LENGTH:
-        credential.psk = list(bytes.fromhex(password))
-    else:
-        credential.password = list(password.encode("utf-8"))
+        # Check for error
+        err = getattr(res, "err", None)
+        if err:
+            raise errors.HoneydewWlanError(
+                f"{type(iterator).__name__}.GetNext() {type(err).__name__} {err}"
+            )
 
-    return credential
+        elements.append(res)
+
+    return elements
 
 
 @dataclass
@@ -243,7 +269,9 @@ class WlanPolicy(AsyncAdapter, wlan_policy.WlanPolicy):
             client_state_updates_server_task=task,
         )
 
-    def get_saved_networks(self) -> list[NetworkConfig]:
+    @asyncmethod
+    # pylint: disable-next=invalid-overridden-method
+    async def get_saved_networks(self) -> list[NetworkConfig]:
         """Gets networks saved on device.
 
         Returns:
@@ -252,8 +280,31 @@ class WlanPolicy(AsyncAdapter, wlan_policy.WlanPolicy):
         Raises:
             HoneydewWlanError: Error from WLAN stack.
             TypeError: Return values not correct types.
+            RuntimeError: Client controller has not been initialized
         """
-        raise NotImplementedError()
+        if self._client_controller is None:
+            raise RuntimeError(
+                "Client controller has not been initialized; call "
+                "create_client_controller() before get_saved_networks()"
+            )
+
+        client, server = Channel.create()
+        iterator = f_wlan_policy.NetworkConfigIterator.Client(client.take())
+
+        try:
+            self._client_controller.proxy.get_saved_networks(
+                iterator=server,
+            )
+        except ZxStatus as status:
+            raise errors.HoneydewWlanError(
+                f"ClientController.GetSavedNetworks() error {status}"
+            ) from status
+
+        return [
+            NetworkConfig.from_fidl(config)
+            for resp in await collect_iterator(iterator)
+            for config in resp.configs
+        ]
 
     @asyncmethod
     # pylint: disable-next=invalid-overridden-method
@@ -349,7 +400,7 @@ class WlanPolicy(AsyncAdapter, wlan_policy.WlanPolicy):
                         ssid=list(target_ssid.encode("utf-8")),
                         type=security_type.to_fidl(),
                     ),
-                    credential=_parse_password(target_pwd),
+                    credential=Credential.from_password(target_pwd).to_fidl(),
                 ),
             )
             if res.err:
@@ -393,29 +444,13 @@ class WlanPolicy(AsyncAdapter, wlan_policy.WlanPolicy):
                 f"ClientController.ScanForNetworks() error {status}"
             ) from status
 
-        # Collect results from iterator until the channel is closed.
-        ssids: set[str] = set()
-
-        while True:
-            try:
-                res = await iterator.get_next()
-                if res.err:
-                    raise errors.HoneydewWlanError(
-                        f"ScanResultIterator.GetNext() ScanErrorCode {res.err}"
-                    )
-            except ZxStatus as status:
-                if status.raw() == ZxStatus.ZX_ERR_PEER_CLOSED:
-                    # The server closed the channel, signifying the end of
-                    # elements.
-                    break
-                raise errors.HoneydewWlanError(
-                    f"ScanResultIterator.GetNext() error {status}"
-                ) from status
-
-            for scan_result in res.response.scan_results:
-                ssids.add(bytes(scan_result.id.ssid).decode("utf-8"))
-
-        return list(ssids)
+        return list(
+            {
+                bytes(scan_result.id.ssid).decode("utf-8")
+                for res in await collect_iterator(iterator)
+                for scan_result in res.response.scan_results
+            }
+        )
 
     def set_new_update_listener(self) -> None:
         """Sets the update listener stream of the facade to a new stream.
