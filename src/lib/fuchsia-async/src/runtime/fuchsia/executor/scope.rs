@@ -185,8 +185,10 @@ impl ScopeRef {
     pub async fn on_no_tasks(&self) {
         let mut waker_entry = std::pin::pin!(self.inner.state.lock().new_waker_entry());
         poll_fn(|cx| {
-            let result = self.inner.state.lock().poll_no_tasks();
+            let mut state = self.inner.state.lock();
+            let result = state.poll_no_tasks();
             if result.is_pending() {
+                // NOTE: The lock must be held until after we have added the waker.
                 waker_entry.as_mut().add(cx.waker().clone());
             }
             result
@@ -674,7 +676,7 @@ impl hash::Hash for PtrKey {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::TestExecutor;
+    use crate::{SendExecutor, TestExecutor};
     use assert_matches::assert_matches;
     use futures::future::join_all;
     use futures::FutureExt;
@@ -1138,6 +1140,29 @@ mod tests {
             let _ = executor.run_until_stalled(&mut pending::<()>());
             assert_eq!(poll_count.load(Ordering::Relaxed), start_count + 2);
             start_count += 2;
+        }
+    }
+
+    #[test]
+    fn on_no_tasks_race() {
+        fn sleep_random() {
+            use rand::Rng;
+            std::thread::sleep(std::time::Duration::from_micros(
+                rand::thread_rng().gen_range(0..10),
+            ));
+        }
+        for _ in 0..2000 {
+            let mut executor = SendExecutor::new(2);
+            let scope = executor.root_scope().new_child();
+            scope
+                .spawn(async {
+                    sleep_random();
+                })
+                .detach();
+            executor.run(async move {
+                sleep_random();
+                scope.on_no_tasks().await;
+            });
         }
     }
 }
