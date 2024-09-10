@@ -1503,6 +1503,7 @@ impl<S: HandleOwner> DataObjectHandle<S> {
                 change_time,
                 sub_dirs: 0,
                 posix_attributes,
+                casefold: false,
             }),
             _ => bail!(FxfsError::NotFile),
         }
@@ -3081,7 +3082,7 @@ mod tests {
             transaction.add(
                 store.store_object_id(),
                 Mutation::replace_or_insert_object(
-                    ObjectKey::child(root_directory.object_id(), TEST_OBJECT_NAME),
+                    ObjectKey::child(root_directory.object_id(), TEST_OBJECT_NAME, false),
                     ObjectValue::None,
                 ),
             );

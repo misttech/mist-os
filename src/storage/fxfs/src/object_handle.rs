@@ -51,8 +51,10 @@ pub struct ObjectProperties {
     pub change_time: Timestamp,
     /// The number of sub-directories.
     pub sub_dirs: u64,
-    // The POSIX attributes: mode, uid, gid, rdev
+    /// The POSIX attributes: mode, uid, gid, rdev
     pub posix_attributes: Option<PosixAttributes>,
+    /// True if this is a directory that has casefolding enabled.
+    pub casefold: bool,
 }
 
 #[async_trait]

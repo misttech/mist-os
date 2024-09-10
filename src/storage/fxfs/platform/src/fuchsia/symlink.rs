@@ -77,6 +77,7 @@ impl FxSymlink {
                 change_time,
                 sub_dirs: 0,
                 posix_attributes,
+                casefold: false,
             }),
             ObjectValue::None => Err(FxfsError::NotFound.into()),
             _ => Err(FxfsError::NotFile.into()),

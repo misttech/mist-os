@@ -500,6 +500,7 @@ async fn update_attributes_directory_with_sufficient_rights() {
         gid: supported_attrs.contains(fio::NodeAttributesQuery::GID).then_some(555),
         rdev: supported_attrs.contains(fio::NodeAttributesQuery::RDEV).then_some(666),
         access_time: supported_attrs.contains(fio::NodeAttributesQuery::ACCESS_TIME).then_some(777),
+        casefold: supported_attrs.contains(fio::NodeAttributesQuery::CASEFOLD).then_some(false),
         ..Default::default()
     };
 

@@ -11,8 +11,8 @@ use crate::object_handle::INVALID_OBJECT_ID;
 use crate::object_store::allocator::{AllocatorItem, Reservation};
 use crate::object_store::object_manager::{reserved_space_from_journal_usage, ObjectManager};
 use crate::object_store::object_record::{
-    ObjectItem, ObjectItemV32, ObjectItemV33, ObjectItemV37, ObjectItemV38, ObjectKey,
-    ObjectKeyData, ObjectValue, ProjectProperty,
+    ObjectItem, ObjectItemV32, ObjectItemV33, ObjectItemV37, ObjectItemV38, ObjectItemV40,
+    ObjectKey, ObjectKeyData, ObjectValue, ProjectProperty,
 };
 use crate::serialized_types::{migrate_nodefault, migrate_to_version, Migrate, Versioned};
 use anyhow::Error;
@@ -20,7 +20,7 @@ use either::{Either, Left, Right};
 use fprint::TypeFingerprint;
 use futures::future::poll_fn;
 use futures::pin_mut;
-use fxfs_crypto::{WrappedKey, WrappedKeyV32};
+use fxfs_crypto::{WrappedKey, WrappedKeyV32, WrappedKeyV40};
 use rustc_hash::FxHashMap as HashMap;
 use scopeguard::ScopeGuard;
 use serde::{Deserialize, Serialize};
@@ -76,14 +76,14 @@ pub struct TransactionLocks<'a>(pub WriteGuard<'a>);
 /// transaction, these are stored as a set which allows some mutations to be deduplicated and found
 /// (and we require custom comparison functions below).  For example, we need to be able to find
 /// object size changes.
-pub type Mutation = MutationV38;
+pub type Mutation = MutationV40;
 
 #[derive(
     Clone, Debug, Eq, Ord, PartialEq, PartialOrd, Serialize, Deserialize, TypeFingerprint, Versioned,
 )]
 #[cfg_attr(fuzz, derive(arbitrary::Arbitrary))]
-pub enum MutationV38 {
-    ObjectStore(ObjectStoreMutationV38),
+pub enum MutationV40 {
+    ObjectStore(ObjectStoreMutationV40),
     EncryptedObjectStore(Box<[u8]>),
     Allocator(AllocatorMutationV32),
     // Indicates the beginning of a flush.  This would typically involve sealing a tree.
@@ -94,11 +94,26 @@ pub enum MutationV38 {
     // Volume has been deleted.  Requires we remove it from the set of managed ObjectStore.
     DeleteVolume,
     UpdateBorrowed(u64),
+    UpdateMutationsKey(UpdateMutationsKeyV40),
+    CreateInternalDir(u64),
+}
+
+#[derive(Migrate, Serialize, Deserialize, TypeFingerprint, Versioned)]
+#[migrate_to_version(MutationV40)]
+pub enum MutationV38 {
+    ObjectStore(ObjectStoreMutationV38),
+    EncryptedObjectStore(Box<[u8]>),
+    Allocator(AllocatorMutationV32),
+    BeginFlush,
+    EndFlush,
+    DeleteVolume,
+    UpdateBorrowed(u64),
     UpdateMutationsKey(UpdateMutationsKeyV32),
     CreateInternalDir(u64),
 }
 
-#[derive(Debug, Deserialize, Migrate, Serialize, Versioned, TypeFingerprint)]
+#[derive(Migrate, Deserialize, Serialize, Versioned, TypeFingerprint)]
+#[migrate_to_version(MutationV38)]
 pub enum MutationV37 {
     ObjectStore(ObjectStoreMutationV37),
     EncryptedObjectStore(Box<[u8]>),
@@ -111,7 +126,7 @@ pub enum MutationV37 {
     CreateInternalDir(u64),
 }
 
-#[derive(Debug, Deserialize, Migrate, Serialize, Versioned, TypeFingerprint)]
+#[derive(Deserialize, Migrate, Serialize, Versioned, TypeFingerprint)]
 #[migrate_to_version(MutationV37)]
 pub enum MutationV33 {
     ObjectStore(ObjectStoreMutationV33),
@@ -125,7 +140,7 @@ pub enum MutationV33 {
     CreateInternalDir(u64),
 }
 
-#[derive(Debug, Deserialize, Migrate, Serialize, Versioned, TypeFingerprint)]
+#[derive(Deserialize, Migrate, Serialize, Versioned, TypeFingerprint)]
 #[migrate_to_version(MutationV33)]
 pub enum MutationV32 {
     ObjectStore(ObjectStoreMutationV32),
@@ -168,23 +183,33 @@ impl Mutation {
 // We have custom comparison functions for mutations that just use the key, rather than the key and
 // value that would be used by default so that we can deduplicate and find mutations (see
 // get_object_mutation below).
-pub type ObjectStoreMutation = ObjectStoreMutationV38;
+pub type ObjectStoreMutation = ObjectStoreMutationV40;
 
-#[derive(Clone, Debug, Serialize, Deserialize, TypeFingerprint)]
+#[derive(Clone, Debug, Serialize, Deserialize, TypeFingerprint, Versioned)]
+#[migrate_nodefault]
 #[cfg_attr(fuzz, derive(arbitrary::Arbitrary))]
+pub struct ObjectStoreMutationV40 {
+    pub item: ObjectItemV40,
+    pub op: OperationV32,
+}
+
+#[derive(Migrate, Serialize, Deserialize, TypeFingerprint)]
+#[migrate_nodefault]
+#[migrate_to_version(ObjectStoreMutationV40)]
 pub struct ObjectStoreMutationV38 {
     pub item: ObjectItemV38,
     pub op: OperationV32,
 }
 
-#[derive(Debug, Deserialize, Migrate, Serialize, TypeFingerprint)]
+#[derive(Deserialize, Migrate, Serialize, TypeFingerprint)]
 #[migrate_nodefault]
+#[migrate_to_version(ObjectStoreMutationV38)]
 pub struct ObjectStoreMutationV37 {
     item: ObjectItemV37,
     op: OperationV32,
 }
 
-#[derive(Debug, Deserialize, Migrate, Serialize, TypeFingerprint)]
+#[derive(Deserialize, Migrate, Serialize, TypeFingerprint)]
 #[migrate_nodefault]
 #[migrate_to_version(ObjectStoreMutationV37)]
 pub struct ObjectStoreMutationV33 {
@@ -192,7 +217,7 @@ pub struct ObjectStoreMutationV33 {
     op: OperationV32,
 }
 
-#[derive(Debug, Deserialize, Migrate, Serialize, TypeFingerprint)]
+#[derive(Deserialize, Migrate, Serialize, TypeFingerprint)]
 #[migrate_nodefault]
 #[migrate_to_version(ObjectStoreMutationV33)]
 pub struct ObjectStoreMutationV32 {
@@ -314,10 +339,19 @@ pub enum AllocatorMutationV32 {
     MarkForDeletion(u64),
 }
 
-pub type UpdateMutationsKey = UpdateMutationsKeyV32;
+pub type UpdateMutationsKey = UpdateMutationsKeyV40;
 
 #[derive(Clone, Debug, Serialize, Deserialize, TypeFingerprint)]
+pub struct UpdateMutationsKeyV40(pub WrappedKeyV40);
+
+#[derive(Serialize, Deserialize, TypeFingerprint)]
 pub struct UpdateMutationsKeyV32(pub WrappedKeyV32);
+
+impl From<UpdateMutationsKeyV32> for UpdateMutationsKeyV40 {
+    fn from(value: UpdateMutationsKeyV32) -> Self {
+        Self(value.0.into())
+    }
+}
 
 impl From<UpdateMutationsKey> for WrappedKey {
     fn from(outer: UpdateMutationsKey) -> Self {
@@ -334,7 +368,7 @@ impl From<WrappedKey> for UpdateMutationsKey {
 #[cfg(fuzz)]
 impl<'a> arbitrary::Arbitrary<'a> for UpdateMutationsKey {
     fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
-        <u64>::arbitrary(u).map(|wrapping_key_id| {
+        <u128>::arbitrary(u).map(|wrapping_key_id| {
             UpdateMutationsKey::from(WrappedKey {
                 wrapping_key_id,
                 // There doesn't seem to be much point to randomly generate crypto keys.
@@ -755,7 +789,9 @@ impl<'a> Transaction<'a> {
                 ObjectKeyData::Attribute(..) => {
                     // TODO(https://fxbug.dev/42073914): Check lock requirements.
                 }
-                ObjectKeyData::Child { .. } => {
+                ObjectKeyData::Child { .. }
+                | ObjectKeyData::EncryptedChild { .. }
+                | ObjectKeyData::CasefoldChild { .. } => {
                     let id = key.object_id;
                     if !self.txn_locks.contains(&LockKey::object(*store_object_id, id))
                         && !self.new_objects.contains(&(*store_object_id, id))

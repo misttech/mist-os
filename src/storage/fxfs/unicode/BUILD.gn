@@ -17,6 +17,9 @@ rustc_library("unicode") {
   deps = [
     ":types",
     ":unicode_gen",
+    "//src/storage/type-fprint:fprint",
+    "//third_party/rust_crates:arbitrary",
+    "//third_party/rust_crates:serde",
   ]
   visibility = [ "//src/storage/fxfs/*" ]
 }
@@ -52,7 +55,10 @@ if (is_host) {
     deps = [
       ":types",
       ":unicode_gen",
+      "//src/storage/type-fprint:fprint",
+      "//third_party/rust_crates:arbitrary",
       "//third_party/rust_crates:regex",
+      "//third_party/rust_crates:serde",
       "//third_party/rust_crates:zip",
     ]
     data_deps = [ ":ucd_zip" ]

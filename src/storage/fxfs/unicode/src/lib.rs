@@ -1,6 +1,8 @@
 // Copyright 2024 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+use fprint::TypeFingerprint;
+use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
 
 mod lookup;
@@ -51,8 +53,8 @@ pub fn casefold_cmp(a: &str, b: &str) -> std::cmp::Ordering {
 }
 
 // A simple wrapper around String that provides casefolding comparison.
-#[derive(Clone, Eq)]
-struct CasefoldString(String);
+#[derive(arbitrary::Arbitrary, Clone, Eq, Serialize, Deserialize, TypeFingerprint)]
+pub struct CasefoldString(String);
 impl CasefoldString {
     pub fn new(s: String) -> Self {
         Self(s)
@@ -87,6 +89,24 @@ impl std::cmp::Ord for CasefoldString {
 impl std::cmp::PartialOrd for CasefoldString {
     fn partial_cmp(&self, rhs: &Self) -> Option<std::cmp::Ordering> {
         Some(casefold_cmp(&self.0, &rhs.0))
+    }
+}
+
+// Nb: This trait is provided for completeness but is NOT intended to be performant.
+impl std::hash::Hash for CasefoldString {
+    fn hash<H>(&self, state: &mut H)
+    where
+        H: std::hash::Hasher,
+    {
+        for ch in casefold(self.0.chars()) {
+            ch.hash(state);
+        }
+    }
+}
+
+impl From<&str> for CasefoldString {
+    fn from(item: &str) -> Self {
+        CasefoldString(item.into())
     }
 }
 

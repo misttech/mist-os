@@ -11,7 +11,9 @@ use crate::object_store::object_record::{
     ChildValue, ObjectAttributes, ObjectDescriptor, ObjectItem, ObjectKey, ObjectKeyData,
     ObjectKind, ObjectValue, PosixAttributes, Timestamp,
 };
-use crate::object_store::transaction::{LockKey, LockKeys, Mutation, Options, Transaction};
+use crate::object_store::transaction::{
+    lock_keys, LockKey, LockKeys, Mutation, Options, Transaction,
+};
 use crate::object_store::{
     DataObjectHandle, HandleOptions, HandleOwner, ObjectStore, SetExtendedAttributeMode,
     StoreObjectHandle,
@@ -33,12 +35,15 @@ pub struct ReplaceContext<'a> {
 /// A directory stores name to child object mappings.
 pub struct Directory<S: HandleOwner> {
     handle: StoreObjectHandle<S>,
+    /// True if the directory has been deleted and is no longer accessible.
     is_deleted: AtomicBool,
+    /// True if this directory uses case-insensitive names.
+    casefold: AtomicBool,
 }
 
 #[fxfs_trace::trace]
 impl<S: HandleOwner> Directory<S> {
-    fn new(owner: Arc<S>, object_id: u64) -> Self {
+    fn new(owner: Arc<S>, object_id: u64, casefold: bool) -> Self {
         Directory {
             handle: StoreObjectHandle::new(
                 owner,
@@ -48,6 +53,7 @@ impl<S: HandleOwner> Directory<S> {
                 /* trace: */ false,
             ),
             is_deleted: AtomicBool::new(false),
+            casefold: AtomicBool::new(casefold),
         }
     }
 
@@ -71,10 +77,51 @@ impl<S: HandleOwner> Directory<S> {
         self.is_deleted.store(true, Ordering::Relaxed);
     }
 
+    /// True if this directory is using casefolding (case-insensitive, normalized unicode filenames)
+    pub fn casefold(&self) -> bool {
+        self.casefold.load(Ordering::Relaxed)
+    }
+
+    /// Enables/disables casefolding. This can only be done on an empty directory.
+    pub async fn set_casefold(&self, val: bool) -> Result<(), Error> {
+        let fs = self.store().filesystem().clone();
+        // Nb: We lock the directory to ensure it doesn't change during our check for children.
+        let mut transaction = fs
+            .new_transaction(
+                lock_keys![LockKey::object(self.store().store_object_id(), self.object_id())],
+                Options::default(),
+            )
+            .await?;
+        ensure!(!self.has_children().await?, FxfsError::InvalidArgs);
+        let mut mutation =
+            self.store().txn_get_object_mutation(&transaction, self.object_id()).await?;
+        if let ObjectValue::Object { kind: ObjectKind::Directory { casefold, .. }, .. } =
+            &mut mutation.item.value
+        {
+            *casefold = val;
+        } else {
+            return Err(
+                anyhow!(FxfsError::Inconsistent).context("casefold only applies to directories")
+            );
+        }
+        transaction.add(self.store().store_object_id(), Mutation::ObjectStore(mutation));
+        transaction.commit_with_callback(|_| self.casefold.store(val, Ordering::Relaxed)).await?;
+        Ok(())
+    }
+
     pub async fn create(
         transaction: &mut Transaction<'_>,
         owner: &Arc<S>,
         create_attributes: Option<&fio::MutableNodeAttributes>,
+    ) -> Result<Directory<S>, Error> {
+        Self::create_with_options(transaction, owner, create_attributes, false).await
+    }
+
+    pub async fn create_with_options(
+        transaction: &mut Transaction<'_>,
+        owner: &Arc<S>,
+        create_attributes: Option<&fio::MutableNodeAttributes>,
+        casefold: bool,
     ) -> Result<Directory<S>, Error> {
         let store = owner.as_ref().as_ref();
         let object_id = store.get_next_object_id(transaction).await?;
@@ -107,7 +154,7 @@ impl<S: HandleOwner> Directory<S> {
             Mutation::insert_object(
                 ObjectKey::object(object_id),
                 ObjectValue::Object {
-                    kind: ObjectKind::Directory { sub_dirs: 0 },
+                    kind: ObjectKind::Directory { sub_dirs: 0, wrapping_key_id: None, casefold },
                     attributes: ObjectAttributes {
                         creation_time,
                         modification_time,
@@ -120,7 +167,7 @@ impl<S: HandleOwner> Directory<S> {
                 },
             ),
         );
-        Ok(Directory::new(owner.clone(), object_id))
+        Ok(Directory::new(owner.clone(), object_id, casefold))
     }
 
     #[trace]
@@ -128,17 +175,17 @@ impl<S: HandleOwner> Directory<S> {
         let store = owner.as_ref().as_ref();
         match store.tree.find(&ObjectKey::object(object_id)).await?.ok_or(FxfsError::NotFound)? {
             ObjectItem {
-                value: ObjectValue::Object { kind: ObjectKind::Directory { .. }, .. },
+                value: ObjectValue::Object { kind: ObjectKind::Directory { casefold, .. }, .. },
                 ..
-            } => Ok(Directory::new(owner.clone(), object_id)),
+            } => Ok(Directory::new(owner.clone(), object_id, casefold)),
             _ => bail!(FxfsError::NotDir),
         }
     }
 
     /// Opens a directory. The caller is responsible for ensuring that the object exists and is a
     /// directory.
-    pub fn open_unchecked(owner: Arc<S>, object_id: u64) -> Self {
-        Self::new(owner, object_id)
+    pub fn open_unchecked(owner: Arc<S>, object_id: u64, casefold: bool) -> Self {
+        Self::new(owner, object_id, casefold)
     }
 
     /// Acquires the transaction with the appropriate locks to replace |dst| with |src.0|/|src.1|.
@@ -263,7 +310,12 @@ impl<S: HandleOwner> Directory<S> {
         if self.is_deleted() {
             return Ok(None);
         }
-        match self.store().tree().find(&ObjectKey::child(self.object_id(), name)).await? {
+        match self
+            .store()
+            .tree()
+            .find(&ObjectKey::child(self.object_id(), name, self.casefold()))
+            .await?
+        {
             None | Some(ObjectItem { value: ObjectValue::None, .. }) => Ok(None),
             Some(ObjectItem {
                 value: ObjectValue::Child(ChildValue { object_id, object_descriptor }),
@@ -281,11 +333,18 @@ impl<S: HandleOwner> Directory<S> {
         create_attributes: Option<&fio::MutableNodeAttributes>,
     ) -> Result<Directory<S>, Error> {
         ensure!(!self.is_deleted(), FxfsError::Deleted);
-        let handle = Directory::create(transaction, self.owner(), create_attributes).await?;
+
+        let handle = Directory::create_with_options(
+            transaction,
+            self.owner(),
+            create_attributes,
+            self.casefold(),
+        )
+        .await?;
         transaction.add(
             self.store().store_object_id(),
             Mutation::replace_or_insert_object(
-                ObjectKey::child(self.object_id(), name),
+                ObjectKey::child(self.object_id(), name, self.casefold()),
                 ObjectValue::child(handle.object_id(), ObjectDescriptor::Directory),
             ),
         );
@@ -314,7 +373,7 @@ impl<S: HandleOwner> Directory<S> {
         transaction.add(
             self.store().store_object_id(),
             Mutation::replace_or_insert_object(
-                ObjectKey::child(self.object_id(), name),
+                ObjectKey::child(self.object_id(), name, self.casefold()),
                 ObjectValue::child(handle.object_id(), ObjectDescriptor::File),
             ),
         );
@@ -432,7 +491,7 @@ impl<S: HandleOwner> Directory<S> {
         transaction.add(
             self.store().store_object_id(),
             Mutation::replace_or_insert_object(
-                ObjectKey::child(self.object_id(), name),
+                ObjectKey::child(self.object_id(), name, self.casefold()),
                 ObjectValue::child(symlink_id, ObjectDescriptor::Symlink),
             ),
         );
@@ -459,7 +518,7 @@ impl<S: HandleOwner> Directory<S> {
         transaction.add(
             self.store().store_object_id(),
             Mutation::replace_or_insert_object(
-                ObjectKey::child(self.object_id(), volume_name),
+                ObjectKey::child(self.object_id(), volume_name, self.casefold()),
                 ObjectValue::child(store_object_id, ObjectDescriptor::Volume),
             ),
         );
@@ -486,7 +545,7 @@ impl<S: HandleOwner> Directory<S> {
         transaction.add(
             self.store().store_object_id(),
             Mutation::replace_or_insert_object(
-                ObjectKey::child(self.object_id(), volume_name),
+                ObjectKey::child(self.object_id(), volume_name, self.casefold()),
                 ObjectValue::None,
             ),
         );
@@ -513,7 +572,7 @@ impl<S: HandleOwner> Directory<S> {
         transaction.add(
             self.store().store_object_id(),
             Mutation::replace_or_insert_object(
-                ObjectKey::child(self.object_id(), name),
+                ObjectKey::child(self.object_id(), name, self.casefold()),
                 ObjectValue::child(object_id, descriptor),
             ),
         );
@@ -531,6 +590,7 @@ impl<S: HandleOwner> Directory<S> {
     }
 
     /// Updates attributes for the directory.
+    /// Nb: The `casefold` attribute is ignored here. It should be set/cleared via `set_casefold()`.
     pub async fn update_attributes<'a>(
         &self,
         transaction: &mut Transaction<'a>,
@@ -539,10 +599,11 @@ impl<S: HandleOwner> Directory<S> {
         change_time: Option<Timestamp>,
     ) -> Result<(), Error> {
         ensure!(!self.is_deleted(), FxfsError::Deleted);
+
         if sub_dirs_delta != 0 {
             let mut mutation =
                 self.store().txn_get_object_mutation(&transaction, self.object_id()).await?;
-            if let ObjectValue::Object { kind: ObjectKind::Directory { sub_dirs }, .. } =
+            if let ObjectValue::Object { kind: ObjectKind::Directory { sub_dirs, .. }, .. } =
                 &mut mutation.item.value
             {
                 *sub_dirs = sub_dirs.saturating_add_signed(sub_dirs_delta);
@@ -550,6 +611,7 @@ impl<S: HandleOwner> Directory<S> {
                 bail!(anyhow!(FxfsError::Inconsistent)
                     .context("Directory.update_attributes: expected directory object"));
             };
+
             transaction.add(self.store().store_object_id(), Mutation::ObjectStore(mutation));
         }
 
@@ -572,6 +634,7 @@ impl<S: HandleOwner> Directory<S> {
                 change_time: Timestamp::zero(),
                 sub_dirs: 0,
                 posix_attributes: None,
+                casefold: false,
             });
         }
 
@@ -583,7 +646,7 @@ impl<S: HandleOwner> Directory<S> {
             .ok_or(FxfsError::NotFound)?;
         match item.value {
             ObjectValue::Object {
-                kind: ObjectKind::Directory { sub_dirs },
+                kind: ObjectKind::Directory { sub_dirs, casefold, .. },
                 attributes:
                     ObjectAttributes {
                         creation_time,
@@ -603,6 +666,7 @@ impl<S: HandleOwner> Directory<S> {
                 change_time,
                 sub_dirs,
                 posix_attributes,
+                casefold,
             }),
             _ => {
                 bail!(anyhow!(FxfsError::Inconsistent)
@@ -662,8 +726,9 @@ impl<S: HandleOwner> Directory<S> {
         from: &str,
     ) -> Result<DirectoryIterator<'a, 'b>, Error> {
         ensure!(!self.is_deleted(), FxfsError::Deleted);
-        let mut iter =
-            merger.query(Query::FullRange(&ObjectKey::child(self.object_id(), from))).await?;
+        let mut iter = merger
+            .query(Query::FullRange(&ObjectKey::child(self.object_id(), from, self.casefold())))
+            .await?;
         // Skip deleted entries.
         loop {
             match iter.get() {
@@ -701,7 +766,12 @@ impl DirectoryIterator<'_, '_> {
                 key: ObjectKey { object_id: oid, data: ObjectKeyData::Child { name } },
                 value: ObjectValue::Child(ChildValue { object_id, object_descriptor }),
                 ..
-            }) if *oid == self.object_id => Some((name, *object_id, object_descriptor)),
+            }) if *oid == self.object_id => Some((&name, *object_id, object_descriptor)),
+            Some(ItemRef {
+                key: ObjectKey { object_id: oid, data: ObjectKeyData::CasefoldChild { name } },
+                value: ObjectValue::Child(ChildValue { object_id, object_descriptor }),
+                ..
+            }) if *oid == self.object_id => Some((&name, *object_id, object_descriptor)),
             _ => None,
         }
     }
@@ -754,7 +824,7 @@ pub async fn replace_child<'a, S: HandleOwner>(
         transaction.add(
             store_id,
             Mutation::replace_or_insert_object(
-                ObjectKey::child(src_dir.object_id(), src_name),
+                ObjectKey::child(src_dir.object_id(), src_name, src_dir.casefold()),
                 ObjectValue::None,
             ),
         );
@@ -839,7 +909,10 @@ pub async fn replace_child_with_object<'a, S: HandleOwner>(
     };
     transaction.add(
         store_id,
-        Mutation::replace_or_insert_object(ObjectKey::child(dst.0.object_id(), dst.1), new_value),
+        Mutation::replace_or_insert_object(
+            ObjectKey::child(dst.0.object_id(), dst.1, dst.0.casefold()),
+            new_value,
+        ),
     );
     dst.0
         .update_attributes(
@@ -2550,6 +2623,127 @@ mod tests {
         assert_eq!(moved_foo_props.creation_time, foo_props.creation_time);
         assert_eq!(moved_foo_props.access_time, foo_props.access_time);
         assert_eq!(moved_foo_props.modification_time, foo_props.modification_time);
+        fs.close().await.expect("Close failed");
+    }
+
+    #[fuchsia::test]
+    async fn test_create_casefold_directory() {
+        let device = DeviceHolder::new(FakeDevice::new(8192, TEST_DEVICE_BLOCK_SIZE));
+        let fs = FxFilesystem::new_empty(device).await.expect("new_empty failed");
+        let object_id = {
+            let mut transaction = fs
+                .clone()
+                .new_transaction(lock_keys![], Options::default())
+                .await
+                .expect("new_transaction failed");
+            let dir = Directory::create(&mut transaction, &fs.root_store(), None)
+                .await
+                .expect("create failed");
+
+            let child_dir = dir
+                .create_child_dir(&mut transaction, "foo", None)
+                .await
+                .expect("create_child_dir failed");
+            let _child_dir_file = child_dir
+                .create_child_file(&mut transaction, "bAr", None)
+                .await
+                .expect("create_child_file failed");
+            transaction.commit().await.expect("commit failed");
+            dir.object_id()
+        };
+        fs.close().await.expect("Close failed");
+        let device = fs.take_device().await;
+
+        // We now have foo/bAr which should be case sensitive (casefold not enabled).
+
+        device.reopen(false);
+        let fs = FxFilesystem::open(device).await.expect("open failed");
+        {
+            let dir = Directory::open(&fs.root_store(), object_id).await.expect("open failed");
+            let (object_id, object_descriptor) =
+                dir.lookup("foo").await.expect("lookup failed").expect("not found");
+            assert_eq!(object_descriptor, ObjectDescriptor::Directory);
+            let child_dir =
+                Directory::open(&fs.root_store(), object_id).await.expect("open failed");
+            assert!(!child_dir.casefold());
+            assert!(child_dir.lookup("BAR").await.expect("lookup failed").is_none());
+            let (object_id, descriptor) =
+                child_dir.lookup("bAr").await.expect("lookup failed").unwrap();
+            assert_eq!(descriptor, ObjectDescriptor::File);
+
+            // We can't set casefold now because the directory isn't empty.
+            child_dir.set_casefold(true).await.expect_err("not empty");
+
+            // Delete the file and subdir and try again.
+            let mut transaction = fs
+                .clone()
+                .new_transaction(
+                    lock_keys![
+                        LockKey::object(fs.root_store().store_object_id(), child_dir.object_id()),
+                        LockKey::object(fs.root_store().store_object_id(), object_id),
+                    ],
+                    Options::default(),
+                )
+                .await
+                .expect("new_transaction failed");
+            assert_matches!(
+                replace_child(&mut transaction, None, (&child_dir, "bAr"))
+                    .await
+                    .expect("replace_child failed"),
+                ReplacedChild::Object(..)
+            );
+            transaction.commit().await.expect("commit failed");
+
+            // This time enabling casefold should succeed.
+            child_dir.set_casefold(true).await.expect("set casefold");
+
+            assert!(child_dir.casefold());
+
+            // Create the file again now that casefold is enabled.
+            let mut transaction = fs
+                .clone()
+                .new_transaction(
+                    lock_keys![LockKey::object(
+                        fs.root_store().store_object_id(),
+                        child_dir.object_id()
+                    ),],
+                    Options::default(),
+                )
+                .await
+                .expect("new_transaction failed");
+            let _child_dir_file = child_dir
+                .create_child_file(&mut transaction, "bAr", None)
+                .await
+                .expect("create_child_file failed");
+            transaction.commit().await.expect("commit failed");
+
+            // Check that we can lookup via a case insensitive name.
+            assert!(child_dir.lookup("BAR").await.expect("lookup failed").is_some());
+            assert!(child_dir.lookup("bAr").await.expect("lookup failed").is_some());
+
+            // Enabling casefold should fail again as the dir is not empty.
+            child_dir.set_casefold(true).await.expect_err("set casefold");
+            assert!(child_dir.casefold());
+
+            // Confirm that casefold will affect created subdirectories.
+            let mut transaction = fs
+                .clone()
+                .new_transaction(
+                    lock_keys![LockKey::object(
+                        fs.root_store().store_object_id(),
+                        child_dir.object_id()
+                    ),],
+                    Options::default(),
+                )
+                .await
+                .expect("new_transaction failed");
+            let sub_dir = child_dir
+                .create_child_dir(&mut transaction, "sub", None)
+                .await
+                .expect("create_sub_dir failed");
+            transaction.commit().await.expect("commit failed");
+            assert!(sub_dir.casefold());
+        };
         fs.close().await.expect("Close failed");
     }
 }

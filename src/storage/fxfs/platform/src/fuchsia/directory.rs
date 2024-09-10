@@ -549,6 +549,10 @@ impl MutableDirectory for FxDirectory {
         attributes: fio::MutableNodeAttributes,
     ) -> Result<(), zx::Status> {
         let fs = self.store().filesystem();
+        // TODO(b/365630582): Reconsider doing this as part of the transaction below.
+        if let Some(casefold) = attributes.casefold {
+            self.directory.set_casefold(casefold).await.map_err(map_to_status)?;
+        }
         let mut transaction = fs
             .clone()
             .new_transaction(
@@ -680,6 +684,7 @@ impl vfs::node::Node for FxDirectory {
                 uid: props.posix_attributes.map(|a| a.uid),
                 gid: props.posix_attributes.map(|a| a.gid),
                 rdev: props.posix_attributes.map(|a| a.rdev),
+                casefold: self.directory.casefold(),
             },
             Immutable {
                 protocols: fio::NodeProtocolKinds::DIRECTORY,

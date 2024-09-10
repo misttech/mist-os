@@ -26,9 +26,9 @@ pub const METADATA_KEY: [u8; 32] = [
 /// It is intended for use only in test code where actual security is inconsequential.
 #[derive(Default)]
 pub struct InsecureCrypt {
-    ciphers: HashMap<u64, Aes256GcmSiv>,
-    active_data_key: Option<u64>,
-    active_metadata_key: Option<u64>,
+    ciphers: HashMap<u128, Aes256GcmSiv>,
+    active_data_key: Option<u128>,
+    active_metadata_key: Option<u128>,
     shutdown: AtomicBool,
 }
 impl InsecureCrypt {

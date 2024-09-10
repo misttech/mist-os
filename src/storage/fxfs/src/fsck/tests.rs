@@ -1053,7 +1053,7 @@ async fn test_children_on_file() {
             &fs,
             store.as_ref(),
             vec![Item::new(
-                ObjectKey::child(object_id, "foo"),
+                ObjectKey::child(object_id, "foo", false),
                 ObjectValue::Child(ChildValue {
                     object_id,
                     object_descriptor: ObjectDescriptor::File,
@@ -1087,7 +1087,11 @@ async fn test_non_file_marked_as_verified() {
                 Item::new(
                     ObjectKey::object(10),
                     ObjectValue::Object {
-                        kind: ObjectKind::Directory { sub_dirs: 0 },
+                        kind: ObjectKind::Directory {
+                            sub_dirs: 0,
+                            wrapping_key_id: None,
+                            casefold: false,
+                        },
                         attributes: ObjectAttributes { ..Default::default() },
                     },
                 ),
@@ -1414,7 +1418,11 @@ async fn test_tombstoned_attribute_does_not_exist() {
                 Item::new(
                     ObjectKey::object(10),
                     ObjectValue::Object {
-                        kind: ObjectKind::Directory { sub_dirs: 0 },
+                        kind: ObjectKind::Directory {
+                            sub_dirs: 0,
+                            wrapping_key_id: None,
+                            casefold: false,
+                        },
                         attributes: ObjectAttributes { ..Default::default() },
                     },
                 ),
