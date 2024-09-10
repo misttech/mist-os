@@ -61,8 +61,8 @@ pub struct FileSystemMountOptions {
     pub root_context: Option<Vec<u8>>,
 }
 
-/// Status information parameter for the [`StatusHolder`] interface.
-pub struct PolicyStatus {
+/// Status information parameter for the [`SeLinuxStatusPublisher`] interface.
+pub struct SeLinuxStatus {
     /// SELinux-wide enforcing vs. permissive mode  bit.
     pub is_enforcing: bool,
     /// Number of times the policy has been changed since SELinux started.
@@ -72,7 +72,7 @@ pub struct PolicyStatus {
 }
 
 /// Interface for security server to interact with selinuxfs status file.
-pub trait StatusHolder: Send {
+pub trait SeLinuxStatusPublisher: Send {
     /// Sets the value part of the associated selinuxfs status file.
-    fn set_value(&mut self, policy_status: PolicyStatus);
+    fn set_status(&mut self, policy_status: SeLinuxStatus);
 }

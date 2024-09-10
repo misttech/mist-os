@@ -25,7 +25,7 @@ use fuchsia_zircon::{self as zx, HandleBased as _};
 use selinux::policy::SUPPORTED_POLICY_VERSION;
 use selinux::SecurityPermission;
 use selinux_core::security_server::SecurityServer;
-use selinux_core::{InitialSid, PolicyStatus, SecurityId, StatusHolder};
+use selinux_core::{InitialSid, SeLinuxStatus, SeLinuxStatusPublisher, SecurityId};
 use starnix_logging::{impossible_error, log_error, log_info, track_stub};
 use starnix_sync::{FileOpsCore, Locked, Unlocked};
 use starnix_uapi::device_type::DeviceType;
@@ -40,14 +40,14 @@ use std::sync::Arc;
 use zerocopy::{AsBytes, NoCell};
 
 /// The version of the SELinux "status" file this implementation implements.
-pub const SELINUX_STATUS_VERSION: u32 = 1;
+const SELINUX_STATUS_VERSION: u32 = 1;
 
 /// Header of the C-style struct exposed via the /sys/fs/selinux/status file,
 /// to userspace. Defined here (instead of imported through bindgen) as selinux
 /// headers are not exposed through  kernel uapi headers.
 #[derive(AsBytes, Copy, Clone, NoCell)]
 #[repr(C, align(4))]
-pub struct SeLinuxStatusHeader {
+struct SeLinuxStatusHeader {
     /// Version number of this structure (1).
     version: u32,
 }
@@ -72,11 +72,11 @@ struct SeLinuxStatusValue {
     deny_unknown: u32,
 }
 
-type SeLinuxStatus = SeqLock<SeLinuxStatusHeader, SeLinuxStatusValue>;
+type StatusSeqLock = SeqLock<SeLinuxStatusHeader, SeLinuxStatusValue>;
 
-impl StatusHolder for SeLinuxStatus {
-    fn set_value(&mut self, policy_status: PolicyStatus) {
-        (self as &mut SeLinuxStatus).set_value(SeLinuxStatusValue {
+impl SeLinuxStatusPublisher for StatusSeqLock {
+    fn set_status(&mut self, policy_status: SeLinuxStatus) {
+        self.set_value(SeLinuxStatusValue {
             enforcing: policy_status.is_enforcing as u32,
             policyload: policy_status.change_count,
             deny_unknown: policy_status.deny_unknown as u32,
@@ -157,7 +157,7 @@ impl SeLinuxFs {
         // The status file needs to be mmap-able, so use a VMO-backed file. When the selinux state
         // changes in the future, the way to update this data (and communicate updates with
         // userspace) is to use the ["seqlock"](https://en.wikipedia.org/wiki/Seqlock) technique.
-        let status_holder = SeLinuxStatus::new_default().map_err(|e| errno!(ENODEV, e))?;
+        let status_holder = StatusSeqLock::new_default().expect("selinuxfs status seqlock");
         let status_file = status_holder
             .get_readonly_vmo()
             .duplicate_handle(zx::Rights::SAME_RIGHTS)
@@ -168,7 +168,7 @@ impl SeLinuxFs {
             MemoryFileNode::from_memory(Arc::new(MemoryObject::from(status_file))),
             mode!(IFREG, 0o444),
         );
-        security_server.set_status_holder(Box::new(status_holder));
+        security_server.set_status_publisher(Box::new(status_holder));
 
         // Write-only files used to configure and query SELinux.
         dir.entry(current_task, "access", AccessApi::new_node(), mode!(IFREG, 0o666));
@@ -828,7 +828,7 @@ mod tests {
         // u32 values.
         const STATUS_T_SIZE: usize = size_of::<u32>() * 5;
 
-        let status_holder = SeLinuxStatus::new_default().unwrap();
+        let status_holder = StatusSeqLock::new_default().unwrap();
         let status_vmo = status_holder.get_readonly_vmo();
 
         // Verify the content and actual size of the structure are as expected.
@@ -879,9 +879,9 @@ mod tests {
     #[fuchsia::test]
     fn status_file_layout() {
         let security_server = SecurityServer::new();
-        let status_holder = SeLinuxStatus::new_default().unwrap();
+        let status_holder = StatusSeqLock::new_default().unwrap();
         let status_vmo = status_holder.get_readonly_vmo();
-        security_server.set_status_holder(Box::new(status_holder));
+        security_server.set_status_publisher(Box::new(status_holder));
         security_server.set_enforcing(false);
         let mut seq_no: u32 = 0;
         with_status_t(&status_vmo, |status| {
@@ -897,6 +897,25 @@ mod tests {
             assert_ne!(status.sequence, seq_no);
             seq_no = status.sequence;
             assert_eq!(seq_no % 2, 0);
+        });
+    }
+
+    #[fuchsia::test]
+    fn status_accurate_directly_following_set_status_publisher() {
+        let security_server = SecurityServer::new();
+        let status_holder = StatusSeqLock::new_default().unwrap();
+        let status_vmo = status_holder.get_readonly_vmo();
+
+        // Ensure a change in status-visible security server state is made before invoking
+        // `set_status_publisher()`.
+        assert_eq!(false, security_server.is_enforcing());
+        security_server.set_enforcing(true);
+
+        security_server.set_status_publisher(Box::new(status_holder));
+        with_status_t(&status_vmo, |status| {
+            // Ensure latest `enforcing` state is reported immediately following
+            // `set_status_publisher()`.
+            assert_eq!(status.enforcing, 1);
         });
     }
 }

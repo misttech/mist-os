@@ -5,8 +5,8 @@
 use crate::access_vector_cache::{Manager as AvcManager, Query, QueryMut};
 use crate::permission_check::PermissionCheck;
 use crate::{
-    FileSystemLabel, FileSystemLabelingScheme, FileSystemMountOptions, PolicyStatus, SecurityId,
-    StatusHolder,
+    FileSystemLabel, FileSystemLabelingScheme, FileSystemMountOptions, SeLinuxStatus,
+    SeLinuxStatusPublisher, SecurityId,
 };
 
 use anyhow::Context as _;
@@ -84,7 +84,7 @@ struct SecurityServerState {
     booleans: SeLinuxBooleans,
 
     /// Write-only interface to the data stored in the selinuxfs status file.
-    status: Option<Box<dyn StatusHolder>>,
+    status_publisher: Option<Box<dyn SeLinuxStatusPublisher>>,
 
     /// True if hooks should enforce policy-based access decisions.
     enforcing: bool,
@@ -160,7 +160,7 @@ impl SecurityServer {
             next_sid: NonZeroU32::new(FIRST_UNUSED_SID).unwrap(),
             policy: None,
             booleans: SeLinuxBooleans::default(),
-            status: None,
+            status_publisher: None,
             enforcing: false,
             policy_change_count: 0,
         });
@@ -216,7 +216,7 @@ impl SecurityServer {
         // parsed policy is not valid.
         let policy = Arc::new(LoadedPolicy { parsed, binary });
 
-        // Replace any existing policy and update the status value in `state.status`.
+        // Replace any existing policy and push update to `state.status_publisher`.
         self.with_state_and_update_status(|state| {
             // Remap any existing Security Contexts to use Ids defined by the new policy.
             // TODO(b/330677360): Replace serialize/parse with an efficient implementation.
@@ -518,9 +518,17 @@ impl SecurityServer {
             .map_or(false, |policy| policy.parsed.is_bounded_by(bounded_type, parent_type))
     }
 
-    pub fn set_status_holder(&self, status_holder: Box<dyn StatusHolder>) {
-        let mut state = self.state.lock();
-        state.status = Some(status_holder);
+    /// Assign a [`SeLinuxStatusPublisher`] to be used for pushing updates to the security server's
+    /// policy status. This should be invoked exactly once when `selinuxfs` is initialized.
+    ///
+    /// # Panics
+    ///
+    /// This will panic on debug builds if it is invoked multiple times.
+    pub fn set_status_publisher(&self, status_holder: Box<dyn SeLinuxStatusPublisher>) {
+        self.with_state_and_update_status(|state| {
+            assert!(state.status_publisher.is_none());
+            state.status_publisher = Some(status_holder);
+        });
     }
 
     /// Returns a reference to the shared access vector cache that delebates cache misses to `self`.
@@ -536,17 +544,17 @@ impl SecurityServer {
     }
 
     /// Runs the supplied function with locked `self`, and then updates the SELinux status file
-    /// associated with `self.state.status`, if any.
+    /// associated with `self.state.status_publisher`, if any.
     fn with_state_and_update_status(&self, f: impl FnOnce(&mut SecurityServerState)) {
         let mut state = self.state.lock();
         f(state.deref_mut());
-        let new_value = PolicyStatus {
+        let new_value = SeLinuxStatus {
             is_enforcing: state.enforcing,
             change_count: state.policy_change_count,
             deny_unknown: state.deny_unknown(),
         };
-        if let Some(ref mut status) = &mut state.status {
-            status.set_value(new_value);
+        if let Some(status_publisher) = &mut state.status_publisher {
+            status_publisher.set_status(new_value);
         }
     }
 }
