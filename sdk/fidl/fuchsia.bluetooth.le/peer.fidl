@@ -90,14 +90,14 @@ type Peer = table {
 /// This lifetime of this capability is tied to that of the LE connection it represents. Closing the
 /// channel results in a disconnection if no other clients hold a Connection to the same peer.
 closed protocol Connection {
-    @available(added=HEAD)
+    @available(added=NEXT)
     compose CodecDelay;
     // Bind the server end of a `fuchsia.bluetooth.gatt2/Client` corresponding to the connected
     // peer.
     /// The following epitaphs may be sent by the server on error:
     /// + `ZX_ERR_ALREADY_BOUND`: A Client server has already been bound in this Connection
     ///                           protocol. The existing Client should be used.
-    @available(added=HEAD)
+    @available(added=NEXT)
     strict RequestGattClient(resource struct {
         client server_end:gatt2.Client;
     });
@@ -116,7 +116,7 @@ closed protocol Connection {
     ///
     /// If we are already waiting for another connection with the same combination of CIG/CIS
     /// values, connection_stream will be closed with a ZX_ERR_INVALID_ARGS epitaph.
-    @available(added=HEAD)
+    @available(added=NEXT)
     strict AcceptCis(resource table {
         /// Identifier of the CIG that contains the requested CIS. Required.
         1: cig_id uint8;
@@ -134,7 +134,7 @@ closed protocol Connection {
     });
 
     /// Connect to an L2CAP LE connection-oriented channel.
-    @available(added=HEAD)
+    @available(added=NEXT)
     strict ConnectL2cap(resource table {
         /// Parameters for the local side of the channel.
         1: parameters bt.ChannelParameters;

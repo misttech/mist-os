@@ -9,7 +9,7 @@ using zx;
 
 /// This protocol allows us to retrieve controller local delay values. It is not intended to be
 /// used stand-alone, but to be composed into protocols that need access to this information.
-@available(added=HEAD)
+@available(added=NEXT)
 closed protocol CodecDelay {
     /// Retrieve the range of controller delay for the codec specified with the provided stream
     /// attributes.

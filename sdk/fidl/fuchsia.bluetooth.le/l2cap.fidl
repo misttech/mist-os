@@ -10,7 +10,7 @@ using zx;
 /// connections.
 ///
 /// See [`ChannelListenerRegistry/ListenL2cap`].
-@available(added=HEAD)
+@available(added=NEXT)
 type AcceptedChannelParameters = table {
     /// All channel modes that should be accepted while listening. Must contain
     /// at least one channel mode or the call will fail with
@@ -29,7 +29,7 @@ type AcceptedChannelParameters = table {
 /// channel requests, but existing established channels will not be affected.
 /// Additionally, once this protocol is closed the implementation is free to
 /// reuse the PSM that was previously assigned for this instance.
-@available(added=HEAD)
+@available(added=NEXT)
 open protocol ChannelListener {
     flexible Accept(resource struct {
         channel client_end:bt.Channel;
@@ -39,12 +39,12 @@ open protocol ChannelListener {
 /// An identifier for a service that accepts connection-oriented channel
 /// connections. Referred to as a (simplified) protocol/service multiplexer
 /// in the Bluetooth specification.
-@available(added=HEAD)
+@available(added=NEXT)
 alias Psm = uint16;
 
 /// Represents the ability to register and accept incoming connections on
 /// connection oriented channels.
-@available(added=HEAD)
+@available(added=NEXT)
 closed protocol ChannelListenerRegistry {
     /// Register a listener for incoming channels. The registry will assign a
     /// PSM value that is unique for the local device, as well as open a

@@ -464,6 +464,39 @@
         "name": "fuchsia.bluetooth/Channel_Receive_Response"
     },
     {
+        "kind": "table/member",
+        "name": "fuchsia.bluetooth/CodecAttributes.codec_configuration",
+        "ordinal": "2",
+        "type": "vector<uint8>"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.bluetooth/CodecAttributes.codec_id",
+        "ordinal": "1",
+        "type": "fuchsia.bluetooth/CodecId"
+    },
+    {
+        "kind": "table",
+        "name": "fuchsia.bluetooth/CodecAttributes"
+    },
+    {
+        "kind": "union/member",
+        "name": "fuchsia.bluetooth/CodecId.assigned_format",
+        "ordinal": "1",
+        "type": "fuchsia.bluetooth/AssignedCodingFormat"
+    },
+    {
+        "kind": "union/member",
+        "name": "fuchsia.bluetooth/CodecId.vendor_format",
+        "ordinal": "2",
+        "type": "fuchsia.bluetooth/VendorCodingFormat"
+    },
+    {
+        "kind": "union",
+        "name": "fuchsia.bluetooth/CodecId",
+        "strictness": "flexible"
+    },
+    {
         "kind": "enum/member",
         "name": "fuchsia.bluetooth/ConnectionRole.FOLLOWER",
         "value": "2"
@@ -478,6 +511,22 @@
         "name": "fuchsia.bluetooth/ConnectionRole",
         "strictness": "strict",
         "type": "uint32"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.bluetooth/DataDirection.INPUT",
+        "value": "1"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.bluetooth/DataDirection.OUTPUT",
+        "value": "2"
+    },
+    {
+        "kind": "enum",
+        "name": "fuchsia.bluetooth/DataDirection",
+        "strictness": "strict",
+        "type": "uint8"
     },
     {
         "kind": "struct/member",
@@ -596,6 +645,22 @@
     {
         "kind": "struct",
         "name": "fuchsia.bluetooth/Int8"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.bluetooth/LogicalTransportType.LE_BIS",
+        "value": "2"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.bluetooth/LogicalTransportType.LE_CIS",
+        "value": "1"
+    },
+    {
+        "kind": "enum",
+        "name": "fuchsia.bluetooth/LogicalTransportType",
+        "strictness": "flexible",
+        "type": "uint8"
     },
     {
         "kind": "const",
@@ -746,6 +811,22 @@
     {
         "kind": "struct",
         "name": "fuchsia.bluetooth/Uuid"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.bluetooth/VendorCodingFormat.company_id",
+        "ordinal": "1",
+        "type": "uint16"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.bluetooth/VendorCodingFormat.vendor_id",
+        "ordinal": "2",
+        "type": "uint16"
+    },
+    {
+        "kind": "table",
+        "name": "fuchsia.bluetooth/VendorCodingFormat"
     },
     {
         "kind": "library",
