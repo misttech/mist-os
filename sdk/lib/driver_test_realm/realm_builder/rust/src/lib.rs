@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use anyhow::{Context as _, Result};
-use fidl::endpoints::{DiscoverableProtocolMarker, ServiceMarker};
 use fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route};
 use {
     fidl_fuchsia_component_test as ftest, fidl_fuchsia_driver_test as fdt, fidl_fuchsia_io as fio,
@@ -23,18 +22,23 @@ pub trait DriverTestRealmBuilder {
     /// This configures proper input/output routing of capabilities.
     async fn driver_test_realm_setup(&self) -> Result<&Self>;
 
-    async fn driver_test_realm_add_expose<S: ServiceMarker>(&self) -> Result<&Self>;
-
+    /// For use in conjunction with `fuchsia.driver.test.RealmArgs/dtr_exposes` defined in
+    /// `sdk/fidl/fuchsia.driver.test/realm.fidl`.
+    /// Whenever a dtr_exposes is going to be provided to the RealmArgs, the user MUST call this
+    /// function with a reference to the same dtr_exposes vector it intends to use. This will
+    /// setup the necessary expose declarations inside the driver test realm and add the necessary
+    /// realm_builder routes to support it.
     async fn driver_test_realm_add_dtr_exposes(
         &self,
         dtr_exposes: &Vec<ftest::Capability>,
     ) -> Result<&Self>;
 
-    async fn driver_test_realm_add_offer<P: DiscoverableProtocolMarker>(
-        &self,
-        from: Ref,
-    ) -> Result<&Self>;
-
+    /// For use in conjunction with `fuchsia.driver.test.RealmArgs/dtr_offers` defined in
+    /// `sdk/fidl/fuchsia.driver.test/realm.fidl`.
+    /// Whenever a dtr_offers is going to be provided to the RealmArgs, the user MUST call this
+    /// function with a reference to the same dtr_offers vector it intends to use. This will
+    /// setup the necessary offers declarations inside the driver test realm and add the necessary
+    /// realm_builder routes to support it.
     async fn driver_test_realm_add_dtr_offers(
         &self,
         dtr_offers: &Vec<ftest::Capability>,
@@ -90,31 +94,6 @@ impl DriverTestRealmBuilder for RealmBuilder {
         self.driver_test_realm_manifest_setup(DRIVER_TEST_REALM_URL).await
     }
 
-    async fn driver_test_realm_add_expose<S: ServiceMarker>(&self) -> Result<&Self> {
-        let mut decl = self.get_component_decl(COMPONENT_NAME).await?;
-        decl.capabilities.push(cm_rust::CapabilityDecl::Service(cm_rust::ServiceDecl {
-            name: S::SERVICE_NAME.parse().expect("service name is not a valid capability name"),
-            source_path: Some(("/svc/".to_owned() + S::SERVICE_NAME).parse().unwrap()),
-        }));
-        decl.exposes.push(cm_rust::ExposeDecl::Service(cm_rust::ExposeServiceDecl {
-            source: cm_rust::ExposeSource::Self_,
-            source_name: S::SERVICE_NAME.parse().unwrap(),
-            source_dictionary: Default::default(),
-            target_name: S::SERVICE_NAME.parse().unwrap(),
-            target: cm_rust::ExposeTarget::Parent,
-            availability: cm_rust::Availability::Required,
-        }));
-        self.replace_component_decl(COMPONENT_NAME, decl).await?;
-        self.add_route(
-            Route::new()
-                .capability(Capability::service::<S>())
-                .from(Ref::child(COMPONENT_NAME))
-                .to(Ref::parent()),
-        )
-        .await?;
-        Ok(&self)
-    }
-
     async fn driver_test_realm_add_dtr_exposes(
         &self,
         dtr_exposes: &Vec<ftest::Capability>,
@@ -160,31 +139,6 @@ impl DriverTestRealmBuilder for RealmBuilder {
             .await?;
         }
 
-        Ok(&self)
-    }
-
-    async fn driver_test_realm_add_offer<P: DiscoverableProtocolMarker>(
-        &self,
-        from: Ref,
-    ) -> Result<&Self> {
-        let mut decl = self.get_component_decl(COMPONENT_NAME).await?;
-        decl.offers.push(cm_rust::OfferDecl::Protocol(cm_rust::OfferProtocolDecl {
-            source: cm_rust::OfferSource::Parent,
-            source_name: P::PROTOCOL_NAME.parse().unwrap(),
-            source_dictionary: Default::default(),
-            target_name: P::PROTOCOL_NAME.parse().unwrap(),
-            target: cm_rust::OfferTarget::Collection("realm_builder".parse().unwrap()),
-            dependency_type: cm_rust::DependencyType::Strong,
-            availability: cm_rust::Availability::Required,
-        }));
-        self.replace_component_decl(COMPONENT_NAME, decl).await?;
-        self.add_route(
-            Route::new()
-                .capability(Capability::protocol::<P>())
-                .from(from)
-                .to(Ref::child(COMPONENT_NAME)),
-        )
-        .await?;
         Ok(&self)
     }
 

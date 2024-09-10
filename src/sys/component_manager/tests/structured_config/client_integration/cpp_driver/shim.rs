@@ -49,17 +49,16 @@ async fn main() -> anyhow::Result<()> {
     // Create the RealmBuilder and start the driver.
     let builder = RealmBuilder::new().await?;
     builder.driver_test_realm_setup().await?;
-    builder.driver_test_realm_add_expose::<scrs::ConfigServiceMarker>().await?;
-    let realm = builder.build().await?;
 
-    let exposes = vec![fdt::Expose {
-        service_name: scrs::ConfigServiceMarker::SERVICE_NAME.to_string(),
-        collection: fdt::Collection::PackageDrivers,
-    }];
+    let expose = fuchsia_component_test::Capability::service::<scrs::ConfigServiceMarker>().into();
+    let dtr_exposes = vec![expose];
+
+    builder.driver_test_realm_add_dtr_exposes(&dtr_exposes).await?;
+    let realm = builder.build().await?;
 
     let args = fdt::RealmArgs {
         root_driver: Some("#meta/cpp_driver_receiver.cm".to_string()),
-        exposes: Some(exposes),
+        dtr_exposes: Some(dtr_exposes),
         ..Default::default()
     };
     info!("about to start driver test realm");
