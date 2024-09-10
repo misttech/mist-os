@@ -94,6 +94,10 @@ int Nelson::Thread() {
   }
   clock_init_steps_.clear();
 
+  if ((status = TouchInit()) != ZX_OK) {
+    zxlogf(ERROR, "TouchInit failed: %d", status);
+  }
+
   // GpioInit() must be called after other subsystems that bind to GPIO have had a chance to add
   // their init steps.
   if ((status = GpioInit()) != ZX_OK) {
@@ -121,10 +125,6 @@ int Nelson::Thread() {
 
   if ((status = UsbInit()) != ZX_OK) {
     zxlogf(ERROR, "UsbInit failed: %d", status);
-  }
-
-  if ((status = TouchInit()) != ZX_OK) {
-    zxlogf(ERROR, "TouchInit failed: %d", status);
   }
 
   if ((status = CanvasInit()) != ZX_OK) {
