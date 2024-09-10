@@ -8,6 +8,7 @@
 #include <lib/syslog/cpp/log_settings.h>
 #include <lib/syslog/cpp/macros.h>
 
+#include <bind/fuchsia/platform/cpp/bind.h>
 #include <src/lib/files/file.h>
 #include <src/lib/fsl/vmo/file.h>
 #include <src/lib/fsl/vmo/sized_vmo.h>
@@ -54,6 +55,10 @@ int main() {
   auto wire_result =
       client->Start(fuchsia_driver_test::wire::RealmArgs::Builder(arena)
                         .root_driver("fuchsia-boot:///platform-bus#meta/platform-bus.cm")
+                        .software_devices(std::vector{fuchsia_driver_test::wire::SoftwareDevice{
+                            .device_name = "ram-disk",
+                            .device_id = bind_fuchsia_platform::BIND_PLATFORM_DEV_DID_RAM_DISK,
+                        }})
                         .Build());
   if (wire_result.status() != ZX_OK) {
     FX_LOG_KV(ERROR, "Failed to call to Realm:Start", FX_KV("status", wire_result.status()));

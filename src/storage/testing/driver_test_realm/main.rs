@@ -29,6 +29,16 @@ async fn main() -> Result<()> {
         .driver_test_realm_start(fdt::RealmArgs {
             root_driver: Some("fuchsia-boot:///platform-bus#meta/platform-bus.cm".to_owned()),
             dtr_exposes: Some(dtr_exposes),
+            software_devices: Some(vec![
+                fidl_fuchsia_driver_test::SoftwareDevice {
+                    device_name: "ram-disk".to_string(),
+                    device_id: bind_fuchsia_platform::BIND_PLATFORM_DEV_DID_RAM_DISK,
+                },
+                fidl_fuchsia_driver_test::SoftwareDevice {
+                    device_name: "ram-nand".to_string(),
+                    device_id: bind_fuchsia_platform::BIND_PLATFORM_DEV_DID_RAM_NAND,
+                },
+            ]),
             ..Default::default()
         })
         .await?;

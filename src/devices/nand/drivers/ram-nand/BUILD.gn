@@ -88,6 +88,7 @@ test("test") {
     "//sdk/lib/device-watcher/cpp",
     "//sdk/lib/driver_test_realm:static",
     "//sdk/lib/fdio",
+    "//src/devices/bind/fuchsia.platform:fuchsia.platform_cpp",
     "//src/devices/testing/mock-ddk",
     "//src/lib/ddk",
     "//src/lib/ddk:ddk-metadata-headers",

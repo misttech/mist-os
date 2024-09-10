@@ -20,6 +20,7 @@
 
 #include <utility>
 
+#include <bind/fuchsia/platform/cpp/bind.h>
 #include <fbl/unique_fd.h>
 #include <gtest/gtest.h>
 
@@ -170,6 +171,12 @@ void HermeticAudioRealm::Create(Options options, async_dispatcher* dispatcher,
   ASSERT_EQ(ZX_OK, realm.component().Connect(driver_test_realm.NewRequest()));
   fuchsia::driver::test::RealmArgs realm_args;
   realm_args.set_root_driver("fuchsia-boot:///platform-bus#meta/platform-bus.cm");
+  realm_args.set_software_devices(std::vector{
+      fuchsia::driver::test::SoftwareDevice{
+          .device_name = "virtual-audio",
+          .device_id = bind_fuchsia_platform::BIND_PLATFORM_DEV_DID_VIRTUAL_AUDIO,
+      },
+  });
 
   fuchsia::driver::test::Realm_Start_Result realm_result;
   ASSERT_EQ(ZX_OK, driver_test_realm->Start(std::move(realm_args), &realm_result));

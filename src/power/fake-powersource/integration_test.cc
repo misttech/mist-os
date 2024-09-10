@@ -11,6 +11,8 @@
 #include <lib/sys/component/cpp/testing/realm_builder_types.h>
 #include <lib/syslog/cpp/macros.h>
 
+#include <bind/fuchsia/platform/cpp/bind.h>
+
 #include "src/lib/testing/loop_fixture/test_loop_fixture.h"
 
 using fuchsia_hardware_powersource::wire::PowerType;
@@ -30,6 +32,8 @@ class FakeBatteryRealmTest : public gtest::TestLoopFixture {
     zx::result dtr = realm_->component().Connect<fuchsia_driver_test::Realm>();
     fuchsia_driver_test::RealmArgs args{{
         .root_driver = "fuchsia-boot:///platform-bus#meta/platform-bus.cm",
+        .software_devices = std::vector{fuchsia_driver_test::SoftwareDevice(
+            "fake-battery", bind_fuchsia_platform::BIND_PLATFORM_DEV_DID_FAKE_BATTERY)},
     }};
     fidl::Result result = fidl::Call(*dtr)->Start(std::move(args));
     ASSERT_TRUE(result.is_ok()) << result.error_value();

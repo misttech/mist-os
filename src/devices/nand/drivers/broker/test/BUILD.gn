@@ -24,6 +24,7 @@ source_set("common") {
     "//sdk/lib/device-watcher/cpp",
     "//sdk/lib/driver_test_realm:static",
     "//sdk/lib/fdio",
+    "//src/devices/bind/fuchsia.platform:fuchsia.platform_cpp",
     "//src/storage/lib/ramdevice_client/cpp",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/fdio-caller",

@@ -24,6 +24,7 @@ executable("bin") {
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/device-watcher/cpp",
     "//sdk/lib/syslog/cpp",
+    "//src/devices/bind/fuchsia.platform:fuchsia.platform_cpp",
     "//src/lib/files:files",
     "//src/lib/fsl",
     "//src/storage/lib/block_client/cpp",

@@ -9,6 +9,7 @@
 #include <zircon/hw/gpt.h>
 #include <zircon/status.h>
 
+#include <bind/fuchsia/platform/cpp/bind.h>
 #include <zxtest/zxtest.h>
 
 #include "parent.h"
@@ -62,6 +63,12 @@ int main(int argc, char** argv) {
   const fidl::WireResult result =
       client->Start(fuchsia_driver_test::wire::RealmArgs::Builder(arena)
                         .root_driver("fuchsia-boot:///platform-bus#meta/platform-bus.cm")
+                        .software_devices(std::vector{
+                            fuchsia_driver_test::wire::SoftwareDevice{
+                                .device_name = "ram-nand",
+                                .device_id = bind_fuchsia_platform::BIND_PLATFORM_DEV_DID_RAM_NAND,
+                            },
+                        })
                         .Build());
   if (!result.ok()) {
     fprintf(stderr, "Failed to call to Realm::Start: %s\n", result.FormatDescription().c_str());

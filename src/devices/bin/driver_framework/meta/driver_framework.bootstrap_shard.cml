@@ -46,6 +46,39 @@
             allow_long_names: true,
         },
     ],
+    capabilities: [
+        {
+            config: "fuchsia.platform.bus.SoftwareDeviceNames",
+            type: "vector",
+            element: {
+                type: "string",
+                max_size: 100,
+            },
+            max_count: 20,
+            value: [
+                "ram-disk",
+                "ram-nand",
+                "virtual-audio",
+                "bt-hci-emulator",
+                "fake-battery",
+                "fake-ac",
+            ],
+        },
+        {
+            config: "fuchsia.platform.bus.SoftwareDeviceIds",
+            type: "vector",
+            element: { type: "uint32" },
+            max_count: 20,
+            value: [
+                45, // PDEV_DID_RAM_DISK
+                46, // PDEV_DID_RAM_NAND
+                47, // PDEV_DID_VIRTUAL_AUDIO
+                48, // PDEV_DID_BT_HCI_EMULATOR
+                51, // PDEV_DID_FAKE_BATTERY
+                55, // PDEV_DID_FAKE_AC
+            ],
+        },
+    ],
     offer: [
         {
             from: "parent",
@@ -83,6 +116,14 @@
                 "fuchsia.driver.UseHardwareIommu",
                 "fuchsia.power.SuspendEnabled",
                 "fuchsia.usb.PeripheralConfig.Functions",
+            ],
+        },
+        {
+            from: "self",
+            to: "#boot-drivers",
+            config: [
+                "fuchsia.platform.bus.SoftwareDeviceIds",
+                "fuchsia.platform.bus.SoftwareDeviceNames",
             ],
         },
         {

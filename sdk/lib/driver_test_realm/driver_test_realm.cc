@@ -610,6 +610,39 @@ class DriverTestRealm final : public fidl::Server<fuchsia_driver_test::Realm> {
         .targets = {component_testing::ChildRef{"driver_manager"}},
     });
 
+    // Set platform bus config based on request.
+    configurations = std::vector<component_testing::ConfigCapability>();
+    component_testing::Ref source;
+    if (request.args().software_devices()) {
+      source = component_testing::SelfRef();
+      std::vector<std::string> device_names;
+      std::vector<uint32_t> device_ids;
+      for (const auto& device : *request.args().software_devices()) {
+        device_names.push_back(device.device_name());
+        device_ids.push_back(device.device_id());
+      }
+      configurations.push_back({
+          .name = "fuchsia.platform.bus.SoftwareDeviceNames",
+          .value = ConfigValue(device_names),
+      });
+      configurations.push_back({
+          .name = "fuchsia.platform.bus.SoftwareDeviceIds",
+          .value = ConfigValue(device_ids),
+      });
+    } else {
+      source = component_testing::VoidRef();
+    }
+    realm_builder_.AddConfiguration(std::move(configurations));
+    realm_builder_.AddRoute({
+        .capabilities =
+            {
+                component_testing::Config{.name = "fuchsia.platform.bus.SoftwareDeviceNames"},
+                component_testing::Config{.name = "fuchsia.platform.bus.SoftwareDeviceIds"},
+            },
+        .source = source,
+        .targets = {component_testing::CollectionRef{"boot-drivers"}},
+    });
+
     realm_ = realm_builder_.SetRealmName("0").Build(dispatcher_);
 
     // Forward exposes.

@@ -29,6 +29,7 @@
 #include <fbl/auto_lock.h>
 
 #include "src/devices/bus/drivers/platform/node-util.h"
+#include "src/devices/bus/drivers/platform/platform_bus_config.h"
 
 namespace {
 // Adds a passthrough device which forwards all banjo connections to the parent device.
@@ -789,55 +790,30 @@ void PlatformBus::DdkInit(ddk::InitTxn txn) {
       return txn.Reply(status);
     }
   }
-  fuchsia_hardware_platform_bus::Node device = {};
-  device.name() = "ram-disk";
-  device.vid() = PDEV_VID_GENERIC;
-  device.pid() = PDEV_PID_GENERIC;
-  device.did() = PDEV_DID_RAM_DISK;
-  auto status = NodeAddInternal(device);
-  if (status.is_error()) {
-    return txn.Reply(status.error_value());
-  }
-  device.name() = "ram-nand";
-  device.vid() = PDEV_VID_GENERIC;
-  device.pid() = PDEV_PID_GENERIC;
-  device.did() = PDEV_DID_RAM_NAND;
-  status = NodeAddInternal(device);
-  if (status.is_error()) {
-    return txn.Reply(status.error_value());
-  }
-  device.name() = "virtual-audio";
-  device.vid() = PDEV_VID_GENERIC;
-  device.pid() = PDEV_PID_GENERIC;
-  device.did() = PDEV_DID_VIRTUAL_AUDIO;
-  status = NodeAddInternal(device);
-  if (status.is_error()) {
-    return txn.Reply(status.error_value());
-  }
-  device.name() = "bt-hci-emulator";
-  device.vid() = PDEV_VID_GENERIC;
-  device.pid() = PDEV_PID_GENERIC;
-  device.did() = PDEV_DID_BT_HCI_EMULATOR;
-  status = NodeAddInternal(device);
-  if (status.is_error()) {
-    return txn.Reply(status.error_value());
+  zx::vmo config_vmo;
+  {
+    zx_status_t status = device_get_config_vmo(zxdev(), config_vmo.reset_and_get_address());
+    if (status != ZX_OK) {
+      return txn.Reply(status);
+    }
   }
 
-  device.name() = "fake-battery";
-  device.vid() = PDEV_VID_GENERIC;
-  device.pid() = PDEV_PID_GENERIC;
-  device.did() = PDEV_DID_FAKE_BATTERY;
-  status = NodeAddInternal(device);
-  if (status.is_error()) {
-    return txn.Reply(status.error_value());
+  auto config = platform_bus_config::Config::CreateFromVmo(std::move(config_vmo));
+  if (config.software_device_ids().size() != config.software_device_names().size()) {
+    zxlogf(ERROR,
+           "Invalid config. software_device_ids and software_device_names must have same length");
+    return txn.Reply(ZX_ERR_INVALID_ARGS);
   }
-  device.name() = "fake-ac";
-  device.vid() = PDEV_VID_GENERIC;
-  device.pid() = PDEV_PID_GENERIC;
-  device.did() = PDEV_DID_FAKE_AC;
-  status = NodeAddInternal(device);
-  if (status.is_error()) {
-    return txn.Reply(status.error_value());
+  for (size_t i = 0; i < config.software_device_ids().size(); i++) {
+    fuchsia_hardware_platform_bus::Node device = {};
+    device.name() = config.software_device_names()[i];
+    device.vid() = PDEV_VID_GENERIC;
+    device.pid() = PDEV_PID_GENERIC;
+    device.did() = config.software_device_ids()[i];
+    auto status = NodeAddInternal(device);
+    if (status.is_error()) {
+      return txn.Reply(status.error_value());
+    }
   }
 
   return txn.Reply(ZX_OK);  // This will make the device visible and able to be unbound.

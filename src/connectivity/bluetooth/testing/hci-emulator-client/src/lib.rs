@@ -255,6 +255,11 @@ mod tests {
         let realm = realm.build().await.expect("failed to build realm");
         let args = fdt::RealmArgs {
             root_driver: Some("fuchsia-boot:///platform-bus#meta/platform-bus.cm".to_string()),
+            software_devices: Some(vec![fidl_fuchsia_driver_test::SoftwareDevice {
+                device_name: "bt-hci-emulator".to_string(),
+                device_id: 48,
+            }]),
+
             ..Default::default()
         };
         realm.driver_test_realm_start(args).await.expect("driver test realm start");

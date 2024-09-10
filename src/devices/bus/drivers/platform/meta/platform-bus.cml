@@ -20,6 +20,27 @@
     ],
     use: [
         {
+            config: "fuchsia.platform.bus.SoftwareDeviceNames",
+            key: "software_device_names",
+            type: "vector",
+            max_count: 20,
+            element: {
+                type: "string",
+                max_size: 100,
+            },
+            availability: "optional",
+            default: [],
+        },
+        {
+            config: "fuchsia.platform.bus.SoftwareDeviceIds",
+            key: "software_device_ids",
+            type: "vector",
+            max_count: 20,
+            element: { type: "uint32" },
+            availability: "optional",
+            default: [],
+        },
+        {
             protocol: [
                 "fuchsia.boot.Items",
                 "fuchsia.device.manager.SystemStateTransition",
