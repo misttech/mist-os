@@ -611,7 +611,7 @@ pub enum Ipv6PresentAddressStatus {
 }
 
 /// An extension trait providing IP layer properties.
-pub trait IpLayerIpExt: IpExt + MulticastRouteIpExt {
+pub trait IpLayerIpExt: IpExt + MulticastRouteIpExt + IcmpHandlerIpExt {
     /// IP Address status.
     type AddressStatus: Debug;
     /// IP Address state.
@@ -1296,10 +1296,7 @@ pub trait IpTransportDispatchContext<I: IpLayerIpExt, BC>: DeviceIdContext<AnyDe
 }
 
 /// A marker trait for all the contexts required for IP ingress.
-pub trait IpLayerIngressContext<
-    I: IpLayerIpExt + IcmpHandlerIpExt,
-    BC: IpLayerBindingsContext<I, Self::DeviceId>,
->:
+pub trait IpLayerIngressContext<I: IpLayerIpExt, BC: IpLayerBindingsContext<I, Self::DeviceId>>:
     IpTransportDispatchContext<I, BC, DeviceId: filter::InterfaceProperties<BC::DeviceClass>>
     + IpDeviceStateContext<I>
     + IpDeviceSendContext<I, BC>
@@ -1312,7 +1309,7 @@ pub trait IpLayerIngressContext<
 }
 
 impl<
-        I: IpLayerIpExt + IcmpHandlerIpExt,
+        I: IpLayerIpExt,
         BC: IpLayerBindingsContext<I, CC::DeviceId>,
         CC: IpTransportDispatchContext<
                 I,
@@ -2121,7 +2118,7 @@ fn dispatch_receive_ipv6_packet<
 /// determination of how to forward. This is advantageous because forwarding
 /// requires the underlying packet buffer, which cannot be "moved" in certain
 /// contexts.
-struct IpPacketForwarder<'a, I: IpLayerIpExt + IcmpHandlerIpExt, D, BT: FilterBindingsTypes> {
+struct IpPacketForwarder<'a, I: IpLayerIpExt, D, BT: FilterBindingsTypes> {
     inbound_device: &'a D,
     outbound_device: &'a D,
     packet_meta: IpLayerPacketMetadata<I, BT>,
@@ -2135,7 +2132,7 @@ struct IpPacketForwarder<'a, I: IpLayerIpExt + IcmpHandlerIpExt, D, BT: FilterBi
 
 impl<'a, I, D, BC> IpPacketForwarder<'a, I, D, BC>
 where
-    I: IpLayerIpExt + IcmpHandlerIpExt,
+    I: IpLayerIpExt,
     BC: IpLayerBindingsContext<I, D>,
 {
     // Forward the provided buffer as specified by this [`IpPacketForwarder`].
@@ -2217,7 +2214,7 @@ where
 }
 
 /// The action to take for a packet that was a candidate for forwarding.
-enum ForwardingAction<'a, I: IpLayerIpExt + IcmpHandlerIpExt, D, BT: FilterBindingsTypes> {
+enum ForwardingAction<'a, I: IpLayerIpExt, D, BT: FilterBindingsTypes> {
     /// Drop the packet without forwarding it or generating an ICMP error.
     SilentlyDrop,
     /// Forward the packet, as specified by the [`IpPacketForwarder`].
@@ -2229,7 +2226,7 @@ enum ForwardingAction<'a, I: IpLayerIpExt + IcmpHandlerIpExt, D, BT: FilterBindi
 
 impl<'a, I, D, BC> ForwardingAction<'a, I, D, BC>
 where
-    I: IpLayerIpExt + IcmpHandlerIpExt,
+    I: IpLayerIpExt,
     BC: IpLayerBindingsContext<I, D>,
 {
     /// Perform the action prescribed by self, with the provided packet buffer.
@@ -2264,7 +2261,7 @@ fn determine_ip_packet_forwarding_action<'a, 'b, I, BC, CC, B>(
     dst_ip: SpecifiedAddr<I::Addr>,
 ) -> ForwardingAction<'b, I, CC::DeviceId, BC>
 where
-    I: IpLayerIpExt + IcmpHandlerIpExt,
+    I: IpLayerIpExt,
     BC: IpLayerBindingsContext<I, CC::DeviceId>,
     CC: IpLayerIngressContext<I, BC> + CounterContext<IpCounters<I>>,
     B: BufferMut,
@@ -2495,7 +2492,7 @@ fn process_fragment<'a, I, CC, BC>(
     packet: I::Packet<&'a mut [u8]>,
 ) -> ProcessFragmentResult<'a, I>
 where
-    I: IpLayerIpExt + IcmpHandlerIpExt,
+    I: IpLayerIpExt,
     for<'b> I::Packet<&'b mut [u8]>: FragmentablePacket,
     CC: IpLayerIngressContext<I, BC> + CounterContext<IpCounters<I>>,
     BC: IpLayerBindingsContext<I, CC::DeviceId>,
