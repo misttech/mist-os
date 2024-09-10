@@ -17,10 +17,10 @@
 namespace forensics::feedback {
 namespace {
 
-ErrorOrString GetUptime() {
-  const auto uptime = FormatDuration(zx::nsec(zx_clock_get_monotonic()));
+ErrorOrString GetUptime(timekeeper::Clock* clock) {
+  const auto uptime = FormatDuration(zx::duration(clock->Now().to_timespec()));
   if (!uptime) {
-    FX_LOGS(ERROR) << "Got negative uptime from zx_clock_get_monotonic()";
+    FX_LOGS(ERROR) << "Got negative uptime from timekeeper::Clock::Now()";
     return ErrorOrString(Error::kBadValue);
   }
 
@@ -58,7 +58,7 @@ Annotations TimeProvider::Get() {
   }();
 
   return {
-      {kDeviceUptimeKey, GetUptime()},
+      {kDeviceUptimeKey, GetUptime(clock_.get())},
       {kDeviceUtcTimeKey, utc_time},
   };
 }
