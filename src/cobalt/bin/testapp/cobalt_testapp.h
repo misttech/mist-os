@@ -60,7 +60,6 @@ class CobaltTestApp {
   std::unique_ptr<async::Loop> loop_;
   std::unique_ptr<sys::ComponentContext> context_;
   fuchsia::cobalt::ControllerSyncPtr cobalt_controller_;
-  fuchsia::cobalt::SystemDataUpdaterSyncPtr system_data_updater_;
   fuchsia::diagnostics::ArchiveAccessorSyncPtr inspect_archive_;
   CobaltTestAppLogger logger_;
   bool use_network_;

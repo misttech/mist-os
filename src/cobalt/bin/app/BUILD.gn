@@ -59,8 +59,6 @@ source_set("lib") {
     "metric_event_logger_impl.cc",
     "metric_event_logger_impl.h",
     "process_lifecycle_impl.h",
-    "system_data_updater_impl.cc",
-    "system_data_updater_impl.h",
     "user_consent_watcher.cc",
     "user_consent_watcher.h",
     "utils.cc",
@@ -216,7 +214,6 @@ executable("cobalt_app_unittests") {
     "current_channel_provider_test.cc",
     "diagnostics_impl_test.cc",
     "metric_event_logger_impl_test.cc",
-    "system_data_updater_impl_test.cc",
     "user_consent_watcher_test.cc",
   ]
   deps = [

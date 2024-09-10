@@ -221,15 +221,9 @@ fuchsia_fuzzer_component("logger-fuzzer-component") {
   deps = [ "app/fuzzer:logger_fuzzer" ]
 }
 
-fuchsia_fuzzer_component("system-data-updater-fuzzer-component") {
-  manifest = "app/fuzzer/meta/system_data_updater_fuzzer.cml"
-  deps = [ "app/fuzzer:system_data_updater_fuzzer" ]
-}
-
 fuchsia_fuzzer_package("cobalt-fuzzers") {
   cpp_fuzzer_components = [
     ":logger-factory-fuzzer-component",
     ":logger-fuzzer-component",
-    ":system-data-updater-fuzzer-component",
   ]
 }

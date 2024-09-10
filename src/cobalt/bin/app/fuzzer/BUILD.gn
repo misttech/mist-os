@@ -34,21 +34,6 @@ source_set("logger_server_provider") {
   ]
 }
 
-source_set("system_data_updater_server_provider") {
-  testonly = true
-
-  sources = [ "system_data_updater_server_provider.cc" ]
-
-  public_deps = [
-    "//sdk/fidl/fuchsia.cobalt:fuchsia.cobalt_hlcpp",
-    "//sdk/lib/fidl/hlcpp",
-    "//sdk/lib/fidl/hlcpp/fuzzing",
-    "//sdk/lib/sys/cpp",
-    "//src/cobalt/bin/app:lib",
-    "//zircon/system/ulib/inspect",
-  ]
-}
-
 fidl_protocol_fuzzer("logger_factory_fuzzer") {
   fidl = "//sdk/fidl/fuchsia.metrics:fuchsia.metrics"
   protocol = "fuchsia.metrics.MetricEventLoggerFactory"
@@ -59,10 +44,4 @@ fidl_protocol_fuzzer("logger_fuzzer") {
   fidl = "//sdk/fidl/fuchsia.metrics:fuchsia.metrics"
   protocol = "fuchsia.metrics.MetricEventLogger"
   deps = [ ":logger_server_provider" ]
-}
-
-fidl_protocol_fuzzer("system_data_updater_fuzzer") {
-  fidl = "//sdk/fidl/fuchsia.cobalt:fuchsia.cobalt"
-  protocol = "fuchsia.cobalt.SystemDataUpdater"
-  deps = [ ":system_data_updater_server_provider" ]
 }
