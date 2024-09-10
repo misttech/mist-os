@@ -18,7 +18,6 @@ source_set("scenic") {
     "//sdk/fidl/fuchsia.ui.gfx:fuchsia.ui.gfx_hlcpp",
     "//sdk/fidl/fuchsia.ui.input.accessibility:fuchsia.ui.input.accessibility_hlcpp",
     "//sdk/fidl/fuchsia.ui.scenic:fuchsia.ui.scenic_hlcpp",
-    "//sdk/fidl/fuchsia.ui.scenic.internal:fuchsia.ui.scenic.internal_hlcpp",
     "//sdk/lib/fit",
     "//src/lib/fxl",
     "//src/ui/lib/escher",
