@@ -134,7 +134,6 @@ impl SampleMetricBuffer {
 }
 
 /// Diagnostic metrics for a sample.
-// TODO(satsukiu): add support for array properties in derive InspectWritable
 struct SampleMetric {
     /// Node containing the sample metrics.
     _node: Node,
