@@ -8,7 +8,10 @@
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/driver/testing/cpp/scoped_global_logger.h>
-#include <lib/inspect/testing/cpp/zxtest/inspect.h>
+#include <lib/fpromise/single_threaded_executor.h>
+#include <lib/inspect/cpp/hierarchy.h>
+#include <lib/inspect/cpp/inspect.h>
+#include <lib/inspect/cpp/reader.h>
 #include <lib/mock-i2c/mock-i2c.h>
 
 #include <optional>
@@ -23,7 +26,7 @@ namespace {
 // Rev 5 datasheet.
 constexpr int kDeviceIdAddress = 0x01;
 
-class Fusb302IdentityTest : public inspect::InspectTestHelper, public zxtest::Test {
+class Fusb302IdentityTest : public zxtest::Test {
  public:
   void SetUp() override {
     auto endpoints = fidl::Endpoints<fuchsia_hardware_i2c::Device>::Create();
@@ -39,11 +42,19 @@ class Fusb302IdentityTest : public inspect::InspectTestHelper, public zxtest::Te
   void TearDown() override { mock_i2c_.VerifyAndClear(); }
 
   void ExpectInspectPropertyEquals(const char* property_name, const std::string& expected_value) {
-    ASSERT_NO_FATAL_FAILURE(ReadInspect(inspect_.DuplicateVmo()));
-    auto* identity_root = hierarchy().GetByPath({"Identity"});
+    fpromise::result<inspect::Hierarchy> hierarchy_result =
+        fpromise::run_single_threaded(inspect::ReadFromInspector(inspect_));
+    ASSERT_TRUE(hierarchy_result.is_ok());
+
+    inspect::Hierarchy hierarchy = std::move(hierarchy_result.value());
+    const inspect::Hierarchy* identity_root = hierarchy.GetByPath({"Identity"});
     ASSERT_TRUE(identity_root);
-    CheckProperty(identity_root->node(), property_name,
-                  inspect::StringPropertyValue(expected_value));
+
+    const inspect::StringPropertyValue* actual_value =
+        identity_root->node().get_property<inspect::StringPropertyValue>(property_name);
+    ASSERT_TRUE(actual_value);
+
+    EXPECT_EQ(actual_value->value(), expected_value);
   }
 
  protected:

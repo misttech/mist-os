@@ -8,7 +8,6 @@
 #include <lib/async-loop/default.h>
 #include <lib/driver/testing/cpp/scoped_global_logger.h>
 #include <lib/inspect/cpp/vmo/types.h>
-#include <lib/inspect/testing/cpp/zxtest/inspect.h>
 #include <lib/mock-i2c/mock-i2c.h>
 #include <zircon/errors.h>
 
@@ -38,7 +37,7 @@ constexpr int kPowerAddress = 0x0b;
 constexpr int kResetAddress = 0x0c;
 constexpr int kControl4Address = 0x10;
 
-class Fusb302ControlsTest : public inspect::InspectTestHelper, public zxtest::Test {
+class Fusb302ControlsTest : public zxtest::Test {
  public:
   void SetUp() override {
     auto endpoints = fidl::Endpoints<fuchsia_hardware_i2c::Device>::Create();

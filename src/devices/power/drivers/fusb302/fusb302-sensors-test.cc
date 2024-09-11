@@ -8,7 +8,6 @@
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/driver/testing/cpp/scoped_global_logger.h>
-#include <lib/inspect/testing/cpp/zxtest/inspect.h>
 #include <lib/mock-i2c/mock-i2c.h>
 #include <lib/stdcompat/span.h>
 
@@ -29,7 +28,7 @@ namespace {
 constexpr int kStatus1AAddress = 0x3d;
 constexpr int kStatus0Address = 0x40;
 
-class Fusb302SensorsTest : public inspect::InspectTestHelper, public zxtest::Test {
+class Fusb302SensorsTest : public zxtest::Test {
  public:
   void SetUp() override {
     auto endpoints = fidl::Endpoints<fuchsia_hardware_i2c::Device>::Create();

@@ -7,8 +7,10 @@
 #include <fidl/fuchsia.hardware.i2c/cpp/wire.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
+#include <lib/fpromise/single_threaded_executor.h>
 #include <lib/inspect/cpp/hierarchy.h>
-#include <lib/inspect/testing/cpp/zxtest/inspect.h>
+#include <lib/inspect/cpp/inspect.h>
+#include <lib/inspect/cpp/reader.h>
 #include <lib/mock-i2c/mock-i2c.h>
 #include <lib/zx/interrupt.h>
 #include <zircon/types.h>
@@ -27,7 +29,7 @@ namespace fusb302 {
 
 namespace {
 
-class Fusb302Test : public inspect::InspectTestHelper, public zxtest::Test {
+class Fusb302Test : public zxtest::Test {
  public:
   void SetUp() override {
     auto endpoints = fidl::Endpoints<fuchsia_hardware_i2c::Device>::Create();
@@ -46,10 +48,19 @@ class Fusb302Test : public inspect::InspectTestHelper, public zxtest::Test {
 
   void ExpectInspectPropertyEquals(const char* node_name, const char* property_name,
                                    int64_t expected_value) {
-    ASSERT_NO_FATAL_FAILURE(ReadInspect(device_->InspectorForTesting().DuplicateVmo()));
-    auto* node_root = hierarchy().GetByPath({node_name});
-    ASSERT_TRUE(node_root);
-    CheckProperty(node_root->node(), property_name, inspect::IntPropertyValue(expected_value));
+    fpromise::result<inspect::Hierarchy> hierarchy_result =
+        fpromise::run_single_threaded(inspect::ReadFromInspector(device_->InspectorForTesting()));
+    ASSERT_TRUE(hierarchy_result.is_ok());
+
+    inspect::Hierarchy hierarchy = std::move(hierarchy_result.value());
+    const inspect::Hierarchy* identity_root = hierarchy.GetByPath({node_name});
+    ASSERT_TRUE(identity_root);
+
+    const inspect::IntPropertyValue* actual_value =
+        identity_root->node().get_property<inspect::IntPropertyValue>(property_name);
+    ASSERT_TRUE(actual_value);
+
+    EXPECT_EQ(actual_value->value(), expected_value);
   }
 
  protected:

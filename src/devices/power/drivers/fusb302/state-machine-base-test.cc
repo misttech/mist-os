@@ -5,8 +5,11 @@
 #include "src/devices/power/drivers/fusb302/state-machine-base.h"
 
 #include <lib/driver/testing/cpp/scoped_global_logger.h>
+#include <lib/fpromise/single_threaded_executor.h>
+#include <lib/inspect/cpp/hierarchy.h>
+#include <lib/inspect/cpp/inspect.h>
+#include <lib/inspect/cpp/reader.h>
 #include <lib/inspect/cpp/vmo/types.h>
-#include <lib/inspect/testing/cpp/zxtest/inspect.h>
 #include <zircon/assert.h>
 
 #include <cinttypes>
@@ -143,16 +146,24 @@ class MockStateMachine : public StateMachineBase<MockStateMachine, MockState, co
   mutable size_t expected_call_index_ = 0;
 };
 
-class StateMachineBaseTest : public inspect::InspectTestHelper, public zxtest::Test {
+class StateMachineBaseTest : public zxtest::Test {
  public:
   void TearDown() override { state_machine_.CheckAllAccessesReplayed(); }
 
   void ExpectInspectStateEquals(MockState state) {
-    ASSERT_NO_FATAL_FAILURE(ReadInspect(inspect_.DuplicateVmo()));
-    auto* state_machine_root = hierarchy().GetByPath({"MockStateMachine"});
+    fpromise::result<inspect::Hierarchy> hierarchy_result =
+        fpromise::run_single_threaded(inspect::ReadFromInspector(inspect_));
+    ASSERT_TRUE(hierarchy_result.is_ok());
+
+    inspect::Hierarchy hierarchy = std::move(hierarchy_result.value());
+    const inspect::Hierarchy* state_machine_root = hierarchy.GetByPath({"MockStateMachine"});
     ASSERT_TRUE(state_machine_root);
-    CheckProperty(state_machine_root->node(), "State",
-                  inspect::IntPropertyValue(static_cast<int32_t>(state)));
+
+    const inspect::IntPropertyValue* actual_state_value =
+        state_machine_root->node().get_property<inspect::IntPropertyValue>("State");
+    ASSERT_TRUE(actual_state_value);
+
+    EXPECT_EQ(actual_state_value->value(), static_cast<int32_t>(state));
   }
 
  protected:
