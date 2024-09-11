@@ -94,10 +94,12 @@ legacy_fuchsia_image_metadata_overrides = {
       bootserver_pave = [ "--fvm" ]
     }
 
-    fvm_fastboot = {
-      name = "fvm.fastboot"
-      archive = true
-      fastboot_flash = [ fvm_partition ]
+    if (assembly_generate_fvm_fastboot) {
+      fvm_fastboot = {
+        name = "fvm.fastboot"
+        archive = true
+        fastboot_flash = [ fvm_partition ]
+      }
     }
   }
 }

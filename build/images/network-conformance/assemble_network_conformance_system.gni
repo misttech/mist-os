@@ -80,23 +80,17 @@ template("assemble_network_conformance_system") {
     platform.storage = {
       filesystems = {
         image_name = _image_name
-        volume = {
-          fvm = {
-            data = {
-            }
-            blob = {
+
+        if (!fxfs_blob) {
+          volume = {
+            fvm = {
+              data = {
+              }
+              blob = {
+              }
             }
           }
         }
-      }
-    }
-  }
-
-  product_assembly_configuration(labels.product_config_fxfs) {
-    forward_variables_from(product_assembly_base, "*")
-    platform.storage = {
-      filesystems = {
-        image_name = _image_name
       }
     }
   }
@@ -105,14 +99,14 @@ template("assemble_network_conformance_system") {
     testonly = true
 
     if (!fxfs_blob) {
-      product_assembly_config_label = ":${labels.product_config}"
       generate_fvm = true
     } else {
-      product_assembly_config_label = ":${labels.product_config_fxfs}"
       generate_fxfs = true
     }
+
     ramdisk_in_zbi = true
 
+    product_assembly_config_label = ":${labels.product_config}"
     board_config_label = ":${labels.board_config}"
 
     cmdline = [ "kernel.halt-on-panic=true" ]

@@ -106,11 +106,9 @@ if (is_fuchsia) {
     generate_vbmeta = use_vbmeta
 
     if (!fxfs_blob) {
-      generate_fvm = !bootfs_only
-      generate_fvm_fastboot = generate_fvm && assembly_generate_fvm_fastboot
-      generate_fvm_nand = generate_fvm && assembly_generate_fvm_nand
+      generate_fvm = true
     } else {
-      generate_fxfs = !bootfs_only
+      generate_fxfs = true
     }
 
     ramdisk_in_zbi = true

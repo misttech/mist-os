@@ -189,7 +189,7 @@ import("//src/developer/ffx/build/ffx_action.gni")
 #
 #   generate_fxfs (optional; default: false)
 #     [bool] Whether a fxfs image will be generated.
-#     Exclusive with generate_fvm and generate_fvm_*. EXPERIMENTAL.
+#     Exclusive with generate_fvm and generate_fvm_*.
 #
 #
 # Optional copy() for the images:
@@ -219,6 +219,8 @@ template("assembled_system") {
   if (defined(invoker.generate_fxfs)) {
     _generate_fxfs = invoker.generate_fxfs
   }
+  assert(!_generate_fvm || !_generate_fxfs,
+         "Only one of Fxfs and FVM can host blobs")
 
   _include_assembly_inputs = false
   if (defined(invoker.include_assembly_inputs)) {
@@ -358,6 +360,21 @@ template("assembled_system") {
     if (defined(invoker.generate_vbmeta)) {
       _generate_vbmeta = invoker.generate_vbmeta
     }
+
+    ramdisk_in_zbi = false
+    if (defined(invoker.ramdisk_in_zbi) && invoker.ramdisk_in_zbi) {
+      assert(
+          _supports_blobs,
+          "The 'ramdisk_in_zbi' mode is only needed when generating either an fvm or fxfs image.")
+      ramdisk_in_zbi = true
+    }
+
+    # The sparse fvm image is not needed when building the ramdisk into the zbi
+    _generate_fvm_sparse = _generate_fvm
+    if (ramdisk_in_zbi) {
+      _generate_fvm_sparse = false
+    }
+
     _generate_fvm_fastboot = false
     if (defined(invoker.generate_fvm_fastboot)) {
       _generate_fvm_fastboot = invoker.generate_fvm_fastboot
@@ -366,13 +383,17 @@ template("assembled_system") {
     if (defined(invoker.generate_fvm_nand)) {
       _generate_fvm_nand = invoker.generate_fvm_nand
     }
-    assert(!(_generate_fvm || _generate_fvm_fastboot || _generate_fvm_nand) ||
-               !_generate_fxfs,
-           "Only one of Fxfs and FVM can host blobs")
 
-    ramdisk_in_zbi = false
-    if (defined(invoker.ramdisk_in_zbi)) {
-      ramdisk_in_zbi = invoker.ramdisk_in_zbi && _supports_blobs
+    if (_generate_fvm_fastboot || _generate_fvm_nand) {
+      assert(_generate_fvm,
+             "The 'generate_fvm_*' options require 'generate_fvm' to be true")
+    }
+
+    # These shouldn't be set when ramdisk_in_zbi is set
+    if (ramdisk_in_zbi) {
+      assert(
+          !_generate_fvm_fastboot && !_generate_fvm_nand,
+          "The 'generate_fvm_*'' options cannot be used whem 'ramdisk_in_zbi' is true.")
     }
 
     forward_variables_from(invoker, [ "image_metadata_overrides" ])
@@ -398,6 +419,17 @@ template("assembled_system") {
         assert(!defined(image_metadata_overrides.fvm_sparse), error_msg)
         assert(!defined(image_metadata_overrides.fvm_fastboot), error_msg)
         not_needed([ "error_msg" ])
+      } else {
+        if (!_generate_fvm_sparse) {
+          assert(
+              !defined(image_metadata_overrides.fvm_sparse),
+              "No Sparse FVM will be built: no metadata override should be provided")
+        }
+        if (!_generate_fvm_fastboot) {
+          assert(
+              !defined(image_metadata_overrides.fvm_fastboot),
+              "No Fastboot FVM will be built: no metadata override should be provided")
+        }
       }
       if (!_generate_fxfs) {
         assert(
@@ -549,6 +581,8 @@ template("assembled_system") {
       }
       if (_generate_fvm) {
         fvm = "${outdir}/fvm.blk"
+      }
+      if (_generate_fvm_sparse) {
         fvm_sparse = "${outdir}/fvm.sparse.blk"
       }
       if (_generate_fvm_fastboot || _generate_fvm_nand) {
@@ -910,9 +944,11 @@ template("assembled_system") {
         if (_generate_fvm) {
           outputs += [
             files.fvm,
-            files.fvm_sparse,
             files.blobfs,
           ]
+        }
+        if (_generate_fvm_sparse) {
+          outputs += [ files.fvm_sparse ]
         }
         if (_generate_fvm_fastboot || _generate_fvm_nand) {
           outputs += [ files.fvm_fastboot ]
@@ -1011,16 +1047,20 @@ template("assembled_system") {
                 forward_variables_from(_common_metadata, "*")
                 forward_variables_from(_image_overrides["fvm"], "*")
               },
-
-              # Sparse FVM
-              {
-                name = "${_namespace}.fvm_sparse"
-                path = rebase_path(files.fvm_sparse, root_build_dir)
-                type = "blk"
-                forward_variables_from(_common_metadata, "*")
-                forward_variables_from(_image_overrides["fvm_sparse"], "*")
-              },
             ]
+
+            if (_generate_fvm_sparse) {
+              images += [
+                # Sparse FVM
+                {
+                  name = "${_namespace}.fvm_sparse"
+                  path = rebase_path(files.fvm_sparse, root_build_dir)
+                  type = "blk"
+                  forward_variables_from(_common_metadata, "*")
+                  forward_variables_from(_image_overrides["fvm_sparse"], "*")
+                },
+              ]
+            }
           } else if (_generate_fxfs) {
             images += [
               {
