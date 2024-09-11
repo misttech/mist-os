@@ -6029,6 +6029,16 @@ significantly.
 
 From //third_party/pigweed/src/pw_compilation_testing/negative_compilation_test.gni:24
 
+### pw_containers_CONFIG
+
+The build target that overrides the default configuration options for this
+module. This should point to a source set that provides defines through a
+public config (which may -include a file or add defines directly).
+
+**Current value (from the default):** `"//third_party/pigweed/src/pw_build:empty"`
+
+From //third_party/pigweed/src/pw_containers/BUILD.gn:30
+
 ### pw_docgen_BUILD_DOCS
 
 Whether or not the current target should build docs.
@@ -7866,67 +7876,67 @@ From //src/starnix/kernel/args.gni:29
 
 **Current value (from the default):** `-1`
 
-From //src/devices/sysmem/bin/sysmem_connector/BUILD.gn:26
+From //src/sysmem/bin/sysmem_connector/BUILD.gn:26
 
 ### sysmem_contiguous_guard_pages_fatal
 
 **Current value (from the default):** `false`
 
-From //src/devices/sysmem/bin/sysmem_connector/BUILD.gn:24
+From //src/sysmem/bin/sysmem_connector/BUILD.gn:24
 
 ### sysmem_contiguous_guard_pages_internal
 
 **Current value (from the default):** `false`
 
-From //src/devices/sysmem/bin/sysmem_connector/BUILD.gn:25
+From //src/sysmem/bin/sysmem_connector/BUILD.gn:25
 
 ### sysmem_contiguous_guard_pages_unused
 
 **Current value (from the default):** `false`
 
-From //src/devices/sysmem/bin/sysmem_connector/BUILD.gn:27
+From //src/sysmem/bin/sysmem_connector/BUILD.gn:27
 
 ### sysmem_contiguous_guard_pages_unused_cycle_seconds
 
 **Current value (from the default):** `600`
 
-From //src/devices/sysmem/bin/sysmem_connector/BUILD.gn:29
+From //src/sysmem/bin/sysmem_connector/BUILD.gn:29
 
 ### sysmem_contiguous_guard_pages_unused_fraction_denominator
 
 **Current value (from the default):** `128`
 
-From //src/devices/sysmem/bin/sysmem_connector/BUILD.gn:28
+From //src/sysmem/bin/sysmem_connector/BUILD.gn:28
 
 ### sysmem_contiguous_memory_size
 
 **Current value (from the default):** `-1`
 
-From //src/devices/sysmem/bin/sysmem_connector/BUILD.gn:20
+From //src/sysmem/bin/sysmem_connector/BUILD.gn:20
 
 ### sysmem_contiguous_memory_size_percent
 
 **Current value (from the default):** `5`
 
-From //src/devices/sysmem/bin/sysmem_connector/BUILD.gn:21
+From //src/sysmem/bin/sysmem_connector/BUILD.gn:21
 
 ### sysmem_protected_memory_size
 
 **Current value (from the default):** `0`
 
-From //src/devices/sysmem/bin/sysmem_connector/BUILD.gn:22
+From //src/sysmem/bin/sysmem_connector/BUILD.gn:22
 
 ### sysmem_protected_memory_size_percent
 
 **Current value (from the default):** `-1`
 
-From //src/devices/sysmem/bin/sysmem_connector/BUILD.gn:23
+From //src/sysmem/bin/sysmem_connector/BUILD.gn:23
 
 ### sysmem_protected_ranges_disable_dynamic
 
 **Current value (from the default):** `false`
 
-From //src/devices/sysmem/bin/sysmem_connector/BUILD.gn:30
+From //src/sysmem/bin/sysmem_connector/BUILD.gn:30
 
 ### target_cpu
 
