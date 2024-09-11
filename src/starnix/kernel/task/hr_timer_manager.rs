@@ -2,12 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fidl_fuchsia_hardware_hrtimer as fhrtimer;
 use fuchsia_zircon::{self as zx, AsHandleRef, HandleBased, HandleRef};
 use starnix_logging::{log_debug, log_error};
 use starnix_sync::{Mutex, MutexGuard};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::{errno, from_status_like_fdio};
+use {fidl_fuchsia_hardware_hrtimer as fhrtimer, fuchsia_async as fasync};
 
 use std::collections::BinaryHeap;
 use std::sync::{Arc, Weak};
@@ -33,6 +33,27 @@ fn connect_to_hrtimer() -> Result<fhrtimer::DeviceSynchronousProxy, Errno> {
         .map_err(|e| errno!(EINVAL, format!("Failed to parse the device entry path: {e:?}")))?;
 
     let (hrtimer, server_end) = fidl::endpoints::create_sync_proxy::<fhrtimer::DeviceMarker>();
+    fdio::service_connect(&path, server_end.into_channel())
+        .map_err(|e| errno!(EINVAL, format!("Failed to open hrtimer device: {e}")))?;
+
+    Ok(hrtimer)
+}
+
+fn connect_to_hrtimer_async() -> Result<fhrtimer::DeviceProxy, Errno> {
+    let mut dir = std::fs::read_dir(HRTIMER_DIRECTORY)
+        .map_err(|e| errno!(EINVAL, format!("Failed to open hrtimer directory: {e}")))?;
+    let entry = dir
+        .next()
+        .ok_or_else(|| errno!(EINVAL, format!("No entry in the hrtimer directory")))?
+        .map_err(|e| errno!(EINVAL, format!("Failed to find hrtimer device: {e}")))?;
+    let path = entry
+        .path()
+        .into_os_string()
+        .into_string()
+        .map_err(|e| errno!(EINVAL, format!("Failed to parse the device entry path: {e:?}")))?;
+
+    let (hrtimer, server_end) = fidl::endpoints::create_proxy::<fhrtimer::DeviceMarker>()
+        .map_err(|e| errno!(EINVAL, format!("Failed to create hrtimer proxy: {e}")))?;
     fdio::service_connect(&path, server_end.into_channel())
         .map_err(|e| errno!(EINVAL, format!("Failed to open hrtimer device: {e}")))?;
 
@@ -66,7 +87,7 @@ pub struct HrTimerManager {
     state: Mutex<HrTimerManagerState>,
 
     /// The event that is registered with hrtimer.
-    timer_event: Option<zx::Event>,
+    hr_timer_event: Option<zx::Event>,
 }
 pub type HrTimerManagerHandle = Arc<HrTimerManager>;
 
@@ -88,23 +109,23 @@ impl HrTimerManager {
     pub fn new() -> HrTimerManagerHandle {
         let device_proxy = connect_to_hrtimer().ok();
         let event = zx::Event::create();
-        let timer_event = event.duplicate_handle(zx::Rights::SAME_RIGHTS).ok();
+        let hr_timer_event = event.duplicate_handle(zx::Rights::SAME_RIGHTS).ok();
         device_proxy.as_ref().map(|d| {
             d.set_event(HRTIMER_DEFAULT_ID, event, zx::MonotonicTime::INFINITE).expect("failed")
         });
         let resolution = get_hrtimer_resolution(device_proxy.as_ref())
             .unwrap_or(fhrtimer::Resolution::Duration(0));
-        Arc::new(Self { device_proxy, resolution, state: Default::default(), timer_event })
+        Arc::new(Self { device_proxy, resolution, state: Default::default(), hr_timer_event })
     }
 
     /// Returns the event that is signaled hrtimer when timers trigger.
     pub fn duplicate_timer_event(&self) -> Option<zx::Event> {
-        self.timer_event.as_ref().and_then(|e| e.duplicate_handle(zx::Rights::SAME_RIGHTS).ok())
+        self.hr_timer_event.as_ref().and_then(|e| e.duplicate_handle(zx::Rights::SAME_RIGHTS).ok())
     }
 
     /// Clears the `EVENT_SIGNALED` signal on the hrtimer event.
     fn reset_timer_event(&self) {
-        if let Some(e) = self.timer_event.as_ref() {
+        if let Some(e) = self.hr_timer_event.as_ref() {
             e.as_handle_ref()
                 .signal(zx::Signals::EVENT_SIGNALED, zx::Signals::NONE)
                 .expect("Failed to clear signal on timer event");
@@ -152,80 +173,80 @@ impl HrTimerManager {
         guard: &mut MutexGuard<'_, HrTimerManagerState>,
     ) -> Result<(), Errno> {
         let resolution_nsecs = self.resolution_nsecs()?;
-        if let Some(node) = guard.timer_heap.peek() {
-            let new_deadline = node.deadline;
-            let wake_source = node.wake_source.clone();
-            // Only restart the HrTimer device when the deadline is different from the running one.
-            if guard.current_deadline != Some(new_deadline) {
-                let hrtimer_ref = node.hr_timer.clone();
-                let self_ref = self.clone();
-                self.stop(guard)?;
-                current_task.kernel().kthreads.spawn(move |_, current_task| {
-                    if let Ok(device_proxy) = self_ref.check_connection() {
-                        // If the deadline is in the past, set the `ticks` as 0 to trigger event right
-                        // away.
-                        let ticks = std::cmp::max(
-                            0,
-                            (new_deadline - zx::MonotonicTime::get()).into_nanos(),
-                        ) / resolution_nsecs;
-                        match device_proxy.start_and_wait(
-                            HRTIMER_DEFAULT_ID,
-                            &fhrtimer::Resolution::Duration(resolution_nsecs),
-                            ticks as u64,
-                            zx::MonotonicTime::INFINITE,
-                        ) {
-                            Ok(Ok(lease)) => {
-                                let _ = hrtimer_ref
-                                    .event
-                                    .as_handle_ref()
-                                    .signal(zx::Signals::NONE, zx::Signals::TIMER_SIGNALED);
-                                if let Some(wake_source) = wake_source.and_then(|f| f.upgrade()) {
-                                    let lease_channel = lease.into_channel();
-                                    wake_source.on_wake(current_task, &lease_channel);
-                                    // Drop the baton lease after wake leases in associated epfd
-                                    // are activated.
-                                    drop(lease_channel);
-                                }
-                                // Remove the expired HrTimer from the heap.
-                                self_ref
-                                    .lock()
-                                    .timer_heap
-                                    .retain(|t| !Arc::ptr_eq(&t.hr_timer, &hrtimer_ref));
-                                // The hrtimer client is responsible for clearing the timer fired
-                                // signal, so we clear it here right before starting the next
-                                // timer.
-                                self_ref.reset_timer_event();
+        let Some(node) = guard.timer_heap.peek() else {
+            return self.stop(guard);
+        };
 
-                                loop {
-                                    // After the front HrTimer expires, we need to start the next
-                                    // one in the heap.
-                                    let mut guard = self_ref.lock();
-                                    match self_ref.start_next(current_task, &mut guard) {
-                                        Ok(_) => break,
-                                        Err(e) => log_error!(
-                                            "Failed to start the next hrtimer in the heap: {e}"
-                                        ),
-                                    }
-                                }
-                            }
-                            Ok(Err(e)) => match e {
-                                fhrtimer::DriverError::Canceled => log_debug!(
-                                    "A new HrTimer with \
+        let new_deadline = node.deadline;
+        // Only restart the HrTimer device when the deadline is different from the running one.
+        if guard.current_deadline == Some(new_deadline) {
+            return Ok(());
+        }
+
+        let wake_source = node.wake_source.clone();
+        let hrtimer_ref = node.hr_timer.clone();
+        let is_interval = *hrtimer_ref.is_interval.lock();
+        // Stop any currently active timers, since they no longer have the earliest deadline.
+        self.stop(guard)?;
+        guard.current_deadline = Some(new_deadline);
+
+        let self_ref = self.clone();
+        current_task.kernel().kthreads.spawn(move |_, current_task| {
+            let mut executor = fasync::LocalExecutor::new();
+            let device_proxy = connect_to_hrtimer_async().expect("failed");
+            // If the deadline is in the past, set the `ticks` as 0 to trigger event right
+            // away.
+            let ticks = std::cmp::max(0, (new_deadline - zx::MonotonicTime::get()).into_nanos())
+                / resolution_nsecs;
+            let f = device_proxy.start_and_wait(
+                HRTIMER_DEFAULT_ID,
+                &fhrtimer::Resolution::Duration(resolution_nsecs),
+                ticks as u64,
+            );
+            // The hrtimer client is responsible for clearing the timer fired
+            // signal, so we clear it here right before starting the next
+            // timer.
+            self_ref.reset_timer_event();
+            let r = executor.run_singlethreaded(f);
+            match r {
+                Ok(Ok(lease)) => {
+                    let _ = hrtimer_ref
+                        .event
+                        .as_handle_ref()
+                        .signal(zx::Signals::NONE, zx::Signals::TIMER_SIGNALED);
+                    if let Some(wake_source) = wake_source.and_then(|f| f.upgrade()) {
+                        let lease_channel = lease.into_channel();
+                        wake_source.on_wake(current_task, &lease_channel);
+                        // Drop the baton lease after wake leases in associated epfd
+                        // are activated.
+                        drop(lease_channel);
+                    }
+                    let mut guard = self_ref.lock();
+                    // Remove the expired HrTimer from the heap.
+                    guard.timer_heap.retain(|t| !Arc::ptr_eq(&t.hr_timer, &hrtimer_ref));
+
+                    if guard.timer_heap.is_empty() && !is_interval {
+                        // Only clear the timer event if there are no more timers to start.
+                        // If there are more timers to start, we have to keep the event signaled
+                        // to prevent suspension until the hanging get has been scheduled.
+                        // Otherwise, we might miss a wake up.
+                        self_ref.reset_timer_event();
+                        return;
+                    }
+
+                    self_ref.start_next(current_task, &mut guard).expect("failed");
+                }
+                Ok(Err(e)) => match e {
+                    fhrtimer::DriverError::Canceled => log_debug!(
+                        "A new HrTimer with \
                                 an earlier deadline has been started. \
                                 This `StartAndWait` attempt is cancelled."
-                                ),
-                                _ => log_error!("HrTimer::StartAndWait driver error: {e:?}"),
-                            },
-                            Err(e) => log_error!("HrTimer::StartAndWait fidl error: {e}"),
-                        }
-                    }
-                });
-                guard.current_deadline = Some(new_deadline);
+                    ),
+                    _ => log_error!("HrTimer::StartAndWait driver error: {e:?}"),
+                },
+                Err(e) => log_error!("HrTimer::StartAndWait fidl error: {e}"),
             }
-        } else {
-            // Heap is empty now.
-            self.stop(guard)?;
-        }
+        });
         Ok(())
     }
 
@@ -294,12 +315,24 @@ impl HrTimerManager {
 #[derive(Debug)]
 pub struct HrTimer {
     event: Arc<zx::Event>,
+
+    /// True iff the timer is currently set to trigger at an interval.
+    ///
+    /// This is used to determine at which point the hrtimer event (not
+    /// `HrTimer::event` but the one that is shared with the actual driver)
+    /// should be cleared.
+    ///
+    /// If this is true, the timer manager will wait to clear the timer event
+    /// until the next timer request has been sent to the driver. This prevents
+    /// lost wake ups where the container happens to suspend between two instances
+    /// of an interval timer triggering.
+    pub is_interval: Mutex<bool>,
 }
 pub type HrTimerHandle = Arc<HrTimer>;
 
 impl HrTimer {
     pub fn new() -> HrTimerHandle {
-        Arc::new(Self { event: Arc::new(zx::Event::create()) })
+        Arc::new(Self { event: Arc::new(zx::Event::create()), is_interval: Mutex::new(false) })
     }
 
     pub fn event(&self) -> zx::Event {
@@ -463,7 +496,7 @@ mod tests {
             device_proxy: Some(proxy),
             resolution: fhrtimer::Resolution::Duration(10000),
             state: Default::default(),
-            timer_event: None,
+            hr_timer_event: None,
         })
     }
 
