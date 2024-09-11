@@ -141,6 +141,7 @@ constexpr bool RelocateSymbolic(Memory& memory, DiagnosticsType& diagnostics,
                 "elfldltl::RelocateSymbolic requires resolve(const Sym&, RelocateTls) callback");
 
   using Traits = RelocationTraits<Machine>;
+  using Tls = TlsTraits<Elf, Machine>;
   using Type = typename Traits::Type;
 
   // Apply either a REL or RELA reloc resolved to a value, ignoring the addend.
@@ -222,7 +223,8 @@ constexpr bool RelocateSymbolic(Memory& memory, DiagnosticsType& diagnostics,
   // segment, stored in a GOT slot to be passed to __tls_get_addr.  The
   // undefined weak case is as for tls_module (above), see comments there.
   auto tls_relative = [apply_with_addend](const auto& reloc, const auto& defn) {
-    return defn.undefined_weak() || apply_with_addend(reloc, defn.symbol().value());
+    return defn.undefined_weak() ||
+           apply_with_addend(reloc, defn.symbol().value() + Tls::kTlsRelativeBias);
   };
 
   // Each TLSDESC reloc acts like two relocs to consecutive GOT slots: first

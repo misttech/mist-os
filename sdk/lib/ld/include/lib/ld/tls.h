@@ -102,13 +102,13 @@ inline T* TpRelative(ptrdiff_t offset = 0) {
   //     https://gcc.gnu.org/bugzilla/show_bug.cgi?id=79609
   // It's also buggy for the special case of 0, see:
   //     https://gcc.gnu.org/bugzilla/show_bug.cgi?id=79619
-  __asm__ __volatile__("mov %%fs:0,%0" : "=r"(tp));
+  __asm__("mov %%fs:0,%0" : "=r"(tp));
 #elif defined(__i386__) && defined(__clang__)
   // Everything above applies the same on x86-32, but with %gs instead.
   using GsRelative = std::byte* [[clang::address_space(256)]];
   tp = *reinterpret_cast<GsRelative*>(0);
 #elif defined(__i386__)
-  __asm__ __volatile__("mov %%gs:0,%0" : "=r"(tp));
+  __asm__("mov %%gs:0,%0" : "=r"(tp));
 #else
   tp = static_cast<std::byte*>(__builtin_thread_pointer());
 #endif

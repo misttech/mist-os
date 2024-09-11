@@ -34,6 +34,7 @@ in_process_executables = [
   ":tls-exec-shlib",
   ":tls-gd",
   ":tls-desc",
+  ":tls-ld",
   ":zygote",
   ":zygote-secondary",
 ]
@@ -908,6 +909,29 @@ test_executable("tls-desc") {
   configs = [ "//build/config:tlsdesc" ]
   deps = [ "../.." ]
   shlib_deps = [ ":tls-desc-dep" ]
+}
+
+test_executable("tls-ld") {
+  can_be_in_process = true
+  sources = [ "tls-ld.cc" ]
+  configs = [ "//build/config:no-tlsdesc" ]
+  deps = [ "../.." ]
+  shlib_deps = [ ":tls-ld-dep" ]
+}
+
+test_shared_library("tls-ld-dep") {
+  public = [ "tls-ld-dep.h" ]
+  sources = [ "tls-ld-dep.cc" ]
+  configs = [ "//build/config:no-tlsdesc" ]
+  deps = [
+    "//sdk/lib/ld:static-tls-get-addr",
+    "//zircon/system/public",
+  ]
+
+  # TODO(https://fxbug.dev/42085421): LTO insists on using IE accesses here. Remove this
+  # when the LLVM bug gets fixed and the fixed toolchain rolled into Fuchsia.
+  remove_configs = [ "//build/config/lto" ]
+  configs += [ "//build/config/lto:no-lto" ]
 }
 
 # This will generate the host-test-data for shlib_deps that are not used by any
