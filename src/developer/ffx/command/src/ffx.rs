@@ -305,6 +305,8 @@ enum CoreCheckErrorEnum {
     MustHaveOneConfigArg(usize),
     #[error("When running in core mode, config flags must be passed as a path to a file. Path: {} is not a file", .0)]
     ConfigArgMustBeFile(String),
+    #[error("Specifying core mode and isolate dir are mutually exclusive. specify one or the other. Isolate Dir Passed: {}", .0.display())]
+    CoreAndIsolateMutuallyExclusive(PathBuf),
 }
 
 fn format_core_check_error_enums(errors: &Vec<CoreCheckErrorEnum>) -> String {
@@ -325,6 +327,15 @@ pub fn check_core_constraints(ffx: &Ffx) -> Result<()> {
     }
 
     let mut errors = vec![];
+
+    match (ffx.core, &ffx.isolate_dir) {
+        (true, Some(isolate_dir)) => {
+            errors.push(CoreCheckErrorEnum::CoreAndIsolateMutuallyExclusive(
+                isolate_dir.to_path_buf(),
+            ));
+        }
+        _ => {}
+    }
 
     if ffx.machine.is_none() {
         errors.push(CoreCheckErrorEnum::MustHaveMachineSpecified);
@@ -635,6 +646,24 @@ mod test {
                 name: "Target must be SocketAddr".into(),
                 expected_errors: vec![CoreCheckErrorEnum::TargetMustBeAddress(
                     "no waaaaaayyy".into(),
+                )],
+            },
+            TestCase {
+                inputs: vec![
+                    "ffx",
+                    "--core",
+                    "--isolate-dir",
+                    "/tmp/foo",
+                    "--machine",
+                    "json",
+                    "--target",
+                    "193.168.1.1:8081",
+                    "target",
+                    "echo",
+                ],
+                name: "Core and Isolate Mutually Exclusive".into(),
+                expected_errors: vec![CoreCheckErrorEnum::CoreAndIsolateMutuallyExclusive(
+                    PathBuf::from("/tmp/foo"),
                 )],
             },
         ];
