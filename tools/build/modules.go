@@ -47,14 +47,8 @@ type Modules struct {
 	// keep-sorted end
 }
 
-// NewModules returns a Modules associated with a given build directory.
-func NewModules(buildDir string) (*Modules, error) {
+func newModulesWithApiClient(buildDir string, buildApiClient *BuildAPIClient) (*Modules, error) {
 	m := &Modules{buildDir: buildDir}
-
-	buildApiClient, err := NewBuildAPIClient(buildDir)
-	if err != nil {
-		return nil, err
-	}
 
 	manifests := map[string]interface{}{
 		// keep-sorted start ignore_prefixes="
@@ -91,6 +85,28 @@ func NewModules(buildDir string) (*Modules, error) {
 		}
 	}
 	return m, nil
+}
+
+// NewModules returns a Modules associated with a given build directory.
+func NewModules(buildDir string) (*Modules, error) {
+	buildApiClient, err := NewBuildAPIClient(buildDir, false)
+	if err != nil {
+		return nil, err
+	}
+
+	return newModulesWithApiClient(buildDir, buildApiClient)
+}
+
+// NewModulesForLastBuildOnly returns a Modules associated with a given build directory,
+// whose content has been filtered to only contain entries related to the last successful
+// build. This should be used to access the correct set of Ninja artifacts after an
+// incremental build.
+func NewModulesForLastBuildOnly(buildDir string) (*Modules, error) {
+	buildApiClient, err := NewBuildAPIClient(buildDir, true)
+	if err != nil {
+		return nil, err
+	}
+	return newModulesWithApiClient(buildDir, buildApiClient)
 }
 
 // BuildDir returns the fuchsia build directory root.
