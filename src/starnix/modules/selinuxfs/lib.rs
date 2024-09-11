@@ -23,9 +23,10 @@ use starnix_core::vfs::{
 
 use fuchsia_zircon::{self as zx, HandleBased as _};
 use selinux::policy::SUPPORTED_POLICY_VERSION;
-use selinux::SecurityPermission;
-use selinux_core::security_server::SecurityServer;
-use selinux_core::{InitialSid, SeLinuxStatus, SeLinuxStatusPublisher, SecurityId};
+use selinux::{
+    InitialSid, SeLinuxStatus, SeLinuxStatusPublisher, SecurityId, SecurityPermission,
+    SecurityServer,
+};
 use starnix_logging::{impossible_error, log_error, log_info, track_stub};
 use starnix_sync::{FileOpsCore, Locked, Unlocked};
 use starnix_uapi::device_type::DeviceType;
@@ -819,7 +820,7 @@ mod tests {
     use super::*;
 
     use fuchsia_zircon::{self as zx, AsHandleRef as _};
-    use selinux_core::security_server::SecurityServer;
+    use selinux::SecurityServer;
     use zerocopy::{FromBytes, FromZeroes};
 
     #[fuchsia::test]

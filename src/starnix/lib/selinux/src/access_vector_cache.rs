@@ -2,11 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use super::SecurityId;
+use crate::policy::AccessVector;
+use crate::sync::Mutex;
+use crate::{AbstractObjectClass, SecurityId};
 
-use selinux::policy::AccessVector;
-use selinux::AbstractObjectClass;
-use starnix_sync::Mutex;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Weak};
 
@@ -49,14 +48,14 @@ impl<Q: Query> QueryMut for Q {
 
 /// An interface for emptying caches that store [`Query`] input/output pairs. This interface
 /// requires implementers to update state via interior mutability.
-pub trait Reset {
+trait Reset {
     /// Removes all entries from this cache and any reset delegate caches encapsulated in this
     /// cache. Returns true only if the cache is still valid after reset.
     fn reset(&self) -> bool;
 }
 
 /// An interface for emptying caches that store [`Query`] input/output pairs.
-pub trait ResetMut {
+trait ResetMut {
     /// Removes all entries from this cache and any reset delegate caches encapsulated in this
     /// cache. Returns true only if the cache is still valid after reset.
     fn reset(&mut self) -> bool;
@@ -68,13 +67,13 @@ impl<R: Reset> ResetMut for R {
     }
 }
 
-pub trait ProxyMut<D> {
+pub(super) trait ProxyMut<D> {
     fn set_delegate(&mut self, delegate: D) -> D;
 }
 
 /// A default implementation for [`AccessQueryable`] that permits no [`AccessVector`].
 #[derive(Default)]
-pub struct DenyAll;
+pub(super) struct DenyAll;
 
 impl Query for DenyAll {
     fn query(
@@ -105,7 +104,7 @@ struct QueryAndResult {
 
 /// An empty access vector cache that delegates to an [`AccessQueryable`].
 #[derive(Default)]
-pub struct Empty<D = DenyAll> {
+struct Empty<D = DenyAll> {
     delegate: D,
 }
 
@@ -137,14 +136,14 @@ impl<D: ResetMut> ResetMut for Empty<D> {
 }
 
 /// Default size of a fixed-sized (pre-allocated) access vector cache.
-pub(crate) const DEFAULT_FIXED_SIZE: usize = 10;
+pub(super) const DEFAULT_FIXED_SIZE: usize = 10;
 
 /// An access vector cache of fixed size and memory allocation. The underlying caching strategy is
 /// FIFO. Entries are evicted one at a time when entries are added to a full cache.
 ///
 /// This implementation is thread-hostile; it expects all operations to be executed on the same
 /// thread.
-pub struct Fixed<D = DenyAll, const SIZE: usize = DEFAULT_FIXED_SIZE> {
+pub(super) struct Fixed<D = DenyAll, const SIZE: usize = DEFAULT_FIXED_SIZE> {
     cache: [Option<QueryAndResult>; SIZE],
     next_index: usize,
     is_full: bool,
@@ -237,7 +236,7 @@ impl<D, const SIZE: usize> ProxyMut<D> for Fixed<D, SIZE> {
 }
 
 /// A locked access vector cache.
-pub struct Locked<D = DenyAll> {
+pub(super) struct Locked<D = DenyAll> {
     delegate: Arc<Mutex<D>>,
 }
 
@@ -351,7 +350,7 @@ impl<R: Reset> Reset for Weak<R> {
 /// results in at most one `reset()` call to the query delegate on the next query. This strategy
 /// allows [`ThreadLocalQuery`] to expose thread-safe reset implementation over thread-hostile
 /// access vector cache implementations.
-pub struct ThreadLocalQuery<D = DenyAll> {
+pub(super) struct ThreadLocalQuery<D = DenyAll> {
     delegate: D,
     current_version: u64,
     active_version: Arc<AtomicVersion>,
@@ -386,12 +385,12 @@ impl<D: QueryMut + ResetMut> QueryMut for ThreadLocalQuery<D> {
 }
 
 /// Default size of an access vector cache shared by all threads in the system.
-pub(crate) const DEFAULT_SHARED_SIZE: usize = 1000;
+pub(super) const DEFAULT_SHARED_SIZE: usize = 1000;
 
 /// Composite access vector cache manager that delegates queries to security server type, `SS`, and
 /// owns a shared cache of size `SHARED_SIZE`, and can produce thread-local caches of size
 /// `THREAD_LOCAL_SIZE`.
-pub struct Manager<
+pub(super) struct Manager<
     SS,
     const SHARED_SIZE: usize = DEFAULT_SHARED_SIZE,
     const THREAD_LOCAL_SIZE: usize = DEFAULT_FIXED_SIZE,
@@ -458,36 +457,40 @@ impl<SS, const SHARED_SIZE: usize, const THREAD_LOCAL_SIZE: usize> Reset
     }
 }
 
+/// Test constants and helpers shared by `tests` and `starnix_tests`.
 #[cfg(test)]
-mod tests {
-    use super::*;
+mod testing {
+    use crate::SecurityId;
 
-    use once_cell::sync::Lazy;
-    use rand::distributions::Uniform;
-    use rand::{thread_rng, Rng as _};
-    use selinux::policy::testing::{ACCESS_VECTOR_0001, ACCESS_VECTOR_0010};
-    use selinux::ObjectClass;
-    use std::collections::{HashMap, HashSet};
     use std::num::NonZeroU32;
-    use std::sync::atomic::{AtomicU32, AtomicUsize};
-    use std::thread::spawn;
+    use std::sync::atomic::{AtomicU32, Ordering};
+    use std::sync::LazyLock;
 
     /// SID to use where any value will do.
-    static A_TEST_SID: Lazy<SecurityId> = Lazy::new(unique_sid);
+    pub(super) static A_TEST_SID: LazyLock<SecurityId> = LazyLock::new(unique_sid);
 
     /// Default fixed cache size to use in tests.
-    const CACHE_ENTRIES: usize = 10;
+    pub(super) const CACHE_ENTRIES: usize = 10;
 
     /// Returns a new `SecurityId` with unique id.
-    fn unique_sid() -> SecurityId {
+    pub(super) fn unique_sid() -> SecurityId {
         static NEXT_ID: AtomicU32 = AtomicU32::new(1000);
         SecurityId(NonZeroU32::new(NEXT_ID.fetch_add(1, Ordering::AcqRel)).unwrap())
     }
 
     /// Returns a vector of `count` unique `SecurityIds`.
-    fn unique_sids(count: usize) -> Vec<SecurityId> {
+    pub(super) fn unique_sids(count: usize) -> Vec<SecurityId> {
         (0..count).map(|_| unique_sid()).collect()
     }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::testing::*;
+    use super::*;
+    use crate::ObjectClass;
+
+    use std::sync::atomic::AtomicUsize;
 
     #[derive(Default)]
     struct Counter<D = DenyAll> {
@@ -526,7 +529,7 @@ mod tests {
         }
     }
 
-    #[fuchsia::test]
+    #[test]
     fn empty_access_vector_cache_default_deny_all() {
         let mut avc = Empty::<DenyAll>::default();
         assert_eq!(
@@ -535,7 +538,7 @@ mod tests {
         );
     }
 
-    #[fuchsia::test]
+    #[test]
     fn fixed_access_vector_cache_add_entry() {
         let mut avc = Fixed::<_, CACHE_ENTRIES>::new(Counter::<DenyAll>::default());
         assert_eq!(0, avc.delegate.query_count());
@@ -553,7 +556,7 @@ mod tests {
         assert_eq!(false, avc.is_full);
     }
 
-    #[fuchsia::test]
+    #[test]
     fn fixed_access_vector_cache_reset() {
         let mut avc = Fixed::<_, CACHE_ENTRIES>::new(Counter::<DenyAll>::default());
 
@@ -575,7 +578,7 @@ mod tests {
         assert_eq!(false, avc.is_full);
     }
 
-    #[fuchsia::test]
+    #[test]
     fn fixed_access_vector_cache_fill() {
         let mut avc = Fixed::<_, CACHE_ENTRIES>::new(Counter::<DenyAll>::default());
 
@@ -600,7 +603,7 @@ mod tests {
         assert_eq!(false, avc.is_full);
     }
 
-    #[fuchsia::test]
+    #[test]
     fn fixed_access_vector_cache_full_miss() {
         let mut avc = Fixed::<_, CACHE_ENTRIES>::new(Counter::<DenyAll>::default());
 
@@ -634,7 +637,7 @@ mod tests {
         assert_eq!(delegate_query_count + 1, avc.delegate.query_count());
     }
 
-    #[fuchsia::test]
+    #[test]
     fn thread_local_query_access_vector_cache_reset() {
         let cache_version = Arc::new(AtomicVersion::default());
         let mut avc = ThreadLocalQuery::new(cache_version.clone(), Counter::<DenyAll>::default());
@@ -646,6 +649,22 @@ mod tests {
         avc.query(A_TEST_SID.clone(), A_TEST_SID.clone(), ObjectClass::Process.into());
         assert_eq!(1, avc.delegate.reset_count());
     }
+}
+
+/// Async tests that depend on `fuchsia::test` only run in starnix.
+#[cfg(test)]
+#[cfg(feature = "selinux_starnix")]
+mod starnix_tests {
+    use super::testing::*;
+    use super::*;
+    use crate::policy::testing::{ACCESS_VECTOR_0001, ACCESS_VECTOR_0010};
+    use crate::ObjectClass;
+
+    use rand::distributions::Uniform;
+    use rand::{thread_rng, Rng as _};
+    use std::collections::{HashMap, HashSet};
+    use std::sync::atomic::AtomicU32;
+    use std::thread::spawn;
 
     const NO_RIGHTS: u32 = 0;
     const READ_RIGHTS: u32 = 1;

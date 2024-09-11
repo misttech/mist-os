@@ -11,8 +11,7 @@
 //! should treat the types as opaque; hook implementations necessarily have access
 //! to kernel structures, but not the other way around.
 
-use selinux_core::security_server::SecurityServer;
-use selinux_core::SecurityId;
+use selinux::{SecurityId, SecurityServer};
 use std::sync::Arc;
 
 /// SELinux implementations called by the LSM hooks.

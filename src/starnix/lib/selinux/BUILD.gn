@@ -8,7 +8,9 @@ import("//build/rust/rustc_library.gni")
 selinux = {
   edition = "2021"
   sources = [
+    "src/access_vector_cache.rs",
     "src/lib.rs",
+    "src/permission_check.rs",
     "src/policy/arrays.rs",
     "src/policy/error.rs",
     "src/policy/extensible_bitmap.rs",
@@ -19,10 +21,22 @@ selinux = {
     "src/policy/parser.rs",
     "src/policy/security_context.rs",
     "src/policy/symbols.rs",
+    "src/security_server.rs",
+    "src/sync.rs",
   ]
   inputs = [
-    "//src/starnix/lib/selinux/testdata/policies/emulator",
-    "//src/starnix/lib/selinux/testdata/micro_policies/security_context_tests_policy.pp",
+    "testdata/micro_policies/file_target_defaults_policy.pp",
+    "testdata/micro_policies/file_source_defaults_policy.pp",
+    "testdata/micro_policies/security_context_tests_policy.pp",
+    "testdata/micro_policies/file_range_source_low_policy.pp",
+    "testdata/policies/selinux_testsuite",
+    "testdata/micro_policies/file_no_defaults_policy.pp",
+    "testdata/micro_policies/file_range_target_low_policy.pp",
+    "testdata/micro_policies/file_range_target_high_policy.pp",
+    "testdata/micro_policies/security_server_tests_policy.pp",
+    "testdata/micro_policies/file_range_source_high_policy.pp",
+    "testdata/micro_policies/file_range_target_low_high_policy.pp",
+    "testdata/micro_policies/file_range_source_low_high_policy.pp",
   ]
   deps = [
     "//third_party/rust_crates:anyhow",
@@ -30,33 +44,56 @@ selinux = {
     "//third_party/rust_crates:thiserror",
     "//third_party/rust_crates:zerocopy",
   ]
+  test_deps = []
 }
 
 additional_selinux_configs = [ "//src/starnix/config:starnix_clippy_lints" ]
 
 rustc_library("selinux") {
   with_unit_tests = true
+  features = []
   configs += additional_selinux_configs
+
   forward_variables_from(selinux, "*")
+  if (is_host) {
+    deps += [ "//third_party/rust_crates:parking_lot" ]
+  } else {
+    features += [ "selinux_starnix" ]
+    deps += [ "//src/starnix/lib/starnix-sync" ]
+    test_deps += [
+      "//src/lib/fuchsia",
+      "//third_party/rust_crates:futures",
+      "//third_party/rust_crates:rand",
+    ]
+  }
 }
 
 fuchsia_unittest_package("starnix-selinux-unit-tests") {
   deps = [ ":selinux_test" ]
 }
 
-if (is_host) {
-  # Host-only build of `selinux` crate enabled test-only features used in
-  # `starnix-selinux-host-tests`.
-  rustc_library("selinux-for-host") {
-    name = "selinux"
-    testonly = true
-    with_unit_tests = false
-    output_dir = "$target_out_dir/host_test_lib"
-    features = [ "selinux_policy_test_api" ]
-    configs += additional_selinux_configs
-    forward_variables_from(selinux, "*")
-  }
+rustc_library("selinux-for-test") {
+  name = "selinux"
+  testonly = true
+  with_unit_tests = false
+  features = [ "selinux_policy_test_api" ]
+  configs += additional_selinux_configs
 
+  forward_variables_from(selinux, "*")
+  if (is_host) {
+    deps += [ "//third_party/rust_crates:parking_lot" ]
+  } else {
+    features += [ "selinux_starnix" ]
+    deps += [ "//src/starnix/lib/starnix-sync" ]
+    test_deps += [
+      "//src/lib/fuchsia",
+      "//third_party/rust_crates:futures",
+      "//third_party/rust_crates:rand",
+    ]
+  }
+}
+
+if (is_host) {
   testdata_policies = [
     "emulator",
     "selinux_testsuite",
@@ -132,7 +169,7 @@ if (is_host) {
     source_root = "host_tests/lib.rs"
     sources = [ "host_tests/lib.rs" ]
     deps = [
-      ":selinux-for-host",
+      ":selinux-for-test",
       ":testdata_composite_policies",
       ":testdata_expectations",
       ":testdata_micro_policies",
@@ -162,7 +199,6 @@ group("tests") {
   deps = [
     ":host_tests",
     ":starnix-selinux-unit-tests",
-    "core:tests",
     "scripts:tests",
   ]
 }

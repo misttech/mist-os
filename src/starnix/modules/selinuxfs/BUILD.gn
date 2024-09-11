@@ -29,7 +29,6 @@ rustc_library("selinuxfs") {
     "//src/starnix/kernel:starnix_core",
     "//src/starnix/kernel:starnix_logging",
     "//src/starnix/lib/selinux",
-    "//src/starnix/lib/selinux/core",
     "//src/starnix/lib/starnix-sync",
     "//src/starnix/lib/starnix-uapi",
     "//third_party/rust_crates:zerocopy",

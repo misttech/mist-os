@@ -4,23 +4,20 @@
 
 use crate::access_vector_cache::{Manager as AvcManager, Query, QueryMut};
 use crate::permission_check::PermissionCheck;
-use crate::{
-    FileSystemLabel, FileSystemLabelingScheme, FileSystemMountOptions, SeLinuxStatus,
-    SeLinuxStatusPublisher, SecurityId,
-};
-
-use anyhow::Context as _;
-use selinux::policy::metadata::HandleUnknown;
-use selinux::policy::parser::ByValue;
-use selinux::policy::{
+use crate::policy::metadata::HandleUnknown;
+use crate::policy::parser::ByValue;
+use crate::policy::{
     parse_policy_by_value, AccessVector, AccessVectorComputer, FsUseLabelAndType, FsUseType,
     Policy, SecurityContext,
 };
-use selinux::{
-    AbstractObjectClass, ClassPermission, FileClass, InitialSid, NullessByteStr, ObjectClass,
-    Permission, FIRST_UNUSED_SID,
+use crate::sync::Mutex;
+use crate::{
+    AbstractObjectClass, ClassPermission, FileClass, FileSystemLabel, FileSystemLabelingScheme,
+    FileSystemMountOptions, InitialSid, NullessByteStr, ObjectClass, Permission, SeLinuxStatus,
+    SeLinuxStatusPublisher, SecurityId, FIRST_UNUSED_SID,
 };
-use starnix_sync::Mutex;
+
+use anyhow::Context as _;
 use std::collections::HashMap;
 use std::num::NonZeroU32;
 use std::ops::DerefMut;
@@ -619,7 +616,7 @@ fn sid_from_mount_option(
 mod tests {
     use super::*;
 
-    use selinux::ProcessPermission;
+    use crate::ProcessPermission;
 
     const TESTSUITE_BINARY_POLICY: &[u8] = include_bytes!("../testdata/policies/selinux_testsuite");
     const TESTS_BINARY_POLICY: &[u8] =
@@ -635,7 +632,7 @@ mod tests {
         security_server
     }
 
-    #[fuchsia::test]
+    #[test]
     fn sid_to_security_context() {
         let security_context = b"unconfined_u:unconfined_r:unconfined_t:s0";
         let security_server = security_server_with_tests_policy();
@@ -648,7 +645,7 @@ mod tests {
         );
     }
 
-    #[fuchsia::test]
+    #[test]
     fn sids_for_different_security_contexts_differ() {
         let security_server = security_server_with_tests_policy();
         let sid1 = security_server
@@ -660,7 +657,7 @@ mod tests {
         assert_ne!(sid1, sid2);
     }
 
-    #[fuchsia::test]
+    #[test]
     fn sids_for_same_security_context_are_equal() {
         let security_context = b"unconfined_u:unconfined_r:unconfined_t:s0";
         let security_server = security_server_with_tests_policy();
@@ -675,7 +672,7 @@ mod tests {
         assert_eq!(security_server.state.lock().sids.len(), sid_count_before + 1);
     }
 
-    #[fuchsia::test]
+    #[test]
     fn sids_allocated_outside_initial_range() {
         let security_context = b"unconfined_u:unconfined_r:unconfined_t:s0";
         let security_server = security_server_with_tests_policy();
@@ -687,7 +684,7 @@ mod tests {
         assert!(sid.0.get() >= FIRST_UNUSED_SID);
     }
 
-    #[fuchsia::test]
+    #[test]
     fn compute_access_vector_allows_all() {
         let security_server = SecurityServer::new();
         let sid1 = SecurityId::initial(InitialSid::Kernel);
@@ -698,20 +695,20 @@ mod tests {
         );
     }
 
-    #[fuchsia::test]
+    #[test]
     fn loaded_policy_can_be_retrieved() {
         let security_server = security_server_with_tests_policy();
         assert_eq!(TESTS_BINARY_POLICY, security_server.get_binary_policy().as_slice());
     }
 
-    #[fuchsia::test]
+    #[test]
     fn loaded_policy_is_validated() {
         let not_really_a_policy = "not a real policy".as_bytes().to_vec();
         let security_server = SecurityServer::new();
         assert!(security_server.load_policy(not_really_a_policy.clone()).is_err());
     }
 
-    #[fuchsia::test]
+    #[test]
     fn enforcing_mode_is_reported() {
         let security_server = SecurityServer::new();
         assert!(!security_server.is_enforcing());
@@ -720,13 +717,13 @@ mod tests {
         assert!(security_server.is_enforcing());
     }
 
-    #[fuchsia::test]
+    #[test]
     fn without_policy_conditional_booleans_are_empty() {
         let security_server = SecurityServer::new();
         assert!(security_server.conditional_booleans().is_empty());
     }
 
-    #[fuchsia::test]
+    #[test]
     fn conditional_booleans_can_be_queried() {
         let policy_bytes = TESTSUITE_BINARY_POLICY.to_vec();
         let security_server = SecurityServer::new();
@@ -743,7 +740,7 @@ mod tests {
         assert!(security_server.get_boolean(boolean).is_ok());
     }
 
-    #[fuchsia::test]
+    #[test]
     fn conditional_booleans_can_be_changed() {
         let policy_bytes = TESTSUITE_BINARY_POLICY.to_vec();
         let security_server = SecurityServer::new();
@@ -769,7 +766,7 @@ mod tests {
         assert_eq!(final_active, final_pending, "Active and pending are the same after commit");
     }
 
-    #[fuchsia::test]
+    #[test]
     fn parse_security_context_no_policy() {
         let security_server = SecurityServer::new();
         let error = security_server
@@ -779,7 +776,7 @@ mod tests {
         assert!(error_string.contains("no policy"));
     }
 
-    #[fuchsia::test]
+    #[test]
     fn compute_new_file_sid_no_policy() {
         let security_server = SecurityServer::new();
 
@@ -793,7 +790,7 @@ mod tests {
         assert!(error_string.contains("no policy"));
     }
 
-    #[fuchsia::test]
+    #[test]
     fn compute_new_file_sid_no_defaults() {
         let security_server = SecurityServer::new();
         let policy_bytes =
@@ -819,7 +816,7 @@ mod tests {
         assert_eq!(computed_context, b"user_u:object_r:file_t:s0");
     }
 
-    #[fuchsia::test]
+    #[test]
     fn compute_new_file_sid_source_defaults() {
         let security_server = SecurityServer::new();
         let policy_bytes =
@@ -845,7 +842,7 @@ mod tests {
         assert_eq!(computed_context, b"user_u:unconfined_r:unconfined_t:s0");
     }
 
-    #[fuchsia::test]
+    #[test]
     fn compute_new_file_sid_target_defaults() {
         let security_server = SecurityServer::new();
         let policy_bytes =
@@ -870,7 +867,7 @@ mod tests {
         assert_eq!(computed_context, b"file_u:object_r:file_t:s0");
     }
 
-    #[fuchsia::test]
+    #[test]
     fn compute_new_file_sid_range_source_low_default() {
         let security_server = SecurityServer::new();
         let policy_bytes =
@@ -895,7 +892,7 @@ mod tests {
         assert_eq!(computed_context, b"user_u:object_r:file_t:s0");
     }
 
-    #[fuchsia::test]
+    #[test]
     fn compute_new_file_sid_range_source_low_high_default() {
         let security_server = SecurityServer::new();
         let policy_bytes =
@@ -921,7 +918,7 @@ mod tests {
         assert_eq!(computed_context, b"user_u:object_r:file_t:s0-s1:c0");
     }
 
-    #[fuchsia::test]
+    #[test]
     fn compute_new_file_sid_range_source_high_default() {
         let security_server = SecurityServer::new();
         let policy_bytes =
@@ -946,7 +943,7 @@ mod tests {
         assert_eq!(computed_context, b"user_u:object_r:file_t:s1:c0");
     }
 
-    #[fuchsia::test]
+    #[test]
     fn compute_new_file_sid_range_target_low_default() {
         let security_server = SecurityServer::new();
         let policy_bytes =
@@ -971,7 +968,7 @@ mod tests {
         assert_eq!(computed_context, b"user_u:object_r:file_t:s0");
     }
 
-    #[fuchsia::test]
+    #[test]
     fn compute_new_file_sid_range_target_low_high_default() {
         let security_server = SecurityServer::new();
         let policy_bytes =
@@ -997,7 +994,7 @@ mod tests {
         assert_eq!(computed_context, b"user_u:object_r:file_t:s0-s1:c0");
     }
 
-    #[fuchsia::test]
+    #[test]
     fn compute_new_file_sid_range_target_high_default() {
         let security_server = SecurityServer::new();
         let policy_bytes =
@@ -1022,7 +1019,7 @@ mod tests {
         assert_eq!(computed_context, b"user_u:object_r:file_t:s1:c0");
     }
 
-    #[fuchsia::test]
+    #[test]
     fn unknown_sids_are_effectively_unlabeled() {
         let security_server = security_server_with_tests_policy();
         security_server.set_enforcing(true);
@@ -1062,7 +1059,7 @@ mod tests {
         );
     }
 
-    #[fuchsia::test]
+    #[test]
     fn permission_check_permissive() {
         let security_server = security_server_with_tests_policy();
         security_server.set_enforcing(false);
@@ -1080,7 +1077,7 @@ mod tests {
         assert!(permission_check.has_permission(sid, sid, ProcessPermission::GetRlimit).permit);
     }
 
-    #[fuchsia::test]
+    #[test]
     fn permission_check_enforcing() {
         let security_server = security_server_with_tests_policy();
         security_server.set_enforcing(true);

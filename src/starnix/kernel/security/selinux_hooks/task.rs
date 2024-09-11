@@ -340,7 +340,7 @@ mod tests {
         create_kernel_and_task_with_selinux, create_kernel_task_and_unlocked_with_selinux,
         create_task,
     };
-    use selinux_core::SecurityId;
+    use selinux::SecurityId;
     use starnix_uapi::signals::SIGTERM;
     use starnix_uapi::{error, CLONE_SIGHAND, CLONE_THREAD, CLONE_VM};
 

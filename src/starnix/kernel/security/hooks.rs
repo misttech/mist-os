@@ -7,8 +7,7 @@ use crate::security::KernelState;
 use crate::task::{CurrentTask, Task};
 use crate::vfs::fs_args::MountParams;
 use crate::vfs::{FsNode, FsNodeHandle, FsStr, FsString, NamespaceNode, ValueOrSize, XattrOp};
-use selinux::SecurityPermission;
-use selinux_core::security_server::SecurityServer;
+use selinux::{SecurityPermission, SecurityServer};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::mount_flags::MountFlags;
 use starnix_uapi::signals::Signal;
@@ -464,7 +463,7 @@ mod tests {
         AutoReleasableTask,
     };
     use linux_uapi::XATTR_NAME_SELINUX;
-    use selinux_core::{InitialSid, SecurityId};
+    use selinux::{InitialSid, SecurityId};
     use starnix_uapi::signals::SIGTERM;
 
     const VALID_SECURITY_CONTEXT: &[u8] = b"u:object_r:test_valid_t:s0";

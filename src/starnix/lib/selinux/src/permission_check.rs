@@ -2,12 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use super::access_vector_cache::{Fixed, Locked, Query, DEFAULT_SHARED_SIZE};
-use super::security_server::SecurityServer;
-use super::SecurityId;
+use crate::access_vector_cache::{Fixed, Locked, Query, DEFAULT_SHARED_SIZE};
+use crate::policy::AccessVectorComputer;
+use crate::security_server::SecurityServer;
+use crate::{ClassPermission, Permission, SecurityId};
 
-use selinux::policy::AccessVectorComputer;
-use selinux::{ClassPermission, Permission};
 use std::sync::Weak;
 
 /// Describes the result of a permission lookup between two Security Contexts.
@@ -92,19 +91,19 @@ fn has_permission<P: ClassPermission + Into<Permission> + Clone + 'static>(
 
 #[cfg(test)]
 mod tests {
-    use super::super::access_vector_cache::DenyAll;
     use super::*;
+    use crate::access_vector_cache::DenyAll;
+    use crate::policy::testing::{ACCESS_VECTOR_0001, ACCESS_VECTOR_0010};
+    use crate::policy::AccessVector;
+    use crate::{AbstractObjectClass, ObjectClass, ProcessPermission};
 
-    use once_cell::sync::Lazy;
-    use selinux::policy::testing::{ACCESS_VECTOR_0001, ACCESS_VECTOR_0010};
-    use selinux::policy::AccessVector;
-    use selinux::{AbstractObjectClass, ObjectClass, ProcessPermission};
     use std::any::Any;
     use std::num::NonZeroU32;
     use std::sync::atomic::{AtomicU32, Ordering};
+    use std::sync::LazyLock;
 
     /// SID to use where any value will do.
-    static A_TEST_SID: Lazy<SecurityId> = Lazy::new(unique_sid);
+    static A_TEST_SID: LazyLock<SecurityId> = LazyLock::new(unique_sid);
 
     /// Returns a new `SecurityId` with unique id.
     fn unique_sid() -> SecurityId {
@@ -200,7 +199,7 @@ mod tests {
         }
     }
 
-    #[fuchsia::test]
+    #[test]
     fn has_permission_both() {
         let deny_all: DenyAllPermissions = Default::default();
         let allow_all: AllowAllPermissions = Default::default();

@@ -12,10 +12,11 @@ use crate::vfs::{
     FileSystem, FsNode, FsNodeHandle, FsStr, FsString, NamespaceNode, ValueOrSize, XattrOp,
 };
 use linux_uapi::XATTR_NAME_SELINUX;
-use selinux::{ClassPermission, InitialSid, Permission, ProcessPermission, SecurityPermission};
-use selinux_core::permission_check::{PermissionCheck, PermissionCheckResult};
-use selinux_core::security_server::SecurityServer;
-use selinux_core::{FileSystemLabel, FileSystemLabelingScheme, FileSystemMountOptions, SecurityId};
+use selinux::permission_check::{PermissionCheck, PermissionCheckResult};
+use selinux::{
+    ClassPermission, FileSystemLabel, FileSystemLabelingScheme, FileSystemMountOptions, InitialSid,
+    Permission, ProcessPermission, SecurityId, SecurityPermission, SecurityServer,
+};
 use starnix_logging::{log_warn, track_stub};
 use starnix_uapi::error;
 use starnix_uapi::errors::Errno;
