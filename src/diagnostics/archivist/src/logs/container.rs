@@ -13,7 +13,9 @@ use crate::logs::stored_message::GenericStoredMessage;
 use crate::utils::AutoCall;
 use derivative::Derivative;
 use diagnostics_data::{BuilderArgs, Data, LogError, Logs, LogsData, LogsDataBuilder};
-use fidl_fuchsia_diagnostics::{Interest as FidlInterest, LogInterestSelector, StreamMode};
+use fidl_fuchsia_diagnostics::{
+    Interest as FidlInterest, LogInterestSelector, Severity as FidlSeverity, StreamMode,
+};
 use fidl_fuchsia_logger::{
     InterestChangeError, LogSinkRequest, LogSinkRequestStream,
     LogSinkWaitForInterestChangeResponder,
@@ -97,6 +99,7 @@ impl LogsArtifactsContainer {
     pub fn new<'a>(
         identity: Arc<ComponentIdentity>,
         interest_selectors: impl Iterator<Item = &'a LogInterestSelector>,
+        initial_interest: Option<FidlSeverity>,
         parent_node: &inspect::Node,
         budget: BudgetHandle,
     ) -> Self {
@@ -104,6 +107,10 @@ impl LogsArtifactsContainer {
             .with_inspect(parent_node, identity.moniker.to_string())
             .expect("failed to attach component log stats");
         stats.set_url(&identity.url);
+        let mut interests = BTreeMap::new();
+        if let Some(severity) = initial_interest {
+            interests.insert(Interest::from(severity), 1);
+        }
         let new = Self {
             identity,
             budget,
@@ -111,7 +118,7 @@ impl LogsArtifactsContainer {
             state: Arc::new(Mutex::new(ContainerState {
                 num_active_channels: 0,
                 num_active_sockets: 0,
-                interests: BTreeMap::new(),
+                interests,
                 hanging_gets: BTreeMap::new(),
                 is_initializing: true,
             })),
@@ -576,6 +583,12 @@ impl From<FidlInterest> for Interest {
     }
 }
 
+impl From<FidlSeverity> for Interest {
+    fn from(severity: FidlSeverity) -> Interest {
+        Interest(FidlInterest { min_severity: Some(severity), ..Default::default() })
+    }
+}
+
 impl std::ops::Deref for Interest {
     type Target = FidlInterest;
     fn deref(&self) -> &Self::Target {
@@ -623,6 +636,7 @@ mod tests {
     use moniker::ExtendedMoniker;
 
     fn initialize_container(
+        severity: Option<Severity>,
     ) -> (Arc<LogsArtifactsContainer>, LogSinkProxy, UnboundedReceiver<Task<()>>) {
         // Initialize container
         let (snd, _rcv) = mpsc::unbounded();
@@ -633,6 +647,7 @@ mod tests {
                 "fuchsia-pkg://test",
             )),
             std::iter::empty(),
+            severity,
             inspect::component::inspector().root(),
             budget_manager.handle(),
         ));
@@ -647,7 +662,7 @@ mod tests {
     #[fuchsia::test]
     async fn update_interest() {
         // Sync path test (initial interest)
-        let (container, log_sink, _sender) = initialize_container();
+        let (container, log_sink, _sender) = initialize_container(None);
         // Get initial interest
         let initial_interest = log_sink.wait_for_interest_change().await.unwrap().unwrap();
         {
@@ -703,8 +718,15 @@ mod tests {
     }
 
     #[fuchsia::test]
+    async fn initial_interest() {
+        let (_container, log_sink, _sender) = initialize_container(Some(Severity::Info));
+        let initial_interest = log_sink.wait_for_interest_change().await.unwrap().unwrap();
+        assert_eq!(initial_interest.min_severity, Some(Severity::Info));
+    }
+
+    #[fuchsia::test]
     async fn interest_serverity_semantics() {
-        let (container, log_sink, _sender) = initialize_container();
+        let (container, log_sink, _sender) = initialize_container(None);
         let initial_interest = log_sink.wait_for_interest_change().await.unwrap().unwrap();
         assert_eq!(initial_interest.min_severity, None);
         // Set some interest.

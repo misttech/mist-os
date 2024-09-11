@@ -2,11 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 use anyhow::*;
+use diagnostics_data::Severity;
 use fidl::endpoints::DiscoverableProtocolMarker;
 use fidl_fuchsia_archivist_test::*;
 use fuchsia_component_test::{
     Capability, ChildOptions, RealmBuilder, RealmBuilderParams, RealmInstance, Ref, Route,
 };
+use tracing::warn;
 use {
     fidl_fuchsia_boot as fboot, fidl_fuchsia_diagnostics as fdiagnostics,
     fidl_fuchsia_inspect as finspect, fidl_fuchsia_logger as flogger,
@@ -56,6 +58,36 @@ impl ArchivistRealmFactory {
             }))
             .await?;
 
+        let initial_interests = config
+            .initial_interests
+            .map(|interests| {
+                interests
+                    .into_iter()
+                    .filter_map(|interest| {
+                        let (Some(moniker), Some(log_severity)) =
+                            (&interest.moniker, &interest.log_severity)
+                        else {
+                            warn!(
+                                ?interest,
+                                "Expected both moniker and severity for the intial interest"
+                            );
+                            return None;
+                        };
+                        let severity = Severity::from(*log_severity);
+                        Some(format!("{moniker}:{severity}"))
+                    })
+                    .collect()
+            })
+            .unwrap_or(Vec::new());
+        builder
+            .add_capability(cm_rust::CapabilityDecl::Config(cm_rust::ConfigurationDecl {
+                name: "fuchsia.diagnostics.ComponentInitialInterests".parse()?,
+                value: cm_rust::ConfigValue::Vector(cm_rust::ConfigVectorValue::StringVector(
+                    initial_interests,
+                )),
+            }))
+            .await?;
+
         // This child test realm allows us to downscope the event stream offered
         // to archivist to the #test subtree. We need this because it's not possible
         // to downscope an event stream to the ref "self". See
@@ -78,6 +110,7 @@ impl ArchivistRealmFactory {
             .capability(Capability::protocol::<finspect::InspectSinkMarker>())
             .capability(Capability::protocol::<flogger::LogMarker>());
         let mut self_to_archivist = Route::new()
+            .capability(Capability::configuration("fuchsia.diagnostics.ComponentInitialInterests"))
             .capability(Capability::configuration("fuchsia.diagnostics.EnableKlog"))
             .capability(Capability::configuration("fuchsia.diagnostics.PipelinesPath"));
 
@@ -91,7 +124,6 @@ impl ArchivistRealmFactory {
             .capability(Capability::configuration("fuchsia.diagnostics.NumThreads"))
             .capability(Capability::configuration("fuchsia.diagnostics.AllowSerialLogs"))
             .capability(Capability::configuration("fuchsia.diagnostics.DenySerialLogs"))
-            .capability(Capability::configuration("fuchsia.diagnostics.ComponentInitialInterests"))
             .capability(Capability::configuration("fuchsia.diagnostics.LogToDebuglog"));
 
         let logs_max_cached_original_bytes_config_capability =

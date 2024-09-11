@@ -158,12 +158,14 @@ mod tests {
         let container_a = Arc::new(LogsArtifactsContainer::new(
             TEST_IDENTITY.clone(),
             std::iter::empty(),
+            None,
             fuchsia_inspect::component::inspector().root(),
             manager.handle(),
         ));
         let container_b = Arc::new(LogsArtifactsContainer::new(
             TEST_IDENTITY.clone(),
             std::iter::empty(),
+            None,
             fuchsia_inspect::component::inspector().root(),
             manager.handle(),
         ));

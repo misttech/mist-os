@@ -27,7 +27,7 @@ use futures::{FutureExt, StreamExt, TryStreamExt};
 use inspect_runtime::EscrowOptions;
 use inspect_testing::ExampleInspectData;
 use std::sync::Arc;
-use tracing::{debug, error, info, warn};
+use tracing::{debug, error, info, trace, warn};
 use {fidl_fuchsia_archivist_test as fpuppet, fuchsia_zircon as zx};
 
 enum IncomingServices {
@@ -263,6 +263,7 @@ async fn handle_puppet_request(
 
             match time {
                 None => match severity {
+                    Severity::Trace => trace!("{message}"),
                     Severity::Debug => debug!("{message}"),
                     Severity::Error => error!("{message}"),
                     Severity::Info => info!("{message}"),

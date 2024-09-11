@@ -206,3 +206,53 @@ async fn set_interest_before_startup() {
     )
     .await;
 }
+
+// This test verifies that the initial severity set for a a component only emits messages at or above its
+// current interest severity level, where the interest is inherited from the
+// parent realm, having been configured before the component was launched.
+#[fuchsia::test]
+async fn initial_interest() {
+    const REALM_NAME: &str = "initial_interest";
+
+    // Create the test realm.
+    let realm_proxy = test_topology::create_realm(ftest::RealmOptions {
+        archivist_config: Some(ftest::ArchivistConfig {
+            initial_interests: Some(vec![ftest::ComponentInitialInterest {
+                moniker: Some(PUPPET_NAME.into()),
+                log_severity: Some(Severity::Debug),
+                ..Default::default()
+            }]),
+            ..Default::default()
+        }),
+        realm_name: Some(REALM_NAME.to_string()),
+        puppets: Some(vec![test_topology::PuppetDeclBuilder::new(PUPPET_NAME).into()]),
+        ..Default::default()
+    })
+    .await
+    .expect("create test topology");
+
+    // Connect to the component under test to start it.
+    let puppet = test_topology::connect_to_puppet(&realm_proxy, PUPPET_NAME)
+        .await
+        .expect("connect to puppet");
+
+    let response = puppet.wait_for_interest_change().await.unwrap();
+    assert_eq!(response.severity, Some(Severity::Debug));
+    puppet
+        .log_messages(vec![
+            (Severity::Trace, "tracing world"),
+            (Severity::Debug, "debugging world"),
+            (Severity::Info, "Hello, world!"),
+        ])
+        .await;
+
+    // Assert logs include the Severity::Debug log.
+    let mut logs = crate::utils::snapshot_and_stream_logs(&realm_proxy).await;
+
+    assert_logs_sequence(
+        &mut logs,
+        &PUPPET_MONIKER,
+        vec![(Severity::Debug, "debugging world"), (Severity::Info, "Hello, world!")],
+    )
+    .await;
+}

@@ -152,6 +152,7 @@ pub struct MemoryMonitorConfig {
     pub normal_capture_delay_s: Option<u32>,
 }
 
+// LINT.IfChange
 /// The initial log interest that a component should receive upon starting up.
 #[derive(Debug, Deserialize, PartialEq, JsonSchema)]
 #[serde(deny_unknown_fields)]
@@ -161,6 +162,7 @@ pub struct ComponentInitialInterest {
     /// The log severity the initial interest should specify.
     pub log_severity: LogSeverity,
 }
+// LINT.ThenChange(/src/diagnostics/archivist/src/logs/repository.rs)
 
 impl Serialize for ComponentInitialInterest {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>

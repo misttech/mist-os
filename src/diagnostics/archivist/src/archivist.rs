@@ -12,7 +12,7 @@ use crate::identity::ComponentIdentity;
 use crate::inspect::container::InspectHandle;
 use crate::inspect::repository::InspectRepository;
 use crate::inspect::servers::*;
-use crate::logs::repository::LogsRepository;
+use crate::logs::repository::{ComponentInitialInterest, LogsRepository};
 use crate::logs::serial::{SerialConfig, SerialSink};
 use crate::logs::servers::*;
 use crate::logs::KernelDebugLog;
@@ -28,6 +28,7 @@ use futures::future::abortable;
 use futures::prelude::*;
 use moniker::ExtendedMoniker;
 use std::path::Path;
+use std::str::FromStr;
 use std::sync::Arc;
 use tracing::{debug, error, info, warn};
 use {fidl_fuchsia_diagnostics_host as fhost, fuchsia_async as fasync, fuchsia_zircon as zx};
@@ -89,8 +90,17 @@ impl Archivist {
         let incoming_external_event_producers =
             Self::initialize_external_event_sources(&mut event_router).await;
 
+        let initial_interests =
+            config.component_initial_interests.into_iter().filter_map(|interest| {
+                ComponentInitialInterest::from_str(&interest)
+                    .map_err(|err| {
+                        warn!(?err, invalid = %interest, "Failed to load initial interest");
+                    })
+                    .ok()
+            });
         let logs_repo = LogsRepository::new(
             config.logs_max_cached_original_bytes,
+            initial_interests,
             component::inspector().root(),
         );
         let serial_task = if !config.allow_serial_logs.is_empty() {

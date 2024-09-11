@@ -6,6 +6,7 @@ library fuchsia.archivist.test;
 
 using fuchsia.testing.harness;
 using fuchsia.component;
+using fuchsia.diagnostics;
 
 /// Subset of Archivist configuration relevant to some test cases.
 type ArchivistConfig = table {
@@ -18,6 +19,16 @@ type ArchivistConfig = table {
 
     /// The path to the Pipelines configuration in Archivist namespace.
     3: pipelines_path string:256;
+
+    /// Initial interests
+    4: initial_interests vector<ComponentInitialInterest>:MAX;
+};
+
+type ComponentInitialInterest = table {
+    /// The moniker to which this interest applies.
+    1: moniker string:MAX;
+    /// The initial severity for this moniker.
+    2: log_severity fuchsia.diagnostics.Severity;
 };
 
 type PuppetDecl = table {
