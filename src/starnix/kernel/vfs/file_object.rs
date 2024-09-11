@@ -12,7 +12,7 @@ use crate::vfs::fsverity::{
     FsVerityState, {self},
 };
 use crate::vfs::{
-    ActiveNamespaceNode, DirentSink, EpollFileObject, FallocMode, FdNumber, FdTableId,
+    ActiveNamespaceNode, DirentSink, EpollFileObject, EpollKey, FallocMode, FdNumber, FdTableId,
     FileReleaser, FileSystemHandle, FileWriteGuard, FileWriteGuardMode, FileWriteGuardRef,
     FsNodeHandle, NamespaceNode, RecordLockCommand, RecordLockOwner,
 };
@@ -1830,10 +1830,11 @@ impl Releasable for FileObject {
         // of each registered epfd.
         for epfd in self.epoll_files.lock().drain() {
             if let Ok(file) = current_task.files.get(epfd) {
-                if let Some(epoll_object) = file.downcast_file::<EpollFileObject>() {
-                    if let Some(file_handle) = self.weak_handle.upgrade() {
-                        epoll_object.drop_lease(current_task, &file_handle);
-                    }
+                if let Some(_epoll_object) = file.downcast_file::<EpollFileObject>() {
+                    current_task
+                        .kernel()
+                        .suspend_resume_manager
+                        .remove_epoll(self.weak_handle.as_ptr() as EpollKey);
                 }
             }
         }

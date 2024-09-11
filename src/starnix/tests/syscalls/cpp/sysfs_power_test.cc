@@ -3,6 +3,9 @@
 // found in the LICENSE file.
 
 #include <fcntl.h>
+#include <sys/epoll.h>
+#include <sys/poll.h>
+#include <sys/timerfd.h>
 #include <sys/uio.h>
 
 #include <string>
@@ -122,16 +125,213 @@ TEST_F(SysfsPowerTest, SuspendStateFileContainsExpectedContents) {
 
 TEST_F(SysfsPowerTest, SuspendStateFileReadOutOfBound) { VerifyReadOutOfBound("/sys/power/state"); }
 
-TEST_F(SysfsPowerTest, SuspendStateFileWrite) {
-  ASSERT_TRUE(files::WriteFile("/sys/power/state", "mem"));
-  ASSERT_TRUE(files::WriteFile("/sys/power/state", "mem\n"));
-  ASSERT_TRUE(files::WriteFile("/sys/power/state", "mem\nfoobar"));
-  ASSERT_TRUE(files::WriteFile("/sys/power/state", "freeze"));
-  ASSERT_TRUE(files::WriteFile("/sys/power/state", "freeze\n"));
-  ASSERT_TRUE(files::WriteFile("/sys/power/state", "freeze\nfoobar"));
+bool attempt_suspend(const std::string& suspend_type) {
+  return files::WriteFile("/sys/power/state", suspend_type);
 }
 
-TEST_F(SysfsPowerTest, SuspendStateFileWriteFails) {
+timer_t start_interval_timer() {
+  timer_t timer_id;
+  struct sigevent sev = {};
+  sev.sigev_notify = SIGEV_NONE;
+  EXPECT_NE(-1, timer_create(CLOCK_REALTIME_ALARM, &sev, &timer_id));
+
+  // Set a test timer that will trigger every 1 second to wake
+  // up all the subsequent suspends.
+  struct itimerspec its = {};
+  its.it_value.tv_sec = 2;
+  its.it_interval.tv_sec = 2;
+  EXPECT_NE(-1, timer_settime(timer_id, 0, &its, nullptr));
+
+  return timer_id;
+}
+
+void stop_interval_timer(timer_t timer_id) {
+  struct itimerspec its = {};
+  its.it_value.tv_sec = 0;
+  its.it_interval.tv_sec = 0;
+  EXPECT_NE(-1, timer_settime(timer_id, 0, &its, nullptr));
+}
+
+TEST_F(SysfsPowerTest, SuspendStateFileWrite) {
+  timer_t timer_id = start_interval_timer();
+
+  ASSERT_TRUE(attempt_suspend("mem"));
+  ASSERT_TRUE(attempt_suspend("mem\n"));
+  ASSERT_TRUE(attempt_suspend("mem\nfoobar"));
+  ASSERT_TRUE(attempt_suspend("freeze"));
+  ASSERT_TRUE(attempt_suspend("freeze\n"));
+  ASSERT_TRUE(attempt_suspend("freeze\nfoobar"));
+
+  stop_interval_timer(timer_id);
+}
+
+TEST_F(SysfsPowerTest, SuspendStateFileWriteFailsWaitAgain) {
+  fbl::unique_fd timer_fd(timerfd_create(CLOCK_REALTIME, 0));
+  EXPECT_TRUE(timer_fd.is_valid());
+
+  fbl::unique_fd epoll_fd(epoll_create(1));
+  EXPECT_TRUE(epoll_fd.is_valid());
+
+  struct epoll_event ev = epoll_event();
+  ev.events = EPOLLIN | EPOLLWAKEUP;
+  EXPECT_EQ(0, epoll_ctl(epoll_fd.get(), EPOLL_CTL_ADD, timer_fd.get(), &ev));
+
+  // Activate the EPOLLWAKEUP event to create the implicit wake lock.
+  {
+    struct itimerspec its = {};
+    its.it_value.tv_sec = 1;
+    EXPECT_EQ(0, timerfd_settime(timer_fd.get(), 0, &its, nullptr));
+
+    int ret = 0;
+    struct epoll_event out_ev;
+    ret = epoll_wait(epoll_fd.get(), &out_ev, 1, -1);
+    EXPECT_EQ(1, ret);
+
+    uint64_t val = 0;
+    // Read the event from the timer_fd to reset the pending events.
+    EXPECT_EQ(1, read(timer_fd.get(), &val, 1));
+  }
+
+  // This should fail due to the implicit wake lock.
+  ASSERT_FALSE(attempt_suspend("mem"));
+
+  // Wait on the events again, which should clear the EPOLLWAKEUP when
+  // no events are returned.
+  {
+    int ret = 0;
+    struct epoll_event out_ev;
+    ret = epoll_wait(epoll_fd.get(), &out_ev, 1, 0);
+    EXPECT_EQ(0, ret);
+  }
+
+  // Attempt to suspend the system now that the implicit wake lock
+  // should have been deleted.
+  timer_t timer_id = start_interval_timer();
+  ASSERT_TRUE(attempt_suspend("mem"));
+  stop_interval_timer(timer_id);
+}
+
+TEST_F(SysfsPowerTest, SuspendStateFileWriteFailsCloseFD) {
+  fbl::unique_fd timer_fd(timerfd_create(CLOCK_REALTIME, 0));
+  EXPECT_TRUE(timer_fd.is_valid());
+
+  fbl::unique_fd epoll_fd(epoll_create(1));
+  EXPECT_TRUE(epoll_fd.is_valid());
+
+  struct epoll_event ev = epoll_event();
+  ev.events = EPOLLIN | EPOLLWAKEUP;
+  EXPECT_EQ(0, epoll_ctl(epoll_fd.get(), EPOLL_CTL_ADD, timer_fd.get(), &ev));
+
+  // Activate the EPOLLWAKEUP event to create the implicit wake lock.
+  {
+    struct itimerspec its = {};
+    its.it_value.tv_sec = 1;
+    EXPECT_EQ(0, timerfd_settime(timer_fd.get(), 0, &its, nullptr));
+
+    int ret = 0;
+    struct epoll_event out_ev;
+    ret = epoll_wait(epoll_fd.get(), &out_ev, 1, -1);
+    EXPECT_EQ(1, ret);
+
+    uint64_t val = 0;
+    // Read the event from the timer_fd to reset the pending events.
+    EXPECT_EQ(1, read(timer_fd.get(), &val, 1));
+  }
+
+  // This should fail due to the implicit wake lock.
+  ASSERT_FALSE(attempt_suspend("mem"));
+
+  // Closing the epoll file descriptor should remove the wake lock.
+  timer_fd.reset();
+
+  // Attempt to suspend the system now that the implicit wake lock
+  // should have been deleted.
+  timer_t timer_id = start_interval_timer();
+  ASSERT_TRUE(attempt_suspend("mem"));
+  stop_interval_timer(timer_id);
+}
+
+TEST_F(SysfsPowerTest, SuspendStateFileWriteFailsCloseEpollFD) {
+  fbl::unique_fd timer_fd(timerfd_create(CLOCK_REALTIME, 0));
+  EXPECT_TRUE(timer_fd.is_valid());
+
+  fbl::unique_fd epoll_fd(epoll_create(1));
+  EXPECT_TRUE(epoll_fd.is_valid());
+
+  struct epoll_event ev = epoll_event();
+  ev.events = EPOLLIN | EPOLLWAKEUP;
+  EXPECT_EQ(0, epoll_ctl(epoll_fd.get(), EPOLL_CTL_ADD, timer_fd.get(), &ev));
+
+  // Activate the EPOLLWAKEUP event to create the implicit wake lock.
+  {
+    struct itimerspec its = {};
+    its.it_value.tv_sec = 1;
+    EXPECT_EQ(0, timerfd_settime(timer_fd.get(), 0, &its, nullptr));
+
+    int ret = 0;
+    struct epoll_event out_ev;
+    ret = epoll_wait(epoll_fd.get(), &out_ev, 1, -1);
+    EXPECT_EQ(1, ret);
+
+    uint64_t val = 0;
+    // Read the event from the timer_fd to reset the pending events.
+    EXPECT_EQ(1, read(timer_fd.get(), &val, 1));
+  }
+
+  // This should fail due to the implicit wake lock.
+  ASSERT_FALSE(attempt_suspend("mem"));
+
+  // Closing the epoll file descriptor should remove the wake lock.
+  epoll_fd.reset();
+
+  // Attempt to suspend the system now that the implicit wake lock
+  // should have been deleted.
+  timer_t timer_id = start_interval_timer();
+  ASSERT_TRUE(attempt_suspend("mem"));
+  stop_interval_timer(timer_id);
+}
+
+TEST_F(SysfsPowerTest, SuspendStateFileWriteFailsEpollDelete) {
+  fbl::unique_fd timer_fd(timerfd_create(CLOCK_REALTIME, 0));
+  EXPECT_TRUE(timer_fd.is_valid());
+
+  fbl::unique_fd epoll_fd(epoll_create(1));
+  EXPECT_TRUE(epoll_fd.is_valid());
+
+  struct epoll_event ev = epoll_event();
+  ev.events = EPOLLIN | EPOLLWAKEUP;
+  EXPECT_EQ(0, epoll_ctl(epoll_fd.get(), EPOLL_CTL_ADD, timer_fd.get(), &ev));
+
+  // Activate the EPOLLWAKEUP event to create the implicit wake lock.
+  {
+    struct itimerspec its = {};
+    its.it_value.tv_sec = 1;
+    EXPECT_EQ(0, timerfd_settime(timer_fd.get(), 0, &its, nullptr));
+
+    int ret = 0;
+    struct epoll_event out_ev;
+    ret = epoll_wait(epoll_fd.get(), &out_ev, 1, -1);
+    EXPECT_EQ(1, ret);
+
+    uint64_t val = 0;
+    // Read the event from the timer_fd to reset the pending events.
+    EXPECT_EQ(1, read(timer_fd.get(), &val, 1));
+  }
+
+  // This should fail due to the implicit wake lock.
+  ASSERT_FALSE(attempt_suspend("mem"));
+
+  // Deleting the epoll file descriptor should remove the wake lock.
+  EXPECT_EQ(0, epoll_ctl(epoll_fd.get(), EPOLL_CTL_DEL, timer_fd.get(), &ev));
+
+  // Attempt to suspend the system now that the implicit wake lock
+  // should have been deleted.
+  timer_t timer_id = start_interval_timer();
+  ASSERT_TRUE(attempt_suspend("mem"));
+  stop_interval_timer(timer_id);
+}
+
+TEST_F(SysfsPowerTest, SuspendStateFileWriteInvalidFails) {
   ASSERT_FALSE(files::WriteFile("/sys/power/state", "test"));
   ASSERT_FALSE(files::WriteFile("/sys/power/state", "disk"));
 }

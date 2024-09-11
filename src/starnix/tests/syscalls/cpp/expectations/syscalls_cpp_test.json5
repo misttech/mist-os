@@ -23,6 +23,12 @@
                 // TODO(https://fxbug.dev/342416456): Rework the test to take
                 // into account logs from the system.
                 "SyslogTest.ProcKmsgPoll",
+
+                // These tests can be enabled when the wake_locks feature is enabled.
+                "SysfsPowerTest.SuspendStateFileWriteFailsWaitAgain",
+                "SysfsPowerTest.SuspendStateFileWriteFailsCloseFD",
+                "SysfsPowerTest.SuspendStateFileWriteFailsCloseEpollFD",
+                "SysfsPowerTest.SuspendStateFileWriteFailsEpollDelete",
             ],
         },
         {

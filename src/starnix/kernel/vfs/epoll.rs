@@ -569,6 +569,15 @@ impl FileOps for EpollFileObject {
         }
         Ok(events)
     }
+
+    fn close(&self, _file: &FileObject, current_task: &CurrentTask) {
+        let guard = self.state.lock();
+        for (key, _wait_object) in guard.wait_objects.iter() {
+            if let ReadyItemKey::Usize(key) = key {
+                current_task.kernel().suspend_resume_manager.remove_epoll(*key);
+            }
+        }
+    }
 }
 
 #[cfg(test)]
