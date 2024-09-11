@@ -126,12 +126,8 @@ class PcirootInspect {
 class PcirootBase : public ddk::PcirootProtocol<PcirootBase>, public PcirootInspect {
  public:
   explicit PcirootBase(PciRootHost* host) : root_host_(host) { InitializeInspect(root_host_); }
-
   virtual ~PcirootBase() = default;
-  zx_status_t PcirootGetAuxdata(const char* args, void* out_data, size_t data_size,
-                                size_t* out_data_actual) {
-    return ZX_ERR_NOT_SUPPORTED;
-  }
+
   virtual zx_status_t PcirootGetBti(uint32_t bdf, uint32_t index, zx::bti* bti) {
     return ZX_ERR_NOT_SUPPORTED;
   }
@@ -219,10 +215,6 @@ class PcirootBase : public ddk::PcirootProtocol<PcirootBase>, public PcirootInsp
       *out_base = result.value();
     }
     return result.status_value();
-  }
-
-  zx_status_t PcirootFreeAddressSpace(uint64_t base, size_t size, pci_address_space_t type) {
-    return ZX_ERR_NOT_SUPPORTED;
   }
 
  private:
