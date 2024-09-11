@@ -178,8 +178,8 @@ FuchsiaLogSeverity GetMinLogSeverity() {
 
 void internal::LogState::PollInterest() {
   log_sink_->WaitForInterestChange().Then(
-      [=](fidl::WireUnownedResult<fuchsia_logger::LogSink::WaitForInterestChange>&
-              interest_result) {
+      [this](fidl::WireUnownedResult<fuchsia_logger::LogSink::WaitForInterestChange>&
+                 interest_result) {
         // FIDL can cancel the operation if the logger is being reconfigured
         // which results in an error.
         if (!interest_result.ok()) {
