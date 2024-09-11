@@ -18,9 +18,9 @@ use starnix_uapi::{
     nf_nat_ipv4_multi_range_compat, nf_nat_range,
     xt_entry_match__bindgen_ty_1__bindgen_ty_1 as xt_entry_match,
     xt_entry_target__bindgen_ty_1__bindgen_ty_1 as xt_entry_target, xt_tcp,
-    xt_tproxy_target_info_v1, xt_udp, IPPROTO_IP, IPPROTO_TCP, IPPROTO_UDP, IPT_RETURN, NF_ACCEPT,
-    NF_DROP, NF_IP_FORWARD, NF_IP_LOCAL_IN, NF_IP_LOCAL_OUT, NF_IP_NUMHOOKS, NF_IP_POST_ROUTING,
-    NF_IP_PRE_ROUTING, NF_QUEUE,
+    xt_tproxy_target_info_v1, xt_udp, IPPROTO_ICMP, IPPROTO_ICMPV6, IPPROTO_IP, IPPROTO_TCP,
+    IPPROTO_UDP, IPT_RETURN, NF_ACCEPT, NF_DROP, NF_IP_FORWARD, NF_IP_LOCAL_IN, NF_IP_LOCAL_OUT,
+    NF_IP_NUMHOOKS, NF_IP_POST_ROUTING, NF_IP_PRE_ROUTING, NF_QUEUE,
 };
 use std::any::type_name;
 use std::collections::{HashMap, HashSet};
@@ -1496,9 +1496,9 @@ impl Entry {
         if ip_info.should_match_protocol() {
             match ip_info.protocol {
                 // matches both TCP and UDP, which is true by default.
-                protocol if protocol == IPPROTO_IP => {}
+                IPPROTO_IP => {}
 
-                protocol if protocol == IPPROTO_TCP => {
+                IPPROTO_TCP => {
                     matchers.transport_protocol =
                         Some(fnet_filter_ext::TransportProtocolMatcher::Tcp {
                             // These fields are set later by `xt_tcp` match extension, if present.
@@ -1507,13 +1507,23 @@ impl Entry {
                         });
                 }
 
-                protocol if protocol == IPPROTO_UDP => {
+                IPPROTO_UDP => {
                     matchers.transport_protocol =
                         Some(fnet_filter_ext::TransportProtocolMatcher::Udp {
                             // These fields are set later by `xt_udp` match extension, if present.
                             src_port: None,
                             dst_port: None,
                         });
+                }
+
+                IPPROTO_ICMP => {
+                    matchers.transport_protocol =
+                        Some(fnet_filter_ext::TransportProtocolMatcher::Icmp)
+                }
+
+                IPPROTO_ICMPV6 => {
+                    matchers.transport_protocol =
+                        Some(fnet_filter_ext::TransportProtocolMatcher::Icmpv6)
                 }
 
                 protocol => {
@@ -2094,14 +2104,40 @@ mod tests {
         );
         extend_with_standard_verdict(&mut entries_bytes, VERDICT_DROP);
 
-        // Entry 3: policy of INPUT chain.
+        // Entry 3: drop all ICMP packets.
+        entries_bytes.extend_from_slice(
+            ipt_entry {
+                ip: ipt_ip { proto: IPPROTO_ICMP as u16, ..Default::default() },
+                target_offset: 112,
+                next_offset: 152,
+                ..Default::default()
+            }
+            .as_bytes(),
+        );
+        extend_with_standard_verdict(&mut entries_bytes, VERDICT_DROP);
+
+        // Entry 4: drop all ICMPV6 packets.
+        // Note: this rule doesn't make sense on a IPv4 table, but iptables will defer to Netstack
+        // to report this error.
+        entries_bytes.extend_from_slice(
+            ipt_entry {
+                ip: ipt_ip { proto: IPPROTO_ICMPV6 as u16, ..Default::default() },
+                target_offset: 112,
+                next_offset: 152,
+                ..Default::default()
+            }
+            .as_bytes(),
+        );
+        extend_with_standard_verdict(&mut entries_bytes, VERDICT_DROP);
+
+        // Entry 5: policy of INPUT chain.
         let input_underflow = entries_bytes.len() as u32;
         extend_with_standard_target_ipv4_entry(&mut entries_bytes, VERDICT_ACCEPT);
 
         // Start of FORWARD built-in chain.
         let forward_hook_entry = entries_bytes.len() as u32;
 
-        // Entry 4: policy of FORWARD chain.
+        // Entry 6: policy of FORWARD chain.
         // Note: FORWARD chain has no other rules.
         let forward_underflow = entries_bytes.len() as u32;
         extend_with_standard_target_ipv4_entry(&mut entries_bytes, VERDICT_ACCEPT);
@@ -2109,7 +2145,7 @@ mod tests {
         // Start of OUTPUT built-in chain.
         let output_hook_entry = entries_bytes.len() as u32;
 
-        // Entry 5: accept all packets going from wifi1 interface.
+        // Entry 7: accept all packets going from wifi1 interface.
         entries_bytes.extend_from_slice(
             ipt_entry {
                 ip: ipt_ip {
@@ -2125,16 +2161,16 @@ mod tests {
         );
         extend_with_standard_verdict(&mut entries_bytes, VERDICT_ACCEPT);
 
-        // Entry 6: policy of OUTPUT chain.
+        // Entry 8: policy of OUTPUT chain.
         let output_underflow = entries_bytes.len() as u32;
         extend_with_standard_target_ipv4_entry(&mut entries_bytes, VERDICT_DROP);
 
-        // Entry 7: end of input.
+        // Entry 9: end of input.
         extend_with_error_target_ipv4_entry(&mut entries_bytes, TARGET_ERROR);
 
         let mut bytes = ipt_replace {
             name: string_to_32_chars("filter"),
-            num_entries: 8,
+            num_entries: 10,
             size: entries_bytes.len() as u32,
             valid_hooks: NfIpHooks::FILTER.bits(),
             hook_entry: [0, input_hook_entry, forward_hook_entry, output_hook_entry, 0],
@@ -2207,14 +2243,48 @@ mod tests {
         );
         extend_with_standard_verdict(&mut entries_bytes, VERDICT_DROP);
 
-        // Entry 3: policy of INPUT chain.
+        // Entry 3: drop all ICMP packets.
+        entries_bytes.extend_from_slice(
+            ip6t_entry {
+                ipv6: ip6t_ip6 {
+                    proto: IPPROTO_ICMP as u16,
+                    flags: IP6T_F_PROTO as u8,
+                    ..Default::default()
+                },
+                target_offset: 168,
+                next_offset: 208,
+                ..Default::default()
+            }
+            .as_bytes(),
+        );
+        extend_with_standard_verdict(&mut entries_bytes, VERDICT_DROP);
+
+        // Entry 4: drop all ICMPV6 packets.
+        // Note: this rule doesn't make sense on a IPv4 table, but iptables will defer to Netstack
+        // to report this error.
+        entries_bytes.extend_from_slice(
+            ip6t_entry {
+                ipv6: ip6t_ip6 {
+                    proto: IPPROTO_ICMPV6 as u16,
+                    flags: IP6T_F_PROTO as u8,
+                    ..Default::default()
+                },
+                target_offset: 168,
+                next_offset: 208,
+                ..Default::default()
+            }
+            .as_bytes(),
+        );
+        extend_with_standard_verdict(&mut entries_bytes, VERDICT_DROP);
+
+        // Entry 5: policy of INPUT chain.
         let input_underflow = entries_bytes.len() as u32;
         extend_with_standard_target_ipv6_entry(&mut entries_bytes, VERDICT_ACCEPT);
 
         // Start of FORWARD built-in chain.
         let forward_hook_entry = entries_bytes.len() as u32;
 
-        // Entry 4: policy of FORWARD chain.
+        // Entry 6: policy of FORWARD chain.
         // Note: FORWARD chain has no other rules.
         let forward_underflow = entries_bytes.len() as u32;
         extend_with_standard_target_ipv6_entry(&mut entries_bytes, VERDICT_ACCEPT);
@@ -2222,7 +2292,7 @@ mod tests {
         // Start of OUTPUT built-in chain.
         let output_hook_entry = entries_bytes.len() as u32;
 
-        // Entry 5: accept all packets going out from wifi1 interface.
+        // Entry 7: accept all packets going out from wifi1 interface.
         entries_bytes.extend_from_slice(
             ip6t_entry {
                 ipv6: ip6t_ip6 {
@@ -2238,16 +2308,16 @@ mod tests {
         );
         extend_with_standard_verdict(&mut entries_bytes, VERDICT_ACCEPT);
 
-        // Entry 6: policy of OUTPUT chain.
+        // Entry 8: policy of OUTPUT chain.
         let output_underflow = entries_bytes.len() as u32;
         extend_with_standard_target_ipv6_entry(&mut entries_bytes, VERDICT_DROP);
 
-        // Entry 7: end of input.
+        // Entry 9: end of input.
         extend_with_error_target_ipv6_entry(&mut entries_bytes, TARGET_ERROR);
 
         let mut bytes = ip6t_replace {
             name: string_to_32_chars("filter"),
-            num_entries: 8,
+            num_entries: 10,
             size: entries_bytes.len() as u32,
             valid_hooks: NfIpHooks::FILTER.bits(),
             hook_entry: [0, input_hook_entry, forward_hook_entry, output_hook_entry, 0],
@@ -2344,6 +2414,28 @@ mod tests {
             fnet_filter_ext::Rule {
                 id: fnet_filter_ext::RuleId {
                     index: 3,
+                    routine: filter_input_routine(&expected_namespace).id.clone(),
+                },
+                matchers: fnet_filter_ext::Matchers {
+                    transport_protocol: Some(fnet_filter_ext::TransportProtocolMatcher::Icmp),
+                    ..Default::default()
+                },
+                action: fnet_filter_ext::Action::Drop,
+            },
+            fnet_filter_ext::Rule {
+                id: fnet_filter_ext::RuleId {
+                    index: 4,
+                    routine: filter_input_routine(&expected_namespace).id.clone(),
+                },
+                matchers: fnet_filter_ext::Matchers {
+                    transport_protocol: Some(fnet_filter_ext::TransportProtocolMatcher::Icmpv6),
+                    ..Default::default()
+                },
+                action: fnet_filter_ext::Action::Drop,
+            },
+            fnet_filter_ext::Rule {
+                id: fnet_filter_ext::RuleId {
+                    index: 5,
                     routine: filter_input_routine(&expected_namespace).id.clone(),
                 },
                 matchers: fnet_filter_ext::Matchers::default(),
