@@ -1,9 +1,11 @@
-# Running package servers
+# Start package servers
 
-## Overview
+The [`ffx repository server`][ffx-repo-server] commands can start and manage
+[Fuchsia package servers][fuchsia-package-server] on the host machine.
 
-Virtually all software running on Fuchsia is collected into Fuchsia Packages.
+## Concepts
 
+Virtually all software running on Fuchsia is collected into Fuchsia packages.
 A [Fuchsia package](/docs/concepts/packages/package.md) is a hierarchical
 collection of files that provides one or more programs, components, or services
 to a Fuchsia system. A Fuchsia package is a term representing a unit of
@@ -20,20 +22,22 @@ For developers working with Fuchsia, a package server is provided that
 facilitates working with packages that are used as the product foundation and
 also overlaying packages compiled locally during the development cycle.
 
-## Starting the package server
+## Start the package server
 
 The package repository server is controlled by running the subcommands of
-[`ffx repository server`](/reference/tools/sdk/ffx#server). This server handles
+[`ffx repository server`][ffx-repo-server]. This server handles
  requests for metadata about the available packages and delivers the file blobs
  that make up the package contents.
 
 ### Basic command
 
-`ffx repository server start`
+```posix-terminal
+ffx repository server start
+```
 
 ### Server Options
 
-#### `--address`
+#### --address
 
 The address that the package server listens on to for requests. The format
 of the address is can be either an IPv4 or IPv6 address. For example,
@@ -55,7 +59,7 @@ packages based on the target device's network connection. For example, when
 non-ffx commands are needed for tunneling or firewall configuration, specifying
 a port is needed to match configuration in these other tools.
 
-#### `--background`, `--daemon`, `--foreground`
+#### --background, --daemon, --foreground
 
 The execution mode of the package server. These options are mutually exclusive;
 only 1 of the execution modes can be used at a time.
@@ -95,7 +99,7 @@ Background is a desirable mode for remote workflows so there can be one remote
 terminal window, and with IDEs such as VS Code where the user experience of
 switching between multiple terminal windows is not easy.
 
-#### `--repo-name`
+#### --repo-name
 
 Uniquely identifies the package server by name. If another package server is
 running with the same name, the new package server will fail with an error.
@@ -108,7 +112,7 @@ must be unique.
 In `--daemon` mode, this option is not allowed, since repositories are managed
 using other commands such as `ffx repository add-from-pm`.
 
-#### `--repo-path`
+#### --repo-path
 
 The path to the root directory of the repository.
 
@@ -132,12 +136,12 @@ characteristic of a development project environment.
 In `--daemon` mode, this option is not allowed,since repositories are managed
 using other commands such as `ffx repository add-from-pm`.
 
-#### `--trusted-root`
+#### --trusted-root
 
 Path to the root metadata that was used to sign the repository TUF metadata.
 
- This establishes the root of trust for this repository. If the TUF metadata was
- not signed by this root metadata, running this command will result in an error.
+This establishes the root of trust for this repository. If the TUF metadata was
+not signed by this root metadata, running this command will result in an error.
 The default is to use 1.root.json from the repository.
 
 There are no configuration properties that affect `--trusted-root`.
@@ -150,7 +154,7 @@ These are options influencing the server registration on the target devices.
 As a developer productivity aide, the package server can register itself on
 development devices. The following options affect this registration behavior.
 
-#### `--no-device`
+#### --no-device
 
 Disables automatic registration of the server on the target device.
 
@@ -164,7 +168,7 @@ Eventually to simplify the package serving process, this option will be the
 default, or registration removed completely. At this point the automatic
 registration workflow would be integrated into other commands.
 
-#### `--alias`
+#### --alias
 
 Identifies a package domain alias for this repository.
 
@@ -183,7 +187,7 @@ This is commonly used when working on a source code project which produces a
 package that must be in the "fuchsia.com" or "chromium.org" domain, but is not
 part of the fuchsia source project.
 
-#### `--alias-conflict-mode`
+#### --alias-conflict-mode
 
 Defines the resolution mechanism when alias registrations conflict.
 Must be either `error-out` or `replace`.
@@ -192,7 +196,7 @@ The default behavior is `replace`.
 
 There are no configuration properties affecting `--alias-conflict-mode`.
 
-#### `--storage-type`
+#### --storage-type
 
 Defines the storage type for packages resolved using this registration.
 `persistent` defines that the packages are persisted across reboots. Alternatively,
@@ -211,7 +215,7 @@ startup process.
 
 ### Start the repository in-tree
 
-See: [fx serve reference](/reference/tools/fx/cmd/serve) for options. As part
+See [`fx serve` reference](/reference/tools/fx/cmd/serve) for options. As part
 of the implementation, `ffx repository server start` is run.
 
 ```posix-terminal
@@ -230,4 +234,8 @@ or in-tree
 fx serve --background
 ```
 
+<!-- Reference links -->
+
+[ffx-repo-server]: /reference/tools/sdk/ffx.md#ffx_repository_server
 [ffx-bug]: https://issuetracker.google.com/issues/new?component=1378294&template=1838957
+[fuchsia-package-server]: /docs/concepts/packages/fuchsia_package_server.md

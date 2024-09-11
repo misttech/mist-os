@@ -7,7 +7,7 @@ Fuchsia package repositories on the host machine.
 
 When a Fuchsia device needs to run new software or update existing software,
 the device requests and downloads [Fuchsia packages][fuchsia-package] from the
-[Fuchsia package server](#start-the-fuchsia-package-server), which is a service
+[Fuchsia package server][fuchsia-package-server], which is a service
 that you can start (and stop) on the host machine. The Fuchsia package server
 then serves Fuchsia packages from a
 [Fuchsia package repository](#create-a-package-repository) configured
@@ -197,6 +197,8 @@ $ ffx repository server start
 server is listening on [::]:8083
 ```
 
+For more options, see [Start package servers][start-package-servers].
+
 ## Stop the Fuchsia package server {:#stop-the-fuchsia-package-server}
 
 To stop the Fuchsia package server, run the following command:
@@ -212,7 +214,14 @@ $ ffx repository server stop
 server stopped
 ```
 
+For more options, see
+[Stop running package servers][start-package-servers].
+
 <!-- Reference links -->
 
 [ffx-repository]: https://fuchsia.dev/reference/tools/sdk/ffx#repository
 [fuchsia-package]: /docs/concepts/packages/package.md
+[fuchsia-package-server]: /docs/concepts/packages/fuchsia_package_server.md
+[start-package-servers]: start-package-servers.md
+[stop-package-servers]: stop-package-servers.md
+

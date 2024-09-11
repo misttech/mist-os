@@ -28,6 +28,9 @@ interact with Fuchsia systems, devices, and software.
 
   * [Create a Fuchsia package repository][create-a-package-repo]
   * [Update Fuchsia packages on a device][update-packages]
+  * [Start package servers][start-package-servers]
+  * [List running package servers][list-package-servers]
+  * [Stop running package servers][stop-package-servers]
 
 * Debugging
 
@@ -69,3 +72,6 @@ interact with Fuchsia systems, devices, and software.
 [explore-components]: explore-components.md
 [measure-memory-usage]: explore-memory-usage.md
 [run-tests]: run-device-tests.md
+[start-package-servers]: start-package-servers.md
+[list-package-servers]: list-package-servers.md
+[stop-package-servers]: stop-package-servers.md

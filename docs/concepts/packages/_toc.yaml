@@ -14,14 +14,8 @@ toc:
   path: /docs/concepts/packages/package_url.md
 - title: "Fuchsia merkle roots"
   path:  /docs/concepts/packages/merkleroot.md
-- title: "Package servers"
-  section:
-  - title: "Starting package servers"
-    path: /docs/concepts/packages/package_server_start.md
-  - title: "Listing running package servers"
-    path: /docs/concepts/packages/package_server_list.md
-  - title: "Stopping package servers"
-    path: /docs/concepts/packages/package_server_stop.md
+- title: "Fuchsia package server"
+  path:  /docs/concepts/packages/fuchsia_package_server.md
 - title: "Package updates"
   section:
   - title: "OTA updates"

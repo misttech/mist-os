@@ -1,11 +1,14 @@
-# Listing running package servers
+# List running package servers
 
-## Overview
+The [`ffx repository server`][ffx-repo-server] commands can identify and list
+[Fuchsia package servers][fuchsia-package-server] running on the host machine.
+
+## Concepts
 
 The package repository server is controlled by running the subcommands of
-[`ffx repository server`](/reference/tools/sdk/ffx#server). This server handles
- requests for metadata about the available packages and delivers the file blobs
- that make up the package contents.
+[`ffx repository server`][ffx-repo-server]. This server handles requests for
+metadata about the available packages and delivers the file blobs that make up
+the package contents.
 
 There can be multiple package servers running on a single host machine. It is
 useful to be able to list these running servers and their properties. These
@@ -18,7 +21,7 @@ higher level system or workflow automation.
 ffx repository server list
 ```
 
-This command supports the [top level ffx options](/reference/tools/sdk/ffx) to
+This command supports the [top level `ffx` options](/reference/tools/sdk/ffx) to
 support programmatic use of the command:
 
 * `--machine` produces machine reader friendly output
@@ -26,11 +29,11 @@ support programmatic use of the command:
 
 ## Options
 
-### `--full`
+### --full
 
-Produces the full details for each running package server.
+Produce the full details for each running package server.
 
-### `--name`
+### --name
 
 Limit the output to package servers with the given name.
 This option can be specified multiple times.
@@ -43,7 +46,9 @@ The default output is a list of:
 * listening address
 * repo_path
 
-```none
+For example:
+
+```none {:.devsite-disable-click-to-copy}
 devhost      \[::\]:8083   /path/to/product_bundles/core.x64/repository
 ```
 
@@ -57,20 +62,26 @@ Full output adds additional fields:
 
 ## Examples
 
-### Listing all running servers
+### List all running servers
 
 ```posix-terminal
 ffx repository server list
 ```
 
-### Listing full details of all running servers
+### List full details of all running servers
 
 ```posix-terminal
 ffx repository server list --full
 ```
 
-### Listing all details for the server named `devhost` or `devhost2`, JSON encoded
+### List all details for the server
+
+List servers named `devhost` or `devhost2` and print the output in JSON format:
 
 ```posix-terminal
 ffx --machine json-pretty repository server list --name devhost --name devhost2
 ```
+<!-- Reference links -->
+
+[ffx-repo-server]: /reference/tools/sdk/ffx.md#ffx_repository_server
+[fuchsia-package-server]: /docs/concepts/packages/fuchsia_package_server.md
