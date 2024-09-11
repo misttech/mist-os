@@ -8,6 +8,7 @@ use crate::security::selinux_hooks::{
 };
 use crate::security::{Arc, ProcAttr, ResolvedElfState, SecurityServer};
 use crate::task::{CurrentTask, Task};
+use crate::todo_check_permission;
 use selinux::{FilePermission, NullessByteStr, ObjectClass};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::signals::{Signal, SIGCHLD, SIGKILL, SIGSTOP};
@@ -71,25 +72,31 @@ pub fn check_exec_access(
     if current_sid == new_sid {
         // To `exec()` a binary in the caller's domain, the caller must be granted
         // "execute_no_trans" permission to the binary.
-        // TODO(http://b/330904217): once filesystems are labeled, deny access.
-        let _ = check_permission(
+        todo_check_permission!(
+            TODO(
+                "https://fxbug.dev/330904217",
+                "Requires that SELinux Test Suite VM has correct labels"
+            ),
             &permission_check,
             current_sid,
             executable_sid,
             FilePermission::ExecuteNoTrans,
-        );
+        )?;
     } else {
         // Check that the domain transition is allowed.
         check_permission(&permission_check, current_sid, new_sid, ProcessPermission::Transition)?;
 
         // Check that the executable file has an entry point into the new domain.
-        // TODO(http://b/330904217): once filesystems are labeled, deny access.
-        let _ = check_permission(
+        todo_check_permission!(
+            TODO(
+                "https://fxbug.dev/330904217",
+                "Requires that SELinux Test Suite VM has correct labels"
+            ),
             &permission_check,
             new_sid,
             executable_sid,
             FilePermission::Entrypoint,
-        );
+        )?;
 
         // Check that ptrace permission is allowed if the process is traced.
         if let Some(ptracer) = current_task.ptracer_task().upgrade() {

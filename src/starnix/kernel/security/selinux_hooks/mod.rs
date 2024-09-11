@@ -191,6 +191,17 @@ fn fs_node_resolve_security_label(
     sid
 }
 
+#[macro_export]
+macro_rules! todo_check_permission {
+    (TODO($bug_url:literal, $todo_message:literal), $permission_check:expr, $source_sid:expr, $target_sid:expr, $permission:expr $(,)?) => {{
+        if check_permission($permission_check, $source_sid, $target_sid, $permission).is_err() {
+            use starnix_logging::track_stub;
+            track_stub!(TODO($bug_url), $todo_message);
+        }
+        Ok(())
+    }};
+}
+
 /// Checks whether `source_sid` is allowed the specified `permission` on `target_sid`.
 fn check_permission<P: ClassPermission + Into<Permission> + Clone + 'static>(
     permission_check: &PermissionCheck<'_>,
@@ -274,8 +285,16 @@ pub(super) fn selinuxfs_check_access(
     let source_sid = current_task.read().security_state.attrs.current_sid;
     let target_sid = fs_node_effective_sid(&security_server, current_task, node);
     let permission_check = security_server.as_permission_check();
-    // TODO: https://fxbug.dev/349117435 - Enable as soon as selinuxfs is labeled (via genfscon).
-    check_permission(&permission_check, source_sid, target_sid, permission).or(Ok(()))
+    todo_check_permission!(
+        TODO(
+            "https://fxbug.dev/349117435",
+            "Security permission checks require selinuxfs to be labeled"
+        ),
+        &permission_check,
+        source_sid,
+        target_sid,
+        permission
+    )
 }
 
 /// The SELinux security structure for `ThreadGroup`.
