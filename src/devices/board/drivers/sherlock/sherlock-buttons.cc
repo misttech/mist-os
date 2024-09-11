@@ -29,9 +29,6 @@
 namespace sherlock {
 namespace fpbus = fuchsia_hardware_platform_bus;
 
-constexpr uint32_t kPullUp = static_cast<uint32_t>(fuchsia_hardware_gpio::GpioFlags::kPullUp);
-constexpr uint32_t kNoPull = static_cast<uint32_t>(fuchsia_hardware_gpio::GpioFlags::kNoPull);
-
 // clang-format off
 static const buttons_button_config_t buttons[] = {
     {BUTTONS_TYPE_DIRECT, BUTTONS_ID_VOLUME_UP, 0, 0, 0},
@@ -43,10 +40,10 @@ static const buttons_button_config_t buttons[] = {
 
 // No need for internal pull, external pull-ups used.
 static const buttons_gpio_config_t gpios[] = {
-    {BUTTONS_GPIO_TYPE_INTERRUPT, BUTTONS_GPIO_FLAG_INVERTED, {.interrupt = {kPullUp}}},
-    {BUTTONS_GPIO_TYPE_INTERRUPT, BUTTONS_GPIO_FLAG_INVERTED, {.interrupt = {kPullUp}}},
-    {BUTTONS_GPIO_TYPE_INTERRUPT, BUTTONS_GPIO_FLAG_INVERTED, {.interrupt = {kNoPull}}},
-    {BUTTONS_GPIO_TYPE_INTERRUPT, 0, {.interrupt = {kNoPull}}},
+    {BUTTONS_GPIO_TYPE_INTERRUPT, BUTTONS_GPIO_FLAG_INVERTED, {}},
+    {BUTTONS_GPIO_TYPE_INTERRUPT, BUTTONS_GPIO_FLAG_INVERTED, {}},
+    {BUTTONS_GPIO_TYPE_INTERRUPT, BUTTONS_GPIO_FLAG_INVERTED, {}},
+    {BUTTONS_GPIO_TYPE_INTERRUPT, 0, {}},
 };
 
 zx_status_t Sherlock::ButtonsInit() {

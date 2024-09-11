@@ -28,9 +28,7 @@ zx::result<> Vim3GpioButtonsVisitor::DriverVisit(fdf_devicetree::Node& node,
   node.AddMetadata(button_config);
 
   const buttons_gpio_config_t gpios[] = {
-      {BUTTONS_GPIO_TYPE_INTERRUPT,
-       BUTTONS_GPIO_FLAG_INVERTED | BUTTONS_GPIO_FLAG_WAKE_VECTOR,
-       {.interrupt = {static_cast<uint32_t>(fuchsia_hardware_gpio::GpioFlags::kNoPull)}}},
+      {BUTTONS_GPIO_TYPE_INTERRUPT, BUTTONS_GPIO_FLAG_INVERTED | BUTTONS_GPIO_FLAG_WAKE_VECTOR, {}},
   };
 
   fuchsia_hardware_platform_bus::Metadata button_gpio_config = {

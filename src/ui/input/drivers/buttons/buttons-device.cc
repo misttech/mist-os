@@ -264,10 +264,11 @@ void ButtonsDevice::GetDescriptor(GetDescriptorCompleter::Sync& completer) {
 zx::result<bool> ButtonsDevice::MatrixScan(uint32_t row, uint32_t col, zx_duration_t delay) {
   auto& gpio_col = gpios_[col];
   {
-    fidl::WireResult result = gpio_col.client->ConfigIn(
-        fuchsia_hardware_gpio::GpioFlags::kNoPull);  // Float column to find row in use.
+    fidl::WireResult result = gpio_col.client->SetBufferMode(
+        fuchsia_hardware_gpio::BufferMode::kInput);  // Float column to find row in use.
     if (!result.ok()) {
-      FDF_LOG(ERROR, "Failed to send ConfigIn request to gpio %u: %s", col, result.status_string());
+      FDF_LOG(ERROR, "Failed to send SetBufferMode request to gpio %u: %s", col,
+              result.status_string());
       return zx::error(result.status());
     }
     if (result->is_error()) {
@@ -290,9 +291,11 @@ zx::result<bool> ButtonsDevice::MatrixScan(uint32_t row, uint32_t col, zx_durati
   }
 
   {
-    fidl::WireResult result = gpio_col.client->ConfigOut(gpio_col.config.matrix.output_value);
+    fidl::WireResult result = gpio_col.client->SetBufferMode(
+        gpio_col.config.matrix.output_value ? fuchsia_hardware_gpio::BufferMode::kOutputHigh
+                                            : fuchsia_hardware_gpio::BufferMode::kOutputLow);
     if (!result.ok()) {
-      FDF_LOG(ERROR, "Failed to send ConfigOut request to gpio %u: %s", col,
+      FDF_LOG(ERROR, "Failed to send SetBufferMode request to gpio %u: %s", col,
               result.status_string());
       return zx::error(read_result.status());
     }
@@ -457,12 +460,30 @@ zx_status_t ButtonsDevice::ConfigureInterrupt(uint32_t idx, uint64_t int_port) {
     }
   }
 
+  fidl::Arena arena;
   // We setup a trigger for the opposite of the current GPIO value.
-  uint32_t flags =
-      (current ? ZX_INTERRUPT_MODE_EDGE_LOW : ZX_INTERRUPT_MODE_EDGE_HIGH) |
-      ((gpio.config.flags & BUTTONS_GPIO_FLAG_WAKE_VECTOR) ? ZX_INTERRUPT_WAKE_VECTOR : 0);
+  auto interrupt_config = fuchsia_hardware_gpio::wire::InterruptConfiguration::Builder(arena)
+                              .mode(current ? fuchsia_hardware_gpio::InterruptMode::kEdgeLow
+                                            : fuchsia_hardware_gpio::InterruptMode::kEdgeHigh)
+                              .Build();
+  fidl::WireResult configure_result = gpio.client->ConfigureInterrupt(interrupt_config);
+  if (!configure_result.ok()) {
+    FDF_LOG(ERROR, "Failed to send ConfigureInterrupt request to gpio %u: %s", idx,
+            configure_result.status_string());
+    return configure_result.status();
+  }
+  if (configure_result->is_error()) {
+    FDF_LOG(ERROR, "Failed to configure interrupt for gpio %u: %s", idx,
+            zx_status_get_string(configure_result->error_value()));
+    return configure_result->error_value();
+  }
 
-  fidl::WireResult interrupt_result = gpio.client->GetInterrupt(flags);
+  // TODO(361851116): Convert this to a proper FIDL type.
+  uint32_t flags =
+      (gpio.config.flags & BUTTONS_GPIO_FLAG_WAKE_VECTOR) ? ZX_INTERRUPT_WAKE_VECTOR : 0;
+
+  fidl::WireResult interrupt_result =
+      gpio.client->GetInterrupt2(static_cast<fuchsia_hardware_gpio::InterruptOptions>(flags));
   if (!interrupt_result.ok()) {
     FDF_LOG(ERROR, "Failed to send GetInterrupt request to gpio %u: %s", idx,
             interrupt_result.status_string());
@@ -473,7 +494,7 @@ zx_status_t ButtonsDevice::ConfigureInterrupt(uint32_t idx, uint64_t int_port) {
             zx_status_get_string(interrupt_result->error_value()));
     return interrupt_result->error_value();
   }
-  gpio.irq = std::move(interrupt_result.value()->irq);
+  gpio.irq = std::move(interrupt_result.value()->interrupt);
 
   status = gpios_[idx].irq.bind(port_, int_port, 0);
   if (status != ZX_OK) {
@@ -566,9 +587,11 @@ zx_status_t ButtonsDevice::Init() {
     auto& gpio = gpios_[i];
 
     if (gpio.config.type == BUTTONS_GPIO_TYPE_MATRIX_OUTPUT) {
-      fidl::WireResult result = gpio.client->ConfigOut(gpio.config.matrix.output_value);
+      fidl::WireResult result = gpio.client->SetBufferMode(
+          gpio.config.matrix.output_value ? fuchsia_hardware_gpio::BufferMode::kOutputHigh
+                                          : fuchsia_hardware_gpio::BufferMode::kOutputLow);
       if (!result.ok()) {
-        FDF_LOG(ERROR, "Failed to send ConfigOut request to gpio %u: %s", i,
+        FDF_LOG(ERROR, "Failed to send SetBufferMode request to gpio %u: %s", i,
                 result.status_string());
         return result.status();
       }
@@ -578,10 +601,11 @@ zx_status_t ButtonsDevice::Init() {
         return ZX_ERR_NOT_SUPPORTED;
       }
     } else if (gpio.config.type == BUTTONS_GPIO_TYPE_INTERRUPT) {
-      fidl::WireResult result = gpio.client->ConfigIn(
-          static_cast<fuchsia_hardware_gpio::GpioFlags>(gpio.config.interrupt.internal_pull));
+      fidl::WireResult result =
+          gpio.client->SetBufferMode(fuchsia_hardware_gpio::BufferMode::kInput);
       if (!result.ok()) {
-        FDF_LOG(ERROR, "Failed to send ConfigIn request to gpio %u: %s", i, result.status_string());
+        FDF_LOG(ERROR, "Failed to send SetBufferMode request to gpio %u: %s", i,
+                result.status_string());
         return result.status();
       }
       if (result->is_error()) {
@@ -594,10 +618,11 @@ zx_status_t ButtonsDevice::Init() {
         return status;
       }
     } else if (gpio.config.type == BUTTONS_GPIO_TYPE_POLL) {
-      fidl::WireResult result = gpio.client->ConfigIn(
-          static_cast<fuchsia_hardware_gpio::GpioFlags>(gpio.config.interrupt.internal_pull));
+      fidl::WireResult result =
+          gpio.client->SetBufferMode(fuchsia_hardware_gpio::BufferMode::kInput);
       if (!result.ok()) {
-        FDF_LOG(ERROR, "Failed to send ConfigIn request to gpio %u: %s", i, result.status_string());
+        FDF_LOG(ERROR, "Failed to send SetBufferMode request to gpio %u: %s", i,
+                result.status_string());
         return result.status();
       }
       if (result->is_error()) {

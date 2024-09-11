@@ -51,14 +51,10 @@ typedef struct GpioConfig {
   uint8_t type;   // e.g. BUTTONS_GPIO_TYPE_INTERRUPT.
   uint8_t flags;  // e.g. BUTTONS_GPIO_FLAG_INVERTED.
   union {
-    struct {  // Only applicable to BUTTONS_GPIO_TYPE_INTERRUPT.
-      uint32_t internal_pull;
-    } interrupt;
     struct {  // Only applicable to BUTTONS_GPIO_TYPE_MATRIX_OUTPUT.
       uint8_t output_value;
     } matrix;
     struct {  // Only applicable to BUTTONS_GPIO_TYPE_POLL.
-      uint32_t internal_pull;
       zx_duration_t period;
     } poll;
   };

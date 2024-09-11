@@ -22,16 +22,10 @@ static const buttons_button_config_t buttons_direct[] = {
     {BUTTONS_TYPE_DIRECT, BUTTONS_ID_VOLUME_UP, 0, 0, 0},
 };
 
-static const buttons_gpio_config_t gpios_direct[] = {
-    {BUTTONS_GPIO_TYPE_INTERRUPT,
-     0,
-     {.interrupt = {static_cast<uint32_t>(fuchsia_hardware_gpio::GpioFlags::kNoPull)}}}};
+static const buttons_gpio_config_t gpios_direct[] = {{BUTTONS_GPIO_TYPE_INTERRUPT, 0, {}}};
 
 static const buttons_gpio_config_t gpios_wakeable[] = {
-    {BUTTONS_GPIO_TYPE_INTERRUPT,
-     BUTTONS_GPIO_FLAG_WAKE_VECTOR,
-     {.interrupt = {static_cast<uint32_t>(fuchsia_hardware_gpio::GpioFlags::kNoPull)}}},
-};
+    {BUTTONS_GPIO_TYPE_INTERRUPT, BUTTONS_GPIO_FLAG_WAKE_VECTOR, {}}};
 
 static const buttons_button_config_t buttons_multiple[] = {
     {BUTTONS_TYPE_DIRECT, BUTTONS_ID_VOLUME_UP, 0, 0, 0},
@@ -40,28 +34,15 @@ static const buttons_button_config_t buttons_multiple[] = {
 };
 
 static const buttons_gpio_config_t gpios_multiple[] = {
-    {BUTTONS_GPIO_TYPE_INTERRUPT,
-     0,
-     {.interrupt = {static_cast<uint32_t>(fuchsia_hardware_gpio::GpioFlags::kNoPull)}}},
-    {BUTTONS_GPIO_TYPE_INTERRUPT,
-     0,
-     {.interrupt = {static_cast<uint32_t>(fuchsia_hardware_gpio::GpioFlags::kNoPull)}}},
-    {BUTTONS_GPIO_TYPE_INTERRUPT,
-     0,
-     {.interrupt = {static_cast<uint32_t>(fuchsia_hardware_gpio::GpioFlags::kNoPull)}}},
+    {BUTTONS_GPIO_TYPE_INTERRUPT, 0, {}},
+    {BUTTONS_GPIO_TYPE_INTERRUPT, 0, {}},
+    {BUTTONS_GPIO_TYPE_INTERRUPT, 0, {}},
 };
 
 static const buttons_gpio_config_t gpios_multiple_one_polled[] = {
-    {BUTTONS_GPIO_TYPE_INTERRUPT,
-     0,
-     {.interrupt = {static_cast<uint32_t>(fuchsia_hardware_gpio::GpioFlags::kNoPull)}}},
-    {BUTTONS_GPIO_TYPE_POLL,
-     0,
-     {.poll = {static_cast<uint32_t>(fuchsia_hardware_gpio::GpioFlags::kNoPull),
-               zx::msec(20).get()}}},
-    {BUTTONS_GPIO_TYPE_INTERRUPT,
-     0,
-     {.interrupt = {static_cast<uint32_t>(fuchsia_hardware_gpio::GpioFlags::kNoPull)}}},
+    {BUTTONS_GPIO_TYPE_INTERRUPT, 0, {}},
+    {BUTTONS_GPIO_TYPE_POLL, 0, {.poll = {zx::msec(20).get()}}},
+    {BUTTONS_GPIO_TYPE_INTERRUPT, 0, {}},
 };
 
 static const buttons_button_config_t buttons_matrix[] = {
@@ -72,12 +53,8 @@ static const buttons_button_config_t buttons_matrix[] = {
 };
 
 static const buttons_gpio_config_t gpios_matrix[] = {
-    {BUTTONS_GPIO_TYPE_INTERRUPT,
-     0,
-     {.interrupt = {static_cast<uint32_t>(fuchsia_hardware_gpio::GpioFlags::kPullUp)}}},
-    {BUTTONS_GPIO_TYPE_INTERRUPT,
-     0,
-     {.interrupt = {static_cast<uint32_t>(fuchsia_hardware_gpio::GpioFlags::kPullUp)}}},
+    {BUTTONS_GPIO_TYPE_INTERRUPT, 0, {}},
+    {BUTTONS_GPIO_TYPE_INTERRUPT, 0, {}},
     {BUTTONS_GPIO_TYPE_MATRIX_OUTPUT, 0, {.matrix = {0}}},
     {BUTTONS_GPIO_TYPE_MATRIX_OUTPUT, 0, {.matrix = {0}}},
 };
@@ -89,15 +66,9 @@ static const buttons_button_config_t buttons_duplicate[] = {
 };
 
 static const buttons_gpio_config_t gpios_duplicate[] = {
-    {BUTTONS_GPIO_TYPE_INTERRUPT,
-     0,
-     {.interrupt = {static_cast<uint32_t>(fuchsia_hardware_gpio::GpioFlags::kNoPull)}}},
-    {BUTTONS_GPIO_TYPE_INTERRUPT,
-     0,
-     {.interrupt = {static_cast<uint32_t>(fuchsia_hardware_gpio::GpioFlags::kNoPull)}}},
-    {BUTTONS_GPIO_TYPE_INTERRUPT,
-     0,
-     {.interrupt = {static_cast<uint32_t>(fuchsia_hardware_gpio::GpioFlags::kNoPull)}}},
+    {BUTTONS_GPIO_TYPE_INTERRUPT, 0, {}},
+    {BUTTONS_GPIO_TYPE_INTERRUPT, 0, {}},
+    {BUTTONS_GPIO_TYPE_INTERRUPT, 0, {}},
 };
 }  // namespace
 
@@ -117,15 +88,32 @@ enum MetadataVersion : uint8_t {
 class LocalFakeGpio : public fake_gpio::FakeGpio {
  public:
   LocalFakeGpio() = default;
-  void SetExpectedInterruptFlags(uint32_t flags) { expected_interrupt_flags_ = flags; }
+  void SetExpectedInterruptOptions(fuchsia_hardware_gpio::InterruptOptions options) {
+    expected_interrupt_options_ = options;
+  }
+  void SetExpectedInterruptMode(fuchsia_hardware_gpio::InterruptMode mode) {
+    expected_interrupt_mode_ = mode;
+  }
 
  private:
-  void GetInterrupt(GetInterruptRequestView request,
-                    GetInterruptCompleter::Sync& completer) override {
-    EXPECT_EQ(request->flags, expected_interrupt_flags_);
-    FakeGpio::GetInterrupt(request, completer);
+  void ConfigureInterrupt(ConfigureInterruptRequestView request,
+                          ConfigureInterruptCompleter::Sync& completer) override {
+    ASSERT_TRUE(request->config.has_mode());
+    if (check_interrupt_mode_) {
+      EXPECT_EQ(request->config.mode(), expected_interrupt_mode_);
+    }
+    FakeGpio::ConfigureInterrupt(request, completer);
   }
-  uint32_t expected_interrupt_flags_ = ZX_INTERRUPT_MODE_EDGE_HIGH;
+  void GetInterrupt2(GetInterrupt2RequestView request,
+                     GetInterrupt2Completer::Sync& completer) override {
+    EXPECT_EQ(request->options, expected_interrupt_options_);
+    check_interrupt_mode_ = false;
+    FakeGpio::GetInterrupt2(request, completer);
+  }
+  fuchsia_hardware_gpio::InterruptOptions expected_interrupt_options_;
+  fuchsia_hardware_gpio::InterruptMode expected_interrupt_mode_ =
+      fuchsia_hardware_gpio::InterruptMode::kEdgeHigh;
+  bool check_interrupt_mode_ = true;
 };
 
 class FakeAggregator : public fidl::Server<fuchsia_input_interaction_observation::Aggregator> {
@@ -243,12 +231,16 @@ class ButtonsTestEnvironment : public fdf_testing::Environment {
     fake_gpio_servers_[gpio_index].SetDefaultReadResponse(zx::ok(read_data));
   }
 
-  void SetExpectedInterruptFlags(uint32_t flags) {
-    fake_gpio_servers_[0].SetExpectedInterruptFlags(flags);
+  void SetExpectedInterruptOptions(fuchsia_hardware_gpio::InterruptOptions options) {
+    fake_gpio_servers_[0].SetExpectedInterruptOptions(options);
+  }
+
+  void SetExpectedInterruptMode(fuchsia_hardware_gpio::InterruptMode mode) {
+    fake_gpio_servers_[0].SetExpectedInterruptMode(mode);
   }
 
   zx::interrupt fake_gpio_interrupts_[kMaxGpioServers];
-  LocalFakeGpio fake_gpio_servers_[kMaxGpioServers];
+  LocalFakeGpio fake_gpio_servers_[kMaxGpioServers]{};
   FakeAggregator fake_aggregator_;
 
  private:
@@ -571,22 +563,22 @@ TEST_P(ParameterizedButtonsTest, MatrixButtonPush) {
   driver_test().RunInEnvironmentTypeContext([](ButtonsTestEnvironment& env) {
     auto gpio_2_states = env.fake_gpio_servers_[2].GetStateLog();
     ASSERT_GE(gpio_2_states.size(), 4U);
-    ASSERT_EQ(fake_gpio::ReadSubState{.flags = fuchsia_hardware_gpio::GpioFlags::kNoPull},
+    ASSERT_EQ(fake_gpio::ReadSubState{},
               (gpio_2_states.end() - 4)->sub_state);  // Float column.
     ASSERT_EQ(fake_gpio::WriteSubState{.value = gpios_matrix[2].matrix.output_value},
               (gpio_2_states.end() - 3)->sub_state);  // Restore column.
-    ASSERT_EQ(fake_gpio::ReadSubState{.flags = fuchsia_hardware_gpio::GpioFlags::kNoPull},
+    ASSERT_EQ(fake_gpio::ReadSubState{},
               (gpio_2_states.end() - 2)->sub_state);  // Float column.
     ASSERT_EQ(fake_gpio::WriteSubState{.value = gpios_matrix[2].matrix.output_value},
               (gpio_2_states.end() - 1)->sub_state);  // Restore column.
 
     auto gpio_3_states = env.fake_gpio_servers_[3].GetStateLog();
     ASSERT_GE(gpio_3_states.size(), 4U);
-    ASSERT_EQ(fake_gpio::ReadSubState{.flags = fuchsia_hardware_gpio::GpioFlags::kNoPull},
+    ASSERT_EQ(fake_gpio::ReadSubState{},
               (gpio_3_states.end() - 4)->sub_state);  // Float column.
     ASSERT_EQ(fake_gpio::WriteSubState{.value = gpios_matrix[3].matrix.output_value},
               (gpio_3_states.end() - 3)->sub_state);  // Restore column.
-    ASSERT_EQ(fake_gpio::ReadSubState{.flags = fuchsia_hardware_gpio::GpioFlags::kNoPull},
+    ASSERT_EQ(fake_gpio::ReadSubState{},
               (gpio_3_states.end() - 2)->sub_state);  // Float column.
     ASSERT_EQ(fake_gpio::WriteSubState{.value = gpios_matrix[3].matrix.output_value},
               (gpio_3_states.end() - 1)->sub_state);  // Restore column.
@@ -760,7 +752,9 @@ TEST_P(ParameterizedButtonsTest, CamMute) {
 
 TEST_P(ParameterizedButtonsTest, DirectButtonWakeable) {
   driver_test().RunInEnvironmentTypeContext([](ButtonsTestEnvironment& env) {
-    env.SetExpectedInterruptFlags(ZX_INTERRUPT_MODE_EDGE_HIGH | ZX_INTERRUPT_WAKE_VECTOR);
+    env.SetExpectedInterruptOptions(
+        static_cast<fuchsia_hardware_gpio::InterruptOptions>(ZX_INTERRUPT_WAKE_VECTOR));
+    env.SetExpectedInterruptMode(fuchsia_hardware_gpio::InterruptMode::kEdgeHigh);
   });
 
   auto result = Init(kMetadataWakeable, /* suspend_enabled */ GetParam());
