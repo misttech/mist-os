@@ -238,7 +238,7 @@ impl PagedObjectHandle {
     }
 
     pub fn get_size(&self) -> u64 {
-        self.vmo.get_content_size().unwrap()
+        self.vmo.get_stream_size().unwrap()
     }
 
     pub fn pre_fetch_keys(&self) -> Option<impl Future<Output = ()>> {
@@ -513,7 +513,7 @@ impl PagedObjectHandle {
                     // which case, the kernel won't mark the tail page dirty again so we must
                     // increase the content size, but no further than the end of the tail page.
                     let new_content_size =
-                        self.vmo().get_content_size().context("get_content_size failed")?;
+                        self.vmo().get_stream_size().context("get_stream_size failed")?;
 
                     assert!(new_content_size >= content_size);
 
@@ -625,7 +625,7 @@ impl PagedObjectHandle {
             self.inner.lock().unwrap().put_back(dirty_pages, &reservation);
         });
 
-        let content_size = self.vmo().get_content_size().context("get_content_size failed")?;
+        let content_size = self.vmo().get_stream_size().context("get_stream_size failed")?;
         let previous_content_size = self.handle.get_size();
         let FlushBatches {
             batches: flush_batches,
@@ -745,7 +745,7 @@ impl PagedObjectHandle {
             if new_size > old_vmo_size {
                 vmo.set_size(new_size)
             } else {
-                vmo.set_content_size(&new_size)
+                vmo.set_stream_size(new_size)
             }
         })
         .await?;
@@ -847,7 +847,7 @@ impl PagedObjectHandle {
             }
             (
                 inner.dirty_page_count,
-                self.vmo.get_content_size()?,
+                self.vmo.get_stream_size()?,
                 inner.dirty_crtime.timestamp(),
                 inner.dirty_mtime.timestamp(),
             )
@@ -2312,14 +2312,14 @@ mod tests {
             .unwrap()
             .map_err(zx::Status::from_raw)
             .unwrap();
-        assert_eq!(vmo.get_content_size().unwrap(), file_size);
+        assert_eq!(vmo.get_stream_size().unwrap(), file_size);
         assert_eq!(vmo.get_size().unwrap(), file_size);
 
         // Resize the file down to one page. Confirm the content size is updated, but the vmo size
         // stays the same.
         file.resize(page_size).await.unwrap().map_err(zx::Status::from_raw).unwrap();
         file.sync().await.unwrap().map_err(zx::Status::from_raw).unwrap();
-        assert_eq!(vmo.get_content_size().unwrap(), page_size);
+        assert_eq!(vmo.get_stream_size().unwrap(), page_size);
         assert_eq!(vmo.get_size().unwrap(), file_size);
 
         // Write some data to the vmo, beyond the current content size. This does _not_ update the
@@ -2327,7 +2327,7 @@ mod tests {
         unblock(move || {
             vmo.write(&[1, 2, 3, 4], page_size * 2).unwrap();
             // Writing this data to the vmo shouldn't update the content size.
-            assert_eq!(vmo.get_content_size().unwrap(), page_size);
+            assert_eq!(vmo.get_stream_size().unwrap(), page_size);
             assert_eq!(vmo.get_size().unwrap(), file_size);
         })
         .await;

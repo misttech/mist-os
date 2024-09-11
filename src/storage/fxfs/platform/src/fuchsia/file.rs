@@ -392,7 +392,7 @@ impl File for FxFile {
                 child_options |= zx::VmoChildOptions::RESIZABLE;
                 rights |= zx::Rights::RESIZE;
             }
-            vmo.create_child(child_options, 0, vmo.get_content_size()?)?
+            vmo.create_child(child_options, 0, vmo.get_stream_size()?)?
         } else {
             vmo.create_child(zx::VmoChildOptions::REFERENCE, 0, 0)?
         };
@@ -1404,6 +1404,9 @@ mod tests {
         let err =
             vmo.set_content_size(&10).expect_err("content size should not be directly modifiable");
         assert_eq!(Status::ACCESS_DENIED, err);
+        let err =
+            vmo.set_stream_size(10).expect_err("stream size should not be directly modifiable");
+        assert_eq!(Status::OUT_OF_RANGE, err);
 
         close_file_checked(file).await;
         fixture.close().await;
@@ -1434,6 +1437,7 @@ mod tests {
             .expect("Failed to get VMO");
         vmo.set_size(10).expect("VMO should be resizable");
         vmo.set_content_size(&20).expect("content size should be modifiable");
+        vmo.set_stream_size(20).expect("stream size should be modifiable");
 
         let vmo = file
             .get_backing_memory(fio::VmoFlags::PRIVATE_CLONE | fio::VmoFlags::READ)
@@ -1443,7 +1447,9 @@ mod tests {
             .expect("Failed to get VMO");
         let err = vmo.set_size(10).expect_err("VMO should not be resizable");
         assert_eq!(err, Status::ACCESS_DENIED);
-        vmo.set_content_size(&20).expect("content is still modifiable");
+        vmo.set_content_size(&20).expect("content is still growable");
+        // This zeroes pages, which can't be done on a read-only VMO.
+        vmo.set_stream_size(20).expect_err("stream size is not modifiable");
 
         close_file_checked(file).await;
         fixture.close().await;
