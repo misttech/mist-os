@@ -11,6 +11,7 @@
 #include <lib/fidl/cpp/wire/wire_messaging_declarations.h>
 #include <lib/fit/internal/result.h>
 #include <lib/syslog/cpp/macros.h>
+#include <lib/zx/clock.h>
 #include <zircon/errors.h>
 
 #include <memory>
@@ -19,6 +20,7 @@
 
 #include "src/media/audio/services/device_registry/audio_device_registry.h"
 #include "src/media/audio/services/device_registry/device.h"
+#include "src/media/audio/services/device_registry/inspector.h"
 #include "src/media/audio/services/device_registry/logging.h"
 
 namespace media_audio {
@@ -37,12 +39,16 @@ std::shared_ptr<RegistryServer> RegistryServer::Create(
 RegistryServer::RegistryServer(std::shared_ptr<AudioDeviceRegistry> parent)
     : parent_(std::move(parent)) {
   ADR_LOG_METHOD(kLogObjectLifetimes);
+  SetInspect(Inspector::Singleton()->RecordRegistryInstance(zx::clock::get_monotonic()));
+
   ++count_;
   LogObjectCounts();
 }
 
 RegistryServer::~RegistryServer() {
   ADR_LOG_METHOD(kLogObjectLifetimes);
+  inspect()->RecordDestructionTime(zx::clock::get_monotonic());
+
   --count_;
   LogObjectCounts();
 }

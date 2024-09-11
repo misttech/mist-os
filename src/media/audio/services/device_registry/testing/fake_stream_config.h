@@ -93,26 +93,28 @@ class FakeStreamConfig final : public fuchsia::hardware::audio::StreamConfig,
     }
     channel_sets_[pcm_format_set_idx]->at(channel_set_idx) = std::move(attributes);
   }
-  void set_sample_formats(size_t pcm_format_set_idx,
-                          std::vector<fuchsia::hardware::audio::SampleFormat> sample_formats) {
+  void set_sample_formats(
+      size_t pcm_format_set_idx,
+      const std::vector<fuchsia::hardware::audio::SampleFormat>& sample_formats) {
     if (pcm_format_set_idx >= sample_formats_.size()) {
       sample_formats_.resize(pcm_format_set_idx + 1);
     }
     sample_formats_[pcm_format_set_idx] = sample_formats;
   }
-  void set_bytes_per_sample(size_t pcm_format_set_idx, std::vector<uint8_t> bytes) {
+  void set_bytes_per_sample(size_t pcm_format_set_idx, const std::vector<uint8_t>& bytes) {
     if (pcm_format_set_idx >= bytes_per_sample_.size()) {
       bytes_per_sample_.resize(pcm_format_set_idx + 1);
     }
     bytes_per_sample_[pcm_format_set_idx] = bytes;
   }
-  void set_valid_bits_per_sample(size_t pcm_format_set_idx, std::vector<uint8_t> valid_bits) {
+  void set_valid_bits_per_sample(size_t pcm_format_set_idx,
+                                 const std::vector<uint8_t>& valid_bits) {
     if (pcm_format_set_idx >= valid_bits_per_sample_.size()) {
       valid_bits_per_sample_.resize(pcm_format_set_idx + 1);
     }
     valid_bits_per_sample_[pcm_format_set_idx] = valid_bits;
   }
-  void set_frame_rates(size_t pcm_format_set_idx, std::vector<uint32_t> rates) {
+  void set_frame_rates(size_t pcm_format_set_idx, const std::vector<uint32_t>& rates) {
     if (pcm_format_set_idx >= frame_rates_.size()) {
       frame_rates_.resize(pcm_format_set_idx + 1);
     }

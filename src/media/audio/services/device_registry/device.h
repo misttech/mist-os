@@ -12,7 +12,6 @@
 #include <lib/fidl/cpp/client.h>
 #include <lib/fidl/cpp/wire/unknown_interaction_handler.h>
 #include <lib/fit/function.h>
-#include <lib/zx/clock.h>
 #include <lib/zx/result.h>
 #include <lib/zx/vmo.h>
 
@@ -29,6 +28,7 @@
 #include "src/media/audio/services/device_registry/basic_types.h"
 #include "src/media/audio/services/device_registry/control_notify.h"
 #include "src/media/audio/services/device_registry/device_presence_watcher.h"
+#include "src/media/audio/services/device_registry/inspector.h"
 #include "src/media/audio/services/device_registry/logging.h"
 #include "src/media/audio/services/device_registry/observer_notify.h"
 
@@ -217,6 +217,8 @@ class Device : public std::enable_shared_from_this<Device> {
   bool checked_for_signalprocessing() const { return supports_signalprocessing_.has_value(); }
   bool supports_signalprocessing() const { return supports_signalprocessing_.value_or(false); }
   void SetSignalProcessingSupported(bool is_supported);
+
+  std::shared_ptr<DeviceInspectInstance> inspect() { return device_inspect_instance_; }
 
   // Static object counts, for debugging purposes.
   static uint64_t count() { return count_; }
@@ -504,9 +506,14 @@ class Device : public std::enable_shared_from_this<Device> {
     std::optional<zx::time> set_active_channels_completed_at;
 
     std::optional<zx::time> start_time;
+
+    std::shared_ptr<RingBufferInspectInstance> inspect_instance;
   };
 
   std::unordered_map<ElementId, RingBufferRecord> ring_buffer_map_;
+
+  // Inspect-related
+  std::shared_ptr<DeviceInspectInstance> device_inspect_instance_;
 };
 
 inline std::ostream& operator<<(std::ostream& out, Device::State device_state) {

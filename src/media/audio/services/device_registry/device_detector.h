@@ -33,6 +33,8 @@ class DeviceDetector {
   virtual ~DeviceDetector() = default;
 
  private:
+  static inline const std::string_view kClassName = "DeviceDetector";
+
   DeviceDetector(DeviceDetectionHandler handler, async_dispatcher_t* dispatcher)
       : handler_(std::move(handler)), dispatcher_(dispatcher) {}
   DeviceDetector() = delete;

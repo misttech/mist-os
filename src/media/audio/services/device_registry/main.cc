@@ -9,9 +9,11 @@
 #include <lib/trace-provider/provider.h>
 
 #include <memory>
+#include <string>
 
 #include "src/media/audio/services/common/fidl_thread.h"
 #include "src/media/audio/services/device_registry/audio_device_registry.h"
+#include "src/media/audio/services/device_registry/inspector.h"
 #include "src/media/audio/services/device_registry/logging.h"
 
 int main(int argc, const char** argv) {
@@ -27,16 +29,29 @@ int main(int argc, const char** argv) {
 
   trace::TraceProviderWithFdio trace_provider(loop->dispatcher(), "audio_device_registry_provider");
 
+  // ...then create the connection to Inspect, so we can chronicle the subsequent actions...
+  media_audio::Inspector::Initialize(loop->dispatcher());
+
   // ...then start the device detection process (which continues after this call returns)...
-  if (adr_service->StartDeviceDetection() != ZX_OK) {
+  if (auto status = adr_service->StartDeviceDetection(); status != ZX_OK) {
+    auto str = std::string("StartDeviceDetection failed to start devfs device detection: ") +
+               std::to_string(status);
+    FX_LOGS(ERROR) << str;
+    media_audio::Inspector::Singleton()->RecordUnhealthy(str);
     return -1;
   }
 
   // ...then register the FIDL services and serve them out, so clients can call them...
-  if (adr_service->RegisterAndServeOutgoing() != ZX_OK) {
-    FX_LOGS(ERROR) << "RegisterAndServeOutgoing failed to serve outgoing directory";
+  if (auto status = adr_service->RegisterAndServeOutgoing(); status != ZX_OK) {
+    auto str = std::string("RegisterAndServeOutgoing failed to serve outgoing directory: ") +
+               std::to_string(status);
+    FX_LOGS(ERROR) << str;
+    media_audio::Inspector::Singleton()->RecordUnhealthy(str);
     return -2;
   }
+
+  // ...then chronicle that adr_service has completed its "starting up" steps...
+  media_audio::Inspector::Singleton()->RecordHealthOk();
 
   // ...then run our loop here in main(), so AudioDeviceRegistry doesn't have to deal with it.
   loop->Run();

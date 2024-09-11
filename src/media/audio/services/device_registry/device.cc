@@ -67,6 +67,7 @@ void Device::RingBufferFidlErrorHandler<fha::RingBuffer>::on_fidl_error(fidl::Un
   }
   auto& ring_buffer = device()->ring_buffer_map_.find(element_id_)->second;
   ring_buffer.ring_buffer_client.reset();
+
   device()->ring_buffer_map_.erase(element_id_);
 }
 
@@ -150,6 +151,10 @@ Device::Device(std::weak_ptr<DevicePresenceWatcher> presence_watcher,
       token_id_(NextTokenId()),
       state_(State::Initializing) {
   ADR_LOG_METHOD(kLogObjectLifetimes);
+  device_inspect_instance_ = Inspector::Singleton()->RecordDeviceInitializing(
+      name_, device_type_, zx::clock::get_monotonic());
+  inspect()->RecordTokenId(token_id_);
+
   ++count_;
   LogObjectCounts();
 
@@ -209,6 +214,8 @@ void Device::SetSignalProcessingSupported(bool is_supported) {
 
 void Device::OnRemoval() {
   ADR_LOG_METHOD(kLogDeviceState);
+  inspect()->RecordRemoval(zx::clock::get_monotonic());
+
   if (has_error()) {
     ADR_WARN_METHOD() << "device already has an error; no device state to unwind";
     --unhealthy_count_;
@@ -251,6 +258,7 @@ void Device::OnError(zx_status_t error) {
   }
 
   FX_PLOGS(WARNING, error) << __func__;
+  inspect()->RecordError(zx::clock::get_monotonic());
 
   if (is_operational()) {
     --initialized_count_;
@@ -507,6 +515,16 @@ void Device::DropRingBuffer(ElementId element_id) {
 
   // If we've already cleaned out any state with the underlying driver RingBuffer, then we're done.
   auto& rb_record = rb_pair->second;
+
+  // This can be called before the RingBufferRecord is entirely populated, if failure occurs after
+  // the initial Connect (such as unsupported format). We can only record the 'destroyed_at'
+  // timestamp if the Inspect instance exists.
+  if (rb_record.inspect_instance) {
+    rb_record.inspect_instance->RecordDestructionTime(zx::clock::get_monotonic());
+  } else {
+    ADR_WARN_METHOD() << "cannot RecordDestructionTime";
+  }
+
   if (!rb_record.ring_buffer_client.has_value() || !rb_record.ring_buffer_client->is_valid()) {
     ADR_LOG_METHOD(kLogRingBufferMethods) << "Driver RingBuffer connection is already dropped";
     return;
@@ -518,6 +536,7 @@ void Device::DropRingBuffer(ElementId element_id) {
 
   rb_record.requested_ring_buffer_bytes.reset();  // User must call CreateRingBuffer again ...
   rb_record.create_ring_buffer_callback = nullptr;
+  rb_record.inspect_instance = nullptr;
 
   rb_record.driver_format.reset();  // ... making us re-call ConnectToRingBufferFidl ...
   rb_record.vmo_format = {};
@@ -844,6 +863,8 @@ void Device::SetHealthState(std::optional<bool> is_healthy) {
     OnError(ZX_ERR_IO);
     return;
   }
+
+  inspect()->RecordDeviceHealthOk();
 
   ADR_LOG_OBJECT(kLogCompositeFidlResponses) << "RetrieveHealthState response: healthy";
   if (!preexisting_health_state.has_value()) {
@@ -1421,6 +1442,8 @@ void Device::RetrieveRingBufferFormatSets() {
       std::make_shared<std::unordered_set<ElementId>>(ring_buffer_ids_);
 
   for (auto id : ring_buffer_ids_) {
+    inspect()->RecordRingBufferElement(id);
+
     if (is_composite()) {
       ADR_LOG_METHOD(kLogCompositeFidlCalls) << " GetRingBufferFormats (element " << id << ")";
       (*composite_client_)
@@ -1671,6 +1694,12 @@ fad::Info Device::CreateDeviceInfo() {
         // Required for Composite, Dai and StreamConfig; absent for Codec:
         .clock_domain(stream_config_properties_->clock_domain());
   }
+
+  inspect()->RecordProperties(info.is_input(), info.manufacturer(), info.product(),
+                              info.unique_instance_id().has_value()
+                                  ? std::optional(UidToString(info.unique_instance_id()))
+                                  : std::nullopt,
+                              info.clock_domain());
 
   return info;
 }
@@ -2399,6 +2428,7 @@ fad::ControlCreateRingBufferError Device::ConnectRingBufferFidl(ElementId elemen
       }},
       .driver_format = driver_format,
   };
+
   ring_buffer_record.ring_buffer_client = fidl::Client<fha::RingBuffer>(
       std::move(client), dispatcher_, ring_buffer_record.ring_buffer_handler.get());
 
@@ -2555,6 +2585,7 @@ void Device::CheckForRingBufferReady(ElementId element_id) {
   SetRingBufferState(element_id, RingBufferState::Stopped);
 
   FX_CHECK(ring_buffer.create_ring_buffer_callback);
+  auto now = zx::clock::get_monotonic();
   ring_buffer.create_ring_buffer_callback(fit::success(Device::RingBufferInfo{
       .ring_buffer = fuchsia_audio::RingBuffer{{
           .buffer = fuchsia_mem::Buffer{{
@@ -2573,6 +2604,7 @@ void Device::CheckForRingBufferReady(ElementId element_id) {
       }},
   }));
   ring_buffer.create_ring_buffer_callback = nullptr;
+  ring_buffer.inspect_instance = inspect()->RecordRingBufferInstance(element_id, now);
 }
 
 // Returns TRUE if it actually calls out to the driver. We avoid doing so if we already know
@@ -2653,6 +2685,16 @@ bool Device::SetActiveChannels(
         callback(zx::ok(*ring_buffer.set_active_channels_completed_at));
         LogActiveChannels(*ring_buffer.active_channels_bitmask,
                           *ring_buffer.set_active_channels_completed_at);
+
+        // This completion can theoretically execute while the device is in the midst of error or
+        // removal, so we only chronicle this SetActiveChannels call if inspect_instance exists.
+        if (ring_buffer.inspect_instance) {
+          ring_buffer.inspect_instance->RecordSetActiveChannelsCall(
+              channel_bitmask, zx::clock::get_monotonic(),
+              *ring_buffer.set_active_channels_completed_at);
+        } else {
+          ADR_WARN_OBJECT() << "cannot RecordSetActiveChannelsCall";
+        }
       });
   TRACE_INSTANT("power-audio", "ADR::Device::SetActiveChannels exit", TRACE_SCOPE_PROCESS, "reason",
                 "Waiting for async response", "bitmask", channel_bitmask);
@@ -2699,6 +2741,14 @@ void Device::StartRingBuffer(ElementId element_id,
         ring_buffer.start_time = zx::time(result->start_time());
         callback(zx::ok(*ring_buffer.start_time));
         SetRingBufferState(element_id, RingBufferState::Started);
+
+        // This completion can theoretically execute while the device is in the midst of error or
+        // removal, so we only capture the 'started_at' timestamp if inspect_instance exists.
+        if (ring_buffer.inspect_instance) {
+          ring_buffer.inspect_instance->RecordStartTime(*ring_buffer.start_time);
+        } else {
+          ADR_WARN_OBJECT() << "cannot RecordStartTime";
+        }
       });
 }
 
@@ -2738,9 +2788,18 @@ void Device::StopRingBuffer(ElementId element_id, fit::callback<void(zx_status_t
         }
         ADR_LOG_OBJECT(kLogRingBufferFidlResponses) << "RingBuffer/Stop: success";
 
+        auto now = zx::clock::get_monotonic();
         ring_buffer.start_time.reset();
         callback(ZX_OK);
         SetRingBufferState(element_id, RingBufferState::Stopped);
+
+        // This completion can theoretically execute while the device is in the midst of error or
+        // removal, so we only capture the 'stopped_at' timestamp if inspect_instance exists.
+        if (ring_buffer.inspect_instance) {
+          ring_buffer.inspect_instance->RecordStopTime(now);
+        } else {
+          ADR_WARN_OBJECT() << "cannot RecordStopTime";
+        }
       });
 }
 

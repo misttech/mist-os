@@ -13,6 +13,7 @@
 #include <memory>
 
 #include "src/lib/fsl/io/device_watcher.h"
+#include "src/media/audio/services/device_registry/inspector.h"
 #include "src/media/audio/services/device_registry/logging.h"
 
 namespace media_audio {
@@ -54,6 +55,8 @@ zx::result<std::shared_ptr<DeviceDetector>> DeviceDetector::Create(DeviceDetecti
 }
 
 zx_status_t DeviceDetector::StartDeviceWatchers() {
+  ADR_LOG_METHOD(kLogDeviceDetection);
+
   // StartDeviceWatchers should never be called a second time.
   FX_CHECK(watchers_.empty());
   FX_CHECK(dispatcher_);
@@ -65,14 +68,17 @@ zx_status_t DeviceDetector::StartDeviceWatchers() {
             const fidl::ClientEnd<fuchsia_io::Directory>& dir, const std::string& filename) {
           if (!dispatcher_) {
             FX_LOGS(ERROR) << "DeviceWatcher fired but dispatcher is gone";
+            Inspector::Singleton()->RecordDetectionFailureOther();
             return;
           }
           if (device_type == fad::DeviceType::kCodec ||
               device_type == fad::DeviceType::kComposite ||
               device_type == fad::DeviceType::kInput || device_type == fad::DeviceType::kOutput) {
+            ADR_LOG_OBJECT(kLogDeviceDetection) << "Successful detection, proceeding to Connect";
             DriverClientFromDevFs(dir, filename, device_type);
           } else {
-            FX_LOGS(WARNING) << device_type << " device detection not yet supported";
+            ADR_WARN_OBJECT() << device_type << " device detection not yet supported";
+            Inspector::Singleton()->RecordDetectionFailureUnsupported();
             return;
           }
         },
@@ -84,6 +90,7 @@ zx_status_t DeviceDetector::StartDeviceWatchers() {
                      << "'; stopping all device monitoring.";
       watchers_.clear();
       handler_ = nullptr;
+      Inspector::Singleton()->RecordDetectionFailureOther();
       return ZX_ERR_INTERNAL;
     }
     watchers_.emplace_back(std::move(watcher));
@@ -94,6 +101,7 @@ zx_status_t DeviceDetector::StartDeviceWatchers() {
 
 void DeviceDetector::DriverClientFromDevFs(const fidl::ClientEnd<fuchsia_io::Directory>& dir,
                                            const std::string& name, fad::DeviceType device_type) {
+  ADR_LOG_STATIC(kLogDeviceDetection);
   FX_CHECK(handler_);
 
   std::optional<fad::DriverClient> driver_client;
@@ -103,6 +111,7 @@ void DeviceDetector::DriverClientFromDevFs(const fidl::ClientEnd<fuchsia_io::Dir
     if (client_end.is_error()) {
       FX_PLOGS(ERROR, client_end.error_value())
           << "DeviceDetector failed to connect to device node at '" << name << "'";
+      Inspector::Singleton()->RecordDetectionFailureToConnect();
       return;
     }
     fidl::Client connector(std::move(client_end.value()), dispatcher_);
@@ -111,6 +120,7 @@ void DeviceDetector::DriverClientFromDevFs(const fidl::ClientEnd<fuchsia_io::Dir
     if (!status.is_ok()) {
       FX_PLOGS(ERROR, status.error_value().status())
           << "Connector/Connect failed for " << device_type;
+      Inspector::Singleton()->RecordDetectionFailureToConnect();
       return;
     }
     driver_client = fad::DriverClient::WithCodec(std::move(client));
@@ -119,6 +129,7 @@ void DeviceDetector::DriverClientFromDevFs(const fidl::ClientEnd<fuchsia_io::Dir
     if (client_end.is_error()) {
       FX_PLOGS(ERROR, client_end.error_value())
           << "DeviceDetector failed to connect to DFv2 Composite node at '" << name << "'";
+      Inspector::Singleton()->RecordDetectionFailureToConnect();
       return;
     }
     driver_client = fad::DriverClient::WithComposite(std::move(client_end.value()));
@@ -127,6 +138,7 @@ void DeviceDetector::DriverClientFromDevFs(const fidl::ClientEnd<fuchsia_io::Dir
     if (client_end.is_error()) {
       FX_PLOGS(ERROR, client_end.error_value())
           << "DeviceDetector failed to connect to device node at '" << name << "'";
+      Inspector::Singleton()->RecordDetectionFailureToConnect();
       return;
     }
     fidl::Client connector(std::move(client_end.value()), dispatcher_);
@@ -135,18 +147,18 @@ void DeviceDetector::DriverClientFromDevFs(const fidl::ClientEnd<fuchsia_io::Dir
     if (!status.is_ok()) {
       FX_PLOGS(ERROR, status.error_value().status())
           << "Connector/Connect failed for " << device_type;
+      Inspector::Singleton()->RecordDetectionFailureToConnect();
       return;
     }
     driver_client = fad::DriverClient::WithStreamConfig(std::move(client));
   } else {
-    FX_LOGS(WARNING) << device_type << " device detection not yet supported";
+    ADR_WARN_METHOD() << device_type << " device detection not yet supported";
+    Inspector::Singleton()->RecordDetectionFailureUnsupported();
     return;
   }
 
-  if constexpr (kLogDeviceDetection) {
-    FX_LOGS(INFO) << "Detected and connected to " << device_type << " '" << name << "'";
-  }
-
+  ADR_LOG_METHOD(kLogDeviceDetection)
+      << "Detected and connected to " << device_type << " '" << name << "'";
   handler_(name, device_type, std::move(*driver_client));
 }
 

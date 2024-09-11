@@ -7,11 +7,13 @@
 #include <fidl/fuchsia.audio.device/cpp/natural_types.h>
 #include <lib/fidl/cpp/wire/unknown_interaction_handler.h>
 #include <lib/fit/internal/result.h>
+#include <lib/zx/clock.h>
 
 #include <utility>
 
 #include "src/media/audio/services/device_registry/audio_device_registry.h"
 #include "src/media/audio/services/device_registry/device.h"
+#include "src/media/audio/services/device_registry/inspector.h"
 #include "src/media/audio/services/device_registry/logging.h"
 #include "src/media/audio/services/device_registry/validate.h"
 
@@ -31,12 +33,16 @@ std::shared_ptr<ProviderServer> ProviderServer::Create(
 ProviderServer::ProviderServer(std::shared_ptr<AudioDeviceRegistry> parent)
     : parent_(std::move(parent)) {
   ADR_LOG_METHOD(kLogObjectLifetimes);
+  SetInspect(Inspector::Singleton()->RecordProviderInspectInstance(zx::clock::get_monotonic()));
+
   ++count_;
   LogObjectCounts();
 }
 
 ProviderServer::~ProviderServer() {
   ADR_LOG_METHOD(kLogObjectLifetimes);
+  inspect()->RecordDestructionTime(zx::clock::get_monotonic());
+
   --count_;
   LogObjectCounts();
 }
@@ -87,6 +93,10 @@ void ProviderServer::AddDevice(AddDeviceRequest& request, AddDeviceCompleter::Sy
   // This kicks off device initialization, which notifies the parent when it completes.
   parent_->AddDevice(Device::Create(parent_, thread().dispatcher(), *request.device_name(),
                                     *request.device_type(), std::move(*request.driver_client())));
+
+  inspect()->RecordAddedDevice(*request.device_name(), *request.device_type(),
+                               zx::clock::get_monotonic());
+
   completer.Reply(fit::success(fad::ProviderAddDeviceResponse{}));
 }
 
