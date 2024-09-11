@@ -45,6 +45,21 @@ impl std::str::FromStr for LogDestination {
     }
 }
 
+impl std::fmt::Display for LogDestination {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let value = match self {
+            Self::Stdout => "stdout".to_string(),
+            Self::Stderr => "stderr".to_string(),
+            Self::TestWriter => "TestWriter".to_string(),
+            Self::File(path) => {
+                format!("File: {}", path.display())
+            }
+            Self::Global => "Global".to_string(),
+        };
+        write!(f, "{}", value)
+    }
+}
+
 pub enum LogDirHandling {
     WithDirWithoutRotate,
     WithDirWithRotate,

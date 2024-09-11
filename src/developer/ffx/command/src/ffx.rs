@@ -307,6 +307,10 @@ enum CoreCheckErrorEnum {
     ConfigArgMustBeFile(String),
     #[error("Specifying core mode and isolate dir are mutually exclusive. specify one or the other. Isolate Dir Passed: {}", .0.display())]
     CoreAndIsolateMutuallyExclusive(PathBuf),
+    #[error("ffx core requries that the Log Destination be explicitly specified")]
+    MustHaveLogDestination,
+    #[error("When running in core mode, Log Destination must be a file. \"{}\" is not a file", .0)]
+    LogDestinationMustBeFile(LogDestination),
 }
 
 fn format_core_check_error_enums(errors: &Vec<CoreCheckErrorEnum>) -> String {
@@ -339,6 +343,16 @@ pub fn check_core_constraints(ffx: &Ffx) -> Result<()> {
 
     if ffx.machine.is_none() {
         errors.push(CoreCheckErrorEnum::MustHaveMachineSpecified);
+    }
+
+    match &ffx.log_destination {
+        Some(LogDestination::File(_)) => {}
+        None => {
+            errors.push(CoreCheckErrorEnum::MustHaveLogDestination);
+        }
+        Some(other) => {
+            errors.push(CoreCheckErrorEnum::LogDestinationMustBeFile(other.clone()));
+        }
     }
 
     match &ffx.target {
@@ -583,6 +597,8 @@ mod test {
                     "--core",
                     "--target",
                     "192.168.1.1:8001",
+                    "--log-output",
+                    "/tmp/out.log",
                     "target",
                     "echo",
                 ],
@@ -590,7 +606,16 @@ mod test {
                 expected_errors: vec![CoreCheckErrorEnum::MustHaveMachineSpecified],
             },
             TestCase {
-                inputs: vec!["ffx", "--core", "--machine", "json", "target", "echo"],
+                inputs: vec![
+                    "ffx",
+                    "--core",
+                    "--log-output",
+                    "/tmp/out.log",
+                    "--machine",
+                    "json",
+                    "target",
+                    "echo",
+                ],
                 name: "Missing Target Name".into(),
                 expected_errors: vec![CoreCheckErrorEnum::MustHaveTarget],
             },
@@ -600,6 +625,8 @@ mod test {
                     "--core",
                     "--target",
                     "192.168.1.1:8004",
+                    "--log-output",
+                    "/tmp/out.log",
                     "--config",
                     "foo=bar",
                     "--machine",
@@ -614,6 +641,8 @@ mod test {
                 inputs: vec![
                     "ffx",
                     "--core",
+                    "--log-output",
+                    "/tmp/out.log",
                     "--target",
                     "192.168.1.1:8004",
                     "--config",
@@ -636,6 +665,8 @@ mod test {
                 inputs: vec![
                     "ffx",
                     "--core",
+                    "--log-output",
+                    "/tmp/out.log",
                     "--target",
                     "no waaaaaayyy",
                     "--machine",
@@ -658,12 +689,50 @@ mod test {
                     "json",
                     "--target",
                     "193.168.1.1:8081",
+                    "--log-output",
+                    "/tmp/out.log",
                     "target",
                     "echo",
                 ],
                 name: "Core and Isolate Mutually Exclusive".into(),
                 expected_errors: vec![CoreCheckErrorEnum::CoreAndIsolateMutuallyExclusive(
                     PathBuf::from("/tmp/foo"),
+                )],
+            },
+            TestCase {
+                inputs: vec![
+                    "ffx",
+                    "--core",
+                    "--log-output",
+                    "-",
+                    "--machine",
+                    "json",
+                    "--target",
+                    "193.168.1.1:8081",
+                    "target",
+                    "echo",
+                ],
+                name: "Core disallows stdout log destination".into(),
+                expected_errors: vec![CoreCheckErrorEnum::LogDestinationMustBeFile(
+                    LogDestination::from_str("-").expect("parse log destination"),
+                )],
+            },
+            TestCase {
+                inputs: vec![
+                    "ffx",
+                    "--core",
+                    "--log-output",
+                    "stderr",
+                    "--machine",
+                    "json",
+                    "--target",
+                    "193.168.1.1:8081",
+                    "target",
+                    "echo",
+                ],
+                name: "Core disallows stdout log destination".into(),
+                expected_errors: vec![CoreCheckErrorEnum::LogDestinationMustBeFile(
+                    LogDestination::from_str("stderr").expect("parse log destination"),
                 )],
             },
         ];
