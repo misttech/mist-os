@@ -5,9 +5,15 @@
 import("//build/components.gni")
 import("//build/rust/rustc_binary.gni")
 
+group("tests") {
+  testonly = true
+
+  # There aren't any tests but this makes sure it's in the build graph so the build doesn't break.
+  deps = [ ":blackout-fxfs-tree" ]
+}
+
 rustc_binary("blackout-fxfs-tree-bin") {
   output_name = "blackout_fxfs_tree_bin"
-  with_unit_tests = true
   testonly = true
   edition = "2021"
   deps = [
