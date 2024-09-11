@@ -28,8 +28,6 @@
 #include <string>
 #include <vector>
 
-#include <bind/fuchsia/cpp/bind.h>
-#include <bind/fuchsia/usb/cpp/bind.h>
 #include <ddktl/fidl.h>
 #include <fbl/alloc_checker.h>
 #include <fbl/auto_lock.h>
@@ -131,23 +129,17 @@ zx_status_t UsbPeripheral::Init() {
   }
   dci_new_.Bind(std::move(*client));
 
-  auto eps = fidl::Endpoints<fuchsia_hardware_usb_dci::UsbDciInterface>::Create();
-
-  intf_srv_.bindings().AddBinding(fdf::Dispatcher::GetCurrent()->async_dispatcher(),
-                                  std::move(eps.server), &intf_srv_, fidl::kIgnoreBindingClosure);
-  intf_srv_cli_.Bind(std::move(eps.client));
-
   // Starting USB mode is determined from device metadata.
   // We read initial value and store it in dev->usb_mode, but do not actually
   // enable it until after all of our functions have bound.
   size_t actual;
-  auto status = device_get_metadata(parent(), DEVICE_METADATA_USB_MODE, &usb_mode_,
-                                    sizeof(usb_mode_), &actual);
+  zx_status_t status = device_get_metadata(parent(), DEVICE_METADATA_USB_MODE, &parent_usb_mode_,
+                                           sizeof(parent_usb_mode_), &actual);
   if (status == ZX_ERR_NOT_FOUND) {
     fbl::AutoLock lock(&lock_);
     // Assume peripheral mode by default.
-    usb_mode_ = USB_MODE_PERIPHERAL;
-  } else if (status != ZX_OK || actual != sizeof(usb_mode_)) {
+    parent_usb_mode_ = USB_MODE_PERIPHERAL;
+  } else if (status != ZX_OK || actual != sizeof(parent_usb_mode_)) {
     zxlogf(ERROR, "%s: DEVICE_METADATA_USB_MODE failed", __func__);
     return status;
   }
@@ -193,20 +185,6 @@ zx_status_t UsbPeripheral::Init() {
   if (status != ZX_OK) {
     zxlogf(ERROR, "Failed to set default config - %d", status);
     return status;
-  }
-
-  {
-    // Set interface right away if function devices are not added yet. If there are function
-    // devices, the interface is set once all functions are registered.
-    fbl::AutoLock _(&lock_);
-    if (!function_devs_added_) {
-      status = SetInterfaceOnParent();
-      if (status != ZX_OK) {
-        zxlogf(ERROR, "SetInterfaceOnParent(): %s", zx_status_get_string(status));
-        return status;
-      }
-      set_interface_in_init_ = true;
-    }
   }
 
   usb_monitor_.Start();
@@ -314,90 +292,64 @@ zx_status_t UsbPeripheral::ValidateFunction(fbl::RefPtr<UsbFunction> function, v
   return ZX_OK;
 }
 
-zx_status_t UsbPeripheral::FunctionRegistered() {
-  fbl::AutoLock lock(&lock_);
-  ZX_ASSERT(configurations_.size() > 0);
-  if (configurations_[0]->config_desc.size() != 0) {
-    return ZX_ERR_BAD_STATE;
-  }
-
-  // Check to see if we have all our functions registered.
-  // If so, we can build our configuration descriptor and tell the DCI driver we are ready.
-  fbl::Vector<size_t> lengths;
+bool UsbPeripheral::AllFunctionsRegistered() {
   for (auto& config : configurations_) {
-    auto& functions = config->functions;
-    size_t length = sizeof(usb_configuration_descriptor_t);
-
-    for (size_t i = 0; i < functions.size(); i++) {
-      auto* function = functions[i].get();
-      size_t descriptors_length;
-      if (function->GetDescriptors(&descriptors_length) != nullptr) {
-        length += descriptors_length;
-      } else {
-        // Need to wait for more functions to register.
-        return ZX_OK;
+    for (const auto& function : config->functions) {
+      if (!function->registered()) {
+        return false;
       }
     }
-    lengths.push_back(length);
+  }
+  return true;
+}
+
+zx_status_t UsbPeripheral::FunctionRegistered() {
+  fbl::AutoLock lock(&lock_);
+  // Check to see if we have all our functions registered.
+  // If so, we can build our configuration descriptor and tell the DCI driver we are ready.
+  if (!AllFunctionsRegistered()) {
+    // Need to wait for more functions to register.
+    return ZX_OK;
   }
   size_t config_idx = 0;
   // build our configuration descriptor
   for (auto& config : configurations_) {
-    auto& functions = config->functions;
-    size_t length = lengths[config_idx];
-    fbl::AllocChecker ac;
-    auto* config_desc_bytes = new (&ac) uint8_t[length];
-    if (!ac.check()) {
-      zxlogf(ERROR, "Building configuration descriptor failed due to no memory.");
-      return ZX_ERR_NO_MEMORY;
+    std::vector<uint8_t> config_desc_bytes(sizeof(usb_configuration_descriptor_t));
+    {
+      auto* config_desc =
+          reinterpret_cast<usb_configuration_descriptor_t*>(config_desc_bytes.data());
+
+      config_desc->b_length = sizeof(*config_desc);
+      config_desc->b_descriptor_type = USB_DT_CONFIG;
+      config_desc->b_num_interfaces = 0;
+      config_desc->b_configuration_value = static_cast<uint8_t>(1 + config_idx);
+      config_desc->i_configuration = 0;
+      // TODO(voydanoff) add a way to configure bm_attributes and bMaxPower
+      config_desc->bm_attributes = USB_CONFIGURATION_SELF_POWERED | USB_CONFIGURATION_RESERVED_7;
+      config_desc->b_max_power = 0;
     }
-    auto* config_desc = reinterpret_cast<usb_configuration_descriptor_t*>(config_desc_bytes);
 
-    config_desc->b_length = sizeof(*config_desc);
-    config_desc->b_descriptor_type = USB_DT_CONFIG;
-    config_desc->w_total_length = htole16(length);
-    config_desc->b_num_interfaces = 0;
-    config_desc->b_configuration_value = static_cast<uint8_t>(1 + config_idx);
-    config_desc->i_configuration = 0;
-    // TODO(voydanoff) add a way to configure bm_attributes and bMaxPower
-    config_desc->bm_attributes = USB_CONFIGURATION_SELF_POWERED | USB_CONFIGURATION_RESERVED_7;
-    config_desc->b_max_power = 0;
-
-    uint8_t* dest = reinterpret_cast<uint8_t*>(config_desc + 1);
-    for (size_t i = 0; i < functions.size(); i++) {
-      auto* function = functions[i].get();
+    for (const auto& function : config->functions) {
       size_t descriptors_length;
       auto* descriptors = function->GetDescriptors(&descriptors_length);
-      memcpy(dest, descriptors, descriptors_length);
-      dest += descriptors_length;
-      config_desc->b_num_interfaces =
-          static_cast<uint8_t>(config_desc->b_num_interfaces + function->GetNumInterfaces());
+      auto old_size = config_desc_bytes.size();
+      config_desc_bytes.resize(old_size + descriptors_length);
+      memcpy(config_desc_bytes.data() + old_size, descriptors, descriptors_length);
+      reinterpret_cast<usb_configuration_descriptor_t*>(config_desc_bytes.data())
+          ->b_num_interfaces += function->GetNumInterfaces();
     }
-    config->config_desc.reset(config_desc_bytes, length);
+    reinterpret_cast<usb_configuration_descriptor_t*>(config_desc_bytes.data())->w_total_length =
+        htole16(config_desc_bytes.size());
+    config->config_desc = std::move(config_desc_bytes);
     config_idx++;
   }
 
-  zxlogf(DEBUG, "usb_device_function_registered functions_registered = true");
-  functions_registered_ = true;
-
-  auto status = DeviceStateChanged();
+  auto status = DeviceStateChangedLocked();
   if (status != ZX_OK) {
-    zxlogf(ERROR, "DeviceStateChanged failed %d", status);
+    zxlogf(ERROR, "DeviceStateChangedLocked failed %d", status);
     return status;
   }
-
   lock.release();
-
-  {
-    fbl::AutoLock _(&lock_);
-    if (!set_interface_in_init_) {
-      status = SetInterfaceOnParent();
-      if (status != ZX_OK) {
-        zxlogf(ERROR, "SetInterfaceOnParent(): %s", zx_status_get_string(status));
-        return status;
-      }
-    }
-  }
 
   if (fidl::Status status = fidl::WireCall(listener_)->FunctionRegistered(); !status.ok()) {
     // If you expected a call here, the listener_ might have been closed before it got called. This
@@ -410,7 +362,6 @@ zx_status_t UsbPeripheral::FunctionRegistered() {
 void UsbPeripheral::FunctionCleared() {
   zxlogf(DEBUG, "%s", __func__);
   fbl::AutoLock lock(&lock_);
-
   if (num_functions_to_clear_ == 0 || !shutting_down_) {
     zxlogf(ERROR, "unexpected FunctionCleared event, num_functions: %lu is_shutting_down: %d",
            num_functions_to_clear_, shutting_down_);
@@ -424,9 +375,11 @@ void UsbPeripheral::FunctionCleared() {
   ClearFunctionsComplete();
 }
 
-zx_status_t UsbPeripheral::SetInterfaceOnParent() {
+zx_status_t UsbPeripheral::SetInterfaceOnParent(bool reset) {
   fidl::Arena arena;
-  auto result = dci_new_.buffer(arena)->SetInterface(intf_srv_cli_.TakeClientEnd());
+  auto client_end = intf_srv_.AddBinding();
+  auto result = dci_new_.buffer(arena)->SetInterface(
+      reset ? fidl::ClientEnd<fuchsia_hardware_usb_dci::UsbDciInterface>() : std::move(client_end));
 
   if (!result.ok()) {
     zxlogf(DEBUG, "(framework) SetInterface(): %s", result.status_string());
@@ -443,7 +396,7 @@ zx_status_t UsbPeripheral::SetInterfaceOnParent() {
   // migration, fall back to banjo if FIDL fails.
   zxlogf(WARNING, "could not SetInterface() over FIDL, falling back to banjo");
   // TODO(b/356940744): Move all DCI drivers over to the UsbDci FIDL protocol.
-  zx_status_t status = dci_.SetInterface(this, &usb_dci_interface_protocol_ops_);
+  zx_status_t status = dci_.SetInterface(this, reset ? nullptr : &usb_dci_interface_protocol_ops_);
   if (status != ZX_OK) {
     zxlogf(ERROR, "SetInterface failed %s", zx_status_get_string(status));
     return status;
@@ -611,50 +564,23 @@ zx_status_t UsbPeripheral::SetInterface(uint8_t interface, uint8_t alt_setting) 
   return ZX_ERR_NOT_SUPPORTED;
 }
 
-zx_status_t UsbPeripheral::AddFunction(UsbConfiguration& config, FunctionDescriptor desc) {
+zx::result<fbl::RefPtr<UsbFunction>> UsbPeripheral::AddFunction(UsbConfiguration& config,
+                                                                FunctionDescriptor desc) {
   fbl::AutoLock lock(&lock_);
-
-  if (functions_bound_) {
+  if (lock_functions_) {
     zxlogf(ERROR, "Functions are already bound");
-    return ZX_ERR_BAD_STATE;
+    return zx::error(ZX_ERR_BAD_STATE);
   }
 
   fbl::AllocChecker ac;
-  auto function =
-      fbl::MakeRefCountedChecked<UsbFunction>(&ac, zxdev(), this, std::move(desc), config.index,
-                                              fdf::Dispatcher().GetCurrent()->async_dispatcher());
+  auto function = fbl::MakeRefCountedChecked<UsbFunction>(
+      &ac, zxdev(), this, desc, config.index, fdf::Dispatcher::GetCurrent()->async_dispatcher());
   if (!ac.check()) {
-    return ZX_ERR_NO_MEMORY;
+    return zx::error(ZX_ERR_NO_MEMORY);
   }
 
   config.functions.push_back(function);
-
-  return ZX_OK;
-}
-
-zx_status_t UsbPeripheral::BindFunctions() {
-  fbl::AutoLock lock(&lock_);
-  if (functions_bound_) {
-    zxlogf(ERROR, "%s: already bound!", __func__);
-    return ZX_ERR_BAD_STATE;
-  }
-
-  if (device_desc_.b_length == 0) {
-    zxlogf(ERROR, "%s: device descriptor not set", __func__);
-    return ZX_ERR_BAD_STATE;
-  }
-  if (!configurations_.size()) {
-    zxlogf(ERROR, "%s: no configurations found", __func__);
-    return ZX_ERR_BAD_STATE;
-  }
-  if (configurations_[0]->functions.size() == 0) {
-    zxlogf(ERROR, "%s: no functions to bind", __func__);
-    return ZX_ERR_BAD_STATE;
-  }
-
-  zxlogf(DEBUG, "%s: functions_bound = true", __func__);
-  functions_bound_ = true;
-  return DeviceStateChanged();
+  return zx::ok(std::move(function));
 }
 
 void UsbPeripheral::ClearFunctions() {
@@ -666,13 +592,12 @@ void UsbPeripheral::ClearFunctions() {
       return;
     }
     shutting_down_ = true;
+    SetInterfaceOnParent(true);
     for (size_t i = 0; i < 256; i++) {
       UsbDciCancelAll(static_cast<uint8_t>(i));
     }
     for (auto& configuration : configurations_) {
-      auto& functions = configuration->functions;
-      for (size_t i = 0; i < functions.size(); i++) {
-        auto* function = functions[i].get();
+      for (const auto& function : configuration->functions) {
         if (function->zxdev()) {
           num_functions_to_clear_++;
         }
@@ -703,16 +628,14 @@ void UsbPeripheral::ClearFunctionsComplete() {
 
   shutting_down_ = false;
   configurations_.reset();
-  functions_bound_ = false;
-  functions_registered_ = false;
-  function_devs_added_ = false;
+  lock_functions_ = false;
   configurations_.reset();
   for (size_t i = 0; i < std::size(endpoint_map_); i++) {
     endpoint_map_[i].reset();
   }
   strings_.clear();
 
-  DeviceStateChanged();
+  DeviceStateChangedLocked();
 
   if (listener_.is_valid()) {
     if (fidl::Status status = fidl::WireCall(listener_)->FunctionsCleared(); !status.ok()) {
@@ -723,100 +646,71 @@ void UsbPeripheral::ClearFunctionsComplete() {
 
 zx_status_t UsbPeripheral::AddFunctionDevices() {
   zxlogf(DEBUG, "%s", __func__);
-  if (function_devs_added_) {
-    return ZX_OK;
-  }
   int func_index = 0;
   for (auto& configuration : configurations_) {
     auto& functions = configuration->functions;
-    for (unsigned i = 0; i < functions.size(); i++) {
-      auto function = functions[i];
+    for (const auto& function : functions) {
       char name[16];
       snprintf(name, sizeof(name), "function-%03u", func_index);
 
-      auto& desc = function->GetFunctionDescriptor();
-
-      zx_device_str_prop_t props[] = {
-          ddk::MakeStrProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_usb::BIND_PROTOCOL_FUNCTION),
-          ddk::MakeStrProperty(bind_fuchsia::USB_CLASS,
-                               static_cast<uint32_t>(desc.interface_class)),
-          ddk::MakeStrProperty(bind_fuchsia::USB_SUBCLASS,
-                               static_cast<uint32_t>(desc.interface_subclass)),
-          ddk::MakeStrProperty(bind_fuchsia::USB_PROTOCOL,
-                               static_cast<uint32_t>(desc.interface_protocol)),
-          ddk::MakeStrProperty(bind_fuchsia::USB_VID,
-                               static_cast<uint32_t>(device_desc_.id_vendor)),
-          ddk::MakeStrProperty(bind_fuchsia::USB_PID,
-                               static_cast<uint32_t>(device_desc_.id_product)),
-      };
-
-      auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-      if (endpoints.is_error()) {
-        return endpoints.status_value();
-      }
-      auto status = function->AddService(std::move(endpoints->server));
-      if (status != ZX_OK) {
-        zxlogf(ERROR, "Could not add service %d", status);
-        return status;
+      zx_status_t status = function->AddDevice(name);
+      if (status != ZX_OK && status != ZX_ERR_ALREADY_BOUND) {
+        zxlogf(ERROR, "AddFunctionDevice %s failed (%s). Continuing on to next.", name,
+               zx_status_get_string(status));
       }
 
-      std::array offers = {
-          fuchsia_hardware_usb_function::UsbFunctionService::Name,
-      };
-      status = function->DdkAdd(ddk::DeviceAddArgs(name)
-                                    .set_str_props(props)
-                                    .forward_metadata(parent(), DEVICE_METADATA_MAC_ADDRESS)
-                                    .forward_metadata(parent(), DEVICE_METADATA_SERIAL_NUMBER)
-                                    .set_fidl_service_offers(offers)
-                                    .set_outgoing_dir(endpoints->client.TakeChannel()));
-      if (status != ZX_OK) {
-        zxlogf(ERROR, "usb_dev_bind_functions add_device failed %d", status);
-        return status;
-      }
-      // Hold a reference while devmgr has a pointer to the function.
-      function->AddRef();
       func_index++;
     }
   }
 
-  function_devs_added_ = true;
   return ZX_OK;
 }
 
 zx_status_t UsbPeripheral::DeviceStateChanged() {
-  zxlogf(DEBUG, "%s usb_mode: %d dci_usb_mode: %d", __func__, usb_mode_, dci_usb_mode_);
+  fbl::AutoLock _(&lock_);
+  return DeviceStateChangedLocked();
+}
 
-  usb_mode_t new_dci_usb_mode = dci_usb_mode_;
-  bool add_function_devs = (usb_mode_ == USB_MODE_PERIPHERAL && functions_bound_);
-  zx_status_t status = ZX_OK;
+zx_status_t UsbPeripheral::DeviceStateChangedLocked() {
+  zxlogf(INFO, "%s cur_usb_mode: %d parent_usb_mode: %d", __func__, cur_usb_mode_,
+         parent_usb_mode_);
 
-  if (usb_mode_ == USB_MODE_PERIPHERAL) {
-    if (functions_registered_) {
+  std::optional<bool> set_interface_on_parent_reset = std::nullopt;
+  usb_mode_t new_dci_usb_mode = cur_usb_mode_;
+  if (parent_usb_mode_ == USB_MODE_PERIPHERAL) {
+    if (lock_functions_) {
+      // publish child devices
+      auto status = AddFunctionDevices();
+      if (status != ZX_OK) {
+        return status;
+      }
+    }
+
+    if (AllFunctionsRegistered()) {
       // switch DCI to device mode
       new_dci_usb_mode = USB_MODE_PERIPHERAL;
+      set_interface_on_parent_reset = false;
     } else {
       new_dci_usb_mode = USB_MODE_NONE;
+      set_interface_on_parent_reset = true;
     }
   } else {
-    new_dci_usb_mode = usb_mode_;
+    new_dci_usb_mode = parent_usb_mode_;
   }
 
-  if (add_function_devs) {
-    // publish child devices if necessary
-    if (!function_devs_added_) {
-      status = AddFunctionDevices();
+  if (cur_usb_mode_ != new_dci_usb_mode) {
+    zxlogf(INFO, "%s: set DCI mode %d", __func__, new_dci_usb_mode);
+    cur_usb_mode_ = new_dci_usb_mode;
+
+    if (set_interface_on_parent_reset.has_value()) {
+      auto status = SetInterfaceOnParent(*set_interface_on_parent_reset);
       if (status != ZX_OK) {
         return status;
       }
     }
   }
 
-  if (dci_usb_mode_ != new_dci_usb_mode) {
-    zxlogf(DEBUG, "%s: set DCI mode %d", __func__, new_dci_usb_mode);
-    dci_usb_mode_ = new_dci_usb_mode;
-  }
-
-  return status;
+  return ZX_OK;
 }
 
 zx_status_t UsbPeripheral::CommonControl(const usb_setup_t* setup, const uint8_t* write_buffer,
@@ -958,12 +852,19 @@ void UsbPeripheral::UsbDciInterfaceSetSpeed(usb_speed_t speed) { speed_ = speed;
 
 void UsbPeripheral::SetConfiguration(SetConfigurationRequestView request,
                                      SetConfigurationCompleter::Sync& completer) {
+  {
+    fbl::AutoLock _(&lock_);
+    if (lock_functions_) {
+      completer.ReplyError(ZX_ERR_ALREADY_BOUND);
+      return;
+    }
+  }
+
   zxlogf(DEBUG, "%s", __func__);
   ZX_ASSERT(!request->config_descriptors.empty());
   uint8_t index = 0;
   for (auto& func_descs : request->config_descriptors) {
-    auto descriptor = fbl::MakeRefCounted<UsbConfiguration>();
-    descriptor->index = index;
+    auto descriptor = fbl::MakeRefCounted<UsbConfiguration>(index);
     configurations_.push_back(descriptor);
     {
       fbl::AutoLock lock(&lock_);
@@ -985,14 +886,17 @@ void UsbPeripheral::SetConfiguration(SetConfigurationRequestView request,
       return;
     }
     for (auto func_desc : func_descs) {
-      AddFunction(*descriptor, func_desc);
+      auto result = AddFunction(*descriptor, func_desc);
+      if (result.is_error()) {
+        zxlogf(ERROR, "AddFunction failed %s", result.status_string());
+      }
     }
     index++;
   }
-  zx_status_t status = BindFunctions();
-  if (status != ZX_OK) {
-    completer.ReplyError(status);
-    return;
+  {
+    fbl::AutoLock _(&lock_);
+    lock_functions_ = true;
+    DeviceStateChangedLocked();
   }
   completer.ReplySuccess();
 }
@@ -1129,7 +1033,14 @@ void UsbPeripheral::DdkRelease() {
 }
 
 zx_status_t UsbPeripheral::SetDefaultConfig(std::vector<FunctionDescriptor>& functions) {
-  auto descriptor = fbl::MakeRefCounted<UsbConfiguration>();
+  {
+    fbl::AutoLock _(&lock_);
+    if (lock_functions_) {
+      return ZX_ERR_ALREADY_BOUND;
+    }
+  }
+
+  auto descriptor = fbl::MakeRefCounted<UsbConfiguration>(static_cast<uint8_t>(0));
   configurations_.push_back(descriptor);
   device_desc_.b_length = sizeof(usb_device_descriptor_t),
   device_desc_.b_descriptor_type = USB_DT_DEVICE;
@@ -1141,25 +1052,20 @@ zx_status_t UsbPeripheral::SetDefaultConfig(std::vector<FunctionDescriptor>& fun
   device_desc_.bcd_device = htole16(0x0100);
   device_desc_.b_num_configurations = 1;
 
-  zx_status_t status = ZX_OK;
   for (auto function : functions) {
-    status = AddFunction(*descriptor, function);
-    if (status != ZX_OK) {
+    auto result = AddFunction(*descriptor, function);
+    if (result.is_error()) {
       zxlogf(ERROR, "Failed to add function: (%d:%d:%d) status: %s", function.interface_class,
-             function.interface_subclass, function.interface_protocol,
-             zx_status_get_string(status));
-      return status;
+             function.interface_subclass, function.interface_protocol, result.status_string());
+      return result.status_value();
     }
   }
 
-  if (!functions.empty()) {
-    status = BindFunctions();
-    if (status != ZX_OK) {
-      zxlogf(ERROR, "Failed to bind functions. status: %s", zx_status_get_string(status));
-      return status;
-    }
+  {
+    fbl::AutoLock _(&lock_);
+    lock_functions_ = true;
+    DeviceStateChangedLocked();
   }
-
   return ZX_OK;
 }
 

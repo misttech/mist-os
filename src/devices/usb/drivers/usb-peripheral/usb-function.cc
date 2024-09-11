@@ -6,14 +6,66 @@
 
 #include <fidl/fuchsia.hardware.usb.endpoint/cpp/wire.h>
 #include <lib/ddk/debug.h>
+#include <lib/ddk/metadata.h>
 
-#include <fbl/array.h>
+#include <bind/fuchsia/cpp/bind.h>
+#include <bind/fuchsia/usb/cpp/bind.h>
+#include <fbl/auto_lock.h>
 
 #include "src/devices/usb/drivers/usb-peripheral/usb-peripheral.h"
 
 namespace usb_peripheral {
 
 namespace fdescriptor = fuchsia_hardware_usb_descriptor;
+
+zx_status_t UsbFunction::AddDevice(const std::string& name) {
+  if (dev_added_) {
+    return ZX_ERR_ALREADY_BOUND;
+  }
+
+  auto& desc = GetFunctionDescriptor();
+
+  zx_device_str_prop_t props[] = {
+      ddk::MakeStrProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_usb::BIND_PROTOCOL_FUNCTION),
+      ddk::MakeStrProperty(bind_fuchsia::USB_CLASS, static_cast<uint32_t>(desc.interface_class)),
+      ddk::MakeStrProperty(bind_fuchsia::USB_SUBCLASS,
+                           static_cast<uint32_t>(desc.interface_subclass)),
+      ddk::MakeStrProperty(bind_fuchsia::USB_PROTOCOL,
+                           static_cast<uint32_t>(desc.interface_protocol)),
+      ddk::MakeStrProperty(bind_fuchsia::USB_VID,
+                           static_cast<uint32_t>(peripheral_->device_desc().id_vendor)),
+      ddk::MakeStrProperty(bind_fuchsia::USB_PID,
+                           static_cast<uint32_t>(peripheral_->device_desc().id_product)),
+  };
+
+  auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+  if (endpoints.is_error()) {
+    return endpoints.status_value();
+  }
+  zx_status_t status = AddService(std::move(endpoints->server));
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "Could not add service %s", zx_status_get_string(status));
+    return status;
+  }
+
+  std::array offers = {
+      fuchsia_hardware_usb_function::UsbFunctionService::Name,
+  };
+  status = DdkAdd(ddk::DeviceAddArgs(name.c_str())
+                      .set_str_props(props)
+                      .forward_metadata(peripheral_->parent(), DEVICE_METADATA_MAC_ADDRESS)
+                      .forward_metadata(peripheral_->parent(), DEVICE_METADATA_SERIAL_NUMBER)
+                      .set_fidl_service_offers(offers)
+                      .set_outgoing_dir(endpoints->client.TakeChannel()));
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "usb_dev_bind_functions add_device failed %s", zx_status_get_string(status));
+    return status;
+  }
+  dev_added_ = true;
+  // Hold a reference while devmgr has a pointer to the function.
+  AddRef();
+  return ZX_OK;
+}
 
 void UsbFunction::DdkRelease() {
   peripheral_->FunctionCleared();
@@ -26,12 +78,19 @@ void UsbFunction::DdkRelease() {
 // UsbFunctionProtocol implementation.
 zx_status_t UsbFunction::UsbFunctionSetInterface(
     const usb_function_interface_protocol_t* function_intf) {
-  if (function_intf == nullptr) {
-    zxlogf(ERROR, "Invalid interface passed to UsbFunctionSetInterface");
-    return ZX_ERR_INVALID_ARGS;
+  auto func_intf = ddk::UsbFunctionInterfaceProtocolClient(function_intf);
+  if (!func_intf.is_valid()) {
+    bool was_valid = function_intf_.is_valid();
+    function_intf_.clear();
+    zxlogf(INFO, "Taking peripheral device offline until ready");
+    return was_valid ? peripheral_->DeviceStateChanged() : ZX_OK;
+  }
+  if (function_intf_.is_valid()) {
+    zxlogf(ERROR, "Function interface already bound");
+    return ZX_ERR_ALREADY_BOUND;
   }
 
-  function_intf_ = ddk::UsbFunctionInterfaceProtocolClient(function_intf);
+  function_intf_ = func_intf;
 
   size_t length = function_intf_.GetDescriptorsSize();
   fbl::AllocChecker ac;
