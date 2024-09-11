@@ -24,6 +24,7 @@ use {
 };
 
 const IPTABLES_RESTORE: &'static str = "iptables-restore";
+const IP6TABLES_RESTORE: &'static str = "ip6tables-restore";
 
 const FILTER_TABLE_WITH_CUSTOM_CHAIN: &[&str] = &[
     "*filter",
@@ -123,9 +124,12 @@ async fn run_with_input(name: &'static str, input_lines: &[&'static str]) -> Rea
 fn namespace_id_for_ipv4_table(table: &str) -> NamespaceId {
     NamespaceId(format!("ipv4-{table}"))
 }
+fn namespace_id_for_ipv6_table(table: &str) -> NamespaceId {
+    NamespaceId(format!("ipv6-{table}"))
+}
 
-fn filter_table_with_custom_chain_resources() -> Vec<Resource> {
-    let namespace_id = namespace_id_for_ipv4_table("filter");
+fn filter_table_with_custom_chain_resources(namespace: Namespace) -> Vec<Resource> {
+    let namespace_id = namespace.id.clone();
     let priority = 0;
     let input_routine_id =
         RoutineId { namespace: namespace_id.clone(), name: String::from("INPUT") };
@@ -136,7 +140,7 @@ fn filter_table_with_custom_chain_resources() -> Vec<Resource> {
     let custom_routine_id =
         RoutineId { namespace: namespace_id.clone(), name: String::from("test") };
     vec![
-        Resource::Namespace(Namespace { id: namespace_id, domain: Domain::Ipv4 }),
+        Resource::Namespace(namespace),
         // INPUT built-in routine
         Resource::Routine(Routine {
             id: input_routine_id.clone(),
@@ -189,8 +193,8 @@ fn filter_table_with_custom_chain_resources() -> Vec<Resource> {
     ]
 }
 
-fn nat_table_with_custom_chain_resources() -> Vec<Resource> {
-    let namespace_id = namespace_id_for_ipv4_table("nat");
+fn nat_table_with_custom_chain_resources(namespace: Namespace) -> Vec<Resource> {
+    let namespace_id = namespace.id.clone();
     let dnat_priority = -100;
     let snat_priority = 100;
     let prerouting_routine_id =
@@ -204,7 +208,7 @@ fn nat_table_with_custom_chain_resources() -> Vec<Resource> {
     let custom_routine_id =
         RoutineId { namespace: namespace_id.clone(), name: String::from("test") };
     vec![
-        Resource::Namespace(Namespace { id: namespace_id, domain: Domain::Ipv4 }),
+        Resource::Namespace(namespace),
         // PREROUTING built-in routine
         Resource::Routine(Routine {
             id: prerouting_routine_id.clone(),
@@ -270,8 +274,8 @@ fn nat_table_with_custom_chain_resources() -> Vec<Resource> {
     ]
 }
 
-fn mangle_table_with_custom_chain_resources() -> Vec<Resource> {
-    let namespace_id = namespace_id_for_ipv4_table("mangle");
+fn mangle_table_with_custom_chain_resources(namespace: Namespace) -> Vec<Resource> {
+    let namespace_id = namespace.id.clone();
     let priority = -150;
     let prerouting_routine_id =
         RoutineId { namespace: namespace_id.clone(), name: String::from("PREROUTING") };
@@ -286,7 +290,7 @@ fn mangle_table_with_custom_chain_resources() -> Vec<Resource> {
     let custom_routine_id =
         RoutineId { namespace: namespace_id.clone(), name: String::from("test") };
     vec![
-        Resource::Namespace(Namespace { id: namespace_id, domain: Domain::Ipv4 }),
+        Resource::Namespace(namespace),
         // PREROUTING built-in routine
         Resource::Routine(Routine {
             id: prerouting_routine_id.clone(),
@@ -365,24 +369,72 @@ fn mangle_table_with_custom_chain_resources() -> Vec<Resource> {
     ]
 }
 
+enum Ip {
+    V4,
+    V6,
+}
+
 #[test_case(
+    Ip::V4,
+    "filter",
     FILTER_TABLE_WITH_CUSTOM_CHAIN,
-    filter_table_with_custom_chain_resources();
-    "filter chain"
+    filter_table_with_custom_chain_resources;
+    "filter chain ipv4"
 )]
 #[test_case(
+    Ip::V6,
+    "filter",
+    FILTER_TABLE_WITH_CUSTOM_CHAIN,
+    filter_table_with_custom_chain_resources;
+    "filter chain ipv6"
+)]
+#[test_case(
+    Ip::V4,
+    "nat",
     NAT_TABLE_WITH_CUSTOM_CHAIN,
-    nat_table_with_custom_chain_resources();
-    "nat chain"
+    nat_table_with_custom_chain_resources;
+    "nat chain ipv4"
 )]
 #[test_case(
+    Ip::V6,
+    "nat",
+    NAT_TABLE_WITH_CUSTOM_CHAIN,
+    nat_table_with_custom_chain_resources;
+    "nat chain ipv6"
+)]
+#[test_case(
+    Ip::V4,
+    "mangle",
     MANGLE_TABLE_WITH_CUSTOM_CHAIN,
-    mangle_table_with_custom_chain_resources();
-    "mangle chain"
+    mangle_table_with_custom_chain_resources;
+    "mangle chain ipv4"
+)]
+#[test_case(
+    Ip::V6,
+    "mangle",
+    MANGLE_TABLE_WITH_CUSTOM_CHAIN,
+    mangle_table_with_custom_chain_resources;
+    "mangle chain ipv6"
 )]
 #[fuchsia::test]
-async fn create_chain(table_spec: &[&'static str], expected_resources: Vec<Resource>) {
-    let realm = run_with_input(IPTABLES_RESTORE, table_spec).await;
+async fn create_chain(
+    protocol: Ip,
+    table_name: &str,
+    table_spec: &[&'static str],
+    expected_resources_fn: fn(Namespace) -> Vec<Resource>,
+) {
+    let (binary, namespace) = match protocol {
+        Ip::V4 => (
+            IPTABLES_RESTORE,
+            Namespace { id: namespace_id_for_ipv4_table(table_name), domain: Domain::Ipv4 },
+        ),
+        Ip::V6 => (
+            IP6TABLES_RESTORE,
+            Namespace { id: namespace_id_for_ipv6_table(table_name), domain: Domain::Ipv6 },
+        ),
+    };
+
+    let realm = run_with_input(binary, table_spec).await;
 
     let state = realm
         .root
@@ -396,7 +448,7 @@ async fn create_chain(table_spec: &[&'static str], expected_resources: Vec<Resou
         .get(&ControllerId(String::from("starnix")))
         .expect("starnix should create controller");
 
-    for expected_resource in expected_resources {
+    for expected_resource in expected_resources_fn(namespace) {
         let observed_resource = starnix
             .get(&expected_resource.id())
             .expect("expected resource {expected_resource:#?}; did not find in {starnix:#?}");

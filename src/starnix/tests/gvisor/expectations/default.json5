@@ -393,7 +393,6 @@
                 "IP6TablesBasic.GetRevision",
                 "IP6TablesBasic.GetEntriesErrorPrecedence",
                 "IP6TablesBasic.GetInfoErrorPrecedence",
-                "IP6TablesTest.InitialInfo",
 
                 // socket_ipv4_datagram_based_socket_unbound_loopback_test
                 // Multicast support is not implemented for ICMP sockets.
