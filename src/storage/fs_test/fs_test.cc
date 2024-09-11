@@ -222,11 +222,9 @@ zx::result<> FsUnbind(const std::string& mount_path) {
   return zx::ok();
 }
 
-// Returns device and device path.
-zx::result<std::pair<RamDevice, std::string>> CreateRamDevice(
-    const TestFilesystemOptions& options) {
-  RamDevice ram_device;
-  std::string device_path;
+// Returns device and associated drivers (e.g. FVM).
+zx::result<RamDevice> CreateRamDevice(const TestFilesystemOptions& options) {
+  std::optional<RamDevice> ram_device;
 
   if (options.use_ram_nand) {
     auto ram_nand_or = CreateRamNand(options);
@@ -234,52 +232,46 @@ zx::result<std::pair<RamDevice, std::string>> CreateRamDevice(
       return ram_nand_or.take_error();
     }
     auto [ram_nand, nand_device_path] = std::move(ram_nand_or).value();
-    ram_device = RamDevice(std::move(ram_nand));
-    device_path = std::move(nand_device_path);
+    ram_device.emplace(std::move(ram_nand), nand_device_path);
   } else {
     auto ram_disk_or = CreateRamDisk(options);
     if (ram_disk_or.is_error()) {
       return ram_disk_or.take_error();
     }
     auto [device, ram_disk_path] = std::move(ram_disk_or).value();
-    ram_device = RamDevice(std::move(device));
-    device_path = std::move(ram_disk_path);
+    ram_device.emplace(std::move(device), ram_disk_path);
   }
 
   // Create an FVM partition if requested.
   if (options.use_fvm) {
     storage::FvmOptions fvm_options = {.initial_fvm_slice_count = options.initial_fvm_slice_count};
-    auto fvm_partition_or = storage::CreateFvmPartition(
-        device_path, static_cast<int>(options.fvm_slice_size), fvm_options);
-    if (fvm_partition_or.is_error()) {
-      return fvm_partition_or.take_error();
+    auto fvm_partition = storage::CreateFvmPartition(
+        ram_device->path(), static_cast<int>(options.fvm_slice_size), fvm_options);
+    if (fvm_partition.is_error()) {
+      return fvm_partition.take_error();
     }
 
     if (options.dummy_fvm_partition_size > 0) {
-      zx::result fvm_device =
-          component::Connect<fuchsia_hardware_block_volume::VolumeManager>(device_path + "/fvm");
-      if (fvm_device.is_error()) {
-        std::cout << "Could not open FVM driver: " << fvm_device.status_string() << std::endl;
-        return fvm_device.take_error();
-      }
-
-      uint64_t slice_count = options.dummy_fvm_partition_size / options.fvm_slice_size;
-      uuid::Uuid type_guid({0x01, 0x02, 0x03, 0x04, 0x01, 0x02, 0x03, 0x04, 0x01, 0x02, 0x03, 0x04,
-                            0x01, 0x02, 0x03, 0x04});
-      uuid::Uuid instance_guid({0x01, 0x02, 0x03, 0x04, 0x01, 0x02, 0x03, 0x04, 0x01, 0x02, 0x03,
-                                0x04, 0x01, 0x02, 0x03, 0x04});
-      std::string_view name = "extra";
-      if (zx::result res = fs_management::FvmAllocatePartition(*fvm_device, slice_count, type_guid,
-                                                               instance_guid, name, 0);
+      fidl::Arena arena;
+      if (zx::result res = fvm_partition->fvm().fs().CreateVolume(
+              "extra",
+              fuchsia_fs_startup::wire::CreateOptions::Builder(arena)
+                  .type_guid({0x01, 0x02, 0x03, 0x04, 0x01, 0x02, 0x03, 0x04, 0x01, 0x02, 0x03,
+                              0x04, 0x01, 0x02, 0x03, 0x04})
+                  .guid({0x01, 0x02, 0x03, 0x04, 0x01, 0x02, 0x03, 0x04, 0x01, 0x02, 0x03, 0x04,
+                         0x01, 0x02, 0x03, 0x04})
+                  .initial_size(options.dummy_fvm_partition_size)
+                  .Build(),
+              fuchsia_fs_startup::wire::MountOptions());
           res.is_error()) {
         std::cout << "Could not allocate extra FVM partition: " << res.status_string() << std::endl;
         return res.take_error();
       }
     }
 
-    return zx::ok(std::make_pair(std::move(ram_device), std::move(fvm_partition_or).value()));
+    ram_device->set_fvm_partition(*std::move(fvm_partition));
   }
-  return zx::ok(std::make_pair(std::move(ram_device), std::move(device_path)));
+  return zx::ok(*std::move(ram_device));
 }
 
 zx::result<> FsFormat(const std::string& device_path, fs_management::FsComponent& component,
@@ -351,14 +343,13 @@ FsMount(const std::string& device_path, const std::string& mount_path,
   return zx::ok(std::make_pair(std::move(fs), std::move(*binding)));
 }
 
-// Returns device and device path.
-zx::result<std::pair<RamDevice, std::string>> OpenRamDevice(const TestFilesystemOptions& options) {
+// Returns device and associated drivers (e.g. FVM).
+zx::result<RamDevice> OpenRamDevice(const TestFilesystemOptions& options) {
   if (!options.vmo->is_valid()) {
     return zx::error(ZX_ERR_NOT_SUPPORTED);
   }
 
-  RamDevice ram_device;
-  std::string device_path;
+  std::optional<RamDevice> ram_device;
 
   if (options.use_ram_nand) {
     // First create the ram-nand device.
@@ -367,8 +358,7 @@ zx::result<std::pair<RamDevice, std::string>> OpenRamDevice(const TestFilesystem
       return ram_nand_or.take_error();
     }
     auto [ram_nand, ftl_device_path] = std::move(ram_nand_or).value();
-    ram_device = RamDevice(std::move(ram_nand));
-    device_path = std::move(ftl_device_path);
+    ram_device.emplace(std::move(ram_nand), std::move(ftl_device_path));
   } else {
     auto ram_disk_or = CreateRamDisk(options);
     if (ram_disk_or.is_error()) {
@@ -376,13 +366,12 @@ zx::result<std::pair<RamDevice, std::string>> OpenRamDevice(const TestFilesystem
     }
 
     auto [device, ram_disk_path] = std::move(ram_disk_or).value();
-    ram_device = RamDevice(std::move(device));
-    device_path = std::move(ram_disk_path);
+    ram_device.emplace(std::move(device), std::move(ram_disk_path));
   }
 
   if (options.use_fvm) {
     // Now bind FVM to it.
-    std::string controller_path = device_path + "/device_controller";
+    std::string controller_path = ram_device->path() + "/device_controller";
     zx::result controller = component::Connect<fuchsia_device::Controller>(controller_path);
     if (controller.is_error()) {
       return controller.take_error();
@@ -393,18 +382,18 @@ zx::result<std::pair<RamDevice, std::string>> OpenRamDevice(const TestFilesystem
       return status.take_error();
     }
 
-    device_path.append("/fvm/fs-test-partition-p-1/block");
+    ram_device->set_path(ram_device->path() + "/fvm/fs-test-partition-p-1/block");
   }
 
   if (zx::result channel =
-          device_watcher::RecursiveWaitForFile(device_path.c_str(), kDeviceWaitTime);
+          device_watcher::RecursiveWaitForFile(ram_device->path().c_str(), kDeviceWaitTime);
       channel.is_error()) {
-    std::cout << "Failed waiting for " << device_path << " to appear: " << channel.status_string()
-              << std::endl;
+    std::cout << "Failed waiting for " << ram_device->path()
+              << " to appear: " << channel.status_string() << std::endl;
     return channel.take_error();
   }
 
-  return zx::ok(std::make_pair(std::move(ram_device), std::move(device_path)));
+  return zx::ok(*std::move(ram_device));
 }
 
 TestFilesystemOptions TestFilesystemOptions::DefaultBlobfs() {
@@ -526,23 +515,22 @@ zx::result<> FilesystemInstance::Unmount(const std::string& mount_path) {
 
 class BlobfsInstance : public FilesystemInstance {
  public:
-  BlobfsInstance(RamDevice device, std::string device_path)
+  BlobfsInstance(RamDevice device)
       : device_(std::move(device)),
-        component_(fs_management::FsComponent::FromDiskFormat(fs_management::kDiskFormatBlobfs)),
-        device_path_(std::move(device_path)) {}
+        component_(fs_management::FsComponent::FromDiskFormat(fs_management::kDiskFormatBlobfs)) {}
 
   zx::result<> Format(const TestFilesystemOptions& options) override {
     fs_management::MkfsOptions mkfs_options;
     mkfs_options.deprecated_padded_blobfs_format =
         options.blob_layout_format == blobfs::BlobLayoutFormat::kDeprecatedPaddedMerkleTreeAtStart;
     mkfs_options.num_inodes = options.num_inodes;
-    return FsFormat(device_path_, component_, mkfs_options,
+    return FsFormat(device_.path(), component_, mkfs_options,
                     /*create_default_volume=*/false);
   }
 
   zx::result<> Mount(const std::string& mount_path,
                      const fs_management::MountOptions& options) override {
-    auto res = FsMount(device_path_, mount_path, component_, options);
+    auto res = FsMount(device_.path(), mount_path, component_, options);
     if (res.is_error()) {
       // We can't reuse the component in the face of errors.
       component_ = fs_management::FsComponent::FromDiskFormat(fs_management::kDiskFormatBlobfs);
@@ -567,14 +555,10 @@ class BlobfsInstance : public FilesystemInstance {
         .always_modify = false,
         .force = true,
     };
-    return zx::make_result(fs_management::Fsck(device_path_, component_, options));
+    return zx::make_result(fs_management::Fsck(device_.path(), component_, options));
   }
 
-  zx::result<std::string> DevicePath() const override { return zx::ok(std::string(device_path_)); }
-  storage::RamDisk* GetRamDisk() override { return std::get_if<storage::RamDisk>(&device_); }
-  ramdevice_client::RamNand* GetRamNand() override {
-    return std::get_if<ramdevice_client::RamNand>(&device_);
-  }
+  RamDevice* GetRamDevice() override { return &device_; }
   fs_management::SingleVolumeFilesystemInterface* fs() override { return fs_.get(); }
   fidl::UnownedClientEnd<fuchsia_io::Directory> ServiceDirectory() const override {
     return fs_->ExportRoot();
@@ -593,24 +577,21 @@ class BlobfsInstance : public FilesystemInstance {
  private:
   RamDevice device_;
   fs_management::FsComponent component_;
-  std::string device_path_;
   std::unique_ptr<fs_management::SingleVolumeFilesystemInterface> fs_;
   fs_management::NamespaceBinding binding_;
 };
 
-std::unique_ptr<FilesystemInstance> BlobfsFilesystem::Create(RamDevice device,
-                                                             std::string device_path) const {
-  return std::make_unique<BlobfsInstance>(std::move(device), std::move(device_path));
+std::unique_ptr<FilesystemInstance> BlobfsFilesystem::Create(RamDevice device) const {
+  return std::make_unique<BlobfsInstance>(std::move(device));
 }
 
 zx::result<std::unique_ptr<FilesystemInstance>> BlobfsFilesystem::Open(
     const TestFilesystemOptions& options) const {
-  auto result = OpenRamDevice(options);
-  if (result.is_error()) {
-    return result.take_error();
+  auto device = OpenRamDevice(options);
+  if (device.is_error()) {
+    return device.take_error();
   }
-  auto [ram_nand, device_path] = std::move(result).value();
-  return zx::ok(std::make_unique<BlobfsInstance>(std::move(ram_nand), std::move(device_path)));
+  return zx::ok(std::make_unique<BlobfsInstance>(*std::move(device)));
 }
 
 }  // namespace fs_test

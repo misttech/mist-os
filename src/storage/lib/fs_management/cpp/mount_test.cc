@@ -244,7 +244,7 @@ void GetPartitionSliceCount(fidl::UnownedClientEnd<fuchsia_hardware_block_volume
 
 class PartitionOverFvmWithRamdiskFixture : public testing::Test {
  public:
-  const char* partition_path() const { return partition_path_.c_str(); }
+  const char* partition_path() const { return fvm_partition_->path().c_str(); }
 
  protected:
   static constexpr uint64_t kBlockSize = 512;
@@ -256,15 +256,14 @@ class PartitionOverFvmWithRamdiskFixture : public testing::Test {
     ramdisk_ = std::move(*ramdisk_or);
 
     uint64_t slice_size = kBlockSize * (2 << 10);
-    auto partition_or =
-        storage::CreateFvmPartition(ramdisk_.path(), static_cast<size_t>(slice_size));
-    ASSERT_TRUE(partition_or.is_ok()) << partition_or.status_string();
-    partition_path_ = std::move(partition_or).value();
+    auto partition = storage::CreateFvmPartition(ramdisk_.path(), static_cast<size_t>(slice_size));
+    ASSERT_TRUE(partition.is_ok()) << partition.status_string();
+    fvm_partition_.emplace(*std::move(partition));
   }
 
  private:
   storage::RamDisk ramdisk_;
-  std::string partition_path_;
+  std::optional<storage::FvmPartition> fvm_partition_;
 };
 
 using PartitionOverFvmWithRamdiskCase = PartitionOverFvmWithRamdiskFixture;

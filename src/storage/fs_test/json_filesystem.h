@@ -33,8 +33,7 @@ class JsonFilesystem : public FilesystemImplWithDefaultMake<JsonFilesystem> {
 
   const Traits& GetTraits() const override { return traits_; }
 
-  std::unique_ptr<FilesystemInstance> Create(RamDevice device,
-                                             std::string device_path) const override;
+  std::unique_ptr<FilesystemInstance> Create(RamDevice device) const override;
 
   zx::result<std::unique_ptr<FilesystemInstance>> Open(
       const TestFilesystemOptions& options) const override;

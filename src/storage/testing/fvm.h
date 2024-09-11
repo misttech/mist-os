@@ -9,8 +9,11 @@
 #include <lib/zx/result.h>
 
 #include <array>
+#include <memory>
 #include <optional>
 #include <string>
+
+#include "src/storage/lib/fs_management/cpp/mount.h"
 
 namespace storage {
 
@@ -23,16 +26,53 @@ struct FvmOptions {
   uint64_t initial_fvm_slice_count = 1;
 };
 
+// Manages a bound FVM driver.
+class FvmInstance {
+ public:
+  FvmInstance(fs_management::FsComponent component, fs_management::StartedMultiVolumeFilesystem fs)
+      : component_(std::move(component)), fs_(std::move(fs)) {}
+
+  fs_management::StartedMultiVolumeFilesystem& fs() { return fs_; }
+
+ protected:
+  fs_management::FsComponent component_;
+  fs_management::StartedMultiVolumeFilesystem fs_;
+};
+
+// Manages a specific partition and a bound FVM driver.
+class FvmPartition {
+ public:
+  FvmPartition(FvmInstance fvm, fs_management::NamespaceBinding binding,
+               std::string_view partition_name, std::string_view path)
+      : fvm_(std::move(fvm)),
+        binding_(std::move(binding)),
+        partition_name_(partition_name),
+        path_(path) {}
+
+  FvmInstance& fvm() { return fvm_; }
+  const std::string& partition_name() const { return partition_name_; }
+  const std::string& path() const { return path_; }
+
+  // Sets the limit for the partition (in bytes).  See fuchsia.fs.startup.Volume::SetLimit.
+  zx::result<> SetLimit(uint64_t limit);
+
+ private:
+  FvmInstance fvm_;
+  fs_management::NamespaceBinding binding_;
+  std::string partition_name_;
+  std::string path_;
+};
+
 // Formats the given block device to be managed by FVM, and start up an FVM instance.
 //
 // Returns that path to the FVM device.
-zx::result<std::string> CreateFvmInstance(const std::string& device_path, size_t slice_size);
+zx::result<FvmInstance> CreateFvmInstance(const std::string& device_path, size_t slice_size);
 
 // Formats the given block device to be FVM managed, and create a new partition on the device.
 //
 // Returns the path to the newly created block device.
-zx::result<std::string> CreateFvmPartition(const std::string& device_path, size_t slice_size,
-                                           const FvmOptions& options = {});
+zx::result<FvmPartition> CreateFvmPartition(const std::string& device_path, size_t slice_size,
+                                            const FvmOptions& options = {});
 
 // Binds the FVM driver to the given device.
 zx::result<> BindFvm(fidl::UnownedClientEnd<fuchsia_device::Controller> device);
