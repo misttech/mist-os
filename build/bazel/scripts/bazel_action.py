@@ -254,10 +254,43 @@ def get_input_starlark_file_path(filename: str) -> str:
     return result
 
 
+def make_writable(p: str) -> None:
+    file_mode = os.stat(p).st_mode
+    is_readonly = file_mode & stat.S_IWUSR == 0
+    if is_readonly:
+        os.chmod(p, file_mode | stat.S_IWUSR)
+
+
+def copy_writable(src: str, dst: str) -> None:
+    os.makedirs(os.path.dirname(dst), exist_ok=True)
+    shutil.copy2(src, dst)
+    make_writable(dst)
+
+
+def copy_directory(src_path: str, dst_path: str) -> None:
+    """Copy directory from |src_path| to |dst_path|."""
+    assert os.path.isdir(
+        src_path
+    ), "{} is not a dir, but copy dir is called.".format(src_path)
+    if os.path.lexists(dst_path):
+        shutil.rmtree(dst_path)
+    shutil.copytree(src_path, dst_path, copy_function=copy_writable)
+    # Make directories writable so their contents can be removed and
+    # repopulated in incremental builds.
+    make_writable(dst_path)
+    for root, dirs, _ in os.walk(dst_path):
+        for d in dirs:
+            make_writable(os.path.join(root, d))
+
+
 def copy_file_if_changed(
     src_path: str, dst_path: str, bazel_output_base_dir: str
 ) -> None:
-    """Copy |src_path| to |dst_path| if they are different."""
+    """Copy file from |src_path| to |dst_path| if they are different."""
+    assert os.path.isfile(
+        src_path
+    ), "{} is not a file, but copy file is called.".format(src_path)
+
     # NOTE: For some reason, filecmp.cmp() will return True if
     # dst_path does not exist, even if src_path is not empty!?
     if os.path.exists(dst_path) and filecmp.cmp(
@@ -267,10 +300,7 @@ def copy_file_if_changed(
 
     # Use lexists to make sure broken symlinks are removed as well.
     if os.path.lexists(dst_path):
-        if os.path.isdir(dst_path):
-            shutil.rmtree(dst_path)
-        else:
-            os.remove(dst_path)
+        os.remove(dst_path)
 
     def is_under_bazel_root(p):
         return os.path.realpath(p).startswith(
@@ -286,53 +316,32 @@ def copy_file_if_changed(
     # directly. Otherwise, or if hard-linking fails due to a cross-device
     # link, do a simple copy.
     do_copy = True
-    if os.path.isfile(src_path):
-        file_mode = os.stat(src_path).st_mode
-        is_src_readonly = file_mode & stat.S_IWUSR == 0
-        if not is_src_readonly:
-            try:
-                os.makedirs(os.path.dirname(dst_path), exist_ok=True)
-                # Get realpath of src_path to avoid symlink chains, which
-                # os.link does not handle properly even follow_symlinks=True.
-                #
-                # NOTE: it is important to link to the final real file because
-                # intermediate links can be temporary. For example, the
-                # gn_targets repository is repopulated in every bazel_action, so
-                # any links pointing to symlinks in gn_targets can be
-                # invalidated during the build.
-                os.link(os.path.realpath(src_path), dst_path)
-                # Update timestamp to avoid Ninja no-op failures that can
-                # happen because Bazel does not maintain consistent timestamps
-                # in the execroot when sandboxing or remote builds are enabled.
-                if is_under_bazel_root(src_path):
-                    os.utime(dst_path)
-                do_copy = False
-            except OSError as e:
-                if e.errno != errno.EXDEV:
-                    raise
-
-    def make_writable(p: str) -> None:
-        file_mode = os.stat(p).st_mode
-        is_readonly = file_mode & stat.S_IWUSR == 0
-        if is_readonly:
-            os.chmod(p, file_mode | stat.S_IWUSR)
-
-    def copy_writable(src: str, dst: str) -> None:
-        os.makedirs(os.path.dirname(dst), exist_ok=True)
-        shutil.copy2(src, dst)
-        make_writable(dst)
+    file_mode = os.stat(src_path).st_mode
+    is_src_readonly = file_mode & stat.S_IWUSR == 0
+    if not is_src_readonly:
+        try:
+            os.makedirs(os.path.dirname(dst_path), exist_ok=True)
+            # Get realpath of src_path to avoid symlink chains, which
+            # os.link does not handle properly even follow_symlinks=True.
+            #
+            # NOTE: it is important to link to the final real file because
+            # intermediate links can be temporary. For example, the
+            # gn_targets repository is repopulated in every bazel_action, so
+            # any links pointing to symlinks in gn_targets can be
+            # invalidated during the build.
+            os.link(os.path.realpath(src_path), dst_path)
+            # Update timestamp to avoid Ninja no-op failures that can
+            # happen because Bazel does not maintain consistent timestamps
+            # in the execroot when sandboxing or remote builds are enabled.
+            if is_under_bazel_root(src_path):
+                os.utime(dst_path)
+            do_copy = False
+        except OSError as e:
+            if e.errno != errno.EXDEV:
+                raise
 
     if do_copy:
-        if os.path.isdir(src_path):
-            shutil.copytree(src_path, dst_path, copy_function=copy_writable)
-            # Make directories writable so their contents can be removed and
-            # repopulated in incremental builds.
-            make_writable(dst_path)
-            for root, dirs, _ in os.walk(dst_path):
-                for d in dirs:
-                    make_writable(os.path.join(root, d))
-        else:
-            copy_writable(src_path, dst_path)
+        copy_writable(src_path, dst_path)
 
 
 def force_symlink(target_path: str, link_path: str) -> None:
@@ -1229,8 +1238,6 @@ def main() -> int:
 
     file_copies = []
     unwanted_dirs = []
-    unwanted_files = []
-    invalid_tracked_files = []
 
     for file_output in args.file_outputs:
         src_path = os.path.join(args.workspace_dir, file_output.bazel_path)
@@ -1244,44 +1251,6 @@ def main() -> int:
         print(
             "\nDirectories are not allowed in --file-outputs Bazel paths, got directories:\n\n%s\n"
             % "\n".join(unwanted_dirs)
-        )
-        return 1
-
-    for dir_output in args.directory_outputs:
-        src_path = os.path.join(args.workspace_dir, dir_output.bazel_path)
-        if not os.path.isdir(src_path):
-            unwanted_files.append(src_path)
-            continue
-        for tracked_file in dir_output.tracked_files:
-            tracked_file = os.path.join(src_path, tracked_file)
-            if not os.path.isfile(tracked_file):
-                invalid_tracked_files.append(tracked_file)
-        dst_path = dir_output.ninja_path
-        file_copies.append((src_path, dst_path))
-
-        if dir_output.copy_debug_symbols:
-            bazel_execroot = find_bazel_execroot(args.workspace_dir)
-            debug_symbol_dirs = run_starlark_cquery(
-                args.bazel_targets[0],
-                "FuchsiaDebugSymbolInfo_debug_symbol_dirs.cquery",
-            )
-            for debug_symbol_dir in debug_symbol_dirs:
-                copy_build_id_dir(
-                    os.path.join(bazel_execroot, debug_symbol_dir),
-                    bazel_output_base_dir,
-                )
-
-    if unwanted_files:
-        print(
-            "\nNon-directories are not allowed in --directory-outputs Bazel path, got:\n\n%s\n"
-            % "\n".join(unwanted_files)
-        )
-        return 1
-
-    if invalid_tracked_files:
-        print(
-            "\nMissing or non-directory tracked files from --directory-outputs Bazel path:\n\n%s\n"
-            % "\n".join(invalid_tracked_files)
         )
         return 1
 
@@ -1333,6 +1302,51 @@ def main() -> int:
     for src_path, dst_path in file_copies:
         copy_file_if_changed(src_path, dst_path, bazel_output_base_dir)
 
+    dir_copies = []
+    unwanted_files = []
+    invalid_tracked_files = []
+
+    for dir_output in args.directory_outputs:
+        src_path = os.path.join(args.workspace_dir, dir_output.bazel_path)
+        if not os.path.isdir(src_path):
+            unwanted_files.append(src_path)
+            continue
+        for tracked_file in dir_output.tracked_files:
+            tracked_file = os.path.join(src_path, tracked_file)
+            if not os.path.isfile(tracked_file):
+                invalid_tracked_files.append(tracked_file)
+        dst_path = dir_output.ninja_path
+        dir_copies.append((src_path, dst_path))
+
+        if dir_output.copy_debug_symbols:
+            bazel_execroot = find_bazel_execroot(args.workspace_dir)
+            debug_symbol_dirs = run_starlark_cquery(
+                args.bazel_targets[0],
+                "FuchsiaDebugSymbolInfo_debug_symbol_dirs.cquery",
+            )
+            for debug_symbol_dir in debug_symbol_dirs:
+                copy_build_id_dir(
+                    os.path.join(bazel_execroot, debug_symbol_dir),
+                    bazel_output_base_dir,
+                )
+
+    if unwanted_files:
+        print(
+            "\nNon-directories are not allowed in --directory-outputs Bazel path, got:\n\n%s\n"
+            % "\n".join(unwanted_files)
+        )
+        return 1
+
+    if invalid_tracked_files:
+        print(
+            "\nMissing or non-directory tracked files from --directory-outputs Bazel path:\n\n%s\n"
+            % "\n".join(invalid_tracked_files)
+        )
+        return 1
+
+    for src_path, dst_path in dir_copies:
+        copy_directory(src_path, dst_path)
+
     if args.path_mapping:
         # When determining source path of the copied output, follow links to get
         # out of bazel-bin, because the content of bazel-bin is not guaranteed
@@ -1343,7 +1357,7 @@ def main() -> int:
                     dst_path
                     + ":"
                     + os.path.relpath(os.path.realpath(src_path), current_dir)
-                    for src_path, dst_path in file_copies
+                    for src_path, dst_path in file_copies + dir_copies
                 )
             )
 
@@ -1403,7 +1417,7 @@ access when it is run.
             return 1
 
         depfile_content = "%s: %s\n" % (
-            " ".join(depfile_quote(c) for _, c in file_copies),
+            " ".join(depfile_quote(c) for _, c in file_copies + dir_copies),
             " ".join(depfile_quote(c) for c in sorted(all_sources)),
         )
 
