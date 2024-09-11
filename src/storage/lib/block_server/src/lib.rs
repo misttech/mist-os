@@ -18,9 +18,15 @@ use {
 pub mod async_interface;
 pub mod c_interface;
 
+/// Information associated with the block device.  The fields are immutable except for
+/// `block_count`.
 #[derive(Clone)]
 pub struct PartitionInfo {
+    /// If `block_count` is zero at construction time, the server will use the `get_volume_info`
+    /// method to get the count of assigned slices and use that (along with the slice and block
+    /// sizes) to determine the block count.
     pub block_count: u64,
+
     pub block_size: u32,
     pub type_guid: [u8; 16],
     pub instance_guid: [u8; 16],
@@ -183,8 +189,15 @@ impl<SM: SessionManager> BlockServer<SM> {
     ) -> Result<Option<impl Future<Output = Result<(), Error>> + Send>, Error> {
         match request {
             fvolume::VolumeRequest::GetInfo { responder } => {
+                let block_count = if self.partition_info.block_count == 0 {
+                    let volume_info = self.session_manager.get_volume_info().await?;
+                    volume_info.0.slice_size * volume_info.1.partition_slice_count
+                        / self.partition_info.block_size as u64
+                } else {
+                    self.partition_info.block_count
+                };
                 responder.send(Ok(&fblock::BlockInfo {
-                    block_count: self.partition_info.block_count,
+                    block_count,
                     block_size: self.partition_info.block_size,
                     max_transfer_size: fblock::MAX_TRANSFER_UNBOUNDED,
                     flags: fblock::Flag::empty(),

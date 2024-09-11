@@ -281,7 +281,10 @@ impl Metadata {
         let header = Header::mut_from_prefix(buffer.as_mut_slice()).unwrap();
         header.hash.copy_from_slice(hasher.finalize().as_slice());
 
-        device.write(offset, buffer.as_ref()).await
+        device.write(offset, buffer.as_ref()).await?;
+
+        // Always flush after writing metadata.
+        device.flush().await
     }
 
     /// Allocates slices.  NOTE: This will leave the metadata in an inconsistent state if this
@@ -886,7 +889,7 @@ impl Component {
             let partition =
                 &inner.metadata.partitions.get(&partition_index).ok_or(zx::Status::INTERNAL)?;
             PartitionInfo {
-                block_count: u32::MAX as u64, // Minfs has a 32 bit limit on the block count.
+                block_count: 0, // Supplied via `get_volume_info`.
                 block_size: fvm.block_size(),
                 type_guid: partition.type_guid,
                 instance_guid: partition.guid,
@@ -1327,6 +1330,7 @@ mod tests {
     }
 
     const BLOCK_SIZE: u32 = 512;
+    const SLICE_SIZE: u64 = 32768;
 
     impl Fixture {
         async fn new(extra_space: u64) -> Self {
@@ -1426,7 +1430,7 @@ mod tests {
         // Reading from a slice that's not allocated should fail.
         assert_eq!(
             client
-                .read_at(MutableBufferSlice::Memory(&mut buf), 32768)
+                .read_at(MutableBufferSlice::Memory(&mut buf), SLICE_SIZE)
                 .await
                 .expect_err("Read from slice #2 should fail"),
             zx::Status::OUT_OF_RANGE
@@ -1471,7 +1475,7 @@ mod tests {
         let buf = vec![0xaf; 16384];
 
         let fake_server = {
-            let fixture = Fixture::new(32768).await;
+            let fixture = Fixture::new(SLICE_SIZE).await;
 
             let volumes_proxy =
                 connect_to_protocol_at_dir_svc::<VolumesMarker>(&fixture.outgoing_dir).unwrap();
@@ -1554,7 +1558,7 @@ mod tests {
         // On the first pass, we should run out of space due to lack of space for the partition
         // data, and in the second case, we should run out of space due to lack of space in the
         // partition table.
-        for extra_space in [32768, 32768 * 1024] {
+        for extra_space in [SLICE_SIZE, SLICE_SIZE * 1024] {
             // Keep creating partitions until we run out of space.
             let mut partition_count = 0;
 
@@ -1643,7 +1647,7 @@ mod tests {
         assert_matches!(
             manager_info.as_deref(),
             Some(fvolume::VolumeManagerInfo {
-                slice_size: 32768,
+                slice_size: SLICE_SIZE,
                 max_virtual_slice: MAX_SLICE_COUNT,
                 assigned_slice_count,
                 ..
@@ -1652,6 +1656,12 @@ mod tests {
         assert_matches!(
             volume_info.as_deref(),
             Some(fvolume::VolumeInfo { partition_slice_count: 257, .. })
+        );
+        // Make sure assigned_slice_count matches block_count from GetInfo.
+        let info = volume_proxy.get_info().await.unwrap().expect("get_info failed");
+        assert_eq!(
+            info.block_count,
+            volume_info.unwrap().partition_slice_count * SLICE_SIZE / BLOCK_SIZE as u64
         );
     }
 
@@ -1714,7 +1724,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_extend() {
-        let fixture = Fixture::new(32768).await;
+        let fixture = Fixture::new(SLICE_SIZE).await;
 
         // Mount the blobfs partition.
         let volume_proxy = connect_to_named_protocol_at_dir_root::<VolumeMarker>(
@@ -1740,7 +1750,7 @@ mod tests {
 
         // A write and read spanning the first two slices should now succeed.
         let buf = vec![0xef; 16384];
-        let offset = 32768 - 8192;
+        let offset = SLICE_SIZE - 8192;
         client.write_at(BufferSlice::Memory(&buf), offset).await.unwrap();
         let mut read_buf = vec![0; 16384];
         client.read_at(MutableBufferSlice::Memory(&mut read_buf), offset).await.unwrap();
@@ -1784,7 +1794,7 @@ mod tests {
         let initial_counts;
 
         let fake_server = {
-            let fixture = Fixture::new(23 * 32768).await;
+            let fixture = Fixture::new(23 * SLICE_SIZE).await;
 
             let volumes_proxy =
                 connect_to_protocol_at_dir_svc::<VolumesMarker>(&fixture.outgoing_dir).unwrap();
@@ -1821,7 +1831,7 @@ mod tests {
                     "foo",
                     dir_server_end,
                     CreateOptions {
-                        initial_size: Some(32768 * 5),
+                        initial_size: Some(SLICE_SIZE * 5),
                         type_guid: Some([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]),
                         ..CreateOptions::default()
                     },
@@ -1879,8 +1889,8 @@ mod tests {
             // Write to every slice.
             let client = RemoteBlockClient::new(&volume_proxy).await.unwrap();
             for i in 0..20 {
-                let buf = vec![i; 32768];
-                client.write_at(BufferSlice::Memory(&buf), i as u64 * 32768).await.unwrap();
+                let buf = vec![i; SLICE_SIZE as usize];
+                client.write_at(BufferSlice::Memory(&buf), i as u64 * SLICE_SIZE).await.unwrap();
             }
 
             // Shrink, and check with QuerySlices.
@@ -1955,12 +1965,12 @@ mod tests {
                 // Read back and check all slices.
                 let client = RemoteBlockClient::new(&volume_proxy).await.unwrap();
                 for i in [0, 3, 11, 12, 13, 14] {
-                    let mut buf = vec![0; 32768];
+                    let mut buf = vec![0; SLICE_SIZE as usize];
                     client
-                        .read_at(MutableBufferSlice::Memory(&mut buf), i as u64 * 32768)
+                        .read_at(MutableBufferSlice::Memory(&mut buf), i as u64 * SLICE_SIZE)
                         .await
                         .unwrap();
-                    assert_eq!(&buf, &vec![i; 32768]);
+                    assert_eq!(&buf, &vec![i; SLICE_SIZE as usize]);
                 }
             };
 
@@ -1995,7 +2005,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_limits() {
-        let fixture = Fixture::new(10 * 32768).await;
+        let fixture = Fixture::new(10 * SLICE_SIZE).await;
 
         // Mount the blobfs partition.
         let blobfs_volume = connect_to_named_protocol_at_dir_root::<VolumeMarker>(
@@ -2117,5 +2127,55 @@ mod tests {
             .write_at_with_opts(BufferSlice::Memory(&buffer), 0, WriteOptions::FORCE_ACCESS)
             .await
             .unwrap();
+    }
+
+    #[fuchsia::test]
+    async fn test_flush_after_metadata_write() {
+        let flush_called = Arc::new(AtomicBool::new(false));
+
+        struct Observer(Arc<AtomicBool>);
+
+        impl fake_block_server::Observer for Observer {
+            fn flush(&self) {
+                self.0.store(true, Ordering::Relaxed);
+            }
+        }
+
+        let contents = std::fs::read("/pkg/data/golden-fvm.blk").unwrap();
+        let fake_server = Arc::new(
+            FakeServerOptions {
+                block_count: Some((contents.len() as u64 + SLICE_SIZE) / BLOCK_SIZE as u64),
+                block_size: BLOCK_SIZE,
+                initial_content: Some(&contents),
+                observer: Some(Box::new(Observer(flush_called.clone()))),
+                ..Default::default()
+            }
+            .into(),
+        );
+
+        let fixture = Fixture::from_fake_server(fake_server).await;
+
+        let volumes_proxy =
+            connect_to_protocol_at_dir_svc::<VolumesMarker>(&fixture.outgoing_dir).unwrap();
+
+        assert!(!flush_called.load(Ordering::Relaxed));
+
+        let (_dir_proxy, dir_server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
+            .expect("Create proxy to succeed");
+        volumes_proxy
+            .create(
+                "foo",
+                dir_server_end,
+                CreateOptions {
+                    type_guid: Some([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]),
+                    ..CreateOptions::default()
+                },
+                MountOptions::default(),
+            )
+            .await
+            .expect("create failed (FIDL)")
+            .expect("create failed");
+
+        assert!(flush_called.load(Ordering::Relaxed));
     }
 }
