@@ -20,7 +20,7 @@ More types of GPU hardware devices may be supported in the future.
 ICD are made available to the loader as [CFv2 components][component]. An ICD
 component must expose a `contents` directory containing an arbitrary
 directory tree containing a shared library, as well as a `metadata` directory
-containing a single `metadata.json` file.
+containing a single [`metadata.json`](#metadata.json) file.
 
 An ICD is generally contained in its own [package]. In that case, the
 `contents` directory would be the root of the package, and the `metadata`
@@ -106,8 +106,8 @@ current state and what components it has loaded. `manifest-fs` and `device-fs`
 are also exposed in the loader component's `out/debug` directory.
 
 ```posix-terminal
-ffx component explore /core/vulkan_loader -c "cat out/debug/manifest-fs"
-ffx component explore /core/vulkan_loader -c "cat out/debug/device-fs"
+ffx component explore /core/vulkan_loader -c "ls out/debug/manifest-fs"
+ffx component explore /core/vulkan_loader -c "ls out/debug/device-fs"
 ```
 
 The loader
