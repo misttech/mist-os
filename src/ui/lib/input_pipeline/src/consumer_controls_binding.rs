@@ -82,6 +82,8 @@ pub struct ConsumerControlsBinding {
 pub struct ConsumerControlsDeviceDescriptor {
     /// The list of buttons that this device contains.
     pub buttons: Vec<ConsumerControlButton>,
+    /// Identifies the device originating this event.
+    pub device_id: u32,
 }
 
 #[async_trait]
@@ -181,6 +183,7 @@ impl ConsumerControlsBinding {
         let device_descriptor: ConsumerControlsDeviceDescriptor =
             ConsumerControlsDeviceDescriptor {
                 buttons: consumer_controls_input_descriptor.buttons.unwrap_or_default(),
+                device_id,
             };
 
         Ok((

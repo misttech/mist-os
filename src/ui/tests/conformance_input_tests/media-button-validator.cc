@@ -117,9 +117,12 @@ class MediaButtonConformanceTest : public ui_conformance_test_base::ConformanceT
       auto [client_end, server_end] = fidl::Endpoints<futi::MediaButtonsDevice>::Create();
       media_buttons_ = fidl::SyncClient(std::move(client_end));
 
-      futi::RegistryRegisterMediaButtonsDeviceRequest request;
+      futi::RegistryRegisterMediaButtonsDeviceAndGetDeviceInfoRequest request;
       request.device(std::move(server_end));
-      ZX_ASSERT_OK(input_registry->RegisterMediaButtonsDevice(std::move(request)));
+      auto res = input_registry->RegisterMediaButtonsDeviceAndGetDeviceInfo(std::move(request));
+      ZX_ASSERT_OK(res);
+
+      device_id_ = res->device_id().value();
     }
   }
 
@@ -135,54 +138,56 @@ class MediaButtonConformanceTest : public ui_conformance_test_base::ConformanceT
     ZX_ASSERT_OK(media_buttons_->SendButtonsState(request));
   }
 
+  fui::MediaButtonsEvent MakeMediaButtonsEvent(int8_t volume, bool mic_mute, bool pause,
+                                               bool camera_disable, bool power, bool function) {
+    fui::MediaButtonsEvent e({.volume = volume,
+                              .mic_mute = mic_mute,
+                              .pause = pause,
+                              .camera_disable = camera_disable,
+                              .power = power,
+                              .function = function,
+                              .device_id = device_id_});
+    return e;
+  }
+
+  fui::MediaButtonsEvent MakeEmptyEvent() {
+    return MakeMediaButtonsEvent(0, false, false, false, false, false);
+  }
+
+  fui::MediaButtonsEvent MakeVolumeUpEvent() {
+    return MakeMediaButtonsEvent(1, false, false, false, false, false);
+  }
+
+  fui::MediaButtonsEvent MakeVolumeDownEvent() {
+    return MakeMediaButtonsEvent(-1, false, false, false, false, false);
+  }
+
+  fui::MediaButtonsEvent MakePauseEvent() {
+    return MakeMediaButtonsEvent(0, false, true, false, false, false);
+  }
+
+  fui::MediaButtonsEvent MakeMicMuteEvent() {
+    return MakeMediaButtonsEvent(0, true, false, false, false, false);
+  }
+
+  fui::MediaButtonsEvent MakeCameraDisableEvent() {
+    return MakeMediaButtonsEvent(0, false, false, true, false, false);
+  }
+
+  fui::MediaButtonsEvent MakePowerEvent() {
+    return MakeMediaButtonsEvent(0, false, false, false, true, false);
+  }
+
+  fui::MediaButtonsEvent MakeFunctionEvent() {
+    return MakeMediaButtonsEvent(0, false, false, false, false, true);
+  }
+
  private:
   fidl::SyncClient<futi::MediaButtonsDevice> media_buttons_;
   fidl::SyncClient<futc::Puppet> puppet_;
   fidl::SyncClient<futc::PuppetFactory> puppet_factory_;
+  uint32_t device_id_;
 };
-
-fui::MediaButtonsEvent MakeMediaButtonsEvent(int8_t volume, bool mic_mute, bool pause,
-                                             bool camera_disable, bool power, bool function) {
-  fui::MediaButtonsEvent e({.volume = volume,
-                            .mic_mute = mic_mute,
-                            .pause = pause,
-                            .camera_disable = camera_disable,
-                            .power = power,
-                            .function = function});
-  return e;
-}
-
-fui::MediaButtonsEvent MakeEmptyEvent() {
-  return MakeMediaButtonsEvent(0, false, false, false, false, false);
-}
-
-fui::MediaButtonsEvent MakeVolumeUpEvent() {
-  return MakeMediaButtonsEvent(1, false, false, false, false, false);
-}
-
-fui::MediaButtonsEvent MakeVolumeDownEvent() {
-  return MakeMediaButtonsEvent(-1, false, false, false, false, false);
-}
-
-fui::MediaButtonsEvent MakePauseEvent() {
-  return MakeMediaButtonsEvent(0, false, true, false, false, false);
-}
-
-fui::MediaButtonsEvent MakeMicMuteEvent() {
-  return MakeMediaButtonsEvent(0, true, false, false, false, false);
-}
-
-fui::MediaButtonsEvent MakeCameraDisableEvent() {
-  return MakeMediaButtonsEvent(0, false, false, true, false, false);
-}
-
-fui::MediaButtonsEvent MakePowerEvent() {
-  return MakeMediaButtonsEvent(0, false, false, false, true, false);
-}
-
-fui::MediaButtonsEvent MakeFunctionEvent() {
-  return MakeMediaButtonsEvent(0, false, false, false, false, true);
-}
 
 std::string ToString(const fui::MediaButtonsEvent& e) {
   std::stringstream ss;

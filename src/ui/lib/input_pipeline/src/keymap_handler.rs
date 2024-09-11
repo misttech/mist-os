@@ -213,6 +213,7 @@ mod tests {
                     &input_device::InputDeviceDescriptor::ConsumerControls(
                         consumer_controls_binding::ConsumerControlsDeviceDescriptor {
                             buttons: vec![],
+                            device_id: 0,
                         },
                     ),
                 )],

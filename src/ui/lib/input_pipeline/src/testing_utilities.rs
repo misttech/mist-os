@@ -244,6 +244,7 @@ pub fn consumer_controls_device_descriptor() -> input_device::InputDeviceDescrip
                 fidl_input_report::ConsumerControlButton::VolumeDown,
                 fidl_input_report::ConsumerControlButton::VolumeUp,
             ],
+            device_id: 0,
         },
     )
 }

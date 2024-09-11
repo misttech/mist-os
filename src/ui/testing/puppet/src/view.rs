@@ -740,6 +740,7 @@ impl View {
                 info!("Key received {:?}", s);
                 Some(test_input::KeyboardInputListenerReportTextInputRequest {
                     text: Some(s),
+                    device_id: key_event.device_id,
                     ..Default::default()
                 })
             }
@@ -747,6 +748,7 @@ impl View {
                 info!("NonPrintableKey received {:?}", key);
                 Some(test_input::KeyboardInputListenerReportTextInputRequest {
                     non_printable: Some(key),
+                    device_id: key_event.device_id,
                     ..Default::default()
                 })
             }
