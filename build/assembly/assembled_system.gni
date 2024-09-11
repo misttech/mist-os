@@ -766,25 +766,33 @@ template("assembled_system") {
 
       # See if there are any developer overrides enabled for this target, and
       # if so, pass them to assembly.
-      foreach(overrides_def, product_assembly_overrides) {
+      _overrides_match_found = false
+      foreach(overrides_def, all_product_assembly_overrides) {
         # This is done by seeing if the target_name matches each of the defined
         # label patterns that are to have overrides.
         if (label_matches(":$target_name", [ overrides_def.assembly ])) {
+          assert(_overrides_match_found == false,
+                 "Multiple matching overrides targets found for " +
+                     get_label_info(":$target_name", "label_no_toolchain") +
+                     " ${overrides_def.assembly} and ${_overrides_match_found}")
+          _overrides_match_found = overrides_def.assembly
+
           # The overrides are given by label, which is used to compute the path
           # to the file created by the developer overrides template.
-          overrides_file =
+          _overrides_file =
               get_label_info(overrides_def.overrides, "target_out_dir") + "/" +
               get_label_info(overrides_def.overrides, "name") +
               "/product_assembly_overrides.json"
 
           args += [
             "--developer-overrides",
-            rebase_path(overrides_file, root_build_dir),
+            rebase_path(_overrides_file, root_build_dir),
           ]
-          inputs += [ overrides_file ]
+          inputs += [ _overrides_file ]
           deps += [ overrides_def.overrides ]
         }
       }
+      not_needed([ "_overrides_match_found" ])
     }
 
     hermetic_inputs_for_image_assembly(labels.image_assembly_inputs) {

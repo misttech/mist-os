@@ -209,7 +209,7 @@ action("remote_services_bazelrc") {
 # Bazel.
 generated_file("assembly_developer_overrides") {
   outputs = [ "${root_gen_dir}/assembly_developer_overrides.json" ]
-  contents = product_assembly_overrides
+  contents = all_product_assembly_overrides
   output_conversion = "json"
 }
 

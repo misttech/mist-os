@@ -75,6 +75,7 @@ group("non_hermetic_deps") {
   # in the action_tracer.py due to how it cleans it's dynamic outputs.
   visibility += [
     "//boards/*",
+    "//build/assembly/overrides/*",
     "//bundles/assembly/*",
     "//local/*",
   ]
