@@ -285,18 +285,22 @@ pub struct Ffx {
     pub core: bool,
 }
 
-#[derive(thiserror::Error, Debug)]
+#[derive(thiserror::Error, PartialEq, Debug)]
 enum CoreCheckError {
     #[error("Command line flags unsatisfactory for core mode:{}", format_core_check_error_enums(.0))]
     User(Vec<CoreCheckErrorEnum>),
 }
 
-#[derive(thiserror::Error, Debug, Clone)]
+#[derive(thiserror::Error, Debug, PartialEq, Clone)]
 enum CoreCheckErrorEnum {
     #[error("ffx core requires that the machine writer be specified")]
     MustHaveMachineSpecified,
     #[error("ffx core requries that the target be explicetly specified")]
     MustHaveTarget,
+    #[error("ffx core requries that the Target be specified by address. Actually passed: \"{}\"", .0)]
+    TargetMustBeAddress(String),
+    #[error("ffx core requries that the Target be a valid IP address. Invalid ID: \"{}\"", .0)]
+    TargetAddressMustHaveValidScopeId(String),
     #[error("Core mode requires at most one --config flag to be passed. Actually passed: {}", .0)]
     MustHaveOneConfigArg(usize),
     #[error("When running in core mode, config flags must be passed as a path to a file. Path: {} is not a file", .0)]
@@ -326,9 +330,24 @@ pub fn check_core_constraints(ffx: &Ffx) -> Result<()> {
         errors.push(CoreCheckErrorEnum::MustHaveMachineSpecified);
     }
 
-    if ffx.target.is_none() {
-        errors.push(CoreCheckErrorEnum::MustHaveTarget);
-    }
+    match &ffx.target {
+        None => errors.push(CoreCheckErrorEnum::MustHaveTarget),
+        Some(t) => match netext::parse_address_parts(t.as_str()) {
+            Err(_) => errors.push(CoreCheckErrorEnum::TargetMustBeAddress(t.clone())),
+            Ok((_, scope, _)) => {
+                if let Some(scope) = scope {
+                    match netext::get_verified_scope_id(scope) {
+                        Ok(_) => {}
+                        Err(_) => {
+                            errors.push(CoreCheckErrorEnum::TargetAddressMustHaveValidScopeId(
+                                scope.to_string(),
+                            ));
+                        }
+                    };
+                };
+            }
+        },
+    };
 
     if ffx.config.len() > 1 {
         errors.push(CoreCheckErrorEnum::MustHaveOneConfigArg(ffx.config.len()));
@@ -543,21 +562,33 @@ mod test {
         struct TestCase {
             inputs: Vec<&'static str>,
             name: String,
+            expected_errors: Vec<CoreCheckErrorEnum>,
         }
 
         let cases = vec![
             TestCase {
-                inputs: vec!["ffx", "--core", "target", "echo"],
+                inputs: vec![
+                    "ffx",
+                    "--core",
+                    "--target",
+                    "192.168.1.1:8001",
+                    "target",
+                    "echo",
+                ],
                 name: "Missing Machine".into(),
+                expected_errors: vec![CoreCheckErrorEnum::MustHaveMachineSpecified],
             },
             TestCase {
                 inputs: vec!["ffx", "--core", "--machine", "json", "target", "echo"],
                 name: "Missing Target Name".into(),
+                expected_errors: vec![CoreCheckErrorEnum::MustHaveTarget],
             },
             TestCase {
                 inputs: vec![
                     "ffx",
                     "--core",
+                    "--target",
+                    "192.168.1.1:8004",
                     "--config",
                     "foo=bar",
                     "--machine",
@@ -566,11 +597,14 @@ mod test {
                     "echo",
                 ],
                 name: "Bad config setting".into(),
+                expected_errors: vec![CoreCheckErrorEnum::ConfigArgMustBeFile("foo=bar".into())],
             },
             TestCase {
                 inputs: vec![
                     "ffx",
                     "--core",
+                    "--target",
+                    "192.168.1.1:8004",
                     "--config",
                     "foo=bar",
                     "--config",
@@ -581,6 +615,27 @@ mod test {
                     "echo",
                 ],
                 name: "Multiple config settings".into(),
+                expected_errors: vec![
+                    CoreCheckErrorEnum::MustHaveOneConfigArg(2),
+                    CoreCheckErrorEnum::ConfigArgMustBeFile("foo=bar".into()),
+                    CoreCheckErrorEnum::ConfigArgMustBeFile("some_file.json".into()),
+                ],
+            },
+            TestCase {
+                inputs: vec![
+                    "ffx",
+                    "--core",
+                    "--target",
+                    "no waaaaaayyy",
+                    "--machine",
+                    "json",
+                    "target",
+                    "echo",
+                ],
+                name: "Target must be SocketAddr".into(),
+                expected_errors: vec![CoreCheckErrorEnum::TargetMustBeAddress(
+                    "no waaaaaayyy".into(),
+                )],
             },
         ];
 
@@ -589,6 +644,20 @@ mod test {
                 FfxCommandLine::new(None, &case.inputs).expect("Command line should parse");
             let res = check_core_constraints(&cmd_line.global);
             assert!(res.is_err(), "Test Case {} was not an error", case.name);
+
+            let Error::User(got_err) = res.unwrap_err() else { panic!() };
+            match got_err.downcast_ref::<CoreCheckError>() {
+                Some(CoreCheckError::User(inner_errs)) => {
+                    assert_eq!(
+                        case.expected_errors, *inner_errs,
+                        "Test Case {} had the wrong errors",
+                        case.name
+                    );
+                }
+                _ => {
+                    unreachable!();
+                }
+            }
         }
     }
 
