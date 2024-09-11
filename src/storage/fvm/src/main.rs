@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use anyhow::{anyhow, bail, ensure, Context, Error};
-use block_client::RemoteBlockClient;
+use block_client::{RemoteBlockClient, WriteOptions};
 use block_server::async_interface::{Interface, SessionManager};
 use block_server::{BlockServer, PartitionInfo};
 use fidl::endpoints::{ClientEnd, DiscoverableProtocolMarker, ServerEnd};
@@ -24,7 +24,7 @@ use std::sync::{Arc, Mutex};
 use storage_device::block_device::BlockDevice;
 use storage_device::buffer::MutableBufferRef;
 use storage_device::{Device, DeviceHolder};
-use tracing::{error, warn};
+use tracing::{debug, error, warn};
 use uuid::Uuid;
 use vfs::directory::entry_container::Directory;
 use vfs::directory::helper::DirectlyMutable;
@@ -337,7 +337,7 @@ impl Metadata {
 impl Fvm {
     /// Opens the FVM device.
     pub async fn open(device: DeviceHolder) -> Result<Self, Error> {
-        ensure!(device.block_size() <= BLOCK_SIZE as u32, zx::Status::NOT_SUPPORTED);
+        ensure!(BLOCK_SIZE as u32 % device.block_size() == 0, zx::Status::NOT_SUPPORTED);
 
         let mut metadata = Vec::new();
         {
@@ -446,67 +446,9 @@ impl Fvm {
             .max_by_key(|(_index, metadata)| metadata.header.generation)
     }
 
-    async fn read(
+    async fn do_io(
         &self,
-        partition_index: u16,
-        device_block_offset: u64,
-        block_count: u32,
-        vmo: &Arc<zx::Vmo>,
-        vmo_offset: u64,
-    ) -> Result<(), Error> {
-        struct Read;
-        impl IoTrait for Read {
-            fn get_op<'a>(
-                device: &'a dyn Device,
-                offset: u64,
-                buf: MutableBufferRef<'a>,
-            ) -> impl Future<Output = Result<(), Error>> + 'a {
-                device.read(offset, buf)
-            }
-
-            fn post(buf: &[u8], vmo: &zx::Vmo, vmo_offset: u64) -> Result<(), zx::Status> {
-                vmo.write(buf, vmo_offset)
-            }
-        }
-        self.do_io::<Read>(partition_index, device_block_offset, block_count, vmo, vmo_offset)
-            .await
-            .map_err(|error| {
-                warn!(?error, "Read failed");
-                error
-            })
-    }
-
-    async fn write(
-        &self,
-        partition_index: u16,
-        device_block_offset: u64,
-        block_count: u32,
-        vmo: &Arc<zx::Vmo>,
-        vmo_offset: u64,
-    ) -> Result<(), Error> {
-        struct Write;
-        impl IoTrait for Write {
-            fn pre(buf: &mut [u8], vmo: &zx::Vmo, vmo_offset: u64) -> Result<(), zx::Status> {
-                vmo.read(buf, vmo_offset)
-            }
-            fn get_op<'a>(
-                device: &'a dyn Device,
-                offset: u64,
-                buf: MutableBufferRef<'a>,
-            ) -> impl Future<Output = Result<(), Error>> + 'a {
-                device.write(offset, buf.into_ref())
-            }
-        }
-        self.do_io::<Write>(partition_index, device_block_offset, block_count, vmo, vmo_offset)
-            .await
-            .map_err(|error| {
-                warn!(?error, "Write failed");
-                error
-            })
-    }
-
-    async fn do_io<Io: IoTrait>(
-        &self,
+        mut io: impl IoTrait,
         partition_index: u16,
         device_block_offset: u64,
         block_count: u32,
@@ -539,7 +481,7 @@ impl Fvm {
 
         while total_len > 0 {
             let amount = std::cmp::min(buffer.len() as u64, total_len) as usize;
-            Io::pre(&mut buffer.as_mut_slice()[..amount], &vmo, vmo_offset)?;
+            io.pre(&mut buffer.as_mut_slice()[..amount], &vmo, vmo_offset)?;
             let mut buffer_left = buffer.as_mut();
             let mut ops = Vec::new();
             while total_len > 0 {
@@ -569,7 +511,7 @@ impl Fvm {
                     + mapping.physical_slice * slice_size
                     + (offset - mapping.logical_slice * slice_size);
 
-                ops.push(Io::get_op(self.device.as_ref(), physical_offset, buf));
+                ops.push(io.get_op(self.device.as_ref(), physical_offset, buf));
                 offset += len as u64;
                 total_len -= len as u64;
                 if remaining.is_empty() {
@@ -578,7 +520,7 @@ impl Fvm {
                 buffer_left = remaining;
             }
             try_join_all(ops).await?;
-            Io::post(&buffer.as_slice()[..amount], &vmo, vmo_offset)?;
+            io.post(&mut buffer.as_mut_slice()[..amount], &vmo, vmo_offset)?;
             vmo_offset += amount as u64;
         }
         Ok(())
@@ -662,20 +604,59 @@ impl Fvm {
 // Trait to abstract over the difference between reads and writes.
 trait IoTrait {
     // Called prior to performing the operation (used for writes).
-    fn pre(_buf: &mut [u8], _vmo: &zx::Vmo, _vmo_offset: u64) -> Result<(), zx::Status> {
+    fn pre(&mut self, _buf: &mut [u8], _vmo: &zx::Vmo, _vmo_offset: u64) -> Result<(), zx::Status> {
         Ok(())
     }
 
     // Called to get the future that performs the read or write.
     fn get_op<'a>(
+        &mut self,
         device: &'a dyn Device,
         offset: u64,
         buf: MutableBufferRef<'a>,
     ) -> impl Future<Output = Result<(), Error>> + 'a;
 
     // Called after performing the operation (used for reads).
-    fn post(_buf: &[u8], _vmo: &zx::Vmo, _vmo_offset: u64) -> Result<(), zx::Status> {
+    fn post(
+        &mut self,
+        _buf: &mut [u8],
+        _vmo: &zx::Vmo,
+        _vmo_offset: u64,
+    ) -> Result<(), zx::Status> {
         Ok(())
+    }
+}
+
+struct Read;
+
+impl IoTrait for Read {
+    fn get_op<'a>(
+        &mut self,
+        device: &'a dyn Device,
+        offset: u64,
+        buf: MutableBufferRef<'a>,
+    ) -> impl Future<Output = Result<(), Error>> + 'a {
+        device.read(offset, buf)
+    }
+
+    fn post(&mut self, buf: &mut [u8], vmo: &zx::Vmo, vmo_offset: u64) -> Result<(), zx::Status> {
+        vmo.write(buf, vmo_offset)
+    }
+}
+
+struct Write(WriteOptions);
+
+impl IoTrait for Write {
+    fn pre(&mut self, buf: &mut [u8], vmo: &zx::Vmo, vmo_offset: u64) -> Result<(), zx::Status> {
+        vmo.read(buf, vmo_offset)
+    }
+    fn get_op<'a>(
+        &mut self,
+        device: &'a dyn Device,
+        offset: u64,
+        buf: MutableBufferRef<'a>,
+    ) -> impl Future<Output = Result<(), Error>> + 'a {
+        device.write_with_opts(offset, buf.into_ref(), self.0)
     }
 }
 
@@ -990,10 +971,17 @@ impl Interface for PartitionInterface {
         vmo: &Arc<zx::Vmo>,
         vmo_offset: u64,
     ) -> Result<(), zx::Status> {
+        debug!(
+            "read {}: @{device_block_offset}, count={block_count}, vmo_offset={vmo_offset}",
+            self.partition_index
+        );
         self.fvm
-            .read(self.partition_index, device_block_offset, block_count, vmo, vmo_offset)
+            .do_io(Read, self.partition_index, device_block_offset, block_count, vmo, vmo_offset)
             .await
-            .map_err(map_to_status)
+            .map_err(|error| {
+                warn!(?error, "Read failed");
+                map_to_status(error)
+            })
     }
 
     async fn write(
@@ -1002,11 +990,26 @@ impl Interface for PartitionInterface {
         block_count: u32,
         vmo: &Arc<zx::Vmo>,
         vmo_offset: u64,
+        opts: WriteOptions,
     ) -> Result<(), zx::Status> {
+        debug!(
+            "write {}: @{device_block_offset}, count={block_count}, vmo_offset={vmo_offset}",
+            self.partition_index
+        );
         self.fvm
-            .write(self.partition_index, device_block_offset, block_count, vmo, vmo_offset)
+            .do_io(
+                Write(opts),
+                self.partition_index,
+                device_block_offset,
+                block_count,
+                vmo,
+                vmo_offset,
+            )
             .await
-            .map_err(map_to_status)
+            .map_err(|error| {
+                warn!(?error, "Write failed");
+                map_to_status(error)
+            })
     }
 
     async fn flush(&self) -> Result<(), zx::Status> {
@@ -1297,8 +1300,10 @@ async fn main() -> Result<(), Error> {
 mod tests {
     use super::{Component, MAX_SLICE_COUNT};
     use assert_matches::assert_matches;
-    use block_client::{BlockClient, BufferSlice, MutableBufferSlice, RemoteBlockClient};
-    use fake_block_server::FakeServer;
+    use block_client::{
+        BlockClient, BufferSlice, MutableBufferSlice, RemoteBlockClient, WriteOptions,
+    };
+    use fake_block_server::{FakeServer, FakeServerOptions};
     use fidl::endpoints::RequestStream;
     use fidl_fuchsia_fs_startup::{
         CheckOptions, CompressionAlgorithm, CreateOptions, EvictionPolicyOverride, MountOptions,
@@ -1308,6 +1313,7 @@ mod tests {
     use fuchsia_component::client::{
         connect_to_named_protocol_at_dir_root, connect_to_protocol_at_dir_svc,
     };
+    use std::sync::atomic::{AtomicBool, Ordering};
     use std::sync::Arc;
     use {
         fidl_fuchsia_hardware_block_volume as fvolume, fidl_fuchsia_io as fio,
@@ -2044,5 +2050,72 @@ mod tests {
             volume_proxy.extend(2, 1).await.expect("extend failed (FIDL)"),
             zx::sys::ZX_ERR_NO_SPACE
         );
+    }
+
+    #[fuchsia::test]
+    async fn test_force_access_passed_through() {
+        let expect_force_access = Arc::new(AtomicBool::new(false));
+
+        struct Observer(Arc<AtomicBool>);
+
+        impl fake_block_server::Observer for Observer {
+            fn write(
+                &self,
+                _device_block_offset: u64,
+                _block_count: u32,
+                _vmo: &Arc<zx::Vmo>,
+                _vmo_offset: u64,
+                opts: WriteOptions,
+            ) {
+                assert_eq!(
+                    opts.contains(WriteOptions::FORCE_ACCESS),
+                    self.0.load(Ordering::Relaxed)
+                );
+            }
+        }
+
+        let contents = std::fs::read("/pkg/data/golden-fvm.blk").unwrap();
+        let fake_server = Arc::new(
+            FakeServerOptions {
+                block_count: Some(contents.len() as u64 / BLOCK_SIZE as u64),
+                block_size: BLOCK_SIZE,
+                initial_content: Some(&contents),
+                observer: Some(Box::new(Observer(expect_force_access.clone()))),
+                ..Default::default()
+            }
+            .into(),
+        );
+
+        let fixture = Fixture::from_fake_server(fake_server).await;
+
+        let volume_proxy = connect_to_named_protocol_at_dir_root::<VolumeMarker>(
+            &fixture.outgoing_dir,
+            "volumes/data",
+        )
+        .unwrap();
+
+        let (dir_proxy, dir_server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
+            .expect("Create proxy to succeed");
+        volume_proxy
+            .mount(dir_server_end, MountOptions::default())
+            .await
+            .expect("mount failed (FIDL)")
+            .expect("mount failed");
+
+        let client = RemoteBlockClient::new(
+            &connect_to_protocol_at_dir_svc::<fvolume::VolumeMarker>(&dir_proxy).unwrap(),
+        )
+        .await
+        .unwrap();
+
+        let buffer = vec![0; BLOCK_SIZE as usize];
+        client.write_at(BufferSlice::Memory(&buffer), 0).await.unwrap();
+
+        expect_force_access.store(true, Ordering::Relaxed);
+
+        client
+            .write_at_with_opts(BufferSlice::Memory(&buffer), 0, WriteOptions::FORCE_ACCESS)
+            .await
+            .unwrap();
     }
 }

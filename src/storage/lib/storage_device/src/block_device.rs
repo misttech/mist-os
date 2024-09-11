@@ -7,7 +7,7 @@ use crate::buffer_allocator::{BufferAllocator, BufferSource};
 use crate::Device;
 use anyhow::{bail, ensure, Error};
 use async_trait::async_trait;
-use block_client::{BlockClient, BlockFlags, BufferSlice, MutableBufferSlice, VmoId};
+use block_client::{BlockClient, BlockFlags, BufferSlice, MutableBufferSlice, VmoId, WriteOptions};
 use fuchsia_zircon::Status;
 use std::ops::Range;
 
@@ -66,7 +66,12 @@ impl Device for BlockDevice {
             .await?)
     }
 
-    async fn write(&self, offset: u64, buffer: BufferRef<'_>) -> Result<(), Error> {
+    async fn write_with_opts(
+        &self,
+        offset: u64,
+        buffer: BufferRef<'_>,
+        opts: WriteOptions,
+    ) -> Result<(), Error> {
         if self.read_only {
             bail!(Status::ACCESS_DENIED);
         }
@@ -79,13 +84,14 @@ impl Device for BlockDevice {
         assert_eq!((offset + buffer.len() as u64) % self.block_size() as u64, 0);
         Ok(self
             .remote
-            .write_at(
+            .write_at_with_opts(
                 BufferSlice::new_with_vmo_id(
                     &self.vmoid,
                     buffer.range().start as u64,
                     buffer.len() as u64,
                 ),
                 offset,
+                opts,
             )
             .await?)
     }

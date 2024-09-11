@@ -4,7 +4,7 @@
 
 use super::{DecodedRequest, GroupOrRequest, IntoSessionManager, Operation, SessionHelper};
 use anyhow::Error;
-use block_protocol::{BlockFifoRequest, BlockFifoResponse};
+use block_protocol::{BlockFifoRequest, BlockFifoResponse, WriteOptions};
 use fuchsia_async::{self as fasync, FifoReadable as _, FifoWritable as _};
 use futures::stream::{FuturesUnordered, StreamExt as _};
 use futures::FutureExt;
@@ -38,6 +38,7 @@ pub trait Interface: Send + Sync + Unpin + 'static {
         block_count: u32,
         vmo: &Arc<zx::Vmo>,
         vmo_offset: u64, // *bytes* not blocks
+        opts: WriteOptions,
     ) -> impl Future<Output = Result<(), zx::Status>> + Send;
 
     /// Called to flush the device.
@@ -196,14 +197,20 @@ async fn process_fifo_request<I: Interface>(
     r: DecodedRequest,
 ) -> Result<(), zx::Status> {
     match r.operation? {
-        Operation::Read { device_block_offset, block_count, vmo_offset } => {
+        Operation::Read { device_block_offset, block_count, _unused, vmo_offset } => {
             interface
                 .read(device_block_offset, block_count, &r.vmo.as_ref().unwrap(), vmo_offset)
                 .await
         }
-        Operation::Write { device_block_offset, block_count, vmo_offset } => {
+        Operation::Write { device_block_offset, block_count, options, vmo_offset } => {
             interface
-                .write(device_block_offset, block_count, &r.vmo.as_ref().unwrap(), vmo_offset)
+                .write(
+                    device_block_offset,
+                    block_count,
+                    &r.vmo.as_ref().unwrap(),
+                    vmo_offset,
+                    options,
+                )
                 .await
         }
         Operation::Flush => interface.flush().await,

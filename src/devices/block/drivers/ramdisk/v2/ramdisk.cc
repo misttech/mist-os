@@ -243,7 +243,8 @@ zx_status_t Ramdisk::ReadWrite(const block_server::Request& request, uint64_t re
         } else {
           *pre_sleep_write_block_count_ -= block_count;
         }
-        if (flags_ & fuchsia_hardware_ramdisk::wire::RamdiskFlag::kDiscardNotFlushedOnWake) {
+        if (!request.operation.write.options.is_force_access() &&
+            flags_ & fuchsia_hardware_ramdisk::wire::RamdiskFlag::kDiscardNotFlushedOnWake) {
           std::random_device random;
           std::bernoulli_distribution distribution;
           for (uint64_t block = block_offset, count = block_count; count > 0; ++block, --count) {

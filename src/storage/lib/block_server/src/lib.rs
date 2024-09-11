@@ -407,11 +407,17 @@ impl<SM: SessionManager> SessionHelper<SM> {
             BlockOpcode::Read => Operation::Read {
                 device_block_offset: request.dev_offset,
                 block_count: request.length,
+                _unused: 0,
                 vmo_offset,
             },
             BlockOpcode::Write => Operation::Write {
                 device_block_offset: request.dev_offset,
                 block_count: request.length,
+                options: if flags.contains(BlockIoFlag::FORCE_ACCESS) {
+                    WriteOptions::FORCE_ACCESS
+                } else {
+                    WriteOptions::empty()
+                },
                 vmo_offset,
             },
             BlockOpcode::Flush => Operation::Flush,
@@ -432,17 +438,26 @@ struct DecodedRequest {
     vmo: Option<Arc<zx::Vmo>>,
 }
 
+/// cbindgen:no-export
+pub type WriteOptions = block_protocol::WriteOptions;
+
 #[repr(C)]
 #[derive(Debug)]
 pub enum Operation {
+    // NOTE: On the C++ side, this ends up as a union and, for efficiency reasons, there is code
+    // that assumes that some fields for reads and writes (and possibly trim) line-up (e.g. common
+    // code can read `device_block_offset` from the read variant and then assume it's valid for the
+    // write variant).
     Read {
         device_block_offset: u64,
         block_count: u32,
+        _unused: u32,
         vmo_offset: u64,
     },
     Write {
         device_block_offset: u64,
         block_count: u32,
+        options: WriteOptions,
         vmo_offset: u64,
     },
     Flush,
@@ -503,7 +518,7 @@ impl From<RequestId> for GroupOrRequest {
 #[cfg(test)]
 mod tests {
     use super::{BlockServer, PartitionInfo};
-    use block_protocol::{BlockFifoCommand, BlockFifoRequest, BlockFifoResponse};
+    use block_protocol::{BlockFifoCommand, BlockFifoRequest, BlockFifoResponse, WriteOptions};
     use fidl_fuchsia_hardware_block_driver::{BlockIoFlag, BlockOpcode};
     use fuchsia_async::{FifoReadable as _, FifoWritable as _};
     use fuchsia_zircon::{AsHandleRef as _, HandleBased as _};
@@ -556,6 +571,7 @@ mod tests {
             _block_count: u32,
             _vmo: &Arc<zx::Vmo>,
             _vmo_offset: u64,
+            _opts: WriteOptions,
         ) -> Result<(), zx::Status> {
             unreachable!();
         }
@@ -805,6 +821,7 @@ mod tests {
             block_count: u32,
             _vmo: &Arc<zx::Vmo>,
             vmo_offset: u64,
+            _opts: WriteOptions,
         ) -> Result<(), zx::Status> {
             if self.return_errors {
                 Err(zx::Status::NOT_SUPPORTED)

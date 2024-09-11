@@ -270,12 +270,21 @@ pub trait BlockClient: Send + Sync {
         device_offset: u64,
     ) -> Result<(), zx::Status>;
 
+    async fn write_at_with_opts(
+        &self,
+        buffer_slice: BufferSlice<'_>,
+        device_offset: u64,
+        opts: WriteOptions,
+    ) -> Result<(), zx::Status>;
+
     /// Writes the data in |buffer_slice| to the device.
     async fn write_at(
         &self,
         buffer_slice: BufferSlice<'_>,
         device_offset: u64,
-    ) -> Result<(), zx::Status>;
+    ) -> Result<(), zx::Status> {
+        self.write_at_with_opts(buffer_slice, device_offset, WriteOptions::empty()).await
+    }
 
     /// Trims the given range on the block device.
     async fn trim(&self, device_range: Range<u64>) -> Result<(), zx::Status>;
@@ -309,6 +318,24 @@ struct Common {
 }
 
 impl Common {
+    fn new(
+        fifo: fasync::Fifo<BlockFifoResponse, BlockFifoRequest>,
+        info: &block::BlockInfo,
+        temp_vmo: zx::Vmo,
+        temp_vmo_id: VmoId,
+    ) -> Self {
+        let fifo_state = Arc::new(Mutex::new(FifoState { fifo: Some(fifo), ..Default::default() }));
+        fasync::Task::spawn(FifoPoller { fifo_state: fifo_state.clone() }).detach();
+        Self {
+            block_size: info.block_size,
+            block_count: info.block_count,
+            block_flags: info.flags,
+            fifo_state,
+            temp_vmo: futures::lock::Mutex::new(temp_vmo),
+            temp_vmo_id,
+        }
+    }
+
     fn to_blocks(&self, bytes: u64) -> Result<u64, zx::Status> {
         if bytes % self.block_size as u64 != 0 {
             Err(zx::Status::INVALID_ARGS)
@@ -355,26 +382,6 @@ impl Common {
         }
         .trace(trace_args)
         .await
-    }
-}
-
-impl Common {
-    fn new(
-        fifo: fasync::Fifo<BlockFifoResponse, BlockFifoRequest>,
-        info: &block::BlockInfo,
-        temp_vmo: zx::Vmo,
-        temp_vmo_id: VmoId,
-    ) -> Self {
-        let fifo_state = Arc::new(Mutex::new(FifoState { fifo: Some(fifo), ..Default::default() }));
-        fasync::Task::spawn(FifoPoller { fifo_state: fifo_state.clone() }).detach();
-        Self {
-            block_size: info.block_size,
-            block_count: info.block_count,
-            block_flags: info.flags,
-            fifo_state,
-            temp_vmo: futures::lock::Mutex::new(temp_vmo),
-            temp_vmo_id,
-        }
     }
 
     async fn detach_vmo(&self, vmo_id: VmoId) -> Result<(), zx::Status> {
@@ -449,13 +456,19 @@ impl Common {
         &self,
         buffer_slice: BufferSlice<'_>,
         device_offset: u64,
+        opts: WriteOptions,
     ) -> Result<(), zx::Status> {
+        let flags = if opts.contains(WriteOptions::FORCE_ACCESS) {
+            BlockIoFlag::FORCE_ACCESS.bits()
+        } else {
+            0
+        };
         match buffer_slice {
             BufferSlice::VmoId { vmo_id, offset, length } => {
                 self.send(BlockFifoRequest {
                     command: BlockFifoCommand {
                         opcode: BlockOpcode::Write.into_primitive(),
-                        flags: 0,
+                        flags,
                         ..Default::default()
                     },
                     vmoid: vmo_id.id(),
@@ -479,7 +492,7 @@ impl Common {
                     self.send(BlockFifoRequest {
                         command: BlockFifoCommand {
                             opcode: BlockOpcode::Write.into_primitive(),
-                            flags: 0,
+                            flags,
                             ..Default::default()
                         },
                         vmoid: self.temp_vmo_id.id(),
@@ -642,12 +655,13 @@ impl BlockClient for RemoteBlockClient {
         self.common.read_at(buffer_slice, device_offset).await
     }
 
-    async fn write_at(
+    async fn write_at_with_opts(
         &self,
         buffer_slice: BufferSlice<'_>,
         device_offset: u64,
+        opts: WriteOptions,
     ) -> Result<(), zx::Status> {
-        self.common.write_at(buffer_slice, device_offset).await
+        self.common.write_at(buffer_slice, device_offset, opts).await
     }
 
     async fn trim(&self, range: Range<u64>) -> Result<(), zx::Status> {
@@ -754,7 +768,7 @@ impl RemoteBlockClientSync {
         buffer_slice: BufferSlice<'_>,
         device_offset: u64,
     ) -> Result<(), zx::Status> {
-        block_on(self.common.write_at(buffer_slice, device_offset))
+        block_on(self.common.write_at(buffer_slice, device_offset, WriteOptions::empty()))
     }
 
     pub fn flush(&self) -> Result<(), zx::Status> {
@@ -837,7 +851,7 @@ impl Future for FifoPoller {
 mod tests {
     use super::{
         BlockClient, BlockFifoRequest, BlockFifoResponse, BufferSlice, MutableBufferSlice,
-        RemoteBlockClient, RemoteBlockClientSync,
+        RemoteBlockClient, RemoteBlockClientSync, WriteOptions,
     };
     use block_server::{BlockServer, PartitionInfo};
     use fidl::endpoints::RequestStream as _;
@@ -1270,6 +1284,7 @@ mod tests {
                 _block_count: u32,
                 _vmo: &Arc<zx::Vmo>,
                 _vmo_offset: u64,
+                _opts: WriteOptions,
             ) -> Result<(), zx::Status> {
                 unreachable!();
             }

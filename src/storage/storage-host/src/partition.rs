@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 use crate::gpt::GptPartition;
-use block_client::VmoId;
+use block_client::{VmoId, WriteOptions};
 use fuchsia_zircon as zx;
 use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex};
@@ -48,9 +48,10 @@ impl block_server::async_interface::Interface for PartitionBackend {
         length: u32,
         vmo: &Arc<zx::Vmo>,
         vmo_offset: u64, // *bytes* not blocks
+        opts: WriteOptions,
     ) -> Result<(), zx::Status> {
         let vmoid = self.get_vmoid(vmo)?;
-        self.partition.write(device_block_offset, length, vmoid.as_ref(), vmo_offset).await
+        self.partition.write(device_block_offset, length, vmoid.as_ref(), vmo_offset, opts).await
     }
 
     async fn flush(&self) -> Result<(), zx::Status> {

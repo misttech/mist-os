@@ -5,7 +5,9 @@
 use crate::partition::PartitionBackend;
 use crate::partitions_directory::PartitionsDirectory;
 use anyhow::{anyhow, Context as _, Error};
-use block_client::{BlockClient as _, BufferSlice, MutableBufferSlice, RemoteBlockClient, VmoId};
+use block_client::{
+    BlockClient as _, BufferSlice, MutableBufferSlice, RemoteBlockClient, VmoId, WriteOptions,
+};
 use block_server::async_interface::SessionManager;
 use block_server::BlockServer;
 use fs_management::filesystem::BlockConnector;
@@ -78,6 +80,7 @@ impl GptPartition {
         block_count: u32,
         vmo_id: &VmoId,
         vmo_offset: u64, // *bytes* not blocks
+        opts: WriteOptions,
     ) -> Result<(), zx::Status> {
         let dev_offset = self
             .absolute_offset(device_block_offset, block_count)
@@ -87,7 +90,7 @@ impl GptPartition {
             vmo_offset,
             (block_count * self.block_size()) as u64,
         );
-        self.block_client.write_at(buffer, dev_offset).await
+        self.block_client.write_at_with_opts(buffer, dev_offset, opts).await
     }
 
     pub async fn flush(&self) -> Result<(), zx::Status> {
@@ -224,13 +227,17 @@ mod tests {
     use super::GptManager;
     use anyhow::Error;
     use block_client::{BlockClient as _, BufferSlice, MutableBufferSlice, RemoteBlockClient};
+    use block_server::WriteOptions;
     use event_listener::{Event, EventListener};
-    use fake_block_server::FakeServer;
-    use fidl::endpoints::{ClientEnd, Proxy as _};
+    use fake_block_server::{FakeServer, FakeServerOptions};
+    use fidl::endpoints::{create_proxy, create_request_stream, ClientEnd, Proxy as _};
     use fs_management::filesystem::BlockConnector;
     use gpt_testing::{format_gpt, PartitionDescriptor};
+    use std::sync::atomic::{AtomicBool, Ordering};
     use std::sync::{Arc, Mutex};
     use vfs::directory::entry_container::Directory as _;
+    use vfs::directory::immutable::simple;
+    use vfs::execution_scope::ExecutionScope;
     use vfs::ObjectRequest;
     use {
         fidl_fuchsia_hardware_block_volume as fvolume, fidl_fuchsia_io as fio,
@@ -593,5 +600,96 @@ mod tests {
                 shutdown.notify(usize::MAX);
             },
         );
+    }
+
+    #[fuchsia::test]
+    async fn test_force_access_passed_through() {
+        const BLOCK_SIZE: u32 = 512;
+        const BLOCK_COUNT: u64 = 1024;
+        let vmo = zx::Vmo::create(BLOCK_COUNT * BLOCK_SIZE as u64).unwrap();
+
+        format_gpt(
+            &vmo,
+            BLOCK_SIZE,
+            vec![PartitionDescriptor {
+                label: "foo".to_string(),
+                type_guid: uuid::Uuid::from_bytes([1; 16]),
+                instance_guid: uuid::Uuid::from_bytes([2; 16]),
+                start_block: 4,
+                num_blocks: 1,
+            }],
+        );
+
+        let expect_force_access = Arc::new(AtomicBool::new(false));
+
+        struct Observer(Arc<AtomicBool>);
+
+        impl fake_block_server::Observer for Observer {
+            fn write(
+                &self,
+                _device_block_offset: u64,
+                _block_count: u32,
+                _vmo: &Arc<zx::Vmo>,
+                _vmo_offset: u64,
+                opts: WriteOptions,
+            ) {
+                assert_eq!(
+                    opts.contains(WriteOptions::FORCE_ACCESS),
+                    self.0.load(Ordering::Relaxed)
+                );
+            }
+        }
+
+        let server = Arc::new(
+            FakeServerOptions {
+                block_count: Some(BLOCK_COUNT),
+                block_size: BLOCK_SIZE,
+                vmo: Some(vmo),
+                observer: Some(Box::new(Observer(expect_force_access.clone()))),
+                ..Default::default()
+            }
+            .into(),
+        );
+
+        struct Server(Arc<FakeServer>);
+
+        impl BlockConnector for Server {
+            fn connect_volume(&self) -> Result<ClientEnd<fvolume::VolumeMarker>, Error> {
+                let (client, stream) = create_request_stream().unwrap();
+                let server = self.0.clone();
+                fasync::Task::spawn(async move {
+                    let _ = server.serve(stream).await;
+                })
+                .detach();
+                Ok(client)
+            }
+        }
+
+        let partitions_dir = simple();
+        let manager =
+            GptManager::new(Arc::new(Server(server)), partitions_dir.clone()).await.unwrap();
+
+        let scope = ExecutionScope::new();
+        let (client, server) = create_proxy::<fvolume::VolumeMarker>().unwrap();
+        partitions_dir.open(
+            scope.clone(),
+            fio::OpenFlags::empty(),
+            "part-0/block".try_into().unwrap(),
+            server.into_channel().into(),
+        );
+
+        let client = RemoteBlockClient::new(client).await.unwrap();
+
+        let buffer = vec![0; BLOCK_SIZE as usize];
+        client.write_at(BufferSlice::Memory(&buffer), 0).await.unwrap();
+
+        expect_force_access.store(true, Ordering::Relaxed);
+
+        client
+            .write_at_with_opts(BufferSlice::Memory(&buffer), 0, WriteOptions::FORCE_ACCESS)
+            .await
+            .unwrap();
+
+        manager.shutdown().await;
     }
 }
