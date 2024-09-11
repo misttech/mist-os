@@ -4,10 +4,10 @@
 
 #include "src/devices/adc/drivers/aml-saradc/aml-saradc.h"
 
-#include <lib/device-protocol/pdev-fidl.h>
 #include <lib/driver/component/cpp/driver_export.h>
 #include <lib/driver/component/cpp/node_add_args.h>
 #include <lib/driver/logging/cpp/structured_logger.h>
+#include <lib/driver/platform-device/cpp/pdev.h>
 
 #include <fbl/auto_lock.h>
 
@@ -167,69 +167,64 @@ zx::result<> AmlSaradc::CreateNode() {
 
 zx::result<> AmlSaradc::Start() {
   // Initialize our compat server.
-  {
-    zx::result result = compat_server_.Initialize(incoming(), outgoing(), node_name(), kDeviceName);
-    if (result.is_error()) {
-      return result.take_error();
-    }
+  if (zx::result result =
+          compat_server_.Initialize(incoming(), outgoing(), node_name(), kDeviceName);
+      result.is_error()) {
+    FDF_SLOG(ERROR, "Failed to initialize compat server.", KV("status", result.status_string()));
+    return result.take_error();
   }
 
-  // Map hardware resources from pdev.
-  std::optional<fdf::MmioBuffer> adc_mmio, ao_mmio;
-  zx::interrupt irq;
-  {
-    zx::result result = incoming()->Connect<fuchsia_hardware_platform_device::Service::Device>();
-    if (result.is_error()) {
-      FDF_LOG(ERROR, "Failed to open pdev service: %s", result.status_string());
-      return result.take_error();
-    }
-    auto pdev = ddk::PDevFidl(std::move(result.value()));
-    if (!pdev.is_valid()) {
-      FDF_LOG(ERROR, "Failed to get pdev");
-      return zx::error(ZX_ERR_NO_RESOURCES);
-    }
-
-    auto status = pdev.MapMmio(0, &adc_mmio);
-    if (status != ZX_OK) {
-      FDF_LOG(ERROR, "Failed to map mmio 0");
-      return zx::error(status);
-    }
-    status = pdev.MapMmio(1, &ao_mmio);
-    if (status != ZX_OK) {
-      FDF_LOG(ERROR, "Failed to map mmio 1");
-      return zx::error(status);
-    }
-
-    status = pdev.GetInterrupt(0, &irq);
-    if (status != ZX_OK) {
-      FDF_LOG(ERROR, "Failed to get interrupt");
-      return zx::error(status);
-    }
-
-    zx::result metadata = pdev.GetMetadata<fuchsia_hardware_adcimpl::Metadata>(
-        fuchsia_hardware_adcimpl::kPdevMetadataTypeIdentifier);
-    if (metadata.is_error()) {
-      FDF_SLOG(ERROR, "Failed to get metadata from platform device.",
-               KV("status", metadata.status_string()));
-      return metadata.take_error();
-    }
-
-    status = metadata_server_.SetMetadata(metadata.value());
-    if (status != ZX_OK) {
-      FDF_SLOG(ERROR, "Failed to set metadata.", KV("status", zx_status_get_string(status)));
-      return zx::error(status);
-    }
+  zx::result pdev_client = incoming()->Connect<fuchsia_hardware_platform_device::Service::Device>();
+  if (pdev_client.is_error()) {
+    FDF_SLOG(ERROR, "Failed to open pdev service.", KV("status", pdev_client.status_string()));
+    return pdev_client.take_error();
+  }
+  fdf::PDev pdev{std::move(pdev_client.value())};
+  if (!pdev.is_valid()) {
+    FDF_LOG(ERROR, "Failed to get pdev");
+    return zx::error(ZX_ERR_NO_RESOURCES);
   }
 
-  zx_status_t status =
-      metadata_server_.Serve(*outgoing(), fdf::Dispatcher::GetCurrent()->async_dispatcher());
+  zx::result adc_mmio = pdev.MapMmio(0);
+  if (adc_mmio.is_error()) {
+    FDF_SLOG(ERROR, "Failed to map mmio 0.", KV("status", adc_mmio.status_string()));
+    return adc_mmio.take_error();
+  }
+
+  zx::result ao_mmio = pdev.MapMmio(1);
+  if (ao_mmio.is_error()) {
+    FDF_SLOG(ERROR, "Failed to map mmio 1.", KV("status", ao_mmio.status_string()));
+    return ao_mmio.take_error();
+  }
+
+  zx::result irq = pdev.GetInterrupt(0);
+  if (irq.is_error()) {
+    FDF_SLOG(ERROR, "Failed to get interrupt.", KV("status", irq.status_string()));
+    return irq.take_error();
+  }
+
+  zx::result metadata = pdev.GetMetadata<fuchsia_hardware_adcimpl::Metadata>(
+      fuchsia_hardware_adcimpl::kPdevMetadataTypeIdentifier);
+  if (metadata.is_error()) {
+    FDF_SLOG(ERROR, "Failed to get metadata from platform device.",
+             KV("status", metadata.status_string()));
+    return metadata.take_error();
+  }
+
+  zx_status_t status = metadata_server_.SetMetadata(metadata.value());
+  if (status != ZX_OK) {
+    FDF_SLOG(ERROR, "Failed to set metadata.", KV("status", zx_status_get_string(status)));
+    return zx::error(status);
+  }
+
+  status = metadata_server_.Serve(*outgoing(), fdf::Dispatcher::GetCurrent()->async_dispatcher());
   if (status != ZX_OK) {
     FDF_SLOG(ERROR, "Failed to serve metadata.", KV("status", zx_status_get_string(status)));
     return zx::error(status);
   }
 
-  device_ =
-      std::make_unique<AmlSaradcDevice>(std::move(*adc_mmio), std::move(*ao_mmio), std::move(irq));
+  device_ = std::make_unique<AmlSaradcDevice>(std::move(adc_mmio.value()),
+                                              std::move(ao_mmio.value()), std::move(irq.value()));
   device_->HwInit();
   auto result = outgoing()->AddService<fuchsia_hardware_adcimpl::Service>(
       fuchsia_hardware_adcimpl::Service::InstanceHandler({
