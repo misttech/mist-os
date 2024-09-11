@@ -31,8 +31,6 @@ class DeviceEnumerationTest : public zxtest::Test {
   void SetUp() override { ASSERT_NO_FATAL_FAILURE(RetrieveNodeInfo()); }
 
  protected:
-  static void TestRunner(const char** device_paths, size_t paths_num);
-
   void VerifyNodes(cpp20::span<const char*> node_monikers);
   void VerifyOneOf(cpp20::span<const char*> node_monikers);
 
