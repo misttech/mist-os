@@ -41,35 +41,49 @@ the [Drivers][dfv2-concepts] section under _Fundamentals_.
 - Extensions
 
   - [Set up the compat device server in a DFv2 driver][set-up-compat-device-server]
-  - [Serve Banjo protocols in a DFv2 driver][serve-banjo-protocols]
+  - [Connect and serve Banjo protocols in a DFv2 driver][serve-banjo-protocols]
   - [Set up devfs in a DFv2 driver][set-up-devfs]
 
 ### DFv2 driver development
 
-- [Write a minimal DFv2 driver][write-a-minimal-driver]
-- [Troubleshoot common issues in DFv2 driver development][troubleshoot-common-issues]
-- [Driver examples][driver-examples]
-- [Composite nodes][composite-nodes]
-- [Driver stack performance][driver-stack-performance]
-- [VMO Registration Pattern][vmo-registration-pattern]
-- [DMA (Direct Memory Access)][dma]
+- [Overview][dfv2-overview]
+
+- How-to
+
+  - [Write a minimal DFv2 driver][write-a-minimal-driver]
+  - [Driver examples][driver-examples]
+  - [Composite nodes][composite-nodes]
+
 - Tutorials
 
   - [Bind rules tutorial][bind-rules-tutorial]
   - [Bind library code generation tutorial][bind-library-code-generation-tutorial]
   - [FIDL tutorial][fidl-tutorial]
+  - [Metadata tutorial][metadata-tutorial]
+
+- Debugging
+
+  - [Troubleshoot common issues in DFv2 driver development][troubleshoot-common-issues]
+  - [Driver utilities][driver-utilities]
 
 - Testing
 
   - [DriverTestRealm][driver-test-realm]
   - [Threading tips in tests][threading-tips-in-tests]
 
-- Debugging
+- Best practices
 
-  - [Driver utilities][driver-utilities]
+  - [VMO registration pattern][vmo-registration-pattern]
+  - [Driver stack performance][driver-stack-performance]
 
-- [Driver runtime API guidelines][driver-runtime-api-guidelines]
-- [Drivers rubric][drivers-rubric]
+- Guidelines
+
+  - [Driver runtime API guidelines][driver-runtime-api-guidelines]
+  - [Drivers rubric][drivers-rubric]
+
+- Concepts
+
+  - [DMA (Direct Memory Access)][dma]
 
 ### DFv1 driver development
 
@@ -205,3 +219,5 @@ the [Drivers][dfv2-concepts] section under _Fundamentals_.
 [set-up-devfs]: migration/set-up-devfs.md
 [troubleshoot-common-issues]: developer_guide/troubleshoot-common-issues.md
 [driver-examples]: developer_guide/driver-examples.md
+[metadata-tutorial]: tutorials/metadata-tutorial.md
+[dfv2-overview]: dfv2-overview.md

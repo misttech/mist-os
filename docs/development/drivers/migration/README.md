@@ -54,7 +54,7 @@ The following guides are added to support tasks that were previously
 identified as missing in the migration playbook above:
 
 - [Set up the compat device server in a DFv2 driver][set-up-compat-device-server]
-- [Serve Banjo protocols in a DFv2 driver][serve-banjo-protocols]
+- [Connect and serve Banjo protocols in a DFv2 driver][serve-banjo-protocols]
 - [Set up devfs in a DFv2 driver][set-up-devfs]
 
 <!-- Reference links -->
