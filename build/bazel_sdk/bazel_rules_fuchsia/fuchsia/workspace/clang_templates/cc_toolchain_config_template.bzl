@@ -28,6 +28,12 @@ def bazel_cpu_to_fuchsia_cpu(cpu):
     }
     return _MAP.get(cpu, cpu)
 
+_SYSROOT_PATHS = {
+    "aarch64": "%{SYSROOT_PATH_AARCH64}",
+    "riscv64": "%{SYSROOT_PATH_RISCV64}",
+    "x86_64": "%{SYSROOT_PATH_X86_64}",
+}
+
 def _cc_toolchain_config_impl(ctx):
     target_system_name = ctx.attr.cpu + "-unknown-fuchsia"
     tool_paths = [
@@ -78,9 +84,7 @@ def _cc_toolchain_config_impl(ctx):
             "$sysroot$/../lib/clang/%{CLANG_VERSION}/include",  # Platform libc++.
             "$sysroot$/../lib/clang/%{CLANG_VERSION}/share",  # Platform libc++.
         ],
-        # The cpu in the fuchsia sdk does not follow the same convention as the one that bazel
-        # uses so we have to map it here.
-        builtin_sysroot = "external/fuchsia_sdk/arch/" + bazel_cpu_to_fuchsia_cpu(ctx.attr.cpu) + "/sysroot",
+        builtin_sysroot = _SYSROOT_PATHS[ctx.attr.cpu],
         cc_target_os = "fuchsia",
         features = cc_features,
     )

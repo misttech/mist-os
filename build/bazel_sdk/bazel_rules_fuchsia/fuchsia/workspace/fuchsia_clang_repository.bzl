@@ -157,6 +157,12 @@ def _fuchsia_clang_repository_impl(ctx):
         crosstool_template,
         substitutions = {
             "%{CLANG_VERSION}": clang_version,
+            "%{SYSROOT_HEADERS_AARCH64}": ctx.attr.sysroot_headers.get("aarch64", "NOT_SET"),
+            "%{SYSROOT_HEADERS_RISCV64}": ctx.attr.sysroot_headers.get("riscv64", "NOT_SET"),
+            "%{SYSROOT_HEADERS_X86_64}": ctx.attr.sysroot_headers.get("x86_64", "NOT_SET"),
+            "%{SYSROOT_LIBS_AARCH64}": ctx.attr.sysroot_libs.get("aarch64", "NOT_SET"),
+            "%{SYSROOT_LIBS_RISCV64}": ctx.attr.sysroot_libs.get("riscv64", "NOT_SET"),
+            "%{SYSROOT_LIBS_X86_64}": ctx.attr.sysroot_libs.get("x86_64", "NOT_SET"),
         },
         executable = False,
     )
@@ -212,6 +218,9 @@ def _fuchsia_clang_repository_impl(ctx):
         "cc_toolchain_config.bzl",
         toolchain_config_template,
         substitutions = {
+            "%{SYSROOT_PATH_AARCH64}": ctx.attr.sysroot_paths.get("aarch64", "NOT_SET"),
+            "%{SYSROOT_PATH_RISCV64}": ctx.attr.sysroot_paths.get("riscv64", "NOT_SET"),
+            "%{SYSROOT_PATH_X86_64}": ctx.attr.sysroot_paths.get("x86_64", "NOT_SET"),
             "%{CLANG_VERSION}": clang_version,
             "%{HOST_OS}": normalized_os,
             "%{HOST_CPU}": normalized_arch,
@@ -253,8 +262,36 @@ archive file.
             allow_single_file = True,
         ),
         "sdk_root_label": attr.label(
-            doc = "The fuchsia sdk root label. eg: @fuchsia_sdk",
+            doc = "DEPRECATED - The fuchsia sdk root label. eg: @fuchsia_sdk",
             default = "@fuchsia_sdk",
+        ),
+        "sysroot_paths": attr.string_dict(
+            doc = "sysroot paths by Bazel arch, relative to execroot",
+            default = {
+                "aarch64": "external/fuchsia_sdk/arch/arm64/sysroot",
+                "x86_64": "external/fuchsia_sdk/arch/x64/sysroot",
+                "riscv64": "external/fuchsia_sdk/arch/riscv64/sysroot",
+            },
+        ),
+        "sysroot_headers": attr.string_dict(
+            doc = "Sysroot headers filegroups by Bazel arch. These will be added to compiler files of cc_toolchain. " +
+                  "Values should be labels pointing to filegroups covering all the headers that must appear in the sandbox of C++ compilation actions. " +
+                  "See default value for example.",
+            default = {
+                "aarch64": "@fuchsia_sdk//:fuchsia-sysroot-headers-aarch64",
+                "x86_64": "@fuchsia_sdk//:fuchsia-sysroot-headers-x86_64",
+                "riscv64": "@fuchsia_sdk//:fuchsia-sysroot-headers-riscv64",
+            },
+        ),
+        "sysroot_libs": attr.string_dict(
+            doc = "Sysroot libraries filegroups by Bazel arch. These will be added to linker files of cc_toolchain. " +
+                  "Values should be labels pointing to filegroups covering all the libraries that must appear in the sandbox of C++ linking actions. " +
+                  "See default value for example.",
+            default = {
+                "aarch64": "@fuchsia_sdk//:fuchsia-sysroot-libraries-aarch64",
+                "x86_64": "@fuchsia_sdk//:fuchsia-sysroot-libraries-x86_64",
+                "riscv64": "@fuchsia_sdk//:fuchsia-sysroot-libraries-riscv64",
+            },
         ),
         "rules_fuchsia_root_label": attr.label(
             doc = "The fuchsia workspace rules root label. eg: @fuchsia_sdk",

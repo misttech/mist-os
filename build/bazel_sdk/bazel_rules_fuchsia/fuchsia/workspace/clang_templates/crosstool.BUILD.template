@@ -21,6 +21,18 @@ licenses(["notice"])
 
 package(default_visibility = ["//visibility:public"])
 
+_FUCHSIA_SYSROOT_HEADERS_FILEGROUPS = {
+    "aarch64": "%{SYSROOT_HEADERS_AARCH64}",
+    "riscv64": "%{SYSROOT_HEADERS_RISCV64}",
+    "x86_64": "%{SYSROOT_HEADERS_X86_64}",
+}
+
+_FUCHSIA_SYSROOT_LIBS_FILEGROUPS = {
+    "aarch64": "%{SYSROOT_LIBS_AARCH64}",
+    "riscv64": "%{SYSROOT_LIBS_RISCV64}",
+    "x86_64": "%{SYSROOT_LIBS_X86_64}",
+}
+
 cc_toolchain_suite(
     name = "toolchain",
     toolchains = fuchsia_cpu_filter_dict(
@@ -131,28 +143,13 @@ filegroup(
 
 [
     filegroup(
-        name = "fuchsia-sysroot-headers-" + cpu,
-        srcs = glob(["fuchsia_sysroot_" + cpu + "/include/**"]),
-    )
-    for cpu in TARGET_CPUS
-]
-
-[
-    filegroup(
-        name = "fuchsia-sysroot-libraries-" + cpu,
-        srcs = glob(["fuchsia_sysroot_" + cpu + "/lib/**"]),
-    )
-    for cpu in TARGET_CPUS
-]
-
-[
-    filegroup(
         name = "compile-" + cpu,
         srcs = [
             ":cc-compiler-prebuilts",
             ":libunwind-headers",
             ":libcxx-headers-" + cpu,
-            "@fuchsia_sdk//:fuchsia-sysroot-headers-" + cpu,
+        ] + [
+            _FUCHSIA_SYSROOT_HEADERS_FILEGROUPS[cpu],
         ],
     )
     for cpu in TARGET_CPUS
@@ -207,9 +204,10 @@ filegroup(
         name = "link-" + cpu,
         srcs = [
             ":cc-linker-prebuilts",
-            "@fuchsia_sdk//:fuchsia-sysroot-libraries-" + cpu,
             ":libcxx-libraries-" + cpu,
             ":runtime-" + cpu,
+        ] + [
+            _FUCHSIA_SYSROOT_LIBS_FILEGROUPS[cpu],
         ],
     )
     for cpu in TARGET_CPUS
@@ -601,7 +599,6 @@ selects.config_setting_group(
         ":hwasan_variant",
     ],
 )
-
 
 selects.config_setting_group(
     name = "riscv64_novariant",
