@@ -4,8 +4,11 @@
 
 //! Type-safe bindings for Zircon resources.
 
-use crate::{ok, AsHandleRef, Handle, HandleBased, HandleRef, Resource, Status};
+use crate::{
+    ok, AsHandleRef, Handle, HandleBased, HandleRef, Koid, MonotonicTime, Resource, Status,
+};
 use bitflags::bitflags;
+use bstr::BStr;
 use fuchsia_zircon_sys as sys;
 
 /// An object representing a Zircon 'debuglog' object.
@@ -61,26 +64,93 @@ impl DebugLog {
     /// Wraps the
     /// [zx_debuglog_read]((https://fuchsia.dev/fuchsia-src/reference/syscalls/debuglog_read.md)
     /// syscall.
-    // TODO(https://fxbug.dev/42108144): Return a safe wrapper type for zx_log_record_t rather than raw bytes
-    // depending on resolution.
-    pub fn read(&self) -> Result<sys::zx_log_record_t, Status> {
+    pub fn read(&self) -> Result<DebugLogRecord, Status> {
         let mut record = sys::zx_log_record_t::default();
-        // zx_debuglog_read options appear to be unused.
-        // zx_debuglog_read returns either an error status or, on success, the actual size of bytes
-        // read into the buffer.
-        let raw_status = unsafe {
+        let bytes_written = unsafe {
             sys::zx_debuglog_read(
                 self.raw_handle(),
-                0,
+                0, /* options are unused, must be 0 */
                 &mut record as *mut _ as *mut u8,
                 std::mem::size_of_val(&record),
             )
         };
         // On error, zx_debuglog_read returns a negative value. All other values indicate success.
-        if raw_status < 0 {
-            Err(Status::from_raw(raw_status))
+        if bytes_written < 0 {
+            Err(Status::from_raw(bytes_written))
         } else {
-            Ok(record)
+            DebugLogRecord::from_raw(&record)
+        }
+    }
+}
+
+/// A record from the kernel's debuglog.
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+pub struct DebugLogRecord {
+    pub sequence: u64,
+    // TODO(https://fxbug.dev/358164839) switch to boot time
+    pub timestamp: MonotonicTime,
+    pub severity: DebugLogSeverity,
+    pub pid: Koid,
+    pub tid: Koid,
+    pub flags: u8,
+    data: [u8; sys::ZX_LOG_RECORD_DATA_MAX],
+    datalen: u16,
+}
+
+impl DebugLogRecord {
+    /// Convert a raw debuglog record into this typed wrapper.
+    pub fn from_raw(raw: &sys::zx_log_record_t) -> Result<Self, Status> {
+        if raw.datalen <= sys::ZX_LOG_RECORD_DATA_MAX as u16 {
+            Ok(Self {
+                timestamp: MonotonicTime::from_nanos(raw.timestamp),
+                sequence: raw.sequence,
+                severity: DebugLogSeverity::from_raw(raw.severity),
+                pid: Koid::from_raw(raw.pid),
+                tid: Koid::from_raw(raw.tid),
+                flags: raw.flags,
+                data: raw.data,
+                datalen: raw.datalen,
+            })
+        } else {
+            Err(Status::INTERNAL)
+        }
+    }
+
+    /// Returns the message data for the record.
+    pub fn data(&self) -> &BStr {
+        BStr::new(&self.data[..self.datalen as usize])
+    }
+}
+
+/// The severity a kernel log message can have.
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub enum DebugLogSeverity {
+    /// Record was written without a known severity.
+    Unknown,
+    /// Trace records include detailed information about program execution.
+    Trace,
+    /// Debug records include development-facing information about program execution.
+    Debug,
+    /// Info records include general information about program execution. (default)
+    Info,
+    /// Warning records include information about potentially problematic operations.
+    Warn,
+    /// Error records include information about failed operations.
+    Error,
+    /// Fatal records convey information about operations which cause a program's termination.
+    Fatal,
+}
+
+impl DebugLogSeverity {
+    fn from_raw(raw: u8) -> Self {
+        match raw {
+            sys::DEBUGLOG_TRACE => Self::Trace,
+            sys::DEBUGLOG_DEBUG => Self::Debug,
+            sys::DEBUGLOG_INFO => Self::Info,
+            sys::DEBUGLOG_WARNING => Self::Warn,
+            sys::DEBUGLOG_ERROR => Self::Error,
+            sys::DEBUGLOG_FATAL => Self::Fatal,
+            _ => Self::Unknown,
         }
     }
 }
@@ -111,9 +181,7 @@ mod tests {
         for _ in 0..10000 {
             match debuglog.read() {
                 Ok(record) => {
-                    let len = record.datalen as usize;
-                    let log = &record.data[0..len];
-                    if log == sent_msg.as_bytes() {
+                    if record.data() == sent_msg.as_bytes() {
                         // We found our log!
                         return;
                     }
@@ -143,8 +211,7 @@ mod tests {
     fn write_and_read_back() {
         let mut bytes = [0; 8];
         cprng_draw(&mut bytes);
-        let rand = u64::from_ne_bytes(bytes);
-        let message = format!("log message {}", rand);
+        let message = format!("log message {:?}", bytes);
 
         let resource = Resource::from(Handle::invalid());
         let debuglog = DebugLog::create(&resource, DebugLogOpts::empty()).unwrap();

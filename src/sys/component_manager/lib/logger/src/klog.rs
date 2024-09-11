@@ -145,8 +145,8 @@ mod tests {
         for _ in 0..10000 {
             match debuglog.read() {
                 Ok(record) => {
-                    let log = &record.data[..record.datalen as usize];
-                    if String::from_utf8_lossy(log).starts_with(&sent_msg) {
+                    let log = record.data().to_string();
+                    if log.starts_with(&sent_msg) {
                         // We found our log!
                         return;
                     }

@@ -11,7 +11,7 @@ use fuchsia_zircon as zx;
 use fuzz::fuzz;
 
 #[derive(Clone, Debug)]
-struct RandomLogRecord(zx::sys::zx_log_record_t);
+struct RandomLogRecord(zx::DebugLogRecord);
 
 /// Fuzzer for kernel debuglog parser.
 #[fuzz]
@@ -23,10 +23,7 @@ impl<'a> Arbitrary<'a> for RandomLogRecord {
     fn arbitrary(u: &mut Unstructured<'a>) -> Result<Self> {
         let sequence = u64::arbitrary(u)?;
         let padding1: [zx::sys::PadByte; 4] = Default::default();
-        let mut datalen = u16::arbitrary(u)?;
-        if usize::from(datalen) > zx::sys::ZX_LOG_RECORD_DATA_MAX {
-            datalen = zx::sys::ZX_LOG_RECORD_DATA_MAX.to_string().parse::<u16>().unwrap();
-        }
+        let datalen = std::cmp::min(u16::arbitrary(u)?, zx::sys::ZX_LOG_RECORD_DATA_MAX as u16);
         let severity = u8::arbitrary(u)?;
         let flags = u8::arbitrary(u)?;
         let timestamp = i64::arbitrary(u)? as zx::sys::zx_time_t;
@@ -38,17 +35,20 @@ impl<'a> Arbitrary<'a> for RandomLogRecord {
         let mut partial = &mut data[0..datalen as usize];
         u.fill_buffer(&mut partial)?;
 
-        Ok(RandomLogRecord(zx::sys::zx_log_record_t {
-            sequence,
-            padding1,
-            datalen,
-            severity,
-            flags,
-            timestamp,
-            pid,
-            tid,
-            data,
-        }))
+        Ok(RandomLogRecord(
+            zx::DebugLogRecord::from_raw(&zx::sys::zx_log_record_t {
+                sequence,
+                padding1,
+                datalen,
+                severity,
+                flags,
+                timestamp,
+                pid,
+                tid,
+                data,
+            })
+            .unwrap(),
+        ))
     }
 
     fn size_hint(_: usize) -> (usize, Option<usize>) {

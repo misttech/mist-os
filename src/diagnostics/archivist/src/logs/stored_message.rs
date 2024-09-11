@@ -110,17 +110,15 @@ impl StoredMessage for StructuredStoredMessage {
 
 #[derive(Debug)]
 pub struct DebugLogStoredMessage {
-    msg: zx::sys::zx_log_record_t,
+    msg: zx::DebugLogRecord,
     severity: Severity,
     size: usize,
     stats: Arc<LogStreamStats>,
 }
 
 impl DebugLogStoredMessage {
-    pub fn new(record: zx::sys::zx_log_record_t, stats: Arc<LogStreamStats>) -> Self {
-        let data_len = record.datalen as usize;
-
-        let mut contents = String::from_utf8_lossy(&record.data[0..data_len]).into_owned();
+    pub fn new(record: zx::DebugLogRecord, stats: Arc<LogStreamStats>) -> Self {
+        let mut contents = record.data().to_string();
         if let Some(b'\n') = contents.bytes().last() {
             contents.pop();
         }
@@ -167,7 +165,7 @@ impl StoredMessage for DebugLogStoredMessage {
     }
 
     fn timestamp(&self) -> i64 {
-        self.msg.timestamp
+        self.msg.timestamp.into_nanos()
     }
 
     fn parse(&self, _source: &ComponentIdentity) -> Result<LogsData> {

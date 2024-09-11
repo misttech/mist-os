@@ -49,7 +49,7 @@ impl Log {
                     match read_only_debuglog.read() {
                         Ok(record) => {
                             // Don't print log messages from ourself.
-                            if record.pid == proc_koid.raw_koid() {
+                            if record.pid == proc_koid {
                                 continue;
                             }
 
@@ -58,23 +58,23 @@ impl Log {
                             // Write prefix with time stamps and ids.
                             let prefix = format!(
                                 "\u{001b}[32m{:05}.{:03}\u{001b}[39m] \u{001b}[31m{:05}.\u{001b}[36m{:05}\u{001b}[39m> ",
-                                record.timestamp / 1_000_000_000,
-                                (record.timestamp / 1_000_000) % 1_000,
-                                record.pid,
-                                record.tid,
+                                record.timestamp.into_nanos() / 1_000_000_000,
+                                (record.timestamp.into_nanos() / 1_000_000) % 1_000,
+                                record.pid.raw_koid(),
+                                record.tid.raw_koid(),
                             );
                             for byte in prefix.as_bytes() {
                                 parser.advance(&mut *term, *byte, &mut sink);
                             }
 
                             // Ignore any trailing newline character.
-                            let mut datalen = record.datalen as usize;
-                            if datalen > 0 && record.data[datalen - 1] == '\n' as u8 {
-                                datalen -= 1;
+                            let mut record_data = record.data();
+                            if record_data.last() == Some(&b'\n') {
+                                record_data = &record_data[..record_data.len() - 1];
                             }
 
                             // Write record data.
-                            for byte in &record.data[0..datalen] {
+                            for byte in record_data.iter() {
                                 parser.advance(&mut *term, *byte, &mut sink);
                             }
 

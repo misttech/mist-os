@@ -439,10 +439,10 @@ pub fn copy_log_message(log_message: &LogMessage) -> LogMessage {
 pub struct TestDebugLog {
     read_responses: Mutex<VecDeque<ReadResponse>>,
 }
-type ReadResponse = Result<zx::sys::zx_log_record_t, zx::Status>;
+type ReadResponse = Result<zx::DebugLogRecord, zx::Status>;
 
 impl crate::logs::debuglog::DebugLog for TestDebugLog {
-    fn read(&self) -> Result<zx::sys::zx_log_record_t, zx::Status> {
+    fn read(&self) -> Result<zx::DebugLogRecord, zx::Status> {
         self.read_responses.lock().pop_front().expect("Got more read requests than enqueued")
     }
 
@@ -462,7 +462,7 @@ impl Default for TestDebugLog {
 }
 
 impl TestDebugLog {
-    pub fn enqueue_read(&self, response: zx::sys::zx_log_record_t) {
+    pub fn enqueue_read(&self, response: zx::DebugLogRecord) {
         self.read_responses.lock().push_back(Ok(response));
     }
 
@@ -476,7 +476,7 @@ impl TestDebugLog {
 }
 
 pub struct TestDebugEntry {
-    pub record: zx::sys::zx_log_record_t,
+    pub record: zx::DebugLogRecord,
 }
 
 pub const TEST_KLOG_FLAGS: u8 = 47;
@@ -496,10 +496,10 @@ impl TestDebugEntry {
         rec.tid = TEST_KLOG_TID;
         rec.data[..len].copy_from_slice(&log_data[..len]);
         rec.severity = 0x30 /* info */;
-        TestDebugEntry { record: rec }
+        TestDebugEntry { record: zx::DebugLogRecord::from_raw(&rec).unwrap() }
     }
 
-    pub fn new_with_severity(log_data: &[u8], severity: u8) -> Self {
+    pub fn new_with_severity(log_data: &[u8], severity: zx::DebugLogSeverity) -> Self {
         let mut this = Self::new(log_data);
         this.record.severity = severity;
         this

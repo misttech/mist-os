@@ -26,7 +26,7 @@ pub static KERNEL_IDENTITY: LazyLock<Arc<ComponentIdentity>> = LazyLock::new(|| 
 pub trait DebugLog {
     /// Reads a single entry off the debug log into `buffer`.  Any existing
     /// contents in `buffer` are overwritten.
-    fn read(&self) -> Result<zx::sys::zx_log_record_t, zx::Status>;
+    fn read(&self) -> Result<zx::DebugLogRecord, zx::Status>;
 
     /// Returns a future that completes when there is another log to read.
     fn ready_signal(&self) -> impl Future<Output = Result<(), zx::Status>> + Send;
@@ -37,7 +37,7 @@ pub struct KernelDebugLog {
 }
 
 impl DebugLog for KernelDebugLog {
-    fn read(&self) -> Result<zx::sys::zx_log_record_t, zx::Status> {
+    fn read(&self) -> Result<zx::DebugLogRecord, zx::Status> {
         self.debuglogger.read()
     }
 
@@ -109,10 +109,8 @@ impl<K: DebugLog> DebugLogBridge<K> {
 
 /// Parses a raw debug log read from the kernel.  Returns the parsed message and
 /// its size in memory on success, and None if parsing fails.
-pub fn convert_debuglog_to_log_message(record: &zx::sys::zx_log_record_t) -> Option<LogsData> {
-    let data_len = record.datalen as usize;
-
-    let mut contents = String::from_utf8_lossy(&record.data[0..data_len]).into_owned();
+pub fn convert_debuglog_to_log_message(record: &zx::DebugLogRecord) -> Option<LogsData> {
+    let mut contents = record.data().to_string();
     if let Some(b'\n') = contents.bytes().last() {
         contents.pop();
     }
@@ -131,11 +129,11 @@ pub fn convert_debuglog_to_log_message(record: &zx::sys::zx_log_record_t) -> Opt
     let early_contents = &contents[..last];
 
     let severity = match record.severity {
-        0x10 => Severity::Trace,
-        0x20 => Severity::Debug,
-        0x40 => Severity::Warn,
-        0x50 => Severity::Error,
-        0x60 => Severity::Fatal,
+        zx::DebugLogSeverity::Trace => Severity::Trace,
+        zx::DebugLogSeverity::Debug => Severity::Debug,
+        zx::DebugLogSeverity::Warn => Severity::Warn,
+        zx::DebugLogSeverity::Error => Severity::Error,
+        zx::DebugLogSeverity::Fatal => Severity::Fatal,
         _ => {
             // By default `zx_log_record_t` carry INFO severity. Since `zx_debuglog_write` doesn't
             // support setting a severity, historically logs have been tagged and annotated with
@@ -158,8 +156,8 @@ pub fn convert_debuglog_to_log_message(record: &zx::sys::zx_log_record_t) -> Opt
             moniker: KERNEL_IDENTITY.moniker.clone(),
             severity,
         })
-        .set_pid(record.pid)
-        .set_tid(record.tid)
+        .set_pid(record.pid.raw_koid())
+        .set_tid(record.tid.raw_koid())
         .add_tag("klog".to_string())
         .set_dropped(0)
         .set_message(contents)
@@ -189,8 +187,8 @@ mod tests {
                 moniker: KERNEL_IDENTITY.moniker.clone(),
                 severity: Severity::Info,
             })
-            .set_pid(klog.record.pid)
-            .set_tid(klog.record.tid)
+            .set_pid(klog.record.pid.raw_koid())
+            .set_tid(klog.record.tid.raw_koid())
             .add_tag("klog")
             .set_message("test log".to_string())
             .build()
@@ -200,9 +198,9 @@ mod tests {
         assert_eq!(
             log_message,
             LogMessage {
-                pid: klog.record.pid,
-                tid: klog.record.tid,
-                time: klog.record.timestamp,
+                pid: klog.record.pid.raw_koid(),
+                tid: klog.record.tid.raw_koid(),
+                time: klog.record.timestamp.into_nanos(),
                 severity: fdiagnostics::Severity::Info.into_primitive() as i32,
                 dropped_logs: 0,
                 tags: vec!["klog".to_string()],
@@ -221,8 +219,8 @@ mod tests {
                 moniker: KERNEL_IDENTITY.moniker.clone(),
                 severity: Severity::Info,
             })
-            .set_pid(klog.record.pid)
-            .set_tid(klog.record.tid)
+            .set_pid(klog.record.pid.raw_koid())
+            .set_tid(klog.record.tid.raw_koid())
             .add_tag("klog")
             .set_message(String::from_utf8(vec![b'a'; zx::sys::ZX_LOG_RECORD_DATA_MAX]).unwrap())
             .build()
@@ -239,8 +237,8 @@ mod tests {
                 moniker: KERNEL_IDENTITY.moniker.clone(),
                 severity: Severity::Info,
             })
-            .set_pid(klog.record.pid)
-            .set_tid(klog.record.tid)
+            .set_pid(klog.record.pid.raw_koid())
+            .set_tid(klog.record.tid.raw_koid())
             .add_tag("klog")
             .set_message("".to_string())
             .build()
@@ -272,8 +270,8 @@ mod tests {
                 moniker: KERNEL_IDENTITY.moniker.clone(),
                 severity: Severity::Info,
             })
-            .set_pid(klog.record.pid)
-            .set_tid(klog.record.tid)
+            .set_pid(klog.record.pid.raw_koid())
+            .set_tid(klog.record.tid.raw_koid())
             .add_tag("klog")
             .set_message("test log".to_string())
             .build()]
@@ -329,7 +327,7 @@ mod tests {
         debug_log.enqueue_read_entry(&TestDebugEntry::new("fourth log".as_bytes()));
         debug_log.enqueue_read_entry(&TestDebugEntry::new_with_severity(
             "ERROR: severity takes precedence over msg when not info".as_bytes(),
-            0x40, /* warn */
+            zx::DebugLogSeverity::Warn,
         ));
         // Create a string prefixed with multi-byte UTF-8 characters. This entry will be labeled as
         // Info rather than Error because the string "ERROR:" only appears after the
