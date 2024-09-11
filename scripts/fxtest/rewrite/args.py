@@ -4,7 +4,9 @@
 
 import argparse
 from dataclasses import dataclass
+from datetime import datetime
 import enum
+import os
 import pathlib
 import sys
 import typing
@@ -20,6 +22,7 @@ class PrevOption(enum.StrEnum):
     LOG = "log"
     PATH = "path"
     REPLAY = "replay"
+    ARTIFACT_PATH = "artifact-path"
     HELP = "help"
 
     def help(self) -> str:
@@ -37,6 +40,8 @@ class PrevOption(enum.StrEnum):
             return "Print the path of the log from the previous run."
         elif self is PrevOption.REPLAY:
             return "Replay the previous run, using new display options."
+        elif self is PrevOption.ARTIFACT_PATH:
+            return "Print the path where artifacts were stored in the previous run."
         elif self is PrevOption.HELP:
             return "Print this help output."
         else:
@@ -97,6 +102,7 @@ class Flags:
     verbose: bool
     status_lines: int
     status_delay: float
+    timestamp_artifacts: bool
     artifact_output_directory: str | None
     slow: float
     quiet: bool
@@ -141,6 +147,15 @@ class Flags:
         if not termout.is_valid() and self.status:
             raise FlagError(
                 "Refusing to output interactive status to a non-TTY."
+            )
+
+        if (
+            self.artifact_output_directory is not None
+            and self.timestamp_artifacts
+        ):
+            self.artifact_output_directory = os.path.join(
+                self.artifact_output_directory,
+                datetime.now().strftime("%Y-%m-%d-%H:%M:%S"),
             )
 
         # Compute environment and check it is valid.
@@ -535,6 +550,13 @@ def parse_args(
         default=0.033,
         type=float,
         help="Control how frequently the status output is updated. Default is every 0.033s, but you can increase the number for calmer output on slower connections.",
+    )
+    output.add_argument(
+        "--timestamp-artifacts",
+        default=False,
+        action=argparse.BooleanOptionalAction,
+        type=bool,
+        help="If set, output artifacts in a timestamped directory under the given output directory. Default is False.",
     )
     output.add_argument(
         "--outdir",

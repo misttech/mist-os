@@ -20,7 +20,6 @@ import tempfile
 import textwrap
 import time
 import typing
-import zlib
 
 import async_utils.command as command
 import async_utils.signals as signals
@@ -158,6 +157,43 @@ def do_process_previous(flags: args.Flags) -> int:
         )
         print(env.get_most_recent_log())
         return 0
+    elif flags.previous is args.PrevOption.ARTIFACT_PATH:
+        env = environment.ExecutionEnvironment.initialize_from_args(
+            flags, create_log_file=False
+        )
+        log_source = log.LogSource.from_env(env)
+        for element in log_source.read_log():
+            if (warning := element.warning) is not None:
+                print(f"WARNING: {warning}", file=sys.stderr)
+                continue
+            if (error := element.error) is not None:
+                print(f"ERROR: {error}", file=sys.stderr)
+                return 1
+            if (event := element.log_event) is None:
+                continue
+            if event.payload is None:
+                continue
+            if (artifact_path := event.payload.artifact_directory_path) is None:
+                continue
+            if artifact_path == "":
+                print(
+                    "ERROR: The previous run did not specify --artifact-output-directory. Run again with that flag set to get the path.",
+                    file=sys.stderr,
+                )
+                return 1
+            if not os.path.isdir(artifact_path):
+                print(
+                    "ERROR: The artifact directory is missing, it may have been deleted.",
+                    file=sys.stderr,
+                )
+                return 1
+            print(artifact_path)
+            return 0
+        print(
+            "ERROR: The previous run is missing an artifact output directory. The log may be corrupt or incomplete.",
+            file=sys.stderr,
+        )
+        return 1
     elif flags.previous is args.PrevOption.HELP:
         print("--previous options:")
         for arg in args.PrevOption:
@@ -183,19 +219,10 @@ def do_print_logs(flags: args.Flags) -> int:
     env = environment.ExecutionEnvironment.initialize_from_args(
         flags, create_log_file=False
     )
-    try:
-        log_path = env.get_most_recent_log()
-        with gzip.open(log_path, "rt") as f:
-            print(f"{log_path}:\n")
-            log.pretty_print(f)
-    except environment.EnvironmentError as e:
-        print(f"Failed to read log: {e}", file=sys.stderr)
+    if log.pretty_print(log.LogSource.from_env(env)):
+        return 0
+    else:
         return 1
-    except gzip.BadGzipFile as e:
-        print(f"File does not appear to be a gzip file. ({e})", file=sys.stderr)
-        return 1
-
-    return 0
 
 
 async def do_replay_log(
@@ -206,28 +233,14 @@ async def do_replay_log(
     )
 
     content: list[event.Event] = []
-    try:
-        log_path = env.get_most_recent_log()
-        with gzip.open(log_path, "rt") as f:
-            for line in f:
-                content.append(event.Event.from_dict(json.loads(line)))  # type: ignore
-    except environment.EnvironmentError as e:
-        print(f"Failed to read log: {e}", file=sys.stderr)
-        return 1
-    except gzip.BadGzipFile as e:
-        print(f"File does not appear to be a gzip file. ({e})", file=sys.stderr)
-        return 1
-    except json.JSONDecodeError as e:
-        print(
-            f"Found invalid JSON data, skipping the rest and proceeding. ({e})",
-            file=sys.stderr,
-        )
-        content.append(event.Event())
-    except (EOFError, zlib.error) as e:
-        print(
-            f"Unexpected end of log, ignoring and proceeding. ({e})",
-            file=sys.stderr,
-        )
+    for log_element in log.LogSource.from_env(env).read_log():
+        if log_element.log_event is not None:
+            content.append(log_element.log_event)
+        elif log_element.warning is not None:
+            print(log_element.warning, file=sys.stderr)
+        elif log_element.error is not None:
+            print(log_element.error, file=sys.stderr)
+            return 1
 
     real_monotonic = time.monotonic()
     if not content:
@@ -381,6 +394,22 @@ async def async_main(
         )
         return 1
     recorder.emit_process_env(exec_env)
+
+    recorder.emit_artifact_directory_path(
+        os.path.abspath(flags.artifact_output_directory)
+        if flags.artifact_output_directory
+        else None
+    )
+
+    if flags.artifact_output_directory and not set(sys.argv).intersection(
+        set(["--timestamp-artifacts", "--no-timestamp-artifacts"])
+    ):
+        recorder.emit_warning_message(
+            "You have not specified --[no-]timestamp-artifacts.\nArtifact output will overwrite previous runs.\nThe default will soon change to support timestamped directories."
+        )
+        recorder.emit_instruction_message(
+            "Specify --timestamp-artifacts to output in timestamped subdirectories. This will soon become the default."
+        )
 
     # Configure file logging based on flags.
     if flags.log and exec_env.log_file:

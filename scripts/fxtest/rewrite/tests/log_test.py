@@ -55,5 +55,5 @@ class TestLogOutput(unittest.IsolatedAsyncioTestCase):
         output = await self._write_test_logs()
         stdout = io.StringIO()
         with contextlib.redirect_stdout(stdout):
-            log.pretty_print(output)
+            log.pretty_print(log.LogSource.from_stream(output))
         self.assertEqual(stdout.getvalue(), "0 tests were run\n")
