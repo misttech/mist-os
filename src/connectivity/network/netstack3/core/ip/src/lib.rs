@@ -232,7 +232,7 @@ pub use internal::base::{
 };
 pub use internal::path_mtu::{PmtuCache, PmtuContext};
 pub use internal::reassembly::{FragmentContext, FragmentTimerId, IpPacketFragmentCache};
-pub use internal::routing::rules::RulesTable;
+pub use internal::routing::rules::{Rule, RuleAction, RuleMatcher, RulesTable};
 pub use internal::routing::{
     request_context_add_route, request_context_del_routes, AddRouteError, IpRoutingDeviceContext,
     NonLocalSrcAddrPolicy, PacketOrigin, RoutingTable,
@@ -247,6 +247,6 @@ pub use internal::types::{
 pub mod testutil {
     pub use crate::internal::base::testutil::DualStackSendIpPacketMeta;
     pub use crate::internal::routing::testutil::{
-        add_route, del_device_routes, del_routes_to_subnet,
+        add_route, del_device_routes, del_routes_to_subnet, set_rules,
     };
 }

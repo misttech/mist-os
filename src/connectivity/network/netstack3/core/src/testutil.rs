@@ -34,9 +34,9 @@ use netstack3_base::testutil::{
 };
 use netstack3_base::{
     AddressResolutionFailed, CtxPair, DeferredResourceRemovalContext, EventContext,
-    FrameDestination, InstantBindingsTypes, InstantContext, LinkDevice, NotFoundError,
-    ReferenceNotifiers, RemoveResourceResult, RngContext, TimerBindingsTypes, TimerContext,
-    TimerHandler, TracingContext, WorkQueueReport,
+    FrameDestination, InstantBindingsTypes, InstantContext, IpDeviceAddr, LinkDevice,
+    NotFoundError, ReferenceNotifiers, RemoveResourceResult, RngContext, TimerBindingsTypes,
+    TimerContext, TimerHandler, TracingContext, WorkQueueReport,
 };
 use netstack3_device::ethernet::{
     EthernetCreationProperties, EthernetDeviceId, EthernetLinkDevice, EthernetWeakDeviceId,
@@ -61,7 +61,7 @@ use netstack3_ip::nud::{self, LinkResolutionContext, LinkResolutionNotifier};
 use netstack3_ip::raw::{RawIpSocketId, RawIpSocketsBindingsContext, RawIpSocketsBindingsTypes};
 use netstack3_ip::{
     self as ip, AddRouteError, AddableEntryEither, AddableMetric, IpLayerEvent, IpLayerTimerId,
-    RawMetric,
+    RawMetric, ResolveRouteError, ResolvedRoute, RoutableIpAddr,
 };
 use netstack3_tcp::testutil::{ClientBuffers, ProvidedBuffers, TestSendBuffer};
 use netstack3_tcp::{BufferSizes, RingBuffer, TcpBindingsTypes};
@@ -295,6 +295,29 @@ where
             AddableEntryEither::V4(entry) => ip::testutil::add_route::<Ipv4, _>(core_ctx, entry),
             AddableEntryEither::V6(entry) => ip::testutil::add_route::<Ipv6, _>(core_ctx, entry),
         }
+    }
+
+    /// Install rules, these rules will replace the rules currently installed.
+    #[netstack3_macros::context_ip_bounds(I, BC, crate)]
+    pub fn set_rules<I: IpExt>(&mut self, rules: Vec<netstack3_ip::Rule<I, DeviceId<BC>>>) {
+        let (core_ctx, _bindings_ctx) = self.contexts();
+        ip::testutil::set_rules(core_ctx, rules)
+    }
+
+    /// Resolves a route with a given source address.
+    #[netstack3_macros::context_ip_bounds(I, BC, crate)]
+    pub fn resolve_route_with_src_addr<I: IpExt>(
+        &mut self,
+        src_ip: IpDeviceAddr<I::Addr>,
+        dst_ip: Option<RoutableIpAddr<I::Addr>>,
+    ) -> Result<ResolvedRoute<I, DeviceId<BC>>, ResolveRouteError> {
+        let (core_ctx, _bindings_ctx) = self.contexts();
+        ip::resolve_output_route_to_destination(
+            core_ctx,
+            None,
+            Some((src_ip, ip::NonLocalSrcAddrPolicy::Deny)),
+            dst_ip,
+        )
     }
 
     /// Delete a route from the forwarding table, returning `Err` if no route

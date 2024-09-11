@@ -16,6 +16,7 @@ use crate::RoutingTableId;
 
 /// Table that contains routing rules.
 pub struct RulesTable<I: Ip, D> {
+    /// Rules of the table.
     rules: Vec<Rule<I, D>>,
 }
 
@@ -35,21 +36,24 @@ impl<I: Ip, D> RulesTable<I, D> {
         self.rules.iter()
     }
 
-    #[cfg(test)]
-    pub(crate) fn rules_mut(&mut self) -> &mut Vec<Rule<I, D>> {
+    /// Gets the mutable reference to the rules vector.
+    #[cfg(any(test, feature = "testutils"))]
+    pub fn rules_mut(&mut self) -> &mut Vec<Rule<I, D>> {
         &mut self.rules
     }
 }
 
 /// A routing rule.
-pub(crate) struct Rule<I: Ip, D> {
-    pub(crate) matcher: RuleMatcher<I>,
-    pub(crate) action: RuleAction<RoutingTableId<I, D>>,
+pub struct Rule<I: Ip, D> {
+    /// The matcher of the rule.
+    pub matcher: RuleMatcher<I>,
+    /// The action of the rule.
+    pub action: RuleAction<RoutingTableId<I, D>>,
 }
 
 /// The action part of a [`Rule`].
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) enum RuleAction<Lookup> {
+pub enum RuleAction<Lookup> {
     /// Will resolve to unreachable.
     // TODO(https://fxbug.dev/357858471): Install Bindings rules in Core.
     #[allow(unused)]
@@ -64,7 +68,7 @@ pub(crate) enum RuleAction<Lookup> {
 /// because the user can specify a source address matcher without specifying the direction of the
 /// traffic.
 #[derive(Debug, Clone)]
-pub(crate) enum TrafficOriginMatcher {
+pub enum TrafficOriginMatcher {
     /// This only matches packets that are generated locally; the optional interface matcher
     /// can be used to match what device is bound to by `SO_BINDTODEVICE`.
     // TODO(https://fxbug.dev/357858471): Install Bindings rules in Core.
@@ -110,22 +114,22 @@ impl<'a, I: Ip, D: DeviceWithName> Matcher<PacketOrigin<I, &'a D>> for TrafficOr
 ///
 /// `None` fields match all packets.
 #[derive(Debug, Clone)]
-pub(crate) struct RuleMatcher<I: Ip> {
+pub struct RuleMatcher<I: Ip> {
     /// Matches on [`PacketOrigin`]'s bound address for a locally generated packet or the source
     /// address of an incoming packet.
     ///
     /// Matches whether the source address of the packet is from the subnet. If the matcher is
     /// specified but the source address is not specified, it resolves to not a match.
-    pub(crate) source_address_matcher: Option<SubnetMatcher<I::Addr>>,
+    pub source_address_matcher: Option<SubnetMatcher<I::Addr>>,
     /// Matches on [`PacketOrigin`]'s bound device for a locally generated packets or the receiving
     /// device of an incoming packet.
-    pub(crate) traffic_origin_matcher: Option<TrafficOriginMatcher>,
+    pub traffic_origin_matcher: Option<TrafficOriginMatcher>,
     // TODO(https://fxbug.dev/337134565): Implement socket marks.
 }
 
 impl<I: Ip> RuleMatcher<I> {
     /// Creates a rule matcher that matches all packets.
-    pub(crate) fn match_all_packets() -> Self {
+    pub fn match_all_packets() -> Self {
         RuleMatcher { source_address_matcher: None, traffic_origin_matcher: None }
     }
 }

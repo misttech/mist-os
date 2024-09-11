@@ -978,6 +978,17 @@ pub enum ResolveRouteError {
     Unreachable,
 }
 
+/// The information about the rule walk in addition to a custom state. This type is introduced so
+/// that `walk_rules` can be extended later with more information about the walk if needed.
+#[derive(Debug, PartialEq, Eq)]
+struct RuleWalkInfo<O> {
+    /// Whether there is a rule with a source address matcher during the walk.
+    observed_source_address_matcher: bool,
+    /// The custom info carried. For example this could be the lookup result from the user provided
+    /// function.
+    inner: O,
+}
+
 /// A helper function that traverses through the rules table.
 ///
 /// To walk through the rules, you need to provide it with an initial value for the loop and a
@@ -986,44 +997,60 @@ pub enum ResolveRouteError {
 ///
 /// # Returns
 ///
-/// - `ControlFlow::Break(RuleAction::Lookup(_))` if we hit a lookup rule and an output is yielded
-///   from the route table.
+/// - `ControlFlow::Break(RuleAction::Lookup(_))` if we hit a lookup rule and an output is
+///   yielded from the route table.
 /// - `ControlFlow::Break(RuleAction::Unreachable)` if we hit an unreachable rule.
-/// - `ControlFlow::Continue(_)` if we finished walking the rules table without yielding any result.
+/// - `ControlFlow::Continue(_)` if we finished walking the rules table without yielding any
+///   result.
 fn walk_rules<
     I: IpLayerIpExt,
-    CC: IpStateContext<I>,
+    CC: IpRouteTablesContext<I, DeviceId: DeviceWithName>,
     O,
     State,
     F: FnMut(
         State,
-        &mut <CC::IpRouteTablesCtx<'_> as IpRouteTablesContext<I>>::IpDeviceIdCtx<'_>,
+        &mut CC::IpDeviceIdCtx<'_>,
         &RoutingTable<I, CC::DeviceId>,
     ) -> ControlFlow<O, State>,
 >(
     core_ctx: &mut CC,
+    rules: &RulesTable<I, CC::DeviceId>,
     init: State,
     rule_input: &RuleInput<'_, I, CC::DeviceId>,
     mut lookup_table: F,
-) -> ControlFlow<RuleAction<O>, State> {
-    core_ctx.with_rules_table(|core_ctx, rules| {
-        rules.iter().try_fold(init, |state, Rule { action, matcher }| {
+) -> ControlFlow<RuleAction<RuleWalkInfo<O>>, RuleWalkInfo<State>> {
+    rules.iter().try_fold(
+        RuleWalkInfo { inner: init, observed_source_address_matcher: false },
+        |RuleWalkInfo { inner: state, observed_source_address_matcher },
+         Rule { action, matcher }| {
+            let observed_source_address_matcher =
+                observed_source_address_matcher || matcher.source_address_matcher.is_some();
             if !matcher.matches(rule_input) {
-                return ControlFlow::Continue(state);
+                return ControlFlow::Continue(RuleWalkInfo {
+                    inner: state,
+                    observed_source_address_matcher,
+                });
             }
             match action {
                 RuleAction::Unreachable => return ControlFlow::Break(RuleAction::Unreachable),
-                RuleAction::Lookup(table_id) => {
-                    core_ctx.with_ip_routing_table(table_id, |core_ctx, table| {
-                        match lookup_table(state, core_ctx, table) {
-                            ControlFlow::Break(out) => ControlFlow::Break(RuleAction::Lookup(out)),
-                            ControlFlow::Continue(state) => ControlFlow::Continue(state),
+                RuleAction::Lookup(table_id) => core_ctx.with_ip_routing_table(
+                    &table_id,
+                    |core_ctx, table| match lookup_table(state, core_ctx, table) {
+                        ControlFlow::Break(out) => {
+                            ControlFlow::Break(RuleAction::Lookup(RuleWalkInfo {
+                                inner: out,
+                                observed_source_address_matcher,
+                            }))
                         }
-                    })
-                }
+                        ControlFlow::Continue(state) => ControlFlow::Continue(RuleWalkInfo {
+                            inner: state,
+                            observed_source_address_matcher,
+                        }),
+                    },
+                ),
             }
-        })
-    })
+        },
+    )
 }
 
 /// Returns the outgoing routing instructions for reaching the given destination.
@@ -1122,66 +1149,96 @@ pub fn resolve_output_route_to_destination<
     let bound_address = src_ip_and_policy.map(|(sock_addr, _policy)| sock_addr.into_inner().get());
     let rule_input =
         RuleInput { packet_origin: PacketOrigin::Local { bound_address, bound_device: device } };
-    let result = walk_rules(
-        core_ctx,
-        None, /* first error encountered */
-        &rule_input,
-        |first_error, core_ctx, table| {
-            let mut matching_with_addr = table.lookup_filter_map(
+    core_ctx.with_rules_table(|core_ctx, rules| {
+        let mut walk_rules = |rule_input, src_ip_and_policy| {
+            walk_rules(
                 core_ctx,
-                device,
-                dst_ip.map_or(I::UNSPECIFIED_ADDRESS, |a| a.addr()),
-                |core_ctx, d| Some(get_local_addr(core_ctx, src_ip_and_policy, d, dst_ip)),
-            );
+                rules,
+                None, /* first error encountered */
+                rule_input,
+                |first_error, core_ctx, table| {
+                    let mut matching_with_addr = table.lookup_filter_map(
+                        core_ctx,
+                        device,
+                        dst_ip.map_or(I::UNSPECIFIED_ADDRESS, |a| a.addr()),
+                        |core_ctx, d| Some(get_local_addr(core_ctx, src_ip_and_policy, d, dst_ip)),
+                    );
 
-            let first_error_in_this_table = match matching_with_addr.next() {
-                Some((Destination { device, next_hop }, Ok(local_addr))) => {
-                    return ControlFlow::Break(Ok((
-                        Destination { device: device.clone(), next_hop },
-                        local_addr,
-                    )));
-                }
-                Some((_, Err(e))) => e,
-                // Note: rule evaluation will continue on to the next rule, if the
-                // previous rule was `Lookup` but the table didn't have the route
-                // inside of it.
-                None => return ControlFlow::Continue(first_error),
-            };
+                    let first_error_in_this_table = match matching_with_addr.next() {
+                        Some((Destination { device, next_hop }, Ok(local_addr))) => {
+                            return ControlFlow::Break(Ok((
+                                Destination { device: device.clone(), next_hop },
+                                local_addr,
+                            )));
+                        }
+                        Some((_, Err(e))) => e,
+                        // Note: rule evaluation will continue on to the next rule, if the
+                        // previous rule was `Lookup` but the table didn't have the route
+                        // inside of it.
+                        None => return ControlFlow::Continue(first_error),
+                    };
 
-            matching_with_addr
-                .filter_map(|(destination, local_addr)| {
-                    // Select successful routes. We ignore later errors
-                    // since we've already saved the first one.
-                    local_addr
-                        .ok_checked::<ResolveRouteError>()
-                        .map(|local_addr| (destination, local_addr))
-                })
-                .next()
-                .map_or(
-                    ControlFlow::Continue(first_error.or(Some(first_error_in_this_table))),
-                    |(Destination { device, next_hop }, local_addr)| {
-                        ControlFlow::Break(Ok((
-                            Destination { device: device.clone(), next_hop },
-                            local_addr,
-                        )))
+                    matching_with_addr
+                        .filter_map(|(destination, local_addr)| {
+                            // Select successful routes. We ignore later errors
+                            // since we've already saved the first one.
+                            local_addr
+                                .ok_checked::<ResolveRouteError>()
+                                .map(|local_addr| (destination, local_addr))
+                        })
+                        .next()
+                        .map_or(
+                            ControlFlow::Continue(first_error.or(Some(first_error_in_this_table))),
+                            |(Destination { device, next_hop }, local_addr)| {
+                                ControlFlow::Break(Ok((
+                                    Destination { device: device.clone(), next_hop },
+                                    local_addr,
+                                )))
+                            },
+                        )
+                },
+            )
+        };
+
+        let result = match walk_rules(&rule_input, src_ip_and_policy) {
+            // Only try to resolve a route again if all of the following are true:
+            // 1. The source address is not provided by the caller.
+            // 2. A route is successfully resolved so we selected a source address.
+            // 3. There is a rule with a source address matcher during the resolution.
+            // The rationale is to make sure the route resolution converges to a sensible route
+            // after considering the source address we select.
+            ControlFlow::Break(RuleAction::Lookup(RuleWalkInfo {
+                inner: Ok((_dst, selected_src_addr)),
+                observed_source_address_matcher: true,
+            })) if src_ip_and_policy.is_none() => walk_rules(
+                &RuleInput {
+                    packet_origin: PacketOrigin::Local {
+                        bound_address: Some(selected_src_addr.into()),
+                        bound_device: device,
                     },
-                )
-        },
-    );
-    match result {
-        ControlFlow::Break(RuleAction::Lookup(result)) => {
-            result.map(|(Destination { device, next_hop }, src_addr)| ResolvedRoute {
-                src_addr: src_addr,
+                },
+                Some((selected_src_addr, NonLocalSrcAddrPolicy::Deny)),
+            ),
+            result => result,
+        };
+
+        match result {
+            ControlFlow::Break(RuleAction::Lookup(RuleWalkInfo {
+                inner: result,
+                observed_source_address_matcher: _,
+            })) => result.map(|(Destination { device, next_hop }, src_addr)| ResolvedRoute {
+                src_addr,
                 device,
                 local_delivery_device: None,
                 next_hop,
-            })
+            }),
+            ControlFlow::Break(RuleAction::Unreachable) => Err(ResolveRouteError::Unreachable),
+            ControlFlow::Continue(RuleWalkInfo {
+                inner: first_error,
+                observed_source_address_matcher: _,
+            }) => Err(first_error.unwrap_or(ResolveRouteError::Unreachable)),
         }
-        ControlFlow::Break(RuleAction::Unreachable) => Err(ResolveRouteError::Unreachable),
-        ControlFlow::Continue(first_error) => {
-            Err(first_error.unwrap_or(ResolveRouteError::Unreachable))
-        }
-    }
+    })
 }
 
 /// Enables a blanket implementation of [`IpSocketContext`].
@@ -3673,16 +3730,24 @@ fn lookup_route_table<I: IpLayerIpExt, CC: IpStateContext<I>>(
         PacketOrigin::Local { bound_address: _, bound_device } => bound_device,
         PacketOrigin::NonLocal { source_address: _, incoming_device: _ } => None,
     };
-    match walk_rules(core_ctx, (), &rule_input, |(), core_ctx, table| {
-        match table.lookup(core_ctx, bound_device, dst_ip) {
-            Some(dst) => ControlFlow::Break(Some(dst)),
-            None => ControlFlow::Continue(()),
+    core_ctx.with_rules_table(|core_ctx, rules| {
+        match walk_rules(core_ctx, rules, (), &rule_input, |(), core_ctx, table| {
+            match table.lookup(core_ctx, bound_device, dst_ip) {
+                Some(dst) => ControlFlow::Break(Some(dst)),
+                None => ControlFlow::Continue(()),
+            }
+        }) {
+            ControlFlow::Break(RuleAction::Lookup(RuleWalkInfo {
+                inner: dst,
+                observed_source_address_matcher: _,
+            })) => dst,
+            ControlFlow::Break(RuleAction::Unreachable) => None,
+            ControlFlow::Continue(RuleWalkInfo {
+                inner: (),
+                observed_source_address_matcher: _,
+            }) => None,
         }
-    }) {
-        ControlFlow::Break(RuleAction::Lookup(dst)) => dst,
-        ControlFlow::Break(RuleAction::Unreachable) => None,
-        ControlFlow::Continue(()) => None,
-    }
+    })
 }
 
 /// Packed destination passed to [`IpDeviceSendContext::send_ip_frame`].
