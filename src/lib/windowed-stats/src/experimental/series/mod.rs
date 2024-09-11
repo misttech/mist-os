@@ -12,7 +12,7 @@ pub mod statistic;
 
 use derivative::Derivative;
 use std::convert::Infallible;
-use std::fmt::Debug;
+use std::fmt::{Debug, Display};
 use std::io;
 use std::marker::PhantomData;
 use thiserror::Error;
@@ -79,8 +79,10 @@ pub trait Interpolator {
     ///
     /// This function queries the aggregations of the series. Typically, the timestamp is the
     /// current time.
-    fn interpolate_and_get_buffers(&mut self, timestamp: Timestamp)
-        -> Result<Vec<u8>, Self::Error>;
+    fn interpolate_and_get_buffers(
+        &mut self,
+        timestamp: Timestamp,
+    ) -> Result<SerializedBuffer, Self::Error>;
 }
 
 /// A buffered round-robin sampler over [timed samples][`TimedSample`] (e.g., a [`TimeMatrix`]).
@@ -99,7 +101,9 @@ pub trait RoundRobinSampler<T>:
 ///
 /// Data semantics determine how statistics are interpreted and time series are aggregated and
 /// buffered.
-pub trait DataSemantic {}
+pub trait DataSemantic {
+    fn display() -> impl Display;
+}
 
 /// A continually increasing value.
 ///
@@ -115,7 +119,11 @@ impl BufferStrategy<u64, LastSample> for Counter {
     type Buffer = DeltaSimple8bRle;
 }
 
-impl DataSemantic for Counter {}
+impl DataSemantic for Counter {
+    fn display() -> impl Display {
+        "counter"
+    }
+}
 
 /// A fluctuating value.
 ///
@@ -132,7 +140,11 @@ where
     type Buffer = A::Buffer;
 }
 
-impl DataSemantic for Gauge {}
+impl DataSemantic for Gauge {
+    fn display() -> impl Display {
+        "gauge"
+    }
+}
 
 /// A set of Boolean values.
 ///
@@ -149,16 +161,20 @@ where
     type Buffer = A::Buffer;
 }
 
-impl DataSemantic for BitSet {}
+impl DataSemantic for BitSet {
+    fn display() -> impl Display {
+        "bitset"
+    }
+}
 
 /// A buffer of data from a single time series.
 #[derive(Clone, Debug)]
-struct SerializedBuffer {
+struct SerializedTimeSeries {
     interval: SamplingInterval,
     data: Vec<u8>,
 }
 
-impl SerializedBuffer {
+impl SerializedTimeSeries {
     /// Gets the sampling interval for the aggregations in the buffer.
     pub fn interval(&self) -> &SamplingInterval {
         &self.interval
@@ -331,11 +347,18 @@ where
         Ok(())
     }
 
-    pub fn serialize_and_get_buffer(&self) -> io::Result<SerializedBuffer> {
+    pub fn serialize_and_get_buffer(&self) -> io::Result<SerializedTimeSeries> {
         let mut data = vec![];
         self.buffer.serialize(&mut data)?;
-        Ok(SerializedBuffer { interval: *self.series.interval(), data })
+        Ok(SerializedTimeSeries { interval: *self.series.interval(), data })
     }
+}
+
+/// A buffer of data from time matrix.
+#[derive(Clone, Debug, PartialEq)]
+pub struct SerializedBuffer {
+    pub data_semantic: String,
+    pub data: Vec<u8>,
 }
 
 /// One or more statistical round-robin time series.
@@ -412,7 +435,7 @@ where
     pub fn fold_and_get_buffers(
         &mut self,
         sample: TimedSample<F::Sample>,
-    ) -> Result<Vec<u8>, FoldError>
+    ) -> Result<SerializedBuffer, FoldError>
     where
         FoldError: From<F::Error>,
     {
@@ -424,7 +447,10 @@ where
         self.serialize(series_buffers).map_err(From::from)
     }
 
-    fn serialize(&self, series_buffers: Vec1<SerializedBuffer>) -> io::Result<Vec<u8>> {
+    fn serialize(
+        &self,
+        series_buffers: Vec1<SerializedTimeSeries>,
+    ) -> io::Result<SerializedBuffer> {
         use crate::experimental::clock::DurationExt;
         use byteorder::{LittleEndian, WriteBytesExt};
         use std::io::Write;
@@ -451,7 +477,10 @@ where
             buffer.write_u16::<LittleEndian>(granularity)?;
             buffer.write_all(&series.data[..len as usize - GRANULARITY_FIELD_LEN])?;
         }
-        Ok(buffer)
+        Ok(SerializedBuffer {
+            data_semantic: format!("{}", <F as Statistic>::Semantic::display()),
+            data: buffer,
+        })
     }
 }
 
@@ -511,7 +540,7 @@ where
     fn interpolate_and_get_buffers(
         &mut self,
         timestamp: Timestamp,
-    ) -> Result<Vec<u8>, Self::Error> {
+    ) -> Result<SerializedBuffer, Self::Error> {
         self.interpolate(timestamp)?;
         let series_buffers = self
             .buffers
@@ -640,7 +669,7 @@ mod tests {
         );
         let buffer = time_matrix.interpolate_and_get_buffers(Timestamp::now()).unwrap();
         assert_eq!(
-            buffer,
+            buffer.data,
             vec![
                 1, // version number
                 3, 0, 0, 0, // created timestamp
@@ -663,7 +692,7 @@ mod tests {
         exec.set_fake_time(fasync::Time::from_nanos(10_000_000_000));
         let buffer = time_matrix.interpolate_and_get_buffers(Timestamp::now()).unwrap();
         assert_eq!(
-            buffer,
+            buffer.data,
             vec![
                 1, // version number
                 3, 0, 0, 0, // created timestamp
