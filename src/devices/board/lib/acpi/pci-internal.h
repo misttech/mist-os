@@ -5,7 +5,7 @@
 #ifndef SRC_DEVICES_BOARD_LIB_ACPI_PCI_INTERNAL_H_
 #define SRC_DEVICES_BOARD_LIB_ACPI_PCI_INTERNAL_H_
 
-#include <fuchsia/hardware/pciroot/c/banjo.h>
+#include <fuchsia/hardware/pciroot/cpp/banjo.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
 #include <lib/pci/pciroot.h>
@@ -18,6 +18,7 @@
 
 #include <acpica/acpi.h>
 #include <acpica/actypes.h>
+#include <ddktl/device.h>
 
 #include "src/devices/board/lib/acpi/acpi.h"
 #include "src/devices/board/lib/acpi/pci.h"
@@ -49,7 +50,7 @@ zx_status_t pci_report_current_resources(acpi::Acpi* acpi, zx_handle_t mmio_reso
 
 class AcpiPciroot;
 using AcpiPcirootType = ddk::Device<AcpiPciroot, ddk::GetProtocolable>;
-class AcpiPciroot : public AcpiPcirootType, public PcirootBase {
+class AcpiPciroot : ddk::PcirootProtocol<AcpiPciroot>, public AcpiPcirootType, public PcirootBase {
  public:
   struct Context {
     char name[ACPI_NAMESEG_SIZE + 1];
@@ -65,8 +66,11 @@ class AcpiPciroot : public AcpiPcirootType, public PcirootBase {
 
   static zx_status_t Create(PciRootHost* root_host, AcpiPciroot::Context ctx, zx_device_t* parent,
                             const char* name, std::vector<pci_bdf_t> acpi_bdfs);
-  zx_status_t PcirootGetBti(uint32_t bdf, uint32_t index, zx::bti* bti) final;
-  zx_status_t PcirootGetPciPlatformInfo(pci_platform_info_t* info) final;
+  using PcirootBase::PcirootAllocateMsi;
+  using PcirootBase::PcirootDriverShouldProxyConfig;
+  using PcirootBase::PcirootGetAddressSpace;
+  zx_status_t PcirootGetBti(uint32_t bdf, uint32_t index, zx::bti* bti);
+  zx_status_t PcirootGetPciPlatformInfo(pci_platform_info_t* info);
   zx_status_t PcirootReadConfig8(const pci_bdf_t* address, uint16_t offset, uint8_t* value) final;
   zx_status_t PcirootReadConfig16(const pci_bdf_t* address, uint16_t offset, uint16_t* value) final;
   zx_status_t PcirootReadConfig32(const pci_bdf_t* address, uint16_t offset, uint32_t* value) final;
@@ -95,7 +99,7 @@ class AcpiPciroot : public AcpiPcirootType, public PcirootBase {
         PcirootBase(root_host),
         context_(std::move(ctx)),
         acpi_bdfs_(std::move(acpi_bdfs)) {}
-  ~AcpiPciroot() override = default;
+  virtual ~AcpiPciroot() = default;
 };
 
 namespace acpi {

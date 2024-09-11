@@ -4,14 +4,6 @@
 #ifndef SRC_DEVICES_PCI_LIB_PCI_INCLUDE_LIB_PCI_ROOT_HOST_H_
 #define SRC_DEVICES_PCI_LIB_PCI_INCLUDE_LIB_PCI_ROOT_HOST_H_
 
-#include <fuchsia/hardware/pciroot/c/banjo.h>
-#include <lib/ddk/debug.h>
-#include <zircon/compiler.h>
-
-// Userspace ACPI/PCI support is entirely in C++, but the legacy kernel pci support
-// still has kpci.c. In lieu of needlessly porting that, it's simpler to ifdef the
-// DDKTL usage away from it until we can remove it entirely.
-#ifdef __cplusplus
 #include <fuchsia/hardware/pciroot/cpp/banjo.h>
 #include <lib/zx/bti.h>
 #include <lib/zx/eventpair.h>
@@ -21,16 +13,15 @@
 #include <lib/zx/thread.h>
 #include <stdint.h>
 #include <string.h>
+#include <zircon/compiler.h>
 #include <zircon/errors.h>
 #include <zircon/syscalls/port.h>
 
 #include <memory>
-#include <thread>
 #include <unordered_map>
 #include <utility>
 #include <vector>
 
-#include <ddktl/device.h>
 #include <fbl/mutex.h>
 #include <region-alloc/region-alloc.h>
 
@@ -126,14 +117,14 @@ class PciRootHost {
  private:
   void DumpAllocatorWindowsLocked() __TA_REQUIRES(lock_) {
     auto cb = [](const ralloc_region_t* r) -> bool {
-      zxlogf(INFO, "    [%#lx, %#lx) [%#zx]", r->base, r->base + r->size, r->size);
+      printf("    [%#lx, %#lx) [%#zx]", r->base, r->base + r->size, r->size);
       return true;
     };
-    zxlogf(INFO, "Mmio32 available:");
+    printf("Mmio32 available:");
     Mmio32().WalkAvailableRegions(cb);
-    zxlogf(INFO, "Mmio64 available:");
+    printf("Mmio64 available:");
     Mmio64().WalkAvailableRegions(cb);
-    zxlogf(INFO, "Io available:");
+    printf("Io available:");
     Io().WalkAvailableRegions(cb);
   }
   void ProcessQueue() __TA_REQUIRES(lock_);
@@ -157,10 +148,7 @@ class PciRootHost {
   struct WindowAllocation {
     WindowAllocation(zx::eventpair host_peer, PciAddressWindow allocated_region)
         : host_peer_(std::move(host_peer)), allocated_region_(std::move(allocated_region)) {}
-    ~WindowAllocation() {
-      zxlogf(DEBUG, "releasing [%#lx, %#lx)", allocated_region_->base,
-             allocated_region_->base + allocated_region_->size);
-    }
+    ~WindowAllocation() {}
     zx::eventpair host_peer_;
     PciAddressWindow allocated_region_;
   };
@@ -178,5 +166,4 @@ class PciRootHost {
   const pci_address_space_t io_type_;
 };
 
-#endif  // ifndef __cplusplus
 #endif  // SRC_DEVICES_PCI_LIB_PCI_INCLUDE_LIB_PCI_ROOT_HOST_H_
