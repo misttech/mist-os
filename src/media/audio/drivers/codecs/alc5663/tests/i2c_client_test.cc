@@ -8,19 +8,21 @@
 #include <lib/async-loop/default.h>
 #include <lib/ddk/driver.h>
 #include <lib/device-protocol/i2c-channel.h>
-#include <lib/mock-i2c/mock-i2c.h>
+#include <lib/mock-i2c/mock-i2c-gtest.h>
 #include <zircon/errors.h>
 
 #include <memory>
 
 #include <fbl/array.h>
+#include <gtest/gtest.h>
 #include <hwreg/bitfields.h>
-#include <zxtest/zxtest.h>
+
+#include "src/lib/testing/predicates/status.h"
 
 namespace audio::alc5663 {
 namespace {
 
-class I2cClientTest : public zxtest::Test {
+class I2cClientTest : public ::testing::Test {
  public:
   I2cClientTest() : loop_(&kAsyncLoopConfigNeverAttachToThread) {}
 
@@ -35,11 +37,11 @@ class I2cClientTest : public zxtest::Test {
   }
 
  protected:
-  mock_i2c::MockI2c& i2c() { return i2c_; }
+  mock_i2c::MockI2cGtest& i2c() { return i2c_; }
   fidl::ClientEnd<fuchsia_hardware_i2c::Device> TakeI2cClient() { return std::move(i2c_client_); }
 
  private:
-  mock_i2c::MockI2c i2c_;
+  mock_i2c::MockI2cGtest i2c_;
   fidl::ClientEnd<fuchsia_hardware_i2c::Device> i2c_client_;
   async::Loop loop_;
 };
@@ -110,7 +112,7 @@ TEST_F(I2cClientTest, ReadRegister) {
 
   TestReg result;
   EXPECT_OK(ReadRegister<TestReg>(&client, &result));
-  EXPECT_EQ(result.data, 0x1122);
+  EXPECT_EQ(result.data, 0x1122u);
 }
 
 TEST_F(I2cClientTest, WriteRegister) {
@@ -129,7 +131,7 @@ TEST_F(I2cClientTest, MapRegister) {
   i2c().ExpectWriteStop({0xaa, 0x33, 0x44});
 
   EXPECT_OK(MapRegister<TestReg>(&client, [](auto reg) {
-    EXPECT_EQ(reg.data, 0x1122);
+    EXPECT_EQ(reg.data, 0x1122u);
     return TestReg{/*data=*/0x3344};
   }));
 }

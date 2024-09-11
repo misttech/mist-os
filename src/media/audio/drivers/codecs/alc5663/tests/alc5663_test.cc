@@ -19,11 +19,12 @@
 #include <vector>
 
 #include <fbl/array.h>
-#include <zxtest/zxtest.h>
+#include <gtest/gtest.h>
 
 #include "alc5663_registers.h"
 #include "fake_i2c.h"
 #include "src/devices/testing/mock-ddk/mock-device.h"
+#include "src/lib/testing/predicates/status.h"
 
 namespace audio::alc5663 {
 namespace {
@@ -375,7 +376,7 @@ TEST(CalculatePll, InputClockTooLow) {
   EXPECT_EQ(CalculatePllParams(1, INT_MAX, &result), ZX_ERR_OUT_OF_RANGE);
 }
 
-class Alc5663 : public zxtest::Test, public loop_fixture::RealLoop {};
+class Alc5663 : public ::testing::Test, public loop_fixture::RealLoop {};
 
 TEST_F(Alc5663, BindUnbind) {
   FakeAlc5663Hardware hardware = CreateFakeAlc5663(dispatcher());
@@ -383,7 +384,7 @@ TEST_F(Alc5663, BindUnbind) {
   // Create device.
   Alc5663Device* device;
   PerformBlockingWork([&] { ASSERT_OK(Alc5663Device::Bind(hardware.parent, &device)); });
-  EXPECT_EQ(hardware.fake_parent->child_count(), 1);
+  EXPECT_EQ(hardware.fake_parent->child_count(), 1u);
 
   // Ensure the device was reset.
   EXPECT_EQ(hardware.codec->state(), FakeAlc5663::State::kReady);
@@ -392,7 +393,7 @@ TEST_F(Alc5663, BindUnbind) {
   device->DdkAsyncRemove();
   // Calls DdkRelease() on device.
   EXPECT_OK(mock_ddk::ReleaseFlaggedDevices(hardware.fake_parent.get()));
-  EXPECT_EQ(hardware.fake_parent->child_count(), 0);
+  EXPECT_EQ(hardware.fake_parent->child_count(), 0u);
 }
 
 TEST_F(Alc5663, InvalidVendor) {
@@ -426,8 +427,8 @@ TEST_F(Alc5663, CheckClocksConfigured) {
   //
   // When ASRC enabled, clk_sys_pre must be at least 512*|sample_rate|. The datasheet doesn't
   // specify an upper bound for this clock, but the PLL's output is capped at 40MHz.
-  EXPECT_GE(clocks.clk_sys_pre, 512 * 48'000);
-  EXPECT_LE(clocks.clk_sys_pre, 40'000'000);
+  EXPECT_GE(clocks.clk_sys_pre, 512 * 48'000u);
+  EXPECT_LE(clocks.clk_sys_pre, 40'000'000u);
 
   // System clock needs to be relatively close to 256*|sample_rate|.
   EXPECT_GE(clocks.clk_sys_i2s, static_cast<uint32_t>(256 * 48'000 * 0.95));
@@ -436,7 +437,7 @@ TEST_F(Alc5663, CheckClocksConfigured) {
   // Shutdown
   device->DdkAsyncRemove();
   EXPECT_OK(mock_ddk::ReleaseFlaggedDevices(hardware.fake_parent.get()));
-  EXPECT_EQ(hardware.fake_parent->child_count(), 0);
+  EXPECT_EQ(hardware.fake_parent->child_count(), 0u);
 }
 
 TEST_F(Alc5663, CheckOutputsEnabled) {
@@ -451,28 +452,29 @@ TEST_F(Alc5663, CheckOutputsEnabled) {
   // have been correctly configured.
 
   // Check power settings.
-  EXPECT_EQ(hardware.codec->ReadRegister<PowerManagementControl1Reg>().pow_dac_l_1(), 1);
-  EXPECT_EQ(hardware.codec->ReadRegister<PowerManagementControl1Reg>().pow_dac_r_1(), 1);
-  EXPECT_EQ(hardware.codec->ReadRegister<PowerManagementControl2Reg>().pow_dac_stereo1_filter(), 1);
-  EXPECT_EQ(hardware.codec->ReadRegister<PowerManagementControl3Reg>().en_l_hp(), 1);
-  EXPECT_EQ(hardware.codec->ReadRegister<PowerManagementControl3Reg>().en_r_hp(), 1);
+  EXPECT_EQ(hardware.codec->ReadRegister<PowerManagementControl1Reg>().pow_dac_l_1(), 1u);
+  EXPECT_EQ(hardware.codec->ReadRegister<PowerManagementControl1Reg>().pow_dac_r_1(), 1u);
+  EXPECT_EQ(hardware.codec->ReadRegister<PowerManagementControl2Reg>().pow_dac_stereo1_filter(),
+            1u);
+  EXPECT_EQ(hardware.codec->ReadRegister<PowerManagementControl3Reg>().en_l_hp(), 1u);
+  EXPECT_EQ(hardware.codec->ReadRegister<PowerManagementControl3Reg>().en_r_hp(), 1u);
 
   // Check amplifier settings.
-  EXPECT_EQ(hardware.codec->ReadRegister<HpAmpControl1Reg>().enable_l_hp(), 1);
-  EXPECT_EQ(hardware.codec->ReadRegister<HpAmpControl1Reg>().enable_r_hp(), 1);
-  EXPECT_EQ(hardware.codec->ReadRegister<HpAmpControl1Reg>().pow_capless_l(), 1);
-  EXPECT_EQ(hardware.codec->ReadRegister<HpAmpControl1Reg>().pow_capless_r(), 1);
-  EXPECT_EQ(hardware.codec->ReadRegister<HpAmpControl1Reg>().pow_pump_l_hp(), 1);
-  EXPECT_EQ(hardware.codec->ReadRegister<HpAmpControl1Reg>().pow_pump_r_hp(), 1);
-  EXPECT_EQ(hardware.codec->ReadRegister<HpAmpControl2Reg>().output_r_hp(), 1);
-  EXPECT_EQ(hardware.codec->ReadRegister<HpAmpControl2Reg>().output_l_hp(), 1);
-  EXPECT_EQ(hardware.codec->ReadRegister<HpAmpControl3Reg>().pow_reg_l_hp(), 1);
-  EXPECT_EQ(hardware.codec->ReadRegister<HpAmpControl3Reg>().pow_reg_r_hp(), 1);
+  EXPECT_EQ(hardware.codec->ReadRegister<HpAmpControl1Reg>().enable_l_hp(), 1u);
+  EXPECT_EQ(hardware.codec->ReadRegister<HpAmpControl1Reg>().enable_r_hp(), 1u);
+  EXPECT_EQ(hardware.codec->ReadRegister<HpAmpControl1Reg>().pow_capless_l(), 1u);
+  EXPECT_EQ(hardware.codec->ReadRegister<HpAmpControl1Reg>().pow_capless_r(), 1u);
+  EXPECT_EQ(hardware.codec->ReadRegister<HpAmpControl1Reg>().pow_pump_l_hp(), 1u);
+  EXPECT_EQ(hardware.codec->ReadRegister<HpAmpControl1Reg>().pow_pump_r_hp(), 1u);
+  EXPECT_EQ(hardware.codec->ReadRegister<HpAmpControl2Reg>().output_r_hp(), 1u);
+  EXPECT_EQ(hardware.codec->ReadRegister<HpAmpControl2Reg>().output_l_hp(), 1u);
+  EXPECT_EQ(hardware.codec->ReadRegister<HpAmpControl3Reg>().pow_reg_l_hp(), 1u);
+  EXPECT_EQ(hardware.codec->ReadRegister<HpAmpControl3Reg>().pow_reg_r_hp(), 1u);
 
   // Shutdown
   device->DdkAsyncRemove();
   EXPECT_OK(mock_ddk::ReleaseFlaggedDevices(hardware.fake_parent.get()));
-  EXPECT_EQ(hardware.fake_parent->child_count(), 0);
+  EXPECT_EQ(hardware.fake_parent->child_count(), 0u);
 }
 
 }  // namespace

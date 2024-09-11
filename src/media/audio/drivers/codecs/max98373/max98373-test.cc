@@ -7,14 +7,15 @@
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
-#include <lib/mock-i2c/mock-i2c.h>
+#include <lib/mock-i2c/mock-i2c-gtest.h>
 #include <lib/simple-codec/simple-codec-client.h>
 #include <lib/simple-codec/simple-codec-helper.h>
 
-#include <zxtest/zxtest.h>
+#include <gtest/gtest.h>
 
 #include "src/devices/gpio/testing/fake-gpio/fake-gpio.h"
 #include "src/devices/testing/mock-ddk/mock-device.h"
+#include "src/lib/testing/predicates/status.h"
 
 namespace audio {
 
@@ -38,7 +39,7 @@ struct Max98373Codec : public Max98373 {
   }
 };
 
-class Max98373Test : public zxtest::Test {
+class Max98373Test : public ::testing::Test {
  public:
   void SetUp() override {
     // Reset by the TAS driver initialization.
@@ -90,7 +91,7 @@ class Max98373Test : public zxtest::Test {
 
  protected:
   async::Loop fidl_servers_loop_{&kAsyncLoopConfigNoAttachToCurrentThread};
-  mock_i2c::MockI2c mock_i2c_;
+  mock_i2c::MockI2cGtest mock_i2c_;
   async_patterns::TestDispatcherBound<fake_gpio::FakeGpio> fake_gpio_{
       fidl_servers_loop_.dispatcher(), std::in_place};
   SimpleCodecClient client_;
@@ -106,34 +107,34 @@ TEST_F(Max98373Test, GetInfo) {
 
 TEST_F(Max98373Test, GetDaiFormats) {
   auto formats = client_.GetDaiFormats();
-  EXPECT_EQ(formats.value().number_of_channels.size(), 4);
-  EXPECT_EQ(formats.value().number_of_channels[0], 2);
-  EXPECT_EQ(formats.value().number_of_channels[1], 4);
-  EXPECT_EQ(formats.value().number_of_channels[2], 8);
-  EXPECT_EQ(formats.value().number_of_channels[3], 16);
-  EXPECT_EQ(formats.value().sample_formats.size(), 1);
+  EXPECT_EQ(formats.value().number_of_channels.size(), 4u);
+  EXPECT_EQ(formats.value().number_of_channels[0], 2u);
+  EXPECT_EQ(formats.value().number_of_channels[1], 4u);
+  EXPECT_EQ(formats.value().number_of_channels[2], 8u);
+  EXPECT_EQ(formats.value().number_of_channels[3], 16u);
+  EXPECT_EQ(formats.value().sample_formats.size(), 1u);
   EXPECT_EQ(formats.value().sample_formats[0], SampleFormat::PCM_SIGNED);
-  EXPECT_EQ(formats.value().frame_formats.size(), 3);
+  EXPECT_EQ(formats.value().frame_formats.size(), 3u);
   EXPECT_EQ(formats.value().frame_formats[0], FrameFormat::TDM1);
   EXPECT_EQ(formats.value().frame_formats[1], FrameFormat::I2S);
   EXPECT_EQ(formats.value().frame_formats[2], FrameFormat::STEREO_LEFT);
-  EXPECT_EQ(formats.value().frame_rates.size(), 8);
-  EXPECT_EQ(formats.value().frame_rates[0], 16'000);
-  EXPECT_EQ(formats.value().frame_rates[1], 22'050);
-  EXPECT_EQ(formats.value().frame_rates[2], 24'000);
-  EXPECT_EQ(formats.value().frame_rates[3], 32'000);
-  EXPECT_EQ(formats.value().frame_rates[4], 44'100);
-  EXPECT_EQ(formats.value().frame_rates[5], 48'000);
-  EXPECT_EQ(formats.value().frame_rates[6], 88'200);
-  EXPECT_EQ(formats.value().frame_rates[7], 96'000);
-  EXPECT_EQ(formats.value().bits_per_slot.size(), 3);
-  EXPECT_EQ(formats.value().bits_per_slot[0], 16);
-  EXPECT_EQ(formats.value().bits_per_slot[1], 24);
-  EXPECT_EQ(formats.value().bits_per_slot[2], 32);
-  EXPECT_EQ(formats.value().bits_per_sample.size(), 3);
-  EXPECT_EQ(formats.value().bits_per_sample[0], 16);
-  EXPECT_EQ(formats.value().bits_per_sample[1], 24);
-  EXPECT_EQ(formats.value().bits_per_sample[2], 32);
+  EXPECT_EQ(formats.value().frame_rates.size(), 8u);
+  EXPECT_EQ(formats.value().frame_rates[0], 16'000u);
+  EXPECT_EQ(formats.value().frame_rates[1], 22'050u);
+  EXPECT_EQ(formats.value().frame_rates[2], 24'000u);
+  EXPECT_EQ(formats.value().frame_rates[3], 32'000u);
+  EXPECT_EQ(formats.value().frame_rates[4], 44'100u);
+  EXPECT_EQ(formats.value().frame_rates[5], 48'000u);
+  EXPECT_EQ(formats.value().frame_rates[6], 88'200u);
+  EXPECT_EQ(formats.value().frame_rates[7], 96'000u);
+  EXPECT_EQ(formats.value().bits_per_slot.size(), 3u);
+  EXPECT_EQ(formats.value().bits_per_slot[0], 16u);
+  EXPECT_EQ(formats.value().bits_per_slot[1], 24u);
+  EXPECT_EQ(formats.value().bits_per_slot[2], 32u);
+  EXPECT_EQ(formats.value().bits_per_sample.size(), 3u);
+  EXPECT_EQ(formats.value().bits_per_sample[0], 16u);
+  EXPECT_EQ(formats.value().bits_per_sample[1], 24u);
+  EXPECT_EQ(formats.value().bits_per_sample[2], 32u);
 }
 
 TEST_F(Max98373Test, Reset) {
@@ -203,7 +204,7 @@ TEST_F(Max98373Test, SetDaiFormat) {
     format.bits_per_sample = 32;  // 32 bits into 16 is not valid.
     auto formats = client_.GetDaiFormats();
     ASSERT_FALSE(IsDaiFormatSupported(format, formats.value()));
-    ASSERT_NOT_OK(client_.SetDaiFormat(std::move(format)));
+    ASSERT_TRUE(client_.SetDaiFormat(std::move(format)).is_error());
   }
 }
 

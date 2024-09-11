@@ -3,14 +3,15 @@
 // found in the LICENSE file.
 
 #include <lib/async-loop/cpp/loop.h>
-#include <lib/mock-i2c/mock-i2c.h>
+#include <lib/mock-i2c/mock-i2c-gtest.h>
 #include <lib/zx/clock.h>
 
 #include <memory>
 
-#include <zxtest/zxtest.h>
+#include <gtest/gtest.h>
 
 #include "src/devices/testing/mock-ddk/mock-device.h"
+#include "src/lib/testing/predicates/status.h"
 #include "src/media/audio/drivers/codecs/da7219/da7219-dfv1.h"
 
 namespace {
@@ -20,7 +21,7 @@ static constexpr fuchsia_hardware_audio::wire::ElementId kHeadphoneGainPeId = 1;
 
 namespace audio::da7219 {
 
-class Da7219Test : public zxtest::Test {
+class Da7219Test : public ::testing::Test {
  public:
   Da7219Test()
       : loop_client_(&kAsyncLoopConfigNeverAttachToThread),
@@ -100,7 +101,7 @@ class Da7219Test : public zxtest::Test {
     return config;
   }
   std::shared_ptr<zx_device> fake_root_;
-  mock_i2c::MockI2c mock_i2c_;
+  mock_i2c::MockI2cGtest mock_i2c_;
   async::Loop loop_client_;
   async_loop_config_t config_;
   async::Loop loop_driver_;
@@ -581,7 +582,7 @@ TEST_F(Da7219Test, OutputHeadphonesSignalProcessingGainTopology) {
   // 1 gain element.
   auto elements = signal->GetElements();
   ASSERT_OK(elements.status());
-  ASSERT_EQ(elements.value()->processing_elements.count(), 1);
+  ASSERT_EQ(elements.value()->processing_elements.count(), 1u);
   auto& element0 = elements.value()->processing_elements[0];
   ASSERT_EQ(element0.id(), kHeadphoneGainPeId);
   ASSERT_EQ(element0.type(), fuchsia_hardware_audio_signalprocessing::ElementType::kGain);
@@ -592,10 +593,10 @@ TEST_F(Da7219Test, OutputHeadphonesSignalProcessingGainTopology) {
   // Topology with 1 element id 1.
   auto topologies = signal->GetTopologies();
   ASSERT_OK(topologies.status());
-  ASSERT_EQ(topologies.value()->topologies.count(), 1);
+  ASSERT_EQ(topologies.value()->topologies.count(), 1u);
   auto& topology0 = topologies.value()->topologies[0];
   ASSERT_EQ(topology0.id(), kTopologyId);
-  ASSERT_EQ(topology0.processing_elements_edge_pairs().count(), 1);
+  ASSERT_EQ(topology0.processing_elements_edge_pairs().count(), 1u);
   auto& edge0 = topology0.processing_elements_edge_pairs()[0];
   ASSERT_EQ(edge0.processing_element_id_from, kHeadphoneGainPeId);
   ASSERT_EQ(edge0.processing_element_id_to, kHeadphoneGainPeId);
