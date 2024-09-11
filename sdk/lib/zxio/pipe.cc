@@ -191,8 +191,9 @@ static constexpr zxio_ops_t zxio_pipe_ops = []() {
     }
     struct sockaddr response;
     response.sa_family = AF_UNIX;
-    memcpy(addr, &response, std::min(static_cast<size_t>(*addrlen), sizeof(struct sockaddr)));
-    *addrlen = sizeof(sa_family_t);
+    const socklen_t response_size = sizeof(sa_family_t);
+    memcpy(addr, &response, std::min(*addrlen, response_size));
+    *addrlen = response_size;
     *out_code = 0;
     return ZX_OK;
   };
