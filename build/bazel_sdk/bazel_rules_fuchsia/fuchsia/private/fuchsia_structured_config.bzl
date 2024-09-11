@@ -11,7 +11,7 @@
 load(":fuchsia_fidl_cc_library.bzl", "fuchsia_fidl_cc_library")
 load(":fuchsia_fidl_library.bzl", "fuchsia_fidl_library")
 load(":providers.bzl", "FuchsiaComponentManifestInfo", "FuchsiaPackageResourcesInfo", "FuchsiaStructuredConfigInfo")
-load(":utils.bzl", "make_resource_struct")
+load(":utils.bzl", "make_resource_struct", "with_fuchsia_constraint")
 
 #####
 # cvf
@@ -276,8 +276,6 @@ def fuchsia_structured_config_cpp_elf_lib(
         namespace = name
     namespace = namespace.replace(".", "_").replace("-", "_")
 
-    cpp_elf_source_target = "%s_cpp_elf_config_lib_source" % name
-
     # generate the client library FIDL source
     fidl_source_target = "%s_fidl_config_lib_source" % name
     _fidl_config_client_lib_source(
@@ -319,7 +317,7 @@ def fuchsia_structured_config_cpp_elf_lib(
         binding_type = "cpp",
         library = ":" + fidl_library_target,
         tags = tags,
-        target_compatible_with = target_compatible_with + ["@platforms//os:fuchsia"],
+        target_compatible_with = target_compatible_with,
         **kwargs
     )
 
@@ -331,6 +329,6 @@ def fuchsia_structured_config_cpp_elf_lib(
             "@fuchsia_sdk//pkg/inspect",
         ],
         tags = tags,
-        target_compatible_with = target_compatible_with,
+        target_compatible_with = with_fuchsia_constraint(target_compatible_with),
         **kwargs
     )
