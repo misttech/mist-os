@@ -192,7 +192,7 @@ scrypt = "0.10.0"
 serde = { version = "1.0.204", features = ["derive"] }
 serde_cbor = "0.11.1"
 serde_derive = "1.0.147"
-serde_json = "1.0.87"
+serde_json = "1.0.128"
 serde_json5 = "0.1.0"
 serde_repr = "0.1.7"
 sha1 = "0.10.5"
@@ -847,8 +847,8 @@ rustflags = []
 [gn.package.serde_derive."1.0.204"]
 rustflags = []
 
-[gn.package.serde_json."1.0.87"]
-rustflags = ["--cfg=limb_width_64"]
+[gn.package.serde_json."1.0.128"]
+rustflags = ["--cfg=fast_arithmetic=\\\"64\\\""]
 
 [gn.package.sha1."0.10.5"]
 group_visibility = { import = "//third_party/rust_crates/visibility.gni", variable = "sha1_visibility" }
