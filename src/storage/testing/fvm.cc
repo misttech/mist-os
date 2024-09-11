@@ -15,15 +15,15 @@
 #include <fbl/unique_fd.h>
 #include <ramdevice-client/ramdisk.h>
 
-#include "src/storage/lib/fs_management/cpp/format.h"
 #include "src/storage/lib/fs_management/cpp/fvm.h"
 
 namespace storage {
 
-namespace fio = fuchsia_io;
+constexpr uuid::Uuid kTestPartGUID = {0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f,
+                                      0xFF, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07};
 
-constexpr std::array<uint8_t, 16> kTestPartGUID = {0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f,
-                                                   0xFF, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07};
+constexpr uuid::Uuid kTestUniqueGUID = {0xFF, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
+                                        0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f};
 
 zx::result<> BindFvm(fidl::UnownedClientEnd<fuchsia_device::Controller> device) {
   auto resp = fidl::WireCall(device)->Bind("fvm.cm");
@@ -40,7 +40,7 @@ zx::result<> BindFvm(fidl::UnownedClientEnd<fuchsia_device::Controller> device) 
   return zx::ok();
 }
 
-zx::result<FvmInstance> CreateFvmInstance(const std::string& device_path, size_t slice_size) {
+zx::result<std::string> CreateFvmInstance(const std::string& device_path, size_t slice_size) {
   zx::result device = component::Connect<fuchsia_hardware_block::Block>(device_path);
   if (device.is_error()) {
     return device.take_error();
@@ -51,76 +51,67 @@ zx::result<FvmInstance> CreateFvmInstance(const std::string& device_path, size_t
     return status.take_error();
   }
 
-  // Start the FVM filesystem.
-  auto component = fs_management::FsComponent::FromDiskFormat(fs_management::kDiskFormatFvm);
+  std::string controller_path = device_path + "/device_controller";
+  zx::result controller = component::Connect<fuchsia_device::Controller>(controller_path);
+  if (controller.is_error()) {
+    return controller.take_error();
+  }
+  if (zx::result status = BindFvm(controller.value()); status.is_error()) {
+    return status.take_error();
+  }
+  std::string fvm_disk_path = device_path + "/fvm";
+  if (zx::result channel = device_watcher::RecursiveWaitForFile(fvm_disk_path.c_str(), zx::sec(3));
+      channel.is_error()) {
+    FX_PLOGS(ERROR, channel.error_value()) << "FVM driver never appeared at " << fvm_disk_path;
+    return channel.take_error();
+  }
 
-  auto fs = MountMultiVolume(*std::move(device), component, fs_management::MountOptions());
-  if (fs.is_error())
-    return fs.take_error();
-  return zx::ok(FvmInstance(std::move(component), *std::move(fs)));
+  return zx::ok(fvm_disk_path);
 }
 
-zx::result<FvmPartition> CreateFvmPartition(const std::string& device_path, size_t slice_size,
-                                            const FvmOptions& options) {
+zx::result<std::string> CreateFvmPartition(const std::string& device_path, size_t slice_size,
+                                           const FvmOptions& options) {
   // Format the raw device to support FVM, and bind the FVM driver to it.
-  zx::result fvm = CreateFvmInstance(device_path, slice_size);
-  if (fvm.is_error()) {
-    return fvm.take_error();
+  zx::result<std::string> fvm_disk_path = CreateFvmInstance(device_path, slice_size);
+  if (fvm_disk_path.is_error()) {
+    return fvm_disk_path.take_error();
   }
 
-  fidl::Array<uint8_t, 16> type_guid = fidl::Array<uint8_t, 16>{1, 2, 3, 4};
-  memcpy(type_guid.data(), options.type ? options.type->data() : kTestPartGUID.data(), 16);
-
-  fidl::Arena arena;
-  zx::result volume =
-      fvm->fs().CreateVolume(options.name,
-                             fuchsia_fs_startup::wire::CreateOptions::Builder(arena)
-                                 .type_guid(std::move(type_guid))
-                                 .initial_size(options.initial_fvm_slice_count * slice_size)
-                                 .Build(),
-                             fuchsia_fs_startup::wire::MountOptions());
-  if (volume.is_error())
-    return volume.take_error();
-
-  static std::atomic<int> counter(0);
-  std::string path = "/test-fvm-" + std::to_string(++counter);
-
-  auto endpoints = fidl::CreateEndpoints<fio::Directory>();
-  if (endpoints.is_error())
-    return endpoints.take_error();
-  if (fidl::OneWayStatus status =
-          fidl::WireCall<fuchsia_io::Directory>(volume->ExportRoot())
-              ->Clone(fio::OpenFlags::kCloneSameRights,
-                      fidl::ServerEnd<fio::Node>(endpoints->server.TakeChannel()));
-      !status.ok()) {
-    return zx::error(status.status());
+  // Open "fvm" driver
+  zx::result fvm_client_end =
+      component::Connect<fuchsia_hardware_block_volume::VolumeManager>(*fvm_disk_path);
+  if (fvm_client_end.is_error()) {
+    FX_LOGS(ERROR) << "Could not open FVM driver: " << fvm_client_end.status_string();
+    return fvm_client_end.take_error();
   }
 
-  auto binding =
-      fs_management::NamespaceBinding::Create(path.c_str(), std::move(endpoints->client));
-  if (binding.is_error())
-    return binding.take_error();
+  uint64_t slice_count = options.initial_fvm_slice_count;
+  uuid::Uuid type_guid = kTestPartGUID;
+  if (options.type) {
+    type_guid = uuid::Uuid(options.type->data());
+  }
 
-  path += "/svc/fuchsia.hardware.block.volume.Volume";
-
-  return zx::ok(FvmPartition(*std::move(fvm), *std::move(binding), options.name, path));
-}
-
-zx::result<> FvmPartition::SetLimit(uint64_t limit) {
-  zx::result volume = component::ConnectAt<fuchsia_fs_startup::Volume>(
-      fvm_.fs().ServiceDirectory(), (std::string("volumes/") + partition_name_).c_str());
-  if (volume.is_error())
-    return volume.take_error();
-  fidl::WireResult result = fidl::WireCall(*volume)->SetLimit(limit);
+  zx::result controller = fs_management::FvmAllocatePartition(
+      *fvm_client_end, slice_count, type_guid, kTestUniqueGUID, options.name, 0);
+  if (controller.is_error()) {
+    FX_LOGS(ERROR) << "Could not allocate FVM partition (slice count: "
+                   << options.initial_fvm_slice_count << "): " << controller.status_string();
+    return controller.take_error();
+  }
+  fidl::WireResult result = fidl::WireCall(*controller)->GetTopologicalPath();
   if (!result.ok()) {
-    FX_LOGS(ERROR) << "SetLimit FIDL call failed: " << result.FormatDescription();
+    FX_LOGS(ERROR) << "Could not get topological path of fvm partition (fidl error): "
+                   << result.FormatDescription();
     return zx::error(result.status());
   }
-  if (result->is_error()) {
-    FX_LOGS(ERROR) << "SetLimit failed: " << zx_status_get_string(result->error_value());
-    return zx::error(result->error_value());
+  fit::result response = *result;
+  if (response.is_error()) {
+    FX_LOGS(ERROR) << "Could not get topological path of fvm partition: "
+                   << zx_status_get_string(response.error_value());
+    return zx::error(response.error_value());
   }
-  return zx::ok();
+
+  return zx::ok(std::string(response->path.data(), response->path.size()));
 }
 
 }  // namespace storage

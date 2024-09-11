@@ -125,9 +125,6 @@ test("corrupt_tests") {
     "//sdk/fidl/fuchsia.device:fuchsia.device_cpp",
     "//sdk/lib/syslog/cpp",
     "//src/lib/fxl/test:gtest_main",
-
-    # These tests use FVM even if the filesystem wouldn't normally use it.
-    "//src/storage/fvm:fvm-component",
     "//zircon/system/ulib/fbl",
   ]
 }

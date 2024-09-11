@@ -236,7 +236,6 @@ fs_test_suite("minfs") {
   deps = [
     ":minfs_fs_test_config",
     ":minfs_validate_fs_test_config",
-    "//src/storage/fvm:fvm-component",
     "//src/storage/minfs/bin:minfs-test-component",
   ]
   extra_components = [
@@ -272,7 +271,6 @@ slow_fs_test_suite("minfs") {
   deps = [
     ":minfs_fs_test_config",
     ":minfs_validate_fs_test_config",
-    "//src/storage/fvm:fvm-component",
     "//src/storage/minfs/bin:minfs-test-component",
   ]
 

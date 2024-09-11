@@ -70,22 +70,23 @@ class JsonInstance : public FilesystemInstance {
                                                filesystem.GetTraits().is_multi_volume);
   }
 
-  JsonInstance(const JsonFilesystem* filesystem, RamDevice device)
+  JsonInstance(const JsonFilesystem* filesystem, RamDevice device, std::string device_path)
       : filesystem_(*filesystem),
         component_(GetComponent(filesystem_)),
-        device_(std::move(device)) {}
+        device_(std::move(device)),
+        device_path_(std::move(device_path)) {}
 
   zx::result<> Format(const TestFilesystemOptions& options) override {
     fs_management::MkfsOptions mkfs_options;
     mkfs_options.sectors_per_cluster = filesystem_.sectors_per_cluster();
-    return FsFormat(device_.path(), component_, mkfs_options,
+    return FsFormat(device_path_, component_, mkfs_options,
                     filesystem_.GetTraits().is_multi_volume);
   }
 
   zx::result<> Mount(const std::string& mount_path,
                      const fs_management::MountOptions& options) override {
     fs_management::MountOptions mount_options = options;
-    auto fs = FsMount(device_.path(), mount_path, component_, mount_options);
+    auto fs = FsMount(device_path_, mount_path, component_, mount_options);
     if (fs.is_error()) {
       // We can't reuse the component in the face of errors.
       component_ = GetComponent(filesystem_);
@@ -111,7 +112,7 @@ class JsonInstance : public FilesystemInstance {
         .force = true,
     };
 
-    auto status = zx::make_result(fs_management::Fsck(device_.path().c_str(), component_, options));
+    auto status = zx::make_result(fs_management::Fsck(device_path_.c_str(), component_, options));
     if (status.is_error()) {
       return status.take_error();
     }
@@ -123,7 +124,7 @@ class JsonInstance : public FilesystemInstance {
     if (filesystem_.GetTraits().uses_crypt) {
       mount_options.crypt_client = []() { return *GetCryptService(); };
     }
-    zx::result device = component::Connect<fuchsia_hardware_block::Block>(device_.path());
+    zx::result device = component::Connect<fuchsia_hardware_block::Block>(device_path_);
     if (device.is_error()) {
       return device.take_error();
     }
@@ -134,7 +135,14 @@ class JsonInstance : public FilesystemInstance {
     return fs->CheckVolume(kDefaultVolumeName, mount_options.crypt_client());
   }
 
-  RamDevice* GetRamDevice() override { return &device_; }
+  zx::result<std::string> DevicePath() const override { return zx::ok(std::string(device_path_)); }
+
+  storage::RamDisk* GetRamDisk() override { return std::get_if<storage::RamDisk>(&device_); }
+
+  ramdevice_client::RamNand* GetRamNand() override {
+    return std::get_if<ramdevice_client::RamNand>(&device_);
+  }
+
   fs_management::SingleVolumeFilesystemInterface* fs() override { return fs_.get(); }
 
   fidl::UnownedClientEnd<fuchsia_io::Directory> ServiceDirectory() const override {
@@ -156,21 +164,25 @@ class JsonInstance : public FilesystemInstance {
   const JsonFilesystem& filesystem_;
   fs_management::FsComponent component_;
   RamDevice device_;
+  std::string device_path_;
   std::unique_ptr<fs_management::SingleVolumeFilesystemInterface> fs_;
   fs_management::NamespaceBinding binding_;
 };
 
-std::unique_ptr<FilesystemInstance> JsonFilesystem::Create(RamDevice device) const {
-  return std::make_unique<JsonInstance>(this, std::move(device));
+std::unique_ptr<FilesystemInstance> JsonFilesystem::Create(RamDevice device,
+                                                           std::string device_path) const {
+  return std::make_unique<JsonInstance>(this, std::move(device), std::move(device_path));
 }
 
 zx::result<std::unique_ptr<FilesystemInstance>> JsonFilesystem::Open(
     const TestFilesystemOptions& options) const {
-  auto device = OpenRamDevice(options);
-  if (device.is_error()) {
-    return device.take_error();
+  auto result = OpenRamDevice(options);
+  if (result.is_error()) {
+    return result.take_error();
   }
-  return zx::ok(std::make_unique<JsonInstance>(this, *std::move(device)));
+  auto [ram_device, device_path] = std::move(result).value();
+  return zx::ok(
+      std::make_unique<JsonInstance>(this, std::move(ram_device), std::move(device_path)));
 }
 
 }  // namespace fs_test

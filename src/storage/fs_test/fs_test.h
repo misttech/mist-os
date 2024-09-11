@@ -28,39 +28,13 @@
 #include "src/storage/lib/fs_management/cpp/admin.h"
 #include "src/storage/lib/fs_management/cpp/format.h"
 #include "src/storage/lib/fs_management/cpp/mount.h"
-#include "src/storage/testing/fvm.h"
 #include "src/storage/testing/ram_disk.h"
 
 namespace fs_test {
 
 class Filesystem;
 
-// Holds the ram disk or nand and additional required drivers (e.g. FVM).
-class RamDevice {
- public:
-  RamDevice(storage::RamDisk ram_disk, std::string_view path)
-      : device_(std::move(ram_disk)), path_(path) {}
-  RamDevice(ramdevice_client::RamNand ram_nand, std::string_view path)
-      : device_(std::move(ram_nand)), path_(path) {}
-
-  void set_fvm_partition(storage::FvmPartition fvm_partition) {
-    path_ = fvm_partition.path();
-    fvm_partition_ = std::move(fvm_partition);
-  }
-
-  void set_path(std::string_view path) { path_ = path; }
-  const std::string& path() const { return path_; }
-
-  storage::RamDisk* ram_disk() { return std::get_if<storage::RamDisk>(&device_); }
-  ramdevice_client::RamNand* ram_nand() { return std::get_if<ramdevice_client::RamNand>(&device_); }
-
-  std::optional<storage::FvmPartition>& fvm_partition() { return fvm_partition_; }
-
- private:
-  std::variant<storage::RamDisk, ramdevice_client::RamNand> device_;
-  std::string path_;
-  std::optional<storage::FvmPartition> fvm_partition_;
-};
+using RamDevice = std::variant<storage::RamDisk, ramdevice_client::RamNand>;
 
 constexpr const char kDefaultVolumeName[] = "default";
 
@@ -116,7 +90,8 @@ std::vector<TestFilesystemOptions> MapAndFilterAllTestFilesystems(
     const std::function<std::optional<TestFilesystemOptions>(const TestFilesystemOptions&)>&);
 TestFilesystemOptions OptionsWithDescription(std::string_view description);
 
-zx::result<RamDevice> CreateRamDevice(const TestFilesystemOptions& options);
+// Returns device and device path.
+zx::result<std::pair<RamDevice, std::string>> CreateRamDevice(const TestFilesystemOptions& options);
 
 // Returns a handle to a test crypt service.
 zx::result<zx::channel> GetCryptService();
@@ -140,27 +115,11 @@ class [[clang::lto_visibility_public]] FilesystemInstance {
   virtual zx::result<> Unmount(const std::string& mount_path);
   virtual zx::result<> Fsck() = 0;
 
-  // For filesystems that run on top of a block device, this returns an object that holds the ram
-  // disk or nand device plus any additional drivers that might be required (e.g. FVM).
-  virtual RamDevice* GetRamDevice() { return nullptr; }
-
   // Returns path of the device on which the filesystem is created. For filesystem that are not
   // block device based, like memfs, the function returns an error.
-  virtual zx::result<std::string> DevicePath() {
-    if (RamDevice* device = GetRamDevice(); device) {
-      return zx::ok(std::string(device->path()));
-    } else {
-      return zx::error(ZX_ERR_BAD_STATE);
-    }
-  }
-  virtual storage::RamDisk* GetRamDisk() {
-    RamDevice* device = GetRamDevice();
-    return device ? device->ram_disk() : nullptr;
-  }
-  virtual ramdevice_client::RamNand* GetRamNand() {
-    RamDevice* device = GetRamDevice();
-    return device ? device->ram_nand() : nullptr;
-  }
+  virtual zx::result<std::string> DevicePath() const = 0;
+  virtual storage::RamDisk* GetRamDisk() { return nullptr; }
+  virtual ramdevice_client::RamNand* GetRamNand() { return nullptr; }
   virtual fs_management::SingleVolumeFilesystemInterface* fs() = 0;
   virtual fidl::UnownedClientEnd<fuchsia_io::Directory> ServiceDirectory() const {
     return fidl::ClientEnd<fuchsia_io::Directory>();
@@ -219,15 +178,17 @@ class FilesystemImpl : public Filesystem {
 template <typename T>
 class FilesystemImplWithDefaultMake : public FilesystemImpl<T> {
  public:
-  virtual std::unique_ptr<FilesystemInstance> Create(RamDevice device) const = 0;
+  virtual std::unique_ptr<FilesystemInstance> Create(RamDevice device,
+                                                     std::string device_path) const = 0;
 
   zx::result<std::unique_ptr<FilesystemInstance>> Make(
       const TestFilesystemOptions& options) const override {
-    auto device = CreateRamDevice(options);
-    if (device.is_error()) {
-      return device.take_error();
+    auto result = CreateRamDevice(options);
+    if (result.is_error()) {
+      return result.take_error();
     }
-    auto instance = Create(*std::move(device));
+    auto [device, device_path] = std::move(result).value();
+    auto instance = Create(std::move(device), std::move(device_path));
     zx::result<> status = instance->Format(options);
     if (status.is_error()) {
       return status.take_error();
@@ -246,7 +207,7 @@ zx::result<std::pair<std::unique_ptr<fs_management::SingleVolumeFilesystemInterf
 FsMount(const std::string& device_path, const std::string& mount_path,
         fs_management::FsComponent& component, const fs_management::MountOptions& mount_options);
 
-zx::result<RamDevice> OpenRamDevice(const TestFilesystemOptions& options);
+zx::result<std::pair<RamDevice, std::string>> OpenRamDevice(const TestFilesystemOptions& options);
 
 std::string StripTrailingSlash(const std::string& in);
 

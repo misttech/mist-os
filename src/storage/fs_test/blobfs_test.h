@@ -26,7 +26,8 @@ class BlobfsFilesystem : public FilesystemImplWithDefaultMake<BlobfsFilesystem> 
     return traits;
   }
 
-  std::unique_ptr<FilesystemInstance> Create(RamDevice device) const override;
+  std::unique_ptr<FilesystemInstance> Create(RamDevice device,
+                                             std::string device_path) const override;
 
   // Opens an existing blobfs file system.  Currently, this only works with ram nand devices, not
   // ram disks.  The data is provided via the vmo provided within the options.
