@@ -273,9 +273,7 @@ TEST(Task, Clone3_InvalidSize) {
 }
 
 static int CloneVForkFunctionSleepExit(void* param) {
-  struct timespec wait {
-    .tv_sec = 0, .tv_nsec = kCloneVforkSleepUS * 1000
-  };
+  struct timespec wait{.tv_sec = 0, .tv_nsec = kCloneVforkSleepUS * 1000};
   nanosleep(&wait, nullptr);
   // Note: exit() is a stdlib function that exits the whole process which we don't want.
   // _exit just exits the current thread which is what matches clone().
@@ -328,12 +326,10 @@ TEST(Task, BrkReturnsCurrentBreakOnFailure) {
 
     // Try to reserve something beyond the program break, aligned to page size.
     uintptr_t map_addr = (program_break & ~(page_size - 1)) + page_size;
-    void* res = mmap(reinterpret_cast<void*>(map_addr), page_size, PROT_NONE,
-                     MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED_NOREPLACE, -1, 0);
-
-    // It's OK if there's already a mapping: brk should also fail in that case.
-    ASSERT_TRUE(res != MAP_FAILED || errno == EEXIST)
-        << "unexpected mmap error: " << std::strerror(errno);
+    uintptr_t res =
+        reinterpret_cast<uintptr_t>(mmap(reinterpret_cast<void*>(map_addr), page_size, PROT_NONE,
+                                         MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED_NOREPLACE, -1, 0));
+    ASSERT_EQ(res, map_addr);
 
     uintptr_t new_break = brk_syscall(map_addr + page_size);
     // brk should fail.

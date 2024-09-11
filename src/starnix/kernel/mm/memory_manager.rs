@@ -260,6 +260,9 @@ pub enum MappingName {
     /// This mapping is the heap.
     Heap,
 
+    /// This is an address range we keep reserved to be able to grow the heap.
+    ReservedForHeap,
+
     /// This mapping is the vdso.
     Vdso,
 
@@ -1035,14 +1038,23 @@ impl MemoryManagerState {
             return Ok(Some(old_addr));
         }
 
-        if self.mappings.intersection(old_range.end..new_range_in_place.end).next().is_some() {
-            // There is some mapping in the growth range prevening an in-place growth.
-            return Ok(None);
-        }
-
         // There is space to grow in-place. The old range must be one contiguous mapping.
         let (original_range, mapping) =
             self.mappings.get(&old_addr).ok_or_else(|| errno!(EINVAL))?;
+
+        for (_, intersect_mapping) in
+            self.mappings.intersection(old_range.end..new_range_in_place.end)
+        {
+            // There is some mapping in the growth range prevening an in-place growth. Allow
+            // growing over it only in case we're remapping the heap on the range that was reserved
+            // for it.
+            if !(mapping.name == MappingName::Heap
+                && intersect_mapping.name == MappingName::ReservedForHeap)
+            {
+                return Ok(None);
+            }
+        }
+
         if old_range.end > original_range.end {
             return error!(EFAULT);
         }
@@ -2845,18 +2857,22 @@ impl MemoryManager {
                 ));
                 memory.set_zx_name(b"starnix-brk");
 
-                // Map the whole program-break memory object into the Zircon address-space, to
-                // prevent other mappings using the range, unless they do so deliberately.  Pages
-                // in this range are made writable, and added to `mappings`, as the caller grows
-                // the program break.
-                let base = state.map_internal(
+                // Map the whole program-break memory object to prevent other mappings using the
+                // range, unless they do so deliberately. Pages in this range are made writable as
+                // the caller grows the program break.
+                let base = state.map_memory(
+                    self,
                     DesiredAddress::Any,
-                    &memory,
+                    memory.clone(),
                     0u64,
                     PROGRAM_BREAK_LIMIT as usize,
                     MappingFlags::ANONYMOUS,
                     /* populate= */ false,
+                    MappingName::ReservedForHeap,
+                    FileWriteGuardRef(None),
+                    &mut released_mappings,
                 )?;
+                assert!(released_mappings.is_empty());
 
                 let brk = ProgramBreak {
                     base,
@@ -2886,8 +2902,7 @@ impl MemoryManager {
                 // break pages, or other mappings.
                 let delta = old_end - new_end;
 
-                // Overwrite the released range with a placeholder Zircon mapping, without
-                // reflecting the change in `mappings`.
+                // Overwrite the released range with a placeholder mapping.
                 #[cfg(feature = "alternate_anon_allocs")]
                 {
                     if state
@@ -2906,34 +2921,34 @@ impl MemoryManager {
                 {
                     let memory_offset = (new_end - brk.base) as u64;
                     if state
-                        .map_internal(
+                        .map_memory(
+                            self,
                             DesiredAddress::FixedOverwrite(new_end),
-                            &brk.placeholder_memory,
+                            brk.placeholder_memory.clone(),
                             memory_offset,
                             delta,
                             MappingFlags::ANONYMOUS,
                             /* populate= */ false,
+                            MappingName::ReservedForHeap,
+                            FileWriteGuardRef(None),
+                            &mut released_mappings,
                         )
                         .is_err()
                     {
                         return Ok(brk.current);
                     }
                 }
-
-                // Remove `mappings` in the released range, and zero any pages that were mapped
-                // anonymously.
-                if state.update_after_unmap(self, new_end, delta, &mut released_mappings).is_err() {
-                    // Things are in an inconsistent state. Good luck, userspace.
-                    return Ok(brk.current);
-                }
             }
             std::cmp::Ordering::Greater => {
                 let range = old_end..new_end;
                 let delta = new_end - old_end;
 
-                // Check for mappings over the program break region.
-                if state.mappings.intersection(&range).next().is_some() {
-                    return Ok(brk.current);
+                // Check for mappings over the program break region. The space reserved for heap is
+                // ok, we can overwrite it.
+                for (_, mapping) in state.mappings.intersection(&range) {
+                    if mapping.name != MappingName::ReservedForHeap {
+                        return Ok(brk.current);
+                    }
                 }
 
                 // TODO(b/310255065): Call `map_anonymous()` directly once
@@ -3811,6 +3826,10 @@ fn write_map(
             fill_to_name(sink);
             sink.write(b"[heap]");
         }
+        MappingName::ReservedForHeap => {
+            // TODO(https://fxbug.dev/365834029): Don't reserve space for heap growth
+            unreachable!("Pages reserved for heap should not be visible");
+        }
         MappingName::Vdso => {
             fill_to_name(sink);
             sink.write(b"[vdso]");
@@ -3886,6 +3905,10 @@ impl SequenceFileSource for ProcMapsFile {
         let state = task.mm().state.read();
         let mut iter = state.mappings.iter_starting_at(&cursor);
         if let Some((range, map)) = iter.next() {
+            // Pages reserved for heap should not be displayed as mapped.
+            if map.name == MappingName::ReservedForHeap {
+                return Ok(Some(range.end));
+            }
             write_map(&task, sink, range, map)?;
             return Ok(Some(range.end));
         }
@@ -3914,6 +3937,10 @@ impl SequenceFileSource for ProcSmapsFile {
         let state = task.mm().state.read();
         let mut iter = state.mappings.iter_starting_at(&cursor);
         if let Some((range, map)) = iter.next() {
+            // Pages reserved for heap should not be displayed as mapped.
+            if map.name == MappingName::ReservedForHeap {
+                return Ok(Some(range.end));
+            }
             write_map(&task, sink, range, map)?;
 
             let size_kb = (range.end.ptr() - range.start.ptr()) / 1024;
@@ -4014,7 +4041,7 @@ mod tests {
         // Look up the given addr in the mappings table.
         let get_range = |addr: UserAddress| {
             let state = mm.state.read();
-            state.mappings.get(&addr).map(|(range, _)| range.clone())
+            state.mappings.get(&addr).map(|(range, mapping)| (range.clone(), mapping.clone()))
         };
 
         // Initialize the program break.
@@ -4023,34 +4050,36 @@ mod tests {
             .expect("failed to set initial program break");
         assert!(base_addr > UserAddress::default());
 
-        // Page containing the program break address should not be mapped.
-        assert_eq!(get_range(base_addr), None);
+        // Page containing the program break address should be reserved.
+        let (_, mapping) =
+            get_range(base_addr).expect("base_addr should point to a reserved range");
+        assert_eq!(mapping.name, MappingName::ReservedForHeap);
 
         // Growing it by a single byte results in that page becoming mapped.
         let addr0 = mm.set_brk(&current_task, base_addr + 1u64).expect("failed to grow brk");
         assert!(addr0 > base_addr);
-        let range0 = get_range(base_addr).expect("base_addr should be mapped");
+        let (range0, _) = get_range(base_addr).expect("base_addr should be mapped");
         assert_eq!(range0.start, base_addr);
         assert_eq!(range0.end, base_addr + *PAGE_SIZE);
 
         // Grow the program break by another byte, which won't be enough to cause additional pages to be mapped.
         let addr1 = mm.set_brk(&current_task, base_addr + 2u64).expect("failed to grow brk");
         assert_eq!(addr1, base_addr + 2u64);
-        let range1 = get_range(base_addr).expect("base_addr should be mapped");
+        let (range1, _) = get_range(base_addr).expect("base_addr should be mapped");
         assert_eq!(range1.start, range0.start);
         assert_eq!(range1.end, range0.end);
 
         // Grow the program break by a non-trival amount and observe the larger mapping.
         let addr2 = mm.set_brk(&current_task, base_addr + 24893u64).expect("failed to grow brk");
         assert_eq!(addr2, base_addr + 24893u64);
-        let range2 = get_range(base_addr).expect("base_addr should be mapped");
+        let (range2, _) = get_range(base_addr).expect("base_addr should be mapped");
         assert_eq!(range2.start, base_addr);
         assert_eq!(range2.end, addr2.round_up(*PAGE_SIZE).unwrap());
 
         // Shrink the program break and observe the smaller mapping.
         let addr3 = mm.set_brk(&current_task, base_addr + 14832u64).expect("failed to shrink brk");
         assert_eq!(addr3, base_addr + 14832u64);
-        let range3 = get_range(base_addr).expect("base_addr should be mapped");
+        let (range3, _) = get_range(base_addr).expect("base_addr should be mapped");
         assert_eq!(range3.start, base_addr);
         assert_eq!(range3.end, addr3.round_up(*PAGE_SIZE).unwrap());
 
@@ -4058,15 +4087,17 @@ mod tests {
         let addr4 =
             mm.set_brk(&current_task, base_addr + 3u64).expect("failed to drastically shrink brk");
         assert_eq!(addr4, base_addr + 3u64);
-        let range4 = get_range(base_addr).expect("base_addr should be mapped");
+        let (range4, _) = get_range(base_addr).expect("base_addr should be mapped");
         assert_eq!(range4.start, base_addr);
         assert_eq!(range4.end, addr4.round_up(*PAGE_SIZE).unwrap());
 
-        // Shrink the program break to zero and observe that the mapping is entirely gone.
+        // Shrink the program break to zero and observe that the mapping is gone and replaced by a reserved memory.
         let addr5 =
             mm.set_brk(&current_task, base_addr).expect("failed to drastically shrink brk to zero");
         assert_eq!(addr5, base_addr);
-        assert_eq!(get_range(base_addr), None);
+        let (_, mapping) =
+            get_range(base_addr).expect("base_addr should point to a reserved range");
+        assert_eq!(mapping.name, MappingName::ReservedForHeap);
     }
 
     #[::fuchsia::test]

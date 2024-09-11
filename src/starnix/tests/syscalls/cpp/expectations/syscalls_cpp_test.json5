@@ -52,6 +52,9 @@
                 "ProcSelfMemProts.CanWriteToPrivateAnonymousMappings/Read",
                 "ProcSelfMemProts.CanWriteToPrivateAnonymousMappings/ReadExecute",
 
+                // TODO(https://fxbug.dev/365834029):
+                "Task.BrkReturnsCurrentBreakOnFailure",
+
                 // TODO(https://fxbug.dev/355404941)
                 "OverlayFs/FsMountTest.CantBypassDirectoryPermissions/0",
                 "OverlayFs/FsMountTest.ChmodWithDifferentModes/0",
