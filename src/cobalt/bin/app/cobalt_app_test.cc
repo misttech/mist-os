@@ -11,6 +11,7 @@
 #include <lib/sys/cpp/testing/component_context_provider.h>
 
 #include <gmock/gmock.h>
+#include <gtest/gtest.h>
 #include <sdk/lib/sys/cpp/testing/service_directory_provider.h>
 
 #include "src/cobalt/bin/app/diagnostics_impl.h"
