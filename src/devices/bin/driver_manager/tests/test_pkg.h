@@ -75,6 +75,20 @@ class TestDirectory : public fuchsia::io::testing::Directory_TestBase {
 // for the started driver host or driver component.
 class TestPkg {
  public:
+  struct Config {
+    // Where the module is located in the test's package. e.g.
+    // /pkg/bin/driver_host2.
+    std::string_view module_test_pkg_path;
+    // The path that will be requested to the /pkg open
+    // handler for the module. e.g. bin/driver_host2.
+    std::string_view module_open_path;
+    // The names of the libraries that are needed by the module.
+    // This list will be used to construct the test files that the driver host runner
+    // or driver runner expects to be present in the "/pkg/libs" dir that will be passed
+    // to the dynamic linker. No additional validation is done on the strings in |expected_libs|.
+    std::vector<std::string_view> expected_libs;
+  };
+
   // |server| is the channel that will be served by |TestPkg|.
   //
   // |module_test_pkg_path| is where the module is located in the test's package. e.g.
@@ -89,6 +103,10 @@ class TestPkg {
   // to the dynamic linker. No additional validation is done on the strings in |expected_libs|.
   TestPkg(fidl::ServerEnd<fuchsia_io::Directory> server, std::string_view module_test_pkg_path,
           std::string_view module_open_path, const std::vector<std::string_view> expected_libs);
+
+  TestPkg(fidl::ServerEnd<fuchsia_io::Directory> server, Config config)
+      : TestPkg(std::move(server), config.module_test_pkg_path, config.module_open_path,
+                config.expected_libs) {}
 
   ~TestPkg() {
     loop_.Quit();
