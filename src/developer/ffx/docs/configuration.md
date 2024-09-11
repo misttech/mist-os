@@ -87,6 +87,9 @@ When updating, please add the value in alphabetical order.
 :                                         : over TCP                           :
 | `fastboot.usb.disabled`                 | Disables fastboot usb discovery if |
 :                                         : set to true. Defaults to `false`   :
+| `ffx.daemon_timeout`                    | How long to wait in milliseconds   |
+:                                         : when attempting to connect to the  |
+:                                         : daemon. Defaults to `15000`        :
 | `ffx.fastboot.inline_target`            | Boolean value to signal that the   |
 :                                         : target is in fastboot, and to      :
 :                                         : communicate directly with it as    :

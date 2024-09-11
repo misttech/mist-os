@@ -1,6 +1,7 @@
 {
     "ffx": {
-        "subtool-search-paths": "$BUILD_DIR/host-tools"
+        "subtool-search-paths": "$BUILD_DIR/host-tools",
+        "daemon_timeout": 15000
     },
     "log": {
         "dir": [

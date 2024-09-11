@@ -29,6 +29,8 @@ pub use constants::DAEMON_LOG_FILENAME;
 
 pub use socket::SocketDetails;
 
+const CONFIG_DAEMON_CONNECT_TIMEOUT_MS: &str = "ffx.daemon_timeout";
+
 #[tracing::instrument]
 async fn create_daemon_proxy(
     node: &Arc<overnet_core::Router>,
@@ -152,7 +154,10 @@ pub async fn get_daemon_proxy_single_link(
     let mut link = Box::pin(link);
     let find = find_next_daemon(node, exclusions).fuse();
     let mut find = Box::pin(find);
-    let mut timeout = Timer::new(Duration::from_secs(5)).fuse();
+    let timeout_ms = ffx_config::get(CONFIG_DAEMON_CONNECT_TIMEOUT_MS)
+        .await
+        .map_err(|_| ffx_error!("Could not get {} config", CONFIG_DAEMON_CONNECT_TIMEOUT_MS))?;
+    let mut timeout = Timer::new(Duration::from_millis(timeout_ms)).fuse();
 
     tracing::debug!("Starting race to get daemon proxy");
     let res = futures::select! {

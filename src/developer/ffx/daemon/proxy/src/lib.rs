@@ -685,7 +685,7 @@ mod test {
     }
 
     #[fuchsia::test]
-    async fn test_init_daemon_blocked_for_6s_timesout() {
+    async fn test_init_daemon_blocked_for_long_timesout() {
         let test_env = ffx_config::test_init().await.expect("Failed to initialize test env");
         let sockpath = test_env.context.get_ascendd_path().await.expect("No ascendd path");
         let local_node = overnet_core::Router::new(None).unwrap();
@@ -694,7 +694,7 @@ mod test {
         let sockpath1 = sockpath.to_owned();
         let local_node1 = Arc::clone(&local_node);
         let _daemon_task =
-            test_daemon(local_node1, sockpath1.to_owned(), "testcurrenthash", 6).await;
+            test_daemon(local_node1, sockpath1.to_owned(), "testcurrenthash", 16).await;
 
         let err = init_daemon_proxy(
             DaemonStart::AutoStart,
