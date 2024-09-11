@@ -1,9 +1,9 @@
 // Copyright 2022 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+
 use crate::capability::CapabilityProvider;
 use crate::model::component::WeakComponentInstance;
-use crate::model::routing::router_ext::WeakInstanceTokenExt;
 use ::routing::component_instance::ComponentInstanceInterface;
 use ::routing::DictExt;
 use async_trait::async_trait;
@@ -17,7 +17,7 @@ use router_error::RouterError;
 use routing::availability::AvailabilityMetadata;
 use routing::bedrock::request_metadata::METADATA_KEY_TYPE;
 use routing::error::{ComponentInstanceError, RoutingError};
-use sandbox::{Dict, RemotableCapability, Request, WeakInstanceToken};
+use sandbox::{Dict, RemotableCapability, Request};
 use std::collections::HashMap;
 use std::sync::Arc;
 use vfs::directory::entry::OpenRequest;
@@ -80,11 +80,7 @@ impl CapabilityProvider for DefaultComponentCapabilityProvider {
                 &self.name,
                 // Routers in `program_output_dict` do not check availability but we need a
                 // request to run hooks.
-                Request {
-                    target: WeakInstanceToken::new_component(self.target.clone()),
-                    debug: false,
-                    metadata,
-                },
+                Request { target: self.target.clone().into(), debug: false, metadata },
             )
             .await?
             .ok_or_else(|| RoutingError::BedrockNotPresentInDictionary {

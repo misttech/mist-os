@@ -2,13 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use super::router_ext::WeakInstanceTokenExt;
 use crate::model::component::WeakComponentInstance;
 use ::routing::bedrock::request_metadata::protocol_metadata;
 use ::routing::bedrock::sandbox_construction::ComponentSandbox;
 use ::routing::DictExt;
 use cm_rust::{ExposeDecl, ExposeProtocolDecl, UseDecl, UseProtocolDecl};
-use sandbox::{Capability, Dict, Request, Router, WeakInstanceToken};
+use sandbox::{Capability, Dict, Request, Router};
 
 /// A request to route a capability through the bedrock layer from use.
 #[derive(Clone, Debug)]
@@ -37,7 +36,7 @@ impl UseRouteRequest {
         match self {
             Self::UseProtocol(decl) => {
                 let request = Request {
-                    target: WeakInstanceToken::new_component(target.clone()),
+                    target: target.clone().into(),
                     debug,
                     metadata: protocol_metadata(decl.availability),
                 };
@@ -108,7 +107,7 @@ impl RouteRequest {
             Self::Use(r) => r.into_router(target, &sandbox.program_input.namespace, debug),
             Self::ExposeProtocol(decl) => {
                 let request = Request {
-                    target: WeakInstanceToken::new_component(target.clone()),
+                    target: target.clone().into(),
                     debug,
                     metadata: protocol_metadata(decl.availability),
                 };

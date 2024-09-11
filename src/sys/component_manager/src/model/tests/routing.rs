@@ -17,8 +17,8 @@ use {
         actions::{
             ActionsManager, DestroyAction, ShutdownAction, ShutdownType, StartAction, StopAction,
         },
-        component::{IncomingCapabilities, StartReason},
-        routing::{router_ext::WeakInstanceTokenExt, Route, RoutingError},
+        component::{ComponentInstance, IncomingCapabilities, StartReason},
+        routing::{Route, RoutingError},
         testing::{
             echo_service::EchoProtocol, mocks::ControllerActionResponse, out_dir::OutDir,
             routing_test_helpers::*, test_helpers::*,
@@ -32,7 +32,7 @@ use {
         },
         error::ComponentInstanceError,
         resolving::ResolverError,
-        DictExt,
+        DictExt, WeakInstanceTokenExt,
     },
     assert_matches::assert_matches,
     async_trait::async_trait,
@@ -3271,7 +3271,7 @@ async fn source_component_stopping_when_routing() {
             .get_capability(&RelativePath::new("foo").unwrap())
             .unwrap()
             .route(sandbox::Request {
-                target: WeakInstanceToken::new_component(root.as_weak()),
+                target: root.as_weak().into(),
                 debug: false,
                 metadata: protocol_metadata(Availability::Required),
             })
@@ -3336,7 +3336,7 @@ async fn source_component_stopped_after_routing_before_open() {
         .get_capability(&RelativePath::new("foo").unwrap())
         .unwrap()
         .route(sandbox::Request {
-            target: WeakInstanceToken::new_component(root.as_weak()),
+            target: root.as_weak().into(),
             debug: false,
             metadata: protocol_metadata(Availability::Required),
         })
@@ -3406,7 +3406,7 @@ async fn source_component_shutdown_after_routing_before_open() {
         .get_capability(&RelativePath::new("foo").unwrap())
         .unwrap()
         .route(sandbox::Request {
-            target: WeakInstanceToken::new_component(root.as_weak()),
+            target: root.as_weak().into(),
             debug: false,
             metadata: protocol_metadata(Availability::Required),
         })
@@ -3463,7 +3463,11 @@ impl Hook for BlockingResolvedHook {
         match &event.payload {
             EventPayload::Resolved { component, .. } => {
                 let expected_moniker = self.receiver.lock().await.next().await.unwrap();
-                let ExtendedMoniker::ComponentInstance(moniker) = component.moniker() else {
+                let ExtendedMoniker::ComponentInstance(moniker) =
+                    <WeakInstanceToken as WeakInstanceTokenExt<ComponentInstance>>::moniker(
+                        component,
+                    )
+                else {
                     panic!("did not expect component_manager");
                 };
                 assert_eq!(moniker, expected_moniker);

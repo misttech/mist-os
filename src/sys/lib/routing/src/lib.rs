@@ -54,6 +54,7 @@ use {fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_io as fio, fuchsia_zirco
 
 pub use bedrock::dict_ext::DictExt;
 pub use bedrock::lazy_get::LazyGet;
+pub use bedrock::weak_instance_token_ext::{test_invalid_instance_token, WeakInstanceTokenExt};
 pub use bedrock::with_availability::WithAvailability;
 
 #[cfg(feature = "serde")]

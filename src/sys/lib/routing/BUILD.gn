@@ -70,6 +70,7 @@ rustc_library("routing") {
     "src/bedrock/request_metadata.rs",
     "src/bedrock/sandbox_construction.rs",
     "src/bedrock/structured_dict.rs",
+    "src/bedrock/weak_instance_token_ext.rs",
     "src/bedrock/with_availability.rs",
     "src/bedrock/with_policy_check.rs",
     "src/bedrock/with_porcelain_type.rs",

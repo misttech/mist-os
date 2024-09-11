@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::model::component::{ExtendedInstance, WeakComponentInstance, WeakExtendedInstance};
-use ::routing::error::ComponentInstanceError;
 use cm_rust::CapabilityTypeName;
 use cm_types::Name;
 use futures::future::BoxFuture;
@@ -210,59 +208,5 @@ impl RouterExt for Router {
         }
 
         Arc::new(RouterEntry { router: self.clone(), request, entry_type, scope, errors_fn })
-    }
-}
-
-/// A trait to add functions WeakComponentInstancethat know about the component
-/// manager types.
-pub trait WeakInstanceTokenExt {
-    /// Create a new token for a component instance or component_manager.
-    fn new(instance: WeakExtendedInstance) -> WeakInstanceToken;
-
-    /// Create a new token for a component instance.
-    fn new_component(instance: WeakComponentInstance) -> WeakInstanceToken {
-        WeakInstanceToken::new(WeakExtendedInstance::Component(instance))
-    }
-
-    /// Upgrade this token to the underlying instance.
-    fn to_instance(self) -> WeakExtendedInstance;
-
-    /// Get a reference to the underlying instance.
-    fn as_ref(&self) -> &WeakExtendedInstance;
-
-    /// Get a strong reference to the underlying instance.
-    fn upgrade(&self) -> Result<ExtendedInstance, ComponentInstanceError>;
-
-    /// Get the moniker for this component.
-    fn moniker(&self) -> moniker::ExtendedMoniker;
-
-    #[cfg(test)]
-    fn invalid() -> WeakInstanceToken {
-        WeakInstanceToken::new_component(WeakComponentInstance::invalid())
-    }
-}
-
-impl WeakInstanceTokenExt for WeakInstanceToken {
-    fn new(instance: WeakExtendedInstance) -> Self {
-        Self { inner: Arc::new(instance) }
-    }
-
-    fn to_instance(self) -> WeakExtendedInstance {
-        self.as_ref().clone()
-    }
-
-    fn as_ref(&self) -> &WeakExtendedInstance {
-        match self.inner.as_any().downcast_ref::<WeakExtendedInstance>() {
-            Some(instance) => &instance,
-            None => panic!(),
-        }
-    }
-
-    fn upgrade(&self) -> Result<ExtendedInstance, ComponentInstanceError> {
-        self.as_ref().upgrade()
-    }
-
-    fn moniker(&self) -> moniker::ExtendedMoniker {
-        self.as_ref().extended_moniker()
     }
 }
