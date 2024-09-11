@@ -25,8 +25,7 @@ executable("amlogic_decoder_integration_tests_bin") {
   sources = [ "test_runner.cc" ]
 
   public_deps = [
-    "//sdk/fidl/fuchsia.device:fuchsia.device_cpp",
-    "//sdk/fidl/fuchsia.hardware.mediacodec:fuchsia.hardware.mediacodec_cpp",
+    "//sdk/fidl/fuchsia.driver.development:fuchsia.driver.development_cpp",
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/fdio",
     "//zircon/system/ulib/fbl",

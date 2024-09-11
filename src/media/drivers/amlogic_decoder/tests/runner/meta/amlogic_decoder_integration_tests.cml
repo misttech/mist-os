@@ -12,19 +12,10 @@
     },
     use: [
         {
-            protocol: [ "fuchsia.tracing.provider.Registry" ],
-        },
-        {
-            // We need /dev/class/media-codec to discover the device under test;
-            // we can't use dev-class here because test also uses the
-            // topological path to open the device's parent.
-            directory: "dev-topological",
-            rights: [ "r*" ],
-            path: "/dev",
-        },
-        {
-            storage: "tmp",
-            path: "/tmp",
+            protocol: [
+                "fuchsia.driver.development.Manager",
+                "fuchsia.tracing.provider.Registry",
+            ],
         },
     ],
 }
