@@ -77,9 +77,6 @@
                 "AllTCPSockets/AllSocketPairTest.RecvmmsgInvalidTimeout/*",
 
                 // Fuchsia does not implement recvmsg correctly for TCP.
-                "AllTCPSockets/AllSocketPairTest.SendmsgRecvmsg10KB/*",
-                "AllTCPSockets/AllSocketPairTest.SendmsgRecvmsg16KB/*",
-                "AllTCPSockets/AllSocketPairTest.SendmsgRecvmsgMsgCtruncNoop/*",
                 "AllTCPSockets/AllSocketPairTest.RecvmsgMsghdrFlagsCleared/*",
                 "AllTCPSockets/AllSocketPairTest.RecvmsgPeekMsghdrFlagsCleared/*",
 
@@ -99,9 +96,6 @@
 
                 // https://fxbug.dev/42094401
                 "AllInetTests/TcpSocketTest.MsgTruncWithCtrunc/*",
-
-                // https://fxbug.dev/42094401
-                "AllInetTests/TcpSocketTest.MsgTruncWithCtruncOnly/*",
 
                 // https://fxbug.dev/42094401
                 "AllInetTests/TcpSocketTest.MsgTruncLargeSize/*",

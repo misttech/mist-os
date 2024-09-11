@@ -45,6 +45,11 @@ zx_status_t zxio_recvmsg_inner(zxio_t* io, struct msghdr* msg, int flags, size_t
     zxio_flags |= ZXIO_PEEK;
     flags &= ~MSG_PEEK;
   }
+  // Fuchsia has neither exec nor signals.
+  flags &= ~(MSG_CMSG_CLOEXEC | MSG_NOSIGNAL);
+  // TODO(https://fxbug.dev/42146893): support MSG_TRUNC and MSG_CTRUNC used by
+  // android. For now just ignore the flags.
+  flags &= ~(MSG_TRUNC | MSG_CTRUNC);
   if (flags) {
     // TODO(https://fxbug.dev/42146893): support MSG_OOB
     return ZX_ERR_NOT_SUPPORTED;
@@ -53,6 +58,9 @@ zx_status_t zxio_recvmsg_inner(zxio_t* io, struct msghdr* msg, int flags, size_t
   if (msg->msg_iovlen > IOV_MAX) {
     return ZX_ERR_INVALID_ARGS;
   }
+
+  // This never have ancillary data.
+  msg->msg_controllen = 0;
 
   // Variable length arrays have to have nonzero sizes, so we can't allocate a zx_iov for an empty
   // io vector. Instead, we can allocate 1 entry when msg_iovlen is 0.  This way zx_iov can still be

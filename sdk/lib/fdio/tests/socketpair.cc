@@ -536,6 +536,28 @@ TEST_P(SocketPair, SelfWriteBeforeSend) {
   t.join();
 }
 
+TEST_P(SocketPair, RecvMsgFlags) {
+  static const size_t page_size = sysconf(_SC_PAGE_SIZE);
+  char buffer[page_size];
+  write(fds()[1].get(), buffer, 1);
+
+  char data[page_size];
+  iovec iov = {.iov_base = buffer, .iov_len = page_size};
+  msghdr msg = {
+      .msg_name = nullptr,
+      .msg_namelen = 0,
+      .msg_iov = &iov,
+      .msg_iovlen = 1,
+      .msg_control = data,
+      .msg_controllen = static_cast<unsigned int>(page_size),
+      .msg_flags = 0,
+  };
+  int flags = MSG_TRUNC | MSG_CTRUNC | MSG_CMSG_CLOEXEC | MSG_NOSIGNAL;
+
+  ASSERT_EQ(recvmsg(fds()[0].get(), &msg, flags), 1);
+  ASSERT_EQ(CMSG_FIRSTHDR(&msg), nullptr);
+}
+
 TEST_P(SocketPair, PeerReadDuringSend) {
   // First, fill up the socket so the next send() will block.
   std::array<char, 256> buf;
