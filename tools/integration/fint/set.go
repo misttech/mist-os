@@ -464,17 +464,27 @@ func genArgs(
 	// of the entries (to match user expectations and to allow tests to properly validate which
 	// override target is used by each assembly target).
 	var assemblyTargetOrder = []string{}
+	var mainTargetOverridesLabel = ""
 	for _, overrideString := range assemblyOverridesStrings {
 		pair := strings.Split(overrideString, "=")
-		if len(pair) != 2 {
-			return nil, fmt.Errorf("assembly overrides must be in ASSEMBLY_TARGET=OVERRIDE_TARGET pairs")
+		if len(pair) == 1 {
+			if mainTargetOverridesLabel != "" {
+				return nil, fmt.Errorf("Only one overrides target can be set for the main assembly.  Found '%s' and '%s'.", mainTargetOverridesLabel, overrideString)
+			}
+			mainTargetOverridesLabel = overrideString
+		} else if len(pair) != 2 {
+			return nil, fmt.Errorf("assembly overrides must be a single OVERRIDE_TARGET label or in ASSEMBLY_TARGET=OVERRIDE_TARGET pairs")
+		} else {
+			_, duplicate := assemblyOverrides[pair[0]]
+			if duplicate {
+				return nil, fmt.Errorf("Only one override target can be provided for each assembly target: %s", pair[0])
+			}
+			assemblyOverrides[pair[0]] = pair[1]
+			assemblyTargetOrder = append(assemblyTargetOrder, pair[0])
 		}
-		_, duplicate := assemblyOverrides[pair[0]]
-		if duplicate {
-			return nil, fmt.Errorf("Only one override target can be provided for each assembly target: %s", pair[0])
-		}
-		assemblyOverrides[pair[0]] = pair[1]
-		assemblyTargetOrder = append(assemblyTargetOrder, pair[0])
+	}
+	if mainTargetOverridesLabel != "" {
+		overridesArgs = append(overridesArgs, fmt.Sprintf("\n\nproduct_assembly_overrides_label = %s", toGNValue(mainTargetOverridesLabel)))
 	}
 	overridesArgs = append(overridesArgs, "\n\nproduct_assembly_overrides = [")
 	for _, assembly_target := range assemblyTargetOrder {

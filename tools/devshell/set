@@ -135,14 +135,16 @@
 ##                         to define the developer assembly overrides targets to
 ##                         use with the given assembly target.  Can be provided
 ##                         multiple times with different ASSEMBLY_TARGET labels.
+##                         if the 'ASSEMBLY_TARGET=' portion is omitted, the
+##                         "main" assembly for the product will be assumed.
 ##
 ## Example:
 ##
-##   $ fx set core.x64 --with //bundles/tests
+##   $ fx set core.x64 --with-test //bundles/tests
 ##   -> build directory: out/default
 ##      board: //boards/x64.gni
 ##      product: //products/core.gni
-##      universe: //bundles/tests (all test packages)
+##      developer_test_labels: //bundles/tests (all test packages)
 
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"/lib/vars.sh || exit $?
 

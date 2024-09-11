@@ -628,6 +628,22 @@ func TestGenArgs(t *testing.T) {
 				`]`,
 			},
 		},
+		{
+			name:               "developer overrides with main assembly override",
+			orderMatters:       true,
+			allowDuplicateArgs: true,
+			assemblyOverridesStrings: []string{
+				"//local:test_args",
+				"//build/images/bringup/*=//local:bringup_args",
+			},
+			expectedArgs: []string{
+				"\n\nproduct_assembly_overrides_label = \"//local:test_args\"",
+				"\n\nproduct_assembly_overrides = [",
+				`assembly = "//build/images/bringup/*"`,
+				`overrides = "//local:bringup_args"`,
+				`]`,
+			},
+		},
 	}
 
 	for _, tc := range testCases {
