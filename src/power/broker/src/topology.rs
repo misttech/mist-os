@@ -121,6 +121,7 @@ pub struct Element {
     id: ElementID,
     name: String,
     valid_levels: Vec<IndexedPowerLevel>,
+    #[allow(dead_code)]
     synthetic: bool,
     inspect_vertex: Rc<RefCell<IGraphVertex<ElementID>>>,
     inspect_edges: Rc<RefCell<HashMap<ElementID, IGraphEdge>>>,
@@ -315,6 +316,7 @@ impl Topology {
         self.elements.contains_key(element_id)
     }
 
+    #[allow(dead_code)]
     pub fn element_is_synthetic(&self, element_id: &ElementID) -> bool {
         self.elements.get(element_id).and_then(|x| Some(x.synthetic)).unwrap_or(false)
     }
