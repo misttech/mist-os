@@ -78,7 +78,6 @@ template("_cuckoo_product_bundle") {
         ]
     cmdline_deps = [ "//build/testing:userboot.next-component-manager" ]
     board_config_label = board_configuration_label
-    allow_eng_platform_bundle_use = true
 
     if (fxfs_blob) {
       product_assembly_config_label =

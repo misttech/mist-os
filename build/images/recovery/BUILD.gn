@@ -97,6 +97,7 @@ if (is_fuchsia) {
   }
 
   assembled_system("recovery-fdr") {
+    testonly = true
     image_name = "fuchsia"
     namespace = "recovery-fdr"
 

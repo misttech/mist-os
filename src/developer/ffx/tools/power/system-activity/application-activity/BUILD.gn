@@ -77,8 +77,6 @@ if (is_fuchsia && has_board) {
     testonly = true
     image_name = "fuchsia"
 
-    allow_eng_platform_bundle_use = true
-
     generate_fxfs = true
     generate_vbmeta = true
     board_config_label = board_configuration_label

@@ -79,10 +79,6 @@ if (is_fuchsia) {
     testonly = fuchsia_zbi_testonly
     check_production_tag = check_production_eligibility
 
-    # In non-prod builds, allow use of the eng and userdebug platform bundles.
-    allow_eng_platform_bundle_use = !check_production_eligibility
-    allow_userdebug_platform_bundle_use = !check_production_eligibility
-
     generate_fvm = !fxfs_blob
     generate_fxfs = fxfs_blob
     generate_fvm_fastboot = !fxfs_blob && assembly_generate_fvm_fastboot

@@ -63,12 +63,12 @@ import("//src/developer/ffx/build/ffx_action.gni")
 #     `product_assembly_configuration` target. This is required if
 #      legacy_bundle_only=false.
 #
-#   allow_userdebug_platform_bundle_use (optional; default=false)
-#     [boolean] If true, allow the 'userdebug' platform bundles to be used by
-#     the assembled system.  (this is only a check made by GN, assembly itself
-#     may still access them)
+#   use_bringup_platform_bundles_only (optional; default=false)
+#     [boolean] If true, only the 'bootstrap' and 'embeddable' are set as
+#     dependencies and inputs for the assembly, to reduce the amount of
+#     the platform that's built on bringup builds.
 #
-#   allow_eng_platform_bundle_use (optional; default=false)
+#   allow_eng_platform_bundle_use (optional; default=true)
 #     [boolean] If true, allow the 'eng' platform bundles to be used by the
 #     assembled system.  (this is only a check made by GN, assembly itself may
 #     still access them)
@@ -440,6 +440,13 @@ template("assembled_system") {
     labels = {
     }
 
+    _use_bringup_aibs_only = false
+    if (defined(invoker.use_bringup_platform_bundles_only)) {
+      if (invoker.use_bringup_platform_bundles_only) {
+        _use_bringup_aibs_only = true
+      }
+    }
+
     labels = {
       forward_variables_from(_outer_labels, "*")
 
@@ -462,20 +469,12 @@ template("assembled_system") {
       compare_images_manifests = "${_namespace}.compare_images_manifests"
 
       # *_platform_aib_labels come from //bundles/assembly/platform_aibs.gni
-      if (defined(invoker.use_bringup_platform_bundles_only) &&
-          invoker.use_bringup_platform_bundles_only) {
+
+      if (_use_bringup_aibs_only) {
+        # Use only the bringup bundles when that's explicitly set.
         platform_common_aibs = bringup_platform_aib_labels
-      } else if (defined(invoker.allow_eng_platform_bundle_use) &&
-                 invoker.allow_eng_platform_bundle_use) {
-        platform_common_aibs = eng_platform_aib_labels
-        not_needed(invoker, [ "allow_userdebug_platform_bundle_use" ])
       } else {
-        if (defined(invoker.allow_userdebug_platform_bundle_use) &&
-            invoker.allow_userdebug_platform_bundle_use) {
-          platform_common_aibs = userdebug_platform_aib_labels
-        } else {
-          platform_common_aibs = user_platform_aib_labels
-        }
+        platform_common_aibs = eng_platform_aib_labels
       }
 
       validation_legacy_aib =
@@ -590,19 +589,11 @@ template("assembled_system") {
       #
       # This isn't strictly required, but it allows the AIB input files to be
       # specified in GN.
-      if (defined(invoker.use_bringup_platform_bundles_only) &&
-          invoker.use_bringup_platform_bundles_only) {
+      if (_use_bringup_aibs_only) {
+        # Use only the bringup bundles when that's explicitly set.
         platform_common_aibs = bringup_platform_aib_files
-      } else if (defined(invoker.allow_eng_platform_bundle_use) &&
-                 invoker.allow_eng_platform_bundle_use) {
-        platform_common_aibs = eng_platform_aib_files
       } else {
-        if (defined(invoker.allow_userdebug_platform_bundle_use) &&
-            invoker.allow_userdebug_platform_bundle_use) {
-          platform_common_aibs = userdebug_platform_aib_files
-        } else {
-          platform_common_aibs = user_platform_aib_files
-        }
+        platform_common_aibs = eng_platform_aib_files
       }
 
       if (defined(labels.custom_kernel_aib)) {

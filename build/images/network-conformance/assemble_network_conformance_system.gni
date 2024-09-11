@@ -114,7 +114,6 @@ template("assemble_network_conformance_system") {
     ramdisk_in_zbi = true
 
     board_config_label = ":${labels.board_config}"
-    allow_eng_platform_bundle_use = true
 
     cmdline = [ "kernel.halt-on-panic=true" ]
   }
