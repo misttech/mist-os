@@ -118,9 +118,6 @@ class UsbAdbTest : public zxtest::Test {
   static constexpr uint32_t kVmoDataSize = 10;
 
   std::unique_ptr<FakeAdbDaemon> CreateFakeAdbDaemon() {
-    mock_usb_.ExpectSetInterface(ZX_OK, {});
-    mock_usb_.ExpectSetInterface(ZX_OK, {});
-
     auto endpoints = fidl::CreateEndpoints<fadb::UsbAdbImpl>();
     EXPECT_TRUE(endpoints.is_ok());
 
@@ -144,7 +141,6 @@ class UsbAdbTest : public zxtest::Test {
 
   void ReleaseFakeAdbDaemon(std::unique_ptr<FakeAdbDaemon>& fake_adb) {
     // Calls during Stop().
-    mock_usb_.ExpectSetInterface(ZX_OK, {});
     mock_usb_.ExpectDisableEp(ZX_OK, kBulkOutEp);
     mock_usb_.ExpectDisableEp(ZX_OK, kBulkInEp);
 

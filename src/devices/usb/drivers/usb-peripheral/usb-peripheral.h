@@ -82,17 +82,15 @@ using UsbPeripheralType =
                 ddk::Messageable<fuchsia_hardware_usb_peripheral::Device>::Mixin>;
 
 struct UsbConfiguration : fbl::RefCounted<UsbConfiguration> {
-  explicit UsbConfiguration(uint8_t index) : index(index) {}
-
   static constexpr uint8_t MAX_INTERFACES = 32;
   // Functions associated with this configuration
   fbl::Vector<fbl::RefPtr<UsbFunction>> functions;
   // USB configuration descriptor, synthesized from our functions' descriptors.
-  std::vector<uint8_t> config_desc;
+  fbl::Array<uint8_t> config_desc;
 
   // Map from interface number to function.
   fbl::RefPtr<UsbFunction> interface_map[MAX_INTERFACES];
-  const uint8_t index;
+  uint8_t index;
 };
 
 // This is the main class for the USB peripheral role driver.
@@ -138,17 +136,20 @@ class UsbPeripheral : public UsbPeripheralType,
                                uint8_t* out_num_interfaces);
   zx_status_t FunctionRegistered();
   void FunctionCleared();
-  zx_status_t SetInterfaceOnParent(bool reset = false) __TA_REQUIRES(lock_);
+  zx_status_t SetInterfaceOnParent() __TA_REQUIRES(lock_);
 
   inline const ddk::UsbDciProtocolClient& dci() const { return dci_; }
   inline const fidl::WireSyncClient<fuchsia_hardware_usb_dci::UsbDci>& dci_new() const {
     return dci_new_;
   }
-  inline bool dci_new_valid() const { return dci_new_valid_; }
+  inline bool dci_new_valid() const {
+    return dci_new_valid_;
+  }
 
   inline size_t ParentRequestSize() const { return parent_request_size_; }
   void UsbPeripheralRequestQueue(usb_request_t* usb_request,
                                  const usb_request_complete_callback_t* complete_cb);
+
 
   zx_status_t ConnectToEndpoint(uint8_t ep_address,
                                 fidl::ServerEnd<fuchsia_hardware_usb_endpoint::Endpoint> ep) {
@@ -160,9 +161,6 @@ class UsbPeripheral : public UsbPeripheralType,
     }
     return ZX_OK;
   }
-
-  const usb_device_descriptor_t& device_desc() { return device_desc_; }
-  zx_status_t DeviceStateChanged();
 
  private:
   // Considered part of the private impl.
@@ -196,15 +194,16 @@ class UsbPeripheral : public UsbPeripheralType,
   }
 
   zx_status_t Init();
-  zx::result<fbl::RefPtr<UsbFunction>> AddFunction(UsbConfiguration& config,
-                                                   FunctionDescriptor desc);
+  zx_status_t AddFunction(UsbConfiguration& config, FunctionDescriptor desc);
+  zx_status_t BindFunctions();
   // Begins the process of clearing the functions.
   void ClearFunctions();
   // Updates the internal state after all functions have finished being removed.
   void ClearFunctionsComplete() __TA_REQUIRES(lock_);
   std::string GetSerialNumber();
-  zx_status_t DeviceStateChangedLocked() __TA_REQUIRES(lock_);
+  zx_status_t DeviceStateChanged() __TA_REQUIRES(lock_);
   zx_status_t AddFunctionDevices() __TA_REQUIRES(lock_);
+  void RemoveFunctionDevices() __TA_REQUIRES(lock_);
   zx_status_t GetDescriptor(uint8_t request_type, uint16_t value, uint16_t index, void* buffer,
                             size_t length, size_t* out_actual);
   zx_status_t SetConfiguration(uint8_t configuration);
@@ -212,8 +211,6 @@ class UsbPeripheral : public UsbPeripheralType,
   zx_status_t SetDefaultConfig(std::vector<FunctionDescriptor>& functions);
   int ListenerCleanupThread();
   void RequestComplete(usb_request_t* req);
-
-  bool AllFunctionsRegistered();
 
   // Our parent's DCI protocol.
   const ddk::UsbDciProtocolClient dci_;
@@ -230,12 +227,14 @@ class UsbPeripheral : public UsbPeripheralType,
   // mutex for protecting our state
   fbl::Mutex lock_;
   // Current USB mode set via ioctl_usb_peripheral_set_mode()
-  usb_mode_t cur_usb_mode_ __TA_GUARDED(lock_) = USB_MODE_NONE;
-  // Our parent's USB mode. Should not change after being set.
-  usb_mode_t parent_usb_mode_ __TA_GUARDED(lock_) = USB_MODE_NONE;
-  // |lock_functions_|: true if all functions have been added to configurations_ and should not be
-  // changed any more.
-  bool lock_functions_ __TA_GUARDED(lock_) = false;
+  usb_mode_t usb_mode_ __TA_GUARDED(lock_) = USB_MODE_NONE;
+  // Our parent's USB mode.
+  usb_mode_t dci_usb_mode_ __TA_GUARDED(lock_) = USB_MODE_NONE;
+  // Set if ioctl_usb_peripheral_bind_functions() has been called
+  // and we have a complete list of our function.
+  bool functions_bound_ __TA_GUARDED(lock_) = false;
+  // True if all our functions have registered their usb_function_interface_protocol_t.
+  bool functions_registered_ __TA_GUARDED(lock_) = false;
   // True if we have added child devices for our functions.
   bool function_devs_added_ __TA_GUARDED(lock_) = false;
   // True if fuchsia_hardware_usb_dci::SetInterface performed in Init().
@@ -271,6 +270,7 @@ class UsbPeripheral : public UsbPeripheralType,
   usb_peripheral_config::Config config_;
 
   UsbDciInterfaceServer intf_srv_{this};
+  fidl::WireSyncClient<fuchsia_hardware_usb_dci::UsbDciInterface> intf_srv_cli_;
 };
 
 }  // namespace usb_peripheral

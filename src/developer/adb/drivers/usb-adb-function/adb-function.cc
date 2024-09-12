@@ -55,22 +55,10 @@ void UsbAdbDevice::Start(StartRequestView request, StartCompleter::Sync& complet
                                 info.FormatDescription().c_str());
                          Stop();
                        });
-  // Reset interface and configure endpoints as adb binding is set now.
-  zx_status_t status = function_.SetInterface(nullptr, nullptr);
+  // Configure endpoints as adb binding is set now.
+  auto status = ConfigureEndpoints(Online());
   if (status != ZX_OK) {
-    zxlogf(ERROR, "SetInterface failed %s", zx_status_get_string(status));
-    CompleteTxn(completer, status);
-    return;
-  }
-  status = function_.SetInterface(this, &usb_function_interface_protocol_ops_);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "SetInterface failed %s", zx_status_get_string(status));
-    CompleteTxn(completer, status);
-    return;
-  }
-  status = ConfigureEndpoints(Online());
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "ConfigureEndpoints failed %s", zx_status_get_string(status));
+    zxlogf(ERROR, "ConfigureEndpoints failed %d", status);
   }
   CompleteTxn(completer, status);
 }
@@ -81,12 +69,9 @@ void UsbAdbDevice::Stop(StopCompleter::Sync& completer) {
 }
 
 void UsbAdbDevice::Stop() {
-  // Disable endpoints and reset binding to prevent new requests present in our
-  // pipeline from getting queued.
-  zx_status_t status = ConfigureEndpoints(false);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "ConfigureEndpoints failed %s", zx_status_get_string(status));
-  }
+  // Disable endpoints and reset binding to prevent new requests present in our pipeline from
+  // getting queued.
+  ConfigureEndpoints(false);
   adb_binding_.reset();
 
   // Cancel all requests in the pipeline -- the completion handler will free these requests as they
@@ -117,11 +102,6 @@ void UsbAdbDevice::Stop() {
       InsertUsbRequest(std::move(pending_replies_.front().request().value()), bulk_out_ep_);
       pending_replies_.pop();
     }
-  }
-
-  status = function_.SetInterface(nullptr, nullptr);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "SetInterface failed %s", zx_status_get_string(status));
   }
 
   fbl::AutoLock _(&lock_);
@@ -494,12 +474,7 @@ zx_status_t UsbAdbDevice::Init() {
     return status;
   }
 
-  status = function_.SetInterface(this, &usb_function_interface_protocol_ops_);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "SetInterface failed %s", zx_status_get_string(status));
-    return status;
-  }
-
+  function_.SetInterface(this, &usb_function_interface_protocol_ops_);
   return ZX_OK;
 }
 
