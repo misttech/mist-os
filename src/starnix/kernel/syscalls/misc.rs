@@ -60,7 +60,7 @@ pub fn sys_uname(
     if current_task.thread_group.read().personality.contains(PersonalityFlags::UNAME26) {
         init_array(&mut result.release, b"2.6.40-starnix");
     } else {
-        init_array(&mut result.release, KERNEL_RELEASE);
+        init_array(&mut result.release, KERNEL_RELEASE.as_bytes());
     }
 
     let version = current_task.kernel().build_version.get_or_try_init(|| {
