@@ -35,7 +35,7 @@ constexpr uint64_t kLoadAddress = 0xffff'ffff'0000'0000;
 
 }  // namespace
 
-int PhysLoadTestMain(KernelStorage kernelfs) {
+int PhysLoadTestMain(KernelStorage& kernelfs) {
   gSymbolize->set_name(kTestName);
 
 #ifdef __aarch64__

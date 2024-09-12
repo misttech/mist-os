@@ -28,7 +28,7 @@ constexpr ktl::string_view kMultiply = "multiply_by_factor";
 
 }  // namespace
 
-int PhysLoadTestMain(KernelStorage kernelfs) {
+int PhysLoadTestMain(KernelStorage& kernelfs) {
   constexpr const char* kTestName = "elf-code-patching-test";
   gSymbolize->set_name(kTestName);
 
