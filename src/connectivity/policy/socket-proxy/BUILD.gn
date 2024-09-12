@@ -22,7 +22,9 @@ network_unified_binary("socket_proxy") {
   deps = [
     "//sdk/fidl/fuchsia.net:fuchsia.net_rust",
     "//sdk/fidl/fuchsia.netpol.socketproxy:fuchsia.netpol.socketproxy_rust",
+    "//sdk/fidl/fuchsia.posix:fuchsia.posix_rust",
     "//sdk/fidl/fuchsia.posix.socket:fuchsia.posix.socket_rust",
+    "//sdk/fidl/fuchsia.posix.socket.raw:fuchsia.posix.socket.raw_rust",
     "//src/lib/diagnostics/inspect/derive",
     "//src/lib/diagnostics/inspect/runtime/rust",
     "//src/lib/diagnostics/inspect/rust",
@@ -48,6 +50,7 @@ network_unified_binary("socket_proxy") {
     "src/dns_watcher.rs",
     "src/main.rs",
     "src/registry.rs",
+    "src/socket_provider.rs",
   ]
 }
 

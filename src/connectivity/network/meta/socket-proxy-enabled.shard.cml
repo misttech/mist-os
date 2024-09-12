@@ -8,6 +8,27 @@
             url: "fuchsia-pkg://fuchsia.com/network-socket-proxy#meta/network-socket-proxy.cm",
         },
     ],
+    offer: [
+        {
+            protocol: [
+                "fuchsia.posix.socket.Provider",
+                "fuchsia.posix.socket.raw.Provider",
+            ],
+            from: "#netstack",
+            to: [ "#socket-proxy" ],
+        },
+        {
+            protocol: [ "fuchsia.posix.socket.Provider" ],
+            from: "#socket-proxy",
+            to: [
+                "#dhcpd",
+                "#dhcpv6-client",
+                "#dns-resolver",
+                "#http-client",
+                "#reachability",
+            ],
+        },
+    ],
     expose: [
         {
             protocol: [
@@ -15,6 +36,22 @@
                 "fuchsia.netpol.socketproxy.StarnixNetworks",
             ],
             from: "#socket-proxy",
+            availability: "optional",
+        },
+        {
+            protocol: [ "fuchsia.posix.socket.Provider" ],
+            from: "#socket-proxy",
+            as: "fuchsia.posix.socket.Provider_PROXIED",
+            availability: "optional",
+        },
+        {
+            protocol: [
+                // TODO(https://fxbug.dev/42175379): once product assembly supports product-specific
+                // components running in the network realm, remove this.
+                "fuchsia.posix.socket.raw.Provider",
+            ],
+            from: "#socket-proxy",
+            as: "fuchsia.posix.socket.raw.Provider_PROXIED",
             availability: "optional",
         },
     ],

@@ -160,17 +160,6 @@
             to: [ "#dns-resolver" ],
         },
         {
-            protocol: [ "fuchsia.posix.socket.Provider" ],
-            from: "#netstack",
-            to: [
-                "#dhcpd",
-                "#dhcpv6-client",
-                "#dns-resolver",
-                "#http-client",
-                "#reachability",
-            ],
-        },
-        {
             protocol: [ "fuchsia.posix.socket.packet.Provider" ],
             from: "#netstack",
             to: [ "#dhcpd" ],

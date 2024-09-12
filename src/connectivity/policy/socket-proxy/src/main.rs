@@ -20,11 +20,22 @@ use tracing::error;
 
 mod dns_watcher;
 mod registry;
+mod socket_provider;
 
+#[derive(Copy, Clone, Debug)]
 struct SocketMarks {
     mark_1: OptionalUint32,
-    #[allow(unused)]
     mark_2: OptionalUint32,
+}
+
+impl SocketMarks {
+    fn has_value(&self) -> bool {
+        match (self.mark_1, self.mark_2) {
+            (OptionalUint32::Value(_), _) => true,
+            (_, OptionalUint32::Value(_)) => true,
+            _ => false,
+        }
+    }
 }
 
 impl Default for SocketMarks {
@@ -40,6 +51,7 @@ impl Default for SocketMarks {
 struct SocketProxy {
     registry: registry::Registry,
     dns_watcher: dns_watcher::DnsServerWatcher,
+    socket_provider: socket_provider::SocketProvider,
 }
 
 impl SocketProxy {
@@ -49,6 +61,7 @@ impl SocketProxy {
         Self {
             registry: registry::Registry::new(mark.clone(), dns_tx),
             dns_watcher: dns_watcher::DnsServerWatcher::new(Arc::new(Mutex::new(dns_rx))),
+            socket_provider: socket_provider::SocketProvider::new(mark.clone()),
         }
     }
 }
@@ -56,6 +69,8 @@ impl SocketProxy {
 enum IncomingService {
     StarnixNetworks(fidl_fuchsia_netpol_socketproxy::StarnixNetworksRequestStream),
     DnsServerWatcher(fidl_fuchsia_netpol_socketproxy::DnsServerWatcherRequestStream),
+    PosixSocket(fidl_fuchsia_posix_socket::ProviderRequestStream),
+    PosixSocketRaw(fidl_fuchsia_posix_socket_raw::ProviderRequestStream),
 }
 
 /// Main entry point for the network socket proxy.
@@ -73,7 +88,9 @@ pub async fn main() -> Result<(), anyhow::Error> {
     let _: &mut ServiceFsDir<'_, _> = fs
         .dir("svc")
         .add_fidl_service(IncomingService::StarnixNetworks)
-        .add_fidl_service(IncomingService::DnsServerWatcher);
+        .add_fidl_service(IncomingService::DnsServerWatcher)
+        .add_fidl_service(IncomingService::PosixSocket)
+        .add_fidl_service(IncomingService::PosixSocketRaw);
 
     let _: &mut ServiceFs<_> = fs.take_and_serve_directory_handle()?;
 
@@ -83,6 +100,8 @@ pub async fn main() -> Result<(), anyhow::Error> {
         match service {
             IncomingService::StarnixNetworks(stream) => proxy.registry.run_starnix(stream).await,
             IncomingService::DnsServerWatcher(stream) => proxy.dns_watcher.run(stream).await,
+            IncomingService::PosixSocket(stream) => proxy.socket_provider.run(stream).await,
+            IncomingService::PosixSocketRaw(stream) => proxy.socket_provider.run_raw(stream).await,
         }
         .unwrap_or_else(|e| error!("{e:?}"))
     })

@@ -319,6 +319,7 @@
                 target_monikers: [
                     "/core/network",
                     "/core/network/netstack",
+                    "/core/network/socket-proxy",
                     "/core/lowpan-ot-driver",
                     "/core/test_manager",
                     "/core/testing/starnix-tests:**",
