@@ -7,9 +7,9 @@
 
 #include <lib/fit/result.h>
 #include <lib/mistos/linux_uapi/typedefs.h>
-#include <lib/mistos/starnix/kernel/sync/locks.h>
 #include <lib/mistos/starnix/kernel/task/thread_group.h>
 #include <lib/mistos/starnix_uapi/errors.h>
+#include <lib/starnix_sync/locks.h>
 #include <zircon/types.h>
 
 #include <fbl/ref_ptr.h>
@@ -44,8 +44,8 @@ struct TaskInfo {
 
 fit::result<Errno, TaskInfo> create_zircon_process(
     fbl::RefPtr<Kernel> kernel,
-    ktl::optional<RwLock<ThreadGroupMutableState>::RwLockWriteGuard> parent, pid_t pid,
-    fbl::RefPtr<ProcessGroup> process_group, const ktl::string_view& name);
+    ktl::optional<starnix_sync::RwLock<ThreadGroupMutableState>::RwLockWriteGuard> parent,
+    pid_t pid, fbl::RefPtr<ProcessGroup> process_group, const ktl::string_view& name);
 
 fit::result<zx_status_t, ktl::pair<KernelHandle<ProcessDispatcher>, Vmar>> create_process(
     fbl::RefPtr<JobDispatcher> job, uint32_t options, const ktl::string_view& name);

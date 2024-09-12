@@ -7,13 +7,13 @@
 #define ZIRCON_KERNEL_LIB_MISTOS_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_FS_TMPFS_H_
 
 #include <lib/fit/result.h>
-#include <lib/mistos/starnix/kernel/sync/locks.h>
 #include <lib/mistos/starnix/kernel/vfs/file_system.h>
 #include <lib/mistos/starnix/kernel/vfs/file_system_ops.h>
 #include <lib/mistos/starnix/kernel/vfs/fs_node_ops.h>
 #include <lib/mistos/starnix/kernel/vfs/xattr.h>
 #include <lib/mistos/starnix_uapi/device_type.h>
 #include <lib/mistos/starnix_uapi/errors.h>
+#include <lib/starnix_sync/locks.h>
 #include <zircon/compiler.h>
 #include <zircon/types.h>
 
@@ -49,7 +49,7 @@ class TmpfsDirectory : public FsNodeOps {
  private:
   MemoryXattrStorage xattrs_;
 
-  mutable StarnixMutex<uint32_t> child_count_;
+  mutable starnix_sync::StarnixMutex<uint32_t> child_count_;
 
  public:
   /// impl TmpfsDirectory
