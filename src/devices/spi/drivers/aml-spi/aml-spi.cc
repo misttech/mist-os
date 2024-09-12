@@ -373,11 +373,13 @@ bool AmlSpi::AssertCs() {
   IntReg::Get().FromValue(0).set_tcen(1).WriteTo(&mmio_);
 
   if (gpio(current_request_->cs()).is_valid()) {
-    gpio(current_request_->cs())->Write(0).Then([this](auto& result) mutable {
-      ZX_ASSERT_MSG(result.ok(), "error: %s", result.FormatDescription().c_str());
-      ZX_ASSERT_MSG(result->is_ok(), "error: %s", zx_status_get_string(result->error_value()));
-      Exchange();
-    });
+    gpio(current_request_->cs())
+        ->SetBufferMode(fuchsia_hardware_gpio::BufferMode::kOutputLow)
+        .Then([this](auto& result) mutable {
+          ZX_ASSERT_MSG(result.ok(), "error: %s", result.FormatDescription().c_str());
+          ZX_ASSERT_MSG(result->is_ok(), "error: %s", zx_status_get_string(result->error_value()));
+          Exchange();
+        });
     return false;
   }
 
@@ -409,11 +411,13 @@ bool AmlSpi::Exchange() {
   }
 
   if (gpio(current_request_->cs()).is_valid()) {
-    gpio(current_request_->cs())->Write(1).Then([this, status](auto& result) mutable {
-      ZX_ASSERT_MSG(result.ok(), "error: %s", result.FormatDescription().c_str());
-      ZX_ASSERT_MSG(result->is_ok(), "error: %s", zx_status_get_string(result->error_value()));
-      CompleteExchange(status);
-    });
+    gpio(current_request_->cs())
+        ->SetBufferMode(fuchsia_hardware_gpio::BufferMode::kOutputHigh)
+        .Then([this, status](auto& result) mutable {
+          ZX_ASSERT_MSG(result.ok(), "error: %s", result.FormatDescription().c_str());
+          ZX_ASSERT_MSG(result->is_ok(), "error: %s", zx_status_get_string(result->error_value()));
+          CompleteExchange(status);
+        });
     return false;
   }
 
