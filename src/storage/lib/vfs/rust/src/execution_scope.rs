@@ -22,7 +22,9 @@ use fuchsia_async::{Scope, Task};
 use futures::task::{self, Poll};
 use futures::Future;
 use std::future::{pending, poll_fn};
+use std::pin::pin;
 use std::sync::{Arc, Mutex, OnceLock};
+use std::task::ready;
 
 #[cfg(target_os = "fuchsia")]
 use fuchsia_async::EHandle;
@@ -143,18 +145,26 @@ impl ExecutionScope {
 
     /// Wait for all tasks to complete.
     pub async fn wait(&self) {
-        loop {
-            self.executor.scope().on_no_tasks().await;
+        let mut on_no_tasks = pin!(self.executor.scope().on_no_tasks());
+        poll_fn(|cx| {
+            // Hold the lock whilst we poll the scope so that the active count can't change.
             let mut inner = self.executor.inner.lock().unwrap();
+            ready!(on_no_tasks.as_mut().poll(cx));
             if inner.active_count == 0 {
-                break;
+                Poll::Ready(())
+            } else {
+                // There are no tasks but there's an active count and we must only finish when there
+                // are no tasks *and* the active count is zero.  To address this, we spawn a fake
+                // task so that we can just use `on_no_tasks`, and then we'll cancel the task when
+                // the active count drops to zero.
+                let scope = self.executor.scope();
+                inner.fake_active_task = Some(scope.spawn(pending::<()>()));
+                on_no_tasks.set(scope.on_no_tasks());
+                assert!(on_no_tasks.as_mut().poll(cx).is_pending());
+                Poll::Pending
             }
-            // There are no tasks but there's an active count and we must only finish when there are
-            // no tasks *and* the active count is zero.  To address this, we spawn a fake task so
-            // that we can just use `on_no_tasks`, and then we'll cancel the task when the active
-            // count drops to zero.
-            inner.fake_active_task = Some(self.executor.scope().spawn(pending::<()>()));
-        }
+        })
+        .await;
     }
 
     /// Prevents the executor from shutting down whilst the guard is held. Returns None if the
