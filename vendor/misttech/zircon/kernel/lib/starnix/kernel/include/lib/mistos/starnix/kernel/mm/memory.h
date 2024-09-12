@@ -18,37 +18,49 @@
 #include <ktl/optional.h>
 #include <ktl/span.h>
 #include <ktl/variant.h>
+#include <object/handle.h>
 #include <object/vm_address_region_dispatcher.h>
 #include <object/vm_object_dispatcher.h>
+
+#include "object/dispatcher.h"
 
 namespace starnix {
 
 struct Vmar {
-  fbl::RefPtr<VmAddressRegionDispatcher> vmar;
-  zx_rights_t rights;
+  HandleOwner vmar;
 
-  bool HasRights(zx_rights_t desired) const { return (rights & desired) == desired; }
+  fbl::RefPtr<VmAddressRegionDispatcher> dispatcher() const {
+    fbl::RefPtr<Dispatcher> disp = vmar->dispatcher();
+    return DownCastDispatcher<VmAddressRegionDispatcher>(&disp);
+  }
 };
 
 struct Vmo {
-  fbl::RefPtr<VmObjectDispatcher> vmo;
-  zx_rights_t rights;
+  HandleOwner vmo;
 
-  bool HasRights(zx_rights_t desired) const { return (rights & desired) == desired; }
+  fbl::RefPtr<VmObjectDispatcher> dispatcher() const {
+    fbl::RefPtr<Dispatcher> disp = vmo->dispatcher();
+    return DownCastDispatcher<VmObjectDispatcher>(&disp);
+  }
 };
 
 /// The memory object is a bpf ring buffer. The layout it represents is:
 /// |Page1 - Page2 - Page3 .. PageN - Page3 .. PageN| where the vmo is
 /// |Page1 - Page2 - Page3 .. PageN|
 struct RingBuf {
-  fbl::RefPtr<VmObjectDispatcher> vmo;
+  HandleOwner vmo;
+
+  fbl::RefPtr<VmObjectDispatcher> dispatcher() const {
+    fbl::RefPtr<Dispatcher> disp = vmo->dispatcher();
+    return DownCastDispatcher<VmObjectDispatcher>(&disp);
+  }
 };
 
 class MemoryObject : public fbl::RefCounted<MemoryObject> {
  public:
   // impl MemoryObject
 
-  static fbl::RefPtr<MemoryObject> From(fbl::RefPtr<VmObjectDispatcher> vmo, zx_rights_t rights);
+  static fbl::RefPtr<MemoryObject> From(HandleOwner vmo);
 
   ktl::optional<fbl::RefPtr<VmObjectDispatcher>> as_vmo();
 
@@ -83,9 +95,9 @@ class MemoryObject : public fbl::RefCounted<MemoryObject> {
 
   fit::result<zx_status_t> op_range(uint32_t op, uint64_t* offset, uint64_t* size) const;
 
-  fit::result<zx_status_t, fbl::RefPtr<MemoryObject>> replace_as_executable() const;
+  fit::result<zx_status_t, fbl::RefPtr<MemoryObject>> replace_as_executable();
 
-  fit::result<zx_status_t, size_t> map_in_vmar(Vmar vmar, size_t vmar_offset,
+  fit::result<zx_status_t, size_t> map_in_vmar(const Vmar& vmar, size_t vmar_offset,
                                                uint64_t* memory_offset, size_t len,
                                                MappingFlags flags) const;
 
