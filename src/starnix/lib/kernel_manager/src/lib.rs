@@ -292,9 +292,9 @@ pub async fn serve_starnix_manager(
                     });
                 }
 
-                // TODO: We will likely have to handle a larger number of wake sources in the future,
-                // at which point we may want to consider a Port-based approach. This would also
-                // allow us to unblock this thread.
+                // TODO: We will likely have to handle a larger number of wake sources in the
+                // future, at which point we may want to consider a Port-based approach. This
+                // would also allow us to unblock this thread.
                 match zx::object_wait_many(&mut wait_items, zx::MonotonicTime::INFINITE) {
                     Ok(_) => {}
                     Err(e) => {
@@ -415,8 +415,8 @@ fn start_proxy(proxy: ChannelProxy, resume_events: Arc<Mutex<Vec<zx::EventPair>>
     });
 }
 
-/// Forwards any pending messages on `read_channel` to `write_channel`, if the `wait_item.pending` contains
-/// `CHANNEL_READABLE`.
+/// Forwards any pending messages on `read_channel` to `write_channel`, if the `wait_item.pending`
+/// contains `CHANNEL_READABLE`.
 ///
 /// If `event` is `Some`, it will be signaled with `EVENT_SIGNALED` if a message was read and
 /// written.
