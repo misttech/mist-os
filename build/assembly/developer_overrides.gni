@@ -126,6 +126,23 @@ import("//build/python/python_action.gni")
 #       build, and is the label of the target that creates the file.
 #
 template("assembly_developer_overrides") {
+  assert(
+      current_toolchain == default_toolchain,
+      "Assembly developer overrides can only be defined in the default toolchain.")
+
+  _valid_overrides_dirs = [ "//local/*" ]
+  if (!label_matches(":$target_name",
+                     # //build/assembly/overrides is an internal implementation
+                     # detail of the product_assembly_overrides_contents GN
+                     # arg, and so it's added separately from the list so that
+                     # the list can also be used to print the valid locations
+                     # that are allowlisted for defining overrides.
+                     _valid_overrides_dirs + [ "//build/assembly/overrides:*" ])) {
+    assert(
+        false,
+        "Assembly developer overrides can only be added to the following directories, as they are for local use only. Contact the software assembly team if you need to define overrides that are checked into the tree to discuss your use-case: $_valid_overrides_dirs")
+  }
+
   labels = {
     # So it can be reused.
     target_name = target_name
@@ -306,12 +323,7 @@ template("assembly_developer_overrides") {
       ":${labels.assembly_overrides_intermediate_inputs}",
       ":${labels.assembly_overrides_intermediate}",
     ]
-    deps = [
-      ":${labels.assembly_overrides_intermediate_input_paths}",
-
-      # The allowlist for where developer overrides can be defined
-      "//build/assembly/overrides:allowlist",
-    ]
+    deps = [ ":${labels.assembly_overrides_intermediate_input_paths}" ]
 
     # The contents of these folders is dynamic, and managed entirely by this
     # action.  Further, this action will need to delete items from these
