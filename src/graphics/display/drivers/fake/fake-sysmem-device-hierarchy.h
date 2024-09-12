@@ -14,7 +14,7 @@
 #include "src/devices/bus/testing/fake-pdev/fake-pdev.h"
 #include "src/devices/testing/mock-ddk/mock-device.h"
 #include "src/graphics/display/drivers/fake/sysmem-service-provider.h"
-#include "src/sysmem/drivers/sysmem/sysmem.h"
+#include "src/sysmem/server/sysmem.h"
 
 namespace display {
 

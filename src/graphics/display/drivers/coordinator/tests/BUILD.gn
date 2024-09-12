@@ -65,7 +65,7 @@ static_library("base") {
     "//src/graphics/display/lib/driver-framework-migration-utils/logging:logging-dfv2",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/predicates",
-    "//src/sysmem/drivers/sysmem:sysmem_common_srcs",
+    "//src/sysmem/server:sysmem_common_srcs",
     "//third_party/googletest:gtest",
     "//zircon/system/ulib/zircon-internal",
   ]

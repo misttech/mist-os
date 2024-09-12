@@ -161,7 +161,7 @@ source_set("fake-sysmem-device-hierarchy") {
     "//sdk/lib/component/outgoing/cpp",
     "//src/devices/bus/testing/fake-pdev",
     "//src/devices/testing/mock-ddk",
-    "//src/sysmem/drivers/sysmem:sysmem_common_srcs",
+    "//src/sysmem/server:sysmem_common_srcs",
   ]
   deps = [
     "//sdk/lib/async:async-cpp",

@@ -155,7 +155,6 @@ hlcpp_visibility = [
   "//src/devices/bus/drivers/platform/test:*",
   "//src/devices/lib/sysmem:*",
   "//src/devices/securemem/drivers/aml-securemem:*",
-  "//src/sysmem/bin/sysmem_connector:*",
   "//src/devices/testing/devmgr-integration-test-shim:*",
   "//src/devices/testing/driver-integration-test-shim:*",
   "//src/devices/tests/banjo-proxy:*",

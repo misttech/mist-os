@@ -5,7 +5,7 @@
 #include <fidl/fuchsia.hardware.sysmem/cpp/fidl.h>
 
 #include "src/graphics/display/drivers/fake/fake-sysmem-device-hierarchy.h"
-#include "src/sysmem/drivers/sysmem/sysmem.h"
+#include "src/sysmem/server/sysmem.h"
 #include "sysmem_fuzz_common.h"
 
 #define DBGRTN 0

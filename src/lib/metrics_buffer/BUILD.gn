@@ -28,7 +28,8 @@ source_set("metrics_buffer") {
     "//src/lib",
     "//src/media/drivers/amlogic_decoder:sources",
     "//src/media/lib/codec_impl",
-    "//src/sysmem/drivers/sysmem:sysmem_common_srcs",
+    "//src/sysmem/server:sysmem_common_srcs",
+    "//src/sysmem/server:sysmem_common_srcs",
   ]
 }
 

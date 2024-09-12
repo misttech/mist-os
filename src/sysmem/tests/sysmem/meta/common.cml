@@ -9,8 +9,8 @@
     ],
     children: [
         {
-            name: "sysmem_connector",
-            url: "#meta/sysmem_connector.cm",
+            name: "sysmem",
+            url: "#meta/sysmem.cm",
         },
     ],
     use: [
@@ -23,21 +23,8 @@
             from: "parent",
         },
         {
-            directory: "dev-sysmem",
-            from: "parent",
-            rights: [ "r*" ],
-            path: "/dev/class/sysmem",
-        },
-        {
             storage: "cache",
             path: "/cache",
-        },
-    ],
-    offer: [
-        {
-            directory: "dev-sysmem",
-            from: "parent",
-            to: [ "#sysmem_connector" ],
         },
     ],
 }

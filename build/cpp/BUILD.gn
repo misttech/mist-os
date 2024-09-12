@@ -124,7 +124,7 @@ config("fidl-wire-deprecated-mutable-tables") {
 
     #------------------
     #------------------
-    "//src/sysmem/drivers/sysmem:sysmem_common_srcs",
+    "//src/sysmem/server:sysmem_common_srcs",
 
     #------------------
     #------------------
