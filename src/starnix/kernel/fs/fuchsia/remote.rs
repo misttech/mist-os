@@ -305,6 +305,7 @@ pub fn new_remote_file(
             ..Default::default()
         })
         .map_err(|status| from_status_like_fdio!(status))?;
+    let mut mode = get_mode(&attrs);
     let (ops, socket): (Box<dyn FileOps>, Option<Arc<Socket>>) =
         match (handle_type, attrs.object_type) {
             (_, ZXIO_OBJECT_TYPE_DIR) => (Box::new(RemoteDirectoryObject::new(zxio)), None),
@@ -318,13 +319,14 @@ pub fn new_remote_file(
             | (_, ZXIO_OBJECT_TYPE_STREAM_SOCKET)
             | (_, ZXIO_OBJECT_TYPE_RAW_SOCKET)
             | (_, ZXIO_OBJECT_TYPE_PACKET_SOCKET) => {
+                // Set the file mode to socket.
+                mode = (mode & !FileMode::IFMT) | FileMode::IFSOCK;
                 let socket_ops = ZxioBackedSocket::new_with_zxio(zxio);
                 let socket = Socket::new_with_ops(Box::new(socket_ops))?;
-                (Box::new(SocketFile::new(socket.clone())), Some(socket))
+                (SocketFile::new(socket.clone()), Some(socket))
             }
             _ => return error!(ENOTSUP),
         };
-    let mode = get_mode(&attrs);
     let file_handle = Anon::new_file_extended(current_task, ops, flags, |id| {
         let mut info = FsNodeInfo::new(id, mode, FsCred::root());
         update_info_from_attrs(&mut info, &attrs);
@@ -1401,6 +1403,7 @@ mod test {
     use crate::mm::PAGE_SIZE;
     use crate::testing::*;
     use crate::vfs::buffers::{VecInputBuffer, VecOutputBuffer};
+    use crate::vfs::socket::SocketMessageFlags;
     use crate::vfs::{EpollFileObject, LookupContext, Namespace, SymlinkMode, TimeUpdateType};
     use assert_matches::assert_matches;
     use fidl::endpoints::Proxy;
@@ -1412,6 +1415,27 @@ mod test {
     use starnix_uapi::file_mode::{mode, AccessCheck};
     use starnix_uapi::vfs::{EpollEvent, FdEvents};
     use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
+
+    #[::fuchsia::test]
+    async fn test_remote_uds() {
+        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
+        let (s1, s2) = zx::Socket::create_datagram();
+        s2.write(&vec![0]).expect("write");
+        let file =
+            new_remote_file(&current_task, s1.into(), OpenFlags::RDWR).expect("new_remote_file");
+        assert!(file.node().is_sock());
+        let socket_ops = file.downcast_file::<SocketFile>().unwrap();
+        let flags = SocketMessageFlags::CTRUNC
+            | SocketMessageFlags::TRUNC
+            | SocketMessageFlags::NOSIGNAL
+            | SocketMessageFlags::CMSG_CLOEXEC;
+        let mut buffer = VecOutputBuffer::new(1024);
+        let info = socket_ops
+            .recvmsg(&mut locked, &current_task, &file, &mut buffer, flags, None)
+            .expect("recvmsg");
+        assert!(info.ancillary_data.is_empty());
+        assert_eq!(info.message_length, 1);
+    }
 
     #[::fuchsia::test]
     async fn test_tree() -> Result<(), anyhow::Error> {
