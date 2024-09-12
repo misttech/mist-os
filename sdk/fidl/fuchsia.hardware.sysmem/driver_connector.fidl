@@ -1,0 +1,56 @@
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+library fuchsia.hardware.sysmem;
+
+using fuchsia.io;
+using fuchsia.sysmem;
+using fuchsia.sysmem2;
+
+/// Most clients of sysmem don't care about this protocol, as most clients get a
+/// connection to sysmem via their /svc directory.
+///
+/// The sysmem-connector acts as a service, but just forwards connection
+/// requests to the sysmem driver using this protocol. A channel with this
+/// protocol is established to the sysmem driver in advance of serving client
+/// requests for [`fuchsia.sysmem/Allocator`] or [`fuchsia.sysmem2/Allocator`].
+/// This interface then allows asynchronously sending the server end of an
+/// Allocator channel to sysmem, which will then be served by the sysmem driver.
+@discoverable
+closed protocol DriverConnector {
+    /// This one-way message sends in the server end of a
+    /// [`fuchsia.sysmem/Allocator`] channel.
+    ///
+    /// `allocator_request` will be served by the sysmem driver (or the channel
+    /// will close).
+    // The "deprecated" parameter value is needed for the reasons described for
+    // the member in sysmem.fidl.
+    @available(deprecated=HEAD)
+    strict ConnectV1(resource struct {
+        allocator_request server_end:fuchsia.sysmem.Allocator;
+    });
+
+    /// This one-way message sends in the server end of a
+    /// [`fuchsia.sysmem2/Allocator`] channel.
+    ///
+    /// `allocator_request` will be served by the sysmem driver (or the channel
+    /// will close).
+    strict ConnectV2(resource struct {
+        allocator_request server_end:fuchsia.sysmem2.Allocator;
+    });
+
+    /// This one-way message sends in the server end of a
+    /// [`fuchsia.hardware.sysmem/Sysmem`] channel.
+    ///
+    /// `sysmem_request` will be served by the sysmem driver (or the channel
+    /// will close).
+    strict ConnectSysmem(resource struct {
+        sysmem_request server_end:Sysmem;
+    });
+
+    /// The sysmem driver won't be able to emit Cobalt metrics until a service
+    /// directory with Cobalt available is sent to sysmem via this message.
+    strict SetAuxServiceDirectory(resource struct {
+        service_directory client_end:fuchsia.io.Directory;
+    });
+};
