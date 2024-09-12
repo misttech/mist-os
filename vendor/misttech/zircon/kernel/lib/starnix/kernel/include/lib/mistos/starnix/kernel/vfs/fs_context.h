@@ -54,7 +54,7 @@ class FsContext : public fbl::RefCounted<FsContext> {
   ///
   /// The root and cwd of the FsContext are initialized to the root of the
   /// namespace.
-  static fbl::RefPtr<FsContext> New(FileSystemHandle root);
+  static fbl::RefPtr<FsContext> New(fbl::RefPtr<Namespace> _namespace);
 
   fbl::RefPtr<FsContext> fork() const;
 

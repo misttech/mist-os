@@ -23,6 +23,7 @@ class CurrentTask;
 class DirEntry;
 class FileObject;
 class FileOps;
+class Task;
 class FsNode;
 struct LookupContext;
 struct SymlinkTarget;
@@ -36,6 +37,43 @@ using FsNodeHandle = fbl::RefPtr<FsNode>;
 using starnix_uapi::Access;
 using starnix_uapi::OpenFlags;
 
+/// The path is reachable from the given root.
+struct Reachable {
+  FsString path;
+};
+
+/// The path is not reachable from the given root.
+struct Unreachable {
+  FsString path;
+};
+
+class PathWithReachability {
+ public:
+  PathWithReachability(Reachable path) : path_(path) {}
+  PathWithReachability(Unreachable path) : path_(path) {}
+
+  FsString into_path() const {
+    return ktl::visit(PathWithReachability::overloaded{
+                          [&](const Reachable& r) { return r.path; },
+                          [&](const Unreachable& u) { return u.path; },
+                      },
+                      path_);
+  }
+
+ private:
+  // Helpers from the reference documentation for std::visit<>, to allow
+  // visit-by-overload of the std::variant<> returned by GetLastReference():
+  template <class... Ts>
+  struct overloaded : Ts... {
+    using Ts::operator()...;
+  };
+  // explicit deduction guide (not needed as of C++20)
+  template <class... Ts>
+  overloaded(Ts...) -> overloaded<Ts...>;
+
+  ktl::variant<Reachable, Unreachable> path_;
+};
+
 /// A node in a mount namespace.
 ///
 /// This tree is a composite of the mount tree and the FsNode tree.
@@ -44,6 +82,7 @@ using starnix_uapi::OpenFlags;
 /// present the client the directory structure that includes the mounted
 /// filesystems.
 struct NamespaceNode {
+ public:
   /// The mount where this namespace node is mounted.
   ///
   /// A given FsNode can be mounted in multiple places in a namespace. This
@@ -52,6 +91,11 @@ struct NamespaceNode {
 
   /// The FsNode that corresponds to this namespace entry.
   DirEntryHandle entry;
+
+ public:
+  // impl NamespaceNode
+
+  static NamespaceNode New(MountHandle mount, DirEntryHandle dir_entry);
 
   /// Create a namespace node that is not mounted in a namespace.
   static NamespaceNode new_anonymous(DirEntryHandle dir_entry);
@@ -111,6 +155,31 @@ struct NamespaceNode {
 
   /// If this is a mount point, return the root of the mount. Otherwise return self.
   NamespaceNode enter_mount() const;
+
+  /// If this is the root of a mount, return the mount point. Otherwise return self.
+  ///
+  /// This is not exactly the same as parent(). If parent() is called on a root, it will escape
+  /// the mount, but then return the parent of the mount point instead of the mount point.
+  NamespaceNode escape_mount() const;
+
+  /// If this node is the root of a mount, return it. Otherwise EINVAL.
+  fit::result<Errno, MountHandle> mount_if_root() const;
+
+  /// Returns the mountpoint at this location in the namespace.
+  ///
+  /// If this node is mounted in another node, this function returns the node
+  /// at which this node is mounted. Otherwise, returns None.
+  ktl::optional<NamespaceNode> mountpoint() const;
+
+  /// The path from the task's root to this node.
+  FsString path(Task& task) const;
+
+  /// The path from the root of the namespace to this node.
+  FsString path_escaping_chroot() const;
+
+  /// Returns the path to this node, accounting for a custom root.
+  /// A task may have a custom root set by `chroot`.
+  PathWithReachability path_from_root(ktl::optional<NamespaceNode>) const;
 
   NamespaceNode with_new_entry(DirEntryHandle _entry) const;
 

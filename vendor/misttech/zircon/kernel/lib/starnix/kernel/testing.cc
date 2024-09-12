@@ -15,34 +15,45 @@
 #include <lib/mistos/starnix/kernel/vfs/dir_entry.h>
 #include <lib/mistos/starnix/kernel/vfs/fs_context.h>
 #include <lib/mistos/starnix/kernel/vfs/fs_node.h>
+#include <lib/mistos/starnix/kernel/vfs/namespace.h>
 
 #include <fbl/ref_ptr.h>
 
 using namespace starnix;
 
-namespace {
+namespace starnix::testing {
 
-// Creates a `Kernel`, `Task`, and `Locked<Unlocked>` for testing purposes.
-//
-// The `Task` is backed by a real process, and can be used to test syscalls.
-ktl::pair<fbl::RefPtr<Kernel>, starnix::testing::AutoReleasableTask>
-create_kernel_task_and_unlocked_with_fs_and_selinux(
-    std::function<FileSystemHandle(const fbl::RefPtr<Kernel>&)> create_fs/*,
-    security_server: Option<Arc<SecurityServer>>*/) {
-  fbl::RefPtr<Kernel> kernel = Kernel::New("").value_or(fbl::RefPtr<Kernel>());
-  ASSERT_MSG(kernel, "failed to create kernel");
-
-  auto init_pid = kernel->pids.Write()->allocate_pid();
-  ASSERT(init_pid == 1);
-  auto fs = FsContext::New(create_fs(kernel));
-  auto init_task = CurrentTask::create_init_process(kernel, init_pid, "test-task", fs);
-
-  return {ktl::move(kernel), testing::AutoReleasableTask::From(init_task.value())};
+fbl::RefPtr<Kernel> create_test_kernel(/*security_server: Arc<SecurityServer>*/) {
+  return Kernel::New("").value();
 }
 
-}  // namespace
+template <typename CreateFsFn>
+fbl::RefPtr<FsContext> create_test_fs_context(const fbl::RefPtr<Kernel>& kernel,
+                                              CreateFsFn create_fs) {
+  return FsContext::New(Namespace::New(create_fs(kernel)));
+}
 
-namespace starnix::testing {
+TaskBuilder create_test_init_task(fbl::RefPtr<Kernel> kernel, fbl::RefPtr<FsContext> fs) {
+  auto init_pid = kernel->pids.Write()->allocate_pid();
+  ASSERT(init_pid == 1);
+  auto init_task = CurrentTask::create_init_process(kernel, init_pid, "test-task", fs);
+
+  /*let system_task =
+        CurrentTask::create_system_task(locked, kernel, fs).expect("create system task");
+    kernel.kthreads.init(system_task).expect("failed to initialize kthreads");*/
+
+  return ktl::move(init_task.value());
+}
+
+template <typename CreateFsFn>
+ktl::pair<fbl::RefPtr<Kernel>, starnix::testing::AutoReleasableTask>
+create_kernel_task_and_unlocked_with_fs_and_selinux(
+    CreateFsFn create_fs /*,security_server: Arc<SecurityServer>*/) {
+  auto kernel = create_test_kernel();
+  auto fs = create_test_fs_context(kernel, create_fs);
+  auto init_task = create_test_init_task(kernel, fs);
+  return ktl::pair(kernel, testing::AutoReleasableTask::From(ktl::move(init_task)));
+}
 
 /// TODO (Herrera) fix to open Bootfs from ZBI
 /// Create a FileSystemHandle for use in testing.
@@ -53,10 +64,6 @@ FileSystemHandle create_pkgfs(const fbl::RefPtr<Kernel>& kernel) {
   return TmpFs::new_fs(kernel);
 }
 
-/// Creates a `Kernel`, `Task`, and `Locked<Unlocked>` with the package file system for testing
-/// purposes.
-///
-/// The `Task` is backed by a real process, and can be used to test syscalls.
 ktl::pair<fbl::RefPtr<Kernel>, starnix::testing::AutoReleasableTask>
 create_kernel_task_and_unlocked_with_pkgfs() {
   return create_kernel_task_and_unlocked_with_fs_and_selinux(create_pkgfs);

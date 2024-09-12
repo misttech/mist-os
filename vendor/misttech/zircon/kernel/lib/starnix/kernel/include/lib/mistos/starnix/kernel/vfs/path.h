@@ -25,22 +25,27 @@ constexpr char SEPARATOR = '/';
 
 // Helper that can be used to build paths backwards, from the tail to head.
 class PathBuilder {
+ private:
+  // The path is kept in `data[pos..]`.
+  fbl::Vector<char> data_;
+  size_t pos_ = 0;
+
+  // impl PathBuilder
+  static constexpr size_t INITIAL_CAPACITY = 32;
+
  public:
+  static PathBuilder New();
+
   void prepend_element(const FsStr& element);
 
+  /// Build the absolute path string.
   FsString build_absolute();
 
+  /// Build the relative path string.
   FsString build_relative();
 
  private:
-  static constexpr size_t INITIAL_CAPACITY = 32;
-
   void ensure_capacity(size_t capacity_needed);
-
-  // The path is kept in `data[pos..]`.
-  fbl::Vector<char> data_;
-
-  size_t pos_ = 0;
 };
 
 }  // namespace starnix

@@ -49,16 +49,83 @@ class AutoReleasableTask {
   ktl::optional<starnix::CurrentTask> task_;
 };
 
+/// An old way of creating a task for testing
+///
+/// This way of creating a task has problems because the test isn't actually run with that task
+/// being current, which means that functions that expect a CurrentTask to actually be mapped into
+/// memory can operate incorrectly.
+///
+/// Please use `spawn_kernel_and_run` instead. If there isn't a variant of `spawn_kernel_and_run`
+/// for this use case, please consider adding one that follows the new pattern of actually running
+/// the test on the spawned task.
 ktl::pair<fbl::RefPtr<Kernel>, starnix::testing::AutoReleasableTask>
 create_kernel_task_and_unlocked_with_pkgfs();
 
-ktl::pair<fbl::RefPtr<starnix::Kernel>, AutoReleasableTask> create_kernel_task_and_unlocked();
-
+/// An old way of creating a task for testing
+///
+/// This way of creating a task has problems because the test isn't actually run with that task
+/// being current, which means that functions that expect a CurrentTask to actually be mapped into
+/// memory can operate incorrectly.
+///
+/// Please use `spawn_kernel_and_run` instead. If there isn't a variant of `spawn_kernel_and_run`
+/// for this use case, please consider adding one that follows the new pattern of actually running
+/// the test on the spawned task.
 ktl::pair<fbl::RefPtr<starnix::Kernel>, AutoReleasableTask> create_kernel_and_task();
 
-// Creates a new `Task` in the provided kernel.
-//
-// The `Task` is backed by a real process, and can be used to test syscalls.
+/// An old way of creating a task for testing
+///
+/// This way of creating a task has problems because the test isn't actually run with that task
+/// being current, which means that functions that expect a CurrentTask to actually be mapped into
+/// memory can operate incorrectly.
+///
+/// Please use `spawn_kernel_and_run` instead. If there isn't a variant of `spawn_kernel_and_run`
+/// for this use case, please consider adding one that follows the new pattern of actually running
+/// the test on the spawned task.
+ktl::pair<fbl::RefPtr<Kernel>, starnix::testing::AutoReleasableTask>
+    create_kernel_and_task_with_selinux(/*security_server: Arc<SecurityServer>*/);
+
+/// Create a Kernel object and run the given callback in the init process for that kernel.
+///
+/// This function is useful if you want to test code that requires a CurrentTask because
+/// your callback is called with the init process as the CurrentTask.
+// pub fn spawn_kernel_and_run<F>(callback: F)
+
+/// An old way of creating a task for testing
+///
+/// This way of creating a task has problems because the test isn't actually run with that task
+/// being current, which means that functions that expect a CurrentTask to actually be mapped into
+/// memory can operate incorrectly.
+///
+/// Please use `spawn_kernel_and_run` instead. If there isn't a variant of `spawn_kernel_and_run`
+/// for this use case, please consider adding one that follows the new pattern of actually running
+/// the test on the spawned task.
+ktl::pair<fbl::RefPtr<starnix::Kernel>, AutoReleasableTask> create_kernel_task_and_unlocked();
+
+/// An old way of creating a task for testing
+///
+/// This way of creating a task has problems because the test isn't actually run with that task
+/// being current, which means that functions that expect a CurrentTask to actually be mapped into
+/// memory can operate incorrectly.
+///
+/// Please use `spawn_kernel_and_run` instead. If there isn't a variant of `spawn_kernel_and_run`
+/// for this use case, please consider adding one that follows the new pattern of actually running
+/// the test on the spawned task.
+ktl::pair<fbl::RefPtr<Kernel>, starnix::testing::AutoReleasableTask>
+    create_kernel_task_and_unlocked_with_selinux(/*security_server: Arc<SecurityServer>*/);
+
+fbl::RefPtr<Kernel> create_test_kernel(/*security_server: Arc<SecurityServer>*/);
+
+TaskBuilder create_test_init_task(fbl::RefPtr<Kernel> kernel, fbl::RefPtr<FsContext> fs);
+
+/// An old way of creating a task for testing
+///
+/// This way of creating a task has problems because the test isn't actually run with that task
+/// being current, which means that functions that expect a CurrentTask to actually be mapped
+/// into memory can operate incorrectly.
+///
+/// Please use `spawn_kernel_and_run` instead. If there isn't a variant of
+/// `spawn_kernel_and_run` for this use case, please consider adding one that follows the new
+/// pattern of actually running the test on the spawned task.
 AutoReleasableTask create_task(fbl::RefPtr<starnix::Kernel>& kernel,
                                const ktl::string_view& task_name);
 

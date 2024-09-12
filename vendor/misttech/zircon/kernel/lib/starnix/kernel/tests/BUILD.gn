@@ -12,6 +12,7 @@ source_set("tests") {
     "io_buffers-test.cc",
 
     #"loader-test.cc",
+    "fs/tmpfs-test.cc",
     "locks-test.cc",
     "memory_manager-test.cc",
     "path-test.cc",
@@ -19,7 +20,7 @@ source_set("tests") {
     "task-test.cc",
     "task/syscalls-test.cc",
     "thread_group-test.cc",
-    "tmpfs-test.cc",
+    "vfs/fs_context-test.cc",
     "vfs/syscalls-test.cc",
   ]
   deps = [
