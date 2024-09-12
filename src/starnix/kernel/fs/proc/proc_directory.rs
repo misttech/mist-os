@@ -59,7 +59,8 @@ impl ProcDirectory {
                 FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
             ),
             "cmdline".into() => {
-                let cmdline = Vec::from(kernel.cmdline.clone());
+                let mut cmdline = Vec::from(kernel.cmdline.clone());
+                cmdline.push(b'\n');
                 fs.create_node(
                     current_task,
                     BytesFile::new_node(cmdline),
