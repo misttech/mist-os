@@ -118,8 +118,6 @@ class DirEntry
                            RwLock<DirEntry::DirEntryChildren>::RwLockWriteGuard children)
         : entry_(ktl::move(entry)), children_(ktl::move(children)) {}
 
-    //~DirEntryLockedChildren();
-
     /// impl<'a> DirEntryLockedChildren<'a>
     template <typename CreateNodeFn>
     fit::result<Errno, ktl::pair<DirEntryHandle, bool>> get_or_create_child(

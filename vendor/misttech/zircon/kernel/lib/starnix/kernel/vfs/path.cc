@@ -17,6 +17,8 @@
 
 namespace starnix {
 
+PathBuilder PathBuilder::New() { return PathBuilder(); }
+
 // Helper that can be used to build paths backwards, from the tail to head.
 void PathBuilder::prepend_element(const FsStr& element) {
   ensure_capacity(element.size() + 1);
