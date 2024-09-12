@@ -125,13 +125,15 @@ impl BytesFileOps for PowerStateFile {
                 },
                 zx::Time::INFINITE,
             ) {
-                Ok(Ok(_)) => {
+                Ok(Ok(res)) => {
                     // TODO(https://fxbug.dev/328306129): Replace this with boot time.
                     let wake_time = zx::MonotonicTime::get();
                     power_manager.update_suspend_stats(|suspend_stats| {
                         suspend_stats.success_count += 1;
                         suspend_stats.last_time_in_suspend_operations =
                             (wake_time - suspend_start_time).into();
+                        suspend_stats.last_time_in_sleep =
+                            zx::Duration::from_nanos(res.suspend_time.unwrap_or(0));
                     });
                 }
                 _ => {

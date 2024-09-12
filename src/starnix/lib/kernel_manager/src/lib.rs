@@ -246,6 +246,9 @@ pub async fn serve_starnix_manager(
                     }
                 };
 
+                // TODO(https://fxbug.dev/328306129): Replace this with boot time.
+                let suspend_start = zx::MonotonicTime::get();
+
                 if let Some(wake_locks) = wake_locks {
                     match wake_locks
                         .wait_handle(zx::Signals::EVENT_SIGNALED, zx::MonotonicTime::ZERO)
@@ -277,7 +280,12 @@ pub async fn serve_starnix_manager(
                 }
                 kernels.acquire_wake_lease(&container_job).await?;
 
-                if let Err(e) = responder.send(Ok(())) {
+                let response = fstarnixrunner::ManagerSuspendContainerResponse {
+                    // TODO(https://fxbug.dev/328306129): Replace this with boot time.
+                    suspend_time: Some((zx::MonotonicTime::get() - suspend_start).into_nanos()),
+                    ..Default::default()
+                };
+                if let Err(e) = responder.send(Ok(&response)) {
                     warn!("error responding to suspend request {:?}", e);
                 }
             }

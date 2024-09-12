@@ -29,6 +29,8 @@
                 "SysfsPowerTest.SuspendStateFileWriteFailsCloseFD",
                 "SysfsPowerTest.SuspendStateFileWriteFailsCloseEpollFD",
                 "SysfsPowerTest.SuspendStateFileWriteFailsEpollDelete",
+                "SysfsPowerTest.SuspendStatsFilesUpdateAfterSuccessfulSuspend",
+                "SysfsPowerTest.SuspendStatsFilesUpdateAfterFailedSuspend",
             ],
         },
         {

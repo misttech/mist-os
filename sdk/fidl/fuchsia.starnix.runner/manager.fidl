@@ -21,13 +21,19 @@ open protocol Manager {
     /// an error if `wake_locks` is signaled at the end of suspension, or an error is
     /// encountered when suspending the container's processes.
     flexible SuspendContainer(resource table {
-        // The job of the container to suspend.
+        /// The job of the container to suspend.
         1: container_job zx.Handle:JOB;
-        // The event that is used to signal whether or not there are any active wake locks in the container.
+        /// The event that is used to signal whether or not there are any active wake locks
+        /// in the container.
         2: wake_locks zx.Handle:EVENTPAIR;
-        // The event that will be signaled when the container should resume.
+        /// The event that will be signaled when the container should resume.
         3: wake_event zx.Handle:EVENT;
-    }) -> () error SuspendError;
+    }) -> (table {
+        /// The amount of time spent in the suspend state.
+        ///
+        /// It is used for tracking suspend stats in the Starnix kernel.
+        1: suspend_time zx.Duration;
+    }) error SuspendError;
 
     /// Creates a pass-through proxy that forwards messages between the `container_channel` and the
     /// `remote_channel`.
