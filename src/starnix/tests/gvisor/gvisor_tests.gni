@@ -270,7 +270,7 @@ gvisor_tests_custom_manifest = [
   },
 ]
 
-# Creates a fuchsia_test_component for a gVisor binary.
+# Creates a fuchsia_test_package for a gVisor binary.
 #
 # Parameters
 #   binary (optional)
@@ -288,11 +288,7 @@ gvisor_tests_custom_manifest = [
 #     Extra parameters to add to the `program` section of the manifest.
 #   container_shard (optional)
 #     Manifest shard that defines the container for the test.
-#   suffix (optional)
-#     Suffix to add to the component name.
-template("gvisor_test_component") {
-  test_name = target_name
-
+template("gvisor_test_package") {
   _container_shard =
       "//src/starnix/containers/debian/meta/debian_container_for_test.shard.cml"
   if (defined(invoker.container_shard)) {
@@ -305,23 +301,20 @@ template("gvisor_test_component") {
   } else {
     _base_shard =
         "//src/starnix/tests/gvisor/meta/gvisor_with_expectations.shard.cml"
+
+    _expectations = "//src/starnix/tests/gvisor/expectations/default_no_unified_aspace.json5"
+    if (defined(invoker.expectations)) {
+      _expectations = invoker.expectations
+    }
   }
 
-  _suffix = ""
-  if (defined(invoker.suffix)) {
-    _suffix = invoker.suffix
+  _container_package = "//src/starnix/containers/debian:debian_package"
+  if (defined(invoker.container_package)) {
+    _container_package = invoker.container_package
   }
 
-  _manifest_label = "${test_name}${_suffix}.cml"
-  _component_name = "${target_name}${_suffix}"
-
-  _suffix = ""
-  if (defined(invoker.suffix)) {
-    _suffix = invoker.suffix
-  }
-
-  _manifest_label = "${test_name}${_suffix}.cml"
-  _component_name = "${target_name}${_suffix}"
+  _manifest_label = "${target_name}.cml"
+  _component_name = invoker.component_name
   _use_persistent_storage =
       defined(invoker.use_persistent_storage) && invoker.use_persistent_storage
   if (_use_persistent_storage) {
@@ -331,20 +324,37 @@ template("gvisor_test_component") {
         "//src/starnix/tests/gvisor/meta/gvisor_use_tmp_storage.shard.cml"
   }
 
-  _suffix = ""
-  if (defined(invoker.suffix)) {
-    _suffix = invoker.suffix
-  }
-  _manifest_label = "${test_name}${_suffix}.cml"
-  _component_name = "${target_name}${_suffix}"
-
-  _binary = test_name
-  if (defined(invoker.binary)) {  # import("//build/dist/zip_resource.gni")
+  _binary = _component_name
+  if (defined(invoker.binary)) {
     _binary = invoker.binary
   }
   _binary_path = "data/tests/${_binary}"
 
-  resource("${_component_name}_bin") {
+  _test_specs = {
+    log_settings = {
+      max_severity = "ERROR"
+    }
+
+    # It takes a while to download the blobs. Debug builders are slower than
+    # their release counterparts.
+    if (is_debug) {
+      timeout_secs = 900
+    } else {
+      timeout_secs = 600
+    }
+
+    if (defined(invoker.test_specs)) {
+      forward_variables_from(invoker.test_specs,
+                             "*",
+                             [
+                               "log_settings",
+                               "timeout_secs",
+                             ])
+    }
+  }
+
+  _bin_resource_label = "${target_name}_bin"
+  resource(_bin_resource_label) {
     sources = [ "${gvisor_prebuilt_directory}/stripped/${_binary}" ]
     outputs = [ _binary_path ]
   }
@@ -376,16 +386,35 @@ template("gvisor_test_component") {
     }
   }
 
-  fuchsia_test_component(_component_name) {
+  _component_label = target_name + "_component"
+  fuchsia_test_component(_component_label) {
     forward_variables_from(invoker, "*")
+    component_name = _component_name
     testonly = true
     check_references = false
     manifest = _manifest_file
     deps = [
-      ":${_component_name}_bin",
+      ":${_bin_resource_label}",
       ":${_manifest_label}",
     ]
     test_type = "starnix"
+  }
+
+  if (_is_benchmark) {
+    fuchsia_test_package(target_name) {
+      deps = [ "//src/starnix/tests/gvisor:gvisor_runfiles" ]
+      subpackages = starnix_test_subpackages + [ _container_package ]
+      test_components = [ ":${_component_label}" ]
+      test_specs = _test_specs
+    }
+  } else {
+    fuchsia_test_with_expectations_package(target_name) {
+      deps = [ "//src/starnix/tests/gvisor:gvisor_runfiles" ]
+      subpackages = starnix_test_subpackages + [ _container_package ]
+      test_components = [ ":${_component_label}" ]
+      expectations = _expectations
+      test_specs = _test_specs
+    }
   }
 }
 
@@ -397,47 +426,51 @@ template("gvisor_test_component") {
 #  use_persistent_storage (optional)
 #    True if the tests should use persistent storage.
 #  suffix (optional)
-#    Suffix to add to the test name.
+#    Suffix to add to the package name.
 #  container_shard (optional)
 #     Manifest shard that defines the container for the test. Debian container
 #     is used by default.
 #  container_package (optional)
 #     Custom Starnix container package to run the tests. Debian container
 #     is used by default.
-template("gvisor_tests_package") {
+template("gvisor_tests_group") {
   _suffix = ""
   if (defined(invoker.suffix)) {
     _suffix = invoker.suffix
   }
 
-  _container_package = "//src/starnix/containers/debian:debian_package"
-  if (defined(invoker.container_package)) {
-    _container_package = invoker.container_package
-  }
-
-  _expectations =
-      "//src/starnix/tests/gvisor/expectations/default_no_unified_aspace.json5"
-  if (defined(invoker.expectations)) {
-    _expectations = invoker.expectations
-  }
-
+  _tests = []
+  _to_forward = [
+    "expectations",
+    "use_persistent_storage",
+    "container_shard",
+    "container_package",
+  ]
   foreach(test_name, gvisor_tests) {
-    gvisor_test_component(test_name) {
-      forward_variables_from(invoker, "*")
+    _label = "starnix_gvisor_${test_name}${_suffix}"
+    gvisor_test_package(_label) {
+      forward_variables_from(invoker, _to_forward)
+      component_name = test_name
       run_as_root = false
     }
+    _tests += [ ":${_label}" ]
   }
 
   foreach(test_name, gvisor_tests_run_as_root) {
-    gvisor_test_component(test_name) {
-      forward_variables_from(invoker, "*")
+    _label = "starnix_gvisor_${test_name}${_suffix}"
+    gvisor_test_package(_label) {
+      forward_variables_from(invoker, _to_forward)
+      component_name = test_name
       run_as_root = true
     }
+    _tests += [ ":${_label}" ]
   }
 
   foreach(test, gvisor_tests_custom_manifest) {
-    gvisor_test_component(test.test_name) {
-      forward_variables_from(invoker, "*")
+    _label = "starnix_gvisor_${test.test_name}${_suffix}"
+    gvisor_test_package(_label) {
+      forward_variables_from(invoker, _to_forward)
+      component_name = test.test_name
       if (defined(test.binary)) {
         binary = test.binary
       }
@@ -451,37 +484,11 @@ template("gvisor_tests_package") {
       }
       run_as_root = false
     }
+    _tests += [ ":${_label}" ]
   }
 
-  fuchsia_test_with_expectations_package(target_name) {
-    deps = [ "//src/starnix/tests/gvisor:gvisor_runfiles" ]
-
-    subpackages = starnix_test_subpackages + [ _container_package ]
-
-    test_components = []
-    foreach(test_name, gvisor_tests) {
-      test_components += [ ":${test_name}${_suffix}" ]
-    }
-    foreach(test_name, gvisor_tests_run_as_root) {
-      test_components += [ ":${test_name}${_suffix}" ]
-    }
-    foreach(test, gvisor_tests_custom_manifest) {
-      test_components += [ ":${test.test_name}${_suffix}" ]
-    }
-
-    expectations = _expectations
-    test_specs = {
-      log_settings = {
-        max_severity = "ERROR"
-      }
-
-      # It takes a while to download the blobs. Debug builders are slower than
-      # their release counterparts.
-      if (is_debug) {
-        timeout_secs = 900
-      } else {
-        timeout_secs = 600
-      }
-    }
+  group(target_name) {
+    testonly = true
+    deps = _tests
   }
 }
