@@ -1026,7 +1026,7 @@ mod tests {
                 .await
                 .expect("transport error on get_vmo")
                 .expect("failed to get vmo");
-            assert!(vmo.get_size().unwrap() > bytes_to_write as u64);
+            assert!(vmo.get_size().unwrap() >= bytes_to_write as u64);
             vmo.write(&blob_data[..bytes_to_write], 0).unwrap();
             writer
                 .bytes_ready(bytes_to_write as u64)

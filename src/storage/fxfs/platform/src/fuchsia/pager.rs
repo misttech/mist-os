@@ -559,6 +559,7 @@ bitflags! {
 }
 
 /// Pager related statistic for a VMO.
+#[derive(Debug)]
 pub struct PagerVmoStats {
     was_vmo_modified: bool,
 }
@@ -595,6 +596,7 @@ impl PagerRequestType for PageInRequest {
 pub type PageInRange<T> = PagerRange<T, PageInRequest>;
 
 /// A requested generated from a ZX_PAGER_VMO_DIRTY packet.
+#[derive(Debug)]
 pub struct MarkDirtyRequest;
 
 impl PagerRequestType for MarkDirtyRequest {
@@ -609,6 +611,7 @@ pub type MarkDirtyRange<T> = PagerRange<T, MarkDirtyRequest>;
 
 /// The requested range from a pager packet. This object ensures that all pager requests receive a
 /// response.
+#[derive(Debug)]
 pub struct PagerRange<T: PagerBacked, U: PagerRequestType> {
     range: Range<u64>,
 
@@ -837,7 +840,7 @@ mod tests {
     impl MockFile {
         fn new(pager: Arc<Pager>) -> Self {
             let (vmo, pager_packet_receiver_registration) = pager
-                .create_vmo(page_size(), zx::VmoOptions::RESIZABLE | zx::VmoOptions::TRAP_DIRTY)
+                .create_vmo(page_size(), zx::VmoOptions::UNBOUNDED | zx::VmoOptions::TRAP_DIRTY)
                 .unwrap();
             Self {
                 pager,
@@ -1030,7 +1033,7 @@ mod tests {
                 .create_child(
                     zx::VmoChildOptions::SNAPSHOT_AT_LEAST_ON_WRITE,
                     0,
-                    file.vmo().get_size().unwrap(),
+                    file.vmo().get_content_size().unwrap(),
                 )
                 .unwrap();
             assert!(pager.watch_for_zero_children(file.as_ref()).unwrap());
@@ -1054,7 +1057,7 @@ mod tests {
                 .create_child(
                     zx::VmoChildOptions::SNAPSHOT_AT_LEAST_ON_WRITE,
                     0,
-                    file.vmo().get_size().unwrap(),
+                    file.vmo().get_content_size().unwrap(),
                 )
                 .unwrap();
             assert!(pager.watch_for_zero_children(file.as_ref()).unwrap());
@@ -1211,39 +1214,131 @@ mod tests {
 
     #[fuchsia::test(threads = 2)]
     async fn test_query_dirty_ranges() {
+        // Some notes on our paging implementation:
+        //  * Fxfs uses UNBOUNDED VMO. These are maximally sized at creation time with
+        //    stream size holding the content length.
+        //  * Like regular VMO, all pages are initially in an unknown state. When a page
+        //    is first accessed, the pager (Fxfs) will be asked to page in content.
+        //  * Size can be set as a property, via set_content_size or via set_stream_size
+        //    but only set_stream_size() should ever be used. This ensures that the tail
+        //    is correctly zeroed.
         let scope = ExecutionScope::new();
         let pager = Arc::new(Pager::new(scope.clone()).unwrap());
-        let file = Arc::new(MockFile::new(pager.clone()));
+        let file = Arc::new(MockFile::new_with_size_and_type(
+            pager.clone(),
+            page_size() + page_size() / 2,
+            zx::VmoOptions::UNBOUNDED,
+        ));
+        let mut buffer = vec![VmoDirtyRange::default(); 2];
         pager.register_file(&file);
 
         let page_size = page_size();
-        file.vmo().set_size(page_size * 7).unwrap();
+        assert_eq!(file.vmo().get_content_size().unwrap(), page_size + page_size / 2);
+
+        let (actual, remaining) =
+            pager.query_dirty_ranges(file.vmo(), 0..page_size * 100, &mut buffer).unwrap();
+        assert_eq!(actual, 0);
+        assert_eq!(remaining, 0);
+
+        // Grow the VMO content size from 1.5 pages to 7.5 pages.
+        file.vmo().set_stream_size(page_size * 7 + page_size / 2).unwrap();
+
+        let (actual, remaining) =
+            pager.query_dirty_ranges(file.vmo(), 0..page_size * 100, &mut buffer).unwrap();
+        assert_eq!(actual, 2);
+        assert_eq!(remaining, 0);
+        // Second page must be assumed to contain data so tail is is zeroed.
+        assert_eq!(buffer[0].range(), page_size..page_size * 2);
+        assert!(!buffer[0].is_zero_range());
+        // All pages after that are marked as zero.
+        // Note that all pages up to the end of the VMO are assumed zero here.
+        assert_eq!(buffer[1].range(), page_size * 2..page_size * 100);
+        assert!(buffer[1].is_zero_range());
+
+        // We expect the tail page to have been read as part of the zeroing when we grew the size.
+        // It will then be marked dirty (modified)
+        assert_eq!(
+            file.pager_requests(true),
+            vec![
+                PagerRequest::PageIn(page_size * 1..page_size * 2),
+                PagerRequest::Dirty(page_size * 1..page_size * 2),
+            ]
+        );
+
         // Modify the 2nd, 3rd, and 5th pages.
         file.vmo().write(&[1, 2, 3, 4], page_size).unwrap();
         file.vmo().write(&[1, 2, 3, 4], page_size * 2).unwrap();
         file.vmo().write(&[1, 2, 3, 4], page_size * 4).unwrap();
 
-        let mut buffer = vec![VmoDirtyRange::default(); 3];
+        // Pages are known zero because we just grew the file.
+        // We don't expect any page-in requests for them.
+        assert_eq!(
+            file.pager_requests(true),
+            vec![
+                PagerRequest::Dirty(page_size * 2..page_size * 3),
+                PagerRequest::Dirty(page_size * 4..page_size * 5)
+            ]
+        );
+
         let (actual, remaining) =
             pager.query_dirty_ranges(file.vmo(), 0..page_size * 7, &mut buffer).unwrap();
-        assert_eq!(actual, 3);
-        assert_eq!(remaining, 1);
+        assert_eq!(actual, 2);
+        assert_eq!(remaining, 2);
+        // Second and third pages (non-zero)
         assert_eq!(buffer[0].range(), page_size..(page_size * 3));
         assert!(!buffer[0].is_zero_range());
-
+        // Fourth page is zero.
         assert_eq!(buffer[1].range(), (page_size * 3)..(page_size * 4));
         assert!(buffer[1].is_zero_range());
 
-        assert_eq!(buffer[2].range(), (page_size * 4)..(page_size * 5));
-        assert!(!buffer[2].is_zero_range());
-
         let (actual, remaining) = pager
-            .query_dirty_ranges(file.vmo(), page_size * 5..page_size * 7, &mut buffer)
+            .query_dirty_ranges(file.vmo(), page_size * 4..page_size * 7, &mut buffer)
             .unwrap();
-        assert_eq!(actual, 1);
+        assert_eq!(actual, 2);
         assert_eq!(remaining, 0);
-        assert_eq!(buffer[0].range(), (page_size * 5)..(page_size * 7));
-        assert!(buffer[0].is_zero_range());
+        // Fifth page (non-zero)
+        assert_eq!(buffer[0].range(), (page_size * 4)..(page_size * 5));
+        assert!(!buffer[0].is_zero_range());
+        // Rest of the VMO is zero.
+        assert_eq!(buffer[1].range(), (page_size * 5)..(page_size * 7));
+        assert!(buffer[1].is_zero_range());
+
+        // Read the 4th page.
+        let mut read_buf = vec![0u8; page_size as usize];
+        file.vmo().read(&mut read_buf, page_size * 3).expect("read");
+        let expected = vec![0u8; page_size as usize];
+        assert_eq!(read_buf, expected);
+        assert_eq!(file.pager_requests(true), vec![]);
+
+        scope.wait().await;
+    }
+
+    #[fuchsia::test(threads = 2)]
+    async fn test_zero_grown_vmo() {
+        // When a VMO's content size is explicitly grown, check that new content is zeroed.
+        let scope = ExecutionScope::new();
+        let pager = Arc::new(Pager::new(scope.clone()).unwrap());
+        let file = Arc::new(MockFile::new(pager.clone()));
+        pager.register_file(&file);
+
+        let write_buf = vec![0xff; page_size() as usize * 2];
+        file.vmo().set_stream_size(page_size() * 2).expect("grow");
+        file.vmo().write(&write_buf, 0).expect("write");
+        let mut read_buf = vec![0u8; page_size() as usize * 2];
+        // The tail beyond the content size will written.
+        file.vmo().read(&mut read_buf, 0).expect("read");
+        assert_eq!(read_buf, write_buf);
+
+        // The tail beyond the new content size should be zeroed.
+        file.vmo().set_stream_size(page_size() + 1).expect("shrink");
+        file.vmo().write(&[0xff; 3], page_size() + 2).expect("write after shrink");
+        // To make sure the above content size change actually zeroed data, we grow again.
+        file.vmo().set_stream_size(page_size() + 4).expect("grow again");
+        let mut read_buf = vec![0u8; page_size() as usize];
+        file.vmo().read(&mut read_buf, page_size()).expect("read");
+        let mut expected = vec![0u8; page_size() as usize];
+        expected[0] = 0xff;
+        assert_eq!(read_buf, expected);
 
         scope.wait().await;
     }
