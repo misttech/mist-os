@@ -149,7 +149,11 @@ impl ProcDirectory {
             ),
             "modules".into() => fs.create_node(
                 current_task,
-                StubEmptyFile::new_node("/proc/modules", bug_ref!("https://fxbug.dev/322894157")),
+                // Starnix does not support dynamically loading modules.
+                // Instead, we pretend to have loaded a single module, ferris (named after
+                // Rust's 🦀), to avoid breaking code that assumes the modules list is
+                // non-empty.
+                BytesFile::new_node(b"ferris 8192 0 - Live 0x0000000000000000\n".to_vec()),
                 FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
             ),
             "pagetypeinfo".into() => fs.create_node(
