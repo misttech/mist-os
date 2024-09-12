@@ -215,7 +215,7 @@ server stopped
 ```
 
 For more options, see
-[Stop running package servers][start-package-servers].
+[Stop running package servers][stop-package-servers].
 
 <!-- Reference links -->
 
