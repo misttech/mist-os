@@ -163,20 +163,21 @@ pub struct StartCommand {
     #[argh(positional)]
     pub product_bundle: Option<String>,
 
-    /// reuse a persistent emulator's state when starting up. If an emulator with the same name as
-    /// this instance has been previously started and then stopped without cleanup, this instance
-    /// will reuse the images from the previous instance. If no previous instance is found, or if
-    /// the old instance is still running, the new emulator will not attempt to start.
+    /// reuse a persistent emulator's (i.e. stopped with `ffx emu stop --persist`) state when
+    /// starting up. If an emulator with the same name as this instance has been previously started
+    /// and then stopped without cleanup, this instance will reuse the images from the previous
+    /// instance. If no previous instance is found, or if the old instance is still running, the new
+    /// emulator will not attempt to start.
     #[argh(switch)]
     pub reuse: bool,
 
-    /// reuse a persistent emulator's state when starting up after version check. If an emulator
-    /// with the same name as this instance has been previously started and then stopped without
-    /// cleanup, the zbi and disk volume files are compared against the original. If they match,
-    /// the instance will reuse the images from the previous instance. If the files do not match,
-    /// the instance is started using the latest files. If there is no staged instance, the emulator
-    /// is started using the latest files and the hash information is recorded so this instance
-    /// can take advantage of this option.
+    /// reuse a persistent emulator's (i.e. stopped with `ffx emu stop --persist`) state when
+    /// starting up after version check. If an emulator with the same name as this instance has been
+    /// previously started and then stopped without cleanup, the zbi and disk volume files are
+    /// compared against the original. If they match, the instance will reuse the images from the
+    /// previous instance. If the files do not match, the instance is started using the latest
+    /// files. If there is no staged instance, the emulator is started using the latest files and
+    /// the hash information is recorded so this instance can take advantage of this option.
     #[argh(switch)]
     pub reuse_with_check: bool,
 
