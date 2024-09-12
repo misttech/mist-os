@@ -29,6 +29,7 @@ use starnix_uapi::errors::Errno;
 use starnix_uapi::file_mode::mode;
 use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::time::duration_to_scheduler_clock;
+use starnix_uapi::version::KERNEL_RELEASE;
 use starnix_uapi::vfs::FdEvents;
 use starnix_uapi::{errno, error, off_t, pid_t};
 use std::collections::BTreeMap;
@@ -213,7 +214,13 @@ impl ProcDirectory {
             },
             "version".into() => fs.create_node(
                 current_task,
-                StubEmptyFile::new_node("/proc/version", bug_ref!("https://fxbug.dev/309002311")),
+                BytesFile::new_node(|| {
+                    let release = std::str::from_utf8(KERNEL_RELEASE).unwrap();
+                    let user = "build-user@build-host";
+                    let toolchain = "clang version HEAD, LLD HEAD";
+                    let version = "#1 SMP PREEMPT";
+                    Ok(format!("Linux version {} ({}) ({}) {}", release, user, toolchain, version))
+                }),
                 FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
             ),
             "vmallocinfo".into() => fs.create_node(

@@ -43,6 +43,7 @@ rustc_library("starnix-uapi") {
     "src/user_address.rs",
     "src/user_buffer.rs",
     "src/user_value.rs",
+    "src/version.rs",
     "src/vfs.rs",
   ]
 
