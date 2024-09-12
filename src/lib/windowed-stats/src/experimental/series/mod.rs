@@ -20,9 +20,12 @@ use thiserror::Error;
 use crate::experimental::clock::{
     MonotonicityError, ObservationTime, Tick, TimedSample, Timestamp, TimestampExt,
 };
-use crate::experimental::series::buffer::{Buffer, BufferStrategy, DeltaSimple8bRle, RingBuffer};
+use crate::experimental::series::buffer::{
+    Buffer, BufferStrategy, DeltaSimple8bRle, DeltaZigZagSimple8bRle, RingBuffer, Simple8bRle,
+    Uncompressed, ZigZagSimple8bRle,
+};
 use crate::experimental::series::interpolation::{
-    Interpolation, InterpolationFor, InterpolationState, LastAggregation, LastSample,
+    Constant, Interpolation, InterpolationFor, InterpolationState, LastAggregation, LastSample,
 };
 use crate::experimental::series::statistic::{OverflowError, PostAggregation, Statistic};
 use crate::experimental::Vec1;
@@ -131,13 +134,35 @@ impl DataSemantic for Counter {
 #[derive(Debug)]
 pub enum Gauge {}
 
-// Gauge semantics forward this implementation to the aggregation type.
-impl<A, P> BufferStrategy<A, P> for Gauge
+impl<P> BufferStrategy<f32, P> for Gauge
 where
-    A: BufferStrategy<A, P>,
     P: Interpolation,
 {
-    type Buffer = A::Buffer;
+    type Buffer = Uncompressed<f32>;
+}
+
+impl BufferStrategy<i64, Constant> for Gauge {
+    type Buffer = ZigZagSimple8bRle;
+}
+
+impl BufferStrategy<i64, LastAggregation> for Gauge {
+    type Buffer = DeltaZigZagSimple8bRle;
+}
+
+impl BufferStrategy<i64, LastSample> for Gauge {
+    type Buffer = DeltaZigZagSimple8bRle;
+}
+
+impl BufferStrategy<u64, Constant> for Gauge {
+    type Buffer = Simple8bRle;
+}
+
+impl BufferStrategy<u64, LastAggregation> for Gauge {
+    type Buffer = DeltaZigZagSimple8bRle;
+}
+
+impl BufferStrategy<u64, LastSample> for Gauge {
+    type Buffer = DeltaZigZagSimple8bRle;
 }
 
 impl DataSemantic for Gauge {
@@ -152,13 +177,12 @@ impl DataSemantic for Gauge {
 #[derive(Debug)]
 pub enum BitSet {}
 
-// Bit set semantics forward this implementation to the aggregation type.
 impl<A, P> BufferStrategy<A, P> for BitSet
 where
-    A: BufferStrategy<A, P>,
+    Simple8bRle: RingBuffer<A>,
     P: Interpolation,
 {
-    type Buffer = A::Buffer;
+    type Buffer = Simple8bRle;
 }
 
 impl DataSemantic for BitSet {

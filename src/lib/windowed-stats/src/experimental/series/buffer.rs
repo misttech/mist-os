@@ -9,9 +9,7 @@ use std::io::{self, Write};
 use tracing::warn;
 
 use crate::experimental::ring_buffer::{Simple8bRleRingBuffer, UncompressedRingBuffer};
-use crate::experimental::series::interpolation::{
-    Constant, Interpolation, LastAggregation, LastSample,
-};
+use crate::experimental::series::interpolation::Interpolation;
 use crate::experimental::series::statistic::Aggregation;
 use crate::experimental::series::SamplingInterval;
 
@@ -36,43 +34,6 @@ where
 }
 
 pub type Buffer<F, P> = <F as BufferStrategy<Aggregation<F>, P>>::Buffer;
-
-// The following `BufferStrategy` implementations associate an encoding with an aggregation type
-// and interpolation (with no other considerations). More sophisticated types like data semantics
-// and statistics may forward their implementations to these.
-
-impl BufferStrategy<i64, LastAggregation> for i64 {
-    type Buffer = DeltaZigZagSimple8bRle;
-}
-
-impl BufferStrategy<i64, LastSample> for i64 {
-    type Buffer = DeltaZigZagSimple8bRle;
-}
-
-impl BufferStrategy<i64, Constant> for i64 {
-    type Buffer = ZigZagSimple8bRle;
-}
-
-impl<P> BufferStrategy<f32, P> for f32
-where
-    P: Interpolation,
-{
-    type Buffer = Uncompressed<f32>;
-}
-
-impl BufferStrategy<u64, Constant> for u64 {
-    type Buffer = Simple8bRle;
-}
-
-impl BufferStrategy<u64, LastAggregation> for u64 {
-    // TODO(https://fxbug.dev/352614791): Use DeltaZigZagSimple8bRle ring buffer once implemented
-    type Buffer = Simple8bRle;
-}
-
-impl BufferStrategy<u64, LastSample> for u64 {
-    // TODO(https://fxbug.dev/352614791): Use DeltaZigZagSimple8bRle ring buffer once implemented
-    type Buffer = Simple8bRle;
-}
 
 /// A fixed-capacity circular ring buffer.
 pub trait RingBuffer<A> {
