@@ -5,42 +5,97 @@
 //! Testing-only code for persistent Timekeeper behavior changes around
 //! real-time clock (RTC) handling.
 
-use crate::Command;
 use anyhow::Result;
 use fidl_fuchsia_time_test as fftt;
-use futures::channel::mpsc;
-use futures::{SinkExt, StreamExt};
+use futures::StreamExt;
 use serde::{Deserialize, Serialize};
+use std::borrow::BorrowMut;
 use std::fs;
 use std::path::Path;
+use std::sync::{Arc, Mutex};
 use tracing::{debug, error};
 
-/// Serves fuchsia.time.test/RTC.
+/// The path to the internal production persistent state file.
+#[allow(dead_code)]
+const PERSISTENT_STATE_PATH: &'static str = "/data/persistent_state.json";
+
+/// A bool shareable across threads.
+///
+/// This is a less powerful version of "atomic bool", fitting the use case
+/// in this code:
+///
+/// 1. Isolate locks to short non-async fns to ensure locks are only held
+///    briefly and never across `.await`s.
+/// 2. Keeps the mutable state sharing code in one place.
+/// 3. Implements `Sync`, as its lifetime (but not use) crosses some `.await`
+///    calls in the using code. (e.g. `Rc<Refcell<_>>`` would not do.)
+#[derive(Debug, Clone)]
+pub struct SharedBool(Arc<Mutex<bool>>);
+
+impl SharedBool {
+    // Create a new [Self] with the provided value.
+    pub fn new(initial_value: bool) -> Self {
+        Self(Arc::new(Mutex::new(initial_value)))
+    }
+
+    /// Set a new value.
+    ///
+    /// May block the current thread if a concurrent operation is in progress.
+    /// May panic if the same thread attempts to block twice; or if any lock
+    /// holder panics.  Neither of these should ever happen in normal operation.
+    pub fn set(&mut self, new_value: bool) {
+        // Refer to docs of std::sync::Mutex for error condition details.
+        let mut g = self
+            .0
+            .lock()
+            .expect("either other holder of this lock panicked, or same thread attempted to lock");
+        *(*g.borrow_mut()) = new_value;
+    }
+
+    /// Get the current value. Blocks the current thread until done.
+    ///
+    /// May block the current thread if a concurrent operation is in progress.
+    /// May panic if the same thread attempts to lock twice; or if any lock
+    /// holder panics.  Neither of these should ever happen in normal operation.
+    pub fn get(&self) -> bool {
+        // Refer to docs of std::sync::Mutex for error condition details.
+        *self
+            .0
+            .lock()
+            .expect("either other holder of this lock panicked, or same thread attempted to lock")
+    }
+}
+
+/// Serves `fuchsia.time.test/Rtc`.
+///
+/// Args:
+/// - `persistent_enabled_bit`: the state bit to manage.
+/// - `stream`: the request stream from the test fixture.
 pub async fn serve(
-    mut cmd: mpsc::Sender<Command>,
+    mut persist_enabled: SharedBool,
     mut stream: fftt::RtcRequestStream,
 ) -> Result<()> {
+    debug!("rtc_testing::serve: entering serving loop");
     while let Some(request) = stream.next().await {
         match request {
             Ok(fftt::RtcRequest::PersistentEnable { responder, .. }) => {
-                debug!("fuchsia.time.test/Rtc.PersistentEnable");
-                let (s, mut done) = mpsc::channel(1);
-                cmd.send(Command::Rtc { persistent_enabled: true, done: s }).await?;
-                done.next().await;
+                debug!("received: fuchsia.time.test/Rtc.PersistentEnable");
+                persist_enabled.set(true);
                 responder.send(Ok(()))?;
+                write_state(&State::new(true));
             }
             Ok(fftt::RtcRequest::PersistentDisable { responder, .. }) => {
-                debug!("fuchsia.time.test/Rtc.PersistentDisable");
-                let (s, mut done) = mpsc::channel(1);
-                cmd.send(Command::Rtc { persistent_enabled: false, done: s }).await?;
-                done.next().await;
+                debug!("received: fuchsia.time.test/Rtc.PersistentDisable");
+                persist_enabled.set(false);
                 responder.send(Ok(()))?;
+                write_state(&State::new(false));
             }
             Err(e) => {
                 error!("FIDL error: {:?}", e);
             }
         };
     }
+    debug!("rtc_testing::serve: exited  serving loop");
     Ok(())
 }
 
@@ -74,7 +129,11 @@ impl State {
 }
 
 /// Read the persistent state. Any errors are logged only, and defaults are returned.
-pub fn read_and_update_state<P: AsRef<Path>>(path: P) -> State {
+pub fn read_and_update_state() -> State {
+    read_and_update_state_internal(PERSISTENT_STATE_PATH)
+}
+
+pub fn read_and_update_state_internal<P: AsRef<Path>>(path: P) -> State {
     let path = path.as_ref();
     let state: State = fs::read_to_string(path)
         .as_ref()
@@ -91,14 +150,18 @@ pub fn read_and_update_state<P: AsRef<Path>>(path: P) -> State {
     let mut next = state.clone();
     next.num_reboots_until_rtc_write_allowed =
         state.num_reboots_until_rtc_write_allowed.saturating_sub(1);
-    write_state(path, &next);
+    write_state_internal(path, &next);
 
     // Return the previous state.
     state
 }
 
 /// Write the persistent state to mutable persistent storage.
-pub fn write_state<P: AsRef<Path>>(path: P, state: &State) {
+pub fn write_state(state: &State) {
+    write_state_internal(PERSISTENT_STATE_PATH, state)
+}
+
+fn write_state_internal<P: AsRef<Path>>(path: P, state: &State) {
     let path = path.as_ref();
     debug!("writing persistent state: {:?} to {:?}", state, path);
     serde_json::to_string(state)
@@ -120,11 +183,11 @@ mod tests {
         let d = tempfile::TempDir::new().expect("tempdir created");
         let p = d.path().join("file.json");
         let s = State::new(false);
-        write_state(&p, &s);
+        write_state_internal(&p, &s);
 
         // First time around, we may not update the RTC.
-        assert!(!read_and_update_state(&p).may_update_rtc());
+        assert!(!read_and_update_state_internal(&p).may_update_rtc());
         // Second time around, we may.
-        assert!(read_and_update_state(&p).may_update_rtc());
+        assert!(read_and_update_state_internal(&p).may_update_rtc());
     }
 }

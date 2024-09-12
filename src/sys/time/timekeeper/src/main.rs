@@ -32,6 +32,7 @@ use fuchsia_runtime::{UtcClock, UtcTimeline};
 use futures::channel::mpsc;
 use futures::future::{self, OptionFuture};
 use futures::stream::StreamExt as _;
+use rtc_testing::SharedBool;
 use std::sync::Arc;
 use time_metrics_registry::TimeMetricDimensionExperiment;
 use tracing::{debug, error, info, warn};
@@ -45,15 +46,6 @@ use {
 pub enum Command {
     /// A power management command.
     PowerManagement,
-    /// A real time clock (RTC) command, only used in tests.
-    Rtc {
-        /// If true, the RTC will be used. If false, the RTC will not be used.
-        /// This setting persists across reboots.
-        persistent_enabled: bool,
-
-        /// The responder used to get a notification of job done.
-        done: mpsc::Sender<()>,
-    },
 }
 
 /// The type union of FIDL messages served by Timekeeper.
@@ -253,11 +245,15 @@ async fn main() -> Result<()> {
         }
     };
 
+    let allow_update_rtc =
+        rtc_testing::SharedBool::new(rtc_testing::read_and_update_state().may_update_rtc());
+
     let (cmd_send, cmd_rcv) = mpsc::channel(1);
-    let serve_test_protocols = config.serve_test_protocols();
 
     let cmd_send_clone = cmd_send.clone();
-    fasync::Task::spawn(async move {
+    let serve_test_protocols = config.serve_test_protocols();
+    let aur = allow_update_rtc.clone();
+    fasync::Task::local(async move {
         maintain_utc(
             primary_track,
             monitor_track,
@@ -266,6 +262,7 @@ async fn main() -> Result<()> {
             config,
             cmd_send_clone,
             cmd_rcv,
+            aur,
         )
         .await;
     })
@@ -282,8 +279,7 @@ async fn main() -> Result<()> {
         fs.take_and_serve_directory_handle()?;
         info!("serving test protocols: fuchsia.test.time/RTC");
 
-        // Allows us to move cmd_send into the closure below.
-        let send_fn = || cmd_send.clone();
+        let allow_update_rtc_fn = || allow_update_rtc.clone();
 
         // Serves one client at a time.  Multiple clients at a time could produce conflicting
         // results.
@@ -291,7 +287,7 @@ async fn main() -> Result<()> {
             .for_each(|request: Rpcs| async move {
                 match request {
                     Rpcs::TimeTest(stream) => {
-                        rtc_testing::serve(send_fn(), stream)
+                        rtc_testing::serve(allow_update_rtc_fn(), stream)
                             .await
                             .map_err(|e| {
                                 tracing::error!("while serving fuchsia.time.test/RPC: {:?}", e)
@@ -424,6 +420,7 @@ async fn maintain_utc<R: 'static, D: 'static>(
     config: Arc<Config>,
     cmd_send: mpsc::Sender<Command>,
     cmd_recv: mpsc::Receiver<Command>,
+    allow_update_rtc: rtc_testing::SharedBool,
 ) where
     R: Rtc,
     D: Diagnostics,
@@ -509,6 +506,7 @@ async fn maintain_utc<R: 'static, D: 'static>(
         Track::Primary,
         Arc::clone(&config),
         cmd_recv,
+        allow_update_rtc,
     );
     let (_, r2) = mpsc::channel(1);
     let fut2_cfg_clone = config.clone();
@@ -522,6 +520,7 @@ async fn maintain_utc<R: 'static, D: 'static>(
                 Track::Monitor,
                 fut2_cfg_clone,
                 r2,
+                SharedBool::new(true),
             )
         })
         .into();
@@ -641,6 +640,7 @@ mod tests {
         let monotonic_ref = zx::MonotonicTime::get();
 
         let (s, r) = mpsc::channel(1);
+        let b = rtc_testing::SharedBool::new(true);
 
         // Maintain UTC until no more work remains
         let mut fut = maintain_utc(
@@ -674,6 +674,7 @@ mod tests {
             Arc::clone(&config),
             s,
             r,
+            b,
         )
         .boxed();
         let _ = executor.run_until_stalled(&mut fut);
@@ -729,6 +730,7 @@ mod tests {
 
         let monotonic_ref = zx::MonotonicTime::get();
         let (s, r) = mpsc::channel(1);
+        let b = rtc_testing::SharedBool::new(true);
 
         // Maintain UTC until no more work remains
         let mut fut = maintain_utc(
@@ -750,6 +752,7 @@ mod tests {
             Arc::clone(&config),
             s,
             r,
+            b,
         )
         .boxed();
 
@@ -805,6 +808,7 @@ mod tests {
 
         let monotonic_ref = zx::MonotonicTime::get();
         let (s, r) = mpsc::channel(1);
+        let b = rtc_testing::SharedBool::new(true);
 
         // Maintain UTC until no more work remains
         let mut fut = maintain_utc(
@@ -826,6 +830,7 @@ mod tests {
             Arc::clone(&config),
             s,
             r,
+            b,
         )
         .boxed();
 
@@ -859,6 +864,7 @@ mod tests {
         }])
         .into();
         let (s, r) = mpsc::channel(1);
+        let b = rtc_testing::SharedBool::new(true);
 
         // Maintain UTC until no more work remains
         let mut fut = maintain_utc(
@@ -869,6 +875,7 @@ mod tests {
             Arc::clone(&config),
             s,
             r,
+            b,
         )
         .boxed();
         let _ = executor.run_until_stalled(&mut fut);
@@ -903,6 +910,7 @@ mod tests {
         }])
         .into();
         let (s, r) = mpsc::channel(1);
+        let b = rtc_testing::SharedBool::new(true);
 
         // Maintain UTC until no more work remains
         let mut fut = maintain_utc(
@@ -913,6 +921,7 @@ mod tests {
             Arc::clone(&config),
             s,
             r,
+            b,
         )
         .boxed();
         let _ = executor.run_until_stalled(&mut fut);
@@ -958,6 +967,7 @@ mod tests {
         }])
         .into();
         let (s, r) = mpsc::channel(1);
+        let b = rtc_testing::SharedBool::new(true);
 
         // Maintain UTC until no more work remains
         let mut fut = maintain_utc(
@@ -968,6 +978,7 @@ mod tests {
             Arc::clone(&config),
             s,
             r,
+            b,
         )
         .boxed();
         let _ = executor.run_until_stalled(&mut fut);
@@ -1012,6 +1023,7 @@ mod tests {
         .into();
 
         let (s, r) = mpsc::channel(1);
+        let b = rtc_testing::SharedBool::new(true);
 
         // Maintain UTC until no more work remains
         let mut fut = maintain_utc(
@@ -1022,6 +1034,7 @@ mod tests {
             Arc::clone(&config),
             s,
             r,
+            b,
         )
         .boxed();
         let _ = executor.run_until_stalled(&mut fut);

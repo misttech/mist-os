@@ -8,8 +8,9 @@ use crate::enums::{
 };
 use crate::estimator::Estimator;
 use crate::rtc::Rtc;
+use crate::rtc_testing::SharedBool;
 use crate::time_source_manager::{KernelMonotonicProvider, TimeSourceManager};
-use crate::{rtc_testing, Command, Config};
+use crate::{Command, Config};
 use chrono::prelude::*;
 use fuchsia_runtime::{UtcClock, UtcTime, UtcTimeline};
 use fuchsia_zircon::{self as zx, AsHandleRef};
@@ -57,6 +58,7 @@ const ERROR_REFRESH_INTERVAL: zx::Duration = zx::Duration::from_minutes(6);
 const ZX_CLOCK_UNKNOWN_ERROR_BOUND: u64 = u64::MAX;
 
 /// The path to the internal persistentstate
+#[allow(dead_code)]
 const PERSISTENT_STATE_PATH: &'static str = "/data/persistent_state.json";
 
 /// Describes how a correction will be made to a clock.
@@ -315,9 +317,10 @@ impl<R: Rtc, D: 'static + Diagnostics> ClockManager<R, D> {
         track: Track,
         config: Arc<Config>,
         async_commands: mpsc::Receiver<Command>,
+        allow_update_rtc: SharedBool,
     ) {
         ClockManager::new(clock, time_source_manager, rtc, diagnostics, track, config, None)
-            .maintain_clock(async_commands)
+            .maintain_clock(async_commands, allow_update_rtc)
             .await
     }
 
@@ -350,7 +353,17 @@ impl<R: Rtc, D: 'static + Diagnostics> ClockManager<R, D> {
     }
 
     /// Maintain the clock indefinitely. This future will never complete.
-    async fn maintain_clock(mut self, async_commands: mpsc::Receiver<Command>) {
+    ///
+    /// Args:
+    /// - `async_commands`: a channel with commands delivered to the maintain clock
+    ///   loop.
+    /// - `allow_update_rtc`: whether the maintain clock loop is allowed to update RTC.
+    ///   This value can be changed by a concurrent but not parallel async fn.
+    async fn maintain_clock(
+        mut self,
+        async_commands: mpsc::Receiver<Command>,
+        allow_update_rtc: SharedBool,
+    ) {
         let pull_delay = self.config.get_back_off_time_between_pull_samples();
         let first_delay = self.config.get_first_sampling_delay();
 
@@ -370,8 +383,8 @@ impl<R: Rtc, D: 'static + Diagnostics> ClockManager<R, D> {
 
         // Initialize from persistent settings.
         let serve_test_protocols = self.config.serve_test_protocols();
-        let mut allow_timekeeper_to_update_rtc = !serve_test_protocols
-            || rtc_testing::read_and_update_state(PERSISTENT_STATE_PATH).may_update_rtc();
+        let update_allowed = allow_update_rtc.get();
+        let allow_timekeeper_to_update_rtc = !serve_test_protocols || update_allowed;
         if !allow_timekeeper_to_update_rtc {
             warn!("RTC updates by Timekeeper are not allowed. This is not a production setting. Take note if you didn't expect this.");
         }
@@ -424,18 +437,6 @@ impl<R: Rtc, D: 'static + Diagnostics> ClockManager<R, D> {
                         Some(Command::PowerManagement) => {
                             self.record_correction(
                                 ClockCorrection::MaxErrorBound, &Default::default(), zx::MonotonicTime::ZERO);
-                        }
-                        Some(Command::Rtc{ persistent_enabled, mut done }) => {
-                            allow_timekeeper_to_update_rtc = persistent_enabled;
-                            rtc_testing::write_state(PERSISTENT_STATE_PATH, &rtc_testing::State::new(allow_timekeeper_to_update_rtc));
-
-
-                            // Acknowledge the change, in a detached task to avoid blocking.
-                            fasync::Task::local(async move {
-                                if let Err(e) = done.send(()).await {
-                                    warn!("could not acknowledge error: {:?}", &e);
-                                }
-                            }).detach();
                         }
                         None => {
                             debug!("unexpected `None`");
@@ -984,7 +985,8 @@ mod tests {
         // Maintain the clock until no more work remains.
         let monotonic_before = zx::MonotonicTime::get();
         let (_, r) = mpsc::channel(1);
-        let mut fut = clock_manager.maintain_clock(r).boxed();
+        let allow_rtc = SharedBool::new(true);
+        let mut fut = clock_manager.maintain_clock(r, allow_rtc).boxed();
         let _ = executor.run_until_stalled(&mut fut);
         let updated_utc = clock.read().unwrap();
         let monotonic_after = zx::MonotonicTime::get();
@@ -1037,7 +1039,8 @@ mod tests {
 
         let (_, r) = mpsc::channel(1);
         let start_time = executor.now();
-        let mut fut = clock_manager.maintain_clock(r).boxed();
+        let b = SharedBool::new(true);
+        let mut fut = clock_manager.maintain_clock(r, b).boxed();
 
         let _ = executor.run_until_stalled(&mut fut);
 
@@ -1064,6 +1067,7 @@ mod tests {
         // At the start, the clock is set to no error.
         let details = clock_clone.get_details().unwrap();
         assert_eq!(0, details.error_bounds);
+        let b = SharedBool::new(true);
 
         let _t = fasync::Task::local(async move {
             // Set zero bound.
@@ -1085,7 +1089,7 @@ mod tests {
                 config,
                 Some(test_sender),
             );
-            clock_manager.maintain_clock(r).boxed().await;
+            clock_manager.maintain_clock(r, b).boxed().await;
         });
 
         // Signal that clock update is needed.
@@ -1115,6 +1119,7 @@ mod tests {
             let rtc = FakeRtc::valid(BACKSTOP_TIME);
             let diagnostics = Arc::new(FakeDiagnostics::new());
             let config = crate::tests::make_test_config_with_test_protocols();
+            let b = SharedBool::new(true);
 
             let monotonic_ref = zx::MonotonicTime::get();
             let clock_manager = create_clock_manager(
@@ -1130,19 +1135,15 @@ mod tests {
                 config,
                 Some(test_sender),
             );
-            clock_manager.maintain_clock(r).boxed().await;
+            clock_manager.maintain_clock(r, b).boxed().await;
         });
-
-        let (done_send, mut done_recv) = mpsc::channel(1);
 
         // Signal that clock update is needed.
         let _signal_rtc_command = fasync::Task::local(async move {
-            s.send(Command::Rtc { persistent_enabled: false, done: done_send }).await.unwrap();
+            s.send(Command::PowerManagement).await.unwrap();
         });
 
         // Wait until the signal propagates.
-        let _result = executor
-            .run_singlethreaded(async move { done_recv.next().await.expect("received result") });
         let ret = executor.run_singlethreaded(async move { test_received.next().await });
         assert_eq!(Some(()), ret);
     }
@@ -1172,7 +1173,8 @@ mod tests {
         // Maintain the clock until no more work remains
         let monotonic_before = zx::MonotonicTime::get();
         let (_, r) = mpsc::channel(1);
-        let mut fut = clock_manager.maintain_clock(r).boxed();
+        let b = SharedBool::new(true);
+        let mut fut = clock_manager.maintain_clock(r, b).boxed();
         let _ = executor.run_until_stalled(&mut fut);
         let updated_utc = clock.read().unwrap();
         let monotonic_after = zx::MonotonicTime::get();
@@ -1242,7 +1244,8 @@ mod tests {
         // Maintain the clock until no more work remains
         let monotonic_before = zx::MonotonicTime::get();
         let (_, r) = mpsc::channel(1);
-        let mut fut = clock_manager.maintain_clock(r).boxed();
+        let b = SharedBool::new(true);
+        let mut fut = clock_manager.maintain_clock(r, b).boxed();
         let _ = executor.run_until_stalled(&mut fut);
         let updated_utc = clock.read().unwrap();
         let monotonic_after = zx::MonotonicTime::get();
@@ -1327,7 +1330,8 @@ mod tests {
         // a clock skew but blocking on the timer to end it.
         let monotonic_before = zx::MonotonicTime::get();
         let (_, r) = mpsc::channel(1);
-        let mut fut = clock_manager.maintain_clock(r).boxed();
+        let b = SharedBool::new(true);
+        let mut fut = clock_manager.maintain_clock(r, b).boxed();
         let _ = executor.run_until_stalled(&mut fut);
         let updated_utc = clock.read().unwrap();
         let details = clock.get_details().unwrap();
