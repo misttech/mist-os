@@ -18,10 +18,9 @@
 #include <lib/mistos/starnix/testing/testing.h>
 #include <lib/unittest/unittest.h>
 
+#include <fbl/vector.h>
 #include <ktl/algorithm.h>
 #include <ktl/span.h>
-
-#include "fbl/vector.h"
 
 namespace unit_testing {
 
