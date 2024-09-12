@@ -329,7 +329,10 @@ impl ConnectDisconnectTimeSeries {
         );
         let connected_networks = manager.inspect_time_matrix_with_metadata(
             "connected_networks",
-            TimeMatrix::<Union<u64>, Constant>::default(),
+            TimeMatrix::<Union<u64>, Constant>::new(
+                SamplingProfile::granular(),
+                Constant::default(),
+            ),
             InspectedTimeMatrixMetadata::default().with_bit_mapping(format!(
                 "{inspect_metadata_path}/{}",
                 InspectMetadataNode::CONNECTED_NETWORKS
@@ -337,7 +340,10 @@ impl ConnectDisconnectTimeSeries {
         );
         let disconnected_networks = manager.inspect_time_matrix_with_metadata(
             "disconnected_networks",
-            TimeMatrix::<Union<u64>, Constant>::default(),
+            TimeMatrix::<Union<u64>, Constant>::new(
+                SamplingProfile::granular(),
+                Constant::default(),
+            ),
             InspectedTimeMatrixMetadata::default()
                 // `disconnected_networks` uses the same bit_mapping as `connected_networks`
                 .with_bit_mapping(format!(
@@ -347,7 +353,10 @@ impl ConnectDisconnectTimeSeries {
         );
         let disconnect_sources = manager.inspect_time_matrix_with_metadata(
             "disconnect_sources",
-            TimeMatrix::<Union<u64>, Constant>::default(),
+            TimeMatrix::<Union<u64>, Constant>::new(
+                SamplingProfile::granular(),
+                Constant::default(),
+            ),
             InspectedTimeMatrixMetadata::default().with_bit_mapping(format!(
                 "{inspect_metadata_path}/{}",
                 InspectMetadataNode::DISCONNECT_SOURCES
