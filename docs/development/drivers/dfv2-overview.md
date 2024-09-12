@@ -1,7 +1,7 @@
 # DFv2 driver development documentation
 
 The documentation in this section is designed to help driver developers create
-new drivers using Fuchsia's [driver framework version 2 (DFv2)][dfv2].
+new drivers using Fuchsia's [driver framework version 2][dfv2] (DFv2).
 
 ## How-to {:#how-to}
 
@@ -68,6 +68,8 @@ See the following tutorials under the **SDK** section:
   bind rules for DFv2 drivers in the Fuchsia SDK environment.
 - [**Driver unit testing quick start**][driver-unit-testing]: Learn how to
   write unit tests for DFv2 drivers in the Fuchsia SDK environment.
+- [**View driver information**][view-driver-info]: Learn how to use the
+  `ffx driver` command to retrieve information about drivers.
 
 <!-- Reference links -->
 
@@ -91,3 +93,4 @@ See the following tutorials under the **SDK** section:
 [driver-codelab]: /docs/get-started/sdk/learn/driver/introduction.md
 [write-bind-rules]: /docs/development/sdk/write-bind-rules-for-driver.md
 [driver-unit-testing]: /docs/development/sdk/driver-testing/driver-unit-testing-quick-start.md
+[view-driver-info]: /docs/development/sdk/ffx/view-driver-information.md
