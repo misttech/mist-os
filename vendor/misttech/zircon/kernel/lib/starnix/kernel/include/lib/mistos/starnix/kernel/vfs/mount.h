@@ -6,7 +6,6 @@
 #define VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_VFS_MOUNT_H_
 
 #include <lib/fit/result.h>
-#include <lib/mistos/starnix/kernel/sync/locks.h>
 #include <lib/mistos/starnix/kernel/vfs/namespace_node.h>
 #include <lib/mistos/starnix/kernel/vfs/path.h>
 #include <lib/mistos/starnix_uapi/device_type.h>
@@ -16,6 +15,7 @@
 #include <lib/mistos/starnix_uapi/open_flags.h>
 #include <lib/mistos/starnix_uapi/vfs.h>
 #include <lib/mistos/util/weak_wrapper.h>
+#include <lib/starnix_sync/locks.h>
 
 #include <fbl/ref_counted_upgradeable.h>
 #include <fbl/ref_ptr.h>
@@ -90,7 +90,7 @@ class Mount : public fbl::RefCountedUpgradeable<Mount> {
  public:
   DirEntryHandle root_;
   FileSystemHandle fs;
-  mutable StarnixMutex<MountFlags> flags_;
+  mutable starnix_sync::StarnixMutex<MountFlags> flags_;
 
   // A unique identifier for this mount reported in /proc/pid/mountinfo.
   uint64_t id;
@@ -98,7 +98,7 @@ class Mount : public fbl::RefCountedUpgradeable<Mount> {
   /// A count of the number of active clients.
   // active_client_counter: MountClientMarker,
 
-  mutable RwLock<MountState> state;
+  mutable starnix_sync::RwLock<MountState> state;
   // Mount used to contain a Weak<Namespace>. It no longer does because since the mount point
   // hash was moved from Namespace to Mount, nothing actually uses it. Now that
   // Namespace::clone_namespace() is implemented in terms of Mount::clone_mount_recursive, it

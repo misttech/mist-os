@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <lib/mistos/starnix/kernel/sync/locks.h>
+#include <lib/starnix_sync/locks.h>
 #include <lib/unittest/unittest.h>
 
 #include <fbl/mutex.h>
@@ -13,7 +13,7 @@
 
 namespace unit_testing {
 
-using namespace starnix;
+using namespace starnix_sync;
 
 struct Data {
   int val;

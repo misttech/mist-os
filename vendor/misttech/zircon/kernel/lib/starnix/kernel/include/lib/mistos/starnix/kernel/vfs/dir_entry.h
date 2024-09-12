@@ -7,12 +7,12 @@
 #define ZIRCON_KERNEL_LIB_MISTOS_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_VFS_DIR_ENTRY_H_
 
 #include <lib/fit/result.h>
-#include <lib/mistos/starnix/kernel/sync/locks.h>
 #include <lib/mistos/starnix/kernel/vfs/fs_node.h>
 #include <lib/mistos/starnix/kernel/vfs/mount_info.h>
 #include <lib/mistos/starnix/kernel/vfs/path.h>
 #include <lib/mistos/starnix_uapi/errors.h>
 #include <lib/mistos/util/weak_wrapper.h>
+#include <lib/starnix_sync/locks.h>
 
 #include <functional>
 #include <utility>
@@ -26,6 +26,8 @@ bool test_tmpfs();
 }
 
 namespace starnix {
+
+using namespace starnix_sync;
 
 class CurrentTask;
 class DirEntry;
