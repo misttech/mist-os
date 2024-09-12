@@ -23,7 +23,7 @@ function is_feature_enabled_by_default {
   "incremental_new") return 1 ;;
   "legacy_fastboot") return 1 ;;
   "legacy_fxtest") return 1 ;;
-  "legacy_fxstatus") return 0 ;;
+  "legacy_fxstatus") return 1 ;;
   esac
 
   # global default is enabled
