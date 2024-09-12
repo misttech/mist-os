@@ -50,33 +50,15 @@ Possible return values are `0` (LOW) or `1` (HIGH).
 
 Aliases: `r`
 
-### write
-
-```none
-gpioutil write <name> <value>
-```
-
-Write a value to a GPIO that's configured as IN.
-
-`<name>` should be one of the values returned from [`list`](#list).
-
-`<value>` should be `0` (LOW) or `1` (HIGH).
-
-This command doesn't return a value.
-
-Aliases: `w`
-
 ### in
 
 ```none
-gpioutil in <name> <value>
+gpioutil in <name>
 ```
 
 Configure a GPIO as IN.
 
 `<name>` should be one of the values returned from [`list`](#list).
-
-`<value>` is the resistor pull. Accepted values are `down`, `up`, or `none`.
 
 This command doesn't return a value.
 
@@ -146,6 +128,20 @@ Set the function for a pin.
 used.
 
 Aliases: `f`
+
+### pull
+
+```none
+gpioutil pull <name> <value>
+```
+
+Configure the pull-up or pull-down resistor for a pin.
+
+`<name>` should be one of the values returned from [`list`](#list).
+
+`<value>` is the resistor pull. Accepted values are `down`, `up`, or `none`.
+
+Aliases: `p`
 
 ### help
 

@@ -17,6 +17,7 @@ namespace {
 using fuchsia_hardware_gpio::Gpio;
 
 class FakeGpio : public fidl::WireServer<Gpio>,
+                 public fidl::WireServer<fuchsia_hardware_pin::Pin>,
                  public fidl::WireServer<fuchsia_hardware_pin::Debug> {
  public:
   explicit FakeGpio(async_dispatcher_t* dispatcher, uint32_t pin = 0,
@@ -36,7 +37,8 @@ class FakeGpio : public fidl::WireServer<Gpio>,
 
   void ConnectPin(fuchsia_hardware_pin::wire::DebugConnectPinRequest* request,
                   ConnectPinCompleter::Sync& completer) override {
-    completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+    fidl::BindServer(dispatcher_, std::move(request->server), this);
+    completer.ReplySuccess();
   }
 
   void ConnectGpio(fuchsia_hardware_pin::wire::DebugConnectGpioRequest* request,
@@ -50,6 +52,34 @@ class FakeGpio : public fidl::WireServer<Gpio>,
     FAIL("Unknown method ordinal 0x%016lx", metadata.method_ordinal);
   }
 
+  void Configure(fuchsia_hardware_pin::wire::PinConfigureRequest* request,
+                 ConfigureCompleter::Sync& completer) override {
+    if (request->config.has_pull()) {
+      mock_set_pull_.Call(request->config.pull());
+    }
+    if (request->config.has_drive_strength_ua()) {
+      mock_set_drive_strength_.Call(request->config.drive_strength_ua());
+    }
+    if (request->config.has_function()) {
+      mock_set_function_.Call(request->config.function());
+    }
+
+    if (!request->config.has_pull() && !request->config.has_drive_strength_ua() &&
+        !request->config.has_function()) {
+      fidl::Arena arena;
+      completer.ReplySuccess(fuchsia_hardware_pin::wire::Configuration::Builder(arena)
+                                 .drive_strength_ua(mock_get_drive_strength_.Call())
+                                 .Build());
+    } else {
+      completer.ReplySuccess(request->config);
+    }
+  }
+
+  void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_hardware_pin::Pin> metadata,
+                             fidl::UnknownMethodCompleter::Sync& completer) override {
+    FAIL("Unknown method ordinal 0x%016lx", metadata.method_ordinal);
+  }
+
   void GetPin(GetPinCompleter::Sync& completer) override {
     mock_get_pin_.Call();
     completer.ReplySuccess(pin_);
@@ -58,53 +88,20 @@ class FakeGpio : public fidl::WireServer<Gpio>,
     mock_get_name_.Call();
     completer.ReplySuccess(::fidl::StringView::FromExternal(name_));
   }
-  void ConfigIn(ConfigInRequestView request, ConfigInCompleter::Sync& completer) override {
-    if (request->flags != fuchsia_hardware_gpio::wire::GpioFlags::kNoPull) {
-      completer.ReplyError(ZX_ERR_INVALID_ARGS);
-      return;
-    }
-    mock_config_in_.Call();
-    completer.ReplySuccess();
-  }
-  void ConfigOut(ConfigOutRequestView request, ConfigOutCompleter::Sync& completer) override {
-    if (request->initial_value != 3) {
-      completer.ReplyError(ZX_ERR_INVALID_ARGS);
-      return;
-    }
-    mock_config_out_.Call();
-    completer.ReplySuccess();
-  }
-  void Read(ReadCompleter::Sync& completer) override {
-    mock_read_.Call();
-    completer.ReplySuccess(true);
-  }
+  void ConfigIn(ConfigInRequestView request, ConfigInCompleter::Sync& completer) override {}
+  void ConfigOut(ConfigOutRequestView request, ConfigOutCompleter::Sync& completer) override {}
+  void Read(ReadCompleter::Sync& completer) override { completer.ReplySuccess(mock_read_.Call()); }
   void SetBufferMode(SetBufferModeRequestView request,
-                     SetBufferModeCompleter::Sync& completer) override {}
-  void Write(WriteRequestView request, WriteCompleter::Sync& completer) override {
-    if (request->value != 7) {
-      completer.ReplyError(ZX_ERR_INVALID_ARGS);
-      return;
-    }
-    mock_write_.Call();
+                     SetBufferModeCompleter::Sync& completer) override {
+    mock_set_buffer_mode_.Call(request->mode);
     completer.ReplySuccess();
   }
+  void Write(WriteRequestView request, WriteCompleter::Sync& completer) override {}
   void SetDriveStrength(SetDriveStrengthRequestView request,
-                        SetDriveStrengthCompleter::Sync& completer) override {
-    if (request->ds_ua != 2000) {
-      completer.ReplyError(ZX_ERR_INVALID_ARGS);
-      return;
-    }
-    mock_set_drive_strength_.Call();
-    completer.ReplySuccess(2000);
-  }
-  void GetDriveStrength(GetDriveStrengthCompleter::Sync& completer) override {
-    mock_get_drive_strength_.Call();
-    completer.ReplySuccess(2000);
-  }
+                        SetDriveStrengthCompleter::Sync& completer) override {}
+  void GetDriveStrength(GetDriveStrengthCompleter::Sync& completer) override {}
   void GetInterrupt2(GetInterrupt2RequestView request,
-                     GetInterrupt2Completer::Sync& completer) override {}
-  void GetInterrupt(GetInterruptRequestView request,
-                    GetInterruptCompleter::Sync& completer) override {
+                     GetInterrupt2Completer::Sync& completer) override {
     if (client_got_interrupt_) {
       return completer.ReplyError(ZX_ERR_ALREADY_BOUND);
     }
@@ -125,9 +122,13 @@ class FakeGpio : public fidl::WireServer<Gpio>,
     mock_get_interrupt_.Call();
     completer.ReplySuccess(std::move(interrupt));
   }
+  void GetInterrupt(GetInterruptRequestView request,
+                    GetInterruptCompleter::Sync& completer) override {}
   void ConfigureInterrupt(fuchsia_hardware_gpio::wire::GpioConfigureInterruptRequest* request,
                           ConfigureInterruptCompleter::Sync& completer) override {
-    completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+    ASSERT_TRUE(request->config.has_mode());
+    mock_configure_interrupt_.Call(request->config.mode());
+    completer.ReplySuccess();
   }
   void ReleaseInterrupt(ReleaseInterruptCompleter::Sync& completer) override {
     if (!client_got_interrupt_) {
@@ -138,47 +139,48 @@ class FakeGpio : public fidl::WireServer<Gpio>,
     completer.ReplySuccess();
   }
   void SetAltFunction(SetAltFunctionRequestView request,
-                      SetAltFunctionCompleter::Sync& completer) override {
-    mock_set_alt_function_.Call(request->function);
-    completer.ReplySuccess();
-  }
+                      SetAltFunctionCompleter::Sync& completer) override {}
   void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_hardware_gpio::Gpio> metadata,
                              fidl::UnknownMethodCompleter::Sync& completer) override {
     FAIL("Unknown method ordinal 0x%016lx", metadata.method_ordinal);
   }
 
-  mock_function::MockFunction<zx_status_t>& MockGetPin() { return mock_get_pin_; }
-  mock_function::MockFunction<zx_status_t>& MockGetName() { return mock_get_name_; }
-  mock_function::MockFunction<zx_status_t>& MockConfigIn() { return mock_config_in_; }
-  mock_function::MockFunction<zx_status_t>& MockConfigOut() { return mock_config_out_; }
-  mock_function::MockFunction<zx_status_t>& MockRead() { return mock_read_; }
-  mock_function::MockFunction<zx_status_t>& MockWrite() { return mock_write_; }
-  mock_function::MockFunction<zx_status_t>& MockSetDriveStrength() {
+  mock_function::MockFunction<void>& MockGetPin() { return mock_get_pin_; }
+  mock_function::MockFunction<void>& MockGetName() { return mock_get_name_; }
+  mock_function::MockFunction<bool>& MockRead() { return mock_read_; }
+  mock_function::MockFunction<void, fuchsia_hardware_gpio::BufferMode>& MockSetBufferMode() {
+    return mock_set_buffer_mode_;
+  }
+  mock_function::MockFunction<void, uint64_t>& MockSetDriveStrength() {
     return mock_set_drive_strength_;
   }
-  mock_function::MockFunction<zx_status_t>& MockGetInterrupt() { return mock_get_interrupt_; }
-  mock_function::MockFunction<zx_status_t>& MockReleaseInterrupt() {
-    return mock_release_interrupt_;
+  mock_function::MockFunction<uint64_t>& MockGetDriveStrength() { return mock_get_drive_strength_; }
+  mock_function::MockFunction<void>& MockGetInterrupt() { return mock_get_interrupt_; }
+  mock_function::MockFunction<void, fuchsia_hardware_gpio::InterruptMode>&
+  MockConfigureInterrupt() {
+    return mock_configure_interrupt_;
   }
-  mock_function::MockFunction<zx_status_t, uint64_t>& MockSetAltFunction() {
-    return mock_set_alt_function_;
+  mock_function::MockFunction<void>& MockReleaseInterrupt() { return mock_release_interrupt_; }
+  mock_function::MockFunction<void, uint64_t>& MockSetFunction() { return mock_set_function_; }
+  mock_function::MockFunction<void, fuchsia_hardware_pin::Pull>& MockSetPull() {
+    return mock_set_pull_;
   }
 
  private:
   async_dispatcher_t* const dispatcher_;
   const uint32_t pin_;
   const std::string_view name_;
-  mock_function::MockFunction<zx_status_t> mock_get_pin_;
-  mock_function::MockFunction<zx_status_t> mock_get_name_;
-  mock_function::MockFunction<zx_status_t> mock_config_in_;
-  mock_function::MockFunction<zx_status_t> mock_config_out_;
-  mock_function::MockFunction<zx_status_t> mock_read_;
-  mock_function::MockFunction<zx_status_t> mock_write_;
-  mock_function::MockFunction<zx_status_t> mock_set_drive_strength_;
-  mock_function::MockFunction<zx_status_t> mock_get_drive_strength_;
-  mock_function::MockFunction<zx_status_t> mock_get_interrupt_;
-  mock_function::MockFunction<zx_status_t> mock_release_interrupt_;
-  mock_function::MockFunction<zx_status_t, uint64_t> mock_set_alt_function_;
+  mock_function::MockFunction<void> mock_get_pin_;
+  mock_function::MockFunction<void> mock_get_name_;
+  mock_function::MockFunction<bool> mock_read_;
+  mock_function::MockFunction<void, fuchsia_hardware_gpio::BufferMode> mock_set_buffer_mode_;
+  mock_function::MockFunction<void, uint64_t> mock_set_drive_strength_;
+  mock_function::MockFunction<uint64_t> mock_get_drive_strength_;
+  mock_function::MockFunction<void> mock_get_interrupt_;
+  mock_function::MockFunction<void, fuchsia_hardware_gpio::InterruptMode> mock_configure_interrupt_;
+  mock_function::MockFunction<void> mock_release_interrupt_;
+  mock_function::MockFunction<void, uint64_t> mock_set_function_;
+  mock_function::MockFunction<void, fuchsia_hardware_pin::Pull> mock_set_pull_;
   bool client_got_interrupt_ = false;
 };
 
@@ -196,11 +198,17 @@ class GpioUtilTest : public zxtest::Test {
   }
 
   void TearDown() override {
-    gpio_->MockConfigIn().VerifyAndClear();
-    gpio_->MockConfigOut().VerifyAndClear();
+    gpio_->MockGetPin().VerifyAndClear();
+    gpio_->MockGetName().VerifyAndClear();
     gpio_->MockRead().VerifyAndClear();
-    gpio_->MockWrite().VerifyAndClear();
+    gpio_->MockSetBufferMode().VerifyAndClear();
     gpio_->MockSetDriveStrength().VerifyAndClear();
+    gpio_->MockGetDriveStrength().VerifyAndClear();
+    gpio_->MockGetInterrupt().VerifyAndClear();
+    gpio_->MockConfigureInterrupt().VerifyAndClear();
+    gpio_->MockReleaseInterrupt().VerifyAndClear();
+    gpio_->MockSetFunction().VerifyAndClear();
+    gpio_->MockSetPull().VerifyAndClear();
 
     loop_->Shutdown();
   }
@@ -215,27 +223,20 @@ TEST_F(GpioUtilTest, GetNameTest) {
   int argc = 3;
   const char* argv[] = {"gpioutil", "n", "some_path"};
 
+  fidl::Arena arena;
   GpioFunc func;
-  uint8_t write_value, out_value;
-  uint64_t ds_ua;
-  fuchsia_hardware_gpio::wire::GpioFlags in_flag;
-  uint32_t interrupt_flags;
-  uint64_t alt_function;
-  EXPECT_EQ(ParseArgs(argc, const_cast<char**>(argv), &func, &write_value, &in_flag, &out_value,
-                      &ds_ua, &interrupt_flags, &alt_function),
+  fuchsia_hardware_gpio::BufferMode buffer_mode;
+  fuchsia_hardware_gpio::InterruptMode interrupt_mode;
+  fuchsia_hardware_pin::wire::Configuration config;
+  EXPECT_EQ(ParseArgs(argc, const_cast<char**>(argv), &func, arena, &buffer_mode, &interrupt_mode,
+                      &config),
             0);
-  EXPECT_EQ(func, 6);
-  EXPECT_EQ(write_value, 0);
-  EXPECT_EQ(in_flag, fuchsia_hardware_gpio::wire::GpioFlags::kNoPull);
-  EXPECT_EQ(out_value, 0);
-  EXPECT_EQ(ds_ua, 0);
-  EXPECT_EQ(interrupt_flags, 0);
-  EXPECT_EQ(alt_function, 0);
+  EXPECT_EQ(func, GetName);
 
-  gpio_->MockGetPin().ExpectCall(ZX_OK);
-  gpio_->MockGetName().ExpectCall(ZX_OK);
-  EXPECT_EQ(ClientCall(fidl::WireSyncClient(std::move(client_)), func, write_value, in_flag,
-                       out_value, ds_ua, interrupt_flags, alt_function),
+  gpio_->MockGetPin().ExpectCall();
+  gpio_->MockGetName().ExpectCall();
+  EXPECT_EQ(ClientCall(fidl::WireSyncClient(std::move(client_)), func, arena, buffer_mode,
+                       interrupt_mode, config),
             0);
 }
 
@@ -243,107 +244,61 @@ TEST_F(GpioUtilTest, ReadTest) {
   int argc = 3;
   const char* argv[] = {"gpioutil", "r", "some_path"};
 
+  fidl::Arena arena;
   GpioFunc func;
-  uint8_t write_value, out_value;
-  uint64_t ds_ua;
-  fuchsia_hardware_gpio::wire::GpioFlags in_flag;
-  uint32_t interrupt_flags;
-  uint64_t alt_function;
-  EXPECT_EQ(ParseArgs(argc, const_cast<char**>(argv), &func, &write_value, &in_flag, &out_value,
-                      &ds_ua, &interrupt_flags, &alt_function),
+  fuchsia_hardware_gpio::BufferMode buffer_mode;
+  fuchsia_hardware_gpio::InterruptMode interrupt_mode;
+  fuchsia_hardware_pin::wire::Configuration config;
+  EXPECT_EQ(ParseArgs(argc, const_cast<char**>(argv), &func, arena, &buffer_mode, &interrupt_mode,
+                      &config),
             0);
-  EXPECT_EQ(func, 0);
-  EXPECT_EQ(write_value, 0);
-  EXPECT_EQ(in_flag, fuchsia_hardware_gpio::wire::GpioFlags::kNoPull);
-  EXPECT_EQ(out_value, 0);
-  EXPECT_EQ(ds_ua, 0);
-  EXPECT_EQ(interrupt_flags, 0);
-  EXPECT_EQ(alt_function, 0);
+  EXPECT_EQ(func, Read);
 
-  gpio_->MockRead().ExpectCall(ZX_OK);
-  EXPECT_EQ(ClientCall(fidl::WireSyncClient(std::move(client_)), func, write_value, in_flag,
-                       out_value, ds_ua, interrupt_flags, alt_function),
+  gpio_->MockRead().ExpectCall(true);
+  EXPECT_EQ(ClientCall(fidl::WireSyncClient(std::move(client_)), func, arena, buffer_mode,
+                       interrupt_mode, config),
             0);
 }
 
-TEST_F(GpioUtilTest, WriteTest) {
-  int argc = 4;
-  const char* argv[] = {"gpioutil", "w", "some_path", "7"};
+TEST_F(GpioUtilTest, InTest) {
+  int argc = 3;
+  const char* argv[] = {"gpioutil", "i", "some_path"};
 
+  fidl::Arena arena;
   GpioFunc func;
-  uint8_t write_value, out_value;
-  uint64_t ds_ua;
-  fuchsia_hardware_gpio::wire::GpioFlags in_flag;
-  uint32_t interrupt_flags;
-  uint64_t alt_function;
-  EXPECT_EQ(ParseArgs(argc, const_cast<char**>(argv), &func, &write_value, &in_flag, &out_value,
-                      &ds_ua, &interrupt_flags, &alt_function),
+  fuchsia_hardware_gpio::BufferMode buffer_mode;
+  fuchsia_hardware_gpio::InterruptMode interrupt_mode;
+  fuchsia_hardware_pin::wire::Configuration config;
+  EXPECT_EQ(ParseArgs(argc, const_cast<char**>(argv), &func, arena, &buffer_mode, &interrupt_mode,
+                      &config),
             0);
-  EXPECT_EQ(func, 1);
-  EXPECT_EQ(write_value, 7);
-  EXPECT_EQ(in_flag, fuchsia_hardware_gpio::wire::GpioFlags::kNoPull);
-  EXPECT_EQ(out_value, 0);
-  EXPECT_EQ(ds_ua, 0);
-  EXPECT_EQ(interrupt_flags, 0);
-  EXPECT_EQ(alt_function, 0);
+  EXPECT_EQ(func, SetBufferMode);
+  EXPECT_EQ(buffer_mode, fuchsia_hardware_gpio::BufferMode::kInput);
 
-  gpio_->MockWrite().ExpectCall(ZX_OK);
-  EXPECT_EQ(ClientCall(fidl::WireSyncClient(std::move(client_)), func, write_value, in_flag,
-                       out_value, ds_ua, interrupt_flags, alt_function),
+  gpio_->MockSetBufferMode().ExpectCall(fuchsia_hardware_gpio::BufferMode::kInput);
+  EXPECT_EQ(ClientCall(fidl::WireSyncClient(std::move(client_)), func, arena, buffer_mode,
+                       interrupt_mode, config),
             0);
 }
 
-TEST_F(GpioUtilTest, ConfigInTest) {
-  int argc = 4;
-  const char* argv[] = {"gpioutil", "i", "some_path", "none"};
-
-  GpioFunc func;
-  uint8_t write_value, out_value;
-  uint64_t ds_ua;
-  fuchsia_hardware_gpio::wire::GpioFlags in_flag;
-  uint32_t interrupt_flags;
-  uint64_t alt_function;
-  EXPECT_EQ(ParseArgs(argc, const_cast<char**>(argv), &func, &write_value, &in_flag, &out_value,
-                      &ds_ua, &interrupt_flags, &alt_function),
-            0);
-  EXPECT_EQ(func, 2);
-  EXPECT_EQ(write_value, 0);
-  EXPECT_EQ(in_flag, fuchsia_hardware_gpio::wire::GpioFlags::kNoPull);
-  EXPECT_EQ(out_value, 0);
-  EXPECT_EQ(ds_ua, 0);
-  EXPECT_EQ(interrupt_flags, 0);
-  EXPECT_EQ(alt_function, 0);
-
-  gpio_->MockConfigIn().ExpectCall(ZX_OK);
-  EXPECT_EQ(ClientCall(fidl::WireSyncClient(std::move(client_)), func, write_value, in_flag,
-                       out_value, ds_ua, interrupt_flags, alt_function),
-            0);
-}
-
-TEST_F(GpioUtilTest, ConfigOutTest) {
+TEST_F(GpioUtilTest, OutTest) {
   int argc = 4;
   const char* argv[] = {"gpioutil", "o", "some_path", "3"};
 
+  fidl::Arena arena;
   GpioFunc func;
-  uint8_t write_value, out_value;
-  uint64_t ds_ua;
-  fuchsia_hardware_gpio::wire::GpioFlags in_flag;
-  uint32_t interrupt_flags;
-  uint64_t alt_function;
-  EXPECT_EQ(ParseArgs(argc, const_cast<char**>(argv), &func, &write_value, &in_flag, &out_value,
-                      &ds_ua, &interrupt_flags, &alt_function),
+  fuchsia_hardware_gpio::BufferMode buffer_mode;
+  fuchsia_hardware_gpio::InterruptMode interrupt_mode;
+  fuchsia_hardware_pin::wire::Configuration config;
+  EXPECT_EQ(ParseArgs(argc, const_cast<char**>(argv), &func, arena, &buffer_mode, &interrupt_mode,
+                      &config),
             0);
-  EXPECT_EQ(func, 3);
-  EXPECT_EQ(write_value, 0);
-  EXPECT_EQ(in_flag, fuchsia_hardware_gpio::wire::GpioFlags::kNoPull);
-  EXPECT_EQ(out_value, 3);
-  EXPECT_EQ(ds_ua, 0);
-  EXPECT_EQ(interrupt_flags, 0);
-  EXPECT_EQ(alt_function, 0);
+  EXPECT_EQ(func, SetBufferMode);
+  EXPECT_EQ(buffer_mode, fuchsia_hardware_gpio::BufferMode::kOutputHigh);
 
-  gpio_->MockConfigOut().ExpectCall(ZX_OK);
-  EXPECT_EQ(ClientCall(fidl::WireSyncClient(std::move(client_)), func, write_value, in_flag,
-                       out_value, ds_ua, interrupt_flags, alt_function),
+  gpio_->MockSetBufferMode().ExpectCall(fuchsia_hardware_gpio::BufferMode::kOutputHigh);
+  EXPECT_EQ(ClientCall(fidl::WireSyncClient(std::move(client_)), func, arena, buffer_mode,
+                       interrupt_mode, config),
             0);
 }
 
@@ -351,26 +306,41 @@ TEST_F(GpioUtilTest, SetDriveStrengthTest) {
   int argc = 4;
   const char* argv[] = {"gpioutil", "d", "some_path", "2000"};
 
+  fidl::Arena arena;
   GpioFunc func;
-  uint8_t write_value, out_value;
-  uint64_t ds_ua;
-  fuchsia_hardware_gpio::wire::GpioFlags in_flag;
-  uint32_t interrupt_flags;
-  uint64_t alt_function;
-  EXPECT_EQ(ParseArgs(argc, const_cast<char**>(argv), &func, &write_value, &in_flag, &out_value,
-                      &ds_ua, &interrupt_flags, &alt_function),
+  fuchsia_hardware_gpio::BufferMode buffer_mode;
+  fuchsia_hardware_gpio::InterruptMode interrupt_mode;
+  fuchsia_hardware_pin::wire::Configuration config;
+  EXPECT_EQ(ParseArgs(argc, const_cast<char**>(argv), &func, arena, &buffer_mode, &interrupt_mode,
+                      &config),
             0);
-  EXPECT_EQ(func, 4);
-  EXPECT_EQ(write_value, 0);
-  EXPECT_EQ(in_flag, fuchsia_hardware_gpio::wire::GpioFlags::kNoPull);
-  EXPECT_EQ(out_value, 0);
-  EXPECT_EQ(ds_ua, 2000);
-  EXPECT_EQ(interrupt_flags, 0);
-  EXPECT_EQ(alt_function, 0);
+  EXPECT_EQ(func, Configure);
+  ASSERT_TRUE(config.has_drive_strength_ua());
+  EXPECT_EQ(config.drive_strength_ua(), 2'000);
 
-  gpio_->MockSetDriveStrength().ExpectCall(ZX_OK);
-  EXPECT_EQ(ClientCall(fidl::WireSyncClient(std::move(client_)), func, write_value, in_flag,
-                       out_value, ds_ua, interrupt_flags, alt_function),
+  gpio_->MockSetDriveStrength().ExpectCall(2'000);
+  EXPECT_EQ(ClientCall(fidl::WireSyncClient(std::move(client_)), func, arena, buffer_mode,
+                       interrupt_mode, config),
+            0);
+}
+
+TEST_F(GpioUtilTest, GetDriveStrengthTest) {
+  int argc = 3;
+  const char* argv[] = {"gpioutil", "d", "some_path"};
+
+  fidl::Arena arena;
+  GpioFunc func;
+  fuchsia_hardware_gpio::BufferMode buffer_mode;
+  fuchsia_hardware_gpio::InterruptMode interrupt_mode;
+  fuchsia_hardware_pin::wire::Configuration config;
+  EXPECT_EQ(ParseArgs(argc, const_cast<char**>(argv), &func, arena, &buffer_mode, &interrupt_mode,
+                      &config),
+            0);
+  EXPECT_EQ(func, GetDriveStrength);
+
+  gpio_->MockGetDriveStrength().ExpectCall(3'000);
+  EXPECT_EQ(ClientCall(fidl::WireSyncClient(std::move(client_)), func, arena, buffer_mode,
+                       interrupt_mode, config),
             0);
 }
 
@@ -378,27 +348,22 @@ TEST_F(GpioUtilTest, InterruptTest) {
   int argc = 4;
   const char* argv[] = {"gpioutil", "q", "some_path", "level-low"};
 
+  fidl::Arena arena;
   GpioFunc func;
-  uint8_t write_value, out_value;
-  uint64_t ds_ua;
-  fuchsia_hardware_gpio::wire::GpioFlags in_flag;
-  uint32_t interrupt_flags;
-  uint64_t alt_function;
-  EXPECT_EQ(ParseArgs(argc, const_cast<char**>(argv), &func, &write_value, &in_flag, &out_value,
-                      &ds_ua, &interrupt_flags, &alt_function),
+  fuchsia_hardware_gpio::BufferMode buffer_mode;
+  fuchsia_hardware_gpio::InterruptMode interrupt_mode;
+  fuchsia_hardware_pin::wire::Configuration config;
+  EXPECT_EQ(ParseArgs(argc, const_cast<char**>(argv), &func, arena, &buffer_mode, &interrupt_mode,
+                      &config),
             0);
   EXPECT_EQ(func, Interrupt);
-  EXPECT_EQ(write_value, 0);
-  EXPECT_EQ(in_flag, fuchsia_hardware_gpio::wire::GpioFlags::kNoPull);
-  EXPECT_EQ(out_value, 0);
-  EXPECT_EQ(ds_ua, 0);
-  EXPECT_EQ(interrupt_flags, ZX_INTERRUPT_MODE_LEVEL_LOW);
-  EXPECT_EQ(alt_function, 0);
+  EXPECT_EQ(interrupt_mode, fuchsia_hardware_gpio::InterruptMode::kLevelLow);
 
-  gpio_->MockGetInterrupt().ExpectCall(ZX_OK);
-  gpio_->MockReleaseInterrupt().ExpectCall(ZX_OK);
-  EXPECT_EQ(ClientCall(fidl::WireSyncClient(std::move(client_)), func, write_value, in_flag,
-                       out_value, ds_ua, interrupt_flags, alt_function),
+  gpio_->MockGetInterrupt().ExpectCall();
+  gpio_->MockConfigureInterrupt().ExpectCall(fuchsia_hardware_gpio::InterruptMode::kLevelLow);
+  gpio_->MockReleaseInterrupt().ExpectCall();
+  EXPECT_EQ(ClientCall(fidl::WireSyncClient(std::move(client_)), func, arena, buffer_mode,
+                       interrupt_mode, config),
             0);
 }
 
@@ -406,26 +371,43 @@ TEST_F(GpioUtilTest, AltFunctionTest) {
   int argc = 4;
   const char* argv[] = {"gpioutil", "f", "some_path", "6"};
 
+  fidl::Arena arena;
   GpioFunc func;
-  uint8_t write_value, out_value;
-  uint64_t ds_ua;
-  fuchsia_hardware_gpio::wire::GpioFlags in_flag;
-  uint32_t interrupt_flags;
-  uint64_t alt_function;
-  EXPECT_EQ(ParseArgs(argc, const_cast<char**>(argv), &func, &write_value, &in_flag, &out_value,
-                      &ds_ua, &interrupt_flags, &alt_function),
+  fuchsia_hardware_gpio::BufferMode buffer_mode;
+  fuchsia_hardware_gpio::InterruptMode interrupt_mode;
+  fuchsia_hardware_pin::wire::Configuration config;
+  EXPECT_EQ(ParseArgs(argc, const_cast<char**>(argv), &func, arena, &buffer_mode, &interrupt_mode,
+                      &config),
             0);
-  EXPECT_EQ(func, AltFunction);
-  EXPECT_EQ(write_value, 0);
-  EXPECT_EQ(in_flag, fuchsia_hardware_gpio::wire::GpioFlags::kNoPull);
-  EXPECT_EQ(out_value, 0);
-  EXPECT_EQ(ds_ua, 0);
-  EXPECT_EQ(interrupt_flags, 0);
-  EXPECT_EQ(alt_function, 6);
+  EXPECT_EQ(func, Configure);
+  ASSERT_TRUE(config.has_function());
+  EXPECT_EQ(config.function(), 6);
 
-  gpio_->MockSetAltFunction().ExpectCall(ZX_OK, 6);
-  EXPECT_EQ(ClientCall(fidl::WireSyncClient(std::move(client_)), func, write_value, in_flag,
-                       out_value, ds_ua, interrupt_flags, alt_function),
+  gpio_->MockSetFunction().ExpectCall(6);
+  EXPECT_EQ(ClientCall(fidl::WireSyncClient(std::move(client_)), func, arena, buffer_mode,
+                       interrupt_mode, config),
+            0);
+}
+
+TEST_F(GpioUtilTest, PullTest) {
+  int argc = 4;
+  const char* argv[] = {"gpioutil", "p", "some_path", "up"};
+
+  fidl::Arena arena;
+  GpioFunc func;
+  fuchsia_hardware_gpio::BufferMode buffer_mode;
+  fuchsia_hardware_gpio::InterruptMode interrupt_mode;
+  fuchsia_hardware_pin::wire::Configuration config;
+  EXPECT_EQ(ParseArgs(argc, const_cast<char**>(argv), &func, arena, &buffer_mode, &interrupt_mode,
+                      &config),
+            0);
+  EXPECT_EQ(func, Configure);
+  ASSERT_TRUE(config.has_pull());
+  EXPECT_EQ(config.pull(), fuchsia_hardware_pin::Pull::kUp);
+
+  gpio_->MockSetPull().ExpectCall(fuchsia_hardware_pin::Pull::kUp);
+  EXPECT_EQ(ClientCall(fidl::WireSyncClient(std::move(client_)), func, arena, buffer_mode,
+                       interrupt_mode, config),
             0);
 }
 
