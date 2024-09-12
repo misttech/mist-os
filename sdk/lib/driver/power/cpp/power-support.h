@@ -330,7 +330,9 @@ fit::result<Error> AddElement(
                             fidl::ServerEnd<fuchsia_power_broker::RequiredLevel>>>
         level_control,
     std::optional<fidl::ServerEnd<fuchsia_power_broker::Lessor>> lessor,
-    std::optional<fidl::ServerEnd<fuchsia_power_broker::ElementControl>> element_control);
+    std::optional<fidl::ServerEnd<fuchsia_power_broker::ElementControl>> element_control,
+    std::optional<fidl::UnownedClientEnd<fuchsia_power_broker::ElementControl>>
+        element_control_client);
 
 /// Call `AddElement` on the `power_broker` channel passed in.
 /// This function uses `ElementDescription` passed in to make the proper call
