@@ -36,10 +36,10 @@
     "{{device.memory.quantity}}{{ua device.memory.units}}",
     "-smp",
     {{! These should probably be predicated on the host CPU. }}
-    {{#if (eq device.cpu.architecture "riscv64")}}
-        "4",
-    {{else}}
+    {{#if (eq device.cpu.architecture "x64")}}
         "4,threads=2",
+    {{else}}
+        "4",
     {{/if}}
     {{! The QMP is an interface for issuing commands to the emulator. The
         commands are sent in JSON, as are the results. The syntax for this
@@ -55,8 +55,10 @@
         "unix:{{runtime.instance_directory}}/monitor,server,nowait",
     {{/if}}
     {{#if (eq runtime.console "console")}}
+        "-chardev",
+        "stdio,id=char0,signal=off",
         "-serial",
-        "mon:stdio",
+        "chardev:char0",
     {{else}}
         "-serial",
         "unix:{{runtime.instance_directory}}/serial,server,nowait,logfile={{host.log}}.serial",
@@ -64,12 +66,11 @@
 
     {{#if (eq device.cpu.architecture "arm64")}}
          "-machine",
-          "virt-2.12",
-          {{#if (eq host.architecture "arm64")}}
-            "-machine", "gic-version=host",
-          {{else}}
-            "-machine", "virtualization=true", "-cpu", "max",
-          {{/if}}
+        {{#if (eq host.architecture "arm64")}}
+            "virt-2.12,gic-version=host",
+        {{else}}
+            "virt-2.12,virtualization=true", "-cpu", "max",
+        {{/if}}
     {{/if}}
     {{#if (eq device.cpu.architecture "x64")}}
         "--machine",
@@ -243,7 +244,6 @@
     {{/if}}
     {{#if (eq device.cpu.architecture "riscv64")}}
     {{else}}
-        "kernel.serial=legacy",
         "kernel.lockup-detector.critical-section-fatal-threshold-ms=0",
         "kernel.lockup-detector.critical-section-threshold-ms=5000",
         "kernel.lockup-detector.heartbeat-age-fatal-threshold-ms=0",
@@ -257,7 +257,6 @@
     {{/if}}
     "kernel.entropy-mixin=de330defe83c3d93556612a133f893892b6b49f96944c3c363197a679a6339b0",
     "kernel.halt-on-panic=true",
-    "kernel.experimental.serial_migration=true",
     "zircon.nodename={{runtime.name}}"
     {{#each runtime.addl_kernel_args}}
         ,"{{this}}"
