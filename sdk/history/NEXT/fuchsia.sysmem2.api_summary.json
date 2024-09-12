@@ -1082,6 +1082,12 @@
     },
     {
         "kind": "table/member",
+        "name": "fuchsia.sysmem2/ImageFormatConstraints.is_alpha_present",
+        "ordinal": "17",
+        "type": "bool"
+    },
+    {
+        "kind": "table/member",
         "name": "fuchsia.sysmem2/ImageFormatConstraints.max_bytes_per_row",
         "ordinal": "7",
         "type": "uint32"

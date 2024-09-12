@@ -1454,10 +1454,6 @@ fpromise::result<fuchsia_images2::wire::PixelFormat> ImageFormatConvertZbiToSysm
     case ZBI_PIXEL_FORMAT_ABGR_8888:
       // Switching to using alpha.
     case ZBI_PIXEL_FORMAT_BGR_888_X:
-      // TODO(b/329142833): Change this to R8G8B8X8 when relevant participants support R8G8B8X8. The
-      // main benefit is ensuring that consumer participants reliably ignore the X/A byte, treating
-      // the RGB portion as fully opaque regardless of the contents of the X/A byte. Currently this
-      // happens to work out ok, but really we should ensure that participants agree re. X vs. A.
       return fpromise::ok(PixelFormat::kR8G8B8A8);
     case ZBI_PIXEL_FORMAT_ARGB_2_10_10_10:
       return fpromise::ok(PixelFormat::kA2R10G10B10);

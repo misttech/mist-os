@@ -316,7 +316,8 @@ struct Format {
 
 void set_pixel_format_modifier_constraints_v2(fidl::SyncClient<v2::BufferCollection>& collection,
                                               std::vector<Format> formats, bool has_buffer_usage,
-                                              bool use_only_format_array = false) {
+                                              bool use_only_format_array = false,
+                                              std::optional<bool> is_alpha_present = std::nullopt) {
   v2::BufferCollectionConstraints constraints;
   if (has_buffer_usage) {
     constraints.usage().emplace();
@@ -364,6 +365,8 @@ void set_pixel_format_modifier_constraints_v2(fidl::SyncClient<v2::BufferCollect
   image_format_constraints.color_spaces().emplace(1);
   image_format_constraints.color_spaces()->at(0) = fuchsia_images2::ColorSpace::kSrgb;
   image_format_constraints.min_size() = {256, 256};
+
+  image_format_constraints.is_alpha_present() = is_alpha_present;
 
   v2::BufferCollectionSetConstraintsRequest set_constraints_request;
   set_constraints_request.constraints() = std::move(constraints);
@@ -928,6 +931,64 @@ bool AttachTokenSucceedsV2(
   IF_FAILURES_RETURN_FALSE();
 
   return true;
+}
+
+bool HasAlphaOrX(fuchsia_images2::PixelFormat pixel_format) {
+  ZX_ASSERT(pixel_format != fuchsia_images2::PixelFormat::kDoNotCare);
+  ZX_ASSERT(pixel_format != fuchsia_images2::PixelFormat::kInvalid);
+  switch (pixel_format) {
+    case fuchsia_images2::PixelFormat::kR8G8B8A8:
+    case fuchsia_images2::PixelFormat::kB8G8R8A8:
+    case fuchsia_images2::PixelFormat::kR2G2B2X2:
+    case fuchsia_images2::PixelFormat::kA2R10G10B10:
+    case fuchsia_images2::PixelFormat::kA2B10G10R10:
+      return true;
+    case fuchsia_images2::PixelFormat::kI420:
+    case fuchsia_images2::PixelFormat::kM420:
+    case fuchsia_images2::PixelFormat::kNv12:
+    case fuchsia_images2::PixelFormat::kYuy2:
+    case fuchsia_images2::PixelFormat::kYv12:
+    case fuchsia_images2::PixelFormat::kB8G8R8:
+    case fuchsia_images2::PixelFormat::kR5G6B5:
+    case fuchsia_images2::PixelFormat::kR3G3B2:
+    case fuchsia_images2::PixelFormat::kL8:
+    case fuchsia_images2::PixelFormat::kR8:
+    case fuchsia_images2::PixelFormat::kR8G8:
+    case fuchsia_images2::PixelFormat::kP010:
+    case fuchsia_images2::PixelFormat::kR8G8B8:
+      return false;
+    default:
+      ZX_PANIC("HasAlphaOrX missing case for value: %u", fidl::ToUnderlying(pixel_format));
+  }
+}
+
+bool IsYuv(fuchsia_images2::PixelFormat pixel_format) {
+  ZX_ASSERT(pixel_format != fuchsia_images2::PixelFormat::kDoNotCare);
+  ZX_ASSERT(pixel_format != fuchsia_images2::PixelFormat::kInvalid);
+  switch (pixel_format) {
+    case fuchsia_images2::PixelFormat::kR8G8B8A8:
+    case fuchsia_images2::PixelFormat::kB8G8R8A8:
+    case fuchsia_images2::PixelFormat::kR2G2B2X2:
+    case fuchsia_images2::PixelFormat::kA2R10G10B10:
+    case fuchsia_images2::PixelFormat::kA2B10G10R10:
+    case fuchsia_images2::PixelFormat::kB8G8R8:
+    case fuchsia_images2::PixelFormat::kR5G6B5:
+    case fuchsia_images2::PixelFormat::kR3G3B2:
+    case fuchsia_images2::PixelFormat::kR8:
+    case fuchsia_images2::PixelFormat::kR8G8:
+    case fuchsia_images2::PixelFormat::kP010:
+    case fuchsia_images2::PixelFormat::kR8G8B8:
+    case fuchsia_images2::PixelFormat::kL8:
+      return false;
+    case fuchsia_images2::PixelFormat::kI420:
+    case fuchsia_images2::PixelFormat::kM420:
+    case fuchsia_images2::PixelFormat::kNv12:
+    case fuchsia_images2::PixelFormat::kYuy2:
+    case fuchsia_images2::PixelFormat::kYv12:
+      return true;
+    default:
+      ZX_PANIC("IsYuv missing case for value: %u", fidl::ToUnderlying(pixel_format));
+  }
 }
 
 }  // namespace
@@ -7194,7 +7255,7 @@ TEST(Sysmem, WaitForAllBuffersAllocatedError) {
   }
 }
 
-TEST(Sysmem, AllocateR8G8B8X8) {
+TEST(Sysmem, AllocateR8G8B8X8_Deprecated) {
   auto parent_token = create_initial_token_v2();
   auto parent = convert_token_to_collection_v2(std::move(parent_token));
   set_pixel_format_modifier_constraints_v2(parent,
@@ -7210,7 +7271,7 @@ TEST(Sysmem, AllocateR8G8B8X8) {
             info->settings()->image_format_constraints()->pixel_format_modifier().value());
 }
 
-TEST(Sysmem, AllocateB8G8R8X8) {
+TEST(Sysmem, AllocateB8G8R8X8_Deprecated) {
   auto parent_token = create_initial_token_v2();
   auto parent = convert_token_to_collection_v2(std::move(parent_token));
   set_pixel_format_modifier_constraints_v2(parent,
@@ -7224,6 +7285,42 @@ TEST(Sysmem, AllocateB8G8R8X8) {
             info->settings()->image_format_constraints()->pixel_format().value());
   EXPECT_EQ(fuchsia_images2::PixelFormatModifier::kLinear,
             info->settings()->image_format_constraints()->pixel_format_modifier().value());
+}
+
+TEST(Sysmem, AllocateR8G8B8X8) {
+  auto parent_token = create_initial_token_v2();
+  auto parent = convert_token_to_collection_v2(std::move(parent_token));
+  set_pixel_format_modifier_constraints_v2(parent,
+                                           {Format(fuchsia_images2::PixelFormat::kR8G8B8A8,
+                                                   fuchsia_images2::PixelFormatModifier::kLinear)},
+                                           true, false, false);
+  auto wait_result = parent->WaitForAllBuffersAllocated();
+  ASSERT_TRUE(wait_result.is_ok());
+  const auto& info = wait_result->buffer_collection_info();
+  EXPECT_EQ(fuchsia_images2::PixelFormat::kR8G8B8A8,
+            info->settings()->image_format_constraints()->pixel_format().value());
+  EXPECT_EQ(fuchsia_images2::PixelFormatModifier::kLinear,
+            info->settings()->image_format_constraints()->pixel_format_modifier().value());
+  EXPECT_TRUE(info->settings()->image_format_constraints()->is_alpha_present().has_value() &&
+              !*info->settings()->image_format_constraints()->is_alpha_present());
+}
+
+TEST(Sysmem, AllocateB8G8R8X8) {
+  auto parent_token = create_initial_token_v2();
+  auto parent = convert_token_to_collection_v2(std::move(parent_token));
+  set_pixel_format_modifier_constraints_v2(parent,
+                                           {Format(fuchsia_images2::PixelFormat::kB8G8R8A8,
+                                                   fuchsia_images2::PixelFormatModifier::kLinear)},
+                                           true, false, false);
+  auto wait_result = parent->WaitForAllBuffersAllocated();
+  ASSERT_TRUE(wait_result.is_ok());
+  const auto& info = wait_result->buffer_collection_info();
+  EXPECT_EQ(fuchsia_images2::PixelFormat::kB8G8R8A8,
+            info->settings()->image_format_constraints()->pixel_format().value());
+  EXPECT_EQ(fuchsia_images2::PixelFormatModifier::kLinear,
+            info->settings()->image_format_constraints()->pixel_format_modifier().value());
+  EXPECT_TRUE(info->settings()->image_format_constraints()->is_alpha_present().has_value() &&
+              !*info->settings()->image_format_constraints()->is_alpha_present());
 }
 
 TEST(Sysmem, V1ConnectToV2Allocator) {
@@ -7260,6 +7357,106 @@ TEST(Sysmem, V1ConnectToV2Allocator) {
     ASSERT_TRUE(validate_result.is_ok());
     ASSERT_TRUE(validate_result->is_known().has_value());
     ASSERT_TRUE(validate_result->is_known().value());
+  }
+}
+
+TEST(Sysmem, IsAlphaPresentField) {
+  fuchsia_images2::PixelFormat kPixelFormats[] = {
+      fuchsia_images2::PixelFormat::kR8G8B8A8,    fuchsia_images2::PixelFormat::kB8G8R8A8,
+      fuchsia_images2::PixelFormat::kI420,        fuchsia_images2::PixelFormat::kM420,
+      fuchsia_images2::PixelFormat::kNv12,        fuchsia_images2::PixelFormat::kYuy2,
+      fuchsia_images2::PixelFormat::kYv12,        fuchsia_images2::PixelFormat::kB8G8R8,
+      fuchsia_images2::PixelFormat::kR5G6B5,      fuchsia_images2::PixelFormat::kR3G3B2,
+      fuchsia_images2::PixelFormat::kR2G2B2X2,    fuchsia_images2::PixelFormat::kL8,
+      fuchsia_images2::PixelFormat::kR8,          fuchsia_images2::PixelFormat::kR8G8,
+      fuchsia_images2::PixelFormat::kA2R10G10B10, fuchsia_images2::PixelFormat::kA2B10G10R10,
+      fuchsia_images2::PixelFormat::kP010,        fuchsia_images2::PixelFormat::kR8G8B8,
+  };
+
+  for (auto pixel_format : kPixelFormats) {
+    for (uint32_t is_field_set = 0; is_field_set < 4; ++is_field_set) {
+      for (uint32_t is_field_true = 0; is_field_true < 4; ++is_field_true) {
+        bool parent_field_set = !!(is_field_set & 0x1);
+        bool child_field_set = !!(is_field_set & 0x2);
+        bool parent_field_true = !!(is_field_true & 0x1);
+        bool child_field_true = !!(is_field_true & 0x2);
+
+        printf(
+            "pixel_format: %u parent_field_set: %u child_field_set: %u parent_field_true: %u child_field_true: %u\n",
+            fidl::ToUnderlying(pixel_format), parent_field_set, child_field_set, parent_field_true,
+            child_field_true);
+
+        auto parent_token = create_initial_token_v2();
+        auto child_token = create_token_under_token_v2(parent_token);
+
+        auto parent_collection = convert_token_to_collection_v2(std::move(parent_token));
+        auto child_collection = convert_token_to_collection_v2(std::move(child_token));
+
+        fuchsia_sysmem2::BufferCollectionConstraints constraints;
+        constraints.min_buffer_count() = 1;
+        constraints.usage().emplace().cpu() = fuchsia_sysmem2::kCpuUsageWriteOften;
+        auto& ifc = constraints.image_format_constraints().emplace().emplace_back();
+        ifc.pixel_format() = pixel_format;
+        ifc.color_spaces() = IsYuv(pixel_format) ? std::vector{fuchsia_images2::ColorSpace::kRec709}
+                                                 : std::vector{fuchsia_images2::ColorSpace::kSrgb};
+        if (pixel_format == fuchsia_images2::PixelFormat::kP010) {
+          ifc.color_spaces() = {fuchsia_images2::ColorSpace::kRec2100};
+        }
+        ifc.min_size() = {64, 64};
+
+        auto setup_field = [&ifc](bool is_field_set, bool is_field_true) {
+          if (is_field_set) {
+            if (is_field_true) {
+              ifc.is_alpha_present() = true;
+            } else {
+              ifc.is_alpha_present() = false;
+            }
+          } else {
+            ifc.is_alpha_present().reset();
+          }
+        };
+
+        setup_field(parent_field_set, parent_field_true);
+        fuchsia_sysmem2::BufferCollectionSetConstraintsRequest set_constraints_request_parent;
+        // intentional copy/clone
+        set_constraints_request_parent.constraints() = constraints;
+        auto parent_set_constraints_result =
+            parent_collection->SetConstraints(std::move(set_constraints_request_parent));
+        ASSERT_TRUE(parent_set_constraints_result.is_ok());
+
+        setup_field(child_field_set, child_field_true);
+        fuchsia_sysmem2::BufferCollectionSetConstraintsRequest set_constraints_request_child;
+        // intentional copy/clone
+        set_constraints_request_child.constraints() = constraints;
+        auto child_set_constraints_result =
+            child_collection->SetConstraints(std::move(set_constraints_request_child));
+        ASSERT_TRUE(child_set_constraints_result.is_ok());
+
+        auto wait_result = parent_collection->WaitForAllBuffersAllocated();
+        if (parent_field_set && child_field_set && parent_field_true != child_field_true) {
+          ASSERT_FALSE(wait_result.is_ok());
+          continue;
+        }
+        ASSERT_TRUE(wait_result.is_ok());
+        auto info = std::move(wait_result->buffer_collection_info().value());
+        auto& result_ifc = info.settings().value().image_format_constraints().value();
+        ASSERT_TRUE(wait_result.is_ok());
+        bool either_participant_field_set = parent_field_set || child_field_set;
+        bool expect_field_set = either_participant_field_set && HasAlphaOrX(pixel_format);
+        ASSERT_EQ(expect_field_set, result_ifc.is_alpha_present().has_value());
+        if (expect_field_set) {
+          bool expected_value;
+          if (parent_field_set) {
+            expected_value = parent_field_true;
+          } else if (child_field_set) {
+            expected_value = child_field_true;
+          } else {
+            ZX_PANIC("unreachable");
+          }
+          ASSERT_EQ(expected_value, result_ifc.is_alpha_present().value());
+        }
+      }
+    }
   }
 }
 

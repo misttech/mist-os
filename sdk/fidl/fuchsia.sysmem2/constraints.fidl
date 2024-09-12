@@ -709,4 +709,35 @@ type ImageFormatConstraints = table {
     /// 3. In this example, if another participant sets `bytes_per_row_divisor`
     /// to 4, the resulting `bytes_per_row_divisor` will be a multiple of 12.
     16: require_bytes_per_row_at_pixel_boundary bool;
+
+    /// If unset, any A channel of any format in this ImageFormatConstraints is
+    /// is ignored or not ignored according to semantics conveyed out of band.
+    ///
+    /// If set to false, the A channel of any format in this
+    /// ImageFormatConstraints is arbitrary values that don't mean anything.
+    /// Producers don't need to ensure any particular values in the A channel
+    /// and consumers should ignore the A channel. This is the same thing as
+    /// calling the 'A' channel 'X' instead.
+    ///
+    /// If set to true, the A channel of any format in this
+    /// ImageFormatConstraints is set to meaningful values. A producer should
+    /// fill out the A values, and a consumer should pay attention to the A
+    /// values as appropriate.
+    ///
+    /// If set values of this field don't match for the same pixel format and
+    /// modifier, that format and modifier will be eliminated from
+    /// consideration.
+    ///
+    /// A participant that knows that the semantics of the A channel are
+    /// conveyed via out of band means can leave this field un-set, even if the
+    /// out of band means is already known to specify alpha present or not
+    /// present, but in this situation it's also ok to fill out this field for
+    /// informational / debugging purposes.
+    ///
+    /// If no participant sets this field, the default is un-set.
+    ///
+    /// If the format chosen for allocation doesn't have an A channel, this
+    /// field will be un-set in the allocation result.
+    @available(added=NEXT)
+    17: is_alpha_present bool;
 };

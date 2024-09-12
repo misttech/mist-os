@@ -493,6 +493,39 @@ bool IsSecureRequired(const fuchsia_sysmem2::BufferCollectionConstraints& constr
   return *bmc.secure_required();
 }
 
+bool HasAlphaOrX(fuchsia_images2::PixelFormat pixel_format) {
+  ZX_DEBUG_ASSERT(pixel_format != fuchsia_images2::PixelFormat::kDoNotCare);
+  ZX_DEBUG_ASSERT(pixel_format != fuchsia_images2::PixelFormat::kInvalid);
+  switch (pixel_format) {
+    case fuchsia_images2::PixelFormat::kR8G8B8A8:
+    case fuchsia_images2::PixelFormat::kR8G8B8X8:
+    case fuchsia_images2::PixelFormat::kB8G8R8A8:
+    case fuchsia_images2::PixelFormat::kB8G8R8X8:
+    case fuchsia_images2::PixelFormat::kR2G2B2X2:
+    case fuchsia_images2::PixelFormat::kA2R10G10B10:
+    case fuchsia_images2::PixelFormat::kA2B10G10R10:
+      return true;
+    case fuchsia_images2::PixelFormat::kI420:
+    case fuchsia_images2::PixelFormat::kM420:
+    case fuchsia_images2::PixelFormat::kNv12:
+    case fuchsia_images2::PixelFormat::kYuy2:
+    case fuchsia_images2::PixelFormat::kMjpeg:
+    case fuchsia_images2::PixelFormat::kYv12:
+    case fuchsia_images2::PixelFormat::kB8G8R8:
+    case fuchsia_images2::PixelFormat::kR5G6B5:
+    case fuchsia_images2::PixelFormat::kR3G3B2:
+    case fuchsia_images2::PixelFormat::kL8:
+    case fuchsia_images2::PixelFormat::kR8:
+    case fuchsia_images2::PixelFormat::kR8G8:
+    case fuchsia_images2::PixelFormat::kP010:
+    case fuchsia_images2::PixelFormat::kR8G8B8:
+      return false;
+    default:
+      LOG(ERROR, "HasAlphaOrX missing case for value: %u", fidl::ToUnderlying(pixel_format));
+      return false;
+  }
+}
+
 }  // namespace
 
 // static
@@ -3354,6 +3387,23 @@ bool LogicalBufferCollection::AccumulateConstraintImageFormat(
   acc->required_max_size()->height() =
       std::max(acc->required_max_size()->height(), c.required_max_size()->height());
 
+  if (c.is_alpha_present().has_value()) {
+    if (!acc->is_alpha_present().has_value()) {
+      acc->is_alpha_present() = *c.is_alpha_present();
+    } else {
+      // The FIDL wire format specification says bool is only 0 or 1, so we rely on FIDL server-side
+      // code to enforce that.
+      ZX_DEBUG_ASSERT_MSG(!!*acc->is_alpha_present() == *acc->is_alpha_present(),
+                          " - FIDL server-side code needs to enforce bool is 0 or 1");
+      ZX_DEBUG_ASSERT_MSG(!!*c.is_alpha_present() == *c.is_alpha_present(),
+                          " - FIDL server-side code needs to enforce bool is 0 or 1");
+      if (*acc->is_alpha_present() != *c.is_alpha_present()) {
+        LogInfo(FROM_HERE, "*acc->is_alpha_present() != *c.is_alpha_present()");
+        return false;
+      }
+    }
+  }
+
   return true;
 }
 
@@ -3640,6 +3690,11 @@ LogicalBufferCollection::GenerateUnpopulatedBufferCollectionInfo(
     }
     // copy / clone from constraints to settings.
     settings.image_format_constraints() = constraints.image_format_constraints()->at(best_index);
+    if (!HasAlphaOrX(settings.image_format_constraints()->pixel_format().value())) {
+      // We want is_alpha_present to be un-set in the allocation result when the format has no A/X
+      // channel.
+      settings.image_format_constraints()->is_alpha_present().reset();
+    }
   }
 
   // Compute the min buffer size implied by image_format_constraints, so we ensure the buffers can
