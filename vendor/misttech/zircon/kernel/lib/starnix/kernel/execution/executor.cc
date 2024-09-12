@@ -51,8 +51,9 @@ fit::result<Errno, TaskInfo> create_zircon_process(
 
   auto [process, root_vmar] = ktl::move(process_or_error.value());
 
-  auto mm_or_error = MemoryManager::New(root_vmar).map_error(
-      [](auto status) { return errno(from_status_like_fdio(status)); });
+  auto mm_or_error = MemoryManager::New(ktl::move(root_vmar)).map_error([](auto status) {
+    return errno(from_status_like_fdio(status));
+  });
 
   if (mm_or_error.is_error()) {
     return mm_or_error.take_error();
@@ -76,7 +77,8 @@ fit::result<zx_status_t, ktl::pair<KernelHandle<ProcessDispatcher>, Vmar>> creat
     return fit::error(status);
   }
 
-  return fit::ok(ktl::pair(ktl::move(process_handle), Vmar{vmar_handle.release(), vmar_rights}));
+  return fit::ok(ktl::pair(ktl::move(process_handle),
+                           Vmar{Handle::Make(ktl::move(vmar_handle), vmar_rights)}));
 }
 
 #if 0
