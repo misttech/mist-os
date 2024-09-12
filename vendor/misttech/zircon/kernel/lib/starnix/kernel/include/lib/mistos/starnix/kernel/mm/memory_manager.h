@@ -326,21 +326,20 @@ struct Vmars {
   // impl Vmars
   static Vmars New(Vmar vmar, zx_info_vmar_t vmar_info);
 
-  Vmar vmar_for_addr(UserAddress addr) const;
+  Vmar& vmar_for_addr(UserAddress addr);
 
   fit::result<Errno, UserAddress> map(DesiredAddress addr, fbl::RefPtr<MemoryObject> memory,
                                       uint64_t memory_offset, size_t length, MappingFlags flags,
                                       bool populate) const;
 
-  fit::result<zx_status_t> unmap(UserAddress addr, size_t length) const;
+  fit::result<zx_status_t> unmap(UserAddress addr, size_t length);
 
-  fit::result<zx_status_t> protect(UserAddress addr, size_t length, uint32_t flags) const;
+  fit::result<zx_status_t> protect(UserAddress addr, size_t length, uint32_t flags);
 
   util::Range<UserAddress> address_range() const;
 
   fit::result<zx_status_t, size_t> raw_map(fbl::RefPtr<MemoryObject> memory, size_t vmar_offset,
-                                           uint64_t memory_offset, size_t len,
-                                           MappingFlags flags) const;
+                                           uint64_t memory_offset, size_t len, MappingFlags flags);
 
   fit::result<zx_status_t> destroy() const;
 

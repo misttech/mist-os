@@ -105,7 +105,7 @@ fit::result<Errno, fbl::RefPtr<MemoryObject>> create_memory(uint64_t size) {
       return fit::error<Errno>(impossible_error(status));
   }
 
-  return fit::ok(MemoryObject::From(kernel_handle.release(), rights));
+  return fit::ok(MemoryObject::From(Handle::Make(ktl::move(kernel_handle), rights)));
 }
 
 zx_vm_option_t user_vmar_flags() {
@@ -114,7 +114,8 @@ zx_vm_option_t user_vmar_flags() {
 }
 
 // zx_status_t zx_vmar_allocate
-fit::result<zx_status_t, Vmar> create_user_vmar(Vmar root_vmar, const zx_info_vmar_t& vmar_info) {
+fit::result<zx_status_t, Vmar> create_user_vmar(const Vmar& root_vmar,
+                                                const zx_info_vmar_t& vmar_info) {
   LTRACEF("vmar_info={.base=%lx,.len=%lu}\n", vmar_info.base, vmar_info.len);
 
   KernelHandle<VmAddressRegionDispatcher> vmar_handle;
@@ -134,14 +135,14 @@ fit::result<zx_status_t, Vmar> create_user_vmar(Vmar root_vmar, const zx_info_vm
 
   // Create the new VMAR
   zx_status_t status =
-      root_vmar.vmar->Allocate(0, vmar_info.len, options, &vmar_handle, &vmar_rights);
+      root_vmar.dispatcher()->Allocate(0, vmar_info.len, options, &vmar_handle, &vmar_rights);
   if (status != ZX_OK) {
     LTRACEF("allocate failed %d\n", status);
     return fit::error(status);
   }
   ASSERT(vmar_handle.dispatcher()->vmar()->base() == vmar_info.base);
 
-  return fit::ok(Vmar{ktl::move(vmar_handle.release()), vmar_rights});
+  return fit::ok(Vmar{Handle::Make(ktl::move(vmar_handle), vmar_rights)});
 }
 
 }  // namespace
@@ -155,12 +156,12 @@ Vmars Vmars::New(Vmar vmar, zx_info_vmar_t vmar_info) {
       if (len <= vmar_info.len) {
         KernelHandle<VmAddressRegionDispatcher> temp_vmar;
         zx_rights_t rights;
-        zx_status_t result = vmar.vmar->Allocate(0, len, 0, &temp_vmar, &rights);
+        zx_status_t result = vmar.dispatcher()->Allocate(0, len, 0, &temp_vmar, &rights);
         if (result != ZX_OK) {
           LTRACEF("Unable to create lower 4 GiB vmar");
-          return ktl::optional<Vmar>(vmar);
+          return ktl::optional<Vmar>(Handle::Make(ktl::move(temp_vmar), rights));
         }
-        return ktl::optional<Vmar>({temp_vmar.release(), rights});
+        return ktl::optional<Vmar>(Handle::Make(ktl::move(temp_vmar), rights));
       } else {
         return ktl::optional<Vmar>(ktl::nullopt);
       }
@@ -169,10 +170,10 @@ Vmars Vmars::New(Vmar vmar, zx_info_vmar_t vmar_info) {
     }
   }();
 
-  return Vmars{vmar, vmar_info, lower_4gb};
+  return Vmars{ktl::move(vmar), vmar_info, ktl::move(lower_4gb)};
 }
 
-Vmar Vmars::vmar_for_addr(UserAddress addr) const {
+Vmar& Vmars::vmar_for_addr(UserAddress addr) {
   if (lower_4gb.has_value()) {
     if (addr < LOWER_4GB_LIMIT.ptr()) {
       return lower_4gb.value();
@@ -252,14 +253,15 @@ fit::result<Errno, UserAddress> Vmars::map(DesiredAddress addr, fbl::RefPtr<Memo
   return fit::ok(map_result.value());
 }
 
-fit::result<zx_status_t> Vmars::unmap(UserAddress addr, size_t length) const {
-  auto _vmar = vmar_for_addr(addr);
-  return fit::error(_vmar.vmar->Unmap(
-      addr.ptr(), length, VmAddressRegionDispatcher::op_children_from_rights(_vmar.rights)));
+fit::result<zx_status_t> Vmars::unmap(UserAddress addr, size_t length) {
+  auto& _vmar = vmar_for_addr(addr);
+  return fit::error(_vmar.dispatcher()->Unmap(
+      addr.ptr(), length,
+      VmAddressRegionDispatcher::op_children_from_rights(_vmar.vmar->rights())));
 }
 
-fit::result<zx_status_t> Vmars::protect(UserAddress addr, size_t length, uint32_t options) const {
-  auto _vmar = vmar_for_addr(addr);
+fit::result<zx_status_t> Vmars::protect(UserAddress addr, size_t length, uint32_t options) {
+  auto& _vmar = vmar_for_addr(addr);
 
   if ((options & ZX_VM_PERM_READ_IF_XOM_UNSUPPORTED)) {
     if (!(arch_vm_features() & ZX_VM_FEATURE_CAN_MAP_XOM)) {
@@ -279,8 +281,8 @@ fit::result<zx_status_t> Vmars::protect(UserAddress addr, size_t length, uint32_
   }
 
   return fit::error(
-      _vmar.vmar->Protect(addr.ptr(), length, options,
-                          VmAddressRegionDispatcher::op_children_from_rights(vmar_rights)));
+      _vmar.dispatcher()->Protect(addr.ptr(), length, options,
+                                  VmAddressRegionDispatcher::op_children_from_rights(vmar_rights)));
 }
 
 util::Range<UserAddress> Vmars::address_range() const {
@@ -290,14 +292,14 @@ util::Range<UserAddress> Vmars::address_range() const {
 
 fit::result<zx_status_t, size_t> Vmars::raw_map(fbl::RefPtr<MemoryObject> memory,
                                                 size_t vmar_offset, uint64_t memory_offset,
-                                                size_t len, MappingFlags flags) const {
+                                                size_t len, MappingFlags flags) {
   return memory->map_in_vmar(
       this->vmar_for_addr(UserAddress::from_ptr(vmar_offset + this->vmar_info.base)), vmar_offset,
       &memory_offset, len, flags);
 }
 
 fit::result<zx_status_t> Vmars::destroy() const {
-  auto status = vmar.vmar->Destroy();
+  auto status = vmar.dispatcher()->Destroy();
   if (status != ZX_OK) {
     return fit::error(status);
   }
@@ -312,7 +314,7 @@ UserAddress Vmars::get_random_base(size_t length) const {
   KernelHandle<VmAddressRegionDispatcher> temp_vmar;
   zx_rights_t rights;
   uintptr_t base;
-  ASSERT(vmar.vmar->Allocate(0, length, 0, &temp_vmar, &rights));
+  ASSERT(vmar.dispatcher()->Allocate(0, length, 0, &temp_vmar, &rights));
   base = temp_vmar.dispatcher()->vmar()->base();
   temp_vmar.reset();
   return UserAddress::from_ptr(base);
@@ -977,7 +979,7 @@ fit::result<Errno, UserAddress> MemoryManager::map_memory(
 fit::result<zx_status_t, fbl::RefPtr<MemoryManager>> MemoryManager::New(Vmar root_vmar) {
   LTRACE;
 
-  auto vmar = root_vmar.vmar->vmar();
+  auto vmar = root_vmar.dispatcher()->vmar();
   zx_info_vmar_t info = {
       .base = vmar->base(),
       .len = vmar->size(),
@@ -989,14 +991,14 @@ fit::result<zx_status_t, fbl::RefPtr<MemoryManager>> MemoryManager::New(Vmar roo
   }
 
   zx_info_vmar_t user_vmar_info = {
-      .base = user_vmar.value().vmar->vmar()->base(),
-      .len = user_vmar.value().vmar->vmar()->size(),
+      .base = user_vmar.value().dispatcher()->vmar()->base(),
+      .len = user_vmar.value().dispatcher()->vmar()->size(),
   };
 
   DEBUG_ASSERT(PRIVATE_ASPACE_BASE == user_vmar_info.base);
   DEBUG_ASSERT(PRIVATE_ASPACE_SIZE == user_vmar_info.len);
 
-  return fit::ok(from_vmar(root_vmar, ktl::move(user_vmar.value()), user_vmar_info));
+  return fit::ok(from_vmar(ktl::move(root_vmar), ktl::move(user_vmar.value()), user_vmar_info));
 }
 
 fbl::RefPtr<MemoryManager> MemoryManager::new_empty() {
@@ -1021,7 +1023,7 @@ MemoryManager::MemoryManager(Vmar root, Vmar user_vmar, zx_info_vmar_t user_vmar
   LTRACEF("user_vmar_info={.base=%lx,.len=%lu}\n", user_vmar_info.base, user_vmar_info.len);
 
   auto _state = state.Write();
-  _state->user_vmars = Vmars::New(user_vmar, user_vmar_info);
+  _state->user_vmars = Vmars::New(ktl::move(user_vmar), user_vmar_info);
   _state->forkable_state_ = MemoryManagerForkableState{{}, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 }
 
@@ -1367,8 +1369,8 @@ fit::result<zx_status_t> MemoryManager::exec(/*NamespaceNode exe_node*/) {
   {
     auto _state = state.Write();
     zx_info_vmar_t info = {
-        .base = root_vmar.vmar->vmar()->base(),
-        .len = root_vmar.vmar->vmar()->size(),
+        .base = root_vmar.dispatcher()->vmar()->base(),
+        .len = root_vmar.dispatcher()->vmar()->size(),
     };
 
     // SAFETY: This operation is safe because the VMAR is for another process.
@@ -1382,11 +1384,11 @@ fit::result<zx_status_t> MemoryManager::exec(/*NamespaceNode exe_node*/) {
     auto vmar = ktl::move(vmar_or_error.value());
 
     zx_info_vmar_t user_vmar_info = {
-        .base = vmar.vmar->vmar()->base(),
-        .len = vmar.vmar->vmar()->size(),
+        .base = vmar.dispatcher()->vmar()->base(),
+        .len = vmar.dispatcher()->vmar()->size(),
     };
 
-    _state->user_vmars = Vmars::New(vmar, user_vmar_info);
+    _state->user_vmars = Vmars::New(ktl::move(vmar), user_vmar_info);
 
     (*_state)->brk = {};
     // state.executable_node = Some(exe_node);
