@@ -224,7 +224,7 @@ constexpr bool RelocateSymbolic(Memory& memory, DiagnosticsType& diagnostics,
   // undefined weak case is as for tls_module (above), see comments there.
   auto tls_relative = [apply_with_addend](const auto& reloc, const auto& defn) {
     return defn.undefined_weak() ||
-           apply_with_addend(reloc, defn.symbol().value() + Tls::kTlsRelativeBias);
+           apply_with_addend(reloc, defn.symbol().value() - Tls::kTlsRelativeBias);
   };
 
   // Each TLSDESC reloc acts like two relocs to consecutive GOT slots: first

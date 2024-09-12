@@ -259,10 +259,10 @@ struct TlsTraits<Elf, ElfMachine::kNone> {
   // that is aligned to p_align and >= p_memsz.
   static constexpr bool kTlsNegative = false;
 
-  // This bias is added into the offset for a kTlsRelative relocation.  It's
-  // then subtracted out again by the `__tls_get_addr` code.  In Local Dynamic
-  // cases, there is no kTlsRelative relocation emitted and instead the offset
-  // word is filled at link time with this bias added.
+  // This bias is subtracted from the offset for a kTlsRelative relocation.
+  // It's then added back in again by the `__tls_get_addr` code.  In Local
+  // Dynamic cases, there is no kTlsRelative relocation emitted and instead the
+  // offset word is filled at link time with this bias subtracted.
   static constexpr typename Elf::size_type kTlsRelativeBias = 0;
 };
 
@@ -280,7 +280,7 @@ struct TlsTraits<Elf, ElfMachine::kAarch64> {
 // RISC-V puts TLS above TP with no offset, as shown in the exemplar.
 template <class Elf>
 struct TlsTraits<Elf, ElfMachine::kRiscv> : public TlsTraits<Elf, ElfMachine::kNone> {
-  static constexpr typename Elf::size_type kTlsRelativeBias = -0x800;
+  static constexpr typename Elf::size_type kTlsRelativeBias = 0x800;
 };
 
 // X86 puts TLS below TP.
