@@ -235,9 +235,12 @@ zx::result<> Lcd::PerformDisplayInitCommandSequence(cpp20::span<const uint8_t> e
           //
           // return ZX_ERR_UNKNOWN;
         } else {
-          fidl::WireResult result = lcd_reset_gpio_->ConfigOut(encoded_commands[i + 3]);
+          fidl::WireResult result = lcd_reset_gpio_->SetBufferMode(
+              encoded_commands[i + 3] ? fuchsia_hardware_gpio::BufferMode::kOutputHigh
+                                      : fuchsia_hardware_gpio::BufferMode::kOutputLow);
           if (!result.ok()) {
-            FDF_LOG(ERROR, "Failed to send ConfigOut request to gpio: %s", result.status_string());
+            FDF_LOG(ERROR, "Failed to send SetBufferMode request to gpio: %s",
+                    result.status_string());
             return zx::error(result.status());
           }
           if (result->is_error()) {

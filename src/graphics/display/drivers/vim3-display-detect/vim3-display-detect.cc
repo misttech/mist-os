@@ -80,10 +80,10 @@ zx::result<bool> Vim3DisplayDetect::ReadGpio(std::string_view gpio_node_name) {
 
   fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio> gpio_client(*std::move(gpio));
 
-  auto result = gpio_client->ConfigIn(fuchsia_hardware_gpio::GpioFlags::kNoPull);
+  auto result = gpio_client->SetBufferMode(fuchsia_hardware_gpio::BufferMode::kInput);
   if (!result.ok() || result->is_error()) {
     auto status = result.ok() ? result->error_value() : result.status();
-    FDF_LOG(ERROR, "ConfigIn failed: %s", zx_status_get_string(status));
+    FDF_LOG(ERROR, "SetBufferMode failed: %s", zx_status_get_string(status));
     return zx::error(status);
   }
 
