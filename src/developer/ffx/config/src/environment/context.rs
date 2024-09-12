@@ -166,12 +166,6 @@ impl EnvironmentContext {
                 no_environment,
             ))
         } else {
-            // Isolate dirs should be absolute paths
-            let isolate_root = if isolate_root.is_absolute() {
-                isolate_root
-            } else {
-                std::fs::canonicalize(&isolate_root)?
-            };
             Ok(Self::new(
                 EnvironmentKind::Isolated { isolate_root },
                 exe_kind,
