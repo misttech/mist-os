@@ -13,6 +13,7 @@
 
 pub mod auto_persist;
 pub mod graph;
+pub mod id_enum;
 pub mod inspectable;
 #[macro_use]
 pub mod log;
