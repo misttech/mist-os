@@ -440,9 +440,9 @@ rustc_library("starnix_core") {
   ]
   configs += [ "//src/starnix/config:starnix_clippy_lints" ]
 
-  if (is_asan) {
-    # At least for ASan, remote execution requires machine
-    # with more memory, particularly in the linking phase.
+  if (is_asan || target_cpu == "riscv64") {
+    # At least for ASan and riscv64, remote execution requires more memory,
+    # particularly in the test linking phase.
     _concurrent_jobs = concurrent_jobs.rust_highmem
     test_configs = _concurrent_jobs.configs
     test_vars = _concurrent_jobs.vars
