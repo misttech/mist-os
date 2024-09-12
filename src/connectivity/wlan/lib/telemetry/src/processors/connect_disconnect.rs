@@ -9,11 +9,13 @@ use fuchsia_inspect::Node as InspectNode;
 use fuchsia_inspect_contrib::auto_persist::{
     AutoPersist, {self},
 };
+use fuchsia_inspect_contrib::id_enum::{inspect_record_id_enum, IdEnum};
 use fuchsia_inspect_contrib::nodes::BoundedListNode;
 use fuchsia_inspect_contrib::{inspect_insert, inspect_log};
 use fuchsia_inspect_derive::Unit;
 use fuchsia_sync::Mutex;
 use std::sync::Arc;
+use strum_macros::{Display, EnumIter};
 use windowed_stats::experimental::clock::TimedSample;
 use windowed_stats::experimental::series::interpolation::Constant;
 use windowed_stats::experimental::series::statistic::Union;
@@ -30,35 +32,35 @@ use {
 
 const INSPECT_CONNECT_EVENTS_LIMIT: usize = 10;
 const INSPECT_DISCONNECT_EVENTS_LIMIT: usize = 10;
-const INSPECT_WLAN_CONNECTIVITY_STATES_ID_LIMIT: usize = 16;
 const INSPECT_CONNECTED_NETWORKS_ID_LIMIT: usize = 16;
 const INSPECT_DISCONNECT_SOURCES_ID_LIMIT: usize = 32;
 
-const IDLE_STATE_NAME: &'static str = "Idle";
-const DISCONNECTED_STATE_NAME: &'static str = "Disconnected";
-const CONNECTED_STATE_NAME: &'static str = "Connected";
-const CONNECTION_STATE_NAMES: [&'static str; 3] =
-    [IDLE_STATE_NAME, DISCONNECTED_STATE_NAME, CONNECTED_STATE_NAME];
-
-#[derive(Debug)]
+#[derive(Debug, Display, EnumIter)]
 enum ConnectionState {
     Idle(IdleState),
     Connected(ConnectedState),
     Disconnected(DisconnectedState),
 }
-#[derive(Debug)]
+
+impl IdEnum for ConnectionState {
+    type Id = u8;
+    fn to_id(&self) -> Self::Id {
+        match self {
+            Self::Idle(_) => 0,
+            Self::Disconnected(_) => 1,
+            Self::Connected(_) => 2,
+        }
+    }
+}
+
+#[derive(Debug, Default)]
 struct IdleState {}
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 struct ConnectedState {}
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 struct DisconnectedState {}
-
-#[derive(PartialEq, Unit)]
-struct InspectWlanConnectivityState {
-    state_name: String,
-}
 
 #[derive(Unit)]
 struct InspectConnectedNetwork {
@@ -202,27 +204,13 @@ impl ConnectDisconnectLogger {
         this
     }
 
-    fn inspect_wlan_connectivity_state(&self) -> InspectWlanConnectivityState {
-        let state_name = match *self.connection_state.lock() {
-            ConnectionState::Idle(_) => IDLE_STATE_NAME,
-            ConnectionState::Disconnected(_) => DISCONNECTED_STATE_NAME,
-            ConnectionState::Connected(_) => CONNECTED_STATE_NAME,
-        };
-        InspectWlanConnectivityState { state_name: state_name.to_string() }
-    }
-
     fn update_connection_state(&self, state: ConnectionState) {
         *self.connection_state.lock() = state;
         self.log_connection_state();
     }
 
     fn log_connection_state(&self) {
-        let wlan_connectivity_state = self.inspect_wlan_connectivity_state();
-        let wlan_connectivity_state_id = self
-            .inspect_metadata_node
-            .lock()
-            .wlan_connectivity_states
-            .record_item(wlan_connectivity_state);
+        let wlan_connectivity_state_id = self.connection_state.lock().to_id() as u64;
         self.time_series_stats.log_wlan_connectivity_state(1 << wlan_connectivity_state_id);
     }
 
@@ -291,7 +279,6 @@ impl ConnectDisconnectLogger {
 }
 
 struct InspectMetadataNode {
-    wlan_connectivity_states: InspectBoundedSetNode<InspectWlanConnectivityState>,
     connected_networks: InspectBoundedSetNode<InspectConnectedNetwork>,
     disconnect_sources: InspectBoundedSetNode<InspectDisconnectSource>,
 }
@@ -302,14 +289,10 @@ impl InspectMetadataNode {
     const DISCONNECT_SOURCES: &'static str = "disconnect_sources";
 
     fn new(inspect_node: &InspectNode) -> Self {
-        let wlan_connectivity_states = inspect_node.create_child("wlan_connectivity_states");
+        inspect_record_id_enum::<ConnectionState>(inspect_node, "wlan_connectivity_states");
         let connected_networks = inspect_node.create_child("connected_networks");
         let disconnect_sources = inspect_node.create_child("disconnect_sources");
-        let mut this = Self {
-            wlan_connectivity_states: InspectBoundedSetNode::new(
-                wlan_connectivity_states,
-                INSPECT_WLAN_CONNECTIVITY_STATES_ID_LIMIT,
-            ),
+        Self {
             connected_networks: InspectBoundedSetNode::new_with_eq_fn(
                 connected_networks,
                 INSPECT_CONNECTED_NETWORKS_ID_LIMIT,
@@ -319,15 +302,6 @@ impl InspectMetadataNode {
                 disconnect_sources,
                 INSPECT_DISCONNECT_SOURCES_ID_LIMIT,
             ),
-        };
-        this.initialize();
-        this
-    }
-
-    fn initialize(&mut self) {
-        for state_name in CONNECTION_STATE_NAMES {
-            let state = InspectWlanConnectivityState { state_name: state_name.to_string() };
-            let _id = self.wlan_connectivity_states.record_item(state);
         }
     }
 }
@@ -435,18 +409,9 @@ mod tests {
             test_stats: contains {
                 metadata: contains {
                     wlan_connectivity_states: {
-                        "0": {
-                            "@time": AnyNumericProperty,
-                            "data": { state_name: "Idle" },
-                        },
-                        "1": {
-                            "@time": AnyNumericProperty,
-                            "data": { state_name: "Disconnected" },
-                        },
-                        "2": {
-                            "@time": AnyNumericProperty,
-                            "data": { state_name: "Connected" },
-                        },
+                        "0": "Idle",
+                        "1": "Disconnected",
+                        "2": "Connected",
                     }
                 }
             }
@@ -484,13 +449,10 @@ mod tests {
         assert_data_tree!(data, root: contains {
             test_stats: contains {
                 metadata: contains {
-                    wlan_connectivity_states: contains {
-                        "0": contains {
-                            "data": { state_name: "Idle" },
-                        },
-                        "2": contains {
-                            "data": { state_name: "Connected" },
-                        }
+                    wlan_connectivity_states: {
+                        "0": "Idle",
+                        "1": "Disconnected",
+                        "2": "Connected",
                     },
                     connected_networks: contains {
                         "0": {
@@ -601,13 +563,10 @@ mod tests {
         assert_data_tree!(data, root: contains {
             test_stats: contains {
                 metadata: {
-                    wlan_connectivity_states: contains {
-                        "0": contains {
-                            "data": { state_name: "Idle" },
-                        },
-                        "1": contains {
-                            "data": { state_name: "Disconnected" },
-                        }
+                    wlan_connectivity_states: {
+                        "0": "Idle",
+                        "1": "Disconnected",
+                        "2": "Connected",
                     },
                     connected_networks: {
                         "0": {
