@@ -674,41 +674,21 @@ bool AttachTokenSucceedsV2(
     IF_FAILURES_RETURN();
 
     if (collection_3.is_valid()) {
-      // TODO(b/360987653): Instead of the code in this block, switch to the mechanism provided by
-      // the fix to b/360987653 which will provide a nicer way to achieve this.
-      //
-      // As a workaround for now until b/360987653 is fixed, we can detect when the server has fully
-      // finished cleaning up collection_3 by attaching a child token, closing collection_3 client
-      // side, and noticing when the child token sees PEER_CLOSED.
-      //
-      // This way we avoid the old collection_3 still having "dibs" on any buffers, which would
-      // otherwise potentially cause the new logical allocation to fail.
-      //
-      // It wouldn't work to intentionally trigger failure using an intentionally broken request via
-      // collection_3 and notice when collection_3 sees PEER_CLOSED, because of the way fidl server
-      // binding error handlers work (the channel server_end closes before the error handler runs
-      // when the close is initiated server-side during fidl request handling).
-      //
-      // In contrast, the fix for b/360987653 will provide a way to know when the server has fully
-      // cleaned up its context for collection_3 without relying on any server impl details or
-      // caring about fidl server binding implementation details.
-      auto [tmp_attached_client, tmp_attached_server] =
-          fidl::Endpoints<fuchsia_sysmem2::BufferCollectionToken>::Create();
-      fuchsia_sysmem2::BufferCollectionAttachTokenRequest attach_request;
-      attach_request.rights_attenuation_mask() = ZX_RIGHT_SAME_RIGHTS;
-      attach_request.token_request() = std::move(tmp_attached_server);
-      auto attach_token_result = collection_3->AttachToken(std::move(attach_request));
-      EXPECT_TRUE(attach_token_result.is_ok());
-      IF_FAILURES_RETURN();
-      // This will async trigger the server to clean up both collection_3 and tmp_attached without
-      // returning to its dispatcher in between. Detecting via tmp_attached_client works but relies
-      // on this server impl detail (see TODO above).
+      zx::eventpair client_end;
+      zx::eventpair server_end;
+      zx_status_t create_status = zx::eventpair::create(/*options=*/0, &client_end, &server_end);
+      ASSERT_OK(create_status);
+      fuchsia_sysmem2::NodeAttachNodeTrackingRequest node_tracking_request;
+      node_tracking_request.server_end() = std::move(server_end);
+      auto attach_node_tracking_result =
+          collection_3->AttachNodeTracking(std::move(node_tracking_request));
+      ASSERT_TRUE(attach_node_tracking_result.is_ok());
+      // This will async trigger the server to clean up collection_3.
       collection_3 = {};
       zx_signals_t pending = 0;
-      auto wait_status = tmp_attached_client.channel().wait_one(ZX_CHANNEL_PEER_CLOSED,
-                                                                zx::time::infinite(), &pending);
-      EXPECT_OK(wait_status);
-      IF_FAILURES_RETURN();
+      auto wait_status =
+          client_end.wait_one(ZX_EVENTPAIR_PEER_CLOSED, zx::time::infinite(), &pending);
+      ASSERT_OK(wait_status);
       // now we know that the old collection_3 has been fully torn down server-side
     }
     ZX_DEBUG_ASSERT(!collection_3.is_valid());
@@ -7458,6 +7438,105 @@ TEST(Sysmem, IsAlphaPresentField) {
       }
     }
   }
+}
+
+TEST(Sysmem, AttachNodeTracking) {
+  auto parent_token = create_initial_token_v2();
+  auto child_token = create_token_under_token_v2(parent_token);
+
+  zx::eventpair client_end;
+  zx::eventpair server_end;
+  zx_status_t create_status = zx::eventpair::create(0, &client_end, &server_end);
+  ASSERT_OK(create_status);
+  fuchsia_sysmem2::NodeAttachNodeTrackingRequest node_tracking_request;
+  node_tracking_request.server_end() = std::move(server_end);
+  auto node_tracking_result = parent_token->AttachNodeTracking(std::move(node_tracking_request));
+  ASSERT_TRUE(node_tracking_result.is_ok());
+
+  auto parent = convert_token_to_collection_v2(std::move(parent_token));
+  auto child = convert_token_to_collection_v2(std::move(child_token));
+
+  // should time out because the server_end was attached, not dropped
+  zx_signals_t pending;
+  zx_status_t wait_status =
+      client_end.wait_one(ZX_EVENTPAIR_PEER_CLOSED, zx::deadline_after(zx::msec(200)), &pending);
+  ASSERT_EQ(wait_status, ZX_ERR_TIMED_OUT);
+
+  child = {};
+  // We don't need to do parent = {} because child failure (without SetDispensable or AttachToken)
+  // will cause parent Node failure.
+
+  wait_status = client_end.wait_one(ZX_EVENTPAIR_PEER_CLOSED, zx::time::infinite(), &pending);
+  ASSERT_OK(wait_status);
+  ASSERT_TRUE(!!(pending & ZX_EVENTPAIR_PEER_CLOSED));
+}
+
+TEST(Sysmem, AttachNodeTrackingWithOrphanedNode) {
+  auto parent_token = create_initial_token_v2();
+  auto child_token = create_token_under_token_v2(parent_token);
+
+  zx::eventpair client_end;
+  zx::eventpair server_end;
+  zx_status_t create_status = zx::eventpair::create(0, &client_end, &server_end);
+  ASSERT_OK(create_status);
+  fuchsia_sysmem2::NodeAttachNodeTrackingRequest node_tracking_request;
+  node_tracking_request.server_end() = std::move(server_end);
+  auto node_tracking_result = parent_token->AttachNodeTracking(std::move(node_tracking_request));
+  ASSERT_TRUE(node_tracking_result.is_ok());
+
+  auto parent = convert_token_to_collection_v2(std::move(parent_token));
+  auto child = convert_token_to_collection_v2(std::move(child_token));
+
+  set_min_camping_constraints_v2(parent, 1);
+  auto release_result = parent->Release();
+  ASSERT_TRUE(release_result.is_ok());
+  parent = {};
+
+  // should time out because the parent was Release()ed before dropping parent, so the attached
+  // server_end stays attached to the orphaned parent node
+  zx_signals_t pending;
+  zx_status_t wait_status =
+      client_end.wait_one(ZX_EVENTPAIR_PEER_CLOSED, zx::deadline_after(zx::msec(200)), &pending);
+  ASSERT_EQ(wait_status, ZX_ERR_TIMED_OUT);
+
+  // Now drop child, which will cause the orphaned parent node to be cleaned up also, which drops
+  // the server_end
+  child = {};
+
+  // verify server_end was dropped
+  wait_status = client_end.wait_one(ZX_EVENTPAIR_PEER_CLOSED, zx::time::infinite(), &pending);
+  ASSERT_OK(wait_status);
+  ASSERT_TRUE(!!(pending & ZX_EVENTPAIR_PEER_CLOSED));
+}
+
+TEST(Sysmem, AttachNodeTrackingCountLimit) {
+  const uint32_t kNotQuiteTooMany = 256;
+  auto parent_token = create_initial_token_v2();
+  std::vector<zx::eventpair> client_ends;
+  auto attach_one = [&] {
+    zx::eventpair client_end;
+    zx::eventpair server_end;
+    zx_status_t create_status = zx::eventpair::create(0, &client_end, &server_end);
+    ASSERT_OK(create_status);
+    fuchsia_sysmem2::NodeAttachNodeTrackingRequest node_tracking_request;
+    node_tracking_request.server_end() = std::move(server_end);
+    auto node_tracking_result = parent_token->AttachNodeTracking(std::move(node_tracking_request));
+    // is_ok() even for the last one since AttachNodeTracking is a one-way message
+    ASSERT_TRUE(node_tracking_result.is_ok());
+    client_ends.push_back(std::move(client_end));
+  };
+  for (uint32_t i = 0; i < kNotQuiteTooMany; ++i) {
+    attach_one();
+  }
+
+  auto sync_result_1 = parent_token->Sync();
+  ASSERT_TRUE(sync_result_1.is_ok());
+
+  // this will trigger failure of parent_token
+  attach_one();
+
+  auto sync_result_2 = parent_token->Sync();
+  ASSERT_FALSE(sync_result_2.is_ok());
 }
 
 // This test is too likely to cause an OOM which would be treated as a flake. For now we can enable

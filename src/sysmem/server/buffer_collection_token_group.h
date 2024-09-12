@@ -102,6 +102,8 @@ class BufferCollectionTokenGroup : public Node {
     void SetDebugTimeoutLogDeadline(SetDebugTimeoutLogDeadlineRequest& request,
                                     SetDebugTimeoutLogDeadlineCompleter::Sync& completer) override;
     void SetVerboseLogging(SetVerboseLoggingCompleter::Sync& completer) override;
+    void AttachNodeTracking(AttachNodeTrackingRequest& request,
+                            AttachNodeTrackingCompleter::Sync& completer) override;
 
     //
     // fuchsia.sysmem.BufferCollectionTokenGroup interface methods (see also "compose Node" methods

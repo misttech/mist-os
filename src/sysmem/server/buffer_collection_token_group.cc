@@ -115,6 +115,11 @@ void BufferCollectionTokenGroup::V2::SetVerboseLogging(
   parent_.SetVerboseLoggingImpl(ConnectionVersion::kVersion2, completer);
 }
 
+void BufferCollectionTokenGroup::V2::AttachNodeTracking(
+    AttachNodeTrackingRequest& request, AttachNodeTrackingCompleter::Sync& completer) {
+  parent_.AttachNodeTrackingImpl(request, completer);
+}
+
 template <typename Completer>
 bool BufferCollectionTokenGroup::CommonCreateChildStage1(
     ConnectionVersion version, Completer& completer,

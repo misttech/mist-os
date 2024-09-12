@@ -134,6 +134,10 @@ open protocol CombinedBufferCollectionToken {
     flexible SetWeakOkV2(resource table {
         1: for_child_nodes_also bool;
     });
+    @selector("fuchsia.sysmem2/Node.AttachNodeTracking")
+    flexible AttachNodeTrackingV2(resource table {
+        1: server_end zx.Handle:EVENTPAIR;
+    });
 
     // fuchsia.sysmem2/BufferCollectionToken, with de-conflicted names:
     @selector("fuchsia.sysmem2/BufferCollectionToken.DuplicateSync")

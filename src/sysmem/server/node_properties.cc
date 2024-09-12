@@ -19,6 +19,12 @@
 
 namespace sysmem_service {
 
+namespace {
+
+const size_t kMaxLifetimeServerEnds = 256;
+
+}  // namespace
+
 NodeProperties::~NodeProperties() {
   ZX_DEBUG_ASSERT(child_count() == 0);
   if (node_) {
@@ -308,6 +314,15 @@ void NodeProperties::SetWeakOk(bool for_child_nodes_also) {
   if (for_child_nodes_also) {
     is_weak_ok_for_child_nodes_also_ = true;
   }
+}
+
+bool NodeProperties::AttachNodeTracking(zx::eventpair server_end) {
+  ZX_DEBUG_ASSERT(lifetime_server_ends_.size() <= kMaxLifetimeServerEnds);
+  if (lifetime_server_ends_.size() == kMaxLifetimeServerEnds) {
+    return false;
+  }
+  lifetime_server_ends_.push_back(std::move(server_end));
+  return true;
 }
 
 NodeProperties::NodeProperties(LogicalBufferCollection* logical_buffer_collection)

@@ -145,6 +145,8 @@ class BufferCollection : public Node {
                                     SetDebugTimeoutLogDeadlineCompleter::Sync& completer) override;
     void SetVerboseLogging(SetVerboseLoggingCompleter::Sync& completer) override;
     void SetWeak(SetWeakCompleter::Sync& completer) override;
+    void AttachNodeTracking(AttachNodeTrackingRequest& request,
+                            AttachNodeTrackingCompleter::Sync& completer) override;
 
     //
     // fuchsia.sysmem.BufferCollection interface methods (see also "compose Node" methods above)

@@ -449,8 +449,27 @@ class Node : public fbl::RefCounted<Node> {
     }
     node_properties().SetWeak();
     // done
-    //
-    // ~completer; one-way message; no reply
+  }
+
+  template <class AttachNodeTrackingRequest, class AttachNodeTrackingCompleterSync>
+  void AttachNodeTrackingImpl(AttachNodeTrackingRequest& request,
+                              AttachNodeTrackingCompleterSync& completer) {
+    if (is_done_) {
+      FailSync(FROM_HERE, ConnectionVersion::kVersion2, completer, ZX_ERR_BAD_STATE,
+               "AttachNodeTracking after Release");
+      return;
+    }
+    if (!request.server_end().has_value()) {
+      FailSync(FROM_HERE, ConnectionVersion::kVersion2, completer, ZX_ERR_INVALID_ARGS,
+               "AttachNodeTracking requires server_end field set");
+      return;
+    }
+    if (!node_properties().AttachNodeTracking(std::move(*request.server_end()))) {
+      FailSync(FROM_HERE, ConnectionVersion::kVersion2, completer, ZX_ERR_BAD_STATE,
+               "AttachNodeTracking failed; too many server_end(s)");
+      return;
+    }
+    // success
   }
 
   template <class SetWeakOkRequest, class SetWeakOkCompleterSync>

@@ -153,6 +153,8 @@ class BufferCollectionToken : public Node, public LoggingMixin {
         CreateBufferCollectionTokenGroupV2Request& request,
         CreateBufferCollectionTokenGroupV2Completer::Sync& completer) override;
     void SetDispensableV2(SetDispensableV2Completer::Sync& completer) override;
+    void AttachNodeTrackingV2(AttachNodeTrackingV2Request& request,
+                              AttachNodeTrackingV2Completer::Sync& completer) override;
 
     void handle_unknown_method(
         fidl::UnknownMethodMetadata<fuchsia_sysmem2_internal::CombinedBufferCollectionToken>

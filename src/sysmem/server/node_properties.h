@@ -206,6 +206,8 @@ class NodeProperties : public std::enable_shared_from_this<NodeProperties> {
   void SetWeakOk(bool for_child_nodes_also);
   [[nodiscard]] bool is_weak_ok() const { return is_weak_ok_; }
 
+  bool AttachNodeTracking(zx::eventpair server_end);
+
   // These counts are for the current NodeProperties + any current children (direct and indirect) of
   // the current NodeProperties.  For LogicalBufferCollection::root_, these counts are for the whole
   // tree.
@@ -237,6 +239,10 @@ class NodeProperties : public std::enable_shared_from_this<NodeProperties> {
  private:
   friend class LogicalBufferCollection;
   explicit NodeProperties(LogicalBufferCollection* logical_buffer_collection);
+
+  // This is first so that it'll be destructed last, notifying the client that the corresponding
+  // Node is fully gone. This includes for OrphanedNode(s) which can still retain buffer counts.
+  std::vector<zx::eventpair> lifetime_server_ends_;
 
   LogicalBufferCollection* logical_buffer_collection_ = nullptr;
 

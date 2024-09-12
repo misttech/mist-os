@@ -564,6 +564,11 @@ void BufferCollection::V2::SetWeak(SetWeakCompleter::Sync& completer) {
   parent_.node_properties().SetWeakOk(false);
 }
 
+void BufferCollection::V2::AttachNodeTracking(AttachNodeTrackingRequest& request,
+                                              AttachNodeTrackingCompleter::Sync& completer) {
+  parent_.AttachNodeTrackingImpl(request, completer);
+}
+
 void BufferCollection::V2::SetWeakOk(SetWeakOkRequest& request,
                                      SetWeakOkCompleter::Sync& completer) {
   if (parent_.wait_for_buffers_seen_) {

@@ -446,6 +446,37 @@ open protocol Node {
     flexible SetWeakOk(resource table {
         1: for_child_nodes_also bool;
     });
+
+    /// The server_end will be closed after this `Node` and any child nodes have
+    /// have released their buffer counts, making those counts available for
+    /// reservation by a different `Node` via
+    /// [`fuchsia.sysmem2/BufferCollection.AttachToken`].
+    ///
+    /// The `Node` buffer counts may not be released until the entire tree of
+    /// `Node`(s) is closed or failed, because
+    /// [`fuchsia.sysmem2/BufferCollection.Release`] followed by channel close
+    /// does not immediately un-reserve the `Node` buffer counts. Instead, the
+    /// `Node` buffer counts remain reserved until the orphaned node is later
+    /// cleaned up.
+    ///
+    /// If the `Node` exceeds a fairly large number of attached eventpair server
+    /// ends, a log message will indicate this and the `Node` (and the
+    /// appropriate) sub-tree will fail.
+    ///
+    /// The `server_end` will remain open when
+    /// [`fuchsia.sysmem2/Allocator.BindSharedCollection`] converts a
+    /// [`fuchsia.sysmem2/BufferCollectionToken`] into a
+    /// [`fuchsia.sysmem2/BufferCollection`].
+    ///
+    /// This message can also be used with a
+    /// [`fuchsia.sysmem2/BufferCollectionTokenGroup`].
+    @available(added=NEXT)
+    flexible AttachNodeTracking(resource table {
+        /// This field must be set. This evenpair end will be closed after the
+        /// `Node` is closed or failed and the node's buffer counts are no
+        /// longer in effect in the logical buffer collection.
+        1: server_end zx.Handle:EVENTPAIR;
+    });
 };
 
 /// A [`fuchsia.sysmem2/BufferCollectionToken`] is not a buffer collection, but

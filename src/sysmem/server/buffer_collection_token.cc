@@ -354,6 +354,11 @@ void BufferCollectionToken::CombinedTokenServer::SetDispensableV2(
   parent_.SetDispensableInternal();
 }
 
+void BufferCollectionToken::CombinedTokenServer::AttachNodeTrackingV2(
+    AttachNodeTrackingV2Request& request, AttachNodeTrackingV2Completer::Sync& completer) {
+  parent_.AttachNodeTrackingImpl(request, completer);
+}
+
 void BufferCollectionToken::CombinedTokenServer::handle_unknown_method(
     fidl::UnknownMethodMetadata<fuchsia_sysmem2_internal::CombinedBufferCollectionToken> metadata,
     fidl::UnknownMethodCompleter::Sync& completer) {
