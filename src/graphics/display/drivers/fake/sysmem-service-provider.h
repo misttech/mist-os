@@ -7,6 +7,7 @@
 
 #include <fidl/fuchsia.hardware.sysmem/cpp/fidl.h>
 #include <fidl/fuchsia.io/cpp/fidl.h>
+#include <fidl/fuchsia.sysmem/cpp/fidl.h>
 #include <lib/zx/result.h>
 
 namespace display {
