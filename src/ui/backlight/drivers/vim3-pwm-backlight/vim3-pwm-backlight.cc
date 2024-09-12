@@ -119,31 +119,17 @@ zx_status_t Vim3PwmBacklight::SetPwmConfig(bool enabled, float duty_cycle) {
   return ZX_OK;
 }
 
-zx_status_t Vim3PwmBacklight::InitializeGpioBacklightPower(bool initially_enabled) {
-  ZX_ASSERT(!gpio_initialized_);
-  fidl::WireResult result = gpio_backlight_power_->ConfigOut(initially_enabled);
+zx_status_t Vim3PwmBacklight::SetGpioBacklightPower(bool enabled) {
+  fidl::WireResult result =
+      gpio_backlight_power_->SetBufferMode(enabled ? fuchsia_hardware_gpio::BufferMode::kOutputHigh
+                                                   : fuchsia_hardware_gpio::BufferMode::kOutputLow);
   if (!result.ok()) {
-    zxlogf(ERROR, "Failed to send ConfigOut request to gpio: %s", result.status_string());
+    zxlogf(ERROR, "Failed to send SetBufferMode request to gpio: %s", result.status_string());
     return result.status();
   }
   if (result->is_error()) {
     zxlogf(ERROR, "Failed to configure gpio to output: %s",
            zx_status_get_string(result->error_value()));
-    return result->error_value();
-  }
-  gpio_initialized_ = true;
-  return ZX_OK;
-}
-
-zx_status_t Vim3PwmBacklight::SetGpioBacklightPower(bool enabled) {
-  ZX_ASSERT(gpio_initialized_);
-  fidl::WireResult result = gpio_backlight_power_->Write(enabled);
-  if (!result.ok()) {
-    zxlogf(ERROR, "Failed to send Write request to gpio: %s", result.status_string());
-    return result.status();
-  }
-  if (result->is_error()) {
-    zxlogf(ERROR, "Failed to write to gpio: %s", zx_status_get_string(result->error_value()));
     return result->error_value();
   }
   return ZX_OK;
@@ -156,7 +142,7 @@ void Vim3PwmBacklight::StoreState(State state) {
 }
 
 zx_status_t Vim3PwmBacklight::Initialize() {
-  if (zx_status_t status = InitializeGpioBacklightPower(/*initially_enabled=*/kInitialState.power);
+  if (zx_status_t status = SetGpioBacklightPower(/*enabled=*/kInitialState.power);
       status != ZX_OK) {
     zxlogf(ERROR, "Cannot initialize LCD-backlight-enable GPIO pin: %s",
            zx_status_get_string(status));

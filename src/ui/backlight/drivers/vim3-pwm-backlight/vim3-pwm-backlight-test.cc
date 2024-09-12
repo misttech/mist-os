@@ -389,7 +389,7 @@ TEST_F(Vim3PwmBacklightDeviceTest, SetStateNormalizedBailoutGpioConfig) {
 
   mock_pwm_.SyncCall(&MockPwmServer::ClearCallMap);
 
-  fake_gpio_.SyncCall(&fake_gpio::FakeGpio::SetWriteCallback,
+  fake_gpio_.SyncCall(&fake_gpio::FakeGpio::SetSetBufferModeCallback,
                       [](fake_gpio::FakeGpio& gpio) { return ZX_ERR_INTERNAL; });
 
   fidl::WireResult result_fail =

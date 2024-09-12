@@ -36,9 +36,9 @@ bool AltFunctionSubState::operator==(const AltFunctionSubState& other) const {
   return function == other.function;
 }
 
-zx_status_t DefaultWriteCallback(FakeGpio& gpio) { return ZX_OK; }
+zx_status_t DefaultSetBufferModeCallback(FakeGpio& gpio) { return ZX_OK; }
 
-FakeGpio::FakeGpio() : write_callback_(DefaultWriteCallback) {
+FakeGpio::FakeGpio() : set_buffer_mode_callback_(DefaultSetBufferModeCallback) {
   zx::interrupt interrupt;
   ZX_ASSERT(zx::interrupt::create(zx::resource(ZX_HANDLE_INVALID), 0, ZX_INTERRUPT_VIRTUAL,
                                   &interrupt) == ZX_OK);
@@ -144,7 +144,12 @@ void FakeGpio::SetBufferMode(SetBufferModeRequestView request,
       ZX_ASSERT_MSG(false, "Unepxected BufferMode value");
   }
 
-  completer.ReplySuccess();
+  zx_status_t response = set_buffer_mode_callback_(*this);
+  if (response == ZX_OK) {
+    completer.ReplySuccess();
+  } else {
+    completer.ReplyError(response);
+  }
 }
 
 void FakeGpio::Write(WriteRequestView request, WriteCompleter::Sync& completer) {
@@ -156,12 +161,7 @@ void FakeGpio::Write(WriteRequestView request, WriteCompleter::Sync& completer) 
 
   state_log_.emplace_back(State{.interrupt_mode = GetCurrentInterruptMode(),
                                 .sub_state = WriteSubState{.value = request->value}});
-  zx_status_t response = write_callback_(*this);
-  if (response == ZX_OK) {
-    completer.ReplySuccess();
-  } else {
-    completer.ReplyError(response);
-  }
+  completer.ReplySuccess();
 }
 
 void FakeGpio::Read(ReadCompleter::Sync& completer) {
@@ -228,8 +228,8 @@ void FakeGpio::SetDefaultReadResponse(std::optional<zx::result<bool>> response) 
   default_read_response_ = response;
 }
 
-void FakeGpio::SetWriteCallback(WriteCallback write_callback) {
-  write_callback_ = std::move(write_callback);
+void FakeGpio::SetSetBufferModeCallback(SetBufferModeCallback set_buffer_mode_callback) {
+  set_buffer_mode_callback_ = std::move(set_buffer_mode_callback);
 }
 
 void FakeGpio::SetCurrentState(State state) { state_log_.push_back(std::move(state)); }

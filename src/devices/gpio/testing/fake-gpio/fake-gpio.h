@@ -60,7 +60,7 @@ class FakeGpio;
 
 using ReadCallback = std::function<zx::result<bool>(FakeGpio&)>;
 
-using WriteCallback = std::function<zx_status_t(FakeGpio&)>;
+using SetBufferModeCallback = std::function<zx_status_t(FakeGpio&)>;
 
 class FakeGpio : public fidl::testing::WireTestBase<fuchsia_hardware_gpio::Gpio> {
  public:
@@ -118,8 +118,8 @@ class FakeGpio : public fidl::testing::WireTestBase<fuchsia_hardware_gpio::Gpio>
   // `Read` requests is empty. Set to none for no default response.
   void SetDefaultReadResponse(std::optional<zx::result<bool>> response);
 
-  // Set the callback used for responding to Write requests to `write_callback`.
-  void SetWriteCallback(WriteCallback write_callback);
+  // Set the callback used for responding to SetBufferMode requests to `set_buffer_mode_callback`.
+  void SetSetBufferModeCallback(SetBufferModeCallback set_buffer_mode_callback);
 
   // Set the current state to `state`.
   void SetCurrentState(State state);
@@ -149,8 +149,8 @@ class FakeGpio : public fidl::testing::WireTestBase<fuchsia_hardware_gpio::Gpio>
   // Queue of callbacks that provide values to respond to `Read` requests with.
   std::queue<ReadCallback> read_callbacks_;
 
-  // Callback that provides the value to respond to `Write` requests with.
-  WriteCallback write_callback_;
+  // Callback that provides the value to respond to `SetBufferMode` requests with.
+  SetBufferModeCallback set_buffer_mode_callback_;
 
   // Interrupt used for GetInterrupt requests.
   zx::result<zx::interrupt> interrupt_;

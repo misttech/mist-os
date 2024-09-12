@@ -50,9 +50,11 @@ zx_status_t LightDevice::SetSimpleValue(bool value) {
     return ZX_ERR_NOT_SUPPORTED;
   }
 
-  fidl::WireResult result = gpio_->Write(value);
+  fidl::WireResult result =
+      gpio_->SetBufferMode(value ? fuchsia_hardware_gpio::BufferMode::kOutputHigh
+                                 : fuchsia_hardware_gpio::BufferMode::kOutputLow);
   if (!result.ok()) {
-    zxlogf(ERROR, "Failed to send Write request to gpio: %s", result.status_string());
+    zxlogf(ERROR, "Failed to send SetBufferMode request to gpio: %s", result.status_string());
     return result.status();
   }
   if (result->is_error()) {
