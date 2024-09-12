@@ -73,6 +73,7 @@ pub struct TestHelper {
     pub inspector: Inspector,
     pub inspect_node: InspectNode,
     pub inspect_metadata_node: InspectNode,
+    pub inspect_metadata_path: String,
 
     pub cobalt_1dot1_proxy: fidl_fuchsia_metrics::MetricEventLoggerProxy,
     cobalt_1dot1_stream: fidl_fuchsia_metrics::MetricEventLoggerRequestStream,
@@ -165,6 +166,7 @@ pub fn setup_test() -> TestHelper {
     let inspector = Inspector::default();
     let inspect_node = inspector.root().create_child("test_stats");
     let inspect_metadata_node = inspect_node.create_child("metadata");
+    let inspect_metadata_path = "root/test_stats/metadata".to_string();
 
     const DEFAULT_BUFFER_SIZE: usize = 100; // arbitrary value
     let (persistence_sender, persistence_stream) = mpsc::channel(DEFAULT_BUFFER_SIZE);
@@ -173,6 +175,7 @@ pub fn setup_test() -> TestHelper {
         inspector,
         inspect_node,
         inspect_metadata_node,
+        inspect_metadata_path,
         cobalt_1dot1_stream,
         cobalt_1dot1_proxy,
         cobalt_events: vec![],

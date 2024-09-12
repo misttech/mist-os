@@ -18,7 +18,9 @@ use windowed_stats::experimental::clock::TimedSample;
 use windowed_stats::experimental::series::interpolation::Constant;
 use windowed_stats::experimental::series::statistic::Union;
 use windowed_stats::experimental::series::{SamplingProfile, TimeMatrix};
-use windowed_stats::experimental::serve::{InspectedTimeMatrix, TimeMatrixClient};
+use windowed_stats::experimental::serve::{
+    InspectedTimeMatrix, InspectedTimeMatrixMetadata, TimeMatrixClient,
+};
 use wlan_common::bss::BssDescription;
 use wlan_common::channel::Channel;
 use {
@@ -158,6 +160,7 @@ impl ConnectDisconnectLogger {
         cobalt_1dot1_proxy: fidl_fuchsia_metrics::MetricEventLoggerProxy,
         inspect_node: &InspectNode,
         inspect_metadata_node: &InspectNode,
+        inspect_metadata_path: &str,
         persistence_req_sender: auto_persist::PersistenceReqSender,
         time_matrix_client: &TimeMatrixClient,
     ) -> Self {
@@ -166,7 +169,7 @@ impl ConnectDisconnectLogger {
             inspect_node,
             inspect_metadata_node,
             persistence_req_sender,
-            ConnectDisconnectTimeSeries::new(&time_matrix_client),
+            ConnectDisconnectTimeSeries::new(&time_matrix_client, inspect_metadata_path),
         )
     }
 
@@ -294,6 +297,10 @@ struct InspectMetadataNode {
 }
 
 impl InspectMetadataNode {
+    const WLAN_CONNECTIVITY_STATES: &'static str = "wlan_connectivity_states";
+    const CONNECTED_NETWORKS: &'static str = "connected_networks";
+    const DISCONNECT_SOURCES: &'static str = "disconnect_sources";
+
     fn new(inspect_node: &InspectNode) -> Self {
         let wlan_connectivity_states = inspect_node.create_child("wlan_connectivity_states");
         let connected_networks = inspect_node.create_child("connected_networks");
@@ -334,25 +341,43 @@ struct ConnectDisconnectTimeSeries {
 }
 
 impl ConnectDisconnectTimeSeries {
-    pub fn new(manager: &TimeMatrixClient) -> Self {
-        let wlan_connectivity_states = manager.inspect_time_matrix(
+    pub fn new(manager: &TimeMatrixClient, inspect_metadata_path: &str) -> Self {
+        let wlan_connectivity_states = manager.inspect_time_matrix_with_metadata(
             "wlan_connectivity_states",
             TimeMatrix::<Union<u64>, Constant>::new(
                 SamplingProfile::highly_granular(),
                 Constant::default(),
             ),
+            InspectedTimeMatrixMetadata::default().with_bit_mapping(format!(
+                "{inspect_metadata_path}/{}",
+                InspectMetadataNode::WLAN_CONNECTIVITY_STATES
+            )),
         );
-        let connected_networks = manager.inspect_time_matrix(
+        let connected_networks = manager.inspect_time_matrix_with_metadata(
             "connected_networks",
             TimeMatrix::<Union<u64>, Constant>::default(),
+            InspectedTimeMatrixMetadata::default().with_bit_mapping(format!(
+                "{inspect_metadata_path}/{}",
+                InspectMetadataNode::CONNECTED_NETWORKS
+            )),
         );
-        let disconnected_networks = manager.inspect_time_matrix(
+        let disconnected_networks = manager.inspect_time_matrix_with_metadata(
             "disconnected_networks",
             TimeMatrix::<Union<u64>, Constant>::default(),
+            InspectedTimeMatrixMetadata::default()
+                // `disconnected_networks` uses the same bit_mapping as `connected_networks`
+                .with_bit_mapping(format!(
+                    "{inspect_metadata_path}/{}",
+                    InspectMetadataNode::CONNECTED_NETWORKS
+                )),
         );
-        let disconnect_sources = manager.inspect_time_matrix(
+        let disconnect_sources = manager.inspect_time_matrix_with_metadata(
             "disconnect_sources",
             TimeMatrix::<Union<u64>, Constant>::default(),
+            InspectedTimeMatrixMetadata::default().with_bit_mapping(format!(
+                "{inspect_metadata_path}/{}",
+                InspectMetadataNode::DISCONNECT_SOURCES
+            )),
         );
         Self {
             wlan_connectivity_states,
@@ -508,6 +533,7 @@ mod tests {
             test_helper.cobalt_1dot1_proxy.clone(),
             &test_helper.inspect_node,
             &test_helper.inspect_metadata_node,
+            &test_helper.inspect_metadata_path,
             test_helper.persistence_sender.clone(),
             &time_matrix_client,
         );

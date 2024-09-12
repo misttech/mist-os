@@ -96,6 +96,7 @@ const TELEMETRY_QUERY_INTERVAL: zx::Duration = zx::Duration::from_seconds(10);
 pub fn serve_telemetry(
     cobalt_1dot1_proxy: fidl_fuchsia_metrics::MetricEventLoggerProxy,
     inspect_node: InspectNode,
+    inspect_path: &str,
     persistence_req_sender: auto_persist::PersistenceReqSender,
 ) -> (TelemetrySender, impl Future<Output = Result<(), Error>>) {
     let (sender, mut receiver) =
@@ -103,7 +104,8 @@ pub fn serve_telemetry(
     let sender = TelemetrySender::new(sender);
 
     // Inspect nodes to hold time series and metadata for other nodes
-    let inspect_metadata_node = inspect_node.create_child("metadata");
+    const METADATA_NODE_NAME: &'static str = "metadata";
+    let inspect_metadata_node = inspect_node.create_child(METADATA_NODE_NAME);
     let inspect_time_series_node = inspect_node.create_child("time_series");
 
     let (time_matrix_client, time_series_fut) =
@@ -114,6 +116,7 @@ pub fn serve_telemetry(
         cobalt_1dot1_proxy.clone(),
         &inspect_node,
         &inspect_metadata_node,
+        &format!("{inspect_path}/{METADATA_NODE_NAME}"),
         persistence_req_sender,
         &time_matrix_client,
     );

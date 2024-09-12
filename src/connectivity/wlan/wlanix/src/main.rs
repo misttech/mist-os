@@ -1487,9 +1487,11 @@ async fn main() {
             // `try_join!()`.
             (wlan_telemetry::setup_disconnected_persistence_req_sender(), OptionFuture::from(None))
         });
+    const CLIENT_STATS_NODE_NAME: &'static str = "client_stats";
     let (telemetry_sender, serve_telemetry_fut) = wlan_telemetry::serve_telemetry(
         cobalt_logger,
-        fuchsia_inspect::component::inspector().root().create_child("client_stats"),
+        fuchsia_inspect::component::inspector().root().create_child(CLIENT_STATS_NODE_NAME),
+        &format!("root/{CLIENT_STATS_NODE_NAME}"),
         persistence_sender,
     );
 
