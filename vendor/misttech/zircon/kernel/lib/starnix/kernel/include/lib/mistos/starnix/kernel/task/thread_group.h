@@ -7,13 +7,12 @@
 
 #include <lib/fit/result.h>
 #include <lib/mistos/linux_uapi/typedefs.h>
-#include <lib/mistos/starnix/kernel/sync/locks.h>
 #include <lib/mistos/starnix/kernel/task/zombie_process.h>
 #include <lib/mistos/starnix_uapi/errors.h>
 #include <lib/mistos/starnix_uapi/resource_limits.h>
 #include <lib/mistos/util/weak_wrapper.h>
+#include <lib/starnix_sync/locks.h>
 
-#include <fbl/canary.h>
 #include <fbl/ref_counted.h>
 #include <fbl/ref_ptr.h>
 #include <ktl/optional.h>
@@ -191,14 +190,14 @@ class ThreadGroup : public fbl::RefCountedUpgradeable<ThreadGroup>,
 
  private:
   /// The mutable state of the ThreadGroup.
-  mutable RwLock<ThreadGroupMutableState> mutable_state_;
+  mutable starnix_sync::RwLock<ThreadGroupMutableState> mutable_state_;
 
  public:
   /// The resource limits for this thread group.  This is outside mutable_state
   /// to avoid deadlocks where the thread_group lock is held when acquiring
   /// the task lock, and vice versa.
   // pub limits: Mutex<ResourceLimits>,
-  mutable StarnixMutex<starnix_uapi::ResourceLimits> limits;
+  mutable starnix_sync::StarnixMutex<starnix_uapi::ResourceLimits> limits;
 
   /// The next unique identifier for a seccomp filter.  These are required to be
   /// able to distinguish identical seccomp filters, which are treated differently
@@ -218,18 +217,20 @@ class ThreadGroup : public fbl::RefCountedUpgradeable<ThreadGroup>,
  public:
   static fbl::RefPtr<ThreadGroup> New(
       fbl::RefPtr<Kernel> kernel, KernelHandle<ProcessDispatcher> process,
-      ktl::optional<RwLock<ThreadGroupMutableState>::RwLockWriteGuard> parent, pid_t leader,
-      fbl::RefPtr<ProcessGroup> process_group);
+      ktl::optional<starnix_sync::RwLock<ThreadGroupMutableState>::RwLockWriteGuard> parent,
+      pid_t leader, fbl::RefPtr<ProcessGroup> process_group);
 
   uint64_t get_rlimit(starnix_uapi::Resource resource) const;
 
   fit::result<Errno> add(fbl::RefPtr<Task> task);
 
   /// state_accessor!(ThreadGroup, mutable_state, Arc<ThreadGroup>);
-  const RwLock<ThreadGroupMutableState>::RwLockReadGuard read() const {
+  const starnix_sync::RwLock<ThreadGroupMutableState>::RwLockReadGuard read() const {
     return mutable_state_.Read();
   }
-  RwLock<ThreadGroupMutableState>::RwLockWriteGuard write() { return mutable_state_.Write(); }
+  starnix_sync::RwLock<ThreadGroupMutableState>::RwLockWriteGuard write() {
+    return mutable_state_.Write();
+  }
 
  public:
   // C++
@@ -240,7 +241,7 @@ class ThreadGroup : public fbl::RefCountedUpgradeable<ThreadGroup>,
 
  private:
   ThreadGroup(fbl::RefPtr<Kernel> kernel, KernelHandle<ProcessDispatcher> process, pid_t leader,
-              ktl::optional<RwLock<ThreadGroupMutableState>::RwLockWriteGuard> parent,
+              ktl::optional<starnix_sync::RwLock<ThreadGroupMutableState>::RwLockWriteGuard> parent,
               fbl::RefPtr<ProcessGroup> process_group);
 };
 

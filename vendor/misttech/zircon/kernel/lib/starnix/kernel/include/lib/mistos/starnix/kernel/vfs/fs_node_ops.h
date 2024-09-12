@@ -6,7 +6,6 @@
 #define VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_VFS_FILE_NODE_OPS_H_
 
 #include <lib/fit/result.h>
-#include <lib/mistos/starnix/kernel/sync/locks.h>
 #include <lib/mistos/starnix/kernel/vfs/falloc.h>
 #include <lib/mistos/starnix/kernel/vfs/fs_node_info.h>
 #include <lib/mistos/starnix/kernel/vfs/namespace_node.h>
@@ -17,6 +16,7 @@
 #include <lib/mistos/starnix_uapi/errors.h>
 #include <lib/mistos/starnix_uapi/file_mode.h>
 #include <lib/mistos/starnix_uapi/open_flags.h>
+#include <lib/starnix_sync/locks.h>
 
 #include <fbl/ref_ptr.h>
 #include <ktl/unique_ptr.h>
@@ -154,7 +154,7 @@ class FsNodeOps {
   /// Return a reader lock on the updated information.
   virtual fit::result<Errno, FsNodeInfo> refresh_info(const FsNode& node,
                                                       const CurrentTask& current_task,
-                                                      RwLock<FsNodeInfo>& info) {
+                                                      starnix_sync::RwLock<FsNodeInfo>& info) {
     return fit::ok(*info.Read());
   }
 

@@ -7,9 +7,9 @@
 
 #include <lib/fit/result.h>
 #include <lib/mistos/starnix/kernel/lifecycle/atomic_counter.h>
-#include <lib/mistos/starnix/kernel/sync/locks.h>
 #include <lib/mistos/starnix/kernel/task/pidtable.h>
 #include <lib/mistos/util/onecell.h>
+#include <lib/starnix_sync/locks.h>
 #include <zircon/types.h>
 
 #include <fbl/ref_counted_upgradeable.h>
@@ -39,7 +39,7 @@ class Kernel : public fbl::RefCountedUpgradeable<Kernel> {
   // pub features: KernelFeatures,
 
   // The processes and threads running in this kernel, organized by pid_t.
-  RwLock<PidTable> pids;
+  starnix_sync::RwLock<PidTable> pids;
 
   /// The default namespace for abstract AF_UNIX sockets in this kernel.
   ///

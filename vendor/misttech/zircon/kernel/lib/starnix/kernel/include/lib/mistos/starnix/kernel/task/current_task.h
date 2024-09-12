@@ -10,7 +10,6 @@
 #include <lib/mistos/starnix/kernel/arch/x64/registers.h>
 #include <lib/mistos/starnix/kernel/loader.h>
 #include <lib/mistos/starnix/kernel/mm/memory_accessor.h>
-#include <lib/mistos/starnix/kernel/sync/locks.h>
 #include <lib/mistos/starnix/kernel/task/pidtable.h>
 #include <lib/mistos/starnix/kernel/vfs/fd_numbers.h>
 #include <lib/mistos/starnix/kernel/vfs/mount.h>
@@ -21,6 +20,7 @@
 #include <lib/mistos/starnix_uapi/signals.h>
 #include <lib/mistos/starnix_uapi/vfs.h>
 #include <lib/mistos/util/weak_wrapper.h>
+#include <lib/starnix_sync/locks.h>
 #include <lib/user_copy/user_ptr.h>
 #include <zircon/types.h>
 
@@ -259,8 +259,8 @@ class CurrentTask : public MemoryAccessorExt {
 
   template <typename TaskInfoFactory>
   static fit::result<Errno, TaskBuilder> create_task_with_pid(
-      const fbl::RefPtr<Kernel>& kernel, RwLock<PidTable>::RwLockWriteGuard& pids, pid_t pid,
-      const ktl::string_view& initial_name, fbl::RefPtr<FsContext> root_fs,
+      const fbl::RefPtr<Kernel>& kernel, starnix_sync::RwLock<PidTable>::RwLockWriteGuard& pids,
+      pid_t pid, const ktl::string_view& initial_name, fbl::RefPtr<FsContext> root_fs,
       TaskInfoFactory&& task_info_factory);
 
  public:

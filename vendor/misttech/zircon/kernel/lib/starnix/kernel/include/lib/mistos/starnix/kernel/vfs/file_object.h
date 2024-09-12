@@ -9,11 +9,11 @@
 #include <lib/fit/result.h>
 #include <lib/mistos/linux_uapi/typedefs.h>
 #include <lib/mistos/starnix/kernel/mm/flags.h>
-#include <lib/mistos/starnix/kernel/sync/locks.h>
 #include <lib/mistos/starnix/kernel/vfs/dirent_sink.h>
 #include <lib/mistos/starnix/kernel/vfs/namespace_node.h>
 #include <lib/mistos/starnix_uapi/open_flags.h>
 #include <lib/mistos/util/weak_wrapper.h>
+#include <lib/starnix_sync/locks.h>
 
 #include <fbl/ref_ptr.h>
 #include <ktl/functional.h>
@@ -87,10 +87,10 @@ class FileObject : public fbl::RefCounted<FileObject> {
 
   FileSystemHandle fs;
 
-  mutable StarnixMutex<off_t> offset;
+  mutable starnix_sync::StarnixMutex<off_t> offset;
 
  private:
-  mutable StarnixMutex<OpenFlags> flags_;
+  mutable starnix_sync::StarnixMutex<OpenFlags> flags_;
 
   // async_owner: Mutex<FileAsyncOwner>,
 

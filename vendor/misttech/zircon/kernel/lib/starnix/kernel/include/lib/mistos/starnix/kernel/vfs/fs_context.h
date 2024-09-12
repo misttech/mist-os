@@ -6,9 +6,9 @@
 #ifndef ZIRCON_KERNEL_LIB_MISTOS_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_VFS_FS_CONTEXT_H_
 #define ZIRCON_KERNEL_LIB_MISTOS_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_VFS_FS_CONTEXT_H_
 
-#include <lib/mistos/starnix/kernel/sync/locks.h>
 #include <lib/mistos/starnix/kernel/vfs/namespace_node.h>
 #include <lib/mistos/starnix_uapi/file_mode.h>
+#include <lib/starnix_sync/locks.h>
 
 #include <fbl/ref_ptr.h>
 
@@ -45,7 +45,7 @@ struct FsContextState {
 class FsContext : public fbl::RefCounted<FsContext> {
  private:
   /// The mutable state for this FsContext.
-  mutable RwLock<FsContextState> state_;
+  mutable starnix_sync::RwLock<FsContextState> state_;
 
  public:
   /// impl FsContext
