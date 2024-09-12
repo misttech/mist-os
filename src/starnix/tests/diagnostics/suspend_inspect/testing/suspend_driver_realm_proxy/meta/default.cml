@@ -24,10 +24,8 @@
             ],
         },
         {
-            service: [
-                "fuchsia.hardware.suspend.SuspendService",
-                "fuchsia.test.syscalls.ControlService",
-            ],
+            protocol: [ "fuchsia.test.suspend.Realm" ],
+            from: "self",
         },
     ],
     offer: [
@@ -74,6 +72,10 @@
     expose: [
         {
             protocol: [ "fuchsia.testing.harness.RealmProxy" ],
+            from: "self",
+        },
+        {
+            protocol: [ "fuchsia.test.suspend.Realm" ],
             from: "self",
         },
         {

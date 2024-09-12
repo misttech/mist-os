@@ -8,5 +8,6 @@ group("tests") {
     "coredumps",
     "correct_pid",
     "self_profile",
+    "suspend_inspect",
   ]
 }

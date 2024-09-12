@@ -3,90 +3,48 @@
 // found in the LICENSE file.
 
 use anyhow::{Context, Result};
-use fidl_fuchsia_testing_harness::RealmProxy_RequestStream;
 use fuchsia_component::server::ServiceFs;
-use fuchsia_component_test::{
-    Capability, ChildOptions, LocalComponentHandles, RealmBuilder, RealmInstance, Ref, Route,
-};
+use fuchsia_component_test::{Capability, RealmBuilder, RealmInstance, Ref};
 use fuchsia_driver_test::{DriverTestRealmBuilder, DriverTestRealmInstance};
-use futures_util::{StreamExt, TryStreamExt};
+use futures_util::StreamExt;
+use std::cell::RefCell;
 use std::rc::Rc;
 use {
     fidl_fuchsia_component_test as ffct, fidl_fuchsia_driver_test as fdt,
     fidl_fuchsia_hardware_suspend as ffhs, fidl_fuchsia_kernel as ffk,
-    fidl_fuchsia_test_syscalls as ffts, fuchsia_async as fasync, fuchsia_zircon as zx,
+    fidl_fuchsia_test_suspend as fftsu, fidl_fuchsia_test_syscalls as ffts,
+    fuchsia_async as fasync,
 };
 
 enum IncomingService {
-    /// The RealmProxy allows serving any protocol by name.
-    RealmProxy(RealmProxy_RequestStream),
-}
-
-// Since our suspend "driver" isn't really a driver, we need a custom test realm
-// manifest for the driver test realm.
-const DRIVER_TEST_REALM_MANIFEST: &str = "#meta/suspend_driver_test_realm.cm";
-
-// fuchsia.kernel.CpuResource
-async fn serve_fake_cpu_resource(mock_handles: LocalComponentHandles) -> Result<()> {
-    let mut fs = ServiceFs::new();
-
-    fs.dir("svc").add_fidl_service(move |mut stream: ffk::CpuResourceRequestStream| {
-        fasync::Task::local(async move {
-            while let Some(ffk::CpuResourceRequest::Get { responder }) =
-                stream.try_next().await.expect("failed to serve CpuResource service")
-            {
-                // This is adequate so long as we don't actually call zx_system_suspend_enter.
-                let handle = zx::Handle::invalid();
-                responder.send(handle.into()).expect("failed to send a fake CpuResource handle");
-            }
-        })
-        .detach();
-    });
-
-    // Run the ServiceFs on the outgoing directory handle from the mock handles
-    fs.serve_connection(mock_handles.outgoing_dir)?;
-    fs.collect::<()>().await;
-    Ok(())
+    SuspendRealm(fftsu::RealmRequestStream),
 }
 
 async fn setup_driver_realm_builder() -> Result<RealmBuilder> {
+    // TODO: 296625903 - `fuchsia.kernel.CpuResource` is taken from the test parent, but should be
+    // initialized here instead.
+
     let realm_builder = RealmBuilder::new().await?;
     // This initializes static routes from a fixed textual manifest.
+    realm_builder.driver_test_realm_setup().await.context("while adding the static routes")?;
+
     realm_builder
-        //.driver_test_realm_manifest_setup(DRIVER_TEST_REALM_MANIFEST)
-        .driver_test_realm_manifest_setup(DRIVER_TEST_REALM_MANIFEST)
+        .driver_test_realm_add_dtr_offers(
+            &vec![Capability::protocol::<ffk::CpuResourceMarker>().into()],
+            Ref::parent(),
+        )
         .await
-        .context("while adding the static routes")?;
-
-    // TODO: fmil - How do I provide from here to #driver_test_realm?
-    let fake_cpuresource = realm_builder
-        .add_local_child(
-            "fake_cpuresource",
-            |mock_handles: LocalComponentHandles| Box::pin(serve_fake_cpu_resource(mock_handles)),
-            ChildOptions::new(),
-        )
-        .await?;
-    realm_builder
-        .add_route(
-            Route::new()
-                .capability(Capability::protocol::<ffk::CpuResourceMarker>())
-                .from(&fake_cpuresource)
-                .to(Ref::parent()),
-        )
-        .await?;
-
-    realm_builder.driver_test_realm_add_offer::<ffk::CpuResourceMarker>(Ref::parent()).await?;
+        .context("while offering needed driver test realm capabilities")?;
 
     // These are the services exposed by the driver test realm in devfs.
     // Extract them for use "here".
     realm_builder
-        .driver_test_realm_add_expose::<ffhs::SuspendServiceMarker>()
+        .driver_test_realm_add_dtr_exposes(&vec![
+            Capability::service::<ffhs::SuspendServiceMarker>().into(),
+            Capability::service::<ffts::ControlServiceMarker>().into(),
+        ])
         .await
-        .context("while exposing SuspendService")?;
-    realm_builder
-        .driver_test_realm_add_expose::<ffts::ControlServiceMarker>()
-        .await
-        .context("while exposing ControlService")?;
+        .context("while exposing needed driver test realm capabilities")?;
     Ok(realm_builder)
 }
 
@@ -98,9 +56,10 @@ async fn create_realm() -> Result<RealmInstance> {
         .driver_test_realm_start(fdt::RealmArgs {
             // Offered from driver's internal test_realm to drivers.
             dtr_offers: Some(vec![
+                // Offering by name string to avoid needing to add these as a dependency
+                // just for the sake of `PROTOCOL_NAME`.
                 ffct::Capability::Protocol(ffct::Protocol {
                     name: Some("fuchsia.kernel.CpuResource".into()),
-                    //from_dictionary: Some("parent".into()),
                     ..ffct::Protocol::default()
                 }),
                 ffct::Capability::Protocol(ffct::Protocol {
@@ -110,58 +69,84 @@ async fn create_realm() -> Result<RealmInstance> {
             ]),
             // Exposed from driver's internal test_realm to driver_test_realm.
             dtr_exposes: Some(vec![
-                ffct::Capability::Service(ffct::Service {
-                    name: Some("fuchsia.test.syscalls.ControlService".into()),
-                    ..ffct::Service::default()
-                }),
-                ffct::Capability::Service(ffct::Service {
-                    name: Some("fuchsia.hardware.suspend.SuspendService".into()),
-                    ..ffct::Service::default()
-                }),
+                Capability::service::<ffhs::SuspendServiceMarker>().into(),
+                Capability::service::<ffts::ControlServiceMarker>().into(),
             ]),
-            ..fdt::RealmArgs::default()
+            ..Default::default()
         })
         .await
         .context("while starting driver realm")?;
     Ok(driver_realm)
 }
 
-struct RealmServer {}
+struct RealmServer {
+    // The singleton test realm. Repeated calls to Create will shut down this
+    // realm (if any) and remove others.
+    realm: RefCell<Option<RealmInstance>>,
+}
 
 impl RealmServer {
     fn new() -> Rc<Self> {
-        Rc::new(Self {})
+        Rc::new(Self { realm: RefCell::new(None) })
+    }
+
+    // Replaces the currently active realm with an optional new one. Replacing
+    // with `None` is the same as shutting the realm down.
+    fn replace_realm(self: &Rc<Self>, realm: Option<RealmInstance>) {
+        let mut r = self.realm.borrow_mut();
+        if r.is_some() && realm.is_some() {
+            tracing::warn!(concat!(
+                "a realm was previously created. ",
+                "That realm will be shut down, and a new one created. ",
+                "Make sure this is what you wanted."
+            ));
+        }
+        *r = realm;
     }
 
     async fn serve_realm_factory(self: Rc<Self>, service: IncomingService) {
         match service {
-            IncomingService::RealmProxy(stream) => {
-                // Task needed because realm_proxy::service::serve is blocking,
-                // and we do not want to block here.
-                fasync::Task::local(async move {
-                    let realm = create_realm().await.expect("failed to build the test realm");
-                    realm_proxy::service::serve(realm, stream)
-                        .await
-                        .expect("failed to serve the realm proxy");
-                })
-                .detach();
+            IncomingService::SuspendRealm(stream) => {
+                self.clone().serve_suspend_realm(stream).await;
             }
         };
+    }
+
+    async fn serve_suspend_realm(self: Rc<Self>, mut stream: fftsu::RealmRequestStream) {
+        // Realm will be kept alive for as long as the loop below spins.
+        fasync::Task::local(async move {
+            while let Some(request) = stream.next().await {
+                match request {
+                    Ok(fftsu::RealmRequest::Create { responder, .. }) => {
+                        let realm = create_realm().await.expect("failed to build the test realm");
+                        self.replace_realm(Some(realm));
+                        tracing::debug!("Test realm created, proceeding.");
+                        let _ = responder.send().unwrap();
+                    }
+                    Err(err) => {
+                        tracing::error!("error while serving Realm: {:?}", &err);
+                    }
+                }
+            }
+            tracing::debug!("no longer serving the suspend realm, realm will be torn down now.");
+            self.replace_realm(None);
+        })
+        .detach();
     }
 }
 
 #[fuchsia::main(logging_tags = ["suspend_driver_realm_proxy", "test"])]
 async fn main() -> Result<()> {
     let mut fs = ServiceFs::new();
-    fs.dir("svc").add_fidl_service(IncomingService::RealmProxy);
+    fs.dir("svc").add_fidl_service(IncomingService::SuspendRealm);
     fs.take_and_serve_directory_handle()?;
 
     // Maybe simplify.
     let server = RealmServer::new();
-    tracing::info!("now serving suspend driver realm");
     fs.for_each(|stream| async {
         server.clone().serve_realm_factory(stream).await;
     })
     .await;
+    tracing::debug!("realm proxy shutting down. presumably the realm has been torn down.");
     Ok(())
 }
