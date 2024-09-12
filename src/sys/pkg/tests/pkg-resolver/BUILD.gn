@@ -503,7 +503,7 @@ fuchsia_test_package("pkg-resolver-integration-tests") {
 
     # Isolated, low-deps netstack
     "//src/connectivity/network:netstack-for-tests",
-    "//src/sys/pkg/bin/system-update-committer:production-component-and-config",
+    "//src/sys/pkg/bin/system-update-committer:component",
   ]
   test_specs = {
     log_settings = {
