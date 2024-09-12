@@ -1390,10 +1390,8 @@ mod handle_driver_event_tests {
             peer_sta_address: [1u8; 6],
             listen_interval: 2,
             ssid: fidl_ieee80211::CSsid { data: [3u8; 32], len: 4 },
-            rsne: [5u8; 257],
-            rsne_len: 6,
-            vendor_ie: [7u8; 514],
-            vendor_ie_len: 8,
+            rsne: vec![5u8; 6],
+            vendor_ie: vec![7u8; 8],
         };
         assert_variant!(
             h.exec.run_until_stalled(&mut h.fullmac_ifc_proxy.assoc_ind(&assoc_ind)),

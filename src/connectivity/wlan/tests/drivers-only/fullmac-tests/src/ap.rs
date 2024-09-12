@@ -276,10 +276,8 @@ async fn test_remote_client_connected_open() {
             peer_sta_address: remote_sta_address.clone(),
             listen_interval: 100,
             ssid: vec_to_cssid(&DEFAULT_OPEN_AP_CONFIG.ssid),
-            rsne_len: 0,
-            rsne: [0; fidl_ieee80211::WLAN_IE_MAX_LEN as usize],
-            vendor_ie_len: 0,
-            vendor_ie: [0; fidl_fullmac::WLAN_VIE_MAX_LEN as usize],
+            rsne: vec![],
+            vendor_ie: vec![],
         })
         .await
         .expect("Could not send AssocInd");

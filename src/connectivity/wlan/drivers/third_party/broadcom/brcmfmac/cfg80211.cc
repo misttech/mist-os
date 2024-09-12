@@ -6165,10 +6165,20 @@ static zx_status_t brcmf_handle_assoc_ind(struct brcmf_if* ifp, const struct brc
   assoc_ind_params.ssid.len = ssid_ie->len;
   memcpy(assoc_ind_params.ssid.data.data(), ssid_ie->data, ssid_ie->len);
 
+  // Create arena before populating vectors
+  zx::result<fdf::Arena> arena_result = fdf::Arena::Create(0, 0);
+  if (arena_result.is_error()) {
+    BRCMF_ERR("Failed to create Arena status=%s", arena_result.status_string());
+    return ZX_ERR_INTERNAL;
+  }
+  fdf::Arena& arena = arena_result.value();
+
   // Extract the RSN information from the IEs
   if (rsn_ie != nullptr) {
-    assoc_ind_params.rsne_len = rsn_ie->len + TLV_HDR_LEN;
-    memcpy(assoc_ind_params.rsne.data(), rsn_ie, assoc_ind_params.rsne_len);
+    size_t rsn_len = rsn_ie->len + TLV_HDR_LEN;
+    const uint8_t* rsn_ie_ptr = reinterpret_cast<const uint8_t*>(rsn_ie);
+    cpp20::span<const uint8_t> rsne_span = {rsn_ie_ptr, rsn_len};
+    assoc_ind_params.rsne = fidl::VectorView<uint8_t>(arena, rsne_span.begin(), rsne_span.end());
   }
 
   BRCMF_IFDBG(WLANIF, ndev, "Sending assoc indication to SME.");
@@ -6177,12 +6187,7 @@ static zx_status_t brcmf_handle_assoc_ind(struct brcmf_if* ifp, const struct brc
               FMT_MAC_ARGS(assoc_ind_params.peer_sta_address));
 #endif /* !defined(NDEBUG) */
 
-  auto arena = fdf::Arena::Create(0, 0);
-  if (arena.is_error()) {
-    BRCMF_ERR("Failed to create Arena status=%s", arena.status_string());
-    return ZX_ERR_INTERNAL;
-  }
-  auto result = ndev->if_proto.buffer(*arena)->AssocInd(assoc_ind_params);
+  auto result = ndev->if_proto.buffer(arena)->AssocInd(assoc_ind_params);
   if (!result.ok()) {
     BRCMF_ERR("Failed to send assoc ind  result.status: %s", result.status_string());
     return ZX_ERR_INTERNAL;

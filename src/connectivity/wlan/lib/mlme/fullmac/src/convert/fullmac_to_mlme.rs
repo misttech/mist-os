@@ -317,11 +317,7 @@ pub fn convert_associate_indication(
             None
         },
         rates: vec![],
-        rsne: if ind.rsne_len > 0 {
-            Some(ind.rsne[..ind.rsne_len as usize].to_vec())
-        } else {
-            None
-        },
+        rsne: if ind.rsne.len() > 0 { Some(ind.rsne) } else { None },
     }
 }
 pub fn convert_disassociate_confirm(
@@ -753,10 +749,8 @@ mod tests {
             peer_sta_address: [3; 6],
             listen_interval: 123,
             ssid: fidl_ieee80211::CSsid { len: 0, data: [4; 32] },
-            rsne_len: 0,
-            rsne: [222; 257],
-            vendor_ie_len: 0,
-            vendor_ie: [223; 514],
+            rsne: vec![],
+            vendor_ie: vec![],
         };
 
         let mlme = convert_associate_indication(fullmac);
