@@ -8,7 +8,7 @@ use num::Unsigned;
 use std::io::{self, Write};
 use tracing::warn;
 
-use crate::experimental::ring_buffer::Simple8bRleRingBuffer;
+use crate::experimental::ring_buffer::{Simple8bRleRingBuffer, UncompressedRingBuffer};
 use crate::experimental::series::interpolation::{
     Constant, Interpolation, LastAggregation, LastSample,
 };
@@ -132,21 +132,25 @@ pub enum Simple8bRleSubtype {
     SignedZigzagEncoded,
 }
 
-// TODO(https://fxbug.dev/352614838): Implement uncompressed ring buffer
-/// A ring buffer that stores arbitrary items in their immediate representation.
 #[derive(Clone, Debug)]
-pub struct Uncompressed<A> {
-    buffer: Vec<A>,
-}
+pub struct Uncompressed<A>(UncompressedRingBuffer<A>);
 
 impl RingBuffer<f32> for Uncompressed<f32> {
     fn with_capacity(capacity: usize) -> Self {
-        warn!("Uncompressed ring buffer is unimplemented. No data will be stored.");
-        Uncompressed { buffer: Vec::with_capacity(capacity) }
+        let ring_buffer = UncompressedRingBuffer::with_min_samples(capacity);
+        Uncompressed(ring_buffer)
     }
 
     fn buffer_type() -> RingBufferType {
         RingBufferType::Uncompressed(UncompressedSubtype::F32)
+    }
+
+    fn push(&mut self, item: f32) {
+        self.0.push(item);
+    }
+
+    fn serialize(&self, mut write: impl Write) -> io::Result<()> {
+        self.0.serialize(&mut write)
     }
 }
 
@@ -249,6 +253,16 @@ impl RingBuffer<u64> for DeltaZigZagSimple8bRle {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn uncompressed_buffer() {
+        let mut buffer = <Uncompressed<f32> as RingBuffer<f32>>::with_capacity(2);
+        buffer.push(22f32);
+        let mut data = vec![];
+        let result = RingBuffer::<f32>::serialize(&buffer, &mut data);
+        assert!(result.is_ok());
+        assert!(!data.is_empty());
+    }
 
     #[test]
     fn simple8b_rle_buffer() {

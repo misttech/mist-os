@@ -660,6 +660,52 @@ mod tests {
     }
 
     #[test]
+    fn time_matrix_with_uncompressed_buffer() {
+        let exec = fasync::TestExecutor::new_with_fake_time();
+        exec.set_fake_time(fasync::Time::from_nanos(3_000_000_000));
+        let mut time_matrix = TimeMatrix::<ArithmeticMean<f32>, Constant>::new(
+            SamplingProfile::highly_granular(),
+            Constant::default(),
+        );
+        let buffer = time_matrix.interpolate_and_get_buffers(Timestamp::now()).unwrap();
+        assert_eq!(
+            buffer.data,
+            vec![
+                1, // version number
+                3, 0, 0, 0, // created timestamp
+                3, 0, 0, 0, // last timestamp
+                0, 0, // type: uncompressed; subtype: f32
+                4, 0, // series 1: length in bytes
+                10, 0, // series 1 granularity: 10s
+                0, 0, // number of elements
+                4, 0, // series 2: length in bytes
+                60, 0, // series 2 granularity: 60s
+                0, 0, // number of elements
+            ]
+        );
+
+        time_matrix.fold(TimedSample::now(f32::from_bits(42u32))).unwrap();
+        exec.set_fake_time(fasync::Time::from_nanos(10_000_000_000));
+        let buffer = time_matrix.interpolate_and_get_buffers(Timestamp::now()).unwrap();
+        assert_eq!(
+            buffer.data,
+            vec![
+                1, // version number
+                3, 0, 0, 0, // created timestamp
+                10, 0, 0, 0, // last timestamp
+                0, 0, // type: uncompressed; subtype: f32
+                8, 0, // series 1: length in bytes
+                10, 0, // series 1 granularity: 10s
+                1, 0, // number of elements
+                42, 0, 0, 0, // item 1
+                4, 0, // series 2: length in bytes
+                60, 0, // series 2 granularity: 60s
+                0, 0, // number of elements
+            ]
+        );
+    }
+
+    #[test]
     fn time_matrix_with_simple8b_rle_buffer() {
         let exec = fasync::TestExecutor::new_with_fake_time();
         exec.set_fake_time(fasync::Time::from_nanos(3_000_000_000));
