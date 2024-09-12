@@ -233,15 +233,26 @@ impl SeLinuxApiOps for LoadApi {
     fn api_write_permission() -> SecurityPermission {
         SecurityPermission::LoadPolicy
     }
-    fn api_write(&self, offset: usize, data: Vec<u8>) -> Result<(), Errno> {
+    fn api_write_with_task(
+        &self,
+        current_task: &CurrentTask,
+        offset: usize,
+        data: Vec<u8>,
+    ) -> Result<(), Errno> {
         if offset != 0 {
             return error!(EINVAL);
         }
+
         log_info!("Loading {} byte policy", data.len());
         self.security_server.load_policy(data).map_err(|error| {
             log_error!("Policy load error: {}", error);
             errno!(EINVAL)
-        })
+        })?;
+
+        // Allow one-time initialization of state that requires a loaded policy.
+        security::selinuxfs_policy_loaded(current_task);
+
+        Ok(())
     }
 }
 
@@ -764,6 +775,16 @@ trait SeLinuxApiOps {
     fn api_read(&self, _offset: usize) -> Result<Cow<'_, [u8]>, Errno> {
         error!(EINVAL)
     }
+
+    /// Variant of `api_write()` that additionally receives the `current_task`.
+    fn api_write_with_task(
+        &self,
+        _current_task: &CurrentTask,
+        offset: usize,
+        data: Vec<u8>,
+    ) -> Result<(), Errno> {
+        self.api_write(offset, data)
+    }
 }
 
 impl<T: SeLinuxApiOps + Sync + Send + 'static> FileOps for SeLinuxApi<T> {
@@ -797,7 +818,7 @@ impl<T: SeLinuxApiOps + Sync + Send + 'static> FileOps for SeLinuxApi<T> {
         )?;
         let data = data.read_all()?;
         let data_len = data.len();
-        self.ops.api_write(offset, data)?;
+        self.ops.api_write_with_task(current_task, offset, data)?;
         Ok(data_len)
     }
 }

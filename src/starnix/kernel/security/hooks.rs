@@ -6,7 +6,9 @@ use super::{selinux_hooks, FileSystemState, ResolvedElfState, TaskState};
 use crate::security::KernelState;
 use crate::task::{CurrentTask, Task};
 use crate::vfs::fs_args::MountParams;
-use crate::vfs::{FsNode, FsNodeHandle, FsStr, FsString, NamespaceNode, ValueOrSize, XattrOp};
+use crate::vfs::{
+    DirEntry, FileSystem, FsNode, FsStr, FsString, NamespaceNode, ValueOrSize, XattrOp,
+};
 use selinux::{SecurityPermission, SecurityServer};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::mount_flags::MountFlags;
@@ -55,26 +57,53 @@ pub fn file_system_init_security(mount_params: &MountParams) -> Result<FileSyste
     Ok(FileSystemState { state: selinux_hooks::file_system_init_security(mount_params)? })
 }
 
+/// Resolves the labeling scheme and arguments for the `file_system`, based on the loaded policy.
+/// If no policy has yet been loaded then no work is done, and the `file_system` will instead be
+/// labeled when a policy is first loaded.
+/// If the `file_system` was already labelled then no further work is done.
+pub fn file_system_resolve_security(
+    current_task: &CurrentTask,
+    file_system: &FileSystem,
+) -> Result<(), Errno> {
+    if_selinux_else_default_ok(current_task, |security_server| {
+        selinux_hooks::file_system_resolve_security(security_server, current_task, file_system)
+    })
+}
+
 /// Used to return an extended attribute name and value to apply to a [`crate::vfs::FsNode`].
 pub struct FsNodeSecurityXattr {
     pub name: &'static FsStr,
     pub value: FsString,
 }
 
-/// Returns the security attribute to label a newly created inode with.
-/// This is analogous to the `inode_init_security()` hook.
-pub fn fs_node_init_security_and_xattr(
+/// Called by the VFS to initialize the security state for an `FsNode` that is being linked at
+/// `dir_entry`.
+/// If the `FsNode` security state had already been initialized, or no policy is yet loaded, then
+/// this is a no-op.
+pub fn fs_node_init_with_dentry(
     current_task: &CurrentTask,
-    new_node: &FsNodeHandle,
-    parent: Option<&FsNodeHandle>,
+    dir_entry: &DirEntry,
+) -> Result<(), Errno> {
+    if_selinux_else_default_ok(current_task, |security_server| {
+        selinux_hooks::fs_node_init_with_dentry(security_server, current_task, dir_entry)
+    })
+}
+
+/// Called by file-system implementations when creating the `FsNode` for a new file, to determine the
+/// correct label based on the `CurrentTask` and `parent` node, and the policy-defined transition
+/// rules, and to initialize the `FsNode`'s security state accordingly.
+/// If no policy has yet been loaded then this is a no-op; if the `FsNode` corresponds to an xattr-
+/// labeled file then it will receive the file-system's "default" label once a policy is loaded.
+/// Returns an extended attribute value to set on the newly-created file if the labeling scheme is
+/// `fs_use_xattr`. For other labeling schemes (e.g. `fs_use_trans`, mountpoint-labeling) a label
+/// is set on the `FsNode` security state, but no extended attribute is set nor returned.
+pub fn fs_node_init_on_create(
+    current_task: &CurrentTask,
+    new_node: &FsNode,
+    parent: &FsNode,
 ) -> Result<Option<FsNodeSecurityXattr>, Errno> {
     if_selinux_else_default_ok(current_task, |security_server| {
-        selinux_hooks::fs_node_init_security_and_xattr(
-            security_server,
-            current_task,
-            new_node,
-            parent,
-        )
+        selinux_hooks::fs_node_init_on_create(security_server, current_task, new_node, parent)
     })
 }
 
@@ -137,7 +166,7 @@ pub fn check_task_create_access(current_task: &CurrentTask) -> Result<(), Errno>
 /// Checks if exec is allowed.
 pub fn check_exec_access(
     current_task: &CurrentTask,
-    executable_node: &FsNodeHandle,
+    executable_node: &FsNode,
 ) -> Result<ResolvedElfState, Errno> {
     if_selinux_else(
         current_task,
@@ -420,6 +449,19 @@ pub fn set_procattr(
         },
         // If SELinux is disabled then no writes are accepted.
         || error!(EINVAL),
+    )
+}
+
+/// Called by the "selinuxfs" when a policy has been successfully loaded, to allow policy-dependent
+/// initialization to be completed. This includes resolving labeling schemes and state for
+/// file-systems mounted prior to policy load (e.g. the "selinuxfs" itself), and initializing
+/// security state for any file nodes they may already contain.
+// TODO: https://fxbug.dev/362917997 - Remove this when SELinux LSM is modularized.
+pub fn selinuxfs_policy_loaded(current_task: &CurrentTask) {
+    if_selinux_else(
+        current_task,
+        |security_server| selinux_hooks::selinuxfs_policy_loaded(security_server, current_task),
+        || panic!("selinuxfs_policy_loaded() without policy!"),
     )
 }
 

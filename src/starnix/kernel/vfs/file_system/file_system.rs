@@ -11,7 +11,7 @@ use crate::task::{CurrentTask, Kernel};
 use crate::vfs::fs_args::MountParams;
 use crate::vfs::{
     DirEntry, DirEntryHandle, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, FsString,
-    WeakFsNodeHandle, XattrOp,
+    WeakFsNodeHandle,
 };
 use linked_hash_map::LinkedHashMap;
 use once_cell::sync::OnceCell;
@@ -198,21 +198,9 @@ impl FileSystem {
     /// filesystem.
     fn prepare_node_for_insertion(
         &self,
-        current_task: &CurrentTask,
+        _current_task: &CurrentTask,
         node: &FsNodeHandle,
     ) -> WeakFsNodeHandle {
-        // TODO(b/355180447): Move this logic so the parent inode (if any) can be taken into account.
-        if let Some(xattr) =
-            security::fs_node_init_security_and_xattr(current_task, &node, None).unwrap_or(None)
-        {
-            let _ = node.ops().set_xattr(
-                node,
-                current_task,
-                xattr.name,
-                xattr.value.as_slice().into(),
-                XattrOp::Create,
-            );
-        }
         Arc::downgrade(node)
     }
 

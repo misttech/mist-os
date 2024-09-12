@@ -9,7 +9,7 @@ use super::{FsNodeSecurityXattr, FsNodeState};
 use crate::task::CurrentTask;
 use crate::vfs::fs_args::MountParams;
 use crate::vfs::{
-    FileSystem, FsNode, FsNodeHandle, FsStr, FsString, NamespaceNode, ValueOrSize, XattrOp,
+    DirEntry, FileSystem, FsNode, FsStr, FsString, NamespaceNode, ValueOrSize, XattrOp,
 };
 use linux_uapi::XATTR_NAME_SELINUX;
 use selinux::permission_check::{PermissionCheck, PermissionCheckResult};
@@ -67,15 +67,50 @@ fn ensure_fs_label<'a>(
     })
 }
 
-/// Returns the security attribute to label a newly created inode with, if any.
-pub(super) fn fs_node_init_security_and_xattr(
+/// Called by the VFS to initialize the security state for an `FsNode` that is being linked at
+/// `dir_entry`.
+pub(super) fn fs_node_init_with_dentry(
     _security_server: &SecurityServer,
     _current_task: &CurrentTask,
-    _new_node: &FsNodeHandle,
-    _parent: Option<&FsNodeHandle>,
+    dir_entry: &DirEntry,
+) -> Result<(), Errno> {
+    // This hook is called every time an `FsNode` is linked to a `DirEntry`, so it is expected that
+    // the `FsNode` may already have been labeled.
+    let fs_node = &dir_entry.node;
+    if fs_node.info().security_state.sid.is_some() {
+        return Ok(());
+    }
+
+    // TODO: https://fxbug.dev/349117435 - Determine the appropriate label for the node, whether
+    // by applying a static `genfscon` label, by reading a dynamic label from the node's extended
+    // attributes, etc. as appropriate for the file-system labeling scheme.
+
+    Ok(())
+}
+
+/// Called by file-system implementations when creating the `FsNode` for a new file.
+pub(super) fn fs_node_init_on_create(
+    _security_server: &SecurityServer,
+    _current_task: &CurrentTask,
+    new_node: &FsNode,
+    _parent: &FsNode,
 ) -> Result<Option<FsNodeSecurityXattr>, Errno> {
-    // TODO(b/334091674): If there is no `parent` then this is the "root" node; apply `root_context`, if set.
-    Ok(None)
+    // By definition this is a new `FsNode` so should not have already been labeled!
+    if new_node.info().security_state.sid.is_some() {
+        log_warn!(
+            "fs_node_init_on_create: node {} in {:?} already created?",
+            new_node.info().ino,
+            new_node.fs().name()
+        );
+    }
+
+    // TODO: https://fxbug.dev/355180447 - Apply dynamic labeling scheme (i.e. "fs_use_trans",
+    // etc.) to determine the SID for the new file node, and apply it to the node.
+    // If the labeling scheme is "fs_use_xattr" then return an `FsNodeSecurityXattr` value describing the
+    // value that the caller should set on the new node.
+    // For static labeling schemes there is nothing to do here.
+
+    return Ok(None);
 }
 
 /// Returns the Security Context corresponding to the SID with which `FsNode`
@@ -274,6 +309,28 @@ pub fn file_system_init_security(mount_params: &MountParams) -> Result<FileSyste
     };
 
     Ok(FileSystemState { mount_options, label: OnceLock::new() })
+}
+
+/// Resolves the labeling scheme and arguments for the `file_system`, based on the loaded policy.
+pub(super) fn file_system_resolve_security(
+    security_server: &SecurityServer,
+    _current_task: &CurrentTask,
+    file_system: &FileSystem,
+) -> Result<(), Errno> {
+    // TODO: https://fxbug.dev/355587237 - Label `FileSystem`s at mount time, (if there is a policy)
+    // or at policy load.
+    ensure_fs_label(security_server, &file_system);
+    Ok(())
+}
+
+/// Called by the "selinuxfs" when a policy has been successfully loaded, to allow policy-dependent
+/// initialization to be completed.
+pub(super) fn selinuxfs_policy_loaded(
+    _security_server: &SecurityServer,
+    _current_task: &CurrentTask,
+) {
+    // TODO: https://fxbug.dev/355587237 - Invoke `file_system_resolve_security()` on pre-existing
+    // `FileSystem`s, and label all reachable `FsNode`s that they contain.
 }
 
 /// Used by the "selinuxfs" module to perform checks on SELinux API file accesses.

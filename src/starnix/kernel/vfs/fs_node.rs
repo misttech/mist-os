@@ -1416,9 +1416,9 @@ impl FsNode {
         )?;
         self.update_metadata_for_child(current_task, &mut mode, &mut owner);
 
-        if mode.is_dir() {
+        let new_node = if mode.is_dir() {
             let mut locked = locked.cast_locked::<FileOpsCore>();
-            self.ops().mkdir(&mut locked, self, current_task, name, mode, owner)
+            self.ops().mkdir(&mut locked, self, current_task, name, mode, owner)?
         } else {
             // https://man7.org/linux/man-pages/man2/mknod.2.html says:
             //
@@ -1435,8 +1435,10 @@ impl FsNode {
                 }
             }
             let mut locked = locked.cast_locked::<FileOpsCore>();
-            self.ops().mknod(&mut locked, self, current_task, name, mode, dev, owner)
-        }
+            self.ops().mknod(&mut locked, self, current_task, name, mode, dev, owner)?
+        };
+        security::fs_node_init_on_create(current_task, &new_node, self)?;
+        Ok(new_node)
     }
 
     pub fn create_symlink<L>(
@@ -1458,7 +1460,10 @@ impl FsNode {
             CheckAccessReason::InternalPermissionChecks,
         )?;
         let mut locked = locked.cast_locked::<FileOpsCore>();
-        self.ops().create_symlink(&mut locked, self, current_task, name, target, owner)
+        let new_node =
+            self.ops().create_symlink(&mut locked, self, current_task, name, target, owner)?;
+        security::fs_node_init_on_create(current_task, &new_node, self)?;
+        Ok(new_node)
     }
 
     pub fn create_tmpfile(

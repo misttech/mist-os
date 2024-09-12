@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::security;
 use crate::task::CurrentTask;
 use crate::vfs::{
     path, CheckAccessReason, FileHandle, FileObject, FsNodeHandle, FsNodeLinkBehavior, FsStr,
@@ -778,7 +779,10 @@ impl DirEntry {
         };
 
         let (child, exists) = match create_result {
-            CreationResult::Created => (child, false),
+            CreationResult::Created => {
+                security::fs_node_init_with_dentry(current_task, &child)?;
+                (child, false)
+            }
             CreationResult::Existed { create_fn } => {
                 if child.ops.revalidate(current_task, &child)? {
                     (child, true)
