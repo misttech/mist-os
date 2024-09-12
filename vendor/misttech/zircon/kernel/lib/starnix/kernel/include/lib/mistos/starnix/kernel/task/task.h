@@ -9,10 +9,10 @@
 #include <lib/fit/result.h>
 #include <lib/mistos/linux_uapi/typedefs.h>
 #include <lib/mistos/starnix/kernel/mm/memory_accessor.h>
-#include <lib/mistos/starnix/kernel/sync/locks.h>
 #include <lib/mistos/starnix/kernel/vfs/fd_table.h>
 #include <lib/mistos/starnix_uapi/auth.h>
 #include <lib/mistos/util/weak_wrapper.h>
+#include <lib/starnix_sync/locks.h>
 
 #include <utility>
 
@@ -28,6 +28,8 @@
 class ThreadDispatcher;
 
 namespace starnix {
+
+using namespace starnix_sync;
 
 enum class ExitStatusType { Exit, Kill, CoreDump, Stop, Continue };
 

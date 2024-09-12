@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef ZIRCON_KERNEL_LIB_MISTOS_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_SYNC_LOCKS_H_
-#define ZIRCON_KERNEL_LIB_MISTOS_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_SYNC_LOCKS_H_
+#ifndef VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_STARNIX_LIB_STARNIX_SYNC_INCLUDE_STARNIX_SYNC_LOCKS_H_
+#define VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_STARNIX_LIB_STARNIX_SYNC_INCLUDE_STARNIX_SYNC_LOCKS_H_
 
 #include <zircon/compiler.h>
 
@@ -12,7 +12,7 @@
 #include <kernel/lockdep.h>
 #include <kernel/mutex.h>
 
-namespace starnix {
+namespace starnix_sync {
 
 template <typename Data>
 class MutexGuard;
@@ -116,6 +116,6 @@ class RwLockGuard : public Guard<BrwLockPi, Option> {
   RwLock<Data>* mtx_;
 };
 
-}  // namespace starnix
+}  // namespace starnix_sync
 
-#endif  // ZIRCON_KERNEL_LIB_MISTOS_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_SYNC_LOCKS_H_
+#endif  // VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_STARNIX_LIB_STARNIX_SYNC_INCLUDE_STARNIX_SYNC_LOCKS_H_

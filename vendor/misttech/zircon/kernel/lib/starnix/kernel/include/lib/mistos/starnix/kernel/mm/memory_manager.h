@@ -9,11 +9,11 @@
 #include <lib/mistos/starnix/kernel/mm/flags.h>
 #include <lib/mistos/starnix/kernel/mm/memory.h>
 #include <lib/mistos/starnix/kernel/mm/memory_accessor.h>
-#include <lib/mistos/starnix/kernel/sync/locks.h>
 #include <lib/mistos/starnix/kernel/vfs/path.h>
 #include <lib/mistos/starnix_uapi/errors.h>
 #include <lib/mistos/starnix_uapi/user_address.h>
 #include <lib/mistos/util/range-map.h>
+#include <lib/starnix_sync/locks.h>
 #include <stdint.h>
 #include <zircon/rights.h>
 #include <zircon/types.h>
@@ -42,6 +42,7 @@ bool test_unmap_returns_multiple_mappings();
 namespace starnix {
 
 using namespace starnix_uapi;
+using namespace starnix_sync;
 
 constexpr uint64_t kProgramBreakLimit = 64 * 1024 * 1024;
 

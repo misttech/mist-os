@@ -7,9 +7,9 @@
 #define ZIRCON_KERNEL_LIB_MISTOS_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_VFS_XATTR_H_
 
 #include <lib/fit/result.h>
-#include <lib/mistos/starnix/kernel/sync/locks.h>
 #include <lib/mistos/starnix/kernel/vfs/fs_args.h>
 #include <lib/mistos/starnix/kernel/vfs/path.h>
+#include <lib/starnix_sync/locks.h>
 
 #include <fbl/intrusive_hash_table.h>
 #include <ktl/string_view.h>
@@ -40,7 +40,7 @@ class XattrOpHelper {
 };
 
 struct MemoryXattrStorage {
-  mutable StarnixMutex<FsStringHashTable> xattrs;
+  mutable starnix_sync::StarnixMutex<FsStringHashTable> xattrs;
 
   /// impl MemoryXattrStorage
   fit::result<Errno, FsString> get_xattr(const FsStr& name) const;

@@ -6,8 +6,8 @@
 #define ZIRCON_KERNEL_LIB_MISTOS_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_TASK_PROCESS_GROUP_H_
 
 #include <lib/mistos/linux_uapi/typedefs.h>
-#include <lib/mistos/starnix/kernel/sync/locks.h>
 #include <lib/mistos/util/weak_wrapper.h>
+#include <lib/starnix_sync/locks.h>
 
 #include <utility>
 
@@ -72,7 +72,7 @@ class ProcessGroup : public fbl::RefCountedUpgradeable<ProcessGroup>,
 
  private:
   /// The mutable state of the ProcessGroup.
-  mutable RwLock<ProcessGroupMutableState> mutable_state_;
+  mutable starnix_sync::RwLock<ProcessGroupMutableState> mutable_state_;
 
  public:
   /// impl ProcessGroup

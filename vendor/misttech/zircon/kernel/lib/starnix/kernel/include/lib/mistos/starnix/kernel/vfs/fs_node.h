@@ -8,7 +8,6 @@
 
 #include <lib/fit/result.h>
 #include <lib/mistos/linux_uapi/typedefs.h>
-#include <lib/mistos/starnix/kernel/sync/locks.h>
 #include <lib/mistos/starnix/kernel/vfs/file_system.h>
 #include <lib/mistos/starnix/kernel/vfs/fs_node_info.h>
 #include <lib/mistos/starnix/kernel/vfs/namespace.h>
@@ -20,6 +19,7 @@
 #include <lib/mistos/starnix_uapi/file_mode.h>
 #include <lib/mistos/starnix_uapi/open_flags.h>
 #include <lib/mistos/util/weak_wrapper.h>
+#include <lib/starnix_sync/locks.h>
 #include <zircon/compiler.h>
 
 #include <functional>
@@ -99,7 +99,7 @@ class FsNode final
   /// Mutable information about this node.
   ///
   /// This data is used to populate the uapi::stat structure.
-  mutable RwLock<FsNodeInfo> info_;
+  mutable starnix_sync::RwLock<FsNodeInfo> info_;
 
   /// Information about the locking information on this node.
   ///
@@ -211,12 +211,12 @@ class FsNode final
   fit::result<Errno, struct stat> stat(const CurrentTask& current_task) const;
 
   // Returns current `FsNodeInfo`.
-  RwLockGuard<FsNodeInfo, BrwLockPi::Reader> info() const { return info_.Read(); }
+  starnix_sync::RwLockGuard<FsNodeInfo, BrwLockPi::Reader> info() const { return info_.Read(); }
 
   /// Refreshes the `FsNodeInfo` if necessary and returns a read lock.
   fit::result<Errno, FsNodeInfo> refresh_info(const CurrentTask& current_task) const;
 
-  template <typename T, typename F >
+  template <typename T, typename F>
   T update_info(F&& mutator) const {
     auto _info = info_.Write();
     return mutator(*_info);

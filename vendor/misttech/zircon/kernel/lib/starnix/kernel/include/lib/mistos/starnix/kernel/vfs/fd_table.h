@@ -7,10 +7,10 @@
 #define ZIRCON_KERNEL_LIB_MISTOS_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_VFS_FD_TABLE_H_
 
 #include <lib/fit/result.h>
-#include <lib/mistos/starnix/kernel/sync/locks.h>
 #include <lib/mistos/starnix/kernel/vfs/fd_numbers.h>
 #include <lib/mistos/util/back_insert_iterator.h>
 #include <lib/mistos/util/bitflags.h>
+#include <lib/starnix_sync/locks.h>
 #include <zircon/compiler.h>
 
 #include <atomic>
@@ -120,13 +120,13 @@ class FdTableInner : public fbl::RefCounted<FdTableInner> {
  private:
   friend class FdTable;
 
-  mutable StarnixMutex<FdTableStore> store_;
+  mutable starnix_sync::StarnixMutex<FdTableStore> store_;
 };
 
 class Task;
 class FdTable {
  private:
-  mutable StarnixMutex<fbl::RefPtr<FdTableInner>> inner_;
+  mutable starnix_sync::StarnixMutex<fbl::RefPtr<FdTableInner>> inner_;
 
  public:
   // impl FdTable
