@@ -28,6 +28,29 @@ open protocol Manager {
         // The event that will be signaled when the container should resume.
         3: wake_event zx.Handle:EVENT;
     }) -> () error SuspendError;
+
+    /// Creates a pass-through proxy that forwards messages between the `container_channel` and the
+    /// `remote_channel`.
+    ///
+    /// If any messages arrive on `remote_channel` while the container is suspended via
+    /// `SuspendContainer`, the container will be resumed and `resume_event` will be signaled with
+    /// `ZX_EVENT_SIGNALED`. Any suspend call that is made while that signal is present on
+    /// `resume_event` will wake immediately. The container is responsible for clearing
+    /// `ZX_EVENT_SIGNALED`.
+    flexible ProxyWakeChannel(resource table {
+        /// The job of the container that holds the other end of `container_channel`.
+        1: container_job zx.Handle:JOB;
+
+        /// The channel endpoint that is connected to the container.
+        2: container_channel zx.Handle:CHANNEL;
+
+        /// The channel endpoint that is connected to a component outside the container.
+        3: remote_channel zx.Handle:CHANNEL;
+
+        /// The event that will be signaled when a message appears on `container_channel` while the
+        /// container is suspended.
+        4: resume_event zx.Handle:EVENTPAIR;
+    });
 };
 
 type SuspendError = flexible enum {
