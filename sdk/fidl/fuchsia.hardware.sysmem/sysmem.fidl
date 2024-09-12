@@ -22,9 +22,6 @@ closed protocol Sysmem {
     /// Takes the client end of a FIDL connection that'll serve
     /// fuchsia.sysmem2.SecureMem, which is a protocol that's specific to
     /// sysmem<->securemem concerns.
-    //
-    // The added=HEAD is fake - see comments in overview.fidl.
-    @available(added=HEAD)
     strict RegisterSecureMem(resource struct {
         secure_mem_connection client_end:fuchsia.sysmem2.SecureMem;
     });
@@ -38,8 +35,15 @@ closed protocol Sysmem {
 service Service {
     sysmem client_end:Sysmem;
 
-    // The added=19 is fake - see comments in overview.fidl.
-    @available(added=19, deprecated=23)
+    // This `deprecated` annotation is required in order to avoid fidlc errors
+    // due to use of types that are deprecated in an SDK library.
+    //
+    // TODO(https://fxbug.dev/360409878): Remove the available annotation in
+    // this non-SDK FIDL library when either (A) the bug is fixed such that
+    // a non-SDK FIDL library can build when referring to SDK deprecated
+    // protocols/types or (B) this library no longer needs to refer to SDK
+    // deprecated protocols/types.
+    @available(deprecated=HEAD)
     allocator_v1 client_end:fuchsia.sysmem.Allocator;
 
     allocator_v2 client_end:fuchsia.sysmem2.Allocator;
