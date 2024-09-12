@@ -8,7 +8,7 @@
 #include <type_traits>
 #include <utility>
 
-#include <zxtest/zxtest.h>
+#include <gtest/gtest.h>
 
 #include "src/devices/power/drivers/fusb302/usb-pd-defs.h"
 #include "src/devices/power/drivers/fusb302/usb-pd-message-type.h"
@@ -221,10 +221,11 @@ TEST(MessageTest, SourceCapabilitiesOneObject) {
   const uint32_t kDataObjects[] = {0x2701912c};
 
   Message message(header, kDataObjects);
+
   EXPECT_EQ(MessageType::kSourceCapabilities, message.header().message_type());
 
-  ASSERT_EQ(1, message.data_objects().size());
-  EXPECT_EQ(0x2701912c, message.data_objects()[0]);
+  ASSERT_EQ(1u, message.data_objects().size());
+  EXPECT_EQ(0x2701912cu, message.data_objects()[0]);
 }
 
 TEST(MessageTest, SourceCapabilitiesMaximumObjects) {
@@ -236,9 +237,9 @@ TEST(MessageTest, SourceCapabilitiesMaximumObjects) {
   Message message(header, kDataObjects);
   EXPECT_EQ(MessageType::kSourceCapabilities, message.header().message_type());
 
-  ASSERT_EQ(7, message.data_objects().size());
-  EXPECT_EQ(0x0a01912c, message.data_objects()[0]);
-  EXPECT_EQ(0xc9402128, message.data_objects()[6]);
+  ASSERT_EQ(7u, message.data_objects().size());
+  EXPECT_EQ(0x0a01912cu, message.data_objects()[0]);
+  EXPECT_EQ(0xc9402128u, message.data_objects()[6]);
 }
 
 TEST(MessageTest, GetSourceCapabilities) {

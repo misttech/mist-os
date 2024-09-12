@@ -19,7 +19,7 @@
 #include <utility>
 
 #include <fbl/vector.h>
-#include <zxtest/zxtest.h>
+#include <gtest/gtest.h>
 
 namespace fusb302 {
 
@@ -146,7 +146,7 @@ class MockStateMachine : public StateMachineBase<MockStateMachine, MockState, co
   mutable size_t expected_call_index_ = 0;
 };
 
-class StateMachineBaseTest : public zxtest::Test {
+class StateMachineBaseTest : public ::testing::Test {
  public:
   void TearDown() override { state_machine_.CheckAllAccessesReplayed(); }
 

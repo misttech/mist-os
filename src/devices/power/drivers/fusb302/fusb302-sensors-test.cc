@@ -8,16 +8,17 @@
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/driver/testing/cpp/scoped_global_logger.h>
-#include <lib/mock-i2c/mock-i2c.h>
+#include <lib/mock-i2c/mock-i2c-gtest.h>
 #include <lib/stdcompat/span.h>
 
 #include <cstdint>
 #include <optional>
 #include <utility>
 
-#include <zxtest/zxtest.h>
+#include <gtest/gtest.h>
 
 #include "src/devices/power/drivers/fusb302/usb-pd-defs.h"
+#include "src/lib/testing/predicates/status.h"
 
 namespace fusb302 {
 
@@ -28,7 +29,7 @@ namespace {
 constexpr int kStatus1AAddress = 0x3d;
 constexpr int kStatus0Address = 0x40;
 
-class Fusb302SensorsTest : public zxtest::Test {
+class Fusb302SensorsTest : public ::testing::Test {
  public:
   void SetUp() override {
     auto endpoints = fidl::Endpoints<fuchsia_hardware_i2c::Device>::Create();
@@ -49,7 +50,7 @@ class Fusb302SensorsTest : public zxtest::Test {
   inspect::Inspector inspect_;
 
   async::Loop loop_{&kAsyncLoopConfigNeverAttachToThread};
-  mock_i2c::MockI2c mock_i2c_;
+  mock_i2c::MockI2cGtest mock_i2c_;
   fidl::ClientEnd<fuchsia_hardware_i2c::Device> mock_i2c_client_;
   std::optional<Fusb302Sensors> sensors_;
 };

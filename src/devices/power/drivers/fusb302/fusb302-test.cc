@@ -11,7 +11,8 @@
 #include <lib/inspect/cpp/hierarchy.h>
 #include <lib/inspect/cpp/inspect.h>
 #include <lib/inspect/cpp/reader.h>
-#include <lib/mock-i2c/mock-i2c.h>
+#include <lib/inspect/testing/cpp/inspect.h>
+#include <lib/mock-i2c/mock-i2c-gtest.h>
 #include <lib/zx/interrupt.h>
 #include <zircon/types.h>
 
@@ -19,17 +20,19 @@
 #include <optional>
 #include <utility>
 
-#include <zxtest/zxtest.h>
+#include <gmock/gmock.h>
+#include <gtest/gtest.h>
 
 #include "src/devices/power/drivers/fusb302/pd-sink-state-machine.h"
 #include "src/devices/power/drivers/fusb302/typec-port-state-machine.h"
 #include "src/devices/power/drivers/fusb302/usb-pd-defs.h"
+#include "src/lib/testing/predicates/status.h"
 
 namespace fusb302 {
 
 namespace {
 
-class Fusb302Test : public zxtest::Test {
+class Fusb302Test : public ::testing::Test {
  public:
   void SetUp() override {
     auto endpoints = fidl::Endpoints<fuchsia_hardware_i2c::Device>::Create();
@@ -53,19 +56,16 @@ class Fusb302Test : public zxtest::Test {
     ASSERT_TRUE(hierarchy_result.is_ok());
 
     inspect::Hierarchy hierarchy = std::move(hierarchy_result.value());
-    const inspect::Hierarchy* identity_root = hierarchy.GetByPath({node_name});
-    ASSERT_TRUE(identity_root);
+    const inspect::Hierarchy* node_root = hierarchy.GetByPath({node_name});
+    ASSERT_TRUE(node_root);
 
-    const inspect::IntPropertyValue* actual_value =
-        identity_root->node().get_property<inspect::IntPropertyValue>(property_name);
-    ASSERT_TRUE(actual_value);
-
-    EXPECT_EQ(actual_value->value(), expected_value);
+    EXPECT_THAT(node_root->node(), inspect::testing::PropertyList(testing::Contains(
+                                       inspect::testing::IntIs(property_name, expected_value))));
   }
 
  protected:
   async::Loop loop_{&kAsyncLoopConfigNeverAttachToThread};
-  mock_i2c::MockI2c mock_i2c_;
+  mock_i2c::MockI2cGtest mock_i2c_;
   std::optional<Fusb302> device_;
 };
 

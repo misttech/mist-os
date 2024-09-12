@@ -6,7 +6,7 @@
 
 #include <cstdint>
 
-#include <zxtest/zxtest.h>
+#include <gtest/gtest.h>
 
 namespace usb_pd {
 
@@ -25,13 +25,13 @@ TEST(FixedPowerSupplyDataTest, VoltageMv) {
   {
     FixedPowerSupplyData fixed_power_supply;
     fixed_power_supply.set_voltage_mv(50);
-    EXPECT_EQ(1, fixed_power_supply.voltage_50mv());
+    EXPECT_EQ(1u, fixed_power_supply.voltage_50mv());
     EXPECT_EQ(50, fixed_power_supply.voltage_mv());
   }
   {
     FixedPowerSupplyData fixed_power_supply;
     fixed_power_supply.set_voltage_mv(51'150);
-    EXPECT_EQ(1'023, fixed_power_supply.voltage_50mv());
+    EXPECT_EQ(1'023u, fixed_power_supply.voltage_50mv());
     EXPECT_EQ(51'150, fixed_power_supply.voltage_mv());
   }
 }
@@ -40,13 +40,13 @@ TEST(FixedPowerSupplyDataTest, MaximumCurrentMa) {
   {
     FixedPowerSupplyData fixed_power_supply;
     fixed_power_supply.set_maximum_current_ma(10);
-    EXPECT_EQ(1, fixed_power_supply.maximum_current_10ma());
+    EXPECT_EQ(1u, fixed_power_supply.maximum_current_10ma());
     EXPECT_EQ(10, fixed_power_supply.maximum_current_ma());
   }
   {
     FixedPowerSupplyData fixed_power_supply;
     fixed_power_supply.set_maximum_current_ma(10'230);
-    EXPECT_EQ(1'023, fixed_power_supply.maximum_current_10ma());
+    EXPECT_EQ(1'023u, fixed_power_supply.maximum_current_10ma());
     EXPECT_EQ(10'230, fixed_power_supply.maximum_current_ma());
   }
 }
@@ -164,13 +164,13 @@ TEST(VariablePowerSupplyDataTest, MaximumVoltageMv) {
   {
     VariablePowerSupplyData variable_power_supply;
     variable_power_supply.set_maximum_voltage_mv(50);
-    EXPECT_EQ(1, variable_power_supply.maximum_voltage_50mv());
+    EXPECT_EQ(1u, variable_power_supply.maximum_voltage_50mv());
     EXPECT_EQ(50, variable_power_supply.maximum_voltage_mv());
   }
   {
     VariablePowerSupplyData variable_power_supply;
     variable_power_supply.set_maximum_voltage_mv(51'150);
-    EXPECT_EQ(1'023, variable_power_supply.maximum_voltage_50mv());
+    EXPECT_EQ(1'023u, variable_power_supply.maximum_voltage_50mv());
     EXPECT_EQ(51'150, variable_power_supply.maximum_voltage_mv());
   }
 }
@@ -179,13 +179,13 @@ TEST(VariablePowerSupplyDataTest, MinimumVoltageMv) {
   {
     VariablePowerSupplyData variable_power_supply;
     variable_power_supply.set_minimum_voltage_mv(50);
-    EXPECT_EQ(1, variable_power_supply.minimum_voltage_50mv());
+    EXPECT_EQ(1u, variable_power_supply.minimum_voltage_50mv());
     EXPECT_EQ(50, variable_power_supply.minimum_voltage_mv());
   }
   {
     VariablePowerSupplyData variable_power_supply;
     variable_power_supply.set_minimum_voltage_mv(51'150);
-    EXPECT_EQ(1'023, variable_power_supply.minimum_voltage_50mv());
+    EXPECT_EQ(1'023u, variable_power_supply.minimum_voltage_50mv());
     EXPECT_EQ(51'150, variable_power_supply.minimum_voltage_mv());
   }
 }
@@ -194,13 +194,13 @@ TEST(VariablePowerSupplyDataTest, MaximumCurrentMa) {
   {
     VariablePowerSupplyData variable_power_supply;
     variable_power_supply.set_maximum_current_ma(10);
-    EXPECT_EQ(1, variable_power_supply.maximum_current_10ma());
+    EXPECT_EQ(1u, variable_power_supply.maximum_current_10ma());
     EXPECT_EQ(10, variable_power_supply.maximum_current_ma());
   }
   {
     VariablePowerSupplyData variable_power_supply;
     variable_power_supply.set_maximum_current_ma(10'230);
-    EXPECT_EQ(1'023, variable_power_supply.maximum_current_10ma());
+    EXPECT_EQ(1'023u, variable_power_supply.maximum_current_10ma());
     EXPECT_EQ(10'230, variable_power_supply.maximum_current_ma());
   }
 }
@@ -209,13 +209,13 @@ TEST(BatteryPowerSupplyDataTest, MaximumVoltageMv) {
   {
     BatteryPowerSupplyData battery_power_supply;
     battery_power_supply.set_maximum_voltage_mv(50);
-    EXPECT_EQ(1, battery_power_supply.maximum_voltage_50mv());
+    EXPECT_EQ(1u, battery_power_supply.maximum_voltage_50mv());
     EXPECT_EQ(50, battery_power_supply.maximum_voltage_mv());
   }
   {
     BatteryPowerSupplyData battery_power_supply;
     battery_power_supply.set_maximum_voltage_mv(51'150);
-    EXPECT_EQ(1'023, battery_power_supply.maximum_voltage_50mv());
+    EXPECT_EQ(1'023u, battery_power_supply.maximum_voltage_50mv());
     EXPECT_EQ(51'150, battery_power_supply.maximum_voltage_mv());
   }
 }
@@ -224,13 +224,13 @@ TEST(BatteryPowerSupplyDataTest, MinimumVoltageMv) {
   {
     BatteryPowerSupplyData battery_power_supply;
     battery_power_supply.set_minimum_voltage_mv(50);
-    EXPECT_EQ(1, battery_power_supply.minimum_voltage_50mv());
+    EXPECT_EQ(1u, battery_power_supply.minimum_voltage_50mv());
     EXPECT_EQ(50, battery_power_supply.minimum_voltage_mv());
   }
   {
     BatteryPowerSupplyData battery_power_supply;
     battery_power_supply.set_minimum_voltage_mv(51'150);
-    EXPECT_EQ(1'023, battery_power_supply.minimum_voltage_50mv());
+    EXPECT_EQ(1'023u, battery_power_supply.minimum_voltage_50mv());
     EXPECT_EQ(51'150, battery_power_supply.minimum_voltage_mv());
   }
 }
@@ -239,13 +239,13 @@ TEST(BatteryPowerSupplyDataTest, MaximumPowerMw) {
   {
     BatteryPowerSupplyData battery_power_supply;
     battery_power_supply.set_maximum_power_mw(250);
-    EXPECT_EQ(1, battery_power_supply.maximum_power_250mw());
+    EXPECT_EQ(1u, battery_power_supply.maximum_power_250mw());
     EXPECT_EQ(250, battery_power_supply.maximum_power_mw());
   }
   {
     BatteryPowerSupplyData battery_power_supply;
     battery_power_supply.set_maximum_power_mw(255'750);
-    EXPECT_EQ(1'023, battery_power_supply.maximum_power_250mw());
+    EXPECT_EQ(1'023u, battery_power_supply.maximum_power_250mw());
     EXPECT_EQ(255'750, battery_power_supply.maximum_power_mw());
   }
 }
@@ -254,13 +254,13 @@ TEST(SinkFixedPowerSupplyDataTest, VoltageMv) {
   {
     SinkFixedPowerSupplyData fixed_power_supply;
     fixed_power_supply.set_voltage_mv(50);
-    EXPECT_EQ(1, fixed_power_supply.voltage_50mv());
+    EXPECT_EQ(1u, fixed_power_supply.voltage_50mv());
     EXPECT_EQ(50, fixed_power_supply.voltage_mv());
   }
   {
     SinkFixedPowerSupplyData fixed_power_supply;
     fixed_power_supply.set_voltage_mv(51'150);
-    EXPECT_EQ(1'023, fixed_power_supply.voltage_50mv());
+    EXPECT_EQ(1'023u, fixed_power_supply.voltage_50mv());
     EXPECT_EQ(51'150, fixed_power_supply.voltage_mv());
   }
 }
@@ -269,13 +269,13 @@ TEST(SinkFixedPowerSupplyDataTest, MaximumCurrentMa) {
   {
     SinkFixedPowerSupplyData fixed_power_supply;
     fixed_power_supply.set_maximum_current_ma(10);
-    EXPECT_EQ(1, fixed_power_supply.maximum_current_10ma());
+    EXPECT_EQ(1u, fixed_power_supply.maximum_current_10ma());
     EXPECT_EQ(10, fixed_power_supply.maximum_current_ma());
   }
   {
     SinkFixedPowerSupplyData fixed_power_supply;
     fixed_power_supply.set_maximum_current_ma(10'230);
-    EXPECT_EQ(1'023, fixed_power_supply.maximum_current_10ma());
+    EXPECT_EQ(1'023u, fixed_power_supply.maximum_current_10ma());
     EXPECT_EQ(10'230, fixed_power_supply.maximum_current_ma());
   }
 }
@@ -283,11 +283,11 @@ TEST(SinkFixedPowerSupplyDataTest, MaximumCurrentMa) {
 TEST(FixedVariableSupplyPowerRequestDataTest, CreateForPosition) {
   FixedVariableSupplyPowerRequestData request_data1 =
       FixedVariableSupplyPowerRequestData::CreateForPosition(1);
-  EXPECT_EQ(1, request_data1.related_power_data_object_position());
+  EXPECT_EQ(1u, request_data1.related_power_data_object_position());
 
   FixedVariableSupplyPowerRequestData request_data7 =
       FixedVariableSupplyPowerRequestData::CreateForPosition(7);
-  EXPECT_EQ(7, request_data7.related_power_data_object_position());
+  EXPECT_EQ(7u, request_data7.related_power_data_object_position());
 }
 
 TEST(FixedVariableSupplyPowerRequestDataTest, OperatingCurrentMa) {
@@ -295,14 +295,15 @@ TEST(FixedVariableSupplyPowerRequestDataTest, OperatingCurrentMa) {
     FixedVariableSupplyPowerRequestData request_data =
         FixedVariableSupplyPowerRequestData::CreateForPosition(1);
     request_data.set_operating_current_ma(10);
-    EXPECT_EQ(1, request_data.operating_current_10ma());
+    EXPECT_EQ(1u, request_data.operating_current_10ma());
     EXPECT_EQ(10, request_data.operating_current_ma());
   }
+
   {
     FixedVariableSupplyPowerRequestData request_data =
         FixedVariableSupplyPowerRequestData::CreateForPosition(1);
     request_data.set_operating_current_ma(10'230);
-    EXPECT_EQ(1'023, request_data.operating_current_10ma());
+    EXPECT_EQ(1'023u, request_data.operating_current_10ma());
     EXPECT_EQ(10'230, request_data.operating_current_ma());
   }
 }
@@ -312,14 +313,14 @@ TEST(FixedVariableSupplyPowerRequestDataTest, LimitCurrentMa) {
     FixedVariableSupplyPowerRequestData request_data =
         FixedVariableSupplyPowerRequestData::CreateForPosition(1);
     request_data.set_limit_current_ma(10);
-    EXPECT_EQ(1, request_data.limit_current_10ma());
+    EXPECT_EQ(1u, request_data.limit_current_10ma());
     EXPECT_EQ(10, request_data.limit_current_ma());
   }
   {
     FixedVariableSupplyPowerRequestData request_data =
         FixedVariableSupplyPowerRequestData::CreateForPosition(1);
     request_data.set_limit_current_ma(10'230);
-    EXPECT_EQ(1'023, request_data.limit_current_10ma());
+    EXPECT_EQ(1'023u, request_data.limit_current_10ma());
     EXPECT_EQ(10'230, request_data.limit_current_ma());
   }
 }
@@ -342,13 +343,13 @@ TEST(BatteryPowerRequestDataTest, OperatingPowerMw) {
   {
     BatteryPowerRequestData request_data = BatteryPowerRequestData::CreateForPosition(1);
     request_data.set_operating_power_mw(250);
-    EXPECT_EQ(1, request_data.operating_power_250mw());
+    EXPECT_EQ(1u, request_data.operating_power_250mw());
     EXPECT_EQ(250, request_data.operating_power_mw());
   }
   {
     BatteryPowerRequestData request_data = BatteryPowerRequestData::CreateForPosition(1);
     request_data.set_operating_power_mw(255'750);
-    EXPECT_EQ(1'023, request_data.operating_power_250mw());
+    EXPECT_EQ(1'023u, request_data.operating_power_250mw());
     EXPECT_EQ(255'750, request_data.operating_power_mw());
   }
 }
@@ -357,13 +358,13 @@ TEST(BatteryPowerRequestDataTest, LimitPowerMw) {
   {
     BatteryPowerRequestData request_data = BatteryPowerRequestData::CreateForPosition(1);
     request_data.set_limit_power_mw(250);
-    EXPECT_EQ(1, request_data.limit_power_250mw());
+    EXPECT_EQ(1u, request_data.limit_power_250mw());
     EXPECT_EQ(250, request_data.limit_power_mw());
   }
   {
     BatteryPowerRequestData request_data = BatteryPowerRequestData::CreateForPosition(1);
     request_data.set_limit_power_mw(255'750);
-    EXPECT_EQ(1'023, request_data.limit_power_250mw());
+    EXPECT_EQ(1'023u, request_data.limit_power_250mw());
     EXPECT_EQ(255'750, request_data.limit_power_mw());
   }
 }

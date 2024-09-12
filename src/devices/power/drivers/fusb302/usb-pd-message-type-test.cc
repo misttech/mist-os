@@ -6,7 +6,7 @@
 
 #include <cstdint>
 
-#include <zxtest/zxtest.h>
+#include <gtest/gtest.h>
 
 namespace usb_pd {
 

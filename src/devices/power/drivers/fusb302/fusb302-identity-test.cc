@@ -12,11 +12,15 @@
 #include <lib/inspect/cpp/hierarchy.h>
 #include <lib/inspect/cpp/inspect.h>
 #include <lib/inspect/cpp/reader.h>
-#include <lib/mock-i2c/mock-i2c.h>
+#include <lib/inspect/testing/cpp/inspect.h>
+#include <lib/mock-i2c/mock-i2c-gtest.h>
 
 #include <optional>
 
-#include <zxtest/zxtest.h>
+#include <gmock/gmock.h>
+#include <gtest/gtest.h>
+
+#include "src/lib/testing/predicates/status.h"
 
 namespace fusb302 {
 
@@ -26,7 +30,7 @@ namespace {
 // Rev 5 datasheet.
 constexpr int kDeviceIdAddress = 0x01;
 
-class Fusb302IdentityTest : public zxtest::Test {
+class Fusb302IdentityTest : public ::testing::Test {
  public:
   void SetUp() override {
     auto endpoints = fidl::Endpoints<fuchsia_hardware_i2c::Device>::Create();
@@ -50,11 +54,9 @@ class Fusb302IdentityTest : public zxtest::Test {
     const inspect::Hierarchy* identity_root = hierarchy.GetByPath({"Identity"});
     ASSERT_TRUE(identity_root);
 
-    const inspect::StringPropertyValue* actual_value =
-        identity_root->node().get_property<inspect::StringPropertyValue>(property_name);
-    ASSERT_TRUE(actual_value);
-
-    EXPECT_EQ(actual_value->value(), expected_value);
+    EXPECT_THAT(identity_root->node(),
+                inspect::testing::PropertyList(
+                    testing::Contains(inspect::testing::StringIs(property_name, expected_value))));
   }
 
  protected:
@@ -63,7 +65,7 @@ class Fusb302IdentityTest : public zxtest::Test {
   inspect::Inspector inspect_;
 
   async::Loop loop_{&kAsyncLoopConfigNeverAttachToThread};
-  mock_i2c::MockI2c mock_i2c_;
+  mock_i2c::MockI2cGtest mock_i2c_;
   fidl::ClientEnd<fuchsia_hardware_i2c::Device> mock_i2c_client_;
   std::optional<Fusb302Identity> identity_;
 };

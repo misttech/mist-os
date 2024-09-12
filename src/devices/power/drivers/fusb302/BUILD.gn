@@ -108,11 +108,12 @@ test("fusb302-test-bin") {
     "//sdk/lib/async-loop:async-loop-cpp",
     "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/driver/testing/cpp:scoped_global_logger",
+    "//sdk/lib/inspect/testing/cpp",
     "//src/devices/bin/driver_runtime",
-    "//src/devices/i2c/testing/mock-i2c",
-    "//zircon/system/ulib/inspect",
-    "//zircon/system/ulib/mock-function",
-    "//zircon/system/ulib/zxtest",
+    "//src/devices/i2c/testing/mock-i2c:mock-i2c-gtest",
+    "//src/lib/fxl/test:gtest_main",
+    "//src/lib/testing/predicates",
+    "//third_party/googletest:gtest",
   ]
 
   # TODO: delete the below and fix compiler errors.
