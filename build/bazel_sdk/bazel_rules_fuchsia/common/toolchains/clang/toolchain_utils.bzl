@@ -125,18 +125,12 @@ def compute_clang_features(host_os, host_cpu, target_os, target_cpu):
         ],
     )
 
-    # https://fxbug.dev/42082246: ML inliner is unsupported on mac-arm64
-    fuchsia_host_tag = "{}-{}".format(host_os, host_cpu)
-    use_ml_inliner = fuchsia_host_tag != "mac-arm64"
-
     opt_feature = feature(
         name = "opt",
-        implies = ["ml_inliner"] if use_ml_inliner else [],
     )
 
     ml_inliner_feature = feature(
         name = "ml_inliner",
-        enabled = use_ml_inliner,
         flag_sets = [
             flag_set(
                 actions = [
