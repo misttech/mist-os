@@ -36,7 +36,15 @@ using FileSystemHandle = fbl::RefPtr<FileSystem>;
 //
 // The namespace records at which entries filesystems are mounted.
 class Namespace : public fbl::RefCounted<Namespace> {
+ private:
+  MountHandle root_mount_;
+
+  // Unique ID of this namespace.
+  uint64_t id_;
+
  public:
+  // impl Namespace
+
   static fbl::RefPtr<Namespace> New(FileSystemHandle fs);
 
   NamespaceNode root();
@@ -47,11 +55,6 @@ class Namespace : public fbl::RefCounted<Namespace> {
 
  private:
   Namespace(MountHandle root_mount, uint64_t id);
-
-  MountHandle root_mount_;
-
-  // Unique ID of this namespace.
-  uint64_t id_;
 };
 
 }  // namespace starnix

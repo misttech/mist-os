@@ -6,6 +6,7 @@
 #define VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_VFS_MOUNT_H_
 
 #include <lib/fit/result.h>
+#include <lib/mistos/starnix/kernel/sync/locks.h>
 #include <lib/mistos/starnix/kernel/vfs/namespace_node.h>
 #include <lib/mistos/starnix/kernel/vfs/path.h>
 #include <lib/mistos/starnix_uapi/device_type.h>
@@ -14,8 +15,9 @@
 #include <lib/mistos/starnix_uapi/mount_flags.h>
 #include <lib/mistos/starnix_uapi/open_flags.h>
 #include <lib/mistos/starnix_uapi/vfs.h>
+#include <lib/mistos/util/weak_wrapper.h>
 
-#include <fbl/ref_counted.h>
+#include <fbl/ref_counted_upgradeable.h>
 #include <fbl/ref_ptr.h>
 #include <kernel/mutex.h>
 #include <ktl/optional.h>
@@ -34,11 +36,12 @@ using MountHandle = fbl::RefPtr<Mount>;
 using starnix_uapi::MountFlags;
 
 struct MountState {
+ private:
   /// The namespace node that this mount is mounted on. This is a tuple instead of a
   /// NamespaceNode because the Mount pointer has to be weak because this is the pointer to the
   /// parent mount, the parent has a pointer to the children too, and making both strong would be
   /// a cycle.
-  // mountpoint: Option<(Weak<Mount>, DirEntryHandle)>,
+  ktl::optional<ktl::pair<util::WeakPtr<Mount>, DirEntryHandle>> mountpoint;
 
   // The keys of this map are always descendants of this mount's root.
   //
@@ -52,10 +55,17 @@ struct MountState {
   /// peer_group(), take_from_peer_group(), and set_peer_group().
   // TODO(tbodt): Refactor the links into, some kind of extra struct or something? This is hard
   // because setting this field requires the Arc<Mount>.
-  // peer_group_: Option<(Arc<PeerGroup>, PtrKey<Mount>)>,
-  /// The membership of this mount in a PeerGroup's downstream. Do not access directly. Instead
-  /// use upstream(), take_from_upstream(), and set_upstream().
-  // upstream_: Option<(Weak<PeerGroup>, PtrKey<Mount>)>,
+  // peer_group_ : Option<(Arc<PeerGroup>, PtrKey<Mount>)>,
+  /// The membership of this mount in a PeerGroup's downstream. Do not access
+  /// directly. Instead use upstream(), take_from_upstream(), and set_upstream().
+  // upstream_ : Option<(Weak<PeerGroup>, PtrKey<Mount>)>,
+
+ private:
+  // impl MountState
+
+ private:
+  // C++
+  friend class Mount;
 };
 
 enum class WhatToMountEnum {
@@ -65,7 +75,6 @@ enum class WhatToMountEnum {
 
 struct WhatToMount {
   WhatToMountEnum type;
-
   ktl::variant<FileSystemHandle, NamespaceNode> what;
 };
 
@@ -77,42 +86,19 @@ struct WhatToMount {
 ///
 /// The mounts in a namespace form a mount tree, with `mountpoint` pointing to the parent and
 /// `submounts` pointing to the children.
-class Mount : public fbl::RefCounted<Mount> {
+class Mount : public fbl::RefCountedUpgradeable<Mount> {
  public:
-  static MountHandle New(WhatToMount what, MountFlags flags);
-
-  static MountHandle new_with_root(DirEntryHandle root, MountFlags flags);
-
-  // A namespace node referring to the root of the mount.
-  NamespaceNode root();
-
-  MountFlags flags();
-
- public:
-  // C++
-  ~Mount();
-
- private:
-  Mount(uint64_t id, MountFlags flags, DirEntryHandle root, FileSystemHandle fs);
-
   DirEntryHandle root_;
-
-#ifdef __clang__
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wunused-private-field"
-#endif
-
-  DECLARE_MUTEX(Mount) mount_flags_lock_;
-  MountFlags flags_ __TA_GUARDED(mount_flags_lock_);
-
-  FileSystemHandle fs_;
+  FileSystemHandle fs;
+  mutable StarnixMutex<MountFlags> flags_;
 
   // A unique identifier for this mount reported in /proc/pid/mountinfo.
-  uint64_t id_;
+  uint64_t id;
 
-  // Lock ordering: mount -> submount
-  DECLARE_MUTEX(Mount) mount_state_lock_;
-  MountState state_ __TA_GUARDED(mount_state_lock_);
+  /// A count of the number of active clients.
+  // active_client_counter: MountClientMarker,
+
+  mutable RwLock<MountState> state;
   // Mount used to contain a Weak<Namespace>. It no longer does because since the mount point
   // hash was moved from Namespace to Mount, nothing actually uses it. Now that
   // Namespace::clone_namespace() is implemented in terms of Mount::clone_mount_recursive, it
@@ -120,9 +106,29 @@ class Mount : public fbl::RefCounted<Mount> {
   // Mountpoint or Namespace, maybe called "parent", and then traverse up to the top of the tree
   // if you need to find a Mount's Namespace.
 
-#ifdef __clang__
-#pragma clang diagnostic pop
-#endif
+ public:
+  /// impl Mount
+  static MountHandle New(WhatToMount what, MountFlags flags);
+
+  static MountHandle new_with_root(DirEntryHandle root, MountFlags flags);
+
+  /// A namespace node referring to the root of the mount.
+  NamespaceNode root();
+
+  /// Returns true if there is a submount on top of `dir_entry`.
+  // has_submount
+
+  /// The NamespaceNode on which this Mount is mounted.
+  ktl::optional<NamespaceNode> mountpoint() const;
+
+  MountFlags flags() const;
+
+ public:
+  // C++
+  ~Mount();
+
+ private:
+  Mount(uint64_t id, MountFlags flags, DirEntryHandle root, FileSystemHandle fs);
 };
 
 }  // namespace starnix

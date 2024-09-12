@@ -47,12 +47,17 @@ fit::result<Errno> MountInfo::check_readonly_filesystem() {
   return fit::ok();
 }
 
+ktl::optional<MountHandle> MountInfo::operator*() const { return handle; }
+
 NamespaceNode Mount::root() { return {{fbl::RefPtr<Mount>(this)}, root_}; }
 
-MountFlags Mount::flags() {
-  Guard<Mutex> lock(&mount_flags_lock_);
-  return flags_;
+ktl::optional<NamespaceNode> Mount::mountpoint() const {
+  auto _state = state.Read();
+  auto &[mount, entry] = _state->mountpoint.value();
+  return NamespaceNode::New(mount.Lock(), entry);
 }
+
+MountFlags Mount::flags() const { return *flags_.Lock(); }
 
 MountHandle Mount::New(WhatToMount what, MountFlags flags) {
   switch (what.type) {
@@ -79,8 +84,8 @@ MountHandle Mount::new_with_root(DirEntryHandle root, MountFlags flags) {
   return handle;
 }
 
-Mount::Mount(uint64_t id, MountFlags flags, DirEntryHandle root, FileSystemHandle fs)
-    : root_(ktl::move(root)), flags_(flags), fs_(ktl::move(fs)), id_(id) {}
+Mount::Mount(uint64_t _id, MountFlags flags, DirEntryHandle root, FileSystemHandle fs)
+    : root_(ktl::move(root)), fs(ktl::move(fs)), flags_(ktl::move(flags)), id(_id) {}
 
 Mount::~Mount() = default;
 
