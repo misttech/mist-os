@@ -131,12 +131,12 @@ mod tests {
     use crate::file;
     use assert_matches::assert_matches;
     use fidl::endpoints;
+    use fuchsia_async as fasync;
     use futures::future::poll_fn;
     use futures::io::AsyncReadExt as _;
     use futures::{join, StreamExt as _, TryStreamExt as _};
     use std::convert::TryFrom as _;
     use tempfile::TempDir;
-    use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
     #[fasync::run_singlethreaded(test)]
     async fn exclusive_ownership() {
@@ -151,7 +151,8 @@ mod tests {
         let path =
             dir.path().join("read_to_end_with_expected_contents").to_str().unwrap().to_owned();
         let () = file::write_in_namespace(&path, expected_contents).await.unwrap();
-        let file = file::open_in_namespace(&path, fio::Flags::PERM_READ).unwrap();
+        let file =
+            file::open_in_namespace_deprecated(&path, fio::OpenFlags::RIGHT_READABLE).unwrap();
 
         let mut reader = AsyncReader::from_proxy(file).unwrap();
         let mut actual_contents = vec![];

@@ -28,14 +28,15 @@ pub fn canonicalize_path(path: &str) -> &str {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use fidl::endpoints::ServerEnd;
     use std::fs;
     use std::path::Path;
     use tempfile::TempDir;
     use vfs::directory::entry_container::Directory;
     use vfs::execution_scope::ExecutionScope;
     use vfs::file::vmo::read_only;
+    use vfs::pseudo_directory;
     use vfs::remote::remote_dir;
-    use vfs::{pseudo_directory, ObjectRequest};
     use {fuchsia_async as fasync, fuchsia_zircon_status as zx_status};
 
     #[fasync::run_singlethreaded(test)]
@@ -44,13 +45,14 @@ mod tests {
         let data = "abc".repeat(10000);
         fs::write(tempdir.path().join("myfile"), &data).expect("failed writing file");
 
-        let dir = crate::directory::open_in_namespace(
+        let dir = crate::directory::open_in_namespace_deprecated(
             tempdir.path().to_str().unwrap(),
-            fio::Flags::from_bits(fio::R_STAR_DIR.bits()).unwrap(),
+            OpenFlags::RIGHT_READABLE,
         )
         .expect("could not open tmp dir");
-        let file = directory::open_file_async(&dir, "myfile", fio::Flags::PERM_READ)
-            .expect("could not open file");
+        let file =
+            directory::open_file_no_describe_deprecated(&dir, "myfile", OpenFlags::RIGHT_READABLE)
+                .expect("could not open file");
         let contents = file::read_to_string(&file).await.expect("could not read file");
         assert_eq!(&contents, &data, "File contents did not match");
     }
@@ -59,19 +61,19 @@ mod tests {
     async fn open_and_write_file_test() {
         // Create temp dir for test.
         let tempdir = TempDir::new().expect("failed to create tmp dir");
-        let dir = crate::directory::open_in_namespace(
+        let dir = crate::directory::open_in_namespace_deprecated(
             tempdir.path().to_str().unwrap(),
-            fio::Flags::from_bits(fio::RW_STAR_DIR.bits()).unwrap(),
+            OpenFlags::RIGHT_READABLE | OpenFlags::RIGHT_WRITABLE,
         )
         .expect("could not open tmp dir");
 
         // Write contents.
         let file_name = Path::new("myfile");
         let data = "abc".repeat(10000);
-        let file = directory::open_file_async(
+        let file = directory::open_file_no_describe_deprecated(
             &dir,
             file_name.to_str().unwrap(),
-            fio::Flags::FLAG_MAYBE_CREATE | fio::Flags::PERM_WRITE,
+            OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::CREATE,
         )
         .expect("could not open file");
         file::write(&file, &data).await.expect("could not write file");
@@ -97,9 +99,9 @@ mod tests {
         let tempdir = TempDir::new().expect("failed to create tmp dir");
         std::fs::write(tempdir.path().join("read_write"), "rw/read_write")
             .expect("failed to write file");
-        let dir = crate::directory::open_in_namespace(
+        let dir = crate::directory::open_in_namespace_deprecated(
             tempdir.path().to_str().unwrap(),
-            fio::Flags::from_bits(fio::RW_STAR_DIR.bits()).unwrap(),
+            OpenFlags::RIGHT_READABLE | OpenFlags::RIGHT_WRITABLE,
         )
         .expect("could not open tmp dir");
         let example_dir = pseudo_directory! {
@@ -111,27 +113,24 @@ mod tests {
         let (example_dir_proxy, example_dir_service) =
             fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
         let scope = ExecutionScope::new();
-        let example_dir_flags = fio::Flags::PROTOCOL_DIRECTORY
-            | fio::Flags::from_bits(fio::RW_STAR_DIR.bits()).unwrap();
-        ObjectRequest::new3(
-            example_dir_flags,
-            &fio::Options::default(),
-            example_dir_service.into(),
-        )
-        .handle(|request| {
-            example_dir.open3(scope, vfs::path::Path::dot(), example_dir_flags, request)
-        });
+        example_dir.open(
+            scope,
+            OpenFlags::RIGHT_READABLE | OpenFlags::RIGHT_WRITABLE | OpenFlags::DIRECTORY,
+            vfs::path::Path::dot(),
+            ServerEnd::new(example_dir_service.into_channel()),
+        );
 
         for (file_name, flags, should_succeed) in vec![
-            ("ro/read_only", fio::Flags::PERM_READ, true),
-            ("ro/read_only", fio::Flags::PERM_READ | fio::Flags::PERM_WRITE, false),
-            ("ro/read_only", fio::Flags::PERM_WRITE, false),
-            ("rw/read_write", fio::Flags::PERM_READ, true),
-            ("rw/read_write", fio::Flags::PERM_READ | fio::Flags::PERM_WRITE, true),
-            ("rw/read_write", fio::Flags::PERM_WRITE, true),
+            ("ro/read_only", OpenFlags::RIGHT_READABLE, true),
+            ("ro/read_only", OpenFlags::RIGHT_READABLE | OpenFlags::RIGHT_WRITABLE, false),
+            ("ro/read_only", OpenFlags::RIGHT_WRITABLE, false),
+            ("rw/read_write", OpenFlags::RIGHT_READABLE, true),
+            ("rw/read_write", OpenFlags::RIGHT_READABLE | OpenFlags::RIGHT_WRITABLE, true),
+            ("rw/read_write", OpenFlags::RIGHT_WRITABLE, true),
         ] {
             let file_proxy =
-                directory::open_file_async(&example_dir_proxy, file_name, flags).unwrap();
+                directory::open_file_no_describe_deprecated(&example_dir_proxy, file_name, flags)
+                    .unwrap();
             match (should_succeed, file_proxy.query().await) {
                 (true, Ok(_)) => (),
                 (false, Err(_)) => continue,
@@ -142,13 +141,13 @@ mod tests {
                     panic!("successfully opened when expected failure, could describe: {:?}", d)
                 }
             }
-            if flags.intersects(fio::Flags::PERM_READ) {
+            if flags.intersects(OpenFlags::RIGHT_READABLE) {
                 assert_eq!(
                     file_name,
                     file::read_to_string(&file_proxy).await.expect("failed to read file")
                 );
             }
-            if flags.intersects(fio::Flags::PERM_WRITE) {
+            if flags.intersects(OpenFlags::RIGHT_WRITABLE) {
                 let _: u64 = file_proxy
                     .write(b"write_only")
                     .await

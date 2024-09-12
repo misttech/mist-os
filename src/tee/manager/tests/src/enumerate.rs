@@ -7,7 +7,7 @@
 use anyhow::{Context, Error};
 use fidl_fuchsia_io;
 use fuchsia_component::client::connect_to_protocol_at_path;
-use fuchsia_fs::directory::{open_directory, readdir, DirentKind};
+use fuchsia_fs::directory::{readdir, DirentKind};
 
 #[fuchsia::test]
 async fn enumerate_exposed_tas() -> Result<(), Error> {
