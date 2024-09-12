@@ -52,13 +52,11 @@ FileMode FsContext::set_umask(FileMode umask) const {
   return old_umask;
 }
 
-fbl::RefPtr<FsContext> FsContext::New(FileSystemHandle root) {
-  auto ns = Namespace::New(root);
-  auto root_ = ns->root();
-
+fbl::RefPtr<FsContext> FsContext::New(fbl::RefPtr<Namespace> _namespace) {
+  auto _root = _namespace->root();
   fbl::AllocChecker ac;
-  auto handle =
-      fbl::AdoptRef(new (&ac) FsContext({ns, root_, ktl::move(root_), FileMode::DEFAULT_UMASK}));
+  auto handle = fbl::AdoptRef(
+      new (&ac) FsContext({_namespace, _root, ktl::move(_root), FileMode::DEFAULT_UMASK}));
   ZX_ASSERT(ac.check());
   return handle;
 }

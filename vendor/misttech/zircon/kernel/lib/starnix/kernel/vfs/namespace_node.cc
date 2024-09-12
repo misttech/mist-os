@@ -20,10 +20,10 @@
 #include <lib/mistos/starnix_uapi/open_flags.h>
 #include <trace.h>
 
-#include <optional>
 #include <utility>
 
 #include <fbl/ref_ptr.h>
+#include <ktl/optional.h>
 
 #include "../kernel_priv.h"
 
@@ -35,6 +35,10 @@ namespace starnix {
 
 bool NamespaceNode::operator==(const NamespaceNode& other) const {
   return (mount.handle == other.mount.handle) && (entry == other.entry);
+}
+
+NamespaceNode NamespaceNode::New(MountHandle mount, DirEntryHandle dir_entry) {
+  return NamespaceNode{MountInfo{mount}, dir_entry};
 }
 
 /// Create a namespace node that is not mounted in a namespace.
@@ -255,6 +259,67 @@ NamespaceNode NamespaceNode::enter_mount() const {
     inner = some.value();
   }
   return inner;
+}
+
+NamespaceNode NamespaceNode::escape_mount() const {
+  auto mountpoint_or_self = *this;
+  while (mountpoint_or_self.mountpoint().has_value()) {
+    mountpoint_or_self = mountpoint_or_self.mountpoint().value();
+  }
+  return mountpoint_or_self;
+}
+
+fit::result<Errno, MountHandle> NamespaceNode::mount_if_root() const {
+  if (auto _mount = (*mount); _mount.has_value()) {
+    if (entry == (*_mount)->root_) {
+      return fit::ok(_mount.value());
+    }
+  }
+  return fit::error(errno(EINVAL));
+}
+
+ktl::optional<NamespaceNode> NamespaceNode::mountpoint() const {
+  if (auto _mount = mount_if_root(); _mount.is_ok()) {
+    return _mount->mountpoint();
+  }
+  return ktl::nullopt;
+}
+
+FsString NamespaceNode::path(Task& task) const {
+  return path_from_root(task.fs()->root()).into_path();
+}
+
+FsString NamespaceNode::path_escaping_chroot() const { return path_from_root({}).into_path(); }
+
+PathWithReachability NamespaceNode::path_from_root(ktl::optional<NamespaceNode> root) const {
+  if (auto _mount = (*mount); _mount.has_value()) {
+    return PathWithReachability(Reachable{entry->local_name()});
+  }
+
+  auto path = PathBuilder::New();
+  auto current = escape_mount();
+  if (root.has_value()) {
+    // The current node is expected to intersect with the custom root as we travel up the tree.
+    auto _root = root->escape_mount();
+    while (current != _root) {
+      if (auto parent = current.parent(); parent.has_value()) {
+        path.prepend_element(current.entry->local_name());
+        current = parent->escape_mount();
+      } else {
+        // This node hasn't intersected with the custom root and has reached the namespace root.
+        return PathWithReachability(Unreachable{path.build_absolute()});
+      }
+    }
+  } else {
+    // No custom root, so travel up the tree to the namespace root.
+    auto parent = current.parent();
+    while (parent.has_value()) {
+      path.prepend_element(current.entry->local_name());
+      parent = parent->escape_mount().parent();
+    }
+  }
+
+  return PathWithReachability(Reachable{path.build_absolute()});
 }
 
 fit::result<Errno, SymlinkTarget> NamespaceNode::readlink(const CurrentTask& current_task) const {
