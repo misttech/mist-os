@@ -357,8 +357,6 @@ class Sysmem final : public MemoryAllocator::Owner,
 
   zx::result<fuchsia_sysmem2::Config> GetConfigFromFile();
 
-  inspect::Inspector inspector_;
-
   // We use this dispatcher to serve fuchsia_hardware_sysmem::Sysmem, since that needs to be on a
   // separate dispatcher from loop_.dispatcher() (at least for now).
   async_dispatcher_t* client_dispatcher_ = nullptr;
@@ -367,6 +365,8 @@ class Sysmem final : public MemoryAllocator::Owner,
   // loop_ thread.
   async::Loop loop_;
   thrd_t loop_thrd_{};
+
+  inspect::ComponentInspector inspector_{loop_.dispatcher(), {}};
 
   // Currently located at bootstrap/driver_manager:root/sysmem.
   inspect::Node sysmem_root_;

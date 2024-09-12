@@ -142,6 +142,7 @@ source_set("sysmem_common_srcs") {
     "//sdk/lib/component/outgoing/cpp",
     "//sdk/lib/fidl",
     "//sdk/lib/fit",
+    "//sdk/lib/inspect/component/cpp",
     "//sdk/lib/syslog/cpp",
     "//src/devices/bind/fuchsia.sysmem.heap:fuchsia.sysmem.heap_cpp",
     "//src/lib/memory_barriers",

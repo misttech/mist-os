@@ -1,11 +1,11 @@
 {
     select: {
-        contiguous_allocations_failed: "INSPECT:bootstrap/driver_manager:root/sysmem/heaps/SysmemContiguousPool:allocations_failed",
-        protected_allocations_failed: "INSPECT:bootstrap/driver_manager:root/sysmem/heaps/SysmemAmlogicProtectedPool:allocations_failed",
-        contiguous_allocation_failed_timestamp: "INSPECT:bootstrap/driver_manager:root/sysmem/heaps/SysmemContiguousPool:last_allocation_failed_timestamp_ns",
-        protected_allocation_failed_timestamp: "INSPECT:bootstrap/driver_manager:root/sysmem/heaps/SysmemAmlogicProtectedPool:last_allocation_failed_timestamp_ns",
-        contiguous_guard_region_checks_failed: "INSPECT:bootstrap/driver_manager:root/sysmem/heaps/SysmemContiguousPool:failed_guard_region_checks",
-        contiguous_guard_region_check_failed_timestamp: "INSPECT:bootstrap/driver_manager:root/sysmem/heaps/SysmemContiguousPool:last_failed_guard_region_check_timestamp_ns",
+        contiguous_allocations_failed: "INSPECT:bootstrap/sysmem:root/sysmem/heaps/SysmemContiguousPool:allocations_failed",
+        protected_allocations_failed: "INSPECT:bootstrap/sysmem:root/sysmem/heaps/SysmemAmlogicProtectedPool:allocations_failed",
+        contiguous_allocation_failed_timestamp: "INSPECT:bootstrap/sysmem:root/sysmem/heaps/SysmemContiguousPool:last_allocation_failed_timestamp_ns",
+        protected_allocation_failed_timestamp: "INSPECT:bootstrap/sysmem:root/sysmem/heaps/SysmemAmlogicProtectedPool:last_allocation_failed_timestamp_ns",
+        contiguous_guard_region_checks_failed: "INSPECT:bootstrap/sysmem:root/sysmem/heaps/SysmemContiguousPool:failed_guard_region_checks",
+        contiguous_guard_region_check_failed_timestamp: "INSPECT:bootstrap/sysmem:root/sysmem/heaps/SysmemContiguousPool:last_failed_guard_region_check_timestamp_ns",
     },
     eval: {
         // Only report failures in the last 30 minutes, since earlier ones are unlikely to be in the logs

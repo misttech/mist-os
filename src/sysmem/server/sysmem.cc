@@ -467,7 +467,7 @@ zx::result<std::unique_ptr<Sysmem>> Sysmem::Create(async_dispatcher_t* client_di
 zx::result<> Sysmem::Initialize(const CreateArgs& create_args) {
   // Put everything under a node called "sysmem" because there's currently there's not a simple way
   // to distinguish (using a selector) which driver inspect information is coming from.
-  sysmem_root_ = inspector_.GetRoot().CreateChild("sysmem");
+  sysmem_root_ = inspector_.inspector().GetRoot().CreateChild("sysmem");
   heaps_ = sysmem_root_.CreateChild("heaps");
   collections_node_ = sysmem_root_.CreateChild("collections");
 
