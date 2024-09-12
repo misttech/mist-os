@@ -216,7 +216,7 @@ pub async fn fsck_with_options(
     // Excess entries mean we won't be able to reap the journal to free space.
     // Missing entries are OK. Entries only exist if there is data for the store that hasn't been
     // flushed yet.
-    for object_id in super_block_header.journal_file_offsets.keys() {
+    for object_id in object_manager.journal_file_offsets().0.keys() {
         if !journal_checkpoint_ids.contains(object_id) {
             fsck.error(FsckError::UnexpectedJournalFileOffset(*object_id))?;
         }

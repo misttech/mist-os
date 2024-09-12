@@ -27,6 +27,7 @@ use crate::testing::writer::Writer;
 use anyhow::{Context, Error};
 use assert_matches::assert_matches;
 use fidl_fuchsia_io as fio;
+use futures::join;
 use fxfs_crypto::{Crypt, WrappedKeys};
 use fxfs_insecure_crypto::InsecureCrypt;
 use mundane::hash::{Digest, Hasher, Sha256};
@@ -2594,4 +2595,76 @@ async fn test_full_disk() {
     }
 
     test.remount().await.expect_err("Remount succeeded");
+}
+
+#[fuchsia::test]
+async fn test_delete_volume() {
+    let mut test = FsckTest::new().await;
+    {
+        let fs = test.filesystem();
+        let root_volume = root_volume(fs.clone()).await.unwrap();
+        let store = root_volume.new_volume("vol", None).await.unwrap();
+        let root_directory =
+            Directory::open(&store, store.root_directory_object_id()).await.expect("open failed");
+        let mut transaction = fs
+            .clone()
+            .new_transaction(
+                lock_keys![LockKey::object(store.store_object_id(), root_directory.object_id())],
+                Options::default(),
+            )
+            .await
+            .expect("new_transaction failed");
+        root_directory
+            .create_child_file(&mut transaction, "child_file", None)
+            .await
+            .expect("create_child_file failed");
+        transaction.commit().await.expect("commit failed");
+        let fs_clone = fs.clone();
+        // Compact in one task while mutating the new store in another task.  This will ensure that
+        // we write out a superblock which referencs the newly created volume in
+        // journal_file_offsets.
+        join!(
+            async move {
+                fs_clone.journal().compact().await.expect("compact failed");
+            },
+            async move {
+                for i in 0..50 {
+                    let mut transaction = fs
+                        .clone()
+                        .new_transaction(
+                            lock_keys![LockKey::object(
+                                store.store_object_id(),
+                                root_directory.object_id()
+                            )],
+                            Options::default(),
+                        )
+                        .await
+                        .expect("new_transaction failed");
+                    root_directory
+                        .create_child_file(&mut transaction, &format!("child_file_{i}"), None)
+                        .await
+                        .expect("create_child_file failed");
+                    transaction.commit().await.expect("commit failed");
+                }
+            },
+        );
+    };
+    {
+        let fs = test.filesystem();
+        let root_volume = root_volume(fs.clone()).await.unwrap();
+        let transaction = fs
+            .new_transaction(
+                lock_keys![LockKey::object(
+                    root_volume.volume_directory().store().store_object_id(),
+                    root_volume.volume_directory().object_id(),
+                )],
+                Options { borrow_metadata_space: true, ..Default::default() },
+            )
+            .await
+            .expect("new_transaction failed");
+        root_volume.delete_volume("vol", transaction, || {}).await.expect("delete_volume failed");
+    }
+
+    test.remount().await.expect("Remount failed");
+    test.run(TestOptions::default()).await.expect("Fsck should succeed");
 }
