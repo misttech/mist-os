@@ -8,7 +8,8 @@ use fidl_fuchsia_developer_remotecontrol::RemoteControlProxy;
 use fidl_fuchsia_sys2::OpenDirType;
 use std::time::{Duration, Instant};
 
-pub const MONIKER: &str = "core/toolbox";
+pub const LEGACY_MONIKER: &str = "core/toolbox";
+pub const MONIKER: &str = "toolbox";
 
 /// Connects to a protocol available in the namespace of the `toolbox` component.
 /// If we fail to connect to the protocol in the namespace of the `toolbox` component, then we'll
@@ -36,7 +37,30 @@ where
         server_end.into_channel(),
     )
     .await;
+
+    // Fallback to legacy toolbox moniker if toolbox is not available.
+    let (toolbox_res, proxy) = if toolbox_res.is_ok() {
+        (toolbox_res, proxy)
+    } else {
+        let (proxy, server_end) = fidl::endpoints::create_proxy::<P>()?;
+        let toolbox_took = Instant::now() - start_time;
+        let timeout = dur.saturating_sub(toolbox_took);
+        (
+            crate::open_with_timeout_at(
+                timeout,
+                LEGACY_MONIKER,
+                OpenDirType::NamespaceDir,
+                &format!("svc/{protocol_name}"),
+                rcs_proxy,
+                server_end.into_channel(),
+            )
+            .await,
+            proxy,
+        )
+    };
+
     let toolbox_took = Instant::now() - start_time;
+
     // after doing these somewhat awkward lines, we know that toolbox_res is an
     // error and we have to either try the backup or return a useful error
     // message. This just avoids an indentation or having to break this out
@@ -73,7 +97,7 @@ fn toolbox_error_message(protocol_name: &str) -> String {
     format!(
         "\
         Attempted to find protocol marker {protocol_name} at \
-        '/core/toolbox', but it wasn't available. \n\n\
+        '/toolbox', but it wasn't available. \n\n\
         Make sure the target is connected and otherwise functioning, \
         and that it is configured to provide capabilities over the \
         network to host tools.\
@@ -85,7 +109,7 @@ fn backup_error_message(protocol_name: &str, backup_name: &str) -> String {
     format!(
         "\
         Attempted to find protocol marker {protocol_name} at \
-        '/core/toolbox' or '{backup_name}', but it wasn't available \
+        '/toolbox' or '{backup_name}', but it wasn't available \
         at either of those monikers. \n\n\
         Make sure the target is connected and otherwise functioning, \
         and that it is configured to provide capabilities over the \

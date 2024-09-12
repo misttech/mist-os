@@ -30,7 +30,7 @@ similar to the following:
 
 ```none {:.devsite-disable-click-to-copy}
 BUG: An internal command error occurred.
-Error: Attempted to find protocol marker fuchsia.debugger.Launcher at '/core/toolbox' or '/core/debugger', but it wasn't available at either of those monikers.
+Error: Attempted to find protocol marker fuchsia.debugger.Launcher at '/toolbox' or '/core/debugger', but it wasn't available at either of those monikers.
 
 Make sure the target is connected and otherwise functioning, and that it is configured to provide capabilities over the network to host tools.
     1.  This service dependency exists but connecting to it failed with error CapabilityConnectFailed. Moniker: /core/debugger. Capability name: fuchsia.debugger.Launcher

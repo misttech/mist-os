@@ -1,16 +1,9 @@
 // Copyright 2023 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-
-// This manifest is intentionally empty other than the child declaration.
-// The toolbox component exists to parent other components. Software assembly
-// composites the toolbox core shard based on children of the toolbox realm.
 {
-    children: [
-        {
-            name: "toolbox",
-            url: "fuchsia-pkg://fuchsia.com/toolbox#meta/toolbox.cm",
-        },
+    capabilities: [
+        { dictionary: "toolbox" },
     ],
     offer: [
         {
@@ -19,48 +12,41 @@
                 "fuchsia.process.explorer.Query",
             ],
             from: "#process_explorer",
-            to: "#toolbox",
+            to: "self/toolbox",
             availability: "optional",
             source_availability: "unknown",
         },
         {
             protocol: [ "fuchsia.buildinfo.Provider" ],
             from: "#build-info",
-            to: "#toolbox",
+            to: "self/toolbox",
             availability: "optional",
             source_availability: "unknown",
         },
         {
-            protocol: [
-                "fuchsia.diagnostics.host.ArchiveAccessor",
-                "fuchsia.diagnostics.LogSettings",
-            ],
-            from: "parent",
-            to: "#toolbox",
-        },
-        {
             protocol: "fuchsia.feedback.DataProvider",
             from: "#feedback",
-            to: "#toolbox",
-        },
-        {
-            service: "fuchsia.hardware.rtc.Service",
-            from: "parent",
-            to: "#toolbox",
+            to: "self/toolbox",
         },
         {
             protocol: "fuchsia.bluetooth.pandora.GrpcServerController",
             from: "#bt-pandora-server",
-            to: "#toolbox",
+            to: "self/toolbox",
             availability: "optional",
             source_availability: "unknown",
         },
         {
             protocol: "fuchsia.bluetooth.pandora.RootcanalClientController",
             from: "#bt-rootcanal",
-            to: "#toolbox",
+            to: "self/toolbox",
             availability: "optional",
             source_availability: "unknown",
+        },
+    ],
+    expose: [
+        {
+            dictionary: "toolbox",
+            from: "self",
         },
     ],
 }

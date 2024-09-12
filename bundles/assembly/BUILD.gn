@@ -365,6 +365,7 @@ assembly_input_bundle("embeddable_userdebug") {
     # shell
     "//zircon/third_party/uapp/dash:bootfs",
   ]
+  bootfs_packages = [ "//src/developer/toolbox" ]
 }
 
 # The most minimal AIB that is included in userdebug and eng assembled systems
@@ -1461,15 +1462,6 @@ assembly_input_bundle("core_realm_development_access") {
             "//src/developer/sshd-host/meta/sshd-host.core_shard.cml",
             "//src/developer/toolbox/meta/toolbox.core_shard.cml",
           ]
-        },
-      ]
-    },
-    {
-      name = "toolbox"
-      components = [
-        {
-          component_name = "toolbox"
-          shards = [ "//src/developer/toolbox/meta/toolbox.cml" ]
         },
       ]
     },

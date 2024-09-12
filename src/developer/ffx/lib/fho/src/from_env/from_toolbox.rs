@@ -37,12 +37,12 @@ where
     }
 }
 
-/// Uses the `/core/toolbox` to find the given proxy.
+/// Uses the `/toolbox` to find the given proxy.
 pub fn toolbox<P: Proxy>() -> WithToolbox<P> {
     WithToolbox { backup: None, _p: PhantomData::default() }
 }
 
-/// Uses the `/core/toolbox` to find the given proxy, and falls
+/// Uses the `/toolbox` to find the given proxy, and falls
 /// back to the given moniker if not.
 pub fn toolbox_or<P: Proxy>(or_moniker: impl AsRef<str>) -> WithToolbox<P> {
     WithToolbox { backup: Some(or_moniker.as_ref().to_owned()), _p: PhantomData::default() }

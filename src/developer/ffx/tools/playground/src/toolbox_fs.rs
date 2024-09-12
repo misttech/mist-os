@@ -16,8 +16,25 @@ pub async fn toolbox_directory(
 ) -> Result<Arc<impl DirectoryEntry>> {
     let controller =
         rcs::root_lifecycle_controller(remote_proxy, std::time::Duration::from_secs(5)).await?;
-    let moniker = moniker::Moniker::try_from("core/toolbox")?;
-    component_debug::lifecycle::resolve_instance(&controller, &moniker).await?;
+    // Attempt to resolve both the modern and legacy locations concurrently and use the one that
+    // resolves successfully
+    let moniker = moniker::Moniker::try_from("toolbox")?;
+    let legacy_moniker = moniker::Moniker::try_from("core/toolbox")?;
+    let (modern, legacy) = futures::join!(
+        component_debug::lifecycle::resolve_instance(&controller, &moniker),
+        component_debug::lifecycle::resolve_instance(&controller, &legacy_moniker)
+    );
+
+    let moniker = if modern.is_ok() {
+        moniker
+    } else if legacy.is_ok() {
+        legacy_moniker
+    } else {
+        return Err(anyhow::anyhow!(
+            "Unable to resolve toolbox component in either toolbox or core/toolbox"
+        ));
+    };
+
     let dir = component_debug::dirs::open_instance_dir_root_readable(
         &moniker,
         sys2::OpenDirType::NamespaceDir.into(),
