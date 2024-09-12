@@ -236,7 +236,6 @@ impl<'a> VfsWatchMsg<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::OpenFlags;
     use assert_matches::assert_matches;
     use fuchsia_async::{DurationExt, TimeoutExt};
     use fuchsia_zircon::prelude::*;
@@ -273,9 +272,9 @@ mod tests {
         let tmp_dir = tempdir().unwrap();
         let _ = File::create(tmp_dir.path().join("file1")).unwrap();
 
-        let dir = crate::directory::open_in_namespace_deprecated(
+        let dir = crate::directory::open_in_namespace(
             tmp_dir.path().to_str().unwrap(),
-            OpenFlags::RIGHT_READABLE,
+            fio::Flags::from_bits(fio::R_STAR_DIR.bits()).unwrap(),
         )
         .unwrap();
         let mut w = Watcher::new(&dir).await.unwrap();
@@ -296,9 +295,9 @@ mod tests {
     async fn test_add() {
         let tmp_dir = tempdir().unwrap();
 
-        let dir = crate::directory::open_in_namespace_deprecated(
+        let dir = crate::directory::open_in_namespace(
             tmp_dir.path().to_str().unwrap(),
-            OpenFlags::RIGHT_READABLE,
+            fio::Flags::from_bits(fio::R_STAR_DIR.bits()).unwrap(),
         )
         .unwrap();
         let mut w = Watcher::new(&dir).await.unwrap();
@@ -326,9 +325,9 @@ mod tests {
         let filepath = tmp_dir.path().join(filename);
         let _ = File::create(&filepath).unwrap();
 
-        let dir = crate::directory::open_in_namespace_deprecated(
+        let dir = crate::directory::open_in_namespace(
             tmp_dir.path().to_str().unwrap(),
-            OpenFlags::RIGHT_READABLE,
+            fio::Flags::from_bits(fio::R_STAR_DIR.bits()).unwrap(),
         )
         .unwrap();
         let mut w = Watcher::new(&dir).await.unwrap();

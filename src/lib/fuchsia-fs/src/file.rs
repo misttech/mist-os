@@ -453,8 +453,8 @@ pub async fn read_fidl<T: Persistable>(file: &fio::FileProxy) -> Result<T, ReadE
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::directory;
     use crate::node::{take_on_open_event, Kind};
-    use crate::{directory, OpenFlags};
     use assert_matches::assert_matches;
     use fidl_fidl_test_schema::{DataTable1, DataTable2};
     use fuchsia_async as fasync;
@@ -541,15 +541,20 @@ mod tests {
     #[fasync::run_singlethreaded(test)]
     async fn write_writes_to_file() {
         let tempdir = TempDir::new().unwrap();
-        let dir = directory::open_in_namespace_deprecated(
+        let dir = directory::open_in_namespace(
             tempdir.path().to_str().unwrap(),
-            OpenFlags::RIGHT_READABLE | OpenFlags::RIGHT_WRITABLE,
+            fio::Flags::from_bits(fio::RW_STAR_DIR.bits()).unwrap(),
         )
         .unwrap();
 
         // Write contents.
-        let flags = fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::CREATE;
-        let file = directory::open_file_deprecated(&dir, "file", flags).await.unwrap();
+        let file = directory::open_file(
+            &dir,
+            "file",
+            fio::Flags::FLAG_MAYBE_CREATE | fio::Flags::PERM_WRITE,
+        )
+        .await
+        .unwrap();
         let data = b"\x80"; // Non UTF-8 data: a continuation byte as the first byte.
         write(&file, data).await.unwrap();
 
@@ -561,15 +566,20 @@ mod tests {
     #[fasync::run_singlethreaded(test)]
     async fn write_writes_to_file_in_chunks_if_needed() {
         let tempdir = TempDir::new().unwrap();
-        let dir = directory::open_in_namespace_deprecated(
+        let dir = directory::open_in_namespace(
             tempdir.path().to_str().unwrap(),
-            OpenFlags::RIGHT_READABLE | OpenFlags::RIGHT_WRITABLE,
+            fio::Flags::from_bits(fio::RW_STAR_DIR.bits()).unwrap(),
         )
         .unwrap();
 
         // Write contents.
-        let flags = fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::CREATE;
-        let file = directory::open_file_deprecated(&dir, "file", flags).await.unwrap();
+        let file = directory::open_file(
+            &dir,
+            "file",
+            fio::Flags::FLAG_MAYBE_CREATE | fio::Flags::PERM_WRITE,
+        )
+        .await
+        .unwrap();
         let data = "abc".repeat(10000);
         write(&file, &data).await.unwrap();
 
@@ -581,15 +591,20 @@ mod tests {
     #[fasync::run_singlethreaded(test)]
     async fn write_appends_to_file() {
         let tempdir = TempDir::new().unwrap();
-        let dir = directory::open_in_namespace_deprecated(
+        let dir = directory::open_in_namespace(
             tempdir.path().to_str().unwrap(),
-            OpenFlags::RIGHT_READABLE | OpenFlags::RIGHT_WRITABLE,
+            fio::Flags::from_bits(fio::RW_STAR_DIR.bits()).unwrap(),
         )
         .unwrap();
 
         // Create and write to the file.
-        let flags = fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::CREATE;
-        let file = directory::open_file_deprecated(&dir, "file", flags).await.unwrap();
+        let file = directory::open_file(
+            &dir,
+            "file",
+            fio::Flags::FLAG_MAYBE_CREATE | fio::Flags::PERM_WRITE,
+        )
+        .await
+        .unwrap();
         write(&file, "Hello ").await.unwrap();
         write(&file, "World!\n").await.unwrap();
         close(file).await.unwrap();
@@ -663,15 +678,20 @@ mod tests {
     #[fasync::run_singlethreaded(test)]
     async fn write_fidl_writes_to_file() {
         let tempdir = TempDir::new().unwrap();
-        let dir = directory::open_in_namespace_deprecated(
+        let dir = directory::open_in_namespace(
             tempdir.path().to_str().unwrap(),
-            OpenFlags::RIGHT_READABLE | OpenFlags::RIGHT_WRITABLE,
+            fio::Flags::from_bits(fio::RW_STAR_DIR.bits()).unwrap(),
         )
         .unwrap();
 
         // Write contents.
-        let flags = fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::CREATE;
-        let file = directory::open_file_deprecated(&dir, "file", flags).await.unwrap();
+        let file = directory::open_file(
+            &dir,
+            "file",
+            fio::Flags::FLAG_MAYBE_CREATE | fio::Flags::PERM_WRITE,
+        )
+        .await
+        .unwrap();
 
         let mut data = DataTable1 {
             num: Some(42),
