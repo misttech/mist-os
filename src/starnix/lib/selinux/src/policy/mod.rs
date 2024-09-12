@@ -31,9 +31,6 @@ use std::ops::Deref;
 use symbols::{find_class_by_name, find_common_symbol_by_name_bytes};
 use zerocopy::{little_endian as le, ByteSlice, FromBytes, NoCell, Ref, Unaligned};
 
-#[cfg(feature = "selinux_policy_test_api")]
-use crate::ClassPermission as _;
-
 /// Maximum SELinux policy version supported by this implementation.
 pub const SUPPORTED_POLICY_VERSION: u32 = 33;
 
@@ -72,11 +69,6 @@ impl AccessVector {
 
     pub(super) fn from_raw(access_vector: u32) -> Self {
         Self(access_vector)
-    }
-
-    #[cfg(feature = "selinux_policy_test_api")]
-    pub fn into_raw(self) -> u32 {
-        self.0
     }
 }
 
@@ -295,58 +287,6 @@ impl<PS: ParseStrategy> Policy<PS> {
         )
     }
 
-    /// Returns whether the input types are explicitly granted `permission` via an `allow [...];`
-    /// policy statement.
-    ///
-    /// # Panics
-    /// If supplied with type Ids not previously obtained from the `Policy` itself; validation
-    /// ensures that all such Ids have corresponding definitions.
-    #[cfg(feature = "selinux_policy_test_api")]
-    pub fn is_explicitly_allowed(
-        &self,
-        source_type: TypeId,
-        target_type: TypeId,
-        permission: sc::Permission,
-    ) -> Result<bool, QueryError> {
-        let object_class = permission.class();
-        if let (Some(target_class), Some(permission)) =
-            (self.0.class(&object_class), self.0.permission(&permission))
-        {
-            self.0.parsed_policy().class_permission_is_explicitly_allowed(
-                source_type,
-                target_type,
-                target_class,
-                permission,
-            )
-        } else {
-            Ok(false)
-        }
-    }
-
-    /// Returns whether the input types are explicitly granted the permission named
-    /// `permission_name` via an `allow [...];` policy statement, or an error if looking up the
-    /// input types fails. This is the "custom" form of this API because `permission_name` is
-    /// associated with a [`crate::AbstractPermission::Custom::permission`] value.
-    ///
-    /// # Panics
-    /// If supplied with type Ids not previously obtained from the `Policy` itself; validation
-    /// ensures that all such Ids have corresponding definitions.
-    #[cfg(feature = "selinux_policy_test_api")]
-    pub fn is_explicitly_allowed_custom(
-        &self,
-        source_type: TypeId,
-        target_type: TypeId,
-        target_class_name: &str,
-        permission_name: &str,
-    ) -> Result<bool, QueryError> {
-        self.0.parsed_policy().is_explicitly_allowed_custom(
-            source_type,
-            target_type,
-            target_class_name,
-            permission_name,
-        )
-    }
-
     /// Computes the access vector that associates type `source_type_name` and `target_type_name`
     /// via an explicit `allow [...];` statement in the binary policy. Computes `AccessVector::NONE`
     /// if no such statement exists.
@@ -388,25 +328,6 @@ impl<PS: ParseStrategy> Policy<PS> {
     pub fn is_bounded_by(&self, bounded_type: TypeId, parent_type: TypeId) -> bool {
         let type_ = self.0.parsed_policy().type_(bounded_type);
         type_.bounded_by() == Some(parent_type)
-    }
-
-    #[cfg(feature = "selinux_policy_test_api")]
-    pub fn print_permissions(&self) {
-        let parsed_policy = self.0.parsed_policy();
-        for class in parsed_policy.classes().into_iter() {
-            println!("{}", std::str::from_utf8(class.name_bytes()).expect("class name"));
-            for permission in class.permissions().into_iter() {
-                println!(
-                    "    {}",
-                    std::str::from_utf8(permission.name_bytes()).expect("permission name")
-                );
-            }
-        }
-    }
-
-    #[cfg(feature = "selinux_policy_test_api")]
-    pub fn type_id_by_name(&self, name: &str) -> TypeId {
-        self.0.parsed_policy().type_id_by_name(name)
     }
 }
 
@@ -458,11 +379,6 @@ impl<PS: ParseStrategy> Unvalidated<PS> {
         Validate::validate(&self.0).context("validating parsed policy")?;
         let index = PolicyIndex::new(self.0).context("building index")?;
         Ok(Policy(index))
-    }
-
-    #[cfg(feature = "selinux_policy_test_api")]
-    pub fn parsed_policy(&self) -> &ParsedPolicy<PS> {
-        &self.0
     }
 }
 
@@ -831,94 +747,564 @@ impl<PS: ParseStrategy, T: Parse<PS>> ParseSlice<PS> for Vec<T> {
     }
 }
 
-pub mod testing {
-    use super::AccessVector;
+#[cfg(test)]
+pub(super) mod testing {
+    use crate::policy::error::ValidateError;
+    use crate::policy::{AccessVector, ParseError};
 
     pub const ACCESS_VECTOR_0001: AccessVector = AccessVector(0b0001u32);
     pub const ACCESS_VECTOR_0010: AccessVector = AccessVector(0b0010u32);
-    pub const ACCESS_VECTOR_0100: AccessVector = AccessVector(0b0100u32);
-    pub const ACCESS_VECTOR_1000: AccessVector = AccessVector(0b1000u32);
-}
-
-#[cfg(test)]
-pub(super) mod test {
-    use super::*;
-
-    use super::error::ValidateError;
 
     /// Downcasts an [`anyhow::Error`] to a [`ParseError`] for structured error comparison in tests.
-    pub fn as_parse_error(error: anyhow::Error) -> ParseError {
+    pub(super) fn as_parse_error(error: anyhow::Error) -> ParseError {
         error.downcast::<ParseError>().expect("parse error")
     }
 
     /// Downcasts an [`anyhow::Error`] to a [`ParseError`] for structured error comparison in tests.
-    pub fn as_validate_error(error: anyhow::Error) -> ValidateError {
+    pub(super) fn as_validate_error(error: anyhow::Error) -> ValidateError {
         error.downcast::<ValidateError>().expect("validate error")
     }
+}
 
-    macro_rules! parse_test {
-        ($parse_output:ident, $data:expr, $result:tt, $check_impl:block) => {{
-            let data = $data;
-            fn check_by_ref<'a>(
-                $result: Result<
-                    ($parse_output<ByRef<&'a [u8]>>, ByRef<&'a [u8]>),
-                    <$parse_output<ByRef<&'a [u8]>> as crate::policy::Parse<ByRef<&'a [u8]>>>::Error,
-                >,
-            ) {
-                $check_impl;
-            }
+#[cfg(test)]
+pub(super) mod tests {
+    use super::*;
 
-            fn check_by_value(
-                $result: Result<
-                    ($parse_output<ByValue<Vec<u8>>>, ByValue<Vec<u8>>),
-                    <$parse_output<ByValue<Vec<u8>>> as crate::policy::Parse<ByValue<Vec<u8>>>>::Error,
-                >,
-            ) -> Option<($parse_output<ByValue<Vec<u8>>>, ByValue<Vec<u8>>)> {
-                $check_impl
-            }
+    use crate::policy::metadata::HandleUnknown;
+    use crate::policy::{parse_policy_by_reference, parse_policy_by_value, SecurityContext};
+    use crate::{
+        ClassPermission as _, FileClass, InitialSid, ObjectClass, Permission, ProcessPermission,
+    };
 
-            let by_ref = ByRef::new(data.as_slice());
-            let by_ref_result = $parse_output::parse(by_ref);
-            check_by_ref(by_ref_result);
-            let by_value_result = $parse_output::<ByValue<Vec<u8>>>::parse(ByValue::new(data));
-            let _ = check_by_value(by_value_result);
-        }};
+    use serde::Deserialize;
+
+    /// Returns whether the input types are explicitly granted `permission` via an `allow [...];`
+    /// policy statement.
+    ///
+    /// # Panics
+    /// If supplied with type Ids not previously obtained from the `Policy` itself; validation
+    /// ensures that all such Ids have corresponding definitions.
+    fn is_explicitly_allowed<PS: ParseStrategy>(
+        policy: &Policy<PS>,
+        source_type: TypeId,
+        target_type: TypeId,
+        permission: sc::Permission,
+    ) -> Result<bool, QueryError> {
+        let object_class = permission.class();
+        if let (Some(target_class), Some(permission)) =
+            (policy.0.class(&object_class), policy.0.permission(&permission))
+        {
+            policy.0.parsed_policy().class_permission_is_explicitly_allowed(
+                source_type,
+                target_type,
+                target_class,
+                permission,
+            )
+        } else {
+            Ok(false)
+        }
     }
 
-    pub(super) use parse_test;
-
-    macro_rules! validate_test {
-        ($parse_output:ident, $data:expr, $result:tt, $check_impl:block) => {{
-            let data = $data;
-            fn check_by_ref<'a>(
-                $result: Result<
-                    (),
-                    <$parse_output<ByRef<&'a [u8]>> as crate::policy::Validate>::Error,
-                >,
-            ) {
-                $check_impl;
-            }
-
-            fn check_by_value(
-                $result: Result<
-                    (),
-                    <$parse_output<ByValue<Vec<u8>>> as crate::policy::Validate>::Error,
-                >,
-            ) {
-                $check_impl
-            }
-
-            let by_ref = ByRef::new(data.as_slice());
-            let (by_ref_parsed, _) =
-                $parse_output::parse(by_ref).expect("successful parse for validate test");
-            let by_ref_result = by_ref_parsed.validate();
-            check_by_ref(by_ref_result);
-            let (by_value_parsed, _) = $parse_output::<ByValue<Vec<u8>>>::parse(ByValue::new(data))
-                .expect("successful parse for validate test");
-            let by_value_result = by_value_parsed.validate();
-            check_by_value(by_value_result);
-        }};
+    fn type_id_by_name<PS: ParseStrategy>(parsed_policy: &ParsedPolicy<PS>, name: &str) -> TypeId {
+        parsed_policy.type_by_name(name).unwrap().id()
     }
 
-    pub(super) use validate_test;
+    #[derive(Debug, Deserialize)]
+    struct Expectations {
+        expected_policy_version: u32,
+        expected_handle_unknown: LocalHandleUnknown,
+    }
+
+    #[derive(Debug, Deserialize, PartialEq)]
+    #[serde(rename_all = "snake_case")]
+    enum LocalHandleUnknown {
+        Deny,
+        Reject,
+        Allow,
+    }
+
+    impl PartialEq<HandleUnknown> for LocalHandleUnknown {
+        fn eq(&self, other: &HandleUnknown) -> bool {
+            match self {
+                LocalHandleUnknown::Deny => *other == HandleUnknown::Deny,
+                LocalHandleUnknown::Reject => *other == HandleUnknown::Reject,
+                LocalHandleUnknown::Allow => *other == HandleUnknown::Allow,
+            }
+        }
+    }
+
+    #[test]
+    fn known_policies() {
+        let policies_and_expectations = [
+            [
+                b"testdata/policies/emulator".to_vec(),
+                include_bytes!("../../testdata/policies/emulator").to_vec(),
+                include_bytes!("../../testdata/expectations/emulator").to_vec(),
+            ],
+            [
+                b"testdata/policies/selinux_testsuite".to_vec(),
+                include_bytes!("../../testdata/policies/selinux_testsuite").to_vec(),
+                include_bytes!("../../testdata/expectations/selinux_testsuite").to_vec(),
+            ],
+        ];
+
+        for [policy_path, policy_bytes, expectations_bytes] in policies_and_expectations {
+            let expectations = serde_json5::from_reader::<Expectations, _>(
+                &mut std::io::Cursor::new(expectations_bytes),
+            )
+            .expect("deserialize expectations");
+
+            // Test parse-by-value.
+
+            let (policy, returned_policy_bytes) =
+                parse_policy_by_value(policy_bytes.clone()).expect("parse policy");
+
+            let policy = policy
+                .validate()
+                .with_context(|| {
+                    format!(
+                        "policy path: {:?}",
+                        std::str::from_utf8(policy_path.as_slice()).unwrap()
+                    )
+                })
+                .expect("validate policy");
+
+            assert_eq!(expectations.expected_policy_version, policy.policy_version());
+            assert_eq!(expectations.expected_handle_unknown, policy.handle_unknown());
+
+            // Returned policy bytes must be identical to input policy bytes.
+            assert_eq!(policy_bytes, returned_policy_bytes);
+
+            // Test parse-by-reference.
+
+            let policy = parse_policy_by_reference(policy_bytes.as_slice()).expect("parse policy");
+            let policy = policy.validate().expect("validate policy");
+
+            assert_eq!(expectations.expected_policy_version, policy.policy_version());
+            assert_eq!(expectations.expected_handle_unknown, policy.handle_unknown());
+        }
+    }
+
+    #[test]
+    fn policy_lookup() {
+        let policy_bytes = include_bytes!("../../testdata/policies/selinux_testsuite");
+        let (policy, _) = parse_policy_by_value(policy_bytes.to_vec()).expect("parse policy");
+        let policy = policy.validate().expect("validate selinux testsuite policy");
+
+        let unconfined_t = type_id_by_name(policy.0.parsed_policy(), "unconfined_t");
+
+        is_explicitly_allowed(
+            &policy,
+            unconfined_t,
+            unconfined_t,
+            Permission::Process(ProcessPermission::Fork),
+        )
+        .expect("check for `allow unconfined_t unconfined_t:process fork;` in policy");
+    }
+
+    #[test]
+    fn initial_contexts() {
+        let policy_bytes = include_bytes!(
+            "../../testdata/micro_policies/multiple_levels_and_categories_policy.pp"
+        );
+        let (policy, _) = parse_policy_by_value(policy_bytes.to_vec()).expect("parse policy");
+        let policy = policy.validate().expect("validate policy");
+
+        let kernel_context = policy.initial_context(InitialSid::Kernel);
+        assert_eq!(
+            policy.serialize_security_context(&kernel_context),
+            b"user0:object_r:type0:s0:c0-s1:c0.c2,c4"
+        )
+    }
+
+    #[test]
+    fn explicit_allow_type_type() {
+        let policy_bytes =
+            include_bytes!("../../testdata/micro_policies/allow_a_t_b_t_class0_perm0_policy.pp");
+        let policy = parse_policy_by_reference(policy_bytes.as_slice()).expect("parse policy");
+        let parsed_policy = &policy.0;
+        Validate::validate(parsed_policy).expect("validate policy");
+
+        let a_t = type_id_by_name(parsed_policy, "a_t");
+        let b_t = type_id_by_name(parsed_policy, "b_t");
+
+        assert!(parsed_policy
+            .is_explicitly_allowed_custom(a_t, b_t, "class0", "perm0")
+            .expect("query well-formed"));
+    }
+
+    #[test]
+    fn no_explicit_allow_type_type() {
+        let policy_bytes =
+            include_bytes!("../../testdata/micro_policies/no_allow_a_t_b_t_class0_perm0_policy.pp");
+        let policy = parse_policy_by_reference(policy_bytes.as_slice()).expect("parse policy");
+        let parsed_policy = &policy.0;
+        Validate::validate(parsed_policy).expect("validate policy");
+
+        let a_t = type_id_by_name(parsed_policy, "a_t");
+        let b_t = type_id_by_name(parsed_policy, "b_t");
+
+        assert!(!parsed_policy
+            .is_explicitly_allowed_custom(a_t, b_t, "class0", "perm0")
+            .expect("query well-formed"));
+    }
+
+    #[test]
+    fn explicit_allow_type_attr() {
+        let policy_bytes =
+            include_bytes!("../../testdata/micro_policies/allow_a_t_b_attr_class0_perm0_policy.pp");
+        let policy = parse_policy_by_reference(policy_bytes.as_slice()).expect("parse policy");
+        let parsed_policy = &policy.0;
+        Validate::validate(parsed_policy).expect("validate policy");
+
+        let a_t = type_id_by_name(parsed_policy, "a_t");
+        let b_t = type_id_by_name(parsed_policy, "b_t");
+
+        assert!(parsed_policy
+            .is_explicitly_allowed_custom(a_t, b_t, "class0", "perm0")
+            .expect("query well-formed"));
+    }
+
+    #[test]
+    fn no_explicit_allow_type_attr() {
+        let policy_bytes = include_bytes!(
+            "../../testdata/micro_policies/no_allow_a_t_b_attr_class0_perm0_policy.pp"
+        );
+        let policy = parse_policy_by_reference(policy_bytes.as_slice()).expect("parse policy");
+        let parsed_policy = &policy.0;
+        Validate::validate(parsed_policy).expect("validate policy");
+
+        let a_t = type_id_by_name(parsed_policy, "a_t");
+        let b_t = type_id_by_name(parsed_policy, "b_t");
+
+        assert!(!parsed_policy
+            .is_explicitly_allowed_custom(a_t, b_t, "class0", "perm0")
+            .expect("query well-formed"));
+    }
+
+    #[test]
+    fn explicit_allow_attr_attr() {
+        let policy_bytes = include_bytes!(
+            "../../testdata/micro_policies/allow_a_attr_b_attr_class0_perm0_policy.pp"
+        );
+        let policy = parse_policy_by_reference(policy_bytes.as_slice()).expect("parse policy");
+        let parsed_policy = &policy.0;
+        Validate::validate(parsed_policy).expect("validate policy");
+
+        let a_t = type_id_by_name(parsed_policy, "a_t");
+        let b_t = type_id_by_name(parsed_policy, "b_t");
+
+        assert!(parsed_policy
+            .is_explicitly_allowed_custom(a_t, b_t, "class0", "perm0")
+            .expect("query well-formed"));
+    }
+
+    #[test]
+    fn no_explicit_allow_attr_attr() {
+        let policy_bytes = include_bytes!(
+            "../../testdata/micro_policies/no_allow_a_attr_b_attr_class0_perm0_policy.pp"
+        );
+        let policy = parse_policy_by_reference(policy_bytes.as_slice()).expect("parse policy");
+        let parsed_policy = &policy.0;
+        Validate::validate(parsed_policy).expect("validate policy");
+
+        let a_t = type_id_by_name(parsed_policy, "a_t");
+        let b_t = type_id_by_name(parsed_policy, "b_t");
+
+        assert!(!parsed_policy
+            .is_explicitly_allowed_custom(a_t, b_t, "class0", "perm0")
+            .expect("query well-formed"));
+    }
+
+    #[test]
+    fn compute_explicitly_allowed_multiple_attributes() {
+        let policy_bytes = include_bytes!("../../testdata/micro_policies/allow_a_t_a1_attr_class0_perm0_a2_attr_class0_perm1_policy.pp");
+        let policy = parse_policy_by_reference(policy_bytes.as_slice()).expect("parse policy");
+        let parsed_policy = &policy.0;
+        Validate::validate(parsed_policy).expect("validate policy");
+
+        let a_t = type_id_by_name(parsed_policy, "a_t");
+
+        let raw_access_vector = parsed_policy
+            .compute_explicitly_allowed_custom(a_t, a_t, "class0")
+            .expect("well-formed query")
+            .0;
+
+        // Two separate attributes are each allowed one permission on `[attr] self:class0`. Both
+        // attributes are associated with "a_t". No other `allow` statements appear in the policy
+        // in relation to "a_t". Therefore, we expect exactly two 1's in the access vector for
+        // query `("a_t", "a_t", "class0")`.
+        assert_eq!(2, raw_access_vector.count_ones());
+    }
+
+    #[test]
+    fn new_file_security_context_minimal() {
+        let policy_bytes =
+            include_bytes!("../../testdata/composite_policies/compiled/minimal_policy.pp");
+        let policy = parse_policy_by_reference(policy_bytes.as_slice())
+            .expect("parse policy")
+            .validate()
+            .expect("validate policy");
+        let source = policy
+            .parse_security_context(b"source_u:source_r:source_t:s0:c0-s2:c0.c1".into())
+            .expect("valid source security context");
+        let target = policy
+            .parse_security_context(b"target_u:target_r:target_t:s1:c1".into())
+            .expect("valid target security context");
+
+        let actual = policy
+            .new_file_security_context(&source, &target, &FileClass::File)
+            .expect("compute new context for new file");
+        let expected: SecurityContext = policy
+            .parse_security_context(b"source_u:object_r:target_t:s0:c0".into())
+            .expect("valid expected security context");
+
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn new_security_context_minimal() {
+        let policy_bytes =
+            include_bytes!("../../testdata/composite_policies/compiled/minimal_policy.pp");
+        let policy = parse_policy_by_reference(policy_bytes.as_slice())
+            .expect("parse policy")
+            .validate()
+            .expect("validate policy");
+        let source = policy
+            .parse_security_context(b"source_u:source_r:source_t:s0:c0-s2:c0.c1".into())
+            .expect("valid source security context");
+        let target = policy
+            .parse_security_context(b"target_u:target_r:target_t:s1:c1".into())
+            .expect("valid target security context");
+
+        let actual = policy
+            .new_security_context(&source, &target, &ObjectClass::Process)
+            .expect("compute new context for new file");
+
+        assert_eq!(source, actual);
+    }
+
+    #[test]
+    fn new_file_security_context_class_defaults() {
+        let policy_bytes =
+            include_bytes!("../../testdata/composite_policies/compiled/class_defaults_policy.pp");
+        let policy = parse_policy_by_reference(policy_bytes.as_slice())
+            .expect("parse policy")
+            .validate()
+            .expect("validate policy");
+        let source = policy
+            .parse_security_context(b"source_u:source_r:source_t:s0:c0-s2:c0.c1".into())
+            .expect("valid source security context");
+        let target = policy
+            .parse_security_context(b"target_u:target_r:target_t:s1:c0-s1:c0.c1".into())
+            .expect("valid target security context");
+
+        let actual = policy
+            .new_file_security_context(&source, &target, &FileClass::File)
+            .expect("compute new context for new file");
+        let expected: SecurityContext = policy
+            .parse_security_context(b"target_u:source_r:source_t:s1:c0-s1:c0.c1".into())
+            .expect("valid expected security context");
+
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn new_security_context_class_defaults() {
+        let policy_bytes =
+            include_bytes!("../../testdata/composite_policies/compiled/class_defaults_policy.pp");
+        let policy = parse_policy_by_reference(policy_bytes.as_slice())
+            .expect("parse policy")
+            .validate()
+            .expect("validate policy");
+        let source = policy
+            .parse_security_context(b"source_u:source_r:source_t:s0:c0-s2:c0.c1".into())
+            .expect("valid source security context");
+        let target = policy
+            .parse_security_context(b"target_u:target_r:target_t:s1:c0-s1:c0.c1".into())
+            .expect("valid target security context");
+
+        let actual = policy
+            .new_security_context(&source, &target, &ObjectClass::Process)
+            .expect("compute new context for new file");
+        let expected: SecurityContext = policy
+            .parse_security_context(b"target_u:source_r:source_t:s1:c0-s1:c0.c1".into())
+            .expect("valid expected security context");
+
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn new_file_security_context_role_transition() {
+        let policy_bytes =
+            include_bytes!("../../testdata/composite_policies/compiled/role_transition_policy.pp");
+        let policy = parse_policy_by_reference(policy_bytes.as_slice())
+            .expect("parse policy")
+            .validate()
+            .expect("validate policy");
+        let source = policy
+            .parse_security_context(b"source_u:source_r:source_t:s0:c0-s2:c0.c1".into())
+            .expect("valid source security context");
+        let target = policy
+            .parse_security_context(b"target_u:target_r:target_t:s1:c1".into())
+            .expect("valid target security context");
+
+        let actual = policy
+            .new_file_security_context(&source, &target, &FileClass::File)
+            .expect("compute new context for new file");
+        let expected: SecurityContext = policy
+            .parse_security_context(b"source_u:transition_r:target_t:s0:c0".into())
+            .expect("valid expected security context");
+
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn new_security_context_role_transition() {
+        let policy_bytes =
+            include_bytes!("../../testdata/composite_policies/compiled/role_transition_policy.pp");
+        let policy = parse_policy_by_reference(policy_bytes.as_slice())
+            .expect("parse policy")
+            .validate()
+            .expect("validate policy");
+        let source = policy
+            .parse_security_context(b"source_u:source_r:source_t:s0:c0-s2:c0.c1".into())
+            .expect("valid source security context");
+        let target = policy
+            .parse_security_context(b"target_u:target_r:target_t:s1:c1".into())
+            .expect("valid target security context");
+
+        let actual = policy
+            .new_security_context(&source, &target, &ObjectClass::Process)
+            .expect("compute new context for new file");
+        let expected: SecurityContext = policy
+            .parse_security_context(b"source_u:transition_r:source_t:s0:c0-s2:c0.c1".into())
+            .expect("valid expected security context");
+
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
+    // TODO(http://b/334968228): Determine whether allow-role-transition check belongs in `new_file_security_context()`, or in the calling hooks, or `PermissionCheck::has_permission()`.
+    #[ignore]
+    fn new_file_security_context_role_transition_not_allowed() {
+        let policy_bytes = include_bytes!(
+            "../../testdata/composite_policies/compiled/role_transition_not_allowed_policy.pp"
+        );
+        let policy = parse_policy_by_reference(policy_bytes.as_slice())
+            .expect("parse policy")
+            .validate()
+            .expect("validate policy");
+        let source = policy
+            .parse_security_context(b"source_u:source_r:source_t:s0:c0-s2:c0.c1".into())
+            .expect("valid source security context");
+        let target = policy
+            .parse_security_context(b"target_u:target_r:target_t:s1:c1".into())
+            .expect("valid target security context");
+
+        let actual = policy.new_file_security_context(&source, &target, &FileClass::File);
+
+        // TODO(http://b/334968228): Update expectation once role validation is implemented.
+        assert!(actual.is_err());
+    }
+
+    #[test]
+    fn new_file_security_context_type_transition() {
+        let policy_bytes =
+            include_bytes!("../../testdata/composite_policies/compiled/type_transition_policy.pp");
+        let policy = parse_policy_by_reference(policy_bytes.as_slice())
+            .expect("parse policy")
+            .validate()
+            .expect("validate policy");
+        let source = policy
+            .parse_security_context(b"source_u:source_r:source_t:s0:c0-s2:c0.c1".into())
+            .expect("valid source security context");
+        let target = policy
+            .parse_security_context(b"target_u:target_r:target_t:s1:c1".into())
+            .expect("valid target security context");
+
+        let actual = policy
+            .new_file_security_context(&source, &target, &FileClass::File)
+            .expect("compute new context for new file");
+        let expected: SecurityContext = policy
+            .parse_security_context(b"source_u:object_r:transition_t:s0:c0".into())
+            .expect("valid expected security context");
+
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn new_security_context_type_transition() {
+        let policy_bytes =
+            include_bytes!("../../testdata/composite_policies/compiled/type_transition_policy.pp");
+        let policy = parse_policy_by_reference(policy_bytes.as_slice())
+            .expect("parse policy")
+            .validate()
+            .expect("validate policy");
+        let source = policy
+            .parse_security_context(b"source_u:source_r:source_t:s0:c0-s2:c0.c1".into())
+            .expect("valid source security context");
+        let target = policy
+            .parse_security_context(b"target_u:target_r:target_t:s1:c1".into())
+            .expect("valid target security context");
+
+        let actual = policy
+            .new_security_context(&source, &target, &ObjectClass::Process)
+            .expect("compute new context for new file");
+        let expected: SecurityContext = policy
+            .parse_security_context(b"source_u:source_r:transition_t:s0:c0-s2:c0.c1".into())
+            .expect("valid expected security context");
+
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn new_file_security_context_range_transition() {
+        let policy_bytes =
+            include_bytes!("../../testdata/composite_policies/compiled/range_transition_policy.pp");
+        let policy = parse_policy_by_reference(policy_bytes.as_slice())
+            .expect("parse policy")
+            .validate()
+            .expect("validate policy");
+        let source = policy
+            .parse_security_context(b"source_u:source_r:source_t:s0:c0-s2:c0.c1".into())
+            .expect("valid source security context");
+        let target = policy
+            .parse_security_context(b"target_u:target_r:target_t:s1:c1".into())
+            .expect("valid target security context");
+
+        let actual = policy
+            .new_file_security_context(&source, &target, &FileClass::File)
+            .expect("compute new context for new file");
+        let expected: SecurityContext = policy
+            .parse_security_context(b"source_u:object_r:target_t:s1:c1-s2:c1.c2".into())
+            .expect("valid expected security context");
+
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn new_security_context_range_transition() {
+        let policy_bytes =
+            include_bytes!("../../testdata/composite_policies/compiled/range_transition_policy.pp");
+        let policy = parse_policy_by_reference(policy_bytes.as_slice())
+            .expect("parse policy")
+            .validate()
+            .expect("validate policy");
+        let source = policy
+            .parse_security_context(b"source_u:source_r:source_t:s0:c0-s2:c0.c1".into())
+            .expect("valid source security context");
+        let target = policy
+            .parse_security_context(b"target_u:target_r:target_t:s1:c1".into())
+            .expect("valid target security context");
+
+        let actual = policy
+            .new_security_context(&source, &target, &ObjectClass::Process)
+            .expect("compute new context for new file");
+        let expected: SecurityContext = policy
+            .parse_security_context(b"source_u:source_r:source_t:s1:c1-s2:c1.c2".into())
+            .expect("valid expected security context");
+
+        assert_eq!(expected, actual);
+    }
 }

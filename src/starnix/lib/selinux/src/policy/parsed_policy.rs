@@ -355,16 +355,6 @@ impl<PS: ParseStrategy> ParsedPolicy<PS> {
     pub(super) fn access_vectors(&self) -> &AccessVectors<PS> {
         &self.access_vectors.data
     }
-
-    #[cfg(feature = "selinux_policy_test_api")]
-    pub fn validate(&self) -> Result<(), anyhow::Error> {
-        Validate::validate(self)
-    }
-
-    #[cfg(feature = "selinux_policy_test_api")]
-    pub fn type_id_by_name(&self, name: &str) -> TypeId {
-        self.type_by_name(name).unwrap().id()
-    }
 }
 
 impl<PS: ParseStrategy> ParsedPolicy<PS>

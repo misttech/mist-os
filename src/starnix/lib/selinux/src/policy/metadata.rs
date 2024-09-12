@@ -192,9 +192,43 @@ impl Validate for Counts {
 
 #[cfg(test)]
 mod tests {
-    use super::super::parser::{ByRef, ByValue};
-    use super::super::test::{as_parse_error, as_validate_error, validate_test};
     use super::*;
+
+    use crate::policy::parser::{ByRef, ByValue};
+    use crate::policy::testing::{as_parse_error, as_validate_error};
+
+    macro_rules! validate_test {
+        ($parse_output:ident, $data:expr, $result:tt, $check_impl:block) => {{
+            let data = $data;
+            fn check_by_ref<'a>(
+                $result: Result<
+                    (),
+                    <$parse_output<ByRef<&'a [u8]>> as crate::policy::Validate>::Error,
+                >,
+            ) {
+                $check_impl;
+            }
+
+            fn check_by_value(
+                $result: Result<
+                    (),
+                    <$parse_output<ByValue<Vec<u8>>> as crate::policy::Validate>::Error,
+                >,
+            ) {
+                $check_impl
+            }
+
+            let by_ref = ByRef::new(data.as_slice());
+            let (by_ref_parsed, _) =
+                $parse_output::parse(by_ref).expect("successful parse for validate test");
+            let by_ref_result = by_ref_parsed.validate();
+            check_by_ref(by_ref_result);
+            let (by_value_parsed, _) = $parse_output::<ByValue<Vec<u8>>>::parse(ByValue::new(data))
+                .expect("successful parse for validate test");
+            let by_value_result = by_value_parsed.validate();
+            check_by_value(by_value_result);
+        }};
+    }
 
     // TODO: Run this test over `validate()`.
     #[test]
