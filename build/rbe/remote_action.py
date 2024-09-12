@@ -15,6 +15,7 @@ import argparse
 import difflib
 import errno
 import filecmp
+import functools
 import hashlib
 import multiprocessing
 import os
@@ -606,6 +607,8 @@ def analyze_rbe_logs(
         return
 
     msg(f"Action log: {action_log}")
+    # TODO: refactor to use remote_action.action_log_record, and avoid
+    # re-parsing the same action log.
     rewrapper_info = ReproxyLogEntry.parse_action_log(action_log)
     execution_id = rewrapper_info.execution_id
     action_digest = rewrapper_info.action_digest
@@ -856,6 +859,27 @@ def path_to_download_stub(stub_path: Path) -> DownloadStubInfo | None:
         return None
 
     return DownloadStubInfo.read_from_file(stub_path)
+
+
+def download_file_to_path(
+    downloader: remotetool.RemoteTool,
+    working_dir_abs: Path,
+    path: Path,
+    blob_digest: str,
+    action_digest: str | None = None,
+) -> cl_utils.SubprocessResult:
+    dl_stub_info = DownloadStubInfo(
+        path=path,
+        type="file",
+        blob_digest=blob_digest,
+        action_digest=action_digest or "not-needed",
+        build_id="not-important",
+    )
+    path.parent.mkdir(parents=True, exist_ok=True)
+    return dl_stub_info.download(
+        downloader=downloader,
+        working_dir_abs=working_dir_abs,
+    )
 
 
 def download_from_stub_path(
@@ -1597,10 +1621,14 @@ exec "${{cmd[@]}}"
             return self.local_launch_command
         return self.remote_launch_command
 
+    @functools.cached_property
+    def action_log_record(self) -> ReproxyLogEntry:
+        self.vmsg(f"Reading remote action log from {self._action_log}.")
+        return ReproxyLogEntry.parse_action_log(self._action_log)
+
     def _process_download_stubs(self) -> None:
         """Create download stubs so artifacts can be retrieved later."""
-        self.vmsg(f"Reading remote action log from {self._action_log}.")
-        log_record = ReproxyLogEntry.parse_action_log(self._action_log)
+        log_record = self.action_log_record
 
         # local execution and local race wins don't need download stubs.
         if log_record.completion_status in {
@@ -2070,6 +2098,30 @@ exec "${{cmd[@]}}"
         # No transform was done, tell the caller to compare the originals as-is.
         return False
 
+    def download_output_file(self, path: Path) -> int:
+        """Downloads one of the known output files.
+
+        This can be useful for downloading outputs from failed actions.
+
+        Returns:
+          0 on success, non-zero on any error.
+        """
+        action_log = self.action_log_record
+        blob_digest = action_log.output_file_digests.get(path)
+        if blob_digest:
+            dl_result = download_file_to_path(
+                downloader=self.downloader(),
+                working_dir_abs=self.working_dir,
+                path=path,
+                blob_digest=blob_digest,
+                action_digest=action_log.action_digest,
+            )
+            return dl_result.verbose_returncode(f"download {path}")
+        else:
+            # Not necessarily an error, as some outputs are conditional.
+            self.vmsg("Output {path} not found among remote outputs.")
+            return 0
+
     def local_fsatrace_transform(self, line: str) -> str:
         return line.replace(str(self.exec_root) + os.path.sep, "").replace(
             str(self.build_subdir), "${build_subdir}"
@@ -2203,17 +2255,10 @@ exec "${{cmd[@]}}"
             )
             for local_out, remote_out, result in differences:
                 msg(f"  {local_out} vs. {remote_out}:")
-                if result.stdout:
-                    print("---- stdout ----")
-                    for line in result.stdout:
-                        print(line)
-                if result.stderr:
-                    print("---- stderr ----")
-                    for line in result.stderr:
-                        print(line)
+                diff_status = result.verbose_returncode("diff")
                 if not result.stdout and not result.stderr:
                     print(
-                        f"diff tool exited {result.returncode}, but did not report differences."
+                        f"diff tool exited {diff_status}, but did not report differences."
                     )
                 msg("------------------------------------")
 
@@ -2235,8 +2280,8 @@ exec "${{cmd[@]}}"
 
             # Also compare file access traces, if available.
             if self._fsatrace_path:
-                diff_status = self._compare_fsatraces()
-                for line in diff_status.stdout:
+                fsatrace_diff_status = self._compare_fsatraces()
+                for line in fsatrace_diff_status.stdout:
                     print(line)
 
             self.show_local_remote_command_differences()

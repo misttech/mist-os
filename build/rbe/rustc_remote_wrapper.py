@@ -1005,7 +1005,14 @@ class RustRemoteAction(object):
             return prepare_status
 
         try:
-            return self.remote_action.run_with_main_args(self._main_args)
+            exit_code = self.remote_action.run_with_main_args(self._main_args)
+            # On non-zero exits, we may be interested in certain debug outputs.
+            if exit_code != 0:
+                link_repro = self._rust_action.link_reproducer
+                if link_repro:
+                    self.remote_action.download_output_file(link_repro)
+                    # if there was an error, diagnostics were already printed.
+            return exit_code
 
         finally:
             self._cleanup()
