@@ -420,18 +420,6 @@ func fuchsiaLogChecks() []FailureModeCheck {
 				},
 			},
 		},
-		&stringInLogCheck{
-			// LINT.IfChange(fxfs_write_stall)
-			String: "[fxfs] WARN: Write has been stalled for 30 seconds",
-			// LINT.ThenChange(/src/storage/fxfs/src/store_object_handle.rs:fxfs_write_stall)
-			Type: syslogType,
-		},
-		&stringInLogCheck{
-			// LINT.IfChange(fxfs_read_stall)
-			String: "[fxfs] WARN: Read has been stalled for 30 seconds",
-			// LINT.ThenChange(/src/storage/fxfs/src/store_object_handle.rs:fxfs_read_stall)
-			Type: syslogType,
-		},
 	}
 
 	oopsExceptBlocks := []*logBlock{
