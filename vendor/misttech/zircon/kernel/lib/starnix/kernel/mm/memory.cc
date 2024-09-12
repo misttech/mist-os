@@ -22,6 +22,7 @@
 #include <vm/vm_object.h>
 
 #include "../kernel_priv.h"
+#include "object/handle.h"
 
 #define LOCAL_TRACE STARNIX_KERNEL_GLOBAL_TRACE(2)
 
@@ -125,31 +126,31 @@ zx_status_t vmar_map_common(zx_vm_option_t options, fbl::RefPtr<VmAddressRegionD
 
 namespace starnix {
 
-fbl::RefPtr<MemoryObject> MemoryObject::From(fbl::RefPtr<VmObjectDispatcher> vmo,
-                                             zx_rights_t rights) {
+fbl::RefPtr<MemoryObject> MemoryObject::From(HandleOwner vmo) {
   fbl::AllocChecker ac;
   fbl::RefPtr<MemoryObject> memory =
-      fbl::AdoptRef(new (&ac) MemoryObject(Vmo{.vmo = ktl::move(vmo), .rights = rights}));
+      fbl::AdoptRef(new (&ac) MemoryObject(Vmo{.vmo = ktl::move(vmo)}));
   ASSERT(ac.check());
   return ktl::move(memory);
 }
 
 ktl::optional<fbl::RefPtr<VmObjectDispatcher>> MemoryObject::as_vmo() {
-  return ktl::visit(
-      MemoryObject::overloaded{
-          [](const Vmo& vmo) { return ktl::optional<fbl::RefPtr<VmObjectDispatcher>>(vmo.vmo); },
-          [](const RingBuf&) {
-            return ktl::optional<fbl::RefPtr<VmObjectDispatcher>>(ktl::nullopt);
-          },
-      },
-      variant_);
+  return ktl::visit(MemoryObject::overloaded{
+                        [](const Vmo& vmo) {
+                          return ktl::optional<fbl::RefPtr<VmObjectDispatcher>>(vmo.dispatcher());
+                        },
+                        [](const RingBuf&) {
+                          return ktl::optional<fbl::RefPtr<VmObjectDispatcher>>(ktl::nullopt);
+                        },
+                    },
+                    variant_);
 }
 
 // ktl::optional<fbl::RefPtr<VmObjectDispatcher>> MemoryObject::into_vmo() {}
 
 uint64_t MemoryObject::get_content_size() const {
   return ktl::visit(MemoryObject::overloaded{
-                        [](const Vmo& vmo) { return vmo.vmo->GetContentSize(); },
+                        [](const Vmo& vmo) { return vmo.dispatcher()->GetContentSize(); },
                         [](const RingBuf&) { return 0ul; },
                     },
                     variant_);
@@ -161,7 +162,7 @@ uint64_t MemoryObject::get_size() const {
   return ktl::visit(MemoryObject::overloaded{
                         [](const Vmo& vmo) {
                           uint64_t size;
-                          auto status = vmo.vmo->GetSize(&size);
+                          auto status = vmo.dispatcher()->GetSize(&size);
                           if (status != ZX_OK) {
                             ZX_PANIC("failed to get vmo size %d", status);
                           }
@@ -175,7 +176,7 @@ uint64_t MemoryObject::get_size() const {
 fit::result<zx_status_t> MemoryObject::set_size(uint64_t size) const {
   return ktl::visit(MemoryObject::overloaded{
                         [&](const Vmo& vmo) -> fit::result<zx_status_t> {
-                          auto status = vmo.vmo->SetSize(size);
+                          auto status = vmo.dispatcher()->SetSize(size);
                           if (status != ZX_OK) {
                             return fit::error(status);
                           }
@@ -226,14 +227,14 @@ fit::result<zx_status_t, fbl::RefPtr<MemoryObject>> MemoryObject::create_child(u
             // child vmo. Should the vmo destroyed between creating the child and setting the id in
             // the dispatcher the currently unset user_id may be used to re-attribute a parent.
             // Holding the refptr prevents any destruction from occurring.
-            zx_rights_t in_rights = vmo.rights;
-            if (!vmo.HasRights(ZX_RIGHT_DUPLICATE | ZX_RIGHT_READ)) {
+            zx_rights_t in_rights = vmo.vmo->rights();
+            if (!vmo.vmo->HasRights(ZX_RIGHT_DUPLICATE | ZX_RIGHT_READ)) {
               return fit::error(ZX_ERR_ACCESS_DENIED);
             }
 
             // clone the vmo into a new one
-            status = vmo.vmo->CreateChild(options, offset, size, in_rights & ZX_RIGHT_GET_PROPERTY,
-                                          &child_vmo);
+            status = vmo.dispatcher()->CreateChild(options, offset, size,
+                                                   in_rights & ZX_RIGHT_GET_PROPERTY, &child_vmo);
             if (status != ZX_OK) {
               return fit::error(status);
             }
@@ -258,7 +259,7 @@ fit::result<zx_status_t, fbl::RefPtr<MemoryObject>> MemoryObject::create_child(u
 
             // A reference child shares the same content size manager as the parent.
             if (options & ZX_VMO_CHILD_REFERENCE) {
-              auto result = vmo.vmo->content_size_manager();
+              auto result = vmo.dispatcher()->content_size_manager();
               if (result.is_error()) {
                 return fit::error(result.status_value());
               }
@@ -295,7 +296,7 @@ fit::result<zx_status_t, fbl::RefPtr<MemoryObject>> MemoryObject::create_child(u
             // make sure we're somehow not elevating rights beyond what a new vmo should have
             DEBUG_ASSERT(((default_rights | ZX_RIGHT_EXECUTE) & rights) == rights);
 
-            return fit::ok(MemoryObject::From(kernel_handle.release(), rights));
+            return fit::ok(MemoryObject::From(Handle::Make(ktl::move(kernel_handle), rights)));
           },
           [](const RingBuf&) -> fit::result<zx_status_t, fbl::RefPtr<MemoryObject>> {
             return fit::error(ZX_ERR_NOT_SUPPORTED);
@@ -309,16 +310,11 @@ fit::result<zx_status_t, fbl::RefPtr<MemoryObject>> MemoryObject::duplicate_hand
   return ktl::visit(
       MemoryObject::overloaded{
           [&rights](const Vmo& vmo) -> fit::result<zx_status_t, fbl::RefPtr<MemoryObject>> {
-            if (!vmo.HasRights(ZX_RIGHT_DUPLICATE))
-              return fit::error(ZX_ERR_ACCESS_DENIED);
-
-            if (rights == ZX_RIGHT_SAME_RIGHTS) {
-              rights = vmo.rights;
-            } else if ((vmo.rights & rights) != rights) {
-              return fit::error(ZX_ERR_INVALID_ARGS);
+            auto handle_ownwer = Handle::Dup(vmo.vmo.get(), rights);
+            if (!handle_ownwer) {
+              return fit::error(ZX_ERR_NO_MEMORY);
             }
-
-            return fit::ok(MemoryObject::From(vmo.vmo, rights));
+            return fit::ok(MemoryObject::From(ktl::move(handle_ownwer)));
           },
           [](const RingBuf& buf) -> fit::result<zx_status_t, fbl::RefPtr<MemoryObject>> {
             return fit::error(ZX_ERR_NOT_SUPPORTED);
@@ -339,7 +335,7 @@ fit::result<zx_status_t> MemoryObject::read(ktl::span<uint8_t>& data, uint64_t o
                           }*/
 
                           zx_status_t status =
-                              vmo.vmo->vmo()->Read(data.data(), offset, data.size());
+                              vmo.dispatcher()->vmo()->Read(data.data(), offset, data.size());
                           if (status != ZX_OK) {
                             LTRACEF("error on vmo read %d\n", status);
                             return fit::error(status);
@@ -370,7 +366,7 @@ fit::result<zx_status_t> MemoryObject::write(const ktl::span<const uint8_t>& dat
                                                               offset, data.size(), nullptr);*/
 
                           zx_status_t status =
-                              vmo.vmo->vmo()->Write(data.data(), offset, data.size());
+                              vmo.dispatcher()->vmo()->Write(data.data(), offset, data.size());
                           if (status != ZX_OK) {
                             LTRACEF("error on vmo write %d\n", status);
                             return fit::error(status);
@@ -391,13 +387,13 @@ zx_info_handle_basic_t MemoryObject::basic_info() const {
   return ktl::visit(MemoryObject::overloaded{
                         [](const Vmo& vmo) {
                           return zx_info_handle_basic_t{
-                              .koid = vmo.vmo->get_koid(),
-                              .rights = vmo.rights,
+                              .koid = vmo.dispatcher()->get_koid(),
+                              .rights = vmo.vmo->rights(),
                           };
                         },
                         [](const RingBuf& buf) {
                           return zx_info_handle_basic_t{
-                              .koid = buf.vmo->get_koid(),
+                              .koid = buf.dispatcher()->get_koid(),
                           };
                         },
                     },
@@ -408,10 +404,10 @@ zx_info_vmo_t MemoryObject::info() const {
   zx_rights_t handle_rights;
   return ktl::visit(MemoryObject::overloaded{
                         [&handle_rights](const Vmo& vmo) -> zx_info_vmo_t {
-                          return vmo.vmo->GetVmoInfo(handle_rights);
+                          return vmo.dispatcher()->GetVmoInfo(handle_rights);
                         },
                         [&handle_rights](const RingBuf& buf) -> zx_info_vmo_t {
-                          return buf.vmo->GetVmoInfo(handle_rights);
+                          return buf.dispatcher()->GetVmoInfo(handle_rights);
                         },
                     },
                     variant_);
@@ -421,7 +417,7 @@ void MemoryObject::set_zx_name(const char* name) const {
   ktl::visit(MemoryObject::overloaded{
                  [&name](const Vmo& vmo) {
                    ktl::span<const uint8_t> n{reinterpret_cast<const uint8_t*>(name), strlen(name)};
-                   starnix::set_zx_name(vmo.vmo, n);
+                   starnix::set_zx_name(vmo.dispatcher(), n);
                  },
                  [](const RingBuf&) {},
              },
@@ -432,8 +428,9 @@ fit::result<zx_status_t> MemoryObject::op_range(uint32_t op, uint64_t* offset,
                                                 uint64_t* size) const {
   return ktl::visit(MemoryObject::overloaded{
                         [&](const Vmo& vmo) -> fit::result<zx_status_t> {
-                          zx_status_t status = vmo.vmo->RangeOp(
-                              op, *offset, *size, user_inout_ptr<void>(nullptr), 0, vmo.rights);
+                          zx_status_t status = vmo.dispatcher()->RangeOp(
+                              op, *offset, *size, user_inout_ptr<void>(nullptr), 0,
+                              vmo.vmo->rights());
                           if (status != ZX_OK) {
                             return fit::error(status);
                           }
@@ -447,29 +444,31 @@ fit::result<zx_status_t> MemoryObject::op_range(uint32_t op, uint64_t* offset,
 }
 
 // zx_vmo_replace_as_executable
-fit::result<zx_status_t, fbl::RefPtr<MemoryObject>> MemoryObject::replace_as_executable() const {
-  return ktl::visit(
-      MemoryObject::overloaded{
-          [](const Vmo& vmo) -> fit::result<zx_status_t, fbl::RefPtr<MemoryObject>> {
-            return fit::ok(MemoryObject::From(vmo.vmo, vmo.rights | ZX_RIGHT_EXECUTE));
-          },
-          [](const RingBuf&) -> fit::result<zx_status_t, fbl::RefPtr<MemoryObject>> {
-            return fit::error(ZX_ERR_NOT_SUPPORTED);
-          },
-      },
-      variant_);
+fit::result<zx_status_t, fbl::RefPtr<MemoryObject>> MemoryObject::replace_as_executable() {
+  return ktl::visit(MemoryObject::overloaded{
+                        [&](const Vmo& vmo) -> fit::result<zx_status_t, fbl::RefPtr<MemoryObject>> {
+                          HandleOwner handle = Handle::Make(ktl::move(vmo.dispatcher()),
+                                                            (vmo.vmo->rights() | ZX_RIGHT_EXECUTE));
+                          return fit::ok(MemoryObject::From(ktl::move(handle)));
+                        },
+                        [](const RingBuf&) -> fit::result<zx_status_t, fbl::RefPtr<MemoryObject>> {
+                          return fit::error(ZX_ERR_NOT_SUPPORTED);
+                        },
+                    },
+                    variant_);
 }
 
 // zx_vmar_map
-fit::result<zx_status_t, size_t> MemoryObject::map_in_vmar(Vmar vmar, size_t vmar_offset,
+fit::result<zx_status_t, size_t> MemoryObject::map_in_vmar(const Vmar& vmar, size_t vmar_offset,
                                                            uint64_t* memory_offset, size_t len,
                                                            MappingFlags flags) const {
   return ktl::visit(MemoryObject::overloaded{
                         [&](const Vmo& vmo) -> fit::result<zx_status_t, size_t> {
                           zx_vaddr_t mapped_addr;
-                          auto result = vmar_map_common(flags.bits(), vmar.vmar, vmar_offset,
-                                                        vmar.rights, vmo.vmo->vmo(), *memory_offset,
-                                                        vmo.rights, len, &mapped_addr);
+                          auto result =
+                              vmar_map_common(flags.bits(), vmar.dispatcher(), vmar_offset,
+                                              vmar.vmar->rights(), vmo.dispatcher()->vmo(),
+                                              *memory_offset, vmo.vmo->rights(), len, &mapped_addr);
 
                           if (result != ZX_OK) {
                             return fit::error(result);
