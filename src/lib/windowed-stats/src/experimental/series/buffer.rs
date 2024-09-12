@@ -65,11 +65,13 @@ impl BufferStrategy<u64, Constant> for u64 {
 }
 
 impl BufferStrategy<u64, LastAggregation> for u64 {
-    type Buffer = DeltaZigZagSimple8bRle;
+    // TODO(https://fxbug.dev/352614791): Use DeltaZigZagSimple8bRle ring buffer once implemented
+    type Buffer = Simple8bRle;
 }
 
 impl BufferStrategy<u64, LastSample> for u64 {
-    type Buffer = DeltaZigZagSimple8bRle;
+    // TODO(https://fxbug.dev/352614791): Use DeltaZigZagSimple8bRle ring buffer once implemented
+    type Buffer = Simple8bRle;
 }
 
 /// A fixed-capacity circular ring buffer.
