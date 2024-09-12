@@ -322,8 +322,8 @@ pub fn run_component_features(
 ) -> Result<(), Errno> {
     for entry in entries {
         match entry.as_str() {
-            #[cfg(not(feature = "starnix_lite"))]
             "framebuffer" => {
+                #[cfg(not(feature = "starnix_lite"))]
                 kernel
                     .framebuffer
                     .start_server(kernel, incoming_dir.take())

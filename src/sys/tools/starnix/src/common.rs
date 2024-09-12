@@ -38,9 +38,12 @@ async fn check_entry_exists(dir: &fio::DirectoryProxy, capability_name: &str) ->
         Some(dir_idx) => {
             let dirname = &capability_name[0..dir_idx];
             let basename = &capability_name[dir_idx + 1..];
-            let nested_dir =
-                fuchsia_fs::directory::open_directory(dir, dirname, fio::OpenFlags::RIGHT_READABLE)
-                    .await?;
+            let nested_dir = fuchsia_fs::directory::open_directory_deprecated(
+                dir,
+                dirname,
+                fio::OpenFlags::RIGHT_READABLE,
+            )
+            .await?;
             let entries = fuchsia_fs::directory::readdir(&nested_dir).await?;
             (basename, entries)
         }
