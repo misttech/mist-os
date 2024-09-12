@@ -5,17 +5,19 @@
 #include "examples/power/cpp/wake_lease.h"
 
 #include <fidl/fuchsia.power.system/cpp/fidl.h>
+#include <lib/driver/power/cpp/testing/fake_activity_governor.h>
+#include <lib/driver/power/cpp/testing/fidl_bound_server.h>
 #include <lib/fidl/cpp/client.h>
 #include <lib/fpromise/result.h>
 #include <zircon/types.h>
 
 #include <gtest/gtest.h>
-#include <sdk/lib/driver/power/cpp/testing/fake_activity_governor.h>
 #include <src/lib/testing/loop_fixture/test_loop_fixture.h>
 
 namespace {
 
 using fdf_power::testing::FakeActivityGovernor;
+using fdf_power::testing::FidlBoundServer;
 using fuchsia_power_system::ActivityGovernor;
 using fuchsia_power_system::WakeLeaseToken;
 
@@ -23,7 +25,8 @@ class WakeLeaseTest : public gtest::TestLoopFixture {};
 
 TEST_F(WakeLeaseTest, TakeWakeLeaseThenDropIt) {
   auto endpoints = fidl::CreateEndpoints<ActivityGovernor>().value();
-  FakeActivityGovernor server(test_loop().dispatcher(), std::move(endpoints.server));
+  FidlBoundServer<FakeActivityGovernor> server(
+      test_loop().dispatcher(), std::move(endpoints.server), test_loop().dispatcher());
   ASSERT_FALSE(server.HasActiveWakeLease());
 
   // Create the ActivityGovernor client and use it to take a WakeLease.

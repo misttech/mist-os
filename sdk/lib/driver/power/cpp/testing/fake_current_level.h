@@ -17,12 +17,9 @@ using fuchsia_power_broker::PowerLevel;
 
 class FakeCurrentLevel : public FidlTestBaseDefault<CurrentLevel> {
  public:
-  FakeCurrentLevel(async_dispatcher_t* dispatcher, fidl::ServerEnd<CurrentLevel> server_end,
-                   PowerLevel initial_level)
-      : FidlTestBaseDefault(dispatcher, std::move(server_end)), current_level_(initial_level) {}
+  explicit FakeCurrentLevel(PowerLevel initial_level = 0) : current_level_(initial_level) {}
 
-  // This function can be made const, but then it doesn't work with DispatcherBound::AsyncCall().
-  PowerLevel current_level() { return current_level_; }
+  PowerLevel current_level() const { return current_level_; }
 
  private:
   void Update(UpdateRequest& request, UpdateCompleter::Sync& completer) override {

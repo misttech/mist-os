@@ -11,6 +11,7 @@
 #include <fidl/fuchsia.power.system/cpp/test_base.h>
 #include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
 #include <lib/driver/component/cpp/driver_export.h>
+#include <lib/driver/power/cpp/testing/fake_element_control.h>
 #include <lib/driver/testing/cpp/driver_runtime.h>
 #include <lib/driver/testing/cpp/internal/driver_lifecycle.h>
 #include <lib/driver/testing/cpp/internal/test_environment.h>
@@ -36,6 +37,8 @@
 #include "src/devices/lib/mmio/test-helper.h"
 
 namespace aml_sdmmc {
+
+using fdf_power::testing::FakeElementControl;
 
 class TestAmlSdmmcWithBanjo : public AmlSdmmcWithBanjo {
  public:
@@ -299,16 +302,17 @@ class FakeRequiredLevel : public fidl::Server<fuchsia_power_broker::RequiredLeve
 
 class PowerElement {
  public:
-  explicit PowerElement(fidl::ServerEnd<fuchsia_power_broker::ElementControl> element_control,
-                        fidl::ServerBindingRef<fuchsia_power_broker::Lessor> lessor,
-                        fidl::ServerBindingRef<fuchsia_power_broker::CurrentLevel> current_level,
-                        fidl::ServerBindingRef<fuchsia_power_broker::RequiredLevel> required_level)
+  explicit PowerElement(
+      fidl::ServerBindingRef<fuchsia_power_broker::ElementControl> element_control,
+      fidl::ServerBindingRef<fuchsia_power_broker::Lessor> lessor,
+      fidl::ServerBindingRef<fuchsia_power_broker::CurrentLevel> current_level,
+      fidl::ServerBindingRef<fuchsia_power_broker::RequiredLevel> required_level)
       : element_control_(std::move(element_control)),
         lessor_(std::move(lessor)),
         current_level_(std::move(current_level)),
         required_level_(std::move(required_level)) {}
 
-  fidl::ServerEnd<fuchsia_power_broker::ElementControl> element_control_;
+  fidl::ServerBindingRef<fuchsia_power_broker::ElementControl> element_control_;
   fidl::ServerBindingRef<fuchsia_power_broker::Lessor> lessor_;
   fidl::ServerBindingRef<fuchsia_power_broker::CurrentLevel> current_level_;
   fidl::ServerBindingRef<fuchsia_power_broker::RequiredLevel> required_level_;
@@ -330,8 +334,14 @@ class FakePowerBroker : public fidl::Server<fuchsia_power_broker::Topology> {
     fidl::ServerEnd<fuchsia_power_broker::RequiredLevel>& required_level_server_end =
         req.level_control_channels().value().required();
     fidl::ServerEnd<fuchsia_power_broker::Lessor>& lessor_server_end = req.lessor_channel().value();
-    fidl::ServerEnd<fuchsia_power_broker::ElementControl>& element_control_server_end =
-        req.element_control().value();
+
+    // Instantiate (fake) element control implementation.
+    ASSERT_TRUE(req.element_control().has_value());
+    auto element_control_impl = std::make_unique<FakeElementControl>();
+    fidl::ServerBindingRef<fuchsia_power_broker::ElementControl> element_control_binding =
+        fidl::BindServer<fuchsia_power_broker::ElementControl>(
+            fdf::Dispatcher::GetCurrent()->async_dispatcher(), std::move(*req.element_control()),
+            std::move(element_control_impl));
 
     // Instantiate (fake) lessor implementation.
     auto lessor_impl = std::make_unique<FakeLessor>();
@@ -379,7 +389,7 @@ class FakePowerBroker : public fidl::Server<fuchsia_power_broker::Topology> {
           [&]() { hardware_power_required_level_->required_level_ = AmlSdmmc::kPowerLevelOn; });
     }
 
-    servers_.emplace_back(std::move(element_control_server_end), std::move(lessor_binding),
+    servers_.emplace_back(std::move(element_control_binding), std::move(lessor_binding),
                           std::move(current_level_binding), std::move(required_level_binding));
 
     completer.Reply(fit::success());

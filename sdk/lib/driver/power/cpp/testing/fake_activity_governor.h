@@ -22,8 +22,7 @@ using fuchsia_power_system::WakeLeaseToken;
 
 class FakeActivityGovernor : public FidlTestBaseDefault<ActivityGovernor> {
  public:
-  FakeActivityGovernor(async_dispatcher_t* dispatcher, fidl::ServerEnd<ActivityGovernor> server_end)
-      : FidlTestBaseDefault(dispatcher, std::move(server_end)), dispatcher_(dispatcher) {}
+  explicit FakeActivityGovernor(async_dispatcher_t* dispatcher) : dispatcher_(dispatcher) {}
 
   bool HasActiveWakeLease() const { return !active_wake_leases_.empty(); }
 
@@ -40,10 +39,10 @@ class FakeActivityGovernor : public FidlTestBaseDefault<ActivityGovernor> {
     wait->Begin(dispatcher_, [this, token_handle, wait = std::move(wait)](
                                  async_dispatcher_t*, async::WaitOnce*, zx_status_t status,
                                  const zx_packet_signal_t*) {
-      EXPECT_EQ(status, ZX_OK);
+      ZX_ASSERT(status == ZX_OK);
       auto it = active_wake_leases_.find(token_handle);
-      EXPECT_NE(it, active_wake_leases_.end());
-      EXPECT_EQ(token_handle, it->second.get());
+      ZX_ASSERT(it != active_wake_leases_.end());
+      ZX_ASSERT(token_handle == it->second.get());
       active_wake_leases_.erase(it);
     });
 
@@ -56,9 +55,7 @@ class FakeActivityGovernor : public FidlTestBaseDefault<ActivityGovernor> {
 
 class FakeActivityGovernorListener : public FidlTestBaseDefault<ActivityGovernorListener> {
  public:
-  FakeActivityGovernorListener(async_dispatcher_t* dispatcher,
-                               fidl::ServerEnd<ActivityGovernorListener> server_end)
-      : FidlTestBaseDefault(dispatcher, std::move(server_end)) {}
+  FakeActivityGovernorListener() = default;
 
   bool SuspendStarted() const { return suspend_started_; }
 

@@ -123,6 +123,7 @@ executable("mock-power-broker-bin") {
     "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/driver/component/cpp:cpp",
     "//sdk/lib/driver/logging/cpp:cpp",
+    "//sdk/lib/driver/power/cpp/testing",
     "//sdk/lib/sys/cpp:cpp",
     "//sdk/lib/syslog/cpp:cpp",
   ]

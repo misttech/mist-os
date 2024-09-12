@@ -21,6 +21,7 @@ class ScopedBackgroundLoop {
   }
 
   ~ScopedBackgroundLoop() {
+    loop_.RunUntilIdle();
     loop_.Quit();
     loop_.Shutdown();
     loop_.JoinThreads();

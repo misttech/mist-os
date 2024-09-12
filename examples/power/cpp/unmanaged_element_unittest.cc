@@ -8,23 +8,26 @@
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/async/dispatcher.h>
-#include <lib/async_patterns/cpp/dispatcher_bound.h>
+#include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
+#include <lib/driver/power/cpp/testing/fake_current_level.h>
+#include <lib/driver/power/cpp/testing/fake_topology.h>
+#include <lib/driver/power/cpp/testing/fidl_bound_server.h>
+#include <lib/driver/power/cpp/testing/scoped_background_loop.h>
 #include <lib/fidl/cpp/client.h>
 #include <lib/fidl/cpp/wire/channel.h>
 #include <lib/fpromise/bridge.h>
 
 #include <gtest/gtest.h>
-#include <sdk/lib/driver/power/cpp/testing/fake_current_level.h>
-#include <sdk/lib/driver/power/cpp/testing/fake_topology.h>
-#include <sdk/lib/driver/power/cpp/testing/scoped_background_loop.h>
 #include <src/lib/testing/loop_fixture/real_loop_fixture.h>
 
 namespace {
 
 using examples::power::UnmanagedElement;
-using fdf_power::testing::FakeCurrentLevel;
-using fdf_power::testing::FakeTopology;
+using fdf_power::testing::FidlBoundServer;
 using fdf_power::testing::ScopedBackgroundLoop;
+using FakeCurrentLevel = FidlBoundServer<fdf_power::testing::FakeCurrentLevel>;
+using FakeTopology = FidlBoundServer<fdf_power::testing::FakeTopology>;
+
 using fuchsia_power_broker::BinaryPowerLevel;
 using fuchsia_power_broker::ElementSchema;
 using fuchsia_power_broker::PowerLevel;
@@ -88,32 +91,16 @@ TEST_F(UnmanagedElementTest, SetLevelChangesTopologyCurrentLevel) {
 
   // Create a CurrentLevel server to handle Update requests in the background. DispatcherBound lets
   // us make safe async calls between the foreground (this test) and background dispatchers.
-  async_patterns::DispatcherBound<FakeCurrentLevel> current_level_server(
+  async_patterns::TestDispatcherBound<FakeCurrentLevel> current_level_server(
       background.dispatcher(), std::in_place, async_patterns::PassDispatcher,
       std::move(schema.level_control_channels()->current()), initial_level);
 
   // Check that CurrentLevel is still set to the initial value.
-  executor.schedule_task(
-      current_level_server.AsyncCall(&FakeCurrentLevel::current_level)
-          .promise()
-          .then([quit = QuitLoopClosure(), &initial_level](fpromise::result<PowerLevel>& result) {
-            EXPECT_TRUE(result.is_ok());
-            ASSERT_EQ(result.value(), initial_level);
-            quit();
-          }));
-  RunLoop();
+  ASSERT_EQ(current_level_server.SyncCall(&FakeCurrentLevel::current_level), initial_level);
 
   // Verify CurrentLevel changes after calling SetLevel on the unmanaged element.
   element->SetLevel(kBinaryPowerLevels[1]);
-  executor.schedule_task(
-      current_level_server.AsyncCall(&FakeCurrentLevel::current_level)
-          .promise()
-          .then([quit = QuitLoopClosure()](fpromise::result<PowerLevel>& result) {
-            EXPECT_TRUE(result.is_ok());
-            ASSERT_EQ(result.value(), kBinaryPowerLevels[1]);
-            quit();
-          }));
-  RunLoop();
+  ASSERT_EQ(current_level_server.SyncCall(&FakeCurrentLevel::current_level), kBinaryPowerLevels[1]);
 }
 
 }  // namespace

@@ -6,6 +6,7 @@ group("testing") {
   testonly = true
   public_deps = [
     ":fakes",
+    ":fidl_bound_server",
     ":fidl_test_base_default",
     ":scoped_background_loop",
   ]
@@ -16,6 +17,7 @@ source_set("fakes") {
   public = [
     "fake_activity_governor.h",
     "fake_current_level.h",
+    "fake_element_control.h",
     "fake_topology.h",
   ]
   public_deps = [
@@ -27,13 +29,16 @@ source_set("fakes") {
   ]
 }
 
+source_set("fidl_bound_server") {
+  testonly = true
+  public = [ "fidl_bound_server.h" ]
+  public_deps = [ "//sdk/lib/fidl/hlcpp" ]
+}
+
 source_set("fidl_test_base_default") {
   testonly = true
   public = [ "fidl_test_base_default.h" ]
-  public_deps = [
-    "//sdk/lib/fidl/hlcpp",
-    "//third_party/googletest:gtest",
-  ]
+  public_deps = [ "//sdk/lib/fidl/hlcpp" ]
 }
 
 source_set("scoped_background_loop") {

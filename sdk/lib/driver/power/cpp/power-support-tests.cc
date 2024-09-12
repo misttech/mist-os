@@ -14,12 +14,16 @@
 #include <lib/async/default.h>
 #include <lib/driver/incoming/cpp/namespace.h>
 #include <lib/driver/power/cpp/element-description-builder.h>
+#include <lib/driver/power/cpp/testing/fake_topology.h>
+#include <lib/driver/power/cpp/testing/fidl_bound_server.h>
+#include <lib/driver/power/cpp/testing/scoped_background_loop.h>
 #include <lib/fidl/cpp/client.h>
 #include <lib/fidl/cpp/wire/channel.h>
 #include <lib/fidl/cpp/wire/internal/transport_channel.h>
 #include <lib/fidl/cpp/wire/status.h>
 #include <lib/fidl/cpp/wire/string_view.h>
 #include <lib/fidl/cpp/wire_natural_conversions.h>
+#include <lib/sys/component/cpp/testing/realm_builder.h>
 #include <lib/sys/component/cpp/testing/realm_builder_types.h>
 #include <lib/zx/event.h>
 #include <zircon/errors.h>
@@ -31,9 +35,6 @@
 
 #include <fbl/ref_ptr.h>
 #include <gtest/gtest.h>
-#include <sdk/lib/driver/power/cpp/testing/fake_topology.h>
-#include <sdk/lib/driver/power/cpp/testing/scoped_background_loop.h>
-#include <sdk/lib/sys/component/cpp/testing/realm_builder.h>
 #include <src/lib/testing/loop_fixture/real_loop_fixture.h>
 #include <src/storage/lib/vfs/cpp/pseudo_dir.h>
 #include <src/storage/lib/vfs/cpp/service.h>
@@ -43,7 +44,8 @@
 
 namespace power_lib_test {
 
-using fdf_power::testing::FakeTopology;
+using fdf_power::testing::FidlBoundServer;
+using FakeTopology = FidlBoundServer<fdf_power::testing::FakeTopology>;
 
 class PowerLibTest : public gtest::RealLoopFixture {};
 
