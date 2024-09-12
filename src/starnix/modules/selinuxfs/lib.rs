@@ -233,16 +233,7 @@ impl SeLinuxApiOps for LoadApi {
     fn api_write_permission() -> SecurityPermission {
         SecurityPermission::LoadPolicy
     }
-    fn api_write_with_task(
-        &self,
-        current_task: &CurrentTask,
-        offset: usize,
-        data: Vec<u8>,
-    ) -> Result<(), Errno> {
-        if offset != 0 {
-            return error!(EINVAL);
-        }
-
+    fn api_write_with_task(&self, current_task: &CurrentTask, data: Vec<u8>) -> Result<(), Errno> {
         log_info!("Loading {} byte policy", data.len());
         self.security_server.load_policy(data).map_err(|error| {
             log_error!("Policy load error: {}", error);
@@ -290,14 +281,15 @@ impl SeLinuxApiOps for EnforceApi {
         SecurityPermission::SetEnforce
     }
 
-    fn api_write(&self, _offset: usize, data: Vec<u8>) -> Result<(), Errno> {
+    fn api_write(&self, data: Vec<u8>) -> Result<(), Errno> {
+        // Callers may write any number of times to this API, so long as the `data` is valid.
         let enforce = parse_unsigned_file::<u32>(&data)? != 0;
         self.security_server.set_enforcing(enforce);
         Ok(())
     }
 
-    fn api_read(&self, _offset: usize) -> Result<Cow<'_, [u8]>, Errno> {
-        Ok(format!("{}", self.security_server.is_enforcing() as u32).into_bytes().into())
+    fn api_read(&self) -> Result<Cow<'_, [u8]>, Errno> {
+        Ok(self.security_server.is_enforcing().then_some(b"1").unwrap_or(b"0").into())
     }
 }
 
@@ -351,11 +343,11 @@ impl SeLinuxApiOps for CreateApi {
     fn api_write_permission() -> SecurityPermission {
         SecurityPermission::ComputeCreate
     }
-    fn api_write(&self, _offset: usize, _data: Vec<u8>) -> Result<(), Errno> {
+    fn api_write(&self, _data: Vec<u8>) -> Result<(), Errno> {
         track_stub!(TODO("https://fxbug.dev/361552580"), "selinux create");
         Ok(())
     }
-    fn api_read(&self, _offset: usize) -> Result<Cow<'_, [u8]>, Errno> {
+    fn api_read(&self) -> Result<Cow<'_, [u8]>, Errno> {
         Ok([].as_ref().into())
     }
 }
@@ -373,7 +365,7 @@ impl SeLinuxApiOps for CheckReqProtApi {
         SecurityPermission::SetCheckReqProt
     }
 
-    fn api_write(&self, _offset: usize, data: Vec<u8>) -> Result<(), Errno> {
+    fn api_write(&self, data: Vec<u8>) -> Result<(), Errno> {
         let _checkreqprot = parse_unsigned_file::<u32>(&data)? != 0;
         track_stub!(TODO("https://fxbug.dev/322874766"), "selinux checkreqprot");
         Ok(())
@@ -397,7 +389,7 @@ impl SeLinuxApiOps for ContextApi {
         SecurityPermission::CheckContext
     }
 
-    fn api_write(&self, _offset: usize, data: Vec<u8>) -> Result<(), Errno> {
+    fn api_write(&self, data: Vec<u8>) -> Result<(), Errno> {
         // Validate that the `data` describe valid user, role, type, etc by attempting to create
         // a SID from it.
         // TODO: https://fxbug.dev/362476447 - Provide a validate API that does not allocate a SID.
@@ -449,13 +441,13 @@ impl SeLinuxApiOps for AccessApi {
         SecurityPermission::ComputeAv
     }
 
-    fn api_write(&self, _offset: usize, _data: Vec<u8>) -> Result<(), Errno> {
+    fn api_write(&self, _data: Vec<u8>) -> Result<(), Errno> {
         track_stub!(TODO("https://fxbug.dev/361551536"), "selinux access");
         Ok(())
     }
 
-    fn api_read(&self, _offset: usize) -> Result<Cow<'_, [u8]>, Errno> {
-        // Format is allowed decided auditallow auditdeny seqno flags
+    fn api_read(&self) -> Result<Cow<'_, [u8]>, Errno> {
+        // Format is: allowed decided auditallow auditdeny seqno flags
         // Everything but seqno must be in hexadecimal format and represents a bits field.
         let result = format!("ffffffff ffffffff 0 ffffffff {} 0\n", self.seqno);
         Ok(result.into_bytes().into())
@@ -603,7 +595,7 @@ impl SeLinuxApiOps for CommitBooleansApi {
         SecurityPermission::SetBool
     }
 
-    fn api_write(&self, _offset: usize, data: Vec<u8>) -> Result<(), Errno> {
+    fn api_write(&self, data: Vec<u8>) -> Result<(), Errno> {
         // "commit_pending_booleans" expects a numeric argument, which is
         // interpreted as a boolean, with the pending booleans committed if the
         // value is true (i.e. non-zero).
@@ -735,15 +727,31 @@ impl FsNodeOps for PermsDirectory {
 }
 
 /// File node implementation tailored to the behaviour of the APIs exposed to userspace via the
-/// SELinux filesystem.fx
+/// SELinux filesystem. These API files share some unusual behaviours:
 ///
-/// API files in the SELinux filesystem have persistent seek offsets, which APIs either
-/// ignore (e.g. request-response APIs like "access" or "context") or error-out if non-zero
-/// (e.g. the policy "load" file).
+/// (1) Seek Position:
+/// API files in the SELinux filesystem do have persistent seek offsets, but asymmetric behaviour
+/// for read and write operations:
+/// - Read operations respect the file offset, and increment it.
+/// - Write operations do not increment the file offset. This is important for APIs such as
+///   "create", which are used by `write()`ing a query and then `read()`ing the resulting value,
+///   since otherwise the `read()` would start from the end of the `write()`.
 ///
-/// Userspace use of SELinux API files follows a simple request/response flow, with the caller
-/// `write()`ing a string of request bytes, and then `read()`ing a string of result bytes
-/// from the API file.
+/// API files do not handle non-zero offset `write()`s consistently. Some, (e.g. "context"), ignore
+/// the offset, while others (e.g. "load") will fail with `EINVAL` if it is non-zero.
+///
+/// (2) Single vs Multi-Request:
+/// Most API files may be `read()` from any number of times, but only support a single `write()`
+/// operation. Attempting to `write()` a second time will return `EBUSY`.
+///
+/// (3) Error Handling:
+/// Once an operation on an API file has failed, all subsequent operations on that file will
+/// also fail, with the same error code.  e.g. Attempting multiple `write()` operations will
+/// return `EBUSY` from the second and subsequent calls, but subsequent calls to `read()`,
+/// `seek()` etc will also return `EBUSY`.
+///
+/// This helper currently implements asymmetric seek behaviour, and permission checks on write
+/// operations.
 struct SeLinuxApi<T: SeLinuxApiOps + Sync + Send + 'static> {
     ops: T,
 }
@@ -764,32 +772,34 @@ trait SeLinuxApiOps {
     /// Returns the "security" class permission that is required in order to write to the API file.
     fn api_write_permission() -> SecurityPermission;
 
-    /// Processes a request written to an API file. Although API files are seekable, the offset
-    /// is ignored by most API file implementations, or may be required to be zero.
-    fn api_write(&self, _offset: usize, _data: Vec<u8>) -> Result<(), Errno> {
+    /// Returns true if writes ignore the seek offset, rather than requiring it to be zero.
+    fn api_write_ignores_offset() -> bool {
+        false
+    }
+
+    /// Processes a request written to an API file.
+    fn api_write(&self, _data: Vec<u8>) -> Result<(), Errno> {
         error!(EINVAL)
     }
 
-    /// Reads the result of a request previously written to the API file. For most APIs the offset
-    /// is simply ignored, in contrast to the behaviour implemented by `BytesFile`.
-    fn api_read(&self, _offset: usize) -> Result<Cow<'_, [u8]>, Errno> {
+    /// Returns the complete contents of this API file.
+    fn api_read(&self) -> Result<Cow<'_, [u8]>, Errno> {
         error!(EINVAL)
     }
 
     /// Variant of `api_write()` that additionally receives the `current_task`.
-    fn api_write_with_task(
-        &self,
-        _current_task: &CurrentTask,
-        offset: usize,
-        data: Vec<u8>,
-    ) -> Result<(), Errno> {
-        self.api_write(offset, data)
+    fn api_write_with_task(&self, _current_task: &CurrentTask, data: Vec<u8>) -> Result<(), Errno> {
+        self.api_write(data)
     }
 }
 
 impl<T: SeLinuxApiOps + Sync + Send + 'static> FileOps for SeLinuxApi<T> {
     fileops_impl_seekable!();
     fileops_impl_noop_sync!();
+
+    fn writes_update_seek_offset(&self) -> bool {
+        false
+    }
 
     fn read(
         &self,
@@ -799,8 +809,8 @@ impl<T: SeLinuxApiOps + Sync + Send + 'static> FileOps for SeLinuxApi<T> {
         offset: usize,
         data: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno> {
-        let response = self.ops.api_read(offset)?;
-        data.write(&response)
+        let response = self.ops.api_read()?;
+        data.write(&response[offset..])
     }
 
     fn write(
@@ -811,6 +821,9 @@ impl<T: SeLinuxApiOps + Sync + Send + 'static> FileOps for SeLinuxApi<T> {
         offset: usize,
         data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno> {
+        if offset != 0 && !T::api_write_ignores_offset() {
+            return error!(EINVAL);
+        }
         security::selinuxfs_check_access(
             current_task,
             &file.name.entry.node,
@@ -818,7 +831,7 @@ impl<T: SeLinuxApiOps + Sync + Send + 'static> FileOps for SeLinuxApi<T> {
         )?;
         let data = data.read_all()?;
         let data_len = data.len();
-        self.ops.api_write_with_task(current_task, offset, data)?;
+        self.ops.api_write_with_task(current_task, data)?;
         Ok(data_len)
     }
 }

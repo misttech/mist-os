@@ -139,6 +139,11 @@ pub trait FileOps: Send + Sync + AsAny + 'static {
     /// Returns whether the file is seekable.
     fn is_seekable(&self) -> bool;
 
+    /// Returns true if `write()` operations on the file will update the seek offset.
+    fn writes_update_seek_offset(&self) -> bool {
+        self.has_persistent_offsets()
+    }
+
     /// Read from the file at an offset. If the file does not have persistent offsets (either
     /// directly, or because it is not seekable), offset will be 0 and can be ignored.
     /// Returns the number of bytes read.
@@ -402,6 +407,10 @@ impl<T: FileOps, P: Deref<Target = T> + Send + Sync + 'static> FileOps for P {
 
     fn has_persistent_offsets(&self) -> bool {
         self.deref().has_persistent_offsets()
+    }
+
+    fn writes_update_seek_offset(&self) -> bool {
+        self.deref().writes_update_seek_offset()
     }
 
     fn is_seekable(&self) -> bool {
@@ -1010,6 +1019,9 @@ impl FileOps for ProxyFileOps {
     fn has_persistent_offsets(&self) -> bool {
         self.0.ops().has_persistent_offsets()
     }
+    fn writes_update_seek_offset(&self) -> bool {
+        self.0.ops().writes_update_seek_offset()
+    }
     fn is_seekable(&self) -> bool {
         self.0.ops().is_seekable()
     }
@@ -1455,7 +1467,9 @@ impl FileObject {
                     self.node().append_lock.read_and(&mut locked, current_task)?;
                 self.write_common(&mut locked, current_task, *offset as usize, data)
             }?;
-            *offset += bytes_written as off_t;
+            if self.ops().writes_update_seek_offset() {
+                *offset += bytes_written as off_t;
+            }
             Ok(bytes_written)
         })
     }
