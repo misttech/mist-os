@@ -12,8 +12,6 @@ using fuchsia.time.external;
 @discoverable
 closed protocol TimeSourceControl {
     /// Forward a PushSource connection.
-    /// TODO(satsukiu): possibly add an enum signifying the role (primary, monitor) of the
-    /// connecting PushSource.
     strict ConnectPushSource(resource struct {
         push_source server_end:fuchsia.time.external.PushSource;
     });
