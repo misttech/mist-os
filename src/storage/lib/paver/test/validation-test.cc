@@ -146,22 +146,32 @@ static cpp20::span<const uint8_t> StringToSpan(const std::string& data) {
   return cpp20::span<const uint8_t>(reinterpret_cast<const uint8_t*>(data.data()), data.size());
 }
 
-TEST(IsValidChromeOSKernel, TooSmall) {
-  ASSERT_FALSE(IsValidChromeOSKernel(StringToSpan("")));
-  ASSERT_FALSE(IsValidChromeOSKernel(StringToSpan("C")));
-  ASSERT_FALSE(IsValidChromeOSKernel(StringToSpan("CHROMEO")));
+TEST(IsValidChromeOsKernel, TooSmall) {
+  EXPECT_FALSE(IsValidChromeOsKernel(StringToSpan("")));
+  EXPECT_FALSE(IsValidChromeOsKernel(StringToSpan("C")));
+  EXPECT_FALSE(IsValidChromeOsKernel(StringToSpan("CHROMEO")));
 }
 
-TEST(IsValidChromeOSKernel, IncorrectMagic) {
-  ASSERT_FALSE(IsValidChromeOSKernel(StringToSpan("CHROMEOX")));
+TEST(IsValidChromeOsKernel, IncorrectMagic) {
+  EXPECT_FALSE(IsValidChromeOsKernel(StringToSpan("CHROMEOX")));
 }
 
-TEST(IsValidChromeOSKernel, MinimalValid) {
-  ASSERT_TRUE(IsValidChromeOSKernel(StringToSpan("CHROMEOS")));
+TEST(IsValidChromeOsKernel, MinimalValid) {
+  EXPECT_TRUE(IsValidChromeOsKernel(StringToSpan("CHROMEOS")));
 }
 
-TEST(IsValidChromeOSKernel, ExcessData) {
-  ASSERT_TRUE(IsValidChromeOSKernel(StringToSpan("CHROMEOS-1234")));
+TEST(IsValidChromeOsKernel, ExcessData) {
+  EXPECT_TRUE(IsValidChromeOsKernel(StringToSpan("CHROMEOS-1234")));
+}
+
+TEST(IsValidAndroidKernel, Validity) {
+  EXPECT_TRUE(IsValidAndroidKernel(StringToSpan("ANDROID!")));
+  EXPECT_FALSE(IsValidAndroidKernel(StringToSpan("VNDRBOOT")));
+}
+
+TEST(IsValidAndroidVendorKernel, Validity) {
+  EXPECT_TRUE(IsValidAndroidVendorKernel(StringToSpan("VNDRBOOT")));
+  EXPECT_FALSE(IsValidAndroidVendorKernel(StringToSpan("ANDROID!")));
 }
 
 }  // namespace

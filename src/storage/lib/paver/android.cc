@@ -48,7 +48,7 @@ zx::result<std::unique_ptr<DevicePartitioner>> AndroidDevicePartitioner::Initial
   }
 
   auto partitioner =
-      WrapUnique(new AndroidDevicePartitioner(arch, std::move(status->gpt), std::move(context)));
+      WrapUnique(new AndroidDevicePartitioner(std::move(status->gpt), std::move(context)));
   if (status->initialize_partition_tables) {
     if (auto status = partitioner->InitPartitionTables(); status.is_error()) {
       return status.take_error();
@@ -161,7 +161,7 @@ zx::result<> AndroidDevicePartitioner::ValidatePayload(const PartitionSpec& spec
   }
 
   if (IsZirconPartitionSpec(spec)) {
-    if (!IsValidAndroidKernel(arch_, data)) {
+    if (!IsValidAndroidVendorKernel(data)) {
       return zx::error(ZX_ERR_BAD_STATE);
     }
   }

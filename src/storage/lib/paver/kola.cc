@@ -136,7 +136,7 @@ zx::result<> KolaPartitioner::ValidatePayload(const PartitionSpec& spec,
   }
 
   if (IsZirconPartitionSpec(spec)) {
-    if (!IsValidAndroidKernel(Arch::kArm64, data)) {
+    if (!IsValidAndroidKernel(data)) {
       return zx::error(ZX_ERR_BAD_STATE);
     }
   }

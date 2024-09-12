@@ -27,6 +27,14 @@ namespace {
 // Magic header of ChromeOS kernel verification block.
 constexpr std::string_view kChromeOsMagicHeader = "CHROMEOS";
 
+// Magic for Android `boot_x` partition.
+// Defined as `BOOT_MAGIC` in AOSP: system/tools/mkbootimg/include/bootimg/bootimg.h
+constexpr std::string_view kAndroidBootMagic = "ANDROID!";
+
+// Magic for Android `vendor_boot_x` partition.
+// Defined as `VENDOR_BOOT_MAGIC` in AOSP: system/tools/mkbootimg/include/bootimg/bootimg.h
+constexpr std::string_view kAndroidVendorBootMagic = "VNDRBOOT";
+
 // Determine if the CRC of the given zbi_header_t is valid.
 //
 // We require that the "hdr" has "hdr->length" valid bytes after it.
@@ -38,6 +46,20 @@ bool ZbiHeaderCrcValid(const zbi_header_t* hdr) {
 
   // Otherwise, calculate the CRC.
   return hdr->crc32 == crc32(0, reinterpret_cast<const uint8_t*>(hdr + 1), hdr->length);
+}
+
+bool CheckMagic(cpp20::span<const uint8_t> data, std::string_view magic,
+                const std::string& kernel_name) {
+  if (data.size() < magic.size()) {
+    ERROR("%s kernel payload too small.\n", kernel_name.c_str());
+    return false;
+  }
+  if (memcmp(data.data(), magic.data(), magic.size()) != 0) {
+    ERROR("%s kernel magic header invalid.\n", kernel_name.c_str());
+    return false;
+  }
+
+  return true;
 }
 
 }  // namespace
@@ -123,35 +145,16 @@ bool IsValidKernelZbi(Arch arch, cpp20::span<const uint8_t> data) {
   return true;
 }
 
-// Magic for Android `vendor_boot_x` partition.
-// Defined as `VENDOR_BOOT_MAGIC` in AOSP:
-// system/tools/mkbootimg/include/bootimg/bootimg.h
-constexpr std::string_view kAndroidVendorBootMagic = "VNDRBOOT";
-
-bool IsValidAndroidKernel(Arch arch, cpp20::span<const uint8_t> data) {
-  // Check magic
-  if (data.size() < kAndroidVendorBootMagic.length()) {
-    return false;
-  }
-  auto magic = data.subspan(0, kAndroidVendorBootMagic.length());
-  return std::equal(magic.begin(), magic.end(), kAndroidVendorBootMagic.begin());
+bool IsValidAndroidKernel(cpp20::span<const uint8_t> data) {
+  return CheckMagic(data, kAndroidBootMagic, "Android");
 }
 
-bool IsValidChromeOSKernel(cpp20::span<const uint8_t> data) {
-  // Ensure the data contains the ChromeOS verification block magic
-  // signature.
-  //
-  // See https://www.chromium.org/chromium-os/chromiumos-design-docs/disk-format
-  if (data.size() < kChromeOsMagicHeader.size()) {
-    ERROR("ChromeOS kernel payload too small.\n");
-    return false;
-  }
-  if (memcmp(data.data(), kChromeOsMagicHeader.data(), kChromeOsMagicHeader.size()) != 0) {
-    ERROR("ChromeOS kernel magic header invalid.\n");
-    return false;
-  }
+bool IsValidAndroidVendorKernel(cpp20::span<const uint8_t> data) {
+  return CheckMagic(data, kAndroidVendorBootMagic, "Android Vendor");
+}
 
-  return true;
+bool IsValidChromeOsKernel(cpp20::span<const uint8_t> data) {
+  return CheckMagic(data, kChromeOsMagicHeader, "ChromeOS");
 }
 
 }  // namespace paver
