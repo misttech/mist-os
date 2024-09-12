@@ -398,7 +398,6 @@ group("deprecated_zx_wrapper_allowlist") {
     "//zircon/system/ulib/sync:*",
     "//zircon/system/ulib/sysconfig-client:*",
     "//zircon/system/ulib/syslog:*",
-    "//zircon/system/ulib/sysmem-connector:*",
     "//zircon/system/ulib/sysmem-version:*",
     "//zircon/system/ulib/task-utils:*",
     "//zircon/system/ulib/test-exceptions:*",

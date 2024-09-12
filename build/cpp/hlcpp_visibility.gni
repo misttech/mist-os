@@ -359,5 +359,4 @@ hlcpp_visibility = [
   "//tools/create/goldens/my-component-test-cpp:*",
   "//zircon/kernel/lib/devicetree/tests:*",
   "//zircon/system/ulib/ktrace/*",
-  "//zircon/system/ulib/sysmem-connector:*",
 ]

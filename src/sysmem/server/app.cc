@@ -8,7 +8,6 @@
 #include <fidl/fuchsia.hardware.sysmem/cpp/fidl.h>
 #include <fidl/fuchsia.metrics/cpp/fidl.h>
 #include <lib/async/dispatcher.h>
-#include <lib/sysmem-connector/sysmem-connector.h>
 #include <lib/vfs/cpp/pseudo_dir.h>
 
 #include <sdk/lib/syslog/cpp/macros.h>
