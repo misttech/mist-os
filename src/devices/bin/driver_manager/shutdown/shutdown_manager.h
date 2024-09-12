@@ -5,8 +5,8 @@
 #ifndef SRC_DEVICES_BIN_DRIVER_MANAGER_SHUTDOWN_SHUTDOWN_MANAGER_H_
 #define SRC_DEVICES_BIN_DRIVER_MANAGER_SHUTDOWN_SHUTDOWN_MANAGER_H_
 
-#include <fidl/fuchsia.device.manager/cpp/fidl.h>
 #include <fidl/fuchsia.process.lifecycle/cpp/wire.h>
+#include <fidl/fuchsia.system.state/cpp/fidl.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/component/incoming/cpp/protocol.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
@@ -19,7 +19,7 @@
 #include "src/devices/bin/driver_manager/shutdown/node_remover.h"
 
 namespace driver_manager {
-using fuchsia_device_manager::SystemPowerState;
+using fuchsia_system_state::SystemPowerState;
 
 // Theory of operation of ShutdownManager:
 //  There are a number of ways shutdown can be initiated:

@@ -12,7 +12,7 @@
 #include <algorithm>
 #include <iterator>
 
-#include "fidl/fuchsia.device.manager/cpp/common_types.h"
+#include "fidl/fuchsia.system.state/cpp/common_types.h"
 #include "src/lib/uuid/uuid.h"
 #include "src/storage/lib/paver/device-partitioner.h"
 #include "src/storage/lib/paver/pave-logging.h"
@@ -24,7 +24,7 @@ namespace paver {
 
 namespace {
 
-using fuchsia_device_manager::SystemPowerState;
+using fuchsia_system_state::SystemPowerState;
 using uuid::Uuid;
 
 constexpr size_t kKibibyte = 1024;

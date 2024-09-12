@@ -98,7 +98,7 @@
     its current state.
   examples:
     - fidl: 'fuchsia.device'
-    - fidl: 'fuchsia.device.manager'
+    - fidl: 'fuchsia.driver.framework'
 
 - name: 'Experiences'
   api_primary: 'chaselatta@google.com'

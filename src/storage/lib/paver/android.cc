@@ -4,7 +4,7 @@
 
 #include "src/storage/lib/paver/android.h"
 
-#include <fidl/fuchsia.device.manager/cpp/common_types.h>
+#include <fidl/fuchsia.system.state/cpp/common_types.h>
 #include <lib/fidl/cpp/channel.h>
 #include <lib/zx/result.h>
 #include <zircon/process.h>
@@ -30,7 +30,7 @@ namespace paver {
 
 namespace {
 
-using fuchsia_device_manager::SystemPowerState;
+using fuchsia_system_state::SystemPowerState;
 using uuid::Uuid;
 
 }  // namespace

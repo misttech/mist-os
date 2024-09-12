@@ -5,10 +5,10 @@
 #ifndef SRC_DEVICES_MISC_DRIVERS_COMPAT_DEVICE_H_
 #define SRC_DEVICES_MISC_DRIVERS_COMPAT_DEVICE_H_
 
-#include <fidl/fuchsia.device.manager/cpp/wire.h>
 #include <fidl/fuchsia.device/cpp/wire.h>
 #include <fidl/fuchsia.driver.compat/cpp/wire.h>
 #include <fidl/fuchsia.driver.framework/cpp/wire.h>
+#include <fidl/fuchsia.system.state/cpp/wire.h>
 #include <lib/async/cpp/executor.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
@@ -178,12 +178,12 @@ class Device : public std::enable_shared_from_this<Device>, public devfs_fidl::D
     // shutdown/reboot flows to emulate DFv1 shutdown. The fdf::Node client should have been torn
     // down by the driver runtime canceling all outstanding waits by the time stop has been called,
     // allowing shutdown to proceed.
-    return parent_ && system_power_state() == fuchsia_device_manager::SystemPowerState::kFullyOn;
+    return parent_ && system_power_state() == fuchsia_system_state::SystemPowerState::kFullyOn;
   }
 
   bool HasChildNamed(std::string_view name) const;
 
-  fuchsia_device_manager::wire::SystemPowerState system_power_state() const;
+  fuchsia_system_state::wire::SystemPowerState system_power_state() const;
 
   bool stop_triggered() const;
 

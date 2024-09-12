@@ -3,8 +3,8 @@
 // found in the LICENSE file.
 
 use {
-    fidl_fuchsia_device_manager as fdevice_manager,
     fidl_fuchsia_hardware_power_statecontrol as fpower,
+    fidl_fuchsia_system_state as fdevice_manager,
 };
 
 /// Type alias for the reboot reasons defined in fuchsia.hardware.power.statecontrol.RebootReason.

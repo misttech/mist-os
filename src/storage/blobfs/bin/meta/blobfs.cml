@@ -48,10 +48,6 @@
     use: [
         {
             protocol: [
-                // Without this, blobfs won't notify device manager to unload drivers from blobfs
-                // before it shuts down.
-                "fuchsia.device.manager.Administrator",
-
                 // Without this, blobfs won't be able to mint executables, but it can still read
                 // and write blobs.
                 "fuchsia.kernel.VmexResource",

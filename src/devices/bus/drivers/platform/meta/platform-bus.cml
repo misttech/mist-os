@@ -43,12 +43,12 @@
         {
             protocol: [
                 "fuchsia.boot.Items",
-                "fuchsia.device.manager.SystemStateTransition",
                 "fuchsia.driver.framework.CompositeNodeManager",
                 "fuchsia.driver.framework.DeviceGroupManager",
                 "fuchsia.kernel.IrqResource",
                 "fuchsia.kernel.MmioResource",
                 "fuchsia.kernel.SmcResource",
+                "fuchsia.system.state.SystemStateTransition",
             ],
         },
         {

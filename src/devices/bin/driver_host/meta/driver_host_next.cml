@@ -20,7 +20,7 @@
         { protocol: "fuchsia.driver.host.DriverHost" },
     ],
     use: [
-        { protocol: "fuchsia.device.manager.SystemStateTransition" },
+        { protocol: "fuchsia.system.state.SystemStateTransition" },
         {
             protocol: [
                 "fuchsia.boot.WriteOnlyLog",

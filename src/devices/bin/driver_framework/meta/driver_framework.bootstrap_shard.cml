@@ -363,7 +363,7 @@
             source_availability: "unknown",
         },
         {
-            protocol: [ "fuchsia.device.manager.SystemStateTransition" ],
+            protocol: [ "fuchsia.system.state.SystemStateTransition" ],
             from: "#shutdown_shim",
             to: [
                 "#boot-drivers",

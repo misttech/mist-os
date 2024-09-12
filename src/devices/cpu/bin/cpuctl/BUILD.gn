@@ -34,7 +34,6 @@ test("cpuctl-test-bin") {
   include_dirs = [ "." ]
   deps = [
     "//sdk/fidl/fuchsia.device:fuchsia.device_cpp_testing",
-    "//sdk/fidl/fuchsia.device.manager:fuchsia.device.manager_cpp_testing",
     "//sdk/fidl/fuchsia.hardware.cpu.ctrl:fuchsia.hardware.cpu.ctrl_cpp_testing",
     "//sdk/lib/async-loop:async-loop-cpp",
     "//sdk/lib/component/incoming/cpp",

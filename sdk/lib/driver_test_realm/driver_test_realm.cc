@@ -5,7 +5,6 @@
 #include <fidl/fuchsia.boot/cpp/wire.h>
 #include <fidl/fuchsia.component.decl/cpp/fidl.h>
 #include <fidl/fuchsia.component.resolution/cpp/wire.h>
-#include <fidl/fuchsia.device.manager/cpp/wire.h>
 #include <fidl/fuchsia.diagnostics/cpp/fidl.h>
 #include <fidl/fuchsia.driver.development/cpp/fidl.h>
 #include <fidl/fuchsia.driver.framework/cpp/wire.h>
@@ -13,6 +12,7 @@
 #include <fidl/fuchsia.io/cpp/wire.h>
 #include <fidl/fuchsia.kernel/cpp/wire.h>
 #include <fidl/fuchsia.pkg/cpp/wire.h>
+#include <fidl/fuchsia.system.state/cpp/wire.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async/dispatcher.h>
 #include <lib/component/incoming/cpp/clone.h>
@@ -191,9 +191,9 @@ class FakeBootItems final : public fidl::WireServer<fuchsia_boot::Items> {
 };
 
 class FakeSystemStateTransition final
-    : public fidl::WireServer<fuchsia_device_manager::SystemStateTransition> {
+    : public fidl::WireServer<fuchsia_system_state::SystemStateTransition> {
   void GetTerminationSystemState(GetTerminationSystemStateCompleter::Sync& completer) override {
-    completer.Reply(fuchsia_device_manager::SystemPowerState::kFullyOn);
+    completer.Reply(fuchsia_system_state::SystemPowerState::kFullyOn);
   }
   void GetMexecZbis(GetMexecZbisCompleter::Sync& completer) override {
     completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
@@ -334,7 +334,7 @@ class DriverTestRealm final : public fidl::Server<fuchsia_driver_test::Realm> {
       }
     }
 
-    zx::result result = outgoing_->AddProtocol<fuchsia_device_manager::SystemStateTransition>(
+    zx::result result = outgoing_->AddProtocol<fuchsia_system_state::SystemStateTransition>(
         std::make_unique<FakeSystemStateTransition>());
     if (result.is_error()) {
       completer.Reply(result.take_error());

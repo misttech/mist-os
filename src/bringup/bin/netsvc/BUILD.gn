@@ -85,10 +85,10 @@ source_set("netsvc_common") {
   deps = [
     "//sdk/fidl/fuchsia.boot:fuchsia.boot_cpp",
     "//sdk/fidl/fuchsia.device:fuchsia.device_cpp",
-    "//sdk/fidl/fuchsia.device.manager:fuchsia.device.manager_cpp",
     "//sdk/fidl/fuchsia.hardware.block:fuchsia.hardware.block_cpp",
     "//sdk/fidl/fuchsia.hardware.power.statecontrol:fuchsia.hardware.power.statecontrol_cpp",
     "//sdk/fidl/fuchsia.sysinfo:fuchsia.sysinfo_cpp",
+    "//sdk/fidl/fuchsia.system.state:fuchsia.system.state_cpp",
     "//sdk/lib/async-default",
     "//sdk/lib/async-loop:async-loop-cpp",
     "//sdk/lib/async-loop:async-loop-default",

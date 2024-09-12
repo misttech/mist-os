@@ -12,4 +12,4 @@ procedures. All components that start a reboot or shutdown do so by talking to
     process.
 -   It prevents suspension during the shutdown process.
 -   It eliminates a dependency cycle between drivers and `power-manager` by
-    implementing `fuchsia.device.manager.SystemStateTransition`.
+    implementing `fuchsia.system.state.SystemStateTransition`.

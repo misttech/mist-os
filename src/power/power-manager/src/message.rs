@@ -32,7 +32,7 @@ pub enum Message {
 
     /// Specify the termination system state, intended to be used in the DriverManagerHandler node.
     /// Arg: the SystemPowerState value indicating the termination state
-    SetTerminationSystemState(fidl_fuchsia_device_manager::SystemPowerState),
+    SetTerminationSystemState(fidl_fuchsia_system_state::SystemPowerState),
 
     /// Notify that the mic enabled state has changed
     /// Arg: the new enabled state

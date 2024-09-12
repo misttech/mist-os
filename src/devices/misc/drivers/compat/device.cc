@@ -27,7 +27,7 @@ namespace fdf {
 using namespace fuchsia_driver_framework;
 }
 namespace fcd = fuchsia_component_decl;
-namespace fdm = fuchsia_device_manager;
+namespace fdm = fuchsia_system_state;
 
 namespace {
 

@@ -73,7 +73,7 @@ impl DriverTestRealmBuilder for RealmBuilder {
             Route::new()
                 .capability(Capability::directory("dev-class").rights(fio::R_STAR_DIR))
                 .capability(Capability::directory("dev-topological").rights(fio::R_STAR_DIR))
-                .capability(Capability::protocol_by_name("fuchsia.device.manager.Administrator"))
+                .capability(Capability::protocol_by_name("fuchsia.system.state.Administrator"))
                 .capability(Capability::protocol_by_name("fuchsia.driver.development.Manager"))
                 .capability(Capability::protocol_by_name(
                     "fuchsia.driver.framework.CompositeNodeManager",

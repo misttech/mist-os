@@ -21,7 +21,7 @@
 namespace paver {
 namespace {
 
-using fuchsia_device_manager::SystemPowerState;
+using fuchsia_system_state::SystemPowerState;
 using uuid::Uuid;
 
 }  // namespace

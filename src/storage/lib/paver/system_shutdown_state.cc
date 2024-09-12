@@ -4,14 +4,14 @@
 
 #include "src/storage/lib/paver/system_shutdown_state.h"
 
-#include <fidl/fuchsia.device.manager/cpp/fidl.h>
+#include <fidl/fuchsia.system.state/cpp/fidl.h>
 
 #include <sdk/lib/component/incoming/cpp/protocol.h>
 
 #include "src/storage/lib/paver/pave-logging.h"
 
-using fuchsia_device_manager::SystemPowerState;
-using fuchsia_device_manager::SystemStateTransition;
+using fuchsia_system_state::SystemPowerState;
+using fuchsia_system_state::SystemStateTransition;
 
 namespace paver {
 
@@ -20,7 +20,7 @@ SystemPowerState GetShutdownSystemState(fidl::UnownedClientEnd<fuchsia_io::Direc
 
   zx::result client = component::ConnectAt<SystemStateTransition>(svc_dir);
   if (client.is_error()) {
-    ERROR("Failed to connect to fuchsia.device.manager/SystemStateTransition: %s",
+    ERROR("Failed to connect to fuchsia.system.state/SystemStateTransition: %s",
           client.status_string());
     return kDefaultShutdownSystemState;
   }

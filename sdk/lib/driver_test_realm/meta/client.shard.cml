@@ -17,10 +17,10 @@
         },
         {
             protocol: [
-                "fuchsia.device.manager.Administrator",
                 "fuchsia.driver.development.Manager",
                 "fuchsia.driver.registrar.DriverRegistrar",
                 "fuchsia.driver.test.Realm",
+                "fuchsia.system.state.Administrator",
             ],
             from: "#driver_test_realm",
         },

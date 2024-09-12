@@ -7,12 +7,12 @@
 #include <dirent.h>
 #include <fidl/fuchsia.boot/cpp/wire_test_base.h>
 #include <fidl/fuchsia.device.fs/cpp/wire_test_base.h>
-#include <fidl/fuchsia.device.manager/cpp/wire_test_base.h>
 #include <fidl/fuchsia.driver.framework/cpp/wire_test_base.h>
 #include <fidl/fuchsia.io/cpp/wire_test_base.h>
 #include <fidl/fuchsia.kernel/cpp/wire_test_base.h>
 #include <fidl/fuchsia.logger/cpp/wire_test_base.h>
 #include <fidl/fuchsia.scheduler/cpp/wire_test_base.h>
+#include <fidl/fuchsia.system.state/cpp/wire_test_base.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/async/default.h>
@@ -456,23 +456,23 @@ class TestRoleManager : public fidl::testing::WireTestBase<fuchsia_scheduler::Ro
 };
 
 class TestSystemStateTransition
-    : public fidl::testing::WireTestBase<fuchsia_device_manager::SystemStateTransition> {
+    : public fidl::testing::WireTestBase<fuchsia_system_state::SystemStateTransition> {
  public:
-  fidl::ProtocolHandler<fuchsia_device_manager::SystemStateTransition> GetHandler() {
+  fidl::ProtocolHandler<fuchsia_system_state::SystemStateTransition> GetHandler() {
     return bindings_.CreateHandler(this, async_get_default_dispatcher(),
                                    fidl::kIgnoreBindingClosure);
   }
 
  private:
   void GetTerminationSystemState(GetTerminationSystemStateCompleter::Sync& completer) override {
-    completer.Reply(fuchsia_device_manager::wire::SystemPowerState::kFullyOn);
+    completer.Reply(fuchsia_system_state::wire::SystemPowerState::kFullyOn);
   }
 
   void NotImplemented_(const std::string& name, fidl::CompleterBase& completer) override {
     printf("Not implemented: SystemStateTransition::%s", name.data());
   }
 
-  fidl::ServerBindingGroup<fuchsia_device_manager::SystemStateTransition> bindings_;
+  fidl::ServerBindingGroup<fuchsia_system_state::SystemStateTransition> bindings_;
 };
 
 class TestLogSink : public fidl::testing::WireTestBase<flogger::LogSink> {
@@ -617,7 +617,7 @@ class IncomingNamespace {
         return result.take_error();
       }
 
-      result = outgoing.AddUnmanagedProtocol<fuchsia_device_manager::SystemStateTransition>(
+      result = outgoing.AddUnmanagedProtocol<fuchsia_system_state::SystemStateTransition>(
           system_state_transition_.GetHandler());
       if (result.is_error()) {
         return result.take_error();

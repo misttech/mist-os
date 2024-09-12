@@ -5,8 +5,8 @@
 #include "include/lib/driver-integration-test/fixture.h"
 
 #include <fidl/fuchsia.board.test/cpp/wire.h>
-#include <fidl/fuchsia.device.manager/cpp/wire.h>
 #include <fidl/fuchsia.driver.framework/cpp/wire.h>
+#include <fidl/fuchsia.system.state/cpp/wire.h>
 #include <fuchsia/driver/test/cpp/fidl.h>
 #include <fuchsia/io/cpp/fidl.h>
 #include <lib/device-watcher/cpp/device-watcher.h>
@@ -90,7 +90,7 @@ zx_status_t IsolatedDevmgr::Create(Args* args, IsolatedDevmgr* out) {
       .targets = {ChildRef{"fshost"}},
   });
   realm_builder.AddRoute(Route{
-      .capabilities = {Protocol{"fuchsia.device.manager.Administrator"}},
+      .capabilities = {Protocol{"fuchsia.system.state.Administrator"}},
       .source = {ChildRef{"driver_test_realm"}},
       .targets = {ChildRef{"fshost"}},
   });

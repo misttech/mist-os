@@ -9,7 +9,7 @@
         lifecycle: { stop_event: "notify" },
     },
     capabilities: [
-        { protocol: "fuchsia.device.manager.SystemStateTransition" },
+        { protocol: "fuchsia.system.state.SystemStateTransition" },
         { protocol: "fuchsia.hardware.power.statecontrol.Admin" },
     ],
     use: [
@@ -29,8 +29,8 @@
     expose: [
         {
             protocol: [
-                "fuchsia.device.manager.SystemStateTransition",
                 "fuchsia.hardware.power.statecontrol.Admin",
+                "fuchsia.system.state.SystemStateTransition",
             ],
             from: "self",
         },

@@ -29,7 +29,7 @@ struct MexecVmos {
 };
 
 zx::result<MexecVmos> GetMexecZbis(zx::unowned_resource mexec_resource) {
-  zx::result client = component::Connect<fuchsia_device_manager::SystemStateTransition>();
+  zx::result client = component::Connect<fuchsia_system_state::SystemStateTransition>();
   if (client.is_error()) {
     LOGF(ERROR, "Failed to connect to StateStateTransition: %s", client.status_string());
     return client.take_error();
@@ -106,7 +106,7 @@ zx::result<MexecVmos> GetMexecZbis(zx::unowned_resource mexec_resource) {
 }
 
 SystemPowerState GetSystemPowerState() {
-  zx::result client = component::Connect<fuchsia_device_manager::SystemStateTransition>();
+  zx::result client = component::Connect<fuchsia_system_state::SystemStateTransition>();
   if (client.is_error()) {
     LOGF(ERROR, "Failed to connect to StateStateTransition: %s, falling back to default",
          client.status_string());

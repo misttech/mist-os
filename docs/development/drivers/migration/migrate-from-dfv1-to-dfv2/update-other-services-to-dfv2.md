@@ -293,8 +293,8 @@ Do the following:
              protocol: [
                  "fuchsia.boot.Arguments",
                  "fuchsia.boot.Items",
-                 "fuchsia.device.manager.SystemStateTransition",
                  "fuchsia.driver.framework.CompositeNodeManager",
+                 "fuchsia.system.state.SystemStateTransition",
              ],
          },
          { service: "fuchsia.driver.compat.Service" },

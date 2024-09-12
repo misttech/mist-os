@@ -4,10 +4,10 @@
 
 #include "src/graphics/display/drivers/intel-display/intel-display-driver.h"
 
-#include <fidl/fuchsia.device.manager/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.pci/cpp/fidl.h>
 #include <fidl/fuchsia.kernel/cpp/fidl.h>
 #include <fidl/fuchsia.sysmem2/cpp/fidl.h>
+#include <fidl/fuchsia.system.state/cpp/fidl.h>
 #include <lib/driver/component/cpp/driver_base.h>
 #include <lib/driver/component/cpp/driver_export.h>
 #include <lib/driver/component/cpp/prepare_stop_completer.h>
@@ -31,12 +31,12 @@ namespace intel_display {
 
 namespace {
 
-zx::result<fuchsia_device_manager::SystemPowerState> GetSystemPowerState(fdf::Namespace& incoming) {
-  zx::result<fidl::ClientEnd<fuchsia_device_manager::SystemStateTransition>>
+zx::result<fuchsia_system_state::SystemPowerState> GetSystemPowerState(fdf::Namespace& incoming) {
+  zx::result<fidl::ClientEnd<fuchsia_system_state::SystemStateTransition>>
       sysmem_power_transition_result =
-          incoming.Connect<fuchsia_device_manager::SystemStateTransition>();
+          incoming.Connect<fuchsia_system_state::SystemStateTransition>();
   if (sysmem_power_transition_result.is_error()) {
-    FDF_LOG(ERROR, "Failed to connect to fuchsia.device.manager/SystemStateTransition: %s",
+    FDF_LOG(ERROR, "Failed to connect to fuchsia.system.state/SystemStateTransition: %s",
             sysmem_power_transition_result.status_string());
     return sysmem_power_transition_result.take_error();
   }
@@ -176,7 +176,7 @@ void IntelDisplayDriver::PrepareStopOnPowerOn(fdf::PrepareStopCompleter complete
 }
 
 void IntelDisplayDriver::PrepareStopOnPowerStateTransition(
-    fuchsia_device_manager::SystemPowerState power_state, fdf::PrepareStopCompleter completer) {
+    fuchsia_system_state::SystemPowerState power_state, fdf::PrepareStopCompleter completer) {
   if (controller_) {
     controller_->PrepareStopOnPowerStateTransition(power_state, std::move(completer));
   } else {
@@ -185,17 +185,17 @@ void IntelDisplayDriver::PrepareStopOnPowerStateTransition(
 }
 
 void IntelDisplayDriver::PrepareStop(fdf::PrepareStopCompleter completer) {
-  zx::result<fuchsia_device_manager::SystemPowerState> system_power_state_result =
+  zx::result<fuchsia_system_state::SystemPowerState> system_power_state_result =
       GetSystemPowerState(*incoming());
   if (system_power_state_result.is_error()) {
     FDF_LOG(WARNING, "Failed to get system power state: %s, fallback to fully on",
             system_power_state_result.status_string());
   }
 
-  fuchsia_device_manager::SystemPowerState system_power_state =
-      system_power_state_result.value_or(fuchsia_device_manager::SystemPowerState::kFullyOn);
+  fuchsia_system_state::SystemPowerState system_power_state =
+      system_power_state_result.value_or(fuchsia_system_state::SystemPowerState::kFullyOn);
 
-  if (system_power_state == fuchsia_device_manager::SystemPowerState::kFullyOn) {
+  if (system_power_state == fuchsia_system_state::SystemPowerState::kFullyOn) {
     PrepareStopOnPowerOn(std::move(completer));
     return;
   }
