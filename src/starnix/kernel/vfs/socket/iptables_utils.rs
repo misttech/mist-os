@@ -9,6 +9,7 @@ use itertools::Itertools;
 use starnix_logging::log_warn;
 use starnix_uapi::iptables_flags::{
     IptIpFlags, IptIpFlagsV4, IptIpFlagsV6, IptIpInverseFlags, NfIpHooks, NfNatRangeFlags,
+    XtTcpInverseFlags, XtUdpInverseFlags,
 };
 use starnix_uapi::{
     c_char, c_int, c_uchar, c_uint, in6_addr, in_addr, ip6t_entry, ip6t_ip6, ip6t_replace,
@@ -66,6 +67,8 @@ pub enum IpTableParseError {
     IpAddressConversion(#[from] IpAddressConversionError),
     #[error("FIDL conversion error: {0}")]
     FidlConversion(#[from] fnet_filter_ext::FidlConversionError),
+    #[error("Port matcher error: {0}")]
+    PortMatcher(#[from] fnet_filter_ext::PortMatcherError),
     #[error("buffer of size {size} is too small to read ipt_replace or ip6t_replace")]
     BufferTooSmallForMetadata { size: usize },
     #[error("specified size {specified_size} does not match size of entries {entries_size}")]
@@ -104,6 +107,10 @@ pub enum IpTableParseError {
     InvalidIpFlags { flags: u8 },
     #[error("invalid IP inverse flags {flags:#x} found in rule specification")]
     InvalidIpInverseFlags { flags: u8 },
+    #[error("invalid TCP matcher inverse flags {flags:#x}")]
+    InvalidXtTcpInverseFlags { flags: u8 },
+    #[error("invalid UDP matcher inverse flags {flags:#x}")]
+    InvalidXtUdpInverseFlags { flags: u8 },
     #[error("invalid standard target verdict {verdict}")]
     InvalidVerdict { verdict: i32 },
     #[error("invalid jump target {jump_target}")]
@@ -130,6 +137,10 @@ pub enum IpTableParseError {
     UnexpectedErrorTarget { error_name: String },
     #[error("too many rules")]
     TooManyRules,
+    #[error("match extension does not match protocol")]
+    MatchExtensionDoesNotMatchProtocol,
+    #[error("match extension would overwrite another matcher")]
+    MatchExtensionOverwrite,
 }
 
 #[derive(Debug, Error, PartialEq)]
@@ -417,7 +428,7 @@ pub struct Entry {
 
 #[derive(Debug)]
 pub enum Matcher {
-    Unknown { name: String, bytes: Vec<u8> },
+    Unknown,
     Tcp(xt_tcp),
     Udp(xt_udp),
 }
@@ -753,14 +764,7 @@ impl IptReplaceParser {
 
             matcher_name => {
                 log_warn!("IpTables: ignored {matcher_name} matcher of size {match_size}");
-                let bytes = self
-                    .get_next_bytes(remaining_size)
-                    .ok_or_else(|| IpTableParseError::MatchSizeMismatch {
-                        size: match_size,
-                        match_name: "unknown",
-                    })?
-                    .to_vec();
-                Matcher::Unknown { name: matcher_name.to_owned(), bytes }
+                Matcher::Unknown
             }
         };
 
@@ -1538,11 +1542,89 @@ impl Entry {
 
     fn populate_matchers_with_match_extensions(
         &self,
-        _matchers: &mut fnet_filter_ext::Matchers,
+        fnet_filter_matchers: &mut fnet_filter_ext::Matchers,
     ) -> Result<Option<()>, IpTableParseError> {
-        if !self.matchers.is_empty() {
-            log_warn!("IpTables: ignored rule-specification with match extensions");
-            return Ok(None);
+        for matcher in &self.matchers {
+            match matcher {
+                Matcher::Tcp(xt_tcp {
+                    spts,
+                    dpts,
+                    invflags,
+                    option: _,
+                    flg_mask: _,
+                    flg_cmp: _,
+                }) => {
+                    // TCP match extension is only valid if protocol is specified as TCP.
+                    let Some(fnet_filter_ext::TransportProtocolMatcher::Tcp {
+                        ref mut src_port,
+                        ref mut dst_port,
+                    }) = fnet_filter_matchers.transport_protocol.as_mut()
+                    else {
+                        return Err(IpTableParseError::MatchExtensionDoesNotMatchProtocol);
+                    };
+
+                    let inverse_flags = XtTcpInverseFlags::from_bits((*invflags).into())
+                        .ok_or_else(|| IpTableParseError::InvalidXtTcpInverseFlags {
+                            flags: *invflags,
+                        })?;
+
+                    if src_port.is_some() || dst_port.is_some() {
+                        return Err(IpTableParseError::MatchExtensionOverwrite);
+                    }
+                    src_port.replace(
+                        fnet_filter_ext::PortMatcher::new(
+                            spts[0],
+                            spts[1],
+                            inverse_flags.contains(XtTcpInverseFlags::SOURCE_PORT),
+                        )
+                        .map_err(IpTableParseError::PortMatcher)?,
+                    );
+                    dst_port.replace(
+                        fnet_filter_ext::PortMatcher::new(
+                            dpts[0],
+                            dpts[1],
+                            inverse_flags.contains(XtTcpInverseFlags::DESTINATION_PORT),
+                        )
+                        .map_err(IpTableParseError::PortMatcher)?,
+                    );
+                }
+                Matcher::Udp(xt_udp { spts, dpts, invflags, __bindgen_padding_0 }) => {
+                    // UDP match extension is only valid if protocol is specified as UDP.
+                    let Some(fnet_filter_ext::TransportProtocolMatcher::Udp {
+                        ref mut src_port,
+                        ref mut dst_port,
+                    }) = fnet_filter_matchers.transport_protocol.as_mut()
+                    else {
+                        return Err(IpTableParseError::MatchExtensionDoesNotMatchProtocol);
+                    };
+
+                    let inverse_flags = XtUdpInverseFlags::from_bits((*invflags).into())
+                        .ok_or_else(|| IpTableParseError::InvalidXtUdpInverseFlags {
+                            flags: *invflags,
+                        })?;
+
+                    if src_port.is_some() || dst_port.is_some() {
+                        return Err(IpTableParseError::MatchExtensionOverwrite);
+                    }
+                    src_port.replace(
+                        fnet_filter_ext::PortMatcher::new(
+                            spts[0],
+                            spts[1],
+                            inverse_flags.contains(XtUdpInverseFlags::SOURCE_PORT),
+                        )
+                        .map_err(IpTableParseError::PortMatcher)?,
+                    );
+                    dst_port.replace(
+                        fnet_filter_ext::PortMatcher::new(
+                            dpts[0],
+                            dpts[1],
+                            inverse_flags.contains(XtUdpInverseFlags::DESTINATION_PORT),
+                        )
+                        .map_err(IpTableParseError::PortMatcher)?,
+                    );
+                }
+                Matcher::Unknown => return Ok(None),
+            }
         }
 
         Ok(Some(()))
@@ -1774,7 +1856,7 @@ mod tests {
     use net_declare::{fidl_ip, fidl_subnet};
     use starnix_uapi::{
         c_char, in6_addr__bindgen_ty_1, in_addr, ipt_entry, ipt_ip, ipt_replace, xt_tcp, xt_udp,
-        IP6T_F_PROTO, IPT_INV_SRCIP,
+        IP6T_F_PROTO, IPT_INV_SRCIP, XT_TCP_INV_DSTPT,
     };
     use test_case::test_case;
     use {fidl_fuchsia_net as fnet, fidl_fuchsia_net_filter_ext as fnet_filter_ext};
@@ -2373,8 +2455,8 @@ mod tests {
                         invert: true,
                     }),
                     transport_protocol: Some(fnet_filter_ext::TransportProtocolMatcher::Tcp {
-                        dst_port: None,
                         src_port: None,
+                        dst_port: None,
                     }),
                     ..Default::default()
                 },
@@ -2393,8 +2475,8 @@ mod tests {
                         invert: false,
                     }),
                     transport_protocol: Some(fnet_filter_ext::TransportProtocolMatcher::Udp {
-                        dst_port: None,
                         src_port: None,
+                        dst_port: None,
                     }),
                     ..Default::default()
                 },
@@ -2483,29 +2565,51 @@ mod tests {
         // Start of INPUT built-in chain.
         let input_hook_entry = entries_bytes.len() as u32;
 
-        // Entry 0: rule with TCP match-extension.
+        // Entry 0: DROP all TCP packets except those destined to port 8000.
         entries_bytes.extend_from_slice(
-            ipt_entry { target_offset: 160, next_offset: 200, ..Default::default() }.as_bytes(),
+            ipt_entry {
+                ip: ipt_ip { proto: IPPROTO_TCP as u16, ..Default::default() },
+                target_offset: 160,
+                next_offset: 200,
+                ..Default::default()
+            }
+            .as_bytes(),
         );
         entries_bytes.extend_from_slice(
             xt_entry_match { match_size: 48, name: string_to_29_chars("tcp"), revision: 0 }
                 .as_bytes(),
         );
-        entries_bytes.extend_from_slice(xt_tcp::default().as_bytes());
+        entries_bytes.extend_from_slice(
+            xt_tcp {
+                spts: [0, 65535],
+                dpts: [8000, 8000],
+                invflags: XT_TCP_INV_DSTPT as u8,
+                ..Default::default()
+            }
+            .as_bytes(),
+        );
         entries_bytes.extend_from_slice(&[0, 0, 0, 0]); // padding
         extend_with_standard_verdict(&mut entries_bytes, VERDICT_DROP);
 
-        // Entry 1: rule with UDP match-extension.
+        // Entry 1: ACCEPT UDP packets with source port between 2000-3000.
         entries_bytes.extend_from_slice(
-            ipt_entry { target_offset: 160, next_offset: 200, ..Default::default() }.as_bytes(),
+            ipt_entry {
+                ip: ipt_ip { proto: IPPROTO_UDP as u16, ..Default::default() },
+                target_offset: 160,
+                next_offset: 200,
+                ..Default::default()
+            }
+            .as_bytes(),
         );
         entries_bytes.extend_from_slice(
             xt_entry_match { match_size: 48, name: string_to_29_chars("udp"), revision: 0 }
                 .as_bytes(),
         );
-        entries_bytes.extend_from_slice(xt_udp::default().as_bytes());
+        entries_bytes.extend_from_slice(
+            xt_udp { spts: [2000, 3000], dpts: [0, 65535], ..Default::default() }.as_bytes(),
+        );
         entries_bytes.extend_from_slice(&[0, 0, 0, 0, 0, 0]);
-        extend_with_standard_verdict(&mut entries_bytes, VERDICT_DROP);
+        extend_with_standard_verdict(&mut entries_bytes, VERDICT_ACCEPT);
 
         // Entry 2: policy of INPUT chain.
         let input_underflow = entries_bytes.len() as u32;
@@ -2567,7 +2671,44 @@ mod tests {
             rules.next().unwrap(),
             fnet_filter_ext::Rule {
                 id: fnet_filter_ext::RuleId {
-                    // Index is 2 because the first 2 rules have match extensions and are ignored.
+                    index: 0,
+                    routine: filter_input_routine(&expected_namespace).id,
+                },
+                matchers: fnet_filter_ext::Matchers {
+                    transport_protocol: Some(fnet_filter_ext::TransportProtocolMatcher::Tcp {
+                        src_port: Some(fnet_filter_ext::PortMatcher::new(0, 65535, false).unwrap()),
+                        dst_port: Some(
+                            fnet_filter_ext::PortMatcher::new(8000, 8000, true).unwrap()
+                        ),
+                    }),
+                    ..Default::default()
+                },
+                action: fnet_filter_ext::Action::Drop,
+            }
+        );
+        assert_eq!(
+            rules.next().unwrap(),
+            fnet_filter_ext::Rule {
+                id: fnet_filter_ext::RuleId {
+                    index: 1,
+                    routine: filter_input_routine(&expected_namespace).id,
+                },
+                matchers: fnet_filter_ext::Matchers {
+                    transport_protocol: Some(fnet_filter_ext::TransportProtocolMatcher::Udp {
+                        src_port: Some(
+                            fnet_filter_ext::PortMatcher::new(2000, 3000, false).unwrap()
+                        ),
+                        dst_port: Some(fnet_filter_ext::PortMatcher::new(0, 65535, false).unwrap()),
+                    }),
+                    ..Default::default()
+                },
+                action: fnet_filter_ext::Action::Accept,
+            }
+        );
+        assert_eq!(
+            rules.next().unwrap(),
+            fnet_filter_ext::Rule {
+                id: fnet_filter_ext::RuleId {
                     index: 2,
                     routine: filter_input_routine(&expected_namespace).id,
                 },
@@ -3342,8 +3483,8 @@ mod tests {
                 },
                 matchers: fnet_filter_ext::Matchers {
                     transport_protocol: Some(fnet_filter_ext::TransportProtocolMatcher::Tcp {
-                        dst_port: None,
                         src_port: None,
+                        dst_port: None,
                     }),
                     ..Default::default()
                 },
@@ -3358,8 +3499,8 @@ mod tests {
                 },
                 matchers: fnet_filter_ext::Matchers {
                     transport_protocol: Some(fnet_filter_ext::TransportProtocolMatcher::Udp {
-                        dst_port: None,
                         src_port: None,
+                        dst_port: None,
                     }),
                     ..Default::default()
                 },
@@ -3374,8 +3515,8 @@ mod tests {
                 },
                 matchers: fnet_filter_ext::Matchers {
                     transport_protocol: Some(fnet_filter_ext::TransportProtocolMatcher::Tcp {
-                        dst_port: None,
                         src_port: None,
+                        dst_port: None,
                     }),
                     ..Default::default()
                 },
@@ -3409,8 +3550,8 @@ mod tests {
                 },
                 matchers: fnet_filter_ext::Matchers {
                     transport_protocol: Some(fnet_filter_ext::TransportProtocolMatcher::Tcp {
-                        dst_port: None,
                         src_port: None,
+                        dst_port: None,
                     }),
                     ..Default::default()
                 },
@@ -3423,8 +3564,8 @@ mod tests {
                 },
                 matchers: fnet_filter_ext::Matchers {
                     transport_protocol: Some(fnet_filter_ext::TransportProtocolMatcher::Udp {
-                        dst_port: None,
                         src_port: None,
+                        dst_port: None,
                     }),
                     ..Default::default()
                 },
@@ -3439,8 +3580,8 @@ mod tests {
                 },
                 matchers: fnet_filter_ext::Matchers {
                     transport_protocol: Some(fnet_filter_ext::TransportProtocolMatcher::Tcp {
-                        dst_port: None,
                         src_port: None,
+                        dst_port: None,
                     }),
                     ..Default::default()
                 },
