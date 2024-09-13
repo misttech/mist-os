@@ -1,0 +1,60 @@
+// Copyright 2024 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
+/// Cross-language shared constants for tracking observability in inspect.
+///
+/// The constants below are inspect keys. We name them so that the names shown
+/// in Inspect output associate well with their meaning.
+///
+/// Some conventions used for uniform reporting:
+/// - All timestamps are expressed in nanoseconds.
+/// - All durations are expressed in nanoseconds.
+/// - All plain counters are suffixed with `_count`.
+/// - All node constant names are suffixed with `_NODE`.
+@available(added=NEXT)
+library fuchsia.power.observability;
+
+// Inspect nodes of suspend hierarchy.
+
+/// Label of an inspect node tallying suspend events.
+const SUSPEND_EVENTS_NODE string = "suspend_events";
+
+/// Label of an inspect node keeping suspend statistics.
+const SUSPEND_STATS_NODE string = "suspend_stats";
+
+// Lifecycle.
+
+/// Timestamp in nanos at which suspend was attempted.
+const SUSPEND_ATTEMPTED_AT string = "attempted_at_ns";
+
+/// Timestamp in nanos at which a resume happened.
+const SUSPEND_RESUMED_AT string = "resumed_at_ns";
+
+/// Timestamp in nanos at which suspend failed.
+const SUSPEND_FAILED_AT string = "failed_at_ns";
+
+/// The duration of time last spent in suspend.
+const SUSPEND_LAST_TIMESTAMP string = "last_time_in_suspend_ns";
+
+/// The duration of time last spent in suspend.
+const SUSPEND_LAST_DURATION string = "last_time_in_suspend_operations";
+
+/// The requested future system state.
+const SUSPEND_REQUESTED_STATE string = "requested_power_state";
+
+// Errors
+
+/// The error code related to the last suspend operation.
+const SUSPEND_LAST_FAILED_ERROR string = "last_failed_error";
+
+// Counters
+
+/// The number of successful suspends.
+const SUSPEND_SUCCESS_COUNT string = "success_count";
+
+/// The number of failed suspends.
+const SUSPEND_FAIL_COUNT string = "fail_count";
+
+/// The number of suspend failures observed.
+const UNHANDLED_SUSPEND_FAILURES_COUNT string = "unhandled_suspend_failures_count";
