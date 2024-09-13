@@ -226,6 +226,19 @@ _flag_groups = struct(
             "-no-canonical-prefixes",
         ],
     ),
+    thread_safety_annotations = _make_flag_group_struct(
+        cflags = [
+            "-Wthread-safety",
+
+            # TODO(https://fxbug.dev/42085252): Clang is catching instances of these in the kernel and drivers.
+            # Temporarily disable them for now to facilitate the roll then come back and
+            # fix them.
+            "-Wno-unknown-warning-option",
+            "-Wno-thread-safety-reference-return",
+            "-D_LIBCPP_ENABLE_THREAD_SAFETY_ANNOTATIONS=1",
+        ],
+        combine_cflags_with_ldflags = False,
+    ),
 )
 
 #
@@ -265,6 +278,7 @@ _default_compile_flags_feature = feature(
                 _flag_groups.symbol_visibility_hidden,
                 _flag_groups.ffp_contract_off,
                 _flag_groups.auto_var_init,
+                _flag_groups.thread_safety_annotations,
             ]),
         ),
         # These are ccflags that will be added to all builds
