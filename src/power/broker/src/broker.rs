@@ -17,7 +17,6 @@ use std::cmp::max;
 use std::collections::{HashMap, HashSet};
 use std::fmt::{self, Debug};
 use std::hash::Hash;
-use std::iter::repeat;
 use uuid::Uuid;
 
 use crate::credentials::*;
@@ -1061,8 +1060,6 @@ impl Broker {
         initial_current_level: fpb::PowerLevel,
         valid_levels: Vec<fpb::PowerLevel>,
         level_dependencies: Vec<fpb::LevelDependency>,
-        assertive_dependency_tokens: Vec<Token>,
-        opportunistic_dependency_tokens: Vec<Token>,
     ) -> Result<ElementID, AddElementError> {
         if valid_levels.len() < 1 {
             return Err(AddElementError::Invalid);
@@ -1105,36 +1102,6 @@ impl Broker {
                     ModifyDependencyError::NotAuthorized => AddElementError::NotAuthorized,
                 });
             };
-        }
-        let labeled_dependency_tokens =
-            assertive_dependency_tokens.into_iter().zip(repeat(DependencyType::Assertive)).chain(
-                opportunistic_dependency_tokens
-                    .into_iter()
-                    .zip(repeat(DependencyType::Opportunistic)),
-            );
-        for (token, dependency_type) in labeled_dependency_tokens {
-            if let Err(err) = self.register_dependency_token(&id, token, dependency_type) {
-                match err {
-                    RegisterDependencyTokenError::Internal => {
-                        tracing::debug!("can't register_dependency_token for {:?}: internal", &id);
-                        return Err(AddElementError::Internal);
-                    }
-                    RegisterDependencyTokenError::AlreadyInUse => {
-                        tracing::debug!(
-                            "can't register_dependency_token for {:?}: already in use",
-                            &id
-                        );
-                        return Err(AddElementError::Invalid);
-                    }
-                    fpb::RegisterDependencyTokenErrorUnknown!() => {
-                        tracing::warn!(
-                            "unknown RegisterDependencyTokenError received: {}",
-                            err.into_primitive()
-                        );
-                        return Err(AddElementError::Internal);
-                    }
-                }
-            }
         }
         Ok(id)
     }
@@ -2227,8 +2194,6 @@ mod tests {
                 // Unsorted. The order declares the order of increasing power.
                 vec![5, 2, 7],
                 vec![],
-                vec![],
-                vec![],
             )
             .expect("add_element failed");
         assert_eq!(broker.lookup_name(&latinum), "Latinum".to_string());
@@ -2309,9 +2274,8 @@ mod tests {
         let inspect = fuchsia_inspect::component::inspector();
         let inspect_node = inspect.root().create_child("test");
         let mut broker = Broker::new(inspect_node);
-        let latinum = broker
-            .add_element("Latinum", 2, vec![0, 1, 2], vec![], vec![], vec![])
-            .expect("add_element failed");
+        let latinum =
+            broker.add_element("Latinum", 2, vec![0, 1, 2], vec![]).expect("add_element failed");
         assert_eq!(broker.get_current_level(&latinum), Some(TWO));
         assert_eq!(broker.get_required_level(&latinum), Some(ZERO));
 
@@ -2431,18 +2395,15 @@ mod tests {
         let token_mithril = DependencyToken::create();
         let never_registered_token = DependencyToken::create();
         let mithril = broker
-            .add_element(
-                "Mithril",
-                OFF.level,
-                BINARY_POWER_LEVELS.to_vec(),
-                vec![],
-                vec![token_mithril
-                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
-                    .expect("dup failed")
-                    .into()],
-                vec![],
-            )
+            .add_element("Mithril", OFF.level, BINARY_POWER_LEVELS.to_vec(), vec![])
             .expect("add_element failed");
+        broker
+            .register_dependency_token(
+                &mithril,
+                token_mithril.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("dup failed").into(),
+                DependencyType::Assertive,
+            )
+            .expect("register_dependency_token failed");
         let v01: Vec<u64> = BINARY_POWER_LEVELS.iter().map(|&v| v as u64).collect();
         assert_data_tree!(inspect, root: {
             test: {
@@ -2488,8 +2449,6 @@ mod tests {
                     .expect("dup failed"),
                 requires_level_by_preference: vec![ON.level],
             }],
-            vec![],
-            vec![],
         );
         assert!(matches!(add_element_not_authorized_res, Err(AddElementError::NotAuthorized)));
 
@@ -2507,8 +2466,6 @@ mod tests {
                         .expect("dup failed"),
                     requires_level_by_preference: vec![ON.level],
                 }],
-                vec![],
-                vec![],
             )
             .expect("add_element failed");
         assert_data_tree!(inspect, root: {
@@ -2575,8 +2532,6 @@ mod tests {
                         .expect("dup failed"),
                     requires_level_by_preference: vec![ON.level],
                 }],
-                vec![],
-                vec![],
             );
         assert!(matches!(add_element_not_authorized_res, Err(AddElementError::NotAuthorized)));
     }
@@ -2587,14 +2542,7 @@ mod tests {
         let inspect_node = inspect.root().create_child("test");
         let mut broker = Broker::new(inspect_node);
         let unobtanium = broker
-            .add_element(
-                "Unobtainium",
-                OFF.level,
-                BINARY_POWER_LEVELS.to_vec(),
-                vec![],
-                vec![],
-                vec![],
-            )
+            .add_element("Unobtainium", OFF.level, BINARY_POWER_LEVELS.to_vec(), vec![])
             .expect("add_element failed");
         assert_eq!(broker.element_exists(&unobtanium), true);
         let v01: Vec<u64> = BINARY_POWER_LEVELS.iter().map(|&v| v as u64).collect();
@@ -2809,11 +2757,11 @@ mod tests {
         let mut broker = Broker::new(inspect_node);
 
         let a = broker
-            .add_element("a", OFF.level, BINARY_POWER_LEVELS.to_vec(), vec![], vec![], vec![])
+            .add_element("a", OFF.level, BINARY_POWER_LEVELS.to_vec(), vec![])
             .expect("add_element failed");
 
         let b = broker
-            .add_element("b", OFF.level, BINARY_POWER_LEVELS.to_vec(), vec![], vec![], vec![])
+            .add_element("b", OFF.level, BINARY_POWER_LEVELS.to_vec(), vec![])
             .expect("add_element failed");
 
         assert_eq!(broker.adjust_lease_counter(&a, 5, 1), 1);
@@ -2846,32 +2794,26 @@ mod tests {
         let mut broker = Broker::new(inspect_node);
         let parent1_token = DependencyToken::create();
         let parent1: ElementID = broker
-            .add_element(
-                "P1",
-                OFF.level,
-                BINARY_POWER_LEVELS.to_vec(),
-                vec![],
-                vec![parent1_token
-                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
-                    .expect("dup failed")
-                    .into()],
-                vec![],
-            )
+            .add_element("P1", OFF.level, BINARY_POWER_LEVELS.to_vec(), vec![])
             .expect("add_element failed");
+        broker
+            .register_dependency_token(
+                &parent1,
+                parent1_token.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("dup failed").into(),
+                DependencyType::Assertive,
+            )
+            .expect("register_dependency_token failed");
         let parent2_token = DependencyToken::create();
         let parent2: ElementID = broker
-            .add_element(
-                "P2",
-                OFF.level,
-                BINARY_POWER_LEVELS.to_vec(),
-                vec![],
-                vec![parent2_token
-                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
-                    .expect("dup failed")
-                    .into()],
-                vec![],
-            )
+            .add_element("P2", OFF.level, BINARY_POWER_LEVELS.to_vec(), vec![])
             .expect("add_element failed");
+        broker
+            .register_dependency_token(
+                &parent2,
+                parent2_token.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("dup failed").into(),
+                DependencyType::Assertive,
+            )
+            .expect("register_dependency_token failed");
         let child = broker
             .add_element(
                 "C",
@@ -2895,8 +2837,6 @@ mod tests {
                         requires_level_by_preference: vec![ON.level],
                     },
                 ],
-                vec![],
-                vec![],
             )
             .expect("add_element failed");
 
@@ -3120,32 +3060,29 @@ mod tests {
         let mut broker = Broker::new(inspect_node);
         let grandparent_token = DependencyToken::create();
         let grandparent: ElementID = broker
-            .add_element(
-                "GP",
-                OFF.level,
-                BINARY_POWER_LEVELS.to_vec(),
-                vec![],
-                vec![grandparent_token
+            .add_element("GP", OFF.level, BINARY_POWER_LEVELS.to_vec(), vec![])
+            .expect("add_element failed");
+        broker
+            .register_dependency_token(
+                &grandparent,
+                grandparent_token
                     .duplicate_handle(zx::Rights::SAME_RIGHTS)
                     .expect("dup failed")
-                    .into()],
-                vec![],
+                    .into(),
+                DependencyType::Assertive,
             )
-            .expect("add_element failed");
+            .expect("register_dependency_token failed");
         let parent_token = DependencyToken::create();
         let parent: ElementID = broker
-            .add_element(
-                "P",
-                OFF.level,
-                BINARY_POWER_LEVELS.to_vec(),
-                vec![],
-                vec![parent_token
-                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
-                    .expect("dup failed")
-                    .into()],
-                vec![],
-            )
+            .add_element("P", OFF.level, BINARY_POWER_LEVELS.to_vec(), vec![])
             .expect("add_element failed");
+        broker
+            .register_dependency_token(
+                &parent,
+                parent_token.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("dup failed").into(),
+                DependencyType::Assertive,
+            )
+            .expect("register_dependency_token failed");
         let child = broker
             .add_element(
                 "C",
@@ -3159,8 +3096,6 @@ mod tests {
                         .expect("dup failed"),
                     requires_level_by_preference: vec![ON.level],
                 }],
-                vec![],
-                vec![],
             )
             .expect("add_element failed");
         broker
@@ -3255,19 +3190,18 @@ mod tests {
         let inspect_node = inspect.root().create_child("test");
         let mut broker = Broker::new(inspect_node);
         let grandparent_token = DependencyToken::create();
-        let grandparent: ElementID = broker
-            .add_element(
-                "GP",
-                10,
-                vec![10, 90, 200],
-                vec![],
-                vec![grandparent_token
+        let grandparent: ElementID =
+            broker.add_element("GP", 10, vec![10, 90, 200], vec![]).expect("add_element failed");
+        broker
+            .register_dependency_token(
+                &grandparent,
+                grandparent_token
                     .duplicate_handle(zx::Rights::SAME_RIGHTS)
                     .expect("dup failed")
-                    .into()],
-                vec![],
+                    .into(),
+                DependencyType::Assertive,
             )
-            .expect("add_element failed");
+            .expect("register_dependency_token failed");
         let parent_token = DependencyToken::create();
         let parent: ElementID = broker
             .add_element(
@@ -3292,13 +3226,15 @@ mod tests {
                         requires_level_by_preference: vec![90],
                     },
                 ],
-                vec![parent_token
-                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
-                    .expect("dup failed")
-                    .into()],
-                vec![],
             )
             .expect("add_element failed");
+        broker
+            .register_dependency_token(
+                &parent,
+                parent_token.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("dup failed").into(),
+                DependencyType::Assertive,
+            )
+            .expect("register_dependency_token failed");
         let child1 = broker
             .add_element(
                 "C1",
@@ -3312,8 +3248,6 @@ mod tests {
                         .expect("dup failed"),
                     requires_level_by_preference: vec![50],
                 }],
-                vec![],
-                vec![],
             )
             .expect("add_element failed");
         let child2 = broker
@@ -3329,8 +3263,6 @@ mod tests {
                         .expect("dup failed"),
                     requires_level_by_preference: vec![30],
                 }],
-                vec![],
-                vec![],
             )
             .expect("add_element failed");
 
@@ -3465,21 +3397,28 @@ mod tests {
         let token_a_assertive = DependencyToken::create();
         let token_a_opportunistic = DependencyToken::create();
         let element_a = broker
-            .add_element(
-                "A",
-                OFF.level,
-                BINARY_POWER_LEVELS.to_vec(),
-                vec![],
-                vec![token_a_assertive
-                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
-                    .expect("dup failed")
-                    .into()],
-                vec![token_a_opportunistic
-                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
-                    .expect("dup failed")
-                    .into()],
-            )
+            .add_element("A", OFF.level, BINARY_POWER_LEVELS.to_vec(), vec![])
             .expect("add_element failed");
+        broker
+            .register_dependency_token(
+                &element_a,
+                token_a_assertive
+                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                    .expect("dup failed")
+                    .into(),
+                DependencyType::Assertive,
+            )
+            .expect("register_dependency_token failed");
+        broker
+            .register_dependency_token(
+                &element_a,
+                token_a_opportunistic
+                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                    .expect("dup failed")
+                    .into(),
+                DependencyType::Opportunistic,
+            )
+            .expect("register_dependency_token failed");
         let element_b = broker
             .add_element(
                 "B",
@@ -3494,8 +3433,6 @@ mod tests {
                         .into(),
                     requires_level_by_preference: vec![ON.level],
                 }],
-                vec![],
-                vec![],
             )
             .expect("add_element failed");
         let element_c = broker
@@ -3512,8 +3449,6 @@ mod tests {
                         .into(),
                     requires_level_by_preference: vec![ON.level],
                 }],
-                vec![],
-                vec![],
             )
             .expect("add_element failed");
 
@@ -3747,21 +3682,28 @@ mod tests {
         let token_b_assertive = DependencyToken::create();
         let token_b_opportunistic = DependencyToken::create();
         let element_b = broker
-            .add_element(
-                "B",
-                OFF.level,
-                BINARY_POWER_LEVELS.to_vec(),
-                vec![],
-                vec![token_b_assertive
-                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
-                    .expect("dup failed")
-                    .into()],
-                vec![token_b_opportunistic
-                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
-                    .expect("dup failed")
-                    .into()],
-            )
+            .add_element("B", OFF.level, BINARY_POWER_LEVELS.to_vec(), vec![])
             .expect("add_element failed");
+        broker
+            .register_dependency_token(
+                &element_b,
+                token_b_assertive
+                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                    .expect("dup failed")
+                    .into(),
+                DependencyType::Assertive,
+            )
+            .expect("register_dependency_token failed");
+        broker
+            .register_dependency_token(
+                &element_b,
+                token_b_opportunistic
+                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                    .expect("dup failed")
+                    .into(),
+                DependencyType::Opportunistic,
+            )
+            .expect("register_dependency_token failed");
         let element_a = broker
             .add_element(
                 "A",
@@ -3776,8 +3718,6 @@ mod tests {
                         .into(),
                     requires_level_by_preference: vec![ON.level],
                 }],
-                vec![],
-                vec![],
             )
             .expect("add_element failed");
         let element_c = broker
@@ -3794,8 +3734,6 @@ mod tests {
                         .into(),
                     requires_level_by_preference: vec![ON.level],
                 }],
-                vec![],
-                vec![],
             )
             .expect("add_element failed");
 
@@ -3877,21 +3815,28 @@ mod tests {
         let token_a_assertive = DependencyToken::create();
         let token_a_opportunistic = DependencyToken::create();
         let element_a = broker
-            .add_element(
-                "A",
-                OFF.level,
-                BINARY_POWER_LEVELS.to_vec(),
-                vec![],
-                vec![token_a_assertive
-                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
-                    .expect("dup failed")
-                    .into()],
-                vec![token_a_opportunistic
-                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
-                    .expect("dup failed")
-                    .into()],
-            )
+            .add_element("A", OFF.level, BINARY_POWER_LEVELS.to_vec(), vec![])
             .expect("add_element failed");
+        broker
+            .register_dependency_token(
+                &element_a,
+                token_a_assertive
+                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                    .expect("dup failed")
+                    .into(),
+                DependencyType::Assertive,
+            )
+            .expect("register_dependency_token failed");
+        broker
+            .register_dependency_token(
+                &element_a,
+                token_a_opportunistic
+                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                    .expect("dup failed")
+                    .into(),
+                DependencyType::Opportunistic,
+            )
+            .expect("register_dependency_token failed");
         let element_b = broker
             .add_element(
                 "B",
@@ -3906,8 +3851,6 @@ mod tests {
                         .into(),
                     requires_level_by_preference: vec![ON.level],
                 }],
-                vec![],
-                vec![],
             )
             .expect("add_element failed");
         let element_c = broker
@@ -3924,8 +3867,6 @@ mod tests {
                         .into(),
                     requires_level_by_preference: vec![ON.level],
                 }],
-                vec![],
-                vec![],
             )
             .expect("add_element failed");
 
@@ -4047,21 +3988,28 @@ mod tests {
         let token_a_assertive = DependencyToken::create();
         let token_a_opportunistic = DependencyToken::create();
         let element_a = broker
-            .add_element(
-                "A",
-                OFF.level,
-                BINARY_POWER_LEVELS.to_vec(),
-                vec![],
-                vec![token_a_assertive
-                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
-                    .expect("dup failed")
-                    .into()],
-                vec![token_a_opportunistic
-                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
-                    .expect("dup failed")
-                    .into()],
-            )
+            .add_element("A", OFF.level, BINARY_POWER_LEVELS.to_vec(), vec![])
             .expect("add_element failed");
+        broker
+            .register_dependency_token(
+                &element_a,
+                token_a_assertive
+                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                    .expect("dup failed")
+                    .into(),
+                DependencyType::Assertive,
+            )
+            .expect("register_dependency_token failed");
+        broker
+            .register_dependency_token(
+                &element_a,
+                token_a_opportunistic
+                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                    .expect("dup failed")
+                    .into(),
+                DependencyType::Opportunistic,
+            )
+            .expect("register_dependency_token failed");
         let element_b = broker
             .add_element(
                 "B",
@@ -4076,28 +4024,33 @@ mod tests {
                         .into(),
                     requires_level_by_preference: vec![ON.level],
                 }],
-                vec![],
-                vec![],
             )
             .expect("add_element failed");
         let token_e_assertive = DependencyToken::create();
         let token_e_opportunistic = DependencyToken::create();
         let element_e = broker
-            .add_element(
-                "E",
-                OFF.level,
-                BINARY_POWER_LEVELS.to_vec(),
-                vec![],
-                vec![token_e_assertive
-                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
-                    .expect("dup failed")
-                    .into()],
-                vec![token_e_opportunistic
-                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
-                    .expect("dup failed")
-                    .into()],
-            )
+            .add_element("E", OFF.level, BINARY_POWER_LEVELS.to_vec(), vec![])
             .expect("add_element failed");
+        broker
+            .register_dependency_token(
+                &element_e,
+                token_e_assertive
+                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                    .expect("dup failed")
+                    .into(),
+                DependencyType::Assertive,
+            )
+            .expect("register_dependency_token failed");
+        broker
+            .register_dependency_token(
+                &element_e,
+                token_e_opportunistic
+                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                    .expect("dup failed")
+                    .into(),
+                DependencyType::Opportunistic,
+            )
+            .expect("register_dependency_token failed");
         let element_c = broker
             .add_element(
                 "C",
@@ -4123,8 +4076,6 @@ mod tests {
                         requires_level_by_preference: vec![ON.level],
                     },
                 ],
-                vec![],
-                vec![],
             )
             .expect("add_element failed");
         let element_d = broker
@@ -4141,8 +4092,6 @@ mod tests {
                         .into(),
                     requires_level_by_preference: vec![ON.level],
                 }],
-                vec![],
-                vec![],
             )
             .expect("add_element failed");
 
@@ -4302,21 +4251,28 @@ mod tests {
         let token_a_assertive = DependencyToken::create();
         let token_a_opportunistic = DependencyToken::create();
         let element_a = broker
-            .add_element(
-                "A",
-                OFF.level,
-                BINARY_POWER_LEVELS.to_vec(),
-                vec![],
-                vec![token_a_assertive
-                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
-                    .expect("dup failed")
-                    .into()],
-                vec![token_a_opportunistic
-                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
-                    .expect("dup failed")
-                    .into()],
-            )
+            .add_element("A", OFF.level, BINARY_POWER_LEVELS.to_vec(), vec![])
             .expect("add_element failed");
+        broker
+            .register_dependency_token(
+                &element_a,
+                token_a_assertive
+                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                    .expect("dup failed")
+                    .into(),
+                DependencyType::Assertive,
+            )
+            .expect("register_dependency_token failed");
+        broker
+            .register_dependency_token(
+                &element_a,
+                token_a_opportunistic
+                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                    .expect("dup failed")
+                    .into(),
+                DependencyType::Opportunistic,
+            )
+            .expect("register_dependency_token failed");
         let element_b = broker
             .add_element(
                 "B",
@@ -4331,8 +4287,6 @@ mod tests {
                         .into(),
                     requires_level_by_preference: vec![ON.level],
                 }],
-                vec![],
-                vec![],
             )
             .expect("add_element failed");
         let element_c = broker
@@ -4349,8 +4303,6 @@ mod tests {
                         .into(),
                     requires_level_by_preference: vec![ON.level],
                 }],
-                vec![],
-                vec![],
             )
             .expect("add_element failed");
 
@@ -4478,21 +4430,28 @@ mod tests {
         let token_a_assertive = DependencyToken::create();
         let token_a_opportunistic = DependencyToken::create();
         let element_a = broker
-            .add_element(
-                "A",
-                OFF.level,
-                BINARY_POWER_LEVELS.to_vec(),
-                vec![],
-                vec![token_a_assertive
-                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
-                    .expect("dup failed")
-                    .into()],
-                vec![token_a_opportunistic
-                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
-                    .expect("dup failed")
-                    .into()],
-            )
+            .add_element("A", OFF.level, BINARY_POWER_LEVELS.to_vec(), vec![])
             .expect("add_element failed");
+        broker
+            .register_dependency_token(
+                &element_a,
+                token_a_assertive
+                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                    .expect("dup failed")
+                    .into(),
+                DependencyType::Assertive,
+            )
+            .expect("register_dependency_token failed");
+        broker
+            .register_dependency_token(
+                &element_a,
+                token_a_opportunistic
+                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                    .expect("dup failed")
+                    .into(),
+                DependencyType::Opportunistic,
+            )
+            .expect("register_dependency_token failed");
         let element_b = broker
             .add_element(
                 "B",
@@ -4507,8 +4466,6 @@ mod tests {
                         .into(),
                     requires_level_by_preference: vec![ON.level],
                 }],
-                vec![],
-                vec![],
             )
             .expect("add_element failed");
         let element_c = broker
@@ -4525,8 +4482,6 @@ mod tests {
                         .into(),
                     requires_level_by_preference: vec![ON.level],
                 }],
-                vec![],
-                vec![],
             )
             .expect("add_element failed");
 
@@ -4707,22 +4662,28 @@ mod tests {
         let mut broker = Broker::new(inspect_node);
         let token_a_assertive = DependencyToken::create();
         let token_a_opportunistic = DependencyToken::create();
-        let element_a = broker
-            .add_element(
-                "A",
-                0,
-                vec![0, 1, 2, 3],
-                vec![],
-                vec![token_a_assertive
+        let element_a =
+            broker.add_element("A", 0, vec![0, 1, 2, 3], vec![]).expect("add_element failed");
+        broker
+            .register_dependency_token(
+                &element_a,
+                token_a_assertive
                     .duplicate_handle(zx::Rights::SAME_RIGHTS)
                     .expect("dup failed")
-                    .into()],
-                vec![token_a_opportunistic
-                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
-                    .expect("dup failed")
-                    .into()],
+                    .into(),
+                DependencyType::Assertive,
             )
-            .expect("add_element failed");
+            .expect("register_dependency_token failed");
+        broker
+            .register_dependency_token(
+                &element_a,
+                token_a_opportunistic
+                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                    .expect("dup failed")
+                    .into(),
+                DependencyType::Opportunistic,
+            )
+            .expect("register_dependency_token failed");
         let element_b = broker
             .add_element(
                 "B",
@@ -4737,8 +4698,6 @@ mod tests {
                         .into(),
                     requires_level_by_preference: vec![3],
                 }],
-                vec![],
-                vec![],
             )
             .expect("add_element failed");
         let element_c = broker
@@ -4755,8 +4714,6 @@ mod tests {
                         .into(),
                     requires_level_by_preference: vec![2],
                 }],
-                vec![],
-                vec![],
             )
             .expect("add_element failed");
         let element_d = broker
@@ -4773,8 +4730,6 @@ mod tests {
                         .into(),
                     requires_level_by_preference: vec![1],
                 }],
-                vec![],
-                vec![],
             )
             .expect("add_element failed");
         let mut broker_status = BrokerStatusMatcher::new();
@@ -4964,22 +4919,28 @@ mod tests {
         let mut broker = Broker::new(inspect_node);
         let token_a_assertive = DependencyToken::create();
         let token_a_opportunistic = DependencyToken::create();
-        let element_a = broker
-            .add_element(
-                "A",
-                0,
-                vec![0, 1, 2],
-                vec![],
-                vec![token_a_assertive
+        let element_a =
+            broker.add_element("A", 0, vec![0, 1, 2], vec![]).expect("add_element failed");
+        broker
+            .register_dependency_token(
+                &element_a,
+                token_a_assertive
                     .duplicate_handle(zx::Rights::SAME_RIGHTS)
                     .expect("dup failed")
-                    .into()],
-                vec![token_a_opportunistic
-                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
-                    .expect("dup failed")
-                    .into()],
+                    .into(),
+                DependencyType::Assertive,
             )
-            .expect("add_element failed");
+            .expect("register_dependency_token failed");
+        broker
+            .register_dependency_token(
+                &element_a,
+                token_a_opportunistic
+                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                    .expect("dup failed")
+                    .into(),
+                DependencyType::Opportunistic,
+            )
+            .expect("register_dependency_token failed");
         let element_b = broker
             .add_element(
                 "B",
@@ -5005,8 +4966,6 @@ mod tests {
                         requires_level_by_preference: vec![2],
                     },
                 ],
-                vec![],
-                vec![],
             )
             .expect("add_element failed");
         let element_c = broker
@@ -5023,8 +4982,6 @@ mod tests {
                         .into(),
                     requires_level_by_preference: vec![2],
                 }],
-                vec![],
-                vec![],
             )
             .expect("add_element failed");
 
@@ -5195,21 +5152,28 @@ mod tests {
         let token_a_assertive = DependencyToken::create();
         let token_a_opportunistic = DependencyToken::create();
         let element_a = broker
-            .add_element(
-                "A",
-                OFF.level,
-                BINARY_POWER_LEVELS.to_vec(),
-                vec![],
-                vec![token_a_assertive
-                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
-                    .expect("dup failed")
-                    .into()],
-                vec![token_a_opportunistic
-                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
-                    .expect("dup failed")
-                    .into()],
-            )
+            .add_element("A", OFF.level, BINARY_POWER_LEVELS.to_vec(), vec![])
             .expect("add_element failed");
+        broker
+            .register_dependency_token(
+                &element_a,
+                token_a_assertive
+                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                    .expect("dup failed")
+                    .into(),
+                DependencyType::Assertive,
+            )
+            .expect("register_dependency_token failed");
+        broker
+            .register_dependency_token(
+                &element_a,
+                token_a_opportunistic
+                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                    .expect("dup failed")
+                    .into(),
+                DependencyType::Opportunistic,
+            )
+            .expect("register_dependency_token failed");
         let element_b = broker
             .add_element(
                 "B",
@@ -5224,24 +5188,22 @@ mod tests {
                         .into(),
                     requires_level_by_preference: vec![ON.level],
                 }],
-                vec![],
-                vec![],
             )
             .expect("add_element failed");
         let token_d_assertive = DependencyToken::create();
         let element_d = broker
-            .add_element(
-                "D",
-                OFF.level,
-                BINARY_POWER_LEVELS.to_vec(),
-                vec![],
-                vec![token_d_assertive
+            .add_element("D", OFF.level, BINARY_POWER_LEVELS.to_vec(), vec![])
+            .expect("add_element failed");
+        broker
+            .register_dependency_token(
+                &element_d,
+                token_d_assertive
                     .duplicate_handle(zx::Rights::SAME_RIGHTS)
                     .expect("dup failed")
-                    .into()],
-                vec![],
+                    .into(),
+                DependencyType::Assertive,
             )
-            .expect("add_element failed");
+            .expect("register_dependency_token failed");
         let element_c = broker
             .add_element(
                 "C",
@@ -5267,8 +5229,6 @@ mod tests {
                         requires_level_by_preference: vec![ON.level],
                     },
                 ],
-                vec![],
-                vec![],
             )
             .expect("add_element failed");
 
@@ -5422,39 +5382,53 @@ mod tests {
         let token_a_assertive = DependencyToken::create();
         let token_a_opportunistic = DependencyToken::create();
         let element_a = broker
-            .add_element(
-                "A",
-                OFF.level,
-                BINARY_POWER_LEVELS.to_vec(),
-                vec![],
-                vec![token_a_assertive
-                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
-                    .expect("dup failed")
-                    .into()],
-                vec![token_a_opportunistic
-                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
-                    .expect("dup failed")
-                    .into()],
-            )
+            .add_element("A", OFF.level, BINARY_POWER_LEVELS.to_vec(), vec![])
             .expect("add_element failed");
+        broker
+            .register_dependency_token(
+                &element_a,
+                token_a_assertive
+                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                    .expect("dup failed")
+                    .into(),
+                DependencyType::Assertive,
+            )
+            .expect("register_dependency_token failed");
+        broker
+            .register_dependency_token(
+                &element_a,
+                token_a_opportunistic
+                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                    .expect("dup failed")
+                    .into(),
+                DependencyType::Opportunistic,
+            )
+            .expect("register_dependency_token failed");
         let token_c_assertive = DependencyToken::create();
         let token_c_opportunistic = DependencyToken::create();
         let element_c = broker
-            .add_element(
-                "C",
-                OFF.level,
-                BINARY_POWER_LEVELS.to_vec(),
-                vec![],
-                vec![token_c_assertive
-                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
-                    .expect("dup failed")
-                    .into()],
-                vec![token_c_opportunistic
-                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
-                    .expect("dup failed")
-                    .into()],
-            )
+            .add_element("C", OFF.level, BINARY_POWER_LEVELS.to_vec(), vec![])
             .expect("add_element failed");
+        broker
+            .register_dependency_token(
+                &element_c,
+                token_c_assertive
+                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                    .expect("dup failed")
+                    .into(),
+                DependencyType::Assertive,
+            )
+            .expect("register_dependency_token failed");
+        broker
+            .register_dependency_token(
+                &element_c,
+                token_c_opportunistic
+                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                    .expect("dup failed")
+                    .into(),
+                DependencyType::Opportunistic,
+            )
+            .expect("register_dependency_token failed");
         let token_b_assertive = DependencyToken::create();
         let element_b = broker
             .add_element(
@@ -5470,13 +5444,18 @@ mod tests {
                         .into(),
                     requires_level_by_preference: vec![ON.level],
                 }],
-                vec![token_b_assertive
-                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
-                    .expect("dup failed")
-                    .into()],
-                vec![],
             )
             .expect("add_element failed");
+        broker
+            .register_dependency_token(
+                &element_b,
+                token_b_assertive
+                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                    .expect("dup failed")
+                    .into(),
+                DependencyType::Assertive,
+            )
+            .expect("register_dependency_token failed");
         let element_d = broker
             .add_element(
                 "D",
@@ -5502,8 +5481,6 @@ mod tests {
                         requires_level_by_preference: vec![ON.level],
                     },
                 ],
-                vec![],
-                vec![],
             )
             .expect("add_element failed");
         let element_e = broker
@@ -5520,8 +5497,6 @@ mod tests {
                         .into(),
                     requires_level_by_preference: vec![ON.level],
                 }],
-                vec![],
-                vec![],
             )
             .expect("add_element failed");
 
@@ -5684,15 +5659,15 @@ mod tests {
         let mut broker = Broker::new(inspect_node);
         let token_a = DependencyToken::create();
         let element_a = broker
-            .add_element(
-                "A",
-                OFF.level,
-                BINARY_POWER_LEVELS.to_vec(),
-                vec![],
-                vec![token_a.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("dup failed").into()],
-                vec![],
-            )
+            .add_element("A", OFF.level, BINARY_POWER_LEVELS.to_vec(), vec![])
             .expect("add_element failed");
+        broker
+            .register_dependency_token(
+                &element_a,
+                token_a.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("dup failed").into(),
+                DependencyType::Assertive,
+            )
+            .expect("register_dependency_token failed");
         let token_b_assertive = DependencyToken::create();
         let token_b_opportunistic = DependencyToken::create();
         let element_b = broker
@@ -5709,16 +5684,28 @@ mod tests {
                         .into(),
                     requires_level_by_preference: vec![ON.level],
                 }],
-                vec![token_b_assertive
-                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
-                    .expect("dup failed")
-                    .into()],
-                vec![token_b_opportunistic
-                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
-                    .expect("dup failed")
-                    .into()],
             )
             .expect("add_element failed");
+        broker
+            .register_dependency_token(
+                &element_b,
+                token_b_assertive
+                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                    .expect("dup failed")
+                    .into(),
+                DependencyType::Assertive,
+            )
+            .expect("register_dependency_token failed");
+        broker
+            .register_dependency_token(
+                &element_b,
+                token_b_opportunistic
+                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                    .expect("dup failed")
+                    .into(),
+                DependencyType::Opportunistic,
+            )
+            .expect("register_dependency_token failed");
         let token_c_assertive = DependencyToken::create();
         let element_c = broker
             .add_element(
@@ -5734,13 +5721,18 @@ mod tests {
                         .into(),
                     requires_level_by_preference: vec![ON.level],
                 }],
-                vec![token_c_assertive
-                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
-                    .expect("dup failed")
-                    .into()],
-                vec![],
             )
             .expect("add_element failed");
+        broker
+            .register_dependency_token(
+                &element_c,
+                token_c_assertive
+                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                    .expect("dup failed")
+                    .into(),
+                DependencyType::Assertive,
+            )
+            .expect("register_dependency_token failed");
         let element_d = broker
             .add_element(
                 "D",
@@ -5755,8 +5747,6 @@ mod tests {
                         .into(),
                     requires_level_by_preference: vec![ON.level],
                 }],
-                vec![],
-                vec![],
             )
             .expect("add_element failed");
         let element_e = broker
@@ -5773,8 +5763,6 @@ mod tests {
                         .into(),
                     requires_level_by_preference: vec![ON.level],
                 }],
-                vec![],
-                vec![],
             )
             .expect("add_element failed");
 
@@ -5940,32 +5928,30 @@ mod tests {
 
         let token_b_assertive = DependencyToken::create();
         let token_c_assertive = DependencyToken::create();
-        let element_b = broker
-            .add_element(
-                "B",
-                0,
-                v012_u8.clone(),
-                vec![],
-                vec![token_b_assertive
+        let element_b =
+            broker.add_element("B", 0, v012_u8.clone(), vec![]).expect("add_element failed");
+        broker
+            .register_dependency_token(
+                &element_b,
+                token_b_assertive
                     .duplicate_handle(zx::Rights::SAME_RIGHTS)
                     .expect("dup failed")
-                    .into()],
-                vec![],
+                    .into(),
+                DependencyType::Assertive,
             )
-            .expect("add_element failed");
-        let element_c = broker
-            .add_element(
-                "C",
-                0,
-                v012_u8.clone(),
-                vec![],
-                vec![token_c_assertive
+            .expect("register_dependency_token failed");
+        let element_c =
+            broker.add_element("C", 0, v012_u8.clone(), vec![]).expect("add_element failed");
+        broker
+            .register_dependency_token(
+                &element_c,
+                token_c_assertive
                     .duplicate_handle(zx::Rights::SAME_RIGHTS)
                     .expect("dup failed")
-                    .into()],
-                vec![],
+                    .into(),
+                DependencyType::Assertive,
             )
-            .expect("add_element failed");
+            .expect("register_dependency_token failed");
         let element_a = broker
             .add_element(
                 "A",
@@ -5991,8 +5977,6 @@ mod tests {
                         requires_level_by_preference: vec![1],
                     },
                 ],
-                vec![],
-                vec![],
             )
             .expect("add_element failed");
 
@@ -6102,35 +6086,40 @@ mod tests {
         let token_c_opportunistic = DependencyToken::create();
         let token_d_assertive = DependencyToken::create();
         let token_e_assertive = DependencyToken::create();
-        let element_b = broker
-            .add_element(
-                "B",
-                0,
-                v0123_u8.clone(),
-                vec![],
-                vec![token_b_assertive
+        let element_b =
+            broker.add_element("B", 0, v0123_u8.clone(), vec![]).expect("add_element failed");
+        broker
+            .register_dependency_token(
+                &element_b,
+                token_b_assertive
                     .duplicate_handle(zx::Rights::SAME_RIGHTS)
                     .expect("dup failed")
-                    .into()],
-                vec![token_b_opportunistic
-                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
-                    .expect("dup failed")
-                    .into()],
+                    .into(),
+                DependencyType::Assertive,
             )
-            .expect("add_element failed");
-        let element_e = broker
-            .add_element(
-                "E",
-                0,
-                v0123_u8.clone(),
-                vec![],
-                vec![token_e_assertive
+            .expect("register_dependency_token failed");
+        broker
+            .register_dependency_token(
+                &element_b,
+                token_b_opportunistic
                     .duplicate_handle(zx::Rights::SAME_RIGHTS)
                     .expect("dup failed")
-                    .into()],
-                vec![],
+                    .into(),
+                DependencyType::Opportunistic,
             )
-            .expect("add_element failed");
+            .expect("register_dependency_token failed");
+        let element_e =
+            broker.add_element("E", 0, v0123_u8.clone(), vec![]).expect("add_element failed");
+        broker
+            .register_dependency_token(
+                &element_e,
+                token_e_assertive
+                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                    .expect("dup failed")
+                    .into(),
+                DependencyType::Assertive,
+            )
+            .expect("register_dependency_token failed");
         let element_d = broker
             .add_element(
                 "D",
@@ -6156,29 +6145,40 @@ mod tests {
                         requires_level_by_preference: vec![1],
                     },
                 ],
-                vec![token_d_assertive
-                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
-                    .expect("dup failed")
-                    .into()],
-                vec![],
             )
             .expect("add_element failed");
-        let element_c = broker
-            .add_element(
-                "C",
-                0,
-                v0123_u8.clone(),
-                vec![],
-                vec![token_c_assertive
+        broker
+            .register_dependency_token(
+                &element_d,
+                token_d_assertive
                     .duplicate_handle(zx::Rights::SAME_RIGHTS)
                     .expect("dup failed")
-                    .into()],
-                vec![token_c_opportunistic
-                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
-                    .expect("dup failed")
-                    .into()],
+                    .into(),
+                DependencyType::Assertive,
             )
-            .expect("add_element failed");
+            .expect("register_dependency_token failed");
+        let element_c =
+            broker.add_element("C", 0, v0123_u8.clone(), vec![]).expect("add_element failed");
+        broker
+            .register_dependency_token(
+                &element_c,
+                token_c_assertive
+                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                    .expect("dup failed")
+                    .into(),
+                DependencyType::Assertive,
+            )
+            .expect("register_dependency_token failed");
+        broker
+            .register_dependency_token(
+                &element_c,
+                token_c_opportunistic
+                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                    .expect("dup failed")
+                    .into(),
+                DependencyType::Opportunistic,
+            )
+            .expect("register_dependency_token failed");
         let element_f = broker
             .add_element(
                 "F",
@@ -6193,8 +6193,6 @@ mod tests {
                         .into(),
                     requires_level_by_preference: vec![1],
                 }],
-                vec![],
-                vec![],
             )
             .expect("add_element failed");
         let element_a = broker
@@ -6231,8 +6229,6 @@ mod tests {
                         requires_level_by_preference: vec![2],
                     },
                 ],
-                vec![],
-                vec![],
             )
             .expect("add_element failed");
 
@@ -6389,22 +6385,28 @@ mod tests {
         let token_b_opportunistic = DependencyToken::create();
         let token_c_assertive = DependencyToken::create();
         let token_c_opportunistic = DependencyToken::create();
-        let element_c = broker
-            .add_element(
-                "C",
-                0,
-                v0123_u8.clone(),
-                vec![],
-                vec![token_c_assertive
+        let element_c =
+            broker.add_element("C", 0, v0123_u8.clone(), vec![]).expect("add_element failed");
+        broker
+            .register_dependency_token(
+                &element_c,
+                token_c_assertive
                     .duplicate_handle(zx::Rights::SAME_RIGHTS)
                     .expect("dup failed")
-                    .into()],
-                vec![token_c_opportunistic
-                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
-                    .expect("dup failed")
-                    .into()],
+                    .into(),
+                DependencyType::Assertive,
             )
-            .expect("add_element failed");
+            .expect("register_dependency_token failed");
+        broker
+            .register_dependency_token(
+                &element_c,
+                token_c_opportunistic
+                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                    .expect("dup failed")
+                    .into(),
+                DependencyType::Opportunistic,
+            )
+            .expect("register_dependency_token failed");
         let element_b = broker
             .add_element(
                 "B",
@@ -6419,16 +6421,28 @@ mod tests {
                         .into(),
                     requires_level_by_preference: vec![1],
                 }],
-                vec![token_b_assertive
-                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
-                    .expect("dup failed")
-                    .into()],
-                vec![token_b_opportunistic
-                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
-                    .expect("dup failed")
-                    .into()],
             )
             .expect("add_element failed");
+        broker
+            .register_dependency_token(
+                &element_b,
+                token_b_assertive
+                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                    .expect("dup failed")
+                    .into(),
+                DependencyType::Assertive,
+            )
+            .expect("register_dependency_token failed");
+        broker
+            .register_dependency_token(
+                &element_b,
+                token_b_opportunistic
+                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                    .expect("dup failed")
+                    .into(),
+                DependencyType::Opportunistic,
+            )
+            .expect("register_dependency_token failed");
         let element_a = broker
             .add_element(
                 "A",
@@ -6463,8 +6477,6 @@ mod tests {
                         requires_level_by_preference: vec![2],
                     },
                 ],
-                vec![],
-                vec![],
             )
             .expect("add_element failed");
 
@@ -6565,25 +6577,32 @@ mod tests {
         let inspect = fuchsia_inspect::component::inspector();
         let inspect_node = inspect.root().create_child("test");
         let mut broker = Broker::new(inspect_node);
-        let token_sag_es_active = DependencyToken::create();
-        let token_sag_es_passive = DependencyToken::create();
+        let token_sag_es_assertive = DependencyToken::create();
+        let token_sag_es_opportunistic = DependencyToken::create();
         let sag_es = broker
-            .add_element(
-                "SAG Execution State",
-                OFF.level,
-                vec![0, 1, 2],
-                vec![],
-                vec![token_sag_es_active
-                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
-                    .expect("dup failed")
-                    .into()],
-                vec![token_sag_es_passive
-                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
-                    .expect("dup failed")
-                    .into()],
-            )
+            .add_element("SAG Execution State", OFF.level, vec![0, 1, 2], vec![])
             .expect("add_element failed");
-        let token_sag_wh_active = DependencyToken::create();
+        broker
+            .register_dependency_token(
+                &sag_es,
+                token_sag_es_assertive
+                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                    .expect("dup failed")
+                    .into(),
+                DependencyType::Assertive,
+            )
+            .expect("register_dependency_token failed");
+        broker
+            .register_dependency_token(
+                &sag_es,
+                token_sag_es_opportunistic
+                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                    .expect("dup failed")
+                    .into(),
+                DependencyType::Opportunistic,
+            )
+            .expect("register_dependency_token failed");
+        let token_sag_wh_assertive = DependencyToken::create();
         let sag_wh = broker
             .add_element(
                 "SAG Wake Handling",
@@ -6592,19 +6611,24 @@ mod tests {
                 vec![fpb::LevelDependency {
                     dependency_type: DependencyType::Assertive,
                     dependent_level: ON.level,
-                    requires_token: token_sag_es_active
+                    requires_token: token_sag_es_assertive
                         .duplicate_handle(zx::Rights::SAME_RIGHTS)
                         .expect("dup failed")
                         .into(),
                     requires_level_by_preference: vec![ON.level],
                 }],
-                vec![token_sag_wh_active
-                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
-                    .expect("dup failed")
-                    .into()],
-                vec![],
             )
             .expect("add_element failed");
+        broker
+            .register_dependency_token(
+                &sag_wh,
+                token_sag_wh_assertive
+                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                    .expect("dup failed")
+                    .into(),
+                DependencyType::Assertive,
+            )
+            .expect("register_dependency_token failed");
         let storage_hw = broker
             .add_element(
                 "Storage Hardware",
@@ -6613,14 +6637,12 @@ mod tests {
                 vec![fpb::LevelDependency {
                     dependency_type: DependencyType::Opportunistic,
                     dependent_level: ON.level,
-                    requires_token: token_sag_es_passive
+                    requires_token: token_sag_es_opportunistic
                         .duplicate_handle(zx::Rights::SAME_RIGHTS)
                         .expect("dup failed")
                         .into(),
                     requires_level_by_preference: vec![ON.level],
                 }],
-                vec![],
-                vec![],
             )
             .expect("add_element failed");
         let storage_wor = broker
@@ -6631,14 +6653,12 @@ mod tests {
                 vec![fpb::LevelDependency {
                     dependency_type: DependencyType::Assertive,
                     dependent_level: ON.level,
-                    requires_token: token_sag_wh_active
+                    requires_token: token_sag_wh_assertive
                         .duplicate_handle(zx::Rights::SAME_RIGHTS)
                         .expect("dup failed")
                         .into(),
                     requires_level_by_preference: vec![ON.level],
                 }],
-                vec![],
-                vec![],
             )
             .expect("add_element failed");
 
@@ -6789,21 +6809,28 @@ mod tests {
         let token_a_assertive = DependencyToken::create();
         let token_a_opportunistic = DependencyToken::create();
         let element_a = broker
-            .add_element(
-                "A",
-                OFF.level,
-                BINARY_POWER_LEVELS.to_vec(),
-                vec![],
-                vec![token_a_assertive
-                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
-                    .expect("dup failed")
-                    .into()],
-                vec![token_a_opportunistic
-                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
-                    .expect("dup failed")
-                    .into()],
-            )
+            .add_element("A", OFF.level, BINARY_POWER_LEVELS.to_vec(), vec![])
             .expect("add_element failed");
+        broker
+            .register_dependency_token(
+                &element_a,
+                token_a_assertive
+                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                    .expect("dup failed")
+                    .into(),
+                DependencyType::Assertive,
+            )
+            .expect("register_dependency_token failed");
+        broker
+            .register_dependency_token(
+                &element_a,
+                token_a_opportunistic
+                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                    .expect("dup failed")
+                    .into(),
+                DependencyType::Opportunistic,
+            )
+            .expect("register_dependency_token failed");
         let element_b = broker
             .add_element(
                 "B",
@@ -6818,8 +6845,6 @@ mod tests {
                         .into(),
                     requires_level_by_preference: vec![ON.level],
                 }],
-                vec![],
-                vec![],
             )
             .expect("add_element failed");
         let element_c = broker
@@ -6836,8 +6861,6 @@ mod tests {
                         .into(),
                     requires_level_by_preference: vec![ON.level],
                 }],
-                vec![],
-                vec![],
             )
             .expect("add_element failed");
 
@@ -6887,9 +6910,8 @@ mod tests {
         let inspect = fuchsia_inspect::component::inspector();
         let inspect_node = inspect.root().create_child("test");
         let mut broker = Broker::new(inspect_node);
-        let element = broker
-            .add_element("E", 0, vec![0, 1, 2], vec![], vec![], vec![])
-            .expect("add_element failed");
+        let element =
+            broker.add_element("E", 0, vec![0, 1, 2], vec![]).expect("add_element failed");
         let mut broker_status = BrokerStatusMatcher::new();
 
         // Initial required level should be 0.
@@ -6948,18 +6970,15 @@ mod tests {
         let mut broker = Broker::new(inspect_node);
         let token_mithril = DependencyToken::create();
         let mithril = broker
-            .add_element(
-                "Mithril",
-                OFF.level,
-                BINARY_POWER_LEVELS.to_vec(),
-                vec![],
-                vec![token_mithril
-                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
-                    .expect("dup failed")
-                    .into()],
-                vec![],
-            )
+            .add_element("Mithril", OFF.level, BINARY_POWER_LEVELS.to_vec(), vec![])
             .expect("add_element failed");
+        broker
+            .register_dependency_token(
+                &mithril,
+                token_mithril.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("dup failed").into(),
+                DependencyType::Assertive,
+            )
+            .expect("register_dependency_token failed");
         let v01: Vec<u64> = BINARY_POWER_LEVELS.iter().map(|&v| v as u64).collect();
 
         // Add an element with a dependency with a list of requires_level_by_preference.
@@ -6978,8 +6997,6 @@ mod tests {
                         .expect("dup failed"),
                     requires_level_by_preference: vec![40, 30, ON.level, 20],
                 }],
-                vec![],
-                vec![],
             )
             .expect("add_element failed");
         assert_data_tree!(inspect, root: {
@@ -7065,26 +7082,36 @@ mod tests {
                 OFF.level,
                 BINARY_POWER_LEVELS.to_vec(),
                 vec![],
-                vec![token_gp1
-                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
-                    .expect("dup failed")
-                    .into()],
-                vec![],
             )
             .expect("add_element failed");
+        broker
+            .register_dependency_token(
+                &element_gp1,
+                token_gp1
+                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                    .expect("dup failed")
+                    .into(),
+                DependencyType::Assertive,
+            )
+            .expect("register_dependency_token failed");
         let element_gp2 = broker
             .add_element(
                 "GP2",
                 OFF.level,
                 BINARY_POWER_LEVELS.to_vec(),
                 vec![],
-                vec![],
-                vec![token_gp2
-                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
-                    .expect("dup failed")
-                    .into()],
             )
             .expect("add_element failed");
+        broker
+            .register_dependency_token(
+                &element_gp2,
+                token_gp2
+                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                    .expect("dup failed")
+                    .into(),
+                DependencyType::Opportunistic,
+            )
+            .expect("register_dependency_token failed");
         let element_x = broker
             .add_element(
                 "X",
@@ -7110,16 +7137,28 @@ mod tests {
                         requires_level_by_preference: vec![ON.level],
                     },
                 ],
-                vec![token_x_assertive
-                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
-                    .expect("dup failed")
-                    .into()],
-                vec![token_x_opportunistic
-                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
-                    .expect("dup failed")
-                    .into()],
             )
             .expect("add_element failed");
+        broker
+            .register_dependency_token(
+                &element_x,
+                token_x_assertive
+                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                    .expect("dup failed")
+                    .into(),
+                DependencyType::Assertive,
+            )
+            .expect("register_dependency_token failed");
+        broker
+            .register_dependency_token(
+                &element_x,
+                token_x_opportunistic
+                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                    .expect("dup failed")
+                    .into(),
+                DependencyType::Opportunistic,
+            )
+            .expect("register_dependency_token failed");
         let element_p1 = broker
             .add_element(
                 "P1",
@@ -7134,16 +7173,28 @@ mod tests {
                         .into(),
                     requires_level_by_preference: vec![ON.level],
                 }],
-                vec![token_p1_assertive
-                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
-                    .expect("dup failed")
-                    .into()],
-                vec![token_p1_opportunistic
-                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
-                    .expect("dup failed")
-                    .into()],
             )
             .expect("add_element failed");
+        broker
+            .register_dependency_token(
+                &element_p1,
+                token_p1_assertive
+                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                    .expect("dup failed")
+                    .into(),
+                DependencyType::Assertive,
+            )
+            .expect("register_dependency_token failed");
+        broker
+            .register_dependency_token(
+                &element_p1,
+                token_p1_opportunistic
+                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                    .expect("dup failed")
+                    .into(),
+                DependencyType::Opportunistic,
+            )
+            .expect("register_dependency_token failed");
         let element_p2 = broker
             .add_element(
                 "P2",
@@ -7158,16 +7209,28 @@ mod tests {
                         .into(),
                     requires_level_by_preference: vec![ON.level],
                 }],
-                vec![token_p2_assertive
-                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
-                    .expect("dup failed")
-                    .into()],
-                vec![token_p2_opportunistic
-                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
-                    .expect("dup failed")
-                    .into()],
             )
             .expect("add_element failed");
+        broker
+            .register_dependency_token(
+                &element_p2,
+                token_p2_assertive
+                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                    .expect("dup failed")
+                    .into(),
+                DependencyType::Assertive,
+            )
+            .expect("register_dependency_token failed");
+        broker
+            .register_dependency_token(
+                &element_p2,
+                token_p2_opportunistic
+                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                    .expect("dup failed")
+                    .into(),
+                DependencyType::Opportunistic,
+            )
+            .expect("register_dependency_token failed");
         let element_c1 = broker
             .add_element(
                 "C1",
@@ -7182,8 +7245,6 @@ mod tests {
                         .into(),
                     requires_level_by_preference: vec![ON.level],
                 }],
-                vec![],
-                vec![],
             )
             .expect("add_element failed");
         let element_c2 = broker
@@ -7200,8 +7261,6 @@ mod tests {
                         .into(),
                     requires_level_by_preference: vec![ON.level],
                 }],
-                vec![],
-                vec![],
             )
             .expect("add_element failed");
         let element_c3 = broker
@@ -7218,8 +7277,6 @@ mod tests {
                         .into(),
                     requires_level_by_preference: vec![ON.level],
                 }],
-                vec![],
-                vec![],
             )
             .expect("add_element failed");
         let element_c4 = broker
@@ -7236,8 +7293,6 @@ mod tests {
                         .into(),
                     requires_level_by_preference: vec![ON.level],
                 }],
-                vec![],
-                vec![],
             )
             .expect("add_element failed");
 
