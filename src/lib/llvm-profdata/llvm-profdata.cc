@@ -321,10 +321,18 @@ template <typename T>
     return BinaryIdsSize(build_id);
   };
 
-  return {
+  ProfRawHeader Header = {
 #define INSTR_PROF_RAW_HEADER(Type, Name, Initializer) .Name = Initializer,
 #include <profile/InstrProfData.inc>
   };
+
+  // The data and names sections are omitted when binary or debuginfo correlation is used.
+  if (NumData == 0 && NamesSize == 0) {
+    Header.CountersDelta = 0;
+    Header.NamesDelta = 0;
+  }
+
+  return Header;
 }
 
 // Don't publish anything if no functions were actually instrumented.
