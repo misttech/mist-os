@@ -179,11 +179,6 @@ exception channel available for taking.
 }
 ```
 
-## Further Reading
-
-For a detailed explanation of how processes are created, please see
-[Zircon program loading and dynamic linking][program-loading].
-
 ### Environment Variables
 
 Environment variables can be set for ELF components by using the `environ`
@@ -204,6 +199,11 @@ and `red`.
     }
 }
 ```
+
+## Further Reading
+
+For a detailed explanation of how processes are created, please see
+[Zircon program loading and dynamic linking][program-loading].
 
 [glossary.component]: /docs/glossary/README.md#component
 [capability-routing]: capabilities/README.md#routing
