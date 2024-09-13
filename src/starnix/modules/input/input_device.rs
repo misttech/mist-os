@@ -17,6 +17,7 @@ use futures::StreamExt as _;
 use starnix_core::device::kobject::DeviceMetadata;
 use starnix_core::device::{DeviceMode, DeviceOps};
 use starnix_core::fs::sysfs::DeviceDirectory;
+use starnix_core::power::create_proxy_for_wake_events;
 use starnix_core::task::{CurrentTask, Kernel};
 use starnix_core::vfs::{FileOps, FsNode, FsString};
 use starnix_logging::log_warn;
@@ -30,9 +31,9 @@ use starnix_uapi::{input_id, BUS_VIRTUAL};
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::{Arc, Weak};
 use {
-    fidl_fuchsia_starnix_runner as frunner, fidl_fuchsia_ui_input3 as fuiinput,
-    fidl_fuchsia_ui_policy as fuipolicy, fidl_fuchsia_ui_views as fuiviews,
-    fuchsia_async as fasync, fuchsia_zircon as zx, starnix_uapi as uapi,
+    fidl_fuchsia_ui_input3 as fuiinput, fidl_fuchsia_ui_policy as fuipolicy,
+    fidl_fuchsia_ui_views as fuiviews, fuchsia_async as fasync, fuchsia_zircon as zx,
+    starnix_uapi as uapi,
 };
 
 // Add a fuchsia-specific vendor ID. 0xf1ca is currently not allocated
@@ -182,7 +183,7 @@ impl InputDevice {
                         // Proxy the touch events through the Starnix runner. This allows touch events to
                         // wake the container when it is suspended.
                         let (touch_source_channel, resume_event) =
-                            create_proxy_for_events(touch_source_client_end.into_channel());
+                            create_proxy_for_wake_events(touch_source_client_end.into_channel());
                         (
                             fuipointer::TouchSourceProxy::new(fidl::AsyncChannel::from_channel(
                                 touch_source_channel,
@@ -333,7 +334,7 @@ impl InputDevice {
                 let (local_listener_stream, local_resume_event) = match event_proxy_mode {
                     EventProxyMode::WakeContainer => {
                         let (local_channel, local_resume_event) =
-                            create_proxy_for_events(remote_server.into_channel());
+                            create_proxy_for_wake_events(remote_server.into_channel());
                         let local_listener_stream =
                             fuipolicy::MediaButtonsListenerRequestStream::from_channel(
                                 fidl::AsyncChannel::from_channel(local_channel),
@@ -483,33 +484,6 @@ impl DeviceOps for InputDevice {
         self.open_files.lock().push(Arc::downgrade(&input_file));
         Ok(Box::new(input_file))
     }
-}
-
-/// Creates a proxy between `remote_channel` and the returned `zx::Channel`.
-///
-/// The proxying is done by the Starnix runner, and allows messages on the channel to wake
-/// the container.
-fn create_proxy_for_events(remote_channel: zx::Channel) -> (zx::Channel, zx::EventPair) {
-    let (local_proxy, kernel_channel) = zx::Channel::create();
-    let (resume_event, local_resume_event) = zx::EventPair::create();
-
-    let manager =
-        fuchsia_component::client::connect_to_protocol::<frunner::ManagerMarker>().expect("failed");
-    manager
-        .proxy_wake_channel(frunner::ManagerProxyWakeChannelRequest {
-            container_job: Some(
-                fuchsia_runtime::job_default()
-                    .duplicate(zx::Rights::SAME_RIGHTS)
-                    .expect("Failed to dup handle"),
-            ),
-            container_channel: Some(kernel_channel),
-            remote_channel: Some(remote_channel),
-            resume_event: Some(resume_event),
-            ..Default::default()
-        })
-        .expect("Failed to create proxy");
-
-    (local_proxy, local_resume_event)
 }
 
 /// get_next_device_id() returns the current value of NEXT_DEVICE_ID for next
