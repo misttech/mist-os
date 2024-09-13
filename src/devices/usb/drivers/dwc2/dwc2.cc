@@ -1349,12 +1349,23 @@ void Dwc2::UsbDciRequestQueue(usb_request_t* req, const usb_request_complete_cal
 }
 
 zx_status_t Dwc2::UsbDciSetInterface(const usb_dci_interface_protocol_t* interface) {
-  if (dci_intf_) {
-    zxlogf(ERROR, "%s: dci_intf_ already set", __func__);
-    return ZX_ERR_BAD_STATE;
+  auto dci_intf = ddk::UsbDciInterfaceProtocolClient(interface);
+  if (!dci_intf.is_valid()) {
+    // Take offline.
+    fbl::AutoLock _(&lock_);
+    dci_intf_.reset();
+    SetConnected(false);
+    SoftDisconnect();
+    ep0_state_ = Ep0State::DISCONNECTED;
+    zx::nanosleep(zx::deadline_after(zx::msec(50)));
+    return ZX_OK;
   }
 
-  dci_intf_ = ddk::UsbDciInterfaceProtocolClient(interface);
+  if (dci_intf_) {
+    zxlogf(ERROR, "%s: dci_intf_ already set!", __func__);
+    return ZX_ERR_ALREADY_BOUND;
+  }
+  dci_intf_ = dci_intf;
 
   return CommonSetInterface();
 }
@@ -1394,12 +1405,22 @@ void Dwc2::ConnectToEndpoint(ConnectToEndpointRequest& request,
 }
 
 void Dwc2::SetInterface(SetInterfaceRequest& request, SetInterfaceCompleter::Sync& completer) {
-  if (dci_intf_) {
-    zxlogf(ERROR, "%s: dci_intf_ already set", __func__);
-    completer.Reply(zx::error(ZX_ERR_BAD_STATE));
+  if (!request.interface().is_valid()) {
+    // Take offline.
+    fbl::AutoLock _(&lock_);
+    dci_intf_.reset();
+    SetConnected(false);
+    SoftDisconnect();
+    ep0_state_ = Ep0State::DISCONNECTED;
+    zx::nanosleep(zx::deadline_after(zx::msec(50)));
     return;
   }
 
+  if (dci_intf_) {
+    zxlogf(ERROR, "%s: dci_intf_ already set!", __func__);
+    completer.Reply(zx::error(ZX_ERR_ALREADY_BOUND));
+    return;
+  }
   dci_intf_ = DciInterfaceFidlClient();
   std::get<DciInterfaceFidlClient>(*dci_intf_).Bind(std::move(request.interface()));
 
