@@ -15,6 +15,7 @@ use std::convert::Infallible;
 use std::fmt::{Debug, Display};
 use std::io;
 use std::marker::PhantomData;
+use std::num::NonZeroUsize;
 use thiserror::Error;
 
 use crate::experimental::clock::{
@@ -64,9 +65,9 @@ pub trait Sampler<T> {
     fn fold(&mut self, sample: T) -> Result<(), Self::Error>;
 }
 
-/// A [`Sampler`] that can efficiently fold zero or more of a particular sample.
+/// A [`Sampler`] that can efficiently fold one or more of a particular sample.
 pub trait Fill<T>: Sampler<T> {
-    fn fill(&mut self, sample: T, n: usize) -> Result<(), Self::Error>;
+    fn fill(&mut self, sample: T, n: NonZeroUsize) -> Result<(), Self::Error>;
 }
 
 pub trait Interpolator {

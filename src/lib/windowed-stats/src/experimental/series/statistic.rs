@@ -7,6 +7,7 @@
 use num::{Num, NumCast, Zero};
 use std::cmp;
 use std::fmt::Debug;
+use std::num::NonZeroUsize;
 use thiserror::Error;
 
 use crate::experimental::series::buffer::BufferStrategy;
@@ -142,14 +143,14 @@ where
     Self: Sampler<T, Error = OverflowError>,
     T: Clone + Num + NumCast,
 {
-    fn fill(&mut self, sample: T, n: usize) -> Result<(), Self::Error> {
-        Ok(match num::cast::<_, T>(n) {
-            Some(m) if n > 0 => {
+    fn fill(&mut self, sample: T, n: NonZeroUsize) -> Result<(), Self::Error> {
+        Ok(match num::cast::<_, T>(n.get()) {
+            Some(m) => {
                 self.fold(sample * m)?;
-                self.increment((n as u64) - 1)?;
+                self.increment((n.get() as u64) - 1)?;
             }
             _ => {
-                for _ in 0..n {
+                for _ in 0..n.get() {
                     self.fold(sample.clone())?;
                 }
             }
@@ -221,11 +222,11 @@ where
     Self: Sampler<T>,
     T: Clone + Num + NumCast,
 {
-    fn fill(&mut self, sample: T, n: usize) -> Result<(), Self::Error> {
-        if let Some(n) = num::cast::<_, T>(n) {
+    fn fill(&mut self, sample: T, n: NonZeroUsize) -> Result<(), Self::Error> {
+        if let Some(n) = num::cast::<_, T>(n.get()) {
             self.fold(sample * n)
         } else {
-            Ok(for _ in 0..n {
+            Ok(for _ in 0..n.get() {
                 self.fold(sample.clone())?;
             })
         }
@@ -274,7 +275,7 @@ where
     Self: Sampler<T, Error = OverflowError>,
     T: Num + NumCast,
 {
-    fn fill(&mut self, sample: T, _n: usize) -> Result<(), Self::Error> {
+    fn fill(&mut self, sample: T, _n: NonZeroUsize) -> Result<(), Self::Error> {
         self.fold(sample)
     }
 }
@@ -330,7 +331,7 @@ where
     Self: Sampler<T, Error = OverflowError>,
     T: Num + NumCast,
 {
-    fn fill(&mut self, sample: T, _n: usize) -> Result<(), Self::Error> {
+    fn fill(&mut self, sample: T, _n: NonZeroUsize) -> Result<(), Self::Error> {
         self.fold(sample)
     }
 }
@@ -397,7 +398,7 @@ impl<T> Fill<T> for LatchMax<T>
 where
     Self: Sampler<T>,
 {
-    fn fill(&mut self, sample: T, _n: usize) -> Result<(), Self::Error> {
+    fn fill(&mut self, sample: T, _n: NonZeroUsize) -> Result<(), Self::Error> {
         self.fold(sample)
     }
 }
@@ -470,7 +471,7 @@ impl<T, F, R> Fill<T> for PostAggregation<F, R>
 where
     F: Fill<T>,
 {
-    fn fill(&mut self, sample: T, n: usize) -> Result<(), Self::Error> {
+    fn fill(&mut self, sample: T, n: NonZeroUsize) -> Result<(), Self::Error> {
         self.statistic.fill(sample, n)
     }
 }
@@ -529,7 +530,7 @@ impl<F, R, T> Fill<T> for Reset<F, R>
 where
     F: Fill<T>,
 {
-    fn fill(&mut self, sample: T, n: usize) -> Result<(), Self::Error> {
+    fn fill(&mut self, sample: T, n: NonZeroUsize) -> Result<(), Self::Error> {
         self.statistic.fill(sample, n)
     }
 }
@@ -565,6 +566,8 @@ where
 
 #[cfg(test)]
 mod tests {
+    use std::num::NonZeroUsize;
+
     use crate::experimental::series::statistic::{
         ArithmeticMean, LatchMax, Max, OverflowError, PostAggregation, Reset, Statistic, Sum, Union,
     };
@@ -590,7 +593,7 @@ mod tests {
     #[test]
     fn arithmetic_mean_aggregation_fill() {
         let mut mean = ArithmeticMean::<f32>::default();
-        mean.fill(1.0, 1000).unwrap();
+        mean.fill(1.0, NonZeroUsize::new(1000).unwrap()).unwrap();
         let aggregation = mean.aggregation().unwrap();
         assert!(aggregation > 0.99 && aggregation < 1.01); // ~ 1.0
     }
@@ -622,7 +625,7 @@ mod tests {
     #[test]
     fn sum_aggregation_fill() {
         let mut sum = Sum::<u64>::default();
-        sum.fill(10, 1000).unwrap();
+        sum.fill(10, NonZeroUsize::new(1000).unwrap()).unwrap();
         let aggregation = sum.aggregation().unwrap();
         assert_eq!(aggregation, 10_000);
     }
@@ -647,7 +650,7 @@ mod tests {
     #[test]
     fn max_aggregation_fill() {
         let mut max = Max::<u64>::default();
-        max.fill(42, 1000).unwrap();
+        max.fill(42, NonZeroUsize::new(1000).unwrap()).unwrap();
         let aggregation = max.aggregation().unwrap();
         assert_eq!(aggregation, 42);
     }
@@ -665,7 +668,7 @@ mod tests {
     #[test]
     fn union_aggregation_fill() {
         let mut value = Union::<u64>::default();
-        value.fill(1 << 2, 1000).unwrap();
+        value.fill(1 << 2, NonZeroUsize::new(1000).unwrap()).unwrap();
         let aggregation = value.aggregation().unwrap();
         assert_eq!(aggregation, 0b100);
     }
@@ -701,7 +704,7 @@ mod tests {
     #[test]
     fn latch_max_aggregation_fill() {
         let mut max = LatchMax::<u64>::default();
-        max.fill(10, 1000).unwrap();
+        max.fill(10, NonZeroUsize::new(1000).unwrap()).unwrap();
         let aggregation = max.aggregation().unwrap();
         assert_eq!(aggregation, 10);
     }
