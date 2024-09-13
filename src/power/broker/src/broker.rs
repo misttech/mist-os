@@ -7077,38 +7077,22 @@ mod tests {
         let token_p2_opportunistic = DependencyToken::create();
 
         let element_gp1 = broker
-            .add_element(
-                "GP1",
-                OFF.level,
-                BINARY_POWER_LEVELS.to_vec(),
-                vec![],
-            )
+            .add_element("GP1", OFF.level, BINARY_POWER_LEVELS.to_vec(), vec![])
             .expect("add_element failed");
         broker
             .register_dependency_token(
                 &element_gp1,
-                token_gp1
-                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
-                    .expect("dup failed")
-                    .into(),
+                token_gp1.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("dup failed").into(),
                 DependencyType::Assertive,
             )
             .expect("register_dependency_token failed");
         let element_gp2 = broker
-            .add_element(
-                "GP2",
-                OFF.level,
-                BINARY_POWER_LEVELS.to_vec(),
-                vec![],
-            )
+            .add_element("GP2", OFF.level, BINARY_POWER_LEVELS.to_vec(), vec![])
             .expect("add_element failed");
         broker
             .register_dependency_token(
                 &element_gp2,
-                token_gp2
-                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
-                    .expect("dup failed")
-                    .into(),
+                token_gp2.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("dup failed").into(),
                 DependencyType::Opportunistic,
             )
             .expect("register_dependency_token failed");
