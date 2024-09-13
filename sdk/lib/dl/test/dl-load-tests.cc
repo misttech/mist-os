@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <thread>
+
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
@@ -1138,5 +1140,124 @@ TYPED_TEST(DlTests, GlobalSatisfiesMissingSymbol) {
 //  - foo-v2 -> foo() returns 7
 // call foo() from has-foo-v2 and expect 2 from foo-v1, because foo-v1 is now
 // the first loaded global module with the symbol.
+
+// A common test subroutine for basic TLS accesses.
+//
+// This test exercises the following sequence of events:
+//   1. The initial thread is created with initial-exec TLS state.
+//   2. dlopen adds dynamic TLS state, and bumps DTV generation.
+//   3. The initial thread uses dynamic TLS via the new DTV.
+//   4. New threads are launched.
+//   5. The new threads use dynamic TLS via their initial DTV (i.e., fast path).
+//
+// NOTE: Whether the slow path may be used in this test depends on the
+// implementation. For instance, at the time of writing, musl's dlopen doesn't
+// update the calling thread's DTV and instead relies on the first access on the
+// thread to use the slow path to call __tls_get_new. However, this test should
+// only be relied upon for testing the fast path, because that is the only thing
+// we can guarantee for all implementations.
+template <class TestFixture, class Test>
+void BasicGlobalDynamicTls(Test& self, const char* module_name) {
+  if constexpr (!TestFixture::kSupportsTls) {
+    GTEST_SKIP() << "test requires TLS";
+  }
+
+  constexpr const char* kGetTlsDescDepDataPtr = "get_tls_dep_data";
+  constexpr const char* kGetTlsDescDepBss1 = "get_tls_dep_bss1";
+  constexpr const char* kGetTlsDescDepWeak = "get_tls_dep_weak";
+
+  self.ExpectRootModuleNotLoaded(module_name);
+  self.ExpectRootModule(module_name);
+
+  // The module should exist for both tls-dep and tls-desc-dep targets.
+  auto result = self.DlOpen(module_name, RTLD_NOW | RTLD_LOCAL);
+  ASSERT_TRUE(result.is_ok()) << result.error_value();
+  EXPECT_TRUE(result.value());
+
+  // The module should exist for both tls-dep and tls-desc-dep targets, but if
+  // it wasn't compiled to have the right type of TLS relocations, then the
+  // symbols won't exist in the module, and we should skip the rest of the
+  // test.
+  auto get_dep_data = self.DlSym(result.value(), kGetTlsDescDepDataPtr);
+  if (get_dep_data.is_error()) {
+    ASSERT_THAT(get_dep_data.error_value().take_str(),
+                ::testing::EndsWith(std::string("undefined symbol: ") + kGetTlsDescDepDataPtr));
+    auto close_result = self.DlClose(result.value());
+    ASSERT_TRUE(close_result.is_ok()) << close_result.error_value();
+    GTEST_SKIP() << "Test module disabled at compile time.";
+  }
+
+  ASSERT_TRUE(get_dep_data.value());
+
+  int* data_ptr1 = RunFunction<int*>(get_dep_data.value());
+  ASSERT_TRUE(data_ptr1);
+
+  int* data_ptr2 = RunFunction<int*>(get_dep_data.value());
+  ASSERT_TRUE(data_ptr2);
+
+  constexpr int kTlsDataInitialVal = 42;
+  constexpr char kBss1InitialVal = 0;
+
+  EXPECT_EQ(*data_ptr1, kTlsDataInitialVal);
+  EXPECT_EQ(*data_ptr1, *data_ptr2);
+
+  // data_ptr1 and data_ptr2 should alias, since `get_tls_dep_data` returns a
+  // pointer to the thread local. This can fail if DTP_OFFSET is non-zero and
+  // the arithmetic using it does not get applied uniformly, causing the
+  // returned pointer to be different than the one stored in the GOT for the
+  // TLSDESC fast path.
+  EXPECT_EQ(data_ptr1, data_ptr2);  // Fails on RISC-V, data_ptr2 == data_ptr1 + kRISCVDtpOffset
+
+  // Modifying the thread local value should not impact other threads. We test
+  // this in the loop below.
+  *data_ptr1 += 1;
+  EXPECT_EQ(*data_ptr1, kTlsDataInitialVal + 1);
+  EXPECT_EQ(data_ptr1, data_ptr2);
+
+  auto get_dep_bss1 = self.DlSym(result.value(), kGetTlsDescDepBss1);
+  ASSERT_TRUE(get_dep_bss1.is_ok()) << get_dep_bss1.error_value();
+  ASSERT_TRUE(get_dep_bss1.value());
+
+  char* bss1_ptr = RunFunction<char*>(get_dep_bss1.value());
+  ASSERT_TRUE(bss1_ptr);
+  EXPECT_EQ(*bss1_ptr, kBss1InitialVal);
+  *bss1_ptr = 1;
+  EXPECT_EQ(*RunFunction<char*>(get_dep_bss1.value()), 1);
+
+  auto get_dep_weak = self.DlSym(result.value(), kGetTlsDescDepWeak);
+  ASSERT_TRUE(get_dep_weak.is_ok()) << get_dep_weak.error_value();
+  ASSERT_TRUE(get_dep_weak.value());
+#if HAVE_TLSDESC
+  // We can only be sure the returned value will be nullptr w/ TLSDESC.
+  // __tls_get_addr may just return whatever happens to be in the GOT.
+  int* weak_ptr = RunFunction<int*>(get_dep_weak.value());
+  EXPECT_EQ(weak_ptr, nullptr);
+#endif
+
+  // The value of another threads TLS variable should be unaffected by this
+  // thread.
+  constexpr int kNumThreads = 10;
+  std::vector<std::thread> threads;
+  threads.reserve(kNumThreads);
+  for (int i = 0; i < kNumThreads; ++i) {
+    threads.emplace_back([&get_dep_data, &get_dep_bss1, kTlsDataInitialVal, kBss1InitialVal] {
+      // Check that each TLS value has its initial value.
+      EXPECT_EQ(*RunFunction<int*>(get_dep_data.value()), kTlsDataInitialVal);
+      EXPECT_EQ(*RunFunction<char*>(get_dep_bss1.value()), kBss1InitialVal);
+    });
+  }
+  for (auto& thread : threads) {
+    thread.join();
+  }
+  ASSERT_TRUE(self.DlClose(result.value()).is_ok());
+}
+
+TYPED_TEST(DlTests, BasicGlobalDynamicTlsDesc) {
+  BasicGlobalDynamicTls<TestFixture>(*this, "tls-desc-dep-module.so");
+}
+
+TYPED_TEST(DlTests, BasicGlobalDynamicTlsGetAddr) {
+  BasicGlobalDynamicTls<TestFixture>(*this, "tls-dep-module.so");
+}
 
 }  // namespace
