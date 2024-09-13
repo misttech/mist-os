@@ -25,17 +25,8 @@ fi
 
 cd $FUCHSIA_DIR
 
-echo "Removing unused code..."
-autoflake \
-    --in-place \
-    --remove-unused-variables \
-    --remove-all-unused-imports \
-    --remove-duplicate-keys \
-    --recursive \
-    $HONEYDEW_SRC
-
 echo "Formatting the code..."
-# Format the code (using black and isort)
+# Format the code (using black, isort and autoflake)
 fx format-code
 
 

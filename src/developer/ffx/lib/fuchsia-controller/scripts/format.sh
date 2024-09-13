@@ -25,16 +25,6 @@ fi
 
 cd $FUCHSIA_DIR
 
-echo "Removing unused code..."
-autoflake \
-    --in-place \
-    --remove-unused-variables \
-    --remove-all-unused-imports \
-    --remove-duplicate-keys \
-    --recursive \
-    --exclude "__init__.py,.venvs**" \
-    $FCT_SRC
-
 echo "Formatting code..."
 fx format-code
 
