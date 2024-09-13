@@ -34,6 +34,7 @@ using std::copy_if;
 using std::exchange;
 using std::fill;
 using std::fill_n;
+using std::reverse;
 using std::swap;
 using std::transform;
 
