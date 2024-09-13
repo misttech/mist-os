@@ -382,7 +382,7 @@ fn start_proxy(proxy: ChannelProxy, resume_events: Arc<Mutex<Vec<zx::EventPair>>
         match zx::object_wait_many(&mut wait_items, zx::MonotonicTime::INFINITE) {
             Ok(_) => {}
             Err(e) => {
-                tracing::error!("Failed to wait on proxied channels in runner: {:?}", e);
+                tracing::warn!("Failed to wait on proxied channels in runner: {:?}", e);
             }
         };
 
@@ -391,7 +391,7 @@ fn start_proxy(proxy: ChannelProxy, resume_events: Arc<Mutex<Vec<zx::EventPair>>
         // `ChannelProxy` will be closed.
         for item in &wait_items {
             if item.pending.contains(zx::Signals::CHANNEL_PEER_CLOSED) {
-                tracing::error!("Proxy received peer closed, exiting proxy loop.");
+                tracing::warn!("Proxy received peer closed, exiting proxy loop.");
                 resume_events.lock().retain(|e| e.get_koid() != proxy.resume_event.get_koid());
                 return;
             }
