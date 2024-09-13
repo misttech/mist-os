@@ -5,12 +5,19 @@
 import("//build/zircon/migrated_targets.gni")
 
 zx_library("bootfs") {
-  sources = [ "bootfs.cc" ]
+  sources = [
+    "bootfs.cc",
+    "vmo_storage_traits.cc",
+  ]
   public_deps = [
+    "//src/lib/zbitl",
     "//vendor/misttech/zircon/kernel/lib/starnix/kernel:starnix_core",
     "//vendor/misttech/zircon/kernel/lib/starnix/lib/starnix-sync",
   ]
-  deps = [ "//zircon/kernel/lib/ktl" ]
+  deps = [
+    "//vendor/misttech/zircon/kernel/lib/mistos/util",
+    "//zircon/kernel/lib/ktl",
+  ]
 }
 
 group("tests") {

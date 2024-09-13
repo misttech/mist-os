@@ -12,13 +12,17 @@
 #include <lib/mistos/starnix/kernel/vfs/xattr.h>
 #include <lib/mistos/starnix_uapi/device_type.h>
 #include <lib/mistos/starnix_uapi/errors.h>
+#include <lib/modules/bootfs/vmo_storage_traits.h>
 #include <lib/starnix_sync/locks.h>
+#include <lib/zbitl/items/bootfs.h>
 #include <zircon/compiler.h>
 #include <zircon/types.h>
 
 #include <fbl/ref_counted.h>
 #include <fbl/ref_ptr.h>
 #include <kernel/mutex.h>
+#include <object/handle.h>
+#include <vm/vm_object.h>
 
 namespace bootfs {
 
@@ -27,22 +31,33 @@ using namespace starnix_sync;
 
 class BootFs : public FileSystemOps {
  public:
-  static FileSystemHandle new_fs(const fbl::RefPtr<Kernel>& kernel);
+  static FileSystemHandle new_fs(const fbl::RefPtr<Kernel>& kernel, HandleOwner zbi_vmo);
 
   static fit::result<Errno, FileSystemHandle> new_fs_with_options(const fbl::RefPtr<Kernel>& kernel,
+                                                                  HandleOwner zbi_vmo,
                                                                   FileSystemOptions options);
 
   fit::result<Errno, struct statfs> statfs(const FileSystem& fs,
                                            const CurrentTask& current_task) final;
 
-  const FsStr& name() final;
+  const FsStr& name() final { return name_; }
 
  public:
   // C++
+  BootFs(HandleOwner zbi_vmo);
+
   ~BootFs();
 
  private:
   const FsStr name_ = "bootfs";
+
+  using BootfsReader = zbitl::Bootfs<fbl::RefPtr<VmObject>>;
+
+  // zbitl::View<fbl::RefPtr<MemoryObject>> view_;
+  // using BootfsReader = zbitl::Bootfs<zbitl::MapOwnedVmo>;
+  // using BootfsView = zbitl::BootfsView<zbitl::MapOwnedVmo>;
+
+  BootfsReader bootfs_reader_;
 };
 
 class BootfsDirectory : public FsNodeOps {
