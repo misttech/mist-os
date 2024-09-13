@@ -64,6 +64,14 @@ TEST_P(SocketPair, GetSockOpt) {
 
   ASSERT_EQ(getsockopt(fds()[0].get(), SOL_SOCKET, SO_PROTOCOL, &optval, &optlen), 0);
   ASSERT_EQ(optval, 0);
+
+  struct linger linger_val;
+  linger_val.l_onoff = 42;
+  linger_val.l_linger = 4242;
+  optlen = sizeof(linger_val);
+  ASSERT_EQ(getsockopt(fds()[0].get(), SOL_SOCKET, SO_LINGER, &linger_val, &optlen), 0);
+  ASSERT_EQ(linger_val.l_onoff, 0);
+  ASSERT_EQ(linger_val.l_linger, 0);
 }
 
 TEST_P(SocketPair, GetPeerAndSockName) {
