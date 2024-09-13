@@ -36,6 +36,8 @@ sdk_source_set("cpp") {
   if (is_fuchsia) {
     category = "partner"
 
+    stable = true
+
     sources += [
       "logging_backend_fuchsia.cc",
       "logging_backend_fuchsia_globals.h",

@@ -107,7 +107,7 @@ cc_source_library://pkg/sys_component_cpp_testing
 cc_source_library://pkg/sys_cpp
 cc_source_library://pkg/sys_cpp_testing
 cc_source_library://pkg/sys_service_cpp
-cc_source_library://pkg/syslog_cpp (unstable)
+cc_source_library://pkg/syslog_cpp
 cc_source_library://pkg/syslog_structured_backend
 cc_source_library://pkg/trace
 cc_source_library://pkg/trace-engine-headersonly
