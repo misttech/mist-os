@@ -73,3 +73,7 @@ class RemoveDirTests(unittest.TestCase):
                     os.path.exists(p),
                     f"{p} still exists after remove_dir({top_dir})",
                 )
+
+
+if __name__ == "__main__":
+    unittest.main()

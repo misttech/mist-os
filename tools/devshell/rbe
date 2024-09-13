@@ -26,7 +26,9 @@ readonly remote_action="$FUCHSIA_DIR/build/rbe/remote_action.py"
 
 # A single command that tests RBE end-to-end through reclient.
 reclient_auth_test_cmd=(
-  env FX_REMOTE_BUILD_METRICS=0 FX_BUILD_RBE_STATS=0
+  env
+  --unset=FX_BUILD_RBE_STATS
+  FX_REMOTE_BUILD_METRICS=0
   "$reproxy_wrap" --
   "$python" -S "$remote_action" --
   echo "greetings from a remote RBE worker"
@@ -97,13 +99,35 @@ function reclient_auth() {
       return 1
     }
   done
-  style::echo --bold --green "re-client+RBE authentication successful"
+  style::echo --green "re-client+RBE authentication successful"
+}
+
+readonly BAZEL_TEST_DIR="$FUCHSIA_DIR/out/_bazel_rbe_test"
+function setup_bazel_workspace() {
+  rm -rf "$BAZEL_TEST_DIR"
+  "$python" -S "$FUCHSIA_DIR/build/bazel/scripts/minimal_workspace.py" \
+    --fuchsia-dir="$FUCHSIA_DIR" \
+    --bazel-bin="$PREBUILT_BAZEL" \
+    --topdir="$BAZEL_TEST_DIR"
+}
+
+function test_bazel_rbe() {
+  setup_bazel_workspace
+  (
+    cd "$BAZEL_TEST_DIR/workspace" &&
+      ../bazel --nohome_rc build --config=remote --config=sponge :all
+  )
 }
 
 function bazel_auth() {
-  # TODO(b/363284694): setup minimal workspace and bazel build to test
-  gcloud_auth
-  style::echo --bold --green "bazel+RBE authentication successful"
+  until test_bazel_rbe
+  do
+    gcloud_auth || {
+      echo "Failed to authenticate with gcloud."
+      return 1
+    }
+  done
+  style::echo --green "bazel+RBE authentication successful"
 }
 
 case "$action" in

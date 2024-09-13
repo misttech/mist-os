@@ -6,7 +6,7 @@
 
 The script first checks whether the Ninja build plan needs to be updated.
 After that, it checks whether the Bazel workspace used by the platform
-build, and associatedd files (e.g. bazel launcher script) and
+build, and associated files (e.g. bazel launcher script) and
 directories (e.g. output_base) need to be updated. It simply exits
 if no update is needed, otherwise, it will regenerate everything
 appropriately.
@@ -18,7 +18,7 @@ files:
     bazel                   Bazel launcher script.
     generated-info.json     State of inputs during last generation.
     output_base/            Bazel output base.
-    output_user_root/       Baze output user root.
+    output_user_root/       Bazel output user root.
     workspace/              Bazel workspace directory.
 
 The workspace/ sub-directory will be populated with symlinks
@@ -519,6 +519,55 @@ def find_host_binary_path(program: str) -> str:
 _VALID_TARGET_CPUS = ("arm64", "x64", "riscv64")
 
 
+def dot_bazelrc_format_args(
+    workspace_dir: str,  # path
+    logs_dir: str,  # path
+    topdir: str,  # path
+    default_platform: str,
+    host_platform: str,
+) -> dict[str, str]:
+    """Returns a dictionary of .format args for expanding template.bazelrc.
+
+    Args:
+      workspace_dir: path to Bazel workspace
+      logs_dir: path to Bazel logs dir
+      topdir: GN output directory
+      default_platform: one of the platforms named in build/bazel/platforms/BUILD.bazel
+      host_platform: the host platform from build/bazel/platforms/BUILD.bazel
+    """
+    return {
+        "default_platform": default_platform,
+        "host_platform": host_platform,
+        "workspace_log_file": os.path.relpath(
+            os.path.join(logs_dir, "workspace-events.log"), workspace_dir
+        ),
+        "execution_log_file": os.path.relpath(
+            os.path.join(logs_dir, "exec_log.pb.zstd"), workspace_dir
+        ),
+        "config_file": os.path.relpath(
+            os.path.join(topdir, "download_config_file"), workspace_dir
+        ),
+    }
+
+
+def remote_services_bazelrc_format_args(
+    build_config: dict[str, str],
+    remote_download_outputs: str,
+) -> dict[str, str]:
+    """Returns a dictionary of .format args for expanding template.remote_services.bazelrc.
+
+    Args:
+      build_config: dictionary containing remote execution configurations
+        from generate_fuchsia_build_config().
+      remote_download_outputs: bazel option --remote_download_outputs
+    """
+    return {
+        "remote_instance_name": build_config["rbe_instance_name"],
+        "rbe_project": build_config["rbe_project"],
+        "remote_download_outputs": remote_download_outputs,
+    }
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawTextHelpFormatter
@@ -800,22 +849,19 @@ block *
     # Generate the content of .bazelrc
     bazelrc_content = expand_template_file(
         "template.bazelrc",
-        default_platform=f"fuchsia_{args.target_arch}",
-        host_platform=host_tag_alt,
-        workspace_log_file=os.path.relpath(
-            os.path.join(logs_dir, "workspace-events.log"), workspace_dir
-        ),
-        execution_log_file=os.path.relpath(
-            os.path.join(logs_dir, "exec_log.pb.zstd"), workspace_dir
-        ),
-        config_file=os.path.relpath(
-            os.path.join(topdir, "download_config_file"), workspace_dir
+        **dot_bazelrc_format_args(
+            workspace_dir=workspace_dir,
+            logs_dir=logs_dir,
+            topdir=topdir,
+            default_platform=f"fuchsia_{args.target_arch}",
+            host_platform=host_tag_alt,
         ),
     ) + expand_template_file(
         "template.remote_services.bazelrc",
-        remote_instance_name=build_config["rbe_instance_name"],
-        rbe_project=build_config["rbe_project"],
-        remote_download_outputs=args.remote_download_outputs,
+        **remote_services_bazelrc_format_args(
+            build_config=build_config,
+            remote_download_outputs=args.remote_download_outputs,
+        ),
     )
     if args.use_bzlmod:
         bazelrc_content += """
@@ -1133,7 +1179,7 @@ common --enable_bzlmod=false
         # Repopulate the workspace directory.
         generated.write(topdir)
 
-        # Update the cotent of generated-info.json file.
+        # Update the content of generated-info.json file.
         with open(generated_info_file, "w") as f:
             f.write(generated_json)
     else:
