@@ -10,12 +10,22 @@
 #include <lib/modules/bootfs/bootfs.h>
 #include <lib/unittest/unittest.h>
 
+#include <object/handle.h>
+
+#include "data/bootfs.zbi.h"
+#include "zbi_file.h"
+
 namespace unit_testing {
 
 bool test_bootfs() {
   BEGIN_TEST;
 
+  ZbiFile zbi;
+  zbi.Write({kBootFsZbi, sizeof(kBootFsZbi) - 1});
+
   auto [kernel, current_task] = starnix::testing::create_kernel_and_task();
+
+  auto fs = bootfs::BootFs::new_fs(kernel, HandleOwner(ktl::move(zbi).Finish()));
 
   END_TEST;
 }
