@@ -181,6 +181,69 @@ TEST_F(ExposeDebugdataTest, MultipleSinks) {
   }
 }
 
+TEST_F(ExposeDebugdataTest, MultipleSinksAndLogFile) {
+  BindFile("logs/foo-logs");
+  BindFile("random-sink/s/my-sink-data.my-data");
+  BindFile("random-sink/d/my-dsink-data.my-data");
+  BindFile("other-random-sink/s/my-other-sink-data.my-data");
+  BindFile("other-random-sink/d/my-other-dsink-data.my-data");
+  ASSERT_NO_FATAL_FAILURE(Serve("/boot/kernel/i"));
+
+  fbl::unique_fd debugdata_dir(open("/boot/kernel/i", O_RDONLY));
+  ASSERT_TRUE(debugdata_dir) << strerror(errno);
+
+  SinkDirMap sink_map;
+
+  ASSERT_TRUE(ExposeBootDebugdata(debugdata_dir, sink_map).is_ok());
+
+  std::vector<std::tuple<std::string, std::string, std::string>> lookup_entries = {
+      {"random-sink", "static", "my-sink-data.my-data"},
+      {"random-sink", "dynamic", "my-dsink-data.my-data"},
+      {"other-random-sink", "static", "my-other-sink-data.my-data"},
+      {"other-random-sink", "dynamic", "my-other-dsink-data.my-data"},
+  };
+
+  EXPECT_EQ(sink_map.find("logs"), sink_map.end());
+  EXPECT_EQ(sink_map.size(), 2u);
+
+  for (const auto& [sink, data_dir, file_name] : lookup_entries) {
+    vfs::PseudoDir* lookup = nullptr;
+    ASSERT_EQ(sink_map[sink]->Lookup(data_dir, reinterpret_cast<vfs::Node**>(&lookup)), ZX_OK);
+    vfs::PseudoDir& out_dir = *lookup;
+    ASSERT_FALSE(out_dir.IsEmpty());
+
+    vfs::Node* node = nullptr;
+    ASSERT_EQ(out_dir.Lookup(file_name, &node), ZX_OK);
+    ASSERT_NE(node, nullptr);
+  }
+}
+
+using ExposeLogsTest = FakeBootItemsFixture;
+
+TEST_F(ExposeLogsTest, MultipleSinksAndLogFile) {
+  BindFile("logs/foo-logs");
+  BindFile("logs/foo-logs2");
+  BindFile("logs/foo-logs3");
+  BindFile("random-sink/s/my-sink-data.my-data");
+  BindFile("random-sink/d/my-dsink-data.my-data");
+  BindFile("other-random-sink/s/my-other-sink-data.my-data");
+  BindFile("other-random-sink/d/my-other-dsink-data.my-data");
+  ASSERT_NO_FATAL_FAILURE(Serve("/boot/kernel/i"));
+
+  auto out_log_dir = std::make_unique<vfs::PseudoDir>();
+  fbl::unique_fd logs_dir(open("/boot/kernel/i/logs", O_RDONLY));
+  ASSERT_TRUE(logs_dir) << strerror(errno);
+
+  ASSERT_TRUE(ExposeLogs(logs_dir, *out_log_dir).is_ok());
+
+  auto lookup = {"foo-logs", "foo-logs2", "foo-logs3"};
+  for (auto log : lookup) {
+    vfs::Node* node = nullptr;
+    ASSERT_EQ(out_log_dir->Lookup(log, &node), ZX_OK);
+    ASSERT_NE(node, nullptr);
+  }
+}
+
 struct PublishRequest {
   std::string sink;
   bool peer_closed;

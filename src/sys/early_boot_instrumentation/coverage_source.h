@@ -40,6 +40,11 @@ using SinkDirMap = std::map<std::string, std::unique_ptr<vfs::PseudoDir>, std::l
 // file, such that repeated module names are not overwritten.
 zx::result<> ExposeBootDebugdata(fbl::unique_fd& boot_debug_data_dir, SinkDirMap& sink_map);
 
+// Given a handle to `boot_logs_dir`, expose all files under `logs` namespace.
+//
+// Usually logs will be exposed under `/boot/kernel/i/logs`.
+zx::result<> ExposeLogs(fbl::unique_fd& boot_logs_dir, vfs::PseudoDir& out_dir);
+
 // Given a channel speaking the |fuchsia.boot.SvcStash| protocol, this will extract all published
 // debug data, and return a map from 'sink_name' to a root directory for each sink. Each root
 // directory contains two child directories, 'static' and 'dynamic'.

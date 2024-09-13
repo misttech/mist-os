@@ -32,10 +32,8 @@
 #include <array>
 #include <cstdint>
 #include <memory>
-#include <mutex>
 #include <string>
 #include <string_view>
-#include <tuple>
 #include <utility>
 
 #include <fbl/unique_fd.h>
@@ -45,8 +43,7 @@
 namespace early_boot_instrumentation {
 namespace {
 
-zx::result<> ExportBootDebugData(vfs::PseudoDir& out_dir, fbl::unique_fd fd,
-                                 std::string_view export_as) {
+zx::result<> ExportAs(vfs::PseudoDir& out_dir, fbl::unique_fd fd, std::string_view export_as) {
   // Get the underlying vmo of the fd.
   zx::vmo vmo;
   if (auto res = fdio_get_vmo_exact(fd.get(), vmo.reset_and_get_address()); res != ZX_OK) {
@@ -115,28 +112,30 @@ vfs::PseudoDir& GetOrCreate(std::string_view sink_name, DataType type, SinkDirMa
   return *reinterpret_cast<vfs::PseudoDir*>(node);
 }
 
+template <typename T>
+void ForEachDentry(DIR* root, T&& visitor) {
+  // Borrow underlying FD for opening relative files.
+  int root_fd = dirfd(root);
+  while (auto* dentry = readdir(root)) {
+    std::string_view dentry_name(dentry->d_name);
+    if (dentry_name == "." || dentry_name == "..") {
+      continue;
+    }
+
+    fbl::unique_fd entry_fd(openat(root_fd, dentry->d_name, O_RDONLY));
+    if (!entry_fd) {
+      FX_LOGS(INFO) << "Failed to obtain FD for " << dentry->d_name << ". " << strerror(errno);
+      continue;
+    }
+
+    visitor(dentry, std::move(entry_fd));
+  }
+}
+
 }  // namespace
 
 zx::result<> ExposeBootDebugdata(fbl::unique_fd& debugdata_root, SinkDirMap& sink_map) {
   // Iterate on every entry in the directory.
-  static constexpr auto for_each_dentry = [](DIR* root, auto&& visitor) {
-    // Borrow underlying FD for opening relative files.
-    int root_fd = dirfd(root);
-    while (auto* dentry = readdir(root)) {
-      std::string_view dentry_name(dentry->d_name);
-      if (dentry_name == "." || dentry_name == "..") {
-        continue;
-      }
-
-      fbl::unique_fd entry_fd(openat(root_fd, dentry->d_name, O_RDONLY));
-      if (!entry_fd) {
-        FX_LOGS(INFO) << "Failed to obtain FD for " << dentry->d_name << ". " << strerror(errno);
-        continue;
-      }
-
-      visitor(dentry, std::move(entry_fd));
-    }
-  };
 
   DIR* root = fdopendir(debugdata_root.get());
   if (!root) {
@@ -148,8 +147,8 @@ zx::result<> ExposeBootDebugdata(fbl::unique_fd& debugdata_root, SinkDirMap& sin
 
   auto for_each_debugdata = [&sink_map](std::string_view sink_name, DataType type,
                                         struct dirent* entry, fbl::unique_fd debugdata_fd) {
-    auto res = ExportBootDebugData(GetOrCreate(sink_name, type, sink_map), std::move(debugdata_fd),
-                                   entry->d_name);
+    auto res =
+        ExportAs(GetOrCreate(sink_name, type, sink_map), std::move(debugdata_fd), entry->d_name);
     if (res.is_error()) {
       FX_LOGS(ERROR) << "Failed to export boot debugdata to: " << sink_name << "/"
                      << DataTypeDir(type) << "/" << entry->d_name;
@@ -170,7 +169,7 @@ zx::result<> ExposeBootDebugdata(fbl::unique_fd& debugdata_root, SinkDirMap& sin
       DIR* static_dir = fdopendir(static_dir_fd.get());
       if (static_dir) {
         static_dir_fd.release();
-        for_each_dentry(static_dir, [&](auto* dentry, fbl::unique_fd debugdata_fd) {
+        ForEachDentry(static_dir, [&](auto* dentry, fbl::unique_fd debugdata_fd) {
           for_each_debugdata(sink_name, DataType::kStatic, dentry, std::move(debugdata_fd));
         });
         closedir(static_dir);
@@ -182,7 +181,7 @@ zx::result<> ExposeBootDebugdata(fbl::unique_fd& debugdata_root, SinkDirMap& sin
       DIR* dynamic_dir = fdopendir(dynamic_dir_fd.release());
       if (dynamic_dir) {
         dynamic_dir_fd.release();
-        for_each_dentry(dynamic_dir, [&](auto* dentry, fbl::unique_fd debugdata_fd) {
+        ForEachDentry(dynamic_dir, [&](auto* dentry, fbl::unique_fd debugdata_fd) {
           for_each_debugdata(sink_name, DataType::kDynamic, dentry, std::move(debugdata_fd));
         });
         closedir(dynamic_dir);
@@ -191,7 +190,7 @@ zx::result<> ExposeBootDebugdata(fbl::unique_fd& debugdata_root, SinkDirMap& sin
   };
 
   // Each entry in the root is a directory named after the sink.
-  for_each_dentry(root, for_each_sink);
+  ForEachDentry(root, for_each_sink);
   closedir(root);
   return zx::success();
 }
@@ -278,6 +277,35 @@ SinkDirMap ExtractDebugData(fidl::ServerEnd<fuchsia_boot::SvcStash> svc_stash) {
   fidl::BindServer(loop.dispatcher(), std::move(svc_stash), &server);
   loop.RunUntilIdle();
   return server.TakeSinkToDir();
+}
+
+zx::result<> ExposeLogs(fbl::unique_fd& boot_logs_dir, vfs::PseudoDir& out_dir) {
+  if (!boot_logs_dir) {
+    return zx::error(ZX_ERR_INVALID_ARGS);
+  }
+
+  DIR* root = fdopendir(boot_logs_dir.get());
+  if (!root) {
+    FX_LOGS(INFO) << "Failed to obtain DIR entry from FD. " << strerror(errno);
+    return zx::error(ZX_ERR_INVALID_ARGS);
+  }
+  // Taken by fdopendir.
+  boot_logs_dir.release();
+
+  ForEachDentry(root, [&out_dir](struct dirent* entry, fbl::unique_fd fd) {
+    std::string_view entry_name(entry->d_name);
+    if (entry->d_type != DT_REG) {
+      return;
+    }
+    if (ExportAs(out_dir, std::move(fd), entry_name).is_ok()) {
+      FX_LOGS(INFO) << "Log file " << entry_name << " exposed on log dir.";
+    } else {
+      FX_LOGS(INFO) << "Log file " << entry_name << " found but failed to be exposed.";
+    }
+  });
+  closedir(root);
+
+  return zx::ok();
 }
 
 }  // namespace early_boot_instrumentation

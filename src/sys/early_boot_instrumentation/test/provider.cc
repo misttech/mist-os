@@ -9,13 +9,13 @@
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/component/incoming/cpp/protocol.h>
+#include <lib/stdcompat/array.h>
 #include <lib/stdcompat/source_location.h>
 #include <lib/sys/cpp/component_context.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/vfs/cpp/pseudo_dir.h>
 #include <lib/vfs/cpp/service.h>
 #include <lib/vfs/cpp/vmo_file.h>
-#include <string.h>
 #include <zircon/status.h>
 #include <zircon/syscalls/object.h>
 
@@ -148,6 +148,7 @@ int main(int argc, char** argv) {
   // Add prof_data dir.
   auto* boot = context->outgoing()->GetOrCreateDirectory("boot");
   auto debugdata = std::make_unique<vfs::PseudoDir>();
+  auto logs = std::make_unique<vfs::PseudoDir>();
   auto kernel = std::make_unique<vfs::PseudoDir>();
   auto boot_llvm_sink = std::make_unique<vfs::PseudoDir>();
   auto llvm_static = std::make_unique<vfs::PseudoDir>();
@@ -177,8 +178,27 @@ int main(int argc, char** argv) {
     llvm_static->AddEntry("physboot.profraw", std::move(physboot_file));
   }
 
+  // Fake Log VMO.
+  auto entries = cpp20::to_array<std::string_view>(
+      {"symbolizer.log", "physboot.log", "physload.log", "foo-bar.log"});
+  for (auto entry : entries) {
+    zx::vmo logs_vmo;
+    if (auto res = zx::vmo::create(4096, 0, &logs_vmo); res != ZX_OK) {
+      FX_LOGS(ERROR) << "Failed to create " << entry
+                     << " VMO. Error: " << zx_status_get_string(res);
+    } else {
+      if (auto res = logs_vmo.write(entry.data(), 0, entry.length()); res != ZX_OK) {
+        FX_LOGS(ERROR) << "Failed to writes " << entry
+                       << " vmo contents. Error: " << zx_status_get_string(res);
+      }
+      auto logs_file = std::make_unique<vfs::VmoFile>(std::move(logs_vmo), 4096);
+      logs->AddEntry(std::string(entry), std::move(logs_file));
+    }
+  }
+
   boot_llvm_sink->AddEntry("s", std::move(llvm_static));
   boot_llvm_sink->AddEntry("d", std::move(llvm_dynamic));
+  debugdata->AddEntry("logs", std::move(logs));
   debugdata->AddEntry("llvm-profile", std::move(boot_llvm_sink));
   kernel->AddEntry("i", std::move(debugdata));
   boot->AddEntry("kernel", std::move(kernel));

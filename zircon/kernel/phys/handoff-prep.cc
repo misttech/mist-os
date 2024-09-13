@@ -341,7 +341,7 @@ void HandoffPrep::SetVersionString(KernelStorage::Bootfs kernel_package) {
   // This transfers the log, so logging after this is not preserved.
   // Extracting the log buffer will automatically detach it from stdout.
   // TODO(mcgrathr): Rename to physboot.log with some prefix.
-  PublishLog("i/llvm-profile/s/physboot.log", ktl::move(*ktl::exchange(gLog, nullptr)));
+  PublishLog("i/logs/physboot", ktl::move(*ktl::exchange(gLog, nullptr)));
 
   // Finalize the published VMOs, including the log just published above.
   FinishExtraVmos();

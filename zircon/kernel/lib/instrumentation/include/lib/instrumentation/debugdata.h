@@ -30,6 +30,9 @@ constexpr ktl::string_view kDynamicSubDir = "/d/";
 // change.
 constexpr ktl::string_view kStaticSubDir = "/s/";
 
+// Debugdata sink used for logs.
+constexpr ktl::string_view kLogDebugDataSink = "logs";
+
 // Returns an encoded path that fits within an object name. The encoded path is of the form:
 //   "$PATH = $ROOT_DIR/$SINK_NAME/$DATA_TYPE/$MODULE_NAME.$SUFFIX"
 //
