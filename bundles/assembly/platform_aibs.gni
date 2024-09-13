@@ -286,7 +286,9 @@ user_platform_aib_names =
       "kernel_evict_continuous",
 
       # Recovery
+      "factory_reset",
       "factory_reset_trigger",
+      "recovery_fdr",
 
       # Starnix
       "starnix_support",

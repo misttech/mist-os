@@ -4,7 +4,6 @@
 
 import("//build/components.gni")
 import("//build/rust/rustc_library.gni")
-import("//src/recovery/system/system_recovery_args.gni")
 
 rustc_library("recovery-ui") {
   edition = "2021"
@@ -48,9 +47,7 @@ rustc_library("recovery-ui") {
     # b/255342472 Always enable debug_console until proxy_view_assistant supports a generic overlay ViewAssistantPtr
     "debug_console",
   ]
-  if (enable_recovery_ui_v2) {
-    features += [ "ota_ui" ]
-  }
+  features += [ "ota_ui" ]
 }
 
 fuchsia_unittest_package("recovery-ui-test") {

@@ -99,6 +99,7 @@ system-update-committer
 ?system-update-realm
 ?system-updater
 ?system_image
+?system_recovery_fdr
 ?tcpdump
 ?tee-clients
 ?text_manager
