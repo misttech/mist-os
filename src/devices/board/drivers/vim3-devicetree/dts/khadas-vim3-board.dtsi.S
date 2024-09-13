@@ -195,6 +195,11 @@
 		gpios = <&gpio A311D_GPIOX(7) 0>;
 		gpio-names = "WIFI_WAKE_HOST";
 	};
+
+	gpio_header {
+		gpios = <&gpio A311D_GPIOH(4) 0>;
+		gpio-names = "GPIO_HEADER_PIN_37";
+	};
 };
 
 &gpio {

@@ -195,6 +195,11 @@
 		pinctrl-0 = <0x37>;
 	};
 
+	gpio_header {
+		gpio-names = "GPIO_HEADER_PIN_37";
+		gpios = <0x06 0x50 0x00>;
+	};
+
 	hdmi-display@ff900000 {
 		amlogic,canvas = <0x04>;
 		compatible = "amlogic,display";
