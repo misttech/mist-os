@@ -13,7 +13,7 @@
 
 #include <hwreg/bitfields.h>
 
-#include "lib/uart/uart.h"
+#include "uart.h"
 
 namespace uart::geni {
 
@@ -276,57 +276,48 @@ struct RxParametersRegister {
 // check the GENI FW version register.
 static constexpr size_t kIoSlots = 0x4000;
 
-struct Driver : public DriverBase<Driver, ZBI_KERNEL_DRIVER_GENI_UART, zbi_dcfg_simple_t,
-                                  IoRegisterType::kMmio8, kIoSlots> {
+// Common clocking values
+// As needed, these can be discovered rather than hard coded.
+static constexpr uint32_t kFrequency = 7372800;
+static constexpr uint32_t kBaudRate = 115200;
+static constexpr uint32_t kOversampling = 16;  // 16 on newer boards, 32 before geni fw 2.5
+static constexpr uint32_t kClockRate = kBaudRate * kOversampling;
+static constexpr uint32_t kClockDiv = kFrequency / kClockRate;
+
+// FIFO fill watermark in terms of FIFO words (kFifoWidth bytes)
+static constexpr uint32_t kTxFifoWatermark = 4;
+
+static constexpr uint32_t kFifoWidth = 4;     // in bytes
+static constexpr uint32_t kRxFifoDepth = 16;  // in fifos
+static constexpr uint32_t kTxFifoDepth = 16;
+
+class Driver : public DriverBase<Driver, ZBI_KERNEL_DRIVER_GENI_UART, zbi_dcfg_simple_t,
+                                 IoRegisterType::kMmio8, kIoSlots> {
+ public:
   static constexpr auto kDevicetreeBindings =
       cpp20::to_array<std::string_view>({"qcom,geni-debug-uart"});
+
+  static constexpr std::string_view config_name() { return "geni"; }
 
   template <typename... Args>
   explicit Driver(Args&&... args)
       : DriverBase<Driver, ZBI_KERNEL_DRIVER_GENI_UART, zbi_dcfg_simple_t, IoRegisterType::kMmio8,
-                   kIoSlots>(std::forward<Args>(args)...) {
-    rx_fifo_depth = kRxFifoDepth;
-    tx_fifo_depth = kTxFifoDepth;
-    rx_fifo_width = kFifoWidth;
-    tx_fifo_width = kFifoWidth;
-  }
-
-  static constexpr std::string_view config_name() { return "geni"; }
-
-  // Common clocking values
-  // As needed, these can be discovered rather than hard coded.
-  static constexpr uint32_t kFrequency = 7372800;
-  static constexpr uint32_t kBaudRate = 115200;
-  static constexpr uint32_t kOversampling = 16;  // 16 on newer boards, 32 before geni fw 2.5
-  static constexpr uint32_t kClockRate = kBaudRate * kOversampling;
-  static constexpr uint32_t kClockDiv = kFrequency / kClockRate;
-
-  // FIFO fill watermark in terms of FIFO words (kFifoWidth bytes)
-  static constexpr uint32_t kTxFifoWatermark = 4;
-
-  static constexpr uint32_t kFifoWidth = 4;     // in bytes
-  static constexpr uint32_t kRxFifoDepth = 16;  // in fifos
-  static constexpr uint32_t kTxFifoDepth = 16;
-
-  uint32_t rx_fifo_depth;
-  uint32_t tx_fifo_depth;
-  uint32_t rx_fifo_width;
-  uint32_t tx_fifo_width;
+                   kIoSlots>(std::forward<Args>(args)...) {}
 
   template <class IoProvider>
   void Init(IoProvider& io) {
     auto tx_hw_params = TxParametersRegister::Get().ReadFrom(io.io());
-    tx_fifo_depth = tx_hw_params.fifo_depth();
+    tx_fifo_depth_ = tx_hw_params.fifo_depth();
     // Store width in bytes, not bits.
-    tx_fifo_width = tx_hw_params.fifo_width() >> 3;
-    if (tx_fifo_width > kFifoWidth) {
-      tx_fifo_width = kFifoWidth;
+    tx_fifo_width_ = tx_hw_params.fifo_width() >> 3;
+    if (tx_fifo_width_ > kFifoWidth) {
+      tx_fifo_width_ = kFifoWidth;
     }
     auto rx_hw_params = RxParametersRegister::Get().ReadFrom(io.io());
-    rx_fifo_depth = rx_hw_params.fifo_depth();
-    rx_fifo_width = rx_hw_params.fifo_width() >> 3;
-    if (rx_fifo_width > kFifoWidth) {
-      rx_fifo_width = kFifoWidth;
+    rx_fifo_depth_ = rx_hw_params.fifo_depth();
+    rx_fifo_width_ = rx_hw_params.fifo_width() >> 3;
+    if (rx_fifo_width_ > kFifoWidth) {
+      rx_fifo_width_ = kFifoWidth;
     }
 
     // Note, this is a very lightweight initialization. Without the bootloader
@@ -386,11 +377,11 @@ struct Driver : public DriverBase<Driver, ZBI_KERNEL_DRIVER_GENI_UART, zbi_dcfg_
     if (fifo_count >= kTxFifoWatermark) {
       return 0;
     }
-    if (fifo_count > tx_fifo_depth) {
+    if (fifo_count > tx_fifo_depth_) {
       return 0;
     }
     // Return available bytes to be filled in the FIFO.
-    return (tx_fifo_depth - fifo_count) * tx_fifo_width;
+    return (tx_fifo_depth_ - fifo_count) * tx_fifo_width_;
   }
 
   template <class IoProvider, typename It1, typename It2>
@@ -407,7 +398,7 @@ struct Driver : public DriverBase<Driver, ZBI_KERNEL_DRIVER_GENI_UART, zbi_dcfg_
     do {
       auto tx = TxFifoRegister::Get().FromValue(0);
       uint32_t value = 0;
-      uint32_t fifo_len = std::min(tx_fifo_width, bytes);
+      uint32_t fifo_len = std::min(tx_fifo_width_, bytes);
       for (uint32_t i = 0; i < fifo_len; ++i, it++, bytes--) {
         // Fill out the value
         value |= (*it & 0xff) << (i * CHAR_BIT);
@@ -532,17 +523,17 @@ struct Driver : public DriverBase<Driver, ZBI_KERNEL_DRIVER_GENI_UART, zbi_dcfg_
 
       // Compute the total bytes up front and then we can check on the last
       // fifo if we should expect fewer bytes.
-      uint32_t to_drain = rx_fifo_status.count() * rx_fifo_width;
+      uint32_t to_drain = rx_fifo_status.count() * rx_fifo_width_;
       if (rx_fifo_status.partial()) {
         // Remove the full fifo size and re-add up to the last byte
-        to_drain -= rx_fifo_width;
+        to_drain -= rx_fifo_width_;
         to_drain += rx_fifo_status.last_byte();
       }
       bool rx_disabled = false;
       // Loop once per full fifo (4 bytes) and let the remainder catch the
       // partial().
       while (to_drain > 0) {
-        uint32_t fifo_len = std::min(rx_fifo_width, to_drain);
+        uint32_t fifo_len = std::min(rx_fifo_width_, to_drain);
         uint32_t value = RxFifoRegister::Get().ReadFrom(io.io()).data();
         to_drain -= fifo_len;
         for (uint32_t c = 0; c < fifo_len && !rx_disabled; ++c) {
@@ -564,6 +555,12 @@ struct Driver : public DriverBase<Driver, ZBI_KERNEL_DRIVER_GENI_UART, zbi_dcfg_
       tx(lock, waiter, [&]() { EnableTxInterrupt(io, false); });
     }
   }
+
+ private:
+  uint32_t rx_fifo_depth_ = kRxFifoDepth;
+  uint32_t tx_fifo_depth_ = kTxFifoDepth;
+  uint32_t rx_fifo_width_ = kFifoWidth;
+  uint32_t tx_fifo_width_ = kFifoWidth;
 };
 
 }  // namespace uart::geni
