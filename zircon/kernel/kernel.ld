@@ -111,7 +111,7 @@ SECTIONS
      * variables.  This is page-aligned and padded out to page size so it can be
      * exported as a VMO without exposing any other .rodata contents.
      */
-    .kcounter.desc : ALIGN(4096) {
+    .kcounter.desc : ALIGN(CONSTANT(COMMONPAGESIZE)) {
         PROVIDE_HIDDEN(k_counter_desc_vmo_begin = .);
         *(.kcounter.desc.header)
         ASSERT(. - k_counter_desc_vmo_begin == 16,
@@ -122,7 +122,7 @@ SECTIONS
                "lib/counters/counters.cc and kernel.ld mismatch");
         *(SORT_BY_NAME(kcountdesc.*))
         PROVIDE_HIDDEN(kcountdesc_end = .);
-        . = ALIGN(4096);
+        . = ALIGN(CONSTANT(COMMONPAGESIZE));
         PROVIDE_HIDDEN(k_counter_desc_vmo_end = .);
     }
 
@@ -277,7 +277,7 @@ SECTIONS
          * in the symbol values below if all those sections are empty.
          */
         . =  ALIGN(8);
-    }
+    } :data
 
     /*
      * Collects instances of fxt::InternedString and fxt::InternedCategory for
@@ -334,7 +334,7 @@ SECTIONS
      * good way to assert that, though.
      */
 
-    .bss : ALIGN(CONSTANT(MAXPAGESIZE)) {
+    .bss : ALIGN(16) {
         PROVIDE_HIDDEN(__bss_start = .);
 
         /*
@@ -354,11 +354,11 @@ SECTIONS
          * page-aligned and padded out to page size so that it can be exported
          * as a VMO without exposing any other .bss contents.
          */
-        . = ALIGN(4096);
+        . = ALIGN(CONSTANT(COMMONPAGESIZE));
         PROVIDE_HIDDEN(kcounters_arena = .);
         *(SORT_BY_NAME(.bss.kcounter.*))
         PROVIDE_HIDDEN(kcounters_arena_end = .);
-        . = ALIGN(4096);
+        . = ALIGN(CONSTANT(COMMONPAGESIZE));
         PROVIDE_HIDDEN(kcounters_arena_page_end = .);
 
         /*

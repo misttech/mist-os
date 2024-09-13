@@ -98,7 +98,7 @@ SECTIONS {
            "lib/counters/counters.cc and kernel.ld mismatch");
     *(SORT_BY_NAME(kcountdesc.*))
     PROVIDE_HIDDEN(kcountdesc_end = .);
-    . = ALIGN(4096);
+    . = ALIGN(CONSTANT(COMMONPAGESIZE));
     PROVIDE_HIDDEN(k_counter_desc_vmo_end = .);
   }
 
@@ -195,10 +195,10 @@ SECTIONS {
    * default `__start_*` and `__stop_*` symbols.
    *
    * There's no way to define `__data_end` precisely since orphans would
-   * go after it.  So it's just page-aligned to match __bss_start.
+   * go after it.  So it's just aligned to match __bss_start.
    */
 
-  .bss : ALIGN(CONSTANT(MAXPAGESIZE)) {
+  .bss : ALIGN(16) {
     PROVIDE_HIDDEN(__data_end = .);
     PROVIDE_HIDDEN(__bss_start = .);
 
@@ -219,11 +219,11 @@ SECTIONS {
      * page-aligned and padded out to page size so that it can be exported
      * as a VMO without exposing any other .bss contents.
      */
-    . = ALIGN(4096);
+    . = ALIGN(CONSTANT(COMMONPAGESIZE));
     PROVIDE_HIDDEN(kcounters_arena = .);
     *(SORT_BY_NAME(.bss.kcounter.*))
     PROVIDE_HIDDEN(kcounters_arena_end = .);
-    . = ALIGN(4096);
+    . = ALIGN(CONSTANT(COMMONPAGESIZE));
     PROVIDE_HIDDEN(kcounters_arena_page_end = .);
 
     /*
