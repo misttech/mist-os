@@ -1,9 +1,9 @@
 {
     select: {
-        hang_timeout_count: "INSPECT:bootstrap/driver_manager:root/msd-arm-mali/device:hang_timeout",
-        last_hang_timeout_ns: "INSPECT:bootstrap/driver_manager:root/msd-arm-mali/device:last_hang_timeout_ns",
-        semaphore_hang_timeout_count: "INSPECT:bootstrap/driver_manager:root/msd-arm-mali/device:semaphore_hang_timeout",
-        last_semaphore_hang_timeout_ns: "INSPECT:bootstrap/driver_manager:root/msd-arm-mali/device:last_semaphore_hang_timeout_ns",
+        hang_timeout_count: "INSPECT:bootstrap/*-drivers*:[name=mali]root/msd-arm-mali/device:hang_timeout",
+        last_hang_timeout_ns: "INSPECT:bootstrap/*-drivers*:[name=mali]root/msd-arm-mali/device:last_hang_timeout_ns",
+        semaphore_hang_timeout_count: "INSPECT:bootstrap/*-drivers*:[name=mali]root/msd-arm-mali/device:semaphore_hang_timeout",
+        last_semaphore_hang_timeout_ns: "INSPECT:bootstrap/*-drivers*:[name=mali]root/msd-arm-mali/device:last_semaphore_hang_timeout_ns",
     },
     eval: {
         last_24_hours: "Fn([time], time > Now() - Hours(24))",
