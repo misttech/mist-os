@@ -898,6 +898,7 @@ sdk_molecule("platform_fidls") {
     "//sdk/fidl/fuchsia.hardware.sdmmc:fuchsia.hardware.sdmmc_sdk($fidl_toolchain)",
     "//sdk/fidl/fuchsia.hardware.serial:fuchsia.hardware.serial_sdk($fidl_toolchain)",
     "//sdk/fidl/fuchsia.hardware.serialimpl:fuchsia.hardware.serialimpl_sdk($fidl_toolchain)",
+    "//sdk/fidl/fuchsia.hardware.sockettunnel:fuchsia.hardware.sockettunnel_sdk($fidl_toolchain)",
     "//sdk/fidl/fuchsia.hardware.spi:fuchsia.hardware.spi_sdk($fidl_toolchain)",
     "//sdk/fidl/fuchsia.hardware.suspend:fuchsia.hardware.suspend_sdk($fidl_toolchain)",
     "//sdk/fidl/fuchsia.hardware.sysmem:fuchsia.hardware.sysmem_sdk($fidl_toolchain)",

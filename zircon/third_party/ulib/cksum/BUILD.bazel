@@ -1,0 +1,29 @@
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+package(default_visibility = ["//visibility:public"])
+
+cc_library(
+    name = "cksum",
+    srcs = [
+        "adler32.c",
+        "crc16.c",
+        "crc32.c",
+        "crc32.h",
+        "zutil.h",
+    ],
+    hdrs = [
+        "include/lib/cksum.h",
+    ],
+    copts = [
+        "-Wno-strict-prototypes",
+    ],
+    includes = [
+        "include",
+    ],
+    target_compatible_with = ["@platforms//os:fuchsia"],
+    deps = [
+        "@internal_sdk//pkg/zircon-internal",
+    ],
+)
