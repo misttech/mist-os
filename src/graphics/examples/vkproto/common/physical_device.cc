@@ -25,11 +25,13 @@ bool ChoosePhysicalDevice(const vk::PhysicalDevice &physical_device_in, const Vk
                           const vk::QueueFlags &queue_flags, bool swapchain_enabled,
                           vk::PhysicalDevice *physical_device_out) {
   auto required_physical_device_exts = s_required_physical_device_exts;
+  char *default_layer = nullptr;
   if (swapchain_enabled) {
     required_physical_device_exts.push_back(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
+    default_layer = const_cast<char *>(kMagmaLayer);
   }
   if (!FindRequiredProperties(s_required_physical_device_exts, vkp::PHYS_DEVICE_EXT_PROP,
-                              kMagmaLayer, physical_device_in)) {
+                              default_layer, physical_device_in)) {
     return false;
   }
 
