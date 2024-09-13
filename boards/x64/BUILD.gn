@@ -28,6 +28,7 @@ common_board_configuration = {
     "fuchsia::pmm_checker_auto",
     "fuchsia::real_time_clock",
     "fuchsia::wlan_softmac",
+    "fuchsia::xhci",
   ]
 
   input_bundles = [
@@ -216,11 +217,6 @@ board_input_bundle("x64_common") {
       package_target = "//src/devices/tpm/drivers/tpm:tpm-pkg"
       package_set = "bootfs"
       driver_components = [ "meta/tpm-driver.cm" ]
-    },
-    {
-      package_target = "//src/devices/usb/drivers/xhci:package"
-      package_set = "bootfs"
-      driver_components = [ "meta/xhci.cm" ]
     },
     {
       package_target = "//src/graphics/display/drivers/intel-display:package"

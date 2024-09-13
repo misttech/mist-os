@@ -454,6 +454,16 @@ assembly_input_bundle("realtek_8211f_driver") {
   ]
 }
 
+# AIB for the xHCI driver
+assembly_input_bundle("xhci_driver") {
+  boot_driver_packages = [
+    {
+      package_target = "//src/devices/usb/drivers/xhci:package"
+      driver_components = [ "meta/xhci.cm" ]
+    },
+  ]
+}
+
 # AIB for the fake-battery driver
 assembly_input_bundle("fake_battery_driver") {
   base_driver_packages = [

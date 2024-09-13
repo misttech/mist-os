@@ -26,6 +26,7 @@ common_board_configuration = {
     "fuchsia::realtek_8211f",
     "fuchsia::usb_peripheral_support",
     "fuchsia::wlan_fullmac",
+    "fuchsia::xhci",
   ]
 
   input_bundles = [
@@ -272,13 +273,6 @@ board_input_bundle("main_bundle") {
       package_target = "//src/ui/input/drivers/focaltech:package"
       package_set = "bootfs"
       driver_components = [ "meta/focaltech.cm" ]
-    },
-
-    # arm64 common drivers
-    {
-      package_target = "//src/devices/usb/drivers/xhci:package"
-      package_set = "bootfs"
-      driver_components = [ "meta/xhci.cm" ]
     },
 
     # Base drivers

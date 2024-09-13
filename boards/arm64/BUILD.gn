@@ -15,6 +15,7 @@ board_configuration("arm64") {
     "fuchsia::driver_framework_v2_support",
     "fuchsia::paravirtualization",
     "fuchsia::real_time_clock",
+    "fuchsia::xhci",
   ]
 
   input_bundles = [
@@ -64,11 +65,6 @@ board_input_bundle("main_bundle") {
       package_target = "//src/devices/bus/drivers/pci:package"
       package_set = "bootfs"
       driver_components = [ "meta/bus-pci.cm" ]
-    },
-    {
-      package_target = "//src/devices/usb/drivers/xhci:package"
-      package_set = "bootfs"
-      driver_components = [ "meta/xhci.cm" ]
     },
   ]
 

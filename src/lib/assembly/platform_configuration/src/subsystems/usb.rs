@@ -10,7 +10,7 @@ pub(crate) struct UsbSubsystemConfig;
 
 impl DefineSubsystemConfiguration<UsbConfig> for UsbSubsystemConfig {
     fn define_configuration(
-        _context: &ConfigurationContext<'_>,
+        context: &ConfigurationContext<'_>,
         usb: &UsbConfig,
         builder: &mut dyn ConfigurationBuilder,
     ) -> anyhow::Result<()> {
@@ -30,6 +30,12 @@ impl DefineSubsystemConfiguration<UsbConfig> for UsbSubsystemConfig {
                 usb_peripheral_functions.into(),
             ),
         )?;
+
+        // Include xHCI driver through a platform AIB.
+        if context.board_info.provides_feature("fuchsia::xhci") {
+            builder.platform_bundle("xhci_driver");
+        }
+
         Ok(())
     }
 }

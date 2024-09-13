@@ -71,4 +71,5 @@ usb-hub
 usb-mass-storage
 usb-peripheral
 ?virtual-console
+?xhci
 zxcrypt
