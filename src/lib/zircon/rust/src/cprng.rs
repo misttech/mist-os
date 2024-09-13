@@ -8,6 +8,18 @@ use crate::{ok, Status};
 use fuchsia_zircon_sys as sys;
 use std::mem::MaybeUninit;
 
+/// Draw random bytes from the kernel's CPRNG to fill the provided buffer. This function always
+/// fills the buffer.
+///
+/// # Safety
+///
+/// The provided pointer must be valid to write to for the provided number of bytes.
+///
+/// Wraps the
+/// [zx_cprng_draw](https://fuchsia.dev/fuchsia-src/reference/syscalls/cprng_draw.md)
+/// syscall.
+pub use sys::zx_cprng_draw as cprng_draw_raw;
+
 /// Draw random bytes from the kernel's CPRNG to fill `buffer`. This function
 /// always fills the buffer.
 ///
@@ -34,7 +46,7 @@ pub fn cprng_draw(buffer: &mut [u8]) {
 pub fn cprng_draw_uninit(buffer: &mut [MaybeUninit<u8>]) -> &mut [u8] {
     // SAFETY: `buffer` is a well formed slice of (maybe) uninitialized `u8`s.
     // `MaybeUninit<T>` and `T` have the same layout.
-    unsafe { sys::zx_cprng_draw(buffer.as_mut_ptr() as *mut u8, buffer.len()) };
+    unsafe { cprng_draw_raw(buffer.as_mut_ptr() as *mut u8, buffer.len()) };
 
     // SAFETY: We're converting &mut [MaybeUninit<u8>] back to &mut [u8], which is only
     // valid to do if all elements of `buffer` have actually been initialized. Here we
