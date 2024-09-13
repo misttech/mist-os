@@ -4,6 +4,7 @@
 
 #include <lib/arch/asm.h>
 #include <lib/ld/tlsdesc.h>
+#include "pthread_arch.h"
 
 // Similar to other machines, the RISC-V psABI defines a 2-Slot layout for
 // TLSDESC resolution. In both the static and dynamic cases, a0 will point to
@@ -424,6 +425,12 @@
   add sp, sp, -(NUM_SAVED_REGS * 8)
   on_saved_regs spill
   spill_vector_regs (NUM_SAVED_REGS + PROLOGUE_SLOTS), a3
+
+  // The first argument to __tls_get_new is the offset value as set for a
+  // DTPREL64 relocation, which subtracts this bias. However, we save an
+  // instruction in the fast path by not including the offset in the TLSDESC
+  // offset slot.
+  addi a0, a0, -(DTP_OFFSET)
   call __tls_get_new
   reload_vector_regs a3
   on_saved_regs reload
