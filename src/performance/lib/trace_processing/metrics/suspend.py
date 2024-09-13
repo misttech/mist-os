@@ -3,7 +3,7 @@
 # found in the LICENSE file.
 """Suspend trace metrics."""
 
-from typing import Iterator, Sequence
+from typing import Iterator, Optional, Sequence
 
 from trace_processing import trace_metrics, trace_model, trace_time, trace_utils
 
@@ -28,13 +28,31 @@ class SuspendMetricsProcessor(trace_metrics.MetricsProcessor):
             Set of metrics results for this test case.
         """
 
+        def unwrap(e: Optional[trace_time.TimePoint]) -> trace_time.TimePoint:
+            if e is None:
+                raise ValueError("expected some, but got None")
+            return e
+
         suspend_events = filter_events(model)
         suspend_time = trace_time.TimeDelta(0)
         for se in suspend_events:
             if se.duration is not None:
                 suspend_time += se.duration
 
-        total_time = trace_utils.total_event_duration(model.all_events())
+        # TODO(https://fxbug.dev/366507238): Find a more robust way of
+        # determining the start of the test. Doing so would be valuable
+        # for tests that do not include scheduling events.
+        trace_start_time = min(
+            map(
+                lambda e: e.start,
+                sum(model.scheduling_records.values(), []),
+            )
+        )
+        event_end_times = map(lambda e: e.end_time(), model.all_events())
+        trace_end_time = max(
+            [unwrap(e) for e in event_end_times if e is not None]
+        )
+        total_time = trace_end_time - trace_start_time
         running_time = total_time - suspend_time
 
         return [

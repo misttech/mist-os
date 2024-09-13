@@ -65,6 +65,15 @@ class Event:
 
         return Event(category, name, start, pid, tid, args)
 
+    def end_time(self) -> Optional[trace_time.TimePoint]:
+        """Get the ending time for this Event
+
+        Returns:
+           * The end time, if the Event has a `duration`
+           * None otherwise
+        """
+        return None
+
 
 class InstantEvent(Event):
     """An event that corresponds to a single moment in time."""
@@ -186,6 +195,12 @@ class DurationEvent(Event):
             base=Event.from_dict(event_dict),
         )
 
+    def end_time(self) -> Optional[trace_time.TimePoint]:
+        if self.duration:
+            return self.start + self.duration
+        else:
+            return None
+
 
 class AsyncEvent(Event):
     """An event which describes work which is happening asynchronously and which
@@ -208,6 +223,12 @@ class AsyncEvent(Event):
     # type: ignore[override]
     def from_dict(id: int, event_dict: dict[str, Any]) -> "AsyncEvent":
         return AsyncEvent(id, duration=None, base=Event.from_dict(event_dict))
+
+    def end_time(self) -> Optional[trace_time.TimePoint]:
+        if self.duration:
+            return self.start + self.duration
+        else:
+            return None
 
 
 class FlowEvent(Event):
