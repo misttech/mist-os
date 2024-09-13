@@ -34,6 +34,7 @@ impl Toggle {
         Self(Arc::new(AtomicBool::new(v)))
     }
 
+    #[allow(missing_docs)]
     pub fn set(&self, v: bool) {
         self.0.store(v, Ordering::SeqCst)
     }
