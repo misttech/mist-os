@@ -16,7 +16,6 @@ use std::rc::Rc;
 use tracing::{debug, error};
 
 /// The path to the internal production persistent state file.
-#[allow(dead_code)]
 const PERSISTENT_STATE_PATH: &'static str = "/data/persistent_state.json";
 
 /// Serves `fuchsia.time.test/Rtc`.

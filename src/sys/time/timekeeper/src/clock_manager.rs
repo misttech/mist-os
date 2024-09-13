@@ -58,10 +58,6 @@ const ERROR_REFRESH_INTERVAL: zx::Duration = zx::Duration::from_minutes(6);
 /// Denotes an unknown clock error bound
 const ZX_CLOCK_UNKNOWN_ERROR_BOUND: u64 = u64::MAX;
 
-/// The path to the internal persistentstate
-#[allow(dead_code)]
-const PERSISTENT_STATE_PATH: &'static str = "/data/persistent_state.json";
-
 /// Describes how a correction will be made to a clock.
 enum ClockCorrection {
     Step(Step),
@@ -340,6 +336,7 @@ impl<R: Rtc, D: 'static + Diagnostics> ClockManager<R, D> {
         config: Arc<Config>,
         test_signaler: Option<mpsc::Sender<()>>,
     ) -> Self {
+        debug!("creating clock manager");
         ClockManager {
             clock,
             time_source_manager,
@@ -365,6 +362,7 @@ impl<R: Rtc, D: 'static + Diagnostics> ClockManager<R, D> {
         async_commands: mpsc::Receiver<Command>,
         allow_update_rtc: Rc<Cell<bool>>,
     ) {
+        debug!("maintain_clock: entered");
         let pull_delay = self.config.get_back_off_time_between_pull_samples();
         let first_delay = self.config.get_first_sampling_delay();
 
@@ -382,17 +380,23 @@ impl<R: Rtc, D: 'static + Diagnostics> ClockManager<R, D> {
         std::mem::drop(details);
         let mut receiver = async_commands.fuse(); // Required by select! below.
 
-        // Initialize from persistent settings.
         let serve_test_protocols = self.config.serve_test_protocols();
         let update_allowed = allow_update_rtc.get();
         let allow_timekeeper_to_update_rtc = !serve_test_protocols || update_allowed;
         if !allow_timekeeper_to_update_rtc {
-            warn!("RTC updates by Timekeeper are not allowed. This is not a production setting. Take note if you didn't expect this.");
+            warn!(concat!(
+                "RTC updates by Timekeeper are not allowed. ",
+                "This is not a production setting. ",
+                "Take note if you didn't expect this."
+            ));
         }
 
         loop {
-            // Acquire a new sample.
+            debug!("manage_clock: asking for a time sample");
+
+            // This may block for a *long* time if a sample is not available.
             let sample = self.time_source_manager.next_sample().await;
+            debug!("manage_clock: `---- got a time sample: {:?}", sample);
 
             // Feed it to the estimator (or initialize the estimator).
             match &mut self.estimator {
@@ -430,6 +434,7 @@ impl<R: Rtc, D: 'static + Diagnostics> ClockManager<R, D> {
             } else {
                 zx::Duration::from_millis(10)
             };
+            debug!("clock_manager: waiting for command");
             select! {
                 command = receiver.next() => {
                     debug!("received command: {:?}", &command);
@@ -453,7 +458,9 @@ impl<R: Rtc, D: 'static + Diagnostics> ClockManager<R, D> {
                 },
 
                 // If no command, then wait.
-                _ = fasync::Timer::new(fasync::Time::after(delay)).fuse() => {},
+                _ = fasync::Timer::new(fasync::Time::after(delay)).fuse() => {
+                    debug!("no commands received: tick");
+                },
             }
         }
     }

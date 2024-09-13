@@ -110,6 +110,7 @@ impl<D: Diagnostics, M: MonotonicProvider> PushSourceManager<D, M> {
                     Ok(event_stream) => event_stream,
                     Err(err) => {
                         error!("Error launching {:?} time source: {:?}", self.role, err);
+                        debug!("Sampling will be reattempted until success.");
                         self.record_time_source_failure(TimeSourceError::LaunchFailed);
                         if self.delays_enabled {
                             fasync::Timer::new(fasync::Time::after(RESTART_DELAY)).await;

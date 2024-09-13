@@ -455,6 +455,7 @@ async fn maintain_utc<R: 'static, D: 'static>(
         false => TimeSourceManager::new,
     };
 
+    debug!("checking whether to start UTC from RTC or not");
     if optional_rtc.is_none() && config.get_utc_start_at_startup() {
         // Legacy programs assume that UTC clock is always running.  If config allows it,
         // we start the clock from backstop and hope for the best.
