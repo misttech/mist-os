@@ -54,7 +54,7 @@ class SystemMetricsDaemonTest : public gtest::TestLoopFixture {
         fake_clock_(new FakeSteadyClock()),
         daemon_(new SystemMetricsDaemon(
             dispatcher(), context_provider_.context(), &stub_logger_,
-            std::unique_ptr<cobalt::SteadyClock>(fake_clock_),
+            std::unique_ptr<cobalt::util::SteadyClockInterface>(fake_clock_),
             std::unique_ptr<cobalt::CpuStatsFetcher>(new FakeCpuStatsFetcher()), nullptr, "tmp/")) {
     daemon_->cpu_bucket_config_ = daemon_->InitializeLinearBucketConfig(
         fuchsia_system_metrics::kCpuPercentageMigratedIntBucketsFloor,
@@ -745,7 +745,7 @@ class SystemMetricsDaemonInitializationTest : public gtest::TestLoopFixture {
     // Initialize the SystemMetricsDaemon with the fake context, and other fakes.
     daemon_ = std::unique_ptr<SystemMetricsDaemon>(new SystemMetricsDaemon(
         dispatcher(), context_provider_.context(), nullptr,
-        std::unique_ptr<cobalt::SteadyClock>(fake_clock_),
+        std::unique_ptr<cobalt::util::SteadyClockInterface>(fake_clock_),
         std::unique_ptr<cobalt::CpuStatsFetcher>(new FakeCpuStatsFetcher()), nullptr, "/tmp"));
   }
 

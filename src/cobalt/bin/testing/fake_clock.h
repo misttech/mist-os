@@ -12,15 +12,16 @@
 #include <optional>
 
 #include "src/cobalt/bin/utils/clock.h"
+#include "third_party/cobalt/src/public/lib/clock_interfaces.h"
 
 namespace cobalt {
 
-// An implementation of SteadyClock that returns a time that does not
+// An implementation of SteadyClockInterface that returns a time that does not
 // increase with real time but only when Increment() is invoked. For use in
 // tests.
-class FakeSteadyClock : public SteadyClock {
+class FakeSteadyClock : public cobalt::util::SteadyClockInterface {
  public:
-  std::chrono::steady_clock::time_point Now() override { return now_; }
+  std::chrono::steady_clock::time_point now() override { return now_; }
 
   void Increment(std::chrono::seconds increment_seconds) { now_ += increment_seconds; }
 
