@@ -15,7 +15,7 @@ use starnix_modules_ashmem::ashmem_device_init;
 use starnix_modules_gpu::gpu_device_init;
 use starnix_modules_gralloc::gralloc_device_init;
 use starnix_modules_input::uinput::register_uinput_device;
-use starnix_modules_input::InputDevice;
+use starnix_modules_input::{EventProxyMode, InputDevice};
 use starnix_modules_magma::magma_device_init;
 use starnix_modules_perfetto_consumer::start_perfetto_consumer_thread;
 use starnix_modules_touch_power_policy::TouchPowerPolicyDevice;
@@ -181,9 +181,9 @@ pub fn run_container_features(
         keyboard_device.clone().register(locked, &kernel.kthreads.system_task());
         register_uinput_device(locked, &kernel.kthreads.system_task());
 
-        touch_device.start_touch_relay(&kernel, touch_source_client, true);
+        touch_device.start_touch_relay(&kernel, touch_source_client, EventProxyMode::WakeContainer);
         keyboard_device.start_keyboard_relay(&kernel, keyboard, view_ref);
-        keyboard_device.start_button_relay(&kernel, registry_proxy);
+        keyboard_device.start_button_relay(&kernel, registry_proxy, EventProxyMode::WakeContainer);
 
         // Channel we use to inform the relay of changes to `touch_standby`
         let (touch_standby_sender, touch_standby_receiver) = channel::<bool>();
