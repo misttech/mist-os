@@ -62,12 +62,20 @@ async fn test_nodegroup() -> Result<()> {
     )
     .expect("Could not open /pkg");
 
+    let test_component = fidl_fuchsia_component_resolution::Component {
+        package: Some(fidl_fuchsia_component_resolution::Package {
+            directory: Some(pkg_client),
+            ..Default::default()
+        }),
+        ..Default::default()
+    };
+
     let realm_options = ftest::RealmOptions {
         driver_test_realm_start_args: Some(fdt::RealmArgs {
-            pkg: Some(pkg_client),
             dtr_offers: Some(vec![
                 fuchsia_component_test::Capability::protocol::<ft::WaiterMarker>().into(),
             ]),
+            test_component: Some(test_component),
             ..Default::default()
         }),
         offers_client: Some(offers_client),

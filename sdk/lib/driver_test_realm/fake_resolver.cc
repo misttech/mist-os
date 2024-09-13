@@ -240,7 +240,15 @@ class FakeComponentResolver final
       ResolveCompleter::Sync& completer) {
     auto resolution_context = fidl::WireCall(internal_client)->GetTestResolutionContext();
     if (!resolution_context.ok()) {
-      FX_LOG_KV(ERROR, "Failed to get resolution context.");
+      FX_LOG_KV(ERROR, "Failed to get resolution context.",
+                FX_KV("description", resolution_context.FormatDescription().c_str()));
+      completer.ReplyError(fuchsia_component_resolution::wire::ResolverError::kInternal);
+      return;
+    }
+
+    if (resolution_context.value().is_error()) {
+      FX_LOG_KV(ERROR, "Failed to get resolution context.",
+                FX_KV("error", zx_status_get_string(resolution_context.value().error_value())));
       completer.ReplyError(fuchsia_component_resolution::wire::ResolverError::kInternal);
       return;
     }
@@ -255,7 +263,7 @@ class FakeComponentResolver final
 
     fidl::Arena arena;
     auto result = fidl::WireCall(*resolver)->ResolveWithContext(
-        fidl::StringView(arena, relative_path), resolution_context.value().context);
+        fidl::StringView(arena, relative_path), resolution_context.value().value()->context);
     if (!result.ok() || result.value().is_error()) {
       FX_LOG_KV(ERROR, "Failed to resolve.");
       completer.ReplyError(fuchsia_component_resolution::wire::ResolverError::kInternal);

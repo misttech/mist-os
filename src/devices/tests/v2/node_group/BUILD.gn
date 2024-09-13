@@ -90,6 +90,7 @@ rustc_test("bin") {
   sources = [ "test.rs" ]
   deps = [
     ":fuchsia.nodegroup.test_rust",
+    "//sdk/fidl/fuchsia.component.resolution:fuchsia.component.resolution_rust",
     "//sdk/fidl/fuchsia.driver.test:fuchsia.driver.test_rust",
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
     "//src/devices/testing/fidl:fuchsia.driver.testing_rust",

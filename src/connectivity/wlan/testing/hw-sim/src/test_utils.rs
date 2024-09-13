@@ -106,8 +106,19 @@ impl TestRealmContext {
         )
         .expect("Could not open /pkg");
 
+        let test_component = fidl_fuchsia_component_resolution::Component {
+            package: Some(fidl_fuchsia_component_resolution::Package {
+                directory: Some(pkg_client),
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+
         driver_test_realm_proxy
-            .start(fidl_driver_test::RealmArgs { pkg: Some(pkg_client), ..Default::default() })
+            .start(fidl_driver_test::RealmArgs {
+                test_component: Some(test_component),
+                ..Default::default()
+            })
             .await
             .expect("FIDL error when starting driver test realm")
             .expect("Driver test realm server returned an error");
