@@ -31,11 +31,6 @@ parser.add_argument(
     default=None,
     help="integer to specify number of seconds before a Mobly test times out.",
 )
-parser.add_argument(
-    "--test-data-path",
-    default=None,
-    help="path to directory containing test-time data dependencies.",
-)
 parser.add_argument("--ffx-path", default=None, help="path to FFX.")
 parser.add_argument(
     "--ssh-path",
@@ -105,7 +100,6 @@ def main() -> None:
         python_path=sys.executable,
         test_path=args.mobly_test_path,
         timeout_sec=args.test_timeout_sec,
-        test_data_path=args.test_data_path,
         verbose=args.v,
         hermetic=args.hermetic,
     )

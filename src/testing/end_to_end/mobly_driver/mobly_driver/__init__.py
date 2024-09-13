@@ -26,7 +26,6 @@ def _execute_test(
     python_path: str,
     test_path: str,
     timeout_sec: Optional[int] = None,
-    test_data_path: Optional[str] = None,
     verbose: bool = False,
     hermetic: bool = False,
 ) -> None:
@@ -40,8 +39,6 @@ def _execute_test(
       test_path: path to the Mobly test executable to run.
       timeout_sec: Number of seconds before a test is killed due to timeout.
         If set to None, timeout is not enforced.
-      test_data_path: path to directory containing test-time data
-        dependencies.
       verbose: Whether to enable verbose output from the mobly test.
       hermetic: Whether the mobly test is a self-contained executable.
 
@@ -50,16 +47,8 @@ def _execute_test(
       MoblyTestTimeoutException if Mobly test duration exceeds timeout.
     """
     test_env = os.environ.copy()
-    if test_data_path:
-        # Adding the test data dir to the test_env PATH enables underlying
-        # Mobly tests to directly call test-time binaries without needing to
-        # plumb their paths through the Mobly config.
-        #
-        # Order matters here as the test data deps are preferred over
-        # binaries of existing names on the system.
-        test_env["PATH"] = os.pathsep.join([test_data_path, test_env["PATH"]])
-        # Set line-buffering for Mobly tests to flush output immediately.
-        test_env["PYTHONUNBUFFERED"] = "1"
+    # Set line-buffering for Mobly tests to flush output immediately.
+    test_env["PYTHONUNBUFFERED"] = "1"
 
     with NamedTemporaryFile(mode="w") as tmp_config:
         config = driver.generate_test_config()
@@ -120,7 +109,6 @@ def run(
     python_path: str,
     test_path: str,
     timeout_sec: Optional[int] = None,
-    test_data_path: Optional[str] = None,
     verbose: bool = False,
     hermetic: bool = False,
 ) -> None:
@@ -136,8 +124,6 @@ def run(
       test_path: path to the Mobly test executable to run.
       timeout_sec: Number of seconds before a test is killed due to timeout.
           If None, timeout is not enforced.
-      test_data_path: path to directory containing test-time data
-          dependencies.
       verbose: Whether to enable verbose output from the mobly test.
       hermetic: Whether the mobly test is a self-contained executable.
 
@@ -163,7 +149,6 @@ def run(
             test_path=test_path,
             driver=driver,
             timeout_sec=timeout_sec,
-            test_data_path=test_data_path,
             verbose=verbose,
             hermetic=hermetic,
         )
