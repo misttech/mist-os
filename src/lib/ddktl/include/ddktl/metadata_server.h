@@ -9,6 +9,7 @@
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
+#include <lib/driver/outgoing/cpp/outgoing_directory.h>
 
 // This header is an adapter for DFv1 drivers to use the //sdk/lib/driver/metadata/cpp library.
 
@@ -299,6 +300,13 @@ class MetadataServer final : public fidl::WireServer<fuchsia_driver_metadata::Me
     encoded_metadata_.emplace(std::move(copy));
 
     return ZX_OK;
+  }
+
+  // Serves the fuchsia.driver.metadata/Service service to |outgoing| under the service name
+  // `ddk::MetadataServer::kFidlServiceName` and instance name
+  // `ddk::MetadataServer::instance_name_`.
+  zx_status_t Serve(fdf::OutgoingDirectory& outgoing, async_dispatcher_t* dispatcher) {
+    return Serve(outgoing.component(), dispatcher);
   }
 
   // Serves the fuchsia.driver.metadata/Service service to |outgoing| under the service name
