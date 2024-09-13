@@ -52,7 +52,6 @@ group("tests") {
     # that is intended to be included as part of a test package that pulls in
     # additional dependencies it needs at runtime.
     ":ip6tables-restore",
-    ":iptables",
     ":iptables-restore",
     ":iptables_test",
   ]
