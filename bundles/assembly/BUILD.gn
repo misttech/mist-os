@@ -2093,8 +2093,8 @@ assembly_input_bundle("bluetooth_avrcp") {
 # build-types: all
 #
 assembly_input_bundle("bluetooth_core") {
+  flexible_packages = [ "//src/connectivity/bluetooth/core/bt-host" ]
   base_packages = [
-    "//src/connectivity/bluetooth/core/bt-host",
     "//src/connectivity/bluetooth/core/bt-init",
     "//src/connectivity/bluetooth/profiles/bt-rfcomm",
   ]
