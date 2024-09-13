@@ -32,7 +32,8 @@ use fuchsia_runtime::{UtcClock, UtcTimeline};
 use futures::channel::mpsc;
 use futures::future::{self, OptionFuture};
 use futures::stream::StreamExt as _;
-use rtc_testing::SharedBool;
+use std::cell::Cell;
+use std::rc::Rc;
 use std::sync::Arc;
 use time_metrics_registry::TimeMetricDimensionExperiment;
 use tracing::{debug, error, info, warn};
@@ -246,7 +247,7 @@ async fn main() -> Result<()> {
     };
 
     let allow_update_rtc =
-        rtc_testing::SharedBool::new(rtc_testing::read_and_update_state().may_update_rtc());
+        Rc::new(Cell::new(rtc_testing::read_and_update_state().may_update_rtc()));
 
     let (cmd_send, cmd_rcv) = mpsc::channel(1);
 
@@ -420,7 +421,7 @@ async fn maintain_utc<R: 'static, D: 'static>(
     config: Arc<Config>,
     cmd_send: mpsc::Sender<Command>,
     cmd_recv: mpsc::Receiver<Command>,
-    allow_update_rtc: rtc_testing::SharedBool,
+    allow_update_rtc: Rc<Cell<bool>>,
 ) where
     R: Rtc,
     D: Diagnostics,
@@ -520,7 +521,7 @@ async fn maintain_utc<R: 'static, D: 'static>(
                 Track::Monitor,
                 fut2_cfg_clone,
                 r2,
-                SharedBool::new(true),
+                Rc::new(Cell::new(true)),
             )
         })
         .into();
@@ -552,9 +553,9 @@ mod tests {
     use crate::rtc::FakeRtc;
     use crate::time_source::{Event as TimeSourceEvent, FakePushTimeSource, Sample};
     use fuchsia_runtime::UtcTime;
-    use futures::FutureExt;
     use lazy_static::lazy_static;
     use std::matches;
+    use std::pin::pin;
     use test_case::test_case;
     use {fidl_fuchsia_time_external as ftexternal, fuchsia_zircon as zx};
 
@@ -640,10 +641,10 @@ mod tests {
         let monotonic_ref = zx::MonotonicTime::get();
 
         let (s, r) = mpsc::channel(1);
-        let b = rtc_testing::SharedBool::new(true);
+        let b = Rc::new(Cell::new(true));
 
         // Maintain UTC until no more work remains
-        let mut fut = maintain_utc(
+        let mut fut = pin!(maintain_utc(
             PrimaryTrack {
                 clock: Arc::clone(&primary_clock),
                 time_source: FakePushTimeSource::events(vec![
@@ -675,8 +676,7 @@ mod tests {
             s,
             r,
             b,
-        )
-        .boxed();
+        ));
         let _ = executor.run_until_stalled(&mut fut);
 
         // Check that the clocks are set.
@@ -730,10 +730,10 @@ mod tests {
 
         let monotonic_ref = zx::MonotonicTime::get();
         let (s, r) = mpsc::channel(1);
-        let b = rtc_testing::SharedBool::new(true);
+        let b = Rc::new(Cell::new(true));
 
         // Maintain UTC until no more work remains
-        let mut fut = maintain_utc(
+        let mut fut = pin!(maintain_utc(
             PrimaryTrack {
                 clock: Arc::clone(&primary_clock),
                 time_source: FakePushTimeSource::events(vec![
@@ -753,8 +753,7 @@ mod tests {
             s,
             r,
             b,
-        )
-        .boxed();
+        ));
 
         // This is slightly silly, but allows us to run the clock maintenance
         // in fake time, waking up appropriate delay timers along the way.
@@ -808,10 +807,10 @@ mod tests {
 
         let monotonic_ref = zx::MonotonicTime::get();
         let (s, r) = mpsc::channel(1);
-        let b = rtc_testing::SharedBool::new(true);
+        let b = Rc::new(Cell::new(true));
 
         // Maintain UTC until no more work remains
-        let mut fut = maintain_utc(
+        let mut fut = pin!(maintain_utc(
             PrimaryTrack {
                 clock: Arc::clone(&primary_clock),
                 time_source: FakePushTimeSource::events(vec![
@@ -831,8 +830,7 @@ mod tests {
             s,
             r,
             b,
-        )
-        .boxed();
+        ));
 
         let start_time = executor.now();
         let _ = executor.run_until_stalled(&mut fut);
@@ -864,10 +862,10 @@ mod tests {
         }])
         .into();
         let (s, r) = mpsc::channel(1);
-        let b = rtc_testing::SharedBool::new(true);
+        let b = Rc::new(Cell::new(true));
 
         // Maintain UTC until no more work remains
-        let mut fut = maintain_utc(
+        let mut fut = pin!(maintain_utc(
             PrimaryTrack { clock: Arc::clone(&clock), time_source },
             None,
             Some(rtc.clone()),
@@ -876,8 +874,7 @@ mod tests {
             s,
             r,
             b,
-        )
-        .boxed();
+        ));
         let _ = executor.run_until_stalled(&mut fut);
 
         // Checking that the clock has not been updated yet
@@ -910,10 +907,10 @@ mod tests {
         }])
         .into();
         let (s, r) = mpsc::channel(1);
-        let b = rtc_testing::SharedBool::new(true);
+        let b = Rc::new(Cell::new(true));
 
         // Maintain UTC until no more work remains
-        let mut fut = maintain_utc(
+        let mut fut = pin!(maintain_utc(
             PrimaryTrack { clock: Arc::clone(&clock), time_source },
             None,
             Some(rtc.clone()),
@@ -922,8 +919,7 @@ mod tests {
             s,
             r,
             b,
-        )
-        .boxed();
+        ));
         let _ = executor.run_until_stalled(&mut fut);
 
         // Checking that the clock has not been updated yet
@@ -967,10 +963,10 @@ mod tests {
         }])
         .into();
         let (s, r) = mpsc::channel(1);
-        let b = rtc_testing::SharedBool::new(true);
+        let b = Rc::new(Cell::new(true));
 
         // Maintain UTC until no more work remains
-        let mut fut = maintain_utc(
+        let mut fut = pin!(maintain_utc(
             PrimaryTrack { clock: Arc::clone(&clock), time_source },
             None,
             Some(rtc.clone()),
@@ -979,8 +975,7 @@ mod tests {
             s,
             r,
             b,
-        )
-        .boxed();
+        ));
         let _ = executor.run_until_stalled(&mut fut);
 
         // Checking that the clock was updated to use the valid RTC time.
@@ -1023,10 +1018,10 @@ mod tests {
         .into();
 
         let (s, r) = mpsc::channel(1);
-        let b = rtc_testing::SharedBool::new(true);
+        let b = Rc::new(Cell::new(true));
 
         // Maintain UTC until no more work remains
-        let mut fut = maintain_utc(
+        let mut fut = pin!(maintain_utc(
             PrimaryTrack { clock: Arc::clone(&clock), time_source },
             None,
             Some(rtc.clone()),
@@ -1035,8 +1030,7 @@ mod tests {
             s,
             r,
             b,
-        )
-        .boxed();
+        ));
         let _ = executor.run_until_stalled(&mut fut);
 
         // Checking that neither the clock nor the RTC were updated.

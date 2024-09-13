@@ -9,62 +9,15 @@ use anyhow::Result;
 use fidl_fuchsia_time_test as fftt;
 use futures::StreamExt;
 use serde::{Deserialize, Serialize};
-use std::borrow::BorrowMut;
+use std::cell::Cell;
 use std::fs;
 use std::path::Path;
-use std::sync::{Arc, Mutex};
+use std::rc::Rc;
 use tracing::{debug, error};
 
 /// The path to the internal production persistent state file.
 #[allow(dead_code)]
 const PERSISTENT_STATE_PATH: &'static str = "/data/persistent_state.json";
-
-/// A bool shareable across threads.
-///
-/// This is a less powerful version of "atomic bool", fitting the use case
-/// in this code:
-///
-/// 1. Isolate locks to short non-async fns to ensure locks are only held
-///    briefly and never across `.await`s.
-/// 2. Keeps the mutable state sharing code in one place.
-/// 3. Implements `Sync`, as its lifetime (but not use) crosses some `.await`
-///    calls in the using code. (e.g. `Rc<Refcell<_>>`` would not do.)
-#[derive(Debug, Clone)]
-pub struct SharedBool(Arc<Mutex<bool>>);
-
-impl SharedBool {
-    // Create a new [Self] with the provided value.
-    pub fn new(initial_value: bool) -> Self {
-        Self(Arc::new(Mutex::new(initial_value)))
-    }
-
-    /// Set a new value.
-    ///
-    /// May block the current thread if a concurrent operation is in progress.
-    /// May panic if the same thread attempts to block twice; or if any lock
-    /// holder panics.  Neither of these should ever happen in normal operation.
-    pub fn set(&mut self, new_value: bool) {
-        // Refer to docs of std::sync::Mutex for error condition details.
-        let mut g = self
-            .0
-            .lock()
-            .expect("either other holder of this lock panicked, or same thread attempted to lock");
-        *(*g.borrow_mut()) = new_value;
-    }
-
-    /// Get the current value. Blocks the current thread until done.
-    ///
-    /// May block the current thread if a concurrent operation is in progress.
-    /// May panic if the same thread attempts to lock twice; or if any lock
-    /// holder panics.  Neither of these should ever happen in normal operation.
-    pub fn get(&self) -> bool {
-        // Refer to docs of std::sync::Mutex for error condition details.
-        *self
-            .0
-            .lock()
-            .expect("either other holder of this lock panicked, or same thread attempted to lock")
-    }
-}
 
 /// Serves `fuchsia.time.test/Rtc`.
 ///
@@ -72,7 +25,7 @@ impl SharedBool {
 /// - `persistent_enabled_bit`: the state bit to manage.
 /// - `stream`: the request stream from the test fixture.
 pub async fn serve(
-    mut persist_enabled: SharedBool,
+    persist_enabled: Rc<Cell<bool>>,
     mut stream: fftt::RtcRequestStream,
 ) -> Result<()> {
     debug!("rtc_testing::serve: entering serving loop");
