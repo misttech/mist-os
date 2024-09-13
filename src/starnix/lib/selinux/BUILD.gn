@@ -95,6 +95,7 @@ group("tests") {
   testonly = true
 
   deps = [
+    ":selinux_test($host_toolchain)",
     ":starnix-selinux-unit-tests",
     "scripts:tests",
   ]
