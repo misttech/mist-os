@@ -222,25 +222,19 @@ class RemoteDecodedModule : public RemoteDecodedModuleBase<Elf>,
     // each DT_NEEDED at the same time.  So the NeededObserver just collects
     // their offsets and then those are reified into strings afterwards.
     RemoteContainer<size_type> needed_offsets;
-    if (auto result = this->DecodeDynamic(diag, memory, dyn_phdr, NeededObserver(needed_offsets));
+    if (auto result =
+            this->DecodeDynamic(diag, memory, dyn_phdr, Base::MakeNeededObserver(needed_offsets));
         result.is_error()) [[unlikely]] {
       return result.error_value();
     }
 
     // Now that DT_STRTAB has been decoded, it's possible to reify each offset
     // into the corresponding SONAME string (and hash it by creating a Soname).
-    needed_.reserve(needed_offsets.size());
-    for (size_type offset : needed_offsets) {
-      std::string_view name = this->symbol_info().string(offset);
-      if (name.empty()) [[unlikely]] {
-        if (!diag.FormatError("DT_NEEDED has DT_STRTAB offset ", offset, " with DT_STRSZ ",
-                              this->symbol_info().strtab().size())) {
-          return false;
-        }
-        continue;
-      }
-      needed_.emplace_back(name);
+    std::optional needed_names = this->template ReifyNeeded<RemoteContainer>(diag, needed_offsets);
+    if (!needed_names) [[unlikely]] {
+      return false;
     }
+    needed_ = *std::move(needed_names);
 
     return true;
   }
@@ -260,13 +254,6 @@ class RemoteDecodedModule : public RemoteDecodedModuleBase<Elf>,
   }
 
  private:
-  // This is ultimately just passed to RemoteContainer<...>::push_back, which
-  // never uses it since it will just crash if allocation fails.
-  static const constexpr std::string_view kImpossibleError{};
-
-  using NeededObserver = elfldltl::DynamicValueCollectionObserver<  //
-      Elf, elfldltl::ElfDynTag::kNeeded, RemoteContainer<size_type>, kImpossibleError>;
-
   elfldltl::MappedVmoFile mapped_vmo_;
   NeededList needed_;
   ExecInfo exec_info_;

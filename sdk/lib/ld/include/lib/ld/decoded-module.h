@@ -267,7 +267,82 @@ class DecodedModule : public DecodedModuleBase {
     module_->symbolizer_modid = modid;
   }
 
+  // This returns an observer that can be passed to DecodeDynamic to collect
+  // DT_NEEDED entries into a container of size_type.  (Container can be
+  // anything that meets the <lib/elfldltl/container.h> template API with a
+  // value_type of size_type.)  This records just the offsets and so can be
+  // used in the initial DecodeDynamic that also discovers DT_STRTAB et al.
+  // The offsets can later be converted using ReifyNeeded (see below).
+  template <class Container>
+  static constexpr auto MakeNeededObserver(Container& needed_offsets) {
+    static_assert(std::is_same_v<size_type, typename Container::value_type>);
+    return NeededObserver<Container>{needed_offsets};
+  }
+
+  // This turns a DT_NEEDED offset (as collected via MakeNeededObserver) into
+  // its string from the DT_STRTAB, normalized as a Soname object.  It returns
+  // failure for an invalid string table entry.  The error value is the "keep
+  // going" result from the Diagnostics object.
+  template <class Diagnostics>
+  constexpr fit::result<bool, Soname> ReifyNeeded(Diagnostics& diag, size_type offset) {
+    using namespace std::string_view_literals;
+    std::string_view name = this->symbol_info().string(offset);
+    if (!name.empty()) [[likely]] {
+      return fit::ok(Soname{name});
+    }
+    const size_t strtab_size = this->symbol_info().strtab().size();
+    if (offset < strtab_size) {
+      return fit::error{diag.FormatError(  //
+          "DT_NEEDED has empty SONAME at DT_STRTAB offset "sv, offset)};
+    }
+    return fit::error{diag.FormatError(  //
+        "DT_NEEDED has DT_STRTAB offset "sv, offset, " with DT_STRSZ "sv, strtab_size)};
+  }
+
+  // This overload applies ReifyNeeded to each offset in a container of
+  // size_type and returns a new container of Soname.  It's invoked e.g.
+  // ```
+  // std::optional needed_names =
+  //     ReifyNeeded<elfldltl::StdContainer<std::vector>::Container>(
+  //         diag, needed_offsets);
+  // ```
+  // A return of std::nullopt means the Diagnostics object returned false after
+  // a bad entry was diagnosed, or there was an allocation failure.  If the
+  // Diagnostics object returned true for a bad entry, that entry is just
+  // omitted from the container it's success even with an empty container.
+  template <template <typename> class Container, class Diagnostics, class Offsets>
+  constexpr std::optional<Container<Soname>> ReifyNeeded(Diagnostics& diag, Offsets&& offsets) {
+    using OffsetType = typename std::decay_t<Offsets>::value_type;
+    static_assert(std::is_same_v<size_type, OffsetType>);
+    std::optional<Container<Soname>> needed{std::in_place};
+    if (!needed->reserve(diag, kNeededFail, offsets.size())) [[unlikely]] {
+      return std::nullopt;
+    }
+    for (size_type offset : offsets) {
+      auto result = ReifyNeeded(diag, offset);
+      if (result.is_error()) [[unlikely]] {
+        if (result.error_value()) {
+          // The Diagnostics object said to keep going, so just skip this one
+          // entry and process all the rest.
+          continue;
+        }
+        return std::nullopt;
+      }
+      if (!needed->push_back(diag, kNeededFail, result.value())) [[unlikely]] {
+        return std::nullopt;
+      }
+    }
+    return needed;
+  }
+
  private:
+  static const constexpr std::string_view kNeededFail =  //
+      "cannot collect DT_NEEDED entries";
+
+  template <class Container>
+  using NeededObserver = elfldltl::DynamicValueCollectionObserver<  //
+      Elf, elfldltl::ElfDynTag::kNeeded, Container, kNeededFail>;
+
   using ModuleStorage =
       std::conditional_t<InlineModule == AbiModuleInline::kYes, std::optional<Module>, Module*>;
 
