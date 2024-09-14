@@ -18,7 +18,7 @@ pub type GenericStoredMessage = Box<dyn StoredMessage>;
 pub trait StoredMessage: Debug + Send + Sync {
     fn size(&self) -> usize;
     fn severity(&self) -> Severity;
-    fn timestamp(&self) -> i64;
+    fn timestamp(&self) -> zx::MonotonicTime;
     fn parse(&self, source: &ComponentIdentity) -> Result<LogsData, anyhow::Error>;
 }
 
@@ -52,7 +52,7 @@ impl StoredMessage for LegacyStoredMessage {
         self.msg.severity
     }
 
-    fn timestamp(&self) -> i64 {
+    fn timestamp(&self) -> zx::MonotonicTime {
         self.msg.timestamp
     }
 
@@ -65,7 +65,7 @@ impl StoredMessage for LegacyStoredMessage {
 pub struct StructuredStoredMessage {
     bytes: Box<[u8]>,
     severity: Severity,
-    timestamp: i64,
+    timestamp: zx::MonotonicTime,
     stats: Arc<LogStreamStats>,
 }
 
@@ -98,7 +98,7 @@ impl StoredMessage for StructuredStoredMessage {
         self.severity
     }
 
-    fn timestamp(&self) -> i64 {
+    fn timestamp(&self) -> zx::MonotonicTime {
         self.timestamp
     }
 
@@ -164,8 +164,8 @@ impl StoredMessage for DebugLogStoredMessage {
         self.severity
     }
 
-    fn timestamp(&self) -> i64 {
-        self.msg.timestamp.into_nanos()
+    fn timestamp(&self) -> zx::MonotonicTime {
+        self.msg.timestamp
     }
 
     fn parse(&self, _source: &ComponentIdentity) -> Result<LogsData> {
@@ -178,7 +178,7 @@ impl StoredMessage for DebugLogStoredMessage {
 pub struct InvalidStoredMessage {
     err: MessageError,
     severity: Severity,
-    timestamp: i64,
+    timestamp: zx::MonotonicTime,
     stats: Arc<LogStreamStats>,
 }
 
@@ -187,7 +187,7 @@ impl InvalidStoredMessage {
         // When we fail to parse a message set a WARN for it and use the timestamp for when the
         // message was received. We'll be adding an error for this.
         let severity = Severity::Warn;
-        let timestamp = zx::MonotonicTime::get().into_nanos();
+        let timestamp = zx::MonotonicTime::get();
         InvalidStoredMessage { err, severity, timestamp, stats }
     }
 }
@@ -207,7 +207,7 @@ impl StoredMessage for InvalidStoredMessage {
         self.severity
     }
 
-    fn timestamp(&self) -> i64 {
+    fn timestamp(&self) -> zx::MonotonicTime {
         self.timestamp
     }
 

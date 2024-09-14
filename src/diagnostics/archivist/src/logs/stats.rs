@@ -43,7 +43,7 @@ impl LogStreamStats {
     }
 
     pub fn ingest_message<T: StoredMessage + ?Sized>(&self, msg: &T) {
-        self.last_timestamp.set(msg.timestamp());
+        self.last_timestamp.set(msg.timestamp().into_nanos());
         self.total.count(msg);
         match msg.severity() {
             Severity::Trace => self.trace.count(msg),

@@ -151,7 +151,11 @@ impl LogsArtifactsContainer {
         parent_trace_id: ftrace::Id,
     ) -> PinStream<Arc<LogsData>> {
         let identity = Arc::clone(&self.identity);
-        let earliest_timestamp = self.buffer.peek_front().map(|f| f.timestamp()).unwrap_or(0);
+        let earliest_timestamp = self
+            .buffer
+            .peek_front()
+            .map(|f| f.timestamp())
+            .unwrap_or(zx::MonotonicTime::from_nanos(0));
         Box::pin(
             self.buffer
                 .cursor(mode)
@@ -490,7 +494,7 @@ impl LogsArtifactsContainer {
     }
 
     /// Returns the timestamp of the earliest log message in this container's buffer, if any.
-    pub fn oldest_timestamp(&self) -> Option<i64> {
+    pub fn oldest_timestamp(&self) -> Option<zx::MonotonicTime> {
         self.buffer.peek_front().map(|m| m.timestamp())
     }
 

@@ -5,6 +5,7 @@
 use crate::identity::ComponentIdentity;
 use crate::logs::container::LogsArtifactsContainer;
 use fuchsia_sync::Mutex;
+use fuchsia_zircon as zx;
 use futures::channel::mpsc;
 use std::sync::{Arc, Weak};
 use tracing::{debug, warn};
@@ -65,7 +66,9 @@ impl BudgetState {
 
         while self.current > self.capacity {
             // find the container with the oldest log message
-            self.containers.sort_unstable_by_key(|c| c.oldest_timestamp().unwrap_or(i64::MAX));
+            self.containers.sort_unstable_by_key(|c| {
+                c.oldest_timestamp().unwrap_or(zx::MonotonicTime::from_nanos(i64::MAX))
+            });
 
             let container_with_oldest = Arc::clone(
                 self.containers

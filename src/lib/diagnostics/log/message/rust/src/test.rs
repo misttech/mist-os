@@ -700,6 +700,6 @@ fn basic_structured_info() {
     let encoded = &buffer.get_ref().as_slice()[..buffer.position() as usize];
 
     let (timestamp, severity) = parse_basic_structured_info(encoded).unwrap();
-    assert_eq!(timestamp, expected_timestamp);
+    assert_eq!(timestamp, zx::MonotonicTime::from_nanos(expected_timestamp));
     assert_eq!(severity, Severity::Error);
 }
