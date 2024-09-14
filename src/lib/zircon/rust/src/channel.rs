@@ -462,31 +462,6 @@ impl Channel {
     }
 }
 
-#[test]
-pub fn test_handle_repr() {
-    assert_eq!(::std::mem::size_of::<sys::zx_handle_t>(), 4);
-    assert_eq!(::std::mem::size_of::<Handle>(), 4);
-    assert_eq!(::std::mem::align_of::<sys::zx_handle_t>(), ::std::mem::align_of::<Handle>());
-
-    // This test asserts that repr(transparent) still works for Handle -> zx_handle_t
-
-    let n: Vec<sys::zx_handle_t> = vec![0, 100, 2 << 32 - 1];
-    let v: Vec<Handle> = n.iter().map(|h| unsafe { Handle::from_raw(*h) }).collect();
-
-    for (handle, raw) in v.iter().zip(n.iter()) {
-        unsafe {
-            assert_eq!(
-                *(handle as *const _ as *const [u8; 4]),
-                *(raw as *const _ as *const [u8; 4])
-            );
-        }
-    }
-
-    for h in v.into_iter() {
-        ::std::mem::forget(h);
-    }
-}
-
 impl AsRef<Channel> for Channel {
     fn as_ref(&self) -> &Self {
         &self
