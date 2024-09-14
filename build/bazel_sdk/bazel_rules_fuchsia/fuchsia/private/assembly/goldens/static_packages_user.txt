@@ -7,7 +7,7 @@
 ?bt-a2dp
 ?bt-avrcp
 ?bt-avrcp-target
-?bt-hfp-audio-gateway-default
+?bt-hfp-audio-gateway
 ?bt-host
 ?bt-init
 ?bt-map-mce

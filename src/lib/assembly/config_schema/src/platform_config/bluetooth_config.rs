@@ -26,7 +26,7 @@ pub struct A2dpConfig {
     pub enabled: bool,
 }
 
-/// Configuration options for Bluetooth media controls (bt-avrcp).
+/// Configuration options for Bluetooth media info and controls (bt-avrcp).
 // TODO(b/324894109): Add profile-specific arguments
 #[derive(Clone, Copy, Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema)]
 pub struct AvrcpConfig {
@@ -34,13 +34,81 @@ pub struct AvrcpConfig {
     pub enabled: bool,
 }
 
-/// Configuration options for Bluetooth hands free calling (bt-hfp).
-// TODO(b/324894109): Add profile-specific arguments
-#[derive(Clone, Copy, Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema)]
+/// HFP Audio Gateway Features
+/// See HFP v1.9 Page 100 for details.
+#[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum HfpAudioGatewayFeature {
+    ThreeWayCalling,
+    EchoCancelingAndNoiseReduction,
+    VoiceRecognition,
+    InbandRingtone,
+    AttachPhoneNumberVoiceTag,
+    RejectIncomingCall,
+    EnhancedCallControl,
+    EnhancedVoiceRecognitionStatus,
+    VoiceRecognitionText,
+}
+
+impl std::fmt::Display for HfpAudioGatewayFeature {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            HfpAudioGatewayFeature::ThreeWayCalling => write!(f, "three_way_calling"),
+            HfpAudioGatewayFeature::EchoCancelingAndNoiseReduction => {
+                write!(f, "echo_canceling_and_noise_reduction")
+            }
+            HfpAudioGatewayFeature::VoiceRecognition => write!(f, "voice_recognition"),
+            HfpAudioGatewayFeature::InbandRingtone => write!(f, "inband_ringtone"),
+            HfpAudioGatewayFeature::AttachPhoneNumberVoiceTag => {
+                write!(f, "attach_phone_number_voice_tag")
+            }
+            HfpAudioGatewayFeature::RejectIncomingCall => write!(f, "reject_incoming_call"),
+            HfpAudioGatewayFeature::EnhancedCallControl => write!(f, "enhanced_call_control"),
+            HfpAudioGatewayFeature::EnhancedVoiceRecognitionStatus => {
+                write!(f, "enhanced_voice_recognition_status")
+            }
+            HfpAudioGatewayFeature::VoiceRecognitionText => write!(f, "voice_recognition_text"),
+        }
+    }
+}
+
+/// Codec IDs defined by the Bluetooth HFP Specification
+/// See HFP v1.9 Appendix B
+#[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, JsonSchema)]
+#[serde(rename_all = "lowercase")]
+pub enum HfpCodecId {
+    Cvsd,
+    Msbc,
+    Lc3Swb,
+}
+
+/// Configuration options for Bluetooth hands free (bt-hfp).
+#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema)]
 pub struct HfpConfig {
     /// Enable hands free calling audio gateway (`bt-hfp-audio-gateway`).
     #[serde(default)]
     pub enabled: bool,
+    /// The set of AudioGateway features that are enabled.
+    /// Features not included are disabled by default, with the exception of the
+    /// following which are always enabled:
+    ///  - Enhanced Call Status
+    ///  - Extended Error Result Codes
+    ///  - Codec Negotiation
+    ///  - HF Indicators
+    ///  - eSCO S4
+    #[serde(default)]
+    pub audio_gateway: Vec<HfpAudioGatewayFeature>,
+    /// The set of codecs that are enabled to use.
+    /// If MSBC is enabled, Wide Band Speech will be enabled
+    /// If LC3 is enabled, Super Wide Band will be enabled
+    /// By default, all codecs supported (either by the controller as specified below) will be enabled.
+    #[serde(default)]
+    pub codecs_supported: Vec<HfpCodecId>,
+    /// Set of codec ids that the Bluetooth controller can encode.
+    /// Codecs not supported will be ignored.
+    /// Codecs not in this list but in codecs_supported will be encoded locally and sent inband.
+    #[serde(default)]
+    pub controller_encodes: Vec<HfpCodecId>,
 }
 
 /// Configuration options for Bluetooth message access profile (bt-map)
@@ -53,7 +121,7 @@ pub struct MapConfig {
 }
 
 /// Platform configuration to enable Bluetooth profiles.
-#[derive(Clone, Copy, Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema)]
 pub struct BluetoothProfilesConfig {
     /// Specifies the configuration for `bt-a2dp`.
     #[serde(default)]
@@ -82,7 +150,7 @@ pub struct BluetoothCoreConfig {
 
 /// Platform configuration options for Bluetooth.
 /// The default platform configuration does not include any Bluetooth packages.
-#[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, JsonSchema)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, JsonSchema)]
 #[serde(tag = "type", rename_all = "lowercase", deny_unknown_fields)]
 pub enum BluetoothConfig {
     /// The standard Bluetooth configuration includes the "core" set of components that provide
@@ -163,6 +231,18 @@ mod tests {
                 },
                 "hfp": {
                     "enabled": true,
+                    "audio_gateway": [
+                        "voice_recognition",
+                        "three_way_calling",
+                        "inband_ringtone",
+                        "echo_canceling_and_noise_reduction",
+                        "attach_phone_number_voice_tag",
+                        "reject_incoming_call",
+                        "enhanced_call_control",
+                        "enhanced_voice_recognition_status",
+                        "voice_recognition_text"],
+                    "codecs_supported": ["cvsd", "msbc", "lc3swb"],
+                    "controller_encodes": ["cvsd", "msbc", "lc3swb"],
                 },
             },
             "core": {
@@ -174,7 +254,22 @@ mod tests {
         let expected_profiles = BluetoothProfilesConfig {
             a2dp: A2dpConfig { enabled: true },
             avrcp: AvrcpConfig { enabled: true },
-            hfp: HfpConfig { enabled: true },
+            hfp: HfpConfig {
+                enabled: true,
+                audio_gateway: vec![
+                    HfpAudioGatewayFeature::VoiceRecognition,
+                    HfpAudioGatewayFeature::ThreeWayCalling,
+                    HfpAudioGatewayFeature::InbandRingtone,
+                    HfpAudioGatewayFeature::EchoCancelingAndNoiseReduction,
+                    HfpAudioGatewayFeature::AttachPhoneNumberVoiceTag,
+                    HfpAudioGatewayFeature::RejectIncomingCall,
+                    HfpAudioGatewayFeature::EnhancedCallControl,
+                    HfpAudioGatewayFeature::EnhancedVoiceRecognitionStatus,
+                    HfpAudioGatewayFeature::VoiceRecognitionText,
+                ],
+                codecs_supported: vec![HfpCodecId::Cvsd, HfpCodecId::Msbc, HfpCodecId::Lc3Swb],
+                controller_encodes: vec![HfpCodecId::Cvsd, HfpCodecId::Msbc, HfpCodecId::Lc3Swb],
+            },
             map: MapConfig { mce_enabled: false },
         };
         let expected_core = BluetoothCoreConfig { legacy_pairing_enabled: true };

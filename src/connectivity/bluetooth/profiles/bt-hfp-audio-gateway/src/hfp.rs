@@ -917,7 +917,6 @@ mod tests {
                     echo_canceling_and_noise_reduction: false,
                     voice_recognition: false,
                     attach_phone_number_to_voice_tag: false,
-                    respond_and_hold: false,
                     enhanced_call_controls: false,
                     wide_band_speech: false,
                     enhanced_voice_recognition: false,

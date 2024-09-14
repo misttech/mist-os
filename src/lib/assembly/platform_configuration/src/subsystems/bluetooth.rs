@@ -6,15 +6,21 @@ use anyhow::format_err;
 
 use crate::subsystems::prelude::*;
 use assembly_config_capabilities::{Config, ConfigValueType};
-use assembly_config_schema::platform_config::bluetooth_config::{BluetoothConfig, Snoop};
+use assembly_config_schema::platform_config::bluetooth_config::{
+    BluetoothConfig, HfpAudioGatewayFeature, HfpCodecId, Snoop,
+};
+use assembly_config_schema::platform_config::media_config::{AudioConfig, PlatformMediaConfig};
 
 pub(crate) struct BluetoothSubsystemConfig;
-impl DefineSubsystemConfiguration<BluetoothConfig> for BluetoothSubsystemConfig {
+impl DefineSubsystemConfiguration<(&BluetoothConfig, &PlatformMediaConfig)>
+    for BluetoothSubsystemConfig
+{
     fn define_configuration(
         context: &ConfigurationContext<'_>,
-        config: &BluetoothConfig,
+        config: &(&BluetoothConfig, &PlatformMediaConfig),
         builder: &mut dyn ConfigurationBuilder,
     ) -> anyhow::Result<()> {
+        let (config, media_config) = config;
         // Snoop is only useful when Inspect filtering is turned on. In practice, this is in Eng &
         // UserDebug builds.
         match (context.build_type, config.snoop()) {
@@ -61,6 +67,92 @@ impl DefineSubsystemConfiguration<BluetoothConfig> for BluetoothSubsystemConfig 
         }
         if profiles.hfp.enabled {
             builder.platform_bundle("bluetooth_hfp_ag");
+
+            let controller_encodes = if profiles.hfp.controller_encodes.is_empty() {
+                vec![HfpCodecId::Cvsd, HfpCodecId::Msbc]
+            } else {
+                profiles.hfp.controller_encodes.clone()
+            };
+
+            // TODO(https://fxbug.dev/362573469): Bail if the features don't make sense
+            // (VoiceRecognitionText without EnhancedVoiceRecognitionStatus, for example)
+            let supported_codecs = if profiles.hfp.codecs_supported.is_empty() {
+                vec![HfpCodecId::Cvsd, HfpCodecId::Msbc, HfpCodecId::Lc3Swb]
+            } else {
+                profiles.hfp.codecs_supported.clone()
+            };
+
+            let offload_type = match media_config.audio {
+                Some(AudioConfig::FullStack(_)) => "dai",
+                Some(AudioConfig::PartialStack) => "codec",
+                None => return Err(format_err!("Bluetooth HFP requires an audio stack")),
+            };
+
+            let mut hfp_ag_config = builder
+                .package("bt-hfp-audio-gateway")
+                .component("meta/bt-hfp-audio-gateway.cm")?;
+            hfp_ag_config
+                .field(
+                    "three_way_calling",
+                    profiles.hfp.audio_gateway.contains(&HfpAudioGatewayFeature::ThreeWayCalling),
+                )?
+                .field(
+                    "reject_incoming_voice_call",
+                    profiles
+                        .hfp
+                        .audio_gateway
+                        .contains(&HfpAudioGatewayFeature::RejectIncomingCall),
+                )?
+                .field(
+                    "in_band_ringtone",
+                    profiles.hfp.audio_gateway.contains(&HfpAudioGatewayFeature::InbandRingtone),
+                )?
+                .field(
+                    "voice_recognition",
+                    profiles
+                        .hfp
+                        .audio_gateway
+                        .contains(&HfpAudioGatewayFeature::EnhancedVoiceRecognitionStatus),
+                )?
+                .field(
+                    "echo_canceling_and_noise_reduction",
+                    profiles
+                        .hfp
+                        .audio_gateway
+                        .contains(&HfpAudioGatewayFeature::EchoCancelingAndNoiseReduction),
+                )?
+                .field(
+                    "attach_phone_number_to_voice_tag",
+                    profiles
+                        .hfp
+                        .audio_gateway
+                        .contains(&HfpAudioGatewayFeature::AttachPhoneNumberVoiceTag),
+                )?
+                .field(
+                    "enhanced_call_controls",
+                    profiles
+                        .hfp
+                        .audio_gateway
+                        .contains(&HfpAudioGatewayFeature::EnhancedCallControl),
+                )?
+                .field(
+                    "enhanced_voice_recognition",
+                    profiles
+                        .hfp
+                        .audio_gateway
+                        .contains(&HfpAudioGatewayFeature::EnhancedVoiceRecognitionStatus),
+                )?
+                .field(
+                    "enhanced_voice_recognition_with_text",
+                    profiles
+                        .hfp
+                        .audio_gateway
+                        .contains(&HfpAudioGatewayFeature::VoiceRecognitionText),
+                )?
+                .field("controller_encoding_cvsd", controller_encodes.contains(&HfpCodecId::Cvsd))?
+                .field("controller_encoding_msbc", controller_encodes.contains(&HfpCodecId::Msbc))?
+                .field("wide_band_speech", supported_codecs.contains(&HfpCodecId::Msbc))?
+                .field("offload_type", offload_type)?;
         }
         if profiles.map.mce_enabled {
             builder.platform_bundle("bluetooth_map_mce");

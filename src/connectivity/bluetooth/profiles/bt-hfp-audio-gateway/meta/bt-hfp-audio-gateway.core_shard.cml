@@ -5,7 +5,8 @@
     children: [
         {
             name: "bt-hfp-audio-gateway",
-            url: "fuchsia-pkg://fuchsia.com/bt-hfp-audio-gateway-default#meta/bt-hfp-audio-gateway.cm",
+            url: "fuchsia-pkg://fuchsia.com/bt-hfp-audio-gateway#meta/bt-hfp-audio-gateway.cm",
+            startup: "eager",
             environment: "#core-env",
         },
     ],
@@ -26,6 +27,7 @@
             protocol: [ "fuchsia.media.AudioDeviceEnumerator" ],
             from: "#audio_core",
             to: [ "#bt-hfp-audio-gateway" ],
+            source_availability: "unknown",
         },
         {
             protocol: [
@@ -34,11 +36,13 @@
             ],
             from: "parent",
             to: "#bt-hfp-audio-gateway",
+            source_availability: "unknown",
         },
         {
             protocol: "fuchsia.mediacodec.CodecFactory",
             from: "#codec_factory",
             to: "#bt-hfp-audio-gateway",
+            source_availability: "unknown",
         },
         {
             protocol: [ "fuchsia.bluetooth.bredr.Profile" ],

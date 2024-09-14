@@ -45,6 +45,7 @@ mod inband;
 use inband::InbandAudioControl;
 
 mod codec;
+pub use codec::CodecAudioControl;
 
 const DEVICE_NAME: &'static str = "Bluetooth HFP";
 
@@ -140,7 +141,7 @@ pub struct PartialOffloadAudioControl {
 }
 
 impl PartialOffloadAudioControl {
-    pub async fn setup(
+    pub async fn setup_audio_core(
         audio_proxy: media::AudioDeviceEnumeratorProxy,
         offload_supported: HashSet<CodecId>,
     ) -> Result<Self, AudioError> {

@@ -2113,7 +2113,9 @@ assembly_input_bundle("bluetooth_core") {
 # build-types: all
 #
 assembly_input_bundle("bluetooth_hfp_ag") {
-  flexible_packages = [ "//src/connectivity/bluetooth/profiles/bt-hfp-audio-gateway:bt-hfp-audio-gateway-default" ]
+  flexible_packages = [
+    "//src/connectivity/bluetooth/profiles/bt-hfp-audio-gateway:without-config",
+  ]
   compiled_packages = [
     {
       name = "core"

@@ -16,7 +16,6 @@ pub struct AudioGatewayFeatureSupport {
     pub echo_canceling_and_noise_reduction: bool,
     pub voice_recognition: bool,
     pub attach_phone_number_to_voice_tag: bool,
-    pub respond_and_hold: bool,
     pub enhanced_call_controls: bool,
     pub wide_band_speech: bool,
     pub enhanced_voice_recognition: bool,
@@ -42,7 +41,6 @@ impl Inspect for AudioGatewayFeatureSupport {
                 "attach_phone_number_to_voice_tag",
                 self.attach_phone_number_to_voice_tag,
             );
-            node.record_bool("respond_and_hold", self.respond_and_hold);
             node.record_bool("enhanced_call_controls", self.enhanced_call_controls);
             node.record_bool("wide_band_speech", self.wide_band_speech);
             node.record_bool("enhanced_voice_recognition", self.enhanced_voice_recognition);
@@ -67,8 +65,6 @@ impl From<hfp_profile_config::Config> for AudioGatewayFeatureSupport {
             // TODO(https://fxbug.dev/42144778): not supported yet
             voice_recognition: false,
             attach_phone_number_to_voice_tag: src.attach_phone_number_to_voice_tag,
-            // TODO(https://fxbug.dev/42153736): not supported yet
-            respond_and_hold: false,
             enhanced_call_controls: src.enhanced_call_controls,
             wide_band_speech: src.wide_band_speech,
             // TODO(https://fxbug.dev/42144778): not supported yet
@@ -100,13 +96,13 @@ mod tests {
             echo_canceling_and_noise_reduction: true,
             voice_recognition: false,
             attach_phone_number_to_voice_tag: false,
-            respond_and_hold: false,
             enhanced_call_controls: false,
             wide_band_speech: true,
             enhanced_voice_recognition: false,
             enhanced_voice_recognition_with_text: false,
             controller_encoding_cvsd: true,
             controller_encoding_msbc: true,
+            offload_type: "dai".to_string(),
         });
         assert_eq!(
             config,
@@ -117,7 +113,6 @@ mod tests {
                 echo_canceling_and_noise_reduction: true,
                 voice_recognition: false,
                 attach_phone_number_to_voice_tag: false,
-                respond_and_hold: false,
                 enhanced_call_controls: false,
                 wide_band_speech: true,
                 enhanced_voice_recognition: false,
@@ -144,7 +139,6 @@ mod tests {
                 echo_canceling_and_noise_reduction: false,
                 voice_recognition: false,
                 attach_phone_number_to_voice_tag: false,
-                respond_and_hold: false,
                 enhanced_call_controls: false,
                 wide_band_speech: false,
                 enhanced_voice_recognition: false,

@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 #![recursion_limit = "1024"]
 
-use anyhow::{Context, Error};
+use anyhow::{anyhow, Context, Error};
 use battery_client::BatteryClient;
 use fidl_fuchsia_media as media;
 use fuchsia_component::server::ServiceFs;
@@ -45,6 +45,31 @@ fn controller_codecs(config: &hfp_profile_config::Config) -> HashSet<features::C
     controller_codecs
 }
 
+async fn setup_audio(
+    config: &hfp_profile_config::Config,
+    controller_codecs: HashSet<features::CodecId>,
+) -> Result<Box<dyn audio::AudioControl>, Error> {
+    if config.offload_type == "dai" {
+        let audio_proxy =
+            fuchsia_component::client::connect_to_protocol::<media::AudioDeviceEnumeratorMarker>()
+                .with_context(|| format!("Error connecting to audio_core"))?;
+        Ok(Box::new(
+            audio::PartialOffloadAudioControl::setup_audio_core(audio_proxy, controller_codecs)
+                .await?,
+        ))
+    } else if config.offload_type == "codec" {
+        let provider = fuchsia_component::client::connect_to_protocol::<
+            fidl_fuchsia_audio_device::ProviderMarker,
+        >()
+        .with_context(|| format!("Error connecting to audio_device_registry"))?;
+        let codec = audio::CodecAudioControl::new(provider);
+        Ok(Box::new(codec))
+    } else {
+        error!(r#type = config.offload_type, "Unrecognized offload type");
+        Err(anyhow!("Can't setup audio"))
+    }
+}
+
 #[fuchsia::main(logging_tags = ["bt-hfp-ag"])]
 async fn main() -> Result<(), Error> {
     let fs = ServiceFs::new();
@@ -55,6 +80,9 @@ async fn main() -> Result<(), Error> {
 
     let config = hfp_profile_config::Config::take_from_startup_handle();
     let controller_codecs = controller_codecs(&config);
+
+    let audio = setup_audio(&config, controller_codecs.clone()).await?;
+
     let feature_support = AudioGatewayFeatureSupport::load_from_config(config);
     debug!(?feature_support, "Starting HFP Audio Gateway");
     let (profile_client, profile_svc) = register_audio_gateway(feature_support)?;
@@ -72,12 +100,6 @@ async fn main() -> Result<(), Error> {
     let (call_manager_sender, call_manager_receiver) = mpsc::channel(1);
     let (test_request_sender, test_request_receiver) = mpsc::channel(1);
 
-    let audio_proxy =
-        fuchsia_component::client::connect_to_protocol::<media::AudioDeviceEnumeratorMarker>()
-            .with_context(|| format!("Error connecting to audio_core"))?;
-    let audio = Box::new(
-        audio::PartialOffloadAudioControl::setup(audio_proxy, controller_codecs.clone()).await?,
-    );
     let sco_connector = ScoConnector::build(profile_svc.clone(), controller_codecs);
 
     let mut hfp = Hfp::new(

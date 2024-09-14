@@ -224,8 +224,7 @@ async fn codec_task(
 }
 
 impl CodecAudioControl {
-    #[allow(unused)]
-    fn new(provider: audio_device::ProviderProxy) -> Self {
+    pub fn new(provider: audio_device::ProviderProxy) -> Self {
         let (events_sender, receiver) = futures::channel::mpsc::channel(1);
         Self {
             provider,
