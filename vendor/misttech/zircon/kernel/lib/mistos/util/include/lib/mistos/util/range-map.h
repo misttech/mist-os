@@ -22,7 +22,7 @@ namespace util {
 
 template <typename T>
 struct Allocator {
-  typedef T value_type;
+  using value_type = T;
 
   Allocator() noexcept = default;
 
