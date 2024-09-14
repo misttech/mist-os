@@ -10,6 +10,7 @@ fidl("fuchsia.net.interfaces.admin") {
   sources = [
     "address.fidl",
     "control.fidl",
+    "overview.fidl",
   ]
 
   public_deps = [

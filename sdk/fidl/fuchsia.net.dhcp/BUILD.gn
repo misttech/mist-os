@@ -9,6 +9,7 @@ fidl("fuchsia.net.dhcp") {
   sources = [
     "client.fidl",
     "options.fidl",
+    "overview.fidl",
     "server.fidl",
   ]
   public_deps = [

@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 /// Library containing methods to enable address masquerading for a given interface pair.
+@available(added=HEAD)
 library fuchsia.net.masquerade;
 
 using fuchsia.net;

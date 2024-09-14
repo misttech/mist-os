@@ -9,6 +9,7 @@ fidl("fuchsia.net.neighbor") {
   sources = [
     "entry.fidl",
     "neighbor.fidl",
+    "overview.fidl",
   ]
   public_deps = [
     "//sdk/fidl/fuchsia.net",

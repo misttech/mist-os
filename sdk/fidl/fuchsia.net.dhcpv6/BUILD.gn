@@ -8,6 +8,7 @@ fidl("fuchsia.net.dhcpv6") {
   sdk_category = "internal"
   sources = [
     "client.fidl",
+    "overview.fidl",
     "server.fidl",
   ]
   public_deps = [

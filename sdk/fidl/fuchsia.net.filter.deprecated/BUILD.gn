@@ -7,6 +7,7 @@ import("//build/fidl/fidl.gni")
 fidl("fuchsia.net.filter.deprecated") {
   sources = [
     "commands.fidl",
+    "overview.fidl",
     "ruleset.fidl",
   ]
   public_deps = [
