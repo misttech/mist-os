@@ -333,13 +333,28 @@ bootstrap_status=0
 # Silence, unless --verbose or there is an error.
 [[ "$bootstrap_status" == 0 && "$verbose" != 1 ]] || {
   cat "$reproxy_logdir"/bootstrap.stdout
-  echo
-  echo "build id: $build_uuid"
-  echo "logs: $reproxy_logdir"
-  echo "socket: $socket_path"
-  [[ "$bootstrap_status" == 0 ]] || exit "$bootstrap_status"
+  cat <<EOF
+
+build id: $build_uuid
+logs: $reproxy_logdir
+socket: $socket_path
+EOF
 }
 _timetrace "Bootstrapping reproxy (done)"
+[[ "$bootstrap_status" == 0 ]] || {
+  # Check for possible known causes of errors, and remedies.
+  if grep -q -e "credential" -e "authenticat" "$reproxy_logdir/bootstrap.ERROR"
+  then
+    cat <<EOF
+Seeing RBE authentication issues?  Try 'fx rbe auth'.
+
+If persistent errors look like b/358163278, try b/338509252#comment15.
+
+If needed, file a support ticket at go/fx-build-bug.
+EOF
+  fi
+  exit "$bootstrap_status"
+}
 
 test "$BUILD_METRICS_ENABLED" = 0 || {
   _timetrace "Authenticating for metrics upload"
