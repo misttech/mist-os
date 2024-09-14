@@ -74,6 +74,7 @@
 /// - (4) When the data is successfully transmitted, `NetworkDeviceImpl` marks
 /// the transmission as complete referencing the buffer's identifier to
 /// [`NetworkDeviceIfc.CompleteTx`].
+@available(added=HEAD)
 library fuchsia.hardware.network.driver;
 
 using fuchsia.hardware.network;
