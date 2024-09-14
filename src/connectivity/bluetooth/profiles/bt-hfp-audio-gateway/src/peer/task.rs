@@ -66,6 +66,7 @@ pub(super) struct PeerTask {
     sco_state: InspectableScoState,
     ringer: Ringer,
     audio_control: Arc<Mutex<Box<dyn AudioControl>>>,
+    audio_without_call: bool,
     hfp_sender: Sender<hfp::Event>,
     manager_id: Option<hfp::ManagerConnectionId>,
     inspect: PeerTaskInspect,
@@ -112,6 +113,7 @@ impl PeerTask {
             sco_state: InspectableScoState::default(),
             ringer: Ringer::default(),
             audio_control,
+            audio_without_call: false,
             hfp_sender,
             manager_id: None,
             inspect: PeerTaskInspect::new(id),
@@ -222,9 +224,13 @@ impl PeerTask {
 
     async fn on_audio_event(&mut self, event: AudioControlEvent) -> Result<(), Error> {
         info!(?event, "Audio Event received");
+        if event.id() != self.id {
+            info!(our_id = %self.id, event_id = %event.id(), "AudioEvent for a peer that is not us, ignoring.");
+            return Ok(());
+        }
         match event {
             AudioControlEvent::Stopped { id, error } => {
-                if error.is_some() && id == self.id {
+                if error.is_some() {
                     info!(peer_id = %id, "Audio Stopped with error {error:?}, closing SCO");
                     if self.sco_state.is_active() {
                         self.sco_state.iset(ScoState::TearingDown);
@@ -233,6 +239,14 @@ impl PeerTask {
                         }
                     }
                 }
+            }
+            AudioControlEvent::RequestStart { id: _ } => {
+                self.audio_without_call = true;
+            }
+            AudioControlEvent::RequestStop { id: _ } => {
+                // We must stop, so transfer any active call to the AG
+                let _ = self.calls.transfer_to_ag();
+                self.audio_without_call = false;
             }
             _ => {}
         }
@@ -611,6 +625,9 @@ impl PeerTask {
                         },
                         _ => {}
                     };
+                   // Sync the SCO connection state
+                   // We can start / stop the SCO audio based on the audio control requests.
+                   let _ = self.update_sco_state().await;
                 }
                 // New request on the gain control protocol
                 request = self.gain_control.select_next_some() => {
@@ -738,7 +755,7 @@ impl PeerTask {
             call_transferred
         );
 
-        if call_active {
+        if call_active || self.audio_without_call {
             match previous_sco_state {
                 // A call just started, so set up SCO.
                 ScoState::Inactive
@@ -769,7 +786,7 @@ impl PeerTask {
             let fut = self.sco_connector.accept(self.id.clone(), self.get_codecs());
             self.sco_state.iset(ScoState::AwaitingRemote(Box::pin(fut)));
         } else {
-            /* No call in progress */
+            // No call in progress and we don't prefer to have audio setup without a call, drop
             self.sco_state.iset(ScoState::Inactive);
         };
 
