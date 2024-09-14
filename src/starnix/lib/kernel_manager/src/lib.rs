@@ -14,6 +14,7 @@ use futures::TryStreamExt;
 use kernels::Kernels;
 use rand::Rng;
 use std::future::Future;
+use std::mem::MaybeUninit;
 use std::sync::Arc;
 use tracing::{debug, warn};
 use {
@@ -361,57 +362,67 @@ fn start_proxy(proxy: ChannelProxy, resume_events: Arc<Mutex<Vec<zx::EventPair>>
     // TODO: We will likely have to handle a larger number of wake sources in the future,
     // at which point we may want to consider a Port-based approach, and reduce the number
     // of threads.
-    std::thread::spawn(move || loop {
-        const CONTAINER_CHANNEL_INDEX: usize = 0;
-        const REMOTE_CHANNEL_INDEX: usize = 1;
+    std::thread::spawn(move || {
+        let mut bounce_bytes = [MaybeUninit::uninit(); zx::sys::ZX_CHANNEL_MAX_MSG_BYTES as usize];
+        let mut bounce_handles =
+            [const { MaybeUninit::uninit() }; zx::sys::ZX_CHANNEL_MAX_MSG_HANDLES as usize];
 
-        // Wait on messages from both the container and remote channel endpoints.
-        let mut wait_items = [
-            zx::WaitItem {
-                handle: proxy.container_channel.as_handle_ref(),
-                waitfor: zx::Signals::CHANNEL_READABLE | zx::Signals::CHANNEL_PEER_CLOSED,
-                pending: zx::Signals::empty(),
-            },
-            zx::WaitItem {
-                handle: proxy.remote_channel.as_handle_ref(),
-                waitfor: zx::Signals::CHANNEL_READABLE | zx::Signals::CHANNEL_PEER_CLOSED,
-                pending: zx::Signals::empty(),
-            },
-        ];
+        loop {
+            const CONTAINER_CHANNEL_INDEX: usize = 0;
+            const REMOTE_CHANNEL_INDEX: usize = 1;
 
-        match zx::object_wait_many(&mut wait_items, zx::MonotonicTime::INFINITE) {
-            Ok(_) => {}
-            Err(e) => {
-                tracing::warn!("Failed to wait on proxied channels in runner: {:?}", e);
+            // Wait on messages from both the container and remote channel endpoints.
+            let mut wait_items = [
+                zx::WaitItem {
+                    handle: proxy.container_channel.as_handle_ref(),
+                    waitfor: zx::Signals::CHANNEL_READABLE | zx::Signals::CHANNEL_PEER_CLOSED,
+                    pending: zx::Signals::empty(),
+                },
+                zx::WaitItem {
+                    handle: proxy.remote_channel.as_handle_ref(),
+                    waitfor: zx::Signals::CHANNEL_READABLE | zx::Signals::CHANNEL_PEER_CLOSED,
+                    pending: zx::Signals::empty(),
+                },
+            ];
+
+            match zx::object_wait_many(&mut wait_items, zx::MonotonicTime::INFINITE) {
+                Ok(_) => {}
+                Err(e) => {
+                    tracing::warn!("Failed to wait on proxied channels in runner: {:?}", e);
+                }
+            };
+
+            // If there was a peer closed, return before attempting to read or write from the channels.
+            // The `ChannelProxy` will be dropped on return, and both proxy endpoints in the
+            // `ChannelProxy` will be closed.
+            for item in &wait_items {
+                if item.pending.contains(zx::Signals::CHANNEL_PEER_CLOSED) {
+                    tracing::warn!("Proxy received peer closed, exiting proxy loop.");
+                    resume_events.lock().retain(|e| e.get_koid() != proxy.resume_event.get_koid());
+                    return;
+                }
             }
-        };
 
-        // If there was a peer closed, return before attempting to read or write from the channels.
-        // The `ChannelProxy` will be dropped on return, and both proxy endpoints in the
-        // `ChannelProxy` will be closed.
-        for item in &wait_items {
-            if item.pending.contains(zx::Signals::CHANNEL_PEER_CLOSED) {
-                tracing::warn!("Proxy received peer closed, exiting proxy loop.");
-                resume_events.lock().retain(|e| e.get_koid() != proxy.resume_event.get_koid());
-                return;
-            }
+            // Forward messages in both directions. Only messages that are entering the container
+            // should signal `proxy.resume_event`, since those are the only messages that should
+            // wake the container if it's suspended.
+            forward_message(
+                &wait_items[CONTAINER_CHANNEL_INDEX],
+                &proxy.container_channel,
+                &proxy.remote_channel,
+                None,
+                &mut bounce_bytes,
+                &mut bounce_handles,
+            );
+            forward_message(
+                &wait_items[REMOTE_CHANNEL_INDEX],
+                &proxy.remote_channel,
+                &proxy.container_channel,
+                Some(&proxy.resume_event),
+                &mut bounce_bytes,
+                &mut bounce_handles,
+            );
         }
-
-        // Forward messages in both directions. Only messages that are entering the container
-        // should signal `proxy.resume_event`, since those are the only messages that should
-        // wake the container if it's suspended.
-        forward_message(
-            &wait_items[CONTAINER_CHANNEL_INDEX],
-            &proxy.container_channel,
-            &proxy.remote_channel,
-            None,
-        );
-        forward_message(
-            &wait_items[REMOTE_CHANNEL_INDEX],
-            &proxy.remote_channel,
-            &proxy.container_channel,
-            Some(&proxy.resume_event),
-        );
     });
 }
 
@@ -425,29 +436,13 @@ fn forward_message(
     read_channel: &zx::Channel,
     write_channel: &zx::Channel,
     event: Option<&zx::EventPair>,
+    bytes: &mut [MaybeUninit<u8>; zx::sys::ZX_CHANNEL_MAX_MSG_BYTES as usize],
+    handles: &mut [MaybeUninit<zx::Handle>; zx::sys::ZX_CHANNEL_MAX_MSG_HANDLES as usize],
 ) {
-    let mut bytes = [0; zx::sys::ZX_CHANNEL_MAX_MSG_BYTES as usize];
-    let mut handles =
-        [const { zx::Handle::invalid() }; zx::sys::ZX_CHANNEL_MAX_MSG_HANDLES as usize];
-    let handles_ptr = (&mut handles as *mut [zx::Handle]) as *mut std::mem::MaybeUninit<zx::Handle>;
-    // SAFETY: These are all initialized, but the `read_raw` api requires `MaybeUninit<Handle>`.
-    let mut uninit_handles = unsafe {
-        std::slice::from_raw_parts_mut(handles_ptr, zx::sys::ZX_CHANNEL_MAX_MSG_HANDLES as usize)
-    };
-
     if wait_item.pending.contains(zx::Signals::CHANNEL_READABLE) {
-        let (status, actual_bytes, actual_handles) =
-            read_channel.read_raw(&mut bytes, &mut uninit_handles).expect("Failed kernel read");
-        match status {
-            Ok(_) => {}
-            Err(e) => {
-                tracing::error!("Error reading from proxy channel: {:?}", e);
-                return;
-            }
-        }
-        write_channel
-            .write(&bytes[..actual_bytes], &mut handles[..actual_handles])
-            .expect("Failed remote write");
+        let (actual_bytes, actual_handles) =
+            read_channel.read_uninit(bytes, handles).expect("Failed kernel read");
+        write_channel.write(actual_bytes, actual_handles).expect("Failed remote write");
         if let Some(event) = event {
             let (clear_mask, set_mask) = (zx::Signals::empty(), zx::Signals::EVENT_SIGNALED);
             event.signal_handle(clear_mask, set_mask).expect("Failed to signal event");

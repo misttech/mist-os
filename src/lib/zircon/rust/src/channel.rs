@@ -59,40 +59,79 @@ impl Channel {
     /// Read a message from a channel. Wraps the
     /// [zx_channel_read](https://fuchsia.dev/fuchsia-src/reference/syscalls/channel_read.md)
     /// syscall.
-    ///
-    /// If the slice lacks the capacity to hold the pending message,
-    /// returns an `Err` with the number of bytes and number of handles needed.
-    /// Otherwise returns an `Ok` with the result as usual.
-    /// If both the outer and inner `Result`s are `Ok`, then the caller can
-    /// assume that the `handles` array is initialized.
-    ///
-    /// Note that `read_slice` may call `read_raw` with some uninitialized
-    /// elements because it resizes the input vector to its capacity
-    /// without initializing all of the elements.
-    pub fn read_raw(
+    pub fn read_uninit(
         &self,
-        bytes: &mut [u8],
+        bytes: &mut [MaybeUninit<u8>],
         handles: &mut [MaybeUninit<Handle>],
-    ) -> Result<(Result<(), Status>, usize, usize), (usize, usize)> {
-        let opts = 0;
+    ) -> ChannelReadResult<(&mut [u8], &mut [Handle])> {
+        // SAFETY: bytes and handles are valid to write to for their lengths
+        match unsafe {
+            self.read_raw(
+                bytes.as_mut_ptr() as *mut u8,
+                bytes.len(),
+                handles.as_mut_ptr() as *mut Handle,
+                handles.len(),
+            )
+        } {
+            ChannelReadResult::Ok((actual_bytes, actual_handles)) => {
+                // SAFETY: if the above call succeeded, the buffers are initialized up to actual_*
+                ChannelReadResult::Ok(unsafe {
+                    (
+                        std::slice::from_raw_parts_mut(
+                            bytes.as_mut_ptr() as *mut u8,
+                            actual_bytes as usize,
+                        ),
+                        std::slice::from_raw_parts_mut(
+                            handles.as_mut_ptr() as *mut Handle,
+                            actual_handles as usize,
+                        ),
+                    )
+                })
+            }
+            ChannelReadResult::BufferTooSmall { bytes_avail, handles_avail } => {
+                ChannelReadResult::BufferTooSmall { bytes_avail, handles_avail }
+            }
+            ChannelReadResult::Err(e) => ChannelReadResult::Err(e),
+        }
+    }
+
+    /// Read a message from a channel. Wraps the
+    /// [zx_channel_read](https://fuchsia.dev/fuchsia-src/reference/syscalls/channel_read.md)
+    /// syscall.
+    ///
+    /// # Safety
+    ///
+    /// `bytes` must be valid to write to for `bytes_len` bytes. `handles` must be valid to write
+    /// to for `handles_len` elements.
+    pub unsafe fn read_raw(
+        &self,
+        bytes: *mut u8,
+        bytes_len: usize,
+        handles: *mut Handle,
+        handles_len: usize,
+    ) -> ChannelReadResult<(usize, usize)> {
+        // SAFETY: invariants for these pointers are upheld by our caller.
         unsafe {
             let raw_handle = self.raw_handle();
             let mut actual_bytes = 0;
             let mut actual_handles = 0;
             let status = ok(sys::zx_channel_read(
                 raw_handle,
-                opts,
-                bytes.as_mut_ptr(),
-                handles.as_mut_ptr() as *mut _,
-                bytes.len() as u32,
-                handles.len() as u32,
+                0, // opts
+                bytes,
+                handles as *mut _,
+                bytes_len as u32,
+                handles_len as u32,
                 &mut actual_bytes,
                 &mut actual_handles,
             ));
-            if status == Err(Status::BUFFER_TOO_SMALL) {
-                Err((actual_bytes as usize, actual_handles as usize))
-            } else {
-                Ok((status, actual_bytes as usize, actual_handles as usize))
+            match status {
+                Ok(()) => ChannelReadResult::Ok((actual_bytes as usize, actual_handles as usize)),
+                Err(Status::BUFFER_TOO_SMALL) => ChannelReadResult::BufferTooSmall {
+                    bytes_avail: actual_bytes as usize,
+                    handles_avail: actual_handles as usize,
+                },
+                Err(e) => ChannelReadResult::Err(e),
             }
         }
     }
@@ -109,28 +148,31 @@ impl Channel {
 
     /// Read a message from a channel into a separate byte vector and handle vector.
     ///
+    /// If the provided `handles` has any elements, they will be dropped before reading from the
+    /// channel.
+    ///
     /// Note that this method can cause internal reallocations in the `Vec`s
     /// if they lacks capacity to hold the full message. If such reallocations
-    /// are not desirable, use `read_raw` instead.
+    /// are not desirable, use `read_uninit` instead.
     pub fn read_split(&self, bytes: &mut Vec<u8>, handles: &mut Vec<Handle>) -> Result<(), Status> {
         loop {
-            unsafe {
-                bytes.set_len(bytes.capacity());
-                handles.set_len(handles.capacity());
-            }
-            let handle_slice: &mut [Handle] = handles;
-            match self.read_raw(bytes, unsafe { mem::transmute(handle_slice) }) {
-                Ok((result, num_bytes, num_handles)) => {
+            // Ensure the capacity slices are the entire `Vec`s.
+            bytes.truncate(0);
+            handles.truncate(0);
+            match self.read_uninit(bytes.spare_capacity_mut(), handles.spare_capacity_mut()) {
+                ChannelReadResult::Ok((byte_slice, handle_slice)) => {
+                    // SAFETY: the kernel has initialized the vecs up to the length of these slices.
                     unsafe {
-                        bytes.set_len(num_bytes);
-                        handles.set_len(num_handles);
+                        bytes.set_len(byte_slice.len());
+                        handles.set_len(handle_slice.len());
                     }
-                    return result;
+                    return Ok(());
                 }
-                Err((num_bytes, num_handles)) => {
-                    ensure_capacity(bytes, num_bytes);
-                    ensure_capacity(handles, num_handles);
+                ChannelReadResult::BufferTooSmall { bytes_avail, handles_avail } => {
+                    ensure_capacity(bytes, bytes_avail);
+                    ensure_capacity(handles, handles_avail);
                 }
+                ChannelReadResult::Err(e) => return Err(e),
             }
         }
     }
@@ -468,6 +510,31 @@ impl AsRef<Channel> for Channel {
     }
 }
 
+#[derive(Debug, Eq, PartialEq)]
+pub enum ChannelReadResult<T> {
+    Ok(T),
+    BufferTooSmall { bytes_avail: usize, handles_avail: usize },
+    Err(Status),
+}
+
+impl<T: std::fmt::Debug> ChannelReadResult<T> {
+    #[track_caller]
+    pub fn unwrap(self) -> T {
+        match self {
+            Self::Ok(t) => t,
+            other => panic!("unwrap() on {other:?}"),
+        }
+    }
+
+    #[track_caller]
+    pub fn expect(self, msg: &str) -> T {
+        match self {
+            Self::Ok(t) => t,
+            other => panic!("expect() on {other:?}: {msg}"),
+        }
+    }
+}
+
 /// A buffer for _receiving_ messages from a channel.
 ///
 /// A `MessageBuf` is essentially a byte buffer and a vector of
@@ -746,8 +813,8 @@ mod tests {
         let mut empty = vec![];
         assert!(p1.write(b"hello", &mut empty).is_ok());
 
-        let result = p2.read_raw(&mut vec![], &mut vec![]);
-        assert_eq!(result, Err((5, 0)));
+        let result = p2.read_uninit(&mut vec![], &mut vec![]);
+        assert_eq!(result, ChannelReadResult::BufferTooSmall { bytes_avail: 5, handles_avail: 0 });
     }
 
     #[test]
