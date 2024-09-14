@@ -133,6 +133,7 @@ async fn main() -> Result<(), Error> {
         fuchsia_inspect::component::init_inspector_with_size(1_000_000),
         inspect_runtime::PublishOptions::default(),
     );
+    fuchsia_inspect::component::serve_inspect_stats();
     let mut health = fuchsia_inspect::component::health();
     health.set_starting_up();
 
