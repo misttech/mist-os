@@ -18,10 +18,10 @@ use selinux::{
     Permission, ProcessPermission, SecurityId, SecurityPermission, SecurityServer,
 };
 use starnix_logging::{log_warn, track_stub};
-use starnix_uapi::error;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::mount_flags::MountFlags;
 use starnix_uapi::unmount_flags::UnmountFlags;
+use starnix_uapi::{errno, error};
 use std::sync::OnceLock;
 
 /// Maximum supported size for the extended attribute value used to store SELinux security
@@ -88,10 +88,24 @@ pub(super) fn fs_node_init_with_dentry(
     Ok(())
 }
 
+/// Returns an [`FsNodeSecurityXattr`] for the security context of `sid`.
+fn make_fs_node_security_xattr(
+    security_server: &SecurityServer,
+    sid: SecurityId,
+) -> Result<FsNodeSecurityXattr, Errno> {
+    security_server
+        .sid_to_security_context(sid)
+        .map(|value| FsNodeSecurityXattr {
+            name: XATTR_NAME_SELINUX.to_bytes().into(),
+            value: value.into(),
+        })
+        .ok_or_else(|| errno!(EINVAL))
+}
+
 /// Called by file-system implementations when creating the `FsNode` for a new file.
 pub(super) fn fs_node_init_on_create(
-    _security_server: &SecurityServer,
-    _current_task: &CurrentTask,
+    security_server: &SecurityServer,
+    current_task: &CurrentTask,
     new_node: &FsNode,
     _parent: &FsNode,
 ) -> Result<Option<FsNodeSecurityXattr>, Errno> {
@@ -102,6 +116,13 @@ pub(super) fn fs_node_init_on_create(
             new_node.info().ino,
             new_node.fs().name()
         );
+    }
+
+    // If the creating task's "fscreate" attribute is set then it overrides the normal process
+    // for labeling new files.
+    if let Some(fscreate_sid) = current_task.read().security_state.attrs.fscreate_sid.clone() {
+        set_cached_sid(new_node, fscreate_sid);
+        return Ok(Some(make_fs_node_security_xattr(security_server, fscreate_sid)?));
     }
 
     // TODO: https://fxbug.dev/355180447 - Apply dynamic labeling scheme (i.e. "fs_use_trans",
