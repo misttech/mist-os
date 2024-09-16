@@ -12,21 +12,15 @@ rustc_library("fuchsia-hyper") {
   with_unit_tests = true
   deps = [
     "//src/lib/fuchsia-async",
-    "//src/lib/fuchsia-sync",
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:http",
     "//third_party/rust_crates:hyper",
     "//third_party/rust_crates:hyper-rustls",
-    "//third_party/rust_crates:lru-cache",
     "//third_party/rust_crates:rustls",
     "//third_party/rust_crates:socket2",
     "//third_party/rust_crates:tokio",
   ]
-  test_deps = [
-    "//third_party/rust_crates:assert_matches",
-    "//third_party/rust_crates:rand",
-    "//third_party/rust_crates:webpki",
-  ]
+  test_deps = [ "//third_party/rust_crates:assert_matches" ]
   if (is_host) {
     deps += [
       "//third_party/rust_crates:async-net",
@@ -47,14 +41,12 @@ rustc_library("fuchsia-hyper") {
     ]
     test_deps += [
       "//src/lib/fidl/rust/fidl",
+      "//src/lib/fuchsia-sync",
       "//third_party/rust_crates:test-case",
     ]
   }
 
-  sources = [
-    "src/lib.rs",
-    "src/session_cache.rs",
-  ]
+  sources = [ "src/lib.rs" ]
   if (is_host) {
     sources += [ "src/not_fuchsia.rs" ]
   } else {
