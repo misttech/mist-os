@@ -23,15 +23,6 @@
     ],
     offer: [
         {
-            protocol: "fuchsia.logger.LogSink",
-            from: "parent",
-            to: [
-                "#integration_test",
-                "#resolver",
-                "#trigger",
-            ],
-        },
-        {
             protocol: "fidl.test.components.Trigger",
             from: "#trigger",
             to: "#integration_test",

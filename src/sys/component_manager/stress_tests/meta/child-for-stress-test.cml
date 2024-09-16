@@ -20,13 +20,6 @@
     capabilities: [
         { protocol: "test.componentmanager.stresstests.ChildRealm" },
     ],
-    offer: [
-        {
-            protocol: "fuchsia.logger.LogSink",
-            from: "parent",
-            to: "#children",
-        },
-    ],
     expose: [
         {
             protocol: "test.componentmanager.stresstests.ChildRealm",

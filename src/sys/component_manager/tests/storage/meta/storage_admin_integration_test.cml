@@ -41,10 +41,5 @@
             from: "self",
             to: "#realm_builder",
         },
-        {
-            protocol: [ "fuchsia.logger.LogSink" ],
-            from: "parent",
-            to: [ "#memfs" ],
-        },
     ],
 }

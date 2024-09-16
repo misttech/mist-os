@@ -30,10 +30,7 @@
     ],
     offer: [
         {
-            protocol: [
-                "fidl.examples.routing.echo.Echo",
-                "fuchsia.logger.LogSink",
-            ],
+            protocol: [ "fidl.examples.routing.echo.Echo" ],
             from: "parent",
             to: "#trigger",
         },
