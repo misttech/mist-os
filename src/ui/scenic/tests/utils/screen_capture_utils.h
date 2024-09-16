@@ -7,9 +7,7 @@
 
 #include <fuchsia/ui/composition/cpp/fidl.h>
 
-#include "src/ui/scenic/lib/allocation/allocator.h"
 #include "src/ui/scenic/lib/allocation/buffer_collection_import_export_tokens.h"
-#include "src/ui/scenic/lib/utils/helpers.h"
 
 namespace integration_tests {
 

@@ -38,24 +38,40 @@ group("tests") {
 group("ctf-tests") {
   testonly = true
   deps = [
-    # TODO(https://fxbug.dev/362762825): Re-enable these tests following API stabilization.
-    # ":display-ownership-integration-test-suite_archive",
-    # ":flatland-allocation-test-suite_archive",
-    # ":flatland-pixeltest-flip-and-orientation-suite_archive",
-    # ":flatland-pixeltest-general-suite_archive",
-    # ":flatland-pixeltest-yuv-suite_archive",
-    # ":flatland-protected-memory-integration-test-suite_archive",
-    # ":null-renderer-integration-test-suite_archive",
-    # ":screen-capture-integration-test-suite_archive",
+    # TODO(https://fxbug.dev/362762825): Re-enable these tests following API stabilization.  They
+    # rely on various internal/unstable FIDL libraries.  On a case-by-case basis, we need to decide
+    # whether to:
+    #    - stabilize the FIDL library in question
+    #    - break the dependency chain to that FIDL library
+    # To see the dependency chains, uncomment the test targets below, and they try to find a GN path
+    # between the test and the internal/unstable FIDL library.  For example:
+    #    ```
+    #    fx gn path $BUILD_DIR "//src/ui/scenic/tests:ctf-tests" \
+    #                          "//sdk/fidl/fuchsia.ui.focus:fuchsia.ui.focus_hlcpp"
+    #    ```
+    # The libraries in question currently include:
+    #    - fuchsia.ui.composition.internal
+    #    - fuchsia.ui.focus
+    #    - fuchsia.ui.observation.scope
+    #    - fuchsia.ui.observation.test
+    #    - fuchsia.ui.pointer.augment
+    #
+    # ":flatland-focus-integration-test-suite_archive",
+    # ":flatland-touch-integration-test-suite_archive",
+    # ":observer-registry-integration-test-suite_archive",
+    # ":scoped-observer-registry-integration-test-suite_archive",
     # ":screen-capture2-integration-test-suite_archive",
 
-    ":flatland-focus-integration-test-suite_archive",
+    ":flatland-allocation-test-suite_archive",
     ":flatland-mouse-integration-test-suite_archive",
-    ":flatland-touch-integration-test-suite_archive",
+    ":flatland-pixeltest-flip-and-orientation-suite_archive",
+    ":flatland-pixeltest-general-suite_archive",
+    ":flatland-pixeltest-yuv-suite_archive",
+    ":flatland-protected-memory-integration-test-suite_archive",
     ":flatland-view-integration-test-suite_archive",
     ":flatland-view-ref-installed-integration-test-suite_archive",
-    ":observer-registry-integration-test-suite_archive",
-    ":scoped-observer-registry-integration-test-suite_archive",
+    ":null-renderer-integration-test-suite_archive",
+    ":screen-capture-integration-test-suite_archive",
     ":singleton-display-integration-test-suite_archive",
   ]
 
@@ -97,10 +113,13 @@ source_set("screen-capture-utils") {
     "utils/screen_capture_utils.h",
   ]
   public_deps = [
-    ":common-deps-zxtest",
     "//sdk/fidl/fuchsia.ui.composition:fuchsia.ui.composition_hlcpp",
     "//src/ui/scenic/lib/allocation:allocation",
-    "//src/ui/scenic/lib/flatland/engine",
+  ]
+  deps = [
+    ":common-deps-zxtest",
+    "//src/ui/scenic/lib/flatland/buffers",
+    "//src/ui/scenic/lib/utils:utils",
     "//zircon/system/ulib/fbl",
   ]
 }
@@ -365,7 +384,6 @@ ctf_components_packages("screen-capture-integration-test") {
     ":screen-capture-utils",
     "//sdk/fidl/fuchsia.ui.composition:fuchsia.ui.composition_hlcpp",
     "//src/ui/scenic/lib/allocation:allocation",
-    "//src/ui/scenic/lib/screen_capture:screen_capture",
     "//src/ui/scenic/lib/utils:utils",
     "//src/ui/testing/util:zxtest_helpers",
     "//zircon/system/ulib/fbl",
@@ -388,8 +406,6 @@ ctf_components_packages("screen-capture2-integration-test") {
     "//sdk/fidl/fuchsia.vulkan.loader:fuchsia.vulkan.loader_hlcpp",
     "//src/ui/lib/escher",
     "//src/ui/scenic/lib/allocation:allocation",
-    "//src/ui/scenic/lib/flatland/engine",
-    "//src/ui/scenic/lib/screen_capture2:screen_capture2",
     "//src/ui/scenic/lib/utils:utils",
     "//zircon/system/ulib/fbl",
   ]

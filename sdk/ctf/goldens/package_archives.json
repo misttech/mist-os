@@ -84,9 +84,9 @@
     "package_name": "timekeeper-integration"
   },
   {
-    "archive_gn_label": "//src/ui/scenic/tests:flatland-focus-integration-test-suite_archive_copy",
-    "archive_name": "flatland-focus-integration-test-suite",
-    "package_name": "flatland-focus-integration-test-suite"
+    "archive_gn_label": "//src/ui/scenic/tests:flatland-allocation-test-suite_archive_copy",
+    "archive_name": "flatland-allocation-test-suite",
+    "package_name": "flatland-allocation-test-suite"
   },
   {
     "archive_gn_label": "//src/ui/scenic/tests:flatland-mouse-integration-test-suite_archive_copy",
@@ -94,9 +94,24 @@
     "package_name": "flatland-mouse-integration-test-suite"
   },
   {
-    "archive_gn_label": "//src/ui/scenic/tests:flatland-touch-integration-test-suite_archive_copy",
-    "archive_name": "flatland-touch-integration-test-suite",
-    "package_name": "flatland-touch-integration-test-suite"
+    "archive_gn_label": "//src/ui/scenic/tests:flatland-pixeltest-flip-and-orientation-suite_archive_copy",
+    "archive_name": "flatland-pixeltest-flip-and-orientation-suite",
+    "package_name": "flatland-pixeltest-flip-and-orientation-suite"
+  },
+  {
+    "archive_gn_label": "//src/ui/scenic/tests:flatland-pixeltest-general-suite_archive_copy",
+    "archive_name": "flatland-pixeltest-general-suite",
+    "package_name": "flatland-pixeltest-general-suite"
+  },
+  {
+    "archive_gn_label": "//src/ui/scenic/tests:flatland-pixeltest-yuv-suite_archive_copy",
+    "archive_name": "flatland-pixeltest-yuv-suite",
+    "package_name": "flatland-pixeltest-yuv-suite"
+  },
+  {
+    "archive_gn_label": "//src/ui/scenic/tests:flatland-protected-memory-integration-test-suite_archive_copy",
+    "archive_name": "flatland-protected-memory-integration-test-suite",
+    "package_name": "flatland-protected-memory-integration-test-suite"
   },
   {
     "archive_gn_label": "//src/ui/scenic/tests:flatland-view-integration-test-suite_archive_copy",
@@ -109,14 +124,14 @@
     "package_name": "flatland-view-ref-installed-integration-test-suite"
   },
   {
-    "archive_gn_label": "//src/ui/scenic/tests:observer-registry-integration-test-suite_archive_copy",
-    "archive_name": "observer-registry-integration-test-suite",
-    "package_name": "observer-registry-integration-test-suite"
+    "archive_gn_label": "//src/ui/scenic/tests:null-renderer-integration-test-suite_archive_copy",
+    "archive_name": "null-renderer-integration-test-suite",
+    "package_name": "null-renderer-integration-test-suite"
   },
   {
-    "archive_gn_label": "//src/ui/scenic/tests:scoped-observer-registry-integration-test-suite_archive_copy",
-    "archive_name": "scoped-observer-registry-integration-test-suite",
-    "package_name": "scoped-observer-registry-integration-test-suite"
+    "archive_gn_label": "//src/ui/scenic/tests:screen-capture-integration-test-suite_archive_copy",
+    "archive_name": "screen-capture-integration-test-suite",
+    "package_name": "screen-capture-integration-test-suite"
   },
   {
     "archive_gn_label": "//src/ui/scenic/tests:singleton-display-integration-test-suite_archive_copy",
