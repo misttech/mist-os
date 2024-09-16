@@ -318,7 +318,7 @@ Please consider contributing aliases for your shell of choice.
     ```
     $ mkdir -p ~/.config/systemd/user/
     $ ln \
-          -s "$MULTIFUCHSIA_ROOT/clean/tools/multifuchsia/systemd/*" \
+          -s "$MULTIFUCHSIA_ROOT/clean/tools/multifuchsia/systemd/"* \
           ~/.config/systemd/user/
     ```
 
