@@ -3362,6 +3362,19 @@
   submitted: '2024-07-08'
   reviewed: '2024-08-13'
 
+- name: 'RFC-0258'
+  title: 'Update from C++17 to C++20'
+  short_description: 'Update from C++17 to C++20 as the Fuchsia tree C++ version and expand the set of formally supported C++ versions in the SDK to include C++20.'
+  authors: ['phosek@google.com']
+  file: '0258_update_from_c++17_to_c++20.md'
+  area: ['Build', 'Languages and Libraries', 'Toolchain']
+  issue: ['42064981']
+  gerrit_change_id: ['1092960']
+  status: 'Accepted'
+  reviewers: ['ianloic@google.com', 'jamesr@google.com', 'mcgrathr@google.com']
+  submitted: '2024-08-01'
+  reviewed: '2024-09-10'
+
 - name: 'RFC-0259'
   title: 'Monotonic Clock Suspension and the Boot Timeline'
   short_description: 'Elaborates on pausing the monotonic clock during S2Idle and introduces the boot timeline.'
