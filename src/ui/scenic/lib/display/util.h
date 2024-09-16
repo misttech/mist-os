@@ -51,6 +51,16 @@ zx_status_t ImportImageForCapture(
     allocation::GlobalBufferCollectionId buffer_collection_id, uint32_t vmo_idx,
     allocation::GlobalImageId capture_image_id);
 
+inline fuchsia_hardware_display::BufferCollectionId ToDisplayFidlBufferCollectionId(
+    allocation::GlobalBufferCollectionId global_buffer_collection_id) {
+  return {{.value = global_buffer_collection_id}};
+}
+
+inline fuchsia_hardware_display::ImageId ToDisplayFidlImageId(
+    allocation::GlobalImageId global_image_id) {
+  return {{.value = global_image_id}};
+}
+
 }  // namespace scenic_impl
 
 #endif  // SRC_UI_SCENIC_LIB_DISPLAY_UTIL_H_

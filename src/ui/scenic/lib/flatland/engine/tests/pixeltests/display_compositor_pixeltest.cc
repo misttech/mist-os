@@ -550,7 +550,7 @@ class DisplayCompositorPixelTest : public DisplayCompositorTestBase {
 
   void ReleaseCaptureBufferCollection(allocation::GlobalBufferCollectionId collection_id) {
     const fuchsia_hardware_display::BufferCollectionId display_collection_id =
-        allocation::ToDisplayBufferCollectionId(collection_id);
+        scenic_impl::ToDisplayFidlBufferCollectionId(collection_id);
     auto display = display_manager_->default_display();
     std::shared_ptr<fidl::SyncClient<fuchsia_hardware_display::Coordinator>> display_coordinator =
         display_manager_->default_display_coordinator();
@@ -578,7 +578,7 @@ class DisplayCompositorPixelTest : public DisplayCompositorTestBase {
     // This ID would only be zero if we were running in an environment without capture support.
     EXPECT_NE(capture_image_id, 0U);
     const fuchsia_hardware_display::ImageId fidl_capture_image_id =
-        allocation::ToFidlImageId(capture_image_id);
+        scenic_impl::ToDisplayFidlImageId(capture_image_id);
 
     auto display = display_manager_->default_display();
     std::shared_ptr<fidl::SyncClient<fuchsia_hardware_display::Coordinator>> display_coordinator =
@@ -2315,7 +2315,7 @@ VK_TEST_F(DisplayCompositorPixelTest, SwitchDisplayMode) {
   EXPECT_TRUE(images_are_same);
 
   // Cleanup.
-  fuchsia_hardware_display::ImageId image_id = allocation::ToFidlImageId(capture_image_id);
+  fuchsia_hardware_display::ImageId image_id = scenic_impl::ToDisplayFidlImageId(capture_image_id);
   const fit::result<fidl::OneWayStatus> release_image_result =
       (*display_coordinator)->ReleaseImage({{.image_id = image_id}});
   EXPECT_TRUE(release_image_result.is_ok())

@@ -381,7 +381,7 @@ void DisplayCompositor::ReleaseBufferCollection(
   std::scoped_lock lock(lock_);
   FX_DCHECK(display_coordinator_.is_valid());
   const fuchsia_hardware_display::BufferCollectionId display_collection_id =
-      allocation::ToDisplayBufferCollectionId(collection_id);
+      scenic_impl::ToDisplayFidlBufferCollectionId(collection_id);
   const fit::result<fidl::OneWayStatus> result = display_coordinator_->ReleaseBufferCollection(
       {{.buffer_collection_id = display_collection_id}});
   if (result.is_error()) {
@@ -434,7 +434,7 @@ bool DisplayCompositor::ImportBufferImage(const allocation::ImageMetadata& metad
 
   const allocation::GlobalBufferCollectionId collection_id = metadata.collection_id;
   const fuchsia_hardware_display::BufferCollectionId display_collection_id =
-      allocation::ToDisplayBufferCollectionId(collection_id);
+      scenic_impl::ToDisplayFidlBufferCollectionId(collection_id);
   const bool display_support_already_set =
       buffer_collection_supports_display_.find(collection_id) !=
       buffer_collection_supports_display_.end();
@@ -465,7 +465,7 @@ bool DisplayCompositor::ImportBufferImage(const allocation::ImageMetadata& metad
   const fuchsia_hardware_display_types::ImageMetadata image_metadata =
       CreateImageMetadata(metadata);
   const fuchsia_hardware_display::ImageId fidl_image_id =
-      allocation::ToFidlImageId(metadata.identifier);
+      scenic_impl::ToDisplayFidlImageId(metadata.identifier);
   const fidl::Result import_image_result = display_coordinator_->ImportImage({{
       .image_metadata = image_metadata,
       .buffer_id = {{
@@ -491,7 +491,8 @@ void DisplayCompositor::ReleaseBufferImage(const allocation::GlobalImageId image
 
   renderer_->ReleaseBufferImage(image_id);
 
-  const fuchsia_hardware_display::ImageId fidl_image_id = allocation::ToFidlImageId(image_id);
+  const fuchsia_hardware_display::ImageId fidl_image_id =
+      scenic_impl::ToDisplayFidlImageId(image_id);
   std::scoped_lock lock(lock_);
 
   if (display_imported_images_.erase(image_id) == 1) {
@@ -711,7 +712,8 @@ void DisplayCompositor::ApplyLayerImage(const fuchsia_hardware_display::LayerId&
       << set_layer_primary_alpha_result.error_value();
 
   // Set the imported image on the layer.
-  const fuchsia_hardware_display::ImageId image_id = allocation::ToFidlImageId(image.identifier);
+  const fuchsia_hardware_display::ImageId image_id =
+      scenic_impl::ToDisplayFidlImageId(image.identifier);
   const fit::result<fidl::OneWayStatus> set_layer_image_result =
       display_coordinator_->SetLayerImage({{
           .layer_id = layer_id,
