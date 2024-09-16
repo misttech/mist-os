@@ -18,6 +18,7 @@
 ##   go: Go source files
 ##   dart: Dart source files
 ##   fidl: FIDL source files
+##   proto: protobuf source files
 ##   service, config: Services configuration files
 ##   cm, manifest: Component manifest files
 ##   gn: GN build files
@@ -42,6 +43,7 @@ get_type_list() {
       'go') SELECTED_FILE_TYPES+=('*.go');;
       'dart') SELECTED_FILE_TYPES+=('*.dart');;
       'fidl') SELECTED_FILE_TYPES+=('*.fidl');;
+      'proto') SELECTED_FILE_TYPES+=('*.proto');;
       'service'|'config') SELECTED_FILE_TYPES+=('*.config');;
       'cm'|'manifest') SELECTED_FILE_TYPES+=('*.cml');;
       'gn') SELECTED_FILE_TYPES+=('*.gn' '*.gni');;
