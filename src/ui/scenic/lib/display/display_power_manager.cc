@@ -68,6 +68,7 @@ void DisplayPowerManager::SetDisplayPower(bool power_on, SetDisplayPowerCallback
     return;
   }
 
+  FX_LOGS(INFO) << "Successfully set display power: power " << (power_on ? "on" : "off");
   inspect_display_power_events_.CreateEntry([power_on](inspect::Node& n) {
     n.RecordInt(power_on ? kDisplayPowerOnEvent : kDisplayPowerOffEvent, zx_clock_get_monotonic());
   });
