@@ -804,9 +804,6 @@ pub trait IpDeviceContext<I: IpLayerIpExt, BC>: IpDeviceStateContext<I> {
     /// Returns true iff the device has unicast forwarding enabled.
     fn is_device_unicast_forwarding_enabled(&mut self, device_id: &Self::DeviceId) -> bool;
 
-    /// Returns the MTU of the device.
-    fn get_mtu(&mut self, device_id: &Self::DeviceId) -> Mtu;
-
     /// Confirm transport-layer forward reachability to the specified neighbor
     /// through the specified device.
     fn confirm_reachable(
@@ -815,6 +812,12 @@ pub trait IpDeviceContext<I: IpLayerIpExt, BC>: IpDeviceStateContext<I> {
         device: &Self::DeviceId,
         neighbor: SpecifiedAddr<I::Addr>,
     );
+}
+
+/// Provides access to an IP device's MTU for the IP layer.
+pub trait IpDeviceMtuContext<I: IpLayerIpExt>: DeviceIdContext<AnyDevice> {
+    /// Returns the MTU of the device.
+    fn get_mtu(&mut self, device_id: &Self::DeviceId) -> Mtu;
 }
 
 /// Events observed at the IP layer.
@@ -880,6 +883,9 @@ pub trait IpLayerContext<
 >:
     IpStateContext<I>
     + IpDeviceContext<I, BC>
+    + IpDeviceMtuContext<I>
+    + IpDeviceSendContext<I, BC>
+    + IcmpErrorHandler<I, BC>
     + MulticastForwardingStateContext<I, BC>
     + MulticastForwardingDeviceContext<I>
 {
@@ -890,6 +896,9 @@ impl<
         BC: IpLayerBindingsContext<I, <CC as DeviceIdContext<AnyDevice>>::DeviceId>,
         CC: IpStateContext<I>
             + IpDeviceContext<I, BC>
+            + IpDeviceMtuContext<I>
+            + IpDeviceSendContext<I, BC>
+            + IcmpErrorHandler<I, BC>
             + MulticastForwardingStateContext<I, BC>
             + MulticastForwardingDeviceContext<I>,
     > IpLayerContext<I, BC> for CC
@@ -1066,7 +1075,10 @@ fn walk_rules<
 pub fn resolve_output_route_to_destination<
     I: Ip + IpDeviceStateIpExt + IpDeviceIpExt + IpLayerIpExt,
     BC: IpDeviceBindingsContext<I, CC::DeviceId> + IpLayerBindingsContext<I, CC::DeviceId>,
-    CC: IpLayerContext<I, BC> + device::IpDeviceConfigurationContext<I, BC>,
+    CC: IpStateContext<I>
+        + IpDeviceContext<I, BC>
+        + IpDeviceStateContext<I>
+        + device::IpDeviceConfigurationContext<I, BC>,
 >(
     core_ctx: &mut CC,
     device: Option<&CC::DeviceId>,
@@ -1252,8 +1264,10 @@ impl<
         BC: IpDeviceBindingsContext<I, CC::DeviceId>
             + IpLayerBindingsContext<I, CC::DeviceId>
             + IpSocketBindingsContext,
-        CC: IpLayerContext<I, BC>
-            + IpLayerEgressContext<I, BC>
+        CC: IpLayerEgressContext<I, BC>
+            + IpStateContext<I>
+            + IpDeviceContext<I, BC>
+            + IpDeviceStateContext<I>
             + device::IpDeviceConfigurationContext<I, BC>
             + UseIpSocketContextBlanket,
     > IpSocketContext<I, BC> for CC
@@ -1357,6 +1371,7 @@ pub trait IpTransportDispatchContext<I: IpLayerIpExt, BC>: DeviceIdContext<AnyDe
 pub trait IpLayerIngressContext<I: IpLayerIpExt, BC: IpLayerBindingsContext<I, Self::DeviceId>>:
     IpTransportDispatchContext<I, BC, DeviceId: filter::InterfaceProperties<BC::DeviceClass>>
     + IpDeviceStateContext<I>
+    + IpDeviceMtuContext<I>
     + IpDeviceSendContext<I, BC>
     + IcmpErrorHandler<I, BC>
     + IpLayerContext<I, BC>
@@ -1374,6 +1389,7 @@ impl<
                 BC,
                 DeviceId: filter::InterfaceProperties<BC::DeviceClass>,
             > + IpDeviceStateContext<I>
+            + IpDeviceMtuContext<I>
             + IpDeviceSendContext<I, BC>
             + IcmpErrorHandler<I, BC>
             + IpLayerContext<I, BC>
@@ -1385,7 +1401,7 @@ impl<
 }
 
 /// A marker trait for all the contexts required for IP egress.
-pub(crate) trait IpLayerEgressContext<I, BC>:
+pub trait IpLayerEgressContext<I, BC>:
     IpDeviceSendContext<I, BC, DeviceId: filter::InterfaceProperties<BC::DeviceClass>>
     + FilterHandlerProvider<I, BC>
     + CounterContext<IpCounters<I>>
@@ -1402,6 +1418,20 @@ where
     CC: IpDeviceSendContext<I, BC, DeviceId: filter::InterfaceProperties<BC::DeviceClass>>
         + FilterHandlerProvider<I, BC>
         + CounterContext<IpCounters<I>>,
+{
+}
+
+/// A marker trait for all the contexts required for IP forwarding.
+pub trait IpLayerForwardingContext<I: IpLayerIpExt, BC: IpLayerBindingsContext<I, Self::DeviceId>>:
+    IpLayerEgressContext<I, BC> + IcmpErrorHandler<I, BC> + IpDeviceMtuContext<I>
+{
+}
+
+impl<
+        I: IpLayerIpExt,
+        BC: IpLayerBindingsContext<I, CC::DeviceId>,
+        CC: IpLayerEgressContext<I, BC> + IcmpErrorHandler<I, BC> + IpDeviceMtuContext<I>,
+    > IpLayerForwardingContext<I, BC> for CC
 {
 }
 
@@ -1916,7 +1946,7 @@ where
 /// generation of the error, which is advantageous because sending the error
 /// requires the underlying packet buffer, which cannot be "moved" in certain
 /// contexts.
-struct IcmpErrorSender<'a, I: IcmpHandlerIpExt, D> {
+pub(crate) struct IcmpErrorSender<'a, I: IcmpHandlerIpExt, D> {
     /// The ICMP error that should be sent.
     err: I::IcmpError,
     /// The original source IP address of the packet (before the local-ingress
@@ -2176,7 +2206,7 @@ fn dispatch_receive_ipv6_packet<
 /// determination of how to forward. This is advantageous because forwarding
 /// requires the underlying packet buffer, which cannot be "moved" in certain
 /// contexts.
-struct IpPacketForwarder<'a, I: IpLayerIpExt, D, BT: FilterBindingsTypes> {
+pub(crate) struct IpPacketForwarder<'a, I: IpLayerIpExt, D, BT: FilterBindingsTypes> {
     inbound_device: &'a D,
     outbound_device: &'a D,
     packet_meta: IpLayerPacketMetadata<I, BT>,
@@ -2197,7 +2227,7 @@ where
     fn forward_with_buffer<CC, B>(self, core_ctx: &mut CC, bindings_ctx: &mut BC, buffer: B)
     where
         B: BufferMut,
-        CC: IpLayerIngressContext<I, BC, DeviceId = D> + CounterContext<IpCounters<I>>,
+        CC: IpLayerForwardingContext<I, BC, DeviceId = D>,
     {
         let Self {
             inbound_device,
@@ -2272,7 +2302,7 @@ where
 }
 
 /// The action to take for a packet that was a candidate for forwarding.
-enum ForwardingAction<'a, I: IpLayerIpExt, D, BT: FilterBindingsTypes> {
+pub(crate) enum ForwardingAction<'a, I: IpLayerIpExt, D, BT: FilterBindingsTypes> {
     /// Drop the packet without forwarding it or generating an ICMP error.
     SilentlyDrop,
     /// Forward the packet, as specified by the [`IpPacketForwarder`].
@@ -2288,10 +2318,14 @@ where
     BC: IpLayerBindingsContext<I, D>,
 {
     /// Perform the action prescribed by self, with the provided packet buffer.
-    fn perform_action_with_buffer<CC, B>(self, core_ctx: &mut CC, bindings_ctx: &mut BC, buffer: B)
-    where
+    pub(crate) fn perform_action_with_buffer<CC, B>(
+        self,
+        core_ctx: &mut CC,
+        bindings_ctx: &mut BC,
+        buffer: B,
+    ) where
         B: BufferMut,
-        CC: IpLayerIngressContext<I, BC, DeviceId = D> + CounterContext<IpCounters<I>>,
+        CC: IpLayerForwardingContext<I, BC, DeviceId = D>,
     {
         match self {
             ForwardingAction::SilentlyDrop => {}
@@ -2306,7 +2340,7 @@ where
 }
 
 /// Determine which [`ForwardingAction`] should be taken for an IP packet.
-fn determine_ip_packet_forwarding_action<'a, 'b, I, BC, CC>(
+pub(crate) fn determine_ip_packet_forwarding_action<'a, 'b, I, BC, CC>(
     core_ctx: &'a mut CC,
     packet: I::Packet<&'a mut [u8]>,
     mut packet_meta: IpLayerPacketMetadata<I, BC>,
@@ -2321,7 +2355,7 @@ fn determine_ip_packet_forwarding_action<'a, 'b, I, BC, CC>(
 where
     I: IpLayerIpExt,
     BC: IpLayerBindingsContext<I, CC::DeviceId>,
-    CC: IpLayerIngressContext<I, BC> + CounterContext<IpCounters<I>>,
+    CC: IpLayerForwardingContext<I, BC>,
 {
     // When forwarding, if a datagram's TTL is one or zero, discard it, as
     // decrementing the TTL would put it below the allowed minimum value.
@@ -2845,7 +2879,7 @@ pub fn receive_ipv4_packet<
     // we need below.
     drop(filter);
 
-    let action = receive_ipv4_packet_action(core_ctx, bindings_ctx, device, &packet);
+    let action = receive_ipv4_packet_action(core_ctx, bindings_ctx, device, &packet, frame_dst);
     match action {
         ReceivePacketAction::MulticastForward { targets, address_status, dst_ip } => {
             let src_ip = packet.src_ip();
@@ -3199,7 +3233,7 @@ pub fn receive_ipv6_packet<
         return;
     };
 
-    match receive_ipv6_packet_action(core_ctx, bindings_ctx, device, &packet) {
+    match receive_ipv6_packet_action(core_ctx, bindings_ctx, device, &packet, frame_dst) {
         ReceivePacketAction::MulticastForward { targets, address_status, dst_ip } => {
             // TOOD(https://fxbug.dev/364242513): Support connection tracking of
             // the multiplexed flows created by multicast forwarding. Here, we
@@ -3419,6 +3453,7 @@ pub fn receive_ipv4_packet_action<
     bindings_ctx: &mut BC,
     device: &CC::DeviceId,
     packet: &Ipv4Packet<B>,
+    frame_dst: Option<FrameDestination>,
 ) -> ReceivePacketAction<Ipv4, CC::DeviceId> {
     let Some(dst_ip) = SpecifiedAddr::new(packet.dst_ip()) else {
         core_ctx.increment(|counters: &IpCounters<Ipv4>| &counters.unspecified_destination);
@@ -3461,6 +3496,7 @@ pub fn receive_ipv4_packet_action<
                 packet,
                 Some(address_status),
                 dst_ip,
+                frame_dst,
             )
         }
         Some(
@@ -3476,6 +3512,7 @@ pub fn receive_ipv4_packet_action<
             dst_ip,
             device,
             packet,
+            frame_dst,
         ),
     }
 }
@@ -3490,6 +3527,7 @@ pub fn receive_ipv6_packet_action<
     bindings_ctx: &mut BC,
     device: &CC::DeviceId,
     packet: &Ipv6Packet<B>,
+    frame_dst: Option<FrameDestination>,
 ) -> ReceivePacketAction<Ipv6, CC::DeviceId> {
     let Some(dst_ip) = SpecifiedAddr::new(packet.dst_ip()) else {
         core_ctx.increment(|counters: &IpCounters<Ipv6>| &counters.unspecified_destination);
@@ -3551,6 +3589,7 @@ pub fn receive_ipv6_packet_action<
                 packet,
                 Some(address_status),
                 dst_ip,
+                frame_dst,
             )
         }
         Some(address_status @ Ipv6PresentAddressStatus::UnicastAssigned) => {
@@ -3597,6 +3636,7 @@ pub fn receive_ipv6_packet_action<
             dst_ip,
             device,
             packet,
+            frame_dst,
         ),
     }
 }
@@ -3615,12 +3655,14 @@ fn receive_ip_multicast_packet_action<
     packet: &I::Packet<B>,
     address_status: Option<I::AddressStatus>,
     dst_ip: SpecifiedAddr<I::Addr>,
+    frame_dst: Option<FrameDestination>,
 ) -> ReceivePacketAction<I, CC::DeviceId> {
-    let targets = multicast_forwarding::lookup_multicast_route_for_packet(
+    let targets = multicast_forwarding::lookup_multicast_route_or_stash_packet(
         core_ctx,
         bindings_ctx,
         packet,
         device,
+        frame_dst,
     );
     match (targets, address_status) {
         (Some(targets), address_status) => {
@@ -3664,6 +3706,7 @@ fn receive_ip_packet_action_common<
     dst_ip: SpecifiedAddr<I::Addr>,
     device_id: &CC::DeviceId,
     packet: &I::Packet<B>,
+    frame_dst: Option<FrameDestination>,
 ) -> ReceivePacketAction<I, CC::DeviceId> {
     if dst_ip.is_multicast() {
         return receive_ip_multicast_packet_action(
@@ -3673,6 +3716,7 @@ fn receive_ip_packet_action_common<
             packet,
             None,
             dst_ip,
+            frame_dst,
         );
     }
 

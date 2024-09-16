@@ -37,8 +37,8 @@ fn loopback_mtu() {
         .into();
     ctx.test_api().enable_device(&device);
 
-    assert_eq!(ip::IpDeviceContext::<Ipv4, _>::get_mtu(&mut ctx.core_ctx(), &device), MTU);
-    assert_eq!(ip::IpDeviceContext::<Ipv6, _>::get_mtu(&mut ctx.core_ctx(), &device), MTU);
+    assert_eq!(ip::IpDeviceMtuContext::<Ipv4>::get_mtu(&mut ctx.core_ctx(), &device), MTU);
+    assert_eq!(ip::IpDeviceMtuContext::<Ipv6>::get_mtu(&mut ctx.core_ctx(), &device), MTU);
 }
 
 #[netstack3_macros::context_ip_bounds(I, FakeBindingsCtx)]

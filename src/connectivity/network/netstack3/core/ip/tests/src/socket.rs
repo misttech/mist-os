@@ -31,7 +31,7 @@ use netstack3_ip::socket::{
     IpSockSendError, IpSocketHandler, MmsError, SendOptions,
 };
 use netstack3_ip::{
-    self as ip, device, AddableEntryEither, AddableMetric, IpDeviceContext, RawMetric,
+    self as ip, device, AddableEntryEither, AddableMetric, IpDeviceMtuContext, RawMetric,
     ResolveRouteError,
 };
 
@@ -696,7 +696,7 @@ fn get_mms_device_removed<I: IpSocketIpExt + IpExt>(remove_device: bool) {
         Err(MmsError::NoDevice(ResolveRouteError::Unreachable))
     } else {
         Ok(Mms::from_mtu::<I>(
-            IpDeviceContext::<I, _>::get_mtu(&mut ctx.core_ctx(), &device_id),
+            IpDeviceMtuContext::<I>::get_mtu(&mut ctx.core_ctx(), &device_id),
             0, /* no ip options/ext hdrs used */
         )
         .unwrap())

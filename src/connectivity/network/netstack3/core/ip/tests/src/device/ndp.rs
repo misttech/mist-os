@@ -1084,7 +1084,7 @@ fn test_receiving_router_advertisement_mtu_option() {
         icmpv6_packet_buf,
     );
     assert_eq!(ctx.core_ctx.ipv6().icmp.ndp_counters.rx.router_advertisement.get(), 1);
-    assert_eq!(ip::IpDeviceContext::<Ipv6, _>::get_mtu(&mut ctx.core_ctx(), &device), hw_mtu);
+    assert_eq!(ip::IpDeviceMtuContext::<Ipv6>::get_mtu(&mut ctx.core_ctx(), &device), hw_mtu);
 
     // Receive a new RA with an invalid MTU option (value is lower than IPv6
     // min MTU).
@@ -1100,7 +1100,7 @@ fn test_receiving_router_advertisement_mtu_option() {
         icmpv6_packet_buf,
     );
     assert_eq!(ctx.core_ctx.ipv6().icmp.ndp_counters.rx.router_advertisement.get(), 2);
-    assert_eq!(ip::IpDeviceContext::<Ipv6, _>::get_mtu(&mut ctx.core_ctx(), &device), hw_mtu);
+    assert_eq!(ip::IpDeviceMtuContext::<Ipv6>::get_mtu(&mut ctx.core_ctx(), &device), hw_mtu);
 
     // Receive a new RA with a valid MTU option (value is exactly IPv6 min
     // MTU).
@@ -1117,7 +1117,7 @@ fn test_receiving_router_advertisement_mtu_option() {
     );
     assert_eq!(ctx.core_ctx.ipv6().icmp.ndp_counters.rx.router_advertisement.get(), 3);
     assert_eq!(
-        ip::IpDeviceContext::<Ipv6, _>::get_mtu(&mut ctx.core_ctx(), &device),
+        ip::IpDeviceMtuContext::<Ipv6>::get_mtu(&mut ctx.core_ctx(), &device),
         Ipv6::MINIMUM_LINK_MTU,
     );
 }

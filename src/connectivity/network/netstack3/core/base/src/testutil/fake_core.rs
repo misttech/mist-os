@@ -32,12 +32,12 @@ impl<S, Meta, DeviceId> ContextProvider for FakeCoreCtx<S, Meta, DeviceId> {
     }
 }
 
-impl<BC, S, Meta, DeviceId> CounterContext<BC> for FakeCoreCtx<S, Meta, DeviceId>
+impl<C, S, Meta, DeviceId> CounterContext<C> for FakeCoreCtx<S, Meta, DeviceId>
 where
-    S: CounterContext<BC>,
+    S: CounterContext<C>,
 {
-    fn with_counters<O, F: FnOnce(&BC) -> O>(&self, cb: F) -> O {
-        CounterContext::<BC>::with_counters(&self.state, cb)
+    fn with_counters<O, F: FnOnce(&C) -> O>(&self, cb: F) -> O {
+        CounterContext::<C>::with_counters(&self.state, cb)
     }
 }
 

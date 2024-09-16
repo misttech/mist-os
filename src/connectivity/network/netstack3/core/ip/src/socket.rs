@@ -26,7 +26,7 @@ use packet_formats::ip::DscpAndEcn;
 use thiserror::Error;
 
 use crate::internal::base::{
-    FilterHandlerProvider, IpCounters, IpDeviceContext, IpLayerIpExt, IpLayerPacketMetadata,
+    FilterHandlerProvider, IpCounters, IpDeviceMtuContext, IpLayerIpExt, IpLayerPacketMetadata,
     IpPacketDestination, IpSendFrameError, IpSendFrameErrorReason, ResolveRouteError,
     SendIpPacketMeta,
 };
@@ -804,7 +804,7 @@ impl<I, BC, CC> DeviceIpSocketHandler<I, BC> for CC
 where
     I: IpLayerIpExt + IpDeviceStateIpExt,
     BC: IpSocketBindingsContext,
-    CC: IpDeviceContext<I, BC> + IpSocketContext<I, BC> + UseDeviceIpSocketHandlerBlanket,
+    CC: IpDeviceMtuContext<I> + IpSocketContext<I, BC> + UseDeviceIpSocketHandlerBlanket,
 {
     fn get_mms(
         &mut self,
@@ -821,7 +821,7 @@ where
         let ResolvedRoute { src_addr: _, local_delivery_device: _, device, next_hop: _ } = self
             .lookup_route(bindings_ctx, device.as_ref(), Some(*local_ip), *remote_ip, *transparent)
             .map_err(MmsError::NoDevice)?;
-        let mtu = IpDeviceContext::<I, BC>::get_mtu(self, &device);
+        let mtu = self.get_mtu(&device);
         // TODO(https://fxbug.dev/42072935): Calculate the options size when they
         // are supported.
         Mms::from_mtu::<I>(mtu, 0 /* no ip options used */).ok_or(MmsError::MTUTooSmall(mtu))

@@ -11,10 +11,11 @@ use core::time::Duration;
 use derivative::Derivative;
 use net_types::ip::{Ip, IpVersionMarker};
 use netstack3_base::{
-    CoreTimerContext, Instant as _, StrongDeviceIdentifier as _, WeakDeviceIdentifier,
+    CoreTimerContext, FrameDestination, Instant as _, StrongDeviceIdentifier as _,
+    WeakDeviceIdentifier,
 };
+use packet::{Buf, ParseBufferMut};
 use packet_formats::ip::IpPacket;
-use todo_unused::todo_unused;
 use zerocopy::ByteSlice;
 
 use crate::internal::multicast_forwarding::{
@@ -87,13 +88,13 @@ impl<I: IpLayerIpExt, D: WeakDeviceIdentifier, BC: MulticastForwardingBindingsCo
     /// Attempt to queue the packet in the pending_table.
     ///
     /// If the table becomes newly occupied, the GC timer is scheduled.
-    #[todo_unused("https://fxbug.dev/353328975")]
     pub(crate) fn try_queue_packet<B>(
         &mut self,
         bindings_ctx: &mut BC,
         key: MulticastRouteKey<I>,
         packet: &I::Packet<B>,
         dev: &D::Strong,
+        frame_dst: Option<FrameDestination>,
     ) -> QueuePacketOutcome
     where
         B: ByteSlice,
@@ -103,12 +104,12 @@ impl<I: IpLayerIpExt, D: WeakDeviceIdentifier, BC: MulticastForwardingBindingsCo
             btree_map::Entry::Vacant(entry) => {
                 let queue = entry.insert(PacketQueue::new(bindings_ctx));
                 queue
-                    .try_push(|| QueuedPacket::new(dev, packet))
+                    .try_push(|| QueuedPacket::new(dev, packet, frame_dst))
                     .expect("newly instantiated queue must have capacity");
                 QueuePacketOutcome::QueuedInNewQueue
             }
             btree_map::Entry::Occupied(mut entry) => {
-                match entry.get_mut().try_push(|| QueuedPacket::new(dev, packet)) {
+                match entry.get_mut().try_push(|| QueuedPacket::new(dev, packet, frame_dst)) {
                     Ok(()) => QueuePacketOutcome::QueuedInExistingQueue,
                     Err(PacketQueueFullError) => QueuePacketOutcome::ExistingQueueFull,
                 }
@@ -190,7 +191,9 @@ pub struct PacketQueue<I: Ip, D: WeakDeviceIdentifier, BT: MulticastForwardingBi
     expires_at: BT::Instant,
 }
 
-impl<I: Ip, D: WeakDeviceIdentifier, BC: MulticastForwardingBindingsContext> PacketQueue<I, D, BC> {
+impl<I: IpLayerIpExt, D: WeakDeviceIdentifier, BC: MulticastForwardingBindingsContext>
+    PacketQueue<I, D, BC>
+{
     fn new(bindings_ctx: &mut BC) -> Self {
         Self {
             queue: Default::default(),
@@ -219,32 +222,73 @@ impl<I: Ip, D: WeakDeviceIdentifier, BC: MulticastForwardingBindingsContext> Pac
 #[derive(Debug)]
 struct PacketQueueFullError;
 
+impl<I: Ip, D: WeakDeviceIdentifier, BT: MulticastForwardingBindingsTypes> IntoIterator
+    for PacketQueue<I, D, BT>
+{
+    type Item = QueuedPacket<I, D>;
+    type IntoIter = <ArrayVec<QueuedPacket<I, D>, PACKET_QUEUE_LEN> as IntoIterator>::IntoIter;
+    fn into_iter(self) -> Self::IntoIter {
+        let Self { queue, expires_at: _ } = self;
+        queue.into_iter()
+    }
+}
+
 /// An individual multicast packet that's queued.
-///
-/// This type acts as a witness that the bytes held in `packet` constitute a
-/// valid [`I::Packet`]. Any attempt to parse the bytes back into an instance of
-/// [`I::Packet`] is infallible.
 #[derive(Debug, PartialEq)]
 pub struct QueuedPacket<I: Ip, D: WeakDeviceIdentifier> {
     /// The device on which the packet arrived.
-    // TODO(https://fxbug.dev/353328975): Use this field to send queued packets.
-    #[allow(unused)]
-    device: D,
-    /// The packet's raw bytes.
-    // TODO(https://fxbug.dev/353328975): Use this field to send queued packets.
-    #[allow(unused)]
-    packet_bytes: Vec<u8>,
-    /// The IP Version of `packet`.
-    _version_marker: IpVersionMarker<I>,
+    pub(crate) device: D,
+    /// The packet.
+    pub(crate) packet: ValidIpPacketBuf<I>,
+    /// The link layer (L2) destination that the packet was sent to, or `None`
+    /// if the packet arrived above the link layer (e.g. a Pure IP device).
+    pub(crate) frame_dst: Option<FrameDestination>,
 }
 
 impl<I: IpLayerIpExt, D: WeakDeviceIdentifier> QueuedPacket<I, D> {
-    fn new<B: ByteSlice>(device: &D::Strong, packet: &I::Packet<B>) -> Self {
+    fn new<B: ByteSlice>(
+        device: &D::Strong,
+        packet: &I::Packet<B>,
+        frame_dst: Option<FrameDestination>,
+    ) -> Self {
         QueuedPacket {
             device: device.downgrade(),
-            packet_bytes: packet.to_vec(),
-            _version_marker: Default::default(),
+            packet: ValidIpPacketBuf::new(packet),
+            frame_dst,
         }
+    }
+}
+
+/// A buffer containing a known-to-be valid IP packet.
+///
+/// The only constructor of this type takes an `I::Packet`, which is already
+/// parsed & validated.
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct ValidIpPacketBuf<I: Ip> {
+    buffer: Buf<Vec<u8>>,
+    _version_marker: IpVersionMarker<I>,
+}
+
+impl<I: IpLayerIpExt> ValidIpPacketBuf<I> {
+    fn new<B: ByteSlice>(packet: &I::Packet<B>) -> Self {
+        Self { buffer: Buf::new(packet.to_vec(), ..), _version_marker: Default::default() }
+    }
+
+    /// Parses the internal buffer into a mutable IP Packet.
+    ///
+    /// # Panics
+    ///
+    /// This function panics if called multiple times. Parsing moves the cursor
+    /// in the underlying buffer from the start of the IP header to the start
+    /// of the IP body.
+    pub(crate) fn parse_ip_packet_mut(&mut self) -> I::Packet<&mut [u8]> {
+        // NB: Safe to unwrap here because the buffer is known to be valid.
+        self.buffer.parse_mut().unwrap()
+    }
+
+    pub(crate) fn into_inner(self) -> Buf<Vec<u8>> {
+        let Self { buffer, _version_marker } = self;
+        buffer
     }
 }
 
@@ -260,6 +304,7 @@ mod tests {
     use netstack3_base::{InstantContext, StrongDeviceIdentifier, TimerContext};
     use packet::ParseBuffer;
     use static_assertions::const_assert;
+    use test_case::test_case;
 
     use crate::internal::multicast_forwarding;
     use crate::internal::multicast_forwarding::testutil::{
@@ -267,7 +312,9 @@ mod tests {
     };
 
     #[ip_test(I)]
-    fn queue_packet<I: TestIpExt>() {
+    #[test_case(None; "no_frame_dst")]
+    #[test_case(Some(FrameDestination::Multicast); "some_frame_dst")]
+    fn queue_packet<I: TestIpExt>(frame_dst: Option<FrameDestination>) {
         const DEV: MultipleDevicesId = MultipleDevicesId::A;
         let key1 = MulticastRouteKey::new(I::SRC1, I::DST1).unwrap();
         let key2 = MulticastRouteKey::new(I::SRC2, I::DST2).unwrap();
@@ -279,7 +326,7 @@ mod tests {
         let mut buf_ref = buf.as_ref();
         let packet = buf_ref.parse::<I::Packet<_>>().expect("parse should succeed");
 
-        let mut bindings_ctx = FakeBindingsCtx::<I>::default();
+        let mut bindings_ctx = FakeBindingsCtx::<I, MultipleDevicesId>::default();
 
         let mut pending_table =
             MulticastForwardingPendingPackets::<
@@ -290,32 +337,56 @@ mod tests {
 
         // The first packet gets a new queue.
         assert_eq!(
-            pending_table.try_queue_packet(&mut bindings_ctx, key1.clone(), &packet, &DEV),
+            pending_table.try_queue_packet(
+                &mut bindings_ctx,
+                key1.clone(),
+                &packet,
+                &DEV,
+                frame_dst
+            ),
             QueuePacketOutcome::QueuedInNewQueue
         );
         // The second - Nth packets uses the existing queue.
         for _ in 1..PACKET_QUEUE_LEN {
             assert_eq!(
-                pending_table.try_queue_packet(&mut bindings_ctx, key1.clone(), &packet, &DEV),
+                pending_table.try_queue_packet(
+                    &mut bindings_ctx,
+                    key1.clone(),
+                    &packet,
+                    &DEV,
+                    frame_dst
+                ),
                 QueuePacketOutcome::QueuedInExistingQueue
             );
         }
         // The Nth +1 packet is rejected.
         assert_eq!(
-            pending_table.try_queue_packet(&mut bindings_ctx, key1.clone(), &packet, &DEV),
+            pending_table.try_queue_packet(
+                &mut bindings_ctx,
+                key1.clone(),
+                &packet,
+                &DEV,
+                frame_dst
+            ),
             QueuePacketOutcome::ExistingQueueFull
         );
 
         // A packet with a different key gets a new queue.
         assert_eq!(
-            pending_table.try_queue_packet(&mut bindings_ctx, key2.clone(), &packet, &DEV),
+            pending_table.try_queue_packet(
+                &mut bindings_ctx,
+                key2.clone(),
+                &packet,
+                &DEV,
+                frame_dst
+            ),
             QueuePacketOutcome::QueuedInNewQueue
         );
 
         // Based on the calls above, `key1` should have a full queue, `key2`
         // should have a queue with only 1 packet, and `key3` shouldn't have
         // a queue.
-        let expected_packet = QueuedPacket::new(&DEV, &packet);
+        let expected_packet = QueuedPacket::new(&DEV, &packet, frame_dst);
         let queue =
             pending_table.remove(&key1, &mut bindings_ctx).expect("key1 should have a queue");
         assert_eq!(queue.queue.len(), PACKET_QUEUE_LEN);
@@ -334,7 +405,7 @@ mod tests {
     /// Helper to observe the next scheduled GC for the core_ctx pending table.
     fn next_gc_time<I: TestIpExt>(
         core_ctx: &mut FakeCoreCtx<I, MultipleDevicesId>,
-        bindings_ctx: &mut FakeBindingsCtx<I>,
+        bindings_ctx: &mut FakeBindingsCtx<I, MultipleDevicesId>,
     ) -> Option<FakeInstant> {
         multicast_forwarding::testutil::with_pending_table(core_ctx, |pending_table| {
             bindings_ctx.scheduled_instant(&mut pending_table.gc_timer)
@@ -344,25 +415,28 @@ mod tests {
     /// Helper to queue packet in the core_ctx pending table.
     fn try_queue_packet<I: TestIpExt>(
         core_ctx: &mut FakeCoreCtx<I, MultipleDevicesId>,
-        bindings_ctx: &mut FakeBindingsCtx<I>,
+        bindings_ctx: &mut FakeBindingsCtx<I, MultipleDevicesId>,
         key: MulticastRouteKey<I>,
         dev: &MultipleDevicesId,
+        frame_dst: Option<FrameDestination>,
     ) -> QueuePacketOutcome {
         let buf =
             multicast_forwarding::testutil::new_ip_packet_buf::<I>(key.src_addr(), key.dst_addr());
         let mut buf_ref = buf.as_ref();
         let packet = buf_ref.parse::<I::Packet<_>>().expect("parse should succeed");
         multicast_forwarding::testutil::with_pending_table(core_ctx, |pending_table| {
-            pending_table.try_queue_packet(bindings_ctx, key, &packet, dev)
+            pending_table.try_queue_packet(bindings_ctx, key, &packet, dev, frame_dst)
         })
     }
 
     /// Helper to remove a packet queue in the core_ctx pending table.
     fn remove_packet_queue<I: TestIpExt>(
         core_ctx: &mut FakeCoreCtx<I, MultipleDevicesId>,
-        bindings_ctx: &mut FakeBindingsCtx<I>,
+        bindings_ctx: &mut FakeBindingsCtx<I, MultipleDevicesId>,
         key: &MulticastRouteKey<I>,
-    ) -> Option<PacketQueue<I, FakeWeakDeviceId<MultipleDevicesId>, FakeBindingsCtx<I>>> {
+    ) -> Option<
+        PacketQueue<I, FakeWeakDeviceId<MultipleDevicesId>, FakeBindingsCtx<I, MultipleDevicesId>>,
+    > {
         multicast_forwarding::testutil::with_pending_table(core_ctx, |pending_table| {
             pending_table.remove(key, bindings_ctx)
         })
@@ -371,7 +445,7 @@ mod tests {
     /// Helper to trigger the GC.
     fn run_gc<I: TestIpExt>(
         core_ctx: &mut FakeCoreCtx<I, MultipleDevicesId>,
-        bindings_ctx: &mut FakeBindingsCtx<I>,
+        bindings_ctx: &mut FakeBindingsCtx<I, MultipleDevicesId>,
     ) {
         assert_matches!(
             &bindings_ctx.trigger_timers_until_instant(bindings_ctx.now(), core_ctx)[..],
@@ -382,6 +456,7 @@ mod tests {
     #[ip_test(I)]
     fn garbage_collection<I: TestIpExt>() {
         const DEV: MultipleDevicesId = MultipleDevicesId::A;
+        const FRAME_DST: Option<FrameDestination> = None;
         let key1 = MulticastRouteKey::<I>::new(I::SRC1, I::DST1).unwrap();
         let key2 = MulticastRouteKey::<I>::new(I::SRC2, I::DST2).unwrap();
 
@@ -403,7 +478,7 @@ mod tests {
         // Queue a packet, and expect the GC to be scheduled.
         let expected_first_gc = bindings_ctx.now() + PENDING_ROUTE_GC_PERIOD;
         assert_eq!(
-            try_queue_packet(core_ctx, bindings_ctx, key1.clone(), &DEV),
+            try_queue_packet(core_ctx, bindings_ctx, key1.clone(), &DEV, FRAME_DST),
             QueuePacketOutcome::QueuedInNewQueue
         );
         assert_eq!(next_gc_time(core_ctx, bindings_ctx), Some(expected_first_gc));
@@ -413,7 +488,7 @@ mod tests {
         // instant.
         bindings_ctx.timers.instant.sleep(PENDING_ROUTE_GC_PERIOD);
         assert_eq!(
-            try_queue_packet(core_ctx, bindings_ctx, key2.clone(), &DEV),
+            try_queue_packet(core_ctx, bindings_ctx, key2.clone(), &DEV, FRAME_DST),
             QueuePacketOutcome::QueuedInNewQueue
         );
         assert_eq!(next_gc_time(core_ctx, bindings_ctx), Some(expected_first_gc));
@@ -435,7 +510,7 @@ mod tests {
         // Finally, verify that if the GC clears the table, it doesn't
         // reschedule itself.
         assert_eq!(
-            try_queue_packet(core_ctx, bindings_ctx, key1.clone(), &DEV),
+            try_queue_packet(core_ctx, bindings_ctx, key1.clone(), &DEV, FRAME_DST),
             QueuePacketOutcome::QueuedInNewQueue
         );
         assert_eq!(next_gc_time(core_ctx, bindings_ctx), Some(expected_second_gc));

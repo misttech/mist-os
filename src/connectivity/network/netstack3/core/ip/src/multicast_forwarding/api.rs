@@ -4,18 +4,26 @@
 
 //! Declares the API for configuring multicast forwarding within the netstack.
 
+use alloc::collections::btree_map;
+
+use log::warn;
 use net_types::ip::{Ip, IpVersionMarker};
+use net_types::SpecifiedAddr;
 use netstack3_base::{AnyDevice, ContextPair, CoreTimerContext, DeviceIdContext};
 
-use crate::internal::multicast_forwarding::route::{Action, MulticastRoute, MulticastRouteKey};
+use crate::internal::base::IpLayerForwardingContext;
+use crate::internal::multicast_forwarding::packet_queue::{PacketQueue, QueuedPacket};
+use crate::internal::multicast_forwarding::route::{
+    Action, MulticastRoute, MulticastRouteKey, MulticastRouteTarget,
+};
 use crate::internal::multicast_forwarding::state::{
     MulticastForwardingEnabledState, MulticastForwardingPendingPacketsContext as _,
     MulticastForwardingState, MulticastForwardingStateContext, MulticastRouteTableContext as _,
 };
 use crate::internal::multicast_forwarding::{
-    MulticastForwardingBindingsContext, MulticastForwardingTimerId,
+    MulticastForwardingDeviceContext, MulticastForwardingTimerId,
 };
-use crate::IpLayerIpExt;
+use crate::{IpLayerBindingsContext, IpLayerIpExt, IpPacketDestination};
 
 /// The API action can not be performed while multicast forwarding is disabled.
 #[derive(Debug, Eq, PartialEq)]
@@ -38,8 +46,11 @@ impl<I: IpLayerIpExt, C> MulticastForwardingApi<I, C>
 where
     C: ContextPair,
     C::CoreContext: MulticastForwardingStateContext<I, C::BindingsContext>
+        + MulticastForwardingDeviceContext<I>
+        + IpLayerForwardingContext<I, C::BindingsContext>
         + CoreTimerContext<MulticastForwardingTimerId<I>, C::BindingsContext>,
-    C::BindingsContext: MulticastForwardingBindingsContext,
+    C::BindingsContext:
+        IpLayerBindingsContext<I, <C::CoreContext as DeviceIdContext<AnyDevice>>::DeviceId>,
 {
     pub(crate) fn core_ctx(&mut self) -> &mut C::CoreContext {
         let Self { ctx, _ip_mark } = self;
@@ -96,36 +107,44 @@ where
         MulticastForwardingDisabledError,
     > {
         let (core_ctx, bindings_ctx) = self.contexts();
-        core_ctx.with_state_mut(|state, ctx| {
+        let (orig_route, packet_queue_and_new_route) = core_ctx.with_state_mut(|state, ctx| {
             let state = state.enabled().ok_or(MulticastForwardingDisabledError {})?;
             ctx.with_route_table_mut(state, |route_table, ctx| {
-                let orig_route = route_table.insert(key.clone(), route);
-                // NB: Only try to send pending packets if the route was newly
-                // installed. Any existing route would not have pending packets,
-                // as per the key-invariant on the route table.
-                match &orig_route {
-                    Some(_route) =>
-                    {
+                match route_table.entry(key.clone()) {
+                    btree_map::Entry::Occupied(mut entry) => {
+                        let orig_route = entry.insert(route);
+                        // NB: Check the invariant that any key present in the
+                        // route table is not also present in the pending table.
                         #[cfg(debug_assertions)]
                         ctx.with_pending_table_mut(state, |pending_table| {
                             debug_assert!(!pending_table.contains(&key));
-                        })
-                    }
-                    None => {
-                        ctx.with_pending_table_mut(state, |pending_table| {
-                            match pending_table.remove(&key, bindings_ctx) {
-                                // No pending packets need to be sent.
-                                None => {}
-                                // TODO(https://fxbug.dev/353328975): Send the
-                                // packets.
-                                Some(_packet_queue) => {}
-                            }
                         });
+                        Ok((Some(orig_route), None))
+                    }
+                    btree_map::Entry::Vacant(entry) => {
+                        let new_route_ref = entry.insert(route);
+                        let packet_queue_and_new_route = ctx
+                            .with_pending_table_mut(state, |pending_table| {
+                                pending_table.remove(&key, bindings_ctx)
+                            })
+                            .map(|packet_queue| (packet_queue, new_route_ref.clone()));
+                        Ok((None, packet_queue_and_new_route))
                     }
                 }
-                Ok(orig_route)
             })
-        })
+        })?;
+
+        if let Some((packet_queue, new_route)) = packet_queue_and_new_route {
+            // NB: we cloned the route out to a context that's no longer holding
+            // the routing table lock. This means the route could have been
+            // removed. In general, that's okay. We'll operate on the
+            // potentially stale route as if it still exists. This mirrors the
+            // lookup pattern used by the unicast/multicast route tables in
+            // other parts of the stack.
+            handle_pending_packets(core_ctx, bindings_ctx, packet_queue, key, new_route)
+        }
+
+        Ok(orig_route)
     }
 
     /// Remove the route from the multicast route table.
@@ -192,6 +211,116 @@ where
     }
 }
 
+/// Attempt to forward the packets from a pending [`PacketQueue`] according to a
+/// newly installed [`MulticastRoute`].
+fn handle_pending_packets<I: IpLayerIpExt, CC, BC>(
+    core_ctx: &mut CC,
+    bindings_ctx: &mut BC,
+    packet_queue: PacketQueue<I, CC::WeakDeviceId, BC>,
+    key: MulticastRouteKey<I>,
+    route: MulticastRoute<CC::DeviceId>,
+) where
+    CC: IpLayerForwardingContext<I, BC> + MulticastForwardingDeviceContext<I>,
+    BC: IpLayerBindingsContext<I, CC::DeviceId>,
+{
+    let MulticastRoute { input_interface, action } = route;
+
+    // NB: We checked that forwarding was enabled on the device before the
+    // packet was enqueued in the pending table. However, the packet may sit in
+    // the queue for an extended period of time, during which forwarding may
+    // have been disabled on the device. Check again here just in case.
+    if !core_ctx.is_device_multicast_forwarding_enabled(&input_interface) {
+        // The user just installed a multicast route, but also disabled
+        // forwarding on the device. Log a warning because that likely indicates
+        // incorrect API usage.
+        warn!(
+            "Dropping pending packets for newly installed multicast route: {key:?}. \
+            Multicast forwarding is disabled on input interface: {input_interface:?}"
+        );
+        // TODO(https://fxbug.dev/352570820): Increment a counter.
+        return;
+    }
+
+    let MulticastRouteKey { src_addr, dst_addr } = key;
+    let dst_ip: SpecifiedAddr<I::Addr> = dst_addr.into();
+    let src_ip: I::RecvSrcAddr = src_addr.into();
+
+    for QueuedPacket { device, packet, frame_dst } in packet_queue.into_iter() {
+        // Short circuit if the queued packet arrived on the wrong device.
+        if device != input_interface {
+            // TODO(https://fxbug.dev/352570820): Increment a counter.
+            // TODO(https://fxbug.dev/353328975): Send a "Wrong Interface"
+            // multicast forwarding event.
+            continue;
+        }
+
+        // TODO(https://fxbug.dev/352570820): Increment a counter.
+        match &action {
+            Action::Forward(targets) => {
+                let packet_iter = RepeatN::new(packet, targets.len());
+                for (mut packet, MulticastRouteTarget { output_interface, min_ttl }) in
+                    packet_iter.zip(targets.iter())
+                {
+                    let packet_metadata = Default::default();
+                    crate::internal::base::determine_ip_packet_forwarding_action::<I, _, _>(
+                        core_ctx,
+                        packet.parse_ip_packet_mut(),
+                        packet_metadata,
+                        Some(*min_ttl),
+                        &input_interface,
+                        &output_interface,
+                        IpPacketDestination::from_addr(dst_ip),
+                        frame_dst,
+                        src_ip,
+                        dst_ip,
+                    )
+                    .perform_action_with_buffer(
+                        core_ctx,
+                        bindings_ctx,
+                        packet.into_inner(),
+                    );
+                }
+            }
+        }
+    }
+}
+
+/// An iterator that repeats a provided item `N` times.
+///
+/// Notably, this iterator will clone the item n-1 times, and move the owned
+/// value into the final item.
+// TODO(https://github.com/rust-lang/rust/issues/104434): Replace this with the
+// standard library version, once it stabilizes.
+struct RepeatN<T> {
+    // `Some` while `size` is greater than 0; `None` otherwise.
+    elem: Option<T>,
+    size: usize,
+}
+
+impl<T> RepeatN<T> {
+    fn new(elem: T, size: usize) -> Self {
+        if size == 0 {
+            Self { elem: None, size }
+        } else {
+            Self { elem: Some(elem), size: size - 1 }
+        }
+    }
+}
+
+impl<T: Clone> Iterator for RepeatN<T> {
+    type Item = T;
+
+    fn next(&mut self) -> Option<T> {
+        let Self { elem, size } = self;
+        if *size > 0 {
+            *size -= 1;
+            Some(elem.as_ref().unwrap().clone())
+        } else {
+            elem.take()
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -201,8 +330,9 @@ mod tests {
     use assert_matches::assert_matches;
     use ip_test_macro::ip_test;
     use netstack3_base::testutil::MultipleDevicesId;
-    use netstack3_base::StrongDeviceIdentifier;
+    use netstack3_base::{FrameDestination, StrongDeviceIdentifier};
     use packet::ParseBuffer;
+    use test_case::test_case;
 
     use crate::internal::multicast_forwarding;
     use crate::internal::multicast_forwarding::packet_queue::QueuePacketOutcome;
@@ -282,6 +412,7 @@ mod tests {
 
     #[ip_test(I)]
     fn add_route_with_pending_packets<I: TestIpExt>() {
+        const FRAME_DST: Option<FrameDestination> = None;
         let right_key = MulticastRouteKey::new(I::SRC1, I::DST1).unwrap();
         let wrong_key = MulticastRouteKey::new(I::SRC2, I::DST2).unwrap();
         let route = MulticastRoute::new_forward(
@@ -304,7 +435,8 @@ mod tests {
                     bindings_ctx,
                     right_key.clone(),
                     &packet,
-                    &MultipleDevicesId::A
+                    &MultipleDevicesId::A,
+                    FRAME_DST
                 ),
                 QueuePacketOutcome::QueuedInNewQueue,
             );
@@ -377,5 +509,14 @@ mod tests {
             Ok(Some(MulticastRoute::new_forward(GOOD_DEV1, [GOOD_TARGET2].into()).unwrap()))
         );
         assert_eq!(api.remove_multicast_route(&key4), Ok(Some(no_ref_to_dev)));
+    }
+
+    #[test_case(0)]
+    #[test_case(1)]
+    #[test_case(10)]
+    fn repeat_n(size: usize) {
+        #[derive(Clone)]
+        struct Foo;
+        assert_eq!(RepeatN::new(Foo, size).count(), size);
     }
 }

@@ -31,7 +31,7 @@ use netstack3_ip::icmp::{
 use netstack3_ip::multicast_forwarding::MulticastForwardingState;
 use netstack3_ip::raw::RawIpSocketMap;
 use netstack3_ip::{
-    self as ip, FragmentContext, IpCounters, IpLayerBindingsContext, IpLayerContext, IpLayerIpExt,
+    self as ip, FragmentContext, IpCounters, IpDeviceContext, IpLayerBindingsContext, IpLayerIpExt,
     IpPacketFragmentCache, IpRouteTablesContext, IpStateContext, IpStateInner, IpTransportContext,
     IpTransportDispatchContext, MulticastMembershipHandler, PmtuCache, PmtuContext,
     ReceiveIpPacketMeta, ResolveRouteError, ResolvedRoute, RoutingTable, RoutingTableId,
@@ -86,7 +86,7 @@ impl<
         L: LockBefore<crate::lock_ordering::IpState<I>>,
     > MulticastMembershipHandler<I, BC> for CoreCtx<'_, BC, L>
 where
-    Self: device::IpDeviceConfigurationContext<I, BC> + IpLayerContext<I, BC>,
+    Self: device::IpDeviceConfigurationContext<I, BC> + IpStateContext<I> + IpDeviceContext<I, BC>,
 {
     fn join_multicast_group(
         &mut self,
