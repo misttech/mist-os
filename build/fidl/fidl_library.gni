@@ -76,35 +76,58 @@ template("fidl_library") {
 
   main_target_name = target_name
 
+  target_dir = get_label_info(main_target_name, "dir")
+  is_vendor_library = string_replace(target_dir, "//vendor/", "") != target_dir
+
   # Whether an SDK category other than "excluded" was specified.
   # It does not actually indicate whether the library is included in any SDK.
   has_non_excluded_sdk_category =
       defined(invoker.sdk_category) && invoker.sdk_category != "excluded"
 
+  _is_in_sdk_category_not_really_in_an_sdk_ =
+      has_non_excluded_sdk_category && (invoker.sdk_category == "internal" ||
+                                        invoker.sdk_category == "experimental")
+
   # Included libraries require compatibility tests unless they are in one of the
   # categories that isn't really included in the Core IDK in any way.
-  requires_compatibility_tests =
-      has_non_excluded_sdk_category && invoker.sdk_category != "internal" &&
-      invoker.sdk_category != "experimental"
+  requires_compatibility_tests = has_non_excluded_sdk_category &&
+                                 !_is_in_sdk_category_not_really_in_an_sdk_
+  if (!has_non_excluded_sdk_category) {
+    not_needed([ "_is_in_sdk_category_not_really_in_an_sdk_" ])
+  }
 
   # All publishable libraries must have compatibility tests.
   # All such libraries are publishable except for those in partner_internal.
   is_sdk_included_publishable =
       requires_compatibility_tests && invoker.sdk_category != "partner_internal"
 
-  # Vendor SDK libraries are are `is_sdk_included_publishable` but not in the
-  # "fuchsia" namespace and not intended to be compaitibility tested. They
-  # specify "unversioned" so that they can be excluded here.
-  if (defined(invoker.versioned) && invoker.versioned == "unversioned") {
-    assert(invoker.sdk_category == "partner")
-    requires_compatibility_tests = false
-    is_sdk_included_publishable = true
+  _is_test_only = defined(invoker.testonly) && invoker.testonly
+
+  is_unversioned_vendor_sdk = false
+  not_needed([ "is_unversioned_vendor_sdk" ])  # Unused in many paths.
+  if (is_vendor_library) {
+    if (has_non_excluded_sdk_category) {
+      assert(invoker.sdk_category == "partner")
+
+      # Vendor SDK libraries are are `is_sdk_included_publishable` but not in the
+      # "fuchsia" namespace and not intended to be compaitibility tested. They
+      # specify "unversioned" so that they can be excluded here.
+      assert(defined(invoker.versioned) && invoker.versioned == "unversioned")
+
+      is_unversioned_vendor_sdk = true
+
+      requires_compatibility_tests = false
+      is_sdk_included_publishable = true
+    }
   }
 
-  # TODO(https://fxbug.dev/325669391): Remove when used in an upcoming CL.
-  not_needed([ "is_sdk_included_publishable" ])
-
   stable = defined(invoker.stable) && invoker.stable
+
+  # All stable libraries must be included in an SDK [category] and require
+  # compatibility tests, but the inverse is not always true.
+  # For unstable libraries with `requires_compatibility_tests=true`, although
+  # the build targets are created, the resulting API summery file will be empty.
+  assert(!stable || requires_compatibility_tests)
 
   compilation_target_name = "${target_name}_compile"
   verification_target_name = "${target_name}_verify"
@@ -128,41 +151,159 @@ template("fidl_library") {
     "testonly",
   ]
 
+  # Some IDK prebuilts depend on FIDL libraries that are currently internal and
+  # unstable. CTF tests, which target `NEXT`, similarly build code that depends
+  # on unstable libraries.
+  # Treat such libraries as unversioned until each is resolved.
+  _unversioned_libraries_used_by_sdk_prebuilts_or_ctf = [
+    # TODO(https://fxbug.dev/330947474): Resolve fdio dependency on library.
+    "fuchsia.device",
+
+    # TODO(https://fxbug.dev/364293789): Resolve SDK prebuilt package dependencies on library.
+    "fuchsia.diagnostics.stream",
+
+    # TODO(https://fxbug.dev/364294648): Resolve heapdump instrumentation dependency on library.
+    "fuchsia.memory.heapdump.process",
+
+    # TODO(https://fxbug.dev/365558387): For each of these time-related
+    # libraries and libraries used by time-related tests, either remove the
+    # dependency from the CTF tests or make the library stable then remove
+    # the library from the list below.
+    "fuchsia.metrics.test",
+    "fuchsia.testing",
+    "fuchsia.testing.deadline",
+    "fuchsia.time",
+    "fuchsia.time.external",
+
+    # TODO(https://fxbug.dev/365602422): For each of these UI-related libraries,
+    # either remove the dependency from the CTF tests or make the library stable
+    # then remove the library from the list below.
+    "fuchsia.ui.focus",
+    "fuchsia.ui.observation.scope",
+    "fuchsia.ui.observation.test",
+    "fuchsia.ui.pointer.augment",
+    "fuchsia.ui.test.conformance",
+    "fuchsia.ui.test.context",
+
+    # TODO(https://fxbug.dev/365602428): For each of these libraries, either
+    # remove the dependency from the CTF tests or make the library stable then
+    # remove the library from the list below.
+    "fuchsia.examples",
+    "fuchsia.pkg.test",
+  ]
+  _is_unversioned_libraries_used_by_sdk_prebuilts_or_ctf =
+      _unversioned_libraries_used_by_sdk_prebuilts_or_ctf + [ library_name ] -
+      [ library_name ] != _unversioned_libraries_used_by_sdk_prebuilts_or_ctf
+
+  # TODO(https://fxbug.dev/364422340): Remove when internal library properly versioned.
+  _is_internal_zx_library =
+      library_name == "zx" && !defined(invoker.sdk_category)
+
+  # //sdk/banjo/fuchsia.sysmem is the only Banjo library with versioning.
+  # Banjo libraries do not have an SDK category and are not marked stable,
+  # so it is not caught in an earlier condition.
+  # TODO(https://fxbug.dev/306258166): Determine an appropriate state for this
+  # library and remove this variable and related exceptions.
+  _is_banjo_sysmem =
+      library_name == "fuchsia.sysmem" && !defined(invoker.sdk_category)
+
   # If `versioned` is not specified, set the default as defined in fidl.gni.
   if (defined(invoker.versioned)) {
     _platform_override_name = string_split(invoker.versioned, ":")
     _platform_override_name = _platform_override_name[0]
     assert(
+        is_sdk_included_publishable || _is_test_only || _is_internal_zx_library,
+        "Non-test library '$library_name' is explicitly versioned but not included in an SDK.")
+    assert(
         !requires_compatibility_tests || _platform_override_name == "fuchsia",
         "Overriding `versioned` is not allowed for SDK FIDL library '$library_name', which is a Fuchsia platform API requiring compatibility tests.")
 
     fidlc_versioned_arg = invoker.versioned
-  } else if (defined(invoker.testonly) && invoker.testonly) {
+  } else if (_is_test_only) {
+    assert(!has_non_excluded_sdk_category)
     fidlc_versioned_arg = "unversioned"
-  } else if (invoker.library_name ==
-             "fuchsia." +
-             string_replace(invoker.library_name, "fuchsia.", "", 1)) {
+  } else if (library_name ==
+             "fuchsia." + string_replace(library_name, "fuchsia.", "", 1)) {
     # It is a non-test library in the "fuchsia" namespace. Set `versioned` to appropriate default.
     if (stable) {
       fidlc_versioned_arg = "fuchsia"
     } else if (requires_compatibility_tests) {
       fidlc_versioned_arg = "fuchsia:HEAD"
     } else {
-      # Some libraries in the "fuchsia" namespace are unversioned (do not specify
-      # `@available(added=HEAD)`) and thus fidlc would fail with
-      # "$library_name is versioned under platform 'unversioned', but expected platform 'fuchsia'"
-      # if a platform is specified.
-      # TODO(https://fxbug.dev/325669391): Make those libraries versioned and uncomment this line.
-      # fidlc_versioned_arg = "fuchsia:HEAD"
+      # All libraries in the "fuchsia" namespace must be versioned. For unstable
+      # or internal libraries, that means specifying `@available(added=HEAD)`.
+      fidlc_versioned_arg = "fuchsia:HEAD"
+
+      if (_is_unversioned_libraries_used_by_sdk_prebuilts_or_ctf) {
+        fidlc_versioned_arg = "unversioned"
+      } else if (_is_banjo_sysmem) {
+        fidlc_versioned_arg = "fuchsia"
+      }
     }
   } else {
     fidlc_versioned_arg = "unversioned"
   }
 
-  assert((!stable && !requires_compatibility_tests) ||
-             (fidlc_versioned_arg == "fuchsia" && stable) ||
-             (fidlc_versioned_arg == "fuchsia:HEAD" && !stable),
-         "The IDK only supports versioned libraries in the 'fuchsia' platform.")
+  # The examples in the documentation may not conform to the expectations
+  # for illustrative purposes, and it does not make sense to change them.
+  _is_documentation_example = library_name == "fuchsia.examples.docs"
+
+  # TODO(https://fxbug.dev/364727245): Make these stable or remove them from partner_internal.
+  _is_unstable_partner_internal =
+      library_name == "fuchsia.audio" ||
+      library_name == "fuchsia.audio.controller" ||
+      library_name == "fuchsia.audio.device" ||
+      library_name == "fuchsia.bluetooth.pandora" ||
+      library_name == "fuchsia.drm" || library_name == "fuchsia.media2" ||
+      library_name == "fuchsia.session.power" ||
+      library_name == "fuchsia.starnix.runner"
+
+  # TODO(https://fxbug.dev/365602428): Determine an appropriate state for these libraries.
+  _is_test_versioned_in_fuchsia = library_name == "fuchsia.element.test" ||
+                                  library_name == "fuchsia.intl.test" ||
+                                  library_name == "fuchsia.settings.test"
+
+  # TODO(https://fxbug.dev/365602428): Determine an appropriate state for library and remove this.
+  _is_test_example_library = library_name == "test.example"
+
+  # These are used in conditions, including within asserts, that are not always executed.
+  not_needed([
+               "_is_unversioned_libraries_used_by_sdk_prebuilts_or_ctf",
+               "_is_internal_zx_library",
+               "_is_banjo_sysmem",
+               "_is_documentation_example",
+               "_is_unstable_partner_internal",
+               "_is_test_versioned_in_fuchsia",
+               "_is_test_example_library",
+             ])
+
+  assert(
+      (fidlc_versioned_arg == "fuchsia" && stable &&
+           requires_compatibility_tests &&
+           (is_sdk_included_publishable ||
+                invoker.sdk_category == "partner_internal")) ||
+          (fidlc_versioned_arg == "fuchsia" && _is_banjo_sysmem && !stable &&
+               !requires_compatibility_tests && !is_sdk_included_publishable) ||
+          (fidlc_versioned_arg == "fuchsia:HEAD" && !stable &&
+               (requires_compatibility_tests == has_non_excluded_sdk_category ||
+                    (_is_in_sdk_category_not_really_in_an_sdk_ &&
+                         !requires_compatibility_tests) ||
+                    (_is_unstable_partner_internal &&
+                         invoker.sdk_category == "partner_internal"))) ||
+          (fidlc_versioned_arg == "unversioned" &&
+               _is_unversioned_libraries_used_by_sdk_prebuilts_or_ctf) ||
+          (fidlc_versioned_arg == "unversioned" && !stable &&
+               !requires_compatibility_tests &&
+               (!has_non_excluded_sdk_category || is_unversioned_vendor_sdk ||
+                    _is_test_example_library)) ||
+          (_is_test_only && !stable && !has_non_excluded_sdk_category &&
+               !requires_compatibility_tests &&
+               (fidlc_versioned_arg == "unversioned" ||
+                    _is_documentation_example ||
+                    fidlc_versioned_arg == "test:1" ||
+                    _is_test_versioned_in_fuchsia)) ||
+          (_is_internal_zx_library && fidlc_versioned_arg == "fuchsia"),
+      "Library '$library_name' has an unexpected combination of stability ('$stable'), versioned ('$fidlc_versioned_arg'), SDK inclusion ('$has_non_excluded_sdk_category'),  publishable ('$is_sdk_included_publishable'), compatibility testing requirements ('$requires_compatibility_tests'), and `testonly` ('$_is_test_only').")
 
   fidl_ir(compilation_target_name) {
     forward_variables_from(invoker, invoker_variables_to_forward_to_fidl_ir)
@@ -171,11 +312,9 @@ template("fidl_library") {
     fidl_library_name = library_name
     gen_dir = target_gen_dir
     json_representation = fidl_ir_json
+    versioned = fidlc_versioned_arg
     if (!defined(available)) {
       available = [ "fuchsia:$fidl_target_api_levels" ]
-    }
-    if (defined(fidlc_versioned_arg)) {
-      versioned = fidlc_versioned_arg
     }
   }
 
@@ -420,10 +559,7 @@ template("fidl_library") {
 
     # Ignore the FIDL libraries that are only present in private versions of
     # the SDK as they don't have the same versioning constraints.
-    target_dir = get_label_info(main_target_name, "dir")
-    is_vendor_library =
-        string_replace(target_dir, "//vendor/", "") != target_dir
-    if (!is_vendor_library && defined(invoker.sdk_category) &&
+    if (!is_unversioned_vendor_sdk && defined(invoker.sdk_category) &&
         invoker.sdk_category == "partner") {
       deps += [ "//sdk/fidl:sdk_fidl_partner_allowlist" ]
     }
