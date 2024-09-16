@@ -702,11 +702,7 @@ impl<'a> Decoder<'a> {
         };
         let handle_info = mem::replace(
             next_handle,
-            HandleInfo {
-                handle: Handle::invalid(),
-                object_type: ObjectType::NONE,
-                rights: Rights::NONE,
-            },
+            HandleInfo::new(Handle::invalid(), ObjectType::NONE, Rights::NONE),
         );
         let handle =
             self.consume_handle_info(handle_info, expected_object_type, expected_rights)?;
@@ -722,11 +718,7 @@ impl<'a> Decoder<'a> {
         };
         drop(mem::replace(
             next_handle,
-            HandleInfo {
-                handle: Handle::invalid(),
-                object_type: ObjectType::NONE,
-                rights: Rights::NONE,
-            },
+            HandleInfo::new(Handle::invalid(), ObjectType::NONE, Rights::NONE),
         ));
         self.next_handle += 1;
         Ok(())
@@ -3320,11 +3312,7 @@ mod test {
                 Decoder::decode_with_context::<EmptyPayload>(
                     ctx,
                     &[],
-                    &mut [HandleInfo {
-                        handle: Handle::invalid(),
-                        object_type: ObjectType::NONE,
-                        rights: Rights::NONE,
-                    }],
+                    &mut [HandleInfo::new(Handle::invalid(), ObjectType::NONE, Rights::NONE,)],
                     &mut ()
                 ),
                 Err(Error::ExtraHandles)

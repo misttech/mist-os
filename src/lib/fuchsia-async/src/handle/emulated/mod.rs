@@ -753,7 +753,7 @@ impl Channel {
             let h_raw = handle.raw_handle();
             let ty = get_hdl_type(h_raw).expect("Bad handle");
             let rights = get_hdl_rights(h_raw).expect("Bad handle");
-            HandleInfo { handle, object_type: ty.object_type(), rights }
+            HandleInfo::new(handle, ty.object_type(), rights)
         }));
         Poll::Ready(Ok(()))
     }
@@ -1276,11 +1276,7 @@ impl MessageBufEtc {
             } else {
                 Some(std::mem::replace(
                     handle_info,
-                    HandleInfo {
-                        handle: Handle::invalid(),
-                        object_type: ObjectType::NONE,
-                        rights: Rights::NONE,
-                    },
+                    HandleInfo::new(Handle::invalid(), ObjectType::NONE, Rights::NONE),
                 ))
             }
         })
@@ -1604,9 +1600,16 @@ pub struct HandleInfo {
     pub object_type: ObjectType,
     /// The rights of the handle.
     pub rights: Rights,
+
+    _unused: u32,
 }
 
 impl HandleInfo {
+    /// Make a `HandleInfo` from its constituent parts.
+    pub const fn new(handle: Handle, object_type: ObjectType, rights: Rights) -> Self {
+        Self { handle, object_type, rights, _unused: 0 }
+    }
+
     /// # Safety
     ///
     /// See [`Handle::from_raw`] for requirements about the validity and closing
@@ -1618,11 +1621,12 @@ impl HandleInfo {
     /// Note that while `raw.ty` _should_ correspond to the type of the handle,
     /// that this is not required for safety.
     pub const unsafe fn from_raw(raw: zx_types::zx_handle_info_t) -> HandleInfo {
-        HandleInfo {
-            handle: Handle::from_raw(raw.handle),
-            object_type: ObjectType(raw.ty),
-            rights: Rights::from_bits_retain(raw.rights),
-        }
+        HandleInfo::new(
+            // SAFETY: caller is responsible for preventing double-closure of the handle.
+            unsafe { Handle::from_raw(raw.handle) },
+            ObjectType(raw.ty),
+            Rights::from_bits_retain(raw.rights),
+        )
     }
 }
 

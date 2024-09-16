@@ -201,15 +201,14 @@ impl Channel {
         let opts = 0;
         unsafe {
             let raw_handle = self.raw_handle();
-            let mut zx_handle_infos: [MaybeUninit<sys::zx_handle_info_t>;
-                sys::ZX_CHANNEL_MAX_MSG_HANDLES as usize] = MaybeUninit::uninit().assume_init();
             let mut actual_bytes = 0;
             let mut actual_handle_infos = 0;
             let status = ok(sys::zx_channel_read_etc(
                 raw_handle,
                 opts,
                 bytes.as_mut_ptr(),
-                zx_handle_infos.as_mut_ptr() as *mut sys::zx_handle_info_t,
+                // These types have identical layouts.
+                handle_infos.as_mut_ptr() as *mut sys::zx_handle_info_t,
                 bytes.len() as u32,
                 handle_infos.len() as u32,
                 &mut actual_bytes,
@@ -218,20 +217,7 @@ impl Channel {
             if status == Err(Status::BUFFER_TOO_SMALL) {
                 Err((actual_bytes as usize, actual_handle_infos as usize))
             } else {
-                Ok((
-                    status.map(|()| {
-                        for i in 0..actual_handle_infos as usize {
-                            std::mem::swap(
-                                &mut handle_infos[i],
-                                &mut MaybeUninit::new(HandleInfo::from_raw(
-                                    zx_handle_infos[i].assume_init(),
-                                )),
-                            );
-                        }
-                    }),
-                    actual_bytes as usize,
-                    actual_handle_infos as usize,
-                ))
+                Ok((status, actual_bytes as usize, actual_handle_infos as usize))
             }
         }
     }
@@ -445,6 +431,8 @@ impl Channel {
         handle_dispositions: &mut [HandleDisposition<'_>],
         buf: &mut MessageBufEtc,
     ) -> Result<(), Status> {
+        buf.clear();
+
         let write_num_bytes: u32 = bytes.len().try_into().map_err(|_| Status::OUT_OF_RANGE)?;
         let write_num_handle_dispositions: u32 =
             handle_dispositions.len().try_into().map_err(|_| Status::OUT_OF_RANGE)?;
@@ -460,47 +448,43 @@ impl Channel {
                 std::mem::replace(&mut handle_dispositions[i], HandleDisposition::invalid());
             zx_handle_dispositions[i].write(handle_disposition.into_raw());
         }
-        buf.clear();
+
         let read_num_bytes: u32 = buf.bytes.capacity().try_into().unwrap_or(u32::MAX);
-        let read_num_handle_infos: u32 = buf.handle_infos.capacity().try_into().unwrap_or(u32::MAX);
-        let mut zx_handle_infos: [std::mem::MaybeUninit<sys::zx_handle_info_t>;
-            sys::ZX_CHANNEL_MAX_MSG_HANDLES as usize] =
-            unsafe { std::mem::MaybeUninit::uninit().assume_init() };
+        buf.ensure_capacity_handle_infos(sys::ZX_CHANNEL_MAX_MSG_HANDLES as usize);
+
         let mut args = sys::zx_channel_call_etc_args_t {
             wr_bytes: bytes.as_ptr(),
             wr_handles: zx_handle_dispositions.as_mut_ptr() as *mut sys::zx_handle_disposition_t,
             rd_bytes: buf.bytes.as_mut_ptr(),
-            rd_handles: zx_handle_infos.as_mut_ptr() as *mut sys::zx_handle_info_t,
+            rd_handles: buf.handle_infos.as_mut_ptr() as *mut sys::zx_handle_info_t,
             wr_num_bytes: write_num_bytes,
             wr_num_handles: write_num_handle_dispositions,
             rd_num_bytes: read_num_bytes,
-            rd_num_handles: read_num_handle_infos,
+            rd_num_handles: buf.handle_infos.capacity() as u32,
         };
         let mut actual_read_bytes: u32 = 0;
         let mut actual_read_handle_infos: u32 = 0;
         let options = 0;
-        let status = unsafe {
-            Status::from_raw(sys::zx_channel_call_etc(
+
+        // SAFETY: args contains pointers that are valid to write to for the provided lengths.
+        unsafe {
+            ok(sys::zx_channel_call_etc(
                 self.raw_handle(),
                 options,
                 timeout.into_nanos(),
                 &mut args,
                 &mut actual_read_bytes,
                 &mut actual_read_handle_infos,
-            ))
+            ))?
         };
+
+        // SAFETY: the kernel has initialized these slices with valid values.
         unsafe {
-            buf.ensure_capacity_handle_infos(actual_read_handle_infos as usize);
-            for i in 0..actual_read_handle_infos as usize {
-                buf.handle_infos.push(HandleInfo::from_raw(zx_handle_infos[i].assume_init()));
-            }
             buf.bytes.set_len(actual_read_bytes as usize);
+            buf.handle_infos.set_len(actual_read_handle_infos as usize);
         }
-        if Status::OK == status {
-            Ok(())
-        } else {
-            Err(status)
-        }
+
+        Ok(())
     }
 }
 
@@ -701,6 +685,7 @@ impl MessageBufEtc {
                         handle: Handle::invalid(),
                         object_type: ObjectType::NONE,
                         rights: Rights::NONE,
+                        _unused: 0,
                     },
                 ))
             }

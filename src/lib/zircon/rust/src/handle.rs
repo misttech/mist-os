@@ -535,32 +535,41 @@ impl HandleDisposition<'_> {
 }
 
 /// Information on handles that were read.
-/// Based on zx_handle_info_t.
+///
+/// ABI-compatible with zx_handle_info_t.
 #[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 #[repr(C)]
 pub struct HandleInfo {
     pub handle: Handle,
     pub object_type: ObjectType,
     pub rights: Rights,
+
+    // Necessary for ABI compatibility with zx_handle_info_t.
+    pub(crate) _unused: u32,
 }
 
+static_assertions::assert_eq_size!(HandleInfo, sys::zx_handle_info_t);
+
 impl HandleInfo {
+    /// Make a new `HandleInfo`.
+    pub const fn new(handle: Handle, object_type: ObjectType, rights: Rights) -> Self {
+        Self { handle, object_type, rights, _unused: 0 }
+    }
+
     /// # Safety
     ///
     /// See [`Handle::from_raw`] for requirements about the validity and closing
     /// of `raw.handle`.
     ///
-    /// `raw.rights` must be a bitwise combination of one or more [`Rights`]
-    /// with no additional bits set.
-    ///
     /// Note that while `raw.ty` _should_ correspond to the type of the handle,
     /// that this is not required for safety.
     pub const unsafe fn from_raw(raw: sys::zx_handle_info_t) -> HandleInfo {
-        HandleInfo {
-            handle: Handle::from_raw(raw.handle),
-            object_type: ObjectType(raw.ty),
-            rights: Rights::from_bits_retain(raw.rights),
-        }
+        HandleInfo::new(
+            // SAFETY: invariants to not double-close are upheld by the caller.
+            unsafe { Handle::from_raw(raw.handle) },
+            ObjectType(raw.ty),
+            Rights::from_bits_retain(raw.rights),
+        )
     }
 }
 
