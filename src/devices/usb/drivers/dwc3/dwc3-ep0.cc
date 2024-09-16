@@ -206,12 +206,12 @@ zx::result<size_t> Dwc3::HandleEp0Setup(const usb_setup_t& setup, void* buffer, 
                               uint8_t* out_buf, size_t out_len) -> zx::result<size_t> {
     fbl::AutoLock lock(&dci_lock_);
 
-    if (!dci_intf_.has_value()) {
+    if (!dci_intf_valid()) {
       return zx::error(ZX_ERR_BAD_STATE);
     }
 
     size_t actual = 0;
-    zx_status_t status = dci_intf_->Control(&setup, in_buf, in_len, out_buf, out_len, &actual);
+    zx_status_t status = DciIntfWrapControl(&setup, in_buf, in_len, out_buf, out_len, &actual);
     if (status == ZX_OK) {
       return zx::ok(actual);
     } else {

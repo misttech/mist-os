@@ -5,6 +5,7 @@
 #ifndef SRC_DEVICES_USB_DRIVERS_DWC3_DWC3_H_
 #define SRC_DEVICES_USB_DRIVERS_DWC3_DWC3_H_
 
+#include <fidl/fuchsia.hardware.usb.dci/cpp/fidl.h>
 #include <lib/ddk/io-buffer.h>
 #include <lib/device-protocol/pdev-fidl.h>
 #include <lib/mmio/mmio.h>
@@ -12,6 +13,7 @@
 #include <lib/zx/result.h>
 
 #include <array>
+#include <variant>
 
 #include <ddktl/device.h>
 #include <fbl/auto_lock.h>
@@ -29,9 +31,12 @@ namespace dwc3 {
 class Dwc3;
 using Dwc3Type = ddk::Device<Dwc3, ddk::Initializable, ddk::Unbindable>;
 
-class Dwc3 : public Dwc3Type, public ddk::UsbDciProtocol<Dwc3, ddk::base_protocol> {
+class Dwc3 : public Dwc3Type,
+             public ddk::UsbDciProtocol<Dwc3, ddk::base_protocol>,
+             public fidl::Server<fuchsia_hardware_usb_dci::UsbDci> {
  public:
   explicit Dwc3(zx_device_t* parent) : Dwc3Type(parent) {}
+
   static zx_status_t Create(void* ctx, zx_device_t* parent);
 
   // Device protocol implementation.
@@ -50,7 +55,50 @@ class Dwc3 : public Dwc3Type, public ddk::UsbDciProtocol<Dwc3, ddk::base_protoco
   size_t UsbDciGetRequestSize();
   zx_status_t UsbDciCancelAll(uint8_t ep_address);
 
+  // fuchsia_hardware_usb_dci::UsbDci protocol implementation.
+  void ConnectToEndpoint(ConnectToEndpointRequest& request,
+                         ConnectToEndpointCompleter::Sync& completer) override {
+    // TODO(b/350802129) Enable the endpoint servers.
+    //
+    // Currently, the Endpoint protocol is not enabled for this driver. The FIDL frontend is
+    // otherwise functional, but requests still need to go through banjo's RequestQueue() method.
+    completer.Reply(fit::as_error(ZX_ERR_NOT_SUPPORTED));
+  }
+
+  void SetInterface(SetInterfaceRequest& request, SetInterfaceCompleter::Sync& completer) override;
+
+  void ConfigureEndpoint(ConfigureEndpointRequest& request,
+                         ConfigureEndpointCompleter::Sync& completer) override;
+
+  void DisableEndpoint(DisableEndpointRequest& request,
+                       DisableEndpointCompleter::Sync& completer) override;
+
+  void EndpointSetStall(EndpointSetStallRequest& request,
+                        EndpointSetStallCompleter::Sync& completer) override;
+
+  void EndpointClearStall(EndpointClearStallRequest& request,
+                          EndpointClearStallCompleter::Sync& completer) override;
+
+  void CancelAll(CancelAllRequest& request, CancelAllCompleter::Sync& completer) override;
+
+  void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_hardware_usb_dci::UsbDci> metadata,
+                             fidl::UnknownMethodCompleter::Sync& completer) override { /* no-op */ }
+
  private:
+  // For the purposes of banjo->FIDL migration.
+  zx_status_t CommonSetInterface();
+  zx_status_t CommonConfigureEndpoint(const usb_endpoint_descriptor_t* ep_desc,
+                                      const usb_ss_ep_comp_descriptor_t* ss_comp_desc);
+  zx_status_t CommonDisableEndpoint(uint8_t ep_addr);
+  zx_status_t CommonEndpointSetStall(uint8_t ep_addr);
+  zx_status_t CommonEndpointClearStall(uint8_t ep_addr);
+  zx_status_t CommonCancelAll(uint8_t ep_addr);
+  void DciIntfWrapSetSpeed(usb_speed_t speed) TA_REQ(dci_lock_);
+  void DciIntfWrapSetConnected(bool connected) TA_REQ(dci_lock_);
+  zx_status_t DciIntfWrapControl(const usb_setup_t* setup, const uint8_t* write_buffer,
+                                 size_t write_size, uint8_t* read_buffer, size_t read_size,
+                                 size_t* read_actual) TA_REQ(dci_lock_);
+
   static inline const uint32_t kEventBufferSize = zx_system_get_page_size();
 
   // physical endpoint numbers.  We use 0 and 1 for EP0, and let the device-mode
@@ -314,7 +362,19 @@ class Dwc3 : public Dwc3Type, public ddk::UsbDciProtocol<Dwc3, ddk::base_protoco
 
   ddk::PDevFidl pdev_;
 
-  TA_GUARDED(dci_lock_) std::optional<ddk::UsbDciInterfaceProtocolClient> dci_intf_;
+  using DciInterfaceBanjoClient = ddk::UsbDciInterfaceProtocolClient;
+  using DciInterfaceFidlClient = fidl::WireSyncClient<fuchsia_hardware_usb_dci::UsbDciInterface>;
+
+  std::variant<std::monostate, DciInterfaceBanjoClient, DciInterfaceFidlClient> dci_intf_
+      TA_GUARDED(dci_lock_);
+
+  inline bool dci_intf_valid() const TA_REQ(dci_lock_) {
+    return std::visit(
+        [](auto&& val) {  // True if the value is not of the monostate variant.
+          return !std::is_same_v<std::decay_t<decltype(val)>, std::monostate>;
+        },
+        dci_intf_);
+  }
 
   std::optional<ddk::MmioBuffer> mmio_;
 
