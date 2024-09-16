@@ -29,7 +29,7 @@ zx_status_t MockOS::GetKernelStats(fidl::WireSyncClient<fuchsia_kernel::Stats>* 
 
 zx_handle_t MockOS::ProcessSelf() { return TestUtils::kSelfHandle; }
 
-zx_time_t MockOS::GetMonotonic() { return clock_++; }
+zx_time_t MockOS::GetMonotonic() { return clock_; }
 
 zx_status_t MockOS::GetProcesses(
     fit::function<zx_status_t(int, zx::handle, zx_koid_t, zx_koid_t)> cb) {
@@ -142,7 +142,7 @@ void TestUtils::CreateCapture(Capture* capture, const CaptureTemplate& t, Captur
   for (const auto& process : t.processes) {
     capture->koid_to_process_.emplace(process.koid, process);
   }
-  capture->ReallocateDescendents(t.rooted_vmo_names);
+  CaptureMaker::ReallocateDescendents(t.rooted_vmo_names, capture->koid_to_vmo_);
 }
 
 // static.
@@ -154,17 +154,8 @@ std::vector<ProcessSummary> TestUtils::GetProcessSummaries(const Summary& summar
 }
 
 zx_status_t TestUtils::GetCapture(Capture* capture, CaptureLevel level, const OsResponses& r) {
-  return GetCapture(capture, level, r, std::make_unique<BaseCaptureStrategy>());
-}
-
-zx_status_t TestUtils::GetCapture(Capture* capture, CaptureLevel level, const OsResponses& r,
-                                  std::unique_ptr<CaptureStrategy> strategy) {
-  MockOS os(r);
-  CaptureState state;
-  zx_status_t ret = Capture::GetCaptureState(&state, os);
-  EXPECT_EQ(ZX_OK, ret);
-  return Capture::GetCapture(capture, state, level, std::move(strategy), os,
-                             Capture::kDefaultRootedVmoNames);
+  CaptureMaker capture_maker({}, std::make_unique<MockOS>(r));
+  return capture_maker.GetCapture(capture, level, Capture::kDefaultRootedVmoNames);
 }
 
 zx_status_t CaptureSupplier::GetCapture(Capture* capture, CaptureLevel level,

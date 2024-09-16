@@ -10,10 +10,8 @@
 
 #include "src/developer/memory/metrics/tests/test_utils.h"
 #include "src/lib/testing/loop_fixture/real_loop_fixture.h"
-#include "src/lib/testing/loop_fixture/test_loop_fixture.h"
 
-namespace memory {
-namespace test {
+namespace memory::test {
 
 using WatcherUnitTest = gtest::RealLoopFixture;
 
@@ -76,5 +74,4 @@ TEST_F(WatcherUnitTest, TwoHighs) {
   EXPECT_EQ(100U, high_waters.at(1).kmem().free_bytes);
 }
 
-}  // namespace test
-}  // namespace memory
+}  // namespace memory::test

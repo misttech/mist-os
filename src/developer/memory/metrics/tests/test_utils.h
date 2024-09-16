@@ -63,7 +63,7 @@ struct OsResponses {
 class CaptureSupplier {
  public:
   explicit CaptureSupplier(std::vector<CaptureTemplate> templates)
-      : templates_(std::move(templates)), index_(0) {}
+      : templates_(std::move(templates)) {}
 
   zx_status_t GetCapture(Capture* capture, CaptureLevel level,
                          bool use_capture_supplier_time = false);
@@ -71,7 +71,7 @@ class CaptureSupplier {
 
  private:
   std::vector<CaptureTemplate> templates_;
-  size_t index_;
+  size_t index_ = 0;
 };
 
 class MockOS : public OS {
@@ -120,8 +120,6 @@ class TestUtils {
   static void CreateCapture(Capture* capture, const CaptureTemplate& t,
                             CaptureLevel level = CaptureLevel::VMO);
   static zx_status_t GetCapture(Capture* capture, CaptureLevel level, const OsResponses& r);
-  static zx_status_t GetCapture(Capture* capture, CaptureLevel level, const OsResponses& r,
-                                std::unique_ptr<CaptureStrategy> strategy);
 
   // Sorted by koid.
   static std::vector<ProcessSummary> GetProcessSummaries(const Summary& summary);

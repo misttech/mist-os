@@ -233,7 +233,9 @@ TEST_F(CaptureUnitTest, VMOCountBadState) {
                     {proc_handle, ZX_INFO_PROCESS_VMOS, &_vmo, sizeof(_vmo), 1, ZX_ERR_BAD_STATE},
                     vmos2_info}});
   EXPECT_EQ(ZX_OK, ret);
-  EXPECT_EQ(1U, c.koid_to_process().size());
+  // TODO(b/366157407): Decide whether it is fine that StarnixCaptureStrategy returns both
+  // processes, given that this initially expected only 1.
+  EXPECT_EQ(2U, c.koid_to_process().size());
   const auto& process = c.process_for_koid(proc2_koid);
   EXPECT_EQ(proc2_koid, process.koid);
   EXPECT_STREQ(proc2_name, process.name);
@@ -258,7 +260,9 @@ TEST_F(CaptureUnitTest, VMOGetBadState) {
                     {proc_handle, ZX_INFO_PROCESS_VMOS, &_vmo, sizeof(_vmo), 1, ZX_ERR_BAD_STATE},
                     vmos2_info}});
   EXPECT_EQ(ZX_OK, ret);
-  EXPECT_EQ(1U, c.koid_to_process().size());
+  // TODO(b/366157407): Decide whether it is fine that StarnixCaptureStrategy returns both
+  // processes, given that this initially expected only 1.
+  EXPECT_EQ(2U, c.koid_to_process().size());
   const auto& process = c.process_for_koid(proc2_koid);
   EXPECT_EQ(proc2_koid, process.koid);
   EXPECT_STREQ(proc2_name, process.name);

@@ -14,6 +14,7 @@
 #include <src/cobalt/bin/testing/stub_metric_event_logger.h>
 
 #include "lib/fpromise/result.h"
+#include "src/developer/memory/metrics/capture_strategy.h"
 #include "src/developer/memory/monitor/monitor.h"
 #include "src/lib/testing/loop_fixture/test_loop_fixture.h"
 
@@ -108,9 +109,10 @@ class MockLoggerFactory : public ::fuchsia::metrics::testing::MetricEventLoggerF
 class MemoryBandwidthInspectTest : public gtest::TestLoopFixture {
  public:
   MemoryBandwidthInspectTest()
-      : monitor_(std::make_unique<Monitor>(context_provider_.TakeContext(), fxl::CommandLine{},
-                                           dispatcher(), false, false, false,
-                                           memory_monitor_config::Config{})),
+      : monitor_(std::make_unique<Monitor>(
+            context_provider_.TakeContext(), fxl::CommandLine{}, dispatcher(), false, false, false,
+            memory_monitor_config::Config{},
+            memory::CaptureMaker::Create(CreateDefaultOS()).value())),
         executor_(dispatcher()),
         ram_binding_(&fake_device_),
         logger_factory_(new MockLoggerFactory()) {
