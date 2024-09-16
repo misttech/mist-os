@@ -6,7 +6,7 @@ use crate::identity::ComponentIdentity;
 use crate::logs::stats::LogStreamStats;
 use anyhow::Result;
 use bstr::{BStr, ByteSlice};
-use diagnostics_data::{LogsData, Severity};
+use diagnostics_data::{LegacySeverity, LogsData, Severity};
 use diagnostics_log_encoding::encode::{
     Encoder, EncoderOpts, EncodingError, MutableBuffer, RecordEvent, WriteEventParams,
 };
@@ -28,9 +28,19 @@ pub struct StoredMessage {
 
 impl StoredMessage {
     pub fn new(buf: Box<[u8]>, stats: &Arc<LogStreamStats>) -> Option<Self> {
-        match diagnostics_message::parse_basic_structured_info(&buf) {
+        match diagnostics_log_encoding::parse::basic_info(&buf) {
             Ok((timestamp, severity)) => {
-                Some(StoredMessage { bytes: buf, severity, timestamp, stats: Arc::clone(stats) })
+                let transcoded_i32 = i8::from_le_bytes(severity.to_le_bytes()) as i32;
+                let Ok(severity) = LegacySeverity::try_from(transcoded_i32) else {
+                    stats.increment_invalid(buf.len());
+                    return None;
+                };
+                Some(StoredMessage {
+                    bytes: buf,
+                    severity: severity.into(),
+                    timestamp,
+                    stats: Arc::clone(stats),
+                })
             }
             _ => {
                 stats.increment_invalid(buf.len());

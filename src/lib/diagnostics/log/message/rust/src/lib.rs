@@ -301,31 +301,3 @@ impl fx_log_packet_t {
             .for_each(|(i, x)| *x = bytes[i].try_into().unwrap());
     }
 }
-
-pub fn parse_basic_structured_info(
-    bytes: &[u8],
-) -> Result<(zx::MonotonicTime, Severity), MessageError> {
-    let (record, _) = diagnostics_log_encoding::parse::parse_record(bytes)?;
-
-    let mut severity_untrusted = None;
-    for a in record.arguments {
-        let label = LogsField::from(a.name);
-        match (a.value, label) {
-            (Value::SignedInt(v), LogsField::RawSeverity) => {
-                severity_untrusted = Some(v);
-                break;
-            }
-            _ => {}
-        }
-    }
-    let raw_severity = if severity_untrusted.is_some() {
-        let transcoded_i32: i32 = severity_untrusted.unwrap().to_string().parse().unwrap();
-        LegacySeverity::try_from(transcoded_i32)?
-    } else {
-        // Cast from the u8 to i8 since verbosity is signed
-        let transcoded_i32 = i8::from_le_bytes(record.severity.to_le_bytes()) as i32;
-        LegacySeverity::try_from(transcoded_i32)?
-    };
-    let (severity, _) = raw_severity.for_structured();
-    Ok((zx::MonotonicTime::from_nanos(record.timestamp), severity))
-}
