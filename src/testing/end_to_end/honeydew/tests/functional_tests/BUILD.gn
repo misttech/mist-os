@@ -180,12 +180,12 @@ group_with_no_dir_target_deps("starnix_arm64_unstable_tests") {
     "transport_tests/test_fastboot:fastboot_test_fc($host_toolchain)",
     "transport_tests/test_fastboot:fastboot_using_serial_test($host_toolchain)",
     "transport_tests/test_ffx:ffx_wait_for_rcs_disconnection_test_fc($host_toolchain)",
+    "transport_tests/test_ffx:test_ffx_on_vim3",
     "transport_tests/test_serial:serial_test($host_toolchain)",
 
     # These tests fail so we explicitly comment them out here for posterity.
     # TODO(https://fxbug.dev/364744544): Fix/remove once consensus is reached.
     # "affordance_tests/test_tracing:tracing_test_fc($host_toolchain)",
-    # "transport_tests/test_ffx:test_ffx_on_vim3",
   ]
 }
 

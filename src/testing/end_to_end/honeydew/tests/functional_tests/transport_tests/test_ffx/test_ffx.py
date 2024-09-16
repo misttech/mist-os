@@ -101,6 +101,12 @@ class FFXTransportTests(fuchsia_base_test.FuchsiaBaseTest):
 
     def test_ffx_run_test_component(self) -> None:
         """Test case for FFX.run_test_component()."""
+        # Skip test if run on non-eng images.
+        asserts.skip_if(
+            "core/test_manager"
+            not in self.device.ffx.run(["component", "list"]),
+            "Test manager component is not present",
+        )
         output: str = self.device.ffx.run_test_component(
             "fuchsia-pkg://fuchsia.com/hello-world-rust-tests#meta/hello-world-rust-tests.cm",
         )
