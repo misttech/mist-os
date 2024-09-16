@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 // DEPRECATED: This library is being replaced. Do not add new dependencies
 // to this interface.
-
+@available(added=HEAD)
 library fuchsia.scheduler.deprecated;
 
 using zx;

@@ -1,6 +1,7 @@
 // Copyright 2024 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+@available(added=HEAD)
 library fuchsia.fdomain;
 
 // A handle ID. This is the same size as an actual Zircon handle, and refers to
