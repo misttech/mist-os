@@ -76,21 +76,33 @@ template("fidl_library") {
 
   main_target_name = target_name
 
-  is_sdk_included =
+  # Whether an SDK category other than "excluded" was specified.
+  # It does not actually indicate whether the library is included in any SDK.
+  has_non_excluded_sdk_category =
       defined(invoker.sdk_category) && invoker.sdk_category != "excluded"
+
+  # Included libraries require compatibility tests unless they are in one of the
+  # categories that isn't really included in the Core IDK in any way.
+  requires_compatibility_tests =
+      has_non_excluded_sdk_category && invoker.sdk_category != "internal" &&
+      invoker.sdk_category != "experimental"
+
+  # All publishable libraries must have compatibility tests.
+  # All such libraries are publishable except for those in partner_internal.
   is_sdk_included_publishable =
-      is_sdk_included && invoker.sdk_category != "internal" &&
-      invoker.sdk_category != "experimental" &&
-      invoker.sdk_category != "partner_internal"
-  requires_compatibility_tests = is_sdk_included_publishable ||
-                                 (defined(invoker.sdk_category) &&
-                                  invoker.sdk_category == "partner_internal")
+      requires_compatibility_tests && invoker.sdk_category != "partner_internal"
+
+  # Vendor SDK libraries are are `is_sdk_included_publishable` but not in the
+  # "fuchsia" namespace and not intended to be compaitibility tested. They
+  # specify "unversioned" so that they can be excluded here.
   if (defined(invoker.versioned) && invoker.versioned == "unversioned") {
-    # Vendor SDK libraries are are `is_sdk_included_publishable` but  not in the
-    # "fuchsia" namespace and not intended to be compaitibility tested. They
-    # specify "unversioned" so that they can be excluded here.
+    assert(invoker.sdk_category == "partner")
     requires_compatibility_tests = false
+    is_sdk_included_publishable = true
   }
+
+  # TODO(https://fxbug.dev/325669391): Remove when used in an upcoming CL.
+  not_needed([ "is_sdk_included_publishable" ])
 
   stable = defined(invoker.stable) && invoker.stable
 
@@ -425,7 +437,7 @@ template("fidl_library") {
     }
   }
 
-  if (is_sdk_included) {
+  if (has_non_excluded_sdk_category) {
     sdk_category = invoker.sdk_category
     if (stable) {
       api_reference = "$library_name.api"
@@ -554,7 +566,7 @@ template("fidl_library") {
         }
       }
     }
-  } else {  # is_sdk_included
+  } else {  # has_non_excluded_sdk_category
     not_needed(invoker, [ "sdk_area" ])
     not_needed([ "sdk_atom_deps" ])
   }
