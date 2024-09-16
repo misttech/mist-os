@@ -280,10 +280,13 @@ where
     }
 }
 
-impl Sampler<u64> for Max<u64> {
+impl<T> Sampler<T> for Max<T>
+where
+    T: Ord + Copy + Num,
+{
     type Error = OverflowError;
 
-    fn fold(&mut self, sample: u64) -> Result<(), Self::Error> {
+    fn fold(&mut self, sample: T) -> Result<(), Self::Error> {
         self.max = Some(match self.max {
             Some(max) => cmp::max(max, sample),
             _ => sample,
@@ -292,10 +295,13 @@ impl Sampler<u64> for Max<u64> {
     }
 }
 
-impl Statistic for Max<u64> {
+impl<T> Statistic for Max<T>
+where
+    T: Ord + Copy + Zero + Num + NumCast + Default,
+{
     type Semantic = Gauge;
-    type Sample = u64;
-    type Aggregation = u64;
+    type Sample = T;
+    type Aggregation = T;
 
     fn reset(&mut self) {
         *self = Default::default();

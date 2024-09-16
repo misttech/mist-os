@@ -4,6 +4,8 @@
 
 mod simple8b_rle;
 mod uncompressed;
+mod zigzag_simple8b_rle;
 
 pub(crate) use simple8b_rle::Simple8bRleRingBuffer;
 pub(crate) use uncompressed::UncompressedRingBuffer;
+pub(crate) use zigzag_simple8b_rle::ZigzagSimple8bRleRingBuffer;

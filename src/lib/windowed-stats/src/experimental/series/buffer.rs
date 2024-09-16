@@ -8,7 +8,9 @@ use num::Unsigned;
 use std::io::{self, Write};
 use tracing::warn;
 
-use crate::experimental::ring_buffer::{Simple8bRleRingBuffer, UncompressedRingBuffer};
+use crate::experimental::ring_buffer::{
+    Simple8bRleRingBuffer, UncompressedRingBuffer, ZigzagSimple8bRleRingBuffer,
+};
 use crate::experimental::series::interpolation::Interpolation;
 use crate::experimental::series::statistic::Aggregation;
 use crate::experimental::series::SamplingInterval;
@@ -140,24 +142,28 @@ where
     }
 }
 
-// TODO(https://fxbug.dev/352614791): Implement ZigZagSimple8bRle ring buffer
-/// A ring buffer that stores signed integer items using zig-zag, Simple8B, and run length
-/// encoding.
 #[derive(Clone, Debug)]
-pub struct ZigZagSimple8bRle;
+pub struct ZigzagSimple8bRle(ZigzagSimple8bRleRingBuffer);
 
-impl<A> RingBuffer<A> for ZigZagSimple8bRle
+impl<A> RingBuffer<A> for ZigzagSimple8bRle
 where
     A: Into<i64>,
 {
     fn with_capacity(capacity: usize) -> Self {
-        warn!("ZigZagSimple8bRle ring buffer is unimplemented. No data will be stored.");
-        let _ = capacity;
-        ZigZagSimple8bRle
+        let ring_buffer = ZigzagSimple8bRleRingBuffer::with_min_samples(capacity);
+        ZigzagSimple8bRle(ring_buffer)
     }
 
     fn buffer_type() -> RingBufferType {
         RingBufferType::Simple8bRle(Simple8bRleSubtype::SignedZigzagEncoded)
+    }
+
+    fn push(&mut self, item: A) {
+        self.0.push(item.into());
+    }
+
+    fn serialize(&self, mut write: impl Write) -> io::Result<()> {
+        self.0.serialize(&mut write)
     }
 }
 
@@ -231,6 +237,16 @@ mod tests {
         buffer.push(22u64);
         let mut data = vec![];
         let result = RingBuffer::<u64>::serialize(&buffer, &mut data);
+        assert!(result.is_ok());
+        assert!(!data.is_empty());
+    }
+
+    #[test]
+    fn zigzag_simple8b_rle_buffer() {
+        let mut buffer = <ZigzagSimple8bRle as RingBuffer<i64>>::with_capacity(2);
+        buffer.push(22i64);
+        let mut data = vec![];
+        let result = RingBuffer::<i64>::serialize(&buffer, &mut data);
         assert!(result.is_ok());
         assert!(!data.is_empty());
     }

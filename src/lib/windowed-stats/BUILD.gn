@@ -35,6 +35,7 @@ rustc_library("windowed-stats") {
     "src/experimental/ring_buffer/mod.rs",
     "src/experimental/ring_buffer/simple8b_rle.rs",
     "src/experimental/ring_buffer/uncompressed.rs",
+    "src/experimental/ring_buffer/zigzag_simple8b_rle.rs",
     "src/experimental/series/buffer.rs",
     "src/experimental/series/interpolation.rs",
     "src/experimental/series/interval.rs",

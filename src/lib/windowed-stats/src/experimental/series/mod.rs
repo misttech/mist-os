@@ -23,7 +23,7 @@ use crate::experimental::clock::{
 };
 use crate::experimental::series::buffer::{
     Buffer, BufferStrategy, DeltaSimple8bRle, DeltaZigZagSimple8bRle, RingBuffer, Simple8bRle,
-    Uncompressed, ZigZagSimple8bRle,
+    Uncompressed, ZigzagSimple8bRle,
 };
 use crate::experimental::series::interpolation::{
     Constant, Interpolation, InterpolationFor, InterpolationState, LastAggregation, LastSample,
@@ -143,7 +143,7 @@ where
 }
 
 impl BufferStrategy<i64, Constant> for Gauge {
-    type Buffer = ZigZagSimple8bRle;
+    type Buffer = ZigzagSimple8bRle;
 }
 
 impl BufferStrategy<i64, LastAggregation> for Gauge {
@@ -776,6 +776,61 @@ mod tests {
                 1,    // number of values in last block
                 0x0f, // RLE selector
                 42, 0, 0, 0, 0, 0, 1, 0, // value 42 appears 1 time
+                7, 0, // series 2: length in bytes
+                60, 0, // series 2 granularity: 60s
+                0, 0, // number of selector elements and value blocks
+                0, 0, // head selector index
+                0, // number of values in last block
+            ]
+        );
+    }
+
+    #[test]
+    fn time_matrix_with_zigzag_simple8b_rle_buffer() {
+        let exec = fasync::TestExecutor::new_with_fake_time();
+        exec.set_fake_time(fasync::Time::from_nanos(3_000_000_000));
+        let mut time_matrix = TimeMatrix::<Max<i64>, Constant>::new(
+            SamplingProfile::highly_granular(),
+            Constant::default(),
+        );
+        let buffer = time_matrix.interpolate_and_get_buffers(Timestamp::now()).unwrap();
+        assert_eq!(
+            buffer.data,
+            vec![
+                1, // version number
+                3, 0, 0, 0, // created timestamp
+                3, 0, 0, 0, // last timestamp
+                1, 1, // type: simple8b RLE; subtype: signed (zigzag encoded)
+                7, 0, // series 1: length in bytes
+                10, 0, // series 1 granularity: 10s
+                0, 0, // number of selector elements and value blocks
+                0, 0, // head selector index
+                0, // number of values in last block
+                7, 0, // series 2: length in bytes
+                60, 0, // series 2 granularity: 60s
+                0, 0, // number of selector elements and value blocks
+                0, 0, // head selector index
+                0, // number of values in last block
+            ]
+        );
+
+        time_matrix.fold(TimedSample::now(-2)).unwrap();
+        exec.set_fake_time(fasync::Time::from_nanos(10_000_000_000));
+        let buffer = time_matrix.interpolate_and_get_buffers(Timestamp::now()).unwrap();
+        assert_eq!(
+            buffer.data,
+            vec![
+                1, // version number
+                3, 0, 0, 0, // created timestamp
+                10, 0, 0, 0, // last timestamp
+                1, 1, // type: simple8b RLE; subtype: signed (zigzag encoded)
+                16, 0, // series 1: length in bytes
+                10, 0, // series 1 granularity: 10s
+                1, 0, // number of selector elements and value blocks
+                0, 0,    // head selector index
+                1,    // number of values in last block
+                0x0f, // RLE selector
+                3, 0, 0, 0, 0, 0, 1, 0, // value -2 (encoded as 3) appears 1 time
                 7, 0, // series 2: length in bytes
                 60, 0, // series 2 granularity: 60s
                 0, 0, // number of selector elements and value blocks
