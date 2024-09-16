@@ -14,14 +14,26 @@ _user_basic = "//build/toolchain/zircon:user.basic_$current_cpu"
 # Compiler ABI, this will do generic variant selection as if it were a
 # loadable_module() target.
 #
-# In the user.basic environment, a "$target_name.select" target is also defined
-# that's used to perform variant selection.
+# In the user.basic environment only, a "$target_name.select" target is also
+# defined that's used to perform variant selection.  When $select is true, the
+# main target always just redirects to this target in the user.basic toolchain.
+# (The `.select` subtarget is not available directly in other toolchains.)
 #
 # Parameters
 #
 #   * public_deps
 #     - Required: This is a list of plain labels (no toolchain)
 #     - Type: list(label_without_toolchain)
+#
+#   * fuchsia
+#     - Optional: Always use the user.basic (Fuchsia) target, even on Linux.
+#     - Type: bool
+#     - Default: false
+#
+#   * select
+#     - Optional: Always do variant selection.
+#     - Type: bool
+#     - Default: false
 #
 #   * exclude_toolchain_tags
 #     - Optional: Used by variant selection.  See variant_target().
@@ -31,6 +43,9 @@ _user_basic = "//build/toolchain/zircon:user.basic_$current_cpu"
 #     - Optional: Usual GN meanings.
 #
 template("user_basic_redirect") {
+  select = defined(invoker.select) && invoker.select
+  always_fuchsia = defined(invoker.fuchsia) && invoker.fuchsia
+
   excluded = false
   if (defined(invoker.exclude_toolchain_tags)) {
     excluded = toolchain_variant.tags + invoker.exclude_toolchain_tags -
@@ -41,22 +56,41 @@ template("user_basic_redirect") {
   no_abi = toolchain_variant.tags + [ "no-compiler-abi" ] -
            [ "no-compiler-abi" ] != toolchain_variant.tags
 
-  if (!excluded && no_abi) {
-    # This is already a basic machine ABI compatible toolchain.
-    assert(!needs_abi)
-    group_deps = invoker.public_deps
-    deps_tc = ""
-  } else if (!excluded && !needs_abi) {
-    # The current variant doesn't require the compiler ABI, so the same variant
-    # should work in the user.basic environment too.
-    group_deps = invoker.public_deps
-    deps_tc = _user_basic + toolchain_variant.suffix
-  } else {
+  if (!always_fuchsia && is_linux) {
+    # For Linux tests, the equivalent of user.basic is the linux_$cpu toolchain
+    # (as opposed to the host toolchain).
+    no_abi = !is_host
+    needs_abi = is_host
+    _user_basic = "//build/toolchain:linux_$current_cpu"
+  }
+
+  if (excluded) {
+    select = true
+  }
+  if (!no_abi) {
+    select = true
+  }
+  if (needs_abi) {
+    select = true
+  }
+
+  if (select) {
     # The current variant won't work in user.basic so redirect to the primary
     # user.basic toolchain and do variant selection there.
     group_deps = [ ":$target_name.select" ]
     deps_tc = _user_basic
     not_needed(invoker, [ "public_deps" ])
+  } else if (no_abi) {
+    # This is already a basic machine ABI compatible toolchain.
+    assert(!needs_abi)
+    group_deps = invoker.public_deps
+    deps_tc = ""
+  } else {
+    # The current variant doesn't require the compiler ABI, so the same variant
+    # should work in the user.basic environment too.
+    assert(!needs_abi)
+    group_deps = invoker.public_deps
+    deps_tc = _user_basic + toolchain_variant.suffix
   }
 
   if (deps_tc != "") {
@@ -89,7 +123,8 @@ template("user_basic_redirect") {
     }
   }
 
-  if (toolchain_environment == "user.basic") {
+  if ("${toolchain_environment}_${current_cpu}" ==
+      get_label_info(_user_basic, "name")) {
     # When user_basic_redirect() is evaluated in an incompatible toolchain it
     # will redirect to this target to do generic variant selection in the right
     # environment context.

@@ -49,7 +49,7 @@ template("hermetic_source_set") {
   libs_target = "_hermetic_source_set.$target_name.libs"
   hermetic_target = "_hermetic_source_set.$target_name.hermetic"
   link_output_name = "$target_name.link"
-  link_rspfile = "$target_gen_dir/$link_output_name.link.rsp"
+  link_rspfile = "$target_gen_dir/$link_output_name.rsp"
   hermetic_output_file = "$target_out_dir/$target_name.o"
 
   undefined_symbols = []
@@ -186,7 +186,7 @@ template("hermetic_source_set") {
       link_output_dir = "$output_dir/exe.unstripped"
     } else {
       link_output_dir = output_dir
-      output_file += ".debug"
+      output_file += zircon_toolchain.link_output_suffix
     }
     metadata = {
       link_output_barrier = []
@@ -268,8 +268,8 @@ template("hermetic_source_set") {
 }
 
 _add_configs = [
+  "//build/config:standalone",
   "//build/config/zircon:no-synthetic-sections",
-  "//build/config/zircon:nolibc",
   "//build/config/zircon:static-libc++",
   "//build/config:symbol_no_undefined",
 ]

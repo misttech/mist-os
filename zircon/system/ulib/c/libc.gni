@@ -228,6 +228,9 @@ template("libc_source_set") {
   basic_abi = defined(invoker.basic_abi) && invoker.basic_abi
   need_redirect = basic_abi && toolchain_variant.tags + [ "no-compiler-abi" ] -
                                [ "no-compiler-abi" ] == toolchain_variant.tags
+  if (is_linux) {
+    need_redirect = basic_abi && is_host
+  }
 
   # The secondary .export target compiles the same functions but with an
   # explicit use of the config to define LLVM_LIBC_FUNCTION for export in the

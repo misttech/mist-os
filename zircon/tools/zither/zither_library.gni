@@ -719,11 +719,13 @@ template("_zither_legacy_syscall_cdecl_sources") {
   }
 
   user_basic_redirect(main_target) {
+    select = true
     forward_variables_from(invoker,
                            [
                              "testonly",
                              "visibility",
                            ])
+    fuchsia = true
     public_deps = [ ":$headers_target" ]
   }
 }

@@ -444,7 +444,7 @@ foreach(in_process,
     ]
 
     if (in_process != ".module") {
-      public_configs += [ "//sdk/lib/ld:abi-interp" ]
+      public_deps += [ "//sdk/lib/ld:startup" ]
       if (is_fuchsia) {
         if (in_process == "") {
           sources += [ "zircon-test-start.cc" ]

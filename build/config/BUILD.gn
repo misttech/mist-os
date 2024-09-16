@@ -1576,3 +1576,21 @@ config("crel") {
     asmflags = cflags
   }
 }
+
+# This should be used by executables that avoid the normal libc dependencies.
+# These must also omit toolchain-provided instrumentation runtimes that will
+# themselves depend on libc.
+config("standalone") {
+  configs = [ "//build/config/zircon:nolibc" ]
+
+  ldflags = []
+  if (!is_gcc) {
+    # The sanitizer runtimes need libc ABIs that aren't provided here.
+    ldflags += [ "-fno-sanitize-link-runtime" ]
+
+    # The standard profiling runtime can't be used in standalone contexts.  The
+    # instrumentation works fine to collect data, and //src/lib/llvm-profdata
+    # can be used to wire up a custom runtime if possible in context.
+    ldflags += [ "-noprofilelib" ]
+  }
+}

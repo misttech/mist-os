@@ -53,9 +53,15 @@ if (current_toolchain == default_toolchain) {
       }
 
       # userboot can't use any instrumentation runtimes.
-      exclude_variant_tags = [ "instrumented" ]
+      exclude_variant_tags = [
+        "instrumented",
+        "needs-compiler-abi",
+        "needs-writable-globals",
+        "uses-shadow",
+      ]
 
       toolchain_tags = [
+        "no-compiler-abi",
         "no-floating-point",
         "standalone",
       ]
