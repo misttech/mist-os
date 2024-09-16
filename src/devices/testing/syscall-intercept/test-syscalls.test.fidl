@@ -6,6 +6,7 @@
 /// that serves the `Control` protocol.
 ///
 /// Use by connecting to [Control].
+@available(added=HEAD)
 library fuchsia.test.syscalls;
 
 using zx;

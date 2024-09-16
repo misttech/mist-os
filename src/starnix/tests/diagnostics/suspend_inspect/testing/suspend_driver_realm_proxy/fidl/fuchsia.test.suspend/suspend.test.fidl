@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 /// Suspend test realm library.
+@available(added=HEAD)
 library fuchsia.test.suspend;
 
 /// Used to create a test realm for suspend.  Keep the connection open

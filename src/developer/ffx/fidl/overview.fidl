@@ -12,4 +12,5 @@
 /// This library also covers the FFX tracing service, which is for running trace
 /// readouts on a Fuchsia target. For more information/usage examples, see the
 /// FFX trace plugin.
+@available(added=HEAD)
 library fuchsia.developer.ffx;
