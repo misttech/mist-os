@@ -18,8 +18,6 @@ pub mod stored_message;
 #[cfg(test)]
 pub mod testing;
 
-pub use debuglog::{convert_debuglog_to_log_message, KernelDebugLog};
-
 #[cfg(test)]
 mod tests {
     use crate::identity::ComponentIdentity;
@@ -98,6 +96,10 @@ mod tests {
                         last_timestamp: AnyProperty,
                         sockets_closed: 1u64,
                         sockets_opened: 1u64,
+                        invalid: {
+                            number: 0u64,
+                            bytes: 0u64,
+                        },
                         total: {
                             number: 5u64,
                             bytes: AnyProperty,
@@ -176,6 +178,10 @@ mod tests {
                             last_timestamp: AnyProperty,
                             sockets_closed: 1u64,
                             sockets_opened: 1u64,
+                            invalid: {
+                                number: 0u64,
+                                bytes: 0u64,
+                            },
                             total: {
                                 number: 1u64,
                                 bytes: AnyProperty,
@@ -214,6 +220,10 @@ mod tests {
                             last_timestamp: AnyProperty,
                             sockets_closed: 1u64,
                             sockets_opened: 1u64,
+                            invalid: {
+                                number: 0u64,
+                                bytes: 0u64,
+                            },
                             total: {
                                 number: 1u64,
                                 bytes: AnyProperty,
@@ -628,6 +638,10 @@ mod tests {
                         last_timestamp: AnyProperty,
                         sockets_closed: 0u64,
                         sockets_opened: 0u64,
+                        invalid: {
+                            number: 0u64,
+                            bytes: 0u64,
+                        },
                         total: {
                             number: 3u64,
                             bytes: AnyProperty,

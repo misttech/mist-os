@@ -105,7 +105,7 @@ impl Sink {
                 metatags: std::iter::empty(),
                 pid: PROCESS_ID.with(|p| *p),
                 tid: THREAD_ID.with(|t| *t),
-                dropped: previously_dropped,
+                dropped: previously_dropped.into(),
             })
         });
     }
@@ -123,7 +123,7 @@ where
                 metatags: self.config.metatags.iter(),
                 pid: PROCESS_ID.with(|p| *p),
                 tid: THREAD_ID.with(|t| *t),
-                dropped: previously_dropped,
+                dropped: previously_dropped.into(),
             })
         });
     }

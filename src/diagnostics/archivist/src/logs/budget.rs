@@ -133,7 +133,7 @@ impl BudgetHandle {
 mod tests {
     use super::*;
     use crate::logs::multiplex::PinStream;
-    use crate::logs::stored_message::{GenericStoredMessage, StructuredStoredMessage};
+    use crate::logs::stored_message::StoredMessage;
     use crate::testing::TEST_IDENTITY;
     use diagnostics_data::{LogsData, Severity};
     use diagnostics_log_encoding::encode::{Encoder, EncoderOpts};
@@ -198,7 +198,7 @@ mod tests {
         assert_eq!(cursor.next().await, None);
     }
 
-    fn fake_message_bytes(timestamp: i64) -> GenericStoredMessage {
+    fn fake_message_bytes(timestamp: i64) -> StoredMessage {
         let record = Record {
             timestamp,
             severity: StreamSeverity::Debug.into_primitive(),
@@ -211,7 +211,7 @@ mod tests {
         let mut encoder = Encoder::new(&mut buffer, EncoderOpts::default());
         encoder.write_record(&record).unwrap();
         let encoded = &buffer.get_ref()[..buffer.position() as usize];
-        StructuredStoredMessage::create(encoded.to_vec(), Default::default())
+        StoredMessage::new(encoded.to_vec().into(), &Default::default()).unwrap()
     }
 
     fn fake_message(timestamp: i64) -> LogsData {

@@ -21,7 +21,7 @@ pub struct LogStreamStats {
     debug: LogCounter,
     trace: LogCounter,
     url: StringProperty,
-
+    invalid: LogCounter,
     inspect_node: Node,
 }
 
@@ -38,11 +38,16 @@ impl LogStreamStats {
         self.sockets_closed.add(1);
     }
 
-    pub fn increment_rolled_out<T: StoredMessage + ?Sized>(&self, msg: &T) {
+    pub fn increment_rolled_out(&self, msg: &StoredMessage) {
         self.rolled_out.count(msg);
     }
 
-    pub fn ingest_message<T: StoredMessage + ?Sized>(&self, msg: &T) {
+    pub fn increment_invalid(&self, bytes: usize) {
+        self.invalid.number.add(1);
+        self.invalid.bytes.add(bytes as u64);
+    }
+
+    pub fn ingest_message(&self, msg: &StoredMessage) {
         self.last_timestamp.set(msg.timestamp().into_nanos());
         self.total.count(msg);
         match msg.severity() {
@@ -65,7 +70,7 @@ struct LogCounter {
 }
 
 impl LogCounter {
-    fn count<T: StoredMessage + ?Sized>(&self, msg: &T) {
+    fn count(&self, msg: &StoredMessage) {
         self.number.add(1);
         self.bytes.add(msg.size() as u64);
     }

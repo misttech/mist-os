@@ -9,7 +9,6 @@ use crate::logs::budget::BudgetManager;
 use crate::logs::container::LogsArtifactsContainer;
 use crate::logs::debuglog::{DebugLog, DebugLogBridge, KERNEL_IDENTITY};
 use crate::logs::multiplex::{Multiplexer, MultiplexerHandle};
-use crate::logs::stored_message::StoredMessage;
 use crate::severity_filter::KlogSeverityFilter;
 use anyhow::format_err;
 use diagnostics_data::{LogsData, Severity};
@@ -147,13 +146,13 @@ impl LogsRepository {
             };
             messages.sort_by_key(|m| m.timestamp());
             for message in messages {
-                container.ingest_message(Box::new(message));
+                container.ingest_message(message);
             }
 
             let res = kernel_logger
                 .listen()
                 .try_for_each(|message| async {
-                    container.ingest_message(Box::new(message));
+                    container.ingest_message(message);
                     Ok(())
                 })
                 .await;
@@ -476,7 +475,7 @@ impl MultiplexerBroker {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::logs::stored_message::{GenericStoredMessage, StructuredStoredMessage};
+    use crate::logs::stored_message::StoredMessage;
     use diagnostics_log_encoding::encode::{Encoder, EncoderOpts};
     use diagnostics_log_encoding::{Argument, Record, Severity as StreamSeverity, Value};
     use fidl_fuchsia_logger::LogSinkMarker;
@@ -605,7 +604,7 @@ mod tests {
         assert_eq!(initial_interest.min_severity, expected_severity);
     }
 
-    fn make_message(msg: &str, timestamp: i64) -> GenericStoredMessage {
+    fn make_message(msg: &str, timestamp: i64) -> StoredMessage {
         let record = Record {
             timestamp,
             severity: StreamSeverity::Debug.into_primitive(),
@@ -619,6 +618,6 @@ mod tests {
         let mut encoder = Encoder::new(&mut buffer, EncoderOpts::default());
         encoder.write_record(&record).unwrap();
         let encoded = &buffer.get_ref()[..buffer.position() as usize];
-        StructuredStoredMessage::create(encoded.to_vec(), Default::default())
+        StoredMessage::new(encoded.to_vec().into(), &Default::default()).unwrap()
     }
 }

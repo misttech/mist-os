@@ -7,8 +7,7 @@
 use crate::identity::ComponentIdentity;
 use crate::logs::error::LogsError;
 use crate::logs::stats::LogStreamStats;
-use crate::logs::stored_message::DebugLogStoredMessage;
-use diagnostics_data::{BuilderArgs, LogsData, LogsDataBuilder, Severity};
+use crate::logs::stored_message::StoredMessage;
 use fidl::prelude::*;
 use fidl_fuchsia_boot::ReadOnlyLogMarker;
 use fuchsia_component::client::connect_to_protocol;
@@ -61,20 +60,23 @@ impl KernelDebugLog {
 
 pub struct DebugLogBridge<K: DebugLog> {
     debug_log: K,
+    next_sequence_id: u64,
     stats: Arc<LogStreamStats>,
 }
 
 impl<K: DebugLog> DebugLogBridge<K> {
     pub fn create(debug_log: K, stats: Arc<LogStreamStats>) -> Self {
-        DebugLogBridge { debug_log, stats }
+        DebugLogBridge { debug_log, stats, next_sequence_id: 0 }
     }
 
-    fn read_log(&mut self) -> Result<DebugLogStoredMessage, zx::Status> {
+    fn read_log(&mut self) -> Result<StoredMessage, zx::Status> {
         let record = self.debug_log.read()?;
-        Ok(DebugLogStoredMessage::new(record, Arc::clone(&self.stats)))
+        let dropped = record.sequence - self.next_sequence_id;
+        self.next_sequence_id = record.sequence + 1;
+        Ok(StoredMessage::from_debuglog(record, dropped, Arc::clone(&self.stats)))
     }
 
-    pub fn existing_logs(&mut self) -> Result<Vec<DebugLogStoredMessage>, zx::Status> {
+    pub fn existing_logs(&mut self) -> Result<Vec<StoredMessage>, zx::Status> {
         let mut result = vec![];
         loop {
             match self.read_log() {
@@ -86,7 +88,7 @@ impl<K: DebugLog> DebugLogBridge<K> {
         Ok(result)
     }
 
-    pub fn listen(self) -> impl Stream<Item = Result<DebugLogStoredMessage, zx::Status>> {
+    pub fn listen(self) -> impl Stream<Item = Result<StoredMessage, zx::Status>> {
         unfold((true, self), move |(mut is_readable, mut klogger)| async move {
             loop {
                 if !is_readable {
@@ -107,147 +109,12 @@ impl<K: DebugLog> DebugLogBridge<K> {
     }
 }
 
-/// Parses a raw debug log read from the kernel.  Returns the parsed message and
-/// its size in memory on success, and None if parsing fails.
-pub fn convert_debuglog_to_log_message(record: &zx::DebugLogRecord) -> Option<LogsData> {
-    let mut contents = record.data().to_string();
-    if let Some(b'\n') = contents.bytes().last() {
-        contents.pop();
-    }
-
-    // TODO(https://fxbug.dev/42108144): Once we support structured logs we won't need this
-    // hack to match a string in klogs.
-    const MAX_STRING_SEARCH_SIZE: usize = 100;
-    let last = contents
-        .char_indices()
-        .nth(MAX_STRING_SEARCH_SIZE)
-        .map(|(i, _)| i)
-        .unwrap_or(contents.len());
-
-    // Don't look beyond the 100th character in the substring to limit the cost
-    // of the substring search operation.
-    let early_contents = &contents[..last];
-
-    let severity = match record.severity {
-        zx::DebugLogSeverity::Trace => Severity::Trace,
-        zx::DebugLogSeverity::Debug => Severity::Debug,
-        zx::DebugLogSeverity::Warn => Severity::Warn,
-        zx::DebugLogSeverity::Error => Severity::Error,
-        zx::DebugLogSeverity::Fatal => Severity::Fatal,
-        _ => {
-            // By default `zx_log_record_t` carry INFO severity. Since `zx_debuglog_write` doesn't
-            // support setting a severity, historically logs have been tagged and annotated with
-            // their severity in the message. If we get here attempt to use the severity in the
-            // message, otherwise fallback to INFO.
-            if early_contents.contains("ERROR:") {
-                Severity::Error
-            } else if early_contents.contains("WARNING:") {
-                Severity::Warn
-            } else {
-                Severity::Info
-            }
-        }
-    };
-
-    Some(
-        LogsDataBuilder::new(BuilderArgs {
-            timestamp_nanos: record.timestamp.into(),
-            component_url: Some(KERNEL_IDENTITY.url.clone()),
-            moniker: KERNEL_IDENTITY.moniker.clone(),
-            severity,
-        })
-        .set_pid(record.pid.raw_koid())
-        .set_tid(record.tid.raw_koid())
-        .add_tag("klog".to_string())
-        .set_dropped(0)
-        .set_message(contents)
-        .build(),
-    )
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::logs::stored_message::StoredMessage;
     use crate::logs::testing::*;
-
-    use fidl_fuchsia_diagnostics as fdiagnostics;
-    use fidl_fuchsia_logger::LogMessage;
+    use diagnostics_data::{BuilderArgs, LogsDataBuilder, Severity};
     use futures::stream::{StreamExt, TryStreamExt};
-
-    #[fuchsia::test]
-    fn convert_debuglog_to_log_message_test() {
-        let klog = TestDebugEntry::new("test log".as_bytes());
-        let data = convert_debuglog_to_log_message(&klog.record).unwrap();
-        assert_eq!(
-            data,
-            LogsDataBuilder::new(BuilderArgs {
-                timestamp_nanos: klog.record.timestamp.into(),
-                component_url: Some(KERNEL_IDENTITY.url.clone()),
-                moniker: KERNEL_IDENTITY.moniker.clone(),
-                severity: Severity::Info,
-            })
-            .set_pid(klog.record.pid.raw_koid())
-            .set_tid(klog.record.tid.raw_koid())
-            .add_tag("klog")
-            .set_message("test log".to_string())
-            .build()
-        );
-        // make sure the `klog` tag still shows up for legacy listeners
-        let log_message: LogMessage = data.into();
-        assert_eq!(
-            log_message,
-            LogMessage {
-                pid: klog.record.pid.raw_koid(),
-                tid: klog.record.tid.raw_koid(),
-                time: klog.record.timestamp.into_nanos(),
-                severity: fdiagnostics::Severity::Info.into_primitive() as i32,
-                dropped_logs: 0,
-                tags: vec!["klog".to_string()],
-                msg: "test log".to_string(),
-            }
-        );
-
-        // maximum allowed klog size
-        let klog = TestDebugEntry::new(&vec![b'a'; zx::sys::ZX_LOG_RECORD_DATA_MAX]);
-        let data = convert_debuglog_to_log_message(&klog.record).unwrap();
-        assert_eq!(
-            data,
-            LogsDataBuilder::new(BuilderArgs {
-                timestamp_nanos: klog.record.timestamp.into(),
-                component_url: Some(KERNEL_IDENTITY.url.clone()),
-                moniker: KERNEL_IDENTITY.moniker.clone(),
-                severity: Severity::Info,
-            })
-            .set_pid(klog.record.pid.raw_koid())
-            .set_tid(klog.record.tid.raw_koid())
-            .add_tag("klog")
-            .set_message(String::from_utf8(vec![b'a'; zx::sys::ZX_LOG_RECORD_DATA_MAX]).unwrap())
-            .build()
-        );
-
-        // empty message
-        let klog = TestDebugEntry::new(&[]);
-        let data = convert_debuglog_to_log_message(&klog.record).unwrap();
-        assert_eq!(
-            data,
-            LogsDataBuilder::new(BuilderArgs {
-                timestamp_nanos: klog.record.timestamp.into(),
-                component_url: Some(KERNEL_IDENTITY.url.clone()),
-                moniker: KERNEL_IDENTITY.moniker.clone(),
-                severity: Severity::Info,
-            })
-            .set_pid(klog.record.pid.raw_koid())
-            .set_tid(klog.record.tid.raw_koid())
-            .add_tag("klog")
-            .set_message("".to_string())
-            .build()
-        );
-
-        // invalid utf-8
-        let klog = TestDebugEntry::new(b"\x00\x9f\x92");
-        assert_eq!(convert_debuglog_to_log_message(&klog.record).unwrap().msg().unwrap(), "\x00��");
-    }
 
     #[fuchsia::test]
     fn logger_existing_logs_test() {

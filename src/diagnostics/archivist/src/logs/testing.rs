@@ -23,6 +23,7 @@ use futures::prelude::*;
 use std::collections::VecDeque;
 use std::io::Cursor;
 use std::marker::PhantomData;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Weak};
 use validating_log_listener::{validate_log_dump, validate_log_stream};
 use {
@@ -486,9 +487,10 @@ pub const TEST_KLOG_TID: u64 = 0xbe02u64;
 
 impl TestDebugEntry {
     pub fn new(log_data: &[u8]) -> Self {
+        static NEXT_SEQUENCE: AtomicU64 = AtomicU64::new(0);
         let mut rec = zx::sys::zx_log_record_t::default();
         let len = rec.data.len().min(log_data.len());
-        rec.sequence = 0;
+        rec.sequence = NEXT_SEQUENCE.fetch_add(1, Ordering::Relaxed);
         rec.datalen = len as u16;
         rec.flags = TEST_KLOG_FLAGS;
         rec.timestamp = TEST_KLOG_TIMESTAMP;
