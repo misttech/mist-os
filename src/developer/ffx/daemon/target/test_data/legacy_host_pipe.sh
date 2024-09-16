@@ -6,7 +6,7 @@ set -e
 
 # Test script to respond as a legacyhost pipe that does not support abi revision
 
-# Expected command line: "-F none -o CheckHostIP=no -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ServerAliveInterval=1 -o ServerAliveCountMax=10 -o LogLevel=ERROR -i /some/path/fuchsia_ed25519 -p 22 192.168.1.1 remote_control_runner --circuit 7561919583897036558 --abi-revision 692809671562192090\n"
+# Expected command line: "-F none -o CheckHostIP=no -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ServerAliveInterval=1 -o ServerAliveCountMax=20 -o LogLevel=ERROR -i /some/path/fuchsia_ed25519 -p 22 192.168.1.1 remote_control_runner --circuit 7561919583897036558 --abi-revision 692809671562192090\n"
 
 # Read args. Skip ones that are not important.
 REMOTE_CONTROL_RUNNER="remote_control_runner"
