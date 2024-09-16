@@ -622,7 +622,9 @@ impl<I: IpExt> DatagramSocketExternalData<I> {
     ) {
         // TODO(https://fxbug.dev/326102014): Store `UdpPacketMeta` in `AvailableMessage`.
         let UdpPacketMeta { src_ip, src_port, dst_ip, dst_port, .. } = meta;
-        self.message_queue.lock().receive(AvailableMessage {
+
+        // NB: Perform the expensive tasks before taking the message queue lock.
+        let message = AvailableMessage {
             interface_id: device_id.bindings_id().id,
             source_addr: src_ip,
             source_port: src_port.map_or(0, NonZeroU16::get),
@@ -630,7 +632,8 @@ impl<I: IpExt> DatagramSocketExternalData<I> {
             destination_port: dst_port.get(),
             timestamp: fasync::Time::now(),
             data: body.as_ref().to_vec(),
-        })
+        };
+        self.message_queue.lock().receive(message);
     }
 }
 
@@ -1047,7 +1050,8 @@ impl<I: IpExt> DatagramSocketExternalData<I> {
         data: B,
     ) {
         debug!("Received ICMP echo reply in binding: {:?}, id: {id}", I::VERSION);
-        self.message_queue.lock().receive(AvailableMessage {
+        // NB: Perform the expensive tasks before taking the message queue lock.
+        let message = AvailableMessage {
             source_addr: src_ip,
             source_port: 0,
             interface_id: device.bindings_id().id,
@@ -1055,7 +1059,8 @@ impl<I: IpExt> DatagramSocketExternalData<I> {
             destination_port: id,
             timestamp: fasync::Time::now(),
             data: data.as_ref().to_vec(),
-        })
+        };
+        self.message_queue.lock().receive(message);
     }
 }
 

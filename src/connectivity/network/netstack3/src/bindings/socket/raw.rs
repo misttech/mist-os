@@ -74,7 +74,9 @@ impl<I: IpExt> SocketState<I> {
     }
 
     fn enqueue_rx_packet<B: ByteSlice>(&self, packet: &I::Packet<B>, device: WeakDeviceId) {
-        self.rx_queue.lock().receive(ReceivedIpPacket::new::<B>(packet, device))
+        // NB: Perform the expensive tasks before taking the message queue lock.
+        let packet = ReceivedIpPacket::new::<B>(packet, device);
+        self.rx_queue.lock().receive(packet);
     }
 
     fn dequeue_rx_packet(&self) -> Option<ReceivedIpPacket<I>> {
