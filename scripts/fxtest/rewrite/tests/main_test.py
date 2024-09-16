@@ -163,7 +163,7 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
             self.test_list_input
         )
         m = mock.AsyncMock(return_value=test_list_entries)
-        patch = mock.patch("main.generate_test_list", m)
+        patch = mock.patch("main.AsyncMain._generate_test_list", m)
         patch.start()
         self.addCleanup(patch.stop)
         return m
