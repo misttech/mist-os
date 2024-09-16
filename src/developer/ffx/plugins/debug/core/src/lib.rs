@@ -51,7 +51,7 @@ impl FfxMain for CoreTool {
             }
         };
 
-        let zxdb_path = self.sdk.get_host_tool("zxdb")?;
+        let zxdb_path = ffx_config::get_host_tool(&self.sdk, "zxdb").await?;
         let mut args = vec!["--core=".to_owned() + &minidump];
         args.extend(self.cmd.zxdb_args);
 

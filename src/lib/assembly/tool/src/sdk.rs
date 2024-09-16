@@ -35,9 +35,7 @@ impl SdkToolProvider {
 
 impl ToolProvider for SdkToolProvider {
     fn get_tool(&self, name: &str) -> Result<Box<dyn Tool>> {
-        let path = self
-            .sdk
-            .get_host_tool(name.as_ref())
+        let path = block_on(ffx_config::get_host_tool(&self.sdk, name.as_ref()))
             .context(format!("Getting host tool from the SDK: {}", name))?;
         self.get_tool_with_path(path)
     }

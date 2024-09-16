@@ -30,7 +30,7 @@ impl FfxMain for SymbolizeTool {
             eprintln!("ensure_symbol_index_registered failed, error was: {:#?}", e);
         }
 
-        let symbolizer_path = sdk.get_host_tool("symbolizer")?;
+        let symbolizer_path = ffx_config::get_host_tool(&sdk, "symbolizer").await?;
         let mut args = self.cmd.symbolizer_args;
         if self.cmd.auth {
             args.push("--auth".to_owned());

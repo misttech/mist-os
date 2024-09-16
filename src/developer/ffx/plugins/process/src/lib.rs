@@ -237,7 +237,9 @@ async fn write_symbolized_stack_traces(mut w: Writer, stack_trace: String) -> Re
         tracing::warn!("ensure_symbol_index_registered failed, error was: {:#?}", e);
     }
 
-    let path = sdk.get_host_tool("symbolizer").context("getting symbolizer binary path")?;
+    let path = ffx_config::get_host_tool(&sdk, "symbolizer")
+        .await
+        .context("getting symbolizer binary path")?;
     let mut cmd = Command::new(path)
         .args(vec![
             "--symbol-server",
