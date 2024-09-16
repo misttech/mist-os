@@ -448,9 +448,6 @@ impl VfsDirectory for BlobDirectory {
                     MutableConnection::create,
                 )
             } else {
-                tracing::error!(
-                    "Tried to open a blob via open(). Use the BlobCreator or BlobReader instead."
-                );
                 Err(Status::NOT_SUPPORTED)
             }
         });
@@ -472,10 +469,7 @@ impl VfsDirectory for BlobDirectory {
                     MutableConnection::create,
                 )
             } else {
-                tracing::error!(
-                    "Tried to open a blob via open(). Use the BlobCreator or BlobReader instead."
-                );
-                return Err(Status::NOT_SUPPORTED);
+                Err(Status::NOT_SUPPORTED)
             }
         });
         Ok(())
