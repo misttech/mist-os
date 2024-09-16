@@ -6,6 +6,16 @@ import("//build/python/python_host_test.gni")
 import("//build/testing/host_test_data.gni")
 
 if (is_host) {
+  host_test_data("wakeup_metrics_processor_test_data") {
+    sources = [
+      "data/wakeup_metrics_processor/many_wakeups.json",
+      "data/wakeup_metrics_processor/one_wakeup.json",
+      "data/wakeup_metrics_processor/zero_wakeups.json",
+    ]
+
+    outputs = [ "${target_out_dir}/runtime_deps/wakeup_metrics_processor/{{source_file_part}}" ]
+  }
+
   host_test_data("trace_importing_test_data") {
     sources = [
       "data/chrome_metadata.json",
@@ -48,6 +58,13 @@ if (is_host) {
     enable_mypy = true
     main_source = "power_metrics_test.py"
     libraries = [ "//src/performance/lib/trace_processing" ]
+  }
+
+  python_host_test("wakeup_metrics_test") {
+    enable_mypy = true
+    main_source = "wakeup_metrics_test.py"
+    libraries = [ "//src/performance/lib/trace_processing" ]
+    deps = [ ":wakeup_metrics_processor_test_data" ]
   }
 
   python_host_test("trace_importing_test") {
@@ -94,5 +111,6 @@ group("tests") {
     ":trace_metrics_test($host_toolchain)",
     ":trace_model_test($host_toolchain)",
     ":trace_utils_test($host_toolchain)",
+    ":wakeup_metrics_test($host_toolchain)",
   ]
 }
