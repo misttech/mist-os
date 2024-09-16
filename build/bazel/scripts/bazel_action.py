@@ -267,18 +267,52 @@ def copy_writable(src: str, dst: str) -> None:
     make_writable(dst)
 
 
-def copy_directory(src_path: str, dst_path: str) -> None:
-    """Copy directory from |src_path| to |dst_path|."""
+def copy_directory_if_changed(
+    src_dir: str, dst_dir: str, tracked_files: List[str]
+) -> None:
+    """Copy directory from |src_path| to |dst_path| if |tracked_files| have different mtimes.
+
+    NOTE this function deliberately uses __mtime__, instead of content, of
+    tracked_files to determine whether directories need a re-copy. This follows
+    the convention many tools used in the build are using, where they use mtime
+    of a file as a proxy for the freshness of a directory, because Ninja only
+    understands timestamps.
+
+    See http://b/365838961 for details.
+    """
     assert os.path.isdir(
-        src_path
+        src_dir
     ), "{} is not a dir, but copy dir is called.".format(src_path)
-    if os.path.lexists(dst_path):
-        shutil.rmtree(dst_path)
-    shutil.copytree(src_path, dst_path, copy_function=copy_writable)
+
+    def all_tracked_files_unchanged(
+        src_dir: str, dst_dir: str, tracked_files: List[str]
+    ) -> bool:
+        """Use __mtime__ to determine whether any tracke file has changed.
+
+        Returns true iff mtimes of tracked files are identical in src_dir and
+        dst_dir.
+        """
+        for tracked_file in tracked_files:
+            dst_tracked_file = os.path.join(dst_dir, tracked_file)
+            if not os.path.exists(dst_tracked_file):
+                return False
+            src_tracked_file = os.path.join(src_dir, tracked_file)
+            if os.path.getmtime(src_tracked_file) != os.path.getmtime(
+                dst_tracked_file
+            ):
+                return False
+        return True
+
+    if all_tracked_files_unchanged(src_dir, dst_dir, tracked_files):
+        return
+
+    if os.path.lexists(dst_dir):
+        shutil.rmtree(dst_dir)
+    shutil.copytree(src_dir, dst_dir, copy_function=copy_writable)
     # Make directories writable so their contents can be removed and
     # repopulated in incremental builds.
-    make_writable(dst_path)
-    for root, dirs, _ in os.walk(dst_path):
+    make_writable(dst_dir)
+    for root, dirs, _ in os.walk(dst_dir):
         for d in dirs:
             make_writable(os.path.join(root, d))
 
@@ -1316,7 +1350,7 @@ def main() -> int:
             if not os.path.isfile(tracked_file):
                 invalid_tracked_files.append(tracked_file)
         dst_path = dir_output.ninja_path
-        dir_copies.append((src_path, dst_path))
+        dir_copies.append((src_path, dst_path, dir_output.tracked_files))
 
         if dir_output.copy_debug_symbols:
             bazel_execroot = find_bazel_execroot(args.workspace_dir)
@@ -1344,8 +1378,12 @@ def main() -> int:
         )
         return 1
 
-    for src_path, dst_path in dir_copies:
-        copy_directory(src_path, dst_path)
+    for src_path, dst_path, tracked_files in dir_copies:
+        copy_directory_if_changed(src_path, dst_path, tracked_files)
+
+    # Drop tracked_files from dir_copies so it can be concatenated with
+    # file_copies later.
+    dir_copies = [(src, dst) for src, dst, _ in dir_copies]
 
     if args.path_mapping:
         # When determining source path of the copied output, follow links to get
