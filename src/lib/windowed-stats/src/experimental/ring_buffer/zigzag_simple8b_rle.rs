@@ -30,7 +30,7 @@ impl ZigzagSimple8bRleRingBuffer {
     /// Push a new value onto the ZigzagSimple8bRleRingBuffer. This might evict
     /// one or more oldest values in the process.
     pub fn push(&mut self, value: i64) {
-        self.buffer.push(zigzag_encode(value))
+        self.buffer.push(zigzag_encode(value));
     }
 }
 
