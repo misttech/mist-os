@@ -144,6 +144,7 @@ if (current_os == "linux") {
 if (is_fuchsia) {
   static_library("static-pie") {
     sources = [ "fuchsia-static-pie.cc" ]
+    public = [ "fuchsia-static-pie.h" ]
     deps = [
       "..",
       "//src/zircon/lib/zircon",
