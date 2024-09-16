@@ -36,6 +36,10 @@ impl DefineSubsystemConfiguration<Option<BuildInfoConfig>> for BuildInfoSubsyste
                 source: build_info.minimum_utc_stamp.clone().into(),
                 destination: "minimum-utc-stamp".into(),
             })?;
+            dir.entry(FileEntry {
+                source: context.get_resource("version.txt"),
+                destination: "platform_version".into(),
+            })?;
         }
         Ok(())
     }

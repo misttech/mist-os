@@ -4171,6 +4171,7 @@ assembly_resources_directory("resources") {
   sources = [
     "//src/developer/memory/buckets/buckets.json",
     "//src/sys/core/core_component_id_index.json5",
+    build_info_files.version,
 
     # Platform configs for the component_manager config.
     "//src/security/policy/component_manager_policy.json5",
@@ -4198,7 +4199,10 @@ assembly_resources_directory("resources") {
     "//src/media/audio/meta/multizone_leader.core_shard.cml.template",
     "//src/media/audio/meta/multizone_leader.core_shard_eng.cml",
   ]
-  deps = [ "//src/lib/icu/tzdata:revision" ]
+  deps = [
+    "//build/info:version",
+    "//src/lib/icu/tzdata:revision",
+  ]
 }
 
 # Sets a low timeout for rebooting when the device runs out-of-memory.
