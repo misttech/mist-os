@@ -6,7 +6,7 @@ mod filter;
 mod opts;
 mod ser;
 
-use anyhow::{Context as _, Error};
+use anyhow::{anyhow, Context as _, Error};
 use ffx_writer::ToolIO as _;
 use fidl_fuchsia_net_stack_ext::{self as fstack_ext, FidlReturn as _};
 use futures::{FutureExt as _, StreamExt as _, TryFutureExt as _, TryStreamExt as _};
@@ -66,6 +66,7 @@ pub trait ServiceConnector<S: fidl::endpoints::ProtocolMarker> {
 pub trait NetCliDepsConnector:
     ServiceConnector<fdebug::InterfacesMarker>
     + ServiceConnector<froot::InterfacesMarker>
+    + ServiceConnector<froot::FilterMarker>
     + ServiceConnector<fdhcp::Server_Marker>
     + ServiceConnector<ffilter_deprecated::FilterMarker>
     + ServiceConnector<finterfaces::StateMarker>
@@ -85,6 +86,7 @@ pub trait NetCliDepsConnector:
 impl<O> NetCliDepsConnector for O where
     O: ServiceConnector<fdebug::InterfacesMarker>
         + ServiceConnector<froot::InterfacesMarker>
+        + ServiceConnector<froot::FilterMarker>
         + ServiceConnector<fdhcp::Server_Marker>
         + ServiceConnector<ffilter_deprecated::FilterMarker>
         + ServiceConnector<finterfaces::StateMarker>
@@ -458,7 +460,7 @@ async fn do_if<C: NetCliDepsConnector>(
                     .map_err(anyhow::Error::new)
                     .and_then(|res| {
                         res.map_err(|e: finterfaces_admin::ControlGetConfigurationError| {
-                            anyhow::anyhow!("{:?}", e)
+                            anyhow!("{:?}", e)
                         })
                     })
                     .context("get configuration")?;
@@ -487,7 +489,7 @@ async fn do_if<C: NetCliDepsConnector>(
                     .map_err(anyhow::Error::new)
                     .and_then(|res| {
                         res.map_err(|e: finterfaces_admin::ControlSetConfigurationError| {
-                            anyhow::anyhow!("{:?}", e)
+                            anyhow!("{:?}", e)
                         })
                     })
                     .context("set configuration")?;
@@ -510,7 +512,7 @@ async fn do_if<C: NetCliDepsConnector>(
                     .map_err(anyhow::Error::new)
                     .and_then(|res| {
                         res.map_err(|e: finterfaces_admin::ControlGetConfigurationError| {
-                            anyhow::anyhow!("{:?}", e)
+                            anyhow!("{:?}", e)
                         })
                     })
                     .context("get configuration")?;
@@ -539,7 +541,7 @@ async fn do_if<C: NetCliDepsConnector>(
                     .map_err(anyhow::Error::new)
                     .and_then(|res| {
                         res.map_err(|e: finterfaces_admin::ControlSetConfigurationError| {
-                            anyhow::anyhow!("{:?}", e)
+                            anyhow!("{:?}", e)
                         })
                     })
                     .context("set configuration")?;
@@ -562,7 +564,7 @@ async fn do_if<C: NetCliDepsConnector>(
                     .map_err(anyhow::Error::new)
                     .and_then(|res| {
                         res.map_err(|e: finterfaces_admin::ControlGetConfigurationError| {
-                            anyhow::anyhow!("{:?}", e)
+                            anyhow!("{:?}", e)
                         })
                     })
                     .context("get configuration")?;
@@ -584,7 +586,7 @@ async fn do_if<C: NetCliDepsConnector>(
                     .map_err(anyhow::Error::new)
                     .and_then(|res| {
                         res.map_err(|e: finterfaces_admin::ControlSetConfigurationError| {
-                            anyhow::anyhow!("{:?}", e)
+                            anyhow!("{:?}", e)
                         })
                     })
                     .context("set configuration")?;
@@ -606,9 +608,7 @@ async fn do_if<C: NetCliDepsConnector>(
                 .await
                 .map_err(anyhow::Error::new)
                 .and_then(|res| {
-                    res.map_err(|e: finterfaces_admin::ControlEnableError| {
-                        anyhow::anyhow!("{:?}", e)
-                    })
+                    res.map_err(|e: finterfaces_admin::ControlEnableError| anyhow!("{:?}", e))
                 })
                 .context("error enabling interface")?;
             if did_enable {
@@ -625,9 +625,7 @@ async fn do_if<C: NetCliDepsConnector>(
                 .await
                 .map_err(anyhow::Error::new)
                 .and_then(|res| {
-                    res.map_err(|e: finterfaces_admin::ControlDisableError| {
-                        anyhow::anyhow!("{:?}", e)
-                    })
+                    res.map_err(|e: finterfaces_admin::ControlDisableError| anyhow!("{:?}", e))
                 })
                 .context("error disabling interface")?;
             if did_disable {
@@ -673,7 +671,7 @@ async fn do_if<C: NetCliDepsConnector>(
                     .await
                     .context("error after adding address")?
                     .ok_or_else(|| {
-                        anyhow::anyhow!(
+                        anyhow!(
                             "Address assignment state stream unexpectedly ended \
                                  before reaching Assigned or Unavailable state. \
                                  This is probably a bug."
@@ -704,7 +702,7 @@ async fn do_if<C: NetCliDepsConnector>(
                         .map_err(anyhow::Error::new)
                         .and_then(|res| {
                             res.map_err(|e: finterfaces_admin::ControlRemoveAddressError| {
-                                anyhow::anyhow!("{:?}", e)
+                                anyhow!("{:?}", e)
                             })
                         })
                         .context("call remove address")?
@@ -1305,7 +1303,7 @@ async fn do_neigh<C: NetCliDepsConnector>(
                     .map_err(anyhow::Error::new)
                     .and_then(|res| {
                         res.map_err(|e: finterfaces_admin::ControlGetConfigurationError| {
-                            anyhow::anyhow!("{:?}", e)
+                            anyhow!("{:?}", e)
                         })
                     })
                     .context("get configuration")?;
@@ -1351,7 +1349,7 @@ async fn do_neigh<C: NetCliDepsConnector>(
                     .map_err(anyhow::Error::new)
                     .and_then(|res| {
                         res.map_err(|e: finterfaces_admin::ControlSetConfigurationError| {
-                            anyhow::anyhow!("{:?}", e)
+                            anyhow!("{:?}", e)
                         })
                     })
                     .context("set configuration")?;
@@ -1431,7 +1429,7 @@ fn jsonify_neigh_iter_item(
         .map(ser::NeighborTableEntry::from)
         .map(serde_json::to_value)
         .map(|res| res.map_err(Error::new))
-        .unwrap_or(Err(anyhow::anyhow!("failed to jsonify NeighborTableEntry")))?;
+        .unwrap_or(Err(anyhow!("failed to jsonify NeighborTableEntry")))?;
     if include_entry_state {
         Ok(json!({
             "state_change_status": state_change_status,
@@ -1684,7 +1682,7 @@ async fn do_dns<W: std::io::Write, C: NetCliDepsConnector>(
             },
         )
         .await?
-        .map_err(|e| anyhow::anyhow!("DNS lookup failed: {:?}", e))?;
+        .map_err(|e| anyhow!("DNS lookup failed: {:?}", e))?;
     let fname::LookupResult { addresses, .. } = result;
     let addrs = addresses.context("`addresses` not set in response from DNS resolver")?;
     for addr in addrs {
@@ -1737,6 +1735,7 @@ mod testutil {
         pub interfaces_state: Option<finterfaces::StateProxy>,
         pub stack: Option<fstack::StackProxy>,
         pub root_interfaces: Option<froot::InterfacesProxy>,
+        pub root_filter: Option<froot::FilterProxy>,
         pub routes_v4: Option<froutes::StateV4Proxy>,
         pub routes_v6: Option<froutes::StateV6Proxy>,
         pub name_lookup: Option<fname::LookupProxy>,
@@ -1751,7 +1750,7 @@ mod testutil {
             self.debug_interfaces
                 .as_ref()
                 .cloned()
-                .ok_or(anyhow::anyhow!("connector has no dhcp server instance"))
+                .ok_or(anyhow!("connector has no dhcp server instance"))
         }
     }
 
@@ -1763,17 +1762,24 @@ mod testutil {
             self.root_interfaces
                 .as_ref()
                 .cloned()
-                .ok_or(anyhow::anyhow!("connector has no root interfaces instance"))
+                .ok_or(anyhow!("connector has no root interfaces instance"))
+        }
+    }
+
+    #[async_trait::async_trait]
+    impl ServiceConnector<froot::FilterMarker> for TestConnector {
+        async fn connect(&self) -> Result<<froot::FilterMarker as ProtocolMarker>::Proxy, Error> {
+            self.root_filter
+                .as_ref()
+                .cloned()
+                .ok_or(anyhow!("connector has no root filter instance"))
         }
     }
 
     #[async_trait::async_trait]
     impl ServiceConnector<fdhcp::Server_Marker> for TestConnector {
         async fn connect(&self) -> Result<<fdhcp::Server_Marker as ProtocolMarker>::Proxy, Error> {
-            self.dhcpd
-                .as_ref()
-                .cloned()
-                .ok_or(anyhow::anyhow!("connector has no dhcp server instance"))
+            self.dhcpd.as_ref().cloned().ok_or(anyhow!("connector has no dhcp server instance"))
         }
     }
 
@@ -1782,7 +1788,7 @@ mod testutil {
         async fn connect(
             &self,
         ) -> Result<<ffilter_deprecated::FilterMarker as ProtocolMarker>::Proxy, Error> {
-            Err(anyhow::anyhow!("connect filter_deprecated unimplemented for test connector"))
+            Err(anyhow!("connect filter_deprecated unimplemented for test connector"))
         }
     }
 
@@ -1794,7 +1800,7 @@ mod testutil {
             self.interfaces_state
                 .as_ref()
                 .cloned()
-                .ok_or(anyhow::anyhow!("connector has no interfaces state instance"))
+                .ok_or(anyhow!("connector has no interfaces state instance"))
         }
     }
 
@@ -1803,28 +1809,28 @@ mod testutil {
         async fn connect(
             &self,
         ) -> Result<<fneighbor::ControllerMarker as ProtocolMarker>::Proxy, Error> {
-            Err(anyhow::anyhow!("connect neighbor controller unimplemented for test connector"))
+            Err(anyhow!("connect neighbor controller unimplemented for test connector"))
         }
     }
 
     #[async_trait::async_trait]
     impl ServiceConnector<fneighbor::ViewMarker> for TestConnector {
         async fn connect(&self) -> Result<<fneighbor::ViewMarker as ProtocolMarker>::Proxy, Error> {
-            Err(anyhow::anyhow!("connect neighbor view unimplemented for test connector"))
+            Err(anyhow!("connect neighbor view unimplemented for test connector"))
         }
     }
 
     #[async_trait::async_trait]
     impl ServiceConnector<fstack::LogMarker> for TestConnector {
         async fn connect(&self) -> Result<<fstack::LogMarker as ProtocolMarker>::Proxy, Error> {
-            Err(anyhow::anyhow!("connect log unimplemented for test connector"))
+            Err(anyhow!("connect log unimplemented for test connector"))
         }
     }
 
     #[async_trait::async_trait]
     impl ServiceConnector<fstack::StackMarker> for TestConnector {
         async fn connect(&self) -> Result<<fstack::StackMarker as ProtocolMarker>::Proxy, Error> {
-            self.stack.as_ref().cloned().ok_or(anyhow::anyhow!("connector has no stack instance"))
+            self.stack.as_ref().cloned().ok_or(anyhow!("connector has no stack instance"))
         }
     }
 
@@ -1833,10 +1839,7 @@ mod testutil {
         async fn connect(
             &self,
         ) -> Result<<froutes::StateV4Marker as ProtocolMarker>::Proxy, Error> {
-            self.routes_v4
-                .as_ref()
-                .cloned()
-                .ok_or(anyhow::anyhow!("connector has no routes_v4 instance"))
+            self.routes_v4.as_ref().cloned().ok_or(anyhow!("connector has no routes_v4 instance"))
         }
     }
 
@@ -1845,10 +1848,7 @@ mod testutil {
         async fn connect(
             &self,
         ) -> Result<<froutes::StateV6Marker as ProtocolMarker>::Proxy, Error> {
-            self.routes_v6
-                .as_ref()
-                .cloned()
-                .ok_or(anyhow::anyhow!("connector has no routes_v6 instance"))
+            self.routes_v6.as_ref().cloned().ok_or(anyhow!("connector has no routes_v6 instance"))
         }
     }
 
@@ -1858,7 +1858,7 @@ mod testutil {
             self.name_lookup
                 .as_ref()
                 .cloned()
-                .ok_or(anyhow::anyhow!("connector has no name lookup instance"))
+                .ok_or(anyhow!("connector has no name lookup instance"))
         }
     }
 
@@ -1885,7 +1885,7 @@ mod testutil {
         async fn connect(
             &self,
         ) -> Result<<fnet_filter::StateMarker as ProtocolMarker>::Proxy, Error> {
-            self.filter.as_ref().cloned().ok_or(anyhow::anyhow!("connector has no filter instance"))
+            self.filter.as_ref().cloned().ok_or(anyhow!("connector has no filter instance"))
         }
     }
 }

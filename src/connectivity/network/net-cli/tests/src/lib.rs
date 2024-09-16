@@ -11,6 +11,8 @@
 
 #![cfg(test)]
 
+mod filter;
+
 use anyhow::Result;
 use argh::FromArgs as _;
 use net_declare::{fidl_ip_v6, fidl_mac};

@@ -4,13 +4,17 @@
 
 use std::collections::{BTreeMap, HashMap};
 use std::pin::pin;
+use std::str::FromStr as _;
 
-use anyhow::Error;
+use anyhow::{anyhow, Error};
 use fidl_fuchsia_net_filter_ext::{
-    ControllerId, Domain, InstalledIpRoutine, InstalledNatRoutine, IpHook, NamespaceId, NatHook,
-    Resource, ResourceId, RoutineId, RoutineType, Rule, RuleId, Update,
+    self as fnet_filter_ext, ControllerId, Domain, InstalledIpRoutine, InstalledNatRoutine, IpHook,
+    NamespaceId, NatHook, Resource, ResourceId, RoutineId, RoutineType, Rule, RuleId, Update,
 };
-use {fidl_fuchsia_net_filter as fnet_filter, fidl_fuchsia_net_filter_ext as fnet_filter_ext};
+use {
+    fidl_fuchsia_net_ext as fnet_ext, fidl_fuchsia_net_filter as fnet_filter,
+    fidl_fuchsia_net_root as fnet_root,
+};
 
 use crate::{connect_with_context, opts, NetCliDepsConnector};
 
@@ -289,8 +293,14 @@ pub(super) async fn do_filter<C: NetCliDepsConnector, W: std::io::Write>(
     cmd: opts::filter::FilterEnum,
     connector: &C,
 ) -> Result<(), Error> {
+    use opts::filter::{
+        Accept, Action, Create, Domain, Drop, FilterEnum, Hook, Jump, List, Namespace, NamespaceId,
+        Redirect, Remove, Resource, ResourceId, Return, Routine, RoutineId, RoutineType, Rule,
+        RuleId, TransparentProxy, TransportProtocolMatcher,
+    };
+
     match cmd {
-        opts::filter::FilterEnum::List(opts::filter::List {}) => {
+        FilterEnum::List(List {}) => {
             let state = connect_with_context::<fnet_filter::StateMarker, _>(connector).await?;
             let stream = fnet_filter_ext::event_stream_from_state(state)?;
             let mut stream = pin!(stream);
@@ -310,6 +320,246 @@ pub(super) async fn do_filter<C: NetCliDepsConnector, W: std::io::Write>(
                         Ok(())
                     },
                 )?;
+            }
+        }
+        FilterEnum::Create(Create { controller, resource, idempotent }) => {
+            let resource = match resource {
+                Resource::Namespace(Namespace { name, domain }) => {
+                    fnet_filter_ext::Resource::Namespace(fnet_filter_ext::Namespace {
+                        id: fnet_filter_ext::NamespaceId(name),
+                        domain: match domain {
+                            Domain::All => fnet_filter_ext::Domain::AllIp,
+                            Domain::Ipv4 => fnet_filter_ext::Domain::Ipv4,
+                            Domain::Ipv6 => fnet_filter_ext::Domain::Ipv6,
+                        },
+                    })
+                }
+                Resource::Routine(Routine { namespace, name, type_, hook, priority }) => {
+                    fnet_filter_ext::Resource::Routine(fnet_filter_ext::Routine {
+                        id: fnet_filter_ext::RoutineId {
+                            namespace: fnet_filter_ext::NamespaceId(namespace),
+                            name,
+                        },
+                        routine_type: match type_ {
+                            RoutineType::Ip => {
+                                let installation = match (hook, priority) {
+                                    (None, None) => None,
+                                    (Some(hook), priority) => {
+                                        Some(fnet_filter_ext::InstalledIpRoutine {
+                                            hook: match hook {
+                                                Hook::Ingress => fnet_filter_ext::IpHook::Ingress,
+                                                Hook::LocalIngress => {
+                                                    fnet_filter_ext::IpHook::LocalIngress
+                                                }
+                                                Hook::Forwarding => {
+                                                    fnet_filter_ext::IpHook::Forwarding
+                                                }
+                                                Hook::LocalEgress => {
+                                                    fnet_filter_ext::IpHook::LocalEgress
+                                                }
+                                                Hook::Egress => fnet_filter_ext::IpHook::Egress,
+                                            },
+                                            priority: priority.unwrap_or_default(),
+                                        })
+                                    }
+                                    (None, Some(_)) => {
+                                        return Err(anyhow!(
+                                            "cannot specify priority without an installation hook"
+                                        ));
+                                    }
+                                };
+                                fnet_filter_ext::RoutineType::Ip(installation)
+                            }
+                            RoutineType::Nat => {
+                                let installation = match (hook, priority) {
+                                    (None, None) => None,
+                                    (Some(hook), priority) => {
+                                        Some(fnet_filter_ext::InstalledNatRoutine {
+                                            hook: match hook {
+                                                Hook::Ingress => fnet_filter_ext::NatHook::Ingress,
+                                                Hook::LocalIngress => {
+                                                    fnet_filter_ext::NatHook::LocalIngress
+                                                }
+                                                Hook::LocalEgress => {
+                                                    fnet_filter_ext::NatHook::LocalEgress
+                                                }
+                                                Hook::Egress => fnet_filter_ext::NatHook::Egress,
+                                                Hook::Forwarding => {
+                                                    return Err(anyhow!(
+                                                        "NAT routines do not run in forwarding hook"
+                                                    ));
+                                                }
+                                            },
+                                            priority: priority.unwrap_or_default(),
+                                        })
+                                    }
+                                    (None, Some(_)) => {
+                                        return Err(anyhow!(
+                                            "cannot specify priority without an installation hook"
+                                        ));
+                                    }
+                                };
+                                fnet_filter_ext::RoutineType::Nat(installation)
+                            }
+                        },
+                    })
+                }
+                Resource::Rule(Rule {
+                    namespace,
+                    routine,
+                    index,
+                    in_interface,
+                    out_interface,
+                    src_addr,
+                    dst_addr,
+                    transport_protocol,
+                    src_port,
+                    dst_port,
+                    action,
+                }) => fnet_filter_ext::Resource::Rule(fnet_filter_ext::Rule {
+                    id: fnet_filter_ext::RuleId {
+                        routine: fnet_filter_ext::RoutineId {
+                            namespace: fnet_filter_ext::NamespaceId(namespace),
+                            name: routine,
+                        },
+                        index,
+                    },
+                    matchers: {
+                        fnet_filter_ext::Matchers {
+                            in_interface: in_interface.map(Into::into),
+                            out_interface: out_interface.map(Into::into),
+                            src_addr: src_addr.map(Into::into),
+                            dst_addr: dst_addr.map(Into::into),
+                            transport_protocol: match transport_protocol {
+                                None => {
+                                    if src_port != None || dst_port != None {
+                                        return Err(anyhow!(
+                                            "must provide a transport protocol to match on port"
+                                        ));
+                                    }
+                                    None
+                                }
+                                Some(matcher) => Some(match matcher {
+                                    TransportProtocolMatcher::Tcp => {
+                                        fnet_filter_ext::TransportProtocolMatcher::Tcp {
+                                            src_port: src_port.map(Into::into),
+                                            dst_port: dst_port.map(Into::into),
+                                        }
+                                    }
+                                    TransportProtocolMatcher::Udp => {
+                                        fnet_filter_ext::TransportProtocolMatcher::Udp {
+                                            src_port: src_port.map(Into::into),
+                                            dst_port: dst_port.map(Into::into),
+                                        }
+                                    }
+                                    TransportProtocolMatcher::Icmp => {
+                                        if src_port != None || dst_port != None {
+                                            return Err(anyhow!(
+                                                "cannot match on src or dst port for ICMP packets"
+                                            ));
+                                        }
+                                        fnet_filter_ext::TransportProtocolMatcher::Icmp
+                                    }
+                                    TransportProtocolMatcher::Icmpv6 => {
+                                        if src_port != None || dst_port != None {
+                                            return Err(anyhow!(
+                                            "cannot match on src or dst port for ICMPv6 packets"
+                                        ));
+                                        }
+                                        fnet_filter_ext::TransportProtocolMatcher::Icmpv6
+                                    }
+                                }),
+                            },
+                            ..Default::default()
+                        }
+                    },
+                    action: match action {
+                        Action::Accept(Accept {}) => fnet_filter_ext::Action::Accept,
+                        Action::Drop(Drop {}) => fnet_filter_ext::Action::Drop,
+                        Action::Jump(Jump { target }) => fnet_filter_ext::Action::Jump(target),
+                        Action::Return(Return {}) => fnet_filter_ext::Action::Return,
+                        Action::TransparentProxy(TransparentProxy { addr, port }) => {
+                            let tproxy = match (addr, port) {
+                                (None, None) => {
+                                    return Err(anyhow!(
+                                        "transparent proxy must specify at least one of local \
+                                            address and local port"
+                                    ))
+                                }
+                                (Some(addr), None) => {
+                                    let addr = fnet_ext::IpAddress::from_str(&addr)?.into();
+                                    fnet_filter_ext::TransparentProxy::LocalAddr(addr)
+                                }
+                                (None, Some(port)) => {
+                                    fnet_filter_ext::TransparentProxy::LocalPort(port)
+                                }
+                                (Some(addr), Some(port)) => {
+                                    let addr = fnet_ext::IpAddress::from_str(&addr)?.into();
+                                    fnet_filter_ext::TransparentProxy::LocalAddrAndPort(addr, port)
+                                }
+                            };
+                            fnet_filter_ext::Action::TransparentProxy(tproxy)
+                        }
+                        Action::Redirect(Redirect { min_dst_port, max_dst_port }) => {
+                            let dst_port = match (min_dst_port, max_dst_port) {
+                                (None, None) => None,
+                                (Some(_), None) | (None, Some(_)) => {
+                                    return Err(anyhow!(
+                                        "specified one end of dst port range but not the other"
+                                    ))
+                                }
+                                (Some(min), Some(max)) => Some(min..=max),
+                            };
+                            fnet_filter_ext::Action::Redirect { dst_port }
+                        }
+                    },
+                }),
+            };
+            let root = connect_with_context::<fnet_root::FilterMarker, _>(connector).await?;
+            let mut controller = fnet_filter_ext::Controller::new_root(
+                &root,
+                &fnet_filter_ext::ControllerId(controller),
+            )
+            .await?;
+            controller.push_changes(vec![fnet_filter_ext::Change::Create(resource)]).await?;
+            if idempotent.unwrap_or(false) {
+                controller.commit_idempotent().await?;
+            } else {
+                controller.commit().await?;
+            }
+        }
+        FilterEnum::Remove(Remove { controller, resource, idempotent }) => {
+            let id = match resource {
+                ResourceId::Namespace(NamespaceId { name }) => {
+                    fnet_filter_ext::ResourceId::Namespace(fnet_filter_ext::NamespaceId(name))
+                }
+                ResourceId::Routine(RoutineId { namespace, name }) => {
+                    fnet_filter_ext::ResourceId::Routine(fnet_filter_ext::RoutineId {
+                        namespace: fnet_filter_ext::NamespaceId(namespace),
+                        name,
+                    })
+                }
+                ResourceId::Rule(RuleId { namespace, routine, index }) => {
+                    fnet_filter_ext::ResourceId::Rule(fnet_filter_ext::RuleId {
+                        routine: fnet_filter_ext::RoutineId {
+                            namespace: fnet_filter_ext::NamespaceId(namespace),
+                            name: routine,
+                        },
+                        index,
+                    })
+                }
+            };
+            let root = connect_with_context::<fnet_root::FilterMarker, _>(connector).await?;
+            let mut controller = fnet_filter_ext::Controller::new_root(
+                &root,
+                &fnet_filter_ext::ControllerId(controller),
+            )
+            .await?;
+            controller.push_changes(vec![fnet_filter_ext::Change::Remove(id)]).await?;
+            if idempotent.unwrap_or(false) {
+                controller.commit_idempotent().await?;
+            } else {
+                controller.commit().await?;
             }
         }
     }
