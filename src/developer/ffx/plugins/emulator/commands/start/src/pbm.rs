@@ -48,7 +48,7 @@ pub(crate) async fn make_configs(
     } else {
         let pb = product_bundle.ok_or_else(|| user_error!("Product bundle required for configuring the emulator instance."))?;
         // Apply the values from the manifest to an emulation configuration.
-        let mut emu_config = convert_bundle_to_configs(&pb, cmd.device().await?, cmd.verbose)
+        let mut emu_config = convert_bundle_to_configs(&pb, cmd.device().await?)
             .await.context("problem with convert_bundle_to_configs")?;
         // Set OVMF references for non riscv guests (at this time we have no efi support for riscv).
         if emu_config.device.cpu.architecture != CpuArchitecture::Riscv64 {
@@ -317,9 +317,9 @@ fn parse_host_port_maps(
             );
         }
     }
-    if emu_config.runtime.log_level == LogLevel::Verbose {
-        eprintln!("Port map parsed: {:?}\n", emu_config.host.port_map);
-    }
+
+    tracing::debug!("Port map parsed: {:?}\n", emu_config.host.port_map);
+
     Ok(())
 }
 
