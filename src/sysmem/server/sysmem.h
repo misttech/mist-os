@@ -50,14 +50,6 @@ struct Settings {
   uint64_t max_allocation_size = UINT64_MAX;
 };
 
-// Non-drivers connect to sysmem via sysmem-connector (service impl). The sysmem-connector uses
-// DriverConnector to get connected to sysmem via devfs. The sysmem-connector then uses
-// DriverConnector to connect to fuchsia_sysmem2::Allocator on behalf of non-driver sysmem clients,
-// to notice when/if sysmem crashes, and to set a (limited) service directory for sysmem to use to
-// connect to Cobalt. DriverConnector is not for use by other drivers.
-//
-// Driver clients of sysmem also connect via sysmem-connector.
-//
 // The fuchsia_hardware_sysmem::Sysmem protocol is used by the securemem driver and by external
 // heaps such as goldfish.
 class Sysmem final : public MemoryAllocator::Owner,
