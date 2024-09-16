@@ -524,6 +524,14 @@
                 "notes": [
                     "Checked in generated code based on AOSP code. See https://fxbug.dev/42068556"
                 ]
+            },
+            {
+                "paths": [
+                    "build/bazel/fuchsia_idk/validation_data"
+                ],
+                "notes": [
+                    "Validation test files for //build/bazel/fuchsia_idk/generate_repository.py"
+                ]
             }
         ]
     }
