@@ -10,6 +10,7 @@ use prettytable::{cell, row, Table};
 use std::fmt;
 
 const SUCCESS_SUMMARY: &'static str = "Success";
+const VOID_SUMMARY: &'static str = "Routed from void";
 
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
@@ -23,6 +24,7 @@ pub struct RouteReport {
     pub error_summary: Option<String>,
     pub source_moniker: Option<String>,
     pub service_instances: Option<Vec<ServiceInstance>>,
+    pub outcome: RouteOutcome,
 }
 
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
@@ -61,7 +63,26 @@ impl TryFrom<fsys::RouteReport> for RouteReport {
             .service_instances
             .map(|s| s.into_iter().map(|s| s.try_into()).collect())
             .transpose()?;
-        Ok(RouteReport { decl_type, capability, error_summary, source_moniker, service_instances })
+        let outcome = match report.outcome {
+            Some(o) => o.try_into()?,
+            None => {
+                // Backward compatibility. `outcome` may be missing if the client (e.g., ffx)
+                // is built at a later version than the target.
+                if error_summary.is_some() {
+                    RouteOutcome::Failed
+                } else {
+                    RouteOutcome::Success
+                }
+            }
+        };
+        Ok(RouteReport {
+            decl_type,
+            capability,
+            error_summary,
+            source_moniker,
+            service_instances,
+            outcome,
+        })
     }
 }
 
@@ -90,6 +111,27 @@ impl TryFrom<fsys::DeclType> for DeclType {
             fsys::DeclType::Use => Ok(DeclType::Use),
             fsys::DeclType::Expose => Ok(DeclType::Expose),
             _ => Err(format_err!("unknown decl type")),
+        }
+    }
+}
+
+#[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
+#[derive(Debug, PartialEq)]
+pub enum RouteOutcome {
+    Success,
+    Void,
+    Failed,
+}
+
+impl TryFrom<fsys::RouteOutcome> for RouteOutcome {
+    type Error = anyhow::Error;
+
+    fn try_from(value: fsys::RouteOutcome) -> std::result::Result<Self, Self::Error> {
+        match value {
+            fsys::RouteOutcome::Success => Ok(RouteOutcome::Success),
+            fsys::RouteOutcome::Void => Ok(RouteOutcome::Void),
+            fsys::RouteOutcome::Failed => Ok(RouteOutcome::Failed),
+            _ => Err(format_err!("unknown route outcome")),
         }
     }
 }
@@ -135,12 +177,24 @@ pub fn create_table(reports: Vec<RouteReport>) -> Table {
 fn add_report(report: RouteReport, table: &mut Table) {
     table
         .add_row(row!(r->"Capability: ", &format!("{} ({})", report.capability, report.decl_type)));
-    let (mark, summary) = if let Some(summary) = &report.error_summary {
-        let mark = ansi_term::Color::Red.paint("[✗]");
-        (mark, summary.as_str())
-    } else {
-        let mark = ansi_term::Color::Green.paint("[✓]");
-        (mark, SUCCESS_SUMMARY)
+    let (mark, summary) = match report.outcome {
+        RouteOutcome::Success => {
+            let mark = ansi_term::Color::Green.paint("[✓]");
+            (mark, SUCCESS_SUMMARY)
+        }
+        RouteOutcome::Void => {
+            let mark = ansi_term::Color::Yellow.paint("[~]");
+            (mark, VOID_SUMMARY)
+        }
+        RouteOutcome::Failed => {
+            let mark = ansi_term::Color::Red.paint("[✗]");
+            let summary = report
+                .error_summary
+                .as_ref()
+                .map(|s| s.as_str())
+                .unwrap_or("Missing error summary. This is a bug.");
+            (mark, summary)
+        }
     };
     table.add_row(row!(r->"Result: ", &format!("{} {}", mark, summary)));
     if let Some(source_moniker) = report.source_moniker {
@@ -219,6 +273,8 @@ mod test {
                     summary: Some("Access denied".into()),
                     ..Default::default()
                 }),
+                // Test inference of Failed
+                outcome: None,
                 ..Default::default()
             }],
         );
@@ -236,6 +292,7 @@ mod test {
                 error_summary: Some(s),
                 source_moniker: None,
                 service_instances: None,
+                outcome: RouteOutcome::Failed,
             } if capability == "fuchsia.foo.bar" && s == "Access denied"
         );
     }
@@ -253,6 +310,7 @@ mod test {
                     decl_type: Some(fsys::DeclType::Use),
                     source_moniker: Some("<component manager>".into()),
                     error: None,
+                    outcome: Some(fsys::RouteOutcome::Void),
                     ..Default::default()
                 },
                 fsys::RouteReport {
@@ -274,6 +332,8 @@ mod test {
                         },
                     ]),
                     error: None,
+                    // Test inference of Success
+                    outcome: None,
                     ..Default::default()
                 },
             ],
@@ -292,6 +352,7 @@ mod test {
                 error_summary: None,
                 source_moniker: Some(m),
                 service_instances: None,
+                outcome: RouteOutcome::Void,
             } if capability == "fuchsia.foo.bar" && m == "<component manager>"
         );
 
@@ -304,6 +365,7 @@ mod test {
                 error_summary: None,
                 source_moniker: Some(m),
                 service_instances: Some(v),
+                outcome: RouteOutcome::Success,
             } if capability == "fuchsia.foo.baz" && m == "/test/src"
                 && v == vec![
                     ServiceInstance {

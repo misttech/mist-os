@@ -8,6 +8,13 @@
         runner: "elf",
         binary: "bin/foo_noop",
     },
+    expose: [
+        {
+            protocol: "void-protocol",
+            from: "void",
+            availability: "optional",
+        },
+    ],
     config: {
         my_uint8: {
             type: "uint8",
