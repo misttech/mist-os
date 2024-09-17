@@ -8,33 +8,21 @@
 #include <lib/fit/result.h>
 #include <lib/mistos/starnix/kernel/vfs/fs_node.h>
 #include <lib/mistos/starnix_uapi/errors.h>
+#include <trace.h>
+
+#include "../kernel_priv.h"
+
+#define LOCAL_TRACE STARNIX_KERNEL_GLOBAL_TRACE(0)
 
 namespace starnix {
 
 fit::result<Errno, FsNodeHandle> FsNodeOps::lookup(const FsNode& node,
                                                    const CurrentTask& current_task,
                                                    const FsStr& name) {
+  // The default implementation here is suitable for filesystems that have permanent entries;
+  // entries that already exist will get found in the cache and shouldn't get this far.
+  LTRACEF("ENOENT name=[%.*s]\n", static_cast<int>(name.length()), name.data());
   return fit::error(errno(ENOENT));
-}
-
-fit::result<Errno, FsNodeHandle> FsNodeOps::mknod(/*FileOpsCore& locked,*/ const FsNode& node,
-                                                  const CurrentTask& current_task,
-                                                  const FsStr& name, FileMode mode, DeviceType dev,
-                                                  FsCred owner) {
-  return fit::error(errno(EROFS));
-}
-
-fit::result<Errno, FsNodeHandle> FsNodeOps::mkdir(const FsNode& node,
-                                                  const CurrentTask& current_task,
-                                                  const FsStr& name, FileMode mode, FsCred owner) {
-  return fit::error(errno(EROFS));
-}
-
-fit::result<Errno, FsNodeHandle> FsNodeOps::create_symlink(const FsNode& node,
-                                                           const CurrentTask& current_task,
-                                                           const FsStr& name, const FsStr& target,
-                                                           FsCred owner) {
-  return fit::error(errno(EROFS));
 }
 
 fit::result<Errno, FsNodeHandle> FsNodeOps::create_tmpfile(const FsNode& node,
