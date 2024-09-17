@@ -167,15 +167,15 @@ pub fn convert_set_keys_resp(
     resp: fidl_fullmac::WlanFullmacSetKeysResp,
     original_set_keys_req: &fidl_mlme::SetKeysRequest,
 ) -> Result<fidl_mlme::SetKeysConfirm> {
-    if resp.num_keys as usize != original_set_keys_req.keylist.len() {
+    if resp.statuslist.len() != original_set_keys_req.keylist.len() {
         bail!(
             "SetKeysReq and SetKeysResp num_keys count differ: {} != {}",
             original_set_keys_req.keylist.len(),
-            resp.num_keys
+            resp.statuslist.len()
         );
     }
     let mut results = vec![];
-    for i in 0..resp.num_keys as usize {
+    for i in 0..resp.statuslist.len() {
         results.push(fidl_mlme::SetKeyResult {
             key_id: original_set_keys_req.keylist[i].key_id,
             status: resp.statuslist[i],
@@ -687,10 +687,8 @@ mod tests {
 
     #[test]
     fn test_convert_set_keys_resp() {
-        let fullmac_resp = fidl_fullmac::WlanFullmacSetKeysResp {
-            num_keys: 1,
-            statuslist: [zx::sys::ZX_ERR_INTERNAL; 4],
-        };
+        let fullmac_resp =
+            fidl_fullmac::WlanFullmacSetKeysResp { statuslist: vec![zx::sys::ZX_ERR_INTERNAL; 1] };
         let original_req =
             fidl_mlme::SetKeysRequest { keylist: vec![fake_set_key_descriptor(); 1] };
 
@@ -707,10 +705,8 @@ mod tests {
 
     #[test]
     fn test_convert_set_keys_resp_mismatching_original_req_is_error() {
-        let fullmac_resp = fidl_fullmac::WlanFullmacSetKeysResp {
-            num_keys: 2,
-            statuslist: [zx::sys::ZX_ERR_INTERNAL; 4],
-        };
+        let fullmac_resp =
+            fidl_fullmac::WlanFullmacSetKeysResp { statuslist: vec![zx::sys::ZX_ERR_INTERNAL; 2] };
         let original_req =
             fidl_mlme::SetKeysRequest { keylist: vec![fake_set_key_descriptor(); 1] };
         assert!(convert_set_keys_resp(fullmac_resp, &original_req).is_err());

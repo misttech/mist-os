@@ -25,12 +25,12 @@ class SetKeysTest : public SimTest {
   SimInterface client_ifc_;
 };
 
-wlan_fullmac_wire::WlanFullmacSetKeysReq FakeSetKeysRequest(
+wlan_fullmac_wire::WlanFullmacImplSetKeysRequest FakeSetKeysRequest(
     const uint8_t keys[][wlan_ieee80211::kMaxKeyLen], size_t n, fidl::AnyArena& arena) {
-  wlan_fullmac_wire::WlanFullmacSetKeysReq set_keys_req{.num_keys = n};
+  fidl::VectorView<fuchsia_wlan_common::wire::WlanKeyConfig> key_list(arena, n);
 
   for (size_t i = 0; i < n; i++) {
-    set_keys_req.keylist[i] =
+    key_list[i] =
         fuchsia_wlan_common::wire::WlanKeyConfig::Builder(arena)
             .key(fidl::VectorView<uint8_t>::FromExternal(
                 const_cast<uint8_t*>(keys[i]), strlen(reinterpret_cast<const char*>(keys[i]))))
@@ -43,15 +43,16 @@ wlan_fullmac_wire::WlanFullmacSetKeysReq FakeSetKeysRequest(
             .protection({})
             .Build();
   }
-  return set_keys_req;
+  auto builder = wlan_fullmac_wire::WlanFullmacImplSetKeysRequest::Builder(arena).keylist(key_list);
+  return builder.Build();
 }
 
 TEST_F(SetKeysTest, MultipleKeys) {
   const uint8_t keys[wlan_fullmac_wire::kWlanMaxKeylistSize][wlan_ieee80211::kMaxKeyLen] = {
       "One", "Two", "Three", "Four"};
-  wlan_fullmac_wire::WlanFullmacSetKeysReq set_keys_req =
+  wlan_fullmac_wire::WlanFullmacImplSetKeysRequest set_keys_req =
       FakeSetKeysRequest(keys, wlan_fullmac_wire::kWlanMaxKeylistSize, client_ifc_.test_arena_);
-  auto result = client_ifc_.client_.buffer(client_ifc_.test_arena_)->SetKeysReq(set_keys_req);
+  auto result = client_ifc_.client_.buffer(client_ifc_.test_arena_)->SetKeys(set_keys_req);
   EXPECT_TRUE(result.ok());
 
   auto& set_keys_resp = result->resp;
@@ -67,9 +68,9 @@ TEST_F(SetKeysTest, MultipleKeys) {
     EXPECT_BYTES_EQ(firmware_keys[i].data, keys[i], firmware_keys[i].len);
   }
 
-  ASSERT_EQ(set_keys_resp.num_keys, wlan_fullmac_wire::kWlanMaxKeylistSize);
-  for (auto status : set_keys_resp.statuslist.data_) {
-    ASSERT_EQ(status, ZX_OK);
+  ASSERT_EQ(set_keys_resp.statuslist.count(), wlan_fullmac_wire::kWlanMaxKeylistSize);
+  for (size_t i = 0; i < set_keys_resp.statuslist.count(); i++) {
+    ASSERT_EQ(set_keys_resp.statuslist[i], ZX_OK);
   }
 }
 
@@ -79,10 +80,8 @@ TEST_F(SetKeysTest, SetGroupKey) {
   const size_t group_keylen = strlen(reinterpret_cast<const char*>(group_key));
   const uint8_t ucast_key[wlan_ieee80211::kMaxKeyLen] = "My Key";
   const size_t ucast_keylen = strlen(reinterpret_cast<const char*>(ucast_key));
-  const size_t kKeyNum = 2;
 
-  fidl::Array<fuchsia_wlan_common::wire::WlanKeyConfig, wlan_fullmac_wire::kWlanMaxKeylistSize>
-      key_list;
+  fidl::VectorView<fuchsia_wlan_common::wire::WlanKeyConfig> key_list(client_ifc_.test_arena_, 2);
   key_list[0] = fuchsia_wlan_common::wire::WlanKeyConfig::Builder(client_ifc_.test_arena_)
                     .key(fidl::VectorView<uint8_t>::FromExternal(const_cast<uint8_t*>(group_key),
                                                                  group_keylen))
@@ -107,16 +106,14 @@ TEST_F(SetKeysTest, SetGroupKey) {
                     .protection({})
                     .Build();
 
-  wlan_fullmac_wire::WlanFullmacSetKeysReq key_req = {
-      .num_keys = kKeyNum,
-      .keylist = {key_list},
-  };
+  auto builder = wlan_fullmac_wire::WlanFullmacImplSetKeysRequest::Builder(client_ifc_.test_arena_)
+                     .keylist(key_list);
 
-  auto result = client_ifc_.client_.buffer(client_ifc_.test_arena_)->SetKeysReq(key_req);
+  auto result = client_ifc_.client_.buffer(client_ifc_.test_arena_)->SetKeys(builder.Build());
   EXPECT_OK(result);
 
   auto& set_keys_resp = result->resp;
-  ASSERT_EQ(set_keys_resp.num_keys, 2ul);
+  ASSERT_EQ(set_keys_resp.statuslist.count(), 2ul);
   ASSERT_OK(set_keys_resp.statuslist.data()[0]);
   ASSERT_OK(set_keys_resp.statuslist.data()[1]);
 
@@ -140,8 +137,7 @@ TEST_F(SetKeysTest, CustomOuiNotSupported) {
 
   fidl::Array<uint8_t, 3> kCustomOui = {1, 2, 3};
 
-  fidl::Array<fuchsia_wlan_common::wire::WlanKeyConfig, wlan_fullmac_wire::kWlanMaxKeylistSize>
-      key_list;
+  fidl::VectorView<fuchsia_wlan_common::wire::WlanKeyConfig> key_list(client_ifc_.test_arena_, 1);
   key_list[0] = fuchsia_wlan_common::wire::WlanKeyConfig::Builder(client_ifc_.test_arena_)
                     .key(fidl::VectorView<uint8_t>::FromExternal(
                         const_cast<uint8_t*>(key), strlen(reinterpret_cast<const char*>(key))))
@@ -154,16 +150,14 @@ TEST_F(SetKeysTest, CustomOuiNotSupported) {
                     .protection({})
                     .Build();
 
-  wlan_fullmac_wire::WlanFullmacSetKeysReq key_req = {
-      .num_keys = 1,
-      .keylist = {key_list},
-  };
+  auto builder = wlan_fullmac_wire::WlanFullmacImplSetKeysRequest::Builder(client_ifc_.test_arena_)
+                     .keylist(key_list);
 
-  auto result = client_ifc_.client_.buffer(client_ifc_.test_arena_)->SetKeysReq(key_req);
+  auto result = client_ifc_.client_.buffer(client_ifc_.test_arena_)->SetKeys(builder.Build());
   EXPECT_OK(result);
 
   auto& set_keys_resp = result->resp;
-  ASSERT_EQ(set_keys_resp.num_keys, 1ul);
+  ASSERT_EQ(set_keys_resp.statuslist.count(), 1ul);
   ASSERT_EQ(set_keys_resp.statuslist.data()[0], ZX_ERR_NOT_SUPPORTED);
 
   std::vector<brcmf_wsec_key_le> firmware_keys;
@@ -178,8 +172,7 @@ TEST_F(SetKeysTest, OptionalOuiSupported) {
   const uint8_t key[wlan_ieee80211::kMaxKeyLen] = "My Key";
   const size_t keylen = strlen(reinterpret_cast<const char*>(key));
 
-  fidl::Array<fuchsia_wlan_common::wire::WlanKeyConfig, wlan_fullmac_wire::kWlanMaxKeylistSize>
-      key_list;
+  fidl::VectorView<fuchsia_wlan_common::wire::WlanKeyConfig> key_list(client_ifc_.test_arena_, 1);
   key_list[0] = fuchsia_wlan_common::wire::WlanKeyConfig::Builder(client_ifc_.test_arena_)
                     .key(fidl::VectorView<uint8_t>::FromExternal(const_cast<uint8_t*>(key), keylen))
                     .key_idx(static_cast<uint8_t>(0))
@@ -190,16 +183,14 @@ TEST_F(SetKeysTest, OptionalOuiSupported) {
                     .protection({})
                     .Build();
 
-  wlan_fullmac_wire::WlanFullmacSetKeysReq key_req = {
-      .num_keys = 1,
-      .keylist = {key_list},
-  };
+  auto builder = wlan_fullmac_wire::WlanFullmacImplSetKeysRequest::Builder(client_ifc_.test_arena_)
+                     .keylist(key_list);
 
-  auto result = client_ifc_.client_.buffer(client_ifc_.test_arena_)->SetKeysReq(key_req);
+  auto result = client_ifc_.client_.buffer(client_ifc_.test_arena_)->SetKeys(builder.Build());
   EXPECT_OK(result);
 
   auto& set_keys_resp = result->resp;
-  ASSERT_EQ(set_keys_resp.num_keys, 1ul);
+  ASSERT_EQ(set_keys_resp.statuslist.count(), 1ul);
   ASSERT_OK(set_keys_resp.statuslist.data()[0]);
 
   std::vector<brcmf_wsec_key_le> firmware_keys;
@@ -217,8 +208,7 @@ TEST_F(SetKeysTest, MsftOuiSupported) {
   const uint8_t key[wlan_ieee80211::kMaxKeyLen] = "My Key";
   const size_t keylen = strlen(reinterpret_cast<const char*>(key));
 
-  fidl::Array<fuchsia_wlan_common::wire::WlanKeyConfig, wlan_fullmac_wire::kWlanMaxKeylistSize>
-      key_list;
+  fidl::VectorView<fuchsia_wlan_common::wire::WlanKeyConfig> key_list(client_ifc_.test_arena_, 1);
   key_list[0] = fuchsia_wlan_common::wire::WlanKeyConfig::Builder(client_ifc_.test_arena_)
                     .key(fidl::VectorView<uint8_t>::FromExternal(const_cast<uint8_t*>(key), keylen))
                     .key_idx(static_cast<uint8_t>(0))
@@ -230,16 +220,14 @@ TEST_F(SetKeysTest, MsftOuiSupported) {
                     .protection({})
                     .Build();
 
-  wlan_fullmac_wire::WlanFullmacSetKeysReq key_req = {
-      .num_keys = 1,
-      .keylist = {key_list},
-  };
+  auto builder = wlan_fullmac_wire::WlanFullmacImplSetKeysRequest::Builder(client_ifc_.test_arena_)
+                     .keylist(key_list);
 
-  auto result = client_ifc_.client_.buffer(client_ifc_.test_arena_)->SetKeysReq(key_req);
+  auto result = client_ifc_.client_.buffer(client_ifc_.test_arena_)->SetKeys(builder.Build());
   EXPECT_OK(result);
 
   auto& set_keys_resp = result->resp;
-  ASSERT_EQ(set_keys_resp.num_keys, 1ul);
+  ASSERT_EQ(set_keys_resp.statuslist.count(), 1ul);
   ASSERT_OK(set_keys_resp.statuslist.data()[0]);
 
   std::vector<brcmf_wsec_key_le> firmware_keys;

@@ -276,10 +276,10 @@ class WlanFullmacImplBridgeServer : public fidl::Server<fuchsia_wlan_fullmac::Wl
     bridge_client_->StopBss(request).Then(
         ForwardResult<WlanFullmacImpl::StopBss>(completer.ToAsync()));
   }
-  void SetKeysReq(SetKeysReqRequest& request, SetKeysReqCompleter::Sync& completer) override {
+  void SetKeys(SetKeysRequest& request, SetKeysCompleter::Sync& completer) override {
     WLAN_TRACE_DURATION();
-    bridge_client_->SetKeysReq(request).Then(
-        ForwardResult<WlanFullmacImpl::SetKeysReq>(completer.ToAsync()));
+    bridge_client_->SetKeys(request).Then(
+        ForwardResult<WlanFullmacImpl::SetKeys>(completer.ToAsync()));
   }
   void DelKeysReq(DelKeysReqRequest& request, DelKeysReqCompleter::Sync& completer) override {}
   void EapolTx(EapolTxRequest& request, EapolTxCompleter::Sync& completer) override {

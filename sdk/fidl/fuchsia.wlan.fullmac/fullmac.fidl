@@ -41,14 +41,8 @@ type WlanFullmacAssocInd = struct {
 
 const WLAN_MAX_KEYLIST_SIZE uint32 = 4;
 
-type WlanFullmacSetKeysReq = struct {
-    num_keys uint64;
-    keylist array<fuchsia.wlan.common.WlanKeyConfig, WLAN_MAX_KEYLIST_SIZE>;
-};
-
 type WlanFullmacSetKeysResp = struct {
-    num_keys uint64;
-    statuslist array<zx.Status, WLAN_MAX_KEYLIST_SIZE>;
+    statuslist vector<zx.Status>:WLAN_MAX_KEYLIST_SIZE;
 };
 
 type DeleteKeyDescriptor = struct {
@@ -637,8 +631,8 @@ closed protocol WlanFullmacImpl {
     strict StopBss(table {
         1: ssid ieee80211.CSsid;
     }) -> ();
-    strict SetKeysReq(struct {
-        req WlanFullmacSetKeysReq;
+    strict SetKeys(table {
+        1: keylist vector<fuchsia.wlan.common.WlanKeyConfig>:WLAN_MAX_KEYLIST_SIZE;
     }) -> (struct {
         resp WlanFullmacSetKeysResp;
     });

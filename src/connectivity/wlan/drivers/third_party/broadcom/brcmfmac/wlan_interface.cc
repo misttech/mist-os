@@ -437,15 +437,17 @@ void WlanInterface::StopBss(StopBssRequestView request, StopBssCompleter::Sync& 
   completer.Reply();
 }
 
-void WlanInterface::SetKeysReq(SetKeysReqRequestView request,
-                               SetKeysReqCompleter::Sync& completer) {
+void WlanInterface::SetKeys(SetKeysRequestView request, SetKeysCompleter::Sync& completer) {
   std::shared_lock<std::shared_mutex> guard(lock_);
-  const fuchsia_wlan_fullmac::wire::WlanFullmacSetKeysReq req = request->req;
-  fuchsia_wlan_fullmac::wire::WlanFullmacSetKeysResp resp;
+  std::vector<zx_status_t> statuslist;
   if (wdev_ != nullptr) {
-    brcmf_if_set_keys_req(wdev_->netdev, &req, &resp);
+    statuslist = brcmf_if_set_keys_req(wdev_->netdev, request);
   }
 
+  fidl::Arena arena;
+
+  fuchsia_wlan_fullmac_wire::WlanFullmacSetKeysResp resp;
+  resp.statuslist = fidl::VectorView(arena, statuslist);
   completer.Reply(resp);
 }
 

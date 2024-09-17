@@ -488,10 +488,9 @@ async fn test_wpa2_connect_request_success() {
         // Expect PTK and GTK keys to be received by driver
         for _ in 0..2 {
             assert_variant!(fullmac_driver.request_stream.next().await,
-                fidl_fullmac::WlanFullmacImpl_Request::SetKeysReq { req, responder } => {
+                fidl_fullmac::WlanFullmacImpl_Request::SetKeys{ payload:_, responder } => {
                     responder.send(&fidl_fullmac::WlanFullmacSetKeysResp {
-                        num_keys: req.num_keys,
-                        statuslist: [zx::sys::ZX_OK; fidl_fullmac::WLAN_MAX_KEYLIST_SIZE as usize],
+                        statuslist: vec![zx::sys::ZX_OK],
                     }).expect("Failed to respond to SetKeys");
             });
         }
@@ -535,14 +534,15 @@ async fn test_wpa2_connect_request_success() {
     assert_eq!(eapol_tx2.dst_addr.unwrap(), COMPATIBLE_WPA2_BSS.bssid.to_array());
 
     // Check that PTK received by driver matches the authenticator's PTK
-    let driver_ptk_req = assert_variant!(&fullmac_request_history[3], FullmacRequest::SetKeysReq(req) => req.clone());
-    assert_eq!(driver_ptk_req.num_keys, 1);
-    let driver_ptk = &driver_ptk_req.keylist[0];
+    let driver_ptk_req =
+        assert_variant!(&fullmac_request_history[3], FullmacRequest::SetKeys(req) => req.clone());
+    assert_eq!(driver_ptk_req.keylist.as_ref().unwrap().len(), 1);
+    let driver_ptk = driver_ptk_req.keylist.as_ref().unwrap();
     let auth_ptk =
         assert_variant!(&auth_update_sink[0], SecAssocUpdate::Key(Key::Ptk(ptk)) => ptk.clone());
 
     assert_eq!(
-        driver_ptk,
+        &driver_ptk[0],
         &fidl_common::WlanKeyConfig {
             key_type: Some(fidl_common::WlanKeyType::Pairwise),
             key_idx: Some(0),
@@ -558,14 +558,14 @@ async fn test_wpa2_connect_request_success() {
 
     // Check that GTK received by driver matches the authenticator's GTK
     let driver_gtk_req =
-        assert_variant!(&fullmac_request_history[4], FullmacRequest::SetKeysReq(req) => req);
-    assert_eq!(driver_gtk_req.num_keys, 1);
-    let driver_gtk = &driver_gtk_req.keylist[0];
+        assert_variant!(&fullmac_request_history[4], FullmacRequest::SetKeys(req) => req);
+    assert_eq!(driver_gtk_req.keylist.as_ref().unwrap().len(), 1);
+    let driver_gtk = driver_gtk_req.keylist.clone().unwrap();
     let auth_gtk =
         assert_variant!(&auth_update_sink[1], SecAssocUpdate::Key(Key::Gtk(gtk)) => gtk.clone());
 
     assert_eq!(
-        driver_gtk,
+        &driver_gtk[0],
         &fidl_common::WlanKeyConfig {
             key_type: Some(fidl_common::WlanKeyType::Group),
             key_idx: Some(auth_gtk.key_id()),
@@ -707,10 +707,9 @@ async fn test_wpa3_connect_success() {
         // Expect PTK, GTK, and IGTK
         for _ in 0..3 {
             assert_variant!(fullmac_driver.request_stream.next().await,
-                fidl_fullmac::WlanFullmacImpl_Request::SetKeysReq { req, responder } => {
+                fidl_fullmac::WlanFullmacImpl_Request::SetKeys{ payload:_, responder } => {
                     responder.send(&fidl_fullmac::WlanFullmacSetKeysResp {
-                        num_keys: req.num_keys,
-                        statuslist: [zx::sys::ZX_OK; fidl_fullmac::WLAN_MAX_KEYLIST_SIZE as usize],
+                        statuslist: vec![zx::sys::ZX_OK],
                     }).expect("Failed to respond to SetKeys");
             });
         }
@@ -774,15 +773,16 @@ async fn test_wpa3_connect_success() {
     assert_eq!(eapol_tx2.dst_addr.unwrap(), COMPATIBLE_WPA2_BSS.bssid.to_array());
 
     // Check that PTK received by driver matches the authenticator's PTK
-    let driver_ptk_req = assert_variant!(&fullmac_request_history[6], FullmacRequest::SetKeysReq(req) => req.clone());
-    assert_eq!(driver_ptk_req.num_keys, 1);
-    let driver_ptk = &driver_ptk_req.keylist[0];
+    let driver_ptk_req =
+        assert_variant!(&fullmac_request_history[6], FullmacRequest::SetKeys(req) => req.clone());
+    assert_eq!(driver_ptk_req.keylist.as_ref().unwrap().len(), 1);
+    let driver_ptk = driver_ptk_req.keylist.unwrap();
     let auth_ptk =
         assert_variant!(&auth_update_sink[0], SecAssocUpdate::Key(Key::Ptk(ptk)) => ptk.clone());
 
     assert_eq!(
-        driver_ptk,
-        &fidl_common::WlanKeyConfig {
+        driver_ptk[0],
+        fidl_common::WlanKeyConfig {
             key_type: Some(fidl_common::WlanKeyType::Pairwise),
             key_idx: Some(0),
             peer_addr: Some(COMPATIBLE_WPA2_BSS.bssid.to_array()),
@@ -797,15 +797,15 @@ async fn test_wpa3_connect_success() {
 
     // Check that GTK received by driver matches the authenticator's GTK
     let driver_gtk_req =
-        assert_variant!(&fullmac_request_history[7], FullmacRequest::SetKeysReq(req) => req);
-    assert_eq!(driver_gtk_req.num_keys, 1);
-    let driver_gtk = &driver_gtk_req.keylist[0];
+        assert_variant!(&fullmac_request_history[7], FullmacRequest::SetKeys(req) => req);
+    assert_eq!(driver_gtk_req.keylist.as_ref().unwrap().len(), 1);
+    let driver_gtk = &driver_gtk_req.keylist.clone().unwrap();
     let auth_gtk =
         assert_variant!(&auth_update_sink[1], SecAssocUpdate::Key(Key::Gtk(gtk)) => gtk.clone());
 
     assert_eq!(
-        driver_gtk,
-        &fidl_common::WlanKeyConfig {
+        driver_gtk[0],
+        fidl_common::WlanKeyConfig {
             key_type: Some(fidl_common::WlanKeyType::Group),
             key_idx: Some(auth_gtk.key_id()),
             peer_addr: Some(ieee80211::BROADCAST_ADDR.to_array()),
@@ -820,14 +820,14 @@ async fn test_wpa3_connect_success() {
 
     // Check that IGTK received by driver matches the authenticator's IGTK
     let driver_igtk_req =
-        assert_variant!(&fullmac_request_history[8], FullmacRequest::SetKeysReq(req) => req);
-    let driver_igtk = &driver_igtk_req.keylist[0];
+        assert_variant!(&fullmac_request_history[8], FullmacRequest::SetKeys(req) => req);
+    let driver_igtk = driver_igtk_req.keylist.clone().unwrap();
     let auth_igtk =
         assert_variant!(&auth_update_sink[2], SecAssocUpdate::Key(Key::Igtk(igtk)) => igtk.clone());
 
     assert_eq!(
-        driver_igtk,
-        &fidl_common::WlanKeyConfig {
+        driver_igtk[0],
+        fidl_common::WlanKeyConfig {
             key_type: Some(fidl_common::WlanKeyType::Igtk),
             key_idx: Some(auth_igtk.key_id.try_into().unwrap()),
             peer_addr: Some(ieee80211::BROADCAST_ADDR.to_array()),

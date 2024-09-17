@@ -203,7 +203,7 @@ impl<D: DeviceOps> MlmeMainLoop<D> {
 
     fn handle_mlme_set_keys_request(&self, req: fidl_mlme::SetKeysRequest) -> anyhow::Result<()> {
         let fullmac_req = mlme_to_fullmac::convert_set_keys_request(&req)?;
-        let fullmac_resp = self.device.set_keys_req(fullmac_req)?;
+        let fullmac_resp = self.device.set_keys(fullmac_req)?;
         let mlme_resp = fullmac_to_mlme::convert_set_keys_resp(fullmac_resp, &req)?;
         self.mlme_event_sink.send(fidl_mlme::MlmeEvent::SetKeysConf { conf: mlme_resp });
         Ok(())
@@ -691,16 +691,16 @@ mod handle_mlme_request_tests {
 
         h.mlme.handle_mlme_request(fidl_req).unwrap();
 
-        let driver_req = assert_variant!(h.driver_calls.try_next(), Ok(Some(DriverCall::SetKeysReq { req })) => req);
-        assert_eq!(driver_req.num_keys, 1);
-        // assert_eq!(driver_req_keys[0], vec![5u8, 6]);
-        assert_eq!(driver_req.keylist[0].key_idx, Some(7));
-        assert_eq!(driver_req.keylist[0].key_type, Some(fidl_common::WlanKeyType::Group));
-        assert_eq!(driver_req.keylist[0].peer_addr, Some([8u8; 6]));
-        assert_eq!(driver_req.keylist[0].rsc, Some(9));
-        assert_eq!(driver_req.keylist[0].cipher_oui, Some([10u8; 3]));
+        let driver_req = assert_variant!(h.driver_calls.try_next(), Ok(Some(DriverCall::SetKeys { req })) => req);
+        assert_eq!(driver_req.keylist.as_ref().unwrap().len(), 1 as usize);
+        let keylist = driver_req.keylist.as_ref().unwrap();
+        assert_eq!(keylist[0].key_idx, Some(7));
+        assert_eq!(keylist[0].key_type, Some(fidl_common::WlanKeyType::Group));
+        assert_eq!(keylist[0].peer_addr, Some([8u8; 6]));
+        assert_eq!(keylist[0].rsc, Some(9));
+        assert_eq!(keylist[0].cipher_oui, Some([10u8; 3]));
         assert_eq!(
-            driver_req.keylist[0].cipher_type,
+            keylist[0].cipher_type,
             Some(fidl_ieee80211::CipherSuiteType::from_primitive_allow_unknown(11))
         );
 
@@ -718,10 +718,7 @@ mod handle_mlme_request_tests {
         let mut h = TestHelper::set_up();
         const NUM_KEYS: usize = 3;
         h.fake_device.lock().unwrap().set_keys_resp_mock =
-            Some(fidl_fullmac::WlanFullmacSetKeysResp {
-                num_keys: NUM_KEYS as u64,
-                statuslist: [0i32, 1, 0, 0],
-            });
+            Some(fidl_fullmac::WlanFullmacSetKeysResp { statuslist: [0i32, 1, 0].to_vec() });
         let mut keylist = vec![];
         let key = fidl_mlme::SetKeyDescriptor {
             key: vec![5u8, 6],
@@ -739,10 +736,11 @@ mod handle_mlme_request_tests {
 
         h.mlme.handle_mlme_request(fidl_req).unwrap();
 
-        let driver_req = assert_variant!(h.driver_calls.try_next(), Ok(Some(DriverCall::SetKeysReq { req })) => req);
-        assert_eq!(driver_req.num_keys, NUM_KEYS as u64);
+        let driver_req = assert_variant!(h.driver_calls.try_next(), Ok(Some(DriverCall::SetKeys { req })) => req);
+        assert_eq!(driver_req.keylist.as_ref().unwrap().len(), NUM_KEYS as usize);
+        let keylist = driver_req.keylist.unwrap();
         for i in 0..NUM_KEYS {
-            assert_eq!(driver_req.keylist[i].key_idx, Some(i as u8));
+            assert_eq!(keylist[i].key_idx, Some(i as u8));
         }
 
         let conf = assert_variant!(h.mlme_event_receiver.try_next(), Ok(Some(fidl_mlme::MlmeEvent::SetKeysConf { conf })) => conf);
@@ -776,7 +774,7 @@ mod handle_mlme_request_tests {
 
         assert!(h.mlme.handle_mlme_request(fidl_req).is_err());
 
-        // No SetKeysReq and SetKeysResp
+        // No SetKeys and SetKeysResp
         assert_variant!(h.driver_calls.try_next(), Err(_));
         assert_variant!(h.mlme_event_receiver.try_next(), Err(_));
     }
@@ -785,7 +783,7 @@ mod handle_mlme_request_tests {
     fn test_set_keys_request_when_resp_has_different_num_keys() {
         let mut h = TestHelper::set_up();
         h.fake_device.lock().unwrap().set_keys_resp_mock =
-            Some(fidl_fullmac::WlanFullmacSetKeysResp { num_keys: 2, statuslist: [0i32; 4] });
+            Some(fidl_fullmac::WlanFullmacSetKeysResp { statuslist: [0i32; 2].to_vec() });
         let fidl_req = wlan_sme::MlmeRequest::SetKeys(fidl_mlme::SetKeysRequest {
             keylist: vec![fidl_mlme::SetKeyDescriptor {
                 key: vec![5u8, 6],
@@ -803,7 +801,7 @@ mod handle_mlme_request_tests {
         // An error is expected when converting the response
         assert!(h.mlme.handle_mlme_request(fidl_req).is_err());
 
-        assert_variant!(h.driver_calls.try_next(), Ok(Some(DriverCall::SetKeysReq { .. })));
+        assert_variant!(h.driver_calls.try_next(), Ok(Some(DriverCall::SetKeys { .. })));
         // No SetKeysConf MLME event because the SetKeysResp from driver has different number of
         // keys.
         assert_variant!(h.mlme_event_receiver.try_next(), Err(_));

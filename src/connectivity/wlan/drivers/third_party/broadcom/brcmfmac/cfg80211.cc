@@ -4333,20 +4333,21 @@ done:
   }
 }
 
-void brcmf_if_set_keys_req(net_device* ndev,
-                           const fuchsia_wlan_fullmac_wire::WlanFullmacSetKeysReq* req,
-                           fuchsia_wlan_fullmac_wire::WlanFullmacSetKeysResp* resp) {
-  BRCMF_IFDBG(WLANIF, ndev, "Set keys request from SME. num_keys: %zu", req->num_keys);
+std::vector<zx_status_t> brcmf_if_set_keys_req(
+    net_device* ndev, const fuchsia_wlan_fullmac_wire::WlanFullmacImplSetKeysRequest* req) {
+  BRCMF_IFDBG(WLANIF, ndev, "Set keys request from SME. num_keys: %zu", req->keylist().count());
   zx_status_t result;
 
-  resp->num_keys = req->num_keys;
-  for (size_t i = 0; i < req->num_keys; i++) {
-    result = brcmf_cfg80211_add_key(ndev, &req->keylist.data()[i]);
+  std::vector<zx_status_t> statuslist;
+  statuslist.reserve(req->keylist().count());
+  for (size_t i = 0; i < req->keylist().count(); i++) {
+    result = brcmf_cfg80211_add_key(ndev, &req->keylist().data()[i]);
     if (result != ZX_OK) {
       BRCMF_WARN("Error setting key %zu: %s.", i, zx_status_get_string(result));
     }
-    resp->statuslist[i] = result;
+    statuslist.emplace_back(result);
   }
+  return statuslist;
 }
 
 void brcmf_if_del_keys_req(net_device* ndev,
