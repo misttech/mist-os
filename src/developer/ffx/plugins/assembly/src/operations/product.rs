@@ -288,6 +288,26 @@ Resulting product is not supported and may misbehave!
             .context("Adding devicetree binary")?;
     }
 
+    // Construct and set the images config
+    let zbi_only = mode != PackageMode::DiskImage;
+    builder
+        .set_images_config(
+            ImagesConfig::from_product_and_board(
+                &platform.storage.filesystems,
+                &board_info.filesystems,
+                zbi_only,
+            )
+            .context("Constructing images config")?,
+        )
+        .context("Setting images configuration.")?;
+
+    //////////////////////
+    //
+    // Generate the output files.  All builder modifications must be complete by here.
+
+    // Strip the mutability of the builder.
+    let builder = builder;
+
     // Serialize the builder state for forensic use.
     let builder_forensics_file_path = outdir.join("assembly_builder_forensics.json");
     let board_forensics_file_path = outdir.join("board_configuration_forensics.json");
@@ -315,17 +335,8 @@ Resulting product is not supported and may misbehave!
     let tools = SdkToolProvider::try_new()?;
 
     // Do the actual building of everything for the Image Assembly config.
-    let mut image_assembly =
+    let image_assembly =
         builder.build(&outdir, &tools).context("Building Image Assembly config")?;
-
-    let zbi_only = mode != PackageMode::DiskImage;
-    let images = ImagesConfig::from_product_and_board(
-        &platform.storage.filesystems,
-        &board_info.filesystems,
-        zbi_only,
-    )
-    .context("Constructing images config")?;
-    image_assembly.images_config = images;
 
     // Validate the built product assembly.
     assembly_validate_product::validate_product(

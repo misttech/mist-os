@@ -20,6 +20,7 @@ use assembly_config_schema::{BoardInformation, DriverDetails, PackageDetails, Pa
 use assembly_domain_config::DomainConfigPackage;
 use assembly_driver_manifest::{DriverManifestBuilder, DriverPackageType};
 use assembly_file_relative_path::SupportsFileRelativePaths;
+use assembly_images_config::ImagesConfig;
 use assembly_named_file_map::NamedFileMap;
 use assembly_package_utils::PackageInternalPathBuf;
 use assembly_platform_configuration::{
@@ -89,6 +90,9 @@ pub struct ImageAssemblyConfigBuilder {
 
     /// Developer override options
     developer_only_options: Option<DeveloperOnlyOptions>,
+
+    /// Optional ImagesConfig to add to the constructed ImageAssembly config
+    images_config: Option<ImagesConfig>,
 }
 
 impl ImageAssemblyConfigBuilder {
@@ -112,6 +116,7 @@ impl ImageAssemblyConfigBuilder {
             configuration_capabilities: None,
             devicetree: None,
             developer_only_options: None,
+            images_config: None,
         }
     }
 
@@ -615,7 +620,7 @@ impl ImageAssemblyConfigBuilder {
         if self.package_configs.insert(package.as_ref().to_owned(), config).is_none() {
             Ok(())
         } else {
-            Err(anyhow::format_err!("duplicate config patch"))
+            Err(anyhow!("duplicate config patch"))
         }
     }
 
@@ -628,7 +633,7 @@ impl ImageAssemblyConfigBuilder {
         if self.domain_configs.insert(package, config).is_none() {
             Ok(())
         } else {
-            Err(anyhow::format_err!("duplicate domain config"))
+            Err(anyhow!("duplicate domain config"))
         }
     }
 
@@ -637,7 +642,7 @@ impl ImageAssemblyConfigBuilder {
         config: assembly_config_capabilities::CapabilityNamedMap,
     ) -> Result<()> {
         if self.configuration_capabilities.is_some() {
-            return Err(anyhow::format_err!("duplicate configuration capabilities"));
+            return Err(anyhow!("duplicate configuration capabilities"));
         }
         self.configuration_capabilities = Some(config);
         Ok(())
@@ -660,9 +665,17 @@ impl ImageAssemblyConfigBuilder {
 
     pub fn add_devicetree(&mut self, devicetree_path: &Utf8Path) -> Result<()> {
         if self.devicetree.is_some() {
-            return Err(anyhow::format_err!("duplicate devicetree binary"));
+            bail!("duplicate devicetree binary");
         }
         self.devicetree = Some(devicetree_path.into());
+        Ok(())
+    }
+
+    pub fn set_images_config(&mut self, images_config: ImagesConfig) -> Result<()> {
+        if self.images_config.is_some() {
+            bail!("image_config has already been set.");
+        }
+        self.images_config = Some(images_config);
         Ok(())
     }
 
@@ -705,6 +718,7 @@ impl ImageAssemblyConfigBuilder {
             configuration_capabilities,
             devicetree,
             developer_only_options,
+            images_config,
         } = self;
 
         let cmc_tool = tools.get_tool("cmc")?;
@@ -920,7 +934,7 @@ impl ImageAssemblyConfigBuilder {
             qemu_kernel: qemu_kernel.context("A qemu kernel configuration must be specified")?,
             boot_args: boot_args.into_iter().collect(),
             bootfs_files,
-            images_config: Default::default(),
+            images_config: images_config.unwrap_or_default(),
             board_name,
             board_driver_arguments,
             devicetree,
