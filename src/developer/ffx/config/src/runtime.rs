@@ -9,7 +9,7 @@ use std::fs::File;
 use std::io::BufReader;
 use std::path::Path;
 
-fn try_split_name_value_pairs(config: &String) -> Result<Option<Value>> {
+pub fn try_split_name_value_pairs(config: &String) -> Result<Option<Value>> {
     let mut runtime_config = Map::new();
     for pair in config.split(',') {
         let s: Vec<&str> = pair.trim().split('=').collect();
@@ -31,7 +31,7 @@ fn try_split_name_value_pairs(config: &String) -> Result<Option<Value>> {
     Ok(Some(Value::Object(runtime_config)))
 }
 
-fn try_parse_json(config: &String) -> Result<Option<Value>> {
+pub fn try_parse_json(config: &String) -> Result<Option<Value>> {
     match serde_json::from_str(config) {
         Ok(v) => Ok(Some(v)),
         Err(_) => bail!("could not parse json from --config flag"),

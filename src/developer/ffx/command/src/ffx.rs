@@ -16,7 +16,7 @@ use ffx_writer::Format;
 use std::collections::HashMap;
 use std::fmt::Write;
 use std::os::unix::process::ExitStatusExt;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::process::ExitStatus;
 use std::str::FromStr;
 
@@ -301,10 +301,8 @@ enum CoreCheckErrorEnum {
     TargetMustBeAddress(String),
     #[error("ffx core requries that the Target be a valid IP address. Invalid ID: \"{}\"", .0)]
     TargetAddressMustHaveValidScopeId(String),
-    #[error("Core mode requires at most one --config flag to be passed. Actually passed: {}", .0)]
-    MustHaveOneConfigArg(usize),
-    #[error("When running in core mode, config flags must be passed as a path to a file. Path: {} is not a file", .0)]
-    ConfigArgMustBeFile(String),
+    #[error("When running in core mode, config flags must be list of Key Value Pairs or valid JSON. Passed: \"{}\"", .0)]
+    ConfigArgMustBeJsonOrKeyValuePair(String),
     #[error("Specifying core mode and isolate dir are mutually exclusive. specify one or the other. Isolate Dir Passed: {}", .0.display())]
     CoreAndIsolateMutuallyExclusive(PathBuf),
     #[error("ffx core requries that the Log Destination be explicitly specified")]
@@ -374,14 +372,13 @@ pub fn check_core_constraints(ffx: &Ffx) -> Result<()> {
         },
     };
 
-    if ffx.config.len() > 1 {
-        errors.push(CoreCheckErrorEnum::MustHaveOneConfigArg(ffx.config.len()));
-    }
-
     for potential_config in ffx.config.iter() {
-        let try_path = Path::new(potential_config);
-        if !try_path.is_file() {
-            errors.push(CoreCheckErrorEnum::ConfigArgMustBeFile(potential_config.clone()));
+        if ffx_config::runtime::try_parse_json(potential_config).is_err()
+            && ffx_config::runtime::try_split_name_value_pairs(potential_config).is_err()
+        {
+            errors.push(CoreCheckErrorEnum::ConfigArgMustBeJsonOrKeyValuePair(
+                potential_config.clone(),
+            ));
         }
     }
 
@@ -597,6 +594,10 @@ mod test {
                     "--core",
                     "--target",
                     "192.168.1.1:8001",
+                    "--config",
+                    "foo=bar,baz=biz",
+                    "--config",
+                    "{\"key\":\"valid_json\"}",
                     "--log-output",
                     "/tmp/out.log",
                     "target",
@@ -628,38 +629,16 @@ mod test {
                     "--log-output",
                     "/tmp/out.log",
                     "--config",
-                    "foo=bar",
+                    "asdf",
                     "--machine",
                     "json",
                     "target",
                     "echo",
                 ],
                 name: "Bad config setting".into(),
-                expected_errors: vec![CoreCheckErrorEnum::ConfigArgMustBeFile("foo=bar".into())],
-            },
-            TestCase {
-                inputs: vec![
-                    "ffx",
-                    "--core",
-                    "--log-output",
-                    "/tmp/out.log",
-                    "--target",
-                    "192.168.1.1:8004",
-                    "--config",
-                    "foo=bar",
-                    "--config",
-                    "some_file.json",
-                    "--machine",
-                    "json",
-                    "target",
-                    "echo",
-                ],
-                name: "Multiple config settings".into(),
-                expected_errors: vec![
-                    CoreCheckErrorEnum::MustHaveOneConfigArg(2),
-                    CoreCheckErrorEnum::ConfigArgMustBeFile("foo=bar".into()),
-                    CoreCheckErrorEnum::ConfigArgMustBeFile("some_file.json".into()),
-                ],
+                expected_errors: vec![CoreCheckErrorEnum::ConfigArgMustBeJsonOrKeyValuePair(
+                    "asdf".into(),
+                )],
             },
             TestCase {
                 inputs: vec![
