@@ -45,15 +45,10 @@ type WlanFullmacSetKeysResp = struct {
     statuslist vector<zx.Status>:WLAN_MAX_KEYLIST_SIZE;
 };
 
-type DeleteKeyDescriptor = struct {
-    key_id uint16;
-    key_type fuchsia.wlan.common.WlanKeyType;
-    address ieee80211.MacAddr;
-};
-
-type WlanFullmacDelKeysReq = struct {
-    num_keys uint64;
-    keylist array<DeleteKeyDescriptor, WLAN_MAX_KEYLIST_SIZE>;
+type DeleteKeyDescriptor = table {
+    1: key_id uint16;
+    2: key_type fuchsia.wlan.common.WlanKeyType;
+    3: address ieee80211.MacAddr;
 };
 
 /// This struct is sent from SME to wlanif, indicating the result of SAE handshake process.
@@ -636,8 +631,8 @@ closed protocol WlanFullmacImpl {
     }) -> (struct {
         resp WlanFullmacSetKeysResp;
     });
-    strict DelKeysReq(struct {
-        req WlanFullmacDelKeysReq;
+    strict DelKeys(table {
+        1: keylist vector<DeleteKeyDescriptor>:WLAN_MAX_KEYLIST_SIZE;
     }) -> ();
     strict EapolTx(table {
         1: src_addr ieee80211.MacAddr;

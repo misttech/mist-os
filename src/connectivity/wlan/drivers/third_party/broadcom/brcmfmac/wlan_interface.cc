@@ -451,12 +451,10 @@ void WlanInterface::SetKeys(SetKeysRequestView request, SetKeysCompleter::Sync& 
   completer.Reply(resp);
 }
 
-void WlanInterface::DelKeysReq(DelKeysReqRequestView request,
-                               DelKeysReqCompleter::Sync& completer) {
+void WlanInterface::DelKeys(DelKeysRequestView request, DelKeysCompleter::Sync& completer) {
   std::shared_lock<std::shared_mutex> guard(lock_);
-  const fuchsia_wlan_fullmac::wire::WlanFullmacDelKeysReq req = request->req;
   if (wdev_ != nullptr) {
-    brcmf_if_del_keys_req(wdev_->netdev, &req);
+    brcmf_if_del_keys_req(wdev_->netdev, request);
   }
   completer.Reply();
 }

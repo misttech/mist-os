@@ -648,7 +648,7 @@ void brcmf_if_stop_req(net_device* ndev,
 std::vector<zx_status_t> brcmf_if_set_keys_req(
     net_device* ndev, const fuchsia_wlan_fullmac_wire::WlanFullmacImplSetKeysRequest* req);
 void brcmf_if_del_keys_req(net_device* ndev,
-                           const fuchsia_wlan_fullmac_wire::WlanFullmacDelKeysReq* req);
+                           const fuchsia_wlan_fullmac_wire::WlanFullmacImplDelKeysRequest* req);
 void brcmf_if_eapol_req(net_device* ndev,
                         const fuchsia_wlan_fullmac_wire::WlanFullmacImplEapolTxRequest* req);
 void brcmf_if_stats_query_req(net_device* ndev);

@@ -149,7 +149,7 @@ impl<D: DeviceOps> MlmeMainLoop<D> {
             Stop(req) => self.device.stop_bss(mlme_to_fullmac::convert_stop_bss_request(req)?)?,
             SetKeys(req) => self.handle_mlme_set_keys_request(req)?,
             DeleteKeys(req) => {
-                self.device.del_keys_req(mlme_to_fullmac::convert_delete_keys_request(req)?)?
+                self.device.del_keys(mlme_to_fullmac::convert_delete_keys_request(req)?)?
             }
             Eapol(req) => self.device.eapol_tx(mlme_to_fullmac::convert_eapol_request(req))?,
             SetCtrlPort(req) => self.set_link_state(req.state)?,
@@ -820,11 +820,12 @@ mod handle_mlme_request_tests {
 
         h.mlme.handle_mlme_request(fidl_req).unwrap();
 
-        let driver_req = assert_variant!(h.driver_calls.try_next(), Ok(Some(DriverCall::DelKeysReq { req })) => req);
-        assert_eq!(driver_req.num_keys, 1);
-        assert_eq!(driver_req.keylist[0].key_id, 1);
-        assert_eq!(driver_req.keylist[0].key_type, fidl_common::WlanKeyType::Peer);
-        assert_eq!(driver_req.keylist[0].address, [2u8; 6]);
+        let driver_req = assert_variant!(h.driver_calls.try_next(), Ok(Some(DriverCall::DelKeys { req })) => req);
+        assert_eq!(driver_req.keylist.as_ref().unwrap().len(), 1);
+        let keylist = driver_req.keylist.unwrap();
+        assert_eq!(keylist[0].key_id, Some(1));
+        assert_eq!(keylist[0].key_type, Some(fidl_common::WlanKeyType::Peer));
+        assert_eq!(keylist[0].address, Some([2u8; 6]));
     }
 
     #[test]

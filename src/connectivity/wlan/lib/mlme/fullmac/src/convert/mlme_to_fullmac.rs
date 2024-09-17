@@ -6,7 +6,6 @@
 // used in production when the Banjo FFI is removed.
 #![allow(dead_code)]
 use anyhow::{bail, Result};
-use std::cmp::min;
 use {
     fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_fullmac as fidl_fullmac,
     fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_mlme as fidl_mlme,
@@ -207,7 +206,7 @@ pub fn convert_set_keys_request(
 
 pub fn convert_delete_keys_request(
     req: fidl_mlme::DeleteKeysRequest,
-) -> Result<fidl_fullmac::WlanFullmacDelKeysReq> {
+) -> Result<fidl_fullmac::WlanFullmacImplDelKeysRequest> {
     const MAX_NUM_KEYS: usize = fidl_fullmac::WLAN_MAX_KEYLIST_SIZE as usize;
     if req.keylist.len() > MAX_NUM_KEYS {
         bail!(
@@ -216,14 +215,15 @@ pub fn convert_delete_keys_request(
             MAX_NUM_KEYS
         );
     }
-    let num_keys = min(req.keylist.len(), MAX_NUM_KEYS);
-    let mut keylist: [fidl_fullmac::DeleteKeyDescriptor; MAX_NUM_KEYS] =
-        std::array::from_fn(|_| dummy_delete_key_descriptor());
-    for i in 0..num_keys {
-        keylist[i] = convert_delete_key_descriptor(req.keylist[i]);
-    }
+    let keylist: Vec<_> = req
+        .keylist
+        .iter()
+        .map(|descriptor: &fidl_mlme::DeleteKeyDescriptor| {
+            convert_delete_key_descriptor(*descriptor)
+        })
+        .collect();
 
-    Ok(fidl_fullmac::WlanFullmacDelKeysReq { num_keys: num_keys as u64, keylist })
+    Ok(fidl_fullmac::WlanFullmacImplDelKeysRequest { keylist: Some(keylist), ..Default::default() })
 }
 
 pub fn convert_eapol_request(
@@ -299,9 +299,10 @@ fn convert_delete_key_descriptor(
     descriptor: fidl_mlme::DeleteKeyDescriptor,
 ) -> fidl_fullmac::DeleteKeyDescriptor {
     fidl_fullmac::DeleteKeyDescriptor {
-        key_id: descriptor.key_id,
-        key_type: convert_key_type(descriptor.key_type),
-        address: descriptor.address,
+        key_id: Some(descriptor.key_id),
+        key_type: Some(convert_key_type(descriptor.key_type)),
+        address: Some(descriptor.address),
+        ..Default::default()
     }
 }
 
@@ -322,9 +323,10 @@ fn convert_ssid(ssid: &[u8]) -> Result<fidl_ieee80211::CSsid> {
 // TODO(https://fxbug.dev/301104836): Cleanup Fullmac FIDL API such that this is no longer needed.
 fn dummy_delete_key_descriptor() -> fidl_fullmac::DeleteKeyDescriptor {
     fidl_fullmac::DeleteKeyDescriptor {
-        key_id: 0,
-        key_type: fidl_common::WlanKeyType::Pairwise,
-        address: [0; 6],
+        key_id: Some(0),
+        key_type: Some(fidl_common::WlanKeyType::Pairwise),
+        address: Some([0; 6]),
+        ..Default::default()
     }
 }
 
@@ -516,15 +518,11 @@ mod tests {
         let mlme = fidl_mlme::DeleteKeysRequest { keylist: vec![fake_delete_key_descriptor(); 2] };
 
         let fullmac = convert_delete_keys_request(mlme).unwrap();
-        assert_eq!(fullmac.num_keys, 2);
+        assert_eq!(fullmac.keylist.as_ref().unwrap().len(), 2);
 
-        for key in &fullmac.keylist[0..2] {
+        let keylist = fullmac.keylist.unwrap();
+        for key in &keylist[0..2] {
             assert_eq!(key, &convert_delete_key_descriptor(fake_delete_key_descriptor()));
-        }
-
-        // All other elements in keylist are default values
-        for key in &fullmac.keylist[2..] {
-            assert_eq!(key, &dummy_delete_key_descriptor());
         }
     }
 

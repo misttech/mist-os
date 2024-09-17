@@ -39,7 +39,7 @@ pub trait DeviceOps {
         &self,
         req: fidl_fullmac::WlanFullmacImplSetKeysRequest,
     ) -> anyhow::Result<fidl_fullmac::WlanFullmacSetKeysResp>;
-    fn del_keys_req(&self, req: fidl_fullmac::WlanFullmacDelKeysReq) -> anyhow::Result<()>;
+    fn del_keys(&self, req: fidl_fullmac::WlanFullmacImplDelKeysRequest) -> anyhow::Result<()>;
     fn eapol_tx(&self, req: fidl_fullmac::WlanFullmacImplEapolTxRequest) -> anyhow::Result<()>;
     fn get_iface_counter_stats(&self) -> anyhow::Result<fidl_mlme::GetIfaceCounterStatsResponse>;
     fn get_iface_histogram_stats(
@@ -173,9 +173,9 @@ impl DeviceOps for FullmacDevice {
             .set_keys(&req, zx::MonotonicTime::INFINITE)
             .context("FIDL error on SetKeysReq")
     }
-    fn del_keys_req(&self, req: fidl_fullmac::WlanFullmacDelKeysReq) -> anyhow::Result<()> {
+    fn del_keys(&self, req: fidl_fullmac::WlanFullmacImplDelKeysRequest) -> anyhow::Result<()> {
         self.fullmac_impl_sync_proxy
-            .del_keys_req(&req, zx::MonotonicTime::INFINITE)
+            .del_keys(&req, zx::MonotonicTime::INFINITE)
             .context("FIDL Error on DelKeysReq")
     }
     fn eapol_tx(&self, req: fidl_fullmac::WlanFullmacImplEapolTxRequest) -> anyhow::Result<()> {
@@ -255,7 +255,7 @@ pub mod test_utils {
         StartBss { req: fidl_fullmac::WlanFullmacImplStartBssRequest },
         StopBss { req: fidl_fullmac::WlanFullmacImplStopBssRequest },
         SetKeys { req: fidl_fullmac::WlanFullmacImplSetKeysRequest },
-        DelKeysReq { req: fidl_fullmac::WlanFullmacDelKeysReq },
+        DelKeys { req: fidl_fullmac::WlanFullmacImplDelKeysRequest },
         EapolTx { req: fidl_fullmac::WlanFullmacImplEapolTxRequest },
         GetIfaceCounterStats,
         GetIfaceHistogramStats,
@@ -486,8 +486,8 @@ pub mod test_utils {
                 }
             }
         }
-        fn del_keys_req(&self, req: fidl_fullmac::WlanFullmacDelKeysReq) -> anyhow::Result<()> {
-            self.driver_call_sender.send(DriverCall::DelKeysReq { req });
+        fn del_keys(&self, req: fidl_fullmac::WlanFullmacImplDelKeysRequest) -> anyhow::Result<()> {
+            self.driver_call_sender.send(DriverCall::DelKeys { req });
             Ok(())
         }
         fn eapol_tx(&self, req: fidl_fullmac::WlanFullmacImplEapolTxRequest) -> anyhow::Result<()> {
