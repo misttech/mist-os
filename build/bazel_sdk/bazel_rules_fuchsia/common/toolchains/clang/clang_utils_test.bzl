@@ -13,7 +13,7 @@ that can be launched with `bazel test` to run the test suite, as in:
 
 If @clang_repo//BUILD.bazel contains something like:
 
-  load("@fuchsia_sdk_common//:toolchains/clang/clang_utils_test.bzl",
+  load("//:toolchains/clang/clang_utils_test.bzl",
        "include_clang_utils_test_suite")
 
   include_clang_utils_test_suite(

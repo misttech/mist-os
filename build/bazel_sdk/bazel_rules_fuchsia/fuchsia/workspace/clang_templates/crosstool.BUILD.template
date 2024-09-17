@@ -534,7 +534,7 @@ config_setting(
 
 # IMPORTANT: The hwasan feature takes precedence over the asan one.
 # Keep this in sync with the definition of sanitizer_features in
-# @fuchsia_sdk_common/toolchains/clang/sanitizer.bzl
+# //common:toolchains/clang/sanitizer.bzl
 config_setting(
     name = "asan_variant",
     flag_values = {

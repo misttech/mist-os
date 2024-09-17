@@ -95,50 +95,50 @@ def _test_to_platform_cpu_constraint(env):
 
 def _test_config_setting_label_for_target_os_cpu(env):
     cases = [
-        ("fuchsia", "x64", "@fuchsia_sdk_common//platforms:is_fuchsia_x64"),
-        ("fuchsia", "k8", "@fuchsia_sdk_common//platforms:is_fuchsia_x64"),
-        ("fuchsia", "x86_64", "@fuchsia_sdk_common//platforms:is_fuchsia_x64"),
-        ("fuchsia", "arm64", "@fuchsia_sdk_common//platforms:is_fuchsia_arm64"),
-        ("fuchsia", "aarch64", "@fuchsia_sdk_common//platforms:is_fuchsia_arm64"),
-        ("fuchsia", "riscv64", "@fuchsia_sdk_common//platforms:is_fuchsia_riscv64"),
-        ("linux", "x64", "@fuchsia_sdk_common//platforms:is_linux_x64"),
-        ("linux", "k8", "@fuchsia_sdk_common//platforms:is_linux_x64"),
-        ("linux", "x86_64", "@fuchsia_sdk_common//platforms:is_linux_x64"),
-        ("linux", "arm64", "@fuchsia_sdk_common//platforms:is_linux_arm64"),
-        ("linux", "aarch64", "@fuchsia_sdk_common//platforms:is_linux_arm64"),
-        ("linux", "riscv64", "@fuchsia_sdk_common//platforms:is_linux_riscv64"),
-        ("mac", "x64", "@fuchsia_sdk_common//platforms:is_mac_x64"),
-        ("mac", "k8", "@fuchsia_sdk_common//platforms:is_mac_x64"),
-        ("mac", "x86_64", "@fuchsia_sdk_common//platforms:is_mac_x64"),
-        ("mac", "arm64", "@fuchsia_sdk_common//platforms:is_mac_arm64"),
-        ("mac", "aarch64", "@fuchsia_sdk_common//platforms:is_mac_arm64"),
-        ("macos", "x64", "@fuchsia_sdk_common//platforms:is_mac_x64"),
-        ("macos", "k8", "@fuchsia_sdk_common//platforms:is_mac_x64"),
-        ("macos", "x86_64", "@fuchsia_sdk_common//platforms:is_mac_x64"),
-        ("macos", "arm64", "@fuchsia_sdk_common//platforms:is_mac_arm64"),
-        ("macos", "aarch64", "@fuchsia_sdk_common//platforms:is_mac_arm64"),
-        ("osx", "x64", "@fuchsia_sdk_common//platforms:is_mac_x64"),
-        ("osx", "k8", "@fuchsia_sdk_common//platforms:is_mac_x64"),
-        ("osx", "x86_64", "@fuchsia_sdk_common//platforms:is_mac_x64"),
-        ("osx", "arm64", "@fuchsia_sdk_common//platforms:is_mac_arm64"),
-        ("osx", "aarch64", "@fuchsia_sdk_common//platforms:is_mac_arm64"),
+        ("fuchsia", "x64", "//common/platforms:is_fuchsia_x64"),
+        ("fuchsia", "k8", "//common/platforms:is_fuchsia_x64"),
+        ("fuchsia", "x86_64", "//common/platforms:is_fuchsia_x64"),
+        ("fuchsia", "arm64", "//common/platforms:is_fuchsia_arm64"),
+        ("fuchsia", "aarch64", "//common/platforms:is_fuchsia_arm64"),
+        ("fuchsia", "riscv64", "//common/platforms:is_fuchsia_riscv64"),
+        ("linux", "x64", "//common/platforms:is_linux_x64"),
+        ("linux", "k8", "//common/platforms:is_linux_x64"),
+        ("linux", "x86_64", "//common/platforms:is_linux_x64"),
+        ("linux", "arm64", "//common/platforms:is_linux_arm64"),
+        ("linux", "aarch64", "//common/platforms:is_linux_arm64"),
+        ("linux", "riscv64", "//common/platforms:is_linux_riscv64"),
+        ("mac", "x64", "//common/platforms:is_mac_x64"),
+        ("mac", "k8", "//common/platforms:is_mac_x64"),
+        ("mac", "x86_64", "//common/platforms:is_mac_x64"),
+        ("mac", "arm64", "//common/platforms:is_mac_arm64"),
+        ("mac", "aarch64", "//common/platforms:is_mac_arm64"),
+        ("macos", "x64", "//common/platforms:is_mac_x64"),
+        ("macos", "k8", "//common/platforms:is_mac_x64"),
+        ("macos", "x86_64", "//common/platforms:is_mac_x64"),
+        ("macos", "arm64", "//common/platforms:is_mac_arm64"),
+        ("macos", "aarch64", "//common/platforms:is_mac_arm64"),
+        ("osx", "x64", "//common/platforms:is_mac_x64"),
+        ("osx", "k8", "//common/platforms:is_mac_x64"),
+        ("osx", "x86_64", "//common/platforms:is_mac_x64"),
+        ("osx", "arm64", "//common/platforms:is_mac_arm64"),
+        ("osx", "aarch64", "//common/platforms:is_mac_arm64"),
     ]
     for os, cpu, expected in cases:
-        asserts.equals(env, expected, config_setting_label_for_target_os_cpu(os, cpu))
+        asserts.equals(env, expected, config_setting_label_for_target_os_cpu(os, cpu, "//common"))
 
 def _test_config_setting_label_for_target_tag(env):
     cases = [
-        ("fuchsia-x64", "@fuchsia_sdk_common//platforms:is_fuchsia_x64"),
-        ("fuchsia-arm64", "@fuchsia_sdk_common//platforms:is_fuchsia_arm64"),
-        ("fuchsia-riscv64", "@fuchsia_sdk_common//platforms:is_fuchsia_riscv64"),
-        ("linux-x64", "@fuchsia_sdk_common//platforms:is_linux_x64"),
-        ("linux-arm64", "@fuchsia_sdk_common//platforms:is_linux_arm64"),
-        ("linux-riscv64", "@fuchsia_sdk_common//platforms:is_linux_riscv64"),
-        ("mac-x64", "@fuchsia_sdk_common//platforms:is_mac_x64"),
-        ("mac-arm64", "@fuchsia_sdk_common//platforms:is_mac_arm64"),
+        ("fuchsia-x64", "//common/platforms:is_fuchsia_x64"),
+        ("fuchsia-arm64", "//common/platforms:is_fuchsia_arm64"),
+        ("fuchsia-riscv64", "//common/platforms:is_fuchsia_riscv64"),
+        ("linux-x64", "//common/platforms:is_linux_x64"),
+        ("linux-arm64", "//common/platforms:is_linux_arm64"),
+        ("linux-riscv64", "//common/platforms:is_linux_riscv64"),
+        ("mac-x64", "//common/platforms:is_mac_x64"),
+        ("mac-arm64", "//common/platforms:is_mac_arm64"),
     ]
     for input, expected in cases:
-        asserts.equals(env, expected, config_setting_label_for_target_tag(input))
+        asserts.equals(env, expected, config_setting_label_for_target_tag(input, "//common"))
 
 def _test_target_tag_dict_to_select_keys(env):
     cases = [
@@ -149,14 +149,14 @@ def _test_target_tag_dict_to_select_keys(env):
                 "fuchsia-riscv64": ["sweet risc"],
             },
             {
-                "@fuchsia_sdk_common//platforms:is_linux_x64": ["oh linux"],
-                "@fuchsia_sdk_common//platforms:is_mac_arm64": ["damn mac"],
-                "@fuchsia_sdk_common//platforms:is_fuchsia_riscv64": ["sweet risc"],
+                "//common/platforms:is_linux_x64": ["oh linux"],
+                "//common/platforms:is_mac_arm64": ["damn mac"],
+                "//common/platforms:is_fuchsia_riscv64": ["sweet risc"],
             },
         ),
     ]
     for input_dict, expected_dict in cases:
-        asserts.equals(env, expected_dict, target_tag_dict_to_select_keys(input_dict))
+        asserts.equals(env, expected_dict, target_tag_dict_to_select_keys(input_dict, "//common"))
         expected_dict_with_default = expected_dict | {
             "//conditions:default": ["default label"],
         }
