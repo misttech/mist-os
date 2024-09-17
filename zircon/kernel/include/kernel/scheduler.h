@@ -433,6 +433,20 @@ class Scheduler {
     }
   }
 
+  // Runs the migration functions of threads in the save_state_list_, placing
+  // the threads in their target RunQueues when done.
+  //
+  // Note that this method is called while holding the special "sched token"
+  // used during reschedule operations. As a result, it is an absolute
+  // requirement that any threads we lock in this method are not discoverable
+  // and lockable from another scheduler that is also holding the "sched token."
+  // Failure to meet this requirement will result in deadlock.
+  void ProcessSaveStateList(SchedTime now) TA_REQ(chainlock_transaction_token);
+
+  // Returns true if the given thread needs to be migrated from one CPU to another.
+  static bool NeedsMigration(Thread* thread)
+      TA_REQ(chainlock_transaction_token, thread->get_lock());
+
   // Lockup detector needs to be able to hold a scheduler's lock in order to
   // print diagnostics
   auto& queue_lock() TA_RET_CAP(queue_lock_) { return queue_lock_; }
@@ -462,30 +476,6 @@ class Scheduler {
     Association,
   };
 
-  // When we need to find a target CPU for a thread to run on, the behavior of
-  // FindTargetCpu depends on the reason why the thread needs to find a target
-  // CPU.  This enumeration encodes the reason allowing FindTargetCpu to
-  // behavior properly.
-  enum class FindTargetCpuReason {
-    // If the thread is unblocking (or coming out of suspend/sleep), then it
-    // might need to choose a CPU which it typically wouldn't (because of its
-    // currently configured soft affinity).  This happens when the thread last
-    // ran on CPU X before blocking, has a migration function, and now needs to
-    // run on a different CPU because of its affinity mask.  The thread will be
-    // sent to CPU X as it unblocks, but as soon as CPU X picks the thread to
-    // run, the threads migration function will be called (on CPU X) before the
-    // scheduler sends it to a different CPU queue (where it will complete the
-    // migration once it is finally scheduled to run).
-    Unblocking,
-
-    // If the thread needs to select a CPU because it is migrating, then the
-    // special logic used for the Unblocking reason is skipped.  It is assumed
-    // that the code has already managed to call the thread's migration function
-    // while running on its last cpu, and now the CPU chosen must be as compatible
-    // with the thread's soft affinity mask as possible.
-    Migrating,
-  };
-
   // Returns the current system time as a SchedTime value.
   static SchedTime CurrentTime() { return SchedTime{current_time()}; }
 
@@ -503,10 +493,10 @@ class Scheduler {
   // once if the initially chosen scheduler becomes deactivated after it was
   // selected, but before it was locked.
   template <typename Callable>
-  static cpu_num_t FindActiveSchedulerForThread(Thread* thread, FindTargetCpuReason reason,
-                                                Callable action) TA_REQ_SHARED(thread->get_lock()) {
+  static cpu_num_t FindActiveSchedulerForThread(Thread* thread, Callable action)
+      TA_REQ_SHARED(thread->get_lock()) {
     while (true) {
-      const cpu_num_t target_cpu = FindTargetCpu(thread, reason);
+      const cpu_num_t target_cpu = FindTargetCpu(thread);
       Scheduler* const target = Get(target_cpu);
       Guard<MonitoredSpinLock, NoIrqSave> target_queue_guard{&target->queue_lock_, SOURCE_TAG};
 
@@ -526,8 +516,7 @@ class Scheduler {
   // Typically, users will want to use FindActiveSchedulerForThread instead,
   // which will supply a locked scheduler which is guaranteed to be active.
   //
-  static cpu_num_t FindTargetCpu(Thread* thread, FindTargetCpuReason reason)
-      TA_REQ_SHARED(thread->get_lock());
+  static cpu_num_t FindTargetCpu(Thread* thread) TA_REQ_SHARED(thread->get_lock());
 
   // Increment the kcounter which tracks the number of times that an extra
   // attempt to find an active scheduler was needed during
@@ -599,7 +588,7 @@ class Scheduler {
   // Evaluates the schedule and returns the thread that should execute,
   // updating the run queue as necessary.
   Thread* EvaluateNextThread(SchedTime now, Thread* current_thread, bool timeslice_expired,
-                             SchedDuration total_runtime_ns,
+                             bool current_is_migrating, SchedDuration total_runtime_ns,
                              Guard<MonitoredSpinLock, NoIrqSave>& queue_guard)
       TA_REQ(chainlock_transaction_token, queue_lock_, current_thread->get_lock());
 
@@ -983,6 +972,20 @@ class Scheduler {
   // The run queue of deadline scheduled threads ready to run, but not currently running.
   TA_GUARDED(queue_lock_)
   RunQueue deadline_run_queue_;
+
+  // The list of threads that need to run the Save stage of their migrate functions.
+  //
+  // There are several invariants that must be maintained when interacting with this
+  // list:
+  // 1. Other CPUs can put threads into this save_state_list_, but only this Scheduler (and thus
+  //    this CPU) can remove threads from it. Removal is currently handled in ProcessSaveStateList.
+  // 2. Interrupts must be disabled while removing threads from this list, effectively ensuring
+  //    that only one call to ProcessSaveStateList can be made at a time on a given CPU.
+  // 3. Threads cannot be destroyed until they are removed from this list. This is guaranteed
+  //    today by the fact that dead threads clean themselves up when they are scheduled, which is
+  //    not possible if the thread is in this list.
+  TA_GUARDED(queue_lock_)
+  Thread::SaveStateList save_state_list_;
 
   // Pointer to the thread actively running on this CPU.
   TA_GUARDED(queue_lock_)
