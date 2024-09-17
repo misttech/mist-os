@@ -27,6 +27,12 @@ fit::result<Error, void*> DlSystemTests::DlOpen(const char* file, int mode) {
   // Call dlopen in an OS-specific context.
   void* result = CallDlOpen(file, mode);
   if (!result) {
+    if (mode & RTLD_NOLOAD) {
+      // Musl emits a "Library x is not already loaded" for RTLD_NOLOAD, so
+      // consume any failure from dlerror here.
+      dlerror();
+      return fit::ok(result);
+    }
     return TakeError();
   }
   TrackModule(result, std::string{file});
@@ -70,26 +76,34 @@ void* DlSystemTests::CallDlOpen(const char* file, int mode) {
 }
 #endif
 
-void DlSystemTests::ExpectRootModuleNotLoaded(std::string_view name) {
-  // DlOpen `name` with `RTLD_NOLOAD` to ensure this will be the first time the
-  // file is loaded from the filesystem.
-  ASSERT_TRUE(DlOpen(std::string{name}.c_str(), RTLD_NOLOAD).is_error());
-  // TODO(https://fxbug.dev/354043838): Uncomment when this function becomes a
-  // wrapper for ExpectRootModule.
-  // Now add the expectation that the file will be loaded from the filesystem.
-  // DlSystemLoadTestsBase::ExpectRootModule(name);
+void DlSystemTests::NoLoadCheck(std::string_view name) {
+  auto result = DlOpen(std::string{name}.c_str(), RTLD_NOW | RTLD_LOCAL | RTLD_NOLOAD);
+  ASSERT_TRUE(result.is_ok());
+  ASSERT_EQ(result.value(), nullptr);
 }
 
-void DlSystemTests::ExpectNeededNotLoaded(std::initializer_list<std::string_view> names) {
-  // DlOpen each "Needed" dep  with `RTLD_NOLOAD` to ensure this will be the
-  // first time the file is loaded from the filesystem.
+void DlSystemTests::ExpectRootModule(std::string_view name) {
+  NoLoadCheck(name);
+  DlSystemLoadTestsBase::ExpectRootModule(name);
+}
+
+void DlSystemTests::Needed(std::initializer_list<std::string_view> names) {
   for (auto name : names) {
-    ASSERT_TRUE(DlOpen(std::string{name}.c_str(), RTLD_NOLOAD).is_error());
+    NoLoadCheck(name);
   }
-  // TODO(https://fxbug.dev/354043838): Uncomment when this function becomes a
-  // wrapper for ExpectRootModule.
   // Now add the expectation that the deps will be loaded from the filesystem.
-  // DlSystemLoadTestsBase::Needed(names);
+  DlSystemLoadTestsBase::Needed(names);
+}
+
+void DlSystemTests::Needed(
+    std::initializer_list<std::pair<std::string_view, bool>> name_found_pairs) {
+  for (auto [name, found] : name_found_pairs) {
+    if (found) {
+      NoLoadCheck(name);
+    }
+  }
+  // Now add the expectation that the deps will be loaded from the filesystem.
+  DlSystemLoadTestsBase::Needed(name_found_pairs);
 }
 
 }  // namespace dl::testing
