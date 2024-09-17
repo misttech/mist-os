@@ -318,12 +318,11 @@ impl DeviceRegistry {
         N: DeviceSysfsOps,
         L: LockBefore<FileOpsCore>,
     {
-        if let Err(err) = self.register_device(
+        if let Err(err) = self.major_devices(metadata.mode).register(
             metadata.device_type.major(),
             metadata.device_type.minor(),
             1,
             dev_ops,
-            metadata.mode,
         ) {
             log_error!("Cannot register device {:?} ({:?})", metadata, err);
         }
@@ -358,27 +357,6 @@ impl DeviceRegistry {
             DeviceMode::Char => &mut state.char_devices,
             DeviceMode::Block => &mut state.block_devices,
         })
-    }
-
-    pub fn register_device(
-        &self,
-        major: u32,
-        base_minor: u32,
-        minor_count: u32,
-        ops: impl DeviceOps,
-        mode: DeviceMode,
-    ) -> Result<(), Errno> {
-        self.major_devices(mode).register(major, base_minor, minor_count, ops)
-    }
-
-    pub fn unregister_device(
-        &self,
-        major: u32,
-        base_minor: u32,
-        minor_count: u32,
-        mode: DeviceMode,
-    ) -> Result<(), Errno> {
-        self.major_devices(mode).unregister(major, base_minor, minor_count)
     }
 
     pub fn register_major(

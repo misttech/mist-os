@@ -184,16 +184,13 @@ where
     let kernel = system_task.kernel();
     let registry = &kernel.device_registry;
     let virtual_block_class = registry.get_or_create_class("block".into(), registry.virtual_bus());
-    registry
-        .register_device(ZRAM_MAJOR, 0, 1, zram_dev, DeviceMode::Block)
-        .expect("Failed to register zram device.");
-
-    registry.add_device(
+    registry.add_and_register_device(
         locked,
         system_task,
         "zram0".into(),
         DeviceMetadata::new("zram0".into(), DeviceType::new(ZRAM_MAJOR, 0), DeviceMode::Block),
         virtual_block_class,
         move |dev| ZramDeviceDirectory::new(dev, zram_dev_weak.clone()),
+        zram_dev,
     );
 }
