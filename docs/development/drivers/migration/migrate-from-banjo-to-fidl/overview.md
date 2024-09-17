@@ -1,36 +1,37 @@
 # Migrate from Banjo to FIDL
 
-DFv1 drivers communicate with each other using the [Banjo][banjo] protocol.
-In DFv2, all communications occur over [FIDL][fidl] (Fuchsia Interface
-Definition Language) calls, for both drivers and non-drivers. So if your
-target driver for [DFv1-to-DFv2 migration][migrate-from-dfv1-to-dfv2] uses
-the Banjo protocol, you'll also need to migrate the driver to use FIDL to
-complete the migration.
+DFv1 drivers communicate with each other using the [Banjo][banjo]
+protocol. In DFv2 all communications occur over
+[FIDL (Fuchsia Interface Definition Language)][fidl] calls,
+for both drivers and non-drivers. So if your DFv1 driver being
+[migrated to DFv2][migrate-from-dfv1-to-dfv2] uses the Banjo
+protocol, you'll need to update the driver to make only FIDL calls
+to complete the migration.
 
-Driver migration from Banjo to FIDL can be summarized as follows:
+In short, migrating a driver from Banjo to FIDL involves the
+steps below:
 
-1. Update the driver's`.fidl` file to create a new FIDL interface.
-2. Update the driver's code to use the new interface.
+1. Update the driver's `.fidl` file to create a new FIDL interface.
+2. Update the driver's source code to use the new interface.
 3. Build and test the driver using the new FIDL interface.
 
 ## Before you start {:#before-you-start}
 
-Before you start jumping into the Banjo-to-FIDL migration tasks, check out
-the [frequently asked questions][faq] page, which can help you identify
+Prior to starting migration tasks, first check out the
+[**Frequently asked questions**][faq] page. This can help you identify
 special conditions or edge cases that may apply to your driver.
 
 ## List of migration tasks {:#list-of-migration-tasks}
 
-Banjo-to-FIDL migration tasks are:
+- [**Convert Banjo protocols to FIDL protocols**][convert-banjo-to-fidl]:
+  Learn how to migrate a driver from using the Banjo protocol to FIDL.
 
-- [Update the DFv1 driver from Banjo to FIDL][update-banjo-to-fidl]
-- ([Optional) Update the DFv1 driver to use the driver runtime][update-driver-runtime]
-- ([Optional) Update the DFv1 driver to use non-default dispatchers][update-non-default-dispatchers]
-- ([Optional) Update the DFv1 driver to use two-way communication][update-two-way-communication]
-- [Update the DFv1 driver's unit tests to use FIDL][update-unit-tests]
-
-For more information and examples, see
-[Additional resources][additional-resources].
+  - [Update the DFv1 driver from Banjo to FIDL][update-banjo-to-fidl]
+  - ([Optional) Update the DFv1 driver to use the driver runtime][update-driver-runtime]
+  - ([Optional) Update the DFv1 driver to use non-default dispatchers][update-non-default-dispatchers]
+  - ([Optional) Update the DFv1 driver to use two-way communication][update-two-way-communication]
+  - [Update the DFv1 driver's unit tests to use FIDL][update-unit-tests]
+  - [Additional resources][additional-resources]
 
 <!-- Reference links -->
 
@@ -44,4 +45,5 @@ For more information and examples, see
 [update-two-way-communication]: convert-banjo-protocols-to-fidl-protocols.md#update-the-dfv1-driver-to-use-two-way-communication
 [update-unit-tests]: convert-banjo-protocols-to-fidl-protocols.md#update-the-dfv1-drivers-unit-tests-to-use-fidl
 [additional-resources]: convert-banjo-protocols-to-fidl-protocols.md#additional-resources
+[convert-banjo-to-fidl]: convert-banjo-protocols-to-fidl-protocols.md
 

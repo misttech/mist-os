@@ -1,11 +1,17 @@
 # DFv1 to DFv2 driver migration
 
 This playbook offers guidelines, best practices, examples, and reference
-materials to help you migrate existing DFv1-based drivers, which are
-stored in the Fuchsia source tree (`fuchsia.git`), to Fuchsia's
-new [driver framework][driver-framework] (DFv2).
+materials to help you migrate existing legacy DFv1 drivers, which are
+stored in the Fuchsia source repository (`fuchsia.git`), to the new
+[driver framework][driver-framework] (DFv2).
 
 ## Before you start {:#before-you-start}
+
+Before you begin working on driver migration, review some of the
+[key concepts][dfv2-concepts] related to DFv2 and familiarize yourself
+with your DFv1 driver's unit tests and integration tests.
+
+### Key differences between DFv1 and DFv2 {:#key-differences-between-dfv1-and-dfv2}
 
 DFv2 enables Fuchsia drivers to be fully user-space
 [components][components]. Like any other Fuchsia component, a DFv2 driver
@@ -16,46 +22,56 @@ Notice the following key differences between DFv1 and DFv2:
 
 - **DFv1**: Drivers are not components. The [Banjo][banjo] protocol is
   used for driver-to-driver communication. Driver host interfaces or the
-  DDK (Driver Development Kits) wrapper are used to manage the life cycle
-  of drivers.
+  DDK ([Driver Development Kits][ddk]) wrapper are used to manage the life
+  cycle of drivers.
 
 - **DFv2**: Drivers are components. FIDL is used for all communication,
   including communication between drivers and non-drivers. The driver
-  framework manages the life cycle of drivers. (For more information,
-  see [Comparison between DFv1 and DFv2][dfv1-vs-dfv2].)
+  framework manages the life cycle of drivers.
+
+For more information, see [Comparison between DFv1 and DFv2][dfv1-vs-dfv2].
+
+### Expected outcome {:#expected-outcome}
 
 Here is a list for the expected conditions of your driver after completing
-the  migration to DFv2:
+the DFv2 migration:
 
-- The driver can be registered with the [driver manager][driver-manager].
+- The driver can be registered with the [DFv2 driver manager][driver-manager].
 - The driver can bind to a [device node][driver-node] in the system.
-- Fuchsia components and drivers can use the driver's capabilities.
+- Other Fuchsia components and drivers in the system can use the driver's
+  capabilities.
 - Fuchsia devices can be flashed with product images containing the driver.
-- All unit tests and integration tests for the driver are passed.
+- The driver passes all existing unit tests and integration tests.
 
-Before you begin working on driver migration, familiarize yourself with
-the driver's unit tests and integration tests.
+## Driver migration playbook {:#driver-migration-playbook}
 
-## Two phases in driver migration {:#two-phases-in-driver-migration}
+This playbook is designed to guide you through the migration tasks
+in a linear manner, which are divided into the following two phases:
 
-When you're ready to migrate your DFv1 driver to DFv2, this playbook can
-assist you with migration tasks in a linear manner. However, keep in mind
-that, depending on your driver's features or settings, you may need to
-handle additional tasks that aren't covered in this playbook.
+1. [**Migrate from DFv1 to DFv2**][migrate-from-dfv1-to-dfv2]: Update
+   the driver's legacy DDK interfaces and other services to DFv2.
+2. [**Migrate from Banjo to FIDL**][migrate-from-banjo-to-fidl]: Update
+   the Banjo protocols used by the driver to FIDL to finish the
+   migration.
 
-Driver migration from DFv1 to DFv2 can be divided into two phases:
+However, keep in mind that depending on your driver's features or
+settings, you may need to complete additional tasks that aren't covered
+in this playbook.
 
-1. [Migrate from DFv1 to DFv2][migrate-from-dfv1-to-dfv2].
-2. [Migrate from Banjo to FIDL][migrate-from-banjo-to-fidl].
-
-### Extensions
+## Extensions
 
 The following guides are added to support tasks that were previously
-identified as missing in the migration playbook above:
+missing in the playbook:
 
-- [Set up the compat device server in a DFv2 driver][set-up-compat-device-server]
-- [Connect and serve Banjo protocols in a DFv2 driver][serve-banjo-protocols]
-- [Set up devfs in a DFv2 driver][set-up-devfs]
+- [**Set up the compat device server in a DFv2 driver**][set-up-compat-device-server]:
+  Set up the compat device server in a DFv2 driver and use it
+  for communicating with DFv1 drivers.
+- [**Connect and serve Banjo protocols in a DFv2 driver**][serve-banjo-protocols]:
+  Serve Banjo protocols in a DFv2 driver and connect to
+  its Banjo server from a DFv1 child driver.
+- [**Set up devfs in a DFv2 driver**][set-up-devfs]: Set up `devfs`
+  in a DFv2 driver so that the driver's services can be discovered
+  by other Fuchsia components in the system.
 
 <!-- Reference links -->
 
@@ -71,3 +87,5 @@ identified as missing in the migration playbook above:
 [set-up-compat-device-server]: /docs/development/drivers/migration/set-up-compat-device-server.md
 [serve-banjo-protocols]: /docs/development/drivers/migration/serve-banjo-protocols.md
 [set-up-devfs]: /docs/development/drivers/migration/set-up-devfs.md
+[dfv2-concepts]: /docs/concepts/drivers/README.md
+[ddk]: /docs/development/drivers/concepts/driver_development/using-ddktl.md
