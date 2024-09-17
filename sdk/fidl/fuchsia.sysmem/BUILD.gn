@@ -17,7 +17,6 @@ fidl("fuchsia.sysmem") {
     "collection.fidl",
     "collections_deprecated.fidl",
     "constraints.fidl",
-    "driver_connector.fidl",
     "format_modifier.fidl",
     "formats_deprecated.fidl",
     "image_formats.fidl",
@@ -27,7 +26,6 @@ fidl("fuchsia.sysmem") {
     "usages.fidl",
   ]
   public_deps = [
-    "//sdk/fidl/fuchsia.io",
     "//sdk/fidl/fuchsia.sysmem2",
     "//zircon/vdso/zx",
   ]

@@ -1007,50 +1007,6 @@
         "type": "uint32"
     },
     {
-        "kind": "protocol/member",
-        "name": "fuchsia.sysmem/DriverConnector.Connect",
-        "strictness": "strict",
-        "ordinal": "7366281471101469060",
-        "direction": "one_way",
-        "request": "fuchsia.sysmem/DriverConnectorConnectRequest"
-    },
-    {
-        "kind": "protocol/member",
-        "name": "fuchsia.sysmem/DriverConnector.SetAuxServiceDirectory",
-        "strictness": "strict",
-        "ordinal": "6074137568747846023",
-        "direction": "one_way",
-        "request": "fuchsia.sysmem/DriverConnectorSetAuxServiceDirectoryRequest"
-    },
-    {
-        "kind": "protocol",
-        "name": "fuchsia.sysmem/DriverConnector",
-        "openness": "closed",
-        "transport": "channel"
-    },
-    {
-        "kind": "struct/member",
-        "name": "fuchsia.sysmem/DriverConnectorConnectRequest.allocator_request",
-        "ordinal": "1",
-        "type": "server_end:fuchsia.sysmem/Allocator"
-    },
-    {
-        "kind": "struct",
-        "name": "fuchsia.sysmem/DriverConnectorConnectRequest",
-        "resourceness": "resource"
-    },
-    {
-        "kind": "struct/member",
-        "name": "fuchsia.sysmem/DriverConnectorSetAuxServiceDirectoryRequest.service_directory",
-        "ordinal": "1",
-        "type": "fuchsia.io/Directory"
-    },
-    {
-        "kind": "struct",
-        "name": "fuchsia.sysmem/DriverConnectorSetAuxServiceDirectoryRequest",
-        "resourceness": "resource"
-    },
-    {
         "kind": "const",
         "name": "fuchsia.sysmem/FORMAT_MODIFIER_ARM_AFBC_16X16",
         "type": "uint64",
