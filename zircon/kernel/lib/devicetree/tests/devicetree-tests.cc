@@ -446,6 +446,13 @@ TEST(DevicetreeTest, StringList) {
     }
   }
   EXPECT_EQ(i, 3);
+
+  const devicetree::StringList string_list("one\0two\0three"sv);
+  const std::vector<std::string_view> string_view_vector(string_list.begin(), string_list.end());
+  ASSERT_EQ(string_view_vector.size(), 3);
+  EXPECT_STREQ("one", string_view_vector[0]);
+  EXPECT_STREQ("two", string_view_vector[1]);
+  EXPECT_STREQ("three", string_view_vector[2]);
 }
 
 auto as_bytes = [](auto& val) {
