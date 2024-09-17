@@ -13,7 +13,7 @@ use tracing::{error, warn};
 use {fuchsia_async as fasync, fuchsia_zircon as zx};
 
 use crate::experimental::clock::{TimedSample, Timestamp};
-use crate::experimental::series::{FoldError, Interpolator, RoundRobinSampler};
+use crate::experimental::series::{FoldError, Interpolator, MatrixSampler};
 
 /// Capacity of "first come, first serve" slots available to clients of
 /// the mpsc::Sender<TelemetryEvent>.
@@ -84,7 +84,7 @@ impl TimeMatrixClient {
     pub fn inspect_time_matrix<T>(
         &self,
         name: impl Into<String>,
-        time_matrix: impl RoundRobinSampler<T> + Send + 'static,
+        time_matrix: impl MatrixSampler<T> + Send + 'static,
     ) -> InspectedTimeMatrix<T> {
         self.inspect_time_matrix_with_metadata(
             name,
@@ -99,7 +99,7 @@ impl TimeMatrixClient {
     pub fn inspect_time_matrix_with_metadata<T>(
         &self,
         name: impl Into<String>,
-        time_matrix: impl RoundRobinSampler<T> + Send + 'static,
+        time_matrix: impl MatrixSampler<T> + Send + 'static,
         metadata: InspectedTimeMatrixMetadata,
     ) -> InspectedTimeMatrix<T> {
         let name = name.into();
@@ -117,13 +117,13 @@ impl TimeMatrixClient {
 pub struct InspectedTimeMatrix<T> {
     name: String,
     #[derivative(Debug = "ignore")]
-    time_matrix: Arc<Mutex<dyn RoundRobinSampler<T> + Send>>,
+    time_matrix: Arc<Mutex<dyn MatrixSampler<T> + Send>>,
 }
 
 impl<T> InspectedTimeMatrix<T> {
     pub(crate) fn new(
         name: impl Into<String>,
-        time_matrix: Arc<Mutex<dyn RoundRobinSampler<T> + Send>>,
+        time_matrix: Arc<Mutex<dyn MatrixSampler<T> + Send>>,
     ) -> Self {
         Self { name: name.into(), time_matrix }
     }

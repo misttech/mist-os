@@ -96,7 +96,7 @@ pub trait Interpolator {
 ///
 /// [`TimedSample`]: crate::experimental::clock::TimedSample
 /// [`TimeMatrix`]: crate::experimental::series::TimeMatrix
-pub trait RoundRobinSampler<T>:
+pub trait MatrixSampler<T>:
     Interpolator<Error = FoldError> + Sampler<TimedSample<T>, Error = FoldError>
 {
 }
@@ -592,7 +592,7 @@ where
     }
 }
 
-impl<F, P> RoundRobinSampler<F::Sample> for TimeMatrix<F, P>
+impl<F, P> MatrixSampler<F::Sample> for TimeMatrix<F, P>
 where
     FoldError: From<F::Error>,
     F: BufferStrategy<F::Aggregation, P> + Statistic,
@@ -610,10 +610,10 @@ mod tests {
         ArithmeticMean, LatchMax, Max, PostAggregation, Sum, Transform, Union,
     };
     use crate::experimental::series::{
-        Interpolator, RoundRobinSampler, Sampler, SamplingProfile, TimeMatrix,
+        Interpolator, MatrixSampler, Sampler, SamplingProfile, TimeMatrix,
     };
 
-    fn fold_and_interpolate_f32(sampler: &mut impl RoundRobinSampler<f32>) {
+    fn fold_and_interpolate_f32(sampler: &mut impl MatrixSampler<f32>) {
         sampler.fold(TimedSample::now(0.0)).unwrap();
         sampler.fold(TimedSample::now(1.0)).unwrap();
         sampler.fold(TimedSample::now(2.0)).unwrap();

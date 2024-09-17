@@ -8,7 +8,7 @@ use std::sync::Arc;
 
 use crate::experimental::clock::{TimedSample, Timestamp};
 use crate::experimental::series::{
-    FoldError, Interpolator, RoundRobinSampler, Sampler, SerializedBuffer,
+    FoldError, Interpolator, MatrixSampler, Sampler, SerializedBuffer,
 };
 use crate::experimental::serve::InspectedTimeMatrix;
 
@@ -60,4 +60,4 @@ impl<T> Interpolator for MockTimeMatrix<T> {
     }
 }
 
-impl<T> RoundRobinSampler<T> for MockTimeMatrix<T> {}
+impl<T> MatrixSampler<T> for MockTimeMatrix<T> {}
