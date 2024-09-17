@@ -634,7 +634,7 @@ fit::result<Errno, ktl::pair<NamespaceNode, FsStr>> CurrentTask::resolve_dir_fd(
   auto dir = dir_result.value();
 
   if (!path.empty()) {
-    if (!dir.entry->node->is_dir()) {
+    if (!dir.entry->node_->is_dir()) {
       return fit::error(errno(ENOTDIR));
     }
     if (auto check_access_result = dir.check_access(*this, Access(Access::EnumType::EXEC));
@@ -681,7 +681,7 @@ fit::result<Errno, ktl::pair<NamespaceNode, bool>> CurrentTask::resolve_open_pat
   if (auto lookup_child_result = parent.lookup_child(*this, child_context, basename);
       lookup_child_result.is_ok()) {
     auto name = lookup_child_result.value();
-    if (name.entry->node->is_lnk()) {
+    if (name.entry->node_->is_lnk()) {
       if (flags.contains(OpenFlagsEnum::PATH) && context.symlink_mode == SymlinkMode::NoFollow) {
         // When O_PATH is specified in flags, if pathname is a symbolic link
         // and the O_NOFOLLOW flag is also specified, then the call returns
@@ -848,12 +848,11 @@ fit::result<Errno, FileHandle> CurrentTask::open_namespace_node_at(
 
   auto [name, created] = result.value();
 
-  auto name_result = [&, name_ = ktl::move(name),
-                      created_ = created]() -> fit::result<Errno, NamespaceNode> {
+  auto name_result = [&]() -> fit::result<Errno, NamespaceNode> {
     if (flags.contains(OpenFlagsEnum::TMPFILE)) {
-      return name_.create_tmpfile(*this, mode.with_type(FileMode::IFREG), flags);
+      return name.create_tmpfile(*this, mode.with_type(FileMode::IFREG), flags);
     } else {
-      auto mode_ = name_.entry->node->info()->mode;
+      auto mode_ = name.entry->node_->info()->mode;
 
       // These checks are not needed in the `O_TMPFILE` case because `mode` refers to the
       // file we are opening. With `O_TMPFILE`, that file is the regular file we just
@@ -875,17 +874,17 @@ fit::result<Errno, FileHandle> CurrentTask::open_namespace_node_at(
         return fit::error(errno(ENOTDIR));
       }
 
-      if (flags.contains(OpenFlagsEnum::TRUNC) && mode.is_reg() && !created_) {
+      if (flags.contains(OpenFlagsEnum::TRUNC) && mode.is_reg() && !created) {
         // You might think we should check file.can_write() at this
         // point, which is what the docs suggest, but apparently we
         // are supposed to truncate the file if this task can write
         // to the underlying node, even if we are opening the file
         // as read-only. See OpenTest.CanTruncateReadOnly.
-        if (auto truncate_result = name_.truncate(*this, 0); truncate_result.is_error()) {
+        if (auto truncate_result = name.truncate(*this, 0); truncate_result.is_error()) {
           return truncate_result.take_error();
         }
       }
-      return fit::ok(name_);
+      return fit::ok(name);
     }
   }();
 

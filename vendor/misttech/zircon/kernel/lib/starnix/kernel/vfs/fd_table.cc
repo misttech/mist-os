@@ -33,7 +33,7 @@ FdTableEntry::FdTableEntry(FileHandle _file, FdTableId fd_table_id, FdFlags flag
 
 FdTableEntry::~FdTableEntry() {
   LTRACEF_LEVEL(3, "fd_table_id %zx\n", fd_table_id_.id);
-  auto fs = file->name.entry->node->fs();
+  auto fs = file->name.entry->node_->fs();
   auto kernel = fs->kernel().Lock();
   if (kernel) {
     // kernel->delayed_releaser.flush_file(file, fd_table_id_);

@@ -74,7 +74,7 @@ MountHandle Mount::new_with_root(DirEntryHandle root, MountFlags flags) {
   auto known_flags = MountFlags(MountFlagsEnum::STORED_ON_MOUNT);
   ASSERT(!flags.intersects(known_flags));
 
-  auto fs = root->node->fs();
+  auto fs = root->node_->fs();
   auto kernel = fs->kernel().Lock();
   ASSERT_MSG(kernel, "can't create mount without a kernel");
 
