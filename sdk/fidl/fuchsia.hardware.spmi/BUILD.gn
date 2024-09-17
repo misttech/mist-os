@@ -6,7 +6,10 @@ import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.hardware.spmi") {
   sdk_area = "Drivers"
-  sources = [ "spmi.fidl" ]
+  sources = [
+    "metadata.fidl",
+    "spmi.fidl",
+  ]
   stable = false
   sdk_category = "partner"
 }
