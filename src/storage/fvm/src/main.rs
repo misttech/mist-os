@@ -389,10 +389,13 @@ impl Fvm {
                         // See if this can be merged with the previous entry.
                         let prev_mapping = &mut mappings[index - 1];
                         let end = prev_mapping.end_slice();
-                        if end == slice {
+                        if end == slice
+                            && prev_mapping.physical_slice + prev_mapping.slice_count
+                                == physical_slice as u64
+                        {
                             prev_mapping.slice_count += 1;
                             false
-                        } else if end < slice {
+                        } else if end <= slice {
                             true
                         } else {
                             bad_mapping = true;
@@ -1378,6 +1381,29 @@ mod tests {
 
             fixture
         }
+
+        async fn mount_volume(&self, volume_name: &str) -> fvolume::VolumeProxy {
+            let volume_proxy = connect_to_named_protocol_at_dir_root::<VolumeMarker>(
+                &self.outgoing_dir,
+                &format!("volumes/{volume_name}"),
+            )
+            .unwrap();
+
+            let (dir_proxy, dir_server_end) =
+                fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
+                    .expect("Create proxy to succeed");
+            volume_proxy
+                .mount(dir_server_end, MountOptions::default())
+                .await
+                .expect("mount failed (FIDL)")
+                .expect("mount failed");
+
+            connect_to_protocol_at_dir_svc::<fvolume::VolumeMarker>(&dir_proxy).unwrap()
+        }
+
+        fn take_fake_server(self) -> Arc<FakeServer> {
+            self.fake_server
+        }
     }
 
     #[fuchsia::test]
@@ -1724,25 +1750,10 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_extend() {
-        let fixture = Fixture::new(SLICE_SIZE).await;
+        let fixture = Fixture::new(SLICE_SIZE * 3).await;
 
         // Mount the blobfs partition.
-        let volume_proxy = connect_to_named_protocol_at_dir_root::<VolumeMarker>(
-            &fixture.outgoing_dir,
-            "volumes/blobfs",
-        )
-        .unwrap();
-
-        let (dir_proxy, dir_server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
-            .expect("Create proxy to succeed");
-        volume_proxy
-            .mount(dir_server_end, MountOptions::default())
-            .await
-            .expect("mount failed (FIDL)")
-            .expect("mount failed");
-
-        let volume_proxy =
-            connect_to_protocol_at_dir_svc::<fvolume::VolumeMarker>(&dir_proxy).unwrap();
+        let volume_proxy = fixture.mount_volume("blobfs").await;
 
         assert_eq!(volume_proxy.extend(1, 1).await.expect("extend failed (FIDL)"), zx::sys::ZX_OK);
 
@@ -1777,6 +1788,36 @@ mod tests {
             volume_proxy.extend(0x8005, 20).await.expect("extend failed (FIDL)"),
             zx::sys::ZX_ERR_INVALID_ARGS
         );
+
+        // Extend the minfs partition, so that the extension of the blobfs volume is not contiguous.
+        let data_volume_proxy = fixture.mount_volume("data").await;
+
+        assert_eq!(
+            data_volume_proxy.extend(0xa0000, 1).await.expect("extend failed (FIDL)"),
+            zx::sys::ZX_OK
+        );
+
+        // Extend the blobfs partition again.
+        assert_eq!(volume_proxy.extend(2, 1).await.expect("extend failed (FIDL)"), zx::sys::ZX_OK);
+
+        // Write to the blobfs partition over the two slices we have extended by.
+        let data = vec![0x73; SLICE_SIZE as usize * 2];
+        client.write_at(BufferSlice::Memory(&data), SLICE_SIZE).await.unwrap();
+
+        // Now read it back.
+        let mut buf = vec![0; SLICE_SIZE as usize * 2];
+        client.read_at(MutableBufferSlice::Memory(&mut buf), SLICE_SIZE).await.unwrap();
+
+        assert_eq!(&buf, &data);
+
+        // Check we get the same when we remount.
+        let fixture = Fixture::from_fake_server(fixture.take_fake_server()).await;
+        let client = RemoteBlockClient::new(&fixture.mount_volume("blobfs").await).await.unwrap();
+
+        buf.fill(0);
+        client.read_at(MutableBufferSlice::Memory(&mut buf), SLICE_SIZE).await.unwrap();
+
+        assert_eq!(&buf, &data);
     }
 
     #[fuchsia::test]
