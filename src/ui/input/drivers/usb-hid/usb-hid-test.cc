@@ -33,11 +33,6 @@ namespace fhidbus = fuchsia_hardware_hidbus;
 
 using usb_virtual::BusLauncher;
 
-std::string GetDeviceControllerPath(std::string_view dev_path) {
-  auto dev_path_modified = std::string(dev_path);
-  return dev_path_modified.append("/device_controller");
-}
-
 class UsbHidTest : public zxtest::Test {
  public:
   void SetUp() override {
@@ -46,7 +41,7 @@ class UsbHidTest : public zxtest::Test {
     bus_ = std::move(bus.value());
 
     auto usb_hid_function_desc = GetConfigDescriptor();
-    ASSERT_NO_FATAL_FAILURE(InitUsbHid(&devpath_, usb_hid_function_desc));
+    ASSERT_NO_FATAL_FAILURE(InitUsbHid(usb_hid_function_desc));
 
     fdio_cpp::UnownedFdioCaller caller(bus_->GetRootFd());
     zx::result controller =
@@ -67,8 +62,7 @@ class UsbHidTest : public zxtest::Test {
   virtual fuchsia_hardware_usb_peripheral::wire::FunctionDescriptor GetConfigDescriptor() = 0;
 
   // Initialize a Usb HID device. Asserts on failure.
-  void InitUsbHid(fbl::String* dev_path,
-                  fuchsia_hardware_usb_peripheral::wire::FunctionDescriptor desc) {
+  void InitUsbHid(fuchsia_hardware_usb_peripheral::wire::FunctionDescriptor desc) {
     namespace usb_peripheral = fuchsia_hardware_usb_peripheral;
     std::vector<usb_peripheral::wire::FunctionDescriptor> function_descs = {desc};
     ASSERT_OK(bus_->SetupPeripheralDevice(
@@ -88,51 +82,12 @@ class UsbHidTest : public zxtest::Test {
           component::ConnectAt<fuchsia_io::Directory>(caller.directory(), "class/input");
       ASSERT_OK(directory);
       zx::result watch_result = device_watcher::WatchDirectoryForItems(
-          directory.value(), [&dev_path](std::string_view devpath) {
-            *dev_path = fbl::String::Concat({"class/input/", devpath});
+          directory.value(), [this](std::string_view devpath) {
+            devpath_ = fbl::String::Concat({"class/input/", devpath});
             return std::monostate{};
           });
       ASSERT_OK(watch_result);
     }
-  }
-
-  // Unbinds Usb HID driver from host.
-  void Unbind(const fbl::String& devpath) {
-    fdio_cpp::UnownedFdioCaller caller(bus_->GetRootFd());
-
-    zx::result input_controller = component::ConnectAt<fuchsia_device::Controller>(
-        caller.directory(), GetDeviceControllerPath(devpath_.data()));
-    ASSERT_OK(input_controller);
-    const fidl::WireResult result = fidl::WireCall(input_controller.value())->GetTopologicalPath();
-    ASSERT_OK(result);
-    const fit::result response = result.value();
-    ASSERT_TRUE(response.is_ok(), "%s", zx_status_get_string(response.error_value()));
-    const std::string_view hid_device_abspath = response->path.get();
-    constexpr std::string_view kDev = "/dev/";
-    ASSERT_TRUE(cpp20::starts_with(hid_device_abspath, kDev));
-    const std::string_view hid_device_relpath = hid_device_abspath.substr(kDev.size());
-    const std::string_view usb_hid_relpath =
-        hid_device_relpath.substr(0, hid_device_relpath.find_last_of('/'));
-
-    zx::result usb_hid_controller = component::ConnectAt<fuchsia_device::Controller>(
-        caller.directory(), GetDeviceControllerPath(usb_hid_relpath));
-    ASSERT_OK(usb_hid_controller);
-    const size_t last_slash = usb_hid_relpath.find_last_of('/');
-    const std::string_view suffix = usb_hid_relpath.substr(last_slash + 1);
-    std::string ifc_path{usb_hid_relpath.substr(0, last_slash)};
-    auto [client_end, server_end] = fidl::Endpoints<fuchsia_io::Directory>::Create();
-    ASSERT_OK(fdio_open_at(caller.directory().channel()->get(), ifc_path.c_str(),
-                           static_cast<uint32_t>(fuchsia_io::OpenFlags::kDirectory),
-                           server_end.TakeChannel().release()));
-    zx::result watcher = device_watcher::DirWatcher::Create(client_end);
-    ASSERT_OK(watcher);
-    {
-      const fidl::WireResult result = fidl::WireCall(usb_hid_controller.value())->ScheduleUnbind();
-      ASSERT_OK(result.status());
-      const fit::result response = result.value();
-      ASSERT_TRUE(response.is_ok(), "%s", zx_status_get_string(response.error_value()));
-    }
-    ASSERT_OK(watcher->WaitForRemoval(suffix, zx::duration::infinite()));
   }
 
   std::optional<BusLauncher> bus_;
@@ -151,8 +106,7 @@ class UsbOneEndpointTest : public UsbHidTest {
   }
 };
 
-// TODO(b/316176095): Re-enable test after ensuring it works with DFv2.
-TEST_F(UsbOneEndpointTest, DISABLED_GetDeviceIdsVidPid) {
+TEST_F(UsbOneEndpointTest, GetDeviceIdsVidPid) {
   // Check USB device descriptor VID/PID plumbing.
   auto result = sync_client_->Query();
   ASSERT_OK(result.status());
@@ -161,8 +115,7 @@ TEST_F(UsbOneEndpointTest, DISABLED_GetDeviceIdsVidPid) {
   EXPECT_EQ(0xaf10, result.value()->info.product_id());
 }
 
-// TODO(b/316176095): Re-enable test after ensuring it works with DFv2.
-TEST_F(UsbOneEndpointTest, DISABLED_SetAndGetReport) {
+TEST_F(UsbOneEndpointTest, SetAndGetReport) {
   uint8_t buf[sizeof(hid_boot_mouse_report_t)] = {0xab, 0xbc, 0xde};
 
   auto set_result = sync_client_->SetReport(fhidbus::wire::ReportType::kInput, 0,
@@ -180,9 +133,6 @@ TEST_F(UsbOneEndpointTest, DISABLED_SetAndGetReport) {
   ASSERT_EQ(0xbc, get_result.value()->report[1]);
   ASSERT_EQ(0xde, get_result.value()->report[2]);
 }
-
-// TODO(b/316176095): Re-enable test after ensuring it works with DFv2.
-TEST_F(UsbOneEndpointTest, DISABLED_UnBind) { ASSERT_NO_FATAL_FAILURE(Unbind(devpath_)); }
 
 class UsbTwoEndpointTest : public UsbHidTest {
  protected:
@@ -195,8 +145,7 @@ class UsbTwoEndpointTest : public UsbHidTest {
   }
 };
 
-// TODO(b/316176095): Re-enable test after ensuring it works with DFv2.
-TEST_F(UsbTwoEndpointTest, DISABLED_SetAndGetReport) {
+TEST_F(UsbTwoEndpointTest, SetAndGetReport) {
   uint8_t buf[sizeof(hid_boot_mouse_report_t)] = {0xab, 0xbc, 0xde};
 
   auto set_result = sync_client_->SetReport(fhidbus::wire::ReportType::kInput, 0,
@@ -214,9 +163,6 @@ TEST_F(UsbTwoEndpointTest, DISABLED_SetAndGetReport) {
   ASSERT_EQ(0xbc, get_result.value()->report[1]);
   ASSERT_EQ(0xde, get_result.value()->report[2]);
 }
-
-// TODO(b/316176095): Re-enable test after ensuring it works with DFv2.
-TEST_F(UsbTwoEndpointTest, DISABLED_UnBind) { ASSERT_NO_FATAL_FAILURE(Unbind(devpath_)); }
 
 }  // namespace
 }  // namespace usb_virtual_bus
