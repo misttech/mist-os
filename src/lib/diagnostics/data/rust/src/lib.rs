@@ -357,6 +357,11 @@ impl LogsMetadata {
     pub fn component_url(&self) -> Option<&str> {
         self.component_url.as_ref().map(|s| s.as_str())
     }
+
+    // TODO(https://fxbug.dev/346806346): transitional, remove.
+    pub fn timestamp_nanos(&self) -> i64 {
+        self.timestamp
+    }
 }
 
 /// Severities a log message can have, often called the log's "level".
