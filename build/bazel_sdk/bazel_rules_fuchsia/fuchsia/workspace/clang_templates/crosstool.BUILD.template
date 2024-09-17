@@ -311,12 +311,12 @@ fuchsia_package_resource_group(
     srcs = fuchsia_cpu_select(
         {
             "arm64": {
-                ":arm_novariant": [
+                ":arm64_novariant": [
                     "//:lib/aarch64-unknown-fuchsia/libc++.so.2",
                     "//:lib/aarch64-unknown-fuchsia/libc++abi.so.1",
                     "//:lib/aarch64-unknown-fuchsia/libunwind.so.1",
                 ],
-                ":arm_asan_variant": [
+                ":arm64_asan_variant": [
                     "//:lib/aarch64-unknown-fuchsia/asan/libc++.so.2",
                     "//:lib/aarch64-unknown-fuchsia/asan/libc++abi.so.1",
                     "//:lib/aarch64-unknown-fuchsia/asan/libunwind.so.1",
@@ -324,7 +324,7 @@ fuchsia_package_resource_group(
                     "//:lib/aarch64-unknown-fuchsia/asan+noexcept/libc++abi.so.1",
                     "//:lib/aarch64-unknown-fuchsia/asan+noexcept/libunwind.so.1",
                 ],
-                ":arm_hwasan_variant": [
+                ":arm64_hwasan_variant": [
                     "//:lib/aarch64-unknown-fuchsia/hwasan/libc++.so.2",
                     "//:lib/aarch64-unknown-fuchsia/hwasan/libc++abi.so.1",
                     "//:lib/aarch64-unknown-fuchsia/hwasan/libunwind.so.1",
@@ -334,12 +334,12 @@ fuchsia_package_resource_group(
                 ],
             },
             "x64": {
-                ":x86_novariant": [
+                ":x64_novariant": [
                     "//:lib/x86_64-unknown-fuchsia/libc++.so.2",
                     "//:lib/x86_64-unknown-fuchsia/libc++abi.so.1",
                     "//:lib/x86_64-unknown-fuchsia/libunwind.so.1",
                 ],
-                ":x86_asan_variant": [
+                ":x64_asan_variant": [
                     "//:lib/x86_64-unknown-fuchsia/asan/libc++.so.2",
                     "//:lib/x86_64-unknown-fuchsia/asan/libc++abi.so.1",
                     "//:lib/x86_64-unknown-fuchsia/asan/libunwind.so.1",
@@ -347,7 +347,7 @@ fuchsia_package_resource_group(
                     "//:lib/x86_64-unknown-fuchsia/asan+noexcept/libc++abi.so.1",
                     "//:lib/x86_64-unknown-fuchsia/asan+noexcept/libunwind.so.1",
                 ],
-                ":x86_hwasan_variant": [
+                ":x64_hwasan_variant": [
                     "//:lib/x86_64-unknown-fuchsia/hwasan/libc++.so.2",
                     "//:lib/x86_64-unknown-fuchsia/hwasan/libc++abi.so.1",
                     "//:lib/x86_64-unknown-fuchsia/hwasan/libunwind.so.1",
@@ -386,14 +386,14 @@ fuchsia_package_resource_group(
     strip_prefix = fuchsia_cpu_select(
         {
             "arm64": {
-                ":arm_novariant": "../fuchsia_clang/lib/aarch64-unknown-fuchsia",
-                ":arm_asan_variant": "../fuchsia_clang/lib/aarch64-unknown-fuchsia/asan",
-                ":arm_hwasan_variant": "../fuchsia_clang/lib/aarch64-unknown-fuchsia/hwasan",
+                ":arm64_novariant": "../fuchsia_clang/lib/aarch64-unknown-fuchsia",
+                ":arm64_asan_variant": "../fuchsia_clang/lib/aarch64-unknown-fuchsia/asan",
+                ":arm64_hwasan_variant": "../fuchsia_clang/lib/aarch64-unknown-fuchsia/hwasan",
             },
             "x64": {
-                ":x86_novariant": "../fuchsia_clang/lib/x86_64-unknown-fuchsia",
-                ":x86_asan_variant": "../fuchsia_clang/lib/x86_64-unknown-fuchsia/asan",
-                ":x86_hwasan_variant": "../fuchsia_clang/lib/x86_64-unknown-fuchsia/hwasan",
+                ":x64_novariant": "../fuchsia_clang/lib/x86_64-unknown-fuchsia",
+                ":x64_asan_variant": "../fuchsia_clang/lib/x86_64-unknown-fuchsia/asan",
+                ":x64_hwasan_variant": "../fuchsia_clang/lib/x86_64-unknown-fuchsia/hwasan",
             },
             "riscv64": {
                 ":riscv64_novariant": "../fuchsia_clang/lib/riscv64-unknown-fuchsia",
@@ -411,18 +411,18 @@ fuchsia_package_resource_group(
     srcs = fuchsia_cpu_select(
         {
             "arm64": {
-                ":arm_asan_variant": [
+                ":arm64_asan_variant": [
                     "//:lib/clang/%{CLANG_VERSION}/lib/aarch64-unknown-fuchsia/libclang_rt.asan.so",
                 ],
-                ":arm_hwasan_variant": [
+                ":arm64_hwasan_variant": [
                     "//:lib/clang/%{CLANG_VERSION}/lib/aarch64-unknown-fuchsia/libclang_rt.hwasan.so",
                 ],
             },
             "x64": {
-                ":x86_asan_variant": [
+                ":x64_asan_variant": [
                     "//:lib/clang/%{CLANG_VERSION}/lib/x86_64-unknown-fuchsia/libclang_rt.asan.so",
                 ],
-                ":x86_hwasan_variant": [
+                ":x64_hwasan_variant": [
                     "//:lib/clang/%{CLANG_VERSION}/lib/x86_64-unknown-fuchsia/libclang_rt.hwasan.so",
                 ],
             },
@@ -446,10 +446,10 @@ fuchsia_package_resource_group(
     strip_prefix = fuchsia_cpu_select(
         {
             "arm64": {
-                ":arm_build": "../fuchsia_clang/lib/clang/%{CLANG_VERSION}/lib/aarch64-unknown-fuchsia",
+                ":arm64_build": "../fuchsia_clang/lib/clang/%{CLANG_VERSION}/lib/aarch64-unknown-fuchsia",
             },
             "x64": {
-                ":x86_build": "../fuchsia_clang/lib/clang/%{CLANG_VERSION}/lib/x86_64-unknown-fuchsia",
+                ":x64_build": "../fuchsia_clang/lib/clang/%{CLANG_VERSION}/lib/x86_64-unknown-fuchsia",
             },
             "riscv64": {
                 ":riscv64_build": "../fuchsia_clang/lib/clang/%{CLANG_VERSION}/lib/riscv64-unknown-fuchsia",
@@ -465,17 +465,11 @@ config_setting(
     values = {"cpu": "aarch64"},
 )
 
-config_setting(
-    name = "armeabi-v7a_cpu_build",
-    values = {"cpu": "armeabi-v7a"},
-)
-
 selects.config_setting_group(
-    name = "arm_build",
+    name = "arm64_build",
     match_any = [
         "@platforms//cpu:arm64",
         ":aarch64_cpu_build",
-        ":armeabi-v7a_cpu_build",
     ],
 )
 
@@ -490,7 +484,7 @@ config_setting(
 )
 
 selects.config_setting_group(
-    name = "x86_build",
+    name = "x64_build",
     match_any = [
         "@platforms//cpu:x86_64",
         ":x86_64_cpu_build",
@@ -553,49 +547,49 @@ config_setting(
 )
 
 selects.config_setting_group(
-    name = "arm_novariant",
+    name = "arm64_novariant",
     match_all = [
-        ":arm_build",
+        ":arm64_build",
         ":novariant",
     ],
 )
 
 selects.config_setting_group(
-    name = "arm_asan_variant",
+    name = "arm64_asan_variant",
     match_all = [
-        ":arm_build",
+        ":arm64_build",
         ":asan_variant",
     ],
 )
 
 selects.config_setting_group(
-    name = "arm_hwasan_variant",
+    name = "arm64_hwasan_variant",
     match_all = [
-        ":arm_build",
+        ":arm64_build",
         ":hwasan_variant",
     ],
 )
 
 selects.config_setting_group(
-    name = "x86_novariant",
+    name = "x64_novariant",
     match_all = [
-        ":x86_build",
+        ":x64_build",
         ":novariant",
     ],
 )
 
 selects.config_setting_group(
-    name = "x86_asan_variant",
+    name = "x64_asan_variant",
     match_all = [
-        ":x86_build",
+        ":x64_build",
         ":asan_variant",
     ],
 )
 
 selects.config_setting_group(
-    name = "x86_hwasan_variant",
+    name = "x64_hwasan_variant",
     match_all = [
-        ":x86_build",
+        ":x64_build",
         ":hwasan_variant",
     ],
 )
