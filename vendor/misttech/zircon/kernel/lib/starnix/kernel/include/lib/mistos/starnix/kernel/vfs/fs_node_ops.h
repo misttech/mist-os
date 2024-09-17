@@ -249,7 +249,7 @@ class FsNodeOps {
                                                                                                    \
   fit::result<Errno, FsNodeHandle> create_symlink(                                                 \
       const FsNode& node, const CurrentTask& current_task, const FsStr& name, const FsStr& target, \
-      FsCred owner) {                                                                              \
+      FsCred owner) final {                                                                        \
     return fit::error(errno(EROFS));                                                               \
   }                                                                                                \
                                                                                                    \
@@ -312,7 +312,7 @@ class FsNodeOps {
                                                                                                    \
   fit::result<Errno, FsNodeHandle> create_symlink(                                                 \
       const FsNode& node, const CurrentTask& current_task, const FsStr& name, const FsStr& target, \
-      FsCred owner) {                                                                              \
+      FsCred owner) final {                                                                        \
     return fit::error(errno(ENOTDIR));                                                             \
   }                                                                                                \
                                                                                                    \

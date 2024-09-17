@@ -56,6 +56,8 @@ class TmpfsDirectory : public FsNodeOps {
   static TmpfsDirectory* New();
 
   /// impl FsNodeOps
+  fs_node_impl_xattr_delegate(xattrs_);
+
   fit::result<Errno, ktl::unique_ptr<FileOps>> create_file_ops(
       /*FileOpsCore& locked,*/ const FsNode& node, const CurrentTask& current_task,
       OpenFlags flags) final;
@@ -66,6 +68,11 @@ class TmpfsDirectory : public FsNodeOps {
   fit::result<Errno, FsNodeHandle> mknod(const FsNode& node, const CurrentTask& current_task,
                                          const FsStr& name, FileMode mode, DeviceType dev,
                                          FsCred owner) final;
+
+  fit::result<Errno, FsNodeHandle> create_symlink(const FsNode& node,
+                                                  const CurrentTask& current_task,
+                                                  const FsStr& name, const FsStr& target,
+                                                  FsCred owner) final;
 
   fit::result<Errno, FsNodeHandle> create_tmpfile(const FsNode& node,
                                                   const CurrentTask& current_task, FileMode mode,

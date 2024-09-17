@@ -10,6 +10,7 @@
 #include <lib/mistos/starnix/kernel/mm/flags.h>
 #include <lib/mistos/starnix/kernel/mm/memory_manager.h>
 #include <lib/mistos/starnix/kernel/vfs/dirent_sink.h>
+#include <lib/mistos/starnix/kernel/vfs/file_object.h>
 #include <lib/mistos/starnix_uapi/errors.h>
 #include <lib/mistos/starnix_uapi/open_flags.h>
 #include <lib/mistos/starnix_uapi/user_address.h>
@@ -204,7 +205,7 @@ fit::result<Errno, off_t> default_eof_offset(const FileObject& file,
 ///    supported.
 template <typename ComputeEndFn>
 fit::result<Errno, off_t> default_seek(off_t current_offset, SeekTarget target,
-                                       ComputeEndFn compute_end) {
+                                       ComputeEndFn&& compute_end) {
   static_assert(std::is_invocable_r_v<fit::result<Errno, off_t>, ComputeEndFn, off_t>);
   auto lresult = [&]() -> fit::result<Errno, ktl::optional<uint64_t>> {
     switch (target.type) {
@@ -313,13 +314,13 @@ fit::result<Errno, off_t> default_seek(off_t current_offset, SeekTarget target,
 #define fileops_impl_dataless()                                                            \
   fit::result<Errno, size_t> read(/*Locked<FileOpsCore>& locked,*/ const FileObject& file, \
                                   const CurrentTask& current_task, size_t offset,          \
-                                  OutputBuffer& data) final {                              \
+                                  OutputBuffer* data) final {                              \
     return fit::error(errno(EINVAL));                                                      \
   }                                                                                        \
                                                                                            \
   fit::result<Errno, size_t> write(/*Locked<WriteOps>& locked,*/ const FileObject& file,   \
                                    const CurrentTask& current_task, size_t offset,         \
-                                   InputBuffer& data) final {                              \
+                                   InputBuffer* data) final {                              \
     return fit::error(errno(EINVAL));                                                      \
   }                                                                                        \
   using __fileops_impl_dataless_force_semicolon = int
@@ -329,7 +330,7 @@ fit::result<Errno, off_t> default_seek(off_t current_offset, SeekTarget target,
                                                                                            \
   fit::result<Errno, size_t> read(/*Locked<FileOpsCore>& locked,*/ const FileObject& file, \
                                   const CurrentTask& current_task, size_t offset,          \
-                                  OutputBuffer& data) final {                              \
+                                  OutputBuffer* data) final {                              \
     return fit::error(errno(EISDIR));                                                      \
   }                                                                                        \
                                                                                            \

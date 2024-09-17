@@ -58,11 +58,9 @@ class FsNode final
 
   /// The current kernel.
   // TODO(https://fxbug.dev/42080557): This is a temporary measure to access a task on drop.
-  // kernel: Weak<Kernel>,
   util::WeakPtr<Kernel> kernel_;
 
   /// The FileSystem that owns this FsNode's tree.
-  // fs: Weak<FileSystem>,
   util::WeakPtr<FileSystem> fs_;
 
  public:
