@@ -7135,7 +7135,7 @@ pub const BPF_REG_10: _bindgen_ty_5 = 10;
 pub const __MAX_BPF_REG: _bindgen_ty_5 = 11;
 pub type _bindgen_ty_5 = crate::types::c_uint;
 #[repr(C)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros, PartialEq)]
 pub struct bpf_insn {
     pub code: __u8,
     pub _bitfield_1: __BindgenBitfieldUnit<[u8; 1usize]>,
