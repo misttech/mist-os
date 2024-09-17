@@ -48,6 +48,14 @@ class PathBuilder {
   void ensure_capacity(size_t capacity_needed);
 };
 
+constexpr bool contains(FsStr str, FsStr substr) {
+  return str.find(substr) != ktl::string_view::npos;
+}
+
+constexpr bool contains(FsStr str, char character) {
+  return str.find(character) != ktl::string_view::npos;
+}
+
 }  // namespace starnix
 
 #endif  // VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_VFS_PATH_H_
