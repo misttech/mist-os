@@ -122,7 +122,7 @@ impl FsNodeOps for BusDevicesDirectory {
 #[cfg(test)]
 mod tests {
     use crate::device::kobject::KObject;
-    use crate::fs::sysfs::{BusCollectionDirectory, SysfsDirectory};
+    use crate::fs::sysfs::{BusCollectionDirectory, KObjectDirectory};
     use crate::task::CurrentTask;
     use crate::testing::{create_fs, create_kernel_and_task};
     use crate::vfs::{FileSystemHandle, FsStr, LookupContext, NamespaceNode, SymlinkMode};
@@ -153,7 +153,7 @@ mod tests {
     async fn bus_devices_directory_contains_device_links() {
         let (kernel, current_task) = create_kernel_and_task();
         let root_kobject = KObject::new_root(Default::default());
-        root_kobject.get_or_create_child("0".into(), SysfsDirectory::new);
+        root_kobject.get_or_create_child("0".into(), KObjectDirectory::new);
         let test_fs =
             create_fs(&kernel, BusCollectionDirectory::new(Arc::downgrade(&root_kobject)));
 

@@ -16,11 +16,11 @@ use starnix_uapi::errors::Errno;
 use starnix_uapi::open_flags::OpenFlags;
 use std::sync::Weak;
 
-pub struct ClassCollectionDirectory {
+pub struct KObjectSymlinkDirectory {
     kobject: Weak<KObject>,
 }
 
-impl ClassCollectionDirectory {
+impl KObjectSymlinkDirectory {
     pub fn new(kobject: Weak<KObject>) -> Self {
         Self { kobject }
     }
@@ -30,7 +30,7 @@ impl ClassCollectionDirectory {
     }
 }
 
-impl FsNodeOps for ClassCollectionDirectory {
+impl FsNodeOps for KObjectSymlinkDirectory {
     fs_node_impl_dir_readonly!();
 
     fn create_file_ops(
@@ -74,7 +74,7 @@ impl FsNodeOps for ClassCollectionDirectory {
 #[cfg(test)]
 mod tests {
     use crate::device::kobject::KObject;
-    use crate::fs::sysfs::{ClassCollectionDirectory, SysfsDirectory};
+    use crate::fs::sysfs::{KObjectSymlinkDirectory, KObjectDirectory};
     use crate::task::CurrentTask;
     use crate::testing::{create_fs, create_kernel_and_task};
     use crate::vfs::{FileSystemHandle, FsStr, LookupContext, NamespaceNode, SymlinkMode};
@@ -91,13 +91,13 @@ mod tests {
     }
 
     #[::fuchsia::test]
-    async fn class_collection_directory_contains_device_links() {
+    async fn kobject_symlink_directory_contains_device_links() {
         let (kernel, current_task) = create_kernel_and_task();
         let root_kobject = KObject::new_root(Default::default());
-        root_kobject.get_or_create_child("0".into(), SysfsDirectory::new);
-        root_kobject.get_or_create_child("0".into(), SysfsDirectory::new);
+        root_kobject.get_or_create_child("0".into(), KObjectDirectory::new);
+        root_kobject.get_or_create_child("0".into(), KObjectDirectory::new);
         let test_fs =
-            create_fs(&kernel, ClassCollectionDirectory::new(Arc::downgrade(&root_kobject)));
+            create_fs(&kernel, KObjectSymlinkDirectory::new(Arc::downgrade(&root_kobject)));
 
         let device_entry =
             lookup_node(&current_task, &test_fs, "0".into()).expect("device 0 directory");

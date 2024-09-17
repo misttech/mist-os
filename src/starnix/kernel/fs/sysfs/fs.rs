@@ -5,7 +5,7 @@
 use crate::device::kobject::KObjectHandle;
 use crate::fs::sysfs::cgroup::CgroupDirectoryNode;
 use crate::fs::sysfs::{
-    sysfs_kernel_directory, sysfs_power_directory, CpuClassDirectory, SysfsDirectory,
+    sysfs_kernel_directory, sysfs_power_directory, CpuClassDirectory, KObjectDirectory,
 };
 use crate::task::{CurrentTask, NetstackDevicesDirectory};
 use crate::vfs::{
@@ -98,7 +98,7 @@ impl SysFs {
         // Remove after registry.rs refactor is in place.
         registry
             .root_kobject()
-            .get_or_create_child("system".into(), SysfsDirectory::new)
+            .get_or_create_child("system".into(), KObjectDirectory::new)
             .get_or_create_child("cpu".into(), CpuClassDirectory::new);
 
         dir.build_root();

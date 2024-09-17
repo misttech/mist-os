@@ -16,11 +16,11 @@ use starnix_uapi::file_mode::mode;
 use starnix_uapi::open_flags::OpenFlags;
 use std::sync::Weak;
 
-pub struct SysfsDirectory {
+pub struct KObjectDirectory {
     kobject: Weak<KObject>,
 }
 
-impl SysfsDirectory {
+impl KObjectDirectory {
     pub fn new(kobject: Weak<KObject>) -> Self {
         Self { kobject }
     }
@@ -30,7 +30,7 @@ impl SysfsDirectory {
     }
 }
 
-impl FsNodeOps for SysfsDirectory {
+impl FsNodeOps for KObjectDirectory {
     fs_node_impl_dir_readonly!();
 
     fn create_file_ops(

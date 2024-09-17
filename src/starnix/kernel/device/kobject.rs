@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::device::DeviceMode;
-use crate::fs::sysfs::SysfsDirectory;
+use crate::fs::sysfs::KObjectDirectory;
 use crate::task::CurrentTask;
 use crate::vfs::buffers::{InputBuffer, OutputBuffer};
 use crate::vfs::{
@@ -53,7 +53,7 @@ impl KObject {
             name: name.to_owned(),
             parent: None,
             children: Default::default(),
-            create_fs_node_ops: Box::new(|kobject| Box::new(SysfsDirectory::new(kobject))),
+            create_fs_node_ops: Box::new(|kobject| Box::new(KObjectDirectory::new(kobject))),
         })
     }
 
@@ -421,34 +421,34 @@ mod tests {
         assert!(root.parent().is_none());
 
         assert!(!root.has_child("virtual".into()));
-        root.get_or_create_child("virtual".into(), SysfsDirectory::new);
+        root.get_or_create_child("virtual".into(), KObjectDirectory::new);
         assert!(root.has_child("virtual".into()));
     }
 
     #[::fuchsia::test]
     fn kobject_path() {
         let root = KObject::new_root("devices".into());
-        let bus = root.get_or_create_child("virtual".into(), SysfsDirectory::new);
+        let bus = root.get_or_create_child("virtual".into(), KObjectDirectory::new);
         let device = bus
-            .get_or_create_child("mem".into(), SysfsDirectory::new)
-            .get_or_create_child("null".into(), SysfsDirectory::new);
+            .get_or_create_child("mem".into(), KObjectDirectory::new)
+            .get_or_create_child("null".into(), KObjectDirectory::new);
         assert_eq!(device.path(), "devices/virtual/mem/null");
     }
 
     #[::fuchsia::test]
     fn kobject_path_to_root() {
         let root = KObject::new_root(Default::default());
-        let bus = root.get_or_create_child("bus".into(), SysfsDirectory::new);
-        let device = bus.get_or_create_child("device".into(), SysfsDirectory::new);
+        let bus = root.get_or_create_child("bus".into(), KObjectDirectory::new);
+        let device = bus.get_or_create_child("device".into(), KObjectDirectory::new);
         assert_eq!(device.path_to_root(), "../..");
     }
 
     #[::fuchsia::test]
     fn kobject_get_children_names() {
         let root = KObject::new_root(Default::default());
-        root.get_or_create_child("virtual".into(), SysfsDirectory::new);
-        root.get_or_create_child("cpu".into(), SysfsDirectory::new);
-        root.get_or_create_child("power".into(), SysfsDirectory::new);
+        root.get_or_create_child("virtual".into(), KObjectDirectory::new);
+        root.get_or_create_child("cpu".into(), KObjectDirectory::new);
+        root.get_or_create_child("power".into(), KObjectDirectory::new);
 
         let names = root.get_children_names();
         assert!(names.iter().any(|name| *name == "virtual"));
@@ -460,8 +460,8 @@ mod tests {
     #[::fuchsia::test]
     fn kobject_remove() {
         let root = KObject::new_root(Default::default());
-        let bus = root.get_or_create_child("virtual".into(), SysfsDirectory::new);
-        let class = bus.get_or_create_child("mem".into(), SysfsDirectory::new);
+        let bus = root.get_or_create_child("virtual".into(), KObjectDirectory::new);
+        let class = bus.get_or_create_child("mem".into(), KObjectDirectory::new);
         assert!(bus.has_child("mem".into()));
         class.remove();
         assert!(!bus.has_child("mem".into()));

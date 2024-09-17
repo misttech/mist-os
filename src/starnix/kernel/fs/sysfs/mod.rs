@@ -4,19 +4,19 @@
 
 mod bus_collection_directory;
 mod cgroup;
-mod class_collection_directory;
 mod cpu_class_directory;
 mod device_directory;
 mod fs;
 mod kernel_directory;
+mod kobject_directory;
+mod kobject_symlink_directory;
 mod power_directory;
-mod sys_fs_directory;
 
 pub use bus_collection_directory::*;
-pub use class_collection_directory::*;
 pub use cpu_class_directory::*;
 pub use device_directory::*;
 pub use fs::*;
 pub use kernel_directory::*;
+pub use kobject_directory::*;
+pub use kobject_symlink_directory::*;
 pub use power_directory::*;
-pub use sys_fs_directory::*;

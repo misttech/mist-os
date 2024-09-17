@@ -8,7 +8,7 @@ use crate::device::kobject::{
 };
 use crate::fs::devtmpfs::{devtmpfs_create_device, devtmpfs_remove_node};
 use crate::fs::sysfs::{
-    BusCollectionDirectory, ClassCollectionDirectory, SysfsDirectory, SYSFS_BLOCK, SYSFS_BUS,
+    BusCollectionDirectory, KObjectDirectory, KObjectSymlinkDirectory, SYSFS_BLOCK, SYSFS_BUS,
     SYSFS_CLASS, SYSFS_DEVICES,
 };
 use crate::task::CurrentTask;
@@ -244,21 +244,27 @@ impl DeviceRegistry {
 
     /// Returns the virtual bus kobject where all virtual and pseudo devices are stored.
     pub fn virtual_bus(&self) -> Bus {
-        Bus::new(self.root_kobject.get_or_create_child("virtual".into(), SysfsDirectory::new), None)
+        Bus::new(
+            self.root_kobject.get_or_create_child("virtual".into(), KObjectDirectory::new),
+            None,
+        )
     }
 
     pub fn get_or_create_bus(&self, name: &FsStr) -> Bus {
         let collection = Collection::new(
             self.bus_subsystem_kobject.get_or_create_child(name, BusCollectionDirectory::new),
         );
-        Bus::new(self.root_kobject.get_or_create_child(name, SysfsDirectory::new), Some(collection))
+        Bus::new(
+            self.root_kobject.get_or_create_child(name, KObjectDirectory::new),
+            Some(collection),
+        )
     }
 
     pub fn get_or_create_class(&self, name: &FsStr, bus: Bus) -> Class {
         let collection = Collection::new(
-            self.class_subsystem_kobject.get_or_create_child(name, ClassCollectionDirectory::new),
+            self.class_subsystem_kobject.get_or_create_child(name, KObjectSymlinkDirectory::new),
         );
-        Class::new(bus.kobject().get_or_create_child(name, SysfsDirectory::new), bus, collection)
+        Class::new(bus.kobject().get_or_create_child(name, KObjectDirectory::new), bus, collection)
     }
 
     pub fn add_device<F, N, L>(
