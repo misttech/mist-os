@@ -23,7 +23,7 @@ pub use hooks::*;
 
 /// Opaque structure encapsulating security subsystem state for the whole system.
 pub struct KernelState {
-    server: Option<Arc<SecurityServer>>,
+    state: Option<selinux_hooks::KernelState>,
 }
 
 /// Opaque structure encapsulating security state for a `ThreadGroup`.

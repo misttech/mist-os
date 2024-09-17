@@ -211,8 +211,11 @@ fn create_kernel_task_and_unlocked_with_fs_and_selinux<'l>(
 ) -> (Arc<Kernel>, AutoReleasableTask, Locked<'l, Unlocked>) {
     let mut locked = Unlocked::new();
     let kernel = create_test_kernel(&mut locked, security_server);
-    let fs = create_test_fs_context(&mut locked, &kernel, create_fs);
-    let init_task = create_test_init_task(&mut locked, &kernel, fs);
+    let fs = create_fs(&kernel);
+    let fs_context = create_test_fs_context(&mut locked, &kernel, |_| fs.clone());
+    let init_task = create_test_init_task(&mut locked, &kernel, fs_context).into();
+    security::file_system_resolve_security(&init_task, &fs)
+        .expect("Failed to resolve root filesystem labeling");
     (kernel, init_task.into(), locked)
 }
 

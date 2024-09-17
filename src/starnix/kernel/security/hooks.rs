@@ -4,12 +4,14 @@
 
 use super::{selinux_hooks, FileSystemState, ResolvedElfState, TaskState};
 use crate::security::KernelState;
-use crate::task::{CurrentTask, Task};
+use crate::task::{CurrentTask, Kernel, Task};
 use crate::vfs::fs_args::MountParams;
 use crate::vfs::{
-    DirEntry, FileSystem, FsNode, FsStr, FsString, NamespaceNode, ValueOrSize, XattrOp,
+    DirEntry, FileSystemHandle, FsNode, FsStr, FsString, NamespaceNode, ValueOrSize, XattrOp,
 };
 use selinux::{SecurityPermission, SecurityServer};
+use starnix_logging::log_debug;
+use starnix_uapi::arc_key::WeakKey;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::mount_flags::MountFlags;
 use starnix_uapi::signals::Signal;
@@ -25,9 +27,9 @@ where
     F: FnOnce(&Arc<SecurityServer>) -> R,
     D: Fn() -> R,
 {
-    task.kernel().security_state.server.as_ref().map_or_else(&default, |ss| {
-        if ss.has_policy() {
-            hook(ss)
+    task.kernel().security_state.state.as_ref().map_or_else(&default, |state| {
+        if state.server.has_policy() {
+            hook(&state.server)
         } else {
             default()
         }
@@ -48,7 +50,7 @@ where
 /// Returns the security state structure for the kernel, based on the supplied "selinux" argument
 /// contents.
 pub fn kernel_init_security(enabled: bool) -> KernelState {
-    KernelState { server: enabled.then(|| SecurityServer::new()) }
+    KernelState { state: enabled.then(|| selinux_hooks::kernel_init_security()) }
 }
 
 /// Return security state to associate with a filesystem based on the supplied mount options.
@@ -57,13 +59,28 @@ pub fn file_system_init_security(mount_params: &MountParams) -> Result<FileSyste
     Ok(FileSystemState { state: selinux_hooks::file_system_init_security(mount_params)? })
 }
 
+/// Gives the hooks subsystem an opportunity to note that the new `file_system` needs labeling, if
+/// SELinux is enabled, but no policy has yet been loaded.
+// TODO: https://fxbug.dev/366405587 - Merge this logic into `file_system_resolve_security()` and
+// remove this extra hook.
+pub fn file_system_post_init_security(kernel: &Kernel, file_system: &FileSystemHandle) {
+    if let Some(state) = &kernel.security_state.state {
+        if !state.server.has_policy() {
+            // TODO: https://fxbug.dev/367585803 - Revise locking to guard against a policy load
+            // sneaking in, in-between `has_policy()` and this `insert()`.
+            log_debug!("Queuing {} FileSystem for labeling", file_system.name());
+            state.pending_file_systems.lock().insert(WeakKey::from(&file_system));
+        }
+    }
+}
+
 /// Resolves the labeling scheme and arguments for the `file_system`, based on the loaded policy.
 /// If no policy has yet been loaded then no work is done, and the `file_system` will instead be
 /// labeled when a policy is first loaded.
 /// If the `file_system` was already labelled then no further work is done.
 pub fn file_system_resolve_security(
     current_task: &CurrentTask,
-    file_system: &FileSystem,
+    file_system: &FileSystemHandle,
 ) -> Result<(), Errno> {
     if_selinux_else_default_ok(current_task, |security_server| {
         selinux_hooks::file_system_resolve_security(security_server, current_task, file_system)
@@ -469,7 +486,7 @@ pub fn selinuxfs_policy_loaded(current_task: &CurrentTask) {
 // TODO: https://fxbug.dev/335397745 - Return a more restricted API, or ...
 // TODO: https://fxbug.dev/362917997 - Remove this when SELinux LSM is modularized.
 pub fn selinuxfs_get_admin_api(current_task: &CurrentTask) -> Option<Arc<SecurityServer>> {
-    current_task.kernel().security_state.server.clone()
+    current_task.kernel().security_state.state.as_ref().map(|state| state.server.clone())
 }
 
 /// Used by the "selinuxfs" module to perform checks on SELinux API file accesses.
@@ -485,12 +502,18 @@ pub fn selinuxfs_check_access(
 }
 
 pub mod testing {
-    use super::{Arc, KernelState, SecurityServer};
+    use super::{selinux_hooks, Arc, KernelState, SecurityServer};
+    use starnix_sync::Mutex;
 
     /// Used by Starnix' `testing.rs` to create `KernelState` wrapping a test-
     /// supplied `SecurityServer`.
     pub fn kernel_state(security_server: Option<Arc<SecurityServer>>) -> KernelState {
-        KernelState { server: security_server.clone() }
+        KernelState {
+            state: security_server.map(|server| selinux_hooks::KernelState {
+                server,
+                pending_file_systems: Mutex::default(),
+            }),
+        }
     }
 }
 
@@ -530,7 +553,7 @@ mod tests {
     fn create_task_pair_with_selinux_disabled() -> (AutoReleasableTask, AutoReleasableTask) {
         let (kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
         let another_task = create_task(&mut locked, &kernel, "another-task");
-        assert!(kernel.security_state.server.is_none());
+        assert!(kernel.security_state.state.is_none());
         (current_task, another_task)
     }
 
@@ -554,7 +577,7 @@ mod tests {
     #[fuchsia::test]
     async fn if_selinux_else_disabled() {
         let (kernel, task) = create_kernel_and_task();
-        assert!(kernel.security_state.server.is_none());
+        assert!(kernel.security_state.state.is_none());
 
         let check_result = if_selinux_else_default_ok(&task, |_| Ok(TestHookResult::WasRun));
         assert_eq!(check_result, Ok(TestHookResult::WasNotRunDefault));
@@ -600,7 +623,7 @@ mod tests {
     #[fuchsia::test]
     async fn task_create_access_allowed_for_selinux_disabled() {
         let (kernel, task) = create_kernel_and_task();
-        assert!(kernel.security_state.server.is_none());
+        assert!(kernel.security_state.state.is_none());
         assert_eq!(check_task_create_access(&task), Ok(()));
     }
 
@@ -615,7 +638,7 @@ mod tests {
     #[fuchsia::test]
     async fn exec_access_allowed_for_selinux_disabled() {
         let (kernel, task, mut locked) = create_kernel_task_and_unlocked();
-        assert!(kernel.security_state.server.is_none());
+        assert!(kernel.security_state.state.is_none());
         let executable_node = &testing::create_test_file(&mut locked, &task).entry.node;
         assert_eq!(check_exec_access(&task, executable_node), Ok(ResolvedElfState { sid: None }));
     }

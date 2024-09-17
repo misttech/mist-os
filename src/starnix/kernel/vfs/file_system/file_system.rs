@@ -140,7 +140,8 @@ impl FileSystem {
         options: FileSystemOptions,
     ) -> Result<FileSystemHandle, Errno> {
         let security_state = security::file_system_init_security(&options.params)?;
-        Ok(Arc::new(FileSystem {
+
+        let file_system = Arc::new(FileSystem {
             kernel: Arc::downgrade(kernel),
             root: OnceCell::new(),
             next_node_id: AtomicU64Counter::new(1),
@@ -157,7 +158,13 @@ impl FileSystem {
                 CacheMode::Uncached => Entries::Uncached,
             },
             security_state,
-        }))
+        });
+
+        // TODO: https://fxbug.dev/366405587 - Workaround to allow SELinux to note that this
+        // `FileSystem` needs labeling, once a policy has been loaded.
+        security::file_system_post_init_security(kernel, &file_system);
+
+        Ok(file_system)
     }
 
     pub fn set_root(self: &FileSystemHandle, root: impl FsNodeOps) {
