@@ -193,6 +193,13 @@ fit::result<Errno, FsNodeHandle> TmpfsDirectory::mknod(const FsNode& node,
   return fit::ok(child_result.value());
 }
 
+fit::result<Errno, FsNodeHandle> TmpfsDirectory::create_symlink(const FsNode& node,
+                                                                const CurrentTask& current_task,
+                                                                const FsStr& name,
+                                                                const FsStr& target, FsCred owner) {
+  return fit::error(errno(ENOTSUP));
+}
+
 fit::result<Errno, FsNodeHandle> TmpfsDirectory::create_tmpfile(const FsNode& node,
                                                                 const CurrentTask& current_task,
                                                                 FileMode mode, FsCred owner) {
