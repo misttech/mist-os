@@ -32,7 +32,7 @@ Run Fuchsia as normal, for example using `fx serve` and `ffx emu start --headles
 To monitor starnix, look for log messages with the `starnix` tag:
 
 ```sh
-ffx log --filter starnix --severity TRACE --select "core/starnix_runner/kernels*#TRACE"
+ffx log --filter starnix --severity TRACE --set-severity "core/starnix_runner/kernels*#TRACE"
 ```
 
 When running tests, you will need to pass the log selection parameters to fx test instead:
@@ -42,8 +42,8 @@ fx test <test name> --min-severity-logs TRACE
 ```
 
 
-The `--select` arguments contain the moniker for the starnix instance whose minimum severity log
-level you want to change. This affects the logs emitted by starnix, as opposed to `--severity`,
+The `--set-severity` arguments contain the moniker for the starnix instance whose minimum severity
+log level you want to change. This affects the logs emitted by starnix, as opposed to `--severity`,
 which affects which logs are filtered for viewing. The changed log level only persists for the
 duration of the `ffx log` command.
 
@@ -171,7 +171,7 @@ You should see output like:
 [ RUN      ] ExitTest.CloseFds
 ```
 
-If you set the log level to `TRACE` (e.g.,  `ffx log --severity TRACE --select "core/test*/*/starnix*#TRACE"`), you should see the system call handling in the device logs:
+If you set the log level to `TRACE` (e.g.,  `ffx log --severity TRACE --set-severity "core/test*/*/starnix*#TRACE"`), you should see the system call handling in the device logs:
 
 ```text
 [629.603][starnix][D] 1[/data/tests/exit_test] wait4(0x3, 0x1c48095b950, 0x0, 0x0, 0x10, 0x10)

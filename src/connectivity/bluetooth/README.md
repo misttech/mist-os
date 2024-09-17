@@ -176,7 +176,7 @@ All other components can be controlled at runtime, using the diagnostics selecto
 For example, to show all logs up to `DEBUG` level in the A2DP profile component, use:
 
 ```
-ffx log --select core/bt-a2dp#DEBUG
+ffx log --set-severity core/bt-a2dp#DEBUG
 ```
 
 Component monikers can be found using `ffx component list`.

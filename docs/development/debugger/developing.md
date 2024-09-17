@@ -52,10 +52,10 @@ ffx component stop /core/debug_agent
 ## Enable debug logging in `debug_agent` {:#enable-debug-logging-debug_agent}
 
 To enable the debug logging of the `debug_agent`, add
-`--select core/debug_agent#DEBUG` to `fx log`. For example:
+`--set-severity core/debug_agent#DEBUG` to `fx log`. For example:
 
 ```posix-terminal
-fx log --select core/debug_agent#DEBUG --tag debug_agent --hide_metadata --pretty
+fx log --set-severity core/debug_agent#DEBUG --tag debug_agent --hide_metadata --pretty
 ```
 
 ## Enable debug logging in zxdb {:#enable-debug-logging}

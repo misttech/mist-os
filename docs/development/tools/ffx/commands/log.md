@@ -101,13 +101,13 @@ For a complete list of filtering options, run `ffx log --help`.
 ## Log settings
 
 Log filters modify how the captured logs are displayed by `ffx log`, but they do not affect the
-log entries emitted by components on the target device. Use the `--select` option to send a
+log entries emitted by components on the target device. Use the `--set-severity` option to send a
 request to configure the [log settings][fidl-logsettings] of specific components during the
 logging session. This adjusts the log level applied to any component matching the provided
 [component selector][component-select] for recording logs.
 
 ```posix-terminal
-ffx log --select {{ '<var>' }}component-selector{{ '</var>' }}#{{ '<var>' }}log-level{{ '</var>' }}
+ffx log --set-severity {{ '<var>' }}component-selector{{ '</var>' }}#{{ '<var>' }}log-level{{ '</var>' }}
 ```
 
 You can use this to temporarily enable logs that are below the minimum severity configure by your
@@ -118,7 +118,7 @@ The following example enables debug logs for the `core/audio` component, and sup
 messages except errors from networking components:
 
 ```none {:.devsite-disable-click-to-copy}
-$ ffx log --select core/audio#DEBUG --select core/network/**#ERROR
+$ ffx log --set-severity core/audio#DEBUG --set-severity core/network/**#ERROR
 ```
 
 Note: Unlike the `--severity` option, which filters the view after logs are captured from the
