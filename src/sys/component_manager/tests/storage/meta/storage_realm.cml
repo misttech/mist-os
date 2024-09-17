@@ -5,6 +5,7 @@
     include: [
         "//src/sys/component_manager/tests/meta/elf_runner_and_environment.shard.cml",
         "inspect/offer.shard.cml",
+        "syslog/offer.shard.cml",
     ],
     children: [
         {
@@ -38,14 +39,6 @@
             directory: "memfs",
             from: "#memfs",
             to: "#storage_user",
-        },
-        {
-            protocol: "fuchsia.logger.LogSink",
-            from: "parent",
-            to: [
-                "#memfs",
-                "#storage_user",
-            ],
         },
     ],
 }
