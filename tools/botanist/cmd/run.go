@@ -388,6 +388,7 @@ func (r *RunCommand) dispatchTests(ctx context.Context, cancel context.CancelFun
 							return err
 						}
 					}
+					defer t.StopSyslog()
 					go func() {
 						syslogName := fmt.Sprintf("%s_syslog.txt", t.Nodename())
 						// TODO(https://fxbug.dev/42150891): Remove when there are no dependencies on this filename.

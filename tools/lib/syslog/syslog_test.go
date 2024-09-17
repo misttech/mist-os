@@ -82,7 +82,7 @@ func (c *fakeSSHClient) ReconnectWithBackoff(_ context.Context, _ retry.Backoff)
 // Note that this function will only call Stream() once, with no retries,
 // although Stream() itself is expected to have internal retries for certain
 // failure modes.
-func startStream(ctx context.Context) (*fakeSSHClient, io.Reader, <-chan error) {
+func startStream(ctx, loggerCtx context.Context) (*fakeSSHClient, io.Reader, <-chan error) {
 	client := &fakeSSHClient{
 		mockRunErrs:   make(chan error),
 		mockRunStdout: make(chan string),
@@ -97,7 +97,7 @@ func startStream(ctx context.Context) (*fakeSSHClient, io.Reader, <-chan error) 
 
 	// syslogger.Stream() will start streaming in a background goroutine
 	// that should run for the duration of the test that uses this function.
-	streamErrs := syslogger.Stream(ctx, pipeWriter)
+	streamErrs := syslogger.Stream(ctx, loggerCtx, pipeWriter)
 
 	// Don't return until we've started running the SSH command, to ensure that
 	// we always return a client in a deterministic state.
@@ -136,9 +136,9 @@ func TestStream(t *testing.T) {
 	ctx := logger.WithLogger(context.Background(), l)
 
 	t.Run("streams stdout until context canceled", func(t *testing.T) {
-		ctx, cancel := context.WithCancel(ctx)
+		syslogCtx, cancel := context.WithCancel(ctx)
 		defer cancel()
-		client, streamOutput, streamErrs := startStream(ctx)
+		client, streamOutput, streamErrs := startStream(syslogCtx, ctx)
 
 		stdout := "ABCDE"
 		client.mockRunStdout <- stdout
@@ -175,7 +175,7 @@ func TestStream(t *testing.T) {
 	// Errors not of type sshutil.ConnectionError should cause the syslogger to
 	// exit, rather than reconnecting and resuming streaming.
 	t.Run("non-connection error interrupts the stream", func(t *testing.T) {
-		client, _, streamErrs := startStream(ctx)
+		client, _, streamErrs := startStream(ctx, ctx)
 
 		// We'll be notified in case Run() is called again (it shouldn't be
 		// called again).
@@ -212,7 +212,7 @@ func TestStream(t *testing.T) {
 
 	// If we come across a connection error we should reconnect and re-run log_listener.
 	t.Run("stream should recover from a connection error", func(t *testing.T) {
-		client, streamOutput, _ := startStream(ctx)
+		client, streamOutput, _ := startStream(ctx, ctx)
 
 		runningAgain := client.listenForRun()
 
@@ -233,7 +233,7 @@ func TestStream(t *testing.T) {
 
 	// If log_listener exits successfully, we should just keep running it.
 	t.Run("stream should rerun log_listener if it exits successfully", func(t *testing.T) {
-		client, _, _ := startStream(ctx)
+		client, _, _ := startStream(ctx, ctx)
 
 		runningAgain := client.listenForRun()
 

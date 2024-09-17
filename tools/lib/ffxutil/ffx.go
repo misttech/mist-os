@@ -311,6 +311,11 @@ func (f *FFXInstance) Run(ctx context.Context, args ...string) error {
 	return f.RunWithTimeout(ctx, 5*time.Minute, args...)
 }
 
+// RunCommand runs the given cmd with the FFXInstance's subprocess runner.
+func (f *FFXInstance) RunCommand(ctx context.Context, cmd *exec.Cmd) error {
+	return f.runner.RunCommand(ctx, cmd)
+}
+
 // RunWithTarget runs ffx with the associated target.
 func (f *FFXInstance) RunWithTarget(ctx context.Context, args ...string) error {
 	if f.target == "" {
