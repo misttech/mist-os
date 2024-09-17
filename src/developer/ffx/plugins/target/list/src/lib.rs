@@ -219,7 +219,6 @@ async fn local_list_targets(
             .await;
     // Fail if any results are Err
     let targets = targets.into_iter().collect::<Result<Vec<ffx::TargetInfo>>>()?;
-
     Ok(targets)
 }
 

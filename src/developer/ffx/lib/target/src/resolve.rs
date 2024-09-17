@@ -173,6 +173,8 @@ pub async fn resolve_target_query(
     resolve_target_query_with_sources(
         query,
         ctx,
+        // TODO(colnnelson): Add DiscoverySources::FASTBOOT_FILE once feature
+        // is announced.
         DiscoverySources::MDNS
             | DiscoverySources::USB
             | DiscoverySources::MANUAL
@@ -309,6 +311,8 @@ pub async fn resolve_target_query_with(
     usb: bool,
     mdns: bool,
 ) -> Result<Vec<TargetHandle>> {
+    // TODO(colnnelson): Add DiscoverySources::FASTBOOT_FILE once feature
+    // is announced.
     let mut sources = DiscoverySources::MANUAL | DiscoverySources::EMULATOR;
     if usb {
         sources = sources | DiscoverySources::USB;
@@ -420,9 +424,17 @@ impl QueryResolverT for QueryResolver {
             query_clone.match_description(&description)
         };
         let emu_instance_root: PathBuf = ctx.get(emulator_instance::EMU_INSTANCE_ROOT_DIR)?;
-        let stream =
-            discovery::wait_for_devices(filter, Some(emu_instance_root), true, false, self.sources)
-                .await?;
+        let fastboot_file_path: Option<PathBuf> =
+            ctx.get(fastboot_file_discovery::FASTBOOT_FILE_PATH).ok();
+        let stream = discovery::wait_for_devices(
+            filter,
+            Some(emu_instance_root),
+            fastboot_file_path,
+            true,
+            false,
+            self.sources,
+        )
+        .await?;
         let discovery_delay = ctx.get(CONFIG_LOCAL_DISCOVERY_TIMEOUT).unwrap_or(2000);
         let delay = Duration::from_millis(discovery_delay);
 

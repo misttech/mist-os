@@ -4,6 +4,7 @@
 
 use crate::emulator_watcher::EmulatorWatcher;
 pub use crate::events::*;
+use crate::fastboot_file_watcher::FastbootWatcher;
 use anyhow::{anyhow, Result};
 use bitflags::bitflags;
 use futures::channel::mpsc::{unbounded, UnboundedReceiver};
@@ -26,6 +27,7 @@ use fidl_fuchsia_developer_ffx as ffx;
 pub mod desc;
 mod emulator_watcher;
 pub mod events;
+mod fastboot_file_watcher;
 pub mod query;
 
 #[allow(dead_code)]
@@ -44,6 +46,9 @@ pub struct TargetStream {
 
     /// Watches for Emulator events
     emulator_watcher: Option<EmulatorWatcher>,
+
+    /// Watches for Emulator events
+    fastboot_file_watcher: Option<FastbootWatcher>,
 
     /// This is where results from the various watchers are published.
     queue: UnboundedReceiver<Result<TargetEvent>>,
@@ -81,6 +86,7 @@ pub trait TargetDiscovery<F> {
 
 pub struct DiscoveryBuilder {
     emulator_instance_root: Option<PathBuf>,
+    fastboot_devices_file_path: Option<PathBuf>,
     notify_added: bool,
     notify_removed: bool,
     sources: DiscoverySources,
@@ -103,6 +109,12 @@ impl DiscoveryBuilder {
         self
     }
 
+    pub fn with_fastboot_devices_file_path(mut self, fastboot_devices_file_path: PathBuf) -> Self {
+        self.fastboot_devices_file_path = Some(fastboot_devices_file_path);
+        self.sources.insert(DiscoverySources::FASTBOOT_FILE);
+        self
+    }
+
     pub fn notify_added(mut self, notify_added: bool) -> Self {
         self.notify_added = notify_added;
         self
@@ -116,6 +128,7 @@ impl DiscoveryBuilder {
     pub fn build(self) -> Discovery {
         Discovery {
             emulator_instance_root: self.emulator_instance_root,
+            fastboot_devices_file_path: self.fastboot_devices_file_path,
             notify_added: self.notify_added,
             notify_removed: self.notify_removed,
             sources: self.sources,
@@ -127,6 +140,7 @@ impl Default for DiscoveryBuilder {
     fn default() -> Self {
         Self {
             emulator_instance_root: None,
+            fastboot_devices_file_path: None,
             notify_added: true,
             notify_removed: true,
             sources: DiscoverySources::default(),
@@ -136,6 +150,7 @@ impl Default for DiscoveryBuilder {
 
 pub struct Discovery {
     emulator_instance_root: Option<PathBuf>,
+    fastboot_devices_file_path: Option<PathBuf>,
     notify_added: bool,
     notify_removed: bool,
     sources: DiscoverySources,
@@ -156,6 +171,7 @@ where
         let stream = wait_for_devices(
             filter,
             self.emulator_instance_root.clone(),
+            self.fastboot_devices_file_path.clone(),
             self.notify_added,
             self.notify_removed,
             self.sources,
@@ -172,6 +188,7 @@ bitflags! {
         const USB = 1 << 1;
         const MANUAL = 1 << 2;
         const EMULATOR = 1 << 3;
+        const FASTBOOT_FILE = 1 << 4;
     }
 }
 
@@ -184,6 +201,7 @@ impl Default for DiscoverySources {
 pub async fn wait_for_devices<F>(
     filter: F,
     emulator_instance_root: Option<PathBuf>,
+    fastboot_devices_file_path: Option<PathBuf>,
     notify_added: bool,
     notify_removed: bool,
     sources: DiscoverySources,
@@ -192,7 +210,6 @@ where
     F: TargetFilter,
 {
     let (sender, queue) = unbounded();
-
     // MDNS Watcher
     let mdns_watcher = if sources.contains(DiscoverySources::MDNS) {
         let mdns_sender = sender.clone();
@@ -259,6 +276,17 @@ where
         None
     };
 
+    let fastboot_file_watcher = if sources.contains(DiscoverySources::FASTBOOT_FILE) {
+        let fastboot_file_sender = sender.clone();
+        if let Some(fastboot_devices_file) = fastboot_devices_file_path {
+            Some(FastbootWatcher::new(fastboot_devices_file, fastboot_file_sender)?)
+        } else {
+            None
+        }
+    } else {
+        None
+    };
+
     Ok(TargetStream {
         filter: Some(Box::new(filter)),
         queue,
@@ -268,6 +296,7 @@ where
         fastboot_usb_watcher,
         manual_targets_watcher,
         emulator_watcher,
+        fastboot_file_watcher,
     })
 }
 
@@ -499,6 +528,7 @@ pub mod test {
             fastboot_usb_watcher: None,
             manual_targets_watcher: None,
             emulator_watcher: None,
+            fastboot_file_watcher: None,
             queue,
             notify_added: true,
             notify_removed: true,
@@ -544,6 +574,7 @@ pub mod test {
             fastboot_usb_watcher: None,
             manual_targets_watcher: None,
             emulator_watcher: None,
+            fastboot_file_watcher: None,
             queue,
             notify_added: false,
             notify_removed: true,
@@ -581,6 +612,7 @@ pub mod test {
             fastboot_usb_watcher: None,
             manual_targets_watcher: None,
             emulator_watcher: None,
+            fastboot_file_watcher: None,
             queue,
             notify_added: true,
             notify_removed: false,
@@ -618,6 +650,7 @@ pub mod test {
             fastboot_usb_watcher: None,
             manual_targets_watcher: None,
             emulator_watcher: None,
+            fastboot_file_watcher: None,
             queue,
             notify_added: true,
             notify_removed: true,
@@ -705,6 +738,7 @@ pub mod test {
         let mut stream = wait_for_devices(
             true_target_filter,
             Some(instance_dir.clone()),
+            None,
             true,
             false,
             DiscoverySources::EMULATOR,

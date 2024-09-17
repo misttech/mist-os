@@ -12,6 +12,7 @@ use ffx_fastboot_interface::interface_factory::{
 use ffx_fastboot_transport_interface::udp::{open, UdpNetworkInterface};
 use fuchsia_async::Timer;
 use std::net::SocketAddr;
+use std::path::PathBuf;
 use std::time::Duration;
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -21,6 +22,7 @@ use std::time::Duration;
 #[derive(Debug, Clone)]
 pub struct UdpFactory {
     target_name: String,
+    fastboot_devices_file_path: Option<PathBuf>,
     addr: SocketAddr,
     open_retries: u64,
     retry_wait_seconds: u64,
@@ -29,11 +31,12 @@ pub struct UdpFactory {
 impl UdpFactory {
     pub fn new(
         target_name: String,
+        fastboot_devices_file_path: Option<PathBuf>,
         addr: SocketAddr,
         open_retries: u64,
         retry_wait_seconds: u64,
     ) -> Self {
-        Self { target_name, addr, open_retries, retry_wait_seconds }
+        Self { target_name, fastboot_devices_file_path, addr, open_retries, retry_wait_seconds }
     }
 }
 
@@ -77,19 +80,26 @@ impl InterfaceFactoryBase<UdpNetworkInterface> for UdpFactory {
     async fn rediscover(&mut self) -> Result<(), InterfaceFactoryError> {
         let filter = UdpTargetFilter { node_name: self.target_name.clone() };
 
-        rediscover_helper(&self.target_name, filter, &mut |connection_state| {
-            match connection_state {
-                FastbootConnectionState::Udp(addrs) => self.addr = addrs.first().unwrap().into(),
-                s @ _ => {
-                    return Err(InterfaceFactoryError::RediscoverTargetNotInCorrectTransport(
-                        self.target_name.clone(),
-                        "UDP".to_string(),
-                        s.to_string(),
-                    ))
+        rediscover_helper(
+            &self.fastboot_devices_file_path,
+            &self.target_name,
+            filter,
+            &mut |connection_state| {
+                match connection_state {
+                    FastbootConnectionState::Udp(addrs) => {
+                        self.addr = addrs.first().unwrap().into()
+                    }
+                    s @ _ => {
+                        return Err(InterfaceFactoryError::RediscoverTargetNotInCorrectTransport(
+                            self.target_name.clone(),
+                            "UDP".to_string(),
+                            s.to_string(),
+                        ))
+                    }
                 }
-            }
-            Ok(())
-        })
+                Ok(())
+            },
+        )
         .await
     }
 }

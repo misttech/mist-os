@@ -33,6 +33,7 @@ libs = [
   "tasks",
   "testing",
   "timeout",
+  "fastboot_file_discovery",
   "usb_fastboot_discovery",
   "version",
   "writer",

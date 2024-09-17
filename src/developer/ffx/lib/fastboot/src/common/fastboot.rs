@@ -14,6 +14,7 @@ use ffx_fastboot_transport_factory::usb::UsbFactory;
 use ffx_fastboot_transport_interface::tcp::TcpNetworkInterface;
 use ffx_fastboot_transport_interface::udp::UdpNetworkInterface;
 use std::net::SocketAddr;
+use std::path::PathBuf;
 use thiserror::Error;
 use usb_bulk::AsyncInterface;
 
@@ -106,11 +107,19 @@ impl FastbootConnectionFactory for ConnectionFactory {
             }
             FastbootConnectionKind::Tcp(target_name, addr) => {
                 let config = FastbootNetworkConnectionConfig::new_tcp().await;
-                Ok(Box::new(tcp_proxy(target_name, &addr, config).await?))
+                let fastboot_device_file_path: Option<PathBuf> =
+                    ffx_config::get(fastboot_file_discovery::FASTBOOT_FILE_PATH).await.ok();
+                Ok(Box::new(
+                    tcp_proxy(target_name, fastboot_device_file_path, &addr, config).await?,
+                ))
             }
             FastbootConnectionKind::Udp(target_name, addr) => {
                 let config = FastbootNetworkConnectionConfig::new_udp().await;
-                Ok(Box::new(udp_proxy(target_name, &addr, config).await?))
+                let fastboot_device_file_path: Option<PathBuf> =
+                    ffx_config::get(fastboot_file_discovery::FASTBOOT_FILE_PATH).await.ok();
+                Ok(Box::new(
+                    udp_proxy(target_name, fastboot_device_file_path, &addr, config).await?,
+                ))
             }
         }
     }
@@ -137,6 +146,7 @@ pub async fn usb_proxy(serial_number: String) -> Result<FastbootProxy<AsyncInter
 /// Creates a FastbootProxy over TCP for a device at the given SocketAddr
 pub async fn tcp_proxy(
     target_name: String,
+    fastboot_device_file_path: Option<PathBuf>,
     addr: &SocketAddr,
     config: FastbootNetworkConnectionConfig,
 ) -> Result<FastbootProxy<TcpNetworkInterface<TcpStream>>> {
@@ -144,8 +154,13 @@ pub async fn tcp_proxy(
         bail!(FastbootConnectionFactoryError::EmptyTargetName);
     }
 
-    let mut factory =
-        TcpFactory::new(target_name, *addr, config.retry_count, config.retry_wait_seconds);
+    let mut factory = TcpFactory::new(
+        target_name,
+        fastboot_device_file_path,
+        *addr,
+        config.retry_count,
+        config.retry_wait_seconds,
+    );
     let interface = factory
         .open()
         .await
@@ -160,6 +175,7 @@ pub async fn tcp_proxy(
 /// Creates a FastbootProxy over TCP for a device at the given SocketAddr
 pub async fn udp_proxy(
     target_name: String,
+    fastboot_device_file_path: Option<PathBuf>,
     addr: &SocketAddr,
     config: FastbootNetworkConnectionConfig,
 ) -> Result<FastbootProxy<UdpNetworkInterface>> {
@@ -167,8 +183,13 @@ pub async fn udp_proxy(
         bail!(FastbootConnectionFactoryError::EmptyTargetName);
     }
 
-    let mut factory =
-        UdpFactory::new(target_name, *addr, config.retry_count, config.retry_wait_seconds);
+    let mut factory = UdpFactory::new(
+        target_name,
+        fastboot_device_file_path,
+        *addr,
+        config.retry_count,
+        config.retry_wait_seconds,
+    );
     let interface = factory
         .open()
         .await

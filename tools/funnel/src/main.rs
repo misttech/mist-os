@@ -210,6 +210,7 @@ async fn list_targets_main(args: SubCommandListTargets) -> Result<(), FunnelErro
     let mut device_stream = wait_for_devices(
         |_: &_| true,
         None,
+        None,
         true,
         true,
         DiscoverySources::MDNS | DiscoverySources::USB,
@@ -244,6 +245,7 @@ async fn funnel_main(args: SubCommandHost) -> Result<(), FunnelError> {
     // Only want added events
     let device_stream = wait_for_devices(
         |_: &_| true,
+        None,
         None,
         true,
         false,

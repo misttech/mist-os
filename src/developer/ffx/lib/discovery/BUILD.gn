@@ -18,6 +18,7 @@ if (is_host) {
       "//src/developer/ffx/fidl:fuchsia.developer.ffx_rust",
       "//src/developer/ffx/lib/addr:lib",
       "//src/developer/ffx/lib/emulator_instance:lib",
+      "//src/developer/ffx/lib/fastboot_file_discovery:lib",
       "//src/developer/ffx/lib/manual_targets:lib",
       "//src/developer/ffx/lib/mdns_discovery:lib",
       "//src/developer/ffx/lib/netext:lib",
@@ -41,6 +42,7 @@ if (is_host) {
       "src/desc.rs",
       "src/emulator_watcher.rs",
       "src/events.rs",
+      "src/fastboot_file_watcher.rs",
       "src/lib.rs",
       "src/query.rs",
     ]

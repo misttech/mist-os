@@ -19,6 +19,7 @@ if (is_host) {
       "//src/developer/ffx/lib/fastboot/interface:lib",
       "//src/developer/ffx/lib/fastboot/transport/factory:lib",
       "//src/developer/ffx/lib/fastboot/transport/interface:lib",
+      "//src/developer/ffx/lib/fastboot_file_discovery:lib",
       "//src/developer/ffx/lib/pbms:lib",
       "//src/developer/ffx/lib/sdk:lib",
       "//src/lib/assembly/partitions_config",
