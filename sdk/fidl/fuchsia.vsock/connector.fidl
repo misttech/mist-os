@@ -49,15 +49,12 @@ closed protocol Connector {
         remote_port uint32;
         con ConnectionTransport;
     }) -> (struct {
-        status zx.Status;
         local_port uint32;
-    });
+    }) error zx.Status;
     /// Registers a listener for a local port. There can only be one listener for
     /// a single port at a time.
     strict Listen(resource struct {
         local_port uint32;
         acceptor client_end:Acceptor;
-    }) -> (struct {
-        status zx.Status;
-    });
+    }) -> () error zx.Status;
 };

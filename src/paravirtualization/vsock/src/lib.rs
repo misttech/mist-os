@@ -103,13 +103,13 @@ mod tests {
                 endpoints::create_endpoints::<AcceptorMarker>();
             assert_eq!(
                 app_client.listen(49152, acceptor_remote).await?,
-                zx::sys::ZX_ERR_UNAVAILABLE
+                Err(zx::sys::ZX_ERR_UNAVAILABLE)
             );
         }
 
         // Listen on a reasonable value.
         let (acceptor_remote, acceptor_client) = endpoints::create_endpoints::<AcceptorMarker>();
-        assert_eq!(app_client.listen(8000, acceptor_remote).await?, zx::sys::ZX_OK);
+        assert_eq!(app_client.listen(8000, acceptor_remote).await?, Ok(()));
         let mut acceptor_client = acceptor_client.into_stream()?;
 
         // Validate that we cannot listen twice
@@ -118,7 +118,7 @@ mod tests {
                 endpoints::create_endpoints::<AcceptorMarker>();
             assert_eq!(
                 app_client.listen(8000, acceptor_remote).await?,
-                zx::sys::ZX_ERR_ALREADY_BOUND
+                Err(zx::sys::ZX_ERR_ALREADY_BOUND)
             );
         }
 
@@ -158,8 +158,7 @@ mod tests {
             // Leave this scope to drop the server_data_socket
         }
         // Request should resolve to an error
-        let (status, _port) = request.await?;
-        assert_eq!(status, zx::sys::ZX_ERR_UNAVAILABLE);
+        assert_eq!(request.await?, Err(zx::sys::ZX_ERR_UNAVAILABLE));
         Ok(())
     }
 
@@ -176,12 +175,11 @@ mod tests {
             unwrap_msg!(DeviceRequest::SendRequest{addr, data, responder} from driver.client);
         responder.send(zx::Status::OK.into_raw())?;
         driver.callbacks.response(&addr)?;
-        let (status, _) = request.await?;
-        zx::Status::ok(status)?;
+        let _ = request.await?.map_err(zx::Status::from_raw)?;
 
         // Start a listener
         let (acceptor_remote, acceptor_client) = endpoints::create_endpoints::<AcceptorMarker>();
-        assert_eq!(app_client.listen(9000, acceptor_remote).await?, zx::sys::ZX_OK);
+        assert_eq!(app_client.listen(9000, acceptor_remote).await?, Ok(()));
         let mut acceptor_client = acceptor_client.into_stream()?;
 
         // Perform a transport reset

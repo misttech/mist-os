@@ -63,17 +63,17 @@ async fn main() -> Result<(), Error> {
         connect_to_protocol::<ConnectorMarker>().context("failed to connect to vsock service")?;
     // Register the listeners early to avoid any race conditions later.
     let (acceptor_client, acceptor) = endpoints::create_endpoints::<AcceptorMarker>();
-    vsock.listen(8001, acceptor_client).await?;
+    vsock.listen(8001, acceptor_client).await?.map_err(zx::Status::from_raw)?;
     let (acceptor_client2, acceptor2) = endpoints::create_endpoints::<AcceptorMarker>();
-    vsock.listen(8002, acceptor_client2).await?;
+    vsock.listen(8002, acceptor_client2).await?.map_err(zx::Status::from_raw)?;
     let (acceptor_client3, acceptor3) = endpoints::create_endpoints::<AcceptorMarker>();
-    vsock.listen(8003, acceptor_client3).await?;
+    vsock.listen(8003, acceptor_client3).await?.map_err(zx::Status::from_raw)?;
     let mut acceptor = acceptor.into_stream()?;
     let mut acceptor2 = acceptor2.into_stream()?;
     let mut acceptor3 = acceptor3.into_stream()?;
 
     let (mut data_stream, client_end, con) = make_con()?;
-    let _port = vsock.connect(2, 8000, con).await?.0;
+    let _port = vsock.connect(2, 8000, con).await?.map_err(zx::Status::from_raw)?;
     test_read_write(&mut data_stream, &client_end).await?;
 
     client_end.shutdown()?;

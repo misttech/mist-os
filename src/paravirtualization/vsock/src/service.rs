@@ -124,21 +124,6 @@ fn map_driver_result(result: Result<i32, fidl::Error>) -> Result<(), Error> {
         .and_then(|x| zx::Status::ok(x).map_err(Error::Driver))
 }
 
-fn send_result<T>(
-    result: Result<T, Error>,
-    send: impl FnOnce(i32, Option<T>) -> Result<(), fidl::Error>,
-) -> Result<(), Error> {
-    match result {
-        Ok(v) => send(zx::Status::OK.into_raw(), Some(v))
-            .map_err(|e| Error::ClientCommunication(e.into())),
-        Err(e) => {
-            send(e.into_status().into_raw(), None)
-                .map_err(|e| Error::ClientCommunication(e.into()))?;
-            Err(e)
-        }
-    }
-}
-
 struct State {
     device: DeviceProxy,
     events: HashMap<Event, oneshot::Sender<()>>,
@@ -224,15 +209,17 @@ impl Vsock {
     // Handles a single incoming client request.
     async fn handle_request(&self, request: ConnectorRequest) -> Result<(), Error> {
         match request {
-            ConnectorRequest::Connect { remote_cid, remote_port, con, responder } => {
-                send_result(self.make_connection(remote_cid, remote_port, con).await, |r, v| {
-                    responder.send(r, v.unwrap_or(0))
-                })
-            }
-            ConnectorRequest::Listen { local_port, acceptor, responder } => {
-                send_result(self.start_listener(acceptor, local_port), |r, _| responder.send(r))
-            }
+            ConnectorRequest::Connect { remote_cid, remote_port, con, responder } => responder
+                .send(
+                    self.make_connection(remote_cid, remote_port, con)
+                        .await
+                        .map_err(|e| e.into_status().into_raw()),
+                ),
+            ConnectorRequest::Listen { local_port, acceptor, responder } => responder.send(
+                self.start_listener(acceptor, local_port).map_err(|e| e.into_status().into_raw()),
+            ),
         }
+        .map_err(|e| Error::ClientCommunication(e.into()))
     }
 
     /// Evaluates messages on a `ConnectorRequestStream` until completion or error
