@@ -34,8 +34,6 @@ TEST_F(DeviceEnumerationTest, Vim3DeviceTreeTest) {
       "dev.sys.platform.gpio-controller-ff634400.aml-gpio.gpio.gpio-93.fusb302-22_group.fusb302",
       "dev.sys.platform.hdmi-display-ff900000",
       "dev.sys.platform.hrtimer-0.aml-hrtimer",
-      "dev.sys.platform.i2c-1c000",
-      "dev.sys.platform.i2c-1c000.i2c-1c000_group.aml-i2c.i2c.i2c-1-56.touchscreen-38_group.focaltouch-HidDevice",
       "dev.sys.platform.i2c-5000",
       "dev.sys.platform.i2c-5000.i2c-5000_group.aml-i2c.i2c.i2c-0-24",
       "dev.sys.platform.i2c-5000.i2c-5000_group.aml-i2c.i2c.i2c-0-24.khadas-mcu-18_group.vim3-mcu",
