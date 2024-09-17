@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::device::kobject::{KObject, KObjectHandle};
-use crate::fs::sysfs::{sysfs_create_link, SysfsOps};
+use crate::fs::sysfs::sysfs_create_link;
 use crate::task::CurrentTask;
 use crate::vfs::{
     fs_node_impl_dir_readonly, DirectoryEntryType, FileOps, FsNode, FsNodeHandle, FsNodeOps, FsStr,
@@ -24,9 +24,7 @@ impl ClassCollectionDirectory {
     pub fn new(kobject: Weak<KObject>) -> Self {
         Self { kobject }
     }
-}
 
-impl SysfsOps for ClassCollectionDirectory {
     fn kobject(&self) -> KObjectHandle {
         self.kobject.upgrade().expect("Weak references to kobject must always be valid")
     }

@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use crate::device::kobject::{Device, KObjectBased, KObjectHandle, UEventFsNode};
-use crate::fs::sysfs::SysfsOps;
 use crate::task::CurrentTask;
 use crate::vfs::buffers::InputBuffer;
 use crate::vfs::{
@@ -50,10 +49,8 @@ impl DeviceDirectory {
             },
         ]
     }
-}
 
-impl SysfsOps for DeviceDirectory {
-    fn kobject(&self) -> KObjectHandle {
+    pub fn kobject(&self) -> KObjectHandle {
         self.device.kobject().clone()
     }
 }
@@ -127,9 +124,7 @@ impl BlockDeviceDirectory {
         });
         entries
     }
-}
 
-impl SysfsOps for BlockDeviceDirectory {
     fn kobject(&self) -> KObjectHandle {
         self.base_dir.kobject()
     }

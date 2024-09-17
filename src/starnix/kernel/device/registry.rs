@@ -8,11 +8,11 @@ use crate::device::kobject::{
 };
 use crate::fs::devtmpfs::{devtmpfs_create_device, devtmpfs_remove_node};
 use crate::fs::sysfs::{
-    BusCollectionDirectory, ClassCollectionDirectory, SysfsDirectory, SysfsOps, SYSFS_BLOCK,
-    SYSFS_BUS, SYSFS_CLASS, SYSFS_DEVICES,
+    BusCollectionDirectory, ClassCollectionDirectory, SysfsDirectory, SYSFS_BLOCK, SYSFS_BUS,
+    SYSFS_CLASS, SYSFS_DEVICES,
 };
 use crate::task::CurrentTask;
-use crate::vfs::{FileOps, FsNode, FsStr};
+use crate::vfs::{FileOps, FsNode, FsNodeOps, FsStr};
 use starnix_logging::{log_error, log_warn, track_stub};
 use starnix_uapi::device_type::{DeviceType, DYN_MAJOR};
 use starnix_uapi::errors::Errno;
@@ -272,7 +272,7 @@ impl DeviceRegistry {
     ) -> Device
     where
         F: Fn(Device) -> N + Send + Sync + 'static,
-        N: SysfsOps,
+        N: FsNodeOps,
         L: LockBefore<FileOpsCore>,
     {
         let class_cloned = class.clone();
@@ -315,7 +315,7 @@ impl DeviceRegistry {
     ) -> Device
     where
         F: Fn(Device) -> N + Send + Sync + 'static,
-        N: SysfsOps,
+        N: FsNodeOps,
         L: LockBefore<FileOpsCore>,
     {
         if let Err(err) = self.major_devices(metadata.mode).register(

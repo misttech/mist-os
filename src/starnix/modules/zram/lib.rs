@@ -3,9 +3,9 @@
 // found in the LICENSE file.
 
 use fuchsia_zircon as zx;
-use starnix_core::device::kobject::{Device, DeviceMetadata, KObjectHandle};
+use starnix_core::device::kobject::{Device, DeviceMetadata};
 use starnix_core::device::{DeviceMode, DeviceOps};
-use starnix_core::fs::sysfs::{BlockDeviceDirectory, BlockDeviceInfo, SysfsOps};
+use starnix_core::fs::sysfs::{BlockDeviceDirectory, BlockDeviceInfo};
 use starnix_core::task::{CurrentTask, KernelStats};
 use starnix_core::vfs::{
     fileops_impl_dataless, fileops_impl_noop_sync, fileops_impl_seekless,
@@ -73,12 +73,6 @@ impl ZramDeviceDirectory {
     pub fn new(device: Device, zram_device: Weak<ZramDevice>) -> Self {
         let base_dir = BlockDeviceDirectory::new(device, zram_device.clone());
         Self { device: zram_device, base_dir }
-    }
-}
-
-impl SysfsOps for ZramDeviceDirectory {
-    fn kobject(&self) -> KObjectHandle {
-        self.base_dir.kobject()
     }
 }
 

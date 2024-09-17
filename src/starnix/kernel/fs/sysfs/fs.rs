@@ -9,8 +9,8 @@ use crate::fs::sysfs::{
 };
 use crate::task::{CurrentTask, NetstackDevicesDirectory};
 use crate::vfs::{
-    CacheMode, FileSystem, FileSystemHandle, FileSystemOps, FileSystemOptions, FsNodeInfo,
-    FsNodeOps, FsStr, PathBuilder, StaticDirectoryBuilder, StubEmptyFile, SymlinkNode,
+    CacheMode, FileSystem, FileSystemHandle, FileSystemOps, FileSystemOptions, FsNodeInfo, FsStr,
+    PathBuilder, StaticDirectoryBuilder, StubEmptyFile, SymlinkNode,
 };
 use starnix_logging::bug_ref;
 use starnix_sync::{Locked, Unlocked};
@@ -112,10 +112,6 @@ pub fn sys_fs(
     options: FileSystemOptions,
 ) -> Result<FileSystemHandle, Errno> {
     Ok(current_task.kernel().sys_fs.get_or_init(|| SysFs::new_fs(current_task, options)).clone())
-}
-
-pub trait SysfsOps: FsNodeOps {
-    fn kobject(&self) -> KObjectHandle;
 }
 
 /// Creates a path to the `to` kobject in the devices tree, relative to the `from` kobject from

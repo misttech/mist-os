@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 use crate::device::kobject::{KObject, KObjectHandle};
-use crate::fs::sysfs::{sysfs_create_link, SysfsOps};
+use crate::fs::sysfs::sysfs_create_link;
 use crate::task::CurrentTask;
 use crate::vfs::{
     fs_node_impl_dir_readonly, DirectoryEntryType, FileOps, FsNode, FsNodeHandle, FsNodeInfo,
@@ -23,12 +23,6 @@ pub struct BusCollectionDirectory {
 impl BusCollectionDirectory {
     pub fn new(kobject: Weak<KObject>) -> Self {
         Self { kobject }
-    }
-}
-
-impl SysfsOps for BusCollectionDirectory {
-    fn kobject(&self) -> KObjectHandle {
-        self.kobject.upgrade().expect("Weak references to kobject must always be valid")
     }
 }
 
@@ -78,9 +72,7 @@ impl BusDevicesDirectory {
     pub fn new(kobject: Weak<KObject>) -> Self {
         Self { kobject }
     }
-}
 
-impl SysfsOps for BusDevicesDirectory {
     fn kobject(&self) -> KObjectHandle {
         self.kobject.upgrade().expect("Weak references to kobject must always be valid")
     }
