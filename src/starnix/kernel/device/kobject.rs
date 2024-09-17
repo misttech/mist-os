@@ -254,7 +254,7 @@ impl Device {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct DeviceMetadata {
     /// Name of the device in /dev.
     pub name: FsString,
@@ -265,12 +265,6 @@ pub struct DeviceMetadata {
 impl DeviceMetadata {
     pub fn new(name: FsString, device_type: DeviceType, mode: DeviceMode) -> Self {
         Self { name, device_type, mode }
-    }
-}
-
-impl PartialEq for DeviceMetadata {
-    fn eq(&self, other: &Self) -> bool {
-        self.name == other.name && self.device_type == other.device_type && self.mode == other.mode
     }
 }
 
