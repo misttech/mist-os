@@ -4,7 +4,7 @@
 
 #include <stdint.h>
 
-#include "test-start.h"
+#include "suffixed-test-start.h"
 
 // This file depends on a generated .ifs file (i.e. a stub shared object) that
 // says it defines `missing_sym` so that at link the time the linker is
@@ -14,6 +14,6 @@
 // libld-dep-missing-sym-dep doesn't define `missing_sym`, so at runtime there
 // will be a missing symbol error.
 
-extern "C" int64_t missing_sym();
+extern "C" int64_t SUFFIXED_SYMBOL(missing_sym)();
 
-extern "C" int64_t TestStart() { return missing_sym() + 4; }
+extern "C" int64_t SUFFIXED_SYMBOL(TestStart)() { return SUFFIXED_SYMBOL(missing_sym)() + 4; }

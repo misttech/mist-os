@@ -6,4 +6,4 @@
 
 #include "indirect-deps.h"
 
-extern "C" __EXPORT int64_t b() { return 6; }
+extern "C" __EXPORT int64_t SUFFIXED_SYMBOL(b)() { return 6; }

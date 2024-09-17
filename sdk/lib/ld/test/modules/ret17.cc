@@ -2,6 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "test-start.h"
+#include "suffixed-test-start.h"
 
-extern "C" int64_t TestStart() { return 17; }
+extern "C" int64_t SUFFIXED_SYMBOL(TestStart)() { return 17; }

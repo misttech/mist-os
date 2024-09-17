@@ -62,7 +62,6 @@ if (is_fuchsia) {
 
 modules = [
   ":second-session-module",
-  ":generate-host-test-data",
   ":tls-dep-module",
   ":tls-desc-dep-module",
 ]
@@ -70,19 +69,48 @@ modules = [
 # Musl's dlclose does not unload the module, which prevents being able to reuse
 # the same test module in multiple dlopen tests that do not expect the module
 # or its deps to already be loaded. Therefore tests must use uniquely named test
-# files. `per_test_modules` includes the modules that require unique names per
-# test, and  `per_test_suffices` include test names in
-# //sdk/lib/dl/test/dl-load-tests.cc. The following foreach loop will add
-# suffixed targets for each module in `per_test_modules` to `modules`.
+# files. `per_test_modules` and `per_test_executables` includes targets that
+# will have copies generated with each suffix in `per_test_suffices`.
+# `per_test_suffices` include test names in //sdk/lib/dl/test/dl-load-tests.cc.
 per_test_modules = [
   ":multiple-foo-deps",
   ":transitive-foo-dep",
   ":multiple-transitive-foo-deps",
   ":root-precedence-in-dep-resolution",
   ":precedence-in-dep-resolution",
+  ":generate-host-test-data",
+]
+
+per_test_executables = [
+  ":ret17",
+  ":ret23",
+  ":relative-reloc",
+  ":symbolic-reloc",
+  ":basic-dep",
+  ":indirect-deps",
+  ":many-deps",
+  ":relro",
+  ":missing-sym",
+  ":missing-dep",
+  ":missing-transitive-dep",
 ]
 
 per_test_suffices = [
+  "NotFound",
+  "InvalidMode",
+  "Basic",
+  "Relative",
+  "Symbolic",
+  "BasicDep",
+  "IndirectDeps",
+  "ManyDeps",
+  "Relro",
+  "MissingSymbol",
+  "GlobalSatisfiesMissingSymbol",
+  "MissingDependency",
+  "MissingTransitiveDependency",
+  "BasicModuleReuse",
+  "UniqueModules",
   "DepOrder",
   "TransitiveDepOrder",
   "LoadedTransitiveDepOrder",
@@ -96,12 +124,6 @@ per_test_suffices = [
   "PrecedenceInDepResolution",
 ]
 
-foreach(suffix, per_test_suffices) {
-  foreach(module, per_test_modules) {
-    modules += [ "$module.$suffix.module" ]
-  }
-}
-
 foreach(label, executables + in_process_executables) {
   modules += [ "$label.module" ]
 }
@@ -113,6 +135,16 @@ foreach(label, in_process_executables + non_module_in_process_executables) {
     label,
     "$label.in-process",
   ]
+}
+
+foreach(suffix, per_test_suffices) {
+  foreach(module, per_test_modules) {
+    modules += [ "$module.$suffix.module" ]
+  }
+  foreach(exec, per_test_executables) {
+    # only the suffix + .module target is needed by tests.
+    modules += [ "$exec.$suffix.module" ]
+  }
 }
 
 # This is used to roll up all the test binaries with appropriate variant
@@ -592,16 +624,6 @@ config("test-executable.in-process.config") {
   ldflags = [ "-Wl,-e,TestStart" ]
 }
 
-test_executable("ret17") {
-  can_be_in_process = true
-  sources = [ "ret17.cc" ]
-}
-
-test_executable("ret23") {
-  can_be_in_process = true
-  sources = [ "ret23.cc" ]
-}
-
 test_executable("partial-page-bss") {
   can_be_in_process = true
   sources = [ "partial-page-bss.cc" ]
@@ -650,11 +672,6 @@ foreach(suffix,
   }
 }
 
-test_executable("relative-reloc") {
-  can_be_in_process = true
-  sources = [ "relative-reloc.cc" ]
-}
-
 config("temporarily-build-as-shared") {
   visibility = [ ":*" ]
 
@@ -667,57 +684,10 @@ config("temporarily-build-as-shared") {
   ldflags += [ "-shared" ]
 }
 
-test_executable("symbolic-reloc") {
-  can_be_in_process = true
-  sources = [
-    "interp.S",
-    "symbolic-reloc.cc",
-  ]
-  defines = [ "DYNAMIC_LINKER_PATH=\"${toolchain_variant.libprefix}ld.so.1\"" ]
-  deps = [ "//zircon/system/public" ]
-  configs = [ ":temporarily-build-as-shared" ]
-}
-
 test_executable("ld-dep") {
   can_be_in_process = true
   sources = [ "ld-dep.cc" ]
   deps = [ "../.." ]
-}
-
-test_dep("a") {
-  symbol_name = "a"
-  value = 13
-}
-
-test_executable("basic-dep") {
-  can_be_in_process = true
-  sources = [ "basic-dep.cc" ]
-  shlib_deps = [ ":ld-dep-a" ]
-}
-
-test_executable("indirect-deps") {
-  can_be_in_process = true
-  sources = [ "basic-dep.cc" ]
-  shlib_deps = [ ":indirect-deps-a" ]
-}
-
-test_shared_library("indirect-deps-a") {
-  sources = [ "indirect-deps-a.cc" ]
-  deps = [ "//zircon/system/public" ]
-  shlib_deps = [
-    ":indirect-deps-b",
-    ":indirect-deps-c",
-  ]
-}
-
-test_shared_library("indirect-deps-b") {
-  sources = [ "indirect-deps-b.cc" ]
-  deps = [ "//zircon/system/public" ]
-}
-
-test_shared_library("indirect-deps-c") {
-  sources = [ "indirect-deps-c.cc" ]
-  deps = [ "//zircon/system/public" ]
 }
 
 test_executable("passive-abi-basic") {
@@ -737,77 +707,6 @@ test_executable("symbolic-namespace") {
   sources = [ "symbolic-namespace.cc" ]
   deps = [ "../.." ]
   shlib_deps = [ ":ld-dep-a" ]
-}
-
-# These show the dependency graph of the test and the expected return value of
-# each dependency's only symbol.
-#
-# many-deps -> (13 + -8 + 3 + 9 = 17)
-#   a -> 13
-#   b -> -2 (-2 + 2 + 13 + -21 = -8)
-#     c -> 2
-#     a -> 13
-#     d -> -5 (-5 + -16 = -21)
-#       c -> 2
-#       e -> -18
-#   f -> 3
-#   _ld_abi -> 9 (the number of total modules including vdso which may not be
-#                 depended on: this is only applicable for many-deps-passive-abi)
-
-test_dep("b") {
-  symbol_name = "b"
-  value = -2
-  dep_symbols = [
-    "a",
-    "c",
-    "d",
-  ]
-  shlib_deps = [
-    ":ld-dep-a",
-    ":ld-dep-c",
-    ":ld-dep-d",
-  ]
-}
-
-test_dep("c") {
-  symbol_name = "c"
-  value = 2
-}
-
-test_dep("d") {
-  symbol_name = "d"
-  value = -5
-  dep_symbols = [
-    "c",
-    "e",
-  ]
-  shlib_deps = [
-    ":ld-dep-c",
-    ":ld-dep-e",
-  ]
-}
-
-test_dep("e") {
-  symbol_name = "e"
-  value = -18
-}
-
-test_dep("f") {
-  symbol_name = "f"
-  value = 3
-}
-
-# This version of many-deps uses a constant number (9) in its return value
-# instead of _ld_abi to represent the total number of loaded modules.
-test_executable("many-deps") {
-  can_be_in_process = true
-  sources = [ "many-deps.cc" ]
-
-  shlib_deps = [
-    ":ld-dep-a",
-    ":ld-dep-b",
-    ":ld-dep-f",
-  ]
 }
 
 # The version of many-deps depends on _ld_abi.
@@ -1006,100 +905,6 @@ test_shared_library("tls-ld-dep") {
   configs += [ "//build/config/lto:no-lto" ]
 }
 
-# This will generate the host-test-data for shlib_deps that are not used by any
-# executables/modules (but are used in tests).
-test_loadable_module("generate-host-test-data") {
-  shlib_deps = [
-    ":ld-dep-defines-missing-sym",
-    ":ld-dep-missing-sym-dep",
-  ]
-}
-
-# This test shlib will generate build artifacts for :missing-sym-dep.ifs, but
-# is not used directly in tests.
-test_dep("missing-sym-dep") {
-  symbol_name = "this_symbol_is_not_used"
-  value = 0
-}
-
-test_dep("defines-missing-sym") {
-  symbol_name = "missing_sym"
-  value = 2
-}
-
-# missing-sym: calls missing_sym()
-#   - libld-dep-missing-sym-dep -> does not define missing_sym()
-test_executable("missing-sym") {
-  sources = [ "missing-sym.cc" ]
-
-  # Note this isn't shlib_deps because there's no corresponding .host-test-data
-  # subtarget, so instead we have explicit data_deps on the real runtime dep.
-  # For Fuchsia this is implicit via the data_deps in ifs_shared_library().
-  deps = [ ":missing-sym-dep.ifs" ]
-  if (!is_fuchsia) {
-    data_deps = [ ":ld-dep-missing-sym-dep.host-test-data($shlib_toolchain)" ]
-  }
-}
-
-# This is a stub for libld-dep-missing-sym-dep for :missing-sym
-test_ifs_shared_library("missing-sym-dep.ifs") {
-  soname = "libld-dep-missing-sym-dep.so"
-  symbols = [
-    {
-      name = "missing_sym"
-      type = "Func"
-    },
-  ]
-
-  data_deps = [ ":ld-dep-missing-sym-dep" ]
-}
-
-# Includes a symbol provided by a DT_NEEDED (missing-dep-dep) that cannot be
-# found:
-# missing-dep -> (x) missing-dep-dep
-test_executable("missing-dep") {
-  sources = [ "missing-dep.cc" ]
-
-  # Note this isn't shlib_deps because there's no corresponding test data.
-  deps = [ ":missing-dep-dep" ]
-}
-
-test_ifs_shared_library("missing-dep-dep") {
-  soname = "libmissing-dep-dep.so"
-  symbols = [
-    {
-      name = "missing_dep_sym"
-      type = "Func"
-    },
-  ]
-}
-
-# Includes a symbol that is provided by a dependency of a DT_NEEDED, but that
-# dependency cannot be found:
-# missing-transitive-dep -> has-missing-dep -> (x) missing-dep-dep
-test_executable("missing-transitive-dep") {
-  sources = [ "missing-transitive-dep.cc" ]
-
-  shlib_deps = [ ":has-missing-dep" ]
-}
-
-# This shared library exports a symbol with a definition that includes another
-# symbol provided by a DT_NEEDED (missing-dep-dep) that cannot be found.
-test_shared_library("has-missing-dep") {
-  sources = [ "has-missing-dep.cc" ]
-
-  # Note this isn't shlib_deps because there's no corresponding test data.
-  deps = [
-    ":missing-dep-dep",
-    "//zircon/system/public",
-  ]
-}
-
-test_executable("relro") {
-  sources = [ "relro.cc" ]
-  deps = [ "//zircon/system/public" ]
-}
-
 test_executable("fixed-load-address") {
   sources = [ "fixed-load-address.cc" ]
   deps = [ "//src/lib/elfldltl" ]
@@ -1109,6 +914,8 @@ test_executable("fixed-load-address") {
 }
 
 test_executable("second-session") {
+  # second-session.cc does not use suffixed-symbols from indirect-deps.h.
+  defines = [ "TEST_SYMBOL_SUFFIX=" ]
   sources = [ "second-session.cc" ]
 
   # Though this is an executable, it has a DT_SONAME and the linker is told to
@@ -1148,6 +955,8 @@ test_ifs_shared_library("second-session.lib") {
 }
 
 test_loadable_module("second-session-module") {
+  # second-session-module.cc does not use suffixed-symbols from indirect-deps.h.
+  defines = [ "TEST_SYMBOL_SUFFIX=" ]
   sources = [ "second-session-module.cc" ]
   deps = [
     ":second-session-module-deps-a",
@@ -1157,6 +966,8 @@ test_loadable_module("second-session-module") {
 }
 
 test_shared_library("second-session-module-deps-a") {
+  # second-session-module-deps-a.cc does not use suffixed-symbols from indirect-deps.h.
+  defines = [ "TEST_SYMBOL_SUFFIX=" ]
   sources = [ "second-session-module-deps-a.cc" ]
   deps = [ "//zircon/system/public" ]
 }
@@ -1226,6 +1037,251 @@ foreach(test, [ "" ] + per_test_suffices) {
   if (test != "") {
     suffix = ".$test"
     sym_suffix = "_$test"
+  }
+
+  test_executable("ret17$suffix") {
+    can_be_in_process = true
+    defines = [ "TEST_SYMBOL_SUFFIX=$sym_suffix" ]
+    sources = [ "ret17.cc" ]
+  }
+
+  test_executable("ret23$suffix") {
+    can_be_in_process = true
+    defines = [ "TEST_SYMBOL_SUFFIX=$sym_suffix" ]
+    sources = [ "ret23.cc" ]
+  }
+
+  test_executable("relative-reloc$suffix") {
+    can_be_in_process = true
+    defines = [ "TEST_SYMBOL_SUFFIX=$sym_suffix" ]
+    sources = [ "relative-reloc.cc" ]
+  }
+
+  test_executable("symbolic-reloc$suffix") {
+    can_be_in_process = true
+    sources = [
+      "interp.S",
+      "symbolic-reloc.cc",
+    ]
+    defines = [
+      "TEST_SYMBOL_SUFFIX=$sym_suffix",
+      "DYNAMIC_LINKER_PATH=\"${toolchain_variant.libprefix}ld.so.1\"",
+    ]
+    deps = [ "//zircon/system/public" ]
+    configs = [ ":temporarily-build-as-shared" ]
+  }
+
+  test_executable("basic-dep$suffix") {
+    can_be_in_process = true
+    defines = [ "TEST_SYMBOL_SUFFIX=$sym_suffix" ]
+    sources = [ "basic-dep.cc" ]
+    shlib_deps = [ ":ld-dep-a$suffix" ]
+  }
+
+  test_executable("indirect-deps$suffix") {
+    can_be_in_process = true
+    defines = [ "TEST_SYMBOL_SUFFIX=$sym_suffix" ]
+    sources = [ "basic-dep.cc" ]
+    shlib_deps = [ ":indirect-deps-a$suffix" ]
+  }
+
+  test_shared_library("indirect-deps-a$suffix") {
+    defines = [ "TEST_SYMBOL_SUFFIX=$sym_suffix" ]
+    sources = [ "indirect-deps-a.cc" ]
+    deps = [ "//zircon/system/public" ]
+    shlib_deps = [
+      ":indirect-deps-b$suffix",
+      ":indirect-deps-c$suffix",
+    ]
+  }
+
+  test_shared_library("indirect-deps-b$suffix") {
+    defines = [ "TEST_SYMBOL_SUFFIX=$sym_suffix" ]
+    sources = [ "indirect-deps-b.cc" ]
+    deps = [ "//zircon/system/public" ]
+  }
+
+  test_shared_library("indirect-deps-c$suffix") {
+    defines = [ "TEST_SYMBOL_SUFFIX=$sym_suffix" ]
+    sources = [ "indirect-deps-c.cc" ]
+    deps = [ "//zircon/system/public" ]
+  }
+
+  # These show the dependency graph of the test and the expected return value of
+  # each dependency's only symbol.
+  #
+  # many-deps -> (13 + -8 + 3 + 9 = 17)
+  #   a -> 13
+  #   b -> -2 (-2 + 2 + 13 + -21 = -8)
+  #     c -> 2
+  #     a -> 13
+  #     d -> -5 (-5 + -16 = -21)
+  #       c -> 2
+  #       e -> -18
+  #   f -> 3
+  #   _ld_abi -> 9 (the number of total modules including vdso which may not be
+  #                 depended on: this is only applicable for many-deps-passive-abi)
+
+  test_dep("a$suffix") {
+    symbol_name = "a$sym_suffix"
+    value = 13
+  }
+
+  test_dep("b$suffix") {
+    symbol_name = "b$sym_suffix"
+    value = -2
+    dep_symbols = [
+      "a$sym_suffix",
+      "c$sym_suffix",
+      "d$sym_suffix",
+    ]
+    shlib_deps = [
+      ":ld-dep-a$suffix",
+      ":ld-dep-c$suffix",
+      ":ld-dep-d$suffix",
+    ]
+  }
+
+  test_dep("c$suffix") {
+    symbol_name = "c$sym_suffix"
+    value = 2
+  }
+
+  test_dep("d$suffix") {
+    symbol_name = "d$sym_suffix"
+    value = -5
+    dep_symbols = [
+      "c$sym_suffix",
+      "e$sym_suffix",
+    ]
+    shlib_deps = [
+      ":ld-dep-c$suffix",
+      ":ld-dep-e$suffix",
+    ]
+  }
+
+  test_dep("e$suffix") {
+    symbol_name = "e$sym_suffix"
+    value = -18
+  }
+
+  test_dep("f$suffix") {
+    symbol_name = "f$sym_suffix"
+    value = 3
+  }
+
+  # This version of many-deps uses a constant number (9) in its return value
+  # instead of _ld_abi to represent the total number of loaded modules.
+  test_executable("many-deps$suffix") {
+    can_be_in_process = true
+    defines = [ "TEST_SYMBOL_SUFFIX=$sym_suffix" ]
+    sources = [ "many-deps.cc" ]
+
+    shlib_deps = [
+      ":ld-dep-a$suffix",
+      ":ld-dep-b$suffix",
+      ":ld-dep-f$suffix",
+    ]
+  }
+
+  test_executable("relro$suffix") {
+    defines = [ "TEST_SYMBOL_SUFFIX=$sym_suffix" ]
+    sources = [ "relro.cc" ]
+    deps = [ "//zircon/system/public" ]
+  }
+
+  # This will generate the host-test-data for shlib_deps that are not used by any
+  # executables/modules (but are used in tests).
+  test_loadable_module("generate-host-test-data$suffix.module") {
+    shlib_deps = [
+      ":ld-dep-defines-missing-sym$suffix",
+      ":ld-dep-missing-sym-dep$suffix",
+    ]
+  }
+
+  # This test shlib will generate build artifacts for :missing-sym-dep.ifs, but
+  # is not used directly in tests.
+  test_dep("missing-sym-dep$suffix") {
+    symbol_name = "this_symbol_is_not_used"
+    value = 0
+  }
+
+  test_dep("defines-missing-sym$suffix") {
+    symbol_name = "missing_sym$sym_suffix"
+    value = 2
+  }
+
+  # missing-sym: calls missing()
+  #   - libld-dep-missing-dep -> does not define missing_sym()
+  test_executable("missing-sym$suffix") {
+    defines = [ "TEST_SYMBOL_SUFFIX=$sym_suffix" ]
+    sources = [ "missing-sym.cc" ]
+
+    # Note this isn't shlib_deps because there's no corresponding .host-test-data
+    # subtarget, so instead we have explicit data_deps on the real runtime dep.
+    # For Fuchsia this is implicit via the data_deps in ifs_shared_library().
+    deps = [ ":missing-sym-dep$suffix.ifs" ]
+    if (!is_fuchsia) {
+      data_deps =
+          [ ":ld-dep-missing-sym-dep$suffix.host-test-data($shlib_toolchain)" ]
+    }
+  }
+
+  # This is a stub for libld-dep-missing-sym-dep for :missing-sym
+  test_ifs_shared_library("missing-sym-dep$suffix.ifs") {
+    soname = "libld-dep-missing-sym-dep$suffix.so"
+    symbols = [
+      {
+        name = "missing_sym$sym_suffix"
+        type = "Func"
+      },
+    ]
+
+    data_deps = [ ":ld-dep-missing-sym-dep$suffix" ]
+  }
+
+  # Includes a symbol provided by a DT_NEEDED (missing-dep-dep) that cannot be
+  # found:
+  # missing-dep -> (x) missing-dep-dep
+  test_executable("missing-dep$suffix") {
+    defines = [ "TEST_SYMBOL_SUFFIX=$sym_suffix" ]
+    sources = [ "missing-dep.cc" ]
+
+    # Note this isn't shlib_deps because there's no corresponding test data.
+    deps = [ ":missing-dep-dep$suffix.ifs" ]
+  }
+
+  test_ifs_shared_library("missing-dep-dep$suffix.ifs") {
+    soname = "libmissing-dep-dep$suffix.so"
+    symbols = [
+      {
+        name = "missing_dep_sym$sym_suffix"
+        type = "Func"
+      },
+    ]
+  }
+
+  # Includes a symbol that is provided by a dependency of a DT_NEEDED, but that
+  # dependency cannot be found:
+  # missing-transitive-dep -> has-missing-dep -> (x) missing-dep-dep
+  test_executable("missing-transitive-dep$suffix") {
+    defines = [ "TEST_SYMBOL_SUFFIX=$sym_suffix" ]
+    sources = [ "missing-transitive-dep.cc" ]
+
+    shlib_deps = [ ":has-missing-dep$suffix" ]
+  }
+
+  # This shared library exports a symbol with a definition that includes another
+  # symbol provided by a DT_NEEDED (missing-dep-dep) that cannot be found.
+  test_shared_library("has-missing-dep$suffix") {
+    defines = [ "TEST_SYMBOL_SUFFIX=$sym_suffix" ]
+    sources = [ "has-missing-dep.cc" ]
+
+    # Note this isn't shlib_deps because there's no corresponding test data.
+    deps = [
+      ":missing-dep-dep$suffix.ifs",
+      "//zircon/system/public",
+    ]
   }
 
   test_dep("foo-v1$suffix") {

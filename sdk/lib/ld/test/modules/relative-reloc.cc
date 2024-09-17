@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "test-start.h"
+#include "suffixed-test-start.h"
 
 namespace {
 
@@ -11,7 +11,7 @@ const int* s = &i;
 
 }  // namespace
 
-extern "C" int64_t TestStart() {
+extern "C" int64_t SUFFIXED_SYMBOL(TestStart)() {
   // We need to take the address of `s` so the compiler doesn't optimize this
   // as a pc-relative load to `i`.
   const int** p = &s;

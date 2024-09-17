@@ -4,8 +4,9 @@
 
 #include <stdint.h>
 
-#include "test-start.h"
+#include "suffixed-symbol.h"
+#include "suffixed-test-start.h"
 
-extern "C" int64_t a();
+extern "C" int64_t SUFFIXED_SYMBOL(a)();
 
-extern "C" int64_t TestStart() { return a() + 4; }
+extern "C" int64_t SUFFIXED_SYMBOL(TestStart)() { return SUFFIXED_SYMBOL(a)() + 4; }
