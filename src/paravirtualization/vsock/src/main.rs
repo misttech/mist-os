@@ -6,7 +6,6 @@
 
 use anyhow::{Context as _, Error};
 use fidl_fuchsia_hardware_vsock::DeviceMarker;
-use fuchsia_async as fasync;
 use fuchsia_component::client::connect_to_named_protocol_at_dir_root;
 use fuchsia_component::server::ServiceFs;
 use fuchsia_fs::OpenFlags;
@@ -43,18 +42,17 @@ async fn main() -> Result<(), Error> {
     let service_clone = service.clone();
     let mut fs = ServiceFs::new();
     fs.dir("svc").add_fidl_service(move |stream| {
-        fasync::Task::spawn(
+        service_clone.spawn(
             service_clone
                 .clone()
                 .run_client_connection(stream)
                 .unwrap_or_else(|err| tracing::info!("Error {} during client connection", err)),
-        )
-        .detach();
+        );
     });
     fs.take_and_serve_directory_handle()?;
 
     // Spawn the services server with a wrapper to discard the return value.
-    fasync::Task::spawn(fs.collect()).detach();
+    service.spawn(fs.collect());
 
     // Run the event loop until completion. The event loop only terminates
     // with an error.

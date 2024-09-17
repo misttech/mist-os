@@ -129,6 +129,7 @@ struct State {
     events: HashMap<Event, oneshot::Sender<()>>,
     used_ports: port::Tracker,
     listens: HashMap<u32, mpsc::UnboundedSender<addr::Vsock>>,
+    tasks: fasync::TaskGroup,
 }
 
 pub struct LockedState {
@@ -169,6 +170,7 @@ impl Vsock {
             events: HashMap::new(),
             used_ports: port::Tracker::new(),
             listens: HashMap::new(),
+            tasks: fasync::TaskGroup::new(),
         };
         let (tx, rx) = crossbeam::channel::unbounded();
         let service =
@@ -197,12 +199,11 @@ impl Vsock {
     ) -> Result<(), Error> {
         let acceptor = acceptor.into_proxy().map_err(|x| Error::ClientCommunication(x.into()))?;
         let stream = self.listen_port(local_port)?;
-        fasync::Task::spawn(
+        self.lock().tasks.spawn(
             self.clone()
                 .run_connection_listener(stream, acceptor)
                 .unwrap_or_else(|err| tracing::warn!("Error {} running connection listener", err)),
-        )
-        .detach();
+        );
         Ok(())
     }
 
@@ -386,15 +387,14 @@ impl Vsock {
                             .into_stream()
                             .map_err(|x| Error::ClientCommunication(x.into()))?;
                         let shutdown_event = self.send_response(&addr, data)?.await?;
-                        fasync::Task::spawn(
+                        self.lock().tasks.spawn(
                             self.clone()
                                 .run_connection(addr, shutdown_event, con, None)
                                 .map_err(|err| {
                                     tracing::warn!("Error {} whilst running connection", err)
                                 })
                                 .map(|_| ()),
-                        )
-                        .detach();
+                        );
                         Ok(())
                     }
                     None => {
@@ -430,13 +430,16 @@ impl Vsock {
             response_event = response_event.fuse() => response_event?,
         }
 
-        fasync::Task::spawn(
+        self.lock().tasks.spawn(
             self.clone()
                 .run_connection(addr, shutdown_event, con, Some(port))
                 .unwrap_or_else(|err| tracing::warn!("Error {} whilst running connection", err)),
-        )
-        .detach();
+        );
         Ok(port_value)
+    }
+
+    pub fn spawn(&self, future: impl Future<Output = ()> + Send + 'static) {
+        self.lock().tasks.spawn(future);
     }
 }
 
@@ -522,7 +525,8 @@ impl State {
                     }
                     None => {
                         tracing::warn!("Request on port {} with no listener", addr.local_port);
-                        fasync::Task::spawn(self.send_rst(&addr).map(|_| ())).detach();
+                        let task = self.send_rst(&addr).map(|_| ());
+                        self.tasks.spawn(task);
                     }
                 }
             }
