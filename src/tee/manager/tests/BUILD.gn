@@ -40,6 +40,16 @@ ta_manager_config_test("ta-manager-enumerate-config-test") {
   test_source_root = "src/enumerate.rs"
 }
 
+ta_manager_config_test("ta-manager-ta-read-props-test") {
+  config_sources = [ "config/932517f3-e807-48f8-b584-fbeec848c2b6.json" ]
+  test_source_root = "src/ta_read_props.rs"
+  deps = [
+    "//sdk/fidl/fuchsia.tee:fuchsia.tee_rust",
+    "//src/tee/tee_internal_api:tee_internal",
+  ]
+  subpackages = [ "//src/tee/ta/read_props:ta-read-props" ]
+}
+
 rustc_test("test_props") {
   edition = "2021"
 
@@ -84,5 +94,6 @@ group("tests") {
     ":ta-manager-enumerate-config-test",
     ":ta-manager-noop-ta-test",
     ":ta-manager-props-test",
+    ":ta-manager-ta-read-props-test",
   ]
 }
