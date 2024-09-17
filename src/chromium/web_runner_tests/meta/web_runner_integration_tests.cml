@@ -72,8 +72,9 @@
         },
         {
             protocol: [
-                // TODO(crbug.com/1224707): Migrate to `fuchsia.scheduler`.
+                // TODO(crbug.com/42050308): Migrate to `fuchsia.scheduler`.
                 "fuchsia.media.ProfileProvider",
+                "fuchsia.scheduler.RoleManager",
 
                 // The `web_instance` attempts to connect to this service.
                 // Tests may pass a clone of the test component's Service
