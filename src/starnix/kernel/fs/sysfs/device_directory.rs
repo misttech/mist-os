@@ -22,10 +22,6 @@ use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::{errno, error};
 use std::sync::Weak;
 
-pub trait DeviceSysfsOps: SysfsOps {
-    fn device(&self) -> Device;
-}
-
 pub struct DeviceDirectory {
     device: Device,
 }
@@ -59,12 +55,6 @@ impl DeviceDirectory {
 impl SysfsOps for DeviceDirectory {
     fn kobject(&self) -> KObjectHandle {
         self.device.kobject().clone()
-    }
-}
-
-impl DeviceSysfsOps for DeviceDirectory {
-    fn device(&self) -> Device {
-        self.device.clone()
     }
 }
 
@@ -142,12 +132,6 @@ impl BlockDeviceDirectory {
 impl SysfsOps for BlockDeviceDirectory {
     fn kobject(&self) -> KObjectHandle {
         self.base_dir.kobject()
-    }
-}
-
-impl DeviceSysfsOps for BlockDeviceDirectory {
-    fn device(&self) -> Device {
-        self.base_dir.device()
     }
 }
 

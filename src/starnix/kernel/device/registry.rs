@@ -8,7 +8,7 @@ use crate::device::kobject::{
 };
 use crate::fs::devtmpfs::{devtmpfs_create_device, devtmpfs_remove_node};
 use crate::fs::sysfs::{
-    BusCollectionDirectory, ClassCollectionDirectory, DeviceSysfsOps, SysfsDirectory, SYSFS_BLOCK,
+    BusCollectionDirectory, ClassCollectionDirectory, SysfsDirectory, SysfsOps, SYSFS_BLOCK,
     SYSFS_BUS, SYSFS_CLASS, SYSFS_DEVICES,
 };
 use crate::task::CurrentTask;
@@ -272,7 +272,7 @@ impl DeviceRegistry {
     ) -> Device
     where
         F: Fn(Device) -> N + Send + Sync + 'static,
-        N: DeviceSysfsOps,
+        N: SysfsOps,
         L: LockBefore<FileOpsCore>,
     {
         let class_cloned = class.clone();
@@ -298,7 +298,7 @@ impl DeviceRegistry {
             log_warn!("Cannot add device {:?} in devtmpfs ({:?})", metadata, err);
         }
 
-        let device = device_kobject.ops().as_ref().as_any().downcast_ref::<N>().unwrap().device();
+        let device = Device::new(device_kobject, class, metadata);
         self.dispatch_uevent(UEventAction::Add, device.clone());
         device
     }
@@ -315,7 +315,7 @@ impl DeviceRegistry {
     ) -> Device
     where
         F: Fn(Device) -> N + Send + Sync + 'static,
-        N: DeviceSysfsOps,
+        N: SysfsOps,
         L: LockBefore<FileOpsCore>,
     {
         if let Err(err) = self.major_devices(metadata.mode).register(

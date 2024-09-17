@@ -5,7 +5,7 @@
 use fuchsia_zircon as zx;
 use starnix_core::device::kobject::{Device, DeviceMetadata, KObjectHandle};
 use starnix_core::device::{DeviceMode, DeviceOps};
-use starnix_core::fs::sysfs::{BlockDeviceDirectory, BlockDeviceInfo, DeviceSysfsOps, SysfsOps};
+use starnix_core::fs::sysfs::{BlockDeviceDirectory, BlockDeviceInfo, SysfsOps};
 use starnix_core::task::{CurrentTask, KernelStats};
 use starnix_core::vfs::{
     fileops_impl_dataless, fileops_impl_noop_sync, fileops_impl_seekless,
@@ -79,12 +79,6 @@ impl ZramDeviceDirectory {
 impl SysfsOps for ZramDeviceDirectory {
     fn kobject(&self) -> KObjectHandle {
         self.base_dir.kobject()
-    }
-}
-
-impl DeviceSysfsOps for ZramDeviceDirectory {
-    fn device(&self) -> Device {
-        self.base_dir.device()
     }
 }
 
