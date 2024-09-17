@@ -2,14 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::format_err;
 use derivative::Derivative;
 use fuchsia_inspect::{Inspector, Node as InspectNode};
 use fuchsia_sync::Mutex;
 use futures::channel::mpsc;
 use futures::{select, Future, FutureExt, StreamExt};
 use std::sync::Arc;
-use tracing::{error, warn};
+use tracing::{error, info, warn};
 use {fuchsia_async as fasync, fuchsia_zircon as zx};
 
 use crate::experimental::clock::{TimedSample, Timestamp};
@@ -41,11 +40,10 @@ pub fn serve_time_matrix_inspection(
         loop {
             select! {
                 time_matrix = receiver.next() => {
-                    let Some(time_matrix) = time_matrix else {
-                        error!("TimeMatrix stream unexpectedly terminated.");
-                        return Err(format_err!("TimeMatrix stream unexpectedly terminated."));
-                    };
-                    time_matrices.push(time_matrix);
+                    match time_matrix {
+                        Some(time_matrix) => time_matrices.push(time_matrix),
+                        None => info!("TimeMatrix stream terminated."),
+                    }
                 }
                 _ = interpolate_interval.next() => {
                     let now = Timestamp::now();
@@ -207,12 +205,12 @@ mod tests {
         exec.set_fake_time(fasync::Time::from_nanos(0));
 
         let inspector = Inspector::default();
-        let (manager, test_fut) =
+        let (client, test_fut) =
             serve_time_matrix_inspection(inspector.root().create_child("time_series"));
         let mut test_fut = pin!(test_fut);
 
         let time_matrix = MockTimeMatrix::<u64>::default();
-        let _inspected_time_matrix = manager.inspect_time_matrix("blah_blah", time_matrix.clone());
+        let _inspected_time_matrix = client.inspect_time_matrix("blah_blah", time_matrix.clone());
 
         let Poll::Pending = exec.run_until_stalled(&mut test_fut) else {
             panic!("test_fut has terminated");
@@ -234,13 +232,13 @@ mod tests {
         let _exec = fasync::TestExecutor::new_with_fake_time();
 
         let inspector = Inspector::default();
-        let (manager, _test_fut) =
+        let (client, _test_fut) =
             serve_time_matrix_inspection(inspector.root().create_child("time_series"));
         let time_matrix = MockTimeMatrix::<u64>::default();
         let metadata =
             InspectedTimeMatrixMetadata::default().with_bit_mapping("some_bit_mapping".to_string());
         let _inspected_time_matrix =
-            manager.inspect_time_matrix_with_metadata("blah_blah", time_matrix.clone(), metadata);
+            client.inspect_time_matrix_with_metadata("blah_blah", time_matrix.clone(), metadata);
 
         assert_data_tree!(inspector, root: {
             time_series: {
@@ -258,11 +256,28 @@ mod tests {
         let _exec = fasync::TestExecutor::new_with_fake_time();
 
         let inspector = Inspector::default();
-        let (manager, _test_fut) =
+        let (client, _test_fut) =
             serve_time_matrix_inspection(inspector.root().create_child("time_series"));
         let time_matrix = MockTimeMatrix::<u64>::default();
-        let inspected_time_matrix = manager.inspect_time_matrix("blah_blah", time_matrix.clone());
+        let inspected_time_matrix = client.inspect_time_matrix("blah_blah", time_matrix.clone());
         assert!(inspected_time_matrix.fold(TimedSample::now(1)).is_ok());
         assert_eq!(&time_matrix.drain_calls()[..], &[TimeMatrixCall::Fold(TimedSample::now(1))]);
+    }
+
+    #[test]
+    fn test_dropping_time_matrix_client() {
+        let mut exec = fasync::TestExecutor::new_with_fake_time();
+
+        let inspector = Inspector::default();
+        let (client, test_fut) =
+            serve_time_matrix_inspection(inspector.root().create_child("time_series"));
+        let mut test_fut = pin!(test_fut);
+
+        std::mem::drop(client);
+
+        // The server fut should continue running even if TimeMatrixClient is dropped
+        let Poll::Pending = exec.run_until_stalled(&mut test_fut) else {
+            panic!("test_fut has terminated");
+        };
     }
 }

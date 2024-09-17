@@ -128,7 +128,6 @@ pub fn serve_telemetry(
         // Prevent the inspect nodes from being dropped while the loop is running.
         let _inspect_node = inspect_node;
         let _inspect_metadata_node = inspect_metadata_node;
-        let _time_matrix_client = time_matrix_client;
 
         let mut telemetry_interval = fasync::Interval::new(TELEMETRY_QUERY_INTERVAL);
         loop {
