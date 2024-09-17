@@ -26,6 +26,11 @@ impl Handle {
     pub(crate) fn client(&self) -> Result<Arc<Client>, Error> {
         self.client.upgrade().ok_or(Error::ConnectionLost)
     }
+
+    /// Get an invalid handle.
+    pub(crate) fn invalid() -> Self {
+        Handle { id: 0, client: Weak::new() }
+    }
 }
 
 impl std::cmp::PartialEq for Handle {

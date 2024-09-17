@@ -4,12 +4,12 @@
 
 use crate::handle::handle_type;
 use crate::responder::Responder;
-use crate::{ordinals, Error, Event, Eventpair, Handle, Socket};
+use crate::{ordinals, Error, Event, Eventpair, Handle, OnFDomainSignals, Socket};
 use fidl_fuchsia_fdomain as proto;
-use fidl_fuchsia_fdomain_ext::AsFDomainRights;
+use fidl_fuchsia_fdomain_ext::{AsFDomainObjectType, AsFDomainRights};
 use futures::channel::mpsc::UnboundedReceiver;
 use futures::future::Either;
-use futures::stream::Stream;
+use futures::stream::{FusedStream, Stream};
 use futures::FutureExt;
 use std::future::Future;
 use std::pin::Pin;
@@ -17,12 +17,13 @@ use std::sync::{Arc, Weak};
 use std::task::{ready, Context, Poll};
 
 /// A channel in a remote FDomain.
-#[derive(PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Channel(pub(crate) Handle);
 
 handle_type!(Channel peered);
 
 /// A message which has been read from a channel.
+#[derive(Debug)]
 pub struct ChannelMessage {
     pub bytes: Vec<u8>,
     pub handles: Vec<HandleInfo>,
@@ -39,14 +40,8 @@ impl ChannelMessage {
                 .map(|info| {
                     let handle = Handle { id: info.handle.id, client: Arc::downgrade(client) };
                     HandleInfo {
-                        rights: convert_rights_truncate(info.rights),
-                        handle: match info.type_ {
-                            proto::ObjType::Channel => AnyHandle::Channel(Channel(handle)),
-                            proto::ObjType::Socket => AnyHandle::Socket(Socket(handle)),
-                            proto::ObjType::Event => AnyHandle::Event(Event(handle)),
-                            proto::ObjType::Eventpair => AnyHandle::EventPair(Eventpair(handle)),
-                            _ => AnyHandle::Unknown(handle, convert_object_type(info.type_)),
-                        },
+                        rights: info.rights,
+                        handle: AnyHandle::from_handle(handle, info.type_),
                     }
                 })
                 .collect(),
@@ -55,19 +50,62 @@ impl ChannelMessage {
 }
 
 /// A handle which has been read from a channel.
+#[derive(Debug)]
 pub struct HandleInfo {
     pub handle: AnyHandle,
-    pub rights: fidl::Rights,
+    pub rights: proto::Rights,
 }
 
 /// Sum type of all the handle types which can be read from a channel. Allows
 /// the user to learn the type of a handle after it has been read.
+#[derive(Debug)]
 pub enum AnyHandle {
     Channel(Channel),
     Socket(Socket),
     Event(Event),
     EventPair(Eventpair),
     Unknown(Handle, fidl::ObjectType),
+}
+
+impl AnyHandle {
+    /// Construct an `AnyHandle` from a `Handle` and an object type.
+    pub fn from_handle(handle: Handle, ty: proto::ObjType) -> AnyHandle {
+        match ty {
+            proto::ObjType::Channel => AnyHandle::Channel(Channel(handle)),
+            proto::ObjType::Socket => AnyHandle::Socket(Socket(handle)),
+            proto::ObjType::Event => AnyHandle::Event(Event(handle)),
+            proto::ObjType::Eventpair => AnyHandle::EventPair(Eventpair(handle)),
+            _ => AnyHandle::Unknown(handle, convert_object_type(ty)),
+        }
+    }
+
+    /// Get an `AnyHandle` wrapping an invalid handle.
+    pub fn invalid() -> AnyHandle {
+        AnyHandle::Unknown(Handle::invalid(), fidl::ObjectType::NONE)
+    }
+
+    /// Get the object type for a handle.
+    pub fn object_type(&self) -> proto::ObjType {
+        match self {
+            AnyHandle::Channel(_) => proto::ObjType::Channel,
+            AnyHandle::Socket(_) => proto::ObjType::Socket,
+            AnyHandle::Event(_) => proto::ObjType::Event,
+            AnyHandle::EventPair(_) => proto::ObjType::Eventpair,
+            AnyHandle::Unknown(_, t) => t.as_fdomain_object_type().unwrap_or(proto::ObjType::None),
+        }
+    }
+}
+
+impl From<AnyHandle> for Handle {
+    fn from(item: AnyHandle) -> Handle {
+        match item {
+            AnyHandle::Channel(h) => h.into(),
+            AnyHandle::Socket(h) => h.into(),
+            AnyHandle::Event(h) => h.into(),
+            AnyHandle::EventPair(h) => h.into(),
+            AnyHandle::Unknown(h, _) => h,
+        }
+    }
 }
 
 /// Operation to perform on a handle when writing it to a channel.
@@ -104,6 +142,22 @@ impl Channel {
             bytes,
             proto::Handles::Handles(handles.into_iter().map(|x| x.take_proto()).collect()),
         )
+    }
+
+    /// A future that returns when the channel is closed.
+    pub fn on_closed(&self) -> OnFDomainSignals {
+        OnFDomainSignals::new(
+            &self.0,
+            proto::Signals {
+                typed: Some(Box::new(proto::Typed::Channel(proto::ChannelSignals::PEER_CLOSED))),
+                general: proto::General::empty(),
+            },
+        )
+    }
+
+    /// Whether this handle is closed.
+    pub fn is_closed(&self) -> bool {
+        self.0.client.upgrade().is_none()
     }
 
     /// Writes a message into the channel.
@@ -189,6 +243,7 @@ impl Channel {
 }
 
 /// A write-only handle to a socket.
+#[derive(Debug)]
 pub struct ChannelWriter(Arc<Channel>);
 
 impl ChannelWriter {
@@ -209,27 +264,66 @@ impl ChannelWriter {
     ) -> impl Future<Output = Result<(), Error>> + 'b {
         self.0.write_etc(bytes, handles)
     }
+
+    /// Get a reference to the inner channel.
+    pub fn as_channel(&self) -> &Channel {
+        &*self.0
+    }
 }
 
 /// A stream of data issuing from a socket.
+#[derive(Debug)]
 pub struct ChannelMessageStream {
     channel: Arc<Channel>,
     messages: UnboundedReceiver<Result<proto::ChannelMessage, proto::Error>>,
 }
 
+impl ChannelMessageStream {
+    /// Turn a `ChannelMessageStream` and its accompanying `ChannelWriter` back
+    /// into a `Channel`.
+    ///
+    /// # Panics
+    /// If this stream and the writer passed didn't come from the same call to
+    /// `Channel::stream`.
+    pub fn rejoin(
+        mut self,
+        writer: ChannelWriter,
+    ) -> (Channel, UnboundedReceiver<Result<proto::ChannelMessage, proto::Error>>) {
+        assert!(Arc::ptr_eq(&self.channel, &writer.0), "Tried to join stream with wrong writer!");
+        if let Ok(client) = self.channel.0.client() {
+            client.stop_channel_streaming(self.channel.0.proto())
+        }
+        std::mem::drop(writer);
+        let channel = std::mem::replace(&mut self.channel, Arc::new(Channel(Handle::invalid())));
+        let (_, r) = futures::channel::mpsc::unbounded();
+        let messages = std::mem::replace(&mut self.messages, r);
+        (Arc::try_unwrap(channel).expect("Stream pointer no longer unique!"), messages)
+    }
+
+    /// Whether this stream is closed.
+    pub fn is_closed(&self) -> bool {
+        self.messages.is_terminated()
+    }
+
+    /// Get a reference to the inner channel.
+    pub fn as_channel(&self) -> &Channel {
+        &*self.channel
+    }
+}
+
 impl Stream for ChannelMessageStream {
-    type Item = ChannelMessage;
+    type Item = Result<ChannelMessage, proto::Error>;
     fn poll_next(mut self: Pin<&mut Self>, ctx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         match ready!(Pin::new(&mut self.messages).poll_next(ctx)) {
             Some(Ok(c)) => {
                 if let Ok(client) = self.channel.0.client() {
-                    Poll::Ready(Some(ChannelMessage::from_proto(&client, c)))
+                    Poll::Ready(Some(Ok(ChannelMessage::from_proto(&client, c))))
                 } else {
                     Poll::Ready(None)
                 }
             }
-            // TODO: Log?
-            Some(Err(_)) | Option::None => Poll::Ready(None),
+            Some(Err(e)) => Poll::Ready(Some(Err(e))),
+            None => Poll::Ready(None),
         }
     }
 }
@@ -277,46 +371,4 @@ fn convert_object_type(ty: proto::ObjType) -> fidl::ObjectType {
         proto::ObjType::Iob => fidl::ObjectType::IOB,
         proto::ObjType::__SourceBreaking { .. } => fidl::ObjectType::NONE,
     }
-}
-
-/// Convert a `proto::Rights` to a `fidl::Rights`. If any rights aren't
-/// understood they are discarded.
-fn convert_rights_truncate(mut rights: proto::Rights) -> fidl::Rights {
-    let mut ret = fidl::Rights::empty();
-
-    for (fidl_right, proto_right) in [
-        (fidl::Rights::DUPLICATE, proto::Rights::DUPLICATE),
-        (fidl::Rights::TRANSFER, proto::Rights::TRANSFER),
-        (fidl::Rights::READ, proto::Rights::READ),
-        (fidl::Rights::WRITE, proto::Rights::WRITE),
-        (fidl::Rights::EXECUTE, proto::Rights::EXECUTE),
-        (fidl::Rights::MAP, proto::Rights::MAP),
-        (fidl::Rights::GET_PROPERTY, proto::Rights::GET_PROPERTY),
-        (fidl::Rights::SET_PROPERTY, proto::Rights::SET_PROPERTY),
-        (fidl::Rights::ENUMERATE, proto::Rights::ENUMERATE),
-        (fidl::Rights::DESTROY, proto::Rights::DESTROY),
-        (fidl::Rights::SET_POLICY, proto::Rights::SET_POLICY),
-        (fidl::Rights::GET_POLICY, proto::Rights::GET_POLICY),
-        (fidl::Rights::SIGNAL, proto::Rights::SIGNAL),
-        (fidl::Rights::SIGNAL_PEER, proto::Rights::SIGNAL_PEER),
-        (fidl::Rights::WAIT, proto::Rights::WAIT),
-        (fidl::Rights::INSPECT, proto::Rights::INSPECT),
-        (fidl::Rights::MANAGE_JOB, proto::Rights::MANAGE_JOB),
-        (fidl::Rights::MANAGE_PROCESS, proto::Rights::MANAGE_PROCESS),
-        (fidl::Rights::MANAGE_THREAD, proto::Rights::MANAGE_THREAD),
-        (fidl::Rights::APPLY_PROFILE, proto::Rights::APPLY_PROFILE),
-        (fidl::Rights::MANAGE_SOCKET, proto::Rights::MANAGE_SOCKET),
-        (fidl::Rights::OP_CHILDREN, proto::Rights::OP_CHILDREN),
-        (fidl::Rights::RESIZE, proto::Rights::RESIZE),
-        (fidl::Rights::ATTACH_VMO, proto::Rights::ATTACH_VMO),
-        (fidl::Rights::MANAGE_VMO, proto::Rights::MANAGE_VMO),
-        (fidl::Rights::SAME_RIGHTS, proto::Rights::SAME_RIGHTS),
-    ] {
-        if rights.contains(proto_right) {
-            rights.remove(proto_right);
-            ret |= fidl_right;
-        }
-    }
-
-    ret
 }

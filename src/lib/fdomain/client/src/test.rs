@@ -5,6 +5,7 @@
 use crate::{AnyHandle, Client, FDomainTransport};
 use fdomain_container::wire::FDomainCodec;
 use fdomain_container::FDomain;
+use fidl_fuchsia_fdomain_ext::AsFDomainRights;
 use futures::stream::Stream;
 use std::pin::Pin;
 use std::sync::Arc;
@@ -84,7 +85,7 @@ async fn channel() {
         | fidl::Rights::WAIT
         | fidl::Rights::INSPECT
         | fidl::Rights::MANAGE_SOCKET;
-    assert_eq!(expect_rights, handle.rights);
+    assert_eq!(expect_rights.as_fdomain_rights().unwrap(), handle.rights);
 
     let AnyHandle::Socket(e) = handle.handle else { panic!() };
 

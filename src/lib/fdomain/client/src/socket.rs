@@ -12,7 +12,7 @@ use std::future::Future;
 use std::sync::Arc;
 
 /// A socket in a remote FDomain.
-#[derive(PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 pub struct Socket(pub(crate) Handle);
 
 handle_type!(Socket peered);

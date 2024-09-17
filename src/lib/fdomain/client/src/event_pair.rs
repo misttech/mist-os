@@ -6,6 +6,6 @@ use crate::handle::handle_type;
 use crate::Handle;
 
 /// An event pair handle in a remote FDomain.
-#[derive(PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 pub struct Eventpair(pub(crate) Handle);
 handle_type!(Eventpair peered);
