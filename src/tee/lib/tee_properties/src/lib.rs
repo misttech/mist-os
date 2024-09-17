@@ -14,7 +14,7 @@ use thiserror::Error;
 use uuid::Uuid;
 
 // Maps to GlobalPlatform TEE Internal Core API Section 4.4: Property Access Functions
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum PropType {
     BinaryBlock,
@@ -122,7 +122,7 @@ impl PropSet {
         config_string: &str,
         prop_set: PropSetType,
     ) -> Result<Self, PropertyError> {
-        let props: TeeProperties = match serde_json::from_str(config_string) {
+        let props: TeeProperties = match serde_json5::from_str(config_string) {
             Ok(tee_props) => tee_props,
             Err(e) => return Err(PropertyError::Generic { msg: e.to_string() }),
         };
@@ -176,6 +176,13 @@ impl PropSet {
             None => Err(PropertyError::ItemNotFound { name: format!("item at index {}", index) }),
         }
     }
+
+    pub fn get_property_type_at_index(&self, index: usize) -> Result<PropType, PropertyError> {
+        match self.properties.get_index(index) {
+            Some((_, (prop_type, _))) => Ok(prop_type.clone()),
+            None => Err(PropertyError::ItemNotFound { name: format!("item at index {}", index) }),
+        }
+    }
 }
 
 pub struct PropEnumerator {
@@ -218,6 +225,16 @@ impl PropEnumerator {
         }
         // This will return ItemNotFound when going out-of-bounds, compliant with spec.
         self.properties.get_property_name_at_index(self.index)
+    }
+
+    pub fn get_property_type(&self) -> Result<PropType, PropertyError> {
+        if !self.started {
+            return Err(PropertyError::ItemNotFound {
+                name: "enumerator has not been started".to_string(),
+            });
+        }
+        // This will return ItemNotFound when going out-of-bounds, compliant with spec.
+        self.properties.get_property_type_at_index(self.index)
     }
 
     pub fn get_property_as_string(&self) -> Result<String, PropertyError> {
@@ -302,7 +319,7 @@ fn parse_uuid(value: String) -> Result<TEE_UUID, PropertyError> {
 }
 
 fn parse_identity(value: String) -> Result<TEE_Identity, PropertyError> {
-    let res: Result<TeeIdentity, serde_json::Error> = serde_json::from_str(&value);
+    let res: Result<TeeIdentity, serde_json5::Error> = serde_json5::from_str(&value);
     match res {
         Ok(identity) => {
             let tee_uuid = parse_uuid(identity.uuid)?;
@@ -338,7 +355,7 @@ pub mod tests {
 
     fn create_test_tee_identity_string() -> String {
         let identity = create_test_tee_identity();
-        serde_json::to_string(&identity).expect("serializing json")
+        serde_json5::to_string(&identity).expect("serializing json")
     }
 
     fn create_test_prop_map() -> PropertiesMap {
@@ -438,6 +455,9 @@ pub mod tests {
         let prop_name = enumerator.get_property_name().expect("getting prop name");
         assert_eq!(TEST_PROP_NAME_STRING.to_string(), prop_name);
 
+        let prop_type = enumerator.get_property_type().expect("getting prop type");
+        assert_eq!(PropType::String, prop_type);
+
         let prop_val = enumerator.get_property_as_string().expect("getting prop as string");
         assert_eq!(TEST_PROP_VAL_STRING.to_string(), prop_val);
 
@@ -446,6 +466,9 @@ pub mod tests {
 
         let prop_name = enumerator.get_property_name().expect("getting prop name");
         assert_eq!(TEST_PROP_NAME_BOOL.to_string(), prop_name);
+
+        let prop_type = enumerator.get_property_type().expect("getting prop type");
+        assert_eq!(PropType::Boolean, prop_type);
 
         let prop_val = enumerator.get_property_as_bool().expect("getting prop as bool");
         assert_eq!(true, prop_val);
@@ -456,6 +479,9 @@ pub mod tests {
         let prop_name = enumerator.get_property_name().expect("getting prop name");
         assert_eq!(TEST_PROP_NAME_U32.to_string(), prop_name);
 
+        let prop_type = enumerator.get_property_type().expect("getting prop type");
+        assert_eq!(PropType::UnsignedInt32, prop_type);
+
         let prop_val = enumerator.get_property_as_u32().expect("getting prop as u32");
         assert_eq!(57, prop_val);
 
@@ -465,6 +491,9 @@ pub mod tests {
         let prop_name = enumerator.get_property_name().expect("getting prop name");
         assert_eq!(TEST_PROP_NAME_U64.to_string(), prop_name);
 
+        let prop_type = enumerator.get_property_type().expect("getting prop type");
+        assert_eq!(PropType::UnsignedInt64, prop_type);
+
         let prop_val = enumerator.get_property_as_u64().expect("getting prop as u64");
         assert_eq!(4294967296, prop_val);
 
@@ -473,6 +502,9 @@ pub mod tests {
 
         let prop_name = enumerator.get_property_name().expect("getting prop name");
         assert_eq!(TEST_PROP_NAME_BINARY_BLOCK.to_string(), prop_name);
+
+        let prop_type = enumerator.get_property_type().expect("getting prop type");
+        assert_eq!(PropType::BinaryBlock, prop_type);
 
         let prop_val =
             enumerator.get_property_as_binary_block().expect("getting prop as binary block");
@@ -484,6 +516,9 @@ pub mod tests {
 
         let prop_name = enumerator.get_property_name().expect("getting prop name");
         assert_eq!(TEST_PROP_NAME_UUID.to_string(), prop_name);
+
+        let prop_type = enumerator.get_property_type().expect("getting prop type");
+        assert_eq!(PropType::Uuid, prop_type);
 
         let prop_val: TEE_UUID = enumerator.get_property_as_uuid().expect("getting prop as uuid");
         let uuid_expected =
@@ -500,6 +535,9 @@ pub mod tests {
 
         let prop_name = enumerator.get_property_name().expect("getting prop name");
         assert_eq!(TEST_PROP_NAME_IDENTITY.to_string(), prop_name);
+
+        let prop_type = enumerator.get_property_type().expect("getting prop type");
+        assert_eq!(PropType::Identity, prop_type);
 
         let prop_val: TEE_Identity =
             enumerator.get_property_as_identity().expect("getting prop as identity");
@@ -988,7 +1026,7 @@ pub mod tests {
     pub fn test_parse_identity_success() {
         let valid_uuid = "5b9e0e40-2636-11e1-ad9e-0002a5d5c51b".to_string();
         let identity = TeeIdentity { login_type: LoginType::TrustedApp, uuid: valid_uuid };
-        let json = serde_json::to_string(&identity).expect("serializing json");
+        let json = serde_json5::to_string(&identity).expect("serializing json");
 
         let res = parse_identity(json);
 
@@ -998,7 +1036,7 @@ pub mod tests {
     #[test]
     pub fn test_parse_identity_empty_uuid() {
         let identity = TeeIdentity { login_type: LoginType::TrustedApp, uuid: "".to_string() };
-        let json = serde_json::to_string(&identity).expect("serializing json");
+        let json = serde_json5::to_string(&identity).expect("serializing json");
 
         let res = parse_identity(json);
 

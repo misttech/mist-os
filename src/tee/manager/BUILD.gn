@@ -16,11 +16,13 @@ rustc_binary("manager") {
   deps = [
     "//sdk/fidl/fuchsia.component:fuchsia.component_rust",
     "//sdk/fidl/fuchsia.component.decl:fuchsia.component.decl_rust",
+    "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
     "//sdk/fidl/fuchsia.tee:fuchsia.tee_rust",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-component",
+    "//src/storage/lib/vfs/rust:vfs",
     "//src/tee/manager-config",
     "//src/tee/tee_internal_api:tee_internal",
     "//third_party/rust_crates:anyhow",
@@ -28,21 +30,34 @@ rustc_binary("manager") {
     "//third_party/rust_crates:tracing",
   ]
 
+  test_deps = [ "//src/tee/lib/tee_properties" ]
+
   configs -= [ "//build/config/rust/lints:allow_unused_results" ]
 
   with_unit_tests = true
 }
 
+resource("tee-system-properties") {
+  sources = [ "config/system_properties.json5" ]
+  outputs = [ "data/properties/system_properties" ]
+}
+
 fuchsia_component("manager-component") {
   manifest = "meta/ta-manager.cml"
   component_name = "ta-manager"
-  deps = [ ":manager" ]
+  deps = [
+    ":manager",
+    ":tee-system-properties",
+  ]
 }
 
 fuchsia_component("manager-realm-test-component") {
   manifest = "meta/ta-manager-realm-test.cml"
   component_name = "ta-manager"
-  deps = [ ":manager" ]
+  deps = [
+    ":manager",
+    ":tee-system-properties",
+  ]
 }
 
 fuchsia_package("ta-manager") {
@@ -54,7 +69,10 @@ fuchsia_package("ta-manager-realm-test") {
 }
 
 fuchsia_unittest_component("manager-test-component") {
-  deps = [ ":manager_test" ]
+  deps = [
+    ":manager_test",
+    ":tee-system-properties",
+  ]
   component_name = "ta-manager-test"
 }
 

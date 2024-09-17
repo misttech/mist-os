@@ -25,6 +25,13 @@ within this collection as required. Each child is expected to expose the protoco
 `fuchsia.tee.Application` to its parent. The manager actively proxies all messages on this protocol
 through the child so that it can set the return origin on replies.
 
+## Properties
+
+TA manager hosts system properties which TAs may query via the internal core API Property family.
+These properties are expected to reflect a mix of platform-specified and hardware-specific values.
+The complete properties file served in a deployment should be constructed at assembly time. The
+config/system_properties.json5 file contains base platform-specified values.
+
 ## Testing
 
 A test configuration of TA Manager is provided in the package ta-manager-realm-test. This differs

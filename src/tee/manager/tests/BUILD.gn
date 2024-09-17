@@ -40,6 +40,42 @@ ta_manager_config_test("ta-manager-enumerate-config-test") {
   test_source_root = "src/enumerate.rs"
 }
 
+rustc_test("test_props") {
+  edition = "2021"
+
+  source_root = "src/properties.rs"
+  sources = [ "src/properties.rs" ]
+  deps = [
+    "//src/lib/fuchsia",
+    "//src/tee/lib/tee_properties",
+    "//third_party/rust_crates:anyhow",
+  ]
+}
+
+fuchsia_test_component("test-props-component") {
+  component_name = "test-props"
+  manifest = "meta/test-props.cml"
+  deps = [ ":test_props" ]
+}
+
+fuchsia_test_component("test-props-root") {
+  manifest = "meta/ta-manager-properties-test-root.cml"
+}
+
+fuchsia_package("test-props-package") {
+  testonly = true
+  deps = [
+    ":test-props-component",
+    ":test-props-root",
+  ]
+  subpackages = [ "//src/tee/manager:ta-manager-realm-test" ]
+}
+
+fuchsia_test("ta-manager-props-test") {
+  package = ":test-props-package"
+  component = ":test-props-root"
+}
+
 group("tests") {
   testonly = true
   deps = [
@@ -47,5 +83,6 @@ group("tests") {
     ":ta-manager-empty-config-test",
     ":ta-manager-enumerate-config-test",
     ":ta-manager-noop-ta-test",
+    ":ta-manager-props-test",
   ]
 }
