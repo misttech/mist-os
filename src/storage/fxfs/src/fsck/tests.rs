@@ -2668,3 +2668,73 @@ async fn test_delete_volume() {
     test.remount().await.expect("Remount failed");
     test.run(TestOptions::default()).await.expect("Fsck should succeed");
 }
+
+#[fuchsia::test]
+async fn test_casefold() {
+    let mut test = FsckTest::new().await;
+
+    for dir_is_casefold in [false, true] {
+        let fs = test.filesystem();
+        let store = fs.root_store();
+        let root_directory =
+            Directory::open(&store, store.root_directory_object_id()).await.expect("open failed");
+        let dirname = if dir_is_casefold { "casefolded" } else { "regular" };
+
+        let mut transaction = fs
+            .clone()
+            .new_transaction(
+                lock_keys![LockKey::object(store.store_object_id(), root_directory.object_id())],
+                Options::default(),
+            )
+            .await
+            .expect("new_transaction failed");
+        let child_dir = root_directory
+            .create_child_dir(&mut transaction, dirname, None)
+            .await
+            .expect("create_child_dir failed");
+        transaction.commit().await.expect("commit transaction failed");
+
+        child_dir.set_casefold(dir_is_casefold).await.expect("enable casefold");
+        let mut transaction = fs
+            .clone()
+            .new_transaction(
+                lock_keys![LockKey::object(store.store_object_id(), child_dir.object_id()),],
+                Options::default(),
+            )
+            .await
+            .expect("new_transaction failed");
+
+        // Manually add a child entry so we can add the wrong ObjectKeyData child type.
+        let handle = Directory::create_with_options(&mut transaction, &store, None, true)
+            .await
+            .expect("create_directory");
+        transaction.add(
+            child_dir.store().store_object_id(),
+            Mutation::replace_or_insert_object(
+                ObjectKey::child(child_dir.object_id(), "b", !dir_is_casefold),
+                ObjectValue::child(handle.object_id(), ObjectDescriptor::Directory),
+            ),
+        );
+        let now = Timestamp::now();
+        child_dir
+            .update_attributes(
+                &mut transaction,
+                Some(&fio::MutableNodeAttributes {
+                    modification_time: Some(now.as_nanos()),
+                    ..Default::default()
+                }),
+                1,
+                Some(now),
+            )
+            .await
+            .expect("update attributes");
+        transaction.commit().await.expect("commit transaction failed");
+    }
+
+    test.remount().await.expect("Remount failed");
+    test.run(TestOptions::default()).await.expect_err("Fsck should fail");
+    assert_matches!(
+        test.errors()[..],
+        [FsckIssue::Error(FsckError::CasefoldInconsistency(..)), ..]
+    );
+}
