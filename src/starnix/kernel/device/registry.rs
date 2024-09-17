@@ -346,7 +346,8 @@ impl DeviceRegistry {
         device.kobject().remove();
         self.dispatch_uevent(UEventAction::Remove, device.clone());
 
-        if let Err(err) = devtmpfs_remove_node(locked, current_task, device.metadata.name.as_ref())
+        if let Err(err) =
+            devtmpfs_remove_node(locked, current_task, device.metadata.devname.as_ref())
         {
             log_error!("Cannot remove device {:?} ({:?})", device, err);
         }

@@ -257,14 +257,16 @@ impl Device {
 #[derive(Clone, Debug, PartialEq)]
 pub struct DeviceMetadata {
     /// Name of the device in /dev.
-    pub name: FsString,
+    ///
+    /// Also appears in sysfs via uevent.
+    pub devname: FsString,
     pub device_type: DeviceType,
     pub mode: DeviceMode,
 }
 
 impl DeviceMetadata {
-    pub fn new(name: FsString, device_type: DeviceType, mode: DeviceMode) -> Self {
-        Self { name, device_type, mode }
+    pub fn new(devname: FsString, device_type: DeviceType, mode: DeviceMode) -> Self {
+        Self { devname, device_type, mode }
     }
 }
 
@@ -322,7 +324,7 @@ impl FileOps for UEventFile {
             "MAJOR={}\nMINOR={}\nDEVNAME={}\n",
             self.device.metadata.device_type.major(),
             self.device.metadata.device_type.minor(),
-            self.device.kobject().name(),
+            self.device.metadata.devname,
         );
         data.write(content.get(offset..).ok_or_else(|| errno!(EINVAL))?.as_bytes())
     }
