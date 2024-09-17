@@ -8,21 +8,23 @@
 
 namespace {
 
+using namespace std::literals;
+
 using elfldltl::internal::ConstString;
 
-constexpr ConstString kEmpty("");
+constexpr ConstString kEmpty{[] { return ""s; }};
 static_assert(kEmpty.empty());
 
-constexpr ConstString kFoo = "foo";
+constexpr ConstString kFoo{[] { return "foo"s; }};
 static_assert(kFoo.size() == 3);
 static_assert(std::string_view(kFoo) == "foo");
 static_assert(kFoo.c_str()[3] == '\0');
 
-constexpr ConstString kFoobar = kFoo + "bar";
+constexpr ConstString kFoobar{[] { return std::string(kFoo) + "bar"; }};
 static_assert(kFoobar.size() == 6);
 static_assert(std::string_view(kFoobar) == "foobar");
 
-constexpr ConstString kFoobarbaz = kFoo + "bar" + "baz";
+constexpr ConstString kFoobarbaz{[] { return std::string(kFoo) + "bar" + "baz"; }};
 static_assert(kFoobarbaz.size() == 9);
 static_assert(std::string_view(kFoobarbaz) == "foobarbaz");
 

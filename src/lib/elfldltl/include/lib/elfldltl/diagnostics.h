@@ -5,7 +5,6 @@
 #ifndef SRC_LIB_ELFLDLTL_INCLUDE_LIB_ELFLDLTL_DIAGNOSTICS_H_
 #define SRC_LIB_ELFLDLTL_INCLUDE_LIB_ELFLDLTL_DIAGNOSTICS_H_
 
-#include <inttypes.h>
 #include <stdio.h>
 #include <zircon/assert.h>
 #include <zircon/compiler.h>
@@ -20,6 +19,8 @@
 #include "internal/diagnostics-printf.h"
 
 namespace elfldltl {
+
+using namespace std::literals;
 
 // Various template APIs use a polymorphic "diagnostics object" argument.
 //
@@ -284,16 +285,13 @@ class Diagnostics {
 
   template <size_t MaxObjects>
   constexpr bool ResourceLimit(std::string_view error, size_t requested) {
-    return FormatError(error,
-                       internal::ConstString(": maximum ") +
-                           internal::IntegerConstString<MaxObjects>() +
-                           internal::ConstString(" < requested "),
-                       requested);
+    constexpr internal::ConstString msg{
+        []() { return ": maximum "s + internal::ToString(MaxObjects) + " < requested "s; }};
+    return FormatError(error, static_cast<const std::string_view&>(msg), requested);
   }
 
   constexpr bool ResourceLimit(size_t max, std::string_view error, size_t requested) {
-    return FormatError(error, internal::ConstString(": maximum"), max,
-                       internal::ConstString(" < requested"), requested);
+    return FormatError(error, ": maximum"sv, max, " < requested"sv, requested);
   }
 
   template <typename... Args>

@@ -8,6 +8,7 @@
 #include <ios>
 
 #include "diagnostics.h"
+#include "internal/const-string.h"
 
 // This provides adapters for elfldltl::Diagnostics types to use std::ostream
 // and compatible types for reporting messages.  This is in a separate header
@@ -19,13 +20,15 @@ namespace elfldltl {
 // These overloads let the object returned by OstreamDiagnostics format the
 // special argument types.
 
-template <typename S, size_t N>
-constexpr decltype(auto) operator<<(S && ostream, internal::ConstString<N> string) {
-  return std::forward<S>(ostream) << static_cast<std::string_view>(string);
+template <typename S, typename CharT, class Traits>
+constexpr decltype(auto) operator<<(S&& ostream,
+                                    const internal::ConstString<CharT, Traits>& string) {
+  using View = std::basic_string_view<CharT, Traits>;
+  return std::forward<S>(ostream) << static_cast<View>(string);
 }
 
 template <typename S, typename T>
-constexpr decltype(auto) operator<<(S && ostream, FileOffset<T> offset) {
+constexpr decltype(auto) operator<<(S&& ostream, FileOffset<T> offset) {
   auto flags = ostream.flags();
   ostream << std::showbase << std::hex << " at file offset " << *offset;
   ostream.flags(flags);
@@ -33,7 +36,7 @@ constexpr decltype(auto) operator<<(S && ostream, FileOffset<T> offset) {
 }
 
 template <typename S, typename T>
-constexpr decltype(auto) operator<<(S && ostream, FileAddress<T> address) {
+constexpr decltype(auto) operator<<(S&& ostream, FileAddress<T> address) {
   auto flags = ostream.flags();
   ostream << std::showbase << std::hex << " at relative address " << *address;
   ostream.flags(flags);
@@ -41,7 +44,7 @@ constexpr decltype(auto) operator<<(S && ostream, FileAddress<T> address) {
 }
 
 template <typename S, typename T, typename = decltype(std::declval<T>().str())>
-constexpr decltype(auto) operator<<(S && ostream, T && t) {
+constexpr decltype(auto) operator<<(S&& ostream, T&& t) {
   return std::forward<S>(ostream) << t.str();
 }
 

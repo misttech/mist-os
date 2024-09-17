@@ -15,6 +15,8 @@
 
 namespace elfldltl {
 
+using namespace std::literals;
+
 template <typename T, bool Swap>
 class UnsignedField;
 
@@ -41,17 +43,19 @@ struct PrintfType {
 
   using IntegerType = std::conditional_t<std::is_signed_v<T>, int64_t, uint64_t>;
 
-  // This is a ConstString of a printf format string fragment.
-  static constexpr auto kFormat = []() {
+  consteval PrintfType() = default;
+
+  // The call operator returns a printf format string.
+  static consteval std::string Format() {
     if constexpr (std::is_signed_v<T>) {
-      return ConstString(" %" PRId64);
+      return " %" PRId64;
     } else {
-      return ConstString(" %" PRIu64);
+      return " %" PRIu64;
     }
-  }();
+  }
 
   // This is a function of T that returns a std::tuple<...> of the arguments to
-  // pass to printf corresponding to the kFormat string.
+  // pass to printf corresponding to that format string.
   static constexpr auto Arguments(IntegerType arg) { return std::make_tuple(arg); }
 };
 
@@ -66,37 +70,37 @@ struct PrintfType<T&&> : public PrintfType<T> {};
 
 template <>
 struct PrintfType<uint8_t> {
-  static constexpr auto kFormat = ConstString(" %" PRIu8);
+  static consteval std::string Format() { return " %" PRIu8; }
   static constexpr auto Arguments(uint8_t arg) { return std::make_tuple(arg); }
 };
 
 template <>
 struct PrintfType<uint16_t> {
-  static constexpr auto kFormat = ConstString(" %" PRIu16);
+  static consteval std::string Format() { return " %" PRIu16; }
   static constexpr auto Arguments(uint16_t arg) { return std::make_tuple(arg); }
 };
 
 template <>
 struct PrintfType<uint32_t> {
-  static constexpr auto kFormat = ConstString(" %" PRIu32);
+  static consteval std::string Format() { return " %" PRIu32; }
   static constexpr auto Arguments(uint32_t arg) { return std::make_tuple(arg); }
 };
 
 template <>
 struct PrintfType<int8_t> {
-  static constexpr auto kFormat = ConstString(" %" PRId8);
+  static consteval std::string Format() { return " %" PRId8; }
   static constexpr auto Arguments(int8_t arg) { return std::make_tuple(arg); }
 };
 
 template <>
 struct PrintfType<int16_t> {
-  static constexpr auto kFormat = ConstString(" %" PRId16);
+  static consteval std::string Format() { return " %" PRId16; }
   static constexpr auto Arguments(int16_t arg) { return std::make_tuple(arg); }
 };
 
 template <>
 struct PrintfType<int32_t> {
-  static constexpr auto kFormat = ConstString(" %" PRId32);
+  static consteval std::string Format() { return " %" PRId32; }
   static constexpr auto Arguments(int32_t arg) { return std::make_tuple(arg); }
 };
 
@@ -112,19 +116,14 @@ struct PrintfType<UnsignedField<T, Swap>> : public PrintfType<T> {};
 template <typename T, bool Swap>
 struct PrintfType<SignedField<T, Swap>> : public PrintfType<std::make_signed_t<T>> {};
 
-template <typename T, size_t N>
-struct Map {
+template <typename T>
+struct FormatFor {
   using Type = T;
-  ConstString<N> string;
+  std::string string;
 };
 
-template <typename T, size_t N>
-constexpr auto FormatFor(const char (&string)[N]) {
-  return Map<T, N - 1>{string};
-}
-
 template <typename T, class First, class... Rest>
-constexpr auto Pick(First first, Rest... rest) {
+consteval std::string Pick(First first, Rest... rest) {
   if constexpr (std::is_same_v<T, typename First::Type>) {
     return first.string;
   } else {
@@ -134,44 +133,49 @@ constexpr auto Pick(First first, Rest... rest) {
 }
 
 template <typename T>
-constexpr auto PrintfHexFormatStringForType() {
-  return ConstString(" %#") + Pick<T>(                                  //
-                                  FormatFor<uint8_t>(PRIx8),            //
-                                  FormatFor<uint16_t>(PRIx16),          //
-                                  FormatFor<uint32_t>(PRIx32),          //
-                                  FormatFor<uint64_t>(PRIx64),          //
-                                  FormatFor<unsigned char>("hhx"),      //
-                                  FormatFor<unsigned short int>("hx"),  //
-                                  FormatFor<unsigned int>("x"),         //
-                                  FormatFor<unsigned long int>("lx"),   //
-                                  FormatFor<unsigned long long int>("llx"));
+consteval std::string PrintfHexFormatStringForType() {
+  return " %#"s + Pick<T>(                                  //
+                      FormatFor<uint8_t>(PRIx8),            //
+                      FormatFor<uint16_t>(PRIx16),          //
+                      FormatFor<uint32_t>(PRIx32),          //
+                      FormatFor<uint64_t>(PRIx64),          //
+                      FormatFor<unsigned char>("hhx"),      //
+                      FormatFor<unsigned short int>("hx"),  //
+                      FormatFor<unsigned int>("x"),         //
+                      FormatFor<unsigned long int>("lx"),   //
+                      FormatFor<unsigned long long int>("llx"));
 }
 
 // This handles string literals.  It could fold them into the format
 // string, but that would require doubling any '%' inside.
 template <size_t N>
 struct PrintfType<const char (&)[N]> {
-  static constexpr auto kFormat = ConstString("%s");
+  static consteval std::string Format() { return "%s"; }
   static constexpr auto Arguments(const char (&str)[N]) { return std::forward_as_tuple(str); }
 };
 
-template <size_t Len>
-struct PrintfType<ConstString<Len>> {
-  static constexpr auto kFormat = ConstString("%s");
-  static constexpr auto Arguments(const ConstString<Len>& str) {
+template <>
+struct PrintfType<const char*> {
+  static consteval std::string Format() { return "%s"; }
+  static constexpr auto Arguments(const char* str) { return std::make_tuple(str); }
+};
+
+// This is specialized on its const& type because it's not copyable.
+template <typename CharT, class Traits>
+struct PrintfType<const ConstString<CharT, Traits>&> {
+  static_assert(std::is_same_v<CharT, char>,
+                "PrintfDiagnosticsReport doesn't support non-char instantiations of ConstString");
+  static_assert(std::is_same_v<Traits, std::string_view::traits_type>,
+                "PrintfDiagnosticsReport doesn't support special instantiations of ConstString");
+  static consteval std::string Format() { return "%s"; }
+  static constexpr auto Arguments(const ConstString<CharT, Traits>& str) {
     return std::make_tuple(str.c_str());
   }
 };
 
 template <>
-struct PrintfType<const char*> {
-  static constexpr auto kFormat = ConstString("%s");
-  static constexpr auto Arguments(const char* str) { return std::make_tuple(str); }
-};
-
-template <>
 struct PrintfType<std::string_view> {
-  static constexpr auto kFormat = ConstString("%.*s");
+  static consteval std::string Format() { return "%.*s"; }
   static constexpr auto Arguments(std::string_view str) {
     return std::make_tuple(static_cast<int>(str.size()), str.data());
   }
@@ -182,26 +186,26 @@ struct PrintfType<SymbolName> : public PrintfType<std::string_view> {};
 
 template <typename T>
 struct PrintfType<FileOffset<T>> {
-  static constexpr auto kFormat =
-      ConstString(" at file offset") + PrintfHexFormatStringForType<T>();
+  static consteval std::string Format() {
+    return " at file offset"s + PrintfHexFormatStringForType<T>();
+  }
   static constexpr auto Arguments(FileOffset<T> arg) { return std::make_tuple(*arg); }
 };
 
 template <typename T>
 struct PrintfType<FileAddress<T>> {
-  static constexpr auto kFormat =
-      ConstString(" at relative address") + PrintfHexFormatStringForType<T>();
+  static consteval std::string Format() {
+    return " at relative address"s + PrintfHexFormatStringForType<T>();
+  }
   static constexpr auto Arguments(FileAddress<T> arg) { return std::make_tuple(*arg); }
 };
 
 // This concatenates them all together in a mandatory constexpr context so the
 // whole format string becomes effectively a single string literal.
 template <typename... T>
-inline constexpr auto kPrintfFormat = (PrintfType<T>::kFormat + ...);
-
-// Specialize the empty case.
-template <>
-inline constexpr auto kPrintfFormat<> = ConstString("");
+inline constexpr ConstString kPrintfFormat{[] {  //
+  return (std::string{} + ... + PrintfType<T>::Format());
+}};
 
 // Calls printer("format string", ...) with arguments corresponding to
 // prefix..., args... (each prefix argument and each later argument might
@@ -209,7 +213,7 @@ inline constexpr auto kPrintfFormat<> = ConstString("");
 template <typename Printer, typename... Prefix, typename... Args>
 constexpr void Printf(Printer&& printer, std::tuple<Prefix...> prefix, Args&&... args) {
   constexpr auto printer_args = [](auto&&... args) {
-    constexpr auto kFormat = kPrintfFormat<decltype(args)...>.c_str();
+    constexpr const char* kFormat = kPrintfFormat<decltype(args)...>.c_str();
     constexpr auto arg_tuple = [](auto&& arg) {
       using T = decltype(arg);
       return PrintfType<T>::Arguments(std::forward<T>(arg));

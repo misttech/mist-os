@@ -5,135 +5,130 @@
 #ifndef SRC_LIB_ELFLDLTL_INCLUDE_LIB_ELFLDLTL_INTERNAL_CONST_STRING_H_
 #define SRC_LIB_ELFLDLTL_INCLUDE_LIB_ELFLDLTL_INTERNAL_CONST_STRING_H_
 
+#include <algorithm>
 #include <array>
-#include <functional>
+#include <span>
+#include <string>
 #include <string_view>
 #include <type_traits>
 
 namespace elfldltl::internal {
 
-// This is a poor programmer's constexpr std::string (which C++ 20 has).
-// It provides the barest subset of std::string functionality in constexpr:
-//  * Copy-constructible, constructible from string literals
-//  * Convertible to std::string_view, has those common methods
-//  * Has c_str() method with NUL terminator guarantee
-//  * Has operator+ that takes other ConstString types or string literals
-// So essentially it acts as an immutable std::string that can be used in
-// simple functional style.
+using namespace std::literals;
 
-template <size_t Len>
-class ConstString {
+// No constexpr std::to_string, and it doesn't handle non-10 bases anyway.
+// C++23 has constexpr std::to_chars for integers, but that doesn't help with
+// determining the length of buffer for it to fill.
+template <typename T>
+consteval std::string ToString(T n, unsigned int base = 10, bool alt = false) {
+  std::string str;
+  auto it = str.begin();
+  if constexpr (std::is_signed_v<T>) {
+    if (n < 0) {
+      str = '-';
+      it = ++str.begin();
+      n = -n;
+    }
+  }
+  if (alt) {
+    switch (base) {
+      case 8:
+        str += '0';
+        it = str.end();
+        break;
+      case 16:
+        str += "0x";
+        it = str.end();
+        break;
+      default:
+        break;
+    }
+  }
+  do {
+    it = str.insert(it, "0123456789abcdef"[n % base]);
+    n /= base;
+  } while (n > 0);
+  return str;
+}
+
+// ConstVector<T, N> is used only to define constexpr variables.  It can
+// only be constructed one way, and cannot be default-constructed, copied, or
+// moved.  The constructor argument is a captureless constexpr lambda of no
+// arguments that returns some standard container with value_type = T and
+// size() == N.  The deduction guide handles the template parameters as long as
+// it returns something container-like.  Once constructed, it acts like a
+// std::span<const T, N> that points to a constexpr std::array<T, N>.  The
+// actual storage is only unique for the sequence of values, even if multiple
+// different lambda arguments produce the same sequence.
+template <typename T, size_t N>
+class ConstVector : public std::span<const T, N> {
  public:
-  template <size_t N>
-  using ConstStringRef = const char (&)[N];
+  ConstVector() = delete;
+  ConstVector(const ConstVector&) = delete;
+  ConstVector(ConstVector&&) = delete;
 
-  using Literal = ConstStringRef<Len + 1>;
-
-  constexpr ConstString(Literal other) { Appender{str_.data()}(other); }
-
-  template <size_t... N>
-  explicit constexpr ConstString(ConstStringRef<N>... literals) {
-    static_assert(((N - 1) + ...) == Len);
-    Appender append{str_.data()};
-    (append(literals), ...);
-  }
-
-  template <size_t... OtherLen>
-  explicit constexpr ConstString(const ConstString<OtherLen>&... other) {
-    static_assert((OtherLen + ...) == Len);
-    Appender append{str_.data()};
-    (append(other), ...);
-  }
-
-  constexpr const char* data() const { return str_.data(); }
-
-  constexpr size_t size() const { return Len; }
-
-  constexpr size_t empty() const { return size() == 0; }
-
-  constexpr const char* c_str() const { return str_.data(); }
-
-  constexpr const char* begin() const { return data(); }
-
-  constexpr const char* end() const { return data() + size(); }
-
-  constexpr operator std::string_view() const { return {data(), size()}; }
-
-  template <size_t OtherLen>
-  constexpr auto operator+(const ConstString<OtherLen>& other) const {
-    return ConstString<Len + OtherLen>(*this, other);
-  }
-
-  template <size_t OtherLenWithTerminator>
-  constexpr auto operator+(const char (&other)[OtherLenWithTerminator]) const {
-    return *this + ConstString<OtherLenWithTerminator - 1>(other);
-  }
-
-  template <size_t OtherLen>
-  constexpr bool operator==(const ConstString<OtherLen>& other) const {
-    return static_cast<std::string_view>(*this) == other;
-  }
-
-  template <auto N, unsigned int Base>
-  friend constexpr auto IntegerConstString();
+  // The argument is a captureless consteval lambda returning std::vector<T>.
+  // The actual argument isn't used, since it's not a constant expression.
+  // It's just used to deduce the type so constexpr instances can be called.
+  template <class Maker>
+  explicit consteval ConstVector(Maker) : std::span<const T, N>{kStorage<MakeArray<Maker>()>} {}
 
  private:
-  constexpr ConstString() = default;
+  using StorageArray = std::array<T, N>;
 
-  struct Appender {
-    template <size_t OtherLen>
-    constexpr void operator()(const ConstString<OtherLen>& str) {
-      for (char c : str) {
-        *p_++ = c;
-      }
-    }
+  // This ensures a single instantiation of the actual storage for each unique
+  // sequence of values, regardless of how they're computed at compile time.
+  template <StorageArray Values>
+  static constexpr StorageArray kStorage = Values;
 
-    constexpr void operator()(std::string_view str) {
-      for (char c : str) {
-        *p_++ = c;
-      }
-    }
-
-    char* p_ = nullptr;
-  };
-
-  std::array<char, Len + 1> str_{};
+  template <class Maker>
+  static consteval StorageArray MakeArray() {
+    constexpr Maker maker;  // This can be called in constant expressions.
+    static_assert(maker().size() == N);
+    // Compute a constexpr object containing the right values.
+    StorageArray values{};
+    std::ranges::copy(maker(), values.begin());
+    return values;
+  }
 };
 
-template <size_t Len>
-ConstString(ConstString<Len> other) -> ConstString<Len>;
+// Deduction guide.
+template <class Maker>
+ConstVector(Maker maker) -> ConstVector<typename decltype(maker())::value_type, Maker{}().size()>;
 
-template <size_t LiteralLen>
-ConstString(const char (&literal)[LiteralLen]) -> ConstString<LiteralLen - 1>;
+// ConstString is to string as ConstVector is to vector.  Its constructor
+// argument lambda should return some std::basic_string<...> type.  The
+// constructed object is like a string_view rather than a span, but also has a
+// c_str() method and guarantees NUL termination like string does.
+template <typename CharT, class Traits>
+class ConstString : public std::basic_string_view<CharT, Traits> {
+ public:
+  ConstString() = delete;
+  ConstString(const ConstString&) = delete;
+  ConstString(ConstString&&) = delete;
 
-template <typename T>
-constexpr size_t IntegerDigits(T n, unsigned int base) {
-  size_t digits = 1;
-  while (n >= static_cast<T>(base)) {
-    n /= static_cast<T>(base);
-    ++digits;
-  }
-  return digits;
-}
+  template <class Maker>
+  explicit consteval ConstString(Maker)
+      : ConstString{ConstVector{[] {
+          std::basic_string<CharT> str = Maker{}();
+          str.push_back('\0');
+          return str;
+        }}} {}
 
-template <auto N, unsigned int Base = 10>
-constexpr auto IntegerConstString() {
-  static_assert(N >= 0);
-  constexpr size_t kDigits = IntegerDigits(N, Base);
-  ConstString<kDigits> result;
-  auto n = N;
-  auto it = result.str_.rbegin();
-  *it++ = '\0';
-  for (auto end = result.str_.rend(); it != end; it++) {
-    char& c = *it;
-    static_assert(Base <= 16);
-    c = "0123456789abcdef"[n % Base];
-    n /= Base;
-  }
-  return result;
-}
+  explicit consteval ConstString(const CharT* str) : std::basic_string_view<CharT, Traits>{str} {}
 
-static_assert(IntegerConstString<1234567>() == ConstString("1234567"));
+  consteval const char* c_str() const { return this->data(); }
+
+ private:
+  template <size_t N>
+  explicit consteval ConstString(const ConstVector<CharT, N>& chars)
+      : std::string_view{chars.data(), N - 1} {}
+};
+
+// Deduction guide.
+template <class Maker>
+ConstString(Maker maker)
+    -> ConstString<typename decltype(maker())::value_type, typename decltype(maker())::traits_type>;
 
 }  // namespace elfldltl::internal
 
