@@ -12,7 +12,7 @@
 /// - All durations are expressed in nanoseconds.
 /// - All plain counters are suffixed with `_count`.
 /// - All node constant names are suffixed with `_NODE`.
-@available(added=NEXT)
+@available(added=HEAD)
 library fuchsia.power.observability;
 
 // Inspect nodes of suspend hierarchy.
