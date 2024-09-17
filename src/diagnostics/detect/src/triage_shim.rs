@@ -61,6 +61,7 @@ mod test {
     const INSPECT: &str = r#"[
         {
             "moniker": "foo.cm",
+            "metadata": {},
             "payload": {"path": {"to": {"leaf": 8}}}
         }
     ]"#;

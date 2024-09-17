@@ -8,7 +8,7 @@ use crate::validate::*;
 use anyhow::format_err;
 use fidl_fuchsia_diagnostics::{
     ComponentSelector, Interest, LogInterestSelector, PropertySelector, Selector, SelectorArgument,
-    Severity, StringSelector, StringSelectorUnknown, SubtreeSelector, TreeSelector,
+    Severity, StringSelector, StringSelectorUnknown, SubtreeSelector, TreeNames, TreeSelector,
 };
 use moniker::{ChildName, ExtendedMoniker, Moniker, EXTENDED_MONIKER_COMPONENT_MANAGER_STR};
 use std::borrow::{Borrow, Cow};
@@ -359,6 +359,47 @@ where
     Ok(true)
 }
 
+/// Checks whether or not a given selector matches a given moniker and if the given `tree_name` is
+/// present in the selector's tree-name-filter list.
+///
+/// Accounts for semantics like unspecified tree-name-filter lists.
+///
+/// Returns an error if the selector is invalid.
+pub fn match_component_and_tree_name<T>(
+    moniker: impl AsRef<[T]>,
+    tree_name: &str,
+    selector: &Selector,
+) -> Result<bool, anyhow::Error>
+where
+    T: AsRef<str>,
+{
+    Ok(match_component_moniker_against_selector(moniker, selector)?
+        && match_tree_name_against_selector(tree_name, selector))
+}
+
+/// Checks whether or not a given `tree_name` is present in the selector's
+/// tree-name-filter list.
+///
+/// Accounts for semantics like unspecified tree-name-filter lists.
+pub fn match_tree_name_against_selector(tree_name: &str, selector: &Selector) -> bool {
+    match selector.tree_names.as_ref() {
+        Some(TreeNames::All(_)) => true,
+
+        Some(TreeNames::Some(filters)) => filters.iter().any(|f| f == tree_name),
+
+        // TODO(https://fxbug.dev/355732696): None for name filter
+        // should use fidl_fuchsia_inspect::DEFAULT_TREE_NAME as an implicit
+        // filter value. This has to be done after tests relying on the current
+        // behavior where a bare selector matches all trees (mainly driver
+        // manager) have been updated to specify tree names or [...].
+        None => true,
+
+        Some(TreeNames::__SourceBreaking { .. }) => {
+            unreachable!("FIDL convention to ensure exhaustive match")
+        }
+    }
+}
+
 /// Evaluates a component moniker against a single selector, returning
 /// True if the selector matches the component, else false.
 ///
@@ -369,7 +410,7 @@ pub fn match_component_moniker_against_selector<T>(
     selector: &Selector,
 ) -> Result<bool, anyhow::Error>
 where
-    T: AsRef<str> + std::string::ToString,
+    T: AsRef<str>,
 {
     selector.validate()?;
 

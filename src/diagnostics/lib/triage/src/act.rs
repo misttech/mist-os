@@ -663,14 +663,17 @@ mod test {
             [
                 {
                     "moniker": "abcd",
+                    "metadata": {},
                     "payload": {"root": {"val": 10}}
                 },
                 {
                     "moniker": "abcd2",
+                    "metadata": {},
                     "payload": ["a", "b"]
                 },
                 {
                     "moniker": "abcd3",
+                    "metadata": {},
                     "payload": null
                 }
             ]

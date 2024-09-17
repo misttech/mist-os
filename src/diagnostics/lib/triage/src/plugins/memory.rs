@@ -105,6 +105,9 @@ mod tests {
 [
   {
     "moniker": "core/memory_monitor",
+    "metadata": {
+        "name": "root"
+    },
     "payload": {
         "root": {
             "current_digest": "Abcd: 10.3k\nOther: 7M\nBbb: 9999\n\nTestCmx: 2G\ninvalid_line\ninvalid: \ninvalid_again: ABCD\n\nFree: 100M\ntimestamp: 10234\n\n"

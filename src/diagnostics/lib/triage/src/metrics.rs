@@ -1216,11 +1216,11 @@ pub(crate) mod test {
         vec![DiagnosticData::new("i".to_string(), Source::Inspect, s.to_string()).unwrap()]
     });
     static NO_PAYLOAD_F: LazyLock<Vec<DiagnosticData>> = LazyLock::new(|| {
-        let s = r#"[{"moniker": "abcd", "payload": null}]"#;
+        let s = r#"[{"moniker": "abcd", "metadata": {}, "payload": null}]"#;
         vec![DiagnosticData::new("i".to_string(), Source::Inspect, s.to_string()).unwrap()]
     });
     static BAD_PAYLOAD_F: LazyLock<Vec<DiagnosticData>> = LazyLock::new(|| {
-        let s = r#"[{"moniker": "abcd", "payload": ["a", "b"]}]"#;
+        let s = r#"[{"moniker": "abcd", "metadata": {}, "payload": ["a", "b"]}]"#;
         vec![DiagnosticData::new("i".to_string(), Source::Inspect, s.to_string()).unwrap()]
     });
     static EMPTY_FILE_FETCHER: LazyLock<FileDataFetcher<'static>> =

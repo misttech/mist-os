@@ -158,13 +158,12 @@ mod tests {
                     {{
                         "data_source": "Inspect",
                         "moniker": "{moniker}",
+                        "metadata": {{}},
                         "payload": {payload},
                         "version": 1
                     }}
                 ]
-            "#,
-                moniker = moniker,
-                payload = payload
+            "#
             );
 
             match expected_error {

@@ -148,6 +148,9 @@ mod test {
     const INSPECT_CONTENT: &str = r#"[
         {
             "moniker": "bootstrap/fshost",
+            "metadata": {
+                "name": "root"
+            },
             "payload": {
                 "root": {
                     "data_stats": {

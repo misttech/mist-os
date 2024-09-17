@@ -1,6 +1,7 @@
 [
     {
         "moniker": "core/foo_agent",
+        "metadata": {},
         "payload": {
             "root": {
                 "current_num_connections": 1,
@@ -10,6 +11,7 @@
     },
     {
         "moniker": "bootstrap/bar",
+        "metadata": {},
         "payload": {
             "root": {
                 "data_stats": {
@@ -23,6 +25,7 @@
     },
     {
         "moniker": "core/session-manager/session:1/app",
+        "metadata": {},
         "payload": {
             "root": {
                 "requests": 100,
