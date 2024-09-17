@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 #include <algorithm>
+#include <filesystem>
 #include <fstream>
 #include <optional>
 #include <string>
