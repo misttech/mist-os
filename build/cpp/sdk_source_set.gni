@@ -135,7 +135,6 @@ template("sdk_source_set") {
                              "non_sdk_local_deps",
                              "sdk_headers_for_internal_use",
                              "source_dir",
-                             "testonly",
                              "stable",
                            ])
 
