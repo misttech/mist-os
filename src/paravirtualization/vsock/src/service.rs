@@ -227,10 +227,7 @@ impl Vsock {
     ///
     /// Takes ownership of a `RequestStream` that is most likely created from a `ServicesServer`
     /// and processes any incoming requests on it.
-    pub async fn run_client_connection(
-        self,
-        request: ConnectorRequestStream,
-    ) -> Result<(), anyhow::Error> {
+    pub async fn run_client_connection(self, request: ConnectorRequestStream) {
         let self_ref = &self;
         let fut = request
             .map_err(|err| Error::ClientCommunication(err.into()))
@@ -240,9 +237,10 @@ impl Vsock {
                 self_ref
                     .handle_request(request)
                     .or_else(|e| future::ready(if e.is_comm_failure() { Err(e) } else { Ok(()) }))
-            })
-            .err_into();
-        fut.await
+            });
+        if let Err(e) = fut.await {
+            tracing::info!("Failed to handle request {}", e);
+        }
     }
     fn alloc_ephemeral_port(self) -> Option<AllocatedPort> {
         let p = self.lock().used_ports.allocate();

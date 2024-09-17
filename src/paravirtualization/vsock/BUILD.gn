@@ -19,6 +19,7 @@ rustc_binary("bin") {
   deps = [
     ":lib",
     "//sdk/fidl/fuchsia.hardware.vsock:fuchsia.hardware.vsock_rust",
+    "//sdk/fidl/fuchsia.vsock:fuchsia.vsock_rust",
     "//sdk/lib/device-watcher/rust",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-component",

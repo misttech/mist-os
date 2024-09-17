@@ -6,12 +6,17 @@
 
 use anyhow::{Context as _, Error};
 use fidl_fuchsia_hardware_vsock::DeviceMarker;
+use fidl_fuchsia_vsock::ConnectorRequestStream;
 use fuchsia_component::client::connect_to_named_protocol_at_dir_root;
 use fuchsia_component::server::ServiceFs;
 use fuchsia_fs::OpenFlags;
-use futures::{StreamExt, TryFutureExt, TryStreamExt};
+use futures::{StreamExt, TryStreamExt};
 
 use vsock_service_lib as service;
+
+enum IncomingRequest {
+    VsockConnection(ConnectorRequestStream),
+}
 
 #[fuchsia::main]
 async fn main() -> Result<(), Error> {
@@ -39,23 +44,21 @@ async fn main() -> Result<(), Error> {
     let (service, event_loop) =
         service::Vsock::new(dev).await.context("Failed to initialize vsock service")?;
 
-    let service_clone = service.clone();
     let mut fs = ServiceFs::new();
-    fs.dir("svc").add_fidl_service(move |stream| {
-        service_clone.spawn(
-            service_clone
-                .clone()
-                .run_client_connection(stream)
-                .unwrap_or_else(|err| tracing::info!("Error {} during client connection", err)),
-        );
-    });
+    fs.dir("svc").add_fidl_service(IncomingRequest::VsockConnection);
+
     fs.take_and_serve_directory_handle()?;
 
-    // Spawn the services server with a wrapper to discard the return value.
-    service.spawn(fs.collect());
+    let fut = fs.map(Ok).try_for_each_concurrent(None, |request: IncomingRequest| async {
+        match request {
+            IncomingRequest::VsockConnection(stream) => {
+                service.clone().run_client_connection(stream).await;
+                Ok(())
+            }
+        }
+    });
 
-    // Run the event loop until completion. The event loop only terminates
-    // with an error.
-    event_loop.await?;
+    let _ = futures::try_join!(fut, event_loop)?;
+
     Ok(())
 }
