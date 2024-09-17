@@ -7,13 +7,14 @@
 
 #include <fidl/fuchsia.hardware.hrtimer/cpp/fidl.h>
 #include <fidl/fuchsia.power.broker/cpp/fidl.h>
-#include <fidl/fuchsia.power.system/cpp/wire.h>
+#include <fidl/fuchsia.power.system/cpp/fidl.h>
 #include <lib/async/cpp/irq.h>
 #include <lib/fit/result.h>
 #include <lib/mmio/mmio-buffer.h>
 #include <lib/zx/interrupt.h>
 
 #include <optional>
+#include <variant>
 
 namespace hrtimer {
 constexpr size_t kTimersAll[] = {0, 1, 2, 3, 4, 5, 6, 7, 8};
@@ -31,7 +32,8 @@ class AmlHrtimerServer : public fidl::Server<fuchsia_hardware_hrtimer::Device> {
       std::optional<fidl::ClientEnd<fuchsia_power_broker::ElementControl>> element_control,
       fidl::SyncClient<fuchsia_power_broker::Lessor> lessor,
       fidl::SyncClient<fuchsia_power_broker::CurrentLevel> current_level,
-      fidl::Client<fuchsia_power_broker::RequiredLevel> required_level, zx::interrupt irq_a,
+      fidl::Client<fuchsia_power_broker::RequiredLevel> required_level,
+      fidl::SyncClient<fuchsia_power_system::ActivityGovernor> sag, zx::interrupt irq_a,
       zx::interrupt irq_b, zx::interrupt irq_c, zx::interrupt irq_d, zx::interrupt irq_f,
       zx::interrupt irq_g, zx::interrupt irq_h, zx::interrupt irq_i);
 
@@ -44,7 +46,8 @@ class AmlHrtimerServer : public fidl::Server<fuchsia_hardware_hrtimer::Device> {
   }
   bool HasWaitCompleter(size_t timer_index) {
     ZX_ASSERT(timer_index < kNumberOfTimers);
-    return timers_[timer_index].power_enabled_wait_completer.has_value();
+    return !std::holds_alternative<std::monostate>(
+        timers_[timer_index].power_enabled_wait_completer);
   }
   bool StartTicksLeftFitInHardware(size_t timer_index) {
     ZX_ASSERT(timer_index < kNumberOfTimers);
@@ -59,6 +62,8 @@ class AmlHrtimerServer : public fidl::Server<fuchsia_hardware_hrtimer::Device> {
   void GetTicksLeft(GetTicksLeftRequest& request, GetTicksLeftCompleter::Sync& completer) override;
   void SetEvent(SetEventRequest& request, SetEventCompleter::Sync& completer) override;
   void StartAndWait(StartAndWaitRequest& request, StartAndWaitCompleter::Sync& completer) override;
+  void StartAndWait2(StartAndWait2Request& request,
+                     StartAndWait2Completer::Sync& completer) override;
   void GetProperties(GetPropertiesCompleter::Sync& completer) override;
   void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_hardware_hrtimer::Device> metadata,
                              fidl::UnknownMethodCompleter::Sync& completer) override;
@@ -93,7 +98,8 @@ class AmlHrtimerServer : public fidl::Server<fuchsia_hardware_hrtimer::Device> {
     zx::interrupt irq;
     async::IrqMethod<Timer, &Timer::HandleIrq> irq_handler{this};
     // Completer saved to reply to a StartAndWait power aware FIDL call.
-    std::optional<StartAndWaitCompleter::Async> power_enabled_wait_completer;
+    std::variant<std::monostate, StartAndWaitCompleter::Async, StartAndWait2Completer::Async>
+        power_enabled_wait_completer;
     uint64_t start_ticks_left = 0;
     uint64_t last_ticks = 0;
   };
@@ -148,6 +154,8 @@ class AmlHrtimerServer : public fidl::Server<fuchsia_hardware_hrtimer::Device> {
   fidl::SyncClient<fuchsia_power_broker::CurrentLevel> current_level_;
   // FIDL client used to monitor the power level to be set as required by the Power Broker.
   fidl::Client<fuchsia_power_broker::RequiredLevel> required_level_;
+  // FIDL client used to request wake leases directly from SAG.
+  fidl::SyncClient<fuchsia_power_system::ActivityGovernor> sag_;
   async_dispatcher_t* dispatcher_;
 };
 }  // namespace hrtimer

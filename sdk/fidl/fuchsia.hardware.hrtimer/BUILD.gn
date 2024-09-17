@@ -9,6 +9,7 @@ fidl("fuchsia.hardware.hrtimer") {
   sources = [ "hrtimer.fidl" ]
   public_deps = [
     "//sdk/fidl/fuchsia.power.broker",
+    "//sdk/fidl/fuchsia.power.system",
     "//zircon/vdso/zx",
   ]
 }

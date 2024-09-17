@@ -138,6 +138,46 @@ void DeviceServer::StartAndWait(StartAndWaitRequest& request,
   completer.Reply(std::move(response));
 }
 
+void DeviceServer::StartAndWait2(StartAndWait2Request& request,
+                                 StartAndWait2Completer::Sync& completer) {
+  auto fut = std::async(
+      std::launch::async,
+      [&]() -> zx::result<fuchsia_hardware_hrtimer::DeviceStartAndWait2Response> {
+        if (!lessor_.has_value()) {
+          FX_LOGS(ERROR) << "No active lessor";
+          return zx::error(ZX_ERR_BAD_STATE);
+        }
+        std::this_thread::sleep_for(std::chrono::nanoseconds(
+            request.resolution().duration().value() * (request.ticks() + 1)));
+        fidl::Result<fuchsia_power_broker::Lessor::Lease> result_lease =
+            lessor_.value()->Lease(fidl::ToUnderlying(fuchsia_power_broker::BinaryPowerLevel::kOn));
+
+        if (result_lease.is_error()) {
+          FX_LOGS(ERROR) << "Failed to acquire a lease: "
+                         << result_lease.error_value().FormatDescription();
+          return zx::error(ZX_ERR_BAD_STATE);
+        }
+
+        zx::eventpair local_wake_lease, remote_wake_lease;
+        zx_status_t status =
+            fuchsia_power_system::WakeLeaseToken::create(0, &local_wake_lease, &remote_wake_lease);
+        if (status != ZX_OK) {
+          FX_LOGS(ERROR) << "WakeLeaseToken create failed: " << zx_status_get_string(status)
+                         << std::endl;
+        }
+
+        fuchsia_hardware_hrtimer::DeviceStartAndWait2Response response;
+        response.expiration_keep_alive(std::move(local_wake_lease));
+
+        if (event_) {
+          event_->signal(0, ZX_EVENT_SIGNALED);
+        }
+        return zx::ok(std::move(response));
+      });
+  auto response = fut.get();
+  completer.Reply(std::move(response));
+}
+
 void DeviceServer::GetProperties(GetPropertiesCompleter::Sync& completer) {
   uint64_t size = 10;
   std::vector<TimerProperties> timer_properties(size);

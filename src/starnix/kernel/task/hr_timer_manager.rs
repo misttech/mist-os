@@ -477,6 +477,9 @@ mod tests {
                     fhrtimer::DeviceRequest::StartAndWait { responder, .. } => {
                         responder.send(Err(fhrtimer::DriverError::InternalError)).expect("");
                     }
+                    fhrtimer::DeviceRequest::StartAndWait2 { responder, .. } => {
+                        responder.send(Err(fhrtimer::DriverError::InternalError)).expect("");
+                    }
                     fhrtimer::DeviceRequest::GetProperties { responder, .. } => {
                         responder.send(fhrtimer::Properties { ..Default::default() }).expect("");
                     }
