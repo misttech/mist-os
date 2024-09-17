@@ -5,6 +5,7 @@
 use crate::{RegistrationConflictMode, RepoStorageType};
 use anyhow::{bail, Result};
 use ffx_config::EnvironmentContext;
+use fidl_fuchsia_pkg_ext::RepositoryConfig;
 use nix::sys::wait::{waitpid, WaitPidFlag, WaitStatus};
 use nix::unistd::Pid;
 use schemars::JsonSchema;
@@ -15,6 +16,7 @@ use std::path::{Path, PathBuf};
 use std::time::Duration;
 use std::{fs, process};
 use timeout::timeout;
+
 /// PathType is an enum encapulating filesystem and URL based paths.
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, JsonSchema)]
 #[serde(rename_all = "lowercase")]
@@ -65,7 +67,7 @@ impl Display for ServerMode {
 /// the startup information for a running package server.
 /// This includes the process id, which is intended for
 /// use to troubleshoot and stop running instances.
-#[derive(Clone, Debug, JsonSchema, Deserialize, Serialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 pub struct PkgServerInfo {
     pub name: String,
     pub address: SocketAddr,
@@ -74,6 +76,7 @@ pub struct PkgServerInfo {
     pub registration_storage_type: RepoStorageType,
     pub registration_alias_conflict_mode: RegistrationConflictMode,
     pub server_mode: ServerMode,
+    pub repo_config: RepositoryConfig,
     pub pid: u32,
 }
 
@@ -265,6 +268,7 @@ pub async fn write_instance_info(
     aliases: Vec<String>,
     storage_type: RepoStorageType,
     conflict_mode: RegistrationConflictMode,
+    repo_config: RepositoryConfig,
 ) -> Result<()> {
     let instance_root = if let Some(context) = env_context {
         context.get("repository.process_dir")?
@@ -282,6 +286,7 @@ pub async fn write_instance_info(
         registration_alias_conflict_mode: conflict_mode.into(),
         server_mode,
         pid: process::id(),
+        repo_config,
     };
     if let Some(existing) = mgr.get_instance(name.into())? {
         if existing.pid != info.pid {
@@ -295,6 +300,8 @@ pub async fn write_instance_info(
 
 #[cfg(test)]
 mod tests {
+    use fidl_fuchsia_pkg_ext::RepositoryConfigBuilder;
+
     use super::*;
     use std::net::Ipv6Addr;
     use std::os::unix::fs::PermissionsExt as _;
@@ -304,15 +311,21 @@ mod tests {
     async fn test_write_instance_info_with_global_context() {
         let env = ffx_config::test_init().await.expect("test env");
         let addr = SocketAddr::new(std::net::IpAddr::V6(std::net::Ipv6Addr::UNSPECIFIED), 8000);
+        let instance_name = "some-instance";
+        let repo_config =
+            RepositoryConfigBuilder::new(format!("fuchsia-pkg://{instance_name}").parse().unwrap())
+                .build();
+
         write_instance_info(
             None,
             ServerMode::Foreground,
-            "somename",
+            instance_name.into(),
             &addr,
             PathBuf::new().as_path().into(),
             vec![],
             RepoStorageType::Ephemeral,
             RegistrationConflictMode::ErrorOut,
+            repo_config,
         )
         .await
         .expect("write_instance_info");
@@ -330,6 +343,8 @@ mod tests {
     async fn test_write_instance_info_with_context() {
         let env = ffx_config::test_init().await.expect("test env");
         let addr = SocketAddr::new(std::net::IpAddr::V6(std::net::Ipv6Addr::UNSPECIFIED), 8000);
+        let repo_config =
+            RepositoryConfigBuilder::new("fuchsia-pkg://somename".parse().unwrap()).build();
         write_instance_info(
             Some(env.context.clone()),
             ServerMode::Foreground,
@@ -339,6 +354,7 @@ mod tests {
             vec![],
             RepoStorageType::Ephemeral,
             RegistrationConflictMode::ErrorOut,
+            repo_config,
         )
         .await
         .expect("write_instance_info");
@@ -354,8 +370,13 @@ mod tests {
     }
     #[test]
     fn test_is_running() {
+        let instance_name = "some-instance";
+        let repo_config =
+            RepositoryConfigBuilder::new(format!("fuchsia-pkg://{instance_name}").parse().unwrap())
+                .build();
+
         let info = PkgServerInfo {
-            name: "somename".into(),
+            name: instance_name.into(),
             address: (Ipv6Addr::UNSPECIFIED, 8000).into(),
             repo_path: Path::new("").into(),
             registration_alias_conflict_mode: RegistrationConflictMode::ErrorOut,
@@ -363,6 +384,7 @@ mod tests {
             pid: process::id(),
             registration_aliases: vec![],
             registration_storage_type: RepoStorageType::Ephemeral,
+            repo_config,
         };
         assert!(info.is_running());
     }
@@ -388,7 +410,11 @@ mod tests {
     fn test_write_not_exist() {
         let tmp = tempfile::TempDir::new().expect("temp dir");
         let mgr = PkgServerInstances::new(tmp.path().join("instances").into());
-        let instance_name = "some_instance";
+        let instance_name = "some-instance";
+        let repo_config =
+            RepositoryConfigBuilder::new(format!("fuchsia-pkg://{instance_name}").parse().unwrap())
+                .build();
+
         let info = PkgServerInfo {
             name: instance_name.into(),
             address: (Ipv6Addr::UNSPECIFIED, 8000).into(),
@@ -398,6 +424,7 @@ mod tests {
             pid: process::id(),
             registration_aliases: vec![],
             registration_storage_type: RepoStorageType::Ephemeral,
+            repo_config,
         };
 
         mgr.write_instance(&info).expect("written OK");
@@ -408,7 +435,11 @@ mod tests {
     fn test_writer_overwrite() {
         let tmp = tempfile::TempDir::new().expect("temp dir");
         let mgr = PkgServerInstances::new(tmp.path().join("instances").into());
-        let instance_name = "some_instance";
+        let instance_name = "some-instance";
+        let repo_config =
+            RepositoryConfigBuilder::new(format!("fuchsia-pkg://{instance_name}").parse().unwrap())
+                .build();
+
         let mut info = PkgServerInfo {
             name: instance_name.into(),
             address: (Ipv6Addr::UNSPECIFIED, 8000).into(),
@@ -418,6 +449,7 @@ mod tests {
             pid: process::id(),
             registration_aliases: vec![],
             registration_storage_type: RepoStorageType::Ephemeral,
+            repo_config,
         };
 
         mgr.write_instance(&info).expect("written OK");
@@ -442,7 +474,11 @@ mod tests {
     fn test_list_1() {
         let tmp = tempfile::TempDir::new().expect("temp dir");
         let mgr = PkgServerInstances::new(tmp.path().join("instances").into());
-        let instance_name = "some_instance";
+        let instance_name = "some-instance";
+        let repo_config =
+            RepositoryConfigBuilder::new(format!("fuchsia-pkg://{instance_name}").parse().unwrap())
+                .build();
+
         let info = PkgServerInfo {
             name: instance_name.into(),
             address: (Ipv6Addr::UNSPECIFIED, 8000).into(),
@@ -452,6 +488,7 @@ mod tests {
             pid: process::id(),
             registration_aliases: vec![],
             registration_storage_type: RepoStorageType::Ephemeral,
+            repo_config,
         };
 
         mgr.write_instance(&info).expect("written OK");
@@ -466,7 +503,11 @@ mod tests {
     fn test_list_2() {
         let tmp = tempfile::TempDir::new().expect("temp dir");
         let mgr = PkgServerInstances::new(tmp.path().join("instances").into());
-        let instance_name = "some_instance";
+        let instance_name = "some-instance";
+        let repo_config_1 =
+            RepositoryConfigBuilder::new(format!("fuchsia-pkg://{instance_name}").parse().unwrap())
+                .build();
+
         let info_1 = PkgServerInfo {
             name: instance_name.into(),
             address: (Ipv6Addr::UNSPECIFIED, 8000).into(),
@@ -476,9 +517,15 @@ mod tests {
             pid: process::id(),
             registration_aliases: vec![],
             registration_storage_type: RepoStorageType::Ephemeral,
+            repo_config: repo_config_1,
         };
 
-        let another_instance_name = "another_instance";
+        let another_instance_name = "another-instance";
+        let repo_config_2 = RepositoryConfigBuilder::new(
+            format!("fuchsia-pkg://{another_instance_name}").parse().unwrap(),
+        )
+        .build();
+
         let info_2 = PkgServerInfo {
             name: another_instance_name.into(),
             address: (Ipv6Addr::UNSPECIFIED, 8000).into(),
@@ -488,6 +535,7 @@ mod tests {
             pid: process::id(),
             registration_aliases: vec![],
             registration_storage_type: RepoStorageType::Ephemeral,
+            repo_config: repo_config_2,
         };
         mgr.write_instance(&info_1).expect("written OK");
         mgr.write_instance(&info_2).expect("written OK");
@@ -507,7 +555,11 @@ mod tests {
     fn test_list_1_not_running() {
         let tmp = tempfile::TempDir::new().expect("temp dir");
         let mgr = PkgServerInstances::new(tmp.path().join("instances").into());
-        let instance_name = "some_instance";
+        let instance_name = "some-instance";
+        let repo_config_1 =
+            RepositoryConfigBuilder::new(format!("fuchsia-pkg://{instance_name}").parse().unwrap())
+                .build();
+
         let info_1 = PkgServerInfo {
             name: instance_name.into(),
             address: (Ipv6Addr::UNSPECIFIED, 8000).into(),
@@ -517,9 +569,15 @@ mod tests {
             pid: process::id(),
             registration_aliases: vec![],
             registration_storage_type: RepoStorageType::Ephemeral,
+            repo_config: repo_config_1,
         };
 
-        let another_instance_name = "another_instance";
+        let another_instance_name = "another-instance";
+        let repo_config_2 = RepositoryConfigBuilder::new(
+            format!("fuchsia-pkg://{another_instance_name}").parse().unwrap(),
+        )
+        .build();
+
         let info_2 = PkgServerInfo {
             name: another_instance_name.into(),
             address: (Ipv6Addr::UNSPECIFIED, 8000).into(),
@@ -529,6 +587,7 @@ mod tests {
             pid: 0,
             registration_aliases: vec![],
             registration_storage_type: RepoStorageType::Ephemeral,
+            repo_config: repo_config_2,
         };
         mgr.write_instance(&info_1).expect("written OK");
         mgr.write_instance(&info_2).expect("written OK");
@@ -561,7 +620,11 @@ mod tests {
     fn test_get_instance_not_running() {
         let tmp = tempfile::TempDir::new().expect("temp dir");
         let mgr = PkgServerInstances::new(tmp.path().join("instances").into());
-        let instance_name = "some_instance";
+        let instance_name = "some-instance";
+        let repo_config =
+            RepositoryConfigBuilder::new(format!("fuchsia-pkg://{instance_name}").parse().unwrap())
+                .build();
+
         let info = PkgServerInfo {
             name: instance_name.into(),
             address: (Ipv6Addr::UNSPECIFIED, 8000).into(),
@@ -571,6 +634,7 @@ mod tests {
             pid: 0,
             registration_aliases: vec![],
             registration_storage_type: RepoStorageType::Ephemeral,
+            repo_config,
         };
 
         mgr.write_instance(&info).expect("written OK");
@@ -593,8 +657,11 @@ mod tests {
         // is still there and should be removed.
         let tmp = tempfile::TempDir::new().expect("temp dir");
         let mgr = PkgServerInstances::new(tmp.path().join("instances").into());
+        let instance_name = "some-instance";
+        let repo_config =
+            RepositoryConfigBuilder::new(format!("fuchsia-pkg://{instance_name}").parse().unwrap())
+                .build();
 
-        let instance_name = "some_instance";
         let info = PkgServerInfo {
             name: instance_name.into(),
             address: (Ipv6Addr::UNSPECIFIED, 8000).into(),
@@ -604,6 +671,7 @@ mod tests {
             pid: process::id(),
             registration_aliases: vec![],
             registration_storage_type: RepoStorageType::Ephemeral,
+            repo_config,
         };
 
         mgr.write_instance(&info).expect("written OK");
@@ -617,8 +685,10 @@ mod tests {
     fn test_remove_not_running() {
         let tmp = tempfile::TempDir::new().expect("temp dir");
         let mgr = PkgServerInstances::new(tmp.path().join("instances").into());
+        let repo_config =
+            RepositoryConfigBuilder::new("fuchsia-pkg://some-server".parse().unwrap()).build();
 
-        let instance_name = "some_instance";
+        let instance_name = "some-instance";
         let info = PkgServerInfo {
             name: instance_name.into(),
             address: (Ipv6Addr::UNSPECIFIED, 8000).into(),
@@ -628,6 +698,7 @@ mod tests {
             pid: 0,
             registration_aliases: vec![],
             registration_storage_type: RepoStorageType::Ephemeral,
+            repo_config,
         };
 
         mgr.write_instance(&info).expect("written OK");
@@ -641,9 +712,11 @@ mod tests {
     fn test_remove_not_found() {
         let tmp = tempfile::TempDir::new().expect("temp dir");
         let mgr = PkgServerInstances::new(tmp.path().join("instances").into());
+        let repo_config =
+            RepositoryConfigBuilder::new("fuchsia-pkg://some-server".parse().unwrap()).build();
 
-        let instance_name = "some_instance";
-        let another_instance_name = "another_instance";
+        let instance_name = "some-instance";
+        let another_instance_name = "another-instance";
         let info = PkgServerInfo {
             name: instance_name.into(),
             address: (Ipv6Addr::UNSPECIFIED, 8000).into(),
@@ -653,6 +726,7 @@ mod tests {
             pid: process::id(),
             registration_aliases: vec![],
             registration_storage_type: RepoStorageType::Ephemeral,
+            repo_config,
         };
 
         mgr.write_instance(&info).expect("written OK");
@@ -682,6 +756,9 @@ mod tests {
 
         let child = process::Command::new(fake_server).spawn().expect("child process");
 
+        let repo_config =
+            RepositoryConfigBuilder::new("fuchsia-pkg://some-server".parse().unwrap()).build();
+
         let info = PkgServerInfo {
             name: "some-server".into(),
             address: (Ipv6Addr::UNSPECIFIED, 8000).into(),
@@ -691,6 +768,7 @@ mod tests {
             pid: child.id(),
             registration_aliases: vec![],
             registration_storage_type: RepoStorageType::Ephemeral,
+            repo_config,
         };
         // There is race condition in which the fake server process could crash (e.g. if the bash
         // has a syntax error and spawning the process is slow) in between the is_running check and

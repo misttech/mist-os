@@ -12,15 +12,47 @@ use fho::{
 };
 use fidl_fuchsia_developer_ffx as ffx;
 use fidl_fuchsia_developer_ffx_ext::ServerStatus;
-use pkg::{PkgServerInfo, PkgServerInstanceInfo, PkgServerInstances, ServerMode};
+use pkg::{
+    PathType, PkgServerInfo, PkgServerInstanceInfo, PkgServerInstances, RegistrationConflictMode,
+    RepoStorageType, ServerMode,
+};
 use schemars::JsonSchema;
 use serde::Serialize;
+use std::net::SocketAddr;
+
+#[derive(Clone, Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub struct PkgServerData {
+    pub name: String,
+    pub address: SocketAddr,
+    pub repo_path: PathType,
+    pub registration_aliases: Vec<String>,
+    pub registration_storage_type: RepoStorageType,
+    pub registration_alias_conflict_mode: RegistrationConflictMode,
+    pub server_mode: ServerMode,
+    pub pid: u32,
+}
+
+impl From<PkgServerInfo> for PkgServerData {
+    fn from(value: PkgServerInfo) -> Self {
+        Self {
+            name: value.name,
+            address: value.address,
+            repo_path: value.repo_path,
+            registration_aliases: value.registration_aliases,
+            registration_storage_type: value.registration_storage_type,
+            registration_alias_conflict_mode: value.registration_alias_conflict_mode,
+            server_mode: value.server_mode,
+            pid: value.pid,
+        }
+    }
+}
 
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum CommandStatus {
     /// Successful execution with an optional informational string.
-    Ok { data: Vec<PkgServerInfo> },
+    Ok { data: Vec<PkgServerData> },
     /// Unexpected error with string.
     UnexpectedError { message: String },
     /// A known kind of error that can be reported usefully to the user
@@ -46,9 +78,10 @@ impl FfxMain for RepoListTool {
         match self.list().await {
             Ok(info) => {
                 // filter by names
-                let filtered: Vec<PkgServerInfo> = info
+                let filtered: Vec<PkgServerData> = info
                     .into_iter()
                     .filter(|s| names.contains(&s.name) || names.is_empty())
+                    .map(Into::into)
                     .collect();
                 writer.machine_or_else(&CommandStatus::Ok { data: filtered.clone() }, || {
                     format_text(filtered, full)
@@ -108,7 +141,7 @@ impl RepoListTool {
     }
 }
 
-fn format_text(infos: Vec<PkgServerInfo>, full: bool) -> String {
+fn format_text(infos: Vec<PkgServerData>, full: bool) -> String {
     let mut lines = vec![];
     for info in infos {
         lines.push(if !full {
@@ -141,6 +174,7 @@ mod tests {
     use super::*;
     use fho::{Format, TestBuffers};
     use fidl_fuchsia_developer_ffx::RepositoryRegistryRequest;
+    use fidl_fuchsia_pkg_ext::RepositoryConfigBuilder;
     use futures::channel::oneshot::channel;
     use std::net::SocketAddr;
     use std::process;
@@ -177,8 +211,13 @@ mod tests {
 
         let repos = Deferred::from_output(Ok(fake_proxy));
 
+        let instance_name = "s1";
+        let repo_config =
+            RepositoryConfigBuilder::new(format!("fuchsia-pkg://{instance_name}").parse().unwrap())
+                .build();
+
         let s1 = PkgServerInfo {
-            name: "s1".into(),
+            name: instance_name.into(),
             address: addr,
             repo_path: pkg::PathType::File("/some/repo".into()),
             registration_aliases: vec![],
@@ -186,6 +225,7 @@ mod tests {
             registration_alias_conflict_mode: pkg::RegistrationConflictMode::ErrorOut,
             server_mode: pkg::ServerMode::Foreground,
             pid: process::id(),
+            repo_config,
         };
         mgr.write_instance(&s1).expect("writing s1");
 
@@ -214,8 +254,13 @@ mod tests {
 
         let repos = Deferred::from_output(Ok(fake_proxy));
 
+        let instance_name = "s1";
+        let repo_config =
+            RepositoryConfigBuilder::new(format!("fuchsia-pkg://{instance_name}").parse().unwrap())
+                .build();
+
         let s1 = PkgServerInfo {
-            name: "s1".into(),
+            name: instance_name.into(),
             address: addr,
             repo_path: pkg::PathType::File("/some/repo".into()),
             registration_aliases: vec![],
@@ -223,6 +268,7 @@ mod tests {
             registration_alias_conflict_mode: pkg::RegistrationConflictMode::ErrorOut,
             server_mode: pkg::ServerMode::Foreground,
             pid: process::id(),
+            repo_config,
         };
         mgr.write_instance(&s1).expect("writing s1");
 
@@ -266,8 +312,13 @@ mod tests {
 
         let repos = Deferred::from_output(Ok(fake_proxy));
 
+        let instance_name = "s1";
+        let repo_config =
+            RepositoryConfigBuilder::new(format!("fuchsia-pkg://{instance_name}").parse().unwrap())
+                .build();
+
         let s1 = PkgServerInfo {
-            name: "s1".into(),
+            name: instance_name.into(),
             address: addr,
             repo_path: pkg::PathType::File("/some/repo".into()),
             registration_aliases: vec![],
@@ -275,8 +326,16 @@ mod tests {
             registration_alias_conflict_mode: pkg::RegistrationConflictMode::ErrorOut,
             server_mode: pkg::ServerMode::Foreground,
             pid: process::id(),
+            repo_config,
         };
         mgr.write_instance(&s1).expect("writing s1");
+
+        let instance_name_2 = "s2";
+        let repo_config_2 = RepositoryConfigBuilder::new(
+            format!("fuchsia-pkg://{instance_name_2}").parse().unwrap(),
+        )
+        .build();
+
         let s2 = PkgServerInfo {
             name: "s2".into(),
             address: addr,
@@ -286,6 +345,7 @@ mod tests {
             registration_alias_conflict_mode: pkg::RegistrationConflictMode::Replace,
             server_mode: pkg::ServerMode::Daemon,
             pid: process::id(),
+            repo_config: repo_config_2,
         };
         mgr.write_instance(&s2).expect("writing s2");
         let tool = RepoListTool {
@@ -313,8 +373,13 @@ mod tests {
 
         let repos = Deferred::from_output(Ok(fake_proxy));
 
+        let instance_name = "s1";
+        let repo_config =
+            RepositoryConfigBuilder::new(format!("fuchsia-pkg://{instance_name}").parse().unwrap())
+                .build();
+
         let s1 = PkgServerInfo {
-            name: "s1".into(),
+            name: instance_name.into(),
             address: addr,
             repo_path: pkg::PathType::File("/some/repo".into()),
             registration_aliases: vec![],
@@ -322,6 +387,7 @@ mod tests {
             registration_alias_conflict_mode: pkg::RegistrationConflictMode::ErrorOut,
             server_mode: pkg::ServerMode::Foreground,
             pid: process::id(),
+            repo_config,
         };
         mgr.write_instance(&s1).expect("writing s1");
 
@@ -337,7 +403,7 @@ mod tests {
 
         let (stdout, stderr) = buffers.into_strings();
         assert_eq!("", stderr);
-        let expected = serde_json::to_string(&CommandStatus::Ok { data: vec![s1] })
+        let expected = serde_json::to_string(&CommandStatus::Ok { data: vec![s1.into()] })
             .expect("serialize expected");
         let data = serde_json::from_str(&stdout).expect("json value");
 

@@ -936,21 +936,49 @@ async fn load_repositories_from_config(inner: &Arc<RwLock<RepoInner>>, write_ins
         };
 
         if valid && write_instance_data {
-            if let Err(e) = write_instance_info(
-                None,
-                ServerMode::Daemon,
-                &name,
-                &addr,
-                repo_path.into(),
-                aliases.into_iter().map(ToString::to_string).collect(),
-                ffx::RepositoryStorageType::Ephemeral.into(),
-                ffx::RepositoryRegistrationAliasConflictMode::Replace.into(),
-            )
-            .await
-            {
-                tracing::error!(
-                    "failed to write repo server instance information for {name}: {e:?}"
-                );
+            // Get the repo configuration from the repo_client.
+            // This is saved as part of the instance data for use by other commands.
+            if let Some(repo_client) = inner.read().await.manager.get(&name) {
+                let repo_url =
+                    if let Ok(repo_url) = fuchsia_url::RepositoryUrl::parse_host(name.clone()) {
+                        repo_url
+                    } else {
+                        tracing::error!("failed to parse a repository_url from {name}");
+                        fuchsia_url::RepositoryUrl::parse(&format!("fuchsia-pkg://unknown/"))
+                            .expect("default url")
+                    };
+
+                let mirror_url: http::Uri = match format!("http://{addr}/{name}").parse() {
+                    Ok(mirror_url) => mirror_url,
+                    Err(e) => {
+                        tracing::error!("failed to parse repo addr 'http://{addr}/{name}':  {e:?}");
+                        http::Uri::default()
+                    }
+                };
+
+                if let Ok(repo_config) =
+                    repo_client.read().await.get_config(repo_url, mirror_url, None)
+                {
+                    if let Err(e) = write_instance_info(
+                        None,
+                        ServerMode::Daemon,
+                        &name,
+                        &addr,
+                        repo_path.into(),
+                        aliases.into_iter().map(ToString::to_string).collect(),
+                        ffx::RepositoryStorageType::Ephemeral.into(),
+                        ffx::RepositoryRegistrationAliasConflictMode::Replace.into(),
+                        repo_config,
+                    )
+                    .await
+                    {
+                        tracing::error!(
+                            "failed to write repo server instance information for {name}: {e:?}"
+                        );
+                    }
+                } else {
+                    tracing::error!("no repo_config object available for {name}");
+                }
             }
         }
     }
