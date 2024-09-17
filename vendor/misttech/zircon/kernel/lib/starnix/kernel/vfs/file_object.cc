@@ -77,7 +77,7 @@ fit::result<Errno, FileHandle> FileObject::New(ktl::unique_ptr<FileOps> ops, Nam
         None
     };
   */
-  auto fs = name.entry->node->fs();
+  auto fs = name.entry->node_->fs();
   auto kernel = fs->kernel().Lock();
   if (!kernel) {
     return fit::error(errno(ENOENT));
@@ -94,7 +94,7 @@ fit::result<Errno, FileHandle> FileObject::New(ktl::unique_ptr<FileOps> ops, Nam
   return fit::ok(file);
 }
 
-FsNodeHandle FileObject::node() const { return name.entry->node; }
+FsNodeHandle FileObject::node() const { return name.entry->node_; }
 
 fit::result<Errno, size_t> FileObject::read(const CurrentTask& current_task,
                                             OutputBuffer* data) const {
