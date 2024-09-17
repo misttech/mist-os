@@ -6,6 +6,8 @@ use byteorder::{LittleEndian, WriteBytesExt};
 use std::collections::VecDeque;
 use std::{io, iter};
 
+use crate::experimental::ring_buffer::zigzag_simple8b_rle::zigzag_decode;
+
 const SELECTORS_PER_BYTE: usize = 2;
 const BITS_PER_BYTE: usize = 8;
 const BITS_PER_SELECTOR: usize = BITS_PER_BYTE / SELECTORS_PER_BYTE;
@@ -134,6 +136,21 @@ impl Simple8bRleBlock {
             value.saturating_mul(self.num_values() as u64)
         } else {
             Simple8bIter::new(*self, self.num_values()).sum()
+        }
+    }
+
+    /// Sum up all the values of this block, assuming that the block is a complete encoding.
+    /// If the sum would overflow, return `i64::MIN` if negative or `i64::MAX` if positive.
+    pub fn saturating_sum_with_zigzag_decode(&self) -> i64 {
+        if self.selector == RLE_SELECTOR {
+            let value = zigzag_decode(self.data & RLE_DATA_BITMASK);
+            value.saturating_mul(self.num_values() as i64)
+        } else {
+            let mut sum = 0i64;
+            for item in Simple8bIter::new(*self, self.num_values()) {
+                sum += zigzag_decode(item);
+            }
+            sum
         }
     }
 

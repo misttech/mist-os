@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 mod delta_simple8b_rle;
+mod delta_zigzag_simple8b_rle;
 mod simple8b_rle;
 mod uncompressed;
 mod zigzag_simple8b_rle;

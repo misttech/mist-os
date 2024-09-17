@@ -4,6 +4,7 @@
 
 use std::io;
 
+use crate::experimental::ring_buffer::simple8b_rle::{Simple8bRleBlock, Simple8bRleBufferMetadata};
 use crate::experimental::ring_buffer::Simple8bRleRingBuffer;
 
 /// ZigzagSimple8bRleRingBuffer is a ring buffer that allows logging an i64 into a
@@ -29,8 +30,16 @@ impl ZigzagSimple8bRleRingBuffer {
 
     /// Push a new value onto the ZigzagSimple8bRleRingBuffer. This might evict
     /// one or more oldest values in the process.
-    pub fn push(&mut self, value: i64) {
-        self.buffer.push(zigzag_encode(value));
+    pub fn push(&mut self, value: i64) -> Vec<Simple8bRleBlock> {
+        self.buffer.push(zigzag_encode(value))
+    }
+
+    pub(crate) fn metadata(&self) -> Simple8bRleBufferMetadata {
+        self.buffer.metadata()
+    }
+
+    pub(crate) fn serialize_data(&self, buffer: &mut impl io::Write) -> io::Result<()> {
+        self.buffer.serialize_data(buffer)
     }
 }
 
@@ -51,6 +60,16 @@ const fn zigzag_encode(x: i64) -> u64 {
     // 0b111...111 ^ 0b111...110 = 0b000...001 (which is 1)
     // ```
     ((x >> i64::BITS - 1) ^ (x << 1)) as u64
+}
+
+// Return `-x//2 - 1` if `x` is odd. Otherwise return `x//2`
+pub const fn zigzag_decode(x: u64) -> i64 {
+    // The below bitwise operation assumes that the number has two-complement representation.
+    //
+    // When `x` is even, `-(x & 1)` is always 0, hence `(x >> 1) & 0 = x//2`
+    // When `x` is odd, `-(x & 1)` is always -1, which is all 1 bits,
+    // hence `(x >> 1) ^ -1 = -x//2 - 1`
+    (x >> 1) as i64 ^ -((x & 1) as i64)
 }
 
 #[cfg(test)]
