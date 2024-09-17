@@ -121,7 +121,7 @@ One of the capabilities exposed by `http-client` to its parent **realm** is
 [fuchsia.net.http.Loader](https://fuchsia.dev/reference/fidl/fuchsia.net.http#Loader).
 This enables other components to issue HTTP requests.
 
-Use the `component select` command determine how many components interact with
+Use the `component capability` command determine how many components interact with
 this capability:
 
 ```posix-terminal
@@ -151,6 +151,6 @@ to the necessary children.
   <b>Extra credit</b>
   <p>A lot of components use the <code>fuchsia.logger.LogSink</code> capability,
   which is needed to read the system logs. You can list them using the same
-  <code>component select</code> search for incoming capabilities.</p>
+  <code>component capability</code> search for incoming capabilities.</p>
   <p>Can you find which component exposes this capability?</p>
 </aside>
