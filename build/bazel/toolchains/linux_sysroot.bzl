@@ -19,8 +19,25 @@ _linux_sysroot_archs = [
     "x86_64",
 ]
 
-def linux_sysroot(name, sysroot_arch, sysroot_path = _linux_sysroot):
-    """Generates a filegroup() target that exposes a Linux sysroot for a given CPU architecture.
+def linux_sysroot_headers(name, sysroot_path = _linux_sysroot):
+    """Generates a filegroup() that exposes headers from a Linux sysroot.
+
+    No attempt is made to filter headers based on CPU architecture.
+
+    Args:
+        name: name of the generated filegroup().
+        sysroot_path: path to the top-level sysroot directory.
+    """
+    native.filegroup(
+        name = name,
+        srcs = native.glob([sysroot_path + "/usr/include/**"]),
+        visibility = ["//visibility:public"],
+    )
+
+def linux_sysroot_libs(name, sysroot_arch, sysroot_path = _linux_sysroot):
+    """Generates a filegroup() that exposes link-time Linux sysroot libraries.
+
+    This only exposes the libraries for a specific CPU architecture.
 
     Args:
         name: name of the generated filegroup().
@@ -31,6 +48,7 @@ def linux_sysroot(name, sysroot_arch, sysroot_path = _linux_sysroot):
     if sysroot_arch not in _linux_sysroot_archs:
         fail("The sysroot_arch parameter must be one of: %s" % _linux_sysroot_archs)
 
+    # Runtime libraries are scatterred in several places.
     glob_patterns = [
         # This file is the dynamic linker configuration script. Not sure whether this is really required.
         sysroot_path + "/etc/ld.so.conf.d/{arch}-linux-gnu.conf",
@@ -40,8 +58,6 @@ def linux_sysroot(name, sysroot_arch, sysroot_path = _linux_sysroot):
         sysroot_path + "/usr/lib/gcc/{arch}-linux-gnu/4.9/**",
         # This directory contains higher-level system libraries (e.g. libX11.so) and crt1.o / crti.o / crtn.o
         sysroot_path + "/usr/lib/{arch}-linux-gnu/**",
-        # This directory contains system headers.
-        sysroot_path + "/usr/include/**",
     ]
 
     # The location of the dynamic linker is different for x64 compared to other architectures.

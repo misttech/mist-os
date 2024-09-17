@@ -21,12 +21,14 @@ def define_host_prebuilt_clang_cc_toolchains(name, host_os, host_arch):
       host_arch: Host cpu architecture string, using Fuchsia conventions.
     """
     if host_os == "linux":
-        sysroot_files_x64 = ["@//:linux_sysroot_x64"]
-        sysroot_files_arm64 = ["@//:linux_sysroot_arm64"]
+        sysroot_header_files = ["@//:linux_sysroot_headers"]
+        sysroot_library_files_x64 = ["@//:linux_sysroot_libs_x64"]
+        sysroot_library_files_arm64 = ["@//:linux_sysroot_libs_arm64"]
         sysroot_path = "prebuilt/third_party/sysroot/linux"
     else:
-        sysroot_files_x64 = []
-        sysroot_files_arm64 = []
+        sysroot_header_files = []
+        sysroot_library_files_x64 = []
+        sysroot_library_files_arm64 = []
         sysroot_path = ""
 
     bazel_os = to_bazel_os_name(host_os)
@@ -38,7 +40,8 @@ def define_host_prebuilt_clang_cc_toolchains(name, host_os, host_arch):
         host_arch = bazel_arch,
         target_os = bazel_os,
         target_arch = "x86_64",
-        sysroot_files = sysroot_files_x64,
+        sysroot_header_files = sysroot_header_files,
+        sysroot_library_files = sysroot_library_files_x64,
         sysroot_path = sysroot_path,
     )
 
@@ -48,6 +51,7 @@ def define_host_prebuilt_clang_cc_toolchains(name, host_os, host_arch):
         host_arch = bazel_arch,
         target_os = bazel_os,
         target_arch = "aarch64",
-        sysroot_files = sysroot_files_arm64,
+        sysroot_header_files = sysroot_header_files,
+        sysroot_library_files = sysroot_library_files_arm64,
         sysroot_path = sysroot_path,
     )

@@ -465,7 +465,8 @@ def generate_clang_cc_toolchain(
         target_os,
         target_arch,
         clang_info = "//:clang_info",
-        sysroot_files = [],
+        sysroot_header_files = [],
+        sysroot_library_files = [],
         sysroot_path = ""):
     """Define C++ toolchain related targets for a prebuilt Clang installation.
 
@@ -486,9 +487,17 @@ def generate_clang_cc_toolchain(
            value. Default to //:clang_info.
            See setup_clang_repository() in repository_utils.bzl.
 
-       sysroot_files: (optiona) A target list for the sysroot files to be used.
+       sysroot_headers_files: (optional) A label list for the sysroot
+           header files. These will be exposed to the sandbox for C++
+           compilation actions.
+
+       sysroot_library_files: (optional) A label list for the sysroot
+           libraries. These will be exposed to the sandbox for
+           C++ link actions.
 
        sysroot_path: (optional) Path to the sysroot directory to be used.
+           This must be set if sysroot_header_files or sysroot_library_files
+           are used.
     """
     _prebuilt_clang_cc_toolchain_config(
         name = name + "_cc_toolchain_config",
@@ -513,19 +522,19 @@ def generate_clang_cc_toolchain(
     compiler_files = name + "_compiler_files"
     native.filegroup(
         name = compiler_files,
-        srcs = common_compiler_files + sysroot_files,
+        srcs = common_compiler_files + sysroot_header_files,
     )
 
     linker_files = name + "_linker_files"
     native.filegroup(
         name = linker_files,
-        srcs = common_linker_files + sysroot_files,
+        srcs = common_linker_files + sysroot_library_files,
     )
 
     all_files = name + "_all_files"
     native.filegroup(
         name = all_files,
-        srcs = common_compiler_files + common_linker_files + sysroot_files,
+        srcs = common_compiler_files + common_linker_files + sysroot_header_files + sysroot_library_files,
     )
 
     native.cc_toolchain(
