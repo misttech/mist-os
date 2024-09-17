@@ -14,6 +14,7 @@
 #include <lib/mistos/starnix/kernel/vfs/fs_node.h>
 #include <lib/mistos/starnix/kernel/vfs/fs_node_ops.h>
 #include <lib/mistos/util/weak_wrapper.h>
+#include <trace.h>
 #include <zircon/assert.h>
 
 #include <algorithm>
@@ -23,7 +24,11 @@
 #include <kernel/mutex.h>
 #include <ktl/unique_ptr.h>
 
+#include "../kernel_priv.h"
+
 #include <ktl/enforce.h>
+
+#define LOCAL_TRACE STARNIX_KERNEL_GLOBAL_TRACE(0)
 
 namespace starnix {
 
@@ -120,13 +125,13 @@ FsNodeHandle FileSystem::create_node_with_id(const CurrentTask& current_task,
 /// Called from the Release trait of FsNode.
 void FileSystem::remove_node(const FsNode& node) {}
 
-void FileSystem::did_create_dir_entry(const DirEntryHandle& entry) {}
+void FileSystem::did_create_dir_entry(const DirEntryHandle& entry) { LTRACE; }
 
-void FileSystem::will_destroy_dir_entry(const DirEntryHandle& entry) {}
+void FileSystem::will_destroy_dir_entry(const DirEntryHandle& entry) { LTRACE; }
 
-void FileSystem::did_access_dir_entry(const DirEntryHandle& entry) {}
+void FileSystem::did_access_dir_entry(const DirEntryHandle& entry) { LTRACE; }
 
-void FileSystem::purge_old_entries() {}
+void FileSystem::purge_old_entries() { LTRACE; }
 
 DirEntryHandle FileSystem::root() { return root_.get(); }
 
