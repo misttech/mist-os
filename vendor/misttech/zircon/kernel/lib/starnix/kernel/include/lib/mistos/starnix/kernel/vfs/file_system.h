@@ -219,7 +219,6 @@ class FileSystem : private fbl::RefCountedUpgradeable<FileSystem> {
   /// Rather than calling FsNode::new directly, file systems should call
   /// FileSystem::get_or_create_node to see if the FsNode already exists in
   /// the cache.
-  // nodes: Mutex<HashMap<ino_t, WeakFsNodeHandle>>,
   DECLARE_MUTEX(FileSystem) nodes_lock_;
   fbl::HashTable<ino_t, WeakFsNodeHandle> nodes_ __TA_GUARDED(nodes_lock_);
 

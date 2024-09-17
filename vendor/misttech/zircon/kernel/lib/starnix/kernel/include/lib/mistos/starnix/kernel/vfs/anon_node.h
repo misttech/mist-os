@@ -22,22 +22,22 @@ namespace starnix {
 
 class Anon : public FsNodeOps {
  public:
-  static FileHandle new_file_extended(const CurrentTask& current_task, ktl::unique_ptr<FileOps> ops,
-                                      OpenFlags flags, std::function<FsNodeInfo(ino_t)> info);
+  // impl FsNodeOps
 
-  static FileHandle new_file(const CurrentTask& current_task, ktl::unique_ptr<FileOps> ops,
-                             OpenFlags flags);
-
-  fit::result<Errno> unlink(const FsNode& node, const CurrentTask& current_task, const FsStr& name,
-                            const FsNodeHandle& child) final {
-    return fit::error(errno(ENOTDIR));
-  }
+  fs_node_impl_not_dir();
 
   fit::result<Errno, ktl::unique_ptr<FileOps>> create_file_ops(
       /*FileOpsCore& locked,*/ const FsNode& node, const CurrentTask& current_task,
       OpenFlags flags) final {
     return fit::error(errno(ENOSYS));
   }
+
+  // impl Anon
+  static FileHandle new_file_extended(const CurrentTask& current_task, ktl::unique_ptr<FileOps> ops,
+                                      OpenFlags flags, std::function<FsNodeInfo(ino_t)> info);
+
+  static FileHandle new_file(const CurrentTask& current_task, ktl::unique_ptr<FileOps> ops,
+                             OpenFlags flags);
 };
 
 class AnonFs : public FileSystemOps {
