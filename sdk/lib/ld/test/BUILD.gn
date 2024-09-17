@@ -7,6 +7,7 @@ import("//build/dist/distribution_manifest.gni")
 import("//build/test.gni")
 import("//build/toolchain/zircon/user_basic_redirect.gni")
 import("//build/zircon/c_utils.gni")
+import("//sdk/lib/ld/testing/test_elf_object.gni")
 
 group("tests") {
   testonly = true
@@ -70,7 +71,11 @@ generated_file("ld-test-switches.rsp") {
 
 # Depending on this plumbs through the response file into cflags.
 group("ld-test-switches") {
-  visibility = [ ":*" ]
+  visibility = [
+    ":*",
+    "../testing:*",
+    "//sdk/lib/dl/test:*",
+  ]
   testonly = true
 
   public_deps = [ ":ld-test-switches.rsp" ]
@@ -101,15 +106,18 @@ source_set("load-tests") {
     "load-tests.h",
   ]
   deps = [
-    ":load-test-modules-info",
+    ":ld-test-switches",
+    ":load-tests-load-sets",
     "..:abi-headers",
     "..:headers",
     "..:posix.headers",
+    "../testing",
     "//src/lib/elfldltl",
     "//src/lib/elfldltl/testing",
     "//third_party/googletest:gtest",
     "//zircon/system/ulib/fbl",
   ]
+  data_deps = [ ":load-test-data" ]
   if (is_fuchsia) {
     sources += [
       "ld-load-zircon-ldsvc-tests-base.h",
@@ -148,6 +156,23 @@ source_set("load-tests") {
   configs -= [ "//build/config:no_rtti" ]
 }
 
+# This gets the ld::testing::TestElfLoadSet data used by the
+# load-tests-symbolizer.cc test cases.
+test_elf_source_set("load-tests-load-sets") {
+  visibility = [ ":*" ]
+  deps = [ ":load-tests-load-sets.basic" ]
+}
+
+user_basic_redirect("load-tests-load-sets.basic") {
+  visibility = [ ":*" ]
+  testonly = true
+  exclude_toolchain_tags = [ "instrumentation-runtime" ]
+  public_deps = [
+    "modules:indirect-deps.in-process.load-set",
+    "modules:indirect-deps.load-set",
+  ]
+}
+
 source_set("test-chdir-guard") {
   testonly = true
   public = [ "test-chdir-guard.h" ]
@@ -167,17 +192,13 @@ if (!is_fuchsia) {
     test_tc = "(//build/toolchain:linux_$current_cpu)"
   }
 
-  # This acts as a group() target for aggregating the deps, but also collects
-  # the host_test_data() metadata (just as test_spec() will do later) so that
-  # gen-load-test-modules-info can read the file list.
-  generated_file("load-test-data") {
+  group("load-test-data") {
+    visibility = [
+      "./*",
+      "//sdk/lib/dl/test/*",
+    ]
     testonly = true
     deps = [ "modules$test_tc" ]
-    outputs = [ "$target_gen_dir/$target_name.json" ]
-    output_conversion = "json"
-    rebase = root_build_dir
-    data_keys = [ "test_runtime_deps" ]
-    walk_keys = [ "test_runtime_deps_barrier" ]
   }
 
   # This is reached via data_deps from the test_executable() targets in
@@ -208,7 +229,10 @@ if (!is_fuchsia) {
   # via fuchsia.ldsvc.
 
   distribution_manifest("load-test-data") {
-    visibility = [ ":*" ]
+    visibility = [
+      "./*",
+      "//sdk/lib/dl/test/*",
+    ]
     testonly = true
 
     # This will collect the files from deps that would go into /pkg/... and
@@ -242,50 +266,4 @@ if (!is_fuchsia) {
     testonly = true
     public_deps = [ "..:ld-startup" ]
   }
-}
-
-# The load-test-data target above produces a JSON file listing test binaries.
-# It's in the distribution_entries schema for Fuchsia and the test_runtime_deps
-# schema for host.  The script handles either schema in --module-list-file.
-toolchain_utils_action("gen-load-test-modules-info") {
-  visibility = [ ":load-test-modules-info" ]
-  testonly = true
-  script = "gen-load-test-modules-info.py"
-  utils = [ "llvm-readelf" ]
-  deps = [ ":load-test-data" ]
-  sources = get_target_outputs(deps[0])
-  outputs = [ "$target_gen_dir/load-test-modules.inc" ]
-  depfile = "$target_gen_dir/load-test-modules.d"
-  args = [
-    "--output=" + rebase_path(outputs[0], root_build_dir),
-    "--depfile=" + rebase_path(depfile, root_build_dir),
-    "--module-list-file=" + rebase_path(sources[0], root_build_dir),
-  ]
-}
-
-# Depending on this gives access to `#include "load-test-modules.inc"` as well
-# as plumbing the LD_TEST_LIBPREFIX macro definition and bringing the test
-# modules all into the containing Fuchsia package or host test's data.
-source_set("load-test-modules-info") {
-  visibility = [
-    "./*",
-    "//sdk/lib/dl/test/*",
-    "//sdk/lib/ld/test/*",
-    "//sdk/lib/ld/testing/*",
-  ]
-  testonly = true
-
-  public = [ "$target_gen_dir/load-test-modules.inc" ]
-  public_configs = [ ":load-test-modules-info.config" ]
-  public_deps = [
-    ":gen-load-test-modules-info",
-    ":ld-test-switches",
-  ]
-
-  data_deps = [ ":load-test-data" ]
-}
-
-config("load-test-modules-info.config") {
-  visibility = [ ":load-test-modules-info" ]
-  include_dirs = [ target_gen_dir ]
 }

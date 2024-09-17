@@ -9,6 +9,7 @@ import("//build/toolchain/ifs_extract.gni")
 import("//build/toolchain/ifs_shared_library.gni")
 import("//build/toolchain/toolchain_environment.gni")
 import("//build/toolchain/zircon/user_basic_redirect.gni")
+import("testing/test_elf_object.gni")
 
 # This is for executables linked to use the startup dynamic linker.  This does
 # not bring any API or ABI access to the executable() at compile or link time;
@@ -16,7 +17,8 @@ import("//build/toolchain/zircon/user_basic_redirect.gni")
 # correctly.  It also brings data_deps for packaging the startup dynamic
 # linker; note, the startup dynamic linker can be harmlessly packaged with the
 # executable and its dependencies even if in fact remote dynamic linking is
-# going to be used instead.
+# going to be used instead.  Finally, this target brings metadata for matching
+# that dynamic linker in test code using <lib/ld/testing/test-elf-object.h>.
 group("startup") {
   public_configs = [ ":abi-interp" ]
   data_deps = [ ":ld-startup.user" ]
@@ -24,7 +26,8 @@ group("startup") {
 
 # This is for users of <lib/ld/remote-dynamic-linker.h> and related APIs.  It
 # provides compile and link time dependencies for using that API.  It also
-# brings data_deps and metadata for packaging the required stub dynamic linker.
+# brings data_deps and metadata for packaging the required stub dynamic linker
+# and for matching it in test code using <lib/ld/testing/test-elf-object.h>.
 group("remote") {
   public_deps = [ ":headers" ]
   data_deps = [ ":ld-stub.user" ]
@@ -172,7 +175,9 @@ source_set("static-tls-get-addr") {
 # restricted to this file.  It defines a target to bring the runtime file into
 # the Fuchsia package (or host test data).  It also verifies the runtime ABI of
 # the file matches ld.ifs so the build will fail rather than deliver known
-# ABI-breaking dynamic linker implementations.
+# ABI-breaking dynamic linker implementations.  Finally, it provides
+# test_elf_object() metadata so that rolling up into a test_elf_load_set() will
+# package a dynamic linker binary for runtime use like a link-time dependency.
 #
 # The ld_abi_user() targets `ld-stub.user` or `ld-startup.user` can appear in
 # $deps or $data_deps lists (it shouldn't matter which, these targets will only
@@ -181,6 +186,7 @@ source_set("static-tls-get-addr") {
 # (and DT_NEEDED), and config("abi-interp") for PT_INTERP.
 template("ld_abi_user") {
   main_target = target_name
+  redirect_target = "$main_target.redirect"
   verify_target = "$main_target.verify-abi"
   extract_target = "$main_target.ifs"
   ifs_file = "$target_out_dir/$extract_target"
@@ -189,8 +195,19 @@ template("ld_abi_user") {
   ld_label = ld_deps[0]
   assert(ld_deps == [ ld_label ])
 
+  # Leave breadcrumbs for test code to use via metadata.  For non-test code,
+  # this just serves to reach the data_deps and metadata of various sorts.
+  test_elf_object(main_target) {
+    forward_variables_from(invoker,
+                           [
+                             "visibility",
+                             "testonly",
+                           ])
+    deps = [ ":$redirect_target" ]
+  }
+
   # Get into the right toolchain and variant.
-  user_basic_redirect(main_target) {
+  user_basic_redirect(redirect_target) {
     visibility = [ ":*" ]
     forward_variables_from(invoker,
                            [

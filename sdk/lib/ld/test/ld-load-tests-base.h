@@ -6,6 +6,7 @@
 #define LIB_LD_TEST_LD_LOAD_TESTS_BASE_H_
 
 #include <lib/elfldltl/diagnostics-ostream.h>
+#include <lib/elfldltl/soname.h>
 #include <lib/elfldltl/testing/diagnostics.h>
 #include <lib/elfldltl/testing/test-pipe-reader.h>
 
@@ -26,7 +27,7 @@ class LdLoadTestsBase {
  public:
   // Non-Fuchsia cases and in-process cases don't have an implicit dependency
   // on a vDSO from the module/test-start.cc code.
-  static constexpr std::string_view kTestExecutableNeedsVdso{};
+  static constexpr std::optional<elfldltl::Soname<>> kTestExecutableNeedsVdso = std::nullopt;
 
   // An indicator to GTEST of whether the test fixture supports the following
   // features so that it may skip related tests if not supported.

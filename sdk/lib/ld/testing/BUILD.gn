@@ -12,8 +12,11 @@ group("testing") {
 library_headers("headers") {
   testonly = true
 
-  headers = []
-  public_deps = []
+  headers = [ "lib/ld/testing/test-elf-object.h" ]
+  public_deps = [
+    "//sdk/lib/stdcompat",
+    "//src/lib/elfldltl",
+  ]
   if (is_fuchsia) {
     headers += [
       "lib/ld/testing/mock-debugdata.h",
@@ -26,6 +29,7 @@ library_headers("headers") {
       "//sdk/fidl/fuchsia.ldsvc:fuchsia.ldsvc_cpp",
       "//sdk/lib/async-loop:async-loop-cpp",
       "//sdk/lib/async-loop:async-loop-default",
+      "//src/lib/elfldltl:headers",
       "//third_party/googletest:gmock",
       "//zircon/system/ulib/fbl",
       "//zircon/system/ulib/zx",
@@ -38,7 +42,7 @@ static_library("ld-testing") {
 
   public_deps = [ ":headers" ]
 
-  sources = []
+  sources = [ "test-elf-object.cc" ]
   deps = []
   if (is_fuchsia) {
     sources += [
@@ -65,7 +69,7 @@ static_library("ld-testing") {
     # Instead `load-test-modules-info` should extract the exact path for each
     # artifact to make it possible for the caller to more simply map a
     # string -> filename.
-    deps += [ "../test:load-test-modules-info" ]
+    deps += [ "../test:ld-test-switches" ]
     metadata = {
       # Don't pick up all the test data that comes with it!
       distribution_entries_barrier = []

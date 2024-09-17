@@ -8,7 +8,7 @@ import("//build/testing/host_test_data.gni")
 import("//build/toolchain/generated_ifs_file.gni")
 import("//build/toolchain/ifs_shared_library.gni")
 import("//build/toolchain/toolchain_environment.gni")
-import("//build/toolchain/zircon/user_basic_redirect.gni")
+import("//sdk/lib/ld/testing/test_elf_object.gni")
 
 # This only gets instantiated in the environment where the test modules are
 # meant to be built.
@@ -116,10 +116,9 @@ foreach(label, in_process_executables + non_module_in_process_executables) {
 }
 
 # This is used to roll up all the test binaries with appropriate variant
-# selection for metadata collection purposes.  It's used both to get the test
+# selection for metadata collection purposes.  It's used to get the test
 # binaries populated in the Fuchsia package (via resource() equivalents) or
-# host subdirectory (via host_test_data() equivalents), and to examine those
-# binaries in the ..:gen-load-test-modules-info target.
+# host subdirectory (via host_test_data() equivalents).
 group("modules") {
   testonly = true
 
@@ -157,12 +156,33 @@ config("runpath-origin") {
 }
 
 template("_test_non_executable") {
-  shlib_target_name = target_name
+  main_target_name = target_name
+  shlib_target_name = "$main_target_name.${invoker.target_type}"
+
+  # This reaches the actual target, but also collects metadata to roll up into
+  # test_elf_load_set() targets.  The test_elf_object() target itself is enough
+  # to reach the real target as deps (for linking and packaging).  But if the
+  # real target has any public{,_deps,_configs} those need to be propagated as
+  # public_deps, so the group keeps the real target's public persona but also
+  # reaches the test_elf_object() without creating a circularity.
+  group(main_target_name) {
+    visibility = [ ":*" ]
+    testonly = true
+    public_deps = [ ":$shlib_target_name($shlib_toolchain)" ]
+    deps = [ ":$main_target_name.test-elf-object($shlib_toolchain)" ]
+  }
+
+  test_elf_object("$main_target_name.test-elf-object") {
+    visibility = [ ":*" ]
+    testonly = true
+    deps = [ ":$shlib_target_name" ]
+  }
 
   target(invoker.target_type, shlib_target_name) {
     visibility = [ ":*" ]
     testonly = true
 
+    output_name = main_target_name
     deps = []
     public_deps = []
     shlib_deps = []
@@ -171,6 +191,7 @@ template("_test_non_executable") {
                            "*",
                            [
                              "configs",
+                             "output_name",
                              "remove_configs",
                              "target_type",
                            ])
@@ -185,6 +206,10 @@ template("_test_non_executable") {
     if (defined(invoker.configs)) {
       configs += invoker.configs
     }
+
+    # Make sure a system dlopen loading the shared library as a dependency of
+    # another module will look for its own dependencies adjacent to it.
+    configs += [ ":runpath-origin" ]
 
     if (defined(invoker.remove_configs)) {
       configs += invoker.remove_configs
@@ -202,12 +227,12 @@ template("_test_non_executable") {
     # host_test_data() generates this copy() target with this metadata, but it
     # adds extra deps that don't work here and are only in host_test_data() for
     # issues with non-shlib variant binaries that don't apply here.
-    copy("$shlib_target_name.host-test-data") {
+    copy("$main_target_name.host-test-data") {
       visibility = [ ":*" ]
       testonly = true
 
       deps = [ ":$shlib_target_name" ]
-      sources = [ "$root_out_dir/$prefix$shlib_target_name.so" ]
+      sources = [ "$root_out_dir/$prefix$main_target_name.so" ]
 
       # TODO(https://fxbug.dev/333947906): copy targets to a variant dedicated dir.
       outputs = [ "$host_out_dir/test_data/elfldltl/{{source_file_part}}" ]
@@ -228,12 +253,7 @@ template("_test_non_executable") {
 template("test_shared_library") {
   _test_non_executable(target_name) {
     target_type = "shared_library"
-    configs = []
     forward_variables_from(invoker, "*", [ "target_type" ])
-
-    # Make sure a system dlopen loading the shared library as a dependency of
-    # another module will look for its own dependencies adjacent to it.
-    configs += [ ":runpath-origin" ]
   }
 }
 
@@ -273,15 +293,11 @@ template("test_loadable_module") {
 
   _test_non_executable(module_target) {
     target_type = "loadable_module"
-    configs = []
     data_deps = []
+    exclude_toolchain_tags = []
     forward_variables_from(invoker, "*", [ "target_type" ])
 
-    # Make sure a system dlopen loading the module will look for its
-    # dependencies adjacent to it.
-    configs += [ ":runpath-origin" ]
-
-    exclude_toolchain_tags = [ "instrumentation-runtime" ]
+    exclude_toolchain_tags += [ "instrumentation-runtime" ]
 
     if (!is_fuchsia && defined(invoker.shlib_deps)) {
       # On Fuchsia, the indirect deps are all reached as resource()
@@ -309,7 +325,7 @@ template("test_loadable_module") {
              "$current_toolchain is $toolchain_environment")
     }
     host_test_data("$module_target.host-test-data") {
-      deps = [ ":$module_target" ]
+      deps = [ ":$module_target.loadable_module" ]
       sources = [ "$root_out_dir/$module_target.so" ]
       outputs = [ "$host_out_dir/test_data/elfldltl/{{source_file_part}}" ]
     }
@@ -400,6 +416,22 @@ template("test_executable") {
         sources = [ "$root_out_dir/$executable_target$suffix$output_suffix" ]
         outputs = [ "$host_out_dir/test_data/elfldltl/{{source_file_part}}" ]
       }
+    }
+
+    # When this rolls up into a test_elf_source_set() target linked into the
+    # test, then ld::testing::TestElfLoadSet::Get("$executable_target") works.
+    test_elf_load_set("$executable_target$suffix.load-set") {
+      visibility = [ "../*" ]
+      output_name = executable_target + suffix
+      deps = [ ":$executable_target$suffix.test-elf-object" ]
+    }
+
+    # The executable / module itself comes first in the TestElfLoadSet,
+    # followed by its transitive deps.
+    test_elf_object("$executable_target$suffix.test-elf-object") {
+      visibility = [ ":*" ]
+      testonly = true
+      deps = [ ":$executable_target$suffix" ]
     }
   }
 }
