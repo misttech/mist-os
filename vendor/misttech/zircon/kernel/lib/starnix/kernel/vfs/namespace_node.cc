@@ -54,7 +54,7 @@ NamespaceNode NamespaceNode::new_anonymous_unrooted(FsNodeHandle node) {
 
 fit::result<Errno, FileHandle> NamespaceNode::open(const CurrentTask& current_task, OpenFlags flags,
                                                    bool check_access) const {
-  auto open_result = entry->node->open(current_task, mount, flags, check_access);
+  auto open_result = entry->node_->open(current_task, mount, flags, check_access);
   if (open_result.is_error())
     return open_result.take_error();
 
@@ -64,7 +64,9 @@ fit::result<Errno, FileHandle> NamespaceNode::open(const CurrentTask& current_ta
 fit::result<Errno, NamespaceNode> NamespaceNode::open_create_node(const CurrentTask& current_task,
                                                                   const FsStr& name, FileMode mode,
                                                                   DeviceType dev, OpenFlags flags) {
-  // LTRACEF_LEVEL(2, "name=%s, mode=0x%x\n", name.c_str(), mode.bits());
+  LTRACEF_LEVEL(2, "name=[%.*s],  mode=0x%x\n", static_cast<int>(name.length()), name.data(),
+                mode.bits());
+
   auto owner = current_task->as_fscred();
   auto _mode = current_task->fs()->apply_umask(mode);
 
@@ -91,7 +93,9 @@ fit::result<Errno, NamespaceNode> NamespaceNode::open_create_node(const CurrentT
 fit::result<Errno, NamespaceNode> NamespaceNode::create_node(const CurrentTask& current_task,
                                                              const FsStr& name, FileMode mode,
                                                              DeviceType dev) {
-  // LTRACEF_LEVEL(2, "name=%s, mode=0x%x\n", name.c_str(), mode.bits());
+  LTRACEF_LEVEL(2, "name=[%.*s],  mode=0x%x\n", static_cast<int>(name.length()), name.data(),
+                mode.bits());
+
   auto owner = current_task->as_fscred();
   auto _mode = current_task->fs()->apply_umask(mode);
   auto result = entry->create_entry(
@@ -118,9 +122,9 @@ fit::result<Errno, NamespaceNode> NamespaceNode::create_tmpfile(const CurrentTas
 fit::result<Errno, NamespaceNode> NamespaceNode::lookup_child(const CurrentTask& current_task,
                                                               LookupContext& context,
                                                               const FsStr& basename) const {
-  // LTRACEF_LEVEL(2, "basename=%s\n", basename.c_str());
+  LTRACEF_LEVEL(2, "basename=[%.*s]\n", static_cast<int>(basename.length()), basename.data());
 
-  if (!entry->node->is_dir()) {
+  if (!entry->node_->is_dir()) {
     return fit::error(errno(ENOTDIR));
   }
 
@@ -161,7 +165,7 @@ fit::result<Errno, NamespaceNode> NamespaceNode::lookup_child(const CurrentTask&
         return lookup_result.take_error();
       }
       auto child = with_new_entry(lookup_result.value());
-      while (child.entry->node->is_lnk()) {
+      while (child.entry->node_->is_lnk()) {
         switch (context.symlink_mode) {
           case NoFollow:
             break;
@@ -222,7 +226,7 @@ fit::result<Errno, NamespaceNode> NamespaceNode::lookup_child(const CurrentTask&
     return fit::error(errno(EXDEV));
   }
 
-  if (context.must_be_directory && !child.entry->node->is_dir()) {
+  if (context.must_be_directory && !child.entry->node_->is_dir()) {
     return fit::error(errno(ENOTDIR));
   }
 
@@ -323,7 +327,7 @@ PathWithReachability NamespaceNode::path_from_root(ktl::optional<NamespaceNode> 
 }
 
 fit::result<Errno, SymlinkTarget> NamespaceNode::readlink(const CurrentTask& current_task) const {
-  return entry->node->readlink(current_task);
+  return entry->node_->readlink(current_task);
 }
 
 fit::result<Errno> NamespaceNode::check_access(const CurrentTask& current_task,
