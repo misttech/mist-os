@@ -299,6 +299,12 @@ impl<PS: ParseStrategy> ParsedPolicy<PS> {
         self.types.data.iter().find(|x| x.name_bytes() == name.as_bytes())
     }
 
+    /// Returns the extensible bitmap describing the set of types/domains for which permission
+    /// checks are permissive.
+    pub(super) fn permissive_types(&self) -> &ExtensibleBitmap<PS> {
+        &self.permissive_map
+    }
+
     /// Returns the `Sensitivity` structure for the requested Id. Valid policies include definitions
     /// for all the Ids they refer to internally; supply some other Id will trigger a panic.
     pub(super) fn sensitivity(&self, id: SensitivityId) -> &Sensitivity<PS> {

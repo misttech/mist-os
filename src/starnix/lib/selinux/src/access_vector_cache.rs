@@ -20,6 +20,10 @@ pub trait Query {
         target_sid: SecurityId,
         target_class: AbstractObjectClass,
     ) -> AccessVector;
+
+    /// Returns true if permission checks for the specified `source_sid` should be permissive,
+    /// such that denials are logged, but not enforced.
+    fn is_permissive(&self, source_sid: SecurityId) -> bool;
 }
 
 /// An interface for computing the rights permitted to a source accessing a target of a particular
@@ -33,6 +37,10 @@ pub trait QueryMut {
         target_sid: SecurityId,
         target_class: AbstractObjectClass,
     ) -> AccessVector;
+
+    /// Returns true if permission checks for the specified `source_sid` should be permissive,
+    /// such that denials are logged, but not enforced.
+    fn is_permissive(&mut self, source_sid: SecurityId) -> bool;
 }
 
 impl<Q: Query> QueryMut for Q {
@@ -43,6 +51,10 @@ impl<Q: Query> QueryMut for Q {
         target_class: AbstractObjectClass,
     ) -> AccessVector {
         (self as &dyn Query).query(source_sid, target_sid, target_class)
+    }
+
+    fn is_permissive(&mut self, source_sid: SecurityId) -> bool {
+        (self as &dyn Query).is_permissive(source_sid)
     }
 }
 
@@ -83,6 +95,10 @@ impl Query for DenyAll {
         _target_class: AbstractObjectClass,
     ) -> AccessVector {
         AccessVector::NONE
+    }
+
+    fn is_permissive(&self, _source_sid: SecurityId) -> bool {
+        false
     }
 }
 
@@ -126,6 +142,10 @@ impl<D: QueryMut> QueryMut for Empty<D> {
         target_class: AbstractObjectClass,
     ) -> AccessVector {
         self.delegate.query(source_sid, target_sid, target_class)
+    }
+
+    fn is_permissive(&mut self, source_sid: SecurityId) -> bool {
+        self.delegate.is_permissive(source_sid)
     }
 }
 
@@ -218,6 +238,9 @@ impl<D: QueryMut, const SIZE: usize> QueryMut for Fixed<D, SIZE> {
 
         access_vector
     }
+    fn is_permissive(&mut self, source_sid: SecurityId) -> bool {
+        self.delegate.is_permissive(source_sid)
+    }
 }
 
 impl<D, const SIZE: usize> ResetMut for Fixed<D, SIZE> {
@@ -264,6 +287,10 @@ impl<D: QueryMut> Query for Locked<D> {
         target_class: AbstractObjectClass,
     ) -> AccessVector {
         self.delegate.lock().query(source_sid, target_sid, target_class)
+    }
+
+    fn is_permissive(&self, source_sid: SecurityId) -> bool {
+        self.delegate.lock().is_permissive(source_sid)
     }
 }
 
@@ -315,6 +342,10 @@ impl<Q: Query> Query for Arc<Q> {
     ) -> AccessVector {
         self.as_ref().query(source_sid, target_sid, target_class)
     }
+
+    fn is_permissive(&self, source_sid: SecurityId) -> bool {
+        self.as_ref().is_permissive(source_sid)
+    }
 }
 
 impl<R: Reset> Reset for Arc<R> {
@@ -333,6 +364,10 @@ impl<Q: Query> Query for Weak<Q> {
         self.upgrade()
             .map(|q| q.query(source_sid, target_sid, target_class))
             .unwrap_or(AccessVector::NONE)
+    }
+
+    fn is_permissive(&self, source_sid: SecurityId) -> bool {
+        self.upgrade().map(|q| q.is_permissive(source_sid)).unwrap_or(false)
     }
 }
 
@@ -381,6 +416,10 @@ impl<D: QueryMut + ResetMut> QueryMut for ThreadLocalQuery<D> {
 
         // Allow `self.delegate` to implement caching strategy and prepare response.
         self.delegate.query(source_sid, target_sid, target_class)
+    }
+
+    fn is_permissive(&mut self, source_sid: SecurityId) -> bool {
+        self.delegate.is_permissive(source_sid)
     }
 }
 
@@ -518,6 +557,10 @@ mod tests {
         ) -> AccessVector {
             self.query_count.fetch_add(1, Ordering::Relaxed);
             self.delegate.query(source_sid, target_sid, target_class)
+        }
+
+        fn is_permissive(&self, source_sid: SecurityId) -> bool {
+            self.delegate.is_permissive(source_sid)
         }
     }
 
@@ -703,6 +746,10 @@ mod starnix_tests {
             } else {
                 panic!("query found invalid policy: {}", policy);
             }
+        }
+
+        fn is_permissive(&self, _source_sid: SecurityId) -> bool {
+            false
         }
     }
 
@@ -1011,6 +1058,10 @@ mod starnix_tests {
             } else {
                 panic!("query found invalid policy: {}", policy);
             }
+        }
+
+        fn is_permissive(&self, _source_sid: SecurityId) -> bool {
+            false
         }
     }
 

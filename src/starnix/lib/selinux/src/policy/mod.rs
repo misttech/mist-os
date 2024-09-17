@@ -329,6 +329,11 @@ impl<PS: ParseStrategy> Policy<PS> {
         let type_ = self.0.parsed_policy().type_(bounded_type);
         type_.bounded_by() == Some(parent_type)
     }
+
+    /// Returns true if the policy has the marked the type/domain for permissive checks.
+    pub fn is_permissive(&self, type_: TypeId) -> bool {
+        self.0.parsed_policy().permissive_types().is_set(type_.0.get())
+    }
 }
 
 impl<PS: ParseStrategy> AccessVectorComputer for Policy<PS> {
@@ -355,11 +360,6 @@ impl<PS: ParseStrategy> AccessVectorComputer for Policy<PS> {
             }
         }
         Some(access_vector)
-    }
-
-    fn is_permissive(&self, _class: ObjectClass) -> bool {
-        // TODO: Lookup whether the corresponding ClassId (if any) is in `permissive_map`!
-        false
     }
 }
 
@@ -397,10 +397,6 @@ pub trait AccessVectorComputer {
         &self,
         permissions: &[P],
     ) -> Option<AccessVector>;
-
-    /// Returns true if permission checks for the specified class should be permissive,
-    /// such that denials are logged, but not enforced.
-    fn is_permissive(&self, class: ObjectClass) -> bool;
 }
 
 /// A data structure that can be parsed as a part of a binary policy.

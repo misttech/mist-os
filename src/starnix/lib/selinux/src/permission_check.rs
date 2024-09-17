@@ -85,7 +85,7 @@ fn has_permission<P: ClassPermission + Into<Permission> + Clone + 'static>(
     if has_permission {
         PermissionCheckResult { permit: true, audit }
     } else {
-        PermissionCheckResult { permit: access_vector_computer.is_permissive(target_class), audit }
+        PermissionCheckResult { permit: query.is_permissive(source_sid), audit }
     }
 }
 
@@ -95,7 +95,7 @@ mod tests {
     use crate::access_vector_cache::DenyAll;
     use crate::policy::testing::{ACCESS_VECTOR_0001, ACCESS_VECTOR_0010};
     use crate::policy::AccessVector;
-    use crate::{AbstractObjectClass, ObjectClass, ProcessPermission};
+    use crate::{AbstractObjectClass, ProcessPermission};
 
     use std::any::Any;
     use std::num::NonZeroU32;
@@ -152,6 +152,10 @@ mod tests {
         ) -> AccessVector {
             self.0.query(source_sid, target_sid, target_class)
         }
+
+        fn is_permissive(&self, _source_sid: SecurityId) -> bool {
+            false
+        }
     }
 
     impl AccessVectorComputer for DenyAllPermissions {
@@ -162,10 +166,6 @@ mod tests {
             permissions: &[P],
         ) -> Option<AccessVector> {
             Some(access_vector_from_permissions(permissions))
-        }
-
-        fn is_permissive(&self, _class: ObjectClass) -> bool {
-            false
         }
     }
 
@@ -182,6 +182,10 @@ mod tests {
         ) -> AccessVector {
             AccessVector::ALL
         }
+
+        fn is_permissive(&self, _source_sid: SecurityId) -> bool {
+            false
+        }
     }
 
     impl AccessVectorComputer for AllowAllPermissions {
@@ -192,10 +196,6 @@ mod tests {
             permissions: &[P],
         ) -> Option<AccessVector> {
             Some(access_vector_from_permissions(permissions))
-        }
-
-        fn is_permissive(&self, _class: ObjectClass) -> bool {
-            false
         }
     }
 

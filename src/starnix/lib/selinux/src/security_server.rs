@@ -565,6 +565,18 @@ impl Query for SecurityServer {
     ) -> AccessVector {
         self.compute_access_vector(source_sid, target_sid, target_class)
     }
+
+    fn is_permissive(&self, source_sid: SecurityId) -> bool {
+        let state = self.state.lock();
+        if !state.enforcing {
+            true
+        } else if let Some(policy) = &state.policy {
+            let source_context = state.sid_to_security_context(source_sid);
+            policy.parsed.is_permissive(source_context.type_())
+        } else {
+            true
+        }
+    }
 }
 
 impl AccessVectorComputer for SecurityServer {
@@ -575,17 +587,6 @@ impl AccessVectorComputer for SecurityServer {
         match &self.state.lock().policy {
             Some(policy) => policy.parsed.access_vector_from_permissions(permissions),
             None => Some(AccessVector::NONE),
-        }
-    }
-
-    fn is_permissive(&self, class: ObjectClass) -> bool {
-        let state = self.state.lock();
-        if !state.enforcing {
-            true
-        } else if let Some(policy) = &state.policy {
-            policy.parsed.is_permissive(class)
-        } else {
-            true
         }
     }
 }
@@ -1092,5 +1093,46 @@ mod tests {
 
         // Test policy does not grant "type0" the process-getrlimit permission to itself.
         assert!(!permission_check.has_permission(sid, sid, ProcessPermission::GetRlimit).permit);
+    }
+
+    #[test]
+    fn permissive_domain() {
+        let security_server = security_server_with_tests_policy();
+        security_server.set_enforcing(true);
+        assert!(security_server.is_enforcing());
+
+        let permissive_sid = security_server
+            .security_context_to_sid("user0:object_r:permissive_t:s0".into())
+            .unwrap();
+        let non_permissive_sid = security_server
+            .security_context_to_sid("user0:object_r:non_permissive_t:s0".into())
+            .unwrap();
+
+        let permission_check = security_server.as_permission_check();
+
+        // Test policy grants process-getsched permission to both of the test domains.
+        assert!(
+            permission_check
+                .has_permission(permissive_sid, permissive_sid, ProcessPermission::GetSched)
+                .permit
+        );
+        assert!(
+            permission_check
+                .has_permission(non_permissive_sid, non_permissive_sid, ProcessPermission::GetSched)
+                .permit
+        );
+
+        // Test policy does not grant process-getsched permission to the test domains on one another.
+        // The permissive domain will be granted the permission, since it is marked permissive.
+        assert!(
+            permission_check
+                .has_permission(permissive_sid, non_permissive_sid, ProcessPermission::GetSched)
+                .permit
+        );
+        assert!(
+            !permission_check
+                .has_permission(non_permissive_sid, permissive_sid, ProcessPermission::GetSched)
+                .permit
+        );
     }
 }
