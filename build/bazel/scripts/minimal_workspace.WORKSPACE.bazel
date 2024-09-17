@@ -8,7 +8,7 @@ workspace(name = "main")
 # and the Fuchsia Bazel SDK rules.
 local_repository(
     name = "fuchsia_sdk_common",
-    path = "build/bazel_sdk/bazel_rules_fuchsia/common",
+    path = "build/bazel_sdk/local_repositories/fuchsia_sdk_common",
 )
 
 # Create the @fuchsia_build_config repository which contains the defs.bzl file
@@ -16,7 +16,7 @@ local_repository(
 # the Fuchsia platform build.
 # buildifier: disable=load-on-top
 load(
-    "@fuchsia_sdk_common//:fuchsia_platform_build.bzl",
+    "@fuchsia_sdk_common//common:fuchsia_platform_build.bzl",
     "fuchsia_build_config_repository",
 )
 

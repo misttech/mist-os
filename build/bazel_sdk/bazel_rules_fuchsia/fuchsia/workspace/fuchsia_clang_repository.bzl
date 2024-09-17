@@ -82,19 +82,7 @@ def _fuchsia_clang_repository_impl(ctx):
     ctx.path(defs_template_file)
 
     # Symlink in common toolchain helpers.
-    _common_helpers = [
-        "platforms/BUILD.bazel",
-        "platforms/utils.bzl",
-        "toolchains/clang/clang_utils.bzl",
-        "toolchains/clang/providers.bzl",
-        "toolchains/clang/repository_utils.bzl",
-        "toolchains/clang/sanitizer.bzl",
-        "toolchains/clang/toolchain_utils.bzl",
-    ]
-    for p in _common_helpers:
-        l = Label("//common:{}".format(p))
-        ctx.path(l)
-        ctx.symlink(l, p)
+    ctx.symlink(Label("//:common"), "common")
 
     ctx.file("WORKSPACE.bazel", content = "", executable = False)
 

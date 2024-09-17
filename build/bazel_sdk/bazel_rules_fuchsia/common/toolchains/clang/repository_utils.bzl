@@ -5,13 +5,10 @@
 """Utilities related to Clang repositories. See README.md for details."""
 
 load("@bazel_skylib//lib:paths.bzl", "paths")
-
-# Note: This is not a self-reference as //tools/clang is not a package, so we're
-# actually loading //:repository_utils.bzl.
-load("//:repository_utils.bzl", "get_fuchsia_host_arch", "get_fuchsia_host_os")
-load("//:toolchains/clang/clang_utils.bzl", "process_clang_builtins_output")
-load("//:toolchains/clang/providers.bzl", "ClangInfo")
-load("//:toolchains/clang/toolchain_utils.bzl", "define_clang_runtime_filegroups")
+load("//common:repository_utils.bzl", "get_fuchsia_host_arch", "get_fuchsia_host_os")
+load("//common:toolchains/clang/clang_utils.bzl", "process_clang_builtins_output")
+load("//common:toolchains/clang/providers.bzl", "ClangInfo")
+load("//common:toolchains/clang/toolchain_utils.bzl", "define_clang_runtime_filegroups")
 
 def prepare_clang_repository(repo_ctx, clang_install_dir):
     """Prepare a repository directory for a clang toolchain creation.
@@ -156,7 +153,7 @@ _clang_info_target = rule(
 )
 
 # buildifier: disable=unnamed-macro
-def setup_clang_repository(constants, common_package_prefix):
+def setup_clang_repository(constants):
     """Create a few required targets in a Clang repository.
 
     This function should be called early from the top-level BUILD.bazel
@@ -165,11 +162,8 @@ def setup_clang_repository(constants, common_package_prefix):
 
     Args:
       constants: The value written to generated_constants.bzl by
-          a call to prepare_clang_repository() that was performed in the
-          repository rule for the current Clang repository.
-
-      common_package_prefix: An optional label for the package containing
-          common definitions for SDK and in-tree workspaces.
+         a call to prepare_clang_repository() that was performed in the
+         repository rule for the current Clang repository.
     """
 
     # Define the top-level `clang_info` target used to expose
@@ -183,7 +177,7 @@ def setup_clang_repository(constants, common_package_prefix):
         fuchsia_host_os = constants.fuchsia_host_os,
     )
 
-    define_clang_runtime_filegroups(constants, common_package_prefix)
+    define_clang_runtime_filegroups(constants)
 
     # The following filegroups are referenced from toolchain definitions
     # created by the generate_clang_cc_toolchain() function from

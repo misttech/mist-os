@@ -10,11 +10,11 @@ load(
 )
 load("@fuchsia_build_config//:defs.bzl", "build_config")
 load(
-    "@fuchsia_sdk_common//:toolchains/clang/clang_utils_test.bzl",
+    "@fuchsia_sdk_common//common:toolchains/clang/clang_utils_test.bzl",
     "include_clang_utils_test_suite",
 )
 load(
-    "@fuchsia_sdk_common//:toolchains/clang/repository_utils.bzl",
+    "@fuchsia_sdk_common//common:toolchains/clang/repository_utils.bzl",
     "setup_clang_repository",
 )
 load(":generated_constants.bzl", "constants")
@@ -25,7 +25,7 @@ exports_files(
     glob(["**/*"]),
 )
 
-setup_clang_repository(constants, "@fuchsia_sdk_common//")
+setup_clang_repository(constants)
 
 define_host_prebuilt_clang_cc_toolchains("host_clang", build_config.host_os, build_config.host_arch)
 

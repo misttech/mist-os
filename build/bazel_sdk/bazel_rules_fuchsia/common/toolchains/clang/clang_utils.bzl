@@ -5,7 +5,7 @@
 """Utilities related to Clang."""
 
 load(
-    "//platforms:utils.bzl",
+    "//common/platforms:utils.bzl",
     "all_target_tags",
     "target_tag_dict_to_select_keys",
     "to_bazel_cpu_name",
@@ -205,7 +205,7 @@ def format_labels_list_to_target_tag_dict(
         for target_tag in target_tags
     }
 
-def format_labels_list_to_target_tag_native_glob_select(labels, target_tags = None, extra_dict = None, common_package_prefix = ""):
+def format_labels_list_to_target_tag_native_glob_select(labels, target_tags = None, extra_dict = None, common_package_prefix = "//common"):
     """Format a list of label patterns into a select() statement.
 
     The result is a select() statement whose keys are config_setting() labels
@@ -214,14 +214,12 @@ def format_labels_list_to_target_tag_native_glob_select(labels, target_tags = No
 
     Args:
         labels: A list of label strings which can contain substitution
-            expressions that will be expanded by this function.
+           expressions that will be expanded by this function.
         target_tags: An optional list of target tags to populate the
-            result dictionary's keys. If None (the default), all supported
-            target tags will be used.
+           result dictionary's keys. If None (the default), all supported
+           target tags will be used.
         extra_dict: An optional dictionary containing additional arguments
-            for the string expansion.
-        common_package_prefix: An optional label for the package containing
-            common definitions for SDK and in-tree workspaces.
+           for the string expansion.
 
     Example:
 

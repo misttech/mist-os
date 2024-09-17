@@ -14,12 +14,12 @@ load(
     "with_feature_set",
 )
 load(
-    "//:toolchains/clang/clang_utils.bzl",
+    "//common:toolchains/clang/clang_utils.bzl",
     "format_labels_list_to_target_tag_native_glob_select",
 )
-load("//:toolchains/clang/providers.bzl", "ClangInfo")
-load("//:toolchains/clang/sanitizer.bzl", "sanitizer_features")
-load("//platforms:utils.bzl", "to_fuchsia_cpu_name", "to_fuchsia_os_name")
+load("//common:toolchains/clang/providers.bzl", "ClangInfo")
+load("//common:toolchains/clang/sanitizer.bzl", "sanitizer_features")
+load("//common/platforms:utils.bzl", "to_fuchsia_cpu_name", "to_fuchsia_os_name")
 
 _all_actions = [
     ACTION_NAMES.assemble,
@@ -289,13 +289,11 @@ def compute_clang_features(host_os, host_cpu, target_os, target_cpu):
     return features
 
 # buildifier: disable=unnamed-macro
-def define_clang_runtime_filegroups(clang_constants, common_package_prefix):
+def define_clang_runtime_filegroups(clang_constants):
     """Generate filegroups for Clang runtime headers and libraries.
 
     Args:
       clang_constants: A struct containing Clang configuration information.
-      common_package_prefix: Optional label for the package containing common
-          definitions between the Bazel SDK and Fuchsia in-tree workspaces.
 
     Returns:
       A struct giving the names of the filegroups for the headers and runtime
@@ -314,7 +312,6 @@ def define_clang_runtime_filegroups(clang_constants, common_package_prefix):
             "include/{clang_target_tuple}/c++/v1/__config_site",
             "include/{clang_target_tuple}/*/c++/v1/__config_site",
         ],
-        common_package_prefix = common_package_prefix,
     )
 
     native.filegroup(
@@ -357,12 +354,9 @@ def define_clang_runtime_filegroups(clang_constants, common_package_prefix):
             #   noexcept/
             #     ...
             #
-            format_labels_list_to_target_tag_native_glob_select(
-                [
-                    "lib/{clang_target_tuple}/**",
-                ],
-                common_package_prefix = common_package_prefix,
-            ) +
+            format_labels_list_to_target_tag_native_glob_select([
+                "lib/{clang_target_tuple}/**",
+            ]) +
             # This contains the Clang runtime libraries, including all
             # their variants. Because individual targets can select a different
             # sanitizer mode than the default for the current build operation,
@@ -394,7 +388,6 @@ def define_clang_runtime_filegroups(clang_constants, common_package_prefix):
                 extra_dict = {
                     "internal_dir": clang_constants.lib_clang_internal_dir,
                 },
-                common_package_prefix = common_package_prefix,
             ),
     )
 

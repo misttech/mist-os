@@ -5,12 +5,12 @@
 """Misc utilities that are related to the Fuchsia platform build only."""
 
 load(
-    "//:repository_utils.bzl",
+    "//common:repository_utils.bzl",
     "get_fuchsia_host_arch",
     "get_fuchsia_host_os",
 )
 load(
-    "//:toolchains/clang/clang_utils.bzl",
+    "//common:toolchains/clang/clang_utils.bzl",
     "to_clang_target_tuple",
 )
 

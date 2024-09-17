@@ -16,9 +16,9 @@ load(
     "find_cpp_toolchain",
     "use_cpp_toolchain",
 )
-load("@fuchsia_clang//:cc_features.bzl", "features")
-load("@fuchsia_clang//:toolchains/clang/toolchain_utils.bzl", "compute_clang_features")
-load("//platforms:utils.bzl", "to_fuchsia_cpu_name")
+load("//:cc_features.bzl", "features")
+load("//common:toolchains/clang/toolchain_utils.bzl", "compute_clang_features")
+load("//common/platforms:utils.bzl", "to_fuchsia_cpu_name")
 
 def bazel_cpu_to_fuchsia_cpu(cpu):
     """Converts the Bazel cpu type to the Fuchsia cpu"""

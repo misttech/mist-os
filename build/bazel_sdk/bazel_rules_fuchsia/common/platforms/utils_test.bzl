@@ -6,7 +6,7 @@
 
 load("@bazel_skylib//lib:unittest.bzl", "asserts", "unittest")
 load(
-    "//platforms:utils.bzl",
+    "//common/platforms:utils.bzl",
     "config_setting_label_for_target_os_cpu",
     "config_setting_label_for_target_tag",
     "target_tag_dict_to_select_keys",
@@ -124,7 +124,7 @@ def _test_config_setting_label_for_target_os_cpu(env):
         ("osx", "aarch64", "//common/platforms:is_mac_arm64"),
     ]
     for os, cpu, expected in cases:
-        asserts.equals(env, expected, config_setting_label_for_target_os_cpu(os, cpu, "//common"))
+        asserts.equals(env, expected, config_setting_label_for_target_os_cpu(os, cpu))
 
 def _test_config_setting_label_for_target_tag(env):
     cases = [
@@ -138,7 +138,7 @@ def _test_config_setting_label_for_target_tag(env):
         ("mac-arm64", "//common/platforms:is_mac_arm64"),
     ]
     for input, expected in cases:
-        asserts.equals(env, expected, config_setting_label_for_target_tag(input, "//common"))
+        asserts.equals(env, expected, config_setting_label_for_target_tag(input))
 
 def _test_target_tag_dict_to_select_keys(env):
     cases = [
@@ -156,7 +156,7 @@ def _test_target_tag_dict_to_select_keys(env):
         ),
     ]
     for input_dict, expected_dict in cases:
-        asserts.equals(env, expected_dict, target_tag_dict_to_select_keys(input_dict, "//common"))
+        asserts.equals(env, expected_dict, target_tag_dict_to_select_keys(input_dict))
         expected_dict_with_default = expected_dict | {
             "//conditions:default": ["default label"],
         }
