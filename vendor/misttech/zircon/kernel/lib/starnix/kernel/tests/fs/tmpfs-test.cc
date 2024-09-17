@@ -16,6 +16,7 @@
 #include <lib/mistos/starnix/kernel/vfs/fs_node.h>
 #include <lib/mistos/starnix/kernel/vfs/path.h>
 #include <lib/mistos/starnix/testing/testing.h>
+#include <lib/mistos/starnix_uapi/open_flags.h>
 #include <lib/unittest/unittest.h>
 
 #include <fbl/vector.h>
@@ -88,6 +89,59 @@ bool test_write_read() {
   END_TEST;
 }
 
+bool test_permissions() {
+  BEGIN_TEST;
+  auto [kernel, current_task] = starnix::testing::create_kernel_task_and_unlocked();
+
+  FsStr path("test.bin");
+  auto file = (*current_task)
+                  .open_file_at(FdNumber::_AT_FDCWD, path,
+                                OpenFlags(OpenFlagsEnum::CREAT) | OpenFlags(OpenFlagsEnum::RDONLY),
+                                FileMode::from_bits(0777), ResolveFlags::empty());
+
+  ASSERT_TRUE(file.is_ok(), "failed to create file");
+
+  END_TEST;
+}
+
+bool test_persistence() {
+  BEGIN_TEST;
+  auto [kernel, current_task] = starnix::testing::create_kernel_task_and_unlocked();
+
+  {
+    auto root = current_task->fs()->root().entry;
+    auto usr = root->create_dir(*current_task, "usr").value();
+    auto _etc = root->create_dir(*current_task, "etc").value();
+    auto _usr_bin = usr->create_dir(*current_task, "bin").value();
+  }
+
+  // At this point, all the nodes are dropped.
+
+  auto _file = (*current_task)
+                   .open_file("/usr/bin", OpenFlags(OpenFlagsEnum::RDONLY) |
+                                              OpenFlags(OpenFlagsEnum::DIRECTORY));
+  ASSERT_TRUE(_file.is_ok(), "failed to open /usr/bin");
+  ASSERT_EQ(errno(ENOENT).error_code(),
+            (*current_task)
+                .open_file("/usr/bin/test.txt", OpenFlags(OpenFlagsEnum::RDWR))
+                .error_value()
+                .error_code());
+  auto _txt = (*current_task)
+                  .open_file_at(FdNumber::_AT_FDCWD, "/usr/bin/test.txt",
+                                OpenFlags(OpenFlagsEnum::RDWR) | OpenFlags(OpenFlagsEnum::CREAT),
+                                FileMode::from_bits(0777), ResolveFlags::empty());
+  auto txt = (*current_task).open_file("/usr/bin/test.txt", OpenFlags(OpenFlagsEnum::RDWR));
+  ASSERT_TRUE(txt.is_ok(), "failed to open test.txt");
+
+  auto usr_bin = (*current_task).open_file("/usr/bin", OpenFlags(OpenFlagsEnum::RDONLY));
+  ASSERT_TRUE(usr_bin.is_ok(), "failed to open /usr/bin");
+
+  // TODO (Herrera) add missing method unlink
+  // usr_bin->name->unlink();
+
+  END_TEST;
+}
+
 bool test_data() {
   BEGIN_TEST;
 
@@ -113,5 +167,7 @@ bool test_data() {
 UNITTEST_START_TESTCASE(starnix_fs_tmpfs)
 UNITTEST("test tmpfs", unit_testing::test_tmpfs)
 UNITTEST("test write read", unit_testing::test_write_read)
+UNITTEST("test permissions", unit_testing::test_permissions)
+// UNITTEST("test persistence", unit_testing::test_persistence)
 UNITTEST("test data", unit_testing::test_data)
 UNITTEST_END_TESTCASE(starnix_fs_tmpfs, "starnix_fs_tmpfs", "Tests for starnix tempfs")
