@@ -287,13 +287,14 @@ impl<T: EngineOperations> EmuStartTool<T> {
 
                 if reused {
                     self.cmd.reuse = true;
-                    let message = "Reusing existing instance.";
+                    let message = "[emulator] Reusing existing instance.";
                     tracing::info!("{message}");
                     writer.line(message)?;
                 } else {
                     // They do not match, so don't reuse and reset the engine.
                     self.cmd.reuse = false;
-                    let message = "Created new instance. Product bundle data has changed.";
+                    let message =
+                        "[emulator] Created new instance. Product bundle data has changed.";
                     tracing::info!("{message}");
                     writer.line(message)?;
                 }
@@ -326,12 +327,12 @@ impl<T: EngineOperations> EmuStartTool<T> {
                         .context("Failed to process the flags template file.")?;
 
                     engine.save_to_disk().await?;
-                    let message = "Reusing existing instance.";
+                    let message = "[emulator] Reusing existing instance.";
                     tracing::info!("{message}");
                     writer.line(message)?;
                 } else {
                     let message = format!(
-                        "Instance '{name}' not found with --reuse flag. \
+                        "[emulator] Instance '{name}' not found with --reuse flag. \
                         Creating a new emulator named '{name}'.",
                         name = emulator_configuration.runtime.name
                     );
