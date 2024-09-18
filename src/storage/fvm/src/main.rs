@@ -537,6 +537,24 @@ impl Fvm {
         let slices = slices as u64;
         let mappings = new_metadata.allocate_slices(proposed, 0, slices, max_slice)?;
 
+        let mut inner = self.write_new_metadata(inner, new_metadata).await?;
+
+        inner.assigned_slice_count = inner.assigned_slice_count.checked_add(slices).unwrap();
+        inner.partition_state.insert(proposed, PartitionState { mappings, slice_limit: 0 });
+
+        Ok(proposed)
+    }
+
+    fn max_slice(&self, metadata: &Metadata) -> u64 {
+        (self.device.block_count() * self.device.block_size() as u64 - metadata.header.data_start())
+            / metadata.header.slice_size
+    }
+
+    async fn write_new_metadata<'a>(
+        &self,
+        inner: async_lock::RwLockUpgradableReadGuard<'a, Inner>,
+        mut new_metadata: Metadata,
+    ) -> Result<async_lock::RwLockWriteGuard<'a, Inner>, Error> {
         new_metadata.header.generation = new_metadata
             .header
             .generation
@@ -550,15 +568,8 @@ impl Fvm {
 
         inner.slot = new_slot;
         inner.metadata = new_metadata;
-        inner.assigned_slice_count = inner.assigned_slice_count.checked_add(slices).unwrap();
-        inner.partition_state.insert(proposed, PartitionState { mappings, slice_limit: 0 });
 
-        Ok(proposed)
-    }
-
-    fn max_slice(&self, metadata: &Metadata) -> u64 {
-        (self.device.block_count() * self.device.block_size() as u64 - metadata.header.data_start())
-            / metadata.header.slice_size
+        Ok(inner)
     }
 }
 
@@ -760,9 +771,9 @@ impl Component {
                         .map_err(map_to_raw_status),
                     )?;
                 }
-                VolumesRequest::Remove { responder, .. } => {
-                    // TODO(https://fxbug.dev/357467643): Implement this.
-                    responder.send(Err(zx::Status::NOT_SUPPORTED.into_raw()))?;
+                VolumesRequest::Remove { responder, name } => {
+                    responder
+                        .send(self.handle_remove_volume(&name).await.map_err(map_to_raw_status))?;
                 }
             }
         }
@@ -902,6 +913,41 @@ impl Component {
             warn!(?error, "Created partition {name}, but failed to mount");
             error
         })
+    }
+
+    async fn handle_remove_volume(self: &Arc<Self>, name: &str) -> Result<(), Error> {
+        let fvm = self.fvm.lock().unwrap().as_ref().unwrap().clone();
+        let inner = fvm.inner.upgradable_read().await;
+        let Some((&partition_index, _)) =
+            inner.metadata.partitions.iter().find(|(_, p)| p.name() == name)
+        else {
+            bail!(zx::Status::NOT_FOUND);
+        };
+        ensure!(
+            !self.mounted.lock().unwrap().contains_key(&partition_index),
+            zx::Status::ALREADY_BOUND
+        );
+        let mut new_metadata = inner.metadata.clone();
+        let mut removed_slices = 0u64;
+        for slice_entry in &mut new_metadata.allocations {
+            if slice_entry.partition_index() == partition_index {
+                slice_entry.0 = 0;
+                removed_slices += 1;
+            }
+        }
+        if new_metadata.partitions.remove(&partition_index).unwrap().slices as u64 != removed_slices
+        {
+            warn!("Mismatch between removed slices and assigned slices");
+        }
+        let mut inner = fvm.write_new_metadata(inner, new_metadata).await?;
+        inner.assigned_slice_count -= removed_slices;
+        inner.partition_state.remove(&partition_index);
+
+        if let Err(error) = self.volumes_directory.remove_entry(name, false) {
+            warn!(?error, "Removed volume from FVM, but failed to remove entry from directory");
+        }
+
+        Ok(())
     }
 }
 
@@ -1103,19 +1149,9 @@ impl Interface for PartitionInterface {
             max_slice,
         )?;
 
-        new_metadata.header.generation =
-            new_metadata.header.generation.checked_add(1).ok_or(zx::Status::BAD_STATE)?;
+        let mut inner =
+            self.fvm.write_new_metadata(inner, new_metadata).await.map_err(map_to_status)?;
 
-        let new_slot = 1 - inner.slot;
-        new_metadata
-            .write(&self.fvm.device, new_metadata.header.offset_for_slot(new_slot))
-            .await
-            .map_err(map_to_status)?;
-
-        let mut inner = async_lock::RwLockUpgradableReadGuard::upgrade(inner).await;
-
-        inner.slot = new_slot;
-        inner.metadata = new_metadata;
         inner.assigned_slice_count = inner.assigned_slice_count.checked_add(slice_count).unwrap();
 
         inner
@@ -1174,22 +1210,12 @@ impl Interface for PartitionInterface {
             }
         }
 
-        new_metadata.header.generation =
-            new_metadata.header.generation.checked_add(1).ok_or(zx::Status::BAD_STATE)?;
-
         let slices = &mut new_metadata.partitions.get_mut(&self.partition_index).unwrap().slices;
         *slices = slices.saturating_sub(slice_count as u32);
 
-        let new_slot = 1 - inner.slot;
-        new_metadata
-            .write(&self.fvm.device, new_metadata.header.offset_for_slot(new_slot))
-            .await
-            .map_err(map_to_status)?;
+        let mut inner =
+            self.fvm.write_new_metadata(inner, new_metadata).await.map_err(map_to_status)?;
 
-        let mut inner = async_lock::RwLockUpgradableReadGuard::upgrade(inner).await;
-
-        inner.slot = new_slot;
-        inner.metadata = new_metadata;
         inner.assigned_slice_count = inner.assigned_slice_count.checked_sub(slice_count).unwrap();
 
         let mappings = &mut inner.partition_state.get_mut(&self.partition_index).unwrap().mappings;
@@ -1277,6 +1303,8 @@ mod tests {
     use fuchsia_component::client::{
         connect_to_named_protocol_at_dir_root, connect_to_protocol_at_dir_svc,
     };
+    use fuchsia_fs::directory::{open_directory_deprecated, readdir};
+    use std::collections::HashSet;
     use std::sync::atomic::{AtomicBool, Ordering};
     use std::sync::Arc;
     use {
@@ -1602,6 +1630,100 @@ mod tests {
                     .expect("mount failed");
             }
         }
+    }
+
+    #[fuchsia::test]
+    async fn test_remove_volume() {
+        let fixture = Fixture::new(SLICE_SIZE).await;
+
+        let volumes_proxy =
+            connect_to_protocol_at_dir_svc::<VolumesMarker>(&fixture.outgoing_dir).unwrap();
+
+        let (_dir_proxy, dir_server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
+            .expect("Create proxy to succeed");
+        volumes_proxy
+            .create(
+                "foo",
+                dir_server_end,
+                CreateOptions { type_guid: Some([1; 16]), ..CreateOptions::default() },
+                MountOptions::default(),
+            )
+            .await
+            .expect("create failed (FIDL)")
+            .expect("create failed");
+
+        // Creating another volume should fail because there won't be enough space.
+        let (_dir_proxy, dir_server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
+            .expect("Create proxy to succeed");
+        assert_eq!(
+            volumes_proxy
+                .create(
+                    "bar",
+                    dir_server_end,
+                    CreateOptions { type_guid: Some([1; 16]), ..CreateOptions::default() },
+                    MountOptions::default(),
+                )
+                .await
+                .expect("create failed (FIDL)"),
+            Err(zx::sys::ZX_ERR_NO_SPACE)
+        );
+
+        // Should fail because the volume is mounted.
+        assert_eq!(
+            volumes_proxy.remove("foo").await.expect("remove failed (FIDL)"),
+            Err(zx::sys::ZX_ERR_ALREADY_BOUND)
+        );
+
+        let fixture = Fixture::from_fake_server(fixture.take_fake_server()).await;
+        let volumes_proxy =
+            connect_to_protocol_at_dir_svc::<VolumesMarker>(&fixture.outgoing_dir).unwrap();
+
+        volumes_proxy.remove("foo").await.expect("remove failed (FIDL)").expect("remove failed");
+
+        // Creating should now succeed.
+        let (_dir_proxy, dir_server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
+            .expect("Create proxy to succeed");
+        volumes_proxy
+            .create(
+                "bar",
+                dir_server_end,
+                CreateOptions { type_guid: Some([1; 16]), ..CreateOptions::default() },
+                MountOptions::default(),
+            )
+            .await
+            .expect("create failed (FIDL)")
+            .expect("create failed");
+
+        let expected = HashSet::from(["bar".to_string(), "blobfs".to_string(), "data".to_string()]);
+        let volumes_dir =
+            open_directory_deprecated(&fixture.outgoing_dir, "volumes", fio::OpenFlags::empty())
+                .await
+                .unwrap();
+        assert_eq!(
+            &readdir(&volumes_dir)
+                .await
+                .unwrap()
+                .into_iter()
+                .map(|d| d.name)
+                .collect::<HashSet<_>>(),
+            &expected,
+        );
+
+        // Check again after a remount.
+        let fixture = Fixture::from_fake_server(fixture.take_fake_server()).await;
+        let volumes_dir =
+            open_directory_deprecated(&fixture.outgoing_dir, "volumes", fio::OpenFlags::empty())
+                .await
+                .unwrap();
+        assert_eq!(
+            &readdir(&volumes_dir)
+                .await
+                .unwrap()
+                .into_iter()
+                .map(|d| d.name)
+                .collect::<HashSet<_>>(),
+            &expected,
+        );
     }
 
     #[fuchsia::test]
