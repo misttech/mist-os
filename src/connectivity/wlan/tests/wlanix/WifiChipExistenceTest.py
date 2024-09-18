@@ -6,40 +6,16 @@ Test that the device has at least one WifiChip.
 """
 
 import asyncio
-import logging
 
 import fidl.fuchsia_wlan_wlanix as fidl_wlanix
 from antlion import base_test
-from antlion.controllers import fuchsia_device
 from fuchsia_controller_py import Channel
-from honeydew.typing.custom_types import FidlEndpoint
 from mobly import test_runner
-from mobly.asserts import abort_class_if, assert_greater, assert_is_not
+from mobly.asserts import assert_greater, assert_is_not
+from wlanix_testing import base_test
 
 
-class WifiChipExistenceTest(base_test.AntlionBaseTest):
-    log: logging.Logger
-    wlanix_proxy: fidl_wlanix.Wlanix.Client
-
-    def setup_class(self) -> None:
-        self.log = logging.getLogger()
-        fuchsia_devices = self.register_controller(fuchsia_device)
-
-        abort_class_if(
-            len(fuchsia_devices) != 1, "Requires exactly one Fuchsia device"
-        )
-        abort_class_if(
-            fuchsia_devices[0].honeydew_fd is None,
-            "Requires a Honeydew-enabled FuchsiaDevice",
-        )
-        self.wlanix_proxy = fidl_wlanix.Wlanix.Client(
-            fuchsia_devices[
-                0
-            ].honeydew_fd.fuchsia_controller.connect_device_proxy(
-                FidlEndpoint("core/wlanix", "fuchsia.wlan.wlanix.Wlanix")
-            )
-        )
-
+class WifiChipExistenceTest(base_test.WlanixBaseTestClass):
     def test_get_chip_ids(self) -> None:
         proxy, server = Channel.create()
         self.wlanix_proxy.get_wifi(wifi=server.take())
