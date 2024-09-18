@@ -71,7 +71,6 @@ def main() -> None:
             real_flags, config_file=config_file, replay_mode=replay_mode
         )
     )
-    signals.register_on_terminate_signal(fut.cancel)  # type: ignore[arg-type]
     try:
         loop = asyncio.get_event_loop()
         loop.run_until_complete(fut)
@@ -109,24 +108,73 @@ async def async_main_wrapper(
     if recorder is None:
         recorder = event.EventRecorder()
 
-    wrapper = AsyncMain(flags, tasks, recorder, config_file, replay_mode)
-    ret = await wrapper.main()
+    end_execution_request_event = asyncio.Event()
+    termination_callback_event = asyncio.Event()
+
+    wrapper = AsyncMain(
+        flags,
+        tasks,
+        recorder,
+        end_execution_request_event,
+        termination_callback_event,
+        config_file,
+        replay_mode,
+    )
+
+    wrapper_task = asyncio.Task(wrapper.main())
+
+    def terminate_handler() -> None:
+        end_execution_request_event.set()
+        signals.unregister_all_termination_signals()
+
+        def kill_handler() -> None:
+            """Immediately cancel and await remaining tasks."""
+            wrapper_task.cancel()
+            for task in tasks:
+                task.cancel()
+            print(
+                statusinfo.error_highlight(
+                    "\nImmediately stopping execution and exiting...",
+                    style=flags.style,
+                ),
+                file=sys.stderr,
+            )
+
+        signals.register_on_terminate_signal(kill_handler)
+
+    signals.register_on_terminate_signal(terminate_handler)
+
+    async def terminate_callback_handler() -> None:
+        await termination_callback_event.wait()
+        wrapper_task.cancel()
+
+    terminate_callback_task = asyncio.Task(terminate_callback_handler())
+
+    try:
+        ret = await wrapper_task
+    except asyncio.CancelledError:
+        ret = 1
+    finally:
+        terminate_callback_task.cancel()
 
     if not tasks:
         # Nothing to clean up, return.
         return ret
 
-    # Ensure that queues tasks are cleaned up before returning.
+    # Ensure that queued tasks are cleaned up before returning.
     to_wait = asyncio.Task(asyncio.wait(tasks), name="Drain tasks")
     timeout_seconds = 5
     try:
-        await asyncio.wait_for(asyncio.shield(to_wait), timeout=timeout_seconds)
+        await asyncio.wait_for(to_wait, timeout=timeout_seconds)
     except asyncio.TimeoutError:
         print(
             f"\n\nWaiting for tasks to complete for longer than {timeout_seconds} seconds...\n",
             file=sys.stderr,
         )
-        await to_wait
+        wrapper_task.cancel()
+        to_wait.cancel()
+    except asyncio.CancelledError:
+        pass
 
     return ret
 
@@ -321,6 +369,8 @@ class AsyncMain:
         flags: args.Flags,
         tasks: list[asyncio.Task[None]],
         recorder: event.EventRecorder,
+        end_execution_request_event: asyncio.Event,
+        termination_callback_event: asyncio.Event,
         config_file: config.ConfigFile | None = None,
         replay_mode: bool = False,
     ):
@@ -330,6 +380,8 @@ class AsyncMain:
             flags (args.Flags): Flags controlling the behavior of fx test.
             tasks (List[asyncio.Tasks]): List to add tasks to that must be awaited before termination.
             recorder (event.Recorder): The recorder for events.
+            end_execution_request_event (asyncio.Event): Set by caller to gracefully stop execution.
+            termination_callback_event (asyncio.Event): Set by callee to instruct caller to terminate execution.
             config_file (config.ConfigFile, optional): The loaded config, if one was set.
             replay_mode (bool, optional): If set, load and replay the most recent log instead
         """
@@ -339,6 +391,8 @@ class AsyncMain:
         self._config_file = config_file
         self._replay_mode = replay_mode
         self._exec_env: environment.ExecutionEnvironment | None = None
+        self._end_execution_request_event = end_execution_request_event
+        self._termination_callback_event = termination_callback_event
 
     async def main(self) -> int:
         """Execute the fx test command through this wrapper.
@@ -350,6 +404,16 @@ class AsyncMain:
         do_output_to_stdout = self._flags.logpath == args.LOG_TO_STDOUT_OPTION
         recorder = self._recorder
         flags = self._flags
+
+        async def immediate_exit_handler() -> None:
+            await self._end_execution_request_event.wait()
+            recorder.emit_warning_message("Interrupt received, terminating.")
+            self._termination_callback_event.set()
+            recorder.emit_end(error="Terminated due to interrupt")
+
+        # Until the point this task is canceled below, any exit request will request
+        # an immediate termination of the command.
+        _immediate_exit_task = asyncio.Task(immediate_exit_handler())
 
         if not do_output_to_stdout and not self._replay_mode:
             self._tasks.append(
@@ -564,6 +628,15 @@ class AsyncMain:
             recorder.emit_end()
             return 0
 
+        # From this point on, separately handle exit requests so that tests can
+        # close cleanly.
+        _immediate_exit_task.cancel()
+        if self._end_execution_request_event.is_set():
+            # We raced with an exit request.
+            # Request termination and await exit.
+            self._termination_callback_event.set()
+            await asyncio.sleep(3600)
+
         # Finally, run all selected tests.
         if not await self._run_all_tests(selections):
             if not flags.has_debugger() and not flags.host:
@@ -576,7 +649,7 @@ class AsyncMain:
                     )
                 )
 
-            recorder.emit_end("Test failures reported")
+            recorder.emit_end("Failed to run all tests")
 
             return 1
 
@@ -1162,6 +1235,15 @@ class AsyncMain:
         abort_all_tests_event = asyncio.Event()
         test_failure_observed: bool = False
 
+        async def test_cancellation_handler() -> None:
+            await self._end_execution_request_event.wait()
+            recorder.emit_warning_message("Received request to terminate...")
+            abort_all_tests_event.set()
+
+        test_cancellation_handler_task = asyncio.Task(
+            test_cancellation_handler()
+        )
+
         maybe_debugger: subprocess.Popen[bytes] | None = None
         debugger_ready: asyncio.Condition = asyncio.Condition()
 
@@ -1233,10 +1315,8 @@ class AsyncMain:
                                         flags,
                                         test_suite_id,
                                         timeout=flags.timeout,
+                                        abort_signal=abort_all_tests_event,
                                     )
-                                ),
-                                asyncio.create_task(
-                                    abort_all_tests_event.wait()
                                 ),
                                 asyncio.create_task(to_run.abort_group.wait()),
                             ],
@@ -1250,6 +1330,7 @@ class AsyncMain:
                         if pending:
                             # Propagate cancellations
                             await asyncio.wait(pending)
+
                         for r in done:
                             # Re-throw exceptions.
                             r.result()
@@ -1271,11 +1352,19 @@ class AsyncMain:
                 except (execution.TestTimeout, execution.TestFailed) as e:
                     if isinstance(e, execution.TestTimeout):
                         status = event.TestSuiteStatus.TIMEOUT
-                        # Abort other tests in this group.
-                        to_run.abort_group.set()
+                        test_failure_observed = True
+                    elif self._end_execution_request_event.is_set():
+                        # Terminating the tests will end up here, since they will have a
+                        # non-zero exit code following SIGTERM.
+                        status = event.TestSuiteStatus.ABORTED
+                        message = "Test suite aborted due to user interrupt."
                     else:
                         status = event.TestSuiteStatus.FAILED
-                    test_failure_observed = True
+                        test_failure_observed = True
+
+                    # Abort other tests in this group.
+                    to_run.abort_group.set()
+
                     if flags.fail:
                         # Abort all other running tests, dropping through to the
                         # following run state code to trigger any waiting executors.
@@ -1313,7 +1402,12 @@ class AsyncMain:
 
         recorder.emit_end(id=test_group)
 
-        return not test_failure_observed
+        test_cancellation_handler_task.cancel()
+
+        return (
+            not test_failure_observed
+            and not self._end_execution_request_event.is_set()
+        )
 
     async def _enumerate_test_cases(
         self,

@@ -107,6 +107,7 @@ class ConsoleState:
             event.TestSuiteStatus, typing.Set[str]
         ] = defaultdict(set)
         self.exec_env: environment.ExecutionEnvironment | None = None
+        self.ended_due_to_error = False
 
 
 class ConsoleOutput:
@@ -228,7 +229,11 @@ class ConsoleOutput:
                 )
             )
 
-        if state.active_durations and not flags.is_replay():
+        if (
+            state.active_durations
+            and not state.ended_due_to_error
+            and not flags.is_replay()
+        ):
             print(
                 statusinfo.error_highlight(
                     "BUG: Durations still active at exit:", style=flags.style
@@ -545,6 +550,7 @@ async def _console_event_loop(
             )
             if next_event.id == event.GLOBAL_RUN_ID:
                 state.end_duration = elapsed_time
+                state.ended_due_to_error = next_event.error is not None
 
         if flags.verbose:
             # In verbose mode, refuse to print too many output characters

@@ -19,3 +19,10 @@ def register_on_terminate_signal(fn: typing.Callable[[], None]) -> None:
     loop = asyncio.get_event_loop()
     for s in [signal.SIGTERM, signal.SIGINT]:
         loop.add_signal_handler(s, fn)
+
+
+def unregister_all_termination_signals() -> None:
+    """Unregister all existing termination signal handlers."""
+    loop = asyncio.get_event_loop()
+    for s in [signal.SIGTERM, signal.SIGINT]:
+        loop.remove_signal_handler(s)
