@@ -13,7 +13,6 @@ import fidl.fuchsia_location_namedplace as f_location_namedplace
 import fidl.fuchsia_wlan_common as f_wlan_common
 import fidl.fuchsia_wlan_common_security as f_wlan_common_security
 import fidl.fuchsia_wlan_device_service as f_wlan_device_service
-import fidl.fuchsia_wlan_internal as f_wlan_internal
 import fidl.fuchsia_wlan_sme as f_wlan_sme
 from fuchsia_controller_py import ZxStatus
 
@@ -40,7 +39,7 @@ from honeydew.typing.wlan import (
 _TEST_SSID = "ThepromisedLAN"
 _TEST_SSID_BYTES = list(str.encode(_TEST_SSID))
 
-_TEST_BSS_DESC_1_FC = f_wlan_internal.BssDescription(
+_TEST_BSS_DESC_1_FC = f_wlan_common.BssDescription(
     bssid=bytes([1, 2, 3]),
     bss_type=f_wlan_common.BssType.PERSONAL,
     beacon_period=2,
@@ -67,7 +66,7 @@ _TEST_BSS_DESC_1 = BssDescription(
 
 # Use the same SSID such that the two scan results will be merged under the same
 # SSID key, allowing the user to choose from multiple BSSes.
-_TEST_BSS_DESC_2_FC = f_wlan_internal.BssDescription(
+_TEST_BSS_DESC_2_FC = f_wlan_common.BssDescription(
     bssid=bytes([3, 2, 1]),
     bss_type=f_wlan_common.BssType.PERSONAL,
     beacon_period=5,

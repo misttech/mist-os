@@ -314,7 +314,7 @@ async fn do_client_connect(
     async fn try_get_bss_desc(
         scan_result: fidl_sme::ClientSmeScanResult,
         ssid: &Ssid,
-    ) -> Result<fidl_internal::BssDescription, Error> {
+    ) -> Result<fidl_common::BssDescription, Error> {
         let mut bss_description = None;
         match scan_result {
             Ok(vmo) => {

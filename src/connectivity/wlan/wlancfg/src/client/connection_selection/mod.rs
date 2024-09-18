@@ -27,7 +27,7 @@ use std::sync::Arc;
 use tracing::{debug, error, info, warn};
 use wlan_common::security::SecurityAuthenticator;
 use wlan_common::sequestered::Sequestered;
-use {fidl_fuchsia_wlan_internal as fidl_internal, fuchsia_async as fasync, fuchsia_zircon as zx};
+use {fidl_fuchsia_wlan_common as fidl_common, fuchsia_async as fasync, fuchsia_zircon as zx};
 
 pub mod bss_selection;
 pub mod network_selection;
@@ -272,7 +272,7 @@ impl ConnectionSelector {
         async fn get_enhanced_bss_description(
             scanned_candidate: &types::ScannedCandidate,
             scan_requester: Arc<dyn scan::ScanRequestApi>,
-        ) -> Result<Sequestered<fidl_internal::BssDescription>, ()> {
+        ) -> Result<Sequestered<fidl_common::BssDescription>, ()> {
             match scanned_candidate.bss.observation {
                 types::ScanObservation::Passive => {
                     info!("Performing directed active scan on selected network")

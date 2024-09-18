@@ -106,7 +106,7 @@ type ScanResult = struct {
     // Time of the scan result relative to when the system was powered on.
     // See https://fuchsia.dev/fuchsia-src/concepts/time/language_support#monotonic_time
     timestamp_nanos zx.Time;
-    bss internal.BssDescription;
+    bss fuchsia.wlan.common.BssDescription;
 };
 
 type ScanEnd = struct {
@@ -115,7 +115,7 @@ type ScanEnd = struct {
 };
 
 type ConnectRequest = struct {
-    selected_bss internal.BssDescription;
+    selected_bss fuchsia.wlan.common.BssDescription;
     connect_failure_timeout uint32;
 
     /// Additional parameters specific to the authentication exchange.
@@ -146,7 +146,7 @@ type ReconnectRequest = struct {
 /// In-progress fullmac-initiated roam attempt details.
 type RoamStartIndication = struct {
     selected_bssid ieee80211.MacAddr;
-    selected_bss internal.BssDescription;
+    selected_bss fuchsia.wlan.common.BssDescription;
 
     /// Whether the original BSS association has been maintained at the start of a roam attempt.
     /// 802.11 dictates that a STA can only be associated with a single BSS, so a roam attempt
@@ -244,7 +244,7 @@ type DeauthenticateIndication = struct {
 
 type AssociateIndication = struct {
     peer_sta_address ieee80211.MacAddr;
-    capability_info internal.CapabilityInfo;
+    capability_info fuchsia.wlan.common.CapabilityInfo;
     listen_interval uint16;
     ssid ieee80211.Ssid:optional;
     rates vector<uint8>:internal.MAX_ASSOC_BASIC_RATES;
@@ -276,7 +276,7 @@ type AssociateResponse = struct {
 
     // This is not part of the MLME SAP, but we need this to set the association context state in
     // the MLME.
-    capability_info internal.CapabilityInfo;
+    capability_info fuchsia.wlan.common.CapabilityInfo;
 
     // This combines both the BSSBasicRateSet and the OperationalRateSet, as the MLME will split
     // them up.
@@ -344,7 +344,7 @@ type StartRequest = struct {
     channel uint8;
 
     // Capability information.
-    capability_info internal.CapabilityInfo;
+    capability_info fuchsia.wlan.common.CapabilityInfo;
 
     // This combines both the BSSBasicRateSet and the OperationalRateSet, as the MLME will split
     // them up.

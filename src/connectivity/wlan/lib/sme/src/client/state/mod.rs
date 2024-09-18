@@ -3478,7 +3478,7 @@ mod tests {
         let state = link_up_state(cmd);
         // Note: this is intentionally malformed. Roam cannot proceed without the missing data, such
         // as the IEs.
-        let selected_bss = fidl_internal::BssDescription {
+        let selected_bss = fidl_common::BssDescription {
             bssid: [0, 0, 0, 0, 0, 0],
             bss_type: fidl_common::BssType::Infrastructure,
             beacon_period: 0,

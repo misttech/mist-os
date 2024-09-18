@@ -344,10 +344,7 @@ mod handle_mlme_request_tests {
     use test_case::test_case;
     use wlan_common::assert_variant;
     use wlan_common::sink::UnboundedSink;
-    use {
-        fidl_fuchsia_wlan_fullmac as fidl_fullmac, fidl_fuchsia_wlan_internal as fidl_internal,
-        fidl_fuchsia_wlan_stats as fidl_stats,
-    };
+    use {fidl_fuchsia_wlan_fullmac as fidl_fullmac, fidl_fuchsia_wlan_stats as fidl_stats};
 
     #[test]
     fn test_scan_request() {
@@ -423,7 +420,7 @@ mod handle_mlme_request_tests {
     fn test_connect_request() {
         let mut h = TestHelper::set_up_with_link_state(fidl_mlme::ControlledPortState::Open);
         let fidl_req = wlan_sme::MlmeRequest::Connect(fidl_mlme::ConnectRequest {
-            selected_bss: fidl_internal::BssDescription {
+            selected_bss: fidl_common::BssDescription {
                 bssid: [100u8; 6],
                 bss_type: fidl_common::BssType::Infrastructure,
                 beacon_period: 101,
@@ -1126,8 +1123,8 @@ mod handle_driver_event_tests {
         fidl_fuchsia_wlan_mlme as fidl_mlme, fuchsia_async as fasync, fuchsia_zircon as zx,
     };
 
-    fn create_bss_descriptions() -> fidl_internal::BssDescription {
-        fidl_internal::BssDescription {
+    fn create_bss_descriptions() -> fidl_common::BssDescription {
+        fidl_common::BssDescription {
             bssid: [9u8; 6],
             bss_type: fidl_common::BssType::Infrastructure,
             beacon_period: 1,

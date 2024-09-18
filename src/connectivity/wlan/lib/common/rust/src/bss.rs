@@ -18,7 +18,7 @@ use std::ops::Range;
 use zerocopy::{AsBytes, Ref};
 use {
     fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211,
-    fidl_fuchsia_wlan_internal as fidl_internal, fidl_fuchsia_wlan_sme as fidl_sme,
+    fidl_fuchsia_wlan_sme as fidl_sme,
 };
 
 // TODO(https://fxbug.dev/42104685): Represent this as bitfield instead.
@@ -115,7 +115,7 @@ pub enum Standard {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct BssDescription {
-    // *** Fields originally in fidl_internal::BssDescription
+    // *** Fields originally in fidl_common::BssDescription
     pub ssid: Ssid,
     pub bssid: Bssid,
     pub bss_type: fidl_common::BssType,
@@ -127,7 +127,7 @@ pub struct BssDescription {
     // Private because the parsed information reference the IEs
     ies: Vec<u8>,
 
-    // *** Fields parsed out of fidl_internal::BssDescription IEs
+    // *** Fields parsed out of fidl_common::BssDescription IEs
     // IEEE Std 802.11-2016 9.4.2.3
     // in 0.5 Mbps, with MSB indicating basic rate. See Table 9-78 for 126, 127.
     // The rates here may include both the basic rates and extended rates, which are not
@@ -500,9 +500,9 @@ impl BssDescription {
     }
 }
 
-impl From<BssDescription> for fidl_internal::BssDescription {
-    fn from(bss: BssDescription) -> fidl_internal::BssDescription {
-        fidl_internal::BssDescription {
+impl From<BssDescription> for fidl_common::BssDescription {
+    fn from(bss: BssDescription) -> fidl_common::BssDescription {
+        fidl_common::BssDescription {
             bssid: bss.bssid.to_array(),
             bss_type: bss.bss_type,
             beacon_period: bss.beacon_period,
@@ -530,10 +530,10 @@ impl fmt::Display for BssDescription {
 }
 // TODO(https://fxbug.dev/42164415): The error printed should include a minimal amount of information
 // about the BSS Description that could not be converted to aid debugging.
-impl TryFrom<fidl_internal::BssDescription> for BssDescription {
+impl TryFrom<fidl_common::BssDescription> for BssDescription {
     type Error = anyhow::Error;
 
-    fn try_from(bss: fidl_internal::BssDescription) -> Result<BssDescription, Self::Error> {
+    fn try_from(bss: fidl_common::BssDescription) -> Result<BssDescription, Self::Error> {
         let mut ssid_range = None;
         let mut rates = None;
         let mut tim_range = None;
@@ -623,7 +623,7 @@ impl TryFrom<fidl_internal::BssDescription> for BssDescription {
     }
 }
 
-/// The BssCandidacy type is used to rank fidl_internal::BssDescription values. It is ordered
+/// The BssCandidacy type is used to rank fidl_common::BssDescription values. It is ordered
 /// first by Protection and then by Dbm.
 #[derive(Debug, Eq, PartialEq)]
 pub struct BssCandidacy {
@@ -699,13 +699,11 @@ mod tests {
         rates: vec![0x02, 0x04, 0x0c],
     ))]
     fn test_bss_lossless_conversion(bss: BssDescription) {
-        let fidl_bss = fidl_internal::BssDescription::from(bss.clone());
+        let fidl_bss = fidl_common::BssDescription::from(bss.clone());
         assert_eq!(bss, BssDescription::try_from(fidl_bss.clone()).unwrap());
         assert_eq!(
             fidl_bss,
-            fidl_internal::BssDescription::from(
-                BssDescription::try_from(fidl_bss.clone()).unwrap()
-            )
+            fidl_common::BssDescription::from(BssDescription::try_from(fidl_bss.clone()).unwrap())
         );
     }
 

@@ -10,10 +10,7 @@ use fuchsia_sync::RwLock;
 use ieee80211::{MacAddr, Ssid};
 use std::collections::HashMap;
 use wlan_common::scan::ScanResult;
-use {
-    fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_internal as fidl_internal,
-    fuchsia_zircon as zx,
-};
+use {fidl_fuchsia_wlan_common as fidl_common, fuchsia_zircon as zx};
 
 // WlanFacade: proxies commands from sl4f test to proper fidl APIs
 //
@@ -105,7 +102,7 @@ impl WlanFacade {
                 .entry(String::from(scan_result.bss_description.ssid.to_string_not_redactable()))
                 .or_insert(vec![]);
 
-            let fidl_bss_desc: fidl_internal::BssDescription = scan_result.bss_description.into();
+            let fidl_bss_desc: fidl_common::BssDescription = scan_result.bss_description.into();
             entry.push(Box::new(fidl_bss_desc.into()));
         }
         Ok(scan_results_by_ssid_string)
@@ -115,7 +112,7 @@ impl WlanFacade {
         &self,
         target_ssid: Ssid,
         target_pwd: Vec<u8>,
-        target_bss_desc: fidl_internal::BssDescription,
+        target_bss_desc: fidl_common::BssDescription,
     ) -> Result<bool, Error> {
         let sme_proxy = wlan_service_util::client::get_first_sme(&self.monitor_svc)
             .await

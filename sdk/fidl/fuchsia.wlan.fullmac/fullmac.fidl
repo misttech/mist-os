@@ -5,7 +5,6 @@
 library fuchsia.wlan.fullmac;
 
 using fuchsia.wlan.common;
-using fuchsia.wlan.internal;
 using fuchsia.wlan.ieee80211 as ieee80211;
 using zx;
 
@@ -71,7 +70,7 @@ type WlanFullmacScanResult = struct {
     // Time of the scan result relative to when the system was powered on.
     // See https://fuchsia.dev/fuchsia-src/concepts/time/language_support#monotonic_time
     timestamp_nanos zx.Time;
-    bss fuchsia.wlan.internal.BssDescription;
+    bss fuchsia.wlan.common.BssDescription;
 };
 
 type WlanScanResult = flexible enum : uint8 {
@@ -425,7 +424,7 @@ closed protocol WlanFullmacImplIfc {
         /// Full BSS description of the target BSS. Required.
         /// If the data in BssDescription is incorrect or incomplete, the roam cannot succeed,
         /// because higher layers will not be able to complete required actions (e.g. SAE).
-        2: selected_bss fuchsia.wlan.internal.BssDescription;
+        2: selected_bss fuchsia.wlan.common.BssDescription;
         /// Whether the original BSS association has been maintained at the start of a roam attempt.
         /// Required. 802.11 dictates that a STA can only be associated with a single BSS, so a roam
         /// attempt typically incurs disassociation at the start of the roam attempt. However,
@@ -572,7 +571,7 @@ closed protocol WlanFullmacImpl {
         6: max_channel_time uint32;
     }) -> ();
     strict Connect(table {
-        1: selected_bss fuchsia.wlan.internal.BssDescription;
+        1: selected_bss fuchsia.wlan.common.BssDescription;
         /// Timeout specified in beacon interval.
         2: connect_failure_timeout uint32;
 

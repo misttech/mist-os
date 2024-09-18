@@ -8,7 +8,7 @@ use crate::client::{
 };
 use crate::{MlmeEventStream, MlmeSink, MlmeStream};
 use fidl::endpoints::{RequestStream, ServerEnd};
-use fidl_fuchsia_wlan_internal::BssDescription as BssDescriptionFidl;
+use fidl_fuchsia_wlan_common::BssDescription as BssDescriptionFidl;
 use fidl_fuchsia_wlan_sme::{self as fidl_sme, ClientSmeRequest, TelemetryRequest};
 use fuchsia_inspect_contrib::auto_persist;
 use futures::channel::mpsc;

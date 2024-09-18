@@ -3,10 +3,7 @@
 // found in the LICENSE file.
 
 use serde::{Deserialize, Serialize};
-use {
-    fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_internal as fidl_internal,
-    fidl_fuchsia_wlan_sme as fidl_sme,
-};
+use {fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_sme as fidl_sme};
 
 /// Enums and structs for wlan client status.
 /// These definitions come from fuchsia.wlan.policy/client_provider.fidl
@@ -206,7 +203,7 @@ pub(crate) struct BssDescriptionDef {
     pub snr_db: i8,
 }
 
-impl From<BssDescriptionDef> for fidl_internal::BssDescription {
+impl From<BssDescriptionDef> for fidl_common::BssDescription {
     fn from(serde_type: BssDescriptionDef) -> Self {
         Self {
             bssid: serde_type.bssid,
@@ -221,8 +218,8 @@ impl From<BssDescriptionDef> for fidl_internal::BssDescription {
     }
 }
 
-impl From<fidl_internal::BssDescription> for BssDescriptionDef {
-    fn from(fidl_type: fidl_internal::BssDescription) -> Self {
+impl From<fidl_common::BssDescription> for BssDescriptionDef {
+    fn from(fidl_type: fidl_common::BssDescription) -> Self {
         Self {
             bssid: fidl_type.bssid,
             bss_type: fidl_type.bss_type.into(),

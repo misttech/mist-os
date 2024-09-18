@@ -42,10 +42,10 @@
 #include <wlan/common/ieee80211_codes.h>
 #include <wlan/common/macaddr.h>
 
+#include "fidl/fuchsia.wlan.common/cpp/natural_types.h"
 #include "fidl/fuchsia.wlan.fullmac/cpp/wire_types.h"
 #include "fidl/fuchsia.wlan.ieee80211/cpp/common_types.h"
 #include "fidl/fuchsia.wlan.ieee80211/cpp/wire_types.h"
-#include "fidl/fuchsia.wlan.internal/cpp/natural_types.h"
 #include "fuchsia/wlan/ieee80211/cpp/fidl.h"
 #include "lib/fidl/cpp/wire/vector_view.h"
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/bcdc.h"
@@ -1931,7 +1931,7 @@ void brcmf_return_roam_start(struct net_device* ndev) {
 
   auto roam_start_builder =
       fuchsia_wlan_fullmac_wire::WlanFullmacImplIfcRoamStartIndRequest::Builder(*arena);
-  fuchsia_wlan_internal::wire::BssDescription selected_bss;
+  fuchsia_wlan_common::wire::BssDescription selected_bss;
 
   // In the current implementation, roam attempts do not maintain association with the original BSS.
   // This may change with Fast BSS Transition support.

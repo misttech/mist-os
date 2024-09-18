@@ -11,7 +11,6 @@ from typing import Protocol
 
 import fidl.fuchsia_wlan_common as f_wlan_common
 import fidl.fuchsia_wlan_device_service as f_wlan_device_service
-import fidl.fuchsia_wlan_internal as f_wlan_internal
 import fidl.fuchsia_wlan_policy as f_wlan_policy
 import fidl.fuchsia_wlan_sme as f_wlan_sme
 
@@ -690,8 +689,8 @@ class BssDescription:
     snr_db: int
 
     @staticmethod
-    def from_fidl(fidl: f_wlan_internal.BssDescription) -> "BssDescription":
-        """Parse from a fuchsia.wlan.internal/BssDescription."""
+    def from_fidl(fidl: f_wlan_common.BssDescription) -> "BssDescription":
+        """Parse from a fuchsia.wlan.common.BssDescription."""
         return BssDescription(
             bssid=list(fidl.bssid),
             bss_type=BssType.from_fidl(fidl.bss_type),
@@ -703,9 +702,9 @@ class BssDescription:
             snr_db=fidl.snr_db,
         )
 
-    def to_fidl(self) -> f_wlan_internal.BssDescription:
-        """Convert to a fuchsia.wlan.internal/BssDescription."""
-        return f_wlan_internal.BssDescription(
+    def to_fidl(self) -> f_wlan_common.BssDescription:
+        """Convert to a fuchsia.wlan.common.BssDescription."""
+        return f_wlan_common.BssDescription(
             bssid=self.bssid,
             bss_type=self.bss_type.to_fidl(),
             beacon_period=self.beacon_period,

@@ -19,7 +19,7 @@ use rand::distributions::{Distribution, Standard};
 use rand::Rng;
 use {
     fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211,
-    fidl_fuchsia_wlan_internal as fidl_internal, fidl_fuchsia_wlan_sme as fidl_sme,
+    fidl_fuchsia_wlan_sme as fidl_sme,
 };
 
 #[rustfmt::skip]
@@ -67,7 +67,7 @@ const DEFAULT_MOCK_IES: &'static [u8] = &[
 ];
 
 pub struct BssDescriptionCreator {
-    // *** Fields already in fidl_internal::BssDescription
+    // *** Fields already in fidl_common::BssDescription
     pub bssid: [u8; 6],
     pub bss_type: fidl_common::BssType,
     pub beacon_period: u16,
@@ -100,7 +100,7 @@ pub struct BssDescriptionCreator {
 }
 
 impl BssDescriptionCreator {
-    pub fn create_bss_description(self) -> Result<fidl_internal::BssDescription, anyhow::Error> {
+    pub fn create_bss_description(self) -> Result<fidl_common::BssDescription, anyhow::Error> {
         let mut ies_updater = ie::IesUpdater::new(DEFAULT_MOCK_IES.to_vec());
         ies_updater.set(IeType::SSID, &self.ssid[..]).context("set SSID")?;
 
@@ -165,7 +165,7 @@ impl BssDescriptionCreator {
             }
         }
 
-        Ok(fidl_internal::BssDescription {
+        Ok(fidl_common::BssDescription {
             bssid: self.bssid,
             bss_type: self.bss_type,
             beacon_period: self.beacon_period,

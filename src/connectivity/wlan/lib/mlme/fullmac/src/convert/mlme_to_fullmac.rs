@@ -333,10 +333,9 @@ fn dummy_delete_key_descriptor() -> fidl_fullmac::DeleteKeyDescriptor {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use fidl_fuchsia_wlan_internal as fidl_internal;
 
-    fn fake_bss_description() -> fidl_internal::BssDescription {
-        fidl_internal::BssDescription {
+    fn fake_bss_description() -> fidl_common::BssDescription {
+        fidl_common::BssDescription {
             bssid: [6, 5, 4, 3, 2, 1],
             bss_type: fidl_common::BssType::Infrastructure,
             beacon_period: 123u16,

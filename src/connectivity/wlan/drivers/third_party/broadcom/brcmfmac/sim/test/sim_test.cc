@@ -350,7 +350,7 @@ void SimInterface::StartConnect(const common::MacAddr& bssid, const wlan_ieee802
 
   // Send connect request
   auto builder = wlan_fullmac_wire::WlanFullmacImplConnectRequest::Builder(test_arena_);
-  fuchsia_wlan_internal::wire::BssDescription bss;
+  fuchsia_wlan_common::wire::BssDescription bss;
   memcpy(bss.bssid.data(), bssid.byte, ETH_ALEN);
   auto ies =
       std::vector<uint8_t>(assoc_ctx_.ies.data(), assoc_ctx_.ies.data() + assoc_ctx_.ies.size());
