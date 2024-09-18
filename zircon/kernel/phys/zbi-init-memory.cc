@@ -63,7 +63,7 @@ void ZbiInitMemory(void* zbi, ktl::span<zbi_mem_range_t> mem_config,
     constexpr uint64_t kBytesPerMib = 0x100'000;
     uint64_t limit_mb = ktl::min(ktl::numeric_limits<uint64_t>::max() / kBytesPerMib,
                                  gBootOptions->memory_limit_mb);
-    pool.RestrictTotalRam(kBytesPerMib * limit_mb);
+    ZX_ASSERT(pool.TruncateTotalRam(kBytesPerMib * limit_mb).is_ok());
   }
 
   if (gBootOptions->phys_verbose) {

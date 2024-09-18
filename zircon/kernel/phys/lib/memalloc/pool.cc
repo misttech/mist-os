@@ -46,8 +46,8 @@ constexpr std::optional<uint64_t> Align(uint64_t addr, uint64_t alignment) {
 // A shared routine for the const and mutable versions of
 // Pool::FindContainingRange() below.
 template <class Ranges>
-auto FindContainingRangeAmong(Ranges&& ranges, uint64_t addr,
-                              uint64_t size) -> decltype(ranges.begin()) {
+auto FindContainingRangeAmong(Ranges&& ranges, uint64_t addr, uint64_t size)
+    -> decltype(ranges.begin()) {
   ZX_DEBUG_ASSERT(size <= kMax - addr);
 
   // Despite the name, this function gives us the first range that is
@@ -586,25 +586,38 @@ fit::result<fit::failed> Pool::UpdateRamSubranges(Type type, uint64_t addr, uint
   return fit::ok();
 }
 
-void Pool::RestrictTotalRam(uint64_t new_capacity_bytes) {
+fit::result<fit::failed> Pool::TruncateTotalRam(uint64_t new_capacity_bytes) {
   // Iterate to where the new capacity is satisfied, possibly truncating the
   // last of those ranges.
   mutable_iterator it = ranges_.begin();
   for (; it != ranges_.end() && new_capacity_bytes > 0; ++it) {
-    if (IsRamType(it->type)) {
-      it->size = std::min(it->size, new_capacity_bytes);
+    if (!IsRamType(it->type)) {
+      continue;
+    }
+    if (it->size <= new_capacity_bytes) {
       new_capacity_bytes -= it->size;
+    } else {
+      uint64_t truncated_start = it->addr + new_capacity_bytes;
+      Range truncated_tail{
+          .addr = truncated_start,
+          .size = it->end() - truncated_start,
+          .type = Type::kTruncatedRam,
+      };
+      if (auto result = InsertSubrange(truncated_tail, it); result.is_error()) {
+        return result.take_error();
+      } else {
+        it = result.value();
+      }
+      new_capacity_bytes = 0;
     }
   }
 
-  // Now drop the remaining RAM.
-  for (mutable_iterator next = ranges_.end(); it != ranges_.end(); it = next) {
-    // Be mindful of iterator invalidation; capture the would-be next first.
-    next = std::next(it);
-    if (IsRamType(it->type)) {
-      RemoveNodeAt(it);
-    }
+  // Now truncate the rest.
+  if (it != ranges_.end()) {
+    return UpdateRamSubranges(Type::kTruncatedRam, it->addr, kMax - it->addr);
   }
+
+  return fit::ok();
 }
 
 fit::result<fit::failed, Pool::mutable_iterator> Pool::InsertSubrange(

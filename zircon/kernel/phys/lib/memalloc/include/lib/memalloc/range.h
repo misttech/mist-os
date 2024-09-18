@@ -115,6 +115,10 @@ enum class Type : uint64_t {
   // below 1MiB in the case of PCs).
   kReservedLow,
 
+  // RAM 'discarded' from a truncation of the physical address space when
+  // simulating booting contexts with less physical memory available.
+  kTruncatedRam,
+
   // A placeholder value signifying the last allocated type. It must not be used
   // as an actual type value.
   kMaxAllocated,

@@ -181,6 +181,10 @@ void HandoffPrep::SetMemory() {
       case memalloc::Type::kTestRamReserve:
         return type;
 
+      // Truncated RAM should now be forgotten.
+      case memalloc::Type::kTruncatedRam:
+        return ktl::nullopt;
+
       default:
         ZX_DEBUG_ASSERT(type != memalloc::Type::kReserved);
         break;
