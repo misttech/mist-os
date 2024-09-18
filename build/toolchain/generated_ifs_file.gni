@@ -41,8 +41,16 @@
 #       },
 #    ]
 #    ```
-#
 #     - Type: list(scope)
+#
+#  * needed_libs
+#   - Optional: The list of DT_NEEDEDs of this generated ELF file. Each entry is
+#   a full SONAME, such as `libfoo.so`.
+#   For example:
+#   ```
+#   needed_libs = [ "libfoo.so", "libbar.so" ]
+#   ```
+#   - Type: list(string)
 template("generated_ifs_file") {
   generated_file(target_name) {
     outputs = [ "$target_gen_dir/$target_name.ifs" ]
@@ -66,6 +74,14 @@ template("generated_ifs_file") {
       symbol_string += " }"
       contents += [ symbol_string ]
     }
+
+    if (defined(invoker.needed_libs)) {
+      contents += [ "NeededLibs:" ]
+      foreach(lib, invoker.needed_libs) {
+        contents += [ "  - ${lib}" ]
+      }
+    }
+
     contents += [ "..." ]
 
     forward_variables_from(invoker,
