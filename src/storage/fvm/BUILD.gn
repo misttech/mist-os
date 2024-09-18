@@ -205,7 +205,10 @@ rustc_binary("fvm_rust") {
   with_unit_tests = true
   name = "fvm"
   edition = "2021"
-  sources = [ "src/main.rs" ]
+  sources = [
+    "src/main.rs",
+    "src/mapping.rs",
+  ]
   deps = [
     "//sdk/fidl/fuchsia.hardware.block:fuchsia.hardware.block_rust",
     "//sdk/fidl/fuchsia.hardware.block.volume:fuchsia.hardware.block.volume_rust",

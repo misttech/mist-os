@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+mod mapping;
+
 use anyhow::{anyhow, bail, ensure, Context, Error};
 use block_client::{RemoteBlockClient, WriteOptions};
 use block_server::async_interface::{Interface, SessionManager};
@@ -15,6 +17,7 @@ use fidl_fuchsia_hardware_block::BlockMarker;
 use fuchsia_runtime::HandleType;
 use futures::future::try_join_all;
 use futures::stream::TryStreamExt;
+use mapping::{Mapping, MappingExt as _};
 use sha2::{Digest, Sha256};
 use std::borrow::Cow;
 use std::collections::{BTreeMap, HashMap};
@@ -163,19 +166,6 @@ struct PartitionState {
     slice_limit: u64,
 }
 
-#[derive(Debug)]
-struct Mapping {
-    logical_slice: u64,
-    physical_slice: u64,
-    slice_count: u64,
-}
-
-impl Mapping {
-    fn end_slice(&self) -> u64 {
-        self.logical_slice + self.slice_count
-    }
-}
-
 #[derive(Clone)]
 struct Metadata {
     // The `hash` field of the header is not necessarily up to date and must be recomputed before
@@ -301,7 +291,7 @@ impl Metadata {
             .slices
             .checked_add(count.try_into().map_err(|_| zx::Status::NO_SPACE)?)
             .ok_or(zx::Status::NO_SPACE)?;
-        let mut mappings: Vec<Mapping> = Vec::new();
+        let mut mappings = Vec::<Mapping>::new();
         for (physical_slice, allocation) in self.allocations.iter_mut().enumerate() {
             if physical_slice as u64 == max_slice {
                 break;
@@ -310,20 +300,16 @@ impl Metadata {
             if allocation.partition_index() == 0 {
                 allocation.set(partition_index, logical_slice);
                 let add_new_mapping = match mappings.last_mut() {
-                    Some(mapping)
-                        if mapping.physical_slice + mapping.slice_count
-                            == physical_slice as u64 =>
-                    {
-                        mapping.slice_count += 1;
+                    Some(mapping) if mapping.to + mapping.len() == physical_slice as u64 => {
+                        mapping.from.end += 1;
                         false
                     }
                     _ => true,
                 };
                 if add_new_mapping {
                     mappings.push(Mapping {
-                        logical_slice,
-                        physical_slice: physical_slice as u64,
-                        slice_count: 1,
+                        from: logical_slice..logical_slice + 1,
+                        to: physical_slice as u64,
                     });
                 }
                 logical_slice += 1;
@@ -382,18 +368,17 @@ impl Fvm {
             assigned_slice_count += 1;
             let mappings = &mut partition_state.entry(partition_index).or_default().mappings;
             let mut bad_mapping = false;
-            match mappings.binary_search_by(|m: &Mapping| m.logical_slice.cmp(&slice)) {
+            match mappings.binary_search_by(|m: &Mapping| m.from.start.cmp(&slice)) {
                 Ok(_) => bad_mapping = true,
                 Err(index) => {
                     let insert = if index > 0 {
                         // See if this can be merged with the previous entry.
                         let prev_mapping = &mut mappings[index - 1];
-                        let end = prev_mapping.end_slice();
+                        let end = prev_mapping.from.end;
                         if end == slice
-                            && prev_mapping.physical_slice + prev_mapping.slice_count
-                                == physical_slice as u64
+                            && prev_mapping.to + prev_mapping.len() == physical_slice as u64
                         {
-                            prev_mapping.slice_count += 1;
+                            prev_mapping.from.end += 1;
                             false
                         } else if end <= slice {
                             true
@@ -407,11 +392,7 @@ impl Fvm {
                     if insert {
                         mappings.insert(
                             index,
-                            Mapping {
-                                logical_slice: slice,
-                                physical_slice: physical_slice as u64,
-                                slice_count: 1,
-                            },
+                            Mapping { from: slice..slice + 1, to: physical_slice as u64 },
                         );
                     }
                 }
@@ -492,7 +473,7 @@ impl Fvm {
             let mut ops = Vec::new();
             while total_len > 0 {
                 let slice = offset / slice_size;
-                let index = match mappings.binary_search_by(|m| m.logical_slice.cmp(&slice)) {
+                let index = match mappings.binary_search_by(|m| m.from.start.cmp(&slice)) {
                     Ok(index) => index,
                     Err(index) if index > 0 => index - 1,
                     _ => {
@@ -502,7 +483,7 @@ impl Fvm {
                     }
                 };
                 let mapping = &mappings[index];
-                let end_slice = mapping.end_slice();
+                let end_slice = mapping.from.end;
                 if slice >= end_slice {
                     return Err(zx::Status::OUT_OF_RANGE).with_context(|| {
                         format!("No mapping #2 ({device_block_offset}, {block_count})")
@@ -514,8 +495,8 @@ impl Fvm {
                         as usize;
                 let (buf, remaining) = buffer_left.split_at_mut(len);
                 let physical_offset = data_start
-                    + mapping.physical_slice * slice_size
-                    + (offset - mapping.logical_slice * slice_size);
+                    + mapping.to * slice_size
+                    + (offset - mapping.from.start * slice_size);
 
                 ops.push(io.get_op(self.device.as_ref(), physical_offset, buf));
                 offset += len as u64;
@@ -1062,7 +1043,7 @@ impl Interface for PartitionInterface {
             if slice >= MAX_SLICE_COUNT {
                 return Err(zx::Status::OUT_OF_RANGE);
             }
-            let index = match mappings.binary_search_by(|m: &Mapping| m.logical_slice.cmp(&slice)) {
+            let index = match mappings.binary_search_by(|m: &Mapping| m.from.start.cmp(&slice)) {
                 Ok(index) => index,
                 Err(index) if index > 0 => index - 1,
                 _ => {
@@ -1074,12 +1055,12 @@ impl Interface for PartitionInterface {
                 }
             };
             let mapping = &mappings[index];
-            let mut end_slice = mapping.end_slice();
+            let mut end_slice = mapping.from.end;
             if slice >= end_slice {
                 if index + 1 < mappings.len() {
                     results.push(fvolume::VsliceRange {
                         allocated: false,
-                        count: mappings[index + 1].logical_slice - slice,
+                        count: mappings[index + 1].from.start - slice,
                     });
                 } else {
                     results.push(fvolume::VsliceRange {
@@ -1090,10 +1071,10 @@ impl Interface for PartitionInterface {
             } else {
                 // Coalesce mappings.
                 for mapping in &mappings[index + 1..] {
-                    if mapping.logical_slice != end_slice {
+                    if mapping.from.start != end_slice {
                         break;
                     }
-                    end_slice = mapping.end_slice();
+                    end_slice = mapping.from.end;
                 }
                 results.push(fvolume::VsliceRange { allocated: true, count: end_slice - slice });
             }
@@ -1107,13 +1088,13 @@ impl Interface for PartitionInterface {
         let partition_state = &inner.partition_state[&self.partition_index];
         let mappings = &partition_state.mappings;
 
-        let get_mapping_index =
-            || match mappings.binary_search_by(|m: &Mapping| m.logical_slice.cmp(&start_slice)) {
+        let check_already_allocated =
+            || match mappings.binary_search_by(|m: &Mapping| m.from.start.cmp(&start_slice)) {
                 Ok(_) => Err(zx::Status::INVALID_ARGS),
                 Err(index) => {
-                    if (index > 0 && mappings[index - 1].end_slice() > start_slice)
+                    if (index > 0 && mappings[index - 1].from.end > start_slice)
                         || (index < mappings.len()
-                            && mappings[index].logical_slice - start_slice < slice_count)
+                            && mappings[index].from.start - start_slice < slice_count)
                     {
                         Err(zx::Status::INVALID_ARGS)
                     } else {
@@ -1122,10 +1103,10 @@ impl Interface for PartitionInterface {
                 }
             };
 
-        let mut mapping_index = get_mapping_index().map_err(|e| {
+        if let Err(e) = check_already_allocated() {
             warn!("Attempt to allocate vslice {start_slice} that is already allocated.");
-            e
-        })?;
+            return Err(e);
+        }
 
         if partition_state.slice_limit > 0
             && (inner.metadata.partitions[&self.partition_index].slices as u64)
@@ -1160,10 +1141,7 @@ impl Interface for PartitionInterface {
         inner.assigned_slice_count = inner.assigned_slice_count.checked_add(slice_count).unwrap();
 
         let mappings = &mut inner.partition_state.get_mut(&self.partition_index).unwrap().mappings;
-        for mapping in new_mappings {
-            mappings.insert(mapping_index, mapping);
-            mapping_index += 1;
-        }
+        mappings.insert_mappings(new_mappings);
 
         Ok(())
     }
@@ -1176,7 +1154,7 @@ impl Interface for PartitionInterface {
         // in the range and then delete the mappings between.
         let delete_start;
         let start_index =
-            match mappings.binary_search_by(|m: &Mapping| m.logical_slice.cmp(&start_slice)) {
+            match mappings.binary_search_by(|m: &Mapping| m.from.start.cmp(&start_slice)) {
                 Ok(index) => {
                     delete_start = index;
                     index
@@ -1192,20 +1170,20 @@ impl Interface for PartitionInterface {
 
         let mut index = start_index;
         let mut slice = start_slice;
-        let mut count = slice_count;
+        let end_slice = start_slice.checked_add(slice_count).ok_or(zx::Status::INVALID_ARGS)?;
         loop {
             let mapping = &mappings[index];
-            if mapping.logical_slice > slice || mapping.end_slice() <= slice {
+            if mapping.from.start > slice || mapping.from.end <= slice {
                 return Err(zx::Status::INVALID_ARGS);
             }
-            let offset = slice - mapping.logical_slice;
-            let start_physical_slice = (mapping.physical_slice + offset) as usize;
-            let amount = std::cmp::min(count, mapping.slice_count - offset);
-            new_metadata.allocations[start_physical_slice..start_physical_slice + amount as usize]
+            let offset = slice - mapping.from.start;
+            let start_physical_slice = (mapping.to + offset) as usize;
+            let end = std::cmp::min(mapping.from.end, end_slice);
+            new_metadata.allocations
+                [start_physical_slice..start_physical_slice + (end - slice) as usize]
                 .fill(SliceEntry(0));
-            slice += amount;
-            count -= amount;
-            if count == 0 {
+            slice = end;
+            if slice == end_slice {
                 break;
             }
             index += 1;
@@ -1233,7 +1211,7 @@ impl Interface for PartitionInterface {
         inner.assigned_slice_count = inner.assigned_slice_count.checked_sub(slice_count).unwrap();
 
         let mappings = &mut inner.partition_state.get_mut(&self.partition_index).unwrap().mappings;
-        let delete_end = if mappings[index].end_slice() == slice { index + 1 } else { index };
+        let delete_end = if mappings[index].from.end == slice { index + 1 } else { index };
         if delete_end > delete_start {
             mappings.drain(delete_start..delete_end);
         }
@@ -1241,16 +1219,13 @@ impl Interface for PartitionInterface {
         // Now adjust the first and last mappings if necessary.
         if start_index != delete_start {
             let mapping = &mut mappings[start_index];
-            let end = mapping.end_slice();
-            mapping.slice_count = start_slice - mapping.logical_slice;
+            let end = mapping.from.end;
+            mapping.from.end = start_slice;
 
             if end > slice {
                 // We need to insert a new mapping to cover the remainder.
-                let new_mapping = Mapping {
-                    logical_slice: slice,
-                    physical_slice: mapping.physical_slice + (slice - mapping.logical_slice),
-                    slice_count: end - slice,
-                };
+                let new_mapping =
+                    Mapping { from: slice..end, to: mapping.to + (slice - mapping.from.start) };
                 mappings.insert(start_index + 1, new_mapping);
 
                 // This path is for when we're deleting a chunk out of a single mapping.  We don't
@@ -1262,10 +1237,9 @@ impl Interface for PartitionInterface {
 
         if delete_end == index {
             let mapping = &mut mappings[start_index + 1];
-            let delta = slice - mapping.logical_slice;
-            mapping.logical_slice = slice;
-            mapping.physical_slice += delta;
-            mapping.slice_count -= delta;
+            let delta = slice - mapping.from.start;
+            mapping.from.start = slice;
+            mapping.to += delta;
         }
 
         Ok(())
