@@ -359,7 +359,8 @@ impl Channel {
         res
     }
 
-    /// Send a message consisting of the given bytes and handles to a channel and await a reply.
+    /// Send a message consisting of the given bytes and handles to a channel and block until a
+    /// reply is received or the timeout is reached.
     ///
     /// The first four bytes of the written and read back messages are treated as a transaction ID
     /// of type `zx_txid_t`. The kernel generates a txid for the written message, replacing that
@@ -367,17 +368,15 @@ impl Channel {
     /// `bytes` will be ignored, and the first four bytes of the response will contain a
     /// kernel-generated txid.
     ///
+    /// In order to avoid dropping replies, the provided `MessageBuf` will be resized to accommodate
+    /// the maximum channel message size. For performance-sensitive code, consider reusing
+    /// `MessageBuf`s or calling `call_uninit` with a stack-allocated buffer.
+    ///
     /// Wraps the
     /// [zx_channel_call](https://fuchsia.dev/fuchsia-src/reference/syscalls/channel_call.md)
     /// syscall.
     ///
-    /// Note that unlike [`read`][read], the caller must ensure that the MessageBuf has enough
-    /// capacity for the bytes and handles which will be received, as replies which are too large
-    /// are discarded.
-    ///
     /// On failure returns the both the main and read status.
-    ///
-    /// [read]: struct.Channel.html#method.read
     pub fn call(
         &self,
         timeout: MonotonicTime,
@@ -389,49 +388,176 @@ impl Channel {
         buf.ensure_capacity_bytes(sys::ZX_CHANNEL_MAX_MSG_BYTES as usize);
         buf.ensure_capacity_handles(sys::ZX_CHANNEL_MAX_MSG_HANDLES as usize);
 
+        let (actual_bytes, actual_handles) = self.call_uninit(
+            timeout,
+            bytes,
+            handles,
+            buf.bytes.spare_capacity_mut(),
+            buf.handles.spare_capacity_mut(),
+        )?;
+
+        // SAFETY: the kernel has initialized these slices with valid values after the call above
+        // succeeded.
+        unsafe {
+            buf.bytes.set_len(actual_bytes.len());
+            buf.handles.set_len(actual_handles.len());
+        }
+
+        Ok(())
+    }
+
+    /// Send a message consisting of the given bytes and handles to a channel and block until a
+    /// reply is received or the timeout is reached. Returns initialized slices of byte message and
+    /// handles on success. Care should be taken to avoid handle leaks by either transferring the
+    /// returned handles out to another type or dropping them explicitly.
+    ///
+    /// The first four bytes of the written and read back messages are treated as a transaction ID
+    /// of type `zx_txid_t`. The kernel generates a txid for the written message, replacing that
+    /// part of the message as read from userspace. In other words, the first four bytes of
+    /// `bytes_in` will be ignored, and the first four bytes of the response will contain a
+    /// kernel-generated txid.
+    ///
+    /// In order to avoid dropping replies, this wrapper requires that the provided out buffers have
+    /// enough space to handle the largest channel messages possible.
+    ///
+    /// Wraps the
+    /// [zx_channel_call](https://fuchsia.dev/fuchsia-src/reference/syscalls/channel_call.md)
+    /// syscall.
+    ///
+    /// On failure returns the both the main and read status.
+    pub fn call_uninit(
+        &self,
+        timeout: MonotonicTime,
+        bytes_in: &[u8],
+        handles_in: &mut [Handle],
+        bytes_out: &mut [MaybeUninit<u8>],
+        handles_out: &mut [MaybeUninit<Handle>],
+    ) -> Result<(&mut [u8], &mut [Handle]), Status> {
+        // SAFETY: in-pointers are both valid to read from for their provided lengths, and
+        // out-pointers are both valid to write to for their provided lengths.
+        let (actual_bytes, actual_handles) = unsafe {
+            self.call_raw(
+                timeout,
+                bytes_in.as_ptr(),
+                bytes_in.len(),
+                handles_in.as_mut_ptr(),
+                handles_in.len(),
+                bytes_out.as_mut_ptr() as *mut u8,
+                bytes_out.len(),
+                handles_out.as_mut_ptr() as *mut Handle,
+                handles_out.len(),
+            )?
+        };
+
+        // SAFETY: the kernel has initialized these slices with valid values.
+        unsafe {
+            Ok((
+                std::slice::from_raw_parts_mut(
+                    bytes_out.as_mut_ptr() as *mut u8,
+                    actual_bytes as usize,
+                ),
+                std::slice::from_raw_parts_mut(
+                    handles_out.as_mut_ptr() as *mut Handle,
+                    actual_handles as usize,
+                ),
+            ))
+        }
+    }
+
+    /// Send a message consisting of the given bytes and handles to a channel and block until a
+    /// reply is received or the timeout is reached. On success, returns the number of bytes and
+    /// handles read from the reply, in that order.
+    ///
+    /// The first four bytes of the written and read back messages are treated as a transaction ID
+    /// of type `zx_txid_t`. The kernel generates a txid for the written message, replacing that
+    /// part of the message as read from userspace. In other words, the first four bytes of
+    /// `bytes_in` will be ignored, and the first four bytes of the response will contain a
+    /// kernel-generated txid.
+    ///
+    /// In order to avoid dropping replies, this wrapper requires that the provided out buffers have
+    /// enough space to handle the largest channel messages possible.
+    ///
+    /// On return, the elements pointed to by `handles_in` will have been zeroed to reflect the
+    /// fact that the handles have been transferred.
+    ///
+    /// Wraps the
+    /// [zx_channel_call](https://fuchsia.dev/fuchsia-src/reference/syscalls/channel_call.md)
+    /// syscall.
+    ///
+    /// On failure returns the both the main and read status.
+    ///
+    /// # Safety
+    ///
+    /// `bytes_in` must be valid to read from for `bytes_in_len` bytes.
+    ///
+    /// `handles_in` must be valid to read from and write to for `handles_in_len` elements.
+    ///
+    /// `bytes_out` must be valid to write to for `bytes_out_len` bytes.
+    ///
+    /// `handles_out` must be valid to write to for `handles_out_len` elements.
+    ///
+    /// `bytes_in` and `bytes_out` may overlap. `handles_in` and `handles_out` may not overlap.
+    pub unsafe fn call_raw(
+        &self,
+        timeout: MonotonicTime,
+        bytes_in: *const u8,
+        bytes_in_len: usize,
+        handles_in: *mut Handle,
+        handles_in_len: usize,
+        bytes_out: *mut u8,
+        bytes_out_len: usize,
+        handles_out: *mut Handle,
+        handles_out_len: usize,
+    ) -> Result<(usize, usize), Status> {
+        // Don't let replies get silently dropped.
+        if bytes_out_len < sys::ZX_CHANNEL_MAX_MSG_BYTES as usize
+            || handles_out_len < sys::ZX_CHANNEL_MAX_MSG_HANDLES as usize
+        {
+            return Err(Status::BUFFER_TOO_SMALL);
+        }
+
         let mut actual_read_bytes: u32 = 0;
         let mut actual_read_handles: u32 = 0;
 
-        // SAFETY: args contains pointers that are valid to write to for the provided lengths.
+        // SAFETY: pointer invariants are upheld by this method's caller, see Safety section in
+        // docs. Handle is ABI-compatible with zx_handle_t, this allows the kernel to safely write
+        // the latter and and for us to later interpret them as the former.
         let res = unsafe {
             ok(sys::zx_channel_call(
                 self.raw_handle(),
                 0, // options
                 timeout.into_nanos(),
                 &sys::zx_channel_call_args_t {
-                    wr_bytes: bytes.as_ptr(),
-                    wr_handles: handles.as_ptr() as *const sys::zx_handle_t,
-                    rd_bytes: buf.bytes.as_mut_ptr(),
-                    rd_handles: buf.handles.as_mut_ptr() as *mut _,
-                    wr_num_bytes: bytes.len().try_into().map_err(|_| Status::OUT_OF_RANGE)?,
-                    wr_num_handles: handles.len().try_into().map_err(|_| Status::OUT_OF_RANGE)?,
-                    rd_num_bytes: buf.bytes.capacity().try_into().unwrap_or(u32::MAX),
-                    rd_num_handles: buf.handles.capacity().try_into().unwrap_or(u32::MAX),
+                    wr_bytes: bytes_in,
+                    wr_num_bytes: bytes_in_len as u32,
+                    wr_handles: handles_in as *mut sys::zx_handle_t,
+                    wr_num_handles: handles_in_len as u32,
+                    rd_bytes: bytes_out,
+                    rd_num_bytes: bytes_out_len as u32,
+                    rd_handles: handles_out as *mut sys::zx_handle_t,
+                    rd_num_handles: handles_out_len as u32,
                 },
                 &mut actual_read_bytes,
                 &mut actual_read_handles,
             ))
         };
 
-        // Outgoing handles are consumed by zx_channel_call so prevent the destructor from being called.
-        for handle in handles {
-            std::mem::forget(std::mem::replace(handle, Handle::invalid()));
+        // Outgoing handles have been consumed by zx_channel_call_etc. Zero them to inhibit drop
+        // implementations.
+        // SAFETY: caller guarantees that `handles_in` is valid to write to for `handles_in_len`
+        // elements. `HandleDisposition` is valid when it is all zeroes.
+        unsafe {
+            std::ptr::write_bytes(handles_in, 0, handles_in_len);
         }
 
         // Only error-return after zeroing out handles.
         res?;
 
-        // SAFETY: if the above raw syscall succeeded, these have been initialized with valid
-        // contents.
-        unsafe {
-            buf.bytes.set_len(actual_read_bytes as usize);
-            buf.handles.set_len(actual_read_handles as usize);
-        }
-
-        Ok(())
+        Ok((actual_read_bytes as usize, actual_read_handles as usize))
     }
 
-    /// Send a message consisting of the given bytes and handles to a channel and await a reply.
+    /// Send a message consisting of the given bytes and handles to a channel and block until a
+    /// reply is received or the timeout is reached.
     ///
     /// The first four bytes of the written and read back messages are treated as a transaction ID
     /// of type `zx_txid_t`. The kernel generates a txid for the written message, replacing that
@@ -439,19 +565,17 @@ impl Channel {
     /// `bytes` will be ignored, and the first four bytes of the response will contain a
     /// kernel-generated txid.
     ///
+    /// In order to avoid dropping replies, the provided `MessageBufEtc` will be resized to
+    /// accomodate the maximum channel message size. For performance-sensitive code, consider
+    /// reusing `MessageBufEtc`s or calling `call_etc_uninit` with a stack-allocated buffer.
+    ///
     /// This differs from `call`, in that it uses extended handle info.
     ///
     /// Wraps the
     /// [zx_channel_call_etc](https://fuchsia.dev/fuchsia-src/reference/syscalls/channel_call_etc.md)
     /// syscall.
     ///
-    /// Note that unlike [`read_etc`][read_etc], the caller must ensure that the MessageBufEtc
-    /// has enough capacity for the bytes and handles which will be received, as replies which are
-    /// too large are discarded.
-    ///
     /// On failure returns the both the main and read status.
-    ///
-    /// [read_etc]: struct.Channel.html#method.read_etc
     pub fn call_etc(
         &self,
         timeout: MonotonicTime,
@@ -460,57 +584,180 @@ impl Channel {
         buf: &mut MessageBufEtc,
     ) -> Result<(), Status> {
         buf.clear();
-
-        let write_num_bytes: u32 = bytes.len().try_into().map_err(|_| Status::OUT_OF_RANGE)?;
-        let write_num_handle_dispositions: u32 =
-            handle_dispositions.len().try_into().map_err(|_| Status::OUT_OF_RANGE)?;
-
         buf.ensure_capacity_bytes(sys::ZX_CHANNEL_MAX_MSG_BYTES as usize);
         buf.ensure_capacity_handle_infos(sys::ZX_CHANNEL_MAX_MSG_HANDLES as usize);
 
-        let mut actual_read_bytes: u32 = 0;
-        let mut actual_read_handle_infos: u32 = 0;
+        let (actual_bytes, actual_handles) = self.call_etc_uninit(
+            timeout,
+            bytes,
+            handle_dispositions,
+            buf.bytes.spare_capacity_mut(),
+            buf.handle_infos.spare_capacity_mut(),
+        )?;
 
-        // SAFETY: args contains pointers that are valid to write to for the provided lengths.
+        // SAFETY: the kernel has initialized these slices with valid values after the call above
+        // succeeded.
+        unsafe {
+            buf.bytes.set_len(actual_bytes.len());
+            buf.handle_infos.set_len(actual_handles.len());
+        }
+
+        Ok(())
+    }
+
+    /// Send a message consisting of the given bytes and handles to a channel and block until a
+    /// reply is received or the timeout is reached. Returns initialized slices of byte message and
+    /// handles on success. Care should be taken to avoid handle leaks by either transferring the
+    /// returned handles out to another type or dropping them explicitly.
+    ///
+    /// The first four bytes of the written and read back messages are treated as a transaction ID
+    /// of type `zx_txid_t`. The kernel generates a txid for the written message, replacing that
+    /// part of the message as read from userspace. In other words, the first four bytes of
+    /// `bytes_in` will be ignored, and the first four bytes of the response will contain a
+    /// kernel-generated txid.
+    ///
+    /// This differs from `call`, in that it uses extended handle info.
+    ///
+    /// In order to avoid dropping replies, this wrapper requires that the provided out buffers have
+    /// enough space to handle the largest channel messages possible.
+    ///
+    /// Wraps the
+    /// [zx_channel_call_etc](https://fuchsia.dev/fuchsia-src/reference/syscalls/channel_call_etc.md)
+    /// syscall.
+    ///
+    /// On failure returns the both the main and read status.
+    pub fn call_etc_uninit(
+        &self,
+        timeout: MonotonicTime,
+        bytes_in: &[u8],
+        handles_in: &mut [HandleDisposition<'_>],
+        bytes_out: &mut [MaybeUninit<u8>],
+        handles_out: &mut [MaybeUninit<HandleInfo>],
+    ) -> Result<(&mut [u8], &mut [HandleInfo]), Status> {
+        // SAFETY: in-pointers are both valid to read from for their provided lengths, and
+        // out-pointers are both valid to write to for their provided lengths.
+        let (actual_bytes, actual_handles) = unsafe {
+            self.call_etc_raw(
+                timeout,
+                bytes_in.as_ptr(),
+                bytes_in.len(),
+                handles_in.as_mut_ptr(),
+                handles_in.len(),
+                bytes_out.as_mut_ptr() as *mut u8,
+                bytes_out.len(),
+                handles_out.as_mut_ptr() as *mut HandleInfo,
+                handles_out.len(),
+            )?
+        };
+
+        // SAFETY: the kernel has initialized these slices with valid values.
+        unsafe {
+            Ok((
+                std::slice::from_raw_parts_mut(
+                    bytes_out.as_mut_ptr() as *mut u8,
+                    actual_bytes as usize,
+                ),
+                std::slice::from_raw_parts_mut(
+                    handles_out.as_mut_ptr() as *mut HandleInfo,
+                    actual_handles as usize,
+                ),
+            ))
+        }
+    }
+
+    /// Send a message consisting of the given bytes and handles to a channel and block until a
+    /// reply is received or the timeout is reached. On success, returns the number of bytes and
+    /// handles read from the reply, in that order.
+    ///
+    /// The first four bytes of the written and read back messages are treated as a transaction ID
+    /// of type `zx_txid_t`. The kernel generates a txid for the written message, replacing that
+    /// part of the message as read from userspace. In other words, the first four bytes of
+    /// `bytes_in` will be ignored, and the first four bytes of the response will contain a
+    /// kernel-generated txid.
+    ///
+    /// This differs from `call`, in that it uses extended handle info.
+    ///
+    /// In order to avoid dropping replies, this wrapper requires that the provided out buffers have
+    /// enough space to handle the largest channel messages possible.
+    ///
+    /// On return, the elements pointed to by `handles_in` will have been zeroed to reflect the
+    /// fact that the handles have been transferred.
+    ///
+    /// Wraps the
+    /// [zx_channel_call_etc](https://fuchsia.dev/fuchsia-src/reference/syscalls/channel_call_etc.md)
+    /// syscall.
+    ///
+    /// On failure returns the both the main and read status.
+    ///
+    /// # Safety
+    ///
+    /// `bytes_in` must be valid to read from for `bytes_in_len` bytes.
+    ///
+    /// `handles_in` must be valid to read from and write to for `handles_in_len` elements.
+    ///
+    /// `bytes_out` must be valid to write to for `bytes_out_len` bytes.
+    ///
+    /// `handles_out` must be valid to write to for `handles_out_len` elements.
+    ///
+    /// `bytes_in` and `bytes_out` may overlap.
+    pub unsafe fn call_etc_raw(
+        &self,
+        timeout: MonotonicTime,
+        bytes_in: *const u8,
+        bytes_in_len: usize,
+        handles_in: *mut HandleDisposition<'_>,
+        handles_in_len: usize,
+        bytes_out: *mut u8,
+        bytes_out_len: usize,
+        handles_out: *mut HandleInfo,
+        handles_out_len: usize,
+    ) -> Result<(usize, usize), Status> {
+        // Don't let replies get silently dropped.
+        if bytes_out_len < sys::ZX_CHANNEL_MAX_MSG_BYTES as usize
+            || handles_out_len < sys::ZX_CHANNEL_MAX_MSG_HANDLES as usize
+        {
+            return Err(Status::BUFFER_TOO_SMALL);
+        }
+
+        let mut actual_read_bytes: u32 = 0;
+        let mut actual_read_handles: u32 = 0;
+
+        // SAFETY: pointer invariants are upheld by this method's caller, see Safety section in
+        // docs. HandleDisposition is ABI-compatible with zx_handle_disposition_t and HandleInfo is
+        // ABI-compatible with zx_handle_info_t, this allows the kernel to safely write the latter
+        // and and for us to later interpret them as the former.
         let res = unsafe {
             ok(sys::zx_channel_call_etc(
                 self.raw_handle(),
                 0, // options
                 timeout.into_nanos(),
                 &mut sys::zx_channel_call_etc_args_t {
-                    wr_bytes: bytes.as_ptr(),
-                    // SAFETY: HandleDisposition is ABI-compatible with zx_handle_disposition_t, allow
-                    // the kernel to write the latter and later interpret them as the former.
-                    wr_handles: handle_dispositions.as_mut_ptr()
-                        as *mut sys::zx_handle_disposition_t,
-                    rd_bytes: buf.bytes.as_mut_ptr(),
-                    rd_handles: buf.handle_infos.as_mut_ptr() as *mut sys::zx_handle_info_t,
-                    wr_num_bytes: write_num_bytes,
-                    wr_num_handles: write_num_handle_dispositions,
-                    rd_num_bytes: buf.bytes.capacity() as u32,
-                    rd_num_handles: buf.handle_infos.capacity() as u32,
+                    wr_bytes: bytes_in,
+                    wr_num_bytes: bytes_in_len as u32,
+                    wr_handles: handles_in as *mut sys::zx_handle_disposition_t,
+                    wr_num_handles: handles_in_len as u32,
+                    rd_bytes: bytes_out,
+                    rd_num_bytes: bytes_out_len as u32,
+                    rd_handles: handles_out as *mut sys::zx_handle_info_t,
+                    rd_num_handles: handles_out_len as u32,
                 },
                 &mut actual_read_bytes,
-                &mut actual_read_handle_infos,
+                &mut actual_read_handles,
             ))
         };
 
         // Outgoing handles are consumed by zx_channel_call so prevent the destructor from being
         // called. Don't overwrite the status field so that callers can inspect it.
-        for disposition in handle_dispositions {
+        // SAFETY: slice invariants must be upheld by this method's caller.
+        let handles = unsafe { std::slice::from_raw_parts_mut(handles_in, handles_in_len) };
+        for disposition in handles {
             std::mem::forget(disposition.take_op());
         }
 
         // Only error-return after zeroing out handles.
         res?;
 
-        // SAFETY: the kernel has initialized these slices with valid values.
-        unsafe {
-            buf.bytes.set_len(actual_read_bytes as usize);
-            buf.handle_infos.set_len(actual_read_handle_infos as usize);
-        }
-
-        Ok(())
+        Ok((actual_read_bytes as usize, actual_read_handles as usize))
     }
 }
 
