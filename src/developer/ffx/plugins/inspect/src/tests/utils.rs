@@ -4,7 +4,7 @@
 
 use anyhow::Result;
 use diagnostics_data::{
-    DiagnosticsHierarchy, InspectData, InspectDataBuilder, InspectHandleName, Property,
+    DiagnosticsHierarchy, InspectData, InspectDataBuilder, InspectHandleName, Property, Timestamp,
 };
 use fidl::endpoints::{create_proxy_and_stream, ServerEnd};
 use fidl::Channel;
@@ -224,7 +224,7 @@ pub fn make_inspect(moniker: &str, timestamp: i64, len: usize, file_name: &str) 
     InspectDataBuilder::new(
         moniker.try_into().unwrap(),
         format!("fake-url://{}", moniker),
-        timestamp,
+        Timestamp::from_nanos(timestamp),
     )
     .with_hierarchy(hierarchy)
     .with_name(InspectHandleName::filename(file_name))

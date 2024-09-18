@@ -313,7 +313,7 @@ impl ReaderServer {
         let mut builder = InspectDataBuilder::new(
             pumped_inspect_data.identity.moniker.clone(),
             identity.url.clone(),
-            hierarchy_data.timestamp.into_nanos(),
+            hierarchy_data.timestamp,
         );
         if let Some(hierarchy) = hierarchy_data.hierarchy {
             builder = builder.with_hierarchy(hierarchy);

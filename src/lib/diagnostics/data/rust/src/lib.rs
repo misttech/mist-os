@@ -22,7 +22,7 @@ use std::borrow::{Borrow, Cow};
 use std::cmp::Ordering;
 use std::fmt;
 use std::hash::Hash;
-use std::ops::{Deref, DerefMut};
+use std::ops::{Add, Deref};
 use std::str::FromStr;
 use std::sync::LazyLock;
 use std::time::Duration;
@@ -162,7 +162,7 @@ impl Metadata for InspectMetadata {
     type Error = InspectError;
 
     fn timestamp(&self) -> Timestamp {
-        Timestamp(self.timestamp)
+        self.timestamp
     }
 
     fn errors(&self) -> Option<&[Self::Error]> {
@@ -188,7 +188,7 @@ impl Metadata for LogsMetadata {
     type Error = LogError;
 
     fn timestamp(&self) -> Timestamp {
-        Timestamp(self.timestamp)
+        self.timestamp
     }
 
     fn errors(&self) -> Option<&[Self::Error]> {
@@ -204,34 +204,28 @@ impl Metadata for LogsMetadata {
 #[derive(Clone, Copy, Debug, Deserialize, Eq, Ord, PartialEq, PartialOrd, Serialize)]
 pub struct Timestamp(i64);
 
+impl Timestamp {
+    /// Returns the number of nanoseconds associated with this timestamp.
+    pub fn into_nanos(self) -> i64 {
+        self.0
+    }
+
+    /// Constructs a timestamp from the given nanoseconds.
+    pub fn from_nanos(nanos: i64) -> Self {
+        Self(nanos)
+    }
+}
+
+impl Add<Timestamp> for Timestamp {
+    type Output = Timestamp;
+    fn add(self, rhs: Timestamp) -> Self::Output {
+        Timestamp(self.0 + rhs.0)
+    }
+}
+
 impl fmt::Display for Timestamp {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.0)
-    }
-}
-
-// i32 here because it's the default for a bare integer literal w/o a type suffix
-impl From<i32> for Timestamp {
-    fn from(nanos: i32) -> Timestamp {
-        Timestamp(nanos as i64)
-    }
-}
-
-impl From<i64> for Timestamp {
-    fn from(nanos: i64) -> Timestamp {
-        Timestamp(nanos)
-    }
-}
-
-impl Into<i64> for Timestamp {
-    fn into(self) -> i64 {
-        self.0
-    }
-}
-
-impl Into<Duration> for Timestamp {
-    fn into(self) -> Duration {
-        Duration::from_nanos(self.0 as u64)
     }
 }
 
@@ -253,20 +247,6 @@ mod zircon {
     }
 }
 
-impl Deref for Timestamp {
-    type Target = i64;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl DerefMut for Timestamp {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
-    }
-}
-
 /// The metadata contained in a `DiagnosticsData` object where the data source is
 /// `DataSource::Inspect`.
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq)]
@@ -283,7 +263,7 @@ pub struct InspectMetadata {
     pub component_url: FlyStr,
 
     /// Monotonic time in nanos.
-    pub timestamp: i64,
+    pub timestamp: Timestamp,
 
     /// When set to true, the data was escrowed. Otherwise, the data was fetched live from the
     /// source component at runtime. When absent, it means the value is false.
@@ -314,7 +294,7 @@ pub struct LogsMetadata {
     pub component_url: Option<FlyStr>,
 
     /// Monotonic time in nanos.
-    pub timestamp: i64,
+    pub timestamp: Timestamp,
 
     /// Severity of the message.
     pub severity: Severity,
@@ -360,7 +340,7 @@ impl LogsMetadata {
 
     // TODO(https://fxbug.dev/346806346): transitional, remove.
     pub fn timestamp_nanos(&self) -> i64 {
-        self.timestamp
+        self.timestamp.into_nanos()
     }
 }
 
@@ -607,7 +587,11 @@ pub struct InspectDataBuilder {
 }
 
 impl InspectDataBuilder {
-    pub fn new(moniker: ExtendedMoniker, component_url: impl Into<FlyStr>, timestamp: i64) -> Self {
+    pub fn new(
+        moniker: ExtendedMoniker,
+        component_url: impl Into<FlyStr>,
+        timestamp: impl Into<Timestamp>,
+    ) -> Self {
         Self {
             data: Data {
                 data_source: DataSource::Inspect,
@@ -618,7 +602,7 @@ impl InspectDataBuilder {
                     errors: None,
                     name: InspectHandleName::name(DEFAULT_TREE_NAME.clone()),
                     component_url: component_url.into(),
-                    timestamp,
+                    timestamp: timestamp.into(),
                     escrowed: false,
                 },
             },
@@ -683,7 +667,7 @@ pub struct BuilderArgs {
     /// The moniker for the component
     pub moniker: ExtendedMoniker,
     /// The timestamp of the message in nanoseconds
-    pub timestamp_nanos: Timestamp,
+    pub timestamp: Timestamp,
     /// The component URL
     pub component_url: Option<FlyStr>,
     /// The message severity
@@ -801,7 +785,7 @@ impl LogsDataBuilder {
         let mut ret = LogsData::for_logs(
             self.args.moniker,
             Some(payload),
-            self.args.timestamp_nanos,
+            self.args.timestamp,
             self.args.component_url,
             self.args.severity,
             self.errors,
@@ -875,7 +859,7 @@ impl Data<Logs> {
             data_source: DataSource::Logs,
             payload,
             metadata: LogsMetadata {
-                timestamp: *(timestamp.into()),
+                timestamp: timestamp.into(),
                 component_url: component_url,
                 severity: severity.into(),
                 errors,
@@ -1240,18 +1224,19 @@ pub enum LogTimeDisplayFormat {
 }
 
 impl LogTimeDisplayFormat {
-    fn write_timestamp(&self, f: &mut fmt::Formatter<'_>, time: i64) -> fmt::Result {
+    fn write_timestamp(&self, f: &mut fmt::Formatter<'_>, time: Timestamp) -> fmt::Result {
         const NANOS_IN_SECOND: i64 = 1_000_000_000;
 
         match self {
             // Don't try to print a human readable string if it's going to be in 1970, fall back
             // to monotonic.
             Self::Original | Self::WallTime { offset: 0, .. } => {
-                let time: Duration = Duration::from_nanos(time as u64);
+                let time: Duration =
+                    Duration::from_nanos(time.into_nanos().try_into().unwrap_or(0));
                 write!(f, "[{:05}.{:06}]", time.as_secs(), time.as_micros() % MICROS_IN_SEC)?;
             }
             Self::WallTime { tz, offset } => {
-                let adjusted = time + offset;
+                let adjusted = time.into_nanos() + offset;
                 let seconds = adjusted / NANOS_IN_SECOND;
                 let rem_nanos = (adjusted % NANOS_IN_SECOND) as u32;
                 let formatted = tz.format(seconds, rem_nanos);
@@ -1296,7 +1281,6 @@ impl Deref for LogTextPresenter<'_> {
 impl fmt::Display for LogTextPresenter<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.options.color.begin_record(f, self.log.severity())?;
-
         self.options.time_format.write_timestamp(f, self.metadata.timestamp)?;
 
         if self.options.show_metadata {
@@ -1607,11 +1591,14 @@ mod tests {
         };
 
         hierarchy.sort();
-        let json_schema =
-            InspectDataBuilder::new("a/b/c/d".try_into().unwrap(), TEST_URL, 123456i64)
-                .with_hierarchy(hierarchy)
-                .with_name(InspectHandleName::filename("test_file_plz_ignore.inspect"))
-                .build();
+        let json_schema = InspectDataBuilder::new(
+            "a/b/c/d".try_into().unwrap(),
+            TEST_URL,
+            Timestamp::from_nanos(123456i64),
+        )
+        .with_hierarchy(hierarchy)
+        .with_name(InspectHandleName::filename("test_file_plz_ignore.inspect"))
+        .build();
 
         let result_json =
             serde_json::to_value(&json_schema).expect("serialization should succeed.");
@@ -1637,11 +1624,14 @@ mod tests {
 
     #[fuchsia::test]
     fn test_errorful_json_inspect_formatting() {
-        let json_schema =
-            InspectDataBuilder::new("a/b/c/d".try_into().unwrap(), TEST_URL, 123456i64)
-                .with_name(InspectHandleName::filename("test_file_plz_ignore.inspect"))
-                .with_errors(vec![InspectError { message: "too much fun being had.".to_string() }])
-                .build();
+        let json_schema = InspectDataBuilder::new(
+            "a/b/c/d".try_into().unwrap(),
+            TEST_URL,
+            Timestamp::from_nanos(123456i64),
+        )
+        .with_name(InspectHandleName::filename("test_file_plz_ignore.inspect"))
+        .with_errors(vec![InspectError { message: "too much fun being had.".to_string() }])
+        .build();
 
         let result_json =
             serde_json::to_value(&json_schema).expect("serialization should succeed.");
@@ -1674,8 +1664,12 @@ mod tests {
 
     #[fuchsia::test]
     fn test_filter_returns_none_on_empty_hierarchy() {
-        let data =
-            InspectDataBuilder::new("a/b/c/d".try_into().unwrap(), TEST_URL, 123456i64).build();
+        let data = InspectDataBuilder::new(
+            "a/b/c/d".try_into().unwrap(),
+            TEST_URL,
+            Timestamp::from_nanos(123456i64),
+        )
+        .build();
         let selectors = parse_selectors(vec!["a/b/c/d:foo"]);
         assert_eq!(data.filter(&selectors).expect("Filter OK"), None);
     }
@@ -1688,9 +1682,13 @@ mod tests {
             }
         };
         hierarchy.sort();
-        let data = InspectDataBuilder::new("b/c/d/e".try_into().unwrap(), TEST_URL, 123456i64)
-            .with_hierarchy(hierarchy)
-            .build();
+        let data = InspectDataBuilder::new(
+            "b/c/d/e".try_into().unwrap(),
+            TEST_URL,
+            Timestamp::from_nanos(123456i64),
+        )
+        .with_hierarchy(hierarchy)
+        .build();
         let selectors = parse_selectors(vec!["a/b/c/d:foo"]);
         assert_eq!(data.filter(&selectors).expect("Filter OK"), None);
     }
@@ -1703,9 +1701,13 @@ mod tests {
             }
         };
         hierarchy.sort();
-        let data = InspectDataBuilder::new("a/b/c/d".try_into().unwrap(), TEST_URL, 123456i64)
-            .with_hierarchy(hierarchy)
-            .build();
+        let data = InspectDataBuilder::new(
+            "a/b/c/d".try_into().unwrap(),
+            TEST_URL,
+            Timestamp::from_nanos(123456i64),
+        )
+        .with_hierarchy(hierarchy)
+        .build();
         let selectors = parse_selectors(vec!["a/b/c/d:foo"]);
 
         assert_eq!(data.filter(&selectors).expect("FIlter OK"), None);
@@ -1720,10 +1722,14 @@ mod tests {
             }
         };
         hierarchy.sort();
-        let data = InspectDataBuilder::new("a/b/c/d".try_into().unwrap(), TEST_URL, 123456i64)
-            .with_name(InspectHandleName::filename("test_file_plz_ignore.inspect"))
-            .with_hierarchy(hierarchy)
-            .build();
+        let data = InspectDataBuilder::new(
+            "a/b/c/d".try_into().unwrap(),
+            TEST_URL,
+            Timestamp::from_nanos(123456i64),
+        )
+        .with_name(InspectHandleName::filename("test_file_plz_ignore.inspect"))
+        .with_hierarchy(hierarchy)
+        .build();
         let selectors = parse_selectors(vec!["a/b/c/d:root:x"]);
 
         let expected_json = json!({
@@ -1754,7 +1760,7 @@ mod tests {
             component_url: Some("url".into()),
             moniker: ExtendedMoniker::parse_str("moniker").unwrap(),
             severity: Severity::Info,
-            timestamp_nanos: 0.into(),
+            timestamp: Timestamp::from_nanos(0),
         });
         //let tree = builder.build();
         let expected_json = json!({
@@ -1786,7 +1792,7 @@ mod tests {
             component_url: Some("url".into()),
             moniker: ExtendedMoniker::parse_str("moniker").unwrap(),
             severity: Severity::Info,
-            timestamp_nanos: 0.into(),
+            timestamp: Timestamp::from_nanos(0),
         })
         .set_message("app")
         .set_file("test file.cc")
@@ -1835,7 +1841,7 @@ mod tests {
     #[fuchsia::test]
     fn display_for_logs() {
         let data = LogsDataBuilder::new(BuilderArgs {
-            timestamp_nanos: Timestamp::from(12345678000i64).into(),
+            timestamp: Timestamp::from_nanos(12345678000i64),
             component_url: Some(FlyStr::from("fake-url")),
             moniker: ExtendedMoniker::parse_str("moniker").unwrap(),
             severity: Severity::Info,
@@ -1860,7 +1866,7 @@ mod tests {
     #[fuchsia::test]
     fn display_for_logs_with_duplicate_moniker() {
         let data = LogsDataBuilder::new(BuilderArgs {
-            timestamp_nanos: Timestamp::from(12345678000i64).into(),
+            timestamp: Timestamp::from_nanos(12345678000i64),
             component_url: Some(FlyStr::from("fake-url")),
             moniker: ExtendedMoniker::parse_str("moniker").unwrap(),
             severity: Severity::Info,
@@ -1886,7 +1892,7 @@ mod tests {
     #[fuchsia::test]
     fn display_for_logs_with_duplicate_moniker_and_no_other_tags() {
         let data = LogsDataBuilder::new(BuilderArgs {
-            timestamp_nanos: Timestamp::from(12345678000i64).into(),
+            timestamp: Timestamp::from_nanos(12345678000i64),
             component_url: Some(FlyStr::from("fake-url")),
             moniker: ExtendedMoniker::parse_str("moniker").unwrap(),
             severity: Severity::Info,
@@ -1911,7 +1917,7 @@ mod tests {
     #[fuchsia::test]
     fn display_for_logs_partial_moniker() {
         let data = LogsDataBuilder::new(BuilderArgs {
-            timestamp_nanos: Timestamp::from(12345678000i64).into(),
+            timestamp: Timestamp::from_nanos(12345678000i64),
             component_url: Some(FlyStr::from("fake-url")),
             moniker: ExtendedMoniker::parse_str("test/moniker").unwrap(),
             severity: Severity::Info,
@@ -1939,7 +1945,7 @@ mod tests {
     #[fuchsia::test]
     fn display_for_logs_exclude_metadata() {
         let data = LogsDataBuilder::new(BuilderArgs {
-            timestamp_nanos: Timestamp::from(12345678000i64).into(),
+            timestamp: Timestamp::from_nanos(12345678000i64),
             component_url: Some(FlyStr::from("fake-url")),
             moniker: ExtendedMoniker::parse_str("moniker").unwrap(),
             severity: Severity::Info,
@@ -1967,7 +1973,7 @@ mod tests {
     #[fuchsia::test]
     fn display_for_logs_exclude_tags() {
         let data = LogsDataBuilder::new(BuilderArgs {
-            timestamp_nanos: Timestamp::from(12345678000i64).into(),
+            timestamp: Timestamp::from_nanos(12345678000i64),
             component_url: Some(FlyStr::from("fake-url")),
             moniker: ExtendedMoniker::parse_str("moniker").unwrap(),
             severity: Severity::Info,
@@ -1995,7 +2001,7 @@ mod tests {
     #[fuchsia::test]
     fn display_for_logs_exclude_file() {
         let data = LogsDataBuilder::new(BuilderArgs {
-            timestamp_nanos: Timestamp::from(12345678000i64).into(),
+            timestamp: Timestamp::from_nanos(12345678000i64),
             component_url: Some(FlyStr::from("fake-url")),
             moniker: ExtendedMoniker::parse_str("moniker").unwrap(),
             severity: Severity::Info,
@@ -2023,7 +2029,7 @@ mod tests {
     #[fuchsia::test]
     fn display_for_logs_include_color_by_severity() {
         let data = LogsDataBuilder::new(BuilderArgs {
-            timestamp_nanos: Timestamp::from(12345678000i64).into(),
+            timestamp: Timestamp::from_nanos(12345678000i64),
             component_url: Some(FlyStr::from("fake-url")),
             moniker: ExtendedMoniker::parse_str("moniker").unwrap(),
             severity: Severity::Error,
@@ -2051,7 +2057,7 @@ mod tests {
     #[fuchsia::test]
     fn display_for_logs_highlight_line() {
         let data = LogsDataBuilder::new(BuilderArgs {
-            timestamp_nanos: Timestamp::from(12345678000i64).into(),
+            timestamp: Timestamp::from_nanos(12345678000i64),
             component_url: Some(FlyStr::from("fake-url")),
             moniker: ExtendedMoniker::parse_str("moniker").unwrap(),
             severity: Severity::Info,
@@ -2079,7 +2085,7 @@ mod tests {
     #[fuchsia::test]
     fn display_for_logs_with_wall_time() {
         let data = LogsDataBuilder::new(BuilderArgs {
-            timestamp_nanos: Timestamp::from(12345678000i64).into(),
+            timestamp: Timestamp::from_nanos(12345678000i64),
             component_url: Some(FlyStr::from("fake-url")),
             moniker: ExtendedMoniker::parse_str("moniker").unwrap(),
             severity: Severity::Info,
@@ -2116,7 +2122,7 @@ mod tests {
     #[fuchsia::test]
     fn display_for_logs_with_dropped_count() {
         let data = LogsDataBuilder::new(BuilderArgs {
-            timestamp_nanos: Timestamp::from(12345678000i64).into(),
+            timestamp: Timestamp::from_nanos(12345678000i64),
             component_url: Some(FlyStr::from("fake-url")),
             moniker: ExtendedMoniker::parse_str("moniker").unwrap(),
             severity: Severity::Info,
@@ -2150,7 +2156,7 @@ mod tests {
     #[fuchsia::test]
     fn display_for_logs_with_rolled_count() {
         let data = LogsDataBuilder::new(BuilderArgs {
-            timestamp_nanos: Timestamp::from(12345678000i64).into(),
+            timestamp: Timestamp::from_nanos(12345678000i64),
             component_url: Some(FlyStr::from("fake-url")),
             moniker: ExtendedMoniker::parse_str("moniker").unwrap(),
             severity: Severity::Info,
@@ -2184,7 +2190,7 @@ mod tests {
     #[fuchsia::test]
     fn display_for_logs_with_dropped_and_rolled_counts() {
         let data = LogsDataBuilder::new(BuilderArgs {
-            timestamp_nanos: Timestamp::from(12345678000i64).into(),
+            timestamp: Timestamp::from_nanos(12345678000i64),
             component_url: Some(FlyStr::from("fake-url")),
             moniker: ExtendedMoniker::parse_str("moniker").unwrap(),
             severity: Severity::Info,
@@ -2219,7 +2225,7 @@ mod tests {
     #[fuchsia::test]
     fn display_for_logs_no_tags() {
         let data = LogsDataBuilder::new(BuilderArgs {
-            timestamp_nanos: Timestamp::from(12345678000i64).into(),
+            timestamp: Timestamp::from_nanos(12345678000i64),
             component_url: Some(FlyStr::from("fake-url")),
             moniker: ExtendedMoniker::parse_str("moniker").unwrap(),
             severity: Severity::Info,
@@ -2255,7 +2261,7 @@ mod tests {
             component_url: Some("url".into()),
             moniker: ExtendedMoniker::parse_str("a/b").unwrap(),
             severity: Severity::Info,
-            timestamp_nanos: 123.into(),
+            timestamp: Timestamp::from_nanos(123),
         })
         .build();
         let original_data: LogsData = serde_json::from_value(original_json).unwrap();
@@ -2288,7 +2294,7 @@ mod tests {
             component_url: Some("url".into()),
             moniker: ExtendedMoniker::parse_str("a/b").unwrap(),
             severity: Severity::Info,
-            timestamp_nanos: 123.into(),
+            timestamp: Timestamp::from_nanos(123),
         })
         .build();
         let original_data: LogsData = serde_json::from_value(original_json).unwrap();

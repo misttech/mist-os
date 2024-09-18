@@ -4,7 +4,7 @@
 
 use diagnostics_data::{
     BuilderArgs, InspectDataBuilder, InspectHandleName, LogsDataBuilder, LogsField, LogsProperty,
-    Severity,
+    Severity, Timestamp,
 };
 use diagnostics_hierarchy::{DiagnosticsHierarchy, Property};
 use fidl_fuchsia_diagnostics::{DataType, Format};
@@ -30,7 +30,7 @@ fn bench_serialization(b: &mut criterion::Bencher, n: usize, m: usize, format: F
     let data = InspectDataBuilder::new(
         "bench".try_into().unwrap(),
         "fuchsia-pkg://fuchsia.com/testing#meta/bench.cm",
-        1,
+        Timestamp::from_nanos(1),
     )
     .with_hierarchy(DiagnosticsHierarchy::new("root", vec![], children))
     .with_name(InspectHandleName::filename("fuchsia.inspect.Tree"))
@@ -49,7 +49,7 @@ fn bench_json_packet_serializer(b: &mut criterion::Bencher, total_logs: u64) {
                 ),
                 moniker: format!("moniker-{i}").as_str().try_into().unwrap(),
                 severity: Severity::Info,
-                timestamp_nanos: (i as i64).into(),
+                timestamp: Timestamp::from_nanos(i as i64),
             })
             .set_message(format!("Benching #{}", i))
             .set_file(format!("bench-{}.rs", i))

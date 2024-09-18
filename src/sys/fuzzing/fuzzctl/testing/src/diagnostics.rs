@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use anyhow::Result;
-use diagnostics_data::{BuilderArgs, LogsDataBuilder, Severity};
+use diagnostics_data::{BuilderArgs, LogsDataBuilder, Severity, Timestamp};
 use futures::AsyncWriteExt;
 
 /// Generates a system log entry from the given `msg` and sends it to the given `socket`.
@@ -18,7 +18,7 @@ use futures::AsyncWriteExt;
 /// See also `writer::Writer::log` which formats these entries for display.
 pub async fn send_log_entry<S: AsRef<str>>(socket: &mut fidl::AsyncSocket, msg: S) -> Result<()> {
     let builder_args = BuilderArgs {
-        timestamp_nanos: 0.into(),
+        timestamp: Timestamp::from_nanos(0),
         component_url: Some("".into()),
         moniker: "moniker".try_into().unwrap(),
         severity: Severity::Info,

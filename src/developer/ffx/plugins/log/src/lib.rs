@@ -11,7 +11,7 @@ use fidl_fuchsia_diagnostics::{LogSettingsMarker, LogSettingsProxy, StreamParame
 use fidl_fuchsia_diagnostics_host::ArchiveAccessorMarker;
 use log_command::log_formatter::{
     dump_logs_from_socket, BootTimeAccessor, DefaultLogFormatter, LogEntry, LogFormatter,
-    Symbolize, WriterContainer,
+    Symbolize, Timestamp, WriterContainer,
 };
 use log_command::{InstanceGetter, LogProcessingResult, LogSubCommand, WatchCommand};
 use std::io::Write;
@@ -235,7 +235,9 @@ where
             formatter.writer().stderr(),
         )
         .await?;
-        formatter.set_boot_timestamp(connection.boot_timestamp as i64);
+        formatter.set_boot_timestamp(Timestamp::from_nanos(
+            connection.boot_timestamp.try_into().unwrap(),
+        ));
         let result = dump_logs_from_socket(
             connection.log_socket,
             &mut formatter,
@@ -325,13 +327,13 @@ mod tests {
         assert_eq!(
             serde_json::from_str::<LogEntry>(&output).unwrap(),
             LogEntry {
-                timestamp: 1.into(),
+                timestamp: Timestamp::from_nanos(1),
                 data: LogData::TargetLog(
                     LogsDataBuilder::new(BuilderArgs {
                         component_url: Some("ffx".into()),
                         moniker: "host/ffx".try_into().unwrap(),
                         severity: Severity::Info,
-                        timestamp_nanos: Timestamp::from(0),
+                        timestamp: Timestamp::from_nanos(0),
                     })
                     .set_pid(1)
                     .set_tid(2)

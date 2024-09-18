@@ -124,7 +124,7 @@ mod tests {
             "fuchsia-pkg://not-a-package",
         );
         let mut builder = diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
-            timestamp_nanos: fuchsia_zircon::MonotonicTime::from_nanos(1).into(),
+            timestamp: fuchsia_zircon::MonotonicTime::from_nanos(1).into(),
             component_url: Some(identity.url.clone()),
             moniker: identity.moniker.clone(),
             severity: Severity::Info,

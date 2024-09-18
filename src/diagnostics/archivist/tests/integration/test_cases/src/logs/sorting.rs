@@ -93,7 +93,7 @@ impl Listener {
     async fn check_next(&mut self, time: i64, expected_moniker: &str) {
         let log = self.stream.next().await.unwrap().unwrap();
         assert_eq!(log.msg().unwrap(), "timing log");
-        assert_eq!(log.metadata.timestamp, time);
+        assert_eq!(log.metadata.timestamp.into_nanos(), time);
         assert_eq!(log.moniker.to_string(), expected_moniker);
     }
 }
@@ -116,7 +116,7 @@ async fn check_log_snapshot(
     let logs = ArchiveReader::new().with_archive(accessor).snapshot::<Logs>().await.unwrap();
     let result = logs
         .into_iter()
-        .map(|log| (log.metadata.timestamp, log.moniker.clone()))
+        .map(|log| (log.metadata.timestamp.into_nanos(), log.moniker.clone()))
         .collect::<Vec<_>>();
     assert_eq!(result, expected_dump);
 }

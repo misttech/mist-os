@@ -288,7 +288,7 @@ mod tests {
         assert_eq!(
             data,
             LogsDataBuilder::new(BuilderArgs {
-                timestamp_nanos: klog.record.timestamp.into(),
+                timestamp: klog.record.timestamp.into(),
                 component_url: Some(KERNEL_IDENTITY.url.clone()),
                 moniker: KERNEL_IDENTITY.moniker.clone(),
                 severity: Severity::Info,
@@ -323,7 +323,7 @@ mod tests {
         assert_eq!(
             data,
             LogsDataBuilder::new(BuilderArgs {
-                timestamp_nanos: klog.record.timestamp.into(),
+                timestamp: klog.record.timestamp.into(),
                 component_url: Some(KERNEL_IDENTITY.url.clone()),
                 moniker: KERNEL_IDENTITY.moniker.clone(),
                 severity: Severity::Info,
@@ -343,7 +343,7 @@ mod tests {
         assert_eq!(
             data,
             LogsDataBuilder::new(BuilderArgs {
-                timestamp_nanos: klog.record.timestamp.into(),
+                timestamp: klog.record.timestamp.into(),
                 component_url: Some(KERNEL_IDENTITY.url.clone()),
                 moniker: KERNEL_IDENTITY.moniker.clone(),
                 severity: Severity::Info,

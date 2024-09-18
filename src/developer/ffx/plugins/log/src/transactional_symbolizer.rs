@@ -769,15 +769,15 @@ mod tests {
         }
     }
 
-    fn create_target_log_entry(msg: impl Into<String>, timestamp: i32) -> (LogEntry, Data<Logs>) {
+    fn create_target_log_entry(msg: impl Into<String>, timestamp: i64) -> (LogEntry, Data<Logs>) {
         let txn = LogEntry {
-            timestamp: timestamp.into(),
+            timestamp: Timestamp::from_nanos(timestamp),
             data: LogData::TargetLog(
                 LogsDataBuilder::new(BuilderArgs {
                     component_url: Some("ffx".into()),
                     moniker: "ffx".try_into().unwrap(),
                     severity: Severity::Info,
-                    timestamp_nanos: Timestamp::from(timestamp),
+                    timestamp: Timestamp::from_nanos(timestamp),
                 })
                 .set_pid(1)
                 .set_tid(2)
@@ -838,7 +838,7 @@ mod tests {
             fake_waker.clone().poll_while_woke(symbolize_task_0.as_mut()),
             Poll::Ready(Some(LogEntry {
                 data: LogData::TargetLog(txn_data.clone()),
-                timestamp: Timestamp::from(0),
+                timestamp: Timestamp::from_nanos(0),
             }))
         );
         // TXN 1 should still not be completed.
@@ -859,7 +859,7 @@ mod tests {
             fake_waker.clone().poll_while_woke(symbolize_task_1.as_mut()),
             Poll::Ready(Some(LogEntry {
                 data: LogData::TargetLog(txn_data_2.clone()),
-                timestamp: Timestamp::from(1),
+                timestamp: Timestamp::from_nanos(1),
             }))
         );
     }

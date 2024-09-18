@@ -138,8 +138,8 @@ impl<'a, S: Write> SerialWriter<'a, S> {
         write!(
             &mut this,
             "[{:05}.{:03}] {:05}:{:05}> [",
-            zx::Duration::from_nanos(log.metadata.timestamp).into_seconds(),
-            zx::Duration::from_nanos(log.metadata.timestamp).into_millis() % 1000,
+            zx::Duration::from_nanos(log.metadata.timestamp.into_nanos()).into_seconds(),
+            zx::Duration::from_nanos(log.metadata.timestamp.into_nanos()).into_millis() % 1000,
             log.pid().unwrap_or(0),
             log.tid().unwrap_or(0)
         )?;
@@ -227,7 +227,7 @@ mod tests {
     #[fuchsia::test]
     fn write_to_serial_handles_denied_tags() {
         let log = LogsDataBuilder::new(BuilderArgs {
-            timestamp_nanos: MonotonicTime::from_nanos(1).into(),
+            timestamp: MonotonicTime::from_nanos(1).into(),
             component_url: Some("url".into()),
             moniker: "core/foo".try_into().unwrap(),
             severity: Severity::Info,
@@ -248,7 +248,7 @@ mod tests {
             "neque bibendum molestie. Etiam ac sapien justo. Nullam aliquet ipsum nec tincidunt."
         );
         let log = LogsDataBuilder::new(BuilderArgs {
-            timestamp_nanos: MonotonicTime::from_nanos(123456789).into(),
+            timestamp: MonotonicTime::from_nanos(123456789).into(),
             component_url: Some("url".into()),
             moniker: "core/foo".try_into().unwrap(),
             severity: Severity::Info,
@@ -275,7 +275,7 @@ mod tests {
     #[fuchsia::test]
     fn when_no_tags_are_present_the_component_name_is_used() {
         let log = LogsDataBuilder::new(BuilderArgs {
-            timestamp_nanos: MonotonicTime::from_nanos(123456789).into(),
+            timestamp: MonotonicTime::from_nanos(123456789).into(),
             component_url: Some("url".into()),
             moniker: "core/foo".try_into().unwrap(),
             severity: Severity::Info,
@@ -315,12 +315,28 @@ mod tests {
             "fuchsia-pkg://core-baz",
         )));
 
-        bootstrap_foo_container.ingest_message(make_message("a", None, 1));
-        core_baz_container.ingest_message(make_message("c", None, 2));
+        bootstrap_foo_container.ingest_message(make_message(
+            "a",
+            None,
+            zx::MonotonicTime::from_nanos(1),
+        ));
+        core_baz_container.ingest_message(make_message(
+            "c",
+            None,
+            zx::MonotonicTime::from_nanos(2),
+        ));
         let (sink, rcv) = TestSink::new();
         let _serial_task = fasync::Task::spawn(serial_config.write_logs(Arc::clone(&repo), sink));
-        bootstrap_bar_container.ingest_message(make_message("b", Some("foo"), 3));
-        core_foo_container.ingest_message(make_message("c", None, 4));
+        bootstrap_bar_container.ingest_message(make_message(
+            "b",
+            Some("foo"),
+            zx::MonotonicTime::from_nanos(3),
+        ));
+        core_foo_container.ingest_message(make_message(
+            "c",
+            None,
+            zx::MonotonicTime::from_nanos(4),
+        ));
 
         let received = rcv.take(2).collect::<Vec<_>>().await;
 
@@ -336,9 +352,9 @@ mod tests {
         );
     }
 
-    fn make_message(msg: &str, tag: Option<&str>, timestamp: i64) -> StoredMessage {
+    fn make_message(msg: &str, tag: Option<&str>, timestamp: zx::MonotonicTime) -> StoredMessage {
         let mut record = Record {
-            timestamp,
+            timestamp: timestamp.into_nanos(),
             severity: StreamSeverity::Debug.into_primitive(),
             arguments: vec![
                 Argument { name: "pid".to_string(), value: Value::UnsignedInt(1) },

@@ -1210,7 +1210,7 @@ fn process_schema_errors(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use diagnostics_data::InspectDataBuilder;
+    use diagnostics_data::{InspectDataBuilder, Timestamp};
     use diagnostics_hierarchy::hierarchy;
     use futures::executor;
 
@@ -1989,7 +1989,7 @@ mod tests {
         let file1_value4 = vec![InspectDataBuilder::new(
             "my/component".try_into().unwrap(),
             "component-url",
-            0, /* timestamp */
+            Timestamp::from_nanos(0),
         )
         .with_hierarchy(hierarchy! { root: {branch: {leaf: 4i32}}})
         .with_name(InspectHandleName::filename("file1"))
@@ -1997,7 +1997,7 @@ mod tests {
         let file2_value3 = vec![InspectDataBuilder::new(
             "my/component".try_into().unwrap(),
             "component-url",
-            0, /* timestamp */
+            Timestamp::from_nanos(0),
         )
         .with_hierarchy(hierarchy! { root: {branch: {leaf: 3i32}}})
         .with_name(InspectHandleName::filename("file2"))
@@ -2005,7 +2005,7 @@ mod tests {
         let file1_value6 = vec![InspectDataBuilder::new(
             "my/component".try_into().unwrap(),
             "component-url",
-            0, /* timestamp */
+            Timestamp::from_nanos(0),
         )
         .with_hierarchy(hierarchy! { root: {branch: {leaf: 6i32}}})
         .with_name(InspectHandleName::filename("file1"))
@@ -2013,7 +2013,7 @@ mod tests {
         let file2_value8 = vec![InspectDataBuilder::new(
             "my/component".try_into().unwrap(),
             "component-url",
-            0, /* timestamp */
+            Timestamp::from_nanos(0),
         )
         .with_hierarchy(hierarchy! { root: {branch: {leaf: 8i32}}})
         .with_name(InspectHandleName::filename("file2"))
@@ -2075,7 +2075,7 @@ mod tests {
         let value = vec![InspectDataBuilder::new(
             "my/component".try_into().unwrap(),
             "component-url",
-            0, /* timestamp */
+            Timestamp::from_nanos(0),
         )
         .with_hierarchy(hierarchy! { root: {branch: {leaf: 4i32}}})
         .with_name(InspectHandleName::filename("file1"))

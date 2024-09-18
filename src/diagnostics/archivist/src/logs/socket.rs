@@ -108,7 +108,7 @@ impl<E> Drop for LogMessageSocket<E> {
 mod tests {
     use super::*;
     use crate::testing::TEST_IDENTITY;
-    use diagnostics_data::{LogsField, Severity};
+    use diagnostics_data::{LogsField, Severity, Timestamp};
     use diagnostics_log_encoding::encode::{Encoder, EncoderOpts};
     use diagnostics_log_encoding::{Argument, Record, Severity as StreamSeverity, Value};
     use diagnostics_message::fx_log_packet_t;
@@ -130,7 +130,7 @@ mod tests {
         let mut ls = LogMessageSocket::new(socket, Default::default());
         sin.write(packet.as_bytes()).unwrap();
         let expected_p = diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
-            timestamp_nanos: zx::MonotonicTime::from_nanos(packet.metadata.time).into(),
+            timestamp: zx::MonotonicTime::from_nanos(packet.metadata.time).into(),
             component_url: Some(TEST_IDENTITY.url.clone()),
             moniker: TEST_IDENTITY.moniker.clone(),
             severity: Severity::Info,
@@ -170,7 +170,7 @@ mod tests {
         let encoded = &buffer.get_ref()[..buffer.position() as usize];
 
         let expected_p = diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
-            timestamp_nanos: timestamp.into(),
+            timestamp: Timestamp::from_nanos(timestamp),
             component_url: Some(TEST_IDENTITY.url.clone()),
             moniker: TEST_IDENTITY.moniker.clone(),
             severity: Severity::Fatal,

@@ -186,7 +186,7 @@ impl LogsArtifactsContainer {
                                             rolled_out_messages,
                                             LogsDataBuilder::new(BuilderArgs {
                                                 moniker: identity.moniker.clone(),
-                                                timestamp_nanos: (*last_timestamp).into(),
+                                                timestamp: (*last_timestamp).into(),
                                                 component_url: Some(identity.url.clone()),
                                                 severity: diagnostics_data::Severity::Warn,
                                             })

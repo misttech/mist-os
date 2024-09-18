@@ -16,7 +16,6 @@ use std::cmp;
 use std::collections::VecDeque;
 use std::io::{self, Write};
 use std::sync::{mpsc, Arc};
-use std::time::Duration;
 use {fidl_fuchsia_diagnostics as fdiagnostics, fuchsia_zircon as zx};
 
 const BUFFER_SIZE: i32 = 1_049_000;
@@ -393,10 +392,10 @@ fn format_log(data: Data<Logs>) -> Result<Option<Vec<u8>>, io::Error> {
         Severity::Error => 3,
         Severity::Fatal => 2,
     };
-    let time: Duration = Duration::from_nanos(data.metadata.timestamp as u64);
+    let time = zx::Duration::from_nanos(data.metadata.timestamp.into_nanos());
     let component_name = data.component_name();
-    let time_secs = time.as_secs();
-    let time_fract = time.as_micros() % 1_000_000;
+    let time_secs = time.into_seconds();
+    let time_fract = time.into_micros() % 1_000_000;
     write!(&mut result, "<{level}>[{time_secs:05}.{time_fract:06}] {component_name}",)?;
 
     match data.metadata.pid {

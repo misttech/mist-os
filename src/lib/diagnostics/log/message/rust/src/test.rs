@@ -98,7 +98,7 @@ fn invalid_utf8_is_handled() {
     let logger_message = LoggerMessage::try_from(buffer).unwrap();
     let parsed = crate::from_logger(get_test_identity(), logger_message);
     let expected = LogsDataBuilder::new(BuilderArgs {
-        timestamp_nanos: packet.metadata.time.into(),
+        timestamp: Timestamp::from_nanos(packet.metadata.time),
         component_url: Some(TEST_IDENTITY.url.clone()),
         moniker: TEST_IDENTITY.moniker.clone(),
         severity: Severity::Debug,
@@ -160,7 +160,7 @@ fn tags_with_message() {
     assert_eq!(logger_message.size_bytes, METADATA_SIZE + b_end);
     let parsed = crate::from_logger(get_test_identity(), logger_message);
     let expected = LogsDataBuilder::new(BuilderArgs {
-        timestamp_nanos: packet.metadata.time.into(),
+        timestamp: Timestamp::from_nanos(packet.metadata.time),
         component_url: Some(TEST_IDENTITY.url.clone()),
         moniker: TEST_IDENTITY.moniker.clone(),
         severity: Severity::Debug,
@@ -227,7 +227,7 @@ fn two_tags_with_message() {
     assert_eq!(logger_message.size_bytes, METADATA_SIZE + data_size);
     let parsed = crate::from_logger(get_test_identity(), logger_message);
     let expected = LogsDataBuilder::new(BuilderArgs {
-        timestamp_nanos: packet.metadata.time.into(),
+        timestamp: Timestamp::from_nanos(packet.metadata.time),
         component_url: Some(TEST_IDENTITY.url.clone()),
         moniker: TEST_IDENTITY.moniker.clone(),
         severity: Severity::Debug,
@@ -281,7 +281,7 @@ fn max_tags_with_message() {
         .map(|tag_num| String::from_utf8(vec![('A' as c_char + tag_num) as u8; tag_len]).unwrap())
         .collect::<Vec<_>>();
     let mut builder = LogsDataBuilder::new(BuilderArgs {
-        timestamp_nanos: packet.metadata.time.into(),
+        timestamp: Timestamp::from_nanos(packet.metadata.time),
         component_url: Some(TEST_IDENTITY.url.clone()),
         moniker: TEST_IDENTITY.moniker.clone(),
         severity: Severity::Debug,
@@ -328,7 +328,7 @@ fn max_tags() {
     assert_eq!(logger_message.size_bytes, 48);
     let parsed = crate::from_logger(get_test_identity(), logger_message);
     let mut builder = LogsDataBuilder::new(BuilderArgs {
-        timestamp_nanos: packet.metadata.time.into(),
+        timestamp: Timestamp::from_nanos(packet.metadata.time),
         component_url: Some(TEST_IDENTITY.url.clone()),
         moniker: TEST_IDENTITY.moniker.clone(),
         severity: Severity::Debug,
@@ -360,7 +360,7 @@ fn no_tags_with_message() {
     assert_eq!(
         parsed,
         LogsDataBuilder::new(BuilderArgs {
-            timestamp_nanos: zx::MonotonicTime::from_nanos(3).into(),
+            timestamp: zx::MonotonicTime::from_nanos(3).into(),
             component_url: Some(TEST_IDENTITY.url.clone()),
             moniker: TEST_IDENTITY.moniker.clone(),
             severity: Severity::Debug,
@@ -386,7 +386,7 @@ fn message_severity() {
     let mut parsed = crate::from_logger(get_test_identity(), logger_message);
 
     let mut expected_message = LogsDataBuilder::new(BuilderArgs {
-        timestamp_nanos: packet.metadata.time.into(),
+        timestamp: Timestamp::from_nanos(packet.metadata.time),
         component_url: Some(TEST_IDENTITY.url.clone()),
         moniker: TEST_IDENTITY.moniker.clone(),
         severity: Severity::Info,
@@ -441,7 +441,7 @@ fn legacy_message_severity() {
     assert_eq!(logger_message.size_bytes, METADATA_SIZE + 1);
     let mut parsed = crate::from_logger(get_test_identity(), logger_message);
     let mut expected_message = LogsDataBuilder::new(BuilderArgs {
-        timestamp_nanos: zx::MonotonicTime::from_nanos(3).into(),
+        timestamp: zx::MonotonicTime::from_nanos(3).into(),
         component_url: Some(TEST_IDENTITY.url.clone()),
         moniker: TEST_IDENTITY.moniker.clone(),
         severity: Severity::Debug,
@@ -534,7 +534,7 @@ fn test_raw_severity_parsing_and_conversions() {
     assert_eq!(
         parsed,
         LogsDataBuilder::new(BuilderArgs {
-            timestamp_nanos: zx::MonotonicTime::from_nanos(72).into(),
+            timestamp: zx::MonotonicTime::from_nanos(72).into(),
             component_url: Some(TEST_IDENTITY.url.clone()),
             moniker: TEST_IDENTITY.moniker.clone(),
             severity: Severity::Debug,
@@ -597,7 +597,7 @@ fn test_from_structured() {
     assert_eq!(
         parsed,
         LogsDataBuilder::new(BuilderArgs {
-            timestamp_nanos: zx::MonotonicTime::from_nanos(72).into(),
+            timestamp: zx::MonotonicTime::from_nanos(72).into(),
             component_url: Some(TEST_IDENTITY.url.clone()),
             moniker: TEST_IDENTITY.moniker.clone(),
             severity: Severity::Error,
@@ -646,7 +646,7 @@ fn test_from_structured() {
     assert_eq!(
         parsed,
         LogsDataBuilder::new(BuilderArgs {
-            timestamp_nanos: zx::MonotonicTime::from_nanos(72).into(),
+            timestamp: zx::MonotonicTime::from_nanos(72).into(),
             component_url: Some(TEST_IDENTITY.url.clone()),
             moniker: TEST_IDENTITY.moniker.clone(),
             severity: Severity::Error,
@@ -671,7 +671,7 @@ fn test_from_structured() {
     assert_eq!(
         parsed,
         LogsDataBuilder::new(BuilderArgs {
-            timestamp_nanos: zx::MonotonicTime::from_nanos(72).into(),
+            timestamp: zx::MonotonicTime::from_nanos(72).into(),
             component_url: Some(TEST_IDENTITY.url.clone()),
             moniker: TEST_IDENTITY.moniker.clone(),
             severity: Severity::Error,

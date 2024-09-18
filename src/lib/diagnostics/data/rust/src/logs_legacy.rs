@@ -186,7 +186,7 @@ impl Into<LogMessage> for &Data<Logs> {
         LogMessage {
             pid: self.pid().unwrap_or(zx::sys::ZX_KOID_INVALID),
             tid: self.tid().unwrap_or(zx::sys::ZX_KOID_INVALID),
-            time: self.metadata.timestamp.into(),
+            time: self.metadata.timestamp.into_nanos(),
             severity: self.legacy_severity().into(),
             dropped_logs: self.dropped_logs().unwrap_or(0) as _,
             tags,
@@ -217,7 +217,7 @@ impl Into<LogMessage> for Data<Logs> {
         LogMessage {
             pid: self.pid().unwrap_or(zx::sys::ZX_KOID_INVALID),
             tid: self.tid().unwrap_or(zx::sys::ZX_KOID_INVALID),
-            time: self.metadata.timestamp.into(),
+            time: self.metadata.timestamp.into_nanos(),
             severity: self.legacy_severity().into(),
             dropped_logs: self.dropped_logs().unwrap_or(0) as _,
             tags: match self.metadata.tags {
@@ -232,7 +232,7 @@ impl Into<LogMessage> for Data<Logs> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::{BuilderArgs, LogsDataBuilder};
+    use crate::{BuilderArgs, LogsDataBuilder, Timestamp};
 
     const TEST_URL: &'static str = "fuchsia-pkg://test";
     const TEST_MONIKER: &'static str = "fake-test/moniker";
@@ -242,7 +242,7 @@ mod test {
             let legacy = LegacySeverity::try_from(i32::from($raw)).unwrap();
             let (severity, raw_severity) = legacy.for_structured();
             let mut msg = LogsDataBuilder::new(BuilderArgs {
-                timestamp_nanos: 0i64.into(),
+                timestamp: Timestamp::from_nanos(0),
                 component_url: Some(TEST_URL.into()),
                 moniker: moniker::ExtendedMoniker::parse_str(TEST_MONIKER).unwrap(),
                 severity,

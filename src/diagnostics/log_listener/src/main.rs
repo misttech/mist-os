@@ -17,7 +17,7 @@ use fuchsia_component::client::{connect_to_protocol, connect_to_protocol_at_path
 use log_command::log_formatter;
 use log_formatter::{
     dump_logs_from_socket as read_logs_from_socket, DefaultLogFormatter, LogEntry, Symbolize,
-    WriterContainer,
+    Timestamp, WriterContainer,
 };
 use log_utils::log_formatter::BootTimeAccessor;
 use log_utils::{LogCommand, LogSubCommand};
@@ -79,7 +79,9 @@ async fn main() -> Result<(), Error> {
         )
         .await
         .unwrap();
-    let boot_ts = fuchsia_runtime::utc_time().into_nanos() - zx::MonotonicTime::get().into_nanos();
+    let boot_ts = Timestamp::from_nanos(
+        fuchsia_runtime::utc_time().into_nanos() - zx::MonotonicTime::get().into_nanos(),
+    );
     let mut formatter = DefaultLogFormatter::<MachineWriter<LogEntry>>::new_from_args(
         &cmd,
         MachineWriter::new(if cmd.json { Some(Format::Json) } else { None }),
