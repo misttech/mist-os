@@ -5,7 +5,7 @@
 #ifndef ZIRCON_KERNEL_LIB_MISTOS_UTIL_INCLUDE_LIB_MISTOS_UTIL_RANGE_MAP_H_
 #define ZIRCON_KERNEL_LIB_MISTOS_UTIL_INCLUDE_LIB_MISTOS_UTIL_RANGE_MAP_H_
 
-#include <lib/heap.h>
+#include <lib/mistos/util/allocator.h>
 #include <zircon/assert.h>
 
 #include <algorithm>
@@ -19,27 +19,6 @@
 #include <fbl/vector.h>
 
 namespace util {
-
-template <typename T>
-struct Allocator {
-  using value_type = T;
-
-  Allocator() noexcept = default;
-
-  template <class U>
-  Allocator(const Allocator<U>&) noexcept {}
-
-  T* allocate(std::size_t n) {
-    if (n > std::size_t(-1) / sizeof(T)) {
-      PANIC("allocate");
-    }
-    auto p = static_cast<T*>(malloc(n * sizeof(T)));
-    ASSERT(p != nullptr);
-    return p;
-  }
-
-  void deallocate(T* p, std::size_t) noexcept { free(p); }
-};
 
 template <typename T>
 struct Range {
