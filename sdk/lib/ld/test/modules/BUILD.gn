@@ -117,6 +117,7 @@ per_test_suffices = [
   "OpenDepDirectly",
   "LocalPrecedence",
   "LocalPrecedenceTransitiveDeps",
+  "GlobalDep",
   "GlobalPrecedence",
   "GlobalPrecedenceDeps",
   "RelativeRelocPrecedence",

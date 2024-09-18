@@ -888,6 +888,57 @@ TYPED_TEST(DlTests, RootPrecedenceInDepResolution) {
 
 // These are test scenarios that test symbol resolution with RTLD_GLOBAL.
 
+// Test that a non-global module can depend on a previously loaded global
+// module, and that dlsym() will be able to access the global module's symbols
+// from the non-global module.
+// dlopen RTLD_GLOBAL foo-v2 -> foo() returns 7
+// dlopen has-foo-v2:
+//    - foo-v2 -> foo() returns 7
+// call foo() from has-foo-v2 and expect foo() to return 7 (from previously
+// loaded RTLD_GLOBAL foo-v2).
+TYPED_TEST(DlTests, GlobalDep) {
+  const auto kGlobalDepFile = TestShlib("libld-dep-foo-v2");
+  const auto kParentFile = TestShlib("libhas-foo-v2");
+  constexpr int64_t kReturnValueFromGlobalDep = 7;
+
+  if constexpr (!TestFixture::kSupportsGlobalMode) {
+    GTEST_SKIP() << "test requires that fixture supports RTLD_GLOBAL";
+  }
+
+  this->Needed({kGlobalDepFile});
+
+  auto open_global_dep = this->DlOpen(kGlobalDepFile.c_str(), RTLD_NOW | RTLD_GLOBAL);
+  ASSERT_TRUE(open_global_dep.is_ok()) << open_global_dep.error_value();
+  EXPECT_TRUE(open_global_dep.value());
+
+  auto global_foo = this->DlSym(open_global_dep.value(), TestSym("foo").c_str());
+  ASSERT_TRUE(global_foo.is_ok()) << global_foo.error_value();
+  ASSERT_TRUE(global_foo.value());
+
+  EXPECT_EQ(RunFunction<int64_t>(global_foo.value()), kReturnValueFromGlobalDep);
+
+  this->Needed({kParentFile});
+
+  auto open_parent = this->DlOpen(kParentFile.c_str(), RTLD_NOW | RTLD_LOCAL);
+  ASSERT_TRUE(open_parent.is_ok()) << open_parent.error_value();
+  EXPECT_TRUE(open_parent.value());
+
+  auto parent_call_foo = this->DlSym(open_parent.value(), TestSym("call_foo").c_str());
+  ASSERT_TRUE(parent_call_foo.is_ok()) << parent_call_foo.error_value();
+  ASSERT_TRUE(parent_call_foo.value());
+
+  EXPECT_EQ(RunFunction<int64_t>(parent_call_foo.value()), kReturnValueFromGlobalDep);
+
+  auto parent_foo = this->DlSym(open_parent.value(), TestSym("foo").c_str());
+  ASSERT_TRUE(parent_foo.is_ok()) << parent_foo.error_value();
+  ASSERT_TRUE(parent_foo.value());
+
+  EXPECT_EQ(RunFunction<int64_t>(parent_foo.value()), kReturnValueFromGlobalDep);
+
+  ASSERT_TRUE(this->DlClose(open_global_dep.value()).is_ok());
+  ASSERT_TRUE(this->DlClose(open_parent.value()).is_ok());
+}
+
 // Test that loaded global module will take precedence over dependency ordering.
 // dlopen RTLD_GLOBAL foo-v2 -> foo() returns 7
 // dlopen has-foo-v1:
