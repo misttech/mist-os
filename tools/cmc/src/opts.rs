@@ -129,6 +129,11 @@ pub enum Commands {
         #[structopt(long = "validate", parse(try_from_str), default_value = "true")]
         /// validate the result
         validate: bool,
+
+        #[structopt(short = "f", long = "features")]
+        /// The set of non-standard features to compile with.
+        /// Only applies to CML files.
+        features: Vec<Feature>,
     },
 
     #[structopt(name = "check-includes")]

@@ -5,6 +5,7 @@
 use crate::error::Error;
 use crate::util;
 use crate::util::{json_or_json5_from_file, write_depfile};
+use cml::features::FeatureSet;
 use serde_json::Value;
 use std::collections::HashSet;
 use std::fs;
@@ -23,6 +24,7 @@ pub(crate) fn merge_includes(
     includepath: &Vec<PathBuf>,
     includeroot: &PathBuf,
     validate: bool,
+    features: &FeatureSet,
 ) -> Result<(), Error> {
     let includes = transitive_includes(&file, &includepath, &includeroot)?;
     let mut document = util::read_cml(&file)?;
@@ -33,7 +35,10 @@ pub(crate) fn merge_includes(
     document.include = None;
     document.canonicalize();
     if validate {
-        cml::compile(&document, cml::CompileOptions::new().file(file.as_path()))?;
+        cml::compile(
+            &document,
+            cml::CompileOptions::new().features(features).file(file.as_path()),
+        )?;
     }
     let json_str = serde_json::to_string_pretty(&document)?;
 
@@ -196,6 +201,7 @@ fn canonicalize_include(
 mod tests {
     use super::*;
     use assert_matches::assert_matches;
+    use cml::features::Feature;
     use serde_json::json;
     use std::fmt::Display;
     use std::fs::File;
@@ -266,6 +272,23 @@ mod tests {
                 &self.include_path,
                 &self.root_path,
                 true,
+                &FeatureSet::empty(),
+            )
+        }
+
+        fn merge_includes_with_features(
+            &self,
+            file: &PathBuf,
+            features: &FeatureSet,
+        ) -> Result<(), Error> {
+            super::merge_includes(
+                file,
+                Some(&self.output),
+                Some(&self.depfile),
+                &self.include_path,
+                &self.root_path,
+                true,
+                features,
             )
         }
 
@@ -277,6 +300,7 @@ mod tests {
                 &self.include_path,
                 &self.root_path,
                 false,
+                &FeatureSet::empty(),
             )
         }
 
@@ -340,6 +364,51 @@ mod tests {
             "use": [{
                 "protocol": "fuchsia.foo.Bar"
             }]
+        }));
+        ctx.assert_depfile_eq(&ctx.output, &[&shard_path]);
+    }
+
+    #[test]
+    fn test_include_cml_with_dictionary() {
+        let ctx = TestContext::new();
+        let cml_path = ctx.new_file(
+            "some.cml",
+            "{include: [\"shard.cml\"], program: {binary: \"bin/hello_world\", runner: \"foo\"}}",
+        );
+        let shard_path = ctx.new_include(
+            "shard.cml",
+            json!({
+                "expose": [
+                    {
+                        "dictionary": "diagnostics",
+                        "from": "self",
+                    }
+                ],
+                "capabilities": [
+                    {
+                        "dictionary": "diagnostics",
+                    }
+                ]
+            }),
+        );
+        ctx.merge_includes_with_features(&cml_path, &vec![Feature::Dictionaries].into()).unwrap();
+
+        ctx.assert_output_eq(json!({
+            "program": {
+                "binary": "bin/hello_world",
+                "runner": "foo"
+            },
+            "expose": [
+                {
+                    "dictionary": "diagnostics",
+                    "from": "self",
+                }
+            ],
+            "capabilities": [
+                {
+                    "dictionary": "diagnostics",
+                }
+            ]
         }));
         ctx.assert_depfile_eq(&ctx.output, &[&shard_path]);
     }
