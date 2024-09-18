@@ -24,5 +24,11 @@
             from: "parent",
             to: [ "#fs-collection" ],
         },
+        {
+            protocol: "fuchsia.tracing.provider.Registry",
+            from: "parent",
+            to: "#fs-collection",
+            availability: "same_as_target",
+        },
     ],
 }

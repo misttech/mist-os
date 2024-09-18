@@ -6,7 +6,7 @@ use super::{DecodedRequest, GroupOrRequest, IntoSessionManager, Operation, Sessi
 use anyhow::Error;
 use block_protocol::{BlockFifoRequest, BlockFifoResponse, WriteOptions};
 use fuchsia_async::{self as fasync, FifoReadable as _, FifoWritable as _};
-use futures::stream::{FuturesUnordered, StreamExt as _};
+use futures::stream::StreamExt as _;
 use futures::FutureExt;
 use std::future::Future;
 use std::mem::MaybeUninit;
@@ -17,10 +17,15 @@ use {
 };
 
 pub trait Interface: Send + Sync + Unpin + 'static {
-    /// Called whenever a VMO is attached, prior to the VMO's usage in any other methods.
+    /// Called whenever a VMO is attached, prior to the VMO's usage in any other methods.  Whilst
+    /// the VMO is attached, `vmo` will keep the same address so it is safe to use the pointer
+    /// value (as, say, a key into a HashMap).
     fn on_attach_vmo(&self, _vmo: &zx::Vmo) -> impl Future<Output = Result<(), zx::Status>> + Send {
         async { Ok(()) }
     }
+
+    /// Called whenever a VMO is detached.
+    fn on_detach_vmo(&self, _vmo: &zx::Vmo) {}
 
     /// Called for a request to read bytes.
     fn read(
@@ -107,58 +112,85 @@ impl<I: Interface> super::SessionManager for SessionManager<I> {
         block_size: u32,
     ) -> Result<(), Error> {
         let (helper, fifo) = SessionHelper::new(self.clone(), block_size)?;
+        let helper = Arc::new(helper);
         let interface = self.interface.clone();
-        let mut inflight_requests = FuturesUnordered::new();
-        let mut stream = stream.fuse();
-        let mut requests = [MaybeUninit::<BlockFifoRequest>::uninit(); 64];
-        let fifo = fasync::Fifo::from_fifo(fifo);
 
-        loop {
-            futures::select! {
-                req = stream.next() => {
-                    let Some(req) = req else { return Ok(()) };
-                    helper.handle_request(req?).await?;
-                }
-                result = fifo.read_entries(&mut requests[..]).fuse() => {
-                    let count = result?;
+        let mut stream = stream.fuse();
+        let fifo = Arc::new(fasync::Fifo::from_fifo(fifo));
+
+        let scope = fasync::Scope::new();
+        let scope_ref = scope.clone();
+        let helper_clone = helper.clone();
+        let mut fifo_task = scope
+            .spawn(async move {
+                let mut requests = [MaybeUninit::<BlockFifoRequest>::uninit(); 64];
+                while let Ok(count) = fifo.read_entries(&mut requests[..]).await {
                     for request in &requests[..count] {
                         if let Some(decoded_request) =
                             helper.decode_fifo_request(unsafe { request.assume_init_ref() })
                         {
                             let interface = interface.clone();
-                            inflight_requests.push(async move {
-                                let group_or_request = decoded_request.group_or_request;
-                                let status =
-                                    process_fifo_request(interface, decoded_request).await.into();
-                                (group_or_request, status)
-                            });
+                            let fifo = fifo.clone();
+                            let helper = helper.clone();
+                            scope_ref
+                                .spawn(async move {
+                                    let group_or_request = decoded_request.group_or_request;
+                                    let status = process_fifo_request(interface, decoded_request)
+                                        .await
+                                        .into();
+                                    match group_or_request {
+                                        GroupOrRequest::Group(group_id) => {
+                                            if let Some(response) =
+                                                helper.message_groups.complete(group_id, status)
+                                            {
+                                                if let Err(_) = fifo.write_entries(&response).await
+                                                {
+                                                    return;
+                                                }
+                                            }
+                                        }
+                                        GroupOrRequest::Request(reqid) => {
+                                            if let Err(_) = fifo
+                                                .write_entries(&BlockFifoResponse {
+                                                    status: status.into_raw(),
+                                                    reqid,
+                                                    ..Default::default()
+                                                })
+                                                .await
+                                            {
+                                                return;
+                                            }
+                                        }
+                                    }
+                                })
+                                .detach();
                         }
                     }
                 }
-                result = inflight_requests.next() => {
-                    if let Some((group_or_request, status)) = result {
-                        match group_or_request {
-                            GroupOrRequest::Group(group_id) => {
-                                if let Some(response) =
-                                    helper.message_groups.complete(group_id, status)
-                                {
-                                    fifo.write_entries(&response).await?;
-                                }
-                            }
-                            GroupOrRequest::Request(reqid) => {
-                                fifo
-                                    .write_entries(&BlockFifoResponse {
-                                        status: status.into_raw(),
-                                        reqid,
-                                        ..Default::default()
-                                    })
-                                    .await?;
-                            }
-                        }
-                    }
-                }
+            })
+            .fuse();
+
+        // Make sure we detach VMOs when we go out of scope.
+        scopeguard::defer! {
+            for (_, vmo) in helper_clone.take_vmos() {
+                self.interface.on_detach_vmo(&vmo);
             }
         }
+
+        loop {
+            futures::select! {
+                maybe_req = stream.next() => {
+                    if let Some(req) = maybe_req {
+                        helper_clone.handle_request(req?).await?;
+                    } else {
+                        break;
+                    }
+                }
+                _ = fifo_task => break,
+            }
+        }
+
+        Ok(())
     }
 
     async fn get_volume_info(
@@ -217,6 +249,11 @@ async fn process_fifo_request<I: Interface>(
         Operation::Trim { device_block_offset, block_count } => {
             interface.trim(device_block_offset, block_count).await
         }
-        Operation::CloseVmo => Ok(()), // The caller did all that was required.
+        Operation::CloseVmo => {
+            if let Some(vmo) = &r.vmo {
+                interface.on_detach_vmo(vmo);
+            }
+            Ok(())
+        }
     }
 }

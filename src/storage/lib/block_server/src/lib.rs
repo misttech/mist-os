@@ -4,15 +4,14 @@
 use anyhow::{anyhow, Error};
 use block_protocol::{BlockFifoRequest, BlockFifoResponse};
 use fidl_fuchsia_hardware_block_driver::{BlockIoFlag, BlockOpcode};
-use futures::stream::FuturesUnordered;
-use futures::{Future, StreamExt as _, TryStreamExt as _};
+use futures::{Future, FutureExt as _, TryStreamExt as _};
 use std::collections::btree_map::Entry;
 use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex};
 use zx::HandleBased;
 use {
     fidl_fuchsia_hardware_block as fblock, fidl_fuchsia_hardware_block_partition as fpartition,
-    fidl_fuchsia_hardware_block_volume as fvolume, fuchsia_zircon as zx,
+    fidl_fuchsia_hardware_block_volume as fvolume, fuchsia_async as fasync, fuchsia_zircon as zx,
 };
 
 pub mod async_interface;
@@ -99,8 +98,9 @@ pub struct BlockServer<SM> {
     session_manager: Arc<SM>,
 }
 
-// Methods take Arc rather than &self because of https://github.com/rust-lang/rust/issues/42940.
-pub trait SessionManager {
+// Methods take Arc<Self> rather than &self because of
+// https://github.com/rust-lang/rust/issues/42940.
+pub trait SessionManager: 'static {
     fn on_attach_vmo(
         self: Arc<Self>,
         vmo: &Arc<zx::Vmo>,
@@ -164,22 +164,16 @@ impl<SM: SessionManager> BlockServer<SM> {
     /// Called to process requests for fuchsia.hardware.block.volume/Volume.
     pub async fn handle_requests(
         &self,
-        requests: fvolume::VolumeRequestStream,
+        mut requests: fvolume::VolumeRequestStream,
     ) -> Result<(), Error> {
-        let mut requests =
-            std::pin::pin!(requests.err_into().and_then(|r| self.handle_request(r)).fuse());
-        let mut sessions = FuturesUnordered::new();
-        loop {
-            futures::select! {
-                maybe_session = requests.try_next() => {
-                    if let Some(Some(session)) = maybe_session? {
-                        sessions.push(session);
-                    }
-                }
-                _ = sessions.select_next_some() => {}
-                complete => return Ok(()),
+        let scope = fasync::Scope::new();
+        while let Some(request) = requests.try_next().await.unwrap() {
+            if let Some(session) = self.handle_request(request).await? {
+                scope.spawn(session.map(|_| ())).detach();
             }
         }
+        scope.await;
+        Ok(())
     }
 
     /// Processes a partition request.
@@ -441,6 +435,10 @@ impl<SM: SessionManager> SessionHelper<SM> {
             BlockOpcode::CloseVmo => Operation::CloseVmo,
         });
         Some(DecodedRequest { group_or_request, operation, vmo })
+    }
+
+    fn take_vmos(&self) -> BTreeMap<u16, Arc<zx::Vmo>> {
+        std::mem::take(&mut *self.vmos.lock().unwrap())
     }
 }
 
