@@ -117,6 +117,9 @@
 
                 // https://fxbug.dev/42094401
                 "AllTCPSockets/TCPSocketPairTest.MsgTruncMsgPeek/*",
+
+                // Fuchsia does not implement IP_MTU_DISCOVER socket option.
+                "AllInetTests/SimpleTcpSocketTest.SetUnsupportedPMTUDISC/*",
             ],
         },
     ],

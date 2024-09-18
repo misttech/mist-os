@@ -107,6 +107,9 @@
                 "AllTCPSockets/TCPSocketPairTest.ResetWithSoLingerZeroTimeoutOption/*",
                 "AllTCPSockets/TCPSocketPairTest.WaitTillMSSWithCorkOption/*",
                 "AllTCPSockets/TCPSocketPairTest.WaitTillTimeoutWithCorkOption/*",
+
+                // Fuchsia does not implement IP_MTU_DISCOVER socket option.
+                "AllInetTests/SimpleTcpSocketTest.SetUnsupportedPMTUDISC/*",
             ],
         },
     ],
