@@ -218,13 +218,12 @@ void AmlUartV2::OnDeviceServerInitialized(zx::result<> device_server_init_result
     }
   }
 
-  ddk::PDevFidl pdev(fidl_pdev.TakeClientEnd());
+  fdf::PDev pdev(fidl_pdev.TakeClientEnd());
 
-  std::optional<fdf::MmioBuffer> mmio;
-  zx_status_t status = pdev.MapMmio(0, &mmio);
-  if (status != ZX_OK) {
-    FDF_LOG(ERROR, "pdev map_mmio failed %d", status);
-    CompleteStart(zx::error(status));
+  zx::result mmio = pdev.MapMmio(0);
+  if (mmio.is_error()) {
+    FDF_SLOG(ERROR, "Failed to map mmio.", KV("status", mmio.status_string()));
+    CompleteStart(mmio.take_error());
     return;
   }
 

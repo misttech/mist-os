@@ -9,7 +9,7 @@
 #include <fidl/fuchsia.power.broker/cpp/fidl.h>
 #include <lib/async/cpp/irq.h>
 #include <lib/async/cpp/wait.h>
-#include <lib/device-protocol/pdev-fidl.h>
+#include <lib/driver/platform-device/cpp/pdev.h>
 #include <lib/fdf/cpp/dispatcher.h>
 #include <lib/mmio/mmio.h>
 #include <lib/zircon-internal/thread_annotations.h>
@@ -54,7 +54,7 @@ class DriverTransportWriteOperation {
 class AmlUart : public fdf::WireServer<fuchsia_hardware_serialimpl::Device> {
  public:
   explicit AmlUart(
-      ddk::PDevFidl pdev, const fuchsia_hardware_serial::wire::SerialPortInfo& serial_port_info,
+      fdf::PDev pdev, const fuchsia_hardware_serial::wire::SerialPortInfo& serial_port_info,
       fdf::MmioBuffer mmio, fdf::UnownedSynchronizedDispatcher irq_dispatcher,
       std::optional<fdf::UnownedSynchronizedDispatcher> timer_dispatcher = std::nullopt,
       bool power_control_enabled = false,
@@ -117,7 +117,7 @@ class AmlUart : public fdf::WireServer<fuchsia_hardware_serialimpl::Device> {
 
   zx::result<fidl::ClientEnd<fuchsia_power_broker::LeaseControl>> AcquireLease();
 
-  ddk::PDevFidl pdev_;
+  fdf::PDev pdev_;
   const fuchsia_hardware_serial::wire::SerialPortInfo serial_port_info_;
   fdf::MmioBuffer mmio_;
 
