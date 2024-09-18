@@ -99,6 +99,9 @@ template("clippy") {
         "-${_level}clippy::all",
         "-Dclippy::correctness",
         "-Dclippy::missing_safety_doc",
+
+        # TODO(https://fxbug.dev/367989368): remove this line
+        "-Airrefutable_let_patterns",
       ]
     }
     args += [
