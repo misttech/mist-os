@@ -243,6 +243,7 @@ fidl_library://fidl/fuchsia.fonts
 fidl_library://fidl/fuchsia.gpu.agis
 fidl_library://fidl/fuchsia.gpu.magma
 fidl_library://fidl/fuchsia.hardware.adc
+fidl_library://fidl/fuchsia.hardware.adcimpl (unstable)
 fidl_library://fidl/fuchsia.hardware.audio
 fidl_library://fidl/fuchsia.hardware.audio.signalprocessing
 fidl_library://fidl/fuchsia.hardware.bluetooth
