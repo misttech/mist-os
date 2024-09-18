@@ -836,7 +836,7 @@ zx_status_t UsbDevice::Init(async_dispatcher_t* dispatcher) {
     return status;
   }
 
-  uint8_t num_configurations = device_desc_.b_num_configurations;
+  const uint8_t num_configurations = device_desc_.b_num_configurations;
   fbl::AllocChecker ac;
   config_descs_.reset(new (&ac) fbl::Array<uint8_t>[num_configurations], num_configurations);
   if (!ac.check()) {
@@ -909,13 +909,18 @@ zx_status_t UsbDevice::Init(async_dispatcher_t* dispatcher) {
   while (override->configuration) {
     if (override->vid == le16toh(device_desc_.id_vendor) &&
         override->pid == le16toh(device_desc_.id_product)) {
+      zxlogf(INFO, "Overriding %x:%x with configuration number %d", override->vid, override->pid,
+             override->configuration);
       configuration = override->configuration;
       break;
     }
     override++;
   }
   if (configuration > num_configurations) {
-    zxlogf(ERROR, "usb_device_add: override configuration number out of range");
+    zxlogf(
+        ERROR,
+        "usb_device_add: override configuration number (%d) out of range (num_configurations %d)",
+        configuration, num_configurations);
     return ZX_ERR_INTERNAL;
   }
   current_config_index_ = static_cast<uint8_t>(configuration - 1);
