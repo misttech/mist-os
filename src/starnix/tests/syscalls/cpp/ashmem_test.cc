@@ -750,7 +750,7 @@ TEST_F(AshmemTest, PinUnsignedOverflow) {
   ashmem_pin pin = {.offset = 2 * PAGE_SIZE, .len = (uint32_t)1048575 * PAGE_SIZE};
 
   auto fd = CreateRegion(nullptr, 4 * PAGE_SIZE);
-  void *addr = mmap(nullptr, PAGE_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd.get(), 0);
+  void *addr = mmap(nullptr, 4 * PAGE_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd.get(), 0);
   ASSERT_TRUE(addr != MAP_FAILED && addr != nullptr);
 
   int status = ioctl(fd.get(), ASHMEM_PIN, pin);
