@@ -133,7 +133,6 @@ template("fidlgen_go_golden_compilation_test") {
     library = ":$main_library_target"
     visibility = [ ":*" ]
     testonly = true
-    sdk_category = "excluded"
   }
 }
 

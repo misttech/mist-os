@@ -5,8 +5,6 @@
 import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.bluetooth.rfcomm.test") {
-  sdk_category = "excluded"
-
   sources = [ "test.fidl" ]
   public_deps = [
     "//sdk/fidl/fuchsia.bluetooth",
