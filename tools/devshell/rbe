@@ -115,7 +115,7 @@ function test_bazel_rbe() {
   setup_bazel_workspace
   (
     cd "$BAZEL_TEST_DIR/workspace" &&
-      ../bazel --nohome_rc build --config=remote --config=sponge :all
+      ../bazel --nohome_rc test --config=remote --config=sponge :all
   )
 }
 
@@ -137,7 +137,7 @@ case "$action" in
     ;;
 
   auth)
-    bazel_auth && reclient_auth && style::echo --bold --green "You can now 'fx build' with RBE."
+    bazel_auth && reclient_auth && echo && style::echo --bold --green "You can now 'fx build' with RBE."
     exit "$?"
     ;;
 

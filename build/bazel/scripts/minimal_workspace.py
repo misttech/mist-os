@@ -146,6 +146,10 @@ def main(argv: Sequence[str]) -> int:
     (workspace_dir / "MODULE.bazel").write_text(
         "\n"
     )  # for bzlmod, can be empty
+    force_symlink(
+        workspace_dir / "expect_pwd.txt",
+        _SCRIPT_DIR / "expect_pwd.txt",
+    )
 
     # Generate the content of .bazelrc
     templates_dir = fuchsia_dir / "build" / "bazel" / "templates"
