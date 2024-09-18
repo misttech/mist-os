@@ -3,14 +3,10 @@
 // found in the LICENSE file.
 
 use crate::device::kobject::{
-    Bus, Class, Device, DeviceMetadata, KObject, KObjectBased, KObjectHandle, UEventAction,
-    UEventContext,
+    Class, Device, DeviceMetadata, KObject, KObjectBased, UEventAction, UEventContext,
 };
+use crate::device::kobject_store::KObjectStore;
 use crate::fs::devtmpfs::{devtmpfs_create_device, devtmpfs_remove_node};
-use crate::fs::sysfs::{
-    BusCollectionDirectory, KObjectDirectory, KObjectSymlinkDirectory, SYSFS_BLOCK, SYSFS_BUS,
-    SYSFS_CLASS, SYSFS_DEVICES,
-};
 use crate::task::CurrentTask;
 use crate::vfs::{FileOps, FsNode, FsNodeOps, FsStr};
 use starnix_logging::{log_error, log_warn, track_stub};
@@ -28,8 +24,6 @@ use std::sync::{Arc, Weak};
 
 use dyn_clone::{clone_trait_object, DynClone};
 use range_map::RangeMap;
-
-use super::kobject::Collection;
 
 const CHRDEV_MINOR_MAX: u32 = 256;
 const BLKDEV_MINOR_MAX: u32 = 2u32.pow(20);
@@ -233,79 +227,9 @@ impl MajorDeviceRegistry {
     }
 }
 
-pub struct KernelObjects {
-    pub devices: KObjectHandle,
-    pub class: KObjectHandle,
-    pub block: KObjectHandle,
-    pub bus: KObjectHandle,
-}
-
-impl KernelObjects {
-    /// Returns the virtual bus kobject where all virtual and pseudo devices are stored.
-    pub fn virtual_bus(&self) -> Bus {
-        Bus::new(self.devices.get_or_create_child("virtual".into(), KObjectDirectory::new), None)
-    }
-
-    pub fn get_or_create_bus(&self, name: &FsStr) -> Bus {
-        let collection =
-            Collection::new(self.bus.get_or_create_child(name, BusCollectionDirectory::new));
-        Bus::new(self.devices.get_or_create_child(name, KObjectDirectory::new), Some(collection))
-    }
-
-    pub fn get_or_create_class(&self, name: &FsStr, bus: Bus) -> Class {
-        let collection =
-            Collection::new(self.class.get_or_create_child(name, KObjectSymlinkDirectory::new));
-        Class::new(bus.kobject().get_or_create_child(name, KObjectDirectory::new), bus, collection)
-    }
-
-    fn create_device<F, N>(
-        &self,
-        name: &FsStr,
-        metadata: DeviceMetadata,
-        class: Class,
-        create_device_sysfs_ops: F,
-    ) -> Device
-    where
-        F: Fn(Device) -> N + Send + Sync + 'static,
-        N: FsNodeOps,
-    {
-        let class_cloned = class.clone();
-        let metadata_cloned = metadata.clone();
-        let device_kobject = class.kobject().get_or_create_child(name, move |kobject| {
-            create_device_sysfs_ops(Device::new(
-                kobject.upgrade().unwrap(),
-                class_cloned.clone(),
-                metadata_cloned.clone(),
-            ))
-        });
-
-        // Insert the created device kobject into its subsystems.
-        class.collection.kobject().insert_child(device_kobject.clone());
-        if metadata.mode == DeviceMode::Block {
-            self.block.insert_child(device_kobject.clone());
-        }
-        if let Some(bus_collection) = &class.bus.collection {
-            bus_collection.kobject().insert_child(device_kobject.clone());
-        }
-
-        Device::new(device_kobject, class, metadata)
-    }
-}
-
-impl Default for KernelObjects {
-    fn default() -> Self {
-        Self {
-            devices: KObject::new_root(SYSFS_DEVICES.into()),
-            class: KObject::new_root(SYSFS_CLASS.into()),
-            block: KObject::new_root_with_dir(SYSFS_BLOCK.into(), KObjectSymlinkDirectory::new),
-            bus: KObject::new_root(SYSFS_BUS.into()),
-        }
-    }
-}
-
 /// The kernel's registry of drivers.
 pub struct DeviceRegistry {
-    pub objects: KernelObjects,
+    pub objects: KObjectStore,
     state: Mutex<DeviceRegistryState>,
 }
 
