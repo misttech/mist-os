@@ -74,7 +74,7 @@ impl FsNodeOps for KObjectSymlinkDirectory {
 #[cfg(test)]
 mod tests {
     use crate::device::kobject::KObject;
-    use crate::fs::sysfs::{KObjectSymlinkDirectory, KObjectDirectory};
+    use crate::fs::sysfs::{KObjectDirectory, KObjectSymlinkDirectory};
     use crate::task::CurrentTask;
     use crate::testing::{create_fs, create_kernel_and_task};
     use crate::vfs::{FileSystemHandle, FsStr, LookupContext, NamespaceNode, SymlinkMode};

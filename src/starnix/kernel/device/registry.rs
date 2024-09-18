@@ -463,7 +463,10 @@ impl Default for DeviceRegistry {
         Self {
             root_kobject: KObject::new_root(SYSFS_DEVICES.into()),
             class_subsystem_kobject: KObject::new_root(SYSFS_CLASS.into()),
-            block_subsystem_kobject: KObject::new_root(SYSFS_BLOCK.into()),
+            block_subsystem_kobject: KObject::new_root_with_dir(
+                SYSFS_BLOCK.into(),
+                KObjectSymlinkDirectory::new,
+            ),
             bus_subsystem_kobject: KObject::new_root(SYSFS_BUS.into()),
             state: Mutex::new(state),
         }

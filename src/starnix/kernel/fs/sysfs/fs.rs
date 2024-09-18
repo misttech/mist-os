@@ -125,7 +125,12 @@ pub fn sysfs_create_link(
     path.prepend_element(to.path().as_ref());
     // Escape one more level from its subsystem to the root of sysfs.
     path.prepend_element("..".into());
-    path.prepend_element(from.path_to_root().as_ref());
+
+    let path_to_root = from.path_to_root();
+    if !path_to_root.is_empty() {
+        path.prepend_element(path_to_root.as_ref());
+    }
+
     // Build a symlink with the relative path.
     SymlinkNode::new(path.build_relative().as_ref(), owner)
 }

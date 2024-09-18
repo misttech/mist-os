@@ -49,15 +49,23 @@ type CreateFsNodeOps = Box<dyn Fn(Weak<KObject>) -> Box<dyn FsNodeOps> + Send + 
 
 impl KObject {
     pub fn new_root(name: &FsStr) -> KObjectHandle {
+        Self::new_root_with_dir(name, KObjectDirectory::new)
+    }
+
+    pub fn new_root_with_dir<F, N>(name: &FsStr, create_fs_node_ops: F) -> KObjectHandle
+    where
+        F: Fn(Weak<KObject>) -> N + Send + Sync + 'static,
+        N: FsNodeOps,
+    {
         Arc::new(Self {
             name: name.to_owned(),
             parent: None,
             children: Default::default(),
-            create_fs_node_ops: Box::new(|kobject| Box::new(KObjectDirectory::new(kobject))),
+            create_fs_node_ops: Box::new(move |kobject| Box::new(create_fs_node_ops(kobject))),
         })
     }
 
-    fn new<F, N>(name: &FsStr, parent: KObjectHandle, create_fs_node_ops: F) -> KObjectHandle
+    fn new_child<F, N>(name: &FsStr, parent: KObjectHandle, create_fs_node_ops: F) -> KObjectHandle
     where
         F: Fn(Weak<KObject>) -> N + Send + Sync + 'static,
         N: FsNodeOps,
@@ -137,7 +145,7 @@ impl KObject {
         match children.get(name).cloned() {
             Some(child) => child,
             None => {
-                let child = KObject::new(name, self.clone(), create_fs_node_ops);
+                let child = KObject::new_child(name, self.clone(), create_fs_node_ops);
                 children.insert(name.into(), child.clone());
                 child
             }
