@@ -33,8 +33,7 @@ use std::sync::Arc;
 fn misc_device_init(locked: &mut Locked<'_, Unlocked>, current_task: &CurrentTask) {
     let kernel = current_task.kernel();
     let registry = &kernel.device_registry;
-    let misc_class =
-        registry.objects.get_or_create_class("misc".into(), registry.objects.virtual_bus());
+    let misc_class = registry.objects.misc_class();
     registry.add_and_register_device(
         locked,
         current_task,

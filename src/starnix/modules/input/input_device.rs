@@ -141,8 +141,7 @@ impl InputDevice {
         let kernel = system_task.kernel();
         let registry = &kernel.device_registry;
 
-        let input_class =
-            registry.objects.get_or_create_class("input".into(), registry.objects.virtual_bus());
+        let input_class = registry.objects.input_class();
         let device_id = get_next_device_id();
         registry.add_and_register_device(
             locked,
