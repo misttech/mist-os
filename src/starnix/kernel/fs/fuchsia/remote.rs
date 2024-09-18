@@ -359,6 +359,7 @@ fn fetch_and_refresh_info_impl<'a>(
             link_count: true,
             modification_time: true,
             change_time: true,
+            casefold: true,
             ..Default::default()
         })
         .map_err(|status| from_status_like_fdio!(status))?;
@@ -643,6 +644,7 @@ impl FsNodeOps for RemoteNode {
                 rdev: true,
                 id: true,
                 fsverity_enabled: true,
+                casefold: true,
                 ..Default::default()
             },
             ..Default::default()
@@ -666,6 +668,7 @@ impl FsNodeOps for RemoteNode {
         if fsverity_enabled && (attrs.protocols & ZXIO_NODE_PROTOCOL_FILE == 0) {
             return error!(EINVAL);
         }
+        let casefold = attrs.casefold;
 
         fs.get_or_create_node(
             current_task,
@@ -690,7 +693,7 @@ impl FsNodeOps for RemoteNode {
                     ops,
                     &fs,
                     node_id,
-                    FsNodeInfo { rdev: rdev, ..FsNodeInfo::new(node_id, mode, owner) },
+                    FsNodeInfo { rdev, casefold, ..FsNodeInfo::new(node_id, mode, owner) },
                 );
                 if fsverity_enabled {
                     *child.fsverity.lock() = FsVerityState::FsVerity;
@@ -2731,6 +2734,107 @@ mod test {
             })
             .await
             .expect("spawn");
+
+        fixture.close().await;
+    }
+
+    #[::fuchsia::test]
+    async fn test_casefold_persists() {
+        let fixture = TestFixture::new().await;
+        let (server, client) = zx::Channel::create();
+        fixture
+            .root()
+            .clone(fio::OpenFlags::CLONE_SAME_RIGHTS, server.into())
+            .expect("clone failed");
+
+        let (kernel, _init_task) = create_kernel_and_task();
+        let _ = kernel
+            .kthreads
+            .spawner()
+            .spawn_and_get_result({
+                let kernel = Arc::clone(&kernel);
+                move |locked, current_task| {
+                    let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE;
+                    let fs = RemoteFs::new_fs(
+                        &kernel,
+                        client,
+                        FileSystemOptions { source: b"/".into(), ..Default::default() },
+                        rights,
+                    )
+                    .expect("new_fs failed");
+                    let ns: Arc<Namespace> = Namespace::new(fs);
+                    let child = ns
+                        .root()
+                        .create_node(
+                            locked,
+                            &current_task,
+                            "dir".into(),
+                            FileMode::ALLOW_ALL.with_type(FileMode::IFDIR),
+                            DeviceType::NONE,
+                        )
+                        .expect("create_node failed");
+                    child
+                        .entry
+                        .node
+                        .update_attributes(locked, &current_task, |info| {
+                            info.casefold = true;
+                            Ok(())
+                        })
+                        .expect("enable casefold")
+                }
+            })
+            .await
+            .expect("spawn");
+
+        // Tear down the kernel and open the dir again. Check that casefold is preserved.
+        let fixture = TestFixture::open(
+            fixture.close().await,
+            TestFixtureOptions {
+                encrypted: true,
+                as_blob: false,
+                format: false,
+                serve_volume: false,
+            },
+        )
+        .await;
+        let (server, client) = zx::Channel::create();
+        fixture
+            .root()
+            .clone(fio::OpenFlags::CLONE_SAME_RIGHTS, server.into())
+            .expect("clone failed");
+        let (kernel, _init_task) = create_kernel_and_task();
+        let casefold = kernel
+            .kthreads
+            .spawner()
+            .spawn_and_get_result({
+                let kernel = Arc::clone(&kernel);
+                move |_, current_task| {
+                    let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE;
+                    let fs = RemoteFs::new_fs(
+                        &kernel,
+                        client,
+                        FileSystemOptions { source: b"/".into(), ..Default::default() },
+                        rights,
+                    )
+                    .expect("new_fs failed");
+                    let ns = Namespace::new(fs);
+                    let mut context = LookupContext::new(SymlinkMode::NoFollow);
+                    let child = ns
+                        .root()
+                        .lookup_child(&current_task, &mut context, "dir".into())
+                        .expect("lookup_child failed");
+                    let casefold = child
+                        .entry
+                        .node
+                        .fetch_and_refresh_info(&current_task)
+                        .expect("fetch_and_refresh_info failed")
+                        .casefold;
+                    casefold
+                }
+            })
+            .await
+            .expect("spawn");
+        assert!(casefold);
 
         fixture.close().await;
     }
