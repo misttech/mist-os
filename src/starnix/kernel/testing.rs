@@ -196,6 +196,9 @@ fn create_test_init_task(
         CurrentTask::create_system_task(locked, kernel, fs).expect("create system task");
     kernel.kthreads.init(system_task).expect("failed to initialize kthreads");
 
+    let system_task = kernel.kthreads.system_task();
+    kernel.hrtimer_manager.init(&system_task).expect("init hrtimer manager worker thread");
+
     // Take the lock on thread group and task in the correct order to ensure any wrong ordering
     // will trigger the tracing-mutex at the right call site.
     {
