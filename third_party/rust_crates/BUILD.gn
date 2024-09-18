@@ -1172,10 +1172,6 @@ group("zerocopy") {
   public_deps = [ ":zerocopy-v0_8_0-alpha_5" ]
 }
 
-group("zerocopy_0_8_0_alpha_21") {
-  public_deps = [ ":zerocopy_0_8_0_alpha_21-v0_8_0-alpha_21" ]
-}
-
 if (!(current_os == "fuchsia")) {
   group("zip") {
     public_deps = [ ":zip-v0_5_5" ]
@@ -18306,48 +18302,6 @@ rust_library("zerocopy-v0_8_0-alpha_5") {
   visibility = [ ":*" ]
 
   applicable_licenses = [ ":zerocopy-v0_8_0-alpha_5.license" ]
-}
-
-license("zerocopy_0_8_0_alpha_21-v0_8_0-alpha_21.license") {
-  public_package_name = "zerocopy"
-  license_files = [
-    "//third_party/rust_crates/vendor/zerocopy-0.8.0-alpha.21/LICENSE-APACHE",
-    "//third_party/rust_crates/vendor/zerocopy-0.8.0-alpha.21/LICENSE-BSD",
-    "//third_party/rust_crates/vendor/zerocopy-0.8.0-alpha.21/LICENSE-MIT",
-  ]
-}
-
-rust_library("zerocopy_0_8_0_alpha_21-v0_8_0-alpha_21") {
-  crate_name = "zerocopy"
-  crate_root =
-      "//third_party/rust_crates/vendor/zerocopy-0.8.0-alpha.21/src/lib.rs"
-  output_name = "zerocopy-cec1bca295f324d"
-  configs -= [ "//build/config/rust:2018_idioms" ]
-
-  deps = []
-  deps += [ ":zerocopy_0_8_0_alpha_21-v0_8_0-alpha_21($host_toolchain)" ]
-  if (true) {
-    deps += [ ":zerocopy_0_8_0_alpha_21-v0_8_0-alpha_21($host_toolchain)" ]
-  }
-
-  rustenv = []
-
-  rustflags = [
-    "--cap-lints=allow",
-    "--edition=2018",
-    "-Cmetadata=cec1bca295f324d",
-    "-Cextra-filename=-cec1bca295f324d",
-    "--cfg=feature=\"derive\"",
-    "--cfg=feature=\"simd\"",
-    "--cfg=feature=\"zerocopy-derive\"",
-    "--cfg=zerocopy_generic_bounds_in_const_fn",
-    "--cfg=zerocopy_aarch64_simd",
-    "--cfg=zerocopy_panic_in_const",
-  ]
-
-  visibility = [ ":*" ]
-
-  applicable_licenses = [ ":zerocopy_0_8_0_alpha_21-v0_8_0-alpha_21.license" ]
 }
 
 license("zerocopy-derive-v0_7_15.license") {
