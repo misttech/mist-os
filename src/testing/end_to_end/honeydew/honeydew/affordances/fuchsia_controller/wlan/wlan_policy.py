@@ -350,13 +350,15 @@ class WlanPolicy(AsyncAdapter, wlan_policy.WlanPolicy):
 
         Raises:
             HoneydewWlanError: Error from WLAN stack.
-            TypeError: Return values not correct types.
+            TimeoutError: Reached timeout without any updates.
         """
         if self._client_controller is None:
             self.create_client_controller()
         assert self._client_controller is not None
 
-        return await self._client_controller.updates.get()
+        return await asyncio.wait_for(
+            self._client_controller.updates.get(), timeout
+        )
 
     def remove_all_networks(self) -> None:
         """Deletes all saved networks on the device.
@@ -564,6 +566,9 @@ class WlanPolicy(AsyncAdapter, wlan_policy.WlanPolicy):
     async def start_client_connections(self) -> None:
         """Enables device to initiate connections to networks.
 
+        Either by auto-connecting to saved networks or acting on incoming calls
+        triggering connections.
+
         See fuchsia.wlan.policy/ClientController.StartClientConnections().
 
         Raises:
@@ -595,6 +600,9 @@ class WlanPolicy(AsyncAdapter, wlan_policy.WlanPolicy):
     # pylint: disable-next=invalid-overridden-method
     async def stop_client_connections(self) -> None:
         """Disables device for initiating connections to networks.
+
+        Tears down any existing connections to WLAN networks and disables
+        initiation of new connections.
 
         See fuchsia.wlan.policy/ClientController.StopClientConnections().
 

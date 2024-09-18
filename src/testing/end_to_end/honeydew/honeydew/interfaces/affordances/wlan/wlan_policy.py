@@ -95,6 +95,7 @@ class WlanPolicy(abc.ABC):
 
         Raises:
             HoneydewWlanError: Error from WLAN stack.
+            TimeoutError: Reached timeout without any updates.
             TypeError: Return values not correct types.
         """
 
@@ -172,6 +173,9 @@ class WlanPolicy(abc.ABC):
     def start_client_connections(self) -> None:
         """Enables device to initiate connections to networks.
 
+        Either by auto-connecting to saved networks or acting on incoming calls
+        triggering connections.
+
         See fuchsia.wlan.policy/ClientController.StartClientConnections().
 
         Raises:
@@ -182,6 +186,9 @@ class WlanPolicy(abc.ABC):
     @abc.abstractmethod
     def stop_client_connections(self) -> None:
         """Disables device for initiating connections to networks.
+
+        Tears down any existing connections to WLAN networks and disables
+        initiation of new connections.
 
         See fuchsia.wlan.policy/ClientController.StopClientConnections().
 

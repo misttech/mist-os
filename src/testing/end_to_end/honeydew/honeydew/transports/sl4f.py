@@ -132,6 +132,7 @@ class SL4F(sl4f_interface.SL4F):
 
         Raises:
             errors.Sl4fError: On failure.
+            errors.Sl4fTimeoutError: On timeout.
         """
         if not params:
             params = {}
@@ -178,6 +179,8 @@ class SL4F(sl4f_interface.SL4F):
                     exception_msg = f"{exception_msg} Error: '{error}'."
                     break
 
+            except errors.HttpTimeoutError as err:
+                raise errors.Sl4fTimeoutError(exception_msg) from err
             except errors.HttpRequestError as err:
                 raise errors.Sl4fError(exception_msg) from err
         raise errors.Sl4fError(exception_msg)

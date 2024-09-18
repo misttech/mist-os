@@ -331,6 +331,23 @@ class Sl4fTests(unittest.TestCase):
         mock_sl4f_url.assert_called()
         mock_send_http_request.assert_called_once()
 
+    @mock.patch.object(
+        http_utils,
+        "send_http_request",
+        side_effect=errors.HttpTimeoutError(""),
+        autospec=True,
+    )
+    def test_send_sl4f_command_timeout(
+        self, mock_send_http_request: mock.Mock
+    ) -> None:
+        """Verify SL4F.run() failure case for HTTP timeouts."""
+        with self.assertRaises(TimeoutError):
+            self.sl4f_obj_with_ipv4.run(
+                method=_MOCK_ARGS["sl4f_request"], attempts=5, interval=0
+            )
+
+        mock_send_http_request.assert_called_once()
+
     @mock.patch.object(sl4f.SL4F, "check_connection", autospec=True)
     def test_start_server(self, mock_check_connection: mock.Mock) -> None:
         """Testcase for SL4F.start_server()"""

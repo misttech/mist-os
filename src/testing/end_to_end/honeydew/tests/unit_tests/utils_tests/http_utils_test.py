@@ -6,6 +6,7 @@
 import json
 import time
 import unittest
+import urllib.error
 import urllib.request
 from collections.abc import Callable
 from http.client import RemoteDisconnected
@@ -161,6 +162,27 @@ class HttpUtilsTests(unittest.TestCase):
         """Testcase for http_utils.send_http_request() failure case because of
         an exception."""
         with self.assertRaises(errors.HttpRequestError):
+            http_utils.send_http_request(
+                url=_PARAMS["url"],
+                interval=_PARAMS["interval"],
+                attempts=_PARAMS["attempts"],
+            )
+
+        self.assertEqual(mock_urlopen.call_count, _PARAMS["attempts"])
+        self.assertEqual(mock_sleep.call_count, _PARAMS["attempts"] - 1)
+
+    @mock.patch.object(time, "sleep", autospec=True)
+    @mock.patch.object(
+        urllib.request,
+        "urlopen",
+        side_effect=urllib.error.URLError(TimeoutError()),
+        autospec=True,
+    )
+    def test_timeout_error(
+        self, mock_urlopen: mock.Mock, mock_sleep: mock.Mock
+    ) -> None:
+        """Verify http_utils.send_http_request() can raise TimeoutError."""
+        with self.assertRaises(TimeoutError):
             http_utils.send_http_request(
                 url=_PARAMS["url"],
                 interval=_PARAMS["interval"],
