@@ -40,8 +40,7 @@ pub fn ashmem_device_init(locked: &mut Locked<'_, Unlocked>, system_task: &Curre
     let kernel = system_task.kernel();
     let registry = &kernel.device_registry;
 
-    let misc_class =
-        registry.objects.get_or_create_class("misc".into(), registry.objects.virtual_bus());
+    let misc_class = registry.objects.misc_class();
     let ashmem_device =
         registry.register_dyn_chrdev(AshmemDevice::new()).expect("ashmem device register failed.");
 

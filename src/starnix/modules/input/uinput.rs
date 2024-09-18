@@ -42,8 +42,7 @@ enum DeviceType {
 pub fn register_uinput_device(locked: &mut Locked<'_, Unlocked>, system_task: &CurrentTask) {
     let kernel = system_task.kernel();
     let registry = &kernel.device_registry;
-    let misc_class =
-        registry.objects.get_or_create_class("misc".into(), registry.objects.virtual_bus());
+    let misc_class = registry.objects.misc_class();
     registry.add_and_register_device(
         locked,
         system_task,
@@ -66,8 +65,7 @@ where
     let kernel = system_task.kernel();
     let registry = &kernel.device_registry;
 
-    let input_class =
-        registry.objects.get_or_create_class("input".into(), registry.objects.virtual_bus());
+    let input_class = registry.objects.input_class();
 
     let device_id = get_next_device_id();
     registry.add_and_register_device(

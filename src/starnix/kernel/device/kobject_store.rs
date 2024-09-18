@@ -29,6 +29,30 @@ impl KObjectStore {
         Bus::new(self.devices.get_or_create_child("virtual".into(), KObjectDirectory::new), None)
     }
 
+    pub fn virtual_block_class(&self) -> Class {
+        self.get_or_create_class("block".into(), self.virtual_bus())
+    }
+
+    pub fn graphics_class(&self) -> Class {
+        self.get_or_create_class("graphics".into(), self.virtual_bus())
+    }
+
+    pub fn input_class(&self) -> Class {
+        self.get_or_create_class("input".into(), self.virtual_bus())
+    }
+
+    pub fn mem_class(&self) -> Class {
+        self.get_or_create_class("mem".into(), self.virtual_bus())
+    }
+
+    pub fn misc_class(&self) -> Class {
+        self.get_or_create_class("misc".into(), self.virtual_bus())
+    }
+
+    pub fn tty_class(&self) -> Class {
+        self.get_or_create_class("tty".into(), self.virtual_bus())
+    }
+
     pub fn get_or_create_bus(&self, name: &FsStr) -> Bus {
         let collection =
             Collection::new(self.bus.get_or_create_child(name, BusCollectionDirectory::new));
