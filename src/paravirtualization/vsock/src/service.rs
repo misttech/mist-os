@@ -14,22 +14,22 @@
 // Fundamentally then there needs to be mutual exclusion in accessing DeviceProxy,
 // and de-multiplexing of incoming messages on the Callbacks stream. There are
 // a two high level options for doing this.
-//  1. Force a single threaded event driver model. This would mean that additional
+//  1. Force a single task event driver model. This would mean that additional
 //     asynchronous executions are never spawned, and any use of await! or otherwise
 //     blocking with additional futures requires collection futures in future sets
 //     or having custom polling logic etc. Whilst this is probably the most resource
-//     efficient it restricts the service to be single threaded forever by its design,
+//     efficient it restricts the service to be single task forever by its design,
 //     is harder to reason about as cannot be written very idiomatically with futures
 //     and is even more complicated to avoid blocking other requests whilst waiting
 //     on responses from the driver.
 //  2. Allow multiple asynchronous executions and use some form of message passing
-//     and locking to handle DeviceProxy access and sharing access to the Callbacks
-//     stream. Potentially more resource intensive with unnecessary locking etc,
-//     but allows for the potential to have actual parallel execution and is much
-//     simpler to write the logic.
-// The chosen option is (2) and the access to DeviceProxy is handled with an Arc<Mutex<State>>,
+//     and mutual exclusion checking to handle DeviceProxy access and sharing access
+//     to the Callbacks stream. Potentially more resource intensive with unnecessary
+//     refcells etc, but allows for the potential to have actual concurrent execution
+//     and is much simpler to write the logic.
+// The chosen option is (2) and the access to DeviceProxy is handled with an Rc<Refcell<State>>,
 // and de-multiplexing of the Callbacks is done by registering an event whilst holding
-// the mutex, and having a single asynchronous thread that is dedicated to converting
+// the refcell, and having a single asynchronous task that is dedicated to converting
 // incoming Callbacks to signaling registered events.
 
 use crate::{addr, port};
@@ -42,14 +42,14 @@ use fidl_fuchsia_vsock::{
     AcceptorProxy, ConnectionRequest, ConnectionRequestStream, ConnectionTransport,
     ConnectorRequest, ConnectorRequestStream,
 };
-use fuchsia_sync::Mutex;
 use futures::channel::{mpsc, oneshot};
 use futures::{future, select, Future, FutureExt, Stream, StreamExt, TryFutureExt, TryStreamExt};
+use std::cell::{RefCell, RefMut};
 use std::collections::HashMap;
 use std::convert::Infallible;
 use std::ops::Deref;
 use std::pin::Pin;
-use std::sync::Arc;
+use std::rc::Rc;
 use std::task::{Context, Poll};
 use thiserror::Error;
 use {fuchsia_async as fasync, fuchsia_zircon as zx};
@@ -132,15 +132,9 @@ struct State {
     tasks: fasync::TaskGroup,
 }
 
-pub struct LockedState {
-    inner: Mutex<State>,
-    deregister_tx: crossbeam::channel::Sender<Deregister>,
-    deregister_rx: crossbeam::channel::Receiver<Deregister>,
-}
-
 #[derive(Clone)]
 pub struct Vsock {
-    inner: Arc<LockedState>,
+    inner: Rc<RefCell<State>>,
 }
 
 impl Vsock {
@@ -172,10 +166,7 @@ impl Vsock {
             listens: HashMap::new(),
             tasks: fasync::TaskGroup::new(),
         };
-        let (tx, rx) = crossbeam::channel::unbounded();
-        let service =
-            LockedState { inner: Mutex::new(service), deregister_tx: tx, deregister_rx: rx };
-        let service = Vsock { inner: Arc::new(service) };
+        let service = Vsock { inner: Rc::new(RefCell::new(service)) };
         let callback_loop = service.clone().run_callbacks(server_stream);
         Ok((service, callback_loop))
     }
@@ -184,14 +175,14 @@ impl Vsock {
         mut callbacks: CallbacksRequestStream,
     ) -> Result<Infallible, anyhow::Error> {
         while let Some(Ok(cb)) = callbacks.next().await {
-            self.lock().do_callback(cb);
+            self.borrow_mut().do_callback(cb);
         }
         // The only way to get here is if our callbacks stream ended, since our notifications
         // cannot disconnect as we are holding a reference to them in |service|.
         Err(format_err!("Driver disconnected"))
     }
 
-    // Spawns a new asynchronous thread for listening for incoming connections on a port.
+    // Spawns a new asynchronous task for listening for incoming connections on a port.
     fn start_listener(
         &self,
         acceptor: fidl::endpoints::ClientEnd<fidl_fuchsia_vsock::AcceptorMarker>,
@@ -199,7 +190,7 @@ impl Vsock {
     ) -> Result<(), Error> {
         let acceptor = acceptor.into_proxy().map_err(|x| Error::ClientCommunication(x.into()))?;
         let stream = self.listen_port(local_port)?;
-        self.lock().tasks.spawn(
+        self.borrow_mut().tasks.local(
             self.clone()
                 .run_connection_listener(stream, acceptor)
                 .unwrap_or_else(|err| tracing::warn!("Error {} running connection listener", err)),
@@ -243,7 +234,7 @@ impl Vsock {
         }
     }
     fn alloc_ephemeral_port(self) -> Option<AllocatedPort> {
-        let p = self.lock().used_ports.allocate();
+        let p = self.borrow_mut().used_ports.allocate();
         p.map(|p| AllocatedPort { port: p, service: self })
     }
     // Creates a `ListenStream` that will retrieve raw incoming connection requests.
@@ -253,7 +244,7 @@ impl Vsock {
             tracing::info!("Rejecting request to listen on ephemeral port {}", port);
             return Err(Error::ConnectionRefused);
         }
-        match self.lock().listens.entry(port) {
+        match self.borrow_mut().listens.entry(port) {
             std::collections::hash_map::Entry::Vacant(entry) => {
                 let (sender, receiver) = mpsc::unbounded();
                 let listen =
@@ -270,7 +261,7 @@ impl Vsock {
 
     // Helper for inserting an event into the events hashmap
     fn register_event(&self, event: Event) -> Result<OneshotEvent, Error> {
-        match self.lock().events.entry(event) {
+        match self.borrow_mut().events.entry(event) {
             std::collections::hash_map::Entry::Vacant(entry) => {
                 let (sender, receiver) = oneshot::channel();
                 let event = OneshotEvent {
@@ -291,13 +282,14 @@ impl Vsock {
         &self,
         addr: &addr::Vsock,
         data: zx::Socket,
-    ) -> Result<impl Future<Output = Result<(OneshotEvent, OneshotEvent), Error>>, Error> {
+    ) -> Result<impl Future<Output = Result<(OneshotEvent, OneshotEvent), Error>> + 'static, Error>
+    {
         let shutdown_callback =
             self.register_event(Event { action: EventType::Shutdown, addr: addr.clone() })?;
         let response_callback =
             self.register_event(Event { action: EventType::Response, addr: addr.clone() })?;
 
-        let send_request_fut = self.lock().device.send_request(&addr, data);
+        let send_request_fut = self.borrow_mut().device.send_request(&addr, data);
 
         Ok(async move {
             map_driver_result(send_request_fut.await)?;
@@ -308,11 +300,11 @@ impl Vsock {
         &self,
         addr: &addr::Vsock,
         data: zx::Socket,
-    ) -> Result<impl Future<Output = Result<OneshotEvent, Error>>, Error> {
+    ) -> Result<impl Future<Output = Result<OneshotEvent, Error>> + 'static, Error> {
         let shutdown_callback =
             self.register_event(Event { action: EventType::Shutdown, addr: addr.clone() })?;
 
-        let send_request_fut = self.lock().device.send_response(&addr.clone(), data);
+        let send_request_fut = self.borrow_mut().device.send_response(&addr.clone(), data);
 
         Ok(async move {
             map_driver_result(send_request_fut.await)?;
@@ -337,14 +329,14 @@ impl Vsock {
             shutdown_event = shutdown_event => {
                 let fut = future::ready(shutdown_event)
                     .err_into()
-                    .and_then(|()| self.lock().send_rst(&addr));
+                    .and_then(|()| self.borrow_mut().send_rst(&addr));
                 return fut.await;
             },
             request = requests.next() => {
                 match request {
                     Some(Ok(ConnectionRequest::Shutdown{control_handle: _control_handle})) => {
                         let fut =
-                            self.lock().send_shutdown(&addr)
+                            self.borrow_mut().send_shutdown(&addr)
                                 // Wait to either receive the RST for the client or to be
                                 // shut down for some other reason
                                 .and_then(|()| shutdown_event.err_into());
@@ -352,12 +344,12 @@ impl Vsock {
                     },
                     // Generate a RST for a non graceful client disconnect.
                     Some(Err(e)) => {
-                        let fut = self.lock().send_rst(&addr);
+                        let fut = self.borrow_mut().send_rst(&addr);
                         fut.await?;
                         return Err(Error::ClientCommunication(e.into()));
                     },
                     None => {
-                        let fut = self.lock().send_rst(&addr);
+                        let fut = self.borrow_mut().send_rst(&addr);
                         return fut.await;
                     },
                 }
@@ -367,7 +359,7 @@ impl Vsock {
 
     // Waits for incoming connections on the given `ListenStream`, checks with the
     // user via the `acceptor` if it should be accepted, and if so spawns a new
-    // asynchronous thread to run the connection.
+    // asynchronous task to run the connection.
     async fn run_connection_listener(
         self,
         incoming: ListenStream,
@@ -385,7 +377,7 @@ impl Vsock {
                             .into_stream()
                             .map_err(|x| Error::ClientCommunication(x.into()))?;
                         let shutdown_event = self.send_response(&addr, data)?.await?;
-                        self.lock().tasks.spawn(
+                        self.borrow_mut().tasks.local(
                             self.clone()
                                 .run_connection(addr, shutdown_event, con, None)
                                 .map_err(|err| {
@@ -396,7 +388,7 @@ impl Vsock {
                         Ok(())
                     }
                     None => {
-                        let fut = self.lock().send_rst(&addr);
+                        let fut = self.borrow_mut().send_rst(&addr);
                         fut.await
                     }
                 }
@@ -405,7 +397,7 @@ impl Vsock {
     }
 
     // Attempts to connect to the given remote cid/port. If successful spawns a new
-    // asynchronous thread to run the connection until completion.
+    // asynchronous task to run the connection until completion.
     async fn make_connection(
         &self,
         remote_cid: u32,
@@ -428,7 +420,7 @@ impl Vsock {
             response_event = response_event.fuse() => response_event?,
         }
 
-        self.lock().tasks.spawn(
+        self.borrow_mut().tasks.local(
             self.clone()
                 .run_connection(addr, shutdown_event, con, Some(port))
                 .unwrap_or_else(|err| tracing::warn!("Error {} whilst running connection", err)),
@@ -436,45 +428,14 @@ impl Vsock {
         Ok(port_value)
     }
 
-    pub fn spawn(&self, future: impl Future<Output = ()> + Send + 'static) {
-        self.lock().tasks.spawn(future);
+    /// Mutably borrow the wrapped value.
+    fn borrow_mut(&self) -> RefMut<'_, State> {
+        self.inner.borrow_mut()
     }
-}
 
-impl Deref for Vsock {
-    type Target = LockedState;
-
-    fn deref(&self) -> &LockedState {
-        &self.inner
-    }
-}
-
-impl LockedState {
-    // Acquires the lock on `inner`, and processes any pending messages
-    fn lock(&self) -> fuchsia_sync::MutexGuard<'_, State> {
-        let mut guard = self.inner.lock();
-        self.deregister_rx.try_iter().for_each(|e| guard.deregister(e));
-        guard
-    }
-    // Tries to acquire the lock on `inner`, and processes any pending messages
-    // if successful
-    fn try_lock(&self) -> Option<fuchsia_sync::MutexGuard<'_, State>> {
-        if let Some(mut guard) = self.inner.try_lock() {
-            self.deregister_rx.try_iter().for_each(|e| guard.deregister(e));
-            Some(guard)
-        } else {
-            None
-        }
-    }
-    // Deregisters the specified event, or queues it for later deregistration if
-    // lock acquisition fails.
+    // Deregisters the specified event.
     fn deregister(&self, event: Deregister) {
-        if let Some(mut service) = self.try_lock() {
-            service.deregister(event);
-        } else {
-            // Should not fail as we expect to be using an unbounded channel
-            let _ = self.deregister_tx.try_send(event);
-        }
+        self.borrow_mut().deregister(event);
     }
 }
 
@@ -495,10 +456,16 @@ impl State {
     }
 
     // Wrappers around device functions with nicer type signatures
-    fn send_rst(&mut self, addr: &addr::Vsock) -> impl Future<Output = Result<(), Error>> {
+    fn send_rst(
+        &mut self,
+        addr: &addr::Vsock,
+    ) -> impl Future<Output = Result<(), Error>> + 'static {
         self.device.send_rst(&addr.clone()).map(|x| map_driver_result(x))
     }
-    fn send_shutdown(&mut self, addr: &addr::Vsock) -> impl Future<Output = Result<(), Error>> {
+    fn send_shutdown(
+        &mut self,
+        addr: &addr::Vsock,
+    ) -> impl Future<Output = Result<(), Error>> + 'static {
         self.device.send_shutdown(&addr).map(|x| map_driver_result(x))
     }
 
@@ -524,7 +491,7 @@ impl State {
                     None => {
                         tracing::warn!("Request on port {} with no listener", addr.local_port);
                         let task = self.send_rst(&addr).map(|_| ());
-                        self.tasks.spawn(task);
+                        self.tasks.local(task);
                     }
                 }
             }
@@ -580,7 +547,7 @@ impl Future for OneshotEvent {
             Poll::Ready(x) => {
                 // Take the event so that we don't try to deregister it later,
                 // as by having sent the message we just received the callbacks
-                // thread will already have removed it
+                // task will already have removed it
                 self.event.take();
                 Poll::Ready(x)
             }

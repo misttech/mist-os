@@ -64,7 +64,7 @@ mod tests {
         .detach();
 
         let (service, event_loop) = Vsock::new(driver_client.into_proxy()?).await?;
-        fasync::Task::spawn(event_loop.map_err(|x| panic!("Event loop stopped {}", x)).map(|_| ()))
+        fasync::Task::local(event_loop.map_err(|x| panic!("Event loop stopped {}", x)).map(|_| ()))
             .detach();
         let (driver_server, driver_callbacks) = rx.await?;
         let driver = MockDriver::new(driver_server, driver_callbacks);
@@ -83,7 +83,7 @@ mod tests {
         let (app_client, app_remote) = endpoints::create_endpoints::<ConnectorMarker>();
         let app_client = app_client.into_proxy()?;
         // Run the client
-        fasync::Task::spawn(
+        fasync::Task::local(
             Vsock::run_client_connection(service.clone(), app_remote.into_stream()?)
                 .then(|_| future::ready(())),
         )

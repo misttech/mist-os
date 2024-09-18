@@ -59,7 +59,7 @@ impl TaskGroup {
 
     /// Spawns a new task in this TaskGroup.
     ///
-    /// To add a future that is not [`Send`] to this TaskGroup, use [`TaskGroup::add`].
+    /// To add a future that is not [`Send`] to this TaskGroup, use [`TaskGroup::local`].
     ///
     /// # Panics
     ///
@@ -67,6 +67,16 @@ impl TaskGroup {
     /// within a call to `run` or `run_singlethreaded`).
     pub fn spawn(&mut self, future: impl Future<Output = ()> + Send + 'static) {
         self.add(Task::spawn(future));
+    }
+
+    /// Spawns a new task in this TaskGroup.
+    ///
+    /// # Panics
+    ///
+    /// `spawn` may panic if not called in the context of a single threaded executor
+    /// (e.g. within a call to `run_singlethreaded`).
+    pub fn local(&mut self, future: impl Future<Output = ()> + 'static) {
+        self.add(Task::local(future));
     }
 
     /// Waits for all Tasks in this TaskGroup to finish.
