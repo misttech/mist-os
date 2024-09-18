@@ -77,10 +77,7 @@ impl FsNodeOps for DeviceDirectory {
         match &**name {
             b"dev" => Ok(node.fs().create_node(
                 current_task,
-                BytesFile::new_node(
-                    format!("{}:{}\n", self.device_type().major(), self.device_type().minor())
-                        .into_bytes(),
-                ),
+                BytesFile::new_node(format!("{}\n", self.device_type()).into_bytes()),
                 FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
             )),
             b"uevent" => Ok(node.fs().create_node(

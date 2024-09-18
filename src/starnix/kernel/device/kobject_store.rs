@@ -8,15 +8,19 @@ use crate::device::kobject::{
 use crate::device::DeviceMode;
 use crate::fs::sysfs::{
     BusCollectionDirectory, KObjectDirectory, KObjectSymlinkDirectory, SYSFS_BLOCK, SYSFS_BUS,
-    SYSFS_CLASS, SYSFS_DEVICES,
+    SYSFS_CLASS, SYSFS_DEV, SYSFS_DEVICES,
 };
-use crate::vfs::{FsNodeOps, FsStr};
+use crate::vfs::{FsNodeOps, FsStr, FsString};
 
 pub struct KObjectStore {
     pub devices: KObjectHandle,
     pub class: KObjectHandle,
     pub block: KObjectHandle,
     pub bus: KObjectHandle,
+    pub dev: KObjectHandle,
+
+    dev_block: KObjectHandle,
+    dev_char: KObjectHandle,
 }
 
 impl KObjectStore {
@@ -58,10 +62,17 @@ impl KObjectStore {
             ))
         });
 
-        // Insert the created device kobject into its subsystems.
+        // Insert the newly created device into various views.
         class.collection.kobject().insert_child(device_kobject.clone());
-        if metadata.mode == DeviceMode::Block {
-            self.block.insert_child(device_kobject.clone());
+        let device_number = metadata.device_type.to_string().into();
+        match metadata.mode {
+            DeviceMode::Block => {
+                self.block.insert_child(device_kobject.clone());
+                self.dev_block.insert_child_with_name(device_number, device_kobject.clone())
+            }
+            DeviceMode::Char => {
+                self.dev_char.insert_child_with_name(device_number, device_kobject.clone())
+            }
         }
         if let Some(bus_collection) = &class.bus.collection {
             bus_collection.kobject().insert_child(device_kobject.clone());
@@ -69,15 +80,41 @@ impl KObjectStore {
 
         Device::new(device_kobject, class, metadata)
     }
+
+    pub(super) fn destroy_device(&self, device: &Device) {
+        let kobject = device.kobject();
+        let name = kobject.name();
+        // Remove the device from its views in the reverse order in which it was added.
+        if let Some(bus_collection) = &device.class.bus.collection {
+            bus_collection.kobject().remove_child(name);
+        }
+        let device_number: FsString = device.metadata.device_type.to_string().into();
+        match device.metadata.mode {
+            DeviceMode::Block => {
+                self.dev_block.remove_child(device_number.as_ref());
+                self.block.remove_child(name);
+            }
+            DeviceMode::Char => {
+                self.dev_char.remove_child(device_number.as_ref());
+            }
+        }
+        device.class.collection.kobject().remove_child(name);
+        // Finally, remove the device from the object store.
+        kobject.remove();
+    }
 }
 
 impl Default for KObjectStore {
     fn default() -> Self {
-        Self {
-            devices: KObject::new_root(SYSFS_DEVICES.into()),
-            class: KObject::new_root(SYSFS_CLASS.into()),
-            block: KObject::new_root_with_dir(SYSFS_BLOCK.into(), KObjectSymlinkDirectory::new),
-            bus: KObject::new_root(SYSFS_BUS.into()),
-        }
+        let devices = KObject::new_root(SYSFS_DEVICES.into());
+        let class = KObject::new_root(SYSFS_CLASS.into());
+        let block = KObject::new_root_with_dir(SYSFS_BLOCK.into(), KObjectSymlinkDirectory::new);
+        let bus = KObject::new_root(SYSFS_BUS.into());
+        let dev = KObject::new_root(SYSFS_DEV.into());
+
+        let dev_block = dev.get_or_create_child("block".into(), KObjectSymlinkDirectory::new);
+        let dev_char = dev.get_or_create_child("char".into(), KObjectSymlinkDirectory::new);
+
+        Self { devices, class, block, bus, dev, dev_block, dev_char }
     }
 }

@@ -2,9 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::device::kobject::{
-    Class, Device, DeviceMetadata, KObject, KObjectBased, UEventAction, UEventContext,
-};
+use crate::device::kobject::{Class, Device, DeviceMetadata, KObject, UEventAction, UEventContext};
 use crate::device::kobject_store::KObjectStore;
 use crate::fs::devtmpfs::{devtmpfs_create_device, devtmpfs_remove_node};
 use crate::task::CurrentTask;
@@ -309,13 +307,7 @@ impl DeviceRegistry {
     ) where
         L: LockBefore<FileOpsCore>,
     {
-        let kobject = device.kobject();
-        let name = kobject.name();
-        device.class.collection.kobject().remove_child(name);
-        if let Some(bus_collection) = &device.class.bus.collection {
-            bus_collection.kobject().remove_child(name);
-        }
-        device.kobject().remove();
+        self.objects.destroy_device(&device);
         self.dispatch_uevent(UEventAction::Remove, device.clone());
 
         if let Err(err) =
@@ -459,6 +451,7 @@ impl DeviceOps for Arc<RwLock<DynRegistry>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::device::kobject::KObjectBased;
     use crate::device::mem::{mem_device_init, DevNull};
     use crate::fs::sysfs::DeviceDirectory;
     use crate::testing::*;

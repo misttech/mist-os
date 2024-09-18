@@ -153,7 +153,11 @@ impl KObject {
     }
 
     pub fn insert_child(self: &KObjectHandle, child: KObjectHandle) {
-        self.children.lock().insert(child.name().to_owned(), child);
+        self.insert_child_with_name(child.name().to_owned(), child);
+    }
+
+    pub fn insert_child_with_name(self: &KObjectHandle, name: FsString, child: KObjectHandle) {
+        self.children.lock().insert(name, child);
     }
 
     /// Collects all children names.

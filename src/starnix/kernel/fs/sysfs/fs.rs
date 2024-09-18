@@ -24,6 +24,7 @@ pub const SYSFS_DEVICES: &str = "devices";
 pub const SYSFS_BUS: &str = "bus";
 pub const SYSFS_CLASS: &str = "class";
 pub const SYSFS_BLOCK: &str = "block";
+pub const SYSFS_DEV: &str = "dev";
 
 struct SysFs;
 impl FileSystemOps for SysFs {
@@ -68,6 +69,7 @@ impl SysFs {
         dir.entry(current_task, SYSFS_BUS, registry.objects.bus.ops(), dir_mode);
         dir.entry(current_task, SYSFS_BLOCK, registry.objects.block.ops(), dir_mode);
         dir.entry(current_task, SYSFS_CLASS, registry.objects.class.ops(), dir_mode);
+        dir.entry(current_task, SYSFS_DEV, registry.objects.dev.ops(), dir_mode);
 
         // TODO(b/297438880): Remove this workaround after net devices are registered correctly.
         kernel
