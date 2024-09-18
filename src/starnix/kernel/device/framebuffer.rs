@@ -243,7 +243,8 @@ where
     let kernel = system_task.kernel();
     let registry = &kernel.device_registry;
 
-    let graphics_class = registry.objects.graphics_class();
+    let graphics_class =
+        registry.objects.get_or_create_class("graphics".into(), registry.objects.virtual_bus());
     registry.add_and_register_device(
         locked,
         system_task,

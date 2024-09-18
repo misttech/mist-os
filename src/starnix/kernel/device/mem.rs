@@ -386,7 +386,8 @@ where
     let kernel = system_task.kernel();
     let registry = &kernel.device_registry;
 
-    let mem_class = registry.objects.mem_class();
+    let mem_class =
+        registry.objects.get_or_create_class("mem".into(), registry.objects.virtual_bus());
     registry.add_and_register_device(
         locked,
         system_task,

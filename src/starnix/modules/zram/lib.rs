@@ -171,7 +171,8 @@ where
     let zram_dev_weak = Arc::downgrade(&zram_dev);
     let kernel = system_task.kernel();
     let registry = &kernel.device_registry;
-    let virtual_block_class = registry.objects.virtual_block_class();
+    let virtual_block_class =
+        registry.objects.get_or_create_class("block".into(), registry.objects.virtual_bus());
     registry.add_and_register_device(
         locked,
         system_task,

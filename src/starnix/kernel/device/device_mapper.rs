@@ -215,7 +215,8 @@ impl DmDevice {
         let kernel = current_task.kernel();
         let registry = &kernel.device_registry;
         let dm_device_name = FsString::from(format!("dm-{minor}"));
-        let virtual_block_class = registry.objects.virtual_block_class();
+        let virtual_block_class =
+            registry.objects.get_or_create_class("block".into(), registry.objects.virtual_bus());
         let device = Arc::new(Self {
             number: DeviceType::new(DEVICE_MAPPER_MAJOR, minor),
             ..Default::default()

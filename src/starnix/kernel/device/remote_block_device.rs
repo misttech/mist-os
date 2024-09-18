@@ -54,7 +54,8 @@ impl RemoteBlockDevice {
         let kernel = current_task.kernel();
         let registry = &kernel.device_registry;
         let device_name = FsString::from(format!("remoteblk-{name}"));
-        let virtual_block_class = registry.objects.virtual_block_class();
+        let virtual_block_class =
+            registry.objects.get_or_create_class("block".into(), registry.objects.virtual_bus());
         let backing_memory_size = backing_memory.get_content_size() as usize;
         let device = Arc::new(Self {
             name: name.to_owned(),
