@@ -164,12 +164,14 @@ where
                 bound_device,
                 icmp_filter: _,
                 hop_limits,
+                multicast_loop,
                 system_checksums,
             } = state;
             let (remote_ip, device) = remote_ip
                 .resolve_addr_with_device(bound_device.clone())
                 .map_err(RawIpSocketSendToError::Zone)?;
-            let send_options = RawIpSocketSendOptions { hop_limits: &hop_limits };
+            let send_options =
+                RawIpSocketSendOptions { hop_limits: &hop_limits, multicast_loop: *multicast_loop };
 
             let build_packet_fn =
                 |src_ip: IpDeviceAddr<I::Addr>| -> Result<RawIpBody<_, _>, RawIpSocketSendToError> {
@@ -320,6 +322,19 @@ where
         })
     }
 
+    /// Sets `multicast_loop` on the socket, returning the original value.
+    ///
+    /// When true, the socket will loop back all sent multicast traffic.
+    pub fn set_multicast_loop(&mut self, id: &RawIpApiSocketId<I, C>, value: bool) -> bool {
+        self.core_ctx()
+            .with_locked_state_mut(id, |state| core::mem::replace(&mut state.multicast_loop, value))
+    }
+
+    /// Gets the `multicast_loop` value on the socket.
+    pub fn get_multicast_loop(&mut self, id: &RawIpApiSocketId<I, C>) -> bool {
+        self.core_ctx().with_locked_state(id, |state| state.multicast_loop)
+    }
+
     /// Provides inspect data for raw IP sockets.
     pub fn inspect<N>(&mut self, inspector: &mut N)
     where
@@ -350,6 +365,7 @@ where
                             bound_device,
                             icmp_filter,
                             hop_limits: _,
+                            multicast_loop: _,
                             system_checksums: _,
                         } = state;
                         if let Some(bound_device) = bound_device {
@@ -701,8 +717,13 @@ fn check_packet_for_delivery<I: IpExt, D: StrongDeviceIdentifier, B: ByteSlice>(
     device: &D,
     socket: &RawIpSocketLockedState<I, D::Weak>,
 ) -> DeliveryOutcome {
-    let RawIpSocketLockedState { bound_device, icmp_filter, hop_limits: _, system_checksums } =
-        socket;
+    let RawIpSocketLockedState {
+        bound_device,
+        icmp_filter,
+        hop_limits: _,
+        multicast_loop: _,
+        system_checksums,
+    } = socket;
     // Verify the received device matches the socket's bound device, if any.
     if bound_device.as_ref().is_some_and(|bound_device| bound_device != device) {
         return DeliveryOutcome::WrongDevice;
@@ -745,6 +766,7 @@ fn check_packet_for_delivery<I: IpExt, D: StrongDeviceIdentifier, B: ByteSlice>(
 /// An implementation of [`SendOptions`] for raw IP sockets.
 struct RawIpSocketSendOptions<'a, I: Ip> {
     hop_limits: &'a SocketHopLimits<I>,
+    multicast_loop: bool,
 }
 
 impl<I: IpExt> SendOptions<I> for RawIpSocketSendOptions<'_, I> {
@@ -753,8 +775,7 @@ impl<I: IpExt> SendOptions<I> for RawIpSocketSendOptions<'_, I> {
     }
 
     fn multicast_loop(&self) -> bool {
-        // TODO(https://fxbug.dev/344645667): Support IP_MULTICAST_LOOP.
-        false
+        self.multicast_loop
     }
 
     fn allow_broadcast(&self) -> Option<I::BroadcastMarker> {
@@ -1112,6 +1133,19 @@ mod test {
         assert_eq!(api.get_multicast_hop_limit(&sock), limit2);
         assert_eq!(api.set_multicast_hop_limit(&sock, None), Some(limit2));
         assert_eq!(api.get_multicast_hop_limit(&sock), DEFAULT_HOP_LIMITS.multicast);
+    }
+
+    #[ip_test(I)]
+    fn set_multicast_loop<I: IpExt + DualStackIpExt + TestIpExt>() {
+        let mut api = new_raw_ip_socket_api::<I>();
+        let sock = api.create(RawIpSocketProtocol::new(IpProto::Udp.into()), Default::default());
+
+        // NB: multicast loopback is enabled by default.
+        assert_eq!(api.get_multicast_loop(&sock), true);
+        assert_eq!(api.set_multicast_loop(&sock, false), true);
+        assert_eq!(api.get_multicast_loop(&sock), false);
+        assert_eq!(api.set_multicast_loop(&sock, true), false);
+        assert_eq!(api.get_multicast_loop(&sock), true);
     }
 
     #[ip_test(I)]

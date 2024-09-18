@@ -370,12 +370,18 @@ impl<'a, I: IpExt + IpSockAddrExt> RequestHandler<'a, I> {
                         .log_error("raw::GetIpMulticastTtl"),
                 )
                 .unwrap_or_log("failed to respond"),
-            fpraw::SocketRequest::SetIpMulticastLoopback { value: _, responder } => {
-                respond_not_supported!("raw::SetIpMulticastLoopback", responder)
-            }
-            fpraw::SocketRequest::GetIpMulticastLoopback { responder } => {
-                respond_not_supported!("raw::GetIpMulticastLoopback", responder)
-            }
+            fpraw::SocketRequest::SetIpMulticastLoopback { value, responder } => responder
+                .send(
+                    handle_set_multicast_loop(ctx, data, value, IpVersion::V4)
+                        .log_error("raw::SetIpMulticastLoopback"),
+                )
+                .unwrap_or_log("failed to respond"),
+            fpraw::SocketRequest::GetIpMulticastLoopback { responder } => responder
+                .send(
+                    handle_get_multicast_loop(ctx, data, IpVersion::V4)
+                        .log_error("raw::GetIpMulticastLoopback"),
+                )
+                .unwrap_or_log("failed to respond"),
             fpraw::SocketRequest::AddIpMembership { membership: _, responder } => {
                 respond_not_supported!("raw::AddIpMembership", responder)
             }
@@ -437,12 +443,18 @@ impl<'a, I: IpExt + IpSockAddrExt> RequestHandler<'a, I> {
                         .log_error("raw::GetIpv6MulticastHops"),
                 )
                 .unwrap_or_log("failed to respond"),
-            fpraw::SocketRequest::SetIpv6MulticastLoopback { value: _, responder } => {
-                respond_not_supported!("raw::SetIpv6MulticastLoopback", responder)
-            }
-            fpraw::SocketRequest::GetIpv6MulticastLoopback { responder } => {
-                respond_not_supported!("raw::GetIpv6MulticastLoopback", responder)
-            }
+            fpraw::SocketRequest::SetIpv6MulticastLoopback { value, responder } => responder
+                .send(
+                    handle_set_multicast_loop(ctx, data, value, IpVersion::V6)
+                        .log_error("raw::SetIpv6MulticastLoopback"),
+                )
+                .unwrap_or_log("failed to respond"),
+            fpraw::SocketRequest::GetIpv6MulticastLoopback { responder } => responder
+                .send(
+                    handle_get_multicast_loop(ctx, data, IpVersion::V6)
+                        .log_error("raw::GetIpv6MulticastLoopback"),
+                )
+                .unwrap_or_log("failed to respond"),
             fpraw::SocketRequest::SetIpv6Only { value: _, responder } => {
                 respond_not_supported!("raw::SetIpv6Only", responder)
             }
@@ -764,6 +776,39 @@ fn handle_get_icmpv6_filter<I: IpExt>(
             Ok(filter) => Ok(filter.into_fidl()),
         },
     )
+}
+
+/// Handler for the following requests:
+///  - [`fpraw::SocketRequest::SetIpMulticastLoop`]
+///  - [`fpraw::SocketRequest::SetIpv6MulticastLoop`]
+#[netstack3_core::context_ip_bounds(I, BindingsCtx)]
+fn handle_set_multicast_loop<I: IpExt>(
+    ctx: &mut Ctx,
+    socket: &SocketWorkerState<I>,
+    value: bool,
+    ip_version: IpVersion,
+) -> Result<(), fposix::Errno> {
+    if I::VERSION != ip_version {
+        return Err(fposix::Errno::Enoprotoopt);
+    }
+    let _old_value: bool = ctx.api().raw_ip_socket().set_multicast_loop(&socket.id, value);
+    Ok(())
+}
+
+/// Handler for the following requests:
+///  - [`fpraw::SocketRequest::GetIpMulticastLoop`]
+///  - [`fpraw::SocketRequest::GetIpv6MulticastLoop`]
+#[netstack3_core::context_ip_bounds(I, BindingsCtx)]
+fn handle_get_multicast_loop<I: IpExt>(
+    ctx: &mut Ctx,
+    socket: &SocketWorkerState<I>,
+    ip_version: IpVersion,
+) -> Result<bool, fposix::Errno> {
+    if I::VERSION != ip_version {
+        return Err(fposix::Errno::Enoprotoopt);
+    }
+
+    Ok(ctx.api().raw_ip_socket().get_multicast_loop(&socket.id))
 }
 
 /// The type of hop limit to set/get.

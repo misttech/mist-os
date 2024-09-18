@@ -30,6 +30,9 @@ pub struct RawIpSocketLockedState<I: IpExt, D: WeakDeviceIdentifier> {
     pub(crate) icmp_filter: Option<RawIpSocketIcmpFilter<I>>,
     /// The socket's hop limits.
     pub(crate) hop_limits: SocketHopLimits<I>,
+    /// Whether the socket should loop back sent multicast traffic.
+    #[derivative(Default(value = "true"))]
+    pub(crate) multicast_loop: bool,
     /// Whether the system should generate/validate checksums for packets
     /// sent/received by this socket.
     // TODO(https://fxbug.dev/343672830): Support enabling/disabling checksum
