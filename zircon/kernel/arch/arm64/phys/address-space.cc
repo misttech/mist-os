@@ -132,7 +132,7 @@ void ArchSetUpAddressSpace(AddressSpace& aspace) {
   auto mair = arch::ArmMemoryAttrIndirectionRegister::Get()
                   .FromValue(0)
                   .SetAttribute(0, kArchNormalMemoryType)
-                  .SetAttribute(1, kArchMmioMemoryType);
+                  .SetAttribute(1, ArchMmioMemoryType());
 
   aspace.Init(mair);
   aspace.SetUpIdentityMappings();

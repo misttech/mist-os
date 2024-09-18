@@ -16,7 +16,7 @@ using ArchLowerPagingTraits = arch::X86FourLevelPagingTraits;
 using ArchUpperPagingTraits = ArchLowerPagingTraits;
 
 inline constexpr arch::X86PagingTraitsBase::MemoryType kArchNormalMemoryType = {};
-inline constexpr arch::X86PagingTraitsBase::MemoryType kArchMmioMemoryType = {};
+inline constexpr arch::X86PagingTraitsBase::MemoryType ArchMmioMemoryType() { return {}; }
 
 inline auto ArchCreatePagingState() {
   return arch::X86PagingTraitsBase::SystemState::Create(hwreg::X86MsrIo{}, arch::BootCpuidIo{});

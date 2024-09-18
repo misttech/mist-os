@@ -19,8 +19,9 @@ inline constexpr arch::ArmMairNormalAttribute kArchNormalMemoryType = {
     .outer = arch::ArmCacheabilityAttribute::kWriteBackReadWriteAllocate,
 };
 
-inline constexpr arch::ArmMairAttribute kArchMmioMemoryType =
-    arch::ArmDeviceMemory::kNonGatheringNonReorderingEarlyAck;
+inline constexpr arch::ArmMairAttribute ArchMmioMemoryType() {
+  return arch::ArmDeviceMemory::kNonGatheringNonReorderingEarlyAck;
+}
 
 inline arch::ArmSystemPagingState ArchCreatePagingState(
     const arch::ArmMemoryAttrIndirectionRegister& mair) {

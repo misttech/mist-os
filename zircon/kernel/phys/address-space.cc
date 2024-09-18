@@ -121,7 +121,7 @@ void AddressSpace::IdentityMapUart() {
     // Page aligned base and size.
     uint64_t base = uart_mmio_base & ~(uint64_t{ZX_PAGE_SIZE} - 1);
     uint64_t size = fbl::round_up(uart_mmio_base + uart_mmio_size, ZX_PAGE_SIZE) - base;
-    auto result = IdentityMap(base, size, kMmioMapSettings);
+    auto result = IdentityMap(base, size, MmioMapSettings());
     if (result.is_error()) {
       ZX_PANIC("Failed to map in UART range: [%#" PRIx64 ", %#" PRIx64 ")", uart_mmio_base,
                uart_mmio_base + size);

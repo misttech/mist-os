@@ -7,18 +7,22 @@
 #ifndef ZIRCON_KERNEL_ARCH_RISCV64_PHYS_INCLUDE_PHYS_ARCH_ADDRESS_SPACE_H_
 #define ZIRCON_KERNEL_ARCH_RISCV64_PHYS_INCLUDE_PHYS_ARCH_ADDRESS_SPACE_H_
 
+#include <lib/arch/riscv64/feature.h>
 #include <lib/arch/riscv64/page-table.h>
+
+#include <phys/main.h>
+
+#include "arch-phys-info.h"
 
 using ArchLowerPagingTraits = arch::RiscvSv39PagingTraits;
 using ArchUpperPagingTraits = ArchLowerPagingTraits;
 
-// Assume Svpbmt feature is present but add a conditional switch to compile
-// time disable its use.
-inline constexpr auto kRiscvSvpbmtEnabled = true;
-
 inline constexpr auto kArchNormalMemoryType = arch::RiscvMemoryType::kPma;
-inline constexpr auto kArchMmioMemoryType =
-    kRiscvSvpbmtEnabled ? arch::RiscvMemoryType::kIo : arch::RiscvMemoryType::kPma;
+
+inline arch::RiscvMemoryType ArchMmioMemoryType() {
+  return gArchPhysInfo->cpu_features[arch::RiscvFeature::kSvpbmt] ? arch::RiscvMemoryType::kIo
+                                                                  : arch::RiscvMemoryType::kPma;
+}
 
 inline arch::RiscvPagingTraitsBase::SystemState ArchCreatePagingState() { return {}; }
 
