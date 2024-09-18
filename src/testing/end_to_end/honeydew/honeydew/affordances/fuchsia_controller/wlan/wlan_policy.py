@@ -57,13 +57,17 @@ class AsyncIterator(Protocol[_T_co]):
         """Get the next element."""
 
 
-async def collect_iterator(iterator: AsyncIterator[_T_co]) -> list[_T_co]:
+async def collect_iterator(
+    iterator: AsyncIterator[_T_co], err_type: type | None = None
+) -> list[_T_co]:
     """Collect all elements from a FIDL iterator.
 
     Will check for errors during collection.
 
     Args:
         iterator: Iterator to collect elements from.
+        err_type: Error class for the result error. Defaults to None for no
+            error checking.
 
     Returns:
         All elements collected from iterator.
@@ -86,9 +90,9 @@ async def collect_iterator(iterator: AsyncIterator[_T_co]) -> list[_T_co]:
 
         # Check for error
         err = getattr(res, "err", None)
-        if err:
+        if err and err_type:
             raise errors.HoneydewWlanError(
-                f"{type(iterator).__name__}.GetNext() {type(err).__name__} {err}"
+                f"{type(iterator).__name__}.GetNext() {err_type.__name__} {err_type(err).name}"
             )
 
         elements.append(res)
@@ -320,7 +324,9 @@ class WlanPolicy(AsyncAdapter, wlan_policy.WlanPolicy):
 
         return [
             NetworkConfig.from_fidl(config)
-            for resp in await collect_iterator(iterator)
+            for resp in await collect_iterator(
+                iterator, f_wlan_policy.ScanErrorCode
+            )
             for config in resp.configs
         ]
 
