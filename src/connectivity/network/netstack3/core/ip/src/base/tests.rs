@@ -4,6 +4,7 @@
 
 use alloc::rc::Rc;
 use core::cell::RefCell;
+use core::convert::Infallible as Never;
 
 use assert_matches::assert_matches;
 use ip_test_macro::ip_test;
@@ -225,17 +226,20 @@ fn test_walk_rules<I: IpLayerIpExt + TestIpExt>() {
         Rule { matcher: RuleMatcher::match_all_packets(), action: RuleAction::Unreachable },
     );
 
-    assert_eq!(
-        walk_rules(
-            &mut ctx,
-            (),
-            &RuleInput {
-                packet_origin: PacketOrigin::Local { bound_address: None, bound_device: None },
-            },
-            |(), _core_ctx, _table| panic!("should not be able to look up tables")
-        ),
-        ControlFlow::Break(RuleAction::<core::convert::Infallible>::Unreachable)
-    );
+    ctx.with_rules_table(|core_ctx, rules| {
+        assert_eq!(
+            walk_rules(
+                core_ctx,
+                rules,
+                (),
+                &RuleInput {
+                    packet_origin: PacketOrigin::Local { bound_address: None, bound_device: None },
+                },
+                |(), _core_ctx, _table| panic!("should not be able to look up tables")
+            ),
+            ControlFlow::Break(RuleAction::<RuleWalkInfo<Never>>::Unreachable)
+        );
+    });
 
     // We setup the routing tables and rules as follows:
     // rule 1: if the source address is from the `I::TEST_ADDRS.subnet`, then lookup route_table_1
@@ -276,51 +280,63 @@ fn test_walk_rules<I: IpLayerIpExt + TestIpExt>() {
 
     // We try to walk the rules with a bound address that matches the rule 1's matcher, we should
     // get a route back with `MultipleDevicesId::A`.
-    assert_eq!(
-        walk_rules(
-            &mut ctx,
-            (),
-            &RuleInput {
-                packet_origin: PacketOrigin::Local {
-                    bound_address: Some(I::TEST_ADDRS.local_ip),
-                    bound_device: None
+    ctx.with_rules_table(|core_ctx, rules| {
+        assert_eq!(
+            walk_rules(
+                core_ctx,
+                rules,
+                (),
+                &RuleInput {
+                    packet_origin: PacketOrigin::Local {
+                        bound_address: Some(I::TEST_ADDRS.local_ip),
+                        bound_device: None
+                    },
                 },
-            },
-            |(), core_ctx, table| {
-                match table.lookup(core_ctx, None, I::TEST_ADDRS.remote_ip.get()) {
-                    None => ControlFlow::Continue(()),
-                    Some(dest) => ControlFlow::Break(dest),
+                |(), core_ctx, table| {
+                    match table.lookup(core_ctx, None, I::TEST_ADDRS.remote_ip.get()) {
+                        None => ControlFlow::Continue(()),
+                        Some(dest) => ControlFlow::Break(dest),
+                    }
                 }
-            }
-        ),
-        ControlFlow::Break(RuleAction::Lookup(Destination {
-            device: MultipleDevicesId::A,
-            next_hop: NextHop::RemoteAsNeighbor
-        }))
-    );
+            ),
+            ControlFlow::Break(RuleAction::Lookup(RuleWalkInfo {
+                inner: Destination {
+                    device: MultipleDevicesId::A,
+                    next_hop: NextHop::RemoteAsNeighbor
+                },
+                observed_source_address_matcher: true
+            }))
+        );
+    });
 
     // Then we walk the rules with a bound address that does not match rule 1's matcher, we should
     // skip route table 1 and get a route back with `MultipleDevicesId::B`.
-    assert_eq!(
-        walk_rules(
-            &mut ctx,
-            (),
-            &RuleInput {
-                packet_origin: PacketOrigin::Local {
-                    bound_address: Some(I::LOOPBACK_ADDRESS),
-                    bound_device: None
+    ctx.with_rules_table(|core_ctx, rules| {
+        assert_eq!(
+            walk_rules(
+                core_ctx,
+                rules,
+                (),
+                &RuleInput {
+                    packet_origin: PacketOrigin::Local {
+                        bound_address: Some(I::LOOPBACK_ADDRESS),
+                        bound_device: None
+                    },
                 },
-            },
-            |(), core_ctx, table| {
-                match table.lookup(core_ctx, None, *I::LOOPBACK_ADDRESS) {
-                    None => ControlFlow::Continue(()),
-                    Some(dest) => ControlFlow::Break(dest),
+                |(), core_ctx, table| {
+                    match table.lookup(core_ctx, None, *I::LOOPBACK_ADDRESS) {
+                        None => ControlFlow::Continue(()),
+                        Some(dest) => ControlFlow::Break(dest),
+                    }
                 }
-            }
-        ),
-        ControlFlow::Break(RuleAction::Lookup(Destination {
-            device: MultipleDevicesId::B,
-            next_hop: NextHop::RemoteAsNeighbor
-        }))
-    );
+            ),
+            ControlFlow::Break(RuleAction::Lookup(RuleWalkInfo {
+                inner: Destination {
+                    device: MultipleDevicesId::B,
+                    next_hop: NextHop::RemoteAsNeighbor
+                },
+                observed_source_address_matcher: true
+            }))
+        );
+    });
 }

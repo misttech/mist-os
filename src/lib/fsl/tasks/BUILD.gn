@@ -17,10 +17,10 @@ sdk_source_set("tasks") {
   deps = [ "//src/zircon/lib/zircon" ]
 
   public_deps = [
+    "//sdk/lib/async:async-cpp",
+    "//sdk/lib/async-default",
     "//sdk/lib/fdio",
     "//sdk/lib/syslog/cpp",
     "//src/lib/fxl:common",
-    "//zircon/system/ulib/async:async-cpp",
-    "//zircon/system/ulib/async-default",
   ]
 }

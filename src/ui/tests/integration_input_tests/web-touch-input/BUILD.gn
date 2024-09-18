@@ -34,6 +34,8 @@ executable("web-touch-input-test-bin") {
     "//sdk/fidl/fuchsia.ui.test.input:fuchsia.ui.test.input_cpp",
     "//sdk/fidl/fuchsia.vulkan.loader:fuchsia.vulkan.loader_cpp",
     "//sdk/fidl/fuchsia.web:fuchsia.web_cpp",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/sys/component/cpp/testing:cpp",
     "//sdk/lib/sys/cpp",
     "//sdk/lib/ui/scenic/cpp",
@@ -42,8 +44,6 @@ executable("web-touch-input-test-bin") {
     "//src/lib/testing/loop_fixture",
     "//src/ui/testing/util",
     "//third_party/googletest:gtest",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/zx",
 
     # TODO(https://fxbug.dev/296294151): Fix after realm builder support new C++ binding.

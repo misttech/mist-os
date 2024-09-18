@@ -79,6 +79,7 @@ class OS {
 std::unique_ptr<OS> CreateDefaultOS();
 
 // Extracts VMO information out of a process tree.
+// TODO(b/366157407): Remove CaptureStrategy abstraction.
 class CaptureStrategy {
  public:
   virtual ~CaptureStrategy() {}
@@ -131,23 +132,20 @@ class Capture {
 // Holds the necessary components required to create a |Capture|.
 class CaptureMaker {
  public:
-  static fit::result<zx_status_t, std::unique_ptr<CaptureMaker>> Create(
-      std::unique_ptr<OS> os, std::unique_ptr<CaptureStrategy> strategy);
+  static fit::result<zx_status_t, std::unique_ptr<CaptureMaker>> Create(std::unique_ptr<OS> os);
 
   zx_status_t GetCapture(
       Capture* capture, CaptureLevel level,
       const std::vector<std::string>& rooted_vmo_names = Capture::kDefaultRootedVmoNames);
 
  private:
-  CaptureMaker(fidl::WireSyncClient<fuchsia_kernel::Stats> stats_client, std::unique_ptr<OS> os,
-               std::unique_ptr<CaptureStrategy> strategy);
+  CaptureMaker(fidl::WireSyncClient<fuchsia_kernel::Stats> stats_client, std::unique_ptr<OS> os);
   static void ReallocateDescendents(Vmo& parent, std::unordered_map<zx_koid_t, Vmo>& koid_to_vmo);
   static void ReallocateDescendents(const std::vector<std::string>& rooted_vmo_names,
                                     std::unordered_map<zx_koid_t, Vmo>& koid_to_vmo);
   // zx_koid_t self_koid_;
   fidl::WireSyncClient<fuchsia_kernel::Stats> stats_client_;
   std::unique_ptr<OS> os_;
-  std::unique_ptr<CaptureStrategy> strategy_;
 
   friend class TestUtils;
 };

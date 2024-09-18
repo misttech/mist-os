@@ -18,6 +18,7 @@
 #include <stdint.h>
 #include <zircon/status.h>
 
+#include <bind/fuchsia/platform/cpp/bind.h>
 #include <fbl/ref_ptr.h>
 
 namespace devmgr_integration_test {
@@ -69,6 +70,12 @@ zx::result<IsolatedDevmgr> IsolatedDevmgr::Create(devmgr_launcher::Args args,
   realm_args.set_driver_tests_enable_all(args.driver_tests_enable_all);
   realm_args.set_driver_tests_enable(std::move(args.driver_tests_enable));
   realm_args.set_driver_tests_disable(std::move(args.driver_tests_disable));
+  realm_args.set_software_devices(std::vector{
+      fuchsia::driver::test::SoftwareDevice{
+          .device_name = "ram-disk",
+          .device_id = bind_fuchsia_platform::BIND_PLATFORM_DEV_DID_RAM_DISK,
+      },
+  });
   fuchsia::driver::test::Realm_Start_Result realm_result;
   if (zx_status_t status = driver_test_realm->Start(std::move(realm_args), &realm_result);
       status != ZX_OK) {

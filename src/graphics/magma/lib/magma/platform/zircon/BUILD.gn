@@ -114,15 +114,15 @@ source_set("connection_client") {
     "..:connection_client_header",
     "..:trace",
     "//sdk/fidl/fuchsia.gpu.magma:fuchsia.gpu.magma_cpp",
+    "//sdk/lib/async-loop:async-loop-cpp",
     "//src/graphics/magma/lib/magma/util:macros",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/zx",
   ]
 
   deps = [ "//src/graphics/magma/lib/magma/util:short_macros" ]
 
   # Fidl bindings should not introduce a dep on libasync-default.so
-  assert_no_deps = [ "//zircon/system/ulib/async-default" ]
+  assert_no_deps = [ "//sdk/lib/async-default" ]
 }
 
 source_set("device_client") {
@@ -165,7 +165,7 @@ source_set("sysmem_connection") {
   ]
 
   # Fidl bindings should not introduce a dep on libasync-default.so
-  assert_no_deps = [ "//zircon/system/ulib/async-default" ]
+  assert_no_deps = [ "//sdk/lib/async-default" ]
 
   # TODO(https://fxbug.dev/42176699): This target uses mutable tables which are deprecated,
   # rather than builders.
@@ -364,20 +364,20 @@ source_set("trace_provider") {
 
   deps = [
     "..:trace_provider_header",
+    "//sdk/lib/async:async-cpp",
     "//src/graphics/magma/lib/magma/util:macros",
     "//src/graphics/magma/lib/magma/util:short_macros",
-    "//zircon/system/ulib/async:async-cpp",
   ]
 
   public_deps = [
+    "//sdk/lib/async-loop:async-loop-cpp",
     "//sdk/lib/fit",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/trace-provider:trace-provider-with-static-engine",
   ]
 
   assert_no_deps = [
+    "//sdk/lib/async-default",
     "//sdk/lib/fdio",
-    "//zircon/system/ulib/async-default",
   ]
 }
 

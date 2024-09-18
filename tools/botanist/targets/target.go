@@ -77,6 +77,10 @@ type FuchsiaTarget interface {
 	// This is only valid when the target has SSH running.
 	CaptureSyslog(client *sshutil.Client, filename, repoURL, blobURL string) error
 
+	// StopSyslog stops the syslog context that controls the process to capture the syslog
+	// that was started by CaptureSyslog().
+	StopSyslog()
+
 	// IPv4 returns the IPv4 of the target; this is nil unless explicitly
 	// configured.
 	IPv4() (net.IP, error)
@@ -139,6 +143,10 @@ type FuchsiaTarget interface {
 type genericFuchsiaTarget struct {
 	targetCtx       context.Context
 	targetCtxCancel context.CancelFunc
+
+	// stopSyslog is the function to cancel streaming the syslog.
+	// This will be set by CaptureSyslog().
+	stopSyslog func()
 
 	nodename          string
 	serial            io.ReadWriteCloser
@@ -446,8 +454,27 @@ func (t *genericFuchsiaTarget) CaptureSyslog(client *sshutil.Client, filename, r
 
 	syslogWriter := botanist.NewLineWriter(botanist.NewTimestampWriter(f), "")
 	syslogCtx, cancel := context.WithCancel(t.targetCtx)
-	defer cancel()
-	errs := syslogger.Stream(syslogCtx, syslogWriter)
+	t.stopSyslog = func() {
+		cancel()
+		done := false
+		timeout := time.After(5 * time.Second)
+		for {
+			select {
+			case <-timeout:
+				done = true
+			default:
+				if !syslogger.IsRunning() {
+					done = true
+				}
+				time.Sleep(500 * time.Millisecond)
+			}
+			if done {
+				break
+			}
+		}
+	}
+	defer t.stopSyslog()
+	errs := syslogger.Stream(syslogCtx, t.targetCtx, syslogWriter)
 	maxAttempts := 5
 	startTime := time.Now()
 	attempt := 0
@@ -483,6 +510,12 @@ func (t *genericFuchsiaTarget) CaptureSyslog(client *sshutil.Client, filename, r
 		}
 	}
 	return nil
+}
+
+func (t *genericFuchsiaTarget) StopSyslog() {
+	if t.stopSyslog != nil {
+		t.stopSyslog()
+	}
 }
 
 // Stop cleans up all of the resources used by the target.

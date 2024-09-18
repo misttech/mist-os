@@ -41,13 +41,13 @@ source_set("lib") {
   deps = [
     ":memory_metrics_registry",
     "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_cpp",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/component/incoming/cpp",
     "//src/devices/lib/amlogic",
     "//src/lib/cobalt/cpp:metric_event_builder",
     "//src/lib/fsl",
     "//src/lib/fxl:fxl_cli",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/trace-provider",
     "//zircon/system/ulib/trace-vthread",
   ]
@@ -64,13 +64,13 @@ metrics_registry("memory_metrics_registry") {
 
 _common_deps = [
   ":lib",
+  "//sdk/lib/async-default",
+  "//sdk/lib/async-loop:async-loop-cpp",
+  "//sdk/lib/async-loop:async-loop-default",
   "//sdk/lib/scheduler/cpp",
   "//sdk/lib/sys/cpp",
   "//src/lib/fsl",
   "//src/lib/fxl:fxl_cli",
-  "//zircon/system/ulib/async-default",
-  "//zircon/system/ulib/async-loop:async-loop-cpp",
-  "//zircon/system/ulib/async-loop:async-loop-default",
   "//zircon/system/ulib/trace-provider",
 ]
 

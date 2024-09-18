@@ -6,7 +6,7 @@
 
 load("@bazel_skylib//lib:unittest.bzl", "asserts", "unittest")
 load(
-    "//:transition_utils.bzl",
+    "//common:transition_utils.bzl",
     "remove_command_line_option_values",
     "set_command_line_option_value",
 )

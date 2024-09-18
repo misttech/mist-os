@@ -139,9 +139,9 @@ type Options = table {
     /// Request a set of attributes to be sent with the OnRepresentation response. Has no effect
     /// if `Flags.FLAG_SEND_REPRESENTATION` is not set.
     1: attributes NodeAttributesQuery;
-    /// Request a set of attributes to be set atomically when creating a new object. Has no effect
-    /// if neither `Flags.FLAG_MAYBE_CREATE` nor `Flags.FLAG_MUST_CREATE` are set, or if an object
-    /// already exists.
+    /// Request a set of attributes to be set atomically when creating a new object. Requests will
+    /// fail with `ZX_ERR_INVALID_ARGS` if neither `Flags.FLAG_MAYBE_CREATE` nor
+    /// `Flags.FLAG_MUST_CREATE` are set (i.e. the creation is mode is Never).
     2: create_attributes MutableNodeAttributes;
 };
 

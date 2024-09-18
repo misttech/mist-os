@@ -7,6 +7,7 @@ use crate::buffer_allocator::{BufferAllocator, BufferSource};
 use crate::{Device, DeviceHolder};
 use anyhow::{ensure, Error};
 use async_trait::async_trait;
+use block_protocol::WriteOptions;
 use rand::Rng;
 use std::ops::Range;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -110,7 +111,12 @@ impl Device for FakeDevice {
         Ok(())
     }
 
-    async fn write(&self, offset: u64, buffer: BufferRef<'_>) -> Result<(), Error> {
+    async fn write_with_opts(
+        &self,
+        offset: u64,
+        buffer: BufferRef<'_>,
+        _opts: WriteOptions,
+    ) -> Result<(), Error> {
         ensure!(!self.closed.load(Ordering::Relaxed));
         ensure!(!self.read_only.load(Ordering::Relaxed));
         (self.operation_closure)(Op::Write)?;

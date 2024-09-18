@@ -19,6 +19,7 @@
 #include "src/media/audio/services/device_registry/audio_device_registry.h"
 #include "src/media/audio/services/device_registry/control_notify.h"
 #include "src/media/audio/services/device_registry/device.h"
+#include "src/media/audio/services/device_registry/inspector.h"
 
 namespace media_audio {
 
@@ -35,8 +36,8 @@ class ControlServer
       fidl::ServerEnd<fuchsia_audio_device::Control> server_end,
       std::shared_ptr<AudioDeviceRegistry> parent, std::shared_ptr<Device> device);
 
-  void OnShutdown(fidl::UnbindInfo info) override;
   ~ControlServer() override;
+  void OnShutdown(fidl::UnbindInfo info) override;
 
   // ObserverNotify
   //
@@ -97,10 +98,15 @@ class ControlServer
   void MaybeCompleteWatchTopology();
   void MaybeCompleteWatchElementState(ElementId element_id);
 
+  bool ControlledDeviceReceivedError() const { return device_has_error_; }
+
+  const std::shared_ptr<FidlServerInspectInstance>& inspect() { return control_inspect_instance_; }
+  void SetInspect(std::shared_ptr<FidlServerInspectInstance> instance) {
+    control_inspect_instance_ = std::move(instance);
+  }
+
   // Static object count, for debugging purposes.
   static inline uint64_t count() { return count_; }
-
-  bool ControlledDeviceReceivedError() const { return device_has_error_; }
 
  private:
   template <typename ServerT, template <typename T> typename FidlServerT, typename ProtocolT>
@@ -136,6 +142,8 @@ class ControlServer
   // Locks a weak_ptr ring_buffer_server_ to shared_ptr and returns it, or returns nullptr.
   std::shared_ptr<RingBufferServer> TryGetRingBufferServer(ElementId element_id);
   std::unordered_map<ElementId, std::weak_ptr<RingBufferServer>> ring_buffer_servers_;
+
+  std::shared_ptr<FidlServerInspectInstance> control_inspect_instance_;
 };
 
 }  // namespace media_audio

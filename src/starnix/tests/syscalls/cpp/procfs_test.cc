@@ -19,6 +19,7 @@
 
 namespace {
 
+using testing::ContainsRegex;
 using testing::MatchesRegex;
 
 class ProcfsTest : public ::testing::Test {
@@ -71,6 +72,48 @@ TEST_F(ProcfsTest, ProcPressure) {
                 MatchesRegex("some avg10=[0-9.]+ avg60=[0-9.]+ avg300=[0-9.]+ total=[0-9.]+\n"
                              "(full avg10=[0-9.]+ avg60=[0-9.]+ avg300=[0-9.]+ total=[0-9.]+\n)?"));
   }
+}
+
+// Verify that /proc/zoneinfo contains something reasonable.
+TEST_F(ProcfsTest, ZoneInfo) {
+  auto path = "/proc/zoneinfo";
+  EXPECT_EQ(0, access(path, R_OK));
+  std::string content;
+  ASSERT_TRUE(files::ReadFileToString(path, &content));
+  // Ensures that one node has `nr_inactive_file` and `nr_inactive_file`.
+  EXPECT_THAT(content, ContainsRegex("(\n|^)Node [0-9]+, zone +[a-zA-Z]+\n"
+                                     "  per-node stats\n"
+                                     "( {6}.*\n)*"
+                                     "      nr_inactive_file [0-9]+\n"
+                                     "      nr_active_file [0-9]+\n"));
+  // Ensures that one node has `free`, `min`, `low`, `high`, `present`, among others.
+  EXPECT_THAT(content, ContainsRegex("(\n|^)Node [0-9]+, zone +[a-zA-Z]+\n"
+                                     "(  .*\n)*"
+                                     "  pages free     [0-9]+\n"
+                                     "(    .*\n)*"
+                                     "        min      [0-9]+\n"
+                                     "(    .*\n)*"
+                                     "        low      [0-9]+\n"
+                                     "(    .*\n)*"
+                                     "        high     [0-9]+\n"
+                                     "(    .*\n)*"
+                                     "        present  [0-9]+\n"
+                                     "(    .*\n)*"
+                                     "  pagesets\n"));
+}
+
+// Verify that /proc/vmstat shape is reasonable.
+TEST_F(ProcfsTest, VmStatFile) {
+  auto path = "/proc/vmstat";
+  EXPECT_EQ(0, access(path, R_OK));
+  std::string content;
+  ASSERT_TRUE(files::ReadFileToString(path, &content));
+  // Ensures that one node has `nr_inactive_file` and `nr_inactive_file`.
+  EXPECT_THAT(content, ContainsRegex("(\n|^)workingset_refault_file [0-9]+\n"));
+  EXPECT_THAT(content, ContainsRegex("(\n|^)nr_inactive_file [0-9]+\n"));
+  EXPECT_THAT(content, ContainsRegex("(\n|^)nr_active_file [0-9]+\n"));
+  EXPECT_THAT(content, ContainsRegex("(\n|^)pgscan_direct [0-9]+\n"));
+  EXPECT_THAT(content, ContainsRegex("(\n|^)pgscan_kswapd [0-9]+\n"));
 }
 
 }  // namespace

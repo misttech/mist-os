@@ -28,7 +28,6 @@
         },
         {
             protocol: [ "fuchsia.input.interaction.observation.Aggregator" ],
-            availability: "optional",
         },
     ],
 }

@@ -16,7 +16,7 @@ use ffx_writer::Format;
 use std::collections::HashMap;
 use std::fmt::Write;
 use std::os::unix::process::ExitStatusExt;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::process::ExitStatus;
 use std::str::FromStr;
 
@@ -285,22 +285,30 @@ pub struct Ffx {
     pub core: bool,
 }
 
-#[derive(thiserror::Error, Debug)]
+#[derive(thiserror::Error, PartialEq, Debug)]
 enum CoreCheckError {
     #[error("Command line flags unsatisfactory for core mode:{}", format_core_check_error_enums(.0))]
     User(Vec<CoreCheckErrorEnum>),
 }
 
-#[derive(thiserror::Error, Debug, Clone)]
+#[derive(thiserror::Error, Debug, PartialEq, Clone)]
 enum CoreCheckErrorEnum {
     #[error("ffx core requires that the machine writer be specified")]
     MustHaveMachineSpecified,
     #[error("ffx core requries that the target be explicetly specified")]
     MustHaveTarget,
-    #[error("Core mode requires at most one --config flag to be passed. Actually passed: {}", .0)]
-    MustHaveOneConfigArg(usize),
-    #[error("When running in core mode, config flags must be passed as a path to a file. Path: {} is not a file", .0)]
-    ConfigArgMustBeFile(String),
+    #[error("ffx core requries that the Target be specified by address. Actually passed: \"{}\"", .0)]
+    TargetMustBeAddress(String),
+    #[error("ffx core requries that the Target be a valid IP address. Invalid ID: \"{}\"", .0)]
+    TargetAddressMustHaveValidScopeId(String),
+    #[error("When running in core mode, config flags must be list of Key Value Pairs or valid JSON. Passed: \"{}\"", .0)]
+    ConfigArgMustBeJsonOrKeyValuePair(String),
+    #[error("Specifying core mode and isolate dir are mutually exclusive. specify one or the other. Isolate Dir Passed: {}", .0.display())]
+    CoreAndIsolateMutuallyExclusive(PathBuf),
+    #[error("ffx core requries that the Log Destination be explicitly specified")]
+    MustHaveLogDestination,
+    #[error("When running in core mode, Log Destination must be a file. \"{}\" is not a file", .0)]
+    LogDestinationMustBeFile(LogDestination),
 }
 
 fn format_core_check_error_enums(errors: &Vec<CoreCheckErrorEnum>) -> String {
@@ -322,22 +330,55 @@ pub fn check_core_constraints(ffx: &Ffx) -> Result<()> {
 
     let mut errors = vec![];
 
+    match (ffx.core, &ffx.isolate_dir) {
+        (true, Some(isolate_dir)) => {
+            errors.push(CoreCheckErrorEnum::CoreAndIsolateMutuallyExclusive(
+                isolate_dir.to_path_buf(),
+            ));
+        }
+        _ => {}
+    }
+
     if ffx.machine.is_none() {
         errors.push(CoreCheckErrorEnum::MustHaveMachineSpecified);
     }
 
-    if ffx.target.is_none() {
-        errors.push(CoreCheckErrorEnum::MustHaveTarget);
+    match &ffx.log_destination {
+        Some(LogDestination::File(_)) => {}
+        None => {
+            errors.push(CoreCheckErrorEnum::MustHaveLogDestination);
+        }
+        Some(other) => {
+            errors.push(CoreCheckErrorEnum::LogDestinationMustBeFile(other.clone()));
+        }
     }
 
-    if ffx.config.len() > 1 {
-        errors.push(CoreCheckErrorEnum::MustHaveOneConfigArg(ffx.config.len()));
-    }
+    match &ffx.target {
+        None => errors.push(CoreCheckErrorEnum::MustHaveTarget),
+        Some(t) => match netext::parse_address_parts(t.as_str()) {
+            Err(_) => errors.push(CoreCheckErrorEnum::TargetMustBeAddress(t.clone())),
+            Ok((_, scope, _)) => {
+                if let Some(scope) = scope {
+                    match netext::get_verified_scope_id(scope) {
+                        Ok(_) => {}
+                        Err(_) => {
+                            errors.push(CoreCheckErrorEnum::TargetAddressMustHaveValidScopeId(
+                                scope.to_string(),
+                            ));
+                        }
+                    };
+                };
+            }
+        },
+    };
 
     for potential_config in ffx.config.iter() {
-        let try_path = Path::new(potential_config);
-        if !try_path.is_file() {
-            errors.push(CoreCheckErrorEnum::ConfigArgMustBeFile(potential_config.clone()));
+        if ffx_config::runtime::try_parse_json(potential_config).is_err()
+            && ffx_config::runtime::try_split_name_value_pairs(potential_config).is_err()
+        {
+            errors.push(CoreCheckErrorEnum::ConfigArgMustBeJsonOrKeyValuePair(
+                potential_config.clone(),
+            ));
         }
     }
 
@@ -543,44 +584,135 @@ mod test {
         struct TestCase {
             inputs: Vec<&'static str>,
             name: String,
+            expected_errors: Vec<CoreCheckErrorEnum>,
         }
 
         let cases = vec![
             TestCase {
-                inputs: vec!["ffx", "--core", "target", "echo"],
+                inputs: vec![
+                    "ffx",
+                    "--core",
+                    "--target",
+                    "192.168.1.1:8001",
+                    "--config",
+                    "foo=bar,baz=biz",
+                    "--config",
+                    "{\"key\":\"valid_json\"}",
+                    "--log-output",
+                    "/tmp/out.log",
+                    "target",
+                    "echo",
+                ],
                 name: "Missing Machine".into(),
-            },
-            TestCase {
-                inputs: vec!["ffx", "--core", "--machine", "json", "target", "echo"],
-                name: "Missing Target Name".into(),
+                expected_errors: vec![CoreCheckErrorEnum::MustHaveMachineSpecified],
             },
             TestCase {
                 inputs: vec![
                     "ffx",
                     "--core",
+                    "--log-output",
+                    "/tmp/out.log",
+                    "--machine",
+                    "json",
+                    "target",
+                    "echo",
+                ],
+                name: "Missing Target Name".into(),
+                expected_errors: vec![CoreCheckErrorEnum::MustHaveTarget],
+            },
+            TestCase {
+                inputs: vec![
+                    "ffx",
+                    "--core",
+                    "--target",
+                    "192.168.1.1:8004",
+                    "--log-output",
+                    "/tmp/out.log",
                     "--config",
-                    "foo=bar",
+                    "asdf",
                     "--machine",
                     "json",
                     "target",
                     "echo",
                 ],
                 name: "Bad config setting".into(),
+                expected_errors: vec![CoreCheckErrorEnum::ConfigArgMustBeJsonOrKeyValuePair(
+                    "asdf".into(),
+                )],
             },
             TestCase {
                 inputs: vec![
                     "ffx",
                     "--core",
-                    "--config",
-                    "foo=bar",
-                    "--config",
-                    "some_file.json",
+                    "--log-output",
+                    "/tmp/out.log",
+                    "--target",
+                    "no waaaaaayyy",
                     "--machine",
                     "json",
                     "target",
                     "echo",
                 ],
-                name: "Multiple config settings".into(),
+                name: "Target must be SocketAddr".into(),
+                expected_errors: vec![CoreCheckErrorEnum::TargetMustBeAddress(
+                    "no waaaaaayyy".into(),
+                )],
+            },
+            TestCase {
+                inputs: vec![
+                    "ffx",
+                    "--core",
+                    "--isolate-dir",
+                    "/tmp/foo",
+                    "--machine",
+                    "json",
+                    "--target",
+                    "193.168.1.1:8081",
+                    "--log-output",
+                    "/tmp/out.log",
+                    "target",
+                    "echo",
+                ],
+                name: "Core and Isolate Mutually Exclusive".into(),
+                expected_errors: vec![CoreCheckErrorEnum::CoreAndIsolateMutuallyExclusive(
+                    PathBuf::from("/tmp/foo"),
+                )],
+            },
+            TestCase {
+                inputs: vec![
+                    "ffx",
+                    "--core",
+                    "--log-output",
+                    "-",
+                    "--machine",
+                    "json",
+                    "--target",
+                    "193.168.1.1:8081",
+                    "target",
+                    "echo",
+                ],
+                name: "Core disallows stdout log destination".into(),
+                expected_errors: vec![CoreCheckErrorEnum::LogDestinationMustBeFile(
+                    LogDestination::from_str("-").expect("parse log destination"),
+                )],
+            },
+            TestCase {
+                inputs: vec![
+                    "ffx",
+                    "--core",
+                    "--log-output",
+                    "stderr",
+                    "--machine",
+                    "json",
+                    "--target",
+                    "193.168.1.1:8081",
+                    "target",
+                    "echo",
+                ],
+                name: "Core disallows stdout log destination".into(),
+                expected_errors: vec![CoreCheckErrorEnum::LogDestinationMustBeFile(
+                    LogDestination::from_str("stderr").expect("parse log destination"),
+                )],
             },
         ];
 
@@ -589,6 +721,20 @@ mod test {
                 FfxCommandLine::new(None, &case.inputs).expect("Command line should parse");
             let res = check_core_constraints(&cmd_line.global);
             assert!(res.is_err(), "Test Case {} was not an error", case.name);
+
+            let Error::User(got_err) = res.unwrap_err() else { panic!() };
+            match got_err.downcast_ref::<CoreCheckError>() {
+                Some(CoreCheckError::User(inner_errs)) => {
+                    assert_eq!(
+                        case.expected_errors, *inner_errs,
+                        "Test Case {} had the wrong errors",
+                        case.name
+                    );
+                }
+                _ => {
+                    unreachable!();
+                }
+            }
         }
     }
 

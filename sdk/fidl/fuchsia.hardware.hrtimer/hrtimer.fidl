@@ -1,10 +1,12 @@
 // Copyright 2024 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+@available(added=HEAD)
 library fuchsia.hardware.hrtimer;
 
 using zx;
 using fuchsia.power.broker;
+using fuchsia.power.system;
 
 /// Maximum count of timers supported by this protocol, arbitrary,
 const MAX_COUNT_TIMERS uint32 = 64;
@@ -66,8 +68,8 @@ type TimerProperties = table {
     /// Optional.
     4: supports_event bool;
 
-    /// If true then the `StartAndWait` method is supported, if false or not present it is not
-    /// supported.
+    /// If true then the `StartAndWait` and `StartAndWait2` methods are supported, if false or
+    /// not present these methods are not supported.
     ///
     /// Optional.
     5: supports_wait bool;
@@ -169,6 +171,43 @@ open protocol Device {
         ticks uint64;
     }) -> (resource struct {
         keep_alive client_end:fuchsia.power.broker.LeaseControl;
+    }) error DriverError;
+
+    /// Start timer `id` and wait for it to expire after `ticks` ticks.
+    ///
+    /// The driver will not respond to this call (hang) until the timer has triggered.
+    /// Calling `Stop` on the timer will abort this call and return `CANCELED`. Note that this
+    /// may race with the expiration of the timer.
+    ///
+    /// This method keeps the system awake (prevents suspension) while the timer is setup using the
+    /// mandatory passed-in `setup_keep_alive` `WakeLeaseToken`.
+    /// When the timer expires this method returns a second `expiration_keep_alive`
+    /// `WakeLeaseToken` to prevent suspension at the time of expiration.
+    /// These keep alive wake lease tokens are provided by the Power Framework's System Activity
+    /// Governor. A driver supporting this call must be able to get `expiration_keep_alive` from
+    /// System Activity Governor.
+    ///
+    /// When `expiration_keep_alive` is closed, then this driver created wake lease keeping the
+    /// system from suspending at the time of the timer expiration is dropped. Hence, to guarantee
+    /// that the system is not suspended by the Power Framework a client must either keep this
+    /// `expiration_keep_alive` for as long as the system needs to stay awake, or a client must
+    /// get its own wake lease from the Power Framework before it drops `expiration_keep_alive` to
+    /// prevent suspension.
+    ///
+    /// Errors:
+    ///
+    /// * INVALID_ARGS: The specified `id` is invalid.
+    /// * NOT_SUPPORTED: This method is not supported for the given `id`.
+    /// * BAD_STATE: The driver is in a bad state, for instance it does not have an
+    ///   `expiration_keep_alive` token to provide to the client.
+    /// * INTERNAL_ERROR: The driver encountered an internal error.
+    flexible StartAndWait2(resource struct {
+        id uint64;
+        resolution Resolution;
+        ticks uint64;
+        setup_keep_alive fuchsia.power.system.WakeLeaseToken;
+    }) -> (resource struct {
+        expiration_keep_alive fuchsia.power.system.WakeLeaseToken;
     }) error DriverError;
 
     /// Get driver properties.

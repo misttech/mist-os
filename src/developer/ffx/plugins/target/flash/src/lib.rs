@@ -22,6 +22,7 @@ use fidl_fuchsia_developer_ffx::{
 use fuchsia_async::{Time, Timer};
 use std::io::Write;
 use std::net::SocketAddr;
+use std::path::PathBuf;
 use std::sync::Once;
 use termion::{color, style};
 
@@ -258,7 +259,10 @@ Using address {} as node name",
                     socket_addr.to_string()
                 };
                 let config = FastbootNetworkConnectionConfig::new_udp().await;
-                let mut proxy = udp_proxy(target_name, &socket_addr, config).await?;
+                let fastboot_device_file_path: Option<PathBuf> =
+                    ffx_config::get(fastboot_file_discovery::FASTBOOT_FILE_PATH).await.ok();
+                let mut proxy =
+                    udp_proxy(target_name, fastboot_device_file_path, &socket_addr, config).await?;
                 from_manifest(&mut writer, cmd, &mut proxy).await.map_err(fho::Error::from)
             } else {
                 ffx_bail!("Could not get a valid address for target");
@@ -287,7 +291,10 @@ Using address {} as node name",
                     socket_addr.to_string()
                 };
                 let config = FastbootNetworkConnectionConfig::new_tcp().await;
-                let mut proxy = tcp_proxy(target_name, &socket_addr, config).await?;
+                let fastboot_device_file_path: Option<PathBuf> =
+                    ffx_config::get(fastboot_file_discovery::FASTBOOT_FILE_PATH).await.ok();
+                let mut proxy =
+                    tcp_proxy(target_name, fastboot_device_file_path, &socket_addr, config).await?;
                 from_manifest(&mut writer, cmd, &mut proxy).await.map_err(fho::Error::from)
             } else {
                 ffx_bail!("Could not get a valid address for target");

@@ -69,14 +69,14 @@ test("virtio-input-test") {
   ]
   deps = [
     "//sdk/fidl/fuchsia.input.report:fuchsia.input.report_cpp",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/async_patterns/testing/cpp",
     "//src/devices/bus/lib/virtio",
     "//src/devices/testing/fake-bti",
     "//src/devices/testing/no_ddk",
     "//src/ui/input/lib/hid-input-report",
     "//src/ui/input/lib/hid-parser",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/zxtest",
   ]

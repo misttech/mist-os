@@ -63,6 +63,7 @@ class CrashReporter : public fuchsia::feedback::CrashReporter {
   async_dispatcher_t* dispatcher_;
   async::Executor executor_;
   const std::shared_ptr<sys::ServiceDirectory> services_;
+  timekeeper::Clock* clock_;
   LogTags* tags_;
   CrashRegister* crash_register_;
   UtcClockReadyWatcher utc_clock_ready_watcher_;

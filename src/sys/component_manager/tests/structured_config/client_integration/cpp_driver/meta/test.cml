@@ -23,11 +23,4 @@
         },
         { protocol: "fuchsia.diagnostics.ArchiveAccessor" },
     ],
-    offer: [
-        {
-            protocol: "fuchsia.logger.LogSink",
-            from: "parent",
-            to: [ "#cpp_driver_shim" ],
-        },
-    ],
 }

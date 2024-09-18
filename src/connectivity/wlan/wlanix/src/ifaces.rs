@@ -434,7 +434,7 @@ pub mod test_utils {
         fidl_sme::ScanResult {
             compatibility: None,
             timestamp_nanos: 1000,
-            bss_description: fidl_internal::BssDescription {
+            bss_description: fidl_common::BssDescription {
                 bssid: [1, 2, 3, 4, 5, 6],
                 bss_type: fidl_common::BssType::Infrastructure,
                 beacon_period: 100,
@@ -1258,8 +1258,8 @@ mod tests {
     )]
     #[fuchsia::test(add_test_attr = false)]
     fn test_connect_to_network_bss_selection(
-        scan_bss_descriptions: Vec<fidl_internal::BssDescription>,
-        recent_connect_failure: Option<(fidl_internal::BssDescription, fidl_sme::ConnectResult)>,
+        scan_bss_descriptions: Vec<fidl_common::BssDescription>,
+        recent_connect_failure: Option<(fidl_common::BssDescription, fidl_sme::ConnectResult)>,
         expected_bssid: Bssid,
     ) {
         let (mut exec, _monitor_stream, manager) = setup_test();

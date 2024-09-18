@@ -210,7 +210,15 @@ async fn force_install<W: std::io::Write>(
     .await
     .context("starting update")?;
 
-    writeln!(writer, "Installing an update.")?;
+    writeln!(
+        writer,
+        "Installing an update.
+Progress reporting is based on the fraction of packages resolved, so if one package is much
+larger than the others, then the reported progress could appear to stall near the end.
+Until the update process is improved to have more granular reporting, try using
+    ffx inspect show 'core/pkg-resolver'
+for more detail on the progress of update-related downloads.\n"
+    )?;
     if !reboot {
         reboot_controller.detach().context("notify installer do not reboot")?;
     }
@@ -371,6 +379,12 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(std::str::from_utf8(&buf).unwrap(), "Installing an update.
+Progress reporting is based on the fraction of packages resolved, so if one package is much
+larger than the others, then the reported progress could appear to stall near the end.
+Until the update process is improved to have more granular reporting, try using
+    ffx inspect show 'core/pkg-resolver'
+for more detail on the progress of update-related downloads.
+
 State: Prepare
 State: Fetch(UpdateInfoAndProgress { info: UpdateInfo { download_size: 1000 }, progress: Progress { fraction_completed: 0.0, bytes_downloaded: 0 } })
 State: Stage(UpdateInfoAndProgress { info: UpdateInfo { download_size: 1000 }, progress: Progress { fraction_completed: 0.5, bytes_downloaded: 500 } })

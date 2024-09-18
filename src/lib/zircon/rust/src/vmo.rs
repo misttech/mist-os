@@ -288,6 +288,23 @@ impl Vmo {
         ok(status)
     }
 
+    /// Get the stream size of a virtual memory object.
+    ///
+    /// Wraps the `zx_vmo_get_stream_size` syscall.
+    pub fn get_stream_size(&self) -> Result<u64, Status> {
+        let mut size = 0;
+        let status = unsafe { sys::zx_vmo_get_stream_size(self.raw_handle(), &mut size) };
+        ok(status).map(|()| size)
+    }
+
+    /// Attempt to set the stream size of a virtual memory object.
+    ///
+    /// Wraps the `zx_vmo_set_stream_size` syscall.
+    pub fn set_stream_size(&self, size: u64) -> Result<(), Status> {
+        let status = unsafe { sys::zx_vmo_set_stream_size(self.raw_handle(), size) };
+        ok(status)
+    }
+
     /// Attempt to change the cache policy of a virtual memory object.
     ///
     /// Wraps the `zx_vmo_set_cache_policy` syscall.
@@ -774,5 +791,26 @@ mod tests {
         assert!(vmo.op_range(VmoOp::ZERO, 0, 16).is_ok());
         assert!(vmo.read(&mut buf[..], 0).is_ok());
         assert_eq!(&buf[..], &[0u8; 16]);
+    }
+
+    #[test]
+    fn vmo_stream_size() {
+        let start_size = 1300;
+        let vmo = Vmo::create_with_opts(VmoOptions::UNBOUNDED, start_size).unwrap();
+        assert_eq!(vmo.get_stream_size().unwrap(), start_size);
+        vmo.set_stream_size(0).unwrap();
+        assert_eq!(vmo.get_stream_size().unwrap(), 0);
+
+        // write should not change content size.
+        let content = b"abcdef";
+        assert!(vmo.write(content, 0).is_ok());
+        assert_eq!(vmo.get_stream_size().unwrap(), 0);
+
+        // stream size can also grow.
+        let mut buf = vec![1; 6];
+        vmo.set_stream_size(6).unwrap();
+        assert!(vmo.read(&mut buf, 0).is_ok());
+        // growing will zero new bytes.
+        assert_eq!(buf, vec![0; 6]);
     }
 }

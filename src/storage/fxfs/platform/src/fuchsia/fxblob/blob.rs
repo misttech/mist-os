@@ -424,7 +424,7 @@ mod tests {
         assert_matches!(blob_vmo.write(b"overwrite", 0), Err(_));
 
         // The VMO's content size shouldn't be modifiable.
-        assert_matches!(blob_vmo.set_content_size(&20), Err(_));
+        assert_matches!(blob_vmo.set_stream_size(20), Err(_));
 
         fixture.close().await;
     }

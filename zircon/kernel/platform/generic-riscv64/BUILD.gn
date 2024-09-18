@@ -21,8 +21,6 @@ source_set("generic-riscv64") {
     "//zircon/kernel/dev/interrupt/plic",
     "//zircon/kernel/dev/pdev/power",
     "//zircon/kernel/dev/pdev/timer",
-    "//zircon/kernel/dev/uart/dw8250",
-    "//zircon/kernel/dev/uart/motmot",
     "//zircon/kernel/lib/boot-options",
     "//zircon/kernel/lib/cbuf",
     "//zircon/kernel/lib/console",

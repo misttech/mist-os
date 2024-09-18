@@ -19,7 +19,7 @@ use hyper::server::accept::from_stream;
 use hyper::server::Server;
 use hyper::service::{make_service_fn, service_fn};
 use hyper::{Body, Method, Request, Response, StatusCode};
-use rustls::{Certificate, NoClientAuth, ServerConfig};
+use rustls::{Certificate, ServerConfig};
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::pin::Pin;
 use std::sync::Arc;
@@ -45,14 +45,20 @@ trait AsyncReadWrite: AsyncRead + AsyncWrite + Send {}
 impl<T> AsyncReadWrite for T where T: AsyncRead + AsyncWrite + Send {}
 
 fn parse_cert_chain(mut bytes: &[u8]) -> Vec<Certificate> {
-    rustls::internal::pemfile::certs(&mut bytes).expect("certs to parse")
+    rustls_pemfile::certs(&mut bytes)
+        .expect("certs to parse")
+        .into_iter()
+        .map(|cert| rustls::Certificate(cert))
+        .collect()
 }
 
 fn parse_private_key(mut bytes: &[u8]) -> rustls::PrivateKey {
-    let keys =
-        rustls::internal::pemfile::rsa_private_keys(&mut bytes).expect("private keys to parse");
+    let keys = rustls_pemfile::read_all(&mut bytes).expect("private keys to parse");
     assert_eq!(keys.len(), 1, "expecting a single private key");
-    keys.into_iter().next().unwrap()
+    match keys.into_iter().next().unwrap() {
+        rustls_pemfile::Item::RSAKey(key) => return rustls::PrivateKey(key),
+        _ => panic!("expected an RSA private key"),
+    }
 }
 
 struct RequestHandler {
@@ -160,10 +166,13 @@ async fn main() {
     let certs = parse_cert_chain(root_ssl_certificates_contents.as_slice());
     let key = parse_private_key(tls_private_key_contents.as_slice());
 
-    let mut tls_config = ServerConfig::new(NoClientAuth::new());
+    let mut tls_config = ServerConfig::builder()
+        .with_safe_defaults()
+        .with_no_client_auth()
+        .with_single_cert(certs, key)
+        .unwrap();
     // Configure ALPN and prefer H2 over HTTP/1.1.
-    tls_config.set_protocols(&[b"h2".to_vec(), b"http/1.1".to_vec()]);
-    tls_config.set_single_cert(certs, key).unwrap();
+    tls_config.alpn_protocols = vec![b"h2".to_vec(), b"http/1.1".to_vec()];
     let tls_acceptor = TlsAcceptor::from(Arc::new(tls_config));
 
     let (listener, addr) = {

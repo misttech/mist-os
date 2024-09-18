@@ -20,5 +20,5 @@ providing `fake-display`.
 
 [fake-display]://src/graphics/display/drivers/fake/
 [display-coordinator]://src/graphics/display/drivers/coordinator/
-[sysmem]://src/devices/sysmem/drivers/sysmem/
+[sysmem]://src/sysmem/drivers/sysmem/
 [inspect]://docs/development/diagnostics/inspect/README.md

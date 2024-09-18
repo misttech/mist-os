@@ -226,25 +226,24 @@ _flag_groups = struct(
             "-no-canonical-prefixes",
         ],
     ),
+    thread_safety_annotations = _make_flag_group_struct(
+        cflags = [
+            "-Wthread-safety",
+
+            # TODO(https://fxbug.dev/42085252): Clang is catching instances of these in the kernel and drivers.
+            # Temporarily disable them for now to facilitate the roll then come back and
+            # fix them.
+            "-Wno-unknown-warning-option",
+            "-Wno-thread-safety-reference-return",
+            "-D_LIBCPP_ENABLE_THREAD_SAFETY_ANNOTATIONS=1",
+        ],
+        combine_cflags_with_ldflags = False,
+    ),
 )
 
 #
 ## Begin feature definitions
 #
-
-# Automatically turned on when we build with -c dbg
-_dbg_feature = feature(
-    name = "dbg",
-)
-
-# Clang ML Inliner is not supported on mac-arm64.
-_use_ml_inliner = "%{HOST_OS}-%{HOST_ARCH}" != "mac-arm64"
-
-_opt_feature = feature(
-    name = "opt",
-    # List any features that should be enabled in opt mode here
-    implies = ["ml_inliner"] if _use_ml_inliner else [],
-)
 
 def _target_system_name_feature(target_system_name):
     return feature(
@@ -279,6 +278,7 @@ _default_compile_flags_feature = feature(
                 _flag_groups.symbol_visibility_hidden,
                 _flag_groups.ffp_contract_off,
                 _flag_groups.auto_var_init,
+                _flag_groups.thread_safety_annotations,
             ]),
         ),
         # These are ccflags that will be added to all builds
@@ -359,121 +359,9 @@ _default_compile_flags_feature = feature(
     ],
 )
 
-# Redefine the dependency_file feature to use -MMD instead of -MD
-# to make remote builds work properly.
-_dependency_file_feature = feature(
-    name = "dependency_file",
-    enabled = True,
-    flag_sets = [
-        flag_set(
-            actions = _all_actions,
-            flag_groups = [
-                flag_group(
-                    flags = ["-MMD", "-MF", "%{dependency_file}"],
-                    expand_if_available = "dependency_file",
-                ),
-            ],
-        ),
-    ],
-)
-
 _supports_pic_feature = feature(
     name = "supports_pic",
     enabled = True,
-)
-
-_coverage_feature = feature(
-    name = "coverage",
-    flag_sets = [
-        flag_set(
-            actions = [
-                ACTION_NAMES.c_compile,
-                ACTION_NAMES.cpp_compile,
-            ] + _all_link_actions,
-            flag_groups = [
-                flag_group(
-                    flags = [
-                        "-fprofile-instr-generate",
-                        "-fcoverage-mapping",
-                    ],
-                ),
-            ],
-        ),
-        flag_set(
-            actions = [
-                ACTION_NAMES.c_compile,
-                ACTION_NAMES.cpp_compile,
-                ACTION_NAMES.cpp_module_compile,
-            ],
-            flag_groups = [
-                flag_group(
-                    flags = [
-                        # This flag will get applied after the default
-                        # set of flags so we can think of this as an override
-                        "-O1",
-                        "-mllvm",
-                        # Enable coverage from system headers in Fuchsia.
-                        "-system-headers-coverage",
-                    ],
-                ),
-            ],
-        ),
-        flag_set(
-            actions = _all_link_actions,
-            flag_groups = _iter_ldflags([
-                # The statically-linked profiling runtime depends on libzircon.
-                _flag_groups.link_zircon,
-            ]) + [
-                flag_group(
-                    flags = [
-                        "-Wl",
-                        "-dynamic-linker=coverage/ld.so.1",
-                    ],
-                ),
-            ],
-        ),
-    ],
-)
-
-_ml_inliner_feature = feature(
-    name = "ml_inliner",
-    enabled = _use_ml_inliner,
-    flag_sets = [
-        flag_set(
-            actions = [
-                ACTION_NAMES.c_compile,
-                ACTION_NAMES.cpp_compile,
-                ACTION_NAMES.cpp_module_compile,
-            ],
-            flag_groups = [
-                flag_group(
-                    flags = [
-                        "-mllvm",
-                        "-enable-ml-inliner=release",
-                    ],
-                ),
-            ],
-        ),
-    ],
-)
-
-_static_cpp_standard_library_feature = feature(
-    name = "static_cpp_standard_library",
-    flag_sets = [
-        flag_set(
-            actions = _all_link_actions,
-            flag_groups = [
-                flag_group(
-                    flags = [
-                        "-stdlib=libc++",
-                        "-unwindlib=libunwind",
-                        "-static-libstdc++",
-                        "-static-libgcc",
-                    ],
-                ),
-            ],
-        ),
-    ],
 )
 
 # This feature adds an RPATH entry into the final binary. We do not want this
@@ -484,56 +372,9 @@ _no_runtime_library_search_directories_feature = feature(
     enabled = False,
 )
 
-# This feature only works with Bazel 7.2+. Its name is hard-coded in Bazel to
-# enable extra linker outputs for cc_binary() and cc_test() targets.
-_generate_linkmap_feature = feature(
-    name = "generate_linkmap",
-    enabled = True,
-    flag_sets = [
-        flag_set(
-            actions = _all_link_actions,
-            flag_groups = [
-                flag_group(
-                    flags = [
-                        "-Wl,--Map=%{output_execpath}.map",
-                    ],
-                    expand_if_available = "output_execpath",
-                ),
-            ],
-        ),
-    ],
-)
-
-# TODO(https://fxbug.dev/356347441): Remove this once Bazel has been fixed.
-#
-# Adding this hard-coded feature to a C++ toolchain disables .d file processing.
-# Surprisingly, this is currently required to avoid incremental Bazel build
-# correctness issues that affect Bazel 7.2+ and 7.3.1, such as the one described
-# in the associated bug.
-_no_dotd_file_feature = feature(
-    name = "no_dotd_file",
-    enabled = True,
-)
-
 features = struct(
     default_compile_flags = _default_compile_flags_feature,
-    dbg = _dbg_feature,
-    opt = _opt_feature,
     target_system_name = _target_system_name_feature,
-    dependency_file = _dependency_file_feature,
     supports_pic = _supports_pic_feature,
-    coverage = _coverage_feature,
-    ml_inliner = _ml_inliner_feature,
-    static_cpp_standard_library = _static_cpp_standard_library_feature,
     no_runtime_library_search_directories = _no_runtime_library_search_directories_feature,
-    generate_linkmap = _generate_linkmap_feature,
-    no_dotd_file = _no_dotd_file_feature,
 )
-
-# Redefine the features here so that we can share with the in-tree definitions.
-# This content is pulled from the fuchsia_sdk_common rules and is inserted when
-# the fuchsia_clang_repository rules runs. To see the content of this template
-# look at @fuchsia_sdk//common/toolchains/clang/sanitizer.bzl
-# It is important to have the '#' before the '{{}}' because buildifier will
-# fail if we don't. When the file name is updated we can remove this.
-#{{SANITIZER_FEATURES}}

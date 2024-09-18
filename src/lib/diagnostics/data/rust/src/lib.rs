@@ -357,6 +357,11 @@ impl LogsMetadata {
     pub fn component_url(&self) -> Option<&str> {
         self.component_url.as_ref().map(|s| s.as_str())
     }
+
+    // TODO(https://fxbug.dev/346806346): transitional, remove.
+    pub fn timestamp_nanos(&self) -> i64 {
+        self.timestamp
+    }
 }
 
 /// Severities a log message can have, often called the log's "level".
@@ -365,27 +370,27 @@ impl LogsMetadata {
 #[derive(Clone, Copy, Debug, Deserialize, Eq, Ord, PartialEq, PartialOrd, Serialize)]
 pub enum Severity {
     /// Trace records include detailed information about program execution.
-    #[serde(rename = "TRACE", alias = "Trace")]
+    #[serde(rename = "TRACE", alias = "Trace", alias = "trace")]
     Trace,
 
     /// Debug records include development-facing information about program execution.
-    #[serde(rename = "DEBUG", alias = "Debug")]
+    #[serde(rename = "DEBUG", alias = "Debug", alias = "debug")]
     Debug,
 
     /// Info records include general information about program execution. (default)
-    #[serde(rename = "INFO", alias = "Info")]
+    #[serde(rename = "INFO", alias = "Info", alias = "info")]
     Info,
 
     /// Warning records include information about potentially problematic operations.
-    #[serde(rename = "WARN", alias = "Warn")]
+    #[serde(rename = "WARN", alias = "Warn", alias = "warn")]
     Warn,
 
     /// Error records include information about failed operations.
-    #[serde(rename = "ERROR", alias = "Error")]
+    #[serde(rename = "ERROR", alias = "Error", alias = "error")]
     Error,
 
     /// Fatal records convey information about operations which cause a program's termination.
-    #[serde(rename = "FATAL", alias = "Fatal")]
+    #[serde(rename = "FATAL", alias = "Fatal", alias = "fatal")]
     Fatal,
 }
 // LINT.ThenChange(/src/lib/assembly/config_schema/src/platform_config/diagnostics_config.rs)

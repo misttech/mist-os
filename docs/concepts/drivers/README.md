@@ -14,6 +14,8 @@ Similar to Fuchsia’s component framework, which manages Fuchsia components, th
 [driver framework][driver-framework] manages the lifecycle and topology of
 all devices (known as [nodes][nodes]) and drivers in a Fuchsia system.
 
+## Table of contents
+
 *  [Driver framework (DFv2)][driver-framework]
 *  [Comparison between DFv1 and DFv2][dfv1-and-dfv2]
 *  [Drivers and nodes][nodes]
@@ -23,6 +25,8 @@ all devices (known as [nodes][nodes]) and drivers in a Fuchsia system.
 *  [Driver dispatcher and threads][driver-dispatcher]
 *  [Driver dispatcher performance][driver-dispatcher-performance]
 
+To learn more about creating DFv2 drivers, see the
+[DFv2 driver development][dfv2-overview] section.
 <!-- Reference links -->
 
 [components]: /docs/concepts/components/v2/README.md
@@ -34,4 +38,4 @@ all devices (known as [nodes][nodes]) and drivers in a Fuchsia system.
 [mapping-memory]: mapping-a-devices-memory-in-a-driver.md
 [driver-dispatcher]: driver-dispatcher-and-threads.md
 [driver-dispatcher-performance]: driver-dispatcher-performance.md
-
+[dfv2-overview]: /docs/development/drivers/dfv2-overview.md

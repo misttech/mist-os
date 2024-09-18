@@ -4,6 +4,7 @@
 
 #include <assert.h>
 #include <fuchsia/hardware/pciroot/c/banjo.h>
+#include <lib/ddk/debug.h>
 #include <lib/pci/pciroot.h>
 #include <stdio.h>
 #include <zircon/hw/pci.h>

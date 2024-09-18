@@ -192,7 +192,7 @@ source_set("loop_fixture") {
   public = [ "$dir_public_testing/loop_fixture.h" ]
   public_deps = [
     "$dir_pw_unit_test",
-    "//zircon/system/ulib/async-testing",
+    "//sdk/lib/async-testing",
   ]
 }
 

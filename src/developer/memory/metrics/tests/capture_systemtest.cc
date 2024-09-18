@@ -7,7 +7,6 @@
 #include <gtest/gtest.h>
 
 #include "src/developer/memory/metrics/capture.h"
-#include "src/developer/memory/metrics/capture_strategy.h"
 
 #define ASSERT_OK_AND_ASSIGN(name, result)                                                 \
   auto name##_result = result;                                                             \
@@ -22,9 +21,7 @@ namespace memory::test {
 using CaptureSystemTest = testing::Test;
 
 TEST_F(CaptureSystemTest, KMEM) {
-  ASSERT_OK_AND_ASSIGN(
-      capture_maker, memory::CaptureMaker::Create(CreateDefaultOS(),
-                                                  std::make_unique<memory::BaseCaptureStrategy>()));
+  ASSERT_OK_AND_ASSIGN(capture_maker, memory::CaptureMaker::Create(CreateDefaultOS()));
   Capture c;
   auto ret = capture_maker->GetCapture(&c, CaptureLevel::KMEM);
   ASSERT_EQ(ZX_OK, ret) << zx_status_get_string(ret);
@@ -34,9 +31,7 @@ TEST_F(CaptureSystemTest, KMEM) {
 
 // TODO(https://fxbug.dev/42059717): deflake and reenable.
 TEST_F(CaptureSystemTest, VMO) {
-  ASSERT_OK_AND_ASSIGN(
-      capture_maker, memory::CaptureMaker::Create(CreateDefaultOS(),
-                                                  std::make_unique<memory::BaseCaptureStrategy>()));
+  ASSERT_OK_AND_ASSIGN(capture_maker, memory::CaptureMaker::Create(CreateDefaultOS()));
   Capture c;
   auto ret = capture_maker->GetCapture(&c, CaptureLevel::VMO);
   ASSERT_EQ(ZX_OK, ret) << zx_status_get_string(ret);

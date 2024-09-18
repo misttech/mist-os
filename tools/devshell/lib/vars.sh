@@ -263,6 +263,7 @@ function fx-build-config-load {
   if [[ -z "${FUCHSIA_NODENAME}" ]]; then
     if [[ -f "${FUCHSIA_BUILD_DIR}.device" ]]; then
       FUCHSIA_NODENAME="$(<"${FUCHSIA_BUILD_DIR}.device")"
+      export FUCHSIA_NODENAME_IS_FROM_FILE="true"
     fi
     export FUCHSIA_NODENAME
   fi

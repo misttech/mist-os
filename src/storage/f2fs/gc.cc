@@ -196,92 +196,20 @@ bool SegmentManager::IsValidBlock(uint32_t segno, uint64_t offset) {
   return sit_info_->sentries[segno].cur_valid_map.GetOne(ToMsbFirst(offset));
 }
 
-GcManager::GcManager(F2fs *fs)
-    : fs_(fs),
-      superblock_info_(fs->GetSuperblockInfo()),
-      segment_manager_(fs->GetSegmentManager()) {}
-
-zx::result<uint32_t> GcManager::Run(bool stop_writeback) {
-  // For testing
-  if (disable_gc_for_test_) {
-    return zx::ok(0);
-  }
-
-  if (superblock_info_.TestCpFlags(CpFlag::kCpErrorFlag)) {
-    return zx::error(ZX_ERR_BAD_STATE);
-  }
-
-  std::lock_guard gc_lock(f2fs::GetGlobalLock());
-  GcType gc_type = GcType::kBgGc;
-  uint32_t sec_freed = 0;
-
-  // FG_GC must run when there is no space (e.g., HasNotEnoughFreeSecs() == true).
-  // If not, gc can compete with others (e.g., writeback) for victim Pages and space.
-  while (segment_manager_.HasNotEnoughFreeSecs()) {
-    if (superblock_info_.TestCpFlags(CpFlag::kCpErrorFlag)) {
-      return zx::error(ZX_ERR_BAD_STATE);
-    }
-    // Stop writeback before gc. The writeback won't be invoked until gc acquires enough sections.
-    FlagAcquireGuard flag(&fs_->GetStopReclaimFlag());
-    if (stop_writeback) {
-      ZX_ASSERT(flag.IsAcquired());
-      ZX_ASSERT(fs_->WaitForWriteback().is_ok());
-    }
-    // For example, if there are many prefree_segments below given threshold, we can make them
-    // free by checkpoint. Then, we secure free segments which doesn't need fggc any more.
-    if (segment_manager_.PrefreeSegments()) {
-      auto before = segment_manager_.FreeSections();
-      if (zx_status_t ret = fs_->WriteCheckpoint(false, false); ret != ZX_OK) {
-        return zx::error(ret);
-      }
-      sec_freed =
-          (safemath::CheckSub<uint32_t>(segment_manager_.FreeSections(), before) + sec_freed)
-              .ValueOrDie();
-      // After acquiring free sections, check if further gc is necessary.
-      continue;
-    }
-
-    if (gc_type == GcType::kBgGc && segment_manager_.HasNotEnoughFreeSecs()) {
-      gc_type = GcType::kFgGc;
-    }
-
-    auto segno_or = segment_manager_.GetGcVictim(gc_type, CursegType::kNoCheckType);
-    if (segno_or.is_error()) {
-      break;
-    }
-    if (auto err = DoGarbageCollect(*segno_or, gc_type); err != ZX_OK) {
-      return zx::error(err);
-    }
-
-    if (gc_type == GcType::kFgGc) {
-      cur_victim_sec_ = kNullSecNo;
-      if (zx_status_t ret = fs_->WriteCheckpoint(false, false); ret != ZX_OK) {
-        return zx::error(ret);
-      }
-      ++sec_freed;
-    }
-  }
-  if (!sec_freed) {
-    return zx::error(ZX_ERR_UNAVAILABLE);
-  }
-  return zx::ok(sec_freed);
-}
-
-zx_status_t GcManager::DoGarbageCollect(uint32_t start_segno, GcType gc_type) {
+zx_status_t SegmentManager::DoGarbageCollect(uint32_t start_segno, GcType gc_type) {
   for (uint32_t i = 0; i < superblock_info_.GetSegsPerSec(); ++i) {
     uint32_t segno = start_segno + i;
-    uint8_t type = IsDataSeg(static_cast<CursegType>(segment_manager_.GetSegmentEntry(segno).type))
-                       ? kSumTypeData
-                       : kSumTypeNode;
+    uint8_t type = IsDataSeg(static_cast<CursegType>(GetSegmentEntry(segno).type)) ? kSumTypeData
+                                                                                   : kSumTypeNode;
 
-    if (segment_manager_.CompareValidBlocks(0, segno, false)) {
+    if (CompareValidBlocks(0, segno, false)) {
       continue;
     }
 
     fbl::RefPtr<Page> sum_page;
     {
       LockedPage locked_sum_page;
-      segment_manager_.GetSumPage(segno, &locked_sum_page);
+      GetSumPage(segno, &locked_sum_page);
       sum_page = locked_sum_page.release();
     }
 
@@ -297,16 +225,17 @@ zx_status_t GcManager::DoGarbageCollect(uint32_t start_segno, GcType gc_type) {
   return ZX_OK;
 }
 
-zx_status_t GcManager::GcNodeSegment(const SummaryBlock &sum_blk, uint32_t segno, GcType gc_type) {
+zx_status_t SegmentManager::GcNodeSegment(const SummaryBlock &sum_blk, uint32_t segno,
+                                          GcType gc_type) {
   const Summary *entry = sum_blk.entries;
   for (block_t off = 0; off < superblock_info_.GetBlocksPerSeg(); ++off, ++entry) {
     nid_t nid = CpuToLe(entry->nid);
 
-    if (gc_type == GcType::kBgGc && segment_manager_.HasNotEnoughFreeSecs()) {
+    if (gc_type == GcType::kBgGc && HasNotEnoughFreeSecs()) {
       return ZX_ERR_BAD_STATE;
     }
 
-    if (!segment_manager_.IsValidBlock(segno, off)) {
+    if (!IsValidBlock(segno, off)) {
       continue;
     }
 
@@ -317,7 +246,7 @@ zx_status_t GcManager::GcNodeSegment(const SummaryBlock &sum_blk, uint32_t segno
 
     NodeInfo ni;
     fs_->GetNodeManager().GetNodeInfo(nid, ni);
-    if (ni.blk_addr != segment_manager_.StartBlock(segno) + off) {
+    if (ni.blk_addr != StartBlock(segno) + off) {
       continue;
     }
 
@@ -328,12 +257,13 @@ zx_status_t GcManager::GcNodeSegment(const SummaryBlock &sum_blk, uint32_t segno
   return ZX_OK;
 }
 
-zx::result<std::pair<nid_t, block_t>> GcManager::CheckDnode(const Summary &sum, block_t blkaddr) {
+zx::result<std::pair<nid_t, block_t>> SegmentManager::CheckDnode(const Summary &sum,
+                                                                 block_t blkaddr) {
   nid_t nid = LeToCpu(sum.nid);
   uint16_t ofs_in_node = LeToCpu(sum.ofs_in_node);
 
-  LockedPage node_page;
-  if (auto err = fs_->GetNodeManager().GetNodePage(nid, &node_page); err != ZX_OK) {
+  LockedPage locked_page;
+  if (auto err = fs_->GetNodeManager().GetNodePage(nid, &locked_page); err != ZX_OK) {
     return zx::error(err);
   }
 
@@ -346,22 +276,27 @@ zx::result<std::pair<nid_t, block_t>> GcManager::CheckDnode(const Summary &sum, 
 
   fs_->GetNodeManager().CheckNidRange(dnode_info.ino);
 
-  zx::result vnode_or = fs_->GetVnode(dnode_info.ino);
+  fbl::RefPtr<NodePage> node_page = fbl::RefPtr<NodePage>::Downcast(locked_page.CopyRefPtr());
+  LockedPage inode_page;
+  if (node_page->IsInode()) {
+    inode_page = std::move(locked_page);
+  }
+  zx::result vnode_or = fs_->GetVnode(dnode_info.ino, std::move(inode_page));
   if (vnode_or.is_error()) {
     return vnode_or.take_error();
   }
 
-  auto start_bidx = node_page.GetPage<NodePage>().StartBidxOfNode(vnode_or->GetAddrsPerInode());
-  block_t source_blkaddr = node_page.GetPage<NodePage>().GetBlockAddr(ofs_in_node);
+  auto start_bidx = node_page->StartBidxOfNode(vnode_or->GetAddrsPerInode());
+  block_t source_blkaddr = node_page->GetBlockAddr(ofs_in_node);
   if (source_blkaddr != blkaddr) {
     return zx::error(ZX_ERR_BAD_STATE);
   }
   return zx::ok(std::make_pair(dnode_info.ino, start_bidx));
 }
 
-zx_status_t GcManager::GcDataSegment(const SummaryBlock &sum_blk, unsigned int segno,
-                                     GcType gc_type) {
-  block_t start_addr = segment_manager_.StartBlock(segno);
+zx_status_t SegmentManager::GcDataSegment(const SummaryBlock &sum_blk, unsigned int segno,
+                                          GcType gc_type) {
+  block_t start_addr = StartBlock(segno);
   const Summary *entry = sum_blk.entries;
   PageList pages_to_disk;
   for (block_t off = 0; off < superblock_info_.GetBlocksPerSeg(); ++off, ++entry) {
@@ -370,12 +305,12 @@ zx_status_t GcManager::GcDataSegment(const SummaryBlock &sum_blk, unsigned int s
     const uint32_t kBlocksPerSection =
         superblock_info_.GetBlocksPerSeg() * superblock_info_.GetSegsPerSec();
     const block_t target_address = safemath::CheckAdd<block_t>(start_addr, off).ValueOrDie();
-    if ((gc_type == GcType::kBgGc && segment_manager_.HasNotEnoughFreeSecs()) ||
-        segment_manager_.CompareValidBlocks(kBlocksPerSection, segno, true)) {
+    if ((gc_type == GcType::kBgGc && HasNotEnoughFreeSecs()) ||
+        CompareValidBlocks(kBlocksPerSection, segno, true)) {
       return ZX_ERR_BAD_STATE;
     }
 
-    if (!segment_manager_.IsValidBlock(segno, off)) {
+    if (!IsValidBlock(segno, off)) {
       continue;
     }
 
@@ -409,13 +344,15 @@ zx_status_t GcManager::GcDataSegment(const SummaryBlock &sum_blk, unsigned int s
     // supply a vmo and dirty it again.
     if (zx::result dirty_or = data_page.SetVmoDirty(); dirty_or.is_error()) {
       vnode_or->VmoRead(offset, kBlockSize);
+      ZX_ASSERT(data_page.SetVmoDirty().is_ok());
     }
-    ZX_ASSERT(data_page.SetVmoDirty().is_ok());
     if (!vnode_or->IsValid()) {
-      // When victim blocks belongs to orphans, we load and keep them on paged_vmo until the orphans
-      // close or kernel reclaims the pages.
+      // When victim blocks belong to a orphan, we load and keep them on paged_vmo instead of
+      // migration. They are available until there is no connection to the orphan or kernel reclaims
+      // the pages.
+      size_t start = data_page->GetKey();
       data_page.reset();
-      vnode_or->TruncateHole(offset, offset + kBlockSize, false);
+      vnode_or->TruncateHole(start, start + 1, false);
       continue;
     }
     data_page.SetDirty();
@@ -434,7 +371,7 @@ zx_status_t GcManager::GcDataSegment(const SummaryBlock &sum_blk, unsigned int s
     fs_->ScheduleWriter(nullptr, std::move(pages_to_disk));
   }
 
-  if (gc_type == GcType::kFgGc && !segment_manager_.CompareValidBlocks(0, segno, false)) {
+  if (gc_type == GcType::kFgGc && !CompareValidBlocks(0, segno, false)) {
     return ZX_ERR_BAD_STATE;
   }
   return ZX_OK;

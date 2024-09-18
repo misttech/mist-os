@@ -124,8 +124,6 @@ class Vim3PwmBacklight : public DeviceType, public ddk::EmptyProtocol<ZX_PROTOCO
 
   State state_;
 
-  bool gpio_initialized_ = false;
-
   inspect::BoolProperty power_property_;
   inspect::DoubleProperty brightness_property_;
 };

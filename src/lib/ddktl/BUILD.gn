@@ -63,6 +63,9 @@ source_set("ddktl") {
 
       # <ddktl/metadata_server.h> has #include <lib/component/outgoing/cpp/outgoing_directory.h>
       "//sdk/lib/component/outgoing/cpp",
+
+      # <ddktl/metadata_server.h> has #include <lib/driver/outgoing/cpp/outgoing_directory.h>
+      "//sdk/lib/driver/outgoing/cpp",
     ]
   }
 
@@ -209,7 +212,6 @@ source_set("ddktl") {
     "//src/devices/serial/drivers/uart16550:*",
     "//src/devices/serial/drivers/usb-cdc-acm:*",
     "//src/devices/serial/drivers/virtio-console:*",
-    "//src/devices/sysmem/drivers/sysmem:*",
     "//src/devices/tee/drivers/optee:*",
     "//src/devices/temperature/drivers/shtv3:*",
     "//src/devices/temperature/drivers/tmp112:*",
@@ -260,7 +262,6 @@ source_set("ddktl") {
     "//src/devices/tpm/drivers/cr50-spi:*",
     "//src/devices/tpm/drivers/tpm:*",
     "//src/devices/tpm/drivers/tpm-lpc:*",
-    "//src/devices/usb/drivers/crg-udc:*",
     "//src/devices/usb/drivers/dwc2:*",
     "//src/devices/usb/drivers/dwc3:*",
     "//src/devices/usb/drivers/usb-bus:*",

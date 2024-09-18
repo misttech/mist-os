@@ -3,7 +3,7 @@
 
 #include "src/media/audio/drivers/aml-g12-tdm/recorder.h"
 
-#include <lib/inspect/cpp/inspect.h>
+#include <lib/inspect/cpp/vmo/types.h>
 #include <lib/zx/clock.h>
 #include <lib/zx/time.h>
 
@@ -14,40 +14,40 @@ namespace audio::aml_g12 {
 PowerTransition::PowerTransition(inspect::Node node, bool state, const zx::time& called_at,
                                  const zx::time& completed_at)
     : node_(std::move(node)) {
-  state_ = node_.CreateBool("power state ", state);
-  called_at_ = node_.CreateInt("called at   ", called_at.get());
-  completed_at_ = node_.CreateInt("effective at", completed_at.get());
+  state_ = node_.CreateBool(kPowerState, state);
+  called_at_ = node_.CreateInt(kCalledAt, called_at.get());
+  completed_at_ = node_.CreateInt(kEffectiveAt, completed_at.get());
 }
 
 DaiEntry::DaiEntry(inspect::Node node, uint64_t element_id) : node_(std::move(node)) {
-  element_id_ = node_.CreateUint("element id", element_id);
+  element_id_ = node_.CreateUint(kElementId, element_id);
 }
 
 ActiveChannelsCall::ActiveChannelsCall(inspect::Node node, uint64_t channel_mask,
                                        const zx::time& called_at, const zx::time& completed_at)
     : node_(std::move(node)) {
-  channel_mask_ = node_.CreateUint("channel bitmask", channel_mask);
-  called_at_ = node_.CreateInt("called at      ", called_at.get());
-  completed_at_ = node_.CreateInt("effective at   ", completed_at.get());
+  channel_mask_ = node_.CreateUint(kChannelBitmask, channel_mask);
+  called_at_ = node_.CreateInt(kCalledAt, called_at.get());
+  completed_at_ = node_.CreateInt(kEffectiveAt, completed_at.get());
 }
 
 RunningInterval::RunningInterval(inspect::Node node, const zx::time& started_at)
     : node_(std::move(node)) {
-  started_at_ = node_.CreateInt("started at", started_at.get());
+  started_at_ = node_.CreateInt(kStartedAt, started_at.get());
 }
 void RunningInterval::RecordStopTime(const zx::time& stopped_at) {
-  stopped_at_ = node_.CreateInt("stopped at", stopped_at.get());
+  stopped_at_ = node_.CreateInt(kStoppedAt, stopped_at.get());
 }
 
 RingBufferRecorder::RingBufferRecorder(inspect::Node node, const zx::time& created_at)
     : instance_node_(std::move(node)) {
-  created_at_ = instance_node_.CreateInt("ring_buffer ctor time ", created_at.get());
-  active_channels_calls_root_ = instance_node_.CreateChild("set_active_channels calls");
-  running_intervals_root_ = instance_node_.CreateChild("running intervals");
+  created_at_ = instance_node_.CreateInt(kCtorTime, created_at.get());
+  active_channels_calls_root_ = instance_node_.CreateChild(kSetActiveChannelsCalls);
+  running_intervals_root_ = instance_node_.CreateChild(kRunningIntervals);
 }
 
 void RingBufferRecorder::RecordDestructionTime(const zx::time& destroyed_at) {
-  destroyed_at_ = instance_node_.CreateInt("ring_buffer dtor time ", destroyed_at.get());
+  destroyed_at_ = instance_node_.CreateInt(kDtorTime, destroyed_at.get());
 }
 
 void RingBufferRecorder::RecordStartTime(const zx::time& started_at) {
@@ -71,9 +71,9 @@ void RingBufferRecorder::RecordActiveChannelsCall(uint64_t active_channels_bitma
 RingBufferSpecification::RingBufferSpecification(inspect::Node node, uint64_t element_id,
                                                  bool supports_active_channels, bool outgoing)
     : node_(std::move(node)) {
-  element_id_ = node_.CreateUint("element id           ", element_id);
-  supports_active_channels_ = node_.CreateBool("supports active_chans", supports_active_channels);
-  outgoing_ = node_.CreateBool("is outgoing stream   ", outgoing);
+  element_id_ = node_.CreateUint(kElementId, element_id);
+  supports_active_channels_ = node_.CreateBool(kSupportsActiveChannels, supports_active_channels);
+  outgoing_ = node_.CreateBool(kIsOutgoingStream, outgoing);
 }
 
 Recorder::Recorder(inspect::Node& inspect_root) : inspect_root_(inspect_root) {
@@ -83,10 +83,10 @@ Recorder::Recorder(inspect::Node& inspect_root) : inspect_root_(inspect_root) {
 // This method reaches into AudioCompositeServer and knows "a priori" which TDM engines are
 // outgoing, so this isn't a perfect abstraction.
 void Recorder::PopulateInspectNodes() {
-  current_power_state_ = inspect_root_.CreateBool("current power state", true);
-  power_transitions_node_ = inspect_root_.CreateChild("power transitions");
+  current_power_state_ = inspect_root_.CreateBool(kCurrentPowerState, true);
+  power_transitions_node_ = inspect_root_.CreateChild(kPowerTransitions);
 
-  ring_buffers_root_node_ = inspect_root_.CreateChild("ring buffers");
+  ring_buffers_root_node_ = inspect_root_.CreateChild(kRingBuffers);
   for (size_t idx = 0u; idx < kNumberOfTdmEngines; ++idx) {
     auto ring_buffer_spec_node =
         ring_buffers_root_node_.CreateChild("tdm engine #" + std::to_string(idx));
@@ -97,7 +97,7 @@ void Recorder::PopulateInspectNodes() {
     ring_buffer_specs_.emplace_back(std::move(ring_buffer_spec));
   }
 
-  dai_root_node_ = inspect_root_.CreateChild("DAIs");
+  dai_root_node_ = inspect_root_.CreateChild(kDAIs);
   for (size_t idx = 0u; idx < kNumberOfPipelines; ++idx) {
     auto dai_node = dai_root_node_.CreateChild("pipeline #" + std::to_string(idx));
     DaiEntry dai_entry{std::move(dai_node), AudioCompositeServer::kDaiIds[idx]};

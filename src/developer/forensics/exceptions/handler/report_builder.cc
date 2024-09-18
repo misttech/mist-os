@@ -49,12 +49,13 @@ CrashReportBuilder& CrashReportBuilder::SetProcess(const zx::process& process) {
       return *this;
     }
 
-    const zx_time_t crashed_process_uptime = zx_clock_get_monotonic() - process_info.start_time;
-    if (crashed_process_uptime >= 0) {
+    const zx::duration crashed_process_uptime =
+        zx::clock::get_monotonic() - zx::time(process_info.start_time);
+    if (crashed_process_uptime.get() >= 0) {
       process_uptime_ = crashed_process_uptime;
     } else {
-      FX_LOGS(WARNING) << "Invalid uptime = " << crashed_process_uptime << ", for crashed process "
-                       << process_name_.value();
+      FX_LOGS(WARNING) << "Invalid uptime = " << crashed_process_uptime.get()
+                       << ", for crashed process " << process_name_.value();
     }
   }
 
@@ -130,7 +131,7 @@ fuchsia::feedback::CrashReport CrashReportBuilder::Consume() {
 
   // Program uptime.
   if (process_uptime_.has_value()) {
-    crash_report.set_program_uptime(process_uptime_.value());
+    crash_report.set_program_uptime(process_uptime_->get());
   }
 
   // Extra annotations.

@@ -27,7 +27,7 @@ namespace fdf {
 using namespace fuchsia_driver_framework;
 }
 namespace fcd = fuchsia_component_decl;
-namespace fdm = fuchsia_device_manager;
+namespace fdm = fuchsia_system_state;
 
 namespace {
 
@@ -1018,7 +1018,7 @@ zx_status_t Device::PublishInspect(zx::vmo inspect_vmo) {
   inspect::PublishVmo(
       dispatcher(), std::move(publishable),
       inspect::VmoOptions{
-          .tree_name = OutgoingName(),
+          .tree_name = Name(),
           .client_end =
               driver()->driver_namespace().Connect<fuchsia_inspect::InspectSink>().value(),
       });

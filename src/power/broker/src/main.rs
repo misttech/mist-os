@@ -235,8 +235,6 @@ impl BrokerSvc {
             u8,
             Vec<u8>,
             Vec<fpb::LevelDependency>,
-            Vec<credentials::Token>,
-            Vec<credentials::Token>,
             Option<fpb::LevelControlChannels>,
             Option<ServerEnd<fpb::LessorMarker>>,
             Option<ServerEnd<fpb::ElementControlMarker>>,
@@ -253,25 +251,11 @@ impl BrokerSvc {
             return Err(fpb::AddElementError::Invalid);
         };
         let level_dependencies = payload.dependencies.unwrap_or(vec![]);
-        let assertive_dependency_tokens: Vec<credentials::Token> = payload
-            .assertive_dependency_tokens_to_register
-            .unwrap_or(vec![])
-            .into_iter()
-            .map(|d| d.into())
-            .collect();
-        let opportunistic_dependency_tokens: Vec<credentials::Token> = payload
-            .opportunistic_dependency_tokens_to_register
-            .unwrap_or(vec![])
-            .into_iter()
-            .map(|d| d.into())
-            .collect();
         Ok((
             element_name,
             initial_current_level,
             valid_levels,
             level_dependencies,
-            assertive_dependency_tokens,
-            opportunistic_dependency_tokens,
             payload.level_control_channels,
             payload.lessor_channel,
             payload.element_control,
@@ -290,8 +274,6 @@ impl BrokerSvc {
                             initial_current_level,
                             valid_levels,
                             level_dependencies,
-                            assertive_dependency_tokens,
-                            opportunistic_dependency_tokens,
                             level_control_channels,
                             lessor_channel,
                             element_control,
@@ -308,8 +290,6 @@ impl BrokerSvc {
                                 initial_current_level,
                                 valid_levels,
                                 level_dependencies,
-                                assertive_dependency_tokens,
-                                opportunistic_dependency_tokens,
                             )
                         };
                         tracing::debug!("AddElement add_element = {:?}", res);

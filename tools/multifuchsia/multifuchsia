@@ -20,7 +20,7 @@ function swap() {
   )
 }
 
-readonly WORKDIR="$(dirname "${BASH_SOURCE[0]}")"
+readonly WORKDIR="$(realpath "$(dirname "${BASH_SOURCE[0]}")")"
 
 function lookup_checkout() {
   local -r name="$1"

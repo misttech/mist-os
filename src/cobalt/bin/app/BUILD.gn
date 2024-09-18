@@ -59,8 +59,6 @@ source_set("lib") {
     "metric_event_logger_impl.cc",
     "metric_event_logger_impl.h",
     "process_lifecycle_impl.h",
-    "system_data_updater_impl.cc",
-    "system_data_updater_impl.h",
     "user_consent_watcher.cc",
     "user_consent_watcher.h",
     "utils.cc",
@@ -73,6 +71,8 @@ source_set("lib") {
     "//sdk/fidl/fuchsia.metrics:fuchsia.metrics_hlcpp",
     "//sdk/fidl/fuchsia.process.lifecycle:fuchsia.process.lifecycle_hlcpp",
     "//sdk/fidl/fuchsia.update.channel:fuchsia.update.channel_cpp",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/inspect/component/cpp",
     "//sdk/lib/sys/cpp",
     "//sdk/lib/syslog/cpp",
@@ -96,8 +96,6 @@ source_set("lib") {
     "//third_party/cobalt/src/public/lib/statusor",
     "//third_party/cobalt/src/system_data",
     "//third_party/cobalt/src/system_data:configuration_data",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
   ]
   deps = [
     "//sdk/lib/component/incoming/cpp:cpp",
@@ -216,7 +214,6 @@ executable("cobalt_app_unittests") {
     "current_channel_provider_test.cc",
     "diagnostics_impl_test.cc",
     "metric_event_logger_impl_test.cc",
-    "system_data_updater_impl_test.cc",
     "user_consent_watcher_test.cc",
   ]
   deps = [

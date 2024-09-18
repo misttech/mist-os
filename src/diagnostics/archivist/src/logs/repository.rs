@@ -9,20 +9,76 @@ use crate::logs::budget::BudgetManager;
 use crate::logs::container::LogsArtifactsContainer;
 use crate::logs::debuglog::{DebugLog, DebugLogBridge, KERNEL_IDENTITY};
 use crate::logs::multiplex::{Multiplexer, MultiplexerHandle};
-use crate::logs::stored_message::StoredMessage;
 use crate::severity_filter::KlogSeverityFilter;
-use diagnostics_data::LogsData;
-use fidl_fuchsia_diagnostics::{LogInterestSelector, Selector, Severity, StreamMode};
+use anyhow::format_err;
+use diagnostics_data::{LogsData, Severity};
+use fidl_fuchsia_diagnostics::{
+    LogInterestSelector, Selector, Severity as FidlSeverity, StreamMode,
+};
+use flyweights::FlyStr;
 use fuchsia_sync::{Mutex, RwLock};
+use fuchsia_url::boot_url::BootUrl;
+use fuchsia_url::AbsoluteComponentUrl;
 use futures::channel::mpsc;
 use futures::prelude::*;
-use moniker::Moniker;
+use moniker::{ExtendedMoniker, Moniker};
 use selectors::SelectorExt;
 use std::collections::{BTreeMap, HashMap};
+use std::str::FromStr;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, LazyLock};
 use tracing::{debug, error};
 use {fuchsia_async as fasync, fuchsia_inspect as inspect, fuchsia_trace as ftrace};
+
+// LINT.IfChange
+#[derive(Ord, PartialOrd, Eq, PartialEq)]
+pub struct ComponentInitialInterest {
+    /// The URL or moniker for the component which should receive the initial interest.
+    component: UrlOrMoniker,
+    /// The log severity the initial interest should specify.
+    log_severity: Severity,
+}
+// LINT.ThenChange(/src/lib/assembly/config_schema/src/platform_config/diagnostics_config.rs)
+
+impl FromStr for ComponentInitialInterest {
+    type Err = anyhow::Error;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let mut split = s.rsplitn(2, ":");
+        match (split.next(), split.next()) {
+            (Some(severity), Some(url_or_moniker)) => {
+                let Ok(url_or_moniker) = UrlOrMoniker::from_str(url_or_moniker) else {
+                    return Err(format_err!("invalid url or moniker"));
+                };
+                let Ok(severity) = Severity::from_str(severity) else {
+                    return Err(format_err!("invalid severity"));
+                };
+                Ok(ComponentInitialInterest { log_severity: severity, component: url_or_moniker })
+            }
+            _ => Err(format_err!("invalid interest")),
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Ord, PartialOrd)]
+pub enum UrlOrMoniker {
+    /// An absolute fuchsia url to a component.
+    Url(FlyStr),
+    /// The absolute moniker for a component.
+    Moniker(ExtendedMoniker),
+}
+
+impl FromStr for UrlOrMoniker {
+    type Err = ();
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        if AbsoluteComponentUrl::from_str(s).is_ok() || BootUrl::parse(s).is_ok() {
+            Ok(UrlOrMoniker::Url(s.into()))
+        } else if let Ok(moniker) = Moniker::from_str(s) {
+            Ok(UrlOrMoniker::Moniker(ExtendedMoniker::ComponentInstance(moniker)))
+        } else {
+            Err(())
+        }
+    }
+}
 
 static INTEREST_CONNECTION_ID: AtomicUsize = AtomicUsize::new(0);
 static ARCHIVIST_MONIKER: LazyLock<Moniker> =
@@ -39,12 +95,21 @@ pub struct LogsRepository {
 }
 
 impl LogsRepository {
-    pub fn new(logs_max_cached_original_bytes: u64, parent: &fuchsia_inspect::Node) -> Arc<Self> {
+    pub fn new(
+        logs_max_cached_original_bytes: u64,
+        initial_interests: impl Iterator<Item = ComponentInitialInterest>,
+        parent: &fuchsia_inspect::Node,
+    ) -> Arc<Self> {
         let (remover_snd, remover_rcv) = mpsc::unbounded();
         let logs_budget = BudgetManager::new(logs_max_cached_original_bytes as usize, remover_snd);
         let (log_sender, log_receiver) = mpsc::unbounded();
         let this = Arc::new(LogsRepository {
-            mutable_state: Mutex::new(LogsRepositoryState::new(logs_budget, log_receiver, parent)),
+            mutable_state: Mutex::new(LogsRepositoryState::new(
+                logs_budget,
+                log_receiver,
+                parent,
+                initial_interests,
+            )),
             log_sender: RwLock::new(log_sender),
             component_removal_task: Mutex::new(None),
         });
@@ -81,13 +146,13 @@ impl LogsRepository {
             };
             messages.sort_by_key(|m| m.timestamp());
             for message in messages {
-                container.ingest_message(Box::new(message));
+                container.ingest_message(message);
             }
 
             let res = kernel_logger
                 .listen()
                 .try_for_each(|message| async {
-                    container.ingest_message(Box::new(message));
+                    container.ingest_message(message);
                     Ok(())
                 })
                 .await;
@@ -177,6 +242,7 @@ impl LogsRepository {
     pub(crate) fn default() -> Arc<Self> {
         LogsRepository::new(
             crate::constants::LEGACY_DEFAULT_MAXIMUM_CACHED_LOGS_BYTES,
+            std::iter::empty(),
             &Default::default(),
         )
     }
@@ -217,6 +283,9 @@ pub struct LogsRepositoryState {
 
     /// The task draining klog and routing to syslog.
     drain_klog_task: Option<fasync::Task<()>>,
+
+    /// The initial log interests with which archivist was configured.
+    initial_interests: BTreeMap<UrlOrMoniker, Severity>,
 }
 
 impl LogsRepositoryState {
@@ -224,6 +293,7 @@ impl LogsRepositoryState {
         logs_budget: BudgetManager,
         log_receiver: mpsc::UnboundedReceiver<fasync::Task<()>>,
         parent: &fuchsia_inspect::Node,
+        initial_interests: impl Iterator<Item = ComponentInitialInterest>,
     ) -> Self {
         Self {
             inspect_node: parent.create_child("log_sources"),
@@ -233,6 +303,11 @@ impl LogsRepositoryState {
             logs_multiplexers: MultiplexerBroker::new(),
             interest_registrations: BTreeMap::new(),
             drain_klog_task: None,
+            initial_interests: initial_interests
+                .map(|ComponentInitialInterest { component, log_severity }| {
+                    (component, log_severity)
+                })
+                .collect(),
         }
     }
 
@@ -244,9 +319,11 @@ impl LogsRepositoryState {
     ) -> Arc<LogsArtifactsContainer> {
         match self.logs_data_store.get(&identity) {
             None => {
+                let initial_interest = self.get_initial_interest(identity.as_ref());
                 let container = Arc::new(LogsArtifactsContainer::new(
                     Arc::clone(&identity),
                     self.interest_registrations.values().flat_map(|s| s.iter()),
+                    initial_interest,
                     &self.inspect_node,
                     self.logs_budget.handle(),
                 ));
@@ -256,6 +333,17 @@ impl LogsRepositoryState {
                 container
             }
             Some(existing) => Arc::clone(existing),
+        }
+    }
+
+    fn get_initial_interest(&self, identity: &ComponentIdentity) -> Option<FidlSeverity> {
+        match (
+            self.initial_interests.get(&UrlOrMoniker::Url(identity.url.clone())),
+            self.initial_interests.get(&UrlOrMoniker::Moniker(identity.moniker.clone())),
+        ) {
+            (None, None) => None,
+            (Some(severity), None) | (None, Some(severity)) => Some(FidlSeverity::from(*severity)),
+            (Some(s1), Some(s2)) => Some(FidlSeverity::from(std::cmp::min(*s1, *s2))),
         }
     }
 
@@ -284,13 +372,15 @@ impl LogsRepositoryState {
                         .matches_component_selector(&selector.selector)
                         .unwrap_or(false)
                 })
-                .min_by_key(|selector| selector.interest.min_severity.unwrap_or(Severity::Info));
+                .min_by_key(|selector| {
+                    selector.interest.min_severity.unwrap_or(FidlSeverity::Info)
+                });
             if let Some(selector) = lowest_selector {
                 if clear_interest {
-                    publisher.set_severity(Severity::Info);
+                    publisher.set_severity(FidlSeverity::Info);
                 } else {
                     publisher
-                        .set_severity(selector.interest.min_severity.unwrap_or(Severity::Info));
+                        .set_severity(selector.interest.min_severity.unwrap_or(FidlSeverity::Info));
                 }
             }
         });
@@ -385,9 +475,10 @@ impl MultiplexerBroker {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::logs::stored_message::{GenericStoredMessage, StructuredStoredMessage};
+    use crate::logs::stored_message::StoredMessage;
     use diagnostics_log_encoding::encode::{Encoder, EncoderOpts};
     use diagnostics_log_encoding::{Argument, Record, Severity as StreamSeverity, Value};
+    use fidl_fuchsia_logger::LogSinkMarker;
     use moniker::ExtendedMoniker;
     use selectors::FastError;
     use std::io::Cursor;
@@ -444,7 +535,76 @@ mod tests {
         }
     }
 
-    fn make_message(msg: &str, timestamp: i64) -> GenericStoredMessage {
+    #[fuchsia::test]
+    async fn data_repo_correctly_sets_initial_interests() {
+        let repo = LogsRepository::new(
+            1000,
+            [
+                ComponentInitialInterest {
+                    component: UrlOrMoniker::Url("fuchsia-pkg://bar".into()),
+                    log_severity: Severity::Info,
+                },
+                ComponentInitialInterest {
+                    component: UrlOrMoniker::Url("fuchsia-pkg://baz".into()),
+                    log_severity: Severity::Warn,
+                },
+                ComponentInitialInterest {
+                    component: UrlOrMoniker::Moniker("core/bar".try_into().unwrap()),
+                    log_severity: Severity::Error,
+                },
+                ComponentInitialInterest {
+                    component: UrlOrMoniker::Moniker("core/foo".try_into().unwrap()),
+                    log_severity: Severity::Debug,
+                },
+            ]
+            .into_iter(),
+            &fuchsia_inspect::Node::default(),
+        );
+
+        // We have the moniker configured, use the associated severity.
+        let container = repo.get_log_container(Arc::new(ComponentIdentity::new(
+            ExtendedMoniker::parse_str("core/foo").unwrap(),
+            "fuchsia-pkg://foo",
+        )));
+        expect_initial_interest(Some(FidlSeverity::Debug), container).await;
+
+        // We have the URL configure, use the associated severity.
+        let container = repo.get_log_container(Arc::new(ComponentIdentity::new(
+            ExtendedMoniker::parse_str("core/baz").unwrap(),
+            "fuchsia-pkg://baz",
+        )));
+        expect_initial_interest(Some(FidlSeverity::Warn), container).await;
+
+        // We have both a URL and a moniker in the config. Pick the minimium one, in this case Info
+        // for the URL over Error for the moniker.
+        let container = repo.get_log_container(Arc::new(ComponentIdentity::new(
+            ExtendedMoniker::parse_str("core/bar").unwrap(),
+            "fuchsia-pkg://bar",
+        )));
+        expect_initial_interest(Some(FidlSeverity::Info), container).await;
+
+        // Neither the moniker nor the URL have an associated severity, therefore, the minimum
+        // severity isn't set.
+        let container = repo.get_log_container(Arc::new(ComponentIdentity::new(
+            ExtendedMoniker::parse_str("core/quux").unwrap(),
+            "fuchsia-pkg://quux",
+        )));
+        expect_initial_interest(None, container).await;
+    }
+
+    async fn expect_initial_interest(
+        expected_severity: Option<FidlSeverity>,
+        container: Arc<LogsArtifactsContainer>,
+    ) {
+        let (sender, _recv) = mpsc::unbounded();
+        let (log_sink, stream) =
+            fidl::endpoints::create_proxy_and_stream::<LogSinkMarker>().expect("create log sink");
+        container.handle_log_sink(stream, sender);
+        let initial_interest = log_sink.wait_for_interest_change().await.unwrap().unwrap();
+        assert_eq!(initial_interest.min_severity, expected_severity);
+    }
+
+    fn make_message(msg: &str, timestamp: i64) -> StoredMessage {
         let record = Record {
             timestamp,
             severity: StreamSeverity::Debug.into_primitive(),
@@ -458,6 +618,6 @@ mod tests {
         let mut encoder = Encoder::new(&mut buffer, EncoderOpts::default());
         encoder.write_record(&record).unwrap();
         let encoded = &buffer.get_ref()[..buffer.position() as usize];
-        StructuredStoredMessage::create(encoded.to_vec(), Default::default())
+        StoredMessage::new(encoded.to_vec().into(), &Default::default()).unwrap()
     }
 }

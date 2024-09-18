@@ -440,6 +440,7 @@ class RustAction(object):
         # post-process some flags
         self._c_sysroot: Path | None = None
         self._use_ld: Path | None = None
+        self._link_reproducer: Path | None = None
         self._want_sysroot_libgcc = False
         self._link_arg_files: Sequence[Path] = []
         for arg in self._link_arg_flags:
@@ -457,6 +458,9 @@ class RustAction(object):
                 # `-Clink-arg=--soname=foo.so` is intended to set the DT_SONAME
                 # for the shared object and is not an input or output file that
                 # needs to be relativized.
+                continue
+            if left == "--reproduce":
+                self._link_reproducer = Path(right)
                 continue
             if is_linkable(arg):
                 self._link_arg_files.append(Path(arg))
@@ -509,6 +513,10 @@ class RustAction(object):
     @property
     def want_sysroot_libgcc(self) -> bool:
         return self._want_sysroot_libgcc
+
+    @property
+    def link_reproducer(self) -> Optional[Path]:
+        return self._link_reproducer
 
     @property
     def target(self) -> Optional[str]:
@@ -684,6 +692,9 @@ class RustAction(object):
         link_map = self.link_map_output
         if link_map:
             yield link_map
+        link_repro = self.link_reproducer
+        if link_repro:
+            yield link_repro
 
     def dep_only_command_with_rspfiles(
         self, depfile_name: str

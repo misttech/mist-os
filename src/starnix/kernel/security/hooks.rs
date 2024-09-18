@@ -4,11 +4,14 @@
 
 use super::{selinux_hooks, FileSystemState, ResolvedElfState, TaskState};
 use crate::security::KernelState;
-use crate::task::{CurrentTask, Task};
+use crate::task::{CurrentTask, Kernel, Task};
 use crate::vfs::fs_args::MountParams;
-use crate::vfs::{FsNode, FsNodeHandle, FsStr, FsString, NamespaceNode, ValueOrSize, XattrOp};
-use selinux::SecurityPermission;
-use selinux_core::security_server::SecurityServer;
+use crate::vfs::{
+    DirEntry, FileSystemHandle, FsNode, FsStr, FsString, NamespaceNode, ValueOrSize, XattrOp,
+};
+use selinux::{SecurityPermission, SecurityServer};
+use starnix_logging::log_debug;
+use starnix_uapi::arc_key::WeakKey;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::mount_flags::MountFlags;
 use starnix_uapi::signals::Signal;
@@ -16,65 +19,38 @@ use starnix_uapi::unmount_flags::UnmountFlags;
 use starnix_uapi::{errno, error};
 use std::sync::Arc;
 
-/// Executes the `hook` closure, dependent on the state of SELinux.
-///
-/// If SELinux is not enabled, or is enabled but has no policy loaded, then the `not_enabled`
-/// closure is executed, to determine the result. Otherwise, the `hook()` is executed on
-/// behalf of the caller.
-fn check_if_selinux_else<H, R, D>(task: &Task, hook: H, not_enabled: D) -> Result<R, Errno>
-where
-    H: FnOnce(&Arc<SecurityServer>) -> Result<R, Errno>,
-    D: FnOnce() -> Result<R, Errno>,
-{
-    if let Some(security_server) = &task.kernel().security_state.server {
-        if !security_server.has_policy() {
-            return not_enabled();
-        }
-        hook(security_server)
-    } else {
-        not_enabled()
-    }
-}
-
-fn check_if_selinux<H, R>(task: &Task, hook: H) -> Result<R, Errno>
-where
-    H: FnOnce(&Arc<SecurityServer>) -> Result<R, Errno>,
-    R: Default,
-{
-    let success = || Ok(R::default());
-    check_if_selinux_else(task, hook, success)
-}
-
-/// Executes the infallible `hook` closure, dependent on the state of SELinux.
-///
-/// This is used for non-enforcing hooks, such as those responsible for generating security labels
-/// for new tasks.
-fn run_if_selinux<F, R>(task: &Task, hook: F) -> R
-where
-    F: FnOnce(&Arc<SecurityServer>) -> R,
-    R: Default,
-{
-    run_if_selinux_else(task, hook, R::default)
-}
-
-fn run_if_selinux_else<F, R, D>(task: &Task, hook: F, default: D) -> R
+/// Executes the `hook` closure if SELinux is enabled, and has a policy loaded.
+/// If SELinux is not enabled, or has no policy loaded, then the `default` closure is executed,
+/// and its result returned.
+fn if_selinux_else<F, R, D>(task: &Task, hook: F, default: D) -> R
 where
     F: FnOnce(&Arc<SecurityServer>) -> R,
     D: Fn() -> R,
 {
-    task.kernel().security_state.server.as_ref().map_or_else(&default, |ss| {
-        if ss.has_policy() {
-            hook(ss)
+    task.kernel().security_state.state.as_ref().map_or_else(&default, |state| {
+        if state.server.has_policy() {
+            hook(&state.server)
         } else {
             default()
         }
     })
 }
 
+/// Specialization of `if_selinux_else(...)` for hooks which return a `Result<..., Errno>`, that
+/// arranges to return a default `Ok(...)` result value if SELinux is not enabled, or not yet
+/// configured with a policy.
+fn if_selinux_else_default_ok<R, F>(task: &Task, hook: F) -> Result<R, Errno>
+where
+    F: FnOnce(&Arc<SecurityServer>) -> Result<R, Errno>,
+    R: Default,
+{
+    if_selinux_else(task, hook, || Ok(R::default()))
+}
+
 /// Returns the security state structure for the kernel, based on the supplied "selinux" argument
 /// contents.
 pub fn kernel_init_security(enabled: bool) -> KernelState {
-    KernelState { server: enabled.then(|| SecurityServer::new()) }
+    KernelState { state: enabled.then(|| selinux_hooks::kernel_init_security()) }
 }
 
 /// Return security state to associate with a filesystem based on the supplied mount options.
@@ -83,31 +59,69 @@ pub fn file_system_init_security(mount_params: &MountParams) -> Result<FileSyste
     Ok(FileSystemState { state: selinux_hooks::file_system_init_security(mount_params)? })
 }
 
+/// Gives the hooks subsystem an opportunity to note that the new `file_system` needs labeling, if
+/// SELinux is enabled, but no policy has yet been loaded.
+// TODO: https://fxbug.dev/366405587 - Merge this logic into `file_system_resolve_security()` and
+// remove this extra hook.
+pub fn file_system_post_init_security(kernel: &Kernel, file_system: &FileSystemHandle) {
+    if let Some(state) = &kernel.security_state.state {
+        if !state.server.has_policy() {
+            // TODO: https://fxbug.dev/367585803 - Revise locking to guard against a policy load
+            // sneaking in, in-between `has_policy()` and this `insert()`.
+            log_debug!("Queuing {} FileSystem for labeling", file_system.name());
+            state.pending_file_systems.lock().insert(WeakKey::from(&file_system));
+        }
+    }
+}
+
+/// Resolves the labeling scheme and arguments for the `file_system`, based on the loaded policy.
+/// If no policy has yet been loaded then no work is done, and the `file_system` will instead be
+/// labeled when a policy is first loaded.
+/// If the `file_system` was already labelled then no further work is done.
+pub fn file_system_resolve_security(
+    current_task: &CurrentTask,
+    file_system: &FileSystemHandle,
+) -> Result<(), Errno> {
+    if_selinux_else_default_ok(current_task, |security_server| {
+        selinux_hooks::file_system_resolve_security(security_server, current_task, file_system)
+    })
+}
+
 /// Used to return an extended attribute name and value to apply to a [`crate::vfs::FsNode`].
 pub struct FsNodeSecurityXattr {
     pub name: &'static FsStr,
     pub value: FsString,
 }
 
-/// Returns the security attribute to label a newly created inode with.
-/// This is analogous to the `inode_init_security()` hook.
-pub fn fs_node_init_security_and_xattr(
+/// Called by the VFS to initialize the security state for an `FsNode` that is being linked at
+/// `dir_entry`.
+/// If the `FsNode` security state had already been initialized, or no policy is yet loaded, then
+/// this is a no-op.
+pub fn fs_node_init_with_dentry(
     current_task: &CurrentTask,
-    new_node: &FsNodeHandle,
-    parent: Option<&FsNodeHandle>,
+    dir_entry: &DirEntry,
+) -> Result<(), Errno> {
+    if_selinux_else_default_ok(current_task, |security_server| {
+        selinux_hooks::fs_node_init_with_dentry(security_server, current_task, dir_entry)
+    })
+}
+
+/// Called by file-system implementations when creating the `FsNode` for a new file, to determine the
+/// correct label based on the `CurrentTask` and `parent` node, and the policy-defined transition
+/// rules, and to initialize the `FsNode`'s security state accordingly.
+/// If no policy has yet been loaded then this is a no-op; if the `FsNode` corresponds to an xattr-
+/// labeled file then it will receive the file-system's "default" label once a policy is loaded.
+/// Returns an extended attribute value to set on the newly-created file if the labeling scheme is
+/// `fs_use_xattr`. For other labeling schemes (e.g. `fs_use_trans`, mountpoint-labeling) a label
+/// is set on the `FsNode` security state, but no extended attribute is set nor returned.
+pub fn fs_node_init_on_create(
+    current_task: &CurrentTask,
+    new_node: &FsNode,
+    parent: &FsNode,
 ) -> Result<Option<FsNodeSecurityXattr>, Errno> {
-    run_if_selinux_else(
-        current_task,
-        |security_server| {
-            selinux_hooks::fs_node_init_security_and_xattr(
-                security_server,
-                current_task,
-                new_node,
-                parent,
-            )
-        },
-        || Ok(None),
-    )
+    if_selinux_else_default_ok(current_task, |security_server| {
+        selinux_hooks::fs_node_init_on_create(security_server, current_task, new_node, parent)
+    })
 }
 
 /// Return the default initial `TaskState` for kernel tasks.
@@ -118,7 +132,7 @@ pub fn task_alloc_for_kernel() -> TaskState {
 /// Returns `TaskState` for a new `Task`, based on that of `task`, and the specified clone flags.
 pub fn task_alloc(task: &Task, clone_flags: u64) -> TaskState {
     TaskState {
-        attrs: run_if_selinux_else(
+        attrs: if_selinux_else(
             task,
             |_| selinux_hooks::task::task_alloc(&task, clone_flags),
             || selinux_hooks::TaskAttrs::for_selinux_disabled(),
@@ -129,7 +143,7 @@ pub fn task_alloc(task: &Task, clone_flags: u64) -> TaskState {
 /// Returns `TaskState` for a new `Task`, based on that of the provided `context`.
 pub fn task_for_context(task: &Task, context: &FsStr) -> Result<TaskState, Errno> {
     Ok(TaskState {
-        attrs: run_if_selinux_else(
+        attrs: if_selinux_else(
             task,
             |security_server| {
                 Ok(selinux_hooks::TaskAttrs::for_sid(
@@ -147,7 +161,7 @@ pub fn task_for_context(task: &Task, context: &FsStr) -> Result<TaskState, Errno
 /// If the task's current SID cannot be resolved then an empty string is returned.
 /// This combines the `task_getsecid()` and `secid_to_secctx()` hooks, in effect.
 pub fn task_get_context(current_task: &CurrentTask, target: &Task) -> Result<Vec<u8>, Errno> {
-    run_if_selinux_else(
+    if_selinux_else(
         current_task,
         |security_server| {
             selinux_hooks::task::task_get_context(&security_server, &current_task, &target)
@@ -158,7 +172,7 @@ pub fn task_get_context(current_task: &CurrentTask, target: &Task) -> Result<Vec
 
 /// Check if creating a task is allowed.
 pub fn check_task_create_access(current_task: &CurrentTask) -> Result<(), Errno> {
-    check_if_selinux(current_task, |security_server| {
+    if_selinux_else_default_ok(current_task, |security_server| {
         selinux_hooks::task::check_task_create_access(
             &security_server.as_permission_check(),
             current_task,
@@ -169,9 +183,9 @@ pub fn check_task_create_access(current_task: &CurrentTask) -> Result<(), Errno>
 /// Checks if exec is allowed.
 pub fn check_exec_access(
     current_task: &CurrentTask,
-    executable_node: &FsNodeHandle,
+    executable_node: &FsNode,
 ) -> Result<ResolvedElfState, Errno> {
-    check_if_selinux_else(
+    if_selinux_else(
         current_task,
         |security_server| {
             selinux_hooks::task::check_exec_access(&security_server, current_task, executable_node)
@@ -183,14 +197,18 @@ pub fn check_exec_access(
 /// Updates the SELinux thread group state on exec.
 /// Corresponds to the `bprm_committing_creds` and `bprm_committed_creds` hooks.
 pub fn update_state_on_exec(current_task: &CurrentTask, elf_security_state: &ResolvedElfState) {
-    run_if_selinux(current_task, |_| {
-        selinux_hooks::task::update_state_on_exec(current_task, elf_security_state);
-    });
+    if_selinux_else(
+        current_task,
+        |_| {
+            selinux_hooks::task::update_state_on_exec(current_task, elf_security_state);
+        },
+        || (),
+    );
 }
 
 /// Checks if `source` may exercise the "getsched" permission on `target`.
 pub fn check_getsched_access(source: &CurrentTask, target: &Task) -> Result<(), Errno> {
-    check_if_selinux(source, |security_server| {
+    if_selinux_else_default_ok(source, |security_server| {
         selinux_hooks::task::check_getsched_access(
             &security_server.as_permission_check(),
             &source,
@@ -201,7 +219,7 @@ pub fn check_getsched_access(source: &CurrentTask, target: &Task) -> Result<(), 
 
 /// Checks if setsched is allowed.
 pub fn check_setsched_access(source: &CurrentTask, target: &Task) -> Result<(), Errno> {
-    check_if_selinux(source, |security_server| {
+    if_selinux_else_default_ok(source, |security_server| {
         selinux_hooks::task::check_setsched_access(
             &security_server.as_permission_check(),
             &source,
@@ -212,7 +230,7 @@ pub fn check_setsched_access(source: &CurrentTask, target: &Task) -> Result<(), 
 
 /// Checks if getpgid is allowed.
 pub fn check_getpgid_access(source: &CurrentTask, target: &Task) -> Result<(), Errno> {
-    check_if_selinux(source, |security_server| {
+    if_selinux_else_default_ok(source, |security_server| {
         selinux_hooks::task::check_getpgid_access(
             &security_server.as_permission_check(),
             &source,
@@ -223,7 +241,7 @@ pub fn check_getpgid_access(source: &CurrentTask, target: &Task) -> Result<(), E
 
 /// Checks if setpgid is allowed.
 pub fn check_setpgid_access(source: &CurrentTask, target: &Task) -> Result<(), Errno> {
-    check_if_selinux(source, |security_server| {
+    if_selinux_else_default_ok(source, |security_server| {
         selinux_hooks::task::check_setpgid_access(
             &security_server.as_permission_check(),
             &source,
@@ -235,7 +253,7 @@ pub fn check_setpgid_access(source: &CurrentTask, target: &Task) -> Result<(), E
 /// Called when the current task queries the session Id of the `target` task.
 /// Corresponds to the `task_getsid` LSM hook.
 pub fn check_task_getsid(source: &CurrentTask, target: &Task) -> Result<(), Errno> {
-    check_if_selinux(source, |security_server| {
+    if_selinux_else_default_ok(source, |security_server| {
         selinux_hooks::task::check_task_getsid(
             &security_server.as_permission_check(),
             &source,
@@ -250,7 +268,7 @@ pub fn check_signal_access(
     target: &Task,
     signal: Signal,
 ) -> Result<(), Errno> {
-    check_if_selinux(source, |security_server| {
+    if_selinux_else_default_ok(source, |security_server| {
         selinux_hooks::task::check_signal_access(
             &security_server.as_permission_check(),
             &source,
@@ -266,7 +284,7 @@ pub fn check_signal_access_tg(
     target: &Task,
     signal: Signal,
 ) -> Result<(), Errno> {
-    check_if_selinux(source, |security_server| {
+    if_selinux_else_default_ok(source, |security_server| {
         selinux_hooks::task::check_signal_access(
             &security_server.as_permission_check(),
             &source,
@@ -278,7 +296,7 @@ pub fn check_signal_access_tg(
 
 // Checks whether the `parent_tracer_task` is allowed to trace the `current_task`.
 pub fn ptrace_traceme(current_task: &CurrentTask, parent_tracer_task: &Task) -> Result<(), Errno> {
-    check_if_selinux(current_task, |security_server| {
+    if_selinux_else_default_ok(current_task, |security_server| {
         selinux_hooks::task::ptrace_access_check(
             &security_server.as_permission_check(),
             &current_task,
@@ -290,7 +308,7 @@ pub fn ptrace_traceme(current_task: &CurrentTask, parent_tracer_task: &Task) -> 
 /// Checks whether the current `current_task` is allowed to trace `tracee_task`.
 /// This fills the role of both of the LSM `ptrace_traceme` and `ptrace_access_check` hooks.
 pub fn ptrace_access_check(current_task: &CurrentTask, tracee_task: &Task) -> Result<(), Errno> {
-    check_if_selinux(current_task, |security_server| {
+    if_selinux_else_default_ok(current_task, |security_server| {
         selinux_hooks::task::ptrace_access_check(
             &security_server.as_permission_check(),
             current_task,
@@ -307,7 +325,7 @@ pub fn task_prlimit(
     check_get_rlimit: bool,
     check_set_rlimit: bool,
 ) -> Result<(), Errno> {
-    check_if_selinux(source, |security_server| {
+    if_selinux_else_default_ok(source, |security_server| {
         selinux_hooks::task::task_prlimit(
             &security_server.as_permission_check(),
             &source,
@@ -329,7 +347,7 @@ pub fn sb_mount(
     flags: MountFlags,
     data: &bstr::BStr,
 ) -> Result<(), Errno> {
-    check_if_selinux(current_task, |security_server| {
+    if_selinux_else_default_ok(current_task, |security_server| {
         selinux_hooks::sb_mount(
             &security_server.as_permission_check(),
             current_task,
@@ -350,7 +368,7 @@ pub fn sb_umount(
     node: &NamespaceNode,
     flags: UnmountFlags,
 ) -> Result<(), Errno> {
-    check_if_selinux(current_task, |security_server| {
+    if_selinux_else_default_ok(current_task, |security_server| {
         selinux_hooks::sb_umount(&security_server.as_permission_check(), current_task, node, flags)
     })
 }
@@ -367,7 +385,7 @@ pub fn fs_node_getsecurity(
     name: &FsStr,
     max_size: usize,
 ) -> Result<ValueOrSize<FsString>, Errno> {
-    run_if_selinux_else(
+    if_selinux_else(
         current_task,
         |security_server| {
             selinux_hooks::fs_node_getsecurity(
@@ -392,7 +410,7 @@ pub fn fs_node_setsecurity(
     value: &FsStr,
     op: XattrOp,
 ) -> Result<(), Errno> {
-    run_if_selinux_else(
+    if_selinux_else(
         current_task,
         |security_server| {
             selinux_hooks::fs_node_setsecurity(
@@ -425,7 +443,7 @@ pub fn get_procattr(
     target: &Task,
     attr: ProcAttr,
 ) -> Result<Vec<u8>, Errno> {
-    check_if_selinux_else(
+    if_selinux_else(
         current_task,
         |security_server| {
             selinux_hooks::task::get_procattr(security_server, current_task, target, attr)
@@ -441,7 +459,7 @@ pub fn set_procattr(
     attr: ProcAttr,
     context: &[u8],
 ) -> Result<(), Errno> {
-    check_if_selinux_else(
+    if_selinux_else(
         current_task,
         |security_server| {
             selinux_hooks::task::set_procattr(security_server, current_task, attr, context)
@@ -451,11 +469,24 @@ pub fn set_procattr(
     )
 }
 
+/// Called by the "selinuxfs" when a policy has been successfully loaded, to allow policy-dependent
+/// initialization to be completed. This includes resolving labeling schemes and state for
+/// file-systems mounted prior to policy load (e.g. the "selinuxfs" itself), and initializing
+/// security state for any file nodes they may already contain.
+// TODO: https://fxbug.dev/362917997 - Remove this when SELinux LSM is modularized.
+pub fn selinuxfs_policy_loaded(current_task: &CurrentTask) {
+    if_selinux_else(
+        current_task,
+        |security_server| selinux_hooks::selinuxfs_policy_loaded(security_server, current_task),
+        || panic!("selinuxfs_policy_loaded() without policy!"),
+    )
+}
+
 /// Used by the "selinuxfs" module to access the SELinux administration API, if enabled.
 // TODO: https://fxbug.dev/335397745 - Return a more restricted API, or ...
 // TODO: https://fxbug.dev/362917997 - Remove this when SELinux LSM is modularized.
 pub fn selinuxfs_get_admin_api(current_task: &CurrentTask) -> Option<Arc<SecurityServer>> {
-    current_task.kernel().security_state.server.clone()
+    current_task.kernel().security_state.state.as_ref().map(|state| state.server.clone())
 }
 
 /// Used by the "selinuxfs" module to perform checks on SELinux API file accesses.
@@ -465,22 +496,24 @@ pub fn selinuxfs_check_access(
     node: &FsNode,
     permission: SecurityPermission,
 ) -> Result<(), Errno> {
-    run_if_selinux_else(
-        current_task,
-        |security_server| {
-            selinux_hooks::selinuxfs_check_access(security_server, current_task, node, permission)
-        },
-        || Ok(()),
-    )
+    if_selinux_else_default_ok(current_task, |security_server| {
+        selinux_hooks::selinuxfs_check_access(security_server, current_task, node, permission)
+    })
 }
 
 pub mod testing {
-    use super::{Arc, KernelState, SecurityServer};
+    use super::{selinux_hooks, Arc, KernelState, SecurityServer};
+    use starnix_sync::Mutex;
 
     /// Used by Starnix' `testing.rs` to create `KernelState` wrapping a test-
     /// supplied `SecurityServer`.
     pub fn kernel_state(security_server: Option<Arc<SecurityServer>>) -> KernelState {
-        KernelState { server: security_server.clone() }
+        KernelState {
+            state: security_server.map(|server| selinux_hooks::KernelState {
+                server,
+                pending_file_systems: Mutex::default(),
+            }),
+        }
     }
 }
 
@@ -495,7 +528,7 @@ mod tests {
         AutoReleasableTask,
     };
     use linux_uapi::XATTR_NAME_SELINUX;
-    use selinux_core::{InitialSid, SecurityId};
+    use selinux::{InitialSid, SecurityId};
     use starnix_uapi::signals::SIGTERM;
 
     const VALID_SECURITY_CONTEXT: &[u8] = b"u:object_r:test_valid_t:s0";
@@ -520,7 +553,7 @@ mod tests {
     fn create_task_pair_with_selinux_disabled() -> (AutoReleasableTask, AutoReleasableTask) {
         let (kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
         let another_task = create_task(&mut locked, &kernel, "another-task");
-        assert!(kernel.security_state.server.is_none());
+        assert!(kernel.security_state.state.is_none());
         (current_task, another_task)
     }
 
@@ -542,50 +575,41 @@ mod tests {
     }
 
     #[fuchsia::test]
-    async fn check_and_run_if_selinux_disabled() {
+    async fn if_selinux_else_disabled() {
         let (kernel, task) = create_kernel_and_task();
-        assert!(kernel.security_state.server.is_none());
+        assert!(kernel.security_state.state.is_none());
 
-        let check_result = check_if_selinux(&task, |_| Ok(TestHookResult::WasRun));
+        let check_result = if_selinux_else_default_ok(&task, |_| Ok(TestHookResult::WasRun));
         assert_eq!(check_result, Ok(TestHookResult::WasNotRunDefault));
 
-        let run_result = run_if_selinux(&task, |_| TestHookResult::WasRun);
-        assert_eq!(run_result, TestHookResult::WasNotRunDefault);
-
         let run_else_result =
-            run_if_selinux_else(&task, |_| TestHookResult::WasRun, || TestHookResult::WasNotRun);
+            if_selinux_else(&task, |_| TestHookResult::WasRun, || TestHookResult::WasNotRun);
         assert_eq!(run_else_result, TestHookResult::WasNotRun);
     }
 
     #[fuchsia::test]
-    async fn check_and_run_if_selinux_without_policy() {
+    async fn if_selinux_else_without_policy() {
         let security_server = SecurityServer::new();
         let (_kernel, task) = create_kernel_and_task_with_selinux(security_server);
 
-        let check_result = check_if_selinux(&task, |_| Ok(TestHookResult::WasRun));
+        let check_result = if_selinux_else_default_ok(&task, |_| Ok(TestHookResult::WasRun));
         assert_eq!(check_result, Ok(TestHookResult::WasNotRunDefault));
 
-        let run_result = run_if_selinux(&task, |_| TestHookResult::WasRun);
-        assert_eq!(run_result, TestHookResult::WasNotRunDefault);
-
         let run_else_result =
-            run_if_selinux_else(&task, |_| TestHookResult::WasRun, || TestHookResult::WasNotRun);
+            if_selinux_else(&task, |_| TestHookResult::WasRun, || TestHookResult::WasNotRun);
         assert_eq!(run_else_result, TestHookResult::WasNotRun);
     }
 
     #[fuchsia::test]
-    async fn check_and_run_if_selinux_with_policy() {
+    async fn if_selinux_else_with_policy() {
         let security_server = security_server_with_policy();
         let (_kernel, task) = create_kernel_and_task_with_selinux(security_server);
 
-        let check_result = check_if_selinux(&task, |_| Ok(TestHookResult::WasRun));
+        let check_result = if_selinux_else_default_ok(&task, |_| Ok(TestHookResult::WasRun));
         assert_eq!(check_result, Ok(TestHookResult::WasRun));
 
-        let run_result = run_if_selinux(&task, |_| TestHookResult::WasRun);
-        assert_eq!(run_result, TestHookResult::WasRun);
-
         let run_else_result =
-            run_if_selinux_else(&task, |_| TestHookResult::WasRun, || TestHookResult::WasNotRun);
+            if_selinux_else(&task, |_| TestHookResult::WasRun, || TestHookResult::WasNotRun);
         assert_eq!(run_else_result, TestHookResult::WasRun);
     }
 
@@ -599,7 +623,7 @@ mod tests {
     #[fuchsia::test]
     async fn task_create_access_allowed_for_selinux_disabled() {
         let (kernel, task) = create_kernel_and_task();
-        assert!(kernel.security_state.server.is_none());
+        assert!(kernel.security_state.state.is_none());
         assert_eq!(check_task_create_access(&task), Ok(()));
     }
 
@@ -614,7 +638,7 @@ mod tests {
     #[fuchsia::test]
     async fn exec_access_allowed_for_selinux_disabled() {
         let (kernel, task, mut locked) = create_kernel_task_and_unlocked();
-        assert!(kernel.security_state.server.is_none());
+        assert!(kernel.security_state.state.is_none());
         let executable_node = &testing::create_test_file(&mut locked, &task).entry.node;
         assert_eq!(check_exec_access(&task, executable_node), Ok(ResolvedElfState { sid: None }));
     }

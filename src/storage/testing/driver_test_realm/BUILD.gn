@@ -29,6 +29,7 @@ rustc_binary("bin") {
     "//sdk/fidl/fuchsia.driver.test:fuchsia.driver.test_rust",
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
     "//sdk/lib/driver_test_realm/realm_builder/rust",
+    "//src/devices/bind/fuchsia.platform:fuchsia.platform_rust",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-component",

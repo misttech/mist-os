@@ -16,7 +16,7 @@ use crate::vfs::{
     FileSystemOptions, FsContext, FsNode, FsNodeOps, FsStr, Namespace,
 };
 
-use selinux_core::security_server::SecurityServer;
+use selinux::SecurityServer;
 use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked, Unlocked};
 use std::ffi::CString;
 use std::mem::MaybeUninit;
@@ -197,6 +197,9 @@ fn create_test_init_task(
         CurrentTask::create_system_task(locked, kernel, fs).expect("create system task");
     kernel.kthreads.init(system_task).expect("failed to initialize kthreads");
 
+    let system_task = kernel.kthreads.system_task();
+    kernel.hrtimer_manager.init(&system_task).expect("init hrtimer manager worker thread");
+
     // Take the lock on thread group and task in the correct order to ensure any wrong ordering
     // will trigger the tracing-mutex at the right call site.
     {
@@ -212,8 +215,11 @@ fn create_kernel_task_and_unlocked_with_fs_and_selinux<'l>(
 ) -> (Arc<Kernel>, AutoReleasableTask, Locked<'l, Unlocked>) {
     let mut locked = Unlocked::new();
     let kernel = create_test_kernel(&mut locked, security_server);
-    let fs = create_test_fs_context(&mut locked, &kernel, create_fs);
-    let init_task = create_test_init_task(&mut locked, &kernel, fs);
+    let fs = create_fs(&kernel);
+    let fs_context = create_test_fs_context(&mut locked, &kernel, |_| fs.clone());
+    let init_task = create_test_init_task(&mut locked, &kernel, fs_context).into();
+    security::file_system_resolve_security(&init_task, &fs)
+        .expect("Failed to resolve root filesystem labeling");
     (kernel, init_task.into(), locked)
 }
 

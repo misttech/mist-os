@@ -2,12 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <fidl/fuchsia.device.manager/cpp/wire.h>
 #include <fidl/fuchsia.hardware.power.statecontrol/cpp/wire.h>
 #include <fidl/fuchsia.io/cpp/wire.h>
 #include <fidl/fuchsia.power.system/cpp/wire.h>
 #include <fidl/fuchsia.process.lifecycle/cpp/wire.h>
 #include <fidl/fuchsia.sys2/cpp/wire.h>
+#include <fidl/fuchsia.system.state/cpp/wire.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/component/incoming/cpp/protocol.h>
@@ -59,15 +59,15 @@ enum class ShutdownControlLevel : uint8_t {
 };
 
 class SystemStateTransitionServer final
-    : public fidl::WireServer<fuchsia_device_manager::SystemStateTransition> {
+    : public fidl::WireServer<fuchsia_system_state::SystemStateTransition> {
  public:
   SystemStateTransitionServer() = default;
 
-  // fuchsia.device.manager/SystemStateTransition APIs.
+  // fuchsia.system.state/SystemStateTransition APIs.
   void GetTerminationSystemState(GetTerminationSystemStateCompleter::Sync& completer) override;
   void GetMexecZbis(GetMexecZbisCompleter::Sync& completer) override;
 
-  void set_system_power_state(fuchsia_device_manager::SystemPowerState system_power_state) {
+  void set_system_power_state(fuchsia_system_state::SystemPowerState system_power_state) {
     fbl::AutoLock al(&lock_);
     system_power_state_ = system_power_state;
   }
@@ -84,8 +84,8 @@ class SystemStateTransitionServer final
 
  private:
   fbl::Mutex lock_;
-  fuchsia_device_manager::SystemPowerState system_power_state_ __TA_GUARDED(&lock_) =
-      fuchsia_device_manager::SystemPowerState::kFullyOn;
+  fuchsia_system_state::SystemPowerState system_power_state_ __TA_GUARDED(&lock_) =
+      fuchsia_system_state::SystemPowerState::kFullyOn;
   zx::vmo mexec_kernel_zbi_ __TA_GUARDED(&lock_);
   zx::vmo mexec_data_zbi_ __TA_GUARDED(&lock_);
 };
@@ -206,7 +206,7 @@ void shutdown_timer() {
 // behavior and then instructing component_manager to perform an orderly
 // shutdown of components. If the orderly shutdown takes too long the shim will
 // exit with a non-zero exit code, killing the root job.
-void drive_shutdown_manually(fuchsia_device_manager::SystemPowerState state) {
+void drive_shutdown_manually(fuchsia_system_state::SystemPowerState state) {
   fprintf(stderr, "[shutdown-shim]: driving shutdown manually\n");
 
   // Start a new thread that makes us exit uncleanly after a timeout. This will
@@ -229,11 +229,11 @@ void drive_shutdown_manually(fuchsia_device_manager::SystemPowerState state) {
 }
 
 zx_status_t send_command(fidl::WireSyncClient<statecontrol_fidl::Admin> statecontrol_client,
-                         fuchsia_device_manager::SystemPowerState fallback_state,
+                         fuchsia_system_state::SystemPowerState fallback_state,
                          const statecontrol_fidl::wire::RebootReason* reboot_reason = nullptr,
                          StateControlAdminServer::MexecRequestView* mexec_request = nullptr) {
   switch (fallback_state) {
-    case fuchsia_device_manager::SystemPowerState::kReboot: {
+    case fuchsia_system_state::SystemPowerState::kReboot: {
       if (reboot_reason == nullptr) {
         fprintf(stderr, "[shutdown-shim]: internal error, bad pointer to reason for reboot\n");
         return ZX_ERR_INTERNAL;
@@ -248,7 +248,7 @@ zx_status_t send_command(fidl::WireSyncClient<statecontrol_fidl::Admin> statecon
       return ZX_OK;
 
     } break;
-    case fuchsia_device_manager::SystemPowerState::kRebootKernelInitiated: {
+    case fuchsia_system_state::SystemPowerState::kRebootKernelInitiated: {
       auto resp = statecontrol_client->Reboot(*reboot_reason);
       if (resp.status() != ZX_OK) {
         return ZX_ERR_UNAVAILABLE;
@@ -259,7 +259,7 @@ zx_status_t send_command(fidl::WireSyncClient<statecontrol_fidl::Admin> statecon
       return ZX_OK;
 
     } break;
-    case fuchsia_device_manager::SystemPowerState::kRebootBootloader: {
+    case fuchsia_system_state::SystemPowerState::kRebootBootloader: {
       auto resp = statecontrol_client->RebootToBootloader();
       if (resp.status() != ZX_OK) {
         return ZX_ERR_UNAVAILABLE;
@@ -270,7 +270,7 @@ zx_status_t send_command(fidl::WireSyncClient<statecontrol_fidl::Admin> statecon
       return ZX_OK;
 
     } break;
-    case fuchsia_device_manager::SystemPowerState::kRebootRecovery: {
+    case fuchsia_system_state::SystemPowerState::kRebootRecovery: {
       auto resp = statecontrol_client->RebootToRecovery();
       if (resp.status() != ZX_OK) {
         return ZX_ERR_UNAVAILABLE;
@@ -281,7 +281,7 @@ zx_status_t send_command(fidl::WireSyncClient<statecontrol_fidl::Admin> statecon
       return ZX_OK;
 
     } break;
-    case fuchsia_device_manager::SystemPowerState::kPoweroff: {
+    case fuchsia_system_state::SystemPowerState::kPoweroff: {
       auto resp = statecontrol_client->Poweroff();
       if (resp.status() != ZX_OK) {
         return ZX_ERR_UNAVAILABLE;
@@ -292,7 +292,7 @@ zx_status_t send_command(fidl::WireSyncClient<statecontrol_fidl::Admin> statecon
       return ZX_OK;
 
     } break;
-    case fuchsia_device_manager::SystemPowerState::kMexec: {
+    case fuchsia_system_state::SystemPowerState::kMexec: {
       if (mexec_request == nullptr) {
         fprintf(stderr, "[shutdown-shim]: internal error, bad pointer to reason for mexec\n");
         return ZX_ERR_INTERNAL;
@@ -308,7 +308,7 @@ zx_status_t send_command(fidl::WireSyncClient<statecontrol_fidl::Admin> statecon
       return ZX_OK;
 
     } break;
-    case fuchsia_device_manager::SystemPowerState::kSuspendRam: {
+    case fuchsia_system_state::SystemPowerState::kSuspendRam: {
       auto resp = statecontrol_client->SuspendToRam();
       if (resp.status() != ZX_OK) {
         return ZX_ERR_UNAVAILABLE;
@@ -328,7 +328,7 @@ zx_status_t send_command(fidl::WireSyncClient<statecontrol_fidl::Admin> statecon
 // function is expected to return an error if there was a transport-related
 // issue talking to power_manager, in which case this program will talk to
 // driver_manager and component_manager to drive shutdown manually.
-zx_status_t forward_command(fuchsia_device_manager::SystemPowerState fallback_state,
+zx_status_t forward_command(fuchsia_system_state::SystemPowerState fallback_state,
                             const statecontrol_fidl::wire::RebootReason* reboot_reason = nullptr) {
   zx::result local = connect_to_protocol_with_timeout<statecontrol_fidl::Admin>();
   if (local.is_ok()) {
@@ -341,7 +341,7 @@ zx_status_t forward_command(fuchsia_device_manager::SystemPowerState fallback_st
     }
     // Power manager may decide not to support suspend. We should respect that and not attempt to
     // suspend manually.
-    if (fallback_state == fuchsia_device_manager::SystemPowerState::kSuspendRam) {
+    if (fallback_state == fuchsia_system_state::SystemPowerState::kSuspendRam) {
       return status;
     }
   }
@@ -363,10 +363,10 @@ void StateControlAdminServer::PowerFullyOn(PowerFullyOnCompleter::Sync& complete
 
 void StateControlAdminServer::Reboot(RebootRequestView request, RebootCompleter::Sync& completer) {
   [[maybe_unused]] auto reboot_control_lease = AcquireShutdownControlLease();
-  fuchsia_device_manager::SystemPowerState target_state =
-      fuchsia_device_manager::SystemPowerState::kReboot;
+  fuchsia_system_state::SystemPowerState target_state =
+      fuchsia_system_state::SystemPowerState::kReboot;
   if (request->reason == statecontrol_fidl::wire::RebootReason::kOutOfMemory) {
-    target_state = fuchsia_device_manager::SystemPowerState::kRebootKernelInitiated;
+    target_state = fuchsia_system_state::SystemPowerState::kRebootKernelInitiated;
   }
   system_state_transition_server_.set_system_power_state(target_state);
   zx_status_t status = forward_command(target_state, &request->reason);
@@ -380,8 +380,8 @@ void StateControlAdminServer::Reboot(RebootRequestView request, RebootCompleter:
 void StateControlAdminServer::RebootToBootloader(RebootToBootloaderCompleter::Sync& completer) {
   [[maybe_unused]] auto reboot_control_lease = AcquireShutdownControlLease();
   system_state_transition_server_.set_system_power_state(
-      fuchsia_device_manager::SystemPowerState::kRebootBootloader);
-  zx_status_t status = forward_command(fuchsia_device_manager::SystemPowerState::kRebootBootloader);
+      fuchsia_system_state::SystemPowerState::kRebootBootloader);
+  zx_status_t status = forward_command(fuchsia_system_state::SystemPowerState::kRebootBootloader);
   if (status == ZX_OK) {
     completer.ReplySuccess();
   } else {
@@ -392,8 +392,8 @@ void StateControlAdminServer::RebootToBootloader(RebootToBootloaderCompleter::Sy
 void StateControlAdminServer::RebootToRecovery(RebootToRecoveryCompleter::Sync& completer) {
   [[maybe_unused]] auto reboot_control_lease = AcquireShutdownControlLease();
   system_state_transition_server_.set_system_power_state(
-      fuchsia_device_manager::SystemPowerState::kRebootRecovery);
-  zx_status_t status = forward_command(fuchsia_device_manager::SystemPowerState::kRebootRecovery);
+      fuchsia_system_state::SystemPowerState::kRebootRecovery);
+  zx_status_t status = forward_command(fuchsia_system_state::SystemPowerState::kRebootRecovery);
   if (status == ZX_OK) {
     completer.ReplySuccess();
   } else {
@@ -404,8 +404,8 @@ void StateControlAdminServer::RebootToRecovery(RebootToRecoveryCompleter::Sync& 
 void StateControlAdminServer::Poweroff(PoweroffCompleter::Sync& completer) {
   [[maybe_unused]] auto reboot_control_lease = AcquireShutdownControlLease();
   system_state_transition_server_.set_system_power_state(
-      fuchsia_device_manager::SystemPowerState::kPoweroff);
-  zx_status_t status = forward_command(fuchsia_device_manager::SystemPowerState::kPoweroff);
+      fuchsia_system_state::SystemPowerState::kPoweroff);
+  zx_status_t status = forward_command(fuchsia_system_state::SystemPowerState::kPoweroff);
   if (status == ZX_OK) {
     completer.ReplySuccess();
   } else {
@@ -430,7 +430,7 @@ void StateControlAdminServer::Mexec(MexecRequestView request, MexecCompleter::Sy
   }
 
   system_state_transition_server_.set_system_power_state(
-      fuchsia_device_manager::SystemPowerState::kMexec);
+      fuchsia_system_state::SystemPowerState::kMexec);
   system_state_transition_server_.set_mexec_kernel_zbi(std::move(kernel_zbi));
   system_state_transition_server_.set_mexec_data_zbi(std::move(data_zbi));
 
@@ -439,7 +439,7 @@ void StateControlAdminServer::Mexec(MexecRequestView request, MexecCompleter::Sy
     fprintf(stderr, "[shutdown-shim]: trying to forward Mexec command\n");
     zx_status_t status =
         send_command(fidl::WireSyncClient(std::move(local.value())),
-                     fuchsia_device_manager::SystemPowerState::kMexec, nullptr, &request);
+                     fuchsia_system_state::SystemPowerState::kMexec, nullptr, &request);
     if (status == ZX_OK) {
       completer.ReplySuccess();
       return;
@@ -454,7 +454,7 @@ void StateControlAdminServer::Mexec(MexecRequestView request, MexecCompleter::Sy
   fprintf(stderr, "[shutdown-shim]: failed to forward command to power_manager: %s\n",
           local.status_string());
 
-  drive_shutdown_manually(fuchsia_device_manager::SystemPowerState::kMexec);
+  drive_shutdown_manually(fuchsia_system_state::SystemPowerState::kMexec);
 
   // We should block on fuchsia.sys.SystemController forever on this thread, if
   // it returns something has gone wrong.
@@ -464,8 +464,8 @@ void StateControlAdminServer::Mexec(MexecRequestView request, MexecCompleter::Sy
 
 void StateControlAdminServer::SuspendToRam(SuspendToRamCompleter::Sync& completer) {
   system_state_transition_server_.set_system_power_state(
-      fuchsia_device_manager::SystemPowerState::kSuspendRam);
-  zx_status_t status = forward_command(fuchsia_device_manager::SystemPowerState::kSuspendRam);
+      fuchsia_system_state::SystemPowerState::kSuspendRam);
+  zx_status_t status = forward_command(fuchsia_system_state::SystemPowerState::kSuspendRam);
   if (status == ZX_OK) {
     completer.ReplySuccess();
   } else {
@@ -500,7 +500,7 @@ void SystemStateTransitionServer::GetTerminationSystemState(
 }
 void SystemStateTransitionServer::GetMexecZbis(GetMexecZbisCompleter::Sync& completer) {
   fbl::AutoLock al(&lock_);
-  if (system_power_state_ != fuchsia_device_manager::SystemPowerState::kMexec) {
+  if (system_power_state_ != fuchsia_system_state::SystemPowerState::kMexec) {
     return completer.ReplyError(ZX_ERR_BAD_STATE);
   }
   completer.ReplySuccess(std::move(mexec_kernel_zbi_), std::move(mexec_data_zbi_));
@@ -512,7 +512,7 @@ zx_status_t StateControlAdminServer::ExportServices(fbl::RefPtr<fs::PseudoDir>& 
       svc_dir->AddEntry(fidl::DiscoverableProtocolName<statecontrol_fidl::Admin>,
                         fbl::MakeRefCounted<fs::Service>(
                             // `fuchsia.hardware.power.statecontrol.Admin| must run on a separate
-                            // thread from `fuchsia.device.manager.SystemStateTransition` as the
+                            // thread from `fuchsia.system.state.SystemStateTransition` as the
                             // latter has to serve requests while the former makes blocking calls.
                             // Notice the different dispatcher specified here vs below.
                             [dispatcher = loop_.dispatcher(),
@@ -524,11 +524,11 @@ zx_status_t StateControlAdminServer::ExportServices(fbl::RefPtr<fs::PseudoDir>& 
     return status;
   }
   return svc_dir->AddEntry(
-      fidl::DiscoverableProtocolName<fuchsia_device_manager::SystemStateTransition>,
+      fidl::DiscoverableProtocolName<fuchsia_system_state::SystemStateTransition>,
       fbl::MakeRefCounted<fs::Service>(
           // See above comment about how this must run on a separate thread from the other service.
-          [dispatcher, this](
-              fidl::ServerEnd<fuchsia_device_manager::SystemStateTransition> server_end) mutable {
+          [dispatcher,
+           this](fidl::ServerEnd<fuchsia_system_state::SystemStateTransition> server_end) mutable {
             fidl::BindServer(dispatcher, std::move(server_end), &system_state_transition_server_);
             return ZX_OK;
           }));

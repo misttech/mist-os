@@ -9,7 +9,7 @@ use crate::mocks::activity_service::MockActivityService;
 use crate::mocks::input_settings_service::MockInputSettingsService;
 use crate::mocks::kernel_service::MockKernelService;
 use crate::mocks::system_controller::MockSystemControllerService;
-use fidl::endpoints::{DiscoverableProtocolMarker, ProtocolMarker, ServiceMarker};
+use fidl::endpoints::{DiscoverableProtocolMarker, ProtocolMarker};
 use fidl::AsHandleRef as _;
 use fuchsia_component_test::{
     Capability, ChildOptions, RealmBuilder, RealmBuilderParams, RealmInstance, Ref, Route,
@@ -75,7 +75,11 @@ impl TestEnvBuilder {
 
         realm_builder.driver_test_realm_setup().await.expect("Failed to setup driver test realm");
 
-        realm_builder.driver_test_realm_add_expose::<fcpu_ctrl::ServiceMarker>().await.unwrap();
+        let expose =
+            fuchsia_component_test::Capability::service::<fcpu_ctrl::ServiceMarker>().into();
+        let dtr_exposes = vec![expose];
+
+        realm_builder.driver_test_realm_add_dtr_exposes(&dtr_exposes).await.unwrap();
 
         let power_manager = realm_builder
             .add_child("power_manager", POWER_MANAGER_URL, ChildOptions::new())
@@ -364,13 +368,9 @@ impl TestEnvBuilder {
         let realm_instance = realm_builder.build().await.expect("Failed to build RealmInstance");
 
         // Start driver test realm
-        let exposes = vec![fdt::Expose {
-            service_name: fcpu_ctrl::ServiceMarker::SERVICE_NAME.to_string(),
-            collection: fdt::Collection::PackageDrivers,
-        }];
         let args = fdt::RealmArgs {
             root_driver: Some("#meta/root.cm".to_string()),
-            exposes: Some(exposes),
+            dtr_exposes: Some(dtr_exposes),
             ..Default::default()
         };
 

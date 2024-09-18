@@ -6,10 +6,9 @@ use anyhow::Error;
 use fidl::endpoints::{ControlHandle, RequestStream};
 use fuchsia_component::client::connect_to_protocol_sync;
 use fuchsia_component::server::ServiceFs;
-use fuchsia_sync::Mutex;
 use futures::{StreamExt, TryStreamExt};
 use kernel_manager::kernels::Kernels;
-use kernel_manager::serve_starnix_manager;
+use kernel_manager::{serve_starnix_manager, SuspendContext};
 use std::sync::Arc;
 use tracing::{info, warn};
 use {
@@ -51,14 +50,14 @@ async fn main() -> Result<(), Error> {
     fs.dir("svc").add_fidl_service(Services::StarnixManager);
     fs.dir("svc").add_fidl_service(Services::AttributionProvider);
     fs.take_and_serve_directory_handle()?;
-    let suspended_processes = Arc::new(Mutex::new(vec![]));
+    let suspend_context = Arc::new(SuspendContext::default());
     fs.for_each_concurrent(None, |request: Services| async {
         match request {
             Services::ComponentRunner(stream) => serve_component_runner(stream, &kernels)
                 .await
                 .expect("failed to start component runner"),
             Services::StarnixManager(stream) => {
-                serve_starnix_manager(stream, suspended_processes.clone(), &kernels)
+                serve_starnix_manager(stream, suspend_context.clone(), &kernels)
                     .await
                     .expect("failed to serve starnix manager")
             }

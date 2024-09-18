@@ -27,6 +27,9 @@ executable("bin") {
   ]
   deps = [
     ":fuchsia.runtime.microbenchmarks_cpp",
+    "//sdk/lib/async:async-cpp",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/driver/runtime:driver_runtime_cpp",
     "//sdk/lib/driver/runtime:driver_runtime_env",
     "//sdk/lib/driver/runtime:driver_runtime_env_cpp",
@@ -35,9 +38,6 @@ executable("bin") {
     "//sdk/lib/syslog/cpp",
     "//src/devices/bin/driver_runtime:driver_runtime_impl",
     "//src/devices/lib/driver:driver_runtime",
-    "//zircon/system/ulib/async:async-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/sync",
     "//zircon/system/ulib/sync:sync-cpp",

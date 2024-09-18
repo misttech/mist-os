@@ -7,6 +7,7 @@
 #include <lib/component/incoming/cpp/protocol.h>
 #include <lib/device-watcher/cpp/device-watcher.h>
 
+#include <bind/fuchsia/platform/cpp/bind.h>
 #include <fbl/unique_fd.h>
 #include <zxtest/zxtest.h>
 
@@ -70,16 +71,23 @@ zx_status_t SetupDriverTestRealm() {
 
   // Start the DriverTestRealm with correct arguments.
   fidl::Arena arena;
-  fuchsia_driver_test::wire::RealmArgs realm_args(arena);
-  realm_args.set_root_driver(arena, "fuchsia-boot:///platform-bus#meta/platform-bus.cm");
-  auto wire_result = client->Start(realm_args);
-  if (!wire_result.ok()) {
-    fprintf(stderr, "Failed to call to Realm:Start: %d", wire_result.status());
-    return wire_result.status();
+  const fidl::WireResult result =
+      client->Start(fuchsia_driver_test::wire::RealmArgs::Builder(arena)
+                        .root_driver("fuchsia-boot:///platform-bus#meta/platform-bus.cm")
+                        .software_devices(std::vector{
+                            fuchsia_driver_test::wire::SoftwareDevice{
+                                .device_name = "ram-nand",
+                                .device_id = bind_fuchsia_platform::BIND_PLATFORM_DEV_DID_RAM_NAND,
+                            },
+                        })
+                        .Build());
+  if (!result.ok()) {
+    fprintf(stderr, "Failed to call to Realm:Start: %d", result.status());
+    return result.status();
   }
-  if (wire_result->is_error()) {
-    fprintf(stderr, "Realm:Start failed: %d", wire_result->error_value());
-    return wire_result->error_value();
+  if (result->is_error()) {
+    fprintf(stderr, "Realm:Start failed: %d", result->error_value());
+    return result->error_value();
   }
 
   return device_watcher::RecursiveWaitForFile(ramdevice_client::RamNand::kBasePath).status_value();

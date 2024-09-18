@@ -17,7 +17,7 @@
 
 namespace {
 
-const std::vector<const char *> s_required_props = {
+const std::vector<const char *> s_required_surface_props = {
     VK_KHR_SURFACE_EXTENSION_NAME,
 #ifdef __Fuchsia__
     VK_FUCHSIA_IMAGEPIPE_SURFACE_EXTENSION_NAME,
@@ -33,7 +33,7 @@ void PrintProps(const std::vector<const char *> &props, const char *msg) {
 }
 
 #if USE_GLFW
-std::vector<const char *> GetExtensionsGLFW() {
+std::vector<const char *> GetSurfaceExtensionsGLFW() {
   uint32_t num_extensions = 0;
 
 #if __linux__
@@ -57,7 +57,7 @@ std::vector<const char *> GetExtensionsGLFW() {
   return extensions;
 }
 #else
-std::vector<const char *> GetExtensionsPrivate() {
+std::vector<const char *> GetSurfaceExtensionsPrivate() {
   std::vector<const char *> extensions;
 #ifdef __Fuchsia__
   const char *kMagmaLayer = "VK_LAYER_FUCHSIA_imagepipe_swapchain_fb";
@@ -65,9 +65,9 @@ std::vector<const char *> GetExtensionsPrivate() {
   const char *kMagmaLayer = nullptr;
 #endif
 
-  std::vector<const char *> required_props = s_required_props;
+  std::vector<const char *> required_props = s_required_surface_props;
 
-  if (FindRequiredProperties(s_required_props, vkp::INSTANCE_EXT_PROP, kMagmaLayer)) {
+  if (FindRequiredProperties(s_required_surface_props, vkp::INSTANCE_EXT_PROP, kMagmaLayer)) {
     extensions.insert(extensions.end(), required_props.begin(), required_props.end());
   }
 
@@ -75,12 +75,12 @@ std::vector<const char *> GetExtensionsPrivate() {
 }
 #endif
 
-void AddRequiredExtensions(std::vector<const char *> *extensions) {
+void AddRequiredSurfaceExtensions(std::vector<const char *> *extensions) {
   std::vector<const char *> required_extensions;
 #if USE_GLFW
-  required_extensions = GetExtensionsGLFW();
+  required_extensions = GetSurfaceExtensionsGLFW();
 #else
-  required_extensions = GetExtensionsPrivate();
+  required_extensions = GetSurfaceExtensionsPrivate();
 #endif
 
   if (!required_extensions.empty())
@@ -121,7 +121,9 @@ bool Instance::Init() {
   RTN_IF_MSG(false, (initialized_ == true), "Already initialized.\n");
 
   // Extensions
-  AddRequiredExtensions(&extensions_);
+  if (swapchain_enabled_) {
+    AddRequiredSurfaceExtensions(&extensions_);
+  }
 
   if (validation_layers_enabled_) {
     extensions_.emplace_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);

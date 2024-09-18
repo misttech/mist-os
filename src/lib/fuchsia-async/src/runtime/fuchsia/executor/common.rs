@@ -167,7 +167,7 @@ impl Executor {
         let next_id = self.task_count.fetch_add(1, Ordering::Relaxed);
         let task = {
             let task = Task::new(next_id, scope.clone(), future);
-            if !scope.lock().insert_task(next_id, task.clone()) {
+            if !scope.insert_task(next_id, task.clone()) {
                 return usize::MAX;
             }
             task
@@ -200,7 +200,7 @@ impl Executor {
     pub fn spawn_main(self: &Arc<Self>, root_scope: &ScopeRef, future: AtomicFuture<'static>) {
         let task = Task::new(MAIN_TASK_ID, root_scope.clone(), future);
         self.collector.task_created(MAIN_TASK_ID, task.source());
-        if !root_scope.lock().insert_task(MAIN_TASK_ID, task.clone()) {
+        if !root_scope.insert_task(MAIN_TASK_ID, task.clone()) {
             panic!("Could not spawn main task");
         }
         task.wake();
@@ -534,16 +534,7 @@ impl Executor {
     ///
     /// The caller must guarantee that the executor isn't running.
     pub(super) unsafe fn drop_main_task(&self, root_scope: &ScopeRef) {
-        let mut root_scope = root_scope.lock();
-        let (task, scope_waker) = root_scope.take_task(MAIN_TASK_ID);
-        if let Some(task) = task {
-            // Even though we've removed the task from active tasks, it could still be in
-            // pending_tasks, so we have to drop the future here. At time of writing, this is only
-            // used by the local executor and there could only be something in ready_tasks if
-            // there's a panic.
-            task.future.drop_future_unchecked();
-        }
-        scope_waker.wake_and_release(root_scope);
+        root_scope.drop_task_unchecked(MAIN_TASK_ID);
     }
 
     fn try_poll(&self, task: &Arc<Task>) -> bool {
@@ -557,8 +548,7 @@ impl Executor {
                 false
             }
             AttemptPollResult::IFinished | AttemptPollResult::Cancelled => {
-                let mut scope = task.scope.lock();
-                scope.task_did_finish(task.id).wake_and_release(scope);
+                task.scope.task_did_finish(task.id);
                 true
             }
             _ => false,
@@ -773,198 +763,5 @@ fn waker_drop(weak_raw: *const ()) {
     // SAFETY: `weak_raw` comes from a previous call to `into_raw`.
     unsafe {
         Weak::from_raw(weak_raw as *const Task);
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::{EHandle, LocalExecutor, SendExecutor, Task, Timer};
-    use fuchsia_sync::{Condvar, Mutex};
-    use std::future::{poll_fn, Future as _};
-    use std::sync::atomic::{AtomicU32, Ordering};
-    use std::sync::Arc;
-    use std::task::{Context, Poll};
-
-    async fn yield_to_executor() {
-        let mut done = false;
-        poll_fn(|cx| {
-            if done {
-                Poll::Ready(())
-            } else {
-                done = true;
-                cx.waker().wake_by_ref();
-                Poll::Pending
-            }
-        })
-        .await;
-    }
-
-    #[test]
-    fn test_detach() {
-        let mut e = LocalExecutor::new();
-        e.run_singlethreaded(async {
-            let counter = Arc::new(AtomicU32::new(0));
-
-            {
-                let counter = counter.clone();
-                Task::spawn(async move {
-                    for _ in 0..5 {
-                        yield_to_executor().await;
-                        counter.fetch_add(1, Ordering::Relaxed);
-                    }
-                })
-                .detach();
-            }
-
-            while counter.load(Ordering::Relaxed) != 5 {
-                yield_to_executor().await;
-            }
-        });
-
-        assert!(e.ehandle.root_scope.lock().join_results.is_empty());
-    }
-
-    #[test]
-    fn test_cancel() {
-        let mut e = LocalExecutor::new();
-        e.run_singlethreaded(async {
-            let ref_count = Arc::new(());
-            // First, just drop the task.
-            {
-                let ref_count = ref_count.clone();
-                let _ = Task::spawn(async move {
-                    let _ref_count = ref_count;
-                    let _: () = std::future::pending().await;
-                });
-            }
-
-            while Arc::strong_count(&ref_count) != 1 {
-                yield_to_executor().await;
-            }
-
-            // Now try explicitly cancelling.
-            let task = {
-                let ref_count = ref_count.clone();
-                Task::spawn(async move {
-                    let _ref_count = ref_count;
-                    let _: () = std::future::pending().await;
-                })
-            };
-
-            assert_eq!(task.cancel().await, None);
-            while Arc::strong_count(&ref_count) != 1 {
-                yield_to_executor().await;
-            }
-
-            // Now cancel a task that has already finished.
-            let task = {
-                let ref_count = ref_count.clone();
-                Task::spawn(async move {
-                    let _ref_count = ref_count;
-                })
-            };
-
-            // Wait for it to finish.
-            while Arc::strong_count(&ref_count) != 1 {
-                yield_to_executor().await;
-            }
-
-            assert_eq!(task.cancel().await, Some(()));
-        });
-
-        assert!(e.ehandle.root_scope.lock().join_results.is_empty());
-    }
-
-    #[test]
-    fn test_cancel_waits() {
-        let mut executor = SendExecutor::new(2);
-        let running = Arc::new((Mutex::new(false), Condvar::new()));
-        let task = {
-            let running = running.clone();
-            executor.root_scope().spawn(async move {
-                *running.0.lock() = true;
-                running.1.notify_all();
-                std::thread::sleep(std::time::Duration::from_millis(10));
-                *running.0.lock() = false;
-                "foo"
-            })
-        };
-        executor.run(async move {
-            {
-                let mut guard = running.0.lock();
-                while !*guard {
-                    running.1.wait(&mut guard);
-                }
-            }
-            assert_eq!(task.cancel().await, Some("foo"));
-            assert!(!*running.0.lock());
-        });
-    }
-
-    fn test_clean_up(callback: impl FnOnce(Task<()>) + Send + 'static) {
-        let mut executor = SendExecutor::new(2);
-        let running = Arc::new((Mutex::new(false), Condvar::new()));
-        let can_quit = Arc::new((Mutex::new(false), Condvar::new()));
-        let task = {
-            let running = running.clone();
-            let can_quit = can_quit.clone();
-            executor.root_scope().spawn(async move {
-                *running.0.lock() = true;
-                running.1.notify_all();
-                {
-                    let mut guard = can_quit.0.lock();
-                    while !*guard {
-                        can_quit.1.wait(&mut guard);
-                    }
-                }
-                *running.0.lock() = false;
-            })
-        };
-        executor.run(async move {
-            {
-                let mut guard = running.0.lock();
-                while !*guard {
-                    running.1.wait(&mut guard);
-                }
-            }
-
-            callback(task);
-
-            *can_quit.0.lock() = true;
-            can_quit.1.notify_all();
-
-            let ehandle = EHandle::local();
-            let scope = ehandle.root_scope();
-
-            // The only way of testing for this is to poll.
-            while scope.lock().all_tasks().len() > 1 || scope.lock().join_results.len() > 0 {
-                Timer::new(std::time::Duration::from_millis(1)).await;
-            }
-
-            assert!(!*running.0.lock());
-        });
-    }
-
-    #[test]
-    fn test_dropped_cancel_cleans_up() {
-        test_clean_up(|task| {
-            let cancel_fut = std::pin::pin!(task.cancel());
-            let waker = futures::task::noop_waker();
-            assert!(cancel_fut.poll(&mut Context::from_waker(&waker)).is_pending());
-        });
-    }
-
-    #[test]
-    fn test_dropped_task_cleans_up() {
-        test_clean_up(|task| {
-            std::mem::drop(task);
-        });
-    }
-
-    #[test]
-    fn test_detach_cleans_up() {
-        test_clean_up(|task| {
-            task.detach();
-        });
     }
 }

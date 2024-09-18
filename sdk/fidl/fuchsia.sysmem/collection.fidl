@@ -496,7 +496,7 @@ closed protocol BufferCollectionToken {
         group_request server_end:BufferCollectionTokenGroup;
     });
 };
-// LINT.ThenChange(//src/devices/sysmem/drivers/sysmem/combined_token.fidl)
+// LINT.ThenChange(//src/sysmem/drivers/sysmem/combined_token.fidl)
 
 /// BufferCollection is a connection directly from a participant to sysmem re.
 /// a logical BufferCollection; typically the logical BufferCollection is shared

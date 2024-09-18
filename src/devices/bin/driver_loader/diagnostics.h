@@ -9,8 +9,6 @@
 #include <lib/elfldltl/diagnostics.h>
 #include <lib/stdcompat/source_location.h>
 
-#include <sstream>
-
 #include "src/devices/lib/log/log.h"
 
 namespace driver_loader {

@@ -35,10 +35,10 @@ test("spmi-ctl-test-bin") {
   include_dirs = [ "." ]
   deps = [
     "//sdk/fidl/fuchsia.hardware.spmi:fuchsia.hardware.spmi_cpp",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/device-watcher/cpp",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/zx",
     "//zircon/system/ulib/zxtest",
   ]

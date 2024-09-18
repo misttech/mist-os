@@ -11,6 +11,7 @@
 #include <poll.h>
 #include <sys/ioctl.h>
 #include <sys/socket.h>
+#include <sys/un.h>
 #include <unistd.h>
 
 #include <array>
@@ -49,6 +50,41 @@ std::thread send_thread(const fbl::unique_fd& fd) {
     EXPECT_EQ(send(fd.get(), buf.data(), buf.size(), kSendFlags), -1);
     EXPECT_EQ(errno, EPIPE) << strerror(errno);
   });
+}
+
+TEST_P(SocketPair, GetSockOpt) {
+  int optval;
+  socklen_t optlen = sizeof(optval);
+
+  ASSERT_EQ(getsockopt(fds()[0].get(), SOL_SOCKET, SO_DOMAIN, &optval, &optlen), 0);
+  ASSERT_EQ(optval, AF_UNIX);
+
+  ASSERT_EQ(getsockopt(fds()[0].get(), SOL_SOCKET, SO_TYPE, &optval, &optlen), 0);
+  ASSERT_EQ(optval, GetParam());
+
+  ASSERT_EQ(getsockopt(fds()[0].get(), SOL_SOCKET, SO_PROTOCOL, &optval, &optlen), 0);
+  ASSERT_EQ(optval, 0);
+
+  struct linger linger_val;
+  linger_val.l_onoff = 42;
+  linger_val.l_linger = 4242;
+  optlen = sizeof(linger_val);
+  ASSERT_EQ(getsockopt(fds()[0].get(), SOL_SOCKET, SO_LINGER, &linger_val, &optlen), 0);
+  ASSERT_EQ(linger_val.l_onoff, 0);
+  ASSERT_EQ(linger_val.l_linger, 0);
+}
+
+TEST_P(SocketPair, GetPeerAndSockName) {
+  struct sockaddr_un addr;
+  socklen_t addrlen = sizeof(addr);
+  ASSERT_EQ(getsockname(fds()[0].get(), reinterpret_cast<struct sockaddr*>(&addr), &addrlen), 0);
+  ASSERT_EQ(addr.sun_family, AF_UNIX);
+  ASSERT_EQ(addrlen, sizeof(sa_family_t));
+
+  addrlen = sizeof(addr);
+  ASSERT_EQ(getpeername(fds()[0].get(), reinterpret_cast<struct sockaddr*>(&addr), &addrlen), 0);
+  ASSERT_EQ(addr.sun_family, AF_UNIX);
+  ASSERT_EQ(addrlen, sizeof(sa_family_t));
 }
 
 TEST_P(SocketPair, Control) {
@@ -506,6 +542,28 @@ TEST_P(SocketPair, SelfWriteBeforeSend) {
   std::thread t = send_thread(fds()[0]);
 
   t.join();
+}
+
+TEST_P(SocketPair, RecvMsgFlags) {
+  static const size_t page_size = sysconf(_SC_PAGE_SIZE);
+  char buffer[page_size];
+  write(fds()[1].get(), buffer, 1);
+
+  char data[page_size];
+  iovec iov = {.iov_base = buffer, .iov_len = page_size};
+  msghdr msg = {
+      .msg_name = nullptr,
+      .msg_namelen = 0,
+      .msg_iov = &iov,
+      .msg_iovlen = 1,
+      .msg_control = data,
+      .msg_controllen = static_cast<unsigned int>(page_size),
+      .msg_flags = 0,
+  };
+  int flags = MSG_TRUNC | MSG_CTRUNC | MSG_CMSG_CLOEXEC | MSG_NOSIGNAL;
+
+  ASSERT_EQ(recvmsg(fds()[0].get(), &msg, flags), 1);
+  ASSERT_EQ(CMSG_FIRSTHDR(&msg), nullptr);
 }
 
 TEST_P(SocketPair, PeerReadDuringSend) {

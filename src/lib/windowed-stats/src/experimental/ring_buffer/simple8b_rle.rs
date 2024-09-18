@@ -6,6 +6,8 @@ use byteorder::{LittleEndian, WriteBytesExt};
 use std::collections::VecDeque;
 use std::{io, iter};
 
+use crate::experimental::ring_buffer::zigzag_simple8b_rle::zigzag_decode;
+
 const SELECTORS_PER_BYTE: usize = 2;
 const BITS_PER_BYTE: usize = 8;
 const BITS_PER_SELECTOR: usize = BITS_PER_BYTE / SELECTORS_PER_BYTE;
@@ -119,13 +121,39 @@ const _: () = {
     );
 };
 
-#[derive(Clone, Copy, Debug)]
-struct Simple8bRleBlock {
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Simple8bRleBlock {
     pub selector: u8,
     pub data: u64,
 }
 
 impl Simple8bRleBlock {
+    /// Sum up all the values of this block, assuming that the block is a complete encoding.
+    /// If the sum would overflow, return `u64::MAX` instead.
+    pub fn saturating_sum(&self) -> u64 {
+        if self.selector == RLE_SELECTOR {
+            let value = self.data & RLE_DATA_BITMASK;
+            value.saturating_mul(self.num_values() as u64)
+        } else {
+            Simple8bIter::new(*self, self.num_values()).sum()
+        }
+    }
+
+    /// Sum up all the values of this block, assuming that the block is a complete encoding.
+    /// If the sum would overflow, return `i64::MIN` if negative or `i64::MAX` if positive.
+    pub fn saturating_sum_with_zigzag_decode(&self) -> i64 {
+        if self.selector == RLE_SELECTOR {
+            let value = zigzag_decode(self.data & RLE_DATA_BITMASK);
+            value.saturating_mul(self.num_values() as i64)
+        } else {
+            let mut sum = 0i64;
+            for item in Simple8bIter::new(*self, self.num_values()) {
+                sum += zigzag_decode(item);
+            }
+            sum
+        }
+    }
+
     /// Get the number of values encoded by this block, assuming that the block is a
     /// complete encoding.
     fn num_values(&self) -> usize {
@@ -174,7 +202,7 @@ pub struct Simple8bRleRingBuffer {
 }
 
 impl Simple8bRleRingBuffer {
-    /// Create a new Simple8bRleRingBuffer that holds at least |min_samples|
+    /// Create a new Simple8bRleRingBuffer that holds at least |min_samples|.
     /// The buffer would continually grow and only evict data if it wouldn't
     /// cause the number of samples to fall below |min_samples|.
     pub const fn with_min_samples(min_samples: usize) -> Self {
@@ -189,9 +217,10 @@ impl Simple8bRleRingBuffer {
 
     /// Serialize the Simple8bRleRingBuffer data into a bytes buffer.
     pub fn serialize(&self, buffer: &mut impl io::Write) -> io::Result<()> {
-        buffer.write_u16::<LittleEndian>(self.selectors.len() as u16)?;
-        buffer.write_u16::<LittleEndian>(self.selectors.head_index as u16)?;
-        buffer.write_u8(self.current_block_num_values as u8)?;
+        let metadata = self.metadata();
+        buffer.write_u16::<LittleEndian>(metadata.num_blocks)?;
+        buffer.write_u16::<LittleEndian>(metadata.selectors_head_index)?;
+        buffer.write_u8(metadata.last_block_num_values)?;
 
         for selector in self.selectors.iter() {
             buffer.write_u8(*selector)?;
@@ -202,7 +231,26 @@ impl Simple8bRleRingBuffer {
         Ok(())
     }
 
-    /// Push a new value onto the Simple8bRleRingBuffer.
+    pub(crate) fn metadata(&self) -> Simple8bRleBufferMetadata {
+        Simple8bRleBufferMetadata {
+            num_blocks: self.selectors.len() as u16,
+            selectors_head_index: self.selectors.head_index as u16,
+            last_block_num_values: self.current_block_num_values as u8,
+        }
+    }
+
+    pub(crate) fn serialize_data(&self, buffer: &mut impl io::Write) -> io::Result<()> {
+        for selector in self.selectors.iter() {
+            buffer.write_u8(*selector)?;
+        }
+        for value_block in &self.value_blocks {
+            buffer.write_u64::<LittleEndian>(*value_block)?;
+        }
+        Ok(())
+    }
+
+    /// Push a new value onto the Simple8bRleRingBuffer. Return the blocks that are
+    /// evicted.
     ///
     /// This method will first attempt to encode the value into the existing block.
     /// If that's not possible, new blocks would be created, and in the process, the
@@ -211,16 +259,18 @@ impl Simple8bRleRingBuffer {
     /// Note that because a block can hold an arbitrary amount of data points, and
     /// multiple blocks might be evicted, an arbitrary number of data points might
     /// be evicted due to this call.
-    pub fn push(&mut self, value: u64) {
+    pub fn push(&mut self, value: u64) -> Vec<Simple8bRleBlock> {
         self.num_samples += 1;
-        self.push_back(value);
+        let mut evicted_blocks = vec![];
+        self.push_back(value, &mut evicted_blocks);
+        evicted_blocks
     }
 
-    fn push_back(&mut self, value: u64) {
+    fn push_back(&mut self, value: u64, evicted_blocks: &mut Vec<Simple8bRleBlock>) {
         let current_block = match self.back() {
             Some(block) => block,
             _ => {
-                self.push_value_onto_new_block(value);
+                self.push_value_onto_new_block(value, evicted_blocks);
                 return;
             }
         };
@@ -327,9 +377,9 @@ impl Simple8bRleRingBuffer {
                 // new block, in which case another block may be created in the recursion.
                 let mut remaining_values = remaining_values.chain(iter::once(value));
                 // Safe to unwrap because we just pushed one value in `remaining_values`
-                self.push_value_onto_new_block(remaining_values.next().unwrap());
+                self.push_value_onto_new_block(remaining_values.next().unwrap(), evicted_blocks);
                 while let Some(v) = remaining_values.next() {
-                    self.push_back(v);
+                    self.push_back(v, evicted_blocks);
                 }
                 return;
             }
@@ -337,7 +387,7 @@ impl Simple8bRleRingBuffer {
 
         // Fall off case: we cannot fit the new value into the existing block, and the existing
         // block is already complete, so we just need to put the new value into a new block.
-        self.push_value_onto_new_block(value);
+        self.push_value_onto_new_block(value, evicted_blocks);
     }
 
     fn front(&self) -> Option<Simple8bRleBlock> {
@@ -354,7 +404,11 @@ impl Simple8bRleRingBuffer {
             .map(|(selector, data)| Simple8bRleBlock { selector, data: *data })
     }
 
-    fn push_value_onto_new_block(&mut self, value: u64) {
+    fn push_value_onto_new_block(
+        &mut self,
+        value: u64,
+        evicted_blocks: &mut Vec<Simple8bRleBlock>,
+    ) {
         self.current_block_num_values = 1;
         let bits_needed = repr_bits_needed(value);
         let new_block = if bits_needed as u64 <= RLE_DATA_NUM_BITS {
@@ -364,16 +418,19 @@ impl Simple8bRleRingBuffer {
         };
         self.push_block(new_block);
 
-        // Evict the oldest block if we still have at least `min_samples` by doing so
+        // Evict the oldest blocks if we still have at least `min_samples` by doing so
         // and if there are more than one block.
-        if self.value_blocks.len() > 1 {
-            if let Some(block) = self.front() {
-                if self.num_samples - block.num_values() >= self.min_samples {
-                    self.selectors.pop_front();
-                    self.value_blocks.pop_front();
-                    self.num_samples -= block.num_values();
-                }
+        while self.value_blocks.len() > 1 {
+            let Some(block) = self.front() else { break };
+            if self.num_samples - block.num_values() < self.min_samples {
+                break;
             }
+            let selector = self.selectors.pop_front();
+            let value_block = self.value_blocks.pop_front();
+            if let (Some(selector), Some(value_block)) = (selector, value_block) {
+                evicted_blocks.push(Simple8bRleBlock { selector, data: value_block })
+            }
+            self.num_samples -= block.num_values();
         }
     }
 
@@ -390,6 +447,12 @@ impl Simple8bRleRingBuffer {
         self.value_blocks.pop_back();
         self.push_block(block);
     }
+}
+
+pub struct Simple8bRleBufferMetadata {
+    pub num_blocks: u16,
+    pub selectors_head_index: u16,
+    pub last_block_num_values: u8,
 }
 
 /// Choose a simple8b selector that can encode the most values with the needed required of bits
@@ -533,8 +596,8 @@ mod tests {
     #[test]
     fn test_ring_buffer_rotates_out_old_values() {
         let mut ring_buffer = Simple8bRleRingBuffer::with_min_samples(2);
-        ring_buffer.push(u64::MAX);
-        ring_buffer.push(u64::MAX - 1);
+        assert_eq!(ring_buffer.push(u64::MAX), vec![]);
+        assert_eq!(ring_buffer.push(u64::MAX - 1), vec![]);
 
         let mut buffer = vec![];
         ring_buffer.serialize(&mut buffer).expect("serialize should succeed");
@@ -548,7 +611,7 @@ mod tests {
         ];
         assert_eq!(&buffer[..], expected_bytes);
 
-        ring_buffer.push(1);
+        assert_eq!(ring_buffer.push(1), vec![Simple8bRleBlock { selector: 0xe, data: u64::MAX }],);
         let mut buffer = vec![];
         ring_buffer.serialize(&mut buffer).expect("serialize should succeed");
         let expected_bytes = &[
@@ -565,7 +628,10 @@ mod tests {
         ];
         assert_eq!(&buffer[..], expected_bytes);
 
-        ring_buffer.push(u64::MAX - 2);
+        assert_eq!(
+            ring_buffer.push(u64::MAX - 2),
+            vec![Simple8bRleBlock { selector: 0xe, data: u64::MAX - 1 }],
+        );
         let mut buffer = vec![];
         ring_buffer.serialize(&mut buffer).expect("serialize should succeed");
         let expected_bytes = &[

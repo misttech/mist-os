@@ -39,7 +39,7 @@ class NativeFakeDispatcher {
 
  private:
   // FakeAsyncLoop is an adapted version of the Zircon async-loop (implemented in
-  // zircon/system/ulib/async-loop/loop.c) for testing. It contains adapted copies of a subset of
+  // sdk/lib/async-loop/loop.c) for testing. It contains adapted copies of a subset of
   // the async-loop methods.
   //
   // In the method copies, 1) code interfacing with Zircon timers has been replaced with a simulated

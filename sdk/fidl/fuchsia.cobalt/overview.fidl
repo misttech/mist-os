@@ -32,5 +32,5 @@
 /// Events are accumulated by the cobalt FIDL service and periodically
 /// Observations, derived from the logged Events, are sent to the Cobalt server,
 /// where they are used to generate Reports.
-@available(added=7)
+@available(added=HEAD)
 library fuchsia.cobalt;

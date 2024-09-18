@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use anyhow::{anyhow, Error, Result};
-use fidl::endpoints::DiscoverableProtocolMarker;
 use fuchsia_component::server::ServiceFs;
 use fuchsia_component_test::{ChildOptions, LocalComponentHandles, RealmBuilder};
 use fuchsia_driver_test::{DriverTestRealmBuilder, DriverTestRealmInstance};
@@ -53,19 +52,18 @@ async fn test_compat_nodegroup() -> Result<()> {
             ChildOptions::new(),
         )
         .await?;
-    builder.driver_test_realm_add_offer::<fcdt::WaiterMarker>((&waiter).into()).await?;
+
+    let offer = fuchsia_component_test::Capability::protocol::<fcdt::WaiterMarker>().into();
+    let dtr_offers = vec![offer];
+
+    builder.driver_test_realm_add_dtr_offers(&dtr_offers, (&waiter).into()).await?;
 
     let instance = builder.build().await?;
-
-    let offers = vec![fdt::Offer {
-        protocol_name: fcdt::WaiterMarker::PROTOCOL_NAME.to_string(),
-        collection: fdt::Collection::BootDrivers,
-    }];
 
     // Start the DriverTestRealm.
     let args = fdt::RealmArgs {
         root_driver: Some("fuchsia-boot:///dtr#meta/test-parent-sys.cm".to_string()),
-        offers: Some(offers),
+        dtr_offers: Some(dtr_offers),
         ..Default::default()
     };
     instance.driver_test_realm_start(args).await?;

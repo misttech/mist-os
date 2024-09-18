@@ -517,6 +517,7 @@ mod tests {
                 fidl_input_report::ConsumerControlButton::VolumeDown,
                 fidl_input_report::ConsumerControlButton::VolumeUp,
             ],
+            device_id: 0,
         })
     }
 

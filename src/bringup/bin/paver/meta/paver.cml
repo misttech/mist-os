@@ -38,14 +38,14 @@
                 "fuchsia.boot.Arguments",
                 "fuchsia.boot.WriteOnlyLog",
 
-                // Paver queries system state transition
-                "fuchsia.device.manager.SystemStateTransition",
-
                 // Services from fshost
                 "fuchsia.fshost.BlockWatcher",
 
                 // Builtin service
                 "fuchsia.process.Launcher",
+
+                // Paver queries system state transition
+                "fuchsia.system.state.SystemStateTransition",
             ],
         },
     ],

@@ -31,12 +31,12 @@ common_deps = [
   ":tpm-lpc_bind",
   "//sdk/banjo/fuchsia.hardware.tpmimpl:fuchsia.hardware.tpmimpl_banjo_cpp",
   "//sdk/fidl/fuchsia.hardware.tpmimpl:fuchsia.hardware.tpmimpl_cpp",
+  "//sdk/lib/async:async-cpp",
+  "//sdk/lib/async-loop:async-loop-cpp",
   "//src/devices/lib/acpi",
   "//src/devices/lib/driver",
   "//src/devices/lib/mmio",
   "//src/lib/ddktl",
-  "//zircon/system/ulib/async:async-cpp",
-  "//zircon/system/ulib/async-loop:async-loop-cpp",
   "//zircon/system/ulib/fbl",
   "//zircon/system/ulib/inspect",
   "//zircon/system/ulib/zx",
@@ -67,11 +67,11 @@ test("tpm-lpc-unit-tests") {
     "unit-tests.cc",
   ]
   deps = common_deps + [
+           "//sdk/lib/async-loop:async-loop-cpp",
            "//sdk/lib/inspect/testing/cpp:zxtest",
            "//src/devices/lib/acpi/mock:mock-acpi",
            "//src/devices/testing/fake-mmio-reg",
            "//src/devices/testing/mock-ddk",
-           "//zircon/system/ulib/async-loop:async-loop-cpp",
            "//zircon/system/ulib/zxtest",
          ]
 }

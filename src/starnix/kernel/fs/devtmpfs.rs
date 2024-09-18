@@ -68,15 +68,15 @@ impl DevTmpFs {
 pub fn devtmpfs_create_device<L>(
     locked: &mut Locked<'_, L>,
     current_task: &CurrentTask,
-    device: DeviceMetadata,
+    device_metadata: DeviceMetadata,
 ) -> Result<DirEntryHandle, Errno>
 where
     L: LockBefore<FileOpsCore>,
 {
-    let separator_pos = device.name.iter().rposition(|&c| c == path::SEPARATOR);
+    let separator_pos = device_metadata.devname.iter().rposition(|&c| c == path::SEPARATOR);
     let (device_path, device_name) = match separator_pos {
-        Some(pos) => device.name.split_at(pos + 1),
-        None => (&[] as &[u8], device.name.as_slice()),
+        Some(pos) => device_metadata.devname.split_at(pos + 1),
+        None => (&[] as &[u8], device_metadata.devname.as_slice()),
     };
     let parent_dir = device_path
         .split(|&c| c == path::SEPARATOR)
@@ -98,8 +98,8 @@ where
         current_task,
         parent_dir,
         device_name.into(),
-        device.mode,
-        device.device_type,
+        device_metadata.mode,
+        device_metadata.device_type,
     )
 }
 

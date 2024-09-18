@@ -293,8 +293,8 @@ Do the following:
              protocol: [
                  "fuchsia.boot.Arguments",
                  "fuchsia.boot.Items",
-                 "fuchsia.device.manager.SystemStateTransition",
                  "fuchsia.driver.framework.CompositeNodeManager",
+                 "fuchsia.system.state.SystemStateTransition",
              ],
          },
          { service: "fuchsia.driver.compat.Service" },
@@ -407,13 +407,13 @@ bootstrap/*-drivers*:[name=sysmem]root
 To access a driver's Inspect during debugging, you can use all the normal tools, such as
 
 ```
-ffx inspect show "bootstrap/*-drivers*:[name=sysmem]root
+ffx inspect show "bootstrap/*-drivers*:[name=sysmem]root"
 ```
 
 or
 
 ```
-ffx inspect show --manifiest sysmem.cm
+ffx inspect show --manifest sysmem.cm
 ```
 
 ## (Optional) Implement your own load_firmware method {:#implement-your-own-load-firmware-method}

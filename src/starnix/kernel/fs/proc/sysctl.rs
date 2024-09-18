@@ -19,6 +19,7 @@ use starnix_sync::Mutex;
 use starnix_uapi::auth::{Capabilities, FsCred, CAP_NET_ADMIN, CAP_SYS_ADMIN, CAP_SYS_RESOURCE};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::file_mode::mode;
+use starnix_uapi::version::{KERNEL_RELEASE, KERNEL_VERSION};
 use starnix_uapi::{errno, error};
 use std::borrow::Cow;
 use std::sync::atomic::{AtomicI32, AtomicUsize, Ordering};
@@ -287,6 +288,22 @@ pub fn sysctl_directory(current_task: &CurrentTask, fs: &FileSystemHandle) -> Fs
             mode,
         );
         dir.node(
+            "osrelease",
+            fs.create_node(
+                current_task,
+                BytesFile::new_node(|| Ok(format!("{}\n", KERNEL_RELEASE))),
+                FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
+            ),
+        );
+        dir.node(
+            "ostype",
+            fs.create_node(
+                current_task,
+                BytesFile::new_node(b"Linux\n".to_vec()),
+                FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
+            ),
+        );
+        dir.node(
             "overflowuid",
             fs.create_node(
                 current_task,
@@ -352,6 +369,14 @@ pub fn sysctl_directory(current_task: &CurrentTask, fs: &FileSystemHandle) -> Fs
         });
     });
     dir.node("net", sysctl_net_diretory(current_task, fs));
+    dir.node(
+        "version",
+        fs.create_node(
+            current_task,
+            BytesFile::new_node(|| Ok(format!("{}\n", KERNEL_VERSION))),
+            FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
+        ),
+    );
     dir.subdir(current_task, "vm", 0o555, |dir| {
         dir.entry(
             current_task,

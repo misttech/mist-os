@@ -34,7 +34,6 @@
 #include <ktl/variant.h>
 #include <lockdep/guard.h>
 #include <platform/debug.h>
-#include <platform/legacy_debug.h>
 #include <platform/uart.h>
 
 #include "platform.h"
@@ -44,8 +43,6 @@ namespace {
 // No locks will be acquired.
 struct NullLockPolicy {};
 
-// Temporary flag for conditionally delegating to legacy_platform_* variants.
-bool use_new_serial = false;
 bool is_tx_irq_enabled = false;
 bool is_serial_enabled = false;
 
@@ -189,135 +186,121 @@ void UartDriverHandoffEarly(const uart::all::Driver& serial) {
       },
       serial);
 
-  use_new_serial = gBootOptions->experimental_serial_migration;
-  if (use_new_serial) {
-    // Serial driver has been initialized by physboot.
-    gUart = serial;
-  }
-
-  PlatformUartDriverHandoffEarly(serial);
+  gUart = serial;
 }
 
 void UartDriverHandoffLate(const uart::all::Driver& serial) {
-  if (use_new_serial) {
-    // This buffer is needed even when serial is disabled, to prevent uninitialized
-    // access to it.
-    rx_queue.Initialize(kRxQueueSize, malloc(kRxQueueSize));
+  // This buffer is needed even when serial is disabled, to prevent uninitialized
+  // access to it.
+  rx_queue.Initialize(kRxQueueSize, malloc(kRxQueueSize));
 
-    if (!platform_serial_enabled()) {
-      return;
-    }
-
-    // Check for interrupt support or explicitly polling uart.
-    ktl::optional<uint32_t> uart_irq;
-    bool polling_mode = false;
-    gUart.Visit([&](auto& driver) {
-      using cfg_type = ktl::decay_t<decltype(driver.uart().config())>;
-      if constexpr (ktl::is_same_v<cfg_type, zbi_dcfg_simple_pio_t> ||
-                    ktl::is_same_v<cfg_type, zbi_dcfg_simple_t>) {
-        uart_irq = PlatformUartGetIrqNumber(driver.uart().config().irq);
-      } else {  // Only |uart::null::Driver| is expected to have a different configuration type.
-        using driver_type = ktl::decay_t<decltype(driver.uart())>;
-        constexpr auto kIsNullDriver = ktl::is_same_v<driver_type, uart::null::Driver>;
-        ZX_ASSERT_MSG(kIsNullDriver, "Unexpected UART Configuration.");
-        // No IRQ Handler for null driver.
-        return;
-      }
-
-      // Check for polling mode.
-      if (!uart_irq || gBootOptions->debug_uart_poll) {
-        // Start the polling without performing any drain.
-        UartPoll</*DrainUart=*/false>(&gUartPollTimer, current_time(), nullptr);
-        printf("UART: POLLING mode enabled.\n");
-        polling_mode = true;
-        return;
-      }
-
-      static constexpr auto rx_irq_handler = [](auto& spinlock, auto&& read_char,
-                                                auto&& mask_rx_interrupt) {
-        // This check needs to be performed under a lock, such that we prevent operation
-        // interleaving that would leave us in a blocked state.
-        //
-        // E.g.
-        // Assume a simple MT scenario with one reader R and one writer R:
-        //
-        // * W: Observes the buffer is full.
-        // * R: Reads a character. The buffer is now empty.
-        // * R: Unmasks RX.
-        // * W: Masks RX.
-        //
-        //  At this point, we have an empty buffer and RX interrupts are masked -
-        //  we're stuck! Thus, to avoid this, we acquire the spinlock before
-        //  checking if the buffer is full, and release after (conditionally)
-        //  masking RX interrupts. By pairing this with the acquisition of the
-        //  same lock around unmasking RX interrupts, we prevent the writer above
-        //  from being interrupted by a read-and-unmask.
-        {
-          Guard<MonitoredSpinLock, NoIrqSave> lock(&spinlock, SOURCE_TAG);
-          if (rx_queue.Full()) {
-            // disables RX interrupts.
-            mask_rx_interrupt();
-            return;
-          }
-        }
-        rx_queue.WriteChar(static_cast<char>(read_char()));
-      };
-
-      static constexpr auto tx_irq_handler = [](auto& spinlock, auto& waiter,
-                                                auto&& mask_tx_interrupts) {
-        // Mask the TX interrupt before signalling any blocked thread as there may
-        // be a race between masking TX here below and unmasking by the blocked
-        // thread.
-        {
-          Guard<MonitoredSpinLock, NoIrqSave> lock(&spinlock, SOURCE_TAG);
-          mask_tx_interrupts();
-        }
-
-        // Do not signal the event while holding the sync capability, this could lead
-        // to invalid lock dependencies.
-        waiter.Wake();
-      };
-
-      constexpr auto irq_handler = [](void* driver_ptr) {
-        auto* typed_driver = static_cast<ktl::decay_t<decltype(driver)>*>(driver_ptr);
-        typed_driver->Interrupt(tx_irq_handler, rx_irq_handler);
-      };
-
-      if constexpr (ktl::is_same_v<cfg_type, zbi_dcfg_simple_t>) {
-        // Configure the interrupt if available.
-        auto irq_config = GetIrqConfigFromFlags(driver.uart().config().flags);
-        if (irq_config) {
-          zx_status_t irq_config_result =
-              configure_interrupt(*uart_irq, irq_config->trigger, irq_config->polarity);
-          DEBUG_ASSERT(irq_config_result == ZX_OK);
-        }
-      }
-
-      // Register IRQ Handler.
-      zx_status_t irq_register_result =
-          register_permanent_int_handler(*uart_irq, irq_handler, &driver);
-      DEBUG_ASSERT(irq_register_result == ZX_OK);
-      // Init Rx Interrupt.
-      driver.InitInterrupt([uart_irq]() { unmask_interrupt(*uart_irq); });
-    });
-
-    if (!polling_mode) {
-      printf("UART: IRQ driven RX: enabled\n");
-
-      is_tx_irq_enabled = !dlog_bypass();
-      printf("UART: IRQ driven TX: %s\n", is_tx_irq_enabled ? "enabled" : "disabled");
-    }
-  }
-  PlatformUartDriverHandoffLate(serial);
-}
-
-void platform_dputs_thread(const char* str, size_t len) {
   if (!platform_serial_enabled()) {
     return;
   }
 
-  if (!use_new_serial) {
-    legacy_platform_dputs_thread(str, len);
+  // Check for interrupt support or explicitly polling uart.
+  ktl::optional<uint32_t> uart_irq;
+  bool polling_mode = false;
+  gUart.Visit([&](auto& driver) {
+    using cfg_type = ktl::decay_t<decltype(driver.uart().config())>;
+    if constexpr (ktl::is_same_v<cfg_type, zbi_dcfg_simple_pio_t> ||
+                  ktl::is_same_v<cfg_type, zbi_dcfg_simple_t>) {
+      uart_irq = PlatformUartGetIrqNumber(driver.uart().config().irq);
+    } else {  // Only |uart::null::Driver| is expected to have a different configuration type.
+      using driver_type = ktl::decay_t<decltype(driver.uart())>;
+      constexpr auto kIsNullDriver = ktl::is_same_v<driver_type, uart::null::Driver>;
+      ZX_ASSERT_MSG(kIsNullDriver, "Unexpected UART Configuration.");
+      // No IRQ Handler for null driver.
+      return;
+    }
+
+    // Check for polling mode.
+    if (!uart_irq || gBootOptions->debug_uart_poll) {
+      // Start the polling without performing any drain.
+      UartPoll</*DrainUart=*/false>(&gUartPollTimer, current_time(), nullptr);
+      printf("UART: POLLING mode enabled.\n");
+      polling_mode = true;
+      return;
+    }
+
+    static constexpr auto rx_irq_handler = [](auto& spinlock, auto&& read_char,
+                                              auto&& mask_rx_interrupt) {
+      // This check needs to be performed under a lock, such that we prevent operation
+      // interleaving that would leave us in a blocked state.
+      //
+      // E.g.
+      // Assume a simple MT scenario with one reader R and one writer R:
+      //
+      // * W: Observes the buffer is full.
+      // * R: Reads a character. The buffer is now empty.
+      // * R: Unmasks RX.
+      // * W: Masks RX.
+      //
+      //  At this point, we have an empty buffer and RX interrupts are masked -
+      //  we're stuck! Thus, to avoid this, we acquire the spinlock before
+      //  checking if the buffer is full, and release after (conditionally)
+      //  masking RX interrupts. By pairing this with the acquisition of the
+      //  same lock around unmasking RX interrupts, we prevent the writer above
+      //  from being interrupted by a read-and-unmask.
+      {
+        Guard<MonitoredSpinLock, NoIrqSave> lock(&spinlock, SOURCE_TAG);
+        if (rx_queue.Full()) {
+          // disables RX interrupts.
+          mask_rx_interrupt();
+          return;
+        }
+      }
+      rx_queue.WriteChar(static_cast<char>(read_char()));
+    };
+
+    static constexpr auto tx_irq_handler = [](auto& spinlock, auto& waiter,
+                                              auto&& mask_tx_interrupts) {
+      // Mask the TX interrupt before signalling any blocked thread as there may
+      // be a race between masking TX here below and unmasking by the blocked
+      // thread.
+      {
+        Guard<MonitoredSpinLock, NoIrqSave> lock(&spinlock, SOURCE_TAG);
+        mask_tx_interrupts();
+      }
+
+      // Do not signal the event while holding the sync capability, this could lead
+      // to invalid lock dependencies.
+      waiter.Wake();
+    };
+
+    constexpr auto irq_handler = [](void* driver_ptr) {
+      auto* typed_driver = static_cast<ktl::decay_t<decltype(driver)>*>(driver_ptr);
+      typed_driver->Interrupt(tx_irq_handler, rx_irq_handler);
+    };
+
+    if constexpr (ktl::is_same_v<cfg_type, zbi_dcfg_simple_t>) {
+      // Configure the interrupt if available.
+      auto irq_config = GetIrqConfigFromFlags(driver.uart().config().flags);
+      if (irq_config) {
+        zx_status_t irq_config_result =
+            configure_interrupt(*uart_irq, irq_config->trigger, irq_config->polarity);
+        DEBUG_ASSERT(irq_config_result == ZX_OK);
+      }
+    }
+
+    // Register IRQ Handler.
+    zx_status_t irq_register_result =
+        register_permanent_int_handler(*uart_irq, irq_handler, &driver);
+    DEBUG_ASSERT(irq_register_result == ZX_OK);
+    // Init Rx Interrupt.
+    driver.InitInterrupt([uart_irq]() { unmask_interrupt(*uart_irq); });
+  });
+
+  if (!polling_mode) {
+    printf("UART: IRQ driven RX: enabled\n");
+
+    is_tx_irq_enabled = !dlog_bypass();
+    printf("UART: IRQ driven TX: %s\n", is_tx_irq_enabled ? "enabled" : "disabled");
+  }
+}
+
+void platform_dputs_thread(const char* str, size_t len) {
+  if (!platform_serial_enabled()) {
     return;
   }
 
@@ -331,11 +314,6 @@ void platform_dputs_irq(const char* str, size_t len) {
     return;
   }
 
-  if (!use_new_serial) {
-    legacy_platform_dputs_irq(str, len);
-    return;
-  }
-
   gUart.Visit([str, len](auto& driver) {
     driver.template Write<IrqSave>({str, len}, UartSyncPolicy::Waiter::Blocking::kNo);
   });
@@ -344,10 +322,6 @@ void platform_dputs_irq(const char* str, size_t len) {
 int platform_dgetc(char* c, bool wait) {
   if (!platform_serial_enabled()) {
     return ZX_ERR_NOT_SUPPORTED;
-  }
-
-  if (!use_new_serial) {
-    return legacy_platform_dgetc(c, wait);
   }
 
   auto read = rx_queue.ReadCharWithContext(wait);
@@ -386,9 +360,6 @@ int platform_pgetc(char* c) {
     return ZX_ERR_NOT_SUPPORTED;
   }
 
-  if (!use_new_serial) {
-    return legacy_platform_pgetc(c);
-  }
   ktl::optional<char> read;
   gUart.Visit([&](auto& driver) { read = driver.Read(); });
 
@@ -402,11 +373,6 @@ int platform_pgetc(char* c) {
 
 void platform_pputc(char c) {
   if (!platform_serial_enabled()) {
-    return;
-  }
-
-  if (!use_new_serial) {
-    legacy_platform_pputc(c);
     return;
   }
 

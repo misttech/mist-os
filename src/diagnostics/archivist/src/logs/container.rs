@@ -9,11 +9,13 @@ use crate::logs::buffer::{ArcList, LazyItem};
 use crate::logs::multiplex::PinStream;
 use crate::logs::socket::{Encoding, LogMessageSocket};
 use crate::logs::stats::LogStreamStats;
-use crate::logs::stored_message::GenericStoredMessage;
+use crate::logs::stored_message::StoredMessage;
 use crate::utils::AutoCall;
 use derivative::Derivative;
 use diagnostics_data::{BuilderArgs, Data, LogError, Logs, LogsData, LogsDataBuilder};
-use fidl_fuchsia_diagnostics::{Interest as FidlInterest, LogInterestSelector, StreamMode};
+use fidl_fuchsia_diagnostics::{
+    Interest as FidlInterest, LogInterestSelector, Severity as FidlSeverity, StreamMode,
+};
 use fidl_fuchsia_logger::{
     InterestChangeError, LogSinkRequest, LogSinkRequestStream,
     LogSinkWaitForInterestChangeResponder,
@@ -49,7 +51,7 @@ pub struct LogsArtifactsContainer {
 
     /// Buffer for all log messages.
     #[derivative(Debug = "ignore")]
-    buffer: ArcList<GenericStoredMessage>,
+    buffer: ArcList<StoredMessage>,
 
     /// Mutable state for the container.
     state: Arc<Mutex<ContainerState>>,
@@ -97,6 +99,7 @@ impl LogsArtifactsContainer {
     pub fn new<'a>(
         identity: Arc<ComponentIdentity>,
         interest_selectors: impl Iterator<Item = &'a LogInterestSelector>,
+        initial_interest: Option<FidlSeverity>,
         parent_node: &inspect::Node,
         budget: BudgetHandle,
     ) -> Self {
@@ -104,6 +107,10 @@ impl LogsArtifactsContainer {
             .with_inspect(parent_node, identity.moniker.to_string())
             .expect("failed to attach component log stats");
         stats.set_url(&identity.url);
+        let mut interests = BTreeMap::new();
+        if let Some(severity) = initial_interest {
+            interests.insert(Interest::from(severity), 1);
+        }
         let new = Self {
             identity,
             budget,
@@ -111,7 +118,7 @@ impl LogsArtifactsContainer {
             state: Arc::new(Mutex::new(ContainerState {
                 num_active_channels: 0,
                 num_active_sockets: 0,
-                interests: BTreeMap::new(),
+                interests,
                 hanging_gets: BTreeMap::new(),
                 is_initializing: true,
             })),
@@ -144,7 +151,11 @@ impl LogsArtifactsContainer {
         parent_trace_id: ftrace::Id,
     ) -> PinStream<Arc<LogsData>> {
         let identity = Arc::clone(&self.identity);
-        let earliest_timestamp = self.buffer.peek_front().map(|f| f.timestamp()).unwrap_or(0);
+        let earliest_timestamp = self
+            .buffer
+            .peek_front()
+            .map(|f| f.timestamp())
+            .unwrap_or(zx::MonotonicTime::from_nanos(0));
         Box::pin(
             self.buffer
                 .cursor(mode)
@@ -373,9 +384,9 @@ impl LogsArtifactsContainer {
     }
 
     /// Updates log stats in inspect and push the message onto the container's buffer.
-    pub fn ingest_message(&self, message: GenericStoredMessage) {
+    pub fn ingest_message(&self, message: StoredMessage) {
         self.budget.allocate(message.size());
-        self.stats.ingest_message(message.as_ref());
+        self.stats.ingest_message(&message);
         self.buffer.push_back(message);
     }
 
@@ -468,7 +479,7 @@ impl LogsArtifactsContainer {
     }
 
     /// Remove the oldest message from this buffer, returning it.
-    pub fn pop(&self) -> Option<Arc<GenericStoredMessage>> {
+    pub fn pop(&self) -> Option<Arc<StoredMessage>> {
         self.buffer.pop_front()
     }
 
@@ -483,7 +494,7 @@ impl LogsArtifactsContainer {
     }
 
     /// Returns the timestamp of the earliest log message in this container's buffer, if any.
-    pub fn oldest_timestamp(&self) -> Option<i64> {
+    pub fn oldest_timestamp(&self) -> Option<zx::MonotonicTime> {
         self.buffer.peek_front().map(|m| m.timestamp())
     }
 
@@ -494,7 +505,7 @@ impl LogsArtifactsContainer {
     }
 
     #[cfg(test)]
-    pub fn buffer(&self) -> &ArcList<GenericStoredMessage> {
+    pub fn buffer(&self) -> &ArcList<StoredMessage> {
         &self.buffer
     }
 
@@ -576,6 +587,12 @@ impl From<FidlInterest> for Interest {
     }
 }
 
+impl From<FidlSeverity> for Interest {
+    fn from(severity: FidlSeverity) -> Interest {
+        Interest(FidlInterest { min_severity: Some(severity), ..Default::default() })
+    }
+}
+
 impl std::ops::Deref for Interest {
     type Target = FidlInterest;
     fn deref(&self) -> &Self::Target {
@@ -623,6 +640,7 @@ mod tests {
     use moniker::ExtendedMoniker;
 
     fn initialize_container(
+        severity: Option<Severity>,
     ) -> (Arc<LogsArtifactsContainer>, LogSinkProxy, UnboundedReceiver<Task<()>>) {
         // Initialize container
         let (snd, _rcv) = mpsc::unbounded();
@@ -633,6 +651,7 @@ mod tests {
                 "fuchsia-pkg://test",
             )),
             std::iter::empty(),
+            severity,
             inspect::component::inspector().root(),
             budget_manager.handle(),
         ));
@@ -647,7 +666,7 @@ mod tests {
     #[fuchsia::test]
     async fn update_interest() {
         // Sync path test (initial interest)
-        let (container, log_sink, _sender) = initialize_container();
+        let (container, log_sink, _sender) = initialize_container(None);
         // Get initial interest
         let initial_interest = log_sink.wait_for_interest_change().await.unwrap().unwrap();
         {
@@ -703,8 +722,15 @@ mod tests {
     }
 
     #[fuchsia::test]
+    async fn initial_interest() {
+        let (_container, log_sink, _sender) = initialize_container(Some(Severity::Info));
+        let initial_interest = log_sink.wait_for_interest_change().await.unwrap().unwrap();
+        assert_eq!(initial_interest.min_severity, Some(Severity::Info));
+    }
+
+    #[fuchsia::test]
     async fn interest_serverity_semantics() {
-        let (container, log_sink, _sender) = initialize_container();
+        let (container, log_sink, _sender) = initialize_container(None);
         let initial_interest = log_sink.wait_for_interest_change().await.unwrap().unwrap();
         assert_eq!(initial_interest.min_severity, None);
         // Set some interest.

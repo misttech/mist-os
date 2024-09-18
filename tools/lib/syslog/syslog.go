@@ -72,7 +72,7 @@ func (s *Syslogger) IsRunning() bool {
 // of the system's uptime. It keeps running until the context is canceled or until an
 // unexpected (not SSH-related) error occurs; otherwise, it returns errors to
 // the returned channel to signify the syslog was interrupted and restarted.
-func (s *Syslogger) Stream(ctx context.Context, output io.Writer) <-chan error {
+func (s *Syslogger) Stream(ctx, loggerCtx context.Context, output io.Writer) <-chan error {
 	errs := make(chan error, 1)
 	sendErr := func(errs chan error, err error) {
 		// Wait a bit for any listeners to clear the channel first.
@@ -99,13 +99,13 @@ func (s *Syslogger) Stream(ctx context.Context, output io.Writer) <-chan error {
 			if s.ffx != nil {
 				command := s.ffx.CommandWithTarget(cmd...)
 				command.Stdout = output
-				err = command.Run()
+				err = s.ffx.RunCommand(ctx, command)
 			} else if s.client != nil {
 				// Note: Fuchsia's log_listener does not write to stderr.
 				err = s.client.Run(ctx, cmd, output, nil)
 			} else {
 				err = fmt.Errorf("syslogger requires an SSH client or ffx instance to run")
-				logger.Errorf(ctx, "error streaming syslog: %s", err)
+				logger.Errorf(loggerCtx, "error streaming syslog: %s", err)
 				s.running = false
 				sendErr(errs, err)
 				close(errs)
@@ -113,9 +113,9 @@ func (s *Syslogger) Stream(ctx context.Context, output io.Writer) <-chan error {
 			}
 			if ctx.Err() == nil {
 				if err != nil {
-					logger.Debugf(ctx, "error streaming syslog: %s", err)
+					logger.Debugf(loggerCtx, "error streaming syslog: %s", err)
 				} else {
-					logger.Debugf(ctx, "log_listener exited successfully, will rerun")
+					logger.Debugf(loggerCtx, "log_listener exited successfully, will rerun")
 					// Don't stream from the beginning of the system's uptime, since
 					// that would include logs that we've already streamed.
 					if s.ffx != nil {
@@ -133,14 +133,14 @@ func (s *Syslogger) Stream(ctx context.Context, output io.Writer) <-chan error {
 			// this method, so it generally indicates that the caller is exiting
 			// normally).
 			if ctx.Err() != nil || (s.client != nil && !sshutil.IsConnectionError(err)) {
-				logger.Debugf(ctx, "syslog streaming complete: %s", err)
+				logger.Debugf(loggerCtx, "syslog streaming complete: %s", err)
 				s.running = false
 				sendErr(errs, err)
 				close(errs)
 				return
 			}
 
-			logger.Errorf(ctx, "syslog: SSH client unresponsive; will attempt to reconnect and continue streaming: %s", err)
+			logger.Errorf(loggerCtx, "syslog: SSH client unresponsive; will attempt to reconnect and continue streaming: %s", err)
 			var reconnectErr error
 			if s.ffx != nil {
 				reconnectErr = retry.Retry(ctx, retry.WithMaxDuration(retry.NewConstantBackoff(defaultReconnectInterval), 30*time.Second), func() error {
@@ -153,7 +153,7 @@ func (s *Syslogger) Stream(ctx context.Context, output io.Writer) <-chan error {
 				// The context probably got cancelled before we were able to
 				// reconnect.
 				if ctx.Err() != nil {
-					logger.Errorf(ctx, "syslog: %s: %s", constants.CtxReconnectError, ctx.Err())
+					logger.Errorf(loggerCtx, "syslog: %s: %s", constants.CtxReconnectError, ctx.Err())
 				}
 				s.running = false
 				sendErr(errs, err)
@@ -168,7 +168,7 @@ func (s *Syslogger) Stream(ctx context.Context, output io.Writer) <-chan error {
 			} else {
 				cmd = LogListenerWithArgs()
 			}
-			logger.Infof(ctx, "syslog: refreshed ssh connection")
+			logger.Infof(loggerCtx, "syslog: refreshed ssh connection")
 			io.WriteString(output, "\n\n<< SYSLOG STREAM INTERRUPTED; RECONNECTING NOW >>\n\n")
 			sendErr(errs, err)
 		}

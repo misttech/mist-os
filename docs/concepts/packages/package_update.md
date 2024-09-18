@@ -84,11 +84,11 @@ update framework). This framework uses cryptographically signed BLOBs to
 securely distribute updated packages to a device running Fuchsia.
 
 For information about how to start, stop, and list package servers running
-in your development environment See:
+in your development environment, see:
 
-* [Starting the package server](/docs/concepts/packages/package_server_start.md)
-* [Listing running package server instances](/docs/concepts/packages/package_server_list.md)
-* [Stopping running package server instances](/docs/concepts/packages/package_server_stop.md)
+* [Start package servers](/docs/development/sdk/ffx/start-package-servers.md)
+* [List running package servers](/docs/development/sdk/ffx/list-package-servers.md)
+* [Stop running package servers](/docs/development/sdk/ffx/stop-package-servers.md)
 
 ## Connecting host and target
 

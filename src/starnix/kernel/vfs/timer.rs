@@ -13,6 +13,7 @@ use crate::vfs::{
     fileops_impl_nonseekable, fileops_impl_noop_sync, Anon, FileHandle, FileObject, FileOps,
 };
 use fuchsia_zircon::{self as zx, HandleRef};
+use starnix_logging::log_warn;
 use starnix_sync::{FileOpsCore, Locked, Mutex};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::open_flags::OpenFlags;
@@ -172,6 +173,12 @@ impl TimerFile {
 impl FileOps for TimerFile {
     fileops_impl_nonseekable!();
     fileops_impl_noop_sync!();
+
+    fn close(&self, _file: &FileObject, current_task: &CurrentTask) {
+        if let Err(e) = self.timer.stop(current_task) {
+            log_warn!("Failed to stop the timer when closing the timerfd: {e:?}");
+        }
+    }
 
     fn write(
         &self,

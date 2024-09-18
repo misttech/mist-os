@@ -5,8 +5,8 @@
 #include "include/lib/driver-integration-test/fixture.h"
 
 #include <fidl/fuchsia.board.test/cpp/wire.h>
-#include <fidl/fuchsia.device.manager/cpp/wire.h>
 #include <fidl/fuchsia.driver.framework/cpp/wire.h>
+#include <fidl/fuchsia.system.state/cpp/wire.h>
 #include <fuchsia/driver/test/cpp/fidl.h>
 #include <fuchsia/io/cpp/fidl.h>
 #include <lib/device-watcher/cpp/device-watcher.h>
@@ -16,6 +16,8 @@
 #include <lib/fdio/fd.h>
 #include <lib/fdio/fdio.h>
 #include <lib/syslog/global.h>
+
+#include <bind/fuchsia/platform/cpp/bind.h>
 
 #include "lib/sys/component/cpp/testing/realm_builder.h"
 
@@ -88,7 +90,7 @@ zx_status_t IsolatedDevmgr::Create(Args* args, IsolatedDevmgr* out) {
       .targets = {ChildRef{"fshost"}},
   });
   realm_builder.AddRoute(Route{
-      .capabilities = {Protocol{"fuchsia.device.manager.Administrator"}},
+      .capabilities = {Protocol{"fuchsia.system.state.Administrator"}},
       .source = {ChildRef{"driver_test_realm"}},
       .targets = {ChildRef{"fshost"}},
   });
@@ -162,6 +164,16 @@ zx_status_t IsolatedDevmgr::Create(Args* args, IsolatedDevmgr* out) {
   realm_args.set_board_name(std::string(args->board_name.data()));
   realm_args.set_driver_disable(args->driver_disable);
   realm_args.set_driver_bind_eager(args->driver_bind_eager);
+  realm_args.set_software_devices(std::vector{
+      fuchsia::driver::test::SoftwareDevice{
+          .device_name = "ram-disk",
+          .device_id = bind_fuchsia_platform::BIND_PLATFORM_DEV_DID_RAM_DISK,
+      },
+      fuchsia::driver::test::SoftwareDevice{
+          .device_name = "ram-nand",
+          .device_id = bind_fuchsia_platform::BIND_PLATFORM_DEV_DID_RAM_NAND,
+      },
+  });
   if (zx_status_t status = driver_test_realm->Start(std::move(realm_args), &realm_result);
       status != ZX_OK) {
     return status;

@@ -6,7 +6,6 @@ group("lib") {
   deps = [
     "linux_uapi",
     "magma",
-    "selinux/core",
     "starnix-lifecycle",
     "starnix-uapi",
     "syncio",

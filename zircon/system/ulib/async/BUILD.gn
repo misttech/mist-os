@@ -4,10 +4,18 @@
 
 group("async") {
   public_deps = [ "//sdk/lib/async" ]
+  visibility = [
+    "//third_party/*",
+    "//vendor/*",
+  ]
 }
 
 group("async-cpp") {
   public_deps = [ "//sdk/lib/async:async-cpp" ]
+  visibility = [
+    "//third_party/*",
+    "//vendor/*",
+  ]
 }
 
 group("tests") {

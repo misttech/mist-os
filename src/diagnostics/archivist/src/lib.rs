@@ -13,7 +13,7 @@ mod diagnostics;
 mod error;
 pub mod events;
 pub mod formatter;
-mod identity;
+pub mod identity;
 mod inspect;
 pub mod logs;
 mod pipeline;

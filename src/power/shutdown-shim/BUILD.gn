@@ -8,18 +8,18 @@ executable("shutdown-shim") {
   sources = [ "main.cc" ]
 
   deps = [
-    "//sdk/fidl/fuchsia.device.manager:fuchsia.device.manager_cpp",
     "//sdk/fidl/fuchsia.hardware.power.statecontrol:fuchsia.hardware.power.statecontrol_cpp",
     "//sdk/fidl/fuchsia.power.system:fuchsia.power.system_cpp",
     "//sdk/fidl/fuchsia.process.lifecycle:fuchsia.process.lifecycle_cpp",
     "//sdk/fidl/fuchsia.sys2:fuchsia.sys2_cpp",
+    "//sdk/fidl/fuchsia.system.state:fuchsia.system.state_cpp",
+    "//sdk/lib/async-default",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/fit",
     "//src/storage/lib/vfs/cpp",
     "//src/sys/lib/stdout-to-debuglog/cpp",
-    "//zircon/system/ulib/async-default",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/zx",
   ]

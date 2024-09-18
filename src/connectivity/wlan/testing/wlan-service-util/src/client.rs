@@ -14,8 +14,8 @@ use wlan_common::security::wpa::credential::{Passphrase, Psk};
 use wlan_common::security::SecurityError;
 use {
     fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_common_security as fidl_security,
-    fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_internal as fidl_internal,
-    fidl_fuchsia_wlan_sme as fidl_sme, fuchsia_zircon as zx,
+    fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_sme as fidl_sme,
+    fuchsia_zircon as zx,
 };
 
 type WlanService = DeviceMonitorProxy;
@@ -160,7 +160,7 @@ pub async fn connect(
     iface_sme_proxy: &fidl_sme::ClientSmeProxy,
     target_ssid: Ssid,
     target_pwd: Vec<u8>,
-    target_bss_desc: fidl_internal::BssDescription,
+    target_bss_desc: fidl_common::BssDescription,
 ) -> Result<bool, Error> {
     let (connection_proxy, connection_remote) = endpoints::create_proxy()?;
 
@@ -986,7 +986,7 @@ mod tests {
         server: &mut StreamFuture<ClientSmeRequestStream>,
         expected_ssid: &Ssid,
         expected_authentication: fidl_security::Authentication,
-        expected_bss_desc: fidl_internal::BssDescription,
+        expected_bss_desc: fidl_common::BssDescription,
     ) {
         match poll_client_sme_request(exec, server) {
             Poll::Ready(ClientSmeRequest::Connect { req, .. }) => {

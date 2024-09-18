@@ -5,6 +5,7 @@
 use crate::buffer::{BufferFuture, BufferRef, MutableBufferRef};
 use anyhow::{bail, Error};
 use async_trait::async_trait;
+use block_protocol::WriteOptions;
 use futures::channel::oneshot::{channel, Sender};
 use std::future::Future;
 use std::mem::ManuallyDrop;
@@ -45,7 +46,17 @@ pub trait Device: Send + Sync {
     async fn read(&self, offset: u64, buffer: MutableBufferRef<'_>) -> Result<(), Error>;
 
     /// Writes the contents of |buffer| to the device at |offset|.
-    async fn write(&self, offset: u64, buffer: BufferRef<'_>) -> Result<(), Error>;
+    async fn write(&self, offset: u64, buffer: BufferRef<'_>) -> Result<(), Error> {
+        self.write_with_opts(offset, buffer, WriteOptions::empty()).await
+    }
+
+    /// Writes the contents of |buffer| to the device at |offset|.
+    async fn write_with_opts(
+        &self,
+        offset: u64,
+        buffer: BufferRef<'_>,
+        opts: WriteOptions,
+    ) -> Result<(), Error>;
 
     /// Trims the given device |range|.
     async fn trim(&self, range: Range<u64>) -> Result<(), Error>;

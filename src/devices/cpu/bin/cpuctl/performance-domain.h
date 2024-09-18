@@ -5,7 +5,6 @@
 #ifndef SRC_DEVICES_CPU_BIN_CPUCTL_PERFORMANCE_DOMAIN_H_
 #define SRC_DEVICES_CPU_BIN_CPUCTL_PERFORMANCE_DOMAIN_H_
 
-#include <fidl/fuchsia.device/cpp/wire.h>
 #include <fidl/fuchsia.hardware.cpu.ctrl/cpp/wire.h>
 
 #include <tuple>

@@ -18,11 +18,11 @@ use rand::{thread_rng, Rng};
 use runner::{get_program_string, get_program_strvec, StartInfoProgramError};
 use starnix_core::execution::execute_task_with_prerun_result;
 use starnix_core::fs::fuchsia::{create_file_from_handle, RemoteFs, SyslogFile};
-use starnix_core::signals;
 use starnix_core::task::{CurrentTask, ExitStatus, Task};
 use starnix_core::vfs::{
     FdNumber, FdTable, FileSystemOptions, FsString, LookupContext, NamespaceNode, WhatToMount,
 };
+use starnix_core::{security, signals};
 use starnix_logging::{log_error, log_info, log_warn};
 use starnix_sync::{FileOpsCore, LockBefore, Locked, Mutex};
 use starnix_uapi::auth::{Capabilities, Credentials};
@@ -467,6 +467,9 @@ impl MountRecord {
             FileSystemOptions { source: path.into(), ..Default::default() },
             rights,
         )?;
+
+        security::file_system_resolve_security(system_task, &fs)?;
+
         // Fuchsia doesn't specify mount flags in the incoming namespace, so we need to make
         // up some flags.
         let flags = MountFlags::NOSUID | MountFlags::NODEV | MountFlags::RELATIME;

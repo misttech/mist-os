@@ -281,8 +281,32 @@ Resulting product is not supported and may misbehave!
         builder.add_product_packages(additional_packages).context("Adding additional packages")?;
     }
 
-    // Get the tool set.
-    let tools = SdkToolProvider::try_new()?;
+    // Add devicetree binary
+    if let Some(devicetree_path) = &board_info.devicetree {
+        builder
+            .add_devicetree(devicetree_path.as_utf8_pathbuf())
+            .context("Adding devicetree binary")?;
+    }
+
+    // Construct and set the images config
+    let zbi_only = mode != PackageMode::DiskImage;
+    builder
+        .set_images_config(
+            ImagesConfig::from_product_and_board(
+                &platform.storage.filesystems,
+                &board_info.filesystems,
+                zbi_only,
+            )
+            .context("Constructing images config")?,
+        )
+        .context("Setting images configuration.")?;
+
+    //////////////////////
+    //
+    // Generate the output files.  All builder modifications must be complete by here.
+
+    // Strip the mutability of the builder.
+    let builder = builder;
 
     // Serialize the builder state for forensic use.
     let builder_forensics_file_path = outdir.join("assembly_builder_forensics.json");
@@ -307,22 +331,12 @@ Resulting product is not supported and may misbehave!
     serde_json::to_writer_pretty(board_forensics_file, &board_info)
         .with_context(|| format!("Writing board forensics file to: {board_forensics_file_path}"))?;
 
-    // Add devicetree binary
-    if let Some(devicetree_path) = &board_info.devicetree {
-        builder
-            .add_devicetree(devicetree_path.as_utf8_pathbuf())
-            .context("Adding devicetree binary")?;
-    }
+    // Get the tool set.
+    let tools = SdkToolProvider::try_new()?;
 
     // Do the actual building of everything for the Image Assembly config.
-    let mut image_assembly =
+    let image_assembly =
         builder.build(&outdir, &tools).context("Building Image Assembly config")?;
-    let images = ImagesConfig::from_product_and_board(
-        &platform.storage.filesystems,
-        &board_info.filesystems,
-    )
-    .context("Constructing images config")?;
-    image_assembly.images_config = images;
 
     // Validate the built product assembly.
     assembly_validate_product::validate_product(

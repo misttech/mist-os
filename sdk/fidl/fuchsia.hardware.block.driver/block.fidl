@@ -1,6 +1,7 @@
 // Copyright 2018 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+@available(added=HEAD)
 library fuchsia.hardware.block.driver;
 
 using fuchsia.hardware.block;
@@ -154,15 +155,6 @@ type BlockCommand = struct {
         /// it should not complete until the data is written to the non-volatile
         /// medium (write), and that reads should bypass any on-device caches.
         FORCE_ACCESS = 0x00000004;
-
-        /// The pre-flush flag generates a flush operation before running this operation
-        /// and flushes on-device caches. It ensures that previous data is written to
-        /// the non-volatile medium. Applying the preflush to an operation in a group
-        /// will only apply to the operation with the flag and not all the other
-        /// operations in the group. The preflush only applies to an operation where the
-        /// preflush flag is set. It does not affect other operations and can proceed in
-        /// parallel. If the flush operation fails, the operation will not proceed.
-        PREFLUSH = 0x00000008;
     };
 };
 

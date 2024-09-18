@@ -96,4 +96,5 @@
 ///       fuzzer.
 ///     * Implementations of the `Monitor` protocol subscribe to updates from
 ///       the fuzzer.
+@available(added=HEAD)
 library fuchsia.fuzzer;

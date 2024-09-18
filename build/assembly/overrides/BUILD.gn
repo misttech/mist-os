@@ -1,0 +1,12 @@
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/assembly/developer_overrides.gni")
+
+#  This is a generated target based on the 'product_assembly_overrides_contents' GN arg.
+if (product_assembly_overrides_contents != false) {
+  assembly_developer_overrides("inlined") {
+    forward_variables_from(product_assembly_overrides_contents, "*")
+  }
+}

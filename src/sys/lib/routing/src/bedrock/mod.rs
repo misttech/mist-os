@@ -8,6 +8,7 @@ pub mod program_output_dict;
 pub mod request_metadata;
 pub mod sandbox_construction;
 pub mod structured_dict;
+pub mod weak_instance_token_ext;
 pub mod with_availability;
 pub mod with_policy_check;
 pub mod with_porcelain_type;

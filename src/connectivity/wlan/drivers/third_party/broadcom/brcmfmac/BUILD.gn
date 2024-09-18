@@ -96,7 +96,7 @@ source_set("bcdc") {
 source_set("timer") {
   sources = [ "timer.cc" ]
   public = [ "timer.h" ]
-  public_deps = [ "//zircon/system/ulib/async" ]
+  public_deps = [ "//sdk/lib/async" ]
 }
 
 # Sources for the driver core logic.
@@ -144,11 +144,11 @@ source_set("core") {
   ]
   deps = [
     ":timer",
+    "//sdk/lib/async",
     "//sdk/lib/driver/component/cpp:cpp",
     "//src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/inspect",
     "//src/connectivity/wlan/lib/common/cpp:common",
     "//third_party/bcmdhd/crossdriver:bcmdhd_crossdriver",
-    "//zircon/system/ulib/async",
   ]
   public_deps = [
     ":debug",

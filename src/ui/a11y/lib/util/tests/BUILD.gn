@@ -4,10 +4,10 @@
 
 group("tests") {
   testonly = true
-  public_deps = [ ":util_tests" ]
+  public_deps = [ ":a11y_util_tests" ]
 }
 
-executable("util_tests") {
+executable("a11y_util_tests") {
   testonly = true
 
   sources = [ "boot_info_manager_test.cc" ]

@@ -11,6 +11,7 @@ use serde::{Deserialize, Serialize};
 pub enum OOMBehavior {
     Reboot { timeout: OOMRebootTimeout },
     JobKill,
+    Disable,
 }
 
 impl Default for OOMBehavior {

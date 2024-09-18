@@ -30,6 +30,7 @@ executable("crash_register_unittest_exe") {
 
   deps = [
     "//sdk/fidl/fuchsia.feedback:fuchsia.feedback_hlcpp",
+    "//sdk/lib/async:async-cpp",
     "//sdk/lib/fit-promise",
     "//src/developer/forensics/crash_reports:crash_register",
     "//src/developer/forensics/crash_reports/info",
@@ -41,7 +42,6 @@ executable("crash_register_unittest_exe") {
     "//src/lib/timekeeper:testing",
     "//third_party/googletest:gmock",
     "//third_party/googletest:gtest",
-    "//zircon/system/ulib/async:async-cpp",
     "//zircon/system/ulib/zx",
   ]
 }

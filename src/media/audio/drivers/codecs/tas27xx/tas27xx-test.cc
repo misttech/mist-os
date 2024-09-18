@@ -8,17 +8,20 @@
 #include <lib/async-loop/default.h>
 #include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
 #include <lib/ddk/metadata.h>
-#include <lib/inspect/cpp/inspect.h>
-#include <lib/inspect/testing/cpp/zxtest/inspect.h>
-#include <lib/mock-i2c/mock-i2c.h>
+#include <lib/fpromise/single_threaded_executor.h>
+#include <lib/inspect/cpp/hierarchy.h>
+#include <lib/inspect/cpp/reader.h>
+#include <lib/inspect/testing/cpp/inspect.h>
+#include <lib/mock-i2c/mock-i2c-gtest.h>
 #include <lib/simple-codec/simple-codec-client.h>
 #include <lib/simple-codec/simple-codec-helper.h>
 #include <lib/sync/completion.h>
 
-#include <zxtest/zxtest.h>
+#include <gtest/gtest.h>
 
 #include "src/devices/gpio/testing/fake-gpio/fake-gpio.h"
 #include "src/devices/testing/mock-ddk/mock-device.h"
+#include "src/lib/testing/predicates/status.h"
 
 namespace audio {
 
@@ -54,7 +57,7 @@ struct Tas27xxCodec : public Tas27xx {
   inspect::Inspector& inspect() { return Tas27xx::inspect(); }
 };
 
-class Tas27xxTest : public inspect::InspectTestHelper, public zxtest::Test {
+class Tas27xxTest : public ::testing::Test {
  public:
   void SetUp() override {
     EXPECT_OK(fidl_servers_loop_.StartThread("fidl-servers"));
@@ -71,7 +74,7 @@ class Tas27xxTest : public inspect::InspectTestHelper, public zxtest::Test {
   async::Loop fidl_servers_loop_{&kAsyncLoopConfigNoAttachToCurrentThread};
 
  protected:
-  mock_i2c::MockI2c mock_i2c_;
+  mock_i2c::MockI2cGtest mock_i2c_;
   async_patterns::TestDispatcherBound<fake_gpio::FakeGpio> fault_gpio_{
       fidl_servers_loop_.dispatcher(), std::in_place};
   fidl::ClientEnd<fuchsia_hardware_i2c::Device> mock_i2c_client_;
@@ -106,7 +109,7 @@ TEST_F(Tas27xxTest, CodecGetInfo) {
   ASSERT_OK(SimpleCodecServer::CreateAndAddToDdk<Tas27xxCodec>(
       fake_parent.get(), std::move(mock_i2c_client_), std::move(fault_gpio_client_)));
   auto* child_dev = fake_parent->GetLatestChild();
-  ASSERT_NOT_NULL(child_dev);
+  ASSERT_TRUE(child_dev);
   auto codec = child_dev->GetDeviceContext<Tas27xxCodec>();
   zx::result<fidl::ClientEnd<fuchsia_hardware_audio::Codec>> codec_client = codec->GetClient();
   ASSERT_OK(codec_client.status_value());
@@ -149,7 +152,7 @@ TEST_F(Tas27xxTest, CodecReset) {
   ASSERT_OK(SimpleCodecServer::CreateAndAddToDdk<Tas27xxCodec>(
       fake_parent.get(), std::move(mock_i2c_client_), std::move(fault_gpio_client_)));
   auto* child_dev = fake_parent->GetLatestChild();
-  ASSERT_NOT_NULL(child_dev);
+  ASSERT_TRUE(child_dev);
   auto codec = child_dev->GetDeviceContext<Tas27xxCodec>();
   zx::result<fidl::ClientEnd<fuchsia_hardware_audio::Codec>> codec_client = codec->GetClient();
   ASSERT_OK(codec_client.status_value());
@@ -234,7 +237,7 @@ TEST_F(Tas27xxTest, DISABLED_CodecResetDueToErrorState) {
   ASSERT_OK(SimpleCodecServer::CreateAndAddToDdk<Tas27xxCodec>(
       fake_parent.get(), std::move(mock_i2c_client_), std::move(fault_gpio_client_)));
   auto* child_dev = fake_parent->GetLatestChild();
-  ASSERT_NOT_NULL(child_dev);
+  ASSERT_TRUE(child_dev);
   auto codec = child_dev->GetDeviceContext<Tas27xxCodec>();
   zx::result<fidl::ClientEnd<fuchsia_hardware_audio::Codec>> codec_client = codec->GetClient();
   ASSERT_OK(codec_client.status_value());
@@ -313,7 +316,7 @@ TEST_F(Tas27xxTest, ExternalConfig) {
   ASSERT_OK(SimpleCodecServer::CreateAndAddToDdk<Tas27xxCodec>(
       fake_parent.get(), std::move(mock_i2c_client_), std::move(fault_gpio_client_)));
   auto* child_dev = fake_parent->GetLatestChild();
-  ASSERT_NOT_NULL(child_dev);
+  ASSERT_TRUE(child_dev);
   auto codec = child_dev->GetDeviceContext<Tas27xxCodec>();
   zx::result<fidl::ClientEnd<fuchsia_hardware_audio::Codec>> codec_client = codec->GetClient();
   ASSERT_OK(codec_client.status_value());
@@ -330,7 +333,7 @@ TEST_F(Tas27xxTest, CodecDaiFormat) {
   ASSERT_OK(SimpleCodecServer::CreateAndAddToDdk<Tas27xxCodec>(
       fake_parent.get(), std::move(mock_i2c_client_), std::move(fault_gpio_client_)));
   auto* child_dev = fake_parent->GetLatestChild();
-  ASSERT_NOT_NULL(child_dev);
+  ASSERT_TRUE(child_dev);
   auto codec = child_dev->GetDeviceContext<Tas27xxCodec>();
   zx::result<fidl::ClientEnd<fuchsia_hardware_audio::Codec>> codec_client = codec->GetClient();
   ASSERT_OK(codec_client.status_value());
@@ -347,33 +350,40 @@ TEST_F(Tas27xxTest, CodecDaiFormat) {
   // Check getting DAI formats.
   {
     auto formats = client.GetDaiFormats();
-    ASSERT_EQ(formats.value().number_of_channels.size(), 1);
-    ASSERT_EQ(formats.value().number_of_channels[0], 2);
-    ASSERT_EQ(formats.value().sample_formats.size(), 1);
+    ASSERT_EQ(formats.value().number_of_channels.size(), 1u);
+    ASSERT_EQ(formats.value().number_of_channels[0], 2u);
+    ASSERT_EQ(formats.value().sample_formats.size(), 1u);
     ASSERT_EQ(formats.value().sample_formats[0], SampleFormat::PCM_SIGNED);
-    ASSERT_EQ(formats.value().frame_formats.size(), 1);
+    ASSERT_EQ(formats.value().frame_formats.size(), 1u);
     ASSERT_EQ(formats.value().frame_formats[0], FrameFormat::I2S);
-    ASSERT_EQ(formats.value().frame_rates.size(), 2);
-    ASSERT_EQ(formats.value().frame_rates[0], 48000);
-    ASSERT_EQ(formats.value().frame_rates[1], 96000);
-    ASSERT_EQ(formats.value().bits_per_slot.size(), 1);
-    ASSERT_EQ(formats.value().bits_per_slot[0], 32);
-    ASSERT_EQ(formats.value().bits_per_sample.size(), 1);
-    ASSERT_EQ(formats.value().bits_per_sample[0], 16);
+    ASSERT_EQ(formats.value().frame_rates.size(), 2u);
+    ASSERT_EQ(formats.value().frame_rates[0], 48000u);
+    ASSERT_EQ(formats.value().frame_rates[1], 96000u);
+    ASSERT_EQ(formats.value().bits_per_slot.size(), 1u);
+    ASSERT_EQ(formats.value().bits_per_slot[0], 32u);
+    ASSERT_EQ(formats.value().bits_per_sample.size(), 1u);
+    ASSERT_EQ(formats.value().bits_per_sample[0], 16u);
   }
 
   // Check inspect state.
-  ASSERT_NO_FATAL_FAILURE(ReadInspect(codec->inspect().DuplicateVmo()));
-  auto* simple_codec = hierarchy().GetByPath({"simple_codec"});
-  ASSERT_TRUE(simple_codec);
-  ASSERT_NO_FATAL_FAILURE(
-      CheckProperty(simple_codec->node(), "state", inspect::StringPropertyValue("created")));
-  ASSERT_NO_FATAL_FAILURE(
-      CheckProperty(simple_codec->node(), "start_time", inspect::IntPropertyValue(0)));
-  ASSERT_NO_FATAL_FAILURE(CheckProperty(simple_codec->node(), "manufacturer",
-                                        inspect::StringPropertyValue("Texas Instruments")));
-  ASSERT_NO_FATAL_FAILURE(
-      CheckProperty(simple_codec->node(), "product", inspect::StringPropertyValue("TAS2770")));
+  fpromise::result<inspect::Hierarchy> hierarchy_result =
+      fpromise::run_single_threaded(inspect::ReadFromInspector(codec->inspect()));
+  ASSERT_TRUE(hierarchy_result.is_ok());
+
+  inspect::Hierarchy hierarchy = std::move(hierarchy_result.value());
+  const inspect::Hierarchy* simple_codec_root = hierarchy.GetByPath({"simple_codec"});
+  ASSERT_TRUE(simple_codec_root);
+
+  EXPECT_THAT(simple_codec_root->node(), inspect::testing::PropertyList(testing::Contains(
+                                             inspect::testing::StringIs("state", "created"))));
+  EXPECT_THAT(
+      simple_codec_root->node(),
+      inspect::testing::PropertyList(testing::Contains(inspect::testing::IntIs("start_time", 0))));
+  EXPECT_THAT(simple_codec_root->node(),
+              inspect::testing::PropertyList(testing::Contains(
+                  inspect::testing::StringIs("manufacturer", "Texas Instruments"))));
+  EXPECT_THAT(simple_codec_root->node(), inspect::testing::PropertyList(testing::Contains(
+                                             inspect::testing::StringIs("product", "TAS2770"))));
 
   // Check setting DAI formats.
   {
@@ -404,7 +414,7 @@ TEST_F(Tas27xxTest, CodecDaiFormat) {
     format.frame_rate = 192'000;
     auto formats = client.GetDaiFormats();
     ASSERT_FALSE(IsDaiFormatSupported(format, formats.value()));
-    ASSERT_NOT_OK(client.SetDaiFormat(std::move(format)));
+    ASSERT_TRUE(client.SetDaiFormat(std::move(format)).is_error());
   }
 
   mock_i2c_.VerifyAndClear();
@@ -416,7 +426,7 @@ TEST_F(Tas27xxTest, CodecGain) {
   ASSERT_OK(SimpleCodecServer::CreateAndAddToDdk<Tas27xxCodec>(
       fake_parent.get(), std::move(mock_i2c_client_), std::move(fault_gpio_client_)));
   auto* child_dev = fake_parent->GetLatestChild();
-  ASSERT_NOT_NULL(child_dev);
+  ASSERT_TRUE(child_dev);
   auto codec = child_dev->GetDeviceContext<Tas27xxCodec>();
   zx::result<fidl::ClientEnd<fuchsia_hardware_audio::Codec>> codec_client = codec->GetClient();
   ASSERT_OK(codec_client.status_value());

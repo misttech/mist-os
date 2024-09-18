@@ -6,10 +6,10 @@ executable("runtests") {
   testonly = true
   sources = [ "runtests.cc" ]
   deps = [
+    "//sdk/lib/async",
+    "//sdk/lib/async-loop",
     "//sdk/lib/device-watcher/cpp",
     "//sdk/lib/fidl",
-    "//zircon/system/ulib/async",
-    "//zircon/system/ulib/async-loop",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/runtests-utils",
     "//zircon/system/ulib/zircon-internal",

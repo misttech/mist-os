@@ -9,9 +9,7 @@ import("//build/test.gni")
 
 # A collection of utilities useful to debuggers and similar programs.
 
-sdk_static_library("elflib") {
-  category = "internal"
-
+static_library("elflib") {
   sources = [ "elflib.cc" ]
 
   public = [ "elflib.h" ]

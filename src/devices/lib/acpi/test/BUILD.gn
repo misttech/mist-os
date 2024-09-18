@@ -7,10 +7,10 @@ import("//build/test.gni")
 test("acpi-unittest") {
   deps = [
     "//sdk/fidl/fuchsia.hardware.acpi:fuchsia.hardware.acpi_cpp",
+    "//sdk/lib/async-loop:async-loop-cpp",
     "//src/devices/lib/acpi",
     "//src/devices/lib/acpi/mock:mock-acpi",
     "//src/lib/ddk",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/zx",
     "//zircon/system/ulib/zxtest",
   ]

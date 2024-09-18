@@ -5,7 +5,6 @@
 import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.net.stack") {
-  sdk_category = "excluded"
   sources = [ "stack.fidl" ]
   public_deps = [
     "//sdk/fidl/fuchsia.net",

@@ -85,17 +85,6 @@ type ElementSchema = resource table {
     /// List of dependencies for this element's power levels.
     /// Note: dependencies UPON this element's levels cannot be added here.
     4: dependencies vector<LevelDependency>:MAX_DEPENDENCIES_IN_ADD_ELEMENT;
-    /// List of assertive dependency tokens to register for this element.
-    /// These tokens will allow other element owners to create assertive
-    /// dependencies upon this element by passing them as the
-    /// requires_token of a LevelDependency.
-    5: assertive_dependency_tokens_to_register vector<DependencyToken>:MAX_TOKENS_IN_ADD_ELEMENT;
-    /// List of opportunistic dependency tokens to register for this element.
-    /// These tokens will allow other element owners to create opportunistic
-    /// dependencies upon this element by passing them as the
-    /// requires_token of a LevelDependency.
-    6: opportunistic_dependency_tokens_to_register
-            vector<DependencyToken>:MAX_TOKENS_IN_ADD_ELEMENT;
     /// Channels on which Power Broker will send required power levels and
     /// receive current level updates.
     7: level_control_channels LevelControlChannels;
@@ -125,9 +114,8 @@ const MAX_TOKENS_IN_ADD_ELEMENT uint16 = 128;
 const MAX_VALID_POWER_LEVELS uint16 = 256;
 
 type AddElementError = flexible enum {
-    INTERNAL = 1;
-    INVALID = 2;
-    NOT_AUTHORIZED = 3;
+    INVALID = 1;
+    NOT_AUTHORIZED = 2;
 };
 
 /// Provides element-scoped access to an element previously added via

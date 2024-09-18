@@ -533,7 +533,29 @@ pub async fn serve_impl<W: Write + 'static>(
                 let repo_client = RepoClient::from_trusted_remote(Box::new(repository) as Box<_>)
                     .await
                     .with_context(|| format!("Creating a repo client for {repo_name}"))?;
+
+                let mirror_url = format!("http://{addr}/{repo_name}", addr = cmd.address)
+                    .parse()
+                    .map_err(|e| bug!("{e}"))?;
+                let repo_url = fuchsia_url::RepositoryUrl::parse_host(repo_name.clone())
+                    .map_err(|e| bug!("{e}"))?;
+                let storage_type: Option<fidl_fuchsia_pkg_ext::RepositoryStorageType> =
+                    match cmd.storage_type {
+                        Some(fidl_fuchsia_developer_ffx::RepositoryStorageType::Ephemeral) => {
+                            Some(fidl_fuchsia_pkg_ext::RepositoryStorageType::Ephemeral)
+                        }
+                        Some(fidl_fuchsia_developer_ffx::RepositoryStorageType::Persistent) => {
+                            Some(fidl_fuchsia_pkg_ext::RepositoryStorageType::Persistent)
+                        }
+                        None => None,
+                    };
+
+                let repo_config = repo_client
+                    .get_config(repo_url, mirror_url, storage_type)
+                    .map_err(|e| bug!("{e}"))?;
+
                 repo_manager.add(&repo_name, repo_client);
+
                 if let Err(e) = write_instance_info(
                     Some(context.clone()),
                     mode.clone(),
@@ -543,6 +565,7 @@ pub async fn serve_impl<W: Write + 'static>(
                     aliases.into_iter().collect(),
                     cmd.storage_type.unwrap_or(RepositoryStorageType::Ephemeral).into(),
                     cmd.alias_conflict_mode.into(),
+                    repo_config,
                 )
                 .await
                 {
@@ -590,6 +613,25 @@ pub async fn serve_impl<W: Write + 'static>(
             repo_client.update().await.context("updating the repository metadata")?;
 
             let repo_name = cmd.repository.clone().unwrap_or_else(|| DEFAULT_REPO_NAME.to_string());
+            let repo_url =
+                fuchsia_url::RepositoryUrl::parse_host(repo_name.clone()).map_err(|e| bug!(e))?;
+            let mirror_url = format!("http://{addr}/{repo_name}", addr = cmd.address)
+                .parse()
+                .map_err(|e: http::uri::InvalidUri| bug!(e))?;
+            let storage_type: Option<fidl_fuchsia_pkg_ext::RepositoryStorageType> =
+                match cmd.storage_type {
+                    Some(fidl_fuchsia_developer_ffx::RepositoryStorageType::Ephemeral) => {
+                        Some(fidl_fuchsia_pkg_ext::RepositoryStorageType::Ephemeral)
+                    }
+                    Some(fidl_fuchsia_developer_ffx::RepositoryStorageType::Persistent) => {
+                        Some(fidl_fuchsia_pkg_ext::RepositoryStorageType::Persistent)
+                    }
+                    None => None,
+                };
+
+            let repo_config = repo_client
+                .get_config(repo_url, mirror_url, storage_type)
+                .map_err(|e| bug!("{e}"))?;
             repo_manager.add(&repo_name, repo_client);
 
             if cmd.refresh_metadata {
@@ -605,6 +647,7 @@ pub async fn serve_impl<W: Write + 'static>(
                 cmd.alias.clone(),
                 cmd.storage_type.unwrap_or(RepositoryStorageType::Ephemeral).into(),
                 cmd.alias_conflict_mode.into(),
+                repo_config,
             )
             .await
             {
@@ -727,6 +770,7 @@ mod test {
     use fidl_fuchsia_pkg::{
         MirrorConfig, RepositoryConfig, RepositoryManagerRequest, RepositoryManagerRequestStream,
     };
+    use fidl_fuchsia_pkg_ext::RepositoryConfigBuilder;
     use fidl_fuchsia_pkg_rewrite::{
         EditTransactionRequest, EngineRequest, EngineRequestStream, RuleIteratorRequest,
     };
@@ -1298,6 +1342,11 @@ mod test {
         let repo_path = env.isolate_root.path().join("repo_path");
         fs::create_dir_all(&repo_path).expect("repo path dir");
 
+        let instance_name = "devhost";
+        let repo_config =
+            RepositoryConfigBuilder::new(format!("fuchsia-pkg://{instance_name}").parse().unwrap())
+                .build();
+
         env.context
             .query("repository.process_dir")
             .level(Some(ConfigLevel::User))
@@ -1306,7 +1355,7 @@ mod test {
             .expect("setting instance root config");
 
         let server_info = PkgServerInfo {
-            name: "devhost".into(),
+            name: instance_name.into(),
             address: (REPO_IPV4_ADDR, REPO_PORT).into(),
             repo_path: repo_path.as_path().into(),
             registration_aliases: vec![],
@@ -1314,6 +1363,7 @@ mod test {
             registration_alias_conflict_mode: RegistrationConflictMode::ErrorOut,
             server_mode: ServerMode::Background,
             pid: std::process::id(),
+            repo_config,
         };
 
         let mgr = PkgServerInstances::new(instance_root);
@@ -1335,11 +1385,11 @@ mod test {
             refresh_metadata: false,
             auto_publish: None,
         },
-            Err(user_error!("repository server is already running on 127.0.0.1:0: named \"devhost\"  serving {:?}\n Use `ffx  repository server list` to list running servers", repo_path))
+            Err(user_error!("repository server is already running on 127.0.0.1:0: named \"{instance_name}\"  serving {:?}\n Use `ffx  repository server list` to list running servers", repo_path))
     ),
     (
         ServeCommand {
-           repository: Some("devhost".into()),
+           repository: Some(instance_name.into()),
            trusted_root: None,
            address: (REPO_IPV4_ADDR, REPO_PORT).into(),
            repo_path: Some(Utf8PathBuf::from_path_buf(repo_path.clone()).expect("utf8 repo_path")),
@@ -1356,7 +1406,7 @@ mod test {
    ),
    (
     ServeCommand {
-       repository: Some("devhost".into()),
+       repository: Some(instance_name.into()),
        trusted_root: None,
        address: (REPO_IPV4_ADDR, 8888).into(),
        repo_path: Some(Utf8PathBuf::from_path_buf(repo_path.clone()).expect("utf8 repo_path")),
@@ -1377,7 +1427,13 @@ mod test {
             let result = serve_impl_validate_args(&cmd, &env.context);
             match expected {
                 Ok(Some(pkg_server_info)) => {
-                    if let Some(actual_info) = result.ok().expect("Ok result") {
+                    if let Some(actual_info) = match result {
+                        Ok(info) => info,
+                        Err(e) => {
+                            assert!(false, " unexpected error {e}");
+                            None
+                        }
+                    } {
                         assert_eq!(actual_info, pkg_server_info)
                     } else {
                         assert!(false, "Expected {pkg_server_info:?}, got None");

@@ -399,10 +399,6 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceConfigurat
         is_ip_unicast_forwarding_enabled::<Ipv4, _, _>(self, device_id)
     }
 
-    fn get_mtu(&mut self, device_id: &Self::DeviceId) -> Mtu {
-        device::IpDeviceConfigurationContext::<Ipv4, _>::get_mtu(self, device_id)
-    }
-
     fn confirm_reachable(
         &mut self,
         bindings_ctx: &mut BC,
@@ -506,10 +502,6 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceConfigurat
         is_ip_unicast_forwarding_enabled::<Ipv6, _, _>(self, device_id)
     }
 
-    fn get_mtu(&mut self, device_id: &Self::DeviceId) -> Mtu {
-        device::IpDeviceConfigurationContext::<Ipv6, _>::get_mtu(self, device_id)
-    }
-
     fn confirm_reachable(
         &mut self,
         bindings_ctx: &mut BC,
@@ -523,6 +515,18 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceConfigurat
             // NUD is not supported on Loopback or pure IP devices.
             DeviceId::Loopback(_) | DeviceId::PureIp(_) => {}
         }
+    }
+}
+
+#[netstack3_macros::instantiate_ip_impl_block(I)]
+impl<
+        I: IpExt,
+        BC: BindingsContext,
+        L: LockBefore<crate::lock_ordering::IpDeviceConfiguration<I>>,
+    > ip::IpDeviceMtuContext<I> for CoreCtx<'_, BC, L>
+{
+    fn get_mtu(&mut self, device_id: &Self::DeviceId) -> Mtu {
+        device::IpDeviceConfigurationContext::<I, _>::get_mtu(self, device_id)
     }
 }
 

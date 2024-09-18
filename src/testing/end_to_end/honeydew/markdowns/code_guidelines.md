@@ -2,7 +2,14 @@
 
 [TOC]
 
-## Reasons for creating guidelines
+## Current status
+
+As of Q3 2024, Fuchsia's Python toolchain now automatically enforces most of
+Honeydew's conformance requirements. Teams may optionally run `conformance.sh`
+for additional verification but they are no longer required to run it before
+code submission.
+
+## Historic reasons for creating guidelines
 
 As of Q4 2023, Fuchsia does not automatically enforce coding standards on
 Python code and fix/flag the CL during development/review process.
@@ -22,29 +29,6 @@ functional test coverage.
 
 To help facilitate #2, Honeydew relies on [Google Python Style Guide]
 (which contains a list of dos and don’ts for Python programs).
-
-## Proposal
-
-### Current State
-
-As of Q4 2023, Fuchsia does not automatically enforce coding standards on
-Python code and fix/flag the CL during development/review process.
-
-### End state
-
-All the tools needed to enforce coding standards on Python code will be
-integrated into Fuchsia developer workflow and will be run automatically in
-CQ/Pre-Submit.
-
-### Interim
-
-Until that point, the Lacewing team has created below guidelines that need to be
-followed by everyone while contributing to Honeydew. Following these guidelines
-will ensure code is well tested, consistent and readable before it is merged.
-
-We understand it's difficult to meet these requirements without automated
-enforcement. Please bear with us while we roll out the appropriate automated
-checks.
 
 ## What are the guidelines?
 
@@ -69,18 +53,8 @@ checks.
 
 To ease the development workflow, we have
 [automated checking for these guidelines](#How-to-check-for-these-guidelines?)
-(everything except functional test cases). Users should run this script and
+(everything except functional test cases). Users can run this script and
 fix any errors it suggests.
-
-
-## When to check for these guidelines?
-
-**These guidelines need to be checked at the least on the following patchsets:**
-1. Initial patchset just before adding reviewers
-2. Final patchset just before merging the CL
-
-On all other patchsets, it is recommended but optional to check these
-guidelines.
 
 ## How to check for these guidelines?
 

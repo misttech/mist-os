@@ -91,4 +91,8 @@ void ArchSetUp(void* zbi);
 // chance to construct one; in that case, "early-init" is returned.
 const char* ProgramName();
 
+// Set up different subsystems for handling a panic. For example, all logs will go
+// through serial only.
+void PreparePanic();
+
 #endif  // ZIRCON_KERNEL_PHYS_INCLUDE_PHYS_MAIN_H_

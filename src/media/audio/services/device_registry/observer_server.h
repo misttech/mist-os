@@ -11,6 +11,7 @@
 
 #include "src/media/audio/services/common/base_fidl_server.h"
 #include "src/media/audio/services/device_registry/device.h"
+#include "src/media/audio/services/device_registry/inspector.h"
 #include "src/media/audio/services/device_registry/logging.h"
 #include "src/media/audio/services/device_registry/observer_notify.h"
 
@@ -63,6 +64,11 @@ class ObserverServer
   void MaybeCompleteWatchTopology();
   void MaybeCompleteWatchElementState(ElementId element_id);
 
+  const std::shared_ptr<FidlServerInspectInstance>& inspect() { return observer_inspect_instance_; }
+  void SetInspect(std::shared_ptr<FidlServerInspectInstance> instance) {
+    observer_inspect_instance_ = std::move(instance);
+  }
+
   // Static object count, for debugging purposes.
   static inline uint64_t count() { return count_; }
 
@@ -90,6 +96,8 @@ class ObserverServer
 
   bool device_has_error_ = false;
   std::shared_ptr<const Device> device_;
+
+  std::shared_ptr<FidlServerInspectInstance> observer_inspect_instance_;
 };
 
 }  // namespace media_audio

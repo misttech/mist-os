@@ -195,6 +195,10 @@ impl CoreRealm {
         // Start DriverTestRealm
         let args = fdt::RealmArgs {
             root_driver: Some(EMULATOR_ROOT_DRIVER_URL.to_string()),
+            software_devices: Some(vec![fidl_fuchsia_driver_test::SoftwareDevice {
+                device_name: "bt-hci-emulator".to_string(),
+                device_id: bind_fuchsia_platform::BIND_PLATFORM_DEV_DID_BT_HCI_EMULATOR,
+            }]),
             ..Default::default()
         };
         instance.driver_test_realm_start(args).await?;

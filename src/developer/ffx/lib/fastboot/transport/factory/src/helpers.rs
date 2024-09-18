@@ -8,8 +8,10 @@ use discovery::{
 };
 use ffx_fastboot_interface::interface_factory::InterfaceFactoryError;
 use futures::StreamExt;
+use std::path::PathBuf;
 
 pub(crate) async fn rediscover_helper<F, U>(
+    fastboot_file_path: &Option<PathBuf>,
     target_name: &String,
     filter: F,
     cb: &mut U,
@@ -21,8 +23,11 @@ where
     let mut device_stream = wait_for_devices(
         filter,
         None,
+        fastboot_file_path.clone(),
         true,
         false,
+        // TODO(colnnelson): add DiscoverySources::FASTSBOOT_FILE to this once
+        // feature is landed announced and stabilized.
         DiscoverySources::MDNS | DiscoverySources::MANUAL,
     )
     .await?;

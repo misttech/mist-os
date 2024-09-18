@@ -18,8 +18,6 @@ pub mod stored_message;
 #[cfg(test)]
 pub mod testing;
 
-pub use debuglog::{convert_debuglog_to_log_message, KernelDebugLog};
-
 #[cfg(test)]
 mod tests {
     use crate::identity::ComponentIdentity;
@@ -98,6 +96,10 @@ mod tests {
                         last_timestamp: AnyProperty,
                         sockets_closed: 1u64,
                         sockets_opened: 1u64,
+                        invalid: {
+                            number: 0u64,
+                            bytes: 0u64,
+                        },
                         total: {
                             number: 5u64,
                             bytes: AnyProperty,
@@ -176,6 +178,10 @@ mod tests {
                             last_timestamp: AnyProperty,
                             sockets_closed: 1u64,
                             sockets_opened: 1u64,
+                            invalid: {
+                                number: 0u64,
+                                bytes: 0u64,
+                            },
                             total: {
                                 number: 1u64,
                                 bytes: AnyProperty,
@@ -214,6 +220,10 @@ mod tests {
                             last_timestamp: AnyProperty,
                             sockets_closed: 1u64,
                             sockets_opened: 1u64,
+                            invalid: {
+                                number: 0u64,
+                                bytes: 0u64,
+                            },
                             total: {
                                 number: 1u64,
                                 bytes: AnyProperty,
@@ -590,27 +600,27 @@ mod tests {
 
         let expected_logs = vec![
             LogMessage {
-                pid: log1.record.pid,
-                tid: log1.record.tid,
-                time: log1.record.timestamp,
+                pid: log1.record.pid.raw_koid(),
+                tid: log1.record.tid.raw_koid(),
+                time: log1.record.timestamp.into_nanos(),
                 dropped_logs: 0,
                 severity: fidl_fuchsia_logger::LogLevelFilter::Info as i32,
                 msg: String::from("log1"),
                 tags: vec![String::from("klog")],
             },
             LogMessage {
-                pid: log2.record.pid,
-                tid: log2.record.tid,
-                time: log2.record.timestamp,
+                pid: log2.record.pid.raw_koid(),
+                tid: log2.record.tid.raw_koid(),
+                time: log2.record.timestamp.into_nanos(),
                 dropped_logs: 0,
                 severity: fidl_fuchsia_logger::LogLevelFilter::Info as i32,
                 msg: String::from("log2"),
                 tags: vec![String::from("klog")],
             },
             LogMessage {
-                pid: log3.record.pid,
-                tid: log3.record.tid,
-                time: log3.record.timestamp,
+                pid: log3.record.pid.raw_koid(),
+                tid: log3.record.tid.raw_koid(),
+                time: log3.record.timestamp.into_nanos(),
                 dropped_logs: 0,
                 severity: fidl_fuchsia_logger::LogLevelFilter::Info as i32,
                 msg: String::from("log3"),
@@ -628,6 +638,10 @@ mod tests {
                         last_timestamp: AnyProperty,
                         sockets_closed: 0u64,
                         sockets_opened: 0u64,
+                        invalid: {
+                            number: 0u64,
+                            bytes: 0u64,
+                        },
                         total: {
                             number: 3u64,
                             bytes: AnyProperty,

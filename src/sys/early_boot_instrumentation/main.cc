@@ -65,6 +65,7 @@ int main(int argc, char** argv) {
   // Even if we fail to populate from the sources, we expose empty directories,
   // such that the contract remains.
   fbl::unique_fd boot_instrumentation_data_dir(open("/boot/kernel/i", O_RDONLY));
+  auto out_logs = std::make_unique<vfs::PseudoDir>();
   if (!boot_instrumentation_data_dir) {
     if (errno != ENOENT) {
       const char* err = strerror(errno);
@@ -73,10 +74,19 @@ int main(int argc, char** argv) {
           << err;
     }
   } else {
+    fbl::unique_fd boot_logs(openat(boot_instrumentation_data_dir.get(), "logs", O_RDONLY));
+
     if (auto res = early_boot_instrumentation::ExposeBootDebugdata(boot_instrumentation_data_dir,
                                                                    sink_map);
         res.is_error()) {
       FX_LOGS(ERROR) << "Could not expose kernel profile data. " << res.status_value();
+    }
+
+    if (!boot_logs) {
+      FX_LOGS(ERROR) << "Failed to obtain logs directory handle." << strerror(errno);
+    }
+    if (auto res = early_boot_instrumentation::ExposeLogs(boot_logs, *out_logs); res.is_error()) {
+      FX_LOGS(ERROR) << "Failed to expose logs from logs directory." << res.status_value();
     }
   }
 
@@ -88,6 +98,7 @@ int main(int argc, char** argv) {
 
   std::unique_ptr context = sys::ComponentContext::Create();
   context->outgoing()->root_dir()->AddEntry("debugdata", std::move(debug_data));
+  context->outgoing()->root_dir()->AddEntry("logs", std::move(out_logs));
   if (zx_status_t status = context->outgoing()->ServeFromStartupInfo(loop.dispatcher());
       status != ZX_OK) {
     FX_PLOGS(FATAL, status) << "Could not serve outgoing directory";

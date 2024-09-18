@@ -34,7 +34,7 @@ const FLUSH_BATCH_SIZE: u64 = 524_288;
 
 /// An expanding write will: mark a page as dirty, write to the page, and then update the content
 /// size. If a flush is triggered during an expanding write then query_dirty_ranges may return pages
-/// that have been marked dirty but are beyond the content size. Those extra pages can't be cleaned
+/// that have been marked dirty but are beyond the stream size. Those extra pages can't be cleaned
 /// during the flush and will have to be cleaned in a later flush. The initial flush will consume
 /// the transaction metadata space that the extra pages were supposed to be part of leaving no
 /// transaction metadata space for the extra pages in the next flush if no additional pages are
@@ -47,7 +47,7 @@ pub struct PagedObjectHandle {
     vmo: TempClonable<zx::Vmo>,
     handle: DataObjectHandle<FxVolume>,
 }
-
+#[derive(Debug)]
 struct Inner {
     dirty_crtime: DirtyTimestamp,
     dirty_mtime: DirtyTimestamp,
@@ -67,7 +67,7 @@ struct Inner {
     read_only: bool,
 }
 
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 enum PendingShrink {
     None,
 
@@ -82,7 +82,7 @@ enum PendingShrink {
 // DirtyTimestamp tracks a dirty timestamp and handles flushing. Whilst we're flushing, we need to
 // hang on to the timestamp in case anything queries it, but once we've finished, we can discard it
 // so long as it hasn't been written again.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 enum DirtyTimestamp {
     None,
     Some(Timestamp),
@@ -238,7 +238,7 @@ impl PagedObjectHandle {
     }
 
     pub fn get_size(&self) -> u64 {
-        self.vmo.get_content_size().unwrap()
+        self.vmo.get_stream_size().unwrap()
     }
 
     pub fn pre_fetch_keys(&self) -> Option<impl Future<Output = ()>> {
@@ -387,8 +387,8 @@ impl PagedObjectHandle {
         let mut flush_batches = FlushBatches::default();
         let mut last_end = 0;
         for modified_range in modified_ranges {
-            // Skip ranges entirely past the content size.  It might be tempting to consider
-            // flushing the range anyway and making up some value for content size, but that's not
+            // Skip ranges entirely past the stream size.  It might be tempting to consider
+            // flushing the range anyway and making up some value for stream size, but that's not
             // safe because the pages will be zeroed before they are written to and it would be
             // wrong to write zeroed data.
             let (range, past_content_size_page_range) =
@@ -507,13 +507,13 @@ impl PagedObjectHandle {
 
             let size = if last_batch {
                 if batch.end() > content_size {
-                    // Now that we've called writeback_begin, get the content size again.  If the
-                    // content size has increased (it can't decrease because we hold a lock on
+                    // Now that we've called writeback_begin, get the stream size again.  If the
+                    // stream size has increased (it can't decrease because we hold a lock on
                     // truncation), it's possible that it grew before we called writeback_begin in
                     // which case, the kernel won't mark the tail page dirty again so we must
-                    // increase the content size, but no further than the end of the tail page.
+                    // increase the stream size, but no further than the end of the tail page.
                     let new_content_size =
-                        self.vmo().get_content_size().context("get_content_size failed")?;
+                        self.vmo().get_stream_size().context("get_stream_size failed")?;
 
                     assert!(new_content_size >= content_size);
 
@@ -625,7 +625,7 @@ impl PagedObjectHandle {
             self.inner.lock().unwrap().put_back(dirty_pages, &reservation);
         });
 
-        let content_size = self.vmo().get_content_size().context("get_content_size failed")?;
+        let content_size = self.vmo().get_stream_size().context("get_stream_size failed")?;
         let previous_content_size = self.handle.get_size();
         let FlushBatches {
             batches: flush_batches,
@@ -734,21 +734,12 @@ impl PagedObjectHandle {
         let keys = lock_keys![LockKey::truncate(store.store_object_id(), self.handle.object_id())];
         let _truncate_guard = fs.lock_manager().write_lock(keys).await;
 
-        let old_vmo_size = self.vmo.get_size()?;
-
         let vmo = self.vmo.temp_clone();
-        // This unblock is to break an executor ordering deadlock situation. Vmo::set_size() may
-        // trigger a blocking call back into fxfs on the same executor via the kernel. If all
+        // This unblock is to break an executor ordering deadlock situation. Vmo::set_stream_size()
+        // may trigger a blocking call back into Fxfs on the same executor via the kernel. If all
         // executor threads are busy, the reentrant call will queue up behind the blocking
-        // set_size() call and never complete.
-        unblock(move || {
-            if new_size > old_vmo_size {
-                vmo.set_size(new_size)
-            } else {
-                vmo.set_content_size(&new_size)
-            }
-        })
-        .await?;
+        // set_stream_size() call and never complete.
+        unblock(move || vmo.set_stream_size(new_size)).await?;
 
         let previous_content_size = self.handle.get_size();
         let mut inner = self.inner.lock().unwrap();
@@ -763,7 +754,7 @@ impl PagedObjectHandle {
         }
 
         // Not all paths through the resize method above cause the modification time in the kernel
-        // to be set (e.g. if only the content size is changed), so force an mtime update here.
+        // to be set (e.g. if only the stream size is changed), so force an mtime update here.
         let _ = self.was_file_modified_since_last_call()?;
         inner.dirty_mtime = DirtyTimestamp::Some(Timestamp::now());
 
@@ -847,7 +838,7 @@ impl PagedObjectHandle {
             }
             (
                 inner.dirty_page_count,
-                self.vmo.get_content_size()?,
+                self.vmo.get_stream_size()?,
                 inner.dirty_crtime.timestamp(),
                 inner.dirty_mtime.timestamp(),
             )
@@ -928,7 +919,7 @@ struct FlushBatches {
     dirty_page_count: u64,
 
     /// The number of pages that were marked dirty but are not included in `batches` because they
-    /// don't need to be flushed. These are pages that were beyond the VMO's content size.
+    /// don't need to be flushed. These are pages that were beyond the VMO's stream size.
     skipped_dirty_page_count: u64,
 
     /// Any zero ranges get put into their own batch, so we can account for them with pager
@@ -2305,30 +2296,27 @@ mod tests {
         file.sync().await.unwrap().map_err(zx::Status::from_raw).unwrap();
 
         // Get the backing memory for the file. Confirm the length of the vmo and the reported
-        // content size.
+        // stream size.
         let vmo = file
             .get_backing_memory(fio::VmoFlags::READ | fio::VmoFlags::WRITE)
             .await
             .unwrap()
             .map_err(zx::Status::from_raw)
             .unwrap();
-        assert_eq!(vmo.get_content_size().unwrap(), file_size);
-        assert_eq!(vmo.get_size().unwrap(), file_size);
+        assert_eq!(vmo.get_stream_size().unwrap(), file_size);
 
-        // Resize the file down to one page. Confirm the content size is updated, but the vmo size
+        // Resize the file down to one page. Confirm the stream size is updated, but the vmo size
         // stays the same.
         file.resize(page_size).await.unwrap().map_err(zx::Status::from_raw).unwrap();
         file.sync().await.unwrap().map_err(zx::Status::from_raw).unwrap();
-        assert_eq!(vmo.get_content_size().unwrap(), page_size);
-        assert_eq!(vmo.get_size().unwrap(), file_size);
+        assert_eq!(vmo.get_stream_size().unwrap(), page_size);
 
-        // Write some data to the vmo, beyond the current content size. This does _not_ update the
-        // content size, but it does make pages dirty beyond the end of the file.
+        // Write some data to the vmo, beyond the current stream size. This does _not_ update the
+        // stream size, but it does make pages dirty beyond the end of the file.
         unblock(move || {
             vmo.write(&[1, 2, 3, 4], page_size * 2).unwrap();
-            // Writing this data to the vmo shouldn't update the content size.
-            assert_eq!(vmo.get_content_size().unwrap(), page_size);
-            assert_eq!(vmo.get_size().unwrap(), file_size);
+            // Writing this data to the vmo shouldn't update the stream size.
+            assert_eq!(vmo.get_stream_size().unwrap(), page_size);
         })
         .await;
 

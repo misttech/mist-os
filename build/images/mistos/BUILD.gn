@@ -114,7 +114,6 @@ if (is_mistos) {
 
       ## Bootstrap
       "//src/bringup:bringup-config",
-      "//src/devices/sysmem/bin/sysmem_connector:sysmem_connector_cmp",
       "//src/sys/core:config",
       "//src/zircon/bin/role_manager",
 

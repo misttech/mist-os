@@ -51,7 +51,7 @@ pub struct WriteEventParams<'a, E, T, MS> {
     /// The thread that emitted the log.
     pub tid: zx::Koid,
     /// Number of events that were dropped before this one.
-    pub dropped: u32,
+    pub dropped: u64,
 }
 
 impl<B> Encoder<B>
@@ -66,6 +66,11 @@ where
     /// Returns a reference to the underlying buffer being used for encoding.
     pub fn inner(&self) -> &B {
         &self.buf
+    }
+
+    /// Returns a reference to the underlying buffer being used for encoding.
+    pub fn take(self) -> B {
+        self.buf
     }
 
     /// Writes a [`tracing::Event`] to the buffer as a record.

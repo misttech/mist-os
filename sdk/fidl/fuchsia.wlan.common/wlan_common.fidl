@@ -274,3 +274,40 @@ type WlanKeyConfig = table {
     /// Optional.
     8: rsc uint64;
 };
+
+/// Corresponds to the Capability Information field defined by IEEE Std 802.11-2020, 9.4.1.4.
+/// This contains subfields that indicate support for requested or optional capabilities.
+///
+/// TODO(https://fxbug.dev/367315525) Consider making this a bitfield.
+@available(added=HEAD)
+alias CapabilityInfo = uint16;
+
+/// Type corresponding to a BSSDescription defined by IEEE Std 802.11-2020 6.3.3.3.2
+///
+/// This type only includes explicit fields for information frequently required
+/// from a BSSDescription. All other fields are left in a raw buffer of IEs as
+/// received in an advertisement from the AP, e.g., from a Beacon or Probe
+/// Response frame.
+///
+/// The inclusion of a raw buffer of IEs ensures this type always includes all
+/// the information an AP advertises, no matter the version of Fuchsia the
+/// advertisement was received in.
+@available(added=HEAD)
+type BssDescription = struct {
+    bssid fuchsia.wlan.ieee80211.MacAddr;
+
+    bss_type BssType;
+    beacon_period uint16; // in TU
+    capability_info CapabilityInfo;
+
+    /// Buffer of IEs as received in an advertisement. E.g., from a Beacon
+    /// or Probe Response frame.
+    ies vector<uint8>:MAX;
+
+    /// Channel information for this BSS.
+    channel WlanChannel;
+    /// The running average of received signal strength indicator in units of dBm.
+    rssi_dbm int8;
+    /// The running average of snr in units of dB.
+    snr_db int8;
+};

@@ -57,7 +57,6 @@ use {fuchsia_async as fasync, fuchsia_zircon as zx};
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 enum EventType {
     Shutdown,
-    VmoComplete,
     Response,
 }
 
@@ -125,26 +124,12 @@ fn map_driver_result(result: Result<i32, fidl::Error>) -> Result<(), Error> {
         .and_then(|x| zx::Status::ok(x).map_err(Error::Driver))
 }
 
-fn send_result<T>(
-    result: Result<T, Error>,
-    send: impl FnOnce(i32, Option<T>) -> Result<(), fidl::Error>,
-) -> Result<(), Error> {
-    match result {
-        Ok(v) => send(zx::Status::OK.into_raw(), Some(v))
-            .map_err(|e| Error::ClientCommunication(e.into())),
-        Err(e) => {
-            send(e.into_status().into_raw(), None)
-                .map_err(|e| Error::ClientCommunication(e.into()))?;
-            Err(e)
-        }
-    }
-}
-
 struct State {
     device: DeviceProxy,
     events: HashMap<Event, oneshot::Sender<()>>,
     used_ports: port::Tracker,
     listens: HashMap<u32, mpsc::UnboundedSender<addr::Vsock>>,
+    tasks: fasync::TaskGroup,
 }
 
 pub struct LockedState {
@@ -185,6 +170,7 @@ impl Vsock {
             events: HashMap::new(),
             used_ports: port::Tracker::new(),
             listens: HashMap::new(),
+            tasks: fasync::TaskGroup::new(),
         };
         let (tx, rx) = crossbeam::channel::unbounded();
         let service =
@@ -213,37 +199,35 @@ impl Vsock {
     ) -> Result<(), Error> {
         let acceptor = acceptor.into_proxy().map_err(|x| Error::ClientCommunication(x.into()))?;
         let stream = self.listen_port(local_port)?;
-        fasync::Task::spawn(
+        self.lock().tasks.spawn(
             self.clone()
                 .run_connection_listener(stream, acceptor)
                 .unwrap_or_else(|err| tracing::warn!("Error {} running connection listener", err)),
-        )
-        .detach();
+        );
         Ok(())
     }
 
     // Handles a single incoming client request.
     async fn handle_request(&self, request: ConnectorRequest) -> Result<(), Error> {
         match request {
-            ConnectorRequest::Connect { remote_cid, remote_port, con, responder } => {
-                send_result(self.make_connection(remote_cid, remote_port, con).await, |r, v| {
-                    responder.send(r, v.unwrap_or(0))
-                })
-            }
-            ConnectorRequest::Listen { local_port, acceptor, responder } => {
-                send_result(self.start_listener(acceptor, local_port), |r, _| responder.send(r))
-            }
+            ConnectorRequest::Connect { remote_cid, remote_port, con, responder } => responder
+                .send(
+                    self.make_connection(remote_cid, remote_port, con)
+                        .await
+                        .map_err(|e| e.into_status().into_raw()),
+                ),
+            ConnectorRequest::Listen { local_port, acceptor, responder } => responder.send(
+                self.start_listener(acceptor, local_port).map_err(|e| e.into_status().into_raw()),
+            ),
         }
+        .map_err(|e| Error::ClientCommunication(e.into()))
     }
 
     /// Evaluates messages on a `ConnectorRequestStream` until completion or error
     ///
     /// Takes ownership of a `RequestStream` that is most likely created from a `ServicesServer`
     /// and processes any incoming requests on it.
-    pub async fn run_client_connection(
-        self,
-        request: ConnectorRequestStream,
-    ) -> Result<(), anyhow::Error> {
+    pub async fn run_client_connection(self, request: ConnectorRequestStream) {
         let self_ref = &self;
         let fut = request
             .map_err(|err| Error::ClientCommunication(err.into()))
@@ -253,9 +237,10 @@ impl Vsock {
                 self_ref
                     .handle_request(request)
                     .or_else(|e| future::ready(if e.is_comm_failure() { Err(e) } else { Ok(()) }))
-            })
-            .err_into();
-        fut.await
+            });
+        if let Err(e) = fut.await {
+            tracing::info!("Failed to handle request {}", e);
+        }
     }
     fn alloc_ephemeral_port(self) -> Option<AllocatedPort> {
         let p = self.lock().used_ports.allocate();
@@ -334,23 +319,6 @@ impl Vsock {
             Ok(shutdown_callback)
         })
     }
-    fn send_vmo(
-        &self,
-        addr: &addr::Vsock,
-        vmo: zx::Vmo,
-        off: u64,
-        len: u64,
-    ) -> Result<impl Future<Output = Result<OneshotEvent, Error>>, Error> {
-        let vmo_callback =
-            self.register_event(Event { action: EventType::VmoComplete, addr: addr.clone() })?;
-
-        let send_request_fut = self.lock().device.send_vmo(&addr, vmo, off, len);
-
-        Ok(async move {
-            map_driver_result(send_request_fut.await)?;
-            Ok(vmo_callback)
-        })
-    }
 
     // Runs a connected socket until completion. Processes any VMO sends and shutdown events.
     async fn run_connection<ShutdownFut>(
@@ -364,77 +332,35 @@ impl Vsock {
         ShutdownFut:
             Future<Output = Result<(), futures::channel::oneshot::Canceled>> + std::marker::Unpin,
     {
-        // This extremely awkward function definition is to temporarily work around select! not being
-        // nestable. Once this is fixed then this should be re-inlined into the single call site below.
-        // Until then don't look closely at this.
-        async fn wait_vmo_complete<ShutdownFut>(
-            mut shutdown_event: &mut futures::future::Fuse<ShutdownFut>,
-            cb: OneshotEvent,
-        ) -> Result<zx::Status, Result<(), Error>>
-        where
-            ShutdownFut: Future<Output = Result<(), futures::channel::oneshot::Canceled>>
-                + std::marker::Unpin,
-        {
-            select! {
-                shutdown_event = shutdown_event => Err(shutdown_event.map_err(|e| e.into())),
-                cb = cb.fuse() => match cb {
-                    Ok(_) => Ok(zx::Status::OK),
-                    Err(_) => Ok(Error::ConnectionReset.into_status()),
-                },
-            }
-        }
         let mut shutdown_event = shutdown_event.fuse();
-        loop {
-            select! {
-                shutdown_event = shutdown_event => {
-                    let fut = future::ready(shutdown_event)
-                        .err_into()
-                        .and_then(|()| self.lock().send_rst(&addr));
-                    return fut.await;
-                },
-                request = requests.next() => {
-                    match request {
-                        Some(Ok(ConnectionRequest::Shutdown{control_handle: _control_handle})) => {
-                            let fut =
-                                self.lock().send_shutdown(&addr)
-                                    // Wait to either receive the RST for the client or to be
-                                    // shut down for some other reason
-                                    .and_then(|()| shutdown_event.err_into());
-                            return fut.await;
-                        },
-                        Some(Ok(ConnectionRequest::SendVmo{vmo, off, len, responder})) => {
-                            // Acquire the potential future from send_vmo in a temporary so we
-                            // can await! on it without holding the lock.
-                            let result = self.send_vmo(&addr, vmo, off, len);
-                            // Equivalent of and_then to expand the Ok future case.
-                            let result = match result {
-                                Ok(fut) => fut.await,
-                                Err(e) => Err(e),
-                            };
-                            let status = match result {
-                                Ok(cb) => {
-                                    match wait_vmo_complete(&mut shutdown_event, cb).await {
-                                        Err(e) => return e,
-                                        Ok(o) => o,
-                                    }
-                                },
-                                Err(e) => e.into_status(),
-                            };
-
-                            let _ = responder.send(status.into_raw());
-                        },
-                        // Generate a RST for a non graceful client disconnect.
-                        Some(Err(e)) => {
-                            let fut = self.lock().send_rst(&addr);
-                            fut.await?;
-                            return Err(Error::ClientCommunication(e.into()));
-                        },
-                        None => {
-                            let fut = self.lock().send_rst(&addr);
-                            return fut.await;
-                        },
-                    }
-                },
+        select! {
+            shutdown_event = shutdown_event => {
+                let fut = future::ready(shutdown_event)
+                    .err_into()
+                    .and_then(|()| self.lock().send_rst(&addr));
+                return fut.await;
+            },
+            request = requests.next() => {
+                match request {
+                    Some(Ok(ConnectionRequest::Shutdown{control_handle: _control_handle})) => {
+                        let fut =
+                            self.lock().send_shutdown(&addr)
+                                // Wait to either receive the RST for the client or to be
+                                // shut down for some other reason
+                                .and_then(|()| shutdown_event.err_into());
+                        return fut.await;
+                    },
+                    // Generate a RST for a non graceful client disconnect.
+                    Some(Err(e)) => {
+                        let fut = self.lock().send_rst(&addr);
+                        fut.await?;
+                        return Err(Error::ClientCommunication(e.into()));
+                    },
+                    None => {
+                        let fut = self.lock().send_rst(&addr);
+                        return fut.await;
+                    },
+                }
             }
         }
     }
@@ -459,15 +385,14 @@ impl Vsock {
                             .into_stream()
                             .map_err(|x| Error::ClientCommunication(x.into()))?;
                         let shutdown_event = self.send_response(&addr, data)?.await?;
-                        fasync::Task::spawn(
+                        self.lock().tasks.spawn(
                             self.clone()
                                 .run_connection(addr, shutdown_event, con, None)
                                 .map_err(|err| {
                                     tracing::warn!("Error {} whilst running connection", err)
                                 })
                                 .map(|_| ()),
-                        )
-                        .detach();
+                        );
                         Ok(())
                     }
                     None => {
@@ -503,13 +428,16 @@ impl Vsock {
             response_event = response_event.fuse() => response_event?,
         }
 
-        fasync::Task::spawn(
+        self.lock().tasks.spawn(
             self.clone()
                 .run_connection(addr, shutdown_event, con, Some(port))
                 .unwrap_or_else(|err| tracing::warn!("Error {} whilst running connection", err)),
-        )
-        .detach();
+        );
         Ok(port_value)
+    }
+
+    pub fn spawn(&self, future: impl Future<Output = ()> + Send + 'static) {
+        self.lock().tasks.spawn(future);
     }
 }
 
@@ -587,14 +515,6 @@ impl State {
                 self.events
                     .remove(&Event { action: EventType::Shutdown, addr: addr::Vsock::from(addr) });
             }
-            CallbacksRequest::SendVmoComplete { addr, control_handle: _control_handle } => {
-                self.events
-                    .remove(&Event {
-                        action: EventType::VmoComplete,
-                        addr: addr::Vsock::from(addr),
-                    })
-                    .map(|channel| channel.send(()));
-            }
             CallbacksRequest::Request { addr, control_handle: _control_handle } => {
                 let addr = addr::Vsock::from(addr);
                 match self.listens.get(&addr.local_port) {
@@ -603,7 +523,8 @@ impl State {
                     }
                     None => {
                         tracing::warn!("Request on port {} with no listener", addr.local_port);
-                        fasync::Task::spawn(self.send_rst(&addr).map(|_| ())).detach();
+                        let task = self.send_rst(&addr).map(|_| ());
+                        self.tasks.spawn(task);
                     }
                 }
             }

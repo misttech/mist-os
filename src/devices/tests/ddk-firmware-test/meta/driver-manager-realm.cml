@@ -102,10 +102,6 @@
             from: "#devfs",
         },
         {
-            protocol: [ "fuchsia.device.manager.Administrator" ],
-            from: "#driver-manager",
-        },
-        {
             protocol: [ "fuchsia.driver.test.Realm" ],
             from: "#driver-manager-support",
         },

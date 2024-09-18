@@ -12,7 +12,7 @@
 #include <memory>
 
 #include <fbl/auto_lock.h>
-#include <zxtest/zxtest.h>
+#include <gtest/gtest.h>
 
 #include "src/storage/lib/vfs/cpp/managed_vfs.h"
 #include "src/storage/lib/vfs/cpp/vfs_types.h"
@@ -104,15 +104,15 @@ TEST(ConnectionRightsTest, GetBackingMemoryWithServe) {
       // expected result.
       const fidl::WireResult result =
           fidl::WireCall(file.client)->GetBackingMemory(row.request_flags);
-      EXPECT_TRUE(result.ok(), "%s", result.FormatDescription().c_str());
+      EXPECT_TRUE(result.ok()) << result.FormatDescription();
       const auto& response = result.value();
 
       // Verify that the result matches the value in our test table.
       if (row.expected_result == ZX_OK) {
-        EXPECT_TRUE(response.is_ok(), "%s", zx_status_get_string(response.error_value()));
+        EXPECT_TRUE(response.is_ok()) << zx_status_get_string(response.error_value());
       } else {
         EXPECT_TRUE(response.is_error());
-        EXPECT_STATUS(response.error_value(), row.expected_result);
+        EXPECT_EQ(response.error_value(), row.expected_result);
       }
     }
   }
@@ -180,25 +180,25 @@ TEST(ConnectionRightsTest, GetBackingMemoryWithServe3) {
     for (const auto& test_case : test_data) {
       // Set up a vfs connection with the testcase's connection flags
       zx::result open_result = fs::Vfs::Open2Result::OpenVnode(vnode, fs::VnodeProtocol::kFile);
-      ASSERT_TRUE(open_result.is_ok(), "%s", open_result.status_string());
+      ASSERT_TRUE(open_result.is_ok()) << open_result.status_string();
 
       auto file = fidl::Endpoints<fio::File>::Create();
       auto serve_result =
           vfs->Serve3(*std::move(open_result), test_case.rights, file.server.channel(), {}, {});
-      ASSERT_TRUE(serve_result.is_ok(), "%s", serve_result.status_string());
+      ASSERT_TRUE(serve_result.is_ok()) << serve_result.status_string();
       // Call FileGetBuffer on the channel with the testcase's request flags. Check that we get the
       // expected result.
       const fidl::WireResult result =
           fidl::WireCall(file.client)->GetBackingMemory(test_case.get_backing_memory_flags);
-      ASSERT_TRUE(result.ok(), "%s", result.FormatDescription().c_str());
+      ASSERT_TRUE(result.ok()) << result.FormatDescription();
       const auto& response = result.value();
 
       // Verify that the result matches the value in our test table.
       if (test_case.get_backing_memory_result == ZX_OK) {
-        EXPECT_TRUE(response.is_ok(), "%s", zx_status_get_string(response.error_value()));
+        EXPECT_TRUE(response.is_ok()) << zx_status_get_string(response.error_value());
       } else {
         EXPECT_TRUE(response.is_error());
-        EXPECT_STATUS(response.error_value(), test_case.get_backing_memory_result);
+        EXPECT_EQ(response.error_value(), test_case.get_backing_memory_result);
       }
     }
   }

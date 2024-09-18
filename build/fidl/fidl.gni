@@ -320,6 +320,9 @@ template("fidl") {
       is_allowed_for_host_test = host_test_fidl_allowlist + [ label_name ] -
                                  [ label_name ] != host_test_fidl_allowlist
       if (is_allowed_for_host_test) {
+        assert(marker_category != "partner" &&
+                   marker_category != "partner_internal",
+               "Update //src/developer/ffx/build/ffx_subtool_allowlist.gni.")
         marker_category = "allowed-for-host-test"
       }
       deps += [ "//sdk:marker-${marker_category}" ]

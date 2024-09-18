@@ -31,9 +31,9 @@ source_set("client_test_helpers") {
     "//sdk/lib/fidl/cpp/tests/*",
   ]
   public_deps = [
+    "//sdk/lib/async:async-cpp",
+    "//sdk/lib/async-testing",
     "//sdk/lib/fidl/cpp/wire",
-    "//zircon/system/ulib/async:async-cpp",
-    "//zircon/system/ulib/async-testing",
     "//zircon/system/ulib/zxtest",
   ]
 }
@@ -56,13 +56,13 @@ test("fidl_llcpp_dispatcher_tests_bin") {
   ]
   deps = [
     ":client_test_helpers",
+    "//sdk/lib/async:async-cpp",
+    "//sdk/lib/async-loop",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//sdk/testing/fidl/protocols_tests:test.basic.protocol_cpp",
     "//sdk/testing/fidl/protocols_tests:test.empty.protocol_cpp",
     "//src/lib/fidl/llcpp/tests/integration:fidl.test.coding.fuchsia_cpp",
-    "//zircon/system/ulib/async:async-cpp",
-    "//zircon/system/ulib/async-loop",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/sync:sync-cpp",
     "//zircon/system/ulib/zxtest",
   ]
@@ -94,13 +94,13 @@ test("fidl_llcpp_endpoints_tests_bin") {
     "server_end_test.cc",
   ]
   deps = [
+    "//sdk/lib/async:async-cpp",
+    "//sdk/lib/async-loop",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//src/lib/fidl/llcpp/tests/integration:llcpptest.protocol.test_cpp",
     "//src/lib/fxl/test:gtest_main",
     "//third_party/googletest:gtest",
-    "//zircon/system/ulib/async:async-cpp",
-    "//zircon/system/ulib/async-loop",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
   ]
 }
 

@@ -14,7 +14,7 @@
 
 #include <ktl/enforce.h>
 
-int PhysLoadTestMain(KernelStorage kernel_storage) {
+int PhysLoadTestMain(KernelStorage& kernel_storage) {
   constexpr const char* kTestName = "physload-handoff-test";
 
   gSymbolize->set_name(kTestName);

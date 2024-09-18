@@ -55,14 +55,21 @@ class BluetoothLE(bluetooth_common.BluetoothCommon):
         """
 
     @abc.abstractmethod
-    def find_gatt_service(self, service_uuid: f_bt.Uuid) -> None:
-        """Find the Gatt Service from the central device.
+    def discover_characteristics(
+        self,
+    ) -> dict[int, dict[str, int | list[int] | None]]:
+        """Discover characteristics of a connected Gatt Service.
 
-        Args:
-            service_uuid: The UUID of the service.
+        Returns:
+            The available characteristics of a connected Gatt Service.
+        """
+
+    @abc.abstractmethod
+    def list_gatt_services(self) -> dict[int, dict[str, Any]]:
+        """List the Gatt Services found on the connected peripheral.
 
         Raises:
-            BluetoothError: If the peripheral fails to complete the FIDL request.
+            BluetoothError: If the device fails to complete the FIDL request.
         """
 
     @abc.abstractmethod
@@ -94,6 +101,9 @@ class BluetoothLE(bluetooth_common.BluetoothCommon):
 
         Args:
             handle: The handle of the service.
+
+        Returns:
+            A characteristic of the Gatt service and its properties
 
         Raises:
             BluetoothError: If the peripheral fails to read the characteristic.

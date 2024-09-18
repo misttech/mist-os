@@ -43,12 +43,17 @@ class Writer final {
   // It returns a task where it builds storage operations from pages and requests the operations to
   // the storage driver server to write the storage operations out to backing storage. On the
   // completion of the storage operations, the task notifies the waiters for writeback pages, and
-  // signals |completion| if it is not null.
+  // signals |completion| if it is not null. See below for the semantics of |needs_preflush|.
   fpromise::promise<> GetTaskForWriteIO(PageList to_submit, sync_completion_t *completion);
   std::vector<storage::BufferedOperation> BuildBufferedOperation(OwnedStorageBuffer &buffer,
                                                                  PageList &pages,
-                                                                 PageList &to_submit);
-  zx::result<storage::Operation> PageToOperation(OwnedStorageBuffer &buffer, Page &page);
+                                                                 PageList &to_submit,
+                                                                 bool &needs_preflush);
+
+  // If the operation requires a pre-flush, |needs_preflush| will be set to true. The caller should
+  // initialise `needs_preflush` to false.
+  zx::result<storage::Operation> PageToOperation(OwnedStorageBuffer &buffer, Page &page,
+                                                 bool &needs_preflush);
 
   const size_t max_block_address_;
   std::mutex mutex_;

@@ -25,7 +25,8 @@ void Writer::Sync() {
                 "FlushDirtyMetaPages() timeout");
 }
 
-zx::result<storage::Operation> Writer::PageToOperation(OwnedStorageBuffer &buffer, Page &page) {
+zx::result<storage::Operation> Writer::PageToOperation(OwnedStorageBuffer &buffer, Page &page,
+                                                       bool &needs_preflush) {
   if (!IsValidBlockAddr(page.GetBlockAddr()) || page.GetBlockAddr() >= max_block_address_) {
     return zx::error(ZX_ERR_INVALID_ARGS);
   }
@@ -37,7 +38,8 @@ zx::result<storage::Operation> Writer::PageToOperation(OwnedStorageBuffer &buffe
 
   storage::OperationType type = storage::OperationType::kWrite;
   if (page.IsCommit()) {
-    type = storage::OperationType::kWritePreflushAndFua;
+    needs_preflush = true;
+    type = storage::OperationType::kWriteFua;
     page.ClearCommit();
   } else if (page.IsSync()) {
     type = storage::OperationType::kWriteFua;
@@ -57,12 +59,13 @@ zx::result<storage::Operation> Writer::PageToOperation(OwnedStorageBuffer &buffe
 
 std::vector<storage::BufferedOperation> Writer::BuildBufferedOperation(OwnedStorageBuffer &buffer,
                                                                        PageList &pages,
-                                                                       PageList &to_submit) {
+                                                                       PageList &to_submit,
+                                                                       bool &needs_preflush) {
   fs::BufferedOperationsBuilder builder;
   NotifyWriteback notifier;
   while (!pages.is_empty()) {
     auto page = pages.pop_front();
-    zx::result operation_or = PageToOperation(buffer, *page);
+    zx::result operation_or = PageToOperation(buffer, *page, needs_preflush);
     if (operation_or.is_error()) {
       if (operation_or.error_value() == ZX_ERR_UNAVAILABLE) {
         // No available buffers. Need to submit pending StorageOperations to free buffers.
@@ -88,11 +91,18 @@ fpromise::promise<> Writer::GetTaskForWriteIO(PageList to_submit, sync_completio
     while (!to_submit.is_empty()) {
       PageList submitted;
       OwnedStorageBuffer buffer = pool_->Get(kDefaultBlocksPerSegment);
-      auto operations = BuildBufferedOperation(buffer, to_submit, submitted);
+      bool needs_preflush = false;
+      auto operations = BuildBufferedOperation(buffer, to_submit, submitted, needs_preflush);
       if (operations.empty()) {
         break;
       }
-      zx_status_t io_status = bcache_mapper_->RunRequests(operations);
+
+      zx_status_t io_status = ZX_OK;
+      if (needs_preflush)
+        io_status = bcache_mapper_->Flush();
+      if (io_status == ZX_OK)
+        io_status = bcache_mapper_->RunRequests(operations);
+
       NotifyWriteback notifier;
       while (!submitted.is_empty()) {
         auto page = submitted.pop_front();

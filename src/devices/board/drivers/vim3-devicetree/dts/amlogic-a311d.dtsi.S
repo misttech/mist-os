@@ -126,6 +126,7 @@
 		gpios = <&gpio_expander 0 0>,
 			<&gpio A311D_GPIOH(2) 0>;
 		gpio-names = "LCD_RESET", "HDMI_HOTPLUG_DETECT";
+		pinctrl-0 = <&hdmi_hotplug_detect_pins>;
 		amlogic,canvas = <&canvas>;
 		display-detect = <&display_detect>;
 		display-detect-names = "HDMI";
@@ -165,6 +166,12 @@
 		pins = <A311D_GPIOE(2)>;
 		function = <0 A311D_GPIOE_2_PWM_D_FN>;
 		output-low;
+	};
+
+	hdmi_hotplug_detect_pins: hdmi-hotplug-detect-pins {
+		pins = <A311D_GPIOH(2)>;
+		input-enable;
+		bias-pull-down;
 	};
 };
 

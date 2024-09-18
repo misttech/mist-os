@@ -1076,6 +1076,27 @@
         "name": "fuchsia.sys2/RouteError"
     },
     {
+        "kind": "enum/member",
+        "name": "fuchsia.sys2/RouteOutcome.FAILED",
+        "value": "3"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.sys2/RouteOutcome.SUCCESS",
+        "value": "1"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.sys2/RouteOutcome.VOID",
+        "value": "2"
+    },
+    {
+        "kind": "enum",
+        "name": "fuchsia.sys2/RouteOutcome",
+        "strictness": "flexible",
+        "type": "uint32"
+    },
+    {
         "kind": "table/member",
         "name": "fuchsia.sys2/RouteReport.capability",
         "ordinal": "1",
@@ -1092,6 +1113,12 @@
         "name": "fuchsia.sys2/RouteReport.error",
         "ordinal": "3",
         "type": "fuchsia.sys2/RouteError"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.sys2/RouteReport.outcome",
+        "ordinal": "7",
+        "type": "fuchsia.sys2/RouteOutcome"
     },
     {
         "kind": "table/member",

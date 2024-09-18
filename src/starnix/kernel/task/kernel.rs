@@ -358,7 +358,7 @@ impl Kernel {
             nmfs: Default::default(),
             security_state,
             trace_fs: Default::default(),
-            device_registry: DeviceRegistry::new(),
+            device_registry: Default::default(),
             container_svc,
             container_data_dir,
             device_mapper_registry: Default::default(),

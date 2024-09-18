@@ -18,9 +18,12 @@
 ##   go: Go source files
 ##   dart: Dart source files
 ##   fidl: FIDL source files
+##   proto: protobuf source files
 ##   service, config: Services configuration files
 ##   cm, manifest: Component manifest files
-##   gn, build: GN build files
+##   gn: GN build files
+##   bzl: Bazel build files
+##   build: GN and Bazel build files
 ##   md, doc: Documentation source files
 ##
 ## The following example searches both C++ and Python files for 'tcgetattr':
@@ -40,9 +43,12 @@ get_type_list() {
       'go') SELECTED_FILE_TYPES+=('*.go');;
       'dart') SELECTED_FILE_TYPES+=('*.dart');;
       'fidl') SELECTED_FILE_TYPES+=('*.fidl');;
+      'proto') SELECTED_FILE_TYPES+=('*.proto');;
       'service'|'config') SELECTED_FILE_TYPES+=('*.config');;
       'cm'|'manifest') SELECTED_FILE_TYPES+=('*.cml');;
-      'gn'|'build') SELECTED_FILE_TYPES+=('*.gn' '*.gni');;
+      'gn') SELECTED_FILE_TYPES+=('*.gn' '*.gni');;
+      'bzl'|'bazel') SELECTED_FILE_TYPES+=('*.bzl' '*.bazel');;
+      'build') SELECTED_FILE_TYPES+=('*.gn' '*.gni' '*.bzl' '*.bazel');;
       'md'|'doc') SELECTED_FILE_TYPES+=('*.md');;
       *) fx-error "Unsupported file type: $1" && fx-command-help && exit 1;;
   esac

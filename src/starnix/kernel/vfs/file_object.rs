@@ -12,7 +12,7 @@ use crate::vfs::fsverity::{
     FsVerityState, {self},
 };
 use crate::vfs::{
-    ActiveNamespaceNode, DirentSink, EpollFileObject, FallocMode, FdNumber, FdTableId,
+    ActiveNamespaceNode, DirentSink, EpollFileObject, EpollKey, FallocMode, FdNumber, FdTableId,
     FileReleaser, FileSystemHandle, FileWriteGuard, FileWriteGuardMode, FileWriteGuardRef,
     FsNodeHandle, NamespaceNode, RecordLockCommand, RecordLockOwner,
 };
@@ -38,10 +38,10 @@ use starnix_uapi::seal_flags::SealFlags;
 use starnix_uapi::user_address::UserAddress;
 use starnix_uapi::vfs::FdEvents;
 use starnix_uapi::{
-    errno, error, fsxattr, off_t, pid_t, uapi, FIONBIO, FIONREAD, FS_IOC_ENABLE_VERITY,
-    FS_IOC_FSGETXATTR, FS_IOC_FSSETXATTR, FS_IOC_GETFLAGS, FS_IOC_MEASURE_VERITY,
-    FS_IOC_READ_VERITY_METADATA, FS_IOC_SETFLAGS, FS_VERITY_FL, SEEK_CUR, SEEK_DATA, SEEK_END,
-    SEEK_HOLE, SEEK_SET, TCGETS,
+    errno, error, fsxattr, off_t, pid_t, uapi, FIONBIO, FIONREAD, FS_CASEFOLD_FL,
+    FS_IOC_ENABLE_VERITY, FS_IOC_FSGETXATTR, FS_IOC_FSSETXATTR, FS_IOC_GETFLAGS,
+    FS_IOC_MEASURE_VERITY, FS_IOC_READ_VERITY_METADATA, FS_IOC_SETFLAGS, FS_VERITY_FL, SEEK_CUR,
+    SEEK_DATA, SEEK_END, SEEK_HOLE, SEEK_SET, TCGETS,
 };
 use std::collections::HashSet;
 use std::fmt;
@@ -138,6 +138,11 @@ pub trait FileOps: Send + Sync + AsAny + 'static {
 
     /// Returns whether the file is seekable.
     fn is_seekable(&self) -> bool;
+
+    /// Returns true if `write()` operations on the file will update the seek offset.
+    fn writes_update_seek_offset(&self) -> bool {
+        self.has_persistent_offsets()
+    }
 
     /// Read from the file at an offset. If the file does not have persistent offsets (either
     /// directly, or because it is not seekable), offset will be 0 and can be ignored.
@@ -402,6 +407,10 @@ impl<T: FileOps, P: Deref<Target = T> + Send + Sync + 'static> FileOps for P {
 
     fn has_persistent_offsets(&self) -> bool {
         self.deref().has_persistent_offsets()
+    }
+
+    fn writes_update_seek_offset(&self) -> bool {
+        self.deref().writes_update_seek_offset()
     }
 
     fn is_seekable(&self) -> bool {
@@ -804,7 +813,7 @@ pub use {
 
 pub fn default_ioctl(
     file: &FileObject,
-    _locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     request: u32,
     arg: SyscallArg,
@@ -853,13 +862,20 @@ pub fn default_ioctl(
             if matches!(*file.node().fsverity.lock(), FsVerityState::FsVerity) {
                 flags |= FS_VERITY_FL;
             }
+            if file.node().info().casefold {
+                flags |= FS_CASEFOLD_FL;
+            }
             current_task.write_object(arg, &flags)?;
             Ok(SUCCESS)
         }
         FS_IOC_SETFLAGS => {
             track_stub!(TODO("https://fxbug.dev/322875367"), "FS_IOC_SETFLAGS");
             let arg = UserAddress::from(arg).into();
-            let _: u32 = current_task.read_object(arg)?;
+            let flags: u32 = current_task.read_object(arg)?;
+            file.node().update_attributes(locked, current_task, |info| {
+                info.casefold = flags & FS_CASEFOLD_FL != 0;
+                Ok(())
+            })?;
             Ok(SUCCESS)
         }
         FS_IOC_ENABLE_VERITY => {
@@ -1002,6 +1018,9 @@ impl FileOps for ProxyFileOps {
     // These don't take &FileObject making it too hard to handle them properly in the macro
     fn has_persistent_offsets(&self) -> bool {
         self.0.ops().has_persistent_offsets()
+    }
+    fn writes_update_seek_offset(&self) -> bool {
+        self.0.ops().writes_update_seek_offset()
     }
     fn is_seekable(&self) -> bool {
         self.0.ops().is_seekable()
@@ -1448,7 +1467,9 @@ impl FileObject {
                     self.node().append_lock.read_and(&mut locked, current_task)?;
                 self.write_common(&mut locked, current_task, *offset as usize, data)
             }?;
-            *offset += bytes_written as off_t;
+            if self.ops().writes_update_seek_offset() {
+                *offset += bytes_written as off_t;
+            }
             Ok(bytes_written)
         })
     }
@@ -1823,10 +1844,11 @@ impl Releasable for FileObject {
         // of each registered epfd.
         for epfd in self.epoll_files.lock().drain() {
             if let Ok(file) = current_task.files.get(epfd) {
-                if let Some(epoll_object) = file.downcast_file::<EpollFileObject>() {
-                    if let Some(file_handle) = self.weak_handle.upgrade() {
-                        epoll_object.drop_lease(current_task, &file_handle);
-                    }
+                if let Some(_epoll_object) = file.downcast_file::<EpollFileObject>() {
+                    current_task
+                        .kernel()
+                        .suspend_resume_manager
+                        .remove_epoll(self.weak_handle.as_ptr() as EpollKey);
                 }
             }
         }

@@ -140,7 +140,7 @@ impl LoopDevice {
         let registry = &kernel.device_registry;
         let loop_device_name = FsString::from(format!("loop{minor}"));
         let virtual_block_class =
-            registry.get_or_create_class("block".into(), registry.virtual_bus());
+            registry.objects.get_or_create_class("block".into(), registry.objects.virtual_bus());
         let device = Arc::new(Self { number: minor, state: Default::default() });
         let device_weak = Arc::<LoopDevice>::downgrade(&device);
         let k_device = registry.add_device(

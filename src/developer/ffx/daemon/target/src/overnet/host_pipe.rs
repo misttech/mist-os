@@ -333,8 +333,7 @@ impl HostPipeChild {
                 Ok(res) => res,
                 Err(e) => {
                     ssh.kill().await?;
-                    let ssh_err =
-                        ffx_ssh::ssh::extract_ssh_error(&mut stderr, verbose_ssh, &ctx).await;
+                    let ssh_err = ffx_ssh::ssh::SshError::from(e.to_string());
                     if let Some(status) = ssh.try_wait()? {
                         match status.code() {
                             // Possible to catch more error codes here, hence the use of a match.

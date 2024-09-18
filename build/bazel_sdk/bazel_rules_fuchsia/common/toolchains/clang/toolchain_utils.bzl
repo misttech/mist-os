@@ -14,19 +14,62 @@ load(
     "with_feature_set",
 )
 load(
-    "//:toolchains/clang/clang_utils.bzl",
+    "//common:toolchains/clang/clang_utils.bzl",
     "format_labels_list_to_target_tag_native_glob_select",
 )
-load("//:toolchains/clang/providers.bzl", "ClangInfo")
-load("//:toolchains/clang/sanitizer.bzl", "sanitizer_features")
+load("//common:toolchains/clang/providers.bzl", "ClangInfo")
+load("//common:toolchains/clang/sanitizer.bzl", "sanitizer_features")
+load("//common/platforms:utils.bzl", "to_fuchsia_cpu_name", "to_fuchsia_os_name")
 
-def compute_clang_features(clang_info, target_os, target_cpu):
+_all_actions = [
+    ACTION_NAMES.assemble,
+    ACTION_NAMES.preprocess_assemble,
+    ACTION_NAMES.c_compile,
+    ACTION_NAMES.cpp_compile,
+    ACTION_NAMES.cpp_module_compile,
+    ACTION_NAMES.objc_compile,
+    ACTION_NAMES.objcpp_compile,
+    ACTION_NAMES.cpp_header_parsing,
+    ACTION_NAMES.clif_match,
+]
+
+_all_compile_actions = [
+    ACTION_NAMES.assemble,
+    ACTION_NAMES.preprocess_assemble,
+    ACTION_NAMES.linkstamp_compile,
+    ACTION_NAMES.c_compile,
+    ACTION_NAMES.cpp_compile,
+    ACTION_NAMES.cpp_header_parsing,
+    ACTION_NAMES.cpp_module_compile,
+    ACTION_NAMES.cpp_module_codegen,
+    ACTION_NAMES.lto_backend,
+    ACTION_NAMES.clif_match,
+]
+
+_all_cpp_compile_actions = [
+    ACTION_NAMES.linkstamp_compile,
+    ACTION_NAMES.cpp_compile,
+    ACTION_NAMES.cpp_header_parsing,
+    ACTION_NAMES.cpp_module_compile,
+    ACTION_NAMES.cpp_module_codegen,
+    ACTION_NAMES.lto_backend,
+    ACTION_NAMES.clif_match,
+]
+
+_all_link_actions = [
+    ACTION_NAMES.cpp_link_executable,
+    ACTION_NAMES.cpp_link_dynamic_library,
+    ACTION_NAMES.cpp_link_nodeps_dynamic_library,
+]
+
+def compute_clang_features(host_os, host_cpu, target_os, target_cpu):
     """Compute list of C++ toolchain features required by Clang.
 
     Args:
-      clang_info: A ClangInfo provider value.
-      target_os: Target OS, following Bazel conventions.
-      target_cpu: Target CPU, following Bazel conventions.
+      host_os: Host OS, following Fuchsia conventions.
+      host_cpu: Host CPU, following Fuchsia conventions.
+      target_os: Target OS, following Fuchsia conventions.
+      target_cpu: Target CPU, following Fuchsia conventions.
 
     Returns:
       A list of feature() objects.
@@ -71,17 +114,7 @@ def compute_clang_features(clang_info, target_os, target_cpu):
         enabled = True,
         flag_sets = [
             flag_set(
-                actions = [
-                    ACTION_NAMES.assemble,
-                    ACTION_NAMES.preprocess_assemble,
-                    ACTION_NAMES.c_compile,
-                    ACTION_NAMES.cpp_compile,
-                    ACTION_NAMES.cpp_module_compile,
-                    ACTION_NAMES.objc_compile,
-                    ACTION_NAMES.objcpp_compile,
-                    ACTION_NAMES.cpp_header_parsing,
-                    ACTION_NAMES.clif_match,
-                ],
+                actions = _all_actions,
                 flag_groups = [
                     flag_group(
                         flags = ["-MMD", "-MF", "%{dependency_file}"],
@@ -92,18 +125,12 @@ def compute_clang_features(clang_info, target_os, target_cpu):
         ],
     )
 
-    # https://fxbug.dev/42082246: ML inliner is unsupported on mac-arm64
-    fuchsia_host_tag = "{}-{}".format(clang_info.fuchsia_host_os, clang_info.fuchsia_host_arch)
-    use_ml_inliner = fuchsia_host_tag != "mac-arm64"
-
     opt_feature = feature(
         name = "opt",
-        implies = ["ml_inliner"] if use_ml_inliner else [],
     )
 
     ml_inliner_feature = feature(
         name = "ml_inliner",
-        enabled = use_ml_inliner,
         flag_sets = [
             flag_set(
                 actions = [
@@ -162,53 +189,49 @@ def compute_clang_features(clang_info, target_os, target_cpu):
                             # set of flags so we can think of this as an override
                             "-O1",
                             "-mllvm",
-                        ] + [
-                            # Enable runtime counter relocation in Linux.
-                            "-runtime-counter-relocation",
-                        ] if is_linux else [
-                            # Enable coverage from system headers in Fuchsia.
-                            "-system-headers-coverage",
-                        ] if is_fuchsia else [],
+                        ] + (
+                            [
+                                # Enable runtime counter relocation in Linux.
+                                "-runtime-counter-relocation",
+                            ] if is_linux else [
+                                # Enable coverage from system headers in Fuchsia.
+                                "-system-headers-coverage",
+                            ] if is_fuchsia else []
+                        ),
                     ),
                 ],
             ),
-        ] + [
-            flag_set(
-                actions = [
-                    ACTION_NAMES.cpp_link_dynamic_library,
-                    ACTION_NAMES.cpp_link_executable,
-                    ACTION_NAMES.cpp_link_nodeps_dynamic_library,
-                ],
-                flag_groups = [
-                    flag_group(
-                        flags = [
-                            # The statically-linked profiling runtime depends on libzircon.
-                            "-lzircon",
-                            "-Wl",
-                            "-dynamic-linker=coverage/ld.so.1",
-                        ],
-                    ),
-                ],
-            ),
-        ] if is_fuchsia else [],
+        ] + (
+            [
+                flag_set(
+                    actions = _all_link_actions,
+                    flag_groups = [
+                        flag_group(
+                            flags = [
+                                # The statically-linked profiling runtime depends on libzircon.
+                                "-lzircon",
+                                "-Wl",
+                                "-dynamic-linker=coverage/ld.so.1",
+                            ],
+                        ),
+                    ],
+                ),
+            ] if is_fuchsia else []
+        ),
     )
 
-    is_macos = target_os in ("osx", "macos")
+    is_macos = target_os == "mac"
 
     generate_linkmap_feature = feature(
         name = "generate_linkmap",
         enabled = True,
         flag_sets = [
             flag_set(
-                actions = [
-                    ACTION_NAMES.cpp_link_executable,
-                    ACTION_NAMES.cpp_link_dynamic_library,
-                    ACTION_NAMES.cpp_link_nodeps_dynamic_library,
-                ],
+                actions = _all_link_actions,
                 flag_groups = [
                     flag_group(
                         flags = [
-                            "-Wl,-map=%{output_execpath}.map" if is_macos else "-Wl,--Map=%{output_execpath}",
+                            "-Wl,-Map=%{output_execpath}.map" if (is_macos or is_fuchsia) else "-Wl,--Map=%{output_execpath}",
                         ],
                         expand_if_available = "output_execpath",
                     ),
@@ -217,12 +240,38 @@ def compute_clang_features(clang_info, target_os, target_cpu):
         ],
     )
 
+    # Automatically turned on when we build with -c dbg
+    dbg_feature = feature(
+        name = "dbg",
+    )
+
+    static_cpp_standard_library_feature = feature(
+        name = "static_cpp_standard_library",
+        flag_sets = [
+            flag_set(
+                actions = _all_link_actions,
+                flag_groups = [
+                    flag_group(
+                        flags = [
+                            "-stdlib=libc++",
+                            "-unwindlib=libunwind",
+                            "-static-libstdc++",
+                            "-static-libgcc",
+                        ],
+                    ),
+                ],
+            ),
+        ],
+    )
+
     features = [
-        opt_feature,
-        dependency_file_feature,
-        ml_inliner_feature,
         coverage_feature,
+        dbg_feature,
+        dependency_file_feature,
         generate_linkmap_feature,
+        ml_inliner_feature,
+        opt_feature,
+        static_cpp_standard_library_feature,
     ] + sanitizer_features
 
     # TODO(https://fxbug.dev/356347441): Remove this once Bazel has been fixed.
@@ -365,7 +414,12 @@ def _prebuilt_clang_cc_toolchain_config_impl(ctx):
     clang_info = ctx.attr.clang_info[ClangInfo]
 
     # TODO(digit): Change features list based on build variants
-    features = compute_clang_features(clang_info, ctx.attr.target_os, ctx.attr.target_arch)
+    features = compute_clang_features(
+        clang_info.fuchsia_host_os,
+        clang_info.fuchsia_host_arch,
+        to_fuchsia_os_name(ctx.attr.target_os),
+        to_fuchsia_cpu_name(ctx.attr.target_arch),
+    )
 
     return cc_common.create_cc_toolchain_config_info(
         ctx = ctx,
@@ -411,7 +465,8 @@ def generate_clang_cc_toolchain(
         target_os,
         target_arch,
         clang_info = "//:clang_info",
-        sysroot_files = [],
+        sysroot_header_files = [],
+        sysroot_library_files = [],
         sysroot_path = ""):
     """Define C++ toolchain related targets for a prebuilt Clang installation.
 
@@ -432,9 +487,17 @@ def generate_clang_cc_toolchain(
            value. Default to //:clang_info.
            See setup_clang_repository() in repository_utils.bzl.
 
-       sysroot_files: (optiona) A target list for the sysroot files to be used.
+       sysroot_headers_files: (optional) A label list for the sysroot
+           header files. These will be exposed to the sandbox for C++
+           compilation actions.
+
+       sysroot_library_files: (optional) A label list for the sysroot
+           libraries. These will be exposed to the sandbox for
+           C++ link actions.
 
        sysroot_path: (optional) Path to the sysroot directory to be used.
+           This must be set if sysroot_header_files or sysroot_library_files
+           are used.
     """
     _prebuilt_clang_cc_toolchain_config(
         name = name + "_cc_toolchain_config",
@@ -459,19 +522,19 @@ def generate_clang_cc_toolchain(
     compiler_files = name + "_compiler_files"
     native.filegroup(
         name = compiler_files,
-        srcs = common_compiler_files + sysroot_files,
+        srcs = common_compiler_files + sysroot_header_files,
     )
 
     linker_files = name + "_linker_files"
     native.filegroup(
         name = linker_files,
-        srcs = common_linker_files + sysroot_files,
+        srcs = common_linker_files + sysroot_library_files,
     )
 
     all_files = name + "_all_files"
     native.filegroup(
         name = all_files,
-        srcs = common_compiler_files + common_linker_files + sysroot_files,
+        srcs = common_compiler_files + common_linker_files + sysroot_header_files + sysroot_library_files,
     )
 
     native.cc_toolchain(

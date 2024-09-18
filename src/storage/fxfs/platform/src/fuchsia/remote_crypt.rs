@@ -41,7 +41,10 @@ impl Crypt for RemoteCrypt {
         let (wrapping_key_id, key, unwrapped_key) =
             self.client.create_key(owner, purpose.into_fidl()).await?.map_err(|e| anyhow!(e))?;
         Ok((
-            WrappedKey { wrapping_key_id, key: WrappedKeyBytes::try_from(key)? },
+            WrappedKey {
+                wrapping_key_id: wrapping_key_id as u128,
+                key: WrappedKeyBytes::try_from(key)?,
+            },
             UnwrappedKey::new(
                 unwrapped_key.try_into().map_err(|_| anyhow!("Unexpected unwrapped key length"))?,
             ),
@@ -55,7 +58,9 @@ impl Crypt for RemoteCrypt {
     ) -> Result<UnwrappedKey, Error> {
         let unwrapped = self
             .client
-            .unwrap_key(wrapped_key.wrapping_key_id, owner, &wrapped_key.key[..])
+            // TODO(b/361105712): Remove try_into() when changing key to u128.
+            .unwrap_key(wrapped_key.wrapping_key_id.try_into().map_err(
+                |_| anyhow!("Wrapping key too large"))?, owner, &wrapped_key.key[..])
             .await?
             .map_err(|e| anyhow!(e))?;
         if unwrapped.len() != KEY_SIZE {

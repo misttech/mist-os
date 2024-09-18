@@ -38,6 +38,7 @@ namespace gigaboot {
 class Device {
  public:
   explicit Device(std::vector<std::string_view> paths) { InitDevicePathProtocol(std::move(paths)); }
+  virtual ~Device() = default;
   virtual efi_block_io_protocol* GetBlockIoProtocol() { return nullptr; }
   virtual efi_disk_io_protocol* GetDiskIoProtocol() { return nullptr; }
   virtual efi_tcg2_protocol* GetTcg2Protocol() { return nullptr; }

@@ -18,8 +18,7 @@ using fuchsia_power_broker::Topology;
 
 class FakeTopology : public FidlTestBaseDefault<Topology> {
  public:
-  FakeTopology(async_dispatcher_t* dispatcher, fidl::ServerEnd<Topology> server_end)
-      : FidlTestBaseDefault(dispatcher, std::move(server_end)) {}
+  FakeTopology() = default;
 
   // Takes a promise containing the next ElementSchema sent to this server via AddElement. This
   // promise can then be processed on a different async dispatcher (possibly on a different thread)

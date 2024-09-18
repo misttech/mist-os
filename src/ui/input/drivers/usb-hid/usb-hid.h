@@ -102,7 +102,7 @@ class UsbHidbus : public DeviceType,
   size_t parent_req_size_ = 0;
 
   std::thread unbind_thread_;
-  sync_completion_t set_report_complete_;
+  std::optional<SetReportCompleter::Async> set_report_completer_;
 
   // Interrupt endpoint
   usb_endpoint::UsbEndpoint<UsbHidbus> ep_in_{usb::EndpointType::INTERRUPT, this,

@@ -524,6 +524,9 @@ class VmCowPages final : public VmHierarchyBase,
   // Different operations that RangeChangeUpdate* can perform against any VmMappings that are found.
   enum class RangeChangeOp {
     Unmap,
+    // Specialized case of Unmap where the caller is stating that it knows that any pages that might
+    // need to be unmapped are all read instances of the shared zero page.
+    UnmapZeroPage,
     RemoveWrite,
     // Unpin is not a 'real' operation in that it does not cause any actions, and is simply used as
     // a mechanism to allow the VmCowPages to trigger a search for any kernel mappings that are
@@ -924,20 +927,95 @@ class VmCowPages final : public VmHierarchyBase,
   // AddNewPagesLocked or similar.
   zx_status_t AllocUninitializedPage(vm_page_t** page, AnonymousPageRequest* page_request);
 
-  // Add a page to the object at |offset|.
+  // Helper class for managing a two part add page transaction. This object allows adding a page to
+  // be split into a check and allocation, which can fail, with the final insertion, which cannot
+  // fail.
+  class AddPageTransaction {
+   public:
+    AddPageTransaction(VmPageOrMarkerRef slot, uint64_t offset, CanOverwriteContent overwrite)
+        : slot_(slot), offset_(offset), overwrite_(overwrite) {}
+    AddPageTransaction(AddPageTransaction&& other)
+        : slot_(other.slot_), offset_(other.offset_), overwrite_(other.overwrite_) {
+      other.slot_ = VmPageOrMarkerRef();
+    }
+    ~AddPageTransaction() { DEBUG_ASSERT(!slot_); }
+    AddPageTransaction(const AddPageTransaction&) = delete;
+    AddPageTransaction& operator=(const AddPageTransaction&) = delete;
+    AddPageTransaction& operator=(AddPageTransaction&&) = delete;
+
+    void Cancel(VmPageList& pl);
+    VmPageOrMarker Complete(VmPageOrMarker p);
+    uint64_t offset() const { return offset_; }
+    CanOverwriteContent overwrite() const { return overwrite_; }
+
+   private:
+    VmPageOrMarkerRef slot_;
+    uint64_t offset_;
+    CanOverwriteContent overwrite_;
+  };
+
+  // Performs initial checks and slot allocations for inserting a new page at the specified
+  // |offset|.
   //
   // |overwrite| controls how the function handles pre-existing content at |offset|. If |overwrite|
-  // does not permit replacing the content, ZX_ERR_ALREADY_EXISTS will be returned. If a page is
-  // released from the page list as a result of overwriting, it is returned through |released_page|
-  // and the caller takes ownership of this page. If the |overwrite| action is such that a page
-  // cannot be released, it is valid for the caller to pass in nullptr for |released_page|.
+  // does not permit replacing the content, ZX_ERR_ALREADY_EXISTS will be returned.
+  //
+  // On success the returned |AddPageTransaction| *must* be used in a call to either
+  // |CompleteAddPageLocked|, |CompleteAddNewPageLocked| or |CancelAddPageLocked|.
+  //
+  // No other |page_list_| operations should be performed until the transaction is complete, and
+  // starting or ending a transaction should be assumed to invalidate any page_list_ iterators or
+  // slots that have been looked up unless the caller explicitly knows otherwise.
+  [[nodiscard]] zx::result<AddPageTransaction> BeginAddPageLocked(uint64_t offset,
+                                                                  CanOverwriteContent overwrite)
+      TA_REQ(lock());
+
+  // Similar to |BeginAddPageLocked| except only the |overwrite| checks are performed and a ready to
+  // use slot is provided by the caller. It is a requirement by the caller to ensure that |slot|:
+  //  * Is for |offset| in this |page_list_|
+  //  * Does not fall in the middle of an interval.
+  // All other requirements of |BeginAddPageLocked| otherwise apply.
+  [[nodiscard]] zx::result<AddPageTransaction> BeginAddPageWithSlotLocked(
+      uint64_t offset, VmPageOrMarkerRef slot, CanOverwriteContent overwrite) TA_REQ(lock());
+
+  // Completes an add page transaction that had been started by inserting the provided page |p| into
+  // the slot looked up in |transaction|. Once complete the transaction must not be used in any
+  // other complete or cancel calls.
+  //
+  // |p| must not be Empty()
   //
   // This operation unmaps the corresponding offset from any existing mappings, unless
   // |do_range_update| is false, in which case it will skip updating mappings.
   //
-  // On success the page to add is moved out of `*p`, otherwise it is left there.
-  zx_status_t AddPageLocked(VmPageOrMarker* p, uint64_t offset, CanOverwriteContent overwrite,
-                            VmPageOrMarker* released_page, bool do_range_update = true)
+  // Any previous content in the slot is returned and must be dealt with by the caller.
+  [[nodiscard]] VmPageOrMarker CompleteAddPageLocked(AddPageTransaction& transaction,
+                                                     VmPageOrMarker&& p, bool do_range_update)
+      TA_REQ(lock());
+
+  // Similar to |CompleteAddPageLocked| except a |vm_page_t| is provided that is assumed to not yet
+  // be in the |OBJECT| state, this page may also be optionally zeroed.
+  [[nodiscard]] VmPageOrMarker CompleteAddNewPageLocked(AddPageTransaction& transaction,
+                                                        vm_page_t* page, bool zero,
+                                                        bool do_range_update) TA_REQ(lock());
+
+  // Cancels an add page transaction and potentially frees the unused slot. It is required to call
+  // this, instead of dropping an |AddPageTransaction| to ensure the page list does not gather empty
+  // nodes. If the transaction was created with |BeginAddPageWithSlotLocked| then it is the
+  // responsibility of the caller to know whether their slot might still be valid or not after
+  // cancelling. Once cancelled the transaction must not have another further complete or cancel
+  // calls against it.
+  void CancelAddPageLocked(AddPageTransaction& transaction) TA_REQ(lock());
+
+  // Helper for checking the |overwrite| conditions on a given slot.
+  zx_status_t CheckOverwriteConditionsLocked(uint64_t offset, VmPageOrMarkerRef slot,
+                                             CanOverwriteContent overwrite) TA_REQ(lock());
+
+  // Add a page to the object at |offset|. This is just a wrapper around performing
+  // |BeginAddPageLocked| and then |CompleteAddPageLocked|, with error handling to perform a free of
+  // the page given in |p| should insertion fail. Otherwise see those methods for a description of
+  // the parameters.
+  zx::result<VmPageOrMarker> AddPageLocked(uint64_t offset, VmPageOrMarker&& p,
+                                           CanOverwriteContent overwrite, bool do_range_update)
       TA_REQ(lock());
 
   // Unmaps and frees all the committed pages in the specified range.

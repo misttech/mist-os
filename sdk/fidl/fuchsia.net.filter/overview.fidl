@@ -6,4 +6,5 @@
 // diagram.
 //
 /// Library providing packet filtering functionality.
+@available(added=HEAD)
 library fuchsia.net.filter;

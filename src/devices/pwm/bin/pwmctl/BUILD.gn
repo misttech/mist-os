@@ -39,7 +39,7 @@ executable("pwmctl-test-bin") {
   ]
   deps = [
     ":common",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/zxtest",
   ]
 }

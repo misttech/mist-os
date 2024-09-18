@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <thread>
+
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
@@ -81,27 +83,27 @@ using TestTypes = ::testing::Types<
 TYPED_TEST_SUITE(DlTests, TestTypes);
 
 TYPED_TEST(DlTests, NotFound) {
-  constexpr const char* kFile = "does-not-exist.so";
+  const std::string kFile = TestModule("does-not-exist");
 
   this->ExpectMissing(kFile);
 
-  auto result = this->DlOpen(kFile, RTLD_NOW | RTLD_LOCAL);
+  auto result = this->DlOpen(kFile.c_str(), RTLD_NOW | RTLD_LOCAL);
   ASSERT_TRUE(result.is_error());
   if constexpr (TestFixture::kCanMatchExactError) {
-    EXPECT_EQ(result.error_value().take_str(), "does-not-exist.so not found");
+    EXPECT_EQ(result.error_value().take_str(), "does-not-exist.NotFound.module.so not found");
   } else {
     EXPECT_THAT(
         result.error_value().take_str(),
         MatchesRegex(
             // emitted by Fuchsia-musl
-            "Error loading shared library .*does-not-exist.so: ZX_ERR_NOT_FOUND"
+            "Error loading shared library .*does-not-exist.NotFound.module.so: ZX_ERR_NOT_FOUND"
             // emitted by Linux-glibc
-            "|.*does-not-exist.so: cannot open shared object file: No such file or directory"));
+            "|.*does-not-exist.NotFound.module.so: cannot open shared object file: No such file or directory"));
   }
 }
 
 TYPED_TEST(DlTests, InvalidMode) {
-  constexpr const char* kFile = "ret17.module.so";
+  const std::string kFile = TestModule("ret17");
 
   if constexpr (!TestFixture::kCanValidateMode) {
     GTEST_SKIP() << "test requires dlopen to validate mode argment";
@@ -115,8 +117,11 @@ TYPED_TEST(DlTests, InvalidMode) {
 #ifdef RTLD_DEEPBIND
   bad_mode &= ~RTLD_DEEPBIND;
 #endif
+  // Make sure the bad_mode does not produce a false positive with RTLD_NOLOAD
+  // checks by the test fixture.
+  bad_mode &= ~RTLD_NOLOAD;
 
-  auto result = this->DlOpen(kFile, bad_mode);
+  auto result = this->DlOpen(kFile.c_str(), bad_mode);
   ASSERT_TRUE(result.is_error());
   EXPECT_EQ(result.error_value().take_str(), "invalid mode parameter")
       << "for mode argument " << bad_mode;
@@ -125,19 +130,16 @@ TYPED_TEST(DlTests, InvalidMode) {
 // Load a basic file with no dependencies.
 TYPED_TEST(DlTests, Basic) {
   constexpr int64_t kReturnValue = 17;
-  constexpr const char* kFile = "ret17.module.so";
-
-  // TODO(https://fxbug.dev/354043838): Fold into ExpectRootModule/Needed API.
-  this->ExpectRootModuleNotLoaded(kFile);
+  const std::string kFile = TestModule("ret17");
 
   this->ExpectRootModule(kFile);
 
-  auto result = this->DlOpen(kFile, RTLD_NOW | RTLD_LOCAL);
+  auto result = this->DlOpen(kFile.c_str(), RTLD_NOW | RTLD_LOCAL);
   ASSERT_TRUE(result.is_ok()) << result.error_value();
   EXPECT_TRUE(result.value());
 
-  // Look up the "TestStart" function and call it, expecting it to return 17.
-  auto sym_result = this->DlSym(result.value(), "TestStart");
+  // Look up the TestSym("TestStart").c_str() function and call it, expecting it to return 17.
+  auto sym_result = this->DlSym(result.value(), TestSym("TestStart").c_str());
   ASSERT_TRUE(sym_result.is_ok()) << result.error_value();
   ASSERT_TRUE(sym_result.value());
 
@@ -150,18 +152,15 @@ TYPED_TEST(DlTests, Basic) {
 // function's return value is derived from the resolved symbols.
 TYPED_TEST(DlTests, Relative) {
   constexpr int64_t kReturnValue = 17;
-  constexpr const char* kFile = "relative-reloc.module.so";
-
-  // TODO(https://fxbug.dev/354043838): Fold into ExpectRootModule/Needed API.
-  this->ExpectRootModuleNotLoaded(kFile);
+  const std::string kFile = TestModule("relative-reloc");
 
   this->ExpectRootModule(kFile);
 
-  auto result = this->DlOpen(kFile, RTLD_NOW | RTLD_LOCAL);
+  auto result = this->DlOpen(kFile.c_str(), RTLD_NOW | RTLD_LOCAL);
   ASSERT_TRUE(result.is_ok()) << result.error_value();
   EXPECT_TRUE(result.value());
 
-  auto sym_result = this->DlSym(result.value(), "TestStart");
+  auto sym_result = this->DlSym(result.value(), TestSym("TestStart").c_str());
   ASSERT_TRUE(sym_result.is_ok()) << result.error_value();
   ASSERT_TRUE(sym_result.value());
 
@@ -174,18 +173,15 @@ TYPED_TEST(DlTests, Relative) {
 // functions' return value is derived from the resolved symbols.
 TYPED_TEST(DlTests, Symbolic) {
   constexpr int64_t kReturnValue = 17;
-  constexpr const char* kFile = "symbolic-reloc.module.so";
-
-  // TODO(https://fxbug.dev/354043838): Fold into ExpectRootModule/Needed API.
-  this->ExpectRootModuleNotLoaded(kFile);
+  const std::string kFile = TestModule("symbolic-reloc");
 
   this->ExpectRootModule(kFile);
 
-  auto result = this->DlOpen(kFile, RTLD_NOW | RTLD_LOCAL);
+  auto result = this->DlOpen(kFile.c_str(), RTLD_NOW | RTLD_LOCAL);
   ASSERT_TRUE(result.is_ok()) << result.error_value();
   EXPECT_TRUE(result.value());
 
-  auto sym_result = this->DlSym(result.value(), "TestStart");
+  auto sym_result = this->DlSym(result.value(), TestSym("TestStart").c_str());
   ASSERT_TRUE(sym_result.is_ok()) << result.error_value();
   ASSERT_TRUE(sym_result.value());
 
@@ -197,21 +193,17 @@ TYPED_TEST(DlTests, Symbolic) {
 // Load a module that depends on a symbol provided directly by a dependency.
 TYPED_TEST(DlTests, BasicDep) {
   constexpr int64_t kReturnValue = 17;
-  constexpr const char* kFile = "basic-dep.module.so";
-  constexpr const char* kDepFile = "libld-dep-a.so";
-
-  // TODO(https://fxbug.dev/354043838): Fold into ExpectRootModule/Needed API.
-  this->ExpectRootModuleNotLoaded(kFile);
-  this->ExpectNeededNotLoaded({kDepFile});
+  const std::string kFile = TestModule("basic-dep");
+  const std::string kDepFile = TestShlib("libld-dep-a");
 
   this->ExpectRootModule(kFile);
   this->Needed({kDepFile});
 
-  auto result = this->DlOpen(kFile, RTLD_NOW | RTLD_LOCAL);
+  auto result = this->DlOpen(kFile.c_str(), RTLD_NOW | RTLD_LOCAL);
   ASSERT_TRUE(result.is_ok()) << result.error_value();
   EXPECT_TRUE(result.value());
 
-  auto sym_result = this->DlSym(result.value(), "TestStart");
+  auto sym_result = this->DlSym(result.value(), TestSym("TestStart").c_str());
   ASSERT_TRUE(sym_result.is_ok()) << result.error_value();
   ASSERT_TRUE(sym_result.value());
 
@@ -226,23 +218,19 @@ TYPED_TEST(DlTests, BasicDep) {
 // (e.g. in its DT_NEEDED list):
 TYPED_TEST(DlTests, IndirectDeps) {
   constexpr int64_t kReturnValue = 17;
-  constexpr const char* kFile = "indirect-deps.module.so";
-  constexpr const char* kDepFile1 = "libindirect-deps-a.so";
-  constexpr const char* kDepFile2 = "libindirect-deps-b.so";
-  constexpr const char* kDepFile3 = "libindirect-deps-c.so";
-
-  // TODO(https://fxbug.dev/354043838): Fold into ExpectRootModule/Needed API.
-  this->ExpectRootModuleNotLoaded(kFile);
-  this->ExpectNeededNotLoaded({kDepFile1, kDepFile2, kDepFile3});
+  const std::string kFile = TestModule("indirect-deps");
+  const std::string kDepFile1 = TestShlib("libindirect-deps-a");
+  const std::string kDepFile2 = TestShlib("libindirect-deps-b");
+  const std::string kDepFile3 = TestShlib("libindirect-deps-c");
 
   this->ExpectRootModule(kFile);
   this->Needed({kDepFile1, kDepFile2, kDepFile3});
 
-  auto result = this->DlOpen(kFile, RTLD_NOW | RTLD_LOCAL);
+  auto result = this->DlOpen(kFile.c_str(), RTLD_NOW | RTLD_LOCAL);
   ASSERT_TRUE(result.is_ok()) << result.error_value();
   EXPECT_TRUE(result.value());
 
-  auto sym_result = this->DlSym(result.value(), "TestStart");
+  auto sym_result = this->DlSym(result.value(), TestSym("TestStart").c_str());
   ASSERT_TRUE(sym_result.is_ok()) << result.error_value();
   ASSERT_TRUE(sym_result.value());
 
@@ -256,26 +244,22 @@ TYPED_TEST(DlTests, IndirectDeps) {
 // share a dependency.
 TYPED_TEST(DlTests, ManyDeps) {
   constexpr int64_t kReturnValue = 17;
-  constexpr const char* kFile = "many-deps.module.so";
-  constexpr const char* kDepFile1 = "libld-dep-a.so";
-  constexpr const char* kDepFile2 = "libld-dep-b.so";
-  constexpr const char* kDepFile3 = "libld-dep-f.so";
-  constexpr const char* kDepFile4 = "libld-dep-c.so";
-  constexpr const char* kDepFile5 = "libld-dep-d.so";
-  constexpr const char* kDepFile6 = "libld-dep-e.so";
-
-  // TODO(https://fxbug.dev/354043838): Fold into ExpectRootModule/Needed API.
-  this->ExpectRootModuleNotLoaded(kFile);
-  this->ExpectNeededNotLoaded({kDepFile1, kDepFile2, kDepFile3, kDepFile4, kDepFile5, kDepFile6});
+  const std::string kFile = TestModule("many-deps");
+  const std::string kDepFile1 = TestShlib("libld-dep-a");
+  const std::string kDepFile2 = TestShlib("libld-dep-b");
+  const std::string kDepFile3 = TestShlib("libld-dep-f");
+  const std::string kDepFile4 = TestShlib("libld-dep-c");
+  const std::string kDepFile5 = TestShlib("libld-dep-d");
+  const std::string kDepFile6 = TestShlib("libld-dep-e");
 
   this->ExpectRootModule(kFile);
   this->Needed({kDepFile1, kDepFile2, kDepFile3, kDepFile4, kDepFile5, kDepFile6});
 
-  auto result = this->DlOpen(kFile, RTLD_NOW | RTLD_LOCAL);
+  auto result = this->DlOpen(kFile.c_str(), RTLD_NOW | RTLD_LOCAL);
   ASSERT_TRUE(result.is_ok()) << result.error_value();
   EXPECT_TRUE(result.value());
 
-  auto sym_result = this->DlSym(result.value(), "TestStart");
+  auto sym_result = this->DlSym(result.value(), TestSym("TestStart").c_str());
   ASSERT_TRUE(sym_result.is_ok()) << result.error_value();
   ASSERT_TRUE(sym_result.value());
 
@@ -286,30 +270,27 @@ TYPED_TEST(DlTests, ManyDeps) {
 
 // TODO(https://fxbug.dev/339028040): Test missing symbol in transitive dep.
 // Load a module that depends on libld-dep-a.so, but this dependency does not
-// provide the b symbol referenced by the root module, so relocation fails.
+// provide the c symbol referenced by the root module, so relocation fails.
 TYPED_TEST(DlTests, MissingSymbol) {
-  constexpr const char* kFile = "missing-sym.module.so";
-  constexpr const char* kDepFile = "libld-dep-missing-sym-dep.so";
-
-  // TODO(https://fxbug.dev/354043838): Fold into ExpectRootModule/Needed API.
-  this->ExpectRootModuleNotLoaded(kFile);
-  this->ExpectNeededNotLoaded({kDepFile});
+  const std::string kFile = TestModule("missing-sym");
+  const std::string kDepFile = TestShlib("libld-dep-missing-sym-dep");
 
   this->ExpectRootModule(kFile);
   this->Needed({kDepFile});
 
-  auto result = this->DlOpen(kFile, RTLD_NOW | RTLD_LOCAL);
+  auto result = this->DlOpen(kFile.c_str(), RTLD_NOW | RTLD_LOCAL);
   ASSERT_TRUE(result.is_error());
   if constexpr (TestFixture::kCanMatchExactError) {
     EXPECT_EQ(result.error_value().take_str(),
-              "missing-sym.module.so: undefined symbol: missing_sym");
+              "missing-sym.MissingSymbol.module.so: undefined symbol: missing_sym_MissingSymbol");
   } else {
-    EXPECT_THAT(result.error_value().take_str(),
-                MatchesRegex(
-                    // emitted by Fuchsia-musl
-                    "Error relocating missing-sym.module.so: missing_sym: symbol not found"
-                    // emitted by Linux-glibc
-                    "|.*missing-sym.module.so: undefined symbol: missing_sym"));
+    EXPECT_THAT(
+        result.error_value().take_str(),
+        MatchesRegex(
+            // emitted by Fuchsia-musl
+            "Error relocating missing-sym.MissingSymbol.module.so: missing_sym_MissingSymbol: symbol not found"
+            // emitted by Linux-glibc
+            "|.*missing-sym.MissingSymbol.module.so: undefined symbol: missing_sym_MissingSymbol"));
   }
 }
 
@@ -322,79 +303,71 @@ TYPED_TEST(DlTests, MissingSymbol) {
 
 // Try to load a module that has a (direct) dependency that cannot be found.
 TYPED_TEST(DlTests, MissingDependency) {
-  constexpr const char* kFile = "missing-dep.module.so";
-  constexpr const char* kDepFile = "libmissing-dep-dep.so";
-
-  // TODO(https://fxbug.dev/354043838): Fold into ExpectRootModule/Needed API.
-  this->ExpectRootModuleNotLoaded(kFile);
+  const std::string kFile = TestModule("missing-dep");
+  const std::string kDepFile = TestShlib("libmissing-dep-dep");
 
   this->ExpectRootModule(kFile);
   this->Needed({NotFound(kDepFile)});
 
-  auto result = this->DlOpen(kFile, RTLD_NOW | RTLD_LOCAL);
+  auto result = this->DlOpen(kFile.c_str(), RTLD_NOW | RTLD_LOCAL);
   ASSERT_TRUE(result.is_error());
 
   // TODO(https://fxbug.dev/336633049): Harmonize "not found" error messages
   // between implementations.
   // Expect that the dependency lib to missing-dep.module.so cannot be found.
   if constexpr (TestFixture::kCanMatchExactError) {
-    EXPECT_EQ(result.error_value().take_str(), "cannot open dependency: libmissing-dep-dep.so");
+    EXPECT_EQ(result.error_value().take_str(),
+              "cannot open dependency: libmissing-dep-dep.MissingDependency.so");
   } else {
     EXPECT_THAT(
         result.error_value().take_str(),
         MatchesRegex(
             // emitted by Fuchsia-musl
-            "Error loading shared library .*libmissing-dep-dep.so: ZX_ERR_NOT_FOUND \\(needed by missing-dep.module.so\\)"
+            "Error loading shared library .*libmissing-dep-dep.MissingDependency.so: ZX_ERR_NOT_FOUND \\(needed by missing-dep.MissingDependency.module.so\\)"
             // emitted by Linux-glibc
-            "|.*libmissing-dep-dep.so: cannot open shared object file: No such file or directory"));
+            "|.*libmissing-dep-dep.MissingDependency.so: cannot open shared object file: No such file or directory"));
   }
 }
 
 // Try to load a module where the dependency of its direct dependency (i.e. a
 // transitive dependency of the root module) cannot be found.
 TYPED_TEST(DlTests, MissingTransitiveDependency) {
-  constexpr const char* kFile = "missing-transitive-dep.module.so";
-  constexpr const char* kDepFile1 = "libhas-missing-dep.so";
-  constexpr const char* kDepFile2 = "libmissing-dep-dep.so";
-
-  // TODO(https://fxbug.dev/354043838): Fold into ExpectRootModule/Needed API.
-  this->ExpectRootModuleNotLoaded(kFile);
-  this->ExpectNeededNotLoaded({kDepFile1});
+  const std::string kFile = TestModule("missing-transitive-dep");
+  const std::string kDepFile1 = TestShlib("libhas-missing-dep");
+  const std::string kDepFile2 = TestShlib("libmissing-dep-dep");
 
   this->ExpectRootModule(kFile);
   this->Needed({Found(kDepFile1), NotFound(kDepFile2)});
 
-  auto result = this->DlOpen(kFile, RTLD_NOW | RTLD_LOCAL);
+  auto result = this->DlOpen(kFile.c_str(), RTLD_NOW | RTLD_LOCAL);
   // TODO(https://fxbug.dev/336633049): Harmonize "not found" error messages
   // between implementations.
   // Expect that the dependency lib to libhas-missing-dep.so cannot be found.
   if constexpr (TestFixture::kCanMatchExactError) {
-    EXPECT_EQ(result.error_value().take_str(), "cannot open dependency: libmissing-dep-dep.so");
+    EXPECT_EQ(result.error_value().take_str(),
+              "cannot open dependency: libmissing-dep-dep.MissingTransitiveDependency.so");
   } else {
     EXPECT_THAT(
         result.error_value().take_str(),
         MatchesRegex(
             // emitted by Fuchsia-musl
-            "Error loading shared library .*libmissing-dep-dep.so: ZX_ERR_NOT_FOUND \\(needed by libhas-missing-dep.so\\)"
+            "Error loading shared library .*libmissing-dep-dep.MissingTransitiveDependency.so: ZX_ERR_NOT_FOUND \\(needed by libhas-missing-dep.MissingTransitiveDependency.so\\)"
             // emitted by Linux-glibc
-            "|.*libmissing-dep-dep.so: cannot open shared object file: No such file or directory"));
+            "|.*libmissing-dep-dep.MissingTransitiveDependency.so: cannot open shared object file: No such file or directory"));
   }
 }
 
 // Test loading a module with relro protections.
 TYPED_TEST(DlTests, Relro) {
-  constexpr const char* kFile = "relro.module.so";
-
-  // TODO(https://fxbug.dev/354043838): Fold into ExpectRootModule/Needed API.
-  this->ExpectRootModuleNotLoaded(kFile);
+  const std::string kFile = TestModule("relro");
 
   this->ExpectRootModule(kFile);
 
-  auto result = this->DlOpen(kFile, RTLD_NOW | RTLD_LOCAL);
+  auto result = this->DlOpen(kFile.c_str(), RTLD_NOW | RTLD_LOCAL);
   ASSERT_TRUE(result.is_ok()) << result.error_value();
   ASSERT_TRUE(result.value());
 
-  auto sym = this->DlSym(result.value(), "TestStart");
+  auto sym = this->DlSym(result.value(), TestSym("TestStart").c_str());
   ASSERT_TRUE(sym.is_ok()) << sym.error_value();
   ASSERT_TRUE(sym.value());
 
@@ -408,31 +381,28 @@ TYPED_TEST(DlTests, Relro) {
 // dlsym() should return a pointer to the same symbol from the same module as
 // well.
 TYPED_TEST(DlTests, BasicModuleReuse) {
-  constexpr const char* kFile = "ret17.module.so";
-
-  // TODO(https://fxbug.dev/354043838): Fold into ExpectRootModule/Needed API.
-  this->ExpectRootModuleNotLoaded(kFile);
+  const std::string kFile = TestModule("ret17");
 
   this->ExpectRootModule(kFile);
 
-  auto res1 = this->DlOpen(kFile, RTLD_NOW | RTLD_LOCAL);
+  auto res1 = this->DlOpen(kFile.c_str(), RTLD_NOW | RTLD_LOCAL);
   ASSERT_TRUE(res1.is_ok()) << res1.error_value();
   auto ptr1 = res1.value();
   EXPECT_TRUE(ptr1);
 
-  auto res2 = this->DlOpen(kFile, RTLD_NOW | RTLD_LOCAL);
+  auto res2 = this->DlOpen(kFile.c_str(), RTLD_NOW | RTLD_LOCAL);
   ASSERT_TRUE(res2.is_ok()) << res2.error_value();
   auto ptr2 = res2.value();
   EXPECT_TRUE(ptr2);
 
   EXPECT_EQ(ptr1, ptr2);
 
-  auto sym1 = this->DlSym(ptr1, "TestStart");
+  auto sym1 = this->DlSym(ptr1, TestSym("TestStart").c_str());
   ASSERT_TRUE(sym1.is_ok()) << sym1.error_value();
   auto sym1_ptr = sym1.value();
   EXPECT_TRUE(sym1_ptr);
 
-  auto sym2 = this->DlSym(ptr2, "TestStart");
+  auto sym2 = this->DlSym(ptr2, TestSym("TestStart").c_str());
   ASSERT_TRUE(sym2.is_ok()) << sym2.error_value();
   auto sym2_ptr = sym2.value();
   EXPECT_TRUE(sym2_ptr);
@@ -443,38 +413,34 @@ TYPED_TEST(DlTests, BasicModuleReuse) {
   ASSERT_TRUE(this->DlClose(ptr2).is_ok());
 }
 
-// Test that different mutually-exclusive files that were dlopen-ed do not share
+// Test that different mutually-exclusive kFiles that were dlopen-ed do not share
 // pointers or resolved symbols.
 TYPED_TEST(DlTests, UniqueModules) {
-  constexpr const char* kFile1 = "ret17.module.so";
-  constexpr const char* kFile2 = "ret23.module.so";
-
-  // TODO(https://fxbug.dev/354043838): Fold into ExpectRootModule/Needed API.
-  this->ExpectRootModuleNotLoaded(kFile1);
-  this->ExpectRootModuleNotLoaded(kFile2);
+  const std::string kFile1 = TestModule("ret17");
+  const std::string kFile2 = TestModule("ret23");
 
   this->ExpectRootModule(kFile1);
 
-  auto ret17 = this->DlOpen(kFile1, RTLD_NOW | RTLD_LOCAL);
+  auto ret17 = this->DlOpen(kFile1.c_str(), RTLD_NOW | RTLD_LOCAL);
   ASSERT_TRUE(ret17.is_ok()) << ret17.error_value();
   auto ret17_ptr = ret17.value();
   EXPECT_TRUE(ret17_ptr);
 
   this->ExpectRootModule(kFile2);
 
-  auto ret23 = this->DlOpen(kFile2, RTLD_NOW | RTLD_LOCAL);
+  auto ret23 = this->DlOpen(kFile2.c_str(), RTLD_NOW | RTLD_LOCAL);
   ASSERT_TRUE(ret23.is_ok()) << ret23.error_value();
   auto ret23_ptr = ret23.value();
   EXPECT_TRUE(ret23_ptr);
 
   EXPECT_NE(ret17_ptr, ret23_ptr);
 
-  auto sym17 = this->DlSym(ret17_ptr, "TestStart");
+  auto sym17 = this->DlSym(ret17_ptr, TestSym("TestStart").c_str());
   ASSERT_TRUE(sym17.is_ok()) << sym17.error_value();
   auto sym17_ptr = sym17.value();
   EXPECT_TRUE(sym17_ptr);
 
-  auto sym23 = this->DlSym(ret23_ptr, "TestStart");
+  auto sym23 = this->DlSym(ret23_ptr, TestSym("TestStart").c_str());
   ASSERT_TRUE(sym23.is_ok()) << sym23.error_value();
   auto sym23_ptr = sym23.value();
   EXPECT_TRUE(sym23_ptr);
@@ -490,15 +456,12 @@ TYPED_TEST(DlTests, UniqueModules) {
 
 // Test that you can dlopen a dependency from a previously loaded module.
 TYPED_TEST(DlTests, OpenDepDirectly) {
-  const auto kFile = TestShlib("libhas-foo-v1");
-  const auto kDepFile = TestShlib("libld-dep-foo-v1");
+  const std::string kFile = TestShlib("libhas-foo-v1");
+  const std::string kDepFile = TestShlib("libld-dep-foo-v1");
 
   if constexpr (!TestFixture::kCanReuseLoadedDeps) {
     GTEST_SKIP() << "test requires that fixture can reuse loaded modules for dependencies";
   }
-
-  // TODO(https://fxbug.dev/354043838): Fold into ExpectRootModule/Needed API.
-  this->ExpectNeededNotLoaded({kFile, kDepFile});
 
   this->Needed({kFile, kDepFile});
 
@@ -539,13 +502,9 @@ TYPED_TEST(DlTests, OpenDepDirectly) {
 // call foo() from multiple-foo-deps pointer and expect 2 from foo-v1.
 TYPED_TEST(DlTests, DepOrder) {
   constexpr const int64_t kReturnValue = 2;
-  const auto kFile = TestModule("multiple-foo-deps");
-  const auto kDepFile1 = TestShlib("libld-dep-foo-v1");
-  const auto kDepFile2 = TestShlib("libld-dep-foo-v2");
-
-  // TODO(https://fxbug.dev/354043838): Fold into ExpectRootModule/Needed API.
-  this->ExpectRootModuleNotLoaded(kFile);
-  this->ExpectNeededNotLoaded({kDepFile1, kDepFile2});
+  const std::string kFile = TestModule("multiple-foo-deps");
+  const std::string kDepFile1 = TestShlib("libld-dep-foo-v1");
+  const std::string kDepFile2 = TestShlib("libld-dep-foo-v2");
 
   this->ExpectRootModule(kFile);
   this->Needed({kDepFile1, kDepFile2});
@@ -571,17 +530,41 @@ TYPED_TEST(DlTests, DepOrder) {
 // call foo() from transitive-foo-dep pointer and expect 7 from foo-v2.
 TYPED_TEST(DlTests, TransitiveDepOrder) {
   constexpr const int64_t kReturnValue = 7;
-  const auto kFile = TestModule("transitive-foo-dep");
-  const auto kDepFile1 = TestShlib("libhas-foo-v1");
-  const auto kDepFile2 = TestShlib("libld-dep-foo-v2");
-  const auto kDepFile3 = TestShlib("libld-dep-foo-v1");
-
-  // TODO(https://fxbug.dev/354043838): Fold into ExpectRootModule/Needed API.
-  this->ExpectRootModuleNotLoaded(kFile);
-  this->ExpectNeededNotLoaded({kDepFile1, kDepFile2, kDepFile3});
+  const std::string kFile = TestModule("transitive-foo-dep");
+  const std::string kDepFile1 = TestShlib("libhas-foo-v1");
+  const std::string kDepFile2 = TestShlib("libld-dep-foo-v2");
+  const std::string kDepFile3 = TestShlib("libld-dep-foo-v1");
 
   this->ExpectRootModule(kFile);
   this->Needed({kDepFile1, kDepFile2, kDepFile3});
+
+  auto res = this->DlOpen(kFile.c_str(), RTLD_NOW | RTLD_LOCAL);
+  ASSERT_TRUE(res.is_ok()) << res.error_value();
+  EXPECT_TRUE(res.value());
+
+  auto sym = this->DlSym(res.value(), TestSym("call_foo").c_str());
+  ASSERT_TRUE(sym.is_ok()) << sym.error_value();
+  ASSERT_TRUE(sym.value());
+
+  EXPECT_EQ(RunFunction<int64_t>(sym.value()), kReturnValue);
+
+  ASSERT_TRUE(this->DlClose(res.value()).is_ok());
+}
+
+// Test that a module graph with a dependency cycle involving the root module
+// will complete dlopen() & dlsym() calls.
+// dlopen cyclic-dep-parent: foo() returns 2.
+//   - has-cyclic-dep:
+//     - cyclic-dep-parent
+//     - foo-v1: foo() returns 2.
+TYPED_TEST(DlTests, CyclicalDependency) {
+  constexpr const int64_t kReturnValue = 2;
+  const auto kFile = TestModule("cyclic-dep-parent");
+  const auto kDepFile1 = TestShlib("libhas-cyclic-dep");
+  const auto kDepFile2 = TestShlib("libld-dep-foo-v1");
+
+  this->ExpectRootModule(kFile);
+  this->Needed({kDepFile1, kDepFile2});
 
   auto res = this->DlOpen(kFile.c_str(), RTLD_NOW | RTLD_LOCAL);
   ASSERT_TRUE(res.is_ok()) << res.error_value();
@@ -609,19 +592,15 @@ TYPED_TEST(DlTests, TransitiveDepOrder) {
 // call foo() from multiple-foo-deps and expect 2 from foo-v1 because it is
 // first in multiple-foo-deps local scope.
 TYPED_TEST(DlTests, LocalPrecedence) {
-  const auto kFile = TestModule("multiple-foo-deps");
-  const auto kDepFile1 = TestShlib("libld-dep-foo-v1");
-  const auto kDepFile2 = TestShlib("libld-dep-foo-v2");
+  const std::string kFile = TestModule("multiple-foo-deps");
+  const std::string kDepFile1 = TestShlib("libld-dep-foo-v1");
+  const std::string kDepFile2 = TestShlib("libld-dep-foo-v2");
   constexpr int64_t kReturnValueFromFooV1 = 2;
   constexpr int64_t kReturnValueFromFooV2 = 7;
 
   if constexpr (!TestFixture::kCanReuseLoadedDeps) {
     GTEST_SKIP() << "test requires that fixture can reuse loaded modules for dependencies";
   }
-
-  // TODO(https://fxbug.dev/354043838): Fold into ExpectRootModule/Needed API.
-  this->ExpectRootModuleNotLoaded(kFile);
-  this->ExpectNeededNotLoaded({kDepFile1, kDepFile2});
 
   this->Needed({kDepFile2});
 
@@ -683,20 +662,16 @@ TYPED_TEST(DlTests, LocalPrecedence) {
 // call foo() from multiple-transitive-foo-deps and expect 7 from foo-v2 because
 // it is first in multiple-transitive-foo-dep's local scope.
 TYPED_TEST(DlTests, LocalPrecedenceTransitiveDeps) {
-  const auto kFile = TestModule("transitive-foo-dep");
-  const auto kDepFile1 = TestShlib("libhas-foo-v1");
-  const auto kDepFile2 = TestShlib("libld-dep-foo-v1");
-  const auto kDepFile3 = TestShlib("libld-dep-foo-v2");
+  const std::string kFile = TestModule("transitive-foo-dep");
+  const std::string kDepFile1 = TestShlib("libhas-foo-v1");
+  const std::string kDepFile2 = TestShlib("libld-dep-foo-v1");
+  const std::string kDepFile3 = TestShlib("libld-dep-foo-v2");
   constexpr int64_t kReturnValueFromFooV1 = 2;
   constexpr int64_t kReturnValueFromFooV2 = 7;
 
   if (!TestFixture::kCanReuseLoadedDeps) {
     GTEST_SKIP() << "test requires that fixture can reuse loaded dependencies";
   }
-
-  // TODO(https://fxbug.dev/354043838): Fold into ExpectRootModule/Needed API.
-  this->ExpectRootModuleNotLoaded(kFile);
-  this->ExpectNeededNotLoaded({kDepFile1, kDepFile2, kDepFile3});
 
   this->Needed({kDepFile1, kDepFile2});
 
@@ -749,21 +724,17 @@ TYPED_TEST(DlTests, LocalPrecedenceTransitiveDeps) {
 // Call foo() from multiple-transitive-foo-deps and expect 2 from foo-v1,
 // because it is first in multiple-transitive-foo-dep's local scope.
 TYPED_TEST(DlTests, LoadedTransitiveDepOrder) {
-  const auto kFile = TestModule("multiple-transitive-foo-deps");
-  const auto kDepFile1 = TestShlib("libhas-foo-v2");
-  const auto kDepFile2 = TestShlib("libld-dep-foo-v2");
-  const auto kDepFile3 = TestShlib("libhas-foo-v1");
-  const auto kDepFile4 = TestShlib("libld-dep-foo-v1");
+  const std::string kFile = TestModule("multiple-transitive-foo-deps");
+  const std::string kDepFile1 = TestShlib("libhas-foo-v2");
+  const std::string kDepFile2 = TestShlib("libld-dep-foo-v2");
+  const std::string kDepFile3 = TestShlib("libhas-foo-v1");
+  const std::string kDepFile4 = TestShlib("libld-dep-foo-v1");
   constexpr int64_t kReturnValueFromFooV1 = 2;
   constexpr int64_t kReturnValueFromFooV2 = 7;
 
   if constexpr (!TestFixture::kCanReuseLoadedDeps) {
     GTEST_SKIP() << "test requires that fixture can reuse loaded modules for dependencies";
   }
-
-  // TODO(https://fxbug.dev/354043838): Fold into ExpectRootModule/Needed API.
-  this->ExpectRootModuleNotLoaded(kFile);
-  this->ExpectNeededNotLoaded({kDepFile1, kDepFile2, kDepFile3, kDepFile4});
 
   this->Needed({kDepFile1, kDepFile2});
 
@@ -824,16 +795,12 @@ TYPED_TEST(DlTests, LoadedTransitiveDepOrder) {
 // bar_v1() from precedence-in-dep-resolution and expect 2.
 // bar_v2() from precedence-in-dep-resolution and expect 2 from foo-v1.
 TYPED_TEST(DlTests, PrecedenceInDepResolution) {
-  const auto kFile = TestModule("precedence-in-dep-resolution");
-  const auto kDepFile1 = TestShlib("libbar-v1");
-  const auto kDepFile2 = TestShlib("libbar-v2");
-  const auto kDepFile3 = TestShlib("libld-dep-foo-v1");
-  const auto kDepFile4 = TestShlib("libld-dep-foo-v2");
+  const std::string kFile = TestModule("precedence-in-dep-resolution");
+  const std::string kDepFile1 = TestShlib("libbar-v1");
+  const std::string kDepFile2 = TestShlib("libbar-v2");
+  const std::string kDepFile3 = TestShlib("libld-dep-foo-v1");
+  const std::string kDepFile4 = TestShlib("libld-dep-foo-v2");
   constexpr int64_t kReturnValueFromFooV1 = 2;
-
-  // TODO(https://fxbug.dev/354043838): Fold into ExpectRootModule/Needed API.
-  this->ExpectRootModuleNotLoaded(kFile);
-  this->ExpectNeededNotLoaded({kDepFile1, kDepFile2, kDepFile3, kDepFile4});
 
   this->ExpectRootModule(kFile);
   this->Needed({kDepFile1, kDepFile2, kDepFile3, kDepFile4});
@@ -870,18 +837,14 @@ TYPED_TEST(DlTests, PrecedenceInDepResolution) {
 // bar_v1() from root-precedence-in-dep-resolution and expect 17.
 // bar_v2() from root-precedence-in-dep-resolution and expect 17.
 TYPED_TEST(DlTests, RootPrecedenceInDepResolution) {
-  const auto kFile = TestModule("root-precedence-in-dep-resolution");
-  const auto kDepFile1 = TestShlib("libbar-v1");
-  const auto kDepFile2 = TestShlib("libbar-v2");
-  const auto kDepFile3 = TestShlib("libld-dep-foo-v1");
-  const auto kDepFile4 = TestShlib("libld-dep-foo-v2");
+  const std::string kFile = TestModule("root-precedence-in-dep-resolution");
+  const std::string kDepFile1 = TestShlib("libbar-v1");
+  const std::string kDepFile2 = TestShlib("libbar-v2");
+  const std::string kDepFile3 = TestShlib("libld-dep-foo-v1");
+  const std::string kDepFile4 = TestShlib("libld-dep-foo-v2");
   constexpr int64_t kReturnValueFromRootModule = 17;
   constexpr int64_t kReturnValueFromFooV1 = 2;
   constexpr int64_t kReturnValueFromFooV2 = 7;
-
-  // TODO(https://fxbug.dev/354043838): Fold into ExpectRootModule/Needed API.
-  this->ExpectRootModuleNotLoaded(kFile);
-  this->ExpectNeededNotLoaded({kDepFile1, kDepFile2, kDepFile3, kDepFile4});
 
   this->ExpectRootModule(kFile);
   this->Needed({kDepFile1, kDepFile2, kDepFile3, kDepFile4});
@@ -953,6 +916,57 @@ TYPED_TEST(DlTests, RootPrecedenceInDepResolution) {
 
 // These are test scenarios that test symbol resolution with RTLD_GLOBAL.
 
+// Test that a non-global module can depend on a previously loaded global
+// module, and that dlsym() will be able to access the global module's symbols
+// from the non-global module.
+// dlopen RTLD_GLOBAL foo-v2 -> foo() returns 7
+// dlopen has-foo-v2:
+//    - foo-v2 -> foo() returns 7
+// call foo() from has-foo-v2 and expect foo() to return 7 (from previously
+// loaded RTLD_GLOBAL foo-v2).
+TYPED_TEST(DlTests, GlobalDep) {
+  const auto kGlobalDepFile = TestShlib("libld-dep-foo-v2");
+  const auto kParentFile = TestShlib("libhas-foo-v2");
+  constexpr int64_t kReturnValueFromGlobalDep = 7;
+
+  if constexpr (!TestFixture::kSupportsGlobalMode) {
+    GTEST_SKIP() << "test requires that fixture supports RTLD_GLOBAL";
+  }
+
+  this->Needed({kGlobalDepFile});
+
+  auto open_global_dep = this->DlOpen(kGlobalDepFile.c_str(), RTLD_NOW | RTLD_GLOBAL);
+  ASSERT_TRUE(open_global_dep.is_ok()) << open_global_dep.error_value();
+  EXPECT_TRUE(open_global_dep.value());
+
+  auto global_foo = this->DlSym(open_global_dep.value(), TestSym("foo").c_str());
+  ASSERT_TRUE(global_foo.is_ok()) << global_foo.error_value();
+  ASSERT_TRUE(global_foo.value());
+
+  EXPECT_EQ(RunFunction<int64_t>(global_foo.value()), kReturnValueFromGlobalDep);
+
+  this->Needed({kParentFile});
+
+  auto open_parent = this->DlOpen(kParentFile.c_str(), RTLD_NOW | RTLD_LOCAL);
+  ASSERT_TRUE(open_parent.is_ok()) << open_parent.error_value();
+  EXPECT_TRUE(open_parent.value());
+
+  auto parent_call_foo = this->DlSym(open_parent.value(), TestSym("call_foo").c_str());
+  ASSERT_TRUE(parent_call_foo.is_ok()) << parent_call_foo.error_value();
+  ASSERT_TRUE(parent_call_foo.value());
+
+  EXPECT_EQ(RunFunction<int64_t>(parent_call_foo.value()), kReturnValueFromGlobalDep);
+
+  auto parent_foo = this->DlSym(open_parent.value(), TestSym("foo").c_str());
+  ASSERT_TRUE(parent_foo.is_ok()) << parent_foo.error_value();
+  ASSERT_TRUE(parent_foo.value());
+
+  EXPECT_EQ(RunFunction<int64_t>(parent_foo.value()), kReturnValueFromGlobalDep);
+
+  ASSERT_TRUE(this->DlClose(open_global_dep.value()).is_ok());
+  ASSERT_TRUE(this->DlClose(open_parent.value()).is_ok());
+}
+
 // Test that loaded global module will take precedence over dependency ordering.
 // dlopen RTLD_GLOBAL foo-v2 -> foo() returns 7
 // dlopen has-foo-v1:
@@ -960,18 +974,15 @@ TYPED_TEST(DlTests, RootPrecedenceInDepResolution) {
 // call foo() from has-foo-v1 and expect foo() to return 7 (from previously
 // loaded RTLD_GLOBAL foo-v2).
 TYPED_TEST(DlTests, GlobalPrecedence) {
-  const auto kFile1 = TestShlib("libld-dep-foo-v2");
-  const auto kFile2 = TestShlib("libhas-foo-v1");
-  const auto kDepFile = TestShlib("libld-dep-foo-v1");
+  const std::string kFile1 = TestShlib("libld-dep-foo-v2");
+  const std::string kFile2 = TestShlib("libhas-foo-v1");
+  const std::string kDepFile = TestShlib("libld-dep-foo-v1");
   constexpr int64_t kReturnValueFromFooV1 = 2;
   constexpr int64_t kReturnValueFromFooV2 = 7;
 
   if constexpr (!TestFixture::kSupportsGlobalMode) {
     GTEST_SKIP() << "test requires that fixture supports RTLD_GLOBAL";
   }
-
-  // TODO(https://fxbug.dev/354043838): Fold into ExpectRootModule/Needed API.
-  this->ExpectNeededNotLoaded({kFile1, kFile2, kDepFile});
 
   this->Needed({kFile1});
 
@@ -1017,19 +1028,16 @@ TYPED_TEST(DlTests, GlobalPrecedence) {
 //   - foo-v2 -> foo() returns 7
 // call foo from has-foo-v2 and expect 2.
 TYPED_TEST(DlTests, GlobalPrecedenceDeps) {
-  const auto kFile1 = TestShlib("libhas-foo-v1");
-  const auto kDepFile1 = TestShlib("libld-dep-foo-v1");
-  const auto kFile2 = TestShlib("libhas-foo-v2");
-  const auto kDepFile2 = TestShlib("libld-dep-foo-v2");
+  const std::string kFile1 = TestShlib("libhas-foo-v1");
+  const std::string kDepFile1 = TestShlib("libld-dep-foo-v1");
+  const std::string kFile2 = TestShlib("libhas-foo-v2");
+  const std::string kDepFile2 = TestShlib("libld-dep-foo-v2");
   constexpr int64_t kReturnValueFromFooV1 = 2;
   constexpr int64_t kReturnValueFromFooV2 = 7;
 
   if constexpr (!TestFixture::kSupportsGlobalMode) {
     GTEST_SKIP() << "test requires that fixture supports RTLD_GLOBAL";
   }
-
-  // TODO(https://fxbug.dev/354043838): Fold into ExpectRootModule/Needed API.
-  this->ExpectNeededNotLoaded({kFile1, kDepFile1, kFile2, kDepFile2});
 
   this->Needed({kFile1, kDepFile1});
 
@@ -1075,48 +1083,47 @@ TYPED_TEST(DlTests, GlobalPrecedenceDeps) {
 // call missing_sym() from missing-sym and expect 6 (4 + 2 from previously
 // loaded module).
 TYPED_TEST(DlTests, GlobalSatisfiesMissingSymbol) {
-  constexpr const char* kFile1 = "libld-dep-defines-missing-sym.so";
-  constexpr const char* kFile2 = "missing-sym.module.so";
-  constexpr const char* kDepFile = "libld-dep-missing-sym-dep.so";
+  const std::string kFile1 = TestShlib("libld-dep-defines-missing-sym");
+  const std::string kFile2 = TestModule("missing-sym");
+  const std::string kDepFile = TestShlib("libld-dep-missing-sym-dep");
   constexpr int64_t kReturnValue = 6;
 
   if constexpr (!TestFixture::kSupportsGlobalMode) {
     GTEST_SKIP() << "test requires that fixture supports RTLD_GLOBAL";
   }
 
-  // TODO(https://fxbug.dev/354043838): Fold into ExpectRootModule/Needed API.
-  this->ExpectNeededNotLoaded({kFile1, kDepFile});
-  this->ExpectRootModuleNotLoaded({kFile2});
-
   this->Needed({kFile1});
 
-  auto res1 = this->DlOpen(kFile1, RTLD_NOW | RTLD_GLOBAL);
+  auto res1 = this->DlOpen(kFile1.c_str(), RTLD_NOW | RTLD_GLOBAL);
   ASSERT_TRUE(res1.is_ok()) << res1.error_value();
   EXPECT_TRUE(res1.value());
 
   this->ExpectRootModule(kFile2);
   this->Needed({kDepFile});
 
-  auto res2 = this->DlOpen(kFile2, RTLD_NOW | RTLD_LOCAL);
+  auto res2 = this->DlOpen(kFile2.c_str(), RTLD_NOW | RTLD_LOCAL);
   ASSERT_TRUE(res2.is_ok()) << res2.error_value();
   EXPECT_TRUE(res2.value());
 
-  auto sym2 = this->DlSym(res2.value(), "TestStart");
+  auto sym2 = this->DlSym(res2.value(), TestSym("TestStart").c_str());
   ASSERT_TRUE(sym2.is_ok()) << sym2.error_value();
   ASSERT_TRUE(sym2.value());
 
   EXPECT_EQ(RunFunction<int64_t>(sym2.value()), kReturnValue);
 
   // dlsym will not be able to find the global symbol from the local scope
-  auto sym3 = this->DlSym(res2.value(), "missing_sym");
+  auto sym3 = this->DlSym(res2.value(), TestSym("missing_sym").c_str());
   ASSERT_TRUE(sym3.is_error()) << sym3.error_value();
   if constexpr (TestFixture::kCanMatchExactError || TestFixture::kEmitsSymbolNotFound) {
-    EXPECT_EQ(sym3.error_value().take_str(), "Symbol not found: missing_sym");
+    EXPECT_EQ(sym3.error_value().take_str(),
+              "Symbol not found: missing_sym_GlobalSatisfiesMissingSymbol");
   } else {
     // emitted by Linux-glibc
-    EXPECT_THAT(sym3.error_value().take_str(),
-                // only the module name is captured from the full test path
-                MatchesRegex("|.*missing-sym.module.so: undefined symbol: missing_sym"));
+    EXPECT_THAT(
+        sym3.error_value().take_str(),
+        // only the module name is captured from the full test path
+        MatchesRegex(
+            ".*missing-sym.GlobalSatisfiesMissingSymbol.module.so: undefined symbol: missing_sym_GlobalSatisfiesMissingSymbol"));
   }
 
   ASSERT_TRUE(this->DlClose(res1.value()).is_ok());
@@ -1138,5 +1145,121 @@ TYPED_TEST(DlTests, GlobalSatisfiesMissingSymbol) {
 //  - foo-v2 -> foo() returns 7
 // call foo() from has-foo-v2 and expect 2 from foo-v1, because foo-v1 is now
 // the first loaded global module with the symbol.
+
+// A common test subroutine for basic TLS accesses.
+//
+// This test exercises the following sequence of events:
+//   1. The initial thread is created with initial-exec TLS state.
+//   2. dlopen adds dynamic TLS state, and bumps DTV generation.
+//   3. The initial thread uses dynamic TLS via the new DTV.
+//   4. New threads are launched.
+//   5. The new threads use dynamic TLS via their initial DTV (i.e., fast path).
+//
+// NOTE: Whether the slow path may be used in this test depends on the
+// implementation. For instance, at the time of writing, musl's dlopen doesn't
+// update the calling thread's DTV and instead relies on the first access on the
+// thread to use the slow path to call __tls_get_new. However, this test should
+// only be relied upon for testing the fast path, because that is the only thing
+// we can guarantee for all implementations.
+template <class TestFixture, class Test>
+void BasicGlobalDynamicTls(Test& self, const char* module_name) {
+  if constexpr (!TestFixture::kSupportsTls) {
+    GTEST_SKIP() << "test requires TLS";
+  }
+
+  constexpr const char* kGetTlsDescDepDataPtr = "get_tls_dep_data";
+  constexpr const char* kGetTlsDescDepBss1 = "get_tls_dep_bss1";
+  constexpr const char* kGetTlsDescDepWeak = "get_tls_dep_weak";
+
+  // The module should exist for both tls-dep and tls-desc-dep targets.
+  auto result = self.DlOpen(module_name, RTLD_NOW | RTLD_LOCAL);
+  ASSERT_TRUE(result.is_ok()) << result.error_value();
+  EXPECT_TRUE(result.value());
+
+  // The module should exist for both tls-dep and tls-desc-dep targets, but if
+  // it wasn't compiled to have the right type of TLS relocations, then the
+  // symbols won't exist in the module, and we should skip the rest of the
+  // test.
+  auto get_dep_data = self.DlSym(result.value(), kGetTlsDescDepDataPtr);
+  if (get_dep_data.is_error()) {
+    ASSERT_THAT(get_dep_data.error_value().take_str(),
+                ::testing::EndsWith(std::string("undefined symbol: ") + kGetTlsDescDepDataPtr));
+    auto close_result = self.DlClose(result.value());
+    ASSERT_TRUE(close_result.is_ok()) << close_result.error_value();
+    GTEST_SKIP() << "Test module disabled at compile time.";
+  }
+
+  ASSERT_TRUE(get_dep_data.value());
+
+  int* data_ptr1 = RunFunction<int*>(get_dep_data.value());
+  ASSERT_TRUE(data_ptr1);
+
+  int* data_ptr2 = RunFunction<int*>(get_dep_data.value());
+  ASSERT_TRUE(data_ptr2);
+
+  constexpr int kTlsDataInitialVal = 42;
+  constexpr char kBss1InitialVal = 0;
+
+  EXPECT_EQ(*data_ptr1, kTlsDataInitialVal);
+  EXPECT_EQ(*data_ptr1, *data_ptr2);
+
+  // data_ptr1 and data_ptr2 should alias, since `get_tls_dep_data` returns a
+  // pointer to the thread local. This can fail if DTP_OFFSET is non-zero and
+  // the arithmetic using it does not get applied uniformly, causing the
+  // returned pointer to be different than the one stored in the GOT for the
+  // TLSDESC fast path.
+  EXPECT_EQ(data_ptr1, data_ptr2);  // Fails on RISC-V, data_ptr2 == data_ptr1 + kRISCVDtpOffset
+
+  // Modifying the thread local value should not impact other threads. We test
+  // this in the loop below.
+  *data_ptr1 += 1;
+  EXPECT_EQ(*data_ptr1, kTlsDataInitialVal + 1);
+  EXPECT_EQ(data_ptr1, data_ptr2);
+
+  auto get_dep_bss1 = self.DlSym(result.value(), kGetTlsDescDepBss1);
+  ASSERT_TRUE(get_dep_bss1.is_ok()) << get_dep_bss1.error_value();
+  ASSERT_TRUE(get_dep_bss1.value());
+
+  char* bss1_ptr = RunFunction<char*>(get_dep_bss1.value());
+  ASSERT_TRUE(bss1_ptr);
+  EXPECT_EQ(*bss1_ptr, kBss1InitialVal);
+  *bss1_ptr = 1;
+  EXPECT_EQ(*RunFunction<char*>(get_dep_bss1.value()), 1);
+
+  auto get_dep_weak = self.DlSym(result.value(), kGetTlsDescDepWeak);
+  ASSERT_TRUE(get_dep_weak.is_ok()) << get_dep_weak.error_value();
+  ASSERT_TRUE(get_dep_weak.value());
+#if HAVE_TLSDESC
+  // We can only be sure the returned value will be nullptr w/ TLSDESC.
+  // __tls_get_addr may just return whatever happens to be in the GOT.
+  int* weak_ptr = RunFunction<int*>(get_dep_weak.value());
+  EXPECT_EQ(weak_ptr, nullptr);
+#endif
+
+  // The value of another threads TLS variable should be unaffected by this
+  // thread.
+  constexpr int kNumThreads = 10;
+  std::vector<std::thread> threads;
+  threads.reserve(kNumThreads);
+  for (int i = 0; i < kNumThreads; ++i) {
+    threads.emplace_back([&get_dep_data, &get_dep_bss1, kTlsDataInitialVal, kBss1InitialVal] {
+      // Check that each TLS value has its initial value.
+      EXPECT_EQ(*RunFunction<int*>(get_dep_data.value()), kTlsDataInitialVal);
+      EXPECT_EQ(*RunFunction<char*>(get_dep_bss1.value()), kBss1InitialVal);
+    });
+  }
+  for (auto& thread : threads) {
+    thread.join();
+  }
+  ASSERT_TRUE(self.DlClose(result.value()).is_ok());
+}
+
+TYPED_TEST(DlTests, BasicGlobalDynamicTlsDesc) {
+  BasicGlobalDynamicTls<TestFixture>(*this, "tls-desc-dep-module.so");
+}
+
+TYPED_TEST(DlTests, BasicGlobalDynamicTlsGetAddr) {
+  BasicGlobalDynamicTls<TestFixture>(*this, "tls-dep-module.so");
+}
 
 }  // namespace

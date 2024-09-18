@@ -120,8 +120,6 @@ class TestUtils {
   static void CreateCapture(Capture* capture, const CaptureTemplate& t,
                             CaptureLevel level = CaptureLevel::VMO);
   static zx_status_t GetCapture(Capture* capture, CaptureLevel level, const OsResponses& r);
-  static zx_status_t GetCapture(Capture* capture, CaptureLevel level, const OsResponses& r,
-                                std::unique_ptr<CaptureStrategy> strategy);
 
   // Sorted by koid.
   static std::vector<ProcessSummary> GetProcessSummaries(const Summary& summary);

@@ -64,8 +64,7 @@ int main(int argc, const char** argv) {
   zx_status_t status = fuchsia_scheduler::SetRoleForThisThread("fuchsia.memory-monitor.main");
   FX_CHECK(status == ZX_OK) << "Set scheduler role status: " << zx_status_get_string(status);
 
-  auto maker_result = memory::CaptureMaker::Create(
-      memory::CreateDefaultOS(), std::make_unique<memory::StarnixCaptureStrategy>());
+  auto maker_result = memory::CaptureMaker::Create(memory::CreateDefaultOS());
   if (maker_result.is_error()) {
     FX_LOGS(ERROR) << "Error getting capture state: "
                    << zx_status_get_string(maker_result.error_value());

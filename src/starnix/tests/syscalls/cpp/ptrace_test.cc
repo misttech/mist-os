@@ -14,9 +14,6 @@
 #include <time.h>
 #include <unistd.h>
 
-#include <fstream>
-#include <iostream>
-
 #include <linux/sched.h>
 
 #ifdef __riscv
@@ -25,7 +22,6 @@
 
 #include <gtest/gtest.h>
 
-#include "src/lib/files/directory.h"
 #include "src/lib/files/file.h"
 #include "src/lib/files/path.h"
 #include "src/starnix/tests/syscalls/cpp/test_helper.h"
@@ -50,24 +46,24 @@ TEST(PtraceTest, SetSigInfo) {
     };
 
     sa.sa_flags = SA_SIGINFO | SA_RESTART;
-    EXPECT_EQ(sigemptyset(&sa.sa_mask), 0);
+    ASSERT_EQ(sigemptyset(&sa.sa_mask), 0);
     sigaction(kInjectedSigno, &sa, nullptr);
     sigaction(kOriginalSigno, &sa, nullptr);
 
-    EXPECT_EQ(ptrace(PTRACE_TRACEME, 0, 0, 0), 0);
+    ASSERT_EQ(ptrace(PTRACE_TRACEME, 0, 0, 0), 0);
     raise(kOriginalSigno);
     _exit(3);
   });
 
   int status;
   ASSERT_EQ(child_pid, waitpid(child_pid, &status, 0));
-  EXPECT_TRUE(WIFSTOPPED(status) && WSTOPSIG(status) == kOriginalSigno) << " status " << status;
+  ASSERT_TRUE(WIFSTOPPED(status) && WSTOPSIG(status) == kOriginalSigno) << " status " << status;
 
   siginfo_t siginfo = {};
   ASSERT_EQ(ptrace(PTRACE_GETSIGINFO, child_pid, 0, &siginfo), 0)
       << "ptrace failed with error " << strerror(errno);
-  EXPECT_EQ(kOriginalSigno, siginfo.si_signo);
-  EXPECT_EQ(SI_TKILL, siginfo.si_code);
+  ASSERT_EQ(kOriginalSigno, siginfo.si_signo);
+  ASSERT_EQ(SI_TKILL, siginfo.si_code);
 
   // Replace the signal with kInjectedSigno, and check that the child exits
   // with kInjectedSigno, indicating that signal injection was successful.
@@ -98,12 +94,12 @@ TEST(PtraceTest, InterruptAfterListen) {
 
   ASSERT_EQ(ptrace(PTRACE_SEIZE, child_pid, 0, 0), 0);
   int status;
-  EXPECT_EQ(waitpid(child_pid, &status, WNOHANG), 0);
+  ASSERT_EQ(waitpid(child_pid, &status, WNOHANG), 0);
 
   // Stop the child with PTRACE_INTERRUPT.
   ASSERT_EQ(ptrace(PTRACE_INTERRUPT, child_pid, 0, 0), 0);
   ASSERT_EQ(waitpid(child_pid, &status, 0), child_pid);
-  EXPECT_EQ(SIGTRAP | (PTRACE_EVENT_STOP << 8), status >> 8);
+  ASSERT_EQ(SIGTRAP | (PTRACE_EVENT_STOP << 8), status >> 8);
 
   ASSERT_EQ(ptrace(PTRACE_POKEDATA, child_pid, &child_should_spin, 0), 0) << strerror(errno);
 
@@ -112,16 +108,16 @@ TEST(PtraceTest, InterruptAfterListen) {
   ASSERT_EQ(kill(child_pid, SIGSTOP), 0);
   ASSERT_EQ(ptrace(PTRACE_CONT, child_pid, 0, 0), 0);
   ASSERT_EQ(waitpid(child_pid, &status, 0), child_pid);
-  EXPECT_TRUE(WIFSTOPPED(status) && WSTOPSIG(status) == SIGSTOP) << " status " << status;
+  ASSERT_TRUE(WIFSTOPPED(status) && WSTOPSIG(status) == SIGSTOP) << " status " << status;
 
   // Move out of signal-delivery-stop and deliver the SIGSTOP.
   ASSERT_EQ(ptrace(PTRACE_CONT, child_pid, 0, SIGSTOP), 0);
   ASSERT_EQ(waitpid(child_pid, &status, 0), child_pid);
-  EXPECT_TRUE(WIFSTOPPED(status) && WSTOPSIG(status) == SIGSTOP)
+  ASSERT_TRUE(WIFSTOPPED(status) && WSTOPSIG(status) == SIGSTOP)
       << "status = " << status << " WIFSTOPPED = " << WIFSTOPPED(status)
       << " WSTOPSIG = " << WSTOPSIG(status);
 
-  EXPECT_EQ(SIGSTOP | (PTRACE_EVENT_STOP << 8), status >> 8);
+  ASSERT_EQ(SIGSTOP | (PTRACE_EVENT_STOP << 8), status >> 8);
 
   // Restart the child, but don't let it execute. Child continues to deliver
   // notifications of when it gets stop / continue signals.  This allows a
@@ -134,10 +130,10 @@ TEST(PtraceTest, InterruptAfterListen) {
   // the stop signal."
   ASSERT_EQ(ptrace(PTRACE_INTERRUPT, child_pid, 0, 0), 0);
   ASSERT_EQ(waitpid(child_pid, &status, 0), child_pid);
-  EXPECT_EQ(SIGSTOP | (PTRACE_EVENT_STOP << 8), status >> 8);
+  ASSERT_EQ(SIGSTOP | (PTRACE_EVENT_STOP << 8), status >> 8);
 
   // Allow the tracer to proceed normally.
-  EXPECT_EQ(ptrace(PTRACE_CONT, child_pid, 0, 0), 0) << strerror(errno);
+  ASSERT_EQ(ptrace(PTRACE_CONT, child_pid, 0, 0), 0) << strerror(errno);
 }
 
 // None of this seems to be defined in our x64 and ARM sysroots.
@@ -179,7 +175,7 @@ TEST(PtraceTest, TraceSyscall) {
   test_helper::ForkHelper helper;
   helper.OnlyWaitForForkedChildren();
   pid_t child_pid = helper.RunInForkedProcess([] {
-    EXPECT_EQ(ptrace(PTRACE_TRACEME, 0, 0, 0), 0);
+    ASSERT_EQ(ptrace(PTRACE_TRACEME, 0, 0, 0), 0);
     raise(SIGSTOP);
     struct timespec req = {.tv_sec = 0, .tv_nsec = 0};
     nanosleep(&req, nullptr);
@@ -187,8 +183,8 @@ TEST(PtraceTest, TraceSyscall) {
 
   int status;
   ASSERT_EQ(child_pid, waitpid(child_pid, &status, 0));
-  EXPECT_TRUE(WIFSTOPPED(status) && WSTOPSIG(status) == SIGSTOP) << " status " << status;
-  EXPECT_EQ(0, ptrace(PTRACE_SETOPTIONS, child_pid, 0, PTRACE_O_TRACESYSGOOD))
+  ASSERT_TRUE(WIFSTOPPED(status) && WSTOPSIG(status) == SIGSTOP) << " status " << status;
+  ASSERT_EQ(0, ptrace(PTRACE_SETOPTIONS, child_pid, 0, PTRACE_O_TRACESYSGOOD))
       << "error " << strerror(errno);
 
   ptrace_syscall_info info;
@@ -200,28 +196,28 @@ TEST(PtraceTest, TraceSyscall) {
       reinterpret_cast<uint8_t *>(&info.exit.is_error + 1) - reinterpret_cast<uint8_t *>(&info);
 
   // We are not at a syscall entry
-  EXPECT_EQ(ptrace(static_cast<enum __ptrace_request>(PTRACE_GET_SYSCALL_INFO), child_pid,
+  ASSERT_EQ(ptrace(static_cast<enum __ptrace_request>(PTRACE_GET_SYSCALL_INFO), child_pid,
                    sizeof(ptrace_syscall_info), &info),
             kExpectedNoneSize);
-  EXPECT_EQ(info.op, PTRACE_SYSCALL_INFO_NONE);
+  ASSERT_EQ(info.op, PTRACE_SYSCALL_INFO_NONE);
 
   bool found = false;
   // We want to make sure we hit the "nanosleep" syscall.  There can be various
   // "hidden" syscalls in the tracee, depending on the implementation of "raise"
   // and "nanosleep".  So, we just keep trying until we hit nanosleep or exit.
   for (int i = 0; i < 10; i++) {
-    EXPECT_EQ(ptrace(PTRACE_SYSCALL, child_pid, 0, 0), 0);
-    EXPECT_EQ(child_pid, waitpid(child_pid, &status, 0));
+    ASSERT_EQ(ptrace(PTRACE_SYSCALL, child_pid, 0, 0), 0);
+    ASSERT_EQ(child_pid, waitpid(child_pid, &status, 0));
     if (!WIFSTOPPED(status) || WSTOPSIG(status) != (SIGTRAP | 0x80)) {
       break;
     }
 
     // We are now at a syscall entry
-    EXPECT_EQ(ptrace(static_cast<enum __ptrace_request>(PTRACE_GET_SYSCALL_INFO), child_pid,
+    ASSERT_EQ(ptrace(static_cast<enum __ptrace_request>(PTRACE_GET_SYSCALL_INFO), child_pid,
                      sizeof(ptrace_syscall_info), &info),
               kExpectedEntrySize);
 
-    EXPECT_EQ(info.op, PTRACE_SYSCALL_INFO_ENTRY);
+    ASSERT_EQ(info.op, PTRACE_SYSCALL_INFO_ENTRY);
     switch (info.entry.nr) {
       case __NR_clock_nanosleep:
       case __NR_nanosleep:
@@ -232,24 +228,24 @@ TEST(PtraceTest, TraceSyscall) {
         goto exit_loop;
     }
 
-    EXPECT_EQ(ptrace(PTRACE_SYSCALL, child_pid, 0, 0), 0);
-    EXPECT_EQ(child_pid, waitpid(child_pid, &status, 0));
-    EXPECT_TRUE(WIFSTOPPED(status) && WSTOPSIG(status) == (SIGTRAP | 0x80))
+    ASSERT_EQ(ptrace(PTRACE_SYSCALL, child_pid, 0, 0), 0);
+    ASSERT_EQ(child_pid, waitpid(child_pid, &status, 0));
+    ASSERT_TRUE(WIFSTOPPED(status) && WSTOPSIG(status) == (SIGTRAP | 0x80))
         << "WIFSTOPPED(status) " << WIFSTOPPED(status) << " WSTOPSIG(status) " << WSTOPSIG(status);
 
     // We are now at a syscall exit
-    EXPECT_EQ(ptrace(static_cast<enum __ptrace_request>(PTRACE_GET_SYSCALL_INFO), child_pid,
+    ASSERT_EQ(ptrace(static_cast<enum __ptrace_request>(PTRACE_GET_SYSCALL_INFO), child_pid,
                      sizeof(ptrace_syscall_info), &info),
               kExpectedExitSize);
 
-    EXPECT_EQ(info.op, PTRACE_SYSCALL_INFO_EXIT);
-    EXPECT_EQ(info.exit.rval, 0);
-    EXPECT_EQ(info.exit.is_error, 0);
+    ASSERT_EQ(info.op, PTRACE_SYSCALL_INFO_EXIT);
+    ASSERT_EQ(info.exit.rval, 0);
+    ASSERT_EQ(info.exit.is_error, 0);
   }
 exit_loop:
 
-  EXPECT_EQ(found, true) << "Never found nanosleep call";
-  EXPECT_EQ(ptrace(PTRACE_CONT, child_pid, 0, 0), 0);
+  ASSERT_EQ(found, true) << "Never found nanosleep call";
+  ASSERT_EQ(ptrace(PTRACE_CONT, child_pid, 0, 0), 0);
 }
 
 #ifdef __x86_64__
@@ -268,23 +264,23 @@ void TraceSyscallWithRestartWithCall(int call, long arg0, long arg1, long arg2, 
   pid_t child_pid = helper.RunInForkedProcess([call, arg0, arg1, arg2, arg3] {
     struct sigaction sa = {};
     sa.sa_handler = [](int signo) {};
-    EXPECT_EQ(sigfillset(&sa.sa_mask), 0);
-    EXPECT_EQ(sigaction(kUnmaskedSignal, &sa, nullptr), 0);
-    EXPECT_EQ(sigprocmask(SIG_UNBLOCK, &sa.sa_mask, nullptr), 0);
+    ASSERT_EQ(sigfillset(&sa.sa_mask), 0);
+    ASSERT_EQ(sigaction(kUnmaskedSignal, &sa, nullptr), 0);
+    ASSERT_EQ(sigprocmask(SIG_UNBLOCK, &sa.sa_mask, nullptr), 0);
 
-    EXPECT_EQ(ptrace(PTRACE_TRACEME, 0, 0, 0), 0);
+    ASSERT_EQ(ptrace(PTRACE_TRACEME, 0, 0, 0), 0);
     raise(SIGSTOP);
 
     // When the following syscalls are interrupted, errno should be some weird
     // internal errno (expected_errno above).  This means that the syscall will
     // return -1 if it is interrupted by a signal that has a user handler.
-    EXPECT_EQ(-1, syscall(call, arg0, arg1, arg2, arg3));
-    EXPECT_EQ(EINTR, errno) << strerror(errno);
+    ASSERT_EQ(-1, syscall(call, arg0, arg1, arg2, arg3));
+    ASSERT_EQ(EINTR, errno) << strerror(errno);
   });
 
   int status;
   ASSERT_EQ(child_pid, waitpid(child_pid, &status, 0));
-  EXPECT_TRUE(WIFSTOPPED(status) && WSTOPSIG(status) == SIGSTOP)
+  ASSERT_TRUE(WIFSTOPPED(status) && WSTOPSIG(status) == SIGSTOP)
       << "status = " << status << " WIFSTOPPED = " << WIFSTOPPED(status)
       << " WSTOPSIG = " << WSTOPSIG(status);
 
@@ -296,28 +292,28 @@ void TraceSyscallWithRestartWithCall(int call, long arg0, long arg1, long arg2, 
     // raise() makes a syscall after sending the signal.
     ASSERT_EQ(ptrace(PTRACE_SYSCALL, child_pid, 0, 0), 0);
     ASSERT_EQ(waitpid(child_pid, &status, 0), child_pid);
-    EXPECT_TRUE(WIFSTOPPED(status) && WSTOPSIG(status) == SIGTRAP) << " status " << status;
+    ASSERT_TRUE(WIFSTOPPED(status) && WSTOPSIG(status) == SIGTRAP) << " status " << status;
 
     ASSERT_EQ(ptrace(PTRACE_GETREGS, child_pid, 0, &regs), 0);
     count += 1;
   } while (static_cast<int>(regs.orig_rax) != call && count < 100);
-  EXPECT_EQ(call, static_cast<int>(regs.orig_rax));
-  EXPECT_EQ(-ENOSYS, static_cast<int>(regs.rax));
+  ASSERT_EQ(call, static_cast<int>(regs.orig_rax));
+  ASSERT_EQ(-ENOSYS, static_cast<int>(regs.rax));
 
   // Resume the child with PTRACE_SYSCALL and expect it to block in the syscall.
-  EXPECT_EQ(ptrace(PTRACE_SYSCALL, child_pid, 0, 0), 0);
+  ASSERT_EQ(ptrace(PTRACE_SYSCALL, child_pid, 0, 0), 0);
   test_helper::WaitUntilBlocked(child_pid, true);
   ASSERT_EQ(waitpid(child_pid, &status, WNOHANG), 0);
 
   // Send the child kUnmaskedSignal, causing it to return the given errno and enter
   // syscall-exit-stop from the syscall.
-  EXPECT_EQ(kill(child_pid, kUnmaskedSignal), 0);
+  ASSERT_EQ(kill(child_pid, kUnmaskedSignal), 0);
   ASSERT_EQ(waitpid(child_pid, &status, 0), child_pid);
-  EXPECT_TRUE(WIFSTOPPED(status) && WSTOPSIG(status) == SIGTRAP) << " status " << status;
+  ASSERT_TRUE(WIFSTOPPED(status) && WSTOPSIG(status) == SIGTRAP) << " status " << status;
 
-  EXPECT_EQ(ptrace(PTRACE_GETREGS, child_pid, 0, &regs), 0);
-  EXPECT_EQ(call, static_cast<int>(regs.orig_rax));
-  EXPECT_EQ(-expected_errno, static_cast<int>(regs.rax));
+  ASSERT_EQ(ptrace(PTRACE_GETREGS, child_pid, 0, &regs), 0);
+  ASSERT_EQ(call, static_cast<int>(regs.orig_rax));
+  ASSERT_EQ(-expected_errno, static_cast<int>(regs.rax));
 
   kill(child_pid, SIGKILL);
   ptrace(PTRACE_DETACH, child_pid, 0, 0);
@@ -358,7 +354,7 @@ TEST(PtraceTest, PokeUser) {
   constexpr long kEndPattern = 0xcdcdcdcd;
 
   pid_t child_pid = helper.RunInForkedProcess([kEndPattern] {
-    EXPECT_EQ(ptrace(PTRACE_TRACEME, 0, 0, 0), 0);
+    ASSERT_EQ(ptrace(PTRACE_TRACEME, 0, 0, 0), 0);
     long output;
 
     asm volatile("movq %0, %%rdi"
@@ -368,7 +364,7 @@ TEST(PtraceTest, PokeUser) {
     kill(getpid(), SIGSTOP);
 
     asm volatile("movq %%rdi, %0" : "=r"(output));
-    EXPECT_EQ(output, kEndPattern);
+    ASSERT_EQ(output, kEndPattern);
   });
 
   ASSERT_NE(child_pid, 0);
@@ -376,13 +372,13 @@ TEST(PtraceTest, PokeUser) {
   // Wait for the child to send itself SIGSTOP and enter signal-delivery-stop.
   int status;
   ASSERT_EQ(waitpid(child_pid, &status, 0), child_pid);
-  EXPECT_TRUE(WIFSTOPPED(status) && WSTOPSIG(status) == SIGSTOP) << " status " << status;
+  ASSERT_TRUE(WIFSTOPPED(status) && WSTOPSIG(status) == SIGSTOP) << " status " << status;
 
-  EXPECT_EQ(0,
+  ASSERT_EQ(0,
             ptrace(PTRACE_POKEUSER, child_pid, offsetof(struct user_regs_struct, rdi), kEndPattern))
       << strerror(errno);
 
-  EXPECT_EQ(0, ptrace(PTRACE_DETACH, child_pid, 0, SIGCONT));
+  ASSERT_EQ(0, ptrace(PTRACE_DETACH, child_pid, 0, SIGCONT));
 }
 
 #endif  // __x86_64__
@@ -391,7 +387,7 @@ TEST(PtraceTest, GetGeneralRegs) {
   test_helper::ForkHelper helper;
   helper.OnlyWaitForForkedChildren();
   pid_t child_pid = helper.RunInForkedProcess([] {
-    EXPECT_EQ(ptrace(PTRACE_TRACEME, 0, 0, 0), 0);
+    ASSERT_EQ(ptrace(PTRACE_TRACEME, 0, 0, 0), 0);
 
     // Use kill explicitly because we check the syscall argument register below.
     kill(getpid(), SIGSTOP);
@@ -403,7 +399,7 @@ TEST(PtraceTest, GetGeneralRegs) {
   // Wait for the child to send itself SIGSTOP and enter signal-delivery-stop.
   int status;
   ASSERT_EQ(waitpid(child_pid, &status, 0), child_pid);
-  EXPECT_TRUE(WIFSTOPPED(status) && WSTOPSIG(status) == SIGSTOP) << " status " << status;
+  ASSERT_TRUE(WIFSTOPPED(status) && WSTOPSIG(status) == SIGSTOP) << " status " << status;
 
 #if defined(__x86_64__)
 #define __REG rsi
@@ -423,34 +419,34 @@ TEST(PtraceTest, GetGeneralRegs) {
 
   // Expect error on incorrect size.
   iov.iov_len = sizeof(regs_set[0]) - 1;
-  EXPECT_EQ(ptrace(PTRACE_GETREGSET, child_pid, NT_PRSTATUS, &iov), -1)
+  ASSERT_EQ(ptrace(PTRACE_GETREGSET, child_pid, NT_PRSTATUS, &iov), -1)
       << "Error " << errno << " " << strerror(errno);
-  EXPECT_EQ(errno, EINVAL);
+  ASSERT_EQ(errno, EINVAL);
 
   // Provide a too large value for iov_len to make sure that ptrace resets it
   // correctly
   iov.iov_len = sizeof(regs_set);
-  EXPECT_EQ(ptrace(PTRACE_GETREGSET, child_pid, NT_PRSTATUS, &iov), 0)
+  ASSERT_EQ(ptrace(PTRACE_GETREGSET, child_pid, NT_PRSTATUS, &iov), 0)
       << "Error " << errno << " " << strerror(errno);
 
   // Make sure ptrace set the correct size for the user_regs_struct.
-  EXPECT_EQ(iov.iov_len, sizeof(struct user_regs_struct));
+  ASSERT_EQ(iov.iov_len, sizeof(struct user_regs_struct));
 
   // Child called kill(2), with SIGSTOP as arg 2.
-  EXPECT_EQ(regs_set[0].__REG, static_cast<unsigned long>(SIGSTOP));
+  ASSERT_EQ(regs_set[0].__REG, static_cast<unsigned long>(SIGSTOP));
 
   // The appropriate defines for this are not in the ptrace header for arm64.
 #ifdef __x86_64__
   // Get the general registers, with PTRACE_GETREGS
   struct user_regs_struct regs_old;
-  EXPECT_EQ(ptrace(PTRACE_GETREGS, child_pid, nullptr, &regs_old), 0)
+  ASSERT_EQ(ptrace(PTRACE_GETREGS, child_pid, nullptr, &regs_old), 0)
       << "Error " << errno << " " << strerror(errno);
 
-  EXPECT_EQ(regs_old.__REG, static_cast<unsigned long>(SIGSTOP));
+  ASSERT_EQ(regs_old.__REG, static_cast<unsigned long>(SIGSTOP));
 #endif
 
   // Get the appropriate general register with PTRACE_PEEKUSER
-  EXPECT_EQ(ptrace(PTRACE_PEEKUSER, child_pid, offsetof(struct user_regs_struct, __REG), nullptr),
+  ASSERT_EQ(ptrace(PTRACE_PEEKUSER, child_pid, offsetof(struct user_regs_struct, __REG), nullptr),
             SIGSTOP)
       << "Error " << errno << " " << strerror(errno);
 
@@ -471,7 +467,7 @@ constexpr int SYS_clone3 = 435;
 // Generate a child process that will spawn a grandchild process,both of which
 // will be traced.  We use SYS_clone3 directly here, as it removes libc
 // discretion about whether this is fork/clone/vfork.
-pid_t ForkUsingClone3(bool is_seized, uint64_t addl_clone_args) {
+void ForkUsingClone3(bool is_seized, uint64_t addl_clone_args, pid_t *out) {
   struct clone_args ca;
   memset(&ca, 0, sizeof(ca));
 
@@ -481,7 +477,7 @@ pid_t ForkUsingClone3(bool is_seized, uint64_t addl_clone_args) {
   pid_t child_pid = static_cast<pid_t>(syscall(SYS_clone3, &ca, sizeof(ca)));
   if (child_pid == 0) {
     if (!is_seized) {
-      EXPECT_EQ(ptrace(PTRACE_TRACEME, 0, 0, 0), 0);
+      ASSERT_EQ(ptrace(PTRACE_TRACEME, 0, 0, 0), 0);
     }
     raise(SIGSTOP);
     pid_t grandchild_pid = static_cast<pid_t>(syscall(SYS_clone3, &ca, sizeof(ca)));
@@ -490,14 +486,14 @@ pid_t ForkUsingClone3(bool is_seized, uint64_t addl_clone_args) {
       exit(0);
     }
     int status;
-    EXPECT_EQ(grandchild_pid, waitpid(grandchild_pid, &status, 0)) << strerror(errno);
-    EXPECT_TRUE(WIFEXITED(status) && WEXITSTATUS(status) == 0)
+    ASSERT_EQ(grandchild_pid, waitpid(grandchild_pid, &status, 0)) << strerror(errno);
+    ASSERT_TRUE(WIFEXITED(status) && WEXITSTATUS(status) == 0)
         << "Failure: WIFEXITED(status) =" << WIFEXITED(status)
         << " WEXITSTATUS(status) == " << WEXITSTATUS(status);
     exit(0);
   }
-  EXPECT_GT(child_pid, 0) << strerror(errno);
-  return child_pid;
+  ASSERT_GT(child_pid, 0) << strerror(errno);
+  *out = child_pid;
 }
 
 template <typename T>
@@ -511,50 +507,50 @@ long get_event_msg(pid_t traced_pid, T *message) {
 void DetectForkAndContinue(pid_t child_pid, bool is_seized, bool child_stops_on_clone) {
   int status;
   pid_t grandchild_pid = 0;
-  EXPECT_EQ(0, ptrace(PTRACE_CONT, child_pid, 0, 0));
+  ASSERT_EQ(0, ptrace(PTRACE_CONT, child_pid, 0, 0));
   if (child_stops_on_clone) {
     // Continue until we hit a fork.
     ASSERT_EQ(child_pid, waitpid(child_pid, &status, 0));
 
-    EXPECT_TRUE(WIFSTOPPED(status) && (status >> 8) == (SIGTRAP | (PTRACE_EVENT_FORK << 8)))
+    ASSERT_TRUE(WIFSTOPPED(status) && (status >> 8) == (SIGTRAP | (PTRACE_EVENT_FORK << 8)))
         << "status = " << status;
 
     // Get the grandchild's pid as reported by ptrace
-    EXPECT_EQ(0, get_event_msg<pid_t>(child_pid, &grandchild_pid))
+    ASSERT_EQ(0, get_event_msg<pid_t>(child_pid, &grandchild_pid))
         << strerror(errno) << ": with child pid: " << child_pid;
-    EXPECT_EQ(0, ptrace(PTRACE_CONT, child_pid, 0, 0))
+    ASSERT_EQ(0, ptrace(PTRACE_CONT, child_pid, 0, 0))
         << strerror(errno) << " with child pid " << child_pid;
     // A grandchild started with TRACEFORK will start with a SIGSTOP or a PTRACE_EVENT_STOP
     // (depending on whether we used PTRACE_SEIZE to attach).
-    EXPECT_EQ(grandchild_pid, waitpid(grandchild_pid, &status, 0)) << strerror(errno);
+    ASSERT_EQ(grandchild_pid, waitpid(grandchild_pid, &status, 0)) << strerror(errno);
   } else {
     grandchild_pid = waitpid(0, &status, 0);
-    EXPECT_NE(-1, grandchild_pid) << strerror(errno);
+    ASSERT_NE(-1, grandchild_pid) << strerror(errno);
   }
 
   if (is_seized) {
-    EXPECT_TRUE(WIFSTOPPED(status) && WSTOPSIG(status) == SIGTRAP)
+    ASSERT_TRUE(WIFSTOPPED(status) && WSTOPSIG(status) == SIGTRAP)
         << "status = " << status << " WIFSTOPPED = " << WIFSTOPPED(status)
         << " WSTOPSIG = " << WSTOPSIG(status);
     int shifted_status = status >> 8;
-    EXPECT_TRUE(((PTRACE_EVENT_STOP << 8) | SIGTRAP) == shifted_status)
+    ASSERT_TRUE(((PTRACE_EVENT_STOP << 8) | SIGTRAP) == shifted_status)
         << "shifted_status = " << shifted_status;
   } else {
-    EXPECT_TRUE(WIFSTOPPED(status) && WSTOPSIG(status) == SIGSTOP)
+    ASSERT_TRUE(WIFSTOPPED(status) && WSTOPSIG(status) == SIGSTOP)
         << " status " << status << " WIFSTOPPED = " << WIFSTOPPED(status)
         << " WSTOPSIG = " << WSTOPSIG(status);
   }
 
-  EXPECT_EQ(0, ptrace(PTRACE_CONT, grandchild_pid, 0, SIGCONT));
+  ASSERT_EQ(0, ptrace(PTRACE_CONT, grandchild_pid, 0, SIGCONT));
 
   // The grandchild should now exit.
-  EXPECT_EQ(grandchild_pid, waitpid(grandchild_pid, &status, 0)) << strerror(errno);
-  EXPECT_TRUE(WIFEXITED(status)) << "WIFEXITED(status) = " << WIFEXITED(status);
+  ASSERT_EQ(grandchild_pid, waitpid(grandchild_pid, &status, 0)) << strerror(errno);
+  ASSERT_TRUE(WIFEXITED(status)) << "WIFEXITED(status) = " << WIFEXITED(status);
 
   // When the grandchild exits, the child receives a SIGCHLD.
-  EXPECT_EQ(child_pid, waitpid(child_pid, &status, 0));
-  EXPECT_TRUE(WIFSTOPPED(status) && WSTOPSIG(status) == SIGCHLD);
-  EXPECT_EQ(0, ptrace(PTRACE_CONT, child_pid, 0, SIGCHLD));
+  ASSERT_EQ(child_pid, waitpid(child_pid, &status, 0));
+  ASSERT_TRUE(WIFSTOPPED(status) && WSTOPSIG(status) == SIGCHLD);
+  ASSERT_EQ(0, ptrace(PTRACE_CONT, child_pid, 0, SIGCHLD));
 
   // The child should now exit
   ASSERT_EQ(child_pid, waitpid(child_pid, &status, 0));
@@ -569,15 +565,16 @@ TEST(PtraceTest, PtraceEventStopWithFork) {
   if (!test_helper::IsStarnix()) {
     GTEST_SKIP() << "This test does not work on Linux in CQ";
   }
-  pid_t child_pid = ForkUsingClone3(false, 0);
+  pid_t child_pid;
+  ForkUsingClone3(false, 0, &child_pid);
   if (HasFatalFailure()) {
     return;
   }
 
   int status;
   ASSERT_EQ(child_pid, waitpid(child_pid, &status, 0));
-  EXPECT_TRUE(WIFSTOPPED(status) && WSTOPSIG(status) == SIGSTOP) << " status " << status;
-  EXPECT_EQ(0, ptrace(PTRACE_SETOPTIONS, child_pid, 0, PTRACE_O_TRACEFORK))
+  ASSERT_TRUE(WIFSTOPPED(status) && WSTOPSIG(status) == SIGSTOP) << " status " << status;
+  ASSERT_EQ(0, ptrace(PTRACE_SETOPTIONS, child_pid, 0, PTRACE_O_TRACEFORK))
       << "error " << strerror(errno);
 
   DetectForkAndContinue(child_pid, false, true);
@@ -588,15 +585,16 @@ TEST(PtraceTest, PtraceEventStopWithForkAndSeize) {
   if (!test_helper::IsStarnix()) {
     GTEST_SKIP() << "This test does not work on Linux in CQ";
   }
-  pid_t child_pid = ForkUsingClone3(true, 0);
+  pid_t child_pid;
+  ForkUsingClone3(true, 0, &child_pid);
   if (HasFatalFailure()) {
     return;
   }
 
-  EXPECT_EQ(ptrace(PTRACE_SEIZE, child_pid, 0, PTRACE_O_TRACEFORK), 0) << strerror(errno);
+  ASSERT_EQ(ptrace(PTRACE_SEIZE, child_pid, 0, PTRACE_O_TRACEFORK), 0) << strerror(errno);
   int status;
   ASSERT_EQ(child_pid, waitpid(child_pid, &status, 0));
-  EXPECT_TRUE(WIFSTOPPED(status) && WSTOPSIG(status) == SIGSTOP) << " status " << status;
+  ASSERT_TRUE(WIFSTOPPED(status) && WSTOPSIG(status) == SIGSTOP) << " status " << status;
 
   DetectForkAndContinue(child_pid, true, true);
 }
@@ -606,13 +604,14 @@ TEST(PtraceTest, PtraceEventStopWithForkClonePtrace) {
   if (!test_helper::IsStarnix()) {
     GTEST_SKIP() << "This test does not work on Linux in CQ";
   }
-  pid_t child_pid = ForkUsingClone3(false, CLONE_PTRACE);
+  pid_t child_pid;
+  ForkUsingClone3(false, CLONE_PTRACE, &child_pid);
   if (HasFatalFailure()) {
     return;
   }
   int status;
   ASSERT_EQ(child_pid, waitpid(child_pid, &status, 0));
-  EXPECT_TRUE(WIFSTOPPED(status) && WSTOPSIG(status) == SIGSTOP) << " status " << status;
+  ASSERT_TRUE(WIFSTOPPED(status) && WSTOPSIG(status) == SIGSTOP) << " status " << status;
 
   DetectForkAndContinue(child_pid, false, false);
 }
@@ -637,54 +636,54 @@ TEST(PtraceTest, PtraceEventStopWithVForkClonePtrace) {
         << " WEXITSTATUS(status) == " << WEXITSTATUS(status);
     exit(0);
   }
-  EXPECT_LT(0, child_pid);
+  ASSERT_LT(0, child_pid);
   pid_t grandchild_pid;
   int status;
   ASSERT_EQ(child_pid, waitpid(child_pid, &status, 0));
-  EXPECT_TRUE(WIFSTOPPED(status) && WSTOPSIG(status) == SIGSTOP) << " status " << status;
-  EXPECT_EQ(0,
+  ASSERT_TRUE(WIFSTOPPED(status) && WSTOPSIG(status) == SIGSTOP) << " status " << status;
+  ASSERT_EQ(0,
             ptrace(PTRACE_SETOPTIONS, child_pid, 0, PTRACE_O_TRACEVFORK | PTRACE_O_TRACEVFORKDONE));
 
-  EXPECT_EQ(0, ptrace(PTRACE_CONT, child_pid, 0, 0))
+  ASSERT_EQ(0, ptrace(PTRACE_CONT, child_pid, 0, 0))
       << strerror(errno) << ": with child pid " << child_pid;
   ASSERT_EQ(child_pid, waitpid(child_pid, &status, 0));
 
-  EXPECT_TRUE(WIFSTOPPED(status) && (status >> 8) == (SIGTRAP | (PTRACE_EVENT_VFORK << 8)))
+  ASSERT_TRUE(WIFSTOPPED(status) && (status >> 8) == (SIGTRAP | (PTRACE_EVENT_VFORK << 8)))
       << "status = " << status;
 
   // Get the grandchild's pid as reported by ptrace
-  EXPECT_EQ(0, get_event_msg<pid_t>(child_pid, &grandchild_pid)) << strerror(errno);
-  EXPECT_EQ(0, ptrace(PTRACE_CONT, child_pid, 0, 0))
+  ASSERT_EQ(0, get_event_msg<pid_t>(child_pid, &grandchild_pid)) << strerror(errno);
+  ASSERT_EQ(0, ptrace(PTRACE_CONT, child_pid, 0, 0))
       << strerror(errno) << ": with child pid " << child_pid;
 
   // Let the grandchild continue.
-  EXPECT_EQ(grandchild_pid, waitpid(grandchild_pid, &status, 0)) << strerror(errno);
-  EXPECT_TRUE(WIFSTOPPED(status) && WSTOPSIG(status) == SIGSTOP) << " status " << status;
+  ASSERT_EQ(grandchild_pid, waitpid(grandchild_pid, &status, 0)) << strerror(errno);
+  ASSERT_TRUE(WIFSTOPPED(status) && WSTOPSIG(status) == SIGSTOP) << " status " << status;
   // Child should not have made progress..
-  EXPECT_EQ(0, waitpid(child_pid, &status, WNOHANG)) << strerror(errno);
-  EXPECT_EQ(0, ptrace(PTRACE_CONT, grandchild_pid, 0, 0)) << strerror(errno);
-  EXPECT_EQ(grandchild_pid, waitpid(grandchild_pid, &status, 0)) << strerror(errno);
+  ASSERT_EQ(0, waitpid(child_pid, &status, WNOHANG)) << strerror(errno);
+  ASSERT_EQ(0, ptrace(PTRACE_CONT, grandchild_pid, 0, 0)) << strerror(errno);
+  ASSERT_EQ(grandchild_pid, waitpid(grandchild_pid, &status, 0)) << strerror(errno);
   ASSERT_TRUE(WIFEXITED(status) && WEXITSTATUS(status) == 99)
       << "WIFEXITED(status) == " << WIFEXITED(status)
       << " WEXITSTATUS(status) == " << WEXITSTATUS(status);
 
   // Grandchild is done, child should continue.
-  EXPECT_EQ(child_pid, waitpid(child_pid, &status, 0)) << strerror(errno);
-  EXPECT_TRUE(WIFSTOPPED(status) && (status >> 8) == (SIGTRAP | (PTRACE_EVENT_VFORK_DONE << 8)))
+  ASSERT_EQ(child_pid, waitpid(child_pid, &status, 0)) << strerror(errno);
+  ASSERT_TRUE(WIFSTOPPED(status) && (status >> 8) == (SIGTRAP | (PTRACE_EVENT_VFORK_DONE << 8)))
       << "status = " << status;
-  EXPECT_EQ(0, ptrace(PTRACE_DETACH, child_pid, 0, 0)) << strerror(errno);
-  EXPECT_EQ(child_pid, waitpid(child_pid, &status, 0)) << strerror(errno);
-  EXPECT_TRUE(WIFEXITED(status) && WEXITSTATUS(status) == 0)
+  ASSERT_EQ(0, ptrace(PTRACE_DETACH, child_pid, 0, 0)) << strerror(errno);
+  ASSERT_EQ(child_pid, waitpid(child_pid, &status, 0)) << strerror(errno);
+  ASSERT_TRUE(WIFEXITED(status) && WEXITSTATUS(status) == 0)
       << "WIFEXITED(status) == " << WIFEXITED(status)
       << " WEXITSTATUS(status) == " << WEXITSTATUS(status);
 }
 
 constexpr int kBadExitStatus = 0xabababab;
 
-pid_t DoExec() {
+void DoExec(pid_t *out) {
   pid_t child_pid = fork();
   if (child_pid == 0) {
-    EXPECT_EQ(ptrace(PTRACE_TRACEME, 0, 0, 0), 0) << strerror(errno);
+    ASSERT_EQ(ptrace(PTRACE_TRACEME, 0, 0, 0), 0) << strerror(errno);
     raise(SIGSTOP);
 
     std::string test_binary = "/data/tests/ptrace_test_exec_child";
@@ -702,29 +701,30 @@ pid_t DoExec() {
     // Should not get here.
     _exit(kBadExitStatus);
   }
-  return child_pid;
+  *out = child_pid;
 }
 
 // Ensure that the tracee sends a SIGTRAP when it encounters an exec and
 // TRACEEXEC is not enabled.
 TEST(PtraceTest, ExecveWithSigtrap) {
-  pid_t child_pid = DoExec();
+  pid_t child_pid;
+  DoExec(&child_pid);
 
   int status;
   ASSERT_EQ(child_pid, waitpid(child_pid, &status, 0));
-  EXPECT_TRUE(WIFSTOPPED(status) && WSTOPSIG(status) == SIGSTOP)
+  ASSERT_TRUE(WIFSTOPPED(status) && WSTOPSIG(status) == SIGSTOP)
       << "status = " << status << " WIFSTOPPED = " << WIFSTOPPED(status)
       << " WSTOPSIG = " << WSTOPSIG(status);
 
-  EXPECT_EQ(0, ptrace(PTRACE_CONT, child_pid, 0, 0));
+  ASSERT_EQ(0, ptrace(PTRACE_CONT, child_pid, 0, 0));
 
-  EXPECT_EQ(child_pid, waitpid(child_pid, &status, 0));
-  EXPECT_TRUE(WIFSTOPPED(status) && WSTOPSIG(status) == SIGTRAP)
+  ASSERT_EQ(child_pid, waitpid(child_pid, &status, 0));
+  ASSERT_TRUE(WIFSTOPPED(status) && WSTOPSIG(status) == SIGTRAP)
       << "status = " << status << " WIFSTOPPED = " << WIFSTOPPED(status)
       << " WSTOPSIG = " << WSTOPSIG(status);
 
-  EXPECT_EQ(0, ptrace(PTRACE_DETACH, child_pid, 0, 0));
-  EXPECT_EQ(child_pid, waitpid(child_pid, &status, 0));
+  ASSERT_EQ(0, ptrace(PTRACE_DETACH, child_pid, 0, 0));
+  ASSERT_EQ(child_pid, waitpid(child_pid, &status, 0));
   ASSERT_TRUE(WIFEXITED(status) && WEXITSTATUS(status) == 0)
       << "WIFEXITED(status) == " << WIFEXITED(status)
       << " WEXITSTATUS(status) == " << WEXITSTATUS(status);
@@ -740,40 +740,41 @@ TEST(PtraceTest, PtraceEventStopWithExit) {
     GTEST_SKIP() << "This test does not work on Linux in CQ";
   }
 
-  pid_t child_pid = DoExec();
+  pid_t child_pid;
+  DoExec(&child_pid);
 
   int status;
   ASSERT_EQ(child_pid, waitpid(child_pid, &status, 0));
-  EXPECT_TRUE(WIFSTOPPED(status) && WSTOPSIG(status) == SIGSTOP)
+  ASSERT_TRUE(WIFSTOPPED(status) && WSTOPSIG(status) == SIGSTOP)
       << "status = " << status << " WIFSTOPPED = " << WIFSTOPPED(status)
       << " WSTOPSIG = " << WSTOPSIG(status);
 
-  EXPECT_EQ(0, ptrace(PTRACE_SETOPTIONS, child_pid, 0, PTRACE_O_TRACEEXIT))
+  ASSERT_EQ(0, ptrace(PTRACE_SETOPTIONS, child_pid, 0, PTRACE_O_TRACEEXIT))
       << "error " << strerror(errno);
-  EXPECT_EQ(0, ptrace(PTRACE_CONT, child_pid, 0, 0));
+  ASSERT_EQ(0, ptrace(PTRACE_CONT, child_pid, 0, 0));
 
   // Wait for the exec
-  EXPECT_EQ(child_pid, waitpid(-1, &status, 0));
-  EXPECT_TRUE(WIFSTOPPED(status) && WSTOPSIG(status) == SIGTRAP)
+  ASSERT_EQ(child_pid, waitpid(-1, &status, 0));
+  ASSERT_TRUE(WIFSTOPPED(status) && WSTOPSIG(status) == SIGTRAP)
       << "status = " << status << " WIFSTOPPED = " << WIFSTOPPED(status)
       << " WSTOPSIG = " << WSTOPSIG(status);
-  EXPECT_EQ(0, ptrace(PTRACE_CONT, child_pid, 0, 0));
+  ASSERT_EQ(0, ptrace(PTRACE_CONT, child_pid, 0, 0));
 
   // Wait for the exit
-  EXPECT_EQ(child_pid, waitpid(child_pid, &status, 0));
-  EXPECT_TRUE(WIFSTOPPED(status) && WSTOPSIG(status) == SIGTRAP)
+  ASSERT_EQ(child_pid, waitpid(child_pid, &status, 0));
+  ASSERT_TRUE(WIFSTOPPED(status) && WSTOPSIG(status) == SIGTRAP)
       << "status = " << status << " WIFSTOPPED = " << WIFSTOPPED(status)
       << " WSTOPSIG = " << WSTOPSIG(status);
 
-  EXPECT_EQ(SIGTRAP | (PTRACE_EVENT_EXIT << 8), status >> 8);
+  ASSERT_EQ(SIGTRAP | (PTRACE_EVENT_EXIT << 8), status >> 8);
   int exit_status = kBadExitStatus;
-  EXPECT_EQ(get_event_msg<int>(child_pid, &exit_status), 0);
+  ASSERT_EQ(get_event_msg<int>(child_pid, &exit_status), 0);
   // The actual exit status seems to change depending on how this test is run,
   // so just make sure that something is returned.
-  EXPECT_TRUE(kBadExitStatus != exit_status)
+  ASSERT_TRUE(kBadExitStatus != exit_status)
       << "expected = " << kBadExitStatus << " actual: " << exit_status;
-  EXPECT_EQ(0, ptrace(PTRACE_DETACH, child_pid, 0, 0)) << " with child pid " << child_pid;
-  EXPECT_EQ(child_pid, waitpid(child_pid, &status, 0));
+  ASSERT_EQ(0, ptrace(PTRACE_DETACH, child_pid, 0, 0)) << " with child pid " << child_pid;
+  ASSERT_EQ(child_pid, waitpid(child_pid, &status, 0));
   ASSERT_TRUE(WIFEXITED(status) && WEXITSTATUS(status) == 0)
       << "WIFEXITED(status) == " << WIFEXITED(status)
       << " WEXITSTATUS(status) == " << WEXITSTATUS(status);
@@ -788,32 +789,33 @@ TEST(PtraceTest, PtraceEventStopWithExecve) {
   if (!test_helper::IsStarnix()) {
     GTEST_SKIP() << "This test does not work on Linux in CQ";
   }
-  pid_t child_pid = DoExec();
+  pid_t child_pid;
+  DoExec(&child_pid);
 
   int status;
   ASSERT_EQ(child_pid, waitpid(child_pid, &status, 0));
-  EXPECT_TRUE(WIFSTOPPED(status) && WSTOPSIG(status) == SIGSTOP)
+  ASSERT_TRUE(WIFSTOPPED(status) && WSTOPSIG(status) == SIGSTOP)
       << "status = " << status << " WIFSTOPPED = " << WIFSTOPPED(status)
       << " WSTOPSIG = " << WSTOPSIG(status);
 
-  EXPECT_EQ(0, ptrace(PTRACE_SETOPTIONS, child_pid, 0, PTRACE_O_TRACEEXEC | PTRACE_O_TRACEEXIT))
+  ASSERT_EQ(0, ptrace(PTRACE_SETOPTIONS, child_pid, 0, PTRACE_O_TRACEEXEC | PTRACE_O_TRACEEXIT))
       << "error " << strerror(errno);
-  EXPECT_EQ(0, ptrace(PTRACE_CONT, child_pid, 0, 0));
+  ASSERT_EQ(0, ptrace(PTRACE_CONT, child_pid, 0, 0));
 
   // Wait for the exec
-  EXPECT_EQ(child_pid, waitpid(child_pid, &status, 0));
-  EXPECT_TRUE(WIFSTOPPED(status) && WSTOPSIG(status) == SIGTRAP)
+  ASSERT_EQ(child_pid, waitpid(child_pid, &status, 0));
+  ASSERT_TRUE(WIFSTOPPED(status) && WSTOPSIG(status) == SIGTRAP)
       << "status = " << status << " WIFSTOPPED = " << WIFSTOPPED(status)
       << " WSTOPSIG = " << WSTOPSIG(status);
 
-  EXPECT_EQ(SIGTRAP | (PTRACE_EVENT_EXEC << 8), status >> 8);
+  ASSERT_EQ(SIGTRAP | (PTRACE_EVENT_EXEC << 8), status >> 8);
   pid_t target_pid;
-  EXPECT_EQ(get_event_msg<pid_t>(child_pid, &target_pid), 0);
-  EXPECT_EQ(target_pid, child_pid);
+  ASSERT_EQ(get_event_msg<pid_t>(child_pid, &target_pid), 0);
+  ASSERT_EQ(target_pid, child_pid);
 
-  EXPECT_EQ(0, ptrace(PTRACE_DETACH, child_pid, 0, 0))
+  ASSERT_EQ(0, ptrace(PTRACE_DETACH, child_pid, 0, 0))
       << strerror(errno) << ": with child pid " << child_pid;
-  EXPECT_EQ(child_pid, waitpid(child_pid, &status, 0));
+  ASSERT_EQ(child_pid, waitpid(child_pid, &status, 0));
   ASSERT_TRUE(WIFEXITED(status) && WEXITSTATUS(status) == 0)
       << "WIFEXITED(status) == " << WIFEXITED(status)
       << " WEXITSTATUS(status) == " << WEXITSTATUS(status);
@@ -829,39 +831,40 @@ TEST(PtraceTest, PtraceEventStopWithSignalExit) {
     GTEST_SKIP() << "This test does not work on Linux in CQ";
   }
 
-  pid_t child_pid = DoExec();
+  pid_t child_pid;
+  DoExec(&child_pid);
 
   int status;
   ASSERT_EQ(child_pid, waitpid(child_pid, &status, 0));
-  EXPECT_TRUE(WIFSTOPPED(status) && WSTOPSIG(status) == SIGSTOP)
+  ASSERT_TRUE(WIFSTOPPED(status) && WSTOPSIG(status) == SIGSTOP)
       << "status = " << status << " WIFSTOPPED = " << WIFSTOPPED(status)
       << " WSTOPSIG = " << WSTOPSIG(status);
 
-  EXPECT_EQ(0, ptrace(PTRACE_SETOPTIONS, child_pid, 0, PTRACE_O_TRACEEXIT))
+  ASSERT_EQ(0, ptrace(PTRACE_SETOPTIONS, child_pid, 0, PTRACE_O_TRACEEXIT))
       << "error " << strerror(errno);
   ASSERT_EQ(0, kill(child_pid, SIGTERM));
-  EXPECT_EQ(0, ptrace(PTRACE_CONT, child_pid, 0, 0));
+  ASSERT_EQ(0, ptrace(PTRACE_CONT, child_pid, 0, 0));
 
   // Wait for the signal-delivery-stop
-  EXPECT_EQ(child_pid, waitpid(child_pid, &status, 0));
-  EXPECT_TRUE(WIFSTOPPED(status) && WSTOPSIG(status) == SIGTERM)
+  ASSERT_EQ(child_pid, waitpid(child_pid, &status, 0));
+  ASSERT_TRUE(WIFSTOPPED(status) && WSTOPSIG(status) == SIGTERM)
       << "status = " << status << " WIFSTOPPED = " << WIFSTOPPED(status)
       << " WSTOPSIG = " << WSTOPSIG(status);
-  EXPECT_EQ(0, ptrace(PTRACE_CONT, child_pid, 0, SIGTERM));
+  ASSERT_EQ(0, ptrace(PTRACE_CONT, child_pid, 0, SIGTERM));
 
   // Wait for the exit
-  EXPECT_EQ(child_pid, waitpid(child_pid, &status, 0));
-  EXPECT_TRUE(WIFSTOPPED(status) && WSTOPSIG(status) == SIGTRAP)
+  ASSERT_EQ(child_pid, waitpid(child_pid, &status, 0));
+  ASSERT_TRUE(WIFSTOPPED(status) && WSTOPSIG(status) == SIGTRAP)
       << "status = " << status << " WIFSTOPPED = " << WIFSTOPPED(status)
       << " WSTOPSIG = " << WSTOPSIG(status);
 
-  EXPECT_EQ(SIGTRAP | (PTRACE_EVENT_EXIT << 8), status >> 8);
+  ASSERT_EQ(SIGTRAP | (PTRACE_EVENT_EXIT << 8), status >> 8);
   int exit_status = 0xabababab;
-  EXPECT_EQ(get_event_msg<int>(child_pid, &exit_status), 0);
-  EXPECT_TRUE(SIGTERM == exit_status) << " exit_status " << exit_status;
-  EXPECT_EQ(0, ptrace(PTRACE_DETACH, child_pid, 0, 0))
+  ASSERT_EQ(get_event_msg<int>(child_pid, &exit_status), 0);
+  ASSERT_TRUE(SIGTERM == exit_status) << " exit_status " << exit_status;
+  ASSERT_EQ(0, ptrace(PTRACE_DETACH, child_pid, 0, 0))
       << strerror(errno) << " with child pid " << child_pid;
-  EXPECT_EQ(child_pid, waitpid(child_pid, &status, 0));
+  ASSERT_EQ(child_pid, waitpid(child_pid, &status, 0));
   ASSERT_TRUE(WIFSIGNALED(status) && WTERMSIG(status) == SIGTERM)
       << "WIFSIGNALED(status) == " << WIFEXITED(status)
       << " WTERMSIG(status) == " << WTERMSIG(status);
@@ -883,39 +886,39 @@ TEST(PtraceTest, GrandchildWithSigsuspend) {
   test_helper::ForkHelper helper;
   helper.OnlyWaitForForkedChildren();
   pid_t child_pid = helper.RunInForkedProcess([] {
-    EXPECT_EQ(0, ptrace(PTRACE_TRACEME, 0, 0, 0));
-    EXPECT_EQ(0, raise(SIGSTOP));
+    ASSERT_EQ(0, ptrace(PTRACE_TRACEME, 0, 0, 0));
+    ASSERT_EQ(0, raise(SIGSTOP));
     sigset_t child_mask, old_mask;
-    EXPECT_EQ(0, sigemptyset(&child_mask));
-    EXPECT_EQ(0, sigaddset(&child_mask, SIGCHLD));
+    ASSERT_EQ(0, sigemptyset(&child_mask));
+    ASSERT_EQ(0, sigaddset(&child_mask, SIGCHLD));
 
     sigset_t empty_mask;
-    EXPECT_EQ(0, sigemptyset(&empty_mask));
+    ASSERT_EQ(0, sigemptyset(&empty_mask));
     struct sigaction sa, oldact;
     sa.sa_sigaction = GrandchildWithSigsuspendSigaction;
     sa.sa_mask = empty_mask;
-    EXPECT_EQ(0, sigaction(SIGCHLD, &sa, &oldact));
+    ASSERT_EQ(0, sigaction(SIGCHLD, &sa, &oldact));
     pid_t my_pid = getpid();
-    EXPECT_EQ(0, sigprocmask(SIG_BLOCK, &child_mask, &old_mask));
+    ASSERT_EQ(0, sigprocmask(SIG_BLOCK, &child_mask, &old_mask));
     pid_t gc_pid = fork();
     if (gc_pid == 0) {
       test_helper::WaitUntilBlocked(my_pid, false);
       exit(0);
     }
-    EXPECT_EQ(-1, sigsuspend(&old_mask));
+    ASSERT_EQ(-1, sigsuspend(&old_mask));
     int status;
-    EXPECT_EQ(gc_pid, waitpid(gc_pid, &status, 0));
-    EXPECT_TRUE(WIFEXITED(status) && WEXITSTATUS(status) == 0)
+    ASSERT_EQ(gc_pid, waitpid(gc_pid, &status, 0));
+    ASSERT_TRUE(WIFEXITED(status) && WEXITSTATUS(status) == 0)
         << "WIFEXITED(status) == " << WIFEXITED(status)
         << " WEXITSTATUS(status) == " << WEXITSTATUS(status);
   });
   int status;
-  EXPECT_EQ(child_pid, waitpid(child_pid, &status, 0));
-  EXPECT_TRUE(WIFSTOPPED(status) && WSTOPSIG(status) == SIGSTOP)
+  ASSERT_EQ(child_pid, waitpid(child_pid, &status, 0));
+  ASSERT_TRUE(WIFSTOPPED(status) && WSTOPSIG(status) == SIGSTOP)
       << WIFSTOPPED(status) << " " << WSTOPSIG(status);
-  EXPECT_EQ(0, ptrace(PTRACE_CONT, child_pid, 0, 0));
-  EXPECT_EQ(child_pid, waitpid(child_pid, &status, 0));
-  EXPECT_TRUE(WIFSTOPPED(status) && WSTOPSIG(status) == SIGCHLD)
+  ASSERT_EQ(0, ptrace(PTRACE_CONT, child_pid, 0, 0));
+  ASSERT_EQ(child_pid, waitpid(child_pid, &status, 0));
+  ASSERT_TRUE(WIFSTOPPED(status) && WSTOPSIG(status) == SIGCHLD)
       << WIFSTOPPED(status) << " " << WSTOPSIG(status);
-  EXPECT_EQ(0, ptrace(PTRACE_CONT, child_pid, 0, SIGCHLD));
+  ASSERT_EQ(0, ptrace(PTRACE_CONT, child_pid, 0, SIGCHLD));
 }

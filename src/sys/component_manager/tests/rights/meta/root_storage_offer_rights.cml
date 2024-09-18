@@ -7,6 +7,7 @@
     include: [
         "//src/sys/component_manager/tests/meta/elf_runner_and_environment.shard.cml",
         "inspect/offer.shard.cml",
+        "syslog/offer.shard.cml",
     ],
     children: [
         {
@@ -33,14 +34,6 @@
             storage: "data",
             from: "self",
             to: "#use_storage",
-        },
-        {
-            protocol: "fuchsia.logger.LogSink",
-            from: "parent",
-            to: [
-                "#expose_dir_rights",
-                "#use_storage",
-            ],
         },
     ],
     expose: [

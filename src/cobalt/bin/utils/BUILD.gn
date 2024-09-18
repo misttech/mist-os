@@ -60,12 +60,6 @@ source_set("error_utils") {
   public_deps = [ "//sdk/fidl/fuchsia.metrics:fuchsia.metrics_hlcpp" ]
 }
 
-source_set("status_utils") {
-  sources = [ "status_utils.h" ]
-
-  public_deps = [ "//sdk/fidl/fuchsia.cobalt:fuchsia.cobalt_hlcpp" ]
-}
-
 executable("cobalt_utils_unittests") {
   testonly = true
 
@@ -81,6 +75,7 @@ executable("cobalt_utils_unittests") {
     ":clock",
     ":fuchsia_http_client",
     "//sdk/fidl/fuchsia.time:fuchsia.time_hlcpp",
+    "//sdk/lib/async-testing",
     "//sdk/lib/inspect/testing/cpp",
     "//sdk/lib/sys/cpp/testing:unit",
     "//src/cobalt/bin/testing:fake_http_loader",
@@ -88,6 +83,5 @@ executable("cobalt_utils_unittests") {
     "//src/lib/testing/loop_fixture",
     "//third_party/googletest:gmock",
     "//third_party/googletest:gtest",
-    "//zircon/system/ulib/async-testing",
   ]
 }

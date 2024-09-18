@@ -887,12 +887,29 @@ Thread* Scheduler::DequeueEarlierDeadlineThread(SchedTime eligible_time, SchedTi
   return eligible_thread;
 }
 
+bool Scheduler::NeedsMigration(Thread* thread) {
+  const cpu_num_t current_cpu = arch_curr_cpu_num();
+  const cpu_mask_t current_cpu_mask = cpu_num_to_mask(current_cpu);
+  const cpu_mask_t active_mask = PeekActiveMask();
+  // Threads that are not ready should not be migrated.
+  if (thread->state() != THREAD_READY) {
+    return false;
+  }
+
+  // If we have no active CPUs, then we cannot migrate this thread, so return false.
+  if (active_mask == 0) {
+    return false;
+  }
+
+  // We need to migrate if the set of CPUs this thread can run on does not include the current CPU.
+  return (thread->scheduler_state().GetEffectiveCpuMask(active_mask) & current_cpu_mask) == 0;
+}
+
 // Selects a thread to run. Performs any necessary maintenance if the current
 // thread is changing, depending on the reason for the change.
 Thread* Scheduler::EvaluateNextThread(SchedTime now, Thread* current_thread, bool timeslice_expired,
-                                      SchedDuration total_runtime_ns,
+                                      bool current_is_migrating, SchedDuration total_runtime_ns,
                                       Guard<MonitoredSpinLock, NoIrqSave>& queue_guard) {
-  using TransientState = SchedulerQueueState::TransientState;
   ktrace::Scope trace = LOCAL_KTRACE_BEGIN_SCOPE(DETAILED, "find_thread");
 
   const bool is_idle = current_thread->IsIdle();
@@ -900,168 +917,55 @@ Thread* Scheduler::EvaluateNextThread(SchedTime now, Thread* current_thread, boo
   const bool is_deadline = IsDeadlineThread(current_thread);
   const bool is_new_deadline_eligible = IsDeadlineThreadEligible(now);
 
-  const cpu_num_t current_cpu = arch_curr_cpu_num();
-  const cpu_mask_t current_cpu_mask = cpu_num_to_mask(current_cpu);
-  const cpu_mask_t active_mask = PeekActiveMask();
-
-  // Returns true when the given thread requires active migration.
-  const auto needs_migration = [active_mask,
-                                current_cpu_mask](const Thread& thread) TA_REQ(this->queue_lock_) {
-    // We are examining threads owned by this scheduler while holding the queue lock.  We should
-    // have read-only access to scheduler_state, and exclusive access to scheduler_queue_state.
-    MarkHasOwnedThreadAccess(thread);
-
-    // Threads may be created and resumed before the thread init level. Work
-    // around an empty active mask by assuming only the current cpu is available.
-    return active_mask != 0 &&
-           ((thread.scheduler_state().GetEffectiveCpuMask(active_mask) & current_cpu_mask) == 0);
-  };
-
   Thread* next_thread = nullptr;
-  if (is_active && needs_migration(*current_thread)) {
-    // Avoid putting the current thread into the run queue in any of the paths
-    // below if it needs active migration. Let the migration loop below handle
-    // moving the thread. This avoids an edge case where time slice expiration
-    // coincides with an action that requires migration. Migration should take
-    // precedence over time slice expiration.
-    next_thread = current_thread;
-  } else if (is_active && likely(!is_idle)) {
-    if (timeslice_expired) {
-      // If the timeslice expired insert the current thread into the run queue.
-      QueueThread(current_thread, Placement::Insertion, now, total_runtime_ns);
-    } else if (is_new_deadline_eligible && is_deadline) {
-      // The current thread is deadline scheduled and there is at least one
-      // eligible deadline thread in the run queue: select the eligible thread
-      // with the earliest deadline, which may still be the current thread.
-      const SchedTime deadline_ns = current_thread->scheduler_state().finish_time_;
-      if (Thread* const earlier_thread = DequeueEarlierDeadlineThread(now, deadline_ns);
-          earlier_thread != nullptr) {
+  if (!current_is_migrating) {
+    if (is_active && likely(!is_idle)) {
+      if (timeslice_expired) {
+        // If the timeslice expired insert the current thread into the run queue.
+        QueueThread(current_thread, Placement::Insertion, now, total_runtime_ns);
+      } else if (is_new_deadline_eligible && is_deadline) {
+        // The current thread is deadline scheduled and there is at least one
+        // eligible deadline thread in the run queue: select the eligible thread
+        // with the earliest deadline, which may still be the current thread.
+        const SchedTime deadline_ns = current_thread->scheduler_state().finish_time_;
+        if (Thread* const earlier_thread = DequeueEarlierDeadlineThread(now, deadline_ns);
+            earlier_thread != nullptr) {
+          QueueThread(current_thread, Placement::Preemption, now, total_runtime_ns);
+          next_thread = earlier_thread;
+        } else {
+          // The current thread still has the earliest deadline.
+          next_thread = current_thread;
+        }
+      } else if (is_new_deadline_eligible && !is_deadline) {
+        // The current thread is fair scheduled and there is at least one eligible
+        // deadline thread in the run queue: return this thread to the run queue.
         QueueThread(current_thread, Placement::Preemption, now, total_runtime_ns);
-        next_thread = earlier_thread;
       } else {
-        // The current thread still has the earliest deadline.
+        // The current thread has remaining time and no eligible contender.
         next_thread = current_thread;
       }
-    } else if (is_new_deadline_eligible && !is_deadline) {
-      // The current thread is fair scheduled and there is at least one eligible
-      // deadline thread in the run queue: return this thread to the run queue.
-      QueueThread(current_thread, Placement::Preemption, now, total_runtime_ns);
-    } else {
-      // The current thread has remaining time and no eligible contender.
-      next_thread = current_thread;
+    } else if (!is_active && likely(!is_idle)) {
+      // The current thread is no longer ready, remove its accounting.  Note,
+      // active_thread_ can either equal current_thread at this point, or be
+      // nullptr if the thread has already been removed from bookkeeping.  Remove
+      // handles this edge case and does not remove the thread from bookkeeping if
+      // it has already been removed.
+      DEBUG_ASSERT((active_thread_ == current_thread) || (active_thread_ == nullptr));
+      MarkHasOwnedThreadAccess(*current_thread);
+      Remove(current_thread);
     }
-  } else if (!is_active && likely(!is_idle)) {
-    // The current thread is no longer ready, remove its accounting.  Note,
-    // active_thread_ can either equal current_thread at this point, or be
-    // nullptr if the thread has already been removed from bookkeeping.  Remove
-    // handles this edge case and does not remove the thread from bookkeeping if
-    // it has already been removed.
-    DEBUG_ASSERT((active_thread_ == current_thread) || (active_thread_ == nullptr));
-    MarkHasOwnedThreadAccess(*current_thread);
-    Remove(current_thread);
   }
 
-  // The current thread is no longer running or has returned to the run queue,
-  // select another thread to run.
+  // The current thread is no longer running, has returned to the run queue, or is migrating.
+  // Select another thread to run.
   if (next_thread == nullptr) {
     next_thread = DequeueThread(now, queue_guard);
-  }
-
-  // If the next thread needs *active* migration, call the migration function,
-  // migrate the thread, and select another thread to run.
-  //
-  // Most migrations are passive. Passive migration happens whenever a thread
-  // becomes READY and a different CPU is selected than the last CPU the thread
-  // ran on.
-  //
-  // Active migration happens under the following conditions:
-  //  1. The CPU affinity of a thread that is READY or RUNNING is changed to
-  //     exclude the CPU it is currently active on.
-  //  2. Passive migration, or active migration due to #1, selects a different
-  //     CPU for a thread with a migration function. Migration to the next CPU
-  //     is delayed until the migration function is called on the last CPU.
-  //  3. A thread that is READY or RUNNING is relocated by the periodic load
-  //     balancer. NOT YET IMPLEMENTED.
-  //
-  cpu_mask_t cpus_to_reschedule_mask = 0;
-  for (; needs_migration(*next_thread); next_thread = DequeueThread(now, queue_guard)) {
-    MarkHasOwnedThreadAccess(*next_thread);
-
-    // Remove accounting from this run queue and flag the thread as being in the
-    // process of migration.  If the next thread is the same thing as the
-    // current thread, be sure to replace the Rescheduling transient state with
-    // a Migrating transient state.
-    if (next_thread == current_thread) {
-      AssertInScheduler(*current_thread);
-      DEBUG_ASSERT(current_thread->scheduler_queue_state().transient_state ==
-                   TransientState::Rescheduling);
-      current_thread->scheduler_queue_state().transient_state = TransientState::None;
-    }
-    RemoveForTransition(next_thread, TransientState::Migrating);
-
-    // Now that the thread has been removed from this scheduler and has been
-    // marked as being in the middle of a migration, we need to finish the
-    // transition by adding it to its new target scheduler, but only if the
-    // thread being migrated is not the current thread.
-    //
-    // Doing this involves dropping our current scheduler's queue lock, then
-    // obtaining the target scheduler's lock while holding the migrating
-    // thread's lock.  Thread's locks must always be obtained before obtaining a
-    // scheduler's queue lock.
-    //
-    // If the migrating thread happens to be the current thread, we need to
-    // defer this operation until a bit later in the reschedule operation.  We
-    // need to continue to hold the current thread's lock until after the
-    // point where we have obtain the next thread's lock, and have re-acquired
-    // our queue lock (which we we need to drop temporarily in order to obtain
-    // the next thread's lock).
-    //
-    // Once we hold all of the required locks, we can finish the thread's
-    // transition into its new scheduler, calling the migration function and
-    // clearing its transient state in the process.
-    if (current_thread != next_thread) {
-      queue_guard.CallUnlocked([&] {
-        // Lock the next thread, then call the Save stage its migrate function
-        // (if any).  This is its last chance to run on this CPU.
-        ChainLockTransaction::AssertActive();
-        ChainLockTransaction& active_clt = ChainLockTransaction::ActiveRef();
-
-        active_clt.Restart(CLT_TAG("Scheduler::EvaluateNextThread (restart)"));
-
-        // Acquire the lock without backing off using an explicit retry loop because the current
-        // thread's lock is held and ChainLock::Acquire asserts that no chain locks are currently
-        // held to avoid misuse in the general case.
-        ChainLockGuard next_thread_guard{next_thread->get_lock(), ChainLockGuard::Defer};
-        while (!next_thread_guard.TryAcquire(ChainLock::AllowFinalized::No,
-                                             ChainLock::RecordBackoff::No)) {
-          arch::Yield();
-        }
-
-        active_clt.Finalize();
-        next_thread->CallMigrateFnLocked(Thread::MigrateStage::Save);
-
-        const cpu_num_t target_cpu = FindActiveSchedulerForThread(
-            next_thread, FindTargetCpuReason::Migrating, [now](Thread* thread, Scheduler* target) {
-              MarkInFindActiveSchedulerForThreadCbk(*thread, *target);
-              DEBUG_ASSERT(thread->scheduler_queue_state().transient_state ==
-                           TransientState::Migrating);
-              target->FinishTransition(now, thread);
-            });
-
-        cpus_to_reschedule_mask |= cpu_num_to_mask(target_cpu);
-      });
-    }
-  }
-
-  // Issue reschedule IPIs to CPUs with migrated threads.
-  if (cpus_to_reschedule_mask) {
-    mp_reschedule(cpus_to_reschedule_mask, 0);
   }
 
   return next_thread;
 }
 
-cpu_num_t Scheduler::FindTargetCpu(Thread* thread, FindTargetCpuReason reason) {
+cpu_num_t Scheduler::FindTargetCpu(Thread* thread) {
   ktrace::Scope trace = LOCAL_KTRACE_BEGIN_SCOPE(DETAILED, "find_target");
 
   // Determine the set of CPUs the thread is allowed to run on.
@@ -1077,26 +981,10 @@ cpu_num_t Scheduler::FindTargetCpu(Thread* thread, FindTargetCpuReason reason) {
 
   LOCAL_KTRACE(DETAILED, "target_mask", ("online", mp_get_online_mask()), ("active", active_mask));
 
-  // If our thread is unblocking (or coming out of sleep/suspend), and it has
-  // run on a CPU in the past, and it has a migration function whose Save
-  // phase has not been called yet, then we must always send it back to the last
-  // CPU it ran on.
-  //
-  // When the thread is selected to run on its last CPU, if it needs to be
-  // migrated, the Save stage of the migration will be executed, and the
-  // scheduler will then immediately re-assign the thread to a different
-  // scheduler to complete the migration operation.
-  //
-  const cpu_num_t last_cpu = thread_state.last_cpu_;
-  if ((reason == FindTargetCpuReason::Unblocking) && thread->has_migrate_fn() &&
-      !thread->migrate_pending() && (last_cpu != INVALID_CPU)) {
-    trace = KTRACE_END_SCOPE(("last_cpu", last_cpu), ("target_cpu", last_cpu));
-    return last_cpu;
-  }
-
   // Find the best target CPU starting at the last CPU the task ran on, if any.
   // Alternatives are considered in order of best to worst potential cache
   // affinity.
+  const cpu_num_t last_cpu = thread_state.last_cpu_;
   const cpu_num_t starting_cpu = last_cpu != INVALID_CPU ? last_cpu : current_cpu;
   const CpuSearchSet& search_set = percpu::Get(starting_cpu).search_set;
 
@@ -1247,6 +1135,69 @@ void Scheduler::UpdateTimeline(SchedTime now) {
        KTRACE_ANNOTATED_VALUE(AssertHeld(queue_lock_), Round<uint64_t>(virtual_time_))));
 }
 
+void Scheduler::ProcessSaveStateList(SchedTime now) {
+  DEBUG_ASSERT(arch_ints_disabled());
+
+  // Move the save_state_list_ to a local, stack allocated list. This allows us to relinquish the
+  // queue_lock_ for the rest of the method.
+  Thread::SaveStateList local_save_state_list;
+  {
+    Guard<MonitoredSpinLock, NoIrqSave> queue_guard{&queue_lock_, SOURCE_TAG};
+    if (save_state_list_.is_empty()) {
+      return;
+    }
+    local_save_state_list = ktl::move(save_state_list_);
+  }
+
+  ChainLockTransaction& active_clt = ChainLockTransaction::ActiveRef();
+  active_clt.Restart(CLT_TAG("Scheduler::ProcessSaveStateList (restart)"));
+
+  cpu_mask_t cpus_to_reschedule_mask = 0;
+  while (!local_save_state_list.is_empty()) {
+    Thread* to_migrate = local_save_state_list.pop_front();
+    // Acquire the thread's lock without backing off using an explicit retry loop because the
+    // current thread's lock is held and ChainLock::Acquire asserts that no chain locks are
+    // currently held to avoid misuse in the general case. We also currently hold the special
+    // "sched token", meaning that we will win arbitration against any other chainlock
+    // transaction.
+    //
+    // This is safe to do here because we can guarantee that no other scheduler holds or is
+    // attempting to acquire the locks of any of the threads in this save_state_list_. The
+    // only context in which schedulers attempt to acquire the locks of threads in other
+    // schedulers is during the `StealWork` routine. However, that routine only looks for
+    // threads in the RunQueues (not save_state_lists) and also does not steal threads that
+    // have migration functions. Therefore, it is impossible for another scheduler to be
+    // fighting over this thread's lock.
+    while (!to_migrate->get_lock().TryAcquire(ChainLock::AllowFinalized::No,
+                                              ChainLock::RecordBackoff::No)) {
+      arch::Yield();
+    }
+
+    // We now have the thread's lock, so run the migrate function.
+    to_migrate->CallMigrateFnLocked(Thread::MigrateStage::Save);
+
+    // TODO(rudymathu): Threads placed in the save_state_list_ via an Unblock operation already
+    // performed a `FindTargetCpu` call. In a future optimization, we should be able to reuse
+    // that value here and avoid another CPU search, provided that the CPU is still online and
+    // load balancing constraints still hold.
+    const cpu_num_t target_cpu =
+        FindActiveSchedulerForThread(to_migrate, [now](Thread* thread, Scheduler* target) {
+          MarkInFindActiveSchedulerForThreadCbk(*thread, *target);
+          DEBUG_ASSERT(thread->scheduler_queue_state().transient_state ==
+                       SchedulerQueueState::TransientState::Migrating);
+          target->FinishTransition(now, thread);
+        });
+    cpus_to_reschedule_mask |= cpu_num_to_mask(target_cpu);
+    to_migrate->get_lock().Release();
+  }
+  ChainLockTransaction::Finalize();
+
+  // Issue reschedule IPIs to CPUs with migrated threads.
+  if (cpus_to_reschedule_mask) {
+    mp_reschedule(cpus_to_reschedule_mask, 0);
+  }
+}
+
 void Scheduler::RescheduleCommon(Thread* const current_thread, SchedTime now,
                                  EndTraceCallback end_outer_trace) {
   using TransientState = SchedulerQueueState::TransientState;
@@ -1276,6 +1227,10 @@ void Scheduler::RescheduleCommon(Thread* const current_thread, SchedTime now,
   // context at the end of the operation (whether we context switched or not).
   const auto saved_transaction_state = ChainLockTransaction::SaveStateAndUseReservedToken();
   current_thread->get_lock().SyncToken();
+
+  // Process all threads in the save_state_list_. We do this before performing any
+  // other reschedule operation.
+  ProcessSaveStateList(now);
 
   Guard<MonitoredSpinLock, NoIrqSave> queue_guard{&queue_lock_, SOURCE_TAG};
   UpdateTimeline(now);
@@ -1403,9 +1358,21 @@ void Scheduler::RescheduleCommon(Thread* const current_thread, SchedTime now,
       actual_runtime_ns.raw_value(), current_state->finish_time_.raw_value(),
       current_state->time_slice_ns_.raw_value(), start_of_current_time_slice_ns_.raw_value());
 
+  // If the current thread needs to be migrated, remove it for migration.
+  bool current_is_migrating = false;
+  if (NeedsMigration(current_thread)) {
+    AssertInScheduler(*current_thread);
+    // The current_thread's transient_state could either be Rescheduling or None, depending on
+    // whether it was running or not. RemoveForTransition, however, expects the transient_state
+    // to be None, so set it explicitly here.
+    current_thread->scheduler_queue_state().transient_state = TransientState::None;
+    RemoveForTransition(current_thread, TransientState::Migrating);
+    current_is_migrating = true;
+  }
+
   // Select the next thread to run.
-  Thread* const next_thread =
-      EvaluateNextThread(now, current_thread, timeslice_expired, total_runtime_ns, queue_guard);
+  Thread* const next_thread = EvaluateNextThread(
+      now, current_thread, timeslice_expired, current_is_migrating, total_runtime_ns, queue_guard);
   DEBUG_ASSERT(next_thread != nullptr);
   const bool thread_changed{current_thread != next_thread};
 
@@ -1725,13 +1692,12 @@ void Scheduler::RescheduleCommon(Thread* const current_thread, SchedTime now,
       // this CPU.
       current_thread->CallMigrateFnLocked(Thread::MigrateStage::Save);
 
-      const cpu_num_t target_cpu =
-          FindActiveSchedulerForThread(current_thread, FindTargetCpuReason::Migrating,
-                                       [now, this](Thread* thread, Scheduler* target) {
-                                         MarkInFindActiveSchedulerForThreadCbk(*thread, *target);
-                                         DEBUG_ASSERT(target != this);
-                                         target->FinishTransition(now, thread);
-                                       });
+      const cpu_num_t target_cpu = FindActiveSchedulerForThread(
+          current_thread, [now, this](Thread* thread, Scheduler* target) {
+            MarkInFindActiveSchedulerForThreadCbk(*thread, *target);
+            DEBUG_ASSERT(target != this);
+            target->FinishTransition(now, thread);
+          });
 
       // Fire off an IPI to the CPU we just moved the thread to.
       mp_reschedule(cpu_num_to_mask(target_cpu), 0);
@@ -2393,16 +2359,40 @@ void Scheduler::Unblock(Thread* thread) {
   thread->canary().Assert();
 
   const SchedTime now = CurrentTime();
-  const cpu_num_t target_cpu = FindActiveSchedulerForThread(
-      thread, FindTargetCpuReason::Unblocking, [now](Thread* thread, Scheduler* target) {
-        MarkInFindActiveSchedulerForThreadCbk(*thread, *target);
-        TraceWakeup(thread, target->this_cpu_);
-        thread->scheduler_state().curr_cpu_ = target->this_cpu_;
-        thread->set_ready();
+  cpu_num_t target_cpu = INVALID_CPU;
+  while (true) {
+    // TODO(rudymathu): This target_cpu should be stashed in the thread prior to adding it to the
+    // save_state_list_, as that would allow us to bypass CPU selection when processing the list so
+    // long as the CPU is still online.
+    target_cpu = FindTargetCpu(thread);
+    const cpu_num_t last_cpu = thread->scheduler_state().last_cpu();
+    const bool needs_migration = (last_cpu != INVALID_CPU && target_cpu != last_cpu &&
+                                  thread->has_migrate_fn() && !thread->migrate_pending());
+    if (needs_migration) {
+      target_cpu = last_cpu;
+    }
+    Scheduler* const target = Get(target_cpu);
+    Guard<MonitoredSpinLock, NoIrqSave> target_queue_guard{&target->queue_lock_, SOURCE_TAG};
+
+    if (target->IsLockedSchedulerActive()) {
+      TraceWakeup(thread, target_cpu);
+      thread->set_ready();
+      thread->UpdateRuntimeStats(thread->state());
+      if (needs_migration) {
+        MarkHasOwnedThreadAccess(*thread);
+        thread->scheduler_queue_state().transient_state =
+            SchedulerQueueState::TransientState::Migrating;
+        target->save_state_list_.push_front(thread);
+      } else {
+        thread->scheduler_state().curr_cpu_ = target_cpu;
         target->AssertInScheduler(*thread);
         target->Insert(now, thread);
-        thread->UpdateRuntimeStats(thread->state());
-      });
+      }
+      break;
+    }
+
+    IncFindTargetCpuRetriesKcounter();
+  }
 
   trace.End();
   thread->get_lock().Release();
@@ -2422,16 +2412,40 @@ void Scheduler::Unblock(Thread::UnblockList list) {
     DEBUG_ASSERT(!thread->IsIdle());
     thread->get_lock().AssertAcquired();
 
-    const cpu_num_t target_cpu = FindActiveSchedulerForThread(
-        thread, FindTargetCpuReason::Unblocking, [now](Thread* thread, Scheduler* target) {
-          MarkInFindActiveSchedulerForThreadCbk(*thread, *target);
-          TraceWakeup(thread, target->this_cpu_);
-          thread->UpdateRuntimeStats(thread->state());
-          thread->scheduler_state().curr_cpu_ = target->this_cpu_;
-          thread->set_ready();
+    cpu_num_t target_cpu = INVALID_CPU;
+    while (true) {
+      // TODO(rudymathu): This target_cpu should be stashed in the thread prior to adding it to the
+      // save_state_list_, as that would allow us to bypass CPU selection when processing the list
+      // so long as the CPU is still online.
+      target_cpu = FindTargetCpu(thread);
+      const cpu_num_t last_cpu = thread->scheduler_state().last_cpu();
+      const bool needs_migration = (last_cpu != INVALID_CPU && target_cpu != last_cpu &&
+                                    thread->has_migrate_fn() && !thread->migrate_pending());
+      if (needs_migration) {
+        target_cpu = last_cpu;
+      }
+      Scheduler* const target = Get(target_cpu);
+      Guard<MonitoredSpinLock, NoIrqSave> target_queue_guard{&target->queue_lock_, SOURCE_TAG};
+
+      if (target->IsLockedSchedulerActive()) {
+        TraceWakeup(thread, target_cpu);
+        thread->set_ready();
+        thread->UpdateRuntimeStats(thread->state());
+        if (needs_migration) {
+          MarkHasOwnedThreadAccess(*thread);
+          thread->scheduler_queue_state().transient_state =
+              SchedulerQueueState::TransientState::Migrating;
+          target->save_state_list_.push_front(thread);
+        } else {
+          thread->scheduler_state().curr_cpu_ = target_cpu;
           target->AssertInScheduler(*thread);
           target->Insert(now, thread);
-        });
+        }
+        break;
+      }
+
+      IncFindTargetCpuRetriesKcounter();
+    }
 
     cpus_to_reschedule_mask |= cpu_num_to_mask(target_cpu);
     thread->get_lock().Release();
@@ -2550,7 +2564,7 @@ void Scheduler::Migrate(Thread* thread) {
       // The CPU the thread is running on will take care of the actual migration.
       cpus_to_reschedule_mask |= thread_cpu_mask;
     } else if (thread->state() == THREAD_READY) {
-      bool removed_thread_for_migrate{false};
+      bool save_state_on_current_cpu{false};
 
       do {  // Explicit scope top hold the lock for this thread's current scheduler.
         Scheduler& thread_sched = *Get(state->curr_cpu_);
@@ -2568,35 +2582,22 @@ void Scheduler::Migrate(Thread* thread) {
           break;
         }
 
-        // Try find a new CPU to run this thread on. Things are simple if the
-        // thread has no migration function, or if the thread has a migration
-        // function, but has already called the Save stage of migration.  We
-        // can just remove the thread from this queue, and put it into a
-        // different one.
-        //
-        // If the thread does have a migration function, and does need the
-        // Save stage to be called, we can do that too, but only if we are
-        // currently running on the last CPU the thread ran on.  Otherwise, the
-        // best we can do is to poke the thread's last CPU and have it
-        // reschedule.  The next time this thread comes up in the queue, it will
-        // be actively migrated by the CPU it last ran on.
+        // Initiate the migration for this thread. If this thread is currently running on
+        // this CPU, we can run its migrate function inline. Otherwise, we need to enqueue
+        // it into the target scheduler's save_state_list_ and IPI that core.
+        thread_sched.EraseFromQueue(thread);
+        thread_sched.RemoveForTransition(thread, SchedulerQueueState::TransientState::Migrating);
         if (thread->has_migrate_fn() && !thread->migrate_pending() &&
             (thread->scheduler_state().last_cpu_ != INVALID_CPU) &&
             (thread->scheduler_state().last_cpu_ != current_cpu)) {
+          thread_sched.save_state_list_.push_front(thread);
           cpus_to_reschedule_mask |= thread_cpu_mask;
-          break;
+        } else {
+          save_state_on_current_cpu = true;
         }
-
-        // Looks like we can take care of migrating the thread right now.  There
-        // is either no migration function to run, or we are able to run it on
-        // this CPU.  Remove the thread, drop its old scheduler's lock, and
-        // finish the migration.
-        thread_sched.EraseFromQueue(thread);
-        thread_sched.Remove(thread, SchedulerQueueState::TransientState::Migrating);
-        removed_thread_for_migrate = true;
       } while (false);
 
-      if (removed_thread_for_migrate) {
+      if (save_state_on_current_cpu) {
         // Before obtaining any new locks, try to call the thread's migration
         // function.  CallMigrateFnLocked will do nothing if we have no
         // migration function, or if we have already started the migration (eg;
@@ -2604,8 +2605,8 @@ void Scheduler::Migrate(Thread* thread) {
         thread->CallMigrateFnLocked(Thread::MigrateStage::Save);
 
         // Find a new CPU for this thread and add it to the queue.
-        const cpu_num_t target_cpu = FindActiveSchedulerForThread(
-            thread, FindTargetCpuReason::Migrating, [](Thread* thread, Scheduler* target) {
+        const cpu_num_t target_cpu =
+            FindActiveSchedulerForThread(thread, [](Thread* thread, Scheduler* target) {
               MarkInFindActiveSchedulerForThreadCbk(*thread, *target);
               target->FinishTransition(CurrentTime(), thread);
             });
@@ -2738,8 +2739,8 @@ void Scheduler::MigrateUnpinnedThreads() {
     // this CPU.
     thread->CallMigrateFnLocked(Thread::MigrateStage::Save);
 
-    const cpu_num_t target_cpu = FindActiveSchedulerForThread(
-        thread, FindTargetCpuReason::Migrating, [current, now](Thread* thread, Scheduler* target) {
+    const cpu_num_t target_cpu =
+        FindActiveSchedulerForThread(thread, [current, now](Thread* thread, Scheduler* target) {
           // Finish the transition and add the thread to the new target queue.  The
           // Restore stage of the migration function will be called on the new CPU the
           // next time the thread becomes scheduled.

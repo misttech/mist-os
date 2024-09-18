@@ -22,9 +22,9 @@ use std::pin::pin;
 use std::sync::Arc;
 use tracing::{debug, error, info, trace, warn};
 use {
-    fidl_fuchsia_location_sensor as fidl_location_sensor,
-    fidl_fuchsia_wlan_internal as fidl_internal, fidl_fuchsia_wlan_policy as fidl_policy,
-    fidl_fuchsia_wlan_sme as fidl_sme, fuchsia_zircon as zx,
+    fidl_fuchsia_location_sensor as fidl_location_sensor, fidl_fuchsia_wlan_common as fidl_common,
+    fidl_fuchsia_wlan_policy as fidl_policy, fidl_fuchsia_wlan_sme as fidl_sme,
+    fuchsia_zircon as zx,
 };
 
 mod fidl_conversion;
@@ -394,7 +394,7 @@ fn bss_to_network_map(
                 },
                 compatibility: scan_result.compatibility,
                 bss_description: wlan_common::sequestered::Sequestered::from(
-                    fidl_internal::BssDescription::from(scan_result.bss_description),
+                    fidl_common::BssDescription::from(scan_result.bss_description),
                 ),
             });
         };

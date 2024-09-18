@@ -32,9 +32,9 @@ fuchsia_test_component("integration_test") {
 executable("provider_puppet_cpp_bin") {
   sources = [ "src/provider_puppet.cc" ]
   deps = [
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/syslog/cpp",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/trace",
     "//zircon/system/ulib/trace-provider",
   ]

@@ -170,7 +170,9 @@ zx::result<> DsiHost::PerformPowerOpSequence(cpp20::span<const PowerOp> commands
           FDF_LOG(ERROR, "Unrecognized GPIO pin #%d, ignoring", op.index);
           break;
         }
-        fidl::WireResult result = lcd_reset_gpio_->Write(op.value);
+        fidl::WireResult result = lcd_reset_gpio_->SetBufferMode(
+            op.value ? fuchsia_hardware_gpio::BufferMode::kOutputHigh
+                     : fuchsia_hardware_gpio::BufferMode::kOutputLow);
         if (!result.ok()) {
           FDF_LOG(ERROR, "Failed to send Write request to lcd gpio: %s", result.status_string());
           return zx::error(result.status());
@@ -201,9 +203,9 @@ zx::result<> DsiHost::PerformPowerOpSequence(cpp20::span<const PowerOp> commands
         }
         {
           fidl::WireResult result =
-              lcd_reset_gpio_->ConfigIn(fuchsia_hardware_gpio::GpioFlags::kPullDown);
+              lcd_reset_gpio_->SetBufferMode(fuchsia_hardware_gpio::BufferMode::kInput);
           if (!result.ok()) {
-            FDF_LOG(ERROR, "Failed to send ConfigIn request to lcd gpio: %s",
+            FDF_LOG(ERROR, "Failed to send SetBufferMode request to lcd gpio: %s",
                     result.status_string());
             return zx::error(result.status());
           }

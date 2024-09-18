@@ -20,7 +20,6 @@ ffx_subtool_fidl_allowlist = [
   "//sdk/fidl/fuchsia.exception:fuchsia.exception",
 
   # used by ffx driver
-  "//sdk/fidl/fuchsia.hardware.pci:fuchsia.hardware.pci",
   "//sdk/fidl/fuchsia.hardware.usb.device:fuchsia.hardware.usb.device",
 
   # used by ffx net
@@ -51,9 +50,6 @@ ffx_subtool_fidl_allowlist = [
   # used by ffx power
   "//sdk/fidl/fuchsia.power.topology.test:fuchsia.power.topology.test",
   "//sdk/fidl/fuchsia.power.broker:fuchsia.power.broker",
-
-  # used by ffx test
-  "//sdk/fidl/fuchsia.test.manager:fuchsia.test.manager",
 
   # used by ffx fuchsia.developer.ffx
   "//sdk/fidl/fuchsia.tracing.controller:fuchsia.tracing.controller",

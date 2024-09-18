@@ -18,18 +18,10 @@
 
 namespace cobalt {
 
-// An abstract interface to a SteadyClock that may be faked in tests.
-class SteadyClock {
- public:
-  virtual ~SteadyClock() = default;
-
-  virtual std::chrono::steady_clock::time_point Now() = 0;
-};
-
 // An implementation of SteadyClock that uses a real clock.
-class RealSteadyClock : public SteadyClock {
+class RealSteadyClock : public util::SteadyClockInterface {
  public:
-  std::chrono::steady_clock::time_point Now() override { return std::chrono::steady_clock::now(); }
+  std::chrono::steady_clock::time_point now() override { return std::chrono::steady_clock::now(); }
 };
 
 class FuchsiaSystemClockInterface : public util::ValidatedClockInterface {

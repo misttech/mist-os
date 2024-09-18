@@ -276,7 +276,7 @@ impl RealSymbolizerProcess {
         if enable_prettification {
             args.push("--prettify-backtrace");
         }
-        let path = sdk.get_host_tool("symbolizer").map_err(|err| {
+        let path = ffx_config::get_host_tool(&sdk, "symbolizer").await.map_err(|err| {
             tracing::warn!(?err, "Failed to get symbolizer binary");
             LogError::SdkNotAvailable { msg: "symbolizer not found" }
         })?;

@@ -1,6 +1,7 @@
 // Copyright 2022 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+@available(added=HEAD)
 library fuchsia.starnix.binder;
 
 using zx;
@@ -38,6 +39,16 @@ type FileHandle = resource struct {
     flags FileFlags;
 };
 
+type FileHandle2 = resource table {
+    /// The handle connecting to the file protocol. If not present, the file
+    /// should behave as it is was a null file: all read must succeed with empty
+    /// content and all write must succeed. See `fdio_fd_create_null()`.
+    1: file zx.Handle;
+
+    /// The flags associated with the opened file.
+    3: flags FileFlags;
+};
+
 /// Protocol that gives the binder driver access to the client process'
 /// resources.
 open protocol ProcessAccessor {
@@ -62,10 +73,12 @@ open protocol ProcessAccessor {
         /// The list of open file the client must add to its fd table, returning
         /// the new minted file descriptors.
         3: add_requests vector<FileHandle>:MAX_REQUEST_COUNT;
+        4: add_requests2 vector<FileHandle2>:MAX_REQUEST_COUNT;
     }) -> (@generated_name("FileResponse") resource table {
         // (No ordinal 1 since there is no response for the close operation.)
         /// The list of open file retriever for the `get_requests`.
         2: get_responses vector<FileHandle>:MAX_REQUEST_COUNT;
+        4: get_responses2 vector<FileHandle2>:MAX_REQUEST_COUNT;
         /// The list of file descriptors minted for the `add_requests`.
         3: add_responses vector<Fd>:MAX_REQUEST_COUNT;
     }) error fuchsia.posix.Errno;

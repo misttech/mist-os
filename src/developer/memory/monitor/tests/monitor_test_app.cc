@@ -94,9 +94,7 @@ std::unique_ptr<memory::MockOS> CreateMockOS() {
 
 int main(int argc, const char** argv) {
   auto os = CreateMockOS();
-  auto capture_maker = memory::CaptureMaker::Create(
-                           CreateMockOS(), std::make_unique<memory::StarnixCaptureStrategy>())
-                           .value();
+  auto capture_maker = memory::CaptureMaker::Create(CreateMockOS()).value();
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
   monitor::Monitor app(sys::ComponentContext::CreateAndServeOutgoingDirectory(), fxl::CommandLine{},
                        loop.dispatcher(), false, false, false, memory_monitor_config::Config{},

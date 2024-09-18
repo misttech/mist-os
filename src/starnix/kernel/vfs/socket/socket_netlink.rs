@@ -718,7 +718,7 @@ impl DeviceListener for Arc<Mutex<NetlinkSocketInner>> {
                             MINOR={minor}\0\
                             SEQNUM={seqnum}\0",
             path = kobject.path(),
-            name = device.metadata.name,
+            name = device.metadata.devname,
             subsystem = subsystem,
             major = device.metadata.device_type.major(),
             minor = device.metadata.device_type.minor(),

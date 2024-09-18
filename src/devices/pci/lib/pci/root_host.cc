@@ -1,8 +1,7 @@
 // Copyright 2019 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-#include <fuchsia/hardware/pciroot/c/banjo.h>
-#include <lib/ddk/debug.h>
+#include <fuchsia/hardware/pciroot/cpp/banjo.h>
 #include <lib/pci/pciroot.h>
 #include <lib/pci/root_host.h>
 #include <lib/zx/object.h>
@@ -19,7 +18,6 @@
 #include <zircon/types.h>
 
 #include <array>
-#include <thread>
 
 #include <fbl/auto_lock.h>
 #include <fbl/mutex.h>
@@ -86,8 +84,6 @@ zx::result<zx_paddr_t> PciRootHost::Allocate(AllocationType type, uint32_t kind,
   }
 
   if (st != ZX_OK) {
-    zxlogf(DEBUG, "failed to allocate %s [%#lx, %#lx): %s.", allocator_name, base, base + size,
-           zx_status_get_string(st));
     return zx::error(st);
   }
 
@@ -102,8 +98,6 @@ zx::result<zx_paddr_t> PciRootHost::Allocate(AllocationType type, uint32_t kind,
   st = zx::resource::create(*rsrc, rsrc_kind | ZX_RSRC_FLAG_EXCLUSIVE, new_base, new_size,
                             name.data(), name.size(), out_resource);
   if (st != ZX_OK) {
-    zxlogf(ERROR, "Failed to create resource for %s [%#lx, %#lx): %s\n", name.data(), new_base,
-           new_base + new_size, zx_status_get_string(st));
     return zx::error(st);
   }
 
@@ -115,8 +109,6 @@ zx::result<zx_paddr_t> PciRootHost::Allocate(AllocationType type, uint32_t kind,
 
   // Discard the lifecycle aspect of the returned pointer, we'll be tracking it on the bus
   // side of things.
-  zxlogf(DEBUG, "allocated %s [%#lx, %#lx) to PciRoot.", allocator_name, new_base,
-         new_base + new_size);
   return zx::ok(new_base);
 }
 

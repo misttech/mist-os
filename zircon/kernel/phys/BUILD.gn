@@ -158,6 +158,7 @@ if (toolchain_environment == "kernel.phys" ||
     allow_circular_includes_from = [ ":elf-image" ]
     deps = [
       ":elf-image",
+      ":log",
       "//src/lib/elfldltl",
       "//src/lib/symbolizer-markup",
       "//zircon/kernel/lib/arch",

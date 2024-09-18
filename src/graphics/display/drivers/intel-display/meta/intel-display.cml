@@ -16,13 +16,13 @@
     use: [
         {
             protocol: [
-                "fuchsia.device.manager.SystemStateTransition",
                 "fuchsia.kernel.FramebufferResource",
                 "fuchsia.kernel.IoportResource",
                 "fuchsia.kernel.MmioResource",
                 "fuchsia.scheduler.RoleManager",
                 "fuchsia.sysmem.Allocator",
                 "fuchsia.sysmem2.Allocator",
+                "fuchsia.system.state.SystemStateTransition",
             ],
         },
         { service: "fuchsia.hardware.pci.Service" },

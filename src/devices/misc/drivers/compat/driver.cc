@@ -4,9 +4,9 @@
 
 #include "src/devices/misc/drivers/compat/driver.h"
 
-#include <fidl/fuchsia.device.manager/cpp/wire.h>
 #include <fidl/fuchsia.driver.framework/cpp/wire.h>
 #include <fidl/fuchsia.scheduler/cpp/wire.h>
+#include <fidl/fuchsia.system.state/cpp/wire.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/component/incoming/cpp/protocol.h>
 #include <lib/ddk/binding_priv.h>
@@ -35,7 +35,7 @@ using namespace fuchsia_driver_framework;
 namespace fio = fuchsia_io;
 namespace fkernel = fuchsia_kernel;
 namespace fldsvc = fuchsia_ldsvc;
-namespace fdm = fuchsia_device_manager;
+namespace fdm = fuchsia_system_state;
 
 using fpromise::bridge;
 using fpromise::error;
@@ -616,10 +616,9 @@ zx_status_t Driver::RunOnDispatcher(fit::callback<zx_status_t()> task) {
 }
 
 void Driver::PrepareStop(fdf::PrepareStopCompleter completer) {
-  zx::result client = this->incoming()->Connect<fuchsia_device_manager::SystemStateTransition>();
+  zx::result client = this->incoming()->Connect<fuchsia_system_state::SystemStateTransition>();
   if (client.is_error()) {
-    FDF_LOGL(ERROR, *logger_,
-             "failed to connect to fuchsia.device.manager/SystemStateTransition: %s",
+    FDF_LOGL(ERROR, *logger_, "failed to connect to fuchsia.system.state/SystemStateTransition: %s",
              client.status_string());
     completer(client.take_error());
     return;

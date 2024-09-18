@@ -44,9 +44,9 @@ cc_library(
         "//src/connectivity/bluetooth/core/bt-host/common",
         "//src/connectivity/bluetooth/core/bt-host/iso",
         "//src/connectivity/bluetooth/core/bt-host/transport",
+        "@fuchsia_sdk//fidl/fuchsia.hardware.bluetooth:fuchsia.hardware.bluetooth_cpp",
         "@fuchsia_sdk//pkg/async-cpp",
         "@fuchsia_sdk//pkg/zx",
-        "@internal_sdk//fidl/fuchsia.hardware.bluetooth:fuchsia.hardware.bluetooth_cpp",
         "@pigweed//pw_bluetooth",
     ],
 )

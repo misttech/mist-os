@@ -8,7 +8,7 @@
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/driver/testing/cpp/scoped_global_logger.h>
-#include <lib/mock-i2c/mock-i2c.h>
+#include <lib/mock-i2c/mock-i2c-gtest.h>
 #include <lib/stdcompat/span.h>
 #include <lib/zx/result.h>
 
@@ -16,11 +16,12 @@
 #include <optional>
 #include <utility>
 
-#include <zxtest/zxtest.h>
+#include <gtest/gtest.h>
 
 #include "src/devices/power/drivers/fusb302/usb-pd-defs.h"
 #include "src/devices/power/drivers/fusb302/usb-pd-message-type.h"
 #include "src/devices/power/drivers/fusb302/usb-pd-message.h"
+#include "src/lib/testing/predicates/status.h"
 
 namespace fusb302 {
 
@@ -50,7 +51,7 @@ const uint8_t kTxOffTxToken = 0xfe;
 constexpr uint8_t kSopRxToken = 0b1110'0000;
 constexpr uint8_t kSopPrimeRxToken = 0b1100'0000;
 
-class Fusb302FifosTest : public zxtest::Test {
+class Fusb302FifosTest : public ::testing::Test {
  public:
   void SetUp() override {
     auto endpoints = fidl::Endpoints<fuchsia_hardware_i2c::Device>::Create();
@@ -80,7 +81,7 @@ class Fusb302FifosTest : public zxtest::Test {
 
   fdf_testing::ScopedGlobalLogger logger_;
   async::Loop loop_{&kAsyncLoopConfigNeverAttachToThread};
-  mock_i2c::MockI2c mock_i2c_;
+  mock_i2c::MockI2cGtest mock_i2c_;
   fidl::ClientEnd<fuchsia_hardware_i2c::Device> mock_i2c_client_;
   std::optional<Fusb302Fifos> fifos_;
 };
@@ -231,7 +232,7 @@ TEST_F(Fusb302FifosTest, RedReceivedMessageDecodingforDataMessageWithOneObject) 
   EXPECT_EQ(usb_pd::MessageType::kRequestPower, result->header().message_type());
 
   ASSERT_EQ(1u, result->data_objects().size());
-  EXPECT_EQ(0x1104b12c, result->data_objects()[0]);
+  EXPECT_EQ(0x1104b12cu, result->data_objects()[0]);
 }
 
 TEST_F(Fusb302FifosTest, RedReceivedMessageDecodingforDataMessageWithMultipleObjects) {
@@ -256,10 +257,10 @@ TEST_F(Fusb302FifosTest, RedReceivedMessageDecodingforDataMessageWithMultipleObj
   EXPECT_EQ(usb_pd::MessageType::kSourceCapabilities, result->header().message_type());
 
   ASSERT_EQ(4u, result->data_objects().size());
-  EXPECT_EQ(0x0b01912c, result->data_objects()[0]);
-  EXPECT_EQ(0x0002d12c, result->data_objects()[1]);
-  EXPECT_EQ(0x0004b12c, result->data_objects()[2]);
-  EXPECT_EQ(0x00064145, result->data_objects()[3]);
+  EXPECT_EQ(0x0b01912cu, result->data_objects()[0]);
+  EXPECT_EQ(0x0002d12cu, result->data_objects()[1]);
+  EXPECT_EQ(0x0004b12cu, result->data_objects()[2]);
+  EXPECT_EQ(0x00064145u, result->data_objects()[3]);
 }
 
 TEST_F(Fusb302FifosTest, ReadReceivedMessageNonSopToken) {

@@ -92,7 +92,7 @@ class Driver : public fdf::DriverBase {
 
   const std::string& driver_path() const { return driver_path_; }
 
-  fuchsia_device_manager::wire::SystemPowerState system_state() const { return system_state_; }
+  fuchsia_system_state::wire::SystemPowerState system_state() const { return system_state_; }
 
   bool stop_triggered() const { return stop_triggered_; }
 
@@ -122,7 +122,7 @@ class Driver : public fdf::DriverBase {
     // should have been torn down by the driver runtime canceling all outstanding waits by the time
     // stop has been called, allowing shutdown to proceed.
     return record_ != nullptr && record_->ops->release != nullptr &&
-           system_state_ == fuchsia_device_manager::SystemPowerState::kFullyOn;
+           system_state_ == fuchsia_system_state::SystemPowerState::kFullyOn;
   }
 
   async::Executor executor_;
@@ -133,8 +133,8 @@ class Driver : public fdf::DriverBase {
   std::string driver_name_;
   Device device_;
 
-  fuchsia_device_manager::wire::SystemPowerState system_state_ =
-      fuchsia_device_manager::wire::SystemPowerState::kFullyOn;
+  fuchsia_system_state::wire::SystemPowerState system_state_ =
+      fuchsia_system_state::wire::SystemPowerState::kFullyOn;
   bool stop_triggered_ = false;
 
   // The next unique device id for devices. Starts at 1 because `device_` has id zero.

@@ -71,10 +71,10 @@ executable("bin") {
   deps = [
     ":grpc_services",
     "//sdk/fidl/fuchsia.bluetooth.pandora:fuchsia.bluetooth.pandora_cpp",
+    "//sdk/lib/async-loop:async-loop-cpp",
     "//sdk/lib/component/outgoing/cpp",
     "//sdk/lib/syslog/cpp",
     "//third_party/grpc:grpc++",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
   ]
 }
 

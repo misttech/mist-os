@@ -222,6 +222,7 @@ pub enum FsckError {
     AllocatedSizeMismatch(u64, u64, u64, u64),
     AllocationForNonexistentOwner(Allocation),
     AllocationMismatch(Allocation, Allocation),
+    CasefoldInconsistency(u64, u64, u64),
     ConflictingTypeForLink(u64, u64, Value, Value),
     ExtentExceedsLength(u64, u64, u64, u64, Value),
     ExtraAllocations(Vec<Allocation>),
@@ -283,6 +284,12 @@ impl FsckError {
             }
             FsckError::AllocationMismatch(observed, stored) => {
                 format!("Observed allocation {:?} but allocator has {:?}", observed, stored)
+            }
+            FsckError::CasefoldInconsistency(store_id, parent_id, child_id) => {
+                format!(
+                    "CasefoldChild inconsistent for store {}, directory {}, child {}",
+                    store_id, parent_id, child_id
+                )
             }
             FsckError::ConflictingTypeForLink(store_id, object_id, expected, actual) => {
                 format!(
@@ -487,6 +494,9 @@ impl FsckError {
             }
             FsckError::AllocationMismatch(observed, stored) => {
                 error!(?observed, ?stored, "Unexpected allocation");
+            }
+            FsckError::CasefoldInconsistency(store_id, parent_id, child_id) => {
+                error!(?store_id, ?parent_id, ?child_id, "CasefoldChild inconsistent");
             }
             FsckError::ConflictingTypeForLink(store_id, oid, expected, actual) => {
                 error!(store_id, oid, ?expected, ?actual, "Bad link");

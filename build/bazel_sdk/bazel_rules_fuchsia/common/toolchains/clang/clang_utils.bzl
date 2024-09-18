@@ -5,7 +5,7 @@
 """Utilities related to Clang."""
 
 load(
-    "//platforms:utils.bzl",
+    "//common/platforms:utils.bzl",
     "all_target_tags",
     "target_tag_dict_to_select_keys",
     "to_bazel_cpu_name",
@@ -205,7 +205,7 @@ def format_labels_list_to_target_tag_dict(
         for target_tag in target_tags
     }
 
-def format_labels_list_to_target_tag_native_glob_select(labels, target_tags = None, extra_dict = None):
+def format_labels_list_to_target_tag_native_glob_select(labels, target_tags = None, extra_dict = None, common_package_prefix = "//common"):
     """Format a list of label patterns into a select() statement.
 
     The result is a select() statement whose keys are config_setting() labels
@@ -230,25 +230,25 @@ def format_labels_list_to_target_tag_native_glob_select(labels, target_tags = No
     Returns
 
         select({
-            "@fuchsia_sdk_common//platforms:is_fuchsia_x64": native.glob([
+            "//common/platforms:is_fuchsia_x64": native.glob([
                 "//package:x86_64-unknown-fuchsia/**",
             ]),
-            "@fuchsia_sdk_common//platforms:is_fuchsia_arm64": native.glob([
+            "//common/platforms:is_fuchsia_arm64": native.glob([
                 "//package:aarch64-unknown-fuchsia/**",
             ]),
-            "@fuchsia_sdk_common//platforms:is_fuchsia_riscv64": native.glob([
+            "//common/platforms:is_fuchsia_riscv64": native.glob([
                 "//package:riscv64-unknown-fuchsia/**",
             ]),
-            "@fuchsia_sdk_common//platforms:is_linux_x64": native.glob([
+            "//common/platforms:is_linux_x64": native.glob([
                 "//package:x86_64-unknown-linux-gnu/**",
             ]),
-            "@fuchsia_sdk_common//platforms:is_linux_arm64": native.glob([
+            "//common/platforms:is_linux_arm64": native.glob([
                 "//package:aarch64-unknown-linux-gnu/**",
             ]),
-            "@fuchsia_sdk_common//platforms:is_mac_x64": native.glob([
+            "//common/platforms:is_mac_x64": native.glob([
                 "//package:x86_64-apple-darwin/**",
             ]),
-            "@fuchsia_sdk_common//platforms:is_mac_arm64": native.glob([
+            "//common/platforms:is_mac_arm64": native.glob([
                 "//package:aarch64-apple-darwin/**",
             ]),
             "//conditions:default": [],
@@ -266,7 +266,8 @@ def format_labels_list_to_target_tag_native_glob_select(labels, target_tags = No
                 extra_dict = extra_dict,
             ).items()
         },
-        [],
+        add_default = [],
+        common_package_prefix = common_package_prefix,
     ))
 
 clang_all_target_tags = all_target_tags

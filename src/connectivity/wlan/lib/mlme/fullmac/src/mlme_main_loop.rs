@@ -149,7 +149,7 @@ impl<D: DeviceOps> MlmeMainLoop<D> {
             Stop(req) => self.device.stop_bss(mlme_to_fullmac::convert_stop_bss_request(req)?)?,
             SetKeys(req) => self.handle_mlme_set_keys_request(req)?,
             DeleteKeys(req) => {
-                self.device.del_keys_req(mlme_to_fullmac::convert_delete_keys_request(req)?)?
+                self.device.del_keys(mlme_to_fullmac::convert_delete_keys_request(req)?)?
             }
             Eapol(req) => self.device.eapol_tx(mlme_to_fullmac::convert_eapol_request(req))?,
             SetCtrlPort(req) => self.set_link_state(req.state)?,
@@ -203,7 +203,7 @@ impl<D: DeviceOps> MlmeMainLoop<D> {
 
     fn handle_mlme_set_keys_request(&self, req: fidl_mlme::SetKeysRequest) -> anyhow::Result<()> {
         let fullmac_req = mlme_to_fullmac::convert_set_keys_request(&req)?;
-        let fullmac_resp = self.device.set_keys_req(fullmac_req)?;
+        let fullmac_resp = self.device.set_keys(fullmac_req)?;
         let mlme_resp = fullmac_to_mlme::convert_set_keys_resp(fullmac_resp, &req)?;
         self.mlme_event_sink.send(fidl_mlme::MlmeEvent::SetKeysConf { conf: mlme_resp });
         Ok(())
@@ -344,10 +344,7 @@ mod handle_mlme_request_tests {
     use test_case::test_case;
     use wlan_common::assert_variant;
     use wlan_common::sink::UnboundedSink;
-    use {
-        fidl_fuchsia_wlan_fullmac as fidl_fullmac, fidl_fuchsia_wlan_internal as fidl_internal,
-        fidl_fuchsia_wlan_stats as fidl_stats,
-    };
+    use {fidl_fuchsia_wlan_fullmac as fidl_fullmac, fidl_fuchsia_wlan_stats as fidl_stats};
 
     #[test]
     fn test_scan_request() {
@@ -423,7 +420,7 @@ mod handle_mlme_request_tests {
     fn test_connect_request() {
         let mut h = TestHelper::set_up_with_link_state(fidl_mlme::ControlledPortState::Open);
         let fidl_req = wlan_sme::MlmeRequest::Connect(fidl_mlme::ConnectRequest {
-            selected_bss: fidl_internal::BssDescription {
+            selected_bss: fidl_common::BssDescription {
                 bssid: [100u8; 6],
                 bss_type: fidl_common::BssType::Infrastructure,
                 beacon_period: 101,
@@ -691,16 +688,16 @@ mod handle_mlme_request_tests {
 
         h.mlme.handle_mlme_request(fidl_req).unwrap();
 
-        let driver_req = assert_variant!(h.driver_calls.try_next(), Ok(Some(DriverCall::SetKeysReq { req })) => req);
-        assert_eq!(driver_req.num_keys, 1);
-        // assert_eq!(driver_req_keys[0], vec![5u8, 6]);
-        assert_eq!(driver_req.keylist[0].key_idx, Some(7));
-        assert_eq!(driver_req.keylist[0].key_type, Some(fidl_common::WlanKeyType::Group));
-        assert_eq!(driver_req.keylist[0].peer_addr, Some([8u8; 6]));
-        assert_eq!(driver_req.keylist[0].rsc, Some(9));
-        assert_eq!(driver_req.keylist[0].cipher_oui, Some([10u8; 3]));
+        let driver_req = assert_variant!(h.driver_calls.try_next(), Ok(Some(DriverCall::SetKeys { req })) => req);
+        assert_eq!(driver_req.keylist.as_ref().unwrap().len(), 1 as usize);
+        let keylist = driver_req.keylist.as_ref().unwrap();
+        assert_eq!(keylist[0].key_idx, Some(7));
+        assert_eq!(keylist[0].key_type, Some(fidl_common::WlanKeyType::Group));
+        assert_eq!(keylist[0].peer_addr, Some([8u8; 6]));
+        assert_eq!(keylist[0].rsc, Some(9));
+        assert_eq!(keylist[0].cipher_oui, Some([10u8; 3]));
         assert_eq!(
-            driver_req.keylist[0].cipher_type,
+            keylist[0].cipher_type,
             Some(fidl_ieee80211::CipherSuiteType::from_primitive_allow_unknown(11))
         );
 
@@ -718,10 +715,7 @@ mod handle_mlme_request_tests {
         let mut h = TestHelper::set_up();
         const NUM_KEYS: usize = 3;
         h.fake_device.lock().unwrap().set_keys_resp_mock =
-            Some(fidl_fullmac::WlanFullmacSetKeysResp {
-                num_keys: NUM_KEYS as u64,
-                statuslist: [0i32, 1, 0, 0],
-            });
+            Some(fidl_fullmac::WlanFullmacSetKeysResp { statuslist: [0i32, 1, 0].to_vec() });
         let mut keylist = vec![];
         let key = fidl_mlme::SetKeyDescriptor {
             key: vec![5u8, 6],
@@ -739,10 +733,11 @@ mod handle_mlme_request_tests {
 
         h.mlme.handle_mlme_request(fidl_req).unwrap();
 
-        let driver_req = assert_variant!(h.driver_calls.try_next(), Ok(Some(DriverCall::SetKeysReq { req })) => req);
-        assert_eq!(driver_req.num_keys, NUM_KEYS as u64);
+        let driver_req = assert_variant!(h.driver_calls.try_next(), Ok(Some(DriverCall::SetKeys { req })) => req);
+        assert_eq!(driver_req.keylist.as_ref().unwrap().len(), NUM_KEYS as usize);
+        let keylist = driver_req.keylist.unwrap();
         for i in 0..NUM_KEYS {
-            assert_eq!(driver_req.keylist[i].key_idx, Some(i as u8));
+            assert_eq!(keylist[i].key_idx, Some(i as u8));
         }
 
         let conf = assert_variant!(h.mlme_event_receiver.try_next(), Ok(Some(fidl_mlme::MlmeEvent::SetKeysConf { conf })) => conf);
@@ -776,7 +771,7 @@ mod handle_mlme_request_tests {
 
         assert!(h.mlme.handle_mlme_request(fidl_req).is_err());
 
-        // No SetKeysReq and SetKeysResp
+        // No SetKeys and SetKeysResp
         assert_variant!(h.driver_calls.try_next(), Err(_));
         assert_variant!(h.mlme_event_receiver.try_next(), Err(_));
     }
@@ -785,7 +780,7 @@ mod handle_mlme_request_tests {
     fn test_set_keys_request_when_resp_has_different_num_keys() {
         let mut h = TestHelper::set_up();
         h.fake_device.lock().unwrap().set_keys_resp_mock =
-            Some(fidl_fullmac::WlanFullmacSetKeysResp { num_keys: 2, statuslist: [0i32; 4] });
+            Some(fidl_fullmac::WlanFullmacSetKeysResp { statuslist: [0i32; 2].to_vec() });
         let fidl_req = wlan_sme::MlmeRequest::SetKeys(fidl_mlme::SetKeysRequest {
             keylist: vec![fidl_mlme::SetKeyDescriptor {
                 key: vec![5u8, 6],
@@ -803,7 +798,7 @@ mod handle_mlme_request_tests {
         // An error is expected when converting the response
         assert!(h.mlme.handle_mlme_request(fidl_req).is_err());
 
-        assert_variant!(h.driver_calls.try_next(), Ok(Some(DriverCall::SetKeysReq { .. })));
+        assert_variant!(h.driver_calls.try_next(), Ok(Some(DriverCall::SetKeys { .. })));
         // No SetKeysConf MLME event because the SetKeysResp from driver has different number of
         // keys.
         assert_variant!(h.mlme_event_receiver.try_next(), Err(_));
@@ -822,11 +817,12 @@ mod handle_mlme_request_tests {
 
         h.mlme.handle_mlme_request(fidl_req).unwrap();
 
-        let driver_req = assert_variant!(h.driver_calls.try_next(), Ok(Some(DriverCall::DelKeysReq { req })) => req);
-        assert_eq!(driver_req.num_keys, 1);
-        assert_eq!(driver_req.keylist[0].key_id, 1);
-        assert_eq!(driver_req.keylist[0].key_type, fidl_common::WlanKeyType::Peer);
-        assert_eq!(driver_req.keylist[0].address, [2u8; 6]);
+        let driver_req = assert_variant!(h.driver_calls.try_next(), Ok(Some(DriverCall::DelKeys { req })) => req);
+        assert_eq!(driver_req.keylist.as_ref().unwrap().len(), 1);
+        let keylist = driver_req.keylist.unwrap();
+        assert_eq!(keylist[0].key_id, Some(1));
+        assert_eq!(keylist[0].key_type, Some(fidl_common::WlanKeyType::Peer));
+        assert_eq!(keylist[0].address, Some([2u8; 6]));
     }
 
     #[test]
@@ -1127,8 +1123,8 @@ mod handle_driver_event_tests {
         fidl_fuchsia_wlan_mlme as fidl_mlme, fuchsia_async as fasync, fuchsia_zircon as zx,
     };
 
-    fn create_bss_descriptions() -> fidl_internal::BssDescription {
-        fidl_internal::BssDescription {
+    fn create_bss_descriptions() -> fidl_common::BssDescription {
+        fidl_common::BssDescription {
             bssid: [9u8; 6],
             bss_type: fidl_common::BssType::Infrastructure,
             beacon_period: 1,
@@ -1390,10 +1386,8 @@ mod handle_driver_event_tests {
             peer_sta_address: [1u8; 6],
             listen_interval: 2,
             ssid: fidl_ieee80211::CSsid { data: [3u8; 32], len: 4 },
-            rsne: [5u8; 257],
-            rsne_len: 6,
-            vendor_ie: [7u8; 514],
-            vendor_ie_len: 8,
+            rsne: vec![5u8; 6],
+            vendor_ie: vec![7u8; 8],
         };
         assert_variant!(
             h.exec.run_until_stalled(&mut h.fullmac_ifc_proxy.assoc_ind(&assoc_ind)),

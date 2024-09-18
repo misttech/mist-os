@@ -12,6 +12,7 @@ group("tests") {
 }
 
 rustc_binary("looper_bin") {
+  testonly = true
   edition = "2021"
   output_name = "looper"
   source_root = "src/looper.rs"

@@ -41,6 +41,12 @@ toc:
     path: /docs/development/sdk/ffx/create-a-package-repository.md
   - title: Update Fuchsia packages on a device
     path: /docs/development/sdk/ffx/update-packages-on-a-device.md
+  - title: Start package servers
+    path: /docs/development/sdk/ffx/start-package-servers.md
+  - title: List running package servers
+    path: /docs/development/sdk/ffx/list-package-servers.md
+  - title: Stop running package servers
+    path: /docs/development/sdk/ffx/stop-package-servers.md
 - title: Debugging
   section:
   - title: Register debug symbols

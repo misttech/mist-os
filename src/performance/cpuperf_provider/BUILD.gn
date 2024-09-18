@@ -63,11 +63,11 @@ executable("bin") {
 
   deps = [
     ":categories",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/sys/cpp",
     "//src/lib/fxl:fxl_cli",
     "//src/performance/lib/perfmon",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/trace",
     "//zircon/system/ulib/trace-provider",
     "//zircon/system/ulib/zircon-internal",

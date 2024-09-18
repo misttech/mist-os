@@ -28,6 +28,7 @@ zx_library("pci") {
 
   public_deps = [
     "//sdk/banjo/fuchsia.hardware.pciroot:fuchsia.hardware.pciroot_banjo_cpp",
+    "//zircon/system/ulib/hwreg",
     "//zircon/system/ulib/inspect",
     "//zircon/system/ulib/region-alloc",
   ]

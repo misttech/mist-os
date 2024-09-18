@@ -21,7 +21,7 @@
 namespace paver {
 namespace {
 
-using fuchsia_device_manager::SystemPowerState;
+using fuchsia_system_state::SystemPowerState;
 using uuid::Uuid;
 
 }  // namespace
@@ -136,7 +136,7 @@ zx::result<> KolaPartitioner::ValidatePayload(const PartitionSpec& spec,
   }
 
   if (IsZirconPartitionSpec(spec)) {
-    if (!IsValidAndroidKernel(Arch::kArm64, data)) {
+    if (!IsValidAndroidKernel(data)) {
       return zx::error(ZX_ERR_BAD_STATE);
     }
   }

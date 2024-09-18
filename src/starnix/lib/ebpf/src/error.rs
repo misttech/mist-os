@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#[derive(thiserror::Error, Debug)]
+#[derive(thiserror::Error, Debug, PartialEq, Eq)]
 pub enum EbpfError {
     #[error("Unable to create VM")]
     VmInitialization,
@@ -16,9 +16,12 @@ pub enum EbpfError {
     #[error("VM error loading program: {0}")]
     VmLoadError(String),
 
-    #[error("Unknown CBPF {element_type} {value} for {op}")]
-    UnrecognizedCbpfError { element_type: String, value: String, op: String },
+    #[error("Invalid cBPF instruction code: 0x{0:x}")]
+    InvalidCbpfInstruction(u16),
 
-    #[error("Scratch buffer overrun: Starnix only supports 3 scratch memory locations")]
-    ScratchBufferOverflow,
+    #[error("Invalid cBPF scratch memory offset: 0x{0:x}")]
+    InvalidCbpfScratchOffset(u32),
+
+    #[error("Invalid cBPF jump offset: 0x{0:x}")]
+    InvalidCbpfJumpOffset(u32),
 }

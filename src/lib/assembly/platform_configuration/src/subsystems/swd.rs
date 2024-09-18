@@ -5,8 +5,7 @@
 use crate::subsystems::prelude::*;
 use anyhow::{anyhow, bail, Context, Result};
 use assembly_config_schema::platform_config::swd_config::{
-    HealthChecks, OtaConfigs, PolicyConfig, PolicyLabels, SwdConfig, UpdateChecker,
-    VerificationFailureAction,
+    OtaConfigs, PolicyConfig, PolicyLabels, SwdConfig, UpdateChecker, VerificationFailureAction,
 };
 use assembly_util::FileEntry;
 use camino::Utf8PathBuf;
@@ -58,7 +57,6 @@ impl DefaultByBuildType for SwdConfig {
             on_verification_failure: VerificationFailureAction::default(),
             tuf_config_paths: vec![],
             include_configurator: false,
-            health_checks: HealthChecks::default(),
         }
     }
 }
@@ -115,14 +113,6 @@ impl DefineSubsystemConfiguration<SwdConfig> for SwdSubsystemConfig {
         if subsystem_config.include_configurator {
             builder.platform_bundle("system_update_configurator");
         }
-
-        let mut health_check_config = builder
-            .package("system-update-committer")
-            .component("meta/system-update-committer.cm")?;
-        health_check_config
-            .field("blobfs", subsystem_config.health_checks.blobfs)?
-            .field("netstack", subsystem_config.health_checks.netstack)?;
-
         Ok(())
     }
 }

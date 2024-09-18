@@ -9,13 +9,19 @@ rustc_test("iptables_test") {
   edition = "2021"
   sources = [ "src/lib.rs" ]
   deps = [
-    "//sdk/fidl/fuchsia.data:fuchsia.data_rust",
+    "//sdk/fidl/fuchsia.component:fuchsia.component_rust",
+    "//sdk/fidl/fuchsia.component.decl:fuchsia.component.decl_rust",
     "//sdk/fidl/fuchsia.net.filter:fuchsia.net.filter_rust",
+    "//sdk/fidl/fuchsia.process:fuchsia.process_rust",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-component-test",
+    "//src/lib/fuchsia-runtime",
     "//src/lib/network/fidl_fuchsia_net_filter_ext",
+    "//src/lib/zircon/rust:fuchsia-zircon",
     "//src/sys/lib/component-events",
+    "//third_party/rust_crates:libc",
     "//third_party/rust_crates:test-case",
+    "//third_party/rust_crates:tracing",
   ]
   configs -= [ "//build/config/rust/lints:allow_unused_results" ]
 }
@@ -46,7 +52,6 @@ group("tests") {
     # that is intended to be included as part of a test package that pulls in
     # additional dependencies it needs at runtime.
     ":ip6tables-restore",
-    ":iptables",
     ":iptables-restore",
     ":iptables_test",
   ]

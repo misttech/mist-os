@@ -28,20 +28,22 @@ source_set("use_media_decoder_source_set") {
   public_deps = [
     "//sdk/fidl/fuchsia.mediacodec:fuchsia.mediacodec_hlcpp",
     "//sdk/fidl/fuchsia.net.http:fuchsia.net.http_hlcpp",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/sys/cpp",
     "//sdk/lib/syslog/cpp",
     "//src/devices/bind/fuchsia.amlogic.platform.sysmem.heap:fuchsia.amlogic.platform.sysmem.heap_cpp",
     "//src/lib/fxl:fxl_cli",
     "//src/media/lib/codec_impl:fourcc",
     "//third_party/boringssl:crypto",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/sysmem-version",
   ]
 
   deps = [
     "//sdk/fidl/fuchsia.hardware.securemem:fuchsia.hardware.securemem_hlcpp",
+    "//sdk/lib/async",
+    "//sdk/lib/async:async-cpp",
     "//sdk/lib/syslog/cpp",
     "//src/media/audio/lib/wav",
     "//src/media/lib/raw_video_writer:raw_video_writer",
@@ -49,8 +51,6 @@ source_set("use_media_decoder_source_set") {
     "//src/media/lib/test:codec_client",
     "//src/media/lib/test:one_shot_event",
     "//src/security/lib/tee/tee-client-api",
-    "//zircon/system/ulib/async",
-    "//zircon/system/ulib/async:async-cpp",
   ]
 }
 

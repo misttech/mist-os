@@ -126,7 +126,7 @@ rustc_library("starnix_lite_kernel_runner") {
     "//src/lib/zircon/rust:fuchsia-zircon",
     "//src/starnix/kernel:starnix_core",
     "//src/starnix/kernel:starnix_logging",
-    "//src/starnix/lib/selinux/core",
+    "//src/starnix/lib/selinux",
     "//src/starnix/lib/starnix-sync",
     "//src/starnix/lib/starnix-uapi",
     "//src/starnix/modules",

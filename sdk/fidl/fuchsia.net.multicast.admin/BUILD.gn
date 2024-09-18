@@ -14,6 +14,7 @@ fidl("fuchsia.net.multicast.admin") {
     "common.fidl",
     "ipv4.fidl",
     "ipv6.fidl",
+    "overview.fidl",
   ]
 
   public_deps = [

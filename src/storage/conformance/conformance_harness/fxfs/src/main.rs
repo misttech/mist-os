@@ -82,7 +82,8 @@ async fn run(mut stream: Io1HarnessRequestStream, fixture: &TestFixture) -> Resu
                         | fio::NodeAttributesQuery::UID
                         | fio::NodeAttributesQuery::GID
                         | fio::NodeAttributesQuery::RDEV
-                        | fio::NodeAttributesQuery::ACCESS_TIME,
+                        | fio::NodeAttributesQuery::ACCESS_TIME
+                        | fio::NodeAttributesQuery::CASEFOLD,
                 })?;
             }
             Io1HarnessRequest::GetDirectory {

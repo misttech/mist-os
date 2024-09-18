@@ -46,7 +46,8 @@ use crate::object_store::object_manager::ObjectManager;
 use crate::object_store::object_record::{AttributeKey, ObjectKey, ObjectKeyData, ObjectValue};
 use crate::object_store::transaction::{
     lock_keys, AllocatorMutation, Mutation, MutationV32, MutationV33, MutationV37, MutationV38,
-    ObjectStoreMutation, Options, Transaction, TxnMutation, TRANSACTION_MAX_JOURNAL_USAGE,
+    MutationV40, ObjectStoreMutation, Options, Transaction, TxnMutation,
+    TRANSACTION_MAX_JOURNAL_USAGE,
 };
 use crate::object_store::{
     AssocObj, DataObjectHandle, HandleOptions, HandleOwner, Item, ItemRef, NewChildStoreOptions,
@@ -111,16 +112,16 @@ pub struct JournalCheckpointV32 {
     pub version: Version,
 }
 
-pub type JournalRecord = JournalRecordV38;
+pub type JournalRecord = JournalRecordV40;
 
 #[derive(Clone, Debug, Serialize, Deserialize, TypeFingerprint, Versioned)]
 #[cfg_attr(fuzz, derive(arbitrary::Arbitrary))]
-pub enum JournalRecordV38 {
+pub enum JournalRecordV40 {
     // Indicates no more records in this block.
     EndBlock,
     // Mutation for a particular object.  object_id here is for the collection i.e. the store or
     // allocator.
-    Mutation { object_id: u64, mutation: MutationV38 },
+    Mutation { object_id: u64, mutation: MutationV40 },
     // Commits records in the transaction.
     Commit,
     // Discard all mutations with offsets greater than or equal to the given offset.
@@ -139,8 +140,18 @@ pub enum JournalRecordV38 {
     // checksums are right. The range is the device offset the checksums are for.
     DataChecksums(Range<u64>, ChecksumsV38),
 }
+#[derive(Migrate, Serialize, Deserialize, TypeFingerprint, Versioned)]
+#[migrate_to_version(JournalRecordV40)]
+pub enum JournalRecordV38 {
+    EndBlock,
+    Mutation { object_id: u64, mutation: MutationV38 },
+    Commit,
+    Discard(u64),
+    DidFlushDevice(u64),
+    DataChecksums(Range<u64>, ChecksumsV38),
+}
 
-#[derive(Debug, Deserialize, Serialize, Versioned, TypeFingerprint)]
+#[derive(Deserialize, Serialize, Versioned, TypeFingerprint)]
 pub enum JournalRecordV37 {
     EndBlock,
     Mutation { object_id: u64, mutation: MutationV37 },
@@ -150,7 +161,7 @@ pub enum JournalRecordV37 {
     DataChecksums(Range<u64>, ChecksumsV37),
 }
 
-impl From<JournalRecordV37> for JournalRecord {
+impl From<JournalRecordV37> for JournalRecordV38 {
     fn from(record: JournalRecordV37) -> Self {
         match record {
             JournalRecordV37::EndBlock => Self::EndBlock,
@@ -176,7 +187,7 @@ impl From<JournalRecordV37> for JournalRecord {
     }
 }
 
-#[derive(Debug, Deserialize, Serialize, Versioned, TypeFingerprint)]
+#[derive(Deserialize, Serialize, Versioned, TypeFingerprint)]
 pub enum JournalRecordV36 {
     EndBlock,
     Mutation { object_id: u64, mutation: MutationV33 },
@@ -203,7 +214,7 @@ impl From<JournalRecordV36> for JournalRecordV37 {
     }
 }
 
-#[derive(Debug, Deserialize, Migrate, Serialize, Versioned, TypeFingerprint)]
+#[derive(Deserialize, Migrate, Serialize, Versioned, TypeFingerprint)]
 #[migrate_to_version(JournalRecordV36)]
 pub enum JournalRecordV34 {
     EndBlock,
@@ -214,7 +225,7 @@ pub enum JournalRecordV34 {
     DataChecksums(Range<u64>, Vec<Checksum>),
 }
 
-#[derive(Debug, Deserialize, Migrate, Serialize, Versioned, TypeFingerprint)]
+#[derive(Deserialize, Migrate, Serialize, Versioned, TypeFingerprint)]
 #[migrate_to_version(JournalRecordV34)]
 pub enum JournalRecordV33 {
     EndBlock,
@@ -224,7 +235,7 @@ pub enum JournalRecordV33 {
     DidFlushDevice(u64),
 }
 
-#[derive(Debug, Deserialize, Migrate, Serialize, Versioned, TypeFingerprint)]
+#[derive(Deserialize, Migrate, Serialize, Versioned, TypeFingerprint)]
 #[migrate_to_version(JournalRecordV33)]
 pub enum JournalRecordV32 {
     EndBlock,

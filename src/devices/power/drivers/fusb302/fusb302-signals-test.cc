@@ -8,19 +8,20 @@
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/driver/testing/cpp/scoped_global_logger.h>
-#include <lib/mock-i2c/mock-i2c.h>
+#include <lib/mock-i2c/mock-i2c-gtest.h>
 
 #include <cstdint>
 #include <optional>
 #include <utility>
 
-#include <zxtest/zxtest.h>
+#include <gtest/gtest.h>
 
 #include "src/devices/power/drivers/fusb302/fusb302-fifos.h"
 #include "src/devices/power/drivers/fusb302/fusb302-sensors.h"
 #include "src/devices/power/drivers/fusb302/usb-pd-defs.h"
 #include "src/devices/power/drivers/fusb302/usb-pd-message-type.h"
 #include "src/devices/power/drivers/fusb302/usb-pd-message.h"
+#include "src/lib/testing/predicates/status.h"
 
 namespace fusb302 {
 
@@ -53,7 +54,7 @@ const uint8_t kTxOffTxToken = 0xfe;
 // datasheet.
 constexpr uint8_t kSopRxToken = 0b1110'0000;
 
-class Fusb302SignalsTest : public zxtest::Test {
+class Fusb302SignalsTest : public ::testing::Test {
  public:
   void SetUp() override {
     auto endpoints = fidl::Endpoints<fuchsia_hardware_i2c::Device>::Create();
@@ -77,7 +78,7 @@ class Fusb302SignalsTest : public zxtest::Test {
   inspect::Inspector inspect_;
 
   async::Loop loop_{&kAsyncLoopConfigNeverAttachToThread};
-  mock_i2c::MockI2c mock_i2c_;
+  mock_i2c::MockI2cGtest mock_i2c_;
   fidl::ClientEnd<fuchsia_hardware_i2c::Device> mock_i2c_client_;
   std::optional<Fusb302Sensors> sensors_;
   std::optional<Fusb302Fifos> fifos_;
@@ -112,6 +113,8 @@ TEST_F(Fusb302SignalsTest, ServiceInterruptsNoOp) {
 }
 
 TEST_F(Fusb302SignalsTest, ServiceInterruptsVbusChange) {
+  sensors_->SetConfiguration(usb_pd::PowerRole::kSink, usb_pd::ConfigChannelPinSwitch::kCc1);
+
   mock_i2c_.ExpectWrite({kInterruptAddress}).ExpectReadStop({0x80});
   mock_i2c_.ExpectWrite({kInterruptAAddress}).ExpectReadStop({0x00});
   mock_i2c_.ExpectWrite({kInterruptBAddress}).ExpectReadStop({0x00});
@@ -128,6 +131,8 @@ TEST_F(Fusb302SignalsTest, ServiceInterruptsVbusChange) {
 }
 
 TEST_F(Fusb302SignalsTest, ServiceInterruptsVbusChangeNoOp) {
+  sensors_->SetConfiguration(usb_pd::PowerRole::kSink, usb_pd::ConfigChannelPinSwitch::kNone);
+
   mock_i2c_.ExpectWrite({kInterruptAddress}).ExpectReadStop({0x80});
   mock_i2c_.ExpectWrite({kInterruptAAddress}).ExpectReadStop({0x00});
   mock_i2c_.ExpectWrite({kInterruptBAddress}).ExpectReadStop({0x00});

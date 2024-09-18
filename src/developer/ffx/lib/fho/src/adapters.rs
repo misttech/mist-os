@@ -31,6 +31,7 @@ macro_rules! embedded_plugin {
                 ffx,
                 context,
                 injector,
+                lookup: std::sync::Arc::new($crate::DeviceLookupDefaultImpl),
             };
 
             // Create the writer, and if the schema is flag is set,

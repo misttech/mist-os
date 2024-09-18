@@ -83,10 +83,12 @@ test("da7219-unit-tests") {
   sources = [ "unit-tests.cc" ]
   deps = [
     ":common-dfv1",
-    "//src/devices/i2c/testing/mock-i2c",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//src/devices/i2c/testing/mock-i2c:mock-i2c-gtest",
     "//src/devices/testing/mock-ddk",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/zxtest",
+    "//src/lib/fxl/test:gtest_main",
+    "//src/lib/testing/predicates",
+    "//third_party/googletest:gtest",
   ]
 }
 

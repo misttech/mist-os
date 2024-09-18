@@ -98,8 +98,8 @@ class WlanInterface : public fidl::WireServer<fuchsia_wlan_fullmac::WlanFullmacI
   void Reset(ResetRequestView request, ResetCompleter::Sync& completer) override;
   void StartBss(StartBssRequestView request, StartBssCompleter::Sync& completer) override;
   void StopBss(StopBssRequestView request, StopBssCompleter ::Sync& completer) override;
-  void SetKeysReq(SetKeysReqRequestView request, SetKeysReqCompleter::Sync& completer) override;
-  void DelKeysReq(DelKeysReqRequestView request, DelKeysReqCompleter::Sync& completer) override;
+  void SetKeys(SetKeysRequestView request, SetKeysCompleter::Sync& completer) override;
+  void DelKeys(DelKeysRequestView request, DelKeysCompleter::Sync& completer) override;
   void EapolTx(EapolTxRequestView request, EapolTxCompleter::Sync& completer) override;
   void GetIfaceCounterStats(GetIfaceCounterStatsCompleter::Sync& completer) override;
   void GetIfaceHistogramStats(GetIfaceHistogramStatsCompleter::Sync& completer) override;

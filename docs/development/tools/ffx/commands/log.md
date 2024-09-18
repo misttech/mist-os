@@ -96,76 +96,18 @@ device. You can apply filters to the log based on timestamps, component, tags, o
 ffx log --filter hello-world --severity error
 ```
 
-For a complete list of filtering options, see the [reference documentation][ffx-reference].
-
-### Log spam filter
-
-You can filter spam entries from the output of the `ffx log` command. To filter the logs, you can define
-the path to a spam definition file in either the `ffx` configuration under the `log_cmd.spam_filepath`
-key or as a flag of the `ffx log` command `--spam-list-path /path/to/spam/file.json`. For more details,
-see the [reference documentation][ffx-reference].
-
-This gives you the ability to define your own spam definitions to filter out logs that you may not find
-useful as you are developing.
-
-#### JSON schema
-
-The log spam definition file is stored in JSON format. This section describes the JSON schema used
-to serialized the data.
-
-| Key      | Value Type                               | Description                               |
-| -------- | ---------------------------------------- | ----------------------------------------- |
-| logSpam  | List of [LogSpamEntry](#log-spam-entry) | List of log spam entries                  |
-
-The following example represents an empty Log Spam Definition:
-
-```json
-{
-  "logSpam": []
-}
-```
-
-##### LogSpamEntry {#log-spam-entry}
-
-| Key                     | Value Type               | Description                                |
-| ----------------------- | ------------------------ | ------------------------------------------ |
-| file (optional)         | String                   | Source file path of log spam               |
-| line (optional)         | Number (64-bit)          | Source line number of log spam             |
-| payloadRegex (optional) | String                   | Rust Regex string that matches the log     |
-:                         :                          : spam's content                             :
-
-The following example represents a sample `LogSpamEntry`:
-
-```json
-{
-  "file": "path/to/log_source.cc",
-  "line": 95,
-  "payloadRegex": "Disconnected\\.*",
-}
-```
-
-A `LogSpamEntry` is considered valid in any of the following cases (other combinations are
-ignored)
-
-| "file"  | "line"  | "payloadRegex" | Behavior                                                   |
-| ------- | ------- | -------------- | ---------------------------------------------------------- |
-| ✓       | ✓       | ✓              | Identifies a log as spam if its source matches "file" and  |
-:         :         :                : "line" and its content matches "payloadRegex"              :
-| ✓       | ✓       | ✗              | Identifies a log as spam if its source matches "file" and  |
-:         :         :                : "line"                                                     :
-| ✗       | ✗       | ✓              | Identifies a log as spam if it has no source information   |
-:         :         :                : and its content matches "payloadRegex"                     :
+For a complete list of filtering options, run `ffx log --help`.
 
 ## Log settings
 
 Log filters modify how the captured logs are displayed by `ffx log`, but they do not affect the
-log entries emitted by components on the target device. Use the `--select` option to send a
+log entries emitted by components on the target device. Use the `--set-severity` option to send a
 request to configure the [log settings][fidl-logsettings] of specific components during the
 logging session. This adjusts the log level applied to any component matching the provided
 [component selector][component-select] for recording logs.
 
 ```posix-terminal
-ffx log --select {{ '<var>' }}component-selector{{ '</var>' }}#{{ '<var>' }}log-level{{ '</var>' }}
+ffx log --set-severity {{ '<var>' }}component-selector{{ '</var>' }}#{{ '<var>' }}log-level{{ '</var>' }}
 ```
 
 You can use this to temporarily enable logs that are below the minimum severity configure by your
@@ -176,12 +118,11 @@ The following example enables debug logs for the `core/audio` component, and sup
 messages except errors from networking components:
 
 ```none {:.devsite-disable-click-to-copy}
-$ ffx log --select core/audio#DEBUG --select core/network/**#ERROR
+$ ffx log --set-severity core/audio#DEBUG --set-severity core/network/**#ERROR
 ```
 
 Note: Unlike the `--severity` option, which filters the view after logs are captured from the
 target device, this configures whether the target components emit logs of the given severity.
 
 [component-select]: /docs/development/tools/ffx/commands/component-select.md
-[ffx-reference]: https://fuchsia.dev/reference/tools/sdk/ffx
 [fidl-logsettings]: https://fuchsia.dev/reference/fidl/fuchsia.diagnostics#LogSettings

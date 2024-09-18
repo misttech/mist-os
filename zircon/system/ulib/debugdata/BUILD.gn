@@ -16,12 +16,12 @@ zx_library("debugdata") {
   ]
   deps = [
     "//sdk/fidl/fuchsia.debugdata:fuchsia.debugdata_cpp",
+    "//sdk/lib/async:async-cpp",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/fidl",
     "//src/lib/fxl",
     "//src/storage/lib/vfs/cpp",
-    "//zircon/system/ulib/async:async-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/fzl",
   ]
@@ -33,7 +33,7 @@ zx_library("debugdata") {
     "//zircon/system/ulib/fbl",
 
     # <debugdata/debugdata.h> has #include <lib/async/cpp/wait.h>.
-    "//zircon/system/ulib/async:async-cpp",
+    "//sdk/lib/async:async-cpp",
 
     # <debugdata/debugdata.h> has #include <lib/zircon-internal/fnv1hash.h>.
     "//zircon/system/ulib/zircon-internal",

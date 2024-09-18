@@ -393,7 +393,6 @@
                 "IP6TablesBasic.GetRevision",
                 "IP6TablesBasic.GetEntriesErrorPrecedence",
                 "IP6TablesBasic.GetInfoErrorPrecedence",
-                "IP6TablesTest.InitialInfo",
 
                 // socket_ipv4_datagram_based_socket_unbound_loopback_test
                 // Multicast support is not implemented for ICMP sockets.
@@ -1195,6 +1194,11 @@
                 // TODO(https://fxbug.dev/365094116): Investigate and re-enable
                 "ProcSysNetIpv4IpForward.CanReadAndWrite",
                 "ProcSysNetPortRange.CanReadAndWrite",
+
+                // TODO(https://fxbug.dev/366204314) deflake
+                "IPv4UDPSockets/IPv4UDPUnboundSocketTest.IpMulticastLoopbackAddr/1",
+                "IPv4UDPSockets/IPv4UDPUnboundSocketTest.IpMulticastLoopbackNic/0",
+                "IPv4UDPSockets/IPv4UDPUnboundSocketTest.IpMulticastLoopbackAddr/0",
             ],
         },
     ],

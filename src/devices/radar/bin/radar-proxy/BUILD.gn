@@ -7,6 +7,9 @@ import("//build/test.gni")
 
 _common_deps = [
   "//sdk/fidl/fuchsia.hardware.radar:fuchsia.hardware.radar_cpp",
+  "//sdk/lib/async:async-cpp",
+  "//sdk/lib/async-loop:async-loop-cpp",
+  "//sdk/lib/async-loop:async-loop-default",
   "//sdk/lib/component/incoming/cpp",
   "//sdk/lib/component/outgoing/cpp",
   "//sdk/lib/fdio",
@@ -15,9 +18,6 @@ _common_deps = [
   "//sdk/lib/syslog/cpp",
   "//src/devices/radar/lib/vmo-manager",
   "//src/lib/fsl",
-  "//zircon/system/ulib/async:async-cpp",
-  "//zircon/system/ulib/async-loop:async-loop-cpp",
-  "//zircon/system/ulib/async-loop:async-loop-default",
   "//zircon/system/ulib/fbl",
   "//zircon/system/ulib/fdio-caller",
   "//zircon/system/ulib/fzl",

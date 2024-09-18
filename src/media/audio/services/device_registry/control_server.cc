@@ -15,6 +15,7 @@
 #include <lib/fit/internal/result.h>
 #include <lib/fit/result.h>
 #include <lib/syslog/cpp/macros.h>
+#include <lib/zx/clock.h>
 #include <lib/zx/result.h>
 #include <zircon/errors.h>
 
@@ -22,6 +23,7 @@
 #include <utility>
 
 #include "src/media/audio/services/device_registry/device.h"
+#include "src/media/audio/services/device_registry/inspector.h"
 #include "src/media/audio/services/device_registry/logging.h"
 #include "src/media/audio/services/device_registry/ring_buffer_server.h"
 #include "src/media/audio/services/device_registry/validate.h"
@@ -46,12 +48,16 @@ ControlServer::ControlServer(std::shared_ptr<AudioDeviceRegistry> parent,
                              std::shared_ptr<Device> device)
     : parent_(std::move(parent)), device_(std::move(device)) {
   ADR_LOG_METHOD(kLogObjectLifetimes);
+  SetInspect(Inspector::Singleton()->RecordControlInstance(zx::clock::get_monotonic()));
+
   ++count_;
   LogObjectCounts();
 }
 
 ControlServer::~ControlServer() {
   ADR_LOG_METHOD(kLogObjectLifetimes);
+  inspect()->RecordDestructionTime(zx::clock::get_monotonic());
+
   --count_;
   LogObjectCounts();
 }
@@ -304,9 +310,8 @@ void ControlServer::CreateRingBuffer(CreateRingBufferRequest& request,
         fit::error(fad::ControlCreateRingBufferError::kBadRingBufferOption)));
     return;
   }
-  auto ring_buffer_server =
-      RingBufferServer::Create(thread_ptr(), std::move(*request.ring_buffer_server()),
-                               shared_from_this(), device_, element_id);
+  auto ring_buffer_server = parent_->CreateRingBufferServer(
+      std::move(*request.ring_buffer_server()), shared_from_this(), device_, element_id);
   AddChildServer(ring_buffer_server);
   ring_buffer_servers_.insert_or_assign(element_id, ring_buffer_server);
 }

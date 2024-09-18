@@ -47,7 +47,7 @@ class IntelDisplayDriver : public fdf::DriverBase {
   zx::result<> InitGpuCoreNode();
 
   void PrepareStopOnPowerOn(fdf::PrepareStopCompleter completer);
-  void PrepareStopOnPowerStateTransition(fuchsia_device_manager::SystemPowerState power_state,
+  void PrepareStopOnPowerStateTransition(fuchsia_system_state::SystemPowerState power_state,
                                          fdf::PrepareStopCompleter completer);
 
   std::unique_ptr<Controller> controller_;

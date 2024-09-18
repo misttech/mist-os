@@ -65,8 +65,9 @@ use recovery_ui::console::{ConsoleMessages, ConsoleViewAssistant};
 
 // 11 seconds so it can count from 10 down to 0 while displaying each tick for 1 second
 const FACTORY_RESET_TIMER_IN_SECONDS: u8 = 11;
-const LOGO_IMAGE_PATH: &str = "/pkg/data/logo.riv";
-const INSTRUCTIONS_TEXT_PATH: &str = "/pkg/data/instructions.txt";
+const LOGO_IMAGE_PATH: &str = "/system-recovery-config/logo.riv";
+const PREVIOUS_LOGO_IMAGE_PATH: &str = "/pkg/data/logo.riv";
+const INSTRUCTIONS_TEXT_PATH: &str = "/system-recovery-config/instructions.txt";
 const BG_COLOR: Color = Color::white();
 const HEADING_COLOR: Color = Color::new();
 const BODY_COLOR: Color = Color { r: 0x7e, g: 0x86, b: 0x8d, a: 0xff };
@@ -124,7 +125,10 @@ const COUNTDOWN_MODE_BODY: &'static str =
     "\nContinue holding the keys to the end of the countdown. \
 This will wipe all of your data from this device and reset it to factory settings.";
 
-const PATH_TO_FDR_RESTRICTION_CONFIG: &'static str = "/config/data/check_fdr_restriction.json";
+const PATH_TO_FDR_RESTRICTION_CONFIG: &'static str =
+    "/system-recovery-config/check_fdr_restriction.json";
+const PREVIOUS_PATH_TO_FDR_RESTRICTION_CONFIG: &'static str =
+    "/config/data/check_fdr_restriction.json";
 
 /// An enum to track whether fdr is restricted or not.
 #[derive(Copy, Clone)]
@@ -189,7 +193,18 @@ impl AppAssistant for RecoveryAppAssistant {
 
     fn create_view_assistant(&mut self, view_key: ViewKey) -> Result<ViewAssistantPtr, Error> {
         let body = get_recovery_body(self.fdr_restriction.is_initially_enabled());
-        let file = load_rive(LOGO_IMAGE_PATH).ok();
+        let file = load_rive(LOGO_IMAGE_PATH)
+            .or_else(|_| {
+                println!("recovery: Failed to load logo from main location: {LOGO_IMAGE_PATH}");
+                let res = load_rive(PREVIOUS_LOGO_IMAGE_PATH);
+                if res.is_ok() {
+                    println!(
+                        "recovery: Loaded logo from previous location: {PREVIOUS_LOGO_IMAGE_PATH}"
+                    );
+                }
+                res
+            })
+            .ok();
         let font_face = font::get_default_font_face().clone();
 
         #[cfg(feature = "debug_console")]
@@ -1274,7 +1289,21 @@ fn make_app_assistant_fut(
         // Build the fdr restriction depending on whether the fdr restriction config exists,
         // and if so, whether or not the policy api allows fdr.
         let fdr_restriction = {
-            let has_restricted_fdr_config = Path::new(PATH_TO_FDR_RESTRICTION_CONFIG).exists();
+            let has_restricted_fdr_config = if Path::new(PATH_TO_FDR_RESTRICTION_CONFIG).exists() {
+                println!(
+                    "recovery: Loaded restriction config from: {PATH_TO_FDR_RESTRICTION_CONFIG}"
+                );
+                true
+            } else {
+                println!("recovery: Failed to load restriction config from main location: {PATH_TO_FDR_RESTRICTION_CONFIG}");
+                if Path::new(PREVIOUS_PATH_TO_FDR_RESTRICTION_CONFIG).exists() {
+                    println!("recovery: Loaded restriction config from previous location: {PREVIOUS_PATH_TO_FDR_RESTRICTION_CONFIG}");
+                    true
+                } else {
+                    println!("recovery: Failed to load restriction config from previous location: {PREVIOUS_PATH_TO_FDR_RESTRICTION_CONFIG}");
+                    false
+                }
+            };
             if has_restricted_fdr_config {
                 let fdr_initially_enabled = check_fdr_enabled().await.unwrap_or_else(|error| {
                     eprintln!("Could not get fdr policy. Falling back to `true`: {:?}", error);

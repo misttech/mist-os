@@ -68,15 +68,9 @@ const ktl::array _kernel_regions = {
         .arch_mmu_flags = ARCH_MMU_FLAG_PERM_READ,
     },
     kernel_region{
-        .name = "kernel_data",
+        .name = "kernel_data_bss",
         .base = (vaddr_t)__data_start,
-        .size = ROUNDUP((uintptr_t)__data_end - (uintptr_t)__data_start, PAGE_SIZE),
-        .arch_mmu_flags = ARCH_MMU_FLAG_PERM_READ | ARCH_MMU_FLAG_PERM_WRITE,
-    },
-    kernel_region{
-        .name = "kernel_bss",
-        .base = (vaddr_t)__bss_start,
-        .size = ROUNDUP((uintptr_t)_end - (uintptr_t)__bss_start, PAGE_SIZE),
+        .size = ROUNDUP((uintptr_t)_end - (uintptr_t)__data_start, PAGE_SIZE),
         .arch_mmu_flags = ARCH_MMU_FLAG_PERM_READ | ARCH_MMU_FLAG_PERM_WRITE,
     },
 };

@@ -7,9 +7,10 @@
 ?bt-a2dp
 ?bt-avrcp
 ?bt-avrcp-target
-?bt-hfp-audio-gateway-default
+?bt-hfp-audio-gateway
 ?bt-host
 ?bt-init
+?bt-map-mce
 ?bt-rfcomm
 ?bt-snoop
 ?build-info
@@ -93,11 +94,13 @@ pkg-resolver
 ?starnix
 ?start_sl4f
 ?stash
+?system-recovery-config
 system-update-committer
 ?system-update-configurator
 ?system-update-realm
 ?system-updater
 ?system_image
+?system_recovery_fdr
 ?tcpdump
 ?tee-clients
 ?text_manager

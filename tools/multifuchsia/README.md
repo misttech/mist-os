@@ -26,6 +26,14 @@ path that's easy to open with your editor of choice, for example
 `~/src/fuchsia`. But it could also be a subdirectory of `$MULTIFUCHSIA_ROOT`
 like `$MULTIFUCHSIA_ROOT/mount`, if you want.
 
+## Caveats
+
+*   You might frequently see the warning `WARNING: cannot read default subvolume
+    id: Operation not permitted`. Unless it is followed by an **error**, it is
+    not a cause for concern. This is rooted in a [subtlely of permissions when
+    traversing btrfs subvolumes](https://lore.kernel.org/linux-btrfs/YYniaHjEO9ssCiGq@angband.pl/T/).
+    It can be safely ignored for now.
+
 ## A tour of `multifuchsia`
 
 ### `./multifuchsia sync_and_build`
@@ -310,7 +318,7 @@ Please consider contributing aliases for your shell of choice.
     ```
     $ mkdir -p ~/.config/systemd/user/
     $ ln \
-          -s "$MULTIFUCHSIA_ROOT/clean/tools/multifuchsia/systemd/*" \
+          -s "$MULTIFUCHSIA_ROOT/clean/tools/multifuchsia/systemd/"* \
           ~/.config/systemd/user/
     ```
 

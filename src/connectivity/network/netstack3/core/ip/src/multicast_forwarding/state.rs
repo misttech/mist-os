@@ -8,28 +8,38 @@ use alloc::collections::BTreeMap;
 use derivative::Derivative;
 use lock_order::lock::{OrderedLockAccess, OrderedLockRef};
 use netstack3_base::sync::{Mutex, RwLock};
-use netstack3_base::{AnyDevice, DeviceIdContext, StrongDeviceIdentifier};
+use netstack3_base::{AnyDevice, CoreTimerContext, DeviceIdContext, StrongDeviceIdentifier};
 
 use crate::internal::multicast_forwarding::packet_queue::MulticastForwardingPendingPackets;
 use crate::internal::multicast_forwarding::route::{MulticastRoute, MulticastRouteKey};
+use crate::internal::multicast_forwarding::{
+    MulticastForwardingBindingsContext, MulticastForwardingBindingsTypes,
+    MulticastForwardingTimerId,
+};
 use crate::IpLayerIpExt;
 
 /// Multicast forwarding state for an IP version `I`.
 ///
 /// Multicast forwarding can be enabled/disabled for `I` globally. When disabled
 /// no state is held.
-#[derive(Debug, Derivative)]
-#[derivative(Default(bound = ""))]
-pub enum MulticastForwardingState<I: IpLayerIpExt, D: StrongDeviceIdentifier> {
+#[derive(Derivative)]
+#[derivative(Debug(bound = ""), Default(bound = ""))]
+pub enum MulticastForwardingState<
+    I: IpLayerIpExt,
+    D: StrongDeviceIdentifier,
+    BT: MulticastForwardingBindingsTypes,
+> {
     /// Multicast forwarding is disabled.
     #[derivative(Default)]
     Disabled,
     /// Multicast forwarding is enabled.
-    Enabled(MulticastForwardingEnabledState<I, D>),
+    Enabled(MulticastForwardingEnabledState<I, D, BT>),
 }
 
-impl<I: IpLayerIpExt, D: StrongDeviceIdentifier> MulticastForwardingState<I, D> {
-    pub(crate) fn enabled(&self) -> Option<&MulticastForwardingEnabledState<I, D>> {
+impl<I: IpLayerIpExt, D: StrongDeviceIdentifier, BT: MulticastForwardingBindingsTypes>
+    MulticastForwardingState<I, D, BT>
+{
+    pub(crate) fn enabled(&self) -> Option<&MulticastForwardingEnabledState<I, D, BT>> {
         match self {
             MulticastForwardingState::Disabled => None,
             MulticastForwardingState::Enabled(state) => Some(state),
@@ -38,9 +48,13 @@ impl<I: IpLayerIpExt, D: StrongDeviceIdentifier> MulticastForwardingState<I, D> 
 }
 
 /// State held by the netstack when multicast forwarding is enabled for `I`.
-#[derive(Debug, Derivative)]
-#[derivative(Default(bound = ""))]
-pub struct MulticastForwardingEnabledState<I: IpLayerIpExt, D: StrongDeviceIdentifier> {
+#[derive(Derivative)]
+#[derivative(Debug(bound = ""))]
+pub struct MulticastForwardingEnabledState<
+    I: IpLayerIpExt,
+    D: StrongDeviceIdentifier,
+    BT: MulticastForwardingBindingsTypes,
+> {
     /// The stack's multicast route table.
     ///
     /// Keys here must not be present in `pending_table`.
@@ -48,10 +62,22 @@ pub struct MulticastForwardingEnabledState<I: IpLayerIpExt, D: StrongDeviceIdent
     /// The stack's table of pending multicast packets.
     ///
     /// Keys here must not be present in `route_table`.
-    pending_table: Mutex<MulticastForwardingPendingPackets<I, D::Weak>>,
+    pending_table: Mutex<MulticastForwardingPendingPackets<I, D::Weak, BT>>,
 }
 
-impl<I: IpLayerIpExt, D: StrongDeviceIdentifier> MulticastForwardingEnabledState<I, D> {
+impl<I: IpLayerIpExt, D: StrongDeviceIdentifier, BC: MulticastForwardingBindingsContext>
+    MulticastForwardingEnabledState<I, D, BC>
+{
+    pub(super) fn new<CC>(bindings_ctx: &mut BC) -> Self
+    where
+        CC: CoreTimerContext<MulticastForwardingTimerId<I>, BC>,
+    {
+        Self {
+            route_table: Default::default(),
+            pending_table: Mutex::new(MulticastForwardingPendingPackets::new::<CC>(bindings_ctx)),
+        }
+    }
+
     // Helper function to circumvent lock ordering, for tests.
     #[cfg(test)]
     pub(super) fn route_table(&self) -> &RwLock<MulticastRouteTable<I, D>> {
@@ -59,7 +85,9 @@ impl<I: IpLayerIpExt, D: StrongDeviceIdentifier> MulticastForwardingEnabledState
     }
     // Helper function to circumvent lock ordering, for tests.
     #[cfg(test)]
-    pub(super) fn pending_table(&self) -> &Mutex<MulticastForwardingPendingPackets<I, D::Weak>> {
+    pub(super) fn pending_table(
+        &self,
+    ) -> &Mutex<MulticastForwardingPendingPackets<I, D::Weak, BC>> {
         &self.pending_table
     }
 }
@@ -67,8 +95,8 @@ impl<I: IpLayerIpExt, D: StrongDeviceIdentifier> MulticastForwardingEnabledState
 /// A table of multicast routes specifying how to forward multicast packets.
 pub type MulticastRouteTable<I, D> = BTreeMap<MulticastRouteKey<I>, MulticastRoute<D>>;
 
-impl<I: IpLayerIpExt, D: StrongDeviceIdentifier> OrderedLockAccess<MulticastRouteTable<I, D>>
-    for MulticastForwardingEnabledState<I, D>
+impl<I: IpLayerIpExt, D: StrongDeviceIdentifier, BT: MulticastForwardingBindingsTypes>
+    OrderedLockAccess<MulticastRouteTable<I, D>> for MulticastForwardingEnabledState<I, D, BT>
 {
     type Lock = RwLock<MulticastRouteTable<I, D>>;
     fn ordered_lock_access(&self) -> OrderedLockRef<'_, Self::Lock> {
@@ -76,28 +104,36 @@ impl<I: IpLayerIpExt, D: StrongDeviceIdentifier> OrderedLockAccess<MulticastRout
     }
 }
 
-impl<I: IpLayerIpExt, D: StrongDeviceIdentifier>
-    OrderedLockAccess<MulticastForwardingPendingPackets<I, D::Weak>>
-    for MulticastForwardingEnabledState<I, D>
+impl<I: IpLayerIpExt, D: StrongDeviceIdentifier, BT: MulticastForwardingBindingsTypes>
+    OrderedLockAccess<MulticastForwardingPendingPackets<I, D::Weak, BT>>
+    for MulticastForwardingEnabledState<I, D, BT>
 {
-    type Lock = Mutex<MulticastForwardingPendingPackets<I, D::Weak>>;
+    type Lock = Mutex<MulticastForwardingPendingPackets<I, D::Weak, BT>>;
     fn ordered_lock_access(&self) -> OrderedLockRef<'_, Self::Lock> {
         OrderedLockRef::new(&self.pending_table)
     }
 }
 
 /// A trait providing access to [`MulticastForwardingState`].
-pub trait MulticastForwardingStateContext<I: IpLayerIpExt>: DeviceIdContext<AnyDevice> {
+pub trait MulticastForwardingStateContext<I: IpLayerIpExt, BT: MulticastForwardingBindingsTypes>:
+    DeviceIdContext<AnyDevice>
+{
     /// The context available after locking the multicast forwarding state.
     type Ctx<'a>: MulticastRouteTableContext<
-        I,
-        DeviceId = Self::DeviceId,
-        WeakDeviceId = Self::WeakDeviceId,
-    >;
+            I,
+            BT,
+            DeviceId = Self::DeviceId,
+            WeakDeviceId = Self::WeakDeviceId,
+        > + MulticastForwardingPendingPacketsContext<
+            I,
+            BT,
+            DeviceId = Self::DeviceId,
+            WeakDeviceId = Self::WeakDeviceId,
+        >;
     /// Provides immutable access to the state.
     fn with_state<
         O,
-        F: FnOnce(&MulticastForwardingState<I, Self::DeviceId>, &mut Self::Ctx<'_>) -> O,
+        F: FnOnce(&MulticastForwardingState<I, Self::DeviceId, BT>, &mut Self::Ctx<'_>) -> O,
     >(
         &mut self,
         cb: F,
@@ -105,7 +141,7 @@ pub trait MulticastForwardingStateContext<I: IpLayerIpExt>: DeviceIdContext<AnyD
     /// Provides mutable access to the state.
     fn with_state_mut<
         O,
-        F: FnOnce(&mut MulticastForwardingState<I, Self::DeviceId>, &mut Self::Ctx<'_>) -> O,
+        F: FnOnce(&mut MulticastForwardingState<I, Self::DeviceId, BT>, &mut Self::Ctx<'_>) -> O,
     >(
         &mut self,
         cb: F,
@@ -113,10 +149,13 @@ pub trait MulticastForwardingStateContext<I: IpLayerIpExt>: DeviceIdContext<AnyD
 }
 
 /// A trait providing access to [`MulticastRouteTable`].
-pub trait MulticastRouteTableContext<I: IpLayerIpExt>: DeviceIdContext<AnyDevice> {
+pub trait MulticastRouteTableContext<I: IpLayerIpExt, BT: MulticastForwardingBindingsTypes>:
+    DeviceIdContext<AnyDevice>
+{
     /// The context available after locking the multicast route table.
     type Ctx<'a>: MulticastForwardingPendingPacketsContext<
         I,
+        BT,
         DeviceId = Self::DeviceId,
         WeakDeviceId = Self::WeakDeviceId,
     >;
@@ -126,7 +165,7 @@ pub trait MulticastRouteTableContext<I: IpLayerIpExt>: DeviceIdContext<AnyDevice
         F: FnOnce(&MulticastRouteTable<I, Self::DeviceId>, &mut Self::Ctx<'_>) -> O,
     >(
         &mut self,
-        state: &MulticastForwardingEnabledState<I, Self::DeviceId>,
+        state: &MulticastForwardingEnabledState<I, Self::DeviceId, BT>,
         cb: F,
     ) -> O;
     /// Provides mutable access to the route table.
@@ -135,22 +174,24 @@ pub trait MulticastRouteTableContext<I: IpLayerIpExt>: DeviceIdContext<AnyDevice
         F: FnOnce(&mut MulticastRouteTable<I, Self::DeviceId>, &mut Self::Ctx<'_>) -> O,
     >(
         &mut self,
-        state: &MulticastForwardingEnabledState<I, Self::DeviceId>,
+        state: &MulticastForwardingEnabledState<I, Self::DeviceId, BT>,
         cb: F,
     ) -> O;
 }
 
 /// A trait providing access to [`MulticastForwardingPendingPackets`].
-pub trait MulticastForwardingPendingPacketsContext<I: IpLayerIpExt>:
-    DeviceIdContext<AnyDevice>
+pub trait MulticastForwardingPendingPacketsContext<
+    I: IpLayerIpExt,
+    BT: MulticastForwardingBindingsTypes,
+>: DeviceIdContext<AnyDevice>
 {
     /// Provides mutable access to the table of pending packets.
     fn with_pending_table_mut<
         O,
-        F: FnOnce(&mut MulticastForwardingPendingPackets<I, Self::WeakDeviceId>) -> O,
+        F: FnOnce(&mut MulticastForwardingPendingPackets<I, Self::WeakDeviceId, BT>) -> O,
     >(
         &mut self,
-        state: &MulticastForwardingEnabledState<I, Self::DeviceId>,
+        state: &MulticastForwardingEnabledState<I, Self::DeviceId, BT>,
         cb: F,
     ) -> O;
 }

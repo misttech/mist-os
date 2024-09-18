@@ -2,8 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::device::kobject::{KObject, KObjectHandle};
-use crate::fs::sysfs::SysfsOps;
+use crate::device::kobject::KObject;
 use crate::fs::tmpfs::TmpfsDirectory;
 use crate::task::CurrentTask;
 use crate::vfs::{
@@ -19,19 +18,11 @@ use starnix_uapi::file_mode::mode;
 use starnix_uapi::open_flags::OpenFlags;
 use std::sync::Weak;
 
-pub struct CpuClassDirectory {
-    kobject: Weak<KObject>,
-}
+pub struct CpuClassDirectory {}
 
 impl CpuClassDirectory {
-    pub fn new(kobject: Weak<KObject>) -> Self {
-        Self { kobject }
-    }
-}
-
-impl SysfsOps for CpuClassDirectory {
-    fn kobject(&self) -> KObjectHandle {
-        self.kobject.upgrade().expect("Weak references to kobject must always be valid")
+    pub fn new(_kobject: Weak<KObject>) -> Self {
+        Self {}
     }
 }
 

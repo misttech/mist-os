@@ -56,7 +56,6 @@ if (is_fuchsia) {
   assembled_system("fx_publish_test.gn_assembly") {
     testonly = true
     product_assembly_config_label = ":product_assembly_config"
-    allow_eng_platform_bundle_use = true
 
     board_config_label = ":board_config"
 

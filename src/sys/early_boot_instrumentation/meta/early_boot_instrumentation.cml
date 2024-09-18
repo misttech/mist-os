@@ -13,6 +13,11 @@
             rights: [ "r*" ],
             path: "/debugdata",
         },
+        {
+            directory: "logs",
+            rights: [ "r*" ],
+            path: "/logs",
+        },
     ],
     use: [
         {
@@ -27,6 +32,10 @@
     expose: [
         {
             directory: "debugdata",
+            from: "self",
+        },
+        {
+            directory: "logs",
             from: "self",
         },
     ],

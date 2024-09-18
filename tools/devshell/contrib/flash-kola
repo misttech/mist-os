@@ -8,7 +8,7 @@
 ### key onto the device via serial console (using default path /dev/ttyUSB0 if unspecified).
 
 ## usage: fx flash-kola [serial_console_path]
-##  e.g.: fx flash-kola /dev/ttyUSB1
+##  e.g.: fx flash-kola /tmp/pontis/serial-10c4-ea60
 
 # Bash strict mode.
 set -eo pipefail
@@ -17,52 +17,51 @@ source "$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"/../lib/va
 fx-config-read
 
 # Use the in-tree fastboot.
-FASTBOOT="${FUCHSIA_DIR}/prebuilt/third_party/fastboot/fastboot"
+readonly FASTBOOT="${FUCHSIA_DIR}/prebuilt/third_party/fastboot/fastboot"
 
 FVM_PATH="$(fx get-build-dir)/$(fx list-build-artifacts --expect-one --name storage-full images)"
 ZBI_PATH="$(fx get-build-dir)/$(fx list-build-artifacts --expect-one --name zircon-a --type zbi images)"
+readonly FVM_PATH ZBI_PATH
 
 DEVICE_COUNT=$(${FASTBOOT} devices | awk NF | wc -l)
+readonly DEVICE_COUNT
 if [[ ${DEVICE_COUNT} -ne 1 ]]; then
   fx-error "Detected ${DEVICE_COUNT} devices in fastboot mode. Make sure there is only one device."
   exit 1
 fi
+
+# Get serial console path to device.
+readonly SERIAL_PATH=${1:-'/dev/ttyUSB0'}
+if [[ $# -eq 0 ]]; then
+  echo "The user's public SSH key will be installed onto the device using the serial console at" \
+      "${SERIAL_PATH}."
+  echo "Alternatively, you can supply the serial console path to be used, e.g.:"
+  echo "  fx flash-kola /tmp/pontis/serial-10c4-ea60"
+  read -r -p "Press enter to continue..."
+fi
+if [[ ! -e "${SERIAL_PATH}" ]]; then
+  fx-error "${SERIAL_PATH} not found."
+  exit 1
+fi
+
+if [[ "${SERIAL_PATH}" =~ (pontis)|(/dev/pts/) ]]; then
+  echo "If the serial console is over pontis, it must be an unused connection."
+  echo "Else, disconnect and reconnect it at http://pontis/ on your laptop."
+  read -r -p "Press enter to continue..."
+fi
+
+stty -F "${SERIAL_PATH}" 115200 raw -echo
+
 ${FASTBOOT} flash boot_a "$ZBI_PATH"
 ${FASTBOOT} flash super "$FVM_PATH"
 
 ${FASTBOOT} reboot
 
-# Get serial console path to device.
-if [[ $# -eq 0 ]]; then
-  SERIAL_PATH='/dev/ttyUSB0'  # default
-else
-  SERIAL_PATH="$1"  # Accept alternative serial console path.
-fi
-if [[ ! -e "${SERIAL_PATH}" ]]; then
-  fx-error "${SERIAL_PATH} not found. Failed to install user's public SSH key."
-  exit 1
-fi
-stty -F "${SERIAL_PATH}" 115200 raw -echo
-
 # Wait until device has completed bootup.
-set +e  # Prevent the non-zero return value of grep from terminating the script.
-TEMP_FILE="$(mktemp)"
-echo "Writing serial console output to ${TEMP_FILE}"
-cat "${SERIAL_PATH}" > "${TEMP_FILE}" & PID=$!
-function cleanup {
-  kill ${PID}
-  rm "${TEMP_FILE}"
-}
-trap cleanup EXIT
-while :; do
-  if grep -q 'Bootup completed.' "${TEMP_FILE}"; then
-    break
-  fi
-  echo "Waiting for device bootup to complete (via serial console at ${SERIAL_PATH})..."
-  sleep 5
-done
+sleep 60
 
 # Install user's public SSH key.
 AUTHKEYS_PATH="$(get-ssh-authkeys)"
+readonly AUTHKEYS_PATH
 echo "echo \"$(cat "${AUTHKEYS_PATH}")\" > /data/ssh/authorized_keys" > "${SERIAL_PATH}"
 echo "Done flashing Kola device."

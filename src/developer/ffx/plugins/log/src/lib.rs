@@ -232,7 +232,7 @@ where
         cmd.maybe_set_interest(
             &connection.log_settings_client,
             realm_query,
-            formatter.writer().is_machine(),
+            formatter.writer().stderr(),
         )
         .await?;
         formatter.set_boot_timestamp(connection.boot_timestamp as i64);
@@ -354,7 +354,7 @@ mod tests {
         let rcs_connector = environment.rcs_connector().await;
         let cmd = LogCommand {
             sub_command: Some(LogSubCommand::Dump(DumpCommand {})),
-            select: vec![parse_log_interest_selector("ambiguous_selector#INFO").unwrap()],
+            set_severity: vec![parse_log_interest_selector("ambiguous_selector#INFO").unwrap()],
             symbolize: SymbolizeMode::Off,
             ..LogCommand::default()
         };
@@ -372,11 +372,11 @@ If this is unintentional you can explicitly match using the
 following command:
 
 ffx log \
-	--select core/other/ambiguous_selector\\:thing/test#INFO \
-	--select core/some/ambiguous_selector\\:thing/test#INFO
+	--set-severity core/other/ambiguous_selector\\:thing/test#INFO \
+	--set-severity core/some/ambiguous_selector\\:thing/test#INFO
 
 If this is intentional, you can disable this with
-ffx log --force-select.
+ffx log --force-set-severity.
 "#;
         assert_eq!(error, EXPECTED_INTEREST_ERROR);
     }
@@ -413,7 +413,7 @@ ffx log --force-select.
         });
         let cmd = LogCommand {
             sub_command: Some(LogSubCommand::Dump(DumpCommand {})),
-            select: selectors.clone(),
+            set_severity: selectors.clone(),
             symbolize: SymbolizeMode::Off,
             ..LogCommand::default()
         };
@@ -766,7 +766,7 @@ ffx log --force-select.
         let cmd = LogCommand {
             sub_command: Some(LogSubCommand::Dump(DumpCommand {})),
             symbolize: SymbolizeMode::Off,
-            select: selector.clone(),
+            set_severity: selector.clone(),
             ..LogCommand::default()
         };
         let mut event_stream = environment.take_event_stream().unwrap();

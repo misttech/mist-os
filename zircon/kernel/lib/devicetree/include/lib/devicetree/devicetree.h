@@ -241,6 +241,12 @@ class StringList {
  public:
   class iterator {
    public:
+    using difference_type = ptrdiff_t;
+    using value_type = std::string_view;
+    using pointer = std::string_view*;
+    using reference = std::string_view&;
+    using iterator_category = std::input_iterator_tag;
+
     constexpr iterator() = default;
     constexpr iterator(const iterator&) = default;
     constexpr iterator& operator=(const iterator&) = default;

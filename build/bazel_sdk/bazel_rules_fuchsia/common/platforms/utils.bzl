@@ -4,6 +4,14 @@
 
 """Common utilities for both repository and regular rules."""
 
+# TECHNICAL NOTE
+#
+# The functions in this file generate labels that assume that the
+# top-level `common` directory of the current repository points
+# to the shared definitions used by both the Bazel SDK rules
+# and the Fuchsia in-tree workspace.
+#
+
 _TO_FUCHSIA_OS_MAP = {
     "macos": "mac",
     "osx": "mac",
@@ -111,7 +119,10 @@ def to_target_os_cpu_pair(target_tag):
         fail("Invalid target tag value (<os>-<cpu> expected): " + target_tag)
     return target_os, target_cpu
 
-def config_setting_label_for_target_os_cpu(target_os, target_cpu):
+def config_setting_label_for_target_os_cpu(
+        target_os,
+        target_cpu,
+        common_package_prefix = "//common"):
     """Return label of a config setting holding True for a specific (os, cpu) pair.
 
     Args:
@@ -122,26 +133,29 @@ def config_setting_label_for_target_os_cpu(target_os, target_cpu):
         true when the current build configuration corresponds to
         (target_os, target_cpu).
     """
-    return "@fuchsia_sdk_common//platforms:is_%s_%s" % (
+    return "%s/platforms:is_%s_%s" % (
+        common_package_prefix,
         to_fuchsia_os_name(target_os),
         to_fuchsia_cpu_name(target_cpu),
     )
 
-def config_setting_label_for_target_tag(target_tag):
+def config_setting_label_for_target_tag(target_tag, common_package_prefix = "//common"):
     """Return label of a config setting holding True for a specific "os-cpu" pair.
 
     Args:
         target_tag: a string identifiying a target (os,cpu) pair, using
           either "-" or "_" as the separator.
+        common_package_prefix: Package prefix for the repository that contains
+            this .bzl file and the BUILD.bazel next to it.
     Returns:
         A label string pointing to a config_setting() value which will hold
         true when the current build configuration corresponds to
         target_os_cpu.
     """
     target_os, target_cpu = to_target_os_cpu_pair(target_tag)
-    return config_setting_label_for_target_os_cpu(target_os, target_cpu)
+    return config_setting_label_for_target_os_cpu(target_os, target_cpu, common_package_prefix)
 
-def target_tag_dict_to_select_keys(input_dict, add_default = None):
+def target_tag_dict_to_select_keys(input_dict, add_default = None, common_package_prefix = "//common"):
     """Convert a { target_tag -> value } dictionary into a select() dictionary.
 
     Args:
@@ -150,7 +164,8 @@ def target_tag_dict_to_select_keys(input_dict, add_default = None):
           or glob() call expressions).
         add_default: If not None, add a //conditions:default clause matching
           this value.
-
+        common_package_prefix: Package prefix for the repository that contains
+            this .bzl file and the BUILD.bazel next to it.
     Returns:
         A dictionary whose keys are config setting labels matching the
         target_tag keys from the input, associated with the corresponding
@@ -164,20 +179,20 @@ def target_tag_dict_to_select_keys(input_dict, add_default = None):
             "macos-aarch64": [ "//package:name2" ],
           }
 
-       target_tag_dict_to_select_keys(input_dict, []) returns
+       target_tag_dict_to_select_keys(input_dict, [], "@repo//common") returns
 
           {
-            "@fuchsia_sdk_common//platforms:is_linux_x64": [
+            "@repo//common/platforms:is_linux_x64": [
                 "//package:name1"
             ],
-            "@fuchsia_sdk_common//platforms:is_mac_arm64": [
+            "@repo//common/platforms:is_mac_arm64": [
                 "//package:name2",
             ],
             "//conditions:default": [],
           }
     """
     result_dict = {
-        config_setting_label_for_target_tag(target_tag): value
+        config_setting_label_for_target_tag(target_tag, common_package_prefix): value
         for target_tag, value in input_dict.items()
     }
     if add_default != None:

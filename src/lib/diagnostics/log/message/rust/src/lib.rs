@@ -148,7 +148,7 @@ pub fn from_structured(source: MonikerWithUrl, bytes: &[u8]) -> Result<LogsData,
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct LoggerMessage {
-    pub timestamp: i64,
+    pub timestamp: zx::MonotonicTime,
     pub severity: Severity,
     pub verbosity: Option<i8>,
     pub pid: u64,
@@ -180,7 +180,7 @@ impl TryFrom<&[u8]> for LoggerMessage {
 
         let pid = LittleEndian::read_u64(&bytes[..8]);
         let tid = LittleEndian::read_u64(&bytes[8..16]);
-        let timestamp = LittleEndian::read_i64(&bytes[16..24]);
+        let timestamp = zx::MonotonicTime::from_nanos(LittleEndian::read_i64(&bytes[16..24]));
 
         let raw_severity = LittleEndian::read_i32(&bytes[24..28]);
         let severity = LegacySeverity::try_from(raw_severity)?;
@@ -300,30 +300,4 @@ impl fx_log_packet_t {
             .enumerate()
             .for_each(|(i, x)| *x = bytes[i].try_into().unwrap());
     }
-}
-
-pub fn parse_basic_structured_info(bytes: &[u8]) -> Result<(i64, Severity), MessageError> {
-    let (record, _) = diagnostics_log_encoding::parse::parse_record(bytes)?;
-
-    let mut severity_untrusted = None;
-    for a in record.arguments {
-        let label = LogsField::from(a.name);
-        match (a.value, label) {
-            (Value::SignedInt(v), LogsField::RawSeverity) => {
-                severity_untrusted = Some(v);
-                break;
-            }
-            _ => {}
-        }
-    }
-    let raw_severity = if severity_untrusted.is_some() {
-        let transcoded_i32: i32 = severity_untrusted.unwrap().to_string().parse().unwrap();
-        LegacySeverity::try_from(transcoded_i32)?
-    } else {
-        // Cast from the u8 to i8 since verbosity is signed
-        let transcoded_i32 = i8::from_le_bytes(record.severity.to_le_bytes()) as i32;
-        LegacySeverity::try_from(transcoded_i32)?
-    };
-    let (severity, _) = raw_severity.for_structured();
-    Ok((record.timestamp, severity))
 }

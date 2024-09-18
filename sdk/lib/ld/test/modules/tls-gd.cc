@@ -12,14 +12,14 @@
 #include "tls-dep.h"
 
 extern "C" int64_t TestStart() {
-  if (ld::abi::_ld_abi.static_tls_modules.size() != 1) {
-    return 1;
-  }
-
   if constexpr (HAVE_TLSDESC != WANT_TLSDESC) {
     // This wouldn't be testing what it's supposed to test.
     return 77;
   } else if (EnsureTestThreadPointer()) {
+    if (ld::abi::_ld_abi.static_tls_modules.size() != 1) {
+      return 1;
+    }
+
     // Any GD accesses here would get relaxed to IE at link time.  So call into
     // the GD-using dependency library.  Though it's in the IE set at runtime,
     // its accesses can't have been relaxed statically since that wasn't known.

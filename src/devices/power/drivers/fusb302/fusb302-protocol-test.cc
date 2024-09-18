@@ -8,7 +8,7 @@
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/driver/testing/cpp/scoped_global_logger.h>
-#include <lib/mock-i2c/mock-i2c.h>
+#include <lib/mock-i2c/mock-i2c-gtest.h>
 #include <lib/stdcompat/span.h>
 #include <lib/zx/result.h>
 
@@ -16,10 +16,11 @@
 #include <optional>
 #include <utility>
 
-#include <zxtest/zxtest.h>
+#include <gtest/gtest.h>
 
 #include "src/devices/power/drivers/fusb302/usb-pd-message-type.h"
 #include "src/devices/power/drivers/fusb302/usb-pd-message.h"
+#include "src/lib/testing/predicates/status.h"
 
 namespace fusb302 {
 
@@ -48,7 +49,7 @@ const uint8_t kTxOffTxToken = 0xfe;
 // datasheet.
 constexpr uint8_t kSopRxToken = 0b1110'0000;
 
-class Fusb302ProtocolTestBase : public zxtest::Test {
+class Fusb302ProtocolTestBase : public ::testing::Test {
  public:
   void SetUp() override {
     auto endpoints = fidl::Endpoints<fuchsia_hardware_i2c::Device>::Create();
@@ -166,7 +167,7 @@ class Fusb302ProtocolTestBase : public zxtest::Test {
   fdf_testing::ScopedGlobalLogger logger_;
 
   async::Loop loop_{&kAsyncLoopConfigNeverAttachToThread};
-  mock_i2c::MockI2c mock_i2c_;
+  mock_i2c::MockI2cGtest mock_i2c_;
   fidl::ClientEnd<fuchsia_hardware_i2c::Device> mock_i2c_client_;
   std::optional<Fusb302Fifos> fifos_;
   std::optional<Fusb302Protocol> protocol_;
@@ -227,7 +228,7 @@ TEST_F(Fusb302ProtocolTestBase, DrainReceiveFifoOneMessage) {
             protocol_->FirstUnreadMessage().header().message_type());
   EXPECT_EQ(usb_pd::MessageId(0), protocol_->FirstUnreadMessage().header().message_id());
   ASSERT_EQ(1u, protocol_->FirstUnreadMessage().data_objects().size());
-  EXPECT_EQ(0x2701912c, protocol_->FirstUnreadMessage().data_objects()[0]);
+  EXPECT_EQ(0x2701912cu, protocol_->FirstUnreadMessage().data_objects()[0]);
 }
 
 TEST_F(Fusb302ProtocolTestBase, DrainReceiveFifoOneMessageMidStream) {
@@ -242,7 +243,7 @@ TEST_F(Fusb302ProtocolTestBase, DrainReceiveFifoOneMessageMidStream) {
             protocol_->FirstUnreadMessage().header().message_type());
   EXPECT_EQ(usb_pd::MessageId(3), protocol_->FirstUnreadMessage().header().message_id());
   ASSERT_EQ(1u, protocol_->FirstUnreadMessage().data_objects().size());
-  EXPECT_EQ(0x2701912c, protocol_->FirstUnreadMessage().data_objects()[0]);
+  EXPECT_EQ(0x2701912cu, protocol_->FirstUnreadMessage().data_objects()[0]);
 }
 
 TEST_F(Fusb302ProtocolAssumedGoodCrcTest, MarkMessageAsReadAfterHardwareRepliedGoodCrc) {

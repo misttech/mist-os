@@ -226,11 +226,13 @@ zx_status_t Astro::Create(void* ctx, zx_device_t* parent) {
 }
 
 zx_status_t Astro::AddPostInitDevice() {
-  constexpr std::array<uint32_t, 4> kPostInitGpios{
+  constexpr std::array<uint32_t, 6> kPostInitGpios{
       bind_fuchsia_amlogic_platform_s905d2::GPIOZ_PIN_ID_PIN_3,
       bind_fuchsia_amlogic_platform_s905d2::GPIOH_PIN_ID_PIN_5,
       bind_fuchsia_amlogic_platform_s905d2::GPIOZ_PIN_ID_PIN_7,
       bind_fuchsia_amlogic_platform_s905d2::GPIOZ_PIN_ID_PIN_8,
+      bind_fuchsia_amlogic_platform_s905d2::GPIOZ_PIN_ID_PIN_4,
+      bind_fuchsia_amlogic_platform_s905d2::GPIOZ_PIN_ID_PIN_9,
   };
 
   const ddk::BindRule post_init_rules[] = {

@@ -10,7 +10,7 @@ group("drivers") {
     "driver_test_realm/sample-driver",
     "metadata:drivers",
     "simple/dfv1:pkg",
-    "simple/dfv2:pkg",
+    "simple/dfv2:bazel_package",
     "skeleton:pkg",
     "template:bazel_package",
     "transport",
@@ -22,7 +22,7 @@ group("hermetic_tests") {
   deps = [
     "driver_test_realm:hermetic_tests",
     "metadata:hermetic_tests",
-    "simple/dfv2/tests:simple-driver-hermetic-test-pkg",
+    "simple/dfv2:simple-driver-test",
     "template:template-test",
     "transport:hermetic_tests",
   ]

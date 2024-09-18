@@ -13,8 +13,6 @@
     offer: [
         {
             protocol: [
-                "fuchsia.logger.LogSink",
-
                 // The component manager launched by RealmBuilder requires this to launch processes.
                 "fuchsia.process.Launcher",
             ],

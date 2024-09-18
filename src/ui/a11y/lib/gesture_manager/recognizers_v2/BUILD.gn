@@ -34,7 +34,7 @@ source_set("recognizers_v2") {
   ]
 
   deps = [
+    "//sdk/lib/async:async-cpp",
     "//sdk/lib/syslog/cpp",
-    "//zircon/system/ulib/async:async-cpp",
   ]
 }

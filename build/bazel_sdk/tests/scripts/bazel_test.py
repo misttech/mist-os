@@ -300,7 +300,13 @@ class BazelRepositoryMap(object):
         if fuchsia_sdk_dir:
             _fuchsia_sdk_dir = fuchsia_sdk_dir.resolve()
             self._overrides["fuchsia_sdk"] = _fuchsia_sdk_dir
-            self._overrides["fuchsia_sdk_common"] = _fuchsia_sdk_dir / "common"
+            self._overrides["fuchsia_sdk_common"] = (
+                fuchsia_source_dir
+                / "build"
+                / "bazel"
+                / "local_repositories"
+                / "fuchsia_sdk_common"
+            )
 
         # These repository overrides are used when converting Bazel labels to actual paths.
         # NOTE: Mapping labels to repository inputs is considerably simpler than

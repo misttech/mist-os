@@ -17,6 +17,8 @@ group("test") {
 test_deps = [
   "//sdk/fidl/fuchsia.fs:fuchsia.fs_cpp",
   "//sdk/fidl/fuchsia.io:fuchsia.io_cpp",
+  "//sdk/lib/async-loop:async-loop-cpp",
+  "//sdk/lib/async-loop:async-loop-default",
   "//sdk/lib/fdio",
   "//sdk/lib/syslog/cpp",
   "//src/lib/chunked-compression",
@@ -26,8 +28,6 @@ test_deps = [
   "//src/storage/lib/fs_management",
   "//third_party/googletest:gmock",
   "//third_party/googletest:gtest",
-  "//zircon/system/ulib/async-loop:async-loop-cpp",
-  "//zircon/system/ulib/async-loop:async-loop-default",
   "//zircon/system/ulib/storage/buffer",
   "//zircon/system/ulib/storage/operation",
   "//zircon/system/ulib/sync",

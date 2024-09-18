@@ -9,11 +9,6 @@
 
 #include <lib/uart/all.h>
 
-// Initializes a 16550-compatible UART at the PLATFORM_EARLY and PLATFORM
-// levels:
-void X86UartInitEarly(const uart::all::Driver& serial);
-void X86UartInitLate();
-
 void pc_suspend_debug();
 void pc_resume_debug();
 

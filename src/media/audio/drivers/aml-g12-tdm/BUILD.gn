@@ -108,6 +108,8 @@ fuchsia_driver("aml-g12-tdm-dai-driver") {
     "//sdk/banjo/fuchsia.hardware.audio:fuchsia.hardware.audio_banjo_cpp",
     "//sdk/fidl/fuchsia.hardware.audio:fuchsia.hardware.audio_cpp",
     "//sdk/fidl/fuchsia.hardware.audio:fuchsia.hardware.audio_hlcpp",
+    "//sdk/lib/async:async-cpp",
+    "//sdk/lib/async-loop:async-loop-cpp",
     "//sdk/lib/fit-promise",
     "//src/devices/bind/fuchsia:fuchsia_cpp",
     "//src/devices/bind/fuchsia.amlogic.platform:fuchsia.amlogic.platform_cpp",
@@ -117,14 +119,12 @@ fuchsia_driver("aml-g12-tdm-dai-driver") {
     "//src/devices/lib/mmio",
     "//src/lib/ddk",
     "//src/lib/ddktl",
-    "//zircon/system/ulib/async:async-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/fzl",
     "//zircon/system/ulib/zx",
 
     # TODO(andresoportus): Remove dependency on TLS (maybe done by C++ bindings unification).
-    "//zircon/system/ulib/async-loop:async-loop-default",
+    "//sdk/lib/async-loop:async-loop-default",
   ]
 }
 

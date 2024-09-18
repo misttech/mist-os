@@ -65,6 +65,31 @@ impl From<fdiagnostics::Severity> for LegacySeverity {
     }
 }
 
+impl From<LegacySeverity> for Severity {
+    fn from(severity: LegacySeverity) -> Severity {
+        match severity {
+            LegacySeverity::Trace => Severity::Trace,
+            LegacySeverity::Debug => Severity::Debug,
+            LegacySeverity::Info => Severity::Info,
+            LegacySeverity::Warn => Severity::Warn,
+            LegacySeverity::Error => Severity::Error,
+            LegacySeverity::Fatal => Severity::Fatal,
+            LegacySeverity::RawSeverity(v) => match v {
+                0 => Severity::Info,
+                v => {
+                    let severity = fdiagnostics::Severity::Info
+                        .into_primitive()
+                        .saturating_sub(v.try_into().unwrap_or(0));
+                    if severity < fdiagnostics::Severity::Info.into_primitive() {
+                        return Severity::Trace;
+                    }
+                    Severity::Debug
+                }
+            },
+        }
+    }
+}
+
 impl From<LegacySeverity> for c_int {
     fn from(severity: LegacySeverity) -> c_int {
         match severity {

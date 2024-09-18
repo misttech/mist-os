@@ -1,5 +1,21 @@
 [
     {
+        "kind": "table/member",
+        "name": "fuchsia.bluetooth.le/AcceptedChannelParameters.accepted_channel_modes",
+        "ordinal": "1",
+        "type": "vector<fuchsia.bluetooth/ChannelMode>"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.bluetooth.le/AcceptedChannelParameters.max_packet_size",
+        "ordinal": "2",
+        "type": "uint16"
+    },
+    {
+        "kind": "table",
+        "name": "fuchsia.bluetooth.le/AcceptedChannelParameters"
+    },
+    {
         "kind": "protocol/member",
         "name": "fuchsia.bluetooth.le/AdvertisedPeripheral.OnConnected",
         "strictness": "strict",
@@ -163,6 +179,12 @@
     },
     {
         "kind": "table/member",
+        "name": "fuchsia.bluetooth.le/AdvertisingParameters.advertising_procedure",
+        "ordinal": "6",
+        "type": "fuchsia.bluetooth.le/AdvertisingProcedure"
+    },
+    {
+        "kind": "table/member",
         "name": "fuchsia.bluetooth.le/AdvertisingParameters.connectable",
         "ordinal": "4",
         "type": "bool"
@@ -194,6 +216,31 @@
     {
         "kind": "table",
         "name": "fuchsia.bluetooth.le/AdvertisingParameters"
+    },
+    {
+        "kind": "union/member",
+        "name": "fuchsia.bluetooth.le/AdvertisingProcedure.extended",
+        "ordinal": "2",
+        "type": "fuchsia.bluetooth.le/Extended"
+    },
+    {
+        "kind": "union/member",
+        "name": "fuchsia.bluetooth.le/AdvertisingProcedure.legacy",
+        "ordinal": "1",
+        "type": "fuchsia.bluetooth.le/Legacy"
+    },
+    {
+        "kind": "union",
+        "name": "fuchsia.bluetooth.le/AdvertisingProcedure",
+        "strictness": "flexible"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.bluetooth.le/Central.Connect",
+        "strictness": "strict",
+        "ordinal": "3576709534865494980",
+        "direction": "one_way",
+        "request": "fuchsia.bluetooth.le/CentralConnectRequest"
     },
     {
         "kind": "protocol/member",
@@ -230,6 +277,16 @@
         "direction": "two_way",
         "request": "fuchsia.bluetooth.le/CentralGetPeripheralsRequest",
         "response": "fuchsia.bluetooth.le/CentralGetPeripheralsResponse"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.bluetooth.le/Central.ListenL2cap",
+        "strictness": "strict",
+        "ordinal": "4163271092247470904",
+        "direction": "two_way",
+        "request": "fuchsia.bluetooth.le/ChannelListenerRegistryListenL2capRequest",
+        "response": "fuchsia.bluetooth.le/ChannelListenerRegistry_ListenL2cap_Response",
+        "error": "int32"
     },
     {
         "kind": "protocol/member",
@@ -317,6 +374,29 @@
     {
         "kind": "struct",
         "name": "fuchsia.bluetooth.le/CentralConnectPeripheralResponse"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.bluetooth.le/CentralConnectRequest.handle",
+        "ordinal": "3",
+        "type": "server_end:fuchsia.bluetooth.le/Connection"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.bluetooth.le/CentralConnectRequest.id",
+        "ordinal": "1",
+        "type": "fuchsia.bluetooth/PeerId"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.bluetooth.le/CentralConnectRequest.options",
+        "ordinal": "2",
+        "type": "fuchsia.bluetooth.le/ConnectionOptions"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.bluetooth.le/CentralConnectRequest",
+        "resourceness": "resource"
     },
     {
         "kind": "struct/member",
@@ -472,10 +552,275 @@
         "name": "fuchsia.bluetooth.le/CentralStartScanResponse"
     },
     {
+        "kind": "protocol/member",
+        "name": "fuchsia.bluetooth.le/ChannelListener.Accept",
+        "strictness": "flexible",
+        "ordinal": "8021856324870536315",
+        "direction": "two_way",
+        "request": "fuchsia.bluetooth.le/ChannelListenerAcceptRequest",
+        "response": "fuchsia.bluetooth.le/ChannelListener_Accept_Response"
+    },
+    {
+        "kind": "protocol",
+        "name": "fuchsia.bluetooth.le/ChannelListener",
+        "openness": "open",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.bluetooth.le/ChannelListenerAcceptRequest.channel",
+        "ordinal": "1",
+        "type": "fuchsia.bluetooth/Channel"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.bluetooth.le/ChannelListenerAcceptRequest",
+        "resourceness": "resource"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.bluetooth.le/ChannelListenerRegistry.ListenL2cap",
+        "strictness": "strict",
+        "ordinal": "4163271092247470904",
+        "direction": "two_way",
+        "request": "fuchsia.bluetooth.le/ChannelListenerRegistryListenL2capRequest",
+        "response": "fuchsia.bluetooth.le/ChannelListenerRegistry_ListenL2cap_Response",
+        "error": "int32"
+    },
+    {
+        "kind": "protocol",
+        "name": "fuchsia.bluetooth.le/ChannelListenerRegistry",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.bluetooth.le/ChannelListenerRegistryListenL2capRequest.listener",
+        "ordinal": "2",
+        "type": "client_end:fuchsia.bluetooth.le/ChannelListener"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.bluetooth.le/ChannelListenerRegistryListenL2capRequest.parameters",
+        "ordinal": "1",
+        "type": "fuchsia.bluetooth.le/AcceptedChannelParameters"
+    },
+    {
+        "kind": "table",
+        "name": "fuchsia.bluetooth.le/ChannelListenerRegistryListenL2capRequest",
+        "resourceness": "resource"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.bluetooth.le/ChannelListenerRegistry_ListenL2cap_Response.psm",
+        "ordinal": "1",
+        "type": "uint16"
+    },
+    {
+        "kind": "table",
+        "name": "fuchsia.bluetooth.le/ChannelListenerRegistry_ListenL2cap_Response"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.bluetooth.le/CisEstablishedParameters.central_to_peripheral_params",
+        "ordinal": "5",
+        "type": "fuchsia.bluetooth.le/CisUnidirectionalParams"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.bluetooth.le/CisEstablishedParameters.cig_sync_delay",
+        "ordinal": "1",
+        "type": "int64"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.bluetooth.le/CisEstablishedParameters.cis_sync_delay",
+        "ordinal": "2",
+        "type": "int64"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.bluetooth.le/CisEstablishedParameters.iso_interval",
+        "ordinal": "4",
+        "type": "int64"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.bluetooth.le/CisEstablishedParameters.max_subevents",
+        "ordinal": "3",
+        "type": "uint8"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.bluetooth.le/CisEstablishedParameters.peripheral_to_central_params",
+        "ordinal": "6",
+        "type": "fuchsia.bluetooth.le/CisUnidirectionalParams"
+    },
+    {
+        "kind": "table",
+        "name": "fuchsia.bluetooth.le/CisEstablishedParameters"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.bluetooth.le/CisUnidirectionalParams.burst_number",
+        "ordinal": "2",
+        "type": "uint8"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.bluetooth.le/CisUnidirectionalParams.flush_timeout",
+        "ordinal": "3",
+        "type": "uint8"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.bluetooth.le/CisUnidirectionalParams.transport_latency",
+        "ordinal": "1",
+        "type": "int64"
+    },
+    {
+        "kind": "table",
+        "name": "fuchsia.bluetooth.le/CisUnidirectionalParams"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.bluetooth.le/CodecDelay.GetCodecLocalDelayRange",
+        "strictness": "strict",
+        "ordinal": "130381179455540045",
+        "direction": "two_way",
+        "request": "fuchsia.bluetooth.le/CodecDelayGetCodecLocalDelayRangeRequest",
+        "response": "fuchsia.bluetooth.le/CodecDelay_GetCodecLocalDelayRange_Response",
+        "error": "int32"
+    },
+    {
+        "kind": "protocol",
+        "name": "fuchsia.bluetooth.le/CodecDelay",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.bluetooth.le/CodecDelayGetCodecLocalDelayRangeRequest.codec_attributes",
+        "ordinal": "3",
+        "type": "fuchsia.bluetooth/CodecAttributes"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.bluetooth.le/CodecDelayGetCodecLocalDelayRangeRequest.data_direction",
+        "ordinal": "2",
+        "type": "fuchsia.bluetooth/DataDirection"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.bluetooth.le/CodecDelayGetCodecLocalDelayRangeRequest.logical_transport_type",
+        "ordinal": "1",
+        "type": "fuchsia.bluetooth/LogicalTransportType"
+    },
+    {
+        "kind": "table",
+        "name": "fuchsia.bluetooth.le/CodecDelayGetCodecLocalDelayRangeRequest"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.bluetooth.le/CodecDelay_GetCodecLocalDelayRange_Response.max_controller_delay",
+        "ordinal": "2",
+        "type": "int64"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.bluetooth.le/CodecDelay_GetCodecLocalDelayRange_Response.min_controller_delay",
+        "ordinal": "1",
+        "type": "int64"
+    },
+    {
+        "kind": "table",
+        "name": "fuchsia.bluetooth.le/CodecDelay_GetCodecLocalDelayRange_Response"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.bluetooth.le/Connection.AcceptCis",
+        "strictness": "strict",
+        "ordinal": "9107185278271390020",
+        "direction": "one_way",
+        "request": "fuchsia.bluetooth.le/ConnectionAcceptCisRequest"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.bluetooth.le/Connection.ConnectL2cap",
+        "strictness": "strict",
+        "ordinal": "1311975855931440361",
+        "direction": "one_way",
+        "request": "fuchsia.bluetooth.le/ConnectionConnectL2capRequest"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.bluetooth.le/Connection.GetCodecLocalDelayRange",
+        "strictness": "strict",
+        "ordinal": "130381179455540045",
+        "direction": "two_way",
+        "request": "fuchsia.bluetooth.le/CodecDelayGetCodecLocalDelayRangeRequest",
+        "response": "fuchsia.bluetooth.le/CodecDelay_GetCodecLocalDelayRange_Response",
+        "error": "int32"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.bluetooth.le/Connection.RequestGattClient",
+        "strictness": "strict",
+        "ordinal": "3055426333748022379",
+        "direction": "one_way",
+        "request": "fuchsia.bluetooth.le/ConnectionRequestGattClientRequest"
+    },
+    {
         "kind": "protocol",
         "name": "fuchsia.bluetooth.le/Connection",
         "openness": "closed",
         "transport": "channel"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.bluetooth.le/ConnectionAcceptCisRequest.cig_id",
+        "ordinal": "1",
+        "type": "uint8"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.bluetooth.le/ConnectionAcceptCisRequest.cis_id",
+        "ordinal": "2",
+        "type": "uint8"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.bluetooth.le/ConnectionAcceptCisRequest.connection_stream",
+        "ordinal": "3",
+        "type": "server_end:fuchsia.bluetooth.le/IsochronousStream"
+    },
+    {
+        "kind": "table",
+        "name": "fuchsia.bluetooth.le/ConnectionAcceptCisRequest",
+        "resourceness": "resource"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.bluetooth.le/ConnectionConnectL2capRequest.channel",
+        "ordinal": "2",
+        "type": "server_end:fuchsia.bluetooth/Channel"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.bluetooth.le/ConnectionConnectL2capRequest.parameters",
+        "ordinal": "1",
+        "type": "fuchsia.bluetooth/ChannelParameters"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.bluetooth.le/ConnectionConnectL2capRequest.psm",
+        "ordinal": "3",
+        "type": "uint16"
+    },
+    {
+        "kind": "table",
+        "name": "fuchsia.bluetooth.le/ConnectionConnectL2capRequest",
+        "resourceness": "resource"
     },
     {
         "kind": "table/member",
@@ -492,6 +837,21 @@
     {
         "kind": "table",
         "name": "fuchsia.bluetooth.le/ConnectionOptions"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.bluetooth.le/ConnectionRequestGattClientRequest.client",
+        "ordinal": "1",
+        "type": "server_end:fuchsia.bluetooth.gatt2/Client"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.bluetooth.le/ConnectionRequestGattClientRequest",
+        "resourceness": "resource"
+    },
+    {
+        "kind": "table",
+        "name": "fuchsia.bluetooth.le/Extended"
     },
     {
         "kind": "table/member",
@@ -532,6 +892,129 @@
     {
         "kind": "table",
         "name": "fuchsia.bluetooth.le/Filter"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.bluetooth.le/IsoPacketStatusFlag.DATA_WITH_POSSIBLE_ERRORS",
+        "value": "1"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.bluetooth.le/IsoPacketStatusFlag.LOST_DATA",
+        "value": "2"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.bluetooth.le/IsoPacketStatusFlag.VALID_DATA",
+        "value": "0"
+    },
+    {
+        "kind": "enum",
+        "name": "fuchsia.bluetooth.le/IsoPacketStatusFlag",
+        "strictness": "strict",
+        "type": "uint8"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.bluetooth.le/IsochronousStream.OnEstablished",
+        "strictness": "flexible",
+        "ordinal": "3754965154485187617",
+        "direction": "event",
+        "request": "fuchsia.bluetooth.le/IsochronousStreamOnEstablishedRequest"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.bluetooth.le/IsochronousStream.Read",
+        "strictness": "flexible",
+        "ordinal": "7889615269229574706",
+        "direction": "two_way",
+        "response": "fuchsia.bluetooth.le/IsochronousStream_Read_Response"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.bluetooth.le/IsochronousStream.SetupDataPath",
+        "strictness": "flexible",
+        "ordinal": "9133830806910611390",
+        "direction": "two_way",
+        "request": "fuchsia.bluetooth.le/IsochronousStreamSetupDataPathRequest",
+        "response": "fuchsia.bluetooth.le/IsochronousStream_SetupDataPath_Response",
+        "error": "int32"
+    },
+    {
+        "kind": "protocol",
+        "name": "fuchsia.bluetooth.le/IsochronousStream",
+        "openness": "open",
+        "transport": "channel"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.bluetooth.le/IsochronousStreamOnEstablishedRequest.established_params",
+        "ordinal": "2",
+        "type": "fuchsia.bluetooth.le/CisEstablishedParameters"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.bluetooth.le/IsochronousStreamOnEstablishedRequest.result",
+        "ordinal": "1",
+        "type": "int32"
+    },
+    {
+        "kind": "table",
+        "name": "fuchsia.bluetooth.le/IsochronousStreamOnEstablishedRequest"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.bluetooth.le/IsochronousStreamSetupDataPathRequest.codec_attributes",
+        "ordinal": "2",
+        "type": "fuchsia.bluetooth/CodecAttributes"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.bluetooth.le/IsochronousStreamSetupDataPathRequest.controller_delay",
+        "ordinal": "3",
+        "type": "int64"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.bluetooth.le/IsochronousStreamSetupDataPathRequest.data_direction",
+        "ordinal": "1",
+        "type": "fuchsia.bluetooth/DataDirection"
+    },
+    {
+        "kind": "table",
+        "name": "fuchsia.bluetooth.le/IsochronousStreamSetupDataPathRequest"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.bluetooth.le/IsochronousStream_Read_Response.data",
+        "ordinal": "1",
+        "type": "vector<uint8>"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.bluetooth.le/IsochronousStream_Read_Response.sequence_number",
+        "ordinal": "2",
+        "type": "uint16"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.bluetooth.le/IsochronousStream_Read_Response.status_flag",
+        "ordinal": "3",
+        "type": "fuchsia.bluetooth.le/IsoPacketStatusFlag"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.bluetooth.le/IsochronousStream_Read_Response.timestamp",
+        "ordinal": "4",
+        "type": "int64"
+    },
+    {
+        "kind": "table",
+        "name": "fuchsia.bluetooth.le/IsochronousStream_Read_Response"
+    },
+    {
+        "kind": "table",
+        "name": "fuchsia.bluetooth.le/Legacy"
     },
     {
         "kind": "const",
@@ -644,6 +1127,16 @@
         "request": "fuchsia.bluetooth.le/PeripheralAdvertiseRequest",
         "response": "fuchsia.bluetooth.le/Peripheral_Advertise_Response",
         "error": "fuchsia.bluetooth.le/PeripheralError"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.bluetooth.le/Peripheral.ListenL2cap",
+        "strictness": "strict",
+        "ordinal": "4163271092247470904",
+        "direction": "two_way",
+        "request": "fuchsia.bluetooth.le/ChannelListenerRegistryListenL2capRequest",
+        "response": "fuchsia.bluetooth.le/ChannelListenerRegistry_ListenL2cap_Response",
+        "error": "int32"
     },
     {
         "kind": "protocol/member",

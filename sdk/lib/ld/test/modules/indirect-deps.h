@@ -7,6 +7,8 @@
 
 #include <stdint.h>
 
-extern "C" int64_t a(), b(), c();
+#include "suffixed-symbol.h"
+
+extern "C" int64_t SUFFIXED_SYMBOL(a)(), SUFFIXED_SYMBOL(b)(), SUFFIXED_SYMBOL(c)();
 
 #endif  // LIB_LD_TEST_MODULES_INDIRECT_DEPS_H_

@@ -9,10 +9,10 @@ test("thread-safe-deleter") {
   output_name = "thread-safe-deleter-test"
   sources = [ "thread-safe-deleter-test.cc" ]
   deps = [
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/fdio",
     "//sdk/lib/fit",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/thread-safe-deleter",
     "//zircon/system/ulib/zxtest",
   ]

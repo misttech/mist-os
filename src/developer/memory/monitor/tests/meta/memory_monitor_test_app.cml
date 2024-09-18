@@ -20,8 +20,8 @@
             protocol: [
                 "fuchsia.kernel.RootJobForInspect",
                 "fuchsia.kernel.Stats",
-                "fuchsia.tracing.provider.Registry",
                 "fuchsia.logger.LogSink",
+                "fuchsia.tracing.provider.Registry",
             ],
         },
 

@@ -12,9 +12,9 @@ executable("setui_accessibility_bin") {
 
   deps = [
     "//sdk/fidl/fuchsia.settings:fuchsia.settings_hlcpp",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/sys/cpp",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
   ]
 }
 

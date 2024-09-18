@@ -24,9 +24,9 @@ source_set("lib") {
     "fake_legacy_stream.h",
   ]
   deps = [
+    "//sdk/lib/async",
     "//sdk/lib/fidl/hlcpp",
     "//sdk/lib/syslog/cpp",
-    "//zircon/system/ulib/async",
   ]
   public_deps = [
     "//sdk/fidl/fuchsia.camera2:fuchsia.camera2_hlcpp",
@@ -39,10 +39,10 @@ cc_test_executable("fake_legacy_stream_unittest_bin") {
   sources = [ "fake_legacy_stream_unittest.cc" ]
   deps = [
     ":lib",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/loop_fixture",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
   ]
 }
 

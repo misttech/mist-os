@@ -18,6 +18,7 @@
 #include <gtest/gtest.h>
 
 #include "src/lib/testing/loop_fixture/test_loop_fixture.h"
+#include "src/media/audio/services/device_registry/inspector.h"
 #include "src/storage/lib/vfs/cpp/pseudo_dir.h"
 #include "src/storage/lib/vfs/cpp/service.h"
 #include "src/storage/lib/vfs/cpp/synchronous_vfs.h"
@@ -166,6 +167,9 @@ class DeviceDetectorTest : public gtest::TestLoopFixture {
   static inline constexpr zx::duration kCommandTimeout = zx::sec(10);
 
   void SetUp() override {
+    // Use our production Inspector during DeviceDetector unittests.
+    media_audio::Inspector::Initialize(dispatcher());
+
     ASSERT_TRUE(input_dir_ != nullptr);
     ASSERT_TRUE(output_dir_ != nullptr);
 

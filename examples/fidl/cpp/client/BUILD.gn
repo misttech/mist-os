@@ -19,7 +19,7 @@ executable("bin") {
     "//sdk/lib/syslog/cpp",
 
     # This library provides an asynchronous event loop implementation.
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-cpp",
 
     # This library is used to consume capabilities, e.g. protocols,
     # from the component's incoming directory.

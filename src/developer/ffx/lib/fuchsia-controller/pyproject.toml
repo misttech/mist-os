@@ -27,7 +27,6 @@ test = [
 guidelines = [
     "coverage==7.2.7",        # for measuring code coverage using unit tests
     "pylint==2.17.4",         # for code linting
-    "autoflake==2.1.1",       # for removeing unused imports and unused variables
     "mypy==1.3.0",            # for type checking
     "types-colorama==0.4.6",  # for type checking
     "jellyfish==0.11.0",      # for type checking

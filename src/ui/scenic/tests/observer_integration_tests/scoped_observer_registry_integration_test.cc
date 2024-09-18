@@ -4,6 +4,7 @@
 
 #include <fuchsia/ui/composition/cpp/fidl.h>
 #include <fuchsia/ui/focus/cpp/fidl.h>
+#include <fuchsia/ui/observation/geometry/cpp/fidl.h>
 #include <fuchsia/ui/observation/scope/cpp/fidl.h>
 #include <lib/fidl/cpp/binding.h>
 #include <lib/fidl/cpp/interface_handle.h>

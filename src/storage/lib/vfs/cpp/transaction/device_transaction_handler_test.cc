@@ -163,23 +163,6 @@ TEST_F(TransactionHandlerTest, RunRequestsWriteFua) {
   EXPECT_EQ(unsigned{BLOCK_IO_FLAG_FORCE_ACCESS}, requests[0].command.flags);
 }
 
-TEST_F(TransactionHandlerTest, RunRequestsWritePreflushAndFua) {
-  const vmoid_t kVmoid = 4;
-  std::vector<BufferedOperation> operations = {
-      {kVmoid, {OperationType::kWritePreflushAndFua, 1, 2, 3}}};
-  EXPECT_EQ(handler_->RunRequests(operations), ZX_OK);
-
-  const std::vector<block_fifo_request_t>& requests = handler_->GetRequests();
-  EXPECT_EQ(1u, requests.size());
-  EXPECT_EQ(1 * kBlockRatio, requests[0].vmo_offset);
-  EXPECT_EQ(2 * kBlockRatio, requests[0].dev_offset);
-  EXPECT_EQ(3 * kBlockRatio, requests[0].length);
-  EXPECT_EQ(kVmoid, requests[0].vmoid);
-  EXPECT_EQ(unsigned{BLOCK_OPCODE_WRITE}, requests[0].command.opcode);
-  EXPECT_EQ(unsigned{BLOCK_IO_FLAG_PREFLUSH | BLOCK_IO_FLAG_FORCE_ACCESS},
-            requests[0].command.flags);
-}
-
 #if ZX_DEBUG_ASSERT_IMPLEMENTED
 
 using TransactionHandlerCrashTest = TransactionHandlerTest;

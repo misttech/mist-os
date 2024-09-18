@@ -110,11 +110,6 @@ TEST_F(AmlSpiBtiPaddrTest, ExchangeDma) {
   driver_test().driver()->mmio()[AML_SPI_DWADDR].SetWriteCallback(
       [&rx_paddr](uint64_t value) { rx_paddr = value; });
 
-  driver_test().RunInEnvironmentTypeContext([](BaseTestEnvironment& env) {
-    env.ExpectGpioWrite(ZX_OK, 0);
-    env.ExpectGpioWrite(ZX_OK, 1);
-  });
-
   uint8_t buf[24] = {};
   memcpy(buf, kTxData, sizeof(buf));
 
@@ -137,8 +132,10 @@ TEST_F(AmlSpiBtiPaddrTest, ExchangeDma) {
   EXPECT_EQ(tx_paddr, AmlSpiBtiPaddrEnvironment::kDmaPaddrs[0]);
   EXPECT_EQ(rx_paddr, AmlSpiBtiPaddrEnvironment::kDmaPaddrs[1]);
 
-  driver_test().RunInEnvironmentTypeContext(
-      [](BaseTestEnvironment& env) { EXPECT_FALSE(env.ControllerReset()); });
+  driver_test().RunInEnvironmentTypeContext([](BaseTestEnvironment& env) {
+    EXPECT_FALSE(env.ControllerReset());
+    EXPECT_EQ(env.cs_toggle_count(), 2u);
+  });
 }
 
 class AmlSpiBtiEmptyEnvironment : public BaseTestEnvironment {
@@ -219,11 +216,6 @@ TEST_F(AmlSpiBtiEmptyTest, ExchangeFallBackToPio) {
   driver_test().driver()->mmio()[AML_SPI_TXDATA].SetWriteCallback(
       [&tx_data](uint64_t value) { tx_data = value; });
 
-  driver_test().RunInEnvironmentTypeContext([](BaseTestEnvironment& env) {
-    env.ExpectGpioWrite(ZX_OK, 0);
-    env.ExpectGpioWrite(ZX_OK, 1);
-  });
-
   uint8_t buf[15] = {};
   memcpy(buf, kTxData, sizeof(buf));
 
@@ -245,8 +237,10 @@ TEST_F(AmlSpiBtiEmptyTest, ExchangeFallBackToPio) {
   EXPECT_EQ(tx_paddr, 0u);
   EXPECT_EQ(rx_paddr, 0u);
 
-  driver_test().RunInEnvironmentTypeContext(
-      [](BaseTestEnvironment& env) { EXPECT_FALSE(env.ControllerReset()); });
+  driver_test().RunInEnvironmentTypeContext([](BaseTestEnvironment& env) {
+    EXPECT_FALSE(env.ControllerReset());
+    EXPECT_EQ(env.cs_toggle_count(), 2u);
+  });
 }
 
 class AmlSpiExchangeDmaClientReversesBufferEnvironment : public AmlSpiBtiPaddrEnvironment {
@@ -327,11 +321,6 @@ TEST_F(AmlSpiExchangeDmaClientReversesBufferTest, Test) {
   driver_test().driver()->mmio()[AML_SPI_DWADDR].SetWriteCallback(
       [&rx_paddr](uint64_t value) { rx_paddr = value; });
 
-  driver_test().RunInEnvironmentTypeContext([](BaseTestEnvironment& env) {
-    env.ExpectGpioWrite(ZX_OK, 0);
-    env.ExpectGpioWrite(ZX_OK, 1);
-  });
-
   uint8_t buf[sizeof(kTxData)] = {};
   memcpy(buf, kTxData, sizeof(buf));
 
@@ -357,6 +346,7 @@ TEST_F(AmlSpiExchangeDmaClientReversesBufferTest, Test) {
   driver_test().RunInEnvironmentTypeContext(
       [](AmlSpiExchangeDmaClientReversesBufferEnvironment& env) {
         EXPECT_FALSE(env.ControllerReset());
+        EXPECT_EQ(env.cs_toggle_count(), 2u);
       });
 }
 

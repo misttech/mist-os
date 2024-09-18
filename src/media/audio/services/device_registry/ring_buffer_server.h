@@ -14,6 +14,7 @@
 #include "src/media/audio/services/common/base_fidl_server.h"
 #include "src/media/audio/services/device_registry/control_server.h"
 #include "src/media/audio/services/device_registry/device.h"
+#include "src/media/audio/services/device_registry/inspector.h"
 
 namespace media_audio {
 
@@ -26,8 +27,8 @@ class RingBufferServer
       fidl::ServerEnd<fuchsia_audio_device::RingBuffer> server_end,
       std::shared_ptr<ControlServer> parent, std::shared_ptr<Device> device, ElementId element_id);
 
-  void OnShutdown(fidl::UnbindInfo info) override;
   ~RingBufferServer() override;
+  void OnShutdown(fidl::UnbindInfo info) override;
   void DeviceDroppedRingBuffer();
   void ClientDroppedControl();
 
@@ -46,6 +47,15 @@ class RingBufferServer
   void MaybeCompleteWatchDelayInfo();
 
   ElementId element_id() const { return element_id_; }
+
+  const std::shared_ptr<FidlServerInspectInstance>& inspect() {
+    return ring_buffer_inspect_instance_;
+  }
+  void SetInspect(std::shared_ptr<FidlServerInspectInstance> instance) {
+    ring_buffer_inspect_instance_ = std::move(instance);
+  }
+
+  std::shared_ptr<ControlServer> parent() { return parent_; }
 
   // Static object count, for debugging purposes.
   static inline uint64_t count() { return count_; }
@@ -74,6 +84,8 @@ class RingBufferServer
   std::optional<fuchsia_audio_device::DelayInfo> new_delay_info_to_notify_;
 
   bool device_dropped_ring_buffer_ = false;
+
+  std::shared_ptr<FidlServerInspectInstance> ring_buffer_inspect_instance_;
 };
 
 }  // namespace media_audio

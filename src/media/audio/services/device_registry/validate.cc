@@ -8,7 +8,6 @@
 #include <fidl/fuchsia.hardware.audio.signalprocessing/cpp/natural_types.h>
 #include <fidl/fuchsia.hardware.audio/cpp/fidl.h>
 #include <lib/syslog/cpp/macros.h>
-#include <lib/zx/clock.h>
 #include <zircon/errors.h>
 #include <zircon/rights.h>
 

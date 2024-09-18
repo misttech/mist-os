@@ -643,6 +643,53 @@ the availability of that capability.
 This section contains common issues you may encounter trying to `use` and
 connect to capabilities from your component with suggested solutions.
 
+### Capability routing failed {#troubleshoot-use-routing}
+
+Component manager performs [capability routing][doc-capabilities] to find the
+source of a given capability once your component attempts to access the
+capability. Routing can fail if one of the component manifests in the routing
+path is configured incorrectly. For example, an `offer` or `expose` declaration
+is missing from some component in the path, or one of the components in the
+chain could not be resolved.
+
+Do the following to check if a routing failure was the cause of channel closure:
+
+*   Use `ffx component route` to check the routing for your component. This
+    can either be used with the moniker of your component or your component's
+    URL. For example:
+
+    ```bash
+    # check with the moniker
+    ffx component route /core/ffx-laboratory:echo_realm/echo_client
+
+    # check with a partial URL
+    ffx component route echo_client.cm
+    ```
+
+*   Check the component logs with `ffx log` for a message beginning with `Failed
+    to route` that explains where the routing chain failed. For example:
+
+    ```none {:.devsite-disable-click-to-copy}
+    [echo_client][][W] protocol `fidl.examples.routing.echo.Echo` was not available for target `/core/ffx-laboratory:echo_realm/echo_client`:
+        `fidl.examples.routing.echo.Echo` was not offered to `/core/ffx-laboratory:echo_realm/echo_client` by parent
+        For more, run `ffx component doctor /core/ffx-laboratory:echo_realm/echo_client`
+    ```
+
+*   Check for an [epitaph on the closed channel](#troubleshooting). The epitaph
+    set for the most common routing failures is `ZX_ERR_NOT_FOUND`:
+
+    ```none {:.devsite-disable-click-to-copy}
+    [echo_client][][I] Connecting to Echo protocol failed with error
+    "A FIDL client's channel to the service fidl.examples.routing.echo.Echo was closed: NOT_FOUND"
+    ```
+
+    See [routing errors](#errors) for more.
+
+For a self-contained example of failed capability routing, see
+[`//examples/components/routing_failed`][example-routing-failed].
+
+### Receiving errors from routing
+
 When capability routing fails, the underlying FIDL channel closes. FIDL protocol
 bindings return an error status if the channel was closed. Consider the
 following example:
@@ -716,39 +763,6 @@ a closed channel, do the following:
       printf("Channel was closed with epitaph: %d\n", status);
     });
     ```
-
-### Capability routing failed {#troubleshoot-use-routing}
-
-Component manager performs [capability routing][doc-capabilities] to find the
-source of a given capability once your component attempts to access the
-capability. Routing can fail if one of the component manifests in the routing
-path is configured incorrectly. For example, an `offer` or `expose` declaration
-is missing from some component in the path, or one of the components in the
-chain could not be resolved.
-
-Do the following to check if a routing failure was the cause of channel closure:
-
-*   Check the component logs with `ffx log` for a message beginning with `Failed
-    to route` that explains where the routing chain failed. For example:
-
-    ```none {:.devsite-disable-click-to-copy}
-    [echo_client][][W] protocol `fidl.examples.routing.echo.Echo` was not available for target `/core/ffx-laboratory:echo_realm/echo_client`:
-        `fidl.examples.routing.echo.Echo` was not offered to `/core/ffx-laboratory:echo_realm/echo_client` by parent
-        For more, run `ffx component doctor /core/ffx-laboratory:echo_realm/echo_client`
-    ```
-
-*   Check for an [epitaph on the closed channel](#troubleshooting). The epitaph
-    set for the most common routing failures is `ZX_ERR_NOT_FOUND`:
-
-    ```none {:.devsite-disable-click-to-copy}
-    [echo_client][][I] Connecting to Echo protocol failed with error
-    "A FIDL client's channel to the service fidl.examples.routing.echo.Echo was closed: NOT_FOUND"
-    ```
-
-    See [routing errors](#errors) for more.
-
-For a self-contained example of failed capability routing, see
-[`//examples/components/routing_failed`][example-routing-failed].
 
 ### Component failed to start {#troubleshoot-use-start}
 

@@ -25,6 +25,14 @@ impl DefineSubsystemConfiguration<Option<BuildInfoConfig>> for BuildInfoSubsyste
                 destination: "version".into(),
             })?;
             dir.entry(FileEntry {
+                source: build_info.version.clone().into(),
+                destination: "product_version".into(),
+            })?;
+            dir.entry(FileEntry {
+                source: context.get_resource("version.txt"),
+                destination: "platform_version".into(),
+            })?;
+            dir.entry(FileEntry {
                 source: build_info.jiri_snapshot.clone().into(),
                 destination: "snapshot".into(),
             })?;

@@ -19,8 +19,8 @@ driver_source_split("mac") {
     "//sdk/fidl/fuchsia.hardware.network:fuchsia.hardware.network_cpp",
     "//sdk/fidl/fuchsia.hardware.network.driver:fuchsia.hardware.network.driver_banjo_cpp",
     "//sdk/fidl/fuchsia.hardware.network.driver:fuchsia.hardware.network.driver_cpp",
+    "//sdk/lib/async:async-cpp",
     "//sdk/lib/fidl",
-    "//zircon/system/ulib/async:async-cpp",
     "//zircon/system/ulib/fbl",
   ]
 }
@@ -52,11 +52,11 @@ test("test_bin") {
   deps = [
     ":mac",
     ":test_util",
+    "//sdk/lib/async-loop:async-loop-cpp",
     "//sdk/lib/driver/testing/cpp:cpp",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/predicates",
     "//third_party/googletest:gmock",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/sync",
     "//zircon/system/ulib/sync:sync-cpp",
     "//zircon/system/ulib/zx",

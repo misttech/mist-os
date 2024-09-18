@@ -13,8 +13,8 @@
         {
             protocol: [
                 "fuchsia.boot.Items",
-                "fuchsia.device.manager.SystemStateTransition",
                 "fuchsia.driver.framework.CompositeNodeManager",
+                "fuchsia.system.state.SystemStateTransition",
             ],
         },
         {

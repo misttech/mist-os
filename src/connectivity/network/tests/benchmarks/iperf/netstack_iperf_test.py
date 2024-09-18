@@ -369,7 +369,9 @@ class NetstackIperfTest(fuchsia_base_test.FuchsiaBaseTest):
         with open(path, "w") as f:
             json.dump(results, f)
         publish.publish_fuchsiaperf(
-            [path], f"fuchsia.netstack.iperf_benchmarks.{self._label}.txt"
+            [path],
+            f"fuchsia.netstack.iperf_benchmarks.{self._label}.txt",
+            test_data_module=test_data,
         )
 
     def _get_cpu_results(

@@ -807,6 +807,18 @@ class SubprocessResult(object):
     def stderr_text(self) -> str:
         return "\n".join(self.stderr)
 
+    def verbose_returncode(self, label: str) -> int:
+        """Prints any stdout/stderr, and returns only the exit code."""
+        if self.stdout:
+            print(f"---- {label}: stdout ----")
+            for line in self.stdout:
+                print(line)
+        if self.stderr:
+            print(f"---- {label}: stderr ----")
+            for line in self.stderr:
+                print(line)
+        return self.returncode
+
 
 async def _read_stream(
     stream: Optional[asyncio.StreamReader], callback: Callable[[bytes], None]

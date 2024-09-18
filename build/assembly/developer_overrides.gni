@@ -126,6 +126,23 @@ import("//build/python/python_action.gni")
 #       build, and is the label of the target that creates the file.
 #
 template("assembly_developer_overrides") {
+  assert(
+      current_toolchain == default_toolchain,
+      "Assembly developer overrides can only be defined in the default toolchain.")
+
+  _valid_overrides_dirs = [ "//local/*" ]
+  if (!label_matches(":$target_name",
+                     # //build/assembly/overrides is an internal implementation
+                     # detail of the product_assembly_overrides_contents GN
+                     # arg, and so it's added separately from the list so that
+                     # the list can also be used to print the valid locations
+                     # that are allowlisted for defining overrides.
+                     _valid_overrides_dirs + [ "//build/assembly/overrides:*" ])) {
+    assert(
+        false,
+        "Assembly developer overrides can only be added to the following directories, as they are for local use only. Contact the software assembly team if you need to define overrides that are checked into the tree to discuss your use-case: $_valid_overrides_dirs")
+  }
+
   labels = {
     # So it can be reused.
     target_name = target_name
@@ -376,8 +393,68 @@ declare_args() {
   #    }
   #  ]
   product_assembly_overrides = []
+
+  # This GN arg provides a short-hand mechanism for setting the developer overrides used by the
+  # "main" product assembly for a product.  If this is set, and there isn't a "main" product
+  # assembly defined, then a GN error will be generated.
+  product_assembly_overrides_label = false
+
+  # This GN arg allows the overrides template to be specified in-line within args.gn.  It is
+  # incompatible with the above 'product_assembly_overrides_label' argument.
+  #
+  # To use this, treat it like an 'assembly_developer_overrides()' template, and the corresponding
+  # template will be instantiated at `//build/assembly/overrides:inlined`, and set as the overrides
+  # for the "main" product assembly as if the following were set:
+  #
+  #   product_assembly_overrides_label = "//build/assembly/overrides:inlined"
+  #
+  product_assembly_overrides_contents = false
 }
 
+# If a value for 'product_assembly_overrides_contents' has been set, that will be used to configure
+# the //build/assembly/overrides:inlined target, so set that as if it were the label configured
+# via product_assembly_overrides_label.
+if (product_assembly_overrides_contents != false) {
+  # But not if 'product_assembly_overrides_label' has also been set.  These are mutally-exclusive.
+  assert(
+      product_assembly_overrides_label == false,
+      "Only one of 'product_assembly_overrides_label' and 'product_assembly_overrides_contents' can be used")
+
+  product_assembly_overrides_label = "//build/assembly/overrides:inlined"
+}
+
+# This is the list of overrides labels and matching assembly label patterns that are used by
+# assembled_system() and bazel_product_bundle().  The GN args set by the developer are used to
+# populate this with the correct information.
+all_product_assembly_overrides = []
+
+# If the override label for the "main" assembly is set, add that to the list of overrides.
+if (product_assembly_overrides_label != false) {
+  # create a temp scope for importing paths.gni into, so that we don't add 'labels' and 'files'
+  # to the places that import this (via assembled_system.gni).
+  _temp_scope = {
+    import("//build/images/paths.gni")
+  }
+
+  # extract 'labels' from the temp scope.
+  _temp_labels = _temp_scope.labels
+  if (_temp_scope.use_bazel_images_only) {
+    # For Bazel-assembled products we can directly set the assembly target that's matched against.
+    _assembly_pattern = _temp_labels.images
+  } else {
+    # For GN-assembled products, we'll use the wildcard on the directory to get the right one.
+    _assembly_pattern = get_label_info(_temp_labels.images, "dir") + ":*"
+  }
+
+  all_product_assembly_overrides += [
+    {
+      assembly = _assembly_pattern
+      overrides = product_assembly_overrides_label
+    },
+  ]
+}
+
+# Add the other pairs of overrides and assembly labels set by the developer.
 foreach(overrides_def, product_assembly_overrides) {
   assert(
       defined(overrides_def.assembly),
@@ -385,4 +462,6 @@ foreach(overrides_def, product_assembly_overrides) {
   assert(
       defined(overrides_def.overrides),
       "'product_assembly_overrides' must specify an overrides target using 'overrides'")
+
+  all_product_assembly_overrides += [ overrides_def ]
 }

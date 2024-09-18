@@ -14,12 +14,17 @@
 #include <lib/async/default.h>
 #include <lib/driver/incoming/cpp/namespace.h>
 #include <lib/driver/power/cpp/element-description-builder.h>
+#include <lib/driver/power/cpp/testing/fake_element_control.h>
+#include <lib/driver/power/cpp/testing/fake_topology.h>
+#include <lib/driver/power/cpp/testing/fidl_bound_server.h>
+#include <lib/driver/power/cpp/testing/scoped_background_loop.h>
 #include <lib/fidl/cpp/client.h>
 #include <lib/fidl/cpp/wire/channel.h>
 #include <lib/fidl/cpp/wire/internal/transport_channel.h>
 #include <lib/fidl/cpp/wire/status.h>
 #include <lib/fidl/cpp/wire/string_view.h>
 #include <lib/fidl/cpp/wire_natural_conversions.h>
+#include <lib/sys/component/cpp/testing/realm_builder.h>
 #include <lib/sys/component/cpp/testing/realm_builder_types.h>
 #include <lib/zx/event.h>
 #include <zircon/errors.h>
@@ -31,9 +36,6 @@
 
 #include <fbl/ref_ptr.h>
 #include <gtest/gtest.h>
-#include <sdk/lib/driver/power/cpp/testing/fake_topology.h>
-#include <sdk/lib/driver/power/cpp/testing/scoped_background_loop.h>
-#include <sdk/lib/sys/component/cpp/testing/realm_builder.h>
 #include <src/lib/testing/loop_fixture/real_loop_fixture.h>
 #include <src/storage/lib/vfs/cpp/pseudo_dir.h>
 #include <src/storage/lib/vfs/cpp/service.h>
@@ -43,7 +45,10 @@
 
 namespace power_lib_test {
 
-using fdf_power::testing::FakeTopology;
+using fdf_power::testing::FidlBoundServer;
+using FakeTopology = FidlBoundServer<fdf_power::testing::FakeTopology>;
+using FakeElementControl = FidlBoundServer<fdf_power::testing::FakeElementControl>;
+using fuchsia_power_broker::ElementControl;
 
 class PowerLibTest : public gtest::RealLoopFixture {};
 
@@ -181,7 +186,7 @@ TEST_F(PowerLibTest, TestLeaseHelper) {
   auto root = realm_builder.Build(async_get_default_dispatcher());
 
   fidl::Endpoints<fuchsia_power_broker::Topology> power_broker =
-      fidl::CreateEndpoints<fuchsia_power_broker::Topology>().value();
+      fidl::Endpoints<fuchsia_power_broker::Topology>::Create();
   zx_status_t connect_result =
       root.component().Connect("fuchsia.power.broker.Topology", power_broker.server.TakeChannel());
   ASSERT_EQ(ZX_OK, connect_result);
@@ -261,7 +266,7 @@ TEST_F(PowerLibTest, TestLeaseHelper) {
 /// expect CreateLeaseHelper to return an appropriate error.
 TEST_F(PowerLibTest, TestCreateLeaseHelperWithClosedChannel) {
   fidl::Endpoints<fuchsia_power_broker::Topology> power_broker =
-      fidl::CreateEndpoints<fuchsia_power_broker::Topology>().value();
+      fidl::Endpoints<fuchsia_power_broker::Topology>::Create();
   power_broker.server.TakeChannel().reset();
 
   zx::event not_registered;
@@ -302,7 +307,7 @@ TEST_F(PowerLibTest, TestCreateLeaseHelperWithInvalidToken) {
   auto root = realm_builder.Build(async_get_default_dispatcher());
 
   fidl::Endpoints<fuchsia_power_broker::Topology> power_broker =
-      fidl::CreateEndpoints<fuchsia_power_broker::Topology>().value();
+      fidl::Endpoints<fuchsia_power_broker::Topology>::Create();
   zx_status_t connect_result =
       root.component().Connect("fuchsia.power.broker.Topology", power_broker.server.TakeChannel());
   ASSERT_EQ(ZX_OK, connect_result);
@@ -335,10 +340,10 @@ TEST_F(PowerLibTest, TestCreateLeaseHelperWithInvalidToken) {
 TEST_F(PowerLibTest, TestElementRunner) {
   // Make the current and required levels channels
   fidl::Endpoints<fuchsia_power_broker::RequiredLevel> required_level_channel =
-      fidl::CreateEndpoints<fuchsia_power_broker::RequiredLevel>().value();
+      fidl::Endpoints<fuchsia_power_broker::RequiredLevel>::Create();
 
   fidl::Endpoints<fuchsia_power_broker::CurrentLevel> current_level_channel =
-      fidl::CreateEndpoints<fuchsia_power_broker::CurrentLevel>().value();
+      fidl::Endpoints<fuchsia_power_broker::CurrentLevel>::Create();
 
   // Set up flags so we verify that all checks are done before we exit.
   bool cls_done = false;
@@ -397,10 +402,10 @@ TEST_F(PowerLibTest, TestElementRunner) {
 /// the client side.
 TEST_F(PowerLibTest, TestElementRunnerManualSet) {
   fidl::Endpoints<fuchsia_power_broker::RequiredLevel> required_level_channel =
-      fidl::CreateEndpoints<fuchsia_power_broker::RequiredLevel>().value();
+      fidl::Endpoints<fuchsia_power_broker::RequiredLevel>::Create();
 
   fidl::Endpoints<fuchsia_power_broker::CurrentLevel> current_level_channel =
-      fidl::CreateEndpoints<fuchsia_power_broker::CurrentLevel>().value();
+      fidl::Endpoints<fuchsia_power_broker::CurrentLevel>::Create();
 
   // Set up the required level servers
   // For this test we don't want to ask the client to change any levels
@@ -480,21 +485,33 @@ TEST_F(PowerLibTest, AddElementNoDep) {
   // Make the fake power broker
   fdf_power::testing::ScopedBackgroundLoop loop;
   fidl::Endpoints<fuchsia_power_broker::Topology> endpoints =
-      fidl::CreateEndpoints<fuchsia_power_broker::Topology>().value();
+      fidl::Endpoints<fuchsia_power_broker::Topology>::Create();
   FakeTopology fake_power_broker(loop.dispatcher(), std::move(endpoints.server));
+  std::unique_ptr<FakeElementControl> fake_element_control(nullptr);
   loop.executor().schedule_task(fake_power_broker.TakeSchemaPromise().then(
-      [](fpromise::result<fuchsia_power_broker::ElementSchema, void>& result) {
+      [&loop,
+       &fake_element_control](fpromise::result<fuchsia_power_broker::ElementSchema, void>& result) {
         EXPECT_TRUE(result.is_ok());
         EXPECT_TRUE(result.value().dependencies().has_value());
         ASSERT_EQ(result.value().dependencies()->size(), static_cast<size_t>(0));
+
+        std::optional<fidl::ServerEnd<ElementControl>>& ec = result.value().element_control();
+        EXPECT_TRUE(ec.has_value());
+        fake_element_control =
+            std::make_unique<FakeElementControl>(loop.dispatcher(), std::move(ec.value()));
       }));
 
   // Call add element
-  zx::event invalid, invalid2;
+  fidl::Endpoints<fuchsia_power_broker::ElementControl> element_control =
+      fidl::Endpoints<fuchsia_power_broker::ElementControl>::Create();
+  zx::event invalid1, invalid2;
   auto call_result =
-      fdf_power::AddElement(endpoints.client, df_config, std::move(tokens), invalid.borrow(),
-                            invalid2.borrow(), std::nullopt, std::nullopt, std::nullopt);
+      fdf_power::AddElement(endpoints.client, df_config, std::move(tokens), invalid1.borrow(),
+                            invalid2.borrow(), std::nullopt, std::nullopt,
+                            std::move(element_control.server), element_control.client.borrow());
   ASSERT_TRUE(call_result.is_ok());
+
+  RunLoopUntil([&fake_element_control] { return fake_element_control != nullptr; });
 }
 
 /// Add an element which has a has multiple level dependencies on a single
@@ -549,15 +566,21 @@ TEST_F(PowerLibTest, AddElementSingleDep) {
   // Make the fake power broker
   fdf_power::testing::ScopedBackgroundLoop loop;
   fidl::Endpoints<fuchsia_power_broker::Topology> endpoints =
-      fidl::CreateEndpoints<fuchsia_power_broker::Topology>().value();
+      fidl::Endpoints<fuchsia_power_broker::Topology>::Create();
+  std::unique_ptr<FakeElementControl> fake_element_control(nullptr);
   FakeTopology fake_power_broker(loop.dispatcher(), std::move(endpoints.server));
   loop.executor().schedule_task(fake_power_broker.TakeSchemaPromise().then(
       [parent_token = std::move(parent_token),
-       child_to_parent_levels = std::move(child_to_parent_levels)](
+       child_to_parent_levels = std::move(child_to_parent_levels), &loop, &fake_element_control](
           fpromise::result<fuchsia_power_broker::ElementSchema, void>& result) mutable {
         EXPECT_TRUE(result.is_ok());
         EXPECT_TRUE(result.value().dependencies().has_value());
         ASSERT_EQ(result.value().dependencies()->size(), static_cast<size_t>(2));
+
+        std::optional<fidl::ServerEnd<ElementControl>>& ec = result.value().element_control();
+        EXPECT_TRUE(ec.has_value());
+        fake_element_control =
+            std::make_unique<FakeElementControl>(loop.dispatcher(), std::move(ec.value()));
 
         // Since both power levels dependended on the same parent power element
         // that both access tokens match the one we made in the test.
@@ -576,10 +599,15 @@ TEST_F(PowerLibTest, AddElementSingleDep) {
 
   // Call add element
   zx::event invalid1, invalid2;
+  fidl::Endpoints<fuchsia_power_broker::ElementControl> element_control =
+      fidl::Endpoints<fuchsia_power_broker::ElementControl>::Create();
   auto call_result =
       fdf_power::AddElement(endpoints.client, df_config, std::move(tokens), invalid1.borrow(),
-                            invalid2.borrow(), std::nullopt, std::nullopt, std::nullopt);
+                            invalid2.borrow(), std::nullopt, std::nullopt,
+                            std::move(element_control.server), element_control.client.borrow());
   ASSERT_TRUE(call_result.is_ok());
+
+  RunLoopUntil([&fake_element_control] { return fake_element_control != nullptr; });
 }
 
 /// Add an element that has dependencies on two different parent elements.
@@ -657,16 +685,23 @@ TEST_F(PowerLibTest, AddElementDoubleDep) {
   // Make the fake power broker
   fdf_power::testing::ScopedBackgroundLoop loop;
   fidl::Endpoints<fuchsia_power_broker::Topology> endpoints =
-      fidl::CreateEndpoints<fuchsia_power_broker::Topology>().value();
+      fidl::Endpoints<fuchsia_power_broker::Topology>::Create();
+  std::unique_ptr<FakeElementControl> fake_element_control(nullptr);
   FakeTopology fake_power_broker(loop.dispatcher(), std::move(endpoints.server));
   loop.executor().schedule_task(fake_power_broker.TakeSchemaPromise().then(
       [parent_token_one = std::move(parent_token_one),
        parent_token_two = std::move(parent_token_two),
-       child_to_parent_levels = std::move(child_to_parent_levels), dep_one_level = dep_one_level](
+       child_to_parent_levels = std::move(child_to_parent_levels), dep_one_level = dep_one_level,
+       &loop, &fake_element_control](
           fpromise::result<fuchsia_power_broker::ElementSchema, void>& result) mutable {
         EXPECT_TRUE(result.is_ok());
         EXPECT_TRUE(result.value().dependencies().has_value());
         ASSERT_EQ(result.value().dependencies()->size(), static_cast<size_t>(2));
+
+        std::optional<fidl::ServerEnd<ElementControl>>& ec = result.value().element_control();
+        EXPECT_TRUE(ec.has_value());
+        fake_element_control =
+            std::make_unique<FakeElementControl>(loop.dispatcher(), std::move(ec.value()));
 
         // Since both power levels dependended on the same parent power element
         // that both access tokens match the one we made in the test
@@ -695,10 +730,15 @@ TEST_F(PowerLibTest, AddElementDoubleDep) {
 
   // Call add element
   zx::event invalid1, invalid2;
+  fidl::Endpoints<fuchsia_power_broker::ElementControl> element_control =
+      fidl::Endpoints<fuchsia_power_broker::ElementControl>::Create();
   auto call_result =
       fdf_power::AddElement(endpoints.client, df_config, std::move(tokens), invalid1.borrow(),
-                            invalid2.borrow(), std::nullopt, std::nullopt, std::nullopt);
+                            invalid2.borrow(), std::nullopt, std::nullopt,
+                            std::move(element_control.server), element_control.client.borrow());
   ASSERT_TRUE(call_result.is_ok());
+
+  RunLoopUntil([&fake_element_control] { return fake_element_control != nullptr; });
 }
 
 /// Check that a power element with two levels, dependent on two different
@@ -794,7 +834,7 @@ TEST_F(PowerLibTest, GetTokensNoTokens) {
   fbl::RefPtr<fs::PseudoDir> empty_dir = fbl::MakeRefCounted<fs::PseudoDir>();
   fs::SynchronousVfs vfs(loop.dispatcher());
   fidl::Endpoints<fuchsia_io::Directory> dir_endpoints =
-      fidl::CreateEndpoints<fuchsia_io::Directory>().value();
+      fidl::Endpoints<fuchsia_io::Directory>::Create();
   vfs.ServeDirectory(std::move(empty_dir), std::move(dir_endpoints.server));
 
   fdf_power::PowerLevel one{.level = 1, .name = "one", .transitions{}};
@@ -837,7 +877,7 @@ TEST_F(PowerLibTest, GetTokensOneDepOneLevel) {
 
   fs::SynchronousVfs vfs(loop.dispatcher());
   fidl::Endpoints<fuchsia_io::Directory> dir_endpoints =
-      fidl::CreateEndpoints<fuchsia_io::Directory>().value();
+      fidl::Endpoints<fuchsia_io::Directory>::Create();
   vfs.ServeDirectory(std::move(power_token_service), std::move(dir_endpoints.server));
 
   // Specify the power element
@@ -911,7 +951,7 @@ TEST_F(PowerLibTest, GetTokensOneDepTwoLevels) {
 
   fs::SynchronousVfs vfs(loop.dispatcher());
   fidl::Endpoints<fuchsia_io::Directory> dir_endpoints =
-      fidl::CreateEndpoints<fuchsia_io::Directory>().value();
+      fidl::Endpoints<fuchsia_io::Directory>::Create();
   vfs.ServeDirectory(std::move(namespace_svc_dir), std::move(dir_endpoints.server));
 
   // Specify the power element
@@ -996,7 +1036,7 @@ TEST_F(PowerLibTest, GetTokensTwoDepTwoLevels) {
 
   fs::SynchronousVfs vfs(loop.dispatcher());
   fidl::Endpoints<fuchsia_io::Directory> dir_endpoints =
-      fidl::CreateEndpoints<fuchsia_io::Directory>().value();
+      fidl::Endpoints<fuchsia_io::Directory>::Create();
   vfs.ServeDirectory(std::move(power_token_service), std::move(dir_endpoints.server));
 
   // Specify the power element
@@ -1145,17 +1185,23 @@ TEST_F(PowerLibTest, ApplyPowerConfiguration) {
   // Make the fake power broker
   std::vector<FakeTopology> fake_power_brokers;
   async::Executor executor(loop.dispatcher());
+  std::unique_ptr<FakeElementControl> fake_element_control(nullptr);
   fbl::RefPtr<fs::Service> topology = fbl::MakeRefCounted<fs::Service>(
-      [&fake_power_brokers, &loop, &executor, &instance_one_data,
+      [&loop, &executor, &fake_power_brokers, &fake_element_control, &instance_one_data,
        &instance_two_data](fidl::ServerEnd<fuchsia_power_broker::Topology> chan) -> int {
         fake_power_brokers.emplace_back(loop.dispatcher(), std::move(chan));
         executor.schedule_task(fake_power_brokers.back().TakeSchemaPromise().then(
-            [&instance_one_data, &instance_two_data](
+            [&instance_one_data, &instance_two_data, &loop, &fake_element_control](
                 fpromise::result<fuchsia_power_broker::ElementSchema, void>& result) {
               EXPECT_TRUE(result.is_ok());
               auto& received_deps = result.value().dependencies();
               EXPECT_TRUE(received_deps.has_value());
               ASSERT_EQ(received_deps->size(), static_cast<size_t>(2));
+
+              std::optional<fidl::ServerEnd<ElementControl>>& ec = result.value().element_control();
+              EXPECT_TRUE(ec.has_value());
+              fake_element_control =
+                  std::make_unique<FakeElementControl>(loop.dispatcher(), std::move(ec.value()));
 
               // Get handle info for the dependency tokens of the service instances
               zx_info_handle_basic_t dep_token_one_info, dep_token_two_info;
@@ -1202,7 +1248,7 @@ TEST_F(PowerLibTest, ApplyPowerConfiguration) {
   // Create the namespace
   fs::SynchronousVfs vfs(loop.dispatcher());
   fidl::Endpoints<fuchsia_io::Directory> dir_endpoints =
-      fidl::CreateEndpoints<fuchsia_io::Directory>().value();
+      fidl::Endpoints<fuchsia_io::Directory>::Create();
   vfs.ServeDirectory(std::move(svcs_dir), std::move(dir_endpoints.server));
   std::vector<fuchsia_component_runner::ComponentNamespaceEntry> namespace_entries;
   namespace_entries.emplace_back(fuchsia_component_runner::ComponentNamespaceEntry{
@@ -1214,6 +1260,7 @@ TEST_F(PowerLibTest, ApplyPowerConfiguration) {
   // Now we've done all that, do the call and check that we get one thing back
   ASSERT_EQ(fdf_power::ApplyPowerConfiguration(ns, configs).value().size(), static_cast<size_t>(1));
 
+  RunLoopUntil([&fake_element_control] { return fake_element_control != nullptr; });
   loop.Shutdown();
   loop.JoinThreads();
 
@@ -1249,7 +1296,7 @@ TEST_F(PowerLibTest, GetTokensOneLevelTwoDeps) {
 
   fs::SynchronousVfs vfs(loop.dispatcher());
   fidl::Endpoints<fuchsia_io::Directory> dir_endpoints =
-      fidl::CreateEndpoints<fuchsia_io::Directory>().value();
+      fidl::Endpoints<fuchsia_io::Directory>::Create();
   vfs.ServeDirectory(std::move(power_token_service), std::move(dir_endpoints.server));
 
   // Specify the power element
@@ -1390,7 +1437,7 @@ TEST_F(PowerLibTest, TestSagElements) {
   fs::SynchronousVfs vfs(loop.dispatcher());
 
   fidl::Endpoints<fuchsia_io::Directory> dir_endpoints =
-      fidl::CreateEndpoints<fuchsia_io::Directory>().value();
+      fidl::Endpoints<fuchsia_io::Directory>::Create();
   vfs.ServeDirectory(std::move(svcs_dir), std::move(dir_endpoints.server));
   std::vector<fuchsia_component_runner::ComponentNamespaceEntry> namespace_entries;
   namespace_entries.emplace_back(fuchsia_component_runner::ComponentNamespaceEntry{
@@ -1485,7 +1532,7 @@ TEST_F(PowerLibTest, TestDriverAndSagElements) {
   svcs_dir->AddEntry(fuchsia_hardware_power::PowerTokenService::Name, power_token_service);
 
   fidl::Endpoints<fuchsia_io::Directory> dir_endpoints =
-      fidl::CreateEndpoints<fuchsia_io::Directory>().value();
+      fidl::Endpoints<fuchsia_io::Directory>::Create();
 
   vfs.ServeDirectory(std::move(svcs_dir), std::move(dir_endpoints.server));
 
@@ -1576,7 +1623,7 @@ TEST_F(PowerLibTest, TestDriverInstanceDep) {
   svcs_dir->AddEntry(fuchsia_hardware_power::PowerTokenService::Name, power_token_service);
 
   fidl::Endpoints<fuchsia_io::Directory> dir_endpoints =
-      fidl::CreateEndpoints<fuchsia_io::Directory>().value();
+      fidl::Endpoints<fuchsia_io::Directory>::Create();
 
   fs::SynchronousVfs vfs(loop.dispatcher());
   vfs.ServeDirectory(std::move(svcs_dir), std::move(dir_endpoints.server));

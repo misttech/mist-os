@@ -5,7 +5,7 @@
 """Repository rules used to populate Clang-based repositories."""
 
 load(
-    "@fuchsia_sdk_common//:toolchains/clang/repository_utils.bzl",
+    "@fuchsia_sdk_common//common:toolchains/clang/repository_utils.bzl",
     "prepare_clang_repository",
 )
 
@@ -34,6 +34,11 @@ def _generate_prebuilt_clang_toolchain_impl(repo_ctx):
     repo_ctx.symlink(
         workspace_dir + "/build/bazel/toolchains/clang/prebuilt_clang.BUILD.bazel",
         "BUILD.bazel",
+    )
+
+    repo_ctx.symlink(
+        workspace_dir + "/build/bazel_sdk/bazel_rules_fuchsia/common",
+        "common",
     )
 
 generate_prebuilt_clang_toolchain_repository = repository_rule(

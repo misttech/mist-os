@@ -165,6 +165,7 @@ impl Socket {
     }
 
     /// Write the given bytes into the socket.
+    ///
     /// Return value (on success) is number of bytes actually written.
     ///
     /// Wraps
@@ -173,21 +174,52 @@ impl Socket {
         self.write_opts(bytes, SocketWriteOpts::default())
     }
 
+    /// Write the given bytes into the socket.
+    ///
+    /// Return value (on success) is number of bytes actually written.
+    ///
+    /// # Safety
+    ///
+    /// `bytes` must be valid to read from for `len` bytes.
+    ///
+    /// Wraps
+    /// [zx_socket_write](https://fuchsia.dev/fuchsia-src/reference/syscalls/socket_write.md).
+    pub unsafe fn write_raw(&self, bytes: *const u8, len: usize) -> Result<usize, Status> {
+        // SAFETY: our caller is responsible for upholding this call's invariants
+        unsafe { self.write_raw_opts(bytes, len, SocketWriteOpts::default()) }
+    }
+
     /// Write the given bytes into the socket, with options.
+    ///
     /// Return value (on success) is number of bytes actually written.
     ///
     /// Wraps
     /// [zx_socket_write](https://fuchsia.dev/fuchsia-src/reference/syscalls/socket_write.md).
     pub fn write_opts(&self, bytes: &[u8], opts: SocketWriteOpts) -> Result<usize, Status> {
+        // SAFETY: this slice is valid to read from for `len` bytes.
+        unsafe { self.write_raw_opts(bytes.as_ptr(), bytes.len(), opts) }
+    }
+
+    /// Write the given bytes into the socket, with options.
+    ///
+    /// Return value (on success) is number of bytes actually written.
+    ///
+    /// # Safety
+    ///
+    /// `bytes` must be valid to read from for `len` bytes.
+    ///
+    /// Wraps
+    /// [zx_socket_write](https://fuchsia.dev/fuchsia-src/reference/syscalls/socket_write.md).
+    pub unsafe fn write_raw_opts(
+        &self,
+        bytes: *const u8,
+        len: usize,
+        opts: SocketWriteOpts,
+    ) -> Result<usize, Status> {
         let mut actual = 0;
+        // SAFETY: this is an FFI call and our caller is responsible for upholding pointer validity.
         let status = unsafe {
-            sys::zx_socket_write(
-                self.raw_handle(),
-                opts.bits(),
-                bytes.as_ptr(),
-                bytes.len(),
-                &mut actual,
-            )
+            sys::zx_socket_write(self.raw_handle(), opts.bits(), bytes, len, &mut actual)
         };
         ok(status).map(|()| actual)
     }
@@ -207,16 +239,45 @@ impl Socket {
     /// Wraps
     /// [zx_socket_read](https://fuchsia.dev/fuchsia-src/reference/syscalls/socket_read.md).
     pub fn read_opts(&self, bytes: &mut [u8], opts: SocketReadOpts) -> Result<usize, Status> {
+        // SAFETY: `bytes` is valid to write to for its whole length.
+        unsafe { self.read_raw_opts(bytes.as_mut_ptr(), bytes.len(), opts) }
+    }
+
+    /// Read the given bytes from the socket.
+    ///
+    /// Return value (on success) is number of bytes actually read.
+    ///
+    /// # Safety
+    ///
+    /// `bytes` must be valid to write to for `len` bytes.
+    ///
+    /// Wraps
+    /// [zx_socket_read](https://fuchsia.dev/fuchsia-src/reference/syscalls/socket_read.md).
+    pub unsafe fn read_raw(&self, bytes: *mut u8, len: usize) -> Result<usize, Status> {
+        // SAFETY: our caller is responsible for this call's invariants
+        unsafe { self.read_raw_opts(bytes, len, SocketReadOpts::default()) }
+    }
+
+    /// Read the given bytes from the socket, with options.
+    ///
+    /// Return value (on success) is number of bytes actually read.
+    ///
+    /// # Safety
+    ///
+    /// `bytes` must be valid to write to for `len` bytes.
+    ///
+    /// Wraps
+    /// [zx_socket_read](https://fuchsia.dev/fuchsia-src/reference/syscalls/socket_read.md).
+    pub unsafe fn read_raw_opts(
+        &self,
+        bytes: *mut u8,
+        len: usize,
+        opts: SocketReadOpts,
+    ) -> Result<usize, Status> {
         let mut actual = 0;
-        let status = unsafe {
-            sys::zx_socket_read(
-                self.raw_handle(),
-                opts.bits(),
-                bytes.as_mut_ptr(),
-                bytes.len(),
-                &mut actual,
-            )
-        };
+        // SAFETY: our caller is responsible for upholding pointer invariants.
+        let status =
+            unsafe { sys::zx_socket_read(self.raw_handle(), opts.bits(), bytes, len, &mut actual) };
         ok(status).map(|()| actual)
     }
 
@@ -235,30 +296,15 @@ impl Socket {
         bytes: &'a mut [MaybeUninit<u8>],
         opts: SocketReadOpts,
     ) -> Result<&'a mut [u8], Status> {
-        let mut actual = 0;
-        let status = unsafe {
-            sys::zx_socket_read(
-                self.raw_handle(),
-                opts.bits(),
-                // TODO(https://fxbug.dev/42079723) use
-                // MaybeUninit::slice_as_mut_ptr when stable.
-                bytes.as_mut_ptr() as *mut u8,
-                bytes.len(),
-                &mut actual,
-            )
-        };
-        ok(status).map(|()| {
-            // TODO(https://fxbug.dev/42079723) use
-            // MaybeUninit::slice_assume_init_mut when stable.
-            //
-            // SAFETY: We're transforming subslice of &mut [MaybeUninit<u8>] to
-            // &mut [u8], which is only valid to do if `actual` elements of
-            // `bytes` have actually been initialized. Here we have to trust
-            // that the kernel didn't lie when it says it wrote `actual` bytes,
-            // but as long as that assumption is valid them it's safe to assume
-            // this subslice is initialized.
-            unsafe { std::slice::from_raw_parts_mut(bytes.as_mut_ptr() as *mut u8, actual) }
-        })
+        // SAFETY: `bytes` is valid to write to for its whole length.
+        // TODO(https://fxbug.dev/42079723) use MaybeUninit::slice_as_mut_ptr when stable.
+        let actual =
+            unsafe { self.read_raw_opts(bytes.as_mut_ptr() as *mut u8, bytes.len(), opts)? };
+        let (valid, _uninit) = bytes.split_at_mut(actual);
+
+        // SAFETY: the kernel has initialized all of `valid`'s bytes.
+        // TODO(https://fxbug.dev/42079723) use MaybeUninit::slice_assume_init_mut when stable.
+        Ok(unsafe { std::slice::from_raw_parts_mut(valid.as_mut_ptr() as *mut u8, valid.len()) })
     }
 
     /// Close half of the socket, so attempts by the other side to write will fail.

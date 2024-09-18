@@ -70,9 +70,9 @@ trace_provider_library("trace-provider") {
   enable_fdio_support = true
   sources = [ "start.cc" ]
   deps = [
-    "//zircon/system/ulib/async-loop",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
+    "//sdk/lib/async-loop",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//zircon/system/ulib/sync",
     "//zircon/system/ulib/trace",
   ]
@@ -121,8 +121,8 @@ trace_provider_library("trace-provider-with-static-engine") {
   # besides libc).
   enable_fdio_support = false
   assert_no_deps = [
+    "//sdk/lib/async-default",
     "//sdk/lib/fdio",
-    "//zircon/system/ulib/async-default",
   ]
 }
 

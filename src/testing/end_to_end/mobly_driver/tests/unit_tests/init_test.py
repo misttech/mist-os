@@ -3,7 +3,6 @@
 # found in the LICENSE file.
 """Unit tests for Mobly driver's __init__.py."""
 
-import os
 import subprocess
 import unittest
 from typing import Any
@@ -155,29 +154,3 @@ class MoblyDriverLibTest(unittest.TestCase):
             universal_newlines=mock.ANY,
             env=mock.ANY,
         )
-
-    @mock.patch("builtins.print")
-    @mock.patch("subprocess.Popen")
-    def test_run_updates_env_with_testdata_dir(
-        self, mock_popen: Any, *unused_args: Any
-    ) -> None:
-        """Test case to ensure env is updated when test_data_path is provided"""
-        self.mock_process.wait.return_value = 0
-        mock_popen.return_value.__enter__.return_value = self.mock_process
-
-        env = {"PATH": "/system/path"}
-        with mock.patch.dict(os.environ, env, clear=True):
-            mobly_driver.run(
-                self.mock_driver,
-                "/py/path",
-                "/test/path",
-                test_data_path="/test_data/path",
-            )
-            mock_popen.assert_called_once_with(
-                mock.ANY,
-                universal_newlines=mock.ANY,
-                env={
-                    "PATH": "/test_data/path:/system/path",
-                    "PYTHONUNBUFFERED": "1",
-                },
-            )

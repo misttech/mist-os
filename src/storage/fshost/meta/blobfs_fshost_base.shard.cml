@@ -23,7 +23,6 @@
         {
             protocol: [
                 "fuchsia.boot.WriteOnlyLog",
-                "fuchsia.device.manager.Administrator",
                 "fuchsia.kernel.VmexResource",
                 "fuchsia.scheduler.RoleManager",
             ],

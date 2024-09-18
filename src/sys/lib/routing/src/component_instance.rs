@@ -289,14 +289,6 @@ impl<C: ComponentInstanceInterface> From<&Arc<C>> for WeakComponentInstanceInter
     }
 }
 
-impl<C: ComponentInstanceInterface + 'static> From<WeakComponentInstanceInterface<C>>
-    for WeakInstanceToken
-{
-    fn from(weak_component: WeakComponentInstanceInterface<C>) -> WeakInstanceToken {
-        WeakExtendedInstanceInterface::Component(weak_component).into()
-    }
-}
-
 impl<C: ComponentInstanceInterface + 'static> TryFrom<WeakInstanceToken>
     for WeakComponentInstanceInterface<C>
 {
@@ -380,14 +372,6 @@ impl<C: ComponentInstanceInterface> From<&ExtendedInstanceInterface<C>>
                 WeakExtendedInstanceInterface::AboveRoot(Arc::downgrade(top_instance))
             }
         }
-    }
-}
-
-impl<C: ComponentInstanceInterface + 'static> From<WeakExtendedInstanceInterface<C>>
-    for WeakInstanceToken
-{
-    fn from(weak_self: WeakExtendedInstanceInterface<C>) -> WeakInstanceToken {
-        WeakInstanceToken { inner: Arc::new(weak_self) }
     }
 }
 

@@ -75,6 +75,7 @@ group("non_hermetic_deps") {
   # in the action_tracer.py due to how it cleans it's dynamic outputs.
   visibility += [
     "//boards/*",
+    "//build/assembly/overrides/*",
     "//bundles/assembly/*",
     "//local/*",
   ]
@@ -255,7 +256,10 @@ group("non_hermetic_deps") {
 
   # TODO(https://fxbug.dev/331492588): Template driver example wraps Bazel output in Ninja, and
   # depends on non_hermetic_deps.
-  visibility += [ "////examples/drivers/template:*" ]
+  visibility += [
+    "//examples/drivers/simple/dfv2:*",
+    "//examples/drivers/template:*",
+  ]
 }
 
 # Build targets that use the legacy zx_library and zx_host_tool templates
@@ -395,7 +399,6 @@ group("deprecated_zx_wrapper_allowlist") {
     "//zircon/system/ulib/sync:*",
     "//zircon/system/ulib/sysconfig-client:*",
     "//zircon/system/ulib/syslog:*",
-    "//zircon/system/ulib/sysmem-connector:*",
     "//zircon/system/ulib/sysmem-version:*",
     "//zircon/system/ulib/task-utils:*",
     "//zircon/system/ulib/test-exceptions:*",

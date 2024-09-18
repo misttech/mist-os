@@ -22,7 +22,7 @@ class SegmentManagerTest : public F2fsFakeDevTestFixture {
 
  protected:
   void MakeDirtySegments(size_t invalidate_ratio, int num_files) {
-    fs_->GetGcManager().DisableFgGc();
+    fs_->GetSegmentManager().DisableFgGc();
     for (int file_no = 0; file_no < num_files; ++file_no) {
       zx::result test_file = root_dir_->Create(std::to_string(file_num++), fs::CreationType::kFile);
       ASSERT_TRUE(test_file.is_ok()) << test_file.status_string();
@@ -38,7 +38,7 @@ class SegmentManagerTest : public F2fsFakeDevTestFixture {
       vnode->Close();
     }
     fs_->SyncFs();
-    fs_->GetGcManager().EnableFgGc();
+    fs_->GetSegmentManager().EnableFgGc();
   }
 
  private:
@@ -127,13 +127,13 @@ TEST_F(SegmentManagerTest, BalanceFs) TA_NO_THREAD_SAFETY_ANALYSIS {
   uint32_t nfree_segs = fs_->GetSegmentManager().FreeSegments();
 
   fs_->ClearOnRecovery();
-  fs_->GetSegmentManager().BalanceFs();
+  fs_->BalanceFs();
 
   ASSERT_EQ(fs_->GetSegmentManager().FreeSegments(), nfree_segs);
   ASSERT_FALSE(fs_->GetSegmentManager().PrefreeSegments());
 
   fs_->SetOnRecovery();
-  fs_->GetSegmentManager().BalanceFs();
+  fs_->BalanceFs();
 
   ASSERT_EQ(fs_->GetSegmentManager().FreeSegments(), nfree_segs);
   ASSERT_FALSE(fs_->GetSegmentManager().PrefreeSegments());

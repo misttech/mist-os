@@ -133,7 +133,7 @@ VK_TEST_F(DisplayTest, SetAllConstraintsTest) {
   // Register the collection with the renderer, which sets the vk constraints.
   const auto collection_id = allocation::GenerateUniqueBufferCollectionId();
   const fuchsia_hardware_display::BufferCollectionId display_collection_id =
-      allocation::ToDisplayBufferCollectionId(collection_id);
+      scenic_impl::ToDisplayFidlBufferCollectionId(collection_id);
   auto image_id = allocation::GenerateUniqueImageId();
   auto result = renderer.ImportBufferCollection(
       collection_id, sysmem_allocator_.get(), std::move(tokens.dup_token),
@@ -224,7 +224,7 @@ VK_TEST_F(DisplayTest, SetAllConstraintsTest) {
                   .buffer_collection_id = display_collection_id,
                   .buffer_index = 0,
               }},
-              .image_id = allocation::ToFidlImageId(display_image_id),
+              .image_id = scenic_impl::ToDisplayFidlImageId(display_image_id),
           }});
   EXPECT_TRUE(import_image_result.is_ok())
       << "Failed to call FIDL ImportImage: " << import_image_result.error_value();
@@ -265,7 +265,7 @@ VK_TEST_F(DisplayTest, SetDisplayImageTest) {
   auto global_collection_id = allocation::GenerateUniqueBufferCollectionId();
   ASSERT_NE(global_collection_id, ZX_KOID_INVALID);
   const fuchsia_hardware_display::BufferCollectionId display_collection_id =
-      allocation::ToDisplayBufferCollectionId(global_collection_id);
+      scenic_impl::ToDisplayFidlBufferCollectionId(global_collection_id);
 
   fidl::ClientEnd<fuchsia_sysmem2::BufferCollectionToken> dup_token(
       std::move(tokens.dup_token).Unbind().TakeChannel());
@@ -293,7 +293,7 @@ VK_TEST_F(DisplayTest, SetDisplayImageTest) {
                     .buffer_collection_id = display_collection_id,
                     .buffer_index = i,
                 }},
-                .image_id = allocation::ToFidlImageId(image_ids[i]),
+                .image_id = scenic_impl::ToDisplayFidlImageId(image_ids[i]),
             }});
     ASSERT_TRUE(import_image_result.is_ok())
         << "Failed to call FIDL ImportImage: " << import_image_result.error_value();
@@ -339,7 +339,7 @@ VK_TEST_F(DisplayTest, SetDisplayImageTest) {
       (*display_coordinator)
           ->SetLayerImage({{
               .layer_id = layer_id,
-              .image_id = allocation::ToFidlImageId(image_ids[0]),
+              .image_id = scenic_impl::ToDisplayFidlImageId(image_ids[0]),
               .wait_event_id = scenic_impl::DisplayEventId(kInvalidEventId),
               .signal_event_id = display_signal_event_id,
           }});
@@ -369,7 +369,7 @@ VK_TEST_F(DisplayTest, SetDisplayImageTest) {
       (*display_coordinator)
           ->SetLayerImage({{
               .layer_id = layer_id,
-              .image_id = allocation::ToFidlImageId(image_ids[1]),
+              .image_id = scenic_impl::ToDisplayFidlImageId(image_ids[1]),
               .wait_event_id = display_wait_event_id,
               .signal_event_id = scenic_impl::DisplayEventId(kInvalidEventId),
           }});

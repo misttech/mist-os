@@ -12,9 +12,10 @@ use crate::object_store::extent_record::{
     ExtentKey, ExtentKeyPartitionIterator, ExtentKeyV32, ExtentValue, ExtentValueV32,
     ExtentValueV37, ExtentValueV38,
 };
-use crate::serialized_types::{migrate_to_version, Migrate, Versioned};
+use crate::serialized_types::{migrate_nodefault, migrate_to_version, Migrate, Versioned};
 use fprint::TypeFingerprint;
-use fxfs_crypto::WrappedKeysV32;
+use fxfs_crypto::{WrappedKeysV32, WrappedKeysV40};
+use fxfs_unicode::CasefoldString;
 use rustc_hash::FxHasher;
 use serde::{Deserialize, Serialize};
 use std::default::Default;
@@ -51,13 +52,13 @@ pub enum ProjectPropertyV32 {
     Usage,
 }
 
-pub type ObjectKeyData = ObjectKeyDataV32;
+pub type ObjectKeyData = ObjectKeyDataV40;
 
 #[derive(
     Clone, Debug, Eq, Hash, PartialEq, PartialOrd, Ord, Serialize, Deserialize, TypeFingerprint,
 )]
 #[cfg_attr(fuzz, derive(arbitrary::Arbitrary))]
-pub enum ObjectKeyDataV32 {
+pub enum ObjectKeyDataV40 {
     /// A generic, untyped object.  This must come first and sort before all other keys for a given
     /// object because it's also used as a tombstone and it needs to merge with all following keys.
     Object,
@@ -66,7 +67,6 @@ pub enum ObjectKeyDataV32 {
     /// An attribute associated with an object.  It has a 64-bit ID.
     Attribute(u64, AttributeKeyV32),
     /// A child of a directory.
-    /// We store the filename as a case-preserving unicode string.
     Child { name: String },
     /// A graveyard entry for an entire object.
     GraveyardEntry { object_id: u64 },
@@ -78,6 +78,24 @@ pub enum ObjectKeyDataV32 {
     /// attribute, which has a maximum size of 255 bytes enforced by fuchsia.io.
     ExtendedAttribute { name: Vec<u8> },
     /// A graveyard entry for an attribute.
+    GraveyardAttributeEntry { object_id: u64, attribute_id: u64 },
+    /// A child of an encrypted directory.
+    /// We store the filename in its encrypted form.
+    EncryptedChild { name: Vec<u8> },
+    /// A child of a directory that uses the casefold feature.
+    /// (i.e. case insensitive, case preserving names)
+    CasefoldChild { name: CasefoldString },
+}
+
+#[derive(Debug, Migrate, Serialize, Deserialize, TypeFingerprint)]
+pub enum ObjectKeyDataV32 {
+    Object,
+    Keys,
+    Attribute(u64, AttributeKeyV32),
+    Child { name: String },
+    GraveyardEntry { object_id: u64 },
+    Project { project_id: u64, property: ProjectPropertyV32 },
+    ExtendedAttribute { name: Vec<u8> },
     GraveyardAttributeEntry { object_id: u64, attribute_id: u64 },
 }
 
@@ -94,7 +112,7 @@ pub enum AttributeKeyV32 {
 }
 
 /// ObjectKey is a key in the object store.
-pub type ObjectKey = ObjectKeyV32;
+pub type ObjectKey = ObjectKeyV40;
 
 #[derive(
     Clone,
@@ -110,10 +128,16 @@ pub type ObjectKey = ObjectKeyV32;
     Versioned,
 )]
 #[cfg_attr(fuzz, derive(arbitrary::Arbitrary))]
-pub struct ObjectKeyV32 {
+pub struct ObjectKeyV40 {
     /// The ID of the object referred to.
     pub object_id: u64,
     /// The type and data of the key.
+    pub data: ObjectKeyDataV40,
+}
+#[derive(Debug, Migrate, Serialize, Deserialize, TypeFingerprint, Versioned)]
+#[migrate_nodefault]
+pub struct ObjectKeyV32 {
+    pub object_id: u64,
     pub data: ObjectKeyDataV32,
 }
 
@@ -159,8 +183,12 @@ impl ObjectKey {
     }
 
     /// Creates an ObjectKey for a child.
-    pub fn child(object_id: u64, name: &str) -> Self {
-        Self { object_id, data: ObjectKeyData::Child { name: name.to_owned() } }
+    pub fn child(object_id: u64, name: &str, casefold: bool) -> Self {
+        if casefold {
+            Self { object_id, data: ObjectKeyData::CasefoldChild { name: name.into() } }
+        } else {
+            Self { object_id, data: ObjectKeyData::Child { name: name.into() } }
+        }
     }
 
     /// Creates a graveyard entry for an object.
@@ -248,6 +276,8 @@ impl LayerKey for ObjectKey {
             | ObjectKeyData::Keys
             | ObjectKeyData::Attribute(..)
             | ObjectKeyData::Child { .. }
+            | ObjectKeyData::EncryptedChild { .. }
+            | ObjectKeyData::CasefoldChild { .. }
             | ObjectKeyData::GraveyardEntry { .. }
             | ObjectKeyData::GraveyardAttributeEntry { .. }
             | ObjectKeyData::Project { property: ProjectProperty::Limit, .. }
@@ -406,11 +436,11 @@ impl From<Timestamp> for std::time::Duration {
     }
 }
 
-pub type ObjectKind = ObjectKindV38;
+pub type ObjectKind = ObjectKindV40;
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, TypeFingerprint)]
 #[cfg_attr(fuzz, derive(arbitrary::Arbitrary))]
-pub enum ObjectKindV38 {
+pub enum ObjectKindV40 {
     File {
         /// The number of references to this file.
         refs: u64,
@@ -421,6 +451,12 @@ pub enum ObjectKindV38 {
     Directory {
         /// The number of sub-directories in this directory.
         sub_dirs: u64,
+        /// If set, contains the wrapping key id used to encrypt the file contents and filenames in
+        /// this directory.
+        wrapping_key_id: Option<u128>,
+        /// If true, all files and sub-directories created in this directory will support case
+        /// insensitive (but case-preserving) file naming.
+        casefold: bool,
     },
     Graveyard,
     Symlink {
@@ -430,6 +466,28 @@ pub enum ObjectKindV38 {
         /// interpret it however they like.
         link: Vec<u8>,
     },
+}
+#[derive(Debug, Serialize, Deserialize, PartialEq, TypeFingerprint)]
+pub enum ObjectKindV38 {
+    File { refs: u64, has_overwrite_extents: bool },
+    Directory { sub_dirs: u64 },
+    Graveyard,
+    Symlink { refs: u64, link: Vec<u8> },
+}
+
+impl From<ObjectKindV38> for ObjectKindV40 {
+    fn from(value: ObjectKindV38) -> Self {
+        match value {
+            ObjectKindV38::File { refs, has_overwrite_extents } => {
+                ObjectKindV40::File { refs, has_overwrite_extents }
+            }
+            ObjectKindV38::Directory { sub_dirs } => {
+                ObjectKindV40::Directory { sub_dirs, wrapping_key_id: None, casefold: false }
+            }
+            ObjectKindV38::Graveyard => ObjectKindV40::Graveyard,
+            ObjectKindV38::Symlink { refs, link } => ObjectKindV40::Symlink { refs, link },
+        }
+    }
 }
 
 #[derive(Debug, Deserialize, Serialize, TypeFingerprint)]
@@ -455,9 +513,14 @@ impl From<ObjectKindV32> for ObjectKindV38 {
     }
 }
 
-pub type EncryptionKeys = EncryptionKeysV32;
+pub type EncryptionKeys = EncryptionKeysV40;
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, TypeFingerprint)]
+pub enum EncryptionKeysV40 {
+    AES256XTS(WrappedKeysV40),
+}
+
+#[derive(Migrate, Serialize, Deserialize, TypeFingerprint)]
 pub enum EncryptionKeysV32 {
     AES256XTS(WrappedKeysV32),
 }
@@ -468,7 +531,7 @@ impl<'a> arbitrary::Arbitrary<'a> for EncryptionKeys {
         <u8>::arbitrary(u).and_then(|count| {
             let mut keys = vec![];
             for _ in 0..count {
-                keys.push(<(u64, u64)>::arbitrary(u).map(|(id, wrapping_key_id)| {
+                keys.push(<(u64, u128)>::arbitrary(u).map(|(id, wrapping_key_id)| {
                     (
                         id,
                         fxfs_crypto::WrappedKey {
@@ -572,14 +635,14 @@ pub struct FsverityMetadataV33 {
 /// ObjectValue is the value of an item in the object store.
 /// Note that the tree stores deltas on objects, so these values describe deltas. Unless specified
 /// otherwise, a value indicates an insert/replace mutation.
-pub type ObjectValue = ObjectValueV38;
+pub type ObjectValue = ObjectValueV40;
 impl Value for ObjectValue {
     const DELETED_MARKER: Self = Self::None;
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, TypeFingerprint, Versioned)]
 #[cfg_attr(fuzz, derive(arbitrary::Arbitrary))]
-pub enum ObjectValueV38 {
+pub enum ObjectValueV40 {
     /// Some keys have no value (this often indicates a tombstone of some sort).  Records with this
     /// value are always filtered when a major compaction is performed, so the meaning must be the
     /// same as if the item was not present.
@@ -588,9 +651,9 @@ pub enum ObjectValueV38 {
     /// (None) i.e. their value is really a boolean: None => false, Some => true.
     Some,
     /// The value for an ObjectKey::Object record.
-    Object { kind: ObjectKindV38, attributes: ObjectAttributesV32 },
+    Object { kind: ObjectKindV40, attributes: ObjectAttributesV32 },
     /// Encryption keys for an object.
-    Keys(EncryptionKeysV32),
+    Keys(EncryptionKeysV40),
     /// An attribute associated with a file object. |size| is the size of the attribute in bytes.
     Attribute { size: u64 },
     /// An extent associated with an object.
@@ -611,7 +674,23 @@ pub enum ObjectValueV38 {
     VerifiedAttribute { size: u64, fsverity_metadata: FsverityMetadataV33 },
 }
 
-#[derive(Debug, Serialize, Deserialize, Migrate, TypeFingerprint, Versioned)]
+#[derive(Migrate, Serialize, Deserialize, TypeFingerprint, Versioned)]
+#[migrate_to_version(ObjectValueV40)]
+pub enum ObjectValueV38 {
+    None,
+    Some,
+    Object { kind: ObjectKindV38, attributes: ObjectAttributesV32 },
+    Keys(EncryptionKeysV32),
+    Attribute { size: u64 },
+    Extent(ExtentValueV38),
+    Child(ChildValueV32),
+    Trim,
+    BytesAndNodes { bytes: i64, nodes: i64 },
+    ExtendedAttribute(ExtendedAttributeValueV32),
+    VerifiedAttribute { size: u64, fsverity_metadata: FsverityMetadataV33 },
+}
+
+#[derive(Migrate, Serialize, Deserialize, TypeFingerprint, Versioned)]
 #[migrate_to_version(ObjectValueV38)]
 pub enum ObjectValueV37 {
     None,
@@ -627,7 +706,7 @@ pub enum ObjectValueV37 {
     VerifiedAttribute { size: u64, fsverity_metadata: FsverityMetadataV33 },
 }
 
-#[derive(Debug, Serialize, Deserialize, Migrate, TypeFingerprint, Versioned)]
+#[derive(Serialize, Deserialize, Migrate, TypeFingerprint, Versioned)]
 #[migrate_to_version(ObjectValueV37)]
 pub enum ObjectValueV33 {
     None,
@@ -643,7 +722,7 @@ pub enum ObjectValueV33 {
     VerifiedAttribute { size: u64, fsverity_metadata: FsverityMetadataV33 },
 }
 
-#[derive(Debug, Deserialize, Migrate, Serialize, Versioned, TypeFingerprint)]
+#[derive(Deserialize, Migrate, Serialize, Versioned, TypeFingerprint)]
 #[migrate_to_version(ObjectValueV33)]
 pub enum ObjectValueV32 {
     None,
@@ -735,12 +814,18 @@ impl ObjectValue {
     }
 }
 
-pub type ObjectItem = ObjectItemV38;
+pub type ObjectItem = ObjectItemV40;
+pub type ObjectItemV40 = Item<ObjectKeyV40, ObjectValueV40>;
 pub type ObjectItemV38 = Item<ObjectKeyV32, ObjectValueV38>;
 pub type ObjectItemV37 = Item<ObjectKeyV32, ObjectValueV37>;
 pub type ObjectItemV33 = Item<ObjectKeyV32, ObjectValueV33>;
 pub type ObjectItemV32 = Item<ObjectKeyV32, ObjectValueV32>;
 
+impl From<ObjectItemV38> for ObjectItemV40 {
+    fn from(item: ObjectItemV38) -> Self {
+        Self { key: item.key.into(), value: item.value.into(), sequence: item.sequence }
+    }
+}
 impl From<ObjectItemV37> for ObjectItemV38 {
     fn from(item: ObjectItemV37) -> Self {
         Self { key: item.key, value: item.value.into(), sequence: item.sequence }

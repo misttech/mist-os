@@ -39,6 +39,8 @@ source_set("driver_runner_test_fixture") {
   sources = [
     "driver_runner_test_fixture.cc",
     "driver_runner_test_fixture.h",
+    "test_pkg.cc",
+    "test_pkg.h",
   ]
   public_deps = [
     "//sdk/lib/inspect/testing/cpp",
@@ -67,14 +69,14 @@ executable("driver_runner_death_test") {
     "//sdk/fidl/fuchsia.driver.framework:fuchsia.driver.framework_cpp_testing",
     "//sdk/fidl/fuchsia.driver.host:fuchsia.driver.host_cpp_testing",
     "//sdk/fidl/fuchsia.io:fuchsia.io_cpp_testing",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/inspect/testing/cpp",
     "//sdk/lib/sys/cpp/testing:unit",
     "//src/devices/bin/driver_manager:driver_runner",
     "//src/devices/bind/fuchsia.platform:fuchsia.platform_cpp",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/loop_fixture",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
   ]
 }
 
@@ -222,18 +224,14 @@ fuchsia_unittest_component("driver-host-loader-service-test") {
 }
 
 test("driver_host_runner_test") {
-  sources = [
-    "driver_host_runner_test.cc",
-    "test_pkg.cc",
-    "test_pkg.h",
-  ]
+  sources = [ "driver_host_runner_test.cc" ]
   deps = [
     ":driver_runner_test_fixture",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//src/devices/bin/driver_loader:driver_loader",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/loop_fixture",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
   ]
 }
 

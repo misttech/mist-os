@@ -34,6 +34,8 @@ source_set("platform") {
     "//sdk/fidl/fuchsia.net:fuchsia.net_hlcpp",
     "//sdk/fidl/fuchsia.net.interfaces:fuchsia.net.interfaces_hlcpp",
     "//sdk/fidl/fuchsia.net.routes:fuchsia.net.routes_hlcpp",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/fdio",
     "//sdk/lib/sys/cpp",
     "//src/connectivity/openthread/lib/ot-stack:ot-stack-callback",
@@ -42,8 +44,6 @@ source_set("platform") {
     "//src/lib/json_parser",
     "//third_party/modp_b64",
     "//third_party/openthread:lib-ot-core",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/svc",
     "//zircon/system/ulib/zx",
   ]

@@ -23,5 +23,5 @@ closed protocol Internal {
     /// test package.
     strict GetTestResolutionContext() -> (struct {
         context fuchsia.component.resolution.Context;
-    });
+    }) error zx.Status;
 };

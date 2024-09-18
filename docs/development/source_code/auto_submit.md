@@ -71,3 +71,10 @@ However, the change author can still manually set **Commit-Queue +2** to submit
 the change. If you think the change should not be submitted, then it's
 recommended that either you withhold **Code-Review +2** or, if another reviewer
 has already approved the change, set **Code-Review -2**.
+
+### I need to look at FYI builder results too. Will red FYI builder block my autosubmit?
+
+Red FYI builders do not block autosubmit! Exercise caution with FYI builders.
+
+Autosubmit has nearly the same submit criteria as manual submit, except that
+autosubmit requires all comments to be resolved.

@@ -1042,7 +1042,10 @@ class VmMapping final : public VmAddressRegionOrMapping,
 
   // Unmap any pages that map the passed in vmo range from the arch aspace.
   // May not intersect with this range.
-  void AspaceUnmapLockedObject(uint64_t offset, uint64_t len) const TA_REQ(object_->lock());
+  // If |only_has_zero_pages| is true then the caller is asserting that it knows that any mappings
+  // in the region will only be for the shared zero page.
+  void AspaceUnmapLockedObject(uint64_t offset, uint64_t len, bool only_has_zero_pages) const
+      TA_REQ(object_->lock());
 
   // Removes any writeable mappings for the passed in vmo range from the arch aspace.
   // May fall back to unmapping pages from the arch aspace if necessary.
@@ -1223,6 +1226,11 @@ class VmMapping final : public VmAddressRegionOrMapping,
 
   // This can be read with either lock hold, but requires both locks to write it.
   MappingProtectionRanges protection_ranges_ TA_GUARDED(object_->lock()) TA_GUARDED(lock());
+
+  class CurrentlyFaulting;
+  // Pointer to a CurrentlyFaulting object if the mapping is presently handling a page fault. This
+  // is protected specifically by the object lock so that AspaceUnmapLockedObject can inspect it.
+  CurrentlyFaulting* currently_faulting_ TA_GUARDED(object_->lock()) = nullptr;
 
   // Helpers for gaining read access to the protection information when only one of the locks is
   // held.

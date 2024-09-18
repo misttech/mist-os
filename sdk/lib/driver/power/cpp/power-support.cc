@@ -128,6 +128,31 @@ std::optional<Error> GetTokensFromParents(ElementDependencyMap& dependencies, To
   return std::nullopt;
 }
 
+fit::result<Error> RegisterDependencyToken(
+    fidl::UnownedClientEnd<fuchsia_power_broker::ElementControl>& element_control_client,
+    const zx::unowned_event& token, const fuchsia_power_broker::DependencyType type) {
+  if (!token->is_valid()) {
+    return fit::error(Error::INVALID_ARGS);
+  }
+  zx::event dupe;
+  zx_status_t dupe_result = token->duplicate(ZX_RIGHT_SAME_RIGHTS, &dupe);
+  if (dupe_result != ZX_OK) {
+    return fit::error(Error::INVALID_ARGS);
+  }
+
+  auto result =
+      fidl::WireCall(element_control_client)->RegisterDependencyToken(std::move(dupe), type);
+  if (!result.ok()) {
+    if (result.is_peer_closed()) {
+      return fit::error(Error::IO);
+    }
+    // TODO(https://fxbug.dev/328266458) not sure if invalid args is right for
+    // all other conditions
+    return fit::error(Error::INVALID_ARGS);
+  }
+  return fit::success();
+}
+
 }  // namespace
 
 void ElementRunner::RunPowerElement() {
@@ -428,7 +453,9 @@ fit::result<Error> AddElement(
                             fidl::ServerEnd<fuchsia_power_broker::RequiredLevel>>>
         level_control,
     std::optional<fidl::ServerEnd<fuchsia_power_broker::Lessor>> lessor,
-    std::optional<fidl::ServerEnd<fuchsia_power_broker::ElementControl>> element_control) {
+    std::optional<fidl::ServerEnd<fuchsia_power_broker::ElementControl>> element_control,
+    std::optional<fidl::UnownedClientEnd<fuchsia_power_broker::ElementControl>>
+        element_control_client) {
   // Get the power levels we should have
   std::vector<fuchsia_power_broker::PowerLevel> levels = PowerLevelsFromConfig(config);
   if (levels.size() == 0) {
@@ -482,28 +509,6 @@ fit::result<Error> AddElement(
     }
   }
 
-  // Duplicate the token for assertive dependencies
-  std::vector<zx::event> assertive_tokens{};
-  if (assertive_token->is_valid()) {
-    zx::event dupe;
-    zx_status_t dupe_result = assertive_token->duplicate(ZX_RIGHT_SAME_RIGHTS, &dupe);
-    if (dupe_result != ZX_OK) {
-      return fit::error(Error::INVALID_ARGS);
-    }
-    assertive_tokens.emplace_back(std::move(dupe));
-  }
-
-  // Duplicate the token for opportunistic dependencies
-  std::vector<zx::event> opportunistic_tokens{};
-  if (opportunistic_token->is_valid()) {
-    zx::event dupe;
-    zx_status_t dupe_result = opportunistic_token->duplicate(ZX_RIGHT_SAME_RIGHTS, &dupe);
-    if (dupe_result != ZX_OK) {
-      return fit::error(Error::INVALID_ARGS);
-    }
-    opportunistic_tokens.emplace_back(std::move(dupe));
-  }
-
   std::optional<fuchsia_power_broker::LevelControlChannels> lvl_ctrl;
   if (level_control.has_value()) {
     lvl_ctrl = {std::move(level_control->first), std::move(level_control->second)};
@@ -516,8 +521,6 @@ fit::result<Error> AddElement(
       .initial_current_level = static_cast<uint8_t>(0),
       .valid_levels = std::move(levels),
       .dependencies = std::move(level_deps),
-      .assertive_dependency_tokens_to_register = std::move(assertive_tokens),
-      .opportunistic_dependency_tokens_to_register = std::move(opportunistic_tokens),
       .level_control_channels = std::move(lvl_ctrl),
   }};
   if (lessor.has_value()) {
@@ -539,16 +542,42 @@ fit::result<Error> AddElement(
     return fit::error(Error::INVALID_ARGS);
   }
 
+  if (element_control_client.has_value()) {
+    if (assertive_token->is_valid()) {
+      fit::result<Error> assertive_result =
+          RegisterDependencyToken(element_control_client.value(), assertive_token,
+                                  fuchsia_power_broker::DependencyType::kAssertive);
+      if (assertive_result.is_error()) {
+        return assertive_result;
+      }
+    }
+    if (opportunistic_token->is_valid()) {
+      fit::result<Error> opportunistic_result =
+          RegisterDependencyToken(element_control_client.value(), opportunistic_token,
+                                  fuchsia_power_broker::DependencyType::kOpportunistic);
+      if (opportunistic_result.is_error()) {
+        return opportunistic_result;
+      }
+    }
+  }
+
   return fit::success();
 }
 
 fit::result<Error> AddElement(fidl::ClientEnd<fuchsia_power_broker::Topology>& power_broker,
                               ElementDesc& description) {
+  std::optional<fidl::UnownedClientEnd<fuchsia_power_broker::ElementControl>>
+      element_control_client = std::nullopt;
+  if (description.element_control_client.has_value()) {
+    element_control_client =
+        std::make_optional<fidl::UnownedClientEnd<fuchsia_power_broker::ElementControl>>(
+            description.element_control_client->borrow());
+  }
   return AddElement(power_broker, description.element_config, std::move(description.tokens),
                     description.assertive_token.borrow(), description.opportunistic_token.borrow(),
                     std::move(description.level_control_servers),
                     std::move(description.lessor_server),
-                    std::move(description.element_control_server));
+                    std::move(description.element_control_server), element_control_client);
 }
 
 void LeaseHelper::AcquireLease(

@@ -14,6 +14,9 @@ using fuchsia.diagnostics;
 /// for a specific driver.
 alias DriverName = string:MAX;
 
+@available(added=HEAD)
+const MAX_SOFTWARE_DEVICES uint32 = 20;
+
 type DriverLog = struct {
     name DriverName;
     log_level fuchsia.diagnostics.Severity;
@@ -36,6 +39,12 @@ type Offer = struct {
 type Expose = struct {
     service_name string:MAX;
     collection Collection;
+};
+
+@available(added=HEAD)
+type SoftwareDevice = struct {
+    device_name string:MAX;
+    device_id uint32;
 };
 
 /// A list of arguments that can be used to configure DriverTestRealm.
@@ -134,6 +143,10 @@ type RealmArgs = resource table {
     /// the driver test realm. This will be used to discover drivers that the test
     /// wants to provide to the driver test realm. Drivers can be both in the test
     /// component package, or a subpackage of the test component package.
+    /// By default all drivers discovered that don't also exist in the |boot| directory
+    /// will be considered to be base drivers.
+    /// Use |boot_driver_components| to provide a list of drivers that should be
+    /// boot drivers.
     /// Default: empty
     @available(added=23)
     16: test_component fuchsia.component.resolution.Component;
@@ -143,6 +156,21 @@ type RealmArgs = resource table {
     /// Default: never shuts down
     @available(added=HEAD)
     17: driver_index_stop_timeout_millis int64;
+
+    /// A list of software only devices that should be created. Typically this is used
+    /// to create fake hardware for tests. Devices will be spawned as platform devices
+    /// under the platform bus. Note that the platform bus must be the root driver for
+    /// this to do anything meaningful.
+    @available(added=HEAD)
+    18: software_devices vector<SoftwareDevice>:MAX_SOFTWARE_DEVICES;
+
+    /// The list of driver component names that should be considered as boot drivers.
+    /// Boot drivers are started in the boot-drivers collection which has more
+    /// capabilities available to it.
+    /// Entries should be the component name (eg: "my_driver_component.cm").
+    /// Default: empty
+    @available(added=NEXT)
+    19: boot_driver_components vector<string:MAX>:MAX;
 };
 
 /// This protocol is for the DriverTestRealm. It is an integration test

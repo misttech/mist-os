@@ -16,11 +16,25 @@ set -e
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"/lib/vars.sh || exit $?
 source "${FUCHSIA_DIR}/tools/devshell/lib/style.sh" || exit $?
 
+# This sets up and shuts down reproxy automatically.
 readonly reproxy_wrap="$FUCHSIA_DIR/build/rbe/fuchsia-reproxy-wrap.sh"
 
-reclient_auth_test=("$reproxy_wrap" -- echo "re-client+RBE authentication successful")
+readonly python="$PREBUILT_PYTHON3"
 
-function usage {
+# remote_action.py exercises rewrapper
+readonly remote_action="$FUCHSIA_DIR/build/rbe/remote_action.py"
+
+# A single command that tests RBE end-to-end through reclient.
+reclient_auth_test_cmd=(
+  env
+  --unset=FX_BUILD_RBE_STATS
+  FX_REMOTE_BUILD_METRICS=0
+  "$reproxy_wrap" --
+  "$python" -S "$remote_action" --
+  echo "greetings from a remote RBE worker"
+)
+
+function usage() {
   fx-command-help
 }
 
@@ -66,16 +80,16 @@ function ensure_gcloud() {
   }
 }
 
+readonly gcloud_auth_args=(auth login --update-adc)
 function gcloud_auth() {
-  readonly auth_args=(auth login --update-adc)
   ensure_gcloud &&
-    echo "running: gcloud ${auth_args[@]}" &&
+    echo "running: gcloud ${gcloud_auth_args[@]}" &&
     echo "If you see a warning about running on a \"Google Compute Engine virtual machine\", hit Y to continue to use a personal account." &&
-    "$gcloud" "${auth_args[@]}"
+    "$gcloud" "${gcloud_auth_args[@]}"
 }
 
 function reclient_auth() {
-  until "${reclient_auth_test[@]}"
+  until "${reclient_auth_test_cmd[@]}"
   do
     # gcert only works in environments that get unrestricted LOAS credentials
     # whereas gcloud auth will always work.
@@ -85,11 +99,35 @@ function reclient_auth() {
       return 1
     }
   done
+  style::echo --green "re-client+RBE authentication successful"
+}
+
+readonly BAZEL_TEST_DIR="$FUCHSIA_DIR/out/_bazel_rbe_test"
+function setup_bazel_workspace() {
+  rm -rf "$BAZEL_TEST_DIR"
+  "$python" -S "$FUCHSIA_DIR/build/bazel/scripts/minimal_workspace.py" \
+    --fuchsia-dir="$FUCHSIA_DIR" \
+    --bazel-bin="$PREBUILT_BAZEL" \
+    --topdir="$BAZEL_TEST_DIR"
+}
+
+function test_bazel_rbe() {
+  setup_bazel_workspace
+  (
+    cd "$BAZEL_TEST_DIR/workspace" &&
+      ../bazel --nohome_rc test --config=remote --config=sponge :all
+  )
 }
 
 function bazel_auth() {
-  # TODO(b/363284694): setup minimal workspace and bazel build to test
-  gcloud_auth
+  until test_bazel_rbe
+  do
+    gcloud_auth || {
+      echo "Failed to authenticate with gcloud."
+      return 1
+    }
+  done
+  style::echo --green "bazel+RBE authentication successful"
 }
 
 case "$action" in
@@ -99,7 +137,7 @@ case "$action" in
     ;;
 
   auth)
-    bazel_auth && reclient_auth && style::echo --bold --green "You can now 'fx build' with RBE."
+    bazel_auth && reclient_auth && echo && style::echo --bold --green "You can now 'fx build' with RBE."
     exit "$?"
     ;;
 

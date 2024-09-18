@@ -18,6 +18,9 @@ source_set("lib") {
     "//sdk/fidl/fuchsia.element:fuchsia.element_cpp",
     "//sdk/fidl/fuchsia.ui.composition:fuchsia.ui.composition_cpp",
     "//sdk/fidl/fuchsia.ui.views:fuchsia.ui.views_cpp",
+    "//sdk/lib/async:async",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/sys/cpp",
     "//sdk/lib/syslog/cpp",
@@ -26,9 +29,6 @@ source_set("lib") {
     "//src/lib/vulkan:vulkan_validation_layers",
     "//src/lib/vulkan/swapchain:image_pipe_swapchain_layer",
     "//src/ui/lib/escher",
-    "//zircon/system/ulib/async:async",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
   ]
 }
 
@@ -42,9 +42,9 @@ executable("bin") {
   sources = [ "main.cc" ]
   deps = [
     ":lib",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/syslog/cpp",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
   ]
 }
 

@@ -130,8 +130,10 @@ class VnodeF2fs : public fs::PagedVnode,
 
   zx_status_t DoTruncate(size_t len) __TA_EXCLUDES(f2fs::GetGlobalLock());
   zx_status_t TruncateBlocks(uint64_t from) __TA_REQUIRES_SHARED(f2fs::GetGlobalLock());
-  zx_status_t TruncateHole(pgoff_t pg_start, pgoff_t pg_end, bool zero = true)
+  zx_status_t TruncateHoleUnsafe(pgoff_t pg_start, pgoff_t pg_end, bool zero = true)
       __TA_REQUIRES_SHARED(f2fs::GetGlobalLock());
+  zx_status_t TruncateHole(pgoff_t pg_start, pgoff_t pg_end, bool zero = true)
+      __TA_EXCLUDES(f2fs::GetGlobalLock());
   void TruncateToSize() __TA_REQUIRES_SHARED(f2fs::GetGlobalLock());
   void EvictVnode() __TA_REQUIRES_SHARED(f2fs::GetGlobalLock());
   zx_status_t GetNewDataPage(pgoff_t index, bool new_i_size, LockedPage *out)

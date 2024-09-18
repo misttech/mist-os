@@ -55,20 +55,19 @@ executable("cobalt_testapp") {
     "//sdk/fidl/fuchsia.cobalt:fuchsia.cobalt_hlcpp",
     "//sdk/fidl/fuchsia.diagnostics:fuchsia.diagnostics_hlcpp",
     "//sdk/fidl/fuchsia.metrics:fuchsia.metrics_hlcpp",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/sys/component/cpp/testing:cpp",
     "//sdk/lib/sys/cpp",
     "//sdk/lib/syslog/cpp",
     "//src/cobalt/bin/utils:base64",
     "//src/cobalt/bin/utils:error_utils",
-    "//src/cobalt/bin/utils:status_utils",
     "//src/lib/fsl",
     "//src/lib/fxl:fxl_cli",
     "//third_party/cobalt/src/lib/util:datetime_util",
     "//third_party/cobalt/src/public/lib:clock_interfaces",
     "//third_party/cobalt/src/registry:cobalt_registry_proto",
     "//third_party/rapidjson",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
   ]
 
   configs += [ "//third_party/cobalt:cobalt_config" ]

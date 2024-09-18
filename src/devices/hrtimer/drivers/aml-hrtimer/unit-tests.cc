@@ -8,15 +8,21 @@
 #include <fidl/fuchsia.power.system/cpp/fidl.h>
 #include <fidl/fuchsia.power.system/cpp/test_base.h>
 #include <lib/ddk/platform-defs.h>
+#include <lib/driver/power/cpp/testing/fake_current_level.h>
+#include <lib/driver/power/cpp/testing/fake_element_control.h>
 #include <lib/driver/testing/cpp/driver_test.h>
 #include <lib/fake-bti/bti.h>
 #include <lib/fzl/vmo-mapper.h>
 
 #include <gtest/gtest.h>
 
+#include "fidl/fuchsia.power.broker/cpp/markers.h"
 #include "src/devices/hrtimer/drivers/aml-hrtimer/aml-hrtimer.h"
 
 namespace hrtimer {
+
+using fdf_power::testing::FakeCurrentLevel;
+using fdf_power::testing::FakeElementControl;
 
 class FakePlatformDevice : public fidl::Server<fuchsia_hardware_platform_device::Device> {
  public:
@@ -199,6 +205,14 @@ class FakeSystemActivityGovernor
     completer.Reply({{std::move(elements)}});
   }
 
+  void TakeWakeLease(TakeWakeLeaseRequest& request,
+                     TakeWakeLeaseCompleter::Sync& completer) override {
+    zx::eventpair wake_lease_remote, wake_lease_local;
+    zx::eventpair::create(0, &wake_lease_local, &wake_lease_remote);
+    wake_leases_.push_back(std::move(wake_lease_local));
+    completer.Reply(std::move(wake_lease_remote));
+  }
+
   void NotImplemented_(const std::string& name, fidl::CompleterBase& completer) override {
     ADD_FAILURE() << name << " is not implemented";
   }
@@ -208,6 +222,7 @@ class FakeSystemActivityGovernor
 
  private:
   zx::event wake_handling_;
+  std::vector<zx::eventpair> wake_leases_;
   fidl::ServerBindingGroup<fuchsia_power_system::ActivityGovernor> bindings_;
 };
 
@@ -277,23 +292,6 @@ class FakeRequiredLevel : public fidl::Server<fuchsia_power_broker::RequiredLeve
   std::optional<WatchCompleter::Async> completer_;
 };
 
-class FakeCurrentLevel : public fidl::Server<fuchsia_power_broker::CurrentLevel> {
- public:
-  void Update(fuchsia_power_broker::CurrentLevelUpdateRequest& request,
-              UpdateCompleter::Sync& completer) override {
-    current_level_ = request.current_level();
-    completer.Reply(fit::success());
-  }
-
-  fuchsia_power_broker::PowerLevel current_level() { return current_level_; }
-
-  void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_power_broker::CurrentLevel> md,
-                             fidl::UnknownMethodCompleter::Sync& completer) override {}
-
- private:
-  fuchsia_power_broker::PowerLevel current_level_ = 0;
-};
-
 class FakePowerBroker : public fidl::Server<fuchsia_power_broker::Topology> {
  public:
   fidl::ProtocolHandler<fuchsia_power_broker::Topology> CreateHandler() {
@@ -303,9 +301,14 @@ class FakePowerBroker : public fidl::Server<fuchsia_power_broker::Topology> {
 
   void AddElement(fuchsia_power_broker::ElementSchema& request,
                   AddElementCompleter::Sync& completer) override {
-    if (request.element_control()) {
-      element_control_server_ = std::move(*request.element_control());
-    }
+    EXPECT_TRUE(request.element_control().has_value());
+    zx_status_t status = request.element_control()->channel().get_info(
+        ZX_INFO_HANDLE_BASIC, &element_control_info_, sizeof(zx_info_handle_basic_t), nullptr,
+        nullptr);
+    EXPECT_EQ(status, ZX_OK);
+    fidl::BindServer<fuchsia_power_broker::ElementControl>(
+        fdf::Dispatcher::GetCurrent()->async_dispatcher(), std::move(*request.element_control()),
+        &element_control_);
 
     if (request.lessor_channel()) {
       fidl::BindServer<fuchsia_power_broker::Lessor>(
@@ -328,9 +331,7 @@ class FakePowerBroker : public fidl::Server<fuchsia_power_broker::Topology> {
   void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_power_broker::Topology> md,
                              fidl::UnknownMethodCompleter::Sync& completer) override {}
 
-  fidl::ServerEnd<fuchsia_power_broker::ElementControl>& element_control_server() {
-    return element_control_server_;
-  }
+  const zx_info_handle_basic_t& element_control_info() const { return element_control_info_; }
   FakeRequiredLevel& required_level() { return required_level_; }
   FakeCurrentLevel& current_level() { return current_level_; }
   bool GetLeaseRequested() { return wake_lessor_.GetLeaseRequested(); }
@@ -340,7 +341,8 @@ class FakePowerBroker : public fidl::Server<fuchsia_power_broker::Topology> {
   FakeLessor wake_lessor_;
   FakeRequiredLevel required_level_;
   FakeCurrentLevel current_level_;
-  fidl::ServerEnd<fuchsia_power_broker::ElementControl> element_control_server_;
+  FakeElementControl element_control_;
+  zx_info_handle_basic_t element_control_info_;
   fidl::ServerBindingGroup<fuchsia_power_broker::Topology> bindings_;
 };
 
@@ -427,8 +429,8 @@ TEST_F(DriverTest, Properties) {
   ASSERT_EQ(result->properties().timers_properties()->size(), std::size_t{9});
   auto& timers = result->properties().timers_properties().value();
 
-  // Timers id 0 to 8 inclusive, except timer id 4.
-  for (uint64_t i = 0; i < 9; ++i) {
+  // Resolutions and range for all timers, except timer id 4.
+  for (auto& i : kTimersAll) {
     ASSERT_TRUE(timers[i].id());
     if (timers[i].id().value() == 4) {
       continue;
@@ -460,9 +462,8 @@ TEST_F(DriverTest, Properties) {
 }
 
 TEST_F(DriverTest, StartTimerNoticks) {
-  // Timers id 0 to 8 inclusive are able to take a 0 ticks expiration request for durations 1, 10,
-  // and 100 usecs.
-  for (uint64_t i = 0; i < 9; ++i) {
+  // All timers are able to take a 0 ticks expiration request for durations 1, 10, and 100 usecs.
+  for (auto& i : kTimersAll) {
     auto result0 =
         client_->Start({i, fuchsia_hardware_hrtimer::Resolution::WithDuration(1'000ULL), 0});
     ASSERT_FALSE(result0.is_error());
@@ -493,9 +494,9 @@ TEST_F(DriverTest, StartTimerNoticks) {
 }
 
 TEST_F(DriverTest, StartTimerMaxTicks) {
-  // Timers id 0 to 8 inclusive are able to take a up to 0xffff ticks expiration request for
-  // durations 1, 10, and 100 usecs.
-  for (uint64_t i = 0; i < 9; ++i) {
+  // All timers are able to take a up to 0xffff ticks expiration request for durations 1, 10, and
+  // 100 usecs.
+  for (auto& i : kTimersAll) {
     auto result0 =
         client_->Start({i, fuchsia_hardware_hrtimer::Resolution::WithDuration(1'000ULL), 0xffff});
     ASSERT_FALSE(result0.is_error());
@@ -536,8 +537,8 @@ TEST_F(DriverTest, StartTimerMaxTicks) {
 }
 
 TEST_F(DriverTest, StartStop) {
-  // Timers id 0 to 8 inclusive but not 4 support events.
-  for (uint64_t i = 0; i < 9; ++i) {
+  // All timers support start/stop.
+  for (auto& i : kTimersAll) {
     auto result_start =
         client_->Start({i, fuchsia_hardware_hrtimer::Resolution::WithDuration(1'000ULL), 1});
     ASSERT_FALSE(result_start.is_error());
@@ -549,7 +550,7 @@ TEST_F(DriverTest, StartStop) {
     ASSERT_EQ(env.platform_device().mmio()[0x3c64], 0x000f'0000UL);  // Timers F, G, H and I.
   });
 
-  for (uint64_t i = 0; i < 9; ++i) {
+  for (auto& i : kTimersAll) {
     auto result_stop = client_->Stop(i);
     ASSERT_FALSE(result_stop.is_error());
   }
@@ -562,12 +563,8 @@ TEST_F(DriverTest, StartStop) {
 }
 
 TEST_F(DriverTest, EventTriggering) {
-  // Timers id 0 to 8 inclusive but not 4 support events (via IRQ notification).
-  zx::event events[9];
-  for (uint64_t i = 0; i < 9; ++i) {
-    if (i == 4) {
-      continue;
-    }
+  zx::event events[kNumberOfTimers];
+  for (auto& i : kTimersSupportWait) {
     ASSERT_EQ(zx::event::create(0, &events[i]), ZX_OK);
     zx::event duplicate_event;
     events[i].duplicate(ZX_RIGHT_SAME_RIGHTS, &duplicate_event);
@@ -581,10 +578,7 @@ TEST_F(DriverTest, EventTriggering) {
   driver_test().RunInEnvironmentTypeContext(
       [](TestEnvironment& env) { env.platform_device().TriggerAllIrqs(); });
 
-  for (uint64_t i = 0; i < 9; ++i) {
-    if (i == 4) {
-      continue;
-    }
+  for (auto& i : kTimersSupportWait) {
     zx_signals_t signals = {};
     ASSERT_EQ(events[i].wait_one(ZX_EVENT_SIGNALED, zx::time::infinite(), &signals), ZX_OK);
   }
@@ -640,8 +634,8 @@ TEST_F(DriverTest, GetTicksTimer4) {
   auto result_start = client_->Start(
       {4, fuchsia_hardware_hrtimer::Resolution::WithDuration(1'000ULL), kArbitraryTicksRequest});
   ASSERT_FALSE(result_start.is_error());
-  // We set the amount read after starting the timer since starting the timer writes to the register
-  // we read upon GetTicksLeft.
+  // We set the amount read after starting the timer since starting the timer writes to the
+  // register we read upon GetTicksLeft.
   constexpr uint64_t kArbitraryCount64bits = 0x1234'5678'0000'0000;
   driver_test().RunInEnvironmentTypeContext([](TestEnvironment& env) {
     env.platform_device().mmio()[0x3c62] =
@@ -811,27 +805,36 @@ TEST_F(DriverTest, PowerLeaseControl) {
     ASSERT_EQ(status, ZX_OK);
   });
   driver_test().RunInEnvironmentTypeContext([&](TestEnvironment& env) {
-    zx_status_t status = env.power_broker().element_control_server().channel().get_info(
-        ZX_INFO_HANDLE_BASIC, &broker_element_control, sizeof(zx_info_handle_basic_t), nullptr,
-        nullptr);
-    ASSERT_EQ(status, ZX_OK);
+    broker_element_control = env.power_broker().element_control_info();
   });
   ASSERT_EQ(broker_element_control.koid, driver_element_control.related_koid);
 }
 
-TEST_F(DriverTest, WaitTriggering) {
+TEST_F(DriverTest, StartAndWaitTriggering) {
   driver_test().RunInEnvironmentTypeContext(
       [](TestEnvironment& env) { env.platform_device().TriggerAllIrqs(); });
 
-  // Timers id 0 to 8 inclusive but not 4 support wait (via IRQ notification).
-  for (uint64_t i = 0; i < 9; ++i) {
-    if (i == 4) {
-      continue;
-    }
+  for (auto& i : kTimersSupportWait) {
     auto result_start =
         client_->StartAndWait({i, fuchsia_hardware_hrtimer::Resolution::WithDuration(1'000ULL), 0});
     ASSERT_FALSE(result_start.is_error());
     ASSERT_TRUE(result_start->keep_alive().is_valid());
+  }
+}
+
+TEST_F(DriverTest, StartAndWait2Triggering) {
+  driver_test().RunInEnvironmentTypeContext(
+      [](TestEnvironment& env) { env.platform_device().TriggerAllIrqs(); });
+
+  for (auto& i : kTimersSupportWait) {
+    zx::eventpair local_wake_lease, remote_wake_lease;
+    ASSERT_TRUE(fuchsia_power_system::WakeLeaseToken::create(0, &local_wake_lease,
+                                                             &remote_wake_lease) == ZX_OK);
+    auto result_start =
+        client_->StartAndWait2({i, fuchsia_hardware_hrtimer::Resolution::WithDuration(1'000ULL), 0,
+                                std::move(remote_wake_lease)});
+    ASSERT_FALSE(result_start.is_error());
+    ASSERT_TRUE(result_start->expiration_keep_alive().is_valid());
   }
 }
 
@@ -882,11 +885,7 @@ TEST_F(DriverTest, LeaseError) {
     env.platform_device().TriggerAllIrqs();
   });
 
-  // Timers id 0 to 8 inclusive but not 4 support wait (via IRQ notification).
-  for (uint64_t i = 0; i < 9; ++i) {
-    if (i == 4) {
-      continue;
-    }
+  for (auto& i : kTimersSupportWait) {
     auto result_start =
         client_->StartAndWait({i, fuchsia_hardware_hrtimer::Resolution::WithDuration(1'000ULL), 0});
     ASSERT_TRUE(result_start.is_error());
@@ -896,15 +895,40 @@ TEST_F(DriverTest, LeaseError) {
   }
 }
 
-TEST_F(DriverTest, WaitStop) {
-  // Timers id 0 to 8 inclusive but not 4 support wait (via IRQ notification).
-  for (uint64_t i = 0; i < 9; ++i) {
-    if (i == 4) {
-      continue;
-    }
+TEST_F(DriverTest, StartAndWaitStop) {
+  for (auto& i : kTimersSupportWait) {
     std::thread thread([this, i]() {
       auto result_start = client_->StartAndWait(
           {i, fuchsia_hardware_hrtimer::Resolution::WithDuration(1'000ULL), 0});
+      ASSERT_TRUE(result_start.is_error());
+      ASSERT_EQ(result_start.error_value().domain_error(),
+                fuchsia_hardware_hrtimer::DriverError::kCanceled);
+    });
+
+    // Wait until the driver has acquired a wait completer such that we can cancel the timer.
+    bool has_wait_completer = false;
+    while (!has_wait_completer) {
+      driver_test().RunInDriverContext([i, &has_wait_completer](AmlHrtimer& driver) {
+        has_wait_completer = driver.HasWaitCompleter(i);
+      });
+      zx::nanosleep(zx::deadline_after(zx::msec(1)));
+    }
+
+    auto result_start_stop = client_->Stop(i);
+    ASSERT_FALSE(result_start_stop.is_error());
+    thread.join();
+  }
+}
+
+TEST_F(DriverTest, StartAndWait2Stop) {
+  for (auto& i : kTimersSupportWait) {
+    std::thread thread([this, i]() {
+      zx::eventpair local_wake_lease, remote_wake_lease;
+      ASSERT_TRUE(fuchsia_power_system::WakeLeaseToken::create(0, &local_wake_lease,
+                                                               &remote_wake_lease) == ZX_OK);
+      auto result_start =
+          client_->StartAndWait2({i, fuchsia_hardware_hrtimer::Resolution::WithDuration(1'000ULL),
+                                  0, std::move(remote_wake_lease)});
       ASSERT_TRUE(result_start.is_error());
       ASSERT_EQ(result_start.error_value().domain_error(),
                 fuchsia_hardware_hrtimer::DriverError::kCanceled);
@@ -958,12 +982,8 @@ class DriverTestNoAutoStop : public ::testing::Test {
 
 TEST_F(DriverTestNoAutoStop, CancelOnDriverStop) {
   std::vector<std::thread> threads;
-  zx::event events[9];
-  // Timers id 0 to 8 inclusive but not 4 support events and wait (via IRQ notification).
-  for (uint64_t i = 0; i < 9; ++i) {
-    if (i == 4) {
-      continue;
-    }
+  zx::event events[kNumberOfTimers];
+  for (auto& i : kTimersSupportWait) {
     ASSERT_EQ(zx::event::create(0, &events[i]), ZX_OK);
     zx::event duplicate_event;
     events[i].duplicate(ZX_RIGHT_SAME_RIGHTS, &duplicate_event);
@@ -1068,17 +1088,30 @@ class DriverTestNoPower : public ::testing::Test {
   fidl::SyncClient<fuchsia_hardware_hrtimer::Device> client_;
 };
 
-TEST_F(DriverTestNoPower, WaitTriggeringNoPower) {
+TEST_F(DriverTestNoPower, StartAndWaitTriggeringNoPower) {
   driver_test().RunInEnvironmentTypeContext(
       [](TestEnvironmentNoPower& env) { env.platform_device().TriggerAllIrqs(); });
 
-  // Timers id 0 to 8 inclusive but not 4 support wait (via IRQ notification).
-  for (uint64_t i = 0; i < 9; ++i) {
-    if (i == 4) {
-      continue;
-    }
+  for (auto& i : kTimersSupportWait) {
     auto result_start =
         client_->StartAndWait({i, fuchsia_hardware_hrtimer::Resolution::WithDuration(1'000ULL), 0});
+    ASSERT_TRUE(result_start.is_error());  // Must fail, no power configuration.
+    ASSERT_EQ(result_start.error_value().domain_error(),
+              fuchsia_hardware_hrtimer::DriverError::kBadState);
+  }
+}
+
+TEST_F(DriverTestNoPower, StartAndWait2TriggeringNoPower) {
+  driver_test().RunInEnvironmentTypeContext(
+      [](TestEnvironmentNoPower& env) { env.platform_device().TriggerAllIrqs(); });
+
+  for (auto& i : kTimersSupportWait) {
+    zx::eventpair local_wake_lease, remote_wake_lease;
+    ASSERT_TRUE(fuchsia_power_system::WakeLeaseToken::create(0, &local_wake_lease,
+                                                             &remote_wake_lease) == ZX_OK);
+    auto result_start =
+        client_->StartAndWait2({i, fuchsia_hardware_hrtimer::Resolution::WithDuration(1'000ULL), 0,
+                                std::move(remote_wake_lease)});
     ASSERT_TRUE(result_start.is_error());  // Must fail, no power configuration.
     ASSERT_EQ(result_start.error_value().domain_error(),
               fuchsia_hardware_hrtimer::DriverError::kBadState);

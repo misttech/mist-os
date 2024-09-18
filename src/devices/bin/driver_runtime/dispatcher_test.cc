@@ -1627,7 +1627,7 @@ TEST_F(DispatcherTest, CancelWaitRaceCondition) {
       // callback to be invoked, so we need to handle this case without failing.
       //
       // In practice, when this test fails it's usually because it hits a debug assert in the
-      // underlying async implementation in zircon/system/ulib/async/wait.cc, rather than failing
+      // underlying async implementation in sdk/lib/async/wait.cc, rather than failing
       // this assert.
       ASSERT_OK(wait.Cancel());
       completion.Signal();

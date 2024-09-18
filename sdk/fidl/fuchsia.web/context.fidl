@@ -143,7 +143,8 @@ type CreateContextParams = resource table {
     ///
     /// The following services are recommended to be present in order to allow CPU scheduling
     /// profiles to be applied to threads to tune their performance, especially for media rendering.
-    /// - [`fuchsia.media.ProfileProvider`]
+    /// - [`fuchsia.media.ProfileProvider`] (requirement will be removed in 2025)
+    /// - [`fuchsia.scheduler.RoleManager`]
     ///
     /// The following services must be present in order to render web content in a Scenic view
     /// using [`Frame.CreateView`], [`Frame.CreateViewWithViewRef`] or [`Frame.CreateView2`]]:

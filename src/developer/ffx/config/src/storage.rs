@@ -319,11 +319,45 @@ impl Config {
         nested_get(self.get_level(level), key_vec.get(0)?, &key_vec[1..]).cloned()
     }
 
+    fn merge_object(&self, mut omap: Map<String, Value>, key: &str) -> Value {
+        let key_vec: Vec<&str> = key.split('.').collect();
+
+        for c in self.iter() {
+            if let Some(Value::Object(map)) = nested_get(c, key_vec[0], &key_vec[1..]) {
+                for (k, v) in map {
+                    if let serde_json::map::Entry::Vacant(e) = omap.entry(k) {
+                        e.insert(v.clone());
+                    }
+                }
+            }
+        }
+
+        Value::Object(omap)
+    }
+
     pub fn get(&self, key: &str, select: SelectMode) -> Option<Value> {
         let key_vec: Vec<&str> = key.split('.').collect();
         match select {
             SelectMode::First => {
-                self.iter().find_map(|c| nested_get(c, *key_vec.get(0)?, &key_vec[1..])).cloned()
+                let res = self
+                    .iter()
+                    .find_map(|c| nested_get(c, *key_vec.get(0)?, &key_vec[1..]))
+                    .cloned();
+                if let Some(Value::Object(omap)) = res {
+                    // When we are querying an object, we want the semantics to
+                    // match that of querying fields within an object. I.e. if
+                    // we get back an object with the same fields as if queries
+                    // those individual fields. This means we need to query the
+                    // all the config levels, merging on all the fields that are
+                    // not shadowed by a higher-level config. Note: this merging
+                    // only makes sense for objects, not for arrays. Objects
+                    // are treated specially in config, by virtue of the "key"
+                    // syntax: "a.b.c"; there is no equivalent array syntax
+                    // ("a.b[0]"), so the semantics can stay simple.
+                    Some(self.merge_object(omap, key))
+                } else {
+                    res
+                }
             }
             SelectMode::All => {
                 let result: Vec<Value> = self
@@ -462,6 +496,15 @@ mod test {
         {
             "name": {
                "nested": "Nested"
+            }
+        }"#;
+
+    const SHALLOW: &'static [u8] = br#"
+        {
+            "name": {
+               "nested": {
+                    "shallow": "SHALLOW"
+               }
             }
         }"#;
 
@@ -892,6 +935,74 @@ mod test {
         };
         let value = test.get("name.nested", SelectMode::First).as_ref().recursive_map(&test_map);
         assert_eq!(value, Some(serde_json::from_str("{\"deep\": {\"name\": \"passed\"}}")?));
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_should_merge_values_in_sub_tree() -> Result<()> {
+        let test = Config {
+            user: None,
+            build: None,
+            global: None,
+            default: serde_json::from_slice(SHALLOW)?,
+            runtime: serde_json::from_slice(DEEP)?,
+        };
+        let value: Option<Value> = test.get("name.nested", SelectMode::First);
+        assert_eq!(
+            value,
+            Some(serde_json::from_str(r#"{"deep": {"name": "TEST_MAP"}, "shallow": "SHALLOW"}"#)?)
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_should_merge_overlapping_values_in_sub_tree() -> Result<()> {
+        const SHALLOW2: &'static [u8] = br#"
+            {
+                "name": {
+                   "nested": {
+                        "shallow": "SHALLOW2"
+                   }
+                }
+            }"#;
+
+        let test = Config {
+            user: None,
+            build: None,
+            global: None,
+            default: serde_json::from_slice(SHALLOW2)?,
+            runtime: serde_json::from_slice(SHALLOW)?,
+        };
+        let value: Option<Value> = test.get("name.nested", SelectMode::First);
+        assert_eq!(value, Some(serde_json::from_str(r#"{"shallow": "SHALLOW"}"#)?));
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_should_merge_objects_in_sub_tree() -> Result<()> {
+        const OBJ1: &'static [u8] = br#"
+            {
+                "top": {
+                   "list": ["a"]
+                }
+            }"#;
+
+        const OBJ2: &'static [u8] = br#"
+            {
+                "top": {
+                   "str": "b"
+                }
+            }"#;
+
+        let test = Config {
+            user: None,
+            build: None,
+            global: None,
+            default: serde_json::from_slice(OBJ1)?,
+            runtime: serde_json::from_slice(OBJ2)?,
+        };
+        let value: Option<Value> = test.get("top", SelectMode::First);
+        assert_eq!(value, Some(serde_json::from_str(r#"{"list": ["a"], "str": "b"}"#)?));
         Ok(())
     }
 

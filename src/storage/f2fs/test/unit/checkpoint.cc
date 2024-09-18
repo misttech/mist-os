@@ -1123,7 +1123,7 @@ TEST_F(CheckpointTest, DoCheckpointDiskFail) {
 
   auto hook = [&](const block_fifo_request_t &_req, const zx::vmo *_vmo) {
     if (_req.command.opcode == BLOCK_OPCODE_WRITE &&
-        _req.command.flags & (BLOCK_IO_FLAG_PREFLUSH | BLOCK_IO_FLAG_FORCE_ACCESS)) {
+        _req.command.flags & BLOCK_IO_FLAG_FORCE_ACCESS) {
       return ZX_ERR_PEER_CLOSED;
     }
     return ZX_OK;

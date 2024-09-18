@@ -38,7 +38,7 @@ use crate::object_store::journal::{
     JournalCheckpoint, JournalCheckpointV32, JournalHandle as _, BLOCK_SIZE,
 };
 use crate::object_store::object_record::{
-    ObjectItemV32, ObjectItemV33, ObjectItemV37, ObjectItemV38,
+    ObjectItemV32, ObjectItemV33, ObjectItemV37, ObjectItemV38, ObjectItemV40,
 };
 use crate::object_store::transaction::{AssocObj, Options};
 use crate::object_store::tree::MajorCompactable;
@@ -208,23 +208,31 @@ impl<'de> Deserialize<'de> for UuidWrapper {
     }
 }
 
-pub type SuperBlockRecord = SuperBlockRecordV38;
+pub type SuperBlockRecord = SuperBlockRecordV40;
 
 #[derive(Debug, Serialize, Deserialize, TypeFingerprint, Versioned)]
-pub enum SuperBlockRecordV38 {
+pub enum SuperBlockRecordV40 {
     // When reading the super-block we know the initial extent, but not subsequent extents, so these
     // records need to exist to allow us to completely read the super-block.
     Extent(Range<u64>),
 
     // Following the super-block header are ObjectItem records that are to be replayed into the root
     // parent object store.
-    ObjectItem(ObjectItemV38),
+    ObjectItem(ObjectItemV40),
 
     // Marks the end of the full super-block.
     End,
 }
 
-#[derive(Debug, Deserialize, Migrate, Serialize, Versioned, TypeFingerprint)]
+#[derive(Migrate, Serialize, Deserialize, TypeFingerprint, Versioned)]
+#[migrate_to_version(SuperBlockRecordV40)]
+pub enum SuperBlockRecordV38 {
+    Extent(Range<u64>),
+    ObjectItem(ObjectItemV38),
+    End,
+}
+
+#[derive(Deserialize, Migrate, Serialize, Versioned, TypeFingerprint)]
 #[migrate_to_version(SuperBlockRecordV38)]
 pub enum SuperBlockRecordV37 {
     Extent(Range<u64>),
@@ -232,7 +240,7 @@ pub enum SuperBlockRecordV37 {
     End,
 }
 
-#[derive(Debug, Deserialize, Migrate, Serialize, Versioned, TypeFingerprint)]
+#[derive(Deserialize, Migrate, Serialize, Versioned, TypeFingerprint)]
 #[migrate_to_version(SuperBlockRecordV37)]
 pub enum SuperBlockRecordV33 {
     Extent(Range<u64>),
@@ -240,7 +248,7 @@ pub enum SuperBlockRecordV33 {
     End,
 }
 
-#[derive(Debug, Deserialize, Migrate, Serialize, Versioned, TypeFingerprint)]
+#[derive(Deserialize, Migrate, Serialize, Versioned, TypeFingerprint)]
 #[migrate_to_version(SuperBlockRecordV33)]
 pub enum SuperBlockRecordV32 {
     Extent(Range<u64>),

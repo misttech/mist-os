@@ -4377,8 +4377,8 @@ pub fn offer_to_all_would_duplicate(
     specific_offer: &Offer,
     target: &cm_types::Name,
 ) -> Result<bool, Error> {
-    // Only protocols may be offered to all
-    assert!(offer_to_all.protocol.is_some());
+    // Only protocols and dictionaries may be offered to all
+    assert!(offer_to_all.protocol.is_some() || offer_to_all.dictionary.is_some());
 
     // If none of the pairs of the cross products of the two offer's protocols
     // match, then the offer is certainly not a duplicate

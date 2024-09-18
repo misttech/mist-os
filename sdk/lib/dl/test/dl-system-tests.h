@@ -26,14 +26,17 @@ class DlSystemTests : public DlSystemLoadTestsBase {
   static constexpr bool kCanMatchExactError = false;
 
 #ifdef __Fuchsia__
-  // Fuchisa's musl will always prioritize a loaded module for symbol lookup.
+  // Musl always prioritizes a loaded module for symbol lookup.
   static constexpr bool kStrictLoadOrderPriority = true;
-  // Fuchsia's musl implementation of dlopen does not validate flag values for
-  // the mode argument.
+  // Musl does not validate flag values for dlopen's mode argument.
   static constexpr bool kCanValidateMode = false;
-  // Fuchsia's musl will emit a "symbol not found" error for scenarios where
-  // glibc or libdl will emit an "undefined symbol" error.
+  // Musl will emit a "symbol not found" error for scenarios where glibc or
+  // libdl will emit an "undefined symbol" error.
   static constexpr bool kEmitsSymbolNotFound = true;
+
+  // TODO(https://fxbug.dev/338295240): Remove once MUSL no longer crashes with weak TLS
+  // symbols.
+  static constexpr bool kSupportsTls = false;
 #endif
 
   fit::result<Error, void*> DlOpen(const char* file, int mode);
@@ -42,16 +45,15 @@ class DlSystemTests : public DlSystemLoadTestsBase {
 
   static fit::result<Error, void*> DlSym(void* module, const char* ref);
 
-  // TODO(https://fxbug.dev/354043838): We can convert these functions to be
-  // wrappers around ExpectLoadModule/Needed when we create stamped executables
-  // in //sdk/lib/ld/test/modules/BUILD.gn.
   // ExpectRootModule or Needed are called by tests when a file is expected to
   // be loaded from the file system for the first time. The following functions
   // will call DlOpen(file, RTLD_NOLOAD) to ensure that `file` is not already
   // loaded (e.g. by a previous test).
-  void ExpectRootModuleNotLoaded(std::string_view name);
+  void ExpectRootModule(std::string_view name);
 
-  void ExpectNeededNotLoaded(std::initializer_list<std::string_view> names);
+  void Needed(std::initializer_list<std::string_view> names);
+
+  void Needed(std::initializer_list<std::pair<std::string_view, bool>> name_found_pairs);
 
   void CleanUpOpenedFile(void* ptr) override { ASSERT_TRUE(DlClose(ptr).is_ok()); }
 
@@ -61,6 +63,10 @@ class DlSystemTests : public DlSystemLoadTestsBase {
   // classes because the logic it performs is only needed for testing the
   // system dlopen by this test fixture.
   void* CallDlOpen(const char* file, int mode);
+
+  // DlOpen `name` with `RTLD_NOLOAD` to ensure this will be the first time the
+  // file is loaded from the filesystem.
+  void NoLoadCheck(std::string_view name);
 };
 
 }  // namespace dl::testing

@@ -142,7 +142,8 @@ where
 {
     let kernel = current_task.kernel();
     let registry = &kernel.device_registry;
-    let tty_class = registry.get_or_create_class("tty".into(), registry.virtual_bus());
+    let tty_class =
+        registry.objects.get_or_create_class("tty".into(), registry.objects.virtual_bus());
     registry.add_device(
         locked,
         current_task,

@@ -926,8 +926,8 @@ TEST(HelpersTest, SecurityLevelFromFidl) {
 }
 
 TEST(HelpersTest, SecurityLevelFromBadFidlFails) {
-  int nonexistant_security_level = 500000;
-  auto level = static_cast<fsys::PairingSecurityLevel>(nonexistant_security_level);
+  int nonexistent_security_level = 500000;
+  auto level = static_cast<fsys::PairingSecurityLevel>(nonexistent_security_level);
   EXPECT_EQ(std::nullopt, SecurityLevelFromFidl(level));
 }
 

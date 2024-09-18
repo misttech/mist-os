@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use anyhow::{Context, Result};
-use fidl::endpoints::ServiceMarker;
 use fuchsia_async::{self as fasync, DurationExt, Timer};
 use fuchsia_component::client;
 use fuchsia_component_test::RealmBuilder;
@@ -16,19 +15,18 @@ async fn test_services() -> Result<()> {
     // Create the RealmBuilder.
     let builder = RealmBuilder::new().await?;
     builder.driver_test_realm_setup().await?;
-    builder.driver_test_realm_add_expose::<ft::DeviceMarker>().await?;
+
+    let expose = fuchsia_component_test::Capability::service::<ft::DeviceMarker>().into();
+    let dtr_exposes = vec![expose];
+
+    builder.driver_test_realm_add_dtr_exposes(&dtr_exposes).await?;
     // Build the Realm.
     let realm = builder.build().await?;
-
-    let exposes = vec![fdt::Expose {
-        service_name: ft::DeviceMarker::SERVICE_NAME.to_string(),
-        collection: fdt::Collection::PackageDrivers,
-    }];
 
     // Start the DriverTestRealm.
     let args = fdt::RealmArgs {
         root_driver: Some("#meta/root.cm".to_string()),
-        exposes: Some(exposes),
+        dtr_exposes: Some(dtr_exposes),
         ..Default::default()
     };
     realm.driver_test_realm_start(args).await?;

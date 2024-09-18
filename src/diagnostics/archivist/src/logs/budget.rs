@@ -5,6 +5,7 @@
 use crate::identity::ComponentIdentity;
 use crate::logs::container::LogsArtifactsContainer;
 use fuchsia_sync::Mutex;
+use fuchsia_zircon as zx;
 use futures::channel::mpsc;
 use std::sync::{Arc, Weak};
 use tracing::{debug, warn};
@@ -65,7 +66,9 @@ impl BudgetState {
 
         while self.current > self.capacity {
             // find the container with the oldest log message
-            self.containers.sort_unstable_by_key(|c| c.oldest_timestamp().unwrap_or(i64::MAX));
+            self.containers.sort_unstable_by_key(|c| {
+                c.oldest_timestamp().unwrap_or(zx::MonotonicTime::from_nanos(i64::MAX))
+            });
 
             let container_with_oldest = Arc::clone(
                 self.containers
@@ -130,7 +133,7 @@ impl BudgetHandle {
 mod tests {
     use super::*;
     use crate::logs::multiplex::PinStream;
-    use crate::logs::stored_message::{GenericStoredMessage, StructuredStoredMessage};
+    use crate::logs::stored_message::StoredMessage;
     use crate::testing::TEST_IDENTITY;
     use diagnostics_data::{LogsData, Severity};
     use diagnostics_log_encoding::encode::{Encoder, EncoderOpts};
@@ -158,12 +161,14 @@ mod tests {
         let container_a = Arc::new(LogsArtifactsContainer::new(
             TEST_IDENTITY.clone(),
             std::iter::empty(),
+            None,
             fuchsia_inspect::component::inspector().root(),
             manager.handle(),
         ));
         let container_b = Arc::new(LogsArtifactsContainer::new(
             TEST_IDENTITY.clone(),
             std::iter::empty(),
+            None,
             fuchsia_inspect::component::inspector().root(),
             manager.handle(),
         ));
@@ -193,7 +198,7 @@ mod tests {
         assert_eq!(cursor.next().await, None);
     }
 
-    fn fake_message_bytes(timestamp: i64) -> GenericStoredMessage {
+    fn fake_message_bytes(timestamp: i64) -> StoredMessage {
         let record = Record {
             timestamp,
             severity: StreamSeverity::Debug.into_primitive(),
@@ -206,7 +211,7 @@ mod tests {
         let mut encoder = Encoder::new(&mut buffer, EncoderOpts::default());
         encoder.write_record(&record).unwrap();
         let encoded = &buffer.get_ref()[..buffer.position() as usize];
-        StructuredStoredMessage::create(encoded.to_vec(), Default::default())
+        StoredMessage::new(encoded.to_vec().into(), &Default::default()).unwrap()
     }
 
     fn fake_message(timestamp: i64) -> LogsData {

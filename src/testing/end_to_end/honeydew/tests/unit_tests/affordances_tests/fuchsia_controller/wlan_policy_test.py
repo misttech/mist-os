@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 """Unit tests for honeydew.affordances.fuchsia_controller.wlan.wlan_policy."""
 
+import asyncio
 import unittest
 from collections.abc import Iterator
 from contextlib import contextmanager
@@ -21,13 +22,91 @@ from honeydew.transports import fuchsia_controller as fc_transport
 from honeydew.typing.wlan import (
     ClientStateSummary,
     ConnectionState,
+    NetworkConfig,
     NetworkIdentifier,
     NetworkState,
+    RequestStatus,
     SecurityType,
     WlanClientState,
 )
 
 _TEST_SSID = "ThepromisedLAN"
+_TEST_SSID_BYTES = list(str.encode(_TEST_SSID))
+
+_TEST_PASSWORD = "password"
+_TEST_PSK = "c9a68e83bfd123d144ec5256bc45682accfb8e8f0561f39f44dd388cba9e86f2"
+
+_TEST_CREDENTIAL_NONE = f_wlan_policy.Credential()
+_TEST_CREDENTIAL_NONE.none = f_wlan_policy.Empty()
+
+_TEST_CREDENTIAL_PASSWORD = f_wlan_policy.Credential()
+_TEST_CREDENTIAL_PASSWORD.password = list(str.encode(_TEST_PASSWORD))
+
+_TEST_CREDENTIAL_PSK = f_wlan_policy.Credential()
+_TEST_CREDENTIAL_PSK.psk = list(bytes.fromhex(_TEST_PSK))
+
+_TEST_NETWORK_CONFIG_NONE = NetworkConfig(
+    ssid=_TEST_SSID,
+    security_type=SecurityType.NONE,
+    credential_type="None",
+    credential_value="",
+)
+_TEST_NETWORK_CONFIG_NONE_FIDL = f_wlan_policy.NetworkConfig(
+    id=f_wlan_policy.NetworkIdentifier(
+        ssid=_TEST_SSID_BYTES,
+        type=f_wlan_policy.SecurityType.NONE,
+    ),
+    credential=_TEST_CREDENTIAL_NONE,
+)
+
+_TEST_NETWORK_CONFIG_PASSWORD = NetworkConfig(
+    ssid=_TEST_SSID,
+    security_type=SecurityType.WPA2,
+    credential_type="Password",
+    credential_value=_TEST_PASSWORD,
+)
+_TEST_NETWORK_CONFIG_PASSWORD_FIDL = f_wlan_policy.NetworkConfig(
+    id=f_wlan_policy.NetworkIdentifier(
+        ssid=_TEST_SSID_BYTES,
+        type=f_wlan_policy.SecurityType.WPA2,
+    ),
+    credential=_TEST_CREDENTIAL_PASSWORD,
+)
+
+_TEST_NETWORK_CONFIG_PSK = NetworkConfig(
+    ssid=_TEST_SSID,
+    security_type=SecurityType.WPA2,
+    credential_type="Psk",
+    credential_value=_TEST_PSK,
+)
+_TEST_NETWORK_CONFIG_PSK_FIDL = f_wlan_policy.NetworkConfig(
+    id=f_wlan_policy.NetworkIdentifier(
+        ssid=_TEST_SSID_BYTES,
+        type=f_wlan_policy.SecurityType.WPA2,
+    ),
+    credential=_TEST_CREDENTIAL_PSK,
+)
+
+_TEST_MAC_ADDRESS_BYTES = bytes([1, 35, 69, 103, 137, 171])  # 01:23:45:67:89:ab
+
+
+def _make_scan_result(ssid: str) -> f_wlan_policy.ScanResult:
+    return f_wlan_policy.ScanResult(
+        id=f_wlan_policy.NetworkIdentifier(
+            ssid=list(ssid.encode("utf-8")),
+            type=f_wlan_policy.SecurityType.WPA2,
+        ),
+        entries=[
+            f_wlan_policy.Bss(
+                bssid=list(_TEST_MAC_ADDRESS_BYTES),
+                rssi=0,
+                frequency=0,
+                timestamp_nanos=0,
+            ),
+        ],
+        compatibility=f_wlan_policy.Compatibility.SUPPORTED,
+    )
+
 
 _T = TypeVar("_T")
 
@@ -73,6 +152,8 @@ class WlanPolicyFCTests(unittest.TestCase):
         self.client_state_updates_proxy: (
             f_wlan_policy.ClientStateUpdatesClient | None
         ) = None
+        self.scan_result_iterator: asyncio.Task[None] | None = None
+        self.network_config_iterator: asyncio.Task[None] | None = None
 
     def tearDown(self) -> None:
         self.wlan_policy_obj.close()
@@ -142,8 +223,75 @@ class WlanPolicyFCTests(unittest.TestCase):
 
     def test_connect(self) -> None:
         """Test if connect works."""
-        with self.assertRaises(NotImplementedError):
-            self.wlan_policy_obj.connect("", SecurityType.NONE)
+        with self._mock_create_client_controller() as client_controller:
+            self.wlan_policy_obj.create_client_controller()
+
+            for msg, resp, expected in [
+                (
+                    "acknowledged",
+                    _async_response(
+                        f_wlan_policy.ClientControllerConnectResponse(
+                            status=f_wlan_common.RequestStatus.ACKNOWLEDGED
+                        )
+                    ),
+                    RequestStatus.ACKNOWLEDGED,
+                ),
+                (
+                    "not supported",
+                    _async_response(
+                        f_wlan_policy.ClientControllerConnectResponse(
+                            status=f_wlan_common.RequestStatus.REJECTED_NOT_SUPPORTED
+                        )
+                    ),
+                    RequestStatus.REJECTED_NOT_SUPPORTED,
+                ),
+                (
+                    "incompatible mode",
+                    _async_response(
+                        f_wlan_policy.ClientControllerConnectResponse(
+                            status=f_wlan_common.RequestStatus.REJECTED_INCOMPATIBLE_MODE
+                        )
+                    ),
+                    RequestStatus.REJECTED_INCOMPATIBLE_MODE,
+                ),
+                (
+                    "already in use",
+                    _async_response(
+                        f_wlan_policy.ClientControllerConnectResponse(
+                            status=f_wlan_common.RequestStatus.REJECTED_ALREADY_IN_USE
+                        )
+                    ),
+                    RequestStatus.REJECTED_ALREADY_IN_USE,
+                ),
+                (
+                    "duplicate request",
+                    _async_response(
+                        f_wlan_policy.ClientControllerConnectResponse(
+                            status=f_wlan_common.RequestStatus.REJECTED_DUPLICATE_REQUEST
+                        )
+                    ),
+                    RequestStatus.REJECTED_DUPLICATE_REQUEST,
+                ),
+                (
+                    "internal error",
+                    _async_error(ZxStatus(ZxStatus.ZX_ERR_INTERNAL)),
+                    None,
+                ),
+            ]:
+                with self.subTest(msg=msg, resp=resp, expected=expected):
+                    client_controller.connect.reset_mock()
+                    client_controller.connect.return_value = resp
+                    if expected:
+                        resp = self.wlan_policy_obj.connect(
+                            _TEST_SSID, SecurityType.NONE
+                        )
+                        self.assertEqual(resp, expected)
+                    else:
+                        with self.assertRaises(HoneydewWlanError):
+                            self.wlan_policy_obj.connect(
+                                _TEST_SSID, SecurityType.NONE
+                            )
+                    client_controller.connect.assert_called_once()
 
     def test_create_client_controller(self) -> None:
         """Test if create_client_controller works."""
@@ -168,10 +316,8 @@ class WlanPolicyFCTests(unittest.TestCase):
                 )
             )
 
-            update = (
-                self.wlan_policy_obj._async_adapter_loop.run_until_complete(
-                    self.wlan_policy_obj._client_controller.updates.get()
-                )
+            update = self.wlan_policy_obj.loop().run_until_complete(
+                self.wlan_policy_obj._client_controller.updates.get()
             )
             self.assertEqual(
                 update,
@@ -182,8 +328,40 @@ class WlanPolicyFCTests(unittest.TestCase):
 
     def test_get_saved_networks(self) -> None:
         """Test if get_saved_networks works."""
-        with self.assertRaises(NotImplementedError):
-            self.wlan_policy_obj.get_saved_networks()
+        with self._mock_create_client_controller() as client_controller:
+            self.wlan_policy_obj.create_client_controller()
+
+            def get_saved_networks(iterator: Channel) -> None:
+                server = TestNetworkConfigIteratorImpl(
+                    iterator,
+                    items=[
+                        [
+                            _TEST_NETWORK_CONFIG_NONE_FIDL,
+                            _TEST_NETWORK_CONFIG_PASSWORD_FIDL,
+                        ],
+                        [_TEST_NETWORK_CONFIG_PSK_FIDL],
+                    ],
+                )
+                self.network_config_iterator = (
+                    self.wlan_policy_obj.loop().create_task(server.serve())
+                )
+
+            client_controller.get_saved_networks = mock.Mock(
+                wraps=get_saved_networks
+            )
+
+            networks = self.wlan_policy_obj.get_saved_networks()
+            self.assertEqual(
+                networks,
+                [
+                    _TEST_NETWORK_CONFIG_NONE,
+                    _TEST_NETWORK_CONFIG_PASSWORD,
+                    _TEST_NETWORK_CONFIG_PSK,
+                ],
+            )
+
+            assert self.network_config_iterator is not None
+            self.wlan_policy_obj._cancel_task(self.network_config_iterator)
 
     def test_get_update(self) -> None:
         """Test if get_update works."""
@@ -259,13 +437,104 @@ class WlanPolicyFCTests(unittest.TestCase):
 
     def test_remove_all_networks(self) -> None:
         """Test if remove_all_networks works."""
-        with self.assertRaises(NotImplementedError):
-            self.wlan_policy_obj.remove_all_networks()
+        with self._mock_create_client_controller() as client_controller:
+            self.wlan_policy_obj.create_client_controller()
 
-    def test_remove_network(self) -> None:
+            # Mock get_saved_networks
+            def get_saved_networks(iterator: Channel) -> None:
+                server = TestNetworkConfigIteratorImpl(
+                    iterator,
+                    items=[
+                        [
+                            _TEST_NETWORK_CONFIG_NONE_FIDL,
+                            _TEST_NETWORK_CONFIG_PASSWORD_FIDL,
+                            _TEST_NETWORK_CONFIG_PSK_FIDL,
+                        ],
+                    ],
+                )
+                self.network_config_iterator = (
+                    self.wlan_policy_obj.loop().create_task(server.serve())
+                )
+
+            client_controller.get_saved_networks = mock.Mock(
+                wraps=get_saved_networks
+            )
+
+            # Mock remove_network, which should be called once for each saved
+            # network.
+            res = f_wlan_policy.ClientControllerRemoveNetworkResult()
+            res.response = f_wlan_policy.ClientControllerRemoveNetworkResponse()
+            client_controller.remove_network.side_effect = [
+                _async_response(res),
+                _async_response(res),
+                _async_response(res),
+            ]
+
+            # Remove all networks
+            self.wlan_policy_obj.remove_all_networks()
+            client_controller.remove_network.assert_has_calls(
+                [
+                    mock.call(config=_TEST_NETWORK_CONFIG_NONE_FIDL),
+                    mock.call(config=_TEST_NETWORK_CONFIG_PASSWORD_FIDL),
+                    mock.call(config=_TEST_NETWORK_CONFIG_PSK_FIDL),
+                ]
+            )
+
+            # Cleanup
+            assert self.network_config_iterator is not None
+            self.wlan_policy_obj._cancel_task(self.network_config_iterator)
+
+    def test_remove_network_passes(self) -> None:
         """Test if remove_network works."""
-        with self.assertRaises(NotImplementedError):
-            self.wlan_policy_obj.remove_network("", SecurityType.NONE)
+        with self._mock_create_client_controller() as client_controller:
+            self.wlan_policy_obj.create_client_controller()
+
+            res = f_wlan_policy.ClientControllerRemoveNetworkResult()
+            res.response = f_wlan_policy.ClientControllerRemoveNetworkResponse()
+            client_controller.remove_network.return_value = _async_response(res)
+
+            self.wlan_policy_obj.remove_network(
+                _TEST_SSID, SecurityType.NONE, None
+            )
+            client_controller.remove_network.assert_called_with(
+                config=_TEST_NETWORK_CONFIG_NONE_FIDL
+            )
+
+    def test_remove_network_fails(self) -> None:
+        """Test if remove_network throws HoneydewWlanError as expected."""
+        with self._mock_create_client_controller() as client_controller:
+            self.wlan_policy_obj.create_client_controller()
+
+            with self.subTest(msg="NetworkConfigChangeError"):
+                res = f_wlan_policy.ClientControllerRemoveNetworkResult()
+                res.err = (
+                    f_wlan_policy.NetworkConfigChangeError.CREDENTIAL_LEN_ERROR
+                )
+                client_controller.remove_network.return_value = _async_response(
+                    res
+                )
+
+                with self.assertRaises(HoneydewWlanError):
+                    self.wlan_policy_obj.remove_network(
+                        _TEST_SSID, SecurityType.NONE, None
+                    )
+                client_controller.remove_network.assert_called_once()
+
+            with self.subTest(msg="ZxStatus"):
+                res = f_wlan_policy.ClientControllerRemoveNetworkResult()
+                res.err = (
+                    f_wlan_policy.NetworkConfigChangeError.CREDENTIAL_LEN_ERROR
+                )
+                client_controller.remove_network.reset_mock()
+                client_controller.remove_network.return_value = _async_error(
+                    ZxStatus(ZxStatus.ZX_ERR_INTERNAL)
+                )
+
+                with self.assertRaises(HoneydewWlanError):
+                    self.wlan_policy_obj.remove_network(
+                        _TEST_SSID, SecurityType.NONE, None
+                    )
+                client_controller.remove_network.assert_called_once()
 
     def test_save_network_passes(self) -> None:
         """Test if save_network works."""
@@ -319,8 +588,44 @@ class WlanPolicyFCTests(unittest.TestCase):
 
     def test_scan_for_networks(self) -> None:
         """Test if scan_for_networks works."""
-        with self.assertRaises(NotImplementedError):
-            self.wlan_policy_obj.scan_for_networks()
+        with self._mock_create_client_controller() as client_controller:
+            self.wlan_policy_obj.create_client_controller()
+
+            def scan_for_networks(iterator: Channel) -> None:
+                server = TestScanResultIteratorImpl(
+                    iterator,
+                    items=[
+                        [
+                            _TEST_SSID,
+                            _TEST_SSID + "2",
+                        ],
+                        [
+                            _TEST_SSID,
+                            _TEST_SSID + "3",
+                        ],
+                    ],
+                )
+                self.scan_result_iterator = (
+                    self.wlan_policy_obj.loop().create_task(server.serve())
+                )
+
+            client_controller.scan_for_networks = mock.Mock(
+                wraps=scan_for_networks
+            )
+
+            networks = self.wlan_policy_obj.scan_for_networks()
+            networks.sort()  # order does not matter
+            self.assertEqual(
+                networks,
+                [
+                    _TEST_SSID,
+                    _TEST_SSID + "2",
+                    _TEST_SSID + "3",
+                ],
+            )
+
+            assert self.scan_result_iterator is not None
+            self.wlan_policy_obj._cancel_task(self.scan_result_iterator)
 
     def test_set_new_update_listener_without_client_controller(self) -> None:
         """Test if set_new_update_listener creates a client controller if it
@@ -505,6 +810,44 @@ class WlanPolicyFCTests(unittest.TestCase):
         """Test if stop_client_connections fails without a client controller."""
         with self.assertRaises(RuntimeError):
             self.wlan_policy_obj.stop_client_connections()
+
+
+class TestScanResultIteratorImpl(f_wlan_policy.ScanResultIterator.Server):
+    """Iterator for scan results."""
+
+    def __init__(self, server: Channel, items: list[list[str]]) -> None:
+        super().__init__(server)
+        self._items = items
+
+    def get_next(self) -> f_wlan_policy.ScanResultIteratorGetNextResponse:
+        """Get next set of scan result SSIDs."""
+        if len(self._items) == 0:
+            raise ZxStatus(ZxStatus.ZX_ERR_PEER_CLOSED)
+        return f_wlan_policy.ScanResultIteratorGetNextResponse(
+            scan_results=[
+                _make_scan_result(ssid) for ssid in self._items.pop(0)
+            ],
+        )
+
+
+class TestNetworkConfigIteratorImpl(f_wlan_policy.NetworkConfigIterator.Server):
+    """Iterator for NetworkConfig results."""
+
+    def __init__(
+        self, server: Channel, items: list[list[f_wlan_policy.NetworkConfig]]
+    ) -> None:
+        super().__init__(server)
+        self._items = items
+
+    def get_next(
+        self,
+    ) -> f_wlan_policy.NetworkConfigIteratorGetNextResponse:
+        """Get next set of NetworkConfigs."""
+        if len(self._items) == 0:
+            raise ZxStatus(ZxStatus.ZX_ERR_PEER_CLOSED)
+        return f_wlan_policy.NetworkConfigIteratorGetNextResponse(
+            configs=self._items.pop(0),
+        )
 
 
 if __name__ == "__main__":

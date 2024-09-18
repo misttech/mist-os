@@ -17,6 +17,12 @@
             rights: [ "rx*" ],
             path: "/svc/ta",
         },
+        {
+            directory: "props",
+            from: "self",
+            rights: [ "r*" ],
+            path: "/data/properties",
+        },
     ],
     use: [
         {
@@ -28,6 +34,10 @@
     expose: [
         {
             directory: "ta",
+            from: "self",
+        },
+        {
+            directory: "props",
             from: "self",
         },
     ],

@@ -4,6 +4,10 @@
 
 #![recursion_limit = "512"]
 
+mod seq_lock;
+
+use seq_lock::SeqLock;
+
 use starnix_core::mm::memory::MemoryObject;
 use starnix_core::security;
 use starnix_core::task::CurrentTask;
@@ -17,12 +21,12 @@ use starnix_core::vfs::{
     StaticDirectoryBuilder, VecDirectory, VecDirectoryEntry,
 };
 
-use fuchsia_zircon as zx;
-use fuchsia_zircon::HandleBased;
+use fuchsia_zircon::{self as zx, HandleBased as _};
 use selinux::policy::SUPPORTED_POLICY_VERSION;
-use selinux::SecurityPermission;
-use selinux_core::security_server::SecurityServer;
-use selinux_core::{InitialSid, SecurityId};
+use selinux::{
+    InitialSid, SeLinuxStatus, SeLinuxStatusPublisher, SecurityId, SecurityPermission,
+    SecurityServer,
+};
 use starnix_logging::{impossible_error, log_error, log_info, track_stub};
 use starnix_sync::{FileOpsCore, Locked, Unlocked};
 use starnix_uapi::device_type::DeviceType;
@@ -34,6 +38,52 @@ use starnix_uapi::{errno, error, off_t, statfs, SELINUX_MAGIC};
 use std::borrow::Cow;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
+use zerocopy::{AsBytes, NoCell};
+
+/// The version of the SELinux "status" file this implementation implements.
+const SELINUX_STATUS_VERSION: u32 = 1;
+
+/// Header of the C-style struct exposed via the /sys/fs/selinux/status file,
+/// to userspace. Defined here (instead of imported through bindgen) as selinux
+/// headers are not exposed through  kernel uapi headers.
+#[derive(AsBytes, Copy, Clone, NoCell)]
+#[repr(C, align(4))]
+struct SeLinuxStatusHeader {
+    /// Version number of this structure (1).
+    version: u32,
+}
+
+impl Default for SeLinuxStatusHeader {
+    fn default() -> Self {
+        Self { version: SELINUX_STATUS_VERSION }
+    }
+}
+
+/// Value part of the C-style struct exposed via the /sys/fs/selinux/status file,
+/// to userspace. Defined here (instead of imported through bindgen) as selinux
+/// headers are not exposed through  kernel uapi headers.
+#[derive(AsBytes, Copy, Clone, Default, NoCell)]
+#[repr(C, align(4))]
+struct SeLinuxStatusValue {
+    /// `0` means permissive mode, `1` means enforcing mode.
+    enforcing: u32,
+    /// The number of times the selinux policy has been reloaded.
+    policyload: u32,
+    /// `0` means allow and `1` means deny unknown object classes/permissions.
+    deny_unknown: u32,
+}
+
+type StatusSeqLock = SeqLock<SeLinuxStatusHeader, SeLinuxStatusValue>;
+
+impl SeLinuxStatusPublisher for StatusSeqLock {
+    fn set_status(&mut self, policy_status: SeLinuxStatus) {
+        self.set_value(SeLinuxStatusValue {
+            enforcing: policy_status.is_enforcing as u32,
+            policyload: policy_status.change_count,
+            deny_unknown: policy_status.deny_unknown as u32,
+        })
+    }
+}
 
 struct SeLinuxFs;
 impl FileSystemOps for SeLinuxFs {
@@ -104,21 +154,22 @@ impl SeLinuxFs {
             BytesFile::new_node(format!("{}", SUPPORTED_POLICY_VERSION).into_bytes()),
             mode!(IFREG, 0o444),
         );
+
+        // The status file needs to be mmap-able, so use a VMO-backed file. When the selinux state
+        // changes in the future, the way to update this data (and communicate updates with
+        // userspace) is to use the ["seqlock"](https://en.wikipedia.org/wiki/Seqlock) technique.
+        let status_holder = StatusSeqLock::new_default().expect("selinuxfs status seqlock");
+        let status_file = status_holder
+            .get_readonly_vmo()
+            .duplicate_handle(zx::Rights::SAME_RIGHTS)
+            .map_err(impossible_error)?;
         dir.entry(
             current_task,
             "status",
-            // The status file needs to be mmap-able, so use a VMO-backed file.
-            // When the selinux state changes in the future, the way to update this data (and
-            // communicate updates with userspace) is to use the
-            // ["seqlock"](https://en.wikipedia.org/wiki/Seqlock) technique.
-            MemoryFileNode::from_memory(Arc::new(MemoryObject::from(
-                security_server
-                    .get_status_vmo()
-                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
-                    .map_err(impossible_error)?,
-            ))),
+            MemoryFileNode::from_memory(Arc::new(MemoryObject::from(status_file))),
             mode!(IFREG, 0o444),
         );
+        security_server.set_status_publisher(Box::new(status_holder));
 
         // Write-only files used to configure and query SELinux.
         dir.entry(current_task, "access", AccessApi::new_node(), mode!(IFREG, 0o666));
@@ -182,15 +233,17 @@ impl SeLinuxApiOps for LoadApi {
     fn api_write_permission() -> SecurityPermission {
         SecurityPermission::LoadPolicy
     }
-    fn api_write(&self, offset: usize, data: Vec<u8>) -> Result<(), Errno> {
-        if offset != 0 {
-            return error!(EINVAL);
-        }
+    fn api_write_with_task(&self, current_task: &CurrentTask, data: Vec<u8>) -> Result<(), Errno> {
         log_info!("Loading {} byte policy", data.len());
         self.security_server.load_policy(data).map_err(|error| {
             log_error!("Policy load error: {}", error);
             errno!(EINVAL)
-        })
+        })?;
+
+        // Allow one-time initialization of state that requires a loaded policy.
+        security::selinuxfs_policy_loaded(current_task);
+
+        Ok(())
     }
 }
 
@@ -228,14 +281,15 @@ impl SeLinuxApiOps for EnforceApi {
         SecurityPermission::SetEnforce
     }
 
-    fn api_write(&self, _offset: usize, data: Vec<u8>) -> Result<(), Errno> {
+    fn api_write(&self, data: Vec<u8>) -> Result<(), Errno> {
+        // Callers may write any number of times to this API, so long as the `data` is valid.
         let enforce = parse_unsigned_file::<u32>(&data)? != 0;
         self.security_server.set_enforcing(enforce);
         Ok(())
     }
 
-    fn api_read(&self, _offset: usize) -> Result<Cow<'_, [u8]>, Errno> {
-        Ok(format!("{}", self.security_server.is_enforcing() as u32).into_bytes().into())
+    fn api_read(&self) -> Result<Cow<'_, [u8]>, Errno> {
+        Ok(self.security_server.is_enforcing().then_some(b"1").unwrap_or(b"0").into())
     }
 }
 
@@ -289,11 +343,11 @@ impl SeLinuxApiOps for CreateApi {
     fn api_write_permission() -> SecurityPermission {
         SecurityPermission::ComputeCreate
     }
-    fn api_write(&self, _offset: usize, _data: Vec<u8>) -> Result<(), Errno> {
+    fn api_write(&self, _data: Vec<u8>) -> Result<(), Errno> {
         track_stub!(TODO("https://fxbug.dev/361552580"), "selinux create");
         Ok(())
     }
-    fn api_read(&self, _offset: usize) -> Result<Cow<'_, [u8]>, Errno> {
+    fn api_read(&self) -> Result<Cow<'_, [u8]>, Errno> {
         Ok([].as_ref().into())
     }
 }
@@ -311,7 +365,7 @@ impl SeLinuxApiOps for CheckReqProtApi {
         SecurityPermission::SetCheckReqProt
     }
 
-    fn api_write(&self, _offset: usize, data: Vec<u8>) -> Result<(), Errno> {
+    fn api_write(&self, data: Vec<u8>) -> Result<(), Errno> {
         let _checkreqprot = parse_unsigned_file::<u32>(&data)? != 0;
         track_stub!(TODO("https://fxbug.dev/322874766"), "selinux checkreqprot");
         Ok(())
@@ -335,7 +389,7 @@ impl SeLinuxApiOps for ContextApi {
         SecurityPermission::CheckContext
     }
 
-    fn api_write(&self, _offset: usize, data: Vec<u8>) -> Result<(), Errno> {
+    fn api_write(&self, data: Vec<u8>) -> Result<(), Errno> {
         // Validate that the `data` describe valid user, role, type, etc by attempting to create
         // a SID from it.
         // TODO: https://fxbug.dev/362476447 - Provide a validate API that does not allocate a SID.
@@ -387,13 +441,13 @@ impl SeLinuxApiOps for AccessApi {
         SecurityPermission::ComputeAv
     }
 
-    fn api_write(&self, _offset: usize, _data: Vec<u8>) -> Result<(), Errno> {
+    fn api_write(&self, _data: Vec<u8>) -> Result<(), Errno> {
         track_stub!(TODO("https://fxbug.dev/361551536"), "selinux access");
         Ok(())
     }
 
-    fn api_read(&self, _offset: usize) -> Result<Cow<'_, [u8]>, Errno> {
-        // Format is allowed decided auditallow auditdeny seqno flags
+    fn api_read(&self) -> Result<Cow<'_, [u8]>, Errno> {
+        // Format is: allowed decided auditallow auditdeny seqno flags
         // Everything but seqno must be in hexadecimal format and represents a bits field.
         let result = format!("ffffffff ffffffff 0 ffffffff {} 0\n", self.seqno);
         Ok(result.into_bytes().into())
@@ -541,7 +595,7 @@ impl SeLinuxApiOps for CommitBooleansApi {
         SecurityPermission::SetBool
     }
 
-    fn api_write(&self, _offset: usize, data: Vec<u8>) -> Result<(), Errno> {
+    fn api_write(&self, data: Vec<u8>) -> Result<(), Errno> {
         // "commit_pending_booleans" expects a numeric argument, which is
         // interpreted as a boolean, with the pending booleans committed if the
         // value is true (i.e. non-zero).
@@ -673,15 +727,31 @@ impl FsNodeOps for PermsDirectory {
 }
 
 /// File node implementation tailored to the behaviour of the APIs exposed to userspace via the
-/// SELinux filesystem.fx
+/// SELinux filesystem. These API files share some unusual behaviours:
 ///
-/// API files in the SELinux filesystem have persistent seek offsets, which APIs either
-/// ignore (e.g. request-response APIs like "access" or "context") or error-out if non-zero
-/// (e.g. the policy "load" file).
+/// (1) Seek Position:
+/// API files in the SELinux filesystem do have persistent seek offsets, but asymmetric behaviour
+/// for read and write operations:
+/// - Read operations respect the file offset, and increment it.
+/// - Write operations do not increment the file offset. This is important for APIs such as
+///   "create", which are used by `write()`ing a query and then `read()`ing the resulting value,
+///   since otherwise the `read()` would start from the end of the `write()`.
 ///
-/// Userspace use of SELinux API files follows a simple request/response flow, with the caller
-/// `write()`ing a string of request bytes, and then `read()`ing a string of result bytes
-/// from the API file.
+/// API files do not handle non-zero offset `write()`s consistently. Some, (e.g. "context"), ignore
+/// the offset, while others (e.g. "load") will fail with `EINVAL` if it is non-zero.
+///
+/// (2) Single vs Multi-Request:
+/// Most API files may be `read()` from any number of times, but only support a single `write()`
+/// operation. Attempting to `write()` a second time will return `EBUSY`.
+///
+/// (3) Error Handling:
+/// Once an operation on an API file has failed, all subsequent operations on that file will
+/// also fail, with the same error code.  e.g. Attempting multiple `write()` operations will
+/// return `EBUSY` from the second and subsequent calls, but subsequent calls to `read()`,
+/// `seek()` etc will also return `EBUSY`.
+///
+/// This helper currently implements asymmetric seek behaviour, and permission checks on write
+/// operations.
 struct SeLinuxApi<T: SeLinuxApiOps + Sync + Send + 'static> {
     ops: T,
 }
@@ -702,22 +772,34 @@ trait SeLinuxApiOps {
     /// Returns the "security" class permission that is required in order to write to the API file.
     fn api_write_permission() -> SecurityPermission;
 
-    /// Processes a request written to an API file. Although API files are seekable, the offset
-    /// is ignored by most API file implementations, or may be required to be zero.
-    fn api_write(&self, _offset: usize, _data: Vec<u8>) -> Result<(), Errno> {
+    /// Returns true if writes ignore the seek offset, rather than requiring it to be zero.
+    fn api_write_ignores_offset() -> bool {
+        false
+    }
+
+    /// Processes a request written to an API file.
+    fn api_write(&self, _data: Vec<u8>) -> Result<(), Errno> {
         error!(EINVAL)
     }
 
-    /// Reads the result of a request previously written to the API file. For most APIs the offset
-    /// is simply ignored, in contrast to the behaviour implemented by `BytesFile`.
-    fn api_read(&self, _offset: usize) -> Result<Cow<'_, [u8]>, Errno> {
+    /// Returns the complete contents of this API file.
+    fn api_read(&self) -> Result<Cow<'_, [u8]>, Errno> {
         error!(EINVAL)
+    }
+
+    /// Variant of `api_write()` that additionally receives the `current_task`.
+    fn api_write_with_task(&self, _current_task: &CurrentTask, data: Vec<u8>) -> Result<(), Errno> {
+        self.api_write(data)
     }
 }
 
 impl<T: SeLinuxApiOps + Sync + Send + 'static> FileOps for SeLinuxApi<T> {
     fileops_impl_seekable!();
     fileops_impl_noop_sync!();
+
+    fn writes_update_seek_offset(&self) -> bool {
+        false
+    }
 
     fn read(
         &self,
@@ -727,8 +809,8 @@ impl<T: SeLinuxApiOps + Sync + Send + 'static> FileOps for SeLinuxApi<T> {
         offset: usize,
         data: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno> {
-        let response = self.ops.api_read(offset)?;
-        data.write(&response)
+        let response = self.ops.api_read()?;
+        data.write(&response[offset..])
     }
 
     fn write(
@@ -739,6 +821,9 @@ impl<T: SeLinuxApiOps + Sync + Send + 'static> FileOps for SeLinuxApi<T> {
         offset: usize,
         data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno> {
+        if offset != 0 && !T::api_write_ignores_offset() {
+            return error!(EINVAL);
+        }
         security::selinuxfs_check_access(
             current_task,
             &file.name.entry.node,
@@ -746,7 +831,7 @@ impl<T: SeLinuxApiOps + Sync + Send + 'static> FileOps for SeLinuxApi<T> {
         )?;
         let data = data.read_all()?;
         let data_len = data.len();
-        self.ops.api_write(offset, data)?;
+        self.ops.api_write_with_task(current_task, data)?;
         Ok(data_len)
     }
 }
@@ -762,4 +847,110 @@ pub fn selinux_fs(
         .selinux_fs
         .get_or_try_init(|| SeLinuxFs::new_fs(current_task, options))
         .cloned()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use fuchsia_zircon::{self as zx, AsHandleRef as _};
+    use selinux::SecurityServer;
+    use zerocopy::{FromBytes, FromZeroes};
+
+    #[fuchsia::test]
+    fn status_vmo_has_correct_size_and_rights() {
+        // The current version of the "status" file contains five packed
+        // u32 values.
+        const STATUS_T_SIZE: usize = size_of::<u32>() * 5;
+
+        let status_holder = StatusSeqLock::new_default().unwrap();
+        let status_vmo = status_holder.get_readonly_vmo();
+
+        // Verify the content and actual size of the structure are as expected.
+        let content_size = status_vmo.get_content_size().unwrap() as usize;
+        assert_eq!(content_size, STATUS_T_SIZE);
+        let actual_size = status_vmo.get_size().unwrap() as usize;
+        assert!(actual_size >= STATUS_T_SIZE);
+
+        // Ensure the returned handle is read-only and non-resizable.
+        let rights = status_vmo.basic_info().unwrap().rights;
+        assert_eq!((rights & zx::Rights::MAP), zx::Rights::MAP);
+        assert_eq!((rights & zx::Rights::READ), zx::Rights::READ);
+        assert_eq!((rights & zx::Rights::GET_PROPERTY), zx::Rights::GET_PROPERTY);
+        assert_eq!((rights & zx::Rights::WRITE), zx::Rights::NONE);
+        assert_eq!((rights & zx::Rights::RESIZE), zx::Rights::NONE);
+    }
+
+    #[derive(FromBytes, FromZeroes)]
+    #[repr(C, align(4))]
+    struct TestSeLinuxStatusT {
+        version: u32,
+        sequence: u32,
+        enforcing: u32,
+        policyload: u32,
+        deny_unknown: u32,
+    }
+
+    fn with_status_t<R>(
+        status_vmo: &Arc<zx::Vmo>,
+        do_test: impl FnOnce(&TestSeLinuxStatusT) -> R,
+    ) -> R {
+        let flags = zx::VmarFlags::PERM_READ
+            | zx::VmarFlags::ALLOW_FAULTS
+            | zx::VmarFlags::REQUIRE_NON_RESIZABLE;
+        let map_addr = fuchsia_runtime::vmar_root_self()
+            .map(0, status_vmo, 0, size_of::<TestSeLinuxStatusT>(), flags)
+            .unwrap();
+        let mapped_status = unsafe { &mut *(map_addr as *mut TestSeLinuxStatusT) };
+        let result = do_test(mapped_status);
+        unsafe {
+            fuchsia_runtime::vmar_root_self()
+                .unmap(map_addr, size_of::<TestSeLinuxStatusT>())
+                .unwrap()
+        };
+        result
+    }
+
+    #[fuchsia::test]
+    fn status_file_layout() {
+        let security_server = SecurityServer::new();
+        let status_holder = StatusSeqLock::new_default().unwrap();
+        let status_vmo = status_holder.get_readonly_vmo();
+        security_server.set_status_publisher(Box::new(status_holder));
+        security_server.set_enforcing(false);
+        let mut seq_no: u32 = 0;
+        with_status_t(&status_vmo, |status| {
+            assert_eq!(status.version, SELINUX_STATUS_VERSION);
+            assert_eq!(status.enforcing, 0);
+            seq_no = status.sequence;
+            assert_eq!(seq_no % 2, 0);
+        });
+        security_server.set_enforcing(true);
+        with_status_t(&status_vmo, |status| {
+            assert_eq!(status.version, SELINUX_STATUS_VERSION);
+            assert_eq!(status.enforcing, 1);
+            assert_ne!(status.sequence, seq_no);
+            seq_no = status.sequence;
+            assert_eq!(seq_no % 2, 0);
+        });
+    }
+
+    #[fuchsia::test]
+    fn status_accurate_directly_following_set_status_publisher() {
+        let security_server = SecurityServer::new();
+        let status_holder = StatusSeqLock::new_default().unwrap();
+        let status_vmo = status_holder.get_readonly_vmo();
+
+        // Ensure a change in status-visible security server state is made before invoking
+        // `set_status_publisher()`.
+        assert_eq!(false, security_server.is_enforcing());
+        security_server.set_enforcing(true);
+
+        security_server.set_status_publisher(Box::new(status_holder));
+        with_status_t(&status_vmo, |status| {
+            // Ensure latest `enforcing` state is reported immediately following
+            // `set_status_publisher()`.
+            assert_eq!(status.enforcing, 1);
+        });
+    }
 }

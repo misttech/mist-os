@@ -20,6 +20,7 @@
 
 #include "src/devices/bin/driver_manager/driver_runner.h"
 #include "src/devices/bin/driver_manager/testing/fake_driver_index.h"
+#include "src/devices/bin/driver_manager/tests/test_pkg.h"
 #include "src/lib/testing/loop_fixture/test_loop_fixture.h"
 
 namespace driver_runner {
@@ -39,6 +40,26 @@ const std::string second_driver_binary = "driver/second-driver.so-";
 using driver_manager::Devfs;
 using driver_manager::DriverRunner;
 using driver_manager::InspectManager;
+
+static const test_utils::TestPkg::Config kDefaultDriverHostPkgConfig = {
+    .module_test_pkg_path = "/pkg/bin/fake_driver_host_with_bootstrap",
+    .module_open_path = "bin/driver_host2",
+    .expected_libs =
+        {
+            "libdh-deps-a.so",
+            "libdh-deps-b.so",
+            "libdh-deps-c.so",
+        },
+};
+
+static const test_utils::TestPkg::Config kDefaultDriverPkgConfig = {
+    .module_test_pkg_path = "/pkg/lib/fake_root_driver.so",
+    .module_open_path = "driver/fake_root_driver.so",
+    .expected_libs =
+        {
+            "libfake_root_driver_deps.so",
+        },
+};
 
 struct NodeChecker {
   std::vector<std::string> node_name;
@@ -256,6 +277,9 @@ class DriverRunnerTest : public gtest::TestLoopFixture {
           fidl::ClientEnd<fuchsia_io::Directory>());
 
   zx::result<StartDriverResult> StartRootDriver();
+  zx::result<StartDriverResult> StartRootDriverDynamicLinking(
+      test_utils::TestPkg::Config driver_host_config = kDefaultDriverHostPkgConfig,
+      test_utils::TestPkg::Config driver_config = kDefaultDriverPkgConfig);
 
   StartDriverResult StartSecondDriver(bool colocate = false, bool host_restart_on_crash = false,
                                       bool use_next_vdso = false);

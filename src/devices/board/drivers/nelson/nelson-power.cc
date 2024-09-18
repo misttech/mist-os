@@ -178,12 +178,20 @@ zx_status_t Nelson::PowerInit() {
     return status;
   }
 
+  return ZX_OK;
+}
+
+zx_status_t Nelson::BrownoutProtectionInit() {
+  // Pull up externally.
+  gpio_init_steps_.push_back(GpioPull(GPIO_ALERT_PWR_L, fuchsia_hardware_pin::Pull::kNone));
+
   const ddk::BindRule kGpioRules[] = {
       ddk::MakeAcceptBindRule(bind_fuchsia_hardware_gpio::SERVICE,
                               bind_fuchsia_hardware_gpio::SERVICE_ZIRCONTRANSPORT),
       ddk::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN,
                               bind_fuchsia_amlogic_platform_s905d3::GPIOZ_PIN_ID_PIN_10),
   };
+
   const ddk::BindRule kCodecRules[] = {
       ddk::MakeAcceptBindRule(bind_fuchsia_hardware_audio::CODECSERVICE,
                               bind_fuchsia_hardware_audio::CODECSERVICE_ZIRCONTRANSPORT),
@@ -192,10 +200,16 @@ zx_status_t Nelson::PowerInit() {
       ddk::MakeAcceptBindRule(bind_fuchsia::PLATFORM_DEV_DID,
                               bind_fuchsia_ti_platform::BIND_PLATFORM_DEV_DID_TAS58XX),
   };
+
   const ddk::BindRule kPowerSensorRules[] = {
       ddk::MakeAcceptBindRule(bind_fuchsia_hardware_power_sensor::SERVICE,
                               bind_fuchsia_hardware_power_sensor::SERVICE_ZIRCONTRANSPORT),
   };
+
+  const ddk::BindRule kGpioInitRules[] = {
+      ddk::MakeAcceptBindRule(bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
+  };
+
   const device_bind_prop_t kGpioProperties[] = {
       ddk::MakeProperty(bind_fuchsia_hardware_gpio::SERVICE,
                         bind_fuchsia_hardware_gpio::SERVICE_ZIRCONTRANSPORT),
@@ -214,10 +228,15 @@ zx_status_t Nelson::PowerInit() {
                         bind_fuchsia_amlogic_platform_s905d3::BIND_POWER_SENSOR_DOMAIN_AUDIO),
   };
 
-  status = DdkAddCompositeNodeSpec("brownout_protection",
-                                   ddk::CompositeNodeSpec(kCodecRules, kCodecProperties)
-                                       .AddParentSpec(kGpioRules, kGpioProperties)
-                                       .AddParentSpec(kPowerSensorRules, kPowerSensorProperties));
+  const device_bind_prop_t kGpioInitProperties[] = {
+      ddk::MakeProperty(bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
+  };
+
+  zx_status_t status = DdkAddCompositeNodeSpec(
+      "brownout_protection", ddk::CompositeNodeSpec(kCodecRules, kCodecProperties)
+                                 .AddParentSpec(kGpioRules, kGpioProperties)
+                                 .AddParentSpec(kPowerSensorRules, kPowerSensorProperties)
+                                 .AddParentSpec(kGpioInitRules, kGpioInitProperties));
   if (status != ZX_OK) {
     zxlogf(ERROR, "%s AddCompositeSpec (brownout-protection)  %d", __FUNCTION__, status);
     return status;

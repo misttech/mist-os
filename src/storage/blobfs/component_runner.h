@@ -5,7 +5,6 @@
 #ifndef SRC_STORAGE_BLOBFS_COMPONENT_RUNNER_H_
 #define SRC_STORAGE_BLOBFS_COMPONENT_RUNNER_H_
 
-#include <fidl/fuchsia.device.manager/cpp/wire.h>
 #include <fidl/fuchsia.io/cpp/markers.h>
 #include <fidl/fuchsia.process.lifecycle/cpp/wire.h>
 #include <lib/async-loop/cpp/loop.h>
@@ -50,16 +49,10 @@ class ComponentRunner final : public fs::PagedVfs {
 
   zx::result<> ServeRoot(fidl::ServerEnd<fuchsia_io::Directory> root,
                          fidl::ServerEnd<fuchsia_process_lifecycle::Lifecycle> lifecycle,
-                         fidl::ClientEnd<fuchsia_device_manager::Administrator> driver_admin_client,
                          zx::resource vmex_resource);
   zx::result<> Configure(std::unique_ptr<BlockDevice> device, const MountOptions& options);
 
  private:
-  // Tell driver_manager to remove all drivers living in storage. This must be called before
-  // shutting down. `callback` will be called once all drivers living in storage have been
-  // unbound and removed.
-  void RemoveSystemDrivers(fit::callback<void(zx_status_t)> callback);
-
   async::Loop& loop_;
   ComponentOptions config_;
 
@@ -67,7 +60,6 @@ class ComponentRunner final : public fs::PagedVfs {
 
   // These are initialized when ServeRoot is called.
   fbl::RefPtr<fs::PseudoDir> outgoing_;
-  fidl::WireSharedClient<fuchsia_device_manager::Administrator> driver_admin_;
 
   // These are created when ServeRoot is called, and are consumed by a successful call to
   // Configure. This causes any incoming requests to queue in the channel pair until we start

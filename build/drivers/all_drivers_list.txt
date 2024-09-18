@@ -3,7 +3,7 @@
 //examples/drivers/metadata/retriever:driver
 //examples/drivers/metadata/sender:driver
 //examples/drivers/simple/dfv1:driver
-//examples/drivers/simple/dfv2:driver
+//examples/drivers/simple/dfv2:bazel_package.bazel_build
 //examples/drivers/skeleton:driver
 //examples/drivers/template:bazel_package.bazel_build
 //examples/drivers/transport/banjo/v1:child_driver
@@ -277,7 +277,6 @@
 //src/devices/tpm/drivers/cr50-spi:fuchsia_driver
 //src/devices/tpm/drivers/tpm-lpc:fuchsia_driver
 //src/devices/tpm/drivers/tpm:fuchsia_driver
-//src/devices/usb/drivers/crg-udc:crg-udc-driver
 //src/devices/usb/drivers/dwc2:dwc2-driver
 //src/devices/usb/drivers/dwc3:dwc3-driver
 //src/devices/usb/drivers/usb-bus:usb-bus-driver

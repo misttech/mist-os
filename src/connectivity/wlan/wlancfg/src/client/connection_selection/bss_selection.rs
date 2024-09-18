@@ -93,7 +93,7 @@ mod test {
     use rand::Rng;
     use wlan_common::{assert_variant, random_fidl_bss_description};
     use {
-        fidl_fuchsia_wlan_internal as fidl_internal, fuchsia_async as fasync,
+        fidl_fuchsia_wlan_common as fidl_common, fuchsia_async as fasync,
         fuchsia_inspect as inspect,
     };
 
@@ -128,7 +128,7 @@ mod test {
         let bss = types::Bss {
             signal: types::Signal { rssi_dbm: rssi, snr_db },
             channel,
-            bss_description: fidl_internal::BssDescription {
+            bss_description: fidl_common::BssDescription {
                 rssi_dbm: rssi,
                 snr_db,
                 channel: channel.into(),

@@ -6,6 +6,7 @@
 #define SRC_DEVICES_POWER_DRIVERS_NELSON_BROWNOUT_PROTECTION_NELSON_BROWNOUT_PROTECTION_H_
 
 #include <fidl/fuchsia.hardware.audio/cpp/wire.h>
+#include <fidl/fuchsia.hardware.gpio/cpp/wire.h>
 #include <fidl/fuchsia.hardware.power.sensor/cpp/wire.h>
 #include <lib/simple-codec/simple-codec-client.h>
 #include <lib/zx/interrupt.h>
@@ -39,9 +40,11 @@ class NelsonBrownoutProtection : public DeviceType {
 
   NelsonBrownoutProtection(zx_device_t* parent,
                            fidl::WireSyncClient<fuchsia_hardware_power_sensor::Device> power_sensor,
+                           fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> alert_gpio,
                            zx::interrupt alert_interrupt, zx::duration voltage_poll_interval)
       : DeviceType(parent),
         power_sensor_(std::move(power_sensor)),
+        alert_gpio_(std::move(alert_gpio)),
         alert_interrupt_(std::move(alert_interrupt)),
         voltage_poll_interval_(voltage_poll_interval) {}
   ~NelsonBrownoutProtection() {
@@ -60,6 +63,7 @@ class NelsonBrownoutProtection : public DeviceType {
   thrd_t thread_;
   CodecClientAgl codec_;
   fidl::WireSyncClient<fuchsia_hardware_power_sensor::Device> power_sensor_;
+  fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> alert_gpio_;
   const zx::interrupt alert_interrupt_;
   std::atomic_bool run_thread_ = true;
   const zx::duration voltage_poll_interval_;

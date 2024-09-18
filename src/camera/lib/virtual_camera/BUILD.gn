@@ -22,12 +22,12 @@ source_set("lib") {
   ]
   public = [ "virtual_camera.h" ]
   deps = [
+    "//sdk/lib/async:async-cpp",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/syslog/cpp",
     "//src/camera/lib/fake_camera",
     "//src/camera/lib/fake_stream",
-    "//zircon/system/ulib/async:async-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/third_party/ulib/safemath",
   ]
   public_deps = [

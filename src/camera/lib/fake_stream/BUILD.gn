@@ -30,11 +30,11 @@ source_set("lib") {
   public = [ "fake_stream.h" ]
   deps = [
     ":impl_header",
+    "//sdk/lib/async:async-cpp",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/fidl/hlcpp",
     "//sdk/lib/syslog/cpp",
-    "//zircon/system/ulib/async:async-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
   ]
   public_deps = [
     "//sdk/fidl/fuchsia.camera3:fuchsia.camera3_hlcpp",

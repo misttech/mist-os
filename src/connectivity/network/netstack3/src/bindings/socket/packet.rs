@@ -63,12 +63,14 @@ impl DeviceSocketBindingsContext<DeviceId<Self>> for BindingsCtx {
 
         let data = MessageData::new(&frame, device);
 
-        let message = match kind {
+        // NB: Perform the expensive tasks before taking the message queue lock.
+        let body = match kind {
             fppacket::Kind::Network => frame.into_body(),
             fppacket::Kind::Link => raw,
-        };
-
-        queue.lock().receive(IntoMessage(data, message));
+        }
+        .to_vec();
+        let message = Message { data, body };
+        queue.lock().receive(message);
     }
 }
 
@@ -122,25 +124,17 @@ struct BindingData {
     id: SocketId<BindingsCtx>,
 }
 
-struct IntoMessage<'a>(MessageData, &'a [u8]);
-
-impl BodyLen for IntoMessage<'_> {
-    fn body_len(&self) -> usize {
-        let Self(_data, body) = self;
-        body.len()
-    }
-}
-
-impl From<IntoMessage<'_>> for Message {
-    fn from(IntoMessage(data, body): IntoMessage<'_>) -> Self {
-        Self { data, body: body.into() }
-    }
-}
-
 #[derive(Debug)]
 struct Message {
     data: MessageData,
     body: Vec<u8>,
+}
+
+impl BodyLen for Message {
+    fn body_len(&self) -> usize {
+        let Self { data: _, body } = self;
+        body.len()
+    }
 }
 
 #[derive(Debug)]
@@ -200,12 +194,6 @@ impl MessageDataInfo {
     fn new_ip(frame: &IpFrame<&[u8]>) -> Self {
         let IpFrame { ip_version, body: _ } = frame;
         Self::Ip { ip_version: *ip_version }
-    }
-}
-
-impl BodyLen for Message {
-    fn body_len(&self) -> usize {
-        self.body.len()
     }
 }
 

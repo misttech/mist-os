@@ -12,7 +12,7 @@
 #include <zircon/types.h>
 
 #include <fbl/ref_ptr.h>
-#include <zxtest/zxtest.h>
+#include <gtest/gtest.h>
 
 #include "src/storage/lib/vfs/cpp/managed_vfs.h"
 #include "src/storage/lib/vfs/cpp/pseudo_dir.h"
@@ -22,7 +22,7 @@ namespace {
 
 namespace fio = fuchsia_io;
 
-class WatcherTest : public zxtest::Test {
+class WatcherTest : public testing::Test {
  public:
   WatcherTest()
       : loop_(&kAsyncLoopConfigAttachToCurrentThread),
@@ -34,12 +34,12 @@ class WatcherTest : public zxtest::Test {
 
   fidl::ClientEnd<fio::DirectoryWatcher> WatchRootDir(fio::WatchMask mask) {
     auto [client, server] = fidl::Endpoints<fio::DirectoryWatcher>::Create();
-    EXPECT_OK(root_->WatchDir(&vfs_, mask, 0, std::move(server)));
+    EXPECT_EQ(root_->WatchDir(&vfs_, mask, 0, std::move(server)), ZX_OK);
     return std::move(client);
   }
 
  protected:
-  void TearDown() override { ASSERT_OK(loop_.RunUntilIdle()); }
+  void TearDown() override { ASSERT_EQ(loop_.RunUntilIdle(), ZX_OK); }
 
  private:
   async::Loop loop_;
@@ -53,7 +53,7 @@ TEST_F(WatcherTest, WatchersDroppedOnChannelClosed) {
     fidl::ClientEnd client = WatchRootDir(fio::WatchMask::kAdded);
     ASSERT_TRUE(root()->HasWatchers());
   }
-  ASSERT_OK(loop().RunUntilIdle());
+  ASSERT_EQ(loop().RunUntilIdle(), ZX_OK);
   ASSERT_FALSE(root()->HasWatchers());
 }
 

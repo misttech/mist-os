@@ -112,9 +112,7 @@ class MemoryBandwidthInspectTest : public gtest::TestLoopFixture {
       : monitor_(std::make_unique<Monitor>(
             context_provider_.TakeContext(), fxl::CommandLine{}, dispatcher(), false, false, false,
             memory_monitor_config::Config{},
-            memory::CaptureMaker::Create(CreateDefaultOS(),
-                                         std::make_unique<memory::StarnixCaptureStrategy>())
-                .value())),
+            memory::CaptureMaker::Create(CreateDefaultOS()).value())),
         executor_(dispatcher()),
         ram_binding_(&fake_device_),
         logger_factory_(new MockLoggerFactory()) {

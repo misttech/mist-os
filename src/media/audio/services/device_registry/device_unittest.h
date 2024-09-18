@@ -22,6 +22,7 @@
 #include "src/media/audio/services/device_registry/basic_types.h"
 #include "src/media/audio/services/device_registry/control_notify.h"
 #include "src/media/audio/services/device_registry/device.h"
+#include "src/media/audio/services/device_registry/inspector.h"
 #include "src/media/audio/services/device_registry/logging.h"
 #include "src/media/audio/services/device_registry/testing/fake_codec.h"
 #include "src/media/audio/services/device_registry/testing/fake_composite.h"
@@ -38,6 +39,9 @@ class DeviceTestBase : public gtest::TestLoopFixture {
 
  public:
   void SetUp() override {
+    // Use our production Inspector during device unittests.
+    media_audio::Inspector::Initialize(dispatcher());
+
     notify_ = std::make_shared<NotifyStub>(*this);
     fake_device_presence_watcher_ = std::make_shared<FakeDevicePresenceWatcher>();
   }

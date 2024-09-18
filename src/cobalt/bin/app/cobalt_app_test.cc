@@ -11,6 +11,7 @@
 #include <lib/sys/cpp/testing/component_context_provider.h>
 
 #include <gmock/gmock.h>
+#include <gtest/gtest.h>
 #include <sdk/lib/sys/cpp/testing/service_directory_provider.h>
 
 #include "src/cobalt/bin/app/diagnostics_impl.h"
@@ -237,20 +238,6 @@ TEST_F(CobaltAppTest, InspectData) {
             ChildrenMatch(UnorderedElementsAre(AllOf(
                 NodeMatches(NameMatches("cobalt_app")),
                 ChildrenMatch(UnorderedElementsAre(NodeMatches(NameMatches("system_data")))))))));
-}
-
-TEST_F(CobaltAppTest, SetSoftwareDistributionInfo) {
-  fuchsia::cobalt::SystemDataUpdaterPtr system_data_updater;
-  context_provider_.ConnectToPublicService(system_data_updater.NewRequest());
-
-  fuchsia::cobalt::Status status = fuchsia::cobalt::Status::INTERNAL_ERROR;
-  fuchsia::cobalt::SoftwareDistributionInfo info;
-  info.set_current_channel("new-channel-name");
-  system_data_updater->SetSoftwareDistributionInfo(
-      std::move(info), [&](fuchsia::cobalt::Status status_) { status = status_; });
-  RunLoopUntilIdle();
-  ASSERT_EQ(status, fuchsia::cobalt::Status::OK);
-  EXPECT_EQ(fake_service_->system_data()->channel(), "Testing Channel");
 }
 
 TEST_F(CobaltAppTest, CreateMetricEventLogger) {

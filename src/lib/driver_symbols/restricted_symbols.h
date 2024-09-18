@@ -63,7 +63,6 @@ const std::set<std::string> kCreateThreadSymbolsDriversAllowlist = {
     "#meta/chromiumos-ec-lpc.cm",
     "#meta/compat.cm",
     "#meta/cr50-spi-driver.cm",
-    "#meta/crg-udc.cm",
     "#meta/cypress.cm",
     "#meta/dwc2.cm",
     "#meta/dwc3.cm",

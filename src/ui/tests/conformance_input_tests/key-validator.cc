@@ -130,9 +130,11 @@ class KeyConformanceTest : public ui_conformance_test_base::ConformanceTest {
       FX_LOGS(INFO) << "Registering fake keyboard";
       auto [client_end, server_end] = fidl::Endpoints<futi::Keyboard>::Create();
 
-      futi::RegistryRegisterKeyboardRequest request;
+      futi::RegistryRegisterKeyboardAndGetDeviceInfoRequest request;
       request.device(std::move(server_end));
-      ZX_ASSERT_OK(input_registry->RegisterKeyboard(std::move(request)));
+      auto res = input_registry->RegisterKeyboardAndGetDeviceInfo(std::move(request));
+      ZX_ASSERT_OK(res);
+      fake_keyboard_device_id_ = res->device_id().value();
 
       fake_keyboard_ = fidl::SyncClient(std::move(client_end));
     }
@@ -183,6 +185,14 @@ class KeyConformanceTest : public ui_conformance_test_base::ConformanceTest {
     FX_LOGS(INFO) << "Key event injected";
   }
 
+  void ExpectEvent(const futi::KeyboardInputListenerReportTextInputRequest& event,
+                   std::optional<std::string> text,
+                   std::optional<fui::NonPrintableKey> non_printable) const {
+    ASSERT_EQ(text, event.text());
+    ASSERT_EQ(non_printable, event.non_printable());
+    ASSERT_EQ(fake_keyboard_device_id_, event.device_id());
+  }
+
  protected:
   int32_t display_width_as_int() const { return static_cast<int32_t>(display_width_); }
   int32_t display_height_as_int() const { return static_cast<int32_t>(display_height_); }
@@ -192,6 +202,7 @@ class KeyConformanceTest : public ui_conformance_test_base::ConformanceTest {
   FocusListener focus_listener_;
   uint32_t display_width_ = 0;
   uint32_t display_height_ = 0;
+  uint32_t fake_keyboard_device_id_ = 0;
 };
 
 class SingleViewKeyConformanceTest : public KeyConformanceTest {
@@ -249,22 +260,22 @@ TEST_F(SingleViewKeyConformanceTest, SimpleKeyPress) {
   ASSERT_EQ(puppet_.key_listener.events_received().size(), 15u);
 
   const auto& events = puppet_.key_listener.events_received();
-  EXPECT_EQ(events[0].non_printable(), fui::NonPrintableKey::kShift);
+  ExpectEvent(events[0], std::nullopt, fui::NonPrintableKey::kShift);
   // view reports value from key meaning so it is Shifted h (H).
-  EXPECT_EQ(events[1].text(), std::string("H"));
-  EXPECT_EQ(events[2].text(), std::string("e"));
-  EXPECT_EQ(events[3].text(), std::string("l"));
-  EXPECT_EQ(events[4].text(), std::string("l"));
-  EXPECT_EQ(events[5].text(), std::string("o"));
-  EXPECT_EQ(events[6].non_printable(), fui::NonPrintableKey::kEnter);
-  EXPECT_EQ(events[7].non_printable(), fui::NonPrintableKey::kShift);
-  EXPECT_EQ(events[8].text(), std::string("W"));
-  EXPECT_EQ(events[9].text(), std::string("o"));
-  EXPECT_EQ(events[10].text(), std::string("r"));
-  EXPECT_EQ(events[11].text(), std::string("l"));
-  EXPECT_EQ(events[12].text(), std::string("d"));
-  EXPECT_EQ(events[13].non_printable(), fui::NonPrintableKey::kShift);
-  EXPECT_EQ(events[14].text(), std::string("!"));
+  ExpectEvent(events[1], "H", std::nullopt);
+  ExpectEvent(events[2], "e", std::nullopt);
+  ExpectEvent(events[3], "l", std::nullopt);
+  ExpectEvent(events[4], "l", std::nullopt);
+  ExpectEvent(events[5], "o", std::nullopt);
+  ExpectEvent(events[6], std::nullopt, fui::NonPrintableKey::kEnter);
+  ExpectEvent(events[7], std::nullopt, fui::NonPrintableKey::kShift);
+  ExpectEvent(events[8], "W", std::nullopt);
+  ExpectEvent(events[9], "o", std::nullopt);
+  ExpectEvent(events[10], "r", std::nullopt);
+  ExpectEvent(events[11], "l", std::nullopt);
+  ExpectEvent(events[12], "d", std::nullopt);
+  ExpectEvent(events[13], std::nullopt, fui::NonPrintableKey::kShift);
+  ExpectEvent(events[14], "!", std::nullopt);
 }
 
 class EmbeddedViewKeyConformanceTest : public KeyConformanceTest {
@@ -323,7 +334,7 @@ class EmbeddedViewKeyConformanceTest : public KeyConformanceTest {
           .id = kChildViewportId,
           .properties = std::move(properties),
       });
-      auto res = parent_puppet_.client->EmbedRemoteView(std::move(embed_remote_view_request));
+      auto res = parent_puppet_.client->EmbedRemoteView(embed_remote_view_request);
       ZX_ASSERT_OK(res);
       view_creation_token = std::move(res->view_creation_token()->value());
     }
@@ -386,7 +397,7 @@ TEST_F(EmbeddedViewKeyConformanceTest, KeyToFocusedView) {
     ASSERT_EQ(parent_puppet_.key_listener.events_received().size(), 1u);
 
     const auto& events = parent_puppet_.key_listener.events_received();
-    EXPECT_EQ(events[0].text(), "a");
+    ExpectEvent(events[0], "a", std::nullopt);
     EXPECT_TRUE(child_puppet_.key_listener.events_received().empty());
     parent_puppet_.key_listener.clear_events();
   }
@@ -409,7 +420,7 @@ TEST_F(EmbeddedViewKeyConformanceTest, KeyToFocusedView) {
     ASSERT_EQ(child_puppet_.key_listener.events_received().size(), 1u);
 
     const auto& events = child_puppet_.key_listener.events_received();
-    EXPECT_EQ(events[0].text(), "b");
+    ExpectEvent(events[0], "b", std::nullopt);
     EXPECT_TRUE(parent_puppet_.key_listener.events_received().empty());
     child_puppet_.key_listener.clear_events();
   }
@@ -431,7 +442,7 @@ TEST_F(EmbeddedViewKeyConformanceTest, KeyToFocusedView) {
     ASSERT_EQ(parent_puppet_.key_listener.events_received().size(), 1u);
 
     const auto& events = parent_puppet_.key_listener.events_received();
-    EXPECT_EQ(events[0].text(), "c");
+    ExpectEvent(events[0], "c", std::nullopt);
     EXPECT_TRUE(child_puppet_.key_listener.events_received().empty());
     parent_puppet_.key_listener.clear_events();
   }

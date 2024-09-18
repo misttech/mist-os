@@ -1978,6 +1978,13 @@ multiconst!(zx_guest_trap_t, [
 pub const ZX_LOG_RECORD_MAX: usize = 256;
 pub const ZX_LOG_RECORD_DATA_MAX: usize = 216;
 
+pub const DEBUGLOG_TRACE: u8 = 0x10;
+pub const DEBUGLOG_DEBUG: u8 = 0x20;
+pub const DEBUGLOG_INFO: u8 = 0x30;
+pub const DEBUGLOG_WARNING: u8 = 0x40;
+pub const DEBUGLOG_ERROR: u8 = 0x50;
+pub const DEBUGLOG_FATAL: u8 = 0x60;
+
 struct_decl_macro! {
     #[repr(C)]
     #[derive(Debug, Copy, Clone, Eq, PartialEq)]

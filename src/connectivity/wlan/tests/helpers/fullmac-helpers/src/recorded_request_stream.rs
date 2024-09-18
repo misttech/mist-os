@@ -21,8 +21,8 @@ pub enum FullmacRequest {
     Reset(fidl_fullmac::WlanFullmacImplResetRequest),
     StartBss(fidl_fullmac::WlanFullmacImplStartBssRequest),
     StopBss(fidl_fullmac::WlanFullmacImplStopBssRequest),
-    SetKeysReq(fidl_fullmac::WlanFullmacSetKeysReq),
-    DelKeysReq(fidl_fullmac::WlanFullmacDelKeysReq),
+    SetKeys(fidl_fullmac::WlanFullmacImplSetKeysRequest),
+    DelKeys(fidl_fullmac::WlanFullmacImplDelKeysRequest),
     EapolTx(fidl_fullmac::WlanFullmacImplEapolTxRequest),
     GetIfaceCounterStats,
     GetIfaceHistogramStats,
@@ -107,11 +107,11 @@ impl RecordedRequestStream {
             WlanFullmacImpl_Request::StopBss { payload, .. } => {
                 self.history.push(FullmacRequest::StopBss(payload.clone()))
             }
-            WlanFullmacImpl_Request::SetKeysReq { req, .. } => {
-                self.history.push(FullmacRequest::SetKeysReq(req.clone()))
+            WlanFullmacImpl_Request::SetKeys { payload, .. } => {
+                self.history.push(FullmacRequest::SetKeys(payload.clone()))
             }
-            WlanFullmacImpl_Request::DelKeysReq { req, .. } => {
-                self.history.push(FullmacRequest::DelKeysReq(req.clone()))
+            WlanFullmacImpl_Request::DelKeys { payload, .. } => {
+                self.history.push(FullmacRequest::DelKeys(payload.clone()))
             }
             WlanFullmacImpl_Request::EapolTx { payload, .. } => {
                 self.history.push(FullmacRequest::EapolTx(payload.clone()))

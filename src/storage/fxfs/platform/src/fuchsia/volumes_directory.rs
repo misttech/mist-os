@@ -21,7 +21,7 @@ use futures::stream::FuturesUnordered;
 use futures::{StreamExt, TryStreamExt};
 use fxfs::errors::FxfsError;
 use fxfs::log::*;
-use fxfs::object_store::transaction::{lock_keys, LockKey, Options};
+use fxfs::object_store::transaction::{lock_keys, LockKey, LockKeys, Options, Transaction};
 use fxfs::object_store::volume::RootVolume;
 use fxfs::object_store::{Directory, ObjectDescriptor, ObjectStore};
 use fxfs::{fsck, metrics};
@@ -156,29 +156,67 @@ impl MountedVolumesGuard<'_> {
         Ok(volume)
     }
 
-    async fn remove_volume(&mut self, name: &str) -> Result<(), Error> {
+    /// Acquires a transaction with appropriate locks to remove volume |name|.
+    /// Also returns the object ID of the store which will be deleted.
+    async fn acquire_transaction_for_remove_volume(
+        &self,
+        name: &str,
+    ) -> Result<(u64, Transaction<'_>), Error> {
+        // Since we don't know the store object ID until we've looked it up in the volumes
+        // directory, we need to loop until we have acquired a lock on a store whose ID is the same
+        // as it was in the last iteration.
         let store = self.volumes_directory.root_volume.volume_directory().store();
-        let transaction = store
-            .filesystem()
-            .new_transaction(
-                lock_keys![LockKey::object(
-                    store.store_object_id(),
-                    self.volumes_directory.root_volume.volume_directory().object_id(),
-                )],
-                Options { borrow_metadata_space: true, ..Default::default() },
-            )
-            .await?;
-        let object_id = match self
-            .volumes_directory
-            .root_volume
-            .volume_directory()
-            .lookup(name)
-            .await?
-            .ok_or(FxfsError::NotFound)?
-        {
-            (object_id, ObjectDescriptor::Volume) => object_id,
-            _ => bail!(anyhow!(FxfsError::Inconsistent).context("Expected volume")),
-        };
+        let mut lock_keys = LockKeys::with_capacity(2);
+        lock_keys.push(LockKey::object(
+            store.store_object_id(),
+            self.volumes_directory.root_volume.volume_directory().object_id(),
+        ));
+        loop {
+            lock_keys.truncate(1);
+            let object_id = match self
+                .volumes_directory
+                .root_volume
+                .volume_directory()
+                .lookup(name)
+                .await?
+                .ok_or(FxfsError::NotFound)?
+            {
+                (object_id, ObjectDescriptor::Volume) => object_id,
+                _ => bail!(anyhow!(FxfsError::Inconsistent).context("Expected volume")),
+            };
+            // We have to ensure that the store isn't flushed while we delete it, because deleting
+            // the store will remove references to it from ObjectManager which are then updated by
+            // flushing.
+            lock_keys.push(LockKey::flush(object_id));
+            let transaction = store
+                .filesystem()
+                .new_transaction(
+                    lock_keys.clone(),
+                    Options { borrow_metadata_space: true, ..Default::default() },
+                )
+                .await?;
+
+            // Now that we're locked, ensure that the volume still has the same object ID.
+            match self
+                .volumes_directory
+                .root_volume
+                .volume_directory()
+                .lookup(name)
+                .await?
+                .ok_or(FxfsError::NotFound)?
+            {
+                (second_object_id, ObjectDescriptor::Volume) if second_object_id == object_id => {
+                    break Ok((object_id, transaction));
+                }
+                (_, ObjectDescriptor::Volume) => continue,
+                _ => bail!(anyhow!(FxfsError::Inconsistent).context("Expected volume")),
+            }
+        }
+    }
+
+    async fn remove_volume(&mut self, name: &str) -> Result<(), Error> {
+        let (object_id, transaction) = self.acquire_transaction_for_remove_volume(name).await?;
+
         // Cowardly refuse to delete a mounted volume.
         ensure!(!self.mounted_volumes.contains_key(&object_id), FxfsError::AlreadyBound);
         if let Some(inspect) = self.volumes_directory.inspect_tree.upgrade() {
@@ -758,7 +796,9 @@ mod tests {
     use fxfs::errors::FxfsError;
     use fxfs::filesystem::FxFilesystem;
     use fxfs::fsck::fsck;
+    use fxfs::lock_keys;
     use fxfs::object_store::allocator::Allocator;
+    use fxfs::object_store::transaction::{LockKey, Options};
     use fxfs::object_store::volume::root_volume;
     use fxfs_crypto::Crypt;
     use fxfs_insecure_crypto::InsecureCrypt;
@@ -1948,6 +1988,88 @@ mod tests {
         );
 
         std::mem::drop(volume);
+        volumes_directory.terminate().await;
+        std::mem::drop(volumes_directory);
+        filesystem.close().await.expect("Filesystem close");
+    }
+
+    #[fuchsia::test(threads = 10)]
+    async fn test_delete_volume_while_flushing() {
+        let device = DeviceHolder::new(FakeDevice::new(8192, 512));
+        let filesystem = FxFilesystem::new_empty(device).await.unwrap();
+        let volumes_directory = VolumesDirectory::new(
+            root_volume(filesystem.clone()).await.unwrap(),
+            Weak::new(),
+            None,
+        )
+        .await
+        .unwrap();
+        let name = "vol";
+        let volume = volumes_directory.create_and_mount_volume(name, None, false).await.unwrap();
+        let mut transaction = filesystem
+            .clone()
+            .new_transaction(
+                lock_keys![LockKey::object(
+                    volume.volume().store().store_object_id(),
+                    volume.root_dir().directory().object_id()
+                )],
+                Options::default(),
+            )
+            .await
+            .unwrap();
+        volume
+            .root_dir()
+            .directory()
+            .create_child_file(&mut transaction, "foo", None)
+            .await
+            .expect("create_child_file failed");
+        transaction.commit().await.expect("commit failed");
+        volumes_directory
+            .lock()
+            .await
+            .unmount(volume.volume().store().store_object_id())
+            .await
+            .expect("unmount failed");
+
+        let filesystem_clone = filesystem.clone();
+        let filesystem_clone2 = filesystem.clone();
+        let volumes_directory_clone1 = volumes_directory.clone();
+        let volumes_directory_clone2 = volumes_directory.clone();
+        let root_store_object_id = filesystem.root_store().store_object_id();
+        let store_info_object_id = volume.volume().store().store_info_handle_object_id().unwrap();
+        join!(
+            async move {
+                // Take a lock that the EndFlush transaction requires, so we interleave removing
+                // the volume between StartFlush and EndFlush.  Release it on a timer since once the
+                // volume is deleted, `remove_volume` needs to take this lock as well to tombstone
+                // the store info.
+                let _guard = filesystem_clone2
+                    .lock_manager()
+                    .read_lock(lock_keys![LockKey::object(
+                        root_store_object_id,
+                        store_info_object_id,
+                    )])
+                    .await;
+                fasync::Timer::new(Duration::from_millis(200)).await;
+            },
+            async move {
+                filesystem_clone.journal().compact().await.expect("Compact failed");
+            },
+            async move {
+                if let Err(e) = volumes_directory_clone1.remove_volume(name).await {
+                    if !FxfsError::NotFound.matches(&e) {
+                        panic!("remove_volume failed: {e:?}");
+                    }
+                }
+            },
+            async move {
+                if let Err(e) = volumes_directory_clone2.remove_volume(name).await {
+                    if !FxfsError::NotFound.matches(&e) {
+                        panic!("remove_volume failed: {e:?}");
+                    }
+                }
+            },
+        );
         volumes_directory.terminate().await;
         std::mem::drop(volumes_directory);
         filesystem.close().await.expect("Filesystem close");

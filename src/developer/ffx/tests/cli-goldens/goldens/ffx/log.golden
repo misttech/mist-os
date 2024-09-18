@@ -2,7 +2,7 @@
   "name": "log",
   "description": "Display logs from a target device",
   "examples": [
-    "Dump the most recent logs and stream new ones as they happen:\n  $ ffx log\n\nStream new logs starting from the current time, filtering for severity of at least \"WARN\":\n  $ ffx log --severity warn --since now\n\nStream logs where the source moniker, component url and message do not include \"sys\":\n  $ ffx log --exclude sys\n\nStream ERROR logs with source moniker, component url or message containing either\n\"netstack\" or \"remote-control.cm\", but not containing \"sys\":\n  $ ffx log --severity error --filter netstack --filter remote-control.cm --exclude sys\n\nDump all available logs where the source moniker, component url, or message contains\n\"remote-control\":\n  $ ffx log --filter remote-control dump\n\nDump all logs from the last 30 minutes logged before 5 minutes ago:\n  $ ffx log --since \"30m ago\" --until \"5m ago\" dump\n\nEnable DEBUG logs from the \"core/audio\" component while logs are streaming:\n  $ ffx log --select core/audio#DEBUG"
+    "Dump the most recent logs and stream new ones as they happen:\n  $ ffx log\n\nStream new logs starting from the current time, filtering for severity of at least \"WARN\":\n  $ ffx log --severity warn --since now\n\nStream logs where the source moniker, component url and message do not include \"sys\":\n  $ ffx log --exclude sys\n\nStream ERROR logs with source moniker, component url or message containing either\n\"netstack\" or \"remote-control.cm\", but not containing \"sys\":\n  $ ffx log --severity error --filter netstack --filter remote-control.cm --exclude sys\n\nDump all available logs where the source moniker, component url, or message contains\n\"remote-control\":\n  $ ffx log --filter remote-control dump\n\nDump all logs from the last 30 minutes logged before 5 minutes ago:\n  $ ffx log --since \"30m ago\" --until \"5m ago\" dump\n\nEnable DEBUG logs from the \"core/audio\" component while logs are streaming:\n  $ ffx log --set-severity core/audio#DEBUG"
   ],
   "flags": [
     {
@@ -230,6 +230,18 @@
       "optionality": "repeating",
       "long": "--select",
       "short": null,
+      "description": "DEPRECATED: use --set-severity",
+      "hidden": false
+    },
+    {
+      "kind": {
+        "Option": {
+          "arg_name": "set-severity"
+        }
+      },
+      "optionality": "repeating",
+      "long": "--set-severity",
+      "short": null,
       "description": "configure the log settings on the target device for components matching the given selector. This modifies the minimum log severity level emitted by components during the logging session. Specify using the format <component-selector>#<log-level>, with level as one of FATAL|ERROR|WARN|INFO|DEBUG|TRACE. May be repeated.",
       "hidden": false
     },
@@ -261,6 +273,14 @@
       "kind": "Switch",
       "optionality": "optional",
       "long": "--force-select",
+      "short": null,
+      "description": "DEPRECATED: use --force-set-severity",
+      "hidden": false
+    },
+    {
+      "kind": "Switch",
+      "optionality": "optional",
+      "long": "--force-set-severity",
       "short": null,
       "description": "if enabled, selectors will be passed directly to Archivist without any filtering. If disabled and no matching components are found, the user will be prompted to either enable this or be given a list of selectors to choose from.",
       "hidden": false

@@ -20,7 +20,9 @@
 #include <efi/types.h>
 #include <fbl/string_printf.h>
 
+#include "fbl/vector.h"
 #include "gpt.h"
+#include "log.h"
 
 namespace gigaboot {
 
@@ -221,37 +223,85 @@ std::string_view MaybeMapPartitionName(const EfiGptBlockDevice& device,
   return partition;
 }
 
-std::optional<gigaboot::RebootMode> GetCommandlineRebootMode() {
+namespace {
+
+std::optional<fbl::Vector<char>> GetCommandlineFromLoadOptions() {
   if (!gEfiLoadedImage) {
-    printf("No loaded image protocol; cannot fetch Gigaboot commandline\n");
+    DLOG("No EFI Loaded Image protocol found\n");
     return std::nullopt;
   }
 
   if (!gEfiLoadedImage->LoadOptions) {
-    printf("No Gigaboot commandline was found\n");
+    DLOG("EFI Loaded Image didn't provide any load options\n");
     return std::nullopt;
   }
 
   // The UEFI spec allows arbitrary binary data in LoadOptions, but for Gigaboot our only use case
   // is QEMU passing us commandline args which will always be UCS-2.
-  if (reinterpret_cast<uintptr_t>(gEfiLoadedImage->LoadOptions) % alignof(char16_t) != 0) {
+  if (reinterpret_cast<uintptr_t>(gEfiLoadedImage->LoadOptions) % alignof(char16_t) != 0 ||
+      gEfiLoadedImage->LoadOptionsSize % sizeof(char16_t) != 0) {
     printf("Warning: Gigaboot commandline is not aligned UTF-16; ignoring\n");
     return std::nullopt;
   }
 
-  efi::String commandline(
+  fbl::Vector<char> utf8 = efi::String::ToUtf8(
       std::u16string_view(reinterpret_cast<char16_t*>(gEfiLoadedImage->LoadOptions),
                           gEfiLoadedImage->LoadOptionsSize / sizeof(char16_t)));
-  if (!commandline.IsValid()) {
+  if (utf8.is_empty()) {
     printf("Warning: Gigaboot commandline is not valid UTF-16; ignoring\n");
     return std::nullopt;
   }
 
-  printf("Gigaboot commandline: %s\n", commandline.c_str());
+  return utf8;
+}
 
-  // Just do super basic matching to look for the only commandline arg we care about. We don't
-  // really need to convert to UTF-8 above for this, but it's useful to print the commandline.
-  if (std::string_view(commandline).find(kCommandlineBootToFastboot) != std::string_view::npos) {
+std::optional<fbl::Vector<char>> GetCommandlineFromDisk() {
+  auto gpt_device = FindEfiGptDevice();
+  if (gpt_device.is_error()) {
+    DLOG("No GPT device found\n");
+    return std::nullopt;
+  }
+
+  if (gpt_device->Load().is_error()) {
+    DLOG("Failed to load GPT from disk\n");
+    return std::nullopt;
+  }
+
+  fbl::Vector<char> commandline;
+  commandline.resize(kDiskCommandlineMaxSize + 1);
+  if (gpt_device
+          ->ReadPartition(kDiskCommandlinePartitionName, 0, kDiskCommandlineMaxSize,
+                          commandline.data())
+          .is_error()) {
+    DLOG("Failed to read from '%s' partition", kDiskCommandlinePartitionName);
+    return std::nullopt;
+  }
+  // Terminate so that we don't buffer-overflow if the disk contents happen to be garbage.
+  *(commandline.end() - 1) = '\0';
+
+  return commandline;
+}
+
+}  // namespace
+
+std::optional<gigaboot::RebootMode> GetCommandlineRebootMode(bool allow_disk_fallback) {
+  auto commandline = GetCommandlineFromLoadOptions();
+  // Right now we only look on-disk if we didn't find a loaded image commandline. It may be useful
+  // in the future to look in both places and combine the commandline, but for now we don't need it.
+  if (!commandline.has_value() && allow_disk_fallback) {
+    commandline = GetCommandlineFromDisk();
+  }
+
+  if (!commandline.has_value()) {
+    printf("No Gigaboot commandline was found\n");
+    return std::nullopt;
+  }
+
+  printf("Gigaboot commandline: %s\n", commandline->data());
+
+  // Just do super basic matching to look for the only commandline arg we care about.
+  if (std::string_view(commandline->data()).find(kCommandlineBootToFastboot) !=
+      std::string_view::npos) {
     printf("Found commandline fastboot trigger\n");
     return gigaboot::RebootMode::kBootloader;
   }

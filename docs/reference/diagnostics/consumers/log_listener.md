@@ -24,7 +24,7 @@ usually invoke it with [`ffx log`](https://fuchsia.dev/reference/tools/sdk/ffx.m
    </td>
   </tr>
   <tr>
-   <td><code>--select &lt;comma-separated-component-interests></code>
+   <td><code>--set-severity &lt;comma-separated-component-interests></code>
    </td>
    <td>
       Configure the minimum severity level for logs emitted by components on the target device

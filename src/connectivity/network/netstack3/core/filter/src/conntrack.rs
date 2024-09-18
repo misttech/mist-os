@@ -1482,9 +1482,7 @@ mod tests {
         assert_eq!(core_ctx.conntrack().contains_tuple(&second_tuple_reply), true);
         assert_eq!(core_ctx.conntrack().inner.lock().num_connections, 2);
 
-        // T=GC_INTERVAL a packet for just the second connection comes in in the
-        // reply direction, which causes the connection to be marked
-        // established.
+        // T=GC_INTERVAL a packet for just the second connection comes in.
         let conn = core_ctx
             .conntrack()
             .get_connection_for_packet_and_update(&bindings_ctx, &second_packet_reply)
@@ -1502,14 +1500,12 @@ mod tests {
         assert_eq!(core_ctx.conntrack().inner.lock().num_connections, 2);
 
         // The state in the table at this point is:
-        // Connection 1
-        //   - Not established
+        // Connection 1:
         //   - Last packet seen at T=0
-        //   - Expires at T=CONNECTION_EXPIRY_TIME_UDP + GC_INTERVAL
+        //   - Expires after T=CONNECTION_EXPIRY_TIME_UDP
         // Connection 2:
-        //   - Established
         //   - Last packet seen at T=GC_INTERVAL
-        //   - Expires at CONNECTION_EXPIRY_TIME_UDP + 2*GC_INTERVAL
+        //   - Expires after CONNECTION_EXPIRY_TIME_UDP + GC_INTERVAL
 
         // T=2*GC_INTERVAL: Triggering a GC does not clean up any connections.
         bindings_ctx.sleep(GC_INTERVAL);
@@ -1521,8 +1517,8 @@ mod tests {
         assert_eq!(core_ctx.conntrack().inner.lock().num_connections, 2);
 
         // Time advances to expiry for the first packet
-        // (T=CONNECTION_EXPIRY_TIME_TCP_UNESTABLISHED + GC_INTERVAL) trigger gc and
-        // note that the first connection was cleaned up
+        // (T=CONNECTION_EXPIRY_TIME_UDP) trigger gc and note that the first
+        // connection was cleaned up
         bindings_ctx.sleep(CONNECTION_EXPIRY_TIME_UDP - 2 * GC_INTERVAL);
         perform_gc(&mut core_ctx, &mut bindings_ctx, gc_trigger);
         assert_eq!(core_ctx.conntrack().contains_tuple(&first_tuple), false);
@@ -1531,8 +1527,9 @@ mod tests {
         assert_eq!(core_ctx.conntrack().contains_tuple(&second_tuple_reply), true);
         assert_eq!(core_ctx.conntrack().inner.lock().num_connections, 1);
 
-        // Advance time past the expiry time for the second connection and see
-        // that it is cleaned up.
+        // Advance time past the expiry time for the second connection
+        // (T=CONNECTION_EXPIRY_TIME_UDP + GC_INTERVAL) and see that it is
+        // cleaned up.
         bindings_ctx.sleep(GC_INTERVAL);
         perform_gc(&mut core_ctx, &mut bindings_ctx, gc_trigger);
         assert_eq!(core_ctx.conntrack().contains_tuple(&first_tuple), false);

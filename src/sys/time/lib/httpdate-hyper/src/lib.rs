@@ -2,10 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use rustls::client::{ServerCertVerified, ServerCertVerifier};
 use rustls::Certificate;
 use std::cell::RefCell;
 use std::sync::{Arc, Mutex};
+use std::time::SystemTime;
 use thiserror::Error;
+use {fuchsia_hyper, hyper};
 
 type DateTime = chrono::DateTime<chrono::FixedOffset>;
 #[derive(Debug, PartialEq, Clone, Copy, Hash, Eq)]
@@ -104,9 +107,9 @@ impl RecordingVerifier {
     // given |time| and |trust_anchors| using standard TLS verification.
     pub fn verify(
         &self,
-        dns_name: webpki::DNSNameRef<'_>,
+        dns_name: webpki::DnsNameRef<'_>,
         time: webpki::Time,
-        trust_anchors: &webpki::TLSServerTrustAnchors<'static>,
+        trust_anchors: &'static [webpki::TrustAnchor<'static>],
     ) -> Result<(), HttpsDateError> {
         let presented_certs = self.presented_certs.lock().unwrap();
         let presented_certs = presented_certs.borrow();
@@ -116,34 +119,43 @@ impl RecordingVerifier {
 
         let untrusted_der: Vec<&[u8]> =
             presented_certs.iter().map(|certificate| certificate.0.as_slice()).collect();
-        let leaf = webpki::EndEntityCert::from(untrusted_der[0])
+        let leaf = webpki::EndEntityCert::try_from(untrusted_der[0])
             .httpsdate_err(HttpsDateErrorType::CorruptLeafCertificate)?;
 
-        leaf.verify_is_valid_tls_server_cert(
+        let crls = &[];
+
+        leaf.verify_for_usage(
             ALLOWED_SIG_ALGS,
             trust_anchors,
             &untrusted_der[1..],
             time,
+            webpki::KeyUsage::server_auth(),
+            crls,
         )
         .httpsdate_err(HttpsDateErrorType::InvalidCertificateChain)?;
 
-        leaf.verify_is_valid_for_dns_name(dns_name)
+        leaf.verify_is_valid_for_subject_name(webpki::SubjectNameRef::DnsName(dns_name))
             .httpsdate_err(HttpsDateErrorType::InvalidCertificateChain)
     }
 }
 
-impl rustls::ServerCertVerifier for RecordingVerifier {
+impl ServerCertVerifier for RecordingVerifier {
     fn verify_server_cert(
         &self,
-        _root_store: &rustls::RootCertStore,
-        presented_certs: &[rustls::Certificate],
-        _dns_name: webpki::DNSNameRef<'_>,
+        end_entity: &rustls::Certificate,
+        intermediates: &[rustls::Certificate],
+        _server_name: &rustls::ServerName,
+        _scts: &mut dyn Iterator<Item = &[u8]>,
         _ocsp_response: &[u8],
-    ) -> Result<rustls::ServerCertVerified, rustls::TLSError> {
+        _now: SystemTime,
+    ) -> Result<ServerCertVerified, rustls::Error> {
         // Don't attempt to verify trust, just store the necessary details
         // for deferred evaluation
-        *self.presented_certs.lock().unwrap().borrow_mut() = presented_certs.to_vec();
-        Ok(rustls::ServerCertVerified::assertion())
+        let mut presented_certs = Vec::with_capacity(1 + intermediates.len());
+        presented_certs.push(end_entity.clone());
+        presented_certs.extend(intermediates.iter().cloned());
+        *self.presented_certs.lock().unwrap().borrow_mut() = presented_certs;
+        Ok(ServerCertVerified::assertion())
     }
 }
 
@@ -152,7 +164,7 @@ pub struct NetworkTimeClient {
     /// The custom verifier used for certificate validation.
     verifier: Arc<RecordingVerifier>,
     /// The set of trust anchors used to verify a response.
-    trust_anchors: &'static webpki::TLSServerTrustAnchors<'static>,
+    trust_anchors: &'static [webpki::TrustAnchor<'static>],
     /// The underlying client for making requests.
     client: fuchsia_hyper::HttpsClient,
 }
@@ -164,18 +176,29 @@ impl NetworkTimeClient {
         Self::new_with_trust_anchors(&webpki_roots_fuchsia::TLS_SERVER_ROOTS)
     }
 
-    fn new_with_trust_anchors(
-        trust_anchors: &'static webpki::TLSServerTrustAnchors<'static>,
-    ) -> Self {
+    fn new_with_trust_anchors(trust_anchors: &'static [webpki::TrustAnchor<'static>]) -> Self {
+        let mut root_store = rustls::RootCertStore::empty();
+
+        root_store.add_trust_anchors(trust_anchors.iter().map(|cert| {
+            rustls::OwnedTrustAnchor::from_subject_spki_name_constraints(
+                cert.subject,
+                cert.spki,
+                cert.name_constraints,
+            )
+        }));
+
         // Because we don't currently have any idea what the "true" time is
         // we need to use a non-standard verifier, `RecordingVerifier`, to allow
         // us to defer trust evaluation until after we've parsed the response.
         let verifier = Arc::new(RecordingVerifier::default());
-        let mut config = fuchsia_hyper::new_rustls_client_config();
-        config.root_store.add_server_trust_anchors(trust_anchors);
+        let mut config = rustls::ClientConfig::builder()
+            .with_safe_defaults()
+            .with_root_certificates(root_store)
+            .with_no_client_auth();
+
         config
             .dangerous()
-            .set_certificate_verifier(Arc::clone(&verifier) as Arc<dyn rustls::ServerCertVerifier>);
+            .set_certificate_verifier(Arc::clone(&verifier) as Arc<dyn ServerCertVerifier>);
 
         let client = fuchsia_hyper::new_https_client_dangerous(config, Default::default());
 
@@ -208,7 +231,7 @@ impl NetworkTimeClient {
             _ => return Err(HttpsDateError::new(HttpsDateErrorType::SchemeNotHttps)),
         }
         let dns_name = match uri.host() {
-            Some(host) => webpki::DNSNameRef::try_from_ascii_str(host)
+            Some(host) => webpki::DnsNameRef::try_from_ascii_str(host)
                 .httpsdate_err(HttpsDateErrorType::InvalidHostname)?,
             None => return Err(HttpsDateError::new(HttpsDateErrorType::InvalidHostname)),
         };
@@ -277,10 +300,7 @@ mod test {
         static ref TEST_CERT_ROOT: rustls::Certificate =
             parse_pem(&include_str!("../certs/ca.cert")).pop().map(rustls::Certificate).unwrap();
         static ref TEST_TRUST_ANCHORS: Vec<webpki::TrustAnchor<'static>> =
-            vec![webpki::trust_anchor_util::cert_der_as_trust_anchor(TEST_CERT_ROOT.as_ref())
-                .unwrap()];
-        static ref TEST_TLS_SERVER_ROOTS: webpki::TLSServerTrustAnchors<'static> =
-            webpki::TLSServerTrustAnchors(&TEST_TRUST_ANCHORS);
+            vec![webpki::TrustAnchor::try_from_cert_der(TEST_CERT_ROOT.as_ref()).unwrap()];
     }
 
     /// Spawn an HTTPS server that signs responses with TEST_PRIVATE_KEY and always returns
@@ -297,8 +317,12 @@ mod test {
             .map_ok(|(conn, _addr)| fuchsia_hyper::TcpStream { stream: conn });
 
         // build a server configuration using a test CA and cert chain
-        let mut tls_config = rustls::ServerConfig::new(rustls::NoClientAuth::new());
-        tls_config.set_single_cert(TEST_CERT_CHAIN.clone(), TEST_PRIVATE_KEY.clone()).unwrap();
+        let tls_config = rustls::ServerConfig::builder()
+            .with_safe_defaults()
+            .with_no_client_auth()
+            .with_single_cert(TEST_CERT_CHAIN.clone(), TEST_PRIVATE_KEY.clone())
+            .unwrap();
+
         let tls_acceptor = tokio_rustls::TlsAcceptor::from(Arc::new(tls_config));
 
         // wrap incoming tcp streams
@@ -365,7 +389,7 @@ mod test {
         let set_time = *CERT_NOT_BEFORE + chrono::Duration::days(1);
         let open_port = serve_fake(set_time.clone());
 
-        let mut client = NetworkTimeClient::new_with_trust_anchors(&TEST_TLS_SERVER_ROOTS);
+        let mut client = NetworkTimeClient::new_with_trust_anchors(&TEST_TRUST_ANCHORS);
 
         let url = format!("https://localhost:{}/", open_port).parse::<hyper::Uri>().unwrap();
         let date = client.get_network_time(url).await.unwrap();
@@ -376,7 +400,7 @@ mod test {
     async fn test_network_err() {
         let open_port = serve_crash();
 
-        let mut client = NetworkTimeClient::new_with_trust_anchors(&TEST_TLS_SERVER_ROOTS);
+        let mut client = NetworkTimeClient::new_with_trust_anchors(&TEST_TRUST_ANCHORS);
 
         let url = format!("https://localhost:{}/", open_port).parse::<hyper::Uri>().unwrap();
         assert_eq!(
@@ -407,7 +431,7 @@ mod test {
         let time = *CERT_NOT_AFTER + chrono::Duration::days(2);
         let open_port = serve_fake(time);
 
-        let mut client = NetworkTimeClient::new_with_trust_anchors(&TEST_TLS_SERVER_ROOTS);
+        let mut client = NetworkTimeClient::new_with_trust_anchors(&TEST_TRUST_ANCHORS);
 
         let url = format!("https://localhost:{}/", open_port).parse::<hyper::Uri>().unwrap();
         assert_eq!(
@@ -418,7 +442,7 @@ mod test {
 
     #[fuchsia::test]
     async fn test_http_rejected() {
-        let mut client = NetworkTimeClient::new_with_trust_anchors(&TEST_TLS_SERVER_ROOTS);
+        let mut client = NetworkTimeClient::new_with_trust_anchors(&TEST_TRUST_ANCHORS);
         let url = "http://localhost/".parse::<hyper::Uri>().unwrap();
         assert_eq!(
             client.get_network_time(url).await.unwrap_err().error_type(),
@@ -432,7 +456,7 @@ mod test {
             .with_timezone(&chrono::FixedOffset::east_opt(1 * 60 * 60).unwrap());
         let open_port = serve_fake(set_time.clone());
 
-        let mut client = NetworkTimeClient::new_with_trust_anchors(&TEST_TLS_SERVER_ROOTS);
+        let mut client = NetworkTimeClient::new_with_trust_anchors(&TEST_TRUST_ANCHORS);
 
         let url = format!("https://localhost:{}/", open_port).parse::<hyper::Uri>().unwrap();
         assert_eq!(

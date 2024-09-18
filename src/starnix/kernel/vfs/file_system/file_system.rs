@@ -11,7 +11,7 @@ use crate::task::{CurrentTask, Kernel};
 use crate::vfs::fs_args::MountParams;
 use crate::vfs::{
     DirEntry, DirEntryHandle, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, FsString,
-    WeakFsNodeHandle, XattrOp,
+    WeakFsNodeHandle,
 };
 use linked_hash_map::LinkedHashMap;
 use once_cell::sync::OnceCell;
@@ -140,7 +140,8 @@ impl FileSystem {
         options: FileSystemOptions,
     ) -> Result<FileSystemHandle, Errno> {
         let security_state = security::file_system_init_security(&options.params)?;
-        Ok(Arc::new(FileSystem {
+
+        let file_system = Arc::new(FileSystem {
             kernel: Arc::downgrade(kernel),
             root: OnceCell::new(),
             next_node_id: AtomicU64Counter::new(1),
@@ -157,7 +158,13 @@ impl FileSystem {
                 CacheMode::Uncached => Entries::Uncached,
             },
             security_state,
-        }))
+        });
+
+        // TODO: https://fxbug.dev/366405587 - Workaround to allow SELinux to note that this
+        // `FileSystem` needs labeling, once a policy has been loaded.
+        security::file_system_post_init_security(kernel, &file_system);
+
+        Ok(file_system)
     }
 
     pub fn set_root(self: &FileSystemHandle, root: impl FsNodeOps) {
@@ -198,21 +205,9 @@ impl FileSystem {
     /// filesystem.
     fn prepare_node_for_insertion(
         &self,
-        current_task: &CurrentTask,
+        _current_task: &CurrentTask,
         node: &FsNodeHandle,
     ) -> WeakFsNodeHandle {
-        // TODO(b/355180447): Move this logic so the parent inode (if any) can be taken into account.
-        if let Some(xattr) =
-            security::fs_node_init_security_and_xattr(current_task, &node, None).unwrap_or(None)
-        {
-            let _ = node.ops().set_xattr(
-                node,
-                current_task,
-                xattr.name,
-                xattr.value.as_slice().into(),
-                XattrOp::Create,
-            );
-        }
         Arc::downgrade(node)
     }
 

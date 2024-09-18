@@ -756,12 +756,28 @@ fn maybe_generate_direct_offer_from_all(
     direct_offers: &[Offer],
     target: &cm_types::Name,
 ) -> Vec<Offer> {
-    assert!(offer_to_all.protocol.is_some());
+    assert!(offer_to_all.protocol.is_some() || offer_to_all.dictionary.is_some());
     let mut returned_offers = vec![];
-    for individual_protocol in offer_to_all.protocol.as_ref().unwrap() {
-        let mut local_offer = offer_to_all.clone();
-        local_offer.protocol = Some(OneOrMany::One(individual_protocol.clone()));
-
+    for mut local_offer in offer_to_all
+        .protocol
+        .as_ref()
+        .unwrap_or(&OneOrMany::Many(vec![]))
+        .iter()
+        .map(|individual_protocol| {
+            let mut local_offer = offer_to_all.clone();
+            local_offer.protocol = Some(OneOrMany::One(individual_protocol.clone()));
+            local_offer
+        })
+        .chain(
+            offer_to_all.dictionary.as_ref().unwrap_or(&OneOrMany::Many(vec![])).into_iter().map(
+                |dictionary| {
+                    let mut local_offer = offer_to_all.clone();
+                    local_offer.dictionary = Some(OneOrMany::One(dictionary.clone()));
+                    local_offer
+                },
+            ),
+        )
+    {
         let disallowed_offer_source = OfferFromRef::Named(target.clone());
         if direct_offers.iter().all(|direct| {
             // Assume that the cml being parsed is valid, which is the only

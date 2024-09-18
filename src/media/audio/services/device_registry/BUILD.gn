@@ -58,8 +58,8 @@ executable("device_registry_bin") {
 
   deps = [
     ":device_registry_lib",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
   ]
 }
 
@@ -73,6 +73,7 @@ executable("device_registry_unittests_bin") {
     "control_server_unittest.cc",
     "device_detector_unittest.cc",
     "device_unittest.cc",
+    "inspector_unittest.cc",
     "observer_server_unittest.cc",
     "provider_server_unittest.cc",
     "registry_server_unittest.cc",
@@ -98,6 +99,7 @@ executable("device_registry_warning_unittests_bin") {
     "control_creator_server_warning_unittest.cc",
     "control_server_warning_unittest.cc",
     "device_warning_unittest.cc",
+    "inspector_warning_unittest.cc",
     "observer_server_warning_unittest.cc",
     "provider_server_warning_unittest.cc",
     "registry_server_warning_unittest.cc",
@@ -110,16 +112,11 @@ executable("device_registry_warning_unittests_bin") {
 }
 
 ## Source sets
+# Created to facilitate code sharing with the fakes+stub_adr in ./testing/
 source_set("common") {
   sources = [
     "basic_types.h",
-    "common.cc",
-    "common.h",
     "logging.h",
-    "signal_processing_utils.cc",
-    "signal_processing_utils.h",
-    "validate.cc",
-    "validate.h",
   ]
 
   public_deps = [
@@ -133,10 +130,13 @@ source_set("common") {
   ]
 }
 
+# Created to facilitate direct unit-testing of the core classes and functions.
 source_set("device_registry_lib") {
   sources = [
     "audio_device_registry.cc",
     "audio_device_registry.h",
+    "common.cc",
+    "common.h",
     "control_creator_server.cc",
     "control_creator_server.h",
     "control_notify.h",
@@ -147,6 +147,8 @@ source_set("device_registry_lib") {
     "device_detector.cc",
     "device_detector.h",
     "device_presence_watcher.h",
+    "inspector.cc",
+    "inspector.h",
     "logging.cc",
     "observer_notify.h",
     "observer_server.cc",
@@ -157,6 +159,10 @@ source_set("device_registry_lib") {
     "registry_server.h",
     "ring_buffer_server.cc",
     "ring_buffer_server.h",
+    "signal_processing_utils.cc",
+    "signal_processing_utils.h",
+    "validate.cc",
+    "validate.h",
   ]
 
   public_deps = [
@@ -164,6 +170,7 @@ source_set("device_registry_lib") {
     "//sdk/fidl/fuchsia.audio.device:fuchsia.audio.device_cpp",
     "//sdk/fidl/fuchsia.hardware.audio:fuchsia.hardware.audio_cpp",
     "//sdk/lib/component/incoming/cpp",
+    "//sdk/lib/inspect/component/cpp",
     "//src/lib/fsl",
     "//src/media/audio/lib/clock",
     "//src/media/audio/services/common",
@@ -173,12 +180,14 @@ source_set("device_registry_lib") {
   deps = [
     "//sdk/lib/component/outgoing/cpp",
     "//sdk/lib/fdio",
+    "//sdk/lib/sys/cpp",
     "//sdk/lib/syslog/cpp",
     "//zircon/system/public",
     "//zircon/system/ulib/zx",
   ]
 }
 
+# Created to share common test sources between the two unittest binaries.
 source_set("unittest_base") {
   testonly = true
 
@@ -187,6 +196,7 @@ source_set("unittest_base") {
     "common_unittest.cc",
     "common_unittest.h",
     "device_unittest.h",
+    "inspector_unittest.h",
     "signal_processing_utils_unittest.h",
   ]
 
@@ -194,6 +204,7 @@ source_set("unittest_base") {
     ":common",
     ":device_registry_lib",
     "testing:fakes",
+    "//sdk/lib/inspect/testing/cpp",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/loop_fixture",
     "//src/media/audio/lib/clock",

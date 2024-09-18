@@ -16,7 +16,7 @@
 
 extern "C" void PhysLoadModuleMain(UartDriver& uart, PhysBootTimes boot_times,
                                    KernelStorage kernel_storage) {
-  if (PhysLoadTestMain(ktl::move(kernel_storage)) == 0) {
+  if (PhysLoadTestMain(kernel_storage) == 0) {
     printf("\n*** Test succeeded ***\n%s\n\n", BOOT_TEST_SUCCESS_STRING);
   }
   abort();

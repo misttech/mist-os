@@ -141,6 +141,11 @@ foreach(funcs,
 
 # These are the functions that are nonproblematic in any context.
 llvm_libc_source_set("minimal-str") {
+  visibility = [
+    ":*",
+    "//src/lib/process_builder:static_pie_test_util",
+  ]
+
   functions = [
     "stpcpy",
     "strchrnul",

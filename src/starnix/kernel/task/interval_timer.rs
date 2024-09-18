@@ -229,6 +229,10 @@ impl IntervalTimer {
         };
         let interval = duration_from_timespec(new_value.it_interval)?;
 
+        if let Some(hr_timer) = &self.hr_timer {
+            *hr_timer.is_interval.lock() = guard.interval != zx::Duration::default();
+        }
+
         // Stop the current running task;
         guard.disarm();
 

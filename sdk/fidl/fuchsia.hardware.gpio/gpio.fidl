@@ -22,6 +22,7 @@ type GpioPolarity = strict enum : uint32 {
     HIGH = 0x1;
 };
 
+/// Whether to drive the GPIO to a high or low voltage, or disable the output buffer.
 type BufferMode = strict enum {
     INPUT = 0;
     OUTPUT_LOW = 1;
@@ -42,6 +43,8 @@ type InterruptConfiguration = table {
     1: mode InterruptMode;
 };
 
+/// Common error codes:
+/// - `ZX_ERR_NOT_SUPPORTED`: The requested operation is not supported by this controller.
 open protocol Gpio {
     /// Get the pin of a GPIO
     strict GetPin() -> (struct {
@@ -75,6 +78,11 @@ open protocol Gpio {
         value bool;
     }) error zx.Status;
 
+    /// Configures the output buffer as per `mode`.
+    strict SetBufferMode(struct {
+        mode BufferMode;
+    }) -> () error zx.Status;
+
     /// Sets the current value of the GPIO (any non-zero value maps to 1).
     strict Write(struct {
         value uint8;
@@ -94,6 +102,20 @@ open protocol Gpio {
         result_ua uint64;
     }) error zx.Status;
 
+    /// Gets an interrupt object pertaining to a particular GPIO pin. Only one interrupt may
+    /// be outstanding per pin, and it must be released by calling `ReleaseInterrupt()` before the
+    /// next call to `GetInterrupt()` will succeed.
+    ///
+    /// Returns `ZX_ERR_ALREADY_EXISTS` if `GetInterrupt()` has already been called without a
+    /// subsequent call to `ReleaseInterrupt()`, `ZX_ERR_INVALID_ARGS` if `options` is invalid, or
+    /// `ZX_ERR_ACCESS_DENIED` if another client has the interrupt.
+    // TODO(42082459): Complete transition to `GetInterrupt()` with this signature.
+    strict GetInterrupt2(struct {
+        options InterruptOptions;
+    }) -> (resource struct {
+        interrupt zx.Handle:INTERRUPT;
+    }) error zx.Status;
+
     /// Gets an interrupt object pertaining to a particular GPIO pin. `flags`
     /// is passed as the `options` parameter when
     /// [creating the interrupt](https://fuchsia.dev/fuchsia-src/reference/syscalls/interrupt_create).
@@ -107,13 +129,19 @@ open protocol Gpio {
     /// client with the interrupt can call `ConfigureInterrupt()`, unless no client has an
     /// interrupt.
     ///
-    /// Returns `ZX_ERR_INVALID_ARGS` of no fields are set, or `ZX_ERR_ACCESS_DENIED` if another
-    /// client has the interrupt.
+    /// Returns `ZX_ERR_INVALID_ARGS` if no fields are set in `config`, or `ZX_ERR_ACCESS_DENIED` if
+    /// another client has the interrupt.
     strict ConfigureInterrupt(struct {
         config InterruptConfiguration;
     }) -> () error zx.Status;
 
-    /// Release the interrupt.
+    /// Releases the interrupt, allowing `GetInterrupt()` to be called again or by another
+    /// client. A client's interrupt is automatically released when it disconnects from the
+    /// server.
+    ///
+    /// Returns `ZX_ERR_NOT_FOUND` if the interrupt has already been released, or if
+    /// `GetInterrupt()` has not been called. Returns `ZX_ERR_ACCESS_DENIED` if another client has
+    /// the interrupt.
     strict ReleaseInterrupt() -> () error zx.Status;
 };
 

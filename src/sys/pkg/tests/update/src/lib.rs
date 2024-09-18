@@ -336,12 +336,18 @@ async fn force_install_reboot() {
 
     assert_output(
        &output,
-        "Installing an update.\n\
-        State: Prepare\n\
-        State: Fetch(UpdateInfoAndProgress { info: UpdateInfo { download_size: 1000 }, progress: Progress { fraction_completed: 0.0, bytes_downloaded: 0 } })\n\
-        State: Stage(UpdateInfoAndProgress { info: UpdateInfo { download_size: 1000 }, progress: Progress { fraction_completed: 0.5, bytes_downloaded: 500 } })\n\
-        State: WaitToReboot(UpdateInfoAndProgress { info: UpdateInfo { download_size: 1000 }, progress: Progress { fraction_completed: 1.0, bytes_downloaded: 1000 } })\n",
-        "",
+"Installing an update.
+Progress reporting is based on the fraction of packages resolved, so if one package is much
+larger than the others, then the reported progress could appear to stall near the end.
+Until the update process is improved to have more granular reporting, try using
+    ffx inspect show 'core/pkg-resolver'
+for more detail on the progress of update-related downloads.
+
+State: Prepare
+State: Fetch(UpdateInfoAndProgress { info: UpdateInfo { download_size: 1000 }, progress: Progress { fraction_completed: 0.0, bytes_downloaded: 0 } })
+State: Stage(UpdateInfoAndProgress { info: UpdateInfo { download_size: 1000 }, progress: Progress { fraction_completed: 0.5, bytes_downloaded: 500 } })
+State: WaitToReboot(UpdateInfoAndProgress { info: UpdateInfo { download_size: 1000 }, progress: Progress { fraction_completed: 1.0, bytes_downloaded: 1000 } })\n",
+"",
         0,
     );
 
@@ -392,12 +398,18 @@ async fn force_install_no_reboot() {
 
     assert_output(
         &output,
-        "Installing an update.\n\
-        State: Prepare\n\
-        State: Fetch(UpdateInfoAndProgress { info: UpdateInfo { download_size: 1000 }, progress: Progress { fraction_completed: 0.0, bytes_downloaded: 0 } })\n\
-        State: Stage(UpdateInfoAndProgress { info: UpdateInfo { download_size: 1000 }, progress: Progress { fraction_completed: 0.5, bytes_downloaded: 500 } })\n\
-        State: WaitToReboot(UpdateInfoAndProgress { info: UpdateInfo { download_size: 1000 }, progress: Progress { fraction_completed: 1.0, bytes_downloaded: 1000 } })\n\
-        State: DeferReboot(UpdateInfoAndProgress { info: UpdateInfo { download_size: 1000 }, progress: Progress { fraction_completed: 1.0, bytes_downloaded: 1000 } })\n",
+"Installing an update.
+Progress reporting is based on the fraction of packages resolved, so if one package is much
+larger than the others, then the reported progress could appear to stall near the end.
+Until the update process is improved to have more granular reporting, try using
+    ffx inspect show 'core/pkg-resolver'
+for more detail on the progress of update-related downloads.
+
+State: Prepare
+State: Fetch(UpdateInfoAndProgress { info: UpdateInfo { download_size: 1000 }, progress: Progress { fraction_completed: 0.0, bytes_downloaded: 0 } })
+State: Stage(UpdateInfoAndProgress { info: UpdateInfo { download_size: 1000 }, progress: Progress { fraction_completed: 0.5, bytes_downloaded: 500 } })
+State: WaitToReboot(UpdateInfoAndProgress { info: UpdateInfo { download_size: 1000 }, progress: Progress { fraction_completed: 1.0, bytes_downloaded: 1000 } })
+State: DeferReboot(UpdateInfoAndProgress { info: UpdateInfo { download_size: 1000 }, progress: Progress { fraction_completed: 1.0, bytes_downloaded: 1000 } })\n",
         "",
         0,
     );
@@ -433,9 +445,15 @@ async fn force_install_failure_state() {
 
     assert_output(
         &output,
-        "Installing an update.\n\
-        State: Prepare\n\
-        State: FailPrepare(Internal)\n",
+        "Installing an update.
+Progress reporting is based on the fraction of packages resolved, so if one package is much
+larger than the others, then the reported progress could appear to stall near the end.
+Until the update process is improved to have more granular reporting, try using
+    ffx inspect show 'core/pkg-resolver'
+for more detail on the progress of update-related downloads.
+
+State: Prepare
+State: FailPrepare(Internal)\n",
         "Error: Encountered failure state\n",
         1,
     );
@@ -466,8 +484,14 @@ async fn force_install_unexpected_end() {
 
     assert_output(
         &output,
-        "Installing an update.\n\
-        State: Prepare\n",
+        "Installing an update.
+Progress reporting is based on the fraction of packages resolved, so if one package is much
+larger than the others, then the reported progress could appear to stall near the end.
+Until the update process is improved to have more granular reporting, try using
+    ffx inspect show 'core/pkg-resolver'
+for more detail on the progress of update-related downloads.
+
+State: Prepare\n",
         "Error: Installation ended unexpectedly\n",
         1,
     );

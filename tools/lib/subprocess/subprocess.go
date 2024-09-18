@@ -138,6 +138,10 @@ func WaitForCmd(ctx context.Context, cmd *exec.Cmd) error {
 
 	go func() {
 		errs <- cmd.Wait()
+		if cmd.ProcessState != nil {
+			retcode := cmd.ProcessState.ExitCode()
+			logger.Debugf(ctx, "Subprocess completed with exit code %d: %v", retcode, cmd.Args)
+		}
 	}()
 
 	pgidSet := cmd.SysProcAttr != nil && cmd.SysProcAttr.Setpgid

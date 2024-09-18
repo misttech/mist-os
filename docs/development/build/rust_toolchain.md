@@ -53,13 +53,13 @@ Prior to building a custom Rust toolchain for Fuchsia, you need to do the follow
    HOST_TRIPLE={{ '<var>' }}x86_64-unknown-linux-gnu{{ '</var>' }}
    cat << "EOF" > cipd.ensure
    @Subdir sdk
-   fuchsia/sdk/core/\${platform} latest
+   fuchsia/sdk/core/${platform} latest
    @Subdir sysroot/linux
    fuchsia/third_party/sysroot/linux git_revision:db18eec0b4f14b6b16174aa2b91e016663157376
    @Subdir sysroot/focal
    fuchsia/third_party/sysroot/focal latest
    @Subdir clang
-   fuchsia/third_party/clang/\${platform} integration
+   fuchsia/third_party/clang/${platform} integration
    EOF
 
    STAGE0_DATE=$(sed -nr 's/^compiler_date=(.*)/\1/p' ${DEV_ROOT}/rust/src/stage0)

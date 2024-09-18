@@ -2,11 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::{Context as _, Error};
+mod filter;
+mod opts;
+mod ser;
+
+use anyhow::{anyhow, Context as _, Error};
 use ffx_writer::ToolIO as _;
 use fidl_fuchsia_net_stack_ext::{self as fstack_ext, FidlReturn as _};
-use filter::{IpRoutines, NatRoutines};
-use fnet_filter_ext::{ControllerId, Rule};
 use futures::{FutureExt as _, StreamExt as _, TryFutureExt as _, TryStreamExt as _};
 use net_types::ip::{Ip, Ipv4, Ipv6};
 use netfilter::FidlReturn as _;
@@ -16,18 +18,18 @@ use serde_json::json;
 use serde_json::value::Value;
 use std::borrow::Cow;
 use std::collections::hash_map::HashMap;
-use std::collections::BTreeMap;
 use std::convert::TryFrom as _;
 use std::iter::FromIterator as _;
 use std::ops::Deref;
 use std::pin::pin;
 use std::str::FromStr as _;
+
 use tracing::{info, warn};
 use {
     fidl_fuchsia_net as fnet, fidl_fuchsia_net_debug as fdebug, fidl_fuchsia_net_dhcp as fdhcp,
     fidl_fuchsia_net_ext as fnet_ext, fidl_fuchsia_net_filter as fnet_filter,
     fidl_fuchsia_net_filter_deprecated as ffilter_deprecated,
-    fidl_fuchsia_net_filter_ext as fnet_filter_ext, fidl_fuchsia_net_interfaces as finterfaces,
+    fidl_fuchsia_net_interfaces as finterfaces,
     fidl_fuchsia_net_interfaces_admin as finterfaces_admin,
     fidl_fuchsia_net_interfaces_ext as finterfaces_ext, fidl_fuchsia_net_name as fname,
     fidl_fuchsia_net_neighbor as fneighbor, fidl_fuchsia_net_neighbor_ext as fneighbor_ext,
@@ -36,15 +38,9 @@ use {
     fidl_fuchsia_net_stackmigrationdeprecated as fnet_migration, fuchsia_zircon_status as zx,
 };
 
-mod opts;
 pub use opts::{
     underlying_user_facing_error, user_facing_error, Command, CommandEnum, UserFacingError,
 };
-
-mod filter;
-use crate::filter::{FilteringResources, Namespace, Routine, RoutinePriority};
-
-mod ser;
 
 macro_rules! filter_fidl {
     ($method:expr, $context:expr) => {
@@ -70,6 +66,7 @@ pub trait ServiceConnector<S: fidl::endpoints::ProtocolMarker> {
 pub trait NetCliDepsConnector:
     ServiceConnector<fdebug::InterfacesMarker>
     + ServiceConnector<froot::InterfacesMarker>
+    + ServiceConnector<froot::FilterMarker>
     + ServiceConnector<fdhcp::Server_Marker>
     + ServiceConnector<ffilter_deprecated::FilterMarker>
     + ServiceConnector<finterfaces::StateMarker>
@@ -89,6 +86,7 @@ pub trait NetCliDepsConnector:
 impl<O> NetCliDepsConnector for O where
     O: ServiceConnector<fdebug::InterfacesMarker>
         + ServiceConnector<froot::InterfacesMarker>
+        + ServiceConnector<froot::FilterMarker>
         + ServiceConnector<fdhcp::Server_Marker>
         + ServiceConnector<ffilter_deprecated::FilterMarker>
         + ServiceConnector<finterfaces::StateMarker>
@@ -126,7 +124,7 @@ pub async fn do_root<C: NetCliDepsConnector>(
                 .context("failed during filter-deprecated command")
         }
         CommandEnum::Filter(opts::filter::Filter { filter_cmd: cmd }) => {
-            do_filter(out, cmd, connector).await.context("failed during filter command")
+            filter::do_filter(out, cmd, connector).await.context("failed during filter command")
         }
         CommandEnum::Log(opts::Log { log_cmd: cmd }) => {
             do_log(cmd, connector).await.context("failed during log command")
@@ -462,7 +460,7 @@ async fn do_if<C: NetCliDepsConnector>(
                     .map_err(anyhow::Error::new)
                     .and_then(|res| {
                         res.map_err(|e: finterfaces_admin::ControlGetConfigurationError| {
-                            anyhow::anyhow!("{:?}", e)
+                            anyhow!("{:?}", e)
                         })
                     })
                     .context("get configuration")?;
@@ -491,7 +489,7 @@ async fn do_if<C: NetCliDepsConnector>(
                     .map_err(anyhow::Error::new)
                     .and_then(|res| {
                         res.map_err(|e: finterfaces_admin::ControlSetConfigurationError| {
-                            anyhow::anyhow!("{:?}", e)
+                            anyhow!("{:?}", e)
                         })
                     })
                     .context("set configuration")?;
@@ -514,7 +512,7 @@ async fn do_if<C: NetCliDepsConnector>(
                     .map_err(anyhow::Error::new)
                     .and_then(|res| {
                         res.map_err(|e: finterfaces_admin::ControlGetConfigurationError| {
-                            anyhow::anyhow!("{:?}", e)
+                            anyhow!("{:?}", e)
                         })
                     })
                     .context("get configuration")?;
@@ -543,7 +541,7 @@ async fn do_if<C: NetCliDepsConnector>(
                     .map_err(anyhow::Error::new)
                     .and_then(|res| {
                         res.map_err(|e: finterfaces_admin::ControlSetConfigurationError| {
-                            anyhow::anyhow!("{:?}", e)
+                            anyhow!("{:?}", e)
                         })
                     })
                     .context("set configuration")?;
@@ -566,7 +564,7 @@ async fn do_if<C: NetCliDepsConnector>(
                     .map_err(anyhow::Error::new)
                     .and_then(|res| {
                         res.map_err(|e: finterfaces_admin::ControlGetConfigurationError| {
-                            anyhow::anyhow!("{:?}", e)
+                            anyhow!("{:?}", e)
                         })
                     })
                     .context("get configuration")?;
@@ -588,7 +586,7 @@ async fn do_if<C: NetCliDepsConnector>(
                     .map_err(anyhow::Error::new)
                     .and_then(|res| {
                         res.map_err(|e: finterfaces_admin::ControlSetConfigurationError| {
-                            anyhow::anyhow!("{:?}", e)
+                            anyhow!("{:?}", e)
                         })
                     })
                     .context("set configuration")?;
@@ -610,9 +608,7 @@ async fn do_if<C: NetCliDepsConnector>(
                 .await
                 .map_err(anyhow::Error::new)
                 .and_then(|res| {
-                    res.map_err(|e: finterfaces_admin::ControlEnableError| {
-                        anyhow::anyhow!("{:?}", e)
-                    })
+                    res.map_err(|e: finterfaces_admin::ControlEnableError| anyhow!("{:?}", e))
                 })
                 .context("error enabling interface")?;
             if did_enable {
@@ -629,9 +625,7 @@ async fn do_if<C: NetCliDepsConnector>(
                 .await
                 .map_err(anyhow::Error::new)
                 .and_then(|res| {
-                    res.map_err(|e: finterfaces_admin::ControlDisableError| {
-                        anyhow::anyhow!("{:?}", e)
-                    })
+                    res.map_err(|e: finterfaces_admin::ControlDisableError| anyhow!("{:?}", e))
                 })
                 .context("error disabling interface")?;
             if did_disable {
@@ -677,7 +671,7 @@ async fn do_if<C: NetCliDepsConnector>(
                     .await
                     .context("error after adding address")?
                     .ok_or_else(|| {
-                        anyhow::anyhow!(
+                        anyhow!(
                             "Address assignment state stream unexpectedly ended \
                                  before reaching Assigned or Unavailable state. \
                                  This is probably a bug."
@@ -708,7 +702,7 @@ async fn do_if<C: NetCliDepsConnector>(
                         .map_err(anyhow::Error::new)
                         .and_then(|res| {
                             res.map_err(|e: finterfaces_admin::ControlRemoveAddressError| {
-                                anyhow::anyhow!("{:?}", e)
+                                anyhow!("{:?}", e)
                             })
                         })
                         .context("call remove address")?
@@ -1196,177 +1190,6 @@ async fn do_filter_deprecated<C: NetCliDepsConnector, W: std::io::Write>(
     Ok(())
 }
 
-async fn do_filter<C: NetCliDepsConnector, W: std::io::Write>(
-    mut out: W,
-    cmd: opts::filter::FilterEnum,
-    connector: &C,
-) -> Result<(), Error> {
-    match cmd {
-        opts::filter::FilterEnum::List(opts::filter::List {}) => {
-            let state = connect_with_context::<fnet_filter::StateMarker, _>(connector).await?;
-            let stream = fnet_filter_ext::event_stream_from_state(state)?;
-            let mut stream = pin!(stream);
-            let resources: FilteringResources =
-                fnet_filter_ext::get_existing_resources(&mut stream).await?;
-
-            for controller_id @ ControllerId(id) in resources.controllers() {
-                writeln_scoped(
-                    &mut out,
-                    0,
-                    format!("controller: \"{}\"", id).as_str(),
-                    |out, padding| {
-                        for namespace in resources.namespaces(controller_id).unwrap() {
-                            do_filter_print_namespace(out, padding, namespace)?;
-                        }
-
-                        Ok(())
-                    },
-                )?;
-            }
-        }
-    }
-    Ok(())
-}
-
-fn do_filter_print_namespace<W: std::io::Write>(
-    out: &mut W,
-    padding: usize,
-    namespace: &Namespace,
-) -> Result<(), Error> {
-    let Namespace { id, domain, .. } = namespace;
-
-    writeln_scoped(out, padding, format!("namespace: \"{}\"", id.0).as_str(), |out, padding| {
-        writeln!(out, "{:padding$}domain: {:?}", "", domain)?;
-
-        let (ip_routines, nat_routines) = &namespace.routines();
-
-        if ip_routines.has_installed_routines() {
-            writeln_scoped(out, padding, "installed IP routines", |out, padding| {
-                let IpRoutines {
-                    ingress,
-                    local_ingress,
-                    forwarding,
-                    local_egress,
-                    egress,
-                    uninstalled: _,
-                } = ip_routines;
-                for (label, routines) in vec![
-                    ("INGRESS", ingress),
-                    ("LOCAL INGRESS", local_ingress),
-                    ("FORWARDING", forwarding),
-                    ("LOCAL EGRESS", local_egress),
-                    ("EGRESS", egress),
-                ] {
-                    do_filter_print_installed_routines(out, padding, label, routines)?;
-                }
-
-                Ok(())
-            })?;
-        }
-
-        if ip_routines.has_uninstalled_routines() {
-            writeln_scoped(out, padding, "uninstalled IP routines", |out, padding| {
-                for routine in ip_routines.uninstalled.iter() {
-                    writeln_scoped(out, padding, routine.id.name.as_str(), |out, padding| {
-                        do_filter_print_rules(out, padding, routine.rules())
-                    })?;
-                }
-
-                Ok(())
-            })?;
-        }
-
-        if nat_routines.has_installed_routines() {
-            let NatRoutines { ingress, local_ingress, local_egress, egress, uninstalled: _ } =
-                nat_routines;
-            writeln_scoped(out, padding, "installed NAT routines", |out, padding| {
-                for (label, routines) in vec![
-                    ("INGRESS", ingress),
-                    ("LOCAL INGRESS", local_ingress),
-                    ("LOCAL EGRESS", local_egress),
-                    ("EGRESS", egress),
-                ] {
-                    do_filter_print_installed_routines(out, padding, label, routines)?;
-                }
-
-                Ok(())
-            })?;
-        }
-
-        if nat_routines.has_uninstalled_routines() {
-            writeln_scoped(out, padding, "uninstalled NAT routines", |out, padding| {
-                for routine in nat_routines.uninstalled.iter() {
-                    writeln_scoped(out, padding, routine.id.name.as_str(), |out, padding| {
-                        do_filter_print_rules(out, padding, routine.rules())
-                    })?;
-                }
-
-                Ok(())
-            })?;
-        }
-        Ok(())
-    })
-}
-
-fn do_filter_print_installed_routines<W: std::io::Write>(
-    out: &mut W,
-    padding: usize,
-    label: &str,
-    routines: &BTreeMap<RoutinePriority, Vec<Routine>>,
-) -> Result<(), Error> {
-    if routines.is_empty() {
-        return Ok(());
-    }
-
-    writeln_scoped(out, padding, label, |out, padding| {
-        for (RoutinePriority(priority), routines) in routines.iter() {
-            for routine @ Routine { id, .. } in routines {
-                writeln_scoped(
-                    out,
-                    padding,
-                    format!("{}. {}", priority, id.name).as_str(),
-                    |out, padding| do_filter_print_rules(out, padding, routine.rules()),
-                )?;
-            }
-        }
-
-        Ok(())
-    })?;
-
-    Ok(())
-}
-
-fn do_filter_print_rules<'a, W: std::io::Write>(
-    out: &mut W,
-    padding: usize,
-    rules: impl Iterator<Item = &'a Rule>,
-) -> Result<(), Error> {
-    for rule in rules {
-        writeln!(
-            out,
-            "{:padding$}{}. {:?} -> {:?}",
-            "", rule.id.index, rule.matchers, rule.action
-        )?;
-    }
-
-    Ok(())
-}
-
-fn writeln_scoped<W: std::io::Write>(
-    out: &mut W,
-    padding: usize,
-    label: &str,
-    inner_scope: impl Fn(&mut W, usize) -> Result<(), Error>,
-) -> Result<(), Error> {
-    writeln!(out, "{:padding$}{label} {{", "")?;
-
-    inner_scope(out, padding + 4)?;
-
-    writeln!(out, "{:padding$}}}", "")?;
-
-    Ok(())
-}
-
 async fn do_log<C: NetCliDepsConnector>(cmd: opts::LogEnum, connector: &C) -> Result<(), Error> {
     let log = connect_with_context::<fstack::LogMarker, _>(connector).await?;
     match cmd {
@@ -1480,7 +1303,7 @@ async fn do_neigh<C: NetCliDepsConnector>(
                     .map_err(anyhow::Error::new)
                     .and_then(|res| {
                         res.map_err(|e: finterfaces_admin::ControlGetConfigurationError| {
-                            anyhow::anyhow!("{:?}", e)
+                            anyhow!("{:?}", e)
                         })
                     })
                     .context("get configuration")?;
@@ -1526,7 +1349,7 @@ async fn do_neigh<C: NetCliDepsConnector>(
                     .map_err(anyhow::Error::new)
                     .and_then(|res| {
                         res.map_err(|e: finterfaces_admin::ControlSetConfigurationError| {
-                            anyhow::anyhow!("{:?}", e)
+                            anyhow!("{:?}", e)
                         })
                     })
                     .context("set configuration")?;
@@ -1606,7 +1429,7 @@ fn jsonify_neigh_iter_item(
         .map(ser::NeighborTableEntry::from)
         .map(serde_json::to_value)
         .map(|res| res.map_err(Error::new))
-        .unwrap_or(Err(anyhow::anyhow!("failed to jsonify NeighborTableEntry")))?;
+        .unwrap_or(Err(anyhow!("failed to jsonify NeighborTableEntry")))?;
     if include_entry_state {
         Ok(json!({
             "state_change_status": state_change_status,
@@ -1859,7 +1682,7 @@ async fn do_dns<W: std::io::Write, C: NetCliDepsConnector>(
             },
         )
         .await?
-        .map_err(|e| anyhow::anyhow!("DNS lookup failed: {:?}", e))?;
+        .map_err(|e| anyhow!("DNS lookup failed: {:?}", e))?;
     let fname::LookupResult { addresses, .. } = result;
     let addrs = addresses.context("`addresses` not set in response from DNS resolver")?;
     for addr in addrs {
@@ -1900,37 +1723,23 @@ async fn do_netstack_migration<W: std::io::Write, C: NetCliDepsConnector>(
 }
 
 #[cfg(test)]
-mod tests {
+mod testutil {
+    use fidl::endpoints::ProtocolMarker;
+
     use super::*;
 
-    use assert_matches::assert_matches;
-    use fidl::endpoints::ProtocolMarker;
-    use fnet_filter_ext::{InstalledIpRoutine, InstalledNatRoutine, Matchers};
-    use fuchsia_async::{self as fasync, TimeoutExt as _};
-    use net_declare::{fidl_ip, fidl_ip_v4, fidl_mac, fidl_subnet};
-    use std::convert::TryInto as _;
-    use std::fmt::Debug;
-    use std::num::NonZeroU64;
-    use test_case::test_case;
-    use {fidl_fuchsia_net_routes as froutes, fidl_fuchsia_net_routes_ext as froutes_ext};
-
-    const IF_ADDR_V4: fnet::Subnet = fidl_subnet!("192.168.0.1/32");
-    const IF_ADDR_V6: fnet::Subnet = fidl_subnet!("fd00::1/64");
-
-    const MAC_1: fnet::MacAddress = fidl_mac!("01:02:03:04:05:06");
-    const MAC_2: fnet::MacAddress = fidl_mac!("02:03:04:05:06:07");
-
     #[derive(Default)]
-    struct TestConnector {
-        debug_interfaces: Option<fdebug::InterfacesProxy>,
-        dhcpd: Option<fdhcp::Server_Proxy>,
-        interfaces_state: Option<finterfaces::StateProxy>,
-        stack: Option<fstack::StackProxy>,
-        root_interfaces: Option<froot::InterfacesProxy>,
-        routes_v4: Option<froutes::StateV4Proxy>,
-        routes_v6: Option<froutes::StateV6Proxy>,
-        name_lookup: Option<fname::LookupProxy>,
-        filter: Option<fnet_filter::StateProxy>,
+    pub(crate) struct TestConnector {
+        pub debug_interfaces: Option<fdebug::InterfacesProxy>,
+        pub dhcpd: Option<fdhcp::Server_Proxy>,
+        pub interfaces_state: Option<finterfaces::StateProxy>,
+        pub stack: Option<fstack::StackProxy>,
+        pub root_interfaces: Option<froot::InterfacesProxy>,
+        pub root_filter: Option<froot::FilterProxy>,
+        pub routes_v4: Option<froutes::StateV4Proxy>,
+        pub routes_v6: Option<froutes::StateV6Proxy>,
+        pub name_lookup: Option<fname::LookupProxy>,
+        pub filter: Option<fnet_filter::StateProxy>,
     }
 
     #[async_trait::async_trait]
@@ -1941,7 +1750,7 @@ mod tests {
             self.debug_interfaces
                 .as_ref()
                 .cloned()
-                .ok_or(anyhow::anyhow!("connector has no dhcp server instance"))
+                .ok_or(anyhow!("connector has no dhcp server instance"))
         }
     }
 
@@ -1953,17 +1762,24 @@ mod tests {
             self.root_interfaces
                 .as_ref()
                 .cloned()
-                .ok_or(anyhow::anyhow!("connector has no root interfaces instance"))
+                .ok_or(anyhow!("connector has no root interfaces instance"))
+        }
+    }
+
+    #[async_trait::async_trait]
+    impl ServiceConnector<froot::FilterMarker> for TestConnector {
+        async fn connect(&self) -> Result<<froot::FilterMarker as ProtocolMarker>::Proxy, Error> {
+            self.root_filter
+                .as_ref()
+                .cloned()
+                .ok_or(anyhow!("connector has no root filter instance"))
         }
     }
 
     #[async_trait::async_trait]
     impl ServiceConnector<fdhcp::Server_Marker> for TestConnector {
         async fn connect(&self) -> Result<<fdhcp::Server_Marker as ProtocolMarker>::Proxy, Error> {
-            self.dhcpd
-                .as_ref()
-                .cloned()
-                .ok_or(anyhow::anyhow!("connector has no dhcp server instance"))
+            self.dhcpd.as_ref().cloned().ok_or(anyhow!("connector has no dhcp server instance"))
         }
     }
 
@@ -1972,7 +1788,7 @@ mod tests {
         async fn connect(
             &self,
         ) -> Result<<ffilter_deprecated::FilterMarker as ProtocolMarker>::Proxy, Error> {
-            Err(anyhow::anyhow!("connect filter_deprecated unimplemented for test connector"))
+            Err(anyhow!("connect filter_deprecated unimplemented for test connector"))
         }
     }
 
@@ -1984,7 +1800,7 @@ mod tests {
             self.interfaces_state
                 .as_ref()
                 .cloned()
-                .ok_or(anyhow::anyhow!("connector has no interfaces state instance"))
+                .ok_or(anyhow!("connector has no interfaces state instance"))
         }
     }
 
@@ -1993,28 +1809,28 @@ mod tests {
         async fn connect(
             &self,
         ) -> Result<<fneighbor::ControllerMarker as ProtocolMarker>::Proxy, Error> {
-            Err(anyhow::anyhow!("connect neighbor controller unimplemented for test connector"))
+            Err(anyhow!("connect neighbor controller unimplemented for test connector"))
         }
     }
 
     #[async_trait::async_trait]
     impl ServiceConnector<fneighbor::ViewMarker> for TestConnector {
         async fn connect(&self) -> Result<<fneighbor::ViewMarker as ProtocolMarker>::Proxy, Error> {
-            Err(anyhow::anyhow!("connect neighbor view unimplemented for test connector"))
+            Err(anyhow!("connect neighbor view unimplemented for test connector"))
         }
     }
 
     #[async_trait::async_trait]
     impl ServiceConnector<fstack::LogMarker> for TestConnector {
         async fn connect(&self) -> Result<<fstack::LogMarker as ProtocolMarker>::Proxy, Error> {
-            Err(anyhow::anyhow!("connect log unimplemented for test connector"))
+            Err(anyhow!("connect log unimplemented for test connector"))
         }
     }
 
     #[async_trait::async_trait]
     impl ServiceConnector<fstack::StackMarker> for TestConnector {
         async fn connect(&self) -> Result<<fstack::StackMarker as ProtocolMarker>::Proxy, Error> {
-            self.stack.as_ref().cloned().ok_or(anyhow::anyhow!("connector has no stack instance"))
+            self.stack.as_ref().cloned().ok_or(anyhow!("connector has no stack instance"))
         }
     }
 
@@ -2023,10 +1839,7 @@ mod tests {
         async fn connect(
             &self,
         ) -> Result<<froutes::StateV4Marker as ProtocolMarker>::Proxy, Error> {
-            self.routes_v4
-                .as_ref()
-                .cloned()
-                .ok_or(anyhow::anyhow!("connector has no routes_v4 instance"))
+            self.routes_v4.as_ref().cloned().ok_or(anyhow!("connector has no routes_v4 instance"))
         }
     }
 
@@ -2035,10 +1848,7 @@ mod tests {
         async fn connect(
             &self,
         ) -> Result<<froutes::StateV6Marker as ProtocolMarker>::Proxy, Error> {
-            self.routes_v6
-                .as_ref()
-                .cloned()
-                .ok_or(anyhow::anyhow!("connector has no routes_v6 instance"))
+            self.routes_v6.as_ref().cloned().ok_or(anyhow!("connector has no routes_v6 instance"))
         }
     }
 
@@ -2048,7 +1858,7 @@ mod tests {
             self.name_lookup
                 .as_ref()
                 .cloned()
-                .ok_or(anyhow::anyhow!("connector has no name lookup instance"))
+                .ok_or(anyhow!("connector has no name lookup instance"))
         }
     }
 
@@ -2075,9 +1885,30 @@ mod tests {
         async fn connect(
             &self,
         ) -> Result<<fnet_filter::StateMarker as ProtocolMarker>::Proxy, Error> {
-            self.filter.as_ref().cloned().ok_or(anyhow::anyhow!("connector has no filter instance"))
+            self.filter.as_ref().cloned().ok_or(anyhow!("connector has no filter instance"))
         }
     }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::convert::TryInto as _;
+    use std::fmt::Debug;
+
+    use assert_matches::assert_matches;
+    use fuchsia_async::{self as fasync, TimeoutExt as _};
+    use net_declare::{fidl_ip, fidl_ip_v4, fidl_mac, fidl_subnet};
+    use test_case::test_case;
+    use {fidl_fuchsia_net_routes as froutes, fidl_fuchsia_net_routes_ext as froutes_ext};
+
+    use super::testutil::TestConnector;
+    use super::*;
+
+    const IF_ADDR_V4: fnet::Subnet = fidl_subnet!("192.168.0.1/32");
+    const IF_ADDR_V6: fnet::Subnet = fidl_subnet!("fd00::1/64");
+
+    const MAC_1: fnet::MacAddress = fidl_mac!("01:02:03:04:05:06");
+    const MAC_2: fnet::MacAddress = fidl_mac!("02:03:04:05:06:07");
 
     fn trim_whitespace_for_comparison(s: &str) -> String {
         s.trim().lines().map(|s| s.trim()).collect::<Vec<&str>>().join("\n")
@@ -4063,386 +3894,5 @@ mac               -
             trim_whitespace_for_comparison(got_output),
             trim_whitespace_for_comparison(WANT_OUTPUT),
         );
-    }
-
-    #[fasync::run_singlethreaded(test)]
-    async fn test_do_filter() {
-        const CONTROLLER_A: &str = "controller a";
-        const CONTROLLER_B: &str = "controller b";
-        const NAMESPACE_A: &str = "namespace a";
-        const NAMESPACE_B: &str = "namespace b";
-        const NAMESPACE_C: &str = "namespace c";
-        const ROUTINE_A: &str = "routine a";
-        const ROUTINE_B: &str = "routine b";
-        const ROUTINE_C: &str = "routine c";
-        const ROUTINE_D: &str = "routine d";
-        const ROUTINE_E: &str = "routine e";
-        const INDEX_FIRST: u32 = 11;
-        const INDEX_SECOND: u32 = 12;
-        const INDEX_THIRD: u32 = 13;
-        const INDEX_FOURTH: u32 = 14;
-
-        let mut output = Vec::new();
-        let (filter, mut requests) =
-            fidl::endpoints::create_proxy_and_stream::<fnet_filter::StateMarker>()
-                .expect("failed to create proxy and request stream for filter server");
-
-        let connector = TestConnector { filter: Some(filter), ..Default::default() };
-        let op = do_filter(
-            &mut output,
-            opts::filter::FilterEnum::List(opts::filter::List {}),
-            &connector,
-        );
-        let op_succeeds = async move {
-            let req = requests
-                .try_next()
-                .await
-                .expect("receiving request")
-                .expect("request stream should not have ended");
-            let (_options, server_end, _state_control_handle) =
-                req.into_get_watcher().expect("request should be of type GetWatcher");
-
-            let mut watcher_request_stream = server_end.into_stream().expect("watcher FIDL error");
-
-            let events = [
-                // controller a, namespace a
-                fnet_filter_ext::Event::Existing(
-                    fnet_filter_ext::ControllerId(CONTROLLER_A.to_string()),
-                    fnet_filter_ext::Resource::Namespace(fnet_filter_ext::Namespace {
-                        id: fnet_filter_ext::NamespaceId(NAMESPACE_A.to_string()),
-                        domain: fnet_filter_ext::Domain::Ipv4,
-                    }),
-                )
-                .into(),
-                // controller a, namespace b
-                fnet_filter_ext::Event::Existing(
-                    fnet_filter_ext::ControllerId(CONTROLLER_A.to_string()),
-                    fnet_filter_ext::Resource::Namespace(fnet_filter_ext::Namespace {
-                        id: fnet_filter_ext::NamespaceId(NAMESPACE_B.to_string()),
-                        domain: fnet_filter_ext::Domain::Ipv4,
-                    }),
-                )
-                .into(),
-                // controller b, namespace c
-                fnet_filter_ext::Event::Existing(
-                    fnet_filter_ext::ControllerId(CONTROLLER_B.to_string()),
-                    fnet_filter_ext::Resource::Namespace(fnet_filter_ext::Namespace {
-                        id: fnet_filter_ext::NamespaceId(NAMESPACE_C.to_string()),
-                        domain: fnet_filter_ext::Domain::Ipv4,
-                    }),
-                )
-                .into(),
-                // controller a, namespace a, routine a (IP)
-                fnet_filter_ext::Event::Existing(
-                    fnet_filter_ext::ControllerId(CONTROLLER_A.to_string()),
-                    fnet_filter_ext::Resource::Routine(fnet_filter_ext::Routine {
-                        id: fnet_filter_ext::RoutineId {
-                            namespace: fnet_filter_ext::NamespaceId(NAMESPACE_A.to_string()),
-                            name: ROUTINE_A.to_string(),
-                        },
-                        routine_type: fnet_filter_ext::RoutineType::Ip(Some(InstalledIpRoutine {
-                            priority: 2,
-                            hook: fnet_filter_ext::IpHook::Egress,
-                        })),
-                    }),
-                )
-                .into(),
-                // controller a, namespace a, routine b (IP)
-                fnet_filter_ext::Event::Existing(
-                    fnet_filter_ext::ControllerId(CONTROLLER_A.to_string()),
-                    fnet_filter_ext::Resource::Routine(fnet_filter_ext::Routine {
-                        id: fnet_filter_ext::RoutineId {
-                            namespace: fnet_filter_ext::NamespaceId(NAMESPACE_A.to_string()),
-                            name: ROUTINE_B.to_string(),
-                        },
-                        routine_type: fnet_filter_ext::RoutineType::Ip(Some(InstalledIpRoutine {
-                            priority: 1,
-                            hook: fnet_filter_ext::IpHook::Egress,
-                        })),
-                    }),
-                )
-                .into(),
-                // controller a, namespace b, routine c (IP)
-                fnet_filter_ext::Event::Existing(
-                    fnet_filter_ext::ControllerId(CONTROLLER_A.to_string()),
-                    fnet_filter_ext::Resource::Routine(fnet_filter_ext::Routine {
-                        id: fnet_filter_ext::RoutineId {
-                            namespace: fnet_filter_ext::NamespaceId(NAMESPACE_B.to_string()),
-                            name: ROUTINE_C.to_string(),
-                        },
-                        routine_type: fnet_filter_ext::RoutineType::Ip(None),
-                    }),
-                )
-                .into(),
-                // controller a, namespace a, routine d (NAT)
-                fnet_filter_ext::Event::Existing(
-                    fnet_filter_ext::ControllerId(CONTROLLER_A.to_string()),
-                    fnet_filter_ext::Resource::Routine(fnet_filter_ext::Routine {
-                        id: fnet_filter_ext::RoutineId {
-                            namespace: fnet_filter_ext::NamespaceId(NAMESPACE_A.to_string()),
-                            name: ROUTINE_D.to_string(),
-                        },
-                        routine_type: fnet_filter_ext::RoutineType::Nat(Some(
-                            InstalledNatRoutine {
-                                priority: 1,
-                                hook: fnet_filter_ext::NatHook::Egress,
-                            },
-                        )),
-                    }),
-                )
-                .into(),
-                // controller a, namespace b, routine e (NAT)
-                fnet_filter_ext::Event::Existing(
-                    fnet_filter_ext::ControllerId(CONTROLLER_A.to_string()),
-                    fnet_filter_ext::Resource::Routine(fnet_filter_ext::Routine {
-                        id: fnet_filter_ext::RoutineId {
-                            namespace: fnet_filter_ext::NamespaceId(NAMESPACE_B.to_string()),
-                            name: ROUTINE_E.to_string(),
-                        },
-                        routine_type: fnet_filter_ext::RoutineType::Nat(None),
-                    }),
-                )
-                .into(),
-                // controller a, namespace a, routine a, rule #1 (11)
-                fnet_filter_ext::Event::Existing(
-                    fnet_filter_ext::ControllerId(CONTROLLER_A.to_string()),
-                    fnet_filter_ext::Resource::Rule(fnet_filter_ext::Rule {
-                        id: fnet_filter_ext::RuleId {
-                            routine: fnet_filter_ext::RoutineId {
-                                namespace: fnet_filter_ext::NamespaceId(NAMESPACE_A.to_string()),
-                                name: ROUTINE_A.to_string(),
-                            },
-                            index: INDEX_FIRST,
-                        },
-                        matchers: Default::default(),
-                        action: fnet_filter_ext::Action::Accept,
-                    }),
-                )
-                .into(),
-                // controller a, namespace a, routine a, rule #2 (12)
-                fnet_filter_ext::Event::Existing(
-                    fnet_filter_ext::ControllerId(CONTROLLER_A.to_string()),
-                    fnet_filter_ext::Resource::Rule(fnet_filter_ext::Rule {
-                        id: fnet_filter_ext::RuleId {
-                            routine: fnet_filter_ext::RoutineId {
-                                namespace: fnet_filter_ext::NamespaceId(NAMESPACE_A.to_string()),
-                                name: ROUTINE_A.to_string(),
-                            },
-                            index: INDEX_SECOND,
-                        },
-                        matchers: Default::default(),
-                        action: fnet_filter_ext::Action::Accept,
-                    }),
-                )
-                .into(),
-                // controller a, namespace a, routine b, rule #3 (13)
-                fnet_filter_ext::Event::Existing(
-                    fnet_filter_ext::ControllerId(CONTROLLER_A.to_string()),
-                    fnet_filter_ext::Resource::Rule(fnet_filter_ext::Rule {
-                        id: fnet_filter_ext::RuleId {
-                            routine: fnet_filter_ext::RoutineId {
-                                namespace: fnet_filter_ext::NamespaceId(NAMESPACE_A.to_string()),
-                                name: ROUTINE_B.to_string(),
-                            },
-                            index: INDEX_THIRD,
-                        },
-                        matchers: Default::default(),
-                        action: fnet_filter_ext::Action::Accept,
-                    }),
-                )
-                .into(),
-                // controller a, namespace b, routine c, rule #1 (11)
-                fnet_filter_ext::Event::Existing(
-                    fnet_filter_ext::ControllerId(CONTROLLER_A.to_string()),
-                    fnet_filter_ext::Resource::Rule(fnet_filter_ext::Rule {
-                        id: fnet_filter_ext::RuleId {
-                            routine: fnet_filter_ext::RoutineId {
-                                namespace: fnet_filter_ext::NamespaceId(NAMESPACE_B.to_string()),
-                                name: ROUTINE_C.to_string(),
-                            },
-                            index: INDEX_FIRST,
-                        },
-                        matchers: Default::default(),
-                        action: fnet_filter_ext::Action::Accept,
-                    }),
-                )
-                .into(),
-                // Test Matcher output: InterfaceMatcher
-                fnet_filter_ext::Event::Existing(
-                    fnet_filter_ext::ControllerId(CONTROLLER_A.to_string()),
-                    fnet_filter_ext::Resource::Rule(fnet_filter_ext::Rule {
-                        id: fnet_filter_ext::RuleId {
-                            routine: fnet_filter_ext::RoutineId {
-                                namespace: fnet_filter_ext::NamespaceId(NAMESPACE_B.to_string()),
-                                name: ROUTINE_E.to_string(),
-                            },
-                            index: INDEX_FIRST,
-                        },
-                        matchers: Matchers {
-                            in_interface: Some(fnet_filter_ext::InterfaceMatcher::Id(
-                                NonZeroU64::new(23).expect("Failed to create NonZeroU64"),
-                            )),
-                            out_interface: None,
-                            src_addr: None,
-                            dst_addr: None,
-                            transport_protocol: None,
-                        },
-                        action: fnet_filter_ext::Action::Accept,
-                    }),
-                )
-                .into(),
-                // Test Matcher output: AddressMatcher
-                fnet_filter_ext::Event::Existing(
-                    fnet_filter_ext::ControllerId(CONTROLLER_A.to_string()),
-                    fnet_filter_ext::Resource::Rule(fnet_filter_ext::Rule {
-                        id: fnet_filter_ext::RuleId {
-                            routine: fnet_filter_ext::RoutineId {
-                                namespace: fnet_filter_ext::NamespaceId(NAMESPACE_B.to_string()),
-                                name: ROUTINE_E.to_string(),
-                            },
-                            index: INDEX_SECOND,
-                        },
-                        matchers: Matchers {
-                            in_interface: None,
-                            out_interface: None,
-                            src_addr: Some(fnet_filter_ext::AddressMatcher {
-                                matcher: fnet_filter_ext::AddressMatcherType::Subnet(
-                                    IF_ADDR_V4.try_into().expect("Failed to create Subnet"),
-                                ),
-                                invert: false,
-                            }),
-                            dst_addr: None,
-                            transport_protocol: None,
-                        },
-                        action: fnet_filter_ext::Action::Accept,
-                    }),
-                )
-                .into(),
-                // Test Matcher output: TransportProtocolMatcher simple
-                fnet_filter_ext::Event::Existing(
-                    fnet_filter_ext::ControllerId(CONTROLLER_A.to_string()),
-                    fnet_filter_ext::Resource::Rule(fnet_filter_ext::Rule {
-                        id: fnet_filter_ext::RuleId {
-                            routine: fnet_filter_ext::RoutineId {
-                                namespace: fnet_filter_ext::NamespaceId(NAMESPACE_B.to_string()),
-                                name: ROUTINE_E.to_string(),
-                            },
-                            index: INDEX_THIRD,
-                        },
-                        matchers: Matchers {
-                            in_interface: None,
-                            out_interface: None,
-                            src_addr: None,
-                            dst_addr: None,
-                            transport_protocol: Some(
-                                fnet_filter_ext::TransportProtocolMatcher::Icmpv6,
-                            ),
-                        },
-                        action: fnet_filter_ext::Action::Accept,
-                    }),
-                )
-                .into(),
-                // Test Matcher output: TransportProtocolMatcher with src_port and dst_port
-                fnet_filter_ext::Event::Existing(
-                    fnet_filter_ext::ControllerId(CONTROLLER_A.to_string()),
-                    fnet_filter_ext::Resource::Rule(fnet_filter_ext::Rule {
-                        id: fnet_filter_ext::RuleId {
-                            routine: fnet_filter_ext::RoutineId {
-                                namespace: fnet_filter_ext::NamespaceId(NAMESPACE_B.to_string()),
-                                name: ROUTINE_E.to_string(),
-                            },
-                            index: INDEX_FOURTH,
-                        },
-                        matchers: Matchers {
-                            in_interface: None,
-                            out_interface: None,
-                            src_addr: None,
-                            dst_addr: None,
-                            transport_protocol: Some(
-                                fnet_filter_ext::TransportProtocolMatcher::Tcp {
-                                    src_port: None,
-                                    dst_port: Some(
-                                        fnet_filter_ext::PortMatcher::new(41, 42, true)
-                                            .expect("Failed to create PortMatcher"),
-                                    ),
-                                },
-                            ),
-                        },
-                        action: fnet_filter_ext::Action::Accept,
-                    }),
-                )
-                .into(),
-                fnet_filter_ext::Event::Idle.into(),
-            ];
-
-            let () = watcher_request_stream
-                .try_next()
-                .await
-                .expect("watcher watch FIDL error")
-                .expect("watcher request stream should not have ended")
-                .into_watch()
-                .expect("request should be of type Watch")
-                .send(&events)
-                .expect("responder.send should succeed");
-
-            assert_matches!(
-                watcher_request_stream.try_next().await.expect("watcher watch FIDL error"),
-                None,
-                "remaining watcher request stream should be empty because client should close \
-                watcher channel after observing existing resources"
-            );
-
-            Ok(())
-        };
-        let ((), ()) = futures::future::try_join(op, op_succeeds)
-            .await
-            .expect("filter server command should succeed");
-
-        const WANT_OUTPUT: &str = r#"controller: "controller a" {
-    namespace: "namespace a" {
-        domain: Ipv4
-        installed IP routines {
-            EGRESS {
-                1. routine b {
-                    13. Matchers -> Accept
-                }
-                2. routine a {
-                    11. Matchers -> Accept
-                    12. Matchers -> Accept
-                }
-            }
-        }
-        installed NAT routines {
-            EGRESS {
-                1. routine d {
-                }
-            }
-        }
-    }
-    namespace: "namespace b" {
-        domain: Ipv4
-        uninstalled IP routines {
-            routine c {
-                11. Matchers -> Accept
-            }
-        }
-        uninstalled NAT routines {
-            routine e {
-                11. Matchers { in_interface: Id(23) } -> Accept
-                12. Matchers { src_addr: AddressMatcher { matcher: 192.168.0.1/32, invert: false } } -> Accept
-                13. Matchers { transport_protocol: Icmpv6 } -> Accept
-                14. Matchers { transport_protocol: Tcp { dst_port: PortMatcher { range: 41..=42, invert: true } } } -> Accept
-            }
-        }
-    }
-}
-controller: "controller b" {
-    namespace: "namespace c" {
-        domain: Ipv4
-    }
-}
-"#;
-        let got_output = std::str::from_utf8(&output).unwrap();
-        pretty_assertions::assert_eq!(got_output, WANT_OUTPUT,);
     }
 }

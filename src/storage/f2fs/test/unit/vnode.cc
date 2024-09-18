@@ -386,7 +386,6 @@ TEST_F(VnodeTest, FindDataBlockAddrsAndPages) {
 
   // Punch a hole at start
   {
-    fs::SharedLock lock(f2fs::GetGlobalLock());
     file->TruncateHole(kStartOffset, kStartOffset + 1);
     removed_pages.insert(kStartOffset);
 
@@ -399,7 +398,6 @@ TEST_F(VnodeTest, FindDataBlockAddrsAndPages) {
 
   // Punch a hole at end
   {
-    fs::SharedLock lock(f2fs::GetGlobalLock());
     file->TruncateHole(kEndOffset - 1, kEndOffset);
     removed_pages.insert(kEndOffset - 1);
 
@@ -412,7 +410,6 @@ TEST_F(VnodeTest, FindDataBlockAddrsAndPages) {
 
   // Punch holes at middle
   {
-    fs::SharedLock lock(f2fs::GetGlobalLock());
     constexpr uint32_t kPunchHoles = 10;
     file->TruncateHole(kMidOffset, kMidOffset + kPunchHoles);
     for (uint32_t i = 0; i < kPunchHoles; ++i) {

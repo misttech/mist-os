@@ -685,21 +685,3 @@ fn test_from_structured() {
         MessageError::ParseError { .. }
     );
 }
-
-#[fuchsia::test]
-fn basic_structured_info() {
-    let expected_timestamp = 72;
-    let record = Record {
-        timestamp: expected_timestamp,
-        severity: StreamSeverity::Error.into_primitive(),
-        arguments: vec![],
-    };
-    let mut buffer = Cursor::new(vec![0u8; MAX_DATAGRAM_LEN]);
-    let mut encoder = Encoder::new(&mut buffer, EncoderOpts::default());
-    encoder.write_record(&record).unwrap();
-    let encoded = &buffer.get_ref().as_slice()[..buffer.position() as usize];
-
-    let (timestamp, severity) = parse_basic_structured_info(encoded).unwrap();
-    assert_eq!(timestamp, expected_timestamp);
-    assert_eq!(severity, Severity::Error);
-}

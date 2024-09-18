@@ -10,6 +10,7 @@ use fidl_fuchsia_vsock::{
     ConnectorMarker,
 };
 use fuchsia_component::client::connect_to_protocol;
+use fuchsia_zircon as zx;
 use futures::StreamExt;
 
 pub struct ProxyServer {
@@ -48,14 +49,14 @@ impl ProxyServer {
 
     pub async fn start(&mut self, port: u32) -> Result<()> {
         tracing::info!("Connecting to VSOCK protocol");
-        let app_client = connect_to_protocol::<ConnectorMarker>();
+        let app_client = connect_to_protocol::<ConnectorMarker>()?;
 
         let (acceptor_remote, acceptor_client) = endpoints::create_endpoints::<AcceptorMarker>();
         let mut acceptor_client = acceptor_client.into_stream()?;
 
-        let status = app_client?.listen(port, acceptor_remote).await?;
+        app_client.listen(port, acceptor_remote).await?.map_err(zx::Status::from_raw)?;
 
-        tracing::info!("Listening for VSOCK connections. status={}", status);
+        tracing::info!("Listening for VSOCK connections.");
 
         while let Some(Ok(AcceptorRequest::Accept { addr: _addr, responder })) =
             acceptor_client.next().await

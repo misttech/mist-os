@@ -18,12 +18,12 @@
 
 namespace media_audio {
 
-#define ADR_LOG_OBJECT(CONDITION) \
-  FX_LAZY_STREAM(FX_LOG_STREAM(INFO, nullptr), CONDITION) << kClassName << "(" << this << "): "
-
 #define ADR_LOG_METHOD(CONDITION)                         \
   FX_LAZY_STREAM(FX_LOG_STREAM(INFO, nullptr), CONDITION) \
       << kClassName << "(" << this << ")::" << __func__ << ": "
+
+#define ADR_LOG_OBJECT(CONDITION) \
+  FX_LAZY_STREAM(FX_LOG_STREAM(INFO, nullptr), CONDITION) << kClassName << "(" << this << "): "
 
 #define ADR_LOG_STATIC(CONDITION) \
   FX_LAZY_STREAM(FX_LOG_STREAM(INFO, nullptr), CONDITION) << kClassName << "::" << __func__ << ": "
@@ -31,9 +31,9 @@ namespace media_audio {
 #define ADR_LOG(CONDITION) \
   FX_LAZY_STREAM(FX_LOG_STREAM(INFO, nullptr), CONDITION) << __func__ << ": "
 
-#define ADR_WARN_OBJECT() FX_LOGS(WARNING) << kClassName << "(" << this << "): "
-
 #define ADR_WARN_METHOD() FX_LOGS(WARNING) << kClassName << "(" << this << ")::" << __func__ << ": "
+
+#define ADR_WARN_OBJECT() FX_LOGS(WARNING) << kClassName << "(" << this << "): "
 
 inline constexpr bool kLogMain = true;
 
@@ -44,6 +44,7 @@ inline constexpr bool kLogAudioDeviceRegistryMethods = false;
 inline constexpr bool kLogDeviceAddErrorRemove = true;
 inline constexpr bool kLogDeviceInfo = true;
 
+inline constexpr bool kTraceInspector = false;
 inline constexpr bool kLogObjectLifetimes = false;
 inline constexpr bool kLogObjectCounts = false;
 

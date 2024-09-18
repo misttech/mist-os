@@ -7,6 +7,7 @@ import("//build/components.gni")
 import("//build/fidl/fidl.gni")
 import("//build/rust/rustc_binary.gni")
 import("//build/rust/rustc_library.gni")
+import("//build/toolchain/zircon/user_basic_redirect.gni")
 import("//build/testing/boot_tests/mistos_unittest_zbi.gni")
 
 rustc_library("process_builder") {
@@ -80,38 +81,51 @@ rustc_binary("test_util") {
   sources = [ "test-utils/test_util.rs" ]
 }
 
-# This is used to test the library's handling of statically linked PIE
-# executables.  Warning: Don't copy this unless you know what you're doing.
-executable("static_pie_test_util") {
+# The test doesn't get normal C library setup before its code runs, so it
+# needs to use the basic machine ABI.
+user_basic_redirect("static_pie_test.basic") {
   testonly = true
+  public_deps = [ ":static_pie_test_util" ]
+}
 
-  # TODO(https://fxbug.dev/42138212): Support syslog backend here.
-  disable_syslog_backend = true
+if (toolchain_environment == "user.basic") {
+  executable("static_pie_test_util") {
+    visibility = [ ":*" ]
+    sources = [ "test-utils/static_pie_test_util.cc" ]
 
-  sources = [ "test-utils/static_pie_test_util.c" ]
-  if (is_mistos) {
-    configs += [
-      "//build/config/mistos:no_cpp_standard_library",
-      "//build/config/mistos:static-pie-config",
+    # Avoid libc references from assert() in libc++ header code.
+    defines = [ "NDEBUG=1" ]
+
+    ldflags = [
+      # A standalone binary should indicate its stack requirements.
+      "-Wl,-z,stack-size=0x20000",
     ]
-  } else {
-    configs += [
-      "//build/config/fuchsia:no_cpp_standard_library",
-      "//build/config/fuchsia:static-pie-config",
+
+    # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings
+    configs += [ "//build/config:Wno-conversion" ]
+    deps = [
+      "//src/lib/elfldltl/test:static-pie",
+      "//src/zircon/lib/zircon",
+      "//zircon/system/ulib/c/string:minimal-str",
+      "//zircon/system/ulib/zircon-internal",
     ]
+
+    include_dirs = [ "//src/lib/elfldltl/test" ]
+
+    exclude_toolchain_tags = [ "instrumented" ]
+
+    # TODO(https://fxbug.dev/126542): __ehdr_start bug in ld.bfd aarch64-elf
+    if (current_cpu == "arm64") {
+      exclude_toolchain_tags += [ "gcc" ]
+    }
   }
-
-  exclude_toolchain_tags = [ "instrumented" ]
-
-  # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings
-  configs += [ "//build/config:Wno-conversion" ]
 }
 
 fuchsia_unittest_package("process-builder-tests") {
   manifest = "meta/process_builder_tests.cml"
   deps = [
     ":process_builder_test",
-    ":static_pie_test_util",
+    ":static_pie_test.basic",
     ":test_util",
     "//src/sys/testing/elftest",
   ]

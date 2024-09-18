@@ -31,7 +31,9 @@
 /// - API evolution. When clients require substantially different augmentation,
 ///   new augmentation protocols representing those capabilities can (and
 ///   should) be introduced.
-@available(added=7)
+// TODO(https://fxbug.dev/365602422): Either remove the dependency from CTF
+// tests and uncomment this line or make this library stable.
+// @available(added=HEAD)
 library fuchsia.ui.pointer.augment;
 
 using fuchsia.ui.pointer as pointer;

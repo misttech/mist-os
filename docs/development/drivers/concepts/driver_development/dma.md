@@ -1,4 +1,4 @@
-# DMA
+# DMA (Direct Memory Access)
 
 Caution: This page may contain information that is specific to the legacy
 version of the driver framework (DFv1).

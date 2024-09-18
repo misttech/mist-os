@@ -72,7 +72,8 @@ struct Allocator : std::allocator<T> {
 TEST(ElfldltlContainerTests, TemplateArgs) {
   ASSERT_FALSE(Allocator<int>::called);
   elfldltl::StdContainer<std::vector, Allocator<int>>::Container<int> list;
-  list.reserve(10);
+  auto diag = ExpectOkDiagnostics();
+  EXPECT_TRUE(list.reserve(diag, "reserve", 10));
 
   EXPECT_TRUE(Allocator<int>::called);
 }

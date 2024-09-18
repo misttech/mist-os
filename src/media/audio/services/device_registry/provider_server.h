@@ -13,6 +13,7 @@
 #include <memory>
 
 #include "src/media/audio/services/common/base_fidl_server.h"
+#include "src/media/audio/services/device_registry/inspector.h"
 
 namespace media_audio {
 
@@ -28,12 +29,18 @@ class ProviderServer
       std::shared_ptr<const FidlThread> thread,
       fidl::ServerEnd<fuchsia_audio_device::Provider> server_end,
       std::shared_ptr<AudioDeviceRegistry> parent);
+
   ~ProviderServer() override;
 
   // fuchsia.audio.device.Provider implementation
   void AddDevice(AddDeviceRequest& request, AddDeviceCompleter::Sync& completer) override;
   void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_audio_device::Provider> metadata,
                              fidl::UnknownMethodCompleter::Sync& completer) override;
+
+  const std::shared_ptr<ProviderInspectInstance>& inspect() { return provider_inspect_instance_; }
+  void SetInspect(std::shared_ptr<ProviderInspectInstance> instance) {
+    provider_inspect_instance_ = std::move(instance);
+  }
 
   // Static object count, for debugging purposes.
   static inline uint64_t count() { return count_; }
@@ -48,6 +55,8 @@ class ProviderServer
   explicit ProviderServer(std::shared_ptr<AudioDeviceRegistry> parent);
 
   std::shared_ptr<AudioDeviceRegistry> parent_;
+
+  std::shared_ptr<ProviderInspectInstance> provider_inspect_instance_;
 };
 
 }  // namespace media_audio

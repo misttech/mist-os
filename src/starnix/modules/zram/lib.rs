@@ -3,9 +3,9 @@
 // found in the LICENSE file.
 
 use fuchsia_zircon as zx;
-use starnix_core::device::kobject::{Device, DeviceMetadata, KObjectHandle};
+use starnix_core::device::kobject::{Device, DeviceMetadata};
 use starnix_core::device::{DeviceMode, DeviceOps};
-use starnix_core::fs::sysfs::{BlockDeviceDirectory, BlockDeviceInfo, DeviceSysfsOps, SysfsOps};
+use starnix_core::fs::sysfs::{BlockDeviceDirectory, BlockDeviceInfo};
 use starnix_core::task::{CurrentTask, KernelStats};
 use starnix_core::vfs::{
     fileops_impl_dataless, fileops_impl_noop_sync, fileops_impl_seekless,
@@ -73,18 +73,6 @@ impl ZramDeviceDirectory {
     pub fn new(device: Device, zram_device: Weak<ZramDevice>) -> Self {
         let base_dir = BlockDeviceDirectory::new(device, zram_device.clone());
         Self { device: zram_device, base_dir }
-    }
-}
-
-impl SysfsOps for ZramDeviceDirectory {
-    fn kobject(&self) -> KObjectHandle {
-        self.base_dir.kobject()
-    }
-}
-
-impl DeviceSysfsOps for ZramDeviceDirectory {
-    fn device(&self) -> Device {
-        self.base_dir.device()
     }
 }
 
@@ -183,17 +171,15 @@ where
     let zram_dev_weak = Arc::downgrade(&zram_dev);
     let kernel = system_task.kernel();
     let registry = &kernel.device_registry;
-    let virtual_block_class = registry.get_or_create_class("block".into(), registry.virtual_bus());
-    registry
-        .register_device(ZRAM_MAJOR, 0, 1, zram_dev, DeviceMode::Block)
-        .expect("Failed to register zram device.");
-
-    registry.add_device(
+    let virtual_block_class =
+        registry.objects.get_or_create_class("block".into(), registry.objects.virtual_bus());
+    registry.add_and_register_device(
         locked,
         system_task,
         "zram0".into(),
         DeviceMetadata::new("zram0".into(), DeviceType::new(ZRAM_MAJOR, 0), DeviceMode::Block),
         virtual_block_class,
         move |dev| ZramDeviceDirectory::new(dev, zram_dev_weak.clone()),
+        zram_dev,
     );
 }

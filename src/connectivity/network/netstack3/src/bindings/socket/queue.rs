@@ -61,7 +61,10 @@ impl<M> MessageQueue<M> {
         message
     }
 
-    pub(crate) fn receive(&mut self, message: impl BodyLen + Into<M>) {
+    pub(crate) fn receive(&mut self, message: M)
+    where
+        M: BodyLen,
+    {
         let Self { queue, local_event } = self;
         let body_len = message.body_len();
         let queue_was_empty = queue.is_empty();
@@ -137,7 +140,10 @@ impl<M> AvailableMessageQueue<M> {
         }
     }
 
-    pub(crate) fn push(&mut self, message: impl BodyLen + Into<M>) -> Result<(), NoSpace> {
+    pub(crate) fn push(&mut self, message: M) -> Result<(), NoSpace>
+    where
+        M: BodyLen,
+    {
         let Self { available_messages, available_messages_size, max_available_messages_size } =
             self;
 
@@ -150,7 +156,7 @@ impl<M> AvailableMessageQueue<M> {
             return Err(NoSpace);
         }
 
-        available_messages.push_back(message.into());
+        available_messages.push_back(message);
         *available_messages_size += len;
         Ok(())
     }

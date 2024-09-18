@@ -23,6 +23,8 @@ class ScopedGlobalLogger {
   explicit ScopedGlobalLogger(FuchsiaLogSeverity min_severity = FUCHSIA_LOG_INFO);
   ~ScopedGlobalLogger();
 
+  fdf::Logger& logger() { return *logger_.get(); }
+
  private:
   // Background loop running the logger.
   async::Loop loop_;

@@ -30,6 +30,11 @@ template("fuchsia_ta_package") {
   ta_name = target_name
   library_target = "_${target_name}_lib"
   ta_name_resource_target = "_${target_name}_resource"
+  ta_props_resource_target = "_${target_name}_props_resource"
+  forward_variables_from(invoker, [ "props_file" ])
+  if (!defined(props_file)) {
+    props_file = "//src/tee/ta/config/ta_properties_template.json5"
+  }
 
   shared_library(library_target) {
     output_name = "${ta_name}"
@@ -58,10 +63,19 @@ template("fuchsia_ta_package") {
     outputs = [ "data/ta_name" ]
   }
 
+  # This file describes TA-specific properties, whose values may be queried by the
+  # Property set of internal core APIs.
+  # TODO(b/366486931): Build-time validation for this TA properties file.
+  resource(ta_props_resource_target) {
+    sources = [ "${props_file}" ]
+    outputs = [ "data/ta_properties" ]
+  }
+
   fuchsia_package(ta_name) {
     deps = [
       ":${library_target}",
       ":${ta_name_resource_target}",
+      ":${ta_props_resource_target}",
       "//src/tee/runtime:runtime-component",
     ]
   }

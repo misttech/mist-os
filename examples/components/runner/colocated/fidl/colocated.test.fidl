@@ -4,6 +4,7 @@
 
 /// Library containing a protocol to report VMO usage by the colocated
 /// component.
+@available(added=HEAD)
 library fuchsia.examples.colocated;
 
 using zx;

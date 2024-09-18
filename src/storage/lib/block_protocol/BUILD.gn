@@ -6,6 +6,12 @@ import("//build/rust/rustc_library.gni")
 
 rustc_library("block_protocol") {
   edition = "2021"
-  sources = [ "src/lib.rs" ]
-  deps = [ "//third_party/rust_crates:zerocopy" ]
+  sources = [
+    "src/fifo.rs",
+    "src/lib.rs",
+  ]
+  deps = [
+    "//third_party/rust_crates:bitflags",
+    "//third_party/rust_crates:zerocopy",
+  ]
 }

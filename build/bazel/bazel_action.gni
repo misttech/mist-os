@@ -6,6 +6,7 @@ import("//build/bazel/bazel_inputs.gni")
 import("//build/bazel/bazel_workspace.gni")
 import("//build/bazel/logging.gni")
 import("//build/bazel/remote_services.gni")
+import("//build/config/clang/clang.gni")
 import("//build/config/compiler.gni")
 import("//build/config/fuchsia_cxx_version.gni")
 import("//build/licenses/generated_licenses_spdx.gni")
@@ -772,6 +773,9 @@ template("bazel_action") {
     } else if (optimize == "size" || optimize == "speed" ||
                optimize == "profile" || optimize == "size_lto") {
       args += [ "--compilation_mode=opt" ]
+      if (clang_ml_inliner) {
+        args += [ "--features=ml_inliner" ]
+      }
     } else {
       assert("Unsupported mode optimize = $optimize")
     }

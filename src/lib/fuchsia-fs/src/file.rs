@@ -77,7 +77,8 @@ mod fuchsia {
         }
     }
 
-    /// *DEPRECATED* - Use [`open_in_namespace`] instead.
+    /// *WARNING* - In the process of being deprecated. Only use [`open_in_namespace`] once all
+    /// out-of-tree servers support open3.
     ///
     /// Opens the given `path` from the current namespace as a [`FileProxy`].
     ///
@@ -99,23 +100,27 @@ mod fuchsia {
         Ok(node)
     }
 
-    /// Opens the given `path` from the current namespace as a [`FileProxy`].
-    ///
-    /// The target is assumed to implement fuchsia.io.File but this isn't verified. To connect to a
-    /// filesystem node which doesn't implement fuchsia.io.File, use the functions in
-    /// [`fuchsia_component::client`] instead.
-    ///
-    /// If the namespace path doesn't exist, or we fail to make the channel pair, this returns an
-    /// error. However, if incorrect flags are sent, or if the rest of the path sent to the
-    /// filesystem server doesn't exist, this will still return success. Instead, the returned
-    /// FileProxy channel pair will be closed with an epitaph.
-    pub fn open_in_namespace(path: &str, flags: fio::Flags) -> Result<fio::FileProxy, OpenError> {
+    // Opens the given `path` from the current namespace as a [`FileProxy`].
+    //
+    // The target is assumed to implement fuchsia.io.File but this isn't verified. To connect to a
+    // filesystem node which doesn't implement fuchsia.io.File, use the functions in
+    // [`fuchsia_component::client`] instead.
+    //
+    // If the namespace path doesn't exist, or we fail to make the channel pair, this returns an
+    // error. However, if incorrect flags are sent, or if the rest of the path sent to the
+    // filesystem server doesn't exist, this will still return success. Instead, the returned
+    // FileProxy channel pair will be closed with an epitaph.
+    //
+    // TODO(https://fxbug.dev/361450366): Make public when out-of-tree servers support open3.
+    #[allow(dead_code)]
+    fn open_in_namespace(path: &str, flags: fio::Flags) -> Result<fio::FileProxy, OpenError> {
         let (node, request) = fidl::endpoints::create_proxy().map_err(OpenError::CreateProxy)?;
         open_channel_in_namespace(path, flags, request)?;
         Ok(node)
     }
 
-    /// *DEPRECATED* - Use [`open_channel_in_namespace`] instead.
+    /// *WARNING* - In the process of being deprecated. Only use [`open_channel_in_namespace`] once
+    /// all out-of-tree servers support open3.
     ///
     /// Asynchronously opens the given [`path`] in the current namespace, serving the connection
     /// over [`request`]. Once the channel is connected, any calls made prior are serviced.
@@ -137,17 +142,20 @@ mod fuchsia {
         namespace.open(path, flags, request.into_channel()).map_err(OpenError::Namespace)
     }
 
-    /// Asynchronously opens the given [`path`] in the current namespace, serving the connection
-    /// over [`request`]. Once the channel is connected, any calls made prior are serviced.
-    ///
-    /// The target is assumed to implement fuchsia.io.File but this isn't verified. To connect to a
-    /// filesystem node which doesn't implement fuchsia.io.File, use the functions in
-    /// [`fuchsia_component::client`] instead.
-    ///
-    /// If the namespace path doesn't exist, this returns an error. However, if incorrect flags are
-    /// sent, or if the rest of the path sent to the filesystem server doesn't exist, this will
-    /// still return success. Instead, the [`request`] channel will be closed with an epitaph.
-    pub fn open_channel_in_namespace(
+    // Asynchronously opens the given [`path`] in the current namespace, serving the connection
+    // over [`request`]. Once the channel is connected, any calls made prior are serviced.
+    //
+    // The target is assumed to implement fuchsia.io.File but this isn't verified. To connect to a
+    // filesystem node which doesn't implement fuchsia.io.File, use the functions in
+    // [`fuchsia_component::client`] instead.
+    //
+    // If the namespace path doesn't exist, this returns an error. However, if incorrect flags are
+    // sent, or if the rest of the path sent to the filesystem server doesn't exist, this will
+    // still return success. Instead, the [`request`] channel will be closed with an epitaph.
+    //
+    // TODO(https://fxbug.dev/361450366): Make public when out-of-tree servers support open3.
+    #[allow(dead_code)]
+    fn open_channel_in_namespace(
         path: &str,
         flags: fio::Flags,
         request: fidl::endpoints::ServerEnd<fio::FileMarker>,
@@ -472,13 +480,15 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn open_in_namespace_opens_real_file() {
-        let exists = open_in_namespace("/pkg/data/file", fio::Flags::PERM_READ).unwrap();
+        let exists =
+            open_in_namespace_deprecated("/pkg/data/file", OpenFlags::RIGHT_READABLE).unwrap();
         assert_matches!(close(exists).await, Ok(()));
     }
 
     #[fasync::run_singlethreaded(test)]
     async fn open_in_namespace_opens_fake_file_under_of_root_namespace_entry() {
-        let notfound = open_in_namespace("/pkg/fake", fio::Flags::PERM_READ).unwrap();
+        let notfound =
+            open_in_namespace_deprecated("/pkg/fake", OpenFlags::RIGHT_READABLE).unwrap();
         // The open error is not detected until the proxy is interacted with.
         assert_matches!(close(notfound).await, Err(_));
     }
@@ -486,7 +496,7 @@ mod tests {
     #[fasync::run_singlethreaded(test)]
     async fn open_in_namespace_rejects_fake_root_namespace_entry() {
         assert_matches!(
-            open_in_namespace("/fake", fio::Flags::PERM_READ),
+            open_in_namespace_deprecated("/fake", OpenFlags::RIGHT_READABLE),
             Err(OpenError::Namespace(zx_status::Status::NOT_FOUND))
         );
     }
@@ -603,7 +613,8 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn read_reads_to_end_of_file() {
-        let file = open_in_namespace("/pkg/data/file", fio::Flags::PERM_READ).unwrap();
+        let file =
+            open_in_namespace_deprecated("/pkg/data/file", OpenFlags::RIGHT_READABLE).unwrap();
 
         let contents = read(&file).await.unwrap();
         assert_eq!(&contents[..], DATA_FILE_CONTENTS.as_bytes());
@@ -611,7 +622,8 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn read_reads_from_current_position() {
-        let file = open_in_namespace("/pkg/data/file", fio::Flags::PERM_READ).unwrap();
+        let file =
+            open_in_namespace_deprecated("/pkg/data/file", OpenFlags::RIGHT_READABLE).unwrap();
 
         // Advance past the first byte.
         let _: Vec<u8> = file.read(1).await.unwrap().unwrap();
@@ -644,7 +656,8 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn read_to_string_reads_data_file() {
-        let file = open_in_namespace("/pkg/data/file", fio::Flags::PERM_READ).unwrap();
+        let file =
+            open_in_namespace_deprecated("/pkg/data/file", OpenFlags::RIGHT_READABLE).unwrap();
         assert_eq!(read_to_string(&file).await.unwrap(), DATA_FILE_CONTENTS);
     }
 
@@ -691,7 +704,8 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn read_fidl_reads_from_file() {
-        let file = open_in_namespace("/pkg/data/fidl_file", fio::Flags::PERM_READ).unwrap();
+        let file =
+            open_in_namespace_deprecated("/pkg/data/fidl_file", OpenFlags::RIGHT_READABLE).unwrap();
 
         let contents = read_fidl::<DataTable2>(&file).await.unwrap();
 

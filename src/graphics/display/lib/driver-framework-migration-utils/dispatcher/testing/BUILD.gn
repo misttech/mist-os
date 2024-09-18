@@ -9,9 +9,9 @@ source_set("dfv2-driver-with-dispatcher") {
     "dfv2-driver-with-dispatcher.h",
   ]
   public_deps = [
+    "//sdk/lib/async:async-cpp",
     "//sdk/lib/driver/component/cpp",
     "//src/graphics/display/lib/driver-framework-migration-utils/dispatcher:driver-runtime-backed-dispatcher",
-    "//zircon/system/ulib/async:async-cpp",
     "//zircon/system/ulib/zx",
   ]
 }

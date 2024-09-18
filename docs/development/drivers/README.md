@@ -1,35 +1,30 @@
 # Drivers
 
-Fuchsia’s driver framework is a collection of libraries, tools, metadata, and
-components that enable developers to create, run, test, and distribute drivers for
-Fuchsia systems. The driver framework aims to provide a stable ABI that allows
+Fuchsia’s [driver framework][dfv2] is a collection of libraries, tools, metadata,
+and components that enable developers to create, run, test, and distribute drivers
+for Fuchsia systems. The driver framework aims to provide a stable ABI that allows
 developers to write a driver once and deploy it on multiple versions of the Fuchsia
 platform. (However, Fuchsia's driver framework is constantly evolving and has not
 achieved ABI stability yet.)
 
-The driver framework is composed of the driver manager, driver hosts, libraries,
-FIDL interfaces, Banjo interfaces, and a set of guidelines for developing drivers
-for Fuchsia:
+Fuchsia has a new version of the driver framework (DFv2). For more information
+on DFv2-specific concepts, see [Drivers][dfv2-concepts] under the **Fundamentals**
+section.
 
-- The **driver manager** is responsible for managing the life cycle of drivers,
-  such as loading, unloading, and registering. It also provides ways for drivers
-  to communicate with each other and with Fuchsia’s [Zircon][zircon] kernel.
-- The **driver host** is a process that runs in the kernel and enables drivers to
-  access kernel resources.
-- The **driver runtime** is an in process library which facilitates communication
-  and event handling.
-- The **FIDL** interfaces are used for communication between drivers and the rest of
-  the system.
-- \[**DFv1 only**\] The **core library** (`libdriver`) provides a set of common functions
-  that DFv1 drivers can use to interact with the driver manager and driver host.
-- \[**DFv1 only**\] The **Banjo** interfaces are used for communication between drivers
-  and the driver manager.
+## Sections
 
-  (For more information on the differences between DFv1 and DFv2, see
-  [Comparison between DFv1 and DFv2][dfv1-and-dfv2].)
-
-For more details on these concepts for the new driver framework (DFv2), see
-the [Drivers][dfv2-concepts] section under _Fundamentals_.
+- [**DFv1 to DFv2 driver migration**][dfv1-to-dfv2-driver-migration-overview]:
+  Migrate existing legacy DFv1 drivers to the new driver framework (DFv2).
+- [**DFv2 driver development**][dfv2-overview]: Create new DFv2 drivers using
+  the [Fuchsia source checkout][fuchsia-git] development setup.
+- [**DFv1 driver development**][fuchsia-driver-development]: Build, debug, and
+  test legacy DFv1 drivers.
+- [**DFv1 concepts**][fuchsia-driver-framework]: Understand concepts specific
+  to the legacy driver framework (DFv1).
+- [**Driver-specific guides**][gpio-init]: Explore examples and best practices
+  unique to specific drivers.
+- [**Others**][deleting-drivers]: Additional information related to Fuchsia
+  driver development.
 
 ## Table of contents
 
@@ -41,35 +36,49 @@ the [Drivers][dfv2-concepts] section under _Fundamentals_.
 - Extensions
 
   - [Set up the compat device server in a DFv2 driver][set-up-compat-device-server]
-  - [Serve Banjo protocols in a DFv2 driver][serve-banjo-protocols]
+  - [Connect and serve Banjo protocols in a DFv2 driver][serve-banjo-protocols]
   - [Set up devfs in a DFv2 driver][set-up-devfs]
 
 ### DFv2 driver development
 
-- [Write a minimal DFv2 driver][write-a-minimal-driver]
-- [Troubleshoot common issues in DFv2 driver development][troubleshoot-common-issues]
-- [Driver examples][driver-examples]
-- [Composite nodes][composite-nodes]
-- [Driver stack performance][driver-stack-performance]
-- [VMO Registration Pattern][vmo-registration-pattern]
-- [DMA (Direct Memory Access)][dma]
+- [Overview][dfv2-overview]
+
+- How-to
+
+  - [Write a minimal DFv2 driver][write-a-minimal-driver]
+  - [Driver examples][driver-examples]
+  - [Composite nodes][composite-nodes]
+
 - Tutorials
 
   - [Bind rules tutorial][bind-rules-tutorial]
   - [Bind library code generation tutorial][bind-library-code-generation-tutorial]
   - [FIDL tutorial][fidl-tutorial]
+  - [Metadata tutorial][metadata-tutorial]
+
+- Debugging
+
+  - [Troubleshoot common issues in DFv2 driver development][troubleshoot-common-issues]
+  - [Driver utilities][driver-utilities]
 
 - Testing
 
   - [DriverTestRealm][driver-test-realm]
   - [Threading tips in tests][threading-tips-in-tests]
 
-- Debugging
+- Best practices
 
-  - [Driver utilities][driver-utilities]
+  - [VMO registration pattern][vmo-registration-pattern]
+  - [Driver stack performance][driver-stack-performance]
 
-- [Driver runtime API guidelines][driver-runtime-api-guidelines]
-- [Drivers rubric][drivers-rubric]
+- Guidelines
+
+  - [Driver runtime API guidelines][driver-runtime-api-guidelines]
+  - [Drivers rubric][drivers-rubric]
+
+- Concepts
+
+  - [DMA (Direct Memory Access)][dma]
 
 ### DFv1 driver development
 
@@ -138,13 +147,12 @@ the [Drivers][dfv2-concepts] section under _Fundamentals_.
 
 - [Deleting drivers][deleting-drivers]
 
-
 <!-- Reference links -->
 
+[dfv2]: /docs/concepts/drivers/driver_framework.md
+[fuchsia-git]: /docs/get-started/get_fuchsia_source.md
 [dfv2-concepts]: /docs/concepts/drivers/README.md
 [dfv2-development]: /docs/get-started/sdk/get-started-with-driver.md
-[zircon]: /docs/concepts/kernel/README.md
-[dfv1-and-dfv2]: /docs/concepts/drivers/comparison_between_dfv1_and_dfv2.md
 [dfv1-to-dfv2-driver-migration-overview]: migration/README.md
 [migrate-from-banjo-to-fidl]: migration/migrate-from-banjo-to-fidl/overview.md
 [migrate-from-dfv1-to-dfv2]: migration/migrate-from-dfv1-to-dfv2/overview.md
@@ -205,3 +213,5 @@ the [Drivers][dfv2-concepts] section under _Fundamentals_.
 [set-up-devfs]: migration/set-up-devfs.md
 [troubleshoot-common-issues]: developer_guide/troubleshoot-common-issues.md
 [driver-examples]: developer_guide/driver-examples.md
+[metadata-tutorial]: tutorials/metadata-tutorial.md
+[dfv2-overview]: dfv2-overview.md

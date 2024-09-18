@@ -5,14 +5,14 @@
 #include "src/storage/lib/paver/device-partitioner.h"
 
 #include <dirent.h>
-#include <fidl/fuchsia.device.manager/cpp/fidl.h>
-#include <fidl/fuchsia.device.manager/cpp/wire.h>
 #include <fidl/fuchsia.device/cpp/wire.h>
 #include <fidl/fuchsia.fshost/cpp/wire_test_base.h>
 #include <fidl/fuchsia.hardware.block/cpp/wire.h>
 #include <fidl/fuchsia.hardware.power.statecontrol/cpp/wire.h>
 #include <fidl/fuchsia.kernel/cpp/wire.h>
 #include <fidl/fuchsia.scheduler/cpp/wire.h>
+#include <fidl/fuchsia.system.state/cpp/fidl.h>
+#include <fidl/fuchsia.system.state/cpp/wire.h>
 #include <fidl/fuchsia.tracing.provider/cpp/wire.h>
 #include <lib/abr/util.h>
 #include <lib/async-loop/cpp/loop.h>
@@ -46,8 +46,8 @@
 #include <soc/aml-common/aml-guid.h>
 #include <zxtest/zxtest.h>
 
-#include "fidl/fuchsia.device.manager/cpp/common_types.h"
-#include "fidl/fuchsia.device.manager/cpp/markers.h"
+#include "fidl/fuchsia.system.state/cpp/common_types.h"
+#include "fidl/fuchsia.system.state/cpp/markers.h"
 #include "lib/zx/result.h"
 #include "lib/zx/time.h"
 #include "src/storage/lib/block_client/cpp/remote_block_device.h"
@@ -77,8 +77,8 @@ constexpr uint64_t kTebibyte{kGibibyte * 1024};
 
 using device_watcher::RecursiveWaitForFile;
 using driver_integration_test::IsolatedDevmgr;
-using fuchsia_device_manager::SystemPowerState;
-using fuchsia_device_manager::SystemStateTransition;
+using fuchsia_system_state::SystemPowerState;
+using fuchsia_system_state::SystemStateTransition;
 using paver::BlockWatcherPauser;
 using paver::PartitionSpec;
 

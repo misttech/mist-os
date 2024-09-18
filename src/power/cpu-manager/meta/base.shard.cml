@@ -8,11 +8,6 @@
     ],
     use: [
         {
-            directory: "dev-topological",
-            rights: [ "r*" ],
-            path: "/dev",
-        },
-        {
             directory: "config",
             rights: [ "r*" ],
             path: "/config",

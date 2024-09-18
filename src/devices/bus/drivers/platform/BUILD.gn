@@ -17,6 +17,15 @@ driver_bind_rules("platform-bus-bind") {
   disable_autobind = true
 }
 
+fuchsia_component_manifest("manifest") {
+  component_name = "platform-bus"
+  manifest = "meta/platform-bus.cml"
+}
+
+fuchsia_structured_config_cpp_elf_lib("platform-bus-config") {
+  cm_label = ":manifest"
+}
+
 fuchsia_driver("platform-bus-driver") {
   output_name = "platform-bus"
   sources = [
@@ -27,6 +36,7 @@ fuchsia_driver("platform-bus-driver") {
   ]
   deps = [
     ":platform-bus-bind",
+    ":platform-bus-config",
     "//sdk/banjo/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_banjo_cpp",
     "//sdk/fidl/fuchsia.boot:fuchsia.boot_cpp",
     "//sdk/fidl/fuchsia.hardware.interrupt:fuchsia.hardware.interrupt_cpp",
@@ -54,10 +64,9 @@ fuchsia_driver("platform-bus-driver") {
 
 fuchsia_driver_component("platform-bus") {
   visibility = [ ":*" ]
-  component_name = "platform-bus"
+  cm_label = ":manifest"
   deps = [ ":platform-bus-driver" ]
   info = "meta/platform-bus-info.json"
-  manifest = "meta/platform-bus.cml"
 }
 
 fuchsia_driver_package("package") {
@@ -81,6 +90,7 @@ test("platform-bus-unittest") {
   ]
   deps = [
     ":platform-bus-bind",
+    ":platform-bus-config",
     "//sdk/banjo/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.powerimpl:fuchsia.hardware.powerimpl_banjo_cpp",
     "//sdk/fidl/fuchsia.boot:fuchsia.boot_cpp",
@@ -130,12 +140,12 @@ test("platform-bus-bti") {
   deps = [
     ":fuchsia.hardware.btitest_cpp",
     "//sdk/fidl/fuchsia.driver.test:fuchsia.driver.test_hlcpp",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/device-watcher/cpp",
     "//sdk/lib/driver_test_realm/realm_builder/cpp",
     "//sdk/lib/fdio",
     "//src/lib/ddk",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/fdio-caller",
     "//zircon/system/ulib/zx",

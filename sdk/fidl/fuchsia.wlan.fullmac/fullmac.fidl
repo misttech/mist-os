@@ -1,10 +1,10 @@
 // Copyright 2022 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+@available(added=HEAD)
 library fuchsia.wlan.fullmac;
 
 using fuchsia.wlan.common;
-using fuchsia.wlan.internal;
 using fuchsia.wlan.ieee80211 as ieee80211;
 using zx;
 
@@ -34,33 +34,20 @@ type WlanFullmacAssocInd = struct {
     // Interval specified in time units.
     listen_interval uint16;
     ssid ieee80211.CSsid;
-    rsne_len uint64;
-    rsne array<uint8, ieee80211.WLAN_IE_MAX_LEN>;
-    vendor_ie_len uint64;
-    vendor_ie array<uint8, WLAN_VIE_MAX_LEN>;
+    rsne vector<uint8>:ieee80211.WLAN_IE_MAX_LEN;
+    vendor_ie vector<uint8>:WLAN_VIE_MAX_LEN;
 };
 
 const WLAN_MAX_KEYLIST_SIZE uint32 = 4;
 
-type WlanFullmacSetKeysReq = struct {
-    num_keys uint64;
-    keylist array<fuchsia.wlan.common.WlanKeyConfig, WLAN_MAX_KEYLIST_SIZE>;
-};
-
 type WlanFullmacSetKeysResp = struct {
-    num_keys uint64;
-    statuslist array<zx.Status, WLAN_MAX_KEYLIST_SIZE>;
+    statuslist vector<zx.Status>:WLAN_MAX_KEYLIST_SIZE;
 };
 
-type DeleteKeyDescriptor = struct {
-    key_id uint16;
-    key_type fuchsia.wlan.common.WlanKeyType;
-    address ieee80211.MacAddr;
-};
-
-type WlanFullmacDelKeysReq = struct {
-    num_keys uint64;
-    keylist array<DeleteKeyDescriptor, WLAN_MAX_KEYLIST_SIZE>;
+type DeleteKeyDescriptor = table {
+    1: key_id uint16;
+    2: key_type fuchsia.wlan.common.WlanKeyType;
+    3: address ieee80211.MacAddr;
 };
 
 /// This struct is sent from SME to wlanif, indicating the result of SAE handshake process.
@@ -83,7 +70,7 @@ type WlanFullmacScanResult = struct {
     // Time of the scan result relative to when the system was powered on.
     // See https://fuchsia.dev/fuchsia-src/concepts/time/language_support#monotonic_time
     timestamp_nanos zx.Time;
-    bss fuchsia.wlan.internal.BssDescription;
+    bss fuchsia.wlan.common.BssDescription;
 };
 
 type WlanScanResult = flexible enum : uint8 {
@@ -437,7 +424,7 @@ closed protocol WlanFullmacImplIfc {
         /// Full BSS description of the target BSS. Required.
         /// If the data in BssDescription is incorrect or incomplete, the roam cannot succeed,
         /// because higher layers will not be able to complete required actions (e.g. SAE).
-        2: selected_bss fuchsia.wlan.internal.BssDescription;
+        2: selected_bss fuchsia.wlan.common.BssDescription;
         /// Whether the original BSS association has been maintained at the start of a roam attempt.
         /// Required. 802.11 dictates that a STA can only be associated with a single BSS, so a roam
         /// attempt typically incurs disassociation at the start of the roam attempt. However,
@@ -584,7 +571,7 @@ closed protocol WlanFullmacImpl {
         6: max_channel_time uint32;
     }) -> ();
     strict Connect(table {
-        1: selected_bss fuchsia.wlan.internal.BssDescription;
+        1: selected_bss fuchsia.wlan.common.BssDescription;
         /// Timeout specified in beacon interval.
         2: connect_failure_timeout uint32;
 
@@ -638,13 +625,13 @@ closed protocol WlanFullmacImpl {
     strict StopBss(table {
         1: ssid ieee80211.CSsid;
     }) -> ();
-    strict SetKeysReq(struct {
-        req WlanFullmacSetKeysReq;
+    strict SetKeys(table {
+        1: keylist vector<fuchsia.wlan.common.WlanKeyConfig>:WLAN_MAX_KEYLIST_SIZE;
     }) -> (struct {
         resp WlanFullmacSetKeysResp;
     });
-    strict DelKeysReq(struct {
-        req WlanFullmacDelKeysReq;
+    strict DelKeys(table {
+        1: keylist vector<DeleteKeyDescriptor>:WLAN_MAX_KEYLIST_SIZE;
     }) -> ();
     strict EapolTx(table {
         1: src_addr ieee80211.MacAddr;

@@ -74,43 +74,6 @@ void WaitForClassDeviceCount(const std::string& path_in_devfs, size_t count) {
 
 }  // namespace device_enumeration
 
-// Static
-void DeviceEnumerationTest::TestRunner(const char** device_paths, size_t paths_num) {
-  async::Loop loop = async::Loop(&kAsyncLoopConfigNeverAttachToThread);
-
-  std::unordered_set<const char*> device_paths_set;
-  for (size_t i = 0; i < paths_num; ++i) {
-    device_paths_set.emplace(device_paths[i]);
-  }
-  async::TaskClosure task;
-  std::vector<std::unique_ptr<fsl::DeviceWatcher>> watchers;
-  {
-    // Intentionally shadow.
-    std::unordered_set<const char*>& device_paths = device_paths_set;
-    task.set_handler([&device_paths]() {
-      // stdout doesn't show up in test logs.
-      fprintf(stderr, "still waiting for device paths:\n");
-      for (const char* path : device_paths) {
-        fprintf(stderr, " %s\n", path);
-      }
-    });
-    ASSERT_OK(task.PostDelayed(loop.dispatcher(), zx::min(1)));
-
-    for (const char* path : device_paths) {
-      device_enumeration::RecursiveWaitForDevfs(
-          std::string("/dev/") + path, 4,
-          [&loop, &device_paths, path]() {
-            ASSERT_EQ(device_paths.erase(path), 1);
-            if (device_paths.empty()) {
-              loop.Shutdown();
-            }
-          },
-          watchers, loop.dispatcher());
-    }
-  }
-  loop.Run();
-}
-
 void DeviceEnumerationTest::VerifyNodes(cpp20::span<const char*> node_monikers) {
   std::vector<std::string> missing_nodes;
   for (const char* moniker : node_monikers) {

@@ -96,10 +96,10 @@ static_library("cpp") {
       "//sdk/lib/file-lock:cpp",
 
       # Required for fs::FuchsiaVfs and fs::Connection
-      "//zircon/system/ulib/async",
+      "//sdk/lib/async",
 
       # Required for fs::PagedVnode
-      "//zircon/system/ulib/async:async-cpp",
+      "//sdk/lib/async:async-cpp",
     ]
     deps = [
       "//sdk/lib/fidl",
@@ -142,24 +142,31 @@ test("fs-vnode-test") {
     "tests/watcher_test.cc",
   ]
   deps = [
+    ":death_test",
     ":test_support",
     "//sdk/fidl/fuchsia.io:fuchsia.io_cpp",
     "//sdk/fidl/fuchsia.io:fuchsia.io_cpp_testing",
+    "//sdk/lib/async",
+    "//sdk/lib/async:async-cpp",
+    "//sdk/lib/async-default",
+    "//sdk/lib/async-loop",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
+    "//sdk/lib/async-testing",
     "//sdk/lib/fdio",
     "//sdk/lib/fidl",
+    "//src/lib/fxl/test:gtest_main",
     "//src/storage/lib/vfs/cpp",
-    "//zircon/system/ulib/async",
-    "//zircon/system/ulib/async:async-cpp",
-    "//zircon/system/ulib/async-default",
-    "//zircon/system/ulib/async-loop",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
-    "//zircon/system/ulib/async-testing",
+    "//third_party/googletest:gmock",
+    "//third_party/googletest:gtest",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/sync:sync-cpp",
     "//zircon/system/ulib/zx",
-    "//zircon/system/ulib/zxtest",
   ]
+}
+
+expect_includes("death_test") {
+  includes = [ "//src/sys/test_runners/gtest/death_test.shard.cml" ]
 }
 
 test("fs-connection-test") {
@@ -172,23 +179,26 @@ test("fs-connection-test") {
     "tests/paging_test.cc",
   ]
   deps = [
+    ":death_test",
     "//sdk/fidl/fuchsia.io:fuchsia.io_cpp_testing",
+    "//sdk/lib/async",
+    "//sdk/lib/async:async-cpp",
+    "//sdk/lib/async-default",
+    "//sdk/lib/async-loop",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/fdio",
     "//sdk/lib/fidl",
     "//sdk/lib/zxio",
     "//src/lib/fxl",
+    "//src/lib/fxl/test:gtest_main",
     "//src/storage/lib/vfs/cpp",
     "//src/storage/memfs:cpp",
-    "//zircon/system/ulib/async",
-    "//zircon/system/ulib/async:async-cpp",
-    "//zircon/system/ulib/async-default",
-    "//zircon/system/ulib/async-loop",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
+    "//third_party/googletest:gmock",
+    "//third_party/googletest:gtest",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/sync",
     "//zircon/system/ulib/zx",
-    "//zircon/system/ulib/zxtest",
   ]
 }
 

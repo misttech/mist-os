@@ -48,9 +48,6 @@ environment variables can be specified:
 
 Here are some of the best practices that should be followed while contributing
 to Honeydew:
-* Right before merging the CL, ensure code is compliant with
-  [Honeydew code guidelines][Honeydew code guidelines] by running
-  `conformance.sh`.
 * Ensure there is [unit tests][unit tests] and
   [functional tests][functional tests] coverage and that you have run the
   impacted [functional tests][functional tests] (either locally or in infra) to
@@ -78,10 +75,8 @@ to Honeydew:
 
 ### Honeydew code guidelines
 
-Honeydew is a crowd sourced and community contributed library that is
-foundational to all Lacewing tests so we have curated a set of guidelines and
-conformance scripts to ensure its uniformity, functional correctness, and
-stability.
+There is a conformance script that users may optionally run to ensure the
+Honeydew codebase's uniformity, functional correctness, and stability.
 
 To learn more, refer to [Honeydew code guidelines](markdowns/code_guidelines.md).
 
@@ -97,13 +92,6 @@ following:
 ```shell
 INFO: Honeydew code has passed all of the conformance steps
 ```
-
-### Code Review Expectations
-
-* If you are making non-superficial changes to Honeydew, refer to Honeydew's
-  [Best Practices][Best Practices] for general guidances.
-* Else, ensure [conformance.sh][conformance.sh] passes right before merging the
-  CL.
 
 ## Interactive usage
 

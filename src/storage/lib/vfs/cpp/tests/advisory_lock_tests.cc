@@ -17,7 +17,7 @@
 #include <future>
 
 #include <fbl/unique_fd.h>
-#include <zxtest/zxtest.h>
+#include <gtest/gtest.h>
 
 #include "src/lib/fxl/strings/substitute.h"
 #include "src/storage/lib/vfs/cpp/remote_dir.h"
@@ -29,15 +29,15 @@ constexpr char kFlockDir[] = "flock-dir";
 constexpr char kTmpfsPathFile[] = "/fshost-flock-tmp/flock_smoke";
 const ssize_t FILE_SIZE = 1024;
 
-class FlockTest : public zxtest::Test {
+class FlockTest : public testing::Test {
  public:
   FlockTest() : memfs_loop_(&kAsyncLoopConfigNoAttachToCurrentThread) {}
 
   void SetUp() override {
-    ASSERT_OK(memfs_loop_.StartThread());
+    ASSERT_EQ(memfs_loop_.StartThread(), ZX_OK);
 
     zx::result memfs = MountedMemfs::Create(memfs_loop_.dispatcher(), kTmpfsPath);
-    ASSERT_OK(memfs);
+    ASSERT_EQ(memfs.status_value(), ZX_OK);
     memfs_.emplace(std::move(memfs.value()));
   }
 
@@ -45,7 +45,7 @@ class FlockTest : public zxtest::Test {
     if (std::optional memfs = std::exchange(memfs_, std::nullopt); memfs.has_value()) {
       std::promise<zx_status_t> promise;
       memfs.value()->Shutdown([&promise](zx_status_t status) { promise.set_value(status); });
-      ASSERT_OK(promise.get_future().get(), );
+      ASSERT_EQ(promise.get_future().get(), ZX_OK);
     }
   }
 
@@ -65,7 +65,7 @@ class FlockTest : public zxtest::Test {
     use_first_fd_ = true;  // first |GetFd| gets this one
     EXPECT_LT(-1, fd);
     fds_.push_back(fd);
-    ASSERT_EQ(write(fd, contents.c_str(), content_size), content_size);
+    ASSERT_EQ(write(fd, contents.c_str(), content_size), static_cast<ssize_t>(content_size));
   }
 
   void CloseFile() {
@@ -79,7 +79,7 @@ class FlockTest : public zxtest::Test {
 
   int GetFd() {
     if (use_first_fd_) {
-      EXPECT_EQ(1, fds_.size());
+      EXPECT_EQ(fds_.size(), 1u);
       use_first_fd_ = false;
       return fds_[0];
     }

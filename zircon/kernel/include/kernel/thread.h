@@ -32,6 +32,7 @@
 #include <arch/ops.h>
 #include <fbl/canary.h>
 #include <fbl/intrusive_double_list.h>
+#include <fbl/intrusive_single_list.h>
 #include <fbl/macros.h>
 #include <fbl/null_lock.h>
 #include <fbl/wavl_tree_best_node_observer.h>
@@ -1471,6 +1472,14 @@ struct Thread : public ChainLockable {
   };
   using UnblockList = fbl::DoublyLinkedListCustomTraits<Thread*, UnblockListTrait>;
 
+  // Traits for the save state list, used to run the Save stage of migration functions.
+  struct SaveStateListTrait {
+    static fbl::SinglyLinkedListNodeState<Thread*>& node_state(Thread& thread) {
+      return thread.save_state_list_node_;
+    }
+  };
+  using SaveStateList = fbl::SinglyLinkedListCustomTraits<Thread*, SaveStateListTrait>;
+
   struct Linebuffer {
     size_t pos = 0;
     ktl::array<char, 128> buffer{};
@@ -1889,6 +1898,9 @@ struct Thread : public ChainLockable {
 
   // Node storage for existing on the temporary batch unblock list.
   fbl::DoublyLinkedListNodeState<Thread*> unblock_list_node_ TA_GUARDED(get_lock());
+
+  // Node storage for existing on the save state list.
+  fbl::SinglyLinkedListNodeState<Thread*> save_state_list_node_ TA_GUARDED(get_lock());
 };
 
 // For the moment, the arch-specific current thread implementations need to come here, after the

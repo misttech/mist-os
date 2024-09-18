@@ -105,10 +105,10 @@ executable("debug_test") {
   testonly = true
   sources = [ "debug_test.cc" ]
   deps = [
+    "//sdk/lib/async-loop:async-loop-cpp",
     "//sdk/lib/driver/testing/cpp:scoped_global_logger",
     "//src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac:debug",
     "//src/lib/fxl/test:gtest_main",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
   ]
 }
 
@@ -164,11 +164,11 @@ executable("timer_test") {
   testonly = true
   sources = [ "timer_test.cc" ]
   deps = [
+    "//sdk/lib/async:async-cpp",
     "//sdk/lib/driver/testing/cpp:cpp",
     "//src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac:timer",
     "//src/lib/fxl/test:gtest_main",
     "//zircon/system/public",
-    "//zircon/system/ulib/async:async-cpp",
   ]
 }
 

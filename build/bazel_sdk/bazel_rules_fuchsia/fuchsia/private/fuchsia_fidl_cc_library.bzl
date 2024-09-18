@@ -6,6 +6,7 @@
 
 load("@bazel_skylib//lib:paths.bzl", "paths")
 load(":providers.bzl", "FuchsiaFidlLibraryInfo")
+load(":utils.bzl", "with_fuchsia_constraint")
 
 _CodegenInfo = provider("Carries generated information across FIDL bindings code generation ", fields = ["files"])
 
@@ -32,7 +33,7 @@ def _typed_deps(deps, binding_type):
 def get_cc_lib_name(fidl_target_name, binding_type):
     return "{fidl}_{binding_type}".format(fidl = fidl_target_name, binding_type = binding_type)
 
-def fuchsia_fidl_cc_library(name, library, binding_type = "cpp_wire", sdk_for_default_deps = None, deps = [], tags = [], **kwargs):
+def fuchsia_fidl_cc_library(name, library, binding_type = "cpp_wire", sdk_for_default_deps = None, deps = [], tags = [], target_compatible_with = [], **kwargs):
     """Generates cc_library() for the given fidl_library.
 
     Args:
@@ -42,6 +43,7 @@ def fuchsia_fidl_cc_library(name, library, binding_type = "cpp_wire", sdk_for_de
       sdk_for_default_deps: Name of the Bazel workspace where default FIDL library dependencies are defined. If empty or not defined, defaults to the current repository.
       deps: Additional dependencies.
       tags: Optional tags.
+      target_compatible_with: Typical bazel meaning.
       **kwargs: Remaining args.
     """
     gen_name = "%s_codegen" % name
@@ -55,12 +57,14 @@ def fuchsia_fidl_cc_library(name, library, binding_type = "cpp_wire", sdk_for_de
         library = library,
         binding_type = binding_type,
         sdk_for_default_deps = sdk_for_default_deps,
+        target_compatible_with = target_compatible_with,
         **kwargs
     )
 
     _impl_wrapper(
         name = impl_name,
         codegen = ":%s" % gen_name,
+        target_compatible_with = target_compatible_with,
         **kwargs
     )
 
@@ -81,6 +85,7 @@ def fuchsia_fidl_cc_library(name, library, binding_type = "cpp_wire", sdk_for_de
             sdk_for_default_deps + "//pkg/fidl_driver_natural",
         ],
         tags = tags,
+        target_compatible_with = with_fuchsia_constraint(target_compatible_with),
         **kwargs
     )
 

@@ -25,14 +25,18 @@
             path: "/dev/class/dai",
         },
         {
+            protocol: [ "fuchsia.bluetooth.bredr.Profile" ],
+            from: "parent",
+        },
+        {
             protocol: [
-                "fuchsia.bluetooth.bredr.Profile",
                 "fuchsia.media.AudioDeviceEnumerator",
                 "fuchsia.mediacodec.CodecFactory",
                 "fuchsia.sysmem.Allocator",
                 "fuchsia.sysmem2.Allocator",
             ],
             from: "parent",
+            availability: "optional",
         },
         {
             protocol: [ "fuchsia.power.battery.BatteryManager" ],
@@ -80,12 +84,6 @@
         // Controls the feature flag sent to the handsfree peer.
         attach_phone_number_to_voice_tag: { type: "bool" },
 
-        // Respond and hold support
-        // Signals to the handsfree that you can put an ongoing call on hold to respond to an incoming
-        // call.
-        // TODO(https://fxbug.dev/42153736): not implemented yet. ignored if true
-        respond_and_hold: { type: "bool" },
-
         // Enhanced Call Controls
         // Whether the enhanced call controls are available. See HFP Spec v1.8 Sec 4.33
         enhanced_call_controls: { type: "bool" },
@@ -111,5 +109,14 @@
         // the BT transport.
         controller_encoding_cvsd: { type: "bool" },
         controller_encoding_msbc: { type: "bool" },
+
+        // What type of audio control to use for controller-encoded audio
+        // Types available:
+        //   - dai - find and use DAI devices, and publish a StreamConfig to Audio Core (full_stack audio)
+        //   - registry - publish a Codec device to the AudioDeviceRegistry (partial_stack audio)
+        offload_type: {
+            type: "string",
+            max_size: 8,
+        },
     },
 }

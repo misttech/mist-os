@@ -110,6 +110,9 @@ AUTO_DERIVE_TRAITS = [
         ["AsBytes", "FromBytes", "NoCell", "FromZeros"],
     ),
     (r"bpf_attr.*", ["FromBytes", "NoCell", "FromZeros"]),
+    (r"bpf_insn", ["AsBytes", "FromBytes", "NoCell", "FromZeros", "PartialEq"]),
+    (r"bpf_sockopt", ["AsBytes", "FromBytes", "NoCell", "FromZeros"]),
+    (r"bpf_sock_addr", ["AsBytes", "FromBytes", "NoCell", "FromZeros"]),
     (r"flat_binder_object.*", ["FromBytes", "NoCell", "FromZeros"]),
     (
         r"usb_functionfs_event.*",
@@ -154,8 +157,6 @@ AUTO_DERIVE_TRAITS = [
     (r"sigevent", ["FromBytes", "NoCell", "FromZeros"]),
     (r"sigval", ["AsBytes", "FromBytes", "NoCell", "FromZeros"]),
     (r"__sk_buff", ["AsBytes", "FromBytes", "NoCell", "FromZeros"]),
-    (r"bpf_sockopt", ["AsBytes", "FromBytes", "NoCell", "FromZeros"]),
-    (r"bpf_sock_addr", ["AsBytes", "FromBytes", "NoCell", "FromZeros"]),
     (r"sockaddr_in*", ["AsBytes", "FromBytes", "NoCell", "FromZeros"]),
     (r"sockaddr_ll*", ["AsBytes", "FromBytes", "NoCell", "FromZeros"]),
     (r"sock_fprog", ["FromBytes", "NoCell", "FromZeros"]),

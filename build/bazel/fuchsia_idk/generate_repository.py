@@ -287,38 +287,11 @@ class PathRewriter(object):
         """Rewrite all paths in a list, return new list."""
         return [self.path(p, relative_from) for p in paths]
 
-    def ffx_tool_path_list(
-        self, paths: T.List[str], relative_from: None | Path = None
-    ) -> T.List[str]:
-        """Rewrite all paths in a list, return new list."""
-        result = []
-        for path in paths:
-            new_path = self.path(path, relative_from)
-            result.append(new_path)
-            if new_path != path:
-                self._output_idk.add_symlink(
-                    new_path, (self._input_dir / path).resolve()
-                )
-
-        return [self.path(p, relative_from) for p in paths]
-
     def property_inplace(self, obj: T.Dict[str, str], prop: str) -> None:
         """Rewrite obj[prop] as path in-place if possible."""
         value: str | None = obj.get(prop, None)
         if value is not None:
             obj[prop] = self.path(value)
-
-    def ffx_tool_property_inplace(
-        self, obj: T.Dict[str, str], prop: str
-    ) -> None:
-        value: str | None = obj.get(prop, None)
-        if value is not None:
-            new_value = self.path(value)
-            obj[prop] = new_value
-            if new_value != value:
-                self._output_idk.add_symlink(
-                    new_value, (self._input_dir / value).resolve()
-                )
 
     def properties_inplace(
         self, obj: T.Dict[str, str], props: T.Sequence[str]
@@ -333,9 +306,6 @@ class PathRewriter(object):
         # of path_list in-place, instead of assigning a new value to
         # the local variable by that name.
         paths[:] = self.path_list(paths)
-
-    def ffx_tool_path_list_inplace(self, paths: T.List[str]) -> None:
-        paths[:] = self.ffx_tool_path_list(paths)
 
     def rewrite_metadata(self, meta: T.Any) -> None:
         """Rewrite metadata JSON value in-place."""
@@ -398,11 +368,11 @@ class PathRewriter(object):
 
         if atom_type == "ffx_tool":
             toolfiles = meta.get("files", {})
-            self.ffx_tool_property_inplace(toolfiles, "executable")
-            self.ffx_tool_property_inplace(toolfiles, "executable_metadata")
+            self.property_inplace(toolfiles, "executable")
+            self.property_inplace(toolfiles, "executable_metadata")
             for arch, toolfiles in meta["target_files"].items():
-                self.ffx_tool_property_inplace(toolfiles, "executable")
-                self.ffx_tool_property_inplace(toolfiles, "executable_metadata")
+                self.property_inplace(toolfiles, "executable")
+                self.property_inplace(toolfiles, "executable_metadata")
             return
 
         if atom_type == "fhcp_tests":
@@ -414,9 +384,9 @@ class PathRewriter(object):
             return
 
         if atom_type == "host_tool":
-            self.ffx_tool_path_list_inplace(meta.get("files", []))
+            self.path_list_inplace(meta.get("files", []))
             for arch, filegroup in meta.get("target_files", {}).items():
-                self.ffx_tool_path_list_inplace(filegroup)
+                self.path_list_inplace(filegroup)
             return
 
         if atom_type == "loadable_module":

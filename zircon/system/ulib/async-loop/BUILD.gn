@@ -4,14 +4,26 @@
 
 group("async-loop") {
   public_deps = [ "//sdk/lib/async-loop" ]
+  visibility = [
+    "//third_party/*",
+    "//vendor/*",
+  ]
 }
 
 group("async-loop-cpp") {
   public_deps = [ "//sdk/lib/async-loop:async-loop-cpp" ]
+  visibility = [
+    "//third_party/*",
+    "//vendor/*",
+  ]
 }
 
 group("async-loop-default") {
   public_deps = [ "//sdk/lib/async-loop:async-loop-default" ]
+  visibility = [
+    "//third_party/*",
+    "//vendor/*",
+  ]
 }
 
 group("tests") {

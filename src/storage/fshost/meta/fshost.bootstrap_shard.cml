@@ -50,11 +50,6 @@
             to: [ "#fshost" ],
         },
         {
-            protocol: [ "fuchsia.device.manager.Administrator" ],
-            from: "#driver_manager",
-            to: "#fshost",
-        },
-        {
             protocol: [
                 "fuchsia.inspect.InspectSink",
                 "fuchsia.logger.LogSink",

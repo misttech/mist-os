@@ -22,6 +22,7 @@
 #include "src/cobalt/bin/system-metrics/cpu_stats_fetcher.h"
 #include "src/cobalt/bin/utils/clock.h"
 #include "third_party/cobalt/src/lib/client/cpp/buckets_config.h"
+#include "third_party/cobalt/src/public/lib/clock_interfaces.h"
 
 // A daemon to send system metrics to Cobalt.
 //
@@ -75,7 +76,7 @@ class SystemMetricsDaemon {
   // pass a non-null |logger| which may be a local mock that does not use FIDL.
   SystemMetricsDaemon(async_dispatcher_t* dispatcher, sys::ComponentContext* context,
                       fuchsia::metrics::MetricEventLogger_Sync* logger,
-                      std::unique_ptr<cobalt::SteadyClock> clock,
+                      std::unique_ptr<cobalt::util::SteadyClockInterface> clock,
                       std::unique_ptr<cobalt::CpuStatsFetcher> cpu_stats_fetcher,
                       std::unique_ptr<cobalt::ActivityListener> activity_listener,
                       std::string activation_file_prefix);
@@ -183,7 +184,7 @@ class SystemMetricsDaemon {
   fuchsia::metrics::MetricEventLoggerSyncPtr logger_fidl_proxy_;
   fuchsia::metrics::MetricEventLogger_Sync* logger_;
   std::chrono::steady_clock::time_point start_time_;
-  std::unique_ptr<cobalt::SteadyClock> clock_;
+  std::unique_ptr<cobalt::util::SteadyClockInterface> clock_;
   std::unique_ptr<cobalt::CpuStatsFetcher> cpu_stats_fetcher_;
   std::unique_ptr<cobalt::ActivityListener> activity_listener_;
   fuchsia::ui::activity::State current_state_ = fuchsia::ui::activity::State::UNKNOWN;

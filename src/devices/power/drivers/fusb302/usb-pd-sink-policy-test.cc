@@ -9,7 +9,7 @@
 
 #include <cstdint>
 
-#include <zxtest/zxtest.h>
+#include <gtest/gtest.h>
 
 #include "src/devices/power/drivers/fusb302/usb-pd-defs.h"
 #include "src/devices/power/drivers/fusb302/usb-pd-message-objects.h"
@@ -36,7 +36,7 @@ uint32_t FixedPowerSupply(int32_t voltage_mv, int32_t current_ma) {
       FixedPowerSupplyData().set_voltage_mv(voltage_mv).set_maximum_current_ma(current_ma));
 }
 
-class SinkPolicyTest : public zxtest::Test {
+class SinkPolicyTest : public ::testing::Test {
  private:
   fdf_testing::ScopedGlobalLogger logger_;
 };

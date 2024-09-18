@@ -102,6 +102,7 @@ fuchsia_driver_package("pkg") {
 
 _test_deps = [
   "//sdk/lib/async_patterns/testing/cpp",
+  "//sdk/lib/driver/power/cpp/testing",
   "//sdk/lib/driver/testing/cpp:cpp",
   "//sdk/lib/inspect/testing/cpp:zxtest",
   "//src/devices/testing/fake-bti",

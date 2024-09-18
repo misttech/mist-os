@@ -78,6 +78,7 @@ impl ToolEnv {
             context,
             behavior: crate::FhoConnectionBehavior::DaemonConnector(injector.clone()),
             injector,
+            lookup: Arc::new(crate::from_env::DeviceLookupDefaultImpl),
         }
     }
 

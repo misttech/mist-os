@@ -39,6 +39,7 @@ struct StdContainer {
     static_assert(std::is_move_constructible_v<Base>);
 
     using Base::Base;
+    using typename Base::size_type;
 
     constexpr Container(Container&&) noexcept = default;
 
@@ -68,12 +69,20 @@ struct StdContainer {
       return std::make_optional(Base::insert(std::forward<Args>(args)...));
     }
 
+    template <class Diagnostics>
+    constexpr std::true_type reserve(Diagnostics& diagnostics, std::string_view error,
+                                     size_type size) {
+      Base::reserve(size);
+      return {};
+    }
+
    private:
     // Make the original methods unavailable.
     using Base::emplace;
     using Base::emplace_back;
     using Base::insert;
     using Base::push_back;
+    using Base::reserve;
   };
 };
 

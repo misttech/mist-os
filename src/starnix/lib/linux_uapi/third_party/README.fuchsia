@@ -1,0 +1,14 @@
+Name: libfuse
+License: BSD
+License File: LICENSE.txt
+Upstream git: https://android.googlesource.com/platform/external/libfuse
+Description:
+
+Header file for the API between kernel and userspace for fuse
+
+Local Modifications:
+
+Added README.fuchsia.
+Added LICENSE file.
+Selected exclusively the fuse_kernel.h file
+Selected the BSD license in the fuse_kernel.h file

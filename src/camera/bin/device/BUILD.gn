@@ -34,10 +34,10 @@ source_set("lib") {
   ]
 
   deps = [
+    "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/syslog/cpp",
     "//src/camera/lib/hanging_get_helper",
     "//src/lib/fsl",
-    "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/fbl",
   ]
 
@@ -50,12 +50,12 @@ source_set("lib") {
     "//sdk/fidl/fuchsia.sysmem2:fuchsia.sysmem2_cpp_hlcpp_conversion",
     "//sdk/fidl/fuchsia.sysmem2:fuchsia.sysmem2_hlcpp",
     "//sdk/fidl/fuchsia.ui.policy:fuchsia.ui.policy_hlcpp",
+    "//sdk/lib/async-loop:async-loop-cpp",
     "//sdk/lib/fidl/hlcpp",
     "//sdk/lib/fit-promise",
     "//sdk/lib/inspect/component/cpp",
     "//sdk/lib/sys/cpp",
     "//src/camera/lib/cobalt_logger",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/sysmem-version",
     "//zircon/system/ulib/trace",
   ]
@@ -72,8 +72,8 @@ executable("camera_device_bin") {
 
   deps = [
     ":lib",
+    "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/syslog/cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/trace-provider",
   ]
 

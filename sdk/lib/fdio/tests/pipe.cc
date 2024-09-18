@@ -30,10 +30,6 @@ TEST(Pipe, UnsupportedOps) {
   ASSERT_ERRNO(ENOTSOCK);
   ASSERT_EQ(accept(read_end.get(), nullptr, nullptr), -1);
   ASSERT_ERRNO(ENOTSOCK);
-  ASSERT_EQ(getsockname(read_end.get(), nullptr, nullptr), -1);
-  ASSERT_ERRNO(ENOTSOCK);
-  ASSERT_EQ(getpeername(read_end.get(), nullptr, nullptr), -1);
-  ASSERT_ERRNO(ENOTSOCK);
   ASSERT_EQ(setsockopt(read_end.get(), 0, 0, nullptr, 0), -1);
   ASSERT_ERRNO(ENOTSOCK);
 }
@@ -97,7 +93,8 @@ TEST(Pipe, PollOutEmptyPipeAndCloseReadEnd) {
   ASSERT_GE(n, 0, "%s", strerror(errno));
 
 #ifdef __Fuchsia__
-  // TODO(https://fxbug.dev/42123845): This should produce one event with POLLOUT | POLLERR on Fuchsia.
+  // TODO(https://fxbug.dev/42123845): This should produce one event with POLLOUT | POLLERR on
+  // Fuchsia.
   EXPECT_EQ(0, n);
 #else
   EXPECT_EQ(1, n);

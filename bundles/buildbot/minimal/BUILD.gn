@@ -79,6 +79,7 @@ group("minimal") {
     "//src/intl:tests",
     "//src/lib:tests",
     "//src/performance:tests",
+    "//src/power:simulated_time_tests",
     "//src/power:tests",
     "//src/starnix:tests",
     "//src/storage:tests",
@@ -91,9 +92,14 @@ group("minimal") {
     deps -= [
       # TODO(https://fxbug.dev/42073578): Remove after removing Go dependencies on RISC-V.
       "//src/connectivity/network:tests",
+
       # TODO(https://fxbug.dev/292292675): Enable once all dependencies succeed on RISC-V.
       # TODO(https://fxbug.dev/42082585): Uncomment when adding to the default targets.
       # "//src/developer:tests",
+
+      # TODO(https://fxbug.dev/367454381): Enable once `minimal.riscv64` can handle the time
+      # acceleration of this test.
+      "//src/power:simulated_time_tests",
     ]
 
     deps += [

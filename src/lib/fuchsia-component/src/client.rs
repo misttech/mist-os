@@ -402,6 +402,7 @@ pub fn realm() -> Result<RealmProxy, Error> {
     connect_to_protocol::<RealmMarker>()
 }
 
+#[allow(missing_docs)]
 #[cfg(test)]
 pub mod test_util {
     use super::*;

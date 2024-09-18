@@ -53,12 +53,12 @@ source_set("paver-core") {
     "//zircon/third_party/ulib/safemath",
   ]
   public_deps = [
-    "//sdk/fidl/fuchsia.device.manager:fuchsia.device.manager_cpp",
     "//sdk/fidl/fuchsia.fshost:fuchsia.fshost_cpp",
     "//sdk/fidl/fuchsia.hardware.block:fuchsia.hardware.block_cpp",
     "//sdk/fidl/fuchsia.hardware.block.partition:fuchsia.hardware.block.partition_cpp",
     "//sdk/fidl/fuchsia.hardware.skipblock:fuchsia.hardware.skipblock_cpp",
     "//sdk/fidl/fuchsia.paver:fuchsia.paver_cpp",
+    "//sdk/fidl/fuchsia.system.state:fuchsia.system.state_cpp",
     "//sdk/lib/zbi-format",
     "//src/firmware/lib/abr",
     "//src/lib/uuid",

@@ -121,6 +121,9 @@ void UsbHidbus::Stop() {
   started_ = false;
   // TODO(tkilbourn) set flag to stop requeueing the interrupt request when we start using this
   // callback
+  if (set_report_completer_.has_value()) {
+    set_report_completer_->ReplyError(ZX_ERR_IO_NOT_PRESENT);
+  }
 }
 
 zx_status_t UsbHidbus::UsbHidControlIn(uint8_t req_type, uint8_t request, uint16_t value,
@@ -195,12 +198,30 @@ void UsbHidbus::GetReport(fhidbus::wire::HidbusGetReportRequest* request,
 }
 
 void UsbHidbus::SetReportComplete(fendpoint::Completion completion) {
-  sync_completion_signal(&set_report_complete_);
+  ep_out_->PutRequest(usb::FidlRequest(std::move(*completion.request())));
+
+  if (!set_report_completer_.has_value()) {
+    // Shutting down. Probably has already replied.
+    return;
+  }
+
+  auto completer = std::move(*set_report_completer_);
+  set_report_completer_.reset();
+  if (*completion.status() == ZX_OK) {
+    completer.ReplySuccess();
+    return;
+  }
+  completer.ReplyError(*completion.status());
 }
 
 void UsbHidbus::SetReport(fhidbus::wire::HidbusSetReportRequest* request,
                           SetReportCompleter::Sync& completer) {
   if (ep_out_.has_value()) {
+    if (set_report_completer_.has_value()) {
+      completer.ReplyError(ZX_ERR_SHOULD_WAIT);
+      return;
+    }
+
     auto req = ep_out_->GetRequest();
     if (!req.has_value()) {
       completer.ReplyError(ZX_ERR_SHOULD_WAIT);
@@ -212,24 +233,19 @@ void UsbHidbus::SetReport(fhidbus::wire::HidbusSetReportRequest* request,
       completer.ReplyError(ZX_ERR_BUFFER_TOO_SMALL);
       return;
     }
+    (*req)->data()->at(0).size(actual[0]);
     auto status = req->CacheFlush(ep_out_->GetMappedLocked);
     if (status != ZX_OK) {
       zxlogf(ERROR, "Cache flush failed %d", status);
     }
     std::vector<fuchsia_hardware_usb_request::Request> requests;
     requests.push_back(req->take_request());
+    set_report_completer_ = completer.ToAsync();
     auto result = (*ep_out_)->QueueRequests(std::move(requests));
     if (result.is_error()) {
       zxlogf(ERROR, "Failed to QueueRequests %s", result.error_value().FormatDescription().c_str());
-      completer.ReplyError(result.error_value().status());
-      return;
+      set_report_completer_->ReplyError(result.error_value().status());
     }
-    status = sync_completion_wait(&set_report_complete_, ZX_TIME_INFINITE);
-    if (status != ZX_OK) {
-      completer.ReplyError(status);
-      return;
-    }
-    completer.ReplySuccess();
     return;
   }
   auto status = UsbHidControlOut(

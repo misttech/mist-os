@@ -484,7 +484,8 @@ pub async fn multi_stream_node_connection_to_async(
         loop {
             let n = match rx.read(&mut buf).await {
                 Ok(0) => {
-                    writer.close(format!("{remote_name} closed the connection"));
+                    writer
+                        .close(format!("connection closed (either by transport or {remote_name})"));
                     break Ok(());
                 }
                 Ok(n) => n,

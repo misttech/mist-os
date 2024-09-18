@@ -34,8 +34,4 @@
             from: "self",
         },
     ],
-    config: {
-        blobfs: { type: "bool" },
-        netstack: { type: "bool" },
-    },
 }

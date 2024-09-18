@@ -182,6 +182,12 @@ class VmPageOrMarker {
     return old;
   }
 
+  [[nodiscard]] VmPageOrMarker Swap(VmPageOrMarker&& other) {
+    uint64_t ret = raw_;
+    raw_ = other.Release();
+    return VmPageOrMarker(ret);
+  }
+
   bool IsPage() const { return !IsEmpty() && (GetType() == kPageType); }
   bool IsMarker() const { return GetType() == kZeroMarkerType; }
   bool IsEmpty() const {
@@ -505,6 +511,15 @@ class VmPageOrMarkerRef {
       VmPageOrMarker::ReferenceValue ref) {
     DEBUG_ASSERT(page_or_marker_);
     return page_or_marker_->ChangeReferenceValue(ref);
+  }
+
+  // Replaces the contents of this VmPageOrMarker with some non-empty contents, and returns what was
+  // previously present. The previous content is allowed to be empty, but the provided content must
+  // be non-empty.
+  [[nodiscard]] VmPageOrMarker SwapContent(VmPageOrMarker&& content) {
+    DEBUG_ASSERT(!content.IsEmpty());
+    DEBUG_ASSERT(page_or_marker_);
+    return page_or_marker_->Swap(ktl::move(content));
   }
 
   // Forward dirty state updates as an allowed mutation.

@@ -18,22 +18,73 @@ pub(crate) mod packet_queue;
 pub(crate) mod route;
 pub(crate) mod state;
 
+use net_types::ip::{GenericOverIp, Ip, IpVersionMarker};
+use netstack3_base::{
+    AnyDevice, DeviceIdContext, FrameDestination, HandleableTimer, InstantBindingsTypes,
+    InstantContext, TimerBindingsTypes, TimerContext,
+};
 use packet_formats::ip::IpPacket;
 use zerocopy::ByteSlice;
 
-use netstack3_base::{AnyDevice, DeviceIdContext};
-use route::{Action, MulticastRouteTargets};
-
+use crate::internal::multicast_forwarding::packet_queue::QueuePacketOutcome;
+use crate::internal::multicast_forwarding::route::{Action, MulticastRouteTargets};
 use crate::multicast_forwarding::{
+    MulticastForwardingPendingPacketsContext, MulticastForwardingState,
     MulticastForwardingStateContext, MulticastRoute, MulticastRouteKey,
     MulticastRouteTableContext as _,
 };
 use crate::IpLayerIpExt;
 
+/// Required types for multicast forwarding provided by Bindings.
+pub trait MulticastForwardingBindingsTypes: InstantBindingsTypes + TimerBindingsTypes {}
+impl<BT: InstantBindingsTypes + TimerBindingsTypes> MulticastForwardingBindingsTypes for BT {}
+
+/// Required functionality for multicast forwarding provided by Bindings.
+pub trait MulticastForwardingBindingsContext:
+    MulticastForwardingBindingsTypes + InstantContext + TimerContext
+{
+}
+impl<BC: MulticastForwardingBindingsTypes + InstantContext + TimerContext>
+    MulticastForwardingBindingsContext for BC
+{
+}
+
 /// Device related functionality required by multicast forwarding.
 pub trait MulticastForwardingDeviceContext<I: IpLayerIpExt>: DeviceIdContext<AnyDevice> {
     /// True if the given device has multicast forwarding enabled.
     fn is_device_multicast_forwarding_enabled(&mut self, dev: &Self::DeviceId) -> bool;
+}
+
+/// A timer event for multicast forwarding.
+#[derive(Clone, Debug, Eq, GenericOverIp, Hash, PartialEq)]
+#[generic_over_ip(I, Ip)]
+pub enum MulticastForwardingTimerId<I: Ip> {
+    /// A trigger to perform garbage collection on the pending packets table.
+    PendingPacketsGc(IpVersionMarker<I>),
+}
+
+impl<
+        I: IpLayerIpExt,
+        BC: MulticastForwardingBindingsContext,
+        CC: MulticastForwardingStateContext<I, BC>,
+    > HandleableTimer<CC, BC> for MulticastForwardingTimerId<I>
+{
+    fn handle(self, core_ctx: &mut CC, bindings_ctx: &mut BC, _: BC::UniqueTimerId) {
+        match self {
+            MulticastForwardingTimerId::PendingPacketsGc(_) => {
+                core_ctx.with_state(|state, ctx| match state {
+                    // Multicast forwarding was disabled after GC was scheduled;
+                    // there are no resources to GC now.
+                    MulticastForwardingState::Disabled => {}
+                    MulticastForwardingState::Enabled(state) => {
+                        ctx.with_pending_table_mut(state, |pending_table| {
+                            pending_table.run_garbage_collection(bindings_ctx);
+                        })
+                    }
+                })
+            }
+        }
+    }
 }
 
 /// Query the multicast route table and return the forwarding targets.
@@ -51,15 +102,18 @@ pub trait MulticastForwardingDeviceContext<I: IpLayerIpExt>: DeviceIdContext<Any
 ///
 /// Note that the returned targets are not synchronized with the multicast route
 /// table and may grow stale if the table is updated.
-pub(crate) fn lookup_multicast_route_for_packet<I, B, CC>(
+pub(crate) fn lookup_multicast_route_or_stash_packet<I, B, CC, BC>(
     core_ctx: &mut CC,
+    bindings_ctx: &mut BC,
     packet: &I::Packet<B>,
     dev: &CC::DeviceId,
+    frame_dst: Option<FrameDestination>,
 ) -> Option<MulticastRouteTargets<CC::DeviceId>>
 where
     I: IpLayerIpExt,
     B: ByteSlice,
-    CC: MulticastForwardingStateContext<I> + MulticastForwardingDeviceContext<I>,
+    CC: MulticastForwardingStateContext<I, BC> + MulticastForwardingDeviceContext<I>,
+    BC: MulticastForwardingBindingsContext,
 {
     // Short circuit if the packet's addresses don't constitute a valid
     // multicast route key (e.g. src is not unicast, or dst is not multicast).
@@ -77,7 +131,7 @@ where
             // TODO(https://fxbug.dev/352570820): Increment a counter.
             return None;
         };
-        ctx.with_route_table(state, |route_table, _ctx| {
+        ctx.with_route_table(state, |route_table, ctx| {
             if let Some(MulticastRoute { input_interface, action }) = route_table.get(&key) {
                 if dev != input_interface {
                     // TODO(https://fxbug.dev/352570820): Increment a counter.
@@ -91,8 +145,18 @@ where
                 }
             }
             // TODO(https://fxbug.dev/352570820): Increment a counter.
-            // TODO(https://fxbug.dev/353328975): Queue the packet and send a
-            // "Missing Route" multicast forwarding event.
+            ctx.with_pending_table_mut(state, |pending_table| {
+                match pending_table.try_queue_packet(bindings_ctx, key, packet, dev, frame_dst) {
+                    QueuePacketOutcome::QueuedInNewQueue => {
+                        // TODO(https://fxbug.dev/353328975): Send a
+                        // "Missing Route" multicast forwarding event.
+                    }
+                    QueuePacketOutcome::QueuedInExistingQueue => {}
+                    QueuePacketOutcome::ExistingQueueFull => {
+                        // TODO(https://fxbug.dev/352570820): Increment a counter.
+                    }
+                }
+            });
             return None;
         })
     })
@@ -107,17 +171,22 @@ mod testutil {
     use core::cell::RefCell;
     use derivative::Derivative;
     use net_declare::{net_ip_v4, net_ip_v6};
-    use net_types::ip::{Ipv4, Ipv4Addr, Ipv6, Ipv6Addr};
+    use net_types::ip::{Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Mtu};
+    use net_types::SpecifiedAddr;
     use netstack3_base::testutil::{FakeStrongDeviceId, MultipleDevicesId};
-    use netstack3_base::CtxPair;
-    use packet::{InnerPacketBuilder, Serializer};
+    use netstack3_base::{CoreTimerContext, CounterContext, CtxPair, FrameDestination};
+    use netstack3_filter::ProofOfEgressCheck;
+    use packet::{BufferMut, InnerPacketBuilder, Serializer};
     use packet_formats::ip::{IpPacketBuilder, IpProto};
 
+    use crate::device::IpDeviceSendContext;
+    use crate::internal::icmp::{IcmpErrorHandler, IcmpHandlerIpExt};
     use crate::multicast_forwarding::{
         MulticastForwardingApi, MulticastForwardingEnabledState, MulticastForwardingPendingPackets,
         MulticastForwardingPendingPacketsContext, MulticastForwardingState, MulticastRouteTable,
         MulticastRouteTableContext,
     };
+    use crate::{IpCounters, IpDeviceMtuContext, IpLayerEvent, IpPacketDestination};
 
     /// An IP extension trait providing constants for various IP addresses.
     pub(crate) trait TestIpExt: IpLayerIpExt {
@@ -162,9 +231,11 @@ mod testutil {
         // NB: Hold in an `Rc<RefCell<...>>` to switch to runtime borrow
         // checking. This allows us to borrow the multicast forwarding state at
         // the same time as the outer `FakeCoreCtx` is mutably borrowed.
-        pub(crate) multicast_forwarding: Rc<RefCell<MulticastForwardingState<I, D>>>,
+        pub(crate) multicast_forwarding:
+            Rc<RefCell<MulticastForwardingState<I, D, FakeBindingsCtx<I, D>>>>,
         // The list of devices that have multicast forwarding enabled.
         pub(crate) forwarding_enabled_devices: HashSet<D>,
+        counters: IpCounters<I>,
     }
 
     impl<I: IpLayerIpExt, D: FakeStrongDeviceId> FakeCoreCtxState<I, D> {
@@ -177,17 +248,33 @@ mod testutil {
         }
     }
 
-    pub(crate) type FakeBindingsCtx = netstack3_base::testutil::FakeBindingsCtx<(), (), (), ()>;
+    impl<I: IpLayerIpExt, D: FakeStrongDeviceId> CounterContext<IpCounters<I>>
+        for FakeCoreCtxState<I, D>
+    {
+        fn with_counters<O, F: FnOnce(&IpCounters<I>) -> O>(&self, cb: F) -> O {
+            cb(&self.counters)
+        }
+    }
+
+    pub(crate) type FakeBindingsCtx<I, D> = netstack3_base::testutil::FakeBindingsCtx<
+        MulticastForwardingTimerId<I>,
+        IpLayerEvent<D, I>,
+        (),
+        (),
+    >;
     pub(crate) type FakeCoreCtx<I, D> =
         netstack3_base::testutil::FakeCoreCtx<FakeCoreCtxState<I, D>, (), D>;
 
-    impl<I: IpLayerIpExt, D: FakeStrongDeviceId> MulticastForwardingStateContext<I>
-        for FakeCoreCtx<I, D>
+    impl<I: IpLayerIpExt, D: FakeStrongDeviceId>
+        MulticastForwardingStateContext<I, FakeBindingsCtx<I, D>> for FakeCoreCtx<I, D>
     {
         type Ctx<'a> = FakeCoreCtx<I, D>;
         fn with_state<
             O,
-            F: FnOnce(&MulticastForwardingState<I, Self::DeviceId>, &mut Self::Ctx<'_>) -> O,
+            F: FnOnce(
+                &MulticastForwardingState<I, Self::DeviceId, FakeBindingsCtx<I, D>>,
+                &mut Self::Ctx<'_>,
+            ) -> O,
         >(
             &mut self,
             cb: F,
@@ -198,7 +285,10 @@ mod testutil {
         }
         fn with_state_mut<
             O,
-            F: FnOnce(&mut MulticastForwardingState<I, Self::DeviceId>, &mut Self::Ctx<'_>) -> O,
+            F: FnOnce(
+                &mut MulticastForwardingState<I, Self::DeviceId, FakeBindingsCtx<I, D>>,
+                &mut Self::Ctx<'_>,
+            ) -> O,
         >(
             &mut self,
             cb: F,
@@ -209,14 +299,16 @@ mod testutil {
         }
     }
 
-    impl<I: IpLayerIpExt, D: FakeStrongDeviceId> MulticastRouteTableContext<I> for FakeCoreCtx<I, D> {
+    impl<I: IpLayerIpExt, D: FakeStrongDeviceId>
+        MulticastRouteTableContext<I, FakeBindingsCtx<I, D>> for FakeCoreCtx<I, D>
+    {
         type Ctx<'a> = FakeCoreCtx<I, D>;
         fn with_route_table<
             O,
             F: FnOnce(&MulticastRouteTable<I, Self::DeviceId>, &mut Self::Ctx<'_>) -> O,
         >(
             &mut self,
-            state: &MulticastForwardingEnabledState<I, Self::DeviceId>,
+            state: &MulticastForwardingEnabledState<I, Self::DeviceId, FakeBindingsCtx<I, D>>,
             cb: F,
         ) -> O {
             let route_table = state.route_table().read();
@@ -227,7 +319,7 @@ mod testutil {
             F: FnOnce(&mut MulticastRouteTable<I, Self::DeviceId>, &mut Self::Ctx<'_>) -> O,
         >(
             &mut self,
-            state: &MulticastForwardingEnabledState<I, Self::DeviceId>,
+            state: &MulticastForwardingEnabledState<I, Self::DeviceId, FakeBindingsCtx<I, D>>,
             cb: F,
         ) -> O {
             let mut route_table = state.route_table().write();
@@ -235,15 +327,17 @@ mod testutil {
         }
     }
 
-    impl<I: IpLayerIpExt, D: FakeStrongDeviceId> MulticastForwardingPendingPacketsContext<I>
-        for FakeCoreCtx<I, D>
+    impl<I: IpLayerIpExt, D: FakeStrongDeviceId>
+        MulticastForwardingPendingPacketsContext<I, FakeBindingsCtx<I, D>> for FakeCoreCtx<I, D>
     {
         fn with_pending_table_mut<
             O,
-            F: FnOnce(&mut MulticastForwardingPendingPackets<I, Self::WeakDeviceId>) -> O,
+            F: FnOnce(
+                &mut MulticastForwardingPendingPackets<I, Self::WeakDeviceId, FakeBindingsCtx<I, D>>,
+            ) -> O,
         >(
             &mut self,
-            state: &MulticastForwardingEnabledState<I, Self::DeviceId>,
+            state: &MulticastForwardingEnabledState<I, Self::DeviceId, FakeBindingsCtx<I, D>>,
             cb: F,
         ) -> O {
             let mut pending_table = state.pending_table().lock();
@@ -259,9 +353,63 @@ mod testutil {
         }
     }
 
-    pub(crate) fn new_api<I: IpLayerIpExt>(
-    ) -> MulticastForwardingApi<I, CtxPair<FakeCoreCtx<I, MultipleDevicesId>, FakeBindingsCtx>>
+    impl<I: IpLayerIpExt, D: FakeStrongDeviceId>
+        CoreTimerContext<MulticastForwardingTimerId<I>, FakeBindingsCtx<I, D>>
+        for FakeCoreCtx<I, D>
     {
+        fn convert_timer(
+            dispatch_id: MulticastForwardingTimerId<I>,
+        ) -> MulticastForwardingTimerId<I> {
+            dispatch_id
+        }
+    }
+
+    impl<I: IpLayerIpExt, D: FakeStrongDeviceId> IpDeviceSendContext<I, FakeBindingsCtx<I, D>>
+        for FakeCoreCtx<I, D>
+    {
+        fn send_ip_frame<S>(
+            &mut self,
+            _bindings_ctx: &mut FakeBindingsCtx<I, D>,
+            _device_id: &D,
+            _destination: IpPacketDestination<I, &D>,
+            _body: S,
+            _egress_proof: ProofOfEgressCheck,
+        ) -> Result<(), netstack3_base::SendFrameError<S>>
+        where
+            S: Serializer + netstack3_filter::IpPacket<I>,
+            S::Buffer: BufferMut,
+        {
+            unimplemented!()
+        }
+    }
+
+    impl<I: IpLayerIpExt, D: FakeStrongDeviceId> IpDeviceMtuContext<I> for FakeCoreCtx<I, D> {
+        fn get_mtu(&mut self, _device_id: &Self::DeviceId) -> Mtu {
+            unimplemented!()
+        }
+    }
+
+    impl<I: IpLayerIpExt, D: FakeStrongDeviceId> IcmpErrorHandler<I, FakeBindingsCtx<I, D>>
+        for FakeCoreCtx<I, D>
+    {
+        fn send_icmp_error_message<B: BufferMut>(
+            &mut self,
+            _bindings_ctx: &mut FakeBindingsCtx<I, D>,
+            _device: &D,
+            _frame_dst: Option<FrameDestination>,
+            _src_ip: <I as IcmpHandlerIpExt>::SourceAddress,
+            _dst_ip: SpecifiedAddr<I::Addr>,
+            _original_packet: B,
+            _error: I::IcmpError,
+        ) {
+            unimplemented!()
+        }
+    }
+
+    pub(crate) fn new_api<I: IpLayerIpExt>() -> MulticastForwardingApi<
+        I,
+        CtxPair<FakeCoreCtx<I, MultipleDevicesId>, FakeBindingsCtx<I, MultipleDevicesId>>,
+    > {
         MulticastForwardingApi::new(CtxPair::with_core_ctx(FakeCoreCtx::with_state(
             Default::default(),
         )))
@@ -272,11 +420,12 @@ mod testutil {
     /// # Panics
     ///
     /// Panics if multicast forwarding is disabled.
-    pub(crate) fn with_pending_table<I, O, F, CC>(core_ctx: &mut CC, cb: F) -> O
+    pub(crate) fn with_pending_table<I, O, F, CC, BT>(core_ctx: &mut CC, cb: F) -> O
     where
         I: IpLayerIpExt,
-        CC: MulticastForwardingStateContext<I>,
-        F: FnOnce(&mut MulticastForwardingPendingPackets<I, CC::WeakDeviceId>) -> O,
+        CC: MulticastForwardingStateContext<I, BT>,
+        BT: MulticastForwardingBindingsTypes,
+        F: FnOnce(&mut MulticastForwardingPendingPackets<I, CC::WeakDeviceId, BT>) -> O,
     {
         core_ctx.with_state(|state, ctx| {
             let state = state.enabled().unwrap();
@@ -320,6 +469,7 @@ mod tests {
     #[test_case(LookupTestCase{right_dev: false, ..LOOKUP_SUCCESS_CASE} => false; "wrong_dev")]
     fn lookup_route<I: TestIpExt>(test_case: LookupTestCase) -> bool {
         let LookupTestCase { enabled, dev_enabled, right_key, right_dev } = test_case;
+        const FRAME_DST: Option<FrameDestination> = None;
         let mut api = testutil::new_api::<I>();
 
         let buf = testutil::new_ip_packet_buf::<I>(I::SRC1, I::DST1);
@@ -359,6 +509,14 @@ mod tests {
             .state
             .set_multicast_forwarding_enabled_for_dev(MultipleDevicesId::A, dev_enabled);
 
-        lookup_multicast_route_for_packet(api.core_ctx(), &packet, &MultipleDevicesId::A).is_some()
+        let (core_ctx, bindings_ctx) = api.contexts();
+        lookup_multicast_route_or_stash_packet(
+            core_ctx,
+            bindings_ctx,
+            &packet,
+            &MultipleDevicesId::A,
+            FRAME_DST,
+        )
+        .is_some()
     }
 }

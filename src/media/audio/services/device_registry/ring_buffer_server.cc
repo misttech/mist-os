@@ -9,6 +9,7 @@
 #include <lib/fidl/cpp/wire/unknown_interaction_handler.h>
 #include <lib/fit/internal/result.h>
 #include <lib/trace/event.h>
+#include <lib/zx/clock.h>
 #include <zircon/errors.h>
 
 #include <utility>
@@ -16,6 +17,7 @@
 #include "src/media/audio/services/common/base_fidl_server.h"
 #include "src/media/audio/services/device_registry/control_server.h"
 #include "src/media/audio/services/device_registry/device.h"
+#include "src/media/audio/services/device_registry/inspector.h"
 #include "src/media/audio/services/device_registry/logging.h"
 
 namespace media_audio {
@@ -36,12 +38,16 @@ RingBufferServer::RingBufferServer(std::shared_ptr<ControlServer> parent,
                                    std::shared_ptr<Device> device, ElementId element_id)
     : parent_(std::move(parent)), device_(std::move(device)), element_id_(element_id) {
   ADR_LOG_METHOD(kLogObjectLifetimes);
+  SetInspect(Inspector::Singleton()->RecordRingBufferInstance(zx::clock::get_monotonic()));
+
   ++count_;
   LogObjectCounts();
 }
 
 RingBufferServer::~RingBufferServer() {
   ADR_LOG_METHOD(kLogObjectLifetimes);
+  inspect()->RecordDestructionTime(zx::clock::get_monotonic());
+
   --count_;
   LogObjectCounts();
 }

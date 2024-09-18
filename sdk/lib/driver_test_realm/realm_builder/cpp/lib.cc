@@ -58,7 +58,7 @@ void Setup(component_testing::RealmBuilder& realm_builder) {
       .targets = {ParentRef()},
   });
   realm_builder.AddRoute(Route{
-      .capabilities = {Protocol{"fuchsia.device.manager.Administrator"}},
+      .capabilities = {Protocol{"fuchsia.system.state.Administrator"}},
       .source = {ChildRef{kComponentName}},
       .targets = {ParentRef()},
   });
@@ -85,7 +85,7 @@ void Setup(component_testing::RealmBuilder& realm_builder) {
       .targets = {ParentRef()},
   });
   realm_builder.AddRoute(Route{
-      .capabilities = {Protocol{"fuchsia.device.manager.Administrator"}},
+      .capabilities = {Protocol{"fuchsia.system.state.Administrator"}},
       .source = {ChildRef{kComponentName}},
       .targets = {ParentRef()},
   });

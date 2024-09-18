@@ -3,11 +3,12 @@
 // found in the LICENSE file.
 
 use crate::security::selinux_hooks::{
-    check_permission, check_self_permission, fs_node_effective_sid, FsNodeHandle, PermissionCheck,
+    check_permission, check_self_permission, fs_node_effective_sid, FsNode, PermissionCheck,
     ProcessPermission, TaskAttrs,
 };
 use crate::security::{Arc, ProcAttr, ResolvedElfState, SecurityServer};
 use crate::task::{CurrentTask, Task};
+use crate::todo_check_permission;
 use selinux::{FilePermission, NullessByteStr, ObjectClass};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::signals::{Signal, SIGCHLD, SIGKILL, SIGSTOP};
@@ -50,7 +51,7 @@ pub fn check_task_create_access(
 pub fn check_exec_access(
     security_server: &Arc<SecurityServer>,
     current_task: &CurrentTask,
-    executable_node: &FsNodeHandle,
+    executable_node: &FsNode,
 ) -> Result<ResolvedElfState, Errno> {
     let (current_sid, exec_sid) = {
         let state = &current_task.read().security_state.attrs;
@@ -71,25 +72,31 @@ pub fn check_exec_access(
     if current_sid == new_sid {
         // To `exec()` a binary in the caller's domain, the caller must be granted
         // "execute_no_trans" permission to the binary.
-        // TODO(http://b/330904217): once filesystems are labeled, deny access.
-        let _ = check_permission(
+        todo_check_permission!(
+            TODO(
+                "https://fxbug.dev/330904217",
+                "Requires that SELinux Test Suite VM has correct labels"
+            ),
             &permission_check,
             current_sid,
             executable_sid,
             FilePermission::ExecuteNoTrans,
-        );
+        )?;
     } else {
         // Check that the domain transition is allowed.
         check_permission(&permission_check, current_sid, new_sid, ProcessPermission::Transition)?;
 
         // Check that the executable file has an entry point into the new domain.
-        // TODO(http://b/330904217): once filesystems are labeled, deny access.
-        let _ = check_permission(
+        todo_check_permission!(
+            TODO(
+                "https://fxbug.dev/330904217",
+                "Requires that SELinux Test Suite VM has correct labels"
+            ),
             &permission_check,
             new_sid,
             executable_sid,
             FilePermission::Entrypoint,
-        );
+        )?;
 
         // Check that ptrace permission is allowed if the process is traced.
         if let Some(ptracer) = current_task.ptracer_task().upgrade() {
@@ -333,7 +340,7 @@ mod tests {
         create_kernel_and_task_with_selinux, create_kernel_task_and_unlocked_with_selinux,
         create_task,
     };
-    use selinux_core::SecurityId;
+    use selinux::SecurityId;
     use starnix_uapi::signals::SIGTERM;
     use starnix_uapi::{error, CLONE_SIGHAND, CLONE_THREAD, CLONE_VM};
 

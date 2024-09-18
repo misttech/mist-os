@@ -14,8 +14,9 @@ use wlan_metrics_registry::{
     PolicyDisconnectionMigratedMetricDimensionReason,
 };
 use {
-    fidl_fuchsia_wlan_internal as fidl_internal, fidl_fuchsia_wlan_policy as fidl_policy,
-    fidl_fuchsia_wlan_sme as fidl_sme, fuchsia_zircon as zx,
+    fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_internal as fidl_internal,
+    fidl_fuchsia_wlan_policy as fidl_policy, fidl_fuchsia_wlan_sme as fidl_sme,
+    fuchsia_zircon as zx,
 };
 
 #[cfg(test)]
@@ -120,7 +121,7 @@ pub struct Bss {
     /// Compatibility with this device's network stack.
     pub compatibility: Option<wlan_common::scan::Compatibility>,
     /// The BSS description with information that SME needs for connecting.
-    pub bss_description: Sequestered<fidl_internal::BssDescription>,
+    pub bss_description: Sequestered<fidl_common::BssDescription>,
 }
 
 impl Bss {

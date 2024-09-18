@@ -6,6 +6,8 @@
 
 #include <vector>
 
+#include <gtest/gtest.h>
+
 #include "src/cobalt/bin/app/metric_event_logger_factory_impl.h"
 #include "src/public/lib/status.h"
 #include "src/public/lib/status_codes.h"

@@ -155,7 +155,6 @@ hlcpp_visibility = [
   "//src/devices/bus/drivers/platform/test:*",
   "//src/devices/lib/sysmem:*",
   "//src/devices/securemem/drivers/aml-securemem:*",
-  "//src/devices/sysmem/bin/sysmem_connector:*",
   "//src/devices/testing/devmgr-integration-test-shim:*",
   "//src/devices/testing/driver-integration-test-shim:*",
   "//src/devices/tests/banjo-proxy:*",
@@ -360,5 +359,4 @@ hlcpp_visibility = [
   "//tools/create/goldens/my-component-test-cpp:*",
   "//zircon/kernel/lib/devicetree/tests:*",
   "//zircon/system/ulib/ktrace/*",
-  "//zircon/system/ulib/sysmem-connector:*",
 ]

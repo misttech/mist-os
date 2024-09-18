@@ -7,7 +7,7 @@
 
 #include <lib/fdio/vfs.h>
 
-#include <zxtest/zxtest.h>
+#include <gtest/gtest.h>
 
 namespace fs {
 // Helper class to check entries of a directory
@@ -41,8 +41,10 @@ class DirentChecker {
     ASSERT_GE(remaining_, entry_size);
     current_ += entry_size;
     remaining_ -= entry_size;
-    EXPECT_BYTES_EQ(reinterpret_cast<const uint8_t*>(name),
-                    reinterpret_cast<const uint8_t*>(entry->name), strlen(name), "name");
+    EXPECT_EQ(memcmp(reinterpret_cast<const uint8_t*>(name),
+                     reinterpret_cast<const uint8_t*>(entry->name), strlen(name)),
+              0)
+        << "name";
     EXPECT_EQ(VTYPE_TO_DTYPE(vtype), entry->type);
   }
 

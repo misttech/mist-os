@@ -127,7 +127,7 @@ unknown severity at time=278.14, the pretty output will look like:
 [278.14] something happened
 ```
 
-## Offline: CQ/GI
+## Offline: CQ/CI/LUCI
 
 When running tests, a [Swarming] bot invokes [botanist], which collects several output streams to be
 presented in the web UI. The `stdout` & `stderr` of botanist are what's presented in the "swarming task
@@ -154,6 +154,28 @@ Normally this includes the following notable items, all interleaved:
 
 This aggregate log is run through the equivalent of `ffx debug symbolize` before upload.
 
+### serial_log.txt
+
+This log includes serial logs from a device.
+
+### triage_output.txt
+
+This includes the results of running the [triage tool] on a snapshot collected
+from a device.
+
+### summary.json
+
+A structured output summary for test execution.
+
+### $debug
+
+Debug logs emitted during infra's recipe step execution.
+
+### $execution details
+
+The details of a recipe step, including the command run and environmental details.
+This log is often helpful for reproducing the recipe step locally.
+
 [monotonic clock]: /reference/syscalls/clock_get_monotonic.md
 [Concepts: Storage]: /docs/concepts/components/diagnostics/logs/README.md#storage
 [forwarded from the klog]: /docs/development/diagnostics/logs/recording.md#forwarding-klog-to-syslog
@@ -165,4 +187,5 @@ This aggregate log is run through the equivalent of `ffx debug symbolize` before
 [`dlog`]: /src/bringup/bin/dlog/README.md
 [botanist]: /tools/botanist/cmd/main.go
 [testrunner]: /tools/testing/testrunner/lib.go
+[triage tool]: /docs/development/diagnostics/triage/README.md
 [Swarming]: https://chromium.googlesource.com/infra/luci/luci-py/+/HEAD/appengine/swarming/doc/README.md

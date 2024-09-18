@@ -213,7 +213,7 @@ void SymbolServerImpl::Fetch(const std::string& build_id, DebugSymbolFileType fi
 
   if (!curl) {
     debug::MessageLoop::Current()->PostTask(
-        FROM_HERE, [cb = std::move(cb)]() mutable { cb(Err("Server not ready."), nullptr); });
+        FROM_HERE, [cb = std::move(cb)]() mutable { cb(Err("Server not ready."), std::string()); });
     return;
   }
 

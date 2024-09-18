@@ -16,14 +16,14 @@ source_set("main") {
   deps = [
     ":src",
     "encoding:production",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/sys/cpp",
     "//sdk/lib/syslog/cpp",
     "//src/developer/forensics/feedback:config",
     "//src/developer/forensics/feedback:redactor_factory",
     "//src/developer/forensics/feedback_data:constants",
     "//src/developer/forensics/utils/redact",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/trace-provider",
   ]
 
@@ -46,13 +46,13 @@ source_set("src") {
     "encoding:encoder",
     "//sdk/fidl/fuchsia.feedback:fuchsia.feedback_hlcpp",
     "//sdk/fidl/fuchsia.process.lifecycle:fuchsia.process.lifecycle_hlcpp",
+    "//sdk/lib/async-loop:async-loop-cpp",
     "//sdk/lib/fit-promise",
     "//sdk/lib/sys/cpp",
     "//src/developer/forensics/feedback_data:log_source",
     "//src/developer/forensics/utils:logs",
     "//src/developer/forensics/utils:storage_size",
     "//src/developer/forensics/utils/redact",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
   ]
 
   deps = [

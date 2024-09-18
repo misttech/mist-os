@@ -56,11 +56,11 @@ source_set("main") {
     ":namespace_init",
     "annotations",
     "reboot_log",
+    "//sdk/lib/async:async-cpp",
     "//sdk/lib/syslog/cpp",
     "//src/developer/forensics/utils/component",
     "//src/lib/files",
     "//src/lib/uuid",
-    "//zircon/system/ulib/async:async-cpp",
   ]
 }
 
@@ -89,6 +89,7 @@ source_set("main_service") {
     "reboot_log",
     "//sdk/fidl/fuchsia.feedback:fuchsia.feedback_hlcpp",
     "//sdk/fidl/fuchsia.process.lifecycle:fuchsia.process.lifecycle_hlcpp",
+    "//sdk/lib/async:async-cpp",
     "//sdk/lib/fit",
     "//sdk/lib/sys/cpp",
     "//src/developer/forensics/crash_reports:annotation_map",
@@ -126,7 +127,6 @@ source_set("main_service") {
     "//src/lib/backoff",
     "//src/lib/fxl",
     "//src/lib/timekeeper",
-    "//zircon/system/ulib/async:async-cpp",
     "//zircon/system/ulib/inspect",
     "//zircon/system/ulib/zx",
   ]
@@ -164,11 +164,11 @@ source_set("network_watcher") {
 
   public_deps = [
     "//sdk/fidl/fuchsia.net.interfaces:fuchsia.net.interfaces_hlcpp",
+    "//sdk/lib/async",
     "//sdk/lib/fit",
     "//sdk/lib/sys/cpp",
     "//src/connectivity/network/lib/net_interfaces/cpp",
     "//src/lib/backoff",
-    "//zircon/system/ulib/async",
   ]
 
   deps = [ "//sdk/lib/syslog/cpp" ]
@@ -197,9 +197,9 @@ source_set("stop_signals") {
     "reboot_log",
     "//sdk/fidl/fuchsia.hardware.power.statecontrol:fuchsia.hardware.power.statecontrol_hlcpp",
     "//sdk/fidl/fuchsia.process.lifecycle:fuchsia.process.lifecycle_hlcpp",
+    "//sdk/lib/async:async-cpp",
     "//sdk/lib/fit",
     "//src/developer/forensics/utils:errors",
-    "//zircon/system/ulib/async:async-cpp",
     "//zircon/system/ulib/zx",
   ]
 }

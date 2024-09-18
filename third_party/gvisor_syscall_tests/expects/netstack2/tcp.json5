@@ -77,9 +77,6 @@
                 "AllTCPSockets/AllSocketPairTest.RecvmmsgInvalidTimeout/*",
 
                 // Fuchsia does not implement recvmsg correctly for TCP.
-                "AllTCPSockets/AllSocketPairTest.SendmsgRecvmsg10KB/*",
-                "AllTCPSockets/AllSocketPairTest.SendmsgRecvmsg16KB/*",
-                "AllTCPSockets/AllSocketPairTest.SendmsgRecvmsgMsgCtruncNoop/*",
                 "AllTCPSockets/AllSocketPairTest.RecvmsgMsghdrFlagsCleared/*",
                 "AllTCPSockets/AllSocketPairTest.RecvmsgPeekMsghdrFlagsCleared/*",
 
@@ -101,9 +98,6 @@
                 "AllInetTests/TcpSocketTest.MsgTruncWithCtrunc/*",
 
                 // https://fxbug.dev/42094401
-                "AllInetTests/TcpSocketTest.MsgTruncWithCtruncOnly/*",
-
-                // https://fxbug.dev/42094401
                 "AllInetTests/TcpSocketTest.MsgTruncLargeSize/*",
 
                 // https://fxbug.dev/42094401
@@ -123,6 +117,9 @@
 
                 // https://fxbug.dev/42094401
                 "AllTCPSockets/TCPSocketPairTest.MsgTruncMsgPeek/*",
+
+                // Fuchsia does not implement IP_MTU_DISCOVER socket option.
+                "AllInetTests/SimpleTcpSocketTest.SetUnsupportedPMTUDISC/*",
             ],
         },
     ],

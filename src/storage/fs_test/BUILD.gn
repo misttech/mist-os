@@ -27,6 +27,9 @@ static_library("fs_test") {
     ":crypt_service",
     "//sdk/fidl/fuchsia.fs:fuchsia.fs_cpp",
     "//sdk/fidl/fuchsia.hardware.ramdisk:fuchsia.hardware.ramdisk_cpp",
+    "//sdk/lib/async-loop",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/device-watcher/cpp",
     "//sdk/lib/fdio",
@@ -38,9 +41,6 @@ static_library("fs_test") {
     "//src/storage/lib/fs_management/cpp:mkfs_with_default",
     "//src/storage/testing:storage_driver_test_support",
     "//third_party/rapidjson",
-    "//zircon/system/ulib/async-loop",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/fdio-caller",
   ]
   public_deps = [
@@ -125,6 +125,9 @@ test("corrupt_tests") {
     "//sdk/fidl/fuchsia.device:fuchsia.device_cpp",
     "//sdk/lib/syslog/cpp",
     "//src/lib/fxl/test:gtest_main",
+
+    # These tests use FVM even if the filesystem wouldn't normally use it.
+    "//src/storage/fvm:fvm-component",
     "//zircon/system/ulib/fbl",
   ]
 }

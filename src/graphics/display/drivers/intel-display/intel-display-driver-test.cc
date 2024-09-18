@@ -4,9 +4,9 @@
 
 #include "src/graphics/display/drivers/intel-display/intel-display-driver.h"
 
-#include <fidl/fuchsia.device.manager/cpp/test_base.h>
 #include <fidl/fuchsia.kernel/cpp/test_base.h>
 #include <fidl/fuchsia.sysmem2/cpp/wire.h>
+#include <fidl/fuchsia.system.state/cpp/test_base.h>
 #include <fuchsia/hardware/display/controller/c/banjo.h>
 #include <fuchsia/hardware/intelgpucore/c/banjo.h>
 #include <lib/async-loop/cpp/loop.h>
@@ -55,7 +55,7 @@ zx::resource CreateFakeRootResource() {
 }
 
 class FakeSystemStateTransition
-    : public fidl::testing::TestBase<fuchsia_device_manager::SystemStateTransition> {
+    : public fidl::testing::TestBase<fuchsia_system_state::SystemStateTransition> {
  public:
   FakeSystemStateTransition() = default;
   ~FakeSystemStateTransition() override = default;
@@ -65,19 +65,18 @@ class FakeSystemStateTransition
     ZX_PANIC("Not implemented: %s", name.c_str());
   }
 
-  // fuchsia_device_manager::SystemStateTransition:
+  // fuchsia_system_state::SystemStateTransition:
   void GetTerminationSystemState(GetTerminationSystemStateCompleter::Sync& completer) override {
     completer.Reply({termination_system_state_});
   }
 
-  void SetTerminationSystemState(
-      fuchsia_device_manager::SystemPowerState termination_system_state) {
+  void SetTerminationSystemState(fuchsia_system_state::SystemPowerState termination_system_state) {
     termination_system_state_ = termination_system_state;
   }
 
  private:
-  fuchsia_device_manager::SystemPowerState termination_system_state_ =
-      fuchsia_device_manager::SystemPowerState::kFullyOn;
+  fuchsia_system_state::SystemPowerState termination_system_state_ =
+      fuchsia_system_state::SystemPowerState::kFullyOn;
 };
 
 class FakeFramebufferResource
@@ -306,7 +305,7 @@ void IntegrationTest::SetUpEnvironment() {
       test_environment_.SyncCall([&](fdf_testing::internal::TestEnvironment* env) {
         return env->incoming_directory()
             .component()
-            .AddUnmanagedProtocol<fuchsia_device_manager::SystemStateTransition>(
+            .AddUnmanagedProtocol<fuchsia_system_state::SystemStateTransition>(
                 fake_system_state_transition_.bind_handler(env_dispatcher_->async_dispatcher()));
       });
   ASSERT_OK(add_system_state_transition_result);

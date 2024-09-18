@@ -7,7 +7,7 @@
 
 #include <cstddef>
 
-#include "test-start.h"
+#include "suffixed-test-start.h"
 
 namespace {
 
@@ -26,7 +26,7 @@ __CONSTINIT const RelroData relro_data{.relocated = &sym};
 
 }  // namespace
 
-extern "C" int64_t TestStart() {
+extern "C" int64_t SUFFIXED_SYMBOL(TestStart)() {
   // We need the compiler to lose provenence information on this address so it
   // can't optimize away these reads and writes knowing that this object is
   // const.

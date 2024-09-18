@@ -6,7 +6,8 @@
 //! diagnostic service APIs.
 
 use crate::{ArgType, Header, StringRef};
-use fidl_fuchsia_diagnostics_stream::{Argument, Record, Value};
+use fidl_fuchsia_diagnostics_stream::{Argument, RawSeverity, Record, Value};
+use fuchsia_zircon as zx;
 use nom::bytes::complete::take;
 use nom::multi::many0;
 use nom::number::complete::{le_f64, le_i64, le_u64};
@@ -17,6 +18,16 @@ use std::rc::Rc;
 use thiserror::Error;
 
 pub(crate) type ParseResult<'a, T> = IResult<&'a [u8], T, ParseError>;
+
+/// Extracts the basic information of a log message: timestamp and severity.
+pub fn basic_info(buf: &[u8]) -> Result<(zx::MonotonicTime, RawSeverity), nom::Err<ParseError>> {
+    let (after_header, header) = parse_header(buf)?;
+    if header.raw_type() != crate::TRACING_FORMAT_LOG_RECORD_TYPE {
+        return Err(nom::Err::Failure(ParseError::ValueOutOfValidRange));
+    }
+    let (_, timestamp) = le_i64(after_header)?;
+    Ok((zx::MonotonicTime::from_nanos(timestamp), header.severity()))
+}
 
 /// Attempt to parse a diagnostic record from the head of this buffer, returning the record and any
 /// unused portion of the buffer if successful.
@@ -182,5 +193,31 @@ impl nom::error::ParseError<&[u8]> for ParseError {
     fn append(_input: &[u8], kind: nom::error::ErrorKind, _prev: Self) -> Self {
         // TODO(https://fxbug.dev/42133514) support chaining these
         ParseError::Nom(kind)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::encode::{Encoder, EncoderOpts};
+    use fidl_fuchsia_diagnostics::Severity;
+    use std::io::Cursor;
+
+    #[fuchsia::test]
+    fn basic_structured_info() {
+        let expected_timestamp = 72;
+        let record = Record {
+            timestamp: expected_timestamp,
+            severity: Severity::Error.into_primitive(),
+            arguments: vec![],
+        };
+        let mut buffer = Cursor::new(vec![0u8; 1000]);
+        let mut encoder = Encoder::new(&mut buffer, EncoderOpts::default());
+        encoder.write_record(&record).unwrap();
+        let encoded = &buffer.get_ref().as_slice()[..buffer.position() as usize];
+
+        let (timestamp, severity) = basic_info(encoded).unwrap();
+        assert_eq!(timestamp, zx::MonotonicTime::from_nanos(expected_timestamp));
+        assert_eq!(severity, Severity::Error.into_primitive());
     }
 }

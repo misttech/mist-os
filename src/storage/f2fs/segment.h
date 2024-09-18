@@ -217,7 +217,6 @@ class SegmentManager {
   bool NeedSSR();
   bool NeedInplaceUpdate(bool is_dir);
 
-  void BalanceFs(uint32_t num_blocks = 0) __TA_EXCLUDES(f2fs::GetGlobalLock());
   void LocateDirtySegment(uint32_t segno, enum DirtyType dirty_type) __TA_REQUIRES(seglist_lock_)
       __TA_REQUIRES_SHARED(sentry_lock_);
   void RemoveDirtySegment(uint32_t segno, enum DirtyType dirty_type) __TA_REQUIRES(seglist_lock_)
@@ -339,8 +338,12 @@ class SegmentManager {
       __TA_REQUIRES_SHARED(sentry_lock_);
 
   size_t GetCostBenefitRatio(uint32_t segno) const __TA_REQUIRES_SHARED(sentry_lock_);
+  zx_status_t DoGarbageCollect(uint32_t segno, GcType gc_type);
 
   // for tests and fsck
+  void DisableFgGc() { disable_gc_for_test_ = true; }
+  void EnableFgGc() { disable_gc_for_test_ = false; }
+  bool CanGc() const { return !disable_gc_for_test_; }
   void SetCurVictimSec(uint32_t secno) TA_NO_THREAD_SAFETY_ANALYSIS { cur_victim_sec_ = secno; }
   uint32_t GetCurVictimSec() TA_NO_THREAD_SAFETY_ANALYSIS { return cur_victim_sec_; }
   block_t GetMainSegmentsCount() const { return main_segments_; }
@@ -374,6 +377,14 @@ class SegmentManager {
 
  private:
   friend class F2fsFakeDevTestFixture;
+  friend class GcTester;
+
+  zx_status_t GcNodeSegment(const SummaryBlock &sum_blk, uint32_t segno, GcType gc_type);
+  // CheckDnode() returns ino of target block and start block index of the target block's dnode
+  // block. It also checks the validity of summary.
+  zx::result<std::pair<nid_t, block_t>> CheckDnode(const Summary &sum, block_t blkaddr);
+  zx_status_t GcDataSegment(const SummaryBlock &sum_blk, unsigned int segno, GcType gc_type);
+
   uint32_t FindNextInuse(uint32_t max, uint32_t start) __TA_EXCLUDES(segmap_lock_);
   void SetFree(uint32_t segno) __TA_EXCLUDES(segmap_lock_);
   void SetInuse(uint32_t segno) __TA_REQUIRES(segmap_lock_);
@@ -445,6 +456,7 @@ class SegmentManager {
   block_t main_segments_ = 0;                                         // # of segments in main area
   block_t reserved_segments_ = 0;                                     // # of reserved segments
   block_t ovp_segments_ = 0;                                          // # of overprovision segments
+  bool disable_gc_for_test_ = false;
 };
 
 }  // namespace f2fs

@@ -13,6 +13,7 @@
 /// possible to obtain a value that is larger than what is being read (in the oob
 /// case). On the other hand, if errors cannot be corrected, the operation will
 /// fail, and corrected_bit_flips will be undefined.
+@available(added=HEAD)
 library fuchsia.hardware.nand;
 
 using fuchsia.hardware.nandinfo;

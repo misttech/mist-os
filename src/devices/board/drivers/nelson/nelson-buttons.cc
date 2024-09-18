@@ -28,7 +28,6 @@
 
 namespace nelson {
 namespace fpbus = fuchsia_hardware_platform_bus;
-using fuchsia_hardware_gpio::GpioFlags;
 
 // clang-format off
 static const buttons_button_config_t buttons[] = {
@@ -41,18 +40,10 @@ static const buttons_button_config_t buttons[] = {
 
 // No need for internal pull, external pull-ups used.
 static const buttons_gpio_config_t gpios[] = {
-    {BUTTONS_GPIO_TYPE_INTERRUPT,
-     BUTTONS_GPIO_FLAG_INVERTED,
-     {.interrupt = {static_cast<uint32_t>(GpioFlags::kPullUp)}}},
-    {BUTTONS_GPIO_TYPE_INTERRUPT,
-     BUTTONS_GPIO_FLAG_INVERTED,
-     {.interrupt = {static_cast<uint32_t>(GpioFlags::kPullUp)}}},
-    {BUTTONS_GPIO_TYPE_POLL,
-     BUTTONS_GPIO_FLAG_INVERTED,
-     {.poll = {static_cast<uint32_t>(GpioFlags::kNoPull), zx::msec(20).get()}}},
-    {BUTTONS_GPIO_TYPE_POLL,
-     0,
-     {.poll = {static_cast<uint32_t>(GpioFlags::kNoPull), zx::msec(20).get()}}},
+    {BUTTONS_GPIO_TYPE_INTERRUPT, BUTTONS_GPIO_FLAG_INVERTED, {}},
+    {BUTTONS_GPIO_TYPE_INTERRUPT, BUTTONS_GPIO_FLAG_INVERTED, {}},
+    {BUTTONS_GPIO_TYPE_POLL, BUTTONS_GPIO_FLAG_INVERTED, {.poll = {zx::msec(20).get()}}},
+    {BUTTONS_GPIO_TYPE_POLL, 0, {.poll = {zx::msec(20).get()}}},
 };
 
 zx_status_t Nelson::ButtonsInit() {

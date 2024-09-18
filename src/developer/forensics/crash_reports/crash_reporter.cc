@@ -105,16 +105,17 @@ CrashReporter::CrashReporter(
     : dispatcher_(dispatcher),
       executor_(dispatcher),
       services_(services),
+      clock_(clock),
       tags_(tags),
       crash_register_(crash_register),
       utc_clock_ready_watcher_(dispatcher_, std::move(clock_handle)),
-      utc_provider_(&utc_clock_ready_watcher_, clock),
+      utc_provider_(&utc_clock_ready_watcher_, clock_),
       crash_server_(crash_server),
       snapshot_store_(report_store->GetSnapshotStore()),
       queue_(dispatcher_, services_, info_context, tags_, report_store, crash_server_),
-      snapshot_collector_(dispatcher, clock, data_provider, report_store->GetSnapshotStore(),
+      snapshot_collector_(dispatcher, clock_, data_provider, report_store->GetSnapshotStore(),
                           &queue_, snapshot_collector_window_duration),
-      product_quotas_(dispatcher_, clock, build_type_config.daily_per_product_crash_report_quota,
+      product_quotas_(dispatcher_, clock_, build_type_config.daily_per_product_crash_report_quota,
                       feedback::kProductQuotasPath, &utc_clock_ready_watcher_,
                       product_quota_reset_offset),
       info_(info_context),
@@ -254,7 +255,7 @@ void CrashReporter::ScheduleHourlySnapshot(const zx::duration delay) {
 
         fuchsia::feedback::CrashReport report;
         report.set_program_name(kHourlySnapshotProgramName)
-            .set_program_uptime(zx_clock_get_monotonic())
+            .set_program_uptime(clock_->Now().get())
             .set_is_fatal(false)
             .set_crash_signature(kHourlySnapshotSignature);
 

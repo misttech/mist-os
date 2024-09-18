@@ -1,13 +1,8 @@
 // Copyright 2021 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+@available(added=HEAD)
 library fuchsia.wlan.internal;
-
-using fuchsia.wlan.common;
-using fuchsia.wlan.ieee80211 as ieee80211;
-
-// IEEE Std 802.11-2016, 9.4.1.4
-alias CapabilityInfo = uint16;
 
 // IEEE Std 802.11-2016 defines 12 values in dot11SupportedDataRatesRxTable and
 // 2 values for BSS Membership Selector in Table 9-78. The number of valid basic rates
@@ -17,27 +12,6 @@ alias CapabilityInfo = uint16;
 // between WLAN components during association.
 @namespaced
 const MAX_ASSOC_BASIC_RATES uint8 = 14;
-
-// IEEE Std 802.11-2016 6.3.3.3.2
-type BssDescription = struct {
-    bssid ieee80211.MacAddr;
-
-    bss_type fuchsia.wlan.common.BssType;
-    beacon_period uint16; // in TU
-    capability_info CapabilityInfo;
-
-    /// All info elements present in the beacon or probe response frame.
-    ies vector<uint8>:MAX;
-
-    // List up non-standard, Fuchsia only parameters
-    channel fuchsia.wlan.common.WlanChannel;
-    // The running average of received signal strength indicator in units of dBm. This value is
-    // updated periodically when the client is associated to an AP.
-    rssi_dbm int8; // dBm
-    // The running average of snr in units of dB. This value is updated periodically when the
-    // client is associated to an AP.
-    snr_db int8;
-};
 
 type WmmStatusResponse = struct {
     apsd bool;

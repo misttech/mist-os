@@ -95,6 +95,8 @@ executable("fidl_codec_test_bin") {
     ":list_for_test",
     ":value_proto",
     "//sdk/fidl/fuchsia.io:fuchsia.io_hlcpp",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//sdk/testing/fidl:test",
     "//sdk/testing/fidl:test_support",
     "//src/lib/fxl/test:gtest_main",
@@ -102,8 +104,6 @@ executable("fidl_codec_test_bin") {
     "//third_party/googletest:gtest",
     "//third_party/rapidjson",
     "//zircon/system/public:public",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
   ]
 }
 

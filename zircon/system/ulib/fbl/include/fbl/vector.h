@@ -97,6 +97,15 @@ struct AlignedAllocatorTraits {
 template <typename T, typename AllocatorTraits = AlignedAllocatorTraits<T>>
 class __OWNER(T) Vector {
  public:
+  // Standard C++ named requirements Container API.
+  using value_type = T;
+  using reference = T&;
+  using const_reference = const T&;
+  using iterator = T*;
+  using const_iterator = const T*;
+  using difference_type = ptrdiff_t;
+  using size_type = size_t;
+
   // move semantics only
   DISALLOW_COPY_AND_ASSIGN_ALLOW_MOVE(Vector);
 

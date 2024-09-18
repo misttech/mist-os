@@ -397,7 +397,6 @@ mod test {
         // Tests that our update loop blocks execution when run using a channel with zero capacity
         // as is done from PushSource. This verifies that each update is processed before another
         // is produced.
-        // TODO(satsukiu) - use a generator instead and remove this test.
         let mut executor = fasync::TestExecutor::new();
 
         let (sampler, _response_complete_fut) =

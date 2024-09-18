@@ -27,6 +27,7 @@ use crate::testing::writer::Writer;
 use anyhow::{Context, Error};
 use assert_matches::assert_matches;
 use fidl_fuchsia_io as fio;
+use futures::join;
 use fxfs_crypto::{Crypt, WrappedKeys};
 use fxfs_insecure_crypto::InsecureCrypt;
 use mundane::hash::{Digest, Hasher, Sha256};
@@ -1053,7 +1054,7 @@ async fn test_children_on_file() {
             &fs,
             store.as_ref(),
             vec![Item::new(
-                ObjectKey::child(object_id, "foo"),
+                ObjectKey::child(object_id, "foo", false),
                 ObjectValue::Child(ChildValue {
                     object_id,
                     object_descriptor: ObjectDescriptor::File,
@@ -1087,7 +1088,11 @@ async fn test_non_file_marked_as_verified() {
                 Item::new(
                     ObjectKey::object(10),
                     ObjectValue::Object {
-                        kind: ObjectKind::Directory { sub_dirs: 0 },
+                        kind: ObjectKind::Directory {
+                            sub_dirs: 0,
+                            wrapping_key_id: None,
+                            casefold: false,
+                        },
                         attributes: ObjectAttributes { ..Default::default() },
                     },
                 ),
@@ -1414,7 +1419,11 @@ async fn test_tombstoned_attribute_does_not_exist() {
                 Item::new(
                     ObjectKey::object(10),
                     ObjectValue::Object {
-                        kind: ObjectKind::Directory { sub_dirs: 0 },
+                        kind: ObjectKind::Directory {
+                            sub_dirs: 0,
+                            wrapping_key_id: None,
+                            casefold: false,
+                        },
                         attributes: ObjectAttributes { ..Default::default() },
                     },
                 ),
@@ -2586,4 +2595,146 @@ async fn test_full_disk() {
     }
 
     test.remount().await.expect_err("Remount succeeded");
+}
+
+#[fuchsia::test]
+async fn test_delete_volume() {
+    let mut test = FsckTest::new().await;
+    {
+        let fs = test.filesystem();
+        let root_volume = root_volume(fs.clone()).await.unwrap();
+        let store = root_volume.new_volume("vol", None).await.unwrap();
+        let root_directory =
+            Directory::open(&store, store.root_directory_object_id()).await.expect("open failed");
+        let mut transaction = fs
+            .clone()
+            .new_transaction(
+                lock_keys![LockKey::object(store.store_object_id(), root_directory.object_id())],
+                Options::default(),
+            )
+            .await
+            .expect("new_transaction failed");
+        root_directory
+            .create_child_file(&mut transaction, "child_file", None)
+            .await
+            .expect("create_child_file failed");
+        transaction.commit().await.expect("commit failed");
+        let fs_clone = fs.clone();
+        // Compact in one task while mutating the new store in another task.  This will ensure that
+        // we write out a superblock which referencs the newly created volume in
+        // journal_file_offsets.
+        join!(
+            async move {
+                fs_clone.journal().compact().await.expect("compact failed");
+            },
+            async move {
+                for i in 0..50 {
+                    let mut transaction = fs
+                        .clone()
+                        .new_transaction(
+                            lock_keys![LockKey::object(
+                                store.store_object_id(),
+                                root_directory.object_id()
+                            )],
+                            Options::default(),
+                        )
+                        .await
+                        .expect("new_transaction failed");
+                    root_directory
+                        .create_child_file(&mut transaction, &format!("child_file_{i}"), None)
+                        .await
+                        .expect("create_child_file failed");
+                    transaction.commit().await.expect("commit failed");
+                }
+            },
+        );
+    };
+    {
+        let fs = test.filesystem();
+        let root_volume = root_volume(fs.clone()).await.unwrap();
+        let transaction = fs
+            .new_transaction(
+                lock_keys![LockKey::object(
+                    root_volume.volume_directory().store().store_object_id(),
+                    root_volume.volume_directory().object_id(),
+                )],
+                Options { borrow_metadata_space: true, ..Default::default() },
+            )
+            .await
+            .expect("new_transaction failed");
+        root_volume.delete_volume("vol", transaction, || {}).await.expect("delete_volume failed");
+    }
+
+    test.remount().await.expect("Remount failed");
+    test.run(TestOptions::default()).await.expect("Fsck should succeed");
+}
+
+#[fuchsia::test]
+async fn test_casefold() {
+    let mut test = FsckTest::new().await;
+
+    for dir_is_casefold in [false, true] {
+        let fs = test.filesystem();
+        let store = fs.root_store();
+        let root_directory =
+            Directory::open(&store, store.root_directory_object_id()).await.expect("open failed");
+        let dirname = if dir_is_casefold { "casefolded" } else { "regular" };
+
+        let mut transaction = fs
+            .clone()
+            .new_transaction(
+                lock_keys![LockKey::object(store.store_object_id(), root_directory.object_id())],
+                Options::default(),
+            )
+            .await
+            .expect("new_transaction failed");
+        let child_dir = root_directory
+            .create_child_dir(&mut transaction, dirname, None)
+            .await
+            .expect("create_child_dir failed");
+        transaction.commit().await.expect("commit transaction failed");
+
+        child_dir.set_casefold(dir_is_casefold).await.expect("enable casefold");
+        let mut transaction = fs
+            .clone()
+            .new_transaction(
+                lock_keys![LockKey::object(store.store_object_id(), child_dir.object_id()),],
+                Options::default(),
+            )
+            .await
+            .expect("new_transaction failed");
+
+        // Manually add a child entry so we can add the wrong ObjectKeyData child type.
+        let handle = Directory::create_with_options(&mut transaction, &store, None, true)
+            .await
+            .expect("create_directory");
+        transaction.add(
+            child_dir.store().store_object_id(),
+            Mutation::replace_or_insert_object(
+                ObjectKey::child(child_dir.object_id(), "b", !dir_is_casefold),
+                ObjectValue::child(handle.object_id(), ObjectDescriptor::Directory),
+            ),
+        );
+        let now = Timestamp::now();
+        child_dir
+            .update_attributes(
+                &mut transaction,
+                Some(&fio::MutableNodeAttributes {
+                    modification_time: Some(now.as_nanos()),
+                    ..Default::default()
+                }),
+                1,
+                Some(now),
+            )
+            .await
+            .expect("update attributes");
+        transaction.commit().await.expect("commit transaction failed");
+    }
+
+    test.remount().await.expect("Remount failed");
+    test.run(TestOptions::default()).await.expect_err("Fsck should fail");
+    assert_matches!(
+        test.errors()[..],
+        [FsckIssue::Error(FsckError::CasefoldInconsistency(..)), ..]
+    );
 }

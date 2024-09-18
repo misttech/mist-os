@@ -32,7 +32,8 @@ class PDev {
 
   template <typename FidlType, typename = std::enable_if_t<fidl::IsFidlObject<FidlType>::value>>
   zx::result<FidlType> GetMetadata(int32_t metadata_type) const {
-    fidl::WireResult raw_metadata = pdev_->GetMetadata(metadata_type);
+    fidl::WireResult<fuchsia_hardware_platform_device::Device::GetMetadata> raw_metadata =
+        pdev_->GetMetadata(metadata_type);
     if (!raw_metadata.ok()) {
       return zx::error(raw_metadata.status());
     }

@@ -55,8 +55,8 @@ shutdown-shim
 spi
 startup
 sysinfo
+sysmem
 ?sysmem-config
-sysmem_connector
 ?ta-manager-config
 ums-function
 usb-audio
@@ -71,4 +71,5 @@ usb-hub
 usb-mass-storage
 usb-peripheral
 ?virtual-console
+?xhci
 zxcrypt

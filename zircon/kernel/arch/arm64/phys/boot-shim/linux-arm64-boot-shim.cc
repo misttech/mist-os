@@ -54,8 +54,8 @@ void PhysMain(void* flat_devicetree_blob, arch::EarlyTicks ticks) {
   InitStdout();
   ApplyRelocations();
 
-  AddressSpace aspace;
-  InitMemory(flat_devicetree_blob, &aspace);
+  // Explicitly provide `nullptr` address space, so the MMU is not set up.
+  InitMemory(flat_devicetree_blob, nullptr);
   MainSymbolize symbolize(kShimName);
 
   // Memory has been initialized, we can finish up parsing the rest of the items from the boot shim.

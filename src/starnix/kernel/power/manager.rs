@@ -10,22 +10,30 @@ use std::collections::HashSet;
 use std::sync::{Arc, Condvar, Mutex as StdMutex};
 
 use anyhow::{anyhow, Context};
-use async_utils::hanging_get::client::HangingGetStream;
 use fidl::endpoints::create_sync_proxy;
-use fuchsia_component::client::{connect_to_protocol, connect_to_protocol_sync};
+use fuchsia_component::client::connect_to_protocol_sync;
 use fuchsia_inspect_contrib::nodes::BoundedListNode;
 use fuchsia_zircon::{HandleBased, Peered};
-use futures::StreamExt;
 use once_cell::sync::OnceCell;
-use starnix_logging::{log_error, log_info, log_warn};
+use starnix_logging::{log_info, log_warn};
 use starnix_sync::{Mutex, MutexGuard};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::{errno, error};
 use {
-    fidl_fuchsia_power_broker as fbroker, fidl_fuchsia_power_suspend as fsuspend,
-    fidl_fuchsia_power_system as fsystem, fidl_fuchsia_session_power as fpower,
+    fidl_fuchsia_power_broker as fbroker, fidl_fuchsia_power_system as fsystem,
+    fidl_fuchsia_session_power as fpower, fidl_fuchsia_starnix_runner as frunner,
     fuchsia_inspect as inspect, fuchsia_zircon as zx,
 };
+
+cfg_if::cfg_if! {
+    if #[cfg(not(feature = "wake_locks"))] {
+        use async_utils::hanging_get::client::HangingGetStream;
+        use fidl_fuchsia_power_suspend as fsuspend;
+        use fuchsia_component::client::connect_to_protocol;
+        use futures::StreamExt;
+        use starnix_logging::log_error;
+    }
+}
 
 #[derive(Debug)]
 struct PowerElement {
@@ -174,7 +182,7 @@ pub type SuspendResumeManagerHandle = Arc<SuspendResumeManager>;
 
 impl SuspendResumeManager {
     /// Locks and returns the inner state of the manager.
-    fn lock(&self) -> MutexGuard<'_, SuspendResumeManagerInner> {
+    pub fn lock(&self) -> MutexGuard<'_, SuspendResumeManagerInner> {
         self.inner.lock()
     }
 
@@ -190,6 +198,7 @@ impl SuspendResumeManager {
             .into_sync_proxy();
         self.init_power_element(&activity_governor, &handoff, system_task)?;
         listener::init_listener(self, &activity_governor, system_task);
+        #[cfg(not(feature = "wake_locks"))]
         self.init_stats_watcher(system_task);
         Ok(())
     }
@@ -337,6 +346,7 @@ impl SuspendResumeManager {
             .expect("Failed to duplicate handle")
     }
 
+    #[cfg(not(feature = "wake_locks"))]
     fn update_stats(&self, stats: fsuspend::SuspendStats) {
         let stats_guard = &mut self.lock().suspend_stats;
 
@@ -358,6 +368,7 @@ impl SuspendResumeManager {
             zx::Duration::from_millis(stats.last_time_in_suspend_operations.unwrap_or_default());
     }
 
+    #[cfg(not(feature = "wake_locks"))]
     fn init_stats_watcher(self: &SuspendResumeManagerHandle, system_task: &CurrentTask) {
         let self_ref = self.clone();
         system_task.kernel().kthreads.spawn_future(async move {
@@ -387,6 +398,14 @@ impl SuspendResumeManager {
     /// Gets the suspend statistics.
     pub fn suspend_stats(&self) -> SuspendStats {
         self.lock().suspend_stats.clone()
+    }
+
+    pub fn update_suspend_stats<UpdateFn>(&self, update: UpdateFn)
+    where
+        UpdateFn: FnOnce(&mut SuspendStats),
+    {
+        let stats_guard = &mut self.lock().suspend_stats;
+        update(stats_guard);
     }
 
     /// Get the contents of the power "sync_on_suspend" file in the power
@@ -497,13 +516,16 @@ impl SuspendResumeManager {
         // Starnix will wait here on suspend.
         let suspend_result = waiter.wait();
 
-        // Synchronously update the stats after performing suspend so that a later
-        // query of stats is guaranteed to reflect the current suspend operation.
-        let stats_proxy = connect_to_protocol_sync::<fsuspend::StatsMarker>()
-            .expect("connection to fuchsia.power.suspend.Stats");
-        match stats_proxy.watch(zx::MonotonicTime::INFINITE) {
-            Ok(stats) => self.update_stats(stats),
-            Err(e) => log_warn!("failed to update stats after suspend: {e:?}"),
+        #[cfg(not(feature = "wake_locks"))]
+        {
+            // Synchronously update the stats after performing suspend so that a later
+            // query of stats is guaranteed to reflect the current suspend operation.
+            let stats_proxy = connect_to_protocol_sync::<fsuspend::StatsMarker>()
+                .expect("connection to fuchsia.power.suspend.Stats");
+            match stats_proxy.watch(zx::MonotonicTime::INFINITE) {
+                Ok(stats) => self.update_stats(stats),
+                Err(e) => log_warn!("failed to update stats after suspend: {e:?}"),
+            }
         }
 
         // Use the same "now" for all subsequent stats.
@@ -584,4 +606,31 @@ pub trait WakeLeaseInterlockOps {
 
 pub trait OnWakeOps: Send + Sync {
     fn on_wake(&self, current_task: &CurrentTask, baton_lease: &zx::Channel);
+}
+
+/// Creates a proxy between `remote_channel` and the returned `zx::Channel`.
+///
+/// The proxying is done by the Starnix runner, and allows messages on the channel to wake
+/// the container.
+pub fn create_proxy_for_wake_events(remote_channel: zx::Channel) -> (zx::Channel, zx::EventPair) {
+    let (local_proxy, kernel_channel) = zx::Channel::create();
+    let (resume_event, local_resume_event) = zx::EventPair::create();
+
+    let manager =
+        fuchsia_component::client::connect_to_protocol::<frunner::ManagerMarker>().expect("failed");
+    manager
+        .proxy_wake_channel(frunner::ManagerProxyWakeChannelRequest {
+            container_job: Some(
+                fuchsia_runtime::job_default()
+                    .duplicate(zx::Rights::SAME_RIGHTS)
+                    .expect("Failed to dup handle"),
+            ),
+            container_channel: Some(kernel_channel),
+            remote_channel: Some(remote_channel),
+            resume_event: Some(resume_event),
+            ..Default::default()
+        })
+        .expect("Failed to create proxy");
+
+    (local_proxy, local_resume_event)
 }

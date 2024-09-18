@@ -32,11 +32,4 @@
             from: "#looper",
         },
     ],
-    offer: [
-        {
-            protocol: "fuchsia.logger.LogSink",
-            from: "parent",
-            to: "#looper",
-        },
-    ],
 }

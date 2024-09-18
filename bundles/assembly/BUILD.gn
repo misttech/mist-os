@@ -164,7 +164,7 @@ assembly_input_bundle("bootstrap") {
   bootfs_packages = [
     "//src/bringup/bin/device-name-provider:package",
     "//src/bringup/bin/sysinfo:package",
-    "//src/devices/sysmem/bin/sysmem_connector:pkg",
+    "//src/sysmem/server:pkg",
     "//src/zircon/bin/role_manager:package",
   ]
 
@@ -178,7 +178,7 @@ assembly_input_bundle("bootstrap") {
           shards = [
             "//src/bringup/bin/paver/meta/paver.bootstrap_shard.cml",
             "//src/bringup/bin/sysinfo/meta/sysinfo.shard.cml",
-            "//src/devices/sysmem/bin/sysmem_connector/meta/sysmem_connector.bootstrap_shard.cml",
+            "//src/sysmem/server/meta/sysmem.bootstrap_shard.cml",
             "//src/bringup/bin/device-name-provider/meta/device-name-provider.bootstrap_shard.cml",
             "//src/zircon/bin/role_manager/meta/role_manager.bootstrap_shard.cml",
           ]
@@ -365,6 +365,7 @@ assembly_input_bundle("embeddable_userdebug") {
     # shell
     "//zircon/third_party/uapp/dash:bootfs",
   ]
+  bootfs_packages = [ "//src/developer/toolbox" ]
 }
 
 # The most minimal AIB that is included in userdebug and eng assembled systems
@@ -449,6 +450,16 @@ assembly_input_bundle("realtek_8211f_driver") {
       package_target =
           "//src/connectivity/ethernet/drivers/realtek-8211f:package"
       driver_components = [ "meta/realtek-8211f.cm" ]
+    },
+  ]
+}
+
+# AIB for the xHCI driver
+assembly_input_bundle("xhci_driver") {
+  boot_driver_packages = [
+    {
+      package_target = "//src/devices/usb/drivers/xhci:package"
+      driver_components = [ "meta/xhci.cm" ]
     },
   ]
 }
@@ -798,7 +809,7 @@ assembly_input_bundle("core_realm") {
   bootfs_packages = [ "//src/sys/pkg/bin/pkg-cache" ]
   base_packages = [
     # This is a required dependency of pkg-cache
-    "//src/sys/pkg/bin/system-update-committer:system-update-committer-without-config",
+    "//src/sys/pkg/bin/system-update-committer",
 
     # Build-Information
     "//src/developer/build_info:build-info-service",
@@ -1464,15 +1475,6 @@ assembly_input_bundle("core_realm_development_access") {
         },
       ]
     },
-    {
-      name = "toolbox"
-      components = [
-        {
-          component_name = "toolbox"
-          shards = [ "//src/developer/toolbox/meta/toolbox.cml" ]
-        },
-      ]
-    },
   ]
   shell_commands = [
     {
@@ -1707,9 +1709,6 @@ assembly_input_bundle("common_standard") {
     # Activity
     "//src/sys/activity",
 
-    # Recovery
-    "//src/recovery/factory_reset:factory_reset_pkg",
-
     # Connectivity
     "//src/connectivity/network/mdns/service:mdns",
   ]
@@ -1796,7 +1795,6 @@ assembly_input_bundle("common_standard") {
             "//src/intl/tzdata_provider/meta/tzdata_provider.core_shard.cml",
             "//src/sys/cache_manager/meta/cache_manager.core_shard.cml",
             "//src/sys/pkg/bin/system-updater/meta/system_updater.core_shard.cml",
-            "//src/recovery/factory_reset/meta/factory_reset.core_shard.cml",
           ]
         },
       ]
@@ -2091,8 +2089,8 @@ assembly_input_bundle("bluetooth_avrcp") {
 # build-types: all
 #
 assembly_input_bundle("bluetooth_core") {
+  flexible_packages = [ "//src/connectivity/bluetooth/core/bt-host" ]
   base_packages = [
-    "//src/connectivity/bluetooth/core/bt-host",
     "//src/connectivity/bluetooth/core/bt-init",
     "//src/connectivity/bluetooth/profiles/bt-rfcomm",
   ]
@@ -2115,7 +2113,9 @@ assembly_input_bundle("bluetooth_core") {
 # build-types: all
 #
 assembly_input_bundle("bluetooth_hfp_ag") {
-  flexible_packages = [ "//src/connectivity/bluetooth/profiles/bt-hfp-audio-gateway:bt-hfp-audio-gateway-default" ]
+  flexible_packages = [
+    "//src/connectivity/bluetooth/profiles/bt-hfp-audio-gateway:without-config",
+  ]
   compiled_packages = [
     {
       name = "core"
@@ -2123,6 +2123,26 @@ assembly_input_bundle("bluetooth_hfp_ag") {
         {
           component_name = "core"
           shards = [ "//src/connectivity/bluetooth/profiles/bt-hfp-audio-gateway/meta/bt-hfp-audio-gateway.core_shard.cml" ]
+        },
+      ]
+    },
+  ]
+}
+
+# Bluetooth profile support: MAP - MCE
+#
+# feature_set_levels: minimal
+# build-types: all
+#
+assembly_input_bundle("bluetooth_map_mce") {
+  flexible_packages = [ "//src/connectivity/bluetooth/profiles/bt-map-mce" ]
+  compiled_packages = [
+    {
+      name = "core"
+      components = [
+        {
+          component_name = "core"
+          shards = [ "//src/connectivity/bluetooth/profiles/bt-map-mce/meta/bt-map-mce.core_shard.cml" ]
         },
       ]
     },
@@ -4151,6 +4171,7 @@ assembly_resources_directory("resources") {
   sources = [
     "//src/developer/memory/buckets/buckets.json",
     "//src/sys/core/core_component_id_index.json5",
+    build_info_files.version,
 
     # Platform configs for the component_manager config.
     "//src/security/policy/component_manager_policy.json5",
@@ -4177,8 +4198,14 @@ assembly_resources_directory("resources") {
     "//src/lib/assembly/platform_configuration/src/subsystems/meta/tee-clients.core_shard.cml",
     "//src/media/audio/meta/multizone_leader.core_shard.cml.template",
     "//src/media/audio/meta/multizone_leader.core_shard_eng.cml",
+
+    # Default recovery logo
+    "//src/recovery/system/res/fuchsia-logo.riv",
   ]
-  deps = [ "//src/lib/icu/tzdata:revision" ]
+  deps = [
+    "//build/info:version",
+    "//src/lib/icu/tzdata:revision",
+  ]
 }
 
 # Sets a low timeout for rebooting when the device runs out-of-memory.
@@ -4189,6 +4216,11 @@ assembly_input_bundle("kernel_oom_reboot_timeout_low") {
 # Enables jobkilling when the device runs out-of-memory.
 assembly_input_bundle("kernel_oom_behavior_jobkill") {
   kernel_cmdline = [ "kernel.oom.behavior=jobkill" ]
+}
+
+# Disable kernel oom handling behavior.
+assembly_input_bundle("kernel_oom_behavior_disable") {
+  kernel_cmdline = [ "kernel.oom.enable=false" ]
 }
 
 # Enables log output to legacy serial console.
@@ -4254,6 +4286,64 @@ assembly_input_bundle("zoneinfo") {
           shards = [
             "//src/intl/tzdata_provider/meta/zoneinfo_provider.core_shard.cml",
           ]
+        },
+      ]
+    },
+  ]
+}
+
+# Assembly support for performing factory resets
+#
+# feature set levels: standard (always), utility (optionally)
+# build types: all
+assembly_input_bundle("factory_reset") {
+  base_packages = [
+    # This still needs to be configured correctly for fxblob support
+    "//src/recovery/factory_reset:factory_reset_pkg",
+  ]
+  compiled_packages = [
+    {
+      name = "core"
+      components = [
+        {
+          component_name = "core"
+          shards = [
+            "//src/recovery/factory_reset/meta/factory_reset.core_shard.cml",
+          ]
+        },
+      ]
+    },
+  ]
+}
+
+# Assembly support for recovery-fdr
+assembly_input_bundle("recovery_fdr") {
+  base_packages = [
+    # This still needs to be configured correctly for board display rotations
+    "//src/recovery/system:system_recovery_fdr",
+  ]
+  compiled_packages = [
+    {
+      name = "core"
+      components = [
+        {
+          component_name = "core"
+          shards = [ "//src/recovery/system/meta/core_shards/system_recovery_fdr.core_shard.cml" ]
+        },
+      ]
+    },
+  ]
+  config_data = [
+    {
+      package_name = "system-update-committer"
+      files = [
+        {
+          # This file is generated by GN, but its contents are always the same
+          # (the template which generates it is basically a macro, and has no
+          # product-controlled GN arguments or metadata).
+          source = "$root_build_dir/gen/src/sys/pkg/bin/system-update-committer/system_update_committer_config_disable.json"
+          destination = "config.json"
+          label = "//src/sys/pkg/bin/system-update-committer:disable"
         },
       ]
     },

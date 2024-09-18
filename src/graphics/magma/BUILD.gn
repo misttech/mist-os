@@ -14,9 +14,9 @@ source_set("msd") {
     "include/lib/magma_service/msd_defs.h",
   ]
   public_deps = [
+    "//sdk/lib/async",
     "//sdk/lib/magma_common",
     "//sdk/lib/stdcompat",
-    "//zircon/system/ulib/async",
     "//zircon/system/ulib/inspect",
     "//zircon/system/ulib/zx",
   ]

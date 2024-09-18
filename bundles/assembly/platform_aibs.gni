@@ -70,6 +70,7 @@ bootstrap_user_platform_aib_names = [
   "bt_transport_uart_driver",
   "bus_pci_driver",
   "realtek_8211f_driver",
+  "xhci_driver",
 ]
 
 # These are the userdebug platform AIBs that are used by bootstrap
@@ -118,6 +119,7 @@ bootstrap_eng_platform_aib_names = [
   # Kernel args
   "kernel_oom_reboot_timeout_low",
   "kernel_oom_behavior_jobkill",
+  "kernel_oom_behavior_disable",
   "kernel_pmm_checker_enabled",
   "kernel_pmm_checker_enabled_auto",
   "kernel_serial_legacy",
@@ -170,6 +172,7 @@ user_platform_aib_names =
       "bluetooth_avrcp",
       "bluetooth_core",
       "bluetooth_hfp_ag",
+      "bluetooth_map_mce",
       "bluetooth_snoop_eager",
       "bluetooth_snoop_lazy",
 
@@ -283,7 +286,9 @@ user_platform_aib_names =
       "kernel_evict_continuous",
 
       # Recovery
+      "factory_reset",
       "factory_reset_trigger",
+      "recovery_fdr",
 
       # Starnix
       "starnix_support",

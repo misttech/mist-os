@@ -97,7 +97,7 @@ class FuchsiaPerfResults(ABC, Generic[P, R]):
             },
         ]
         test_perf_file = os.path.join(
-            results_path, f"results.{label.lower()}.fuchsiaperf.fyi.json"
+            results_path, f"results.{label.lower()}.freeform.json"
         )
         with open(test_perf_file, "w") as f:
             json.dump(fuchsiaperf_data, f, indent=4)

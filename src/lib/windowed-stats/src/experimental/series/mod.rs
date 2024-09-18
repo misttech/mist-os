@@ -12,17 +12,21 @@ pub mod statistic;
 
 use derivative::Derivative;
 use std::convert::Infallible;
-use std::fmt::Debug;
+use std::fmt::{Debug, Display};
 use std::io;
 use std::marker::PhantomData;
+use std::num::NonZeroUsize;
 use thiserror::Error;
 
 use crate::experimental::clock::{
     MonotonicityError, ObservationTime, Tick, TimedSample, Timestamp, TimestampExt,
 };
-use crate::experimental::series::buffer::{Buffer, BufferStrategy, DeltaSimple8bRle, RingBuffer};
+use crate::experimental::series::buffer::{
+    Buffer, BufferStrategy, DeltaSimple8bRle, DeltaZigZagSimple8bRle, RingBuffer, Simple8bRle,
+    Uncompressed, ZigzagSimple8bRle,
+};
 use crate::experimental::series::interpolation::{
-    Interpolation, InterpolationFor, InterpolationState, LastAggregation, LastSample,
+    Constant, Interpolation, InterpolationFor, InterpolationState, LastAggregation, LastSample,
 };
 use crate::experimental::series::statistic::{OverflowError, PostAggregation, Statistic};
 use crate::experimental::Vec1;
@@ -61,9 +65,9 @@ pub trait Sampler<T> {
     fn fold(&mut self, sample: T) -> Result<(), Self::Error>;
 }
 
-/// A [`Sampler`] that can efficiently fold zero or more of a particular sample.
+/// A [`Sampler`] that can efficiently fold one or more of a particular sample.
 pub trait Fill<T>: Sampler<T> {
-    fn fill(&mut self, sample: T, n: usize) -> Result<(), Self::Error>;
+    fn fill(&mut self, sample: T, n: NonZeroUsize) -> Result<(), Self::Error>;
 }
 
 pub trait Interpolator {
@@ -79,8 +83,10 @@ pub trait Interpolator {
     ///
     /// This function queries the aggregations of the series. Typically, the timestamp is the
     /// current time.
-    fn interpolate_and_get_buffers(&mut self, timestamp: Timestamp)
-        -> Result<Vec<u8>, Self::Error>;
+    fn interpolate_and_get_buffers(
+        &mut self,
+        timestamp: Timestamp,
+    ) -> Result<SerializedBuffer, Self::Error>;
 }
 
 /// A buffered round-robin sampler over [timed samples][`TimedSample`] (e.g., a [`TimeMatrix`]).
@@ -90,7 +96,7 @@ pub trait Interpolator {
 ///
 /// [`TimedSample`]: crate::experimental::clock::TimedSample
 /// [`TimeMatrix`]: crate::experimental::series::TimeMatrix
-pub trait RoundRobinSampler<T>:
+pub trait MatrixSampler<T>:
     Interpolator<Error = FoldError> + Sampler<TimedSample<T>, Error = FoldError>
 {
 }
@@ -99,7 +105,9 @@ pub trait RoundRobinSampler<T>:
 ///
 /// Data semantics determine how statistics are interpreted and time series are aggregated and
 /// buffered.
-pub trait DataSemantic {}
+pub trait DataSemantic {
+    fn display() -> impl Display;
+}
 
 /// A continually increasing value.
 ///
@@ -115,7 +123,11 @@ impl BufferStrategy<u64, LastSample> for Counter {
     type Buffer = DeltaSimple8bRle;
 }
 
-impl DataSemantic for Counter {}
+impl DataSemantic for Counter {
+    fn display() -> impl Display {
+        "counter"
+    }
+}
 
 /// A fluctuating value.
 ///
@@ -123,16 +135,42 @@ impl DataSemantic for Counter {}
 #[derive(Debug)]
 pub enum Gauge {}
 
-// Gauge semantics forward this implementation to the aggregation type.
-impl<A, P> BufferStrategy<A, P> for Gauge
+impl<P> BufferStrategy<f32, P> for Gauge
 where
-    A: BufferStrategy<A, P>,
     P: Interpolation,
 {
-    type Buffer = A::Buffer;
+    type Buffer = Uncompressed<f32>;
 }
 
-impl DataSemantic for Gauge {}
+impl BufferStrategy<i64, Constant> for Gauge {
+    type Buffer = ZigzagSimple8bRle;
+}
+
+impl BufferStrategy<i64, LastAggregation> for Gauge {
+    type Buffer = DeltaZigZagSimple8bRle;
+}
+
+impl BufferStrategy<i64, LastSample> for Gauge {
+    type Buffer = DeltaZigZagSimple8bRle;
+}
+
+impl BufferStrategy<u64, Constant> for Gauge {
+    type Buffer = Simple8bRle;
+}
+
+impl BufferStrategy<u64, LastAggregation> for Gauge {
+    type Buffer = DeltaZigZagSimple8bRle;
+}
+
+impl BufferStrategy<u64, LastSample> for Gauge {
+    type Buffer = DeltaZigZagSimple8bRle;
+}
+
+impl DataSemantic for Gauge {
+    fn display() -> impl Display {
+        "gauge"
+    }
+}
 
 /// A set of Boolean values.
 ///
@@ -140,25 +178,28 @@ impl DataSemantic for Gauge {}
 #[derive(Debug)]
 pub enum BitSet {}
 
-// Bit set semantics forward this implementation to the aggregation type.
 impl<A, P> BufferStrategy<A, P> for BitSet
 where
-    A: BufferStrategy<A, P>,
+    Simple8bRle: RingBuffer<A>,
     P: Interpolation,
 {
-    type Buffer = A::Buffer;
+    type Buffer = Simple8bRle;
 }
 
-impl DataSemantic for BitSet {}
+impl DataSemantic for BitSet {
+    fn display() -> impl Display {
+        "bitset"
+    }
+}
 
 /// A buffer of data from a single time series.
 #[derive(Clone, Debug)]
-struct SerializedBuffer {
+struct SerializedTimeSeries {
     interval: SamplingInterval,
     data: Vec<u8>,
 }
 
-impl SerializedBuffer {
+impl SerializedTimeSeries {
     /// Gets the sampling interval for the aggregations in the buffer.
     pub fn interval(&self) -> &SamplingInterval {
         &self.interval
@@ -331,11 +372,18 @@ where
         Ok(())
     }
 
-    pub fn serialize_and_get_buffer(&self) -> io::Result<SerializedBuffer> {
+    pub fn serialize_and_get_buffer(&self) -> io::Result<SerializedTimeSeries> {
         let mut data = vec![];
         self.buffer.serialize(&mut data)?;
-        Ok(SerializedBuffer { interval: *self.series.interval(), data })
+        Ok(SerializedTimeSeries { interval: *self.series.interval(), data })
     }
+}
+
+/// A buffer of data from time matrix.
+#[derive(Clone, Debug, PartialEq)]
+pub struct SerializedBuffer {
+    pub data_semantic: String,
+    pub data: Vec<u8>,
 }
 
 /// One or more statistical round-robin time series.
@@ -412,7 +460,7 @@ where
     pub fn fold_and_get_buffers(
         &mut self,
         sample: TimedSample<F::Sample>,
-    ) -> Result<Vec<u8>, FoldError>
+    ) -> Result<SerializedBuffer, FoldError>
     where
         FoldError: From<F::Error>,
     {
@@ -424,7 +472,10 @@ where
         self.serialize(series_buffers).map_err(From::from)
     }
 
-    fn serialize(&self, series_buffers: Vec1<SerializedBuffer>) -> io::Result<Vec<u8>> {
+    fn serialize(
+        &self,
+        series_buffers: Vec1<SerializedTimeSeries>,
+    ) -> io::Result<SerializedBuffer> {
         use crate::experimental::clock::DurationExt;
         use byteorder::{LittleEndian, WriteBytesExt};
         use std::io::Write;
@@ -451,7 +502,10 @@ where
             buffer.write_u16::<LittleEndian>(granularity)?;
             buffer.write_all(&series.data[..len as usize - GRANULARITY_FIELD_LEN])?;
         }
-        Ok(buffer)
+        Ok(SerializedBuffer {
+            data_semantic: format!("{}", <F as Statistic>::Semantic::display()),
+            data: buffer,
+        })
     }
 }
 
@@ -511,7 +565,7 @@ where
     fn interpolate_and_get_buffers(
         &mut self,
         timestamp: Timestamp,
-    ) -> Result<Vec<u8>, Self::Error> {
+    ) -> Result<SerializedBuffer, Self::Error> {
         self.interpolate(timestamp)?;
         let series_buffers = self
             .buffers
@@ -538,7 +592,7 @@ where
     }
 }
 
-impl<F, P> RoundRobinSampler<F::Sample> for TimeMatrix<F, P>
+impl<F, P> MatrixSampler<F::Sample> for TimeMatrix<F, P>
 where
     FoldError: From<F::Error>,
     F: BufferStrategy<F::Aggregation, P> + Statistic,
@@ -556,10 +610,10 @@ mod tests {
         ArithmeticMean, LatchMax, Max, PostAggregation, Sum, Transform, Union,
     };
     use crate::experimental::series::{
-        Interpolator, RoundRobinSampler, Sampler, SamplingProfile, TimeMatrix,
+        Interpolator, MatrixSampler, Sampler, SamplingProfile, TimeMatrix,
     };
 
-    fn fold_and_interpolate_f32(sampler: &mut impl RoundRobinSampler<f32>) {
+    fn fold_and_interpolate_f32(sampler: &mut impl MatrixSampler<f32>) {
         sampler.fold(TimedSample::now(0.0)).unwrap();
         sampler.fold(TimedSample::now(1.0)).unwrap();
         sampler.fold(TimedSample::now(2.0)).unwrap();
@@ -631,6 +685,52 @@ mod tests {
     }
 
     #[test]
+    fn time_matrix_with_uncompressed_buffer() {
+        let exec = fasync::TestExecutor::new_with_fake_time();
+        exec.set_fake_time(fasync::Time::from_nanos(3_000_000_000));
+        let mut time_matrix = TimeMatrix::<ArithmeticMean<f32>, Constant>::new(
+            SamplingProfile::highly_granular(),
+            Constant::default(),
+        );
+        let buffer = time_matrix.interpolate_and_get_buffers(Timestamp::now()).unwrap();
+        assert_eq!(
+            buffer.data,
+            vec![
+                1, // version number
+                3, 0, 0, 0, // created timestamp
+                3, 0, 0, 0, // last timestamp
+                0, 0, // type: uncompressed; subtype: f32
+                4, 0, // series 1: length in bytes
+                10, 0, // series 1 granularity: 10s
+                0, 0, // number of elements
+                4, 0, // series 2: length in bytes
+                60, 0, // series 2 granularity: 60s
+                0, 0, // number of elements
+            ]
+        );
+
+        time_matrix.fold(TimedSample::now(f32::from_bits(42u32))).unwrap();
+        exec.set_fake_time(fasync::Time::from_nanos(10_000_000_000));
+        let buffer = time_matrix.interpolate_and_get_buffers(Timestamp::now()).unwrap();
+        assert_eq!(
+            buffer.data,
+            vec![
+                1, // version number
+                3, 0, 0, 0, // created timestamp
+                10, 0, 0, 0, // last timestamp
+                0, 0, // type: uncompressed; subtype: f32
+                8, 0, // series 1: length in bytes
+                10, 0, // series 1 granularity: 10s
+                1, 0, // number of elements
+                42, 0, 0, 0, // item 1
+                4, 0, // series 2: length in bytes
+                60, 0, // series 2 granularity: 60s
+                0, 0, // number of elements
+            ]
+        );
+    }
+
+    #[test]
     fn time_matrix_with_simple8b_rle_buffer() {
         let exec = fasync::TestExecutor::new_with_fake_time();
         exec.set_fake_time(fasync::Time::from_nanos(3_000_000_000));
@@ -640,7 +740,7 @@ mod tests {
         );
         let buffer = time_matrix.interpolate_and_get_buffers(Timestamp::now()).unwrap();
         assert_eq!(
-            buffer,
+            buffer.data,
             vec![
                 1, // version number
                 3, 0, 0, 0, // created timestamp
@@ -663,7 +763,7 @@ mod tests {
         exec.set_fake_time(fasync::Time::from_nanos(10_000_000_000));
         let buffer = time_matrix.interpolate_and_get_buffers(Timestamp::now()).unwrap();
         assert_eq!(
-            buffer,
+            buffer.data,
             vec![
                 1, // version number
                 3, 0, 0, 0, // created timestamp
@@ -676,6 +776,61 @@ mod tests {
                 1,    // number of values in last block
                 0x0f, // RLE selector
                 42, 0, 0, 0, 0, 0, 1, 0, // value 42 appears 1 time
+                7, 0, // series 2: length in bytes
+                60, 0, // series 2 granularity: 60s
+                0, 0, // number of selector elements and value blocks
+                0, 0, // head selector index
+                0, // number of values in last block
+            ]
+        );
+    }
+
+    #[test]
+    fn time_matrix_with_zigzag_simple8b_rle_buffer() {
+        let exec = fasync::TestExecutor::new_with_fake_time();
+        exec.set_fake_time(fasync::Time::from_nanos(3_000_000_000));
+        let mut time_matrix = TimeMatrix::<Max<i64>, Constant>::new(
+            SamplingProfile::highly_granular(),
+            Constant::default(),
+        );
+        let buffer = time_matrix.interpolate_and_get_buffers(Timestamp::now()).unwrap();
+        assert_eq!(
+            buffer.data,
+            vec![
+                1, // version number
+                3, 0, 0, 0, // created timestamp
+                3, 0, 0, 0, // last timestamp
+                1, 1, // type: simple8b RLE; subtype: signed (zigzag encoded)
+                7, 0, // series 1: length in bytes
+                10, 0, // series 1 granularity: 10s
+                0, 0, // number of selector elements and value blocks
+                0, 0, // head selector index
+                0, // number of values in last block
+                7, 0, // series 2: length in bytes
+                60, 0, // series 2 granularity: 60s
+                0, 0, // number of selector elements and value blocks
+                0, 0, // head selector index
+                0, // number of values in last block
+            ]
+        );
+
+        time_matrix.fold(TimedSample::now(-2)).unwrap();
+        exec.set_fake_time(fasync::Time::from_nanos(10_000_000_000));
+        let buffer = time_matrix.interpolate_and_get_buffers(Timestamp::now()).unwrap();
+        assert_eq!(
+            buffer.data,
+            vec![
+                1, // version number
+                3, 0, 0, 0, // created timestamp
+                10, 0, 0, 0, // last timestamp
+                1, 1, // type: simple8b RLE; subtype: signed (zigzag encoded)
+                16, 0, // series 1: length in bytes
+                10, 0, // series 1 granularity: 10s
+                1, 0, // number of selector elements and value blocks
+                0, 0,    // head selector index
+                1,    // number of values in last block
+                0x0f, // RLE selector
+                3, 0, 0, 0, 0, 0, 1, 0, // value -2 (encoded as 3) appears 1 time
                 7, 0, // series 2: length in bytes
                 60, 0, // series 2 granularity: 60s
                 0, 0, // number of selector elements and value blocks

@@ -8,8 +8,10 @@ The vulkan loader waits for GPU devices to appear, then queries them for the
 URLs of ICD components that can be used with them. The exact query depends on
 the type of GPU device:
 
-* /dev/class/gpu - [fuchsia.gpu.magma/Device.GetIcdList][GetIcdList] is called
-    on the device.
+* /dev/class/gpu - This devfs entry exposes the
+    [fuchsia.gpu.magma/CombinedDevice][CombinedDevice] protocol.
+    [fuchsia.gpu.magma/IcdLoaderDevice.GetIcdList][GetIcdList] is called on the
+    device to retrieve the URL.
 * /dev/class/goldfish-pipe: The ICD URL is hardcoded to be
     fuchsia-pkg://fuchsia.com/libvulkan_goldfish#meta/vulkan.cm
 
@@ -20,7 +22,7 @@ More types of GPU hardware devices may be supported in the future.
 ICD are made available to the loader as [CFv2 components][component]. An ICD
 component must expose a `contents` directory containing an arbitrary
 directory tree containing a shared library, as well as a `metadata` directory
-containing a single `metadata.json` file.
+containing a single [`metadata.json`](#metadata.json) file.
 
 An ICD is generally contained in its own [package]. In that case, the
 `contents` directory would be the root of the package, and the `metadata`
@@ -106,21 +108,22 @@ current state and what components it has loaded. `manifest-fs` and `device-fs`
 are also exposed in the loader component's `out/debug` directory.
 
 ```posix-terminal
-ffx component explore /core/vulkan_loader -c "cat out/debug/manifest-fs"
-ffx component explore /core/vulkan_loader -c "cat out/debug/device-fs"
+ffx component explore /core/vulkan_loader -c "ls out/debug/manifest-fs"
+ffx component explore /core/vulkan_loader -c "ls out/debug/device-fs"
 ```
 
 The loader
 service must be launched first; one way to do that is using [ffx component
 start][ffx-start].
 
-[GetIcdList]: https://fuchsia.dev/reference/fidl/fuchsia.gpu.magma#Device.GetIcdList
+[CombinedDevice]: https://fuchsia.dev/reference/fidl/fuchsia.gpu.magma#CombinedDevice
+[GetIcdList]: https://fuchsia.dev/reference/fidl/fuchsia.gpu.magma#IcdLoaderDevice.GetIcdList
 [VMO]: /docs/glossary.md#virtual-memory-object
 [ICD]: /docs/concepts/packages/system.md#vulkan-icd
 [runner]: /docs/concepts/components/v2/capabilities/runner.md
 [component]: /docs/glossary.md#component
 [package]: /docs/concepts/packages/package.md
 [component-manifest]: /docs/concepts/components/v2/component_manifests.md
-[loaderinterface]: https://github.com/KhronosGroup/Vulkan-Loader/blob/master/loader/LoaderAndLayerInterface.md
+[loaderinterface]: https://github.com/KhronosGroup/Vulkan-Loader/blob/main/docs/LoaderInterfaceArchitecture.md
 [meta-far]: /docs/concepts/packages/package.md#meta-far
 [ffx-start]: /docs/development/sdk/ffx/start-a-component-during-development.md#start-a-component

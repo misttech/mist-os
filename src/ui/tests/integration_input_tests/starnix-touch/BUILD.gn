@@ -80,7 +80,10 @@ fuchsia_test_package("starnix-touch-test") {
     "ui-client:component",
     "//src/ui/testing/test_ui_stack:test-ui-stack-component",
   ]
-  subpackages = [ "//src/starnix/kernel:starnix_kernel_package" ]
+  subpackages = [
+    "//src/starnix/kernel:starnix_kernel_package",
+    "//src/starnix/runner:starnix_package",
+  ]
   test_specs = {
     log_settings = {
       # TODO(https://fxbug.dev/42174827): Investigate removal of allowing ERROR severity.

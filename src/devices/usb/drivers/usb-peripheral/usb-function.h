@@ -100,9 +100,14 @@ class UsbFunction : public UsbFunctionType,
   void ConnectToEndpoint(ConnectToEndpointRequest& request,
                          ConnectToEndpointCompleter::Sync& completer) override;
 
+  zx_status_t AddDevice(const std::string& name);
+  bool registered() const { return function_intf_.is_valid(); }
+
  private:
   DISALLOW_COPY_ASSIGN_AND_MOVE(UsbFunction);
 
+  // |dev_added_|: true if device has already been published
+  bool dev_added_ = false;
   uint8_t configuration_;
   UsbPeripheral* peripheral_;
   ddk::UsbFunctionInterfaceProtocolClient function_intf_;

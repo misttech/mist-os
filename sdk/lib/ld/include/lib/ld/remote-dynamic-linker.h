@@ -874,8 +874,8 @@ class RemoteDynamicLinker {
   static auto FilteredModules(List& modules, Predicate&& predicate) {
     // Use a span to get a copyable view of the List, which must be used only
     // by reference.
-    cpp20::span view{modules};
-    return ld::internal::filter_view{view, std::forward<Predicate>(predicate)};
+    std::span view{modules};
+    return std::views::filter(view, std::forward<Predicate>(predicate));
   }
 
   AbiStubPtr abi_stub_;

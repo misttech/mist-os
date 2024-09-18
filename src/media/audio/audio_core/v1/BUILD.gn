@@ -103,6 +103,7 @@ source_set("audio_core_lib") {
     "//sdk/fidl/fuchsia.mediastreams:fuchsia.mediastreams_hlcpp",
     "//sdk/fidl/fuchsia.thermal:fuchsia.thermal_hlcpp",
     "//sdk/fidl/fuchsia.ultrasound:fuchsia.ultrasound_hlcpp",
+    "//sdk/lib/async-loop:async-loop-cpp",
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/fit-promise",
     "//sdk/lib/inspect/component/cpp",
@@ -120,7 +121,6 @@ source_set("audio_core_lib") {
     "//src/media/audio/lib/wav",
     "//third_party/googletest:gtest_prod",
     "//third_party/rapidjson",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/ffl",
     "//zircon/system/ulib/fzl",
     "//zircon/system/ulib/trace",
@@ -128,6 +128,7 @@ source_set("audio_core_lib") {
 
   deps = [
     "//sdk/fidl/fuchsia.scheduler:fuchsia.scheduler_hlcpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/fdio",
     "//sdk/lib/fidl/cpp",
     "//sdk/lib/fit",
@@ -135,7 +136,6 @@ source_set("audio_core_lib") {
     "//sdk/lib/sys/cpp",
     "//src/lib/fsl",
     "//src/media/audio/drivers/lib/audio-proto-utils",
-    "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/zx",
   ]
@@ -210,6 +210,8 @@ executable("unittest_bin") {
     "//sdk/fidl/fuchsia.audio.effects:fuchsia.audio.effects_hlcpp",
     "//sdk/fidl/fuchsia.hardware.audio:fuchsia.hardware.audio_hlcpp",
     "//sdk/fidl/fuchsia.scheduler:fuchsia.scheduler_hlcpp",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/fit-promise",
     "//sdk/lib/inspect/testing/cpp",
     "//sdk/lib/sys/cpp/testing:unit",
@@ -225,8 +227,6 @@ executable("unittest_bin") {
     "//src/media/audio/lib/processing:prebuilt_coefficient_tables",
     "//src/storage/lib/vfs/cpp",
     "//third_party/googletest:gmock",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/fzl",
   ]
 

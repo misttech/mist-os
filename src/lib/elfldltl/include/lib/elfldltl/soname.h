@@ -15,7 +15,6 @@
 #endif
 
 #include "abi-ptr.h"
-#include "abi-span.h"
 #include "gnu-hash.h"
 
 namespace elfldltl {
@@ -127,6 +126,21 @@ class Soname {
   using AbiMembers = Template<&Soname::name_, &Soname::size_, &Soname::hash_>;
 };
 
+inline namespace literals {
+
+consteval elfldltl::Soname<> operator""_soname(const char* str, size_t len) {
+  return elfldltl::Soname<>{std::string_view{str, len}};
+}
+
+}  // namespace literals
 }  // namespace elfldltl
+
+// This is the API contract for standard C++ hash-based containers.
+template <class Elf, class AbiTraits>
+struct std::hash<elfldltl::Soname<Elf, AbiTraits>> {
+  constexpr uint32_t operator()(const elfldltl::Soname<Elf, AbiTraits>& soname) const {
+    return soname.hash();
+  }
+};
 
 #endif  // SRC_LIB_ELFLDLTL_INCLUDE_LIB_ELFLDLTL_SONAME_H_

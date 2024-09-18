@@ -25,6 +25,8 @@ source_set("perfetto_bridge_lib") {
   ]
 
   deps = [
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/fidl/hlcpp",
     "//sdk/lib/fit",
     "//sdk/lib/sys/cpp",
@@ -33,8 +35,6 @@ source_set("perfetto_bridge_lib") {
     "//third_party/perfetto/protos/perfetto/config:cpp",
     "//third_party/perfetto/protos/perfetto/trace:non_minimal_cpp",
     "//third_party/rapidjson",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
   ]
 }
 
@@ -52,6 +52,8 @@ executable("bin") {
 
   deps = [
     ":perfetto_bridge_lib",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/component/outgoing/cpp",
     "//sdk/lib/fidl/hlcpp",
     "//sdk/lib/fidl/hlcpp",
@@ -59,8 +61,6 @@ executable("bin") {
     "//sdk/lib/sys/cpp",
     "//sdk/lib/syslog/cpp",
     "//src/lib/fxl:fxl_cli",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/trace",
     "//zircon/system/ulib/trace-provider",

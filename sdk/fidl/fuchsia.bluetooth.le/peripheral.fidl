@@ -46,7 +46,7 @@ type AdvertisingModeHint = strict enum : uint8 {
     SLOW = 3;
 };
 
-@available(added=HEAD)
+@available(added=NEXT)
 type AdvertisingProcedure = flexible union {
     /// Advertise using legacy advertising packets. All devices should be able
     /// to discover this type of packet.
@@ -99,7 +99,7 @@ type AdvertisingParameters = table {
     /// If not present, we default to legacy advertising to maintain optimal compatibility with
     /// pre-Bluetooth 5.0 devices. See field descriptions within AdvertisingProcedure for more
     /// information.
-    @available(added=HEAD)
+    @available(added=NEXT)
     6: advertising_procedure AdvertisingProcedure;
 };
 
@@ -140,7 +140,7 @@ closed protocol AdvertisedPeripheral {
 closed protocol Peripheral {
     /// A [`Peripheral`] may reserve L2CAP connection-oriented channels for
     /// receiving connections from peers.
-    @available(added=HEAD)
+    @available(added=NEXT)
     compose ChannelListenerRegistry;
 
     /// Start advertising continuously as a LE peripheral. If advertising cannot

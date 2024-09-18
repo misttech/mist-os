@@ -191,8 +191,8 @@ class MkfsTester {
 
 class GcTester {
  public:
-  static zx_status_t DoGarbageCollect(GcManager &manager, uint32_t segno, GcType gc_type);
-  static zx_status_t GcDataSegment(GcManager &manager, const SummaryBlock &sum_blk,
+  static zx_status_t DoGarbageCollect(SegmentManager &manager, uint32_t segno, GcType gc_type);
+  static zx_status_t GcDataSegment(SegmentManager &manager, const SummaryBlock &sum_blk,
                                    unsigned int segno, GcType gc_type);
 };
 

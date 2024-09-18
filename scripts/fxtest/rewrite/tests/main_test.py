@@ -20,6 +20,7 @@ from parameterized import parameterized
 import args
 import environment
 import event
+import log
 import main
 import test_list_file
 
@@ -162,7 +163,7 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
             self.test_list_input
         )
         m = mock.AsyncMock(return_value=test_list_entries)
-        patch = mock.patch("main.generate_test_list", m)
+        patch = mock.patch("main.AsyncMain._generate_test_list", m)
         patch.start()
         self.addCleanup(patch.stop)
         return m
@@ -882,4 +883,181 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
             except json.JSONDecodeError as e:
                 self.fail(
                     f"Failed to parse line as JSON.\nLine: {line}\nError: {e}"
+                )
+
+    async def test_artifact_options(self) -> None:
+        """Test that we handle artifact output directories and can query their value"""
+
+        self._mock_run_command(0)
+        self._mock_subprocess_call(0)
+        self._mock_has_device_connected(True)
+        self._mock_has_tests_in_base([])
+
+        with self.subTest("no artifact path still produces empty event"):
+            with tempfile.TemporaryDirectory() as td:
+                logpath = os.path.join(td, "log.json.gz")
+                flags = args.parse_args(["--simple", "--logpath", logpath])
+                ret = await main.async_main_wrapper(flags)
+                self.assertEqual(ret, 0)
+
+                env = environment.ExecutionEnvironment.initialize_from_args(
+                    flags, create_log_file=False
+                )
+
+                artifact_path: str | None = None
+                for log_entry in log.LogSource.from_env(env).read_log():
+                    if (event := log_entry.log_event) is not None:
+                        if (
+                            event.payload is not None
+                            and (path := event.payload.artifact_directory_path)
+                            is not None
+                        ):
+                            artifact_path = path
+                    self.assertIsNone(log_entry.error)
+                    self.assertIsNone(log_entry.warning)
+                self.assertEqual(artifact_path, "")
+
+                # Using the output log file, we should get an error requesting the artifact output.
+                stderr = io.StringIO()
+                with contextlib.redirect_stderr(stderr):
+                    ret = main.do_process_previous(
+                        args.parse_args(
+                            [
+                                "-pr",
+                                "artifact-path",
+                                "--logpath",
+                                logpath,
+                            ]
+                        )
+                    )
+                    self.assertNotEqual(ret, 0)
+
+                lines = stderr.getvalue().splitlines()
+                self.assertEqual(
+                    lines,
+                    [
+                        "ERROR: The previous run did not specify --artifact-output-directory. Run again with that flag set to get the path."
+                    ],
+                )
+
+        with self.subTest(
+            "artifact path by default goes to the top level directory"
+        ):
+            with tempfile.TemporaryDirectory() as td:
+                logpath = os.path.join("log.json.gz")
+                artifact_root = os.path.join(td, "artifacts")
+                flags = args.parse_args(
+                    [
+                        "--simple",
+                        "--logpath",
+                        logpath,
+                        "--outdir",
+                        artifact_root,
+                    ]
+                )
+                ret = await main.async_main_wrapper(flags)
+                self.assertEqual(ret, 0)
+
+                env = environment.ExecutionEnvironment.initialize_from_args(
+                    flags, create_log_file=False
+                )
+
+                artifact_path = None
+                for log_entry in log.LogSource.from_env(env).read_log():
+                    if (event := log_entry.log_event) is not None:
+                        if (
+                            event.payload is not None
+                            and (path := event.payload.artifact_directory_path)
+                            is not None
+                        ):
+                            artifact_path = path
+                    self.assertIsNone(log_entry.error)
+                    self.assertIsNone(log_entry.warning)
+                self.assertEqual(artifact_path, artifact_root)
+
+                # Using the output log file, we should still see an error getting the path because the directory will not be present.
+                stderr = io.StringIO()
+                with contextlib.redirect_stderr(stderr):
+                    ret = main.do_process_previous(
+                        args.parse_args(
+                            [
+                                "-pr",
+                                "artifact-path",
+                                "--logpath",
+                                logpath,
+                            ]
+                        )
+                    )
+                    self.assertNotEqual(ret, 0)
+
+                lines = stderr.getvalue().splitlines()
+                self.assertEqual(
+                    lines,
+                    [
+                        "ERROR: The artifact directory is missing, it may have been deleted."
+                    ],
+                )
+
+                # Create the artifact directory. Listing artifact path should work now.
+                os.makedirs(artifact_root)
+                stdout = mock.MagicMock(wraps=io.StringIO())
+                stdout.fileno = lambda: -1
+                with contextlib.redirect_stdout(stdout):
+                    ret = main.do_process_previous(
+                        args.parse_args(
+                            [
+                                "-pr",
+                                "artifact-path",
+                                "--logpath",
+                                logpath,
+                            ]
+                        )
+                    )
+                    self.assertEqual(ret, 0)
+
+                lines = stdout.getvalue().splitlines()
+                self.assertEqual(
+                    lines,
+                    [artifact_root],
+                )
+
+        with self.subTest(
+            "--timestamp-artifacts causes artifacts to go to subdir"
+        ):
+            with tempfile.TemporaryDirectory() as td:
+                logpath = os.path.join("log.json.gz")
+                artifact_root = os.path.join(td, "artifacts")
+                flags = args.parse_args(
+                    [
+                        "--simple",
+                        "--logpath",
+                        logpath,
+                        "--outdir",
+                        artifact_root,
+                        "--timestamp-artifacts",
+                    ]
+                )
+                ret = await main.async_main_wrapper(flags)
+                self.assertEqual(ret, 0)
+
+                env = environment.ExecutionEnvironment.initialize_from_args(
+                    flags, create_log_file=False
+                )
+
+                artifact_path = None
+                for log_entry in log.LogSource.from_env(env).read_log():
+                    if (event := log_entry.log_event) is not None:
+                        if (
+                            event.payload is not None
+                            and (path := event.payload.artifact_directory_path)
+                            is not None
+                        ):
+                            artifact_path = path
+                    self.assertIsNone(log_entry.error)
+                    self.assertIsNone(log_entry.warning)
+                self.assertNotEqual(artifact_path, artifact_root)
+                assert artifact_path is not None
+                self.assertEqual(
+                    os.path.commonprefix([artifact_path, artifact_root]),
+                    artifact_root,
                 )

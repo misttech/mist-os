@@ -19,20 +19,20 @@ sdk_source_set("io") {
   ]
 
   deps = [
+    "//sdk/lib/async-default",
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/fdio",
     "//src/zircon/lib/zircon",
-    "//zircon/system/ulib/async-default",
   ]
 
   public_deps = [
     "//sdk/fidl/fuchsia.io:fuchsia.io_cpp",
+    "//sdk/lib/async:async-cpp",
     "//sdk/lib/fit",
     "//sdk/lib/syslog/cpp",
     "//src/lib/files",
     "//src/lib/fxl:common",
     "//src/lib/fxl:memory",
-    "//zircon/system/ulib/async:async-cpp",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/fzl",
     "//zircon/system/ulib/zx",

@@ -14,8 +14,8 @@ group("bootfs-tests") {
     "//src/bringup/bin/sysinfo:sysinfo-bootfs-test",
     "//src/bringup/tests/bootfs_test:running-on-bootfs-test",
     "//src/devices/board/lib/smbios:smbios-bootfs-test",
-    "//src/devices/sysmem/tests/sysmem:sysmem-bootfs-test-v1",
-    "//src/devices/sysmem/tests/sysmem:sysmem-bootfs-test-v2",
+    "//src/sysmem/tests/sysmem:sysmem-bootfs-test-v1",
+    "//src/sysmem/tests/sysmem:sysmem-bootfs-test-v2",
 
     # The devcoordinator-namespace-test assumes the root filesystem and can't
     # be migrated as packages are given their own local filesystem.

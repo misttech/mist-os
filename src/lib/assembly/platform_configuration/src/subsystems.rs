@@ -255,7 +255,7 @@ fn configure_subsystems(
 
     bluetooth::BluetoothSubsystemConfig::define_configuration(
         &context_base.for_subsystem("bluetooth"),
-        &platform.bluetooth,
+        &(&platform.bluetooth, &platform.media),
         builder,
     )
     .context("Configuring the `bluetooth` subsystem")?;

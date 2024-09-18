@@ -21,7 +21,6 @@ use std::path::PathBuf;
 pub async fn convert_bundle_to_configs(
     product_bundle: &ProductBundle,
     device_name: Option<String>,
-    verbose: bool,
 ) -> Result<EmulatorConfiguration> {
     match &product_bundle {
         ProductBundle::V2(product_bundle) => {
@@ -54,12 +53,11 @@ pub async fn convert_bundle_to_configs(
             let virtual_device = match virtual_device {
                 VirtualDevice::V1(v) => v,
             };
-            if verbose {
-                eprintln!(
-                    "Found PBM: {:#?}\nVirtual Device: {:#?}",
-                    &product_bundle, &virtual_device
-                );
-            }
+            tracing::debug!(
+                "Found PBM: {:#?}\nVirtual Device: {:#?}",
+                &product_bundle,
+                &virtual_device
+            );
             convert_v2_bundle_to_configs(&product_bundle, &virtual_device)
         }
     }

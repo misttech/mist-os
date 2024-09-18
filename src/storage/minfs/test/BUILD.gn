@@ -37,6 +37,8 @@ test("minfs_unit") {
     "unit/vnode_mapper_test.cc",
   ]
   deps = [
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//src/lib/fxl/test:gtest_main",
     "//src/storage/fvm",
     "//src/storage/lib/block_client/cpp",
@@ -47,8 +49,6 @@ test("minfs_unit") {
     "//src/storage/minfs/inspector",
     "//third_party/googletest:gmock",
     "//third_party/googletest:gtest",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/bitmap",
     "//zircon/system/ulib/sync",
     "//zircon/system/ulib/zircon-internal",
@@ -69,6 +69,12 @@ test("minfs-integration") {
   ]
   deps = [
     "//sdk/fidl/fuchsia.io:fuchsia.io_cpp",
+    "//sdk/lib/async",
+    "//sdk/lib/async:async-cpp",
+    "//sdk/lib/async-default",
+    "//sdk/lib/async-loop",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/component/incoming/cpp",
     "//src/lib/fxl/test:gtest_main",
     "//src/storage/fs_test",
@@ -77,12 +83,6 @@ test("minfs-integration") {
     "//src/storage/minfs",
     "//third_party/googletest:gmock",
     "//third_party/googletest:gtest",
-    "//zircon/system/ulib/async",
-    "//zircon/system/ulib/async:async-cpp",
-    "//zircon/system/ulib/async-default",
-    "//zircon/system/ulib/async-loop",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/fdio-caller",
     "//zircon/system/ulib/zx",
@@ -110,16 +110,16 @@ test("minfs-power") {
   sources = [ "integration/power_test.cc" ]
   deps = [
     "//sdk/fidl/fuchsia.io:fuchsia.io_cpp",
+    "//sdk/lib/async",
+    "//sdk/lib/async:async-cpp",
+    "//sdk/lib/async-default",
+    "//sdk/lib/async-loop",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//src/lib/fxl/test:gtest_main",
     "//src/storage/fs_test",
     "//src/storage/minfs",
     "//third_party/googletest:gtest",
-    "//zircon/system/ulib/async",
-    "//zircon/system/ulib/async:async-cpp",
-    "//zircon/system/ulib/async-default",
-    "//zircon/system/ulib/async-loop",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/zx",
   ]
 }
@@ -149,15 +149,15 @@ test("minfs_component_runner_test") {
   deps = [
     "//sdk/fidl/fuchsia.fs:fuchsia.fs_cpp",
     "//sdk/fidl/fuchsia.io:fuchsia.io_cpp",
+    "//sdk/lib/async-loop",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/fdio",
     "//src/lib/fxl/test:gtest_main",
     "//src/storage/fidl/fuchsia.fs.startup:fuchsia.fs.startup_cpp",
     "//src/storage/lib/block_client/cpp:fake_device",
     "//src/storage/minfs",
-    "//zircon/system/ulib/async-loop",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/id_allocator",
     "//zircon/system/ulib/zx",
   ]
@@ -170,10 +170,10 @@ storage_driver_test_realm_v2_component("minfs-integration-fs-tests") {
 fuchsia_library_fuzzer("minfs-fuzzer") {
   sources = [ "unit/fuzz.cc" ]
   deps = [
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//src/storage/lib/block_client/cpp:fake_device",
     "//src/storage/minfs",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/bitmap",
     "//zircon/system/ulib/zircon-internal",
     "//zircon/system/ulib/zx",
@@ -236,6 +236,7 @@ fs_test_suite("minfs") {
   deps = [
     ":minfs_fs_test_config",
     ":minfs_validate_fs_test_config",
+    "//src/storage/fvm:fvm-component",
     "//src/storage/minfs/bin:minfs-test-component",
   ]
   extra_components = [
@@ -271,6 +272,7 @@ slow_fs_test_suite("minfs") {
   deps = [
     ":minfs_fs_test_config",
     ":minfs_validate_fs_test_config",
+    "//src/storage/fvm:fvm-component",
     "//src/storage/minfs/bin:minfs-test-component",
   ]
 

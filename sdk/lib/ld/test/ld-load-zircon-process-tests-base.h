@@ -5,6 +5,7 @@
 #ifndef LIB_LD_TEST_LD_LOAD_ZIRCON_PROCESS_TESTS_BASE_H_
 #define LIB_LD_TEST_LD_LOAD_ZIRCON_PROCESS_TESTS_BASE_H_
 
+#include <lib/elfldltl/soname.h>
 #include <lib/ld/testing/test-processargs.h>
 #include <lib/zx/process.h>
 #include <lib/zx/thread.h>
@@ -21,7 +22,9 @@ class LdLoadZirconProcessTestsBase : public LdLoadZirconLdsvcTestsBase {
  public:
   // The Fuchsia test executables (via modules/zircon-test-start.cc) link
   // directly to the vDSO, so it appears before other modules.
-  static constexpr std::string_view kTestExecutableNeedsVdso = "libzircon.so";
+  static constexpr std::optional<elfldltl::Soname<>> kTestExecutableNeedsVdso{
+      "libzircon.so",
+  };
 
   static constexpr int64_t kRunFailureForTrap = ZX_TASK_RETCODE_EXCEPTION_KILL;
   static constexpr int64_t kRunFailureForBadPointer = ZX_TASK_RETCODE_EXCEPTION_KILL;

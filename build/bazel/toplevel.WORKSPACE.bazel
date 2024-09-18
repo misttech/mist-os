@@ -92,11 +92,12 @@ local_repository(
     path = "third_party/github.com/google/emboss/src",
 )
 
-# The repository containing common definitions for the Fuchsia platform build
-# and the Fuchsia Bazel SDK rules.
+# Create the @fuchsia_sdk_common repository that
+# only exposes the shared definitions from @fuchsia_sdk//common
+# and nothing else.
 local_repository(
     name = "fuchsia_sdk_common",
-    path = "build/bazel_sdk/bazel_rules_fuchsia/common",
+    path = "build/bazel/local_repositories/fuchsia_sdk_common",
 )
 
 # Create the @fuchsia_build_config repository which contains the defs.bzl file
@@ -104,7 +105,7 @@ local_repository(
 # the Fuchsia platform build.
 # buildifier: disable=load-on-top
 load(
-    "@fuchsia_sdk_common//:fuchsia_platform_build.bzl",
+    "@fuchsia_sdk_common//common:fuchsia_platform_build.bzl",
     "fuchsia_build_config_repository",
 )
 
@@ -344,7 +345,7 @@ register_toolchains("@prebuilt_clang//:host_clang_%s_arm64_cc_toolchain" % fuchs
 
 # buildifier: disable=load-on-top
 load(
-    "@fuchsia_sdk_common//:toolchains/python/repository_rule.bzl",
+    "@fuchsia_sdk_common//common:toolchains/python/repository_rule.bzl",
     "compact_python_runtime_repository",
 )
 

@@ -10,6 +10,33 @@ load("@fuchsia_sdk//fuchsia:defs.bzl", "fuchsia_debug_symbols", "fuchsia_toolcha
 load("@fuchsia_sdk//fuchsia/workspace:sdk_host_tool.bzl", "sdk_host_tool")
 load("api_version.bzl", "DEFAULT_TARGET_API")
 
+load("//:generated_constants.bzl", sdk_constants = "constants")
+
+_TO_BAZEL_CPU_MAP = {
+    "x64": "x86_64",
+    "arm64": "aarch64",
+}
+
+TARGET_CPUS = [cpu for cpu in sdk_constants.target_cpus]
+
+[
+    filegroup(
+        name = "fuchsia-sysroot-headers-" + _TO_BAZEL_CPU_MAP.get(cpu, cpu),
+        srcs = glob(["arch/" + cpu + "/sysroot/include/**"]),
+        visibility = [ "//visibility:public" ],
+    )
+    for cpu in TARGET_CPUS
+]
+
+[
+    filegroup(
+        name = "fuchsia-sysroot-libraries-" + _TO_BAZEL_CPU_MAP.get(cpu, cpu),
+        srcs = glob(["arch/" + cpu + "/sysroot/lib/**"]),
+        visibility = [ "//visibility:public" ],
+    )
+    for cpu in TARGET_CPUS
+]
+
 # Export all files directly within this package as individual targets.
 exports_files(glob(["**/*"]))
 

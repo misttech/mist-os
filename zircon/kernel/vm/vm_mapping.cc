@@ -43,6 +43,70 @@ KCOUNTER(vm_mappings_protect_no_write, "vm.aspace.mapping.protect_without_write"
 
 }  // namespace
 
+// Helper class for managing the logic of skipping certain unmap operations for in progress faults.
+// This is expected to be stack allocated under the object lock and the object lock must not be
+// dropped over its lifetime.
+// Creating this object creates a contract where the caller will either update the mapping for this
+// location and call Success, or this object will automatically unmap the location if necessary.
+class VmMapping::CurrentlyFaulting {
+ public:
+  CurrentlyFaulting(VmMapping* mapping, uint64_t object_offset) TA_REQ(mapping->object_->lock())
+      : mapping_(mapping), object_offset_(object_offset) {
+    DEBUG_ASSERT(mapping->currently_faulting_ == nullptr);
+    mapping->currently_faulting_ = this;
+  }
+  ~CurrentlyFaulting() {
+    // If the caller did not call Success, and an unmap was skipped, then we must unmap the range
+    // ourselves. We only do the unmap here if a prior unmap was skipped to avoid needless unmaps
+    // due to transient errors such as needing to wait on a page request.
+    if (state_ == State::UnmapSkipped) {
+      vaddr_t base;
+      size_t new_len;
+      bool valid_range =
+          mapping_->ObjectRangeToVaddrRange(object_offset_, PAGE_SIZE, &base, &new_len);
+      ASSERT(valid_range);
+      ASSERT(new_len == PAGE_SIZE);
+      zx_status_t status = mapping_->aspace_->arch_aspace().Unmap(
+          base, new_len / PAGE_SIZE, mapping_->aspace_->EnlargeArchUnmap(), nullptr);
+      ASSERT(status == ZX_OK);
+    }
+    mapping_->currently_faulting_ = nullptr;
+  }
+
+  // Called to say that the given range needs to be unmapped. This returns true if updating the
+  // range will be handled by the faulting thread and that the unmap can therefore be skipped.
+  // Returns false if the caller should unmap themselves.
+  bool UnmapRange(uint64_t object_offset, uint64_t len) {
+    DEBUG_ASSERT(state_ != State::Completed);
+    if (Intersects(object_offset, len)) {
+      state_ = State::UnmapSkipped;
+      return true;
+    }
+    return false;
+  }
+
+  // Called to indicate that the mapping for the fault location has been updated successfully. This
+  // acts to cancel the unmap that would otherwise happen when this object goes out of scope.
+  void MappingUpdated() { state_ = State::Completed; }
+
+  DISALLOW_COPY_ASSIGN_AND_MOVE(CurrentlyFaulting);
+
+ private:
+  bool Intersects(uint64_t object_offset, uint64_t len) const {
+    return object_offset == object_offset_;
+  }
+  // Reference back to the original mapping.
+  VmMapping* mapping_;
+  // The offset, in object space, of the page fault.
+  uint64_t object_offset_;
+  enum class State {
+    NoUnmapNeeded,
+    UnmapSkipped,
+    Completed,
+  };
+  State state_ = State::NoUnmapNeeded;
+};
+
 VmMapping::VmMapping(VmAddressRegion& parent, vaddr_t base, size_t size, uint32_t vmar_flags,
                      fbl::RefPtr<VmObject> vmo, uint64_t vmo_offset,
                      MappingProtectionRanges&& ranges, Mergeable mergeable)
@@ -418,7 +482,8 @@ bool VmMapping::ObjectRangeToVaddrRange(uint64_t offset, uint64_t len, vaddr_t* 
   return true;
 }
 
-void VmMapping::AspaceUnmapLockedObject(uint64_t offset, uint64_t len) const {
+void VmMapping::AspaceUnmapLockedObject(uint64_t offset, uint64_t len,
+                                        bool only_has_zero_pages) const {
   canary_.Assert();
 
   // NOTE: must be acquired with the vmo lock held, but doesn't need to take
@@ -435,6 +500,15 @@ void VmMapping::AspaceUnmapLockedObject(uint64_t offset, uint64_t len) const {
   // modified. Therefore it's correct to read object_ here for the purposes of an assert, but cannot
   // be expressed nicely with regular annotations.
   [&]() TA_NO_THREAD_SAFETY_ANALYSIS { DEBUG_ASSERT(object_); }();
+
+  // In the case of unmapping known instances of the zero page check if this range intersects with
+  // an in progress fault. If it does we can skip the unmap with the knowledge that the mapping will
+  // be updated later. This is safe since the zero page is, by definition, only mapped read only,
+  // and is never modified so delaying the update of the mapping cannot cause either any users to
+  // see incorrect data, or users to be able to modify an old mapping.
+  if (only_has_zero_pages && currently_faulting_ && currently_faulting_->UnmapRange(offset, len)) {
+    return;
+  }
 
   LTRACEF("region %p obj_offset %#" PRIx64 " size %zu, offset %#" PRIx64 " len %#" PRIx64 "\n",
           this, object_offset_locked_object(), size_, offset, len);
@@ -980,6 +1054,8 @@ zx_status_t VmMapping::PageFaultLocked(vaddr_t va, const uint pf_flags,
   // Trim out pages to the limit of the VMO.
   max_out_pages = ktl::min(max_out_pages, (vmo_size - vmo_offset) / PAGE_SIZE);
 
+  CurrentlyFaulting currently_faulting(this, vmo_offset);
+
   __UNINITIALIZED VmMappingCoalescer<kMaxPages> coalescer(
       this, va, range.mmu_flags, ArchVmAspace::ExistingEntryAction::Upgrade);
 
@@ -1063,7 +1139,13 @@ zx_status_t VmMapping::PageFaultLocked(vaddr_t va, const uint pf_flags,
 
   VM_KTRACE_DURATION(2, "map_page", ("va", ktrace::Pointer{va}), ("pf_flags", pf_flags));
 
-  return coalescer.Flush();
+  zx_status_t status = coalescer.Flush();
+  if (status == ZX_OK) {
+    // Mapping has been successfully updated by us. Inform the faulting helper so that it knows not
+    // to unmap the range instead.
+    currently_faulting.MappingUpdated();
+  }
+  return status;
 }
 
 void VmMapping::ActivateLocked() {

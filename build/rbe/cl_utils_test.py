@@ -1113,15 +1113,27 @@ class SubprocessResultTests(unittest.TestCase):
         self.assertEqual(result.stdout_text, "")
         self.assertEqual(result.stderr_text, "")
 
+        output = io.StringIO()
+        with contextlib.redirect_stdout(output):
+            self.assertEqual(result.verbose_returncode("process"), 3)
+        self.assertEqual(output.getvalue(), "")
+
     def test_with_output(self) -> None:
-        result = cl_utils.SubprocessResult(
-            1, stdout=["foo", "bar"], stderr=["baz"]
-        )
+        stdout = ["foo", "bar"]
+        stderr = ["baz"]
+        result = cl_utils.SubprocessResult(1, stdout=stdout, stderr=stderr)
         self.assertEqual(result.returncode, 1)
-        self.assertEqual(result.stdout, ["foo", "bar"])
-        self.assertEqual(result.stderr, ["baz"])
+        self.assertEqual(result.stdout, stdout)
+        self.assertEqual(result.stderr, stderr)
         self.assertEqual(result.stdout_text, "foo\nbar")
         self.assertEqual(result.stderr_text, "baz")
+
+        output = io.StringIO()
+        with contextlib.redirect_stdout(output):
+            self.assertEqual(result.verbose_returncode("process"), 1)
+        printed_lines = output.getvalue().splitlines()
+        important_lines = [l for l in printed_lines if "----" not in l]
+        self.assertEqual(important_lines, stdout + stderr)
 
 
 class SubprocessCallTests(unittest.TestCase):

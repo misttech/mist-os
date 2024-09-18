@@ -80,7 +80,137 @@ size_t UsbVirtualHost::UsbHciGetRequestSize() { return bus_->UsbHciGetRequestSiz
 
 void UsbVirtualHost::ConnectToEndpoint(ConnectToEndpointRequest& request,
                                        ConnectToEndpointCompleter::Sync& completer) {
-  completer.Reply(fit::as_error(ZX_ERR_NOT_SUPPORTED));
+  uint8_t index = EpAddressToIndex(request.ep_addr());
+  if (index >= USB_MAX_EPS) {
+    printf("usb_virtual_bus_host_queue bad endpoint %u\n", request.ep_addr());
+    return completer.Reply(zx::error(ZX_ERR_INVALID_ARGS));
+  }
+
+  if (eps_[index].has_value()) {
+    return completer.Reply(zx::error(ZX_ERR_ALREADY_BOUND));
+  }
+
+  async::PostTask(bus_->device_dispatcher(), [this, index, req = std::move(request),
+                                              cmp = completer.ToAsync()]() mutable {
+    eps_[index].emplace(bus_->ep(index), fdf::Dispatcher::GetCurrent()->async_dispatcher(),
+                        std::move(req.ep()));
+    cmp.Reply(zx::ok());
+  });
+}
+
+UsbVirtualHost::~UsbVirtualHost() {
+  libsync::Completion wait;
+  async::PostTask(bus_->device_dispatcher(), [this, &wait]() mutable {
+    for (auto& ep : eps_) {
+      ep.reset();
+    }
+    wait.Signal();
+  });
+  wait.Wait();
+}
+
+void UsbVirtualHost::UsbEpServer::OnFidlClosed(fidl::UnbindInfo) {
+  for (const auto& [_, registered_vmo] : registered_vmos_) {
+    auto status = zx::vmar::root_self()->unmap(registered_vmo.addr, registered_vmo.size);
+    if (status != ZX_OK) {
+      zxlogf(ERROR, "Failed to unmap VMO %d", status);
+      continue;
+    }
+  }
+}
+
+void UsbVirtualHost::UsbEpServer::RegisterVmos(RegisterVmosRequest& request,
+                                               RegisterVmosCompleter::Sync& completer) {
+  std::vector<fuchsia_hardware_usb_endpoint::VmoHandle> vmos;
+  for (const auto& info : request.vmo_ids()) {
+    ZX_ASSERT(info.id());
+    ZX_ASSERT(info.size());
+    auto id = *info.id();
+    auto size = *info.size();
+
+    if (registered_vmos_.find(id) != registered_vmos_.end()) {
+      zxlogf(ERROR, "VMO ID %lu already registered", id);
+      continue;
+    }
+
+    zx::vmo vmo;
+    auto status = zx::vmo::create(size, 0, &vmo);
+    if (status != ZX_OK) {
+      zxlogf(ERROR, "Failed to pin registered VMO %d", status);
+      continue;
+    }
+
+    // Map VMO.
+    zx_vaddr_t mapped_addr;
+    status = zx::vmar::root_self()->map(ZX_VM_PERM_READ | ZX_VM_PERM_WRITE, 0, vmo, 0, size,
+                                        &mapped_addr);
+    if (status != ZX_OK) {
+      zxlogf(ERROR, "Failed to map the vmo: %d", status);
+      // Try for the next one.
+      continue;
+    }
+
+    // Save
+    vmos.emplace_back(
+        std::move(fuchsia_hardware_usb_endpoint::VmoHandle().id(id).vmo(std::move(vmo))));
+    registered_vmos_.emplace(id, usb::MappedVmo{mapped_addr, size});
+  }
+
+  completer.Reply({std::move(vmos)});
+}
+
+void UsbVirtualHost::UsbEpServer::UnregisterVmos(UnregisterVmosRequest& request,
+                                                 UnregisterVmosCompleter::Sync& completer) {
+  std::vector<zx_status_t> errors;
+  std::vector<uint64_t> failed_vmo_ids;
+  for (const auto& id : request.vmo_ids()) {
+    auto registered_vmo = registered_vmos_.extract(id);
+    if (registered_vmo.empty()) {
+      failed_vmo_ids.emplace_back(id);
+      errors.emplace_back(ZX_ERR_NOT_FOUND);
+      continue;
+    }
+
+    auto status =
+        zx::vmar::root_self()->unmap(registered_vmo.mapped().addr, registered_vmo.mapped().size);
+    if (status != ZX_OK) {
+      zxlogf(ERROR, "Failed to unmap VMO %d", status);
+      failed_vmo_ids.emplace_back(id);
+      errors.emplace_back(status);
+      continue;
+    }
+  }
+  completer.Reply({std::move(failed_vmo_ids), std::move(errors)});
+}
+
+void UsbVirtualHost::UsbEpServer::QueueRequests(QueueRequestsRequest& request,
+                                                QueueRequestsCompleter::Sync& completer) {
+  for (auto& req : request.req()) {
+    ep_->QueueRequest(usb::FidlRequest{std::move(req)});
+  }
+}
+
+void UsbVirtualHost::UsbEpServer::CancelAll(CancelAllCompleter::Sync& completer) {
+  completer.Reply(ep_->CancelAll());
+}
+
+void UsbVirtualHost::UsbEpServer::RequestComplete(zx_status_t status, size_t actual,
+                                                  usb::FidlRequest request) {
+  auto defer_completion = *request->defer_completion();
+  completions_.emplace_back(std::move(fuchsia_hardware_usb_endpoint::Completion()
+                                          .request(request.take_request())
+                                          .status(status)
+                                          .transfer_size(actual)));
+  if (defer_completion && status == ZX_OK) {
+    return;
+  }
+  std::vector<fuchsia_hardware_usb_endpoint::Completion> completions;
+  completions.swap(completions_);
+
+  auto result = fidl::SendEvent(binding_)->OnCompletion(std::move(completions));
+  if (result.is_error()) {
+    zxlogf(ERROR, "Error sending event: %s", result.error_value().status_string());
+  }
 }
 
 }  // namespace usb_virtual_bus

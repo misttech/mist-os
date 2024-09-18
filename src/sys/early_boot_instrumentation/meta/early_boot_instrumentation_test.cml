@@ -27,6 +27,12 @@
             rights: [ "r*" ],
             path: "/debugdata",
         },
+        {
+            directory: "logs",
+            from: "#early-boot-instrumentation",
+            rights: [ "r*" ],
+            path: "/logs",
+        },
     ],
     offer: [
         {

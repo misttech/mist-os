@@ -4,7 +4,7 @@
 #ifndef SRC_MEDIA_AUDIO_DRIVERS_AML_G12_TDM_RECORDER_H_
 #define SRC_MEDIA_AUDIO_DRIVERS_AML_G12_TDM_RECORDER_H_
 
-#include <lib/inspect/cpp/inspect.h>
+#include <lib/inspect/cpp/vmo/types.h>
 #include <lib/zx/clock.h>
 #include <lib/zx/time.h>
 
@@ -15,6 +15,28 @@ namespace audio::aml_g12 {
 // The Recorder class is responsible for creating and updating Inspect -- so we don't need to
 // implement this functionality in classes dedicated to other functions.
 //
+
+// Use StringReferences to save space in the Inspect VMO.
+const inspect::StringReference kCurrentPowerState("current_power_state");
+
+const inspect::StringReference kPowerTransitions("power_transitions");
+const inspect::StringReference kCalledAt("called_at");
+const inspect::StringReference kEffectiveAt("effective_at");
+const inspect::StringReference kPowerState("power_state");
+
+const inspect::StringReference kRingBuffers("RingBuffers");
+const inspect::StringReference kElementId("element_id");
+const inspect::StringReference kSupportsActiveChannels("supports_active_channels");
+const inspect::StringReference kIsOutgoingStream("is_outgoing_stream");
+const inspect::StringReference kCtorTime("ctor_time");
+const inspect::StringReference kDtorTime("dtor_time");
+const inspect::StringReference kRunningIntervals("running_intervals");
+const inspect::StringReference kStartedAt("started_at");
+const inspect::StringReference kStoppedAt("stopped_at");
+const inspect::StringReference kSetActiveChannelsCalls("SetActiveChannels_calls");
+const inspect::StringReference kChannelBitmask("channel_bitmask");
+
+const inspect::StringReference kDAIs("DAIs");
 
 // Represents a single power transition.
 class PowerTransition {

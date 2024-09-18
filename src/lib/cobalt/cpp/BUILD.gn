@@ -11,10 +11,10 @@ source_set("unittests") {
 
   deps = [
     ":metric_event_builder",
+    "//sdk/lib/async-testing",
     "//sdk/lib/sys/cpp/testing:unit",
     "//src/lib/fsl",
     "//third_party/googletest:gtest",
-    "//zircon/system/ulib/async-testing",
   ]
 
   # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings

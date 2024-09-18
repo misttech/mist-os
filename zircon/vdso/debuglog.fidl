@@ -98,7 +98,7 @@ closed protocol Debuglog {
     ///
     /// ## Return value
     ///
-    /// `zx_debuglog_read()` returns `ZX_OK` on success. In the event of failure,
+    /// `zx_debuglog_write()` returns `ZX_OK` on success. In the event of failure,
     /// a negative error value is returned.
     ///
     /// ## Errors

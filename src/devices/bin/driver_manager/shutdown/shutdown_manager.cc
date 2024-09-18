@@ -29,7 +29,7 @@ struct MexecVmos {
 };
 
 zx::result<MexecVmos> GetMexecZbis(zx::unowned_resource mexec_resource) {
-  zx::result client = component::Connect<fuchsia_device_manager::SystemStateTransition>();
+  zx::result client = component::Connect<fuchsia_system_state::SystemStateTransition>();
   if (client.is_error()) {
     LOGF(ERROR, "Failed to connect to StateStateTransition: %s", client.status_string());
     return client.take_error();
@@ -106,7 +106,7 @@ zx::result<MexecVmos> GetMexecZbis(zx::unowned_resource mexec_resource) {
 }
 
 SystemPowerState GetSystemPowerState() {
-  zx::result client = component::Connect<fuchsia_device_manager::SystemStateTransition>();
+  zx::result client = component::Connect<fuchsia_system_state::SystemStateTransition>();
   if (client.is_error()) {
     LOGF(ERROR, "Failed to connect to StateStateTransition: %s, falling back to default",
          client.status_string());
@@ -196,11 +196,7 @@ void ShutdownManager::OnUnbound(const char* connection, fidl::UnbindInfo info) {
 }
 
 void ShutdownManager::Publish(component::OutgoingDirectory& outgoing) {
-  auto result = outgoing.AddUnmanagedProtocol<fuchsia_device_manager::Administrator>(
-      admin_bindings_.CreateHandler(this, dispatcher_, fidl::kIgnoreBindingClosure));
-  ZX_ASSERT_MSG(result.is_ok(), "%s", result.status_string());
-
-  result = outgoing.AddUnmanagedProtocol<fuchsia_process_lifecycle::Lifecycle>(
+  zx::result result = outgoing.AddUnmanagedProtocol<fuchsia_process_lifecycle::Lifecycle>(
       lifecycle_bindings_.CreateHandler(&devfs_lifecycle_, dispatcher_,
                                         fidl::kIgnoreBindingClosure),
       "fuchsia.device.fs.lifecycle.Lifecycle");
@@ -251,12 +247,6 @@ void ShutdownManager::OnBootShutdownComplete() {
     callback(ZX_OK);
   }
   boot_shutdown_complete_callbacks_.clear();
-}
-
-void ShutdownManager::UnregisterSystemStorageForShutdown(
-    UnregisterSystemStorageForShutdownCompleter::Sync& completer) {
-  SignalPackageShutdown(
-      [completer = completer.ToAsync()](zx_status_t status) mutable { completer.Reply(status); });
 }
 
 void ShutdownManager::SignalPackageShutdown(fit::callback<void(zx_status_t)> cb) {

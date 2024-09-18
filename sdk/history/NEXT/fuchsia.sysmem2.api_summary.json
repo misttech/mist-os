@@ -175,6 +175,14 @@
     },
     {
         "kind": "protocol/member",
+        "name": "fuchsia.sysmem2/BufferCollection.AttachNodeTracking",
+        "strictness": "flexible",
+        "ordinal": "4549465353676377516",
+        "direction": "one_way",
+        "request": "fuchsia.sysmem2/NodeAttachNodeTrackingRequest"
+    },
+    {
+        "kind": "protocol/member",
         "name": "fuchsia.sysmem2/BufferCollection.AttachToken",
         "strictness": "flexible",
         "ordinal": "5092582717741672834",
@@ -422,6 +430,14 @@
     },
     {
         "kind": "protocol/member",
+        "name": "fuchsia.sysmem2/BufferCollectionToken.AttachNodeTracking",
+        "strictness": "flexible",
+        "ordinal": "4549465353676377516",
+        "direction": "one_way",
+        "request": "fuchsia.sysmem2/NodeAttachNodeTrackingRequest"
+    },
+    {
+        "kind": "protocol/member",
         "name": "fuchsia.sysmem2/BufferCollectionToken.CreateBufferCollectionTokenGroup",
         "strictness": "flexible",
         "ordinal": "3528804016404117234",
@@ -589,6 +605,14 @@
         "strictness": "flexible",
         "ordinal": "6643511257208525586",
         "direction": "one_way"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.sysmem2/BufferCollectionTokenGroup.AttachNodeTracking",
+        "strictness": "flexible",
+        "ordinal": "4549465353676377516",
+        "direction": "one_way",
+        "request": "fuchsia.sysmem2/NodeAttachNodeTrackingRequest"
     },
     {
         "kind": "protocol/member",
@@ -1082,6 +1106,12 @@
     },
     {
         "kind": "table/member",
+        "name": "fuchsia.sysmem2/ImageFormatConstraints.is_alpha_present",
+        "ordinal": "17",
+        "type": "bool"
+    },
+    {
+        "kind": "table/member",
         "name": "fuchsia.sysmem2/ImageFormatConstraints.max_bytes_per_row",
         "ordinal": "7",
         "type": "uint32"
@@ -1218,6 +1248,14 @@
     },
     {
         "kind": "protocol/member",
+        "name": "fuchsia.sysmem2/Node.AttachNodeTracking",
+        "strictness": "flexible",
+        "ordinal": "4549465353676377516",
+        "direction": "one_way",
+        "request": "fuchsia.sysmem2/NodeAttachNodeTrackingRequest"
+    },
+    {
+        "kind": "protocol/member",
         "name": "fuchsia.sysmem2/Node.GetBufferCollectionId",
         "strictness": "flexible",
         "ordinal": "8633851600235444876",
@@ -1308,6 +1346,17 @@
         "name": "fuchsia.sysmem2/Node",
         "openness": "open",
         "transport": "channel"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.sysmem2/NodeAttachNodeTrackingRequest.server_end",
+        "ordinal": "1",
+        "type": "zx/Handle:EVENTPAIR"
+    },
+    {
+        "kind": "table",
+        "name": "fuchsia.sysmem2/NodeAttachNodeTrackingRequest",
+        "resourceness": "resource"
     },
     {
         "kind": "table/member",

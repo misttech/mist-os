@@ -21,6 +21,9 @@
             url: "fuchsia-boot:///shutdown-shim#meta/shutdown-shim.cm",
         },
     ],
+    capabilities: [
+        { dictionary: "toolbox" },
+    ],
     offer: [
         {
             from: "parent",
@@ -157,6 +160,14 @@
             dependency: "weak",
             availability: "optional",
         },
+        {
+            protocol: [
+                "fuchsia.diagnostics.host.ArchiveAccessor",
+                "fuchsia.diagnostics.LogSettings",
+            ],
+            from: "#archivist",
+            to: "self/toolbox",
+        },
 
         // -- End Archivist offers --
         // TODO(https://fxbug.dev/324494668): remove this when Netstack2 is gone.
@@ -168,6 +179,10 @@
         },
     ],
     expose: [
+        {
+            dictionary: "toolbox",
+            from: "self",
+        },
         {
             protocol: "fuchsia.hardware.pty.Device",
             from: "#ptysvc",

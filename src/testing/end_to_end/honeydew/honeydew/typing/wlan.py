@@ -11,9 +11,11 @@ from typing import Protocol
 
 import fidl.fuchsia_wlan_common as f_wlan_common
 import fidl.fuchsia_wlan_device_service as f_wlan_device_service
-import fidl.fuchsia_wlan_internal as f_wlan_internal
 import fidl.fuchsia_wlan_policy as f_wlan_policy
 import fidl.fuchsia_wlan_sme as f_wlan_sme
+
+# Length of a pre-shared key (PSK) used as a password.
+_PSK_LENGTH = 64
 
 
 @dataclass(frozen=True)
@@ -397,6 +399,18 @@ class NetworkConfig:
     credential_type: str
     credential_value: str
 
+    @staticmethod
+    def from_fidl(fidl: f_wlan_policy.NetworkConfig) -> "NetworkConfig":
+        """Parse from a fuchsia.wlan.policy/NetworkConfig."""
+        identifier = NetworkIdentifier.from_fidl(fidl.id)
+        credential = Credential.from_fidl(fidl.credential)
+        return NetworkConfig(
+            ssid=identifier.ssid,
+            security_type=identifier.security_type,
+            credential_type=credential.type(),
+            credential_value=credential.value(),
+        )
+
     def __lt__(self, other: NetworkConfig) -> bool:
         return self.ssid < other.ssid
 
@@ -421,8 +435,112 @@ class NetworkIdentifier:
             security_type=SecurityType.from_fidl(fidl.type),
         )
 
+    def to_fidl(self) -> f_wlan_policy.NetworkIdentifier:
+        """Convert to a fuchsia.wlan.policy/NetworkIdentifier."""
+        return f_wlan_policy.NetworkIdentifier(
+            ssid=list(self.ssid.encode("utf-8")),
+            type=self.security_type.to_fidl(),
+        )
+
     def __lt__(self, other: NetworkIdentifier) -> bool:
         return self.ssid < other.ssid
+
+
+class Credential(Protocol):
+    """Information used to verify access to a target network."""
+
+    def type(self) -> str:
+        """Type of credential."""
+
+    def value(self) -> str:
+        """Value of the credential, or empty string if not applicable."""
+
+    def to_fidl(self) -> f_wlan_policy.Credential:
+        """Convert to a fuchsia.wlan.policy/Credential."""
+
+    @staticmethod
+    def from_password(password: str | None) -> Credential:
+        """Parse a password into a Credential.
+
+        Args:
+            password: String password, pre-shared key in hex form with length 64, or
+                None/empty to represent open.
+
+        Return:
+            A fuchsia.wlan.policy/Credential union object.
+        """
+        if not password:
+            return CredentialNone()
+        elif len(password) == _PSK_LENGTH:
+            return CredentialPsk(password)
+        else:
+            return CredentialPassword(password)
+
+    @staticmethod
+    def from_fidl(fidl: f_wlan_policy.Credential) -> Credential:
+        """Parse a fuchsia.wlan.policy/Credential."""
+        if fidl.none is not None:
+            return CredentialNone()
+        if fidl.password is not None:
+            return CredentialPassword(bytes(fidl.password).decode("utf-8"))
+        if fidl.psk is not None:
+            return CredentialPsk(bytes(fidl.psk).hex())
+        raise TypeError(
+            f"Unknown value for fuchsia.wlan.policy/Credential: {fidl}"
+        )
+
+
+class CredentialNone(Credential):
+    """Credentials to connect to an unprotected network."""
+
+    def type(self) -> str:
+        return "None"
+
+    def value(self) -> str:
+        return ""
+
+    def to_fidl(self) -> f_wlan_policy.Credential:
+        cred = f_wlan_policy.Credential()
+        cred.none = f_wlan_policy.Empty()
+        return cred
+
+
+@dataclass(frozen=True)
+class CredentialPassword(Credential):
+    """Credentials to connect to an password protected network."""
+
+    password: str
+    """Plaintext password."""
+
+    def type(self) -> str:
+        return "Password"
+
+    def value(self) -> str:
+        return self.password
+
+    def to_fidl(self) -> f_wlan_policy.Credential:
+        cred = f_wlan_policy.Credential()
+        cred.password = list(self.password.encode("utf-8"))
+        return cred
+
+
+@dataclass(frozen=True)
+class CredentialPsk(Credential):
+    """Credentials to connect to an network using a pre-shared key."""
+
+    psk: str
+    """Hash representation of the network passphrase."""
+
+    def type(self) -> str:
+        return "Psk"
+
+    def value(self) -> str:
+        return self.psk
+
+    def to_fidl(self) -> f_wlan_policy.Credential:
+        cred = f_wlan_policy.Credential()
+        cred.psk = list(bytes.fromhex(self.psk))
+        return cred
 
 
 @dataclass(frozen=True)
@@ -571,8 +689,8 @@ class BssDescription:
     snr_db: int
 
     @staticmethod
-    def from_fidl(fidl: f_wlan_internal.BssDescription) -> "BssDescription":
-        """Parse from a fuchsia.wlan.internal/BssDescription."""
+    def from_fidl(fidl: f_wlan_common.BssDescription) -> "BssDescription":
+        """Parse from a fuchsia.wlan.common.BssDescription."""
         return BssDescription(
             bssid=list(fidl.bssid),
             bss_type=BssType.from_fidl(fidl.bss_type),
@@ -584,9 +702,9 @@ class BssDescription:
             snr_db=fidl.snr_db,
         )
 
-    def to_fidl(self) -> f_wlan_internal.BssDescription:
-        """Convert to a fuchsia.wlan.internal/BssDescription."""
-        return f_wlan_internal.BssDescription(
+    def to_fidl(self) -> f_wlan_common.BssDescription:
+        """Convert to a fuchsia.wlan.common.BssDescription."""
+        return f_wlan_common.BssDescription(
             bssid=self.bssid,
             bss_type=self.bss_type.to_fidl(),
             beacon_period=self.beacon_period,

@@ -258,6 +258,12 @@ struct TlsTraits<Elf, ElfMachine::kNone> {
   // (the executable's if it has one) has the offset closest to zero
   // that is aligned to p_align and >= p_memsz.
   static constexpr bool kTlsNegative = false;
+
+  // This bias is subtracted from the offset for a kTlsRelative relocation.
+  // It's then added back in again by the `__tls_get_addr` code.  In Local
+  // Dynamic cases, there is no kTlsRelative relocation emitted and instead the
+  // offset word is filled at link time with this bias subtracted.
+  static constexpr typename Elf::size_type kTlsRelativeBias = 0;
 };
 
 // AArch64 puts TLS above TP after a two-word reserved area.
@@ -268,11 +274,14 @@ struct TlsTraits<Elf, ElfMachine::kAarch64> {
 
   static constexpr size_type kTlsLocalExecOffset = 2 * sizeof(size_type);
   static constexpr bool kTlsNegative = false;
+  static constexpr typename Elf::size_type kTlsRelativeBias = 0;
 };
 
 // RISC-V puts TLS above TP with no offset, as shown in the exemplar.
 template <class Elf>
-struct TlsTraits<Elf, ElfMachine::kRiscv> : public TlsTraits<Elf, ElfMachine::kNone> {};
+struct TlsTraits<Elf, ElfMachine::kRiscv> : public TlsTraits<Elf, ElfMachine::kNone> {
+  static constexpr typename Elf::size_type kTlsRelativeBias = 0x800;
+};
 
 // X86 puts TLS below TP.
 template <class Elf>
@@ -280,6 +289,7 @@ struct TlsTraits<Elf, ElfMachine::kX86_64> {
   using GotAddr = Elf64<ElfData::k2Lsb>::Addr;
   static constexpr typename Elf::size_type kTlsLocalExecOffset = 0;
   static constexpr bool kTlsNegative = true;
+  static constexpr typename Elf::size_type kTlsRelativeBias = 0;
 };
 
 template <class Elf>

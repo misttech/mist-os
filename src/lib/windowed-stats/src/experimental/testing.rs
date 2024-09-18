@@ -7,7 +7,9 @@ use fuchsia_sync::Mutex;
 use std::sync::Arc;
 
 use crate::experimental::clock::{TimedSample, Timestamp};
-use crate::experimental::series::{FoldError, Interpolator, RoundRobinSampler, Sampler};
+use crate::experimental::series::{
+    FoldError, Interpolator, MatrixSampler, Sampler, SerializedBuffer,
+};
 use crate::experimental::serve::InspectedTimeMatrix;
 
 #[derive(Derivative)]
@@ -52,10 +54,10 @@ impl<T> Interpolator for MockTimeMatrix<T> {
     fn interpolate_and_get_buffers(
         &mut self,
         timestamp: Timestamp,
-    ) -> Result<Vec<u8>, Self::Error> {
+    ) -> Result<SerializedBuffer, Self::Error> {
         self.interpolate(timestamp)?;
-        Ok(vec![])
+        Ok(SerializedBuffer { data_semantic: "mock".to_string(), data: vec![] })
     }
 }
 
-impl<T> RoundRobinSampler<T> for MockTimeMatrix<T> {}
+impl<T> MatrixSampler<T> for MockTimeMatrix<T> {}

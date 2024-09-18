@@ -27,12 +27,12 @@ source_set("inspector") {
     "parser.h",
   ]
   public_deps = [
+    "//sdk/lib/async",
     "//src/storage/lib/block_client/cpp",
     "//src/storage/lib/disk_inspector",
     "//src/storage/lib/vfs/cpp/journal",
     "//src/storage/lib/vfs/cpp/transaction",
     "//src/storage/minfs",
-    "//zircon/system/ulib/async",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/storage/buffer",
     "//zircon/system/ulib/zx",

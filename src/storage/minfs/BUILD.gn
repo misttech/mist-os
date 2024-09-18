@@ -69,12 +69,12 @@ static_library("minfs") {
     "//zircon/system/ulib/zx",
   ]
   deps = [
+    "//sdk/lib/async:async-cpp",
     "//sdk/lib/fit",
     "//sdk/lib/syslog/cpp",
     "//src/storage/fvm",
     "//src/storage/lib/trace:cpp",
     "//src/storage/lib/vfs/cpp",
-    "//zircon/system/ulib/async:async-cpp",
     "//zircon/system/ulib/bitmap",
     "//zircon/system/ulib/range",
     "//zircon/system/ulib/storage/operation",
@@ -118,7 +118,7 @@ static_library("minfs") {
       "//zircon/system/ulib/zx",
 
       # runner.h includes lib/async-loop/cpp/loop.h
-      "//zircon/system/ulib/async-loop:async-loop-cpp",
+      "//sdk/lib/async-loop:async-loop-cpp",
 
       # mount.h includes fidl/fuchsia.process.lifecycle/cpp/wire.h
       "//sdk/fidl/fuchsia.process.lifecycle:fuchsia.process.lifecycle_cpp",
@@ -126,16 +126,16 @@ static_library("minfs") {
     deps += [
       "//sdk/fidl/fuchsia.device:fuchsia.device_cpp",
       "//sdk/fidl/fuchsia.io:fuchsia.io_cpp",
+      "//sdk/lib/async",
+      "//sdk/lib/async-default",
+      "//sdk/lib/async-loop",
+      "//sdk/lib/async-loop:async-loop-default",
       "//sdk/lib/fidl",
       "//sdk/lib/sys/cpp:cpp",
       "//sdk/lib/syslog/cpp",
       "//src/storage/fidl/fuchsia.fs.startup:fuchsia.fs.startup_cpp",
       "//src/storage/fvm",
       "//src/storage/lib/storage-metrics",
-      "//zircon/system/ulib/async",
-      "//zircon/system/ulib/async-default",
-      "//zircon/system/ulib/async-loop",
-      "//zircon/system/ulib/async-loop:async-loop-default",
       "//zircon/system/ulib/fdio-caller",
       "//zircon/system/ulib/fzl",
       "//zircon/system/ulib/inspect",

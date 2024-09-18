@@ -4,7 +4,6 @@
 
 #include "src/storage/blobfs/mount.h"
 
-#include <fidl/fuchsia.device.manager/cpp/markers.h>
 #include <fidl/fuchsia.io/cpp/markers.h>
 #include <fidl/fuchsia.process.lifecycle/cpp/markers.h>
 #include <lib/async-loop/cpp/loop.h>
@@ -32,15 +31,8 @@ zx::result<> StartComponent(ComponentOptions options, fidl::ServerEnd<fuchsia_io
   async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
   trace::TraceProviderWithFdio provider(loop.dispatcher());
 
-  auto client_end = component::Connect<fuchsia_device_manager::Administrator>();
-  if (!client_end.is_ok()) {
-    FX_LOGS(WARNING) << "Failed to connect to device manager: " << client_end.status_string()
-                     << ". Assuming test environment and continuing";
-  }
-
   runner = std::make_unique<ComponentRunner>(loop, options);
-  auto status = runner->ServeRoot(std::move(root), std::move(lifecycle), std::move(*client_end),
-                                  std::move(vmex_resource));
+  auto status = runner->ServeRoot(std::move(root), std::move(lifecycle), std::move(vmex_resource));
   if (status.is_error()) {
     return status;
   }

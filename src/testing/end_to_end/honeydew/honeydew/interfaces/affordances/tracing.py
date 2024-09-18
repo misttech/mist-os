@@ -32,6 +32,14 @@ class Tracing(abc.ABC):
         """
 
     @abc.abstractmethod
+    def is_active(self) -> bool:
+        """Checks if there is a currently active trace.
+
+        Returns:
+            True if the tracing is currently running, False otherwise.
+        """
+
+    @abc.abstractmethod
     def is_session_initialized(self) -> bool:
         """Checks if the session is initialized or not.
 

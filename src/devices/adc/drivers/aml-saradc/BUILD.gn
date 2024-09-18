@@ -19,14 +19,17 @@ driver_bind_rules("aml_saradc_bind") {
 }
 
 source_set("common") {
-  sources = [ "aml-saradc.cc" ]
+  sources = [
+    "aml-saradc.cc",
+    "aml-saradc.h",
+  ]
   public_deps = [
     ":aml_saradc_bind",
     "//sdk/fidl/fuchsia.hardware.adcimpl:fuchsia.hardware.adcimpl_cpp",
     "//sdk/lib/driver/compat/cpp",
     "//sdk/lib/driver/component/cpp",
+    "//sdk/lib/driver/platform-device/cpp",
     "//src/devices/adc/metadata",
-    "//src/devices/bus/lib/device-protocol-pdev",
     "//src/devices/lib/amlogic",
     "//src/devices/lib/mmio",
     "//zircon/system/ulib/fbl",

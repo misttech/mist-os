@@ -4,8 +4,8 @@
 
 #include "src/devices/bin/driver_host/driver_host.h"
 
-#include <fidl/fuchsia.device.manager/cpp/wire.h>
 #include <fidl/fuchsia.io/cpp/fidl.h>
+#include <fidl/fuchsia.system.state/cpp/wire.h>
 #include <lib/async/cpp/task.h>
 #include <lib/component/incoming/cpp/protocol.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
@@ -183,12 +183,12 @@ void DriverHost::ShutdownDriver(Driver* driver, fidl::ServerEnd<fdh::Driver> ser
         // We only exit if we're not shutting down in order to match DFv1 behavior.
         // TODO(https://fxbug.dev/42075187): We should always exit driver hosts when we get down to
         // 0 drivers.
-        zx::result client = component::Connect<fuchsia_device_manager::SystemStateTransition>();
+        zx::result client = component::Connect<fuchsia_system_state::SystemStateTransition>();
         ZX_ASSERT_MSG(!client.is_error(), "Failed to connect to SystemStateTransition: %s",
                       client.status_string());
         fidl::WireResult result = fidl::WireCall(client.value())->GetTerminationSystemState();
         if (result.ok() == false ||
-            result->state == fuchsia_device_manager::SystemPowerState::kFullyOn) {
+            result->state == fuchsia_system_state::SystemPowerState::kFullyOn) {
           loop_.Quit();
         }
       }

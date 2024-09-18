@@ -26,8 +26,8 @@ source_set("testing") {
   ]
 
   deps = [
+    "//sdk/lib/async",
     "//sdk/lib/syslog/cpp",
-    "//zircon/system/ulib/async",
   ]
   public_deps = [
     "..:common",

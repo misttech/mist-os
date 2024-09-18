@@ -5,8 +5,6 @@
 import("//build/fidl/fidl.gni")
 
 fidl("fdf") {
-  sdk_category = "experimental"
-
   sources = [ "handle.fidl" ]
 
   golden_fuzzer = true

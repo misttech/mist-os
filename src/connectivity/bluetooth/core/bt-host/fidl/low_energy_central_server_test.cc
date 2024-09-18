@@ -1129,7 +1129,7 @@ TEST_F(LowEnergyCentralServerTest, ConnectThenPeerDisconnectThenReconnect) {
   EXPECT_FALSE(epitaph_1.has_value());
 }
 
-TEST_F(LowEnergyCentralServerTest, ConnectFailsDueToPeerNotConnectableThenConnectSuceeds) {
+TEST_F(LowEnergyCentralServerTest, ConnectFailsDueToPeerNotConnectableThenConnectSucceeds) {
   bt::gap::Peer* peer = adapter()->peer_cache()->NewPeer(kTestAddr, /*connectable=*/false);
   ASSERT_TRUE(peer);
   auto fake_peer = std::make_unique<bt::testing::FakePeer>(kTestAddr, pw_dispatcher());

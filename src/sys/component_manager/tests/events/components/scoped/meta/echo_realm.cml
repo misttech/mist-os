@@ -5,6 +5,7 @@
     include: [
         "//src/sys/component_manager/tests/meta/elf_runner_and_environment.shard.cml",
         "inspect/offer.shard.cml",
+        "syslog/offer.shard.cml",
     ],
 
     // Two children: a server and client. "echo_client" has "eager" startup so it
@@ -26,14 +27,6 @@
 
     // Route Echo service from server to client.
     offer: [
-        {
-            protocol: "fuchsia.logger.LogSink",
-            from: "parent",
-            to: [
-                "#echo_client",
-                "#echo_reporter",
-            ],
-        },
         {
             protocol: "fidl.examples.routing.echo.Echo",
             from: "#echo_reporter",

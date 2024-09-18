@@ -154,12 +154,7 @@ std::vector<ProcessSummary> TestUtils::GetProcessSummaries(const Summary& summar
 }
 
 zx_status_t TestUtils::GetCapture(Capture* capture, CaptureLevel level, const OsResponses& r) {
-  return GetCapture(capture, level, r, std::make_unique<BaseCaptureStrategy>());
-}
-
-zx_status_t TestUtils::GetCapture(Capture* capture, CaptureLevel level, const OsResponses& r,
-                                  std::unique_ptr<CaptureStrategy> strategy) {
-  CaptureMaker capture_maker({}, std::make_unique<MockOS>(r), std::move(strategy));
+  CaptureMaker capture_maker({}, std::make_unique<MockOS>(r));
   return capture_maker.GetCapture(capture, level, Capture::kDefaultRootedVmoNames);
 }
 

@@ -16,15 +16,15 @@ executable("unittests") {
   sources = [ "image_compression_unittest.cc" ]
 
   deps = [
+    "//sdk/lib/async-default",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/loop_fixture",
     "//src/ui/scenic/lib/image-compression:lib",
     "//src/ui/testing/util:screenshot_helper",
     "//third_party/googletest:gtest",
     "//third_party/libpng",
-    "//zircon/system/ulib/async-default",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
   ]
 }
 

@@ -34,6 +34,8 @@ class DlImplTests : public Base {
   static constexpr bool kCanReuseLoadedDeps = false;
   // TODO(https://fxbug.dev/354786114): dlsym should lookup symbols in deps.
   static constexpr bool kDlSymSupportsDeps = false;
+  // TODO(https://fxbug.dev/342480690): Support TLS
+  static constexpr bool kSupportsTls = false;
 
   fit::result<Error, void*> DlOpen(const char* file, int mode) {
     // Check that all Needed/Expect* expectations for loaded objects were

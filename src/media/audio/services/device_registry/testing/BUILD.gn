@@ -36,6 +36,7 @@ source_set("fakes") {
   ]
 
   deps = [
+    "//sdk/lib/async-testing",
     "//sdk/lib/fit",
     "//sdk/lib/syslog/cpp",
     "//src/lib/fxl/test:gtest_main",
@@ -44,7 +45,6 @@ source_set("fakes") {
     "//src/media/audio/services/device_registry:common",
     "//src/media/audio/services/device_registry:device_registry_lib",
     "//zircon/system/public",
-    "//zircon/system/ulib/async-testing",
   ]
 }
 
@@ -60,11 +60,11 @@ executable("stub_adr") {
 
   deps = [
     "//sdk/fidl/fuchsia.audio.device:fuchsia.audio.device_cpp",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/component/outgoing/cpp",
     "//src/media/audio/services/common",
     "//src/media/audio/services/device_registry:common",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
   ]
 }
 

@@ -224,24 +224,27 @@ TEST_F(GpioTest, TestGpioAll) {
 
   EXPECT_TRUE(pin_state(1).value);
 
-  gpio_client->ConfigIn(fuchsia_hardware_gpio::GpioFlags::kPullDown)
-      .ThenExactlyOnce([&](fidl::WireUnownedResult<fuchsia_hardware_gpio::Gpio::ConfigIn>& result) {
-        EXPECT_OK(result.status());
-        driver_test().runtime().Quit();
-      });
+  gpio_client->SetBufferMode(fuchsia_hardware_gpio::BufferMode::kInput)
+      .ThenExactlyOnce(
+          [&](fidl::WireUnownedResult<fuchsia_hardware_gpio::Gpio::SetBufferMode>& result) {
+            EXPECT_OK(result.status());
+            driver_test().runtime().Quit();
+          });
   driver_test().runtime().Run();
   driver_test().runtime().ResetQuit();
 
-  EXPECT_EQ(pin_state(1).pull, fuchsia_hardware_pin::Pull::kDown);
+  EXPECT_EQ(pin_state(1).mode, MockPinImpl::PinState::kIn);
 
-  gpio_client->ConfigOut(5).ThenExactlyOnce(
-      [&](fidl::WireUnownedResult<fuchsia_hardware_gpio::Gpio::ConfigOut>& result) {
-        EXPECT_OK(result.status());
-        driver_test().runtime().Quit();
-      });
+  gpio_client->SetBufferMode(fuchsia_hardware_gpio::BufferMode::kOutputHigh)
+      .ThenExactlyOnce(
+          [&](fidl::WireUnownedResult<fuchsia_hardware_gpio::Gpio::SetBufferMode>& result) {
+            EXPECT_OK(result.status());
+            driver_test().runtime().Quit();
+          });
   driver_test().runtime().Run();
   driver_test().runtime().ResetQuit();
 
+  EXPECT_EQ(pin_state(1).mode, MockPinImpl::PinState::kOut);
   EXPECT_TRUE(pin_state(1).value);
 
   gpio_client->SetDriveStrength(2000).ThenExactlyOnce(
@@ -755,7 +758,7 @@ TEST_F(GpioTest, SchedulerRole) {
 
     // The GPIO driver should be bound on a different dispatcher, so a sync client should work here.
     fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio> gpio_client(*std::move(client_end));
-    auto result = gpio_client->Write(1);
+    auto result = gpio_client->Write(true);
     ASSERT_TRUE(result.ok());
     EXPECT_TRUE(result->is_ok());
   }
@@ -868,13 +871,14 @@ TEST_F(GpioTest, DebugDevfs) {
         EXPECT_EQ(pin_state(1).drive_strength, 2000u);
       });
 
-  gpio_client->ConfigOut(1).ThenExactlyOnce(
-      [&](fidl::WireUnownedResult<fuchsia_hardware_gpio::Gpio::ConfigOut>& result) {
-        ASSERT_TRUE(result.ok());
-        EXPECT_TRUE(result->is_ok());
-        EXPECT_EQ(pin_state(1).mode, MockPinImpl::PinState::kOut);
-        EXPECT_TRUE(pin_state(1).value);
-      });
+  gpio_client->SetBufferMode(fuchsia_hardware_gpio::BufferMode::kOutputHigh)
+      .ThenExactlyOnce(
+          [&](fidl::WireUnownedResult<fuchsia_hardware_gpio::Gpio::SetBufferMode>& result) {
+            ASSERT_TRUE(result.ok());
+            EXPECT_TRUE(result->is_ok());
+            EXPECT_EQ(pin_state(1).mode, MockPinImpl::PinState::kOut);
+            EXPECT_TRUE(pin_state(1).value);
+          });
 
   debug_client->ConnectPin(std::move(pin_server_end))
       .ThenExactlyOnce(

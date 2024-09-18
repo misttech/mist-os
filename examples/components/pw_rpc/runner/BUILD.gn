@@ -33,6 +33,9 @@ executable("bin") {
     "//sdk/fidl/fuchsia.data:fuchsia.data_cpp",
     "//sdk/fidl/fuchsia.io:fuchsia.io_cpp",
     "//sdk/fidl/fuchsia.logger:fuchsia.logger_cpp",
+    "//sdk/lib/async",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/component/outgoing/cpp",
     "//sdk/lib/fdio",
     "//sdk/lib/syslog/cpp",
@@ -45,9 +48,6 @@ executable("bin") {
     "//third_party/pigweed/src/pw_rpc:client",
     "//third_party/pigweed/src/pw_rpc/raw:client_api",
     "//third_party/pigweed/src/pw_stream:socket_stream",
-    "//zircon/system/ulib/async",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
   ]
 }
 

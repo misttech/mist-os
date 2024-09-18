@@ -46,8 +46,7 @@ Note: This "Getting Started" assumes that you already have Inspect
 instrumentation in your component. Please see the
 [Inspect Codelab] for more information on Inspect instrumentation.
 
-1.  If you are a V2 component, make sure that you expose your `diagnostics`
-    directory to the [Diagnostics platform].
+1.  Ensure you serve Inspect using [ComponentInspector] or the [inspect_runtime].
 1.  Register the [Cobalt metric]
     you want to transform your Inspect metric into.
 1.  Create a Sampler configuration defining the transformation from Inspect to
@@ -55,7 +54,8 @@ instrumentation in your component. Please see the
 
 [Inspect Codelab]: /docs/development/diagnostics/inspect/codelab/README.md
 [Cobalt metric]: https://fuchsia.dev/reference/fidl/fuchsia.metrics
-[Diagnostics platform]: /docs/reference/diagnostics/inspect/tree.md#archivist
+[ComponentInspector]: /sdk/lib/inspect/component/cpp/component.h
+[inspect_runtime]: /src/lib/diagnostics/inspect/runtime/rust/README.md
 [See existing config files]: https://fuchsia.googlesource.com/fuchsia/+/refs/heads/main/src/diagnostics/config/sampler/
 
 ## Sampler Configuration {#configuration}

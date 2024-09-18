@@ -7,12 +7,14 @@ use std::path::Path;
 
 use anyhow::Error;
 use fidl_fuchsia_tee::ApplicationRequestStream;
-use fuchsia_async as fasync;
 use fuchsia_component::client::{connect_to_protocol, connect_to_protocol_at_dir_root};
 use fuchsia_component::server::ServiceFs;
 use fuchsia_tee_manager_config::TAConfig;
 use futures::prelude::*;
 use tee_internal::binding::TEE_ERROR_TARGET_DEAD;
+use vfs::file::vmo::read_only;
+use vfs::file::File;
+use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
 struct TAConnectRequest {
     uuid: String,
@@ -152,6 +154,13 @@ async fn main() -> Result<(), Error> {
         });
     }
 
+    let system_props =
+        std::fs::read_to_string(std::path::Path::new("/pkg/data/properties/system_properties"))?;
+    let mut data_dir = fs.dir("data");
+    let mut properties_dir = data_dir.dir("properties");
+    let vmo = read_only(system_props).get_backing_memory(fio::VmoFlags::READ).await?;
+    let _ = properties_dir.add_vmo_file_at("system_properties", vmo);
+
     let _ = fs.take_and_serve_directory_handle()?;
 
     let mut application_task_group = fasync::TaskGroup::new();
@@ -169,4 +178,43 @@ async fn main() -> Result<(), Error> {
     application_task_group.join().await;
 
     Ok(())
+}
+
+#[cfg(test)]
+pub mod tests {
+    use std::path::Path;
+    use tee_properties::{PropEnumerator, PropSet, PropSetType, PropType};
+
+    // This test validates the base platform-specified properties which are hosted in TA manager.
+    #[test]
+    fn validate_system_properties() {
+        let properties_file_path = Path::new("/pkg/data/properties/system_properties");
+
+        let prop_set =
+            PropSet::from_config_file(&properties_file_path, PropSetType::TeeImplementation)
+                .expect("prop set loads successfully");
+        let mut prop_enum = PropEnumerator::new(prop_set);
+        prop_enum.start();
+
+        // Will report ItemNotFound error when it moves past the end of the property set.
+        while prop_enum.get_property_name().is_ok() {
+            let prop_type: PropType =
+                prop_enum.get_property_type().expect("get property type successfully");
+            let parse_success = match prop_type {
+                PropType::BinaryBlock => prop_enum.get_property_as_binary_block().is_ok(),
+                PropType::UnsignedInt32 => prop_enum.get_property_as_u32().is_ok(),
+                PropType::UnsignedInt64 => prop_enum.get_property_as_u64().is_ok(),
+                PropType::Boolean => prop_enum.get_property_as_bool().is_ok(),
+                PropType::Uuid => prop_enum.get_property_as_uuid().is_ok(),
+                PropType::Identity => prop_enum.get_property_as_identity().is_ok(),
+                PropType::String => prop_enum.get_property_as_string().is_ok(),
+            };
+            assert!(
+                parse_success,
+                "Bad value found, parsing expected to fail: {:?}",
+                prop_enum.get_property_name().expect("get name successfully")
+            );
+            prop_enum.next().expect("advance to next successfully");
+        }
+    }
 }

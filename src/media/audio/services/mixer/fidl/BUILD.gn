@@ -60,12 +60,12 @@ source_set("fidl") {
     "//sdk/fidl/fuchsia.audio.mixer:fuchsia.audio.mixer_cpp",
     "//sdk/fidl/fuchsia.audio.mixer:fuchsia.audio.mixer_cpp",
     "//sdk/fidl/fuchsia.mediastreams:fuchsia.mediastreams_cpp",
+    "//sdk/lib/async:async-cpp",
     "//sdk/lib/fit",
     "//sdk/lib/fit-promise",
     "//src/media/audio/services/common",
     "//src/media/audio/services/mixer/common",
     "//src/media/audio/services/mixer/mix",
-    "//zircon/system/ulib/async:async-cpp",
     "//zircon/system/ulib/trace",
   ]
 
@@ -98,7 +98,10 @@ executable("fidl_unittests") {
   deps = [
     ":fidl",
     "//sdk/fidl/fuchsia.audio.mixer:fuchsia.audio.mixer_cpp",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/async-loop-testing/cpp",
+    "//sdk/lib/async-testing",
     "//src/lib/fxl/test:gtest_main",
     "//src/media/audio/lib/clock/testing",
     "//src/media/audio/lib/processing:prebuilt_coefficient_tables",
@@ -107,9 +110,6 @@ executable("fidl_unittests") {
     "//src/media/audio/services/mixer/mix",
     "//src/media/audio/services/mixer/mix/testing",
     "//third_party/googletest:gmock",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
-    "//zircon/system/ulib/async-testing",
     "//zircon/system/ulib/sync:sync-cpp",
   ]
 }

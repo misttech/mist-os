@@ -22,7 +22,7 @@ executable("bin") {
     "//sdk/lib/component/outgoing/cpp",
 
     # This library provides an the asynchronous event loop implementation.
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-cpp",
   ]
 }
 

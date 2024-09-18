@@ -46,7 +46,7 @@ void FdioTest::SetUp() {
 
   runner_ = std::make_unique<ComponentRunner>(
       *loop_, ComponentOptions{.pager_threads = mount_options_.paging_threads});
-  ASSERT_EQ(runner_->ServeRoot(std::move(outgoing_dir_server), {}, {}, std::move(vmex_resource_))
+  ASSERT_EQ(runner_->ServeRoot(std::move(outgoing_dir_server), {}, std::move(vmex_resource_))
                 .status_value(),
             ZX_OK);
 

@@ -71,7 +71,6 @@
 #include "src/storage/f2fs/file.h"
 #include "src/storage/f2fs/node.h"
 #include "src/storage/f2fs/segment.h"
-#include "src/storage/f2fs/gc.h"
 #include "src/storage/f2fs/mkfs.h"
 #include "src/storage/f2fs/fsck.h"
 #include "src/storage/f2fs/service/admin.h"
@@ -105,7 +104,7 @@ class F2fs final {
   zx::result<fs::FilesystemInfo> GetFilesystemInfo();
   InspectTree &GetInspectTree() { return *inspect_tree_; }
 
-  zx::result<fbl::RefPtr<VnodeF2fs>> GetVnode(ino_t ino);
+  zx::result<fbl::RefPtr<VnodeF2fs>> GetVnode(ino_t ino, LockedPage inode_page = {});
   zx::result<fbl::RefPtr<VnodeF2fs>> CreateNewVnode(umode_t mode,
                                                     std::optional<gid_t> gid = std::nullopt);
 
@@ -134,10 +133,6 @@ class F2fs final {
     ZX_DEBUG_ASSERT(node_manager_ != nullptr);
     return *node_manager_;
   }
-  GcManager &GetGcManager() const {
-    ZX_DEBUG_ASSERT(gc_manager_ != nullptr);
-    return *gc_manager_;
-  }
   PlatformVfs *vfs() const { return vfs_; }
 
   // For testing Reset() and TakeBc()
@@ -162,8 +157,8 @@ class F2fs final {
   void Sync(SyncCallback closure = nullptr) __TA_EXCLUDES(f2fs::GetGlobalLock());
   zx_status_t SyncFs(bool bShutdown = false) __TA_EXCLUDES(f2fs::GetGlobalLock());
   zx_status_t DoCheckpoint(bool is_umount) __TA_REQUIRES(f2fs::GetGlobalLock());
-  zx_status_t WriteCheckpoint(bool stop_writeback, bool is_umount)
-      __TA_REQUIRES(f2fs::GetGlobalLock()) __TA_EXCLUDES(writeback_mutex_);
+  zx_status_t WriteCheckpoint(bool is_umount) __TA_EXCLUDES(f2fs::GetGlobalLock())
+      __TA_REQUIRES_SHARED(writeback_mutex_);
 
   // recovery.cc
   // For the list of fsync inodes, used only during recovery
@@ -233,16 +228,10 @@ class F2fs final {
 
   void ScheduleWritebackAndReclaimPages(size_t num_pages = kDefaultBlocksPerSegment);
 
-  zx::result<> WaitForWriteback() __TA_EXCLUDES(writeback_mutex_) {
-    if (!writeback_mutex_.try_lock_shared_for(std::chrono::seconds(kWriteTimeOut))) {
-      return zx::error(ZX_ERR_TIMED_OUT);
-    }
-    writeback_mutex_.unlock_shared();
-    return zx::ok();
-  }
-
-  std::atomic_flag &GetStopReclaimFlag() { return stop_reclaim_flag_; }
-
+  zx::result<> WaitForWriteback() __TA_EXCLUDES(writeback_mutex_);
+  zx::result<uint32_t> StartGc() __TA_EXCLUDES(f2fs::GetGlobalLock())
+      __TA_REQUIRES(writeback_mutex_);
+  void BalanceFs(uint32_t num_blocks = 0) __TA_EXCLUDES(f2fs::GetGlobalLock(), writeback_mutex_);
   bool HasNotEnoughMemory(size_t factor = 1) {
     // release-acquire ordering with MemoryPressureWatcher::OnLevelChanged().
     auto level = current_memory_pressure_level_.load(std::memory_order_acquire);
@@ -251,13 +240,7 @@ class F2fs final {
            (level == MemoryPressure::kUnknown &&
             superblock_info_->GetPageCount(CountType::kDirtyData) * factor >= kMaxDirtyDataPages);
   }
-
-  void WaitForAvailableMemory() __TA_EXCLUDES(writeback_mutex_) {
-    while (HasNotEnoughMemory()) {
-      ScheduleWritebackAndReclaimPages();
-      ZX_ASSERT(WaitForWriteback().is_ok());
-    }
-  }
+  void WaitForAvailableMemory() __TA_EXCLUDES(writeback_mutex_);
 
   bool IsOnRecovery() const { return on_recovery_; }
   void SetOnRecovery() { on_recovery_ = true; }
@@ -283,6 +266,10 @@ class F2fs final {
 
   std::atomic_flag teardown_flag_ = ATOMIC_FLAG_INIT;
   std::atomic_flag stop_reclaim_flag_ = ATOMIC_FLAG_INIT;
+
+  // It synchronizes the execution of gc and writeback tasks that flush dirty data pages and
+  // produce additional dirty node pages. |writeback_mutex_| should be acquired before
+  // f2fs::GetGlobalLock() to avoid deadlock.
   std::shared_timed_mutex writeback_mutex_;
 
   FuchsiaDispatcher dispatcher_;
@@ -296,7 +283,6 @@ class F2fs final {
   std::unique_ptr<SuperblockInfo> superblock_info_;
   std::unique_ptr<SegmentManager> segment_manager_;
   std::unique_ptr<NodeManager> node_manager_;
-  std::unique_ptr<GcManager> gc_manager_;
 
   std::unique_ptr<Reader> reader_;
   std::unique_ptr<Writer> writer_;

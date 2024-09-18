@@ -1556,6 +1556,13 @@ async fn add_multicast_route<I: Ip, N: Netstack>(
         // Queue a packet that could potentially be forwarded once a multicast route
         // is installed.
         test_network.send_multicast_packet().await;
+        // TODO(https://fxbug.dev/353328975): Wait for a "missing route" event
+        // instead of sleeping.
+        const WAIT_AFTER_SEND_DURATION: zx::Duration = zx::Duration::from_seconds(2);
+        // After sending the packet, sleep for a few seconds to ensure that the
+        // it's actually in the Netstack's pending table before we install a
+        // route.
+        netstack_testing_common::sleep(WAIT_AFTER_SEND_DURATION.into_seconds()).await;
     }
 
     let route_action = action.and_then(|action| {

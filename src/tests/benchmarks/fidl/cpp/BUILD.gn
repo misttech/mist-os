@@ -19,10 +19,10 @@ foreach(suite, benchmark_suites) {
     fidl = suite.fidl_target
     deps = [
       "//sdk/ctf/tests/pkg/fidl/cpp:handle_util",
+      "//sdk/lib/async-loop:async-loop-cpp",
+      "//sdk/lib/async-loop:async-loop-default",
       "//sdk/lib/fidl",
       "//sdk/lib/fidl/hlcpp",
-      "//zircon/system/ulib/async-loop:async-loop-cpp",
-      "//zircon/system/ulib/async-loop:async-loop-default",
       "//zircon/system/ulib/perftest",
     ]
     extra_args = [
@@ -37,9 +37,9 @@ executable("bin") {
   testonly = true
   sources = [ "main.cc" ]
   deps = [
+           "//sdk/lib/async-loop:async-loop-cpp",
+           "//sdk/lib/async-loop:async-loop-default",
            "//src/zircon/lib/zircon",
-           "//zircon/system/ulib/async-loop:async-loop-cpp",
-           "//zircon/system/ulib/async-loop:async-loop-default",
            "//zircon/system/ulib/perftest",
          ] + gidl_deps
 }

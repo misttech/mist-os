@@ -5,8 +5,8 @@
 #ifndef SRC_DEVICES_BIN_DRIVER_MANAGER_SHUTDOWN_SHUTDOWN_MANAGER_H_
 #define SRC_DEVICES_BIN_DRIVER_MANAGER_SHUTDOWN_SHUTDOWN_MANAGER_H_
 
-#include <fidl/fuchsia.device.manager/cpp/fidl.h>
 #include <fidl/fuchsia.process.lifecycle/cpp/wire.h>
+#include <fidl/fuchsia.system.state/cpp/fidl.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/component/incoming/cpp/protocol.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
@@ -19,12 +19,11 @@
 #include "src/devices/bin/driver_manager/shutdown/node_remover.h"
 
 namespace driver_manager {
-using fuchsia_device_manager::SystemPowerState;
+using fuchsia_system_state::SystemPowerState;
 
 // Theory of operation of ShutdownManager:
 //  There are a number of ways shutdown can be initiated:
 //   - The process could be terminated, resulting in a signal from the Lifecycle channel
-//   - The administrator interface could signal UnregisterSystemStorageForShutdown
 //   - Any of the fidl connections could be dropped
 //  These events can cause one of two stages of the driver shutdown to be triggered:
 //  Package Shutdown:  The shutdown manager signals the node_remover to shut down all package
@@ -44,8 +43,7 @@ using fuchsia_device_manager::SystemPowerState;
 //  The ShutdownManager is not thread safe. It assumes that all channels will be dispatched
 //  on the same single threaded dispatcher, and that all callbacks will also be called on
 //  that same thread.
-class ShutdownManager : public fidl::WireServer<fuchsia_device_manager::Administrator>,
-                        public fidl::WireServer<fuchsia_process_lifecycle::Lifecycle> {
+class ShutdownManager : public fidl::WireServer<fuchsia_process_lifecycle::Lifecycle> {
  public:
   enum class State : uint32_t {
     // The system is running, nothing is being stopped.
@@ -117,22 +115,6 @@ class ShutdownManager : public fidl::WireServer<fuchsia_device_manager::Administ
   //  All other states |  Immediately call callback
   void SignalBootShutdown(fit::callback<void(zx_status_t)> cb);
 
-  // fuchsia.device.manager/Administrator interface
-  // TODO(https://fxbug.dev/42147562): Remove this API.
-  // This is a temporary API until DriverManager can ensure that base drivers
-  // will be shut down automatically before fshost exits. This will happen
-  // once drivers-as-components is implemented.
-  // In the meantime, this API should only be called by fshost, and it must
-  // be called before fshost exits. This function iterates over the devices
-  // and suspends any device whose driver lives in storage. This API must be
-  // called by fshost before it shuts down. Otherwise the devices that live
-  // in storage may page fault as it access memory that should be provided by
-  // the exited fshost. This function will not return until the devices are
-  // suspended. If there are no devices that live in storage, this function
-  // will immediatetly return.
-  void UnregisterSystemStorageForShutdown(
-      UnregisterSystemStorageForShutdownCompleter::Sync& completer) override;
-
   // fuchsia.process.lifecycle/Lifecycle interface
   // The process must clean up its state in preparation for termination, and
   // must close the channel hosting the `Lifecycle` protocol when it is
@@ -159,7 +141,6 @@ class ShutdownManager : public fidl::WireServer<fuchsia_device_manager::Administ
   // packaged drivers upon receiving this signal.
   Lifecycle devfs_with_pkg_lifecycle_;
 
-  fidl::ServerBindingGroup<fuchsia_device_manager::Administrator> admin_bindings_;
   fidl::ServerBindingGroup<fuchsia_process_lifecycle::Lifecycle> lifecycle_bindings_;
   std::list<fit::callback<void(zx_status_t)>> package_shutdown_complete_callbacks_;
   std::list<fit::callback<void(zx_status_t)>> boot_shutdown_complete_callbacks_;

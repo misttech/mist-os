@@ -11,6 +11,7 @@
 #include <memory>
 
 #include "src/media/audio/services/common/base_fidl_server.h"
+#include "src/media/audio/services/device_registry/inspector.h"
 
 namespace media_audio {
 
@@ -34,6 +35,13 @@ class ControlCreatorServer : public std::enable_shared_from_this<ControlCreatorS
       fidl::UnknownMethodMetadata<fuchsia_audio_device::ControlCreator> metadata,
       fidl::UnknownMethodCompleter::Sync& completer) override;
 
+  const std::shared_ptr<FidlServerInspectInstance>& inspect() {
+    return control_creator_inspect_instance_;
+  }
+  void SetInspect(std::shared_ptr<FidlServerInspectInstance> instance) {
+    control_creator_inspect_instance_ = std::move(instance);
+  }
+
   // Static object count, for debugging purposes.
   static inline uint64_t count() { return count_; }
 
@@ -47,6 +55,8 @@ class ControlCreatorServer : public std::enable_shared_from_this<ControlCreatorS
   explicit ControlCreatorServer(std::shared_ptr<AudioDeviceRegistry> parent);
 
   std::shared_ptr<AudioDeviceRegistry> parent_;
+
+  std::shared_ptr<FidlServerInspectInstance> control_creator_inspect_instance_;
 };
 
 }  // namespace media_audio

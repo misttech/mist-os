@@ -132,11 +132,6 @@ TEST_F(AmlSpiTest, Exchange) {
   driver_test().driver()->mmio()[AML_SPI_TXDATA].SetWriteCallback(
       [&tx_data](uint64_t value) { tx_data = value; });
 
-  driver_test().RunInEnvironmentTypeContext([](BaseTestEnvironment& env) {
-    env.ExpectGpioWrite(ZX_OK, 0);
-    env.ExpectGpioWrite(ZX_OK, 1);
-  });
-
   fdf::Arena arena('TEST');
   spiimpl.buffer(arena)
       ->ExchangeVector(0, fidl::VectorView<uint8_t>::FromExternal(kTxData, sizeof(kTxData)))
@@ -153,7 +148,7 @@ TEST_F(AmlSpiTest, Exchange) {
 
   driver_test().RunInEnvironmentTypeContext([](BaseTestEnvironment& env) {
     EXPECT_FALSE(env.ControllerReset());
-    ASSERT_NO_FATAL_FAILURE(env.VerifyGpioAndClear());
+    EXPECT_EQ(env.cs_toggle_count(), 2u);
   });
 }
 
@@ -192,7 +187,7 @@ TEST_F(AmlSpiTest, ExchangeCsManagedByClient) {
     EXPECT_FALSE(env.ControllerReset());
 
     // There should be no GPIO calls as the client manages CS for this device.
-    ASSERT_NO_FATAL_FAILURE(env.VerifyGpioAndClear());
+    EXPECT_EQ(env.cs_toggle_count(), 0u);
   });
 }
 
@@ -274,11 +269,6 @@ TEST_F(AmlSpiTest, TransmitVmo) {
         });
   }
 
-  driver_test().RunInEnvironmentTypeContext([](BaseTestEnvironment& env) {
-    env.ExpectGpioWrite(ZX_OK, 0);
-    env.ExpectGpioWrite(ZX_OK, 1);
-  });
-
   EXPECT_OK(test_vmo.write(kTxData, 512, sizeof(kTxData)));
 
   uint64_t tx_data = 0;
@@ -296,7 +286,7 @@ TEST_F(AmlSpiTest, TransmitVmo) {
 
   driver_test().RunInEnvironmentTypeContext([](BaseTestEnvironment& env) {
     EXPECT_FALSE(env.ControllerReset());
-    ASSERT_NO_FATAL_FAILURE(env.VerifyGpioAndClear());
+    EXPECT_EQ(env.cs_toggle_count(), 2u);
   });
 }
 
@@ -331,11 +321,6 @@ TEST_F(AmlSpiTest, ReceiveVmo) {
   driver_test().driver()->mmio()[AML_SPI_RXDATA].SetReadCallback(
       []() { return kExpectedRxData[0]; });
 
-  driver_test().RunInEnvironmentTypeContext([](BaseTestEnvironment& env) {
-    env.ExpectGpioWrite(ZX_OK, 0);
-    env.ExpectGpioWrite(ZX_OK, 1);
-  });
-
   spiimpl.buffer(arena)->ReceiveVmo(0, {1, 512, sizeof(kExpectedRxData)}).Then([&](auto& result) {
     ASSERT_TRUE(result.ok());
     EXPECT_TRUE(result->is_ok());
@@ -349,7 +334,7 @@ TEST_F(AmlSpiTest, ReceiveVmo) {
 
   driver_test().RunInEnvironmentTypeContext([](BaseTestEnvironment& env) {
     EXPECT_FALSE(env.ControllerReset());
-    ASSERT_NO_FATAL_FAILURE(env.VerifyGpioAndClear());
+    EXPECT_EQ(env.cs_toggle_count(), 2u);
   });
 }
 
@@ -389,11 +374,6 @@ TEST_F(AmlSpiTest, ExchangeVmo) {
   driver_test().driver()->mmio()[AML_SPI_TXDATA].SetWriteCallback(
       [&tx_data](uint64_t value) { tx_data = value; });
 
-  driver_test().RunInEnvironmentTypeContext([](BaseTestEnvironment& env) {
-    env.ExpectGpioWrite(ZX_OK, 0);
-    env.ExpectGpioWrite(ZX_OK, 1);
-  });
-
   EXPECT_OK(test_vmo.write(kTxData, 512, sizeof(kTxData)));
 
   spiimpl.buffer(arena)
@@ -413,7 +393,7 @@ TEST_F(AmlSpiTest, ExchangeVmo) {
 
   driver_test().RunInEnvironmentTypeContext([](BaseTestEnvironment& env) {
     EXPECT_FALSE(env.ControllerReset());
-    ASSERT_NO_FATAL_FAILURE(env.VerifyGpioAndClear());
+    EXPECT_EQ(env.cs_toggle_count(), 2u);
   });
 }
 
@@ -443,11 +423,6 @@ TEST_F(AmlSpiTest, TransfersOutOfRange) {
         });
   }
 
-  driver_test().RunInEnvironmentTypeContext([](BaseTestEnvironment& env) {
-    env.ExpectGpioWrite(ZX_OK, 0);
-    env.ExpectGpioWrite(ZX_OK, 1);
-  });
-
   spiimpl.buffer(arena)->ExchangeVmo(1, {1, 0, 2}, {1, 2, 2}).Then([&](auto& result) {
     ASSERT_TRUE(result.ok());
     EXPECT_TRUE(result->is_ok());
@@ -463,11 +438,6 @@ TEST_F(AmlSpiTest, TransfersOutOfRange) {
   spiimpl.buffer(arena)->ExchangeVmo(1, {1, 0, 3}, {1, 2, 3}).Then([&](auto& result) {
     ASSERT_TRUE(result.ok());
     EXPECT_TRUE(result->is_error());
-  });
-
-  driver_test().RunInEnvironmentTypeContext([](BaseTestEnvironment& env) {
-    env.ExpectGpioWrite(ZX_OK, 0);
-    env.ExpectGpioWrite(ZX_OK, 1);
   });
 
   spiimpl.buffer(arena)->TransmitVmo(1, {1, 0, 4}).Then([&](auto& result) {
@@ -491,19 +461,9 @@ TEST_F(AmlSpiTest, TransfersOutOfRange) {
     EXPECT_TRUE(result->is_error());
   });
 
-  driver_test().RunInEnvironmentTypeContext([](BaseTestEnvironment& env) {
-    env.ExpectGpioWrite(ZX_OK, 0);
-    env.ExpectGpioWrite(ZX_OK, 1);
-  });
-
   spiimpl.buffer(arena)->ReceiveVmo(1, {1, 0, 4}).Then([&](auto& result) {
     ASSERT_TRUE(result.ok());
     EXPECT_TRUE(result->is_ok());
-  });
-
-  driver_test().RunInEnvironmentTypeContext([](BaseTestEnvironment& env) {
-    env.ExpectGpioWrite(ZX_OK, 0);
-    env.ExpectGpioWrite(ZX_OK, 1);
   });
 
   spiimpl.buffer(arena)->ReceiveVmo(1, {1, 3, 1}).Then([&](auto& result) {
@@ -527,7 +487,7 @@ TEST_F(AmlSpiTest, TransfersOutOfRange) {
   driver_test().runtime().Run();
 
   driver_test().RunInEnvironmentTypeContext(
-      [](BaseTestEnvironment& env) { ASSERT_NO_FATAL_FAILURE(env.VerifyGpioAndClear()); });
+      [](BaseTestEnvironment& env) { EXPECT_EQ(env.cs_toggle_count(), 8u); });
 }
 
 TEST_F(AmlSpiTest, VmoBadRights) {
@@ -567,11 +527,6 @@ TEST_F(AmlSpiTest, VmoBadRights) {
         });
   }
 
-  driver_test().RunInEnvironmentTypeContext([](BaseTestEnvironment& env) {
-    env.ExpectGpioWrite(ZX_OK, 0);
-    env.ExpectGpioWrite(ZX_OK, 1);
-  });
-
   spiimpl.buffer(arena)->ExchangeVmo(0, {1, 0, 128}, {2, 128, 128}).Then([&](auto& result) {
     ASSERT_TRUE(result.ok());
     EXPECT_TRUE(result->is_ok());
@@ -592,7 +547,7 @@ TEST_F(AmlSpiTest, VmoBadRights) {
   driver_test().runtime().Run();
 
   driver_test().RunInEnvironmentTypeContext(
-      [](BaseTestEnvironment& env) { ASSERT_NO_FATAL_FAILURE(env.VerifyGpioAndClear()); });
+      [](BaseTestEnvironment& env) { EXPECT_EQ(env.cs_toggle_count(), 2u); });
 }
 
 TEST_F(AmlSpiTest, Exchange64BitWords) {
@@ -618,11 +573,6 @@ TEST_F(AmlSpiTest, Exchange64BitWords) {
   driver_test().driver()->mmio()[AML_SPI_TXDATA].SetWriteCallback(
       [&tx_data](uint64_t value) { tx_data = value; });
 
-  driver_test().RunInEnvironmentTypeContext([](BaseTestEnvironment& env) {
-    env.ExpectGpioWrite(ZX_OK, 0);
-    env.ExpectGpioWrite(ZX_OK, 1);
-  });
-
   fdf::Arena arena('TEST');
 
   spiimpl.buffer(arena)
@@ -641,7 +591,7 @@ TEST_F(AmlSpiTest, Exchange64BitWords) {
 
   driver_test().RunInEnvironmentTypeContext([](BaseTestEnvironment& env) {
     EXPECT_FALSE(env.ControllerReset());
-    ASSERT_NO_FATAL_FAILURE(env.VerifyGpioAndClear());
+    EXPECT_EQ(env.cs_toggle_count(), 2u);
   });
 }
 
@@ -667,11 +617,6 @@ TEST_F(AmlSpiTest, Exchange64Then8BitWords) {
   driver_test().driver()->mmio()[AML_SPI_TXDATA].SetWriteCallback(
       [&tx_data](uint64_t value) { tx_data = value; });
 
-  driver_test().RunInEnvironmentTypeContext([](BaseTestEnvironment& env) {
-    env.ExpectGpioWrite(ZX_OK, 0);
-    env.ExpectGpioWrite(ZX_OK, 1);
-  });
-
   fdf::Arena arena('TEST');
 
   spiimpl.buffer(arena)
@@ -689,7 +634,7 @@ TEST_F(AmlSpiTest, Exchange64Then8BitWords) {
 
   driver_test().RunInEnvironmentTypeContext([](BaseTestEnvironment& env) {
     EXPECT_FALSE(env.ControllerReset());
-    ASSERT_NO_FATAL_FAILURE(env.VerifyGpioAndClear());
+    EXPECT_EQ(env.cs_toggle_count(), 2u);
   });
 }
 
@@ -699,11 +644,6 @@ TEST_F(AmlSpiTest, ExchangeResetsController) {
 
   fdf::WireClient<fuchsia_hardware_spiimpl::SpiImpl> spiimpl(*std::move(spiimpl_client),
                                                              fdf::Dispatcher::GetCurrent()->get());
-
-  driver_test().RunInEnvironmentTypeContext([](BaseTestEnvironment& env) {
-    env.ExpectGpioWrite(ZX_OK, 0);
-    env.ExpectGpioWrite(ZX_OK, 1);
-  });
 
   fdf::Arena arena('TEST');
 
@@ -721,10 +661,8 @@ TEST_F(AmlSpiTest, ExchangeResetsController) {
       });
   driver_test().runtime().Run();
 
-  driver_test().RunInEnvironmentTypeContext([](BaseTestEnvironment& env) {
-    env.ExpectGpioWrite(ZX_OK, 0);
-    env.ExpectGpioWrite(ZX_OK, 1);
-  });
+  driver_test().RunInEnvironmentTypeContext(
+      [](BaseTestEnvironment& env) { EXPECT_EQ(env.cs_toggle_count(), 2u); });
 
   // Controller should be reset because a 64-bit transfer was preceded by a transfer of an odd
   // number of bytes.
@@ -740,10 +678,8 @@ TEST_F(AmlSpiTest, ExchangeResetsController) {
       });
   driver_test().runtime().Run();
 
-  driver_test().RunInEnvironmentTypeContext([](BaseTestEnvironment& env) {
-    env.ExpectGpioWrite(ZX_OK, 0);
-    env.ExpectGpioWrite(ZX_OK, 1);
-  });
+  driver_test().RunInEnvironmentTypeContext(
+      [](BaseTestEnvironment& env) { EXPECT_EQ(env.cs_toggle_count(), 4u); });
 
   spiimpl.buffer(arena)
       ->ExchangeVector(0, fidl::VectorView<uint8_t>::FromExternal(buf, 3))
@@ -757,10 +693,8 @@ TEST_F(AmlSpiTest, ExchangeResetsController) {
       });
   driver_test().runtime().Run();
 
-  driver_test().RunInEnvironmentTypeContext([](BaseTestEnvironment& env) {
-    env.ExpectGpioWrite(ZX_OK, 0);
-    env.ExpectGpioWrite(ZX_OK, 1);
-  });
+  driver_test().RunInEnvironmentTypeContext(
+      [](BaseTestEnvironment& env) { EXPECT_EQ(env.cs_toggle_count(), 6u); });
 
   spiimpl.buffer(arena)
       ->ExchangeVector(0, fidl::VectorView<uint8_t>::FromExternal(buf, 6))
@@ -774,10 +708,8 @@ TEST_F(AmlSpiTest, ExchangeResetsController) {
       });
   driver_test().runtime().Run();
 
-  driver_test().RunInEnvironmentTypeContext([](BaseTestEnvironment& env) {
-    env.ExpectGpioWrite(ZX_OK, 0);
-    env.ExpectGpioWrite(ZX_OK, 1);
-  });
+  driver_test().RunInEnvironmentTypeContext(
+      [](BaseTestEnvironment& env) { EXPECT_EQ(env.cs_toggle_count(), 8u); });
 
   spiimpl.buffer(arena)
       ->ExchangeVector(0, fidl::VectorView<uint8_t>::FromExternal(buf, 8))
@@ -792,7 +724,7 @@ TEST_F(AmlSpiTest, ExchangeResetsController) {
   driver_test().runtime().Run();
 
   driver_test().RunInEnvironmentTypeContext(
-      [](BaseTestEnvironment& env) { ASSERT_NO_FATAL_FAILURE(env.VerifyGpioAndClear()); });
+      [](BaseTestEnvironment& env) { EXPECT_EQ(env.cs_toggle_count(), 10u); });
 }
 
 TEST_F(AmlSpiTest, ReleaseVmos) {
@@ -992,11 +924,6 @@ TEST_F(AmlSpiNoResetFragmentTest, ExchangeWithNoResetFragment) {
   fdf::WireClient<fuchsia_hardware_spiimpl::SpiImpl> spiimpl(*std::move(spiimpl_client),
                                                              fdf::Dispatcher::GetCurrent()->get());
 
-  driver_test().RunInEnvironmentTypeContext([](BaseTestEnvironment& env) {
-    env.ExpectGpioWrite(ZX_OK, 0);
-    env.ExpectGpioWrite(ZX_OK, 1);
-  });
-
   fdf::Arena arena('TEST');
 
   uint8_t buf[17] = {};
@@ -1010,11 +937,6 @@ TEST_F(AmlSpiNoResetFragmentTest, ExchangeWithNoResetFragment) {
             [](BaseTestEnvironment& env) { EXPECT_FALSE(env.ControllerReset()); });
       });
 
-  driver_test().RunInEnvironmentTypeContext([](BaseTestEnvironment& env) {
-    env.ExpectGpioWrite(ZX_OK, 0);
-    env.ExpectGpioWrite(ZX_OK, 1);
-  });
-
   // Controller should not be reset because no reset fragment was provided.
   spiimpl.buffer(arena)
       ->ExchangeVector(0, fidl::VectorView<uint8_t>::FromExternal(buf, 16))
@@ -1026,11 +948,6 @@ TEST_F(AmlSpiNoResetFragmentTest, ExchangeWithNoResetFragment) {
             [](BaseTestEnvironment& env) { EXPECT_FALSE(env.ControllerReset()); });
       });
 
-  driver_test().RunInEnvironmentTypeContext([](BaseTestEnvironment& env) {
-    env.ExpectGpioWrite(ZX_OK, 0);
-    env.ExpectGpioWrite(ZX_OK, 1);
-  });
-
   spiimpl.buffer(arena)
       ->ExchangeVector(0, fidl::VectorView<uint8_t>::FromExternal(buf, 3))
       .Then([&](auto& result) {
@@ -1041,11 +958,6 @@ TEST_F(AmlSpiNoResetFragmentTest, ExchangeWithNoResetFragment) {
             [](BaseTestEnvironment& env) { EXPECT_FALSE(env.ControllerReset()); });
       });
 
-  driver_test().RunInEnvironmentTypeContext([](BaseTestEnvironment& env) {
-    env.ExpectGpioWrite(ZX_OK, 0);
-    env.ExpectGpioWrite(ZX_OK, 1);
-  });
-
   spiimpl.buffer(arena)
       ->ExchangeVector(0, fidl::VectorView<uint8_t>::FromExternal(buf, 6))
       .Then([&](auto& result) {
@@ -1055,11 +967,6 @@ TEST_F(AmlSpiNoResetFragmentTest, ExchangeWithNoResetFragment) {
         driver_test().RunInEnvironmentTypeContext(
             [](BaseTestEnvironment& env) { EXPECT_FALSE(env.ControllerReset()); });
       });
-
-  driver_test().RunInEnvironmentTypeContext([](BaseTestEnvironment& env) {
-    env.ExpectGpioWrite(ZX_OK, 0);
-    env.ExpectGpioWrite(ZX_OK, 1);
-  });
 
   spiimpl.buffer(arena)
       ->ExchangeVector(0, fidl::VectorView<uint8_t>::FromExternal(buf, 8))
@@ -1074,7 +981,7 @@ TEST_F(AmlSpiNoResetFragmentTest, ExchangeWithNoResetFragment) {
   driver_test().runtime().Run();
 
   driver_test().RunInEnvironmentTypeContext(
-      [](BaseTestEnvironment& env) { ASSERT_NO_FATAL_FAILURE(env.VerifyGpioAndClear()); });
+      [](BaseTestEnvironment& env) { EXPECT_EQ(env.cs_toggle_count(), 10u); });
 }
 
 class AmlSpiNoIrqEnvironment : public BaseTestEnvironment {

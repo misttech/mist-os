@@ -1,12 +1,12 @@
 {
     select: {
-        contiguous_allocations_failed: "INSPECT:bootstrap/driver_manager:root/sysmem/heaps/SysmemContiguousPool:allocations_failed",
-        protected_allocations_failed: "INSPECT:bootstrap/driver_manager:root/sysmem/heaps/SysmemAmlogicProtectedPool:allocations_failed",
-        tee_secure_allocations_failed: "INSPECT:bootstrap/driver_manager:root/sysmem/heaps/tee_secure:allocations_failed",
-        contiguous_size: "INSPECT:bootstrap/driver_manager:root/sysmem/heaps/SysmemContiguousPool:size",
-        protected_size: "INSPECT:bootstrap/driver_manager:root/sysmem/heaps/SysmemAmlogicProtectedPool:size",
-        contiguous_high_water: "INSPECT:bootstrap/driver_manager:root/sysmem/heaps/SysmemContiguousPool:high_water_mark",
-        protected_high_water: "INSPECT:bootstrap/driver_manager:root/sysmem/heaps/SysmemAmlogicProtectedPool:high_water_mark",
+        contiguous_allocations_failed: "INSPECT:bootstrap/sysmem:root/sysmem/heaps/SysmemContiguousPool:allocations_failed",
+        protected_allocations_failed: "INSPECT:bootstrap/sysmem:root/sysmem/heaps/SysmemAmlogicProtectedPool:allocations_failed",
+        tee_secure_allocations_failed: "INSPECT:bootstrap/sysmem:root/sysmem/heaps/tee_secure:allocations_failed",
+        contiguous_size: "INSPECT:bootstrap/sysmem:root/sysmem/heaps/SysmemContiguousPool:size",
+        protected_size: "INSPECT:bootstrap/sysmem:root/sysmem/heaps/SysmemAmlogicProtectedPool:size",
+        contiguous_high_water: "INSPECT:bootstrap/sysmem:root/sysmem/heaps/SysmemContiguousPool:high_water_mark",
+        protected_high_water: "INSPECT:bootstrap/sysmem:root/sysmem/heaps/SysmemAmlogicProtectedPool:high_water_mark",
     },
     eval: {
         contiguous_high_water_ratio: "contiguous_high_water / contiguous_size",

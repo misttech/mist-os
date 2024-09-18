@@ -6,7 +6,6 @@
 // used in production when the Banjo FFI is removed.
 #![allow(dead_code)]
 use anyhow::{bail, Result};
-use std::cmp::min;
 use {
     fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_fullmac as fidl_fullmac,
     fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_mlme as fidl_mlme,
@@ -47,15 +46,7 @@ pub fn convert_connect_request(
         auth_type: Some(convert_auth_type(req.auth_type)),
         sae_password: Some(req.sae_password),
 
-        // TODO(https://fxbug.dev/301104836): We don't use None here and instead pass along a default key config.
-        //
-        // This preserves the behavior through the Banjo FFI path and avoids needing to make
-        // changes in brcmfmac while the Banjo FFI is being removed. This should be cleaned up as
-        // part of Fullmac FIDL cleanup.
-        wep_key: req
-            .wep_key
-            .map(|key| convert_set_key_descriptor(&key))
-            .or_else(|| Some(dummy_wlan_key_config())),
+        wep_key: req.wep_key.map(|key| convert_set_key_descriptor(&key)),
         security_ie: Some(req.security_ie),
         ..Default::default()
     }
@@ -199,7 +190,7 @@ pub fn convert_stop_bss_request(
 // Note: this takes a reference since |req| will be used later to convert the response.
 pub fn convert_set_keys_request(
     req: &fidl_mlme::SetKeysRequest,
-) -> Result<fidl_fullmac::WlanFullmacSetKeysReq> {
+) -> Result<fidl_fullmac::WlanFullmacImplSetKeysRequest> {
     const MAX_NUM_KEYS: usize = fidl_fullmac::WLAN_MAX_KEYLIST_SIZE as usize;
     if req.keylist.len() > MAX_NUM_KEYS {
         bail!(
@@ -208,20 +199,14 @@ pub fn convert_set_keys_request(
             MAX_NUM_KEYS
         );
     }
-    let num_keys = min(req.keylist.len(), MAX_NUM_KEYS);
+    let keylist: Vec<_> = req.keylist.iter().map(convert_set_key_descriptor).collect();
 
-    let mut keylist: [fidl_common::WlanKeyConfig; MAX_NUM_KEYS] =
-        std::array::from_fn(|_| dummy_wlan_key_config());
-    for i in 0..num_keys {
-        keylist[i] = convert_set_key_descriptor(&req.keylist[i]);
-    }
-
-    Ok(fidl_fullmac::WlanFullmacSetKeysReq { num_keys: num_keys as u64, keylist })
+    Ok(fidl_fullmac::WlanFullmacImplSetKeysRequest { keylist: Some(keylist), ..Default::default() })
 }
 
 pub fn convert_delete_keys_request(
     req: fidl_mlme::DeleteKeysRequest,
-) -> Result<fidl_fullmac::WlanFullmacDelKeysReq> {
+) -> Result<fidl_fullmac::WlanFullmacImplDelKeysRequest> {
     const MAX_NUM_KEYS: usize = fidl_fullmac::WLAN_MAX_KEYLIST_SIZE as usize;
     if req.keylist.len() > MAX_NUM_KEYS {
         bail!(
@@ -230,14 +215,15 @@ pub fn convert_delete_keys_request(
             MAX_NUM_KEYS
         );
     }
-    let num_keys = min(req.keylist.len(), MAX_NUM_KEYS);
-    let mut keylist: [fidl_fullmac::DeleteKeyDescriptor; MAX_NUM_KEYS] =
-        std::array::from_fn(|_| dummy_delete_key_descriptor());
-    for i in 0..num_keys {
-        keylist[i] = convert_delete_key_descriptor(req.keylist[i]);
-    }
+    let keylist: Vec<_> = req
+        .keylist
+        .iter()
+        .map(|descriptor: &fidl_mlme::DeleteKeyDescriptor| {
+            convert_delete_key_descriptor(*descriptor)
+        })
+        .collect();
 
-    Ok(fidl_fullmac::WlanFullmacDelKeysReq { num_keys: num_keys as u64, keylist })
+    Ok(fidl_fullmac::WlanFullmacImplDelKeysRequest { keylist: Some(keylist), ..Default::default() })
 }
 
 pub fn convert_eapol_request(
@@ -313,9 +299,10 @@ fn convert_delete_key_descriptor(
     descriptor: fidl_mlme::DeleteKeyDescriptor,
 ) -> fidl_fullmac::DeleteKeyDescriptor {
     fidl_fullmac::DeleteKeyDescriptor {
-        key_id: descriptor.key_id,
-        key_type: convert_key_type(descriptor.key_type),
-        address: descriptor.address,
+        key_id: Some(descriptor.key_id),
+        key_type: Some(convert_key_type(descriptor.key_type)),
+        address: Some(descriptor.address),
+        ..Default::default()
     }
 }
 
@@ -336,23 +323,9 @@ fn convert_ssid(ssid: &[u8]) -> Result<fidl_ieee80211::CSsid> {
 // TODO(https://fxbug.dev/301104836): Cleanup Fullmac FIDL API such that this is no longer needed.
 fn dummy_delete_key_descriptor() -> fidl_fullmac::DeleteKeyDescriptor {
     fidl_fullmac::DeleteKeyDescriptor {
-        key_id: 0,
-        key_type: fidl_common::WlanKeyType::Pairwise,
-        address: [0; 6],
-    }
-}
-
-// TODO(https://fxbug.dev/301104836): Cleanup Fullmac FIDL API such that this is no longer needed.
-fn dummy_wlan_key_config() -> fidl_common::WlanKeyConfig {
-    fidl_common::WlanKeyConfig {
-        protection: Some(fidl_common::WlanProtection::RxTx),
-        key: Some(vec![]),
-        key_idx: Some(0),
-        key_type: Some(fidl_common::WlanKeyType::from_primitive_allow_unknown(0)),
-        peer_addr: Some([0; 6]),
-        rsc: Some(0),
-        cipher_oui: Some([0; 3]),
-        cipher_type: Some(fidl_ieee80211::CipherSuiteType::from_primitive_allow_unknown(0)),
+        key_id: Some(0),
+        key_type: Some(fidl_common::WlanKeyType::Pairwise),
+        address: Some([0; 6]),
         ..Default::default()
     }
 }
@@ -360,10 +333,9 @@ fn dummy_wlan_key_config() -> fidl_common::WlanKeyConfig {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use fidl_fuchsia_wlan_internal as fidl_internal;
 
-    fn fake_bss_description() -> fidl_internal::BssDescription {
-        fidl_internal::BssDescription {
+    fn fake_bss_description() -> fidl_common::BssDescription {
+        fidl_common::BssDescription {
             bssid: [6, 5, 4, 3, 2, 1],
             bss_type: fidl_common::BssType::Infrastructure,
             beacon_period: 123u16,
@@ -458,7 +430,6 @@ mod tests {
                 connect_failure_timeout: Some(60),
                 auth_type: Some(fidl_fullmac::WlanAuthType::OpenSystem),
                 sae_password: Some(vec![10, 11, 12, 13, 14]),
-                wep_key: Some(dummy_wlan_key_config()),
                 security_ie: Some(vec![44, 55, 66]),
                 ..Default::default()
             }
@@ -483,7 +454,6 @@ mod tests {
                 connect_failure_timeout: Some(60),
                 auth_type: Some(fidl_fullmac::WlanAuthType::OpenSystem),
                 sae_password: Some(vec![]),
-                wep_key: Some(dummy_wlan_key_config()),
                 security_ie: Some(vec![]),
                 ..Default::default()
             }
@@ -524,14 +494,10 @@ mod tests {
 
         let fullmac = convert_set_keys_request(&mlme).unwrap();
 
-        assert_eq!(fullmac.num_keys, 2);
-        for key in &fullmac.keylist[0..2] {
+        assert_eq!(fullmac.keylist.as_ref().unwrap().len(), 2);
+        let keylist = fullmac.keylist.unwrap();
+        for key in &keylist[0..2] {
             assert_eq!(key, &convert_set_key_descriptor(&fake_set_key_descriptor()));
-        }
-
-        // All other elements in keylist are default values.
-        for key in &fullmac.keylist[2..] {
-            assert_eq!(key, &dummy_wlan_key_config());
         }
     }
 
@@ -551,15 +517,11 @@ mod tests {
         let mlme = fidl_mlme::DeleteKeysRequest { keylist: vec![fake_delete_key_descriptor(); 2] };
 
         let fullmac = convert_delete_keys_request(mlme).unwrap();
-        assert_eq!(fullmac.num_keys, 2);
+        assert_eq!(fullmac.keylist.as_ref().unwrap().len(), 2);
 
-        for key in &fullmac.keylist[0..2] {
+        let keylist = fullmac.keylist.unwrap();
+        for key in &keylist[0..2] {
             assert_eq!(key, &convert_delete_key_descriptor(fake_delete_key_descriptor()));
-        }
-
-        // All other elements in keylist are default values
-        for key in &fullmac.keylist[2..] {
-            assert_eq!(key, &dummy_delete_key_descriptor());
         }
     }
 

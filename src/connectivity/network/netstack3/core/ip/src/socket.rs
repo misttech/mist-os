@@ -26,7 +26,7 @@ use packet_formats::ip::DscpAndEcn;
 use thiserror::Error;
 
 use crate::internal::base::{
-    FilterHandlerProvider, IpCounters, IpDeviceContext, IpLayerIpExt, IpLayerPacketMetadata,
+    FilterHandlerProvider, IpCounters, IpDeviceMtuContext, IpLayerIpExt, IpLayerPacketMetadata,
     IpPacketDestination, IpSendFrameError, IpSendFrameErrorReason, ResolveRouteError,
     SendIpPacketMeta,
 };
@@ -455,18 +455,6 @@ where
         // available at the time is used for each outgoing packet.
         let resolved_route =
             self.lookup_route(bindings_ctx, device, local_ip, remote_ip, transparent)?;
-        // TODO(https://fxbug.dev/362366411): This second lookup is unnecessary in most cases when
-        // there are no installed rules that has a `from` matcher.
-        let resolved_route = match local_ip {
-            None => self.lookup_route(
-                bindings_ctx,
-                device,
-                Some(resolved_route.src_addr),
-                remote_ip,
-                transparent,
-            )?,
-            Some(_) => resolved_route,
-        };
         Ok(new_ip_socket(device, resolved_route, remote_ip, proto, transparent))
     }
 
@@ -816,7 +804,7 @@ impl<I, BC, CC> DeviceIpSocketHandler<I, BC> for CC
 where
     I: IpLayerIpExt + IpDeviceStateIpExt,
     BC: IpSocketBindingsContext,
-    CC: IpDeviceContext<I, BC> + IpSocketContext<I, BC> + UseDeviceIpSocketHandlerBlanket,
+    CC: IpDeviceMtuContext<I> + IpSocketContext<I, BC> + UseDeviceIpSocketHandlerBlanket,
 {
     fn get_mms(
         &mut self,
@@ -833,7 +821,7 @@ where
         let ResolvedRoute { src_addr: _, local_delivery_device: _, device, next_hop: _ } = self
             .lookup_route(bindings_ctx, device.as_ref(), Some(*local_ip), *remote_ip, *transparent)
             .map_err(MmsError::NoDevice)?;
-        let mtu = IpDeviceContext::<I, BC>::get_mtu(self, &device);
+        let mtu = self.get_mtu(&device);
         // TODO(https://fxbug.dev/42072935): Calculate the options size when they
         // are supported.
         Mms::from_mtu::<I>(mtu, 0 /* no ip options used */).ok_or(MmsError::MTUTooSmall(mtu))

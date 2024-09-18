@@ -13,20 +13,14 @@ toc:
   - include: /docs/development/drivers/migration/_toc.yaml
 - title: "DFv2 driver development"
   section:
+  - title: "Overview"
+    path: /docs/development/drivers/dfv2-overview.md
   - title: "Write a minimal DFv2 driver"
     path: /docs/development/drivers/developer_guide/write-a-minimal-dfv2-driver.md
-  - title: "Troubleshoot common issues in DFv2 driver development"
-    path: /docs/development/drivers/developer_guide/troubleshoot-common-issues.md
   - title: "Driver examples"
     path: /docs/development/drivers/developer_guide/driver-examples.md
   - title: "Composite nodes"
     path: /docs/development/drivers/developer_guide/composite-node.md
-  - title: "Driver stack performance"
-    path: /docs/development/drivers/best_practices/driver_stack_performance.md
-  - title: "VMO Registration Pattern"
-    path: /docs/development/drivers/best_practices/vmo-registration-pattern.md
-  - title: "DMA (Direct Memory Access)"
-    path: /docs/development/drivers/concepts/driver_development/dma.md
   - title: "Tutorials"
     section:
     - title: "Bind rules tutorial"
@@ -37,20 +31,34 @@ toc:
       path: /docs/development/drivers/tutorials/fidl-tutorial.md
     - title: "Metadata tutorial"
       path: /docs/development/drivers/tutorials/metadata-tutorial.md
+  - title: "Debugging"
+    section:
+    - title: "Troubleshoot common issues in DFv2 driver development"
+      path: /docs/development/drivers/developer_guide/troubleshoot-common-issues.md
+    - title: "Driver utilities"
+      path: /docs/development/drivers/diagnostics/driver-utils.md
   - title: "Testing"
     section:
     - title: "DriverTestRealm"
       path: /docs/development/drivers/testing/driver_test_realm.md
     - title: "Threading tips in tests"
       path: /docs/development/drivers/testing/threading-tips-in-tests.md
-  - title: "Debugging"
+  - title: "Best practices"
     section:
-    - title: "Driver utilities"
-      path: /docs/development/drivers/diagnostics/driver-utils.md
-  - title: "Driver runtime API guidelines"
-    path: /docs/development/drivers/developer_guide/driver-runtime-api-guidelines.md
-  - title: "Drivers rubric"
-    path: /docs/development/drivers/developer_guide/rubric.md
+    - title: "VMO registration pattern"
+      path: /docs/development/drivers/best_practices/vmo-registration-pattern.md
+    - title: "Driver stack performance"
+      path: /docs/development/drivers/best_practices/driver_stack_performance.md
+  - title: "Guidelines"
+    section:
+    - title: "Driver runtime API guidelines"
+      path: /docs/development/drivers/developer_guide/driver-runtime-api-guidelines.md
+    - title: "Drivers rubric"
+      path: /docs/development/drivers/developer_guide/rubric.md
+  - title: "Concepts"
+    section:
+    - title: "DMA (Direct Memory Access)"
+      path: /docs/development/drivers/concepts/driver_development/dma.md
 - title: "DFv1 driver development"
   section:
   - include: /docs/development/drivers/developer_guide/_toc.yaml

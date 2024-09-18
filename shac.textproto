@@ -8,6 +8,7 @@ allow_network: False
 # BUILD.gn files) so //third_party cannot be ignored in its entirety.
 ignore: "/third_party/golibs"
 ignore: "/third_party/rust_crates/vendor"
+ignore: "/build/bazel/fuchsia_idk/validation_data"
 vars: [
   {
     name: "fuchsia_dir"

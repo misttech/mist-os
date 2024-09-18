@@ -14,7 +14,7 @@ use crate::model::environment::Environment;
 use crate::model::escrow::{self, EscrowedState};
 use crate::model::namespace::create_namespace;
 use crate::model::routing::legacy::RouteRequestExt;
-use crate::model::routing::router_ext::{RouterExt, WeakInstanceTokenExt};
+use crate::model::routing::router_ext::RouterExt;
 use crate::model::routing::service::{AnonymizedAggregateServiceDir, AnonymizedServiceRoute};
 use crate::model::routing::{self, RoutingError};
 use crate::model::start::Start;
@@ -32,7 +32,7 @@ use ::routing::component_instance::{
 };
 use ::routing::error::ComponentInstanceError;
 use ::routing::resolving::{ComponentAddress, ComponentResolutionContext};
-use ::routing::DictExt;
+use ::routing::{DictExt, WeakInstanceTokenExt};
 use async_trait::async_trait;
 use async_utils::async_once::Once;
 use clonable_error::ClonableError;
@@ -608,7 +608,7 @@ impl ResolvedInstanceState {
         let create_exposed_dict = async {
             let component = self.weak_component.upgrade().unwrap();
             let dict = Router::dict_routers_to_open(
-                &WeakInstanceToken::new_component(self.weak_component.clone()),
+                &self.weak_component.clone().into(),
                 &component.execution_scope,
                 &self.sandbox.component_output_dict,
                 &exposes_needing_metadata,
@@ -1189,7 +1189,11 @@ impl Routable for CapabilityRequestedHook {
             RoutingError::from(ComponentInstanceError::ComponentManagerInstanceUnexpected {}).into()
         }
 
-        let ExtendedMoniker::ComponentInstance(target_moniker) = request.target.moniker() else {
+        let ExtendedMoniker::ComponentInstance(target_moniker) =
+            <WeakInstanceToken as WeakInstanceTokenExt<ComponentInstance>>::moniker(
+                &request.target,
+            )
+        else {
             return Err(cm_unexpected());
         };
         self.source

@@ -33,6 +33,7 @@ group("hermetic_tests") {
     "destruction:destruction_integration_test",
     "diagnostics:tests",
     "dictionaries:tests",
+    "dictionaries_route_to_all:tests",
     "dynamic_offers:tests",
     "elf_runner:tests",
     "events:events_integration_test",

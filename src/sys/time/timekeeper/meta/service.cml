@@ -20,7 +20,7 @@
         },
     ],
     capabilities: [
-        { protocol: "fuchsia.time.test.RTC" },
+        { protocol: "fuchsia.time.test.Rtc" },
     ],
     use: [
         {
@@ -75,7 +75,7 @@
     ],
     expose: [
         {
-            protocol: [ "fuchsia.time.test.RTC" ],
+            protocol: [ "fuchsia.time.test.Rtc" ],
             from: "self",
             to: "parent",
             availability: "optional",

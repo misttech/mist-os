@@ -662,3 +662,9 @@
   available_in_git: 'b69d05374ff7fd131a31548fb44fd38137e277f6'
   areas: ['Kernel', 'UART']
   path: '/zircon/kernel/dev/uart/imx'
+- short_description: 'CRG-UDC USB controller driver on av400 boards'
+  deletion_reason: 'av400 no longer supported'
+  gerrit_change_id: '1092102'
+  available_in_git: '9700936a3f0f0a02563ae1071e8029054ceb7b7d'
+  areas: ['USB']
+  path: 'src/devices/usb/drivers/crg-udc'

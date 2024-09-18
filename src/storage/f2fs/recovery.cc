@@ -179,7 +179,6 @@ void F2fs::CheckIndexInPrevNodes(block_t blkaddr) {
   }
 
   // Deallocate previous index in the node page
-  fs::SharedLock lock(f2fs::GetGlobalLock());
   vnode_refptr->TruncateHole(bidx, bidx + 1, true);
 }
 

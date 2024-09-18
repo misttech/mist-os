@@ -5,7 +5,6 @@
 """Input Latency Benchmark."""
 
 import os
-from importlib.resources import as_file, files
 from pathlib import Path
 
 import test_data
@@ -96,12 +95,11 @@ class InputBenchmark(fuchsia_base_test.FuchsiaBaseTest):
             output_path=fuchsiaperf_json_path,
         )
 
-        expected_metrics_file = f"{TEST_NAME}.txt"
-        with as_file(files(test_data).joinpath(expected_metrics_file)) as f:
-            publish.publish_fuchsiaperf(
-                fuchsia_perf_file_paths=[fuchsiaperf_json_path],
-                expected_metric_names_filename=str(f),
-            )
+        publish.publish_fuchsiaperf(
+            fuchsia_perf_file_paths=[fuchsiaperf_json_path],
+            expected_metric_names_filename=f"{TEST_NAME}.txt",
+            test_data_module=test_data,
+        )
 
 
 if __name__ == "__main__":

@@ -14,4 +14,5 @@
 ///
 /// If you believe the non-root libraries do not support your use case, please
 /// reach out to the Netstack team to explore alternative options.
+@available(added=HEAD)
 library fuchsia.net.root;

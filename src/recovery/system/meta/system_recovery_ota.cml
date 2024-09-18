@@ -94,12 +94,6 @@
         },
     ],
     offer: [
-        {
-            protocol: "fuchsia.device.manager.Administrator",
-            from: "parent",
-            to: "#fs-collection",
-        },
-
         // Offer directories from system_recovery_ota to pkg-recovery child (inherit rights from system_recovery_ota).
         {
             directory: "primary-system-blobfs",

@@ -19,6 +19,7 @@ ffx_plugin("ffx_flash") {
     "//src/developer/ffx/lib/addr:lib",
     "//src/developer/ffx/lib/errors:lib",
     "//src/developer/ffx/lib/fastboot:lib",
+    "//src/developer/ffx/lib/fastboot_file_discovery:lib",
     "//src/developer/ffx/lib/fho:lib",
     "//src/developer/ffx/lib/ssh:lib",
     "//src/lib/fuchsia-async",

@@ -58,14 +58,18 @@ impl UnhandledInputHandler for MediaButtonsHandler {
             input_device::UnhandledInputEvent {
                 device_event:
                     input_device::InputDeviceEvent::ConsumerControls(ref media_buttons_event),
-                device_descriptor: input_device::InputDeviceDescriptor::ConsumerControls(_),
+                device_descriptor:
+                    input_device::InputDeviceDescriptor::ConsumerControls(ref device_descriptor),
                 event_time,
                 trace_id: _,
             } => {
                 self.inspect_status.count_received_event(input_device::InputEvent::from(
                     unhandled_input_event.clone(),
                 ));
-                let media_buttons_event = Self::create_media_buttons_event(media_buttons_event);
+                let media_buttons_event = Self::create_media_buttons_event(
+                    media_buttons_event,
+                    device_descriptor.device_id,
+                );
 
                 // Send the event if the media buttons are supported.
                 self.send_event_to_listeners(&media_buttons_event).await;
@@ -200,6 +204,7 @@ impl MediaButtonsHandler {
     /// -  `event`: The MediaButtonEvent to create a MediaButtonsEvent from.
     fn create_media_buttons_event(
         event: &consumer_controls_binding::ConsumerControlsEvent,
+        device_id: u32,
     ) -> fidl_ui_input::MediaButtonsEvent {
         let mut new_event = fidl_ui_input::MediaButtonsEvent {
             volume: Some(0),
@@ -208,6 +213,7 @@ impl MediaButtonsHandler {
             camera_disable: Some(false),
             power: Some(false),
             function: Some(false),
+            device_id: Some(device_id),
             ..Default::default()
         };
         for button in &event.pressed_buttons {
@@ -369,6 +375,7 @@ mod tests {
             camera_disable,
             power,
             function,
+            device_id: Some(0),
             ..Default::default()
         }
     }

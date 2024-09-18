@@ -33,11 +33,11 @@ if (is_fuchsia) {
       "//sdk/fidl/fuchsia.hardware.block:fuchsia.hardware.block_cpp",
       "//sdk/fidl/fuchsia.hardware.block.volume:fuchsia.hardware.block.volume_cpp",
       "//sdk/fidl/fuchsia.io:fuchsia.io_cpp",
+      "//sdk/lib/async",
       "//sdk/lib/fidl",
       "//src/lib/uuid",
       "//src/storage/fidl/fuchsia.fs.startup:fuchsia.fs.startup_cpp",
       "//src/storage/fxfs/fidl/fuchsia.fxfs:fuchsia.fxfs_cpp",
-      "//zircon/system/ulib/async",
       "//zircon/system/ulib/fbl",
     ]
     deps = [
@@ -85,13 +85,13 @@ test("fs-management-unittest") {
     "//sdk/fidl/fuchsia.device:fuchsia.device_cpp_testing",
     "//sdk/fidl/fuchsia.hardware.block.partition:fuchsia.hardware.block.partition_cpp_testing",
     "//sdk/fidl/fuchsia.hardware.block.volume:fuchsia.hardware.block.volume_cpp_testing",
+    "//sdk/lib/async-loop:async-loop-cpp",
     "//sdk/lib/syslog/cpp",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/fxl/test:test_settings",
     "//src/storage/fvm",
     "//src/storage/lib/block_client/cpp",
     "//third_party/googletest:gtest",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/fdio-caller",
   ]
 }
@@ -116,6 +116,7 @@ test("fs-management-test") {
     "//sdk/fidl/fuchsia.hardware.block:fuchsia.hardware.block_cpp",
     "//sdk/fidl/fuchsia.hardware.block.volume:fuchsia.hardware.block.volume_cpp",
     "//sdk/fidl/fuchsia.io:fuchsia.io_cpp",
+    "//sdk/lib/async-loop:async-loop-cpp",
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/fdio",
     "//sdk/lib/syslog/cpp",
@@ -129,7 +130,6 @@ test("fs-management-test") {
     "//src/storage/testing:storage_driver_test_realm",
     "//src/storage/testing:storage_driver_test_support",
     "//third_party/googletest:gtest",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/fdio-caller",
     "//zircon/system/ulib/zx",

@@ -81,6 +81,11 @@ def _fuchsia_board_configuration_impl(ctx):
     if platform != {}:
         board_config["platform"] = platform
 
+    hardware_info = json.decode(ctx.attr.hardware_info)
+    check_type(hardware_info, "dict")
+    if hardware_info != {}:
+        board_config["hardware_info"] = hardware_info
+
     # Files from board_input_bundles have paths that are relative to root,
     # prefix "../"s to make them relative to the output board config.
     board_config_relative_to_root = "../" * board_config_file.path.count("/")
@@ -158,6 +163,10 @@ _fuchsia_board_configuration = rule(
             doc = "Name of this board.",
             mandatory = True,
         ),
+        "hardware_info": attr.string(
+            doc = "Data provided via the 'fuchsia.hwinfo.Board' protocol.",
+            default = "{}",
+        ),
         "board_input_bundles": attr.label_list(
             doc = "Board Input Bundles targets to be included into the board.",
             providers = [FuchsiaBoardInputBundleInfo],
@@ -204,6 +213,7 @@ def fuchsia_board_configuration(
         filesystems = {},
         platform = {},
         kernel = {},
+        hardware_info = {},
         **kwargs):
     """A board configuration that takes a dict for the filesystems config."""
     filesystem_labels = extract_labels(filesystems)
@@ -213,6 +223,7 @@ def fuchsia_board_configuration(
         filesystems = json.encode_indent(filesystems, indent = "    "),
         platform = json.encode_indent(platform, indent = "    "),
         kernel = json.encode_indent(kernel, indent = "    "),
+        hardware_info = json.encode_indent(hardware_info, indent = "    "),
         filesystems_labels = filesystem_labels,
         **kwargs
     )

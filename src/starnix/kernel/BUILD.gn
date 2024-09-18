@@ -79,6 +79,14 @@ rustc_binary("starnix_kernel_bin") {
   configs += [ "//src/starnix/config:starnix_clippy_lints" ]
 
   disable_rustdoc = false
+
+  if (target_cpu == "riscv64") {
+    # At least for riscv64, remote linking requires machine
+    # with more memory, particularly in the linking phase.
+    _concurrent_jobs = concurrent_jobs.rust_highmem
+    configs += _concurrent_jobs.configs
+    forward_variables_from(_concurrent_jobs.vars, "*")
+  }
 }
 
 rustc_library("starnix_core") {
@@ -148,14 +156,14 @@ rustc_library("starnix_core") {
     "fs/proc/sysrq.rs",
     "fs/sysfs/bus_collection_directory.rs",
     "fs/sysfs/cgroup.rs",
-    "fs/sysfs/class_collection_directory.rs",
     "fs/sysfs/cpu_class_directory.rs",
     "fs/sysfs/device_directory.rs",
     "fs/sysfs/fs.rs",
     "fs/sysfs/kernel_directory.rs",
+    "fs/sysfs/kobject_directory.rs",
+    "fs/sysfs/kobject_symlink_directory.rs",
     "fs/sysfs/mod.rs",
     "fs/sysfs/power_directory.rs",
-    "fs/sysfs/sys_fs_directory.rs",
     "fs/tmpfs.rs",
     "lib.rs",
     "loader.rs",
@@ -329,6 +337,7 @@ rustc_library("starnix_core") {
     "//sdk/fidl/fuchsia.scheduler:fuchsia.scheduler_rust",
     "//sdk/fidl/fuchsia.session.power:fuchsia.session.power_rust",
     "//sdk/fidl/fuchsia.starnix.binder:fuchsia.starnix.binder_rust",
+    "//sdk/fidl/fuchsia.starnix.runner:fuchsia.starnix.runner_rust",
     "//sdk/fidl/fuchsia.sysinfo:fuchsia.sysinfo_rust",
     "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_rust",
     "//sdk/fidl/fuchsia.sysmem2:fuchsia.sysmem2_rust",
@@ -369,7 +378,6 @@ rustc_library("starnix_core") {
     "//src/starnix/lib/linux_uapi",
     "//src/starnix/lib/range_map",
     "//src/starnix/lib/selinux",
-    "//src/starnix/lib/selinux/core",
     "//src/starnix/lib/starnix-lifecycle",
     "//src/starnix/lib/starnix-sync",
     "//src/starnix/lib/starnix-syscalls",
@@ -390,6 +398,7 @@ rustc_library("starnix_core") {
     "//third_party/rust_crates:bitflags",
     "//third_party/rust_crates:bstr",
     "//third_party/rust_crates:byteorder",
+    "//third_party/rust_crates:cfg-if",
     "//third_party/rust_crates:derivative",
     "//third_party/rust_crates:dyn-clone",
     "//third_party/rust_crates:fragile",
@@ -487,8 +496,9 @@ rustc_library("starnix_core") {
   ]
   configs += [ "//src/starnix/config:starnix_clippy_lints" ]
 
-  if (is_asan) {
-    # At least for ASan, remote execution requires machine with more memory.
+  if (is_asan || target_cpu == "riscv64") {
+    # At least for ASan and riscv64, remote execution requires more memory,
+    # particularly in the test linking phase.
     _concurrent_jobs = concurrent_jobs.rust_highmem
     test_configs = _concurrent_jobs.configs
     test_vars = _concurrent_jobs.vars

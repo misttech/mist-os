@@ -8,6 +8,7 @@
 #include <lib/driver/testing/cpp/driver_runtime.h>
 #include <lib/driver/testing/cpp/internal/driver_lifecycle.h>
 #include <lib/driver/testing/cpp/internal/test_environment.h>
+#include <lib/driver/testing/cpp/scoped_global_logger.h>
 #include <lib/driver/testing/cpp/test_node.h>
 #include <lib/inspect/testing/cpp/zxtest/inspect.h>
 #include <lib/zx/clock.h>
@@ -23,8 +24,6 @@ namespace ahci {
 
 class PortTest : public zxtest::Test {
  protected:
-  void SetUp() override { fdf::Logger::SetGlobalInstance(&logger_); }
-
   void TearDown() override { fake_bus_.reset(); }
 
   void PortEnable(Bus* bus, Port* port) {
@@ -55,8 +54,7 @@ class PortTest : public zxtest::Test {
   // If non-null, this pointer is owned by Controller::bus_
   std::unique_ptr<FakeBus> fake_bus_;
 
-  fdf::Logger logger_{"ahci-test", FUCHSIA_LOG_DEBUG, zx::socket{},
-                      fidl::WireClient<fuchsia_logger::LogSink>()};
+  fdf_testing::ScopedGlobalLogger logger_;
 };
 
 TEST(SataTest, SataStringFixTest) {

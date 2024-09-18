@@ -3361,3 +3361,29 @@
   reviewers: ['csuter@google.com', 'garratt@google.comm', 'surajmalhotra@google.com, curtisgalloway@google.com']
   submitted: '2024-07-08'
   reviewed: '2024-08-13'
+
+- name: 'RFC-0258'
+  title: 'Update from C++17 to C++20'
+  short_description: 'Update from C++17 to C++20 as the Fuchsia tree C++ version and expand the set of formally supported C++ versions in the SDK to include C++20.'
+  authors: ['phosek@google.com']
+  file: '0258_update_from_c++17_to_c++20.md'
+  area: ['Build', 'Languages and Libraries', 'Toolchain']
+  issue: ['42064981']
+  gerrit_change_id: ['1092960']
+  status: 'Accepted'
+  reviewers: ['ianloic@google.com', 'jamesr@google.com', 'mcgrathr@google.com']
+  submitted: '2024-08-01'
+  reviewed: '2024-09-10'
+
+- name: 'RFC-0259'
+  title: 'Monotonic Clock Suspension and the Boot Timeline'
+  short_description: 'Elaborates on pausing the monotonic clock during S2Idle and introduces the boot timeline.'
+  authors: ['rudymathu@google.com']
+  file: '0259_monotonic_clock_suspension_and_the_boot_timeline.md'
+  area: ['System']
+  issue: ['328306129', '341785588']
+  gerrit_change_id: ['1102437']
+  status: 'Accepted'
+  reviewers: ['alizhang@google.com', 'adamperry@google.com', 'brunodalbo@google.com', 'crjohns@google.com', 'fmil@google.com', 'gmtr@google.com', 'johngro@google.com', 'maniscalco@google.com', 'miguelfrde@google.com', 'tgales@google.com', 'tmandry@google.com']
+  submitted: '2024-08-16'
+  reviewed: '2024-09-11'

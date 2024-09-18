@@ -40,13 +40,13 @@ fuchsia_driver("root-driver") {
   deps = [
     ":fuchsia.compat.runtime.test_cpp",
     ":root-bind",
+    "//sdk/lib/async:async-cpp",
     "//sdk/lib/driver/compat/cpp",
     "//sdk/lib/driver/compat/cpp:symbols",
     "//sdk/lib/driver/component/cpp:cpp",
     "//src/devices/bind/fuchsia.test:fuchsia.test_cpp",
     "//src/devices/lib/driver:driver_runtime",
     "//src/lib/ddk",
-    "//zircon/system/ulib/async:async-cpp",
   ]
 }
 
@@ -105,7 +105,6 @@ rustc_test("bin") {
     "//sdk/fidl/fuchsia.driver.test:fuchsia.driver.test_rust",
     "//sdk/lib/device-watcher/rust",
     "//sdk/lib/driver_test_realm/realm_builder/rust",
-    "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-component-test",
     "//third_party/rust_crates:anyhow",

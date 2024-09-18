@@ -1,49 +1,54 @@
 # SDK workflows
 
-Below is the list of workflows you can perform in the Fuchsia SDK development environment to
-interact with Fuchsia systems, devices, and software.
+This section organizes `ffx`-based workflows for interacting
+with Fuchsia components, devices and systems in the Fuchsia
+SDK development environment, as well as the Fuchsia source
+checkout development environment.
 
 ## Table of contents
 
-* Devices
+### Devices
 
-  * [Start the Fuchsia emulator][start-femu]
-  * [Flash a Fuchsia image on a device][flash-device]
-  * [Create SSH keys for Fuchsia devices][create-ssh-keys]
-  * [View device information][view-device-info]
-  * [View device logs][view-device-logs]
+* [Start the Fuchsia emulator][start-femu]
+* [Flash a Fuchsia image on a device][flash-device]
+* [Create SSH keys for Fuchsia devices][create-ssh-keys]
+* [View device information][view-device-info]
+* [View device logs][view-device-logs]
 
-* Components
+### Components
 
-  * [Explore components][explore-components]
-  * [View component information][view-component-info]
-  * [Start a component during development][start-a-component]
-  * [Copy files to and from a component][copy-files]
+* [Explore components][explore-components]
+* [View component information][view-component-info]
+* [Start a component during development][start-a-component]
+* [Copy files to and from a component][copy-files]
 
-* Drivers
+### Drivers
 
-  * [View driver information][view-driver-info]
+* [View driver information][view-driver-info]
 
-* Packages
+### Packages
 
-  * [Create a Fuchsia package repository][create-a-package-repo]
-  * [Update Fuchsia packages on a device][update-packages]
+* [Create a Fuchsia package repository][create-a-package-repo]
+* [Update Fuchsia packages on a device][update-packages]
+* [Start package servers][start-package-servers]
+* [List running package servers][list-package-servers]
+* [Stop running package servers][stop-package-servers]
 
-* Debugging
+### Debugging
 
-  * [Register debug symbols][register-symbols]
-  * [Symbolize logs][symbolize-logs]
-  * [Start the Fuchsia debugger][start-zxdb]
-  * [Monitor FIDL messages on a device][monitor-fidl]
+* [Register debug symbols][register-symbols]
+* [Symbolize logs][symbolize-logs]
+* [Start the Fuchsia debugger][start-zxdb]
+* [Monitor FIDL messages on a device][monitor-fidl]
 
-* Performance
+### Performance
 
-  * [Record traces for performance analysis][record-traces]
-  * [Measure the memory usage on a device][measure-memory-usage]
+* [Record traces for performance analysis][record-traces]
+* [Measure the memory usage on a device][measure-memory-usage]
 
-* Testing
+### Testing
 
-  * [Run tests on a device][run-tests]
+* [Run tests on a device][run-tests]
 
 <!-- Reference links -->
 
@@ -69,3 +74,6 @@ interact with Fuchsia systems, devices, and software.
 [explore-components]: explore-components.md
 [measure-memory-usage]: explore-memory-usage.md
 [run-tests]: run-device-tests.md
+[start-package-servers]: start-package-servers.md
+[list-package-servers]: list-package-servers.md
+[stop-package-servers]: stop-package-servers.md

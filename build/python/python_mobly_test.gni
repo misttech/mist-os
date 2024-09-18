@@ -294,8 +294,6 @@ template("python_mobly_test") {
   _md_test_data_dir =
       get_label_info("//src/testing/end_to_end/mobly_driver", "target_out_dir")
   _common_host_test_args = [
-    "--test-data-path",
-    rebase_path(_test_dir, root_build_dir),
     "--ffx-path",
     rebase_path("${host_tools_dir}/ffx", root_build_dir),
     "--transport",

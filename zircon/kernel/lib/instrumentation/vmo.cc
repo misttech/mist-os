@@ -57,7 +57,7 @@ class SymbolizerFile {
   }
 
  private:
-  static constexpr ktl::string_view kVmoName = "data/symbolizer.log";
+  static constexpr ktl::string_view kVmoName = "i/logs/zircon.elf.symbolizer";
 
   fbl::RefPtr<VmObjectPaged> vmo_;
   FILE stream_{this};

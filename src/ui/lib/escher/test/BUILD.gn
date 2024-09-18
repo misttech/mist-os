@@ -131,11 +131,11 @@ if (is_host && !has_prebuilt_vulkan_runtime) {
         "profiling/timestamp_profiler_unittest.cc",
       ]
       deps += [
+        "//sdk/lib/async:async-cpp",
+        "//sdk/lib/async-default",
+        "//sdk/lib/async-loop:async-loop-cpp",
+        "//sdk/lib/async-loop:async-loop-default",
         "//src/lib/testing/loop_fixture",
-        "//zircon/system/ulib/async:async-cpp",
-        "//zircon/system/ulib/async-default",
-        "//zircon/system/ulib/async-loop:async-loop-cpp",
-        "//zircon/system/ulib/async-loop:async-loop-default",
       ]
     }
 

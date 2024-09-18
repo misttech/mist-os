@@ -14,6 +14,7 @@ use anyhow::{anyhow, Error};
 use async_trait::async_trait;
 use chacha20::{ChaCha20, Key};
 use fprint::TypeFingerprint;
+use fxfs_macros::{migrate_nodefault, Migrate};
 use serde::de::{Error as SerdeError, Visitor};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use static_assertions::assert_cfg;
@@ -137,13 +138,13 @@ impl<'de> Deserialize<'de> for WrappedKeyBytes {
     }
 }
 
-pub type WrappedKey = WrappedKeyV32;
+pub type WrappedKey = WrappedKeyV40;
 
 #[derive(Clone, Debug, Serialize, Deserialize, TypeFingerprint, PartialEq)]
-pub struct WrappedKeyV32 {
+pub struct WrappedKeyV40 {
     /// The identifier of the wrapping key.  The identifier has meaning to whatever is doing the
     /// unwrapping.
-    pub wrapping_key_id: u64,
+    pub wrapping_key_id: u128,
     /// AES 256 requires a 512 bit key, which is made of two 256 bit keys, one for the data and one
     /// for the tweak.  It is safe to use the same 256 bit key for both (see
     /// https://csrc.nist.gov/CSRC/media/Projects/Block-Cipher-Techniques/documents/BCM/Comments/XTS/follow-up_XTS_comments-Ball.pdf)
@@ -152,11 +153,26 @@ pub struct WrappedKeyV32 {
     pub key: WrappedKeyBytesV32,
 }
 
+#[derive(Default, Clone, Migrate, Debug, Serialize, Deserialize, TypeFingerprint)]
+#[migrate_nodefault]
+pub struct WrappedKeyV32 {
+    pub wrapping_key_id: u64,
+    pub key: WrappedKeyBytesV32,
+}
+
 /// To support key rolling and clones, a file can have more than one key.  Each key has an ID that
 /// unique to the file.
-pub type WrappedKeys = WrappedKeysV32;
+pub type WrappedKeys = WrappedKeysV40;
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, TypeFingerprint)]
+pub struct WrappedKeysV40(Vec<(u64, WrappedKeyV40)>);
+
+impl From<WrappedKeysV32> for WrappedKeysV40 {
+    fn from(value: WrappedKeysV32) -> Self {
+        Self(value.0.into_iter().map(|(id, key)| (id, key.into())).collect())
+    }
+}
+#[derive(Clone, Debug, Serialize, Deserialize, TypeFingerprint)]
 pub struct WrappedKeysV32(pub Vec<(u64, WrappedKeyV32)>);
 
 impl From<Vec<(u64, WrappedKey)>> for WrappedKeys {

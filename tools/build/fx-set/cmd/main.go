@@ -291,14 +291,6 @@ func parseArgsAndEnv(args []string, env map[string]string) (*setArgs, error) {
 		return nil, fmt.Errorf("--cxx-rbe and --no-cxx-rbe are mutually exclusive")
 	}
 
-	// for each --assembly-override foo=bar string pair, split them into a pair
-	// of strings and validate their lengths
-	for _, overrideStringPair := range cmd.assemblyOverrideStrings {
-		if len(strings.Split(overrideStringPair, "=")) != 2 {
-			return nil, fmt.Errorf(("assembly overrides must be in ASSEMBLY_TARGET=OVERRIDE_TARGET pairs"))
-		}
-	}
-
 	if flagSet.NArg() == 0 {
 		return nil, fmt.Errorf("missing a PRODUCT.BOARD argument")
 	} else if flagSet.NArg() > 1 {

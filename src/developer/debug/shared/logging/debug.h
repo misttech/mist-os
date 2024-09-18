@@ -23,9 +23,10 @@ void SetDebugLogging(bool);
 bool IsDebugLoggingActive();
 
 // The debug logging in debug_agent can also be enabled dynamically remotely via
-//   fx log --select core/debug_agent#DEBUG
+//   fx log --set-severity core/debug_agent#DEBUG
 // Although you usually want more options such as
-//   fx log --select core/debug_agent#DEBUG --tag debug_agent --since_now --hide_metadata --pretty
+//   fx log --set-severity core/debug_agent#DEBUG --tag debug_agent --since_now --hide_metadata \
+//      --pretty
 //
 // `ffx log` doesn't work yet because of https://fxbug.dev/42182432.
 

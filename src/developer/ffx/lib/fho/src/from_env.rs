@@ -9,9 +9,10 @@ use ffx_command::{return_bug, return_user_error, FfxCommandLine, FfxContext, Res
 use ffx_config::EnvironmentContext;
 use ffx_core::Injector;
 use ffx_fidl::VersionInfo;
-use ffx_target::{resolve_target_query_to_info, TargetInfoQuery};
+use ffx_target::TargetInfoQuery;
 use fidl::endpoints::{DiscoverableProtocolMarker, Proxy};
 use fidl_fuchsia_developer_ffx as ffx_fidl;
+use futures::future::LocalBoxFuture;
 use rcs::OpenDirType;
 use std::future::Future;
 use std::marker::PhantomData;
@@ -51,12 +52,50 @@ pub enum FhoConnectionBehavior {
     DirectConnector(Rc<dyn DirectConnector>),
 }
 
+// This trait can a.) probably use more members, and b.) be something that is made public inside of
+// the `target` library.
+#[cfg_attr(test, mockall::automock)]
+pub trait DeviceLookup {
+    fn target_spec(&self, env: EnvironmentContext) -> LocalBoxFuture<'_, Result<Option<String>>>;
+
+    fn resolve_target_query_to_info(
+        &self,
+        query: TargetInfoQuery,
+        env: EnvironmentContext,
+    ) -> LocalBoxFuture<'_, Result<Vec<ffx_fidl::TargetInfo>>>;
+}
+
+/// The default implementation of device lookup and resolution. Primarily used for simpler testing.
+#[doc(hidden)]
+pub struct DeviceLookupDefaultImpl;
+
+impl DeviceLookup for DeviceLookupDefaultImpl {
+    fn target_spec(&self, env: EnvironmentContext) -> LocalBoxFuture<'_, Result<Option<String>>> {
+        Box::pin(async move {
+            ffx_target::get_target_specifier(&env).await.bug_context("looking up target specifier")
+        })
+    }
+
+    fn resolve_target_query_to_info(
+        &self,
+        query: TargetInfoQuery,
+        ctx: EnvironmentContext,
+    ) -> LocalBoxFuture<'_, Result<Vec<ffx_fidl::TargetInfo>>> {
+        Box::pin(async move {
+            ffx_target::resolve_target_query_to_info(query, &ctx)
+                .await
+                .bug_context("resolving target")
+        })
+    }
+}
+
 #[derive(Clone)]
 pub struct FhoEnvironment {
     pub ffx: FfxCommandLine,
     pub context: EnvironmentContext,
     pub injector: Arc<dyn Injector>,
     pub behavior: FhoConnectionBehavior,
+    pub lookup: Arc<dyn DeviceLookup>,
 }
 
 impl FhoEnvironment {
@@ -391,16 +430,21 @@ impl TryFromEnv for Vec<ffx_fidl::TargetInfo> {
     /// end up attempting to connect to all discoverable targets which may be problematic in test or
     /// lab environments.
     async fn try_from_env(env: &FhoEnvironment) -> Result<Self> {
-        let target = ffx_target::get_target_specifier(&env.context)
-            .await
-            .bug_context("getting ffx target")?
-            .user_message("A target must either be set as default or explicitly provided.")?;
-        let targets =
-            resolve_target_query_to_info(TargetInfoQuery::from(target.clone()), &env.context)
-                .await
-                .bug_context("resolving target")?;
+        let target = env.lookup.target_spec(env.context.clone()).await?;
+        let targets = env
+            .lookup
+            .resolve_target_query_to_info(
+                TargetInfoQuery::from(target.clone()),
+                env.context.clone(),
+            )
+            .await?;
         if targets.is_empty() {
-            return_user_error!("Could not discover any targets for specifier '{target}'.");
+            match target.as_ref() {
+                Some(t) => {
+                    return_user_error!("Could not discover any targets for specifier '{}'.", t)
+                }
+                None => return_user_error!("Could not discover any targets."),
+            }
         }
         Ok(targets)
     }
@@ -852,5 +896,71 @@ mod tests {
         let connector = Connector::<RemoteControlProxy>::try_from_env(&tool_env).await.unwrap();
         let res = connector.try_connect(|_, _| Ok(())).await;
         assert!(res.is_err(), "Expected failure: {:?}", res);
+    }
+
+    #[fuchsia::test]
+    async fn test_target_info_try_from_env_none_is_okay() {
+        let config_env = ffx_config::test_init().await.unwrap();
+        let mut mock = MockDeviceLookup::new();
+        mock.expect_target_spec().times(1).returning(|_e| Box::pin(async { Ok(None) }));
+        mock.expect_resolve_target_query_to_info()
+            .times(1)
+            .returning(|_q, _e| Box::pin(async { Ok(vec![ffx_fidl::TargetInfo::default()]) }));
+        let mut tool_env =
+            crate::testing::ToolEnv::new().make_environment(config_env.context.clone());
+        tool_env.lookup = Arc::new(mock);
+        let info = ffx_fidl::TargetInfo::try_from_env(&tool_env).await.unwrap();
+        assert_eq!(info, ffx_fidl::TargetInfo::default());
+    }
+
+    #[fuchsia::test]
+    async fn test_target_info_try_from_env_no_targets_is_error() {
+        let config_env = ffx_config::test_init().await.unwrap();
+        let mut mock = MockDeviceLookup::new();
+        mock.expect_target_spec().times(1).returning(|_e| Box::pin(async { Ok(None) }));
+        mock.expect_resolve_target_query_to_info()
+            .times(1)
+            .returning(|_q, _e| Box::pin(async { Ok(vec![]) }));
+        let mut tool_env =
+            crate::testing::ToolEnv::new().make_environment(config_env.context.clone());
+        tool_env.lookup = Arc::new(mock);
+        let result = ffx_fidl::TargetInfo::try_from_env(&tool_env).await;
+        assert!(result.is_err());
+    }
+
+    #[fuchsia::test]
+    async fn test_target_info_try_from_env_specifier_with_no_targets_is_error() {
+        let config_env = ffx_config::test_init().await.unwrap();
+        let mut mock = MockDeviceLookup::new();
+        mock.expect_target_spec()
+            .times(1)
+            .returning(|_e| Box::pin(async { Ok(Some("frobinator".to_string())) }));
+        mock.expect_resolve_target_query_to_info()
+            .times(1)
+            .returning(|_q, _e| Box::pin(async { Ok(vec![]) }));
+        let mut tool_env =
+            crate::testing::ToolEnv::new().make_environment(config_env.context.clone());
+        tool_env.lookup = Arc::new(mock);
+        let result = ffx_fidl::TargetInfo::try_from_env(&tool_env).await;
+        assert!(result.is_err());
+    }
+
+    #[fuchsia::test]
+    async fn test_target_info_try_from_env_too_many_targets_is_error() {
+        let config_env = ffx_config::test_init().await.unwrap();
+        let mut mock = MockDeviceLookup::new();
+        mock.expect_target_spec()
+            .times(1)
+            .returning(|_e| Box::pin(async { Ok(Some("frobinator".to_string())) }));
+        mock.expect_resolve_target_query_to_info().times(1).returning(|_q, _e| {
+            Box::pin(async {
+                Ok(vec![ffx_fidl::TargetInfo::default(), ffx_fidl::TargetInfo::default()])
+            })
+        });
+        let mut tool_env =
+            crate::testing::ToolEnv::new().make_environment(config_env.context.clone());
+        tool_env.lookup = Arc::new(mock);
+        let result = ffx_fidl::TargetInfo::try_from_env(&tool_env).await;
+        assert!(result.is_err());
     }
 }

@@ -107,6 +107,7 @@ cc_source_library://pkg/sys_component_cpp_testing
 cc_source_library://pkg/sys_cpp
 cc_source_library://pkg/sys_cpp_testing
 cc_source_library://pkg/sys_service_cpp
+cc_source_library://pkg/syslog_cpp
 cc_source_library://pkg/syslog_structured_backend
 cc_source_library://pkg/trace
 cc_source_library://pkg/trace-engine-headersonly
@@ -197,8 +198,8 @@ fidl_library://fidl/fuchsia.bluetooth.bredr
 fidl_library://fidl/fuchsia.bluetooth.fastpair
 fidl_library://fidl/fuchsia.bluetooth.gatt
 fidl_library://fidl/fuchsia.bluetooth.gatt2
-fidl_library://fidl/fuchsia.bluetooth.host
 fidl_library://fidl/fuchsia.bluetooth.hfp
+fidl_library://fidl/fuchsia.bluetooth.host
 fidl_library://fidl/fuchsia.bluetooth.le
 fidl_library://fidl/fuchsia.bluetooth.sys
 fidl_library://fidl/fuchsia.buildinfo
@@ -242,6 +243,7 @@ fidl_library://fidl/fuchsia.fonts
 fidl_library://fidl/fuchsia.gpu.agis
 fidl_library://fidl/fuchsia.gpu.magma
 fidl_library://fidl/fuchsia.hardware.adc
+fidl_library://fidl/fuchsia.hardware.adcimpl (unstable)
 fidl_library://fidl/fuchsia.hardware.audio
 fidl_library://fidl/fuchsia.hardware.audio.signalprocessing
 fidl_library://fidl/fuchsia.hardware.bluetooth
@@ -266,7 +268,10 @@ fidl_library://fidl/fuchsia.hardware.registers (unstable)
 fidl_library://fidl/fuchsia.hardware.rtc
 fidl_library://fidl/fuchsia.hardware.sdio (unstable)
 fidl_library://fidl/fuchsia.hardware.sdmmc (unstable)
+fidl_library://fidl/fuchsia.hardware.serial (unstable)
+fidl_library://fidl/fuchsia.hardware.serialimpl (unstable)
 fidl_library://fidl/fuchsia.hardware.sharedmemory (unstable)
+fidl_library://fidl/fuchsia.hardware.spi (unstable)
 fidl_library://fidl/fuchsia.hardware.spiimpl (unstable)
 fidl_library://fidl/fuchsia.hardware.spmi (unstable)
 fidl_library://fidl/fuchsia.hardware.temperature

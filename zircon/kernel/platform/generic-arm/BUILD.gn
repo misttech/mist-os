@@ -6,7 +6,6 @@
 
 source_set("generic-arm") {
   sources = [
-    "dev-init-uart.cc",
     "dev-init.cc",
     "efi.cc",
     "platform.cc",
@@ -27,10 +26,6 @@ source_set("generic-arm") {
     "//zircon/kernel/dev/power/motmot",
     "//zircon/kernel/dev/psci",
     "//zircon/kernel/dev/timer/arm_generic",
-    "//zircon/kernel/dev/uart/amlogic_s905",
-    "//zircon/kernel/dev/uart/dw8250",
-    "//zircon/kernel/dev/uart/motmot",
-    "//zircon/kernel/dev/uart/pl011",
     "//zircon/kernel/lib/arch",
     "//zircon/kernel/lib/boot-options",
     "//zircon/kernel/lib/cbuf",

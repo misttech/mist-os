@@ -247,6 +247,12 @@
             to: "#core",
             availability: "optional",
         },
+        {
+            dictionary: "toolbox",
+            from: "#core",
+            as: "toolbox-core",
+            to: "#toolbox",
+        },
     ],
     environments: [
         {

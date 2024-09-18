@@ -67,6 +67,8 @@ struct ScannedDir {
     visited: UnsafeCell<bool>,
     // Attributes for this directory.
     attributes: ScannedAttributes,
+    // True if directory uses casefold
+    casefold: bool,
 }
 
 unsafe impl Sync for ScannedDir {}
@@ -194,7 +196,7 @@ impl<'a> ScannedStore<'a> {
                         );
                     }
                     ObjectValue::Object {
-                        kind: ObjectKind::Directory { sub_dirs },
+                        kind: ObjectKind::Directory { sub_dirs, casefold, .. },
                         attributes: ObjectAttributes { project_id, allocated_size, .. },
                     } => {
                         if *project_id > 0 {
@@ -230,6 +232,7 @@ impl<'a> ScannedStore<'a> {
                                     in_graveyard: false,
                                     extended_attributes: Vec::new(),
                                 },
+                                casefold: *casefold,
                             }),
                         );
                     }
@@ -426,7 +429,10 @@ impl<'a> ScannedStore<'a> {
                     }
                 }
             }
-            ObjectKeyData::Child { name: ref _name } => match value {
+            // TODO(b/365631616): Check that the child type matches the directory metadata.
+            ObjectKeyData::Child { .. }
+            | ObjectKeyData::CasefoldChild { .. }
+            | ObjectKeyData::EncryptedChild { .. } => match value {
                 ObjectValue::None => {}
                 ObjectValue::Child(ChildValue { object_id: child_id, object_descriptor }) => {
                     if *child_id == INVALID_OBJECT_ID {
@@ -555,7 +561,17 @@ impl<'a> ScannedStore<'a> {
         parent_id: u64,
         child_id: u64,
         object_descriptor: &ObjectDescriptor,
+        casefold: bool,
     ) -> Result<(), Error> {
+        if let Some(ScannedObject::Directory(dir)) = self.objects.get(&parent_id) {
+            if dir.casefold != casefold {
+                self.fsck.error(FsckError::CasefoldInconsistency(
+                    self.store_id,
+                    parent_id,
+                    child_id,
+                ))?;
+            }
+        }
         match (self.objects.get_mut(&child_id), object_descriptor) {
             (
                 Some(ScannedObject::File(ScannedFile { parents, .. })),
@@ -844,7 +860,12 @@ async fn scan_extents_and_directory_children<'a>(
                 key: ObjectKey { object_id, data: ObjectKeyData::Child { .. } },
                 value: ObjectValue::Child(ChildValue { object_id: child_id, object_descriptor }),
                 ..
-            } => scanned.process_child(*object_id, *child_id, object_descriptor)?,
+            } => scanned.process_child(*object_id, *child_id, object_descriptor, false)?,
+            ItemRef {
+                key: ObjectKey { object_id, data: ObjectKeyData::CasefoldChild { .. } },
+                value: ObjectValue::Child(ChildValue { object_id: child_id, object_descriptor }),
+                ..
+            } => scanned.process_child(*object_id, *child_id, object_descriptor, true)?,
             _ => {}
         }
         iter.advance().await?;

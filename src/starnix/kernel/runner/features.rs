@@ -30,7 +30,7 @@ use starnix_modules_gralloc::gralloc_device_init;
 #[cfg(not(feature = "starnix_lite"))]
 use starnix_modules_input::uinput::register_uinput_device;
 #[cfg(not(feature = "starnix_lite"))]
-use starnix_modules_input::InputDevice;
+use starnix_modules_input::{EventProxyMode, InputDevice};
 #[cfg(not(feature = "starnix_lite"))]
 use starnix_modules_magma::magma_device_init;
 #[cfg(not(feature = "starnix_lite"))]
@@ -183,9 +183,9 @@ pub fn run_container_features(
     if features.framebuffer {
         fb_device_init(locked, system_task);
 
-        let (touch_source_proxy, touch_source_stream) = fidl::endpoints::create_sync_proxy();
+        let (touch_source_client, touch_source_server) = fidl::endpoints::create_endpoints();
         let view_bound_protocols = fuicomposition::ViewBoundProtocols {
-            touch_source: Some(touch_source_stream),
+            touch_source: Some(touch_source_server),
             ..Default::default()
         };
         let view_identity = fuiviews::ViewIdentityOnCreation::from(
@@ -225,9 +225,9 @@ pub fn run_container_features(
         keyboard_device.clone().register(locked, &kernel.kthreads.system_task());
         register_uinput_device(locked, &kernel.kthreads.system_task());
 
-        touch_device.start_touch_relay(&kernel, touch_source_proxy);
+        touch_device.start_touch_relay(&kernel, touch_source_client, EventProxyMode::WakeContainer);
         keyboard_device.start_keyboard_relay(&kernel, keyboard, view_ref);
-        keyboard_device.start_button_relay(&kernel, registry_proxy);
+        keyboard_device.start_button_relay(&kernel, registry_proxy, EventProxyMode::WakeContainer);
 
         // Channel we use to inform the relay of changes to `touch_standby`
         let (touch_standby_sender, touch_standby_receiver) = channel::<bool>();

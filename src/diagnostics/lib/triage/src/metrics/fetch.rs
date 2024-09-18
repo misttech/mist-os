@@ -7,6 +7,7 @@ use crate::config::{DataFetcher, DiagnosticData, Source};
 use anyhow::{anyhow, bail, Context, Error, Result};
 use diagnostics_hierarchy::DiagnosticsHierarchy;
 use fidl_fuchsia_diagnostics::Selector;
+use fidl_fuchsia_inspect::DEFAULT_TREE_NAME;
 use regex::Regex;
 use selectors::VerboseError;
 use serde::Serialize;
@@ -15,7 +16,7 @@ use serde_json::map::Map as JsonMap;
 use serde_json::Value as JsonValue;
 use std::collections::HashMap;
 use std::str::FromStr;
-use std::sync::{Arc, LazyLock};
+use std::sync::LazyLock;
 
 /// [Fetcher] is a source of values to feed into the calculations. It may contain data either
 /// from snapshot.zip files (e.g. inspect.json data that can be accessed via "select" entries)
@@ -200,9 +201,17 @@ impl TryFrom<String> for SelectorString {
     }
 }
 
+#[derive(Debug)]
 pub struct ComponentInspectInfo {
     processed_data: DiagnosticsHierarchy,
     moniker: Vec<String>,
+    tree_name: String,
+}
+
+impl ComponentInspectInfo {
+    fn matches_selector(&self, selector: &Selector) -> Result<bool, anyhow::Error> {
+        selectors::match_component_and_tree_name(&self.moniker, &self.tree_name, selector)
+    }
 }
 
 #[derive(Default)]
@@ -323,6 +332,14 @@ impl TryFrom<Vec<JsonValue>> for InspectFetcher {
             .iter()
             .map(|raw_component| {
                 let moniker = moniker_from(raw_component)?;
+                let tree_name = match extract_json_value(
+                    extract_json_value(raw_component, "metadata")?,
+                    "name",
+                ) {
+                    Ok(n) => n.as_str().unwrap_or(DEFAULT_TREE_NAME).to_string(),
+                    // the "name" field might be missing from older systems
+                    Err(_) => DEFAULT_TREE_NAME.to_string(),
+                };
                 let raw_contents = extract_json_value(raw_component, "payload").or_else(|_| {
                     extract_json_value(raw_component, "contents").or_else(|_| {
                         bail!("Neither 'payload' nor 'contents' found in Inspect component")
@@ -342,7 +359,7 @@ impl TryFrom<Vec<JsonValue>> for InspectFetcher {
                         })?
                     }
                 };
-                Ok(ComponentInspectInfo { moniker, processed_data })
+                Ok(ComponentInspectInfo { moniker, processed_data, tree_name })
             })
             .collect::<Vec<_>>();
 
@@ -369,14 +386,10 @@ impl InspectFetcher {
     }
 
     fn try_fetch(&self, selector_string: &SelectorString) -> Result<Vec<MetricValue>, Error> {
-        let arc_selector = Arc::new(selector_string.parsed_selector.clone());
         let mut properties = Vec::new();
         let mut found_component = false;
         for component in self.components.iter() {
-            if !selectors::match_component_moniker_against_selector(
-                &component.moniker,
-                &arc_selector,
-            )? {
+            if !component.matches_selector(&selector_string.parsed_selector)? {
                 continue;
             }
             found_component = true;
@@ -434,11 +447,13 @@ mod test {
             {
                 "data_source": "Inspect",
                 "moniker": "bar",
+                "metadata": {},
                 "payload": { "root": { "bar": 99 }}
             },
             {
                 "data_source": "Inspect",
                 "moniker": "bar2",
+                "metadata": {},
                 "payload": { "root": { "bar": 90 }}
             }
 
@@ -461,11 +476,13 @@ mod test {
                 {
                     "data_source": "Inspect",
                     "moniker": "bootstrap/foo",
+                    "metadata": {},
                     "payload": null
                 },
                 {
                     "data_source": "Inspect",
                     "moniker": "bootstrap/foo",
+                    "metadata": {},
                     "payload": {"root": {"bar": 10}}
                 }
             ]"#;
@@ -658,27 +675,123 @@ mod test {
     }
 
     #[fuchsia::test]
+    fn test_fetch_with_tree_names() {
+        let cases = &[
+            (
+                "INSPECT:core/*:[name=root]root:foo",
+                vec![MetricValue::String("bar".to_string())],
+                r#"[
+  {
+    "data_source": "Inspect",
+    "metadata": {
+      "name": "root",
+      "component_url": "fuchsia-pkg://fuchsia.com/foo#meta/foo.cm",
+      "timestamp": 6532507441581
+    },
+    "moniker": "core/foo",
+    "payload": {
+      "root": {
+        "foo": "bar"
+      }
+    }
+  },
+  {
+    "data_source": "Inspect",
+    "metadata": {
+      "name": "root",
+      "component_url": "fuchsia-pkg://fuchsia.com/baz#meta/baz.cm",
+      "timestamp": 6532507441581
+    },
+    "moniker": "core/baz",
+    "payload": {
+      "root": {
+        "baz": ""
+      }
+    }
+  }
+]
+"#,
+            ),
+            (
+                "INSPECT:core/*:[name=foo-is-bar]root:foo",
+                vec![MetricValue::String("bar".to_string())],
+                r#"[
+  {
+    "data_source": "Inspect",
+    "metadata": {
+      "name": "foo-is-bar",
+      "component_url": "fuchsia-pkg://fuchsia.com/foo#meta/foo.cm",
+      "timestamp": 6532507441581
+    },
+    "moniker": "core/foo",
+    "payload": {
+      "root": {
+        "foo": "bar"
+      }
+    }
+  },
+  {
+    "data_source": "Inspect",
+    "metadata": {
+      "name": "foo-is-qux",
+      "component_url": "fuchsia-pkg://fuchsia.com/foo#meta/foo.cm",
+      "timestamp": 6532507441581
+    },
+    "moniker": "core/foo",
+    "payload": {
+      "root": {
+        "foo": "qux"
+      }
+    }
+  },
+  {
+    "data_source": "Inspect",
+    "metadata": {
+      "name": "root",
+      "component_url": "fuchsia-pkg://fuchsia.com/baz#meta/baz.cm",
+      "timestamp": 6532507441581
+    },
+    "moniker": "core/baz",
+    "payload": {
+      "root": {
+        "baz": ""
+      }
+    }
+  }
+]
+"#,
+            ),
+        ];
+
+        for (selector, expected, json) in cases {
+            let fetcher = InspectFetcher::try_from(*json).unwrap();
+            let metric = fetcher.fetch_str(selector);
+            assert_eq!(expected, &metric, "component list: {:#?}", fetcher.components);
+        }
+    }
+
+    #[fuchsia::test]
     fn test_fetch() -> Result<(), Error> {
         // This tests both the moniker/payload and path/content (old-style) Inspect formats.
         let json_options = vec![
             r#"[
-        {"moniker":"asdf/foo/qwer",
+        {"moniker":"asdf/foo/qwer", "metadata": {},
          "payload":{"root":{"dataInt":5, "child":{"dataFloat":2.3}}}},
-        {"moniker":"zxcv/bar/hjkl",
+        {"moniker":"zxcv/bar/hjkl", "metadata": {},
          "payload":{"base":{"dataInt":42, "array":[2,3,4], "yes": true}}},
-        {"moniker":"fail_component",
+        {"moniker":"fail_component", "metadata": {},
          "payload": ["a", "b"]},
-        {"moniker":"missing_component",
+        {"moniker":"missing_component", "metadata": {},
          "payload": null}
         ]"#,
             r#"[
-        {"moniker":"asdf/foo/qwer",
+        {"moniker":"asdf/foo/qwer", "metadata": {},
          "payload":{"root":{"dataInt":5, "child":{"dataFloat":2.3}}}},
-        {"moniker":"zxcv/bar/hjkl",
+        {"moniker":"zxcv/bar/hjkl", "metadata": {},
          "contents":{"base":{"dataInt":42, "array":[2,3,4], "yes": true}}},
-        {"moniker":"fail_component",
+        {"moniker":"fail_component", "metadata": {},
          "payload": ["a", "b"]},
-        {"moniker":"missing_component",
+        {"moniker":"missing_component", "metadata": {},
          "payload": null}
         ]"#,
         ];

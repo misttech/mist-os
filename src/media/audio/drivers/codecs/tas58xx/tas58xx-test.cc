@@ -9,19 +9,24 @@
 #include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
+#include <lib/fpromise/single_threaded_executor.h>
+#include <lib/inspect/cpp/hierarchy.h>
 #include <lib/inspect/cpp/inspect.h>
-#include <lib/inspect/testing/cpp/zxtest/inspect.h>
-#include <lib/mock-i2c/mock-i2c.h>
+#include <lib/inspect/cpp/reader.h>
+#include <lib/inspect/testing/cpp/inspect.h>
+#include <lib/mock-i2c/mock-i2c-gtest.h>
 #include <lib/simple-codec/simple-codec-client.h>
 #include <lib/simple-codec/simple-codec-helper.h>
 #include <lib/sync/completion.h>
 
 #include <string>
 
-#include <zxtest/zxtest.h>
+#include <gmock/gmock.h>
+#include <gtest/gtest.h>
 
 #include "src/devices/gpio/testing/fake-gpio/fake-gpio.h"
 #include "src/devices/testing/mock-ddk/mock-device.h"
+#include "src/lib/testing/predicates/status.h"
 
 namespace audio {
 
@@ -65,7 +70,7 @@ struct Tas58xxCodec : public Tas58xx {
   bool BackgroundFaultPollingIsEnabled() override { return false; }
 };
 
-class Tas58xxTest : public inspect::InspectTestHelper, public zxtest::Test {
+class Tas58xxTest : public ::testing::Test {
  public:
   void SetUp() override {
     fake_parent_ = MockDevice::FakeRootParent();
@@ -87,7 +92,7 @@ class Tas58xxTest : public inspect::InspectTestHelper, public zxtest::Test {
         fake_parent_.get(), std::move(endpoints.client), std::move(fault_gpio_client)));
 
     auto* child_dev = fake_parent_->GetLatestChild();
-    ASSERT_NOT_NULL(child_dev);
+    ASSERT_TRUE(child_dev);
     codec_ = child_dev->GetDeviceContext<Tas58xxCodec>();
     zx::result<fidl::ClientEnd<fuchsia_hardware_audio::Codec>> codec_client = codec_->GetClient();
     ASSERT_OK(codec_client.status_value());
@@ -104,7 +109,7 @@ class Tas58xxTest : public inspect::InspectTestHelper, public zxtest::Test {
     fault_gpio_.SyncCall(&fake_gpio::FakeGpio::PushReadResponse, response);
   }
 
-  mock_i2c::MockI2c mock_i2c_;
+  mock_i2c::MockI2cGtest mock_i2c_;
   async_patterns::TestDispatcherBound<fake_gpio::FakeGpio> fault_gpio_{
       fidl_servers_loop_.dispatcher(), std::in_place};
   SimpleCodecClient client_;
@@ -259,23 +264,23 @@ TEST_F(Tas58xxTest, BadSetDai) {
 
 TEST_F(Tas58xxTest, GetDai) {
   auto formats = client_.GetDaiFormats();
-  EXPECT_EQ(formats.value().number_of_channels.size(), 2);
-  EXPECT_EQ(formats.value().number_of_channels[0], 2);
-  EXPECT_EQ(formats.value().number_of_channels[1], 4);
-  EXPECT_EQ(formats.value().sample_formats.size(), 1);
+  EXPECT_EQ(formats.value().number_of_channels.size(), 2u);
+  EXPECT_EQ(formats.value().number_of_channels[0], 2u);
+  EXPECT_EQ(formats.value().number_of_channels[1], 4u);
+  EXPECT_EQ(formats.value().sample_formats.size(), 1u);
   EXPECT_EQ(formats.value().sample_formats[0], SampleFormat::PCM_SIGNED);
-  EXPECT_EQ(formats.value().frame_formats.size(), 2);
+  EXPECT_EQ(formats.value().frame_formats.size(), 2u);
   EXPECT_EQ(formats.value().frame_formats[0], FrameFormat::I2S);
   EXPECT_EQ(formats.value().frame_formats[1], FrameFormat::TDM1);
-  EXPECT_EQ(formats.value().frame_rates.size(), 2);
-  EXPECT_EQ(formats.value().frame_rates[0], 48'000);
-  EXPECT_EQ(formats.value().frame_rates[1], 96'000);
-  EXPECT_EQ(formats.value().bits_per_slot.size(), 2);
-  EXPECT_EQ(formats.value().bits_per_slot[0], 16);
-  EXPECT_EQ(formats.value().bits_per_slot[1], 32);
-  EXPECT_EQ(formats.value().bits_per_sample.size(), 2);
-  EXPECT_EQ(formats.value().bits_per_sample[0], 16);
-  EXPECT_EQ(formats.value().bits_per_sample[1], 32);
+  EXPECT_EQ(formats.value().frame_rates.size(), 2u);
+  EXPECT_EQ(formats.value().frame_rates[0], 48'000u);
+  EXPECT_EQ(formats.value().frame_rates[1], 96'000u);
+  EXPECT_EQ(formats.value().bits_per_slot.size(), 2u);
+  EXPECT_EQ(formats.value().bits_per_slot[0], 16u);
+  EXPECT_EQ(formats.value().bits_per_slot[1], 32u);
+  EXPECT_EQ(formats.value().bits_per_sample.size(), 2u);
+  EXPECT_EQ(formats.value().bits_per_sample[0], 16u);
+  EXPECT_EQ(formats.value().bits_per_sample[1], 32u);
 }
 
 TEST_F(Tas58xxTest, GetInfo5805) {
@@ -333,7 +338,7 @@ TEST_F(Tas58xxTest, SetGainDeprecated) {
 }
 
 // Tests that don't use SimpleCodec and make signal processing calls on their own.
-class Tas58xxSignalProcessingTest : public inspect::InspectTestHelper, public zxtest::Test {
+class Tas58xxSignalProcessingTest : public ::testing::Test {
  public:
   void SetUp() override {
     fake_parent_ = MockDevice::FakeRootParent();
@@ -355,7 +360,7 @@ class Tas58xxSignalProcessingTest : public inspect::InspectTestHelper, public zx
         fake_parent_.get(), std::move(endpoints.client), std::move(fault_gpio_client)));
 
     auto* child_dev = fake_parent_->GetLatestChild();
-    ASSERT_NOT_NULL(child_dev);
+    ASSERT_TRUE(child_dev);
     codec_ = child_dev->GetDeviceContext<Tas58xxCodec>();
 
     fidl::InterfaceHandle<audio_fidl::Codec> codec_handle;
@@ -379,7 +384,7 @@ class Tas58xxSignalProcessingTest : public inspect::InspectTestHelper, public zx
  protected:
   fidl::SynchronousInterfacePtr<audio_fidl::Codec> codec_client_;
   fidl::SynchronousInterfacePtr<signal_fidl::SignalProcessing> signal_processing_client_;
-  mock_i2c::MockI2c mock_i2c_;
+  mock_i2c::MockI2cGtest mock_i2c_;
   async_patterns::TestDispatcherBound<fake_gpio::FakeGpio> fault_gpio_{
       fidl_servers_loop_.dispatcher(), std::in_place};
   Tas58xxCodec* codec_;
@@ -389,9 +394,9 @@ TEST_F(Tas58xxSignalProcessingTest, GetTopologySignalProcessing) {
   signal_fidl::Reader_GetTopologies_Result result;
   ASSERT_OK(signal_processing_client_->GetTopologies(&result));
   ASSERT_FALSE(result.is_err());
-  ASSERT_EQ(result.response().topologies.size(), 1);
+  ASSERT_EQ(result.response().topologies.size(), 1u);
   ASSERT_EQ(result.response().topologies[0].id(), codec_->GetTopologyId());
-  ASSERT_EQ(result.response().topologies[0].processing_elements_edge_pairs().size(), 3);
+  ASSERT_EQ(result.response().topologies[0].processing_elements_edge_pairs().size(), 3u);
   ASSERT_EQ(result.response()
                 .topologies[0]
                 .processing_elements_edge_pairs()[0]
@@ -428,9 +433,9 @@ TEST_F(Tas58xxSignalProcessingTest, GetTopologySignalProcessing) {
   ASSERT_TRUE(result3.is_err());
 }
 
-TEST(Tas58xxSignalProcessingTest, SignalProcessingConnectTooManyConnections) {
+TEST(Tas58xxSignalProcessingMultiConnectionTest, SignalProcessingConnectTooManyConnections) {
   auto fake_parent = MockDevice::FakeRootParent();
-  mock_i2c::MockI2c mock_i2c;
+  mock_i2c::MockI2cGtest mock_i2c;
   async::Loop fidl_servers_loop{&kAsyncLoopConfigNoAttachToCurrentThread};
 
   mock_i2c.ExpectWrite({0x67}).ExpectReadStop({0x95});  // Check DIE ID.
@@ -447,7 +452,7 @@ TEST(Tas58xxSignalProcessingTest, SignalProcessingConnectTooManyConnections) {
   ASSERT_OK(SimpleCodecServer::CreateAndAddToDdk<Tas58xxCodec>(
       fake_parent.get(), std::move(endpoints.client), std::move(fault_gpio_client)));
   auto* child_dev = fake_parent->GetLatestChild();
-  ASSERT_NOT_NULL(child_dev);
+  ASSERT_TRUE(child_dev);
   auto codec = child_dev->GetDeviceContext<Tas58xxCodec>();
 
   zx::channel channel_remote, channel_local;
@@ -521,11 +526,16 @@ TEST_F(Tas58xxSignalProcessingTest, SetGain) {
     ASSERT_TRUE(state_received.type_specific().gain().has_gain());
     ASSERT_EQ(state_received.type_specific().gain().gain(), -12.0f);
 
-    ASSERT_NO_FATAL_FAILURE(ReadInspect(codec_->inspect().DuplicateVmo()));
-    auto* root = hierarchy().GetByPath({"tas58xx"});
-    ASSERT_TRUE(root);
-    ASSERT_NO_FATAL_FAILURE(
-        CheckProperty(root->node(), "gain_db", inspect::DoublePropertyValue(-12.f)));
+    fpromise::result<inspect::Hierarchy> hierarchy_result =
+        fpromise::run_single_threaded(inspect::ReadFromInspector(codec_->inspect()));
+    ASSERT_TRUE(hierarchy_result.is_ok());
+
+    inspect::Hierarchy hierarchy = std::move(hierarchy_result.value());
+    const inspect::Hierarchy* codec_root = hierarchy.GetByPath({"tas58xx"});
+    ASSERT_TRUE(codec_root);
+
+    EXPECT_THAT(codec_root->node(), inspect::testing::PropertyList(testing::Contains(
+                                        inspect::testing::DoubleIs("gain_db", -12.))));
   }
 
   // If no gain and no enable/disable state is provided, then there should be no change and
@@ -562,11 +572,16 @@ TEST_F(Tas58xxSignalProcessingTest, SetGain) {
     ASSERT_TRUE(state_received.type_specific().gain().has_gain());
     ASSERT_EQ(state_received.type_specific().gain().gain(), 0.0f);  // Effectively disables gain.
 
-    ASSERT_NO_FATAL_FAILURE(ReadInspect(codec_->inspect().DuplicateVmo()));
-    auto* root = hierarchy().GetByPath({"tas58xx"});
-    ASSERT_TRUE(root);
-    ASSERT_NO_FATAL_FAILURE(
-        CheckProperty(root->node(), "gain_db", inspect::DoublePropertyValue(0.f)));
+    fpromise::result<inspect::Hierarchy> hierarchy_result =
+        fpromise::run_single_threaded(inspect::ReadFromInspector(codec_->inspect()));
+    ASSERT_TRUE(hierarchy_result.is_ok());
+
+    inspect::Hierarchy hierarchy = std::move(hierarchy_result.value());
+    const inspect::Hierarchy* codec_root = hierarchy.GetByPath({"tas58xx"});
+    ASSERT_TRUE(codec_root);
+
+    EXPECT_THAT(codec_root->node(), inspect::testing::PropertyList(testing::Contains(
+                                        inspect::testing::DoubleIs("gain_db", 0.))));
   }
 
   // Disable gain but provide a gain value, still effectively disables gain (0dB).
@@ -629,10 +644,17 @@ TEST_F(Tas58xxSignalProcessingTest, SetMute) {
     ASSERT_TRUE(state_received.has_bypassed());
     ASSERT_FALSE(state_received.bypassed());
 
-    ASSERT_NO_FATAL_FAILURE(ReadInspect(codec_->inspect().DuplicateVmo()));
-    auto* root = hierarchy().GetByPath({"tas58xx"});
-    ASSERT_TRUE(root);
-    ASSERT_NO_FATAL_FAILURE(CheckProperty(root->node(), "muted", inspect::BoolPropertyValue(true)));
+    fpromise::result<inspect::Hierarchy> hierarchy_result =
+        fpromise::run_single_threaded(inspect::ReadFromInspector(codec_->inspect()));
+    ASSERT_TRUE(hierarchy_result.is_ok());
+
+    inspect::Hierarchy hierarchy = std::move(hierarchy_result.value());
+    const inspect::Hierarchy* codec_root = hierarchy.GetByPath({"tas58xx"});
+    ASSERT_TRUE(codec_root);
+
+    EXPECT_THAT(
+        codec_root->node(),
+        inspect::testing::PropertyList(testing::Contains(inspect::testing::BoolIs("muted", true))));
   }
 
   // If no enable/disable is provided, then there should be no change and no I2C transaction.
@@ -665,11 +687,16 @@ TEST_F(Tas58xxSignalProcessingTest, SetMute) {
     ASSERT_TRUE(state_received.has_bypassed());
     ASSERT_TRUE(state_received.bypassed());
 
-    ASSERT_NO_FATAL_FAILURE(ReadInspect(codec_->inspect().DuplicateVmo()));
-    auto* root = hierarchy().GetByPath({"tas58xx"});
-    ASSERT_TRUE(root);
-    ASSERT_NO_FATAL_FAILURE(
-        CheckProperty(root->node(), "muted", inspect::BoolPropertyValue(false)));
+    fpromise::result<inspect::Hierarchy> hierarchy_result =
+        fpromise::run_single_threaded(inspect::ReadFromInspector(codec_->inspect()));
+    ASSERT_TRUE(hierarchy_result.is_ok());
+
+    inspect::Hierarchy hierarchy = std::move(hierarchy_result.value());
+    const inspect::Hierarchy* codec_root = hierarchy.GetByPath({"tas58xx"});
+    ASSERT_TRUE(codec_root);
+
+    EXPECT_THAT(codec_root->node(), inspect::testing::PropertyList(testing::Contains(
+                                        inspect::testing::BoolIs("muted", false))));
   }
 }
 
@@ -859,11 +886,11 @@ TEST_F(Tas58xxSignalProcessingTest, WatchEqualizer) {
   ASSERT_TRUE(state_received.type_specific().equalizer().band_states()[2].has_id());
   ASSERT_TRUE(state_received.type_specific().equalizer().band_states()[3].has_id());
   ASSERT_TRUE(state_received.type_specific().equalizer().band_states()[4].has_id());
-  ASSERT_EQ(state_received.type_specific().equalizer().band_states()[0].id(), 0);
-  ASSERT_EQ(state_received.type_specific().equalizer().band_states()[1].id(), 1);
-  ASSERT_EQ(state_received.type_specific().equalizer().band_states()[2].id(), 2);
-  ASSERT_EQ(state_received.type_specific().equalizer().band_states()[3].id(), 3);
-  ASSERT_EQ(state_received.type_specific().equalizer().band_states()[4].id(), 4);
+  ASSERT_EQ(state_received.type_specific().equalizer().band_states()[0].id(), 0u);
+  ASSERT_EQ(state_received.type_specific().equalizer().band_states()[1].id(), 1u);
+  ASSERT_EQ(state_received.type_specific().equalizer().band_states()[2].id(), 2u);
+  ASSERT_EQ(state_received.type_specific().equalizer().band_states()[3].id(), 3u);
+  ASSERT_EQ(state_received.type_specific().equalizer().band_states()[4].id(), 4u);
 
   ASSERT_TRUE(state_received.type_specific().equalizer().band_states()[0].has_type());
   ASSERT_TRUE(state_received.type_specific().equalizer().band_states()[1].has_type());
@@ -983,13 +1010,13 @@ TEST_F(Tas58xxSignalProcessingTest, SetEqualizerBandDisabled) {
                 .type_specific()
                 .equalizer()
                 .min_frequency(),
-            100);
+            100u);
   ASSERT_EQ(result.response()
                 .processing_elements[kEqualizerPeIndex]
                 .type_specific()
                 .equalizer()
                 .max_frequency(),
-            20'000);
+            20'000u);
   ASSERT_EQ(result.response()
                 .processing_elements[kEqualizerPeIndex]
                 .type_specific()
@@ -1463,9 +1490,9 @@ TEST_F(Tas58xxSignalProcessingTest, SetEqualizerElementDisabled) {
   }
 }
 
-TEST(Tas58xxTest, Reset) {
+TEST(Tas58xxCustomEnvTest, Reset) {
   auto fake_parent = MockDevice::FakeRootParent();
-  mock_i2c::MockI2c mock_i2c;
+  mock_i2c::MockI2cGtest mock_i2c;
   async::Loop fidl_servers_loop{&kAsyncLoopConfigNoAttachToCurrentThread};
 
   mock_i2c.ExpectWrite({0x67}).ExpectReadStop({0x95});  // Check DIE ID.
@@ -1482,7 +1509,7 @@ TEST(Tas58xxTest, Reset) {
   ASSERT_OK(SimpleCodecServer::CreateAndAddToDdk<Tas58xxCodec>(
       fake_parent.get(), std::move(endpoints.client), std::move(fault_gpio_client)));
   auto* child_dev = fake_parent->GetLatestChild();
-  ASSERT_NOT_NULL(child_dev);
+  ASSERT_TRUE(child_dev);
   auto codec = child_dev->GetDeviceContext<Tas58xxCodec>();
   zx::result<fidl::ClientEnd<fuchsia_hardware_audio::Codec>> codec_client = codec->GetClient();
   ASSERT_OK(codec_client.status_value());
@@ -1512,9 +1539,9 @@ TEST(Tas58xxTest, Reset) {
   mock_i2c.VerifyAndClear();
 }
 
-TEST(Tas58xxTest, BadFaultGpio) {
+TEST(Tas58xxCustomEnvTest, BadFaultGpio) {
   auto fake_parent = MockDevice::FakeRootParent();
-  mock_i2c::MockI2c mock_i2c;
+  mock_i2c::MockI2cGtest mock_i2c;
   async::Loop fidl_servers_loop{&kAsyncLoopConfigNoAttachToCurrentThread};
 
   mock_i2c.ExpectWrite({0x67}).ExpectReadStop({0x95});  // Check DIE ID.
@@ -1528,7 +1555,7 @@ TEST(Tas58xxTest, BadFaultGpio) {
       fake_parent.get(), std::move(endpoints.client),
       fidl::ClientEnd<fuchsia_hardware_gpio::Gpio>()));
   auto* child_dev = fake_parent->GetLatestChild();
-  ASSERT_NOT_NULL(child_dev);
+  ASSERT_TRUE(child_dev);
   auto codec = child_dev->GetDeviceContext<Tas58xxCodec>();
   // Trigger a poll faults which uses the FAULT GPIO, must not crash.
   codec->PeriodicPollFaults();
@@ -1542,9 +1569,9 @@ TEST(Tas58xxTest, BadFaultGpio) {
   [[maybe_unused]] auto info = client.GetInfo();
 }
 
-TEST(Tas58xxTest, Bridged) {
+TEST(Tas58xxCustomEnvTest, Bridged) {
   auto fake_parent = MockDevice::FakeRootParent();
-  mock_i2c::MockI2c mock_i2c;
+  mock_i2c::MockI2cGtest mock_i2c;
   async::Loop fidl_servers_loop{&kAsyncLoopConfigNoAttachToCurrentThread};
 
   mock_i2c.ExpectWrite({0x67}).ExpectReadStop({0x95});  // Check DIE ID.
@@ -1565,7 +1592,7 @@ TEST(Tas58xxTest, Bridged) {
   ASSERT_OK(SimpleCodecServer::CreateAndAddToDdk<Tas58xxCodec>(
       fake_parent.get(), std::move(endpoints.client), std::move(fault_gpio_client)));
   auto* child_dev = fake_parent->GetLatestChild();
-  ASSERT_NOT_NULL(child_dev);
+  ASSERT_TRUE(child_dev);
   auto codec = child_dev->GetDeviceContext<Tas58xxCodec>();
   zx::result<fidl::ClientEnd<fuchsia_hardware_audio::Codec>> codec_client = codec->GetClient();
   ASSERT_OK(codec_client.status_value());
@@ -1645,9 +1672,9 @@ TEST_F(Tas58xxTest, StopStart) {
   ASSERT_OK(client_.Start());
 }
 
-TEST(Tas58xxTest, ExternalConfig) {
+TEST(Tas58xxExternalConfigTest, ExternalConfig) {
   auto fake_parent = MockDevice::FakeRootParent();
-  mock_i2c::MockI2c mock_i2c;
+  mock_i2c::MockI2cGtest mock_i2c;
   async::Loop fidl_servers_loop{&kAsyncLoopConfigNoAttachToCurrentThread};
 
   mock_i2c.ExpectWrite({0x67}).ExpectReadStop({0x95});  // Check DIE ID.
@@ -1679,7 +1706,7 @@ TEST(Tas58xxTest, ExternalConfig) {
   ASSERT_OK(SimpleCodecServer::CreateAndAddToDdk<Tas58xxCodec>(
       fake_parent.get(), std::move(endpoints.client), std::move(fault_gpio_client)));
   auto* child_dev = fake_parent->GetLatestChild();
-  ASSERT_NOT_NULL(child_dev);
+  ASSERT_TRUE(child_dev);
   auto codec = child_dev->GetDeviceContext<Tas58xxCodec>();
   zx::result<fidl::ClientEnd<fuchsia_hardware_audio::Codec>> codec_client = codec->GetClient();
   ASSERT_OK(codec_client.status_value());
@@ -1740,26 +1767,38 @@ TEST_F(Tas58xxTest, FaultNotSeen) {
   SetFaultGpioReadResponse(zx::ok<uint8_t>(1));  // 1 means FAULT inactive
   codec_->PeriodicPollFaults();
 
-  ASSERT_NO_FATAL_FAILURE(ReadInspect(codec_->inspect().DuplicateVmo()));
-  auto* fault_root = hierarchy().GetByPath({"tas58xx"});
-  ASSERT_TRUE(fault_root);
-  auto& faults = fault_root->children();
-  ASSERT_EQ(faults.size(), 1);
-  ASSERT_NO_FATAL_FAILURE(
-      CheckProperty(faults[0].node(), "state", inspect::StringPropertyValue("No fault")));
+  fpromise::result<inspect::Hierarchy> hierarchy_result =
+      fpromise::run_single_threaded(inspect::ReadFromInspector(codec_->inspect()));
+  ASSERT_TRUE(hierarchy_result.is_ok());
+
+  inspect::Hierarchy hierarchy = std::move(hierarchy_result.value());
+  const inspect::Hierarchy* codec_root = hierarchy.GetByPath({"tas58xx"});
+  ASSERT_TRUE(codec_root);
+
+  auto& faults = codec_root->children();
+  ASSERT_EQ(faults.size(), 1u);
+
+  EXPECT_THAT(faults[0].node(), inspect::testing::PropertyList(testing::Contains(
+                                    inspect::testing::StringIs("state", "No fault"))));
 }
 
 TEST_F(Tas58xxTest, FaultPollGpioError) {
   SetFaultGpioReadResponse(zx::error(ZX_ERR_INTERNAL));  // Gpio Error
   codec_->PeriodicPollFaults();
 
-  ASSERT_NO_FATAL_FAILURE(ReadInspect(codec_->inspect().DuplicateVmo()));
-  auto* fault_root = hierarchy().GetByPath({"tas58xx"});
-  ASSERT_TRUE(fault_root);
-  auto& faults = fault_root->children();
-  ASSERT_EQ(faults.size(), 1);
-  ASSERT_NO_FATAL_FAILURE(
-      CheckProperty(faults[0].node(), "state", inspect::StringPropertyValue("GPIO error")));
+  fpromise::result<inspect::Hierarchy> hierarchy_result =
+      fpromise::run_single_threaded(inspect::ReadFromInspector(codec_->inspect()));
+  ASSERT_TRUE(hierarchy_result.is_ok());
+
+  inspect::Hierarchy hierarchy = std::move(hierarchy_result.value());
+  const inspect::Hierarchy* codec_root = hierarchy.GetByPath({"tas58xx"});
+  ASSERT_TRUE(codec_root);
+
+  auto& faults = codec_root->children();
+  ASSERT_EQ(faults.size(), 1u);
+
+  EXPECT_THAT(faults[0].node(), inspect::testing::PropertyList(testing::Contains(
+                                    inspect::testing::StringIs("state", "GPIO error"))));
 }
 
 TEST_F(Tas58xxTest, FaultPollI2CError) {
@@ -1771,13 +1810,19 @@ TEST_F(Tas58xxTest, FaultPollI2CError) {
   mock_i2c_.ExpectWriteStop({0x78, 0x80});
   codec_->PeriodicPollFaults();
 
-  ASSERT_NO_FATAL_FAILURE(ReadInspect(codec_->inspect().DuplicateVmo()));
-  auto* fault_root = hierarchy().GetByPath({"tas58xx"});
-  ASSERT_TRUE(fault_root);
-  auto& faults = fault_root->children();
-  ASSERT_EQ(faults.size(), 1);
-  ASSERT_NO_FATAL_FAILURE(
-      CheckProperty(faults[0].node(), "state", inspect::StringPropertyValue("I2C error")));
+  fpromise::result<inspect::Hierarchy> hierarchy_result =
+      fpromise::run_single_threaded(inspect::ReadFromInspector(codec_->inspect()));
+  ASSERT_TRUE(hierarchy_result.is_ok());
+
+  inspect::Hierarchy hierarchy = std::move(hierarchy_result.value());
+  const inspect::Hierarchy* codec_root = hierarchy.GetByPath({"tas58xx"});
+  ASSERT_TRUE(codec_root);
+
+  auto& faults = codec_root->children();
+  ASSERT_EQ(faults.size(), 1u);
+
+  EXPECT_THAT(faults[0].node(), inspect::testing::PropertyList(testing::Contains(
+                                    inspect::testing::StringIs("state", "I2C error"))));
 }
 
 TEST_F(Tas58xxTest, FaultPollClockFault) {
@@ -1789,13 +1834,20 @@ TEST_F(Tas58xxTest, FaultPollClockFault) {
   mock_i2c_.ExpectWriteStop({0x78, 0x80});
   codec_->PeriodicPollFaults();
 
-  ASSERT_NO_FATAL_FAILURE(ReadInspect(codec_->inspect().DuplicateVmo()));
-  auto* fault_root = hierarchy().GetByPath({"tas58xx"});
-  ASSERT_TRUE(fault_root);
-  auto& faults = fault_root->children();
-  ASSERT_EQ(faults.size(), 1);
-  ASSERT_NO_FATAL_FAILURE(CheckProperty(faults[0].node(), "state",
-                                        inspect::StringPropertyValue("Clock fault, 00 04 00 00")));
+  fpromise::result<inspect::Hierarchy> hierarchy_result =
+      fpromise::run_single_threaded(inspect::ReadFromInspector(codec_->inspect()));
+  ASSERT_TRUE(hierarchy_result.is_ok());
+
+  inspect::Hierarchy hierarchy = std::move(hierarchy_result.value());
+  const inspect::Hierarchy* codec_root = hierarchy.GetByPath({"tas58xx"});
+  ASSERT_TRUE(codec_root);
+
+  auto& faults = codec_root->children();
+  ASSERT_EQ(faults.size(), 1u);
+
+  EXPECT_THAT(faults[0].node(),
+              inspect::testing::PropertyList(testing::Contains(
+                  inspect::testing::StringIs("state", "Clock fault, 00 04 00 00"))));
 }
 
 // Trigger 20 "events" -- ten faults, each of which then goes away.
@@ -1826,11 +1878,15 @@ TEST_F(Tas58xxTest, FaultsAgeOut) {
 
   // We should have ten events seen, and all of them should be
   // timestamped after time_threshold.
-  ASSERT_NO_FATAL_FAILURE(ReadInspect(codec_->inspect().DuplicateVmo()));
-  auto* fault_root = hierarchy().GetByPath({"tas58xx"});
+  fpromise::result<inspect::Hierarchy> hierarchy_result =
+      fpromise::run_single_threaded(inspect::ReadFromInspector(codec_->inspect()));
+  ASSERT_TRUE(hierarchy_result.is_ok());
+
+  inspect::Hierarchy hierarchy = std::move(hierarchy_result.value());
+  const inspect::Hierarchy* fault_root = hierarchy.GetByPath({"tas58xx"});
   ASSERT_TRUE(fault_root);
   auto& faults = fault_root->children();
-  ASSERT_EQ(faults.size(), 10);
+  ASSERT_EQ(faults.size(), 10u);
   for (int event_count = 0; event_count < 10; event_count++) {
     const auto* first_seen_property =
         faults[event_count].node().get_property<inspect::IntPropertyValue>("first_seen");

@@ -42,7 +42,6 @@ fuchsia_cc_driver(
         "@fuchsia_sdk//pkg/driver_component_cpp",
         "@fuchsia_sdk//pkg/driver_runtime",
         "@fuchsia_sdk//pkg/driver_runtime_cpp",
-        "@internal_sdk//fidl/fuchsia.boot:fuchsia.boot_cpp",
         "@internal_sdk//pkg/devicetree-default",
         "@internal_sdk//pkg/devicetree-load-visitors",
         "@internal_sdk//pkg/devicetree-manager",

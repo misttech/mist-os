@@ -49,13 +49,13 @@ source_set("fidl_oneshot") {
 
   public_deps = [
     ":errors",
+    "//sdk/lib/async",
+    "//sdk/lib/async:async-cpp",
     "//sdk/lib/fidl/hlcpp",
     "//sdk/lib/fit",
     "//sdk/lib/fit-promise",
     "//sdk/lib/sys/cpp",
     "//sdk/lib/syslog/cpp",
-    "//zircon/system/ulib/async",
-    "//zircon/system/ulib/async:async-cpp",
   ]
 }
 
@@ -114,8 +114,8 @@ source_set("promise_timeout") {
 
   public_deps = [
     ":errors",
+    "//sdk/lib/async:async-cpp",
     "//sdk/lib/fit-promise",
-    "//zircon/system/ulib/async:async-cpp",
   ]
 }
 
@@ -174,8 +174,8 @@ source_set("utc_clock_ready_watcher") {
   ]
 
   public_deps = [
-    "//zircon/system/ulib/async",
-    "//zircon/system/ulib/async:async-cpp",
+    "//sdk/lib/async",
+    "//sdk/lib/async:async-cpp",
     "//zircon/system/ulib/zx",
   ]
 

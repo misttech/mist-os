@@ -322,7 +322,8 @@ pub(crate) mod testutil {
     use netstack3_base::testutil::FakeCoreCtx;
     use netstack3_base::{NotFoundError, StrongDeviceIdentifier};
 
-    use crate::internal::base::IpRouteTablesContext;
+    use crate::internal::base::{IpRouteTablesContext, IpStateContext};
+    use crate::internal::routing::rules::Rule;
     use crate::internal::types::{AddableMetric, Generation, Metric};
 
     use super::*;
@@ -359,6 +360,16 @@ pub(crate) mod testutil {
                 generation: Generation::initial(),
             })?;
             Ok(())
+        })
+    }
+
+    /// Install and replace any existing rules.
+    pub fn set_rules<I: IpLayerIpExt, CC: IpStateContext<I>>(
+        core_ctx: &mut CC,
+        rules: Vec<Rule<I, CC::DeviceId>>,
+    ) {
+        core_ctx.with_rules_table_mut(|_core_ctx, rules_table| {
+            *rules_table.rules_mut() = rules;
         })
     }
 

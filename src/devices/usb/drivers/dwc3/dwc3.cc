@@ -4,9 +4,13 @@
 
 #include "src/devices/usb/drivers/dwc3/dwc3.h"
 
+#include <fidl/fuchsia.hardware.usb.descriptor/cpp/wire.h>
 #include <lib/ddk/binding_driver.h>
 #include <lib/fit/defer.h>
 #include <lib/zx/clock.h>
+
+#include <cstdlib>
+#include <span>
 
 #include <fbl/auto_lock.h>
 #include <usb/usb.h>
@@ -14,6 +18,8 @@
 #include "src/devices/usb/drivers/dwc3/dwc3-regs.h"
 
 namespace dwc3 {
+
+namespace fdescriptor = fuchsia_hardware_usb_descriptor;
 
 zx_status_t Dwc3::Create(void* ctx, zx_device_t* parent) {
   auto dev = std::make_unique<Dwc3>(parent);
@@ -347,8 +353,8 @@ void Dwc3::HandleResetEvent() {
 
   {
     fbl::AutoLock lock(&dci_lock_);
-    if (dci_intf_) {
-      dci_intf_->SetConnected(true);
+    if (dci_intf_valid()) {
+      DciIntfWrapSetConnected(true);
     }
   }
 }
@@ -400,8 +406,8 @@ void Dwc3::HandleConnectionDoneEvent() {
 
   {
     fbl::AutoLock lock(&dci_lock_);
-    if (dci_intf_) {
-      dci_intf_->SetSpeed(new_speed);
+    if (dci_intf_valid()) {
+      DciIntfWrapSetSpeed(new_speed);
     }
   }
 }
@@ -417,8 +423,8 @@ void Dwc3::HandleDisconnectedEvent() {
 
   {
     fbl::AutoLock lock(&dci_lock_);
-    if (dci_intf_) {
-      dci_intf_->SetConnected(false);
+    if (dci_intf_valid()) {
+      DciIntfWrapSetConnected(false);
     }
   }
 
@@ -439,11 +445,6 @@ void Dwc3::DdkInit(ddk::InitTxn txn) {
 }
 
 void Dwc3::DdkUnbind(ddk::UnbindTxn txn) {
-  {
-    fbl::AutoLock lock(&dci_lock_);
-    dci_intf_.reset();
-  }
-
   if (irq_thread_started_.load()) {
     zx_status_t status = SignalIrqThread(IrqSignal::Exit);
     // if we can't signal the thread, we are not going to be able to shut down
@@ -521,16 +522,7 @@ void Dwc3::UsbDciRequestQueue(usb_request_t* usb_req, const usb_request_complete
   }
 }
 
-zx_status_t Dwc3::UsbDciSetInterface(const usb_dci_interface_protocol_t* interface) {
-  fbl::AutoLock lock(&dci_lock_);
-
-  if (dci_intf_) {
-    zxlogf(ERROR, "Dwc3: DCI Interface already set");
-    return ZX_ERR_BAD_STATE;
-  }
-
-  dci_intf_ = ddk::UsbDciInterfaceProtocolClient(interface);
-
+zx_status_t Dwc3::CommonSetInterface() {
   StartPeripheralMode();
 
   // Start the interrupt thread.
@@ -545,8 +537,40 @@ zx_status_t Dwc3::UsbDciSetInterface(const usb_dci_interface_protocol_t* interfa
   return ZX_OK;
 }
 
-zx_status_t Dwc3::UsbDciConfigEp(const usb_endpoint_descriptor_t* ep_desc,
-                                 const usb_ss_ep_comp_descriptor_t* ss_comp_desc) {
+zx_status_t Dwc3::UsbDciSetInterface(const usb_dci_interface_protocol_t* interface) {
+  fbl::AutoLock lock(&dci_lock_);
+
+  if (dci_intf_valid()) {
+    zxlogf(ERROR, "%s: DCI Interface already set", __func__);
+    return ZX_ERR_BAD_STATE;
+  }
+
+  dci_intf_ = ddk::UsbDciInterfaceProtocolClient(interface);
+
+  return CommonSetInterface();
+}
+
+void Dwc3::SetInterface(SetInterfaceRequest& request, SetInterfaceCompleter::Sync& completer) {
+  fbl::AutoLock lock(&dci_lock_);
+
+  if (dci_intf_valid()) {
+    zxlogf(ERROR, "%s: DCI Interface already set", __func__);
+    completer.Reply(zx::error(ZX_ERR_BAD_STATE));
+    return;
+  }
+
+  dci_intf_ = DciInterfaceFidlClient{};
+  std::get<DciInterfaceFidlClient>(dci_intf_).Bind(std::move(request.interface()));
+
+  if (zx_status_t status = CommonSetInterface(); status != ZX_OK) {
+    completer.Reply(zx::error(status));
+  } else {
+    completer.Reply(fit::ok());
+  }
+}
+
+zx_status_t Dwc3::CommonConfigureEndpoint(const usb_endpoint_descriptor_t* ep_desc,
+                                          const usb_ss_ep_comp_descriptor_t* ss_comp_desc) {
   const uint8_t ep_num = UsbAddressToEpNum(ep_desc->b_endpoint_address);
   UserEndpoint* const uep = get_user_endpoint(ep_num);
 
@@ -581,8 +605,39 @@ zx_status_t Dwc3::UsbDciConfigEp(const usb_endpoint_descriptor_t* ep_desc,
   return ZX_OK;
 }
 
-zx_status_t Dwc3::UsbDciDisableEp(uint8_t ep_address) {
-  const uint8_t ep_num = UsbAddressToEpNum(ep_address);
+zx_status_t Dwc3::UsbDciConfigEp(const usb_endpoint_descriptor_t* ep_desc,
+                                 const usb_ss_ep_comp_descriptor_t* ss_comp_desc) {
+  return CommonConfigureEndpoint(ep_desc, ss_comp_desc);
+}
+
+void Dwc3::ConfigureEndpoint(ConfigureEndpointRequest& request,
+                             ConfigureEndpointCompleter::Sync& completer) {
+  // For now, we'll convert the FIDL-structs into the requisite banjo-structs. Later, when we get
+  // rid of the banjo stuff, we can just use the FIDL struct field data directly.
+  usb_endpoint_descriptor_t ep_desc{
+      .b_length = request.ep_descriptor().b_length(),
+      .b_descriptor_type = request.ep_descriptor().b_descriptor_type(),
+      .b_endpoint_address = request.ep_descriptor().b_endpoint_address(),
+      .bm_attributes = request.ep_descriptor().bm_attributes(),
+      .w_max_packet_size = request.ep_descriptor().w_max_packet_size(),
+      .b_interval = request.ep_descriptor().b_interval()};
+
+  usb_ss_ep_comp_descriptor_t ss_comp_desc{
+      .b_length = request.ss_comp_descriptor().b_length(),
+      .b_descriptor_type = request.ss_comp_descriptor().b_descriptor_type(),
+      .b_max_burst = request.ss_comp_descriptor().b_max_burst(),
+      .bm_attributes = request.ss_comp_descriptor().bm_attributes(),
+      .w_bytes_per_interval = request.ss_comp_descriptor().w_bytes_per_interval()};
+
+  if (zx_status_t status = CommonConfigureEndpoint(&ep_desc, &ss_comp_desc); status != ZX_OK) {
+    completer.Reply(zx::error(status));
+  } else {
+    completer.Reply(fit::ok());
+  }
+}
+
+zx_status_t Dwc3::CommonDisableEndpoint(uint8_t ep_addr) {
+  const uint8_t ep_num = UsbAddressToEpNum(ep_addr);
   UserEndpoint* const uep = get_user_endpoint(ep_num);
 
   if (uep == nullptr) {
@@ -601,8 +656,19 @@ zx_status_t Dwc3::UsbDciDisableEp(uint8_t ep_address) {
   return ZX_OK;
 }
 
-zx_status_t Dwc3::UsbDciEpSetStall(uint8_t ep_address) {
-  const uint8_t ep_num = UsbAddressToEpNum(ep_address);
+zx_status_t Dwc3::UsbDciDisableEp(uint8_t ep_address) { return CommonDisableEndpoint(ep_address); }
+
+void Dwc3::DisableEndpoint(DisableEndpointRequest& request,
+                           DisableEndpointCompleter::Sync& completer) {
+  if (zx_status_t status = CommonDisableEndpoint(request.ep_address()); status != ZX_OK) {
+    completer.Reply(zx::error(status));
+  } else {
+    completer.Reply(fit::ok());
+  }
+}
+
+zx_status_t Dwc3::CommonEndpointSetStall(uint8_t ep_addr) {
+  const uint8_t ep_num = UsbAddressToEpNum(ep_addr);
   UserEndpoint* const uep = get_user_endpoint(ep_num);
 
   if (uep == nullptr) {
@@ -613,8 +679,21 @@ zx_status_t Dwc3::UsbDciEpSetStall(uint8_t ep_address) {
   return EpSetStall(uep->ep, true);
 }
 
-zx_status_t Dwc3::UsbDciEpClearStall(uint8_t ep_address) {
-  const uint8_t ep_num = UsbAddressToEpNum(ep_address);
+zx_status_t Dwc3::UsbDciEpSetStall(uint8_t ep_address) {
+  return CommonEndpointSetStall(ep_address);
+}
+
+void Dwc3::EndpointSetStall(EndpointSetStallRequest& request,
+                            EndpointSetStallCompleter::Sync& completer) {
+  if (zx_status_t status = CommonEndpointSetStall(request.ep_address()); status != ZX_OK) {
+    completer.Reply(zx::error(status));
+  } else {
+    completer.Reply(fit::ok());
+  }
+}
+
+zx_status_t Dwc3::CommonEndpointClearStall(uint8_t ep_addr) {
+  const uint8_t ep_num = UsbAddressToEpNum(ep_addr);
   UserEndpoint* const uep = get_user_endpoint(ep_num);
 
   if (uep == nullptr) {
@@ -625,10 +704,23 @@ zx_status_t Dwc3::UsbDciEpClearStall(uint8_t ep_address) {
   return EpSetStall(uep->ep, false);
 }
 
+zx_status_t Dwc3::UsbDciEpClearStall(uint8_t ep_address) {
+  return CommonEndpointClearStall(ep_address);
+}
+
+void Dwc3::EndpointClearStall(EndpointClearStallRequest& request,
+                              EndpointClearStallCompleter::Sync& completer) {
+  if (zx_status_t status = CommonEndpointClearStall(request.ep_address()); status != ZX_OK) {
+    completer.Reply(zx::error(status));
+  } else {
+    completer.Reply(fit::ok());
+  }
+}
+
 size_t Dwc3::UsbDciGetRequestSize() { return Request::RequestSize(sizeof(usb_request_t)); }
 
-zx_status_t Dwc3::UsbDciCancelAll(uint8_t ep_address) {
-  const uint8_t ep_num = UsbAddressToEpNum(ep_address);
+zx_status_t Dwc3::CommonCancelAll(uint8_t ep_addr) {
+  const uint8_t ep_num = UsbAddressToEpNum(ep_addr);
   UserEndpoint* const uep = get_user_endpoint(ep_num);
 
   if (uep == nullptr) {
@@ -636,6 +728,120 @@ zx_status_t Dwc3::UsbDciCancelAll(uint8_t ep_address) {
   }
 
   return UserEpCancelAll(*uep);
+}
+
+zx_status_t Dwc3::UsbDciCancelAll(uint8_t ep_address) { return CommonCancelAll(ep_address); }
+
+void Dwc3::CancelAll(CancelAllRequest& request, CancelAllCompleter::Sync& completer) {
+  if (zx_status_t status = CommonCancelAll(request.ep_address()); status != ZX_OK) {
+    completer.Reply(zx::error(status));
+  } else {
+    completer.Reply(fit::ok());
+  }
+}
+
+void Dwc3::DciIntfWrapSetSpeed(usb_speed_t speed) {
+  ZX_ASSERT(dci_intf_valid());
+
+  if (std::holds_alternative<DciInterfaceBanjoClient>(dci_intf_)) {
+    std::get<DciInterfaceBanjoClient>(dci_intf_).SetSpeed(speed);
+    return;
+  }
+
+  fdescriptor::wire::UsbSpeed fspeed{fdescriptor::wire::UsbSpeed::kUndefined};
+
+  // Convert banjo usb_speed_t into FIDL speed struct.
+  switch (speed) {
+    case USB_SPEED_LOW:
+      fspeed = fdescriptor::wire::UsbSpeed::kLow;
+      break;
+    case USB_SPEED_FULL:
+      fspeed = fdescriptor::wire::UsbSpeed::kFull;
+      break;
+    case USB_SPEED_HIGH:
+      fspeed = fdescriptor::wire::UsbSpeed::kHigh;
+      break;
+    case USB_SPEED_SUPER:
+      fspeed = fdescriptor::wire::UsbSpeed::kSuper;
+      break;
+    case USB_SPEED_ENHANCED_SUPER:
+      fspeed = fdescriptor::wire::UsbSpeed::kEnhancedSuper;
+      break;
+  };
+
+  fidl::Arena arena;
+  auto result = std::get<DciInterfaceFidlClient>(dci_intf_).buffer(arena)->SetSpeed(fspeed);
+  if (!result.ok()) {
+    zxlogf(ERROR, "(framework) SetSpeed(): %s", result.status_string());
+  } else if (result->is_error()) {
+    zxlogf(ERROR, "SetSpeed(): %s", result.error().FormatDescription().c_str());
+  }
+}
+
+void Dwc3::DciIntfWrapSetConnected(bool connected) {
+  ZX_ASSERT(dci_intf_valid());
+
+  if (std::holds_alternative<DciInterfaceBanjoClient>(dci_intf_)) {
+    std::get<DciInterfaceBanjoClient>(dci_intf_).SetConnected(connected);
+    return;
+  }
+
+  fidl::Arena arena;
+  auto result = std::get<DciInterfaceFidlClient>(dci_intf_).buffer(arena)->SetConnected(connected);
+  if (!result.ok()) {
+    zxlogf(ERROR, "(framework) SetConnected(): %s", result.status_string());
+  } else if (result->is_error()) {
+    zxlogf(ERROR, "SetConnected(): %s", result.error().FormatDescription().c_str());
+  }
+}
+
+zx_status_t Dwc3::DciIntfWrapControl(const usb_setup_t* setup, const uint8_t* write_buffer,
+                                     size_t write_size, uint8_t* read_buffer, size_t read_size,
+                                     size_t* read_actual) {
+  ZX_ASSERT(dci_intf_valid());
+
+  if (std::holds_alternative<DciInterfaceBanjoClient>(dci_intf_)) {
+    return std::get<DciInterfaceBanjoClient>(dci_intf_).Control(
+        setup, write_buffer, write_size, read_buffer, read_size, read_actual);
+  }
+
+  // Convert banjo usb_setup_t into FIDL setup struct.
+  fdescriptor::wire::UsbSetup fsetup;
+  fsetup.bm_request_type = setup->bm_request_type;
+  fsetup.b_request = setup->b_request;
+  fsetup.w_value = setup->w_value;
+  fsetup.w_index = setup->w_index;
+  fsetup.w_length = setup->w_length;
+
+  auto fwrite =
+      fidl::VectorView<uint8_t>::FromExternal(const_cast<uint8_t*>(write_buffer), write_size);
+
+  fidl::Arena arena;
+  auto result = std::get<DciInterfaceFidlClient>(dci_intf_).buffer(arena)->Control(fsetup, fwrite);
+
+  if (!result.ok()) {
+    zxlogf(ERROR, "(framework) Control(): %s", result.status_string());
+    return ZX_ERR_INTERNAL;
+  }
+  if (result->is_error()) {
+    zxlogf(ERROR, "Control(): %s", result.error().FormatDescription().c_str());
+    return result->error_value();
+  }
+
+  // A lightweight byte-span is used to make it easier to process the read data.
+  cpp20::span<uint8_t> read_data{result.value()->read.get()};
+
+  // Don't blow out caller's buffer.
+  if (read_data.size_bytes() > read_size) {
+    return ZX_ERR_NO_MEMORY;
+  }
+
+  if (!read_data.empty()) {
+    std::memcpy(read_buffer, read_data.data(), read_data.size_bytes());
+    *read_actual = read_data.size_bytes();
+  }
+
+  return ZX_OK;
 }
 
 static constexpr zx_driver_ops_t driver_ops = []() {

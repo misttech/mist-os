@@ -23,6 +23,7 @@ use futures::prelude::*;
 use std::collections::VecDeque;
 use std::io::Cursor;
 use std::marker::PhantomData;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Weak};
 use validating_log_listener::{validate_log_dump, validate_log_stream};
 use {
@@ -81,7 +82,7 @@ impl TestHarness {
 
     fn make(hold_sinks: bool) -> Self {
         let inspector = Inspector::default();
-        let log_manager = LogsRepository::new(1_000_000, inspector.root());
+        let log_manager = LogsRepository::new(1_000_000, std::iter::empty(), inspector.root());
         let log_server = LogServer::new(Arc::clone(&log_manager));
 
         let (log_proxy, log_stream) =
@@ -401,7 +402,7 @@ pub async fn debuglog_test(
     debug_log: TestDebugLog,
 ) -> Inspector {
     let inspector = Inspector::default();
-    let lm = LogsRepository::new(1_000_000, inspector.root());
+    let lm = LogsRepository::new(1_000_000, std::iter::empty(), inspector.root());
     let log_server = LogServer::new(Arc::clone(&lm));
     let (log_proxy, log_stream) = fidl::endpoints::create_proxy_and_stream::<LogMarker>().unwrap();
     log_server.spawn(log_stream);
@@ -439,10 +440,10 @@ pub fn copy_log_message(log_message: &LogMessage) -> LogMessage {
 pub struct TestDebugLog {
     read_responses: Mutex<VecDeque<ReadResponse>>,
 }
-type ReadResponse = Result<zx::sys::zx_log_record_t, zx::Status>;
+type ReadResponse = Result<zx::DebugLogRecord, zx::Status>;
 
 impl crate::logs::debuglog::DebugLog for TestDebugLog {
-    fn read(&self) -> Result<zx::sys::zx_log_record_t, zx::Status> {
+    fn read(&self) -> Result<zx::DebugLogRecord, zx::Status> {
         self.read_responses.lock().pop_front().expect("Got more read requests than enqueued")
     }
 
@@ -462,7 +463,7 @@ impl Default for TestDebugLog {
 }
 
 impl TestDebugLog {
-    pub fn enqueue_read(&self, response: zx::sys::zx_log_record_t) {
+    pub fn enqueue_read(&self, response: zx::DebugLogRecord) {
         self.read_responses.lock().push_back(Ok(response));
     }
 
@@ -476,7 +477,7 @@ impl TestDebugLog {
 }
 
 pub struct TestDebugEntry {
-    pub record: zx::sys::zx_log_record_t,
+    pub record: zx::DebugLogRecord,
 }
 
 pub const TEST_KLOG_FLAGS: u8 = 47;
@@ -486,9 +487,10 @@ pub const TEST_KLOG_TID: u64 = 0xbe02u64;
 
 impl TestDebugEntry {
     pub fn new(log_data: &[u8]) -> Self {
+        static NEXT_SEQUENCE: AtomicU64 = AtomicU64::new(0);
         let mut rec = zx::sys::zx_log_record_t::default();
         let len = rec.data.len().min(log_data.len());
-        rec.sequence = 0;
+        rec.sequence = NEXT_SEQUENCE.fetch_add(1, Ordering::Relaxed);
         rec.datalen = len as u16;
         rec.flags = TEST_KLOG_FLAGS;
         rec.timestamp = TEST_KLOG_TIMESTAMP;
@@ -496,10 +498,10 @@ impl TestDebugEntry {
         rec.tid = TEST_KLOG_TID;
         rec.data[..len].copy_from_slice(&log_data[..len]);
         rec.severity = 0x30 /* info */;
-        TestDebugEntry { record: rec }
+        TestDebugEntry { record: zx::DebugLogRecord::from_raw(&rec).unwrap() }
     }
 
-    pub fn new_with_severity(log_data: &[u8], severity: u8) -> Self {
+    pub fn new_with_severity(log_data: &[u8], severity: zx::DebugLogSeverity) -> Self {
         let mut this = Self::new(log_data);
         this.record.severity = severity;
         this

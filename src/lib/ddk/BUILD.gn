@@ -3,9 +3,6 @@
 # found in the LICENSE file.
 
 import("//build/cpp/library_headers.gni")
-import("//build/cpp/sdk_source_set.gni")
-import("//build/cpp/sdk_static_library.gni")
-import("//build/zircon/zx_library.gni")
 
 group("tests") {
   testonly = true
@@ -19,9 +16,7 @@ config("include") {
 # This needs to be static_library rather than source_set, as we need
 # Unix linking rules to apply. This is so that only the object files
 # corresponding to the used functions will be linked to the final binary.
-sdk_static_library("ddk") {
-  category = "experimental"
-  sdk_name = "ddk"
+static_library("ddk") {
   public = [
     "include/lib/ddk/binding_driver.h",
     "include/lib/ddk/binding_priv.h",
@@ -37,9 +32,6 @@ sdk_static_library("ddk") {
     "include/lib/ddk/trace/event.h",
   ]
 
-  # These headers will error out if included directly from user code.
-  sdk_headers_for_internal_use = [ "include/lib/ddk/protodefs.h" ]
-
   if (is_fuchsia) {
     sources = [
       "io-buffer.c",
@@ -53,9 +45,9 @@ sdk_static_library("ddk") {
   public_deps = [
     # <ddk/io-buffer.h> has #include <zircon/syscalls.h>.
 
+    "//sdk/lib/async:async",
     "//sdk/lib/driver/runtime:driver_runtime",
     "//sdk/lib/zbi-format",
-    "//zircon/system/ulib/async:async",
     "//zircon/system/ulib/ddk-platform-defs",
     "//zircon/system/ulib/syslog:syslog-headers",
   ]
@@ -239,8 +231,6 @@ sdk_static_library("ddk") {
     "//src/devices/serial/drivers/uart16550:*",
     "//src/devices/serial/drivers/usb-cdc-acm:*",
     "//src/devices/spi/bin/spiutil:*",
-    "//src/devices/sysmem/drivers/sysmem:*",
-    "//src/devices/sysmem/tests/sysmem:*",
     "//src/devices/temperature/drivers/shtv3:*",
     "//src/devices/temperature/drivers/tmp112:*",
     "//src/devices/testing/devmgr-integration-test-shim:*",
@@ -285,7 +275,6 @@ sdk_static_library("ddk") {
     "//src/devices/thermal/drivers/aml-thermal-s905d2g-legacy:*",
     "//src/devices/thermal/drivers/aml-thermistor:*",
     "//src/devices/thermal/drivers/aml-thermistor/test:*",
-    "//src/devices/usb/drivers/crg-udc:*",
     "//src/devices/usb/drivers/dwc2:*",
     "//src/devices/usb/drivers/dwc3:*",
     "//src/devices/usb/drivers/usb-bus:*",
@@ -479,12 +468,10 @@ library_headers("ddk_metadata_only") {
 
 # Exports the metadata.h file to the SDK to support the transition
 # to DFv2.
-sdk_source_set("ddk_metadata") {
-  category = "internal"
-  sdk_name = "ddk"
-  include_base = "include"
+source_set("ddk_metadata") {
+  public_configs = [ ":include" ]
   public = [ "include/lib/ddk/metadata.h" ]
-  non_sdk_deps = [ ":ddk_metadata_only" ]
+  deps = [ ":ddk_metadata_only" ]
   public_deps = [ "//sdk/lib/zbi-format" ]
 }
 

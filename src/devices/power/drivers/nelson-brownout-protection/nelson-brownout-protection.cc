@@ -4,7 +4,6 @@
 
 #include "nelson-brownout-protection.h"
 
-#include <fidl/fuchsia.hardware.gpio/cpp/wire.h>
 #include <fidl/fuchsia.hardware.power.sensor/cpp/wire.h>
 #include <fuchsia/hardware/audio/cpp/banjo.h>
 #include <lib/ddk/binding_driver.h>
@@ -110,10 +109,9 @@ zx_status_t NelsonBrownoutProtection::Create(void* ctx, zx_device_t* parent,
       std::move(alert_gpio_result.value()));
 
   {
-    // Pulled up externally.
-    fidl::WireResult result = alert_gpio->ConfigIn(fuchsia_hardware_gpio::GpioFlags::kNoPull);
+    fidl::WireResult result = alert_gpio->SetBufferMode(fuchsia_hardware_gpio::BufferMode::kInput);
     if (!result.ok()) {
-      zxlogf(ERROR, "Failed to send ConfigIn request: %s", result.status_string());
+      zxlogf(ERROR, "Failed to send SetBufferMode request: %s", result.status_string());
       return result.status();
     }
     if (result->is_error()) {
@@ -123,7 +121,23 @@ zx_status_t NelsonBrownoutProtection::Create(void* ctx, zx_device_t* parent,
     }
   }
 
-  fidl::WireResult alert_interrupt = alert_gpio->GetInterrupt(ZX_INTERRUPT_MODE_EDGE_LOW);
+  fidl::Arena arena;
+  auto interrupt_config = fuchsia_hardware_gpio::wire::InterruptConfiguration::Builder(arena)
+                              .mode(fuchsia_hardware_gpio::InterruptMode::kEdgeLow)
+                              .Build();
+  fidl::WireResult configure_result = alert_gpio->ConfigureInterrupt(interrupt_config);
+  if (!configure_result.ok()) {
+    zxlogf(ERROR, "Failed to send ConfigureInterrupt request to gpio: %s",
+           configure_result.status_string());
+    return configure_result.status();
+  }
+  if (configure_result->is_error()) {
+    zxlogf(ERROR, "Failed to configure interrupt: %s",
+           zx_status_get_string(configure_result->error_value()));
+    return configure_result->error_value();
+  }
+
+  fidl::WireResult alert_interrupt = alert_gpio->GetInterrupt2({});
   if (!alert_interrupt.ok()) {
     zxlogf(ERROR, "Failed to send GetInterrupt request: %s", alert_interrupt.status_string());
     return alert_interrupt.status();
@@ -135,9 +149,9 @@ zx_status_t NelsonBrownoutProtection::Create(void* ctx, zx_device_t* parent,
   }
 
   zx_status_t status;
-  auto dev = std::make_unique<NelsonBrownoutProtection>(parent, std::move(power_sensor_client),
-                                                        std::move(alert_interrupt.value()->irq),
-                                                        voltage_poll_interval);
+  auto dev = std::make_unique<NelsonBrownoutProtection>(
+      parent, std::move(power_sensor_client), alert_gpio.TakeClientEnd(),
+      std::move(alert_interrupt.value()->interrupt), voltage_poll_interval);
   if ((status = dev->Init(std::move(*codec_client_end))) != ZX_OK) {
     return status;
   }

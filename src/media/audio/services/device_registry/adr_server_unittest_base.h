@@ -22,6 +22,7 @@
 #include "src/media/audio/services/device_registry/control_creator_server.h"
 #include "src/media/audio/services/device_registry/control_server.h"
 #include "src/media/audio/services/device_registry/device.h"
+#include "src/media/audio/services/device_registry/inspector.h"
 #include "src/media/audio/services/device_registry/observer_server.h"
 #include "src/media/audio/services/device_registry/provider_server.h"
 #include "src/media/audio/services/device_registry/registry_server.h"
@@ -42,6 +43,12 @@ inline void LogFidlClientError(fidl::UnbindInfo error, const std::string& tag = 
 
 // This provides shared unittest functions for AudioDeviceRegistry and the six FIDL server classes.
 class AudioDeviceRegistryServerTestBase : public gtest::TestLoopFixture {
+ public:
+  void SetUp() override {
+    // Use our production Inspector during device unittests.
+    media_audio::Inspector::Initialize(dispatcher());
+  }
+
  protected:
   // Create a FakeCodec that can mock a real device that has been detected, using default settings.
   // From here, the fake Codec can be customized before it is enabled.
@@ -152,6 +159,17 @@ class AudioDeviceRegistryServerTestBase : public gtest::TestLoopFixture {
   std::optional<zx_status_t>& registry_fidl_error_status() { return registry_fidl_error_status_; }
 
   // ControlCreator support
+  std::unique_ptr<TestServerAndNaturalAsyncClient<ControlCreatorServer>>
+  CreateTestControlCreatorServer() {
+    auto [client_end, server_end] =
+        CreateNaturalAsyncClientOrDie<fuchsia_audio_device::ControlCreator>();
+    auto server = adr_service_->CreateControlCreatorServer(std::move(server_end));
+    control_creator_fidl_error_status().reset();
+    auto client = fidl::Client<fuchsia_audio_device::ControlCreator>(
+        std::move(client_end), dispatcher(), control_creator_fidl_handler_.get());
+    return std::make_unique<TestServerAndNaturalAsyncClient<ControlCreatorServer>>(
+        test_loop(), std::move(server), std::move(client));
+  }
   class ControlCreatorFidlHandler final
       : public fidl::AsyncEventHandler<fuchsia_audio_device::ControlCreator>,
         public FidlHandler {
@@ -168,17 +186,6 @@ class AudioDeviceRegistryServerTestBase : public gtest::TestLoopFixture {
                        << metadata.event_ordinal;
     }
   };
-  std::unique_ptr<TestServerAndNaturalAsyncClient<ControlCreatorServer>>
-  CreateTestControlCreatorServer() {
-    auto [client_end, server_end] =
-        CreateNaturalAsyncClientOrDie<fuchsia_audio_device::ControlCreator>();
-    auto server = adr_service_->CreateControlCreatorServer(std::move(server_end));
-    control_creator_fidl_error_status().reset();
-    auto client = fidl::Client<fuchsia_audio_device::ControlCreator>(
-        std::move(client_end), dispatcher(), control_creator_fidl_handler_.get());
-    return std::make_unique<TestServerAndNaturalAsyncClient<ControlCreatorServer>>(
-        test_loop(), std::move(server), std::move(client));
-  }
   std::optional<zx_status_t>& control_creator_fidl_error_status() {
     return control_creator_fidl_error_status_;
   }

@@ -700,7 +700,10 @@ impl TemperatureFilter {
         if time_constant == Seconds(0.0) {
             y
         } else {
-            Celsius(y_prev.0 + (time_delta.0 / time_constant.0) * (y.0 - y_prev.0))
+            // Cap the time_delta/time_constant at a maximum value of 1. This prevents the filter
+            // from becoming unstable when time_delta is large, such as when the device comes out
+            // of suspension.
+            Celsius(y_prev.0 + (time_delta.0 / time_constant.0).min(1.0) * (y.0 - y_prev.0))
         }
     }
 }
@@ -727,6 +730,12 @@ mod temperature_filter_tests {
 
         // Filter constant of 0 is valid and should be treated as "no filtering"
         assert_eq!(TemperatureFilter::low_pass_filter(y_1, y_0, time_delta, Seconds(0.0)), y_1);
+
+        // y_prev is ignored when time_delta > time_constant
+        assert_eq!(
+            TemperatureFilter::low_pass_filter(y_1, y_0, Seconds(100.0), time_constant),
+            y_1
+        );
     }
 
     /// Tests that the TemperatureFilter `get_temperature` function queries the TemperatureHandler

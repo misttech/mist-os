@@ -59,6 +59,7 @@ class RustActionTests(unittest.TestCase):
         self.assertIsNone(r.link_map_output)
         self.assertIsNone(r.c_sysroot)
         self.assertIsNone(r.use_ld)
+        self.assertIsNone(r.link_reproducer)
         self.assertEqual(r.native, [])
         self.assertEqual(r.explicit_link_arg_files, [])
         self.assertEqual(r.externs, {})
@@ -273,6 +274,20 @@ class RustActionTests(unittest.TestCase):
             _paths({"obj/foo-feedbeef.bc", "obj/foo-feedbeef.ll"}),
             set(r.extra_output_files()),
         )
+
+    def test_link_reproducer(self) -> None:
+        repro_archive = Path("path/to/repro.tar")
+        r = rustc.RustAction(
+            [
+                "../tools/rustc",
+                f"-Clink-arg=--reproduce={repro_archive}",
+                "../foo/lib.rs",
+                "-o",
+                "foo.rlib",
+            ]
+        )
+        self.assertEqual(r.link_reproducer, repro_archive)
+        self.assertIn(repro_archive, r.extra_output_files())
 
     def test_c_sysroot(self) -> None:
         c_sysroot = Path("../path/to/platform/sysroot")

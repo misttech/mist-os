@@ -5,7 +5,7 @@
 #include <stdint.h>
 #include <zircon/compiler.h>
 
-#include "test-start.h"
+#include "suffixed-test-start.h"
 
 // These use C linkage to make debugging easier.
 // Only TestStart _needs_ to be extern "C".
@@ -27,5 +27,5 @@ __EXPORT int NeedsGot() { return Seven; }
 
 // The value returned depends on how all the symbols above got resolved.
 // The versions defined above add up to (36 - 26) + 7 = 17.
-int64_t TestStart() { return NeedsPlt() + NeedsGot(); }
+int64_t SUFFIXED_SYMBOL(TestStart)() { return NeedsPlt() + NeedsGot(); }
 }

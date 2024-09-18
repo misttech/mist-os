@@ -54,8 +54,10 @@ void PhysMain(void* fdt, arch::EarlyTicks ticks) {
   // be supplied to the CPU topology devicetree matcher.
   ArchSetUp(nullptr);
 
-  AddressSpace aspace;
-  InitMemory(fdt, &aspace);
+  // Explicitly provide `nullptr` address space, so the MMU is not set up.
+  // We do not know yet the supported features/extension in riscv, avoid possibly setting
+  // invalid bits in the page tables by not setting up the MMU at all.
+  InitMemory(fdt, nullptr);
 
   MainSymbolize symbolize(kShimName);
 

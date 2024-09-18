@@ -32,7 +32,7 @@ source_set("mock-ddk") {
     "//src/lib/ddk",
 
     # mock_ddk.h has #include <lib/sync/completion.h>.
-    "//zircon/system/ulib/async",
+    "//sdk/lib/async",
     "//zircon/system/ulib/svc",
     "//zircon/system/ulib/sync",
   ]
@@ -48,11 +48,11 @@ test("mock-ddk-test-bin") {
   sources = [ "mock-ddk-test.cc" ]
   deps = [
     ":mock-ddk",
+    "//sdk/lib/async-loop:async-loop-cpp",
     "//sdk/lib/component/outgoing/cpp",
     "//sdk/lib/driver/outgoing/cpp",
     "//src/devices/tests/fidl-service:echo_cpp",
     "//src/lib/ddktl",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/zx",
     "//zircon/system/ulib/zxtest",

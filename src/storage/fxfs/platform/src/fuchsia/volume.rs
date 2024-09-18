@@ -257,7 +257,7 @@ impl FxVolume {
             )
             .await?;
         Ok(match internal_dir.directory().lookup(PROFILE_DIRECTORY).await? {
-            Some((object_id, _)) => Directory::open_unchecked(self.clone(), object_id),
+            Some((object_id, _)) => Directory::open_unchecked(self.clone(), object_id, false),
             None => {
                 let new_dir = internal_dir
                     .directory()
@@ -399,10 +399,12 @@ impl FxVolume {
                         ObjectStore::open_object(self, object_id, HandleOptions::default(), None)
                             .await?,
                     ) as Arc<dyn FxNode>,
-                    ObjectDescriptor::Directory => Arc::new(FxDirectory::new(
-                        parent,
-                        Directory::open_unchecked(self.clone(), object_id),
-                    )) as Arc<dyn FxNode>,
+                    ObjectDescriptor::Directory => {
+                        // Can't use open_unchecked because we don't know if the dir is casefolded
+                        // or encrypted.
+                        Arc::new(FxDirectory::new(parent, Directory::open(self, object_id).await?))
+                            as Arc<dyn FxNode>
+                    }
                     ObjectDescriptor::Symlink => Arc::new(FxSymlink::new(self.clone(), object_id)),
                     _ => bail!(FxfsError::Inconsistent),
                 };

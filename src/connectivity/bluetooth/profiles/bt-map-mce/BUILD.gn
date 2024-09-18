@@ -19,11 +19,14 @@ rustc_binary("bin") {
     "//src/connectivity/bluetooth/lib/bt-obex/objects",
     "//src/connectivity/bluetooth/lib/fuchsia-bluetooth",
     "//src/connectivity/bluetooth/lib/profile-client",
+    "//src/lib/diagnostics/inspect/rust",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-component",
     "//src/lib/fuchsia-sync",
+    "//src/lib/zircon/rust:fuchsia-zircon",
+    "//src/lib/zircon/rust:fuchsia-zircon",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:futures",
@@ -35,11 +38,9 @@ rustc_binary("bin") {
     "//src/connectivity/bluetooth/lib/async-helpers:async-test-helpers",
     "//src/connectivity/bluetooth/lib/packet-encoding",
     "//src/lib/async-utils",
-    "//src/lib/fuchsia-async",
   ]
 
   sources = [
-    "src/fidl_service.rs",
     "src/main.rs",
     "src/message_access_service.rs",
     "src/message_notification_service.rs",

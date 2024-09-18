@@ -23,12 +23,6 @@
             ],
             from: "parent",
         },
-        {
-            directory: "dev-topological",
-            from: "parent",
-            rights: [ "r*" ],
-            path: "/dev",
-        },
     ],
     expose: [
         {

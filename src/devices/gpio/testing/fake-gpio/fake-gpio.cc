@@ -36,13 +36,38 @@ bool AltFunctionSubState::operator==(const AltFunctionSubState& other) const {
   return function == other.function;
 }
 
-zx_status_t DefaultWriteCallback(FakeGpio& gpio) { return ZX_OK; }
+zx_status_t DefaultSetBufferModeCallback(FakeGpio& gpio) { return ZX_OK; }
 
-FakeGpio::FakeGpio() : write_callback_(DefaultWriteCallback) {
+FakeGpio::FakeGpio() : set_buffer_mode_callback_(DefaultSetBufferModeCallback) {
   zx::interrupt interrupt;
   ZX_ASSERT(zx::interrupt::create(zx::resource(ZX_HANDLE_INVALID), 0, ZX_INTERRUPT_VIRTUAL,
                                   &interrupt) == ZX_OK);
   interrupt_ = zx::ok(std::move(interrupt));
+}
+
+void FakeGpio::GetInterrupt2(GetInterrupt2RequestView request,
+                             GetInterrupt2Completer::Sync& completer) {
+  if (interrupt_.is_error()) {
+    completer.ReplyError(interrupt_.error_value());
+    return;
+  }
+
+  if (interrupt_used_.exchange(/*desired=*/true, std::memory_order_relaxed)) {
+    completer.ReplyError(ZX_ERR_ALREADY_BOUND);
+    return;
+  }
+
+  auto sub_state = state_log_.empty()
+                       ? ReadSubState{.flags = fuchsia_hardware_gpio::GpioFlags::kNoPull}
+                       : state_log_.back().sub_state;
+  state_log_.emplace_back(State{
+      .interrupt_options = request->options,
+      .sub_state = sub_state,
+  });
+
+  zx::interrupt interrupt;
+  ZX_ASSERT(interrupt_.value().duplicate(ZX_RIGHT_SAME_RIGHTS, &interrupt) == ZX_OK);
+  completer.ReplySuccess(std::move(interrupt));
 }
 
 void FakeGpio::GetInterrupt(GetInterruptRequestView request,
@@ -98,6 +123,35 @@ void FakeGpio::ConfigOut(ConfigOutRequestView request, ConfigOutCompleter::Sync&
   completer.ReplySuccess();
 }
 
+void FakeGpio::SetBufferMode(SetBufferModeRequestView request,
+                             SetBufferModeCompleter::Sync& completer) {
+  switch (request->mode) {
+    case fuchsia_hardware_gpio::BufferMode::kInput:
+      if (state_log_.empty() ||
+          !std::holds_alternative<ReadSubState>(state_log_.back().sub_state)) {
+        state_log_.emplace_back(
+            State{.interrupt_mode = GetCurrentInterruptMode(), .sub_state = ReadSubState{}});
+      }
+      break;
+    case fuchsia_hardware_gpio::BufferMode::kOutputLow:
+    case fuchsia_hardware_gpio::BufferMode::kOutputHigh:
+      state_log_.emplace_back(State{
+          .interrupt_mode = GetCurrentInterruptMode(),
+          .sub_state = WriteSubState{.value = request->mode ==
+                                              fuchsia_hardware_gpio::BufferMode::kOutputHigh}});
+      break;
+    default:
+      ZX_ASSERT_MSG(false, "Unepxected BufferMode value");
+  }
+
+  zx_status_t response = set_buffer_mode_callback_(*this);
+  if (response == ZX_OK) {
+    completer.ReplySuccess();
+  } else {
+    completer.ReplyError(response);
+  }
+}
+
 void FakeGpio::Write(WriteRequestView request, WriteCompleter::Sync& completer) {
   // Gpio must be configured to output in order to be written to.
   if (state_log_.empty() || !std::holds_alternative<WriteSubState>(state_log_.back().sub_state)) {
@@ -107,12 +161,7 @@ void FakeGpio::Write(WriteRequestView request, WriteCompleter::Sync& completer) 
 
   state_log_.emplace_back(State{.interrupt_mode = GetCurrentInterruptMode(),
                                 .sub_state = WriteSubState{.value = request->value}});
-  zx_status_t response = write_callback_(*this);
-  if (response == ZX_OK) {
-    completer.ReplySuccess();
-  } else {
-    completer.ReplyError(response);
-  }
+  completer.ReplySuccess();
 }
 
 void FakeGpio::Read(ReadCompleter::Sync& completer) {
@@ -179,8 +228,8 @@ void FakeGpio::SetDefaultReadResponse(std::optional<zx::result<bool>> response) 
   default_read_response_ = response;
 }
 
-void FakeGpio::SetWriteCallback(WriteCallback write_callback) {
-  write_callback_ = std::move(write_callback);
+void FakeGpio::SetSetBufferModeCallback(SetBufferModeCallback set_buffer_mode_callback) {
+  set_buffer_mode_callback_ = std::move(set_buffer_mode_callback);
 }
 
 void FakeGpio::SetCurrentState(State state) { state_log_.push_back(std::move(state)); }

@@ -6,6 +6,7 @@
 ///
 /// See the [Rtc] protocol below for runtime configuration of the Real Time
 /// Clock (RTC) access, on devices where an RTC is available.
+@available(added=HEAD)
 library fuchsia.time.test;
 
 /// The error type returned from the methods of the [RTC] protocol.

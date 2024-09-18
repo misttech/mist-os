@@ -113,10 +113,7 @@ fuchsia_component("debian_realm_component") {
   testonly = true
   component_name = "debian_realm"
   manifest = "meta/debian_realm.cml"
-  deps = [
-    ":debian_container_component",
-    "//src/starnix/runner:starnix_runner_bin",
-  ]
+  deps = [ ":debian_container_component" ]
 }
 
 # The Debian container. This is just a manifest file configuring Component
@@ -131,6 +128,5 @@ fuchsia_component("debian_container_component") {
     "//src/starnix/containers/debian:container_resources",  # filesystem data
                                                             # for
                                                             # debian container
-    "//src/starnix/runner",
   ]
 }

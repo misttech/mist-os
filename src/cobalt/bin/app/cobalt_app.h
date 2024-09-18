@@ -137,11 +137,6 @@ class CobaltApp {
 
   std::unique_ptr<CurrentChannelProvider> current_channel_provider_;
 
-  // TODO: b/315496857 - Delete SystemDataUpdaterImpl once fuchsia::cobalt::SystemDataUpdater is
-  // removed and out of the support window.
-  std::unique_ptr<fuchsia::cobalt::SystemDataUpdater> system_data_updater_impl_;
-  fidl::BindingSet<fuchsia::cobalt::SystemDataUpdater> system_data_updater_bindings_;
-
   std::unique_ptr<AggregateAndUploadImpl> aggregate_and_upload_impl_;
   fidl::BindingSet<fuchsia::cobalt::AggregateAndUpload> aggregate_and_upload_bindings_;
 

@@ -11,7 +11,7 @@
 #include <fuchsia/hardware/usb/hci/cpp/banjo.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/ddk/device.h>
-#include <lib/sync/completion.h>
+#include <lib/sync/cpp/completion.h>
 #include <threads.h>
 
 #include <memory>
@@ -27,6 +27,45 @@
 
 namespace usb_virtual_bus {
 
+// For mapping b_endpoint_address value to/from index in range 0 - 31.
+// OUT endpoints are in range 1 - 15, IN endpoints are in range 17 - 31.
+static inline uint8_t EpAddressToIndex(uint8_t addr) {
+  return static_cast<uint8_t>(((addr) & 0xF) | (((addr) & 0x80) >> 3));
+}
+
+using Request = usb::BorrowedRequest<void>;
+using RequestQueue = usb::BorrowedRequestQueue<void>;
+using RequestVariant = std::variant<Request, usb::FidlRequest>;
+
+// This struct represents an endpoint on the virtual device.
+class UsbVirtualEp {
+ public:
+  ~UsbVirtualEp() {
+    ZX_ASSERT(host_reqs.empty());
+    ZX_ASSERT(device_reqs.is_empty());
+  }
+
+  void Init(UsbVirtualBus* bus, uint8_t index) {
+    bus_ = bus;
+    index_ = index;
+  }
+
+  void QueueRequest(RequestVariant request);
+  zx::result<> CancelAll();
+  void RequestComplete(zx_status_t status, size_t actual, RequestVariant request);
+
+  bool is_control() const { return index_ == 0; }
+
+  std::queue<RequestVariant> host_reqs;
+  RequestQueue device_reqs;
+  uint16_t max_packet_size = 0;
+  bool stalled = false;
+
+ private:
+  UsbVirtualBus* bus_;
+  uint8_t index_;
+};
+
 class UsbVirtualBus;
 class UsbVirtualDevice;
 class UsbVirtualHost;
@@ -38,7 +77,11 @@ using UsbVirtualBusType =
 class UsbVirtualBus : public UsbVirtualBusType {
  public:
   explicit UsbVirtualBus(zx_device_t* parent, async_dispatcher_t* dispatcher)
-      : UsbVirtualBusType(parent), dispatcher_(dispatcher), outgoing_(dispatcher) {}
+      : UsbVirtualBusType(parent), dispatcher_(dispatcher), outgoing_(dispatcher) {
+    for (uint8_t i = 0; i < USB_MAX_EPS; i++) {
+      eps_[i].Init(this, i);
+    }
+  }
 
   static zx_status_t Create(zx_device_t* parent);
 
@@ -88,25 +131,19 @@ class UsbVirtualBus : public UsbVirtualBusType {
   // Public for unit tests.
   void SetConnected(bool connected);
 
+  UsbVirtualEp* ep(uint8_t index) { return &eps_[index]; }
+  async_dispatcher_t* device_dispatcher() { return device_dispatcher_.async_dispatcher(); }
+
  private:
   DISALLOW_COPY_ASSIGN_AND_MOVE(UsbVirtualBus);
 
-  using Request = usb::BorrowedRequest<void>;
-  using RequestQueue = usb::BorrowedRequestQueue<void>;
-
-  // This struct represents an endpoint on the virtual device.
-  struct usb_virtual_ep_t {
-    RequestQueue host_reqs;
-    RequestQueue device_reqs;
-    uint16_t max_packet_size = 0;
-    bool stalled = false;
-  };
+  friend class UsbVirtualEp;
 
   zx_status_t Init();
   zx_status_t CreateDevice();
   zx_status_t CreateHost();
-  int DeviceThread();
-  void HandleControl(Request req);
+  void ProcessRequests();
+  void HandleControl(RequestVariant req);
   zx_status_t SetStall(uint8_t ep_address, bool stall);
 
   async_dispatcher_t* dispatcher_;
@@ -121,16 +158,16 @@ class UsbVirtualBus : public UsbVirtualBusType {
   // Callbacks to the USB bus driver.
   ddk::UsbBusInterfaceProtocolClient bus_intf_;
 
-  usb_virtual_ep_t eps_[USB_MAX_EPS];
+  UsbVirtualEp eps_[USB_MAX_EPS];
 
-  thrd_t device_thread_;
-  bool device_thread_started_ = false;
+  fdf::SynchronizedDispatcher device_dispatcher_;
+  libsync::Completion device_dispatcher_shutdown_wait_;
+  async::TaskClosureMethod<UsbVirtualBus, &UsbVirtualBus::ProcessRequests> process_requests_{this};
   // Host-side lock
   fbl::Mutex lock_;
 
   // Device-side lock
   fbl::Mutex device_lock_ __TA_ACQUIRED_AFTER(lock_);
-  fbl::ConditionVariable device_signal_ __TA_GUARDED(device_lock_);
   fbl::Mutex connection_lock_ __TA_ACQUIRED_BEFORE(device_lock_);
   // True when the virtual bus is connected.
   bool connected_ __TA_GUARDED(connection_lock_) = false;

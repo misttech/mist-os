@@ -166,10 +166,6 @@ if (labels.images == "//build/images/bringup") {
     product_assembly_config_label = ":product_assembly_config"
     board_config_label = ":board"
 
-    # As `:product_assembly_config` specifies an `eng` build-type, the assembly
-    # needs to be allowed to use the "eng" platform bundles as deps / inputs.
-    allow_eng_platform_bundle_use = true
-
     base_packages = [
       # This is config data for cobalt.
       "//src/cobalt/bin/app:cobalt_registry",

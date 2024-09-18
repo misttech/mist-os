@@ -8,10 +8,12 @@
 #include <fidl/fuchsia.hardware.audio/cpp/fidl.h>
 #include <lib/fit/internal/result.h>
 #include <lib/syslog/cpp/macros.h>
+#include <lib/zx/clock.h>
 #include <zircon/errors.h>
 
 #include "src/media/audio/services/device_registry/audio_device_registry.h"
 #include "src/media/audio/services/device_registry/device.h"
+#include "src/media/audio/services/device_registry/inspector.h"
 #include "src/media/audio/services/device_registry/logging.h"
 
 namespace media_audio {
@@ -29,6 +31,7 @@ std::shared_ptr<ObserverServer> ObserverServer::Create(std::shared_ptr<const Fid
 
 ObserverServer::ObserverServer(std::shared_ptr<const Device> device) : device_(std::move(device)) {
   ADR_LOG_METHOD(kLogObjectLifetimes);
+  SetInspect(Inspector::Singleton()->RecordObserverInstance(zx::clock::get_monotonic()));
 
   // TODO(https://fxbug.dev/42068381): Consider Health-check if this can change post-initialization.
 
@@ -38,6 +41,8 @@ ObserverServer::ObserverServer(std::shared_ptr<const Device> device) : device_(s
 
 ObserverServer::~ObserverServer() {
   ADR_LOG_METHOD(kLogObjectLifetimes);
+  inspect()->RecordDestructionTime(zx::clock::get_monotonic());
+
   --count_;
   LogObjectCounts();
 }

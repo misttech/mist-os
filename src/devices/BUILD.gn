@@ -43,7 +43,6 @@ group("tests") {
     "spi:tests",
     "spmi:tests",
     "suspend:tests",
-    "sysmem:tests",
     "tee:tests",
     "temperature:tests",
     "testing:tests",

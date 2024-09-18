@@ -21,15 +21,13 @@ rustc_binary("bin") {
     "//sdk/fidl/fuchsia.driver.test:fuchsia.driver.test_rust",
     "//sdk/fidl/fuchsia.hardware.suspend:fuchsia.hardware.suspend_rust",
     "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_rust",
-    "//sdk/fidl/fuchsia.testing.harness:fuchsia.testing.harness_rust",
     "//sdk/lib/driver_test_realm/realm_builder/rust",
     "//src/devices/testing/syscall-intercept:fuchsia.test.syscalls_rust",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-component",
     "//src/lib/fuchsia-component-test",
-    "//src/lib/zircon/rust:fuchsia-zircon",
-    "//src/testing/realm_proxy",
+    "//src/starnix/tests/diagnostics/suspend_inspect/testing/suspend_driver_realm_proxy/fidl/fuchsia.test.suspend:fuchsia.test.suspend_rust",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:futures-util",
     "//third_party/rust_crates:tracing",
@@ -38,18 +36,6 @@ rustc_binary("bin") {
 
 fuchsia_component_manifest("default") {
   manifest = "meta/default.cml"
-}
-
-fuchsia_component_manifest("suspend_driver_test_realm") {
-  manifest = "meta/suspend_driver_test_realm.cml"
-}
-
-fuchsia_structured_config_values("suspend_driver_test_realm_config") {
-  testonly = true
-  cm_label = ":suspend_driver_test_realm"
-  values = {
-    tunnel_boot_items = false
-  }
 }
 
 fuchsia_component("component") {
@@ -64,8 +50,6 @@ fuchsia_package("pkg") {
   package_name = "suspend_driver_realm_proxy"
   deps = [
     ":component",
-    ":suspend_driver_test_realm",
-    ":suspend_driver_test_realm_config",
     "//src/devices/bin/driver_host:next_component",
     "//src/devices/bus/drivers/platform:platform-bus",
     "//src/devices/misc/drivers/test-parent",

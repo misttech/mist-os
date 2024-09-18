@@ -55,7 +55,7 @@ use fidl_fuchsia_io as fio;
 use fprint::TypeFingerprint;
 use fuchsia_inspect::ArrayProperty;
 use fxfs_crypto::ff1::Ff1;
-use fxfs_crypto::{Crypt, KeyPurpose, StreamCipher, WrappedKey, WrappedKeyV32, WrappedKeys};
+use fxfs_crypto::{Crypt, KeyPurpose, StreamCipher, WrappedKeyV32, WrappedKeyV40, WrappedKeys};
 use once_cell::sync::OnceCell;
 use scopeguard::ScopeGuard;
 use serde::{Deserialize, Serialize};
@@ -88,10 +88,10 @@ pub trait HandleOwner: AsRef<ObjectStore> + Send + Sync + 'static {}
 
 /// StoreInfo stores information about the object store.  This is stored within the parent object
 /// store, and is used, for example, to get the persistent layer objects.
-pub type StoreInfo = StoreInfoV36;
+pub type StoreInfo = StoreInfoV40;
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, TypeFingerprint, Versioned)]
-pub struct StoreInfoV36 {
+pub struct StoreInfoV40 {
     /// The globally unique identifier for the associated object store. If unset, will be all zero.
     guid: [u8; 16],
 
@@ -117,7 +117,7 @@ pub struct StoreInfoV36 {
     object_count: u64,
 
     /// The (wrapped) key that encrypted mutations should use.
-    mutations_key: Option<WrappedKeyV32>,
+    mutations_key: Option<WrappedKeyV40>,
 
     /// Mutations for the store are encrypted using a stream cipher.  To decrypt the mutations, we
     /// need to know the offset in the cipher stream to start it.
@@ -131,14 +131,30 @@ pub struct StoreInfoV36 {
     /// reveal (such as the number of files in the system and the ordering of their creation in
     /// time).  Only the bottom 32 bits of the object ID are encrypted whilst the top 32 bits will
     /// increment after 2^32 object IDs have been used and this allows us to roll the key.
-    object_id_key: Option<WrappedKeyV32>,
+    object_id_key: Option<WrappedKeyV40>,
 
     /// A directory for storing internal files in a directory structure. Holds INVALID_OBJECT_ID
     /// when the directory doesn't yet exist.
     internal_directory_object_id: u64,
 }
 
-#[derive(Clone, Debug, Default, Migrate, Serialize, Deserialize, TypeFingerprint, Versioned)]
+#[derive(Default, Migrate, Serialize, Deserialize, TypeFingerprint, Versioned)]
+#[migrate_to_version(StoreInfoV40)]
+pub struct StoreInfoV36 {
+    guid: [u8; 16],
+    last_object_id: u64,
+    pub layers: Vec<u64>,
+    root_directory_object_id: u64,
+    graveyard_directory_object_id: u64,
+    object_count: u64,
+    mutations_key: Option<WrappedKeyV32>,
+    mutations_cipher_offset: u64,
+    pub encrypted_mutations_object_id: u64,
+    object_id_key: Option<WrappedKeyV32>,
+    internal_directory_object_id: u64,
+}
+
+#[derive(Migrate, Serialize, Deserialize, TypeFingerprint, Versioned)]
 #[migrate_to_version(StoreInfoV36)]
 pub struct StoreInfoV32 {
     guid: [u8; 16],
@@ -200,10 +216,10 @@ pub struct NewChildStoreOptions {
     pub object_id: u64,
 }
 
-pub type EncryptedMutations = EncryptedMutationsV32;
+pub type EncryptedMutations = EncryptedMutationsV40;
 
 #[derive(Clone, Default, Deserialize, Serialize, TypeFingerprint)]
-pub struct EncryptedMutationsV32 {
+pub struct EncryptedMutationsV40 {
     // Information about the mutations are held here, but the actual encrypted data is held within
     // data.  For each transaction, we record the checkpoint and the count of mutations within the
     // transaction.  The checkpoint is required for the log file offset (which we need to apply the
@@ -216,7 +232,28 @@ pub struct EncryptedMutationsV32 {
 
     // If the mutations key was rolled, this holds the offset in `data` where the new key should
     // apply.
-    mutations_key_roll: Vec<(usize, WrappedKey)>,
+    mutations_key_roll: Vec<(usize, WrappedKeyV40)>,
+}
+
+#[derive(Deserialize, Serialize, TypeFingerprint, Versioned)]
+pub struct EncryptedMutationsV32 {
+    transactions: Vec<(JournalCheckpoint, u64)>,
+    data: Vec<u8>,
+    mutations_key_roll: Vec<(usize, WrappedKeyV32)>,
+}
+
+impl From<EncryptedMutationsV32> for EncryptedMutationsV40 {
+    fn from(item: EncryptedMutationsV32) -> Self {
+        Self {
+            transactions: item.transactions,
+            data: item.data,
+            mutations_key_roll: item
+                .mutations_key_roll
+                .into_iter()
+                .map(|(a, b)| (a, b.into()))
+                .collect(),
+        }
+    }
 }
 
 impl std::fmt::Debug for EncryptedMutations {

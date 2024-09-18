@@ -44,11 +44,11 @@ cc_library(
         "//third_party/pigweed/backends/pw_log:printf",
         "//third_party/pigweed/backends/pw_random:zircon_random_generator",
         "@fuchsia_sdk//fidl/fuchsia.driver.framework:fuchsia.driver.framework_cpp",
+        "@fuchsia_sdk//fidl/fuchsia.hardware.bluetooth:fuchsia.hardware.bluetooth_cpp",
         "@fuchsia_sdk//pkg/async-loop-cpp",
         "@fuchsia_sdk//pkg/driver_component_cpp",
         "@fuchsia_sdk//pkg/driver_devfs_cpp",
         "@fuchsia_sdk//pkg/driver_runtime",
-        "@internal_sdk//fidl/fuchsia.hardware.bluetooth:fuchsia.hardware.bluetooth_cpp",
     ],
 )
 

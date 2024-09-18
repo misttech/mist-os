@@ -232,9 +232,10 @@ zx_status_t Gt6853Device::Init() {
   last_event_timestamp_ = metrics_root_.CreateUint("last_event_timestamp", 0);
 
   {
-    fidl::WireResult result = interrupt_gpio_->ConfigIn(fuchsia_hardware_gpio::GpioFlags::kNoPull);
+    fidl::WireResult result =
+        interrupt_gpio_->SetBufferMode(fuchsia_hardware_gpio::BufferMode::kInput);
     if (!result.ok()) {
-      zxlogf(ERROR, "Failed to send ConfigIn request to interrupt gpio: %s",
+      zxlogf(ERROR, "Failed to send SetBufferMode request to interrupt gpio: %s",
              result.status_string());
       return result.status();
     }
@@ -245,7 +246,25 @@ zx_status_t Gt6853Device::Init() {
     }
   }
 
-  fidl::WireResult interrupt_result = interrupt_gpio_->GetInterrupt(ZX_INTERRUPT_MODE_EDGE_LOW);
+  {
+    fidl::Arena arena;
+    auto config = fuchsia_hardware_gpio::wire::InterruptConfiguration::Builder(arena)
+                      .mode(fuchsia_hardware_gpio::InterruptMode::kEdgeLow)
+                      .Build();
+    fidl::WireResult result = interrupt_gpio_->ConfigureInterrupt(config);
+    if (!result.ok()) {
+      zxlogf(ERROR, "Failed to send ConfigureInterrupt request to interrupt gpio: %s",
+             result.status_string());
+      return result.status();
+    }
+    if (result->is_error()) {
+      zxlogf(ERROR, "Failed to configure interrupt gpio: %s",
+             zx_status_get_string(result->error_value()));
+      return result->error_value();
+    }
+  }
+
+  fidl::WireResult interrupt_result = interrupt_gpio_->GetInterrupt2({});
   if (!interrupt_result.ok()) {
     zxlogf(ERROR, "Failed to send GetInterrupt request to interrupt gpio: %s",
            interrupt_result.status_string());
@@ -256,7 +275,7 @@ zx_status_t Gt6853Device::Init() {
            zx_status_get_string(interrupt_result->error_value()));
     return interrupt_result->error_value();
   }
-  interrupt_ = std::move(interrupt_result.value()->irq);
+  interrupt_ = std::move(interrupt_result.value()->interrupt);
 
   zx::result<fuchsia_mem::wire::Range> config = GetConfigFileVmo();
   if (config.is_error()) {
@@ -665,9 +684,11 @@ zx_status_t Gt6853Device::PrepareFirmwareUpdate(
   }
 
   {
-    fidl::WireResult result = reset_gpio_->ConfigOut(0);
+    fidl::WireResult result =
+        reset_gpio_->SetBufferMode(fuchsia_hardware_gpio::BufferMode::kOutputLow);
     if (!result.ok()) {
-      zxlogf(ERROR, "Failed to send ConfigOut request to reset gpio: %s", result.status_string());
+      zxlogf(ERROR, "Failed to send SetBufferMode request to reset gpio: %s",
+             result.status_string());
       return result.status();
     }
     if (result->is_error()) {
@@ -678,9 +699,11 @@ zx_status_t Gt6853Device::PrepareFirmwareUpdate(
   }
   zx::nanosleep(zx::deadline_after(kResetSetupTime));
   {
-    fidl::WireResult result = reset_gpio_->Write(1);
+    fidl::WireResult result =
+        reset_gpio_->SetBufferMode(fuchsia_hardware_gpio::BufferMode::kOutputHigh);
     if (!result.ok()) {
-      zxlogf(ERROR, "Failed to send Write request to reset gpio: %s", result.status_string());
+      zxlogf(ERROR, "Failed to send SetBufferMode request to reset gpio: %s",
+             result.status_string());
       return result.status();
     }
     if (result->is_error()) {
@@ -932,9 +955,11 @@ zx_status_t Gt6853Device::FinishFirmwareUpdate() {
   }
 
   {
-    fidl::WireResult result = reset_gpio_->Write(0);
+    fidl::WireResult result =
+        reset_gpio_->SetBufferMode(fuchsia_hardware_gpio::BufferMode::kOutputLow);
     if (!result.ok()) {
-      zxlogf(ERROR, "Failed to send Write request to reset gpio: %s", result.status_string());
+      zxlogf(ERROR, "Failed to send SetBufferMode request to reset gpio: %s",
+             result.status_string());
       return result.status();
     }
     if (result->is_error()) {
@@ -945,9 +970,11 @@ zx_status_t Gt6853Device::FinishFirmwareUpdate() {
   }
   zx::nanosleep(zx::deadline_after(kResetSetupTime));
   {
-    fidl::WireResult result = reset_gpio_->Write(1);
+    fidl::WireResult result =
+        reset_gpio_->SetBufferMode(fuchsia_hardware_gpio::BufferMode::kOutputHigh);
     if (!result.ok()) {
-      zxlogf(ERROR, "Failed to send Write request to reset gpio: %s", result.status_string());
+      zxlogf(ERROR, "Failed to send SetBufferMode request to reset gpio: %s",
+             result.status_string());
       return result.status();
     }
     if (result->is_error()) {

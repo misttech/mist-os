@@ -14,6 +14,7 @@ use futures::TryStreamExt;
 use kernels::Kernels;
 use rand::Rng;
 use std::future::Future;
+use std::mem::MaybeUninit;
 use std::sync::Arc;
 use tracing::{debug, warn};
 use {
@@ -170,6 +171,12 @@ impl StarnixKernel {
     }
 }
 
+#[derive(Default)]
+pub struct SuspendContext {
+    suspended_processes: Arc<Mutex<Vec<zx::Handle>>>,
+    resume_events: Arc<Mutex<Vec<zx::EventPair>>>,
+}
+
 /// Generate a random name for the kernel.
 ///
 /// We used to include some human-readable parts in the name, but people were
@@ -209,13 +216,13 @@ async fn open_exposed_directory(
 
 pub async fn serve_starnix_manager(
     mut stream: fstarnixrunner::ManagerRequestStream,
-    suspended_processes: Arc<Mutex<Vec<zx::Handle>>>,
+    suspend_context: Arc<SuspendContext>,
     kernels: &Kernels,
 ) -> Result<(), Error> {
     while let Some(event) = stream.try_next().await? {
         match event {
             fstarnixrunner::ManagerRequest::Suspend { responder, .. } => {
-                suspend_kernels(kernels, &suspended_processes).await;
+                suspend_kernels(kernels, &suspend_context.suspended_processes).await;
                 if let Err(e) = responder.send() {
                     warn!("error replying to suspend request: {e}");
                 }
@@ -246,6 +253,9 @@ pub async fn serve_starnix_manager(
                     }
                 };
 
+                // TODO(https://fxbug.dev/328306129): Replace this with boot time.
+                let suspend_start = zx::MonotonicTime::get();
+
                 if let Some(wake_locks) = wake_locks {
                     match wake_locks
                         .wait_handle(zx::Signals::EVENT_SIGNALED, zx::MonotonicTime::ZERO)
@@ -254,7 +264,7 @@ pub async fn serve_starnix_manager(
                             // There were wake locks active after suspending all processes, resume
                             // and fail the suspend call.
                             if let Err(e) =
-                                responder.send(Err(fstarnixrunner::SuspendError::SuspendFailure))
+                                responder.send(Err(fstarnixrunner::SuspendError::WakeLocksExist))
                             {
                                 warn!("error responding to suspend request {:?}", e);
                             }
@@ -265,27 +275,179 @@ pub async fn serve_starnix_manager(
                 }
 
                 kernels.drop_wake_lease(&container_job)?;
-                if let Some(wake_event) = wake_event {
-                    match wake_event
-                        .wait_handle(zx::Signals::EVENT_SIGNALED, zx::MonotonicTime::INFINITE)
-                    {
-                        Ok(_) => {}
-                        Err(e) => {
-                            warn!("error waiting for wake event {:?}", e);
-                        }
-                    };
+
+                let resume_events = suspend_context.resume_events.lock();
+                let mut wait_items: Vec<zx::WaitItem<'_>> = resume_events
+                    .iter()
+                    .map(|e: &zx::EventPair| zx::WaitItem {
+                        handle: e.as_handle_ref(),
+                        waitfor: zx::Signals::EVENT_SIGNALED,
+                        pending: zx::Signals::empty(),
+                    })
+                    .collect();
+                if let Some(wake_event) = wake_event.as_ref() {
+                    wait_items.push(zx::WaitItem {
+                        handle: wake_event.as_handle_ref(),
+                        waitfor: zx::Signals::EVENT_SIGNALED,
+                        pending: zx::Signals::empty(),
+                    });
                 }
+
+                // TODO: We will likely have to handle a larger number of wake sources in the
+                // future, at which point we may want to consider a Port-based approach. This
+                // would also allow us to unblock this thread.
+                match zx::object_wait_many(&mut wait_items, zx::MonotonicTime::INFINITE) {
+                    Ok(_) => {}
+                    Err(e) => {
+                        warn!("error waiting for wake event {:?}", e);
+                    }
+                };
+
                 kernels.acquire_wake_lease(&container_job).await?;
 
-                if let Err(e) = responder.send(Ok(())) {
+                let response = fstarnixrunner::ManagerSuspendContainerResponse {
+                    // TODO(https://fxbug.dev/328306129): Replace this with boot time.
+                    suspend_time: Some((zx::MonotonicTime::get() - suspend_start).into_nanos()),
+                    ..Default::default()
+                };
+                if let Err(e) = responder.send(Ok(&response)) {
                     warn!("error responding to suspend request {:?}", e);
                 }
             }
-            fstarnixrunner::ManagerRequest::Resume { .. } => resume_kernels(&suspended_processes),
+            fstarnixrunner::ManagerRequest::ProxyWakeChannel { payload, .. } => {
+                let fstarnixrunner::ManagerProxyWakeChannelRequest {
+                    // TODO: Handle more than one container.
+                    container_job: Some(_container_job),
+                    remote_channel: Some(remote_channel),
+                    container_channel: Some(container_channel),
+                    resume_event: Some(resume_event),
+                    ..
+                } = payload
+                else {
+                    continue;
+                };
+
+                let proxy = ChannelProxy { container_channel, remote_channel, resume_event };
+                suspend_context.resume_events.lock().push(
+                    proxy.resume_event.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("failed"),
+                );
+
+                start_proxy(proxy, suspend_context.resume_events.clone());
+            }
+            fstarnixrunner::ManagerRequest::Resume { .. } => {
+                resume_kernels(&suspend_context.suspended_processes)
+            }
             _ => {}
         }
     }
     Ok(())
+}
+
+struct ChannelProxy {
+    /// The channel that is connected to the container component.
+    container_channel: zx::Channel,
+
+    /// The channel that is connected to a peer outside of the container component.
+    remote_channel: zx::Channel,
+
+    /// The resume event that is signaled when messages are proxied into the container.
+    resume_event: zx::EventPair,
+}
+
+/// Starts a thread that proxies messages between `proxy.container_channel` and
+/// `proxy.remote_channel`. The thread will exit when either of the channels' peer is closed.
+///
+/// When the proxy exits, `proxy.resume_event` will be removed from `resume_events`.
+fn start_proxy(proxy: ChannelProxy, resume_events: Arc<Mutex<Vec<zx::EventPair>>>) {
+    // TODO: We will likely have to handle a larger number of wake sources in the future,
+    // at which point we may want to consider a Port-based approach, and reduce the number
+    // of threads.
+    std::thread::spawn(move || {
+        let mut bounce_bytes = [MaybeUninit::uninit(); zx::sys::ZX_CHANNEL_MAX_MSG_BYTES as usize];
+        let mut bounce_handles =
+            [const { MaybeUninit::uninit() }; zx::sys::ZX_CHANNEL_MAX_MSG_HANDLES as usize];
+
+        loop {
+            const CONTAINER_CHANNEL_INDEX: usize = 0;
+            const REMOTE_CHANNEL_INDEX: usize = 1;
+
+            // Wait on messages from both the container and remote channel endpoints.
+            let mut wait_items = [
+                zx::WaitItem {
+                    handle: proxy.container_channel.as_handle_ref(),
+                    waitfor: zx::Signals::CHANNEL_READABLE | zx::Signals::CHANNEL_PEER_CLOSED,
+                    pending: zx::Signals::empty(),
+                },
+                zx::WaitItem {
+                    handle: proxy.remote_channel.as_handle_ref(),
+                    waitfor: zx::Signals::CHANNEL_READABLE | zx::Signals::CHANNEL_PEER_CLOSED,
+                    pending: zx::Signals::empty(),
+                },
+            ];
+
+            match zx::object_wait_many(&mut wait_items, zx::MonotonicTime::INFINITE) {
+                Ok(_) => {}
+                Err(e) => {
+                    tracing::warn!("Failed to wait on proxied channels in runner: {:?}", e);
+                }
+            };
+
+            // If there was a peer closed, return before attempting to read or write from the channels.
+            // The `ChannelProxy` will be dropped on return, and both proxy endpoints in the
+            // `ChannelProxy` will be closed.
+            for item in &wait_items {
+                if item.pending.contains(zx::Signals::CHANNEL_PEER_CLOSED) {
+                    tracing::warn!("Proxy received peer closed, exiting proxy loop.");
+                    resume_events.lock().retain(|e| e.get_koid() != proxy.resume_event.get_koid());
+                    return;
+                }
+            }
+
+            // Forward messages in both directions. Only messages that are entering the container
+            // should signal `proxy.resume_event`, since those are the only messages that should
+            // wake the container if it's suspended.
+            forward_message(
+                &wait_items[CONTAINER_CHANNEL_INDEX],
+                &proxy.container_channel,
+                &proxy.remote_channel,
+                None,
+                &mut bounce_bytes,
+                &mut bounce_handles,
+            );
+            forward_message(
+                &wait_items[REMOTE_CHANNEL_INDEX],
+                &proxy.remote_channel,
+                &proxy.container_channel,
+                Some(&proxy.resume_event),
+                &mut bounce_bytes,
+                &mut bounce_handles,
+            );
+        }
+    });
+}
+
+/// Forwards any pending messages on `read_channel` to `write_channel`, if the `wait_item.pending`
+/// contains `CHANNEL_READABLE`.
+///
+/// If `event` is `Some`, it will be signaled with `EVENT_SIGNALED` if a message was read and
+/// written.
+fn forward_message(
+    wait_item: &zx::WaitItem<'_>,
+    read_channel: &zx::Channel,
+    write_channel: &zx::Channel,
+    event: Option<&zx::EventPair>,
+    bytes: &mut [MaybeUninit<u8>; zx::sys::ZX_CHANNEL_MAX_MSG_BYTES as usize],
+    handles: &mut [MaybeUninit<zx::Handle>; zx::sys::ZX_CHANNEL_MAX_MSG_HANDLES as usize],
+) {
+    if wait_item.pending.contains(zx::Signals::CHANNEL_READABLE) {
+        let (actual_bytes, actual_handles) =
+            read_channel.read_uninit(bytes, handles).expect("Failed kernel read");
+        write_channel.write(actual_bytes, actual_handles).expect("Failed remote write");
+        if let Some(event) = event {
+            let (clear_mask, set_mask) = (zx::Signals::empty(), zx::Signals::EVENT_SIGNALED);
+            event.signal_handle(clear_mask, set_mask).expect("Failed to signal event");
+        }
+    }
 }
 
 async fn suspend_kernels(kernels: &Kernels, suspended_processes: &Mutex<Vec<zx::Handle>>) {

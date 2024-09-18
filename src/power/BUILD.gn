@@ -60,3 +60,8 @@ group("tests") {
     "topology-test-daemon:tests",
   ]
 }
+
+group("simulated_time_tests") {
+  testonly = true
+  deps = [ "power-manager:integration_tests" ]
+}

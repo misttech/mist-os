@@ -15,12 +15,12 @@ group("common") {
   public_deps = [
     ":bind",
     "//sdk/fidl/fuchsia.hardware.power.sensor:fuchsia.hardware.power.sensor_cpp",
+    "//sdk/lib/async-loop:async-loop-cpp",
     "//src/devices/bind/fuchsia:fuchsia_cpp",
     "//src/devices/i2c/lib/device-protocol-i2c-channel",
     "//src/devices/lib/driver",
     "//src/lib/ddk",
     "//src/lib/ddktl",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/zircon-internal",
     "//zircon/system/ulib/zx",

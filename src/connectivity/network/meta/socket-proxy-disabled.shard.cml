@@ -3,6 +3,19 @@
 // found in the LICENSE file.
 {
     children: [],
+    offer: [
+        {
+            protocol: [ "fuchsia.posix.socket.Provider" ],
+            from: "#netstack",
+            to: [
+                "#dhcpd",
+                "#dhcpv6-client",
+                "#dns-resolver",
+                "#http-client",
+                "#reachability",
+            ],
+        },
+    ],
     expose: [
         {
             protocol: [
@@ -10,6 +23,22 @@
                 "fuchsia.netpol.socketproxy.StarnixNetworks",
             ],
             from: "void",
+            availability: "optional",
+        },
+        {
+            protocol: [ "fuchsia.posix.socket.Provider" ],
+            from: "void",
+            as: "fuchsia.posix.socket.Provider_PROXIED",
+            availability: "optional",
+        },
+        {
+            protocol: [
+                // TODO(https://fxbug.dev/42175379): once product assembly supports product-specific
+                // components running in the network realm, remove this.
+                "fuchsia.posix.socket.raw.Provider",
+            ],
+            from: "void",
+            as: "fuchsia.posix.socket.raw.Provider_PROXIED",
             availability: "optional",
         },
     ],

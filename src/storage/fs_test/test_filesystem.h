@@ -54,6 +54,10 @@ class TestFilesystem {
     return fbl::unique_fd(open(mount_path_.c_str(), O_RDONLY | O_DIRECTORY));
   }
 
+  // Returns the ram device (which will include access to the FVM partition if one is
+  // configured).
+  RamDevice* GetRamDevice() const { return filesystem_->GetRamDevice(); }
+
   // Returns the ramdisk, or nullptr if one isn't being used.
   storage::RamDisk* GetRamDisk() const { return filesystem_->GetRamDisk(); }
 

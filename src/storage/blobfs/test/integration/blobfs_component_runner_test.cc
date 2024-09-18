@@ -23,21 +23,6 @@ namespace {
 constexpr uint32_t kBlockSize = 512;
 constexpr uint32_t kNumBlocks = 8192;
 
-class FakeDriverManagerAdmin final
-    : public fidl::WireServer<fuchsia_device_manager::Administrator> {
- public:
-  void UnregisterSystemStorageForShutdown(
-      UnregisterSystemStorageForShutdownCompleter::Sync& completer) override {
-    unregister_was_called_ = true;
-    completer.Reply(ZX_OK);
-  }
-
-  bool UnregisterWasCalled() { return unregister_was_called_; }
-
- private:
-  std::atomic<bool> unregister_was_called_ = false;
-};
-
 class BlobfsComponentRunnerTest : public testing::Test {
  public:
   BlobfsComponentRunnerTest()
@@ -54,11 +39,11 @@ class BlobfsComponentRunnerTest : public testing::Test {
   }
   void TearDown() override {}
 
-  void StartServe(fidl::ClientEnd<fuchsia_device_manager::Administrator> device_admin_client) {
+  void StartServe() {
     runner_ = std::make_unique<ComponentRunner>(loop_, config_);
-    auto status = runner_->ServeRoot(std::move(server_end_),
-                                     fidl::ServerEnd<fuchsia_process_lifecycle::Lifecycle>(),
-                                     std::move(device_admin_client), zx::resource());
+    auto status =
+        runner_->ServeRoot(std::move(server_end_),
+                           fidl::ServerEnd<fuchsia_process_lifecycle::Lifecycle>(), zx::resource());
     ASSERT_EQ(status.status_value(), ZX_OK);
   }
 
@@ -90,34 +75,7 @@ class BlobfsComponentRunnerTest : public testing::Test {
 };
 
 TEST_F(BlobfsComponentRunnerTest, ServeAndConfigureStartsBlobfs) {
-  FakeDriverManagerAdmin driver_admin;
-  auto admin_endpoints = fidl::Endpoints<fuchsia_device_manager::Administrator>::Create();
-  fidl::BindServer(loop_.dispatcher(), std::move(admin_endpoints.server), &driver_admin);
-
-  ASSERT_NO_FATAL_FAILURE(StartServe(std::move(admin_endpoints.client)));
-
-  auto svc_dir = GetSvcDir();
-  auto client_end = component::ConnectAt<fuchsia_fs_startup::Startup>(svc_dir.borrow());
-  ASSERT_EQ(client_end.status_value(), ZX_OK);
-
-  MountOptions options;
-  auto status = runner_->Configure(std::move(device_), options);
-  ASSERT_EQ(status.status_value(), ZX_OK);
-
-  std::atomic<bool> callback_called = false;
-  runner_->Shutdown([callback_called = &callback_called](zx_status_t status) {
-    EXPECT_EQ(status, ZX_OK);
-    *callback_called = true;
-  });
-  // Shutdown quits the loop.
-  ASSERT_EQ(loop_.RunUntilIdle(), ZX_ERR_CANCELED);
-  ASSERT_TRUE(callback_called);
-
-  EXPECT_TRUE(driver_admin.UnregisterWasCalled());
-}
-
-TEST_F(BlobfsComponentRunnerTest, ServeAndConfigureStartsBlobfsWithoutDriverManager) {
-  ASSERT_NO_FATAL_FAILURE(StartServe(fidl::ClientEnd<fuchsia_device_manager::Administrator>()));
+  ASSERT_NO_FATAL_FAILURE(StartServe());
 
   auto svc_dir = GetSvcDir();
   auto client_end = component::ConnectAt<fuchsia_fs_startup::Startup>(svc_dir.borrow());
@@ -138,10 +96,6 @@ TEST_F(BlobfsComponentRunnerTest, ServeAndConfigureStartsBlobfsWithoutDriverMana
 }
 
 TEST_F(BlobfsComponentRunnerTest, RequestsBeforeStartupAreQueuedAndServicedAfter) {
-  FakeDriverManagerAdmin driver_admin;
-  auto admin_endpoints = fidl::Endpoints<fuchsia_device_manager::Administrator>::Create();
-  fidl::BindServer(loop_.dispatcher(), std::move(admin_endpoints.server), &driver_admin);
-
   // Start a call to the filesystem. We expect that this request will be queued and won't return
   // until Configure is called on the runner. Initially, GetSvcDir will fire off an open call on
   // the root_ connection, but as the server end isn't serving anything yet, the request is queued
@@ -164,7 +118,7 @@ TEST_F(BlobfsComponentRunnerTest, RequestsBeforeStartupAreQueuedAndServicedAfter
   ASSERT_EQ(loop_.RunUntilIdle(), ZX_OK);
   ASSERT_FALSE(query_complete);
 
-  ASSERT_NO_FATAL_FAILURE(StartServe(std::move(admin_endpoints.client)));
+  ASSERT_NO_FATAL_FAILURE(StartServe());
   ASSERT_EQ(loop_.RunUntilIdle(), ZX_OK);
   ASSERT_FALSE(query_complete);
 
@@ -185,16 +139,10 @@ TEST_F(BlobfsComponentRunnerTest, RequestsBeforeStartupAreQueuedAndServicedAfter
   });
   ASSERT_EQ(loop_.RunUntilIdle(), ZX_ERR_CANCELED);
   ASSERT_TRUE(callback_called);
-
-  EXPECT_TRUE(driver_admin.UnregisterWasCalled());
 }
 
 TEST_F(BlobfsComponentRunnerTest, DoubleShutdown) {
-  FakeDriverManagerAdmin driver_admin;
-  auto admin_endpoints = fidl::Endpoints<fuchsia_device_manager::Administrator>::Create();
-  fidl::BindServer(loop_.dispatcher(), std::move(admin_endpoints.server), &driver_admin);
-
-  ASSERT_NO_FATAL_FAILURE(StartServe(std::move(admin_endpoints.client)));
+  ASSERT_NO_FATAL_FAILURE(StartServe());
 
   auto svc_dir = GetSvcDir();
   auto client_end = component::ConnectAt<fuchsia_fs_startup::Startup>(svc_dir.borrow());
@@ -228,8 +176,6 @@ TEST_F(BlobfsComponentRunnerTest, DoubleShutdown) {
   // Both callbacks were completed.
   ASSERT_TRUE(callback_called);
   ASSERT_TRUE(callback2_called);
-
-  EXPECT_TRUE(driver_admin.UnregisterWasCalled());
 }
 
 }  // namespace

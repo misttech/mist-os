@@ -8,10 +8,10 @@ use num::Unsigned;
 use std::io::{self, Write};
 use tracing::warn;
 
-use crate::experimental::ring_buffer::Simple8bRleRingBuffer;
-use crate::experimental::series::interpolation::{
-    Constant, Interpolation, LastAggregation, LastSample,
+use crate::experimental::ring_buffer::{
+    Simple8bRleRingBuffer, UncompressedRingBuffer, ZigzagSimple8bRleRingBuffer,
 };
+use crate::experimental::series::interpolation::Interpolation;
 use crate::experimental::series::statistic::Aggregation;
 use crate::experimental::series::SamplingInterval;
 
@@ -36,41 +36,6 @@ where
 }
 
 pub type Buffer<F, P> = <F as BufferStrategy<Aggregation<F>, P>>::Buffer;
-
-// The following `BufferStrategy` implementations associate an encoding with an aggregation type
-// and interpolation (with no other considerations). More sophisticated types like data semantics
-// and statistics may forward their implementations to these.
-
-impl BufferStrategy<i64, LastAggregation> for i64 {
-    type Buffer = DeltaZigZagSimple8bRle;
-}
-
-impl BufferStrategy<i64, LastSample> for i64 {
-    type Buffer = DeltaZigZagSimple8bRle;
-}
-
-impl BufferStrategy<i64, Constant> for i64 {
-    type Buffer = ZigZagSimple8bRle;
-}
-
-impl<P> BufferStrategy<f32, P> for f32
-where
-    P: Interpolation,
-{
-    type Buffer = Uncompressed<f32>;
-}
-
-impl BufferStrategy<u64, Constant> for u64 {
-    type Buffer = Simple8bRle;
-}
-
-impl BufferStrategy<u64, LastAggregation> for u64 {
-    type Buffer = DeltaZigZagSimple8bRle;
-}
-
-impl BufferStrategy<u64, LastSample> for u64 {
-    type Buffer = DeltaZigZagSimple8bRle;
-}
 
 /// A fixed-capacity circular ring buffer.
 pub trait RingBuffer<A> {
@@ -130,21 +95,25 @@ pub enum Simple8bRleSubtype {
     SignedZigzagEncoded,
 }
 
-// TODO(https://fxbug.dev/352614838): Implement uncompressed ring buffer
-/// A ring buffer that stores arbitrary items in their immediate representation.
 #[derive(Clone, Debug)]
-pub struct Uncompressed<A> {
-    buffer: Vec<A>,
-}
+pub struct Uncompressed<A>(UncompressedRingBuffer<A>);
 
 impl RingBuffer<f32> for Uncompressed<f32> {
     fn with_capacity(capacity: usize) -> Self {
-        warn!("Uncompressed ring buffer is unimplemented. No data will be stored.");
-        Uncompressed { buffer: Vec::with_capacity(capacity) }
+        let ring_buffer = UncompressedRingBuffer::with_min_samples(capacity);
+        Uncompressed(ring_buffer)
     }
 
     fn buffer_type() -> RingBufferType {
         RingBufferType::Uncompressed(UncompressedSubtype::F32)
+    }
+
+    fn push(&mut self, item: f32) {
+        self.0.push(item);
+    }
+
+    fn serialize(&self, mut write: impl Write) -> io::Result<()> {
+        self.0.serialize(&mut write)
     }
 }
 
@@ -173,24 +142,28 @@ where
     }
 }
 
-// TODO(https://fxbug.dev/352614791): Implement ZigZagSimple8bRle ring buffer
-/// A ring buffer that stores signed integer items using zig-zag, Simple8B, and run length
-/// encoding.
 #[derive(Clone, Debug)]
-pub struct ZigZagSimple8bRle;
+pub struct ZigzagSimple8bRle(ZigzagSimple8bRleRingBuffer);
 
-impl<A> RingBuffer<A> for ZigZagSimple8bRle
+impl<A> RingBuffer<A> for ZigzagSimple8bRle
 where
     A: Into<i64>,
 {
     fn with_capacity(capacity: usize) -> Self {
-        warn!("ZigZagSimple8bRle ring buffer is unimplemented. No data will be stored.");
-        let _ = capacity;
-        ZigZagSimple8bRle
+        let ring_buffer = ZigzagSimple8bRleRingBuffer::with_min_samples(capacity);
+        ZigzagSimple8bRle(ring_buffer)
     }
 
     fn buffer_type() -> RingBufferType {
         RingBufferType::Simple8bRle(Simple8bRleSubtype::SignedZigzagEncoded)
+    }
+
+    fn push(&mut self, item: A) {
+        self.0.push(item.into());
+    }
+
+    fn serialize(&self, mut write: impl Write) -> io::Result<()> {
+        self.0.serialize(&mut write)
     }
 }
 
@@ -249,11 +222,31 @@ mod tests {
     use super::*;
 
     #[test]
+    fn uncompressed_buffer() {
+        let mut buffer = <Uncompressed<f32> as RingBuffer<f32>>::with_capacity(2);
+        buffer.push(22f32);
+        let mut data = vec![];
+        let result = RingBuffer::<f32>::serialize(&buffer, &mut data);
+        assert!(result.is_ok());
+        assert!(!data.is_empty());
+    }
+
+    #[test]
     fn simple8b_rle_buffer() {
         let mut buffer = <Simple8bRle as RingBuffer<u64>>::with_capacity(2);
         buffer.push(22u64);
         let mut data = vec![];
         let result = RingBuffer::<u64>::serialize(&buffer, &mut data);
+        assert!(result.is_ok());
+        assert!(!data.is_empty());
+    }
+
+    #[test]
+    fn zigzag_simple8b_rle_buffer() {
+        let mut buffer = <ZigzagSimple8bRle as RingBuffer<i64>>::with_capacity(2);
+        buffer.push(22i64);
+        let mut data = vec![];
+        let result = RingBuffer::<i64>::serialize(&buffer, &mut data);
         assert!(result.is_ok());
         assert!(!data.is_empty());
     }

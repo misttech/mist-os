@@ -383,6 +383,12 @@
             source_availability: "unknown",
         },
         {
+            protocol: [ "fuchsia.bluetooth.map.MessagingClient" ],
+            from: "#bt-map-mce",
+            to: "#sshd-host",
+            source_availability: "unknown",
+        },
+        {
             protocol: "fuchsia.bluetooth.snoop.Snoop",
             from: "#bt-snoop",
             to: "#sshd-host",

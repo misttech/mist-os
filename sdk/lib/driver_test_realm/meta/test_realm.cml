@@ -157,8 +157,8 @@
         {
             protocol: [
                 "fuchsia.boot.Items",
-                "fuchsia.device.manager.SystemStateTransition",
                 "fuchsia.kernel.RootJob",
+                "fuchsia.system.state.SystemStateTransition",
             ],
             from: "parent",
             to: [ "#driver_manager" ],
@@ -170,7 +170,7 @@
             availability: "optional",
         },
         {
-            protocol: [ "fuchsia.device.manager.SystemStateTransition" ],
+            protocol: [ "fuchsia.system.state.SystemStateTransition" ],
             from: "parent",
             to: [
                 "#base-drivers",
@@ -241,9 +241,9 @@
         },
         {
             protocol: [
-                "fuchsia.device.manager.Administrator",
                 "fuchsia.driver.development.Manager",
                 "fuchsia.driver.framework.CompositeNodeManager",
+                "fuchsia.system.state.Administrator",
             ],
             from: "#driver_manager",
         },

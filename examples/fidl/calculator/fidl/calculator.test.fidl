@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 /// Library containing a simple calculator protocol.
+@available(added=HEAD)
 library fuchsia.examples.calculator;
 
 /// A protocol for a simple calculator.

@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <lib/elfldltl/machine.h>
 #include <lib/ld/abi.h>
 #include <lib/ld/tls.h>
 #include <zircon/compiler.h>
@@ -21,7 +22,7 @@ __EXPORT void* __tls_get_addr(const elfldltl::Elf<>::TlsGetAddrGot& got) {
   // be replaced with a version that always uses the DTV.  This startup-only
   // implementation has the advantage of not needing a DTV.
   return TpRelative(TlsInitialExecOffset(_ld_abi, got.tls_modid) +
-                    static_cast<ptrdiff_t>(got.offset));
+                    static_cast<ptrdiff_t>(got.offset + elfldltl::TlsTraits<>::kTlsRelativeBias));
 }
 
 }  // namespace ld::abi

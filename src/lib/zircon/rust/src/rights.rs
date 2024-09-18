@@ -14,7 +14,7 @@ bitflags! {
     /// Rights associated with a handle.
     ///
     /// See [rights](https://fuchsia.dev/fuchsia-src/concepts/kernel/rights) for more information.
-    #[repr(C)]
+    #[repr(transparent)]
     #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
     pub struct Rights: sys::zx_rights_t {
         const NONE            = sys::ZX_RIGHT_NONE;

@@ -5,10 +5,7 @@
 import("//build/components.gni")
 import("//build/cpp/sdk_static_library.gni")
 
-sdk_static_library("fsl") {
-  no_headers = true
-  category = "internal"
-
+static_library("fsl") {
   output_name = "fsl"
 
   public_deps = [
@@ -18,12 +15,6 @@ sdk_static_library("fsl") {
     "//src/lib/fsl/tasks",
     "//src/lib/fsl/types",
     "//src/lib/fsl/vmo",
-  ]
-
-  runtime_deps = [
-    "//sdk/lib/fdio:fdio_sdk",
-    "//sdk/lib/syslog/cpp:backend_fuchsia_globals_sdk",
-    "//zircon/system/ulib/async-default:async-default_sdk",
   ]
 }
 

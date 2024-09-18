@@ -5,42 +5,49 @@
 //! Testing-only code for persistent Timekeeper behavior changes around
 //! real-time clock (RTC) handling.
 
-use crate::Command;
 use anyhow::Result;
 use fidl_fuchsia_time_test as fftt;
-use futures::channel::mpsc;
-use futures::{SinkExt, StreamExt};
+use futures::StreamExt;
 use serde::{Deserialize, Serialize};
+use std::cell::Cell;
 use std::fs;
 use std::path::Path;
+use std::rc::Rc;
 use tracing::{debug, error};
 
-/// Serves fuchsia.time.test/RTC.
+/// The path to the internal production persistent state file.
+const PERSISTENT_STATE_PATH: &'static str = "/data/persistent_state.json";
+
+/// Serves `fuchsia.time.test/Rtc`.
+///
+/// Args:
+/// - `persistent_enabled_bit`: the state bit to manage.
+/// - `stream`: the request stream from the test fixture.
 pub async fn serve(
-    mut cmd: mpsc::Sender<Command>,
+    persist_enabled: Rc<Cell<bool>>,
     mut stream: fftt::RtcRequestStream,
 ) -> Result<()> {
+    debug!("rtc_testing::serve: entering serving loop");
     while let Some(request) = stream.next().await {
         match request {
             Ok(fftt::RtcRequest::PersistentEnable { responder, .. }) => {
-                debug!("fuchsia.time.test/Rtc.PersistentEnable");
-                let (s, mut done) = mpsc::channel(1);
-                cmd.send(Command::Rtc { persistent_enabled: true, done: s }).await?;
-                done.next().await;
+                debug!("received: fuchsia.time.test/Rtc.PersistentEnable");
+                persist_enabled.set(true);
                 responder.send(Ok(()))?;
+                write_state(&State::new(true));
             }
             Ok(fftt::RtcRequest::PersistentDisable { responder, .. }) => {
-                debug!("fuchsia.time.test/Rtc.PersistentDisable");
-                let (s, mut done) = mpsc::channel(1);
-                cmd.send(Command::Rtc { persistent_enabled: false, done: s }).await?;
-                done.next().await;
+                debug!("received: fuchsia.time.test/Rtc.PersistentDisable");
+                persist_enabled.set(false);
                 responder.send(Ok(()))?;
+                write_state(&State::new(false));
             }
             Err(e) => {
                 error!("FIDL error: {:?}", e);
             }
         };
     }
+    debug!("rtc_testing::serve: exited  serving loop");
     Ok(())
 }
 
@@ -74,7 +81,11 @@ impl State {
 }
 
 /// Read the persistent state. Any errors are logged only, and defaults are returned.
-pub fn read_and_update_state<P: AsRef<Path>>(path: P) -> State {
+pub fn read_and_update_state() -> State {
+    read_and_update_state_internal(PERSISTENT_STATE_PATH)
+}
+
+pub fn read_and_update_state_internal<P: AsRef<Path>>(path: P) -> State {
     let path = path.as_ref();
     let state: State = fs::read_to_string(path)
         .as_ref()
@@ -91,14 +102,18 @@ pub fn read_and_update_state<P: AsRef<Path>>(path: P) -> State {
     let mut next = state.clone();
     next.num_reboots_until_rtc_write_allowed =
         state.num_reboots_until_rtc_write_allowed.saturating_sub(1);
-    write_state(path, &next);
+    write_state_internal(path, &next);
 
     // Return the previous state.
     state
 }
 
 /// Write the persistent state to mutable persistent storage.
-pub fn write_state<P: AsRef<Path>>(path: P, state: &State) {
+pub fn write_state(state: &State) {
+    write_state_internal(PERSISTENT_STATE_PATH, state)
+}
+
+fn write_state_internal<P: AsRef<Path>>(path: P, state: &State) {
     let path = path.as_ref();
     debug!("writing persistent state: {:?} to {:?}", state, path);
     serde_json::to_string(state)
@@ -120,11 +135,11 @@ mod tests {
         let d = tempfile::TempDir::new().expect("tempdir created");
         let p = d.path().join("file.json");
         let s = State::new(false);
-        write_state(&p, &s);
+        write_state_internal(&p, &s);
 
         // First time around, we may not update the RTC.
-        assert!(!read_and_update_state(&p).may_update_rtc());
+        assert!(!read_and_update_state_internal(&p).may_update_rtc());
         // Second time around, we may.
-        assert!(read_and_update_state(&p).may_update_rtc());
+        assert!(read_and_update_state_internal(&p).may_update_rtc());
     }
 }

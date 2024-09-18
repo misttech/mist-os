@@ -8,7 +8,6 @@ import("//build/dist/resource.gni")
 import("//build/rust/rustc_binary.gni")
 import("//build/rust/rustc_library.gni")
 import("//build/testing/environments.gni")
-import("//src/recovery/system/system_recovery_args.gni")
 import("//src/sys/core/build/core_shard.gni")
 
 # Generate rust library for the config
@@ -87,22 +86,22 @@ if (current_toolchain == default_toolchain) {
 }
 
 resource("recovery_logo") {
-  sources = [ recovery_logo_path ]
+  sources = [ "//src/recovery/system/res/fuchsia-logo.riv" ]
   outputs = [ "data/logo.riv" ]
 }
 
 resource("icons") {
-  sources = [ icons_path ]
+  sources = [ "//src/recovery/system/res/ota_icons.riv" ]
   outputs = [ "data/ota_icons.riv" ]
 }
 
 resource("instructions") {
-  sources = [ instructions_path ]
+  sources = [ "//src/recovery/system/res/instructions.txt" ]
   outputs = [ "data/instructions.txt" ]
 }
 
 resource("qr_codes") {
-  sources = [ qr_codes_path ]
+  sources = [ "//src/recovery/system/res/qr_codes.riv" ]
   outputs = [ "data/qr_codes.riv" ]
 }
 
@@ -231,14 +230,12 @@ rustc_binary("bin") {
     "http_setup_server",
   ]
   sources = [ "src/main.rs" ]
-  if (enable_recovery_ui_v2) {
-    deps += [
-      ":icons",
-      ":qr_codes",
-    ]
-    features += [ "ota_ui" ]
-    sources += [ "src/ui_v2.rs" ]
-  }
+  deps += [
+    ":icons",
+    ":qr_codes",
+  ]
+  features += [ "ota_ui" ]
+  sources += [ "src/ui_v2.rs" ]
 }
 
 rustc_binary("bin_ota") {
@@ -298,12 +295,7 @@ fuchsia_component_manifest("manifest") {
 
 fuchsia_component("component") {
   cm_label = ":manifest"
-  deps = [
-    ":bin",
-    ":instructions",
-    ":recovery_logo",
-    ":roboto_regular",
-  ]
+  deps = [ ":bin" ]
 }
 
 fuchsia_structured_config_values("values_from_gn") {
@@ -317,6 +309,9 @@ fuchsia_package("system_recovery") {
   deps = [
     ":component",
     ":component_ota",
+    ":instructions",
+    ":recovery_logo",
+    ":roboto_regular",
     ":values_from_gn",
   ]
 }
@@ -355,12 +350,7 @@ fuchsia_component_manifest("manifest_fdr") {
 
 fuchsia_component("component_fdr") {
   cm_label = ":manifest_fdr"
-  deps = [
-    ":bin_fdr",
-    ":instructions",
-    ":recovery_logo",
-    ":roboto_regular",
-  ]
+  deps = [ ":bin_fdr" ]
 }
 
 fuchsia_structured_config_values("values_from_gn_fdr") {
@@ -373,6 +363,7 @@ fuchsia_structured_config_values("values_from_gn_fdr") {
 fuchsia_package("system_recovery_fdr") {
   deps = [
     ":component_fdr",
+    ":roboto_regular",
     ":values_from_gn_fdr",
   ]
 }
@@ -442,12 +433,7 @@ fuchsia_component_manifest("manifest_installer") {
 
 fuchsia_component("component_installer") {
   cm_label = ":manifest_installer"
-  deps = [
-    ":bin_installer",
-    ":instructions",
-    ":recovery_logo",
-    ":roboto_regular",
-  ]
+  deps = [ ":bin_installer" ]
 }
 
 fuchsia_structured_config_values("values_from_gn_installer") {
@@ -460,6 +446,9 @@ fuchsia_structured_config_values("values_from_gn_installer") {
 fuchsia_package("system_recovery_installer") {
   deps = [
     ":component_installer",
+    ":instructions",
+    ":recovery_logo",
+    ":roboto_regular",
     ":values_from_gn_installer",
   ]
 }

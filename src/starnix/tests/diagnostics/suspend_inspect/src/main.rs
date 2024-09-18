@@ -2,9 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-// XXX(fmil): remove
-#![allow(unused)]
-
 use anyhow::{Context, Result};
 use component_events::events::{EventStream, Started, Stopped};
 use component_events::matcher::EventMatcher;
@@ -13,11 +10,13 @@ use fasync::{DurationExt, TimeoutExt};
 use futures::{TryFutureExt, TryStreamExt};
 use tracing::info;
 use {
-    fidl_fuchsia_test_syscalls as ffts, fidl_fuchsia_testing_harness as ffth,
+    fidl_fuchsia_test_suspend as fftsu, fidl_fuchsia_test_syscalls as ffts,
     fuchsia_async as fasync, fuchsia_component as fxc, fuchsia_component_test as fxct,
     fuchsia_driver_test as _, fuchsia_zircon as zx,
 };
 
+// Wait at most this long for a suspender device to appear in the service
+// dir.
 const SUSPEND_DEVICE_TIMEOUT: zx::Duration = zx::Duration::from_seconds(5);
 
 // The connection method is borrowed from system-activity-governor code.
@@ -35,7 +34,9 @@ async fn connect_to_control() -> Result<ffts::ControlProxy> {
             .try_next()
             .map_err(|e| anyhow::anyhow!("Failed to get next watch message: {e:?}"))
             .on_timeout(SUSPEND_DEVICE_TIMEOUT.after_now(), || {
-                Err(anyhow::anyhow!("Timeout waiting for next watcher message."))
+                Err(anyhow::anyhow!(
+                    "Timeout waiting for next watcher message on ffs::directory::Watcher."
+                ))
             })
             .await?;
 
@@ -76,45 +77,55 @@ async fn test_suspend() -> Result<()> {
     // If you don't do this, your code will not receive the events you expect.
     let moniker = format!("{collection}:{child_name}");
 
-    // Starts the suspend driver test realm.
-    let realm_proxy_control = fxc::client::connect_to_protocol::<ffth::RealmProxy_Marker>()
-        .context("connecting to RealmProxy")?;
-
-    let control_proxy = connect_to_control().await.context("while connecting to control")?;
-
-    // If we want OK to be returned, we must set it explicitly. Otherwise an
-    // error will be returned by default.
-    control_proxy.set_suspend_enter_result(zx::Status::OK.into_raw()).await?;
-
-    let state = control_proxy.get_state().await.context("while calling get_state")?;
-    assert_eq!(0, state);
-
     {
-        let instance =
-            fxct::ScopedInstance::new_with_name(child_name.into(), collection.into(), url.into())
-                .await?;
+        // Keep this alive to keep the test realm alive.
+        let realm_control_proxy = fxc::client::connect_to_protocol::<fftsu::RealmMarker>()
+            .context("connecting to driver test realm")?;
 
-        info!("starting suspend_linux binary ... ");
-        let _binder = instance.connect_to_binder().unwrap();
+        // Required for the test realm to be created.
+        realm_control_proxy.create().await.context("while creating test realm")?;
 
-        EventMatcher::ok().moniker(&moniker).wait::<Started>(&mut events).await.unwrap();
-        EventMatcher::ok().moniker(&moniker).wait::<Stopped>(&mut events).await.unwrap();
-        info!("... and it stopped.");
+        let control_proxy = connect_to_control().await.context("while connecting to control")?;
+
+        // If we want OK to be returned, we must set it explicitly. Otherwise an
+        // error will be returned by default.
+        control_proxy.set_suspend_enter_result(zx::Status::OK.into_raw()).await?;
+
+        let state = control_proxy.get_state().await.context("while calling get_state")?;
+        assert_eq!(0, state);
+
+        {
+            let instance = fxct::ScopedInstance::new_with_name(
+                child_name.into(),
+                collection.into(),
+                url.into(),
+            )
+            .await?;
+
+            info!("starting suspend_linux binary ... ");
+            let _binder = instance.connect_to_binder().unwrap();
+
+            EventMatcher::ok().moniker(&moniker).wait::<Started>(&mut events).await.unwrap();
+            EventMatcher::ok().moniker(&moniker).wait::<Stopped>(&mut events).await.unwrap();
+            info!("... and it stopped.");
+        }
+
+        // Linux program started, suspended, resumed, then stopped. The resulting
+        // inspect should have been captured and ought to be available.
+        let kernel_inspect = ArchiveReader::new()
+            // See notes above for moniker.
+            .select_all_for_moniker("test_suite/kernel")
+            .with_minimum_schema_count(1)
+            .snapshot::<Inspect>()
+            .await?;
+        print!("{:?}", kernel_inspect);
+        assert_eq!(kernel_inspect.len(), 1);
+
+        let state = control_proxy.get_state().await.context("while calling get_state")?;
+        assert_eq!(1, state);
+
+        info!("tearing down the test realm now");
     }
-
-    // Linux program started, suspended, resumed, then stopped. The resulting
-    // inspect should have been captured and ought to be available.
-    let kernel_inspect = ArchiveReader::new()
-        // See notes above for moniker.
-        .select_all_for_moniker("test_suite/kernel")
-        .with_minimum_schema_count(1)
-        .snapshot::<Inspect>()
-        .await?;
-    print!("{:?}", kernel_inspect);
-    assert_eq!(kernel_inspect.len(), 1);
-
-    let state = control_proxy.get_state().await.context("while calling get_state")?;
-    assert_eq!(1, state);
 
     Ok(())
 }

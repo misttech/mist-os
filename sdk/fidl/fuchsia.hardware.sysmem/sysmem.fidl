@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 library fuchsia.hardware.sysmem;
 
-using fuchsia.sysmem;
 using fuchsia.sysmem2;
 using zx;
 
@@ -22,9 +21,6 @@ closed protocol Sysmem {
     /// Takes the client end of a FIDL connection that'll serve
     /// fuchsia.sysmem2.SecureMem, which is a protocol that's specific to
     /// sysmem<->securemem concerns.
-    //
-    // The added=HEAD is fake - see comments in overview.fidl.
-    @available(added=HEAD)
     strict RegisterSecureMem(resource struct {
         secure_mem_connection client_end:fuchsia.sysmem2.SecureMem;
     });
@@ -33,14 +29,4 @@ closed protocol Sysmem {
     /// will be closing soon, and that this channel closure should not be
     /// considered an error.
     strict UnregisterSecureMem() -> () error zx.Status;
-};
-
-service Service {
-    sysmem client_end:Sysmem;
-
-    // The added=19 is fake - see comments in overview.fidl.
-    @available(added=19, deprecated=23)
-    allocator_v1 client_end:fuchsia.sysmem.Allocator;
-
-    allocator_v2 client_end:fuchsia.sysmem2.Allocator;
 };

@@ -1144,6 +1144,56 @@ class RustRemoteActionPrepareTests(unittest.TestCase):
         self.assertEqual(run_status, 0)
         mock_download_inputs.assert_called_once()
 
+    def test_run_remote_downloads_link_repro_on_failure(self) -> None:
+        exec_root = Path("/home/project")
+        working_dir = exec_root / "build-here"
+        compiler = Path("../tools/bin/rustc")
+        shlib = Path("tools/lib/librusteze.so")
+        shlib_abs = exec_root / shlib
+        shlib_rel = cl_utils.relpath(shlib_abs, start=working_dir)
+        source = Path("../foo/src/lib.rs")
+        rlib = Path("obj/foo.rlib")
+        deps = [Path("../foo/src/other.rs")]
+        link_repro_path = Path("debug/lld-crash.tar")
+        depfile_contents = [str(d) + ":" for d in deps]
+        command = _strs(
+            [
+                compiler,
+                source,
+                "-o",
+                rlib,
+                f"-Clink-arg=--reproduce={link_repro_path}",
+            ]
+        )
+        r = rustc_remote_wrapper.RustRemoteAction(
+            ["--", *command],
+            exec_root=exec_root,
+            working_dir=working_dir,
+            auto_reproxy=False,
+        )
+        self.assertEqual(r._rust_action.link_reproducer, link_repro_path)
+
+        prepare_mocks = self.generate_prepare_mocks(
+            depfile_contents=depfile_contents,
+            compiler_shlibs=[shlib_rel],
+        )
+        with contextlib.ExitStack() as stack:
+            for m in prepare_mocks:
+                stack.enter_context(m)
+            with mock.patch.object(
+                remote_action.RemoteAction, "run_with_main_args", return_value=1
+            ) as mock_run:
+                with mock.patch.object(
+                    remote_action.RemoteAction,
+                    "download_output_file",
+                    return_value=0,
+                ) as mock_download:
+                    run_status = r.run()
+
+        self.assertEqual(run_status, 1)  # failure
+        mock_run.assert_called_once()
+        mock_download.assert_called_once_with(link_repro_path)
+
     def test_post_run_actions(self) -> None:
         exec_root = Path("/home/project")
         working_dir = exec_root / "build-here"

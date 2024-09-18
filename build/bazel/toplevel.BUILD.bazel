@@ -8,7 +8,11 @@ See //build/bazel/README.md for details about this file.
 """
 
 load("@fuchsia_build_config//:defs.bzl", "build_config")
-load("//:build/bazel/toolchains/linux_sysroot.bzl", "linux_sysroot")
+load(
+    "//:build/bazel/toolchains/linux_sysroot.bzl",
+    "linux_sysroot_headers",
+    "linux_sysroot_libs",
+)
 
 # This exclude is needed as there are files in the folder that have space
 # in the filename. Bazel does not support spaces in filename.
@@ -21,7 +25,7 @@ exports_files(
     # Export these files for the benefit of the //build/bazel/toolchains/clang package.
     glob(["prebuilt/third_party/clang/**"]) +
     glob(["prebuilt/third_party/sysroot/linux"]) +
-    glob(["build/bazel/**"]) +
+    glob(["build/bazel/toolchains/**"]) +
 
     # Used by code generators in vendor/google:
     glob(["prebuilt/third_party/gn/*/gn"]) +
@@ -61,13 +65,17 @@ exports_files(
     [],
 )
 
-linux_sysroot(
-    name = "linux_sysroot_x64",
+linux_sysroot_headers(
+    name = "linux_sysroot_headers",
+)
+
+linux_sysroot_libs(
+    name = "linux_sysroot_libs_x64",
     sysroot_arch = "x86_64",
 )
 
-linux_sysroot(
-    name = "linux_sysroot_arm64",
+linux_sysroot_libs(
+    name = "linux_sysroot_libs_arm64",
     sysroot_arch = "aarch64",
 )
 

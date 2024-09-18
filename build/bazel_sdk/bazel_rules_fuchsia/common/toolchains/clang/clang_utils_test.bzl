@@ -13,7 +13,7 @@ that can be launched with `bazel test` to run the test suite, as in:
 
 If @clang_repo//BUILD.bazel contains something like:
 
-  load("@fuchsia_sdk_common//:toolchains/clang/clang_utils_test.bzl",
+  load("//common:toolchains/clang/clang_utils_test.bzl",
        "include_clang_utils_test_suite")
 
   include_clang_utils_test_suite(
@@ -23,15 +23,15 @@ If @clang_repo//BUILD.bazel contains something like:
 
 load("@bazel_skylib//lib:unittest.bzl", "asserts", "unittest")
 load(
-    "//:toolchains/clang/clang_utils.bzl",
+    "//common:toolchains/clang/clang_utils.bzl",
     "clang_all_target_tags",
     "format_labels_list_to_target_tag_dict",
     "format_target_tag_labels_dict",
     "process_clang_builtins_output",
     "to_clang_target_tuple",
 )
-load("//platforms:utils_test.bzl", "platforms_utils_test")
-load("//:transition_utils_test.bzl", "transition_utils_test")
+load("//common/platforms:utils_test.bzl", "platforms_utils_test")
+load("//common:transition_utils_test.bzl", "transition_utils_test")
 
 def _process_clang_builtins_output_test(ctx):
     response = """Fuchsia clang version 16.0.0 (https://llvm.googlesource.com/llvm-project 039b969b32b64b64123dce30dd28ec4e343d893f)

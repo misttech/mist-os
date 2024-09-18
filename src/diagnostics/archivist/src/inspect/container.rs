@@ -18,16 +18,13 @@ use futures::channel::oneshot;
 use futures::{FutureExt, Stream};
 use selectors::SelectorExt;
 use std::collections::HashMap;
-use std::sync::{Arc, LazyLock, Weak};
+use std::sync::{Arc, Weak};
 use std::time::Duration;
 use tracing::warn;
 use {
     fidl_fuchsia_diagnostics as fdiagnostics, fidl_fuchsia_inspect as finspect,
     fidl_fuchsia_io as fio, fuchsia_trace as ftrace, inspect_fidl_load as deprecated_inspect,
 };
-
-static DEFAULT_TREE_NAME: LazyLock<FlyStr> =
-    LazyLock::new(|| FlyStr::new(finspect::DEFAULT_TREE_NAME));
 
 #[derive(Debug)]
 pub enum InspectHandle {
@@ -196,29 +193,12 @@ impl InspectArtifactsContainer {
         };
         match handle {
             InspectHandle::Tree { name, .. } | InspectHandle::Escrow { name, .. } => {
-                selectors.any(|s| match s.tree_names.as_ref() {
-                    Some(fdiagnostics::TreeNames::All(_)) => true,
-
-                    Some(fdiagnostics::TreeNames::Some(filters)) => filters.iter().any(|f| {
-                        f == name
-                            .as_ref()
-                            .map(|name_ref| name_ref.as_str())
-                            .unwrap_or(DEFAULT_TREE_NAME.as_str())
-                    }),
-
-                    // None for name filter and None for the name imply that the default
-                    // name filter should be used for both, ie this is a match.
-                    //
-                    // TODO(https://fxbug.dev/355732696): None for name filter and
-                    // Some(name) for name should use DEFAULT_TREE_NAME as an implicit
-                    // filter value. This has to be done after tests relying on the current
-                    // behavior where a bare selector matches all trees (mainly driver
-                    // manager) have been updated to specify tree names or [...].
-                    None => true,
-
-                    Some(fdiagnostics::TreeNames::__SourceBreaking { .. }) => {
-                        unreachable!("FIDL convention to ensure exhaustive match")
-                    }
+                selectors.any(|s| {
+                    let name = match name.as_ref() {
+                        Some(fly) => fly.as_str(),
+                        None => finspect::DEFAULT_TREE_NAME,
+                    };
+                    selectors::match_tree_name_against_selector(name, s)
                 })
             }
             InspectHandle::Directory { .. } => selectors.any(|s| {

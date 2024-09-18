@@ -5,7 +5,5 @@
 import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.bluetooth.hfp.test") {
-  sdk_category = "excluded"
-
   sources = [ "test.fidl" ]
 }

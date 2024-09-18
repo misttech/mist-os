@@ -2056,7 +2056,9 @@ void VmObjectPaged::RangeChangeUpdateLocked(uint64_t offset, uint64_t len, Range
   for (auto& m : mapping_list_) {
     m.assert_object_lock();
     if (op == RangeChangeOp::Unmap) {
-      m.AspaceUnmapLockedObject(aligned_offset, aligned_len);
+      m.AspaceUnmapLockedObject(aligned_offset, aligned_len, false);
+    } else if (op == RangeChangeOp::UnmapZeroPage) {
+      m.AspaceUnmapLockedObject(aligned_offset, aligned_len, true);
     } else if (op == RangeChangeOp::RemoveWrite) {
       m.AspaceRemoveWriteLockedObject(aligned_offset, aligned_len);
     } else if (op == RangeChangeOp::DebugUnpin) {

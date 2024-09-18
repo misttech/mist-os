@@ -20,6 +20,8 @@ driver_bind_rules("goldfish_address_space-bind") {
 common_deps = [
   ":goldfish_address_space-bind",
   "//sdk/fidl/fuchsia.hardware.goldfish:fuchsia.hardware.goldfish_cpp",
+  "//sdk/lib/async-loop:async-loop-cpp",
+  "//sdk/lib/async-loop:async-loop-default",
   "//sdk/lib/component/outgoing/cpp",
   "//sdk/lib/driver/runtime:driver_runtime_cpp",
   "//sdk/lib/fidl",
@@ -29,8 +31,6 @@ common_deps = [
   "//src/devices/pci/lib/device-protocol-pci",
   "//src/lib/ddk",
   "//src/lib/ddktl",
-  "//zircon/system/ulib/async-loop:async-loop-cpp",
-  "//zircon/system/ulib/async-loop:async-loop-default",
   "//zircon/system/ulib/fbl",
   "//zircon/system/ulib/trace",
   "//zircon/system/ulib/trace",
@@ -68,13 +68,13 @@ test("goldfish-address-space-test") {
   ]
   deps = common_deps + [
            "//sdk/fidl/fuchsia.hardware.pci:fuchsia.hardware.pci_cpp_testing",
+           "//sdk/lib/async-default",
+           "//sdk/lib/async-loop:async-loop-cpp",
            "//sdk/lib/async-loop-testing/cpp",
            "//sdk/lib/async_patterns/testing/cpp",
            "//sdk/lib/component/outgoing/cpp",
            "//src/devices/testing/fake-bti",
            "//src/devices/testing/mock-ddk",
-           "//zircon/system/ulib/async-default",
-           "//zircon/system/ulib/async-loop:async-loop-cpp",
            "//zircon/system/ulib/mmio-ptr:mmio-ptr-fake",
            "//zircon/system/ulib/mock-function",
            "//zircon/system/ulib/sync",

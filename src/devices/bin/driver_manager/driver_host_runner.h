@@ -75,9 +75,10 @@ class DriverHostRunner : public fidl::WireServer<fuchsia_component_runner::Compo
   void StartDriverHostComponent(std::string_view moniker, std::string_view url,
                                 StartComponentCallback callback);
 
-  zx::result<fidl::ClientEnd<fuchsia_driver_loader::DriverHost>> LoadDriverHost(
-      driver_loader::Loader* loader, const fuchsia_component_runner::ComponentStartInfo& start_info,
-      std::string_view name, zx::channel bootstrap_receiver);
+  void LoadDriverHost(driver_loader::Loader* loader,
+                      const fuchsia_component_runner::ComponentStartInfo& start_info,
+                      std::string_view name, zx::channel bootstrap_receiver,
+                      StartDriverHostCallback callback);
 
   // Creates the process and starting thread for a driver host.
   zx::result<DriverHost*> CreateDriverHost(std::string_view name);

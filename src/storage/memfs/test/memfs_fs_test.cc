@@ -63,8 +63,6 @@ class MemfsInstance : public fs_test::FilesystemInstance {
 
   zx::result<> Fsck() override { return zx::ok(); }
 
-  zx::result<std::string> DevicePath() const override { return zx::error(ZX_ERR_BAD_STATE); }
-
   fs_management::SingleVolumeFilesystemInterface* fs() override { return nullptr; }
 
   std::string GetMoniker() const override {

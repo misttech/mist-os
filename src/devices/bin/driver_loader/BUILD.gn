@@ -3,25 +3,25 @@
 # found in the LICENSE file.
 
 source_set("driver_loader") {
+  public = [ "loader.h" ]
+  public_deps = [
+    # These all provide headers used by diagnostics.h and/or loader.h.
+    "//sdk/fidl/fuchsia.driver.loader:fuchsia.driver.loader_cpp",
+    "//sdk/fidl/fuchsia.io:fuchsia.io_cpp",
+    "//sdk/lib/async",
+    "//sdk/lib/ld:remote",
+    "//sdk/lib/stdcompat",
+    "//src/devices/lib/log",
+    "//src/lib/elfldltl",
+    "//zircon/system/ulib/fbl",
+    "//zircon/system/ulib/zx",
+  ]
   sources = [
     "diagnostics.h",
     "loader.cc",
-    "loader.h",
   ]
   deps = [
-    "//sdk/fidl/fuchsia.io:fuchsia.io_cpp",
     "//sdk/lib/fdio",
-    "//sdk/lib/ld:ld-stub.basic",
-  ]
-  public_deps = [
-    "//sdk/fidl/fuchsia.driver.loader:fuchsia.driver.loader_cpp",
-    "//sdk/lib/ld:abi-headers",
-    "//sdk/lib/ld:headers",
-    "//src/devices/lib/log",
-    "//src/lib/elfldltl",
-    "//zircon/system/ulib/async",
-    "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/zircon-internal",
-    "//zircon/system/ulib/zx",
   ]
 }

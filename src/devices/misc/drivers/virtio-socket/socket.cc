@@ -155,35 +155,6 @@ void SocketDevice::SendResponse(::fuchsia_hardware_vsock::wire::DeviceSendRespon
   completer.Reply(ZX_OK);
 }
 
-void SocketDevice::SendVmo(::fuchsia_hardware_vsock::wire::DeviceSendVmoRequest* request,
-                           SendVmoCompleter::Sync& completer) {
-  fbl::AutoLock lock(&lock_);
-  if (!callbacks_.is_valid()) {
-    completer.Reply(ZX_ERR_BAD_STATE);
-    return;
-  }
-
-  auto conn = connections_.find(ConnectionKey(request->addr));
-  if (conn == connections_.end()) {
-    completer.Reply(ZX_ERR_NOT_FOUND);
-    return;
-  }
-  // Forbid the zero length as the VMO transfer code will get confused.
-  if (request->len == 0) {
-    completer.Reply(ZX_ERR_INVALID_ARGS);
-    return;
-  }
-  zx_status_t result =
-      conn->SetVmo(bti_, std::move(request->vmo), request->off, request->len, bti_contiguity_);
-  if (result != ZX_OK) {
-    completer.Reply(result);
-    return;
-  }
-  ContinueTxLocked(false, conn.CopyPointer());
-
-  completer.Reply(ZX_OK);
-}
-
 void SocketDevice::GetCid(GetCidCompleter::Sync& completer) {
   fbl::AutoLock lock(&lock_);
   completer.Reply(cid_);
@@ -270,19 +241,13 @@ void SocketDevice::DdkRelease() {
 
 void SocketDevice::IrqRingUpdate() {
   fbl::AutoLock lock(&lock_);
-  tx_.ProcessDescriptors(
-      [this](const ConnectionKey& key, uint64_t payload) TA_NO_THREAD_SAFETY_ANALYSIS {
-        auto conn = connections_.find(key);
-        if (conn != connections_.end()) {
-          if (conn->NotifyVmoTxComplete(payload)) {
-            if (callbacks_.is_valid()) {
-              // TODO(https://fxbug.dev/42180237) Consider handling the error instead of
-              // ignoring it.
-              [[maybe_unused]] auto _ = callbacks_->SendVmoComplete(conn->GetKey().addr);
-            }
-          }
-        }
-      });
+  tx_.ProcessDescriptors([this](const ConnectionKey& key, uint64_t payload)
+                             TA_NO_THREAD_SAFETY_ANALYSIS {
+                               auto conn = connections_.find(key);
+                               if (conn != connections_.end()) {
+                                 conn->NotifyVmoTxComplete(payload);
+                               }
+                             });
   event_.ProcessDescriptors<virtio_vsock_event_t>(
       [this](virtio_vsock_event_t* event, void* data, uint32_t data_len)
           TA_NO_THREAD_SAFETY_ANALYSIS {

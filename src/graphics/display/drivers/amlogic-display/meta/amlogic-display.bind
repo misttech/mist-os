@@ -49,3 +49,7 @@ optional node "mipi-dsi-display" {
 optional node "hdmi-display" {
   fuchsia.display.OUTPUT == fuchsia.display.OUTPUT.HDMI;
 }
+
+optional node "gpio-init" {
+  fuchsia.BIND_INIT_STEP == fuchsia.gpio.BIND_INIT_STEP.GPIO;
+}

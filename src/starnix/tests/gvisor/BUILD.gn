@@ -79,54 +79,27 @@ group("gvisor_runfiles") {
   }
 }
 
+all_benchmark_targets = []
+all_benchmark_packages = []
 foreach(benchmark_name, gvisor_benchmarks) {
-  name = "${benchmark_name}_benchmark"
-  gvisor_test_component(name) {
+  _package_label = "starnix_gvisor_${benchmark_name}_benchmark"
+  gvisor_test_package(_package_label) {
     is_benchmark = true
     run_as_root = false
+    component_name = "${benchmark_name}_benchmark"
+
+    # Set environments to none so infra doesn't run these benchmarks.
+    # These benchmarks are run as a part of the perf test targets below.
+    test_specs = {
+      environments = []
+    }
   }
-}
+  all_benchmark_packages += [ ":${_package_label}" ]
 
-# GVisor tests with the default settings.
-gvisor_tests_package("starnix_gvisor_tests") {
-}
-
-# GVisor tests with persistent storage on fxfs.
-gvisor_tests_package("starnix_gvisor_tests_on_fxfs") {
-  expectations = "expectations/using_fxfs_test.json5"
-  if (!starnix_unified_aspace) {
-    expectations = "expectations/using_fxfs_test_no_unified_aspace.json5"
-  }
-  use_persistent_storage = true
-  suffix = "_use_persistent_storage"
-}
-
-fuchsia_test_package("starnix_gvisor_benchmarks") {
-  deps = [ ":gvisor_runfiles" ]
-
-  test_components = []
-
-  foreach(benchmark_name, gvisor_benchmarks) {
-    test_components += [ ":${benchmark_name}_benchmark" ]
-  }
-
-  subpackages = starnix_test_subpackages +
-                [ "//src/starnix/containers/debian:debian_package" ]
-
-  # Set environments to none so infra doesn't run these benchmarks.
-  # These benchmarks are run as a part of:
-  # //src/tests/end_to_end/perf/test/starnix_gvisor_benchmarks_test.dart
-  test_specs = {
-    environments = []
-  }
-}
-
-all_benchmark_targets = []
-foreach(benchmark_name, gvisor_benchmarks) {
   # The "starnix_host_benchmark_gvisor_" prefix is useful for running all benchmarks with `fx test`.
-  name = "starnix_host_benchmark_gvisor_${benchmark_name}"
-  fuchsia_component_perf_test(name) {
-    package = ":starnix_gvisor_benchmarks"
+  _host_label = "starnix_host_benchmark_gvisor_${benchmark_name}"
+  fuchsia_component_perf_test(_host_label) {
+    package = ":${_package_label}"
     component_name = "${benchmark_name}_benchmark"
     expected_metric_names_filepath = "//src/tests/end_to_end/perf/expected_metric_names/fuchsia.starnix.gvisor_benchmarks.${benchmark_name}.txt"
 
@@ -148,8 +121,26 @@ foreach(benchmark_name, gvisor_benchmarks) {
     }
     test_type = "starnix"
   }
+  all_benchmark_targets += [ ":${_host_label}" ]
+}
 
-  all_benchmark_targets += [ ":${name}" ]
+group("starnix_gvisor_benchmarks") {
+  testonly = true
+  deps = all_benchmark_packages
+}
+
+# GVisor tests with the default settings.
+gvisor_tests_group("starnix_gvisor_tests") {
+}
+
+# GVisor tests with persistent storage on fxfs.
+gvisor_tests_group("starnix_gvisor_tests_on_fxfs") {
+  expectations = "expectations/using_fxfs_test.json5"
+  if (!starnix_unified_aspace) {
+    expectations = "expectations/using_fxfs_test_no_unified_aspace.json5"
+  }
+  use_persistent_storage = true
+  suffix = "_on_fxfs"
 }
 
 group("benchmarks") {

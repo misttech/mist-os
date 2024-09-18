@@ -6,13 +6,13 @@ executable("usbctl") {
   sources = [ "usbctl.cc" ]
   deps = [
     "//sdk/fidl/fuchsia.hardware.usb.peripheral:fuchsia.hardware.usb.peripheral_cpp",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/fidl",
     "//src/devices/usb/lib/usb",
     "//src/devices/usb/lib/usb:cdc",
     "//src/devices/usb/lib/usb:peripheral",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/usb-peripheral-utils",
     "//zircon/system/ulib/zx",
   ]

@@ -16,6 +16,7 @@ use rand_xorshift::XorShiftRng;
 use sdk_metadata::{LoadedProductBundle, ProductBundle};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashMap};
+use std::ffi::CString;
 use std::fs::{File, OpenOptions};
 use std::io::{BufReader, Read, Seek, SeekFrom, Write};
 use std::ops::Range;
@@ -43,6 +44,14 @@ const ZBI_ZIRCON_R: &str = "zbi_zircon-r";
 const BLK_STORAGE_SPARSE: &str = "blk_storage-sparse";
 const FXFS_BLK_STORAGE_FULL: &str = "fxfs-blk_storage-full";
 const BLK_BLOB: &str = "blk_blob";
+
+/// On QEMU, the bootloader will look for an EFI application commandline in this partition, to
+/// allow tests to control the boot mode.
+///
+/// The bootloader will match against the partition name; the type GUID doesn't matter.
+const QEMU_COMMANDLINE_PARTITION_NAME: &str = "qemu-commandline";
+const QEMU_COMMANDLINE_PARTITION_SIZE: u64 = 1024;
+const QEMU_COMMANDLINE_PARTITION_GUID: PartType = part_type("F5F38420-F848-423C-9945-3D845492A05A");
 
 // The relevant part of the product bundle metadata schema, as realized by
 // entries in the product_bundles.json build API module.
@@ -191,6 +200,10 @@ struct TopLevel {
     /// path to Fxfs partition image (if --use_fxfs is set)
     #[argh(option)]
     fxfs: Option<Utf8PathBuf>,
+
+    /// contents to put in a "qemu-commandline" partition
+    #[argh(option)]
+    qemu_commandline: Option<String>,
 }
 
 #[derive(Debug)]
@@ -374,6 +387,20 @@ fn run(mut args: TopLevel) -> Result<(), Error> {
     let efi_part =
         add_partition(&mut gpt_disk, efi_partition_name, args.efi_size, gpt::partition_types::EFI)?;
 
+    // If a QEMU commandline is specified, this tuple will hold (partition_range, contents).
+    let qemu_commandline = match args.qemu_commandline {
+        Some(ref commandline) => Some((
+            add_partition(
+                &mut gpt_disk,
+                QEMU_COMMANDLINE_PARTITION_NAME,
+                QEMU_COMMANDLINE_PARTITION_SIZE,
+                QEMU_COMMANDLINE_PARTITION_GUID,
+            )?,
+            commandline,
+        )),
+        None => None,
+    };
+
     struct Partitions {
         zircon_a: Range<u64>,
         vbmeta_a: Range<u64>,
@@ -546,6 +573,17 @@ fn run(mut args: TopLevel) -> Result<(), Error> {
         )?;
     } else {
         write_esp_content(Shift::new(&mut disk, efi_part.start), &args, FsOptions::new())?;
+    }
+
+    if let Some((partition, contents)) = qemu_commandline {
+        // Bootloader expects a nul-terminated string.
+        let contents = CString::new(contents.as_bytes())?;
+        let contents = contents.as_bytes_with_nul();
+        let part_size = partition.end - partition.start;
+        if contents.len() > part_size.try_into()? {
+            bail!("QEMU commandline contents too large (max {})", part_size);
+        }
+        disk.write_all_at(contents, partition.start)?;
     }
 
     if let Some(partitions) = abr_partitions {
@@ -962,6 +1000,9 @@ fn write_abr(disk: &mut File, offset: u64, boot_part: BootPart) -> Result<(), Er
 #[cfg(test)]
 mod tests {
     use super::*;
+    use gpt::disk::read_disk;
+    use std::str::from_utf8;
+    use tempfile::TempDir;
 
     fn compare_golden(test_data_dir: &Utf8Path, image_path: &Utf8Path) {
         let image = std::fs::read(&image_path).expect("Unable to read image");
@@ -1132,5 +1173,104 @@ mod tests {
         .expect("run failed");
 
         compare_golden(&test_data_dir, &image_path);
+    }
+
+    /// Calls `make-fuchsia-vol` with common args plus a QEMU commandline string.
+    ///
+    /// Returns a (temp_directory, image_path) tuple on success.
+    fn make_vol_with_commandline(commandline: &str) -> Result<(TempDir, Utf8PathBuf), Error> {
+        let tmp = tempfile::tempdir().unwrap();
+        let dir = Utf8Path::from_path(tmp.path()).unwrap();
+        let image_path = dir.join("image");
+
+        for i in 0..11 {
+            std::fs::write(dir.join(format!("placeholder.{}", i)), vec![i; 8192]).unwrap();
+        }
+
+        let current_exe = std::env::current_exe().unwrap();
+
+        let test_data_dir = Utf8PathBuf::from_path_buf(
+            current_exe.parent().unwrap().join("make-fuchsia-vol_test_data"),
+        )
+        .unwrap();
+
+        const IMAGE_SIZE: usize = 67108864;
+
+        // Same args as the above tests, but with `--qemu-commandline` also.
+        run(TopLevel::from_args(
+            &["make-fuchsia-vol"],
+            &[
+                image_path.as_str(),
+                "--abr-size",
+                "8192",
+                "--resize",
+                &format!("{}", IMAGE_SIZE),
+                "--seed",
+                "test_compare_golden",
+                "--efi-size",
+                "40000000",
+                "--bootloader",
+                dir.join("placeholder.0").as_str(),
+                "--zbi",
+                dir.join("placeholder.1").as_str(),
+                "--zedboot",
+                dir.join("placeholder.2").as_str(),
+                "--cmdline",
+                dir.join("placeholder.3").as_str(),
+                "--sparse-fvm",
+                dir.join("placeholder.4").as_str(),
+                "--zircon-a",
+                dir.join("placeholder.5").as_str(),
+                "--vbmeta-a",
+                dir.join("placeholder.6").as_str(),
+                "--zircon-b",
+                dir.join("placeholder.7").as_str(),
+                "--vbmeta-b",
+                dir.join("placeholder.8").as_str(),
+                "--zircon-r",
+                dir.join("placeholder.9").as_str(),
+                "--vbmeta-r",
+                dir.join("placeholder.10").as_str(),
+                "--fuchsia-build-dir",
+                test_data_dir.as_str(),
+                "--product-bundle",
+                test_data_dir.as_str(),
+                "--qemu-commandline",
+                commandline,
+            ],
+        )
+        .unwrap())?;
+
+        Ok((tmp, image_path))
+    }
+
+    #[test]
+    fn test_qemu_commandline() {
+        let (_tmp, image_path) = make_vol_with_commandline("boot_mode=fastboot").unwrap();
+
+        // Find the partition location from the GPT.
+        let disk = read_disk(&image_path).unwrap();
+        let partition = disk
+            .partitions()
+            .iter()
+            .find(|p| p.1.name == QEMU_COMMANDLINE_PARTITION_NAME)
+            .unwrap()
+            .1;
+
+        // Make sure the partition contains our expected contents.
+        let file = File::open(&image_path).unwrap();
+        let mut buffer = [0u8; 19];
+        assert!(file
+            .read_exact_at(&mut buffer, partition.bytes_start(*disk.logical_block_size()).unwrap())
+            .is_ok());
+        assert_eq!(&buffer, b"boot_mode=fastboot\0");
+    }
+
+    #[test]
+    fn test_qemu_commandline_too_long() {
+        // The commandline plus a nul-terminator needs to fit in the partition, so trying to
+        // provide contents equal to the partition size should fail.
+        let too_long_commandline = vec![b'a'; QEMU_COMMANDLINE_PARTITION_SIZE as usize];
+        assert!(make_vol_with_commandline(from_utf8(&too_long_commandline).unwrap()).is_err());
     }
 }

@@ -38,13 +38,31 @@ zx::result<std::unique_ptr<HotPlugDetection>> HotPlugDetection::Create(
 
   fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio> pin_gpio(std::move(pin_gpio_result.value()));
 
-  fidl::WireResult interrupt_result = pin_gpio->GetInterrupt(ZX_INTERRUPT_MODE_LEVEL_HIGH);
+  fidl::Arena arena;
+  auto interrupt_config = fuchsia_hardware_gpio::wire::InterruptConfiguration::Builder(arena)
+                              .mode(fuchsia_hardware_gpio::InterruptMode::kLevelHigh)
+                              .Build();
+  fidl::WireResult configure_interrupt_result = pin_gpio->ConfigureInterrupt(interrupt_config);
+  if (!configure_interrupt_result.ok()) {
+    FDF_LOG(ERROR, "Failed to send ConfigureInterrupt request to HPD GPIO: %s",
+            configure_interrupt_result.status_string());
+    return zx::error(configure_interrupt_result.status());
+  }
+  fidl::WireResultUnwrapType<fuchsia_hardware_gpio::Gpio::ConfigureInterrupt>&
+      configure_interrupt_response = configure_interrupt_result.value();
+  if (configure_interrupt_response.is_error()) {
+    FDF_LOG(ERROR, "Failed to configure HPD GPIO interrupt: %s",
+            zx_status_get_string(configure_interrupt_response.error_value()));
+    return configure_interrupt_response.take_error();
+  }
+
+  fidl::WireResult interrupt_result = pin_gpio->GetInterrupt2({});
   if (interrupt_result->is_error()) {
     FDF_LOG(ERROR, "Failed to send GetInterrupt request to HPD GPIO: %s",
             interrupt_result.status_string());
     return interrupt_result->take_error();
   }
-  fidl::WireResultUnwrapType<fuchsia_hardware_gpio::Gpio::GetInterrupt>& interrupt_response =
+  fidl::WireResultUnwrapType<fuchsia_hardware_gpio::Gpio::GetInterrupt2>& interrupt_response =
       interrupt_result.value();
   if (interrupt_response.is_error()) {
     FDF_LOG(ERROR, "Failed to get interrupt from HPD GPIO: %s",
@@ -67,7 +85,7 @@ zx::result<std::unique_ptr<HotPlugDetection>> HotPlugDetection::Create(
 
   fbl::AllocChecker alloc_checker;
   std::unique_ptr<HotPlugDetection> hot_plug_detection = fbl::make_unique_checked<HotPlugDetection>(
-      &alloc_checker, pin_gpio.TakeClientEnd(), std::move(interrupt_response->irq),
+      &alloc_checker, pin_gpio.TakeClientEnd(), std::move(interrupt_response->interrupt),
       std::move(on_state_change), std::move(dispatcher));
   if (!alloc_checker.check()) {
     FDF_LOG(ERROR, "Out of memory while allocating HotPlugDetection");
@@ -130,19 +148,19 @@ HotPlugDetectionState HotPlugDetection::CurrentState() {
 }
 
 zx::result<> HotPlugDetection::Init() {
-  fidl::WireResult<fuchsia_hardware_gpio::Gpio::ConfigIn> config_in_result =
-      pin_gpio_->ConfigIn(fuchsia_hardware_gpio::GpioFlags::kPullDown);
-  if (!config_in_result.ok()) {
-    FDF_LOG(ERROR, "Failed to send ConfigIn request to hpd gpio: %s",
-            config_in_result.status_string());
-    return zx::error(config_in_result.status());
+  fidl::WireResult<fuchsia_hardware_gpio::Gpio::SetBufferMode> set_buffer_mode_result =
+      pin_gpio_->SetBufferMode(fuchsia_hardware_gpio::BufferMode::kInput);
+  if (!set_buffer_mode_result.ok()) {
+    FDF_LOG(ERROR, "Failed to send SetBufferMode request to hpd gpio: %s",
+            set_buffer_mode_result.status_string());
+    return zx::error(set_buffer_mode_result.status());
   }
-  fidl::WireResultUnwrapType<fuchsia_hardware_gpio::Gpio::ConfigIn>& config_in_response =
-      config_in_result.value();
-  if (config_in_response.is_error()) {
+  fidl::WireResultUnwrapType<fuchsia_hardware_gpio::Gpio::ConfigIn>& set_buffer_mode_response =
+      set_buffer_mode_result.value();
+  if (set_buffer_mode_response.is_error()) {
     FDF_LOG(ERROR, "Failed to configure hpd gpio to input: %s",
-            zx_status_get_string(config_in_response.error_value()));
-    return config_in_response.take_error();
+            zx_status_get_string(set_buffer_mode_response.error_value()));
+    return set_buffer_mode_response.take_error();
   }
 
   zx_status_t status = pin_gpio_irq_handler_.Begin(irq_handler_dispatcher_.async_dispatcher());

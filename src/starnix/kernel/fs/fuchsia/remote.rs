@@ -3,20 +3,19 @@
 // found in the LICENSE file.
 
 use crate::fs::fuchsia::sync_file::{SyncFence, SyncFile, SyncPoint, Timeline};
-use crate::fs::fuchsia::zxio::{zxio_query_events, zxio_wait_async};
 use crate::mm::memory::MemoryObject;
 use crate::mm::{ProtectionFlags, VMEX_RESOURCE};
-use crate::task::{CurrentTask, EventHandler, Kernel, WaitCanceler, Waiter};
+use crate::task::{CurrentTask, Kernel};
 use crate::vfs::buffers::{with_iovec_segments, InputBuffer, OutputBuffer};
 use crate::vfs::fsverity::FsVerityState;
 use crate::vfs::socket::{Socket, SocketFile, ZxioBackedSocket};
 use crate::vfs::{
-    default_ioctl, default_seek, fileops_impl_directory, fileops_impl_nonseekable,
-    fileops_impl_noop_sync, fileops_impl_seekable, fs_node_impl_not_dir, fs_node_impl_symlink,
-    fs_node_impl_xattr_delegate, Anon, AppendLockGuard, CacheConfig, CacheMode, DirectoryEntryType,
-    DirentSink, FallocMode, FileHandle, FileObject, FileOps, FileSystem, FileSystemHandle,
-    FileSystemOps, FileSystemOptions, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, FsString,
-    SeekTarget, SymlinkTarget, XattrOp, XattrStorage, DEFAULT_BYTES_PER_BLOCK,
+    default_ioctl, default_seek, fileops_impl_directory, fileops_impl_seekable,
+    fs_node_impl_not_dir, fs_node_impl_symlink, fs_node_impl_xattr_delegate, Anon, AppendLockGuard,
+    CacheConfig, CacheMode, DirectoryEntryType, DirentSink, FallocMode, FileHandle, FileObject,
+    FileOps, FileSystem, FileSystemHandle, FileSystemOps, FileSystemOptions, FsNode, FsNodeHandle,
+    FsNodeInfo, FsNodeOps, FsStr, FsString, SeekTarget, SymlinkTarget, XattrOp, XattrStorage,
+    DEFAULT_BYTES_PER_BLOCK,
 };
 use bstr::ByteSlice;
 use fidl::AsHandleRef;
@@ -36,7 +35,7 @@ use starnix_uapi::errors::Errno;
 use starnix_uapi::file_mode::FileMode;
 use starnix_uapi::mount_flags::MountFlags;
 use starnix_uapi::open_flags::OpenFlags;
-use starnix_uapi::vfs::{default_statfs, FdEvents};
+use starnix_uapi::vfs::default_statfs;
 use starnix_uapi::{
     __kernel_fsid_t, errno, error, from_status_like_fdio, fsverity_descriptor, ino_t, off_t, statfs,
 };
@@ -164,7 +163,7 @@ impl FileSystemOps for RemoteFs {
     }
 
     fn name(&self) -> &'static FsStr {
-        "remote".into()
+        "remotefs".into()
     }
 
     fn generate_node_ids(&self) -> bool {
@@ -306,30 +305,36 @@ pub fn new_remote_file(
             ..Default::default()
         })
         .map_err(|status| from_status_like_fdio!(status))?;
-    let ops: Box<dyn FileOps> = match (handle_type, attrs.object_type) {
-        (zx::ObjectType::SOCKET, _) => Box::new(RemotePipeObject::new(zxio)),
-        (_, ZXIO_OBJECT_TYPE_DIR) => Box::new(RemoteDirectoryObject::new(zxio)),
-        (zx::ObjectType::VMO, _)
-        | (zx::ObjectType::DEBUGLOG, _)
-        | (_, ZXIO_OBJECT_TYPE_FILE)
-        | (_, ZXIO_OBJECT_TYPE_NONE) => Box::new(RemoteFileObject::new(zxio)),
-        (_, ZXIO_OBJECT_TYPE_SYNCHRONOUS_DATAGRAM_SOCKET)
-        | (_, ZXIO_OBJECT_TYPE_DATAGRAM_SOCKET)
-        | (_, ZXIO_OBJECT_TYPE_STREAM_SOCKET)
-        | (_, ZXIO_OBJECT_TYPE_RAW_SOCKET)
-        | (_, ZXIO_OBJECT_TYPE_PACKET_SOCKET) => {
-            let socket_ops = ZxioBackedSocket::new_with_zxio(zxio);
-            let socket = Socket::new_with_ops(Box::new(socket_ops))?;
-            Box::new(SocketFile::new(socket))
-        }
-        _ => return error!(ENOTSUP),
-    };
-    let mode = get_mode(&attrs);
+    let mut mode = get_mode(&attrs);
+    let (ops, socket): (Box<dyn FileOps>, Option<Arc<Socket>>) =
+        match (handle_type, attrs.object_type) {
+            (_, ZXIO_OBJECT_TYPE_DIR) => (Box::new(RemoteDirectoryObject::new(zxio)), None),
+            (zx::ObjectType::VMO, _)
+            | (zx::ObjectType::DEBUGLOG, _)
+            | (_, ZXIO_OBJECT_TYPE_FILE)
+            | (_, ZXIO_OBJECT_TYPE_NONE) => (Box::new(RemoteFileObject::new(zxio)), None),
+            (zx::ObjectType::SOCKET, _)
+            | (_, ZXIO_OBJECT_TYPE_SYNCHRONOUS_DATAGRAM_SOCKET)
+            | (_, ZXIO_OBJECT_TYPE_DATAGRAM_SOCKET)
+            | (_, ZXIO_OBJECT_TYPE_STREAM_SOCKET)
+            | (_, ZXIO_OBJECT_TYPE_RAW_SOCKET)
+            | (_, ZXIO_OBJECT_TYPE_PACKET_SOCKET) => {
+                // Set the file mode to socket.
+                mode = (mode & !FileMode::IFMT) | FileMode::IFSOCK;
+                let socket_ops = ZxioBackedSocket::new_with_zxio(zxio);
+                let socket = Socket::new_with_ops(Box::new(socket_ops))?;
+                (SocketFile::new(socket.clone()), Some(socket))
+            }
+            _ => return error!(ENOTSUP),
+        };
     let file_handle = Anon::new_file_extended(current_task, ops, flags, |id| {
         let mut info = FsNodeInfo::new(id, mode, FsCred::root());
         update_info_from_attrs(&mut info, &attrs);
         info
     });
+    if let Some(socket) = socket {
+        file_handle.node().set_socket(socket);
+    }
     Ok(file_handle)
 }
 
@@ -757,6 +762,7 @@ impl FsNodeOps for RemoteNode {
             uid: info.uid,
             gid: info.gid,
             rdev: info.rdev.bits(),
+            casefold: info.casefold,
             has,
             ..Default::default()
         };
@@ -941,20 +947,6 @@ fn zxio_read_inner(
     }
 }
 
-fn zxio_read(zxio: &Zxio, data: &mut dyn OutputBuffer) -> Result<usize, Errno> {
-    zxio_read_inner(
-        data,
-        |iovecs| {
-            // SAFETY: `zxio_read_inner` maps the returned error to an appropriate
-            // `Errno` for userspace to handle. `data` only points to memory that
-            // is allowed to be written to (Linux user-mode aspace or a valid
-            // Starnix owned buffer).
-            unsafe { zxio.readv(iovecs) }
-        },
-        |bytes| zxio.read(bytes),
-    )
-}
-
 fn zxio_read_at(zxio: &Zxio, offset: usize, data: &mut dyn OutputBuffer) -> Result<usize, Errno> {
     let offset = offset as u64;
     zxio_read_inner(
@@ -993,22 +985,6 @@ fn zxio_write_inner(
             Ok(actual)
         }
     }
-}
-
-fn zxio_write(
-    zxio: &Zxio,
-    _current_task: &CurrentTask,
-    data: &mut dyn InputBuffer,
-) -> Result<usize, Errno> {
-    zxio_write_inner(
-        data,
-        |iovecs| {
-            // SAFETY: `zxio_write_inner` maps the returned error to an appropriate
-            // `Errno` for userspace to handle.
-            unsafe { zxio.writev(iovecs) }
-        },
-        |bytes| zxio.write(bytes),
-    )
 }
 
 fn zxio_write_at(
@@ -1389,87 +1365,6 @@ impl FileOps for RemoteFileObject {
     }
 }
 
-struct RemotePipeObject {
-    /// The underlying Zircon I/O object.
-    ///
-    /// Shared with RemoteNode.
-    zxio: Arc<syncio::Zxio>,
-}
-
-impl RemotePipeObject {
-    fn new(zxio: impl Into<Arc<Zxio>>) -> Self {
-        Self { zxio: zxio.into() }
-    }
-}
-
-impl FileOps for RemotePipeObject {
-    fileops_impl_nonseekable!();
-    fileops_impl_noop_sync!();
-
-    fn read(
-        &self,
-        locked: &mut Locked<'_, FileOpsCore>,
-        file: &FileObject,
-        current_task: &CurrentTask,
-        offset: usize,
-        data: &mut dyn OutputBuffer,
-    ) -> Result<usize, Errno> {
-        debug_assert!(offset == 0);
-        file.blocking_op(locked, current_task, FdEvents::POLLIN | FdEvents::POLLHUP, None, |_| {
-            zxio_read(&self.zxio, data)
-        })
-    }
-
-    fn write(
-        &self,
-        locked: &mut Locked<'_, FileOpsCore>,
-        file: &FileObject,
-        current_task: &CurrentTask,
-        offset: usize,
-        data: &mut dyn InputBuffer,
-    ) -> Result<usize, Errno> {
-        debug_assert!(offset == 0);
-        file.blocking_op(locked, current_task, FdEvents::POLLOUT | FdEvents::POLLHUP, None, |_| {
-            zxio_write(&self.zxio, current_task, data)
-        })
-    }
-
-    fn wait_async(
-        &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
-        _file: &FileObject,
-        _current_task: &CurrentTask,
-        waiter: &Waiter,
-        events: FdEvents,
-        handler: EventHandler,
-    ) -> Option<WaitCanceler> {
-        Some(zxio_wait_async(&self.zxio, waiter, events, handler))
-    }
-
-    fn query_events(
-        &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
-        _file: &FileObject,
-        _current_task: &CurrentTask,
-    ) -> Result<FdEvents, Errno> {
-        zxio_query_events(&self.zxio)
-    }
-
-    fn to_handle(
-        &self,
-        _locked: &mut Locked<'_, FileOpsToHandle>,
-        _file: &FileObject,
-        _current_task: &CurrentTask,
-    ) -> Result<Option<zx::Handle>, Errno> {
-        self.zxio
-            .as_ref()
-            .clone()
-            .and_then(Zxio::release)
-            .map(Some)
-            .map_err(|status| from_status_like_fdio!(status))
-    }
-}
-
 struct RemoteSymlink {
     zxio: Arc<syncio::Zxio>,
 }
@@ -1508,6 +1403,7 @@ mod test {
     use crate::mm::PAGE_SIZE;
     use crate::testing::*;
     use crate::vfs::buffers::{VecInputBuffer, VecOutputBuffer};
+    use crate::vfs::socket::SocketMessageFlags;
     use crate::vfs::{EpollFileObject, LookupContext, Namespace, SymlinkMode, TimeUpdateType};
     use assert_matches::assert_matches;
     use fidl::endpoints::Proxy;
@@ -1517,8 +1413,29 @@ mod test {
     use starnix_uapi::auth::Credentials;
     use starnix_uapi::errors::EINVAL;
     use starnix_uapi::file_mode::{mode, AccessCheck};
-    use starnix_uapi::vfs::EpollEvent;
+    use starnix_uapi::vfs::{EpollEvent, FdEvents};
     use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
+
+    #[::fuchsia::test]
+    async fn test_remote_uds() {
+        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
+        let (s1, s2) = zx::Socket::create_datagram();
+        s2.write(&vec![0]).expect("write");
+        let file =
+            new_remote_file(&current_task, s1.into(), OpenFlags::RDWR).expect("new_remote_file");
+        assert!(file.node().is_sock());
+        let socket_ops = file.downcast_file::<SocketFile>().unwrap();
+        let flags = SocketMessageFlags::CTRUNC
+            | SocketMessageFlags::TRUNC
+            | SocketMessageFlags::NOSIGNAL
+            | SocketMessageFlags::CMSG_CLOEXEC;
+        let mut buffer = VecOutputBuffer::new(1024);
+        let info = socket_ops
+            .recvmsg(&mut locked, &current_task, &file, &mut buffer, flags, None)
+            .expect("recvmsg");
+        assert!(info.ancillary_data.is_empty());
+        assert_eq!(info.message_length, 1);
+    }
 
     #[::fuchsia::test]
     async fn test_tree() -> Result<(), anyhow::Error> {

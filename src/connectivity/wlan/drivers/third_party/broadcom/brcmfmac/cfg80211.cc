@@ -42,10 +42,10 @@
 #include <wlan/common/ieee80211_codes.h>
 #include <wlan/common/macaddr.h>
 
+#include "fidl/fuchsia.wlan.common/cpp/natural_types.h"
 #include "fidl/fuchsia.wlan.fullmac/cpp/wire_types.h"
 #include "fidl/fuchsia.wlan.ieee80211/cpp/common_types.h"
 #include "fidl/fuchsia.wlan.ieee80211/cpp/wire_types.h"
-#include "fidl/fuchsia.wlan.internal/cpp/natural_types.h"
 #include "fuchsia/wlan/ieee80211/cpp/fidl.h"
 #include "lib/fidl/cpp/wire/vector_view.h"
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/bcdc.h"
@@ -1931,7 +1931,7 @@ void brcmf_return_roam_start(struct net_device* ndev) {
 
   auto roam_start_builder =
       fuchsia_wlan_fullmac_wire::WlanFullmacImplIfcRoamStartIndRequest::Builder(*arena);
-  fuchsia_wlan_internal::wire::BssDescription selected_bss;
+  fuchsia_wlan_common::wire::BssDescription selected_bss;
 
   // In the current implementation, roam attempts do not maintain association with the original BSS.
   // This may change with Fast BSS Transition support.
@@ -4333,25 +4333,26 @@ done:
   }
 }
 
-void brcmf_if_set_keys_req(net_device* ndev,
-                           const fuchsia_wlan_fullmac_wire::WlanFullmacSetKeysReq* req,
-                           fuchsia_wlan_fullmac_wire::WlanFullmacSetKeysResp* resp) {
-  BRCMF_IFDBG(WLANIF, ndev, "Set keys request from SME. num_keys: %zu", req->num_keys);
+std::vector<zx_status_t> brcmf_if_set_keys_req(
+    net_device* ndev, const fuchsia_wlan_fullmac_wire::WlanFullmacImplSetKeysRequest* req) {
+  BRCMF_IFDBG(WLANIF, ndev, "Set keys request from SME. num_keys: %zu", req->keylist().count());
   zx_status_t result;
 
-  resp->num_keys = req->num_keys;
-  for (size_t i = 0; i < req->num_keys; i++) {
-    result = brcmf_cfg80211_add_key(ndev, &req->keylist.data()[i]);
+  std::vector<zx_status_t> statuslist;
+  statuslist.reserve(req->keylist().count());
+  for (size_t i = 0; i < req->keylist().count(); i++) {
+    result = brcmf_cfg80211_add_key(ndev, &req->keylist().data()[i]);
     if (result != ZX_OK) {
       BRCMF_WARN("Error setting key %zu: %s.", i, zx_status_get_string(result));
     }
-    resp->statuslist[i] = result;
+    statuslist.emplace_back(result);
   }
+  return statuslist;
 }
 
 void brcmf_if_del_keys_req(net_device* ndev,
-                           const fuchsia_wlan_fullmac_wire::WlanFullmacDelKeysReq* req) {
-  BRCMF_IFDBG(WLANIF, ndev, "Del keys request from SME. num_keys: %zu", req->num_keys);
+                           const fuchsia_wlan_fullmac_wire::WlanFullmacImplDelKeysRequest* req) {
+  BRCMF_IFDBG(WLANIF, ndev, "Del keys request from SME. num_keys: %zu", req->keylist().count());
 
   BRCMF_ERR("Unimplemented");
 }
@@ -6165,10 +6166,20 @@ static zx_status_t brcmf_handle_assoc_ind(struct brcmf_if* ifp, const struct brc
   assoc_ind_params.ssid.len = ssid_ie->len;
   memcpy(assoc_ind_params.ssid.data.data(), ssid_ie->data, ssid_ie->len);
 
+  // Create arena before populating vectors
+  zx::result<fdf::Arena> arena_result = fdf::Arena::Create(0, 0);
+  if (arena_result.is_error()) {
+    BRCMF_ERR("Failed to create Arena status=%s", arena_result.status_string());
+    return ZX_ERR_INTERNAL;
+  }
+  fdf::Arena& arena = arena_result.value();
+
   // Extract the RSN information from the IEs
   if (rsn_ie != nullptr) {
-    assoc_ind_params.rsne_len = rsn_ie->len + TLV_HDR_LEN;
-    memcpy(assoc_ind_params.rsne.data(), rsn_ie, assoc_ind_params.rsne_len);
+    size_t rsn_len = rsn_ie->len + TLV_HDR_LEN;
+    const uint8_t* rsn_ie_ptr = reinterpret_cast<const uint8_t*>(rsn_ie);
+    cpp20::span<const uint8_t> rsne_span = {rsn_ie_ptr, rsn_len};
+    assoc_ind_params.rsne = fidl::VectorView<uint8_t>(arena, rsne_span.begin(), rsne_span.end());
   }
 
   BRCMF_IFDBG(WLANIF, ndev, "Sending assoc indication to SME.");
@@ -6177,12 +6188,7 @@ static zx_status_t brcmf_handle_assoc_ind(struct brcmf_if* ifp, const struct brc
               FMT_MAC_ARGS(assoc_ind_params.peer_sta_address));
 #endif /* !defined(NDEBUG) */
 
-  auto arena = fdf::Arena::Create(0, 0);
-  if (arena.is_error()) {
-    BRCMF_ERR("Failed to create Arena status=%s", arena.status_string());
-    return ZX_ERR_INTERNAL;
-  }
-  auto result = ndev->if_proto.buffer(*arena)->AssocInd(assoc_ind_params);
+  auto result = ndev->if_proto.buffer(arena)->AssocInd(assoc_ind_params);
   if (!result.ok()) {
     BRCMF_ERR("Failed to send assoc ind  result.status: %s", result.status_string());
     return ZX_ERR_INTERNAL;

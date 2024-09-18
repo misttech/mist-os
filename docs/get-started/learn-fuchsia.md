@@ -24,7 +24,7 @@ is recommended you learn about the fundamentals of using the Fuchsia SDK.
 ## Source tree - Contribute to Fuchsia
 
 As Fuchsia is an open source project, you can contribute to the Fuchsia source tree. Before you
-begin contributing, it’s recommended that you learn about the fundamentals about
+begin contributing, it’s recommended that you learn about the fundamentals of
 the Fuchsia platform to understand how Fuchsia works.
 
 <a class="button button-primary"

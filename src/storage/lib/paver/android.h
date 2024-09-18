@@ -44,12 +44,11 @@ class AndroidDevicePartitioner : public DevicePartitioner {
   zx::result<> OnStop() const override;
 
  private:
-  AndroidDevicePartitioner(Arch arch, std::unique_ptr<GptDevicePartitioner> gpt,
+  AndroidDevicePartitioner(std::unique_ptr<GptDevicePartitioner> gpt,
                            std::shared_ptr<Context> context)
-      : gpt_(std::move(gpt)), arch_(arch), context_(context) {}
+      : gpt_(std::move(gpt)), context_(context) {}
 
   std::unique_ptr<GptDevicePartitioner> gpt_;
-  Arch arch_;
   std::shared_ptr<Context> context_;
 };
 

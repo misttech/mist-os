@@ -77,10 +77,12 @@ class BluetoothLE(bluetooth_le.BluetoothLE, bluetooth_common.BluetoothCommon):
             fuchsia_controller=fuchsia_controller,
             reboot_affordance=reboot_affordance,
         )
+        self.service_info: dict[int, dict[str, Any]]
         self._peripheral_advertisement_server: asyncio.Task[None] | None = None
         self._name: str = device_name
         self._connection_client: fc.Channel | None = None
         self._gatt_client: fc.Channel | None = None
+        self._remote_service_client: fc.Channel | None = None
         self._peripheral_connection: fc.Channel | None = None
         self._fc_transport: fc_transport.FuchsiaController = fuchsia_controller
         self._reboot_affordance: affordances_capable.RebootCapableDevice = (
@@ -102,6 +104,7 @@ class BluetoothLE(bluetooth_le.BluetoothLE, bluetooth_common.BluetoothCommon):
         self._peripheral_controller_proxy = None
         self._central_controller_proxy = None
         self._gatt_server_proxy = None
+        self._remote_service_client = None
         if self._peripheral_advertisement_server is not None:
             _LOGGER.debug(
                 "Cancelling Peripheral Advertisement Server and setting to None"
@@ -149,6 +152,7 @@ class BluetoothLE(bluetooth_le.BluetoothLE, bluetooth_common.BluetoothCommon):
         )
         self._le_session_initialized = True
         self.known_le_devices: dict[str, Any] = dict()
+        self.service_info: dict[int, dict[str, Any]] = dict()
         self._uuid = f_bt.Uuid(value=self._generate_random_bluetooth_uuid())
 
     def stop_advertise(self) -> None:
@@ -316,21 +320,159 @@ class BluetoothLE(bluetooth_le.BluetoothLE, bluetooth_common.BluetoothCommon):
         return uuid_list
 
     def publish_service(self) -> f_bt.Uuid:
-        """Publish Gatt service on the Peripheral device."""
+        """Publish the Gatt service from the peripheral.
+
+        Returns:
+            The UUID of the service.
+
+        Raises:
+            NotImplementedError
+        """
         raise NotImplementedError
 
     def request_gatt_client(self) -> None:
-        """Request Gatt Client from the Central device."""
-        raise NotImplementedError
+        """Request the Gatt Client.
 
-    def find_gatt_service(self, service_uuid: f_bt.Uuid) -> None:
-        """Find existing Gatt Services from the Central device."""
-        raise NotImplementedError
+        Raises:
+            BluetoothError: If the peripheral fails to request the Gatt client.
+        """
+        try:
+            assert (
+                self._connection_client is not None
+            )  # the central connection handle should request Gatt client
+            (client, server) = Channel.create()
+            client = f_gatt_controller.Client.Client(client)
+            self._connection_client.request_gatt_client(
+                client=server.take()
+            )  # bind server end of gatt2 client
+            self._gatt_client = client
+        except Exception as e:
+            raise errors.BluetoothError(
+                f"Failed to complete Request Gatt client FIDL call on {self._device_name}."
+            ) from e
+
+    def list_gatt_services(self) -> dict[int, dict[str, Any]]:
+        """List the Gatt Services found on the connected peripheral.
+
+        Returns:
+            The list of Gatt Services of the connected peripheral.
+
+        Raises:
+            BluetoothError: If the device fails to complete the FIDL request.
+        """
+        try:
+            assert (
+                self._gatt_client is not None
+            )  # the gatt client should not be none
+            res = self.loop.run_until_complete(
+                asyncio.wait_for(self._gatt_client.watch_services(uuids=[]), 10)
+            )
+        except TimeoutError:
+            _LOGGER.info(
+                "No updates on {self._device_name} from watch_services(), returning cache."
+            )
+            return self.service_info
+        for service in res.updated:
+            self.service_info[service.handle.value] = {
+                "kind": service.kind,
+                "type": service.type,
+                "characteristics": service.characteristics,
+                "includes": service.includes,
+            }
+        for service in res.removed:
+            del self.service_info[service]
+        return self.service_info
 
     def connect_to_service(self, handle: int) -> None:
-        """Connect to a Gatt Service from the Central Device."""
-        raise NotImplementedError
+        """Connect to an available GATT service on the peripheral device.
 
-    def read_characteristic(self, handle: int) -> None:
-        """Read a characteristic from a connected Gatt Service."""
-        raise NotImplementedError
+        Args:
+            handle: The handle of the service.
+
+        Raises:
+            BluetoothError: If the central device fails to connect to Gatt service.
+        """
+        try:
+            assert self._gatt_client is not None
+            service_handle = f_gatt_controller.ServiceHandle(value=handle)
+            (client, server) = Channel.create()
+            self._gatt_client.connect_to_service(
+                handle=service_handle, service=server.take()
+            )
+            client = f_gatt_controller.RemoteService.Client(client)
+            self._remote_service_client = client
+        except Exception as e:
+            raise errors.BluetoothError(
+                f"Failed to complete connect_to_service FIDL call on {self._device_name}."
+            ) from e
+
+    def discover_characteristics(
+        self,
+    ) -> dict[int, dict[str, int | list[int] | None]]:
+        """Discover characteristics of a connected Gatt Service.
+
+        Returns:
+            The available characteristics of a connected Gatt Service.
+        """
+        try:
+            assert self._remote_service_client is not None
+            res = self.loop.run_until_complete(
+                asyncio.wait_for(
+                    self._remote_service_client.discover_characteristics(), 10
+                )
+            )
+        except Exception as e:
+            raise errors.BluetoothError(
+                f"Failed to complete discover_characteristics FIDL call on {self._device_name}."
+            ) from e
+        remote_response = {}
+        for characteristic in res.characteristics:
+            remote_response[characteristic.handle.value] = {
+                "handle": characteristic.handle.value,
+                "type": characteristic.type.value,
+                "properties": characteristic.properties,
+                "permissions": characteristic.permissions,
+                "descriptors": characteristic.descriptors,
+            }
+        return remote_response
+
+    def read_characteristic(
+        self, handle: int
+    ) -> dict[str, int | list[int] | None | bool]:
+        """Read characteristic of the Gatt service.
+
+        Args:
+            handle: The handle of the service.
+
+        Returns:
+            A characteristic of the Gatt service and its properties
+
+        Raises:
+            BluetoothError: If the peripheral fails to read the characteristic.
+        """
+        try:
+            assert (
+                self._remote_service_client is not None
+            )  # we must have a connected client to make a remote service
+            service_handle = f_gatt_controller.ServiceHandle(value=handle)
+            read_options = f_gatt_controller.ReadOptions()
+            read_options.short_read = f_gatt_controller.ShortReadOptions()
+            res = self.loop.run_until_complete(
+                asyncio.wait_for(
+                    self._remote_service_client.read_characteristic(
+                        handle=service_handle, options=read_options
+                    ),
+                    10,
+                )
+            )
+        except Exception as e:
+            raise errors.BluetoothError(
+                f"Failed to complete read_characteristics FIDL call on {self._device_name}."
+            ) from e
+        characteristic = res.response.value
+        char_response = {
+            "handle": characteristic.handle.value,
+            "value": characteristic.value,
+            "truncated": characteristic.maybe_truncated,
+        }
+        return char_response

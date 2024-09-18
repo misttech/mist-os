@@ -14,9 +14,12 @@
 #include <phys/stack.h>
 #include <phys/symbolize.h>
 
+#include "log.h"
+
 namespace {
 
 [[noreturn]] PHYS_SINGLETHREAD void vpanic(const char* format, va_list args) {
+  PreparePanic();
   // Print the message.
   vprintf(format, args);
   va_end(args);
@@ -59,4 +62,11 @@ PHYS_SINGLETHREAD void __zx_panic(const char* format, ...) {
   va_list args;
   va_start(args, format);
   vpanic(format, args);
+}
+
+void PreparePanic() {
+  if (gLog) {
+    // Disable logging into phys/log and just use serial.
+    gLog->RestoreStdout();
+  }
 }

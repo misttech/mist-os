@@ -8,7 +8,7 @@
 #include <zircon/syscalls.h>
 #include <zircon/syscalls/object.h>
 
-#include <zxtest/zxtest.h>
+#include <gtest/gtest.h>
 
 #include "src/storage/lib/vfs/cpp/vfs_types.h"
 #include "src/storage/lib/vfs/cpp/vmo_file.h"
@@ -37,17 +37,17 @@ zx_rights_t GetRights(zx_handle_t handle) {
 }
 
 void FillVmo(const zx::vmo& vmo, size_t offset, size_t length, uint8_t byte) {
-  uint8_t data[length];
-  memset(data, byte, length);
+  auto data = std::make_unique<uint8_t[]>(length);
+  memset(data.get(), byte, length);
 
-  zx_status_t status = vmo.write(data, offset, length);
+  zx_status_t status = vmo.write(data.get(), offset, length);
   ASSERT_EQ(ZX_OK, status);
 }
 
 void CheckVmo(const zx::vmo& vmo, size_t offset, size_t length, uint8_t expected_byte) {
-  uint8_t data[length];
+  auto data = std::make_unique<uint8_t[]>(length);
 
-  zx_status_t status = vmo.read(data, offset, length);
+  zx_status_t status = vmo.read(data.get(), offset, length);
   ASSERT_EQ(ZX_OK, status);
 
   for (size_t i = 0; i < length; i++) {
@@ -115,15 +115,15 @@ TEST(VmoFile, Open) {
     auto result = file->ValidateOptions(VnodeOptions::ReadOnly());
     EXPECT_RESULT_OK(result);
     EXPECT_EQ(ZX_OK, file->Open(&redirect));
-    EXPECT_NULL(redirect);
+    EXPECT_EQ(redirect, nullptr);
     EXPECT_RESULT_ERROR(ZX_ERR_ACCESS_DENIED, file->ValidateOptions(VnodeOptions::ReadWrite()));
-    EXPECT_NULL(redirect);
+    EXPECT_EQ(redirect, nullptr);
     EXPECT_RESULT_ERROR(ZX_ERR_ACCESS_DENIED, file->ValidateOptions(VnodeOptions::WriteOnly()));
-    EXPECT_NULL(redirect);
+    EXPECT_EQ(redirect, nullptr);
     EXPECT_RESULT_ERROR(ZX_ERR_ACCESS_DENIED, file->ValidateOptions(VnodeOptions::ReadExec()));
-    EXPECT_NULL(redirect);
+    EXPECT_EQ(redirect, nullptr);
     EXPECT_RESULT_ERROR(ZX_ERR_NOT_DIR, file->ValidateOptions(VnodeOptions().set_directory()));
-    EXPECT_NULL(redirect);
+    EXPECT_EQ(redirect, nullptr);
   }
 
   // writable
@@ -137,23 +137,23 @@ TEST(VmoFile, Open) {
       zx::result result = file->ValidateOptions(VnodeOptions::ReadOnly());
       EXPECT_RESULT_OK(result);
       EXPECT_EQ(ZX_OK, file->Open(&redirect));
-      EXPECT_NULL(redirect);
+      EXPECT_EQ(redirect, nullptr);
     }
     {
       zx::result result = file->ValidateOptions(VnodeOptions::ReadWrite());
       EXPECT_RESULT_OK(result);
       EXPECT_EQ(ZX_OK, file->Open(&redirect));
-      EXPECT_NULL(redirect);
+      EXPECT_EQ(redirect, nullptr);
     }
     {
       zx::result result = file->ValidateOptions(VnodeOptions::WriteOnly());
       EXPECT_RESULT_OK(result);
       EXPECT_EQ(ZX_OK, file->Open(&redirect));
-      EXPECT_NULL(redirect);
+      EXPECT_EQ(redirect, nullptr);
       EXPECT_RESULT_ERROR(ZX_ERR_ACCESS_DENIED, file->ValidateOptions(VnodeOptions::ReadExec()));
-      EXPECT_NULL(redirect);
+      EXPECT_EQ(redirect, nullptr);
       EXPECT_RESULT_ERROR(ZX_ERR_NOT_DIR, file->ValidateOptions(VnodeOptions().set_directory()));
-      EXPECT_NULL(redirect);
+      EXPECT_EQ(redirect, nullptr);
     }
   }
 }
@@ -162,8 +162,8 @@ TEST(VmoFile, Read) {
   zx::vmo abc;
   CreateVmoABC(&abc);
 
-  uint8_t data[VMO_SIZE];
-  memset(data, 0, VMO_SIZE);
+  auto data = std::make_unique<uint8_t[]>(VMO_SIZE);
+  memset(data.get(), 0, VMO_SIZE);
 
   {
     SCOPED_TRACE("empty-read-nonempty-file");
@@ -171,7 +171,7 @@ TEST(VmoFile, Read) {
     ASSERT_EQ(ZX_OK, abc.duplicate(ZX_RIGHT_SAME_RIGHTS, &dup));
     auto file = fbl::MakeRefCounted<fs::VmoFile>(std::move(dup), 0u, zx_system_get_page_size());
     size_t actual = UINT64_MAX;
-    EXPECT_EQ(ZX_OK, file->Read(data, 0u, 0u, &actual));
+    EXPECT_EQ(ZX_OK, file->Read(data.get(), 0u, 0u, &actual));
     EXPECT_EQ(0u, actual);
   }
 
@@ -181,7 +181,7 @@ TEST(VmoFile, Read) {
     ASSERT_EQ(ZX_OK, abc.duplicate(ZX_RIGHT_SAME_RIGHTS, &dup));
     auto file = fbl::MakeRefCounted<fs::VmoFile>(std::move(dup), 0u);
     size_t actual = UINT64_MAX;
-    EXPECT_EQ(ZX_OK, file->Read(data, 1u, 0u, &actual));
+    EXPECT_EQ(ZX_OK, file->Read(data.get(), 1u, 0u, &actual));
     EXPECT_EQ(0u, actual);
   }
 
@@ -191,7 +191,7 @@ TEST(VmoFile, Read) {
     ASSERT_EQ(ZX_OK, abc.duplicate(ZX_RIGHT_SAME_RIGHTS, &dup));
     auto file = fbl::MakeRefCounted<fs::VmoFile>(std::move(dup), 10u);
     size_t actual = UINT64_MAX;
-    EXPECT_EQ(ZX_OK, file->Read(data, 0u, 10u, &actual));
+    EXPECT_EQ(ZX_OK, file->Read(data.get(), 0u, 10u, &actual));
     EXPECT_EQ(0u, actual);
   }
 
@@ -201,7 +201,7 @@ TEST(VmoFile, Read) {
     ASSERT_EQ(ZX_OK, abc.duplicate(ZX_RIGHT_SAME_RIGHTS, &dup));
     auto file = fbl::MakeRefCounted<fs::VmoFile>(std::move(dup), 10u);
     size_t actual = UINT64_MAX;
-    EXPECT_EQ(ZX_OK, file->Read(data, 1u, 10u, &actual));
+    EXPECT_EQ(ZX_OK, file->Read(data.get(), 1u, 10u, &actual));
     EXPECT_EQ(0u, actual);
   }
 
@@ -211,7 +211,7 @@ TEST(VmoFile, Read) {
     ASSERT_EQ(ZX_OK, abc.duplicate(ZX_RIGHT_SAME_RIGHTS, &dup));
     auto file = fbl::MakeRefCounted<fs::VmoFile>(std::move(dup), 10u);
     size_t actual = UINT64_MAX;
-    EXPECT_EQ(ZX_OK, file->Read(data, 0u, 11u, &actual));
+    EXPECT_EQ(ZX_OK, file->Read(data.get(), 0u, 11u, &actual));
     EXPECT_EQ(0u, actual);
   }
 
@@ -221,7 +221,7 @@ TEST(VmoFile, Read) {
     ASSERT_EQ(ZX_OK, abc.duplicate(ZX_RIGHT_SAME_RIGHTS, &dup));
     auto file = fbl::MakeRefCounted<fs::VmoFile>(std::move(dup), 10u);
     size_t actual = UINT64_MAX;
-    EXPECT_EQ(ZX_OK, file->Read(data, 1u, 11u, &actual));
+    EXPECT_EQ(ZX_OK, file->Read(data.get(), 1u, 11u, &actual));
     EXPECT_EQ(0u, actual);
   }
 
@@ -231,10 +231,10 @@ TEST(VmoFile, Read) {
     ASSERT_EQ(ZX_OK, abc.duplicate(ZX_RIGHT_SAME_RIGHTS, &dup));
     auto file = fbl::MakeRefCounted<fs::VmoFile>(std::move(dup), 10u);
     size_t actual = UINT64_MAX;
-    EXPECT_EQ(ZX_OK, file->Read(data, 11u, 1u, &actual));
+    EXPECT_EQ(ZX_OK, file->Read(data.get(), 11u, 1u, &actual));
     EXPECT_EQ(9u, actual);
-    CheckData(data, 0u, 9u, 'A');
-    CheckData(data, 9u, 1, 0);
+    CheckData(data.get(), 0u, 9u, 'A');
+    CheckData(data.get(), 9u, 1, 0);
   }
 
   {
@@ -243,11 +243,11 @@ TEST(VmoFile, Read) {
     ASSERT_EQ(ZX_OK, abc.duplicate(ZX_RIGHT_SAME_RIGHTS, &dup));
     auto file = fbl::MakeRefCounted<fs::VmoFile>(std::move(dup), VMO_SIZE);
     size_t actual = UINT64_MAX;
-    EXPECT_EQ(ZX_OK, file->Read(data, VMO_SIZE, 0u, &actual));
+    EXPECT_EQ(ZX_OK, file->Read(data.get(), VMO_SIZE, 0u, &actual));
     EXPECT_EQ(VMO_SIZE, actual);
-    CheckData(data, PAGE_0, zx_system_get_page_size(), 'A');
-    CheckData(data, PAGE_1, zx_system_get_page_size(), 'B');
-    CheckData(data, PAGE_2, zx_system_get_page_size(), 'C');
+    CheckData(data.get(), PAGE_0, zx_system_get_page_size(), 'A');
+    CheckData(data.get(), PAGE_1, zx_system_get_page_size(), 'B');
+    CheckData(data.get(), PAGE_2, zx_system_get_page_size(), 'C');
   }
 }
 
@@ -255,8 +255,8 @@ TEST(VmoFile, Write) {
   zx::vmo abc;
   CreateVmoABC(&abc);
 
-  uint8_t data[VMO_SIZE];
-  memset(data, '!', VMO_SIZE);
+  auto data = std::make_unique<uint8_t[]>(VMO_SIZE);
+  memset(data.get(), '!', VMO_SIZE);
 
   {
     SCOPED_TRACE("empty-write-nonempty-file");
@@ -264,7 +264,7 @@ TEST(VmoFile, Write) {
     ASSERT_EQ(ZX_OK, abc.duplicate(ZX_RIGHT_SAME_RIGHTS, &dup));
     auto file = fbl::MakeRefCounted<fs::VmoFile>(std::move(dup), zx_system_get_page_size(), true);
     size_t actual = UINT64_MAX;
-    EXPECT_EQ(ZX_OK, file->Write(data, 0u, 0u, &actual));
+    EXPECT_EQ(ZX_OK, file->Write(data.get(), 0u, 0u, &actual));
     EXPECT_EQ(0u, actual);
     CheckVmo(abc, PAGE_0, zx_system_get_page_size(), 'A');
     CheckVmo(abc, PAGE_1, zx_system_get_page_size(), 'B');
@@ -277,7 +277,7 @@ TEST(VmoFile, Write) {
     ASSERT_EQ(ZX_OK, abc.duplicate(ZX_RIGHT_SAME_RIGHTS, &dup));
     auto file = fbl::MakeRefCounted<fs::VmoFile>(std::move(dup), 0u, true);
     size_t actual = UINT64_MAX;
-    EXPECT_EQ(ZX_ERR_NO_SPACE, file->Write(data, 1u, 0u, &actual));
+    EXPECT_EQ(ZX_ERR_NO_SPACE, file->Write(data.get(), 1u, 0u, &actual));
   }
 
   {
@@ -286,7 +286,7 @@ TEST(VmoFile, Write) {
     ASSERT_EQ(ZX_OK, abc.duplicate(ZX_RIGHT_SAME_RIGHTS, &dup));
     auto file = fbl::MakeRefCounted<fs::VmoFile>(std::move(dup), 10u, true);
     size_t actual = UINT64_MAX;
-    EXPECT_EQ(ZX_OK, file->Write(data, 0u, 10u, &actual));
+    EXPECT_EQ(ZX_OK, file->Write(data.get(), 0u, 10u, &actual));
     EXPECT_EQ(0u, actual);
     CheckVmo(abc, PAGE_0, zx_system_get_page_size(), 'A');
     CheckVmo(abc, PAGE_1, zx_system_get_page_size(), 'B');
@@ -299,7 +299,7 @@ TEST(VmoFile, Write) {
     ASSERT_EQ(ZX_OK, abc.duplicate(ZX_RIGHT_SAME_RIGHTS, &dup));
     auto file = fbl::MakeRefCounted<fs::VmoFile>(std::move(dup), 10u, true);
     size_t actual = UINT64_MAX;
-    EXPECT_EQ(ZX_ERR_NO_SPACE, file->Write(data, 1u, 10u, &actual));
+    EXPECT_EQ(ZX_ERR_NO_SPACE, file->Write(data.get(), 1u, 10u, &actual));
   }
 
   {
@@ -308,7 +308,7 @@ TEST(VmoFile, Write) {
     ASSERT_EQ(ZX_OK, abc.duplicate(ZX_RIGHT_SAME_RIGHTS, &dup));
     auto file = fbl::MakeRefCounted<fs::VmoFile>(std::move(dup), 10u, true);
     size_t actual = UINT64_MAX;
-    EXPECT_EQ(ZX_OK, file->Write(data, 0u, 11u, &actual));
+    EXPECT_EQ(ZX_OK, file->Write(data.get(), 0u, 11u, &actual));
     EXPECT_EQ(0u, actual);
     CheckVmo(abc, PAGE_0, zx_system_get_page_size(), 'A');
     CheckVmo(abc, PAGE_1, zx_system_get_page_size(), 'B');
@@ -321,7 +321,7 @@ TEST(VmoFile, Write) {
     ASSERT_EQ(ZX_OK, abc.duplicate(ZX_RIGHT_SAME_RIGHTS, &dup));
     auto file = fbl::MakeRefCounted<fs::VmoFile>(std::move(dup), 10u, true);
     size_t actual = UINT64_MAX;
-    EXPECT_EQ(ZX_ERR_NO_SPACE, file->Write(data, 1u, 11u, &actual));
+    EXPECT_EQ(ZX_ERR_NO_SPACE, file->Write(data.get(), 1u, 11u, &actual));
   }
 
   {
@@ -330,7 +330,7 @@ TEST(VmoFile, Write) {
     ASSERT_EQ(ZX_OK, abc.duplicate(ZX_RIGHT_SAME_RIGHTS, &dup));
     auto file = fbl::MakeRefCounted<fs::VmoFile>(std::move(dup), 10u, true);
     size_t actual = UINT64_MAX;
-    EXPECT_EQ(ZX_OK, file->Write(data, 11u, 1u, &actual));
+    EXPECT_EQ(ZX_OK, file->Write(data.get(), 11u, 1u, &actual));
     EXPECT_EQ(9u, actual);
     CheckVmo(abc, PAGE_0, 1, 'A');
     CheckVmo(abc, PAGE_0 + 1, 9u, '!');
@@ -345,7 +345,7 @@ TEST(VmoFile, Write) {
     ASSERT_EQ(ZX_OK, abc.duplicate(ZX_RIGHT_SAME_RIGHTS, &dup));
     auto file = fbl::MakeRefCounted<fs::VmoFile>(std::move(dup), VMO_SIZE, true);
     size_t actual = UINT64_MAX;
-    EXPECT_EQ(ZX_OK, file->Write(data, VMO_SIZE, 0u, &actual));
+    EXPECT_EQ(ZX_OK, file->Write(data.get(), VMO_SIZE, 0u, &actual));
     EXPECT_EQ(VMO_SIZE, actual);
     CheckVmo(abc, 0u, VMO_SIZE, '!');
   }

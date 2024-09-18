@@ -29,7 +29,17 @@ autogen_warning = """
 after_includes = """
 
 namespace block_server::internal {
+
 struct BlockServer;
+
+class WriteOptions {
+ public:
+  bool is_force_access() const { return (options_ & 1) != 0; }
+
+ private:
+  uint32_t options_;
+};
+
 }  // block_server::internal"""
 
 namespaces = ["block_server", "internal"]

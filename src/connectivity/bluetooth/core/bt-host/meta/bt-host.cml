@@ -2,10 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 {
-    include: [
-        "inspect/client.shard.cml",
-        "syslog/client.shard.cml",
-    ],
+    include: [ "inspect/client.shard.cml" ],
     program: {
         // Use the built-in ELF runner.
         runner: "elf",
@@ -37,6 +34,18 @@
         },
         {
             protocol: [ "fuchsia.bluetooth.host.Receiver" ],
+        },
+
+        // We can't use the LogSink shard because this is compiled out-of-tree.
+        // Dictionaries aren't yet available in the SDK, so nothing out-of-tree
+        // can use the shard which is being switched over to dictionaries.
+        { protocol: "fuchsia.logger.LogSink" },
+    ],
+    offer: [
+        {
+            protocol: "fuchsia.logger.LogSink",
+            from: "parent",
+            to: "all",
         },
     ],
     config: {

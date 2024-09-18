@@ -40,7 +40,6 @@
                 "AllInetTests/TcpSocketTest.ShutdownWriteInTimeWait/*",
                 "AllInetTests/TcpSocketTest.MsgTrunc/*",
                 "AllInetTests/TcpSocketTest.MsgTruncWithCtrunc/*",
-                "AllInetTests/TcpSocketTest.MsgTruncWithCtruncOnly/*",
                 "AllInetTests/TcpSocketTest.MsgTruncLargeSize/*",
                 "AllInetTests/TcpSocketTest.MsgTruncPeek/*",
                 "AllInetTests/TcpSocketTest.SetPMTUD/*",
@@ -75,9 +74,6 @@
                 "AllTCPSockets/AllSocketPairTest.BasicSendmmsg/*",
                 "AllTCPSockets/AllSocketPairTest.SendmmsgIsLimitedByMAXIOV/*",
                 "AllTCPSockets/AllSocketPairTest.BasicRecvmmsg/*",
-                "AllTCPSockets/AllSocketPairTest.SendmsgRecvmsg10KB/*",
-                "AllTCPSockets/AllSocketPairTest.SendmsgRecvmsgMsgCtruncNoop/*",
-                "AllTCPSockets/AllSocketPairTest.SendmsgRecvmsg16KB/*",
                 "AllTCPSockets/AllSocketPairTest.RecvmsgMsghdrFlagsCleared/*",
                 "AllTCPSockets/AllSocketPairTest.RecvmsgPeekMsghdrFlagsCleared/*",
                 "AllTCPSockets/AllSocketPairTest.RecvmmsgInvalidTimeout/*",
@@ -111,6 +107,9 @@
                 "AllTCPSockets/TCPSocketPairTest.ResetWithSoLingerZeroTimeoutOption/*",
                 "AllTCPSockets/TCPSocketPairTest.WaitTillMSSWithCorkOption/*",
                 "AllTCPSockets/TCPSocketPairTest.WaitTillTimeoutWithCorkOption/*",
+
+                // Fuchsia does not implement IP_MTU_DISCOVER socket option.
+                "AllInetTests/SimpleTcpSocketTest.SetUnsupportedPMTUDISC/*",
             ],
         },
     ],

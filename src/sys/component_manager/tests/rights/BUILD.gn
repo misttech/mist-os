@@ -35,10 +35,10 @@ executable("expose_dir_rights_bin") {
 
   deps = [
     "//sdk/fidl/fuchsia.io:fuchsia.io_cpp",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//src/storage/lib/vfs/cpp",
     "//src/storage/memfs:lib",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/svc",
     "//zircon/system/ulib/zx",
   ]

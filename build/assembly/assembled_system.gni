@@ -63,12 +63,12 @@ import("//src/developer/ffx/build/ffx_action.gni")
 #     `product_assembly_configuration` target. This is required if
 #      legacy_bundle_only=false.
 #
-#   allow_userdebug_platform_bundle_use (optional; default=false)
-#     [boolean] If true, allow the 'userdebug' platform bundles to be used by
-#     the assembled system.  (this is only a check made by GN, assembly itself
-#     may still access them)
+#   use_bringup_platform_bundles_only (optional; default=false)
+#     [boolean] If true, only the 'bootstrap' and 'embeddable' are set as
+#     dependencies and inputs for the assembly, to reduce the amount of
+#     the platform that's built on bringup builds.
 #
-#   allow_eng_platform_bundle_use (optional; default=false)
+#   allow_eng_platform_bundle_use (optional; default=true)
 #     [boolean] If true, allow the 'eng' platform bundles to be used by the
 #     assembled system.  (this is only a check made by GN, assembly itself may
 #     still access them)
@@ -189,7 +189,7 @@ import("//src/developer/ffx/build/ffx_action.gni")
 #
 #   generate_fxfs (optional; default: false)
 #     [bool] Whether a fxfs image will be generated.
-#     Exclusive with generate_fvm and generate_fvm_*. EXPERIMENTAL.
+#     Exclusive with generate_fvm and generate_fvm_*.
 #
 #
 # Optional copy() for the images:
@@ -219,6 +219,8 @@ template("assembled_system") {
   if (defined(invoker.generate_fxfs)) {
     _generate_fxfs = invoker.generate_fxfs
   }
+  assert(!_generate_fvm || !_generate_fxfs,
+         "Only one of Fxfs and FVM can host blobs")
 
   _include_assembly_inputs = false
   if (defined(invoker.include_assembly_inputs)) {
@@ -358,6 +360,21 @@ template("assembled_system") {
     if (defined(invoker.generate_vbmeta)) {
       _generate_vbmeta = invoker.generate_vbmeta
     }
+
+    ramdisk_in_zbi = false
+    if (defined(invoker.ramdisk_in_zbi) && invoker.ramdisk_in_zbi) {
+      assert(
+          _supports_blobs,
+          "The 'ramdisk_in_zbi' mode is only needed when generating either an fvm or fxfs image.")
+      ramdisk_in_zbi = true
+    }
+
+    # The sparse fvm image is not needed when building the ramdisk into the zbi
+    _generate_fvm_sparse = _generate_fvm
+    if (ramdisk_in_zbi) {
+      _generate_fvm_sparse = false
+    }
+
     _generate_fvm_fastboot = false
     if (defined(invoker.generate_fvm_fastboot)) {
       _generate_fvm_fastboot = invoker.generate_fvm_fastboot
@@ -366,13 +383,17 @@ template("assembled_system") {
     if (defined(invoker.generate_fvm_nand)) {
       _generate_fvm_nand = invoker.generate_fvm_nand
     }
-    assert(!(_generate_fvm || _generate_fvm_fastboot || _generate_fvm_nand) ||
-               !_generate_fxfs,
-           "Only one of Fxfs and FVM can host blobs")
 
-    ramdisk_in_zbi = false
-    if (defined(invoker.ramdisk_in_zbi)) {
-      ramdisk_in_zbi = invoker.ramdisk_in_zbi && _supports_blobs
+    if (_generate_fvm_fastboot || _generate_fvm_nand) {
+      assert(_generate_fvm,
+             "The 'generate_fvm_*' options require 'generate_fvm' to be true")
+    }
+
+    # These shouldn't be set when ramdisk_in_zbi is set
+    if (ramdisk_in_zbi) {
+      assert(
+          !_generate_fvm_fastboot && !_generate_fvm_nand,
+          "The 'generate_fvm_*'' options cannot be used whem 'ramdisk_in_zbi' is true.")
     }
 
     forward_variables_from(invoker, [ "image_metadata_overrides" ])
@@ -398,6 +419,17 @@ template("assembled_system") {
         assert(!defined(image_metadata_overrides.fvm_sparse), error_msg)
         assert(!defined(image_metadata_overrides.fvm_fastboot), error_msg)
         not_needed([ "error_msg" ])
+      } else {
+        if (!_generate_fvm_sparse) {
+          assert(
+              !defined(image_metadata_overrides.fvm_sparse),
+              "No Sparse FVM will be built: no metadata override should be provided")
+        }
+        if (!_generate_fvm_fastboot) {
+          assert(
+              !defined(image_metadata_overrides.fvm_fastboot),
+              "No Fastboot FVM will be built: no metadata override should be provided")
+        }
       }
       if (!_generate_fxfs) {
         assert(
@@ -440,6 +472,13 @@ template("assembled_system") {
     labels = {
     }
 
+    _use_bringup_aibs_only = false
+    if (defined(invoker.use_bringup_platform_bundles_only)) {
+      if (invoker.use_bringup_platform_bundles_only) {
+        _use_bringup_aibs_only = true
+      }
+    }
+
     labels = {
       forward_variables_from(_outer_labels, "*")
 
@@ -462,20 +501,12 @@ template("assembled_system") {
       compare_images_manifests = "${_namespace}.compare_images_manifests"
 
       # *_platform_aib_labels come from //bundles/assembly/platform_aibs.gni
-      if (defined(invoker.use_bringup_platform_bundles_only) &&
-          invoker.use_bringup_platform_bundles_only) {
+
+      if (_use_bringup_aibs_only) {
+        # Use only the bringup bundles when that's explicitly set.
         platform_common_aibs = bringup_platform_aib_labels
-      } else if (defined(invoker.allow_eng_platform_bundle_use) &&
-                 invoker.allow_eng_platform_bundle_use) {
-        platform_common_aibs = eng_platform_aib_labels
-        not_needed(invoker, [ "allow_userdebug_platform_bundle_use" ])
       } else {
-        if (defined(invoker.allow_userdebug_platform_bundle_use) &&
-            invoker.allow_userdebug_platform_bundle_use) {
-          platform_common_aibs = userdebug_platform_aib_labels
-        } else {
-          platform_common_aibs = user_platform_aib_labels
-        }
+        platform_common_aibs = eng_platform_aib_labels
       }
 
       validation_legacy_aib =
@@ -550,6 +581,8 @@ template("assembled_system") {
       }
       if (_generate_fvm) {
         fvm = "${outdir}/fvm.blk"
+      }
+      if (_generate_fvm_sparse) {
         fvm_sparse = "${outdir}/fvm.sparse.blk"
       }
       if (_generate_fvm_fastboot || _generate_fvm_nand) {
@@ -590,19 +623,11 @@ template("assembled_system") {
       #
       # This isn't strictly required, but it allows the AIB input files to be
       # specified in GN.
-      if (defined(invoker.use_bringup_platform_bundles_only) &&
-          invoker.use_bringup_platform_bundles_only) {
+      if (_use_bringup_aibs_only) {
+        # Use only the bringup bundles when that's explicitly set.
         platform_common_aibs = bringup_platform_aib_files
-      } else if (defined(invoker.allow_eng_platform_bundle_use) &&
-                 invoker.allow_eng_platform_bundle_use) {
-        platform_common_aibs = eng_platform_aib_files
       } else {
-        if (defined(invoker.allow_userdebug_platform_bundle_use) &&
-            invoker.allow_userdebug_platform_bundle_use) {
-          platform_common_aibs = userdebug_platform_aib_files
-        } else {
-          platform_common_aibs = user_platform_aib_files
-        }
+        platform_common_aibs = eng_platform_aib_files
       }
 
       if (defined(labels.custom_kernel_aib)) {
@@ -766,25 +791,33 @@ template("assembled_system") {
 
       # See if there are any developer overrides enabled for this target, and
       # if so, pass them to assembly.
-      foreach(overrides_def, product_assembly_overrides) {
+      _overrides_match_found = false
+      foreach(overrides_def, all_product_assembly_overrides) {
         # This is done by seeing if the target_name matches each of the defined
         # label patterns that are to have overrides.
         if (label_matches(":$target_name", [ overrides_def.assembly ])) {
+          assert(_overrides_match_found == false,
+                 "Multiple matching overrides targets found for " +
+                     get_label_info(":$target_name", "label_no_toolchain") +
+                     " ${overrides_def.assembly} and ${_overrides_match_found}")
+          _overrides_match_found = overrides_def.assembly
+
           # The overrides are given by label, which is used to compute the path
           # to the file created by the developer overrides template.
-          overrides_file =
+          _overrides_file =
               get_label_info(overrides_def.overrides, "target_out_dir") + "/" +
               get_label_info(overrides_def.overrides, "name") +
               "/product_assembly_overrides.json"
 
           args += [
             "--developer-overrides",
-            rebase_path(overrides_file, root_build_dir),
+            rebase_path(_overrides_file, root_build_dir),
           ]
-          inputs += [ overrides_file ]
+          inputs += [ _overrides_file ]
           deps += [ overrides_def.overrides ]
         }
       }
+      not_needed([ "_overrides_match_found" ])
     }
 
     hermetic_inputs_for_image_assembly(labels.image_assembly_inputs) {
@@ -911,9 +944,11 @@ template("assembled_system") {
         if (_generate_fvm) {
           outputs += [
             files.fvm,
-            files.fvm_sparse,
             files.blobfs,
           ]
+        }
+        if (_generate_fvm_sparse) {
+          outputs += [ files.fvm_sparse ]
         }
         if (_generate_fvm_fastboot || _generate_fvm_nand) {
           outputs += [ files.fvm_fastboot ]
@@ -1012,16 +1047,20 @@ template("assembled_system") {
                 forward_variables_from(_common_metadata, "*")
                 forward_variables_from(_image_overrides["fvm"], "*")
               },
-
-              # Sparse FVM
-              {
-                name = "${_namespace}.fvm_sparse"
-                path = rebase_path(files.fvm_sparse, root_build_dir)
-                type = "blk"
-                forward_variables_from(_common_metadata, "*")
-                forward_variables_from(_image_overrides["fvm_sparse"], "*")
-              },
             ]
+
+            if (_generate_fvm_sparse) {
+              images += [
+                # Sparse FVM
+                {
+                  name = "${_namespace}.fvm_sparse"
+                  path = rebase_path(files.fvm_sparse, root_build_dir)
+                  type = "blk"
+                  forward_variables_from(_common_metadata, "*")
+                  forward_variables_from(_image_overrides["fvm_sparse"], "*")
+                },
+              ]
+            }
           } else if (_generate_fxfs) {
             images += [
               {

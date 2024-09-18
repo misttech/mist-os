@@ -49,7 +49,6 @@ using memory::Digest;
 using memory::Digester;
 using memory::Printer;
 using memory::SORTED;
-using memory::StarnixCaptureStrategy;
 using memory::Summary;
 
 const char Monitor::kTraceName[] = "memory_monitor";
@@ -214,7 +213,6 @@ Monitor::Monitor(std::unique_ptr<sys::ComponentContext> context,
   trace_observer_.Start(dispatcher_, [this] { UpdateState(); });
   if (logging_) {
     Capture capture;
-    auto strategy = std::make_unique<StarnixCaptureStrategy>();
     auto s = capture_maker_->GetCapture(&capture, CaptureLevel::KMEM);
     if (s != ZX_OK) {
       FX_LOGS(ERROR) << "Error getting capture: " << zx_status_get_string(s);
@@ -285,7 +283,6 @@ void Monitor::CollectJsonStatsWithOptions(zx::socket socket) {
   Capture capture;
 
   zx_status_t capture_status;
-  auto strategy = std::make_unique<StarnixCaptureStrategy>();
   capture_status = capture_maker_->GetCapture(&capture, CaptureLevel::VMO);
 
   if (capture_status != ZX_OK) {
@@ -591,7 +588,6 @@ void Monitor::PressureLevelChanged(Level level) {
   if (level == kImminentOOM) {
     // Force the current state to be written as the high_waters. Later is better.
     memory::Capture c;
-    auto strategy = std::make_unique<StarnixCaptureStrategy>();
     auto s = capture_maker_->GetCapture(&c, CaptureLevel::VMO);
     if (s == ZX_OK) {
       high_water_->RecordHighWater(c);

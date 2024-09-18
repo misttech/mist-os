@@ -9,19 +9,24 @@ use super::{FsNodeSecurityXattr, FsNodeState};
 use crate::task::CurrentTask;
 use crate::vfs::fs_args::MountParams;
 use crate::vfs::{
-    FileSystem, FsNode, FsNodeHandle, FsStr, FsString, NamespaceNode, ValueOrSize, XattrOp,
+    DirEntry, FileSystem, FileSystemHandle, FsNode, FsStr, FsString, NamespaceNode, ValueOrSize,
+    XattrOp,
 };
 use linux_uapi::XATTR_NAME_SELINUX;
-use selinux::{ClassPermission, InitialSid, Permission, ProcessPermission, SecurityPermission};
-use selinux_core::permission_check::{PermissionCheck, PermissionCheckResult};
-use selinux_core::security_server::SecurityServer;
-use selinux_core::{FileSystemLabel, FileSystemLabelingScheme, FileSystemMountOptions, SecurityId};
-use starnix_logging::{log_warn, track_stub};
-use starnix_uapi::error;
+use selinux::permission_check::{PermissionCheck, PermissionCheckResult};
+use selinux::{
+    ClassPermission, FileSystemLabel, FileSystemLabelingScheme, FileSystemMountOptions, InitialSid,
+    Permission, ProcessPermission, SecurityId, SecurityPermission, SecurityServer,
+};
+use starnix_logging::{log_debug, log_warn, track_stub};
+use starnix_sync::Mutex;
+use starnix_uapi::arc_key::WeakKey;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::mount_flags::MountFlags;
 use starnix_uapi::unmount_flags::UnmountFlags;
-use std::sync::OnceLock;
+use starnix_uapi::{errno, error};
+use std::collections::HashSet;
+use std::sync::{Arc, OnceLock};
 
 /// Maximum supported size for the extended attribute value used to store SELinux security
 /// contexts in a filesystem node extended attributes.
@@ -54,27 +59,71 @@ pub(super) fn sb_umount(
     Ok(())
 }
 
-// Returns the labeling scheme to use for `fs`.
-// Must not be called until a policy has been loaded.
-fn ensure_fs_label<'a>(
-    security_server: &SecurityServer,
-    fs: &'a FileSystem,
-) -> &'a FileSystemLabel {
-    assert!(security_server.has_policy());
-    fs.security_state.state.label.get_or_init(|| {
-        security_server.resolve_fs_label(fs.name().into(), &fs.security_state.state.mount_options)
-    })
-}
-
-/// Returns the security attribute to label a newly created inode with, if any.
-pub(super) fn fs_node_init_security_and_xattr(
+/// Called by the VFS to initialize the security state for an `FsNode` that is being linked at
+/// `dir_entry`.
+pub(super) fn fs_node_init_with_dentry(
     _security_server: &SecurityServer,
     _current_task: &CurrentTask,
-    _new_node: &FsNodeHandle,
-    _parent: Option<&FsNodeHandle>,
+    dir_entry: &DirEntry,
+) -> Result<(), Errno> {
+    // This hook is called every time an `FsNode` is linked to a `DirEntry`, so it is expected that
+    // the `FsNode` may already have been labeled.
+    let fs_node = &dir_entry.node;
+    if fs_node.info().security_state.sid.is_some() {
+        return Ok(());
+    }
+
+    // TODO: https://fxbug.dev/349117435 - Determine the appropriate label for the node, whether
+    // by applying a static `genfscon` label, by reading a dynamic label from the node's extended
+    // attributes, etc. as appropriate for the file-system labeling scheme.
+
+    Ok(())
+}
+
+/// Returns an [`FsNodeSecurityXattr`] for the security context of `sid`.
+fn make_fs_node_security_xattr(
+    security_server: &SecurityServer,
+    sid: SecurityId,
+) -> Result<FsNodeSecurityXattr, Errno> {
+    security_server
+        .sid_to_security_context(sid)
+        .map(|value| FsNodeSecurityXattr {
+            name: XATTR_NAME_SELINUX.to_bytes().into(),
+            value: value.into(),
+        })
+        .ok_or_else(|| errno!(EINVAL))
+}
+
+/// Called by file-system implementations when creating the `FsNode` for a new file.
+pub(super) fn fs_node_init_on_create(
+    security_server: &SecurityServer,
+    current_task: &CurrentTask,
+    new_node: &FsNode,
+    _parent: &FsNode,
 ) -> Result<Option<FsNodeSecurityXattr>, Errno> {
-    // TODO(b/334091674): If there is no `parent` then this is the "root" node; apply `root_context`, if set.
-    Ok(None)
+    // By definition this is a new `FsNode` so should not have already been labeled!
+    if new_node.info().security_state.sid.is_some() {
+        log_warn!(
+            "fs_node_init_on_create: node {} in {:?} already created?",
+            new_node.info().ino,
+            new_node.fs().name()
+        );
+    }
+
+    // If the creating task's "fscreate" attribute is set then it overrides the normal process
+    // for labeling new files.
+    if let Some(fscreate_sid) = current_task.read().security_state.attrs.fscreate_sid.clone() {
+        set_cached_sid(new_node, fscreate_sid);
+        return Ok(Some(make_fs_node_security_xattr(security_server, fscreate_sid)?));
+    }
+
+    // TODO: https://fxbug.dev/355180447 - Apply dynamic labeling scheme (i.e. "fs_use_trans",
+    // etc.) to determine the SID for the new file node, and apply it to the node.
+    // If the labeling scheme is "fs_use_xattr" then return an `FsNodeSecurityXattr` value describing the
+    // value that the caller should set on the new node.
+    // For static labeling schemes there is nothing to do here.
+
+    return Ok(None);
 }
 
 /// Returns the Security Context corresponding to the SID with which `FsNode`
@@ -159,7 +208,8 @@ fn fs_node_resolve_security_label(
     }
 
     let fs = fs_node.fs();
-    let label = ensure_fs_label(security_server, &fs);
+    let label = fs.security_state.state.get_label();
+
     let sid = match label.scheme {
         // mountpoint-labelling labels every node from the "context=" mount option.
         FileSystemLabelingScheme::Mountpoint => Some(label.sid),
@@ -189,6 +239,17 @@ fn fs_node_resolve_security_label(
         set_cached_sid(fs_node, sid);
     }
     sid
+}
+
+#[macro_export]
+macro_rules! todo_check_permission {
+    (TODO($bug_url:literal, $todo_message:literal), $permission_check:expr, $source_sid:expr, $target_sid:expr, $permission:expr $(,)?) => {{
+        if check_permission($permission_check, $source_sid, $target_sid, $permission).is_err() {
+            use starnix_logging::track_stub;
+            track_stub!(TODO($bug_url), $todo_message);
+        }
+        Ok(())
+    }};
 }
 
 /// Checks whether `source_sid` is allowed the specified `permission` on `target_sid`.
@@ -239,8 +300,15 @@ fn check_self_permission(
     check_permission(permission_check, subject_sid, subject_sid, permission)
 }
 
+/// Returns the security state structure for the kernel.
+pub(super) fn kernel_init_security() -> KernelState {
+    KernelState { server: SecurityServer::new(), pending_file_systems: Mutex::default() }
+}
+
 /// Return security state to associate with a filesystem based on the supplied mount options.
-pub fn file_system_init_security(mount_params: &MountParams) -> Result<FileSystemState, Errno> {
+pub(super) fn file_system_init_security(
+    mount_params: &MountParams,
+) -> Result<FileSystemState, Errno> {
     let context = mount_params.get(FsStr::new(b"context")).cloned();
     let def_context = mount_params.get(FsStr::new(b"defcontext")).cloned();
     let fs_context = mount_params.get(FsStr::new(b"fscontext")).cloned();
@@ -264,6 +332,44 @@ pub fn file_system_init_security(mount_params: &MountParams) -> Result<FileSyste
     Ok(FileSystemState { mount_options, label: OnceLock::new() })
 }
 
+/// Resolves the labeling scheme and arguments for the `file_system`, based on the loaded policy.
+pub(super) fn file_system_resolve_security(
+    security_server: &SecurityServer,
+    _current_task: &CurrentTask,
+    file_system: &FileSystemHandle,
+) -> Result<(), Errno> {
+    // TODO: https://fxbug.dev/334094811 - Determine how failures, e.g. mount options containing
+    // Security Context values that are not valid in the loaded policy.
+    file_system.security_state.state.label.get_or_init(|| {
+        log_debug!("Labeling {} FileSystem ...", file_system.name());
+        security_server.resolve_fs_label(
+            file_system.name().into(),
+            &file_system.security_state.state.mount_options,
+        )
+    });
+    // TODO: https://fxbug.dev/366405530 - Label existing `FsNode`s in the resolved `FileSystem`.
+    Ok(())
+}
+
+/// Called by the "selinuxfs" when a policy has been successfully loaded, to allow policy-dependent
+/// initialization to be completed.
+pub(super) fn selinuxfs_policy_loaded(
+    security_server: &SecurityServer,
+    current_task: &CurrentTask,
+) {
+    let kernel_state = current_task.kernel().security_state.state.as_ref().unwrap();
+
+    // Invoke `file_system_resolve_security()` on all pre-existing `FileSystem`s.
+    // No new `FileSystem`s should be added to `pending_file_systems` after policy load.
+    let pending_file_systems = std::mem::take(&mut *kernel_state.pending_file_systems.lock());
+    for file_system in pending_file_systems {
+        if let Some(file_system) = file_system.0.upgrade() {
+            file_system_resolve_security(security_server, current_task, &file_system)
+                .unwrap_or_else(|_| panic!("Failed to resolve {} FileSystem", file_system.name()));
+        }
+    }
+}
+
 /// Used by the "selinuxfs" module to perform checks on SELinux API file accesses.
 pub(super) fn selinuxfs_check_access(
     security_server: &SecurityServer,
@@ -274,8 +380,26 @@ pub(super) fn selinuxfs_check_access(
     let source_sid = current_task.read().security_state.attrs.current_sid;
     let target_sid = fs_node_effective_sid(&security_server, current_task, node);
     let permission_check = security_server.as_permission_check();
-    // TODO: https://fxbug.dev/349117435 - Enable as soon as selinuxfs is labeled (via genfscon).
-    check_permission(&permission_check, source_sid, target_sid, permission).or(Ok(()))
+    todo_check_permission!(
+        TODO(
+            "https://fxbug.dev/349117435",
+            "Security permission checks require selinuxfs to be labeled"
+        ),
+        &permission_check,
+        source_sid,
+        target_sid,
+        permission
+    )
+}
+
+/// The global SELinux security structures, held by the `Kernel`.
+pub(super) struct KernelState {
+    // Owning reference to the SELinux `SecurityServer`.
+    pub(super) server: Arc<SecurityServer>,
+
+    /// Set of [`create::vfs::FileSystem`]s that have been constructed, and must be labeled as soon
+    /// as a policy is loaded into the `server`.
+    pub(super) pending_file_systems: Mutex<HashSet<WeakKey<FileSystem>>>,
 }
 
 /// The SELinux security structure for `ThreadGroup`.
@@ -332,6 +456,15 @@ pub(super) struct FileSystemState {
     // need to be retained after the file system has been labeled.
     mount_options: FileSystemMountOptions,
     label: OnceLock<FileSystemLabel>,
+}
+
+impl FileSystemState {
+    /// Returns the labeling scheme to use for `fs`.
+    /// Panics if the `FileSystem` has not had labeling resolved, which should not be possible once
+    /// a policy has been loaded.
+    fn get_label(&self) -> &FileSystemLabel {
+        self.label.get().unwrap_or_else(|| panic!("Unlabeled FileSystem!"))
+    }
 }
 
 /// Sets the cached security id associated with `fs_node` to `sid`. Storing the security id will

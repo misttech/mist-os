@@ -22,6 +22,8 @@
 
 #include <task-utils/walker.h>
 
+#include "src/developer/memory/metrics/capture_strategy.h"
+
 namespace memory {
 
 class OSImpl : public OS, public TaskEnumerator {
@@ -196,9 +198,8 @@ const std::vector<std::string> Capture::kDefaultRootedVmoNames = {
     "SysmemContiguousPool", "SysmemAmlogicProtectedPool", "Sysmem-core"};
 
 CaptureMaker::CaptureMaker(fidl::WireSyncClient<fuchsia_kernel::Stats> stats_client,
-                           std::unique_ptr<OS> os, std::unique_ptr<CaptureStrategy> strategy)
-    : stats_client_(std::move(stats_client)), os_(std::move(os)), strategy_(std::move(strategy)) {
-  FX_CHECK(strategy_);
+                           std::unique_ptr<OS> os)
+    : stats_client_(std::move(stats_client)), os_(std::move(os)) {
   FX_CHECK(os_);
 }
 
@@ -237,11 +238,12 @@ zx_status_t CaptureMaker::GetCapture(Capture* capture, CaptureLevel level,
     return err;
   }
 
+  StarnixCaptureStrategy strategy;
   // We don't have a guarantee on the iteration order of GetProcesses. To be able to filter jobs
   // correctly based on the name of their processes, we need to go through all processes first. We
   // extract the process handle and keep it to avoid walking the process tree a second time.
   err = os_->GetProcesses(
-      [this](int depth, zx::handle handle, zx_koid_t koid, zx_koid_t parent_koid) {
+      [this, &strategy](int depth, zx::handle handle, zx_koid_t koid, zx_koid_t parent_koid) {
         TRACE_DURATION("memory_metrics", "Capture::GetProcesses::Callback");
         Process process{.koid = koid, .job = parent_koid};
 
@@ -250,11 +252,11 @@ zx_status_t CaptureMaker::GetCapture(Capture* capture, CaptureLevel level,
           return s == ZX_ERR_BAD_STATE ? ZX_OK : s;
         }
 
-        s = strategy_->OnNewProcess(*os_, std::move(process), std::move(handle));
+        s = strategy.OnNewProcess(*os_, std::move(process), std::move(handle));
         return s == ZX_ERR_BAD_STATE ? ZX_OK : s;
       });
 
-  auto result = strategy_->Finalize(*os_);
+  auto result = strategy.Finalize(*os_);
   if (result.is_error()) {
     return result.error_value();
   }
@@ -269,7 +271,7 @@ zx_status_t CaptureMaker::GetCapture(Capture* capture, CaptureLevel level,
 }
 
 fit::result<zx_status_t, std::unique_ptr<CaptureMaker>> CaptureMaker::Create(
-    std::unique_ptr<OS> os, std::unique_ptr<CaptureStrategy> strategy) {
+    std::unique_ptr<OS> os) {
   TRACE_DURATION("memory_metrics", "Capture::GetCaptureState");
   fidl::WireSyncClient<fuchsia_kernel::Stats> stats_client;
 
@@ -278,8 +280,8 @@ fit::result<zx_status_t, std::unique_ptr<CaptureMaker>> CaptureMaker::Create(
     return fit::error(err);
   }
 
-  return fit::ok(std::unique_ptr<CaptureMaker>(
-      new CaptureMaker{std::move(stats_client), std::move(os), std::move(strategy)}));
+  return fit::ok(
+      std::unique_ptr<CaptureMaker>(new CaptureMaker{std::move(stats_client), std::move(os)}));
 }
 
 // Descendents of this vmo will have their allocated_bytes treated as an allocation of their

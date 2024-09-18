@@ -335,6 +335,12 @@ class EventPayloadUnion:
     # The parsed environment is included in the value.
     process_env: environment.ExecutionEnvironment | None = None
 
+    # This event denotes the computation of a final artifact directory.
+    #
+    # The absolute path to the directory is included in the value.
+    # The path will be empty if this run will not save artifacts.
+    artifact_directory_path: str | None = None
+
     # This event denotes a message to be shown to the user.
     #
     # The value provides display information.
@@ -756,6 +762,21 @@ class EventRecorder:
                 payload=EventPayloadUnion(
                     user_message=Message(value=message, level=level)
                 ),
+            )
+        )
+
+    def emit_artifact_directory_path(self, path: str | None) -> None:
+        """Emit an artifact_directory_path event with details on output path.
+
+        Args:
+            path (str | None): The path to the artifact directory.
+                None if artifacts will not be saved.
+        """
+        self._emit(
+            Event(
+                GLOBAL_RUN_ID,
+                self._get_timestamp(),
+                payload=EventPayloadUnion(artifact_directory_path=path or ""),
             )
         )
 

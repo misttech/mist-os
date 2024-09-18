@@ -5,23 +5,31 @@
 
 #include <lib/driver/logging/cpp/structured_logger.h>
 
+#include <variant>
+
 #include "src/devices/hrtimer/drivers/aml-hrtimer/aml-hrtimer-regs.h"
 
 namespace hrtimer {
+
+// To use switch like logic for std::visitor on std::variat.
+template <class... Ts>
+struct overloaded : Ts... {
+  using Ts::operator()...;
+};
 
 AmlHrtimerServer::AmlHrtimerServer(
     async_dispatcher_t* dispatcher, fdf::MmioBuffer mmio,
     std::optional<fidl::ClientEnd<fuchsia_power_broker::ElementControl>> element_control,
     fidl::SyncClient<fuchsia_power_broker::Lessor> lessor,
     fidl::SyncClient<fuchsia_power_broker::CurrentLevel> current_level,
-    fidl::Client<fuchsia_power_broker::RequiredLevel> required_level, zx::interrupt irq_a,
+    fidl::Client<fuchsia_power_broker::RequiredLevel> required_level,
+    fidl::SyncClient<fuchsia_power_system::ActivityGovernor> sag, zx::interrupt irq_a,
     zx::interrupt irq_b, zx::interrupt irq_c, zx::interrupt irq_d, zx::interrupt irq_f,
     zx::interrupt irq_g, zx::interrupt irq_h, zx::interrupt irq_i)
     : element_control_(std::move(element_control)),
       current_level_(std::move(current_level)),
-      required_level_(std::move(required_level))
-
-{
+      required_level_(std::move(required_level)),
+      sag_(std::move(sag)) {
   mmio_.emplace(std::move(mmio));
   dispatcher_ = dispatcher;
   wake_handling_lessor_ = std::move(lessor);
@@ -105,34 +113,56 @@ void AmlHrtimerServer::Timer::HandleIrq(async_dispatcher_t* dispatcher, async::I
     auto start_result = parent.StartHardware(timer_index);
     if (start_result.is_error()) {
       FDF_LOG(ERROR, "Could not restart the hardware for timer id: %zu", properties.id);
-      if (power_enabled_wait_completer) {
-        power_enabled_wait_completer->Reply(
-            zx::error(fuchsia_hardware_hrtimer::DriverError::kBadState));
-        power_enabled_wait_completer.reset();
-      }
+      std::visit(
+          overloaded{
+              [&](StartAndWaitCompleter::Async& completer) {
+                FDF_LOG(ERROR, "Could not restart the hardware for timer id: %zu", properties.id);
+                completer.Reply(zx::error(fuchsia_hardware_hrtimer::DriverError::kBadState));
+              },
+              [&](StartAndWait2Completer::Async& completer) {
+                FDF_LOG(ERROR, "Could not restart the hardware for timer id: %zu", properties.id);
+                completer.Reply(zx::error(fuchsia_hardware_hrtimer::DriverError::kBadState));
+              },
+              [](std::monostate& empty) {}},
+          power_enabled_wait_completer);
+      power_enabled_wait_completer = std::monostate{};
     }
   } else {
     ZX_ASSERT(last_ticks == start_ticks_left);
-    FDF_LOG(INFO, "Timer id: %zu IRQ%s triggered, last ticks: %lu", properties.id,
-            power_enabled_wait_completer ? " w/wait" : "", last_ticks);
-    if (power_enabled_wait_completer) {
-      // Before we ack the irq we take a lease to prevent the system from suspending while we
-      // notify any clients.
-      // The lease is passed to the completer or dropped as we exit this scope which guarantees the
-      // waiting client was notified before the system suspended.
-      auto lease_control = parent.LeaseWakeHandling();
-      // We don't exit on error conditions since we need to potentially signal an event and ack the
-      // irq regardless.
-      if (lease_control.is_error()) {
-        power_enabled_wait_completer->Reply(
-            zx::error(fuchsia_hardware_hrtimer::DriverError::kBadState));
-      } else {
-        power_enabled_wait_completer->Reply(
-            zx::ok(fuchsia_hardware_hrtimer::DeviceStartAndWaitResponse{
-                {.keep_alive = std::move(*lease_control)}}));
-      }
-      power_enabled_wait_completer.reset();
-    }
+    // If we have a wait, before we ack the IRQ we take a lease to prevent the system
+    // from suspending while we notify any clients. The lease is passed to the completer or
+    // dropped as we exit its scope which guarantees the waiting client was notified before the
+    // system suspends. We don't exit on error conditions since we need to potentially signal an
+    // event and ack the IRQ regardless.
+    std::visit(
+        overloaded{[&](StartAndWaitCompleter::Async& completer) {
+                     FDF_LOG(INFO, "Timer id: %zu IRQ w/wait triggered, last ticks: %lu",
+                             properties.id, last_ticks);
+                     auto lease_control = parent.LeaseWakeHandling();
+                     if (lease_control.is_error()) {
+                       completer.Reply(zx::error(fuchsia_hardware_hrtimer::DriverError::kBadState));
+                     } else {
+                       completer.Reply(zx::ok(fuchsia_hardware_hrtimer::DeviceStartAndWaitResponse{
+                           {.keep_alive = std::move(*lease_control)}}));
+                     }
+                   },
+                   [&](StartAndWait2Completer::Async& completer) {
+                     FDF_LOG(INFO, "Timer id: %zu IRQ w/wait2 triggered, last ticks: %lu",
+                             properties.id, last_ticks);
+                     auto wake_lease = parent.sag_->TakeWakeLease(std::string("aml-hrtimer"));
+                     if (wake_lease.is_error()) {
+                       completer.Reply(zx::error(fuchsia_hardware_hrtimer::DriverError::kBadState));
+                     } else {
+                       completer.Reply(zx::ok(fuchsia_hardware_hrtimer::DeviceStartAndWait2Response{
+                           {.expiration_keep_alive = std::move(wake_lease->token())}}));
+                     }
+                   },
+                   [&](std::monostate& empty) {
+                     FDF_LOG(INFO, "Timer id: %zu IRQ triggered, last ticks: %lu", properties.id,
+                             last_ticks);
+                   }},
+        power_enabled_wait_completer);
+    power_enabled_wait_completer = std::monostate();
 
     if (event) {
       event->signal(0, ZX_EVENT_SIGNALED);
@@ -204,11 +234,16 @@ void AmlHrtimerServer::ShutDown() {
     if (timers_[timer_index].irq.is_valid()) {
       timers_[timer_index].irq_handler.Cancel();
     }
-    if (timers_[timer_index].power_enabled_wait_completer) {
-      timers_[timer_index].power_enabled_wait_completer->Reply(
-          zx::error(fuchsia_hardware_hrtimer::DriverError::kCanceled));
-      timers_[timer_index].power_enabled_wait_completer.reset();
-    }
+    std::visit(
+        overloaded{[](StartAndWaitCompleter::Async& completer) {
+                     completer.Reply(zx::error(fuchsia_hardware_hrtimer::DriverError::kCanceled));
+                   },
+                   [](StartAndWait2Completer::Async& completer) {
+                     completer.Reply(zx::error(fuchsia_hardware_hrtimer::DriverError::kCanceled));
+                   },
+                   [](std::monostate& empty) {}},
+        timers_[timer_index].power_enabled_wait_completer);
+    timers_[timer_index].power_enabled_wait_completer = std::monostate();
   }
 }
 
@@ -320,11 +355,18 @@ void AmlHrtimerServer::Stop(StopRequest& request, StopCompleter::Sync& completer
   if (timers_[timer_index].irq.is_valid()) {
     timers_[timer_index].irq_handler.Cancel();
   }
-  if (timers_[timer_index].power_enabled_wait_completer) {
-    timers_[timer_index].power_enabled_wait_completer->Reply(
-        zx::error(fuchsia_hardware_hrtimer::DriverError::kCanceled));
-    timers_[timer_index].power_enabled_wait_completer.reset();
-  }
+  std::visit(
+      overloaded{[&](StartAndWaitCompleter::Async& completer) {
+                   FDF_LOG(INFO, "Received Stop canceling wait for timer id: %zu", request.id());
+                   completer.Reply(zx::error(fuchsia_hardware_hrtimer::DriverError::kCanceled));
+                 },
+                 [&](StartAndWait2Completer::Async& completer) {
+                   FDF_LOG(INFO, "Received Stop canceling wait2 for timer id: %zu", request.id());
+                   completer.Reply(zx::error(fuchsia_hardware_hrtimer::DriverError::kCanceled));
+                 },
+                 [](std::monostate& empty) {}},
+      timers_[timer_index].power_enabled_wait_completer);
+  timers_[timer_index].power_enabled_wait_completer = std::monostate();
   completer.Reply(zx::ok());
 }
 
@@ -381,7 +423,7 @@ void AmlHrtimerServer::StartAndWait(StartAndWaitRequest& request,
     completer.Reply(zx::error(fuchsia_hardware_hrtimer::DriverError::kInternalError));
     return;
   }
-  if (timers_[timer_index].power_enabled_wait_completer.has_value()) {
+  if (!std::holds_alternative<std::monostate>(timers_[timer_index].power_enabled_wait_completer)) {
     FDF_LOG(ERROR, "Invalid state for wait, already waiting for timer id: %lu", request.id());
     completer.Reply(zx::error(fuchsia_hardware_hrtimer::DriverError::kBadState));
     return;
@@ -398,10 +440,63 @@ void AmlHrtimerServer::StartAndWait(StartAndWaitRequest& request,
     completer.Reply(zx::error(start_result.error_value()));
     return;
   }
-  timers_[timer_index].power_enabled_wait_completer.emplace(completer.ToAsync());
+  timers_[timer_index].power_enabled_wait_completer = completer.ToAsync();
   zx_status_t status = timers_[timer_index].irq_handler.Begin(dispatcher_);
   if (status == ZX_ERR_ALREADY_EXISTS) {
     FDF_LOG(DEBUG, "IRQ handler already setup for timer id: %lu", request.id());
+  }
+}
+
+void AmlHrtimerServer::StartAndWait2(StartAndWait2Request& request,
+                                     StartAndWait2Completer::Sync& completer) {
+  size_t timer_index = TimerIndexFromId(request.id());
+  if (timer_index >= kNumberOfTimers) {
+    FDF_LOG(ERROR, "Invalid timer id: %lu", request.id());
+    completer.Reply(zx::error(fuchsia_hardware_hrtimer::DriverError::kInvalidArgs));
+    return;
+  }
+  // Fail power enabled StartAndWait2 if power management is not functional.
+  if (!element_control_) {
+    FDF_LOG(ERROR, "Power management not functional. StartAndWait2 failed for timer id: %lu",
+            request.id());
+    completer.Reply(zx::error(fuchsia_hardware_hrtimer::DriverError::kBadState));
+    return;
+  }
+  if (!timers_properties_[timer_index].supports_notifications) {
+    FDF_LOG(ERROR, "Notifications not supported for timer id: %lu", request.id());
+    completer.Reply(zx::error(fuchsia_hardware_hrtimer::DriverError::kNotSupported));
+    return;
+  }
+  if (!timers_[timer_index].irq.is_valid()) {
+    FDF_LOG(ERROR, "Invalid IRQ for timer id: %lu", request.id());
+    completer.Reply(zx::error(fuchsia_hardware_hrtimer::DriverError::kInternalError));
+    return;
+  }
+  if (!std::holds_alternative<std::monostate>(timers_[timer_index].power_enabled_wait_completer)) {
+    FDF_LOG(ERROR, "Invalid state for wait, already waiting for timer id: %lu", request.id());
+    completer.Reply(zx::error(fuchsia_hardware_hrtimer::DriverError::kBadState));
+    return;
+  }
+  timers_[timer_index].start_ticks_left = request.ticks();
+  if (!request.resolution().duration()) {
+    FDF_LOG(ERROR, "Invalid resolution, no duration for timer id: %zu", request.id());
+    completer.Reply(zx::error(fuchsia_hardware_hrtimer::DriverError::kInvalidArgs));
+    return;
+  }
+  timers_[timer_index].resolution_nsecs = request.resolution().duration().value();
+  auto start_result = StartHardware(timer_index);
+  if (start_result.is_error()) {
+    completer.Reply(zx::error(start_result.error_value()));
+    return;
+  }
+  timers_[timer_index].power_enabled_wait_completer = completer.ToAsync();
+  zx_status_t status = timers_[timer_index].irq_handler.Begin(dispatcher_);
+  if (status == ZX_ERR_ALREADY_EXISTS) {
+    FDF_LOG(DEBUG, "IRQ handler already setup for timer id: %lu", request.id());
+  }
+  {
+    // request.setup_keep_alive() is dropped here since the timer has been setup.
+    auto to_drop = std::move(request.setup_keep_alive());
   }
 }
 

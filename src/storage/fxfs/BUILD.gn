@@ -21,6 +21,7 @@ fxfs_deps = [
   "//src/lib/mundane",
   "//src/storage/fxfs/crypto",
   "//src/storage/fxfs/trace",
+  "//src/storage/fxfs/unicode",
   "//src/storage/lib/fsverity-merkle",
   "//src/storage/lib/storage_device",
   "//src/storage/type-fprint:fprint",

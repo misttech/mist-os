@@ -98,6 +98,9 @@ source_set("semantics_integration_test_fixture") {
     "//sdk/fidl/fuchsia.ui.composition:fuchsia.ui.composition_hlcpp",
     "//sdk/fidl/fuchsia.ui.input:fuchsia.ui.input_hlcpp",
     "//sdk/fidl/fuchsia.vulkan.loader:fuchsia.vulkan.loader_hlcpp",
+    "//sdk/lib/async-loop",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//src/lib/testing/loop_fixture",
     "//src/ui/a11y/lib/annotation/tests/mocks",
     "//src/ui/a11y/lib/semantics",
@@ -107,9 +110,6 @@ source_set("semantics_integration_test_fixture") {
     "//src/ui/testing/ui_test_manager",
     "//src/ui/testing/util",
     "//third_party/googletest:gtest",
-    "//zircon/system/ulib/async-loop",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
   ]
 }
 

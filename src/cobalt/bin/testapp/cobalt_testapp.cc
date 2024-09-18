@@ -41,7 +41,9 @@ constexpr uint32_t kControlId = 48954961;
 constexpr uint32_t kExperimentId = 48954962;
 
 bool CobaltTestApp::RunTests() {
-  { component_testing::ScopedChild child = Connect(kCobaltWithEventAggregatorWorker); }
+  {
+    component_testing::ScopedChild child = Connect(kCobaltWithEventAggregatorWorker);
+  }
 
   return DoLocalAggregationTests(kEventAggregatorBackfillDays, kCobaltNoEventAggregatorWorker);
 }
@@ -118,13 +120,6 @@ component_testing::ScopedChild CobaltTestApp::Connect(const std::string &variant
     FX_CHECK(!result_with_experiments.is_err()) << "CreateMetricEventLoggerWithExperiments() => "
                                                 << ErrorToString(result_with_experiments.err());
   }
-
-  child.Connect(system_data_updater_.NewRequest());
-  fuchsia::cobalt::Status status = fuchsia::cobalt::Status::INTERNAL_ERROR;
-  fuchsia::cobalt::SoftwareDistributionInfo info;
-  info.set_current_channel("devhost");
-  system_data_updater_->SetSoftwareDistributionInfo(std::move(info), &status);
-  FX_CHECK(status == fuchsia::cobalt::Status::OK) << "Unable to set software distribution info";
 
   cobalt_controller_ = child.ConnectSync<fuchsia::cobalt::Controller>();
 

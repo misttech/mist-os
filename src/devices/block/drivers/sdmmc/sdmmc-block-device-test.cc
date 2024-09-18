@@ -16,6 +16,7 @@
 #include <lib/ddk/metadata.h>
 #include <lib/driver/compat/cpp/device_server.h>
 #include <lib/driver/component/cpp/driver_export.h>
+#include <lib/driver/power/cpp/testing/fake_element_control.h>
 #include <lib/driver/testing/cpp/driver_runtime.h>
 #include <lib/driver/testing/cpp/internal/driver_lifecycle.h>
 #include <lib/driver/testing/cpp/internal/test_environment.h>
@@ -41,6 +42,8 @@
 #include "sdmmc-types.h"
 
 namespace sdmmc {
+
+using fdf_power::testing::FakeElementControl;
 
 class TestSdmmcRootDevice : public SdmmcRootDevice {
  public:
@@ -137,21 +140,6 @@ class FakeSystemActivityGovernor
 
   zx::event exec_state_opportunistic_;
   zx::event wake_handling_assertive_;
-};
-
-class FakeElementControl : public fidl::Server<fuchsia_power_broker::ElementControl> {
- public:
-  void OpenStatusChannel(OpenStatusChannelRequest& req,
-                         OpenStatusChannelCompleter::Sync& completer) override {}
-
-  void RegisterDependencyToken(RegisterDependencyTokenRequest& req,
-                               RegisterDependencyTokenCompleter::Sync& completer) override {}
-
-  void UnregisterDependencyToken(UnregisterDependencyTokenRequest& req,
-                                 UnregisterDependencyTokenCompleter::Sync& completer) override {}
-
-  void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_power_broker::ElementControl> md,
-                             fidl::UnknownMethodCompleter::Sync& completer) override {}
 };
 
 class FakeLessor : public fidl::Server<fuchsia_power_broker::Lessor> {

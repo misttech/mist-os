@@ -14,6 +14,7 @@
 
 #include <utility>
 
+#include <bind/fuchsia/platform/cpp/bind.h>
 #include <fbl/string.h>
 #include <fbl/unique_fd.h>
 #include <ramdevice-client/ramnand.h>
@@ -114,9 +115,14 @@ int main(int argc, char** argv) {
 
   // Start the DriverTestRealm with correct arguments.
   fidl::Arena arena;
-  fuchsia_driver_test::wire::RealmArgs realm_args(arena);
-  realm_args.set_root_driver(arena, "fuchsia-boot:///platform-bus#meta/platform-bus.cm");
-  auto wire_result = client->Start(realm_args);
+  auto wire_result =
+      client->Start(fuchsia_driver_test::wire::RealmArgs::Builder(arena)
+                        .root_driver("fuchsia-boot:///platform-bus#meta/platform-bus.cm")
+                        .software_devices(std::vector{fuchsia_driver_test::wire::SoftwareDevice{
+                            .device_name = "ram-nand",
+                            .device_id = bind_fuchsia_platform::BIND_PLATFORM_DEV_DID_RAM_NAND,
+                        }})
+                        .Build());
   if (wire_result.status() != ZX_OK) {
     fprintf(stderr, "Failed to call to Realm:Start: %d\n", wire_result.status());
     return 1;

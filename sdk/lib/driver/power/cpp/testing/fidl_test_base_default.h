@@ -9,28 +9,18 @@
 #include <lib/fidl/cpp/wire/channel.h>
 #include <lib/fidl/cpp/wire/unknown_interaction_handler.h>
 
-#include <gtest/gtest.h>
-
 namespace fdf_power::testing {
 
 template <typename Protocol>
 class FidlTestBaseDefault : public fidl::testing::TestBase<Protocol> {
- public:
-  FidlTestBaseDefault(async_dispatcher_t* dispatcher, fidl::ServerEnd<Protocol> server_end)
-      : binding_(fidl::BindServer(
-            dispatcher, std::move(server_end), this,
-            [](FidlTestBaseDefault*, fidl::UnbindInfo, fidl::ServerEnd<Protocol>) {})) {}
-
+ private:
   void NotImplemented_(const std::string& name, fidl::CompleterBase& completer) final {
-    FAIL() << "Unexpected call: " << name;
+    ZX_PANIC("Unexpected call: %s", name.c_str());
   }
   void handle_unknown_method(fidl::UnknownMethodMetadata<Protocol> metadata,
                              fidl::UnknownMethodCompleter::Sync& completer) final {
-    FAIL() << "Encountered unknown method";
+    ZX_PANIC("Encountered unknown method");
   }
-
- private:
-  fidl::ServerBindingRef<Protocol> binding_;
 };
 
 }  // namespace fdf_power::testing

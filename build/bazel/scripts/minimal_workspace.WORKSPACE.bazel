@@ -1,0 +1,42 @@
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+workspace(name = "main")
+
+load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
+
+# Bazel Skylib; Starlark utilities
+# https://github.com/bazelbuild/bazel-skylib
+http_archive(
+    name = "bazel_skylib",
+    sha256 = "74d544d96f4a5bb630d465ca8bbcfe231e3594e5aae57e1edbf17a6eb3ca2506",
+    urls = [
+        "https://mirror.bazel.build/github.com/bazelbuild/bazel-skylib/releases/download/1.3.0/bazel-skylib-1.3.0.tar.gz",
+        "https://github.com/bazelbuild/bazel-skylib/releases/download/1.3.0/bazel-skylib-1.3.0.tar.gz",
+    ],
+)
+
+load("@bazel_skylib//:workspace.bzl", "bazel_skylib_workspace")
+
+bazel_skylib_workspace()
+
+# The repository containing common definitions for the Fuchsia platform build
+# and the Fuchsia Bazel SDK rules.
+local_repository(
+    name = "fuchsia_sdk_common",
+    path = "build/bazel_sdk/local_repositories/fuchsia_sdk_common",
+)
+
+# Create the @fuchsia_build_config repository which contains the defs.bzl file
+# exporting a `build_config` struct of configuration information specific to
+# the Fuchsia platform build.
+# buildifier: disable=load-on-top
+load(
+    "@fuchsia_sdk_common//common:fuchsia_platform_build.bzl",
+    "fuchsia_build_config_repository",
+)
+
+fuchsia_build_config_repository(
+    name = "fuchsia_build_config",
+)

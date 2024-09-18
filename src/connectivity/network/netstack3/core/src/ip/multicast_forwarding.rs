@@ -8,12 +8,15 @@
 use lock_order::lock::LockLevelFor;
 use lock_order::relation::LockBefore;
 use lock_order::wrap::LockedWrapperApi;
+use netstack3_base::CoreTimerContext;
 use netstack3_device::{DeviceId, WeakDeviceId};
 use netstack3_ip::multicast_forwarding::{
     MulticastForwardingEnabledState, MulticastForwardingPendingPackets,
     MulticastForwardingPendingPacketsContext, MulticastForwardingState,
-    MulticastForwardingStateContext, MulticastRouteTable, MulticastRouteTableContext,
+    MulticastForwardingStateContext, MulticastForwardingTimerId, MulticastRouteTable,
+    MulticastRouteTableContext,
 };
+use netstack3_ip::IpLayerTimerId;
 
 use crate::{lock_ordering, BindingsContext, BindingsTypes, CoreCtx, IpExt};
 
@@ -22,13 +25,13 @@ impl<
         I: IpExt,
         BC: BindingsContext,
         L: LockBefore<lock_ordering::IpMulticastForwardingState<I>>,
-    > MulticastForwardingStateContext<I> for CoreCtx<'_, BC, L>
+    > MulticastForwardingStateContext<I, BC> for CoreCtx<'_, BC, L>
 {
     type Ctx<'a> = CoreCtx<'a, BC, lock_ordering::IpMulticastForwardingState<I>>;
 
     fn with_state<
         O,
-        F: FnOnce(&MulticastForwardingState<I, Self::DeviceId>, &mut Self::Ctx<'_>) -> O,
+        F: FnOnce(&MulticastForwardingState<I, Self::DeviceId, BC>, &mut Self::Ctx<'_>) -> O,
     >(
         &mut self,
         cb: F,
@@ -40,7 +43,7 @@ impl<
 
     fn with_state_mut<
         O,
-        F: FnOnce(&mut MulticastForwardingState<I, Self::DeviceId>, &mut Self::Ctx<'_>) -> O,
+        F: FnOnce(&mut MulticastForwardingState<I, Self::DeviceId, BC>, &mut Self::Ctx<'_>) -> O,
     >(
         &mut self,
         cb: F,
@@ -53,7 +56,7 @@ impl<
 
 #[netstack3_macros::instantiate_ip_impl_block(I)]
 impl<I: IpExt, BC: BindingsContext, L: LockBefore<lock_ordering::IpMulticastRouteTable<I>>>
-    MulticastRouteTableContext<I> for CoreCtx<'_, BC, L>
+    MulticastRouteTableContext<I, BC> for CoreCtx<'_, BC, L>
 {
     type Ctx<'a> = CoreCtx<'a, BC, lock_ordering::IpMulticastRouteTable<I>>;
 
@@ -62,7 +65,7 @@ impl<I: IpExt, BC: BindingsContext, L: LockBefore<lock_ordering::IpMulticastRout
         F: FnOnce(&MulticastRouteTable<I, Self::DeviceId>, &mut Self::Ctx<'_>) -> O,
     >(
         &mut self,
-        state: &MulticastForwardingEnabledState<I, Self::DeviceId>,
+        state: &MulticastForwardingEnabledState<I, Self::DeviceId, BC>,
         cb: F,
     ) -> O {
         let mut locked = self.adopt(state);
@@ -77,7 +80,7 @@ impl<I: IpExt, BC: BindingsContext, L: LockBefore<lock_ordering::IpMulticastRout
         F: FnOnce(&mut MulticastRouteTable<I, Self::DeviceId>, &mut Self::Ctx<'_>) -> O,
     >(
         &mut self,
-        state: &MulticastForwardingEnabledState<I, Self::DeviceId>,
+        state: &MulticastForwardingEnabledState<I, Self::DeviceId, BC>,
         cb: F,
     ) -> O {
         let mut locked = self.adopt(state);
@@ -93,14 +96,14 @@ impl<
         I: IpExt,
         BC: BindingsContext,
         L: LockBefore<lock_ordering::IpMulticastForwardingPendingPackets<I>>,
-    > MulticastForwardingPendingPacketsContext<I> for CoreCtx<'_, BC, L>
+    > MulticastForwardingPendingPacketsContext<I, BC> for CoreCtx<'_, BC, L>
 {
     fn with_pending_table_mut<
         O,
-        F: FnOnce(&mut MulticastForwardingPendingPackets<I, Self::WeakDeviceId>) -> O,
+        F: FnOnce(&mut MulticastForwardingPendingPackets<I, Self::WeakDeviceId, BC>) -> O,
     >(
         &mut self,
-        state: &MulticastForwardingEnabledState<I, Self::DeviceId>,
+        state: &MulticastForwardingEnabledState<I, Self::DeviceId, BC>,
         cb: F,
     ) -> O {
         let mut locked = self.adopt(state);
@@ -110,14 +113,24 @@ impl<
     }
 }
 
-impl<I: IpExt, BT: BindingsTypes> LockLevelFor<MulticastForwardingEnabledState<I, DeviceId<BT>>>
+impl<I: IpExt, BT: BindingsTypes> LockLevelFor<MulticastForwardingEnabledState<I, DeviceId<BT>, BT>>
     for lock_ordering::IpMulticastRouteTable<I>
 {
     type Data = MulticastRouteTable<I, DeviceId<BT>>;
 }
 
-impl<I: IpExt, BT: BindingsTypes> LockLevelFor<MulticastForwardingEnabledState<I, DeviceId<BT>>>
+impl<I: IpExt, BT: BindingsTypes> LockLevelFor<MulticastForwardingEnabledState<I, DeviceId<BT>, BT>>
     for lock_ordering::IpMulticastForwardingPendingPackets<I>
 {
-    type Data = MulticastForwardingPendingPackets<I, WeakDeviceId<BT>>;
+    type Data = MulticastForwardingPendingPackets<I, WeakDeviceId<BT>, BT>;
+}
+
+impl<I, BC, L> CoreTimerContext<MulticastForwardingTimerId<I>, BC> for CoreCtx<'_, BC, L>
+where
+    I: IpExt,
+    BC: BindingsContext,
+{
+    fn convert_timer(dispatch_id: MulticastForwardingTimerId<I>) -> BC::DispatchId {
+        IpLayerTimerId::from(dispatch_id).into()
+    }
 }

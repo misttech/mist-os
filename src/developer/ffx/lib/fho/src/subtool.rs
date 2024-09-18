@@ -175,6 +175,7 @@ impl<T: FfxTool> FhoTool<T> {
             ffx,
             context: context.clone(),
             injector,
+            lookup: Arc::new(crate::from_env::DeviceLookupDefaultImpl),
         };
         let main = T::from_env(env.clone(), tool).await?;
 

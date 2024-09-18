@@ -24,6 +24,7 @@ extern "C" uint64_t PhysException(uint64_t vector, const char* vector_name,
   }
 
   // Otherwise complain verbosely and reboot.
+  PreparePanic();
   PrintPhysException(vector, vector_name, state);
   ArchPanicReset();
 }

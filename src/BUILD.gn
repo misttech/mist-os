@@ -34,6 +34,7 @@ group("tests_no_e2e") {
     "media:tests",
     "paravirtualization:tests",
     "performance:tests",
+    "power:simulated_time_tests",
     "power:tests",
     "recovery:tests_no_e2e",
     "security:tests",

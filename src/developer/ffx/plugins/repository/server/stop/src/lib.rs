@@ -166,6 +166,7 @@ mod tests {
     use ffx_config::TestEnv;
     use fho::Format;
     use fidl_fuchsia_developer_ffx::{RepositoryRegistryMarker, RepositoryRegistryRequest};
+    use fidl_fuchsia_pkg_ext::RepositoryConfigBuilder;
     use futures::channel::oneshot::channel;
     use pkg::{RegistrationConflictMode, RepoStorageType};
     use serde_json::Value;
@@ -201,6 +202,9 @@ mod tests {
         let instance_root = context.get("repository.process_dir").expect("instance dir");
         let mgr = PkgServerInstances::new(instance_root);
 
+        let repo_config =
+            RepositoryConfigBuilder::new(format!("fuchsia-pkg://{name}").parse().unwrap()).build();
+
         let address = (Ipv4Addr::LOCALHOST, 1234).into();
 
         mgr.write_instance(&PkgServerInfo {
@@ -212,6 +216,7 @@ mod tests {
             registration_alias_conflict_mode: RegistrationConflictMode::ErrorOut,
             server_mode: ServerMode::Foreground,
             pid: child.id(),
+            repo_config,
         })
         .expect("writing instance");
         Ok((mgr, child))
@@ -223,6 +228,9 @@ mod tests {
 
         let address = (Ipv4Addr::LOCALHOST, 1234).into();
 
+        let repo_config =
+            RepositoryConfigBuilder::new(format!("fuchsia-pkg://{name}").parse().unwrap()).build();
+
         mgr.write_instance(&PkgServerInfo {
             name,
             address,
@@ -232,6 +240,7 @@ mod tests {
             registration_alias_conflict_mode: RegistrationConflictMode::ErrorOut,
             server_mode: ServerMode::Daemon,
             pid: process::id(),
+            repo_config,
         })
         .map_err(Into::into)
     }

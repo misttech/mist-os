@@ -15,13 +15,13 @@ executable("bin") {
 
   deps = [
     "//sdk/fidl/fuchsia.input.report:fuchsia.input.report_cpp",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/component/incoming/cpp",
     "//src/lib/ddk",
     "//src/lib/files",
     "//src/lib/fsl",
     "//src/lib/fxl:fxl_cli",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/fzl",
     "//zircon/system/ulib/trace",
     "//zircon/system/ulib/trace-provider",
@@ -43,13 +43,13 @@ test("print-input-report-test-bin") {
 
   deps = [
     "//sdk/fidl/fuchsia.input.report:fuchsia.input.report_cpp",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//src/lib/ddk",
     "//src/lib/fxl/test:gtest_main",
     "//src/ui/input/lib/hid-input-report",
     "//src/ui/input/lib/hid-parser",
     "//src/ui/input/testing/fake_input_report_device",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/sync",
     "//zircon/system/ulib/trace",

@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::security;
 use crate::task::CurrentTask;
 use crate::vfs::{FileSystemHandle, FileSystemOptions, FsStr, FsString};
 use starnix_sync::{Locked, Mutex, Unlocked};
@@ -48,7 +49,10 @@ impl FsRegistry {
         fs_type: &FsStr,
         options: FileSystemOptions,
     ) -> Option<Result<FileSystemHandle, Errno>> {
-        let maybe_create_fs = self.registry.lock().get(fs_type).map(Arc::clone);
-        maybe_create_fs.map(|create_fs| create_fs(locked, current_task, options))
+        let create_fs = self.registry.lock().get(fs_type).map(Arc::clone)?;
+        Some(create_fs(locked, current_task, options).and_then(|fs| {
+            security::file_system_resolve_security(&current_task, &fs)?;
+            Ok(fs)
+        }))
     }
 }

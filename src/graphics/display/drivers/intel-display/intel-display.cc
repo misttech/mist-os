@@ -2130,9 +2130,9 @@ void Controller::PrepareStopOnPowerOn(fdf::PrepareStopCompleter completer) {
 }
 
 void Controller::PrepareStopOnPowerStateTransition(
-    fuchsia_device_manager::SystemPowerState power_state, fdf::PrepareStopCompleter completer) {
+    fuchsia_system_state::SystemPowerState power_state, fdf::PrepareStopCompleter completer) {
   // TODO(https://fxbug.dev/42119483): Implement the suspend hook based on suspendtxn
-  if (power_state == fuchsia_device_manager::SystemPowerState::kMexec) {
+  if (power_state == fuchsia_system_state::SystemPowerState::kMexec) {
     zx::result<FramebufferInfo> fb_status = GetFramebufferInfo(resources_.framebuffer);
     if (fb_status.is_error()) {
       completer(zx::ok());

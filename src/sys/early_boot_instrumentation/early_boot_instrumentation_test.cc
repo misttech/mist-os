@@ -5,26 +5,38 @@
 #include <fcntl.h>
 #include <lib/stdcompat/array.h>
 
-#include <array>
+#include <string_view>
+#include <vector>
 
 #include <fbl/unique_fd.h>
 #include <gtest/gtest.h>
 
 namespace {
-template <size_t N>
-bool CheckContents(const char (&str)[N], fbl::unique_fd file) {
-  auto expected = cpp20::to_array(str);
-  decltype(expected) actual = {};
+
+bool CheckContents(std::string_view contents, fbl::unique_fd file) {
+  std::vector<char> actual;
+  actual.resize(contents.size());
   size_t acc_offset = 0;
   while (auto read_bytes =
              read(file.get(), actual.data() + acc_offset, actual.size() - acc_offset)) {
     acc_offset += read_bytes;
   }
-  return acc_offset == expected.size() &&
-         memcmp(actual.data(), expected.data(), actual.size()) == 0;
+  return acc_offset == contents.size() &&
+         memcmp(actual.data(), contents.data(), actual.size()) == 0;
 }
 
 }  // namespace
+
+TEST(EarlyBootInstrumentationTest, HasLogsUnderLogs) {
+  auto entries = cpp20::to_array<std::string_view>(
+      {"symbolizer.log", "physboot.log", "physload.log", "foo-bar.log"});
+  for (auto entry : entries) {
+    std::string path = "/logs/" + std::string(entry);
+    fbl::unique_fd file(open(path.c_str(), O_RDONLY));
+    ASSERT_TRUE(file);
+    ASSERT_TRUE(CheckContents(entry, std::move(file)));
+  }
+}
 
 TEST(EarlyBootInstrumentationTest, HasKernelInDynamic) {
   fbl::unique_fd kernel_file(open("/debugdata/llvm-profile/dynamic/zircon.profraw", O_RDONLY));

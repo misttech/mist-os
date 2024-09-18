@@ -9,7 +9,7 @@ use component_debug::config::{
     resolve_raw_config_capabilities, resolve_raw_config_overrides, RawConfigEntry,
 };
 use component_debug::realm::{get_resolved_declaration, resolve_declaration};
-use component_debug::route::{DeclType, RouteReport};
+use component_debug::route::{DeclType, RouteOutcome, RouteReport};
 use fuchsia_component::client::connect_to_protocol;
 use moniker::Moniker;
 use std::str::FromStr;
@@ -58,7 +58,8 @@ async fn show() {
     // fuchsia.sys2.RealmQuery
     // fuchsia.sys2.RouteValidator
     // fuchsia.foo.Bar
-    assert_eq!(resolved.incoming_capabilities.len(), 6);
+    // void-protocol
+    assert_eq!(resolved.incoming_capabilities.len(), 7);
 
     // The expected exposed capabilities are:
     // fuchsia.test.Suite
@@ -140,6 +141,7 @@ async fn route() {
             error_summary: Some(_),
             source_moniker: None,
             service_instances: None,
+            outcome: RouteOutcome::Failed,
         } if capability == "fuchsia.foo.Bar"
     );
 
@@ -152,6 +154,7 @@ async fn route() {
             error_summary: None,
             source_moniker: Some(m),
             service_instances: None,
+            outcome: RouteOutcome::Success,
         } if capability == "data" && m == "."
     );
 
@@ -174,6 +177,7 @@ async fn route() {
             error_summary: Some(_),
             source_moniker: None,
             service_instances: None,
+            outcome: RouteOutcome::Failed,
         } if capability == "fuchsia.foo.Bar"
     );
 
@@ -186,6 +190,7 @@ async fn route() {
             error_summary: None,
             source_moniker: Some(m),
             service_instances: None,
+            outcome: RouteOutcome::Success,
         } if capability == "fuchsia.foo.Bar" && m == "."
     );
 
@@ -202,12 +207,65 @@ async fn route() {
     // fuchsia.sys2.RealmExplorer
     // fuchsia.sys2.RealmQuery
     // fuchsia.sys2.RouteValidator
+    // void-protocol
     //
     // The expected exposed capabilities are:
     // fuchsia.foo.bar
     // fuchsia.test.Suite
     // data
-    assert_eq!(reports.len(), 6 + 3);
+    assert_eq!(reports.len(), 7 + 3);
+}
+
+#[fuchsia::test]
+async fn route_void() {
+    let route_validator = connect_to_protocol::<fsys::RouteValidatorMarker>().unwrap();
+    let realm_query = connect_to_protocol::<fsys::RealmQueryMarker>().unwrap();
+    let mut reports = route_cmd_serialized(
+        "/".into(),
+        Some("use:void-protocol".into()),
+        route_validator,
+        realm_query,
+    )
+    .await
+    .unwrap();
+
+    assert_eq!(reports.len(), 1);
+    let report = reports.remove(0);
+    assert_matches!(
+        report,
+        RouteReport {
+            decl_type: DeclType::Use,
+            capability,
+            error_summary: None,
+            source_moniker: Some(m),
+            service_instances: None,
+            outcome: RouteOutcome::Void,
+        } if capability == "void-protocol" && m == "foo"
+    );
+
+    let route_validator = connect_to_protocol::<fsys::RouteValidatorMarker>().unwrap();
+    let realm_query = connect_to_protocol::<fsys::RealmQueryMarker>().unwrap();
+    let mut reports = route_cmd_serialized(
+        "foo".into(),
+        Some("expose:void-protocol".into()),
+        route_validator,
+        realm_query,
+    )
+    .await
+    .unwrap();
+    assert_eq!(reports.len(), 1);
+    let report = reports.remove(0);
+    assert_matches!(
+        report,
+        RouteReport {
+            decl_type: DeclType::Expose,
+            capability,
+            error_summary: None,
+            source_moniker: Some(m),
+            service_instances: None,
+            outcome: RouteOutcome::Void,
+        } if capability == "void-protocol" && m == "foo"
+    );
 }
 
 async fn expected_foo_manifest() -> cm_rust::ComponentDecl {

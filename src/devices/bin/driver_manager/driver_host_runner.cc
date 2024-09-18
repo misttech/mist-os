@@ -176,8 +176,8 @@ void DriverHostRunner::StartDriverHost(driver_loader::Loader* loader,
           callback(component.take_error());
           return;
         }
-        auto result = LoadDriverHost(loader, component->info, name, std::move(bootstrap_receiver));
-        callback(std::move(result));
+        LoadDriverHost(loader, component->info, name, std::move(bootstrap_receiver),
+                       std::move(callback));
       });
 }
 
@@ -189,9 +189,9 @@ std::unordered_set<const DriverHostRunner::DriverHost*> DriverHostRunner::Driver
   return result_hosts;
 }
 
-zx::result<fidl::ClientEnd<fuchsia_driver_loader::DriverHost>> DriverHostRunner::LoadDriverHost(
+void DriverHostRunner::LoadDriverHost(
     driver_loader::Loader* loader, const fuchsia_component_runner::ComponentStartInfo& start_info,
-    std::string_view name, zx::channel bootstrap_receiver) {
+    std::string_view name, zx::channel bootstrap_receiver, StartDriverHostCallback callback) {
   auto url = *start_info.resolved_url();
   fidl::Arena arena;
   fuchsia_data::wire::Dictionary wire_program = fidl::ToWire(arena, *start_info.program());
@@ -200,20 +200,23 @@ zx::result<fidl::ClientEnd<fuchsia_driver_loader::DriverHost>> DriverHostRunner:
   if (binary.is_error()) {
     LOGF(ERROR, "Failed to start driver host, missing 'binary' argument: %s",
          binary.status_string());
-    return binary.take_error();
+    callback(binary.take_error());
+    return;
   }
 
   auto pkg = fdf_internal::NsValue(*start_info.ns(), "/pkg");
   if (pkg.is_error()) {
     LOGF(ERROR, "Failed to start driver host, missing '/pkg' directory: %s", pkg.status_string());
-    return pkg.take_error();
+    callback(pkg.take_error());
+    return;
   }
 
   auto driver_file = pkg_utils::OpenPkgFile(*pkg, *binary);
   if (driver_file.is_error()) {
     LOGF(ERROR, "Failed to open driver host '%s' file: %s", url.c_str(),
          driver_file.status_string());
-    return driver_file.take_error();
+    callback(driver_file.take_error());
+    return;
   }
 
   zx::vmo exec_vmo = std::move(*driver_file);
@@ -221,14 +224,16 @@ zx::result<fidl::ClientEnd<fuchsia_driver_loader::DriverHost>> DriverHostRunner:
   auto vdso_result = GetVdsoVmo();
   if (vdso_result.is_error()) {
     LOGF(ERROR, "Failed to get vdso vmo, %s", vdso_result.status_string());
-    return vdso_result.take_error();
+    callback(vdso_result.take_error());
+    return;
   }
   zx::vmo vdso_vmo = std::move(*vdso_result);
 
   zx::result<DriverHost*> driver_host = CreateDriverHost(name);
   if (driver_host.is_error()) {
     LOGF(ERROR, "Failed to create driver host env: %s", driver_host.status_string());
-    return driver_host.take_error();
+    callback(driver_host.take_error());
+    return;
   }
 
   zx::process process;
@@ -238,13 +243,15 @@ zx::result<fidl::ClientEnd<fuchsia_driver_loader::DriverHost>> DriverHostRunner:
   zx_status_t status = (*driver_host)->GetDuplicateHandles(&process, &thread, &root_vmar);
   if (status != ZX_OK) {
     LOGF(ERROR, "GetDuplicateHandles failed: %s", zx_status_get_string(status));
-    return zx::error(status);
+    callback(zx::error(status));
+    return;
   }
 
   auto lib_dir = pkg_utils::OpenLibDir(*pkg);
   if (lib_dir.is_error()) {
     LOGF(ERROR, "Failed to open lib directory %s", lib_dir.status_string());
-    return lib_dir.take_error();
+    callback(lib_dir.take_error());
+    return;
   }
 
   auto loader_result = loader->Start(std::move(process), std::move(thread), std::move(root_vmar),
@@ -252,9 +259,10 @@ zx::result<fidl::ClientEnd<fuchsia_driver_loader::DriverHost>> DriverHostRunner:
                                      std::move(bootstrap_receiver));
   if (loader_result.is_error()) {
     LOGF(ERROR, "Loader failed to start driver host: %s", loader_result.status_string());
-    return loader_result.take_error();
+    callback(loader_result.take_error());
+    return;
   }
-  return loader_result;
+  callback(std::move(loader_result));
 }
 
 void DriverHostRunner::StartDriverHostComponent(std::string_view moniker, std::string_view url,

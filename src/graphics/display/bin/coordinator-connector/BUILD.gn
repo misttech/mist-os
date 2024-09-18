@@ -33,8 +33,8 @@ source_set("devfs_factory") {
   ]
   deps = [
     "//sdk/fidl/fuchsia.hardware.display:fuchsia.hardware.display_cpp",
+    "//sdk/lib/async:async-cpp",
     "//sdk/lib/sys/cpp",
-    "//zircon/system/ulib/async:async-cpp",
     "//zircon/system/ulib/fbl",
   ]
   visibility = [ ":*" ]
@@ -47,10 +47,10 @@ executable("bin") {
 
   deps = [
     ":devfs_factory",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/component/outgoing/cpp",
     "//src/lib/fxl",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/trace-provider",
   ]
 }

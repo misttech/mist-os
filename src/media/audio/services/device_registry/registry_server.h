@@ -16,6 +16,7 @@
 
 #include "src/media/audio/services/common/base_fidl_server.h"
 #include "src/media/audio/services/device_registry/device.h"
+#include "src/media/audio/services/device_registry/inspector.h"
 
 namespace media_audio {
 
@@ -32,6 +33,7 @@ class RegistryServer
       std::shared_ptr<const FidlThread> thread,
       fidl::ServerEnd<fuchsia_audio_device::Registry> server_end,
       std::shared_ptr<AudioDeviceRegistry> parent);
+
   ~RegistryServer() override;
 
   // fuchsia.audio.device.Registry implementation
@@ -44,6 +46,11 @@ class RegistryServer
 
   void DeviceWasAdded(const std::shared_ptr<const Device>& new_device);
   void DeviceWasRemoved(TokenId removed_id);
+
+  const std::shared_ptr<FidlServerInspectInstance>& inspect() { return registry_inspect_instance_; }
+  void SetInspect(std::shared_ptr<FidlServerInspectInstance> instance) {
+    registry_inspect_instance_ = std::move(instance);
+  }
 
   // Static object count, for debugging purposes.
   static inline uint64_t count() { return count_; }
@@ -67,6 +74,8 @@ class RegistryServer
 
   std::queue<TokenId> devices_removed_since_notify_;
   std::optional<WatchDeviceRemovedCompleter::Async> watch_device_removed_completer_;
+
+  std::shared_ptr<FidlServerInspectInstance> registry_inspect_instance_;
 };
 
 }  // namespace media_audio

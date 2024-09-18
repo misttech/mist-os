@@ -334,7 +334,7 @@ zx_status_t Bus::ConfigureLegacyIrqs() {
     // If a device has no pin configured in the InterruptPin register then it
     // has no legacy interrupt. PCI Local Bus Spec v3 Section 2.2.6.
     if (pin == 0) {
-      continue;
+      pin = 1;  // TODO(365837900): Re-add 'continue' here when crosvm Interrupt Pin is populated.
     }
 
     // To avoid devices all ending up on the same pin the PCI bridge spec

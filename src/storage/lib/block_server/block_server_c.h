@@ -28,7 +28,17 @@
 #include "lib/zx/vmo.h"
 
 namespace block_server::internal {
+
 struct BlockServer;
+
+class WriteOptions {
+ public:
+  bool is_force_access() const { return (options_ & 1) != 0; }
+
+ private:
+  uint32_t options_;
+};
+
 }  // namespace block_server::internal
 
 namespace block_server {
@@ -61,12 +71,14 @@ struct Operation {
   struct Read_Body {
     uint64_t device_block_offset;
     uint32_t block_count;
+    uint32_t _unused;
     uint64_t vmo_offset;
   };
 
   struct Write_Body {
     uint64_t device_block_offset;
     uint32_t block_count;
+    WriteOptions options;
     uint64_t vmo_offset;
   };
 

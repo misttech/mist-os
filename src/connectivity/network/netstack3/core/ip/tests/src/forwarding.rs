@@ -4,8 +4,10 @@
 
 use ip_test_macro::ip_test;
 use net_declare::{net_subnet_v4, net_subnet_v6};
-use net_types::ip::{IpAddress as _, Ipv4Addr, Ipv6Addr};
-use net_types::SpecifiedAddr;
+use net_types::ip::{AddrSubnet, IpAddress as _, Ipv4Addr, Ipv6Addr, Subnet};
+use net_types::{SpecifiedAddr, Witness as _};
+use netstack3_base::socket::SocketIpAddr;
+use netstack3_base::IpDeviceAddr;
 use test_case::test_case;
 
 use netstack3_base::testutil::TestIpExt;
@@ -13,10 +15,13 @@ use netstack3_core::device::{
     DeviceId, EthernetCreationProperties, EthernetLinkDevice, MaxEthernetFrameSize,
 };
 use netstack3_core::error::NotFoundError;
-use netstack3_core::testutil::{CtxPairExt as _, FakeCtx, DEFAULT_INTERFACE_METRIC};
+use netstack3_core::testutil::{
+    CtxPairExt as _, FakeBindingsCtx, FakeCtx, DEFAULT_INTERFACE_METRIC,
+};
 use netstack3_core::StackStateBuilder;
 use netstack3_ip::{
     AddRouteError, AddableEntry, AddableEntryEither, AddableMetric, Entry, Metric, RawMetric,
+    ResolvedRoute, Rule, RuleAction, RuleMatcher,
 };
 
 #[ip_test(I)]
@@ -207,4 +212,147 @@ fn test_route_tracks_interface_metric<I: TestIpExt>() {
 
     // Remove the device and routes to clear all dangling references.
     ctx.test_api().clear_routes_and_remove_device(device_id);
+}
+
+#[netstack3_macros::context_ip_bounds(I, FakeBindingsCtx)]
+#[ip_test(I)]
+fn test_route_resolution_respects_source_address_matcher<I: TestIpExt + netstack3_core::IpExt>() {
+    let mut ctx = FakeCtx::new_with_builder(StackStateBuilder::default());
+
+    // Creates a device with the given subnet address, and installs a default route
+    // in the given table.
+    let set_up_device = |ctx: &mut FakeCtx, device_addr_subnet| {
+        let device_id: DeviceId<_> = ctx
+            .core_api()
+            .device::<EthernetLinkDevice>()
+            .add_device_with_default_state(
+                EthernetCreationProperties {
+                    mac: I::TEST_ADDRS.local_mac,
+                    max_frame_size: MaxEthernetFrameSize::from_mtu(I::MINIMUM_LINK_MTU).unwrap(),
+                },
+                DEFAULT_INTERFACE_METRIC,
+            )
+            .into();
+        ctx.test_api().enable_device(&device_id);
+        ctx.core_api()
+            .device_ip_any()
+            .add_ip_addr_subnet(&device_id, device_addr_subnet)
+            .expect("failed to assign IP address");
+        let device_metric = ctx.core_api().device_ip::<I>().get_routing_metric(&device_id);
+        (device_id, device_metric)
+    };
+
+    let main_table = ctx.core_api().routes::<I>().main_table_id();
+    let (device_id_1, device_metric_1) = set_up_device(
+        &mut ctx,
+        AddrSubnet::new(I::TEST_ADDRS.local_ip.get(), I::TEST_ADDRS.subnet.prefix()).unwrap(),
+    );
+    // default route to device 1.
+    ctx.core_api().routes::<I>().set_routes(
+        &main_table,
+        alloc::vec![netstack3_core::routes::Entry {
+            subnet: Subnet::new(I::UNSPECIFIED_ADDRESS, 0).unwrap(),
+            device: device_id_1.clone(),
+            gateway: None,
+            metric: Metric::MetricTracksInterface(device_metric_1),
+        }
+        .with_generation(netstack3_ip::Generation::initial())],
+    );
+    let second_table = ctx.core_api().routes::<I>().new_table();
+    let (device_id_2, device_metric_2) = set_up_device(
+        &mut ctx,
+        AddrSubnet::new(I::get_other_ip_address(254).get(), I::TEST_ADDRS.subnet.prefix()).unwrap(),
+    );
+    let gateway = I::get_other_ip_address(100);
+    ctx.core_api().routes::<I>().set_routes(
+        &second_table,
+        alloc::vec![
+            // For any lookup for the test subnet, we still direct to device 1.
+            // Note that we use a gateway here to differentiate with the route
+            // in the main table (no gateway).
+            netstack3_core::routes::Entry {
+                subnet: I::TEST_ADDRS.subnet,
+                device: device_id_1.clone(),
+                gateway: Some(gateway),
+                metric: Metric::MetricTracksInterface(device_metric_1),
+            }
+            .with_generation(netstack3_ip::Generation::initial()),
+            // Otherwise device 2.
+            netstack3_core::routes::Entry {
+                subnet: Subnet::new(I::UNSPECIFIED_ADDRESS, 0).unwrap(),
+                device: device_id_2,
+                gateway: None,
+                metric: Metric::MetricTracksInterface(device_metric_2),
+            }
+            .with_generation(netstack3_ip::Generation::initial())
+        ],
+    );
+
+    // We setup the rule so that there is a higher priority rule pointing to the `second_table` with
+    // the test subnet as the source address matcher.
+    ctx.test_api().set_rules::<I>(alloc::vec![
+        Rule {
+            matcher: RuleMatcher {
+                source_address_matcher: Some(netstack3_base::SubnetMatcher(I::TEST_ADDRS.subnet)),
+                traffic_origin_matcher: None
+            },
+            action: RuleAction::Lookup(second_table)
+        },
+        Rule { matcher: RuleMatcher::match_all_packets(), action: RuleAction::Lookup(main_table) },
+    ]);
+
+    let expected_route_no_gateway = ResolvedRoute {
+        src_addr: IpDeviceAddr::new(I::TEST_ADDRS.local_ip.get()).unwrap(),
+        device: device_id_1.clone(),
+        local_delivery_device: None,
+        next_hop: netstack3_ip::NextHop::RemoteAsNeighbor,
+    };
+
+    let expected_route_with_gateway = ResolvedRoute {
+        src_addr: IpDeviceAddr::new(I::TEST_ADDRS.local_ip.get()).unwrap(),
+        device: device_id_1,
+        local_delivery_device: None,
+        next_hop: netstack3_ip::NextHop::Gateway(gateway),
+    };
+
+    // We need to lookup the route again and in this case the destination address matches the
+    // more specific prefix in `second_table`, it should yield the route with a gateway.
+    assert_eq!(
+        ctx.core_api()
+            .routes::<I>()
+            .resolve_route(SocketIpAddr::new(I::TEST_ADDRS.remote_ip.get())),
+        Ok(expected_route_with_gateway.clone())
+    );
+
+    // Make sure the route lookup actually converges with the same source address supplied by the
+    // user - IpSock will select a source address on creation and use it to lookup routes when
+    // sending packets later.
+    assert_eq!(
+        ctx.test_api().resolve_route_with_src_addr(
+            IpDeviceAddr::new(I::TEST_ADDRS.local_ip.get()).unwrap(),
+            SocketIpAddr::new(I::TEST_ADDRS.remote_ip.get()),
+        ),
+        Ok(expected_route_with_gateway)
+    );
+
+    // This case will hit the default route in the `second_table` during the second lookup. However
+    // because of strong host model, the default route is not usable so we will continue to the
+    // main table during the second lookup and yield the route without the gateway.
+    assert_eq!(
+        ctx.core_api()
+            .routes::<I>()
+            .resolve_route(SocketIpAddr::new(I::get_other_remote_ip_address(254).get())),
+        Ok(expected_route_no_gateway.clone())
+    );
+
+    // Make sure the route lookup actually converges with the same source address supplied by the
+    // user - IpSock will select a source address on creation and use it to lookup routes when
+    // sending packets later.
+    assert_eq!(
+        ctx.test_api().resolve_route_with_src_addr(
+            IpDeviceAddr::new(I::TEST_ADDRS.local_ip.get()).unwrap(),
+            SocketIpAddr::new(I::get_other_remote_ip_address(254).get())
+        ),
+        Ok(expected_route_no_gateway)
+    );
 }

@@ -44,6 +44,14 @@ fuchsia_test_package("bt-avrcp-integration-tests") {
   test_specs = {
     # The profile integration tests tend to flake if tests are run in parallel.
     parallel = 1
+
+    # In some test runs, `bt-avrcp` emits an ERROR severity log if the mock component that provides
+    # the BR/EDR Profile service gets torn down before `bt-avrcp`. This is expected and correct
+    # behavior. There is currently no way to enforce shutdown ordering of components started in
+    # RealmBuilder.
+    log_settings = {
+      max_severity = "ERROR"
+    }
   }
 
   deps = [

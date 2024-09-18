@@ -13,9 +13,10 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <ranges>
+#include <type_traits>
 
 #include "abi.h"
-#include "internal/filter-view.h"
 
 namespace ld {
 namespace abi {
@@ -182,7 +183,7 @@ constexpr AbiModuleList<Elf> AbiLoadedModules(const abi::Abi<Elf>& abi) {
 template <class Elf = elfldltl::Elf<>>
 constexpr auto AbiLoadedSymbolModules(const abi::Abi<Elf>& abi) {
   using Module = typename abi::Abi<Elf>::Module;
-  return ld::internal::filter_view{AbiLoadedModules(abi), &Module::symbols_visible};
+  return std::views::filter(AbiLoadedModules(abi), &Module::symbols_visible);
 }
 
 // This uses the symbolizer_markup::Writer API to emit the contextual elements

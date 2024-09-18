@@ -1203,37 +1203,6 @@ void PageQueues::ChangeObjectOffset(vm_page_t* page, VmCowPages* object, uint64_
   ChangeObjectOffsetLocked(page, object, page_offset);
 }
 
-void PageQueues::ChangeObjectOffsetArray(vm_page_t** pages, VmCowPages* object, uint64_t* offsets,
-                                         size_t count) {
-  DEBUG_ASSERT(pages);
-  DEBUG_ASSERT(offsets);
-  DEBUG_ASSERT(object);
-
-  for (size_t i = 0; i < count;) {
-    // Don't process more than kMaxBatchSize pages while holding the lock.
-    // Instead, drop out of the lock and let other operations proceed before
-    // picking the lock up again and resuming.
-    size_t end = i + ktl::min(count - i, kMaxBatchSize);
-    {
-      Guard<SpinLock, IrqSave> guard{&lock_};
-      for (; i < end; i++) {
-        DEBUG_ASSERT(pages[i]);
-        ChangeObjectOffsetLocked(pages[i], object, offsets[i]);
-      }
-    }
-
-    // If we are not done yet, relax the CPU a bit just to let someone else have
-    // a chance at grabbing the spinlock.
-    //
-    // TODO(johngro): Once our spinlocks have been updated to be more fair
-    // (ticket locks, MCS locks, whatever), come back here and remove this
-    // pessimistic cpu relax.
-    if (i < count) {
-      arch::Yield();
-    }
-  }
-}
-
 void PageQueues::ChangeObjectOffsetLocked(vm_page_t* page, VmCowPages* object,
                                           uint64_t page_offset) {
   DEBUG_ASSERT(page->state() == vm_page_state::OBJECT);

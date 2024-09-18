@@ -209,6 +209,33 @@ class TestStatusCommand(unittest.TestCase):
         lines = set(out.getvalue().splitlines())
         self.assertEqual(lines, lines - {"Build Info:"})
 
+    def test_device_name_from_environment(self) -> None:
+        """Retrieve device name from environment variables"""
+
+        self.env_mock["FUCHSIA_NODENAME"] = "foo"
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            main.main([])
+        lines = set(out.getvalue().splitlines())
+        self.assertSetContains(set(lines), "  Device name: foo (set by fx -d)")
+
+    def test_device_name_from_build(self) -> None:
+        """Retrieve device name from build file"""
+
+        # Note that this still obtains the nodename from environment,
+        # but we use an additional environment variable to determine
+        # the source of the data.
+
+        self.env_mock["FUCHSIA_NODENAME"] = "foo"
+        self.env_mock["FUCHSIA_NODENAME_IS_FROM_FILE"] = "true"
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            main.main([])
+        lines = set(out.getvalue().splitlines())
+        self.assertSetContains(
+            set(lines), "  Device name: foo (set by `fx set-device`)"
+        )
+
 
 EXPECTED_TEXT_OUTPUT = """
 fx status

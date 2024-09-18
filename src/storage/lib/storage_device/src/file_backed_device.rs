@@ -10,6 +10,7 @@ use {
     },
     anyhow::{ensure, Error},
     async_trait::async_trait,
+    block_protocol::WriteOptions,
     // Provides read_exact_at and write_all_at.
     // TODO(jfsulliv): Do we need to support non-UNIX systems?
     std::{ops::Range, os::unix::fs::FileExt},
@@ -76,7 +77,12 @@ impl Device for FileBackedDevice {
         Ok(())
     }
 
-    async fn write(&self, offset: u64, buffer: BufferRef<'_>) -> Result<(), Error> {
+    async fn write_with_opts(
+        &self,
+        offset: u64,
+        buffer: BufferRef<'_>,
+        _opts: WriteOptions,
+    ) -> Result<(), Error> {
         assert_eq!(offset % self.block_size() as u64, 0);
         assert_eq!(buffer.range().start % self.block_size() as usize, 0);
         assert_eq!(buffer.len() % self.block_size() as usize, 0);

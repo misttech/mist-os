@@ -6,6 +6,7 @@
 #define SRC_DEVICES_SPI_DRIVERS_AML_SPI_TESTS_AML_SPI_TEST_ENV_H_
 
 #include <endian.h>
+#include <fidl/fuchsia.hardware.gpio/cpp/wire_test_base.h>
 #include <fidl/fuchsia.hardware.platform.device/cpp/wire_test_base.h>
 #include <lib/ddk/metadata.h>
 #include <lib/driver/testing/cpp/driver_test.h>
@@ -17,7 +18,6 @@
 #include <fake-mmio-reg/fake-mmio-reg.h>
 #include <gtest/gtest.h>
 
-#include "src/devices/gpio/testing/fake-gpio/fake-gpio.h"
 #include "src/devices/registers/testing/mock-registers/mock-registers.h"
 #include "src/devices/spi/drivers/aml-spi/aml-spi.h"
 #include "src/devices/spi/drivers/aml-spi/registers.h"
@@ -121,7 +121,8 @@ class FakePDev : public fidl::testing::WireTestBase<fuchsia_hardware_platform_de
   fidl::ServerBindingGroup<fuchsia_hardware_platform_device::Device> binding_group_;
 };
 
-class BaseTestEnvironment : public fdf_testing::Environment {
+class BaseTestEnvironment : public fdf_testing::Environment,
+                            public fidl::testing::WireTestBase<fuchsia_hardware_gpio::Gpio> {
  public:
   BaseTestEnvironment()
       : fdf_testing::Environment(), registers_(fdf::Dispatcher::GetCurrent()->async_dispatcher()) {}
@@ -146,37 +147,23 @@ class BaseTestEnvironment : public fdf_testing::Environment {
     EXPECT_OK(
         compat_default_.Serve(fdf::Dispatcher::GetCurrent()->async_dispatcher(), &to_driver_vfs));
 
-    result = to_driver_vfs.AddService<fuchsia_hardware_gpio::Service>(gpio_.CreateInstanceHandler(),
+    result = to_driver_vfs.AddService<fuchsia_hardware_gpio::Service>(CreateInstanceHandler(),
                                                                       "gpio-cs-2");
     if (result.is_error()) {
       return result.take_error();
     }
 
-    result = to_driver_vfs.AddService<fuchsia_hardware_gpio::Service>(gpio_.CreateInstanceHandler(),
+    result = to_driver_vfs.AddService<fuchsia_hardware_gpio::Service>(CreateInstanceHandler(),
                                                                       "gpio-cs-3");
     if (result.is_error()) {
       return result.take_error();
     }
 
-    result = to_driver_vfs.AddService<fuchsia_hardware_gpio::Service>(gpio_.CreateInstanceHandler(),
+    result = to_driver_vfs.AddService<fuchsia_hardware_gpio::Service>(CreateInstanceHandler(),
                                                                       "gpio-cs-5");
     if (result.is_error()) {
       return result.take_error();
     }
-
-    gpio_.SetCurrentState(fake_gpio::State{.sub_state = fake_gpio::WriteSubState{.value = 0}});
-    gpio_.SetWriteCallback([this](fake_gpio::FakeGpio& gpio) {
-      if (gpio_writes_.empty()) {
-        EXPECT_FALSE(gpio_writes_.empty());
-        return ZX_ERR_INTERNAL;
-      }
-      auto [status, value] = gpio_writes_.front();
-      gpio_writes_.pop();
-      if (status != ZX_OK) {
-        EXPECT_EQ(value, gpio_.GetWriteValue());
-      }
-      return status;
-    });
 
     if (SetupResetRegister()) {
       auto result = to_driver_vfs.AddService<fuchsia_hardware_registers::Service>(
@@ -206,12 +193,7 @@ class BaseTestEnvironment : public fdf_testing::Environment {
     EXPECT_OK(compat.AddMetadata(DEVICE_METADATA_AMLSPI_CONFIG, &kSpiConfig, sizeof(kSpiConfig)));
   }
 
-  void ExpectGpioWrite(zx_status_t status, uint8_t value) { gpio_writes_.emplace(status, value); }
-
-  void VerifyGpioAndClear() {
-    EXPECT_EQ(gpio_writes_.size(), 0u);
-    gpio_writes_ = {};
-  }
+  uint32_t cs_toggle_count() const { return cs_toggle_count_; }
 
   bool ControllerReset() {
     zx_status_t status = registers_.VerifyAll();
@@ -233,15 +215,36 @@ class BaseTestEnvironment : public fdf_testing::Environment {
       .use_enhanced_clock_mode = false,
   };
 
+  fuchsia_hardware_gpio::Service::InstanceHandler CreateInstanceHandler() {
+    return fuchsia_hardware_gpio::Service::InstanceHandler({
+        .device = bindings_.CreateHandler(this, fdf::Dispatcher::GetCurrent()->async_dispatcher(),
+                                          fidl::kIgnoreBindingClosure),
+    });
+  }
+
+  void SetBufferMode(SetBufferModeRequestView request,
+                     SetBufferModeCompleter::Sync& completer) override {
+    if (request->mode != cs_buffer_mode_) {
+      cs_toggle_count_++;
+    }
+    cs_buffer_mode_ = request->mode;
+    completer.ReplySuccess();
+  }
+
+  void NotImplemented_(const std::string& name, ::fidl::CompleterBase& completer) override {
+    completer.Close(ZX_ERR_NOT_SUPPORTED);
+  }
+
   FakePDev pdev_server_;
   zx::interrupt interrupt_;
 
   mock_registers::MockRegisters registers_;
-  std::queue<std::pair<zx_status_t, uint8_t>> gpio_writes_;
-  fake_gpio::FakeGpio gpio_;
 
   compat::DeviceServer compat_;
   compat::DeviceServer compat_default_;
+  fuchsia_hardware_gpio::BufferMode cs_buffer_mode_{fuchsia_hardware_gpio::BufferMode::kOutputHigh};
+  uint32_t cs_toggle_count_ = 0;
+  fidl::ServerBindingGroup<fuchsia_hardware_gpio::Gpio> bindings_;
 };
 
 }  // namespace spi

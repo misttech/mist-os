@@ -21,11 +21,11 @@ common_deps = [
   "//sdk/banjo/fuchsia.hardware.tpmimpl:fuchsia.hardware.tpmimpl_banjo_cpp",
   "//sdk/fidl/fuchsia.hardware.spi:fuchsia.hardware.spi_cpp",
   "//sdk/fidl/fuchsia.hardware.tpmimpl:fuchsia.hardware.tpmimpl_cpp",
+  "//sdk/lib/async:async-cpp",
+  "//sdk/lib/async-loop:async-loop-cpp",
   "//src/devices/lib/acpi",
   "//src/devices/lib/driver",
   "//src/lib/ddktl",
-  "//zircon/system/ulib/async:async-cpp",
-  "//zircon/system/ulib/async-loop:async-loop-cpp",
   "//zircon/system/ulib/inspect",
   "//zircon/system/ulib/zx",
 ]

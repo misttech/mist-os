@@ -25,11 +25,11 @@ common_deps = [
   ":bind",
   "//sdk/fidl/fuchsia.hardware.acpi:fuchsia.hardware.acpi_cpp",
   "//sdk/fidl/fuchsia.hardware.powersource:fuchsia.hardware.powersource_cpp",
+  "//sdk/lib/async-loop",
   "//sdk/lib/driver/runtime:driver_runtime_cpp",
   "//src/devices/lib/acpi",
   "//src/devices/lib/driver:driver_runtime",
   "//src/lib/ddktl",
-  "//zircon/system/ulib/async-loop",
   "//zircon/system/ulib/fbl",
   "//zircon/system/ulib/inspect",
   "//zircon/system/ulib/zx",
@@ -59,10 +59,10 @@ test("acpi-battery-unit-tests") {
     "unit-tests.cc",
   ]
   deps = common_deps + [
+           "//sdk/lib/async-loop:async-loop-cpp",
            "//sdk/lib/inspect/testing/cpp:zxtest",
            "//src/devices/lib/acpi/mock:mock-acpi",
            "//src/devices/testing/mock-ddk",
-           "//zircon/system/ulib/async-loop:async-loop-cpp",
            "//zircon/system/ulib/zxtest",
          ]
 }

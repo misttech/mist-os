@@ -5,6 +5,7 @@
 use crate::fs::proc::pid_directory::pid_directory;
 use crate::fs::proc::sysctl::{net_directory, sysctl_directory};
 use crate::fs::proc::sysrq::SysRqNode;
+use crate::mm::PAGE_SIZE;
 use crate::task::{
     CurrentTask, EventHandler, Kernel, KernelStats, TaskStateCode, WaitCanceler, Waiter,
 };
@@ -28,6 +29,7 @@ use starnix_uapi::errors::Errno;
 use starnix_uapi::file_mode::mode;
 use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::time::duration_to_scheduler_clock;
+use starnix_uapi::version::{KERNEL_RELEASE, KERNEL_VERSION};
 use starnix_uapi::vfs::FdEvents;
 use starnix_uapi::{errno, error, off_t, pid_t};
 use std::collections::BTreeMap;
@@ -57,7 +59,8 @@ impl ProcDirectory {
                 FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
             ),
             "cmdline".into() => {
-                let cmdline = Vec::from(kernel.cmdline.clone());
+                let mut cmdline = Vec::from(kernel.cmdline.clone());
+                cmdline.push(b'\n');
                 fs.create_node(
                     current_task,
                     BytesFile::new_node(cmdline),
@@ -146,7 +149,11 @@ impl ProcDirectory {
             ),
             "modules".into() => fs.create_node(
                 current_task,
-                StubEmptyFile::new_node("/proc/modules", bug_ref!("https://fxbug.dev/322894157")),
+                // Starnix does not support dynamically loading modules.
+                // Instead, we pretend to have loaded a single module, ferris (named after
+                // Rust's 🦀), to avoid breaking code that assumes the modules list is
+                // non-empty.
+                BytesFile::new_node(b"ferris 8192 0 - Live 0x0000000000000000\n".to_vec()),
                 FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
             ),
             "pagetypeinfo".into() => fs.create_node(
@@ -212,7 +219,13 @@ impl ProcDirectory {
             },
             "version".into() => fs.create_node(
                 current_task,
-                StubEmptyFile::new_node("/proc/version", bug_ref!("https://fxbug.dev/309002311")),
+                BytesFile::new_node(|| {
+                    let release = KERNEL_RELEASE;
+                    let user = "build-user@build-host";
+                    let toolchain = "clang version HEAD, LLD HEAD";
+                    let version = KERNEL_VERSION;
+                    Ok(format!("Linux version {} ({}) ({}) {}\n", release, user, toolchain, version))
+                }),
                 FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
             ),
             "vmallocinfo".into() => fs.create_node(
@@ -225,12 +238,12 @@ impl ProcDirectory {
             ),
             "vmstat".into() => fs.create_node(
                 current_task,
-                StubEmptyFile::new_node("/proc/vmstat", bug_ref!("https://fxbug.dev/322894141")),
+                VmStatFile::new_node(&kernel.stats),
                 FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
             ),
             "zoneinfo".into() => fs.create_node(
                 current_task,
-                StubEmptyFile::new_node("/proc/zoneinfo", bug_ref!("https://fxbug.dev/322893866")),
+                ZoneInfoFile::new_node(&kernel.stats),
                 FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
             ),
         };
@@ -720,6 +733,102 @@ impl DynamicFileSource for UptimeFile {
 }
 
 #[derive(Clone)]
+struct ZoneInfoFile {
+    kernel_stats: Arc<KernelStats>,
+}
+
+impl ZoneInfoFile {
+    pub fn new_node(kernel_stats: &Arc<KernelStats>) -> impl FsNodeOps {
+        DynamicFile::new_node(Self { kernel_stats: kernel_stats.clone() })
+    }
+}
+
+impl DynamicFileSource for ZoneInfoFile {
+    fn generate(&self, sink: &mut DynamicFileBuf) -> Result<(), Errno> {
+        let mem_stats = self
+            .kernel_stats
+            .get()
+            .get_memory_stats_extended(zx::MonotonicTime::INFINITE)
+            .map_err(|e| {
+                log_error!("FIDL error getting memory stats: {e}");
+                errno!(EIO)
+            })?;
+
+        let userpager_total = mem_stats.vmo_pager_total_bytes.unwrap_or_default() / *PAGE_SIZE;
+        let userpager_active = mem_stats.vmo_pager_newest_bytes.unwrap_or_default() / *PAGE_SIZE;
+
+        let nr_active_file = userpager_active;
+        let nr_inactive_file = userpager_total.saturating_sub(userpager_active);
+        let free = mem_stats.free_bytes.unwrap_or_default() / *PAGE_SIZE;
+        let present = mem_stats.total_bytes.unwrap_or_default() / *PAGE_SIZE;
+
+        // Pages min: minimum number of free pages the kernel tries to maintain in this memory zone.
+        // Can be set by writing to `/proc/sys/vm/min_free_kbytes`. It is observed to be ~3% of the
+        // total memory.
+        let pages_min = present * 3 / 100;
+        // Pages low: more aggressive memory reclaimation when free pages fall below this level.
+        // Typically ~4% of the total memory.
+        let pages_low = present * 4 / 100;
+        // Pages high: page reclamation begins when free pages drop below this level.
+        // Typically ~4% of the total memory.
+        let pages_high = present * 6 / 100;
+
+        // Only required fields are written. Add more fields as needed.
+        writeln!(sink, "Node 0, zone   Normal")?;
+        writeln!(sink, "  per-node stats")?;
+        writeln!(sink, "      nr_inactive_file {}", nr_inactive_file)?;
+        writeln!(sink, "      nr_active_file {}", nr_active_file)?;
+        writeln!(sink, "  pages free     {}", free)?;
+        writeln!(sink, "        min      {}", pages_min)?;
+        writeln!(sink, "        low      {}", pages_low)?;
+        writeln!(sink, "        high     {}", pages_high)?;
+        writeln!(sink, "        present  {}", present)?;
+        writeln!(sink, "  pagesets")?;
+
+        Ok(())
+    }
+}
+
+#[derive(Clone)]
+struct VmStatFile {
+    kernel_stats: Arc<KernelStats>,
+}
+
+impl VmStatFile {
+    pub fn new_node(kernel_stats: &Arc<KernelStats>) -> impl FsNodeOps {
+        DynamicFile::new_node(Self { kernel_stats: kernel_stats.clone() })
+    }
+}
+
+impl DynamicFileSource for VmStatFile {
+    fn generate(&self, sink: &mut DynamicFileBuf) -> Result<(), Errno> {
+        let mem_stats = self
+            .kernel_stats
+            .get()
+            .get_memory_stats_extended(zx::MonotonicTime::INFINITE)
+            .map_err(|e| {
+                log_error!("FIDL error getting memory stats: {e}");
+                errno!(EIO)
+            })?;
+
+        let userpager_total = mem_stats.vmo_pager_total_bytes.unwrap_or_default() / *PAGE_SIZE;
+        let userpager_active = mem_stats.vmo_pager_newest_bytes.unwrap_or_default() / *PAGE_SIZE;
+
+        let nr_active_file = userpager_active;
+        let nr_inactive_file = userpager_total.saturating_sub(userpager_active);
+
+        // Only fields required so far are written. Add more fields as needed.
+        writeln!(sink, "workingset_refault_file {}", 0)?;
+        writeln!(sink, "nr_inactive_file {}", nr_inactive_file)?;
+        writeln!(sink, "nr_active_file {}", nr_active_file)?;
+        writeln!(sink, "pgscan_direct {}", 0)?;
+        writeln!(sink, "pgscan_kswapd {}", 0)?;
+
+        Ok(())
+    }
+}
+
+#[derive(Clone)]
 struct StatFile {
     kernel_stats: Arc<KernelStats>,
 }
@@ -732,11 +841,11 @@ impl DynamicFileSource for StatFile {
     fn generate(&self, sink: &mut DynamicFileBuf) -> Result<(), Errno> {
         let uptime = zx::MonotonicTime::get() - zx::MonotonicTime::ZERO;
 
-        let cpu_stats = self
-            .kernel_stats
-            .get()
-            .get_cpu_stats(zx::MonotonicTime::INFINITE)
-            .map_err(|_| errno!(EIO))?;
+        let cpu_stats =
+            self.kernel_stats.get().get_cpu_stats(zx::MonotonicTime::INFINITE).map_err(|e| {
+                log_error!("FIDL error getting cpu stats: {e}");
+                errno!(EIO)
+            })?;
 
         // Number of values reported per CPU. See `get_cpu_stats_row` below for the list of values.
         const NUM_CPU_STATS: usize = 10;

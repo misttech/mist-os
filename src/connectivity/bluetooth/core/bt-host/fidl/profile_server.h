@@ -231,7 +231,7 @@ class ProfileServer : public ServerBase<fuchsia::bluetooth::bredr::Profile> {
   fidl::InterfaceHandle<fuchsia::bluetooth::bredr::AudioOffloadExt> BindAudioOffloadExtServer(
       bt::l2cap::Channel::WeakPtr channel);
 
-  // Create an Connection server for the given channel and set up callbacks.
+  // Create a Connection server for the given channel and set up callbacks.
   // Returns the client end of the channel, or null on failure.
   std::optional<fidl::InterfaceHandle<fuchsia::bluetooth::Channel>> BindBrEdrConnectionServer(
       bt::l2cap::Channel::WeakPtr channel, fit::callback<void()> closed_callback);

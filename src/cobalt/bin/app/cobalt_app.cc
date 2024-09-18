@@ -17,7 +17,6 @@
 #include "src/cobalt/bin/app/current_channel_provider.h"
 #include "src/cobalt/bin/app/diagnostics_impl.h"
 #include "src/cobalt/bin/app/metric_event_logger_factory_impl.h"
-#include "src/cobalt/bin/app/system_data_updater_impl.h"
 #include "src/cobalt/bin/app/utils.h"
 #include "src/cobalt/bin/utils/fuchsia_http_client.h"
 #include "src/public/lib/statusor/statusor.h"
@@ -214,8 +213,7 @@ CobaltApp::CobaltApp(
       validated_clock_(std::move(validated_clock)),
       current_channel_provider_(
           CreateCurrentChannelProvider(dispatcher, inspect_node_.CreateChild("system_data"),
-                                       cobalt_service_->system_data()->channel())),
-      system_data_updater_impl_(std::make_unique<SystemDataUpdaterImpl>()) {
+                                       cobalt_service_->system_data()->channel())) {
   validated_clock_->AwaitExternalSource([this, start_event_aggregator_worker]() {
     // Now that the clock is accurate, notify CobaltService.
     cobalt_service_->SystemClockIsAccurate(std::make_unique<util::SystemClock>(),
@@ -235,19 +233,6 @@ CobaltApp::CobaltApp(
         cobalt_service_.get(), metric_event_logger_factory_impl_.get(), std::move(shutdown),
         std::move(lifecycle_handle), dispatcher);
   }
-
-  if (current_channel_provider_ != nullptr) {
-    current_channel_provider_->GetCurrentChannel([this](const std::string& current_channel) {
-      const system_data::SoftwareDistributionInfo info{
-          .channel = current_channel,
-      };
-      cobalt_service_->system_data()->SetSoftwareDistributionInfo(info);
-    });
-  }
-
-  // Start serving SystemDataUpdater protocol.
-  context_->outgoing()->AddPublicService(
-      system_data_updater_bindings_.GetHandler(system_data_updater_impl_.get()));
 
   if (watch_for_user_consent) {
     user_consent_watcher_ = std::make_unique<UserConsentWatcher>(

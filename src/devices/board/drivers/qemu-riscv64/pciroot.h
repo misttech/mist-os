@@ -17,17 +17,28 @@
 namespace board_qemu_riscv64 {
 class QemuRiscv64Pciroot;
 using QemuRiscv64PcirootType = ddk::Device<QemuRiscv64Pciroot, ddk::GetProtocolable>;
-class QemuRiscv64Pciroot : public QemuRiscv64PcirootType, public PcirootBase {
+class QemuRiscv64Pciroot : public QemuRiscv64PcirootType,
+                           public PcirootBase,
+                           public ddk::PcirootProtocol<QemuRiscv64Pciroot> {
  public:
   struct Context {
     zx::vmo ecam;
   };
-  ~QemuRiscv64Pciroot() override = default;
+  virtual ~QemuRiscv64Pciroot() = default;
   static zx::result<> Create(PciRootHost* root_host, QemuRiscv64Pciroot::Context ctx,
                              zx_device_t* parent, const char* name);
   // fuchsia.hardware.pciroot implementation fill-ins
-  zx_status_t PcirootGetBti(uint32_t bdf, uint32_t index, zx::bti* bti) final;
-  zx_status_t PcirootGetPciPlatformInfo(pci_platform_info_t* info) final;
+  using PcirootBase::PcirootAllocateMsi;
+  using PcirootBase::PcirootDriverShouldProxyConfig;
+  using PcirootBase::PcirootGetAddressSpace;
+  using PcirootBase::PcirootReadConfig16;
+  using PcirootBase::PcirootReadConfig32;
+  using PcirootBase::PcirootReadConfig8;
+  using PcirootBase::PcirootWriteConfig16;
+  using PcirootBase::PcirootWriteConfig32;
+  using PcirootBase::PcirootWriteConfig8;
+  zx_status_t PcirootGetBti(uint32_t bdf, uint32_t index, zx::bti* bti);
+  zx_status_t PcirootGetPciPlatformInfo(pci_platform_info_t* info);
 
   // DFv1 DDK methods
   void DdkRelease() { delete this; }

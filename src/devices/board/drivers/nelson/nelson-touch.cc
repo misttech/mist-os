@@ -20,6 +20,7 @@
 #include <bind/fuchsia/hardware/i2c/cpp/bind.h>
 #include <bind/fuchsia/i2c/cpp/bind.h>
 
+#include "nelson-gpios.h"
 #include "nelson.h"
 
 namespace nelson {
@@ -65,6 +66,14 @@ const std::vector kResetProperties = {
                       bind_fuchsia_hardware_gpio::SERVICE_ZIRCONTRANSPORT),
     fdf::MakeProperty(bind_fuchsia_gpio::FUNCTION, bind_fuchsia_gpio::FUNCTION_TOUCH_RESET),
 };
+
+const std::vector kGpioInitRules = {
+    fdf::MakeAcceptBindRule(bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
+};
+
+const std::vector kGpioInitProperties = {
+    fdf::MakeProperty(bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
+};
 }  // namespace
 
 static const std::vector<fpbus::BootMetadata> touch_boot_metadata{
@@ -75,6 +84,8 @@ static const std::vector<fpbus::BootMetadata> touch_boot_metadata{
 };
 
 zx_status_t Nelson::TouchInit() {
+  gpio_init_steps_.push_back(GpioPull(GPIO_TOUCH_SOC_INT_L, fuchsia_hardware_pin::Pull::kNone));
+
   fpbus::Node touch_dev;
   touch_dev.name() = "gt6853-touch";
   touch_dev.vid() = PDEV_VID_GOODIX;
@@ -93,6 +104,10 @@ zx_status_t Nelson::TouchInit() {
       fuchsia_driver_framework::ParentSpec{{
           .bind_rules = kResetRules,
           .properties = kResetProperties,
+      }},
+      fuchsia_driver_framework::ParentSpec{{
+          .bind_rules = kGpioInitRules,
+          .properties = kGpioInitProperties,
       }},
   };
 

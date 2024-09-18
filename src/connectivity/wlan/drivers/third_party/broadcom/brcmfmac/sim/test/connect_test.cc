@@ -417,7 +417,7 @@ void ConnectTest::OnSignalReport(const wlan_fullmac_wire::WlanFullmacSignalRepor
 void ConnectTest::StartConnect() {
   // Send connect request
   auto builder = wlan_fullmac_wire::WlanFullmacImplConnectRequest::Builder(client_ifc_.test_arena_);
-  fuchsia_wlan_internal::wire::BssDescription bss;
+  fuchsia_wlan_common::wire::BssDescription bss;
   std::memcpy(bss.bssid.data(), context_.bssid.byte, ETH_ALEN);
   bss.ies = fidl::VectorView<uint8_t>(client_ifc_.test_arena_, context_.ies);
   bss.channel = context_.tx_info.channel;

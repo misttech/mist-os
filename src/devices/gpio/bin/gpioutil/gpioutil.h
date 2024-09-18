@@ -11,15 +11,12 @@
 
 enum GpioFunc {
   Read,
-  Write,
-  ConfigIn,
-  ConfigOut,
-  SetDriveStrength,
-  GetDriveStrength,
+  SetBufferMode,
+  Interrupt,
+  Configure,
   GetName,
   List,
-  Interrupt,
-  AltFunction,
+  GetDriveStrength,
   Invalid
 };
 
@@ -30,9 +27,10 @@ template <typename T>
 zx::result<> GetStatus(const T& result);
 
 // Parse the command line arguments in |argv|
-int ParseArgs(int argc, char** argv, GpioFunc* func, uint8_t* write_value,
-              fuchsia_hardware_gpio::wire::GpioFlags* in_flag, uint8_t* out_value, uint64_t* ds_ua,
-              uint32_t* interrupt_flags, uint64_t* alt_function);
+int ParseArgs(int argc, char** argv, GpioFunc* func, fidl::AnyArena& arena,
+              fuchsia_hardware_gpio::BufferMode* buffer_mode,
+              fuchsia_hardware_gpio::InterruptMode* interrupt_mode,
+              fuchsia_hardware_pin::wire::Configuration* config);
 
 zx::result<> ListGpios();
 
@@ -40,7 +38,8 @@ zx::result<fidl::WireSyncClient<fuchsia_hardware_pin::Debug>> FindDebugClientByN
     std::string_view name);
 
 int ClientCall(fidl::WireSyncClient<fuchsia_hardware_pin::Debug> client, GpioFunc func,
-               uint8_t write_value, fuchsia_hardware_gpio::wire::GpioFlags in_flag,
-               uint8_t out_value, uint64_t ds_ua, uint32_t interrupt_flags, uint64_t alt_function);
+               fidl::AnyArena& arena, fuchsia_hardware_gpio::BufferMode buffer_mode,
+               fuchsia_hardware_gpio::InterruptMode interrupt_mode,
+               fuchsia_hardware_pin::wire::Configuration config);
 
 #endif  // SRC_DEVICES_GPIO_BIN_GPIOUTIL_GPIOUTIL_H_

@@ -34,6 +34,8 @@ executable("touch-input-test-bin") {
     "//sdk/fidl/fuchsia.ui.scenic:fuchsia.ui.scenic_cpp",
     "//sdk/fidl/fuchsia.ui.test.input:fuchsia.ui.test.input_cpp",
     "//sdk/fidl/fuchsia.vulkan.loader:fuchsia.vulkan.loader_cpp",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/fdio",
     "//sdk/lib/fit",
     "//sdk/lib/sys/component/cpp/testing:cpp",
@@ -47,8 +49,6 @@ executable("touch-input-test-bin") {
     "//src/ui/testing/util:fidl_cpp_helpers",
     "//src/ui/testing/util:portable_ui_test",
     "//third_party/googletest:gtest",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/zx",
   ]
 }
@@ -103,6 +103,8 @@ executable("pointerinjector-config-test-bin") {
     "//sdk/fidl/fuchsia.ui.composition:fuchsia.ui.composition_cpp",
     "//sdk/fidl/fuchsia.ui.scenic:fuchsia.ui.scenic_cpp",
     "//sdk/fidl/fuchsia.ui.test.input:fuchsia.ui.test.input_cpp",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/fdio",
     "//sdk/lib/fit",
     "//sdk/lib/sys/component/cpp/testing:cpp",
@@ -115,8 +117,6 @@ executable("pointerinjector-config-test-bin") {
     "//src/ui/testing/util:fidl_cpp_helpers",
     "//src/ui/testing/util:portable_ui_test",
     "//third_party/googletest:gtest",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/zx",
   ]
 }

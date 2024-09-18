@@ -672,54 +672,91 @@ async fn duplicate_address_detection<N: Netstack>(name: &str) {
 #[netstack_test]
 #[variant(N, Netstack)]
 async fn dad_assigns_when_echoed<N: Netstack>(name: &str) {
-    let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
-    let (_network, _realm, iface, fake_ep) =
-        setup_network::<N>(&sandbox, name, None).await.expect("error setting up network");
+    const MAXIMUM_RETRIES: usize = 10;
+    for _ in 0..MAXIMUM_RETRIES {
+        let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
+        let (_network, _realm, iface, fake_ep) =
+            setup_network::<N>(&sandbox, name, None).await.expect("error setting up network");
 
-    let control = iface.control();
+        let control = iface.control();
 
-    let mut state_stream =
-        add_address_for_dad(&iface, &fake_ep, &control, true, |fake_ep, ns| async move {
-            fake_ep
-                .write(&ns.expect("should have seen neighbor solicitation")[..])
-                .await
-                .expect("echoing back ns should succeed");
-        })
-        .await;
+        let (stop_echo_signal_sender, mut stop_echo_signal_receiver) =
+            futures::channel::oneshot::channel();
 
-    let assert_dad_success_fut =
-        async move { assert_dad_success(&mut state_stream).await }.boxed_local();
-
-    // NB: we've already seen one probe from the above `add_address_for_dad` invocation.
-    let mut got_num_probes = 1usize;
-    // 1 solicitation by default + 3 additional solicitations due to the looped-back probe.
-    let want_num_probes = 4usize;
-
-    let echo_ns_fut = async {
-        while got_num_probes < want_num_probes {
-            // NB: We're echoing back all traffic observed on the fake endpoint (not
-            // just neighbor solicitations).
-            let (data, _dropped) =
-                fake_ep.read().await.expect("reading from fake_ep should succeed");
-
-            if parse_icmp_packet_in_ip_packet_in_ethernet_frame::<
-                net_types::ip::Ipv6,
-                _,
-                NeighborSolicitation,
-                _,
-            >(&data, EthernetFrameLengthCheck::NoCheck, |p| {
-                assert_matches!(&p.body().iter().collect::<Vec<_>>()[..], [NdpOption::Nonce(_)])
+        let mut state_stream =
+            add_address_for_dad(&iface, &fake_ep, &control, true, |fake_ep, ns| async move {
+                fake_ep
+                    .write(&ns.expect("should have seen neighbor solicitation")[..])
+                    .await
+                    .expect("echoing back ns should succeed");
             })
-            .is_ok()
-            {
-                got_num_probes += 1;
-            }
-            fake_ep.write(&data).await.expect("echoing back ns should succeed");
-        }
-    }
-    .boxed_local();
+            .await;
 
-    let ((), ()) = futures::future::join(assert_dad_success_fut, echo_ns_fut).await;
+        let assert_dad_success_fut = async move {
+            assert_dad_success(&mut state_stream).await;
+            stop_echo_signal_sender.send(()).expect("failed to stop the echo task");
+        };
+
+        // 1 solicitation by default + 3 additional solicitations due to the looped-back probe.
+        const WANT_NUM_PROBES: usize = 4usize;
+        // This test can be flaky because the DAD can finish before the echo future gets any NS,
+        // in that case we will just retry.
+        const FLAKE_NUM_PROBES: usize = 1usize;
+
+        let echo_ns_fut = async {
+            // NB: we've already seen one probe from the above `add_address_for_dad` invocation.
+            let mut got_num_probes = 1usize;
+
+            while got_num_probes < WANT_NUM_PROBES {
+                let (data, _dropped) = futures::select_biased! {
+                    r = fake_ep.read() => r.expect("reading from fake_ep should succeed"),
+                    r = stop_echo_signal_receiver => {
+                        r.expect("sender should never be dropped");
+                        // The following condition means the DAD succeeded before any additional
+                        // probes, we break out early so that we can retry. Otherwise we already
+                        // received at least one additional probe, continue the loop so that we
+                        // receive at least `WANT_NUM_PROBES`.
+                        if got_num_probes == 1 {
+                            break;
+                        } else {
+                            continue;
+                        }
+                    }
+                };
+
+                if let Ok((_src_mac, _dst_mac, _src_ip, _dst_ip, _ttl, ns, _code)) =
+                    parse_icmp_packet_in_ip_packet_in_ethernet_frame::<
+                        net_types::ip::Ipv6,
+                        _,
+                        NeighborSolicitation,
+                        _,
+                    >(&data, EthernetFrameLengthCheck::NoCheck, |p| {
+                        assert_matches!(
+                            &p.body().iter().collect::<Vec<_>>()[..],
+                            [NdpOption::Nonce(_)]
+                        )
+                    })
+                {
+                    if *ns.target_address() == ipv6_consts::LINK_LOCAL_ADDR {
+                        got_num_probes += 1;
+                        fake_ep.write(&data).await.expect("echoing back ns should succeed");
+                    }
+                }
+            }
+
+            got_num_probes
+        };
+
+        let ((), got_num_probes) = futures::join!(assert_dad_success_fut, echo_ns_fut);
+        // The test has passed because we got the expected number of probes.
+        if got_num_probes == WANT_NUM_PROBES {
+            return;
+        }
+        // A flake happened, meaning the only valid number of probes the ns_echo future can receive
+        // is 1, anything else is a failure.
+        assert_eq!(got_num_probes, FLAKE_NUM_PROBES);
+    }
+    panic!("maximum trial number exceeded");
 }
 
 /// Tests to make sure default router discovery, prefix discovery and more-specific

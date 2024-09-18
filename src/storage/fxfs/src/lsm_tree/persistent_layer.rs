@@ -1045,6 +1045,7 @@ mod tests {
     use crate::round::round_up;
     use crate::serialized_types::{
         versioned_type, Version, Versioned, VersionedLatest, LATEST_VERSION,
+        NEW_PERSISTENT_LAYER_VERSION,
     };
     use crate::testing::fake_object::{FakeObject, FakeObjectHandle};
     use crate::testing::writer::Writer;
@@ -1792,7 +1793,7 @@ mod tests {
         let handle = FakeObjectHandle::new(Arc::new(FakeObject::new()));
         {
             let mut writer = OldPersistentLayerWriter::<_, i32, i32>::new(
-                Version { major: LATEST_VERSION.major - 1, minor: 0 },
+                Version { major: NEW_PERSISTENT_LAYER_VERSION.major - 1, minor: 0 },
                 Writer::new(&handle).await,
                 BLOCK_SIZE,
             )
@@ -1817,7 +1818,7 @@ mod tests {
         let handle = FakeObjectHandle::new(Arc::new(FakeObject::new()));
         {
             let mut writer = OldPersistentLayerWriter::<_, i32, i32>::new(
-                Version { major: LATEST_VERSION.major - 1, minor: 0 },
+                Version { major: NEW_PERSISTENT_LAYER_VERSION.major - 1, minor: 0 },
                 Writer::new(&handle).await,
                 BLOCK_SIZE,
             )

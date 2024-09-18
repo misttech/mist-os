@@ -73,14 +73,19 @@ impl UnhandledInputHandler for ImeHandler {
         match unhandled_input_event {
             input_device::UnhandledInputEvent {
                 device_event: input_device::InputDeviceEvent::Keyboard(ref keyboard_device_event),
-                device_descriptor: input_device::InputDeviceDescriptor::Keyboard(_),
+                device_descriptor:
+                    input_device::InputDeviceDescriptor::Keyboard(ref keyboard_description),
                 event_time,
                 trace_id: _,
             } => {
                 self.inspect_status.count_received_event(input_device::InputEvent::from(
                     unhandled_input_event.clone(),
                 ));
-                let key_event = create_key_event(&keyboard_device_event, event_time);
+                let key_event = create_key_event(
+                    &keyboard_device_event,
+                    event_time,
+                    keyboard_description.device_id,
+                );
                 self.dispatch_key(key_event).await;
                 // Consume the input event.
                 self.inspect_status.count_handled_event();
@@ -159,6 +164,7 @@ impl ImeHandler {
 fn create_key_event(
     event: &keyboard_binding::KeyboardEvent,
     event_time: zx::MonotonicTime,
+    device_id: u32,
 ) -> fidl_ui_input3::KeyEvent {
     let modifier_state: FrozenModifierState =
         event.get_modifiers().unwrap_or(Modifiers::from_bits_allow_unknown(0)).into();
@@ -192,6 +198,7 @@ fn create_key_event(
         lock_state: event.get_lock_state(),
         key_meaning,
         repeat_sequence,
+        device_id: Some(device_id),
         ..Default::default()
     }
 }
@@ -335,6 +342,7 @@ mod tests {
         let device_descriptor = input_device::InputDeviceDescriptor::Keyboard(
             keyboard_binding::KeyboardDeviceDescriptor {
                 keys: vec![fidl_input::Key::A],
+                device_id: 0,
                 ..Default::default()
             },
         );
@@ -354,6 +362,7 @@ mod tests {
             key: Some(fidl_input::Key::A),
             // A key "A" without shift is a lowercase 'a'.
             key_meaning: Some(fidl_ui_input3::KeyMeaning::Codepoint(97)),
+            device_id: Some(0),
             ..Default::default()
         }];
 
@@ -375,6 +384,7 @@ mod tests {
         let device_descriptor = input_device::InputDeviceDescriptor::Keyboard(
             keyboard_binding::KeyboardDeviceDescriptor {
                 keys: vec![fidl_input::Key::A],
+                device_id: 0,
                 ..Default::default()
             },
         );
@@ -393,6 +403,7 @@ mod tests {
             type_: Some(fidl_ui_input3::KeyEventType::Released),
             key: Some(fidl_input::Key::A),
             key_meaning: Some(fidl_ui_input3::KeyMeaning::Codepoint(97)),
+            device_id: Some(0),
             ..Default::default()
         }];
 
@@ -414,6 +425,7 @@ mod tests {
         let device_descriptor = input_device::InputDeviceDescriptor::Keyboard(
             keyboard_binding::KeyboardDeviceDescriptor {
                 keys: vec![fidl_input::Key::A, fidl_input::Key::B],
+                device_id: 0,
                 ..Default::default()
             },
         );
@@ -460,6 +472,7 @@ mod tests {
                 type_: Some(fidl_ui_input3::KeyEventType::Pressed),
                 key: Some(fidl_input::Key::A),
                 key_meaning: Some(fidl_ui_input3::KeyMeaning::Codepoint(97)),
+                device_id: Some(0),
                 ..Default::default()
             },
             fidl_ui_input3::KeyEvent {
@@ -467,6 +480,7 @@ mod tests {
                 type_: Some(fidl_ui_input3::KeyEventType::Released),
                 key: Some(fidl_input::Key::A),
                 key_meaning: Some(fidl_ui_input3::KeyMeaning::Codepoint(97)),
+                device_id: Some(0),
                 ..Default::default()
             },
             fidl_ui_input3::KeyEvent {
@@ -474,6 +488,7 @@ mod tests {
                 type_: Some(fidl_ui_input3::KeyEventType::Pressed),
                 key: Some(fidl_input::Key::B),
                 key_meaning: Some(fidl_ui_input3::KeyMeaning::Codepoint(98)),
+                device_id: Some(0),
                 ..Default::default()
             },
             fidl_ui_input3::KeyEvent {
@@ -481,6 +496,7 @@ mod tests {
                 type_: Some(fidl_ui_input3::KeyEventType::Pressed),
                 key: Some(fidl_input::Key::C),
                 key_meaning: Some(fidl_ui_input3::KeyMeaning::Codepoint(42)),
+                device_id: Some(0),
                 ..Default::default()
             },
         ];
@@ -507,6 +523,7 @@ mod tests {
         let device_descriptor = input_device::InputDeviceDescriptor::Keyboard(
             keyboard_binding::KeyboardDeviceDescriptor {
                 keys: vec![fidl_input::Key::A, fidl_input::Key::CapsLock],
+                device_id: 0,
                 ..Default::default()
             },
         );
@@ -553,6 +570,7 @@ mod tests {
                 key_meaning: Some(fidl_ui_input3::KeyMeaning::NonPrintableKey(
                     fidl_ui_input3::NonPrintableKey::CapsLock,
                 )),
+                device_id: Some(0),
                 ..Default::default()
             },
             fidl_ui_input3::KeyEvent {
@@ -562,6 +580,7 @@ mod tests {
                 modifiers: Some(fidl_ui_input3::Modifiers::CAPS_LOCK),
                 lock_state: Some(fidl_ui_input3::LockState::CAPS_LOCK),
                 key_meaning: Some(fidl_ui_input3::KeyMeaning::Codepoint(65)),
+                device_id: Some(0),
                 ..Default::default()
             },
             fidl_ui_input3::KeyEvent {
@@ -572,6 +591,7 @@ mod tests {
                 key_meaning: Some(fidl_ui_input3::KeyMeaning::NonPrintableKey(
                     fidl_ui_input3::NonPrintableKey::CapsLock,
                 )),
+                device_id: Some(0),
                 ..Default::default()
             },
         ];
@@ -597,6 +617,7 @@ mod tests {
                     fidl_input::Key::Tab,
                     fidl_input::Key::Backspace,
                 ],
+                device_id: 0,
                 ..Default::default()
             },
         );
@@ -636,6 +657,7 @@ mod tests {
                 key_meaning: Some(fidl_ui_input3::KeyMeaning::NonPrintableKey(
                     fidl_ui_input3::NonPrintableKey::Enter,
                 )),
+                device_id: Some(0),
                 ..Default::default()
             },
             fidl_ui_input3::KeyEvent {
@@ -645,6 +667,7 @@ mod tests {
                 key_meaning: Some(fidl_ui_input3::KeyMeaning::NonPrintableKey(
                     fidl_ui_input3::NonPrintableKey::Tab,
                 )),
+                device_id: Some(0),
                 ..Default::default()
             },
             fidl_ui_input3::KeyEvent {
@@ -655,6 +678,7 @@ mod tests {
                 key_meaning: Some(fidl_ui_input3::KeyMeaning::NonPrintableKey(
                     fidl_ui_input3::NonPrintableKey::Backspace,
                 )),
+                device_id: Some(0),
                 ..Default::default()
             },
         ];
@@ -680,6 +704,7 @@ mod tests {
                     fidl_input::Key::Tab,
                     fidl_input::Key::Backspace,
                 ],
+                device_id: 0,
                 ..Default::default()
             },
         );
@@ -700,6 +725,7 @@ mod tests {
             key_meaning: Some(fidl_ui_input3::KeyMeaning::NonPrintableKey(
                 fidl_ui_input3::NonPrintableKey::Tab,
             )),
+            device_id: Some(0),
             ..Default::default()
         }];
 
@@ -720,6 +746,7 @@ mod tests {
         let device_descriptor = input_device::InputDeviceDescriptor::Keyboard(
             keyboard_binding::KeyboardDeviceDescriptor {
                 keys: vec![fidl_input::Key::LeftCtrl, fidl_input::Key::Tab],
+                device_id: 0,
                 ..Default::default()
             },
         );
@@ -760,6 +787,7 @@ mod tests {
                 key_meaning: Some(fidl_ui_input3::KeyMeaning::NonPrintableKey(
                     fidl_ui_input3::NonPrintableKey::Shift,
                 )),
+                device_id: Some(0),
                 ..Default::default()
             },
             fidl_ui_input3::KeyEvent {
@@ -770,6 +798,7 @@ mod tests {
                 key_meaning: Some(fidl_ui_input3::KeyMeaning::NonPrintableKey(
                     fidl_ui_input3::NonPrintableKey::Shift,
                 )),
+                device_id: Some(0),
                 ..Default::default()
             },
             fidl_ui_input3::KeyEvent {
@@ -778,6 +807,7 @@ mod tests {
                 key: Some(fidl_input::Key::A),
                 modifiers: Some(Modifiers::RIGHT_SHIFT | Modifiers::LEFT_SHIFT | Modifiers::SHIFT),
                 key_meaning: Some(fidl_ui_input3::KeyMeaning::Codepoint(65)), // "A"
+                device_id: Some(0),
                 ..Default::default()
             },
         ];
@@ -799,6 +829,7 @@ mod tests {
         let device_descriptor = input_device::InputDeviceDescriptor::Keyboard(
             keyboard_binding::KeyboardDeviceDescriptor {
                 keys: vec![fidl_input::Key::LeftCtrl, fidl_input::Key::Tab],
+                device_id: 0,
                 ..Default::default()
             },
         );
@@ -830,6 +861,7 @@ mod tests {
                 key_meaning: Some(fidl_ui_input3::KeyMeaning::NonPrintableKey(
                     fidl_ui_input3::NonPrintableKey::Control,
                 )),
+                device_id: Some(0),
                 ..Default::default()
             },
             fidl_ui_input3::KeyEvent {
@@ -839,6 +871,7 @@ mod tests {
                 key_meaning: Some(fidl_ui_input3::KeyMeaning::NonPrintableKey(
                     fidl_ui_input3::NonPrintableKey::Tab,
                 )),
+                device_id: Some(0),
                 ..Default::default()
             },
         ];
@@ -961,6 +994,7 @@ mod tests {
             type_: Some(fidl_ui_input3::KeyEventType::Pressed),
             key: Some(fidl_input::Key::A),
             key_meaning: Some(fidl_ui_input3::KeyMeaning::Codepoint(97)),
+            device_id: Some(0),
             ..Default::default()}; "basic value copy")]
     #[test_case(
         keyboard_binding::KeyboardEvent::new(
@@ -973,11 +1007,12 @@ mod tests {
             key: Some(fidl_input::Key::A),
             key_meaning: Some(fidl_ui_input3::KeyMeaning::Codepoint(97)),
             repeat_sequence: Some(13),
+            device_id: Some(0),
             ..Default::default()}; "repeat_sequence is honored")]
     fn test_create_key_event(
         event: keyboard_binding::KeyboardEvent,
         event_time: zx::MonotonicTime,
     ) -> fidl_ui_input3::KeyEvent {
-        super::create_key_event(&event, event_time)
+        super::create_key_event(&event, event_time, 0)
     }
 }

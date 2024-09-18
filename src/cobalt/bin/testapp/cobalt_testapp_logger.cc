@@ -14,11 +14,7 @@
 #include <rapidjson/document.h>
 #include <src/lib/fsl/vmo/strings.h>
 
-#include "src/cobalt/bin/utils/status_utils.h"
-
 namespace cobalt::testapp {
-
-using ::cobalt::StatusToString;
 
 bool CobaltTestAppLogger::LogOccurrence(uint32_t metric_id, std::vector<uint32_t> indices,
                                         uint64_t count, ExperimentArm arm) {

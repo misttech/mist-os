@@ -9,10 +9,29 @@
 #include <sys/stat.h>
 #include <zircon/compiler.h>
 
+#include <algorithm>
+
 #include "sdk/lib/zxio/private.h"
 #include "sdk/lib/zxio/vector.h"
 
 namespace {
+template <typename T>
+zx_status_t set_stockopt_value(int16_t* out_code, void* output, socklen_t* output_size, T* input) {
+  if (*output_size < sizeof(T)) {
+    *out_code = EINVAL;
+    return ZX_ERR_INVALID_ARGS;
+  }
+  memcpy(output, input, sizeof(T));
+  *output_size = sizeof(T);
+  *out_code = 0;
+  return ZX_OK;
+}
+
+zx_status_t set_stockopt_value_int(int16_t* out_code, void* output, socklen_t* output_size,
+                                   uint32_t input) {
+  return set_stockopt_value(out_code, output, output_size, &input);
+}
+
 // Partial implementation of getsockopt for zx::Socket interpreted as Unix
 // domain socket.
 zx_status_t getsockopt(uint32_t so_type, zxio_t* io, int level, int optname, void* optval,
@@ -27,24 +46,21 @@ zx_status_t getsockopt(uint32_t so_type, zxio_t* io, int level, int optname, voi
   }
   switch (optname) {
     case SO_DOMAIN:
-      *static_cast<uint32_t*>(optval) = AF_UNIX;
-      *optlen = sizeof(uint32_t);
-      break;
+      return set_stockopt_value_int(out_code, optval, optlen, AF_UNIX);
     case SO_TYPE:
-      *static_cast<uint32_t*>(optval) = so_type;
-      *optlen = sizeof(uint32_t);
-      break;
+      return set_stockopt_value_int(out_code, optval, optlen, so_type);
     case SO_PROTOCOL:
-      *static_cast<uint32_t*>(optval) = 0;
-      *optlen = sizeof(uint32_t);
-      break;
+      return set_stockopt_value_int(out_code, optval, optlen, 0);
+    case SO_LINGER: {
+      struct linger response{};
+      response.l_onoff = 0;
+      response.l_linger = 0;
+      return set_stockopt_value(out_code, optval, optlen, &response);
+    }
     default:
       *out_code = EINVAL;
       return ZX_ERR_INVALID_ARGS;
   }
-
-  *out_code = 0;
-  return ZX_OK;
 }
 }  // namespace
 
@@ -181,6 +197,21 @@ static constexpr zxio_ops_t zxio_pipe_ops = []() {
     *out_code = 0;
     return zxio_sendmsg_inner(io, msg, flags, out_actual);
   };
+
+  ops.getsockname = [](zxio_t* io, struct sockaddr* addr, socklen_t* addrlen, int16_t* out_code) {
+    if (addrlen == nullptr || (*addrlen != 0 && addr == nullptr)) {
+      *out_code = EFAULT;
+      return ZX_OK;
+    }
+    struct sockaddr response;
+    response.sa_family = AF_UNIX;
+    const socklen_t response_size = sizeof(sa_family_t);
+    memcpy(addr, &response, std::min(*addrlen, response_size));
+    *addrlen = response_size;
+    *out_code = 0;
+    return ZX_OK;
+  };
+  ops.getpeername = ops.getsockname;
 
   return ops;
 }();

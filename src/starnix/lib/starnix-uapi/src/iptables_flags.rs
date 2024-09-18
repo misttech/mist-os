@@ -77,6 +77,24 @@ bitflags! {
     }
 }
 
+bitflags! {
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+    pub struct XtTcpInverseFlags: u32 {
+        const SOURCE_PORT = uapi::XT_TCP_INV_SRCPT;
+        const DESTINATION_PORT = uapi::XT_TCP_INV_DSTPT;
+        const FLAGS = uapi::XT_TCP_INV_FLAGS;
+        const OPTION = uapi::XT_TCP_INV_OPTION;
+    }
+}
+
+bitflags! {
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+    pub struct XtUdpInverseFlags: u32 {
+        const SOURCE_PORT = uapi::XT_UDP_INV_SRCPT;
+        const DESTINATION_PORT = uapi::XT_UDP_INV_DSTPT;
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -88,5 +106,7 @@ mod tests {
         assert_eq!(IptIpFlagsV6::all().bits(), uapi::IP6T_F_MASK);
         assert_eq!(NfIpHooks::all().bits().count_ones(), uapi::NF_IP_NUMHOOKS);
         assert_eq!(NfNatRangeFlags::all().bits(), uapi::NF_NAT_RANGE_MASK);
+        assert_eq!(XtTcpInverseFlags::all().bits(), uapi::XT_TCP_INV_MASK);
+        assert_eq!(XtUdpInverseFlags::all().bits(), uapi::XT_UDP_INV_MASK);
     }
 }

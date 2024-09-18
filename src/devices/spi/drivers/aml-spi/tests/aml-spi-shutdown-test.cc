@@ -36,11 +36,6 @@ TEST_F(AmlSpiShutdownTest, Shutdown) {
   fdf::WireClient<fuchsia_hardware_spiimpl::SpiImpl> spiimpl(*std::move(spiimpl_client),
                                                              fdf::Dispatcher::GetCurrent()->get());
 
-  driver_test().RunInEnvironmentTypeContext([](BaseTestEnvironment& env) {
-    env.ExpectGpioWrite(ZX_OK, 0);
-    env.ExpectGpioWrite(ZX_OK, 1);
-  });
-
   uint8_t buf[16] = {};
   fdf::Arena arena('TEST');
   spiimpl.buffer(arena)
@@ -62,7 +57,7 @@ TEST_F(AmlSpiShutdownTest, Shutdown) {
   // All SPI devices have been released at this point, so no further calls can be made.
   driver_test().RunInEnvironmentTypeContext([](BaseTestEnvironment& env) {
     EXPECT_FALSE(env.ControllerReset());
-    ASSERT_NO_FATAL_FAILURE(env.VerifyGpioAndClear());
+    EXPECT_EQ(env.cs_toggle_count(), 2u);
   });
 
   driver_test().ShutdownAndDestroyDriver();

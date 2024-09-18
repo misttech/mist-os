@@ -440,6 +440,41 @@ zx::result<DriverRunnerTest::StartDriverResult> DriverRunnerTest::StartRootDrive
       },
       std::move(start_handler)));
 }
+
+zx::result<DriverRunnerTest::StartDriverResult> DriverRunnerTest::StartRootDriverDynamicLinking(
+    test_utils::TestPkg::Config driver_host_config, test_utils::TestPkg::Config driver_config) {
+  PrepareRealmForDriverComponentStart("dev", driver_runner::root_driver_url);
+
+  auto start = driver_runner().StartRootDriver(driver_runner::root_driver_url);
+  if (start.is_error()) {
+    return start.take_error();
+  }
+  EXPECT_TRUE(RunLoopUntilIdle());
+
+  auto pkg_endpoints = fidl::Endpoints<fuchsia_io::Directory>::Create();
+  test_utils::TestPkg test_pkg(std::move(pkg_endpoints.server), driver_config);
+  StartDriverHandler start_handler = [pkg_path = driver_config.module_open_path](
+                                         driver_runner::TestDriver* driver,
+                                         fdfw::DriverStartArgs start_args) {
+    ValidateProgram(start_args.program(), pkg_path, "false" /* colocate */,
+                    "false" /* host_restart_on_crash */, "false" /* use_next_vdso */,
+                    "true" /* use_dynamic_linker */);
+  };
+
+  auto driver_host_pkg_endpoints = fidl::Endpoints<fuchsia_io::Directory>::Create();
+  test_utils::TestPkg driver_host_test_pkg(std::move(driver_host_pkg_endpoints.server),
+                                           driver_host_config);
+
+  return zx::ok(StartDriver(
+      {
+          .url = driver_runner::root_driver_url,
+          .binary = std::string(driver_config.module_open_path),
+          .use_dynamic_linker = true,
+      },
+      std::move(start_handler), std::move(pkg_endpoints.client),
+      std::move(driver_host_pkg_endpoints.client)));
+}
+
 void DriverRunnerTest::Unbind() {
   if (driver_host_binding_.has_value()) {
     driver_host_binding_.reset();

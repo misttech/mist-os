@@ -31,6 +31,7 @@ pub mod unmount_flags;
 pub mod user_address;
 pub mod user_buffer;
 pub mod user_value;
+pub mod version;
 pub mod vfs;
 
 #[cfg(target_arch = "aarch64")]

@@ -40,12 +40,12 @@ test("namespace-dfv1-tests-bin") {
     ":namespace-dfv1",
     "testing:test.display.namespace_cpp",
     "//sdk/fidl/fuchsia.io:fuchsia.io_cpp",
+    "//sdk/lib/async-loop:async-loop-cpp",
     "//sdk/lib/async_patterns/testing/cpp",
     "//src/devices/testing/mock-ddk",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/predicates",
     "//third_party/googletest:gtest",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
   ]
 }
 

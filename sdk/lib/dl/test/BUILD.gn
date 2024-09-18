@@ -48,7 +48,8 @@ test("dl-unittests") {
     }
 
     # Plumb in the switch to set cflags, such as the libprefix for test files.
-    deps += [ "//sdk/lib/ld/test:load-test-modules-info" ]
+    deps += [ "//sdk/lib/ld/test:ld-test-switches" ]
+    data_deps = [ "//sdk/lib/ld/test:load-test-data" ]
   }
 }
 

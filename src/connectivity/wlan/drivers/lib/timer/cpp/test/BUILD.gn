@@ -7,9 +7,9 @@ import("//build/test.gni")
 test("wlan_drivers_timer_test") {
   sources = [ "timer_test.cc" ]
   deps = [
+    "//sdk/lib/async-loop:async-loop-cpp",
     "//src/connectivity/wlan/drivers/lib/timer:cpp",
     "//src/devices/testing/no_ddk",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/mock-function",
     "//zircon/system/ulib/zxtest:zxtest",
   ]

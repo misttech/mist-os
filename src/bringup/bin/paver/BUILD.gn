@@ -21,12 +21,12 @@ foreach(board_name, _boards) {
     deps = [
       "//sdk/fidl/fuchsia.paver:fuchsia.paver_cpp",
       "//sdk/fidl/fuchsia.process.lifecycle:fuchsia.process.lifecycle_cpp",
+      "//sdk/lib/async-loop:async-loop-cpp",
+      "//sdk/lib/async-loop:async-loop-default",
       "//sdk/lib/component/outgoing/cpp",
       "//sdk/lib/fdio",
       "//src/storage/lib/paver:${board_name}",
       "//src/sys/lib/stdout-to-debuglog/cpp",
-      "//zircon/system/ulib/async-loop:async-loop-cpp",
-      "//zircon/system/ulib/async-loop:async-loop-default",
     ]
   }
 
@@ -48,12 +48,12 @@ executable("paver") {
   sources = [ "paver.cc" ]
   deps = [
     "//sdk/fidl/fuchsia.process.lifecycle:fuchsia.process.lifecycle_cpp",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/component/outgoing/cpp",
     "//sdk/lib/fdio",
     "//src/storage/lib/paver",
     "//src/sys/lib/stdout-to-debuglog/cpp",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
   ]
 }
 

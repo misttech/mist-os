@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use async_trait::async_trait;
-use block_client::{BlockClient, BufferSlice, MutableBufferSlice, VmoId};
+use block_client::{BlockClient, BufferSlice, MutableBufferSlice, VmoId, WriteOptions};
 use std::collections::BTreeMap;
 use std::ops::Range;
 use std::sync::atomic::{self, AtomicU32};
@@ -100,10 +100,11 @@ impl BlockClient for FakeBlockClient {
         }
     }
 
-    async fn write_at(
+    async fn write_at_with_opts(
         &self,
         buffer_slice: BufferSlice<'_>,
         device_offset: u64,
+        _opts: WriteOptions,
     ) -> Result<(), zx::Status> {
         if device_offset % self.block_size as u64 != 0 {
             return Err(zx::Status::INVALID_ARGS);

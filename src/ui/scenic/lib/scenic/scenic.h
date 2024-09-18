@@ -6,7 +6,6 @@
 #define SRC_UI_SCENIC_LIB_SCENIC_SCENIC_H_
 
 #include <fuchsia/ui/scenic/cpp/fidl.h>
-#include <fuchsia/ui/scenic/internal/cpp/fidl.h>
 #include <lib/async/default.h>
 #include <lib/fidl/cpp/binding_set.h>
 #include <lib/fit/function.h>

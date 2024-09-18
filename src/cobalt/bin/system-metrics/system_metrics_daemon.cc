@@ -54,8 +54,7 @@ std::chrono::seconds SecondsBeforeNextHour(std::chrono::seconds uptime) {
 SystemMetricsDaemon::SystemMetricsDaemon(async_dispatcher_t* dispatcher,
                                          sys::ComponentContext* context)
     : SystemMetricsDaemon(
-          dispatcher, context, nullptr,
-          std::unique_ptr<cobalt::SteadyClock>(new cobalt::RealSteadyClock()),
+          dispatcher, context, nullptr, std::make_unique<cobalt::RealSteadyClock>(),
           std::unique_ptr<cobalt::CpuStatsFetcher>(new cobalt::CpuStatsFetcherImpl()),
           std::make_unique<cobalt::ActivityListener>(
               fit::bind_member<&SystemMetricsDaemon::UpdateState>(this)),
@@ -68,13 +67,14 @@ SystemMetricsDaemon::SystemMetricsDaemon(async_dispatcher_t* dispatcher,
 
 SystemMetricsDaemon::SystemMetricsDaemon(
     async_dispatcher_t* dispatcher, sys::ComponentContext* context,
-    fuchsia::metrics::MetricEventLogger_Sync* logger, std::unique_ptr<cobalt::SteadyClock> clock,
+    fuchsia::metrics::MetricEventLogger_Sync* logger,
+    std::unique_ptr<cobalt::util::SteadyClockInterface> clock,
     std::unique_ptr<cobalt::CpuStatsFetcher> cpu_stats_fetcher,
     std::unique_ptr<cobalt::ActivityListener> activity_listener, std::string activation_file_prefix)
     : dispatcher_(dispatcher),
       context_(context),
       logger_(logger),
-      start_time_(clock->Now()),
+      start_time_(clock->now()),
       clock_(std::move(clock)),
       cpu_stats_fetcher_(std::move(cpu_stats_fetcher)),
       activity_listener_(std::move(activity_listener)),
@@ -165,7 +165,7 @@ std::chrono::seconds SystemMetricsDaemon::GetUpTime() {
   // as a proxy for the system start time. This is fine as long as we don't
   // start seeing systematic restarts of the SystemMetricsDaemon. If that
   // starts happening we should look into how to capture actual boot time.
-  std::chrono::steady_clock::time_point now = clock_->Now();
+  std::chrono::steady_clock::time_point now = clock_->now();
   return std::chrono::duration_cast<std::chrono::seconds>(now - start_time_);
 }
 
@@ -411,7 +411,7 @@ std::chrono::seconds SystemMetricsDaemon::LogActiveTime() {
     InitializeLogger();
     return std::chrono::minutes(1);
   }
-  std::chrono::steady_clock::time_point now = clock_->Now();
+  std::chrono::steady_clock::time_point now = clock_->now();
   if (current_state_ == fuchsia::ui::activity::State::ACTIVE) {
     unlogged_active_duration_ += (now - active_start_time_);
     active_start_time_ = now;
@@ -494,9 +494,9 @@ void SystemMetricsDaemon::UpdateState(fuchsia::ui::activity::State state) {
     return;
   }
   if (state == fuchsia::ui::activity::State::ACTIVE) {
-    active_start_time_ = clock_->Now();
+    active_start_time_ = clock_->now();
   } else {
-    unlogged_active_duration_ += (clock_->Now() - active_start_time_);
+    unlogged_active_duration_ += (clock_->now() - active_start_time_);
     active_start_time_ = std::chrono::steady_clock::time_point();
   }
   current_state_ = state;

@@ -12,9 +12,9 @@ source_set("sources") {
 
   public_deps = [ "//src/lib/fxl:fxl_cli" ]
   deps = [
+    "//sdk/lib/async-loop",
+    "//sdk/lib/async-loop:async-loop-cpp",
     "//third_party/github.com/ARM-software/HWCPipe:mali_profiler",
-    "//zircon/system/ulib/async-loop",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/trace",
     "//zircon/system/ulib/trace-engine",
     "//zircon/system/ulib/trace-provider",

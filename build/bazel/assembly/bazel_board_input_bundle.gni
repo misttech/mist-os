@@ -13,13 +13,6 @@ import("//build/bazel/bazel_build_action.gni")
 #    The Bazel board input bundle target to build.
 #    Type: label (from BUILD.bazel)
 #
-#  bazel_inputs_from_gn (optional)
-#    The Bazel input targets (defined by bazel_input_xxx GN templates) used to
-#    plumb outputs from GN/Ninja to Bazel. This list should include all GN
-#    targets producing outputs used in the Bazel board input bundle. This is
-#    usually GN defined configurations, GN defined drivers, etc.
-#    Type: list(label)
-#
 #  deps
 #  metadata
 #  testonly
@@ -41,19 +34,10 @@ template("bazel_board_input_bundle") {
                              "testonly",
                              "visibility",
                              "inputs",
-                             "bazel_inputs_from_gn",
                              "remote_build",
                            ])
 
     bazel_target = bazel_target
-    if (defined(bazel_inputs_from_gn)) {
-      if (!defined(deps)) {
-        deps = []
-      }
-      if (defined(bazel_inputs_from_gn)) {
-        deps += bazel_inputs_from_gn
-      }
-    }
 
     # Directory outputs are OK because `board_input_bundle.json` correctly
     # represents the freshness of all outputs.

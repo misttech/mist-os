@@ -491,4 +491,8 @@ type KeyEvent = table {
     /// is actuated or not. `LockState.CAPS_LOCK` can be active even if the
     /// Caps Lock key is not currently actuated.
     7: lock_state LockState;
+
+    /// Identifies the device originating this event.
+    @available(added=NEXT)
+    8: device_id uint32;
 };

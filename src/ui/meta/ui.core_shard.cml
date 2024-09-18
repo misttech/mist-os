@@ -57,10 +57,4 @@
             availability: "optional",
         },
     ],
-    expose: [
-        {
-            protocol: [ "fuchsia.input.interaction.observation.Aggregator" ],
-            from: "#ui",
-        },
-    ],
 }

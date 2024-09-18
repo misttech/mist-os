@@ -26,6 +26,8 @@ struct AllocCheckerContainer {
     using Base = C<T, P...>;
 
     using Base::Base;
+    using typename Base::size_type;
+    using typename Base::value_type;
 
     constexpr Container(Container&&) noexcept = default;
 
@@ -36,29 +38,29 @@ struct AllocCheckerContainer {
       fbl::AllocChecker ac;
       Base::push_back(std::forward<U>(value), &ac);
       if (!ac.check()) {
-        diagnostics.OutOfMemory(error, sizeof(U));
+        diagnostics.OutOfMemory(error, sizeof(value_type));
         return false;
       }
       return true;
     }
 
     template <class Diagnostics, typename U>
-    bool insert(Diagnostics& diagnostics, std::string_view error, size_t index, U&& value) {
+    bool insert(Diagnostics& diagnostics, std::string_view error, size_type index, U&& value) {
       fbl::AllocChecker ac;
       Base::insert(index, std::forward<U>(value), &ac);
       if (!ac.check()) {
-        diagnostics.OutOfMemory(error, sizeof(U));
+        diagnostics.OutOfMemory(error, sizeof(value_type));
         return false;
       }
       return true;
     }
 
     template <class Diagnostics>
-    bool reserve(Diagnostics& diagnostics, std::string_view error, size_t capacity) {
+    bool reserve(Diagnostics& diagnostics, std::string_view error, size_type capacity) {
       fbl::AllocChecker ac;
       Base::reserve(capacity, &ac);
       if (!ac.check()) {
-        diagnostics.OutOfMemory(error, capacity);
+        diagnostics.OutOfMemory(error, capacity * sizeof(value_type));
         return false;
       }
       return true;

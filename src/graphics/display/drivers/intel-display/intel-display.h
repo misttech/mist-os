@@ -5,9 +5,9 @@
 #ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_DISPLAY_INTEL_DISPLAY_H_
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_DISPLAY_INTEL_DISPLAY_H_
 
-#include <fidl/fuchsia.device.manager/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.pci/cpp/wire.h>
 #include <fidl/fuchsia.hardware.sysmem/cpp/wire.h>
+#include <fidl/fuchsia.system.state/cpp/fidl.h>
 #include <fuchsia/hardware/display/controller/cpp/banjo.h>
 #include <fuchsia/hardware/intelgpucore/cpp/banjo.h>
 #include <lib/device-protocol/pci.h>
@@ -101,7 +101,7 @@ class Controller : public ddk::DisplayEngineProtocol<Controller>,
   void PrepareStopOnPowerOn(fdf::PrepareStopCompleter completer);
 
   // Corresponds to DFv2 `PrepareStop()`.
-  void PrepareStopOnPowerStateTransition(fuchsia_device_manager::SystemPowerState power_state,
+  void PrepareStopOnPowerStateTransition(fuchsia_system_state::SystemPowerState power_state,
                                          fdf::PrepareStopCompleter completer);
 
   // display controller protocol ops

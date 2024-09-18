@@ -7,6 +7,8 @@
 #include <lib/async/cpp/executor.h>
 #include <lib/async/dispatcher.h>
 #include <lib/component/incoming/cpp/protocol.h>
+#include <lib/driver/power/cpp/testing/fake_activity_governor.h>
+#include <lib/driver/power/cpp/testing/fidl_bound_server.h>
 #include <lib/fidl/cpp/client.h>
 #include <lib/fpromise/result.h>
 #include <lib/zx/time.h>
@@ -16,7 +18,6 @@
 #include <string>
 
 #include <gtest/gtest.h>
-#include <sdk/lib/driver/power/cpp/testing/fake_activity_governor.h>
 #include <src/lib/testing/loop_fixture/real_loop_fixture.h>
 
 #include "examples/power/cpp/wake_lease.h"
@@ -24,6 +25,7 @@
 namespace {
 
 using fdf_power::testing::FakeActivityGovernorListener;
+using fdf_power::testing::FidlBoundServer;
 using fuchsia_power_broker::CurrentLevel;
 using fuchsia_power_broker::DependencyToken;
 using fuchsia_power_broker::DependencyType;
@@ -126,7 +128,7 @@ TEST_F(WakeLeaseIntegrationTest, DISABLED_WakeLeaseBlocksSuspend) {
 
   // Register a Listener on System Activity Governor to check for suspend callbacks.
   auto endpoints = fidl::CreateEndpoints<ActivityGovernorListener>().value();
-  FakeActivityGovernorListener listener(dispatcher(), std::move(endpoints.server));
+  FidlBoundServer<FakeActivityGovernorListener> listener(dispatcher(), std::move(endpoints.server));
   bool register_listener_completed = false;
   activity_governor
       ->RegisterListener({{.listener = std::make_optional(std::move(endpoints.client))}})

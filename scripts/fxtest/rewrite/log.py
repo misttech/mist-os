@@ -3,12 +3,16 @@
 # found in the LICENSE file.
 
 import collections
+from collections.abc import Iterator
+from dataclasses import dataclass
+import gzip
 import json
 import math
 import sys
 import typing
 import zlib
 
+import environment
 import event
 
 
@@ -37,7 +41,88 @@ async def writer(
             print(f"LOG ERROR: {e} {value}")
 
 
-def pretty_print(in_stream: typing.TextIO) -> None:
+@dataclass
+class LogIterElement:
+    # If set, this element provides the path of the log that was opened.
+    log_path: str | None = None
+
+    # If set, this elements provides one event from the file.
+    log_event: event.Event | None = None
+
+    # If set, this element provides a warning message. Parsing should continue.
+    warning: str | None = None
+
+    # If set, this element provides a fatal error message. Parsing should stop.
+    error: str | None = None
+
+
+class LogSource:
+    __static_key = object()
+
+    def __init__(
+        self,
+        __static_key: typing.Any,
+        exec_env: environment.ExecutionEnvironment | None = None,
+        stream: typing.TextIO | None = None,
+    ):
+        assert (
+            __static_key == self.__static_key
+        ), "LogSource must be created by from_env() or from_stream()."
+        assert (
+            exec_env is None or stream is None
+        ), "LogSource must be either an environment or stream."
+        self._exec_env = exec_env
+        self._stream = stream
+
+    @classmethod
+    def from_env(
+        cls, exec_env: environment.ExecutionEnvironment
+    ) -> "LogSource":
+        return LogSource(cls.__static_key, exec_env=exec_env)
+
+    @classmethod
+    def from_stream(cls, stream: typing.TextIO | None = None) -> "LogSource":
+        return LogSource(cls.__static_key, stream=stream)
+
+    def read_log(self) -> Iterator[LogIterElement]:
+        stream = self._stream
+
+        try:
+            if stream is None and self._exec_env is not None:
+                log_path = self._exec_env.get_most_recent_log()
+                yield LogIterElement(log_path=log_path)
+                stream = gzip.open(log_path, "rt")
+
+            assert stream is not None
+
+            for line in stream:
+                if not line:
+                    continue
+
+                json_contents = json.loads(line)
+                log_event: event.Event = event.Event.from_dict(json_contents)  # type: ignore[attr-defined]
+                yield LogIterElement(log_event=log_event)
+        except environment.EnvironmentError as e:
+            yield LogIterElement(error=f"Failed to read log: {e}")
+            return
+        except gzip.BadGzipFile as e:
+            yield LogIterElement(
+                error=f"File does not appear to be a gzip file. ({e})"
+            )
+            return
+        except json.JSONDecodeError as e:
+            yield LogIterElement(
+                warning=f"Found invalid JSON data, skipping the rest and proceeding. ({e})"
+            )
+        except (EOFError, zlib.error) as e:
+            yield LogIterElement(
+                warning=f"File may be corrupt, skipping the rest and proceeding. ({e})",
+            )
+
+
+def pretty_print(
+    log_source: LogSource,
+) -> bool:
     suite_names: dict[int, str] = dict()
     command_to_suite: dict[int, int] = dict()
 
@@ -54,12 +139,8 @@ def pretty_print(in_stream: typing.TextIO) -> None:
         millis = int(ts * 1e3 % 1e3)
         return f"{seconds:04}.{millis:03}"
 
-    try:
-        for line in in_stream:
-            if not line:
-                continue
-            json_contents = json.loads(line)
-            e: event.Event = event.Event.from_dict(json_contents)  # type: ignore[attr-defined]
+    for element in log_source.read_log():
+        if (e := element.log_event) is not None:
             if e.id == 0:
                 time_base = e.timestamp
             if not e.payload:
@@ -95,17 +176,11 @@ def pretty_print(in_stream: typing.TextIO) -> None:
                 formatted_suite_events[e.id].append(
                     f"[{format_time(e)}] Suite ended with status {outcome.status.value}"
                 )
-    except json.JSONDecodeError as e:
-        print(
-            f"Found invalid JSON data, skipping the rest and proceeding. ({e})",
-            file=sys.stderr,
-        )
-    except (EOFError, zlib.error) as e:
-        print(
-            f"File may be corrupt, skipping the rest and proceeding. ({e})",
-            file=sys.stderr,
-        ),
-
+        elif (warning := element.warning) is not None:
+            print(warning, file=sys.stderr)
+        elif (error := element.error) is not None:
+            print(error, file=sys.stderr)
+            return False
     print(f"{len(suite_names)} tests were run")
     for id in sorted(suite_names.keys()):
         name = suite_names[id]
@@ -113,3 +188,4 @@ def pretty_print(in_stream: typing.TextIO) -> None:
         for line in formatted_suite_events[id]:
             print(line.strip())
         print(f"[END {name}]\n")
+    return True

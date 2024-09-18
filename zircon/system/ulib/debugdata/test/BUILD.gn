@@ -17,10 +17,10 @@ test("debugdata") {
     "debugdata.cc",
   ]
   deps = [
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//src/lib/files",
     "//src/storage/lib/vfs/cpp",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/debugdata",
     "//zircon/system/ulib/zx",
     "//zircon/system/ulib/zxtest",

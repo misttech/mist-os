@@ -3,8 +3,6 @@
 # license that can be found in the LICENSE file.
 
 import("//build/components/fuchsia_unittest_package.gni")
-import("//build/cpp/sdk_shared_library.gni")
-import("//build/cpp/sdk_source_set.gni")
 
 config("re2_config") {
   include_dirs = [ "src" ]
@@ -82,28 +80,9 @@ source_set("re2_source") {
 
 # Building as a shared library to reduce space usage in production images.
 # See space analysis in fxrev.dev/532721.
-if (default_library_type == "shared_library") {
-  _library_type = "sdk_shared_library"
-} else if (default_library_type == "static_library") {
-  _library_type = "sdk_source_set"
-} else {
-  assert(
-      false,
-      "Unexpected default_library_type ${default_library_type}, want one of [shared_library, static_library]")
-}
-
-target(_library_type, "re2") {
-  category = "internal"
-  if (default_library_type == "static_library") {
-    build_as_static = true
-  }
-
-  include_base = "src"
+target(default_library_type, "re2") {
   deps = [ ":re2_source" ]
-  public = [
-    "src/re2/re2.h",
-    "src/re2/stringpiece.h",
-  ]
+  public = [ "src/re2/re2.h" ]
   public_configs = [ ":re2_config" ]
   configs += [ ":re2_skipped_warnings" ]
   configs -= [ "//build/config:symbol_visibility_hidden" ]

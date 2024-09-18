@@ -39,7 +39,7 @@
             availability: "optional",
         },
         {
-            protocol: [ "fuchsia.device.manager.SystemStateTransition" ],
+            protocol: [ "fuchsia.system.state.SystemStateTransition" ],
             from: "#shutdown_shim",
             to: "#paver",
         },

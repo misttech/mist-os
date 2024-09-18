@@ -172,7 +172,7 @@ Dump all logs from the last 30 minutes logged before 5 minutes ago:
   $ ffx log --since \"30m ago\" --until \"5m ago\" dump
 
 Enable DEBUG logs from the \"core/audio\" component while logs are streaming:
-  $ ffx log --select core/audio#DEBUG"
+  $ ffx log --set-severity core/audio#DEBUG"
 )]
 pub struct LogCommand {
     #[argh(subcommand)]
@@ -276,6 +276,10 @@ pub struct LogCommand {
     #[argh(option, default = "SymbolizeMode::Pretty")]
     pub symbolize: SymbolizeMode,
 
+    /// DEPRECATED: use --set-severity
+    #[argh(option, from_str_fn(log_interest_selector))]
+    pub select: Vec<LogInterestSelector>,
+
     /// configure the log settings on the target device for components matching
     /// the given selector. This modifies the minimum log severity level emitted
     /// by components during the logging session.
@@ -283,18 +287,26 @@ pub struct LogCommand {
     /// as one of FATAL|ERROR|WARN|INFO|DEBUG|TRACE.
     /// May be repeated.
     #[argh(option, from_str_fn(log_interest_selector))]
-    pub select: Vec<LogInterestSelector>,
+    pub set_severity: Vec<LogInterestSelector>,
+
     /// filters by pid
     #[argh(option)]
     pub pid: Option<u64>,
+
     /// filters by tid
     #[argh(option)]
     pub tid: Option<u64>,
+
+    /// DEPRECATED: use --force-set-severity
+    #[argh(switch)]
+    pub force_select: bool,
+
     /// if enabled, selectors will be passed directly to Archivist without any filtering.
     /// If disabled and no matching components are found, the user will be prompted to
     /// either enable this or be given a list of selectors to choose from.
     #[argh(switch)]
-    pub force_select: bool,
+    pub force_set_severity: bool,
+
     /// enables structured JSON logs.
     #[cfg(target_os = "fuchsia")]
     #[argh(switch)]
@@ -318,12 +330,14 @@ impl Default for LogCommand {
             show_metadata: false,
             raw: false,
             force_select: false,
+            force_set_severity: false,
             since: None,
             since_monotonic: None,
             until: None,
             until_monotonic: None,
             sub_command: None,
             select: vec![],
+            set_severity: vec![],
             show_full_moniker: false,
             pid: None,
             tid: None,
@@ -400,11 +414,12 @@ impl InstanceGetter for RealmQueryProxy {
 }
 
 impl LogCommand {
-    async fn map_interest_selectors(
+    async fn map_interest_selectors<'a>(
         &self,
         realm_query: &impl InstanceGetter,
-    ) -> Result<Vec<Cow<'_, LogInterestSelector>>, LogError> {
-        let selectors = self.get_selectors_and_monikers();
+        interest_selectors: impl Iterator<Item = &'a LogInterestSelector>,
+    ) -> Result<Vec<Cow<'a, LogInterestSelector>>, LogError> {
+        let selectors = Self::get_selectors_and_monikers(interest_selectors);
         let mut translated_selectors = vec![];
         for (moniker, selector) in selectors {
             // Attempt to translate to a single instance
@@ -436,7 +451,7 @@ impl LogCommand {
                 for selector in instances {
                     writeln!(
                         output,
-                        "\t--select {}#{} \\",
+                        "\t--set-severity {}#{} \\",
                         sanitize_moniker_for_selectors(selector.to_string().as_str())
                             .replace("\\", "\\\\"),
                         format!("{:?}", oselector.interest.min_severity.unwrap()).to_uppercase()
@@ -450,7 +465,7 @@ impl LogCommand {
 
             writeln!(&mut err_output, "{}", String::from_utf8(output).unwrap())?;
             writeln!(&mut err_output, "\nIf this is intentional, you can disable this with")?;
-            writeln!(&mut err_output, "ffx log --force-select.")?;
+            writeln!(&mut err_output, "ffx log --force-set-severity.")?;
 
             ffx_bail!("{}", String::from_utf8(err_output)?);
         }
@@ -464,26 +479,43 @@ impl LogCommand {
         &self,
         log_settings_client: &LogSettingsProxy,
         realm_query: &impl InstanceGetter,
-        is_machine: bool,
+        error_writer: &mut impl Write,
     ) -> Result<(), LogError> {
-        let mut selectors = Cow::Borrowed(&self.select);
-        if !self.select.is_empty() && !is_machine && !self.force_select {
-            let new_selectors = self.map_interest_selectors(realm_query).await?;
+        if !self.select.is_empty() {
+            writeln!(error_writer, "DEPRECATED: use --set-severity instead of --select")?;
+        }
+        if self.force_select {
+            writeln!(
+                error_writer,
+                "DEPRECATED: use --force-set-severity instead of --force-select"
+            )?;
+        }
+        let all_selectors = self
+            .select
+            .iter()
+            .cloned()
+            .chain(self.set_severity.iter().cloned())
+            .collect::<Vec<_>>();
+        let mut selectors: Cow<'_, Vec<_>> = Cow::Borrowed(&all_selectors);
+        if !selectors.is_empty() && !(self.force_select || self.force_set_severity) {
+            let new_selectors = self.map_interest_selectors(realm_query, selectors.iter()).await?;
             if !new_selectors.is_empty() {
                 selectors = Cow::Owned(
                     new_selectors.into_iter().map(|selector| selector.into_owned()).collect(),
                 );
             }
         }
-        if !self.select.is_empty() {
+        if !all_selectors.is_empty() {
             log_settings_client.set_interest(selectors.as_ref()).await?;
         }
         Ok(())
     }
 
-    fn get_selectors_and_monikers(&self) -> Vec<(String, &LogInterestSelector)> {
+    fn get_selectors_and_monikers<'a>(
+        interest_selectors: impl Iterator<Item = &'a LogInterestSelector>,
+    ) -> Vec<(String, &'a LogInterestSelector)> {
         let mut selectors = vec![];
-        for selector in &self.select {
+        for selector in interest_selectors {
             let segments = selector.selector.moniker_segments.as_ref().unwrap();
             let mut full_moniker = String::new();
             for segment in segments {
@@ -569,7 +601,7 @@ mod test {
 
         let cmd = LogCommand {
             sub_command: Some(LogSubCommand::Dump(DumpCommand {})),
-            select: vec![parse_log_interest_selector("ambiguous_selector#INFO").unwrap()],
+            set_severity: vec![parse_log_interest_selector("ambiguous_selector#INFO").unwrap()],
             ..LogCommand::default()
         };
         let mut set_interest_result = None;
@@ -577,7 +609,7 @@ mod test {
         let mut scheduler = FuturesUnordered::new();
         scheduler.push(Either::Left(async {
             set_interest_result =
-                Some(cmd.maybe_set_interest(&settings_proxy, &getter, false).await);
+                Some(cmd.maybe_set_interest(&settings_proxy, &getter, &mut vec![]).await);
             drop(settings_proxy);
         }));
         scheduler.push(Either::Right(async {
@@ -597,11 +629,11 @@ If this is unintentional you can explicitly match using the
 following command:
 
 ffx log \
-	--select core/some/ambiguous_selector\\:thing/test#INFO \
-	--select core/other/ambiguous_selector\\:thing/test#INFO
+	--set-severity core/some/ambiguous_selector\\:thing/test#INFO \
+	--set-severity core/other/ambiguous_selector\\:thing/test#INFO
 
 If this is intentional, you can disable this with
-ffx log --force-select.
+ffx log --force-set-severity.
 "#;
         assert_eq!(error, EXPECTED_INTEREST_ERROR);
     }
@@ -610,7 +642,7 @@ ffx log --force-select.
     async fn logger_translates_selector_if_one_match() {
         let cmd = LogCommand {
             sub_command: Some(LogSubCommand::Dump(DumpCommand {})),
-            select: vec![parse_log_interest_selector("ambiguous_selector#INFO").unwrap()],
+            set_severity: vec![parse_log_interest_selector("ambiguous_selector#INFO").unwrap()],
             ..LogCommand::default()
         };
         let mut set_interest_result = None;
@@ -621,7 +653,7 @@ ffx log --force-select.
         let (settings_proxy, settings_server) = create_proxy::<LogSettingsMarker>().unwrap();
         scheduler.push(Either::Left(async {
             set_interest_result =
-                Some(cmd.maybe_set_interest(&settings_proxy, &getter, false).await);
+                Some(cmd.maybe_set_interest(&settings_proxy, &getter, &mut vec![]).await);
             drop(settings_proxy);
         }));
         scheduler.push(Either::Right(async {
@@ -643,11 +675,11 @@ ffx log --force-select.
     }
 
     #[fuchsia::test]
-    async fn logger_prints_ignores_ambiguity_if_force_select_is_used() {
+    async fn logger_prints_ignores_ambiguity_if_force_set_severity_is_used() {
         let cmd = LogCommand {
             sub_command: Some(LogSubCommand::Dump(DumpCommand {})),
-            select: vec![parse_log_interest_selector("ambiguous_selector#INFO").unwrap()],
-            force_select: true,
+            set_severity: vec![parse_log_interest_selector("ambiguous_selector#INFO").unwrap()],
+            force_set_severity: true,
             ..LogCommand::default()
         };
         let mut getter = FakeInstanceGetter::default();
@@ -661,7 +693,7 @@ ffx log --force-select.
         let (settings_proxy, settings_server) = create_proxy::<LogSettingsMarker>().unwrap();
         scheduler.push(Either::Left(async {
             set_interest_result =
-                Some(cmd.maybe_set_interest(&settings_proxy, &getter, false).await);
+                Some(cmd.maybe_set_interest(&settings_proxy, &getter, &mut vec![]).await);
             drop(settings_proxy);
         }));
         scheduler.push(Either::Right(async {
@@ -686,8 +718,8 @@ ffx log --force-select.
     async fn logger_prints_ignores_ambiguity_if_machine_output_is_used() {
         let cmd = LogCommand {
             sub_command: Some(LogSubCommand::Dump(DumpCommand {})),
-            select: vec![parse_log_interest_selector("ambiguous_selector#INFO").unwrap()],
-            force_select: true,
+            set_severity: vec![parse_log_interest_selector("ambiguous_selector#INFO").unwrap()],
+            force_set_severity: true,
             ..LogCommand::default()
         };
         let mut getter = FakeInstanceGetter::default();
@@ -701,7 +733,7 @@ ffx log --force-select.
         let (settings_proxy, settings_server) = create_proxy::<LogSettingsMarker>().unwrap();
         scheduler.push(Either::Left(async {
             set_interest_result =
-                Some(cmd.maybe_set_interest(&settings_proxy, &getter, false).await);
+                Some(cmd.maybe_set_interest(&settings_proxy, &getter, &mut vec![]).await);
             drop(settings_proxy);
         }));
         scheduler.push(Either::Right(async {

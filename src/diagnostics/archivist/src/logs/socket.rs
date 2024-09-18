@@ -2,9 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be found in the LICENSE file.
 
 use super::stats::LogStreamStats;
-use crate::logs::stored_message::{
-    GenericStoredMessage, LegacyStoredMessage, StructuredStoredMessage,
-};
+use crate::logs::stored_message::StoredMessage;
 use futures::Stream;
 use std::marker::PhantomData;
 use std::pin::Pin;
@@ -15,7 +13,7 @@ use {fuchsia_async as fasync, fuchsia_zircon as zx};
 /// An `Encoding` is able to parse a `Message` from raw bytes.
 pub trait Encoding {
     /// Attempt to parse a message from the given buffer
-    fn wrap_bytes(bytes: Vec<u8>, stats: Arc<LogStreamStats>) -> GenericStoredMessage;
+    fn wrap_bytes(bytes: Vec<u8>, stats: &Arc<LogStreamStats>) -> Option<StoredMessage>;
 }
 
 /// An encoding that can parse the legacy [logger/syslog wire format]
@@ -31,14 +29,14 @@ pub struct LegacyEncoding;
 pub struct StructuredEncoding;
 
 impl Encoding for LegacyEncoding {
-    fn wrap_bytes(buf: Vec<u8>, stats: Arc<LogStreamStats>) -> GenericStoredMessage {
-        LegacyStoredMessage::create(buf, stats)
+    fn wrap_bytes(buf: Vec<u8>, stats: &Arc<LogStreamStats>) -> Option<StoredMessage> {
+        StoredMessage::from_legacy(buf.into_boxed_slice(), stats)
     }
 }
 
 impl Encoding for StructuredEncoding {
-    fn wrap_bytes(buf: Vec<u8>, stats: Arc<LogStreamStats>) -> GenericStoredMessage {
-        StructuredStoredMessage::create(buf, stats)
+    fn wrap_bytes(buf: Vec<u8>, stats: &Arc<LogStreamStats>) -> Option<StoredMessage> {
+        StoredMessage::new(buf.into_boxed_slice(), stats)
     }
 }
 
@@ -71,7 +69,7 @@ impl<E> Stream for LogMessageSocket<E>
 where
     E: Encoding + Unpin,
 {
-    type Item = Result<GenericStoredMessage, zx::Status>;
+    type Item = Result<StoredMessage, zx::Status>;
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let this = self.get_mut();
@@ -90,7 +88,10 @@ where
                 // If we got data, then return the data we read.
                 Poll::Ready(Ok(_len)) => {
                     let buf = std::mem::take(&mut this.buffer);
-                    return Poll::Ready(Some(Ok(E::wrap_bytes(buf, Arc::clone(&this.stats)))));
+                    let Some(msg) = E::wrap_bytes(buf, &this.stats) else {
+                        continue;
+                    };
+                    return Poll::Ready(Some(Ok(msg)));
                 }
             }
         }
@@ -110,7 +111,7 @@ mod tests {
     use diagnostics_data::{LogsField, Severity};
     use diagnostics_log_encoding::encode::{Encoder, EncoderOpts};
     use diagnostics_log_encoding::{Argument, Record, Severity as StreamSeverity, Value};
-    use diagnostics_message::{fx_log_packet_t, METADATA_SIZE};
+    use diagnostics_message::fx_log_packet_t;
     use fuchsia_zircon as zx;
     use futures::StreamExt;
     use std::io::Cursor;
@@ -141,7 +142,6 @@ mod tests {
         .build();
 
         let bytes = ls.next().await.unwrap().unwrap();
-        assert_eq!(bytes.size(), METADATA_SIZE + 6 /* tag */+ 6 /* msg */,);
         let result_message = bytes.parse(&TEST_IDENTITY).unwrap();
         assert_eq!(result_message, expected_p);
 

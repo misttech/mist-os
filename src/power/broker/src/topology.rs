@@ -121,6 +121,8 @@ pub struct Element {
     id: ElementID,
     name: String,
     valid_levels: Vec<IndexedPowerLevel>,
+    #[allow(dead_code)]
+    synthetic: bool,
     inspect_vertex: Rc<RefCell<IGraphVertex<ElementID>>>,
     inspect_edges: Rc<RefCell<HashMap<ElementID, IGraphEdge>>>,
 }
@@ -130,6 +132,7 @@ impl Element {
         id: ElementID,
         name: String,
         mut valid_levels: Vec<IndexedPowerLevel>,
+        synthetic: bool,
         inspect_vertex: IGraphVertex<ElementID>,
     ) -> Self {
         valid_levels.sort();
@@ -137,6 +140,7 @@ impl Element {
             id,
             name,
             valid_levels,
+            synthetic,
             inspect_vertex: Rc::new(RefCell::new(inspect_vertex)),
             inspect_edges: Rc::new(RefCell::new(HashMap::new())),
         }
@@ -145,7 +149,6 @@ impl Element {
 
 #[derive(Debug)]
 pub enum AddElementError {
-    Internal,
     Invalid,
     NotAuthorized,
 }
@@ -153,7 +156,6 @@ pub enum AddElementError {
 impl Into<fpb::AddElementError> for AddElementError {
     fn into(self) -> fpb::AddElementError {
         match self {
-            AddElementError::Internal => fpb::AddElementError::Internal,
             AddElementError::Invalid => fpb::AddElementError::Invalid,
             AddElementError::NotAuthorized => fpb::AddElementError::NotAuthorized,
         }
@@ -302,7 +304,7 @@ impl Topology {
             .collect();
         self.elements.insert(
             id.clone(),
-            Element::new(id.clone(), name.into(), valid_levels, inspect_vertex),
+            Element::new(id.clone(), name.into(), valid_levels, synthetic, inspect_vertex),
         );
         Ok(id)
     }
@@ -310,6 +312,11 @@ impl Topology {
     #[cfg(test)]
     pub fn element_exists(&self, element_id: &ElementID) -> bool {
         self.elements.contains_key(element_id)
+    }
+
+    #[allow(dead_code)]
+    pub fn element_is_synthetic(&self, element_id: &ElementID) -> bool {
+        self.elements.get(element_id).and_then(|x| Some(x.synthetic)).unwrap_or(false)
     }
 
     pub fn element_name(&self, element_id: &ElementID) -> Cow<'_, str> {
@@ -1087,6 +1094,12 @@ mod tests {
                 },
             },
         }}}});
+
+        let synthetic_element = t
+            .add_synthetic_element("Synthetic", BINARY_POWER_LEVELS.to_vec())
+            .expect("add_synthetic_element failed");
+        assert_eq!(t.element_exists(&synthetic_element), true);
+        assert_eq!(t.element_is_synthetic(&synthetic_element), true);
     }
 
     #[fuchsia::test]

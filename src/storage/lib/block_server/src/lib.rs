@@ -4,23 +4,28 @@
 use anyhow::{anyhow, Error};
 use block_protocol::{BlockFifoRequest, BlockFifoResponse};
 use fidl_fuchsia_hardware_block_driver::{BlockIoFlag, BlockOpcode};
-use futures::stream::FuturesUnordered;
-use futures::{Future, StreamExt as _, TryStreamExt as _};
+use futures::{Future, FutureExt as _, TryStreamExt as _};
 use std::collections::btree_map::Entry;
 use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex};
 use zx::HandleBased;
 use {
     fidl_fuchsia_hardware_block as fblock, fidl_fuchsia_hardware_block_partition as fpartition,
-    fidl_fuchsia_hardware_block_volume as fvolume, fuchsia_zircon as zx,
+    fidl_fuchsia_hardware_block_volume as fvolume, fuchsia_async as fasync, fuchsia_zircon as zx,
 };
 
 pub mod async_interface;
 pub mod c_interface;
 
+/// Information associated with the block device.  The fields are immutable except for
+/// `block_count`.
 #[derive(Clone)]
 pub struct PartitionInfo {
+    /// If `block_count` is zero at construction time, the server will use the `get_volume_info`
+    /// method to get the count of assigned slices and use that (along with the slice and block
+    /// sizes) to determine the block count.
     pub block_count: u64,
+
     pub block_size: u32,
     pub type_guid: [u8; 16],
     pub instance_guid: [u8; 16],
@@ -93,8 +98,9 @@ pub struct BlockServer<SM> {
     session_manager: Arc<SM>,
 }
 
-// Methods take Arc rather than &self because of https://github.com/rust-lang/rust/issues/42940.
-pub trait SessionManager {
+// Methods take Arc<Self> rather than &self because of
+// https://github.com/rust-lang/rust/issues/42940.
+pub trait SessionManager: 'static {
     fn on_attach_vmo(
         self: Arc<Self>,
         vmo: &Arc<zx::Vmo>,
@@ -158,22 +164,16 @@ impl<SM: SessionManager> BlockServer<SM> {
     /// Called to process requests for fuchsia.hardware.block.volume/Volume.
     pub async fn handle_requests(
         &self,
-        requests: fvolume::VolumeRequestStream,
+        mut requests: fvolume::VolumeRequestStream,
     ) -> Result<(), Error> {
-        let mut requests =
-            std::pin::pin!(requests.err_into().and_then(|r| self.handle_request(r)).fuse());
-        let mut sessions = FuturesUnordered::new();
-        loop {
-            futures::select! {
-                maybe_session = requests.try_next() => {
-                    if let Some(Some(session)) = maybe_session? {
-                        sessions.push(session);
-                    }
-                }
-                _ = sessions.select_next_some() => {}
-                complete => return Ok(()),
+        let scope = fasync::Scope::new();
+        while let Some(request) = requests.try_next().await.unwrap() {
+            if let Some(session) = self.handle_request(request).await? {
+                scope.spawn(session.map(|_| ())).detach();
             }
         }
+        scope.await;
+        Ok(())
     }
 
     /// Processes a partition request.
@@ -183,8 +183,15 @@ impl<SM: SessionManager> BlockServer<SM> {
     ) -> Result<Option<impl Future<Output = Result<(), Error>> + Send>, Error> {
         match request {
             fvolume::VolumeRequest::GetInfo { responder } => {
+                let block_count = if self.partition_info.block_count == 0 {
+                    let volume_info = self.session_manager.get_volume_info().await?;
+                    volume_info.0.slice_size * volume_info.1.partition_slice_count
+                        / self.partition_info.block_size as u64
+                } else {
+                    self.partition_info.block_count
+                };
                 responder.send(Ok(&fblock::BlockInfo {
-                    block_count: self.partition_info.block_count,
+                    block_count,
                     block_size: self.partition_info.block_size,
                     max_transfer_size: fblock::MAX_TRANSFER_UNBOUNDED,
                     flags: fblock::Flag::empty(),
@@ -407,11 +414,17 @@ impl<SM: SessionManager> SessionHelper<SM> {
             BlockOpcode::Read => Operation::Read {
                 device_block_offset: request.dev_offset,
                 block_count: request.length,
+                _unused: 0,
                 vmo_offset,
             },
             BlockOpcode::Write => Operation::Write {
                 device_block_offset: request.dev_offset,
                 block_count: request.length,
+                options: if flags.contains(BlockIoFlag::FORCE_ACCESS) {
+                    WriteOptions::FORCE_ACCESS
+                } else {
+                    WriteOptions::empty()
+                },
                 vmo_offset,
             },
             BlockOpcode::Flush => Operation::Flush,
@@ -423,6 +436,10 @@ impl<SM: SessionManager> SessionHelper<SM> {
         });
         Some(DecodedRequest { group_or_request, operation, vmo })
     }
+
+    fn take_vmos(&self) -> BTreeMap<u16, Arc<zx::Vmo>> {
+        std::mem::take(&mut *self.vmos.lock().unwrap())
+    }
 }
 
 #[derive(Debug)]
@@ -432,17 +449,26 @@ struct DecodedRequest {
     vmo: Option<Arc<zx::Vmo>>,
 }
 
+/// cbindgen:no-export
+pub type WriteOptions = block_protocol::WriteOptions;
+
 #[repr(C)]
 #[derive(Debug)]
 pub enum Operation {
+    // NOTE: On the C++ side, this ends up as a union and, for efficiency reasons, there is code
+    // that assumes that some fields for reads and writes (and possibly trim) line-up (e.g. common
+    // code can read `device_block_offset` from the read variant and then assume it's valid for the
+    // write variant).
     Read {
         device_block_offset: u64,
         block_count: u32,
+        _unused: u32,
         vmo_offset: u64,
     },
     Write {
         device_block_offset: u64,
         block_count: u32,
+        options: WriteOptions,
         vmo_offset: u64,
     },
     Flush,
@@ -503,7 +529,7 @@ impl From<RequestId> for GroupOrRequest {
 #[cfg(test)]
 mod tests {
     use super::{BlockServer, PartitionInfo};
-    use block_protocol::{BlockFifoCommand, BlockFifoRequest, BlockFifoResponse};
+    use block_protocol::{BlockFifoCommand, BlockFifoRequest, BlockFifoResponse, WriteOptions};
     use fidl_fuchsia_hardware_block_driver::{BlockIoFlag, BlockOpcode};
     use fuchsia_async::{FifoReadable as _, FifoWritable as _};
     use fuchsia_zircon::{AsHandleRef as _, HandleBased as _};
@@ -556,6 +582,7 @@ mod tests {
             _block_count: u32,
             _vmo: &Arc<zx::Vmo>,
             _vmo_offset: u64,
+            _opts: WriteOptions,
         ) -> Result<(), zx::Status> {
             unreachable!();
         }
@@ -805,6 +832,7 @@ mod tests {
             block_count: u32,
             _vmo: &Arc<zx::Vmo>,
             vmo_offset: u64,
+            _opts: WriteOptions,
         ) -> Result<(), zx::Status> {
             if self.return_errors {
                 Err(zx::Status::NOT_SUPPORTED)

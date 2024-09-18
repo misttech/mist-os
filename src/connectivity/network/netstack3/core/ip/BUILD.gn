@@ -54,7 +54,6 @@ rustc_library_with_features("netstack3-ip") {
     "//src/connectivity/lib/net-types",
     "//src/connectivity/lib/packet-formats",
     "//src/connectivity/network/lib/explicit",
-    "//src/connectivity/network/lib/todo_unused",
     "//src/connectivity/network/netstack3/core/lock-order",
     "//src/lib/const-unwrap",
     "//src/lib/fakealloc",
@@ -123,6 +122,7 @@ rustc_library_with_features("netstack3-ip") {
         "//src/connectivity/network/netstack3/core/base:netstack3-base-testutils",
         "//src/connectivity/network/netstack3/core/filter:netstack3-filter-testutils",
         "//third_party/rust_crates:itertools",
+        "//third_party/rust_crates:static_assertions",
         "//third_party/rust_crates:test-case",
       ]
     },

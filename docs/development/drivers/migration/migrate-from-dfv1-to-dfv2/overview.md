@@ -1,33 +1,32 @@
 # Migrate from DFv1 to DFv2
 
-A major part of DFv1-to-DFv2 migration work involves updating the
-[driver interfaces][driver-interfaces] to DFv2.
+Migrating a DFv1 driver to DFv2 primarily involves updating the
+driver's interfaces and services to DFv2.
 
-However, if your target driver has descendant DFv1 drivers that haven't yet
-migrated to DFv2, you need to use the compatibility shim to enable your
-now-DFv2 driver to talk to other DFv1 drivers in the system. For more
-information on setting up and using this compatibility shim in a DFv2 driver,
-see the
-[Set up the compat device server in a DFv2 driver][set-up-compat-device-server]
-guide.
+However, if your target driver has descendant DFv1 drivers that haven't
+yet migrated to DFv2, you need to use the [compatibility shim][compat-shim]
+to enable your now-DFv2 driver to talk to other DFv1 drivers in the system.
+For more information, see
+[**Set up the compat device server in a DFv2 driver**][set-up-compat-device-server].
 
 ## Before you start {:#before-you-start}
 
-Before you start jumping into the DFv1-to-DFv2 migration tasks, check out
-the [frequently asked questions][faq] page, which can help you identify special
-conditions or edge cases that may apply to your driver.
+Prior to starting migration tasks, first check out the
+[**Frequently asked questions**][faq] page. This can help you identify
+special conditions or edge cases that may apply to your driver.
 
 ## List of migration tasks {:#list-of-migration-tasks}
 
-DFv1-to-DFv2 migration tasks are:
-
-- [Update DDK interfaces to DFv2][update-ddk-interfaces-to-dfv2]
+- [**Update DDK interfaces to DFv2**][update-ddk-interfaces-to-dfv2]:
+  Learn how to migrate the legacy DFv1 driver interfaces to DFv2.
 
   - [Update dependencies from DDK to DFv2][update-dependencies]
   - [Update the driver interfaces from DFv1 to DFv2][update-driver-interfaces]
   - [Migrate other interfaces][migrate-other-interfaces]
 
-- [Update other services to DFv2][update-other-services-to-dfv2]
+- [**Update other services to DFv2**][update-other-services-to-dfv2]:
+  Learn how to migrate a driver's services other than the DDK interfaces
+  to DFv2.
 
   - [Use the DFv2 service discovery][use-service-discovery]
   - [Update component manifests of other drivers][update-component-manifests]
@@ -37,9 +36,7 @@ DFv1-to-DFv2 migration tasks are:
   - ([Optional) Implement your own load_firmware method][implement-firmware]
   - ([Optional) Use the node properties generated from FIDL service offers][use-node-properties]
   - [Update unit tests to DFv2][update-unit-tests]
-
-For more information and examples, see
-[Additional resources][additional-resources].
+  - [Additional resources][additional-resources]
 
 <!-- Reference links -->
 
@@ -60,3 +57,4 @@ For more information and examples, see
 [update-unit-tests]: update-other-services-to-dfv2.md#update-unit-tests-to-dfv2
 [additional-resources]: update-other-services-to-dfv2.md#additional-resources
 [set-up-compat-device-server]: /docs/development/drivers/migration/set-up-compat-device-server.md
+[compat-shim]: faq.md#what_is_the_compatibility_shim_and_when_is_it_necessary

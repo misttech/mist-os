@@ -6,27 +6,34 @@
 #include <fidl/fuchsia.test.drivers.power/cpp/fidl.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
+#include <lib/driver/power/cpp/testing/fake_element_control.h>
+#include <lib/driver/power/cpp/testing/fidl_bound_server.h>
 #include <lib/syslog/cpp/macros.h>
 
 #include <sdk/lib/sys/cpp/outgoing_directory.h>
 
+#include "lib/async/dispatcher.h"
 #include "lib/fit/internal/result.h"
 
 namespace mock_power_broker {
 
+using fdf_power::testing::FakeElementControl;
+using fdf_power::testing::FidlBoundServer;
+
 class PowerElement {
  public:
-  explicit PowerElement(fidl::ServerEnd<fuchsia_power_broker::ElementControl> ec,
+  explicit PowerElement(async_dispatcher_t* dispatcher,
+                        fidl::ServerEnd<fuchsia_power_broker::ElementControl> ec,
                         fidl::ServerEnd<fuchsia_power_broker::Lessor> less,
                         fidl::ServerEnd<fuchsia_power_broker::CurrentLevel> current,
                         fidl::ServerEnd<fuchsia_power_broker::RequiredLevel> required)
-      : element_control_(std::move(ec)),
+      : element_control_(dispatcher, std::move(ec)),
         lessor_(std::move(less)),
         current_level_(std::move(current)),
         required_level_(std::move(required)) {}
 
  private:
-  fidl::ServerEnd<fuchsia_power_broker::ElementControl> element_control_;
+  FidlBoundServer<FakeElementControl> element_control_;
   fidl::ServerEnd<fuchsia_power_broker::Lessor> lessor_;
   fidl::ServerEnd<fuchsia_power_broker::CurrentLevel> current_level_;
   fidl::ServerEnd<fuchsia_power_broker::RequiredLevel> required_level_;
@@ -35,11 +42,14 @@ class PowerElement {
 class Topology : public fidl::Server<fuchsia_power_broker::Topology>,
                  public fidl::Server<fuchsia_test_drivers_power::GetPowerElements> {
  public:
+  explicit Topology(async_dispatcher_t* dispatcher) : dispatcher_(dispatcher) {}
+
   void AddElement(AddElementRequest& req, AddElementCompleter::Sync& completer) override {
     FX_LOGS(INFO) << "Got add element request for element named '"
                   << req.element_name().value().c_str() << "'";
 
-    clients_.emplace_back(std::move(req.element_control().value()),
+    ZX_ASSERT(dispatcher_ != nullptr);
+    clients_.emplace_back(dispatcher_, std::move(req.element_control().value()),
                           std::move(req.lessor_channel().value()),
                           std::move(req.level_control_channels().value().current()),
                           std::move(req.level_control_channels().value().required()));
@@ -74,6 +84,8 @@ class Topology : public fidl::Server<fuchsia_power_broker::Topology>,
     completer_ = std::nullopt;
     added_elements_ = std::vector<std::string>();
   }
+
+  async_dispatcher_t* dispatcher_ = nullptr;
   std::optional<GetElementsCompleter::Async> completer_;
   std::vector<std::string> added_elements_;
   std::vector<PowerElement> clients_;
@@ -90,7 +102,7 @@ int main(int argc, char** argv) {
   std::vector<fidl::ServerBindingRef<fuchsia_test_drivers_power::GetPowerElements>>
       get_elements_bindings_;
   std::shared_ptr<mock_power_broker::Topology> handler =
-      std::make_shared<mock_power_broker::Topology>();
+      std::make_shared<mock_power_broker::Topology>(loop.dispatcher());
 
   fidl::ProtocolHandler<fuchsia_power_broker::Topology> req_handler =
       [handler, &topology_bindings_, &loop](fidl::ServerEnd<fuchsia_power_broker::Topology> req) {

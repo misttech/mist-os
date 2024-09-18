@@ -33,7 +33,9 @@ ServerAliveInterval=1
 # Sets the number of keepalive messages that may be sent by the client
 # without the client receiving any messages back from the server.
 # When this threshold is reached the client will terminate the session.
-ServerAliveCountMax=10
+# Note that emulator processes sometimes stalling, apparently due to
+# a Cavium issue (b/343550891) this should be more than 15.
+ServerAliveCountMax=20
 
 # Specifies whether to send TCP keepalives to the other side. These operate on the level of the TCP protocol.
 TCPKeepAlive=yes

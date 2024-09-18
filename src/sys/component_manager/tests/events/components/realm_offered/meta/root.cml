@@ -5,6 +5,7 @@
     include: [
         "//src/sys/component_manager/tests/meta/elf_runner_and_environment.shard.cml",
         "inspect/offer.shard.cml",
+        "syslog/offer.shard.cml",
     ],
 
     // The nested realm that will bootstrap what we want to test.
@@ -19,11 +20,6 @@
 
     // Route Echo service from server to client.
     offer: [
-        {
-            protocol: [ "fuchsia.logger.LogSink" ],
-            from: "parent",
-            to: "#nested_realm",
-        },
         {
             event_stream: [
                 "started",

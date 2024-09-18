@@ -70,6 +70,9 @@ When updating, please add the value in alphabetical order.
 :                                         : interfaces before starting the     :
 :                                         : emulator.                          :
 :                                         : Defaults to `""` (the empty string):
+| `fastboot.devices_file`                 | Path to the fastboot devices file. :
+:                                         : Defaults to                        :
+:                                         : `${HOME}/.fastboot/devices`        :
 | `fastboot.flash.min_timeout_secs`       | The minimum flash timeout (in      |
 :                                         : seconds) for flashing to a target  :
 :                                         : device. Defaults to `60` seconds   :
@@ -87,6 +90,9 @@ When updating, please add the value in alphabetical order.
 :                                         : over TCP                           :
 | `fastboot.usb.disabled`                 | Disables fastboot usb discovery if |
 :                                         : set to true. Defaults to `false`   :
+| `ffx.daemon_timeout`                    | How long to wait in milliseconds   |
+:                                         : when attempting to connect to the  |
+:                                         : daemon. Defaults to `15000`        :
 | `ffx.fastboot.inline_target`            | Boolean value to signal that the   |
 :                                         : target is in fastboot, and to      :
 :                                         : communicate directly with it as    :

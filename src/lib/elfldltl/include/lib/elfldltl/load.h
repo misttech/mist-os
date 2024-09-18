@@ -285,7 +285,10 @@ class LoadInfo {
     vaddr_size_ = other.vaddr_size();
 
     segments_.clear();
-    segments_.reserve(other.segments().size());
+    if (!segments_.reserve(diag, "cannot copy segment info", other.segments().size()))
+        [[unlikely]] {
+      return false;
+    }
     auto copy_segment = [this, &diag](const auto& other_segment) -> bool {
       using OtherSegment = std::decay_t<decltype(other_segment)>;
       using NewSegment = SegmentTypeFromOther<Other, OtherSegment>;

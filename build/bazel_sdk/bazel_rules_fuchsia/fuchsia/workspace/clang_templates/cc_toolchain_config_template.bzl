@@ -16,81 +16,54 @@ load(
     "find_cpp_toolchain",
     "use_cpp_toolchain",
 )
-load("@fuchsia_clang//:cc_features.bzl", "features", "sanitizer_features")
+load("//:cc_features.bzl", "features")
+load("//common:toolchains/clang/toolchain_utils.bzl", "compute_clang_features")
+load("//common/platforms:utils.bzl", "to_fuchsia_cpu_name")
+
+def bazel_cpu_to_fuchsia_cpu(cpu):
+    """Converts the Bazel cpu type to the Fuchsia cpu"""
+    _MAP = {
+        "aarch64": "arm64",
+        "x86_64": "x64",
+    }
+    return _MAP.get(cpu, cpu)
+
+_SYSROOT_PATHS = {
+    "aarch64": "%{SYSROOT_PATH_AARCH64}",
+    "riscv64": "%{SYSROOT_PATH_RISCV64}",
+    "x86_64": "%{SYSROOT_PATH_X86_64}",
+}
 
 def _cc_toolchain_config_impl(ctx):
     target_system_name = ctx.attr.cpu + "-unknown-fuchsia"
     tool_paths = [
-        tool_path(
-            name = "ar",
-            path = "bin/llvm-ar",
-        ),
-        tool_path(
-            name = "cpp",
-            path = "bin/clang++",
-        ),
-        tool_path(
-            name = "gcc",
-            path = "bin/clang",
-        ),
-        tool_path(
-            name = "lld",
-            path = "bin/lld",
-        ),
-        tool_path(
-            name = "objdump",
-            path = "bin/llvm-objdump",
-        ),
-        tool_path(
-            name = ACTION_NAMES.strip,
-            path = "bin/llvm-strip",
-        ),
-        tool_path(
-            name = "nm",
-            path = "bin/llvm-nm",
-        ),
-        tool_path(
-            name = "objcopy",
-            path = "bin/llvm-objcopy",
-        ),
-        tool_path(
-            name = "dwp",
-            path = "/not_available/dwp",
-        ),
-        tool_path(
-            name = "compat-ld",
-            path = "/not_available/compat-ld",
-        ),
-        tool_path(
-            name = "gcov",
-            path = "/not_available/gcov",
-        ),
-        tool_path(
-            name = "gcov-tool",
-            path = "/not_available/gcov-tool",
-        ),
-        tool_path(
-            name = "ld",
-            path = "bin/ld.lld",
-        ),
+        tool_path(name = "ar", path = "bin/llvm-ar"),
+        tool_path(name = "cpp", path = "bin/clang++"),
+        tool_path(name = "gcc", path = "bin/clang"),
+        tool_path(name = "lld", path = "bin/lld"),
+        tool_path(name = "objdump", path = "bin/llvm-objdump"),
+        tool_path(name = ACTION_NAMES.strip, path = "bin/llvm-strip"),
+        tool_path(name = "nm", path = "bin/llvm-nm"),
+        tool_path(name = "objcopy", path = "bin/llvm-objcopy"),
+        tool_path(name = "dwp", path = "/not_available/dwp"),
+        tool_path(name = "compat-ld", path = "/not_available/compat-ld"),
+        tool_path(name = "gcov", path = "/not_available/gcov"),
+        tool_path(name = "gcov-tool", path = "/not_available/gcov-tool"),
+        tool_path(name = "ld", path = "bin/ld.lld"),
     ]
 
     cc_features = [
         features.default_compile_flags,
-        features.dbg,
-        features.opt,
         features.target_system_name(target_system_name),
-        features.dependency_file,
         features.supports_pic,
-        features.coverage,
-        features.ml_inliner,
-        features.static_cpp_standard_library,
         features.no_runtime_library_search_directories,
-        features.generate_linkmap,
-    ] + sanitizer_features
-
-    # TODO(https://fxbug.dev/356347441): Remove this once Bazel has been fixed.
-    cc_features.append(features.no_dotd_file)
+    ]
+    cc_features += compute_clang_features(
+        "{HOST_OS}",
+        "{HOST_CPU}",
+        "fuchsia",
+        to_fuchsia_cpu_name(ctx.attr.cpu),
+    )
 
     return cc_common.create_cc_toolchain_config_info(
         ctx = ctx,
@@ -111,7 +84,7 @@ def _cc_toolchain_config_impl(ctx):
             "$sysroot$/../lib/clang/%{CLANG_VERSION}/include",  # Platform libc++.
             "$sysroot$/../lib/clang/%{CLANG_VERSION}/share",  # Platform libc++.
         ],
-        builtin_sysroot = "%{SYSROOT_PATH_PREFIX}" + ctx.attr.cpu,
+        builtin_sysroot = _SYSROOT_PATHS[ctx.attr.cpu],
         cc_target_os = "fuchsia",
         features = cc_features,
     )

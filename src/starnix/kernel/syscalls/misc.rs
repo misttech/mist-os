@@ -31,6 +31,7 @@ use starnix_uapi::errors::Errno;
 use starnix_uapi::personality::PersonalityFlags;
 use starnix_uapi::user_address::{UserAddress, UserCString, UserRef};
 use starnix_uapi::user_buffer::MAX_RW_COUNT;
+use starnix_uapi::version::KERNEL_RELEASE;
 use starnix_uapi::{
     c_char, errno, error, from_status_like_fdio, perf_event_attr, pid_t, uapi, utsname, EFAULT,
     GRND_NONBLOCK, GRND_RANDOM, LINUX_REBOOT_CMD_CAD_OFF, LINUX_REBOOT_CMD_CAD_ON,
@@ -63,7 +64,7 @@ pub fn sys_uname(
     if current_task.thread_group.read().personality.contains(PersonalityFlags::UNAME26) {
         init_array(&mut result.release, b"2.6.40-starnix");
     } else {
-        init_array(&mut result.release, b"5.10.199-starnix");
+        init_array(&mut result.release, KERNEL_RELEASE.as_bytes());
     }
 
     let version = current_task.kernel().build_version.get_or_try_init(|| {

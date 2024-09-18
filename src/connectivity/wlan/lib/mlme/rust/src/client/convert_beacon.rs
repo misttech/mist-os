@@ -7,10 +7,7 @@ use ieee80211::{Bssid, MacAddrBytes};
 use wlan_common::channel::derive_channel;
 use wlan_common::mac::CapabilityInfo;
 use wlan_common::{ie, TimeUnit};
-use {
-    fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_internal as fidl_internal,
-    fidl_fuchsia_wlan_softmac as fidl_softmac,
-};
+use {fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_softmac as fidl_softmac};
 
 /// Given information from beacon or probe response, convert to BssDescription.
 pub fn construct_bss_description(
@@ -19,7 +16,7 @@ pub fn construct_bss_description(
     capability_info: CapabilityInfo,
     ies: &[u8],
     rx_info: fidl_softmac::WlanRxInfo,
-) -> Result<fidl_internal::BssDescription, Error> {
+) -> Result<fidl_common::BssDescription, Error> {
     let mut dsss_channel = None;
     let mut parsed_ht_op = None;
     let mut parsed_vht_op = None;
@@ -45,7 +42,7 @@ pub fn construct_bss_description(
     let channel =
         derive_channel(rx_info.channel.primary, dsss_channel, parsed_ht_op, parsed_vht_op);
 
-    Ok(fidl_internal::BssDescription {
+    Ok(fidl_common::BssDescription {
         bssid: bssid.to_array(),
         bss_type,
         beacon_period: beacon_interval.0,
@@ -178,7 +175,7 @@ mod tests {
 
         assert_eq!(
             bss_description,
-            fidl_internal::BssDescription {
+            fidl_common::BssDescription {
                 bssid: BSSID.to_array(),
                 bss_type: fidl_common::BssType::Infrastructure,
                 beacon_period: BEACON_INTERVAL,

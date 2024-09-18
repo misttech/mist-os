@@ -18,9 +18,8 @@ use wlan_common::time::TimeUnit;
 use wlan_frame_writer::write_frame_to_vec;
 use {
     fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211,
-    fidl_fuchsia_wlan_internal as fidl_internal, fidl_fuchsia_wlan_mlme as fidl_mlme,
-    fidl_fuchsia_wlan_softmac as fidl_softmac, fuchsia_trace as trace, fuchsia_zircon as zx,
-    wlan_trace as wtrace,
+    fidl_fuchsia_wlan_mlme as fidl_mlme, fidl_fuchsia_wlan_softmac as fidl_softmac,
+    fuchsia_trace as trace, fuchsia_zircon as zx, wlan_trace as wtrace,
 };
 
 // TODO(https://fxbug.dev/42171393): Currently hardcoded until parameters supported.
@@ -515,7 +514,7 @@ fn active_scan_request_series(
     Ok(active_scan_request_series)
 }
 
-fn send_scan_result<D: DeviceOps>(txn_id: u64, bss: fidl_internal::BssDescription, device: &mut D) {
+fn send_scan_result<D: DeviceOps>(txn_id: u64, bss: fidl_common::BssDescription, device: &mut D) {
     if trace::is_enabled() {
         let trace_bss = wlan_common::bss::BssDescription::try_from(bss.clone())
             .map(|bss| format!("{}", bss))
@@ -571,21 +570,20 @@ mod tests {
             ..MockWlanRxInfo::with_channel(fake_wlan_channel().into())
         }
         .into();
-        static ref BSS_DESCRIPTION_FOO: fidl_internal::BssDescription =
-            fidl_internal::BssDescription {
-                bssid: BSSID_FOO.to_array(),
-                bss_type: fidl_common::BssType::Infrastructure,
-                beacon_period: BEACON_INTERVAL_FOO,
-                capability_info: CAPABILITY_INFO_FOO.0,
-                ies: BEACON_IES_FOO.to_vec(),
-                rssi_dbm: RX_INFO_FOO.rssi_dbm,
-                channel: fidl_common::WlanChannel {
-                    primary: RX_INFO_FOO.channel.primary,
-                    cbw: fidl_common::ChannelBandwidth::Cbw20,
-                    secondary80: 0,
-                },
-                snr_db: 0,
-            };
+        static ref BSS_DESCRIPTION_FOO: fidl_common::BssDescription = fidl_common::BssDescription {
+            bssid: BSSID_FOO.to_array(),
+            bss_type: fidl_common::BssType::Infrastructure,
+            beacon_period: BEACON_INTERVAL_FOO,
+            capability_info: CAPABILITY_INFO_FOO.0,
+            ies: BEACON_IES_FOO.to_vec(),
+            rssi_dbm: RX_INFO_FOO.rssi_dbm,
+            channel: fidl_common::WlanChannel {
+                primary: RX_INFO_FOO.channel.primary,
+                cbw: fidl_common::ChannelBandwidth::Cbw20,
+                secondary80: 0,
+            },
+            snr_db: 0,
+        };
         static ref BSSID_BAR: Bssid = [1u8; 6].into();
     }
 
@@ -606,21 +604,20 @@ mod tests {
             ..MockWlanRxInfo::with_channel(fake_wlan_channel().into())
         }
         .into();
-        static ref BSS_DESCRIPTION_BAR: fidl_internal::BssDescription =
-            fidl_internal::BssDescription {
-                bssid: BSSID_BAR.to_array(),
-                bss_type: fidl_common::BssType::Infrastructure,
-                beacon_period: BEACON_INTERVAL_BAR,
-                capability_info: CAPABILITY_INFO_BAR.0,
-                ies: BEACON_IES_BAR.to_vec(),
-                rssi_dbm: RX_INFO_BAR.rssi_dbm,
-                channel: fidl_common::WlanChannel {
-                    primary: RX_INFO_BAR.channel.primary,
-                    cbw: fidl_common::ChannelBandwidth::Cbw20,
-                    secondary80: 0,
-                },
-                snr_db: 0,
-            };
+        static ref BSS_DESCRIPTION_BAR: fidl_common::BssDescription = fidl_common::BssDescription {
+            bssid: BSSID_BAR.to_array(),
+            bss_type: fidl_common::BssType::Infrastructure,
+            beacon_period: BEACON_INTERVAL_BAR,
+            capability_info: CAPABILITY_INFO_BAR.0,
+            ies: BEACON_IES_BAR.to_vec(),
+            rssi_dbm: RX_INFO_BAR.rssi_dbm,
+            channel: fidl_common::WlanChannel {
+                primary: RX_INFO_BAR.channel.primary,
+                cbw: fidl_common::ChannelBandwidth::Cbw20,
+                secondary80: 0,
+            },
+            snr_db: 0,
+        };
     }
 
     lazy_static! {

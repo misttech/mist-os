@@ -5,12 +5,12 @@
 use crate::device::kobject::KObjectHandle;
 use crate::fs::sysfs::cgroup::CgroupDirectoryNode;
 use crate::fs::sysfs::{
-    sysfs_kernel_directory, sysfs_power_directory, CpuClassDirectory, SysfsDirectory,
+    sysfs_kernel_directory, sysfs_power_directory, CpuClassDirectory, KObjectDirectory,
 };
 use crate::task::{CurrentTask, NetstackDevicesDirectory};
 use crate::vfs::{
-    CacheMode, FileSystem, FileSystemHandle, FileSystemOps, FileSystemOptions, FsNodeInfo,
-    FsNodeOps, FsStr, PathBuilder, StaticDirectoryBuilder, StubEmptyFile, SymlinkNode,
+    CacheMode, FileSystem, FileSystemHandle, FileSystemOps, FileSystemOptions, FsNodeInfo, FsStr,
+    PathBuilder, StaticDirectoryBuilder, StubEmptyFile, SymlinkNode,
 };
 use starnix_logging::bug_ref;
 use starnix_sync::{Locked, Unlocked};
@@ -64,15 +64,16 @@ impl SysFs {
         });
 
         let registry = &kernel.device_registry;
-        dir.entry(current_task, SYSFS_DEVICES, registry.root_kobject().ops(), dir_mode);
-        dir.entry(current_task, SYSFS_BUS, registry.bus_subsystem_kobject().ops(), dir_mode);
-        dir.entry(current_task, SYSFS_BLOCK, registry.block_subsystem_kobject().ops(), dir_mode);
-        dir.entry(current_task, SYSFS_CLASS, registry.class_subsystem_kobject().ops(), dir_mode);
+        dir.entry(current_task, SYSFS_DEVICES, registry.objects.devices.ops(), dir_mode);
+        dir.entry(current_task, SYSFS_BUS, registry.objects.bus.ops(), dir_mode);
+        dir.entry(current_task, SYSFS_BLOCK, registry.objects.block.ops(), dir_mode);
+        dir.entry(current_task, SYSFS_CLASS, registry.objects.class.ops(), dir_mode);
 
         // TODO(b/297438880): Remove this workaround after net devices are registered correctly.
         kernel
             .device_registry
-            .class_subsystem_kobject()
+            .objects
+            .class
             .get_or_create_child("net".into(), |_| NetstackDevicesDirectory::new_sys_class_net());
 
         sysfs_kernel_directory(current_task, &mut dir);
@@ -97,8 +98,9 @@ impl SysFs {
         // TODO(https://fxbug.dev/42072346): Temporary fix of flakeness in tcp_socket_test.
         // Remove after registry.rs refactor is in place.
         registry
-            .root_kobject()
-            .get_or_create_child("system".into(), SysfsDirectory::new)
+            .objects
+            .devices
+            .get_or_create_child("system".into(), KObjectDirectory::new)
             .get_or_create_child("cpu".into(), CpuClassDirectory::new);
 
         dir.build_root();
@@ -114,10 +116,6 @@ pub fn sys_fs(
     Ok(current_task.kernel().sys_fs.get_or_init(|| SysFs::new_fs(current_task, options)).clone())
 }
 
-pub trait SysfsOps: FsNodeOps {
-    fn kobject(&self) -> KObjectHandle;
-}
-
 /// Creates a path to the `to` kobject in the devices tree, relative to the `from` kobject from
 /// a subsystem.
 pub fn sysfs_create_link(
@@ -129,7 +127,12 @@ pub fn sysfs_create_link(
     path.prepend_element(to.path().as_ref());
     // Escape one more level from its subsystem to the root of sysfs.
     path.prepend_element("..".into());
-    path.prepend_element(from.path_to_root().as_ref());
+
+    let path_to_root = from.path_to_root();
+    if !path_to_root.is_empty() {
+        path.prepend_element(path_to_root.as_ref());
+    }
+
     // Build a symlink with the relative path.
     SymlinkNode::new(path.build_relative().as_ref(), owner)
 }

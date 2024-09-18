@@ -22,7 +22,6 @@
 namespace cobalt::testapp {
 
 using fidl::VectorPtr;
-using fuchsia::cobalt::Status;
 using util::SystemClockInterface;
 using util::TimeToDayIndex;
 using LoggerMethod = cobalt_internal_registry::LoggerCallsMadeMigratedMetricDimensionLoggerMethod;

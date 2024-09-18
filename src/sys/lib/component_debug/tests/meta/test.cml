@@ -52,6 +52,11 @@
             protocol: "fidl.examples.routing.echo.Echo",
             from: "#echo_server",
         },
+        {
+            protocol: "void-protocol",
+            from: "#foo",
+            availability: "optional",
+        },
 
         // These capabilities aren't actually being used, but commands should still be able to
         // find them.

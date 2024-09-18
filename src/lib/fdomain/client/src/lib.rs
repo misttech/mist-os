@@ -6,7 +6,7 @@ use fidl_message::TransactionHeader;
 use futures::channel::mpsc::UnboundedSender;
 use futures::channel::oneshot::Sender;
 use futures::future::{poll_fn, Either};
-use futures::stream::Stream;
+use futures::stream::Stream as StreamTrait;
 use futures::FutureExt;
 use std::collections::hash_map::Entry;
 use std::collections::{HashMap, VecDeque};
@@ -37,8 +37,12 @@ pub use channel::{
 pub use event::Event;
 pub use event_pair::Eventpair;
 pub use handle::{AsHandleRef, Handle, HandleBased, HandleRef, OnFDomainSignals, Peered};
-pub use proto::{Error as FDomainError, WriteChannelError, WriteSocketError};
+pub use proto::{Error as FDomainError, ObjType, WriteChannelError, WriteSocketError};
 pub use socket::{Socket, SocketDisposition, SocketReadStream, SocketWriter};
+
+// Unsupported handle types.
+pub use Handle as Stream;
+pub use Handle as Vmo;
 
 fdomain_macros::extract_ordinals_env!("FDOMAIN_FIDL_PATH");
 
@@ -83,6 +87,9 @@ fn write_fdomain_error(error: &FDomainError, f: &mut std::fmt::Formatter<'_>) ->
         _ => todo!(),
     }
 }
+
+/// Result type alias.
+pub type Result<T, E = Error> = std::result::Result<T, E>;
 
 /// Error type emitted by FDomain operations.
 #[derive(Clone)]
@@ -236,7 +243,7 @@ impl From<::fidl::Error> for InnerError {
 ///    via the `Stream` trait, which this trait requires.
 /// 2) A way to send messages. This is provided by implementing the
 ///    `poll_send_message` method.
-pub trait FDomainTransport: Stream<Item = Result<Box<[u8]>, std::io::Error>> + Send {
+pub trait FDomainTransport: StreamTrait<Item = Result<Box<[u8]>, std::io::Error>> + Send {
     /// Attempt to send a message asynchronously. Messages should be sent so
     /// that they arrive at the target in order.
     fn poll_send_message(

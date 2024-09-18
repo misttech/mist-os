@@ -21,7 +21,7 @@ pw_source_set("task") {
   ]
   public_deps = [
     "$dir_pw_async:task.facade",
-    "//zircon/system/ulib/async-loop:async-loop-default",
+    "//sdk/lib/async-loop:async-loop-default",
     "//zircon/system/ulib/zx",
   ]
   sources = [ "task.cc" ]
@@ -80,8 +80,8 @@ executable("pigweed_backend_pw_async_fuchsia_tests_executable") {
     ":dispatcher",
     ":fake_dispatcher_fixture",
     "$dir_pw_unit_test",
+    "//sdk/lib/async-testing:async-testing",
     "//src/lib/fxl/test:gtest_main",
-    "//zircon/system/ulib/async-testing:async-testing",
   ]
 }
 

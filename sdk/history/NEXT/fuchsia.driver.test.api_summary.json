@@ -45,6 +45,12 @@
     },
     {
         "kind": "table/member",
+        "name": "fuchsia.driver.test/RealmArgs.boot_driver_components",
+        "ordinal": "19",
+        "type": "vector<string>"
+    },
+    {
+        "kind": "table/member",
         "name": "fuchsia.driver.test/RealmArgs.driver_bind_eager",
         "ordinal": "9",
         "type": "vector<string>"

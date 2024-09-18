@@ -100,6 +100,7 @@ source_set("common_srcs") {
     "//sdk/fidl/fuchsia.hardware.gpio:fuchsia.hardware.gpio_cpp",
     "//sdk/fidl/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_cpp",
     "//sdk/fidl/fuchsia.hardware.sysmem:fuchsia.hardware.sysmem_cpp",
+    "//sdk/lib/async:async-cpp",
     "//sdk/lib/driver/compat/cpp",
     "//sdk/lib/driver/incoming/cpp",
     "//sdk/lib/driver/logging/cpp",
@@ -114,7 +115,6 @@ source_set("common_srcs") {
     "//src/graphics/display/lib/mipi-dsi",
     "//src/lib/ddk:ddk_metadata_only",
     "//src/lib/fxl",
-    "//zircon/system/ulib/async:async-cpp",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/hwreg",
     "//zircon/system/ulib/image-format",
@@ -183,6 +183,8 @@ test("amlogic-display-test") {
     ":common_srcs",
     "//sdk/fidl/fuchsia.component.runner:fuchsia.component.runner_cpp",
     "//sdk/fidl/fuchsia.sysmem2:fuchsia.sysmem2_cpp_testing",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/async_patterns/testing/cpp",
     "//sdk/lib/driver/compat/cpp",
     "//sdk/lib/driver/component/cpp",
@@ -202,8 +204,6 @@ test("amlogic-display-test") {
     "//src/lib/testing/predicates",
     "//third_party/googletest:gmock",
     "//third_party/googletest:gtest",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
   ]
   assert_no_deps = [ ":amlogic_display_bind" ]
 }
