@@ -1151,7 +1151,7 @@ async fn test_activity_governor_increments_fail_count_on_suspend_error() -> Resu
                 },
             },
             wake_leases: {},
-            unhandled_suspend_failures: 1u64,
+            unhandled_suspend_failures: NonZeroUintProperty,
             "fuchsia.inspect.Health": contains {
                 status: "OK",
             },
@@ -1273,7 +1273,7 @@ async fn test_activity_governor_suspends_successfully_after_failure() -> Result<
                 },
             },
             wake_leases: {},
-            unhandled_suspend_failures: 1u64,
+            unhandled_suspend_failures: NonZeroUintProperty,
             "fuchsia.inspect.Health": contains {
                 status: "OK",
             },
