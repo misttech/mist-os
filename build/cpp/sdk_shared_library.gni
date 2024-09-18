@@ -152,22 +152,7 @@ template("sdk_shared_library") {
   } else {
     atom_name = output_name
   }
-
-  if (invoker.category != "internal") {
-    sdk_root_path = "pkg/${atom_name}"
-  } else {
-    # For internal SDK libraries, the sdk_name is the fully qualified target name with some tweaks. For example:
-    #    //src/lib/fxl:fxl            sdk_name = //src/lib/fxl_fxl          sdk_root_path= src/lib/fxl_fxl
-    #    //src/lib/fxl:functional     sdk_name = //src/lib/fxl_functional   sdk_root_path= src/lib/fxl_functional
-    #    //src/lib/fxl/files:files    sdk_name = //src/lib/fxl/files_files  sdk_root_path= src/lib/fxl/files_files
-    full_label = get_label_info(":${invoker.target_name}", "label_no_toolchain")
-    path = get_label_info(full_label, "dir")
-    path = "${path}_${invoker.target_name}"
-
-    atom_name = path
-    sdk_root_path = string_replace(path, "//", "")
-  }
-  sdk_id = "sdk://${sdk_root_path}"
+  sdk_id = "sdk://pkg/${atom_name}"
 
   no_headers = defined(invoker.no_headers) && invoker.no_headers
 
@@ -218,7 +203,7 @@ template("sdk_shared_library") {
     }
     if (libcxx_linkage == "static") {
       configs += [ "//build/config/fuchsia:static_cpp_standard_library" ]
-    } else if (invoker.category != "internal") {
+    } else {
       # Adding this linker flag keeps us honest about not committing to a
       # specific C++ ABI. If this flag is causing your library to not
       # compile, consider whether your library really ought to be in the SDK.
@@ -226,9 +211,6 @@ template("sdk_shared_library") {
       # precompiled. If you do require precompilation, you probably need to
       # find a way not to depend on dynamically linking C++ symbols because C++
       # does not have a sufficiently stable ABI for the purposes of our SDK.
-      #
-      # NOTE: This flag is not necessary for internal SDK libraries since they
-      # are not intended to be consumed by SDK users.
       configs += [ "//build/config/fuchsia:no_cpp_standard_library" ]
     }
 
@@ -255,6 +237,9 @@ template("sdk_shared_library") {
       deps += [ "//build/sdk:sdk_shared_libraries_allowlist" ]
     }
   }
+
+  # Base path for source files of this library in SDKs.
+  file_base = "pkg/${atom_name}"
 
   # Identify dependencies and their metadata files.
   sdk_deps = []
@@ -310,29 +295,15 @@ template("sdk_shared_library") {
       }
     }
   }
-
   sdk_metadata_headers = []
   sdk_header_files = []
-
-  if (defined(invoker.include_base)) {
-    include_base = invoker.include_base
-  } else {
-    if (invoker.category == "internal") {
-      # by default, we want internal SDK elements to have their include path similar when used through
-      # an SDK (eg Bazel SDk) or directly (GN/Ninja), so that source code doesn't need to be changed
-      # when switching from one to the other.
-      include_base = "//"
-    } else {
-      include_base = "include"
-    }
-  }
-  assert(include_base != "")  # Work around for unused variable warning when
-
-  include_dest = "${sdk_root_path}/include"
-
   foreach(header, all_headers) {
+    include_base = "include"
+    if (defined(invoker.include_base)) {
+      include_base = invoker.include_base
+    }
     destination = rebase_path(header, include_base)
-    header_dest = "${include_dest}/${destination}"
+    header_dest = "${file_base}/include/${destination}"
     sdk_metadata_headers += [ header_dest ]
     sdk_header_files += [
       {
@@ -375,7 +346,7 @@ template("sdk_shared_library") {
     sdk_files += [
       {
         source = get_path_info(invoker.symbols_api, "abspath")
-        dest = "${sdk_root_path}/" + get_path_info(invoker.symbols_api, "file")
+        dest = "${file_base}/" + get_path_info(invoker.symbols_api, "file")
       },
     ]
   }
@@ -391,7 +362,7 @@ template("sdk_shared_library") {
                                "all_deps",
                                "sdk_headers_for_internal_use",
                              ])
-      file_base = sdk_root_path
+      file_base = file_base
     }
   } else {
     not_needed([
@@ -427,9 +398,9 @@ template("sdk_shared_library") {
       "--format",
       "shared",
       "--root",
-      sdk_root_path,
+      file_base,
       "--include-dir",
-      include_dest,
+      "${file_base}/include",
       "--dist-path",
       "lib/${lib_name}",
       "--arch",
@@ -500,7 +471,7 @@ template("sdk_shared_library") {
 
     meta = {
       source = metadata_file
-      dest = "${sdk_root_path}/meta.json"
+      dest = "${file_base}/meta.json"
       schema = "cc_prebuilt_library"
     }
 
