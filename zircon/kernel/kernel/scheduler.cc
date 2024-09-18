@@ -2687,10 +2687,17 @@ void Scheduler::MigrateUnpinnedThreads() {
   current->cpu_deactivating_.store(false, ktl::memory_order_release);
 
   // Now move any READY threads who can be moved over to a temporary list,
-  // flagging them as in the process of currently migrating.
+  // flagging them as in the process of currently migrating. Also move all
+  // of the threads in the save_state_list into a temporary list, as they
+  // need to be migrated as well.
   Thread::UnblockList migrating_threads;
+  Thread::SaveStateList local_save_state_list;
   {
     Guard<MonitoredSpinLock, NoIrqSave> queue_guard{&current->queue_lock_, SOURCE_TAG};
+
+    if (!current->save_state_list_.is_empty()) {
+      local_save_state_list = ktl::move(current->save_state_list_);
+    }
 
     auto MoveThreads = [&migrating_threads, current, current_cpu_mask](
                            RunQueue& run_queue,
@@ -2730,8 +2737,7 @@ void Scheduler::MigrateUnpinnedThreads() {
   // the scheduler's queue lock, it is possible that these threads have changed
   // effective priority since being remove from their old scheduler, but before
   // arriving at a new one.
-  while (!migrating_threads.is_empty()) {
-    Thread* thread = migrating_threads.pop_front();
+  auto MigrateThread = [current, now](Thread* thread) -> cpu_num_t {
     SingleChainLockGuard guard{IrqSaveOption, thread->get_lock(),
                                CLT_TAG("Scheduler::MigrateUnpinnedThreads")};
 
@@ -2751,6 +2757,18 @@ void Scheduler::MigrateUnpinnedThreads() {
           target->FinishTransition(now, thread);
         });
 
+    return target_cpu;
+  };
+
+  while (!migrating_threads.is_empty()) {
+    Thread* thread = migrating_threads.pop_front();
+    const cpu_num_t target_cpu = MigrateThread(thread);
+    cpus_to_reschedule_mask |= cpu_num_to_mask(target_cpu);
+  }
+
+  while (!local_save_state_list.is_empty()) {
+    Thread* thread = local_save_state_list.pop_front();
+    const cpu_num_t target_cpu = MigrateThread(thread);
     cpus_to_reschedule_mask |= cpu_num_to_mask(target_cpu);
   }
 
