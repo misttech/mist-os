@@ -1479,6 +1479,7 @@ dependencies = [
  "walkdir",
  "which",
  "xml-rs",
+ "zerocopy 0.0.0-alpha.0",
  "zerocopy 0.8.0-alpha.5",
  "zip",
  "zstd",
@@ -5077,6 +5078,15 @@ checksum = "541b12c998c5b56aa2b4e6f18f03664eef9a4fd0a246a55594efae6cc2d964b5"
 
 [[package]]
 name = "zerocopy"
+version = "0.0.0-alpha.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "655127495cde1b3a89283121bfe982bca84765dd66810b2a9156f68be140d985"
+dependencies = [
+ "zerocopy-derive 0.0.0-alpha.0",
+]
+
+[[package]]
+name = "zerocopy"
 version = "0.7.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "81ba595b9f2772fbee2312de30eeb80ec773b4cb2f1e8098db024afadda6c06f"
@@ -5092,6 +5102,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7dd4a4b5a6b38e736bca19abe211abf0ba2552462555fc960d763fbbaff2b191"
 dependencies = [
  "zerocopy-derive 0.8.0-alpha.5",
+]
+
+[[package]]
+name = "zerocopy-derive"
+version = "0.0.0-alpha.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fe098329ec597f2190f545e13c4e752ed33a740d5d00e9e31ec47b5c137e6012"
+dependencies = [
+ "proc-macro2 1.0.86",
+ "quote 1.0.35",
+ "syn 2.0.69",
 ]
 
 [[package]]
