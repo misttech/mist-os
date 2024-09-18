@@ -47,7 +47,8 @@ impl Channel {
 
     /// Read a message from a channel. Wraps the
     /// [zx_channel_read](https://fuchsia.dev/fuchsia-src/reference/syscalls/channel_read.md)
-    /// syscall.
+    /// syscall. Care should be taken to avoid handle leaks by either transferring the
+    /// returned handles out to another type or dropping them explicitly.
     pub fn read_uninit(
         &self,
         bytes: &mut [MaybeUninit<u8>],
@@ -166,6 +167,45 @@ impl Channel {
         }
     }
 
+    /// Read a message from a channel. Wraps the
+    /// [zx_channel_read](https://fuchsia.dev/fuchsia-src/reference/syscalls/channel_read.md)
+    /// syscall.
+    pub fn read_etc_uninit(
+        &self,
+        bytes: &mut [MaybeUninit<u8>],
+        handles: &mut [MaybeUninit<HandleInfo>],
+    ) -> ChannelReadResult<(&mut [u8], &mut [HandleInfo])> {
+        // SAFETY: bytes and handles are valid to write to for their lengths
+        match unsafe {
+            self.read_etc_raw(
+                bytes.as_mut_ptr() as *mut u8,
+                bytes.len(),
+                handles.as_mut_ptr() as *mut HandleInfo,
+                handles.len(),
+            )
+        } {
+            ChannelReadResult::Ok((actual_bytes, actual_handles)) => {
+                // SAFETY: if the above call succeeded, the buffers are initialized up to actual_*
+                ChannelReadResult::Ok(unsafe {
+                    (
+                        std::slice::from_raw_parts_mut(
+                            bytes.as_mut_ptr() as *mut u8,
+                            actual_bytes as usize,
+                        ),
+                        std::slice::from_raw_parts_mut(
+                            handles.as_mut_ptr() as *mut HandleInfo,
+                            actual_handles as usize,
+                        ),
+                    )
+                })
+            }
+            ChannelReadResult::BufferTooSmall { bytes_avail, handles_avail } => {
+                ChannelReadResult::BufferTooSmall { bytes_avail, handles_avail }
+            }
+            ChannelReadResult::Err(e) => ChannelReadResult::Err(e),
+        }
+    }
+
     /// Read a message from a channel.
     /// Wraps the [zx_channel_read_etc](https://fuchsia.dev/fuchsia-src/reference/syscalls/channel_read_etc.md)
     /// syscall.
@@ -173,40 +213,42 @@ impl Channel {
     /// This differs from `read_raw` in that it returns extended information on
     /// the handles.
     ///
-    /// If the slice lacks the capacity to hold the pending message,
-    /// returns an `Err` with the number of bytes and number of handles needed.
-    /// Otherwise returns an `Ok` with the result as usual.
-    /// If both the outer and inner `Result`s are `Ok`, then the caller can
-    /// assume that the `handle_infos` array is initialized.
+    /// On success, returns the number of bytes and handles read.
     ///
-    /// Note that `read_etc_slice` may call `read_etc_raw` with some
-    /// uninitialized elements because it resizes the input vector to its
-    /// capacity without initializing all of the elements.
-    pub fn read_etc_raw(
+    /// # Safety
+    ///
+    /// `bytes` must be valid to write to for `bytes_len` bytes.
+    ///
+    /// `handles` must be valid to write to for `handles_len` elements.
+    pub unsafe fn read_etc_raw(
         &self,
-        bytes: &mut [u8],
-        handle_infos: &mut [MaybeUninit<HandleInfo>],
-    ) -> Result<(Result<(), Status>, usize, usize), (usize, usize)> {
-        let opts = 0;
+        bytes: *mut u8,
+        bytes_len: usize,
+        handles: *mut HandleInfo,
+        handles_len: usize,
+    ) -> ChannelReadResult<(usize, usize)> {
+        // SAFETY: our caller upholds the require invariants. It is sound to interpret
+        // HandleInfo as zx_handle_info_t as they have identical layouts.
         unsafe {
-            let raw_handle = self.raw_handle();
             let mut actual_bytes = 0;
-            let mut actual_handle_infos = 0;
+            let mut actual_handles = 0;
             let status = ok(sys::zx_channel_read_etc(
-                raw_handle,
-                opts,
-                bytes.as_mut_ptr(),
-                // These types have identical layouts.
-                handle_infos.as_mut_ptr() as *mut sys::zx_handle_info_t,
-                bytes.len() as u32,
-                handle_infos.len() as u32,
+                self.raw_handle(),
+                0, // options
+                bytes,
+                handles as *mut sys::zx_handle_info_t,
+                bytes_len as u32,
+                handles_len as u32,
                 &mut actual_bytes,
-                &mut actual_handle_infos,
+                &mut actual_handles,
             ));
-            if status == Err(Status::BUFFER_TOO_SMALL) {
-                Err((actual_bytes as usize, actual_handle_infos as usize))
-            } else {
-                Ok((status, actual_bytes as usize, actual_handle_infos as usize))
+            match status {
+                Ok(()) => ChannelReadResult::Ok((actual_bytes as usize, actual_handles as usize)),
+                Err(Status::BUFFER_TOO_SMALL) => ChannelReadResult::BufferTooSmall {
+                    bytes_avail: actual_bytes as usize,
+                    handles_avail: actual_handles as usize,
+                },
+                Err(e) => ChannelReadResult::Err(e),
             }
         }
     }
@@ -218,7 +260,7 @@ impl Channel {
     ///
     /// Note that this method can cause internal reallocations in the `MessageBufEtc`
     /// if it is lacks capacity to hold the full message. If such reallocations
-    /// are not desirable, use `read_etc_raw` instead.
+    /// are not desirable, use `read_etc_uninit` or `read_etc_raw` instead.
     pub fn read_etc(&self, buf: &mut MessageBufEtc) -> Result<(), Status> {
         let (bytes, handles) = buf.split_mut();
         self.read_etc_split(bytes, handles)
@@ -231,30 +273,29 @@ impl Channel {
     ///
     /// Note that this method can cause internal reallocations in the `Vec`s
     /// if they lacks capacity to hold the full message. If such reallocations
-    /// are not desirable, use `read_raw` instead.
+    /// are not desirable, use `read_etc_uninit` or `read_etc_raw` instead.
     pub fn read_etc_split(
         &self,
         bytes: &mut Vec<u8>,
-        handle_infos: &mut Vec<HandleInfo>,
+        handles: &mut Vec<HandleInfo>,
     ) -> Result<(), Status> {
         loop {
-            unsafe {
-                bytes.set_len(bytes.capacity());
-                handle_infos.set_len(handle_infos.capacity());
-            }
-            let handle_info_slice: &mut [HandleInfo] = handle_infos;
-            match self.read_etc_raw(bytes, unsafe { std::mem::transmute(handle_info_slice) }) {
-                Ok((result, num_bytes, num_handle_infos)) => {
+            bytes.clear();
+            handles.clear();
+            match self.read_etc_uninit(bytes.spare_capacity_mut(), handles.spare_capacity_mut()) {
+                ChannelReadResult::Ok((byte_slice, handle_slice)) => {
+                    // SAFETY: the kernel has initialized the vecs up to the length of these slices.
                     unsafe {
-                        bytes.set_len(num_bytes);
-                        handle_infos.set_len(num_handle_infos);
+                        bytes.set_len(byte_slice.len());
+                        handles.set_len(handle_slice.len());
                     }
-                    return result;
+                    return Ok(());
                 }
-                Err((num_bytes, num_handle_infos)) => {
-                    ensure_capacity(bytes, num_bytes);
-                    ensure_capacity(handle_infos, num_handle_infos);
+                ChannelReadResult::BufferTooSmall { bytes_avail, handles_avail } => {
+                    ensure_capacity(bytes, bytes_avail);
+                    ensure_capacity(handles, handles_avail);
                 }
+                ChannelReadResult::Err(e) => return Err(e),
             }
         }
     }
@@ -794,8 +835,8 @@ mod tests {
         let mut empty = vec![];
         assert!(p1.write_etc(b"hello", &mut empty).is_ok());
 
-        let result = p2.read_etc_raw(&mut vec![], &mut vec![]);
-        assert_eq!(result, Err((5, 0)));
+        let result = p2.read_etc_uninit(&mut vec![], &mut vec![]);
+        assert_eq!(result, ChannelReadResult::BufferTooSmall { bytes_avail: 5, handles_avail: 0 });
     }
 
     fn too_many_bytes() -> Vec<u8> {
