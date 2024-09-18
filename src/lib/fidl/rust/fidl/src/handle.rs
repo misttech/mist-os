@@ -129,9 +129,9 @@ pub fn convert_handle_dispositions_to_infos(
 ) -> crate::Result<Vec<HandleInfo>> {
     handle_dispositions
         .into_iter()
-        .map(|hd| {
+        .map(|mut hd| {
             Ok(HandleInfo::new(
-                match hd.handle_op {
+                match hd.take_op() {
                     HandleOp::Move(h) if hd.rights == Rights::SAME_RIGHTS => h,
                     HandleOp::Move(h) => {
                         h.replace(hd.rights).map_err(crate::Error::HandleReplace)?

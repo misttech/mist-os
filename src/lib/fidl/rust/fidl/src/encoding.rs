@@ -1691,12 +1691,12 @@ unsafe fn encode_handle(
         return Err(Error::NotNullable);
     }
     encoder.write_num(ALLOC_PRESENT_U32, offset);
-    encoder.handles.push(HandleDisposition {
-        handle_op: HandleOp::Move(handle),
+    encoder.handles.push(HandleDisposition::new(
+        HandleOp::Move(handle),
         object_type,
         rights,
-        result: Status::OK,
-    });
+        Status::OK,
+    ));
     Ok(())
 }
 
@@ -3339,12 +3339,17 @@ mod test {
                 .expect("Encoding failed");
 
             assert_eq!(handle_buf.len(), 1);
-            assert_matches!(handle_buf[0].handle_op, HandleOp::Move(ref h) if h.raw_handle() == raw_handle);
+            assert!(handle_buf[0].is_move());
+            assert_eq!(handle_buf[0].raw_handle(), raw_handle);
 
             let mut handle_out = new_empty!(T);
             Decoder::decode_with_context::<T>(ctx, buf, &mut to_infos(handle_buf), &mut handle_out)
                 .expect("Decoding failed");
-            assert_eq!(handle_out.raw_handle(), raw_handle, "foobar");
+            assert_eq!(
+                handle_out.raw_handle(),
+                raw_handle,
+                "decoded handle must match encoded handle"
+            );
         }
     }
 

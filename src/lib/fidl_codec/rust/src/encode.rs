@@ -400,12 +400,12 @@ impl<'n> EncodeBuffer<'n> {
         if let Some(handle_op) = handle_op {
             self.bytes.extend(&ALLOC_PRESENT_U32.to_le_bytes());
             Ok(Box::new(move |this, _| {
-                this.handles.push(fidl::HandleDisposition {
+                this.handles.push(fidl::HandleDisposition::new(
                     handle_op,
                     object_type,
                     rights,
-                    result: fidl::Status::OK,
-                });
+                    fidl::Status::OK,
+                ));
                 Ok(())
             }))
         } else {

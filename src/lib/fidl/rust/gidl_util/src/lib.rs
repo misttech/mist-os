@@ -121,17 +121,11 @@ pub fn get_handle_koid(handle_info: &zx_types::zx_handle_info_t) -> zx_types::zx
     handle.basic_info().unwrap().koid.raw_koid()
 }
 
-/// Converts a `HandleDisposition` to a raw `zx_handle_t`.
-pub fn to_zx_handle_t(hd: &HandleDisposition<'_>) -> zx_types::zx_handle_t {
-    match &hd.handle_op {
-        HandleOp::Move(handle) => handle.raw_handle(),
-        HandleOp::Duplicate(handle_ref) => handle_ref.raw_handle(),
-    }
-}
-
 /// Converts a `HandleDisposition` to a raw `zx_handle_disposition_t`.
-pub fn to_zx_handle_disposition_t(hd: &HandleDisposition<'_>) -> zx_types::zx_handle_disposition_t {
-    match &hd.handle_op {
+pub fn to_zx_handle_disposition_t(
+    mut hd: HandleDisposition<'_>,
+) -> zx_types::zx_handle_disposition_t {
+    match hd.take_op() {
         HandleOp::Move(handle) => zx_types::zx_handle_disposition_t {
             operation: zx_types::ZX_HANDLE_OP_MOVE,
             handle: handle.raw_handle(),

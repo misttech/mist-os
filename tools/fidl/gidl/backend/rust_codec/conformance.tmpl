@@ -18,7 +18,7 @@ use {
     gidl_util::{
         HandleDef, HandleSubtype, copy_handle, create_handles, decode_value,
         get_handle_koid, get_info_handle_valid, repeat, select_handle_infos,
-        select_raw_handle_infos, to_zx_handle_t, to_zx_handle_disposition_t,
+        select_raw_handle_infos, to_zx_handle_disposition_t,
     },
 };
 
@@ -42,12 +42,12 @@ fn test_{{ .Name }}_encode() {
     assert_eq!(bytes, &{{ .Bytes }});
     {{- if .HandleDispositions }}
     assert_eq!(
-        handle_dispositions.iter().map(to_zx_handle_disposition_t).collect::<Vec<_>>(),
+        handle_dispositions.into_iter().map(to_zx_handle_disposition_t).collect::<Vec<_>>(),
         &{{ .HandleDispositions }}
     );
     {{- else if .Handles }}
     assert_eq!(
-        handle_dispositions.iter().map(to_zx_handle_t).collect::<Vec<_>>(),
+        handle_dispositions.iter().map(|h| h.raw_handle()).collect::<Vec<_>>(),
         &{{ .Handles }}
     );
     {{- else }}

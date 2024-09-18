@@ -5,22 +5,11 @@
 //! Type-safe bindings for Zircon channel objects.
 
 use crate::{
-    ok, AsHandleRef, Handle, HandleBased, HandleDisposition, HandleInfo, HandleOp, HandleRef,
-    MonotonicTime, ObjectType, Peered, Rights, Status,
+    ok, AsHandleRef, Handle, HandleBased, HandleDisposition, HandleInfo, HandleRef, MonotonicTime,
+    ObjectType, Peered, Rights, Status,
 };
 use fuchsia_zircon_sys as sys;
 use std::mem::{self, MaybeUninit};
-
-impl HandleDisposition<'_> {
-    const fn invalid<'a>() -> HandleDisposition<'a> {
-        HandleDisposition {
-            handle_op: HandleOp::Move(Handle::invalid()),
-            object_type: ObjectType::NONE,
-            rights: Rights::NONE,
-            result: Status::OK,
-        }
-    }
-}
 
 /// An object representing a Zircon
 /// [channel](https://fuchsia.dev/fuchsia-src/concepts/objects/channel.md).
@@ -303,35 +292,30 @@ impl Channel {
         bytes: &[u8],
         handle_dispositions: &mut [HandleDisposition<'_>],
     ) -> Result<(), Status> {
-        let opts = 0;
         let n_bytes: u32 = bytes.len().try_into().map_err(|_| Status::OUT_OF_RANGE)?;
         let n_handle_dispositions: u32 =
             handle_dispositions.len().try_into().map_err(|_| Status::OUT_OF_RANGE)?;
-        if n_handle_dispositions > sys::ZX_CHANNEL_MAX_MSG_HANDLES {
-            // don't let the kernel check this bound for us because we have a fixed size array below
-            return Err(Status::OUT_OF_RANGE);
-        }
-        unsafe {
-            let mut zx_handle_dispositions: [std::mem::MaybeUninit<sys::zx_handle_disposition_t>;
-                sys::ZX_CHANNEL_MAX_MSG_HANDLES as usize] =
-                std::mem::MaybeUninit::uninit().assume_init();
-            for i in 0..n_handle_dispositions as usize {
-                let handle_disposition =
-                    std::mem::replace(&mut handle_dispositions[i], HandleDisposition::invalid());
-                zx_handle_dispositions[i] =
-                    std::mem::MaybeUninit::new(handle_disposition.into_raw());
-            }
-            let status = sys::zx_channel_write_etc(
+        let res = unsafe {
+            ok(sys::zx_channel_write_etc(
                 self.raw_handle(),
-                opts,
+                0, // options
                 bytes.as_ptr(),
                 n_bytes,
-                zx_handle_dispositions.as_mut_ptr() as *mut sys::zx_handle_disposition_t,
+                // SAFETY: HandleDisposition is ABI-compatible with zx_handle_disposition_t, allow
+                // the kernel to treat them interchangeably and to interpret the latter as the
+                // former after this call returns.
+                handle_dispositions.as_mut_ptr() as *mut sys::zx_handle_disposition_t,
                 n_handle_dispositions,
-            );
-            ok(status)?;
-            Ok(())
+            ))
+        };
+
+        // Outgoing handles are consumed by zx_channel_write_etc so prevent the destructor from
+        // being called. Don't overwrite the status field so that callers can inspect it.
+        for disposition in handle_dispositions {
+            std::mem::forget(disposition.take_op());
         }
+
+        res
     }
 
     /// Send a message consisting of the given bytes and handles to a channel and await a reply.
@@ -360,47 +344,50 @@ impl Channel {
         handles: &mut [Handle],
         buf: &mut MessageBuf,
     ) -> Result<(), Status> {
-        let write_num_bytes: u32 = bytes.len().try_into().map_err(|_| Status::OUT_OF_RANGE)?;
-        let write_num_handles: u32 = handles.len().try_into().map_err(|_| Status::OUT_OF_RANGE)?;
         buf.clear();
-        let read_num_bytes: u32 = buf.bytes.capacity().try_into().unwrap_or(u32::MAX);
-        let read_num_handles: u32 = buf.handles.capacity().try_into().unwrap_or(u32::MAX);
-        let args = sys::zx_channel_call_args_t {
-            wr_bytes: bytes.as_ptr(),
-            wr_handles: handles.as_ptr() as *const sys::zx_handle_t,
-            rd_bytes: buf.bytes.as_mut_ptr(),
-            rd_handles: buf.handles.as_mut_ptr() as *mut _,
-            wr_num_bytes: write_num_bytes,
-            wr_num_handles: write_num_handles,
-            rd_num_bytes: read_num_bytes,
-            rd_num_handles: read_num_handles,
-        };
+        buf.ensure_capacity_bytes(sys::ZX_CHANNEL_MAX_MSG_BYTES as usize);
+        buf.ensure_capacity_handles(sys::ZX_CHANNEL_MAX_MSG_HANDLES as usize);
+
         let mut actual_read_bytes: u32 = 0;
         let mut actual_read_handles: u32 = 0;
-        let options = 0;
-        let status = unsafe {
-            Status::from_raw(sys::zx_channel_call(
+
+        // SAFETY: args contains pointers that are valid to write to for the provided lengths.
+        let res = unsafe {
+            ok(sys::zx_channel_call(
                 self.raw_handle(),
-                options,
+                0, // options
                 timeout.into_nanos(),
-                &args,
+                &sys::zx_channel_call_args_t {
+                    wr_bytes: bytes.as_ptr(),
+                    wr_handles: handles.as_ptr() as *const sys::zx_handle_t,
+                    rd_bytes: buf.bytes.as_mut_ptr(),
+                    rd_handles: buf.handles.as_mut_ptr() as *mut _,
+                    wr_num_bytes: bytes.len().try_into().map_err(|_| Status::OUT_OF_RANGE)?,
+                    wr_num_handles: handles.len().try_into().map_err(|_| Status::OUT_OF_RANGE)?,
+                    rd_num_bytes: buf.bytes.capacity().try_into().unwrap_or(u32::MAX),
+                    rd_num_handles: buf.handles.capacity().try_into().unwrap_or(u32::MAX),
+                },
                 &mut actual_read_bytes,
                 &mut actual_read_handles,
             ))
         };
+
+        // Outgoing handles are consumed by zx_channel_call so prevent the destructor from being called.
+        for handle in handles {
+            std::mem::forget(std::mem::replace(handle, Handle::invalid()));
+        }
+
+        // Only error-return after zeroing out handles.
+        res?;
+
+        // SAFETY: if the above raw syscall succeeded, these have been initialized with valid
+        // contents.
         unsafe {
-            // Outgoing handles are consumed by zx_channel_call so prevent the destructor from being called.
-            for handle in handles {
-                std::mem::forget(std::mem::replace(handle, Handle::invalid()));
-            }
             buf.bytes.set_len(actual_read_bytes as usize);
             buf.handles.set_len(actual_read_handles as usize);
         }
-        if Status::OK == status {
-            Ok(())
-        } else {
-            Err(status)
-        }
+
+        Ok(())
     }
 
     /// Send a message consisting of the given bytes and handles to a channel and await a reply.
@@ -436,47 +423,45 @@ impl Channel {
         let write_num_bytes: u32 = bytes.len().try_into().map_err(|_| Status::OUT_OF_RANGE)?;
         let write_num_handle_dispositions: u32 =
             handle_dispositions.len().try_into().map_err(|_| Status::OUT_OF_RANGE)?;
-        if write_num_handle_dispositions > sys::ZX_CHANNEL_MAX_MSG_HANDLES {
-            // don't let the kernel check this bound for us because we have a fixed size array below
-            return Err(Status::OUT_OF_RANGE);
-        }
-        let mut zx_handle_dispositions: [std::mem::MaybeUninit<sys::zx_handle_disposition_t>;
-            sys::ZX_CHANNEL_MAX_MSG_HANDLES as usize] =
-            [std::mem::MaybeUninit::uninit(); sys::ZX_CHANNEL_MAX_MSG_HANDLES as usize];
-        for i in 0..write_num_handle_dispositions as usize {
-            let handle_disposition =
-                std::mem::replace(&mut handle_dispositions[i], HandleDisposition::invalid());
-            zx_handle_dispositions[i].write(handle_disposition.into_raw());
-        }
 
-        let read_num_bytes: u32 = buf.bytes.capacity().try_into().unwrap_or(u32::MAX);
+        buf.ensure_capacity_bytes(sys::ZX_CHANNEL_MAX_MSG_BYTES as usize);
         buf.ensure_capacity_handle_infos(sys::ZX_CHANNEL_MAX_MSG_HANDLES as usize);
 
-        let mut args = sys::zx_channel_call_etc_args_t {
-            wr_bytes: bytes.as_ptr(),
-            wr_handles: zx_handle_dispositions.as_mut_ptr() as *mut sys::zx_handle_disposition_t,
-            rd_bytes: buf.bytes.as_mut_ptr(),
-            rd_handles: buf.handle_infos.as_mut_ptr() as *mut sys::zx_handle_info_t,
-            wr_num_bytes: write_num_bytes,
-            wr_num_handles: write_num_handle_dispositions,
-            rd_num_bytes: read_num_bytes,
-            rd_num_handles: buf.handle_infos.capacity() as u32,
-        };
         let mut actual_read_bytes: u32 = 0;
         let mut actual_read_handle_infos: u32 = 0;
-        let options = 0;
 
         // SAFETY: args contains pointers that are valid to write to for the provided lengths.
-        unsafe {
+        let res = unsafe {
             ok(sys::zx_channel_call_etc(
                 self.raw_handle(),
-                options,
+                0, // options
                 timeout.into_nanos(),
-                &mut args,
+                &mut sys::zx_channel_call_etc_args_t {
+                    wr_bytes: bytes.as_ptr(),
+                    // SAFETY: HandleDisposition is ABI-compatible with zx_handle_disposition_t, allow
+                    // the kernel to write the latter and later interpret them as the former.
+                    wr_handles: handle_dispositions.as_mut_ptr()
+                        as *mut sys::zx_handle_disposition_t,
+                    rd_bytes: buf.bytes.as_mut_ptr(),
+                    rd_handles: buf.handle_infos.as_mut_ptr() as *mut sys::zx_handle_info_t,
+                    wr_num_bytes: write_num_bytes,
+                    wr_num_handles: write_num_handle_dispositions,
+                    rd_num_bytes: buf.bytes.capacity() as u32,
+                    rd_num_handles: buf.handle_infos.capacity() as u32,
+                },
                 &mut actual_read_bytes,
                 &mut actual_read_handle_infos,
-            ))?
+            ))
         };
+
+        // Outgoing handles are consumed by zx_channel_call so prevent the destructor from being
+        // called. Don't overwrite the status field so that callers can inspect it.
+        for disposition in handle_dispositions {
+            std::mem::forget(disposition.take_op());
+        }
+
+        // Only error-return after zeroing out handles.
+        res?;
 
         // SAFETY: the kernel has initialized these slices with valid values.
         unsafe {
@@ -710,7 +695,7 @@ fn ensure_capacity<T>(vec: &mut Vec<T>, size: usize) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{DurationNum, Port, Signals, Vmo};
+    use crate::{DurationNum, HandleOp, Port, Signals, Vmo};
     use std::thread;
 
     #[test]
@@ -741,12 +726,12 @@ mod tests {
     fn channel_basic_etc_with_handle_move() {
         let (p1, p2) = Channel::create();
 
-        let mut handles = vec![HandleDisposition {
-            handle_op: HandleOp::Move(Port::create().into()),
-            rights: Rights::TRANSFER,
-            object_type: ObjectType::PORT,
-            result: Status::OK,
-        }];
+        let mut handles = vec![HandleDisposition::new(
+            HandleOp::Move(Port::create().into()),
+            ObjectType::PORT,
+            Rights::TRANSFER,
+            Status::OK,
+        )];
         match p1.write_etc(b"", &mut handles) {
             Err(err) => {
                 panic!("error: {}", err);
@@ -770,12 +755,12 @@ mod tests {
         let (p1, p2) = Channel::create();
 
         let port = Port::create();
-        let mut handles = vec![HandleDisposition {
-            handle_op: HandleOp::Duplicate(port.as_handle_ref()),
-            rights: Rights::SAME_RIGHTS,
-            object_type: ObjectType::NONE,
-            result: Status::OK,
-        }];
+        let mut handles = vec![HandleDisposition::new(
+            HandleOp::Duplicate(port.as_handle_ref()),
+            ObjectType::NONE,
+            Rights::SAME_RIGHTS,
+            Status::OK,
+        )];
         p1.write_etc(b"", &mut handles).unwrap();
 
         let orig_port_info = port.basic_info().unwrap();
@@ -828,12 +813,12 @@ mod tests {
     fn too_many_dispositions() -> Vec<HandleDisposition<'static>> {
         let mut handles = vec![];
         for _ in 0..sys::ZX_CHANNEL_MAX_MSG_HANDLES + 1 {
-            handles.push(HandleDisposition {
-                handle_op: HandleOp::Move(crate::Event::create().into()),
-                object_type: ObjectType::EVENT,
-                rights: Rights::TRANSFER,
-                result: Status::OK,
-            });
+            handles.push(HandleDisposition::new(
+                HandleOp::Move(crate::Event::create().into()),
+                ObjectType::EVENT,
+                Rights::TRANSFER,
+                Status::OK,
+            ));
         }
         handles
     }
@@ -849,6 +834,15 @@ mod tests {
     }
 
     #[test]
+    fn channel_write_consumes_handles_on_failure() {
+        let (send, recv) = Channel::create();
+        drop(recv);
+        let mut handles = vec![crate::Event::create().into()];
+        send.write(&[], &mut handles).unwrap_err();
+        assert!(handles[0].is_invalid());
+    }
+
+    #[test]
     fn channel_write_etc_too_many_bytes() {
         Channel::create().0.write_etc(&too_many_bytes(), &mut []).unwrap_err();
     }
@@ -856,6 +850,54 @@ mod tests {
     #[test]
     fn channel_write_etc_too_many_handles() {
         Channel::create().0.write_etc(&vec![], &mut too_many_dispositions()[..]).unwrap_err();
+    }
+
+    #[test]
+    fn channel_write_etc_consumes_moved_handles_on_failure() {
+        let (send, recv) = Channel::create();
+        drop(recv);
+        let mut handles = vec![HandleDisposition::new(
+            HandleOp::Move(crate::Event::create().into()),
+            ObjectType::EVENT,
+            Rights::NONE,
+            Status::OK,
+        )];
+        send.write_etc(&[], &mut handles).unwrap_err();
+        assert_eq!(handles[0].raw_handle(), sys::ZX_HANDLE_INVALID);
+        assert_eq!(handles[0].result, Status::OK);
+    }
+
+    #[test]
+    fn channel_write_etc_preserves_per_disposition_failures() {
+        let (send, _recv) = Channel::create();
+
+        let event = crate::Event::create();
+        let event_no_rights = event.duplicate_handle(Rights::NONE).unwrap();
+
+        let mut handles = vec![
+            HandleDisposition::new(
+                HandleOp::Move(event.into()),
+                ObjectType::EVENT,
+                Rights::SAME_RIGHTS,
+                Status::OK,
+            ),
+            HandleDisposition::new(
+                HandleOp::Move(event_no_rights.into()),
+                ObjectType::EVENT,
+                Rights::SAME_RIGHTS,
+                Status::OK,
+            ),
+        ];
+
+        send.write_etc(&[], &mut handles).unwrap_err();
+
+        // Both handles should be moved.
+        assert_eq!(handles[0].raw_handle(), sys::ZX_HANDLE_INVALID);
+        assert_eq!(handles[1].raw_handle(), sys::ZX_HANDLE_INVALID);
+
+        // Each handle should separately report the status of transferring/duplicating that handle.
+        assert_eq!(handles[0].result, Status::OK);
+        assert_ne!(handles[1].result, Status::OK, "must have transfer rights to succeed");
     }
 
     #[test]
@@ -1071,12 +1113,12 @@ mod tests {
         let mut buf = MessageBufEtc::new();
         buf.ensure_capacity_bytes(12);
         buf.ensure_capacity_handle_infos(1);
-        let mut handle_dispositions = [HandleDisposition {
-            handle_op: HandleOp::Move(Port::create().into()),
-            object_type: ObjectType::PORT,
-            rights: Rights::TRANSFER,
-            result: Status::OK,
-        }];
+        let mut handle_dispositions = [HandleDisposition::new(
+            HandleOp::Move(Port::create().into()),
+            ObjectType::PORT,
+            Rights::TRANSFER,
+            Status::OK,
+        )];
         // NOTE(raggi): CQ has been seeing some long stalls from channel call,
         // and it's as yet unclear why. The timeout here has been made much
         // larger in order to avoid that, as the issues are not issues with this
@@ -1099,5 +1141,44 @@ mod tests {
 
         let sbuf = rx.recv().expect("mpsc channel recv error");
         assert_eq!(&sbuf[4..], b"call");
+    }
+
+    #[test]
+    fn channel_call_etc_preserves_per_disposition_failures() {
+        let (send, _recv) = Channel::create();
+
+        let event = crate::Event::create();
+        let event_no_rights = event.duplicate_handle(Rights::NONE).unwrap();
+
+        let mut handles = vec![
+            HandleDisposition::new(
+                HandleOp::Move(event.into()),
+                ObjectType::EVENT,
+                Rights::SAME_RIGHTS,
+                Status::OK,
+            ),
+            HandleDisposition::new(
+                HandleOp::Move(event_no_rights.into()),
+                ObjectType::EVENT,
+                Rights::SAME_RIGHTS,
+                Status::OK,
+            ),
+        ];
+
+        send.call_etc(
+            MonotonicTime::INFINITE,
+            &[0, 0, 0, 0],
+            &mut handles,
+            &mut MessageBufEtc::default(),
+        )
+        .unwrap_err();
+
+        // Both handles should be invalidated.
+        assert_eq!(handles[0].raw_handle(), sys::ZX_HANDLE_INVALID);
+        assert_eq!(handles[1].raw_handle(), sys::ZX_HANDLE_INVALID);
+
+        // Each handle should separately report the status of transferring/duplicating that handle.
+        assert_eq!(handles[0].result, Status::OK);
+        assert_ne!(handles[1].result, Status::OK, "must have duplicate rights to succeed");
     }
 }

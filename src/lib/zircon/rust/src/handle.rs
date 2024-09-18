@@ -506,16 +506,76 @@ pub enum HandleOp<'a> {
 /// Operation to perform on handles during write.
 /// Based on zx_handle_disposition_t, but does not match the same layout.
 #[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[repr(C)]
 pub struct HandleDisposition<'a> {
-    pub handle_op: HandleOp<'a>,
+    // Must be either ZX_HANDLE_OP_MOVE or ZX_HANDLE_OP_DUPLICATE.
+    operation: sys::zx_handle_op_t,
+    // ZX_HANDLE_OP_MOVE==owned, ZX_HANDLE_OP_DUPLICATE==borrowed.
+    handle: sys::zx_handle_t,
+    // Preserve a borrowed handle's lifetime. Does not occupy any layout.
+    _handle_lifetime: std::marker::PhantomData<&'a ()>,
+
     pub object_type: ObjectType,
     pub rights: Rights,
     pub result: Status,
 }
 
-impl HandleDisposition<'_> {
-    pub fn into_raw<'a>(self) -> sys::zx_handle_disposition_t {
-        match self.handle_op {
+static_assertions::assert_eq_size!(HandleDisposition<'_>, sys::zx_handle_disposition_t);
+
+impl<'a> HandleDisposition<'a> {
+    pub fn new(
+        handle_op: HandleOp<'a>,
+        object_type: ObjectType,
+        rights: Rights,
+        status: Status,
+    ) -> Self {
+        let (operation, handle) = match handle_op {
+            HandleOp::Move(h) => (sys::ZX_HANDLE_OP_MOVE, h.into_raw()),
+            HandleOp::Duplicate(h) => (sys::ZX_HANDLE_OP_DUPLICATE, h.raw_handle()),
+        };
+
+        Self {
+            operation,
+            handle,
+            _handle_lifetime: std::marker::PhantomData,
+            object_type,
+            rights: rights,
+            result: status,
+        }
+    }
+
+    pub fn raw_handle(&self) -> sys::zx_handle_t {
+        self.handle
+    }
+
+    pub fn is_move(&self) -> bool {
+        self.operation == sys::ZX_HANDLE_OP_MOVE
+    }
+
+    pub fn is_duplicate(&self) -> bool {
+        self.operation == sys::ZX_HANDLE_OP_DUPLICATE
+    }
+
+    pub fn take_op(&mut self) -> HandleOp<'a> {
+        match self.operation {
+            sys::ZX_HANDLE_OP_MOVE => {
+                // SAFETY: this is guaranteed to be a valid handle number by a combination of this
+                // type's public API and the kernel's guarantees.
+                HandleOp::Move(unsafe {
+                    Handle::from_raw(std::mem::replace(&mut self.handle, sys::ZX_HANDLE_INVALID))
+                })
+            }
+            sys::ZX_HANDLE_OP_DUPLICATE => {
+                // SAFETY: this is guaranteed to be a valid handle number by a combination of this
+                // type's public API and the kernel's guarantees.
+                HandleOp::Duplicate(unsafe { Unowned::from_raw_handle(self.handle) })
+            }
+            _ => unreachable!(),
+        }
+    }
+
+    pub fn into_raw(mut self) -> sys::zx_handle_disposition_t {
+        match self.take_op() {
             HandleOp::Move(mut handle) => sys::zx_handle_disposition_t {
                 operation: sys::ZX_HANDLE_OP_MOVE,
                 handle: std::mem::replace(&mut handle, Handle::invalid()).into_raw(),
@@ -530,6 +590,15 @@ impl HandleDisposition<'_> {
                 rights: self.rights.bits(),
                 result: self.result.into_raw(),
             },
+        }
+    }
+}
+
+impl<'a> Drop for HandleDisposition<'a> {
+    fn drop(&mut self) {
+        // Ensure we clean up owned handle variants.
+        if self.operation == sys::ZX_HANDLE_OP_MOVE {
+            unsafe { drop(Handle::from_raw(self.handle)) };
         }
     }
 }
@@ -694,12 +763,12 @@ mod tests {
     #[test]
     fn raw_handle_disposition() {
         const RAW_HANDLE: sys::zx_handle_t = 1;
-        let hd = HandleDisposition {
-            handle_op: HandleOp::Move(unsafe { Handle::from_raw(RAW_HANDLE) }),
-            rights: Rights::EXECUTE,
-            object_type: ObjectType::VMO,
-            result: Status::OK,
-        };
+        let hd = HandleDisposition::new(
+            HandleOp::Move(unsafe { Handle::from_raw(RAW_HANDLE) }),
+            ObjectType::VMO,
+            Rights::EXECUTE,
+            Status::OK,
+        );
         let raw_hd = hd.into_raw();
         assert_eq!(raw_hd.operation, sys::ZX_HANDLE_OP_MOVE);
         assert_eq!(raw_hd.handle, RAW_HANDLE);
