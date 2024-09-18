@@ -400,8 +400,23 @@ impl PartialEq for UpdateMutationsKey {
 
 /// When creating a transaction, locks typically need to be held to prevent two or more writers
 /// trying to make conflicting mutations at the same time.  LockKeys are used for this.
+/// NOTE: Ordering is important here!  The lock manager sorts the list of locks in a transaction
+/// to acquire them in a consistent order, but there are special cases for the Filesystem lock and
+/// the Flush lock.
+/// The Filesystem lock is taken by every transaction and is done so first, as part of the TxnGuard.
+/// The Flush lock is taken when we flush an LSM tree (e.g. an object store), and is held for
+/// several transactions.  As such, it must come first in the lock acquisition ordering, so that
+/// other transactions using the Flush lock have the same ordering as in flushing.
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, Copy)]
 pub enum LockKey {
+    /// Locks the entire filesystem.
+    Filesystem,
+
+    /// Used to lock flushing an object.
+    Flush {
+        object_id: u64,
+    },
+
     /// Used to lock changes to a particular object attribute (e.g. writes).
     ObjectAttribute {
         store_object_id: u64,
@@ -415,17 +430,9 @@ pub enum LockKey {
         object_id: u64,
     },
 
-    /// Locks the entire filesystem.
-    Filesystem,
-
     ProjectId {
         store_object_id: u64,
         project_id: u64,
-    },
-
-    /// Used to lock flushing an object.
-    Flush {
-        object_id: u64,
     },
 
     /// Used to lock any truncate operations for a file.

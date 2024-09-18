@@ -119,6 +119,14 @@ impl Inner {
         // deallocated.
             + journal::RESERVED_SPACE
     }
+
+    fn object(&self, object_id: u64) -> Option<Arc<dyn JournalingObject>> {
+        if object_id == self.allocator_object_id {
+            Some(self.allocator.clone().unwrap() as Arc<dyn JournalingObject>)
+        } else {
+            self.stores.get(&object_id).map(|x| x.clone() as Arc<dyn JournalingObject>)
+        }
+    }
 }
 
 impl ObjectManager {
@@ -572,22 +580,25 @@ impl ObjectManager {
     ///
     /// Also returns the earliest known version of a struct on the filesystem.
     pub async fn flush(&self) -> Result<Version, Error> {
-        let mut object_ids: Vec<_> =
-            self.inner.read().unwrap().journal_checkpoints.keys().cloned().collect();
-        // Process objects in reverse sorted order because that will mean we compact the root object
-        // store last which will ensure we include the metadata from the compactions of other
-        // objects.
-        object_ids.sort_unstable();
+        let objects = {
+            let inner = self.inner.read().unwrap();
+            let mut object_ids = inner.journal_checkpoints.keys().cloned().collect::<Vec<_>>();
+            // Process objects in reverse sorted order because that will mean we compact the root
+            // object store last which will ensure we include the metadata from the compactions of
+            // other objects.
+            object_ids.sort_unstable();
+            object_ids
+                .iter()
+                .rev()
+                .map(|oid| (*oid, inner.object(*oid).unwrap()))
+                .collect::<Vec<_>>()
+        };
 
         // As we iterate, keep track of the earliest version used by structs in these objects
         let mut earliest_version: Version = LATEST_VERSION;
-        for &object_id in object_ids.iter().rev() {
-            let object_earliest_version = self
-                .object(object_id)
-                .unwrap()
-                .flush()
-                .await
-                .with_context(|| format!("Failed to flush oid {object_id}"))?;
+        for (object_id, object) in objects {
+            let object_earliest_version =
+                object.flush().await.with_context(|| format!("Failed to flush oid {object_id}"))?;
             if object_earliest_version < earliest_version {
                 earliest_version = object_earliest_version;
             }
@@ -597,12 +608,7 @@ impl ObjectManager {
     }
 
     fn object(&self, object_id: u64) -> Option<Arc<dyn JournalingObject>> {
-        let inner = self.inner.read().unwrap();
-        if object_id == inner.allocator_object_id {
-            Some(inner.allocator.clone().unwrap() as Arc<dyn JournalingObject>)
-        } else {
-            inner.stores.get(&object_id).map(|x| x.clone() as Arc<dyn JournalingObject>)
-        }
+        self.inner.read().unwrap().object(object_id)
     }
 
     pub fn init_metadata_reservation(&self) -> Result<(), Error> {
