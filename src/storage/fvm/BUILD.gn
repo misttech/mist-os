@@ -201,43 +201,60 @@ fuchsia_test_package("fvm-integration-test") {
   deps = [ "//src/storage/minfs/bin:minfs-component" ]
 }
 
+fvm_sources = [
+  "src/device.rs",
+  "src/main.rs",
+  "src/mapping.rs",
+]
+
+fvm_deps = [
+  "//sdk/fidl/fuchsia.hardware.block:fuchsia.hardware.block_rust",
+  "//sdk/fidl/fuchsia.hardware.block.volume:fuchsia.hardware.block.volume_rust",
+  "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
+  "//src/lib/fidl/rust/fidl",
+  "//src/lib/fuchsia",
+  "//src/lib/fuchsia-async",
+  "//src/lib/fuchsia-runtime",
+  "//src/lib/trace/rust:trace-provider",
+  "//src/lib/zircon/rust:fuchsia-zircon",
+  "//src/storage/fidl/fuchsia.fs.startup:fuchsia.fs.startup_rust",
+  "//src/storage/lib/block_client/rust",
+  "//src/storage/lib/block_server",
+  "//src/storage/lib/vfs/rust:vfs",
+  "//third_party/rust_crates:anyhow",
+  "//third_party/rust_crates:async-lock",
+  "//third_party/rust_crates:futures",
+  "//third_party/rust_crates:sha2",
+  "//third_party/rust_crates:tracing",
+  "//third_party/rust_crates:uuid",
+  "//third_party/rust_crates:zerocopy",
+]
+
 rustc_binary("fvm_rust") {
-  with_unit_tests = true
   name = "fvm"
   edition = "2021"
-  sources = [
-    "src/device.rs",
-    "src/main.rs",
-    "src/mapping.rs",
-  ]
-  deps = [
-    "//sdk/fidl/fuchsia.hardware.block:fuchsia.hardware.block_rust",
-    "//sdk/fidl/fuchsia.hardware.block.volume:fuchsia.hardware.block.volume_rust",
-    "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
-    "//src/lib/fidl/rust/fidl",
-    "//src/lib/fuchsia",
-    "//src/lib/fuchsia-async",
-    "//src/lib/fuchsia-runtime",
-    "//src/lib/trace/rust:trace-provider",
-    "//src/lib/zircon/rust:fuchsia-zircon",
-    "//src/storage/fidl/fuchsia.fs.startup:fuchsia.fs.startup_rust",
-    "//src/storage/lib/block_client/rust",
-    "//src/storage/lib/block_server",
-    "//src/storage/lib/vfs/rust:vfs",
-    "//third_party/rust_crates:anyhow",
-    "//third_party/rust_crates:async-lock",
-    "//third_party/rust_crates:futures",
-    "//third_party/rust_crates:sha2",
-    "//third_party/rust_crates:tracing",
-    "//third_party/rust_crates:uuid",
-    "//third_party/rust_crates:zerocopy",
-  ]
-  test_deps = [
-    ":golden",
-    "//src/lib/fuchsia-component",
-    "//src/storage/lib/block_server:fake_block_server",
-    "//third_party/rust_crates:assert_matches",
-  ]
+  sources = fvm_sources
+  deps = fvm_deps
+
+  # Without optimizations, debug builds trigger test timeouts (e.g. minfs-full-tests), so enable
+  # optimizations for all builds.
+  configs -= [ "//build/config:default_optimize" ]
+  configs += [ "//build/config:optimize_speed" ]
+  if (!is_lto_variant) {
+    configs += [ "//build/config/lto:thinlto" ]
+  }
+}
+
+rustc_test("fvm_rust_test") {
+  edition = "2021"
+  source_root = "src/main.rs"
+  sources = fvm_sources
+  deps = fvm_deps + [
+           ":golden",
+           "//src/lib/fuchsia-component",
+           "//src/storage/lib/block_server:fake_block_server",
+           "//third_party/rust_crates:assert_matches",
+         ]
 }
 
 fuchsia_component("fvm-component") {

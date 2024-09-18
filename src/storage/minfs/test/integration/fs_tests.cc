@@ -148,45 +148,26 @@ class MinfsFvmTest : public BaseFilesystemTest {
   }
 
   zx::result<fuchsia_hardware_block_volume::wire::VolumeManagerInfo> GetVolumeManagerInfo() {
-    zx::result volume_manager = GetVolumeManager();
-    if (volume_manager.is_error()) {
-      return volume_manager.take_error();
+    zx::result<std::string> device_path = fs().DevicePath();
+    if (device_path.is_error()) {
+      return device_path.take_error();
+    }
+    zx::result volume =
+        component::Connect<fuchsia_hardware_block_volume::Volume>(device_path.value());
+    if (volume.is_error()) {
+      return volume.take_error();
     }
 
-    fidl::WireResult response = fidl::WireCall(volume_manager.value())->GetInfo();
+    fidl::WireResult response = fidl::WireCall(volume.value())->GetVolumeInfo();
     if (response.status() != ZX_OK)
       return zx::error(response.status());
     if (response.value().status != ZX_OK)
       return zx::error(response.value().status);
-    return zx::ok(*response.value().info);
+    return zx::ok(*response.value().manager);
   }
 
-  zx_status_t SetPartitionLimit(uint64_t slice_limit) {
-    zx::result volume_manager = GetVolumeManager();
-    if (volume_manager.is_error()) {
-      return volume_manager.error_value();
-    }
-
-    auto guid_or = GetMinfsPartitionGuid();
-    EXPECT_TRUE(guid_or.is_ok());
-
-    fidl::WireResult set_response =
-        fidl::WireCall(volume_manager.value())->SetPartitionLimit(*guid_or, slice_limit);
-    if (set_response.status() != ZX_OK)
-      return set_response.status();
-    if (set_response.value().status != ZX_OK)
-      return set_response.value().status;
-
-    // Query the partition limit to make sure it worked.
-    fidl::WireResult get_response =
-        fidl::WireCall(volume_manager.value())->GetPartitionLimit(*guid_or);
-    if (get_response.status() != ZX_OK)
-      return get_response.status();
-    if (get_response.value().status != ZX_OK)
-      return get_response.value().status;
-
-    EXPECT_EQ(slice_limit, get_response.value().slice_count);
-    return ZX_OK;
+  zx::result<> SetPartitionLimit(uint64_t slice_limit_in_bytes) {
+    return fs().GetRamDevice()->fvm_partition()->SetLimit(slice_limit_in_bytes);
   }
 };
 
@@ -300,24 +281,24 @@ TEST_F(MinfsFvmTestWith8MiBSliceSize, FreeSharedPoolBytes) {
   // Lower the partition limit to one more slice than the filesystem currently is using (since
   // there's only our partition in FVM, we know all used slices belong to minfs).
   uint64_t new_limit = manager_info->assigned_slice_count + 1;
-  ASSERT_EQ(ZX_OK, SetPartitionLimit(new_limit));
+  ASSERT_EQ(SetPartitionLimit(new_limit * kSliceSize).status_value(), ZX_OK);
   ASSERT_NO_FATAL_FAILURE(QueryInfo(fs(), &info));
   EXPECT_EQ(kSliceSize, info.free_shared_pool_bytes);  // Set exactly one slice free.
 
   // Match the limit to the current partition size.
   new_limit = manager_info->assigned_slice_count;
-  ASSERT_EQ(ZX_OK, SetPartitionLimit(new_limit));
+  ASSERT_EQ(SetPartitionLimit(new_limit * kSliceSize).status_value(), ZX_OK);
   ASSERT_NO_FATAL_FAILURE(QueryInfo(fs(), &info));
   EXPECT_EQ(0u, info.free_shared_pool_bytes);  // No slices free.
 
   // Lower the limit to to below the partition size.
   new_limit = manager_info->assigned_slice_count - 1;
-  ASSERT_EQ(ZX_OK, SetPartitionLimit(new_limit));
+  ASSERT_EQ(SetPartitionLimit(new_limit * kSliceSize).status_value(), ZX_OK);
   ASSERT_NO_FATAL_FAILURE(QueryInfo(fs(), &info));
   EXPECT_EQ(0u, info.free_shared_pool_bytes);  // No slices free.
 
   // Remove the limit, it should go back to the full free bytes.
-  ASSERT_EQ(ZX_OK, SetPartitionLimit(0u));
+  ASSERT_EQ(SetPartitionLimit(0u).status_value(), ZX_OK);
   ASSERT_NO_FATAL_FAILURE(QueryInfo(fs(), &info));
   ASSERT_EQ(kSliceSize * free_slices, info.free_shared_pool_bytes);
 }
