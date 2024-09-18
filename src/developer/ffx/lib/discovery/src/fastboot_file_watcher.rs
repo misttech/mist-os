@@ -21,10 +21,8 @@ impl FastbootWatcher {
         let existing = get_fastboot_devices(&instance_root)?;
         for device in existing {
             let event = fastboot_file_discovery::FastbootEvent::Discovered(device);
-            let handle = event.try_into();
-            if let Ok(h) = handle {
-                let _ = sender.unbounded_send(Ok(h));
-            }
+            let handle = event.into();
+            let _ = sender.unbounded_send(Ok(handle));
         }
 
         // FastbootFile (and therefore notify thread) lifetime should last as long as the task,
