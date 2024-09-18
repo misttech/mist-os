@@ -166,6 +166,8 @@ impl EnvironmentContext {
                 no_environment,
             ))
         } else {
+            // Isolate dirs should be absolute paths
+            let isolate_root = std::path::absolute(&isolate_root)?;
             Ok(Self::new(
                 EnvironmentKind::Isolated { isolate_root },
                 exe_kind,
