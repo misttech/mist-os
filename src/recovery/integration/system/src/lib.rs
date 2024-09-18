@@ -37,7 +37,14 @@ async fn set_up_realm() -> Result<RealmBuilder, Error> {
                 .to(&system_recovery),
         )
         .await?;
-
+    builder
+        .add_route(
+            Route::new()
+                .capability(Capability::configuration("fuchsia.recovery.DisplayRotation"))
+                .from(Ref::void())
+                .to(&system_recovery),
+        )
+        .await?;
     Ok(builder)
 }
 

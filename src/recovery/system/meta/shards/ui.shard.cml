@@ -25,6 +25,13 @@
             rights: [ "r*" ],
             path: "/dev/class/input-report",
         },
+        {
+            config: "fuchsia.recovery.DisplayRotation",
+            key: "display_rotation",
+            availability: "optional",
+            type: "uint16",
+            default: 0,
+        },
     ],
     expose: [
         {

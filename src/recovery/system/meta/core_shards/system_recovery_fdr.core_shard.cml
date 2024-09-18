@@ -20,6 +20,12 @@
             to: "#system_recovery",
         },
         {
+            from: "parent",
+            to: "#system_recovery",
+            config: [ "fuchsia.recovery.DisplayRotation" ],
+            availability: "same_as_target",
+        },
+        {
             directory: "config-data",
             from: "parent",
             to: "#system_recovery",

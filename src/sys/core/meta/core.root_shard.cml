@@ -25,6 +25,8 @@
                 "fuchsia.memory.NormalCaptureDelay",
                 "fuchsia.memory.WarningCaptureDelay",
                 "fuchsia.power.SuspendEnabled",
+                "fuchsia.recovery.DisplayRotation",
+                "fuchsia.recovery.UseFxBlob",
                 "fuchsia.scenic.DisplayComposition",
                 "fuchsia.scenic.DisplayRotation",
                 "fuchsia.scenic.FrameSchedulerMinPredictedFrameDurationInUs",

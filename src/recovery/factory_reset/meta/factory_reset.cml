@@ -36,6 +36,11 @@
             rights: [ "r*" ],
             path: "/dev",
         },
+        {
+            config: "fuchsia.recovery.UseFxBlob",
+            key: "use_fxblob",
+            type: "bool",
+        },
     ],
     expose: [
         {
