@@ -29,8 +29,10 @@ readonly RAW_LINES="// Copyright 2023 The Fuchsia Authors. All rights reserved.
 #![allow(non_camel_case_types)]
 #![allow(non_snake_case)]
 #![allow(clippy::undocumented_unsafe_blocks)]
+// Allow unused definitions
+#![allow(dead_code, unused_results)]
 
-use zerocopy::{AsBytes, FromBytes, FromZeros};
+use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell};
 
 // Configure linkage for MacOS.
 #[cfg(target_os = \"macos\")]
@@ -41,8 +43,7 @@ extern \"C\" {}"
 readonly OUTPUT="src/zbi_format.rs"
 
 readonly INPUT=( \
-	"${FUCHSIA_DIR}/sdk/lib/zbi-format/include/lib/zbi-format/kernel.h" \
-	"${FUCHSIA_DIR}/sdk/lib/zbi-format/include/lib/zbi-format/zbi.h" \
+	"${FUCHSIA_DIR}/sdk/lib/zbi-format/include/lib/zbi-format/*.h" \
 )
 
 tmp="$(mktemp --suffix=.h)"
@@ -67,11 +68,13 @@ echo ${tmp}
     --with-derive-default \
     --with-derive-partialeq \
     --impl-debug \
-    --with-derive-custom-struct zbi_header_t=FromBytes,AsBytes,FromZeros \
+    --with-derive-custom-struct 'zbi_.*_t'=FromBytes,AsBytes,FromZeros,NoCell \
     --output ${OUTPUT} \
-    --allowlist-type '(zbi_type_t|zbi_flags_t|zbi_header_t|zbi_kernel_t)' \
+    --allowlist-type 'zbi_.+_t' \
     --allowlist-var 'ZBI_.+' \
+    --blocklist-type 'zbi_topology_.+_t_.*' \
+    --blocklist-type 'zbi_topology_(entity|architecture_info|processor|node)_t' \
+    --use-core \
     -- -x c \
     -I ${FUCHSIA_DIR}/sdk/lib/zbi-format/include \
-
 
