@@ -40,7 +40,8 @@ impl TouchPowerPolicyDevice {
     {
         let kernel = system_task.kernel();
         let registry = &kernel.device_registry;
-        let misc_class = registry.get_or_create_class("misc".into(), registry.virtual_bus());
+        let misc_class =
+            registry.objects.get_or_create_class("misc".into(), registry.objects.virtual_bus());
         registry.add_and_register_device(
             locked,
             system_task,

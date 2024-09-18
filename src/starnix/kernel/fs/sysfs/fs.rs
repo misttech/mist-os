@@ -64,15 +64,16 @@ impl SysFs {
         });
 
         let registry = &kernel.device_registry;
-        dir.entry(current_task, SYSFS_DEVICES, registry.root_kobject().ops(), dir_mode);
-        dir.entry(current_task, SYSFS_BUS, registry.bus_subsystem_kobject().ops(), dir_mode);
-        dir.entry(current_task, SYSFS_BLOCK, registry.block_subsystem_kobject().ops(), dir_mode);
-        dir.entry(current_task, SYSFS_CLASS, registry.class_subsystem_kobject().ops(), dir_mode);
+        dir.entry(current_task, SYSFS_DEVICES, registry.objects.devices.ops(), dir_mode);
+        dir.entry(current_task, SYSFS_BUS, registry.objects.bus.ops(), dir_mode);
+        dir.entry(current_task, SYSFS_BLOCK, registry.objects.block.ops(), dir_mode);
+        dir.entry(current_task, SYSFS_CLASS, registry.objects.class.ops(), dir_mode);
 
         // TODO(b/297438880): Remove this workaround after net devices are registered correctly.
         kernel
             .device_registry
-            .class_subsystem_kobject()
+            .objects
+            .class
             .get_or_create_child("net".into(), |_| NetstackDevicesDirectory::new_sys_class_net());
 
         sysfs_kernel_directory(current_task, &mut dir);
@@ -97,7 +98,8 @@ impl SysFs {
         // TODO(https://fxbug.dev/42072346): Temporary fix of flakeness in tcp_socket_test.
         // Remove after registry.rs refactor is in place.
         registry
-            .root_kobject()
+            .objects
+            .devices
             .get_or_create_child("system".into(), KObjectDirectory::new)
             .get_or_create_child("cpu".into(), CpuClassDirectory::new);
 

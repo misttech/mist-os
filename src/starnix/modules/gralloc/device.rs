@@ -50,7 +50,8 @@ where
     let kernel = current_task.kernel();
     let registry = &kernel.device_registry;
 
-    let starnix_class = registry.get_or_create_class("starnix".into(), registry.virtual_bus());
+    let starnix_class =
+        registry.objects.get_or_create_class("starnix".into(), registry.objects.virtual_bus());
 
     let gralloc_type: DeviceType = registry
         .register_dyn_chrdev(GrallocDevice::new(mode_setter))

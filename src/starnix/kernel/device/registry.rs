@@ -201,12 +201,46 @@ impl MajorDevices {
     }
 }
 
+pub struct KernelObjects {
+    pub devices: KObjectHandle,
+    pub class: KObjectHandle,
+    pub block: KObjectHandle,
+    pub bus: KObjectHandle,
+}
+
+impl KernelObjects {
+    /// Returns the virtual bus kobject where all virtual and pseudo devices are stored.
+    pub fn virtual_bus(&self) -> Bus {
+        Bus::new(self.devices.get_or_create_child("virtual".into(), KObjectDirectory::new), None)
+    }
+
+    pub fn get_or_create_bus(&self, name: &FsStr) -> Bus {
+        let collection =
+            Collection::new(self.bus.get_or_create_child(name, BusCollectionDirectory::new));
+        Bus::new(self.devices.get_or_create_child(name, KObjectDirectory::new), Some(collection))
+    }
+
+    pub fn get_or_create_class(&self, name: &FsStr, bus: Bus) -> Class {
+        let collection =
+            Collection::new(self.class.get_or_create_child(name, KObjectSymlinkDirectory::new));
+        Class::new(bus.kobject().get_or_create_child(name, KObjectDirectory::new), bus, collection)
+    }
+}
+
+impl Default for KernelObjects {
+    fn default() -> Self {
+        Self {
+            devices: KObject::new_root(SYSFS_DEVICES.into()),
+            class: KObject::new_root(SYSFS_CLASS.into()),
+            block: KObject::new_root_with_dir(SYSFS_BLOCK.into(), KObjectSymlinkDirectory::new),
+            bus: KObject::new_root(SYSFS_BUS.into()),
+        }
+    }
+}
+
 /// The kernel's registry of drivers.
 pub struct DeviceRegistry {
-    root_kobject: KObjectHandle,
-    class_subsystem_kobject: KObjectHandle,
-    block_subsystem_kobject: KObjectHandle,
-    bus_subsystem_kobject: KObjectHandle,
+    pub objects: KernelObjects,
     state: Mutex<DeviceRegistryState>,
 }
 
@@ -223,48 +257,6 @@ struct DeviceRegistryState {
 impl DeviceRegistry {
     pub fn new() -> Self {
         Self::default()
-    }
-
-    /// Returns the root kobject.
-    pub fn root_kobject(&self) -> KObjectHandle {
-        self.root_kobject.clone()
-    }
-
-    pub fn bus_subsystem_kobject(&self) -> KObjectHandle {
-        self.bus_subsystem_kobject.clone()
-    }
-
-    pub fn class_subsystem_kobject(&self) -> KObjectHandle {
-        self.class_subsystem_kobject.clone()
-    }
-
-    pub fn block_subsystem_kobject(&self) -> KObjectHandle {
-        self.block_subsystem_kobject.clone()
-    }
-
-    /// Returns the virtual bus kobject where all virtual and pseudo devices are stored.
-    pub fn virtual_bus(&self) -> Bus {
-        Bus::new(
-            self.root_kobject.get_or_create_child("virtual".into(), KObjectDirectory::new),
-            None,
-        )
-    }
-
-    pub fn get_or_create_bus(&self, name: &FsStr) -> Bus {
-        let collection = Collection::new(
-            self.bus_subsystem_kobject.get_or_create_child(name, BusCollectionDirectory::new),
-        );
-        Bus::new(
-            self.root_kobject.get_or_create_child(name, KObjectDirectory::new),
-            Some(collection),
-        )
-    }
-
-    pub fn get_or_create_class(&self, name: &FsStr, bus: Bus) -> Class {
-        let collection = Collection::new(
-            self.class_subsystem_kobject.get_or_create_child(name, KObjectSymlinkDirectory::new),
-        );
-        Class::new(bus.kobject().get_or_create_child(name, KObjectDirectory::new), bus, collection)
     }
 
     pub fn add_device<F, N, L>(
@@ -294,7 +286,7 @@ impl DeviceRegistry {
         // Insert the created device kobject into its subsystems.
         class.collection.kobject().insert_child(device_kobject.clone());
         if metadata.mode == DeviceMode::Block {
-            self.block_subsystem_kobject.insert_child(device_kobject.clone());
+            self.objects.block.insert_child(device_kobject.clone());
         }
         if let Some(bus_collection) = &class.bus.collection {
             bus_collection.kobject().insert_child(device_kobject.clone());
@@ -460,16 +452,7 @@ impl Default for DeviceRegistry {
             .char_devices
             .register_major(DYN_MAJOR, Arc::clone(&state.dyn_devices))
             .expect("Failed to register DYN_MAJOR");
-        Self {
-            root_kobject: KObject::new_root(SYSFS_DEVICES.into()),
-            class_subsystem_kobject: KObject::new_root(SYSFS_CLASS.into()),
-            block_subsystem_kobject: KObject::new_root_with_dir(
-                SYSFS_BLOCK.into(),
-                KObjectSymlinkDirectory::new,
-            ),
-            bus_subsystem_kobject: KObject::new_root(SYSFS_BUS.into()),
-            state: Mutex::new(state),
-        }
+        Self { objects: Default::default(), state: Mutex::new(state) }
     }
 }
 
@@ -615,7 +598,8 @@ mod tests {
         let (kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
         let registry = &kernel.device_registry;
 
-        let input_class = registry.get_or_create_class("input".into(), registry.virtual_bus());
+        let input_class =
+            registry.objects.get_or_create_class("input".into(), registry.objects.virtual_bus());
         registry.add_device(
             &mut locked,
             &current_task,
@@ -625,9 +609,10 @@ mod tests {
             DeviceDirectory::new,
         );
 
-        assert!(registry.class_subsystem_kobject().has_child("input".into()));
+        assert!(registry.objects.class.has_child("input".into()));
         assert!(registry
-            .class_subsystem_kobject()
+            .objects
+            .class
             .get_child("input".into())
             .and_then(|collection| collection.get_child("mice".into()))
             .is_some());
@@ -638,8 +623,8 @@ mod tests {
         let (kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
         let registry = &kernel.device_registry;
 
-        let bus = registry.get_or_create_bus("bus".into());
-        let class = registry.get_or_create_class("class".into(), bus);
+        let bus = registry.objects.get_or_create_bus("bus".into());
+        let class = registry.objects.get_or_create_class("class".into(), bus);
         registry.add_device(
             &mut locked,
             &current_task,
@@ -648,9 +633,10 @@ mod tests {
             class,
             DeviceDirectory::new,
         );
-        assert!(registry.bus_subsystem_kobject().has_child("bus".into()));
+        assert!(registry.objects.bus.has_child("bus".into()));
         assert!(registry
-            .bus_subsystem_kobject()
+            .objects
+            .bus
             .get_child("bus".into())
             .and_then(|collection| collection.get_child("device".into()))
             .is_some());
@@ -661,8 +647,8 @@ mod tests {
         let (kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
         let registry = &kernel.device_registry;
 
-        let pci_bus = registry.get_or_create_bus("pci".into());
-        let input_class = registry.get_or_create_class("input".into(), pci_bus);
+        let pci_bus = registry.objects.get_or_create_bus("pci".into());
+        let input_class = registry.objects.get_or_create_class("input".into(), pci_bus);
         let mice_dev = registry.add_device(
             &mut locked,
             &current_task,
@@ -675,12 +661,14 @@ mod tests {
         registry.remove_device(&mut locked, &current_task, mice_dev);
         assert!(!input_class.kobject().has_child("mice".into()));
         assert!(!registry
-            .bus_subsystem_kobject()
+            .objects
+            .bus
             .get_child("pci".into())
             .expect("get pci collection")
             .has_child("mice".into()));
         assert!(!registry
-            .class_subsystem_kobject()
+            .objects
+            .class
             .get_child("input".into())
             .expect("get input collection")
             .has_child("mice".into()));
