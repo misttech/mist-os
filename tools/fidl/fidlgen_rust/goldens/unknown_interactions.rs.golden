@@ -5,15 +5,11 @@
 #![warn(clippy::all)]
 #![allow(unused_parens, unused_mut, unused_imports, nonstandard_style)]
 
-use {
-    bitflags::bitflags,
-    fidl::{
-        client::QueryResponseFut,
-        endpoints::{ControlHandle as _, Responder as _},
-    },
-    fuchsia_zircon_status as zx_status,
-    futures::future::{self, MaybeDone, TryFutureExt},
-};
+use bitflags::bitflags;
+use fidl::client::QueryResponseFut;
+use fidl::endpoints::{ControlHandle as _, Responder as _};
+use fuchsia_zircon_status as zx_status;
+use futures::future::{self, MaybeDone, TryFutureExt};
 
 #[cfg(target_os = "fuchsia")]
 use fuchsia_zircon as zx;
@@ -1043,7 +1039,10 @@ impl UnknownInteractionsAjarProtocolSynchronousProxy {
         Ok(_response)
     }
 
-    pub fn r#strict_two_way_fields(&self, ___deadline: zx::MonotonicTime) -> Result<i32, fidl::Error> {
+    pub fn r#strict_two_way_fields(
+        &self,
+        ___deadline: zx::MonotonicTime,
+    ) -> Result<i32, fidl::Error> {
         let _response = self.client.send_query::<
             fidl::encoding::EmptyPayload,
             UnknownInteractionsAjarProtocolStrictTwoWayFieldsResponse,
@@ -2088,6 +2087,16 @@ impl fidl::endpoints::ControlHandle for UnknownInteractionsAjarProtocolControlHa
     fn on_closed(&self) -> fidl::OnSignalsRef<'_> {
         self.inner.channel().on_closed()
     }
+
+    #[cfg(target_os = "fuchsia")]
+    fn signal_peer(
+        &self,
+        clear_mask: zx::Signals,
+        set_mask: zx::Signals,
+    ) -> Result<(), zx_status::Status> {
+        use fidl::Peered;
+        self.inner.channel().as_ref().signal_peer(clear_mask, set_mask)
+    }
 }
 
 impl UnknownInteractionsAjarProtocolControlHandle {
@@ -2857,7 +2866,10 @@ impl UnknownInteractionsClosedProtocolSynchronousProxy {
         Ok(_response)
     }
 
-    pub fn r#strict_two_way_fields(&self, ___deadline: zx::MonotonicTime) -> Result<i32, fidl::Error> {
+    pub fn r#strict_two_way_fields(
+        &self,
+        ___deadline: zx::MonotonicTime,
+    ) -> Result<i32, fidl::Error> {
         let _response = self.client.send_query::<
             fidl::encoding::EmptyPayload,
             UnknownInteractionsClosedProtocolStrictTwoWayFieldsResponse,
@@ -3761,6 +3773,16 @@ impl fidl::endpoints::ControlHandle for UnknownInteractionsClosedProtocolControl
     fn on_closed(&self) -> fidl::OnSignalsRef<'_> {
         self.inner.channel().on_closed()
     }
+
+    #[cfg(target_os = "fuchsia")]
+    fn signal_peer(
+        &self,
+        clear_mask: zx::Signals,
+        set_mask: zx::Signals,
+    ) -> Result<(), zx_status::Status> {
+        use fidl::Peered;
+        self.inner.channel().as_ref().signal_peer(clear_mask, set_mask)
+    }
 }
 
 impl UnknownInteractionsClosedProtocolControlHandle {
@@ -4526,7 +4548,10 @@ impl UnknownInteractionsProtocolSynchronousProxy {
         Ok(_response)
     }
 
-    pub fn r#strict_two_way_fields(&self, ___deadline: zx::MonotonicTime) -> Result<i32, fidl::Error> {
+    pub fn r#strict_two_way_fields(
+        &self,
+        ___deadline: zx::MonotonicTime,
+    ) -> Result<i32, fidl::Error> {
         let _response = self.client.send_query::<
             fidl::encoding::EmptyPayload,
             UnknownInteractionsProtocolStrictTwoWayFieldsResponse,
@@ -4646,7 +4671,10 @@ impl UnknownInteractionsProtocolSynchronousProxy {
         Ok(_response)
     }
 
-    pub fn r#flexible_two_way_fields(&self, ___deadline: zx::MonotonicTime) -> Result<i32, fidl::Error> {
+    pub fn r#flexible_two_way_fields(
+        &self,
+        ___deadline: zx::MonotonicTime,
+    ) -> Result<i32, fidl::Error> {
         let _response =
             self.client
                 .send_query::<fidl::encoding::EmptyPayload, fidl::encoding::FlexibleType<
@@ -6185,6 +6213,16 @@ impl fidl::endpoints::ControlHandle for UnknownInteractionsProtocolControlHandle
 
     fn on_closed(&self) -> fidl::OnSignalsRef<'_> {
         self.inner.channel().on_closed()
+    }
+
+    #[cfg(target_os = "fuchsia")]
+    fn signal_peer(
+        &self,
+        clear_mask: zx::Signals,
+        set_mask: zx::Signals,
+    ) -> Result<(), zx_status::Status> {
+        use fidl::Peered;
+        self.inner.channel().as_ref().signal_peer(clear_mask, set_mask)
     }
 }
 

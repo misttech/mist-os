@@ -5,15 +5,11 @@
 #![warn(clippy::all)]
 #![allow(unused_parens, unused_mut, unused_imports, nonstandard_style)]
 
-use {
-    bitflags::bitflags,
-    fidl::{
-        client::QueryResponseFut,
-        endpoints::{ControlHandle as _, Responder as _},
-    },
-    fuchsia_zircon_status as zx_status,
-    futures::future::{self, MaybeDone, TryFutureExt},
-};
+use bitflags::bitflags;
+use fidl::client::QueryResponseFut;
+use fidl::endpoints::{ControlHandle as _, Responder as _};
+use fuchsia_zircon_status as zx_status;
+use futures::future::{self, MaybeDone, TryFutureExt};
 
 #[cfg(target_os = "fuchsia")]
 use fuchsia_zircon as zx;
@@ -368,6 +364,16 @@ impl fidl::endpoints::ControlHandle for AllowedControlHandle {
     fn on_closed(&self) -> fidl::OnSignalsRef<'_> {
         self.inner.channel().on_closed()
     }
+
+    #[cfg(target_os = "fuchsia")]
+    fn signal_peer(
+        &self,
+        clear_mask: zx::Signals,
+        set_mask: zx::Signals,
+    ) -> Result<(), zx_status::Status> {
+        use fidl::Peered;
+        self.inner.channel().as_ref().signal_peer(clear_mask, set_mask)
+    }
 }
 
 impl AllowedControlHandle {}
@@ -445,7 +451,10 @@ impl DenyEachBindingSynchronousProxy {
 
     /// Waits until an event arrives and returns it. It is safe for other
     /// threads to make concurrent requests while waiting for an event.
-    pub fn wait_for_event(&self, deadline: zx::MonotonicTime) -> Result<DenyEachBindingEvent, fidl::Error> {
+    pub fn wait_for_event(
+        &self,
+        deadline: zx::MonotonicTime,
+    ) -> Result<DenyEachBindingEvent, fidl::Error> {
         DenyEachBindingEvent::decode(self.client.wait_for_event(deadline)?)
     }
 
@@ -1034,6 +1043,16 @@ impl fidl::endpoints::ControlHandle for DenyEachBindingControlHandle {
 
     fn on_closed(&self) -> fidl::OnSignalsRef<'_> {
         self.inner.channel().on_closed()
+    }
+
+    #[cfg(target_os = "fuchsia")]
+    fn signal_peer(
+        &self,
+        clear_mask: zx::Signals,
+        set_mask: zx::Signals,
+    ) -> Result<(), zx_status::Status> {
+        use fidl::Peered;
+        self.inner.channel().as_ref().signal_peer(clear_mask, set_mask)
     }
 }
 
@@ -1718,6 +1737,16 @@ impl fidl::endpoints::ControlHandle for ImportsSameNameContextControlHandle {
 
     fn on_closed(&self) -> fidl::OnSignalsRef<'_> {
         self.inner.channel().on_closed()
+    }
+
+    #[cfg(target_os = "fuchsia")]
+    fn signal_peer(
+        &self,
+        clear_mask: zx::Signals,
+        set_mask: zx::Signals,
+    ) -> Result<(), zx_status::Status> {
+        use fidl::Peered;
+        self.inner.channel().as_ref().signal_peer(clear_mask, set_mask)
     }
 }
 

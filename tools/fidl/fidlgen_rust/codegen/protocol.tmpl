@@ -605,6 +605,16 @@ impl fidl::endpoints::ControlHandle for {{ $protocol.ControlHandle }} {
     fn on_closed(&self) -> fidl::OnSignalsRef<'_> {
         self.inner.channel().on_closed()
     }
+
+    #[cfg(target_os = "fuchsia")]
+    fn signal_peer(
+        &self,
+        clear_mask: zx::Signals,
+        set_mask: zx::Signals,
+    ) -> Result<(), zx_status::Status> {
+        use fidl::Peered;
+        self.inner.channel().as_ref().signal_peer(clear_mask, set_mask)
+    }
 }
 
 impl {{ $protocol.ControlHandle }} {

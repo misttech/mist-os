@@ -5,15 +5,11 @@
 #![warn(clippy::all)]
 #![allow(unused_parens, unused_mut, unused_imports, nonstandard_style)]
 
-use {
-    bitflags::bitflags,
-    fidl::{
-        client::QueryResponseFut,
-        endpoints::{ControlHandle as _, Responder as _},
-    },
-    fuchsia_zircon_status as zx_status,
-    futures::future::{self, MaybeDone, TryFutureExt},
-};
+use bitflags::bitflags;
+use fidl::client::QueryResponseFut;
+use fidl::endpoints::{ControlHandle as _, Responder as _};
+use fuchsia_zircon_status as zx_status;
+use futures::future::{self, MaybeDone, TryFutureExt};
 
 #[cfg(target_os = "fuchsia")]
 use fuchsia_zircon as zx;
@@ -590,6 +586,16 @@ impl fidl::endpoints::ControlHandle for AnotherDiscoverableProtocolControlHandle
     fn on_closed(&self) -> fidl::OnSignalsRef<'_> {
         self.inner.channel().on_closed()
     }
+
+    #[cfg(target_os = "fuchsia")]
+    fn signal_peer(
+        &self,
+        clear_mask: zx::Signals,
+        set_mask: zx::Signals,
+    ) -> Result<(), zx_status::Status> {
+        use fidl::Peered;
+        self.inner.channel().as_ref().signal_peer(clear_mask, set_mask)
+    }
 }
 
 impl AnotherDiscoverableProtocolControlHandle {}
@@ -655,7 +661,10 @@ impl ChannelProtocolSynchronousProxy {
 
     /// Waits until an event arrives and returns it. It is safe for other
     /// threads to make concurrent requests while waiting for an event.
-    pub fn wait_for_event(&self, deadline: zx::MonotonicTime) -> Result<ChannelProtocolEvent, fidl::Error> {
+    pub fn wait_for_event(
+        &self,
+        deadline: zx::MonotonicTime,
+    ) -> Result<ChannelProtocolEvent, fidl::Error> {
         ChannelProtocolEvent::decode(self.client.wait_for_event(deadline)?)
     }
 
@@ -1131,6 +1140,16 @@ impl fidl::endpoints::ControlHandle for ChannelProtocolControlHandle {
 
     fn on_closed(&self) -> fidl::OnSignalsRef<'_> {
         self.inner.channel().on_closed()
+    }
+
+    #[cfg(target_os = "fuchsia")]
+    fn signal_peer(
+        &self,
+        clear_mask: zx::Signals,
+        set_mask: zx::Signals,
+    ) -> Result<(), zx_status::Status> {
+        use fidl::Peered;
+        self.inner.channel().as_ref().signal_peer(clear_mask, set_mask)
     }
 }
 
@@ -1641,6 +1660,16 @@ impl fidl::endpoints::ControlHandle for DiscoverableProtocolControlHandle {
     fn on_closed(&self) -> fidl::OnSignalsRef<'_> {
         self.inner.channel().on_closed()
     }
+
+    #[cfg(target_os = "fuchsia")]
+    fn signal_peer(
+        &self,
+        clear_mask: zx::Signals,
+        set_mask: zx::Signals,
+    ) -> Result<(), zx_status::Status> {
+        use fidl::Peered;
+        self.inner.channel().as_ref().signal_peer(clear_mask, set_mask)
+    }
 }
 
 impl DiscoverableProtocolControlHandle {}
@@ -2048,6 +2077,16 @@ impl fidl::endpoints::ControlHandle for HandleRightsProtocolControlHandle {
     fn on_closed(&self) -> fidl::OnSignalsRef<'_> {
         self.inner.channel().on_closed()
     }
+
+    #[cfg(target_os = "fuchsia")]
+    fn signal_peer(
+        &self,
+        clear_mask: zx::Signals,
+        set_mask: zx::Signals,
+    ) -> Result<(), zx_status::Status> {
+        use fidl::Peered;
+        self.inner.channel().as_ref().signal_peer(clear_mask, set_mask)
+    }
 }
 
 impl HandleRightsProtocolControlHandle {
@@ -2195,7 +2234,10 @@ impl ManyParametersSynchronousProxy {
 
     /// Waits until an event arrives and returns it. It is safe for other
     /// threads to make concurrent requests while waiting for an event.
-    pub fn wait_for_event(&self, deadline: zx::MonotonicTime) -> Result<ManyParametersEvent, fidl::Error> {
+    pub fn wait_for_event(
+        &self,
+        deadline: zx::MonotonicTime,
+    ) -> Result<ManyParametersEvent, fidl::Error> {
         ManyParametersEvent::decode(self.client.wait_for_event(deadline)?)
     }
 
@@ -2566,6 +2608,16 @@ impl fidl::endpoints::ControlHandle for ManyParametersControlHandle {
     fn on_closed(&self) -> fidl::OnSignalsRef<'_> {
         self.inner.channel().on_closed()
     }
+
+    #[cfg(target_os = "fuchsia")]
+    fn signal_peer(
+        &self,
+        clear_mask: zx::Signals,
+        set_mask: zx::Signals,
+    ) -> Result<(), zx_status::Status> {
+        use fidl::Peered;
+        self.inner.channel().as_ref().signal_peer(clear_mask, set_mask)
+    }
 }
 
 impl ManyParametersControlHandle {}
@@ -2626,7 +2678,10 @@ impl MethodWithUnionSynchronousProxy {
 
     /// Waits until an event arrives and returns it. It is safe for other
     /// threads to make concurrent requests while waiting for an event.
-    pub fn wait_for_event(&self, deadline: zx::MonotonicTime) -> Result<MethodWithUnionEvent, fidl::Error> {
+    pub fn wait_for_event(
+        &self,
+        deadline: zx::MonotonicTime,
+    ) -> Result<MethodWithUnionEvent, fidl::Error> {
         MethodWithUnionEvent::decode(self.client.wait_for_event(deadline)?)
     }
 
@@ -2902,6 +2957,16 @@ impl fidl::endpoints::ControlHandle for MethodWithUnionControlHandle {
     fn on_closed(&self) -> fidl::OnSignalsRef<'_> {
         self.inner.channel().on_closed()
     }
+
+    #[cfg(target_os = "fuchsia")]
+    fn signal_peer(
+        &self,
+        clear_mask: zx::Signals,
+        set_mask: zx::Signals,
+    ) -> Result<(), zx_status::Status> {
+        use fidl::Peered;
+        self.inner.channel().as_ref().signal_peer(clear_mask, set_mask)
+    }
 }
 
 impl MethodWithUnionControlHandle {}
@@ -3022,7 +3087,10 @@ impl PlatformServer_SynchronousProxy {
 
     /// Waits until an event arrives and returns it. It is safe for other
     /// threads to make concurrent requests while waiting for an event.
-    pub fn wait_for_event(&self, deadline: zx::MonotonicTime) -> Result<PlatformServer_Event, fidl::Error> {
+    pub fn wait_for_event(
+        &self,
+        deadline: zx::MonotonicTime,
+    ) -> Result<PlatformServer_Event, fidl::Error> {
         PlatformServer_Event::decode(self.client.wait_for_event(deadline)?)
     }
 }
@@ -3223,6 +3291,16 @@ impl fidl::endpoints::ControlHandle for PlatformServer_ControlHandle {
     fn on_closed(&self) -> fidl::OnSignalsRef<'_> {
         self.inner.channel().on_closed()
     }
+
+    #[cfg(target_os = "fuchsia")]
+    fn signal_peer(
+        &self,
+        clear_mask: zx::Signals,
+        set_mask: zx::Signals,
+    ) -> Result<(), zx_status::Status> {
+        use fidl::Peered;
+        self.inner.channel().as_ref().signal_peer(clear_mask, set_mask)
+    }
 }
 
 impl PlatformServer_ControlHandle {}
@@ -3311,7 +3389,10 @@ impl WithAndWithoutRequestResponseSynchronousProxy {
         )
     }
 
-    pub fn r#no_request_empty_response(&self, ___deadline: zx::MonotonicTime) -> Result<(), fidl::Error> {
+    pub fn r#no_request_empty_response(
+        &self,
+        ___deadline: zx::MonotonicTime,
+    ) -> Result<(), fidl::Error> {
         let _response =
             self.client.send_query::<fidl::encoding::EmptyPayload, fidl::encoding::EmptyPayload>(
                 (),
@@ -3322,7 +3403,10 @@ impl WithAndWithoutRequestResponseSynchronousProxy {
         Ok(_response)
     }
 
-    pub fn r#no_request_with_response(&self, ___deadline: zx::MonotonicTime) -> Result<String, fidl::Error> {
+    pub fn r#no_request_with_response(
+        &self,
+        ___deadline: zx::MonotonicTime,
+    ) -> Result<String, fidl::Error> {
         let _response = self.client.send_query::<
             fidl::encoding::EmptyPayload,
             WithAndWithoutRequestResponseNoRequestWithResponseResponse,
@@ -3940,6 +4024,16 @@ impl fidl::endpoints::ControlHandle for WithAndWithoutRequestResponseControlHand
     fn on_closed(&self) -> fidl::OnSignalsRef<'_> {
         self.inner.channel().on_closed()
     }
+
+    #[cfg(target_os = "fuchsia")]
+    fn signal_peer(
+        &self,
+        clear_mask: zx::Signals,
+        set_mask: zx::Signals,
+    ) -> Result<(), zx_status::Status> {
+        use fidl::Peered;
+        self.inner.channel().as_ref().signal_peer(clear_mask, set_mask)
+    }
 }
 
 impl WithAndWithoutRequestResponseControlHandle {
@@ -4287,7 +4381,10 @@ impl WithErrorSyntaxSynchronousProxy {
 
     /// Waits until an event arrives and returns it. It is safe for other
     /// threads to make concurrent requests while waiting for an event.
-    pub fn wait_for_event(&self, deadline: zx::MonotonicTime) -> Result<WithErrorSyntaxEvent, fidl::Error> {
+    pub fn wait_for_event(
+        &self,
+        deadline: zx::MonotonicTime,
+    ) -> Result<WithErrorSyntaxEvent, fidl::Error> {
         WithErrorSyntaxEvent::decode(self.client.wait_for_event(deadline)?)
     }
 
@@ -4781,6 +4878,16 @@ impl fidl::endpoints::ControlHandle for WithErrorSyntaxControlHandle {
     fn on_closed(&self) -> fidl::OnSignalsRef<'_> {
         self.inner.channel().on_closed()
     }
+
+    #[cfg(target_os = "fuchsia")]
+    fn signal_peer(
+        &self,
+        clear_mask: zx::Signals,
+        set_mask: zx::Signals,
+    ) -> Result<(), zx_status::Status> {
+        use fidl::Peered;
+        self.inner.channel().as_ref().signal_peer(clear_mask, set_mask)
+    }
 }
 
 impl WithErrorSyntaxControlHandle {}
@@ -5129,7 +5236,10 @@ impl WithProtocolEndsSynchronousProxy {
 
     /// Waits until an event arrives and returns it. It is safe for other
     /// threads to make concurrent requests while waiting for an event.
-    pub fn wait_for_event(&self, deadline: zx::MonotonicTime) -> Result<WithProtocolEndsEvent, fidl::Error> {
+    pub fn wait_for_event(
+        &self,
+        deadline: zx::MonotonicTime,
+    ) -> Result<WithProtocolEndsEvent, fidl::Error> {
         WithProtocolEndsEvent::decode(self.client.wait_for_event(deadline)?)
     }
 
@@ -5592,6 +5702,16 @@ impl fidl::endpoints::ControlHandle for WithProtocolEndsControlHandle {
 
     fn on_closed(&self) -> fidl::OnSignalsRef<'_> {
         self.inner.channel().on_closed()
+    }
+
+    #[cfg(target_os = "fuchsia")]
+    fn signal_peer(
+        &self,
+        clear_mask: zx::Signals,
+        set_mask: zx::Signals,
+    ) -> Result<(), zx_status::Status> {
+        use fidl::Peered;
+        self.inner.channel().as_ref().signal_peer(clear_mask, set_mask)
     }
 }
 
