@@ -23,6 +23,8 @@ const char kFuchsiaBuildInfoDirectoryPath[] = "/config/build-info";
 const char kProductFileName[] = "product";
 const char kBoardFileName[] = "board";
 const char kVersionFileName[] = "version";
+const char kPlatformVersionFileName[] = "platform_version";
+const char kProductVersionFileName[] = "product_version";
 const char kLastCommitDateFileName[] = "latest-commit-date";
 }  // namespace
 
@@ -145,6 +147,8 @@ TEST_F(BuildInfoServiceTestFixture, BuildInfo) {
   CreateBuildInfoFile(kProductFileName);
   CreateBuildInfoFile(kBoardFileName);
   CreateBuildInfoFile(kVersionFileName);
+  CreateBuildInfoFile(kPlatformVersionFileName);
+  CreateBuildInfoFile(kProductVersionFileName);
   CreateBuildInfoFile(kLastCommitDateFileName);
 
   fuchsia::buildinfo::ProviderPtr proxy = GetProxy();
@@ -155,6 +159,10 @@ TEST_F(BuildInfoServiceTestFixture, BuildInfo) {
     EXPECT_EQ(response.board_config(), kBoardFileName);
     EXPECT_TRUE(response.has_version());
     EXPECT_EQ(response.version(), kVersionFileName);
+    EXPECT_TRUE(response.has_platform_version());
+    EXPECT_EQ(response.platform_version(), kPlatformVersionFileName);
+    EXPECT_TRUE(response.has_product_version());
+    EXPECT_EQ(response.product_version(), kProductVersionFileName);
     EXPECT_TRUE(response.has_latest_commit_date());
     EXPECT_EQ(response.latest_commit_date(), kLastCommitDateFileName);
   });
@@ -173,6 +181,8 @@ TEST_F(BuildInfoServiceTestFixture, EmptyBuildInfo) {
     EXPECT_FALSE(response.has_product_config());
     EXPECT_FALSE(response.has_board_config());
     EXPECT_FALSE(response.has_version());
+    EXPECT_FALSE(response.has_platform_version());
+    EXPECT_FALSE(response.has_product_version());
     EXPECT_FALSE(response.has_latest_commit_date());
   });
 
@@ -185,6 +195,8 @@ TEST_F(BuildInfoServiceTestFixture, NonPresentBuildInfo) {
     EXPECT_FALSE(response.has_product_config());
     EXPECT_FALSE(response.has_board_config());
     EXPECT_FALSE(response.has_version());
+    EXPECT_FALSE(response.has_platform_version());
+    EXPECT_FALSE(response.has_product_version());
     EXPECT_FALSE(response.has_latest_commit_date());
   });
 

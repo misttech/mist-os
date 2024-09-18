@@ -25,6 +25,17 @@ type BuildInfo = table {
     /// (specifically, the "CommitDate" field) formatted in strict ISO 8601 format in
     /// the UTC timezone. Example: "2019-03-28T15:42:20+00:00"
     4: latest_commit_date string:MAX_STRING_LENGTH;
+
+    /// The version of the Fuchsia platform included in the build.
+    /// Provided by Assembly from platform artifacts.
+    @available(added=HEAD)
+    5: platform_version string:MAX_STRING_LENGTH;
+
+    /// The product version of this build.
+    /// Provided in Assembly product configuration.
+    /// Defaults to the same value as `version`.
+    @available(added=HEAD)
+    6: product_version string:MAX_STRING_LENGTH;
 };
 
 /// Returns build information about a Fuchsia system.
