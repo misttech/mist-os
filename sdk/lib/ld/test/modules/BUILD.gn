@@ -93,6 +93,7 @@ per_test_executables = [
   ":missing-sym",
   ":missing-dep",
   ":missing-transitive-dep",
+  ":cyclic-dep-parent",
 ]
 
 per_test_suffices = [
@@ -113,6 +114,7 @@ per_test_suffices = [
   "UniqueModules",
   "DepOrder",
   "TransitiveDepOrder",
+  "CyclicalDependency",
   "LoadedTransitiveDepOrder",
   "OpenDepDirectly",
   "LocalPrecedence",
@@ -299,6 +301,7 @@ template("test_ifs_shared_library") {
                            [
                              "soname",
                              "symbols",
+                             "needed_libs",
                            ])
   }
   ifs_shared_library(target_name) {
@@ -312,6 +315,7 @@ template("test_ifs_shared_library") {
                              "abi",
                              "soname",
                              "symbols",
+                             "needed_libs",
                            ])
 
     gen_outputs = get_target_outputs(":${target_name}.ifs")
@@ -1386,6 +1390,44 @@ foreach(test, [ "" ] + per_test_suffices) {
       ":bar-v1$suffix",
       ":bar-v2$suffix",
     ]
+  }
+
+  # cyclic dependency with the root module:
+  # - cyclic-dep-parent: foo() returns 2.
+  #   - has-cyclic-dep:
+  #     - cyclic-dep-parent
+  #     - foo-v1: foo() returns 2.
+  test_loadable_module("cyclic-dep-parent$suffix.module") {
+    defines = [ "TEST_SYMBOL_SUFFIX=$sym_suffix" ]
+    sources = [ "foo.cc" ]
+    deps = [ ":has-cyclic-dep.ifs$suffix" ]
+    if (!is_fuchsia) {
+      data_deps = [ ":has-cyclic-dep$suffix.host-test-data($shlib_toolchain)" ]
+    }
+  }
+
+  # This shlib stub depends on the parent module (cyclic-dep-parent)
+  test_ifs_shared_library("has-cyclic-dep.ifs$suffix") {
+    soname = "libhas-cyclic-dep$suffix.so"
+    symbols = [
+      {
+        name = "foo$sym_suffix"
+        type = "Func"
+      },
+    ]
+    needed_libs = [
+      "cylic-dep-parent$suffix.module.so",
+      "libld-dep-foo-v1$suffix.so",
+    ]
+    data_deps = [ ":has-cyclic-dep$suffix" ]
+  }
+
+  # This test shlib will generate build artifacts for :has-cyclic-dep.ifs, but
+  # is not used directly in tests.
+  test_shared_library("has-cyclic-dep$suffix") {
+    defines = [ "TEST_SYMBOL_SUFFIX=$sym_suffix" ]
+    sources = [ "foo.cc" ]
+    shlib_deps = [ ":ld-dep-foo-v1$suffix" ]
   }
 }
 

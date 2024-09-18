@@ -551,6 +551,34 @@ TYPED_TEST(DlTests, TransitiveDepOrder) {
   ASSERT_TRUE(this->DlClose(res.value()).is_ok());
 }
 
+// Test that a module graph with a dependency cycle involving the root module
+// will complete dlopen() & dlsym() calls.
+// dlopen cyclic-dep-parent: foo() returns 2.
+//   - has-cyclic-dep:
+//     - cyclic-dep-parent
+//     - foo-v1: foo() returns 2.
+TYPED_TEST(DlTests, CyclicalDependency) {
+  constexpr const int64_t kReturnValue = 2;
+  const auto kFile = TestModule("cyclic-dep-parent");
+  const auto kDepFile1 = TestShlib("libhas-cyclic-dep");
+  const auto kDepFile2 = TestShlib("libld-dep-foo-v1");
+
+  this->ExpectRootModule(kFile);
+  this->Needed({kDepFile1, kDepFile2});
+
+  auto res = this->DlOpen(kFile.c_str(), RTLD_NOW | RTLD_LOCAL);
+  ASSERT_TRUE(res.is_ok()) << res.error_value();
+  EXPECT_TRUE(res.value());
+
+  auto sym = this->DlSym(res.value(), TestSym("call_foo").c_str());
+  ASSERT_TRUE(sym.is_ok()) << sym.error_value();
+  ASSERT_TRUE(sym.value());
+
+  EXPECT_EQ(RunFunction<int64_t>(sym.value()), kReturnValue);
+
+  ASSERT_TRUE(this->DlClose(res.value()).is_ok());
+}
+
 // These are test scenarios that test symbol resolution from the local scope
 // of the dlopen-ed module, when some (or all) of its dependencies have already
 // been loaded.
