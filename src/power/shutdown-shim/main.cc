@@ -3,15 +3,12 @@
 // found in the LICENSE file.
 
 #include <fidl/fuchsia.hardware.power.statecontrol/cpp/wire.h>
-#include <fidl/fuchsia.io/cpp/wire.h>
 #include <fidl/fuchsia.power.system/cpp/wire.h>
-#include <fidl/fuchsia.process.lifecycle/cpp/wire.h>
 #include <fidl/fuchsia.sys2/cpp/wire.h>
 #include <fidl/fuchsia.system.state/cpp/wire.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/component/incoming/cpp/protocol.h>
-#include <lib/fit/function.h>
 #include <lib/zx/eventpair.h>
 #include <zircon/errors.h>
 #include <zircon/process.h>
@@ -20,12 +17,12 @@
 
 #include <chrono>
 #include <cstdio>
+#include <memory>
 #include <optional>
 #include <thread>
 
 #include <fbl/auto_lock.h>
 #include <fbl/mutex.h>
-#include <fbl/string_printf.h>
 
 #include "lib/async/default.h"
 #include "src/storage/lib/vfs/cpp/managed_vfs.h"
@@ -58,10 +55,16 @@ enum class ShutdownControlLevel : uint8_t {
   kActive = 1u
 };
 
+template <typename Protocol>
+zx::result<fidl::ClientEnd<Protocol>> connect_to_protocol_with_timeout(
+    const char* name = fidl::DiscoverableProtocolDefaultPath<Protocol>);
+
+class RebootWatcher;
+
 class SystemStateTransitionServer final
     : public fidl::WireServer<fuchsia_system_state::SystemStateTransition> {
  public:
-  SystemStateTransitionServer() = default;
+  SystemStateTransitionServer() { Prepare(); }
 
   // fuchsia.system.state/SystemStateTransition APIs.
   void GetTerminationSystemState(GetTerminationSystemStateCompleter::Sync& completer) override;
@@ -83,11 +86,60 @@ class SystemStateTransitionServer final
   }
 
  private:
+  void Prepare() {
+    zx::result local =
+        connect_to_protocol_with_timeout<statecontrol_fidl::RebootMethodsWatcherRegister>();
+    if (local.is_ok()) {
+      zx::result watcher_channels =
+          fidl::CreateEndpoints<statecontrol_fidl::RebootMethodsWatcher>();
+      watcher_ = std::make_unique<RebootWatcher>(std::move(watcher_channels->server), this,
+                                                 async_get_default_dispatcher());
+      fidl::WireResult res =
+          fidl::WireCall(local.value())->RegisterWithAck(std::move(watcher_channels->client));
+      if (!res.ok()) {
+        fprintf(stderr, "[shutdown-shim]: RegisterWithAck failed\n");
+        return;
+      }
+      fprintf(stderr, "[shutdown-shim]: RegisterWithAck succeeded\n");
+    } else {
+      // It's fine this is not available in bootstrap
+      fprintf(stderr, "[shutdown-shim]: Not able to connect to RebootMethodWatcherRegister\n");
+    }
+  }
+
   fbl::Mutex lock_;
   fuchsia_system_state::SystemPowerState system_power_state_ __TA_GUARDED(&lock_) =
       fuchsia_system_state::SystemPowerState::kFullyOn;
   zx::vmo mexec_kernel_zbi_ __TA_GUARDED(&lock_);
   zx::vmo mexec_data_zbi_ __TA_GUARDED(&lock_);
+  std::unique_ptr<RebootWatcher> watcher_;
+};
+
+class RebootWatcher : public fidl::WireServer<statecontrol_fidl::RebootMethodsWatcher> {
+ public:
+  RebootWatcher(fidl::ServerEnd<statecontrol_fidl::RebootMethodsWatcher> server_end,
+                SystemStateTransitionServer* system_state_transition_server,
+                async_dispatcher_t* dispatcher)
+      : system_state_transition_server_(system_state_transition_server) {
+    fidl::BindServer(dispatcher, std::move(server_end), this);
+  }
+  RebootWatcher(const RebootWatcher&) = delete;
+  RebootWatcher& operator=(const RebootWatcher&) = delete;
+  RebootWatcher(RebootWatcher&&) = delete;
+  RebootWatcher& operator=(RebootWatcher&&) = delete;
+
+  void OnReboot(OnRebootRequestView request, OnRebootCompleter::Sync& completer) override {
+    // Ignore other reasons because they are from shutdown-shim and are processed already.
+    if (request->reason == statecontrol_fidl::RebootReason::kHighTemperature) {
+      fuchsia_system_state::SystemPowerState target_state =
+          fuchsia_system_state::SystemPowerState::kReboot;
+      system_state_transition_server_->set_system_power_state(target_state);
+    }
+    completer.Reply();
+  }
+
+ private:
+  SystemStateTransitionServer* system_state_transition_server_;
 };
 
 class StateControlAdminServer final : public fidl::WireServer<statecontrol_fidl::Admin> {
@@ -132,8 +184,7 @@ class StateControlAdminServer final : public fidl::WireServer<statecontrol_fidl:
 // bringup). Once a component is able to be resolved, then all new service
 // connections will either succeed or fail rather quickly.
 template <typename Protocol>
-zx::result<fidl::ClientEnd<Protocol>> connect_to_protocol_with_timeout(
-    const char* name = fidl::DiscoverableProtocolDefaultPath<Protocol>) {
+zx::result<fidl::ClientEnd<Protocol>> connect_to_protocol_with_timeout(const char* name) {
   zx::result channel = component::Connect<Protocol>(name);
   if (channel.is_error()) {
     return channel.take_error();
