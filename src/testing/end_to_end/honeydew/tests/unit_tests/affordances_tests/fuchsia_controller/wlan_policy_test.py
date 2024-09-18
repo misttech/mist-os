@@ -331,9 +331,9 @@ class WlanPolicyFCTests(unittest.TestCase):
         with self._mock_create_client_controller() as client_controller:
             self.wlan_policy_obj.create_client_controller()
 
-            def get_saved_networks(iterator: Channel) -> None:
+            def get_saved_networks(iterator: int) -> None:
                 server = TestNetworkConfigIteratorImpl(
-                    iterator,
+                    Channel(iterator),
                     items=[
                         [
                             _TEST_NETWORK_CONFIG_NONE_FIDL,
@@ -441,9 +441,9 @@ class WlanPolicyFCTests(unittest.TestCase):
             self.wlan_policy_obj.create_client_controller()
 
             # Mock get_saved_networks
-            def get_saved_networks(iterator: Channel) -> None:
+            def get_saved_networks(iterator: int) -> None:
                 server = TestNetworkConfigIteratorImpl(
-                    iterator,
+                    Channel(iterator),
                     items=[
                         [
                             _TEST_NETWORK_CONFIG_NONE_FIDL,
@@ -591,9 +591,9 @@ class WlanPolicyFCTests(unittest.TestCase):
         with self._mock_create_client_controller() as client_controller:
             self.wlan_policy_obj.create_client_controller()
 
-            def scan_for_networks(iterator: Channel) -> None:
+            def scan_for_networks(iterator: int) -> None:
                 server = TestScanResultIteratorImpl(
-                    iterator,
+                    Channel(iterator),
                     items=[
                         [
                             _TEST_SSID,

@@ -311,7 +311,7 @@ class WlanPolicy(AsyncAdapter, wlan_policy.WlanPolicy):
 
         try:
             self._client_controller.proxy.get_saved_networks(
-                iterator=server,
+                iterator=server.take(),
             )
         except ZxStatus as status:
             raise errors.HoneydewWlanError(
@@ -494,7 +494,7 @@ class WlanPolicy(AsyncAdapter, wlan_policy.WlanPolicy):
 
         try:
             self._client_controller.proxy.scan_for_networks(
-                iterator=server,
+                iterator=server.take(),
             )
         except ZxStatus as status:
             raise errors.HoneydewWlanError(
