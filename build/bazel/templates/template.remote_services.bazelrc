@@ -59,7 +59,7 @@ build:sponge_infra --config=_sponge --config=_bes_infra
 build:_resultstore --config=_bes_common
 build:_resultstore --bes_backend=buildeventservice.googleapis.com
 # note: go/fxbtx points to project=rbe-fuchsia-prod (and should match {rbe_project})
-build:_resultstore --bes_results_url=https://go/fxbtx/
+build:_resultstore --bes_results_url=http://go/fxbtx/
 build:_resultstore --remote_instance_name=projects/{rbe_project}/instances/default
 
 # This variant is suitable for developers.
