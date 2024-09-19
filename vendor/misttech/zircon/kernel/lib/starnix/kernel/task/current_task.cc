@@ -920,6 +920,7 @@ fit::result<Errno, ktl::pair<NamespaceNode, FsString>> CurrentTask::lookup_paren
         lookup_child_result.is_error()) {
       return lookup_child_result.take_error();
     } else {
+      current_node = lookup_child_result.value();
       current_path_component = *it;
     }
   }
