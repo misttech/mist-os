@@ -66,6 +66,7 @@ if (is_fuchsia) {
       storage = {
         filesystems = {
           image_name = _assemble_system_recovery_target_name
+          image_mode = "ramdisk"
           volume = {
             fvm = {
               data = {

@@ -12,7 +12,7 @@ use assembly_config_schema::{
     AssemblyConfig, BoardInformation, BoardInputBundle, FeatureSupportLevel,
 };
 use assembly_file_relative_path::SupportsFileRelativePaths;
-use assembly_images_config::ImagesConfig;
+use assembly_images_config::{FilesystemImageMode, ImagesConfig};
 use assembly_tool::SdkToolProvider;
 use assembly_util::{read_config, BlobfsCompiledPackageDestination, CompiledPackageDestination};
 use camino::{Utf8Path, Utf8PathBuf};
@@ -159,6 +159,15 @@ Resulting product is not supported and may misbehave!
     // Replace board_info with a new one that swaps its empty 'configuraton' field
     // for the consolidated one created from the board's input bundles.
     let board_info = BoardInformation { configuration: board_provided_config, ..board_info };
+
+    assert_eq!(
+        platform.storage.filesystems.image_mode,
+        match mode {
+            PackageMode::DiskImage => FilesystemImageMode::Partition,
+            PackageMode::DiskImageInZbi => FilesystemImageMode::Ramdisk,
+            PackageMode::BootFS => FilesystemImageMode::NoImage,
+        }
+    );
 
     // Get platform configuration based on the AssemblyConfig and the BoardInformation.
     let ramdisk_image = mode == PackageMode::DiskImageInZbi;
