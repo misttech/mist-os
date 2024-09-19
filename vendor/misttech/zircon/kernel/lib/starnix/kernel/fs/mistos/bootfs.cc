@@ -11,8 +11,8 @@
 #include <lib/mistos/starnix/kernel/task/task.h>
 #include <lib/mistos/starnix/kernel/vfs/fs_node.h>
 #include <lib/mistos/starnix/kernel/vfs/fs_node_ops.h>
+#include <lib/mistos/starnix/kernel/vfs/memory_file.h>
 #include <lib/mistos/starnix/kernel/vfs/simple_directory.h>
-#include <lib/mistos/starnix/kernel/vfs/vmo_file.h>
 #include <lib/mistos/util/status.h>
 #include <lib/zbitl/error-stdio.h>
 #include <lib/zbitl/view.h>
@@ -188,8 +188,9 @@ fit::result<Errno, FileSystemHandle> BootFs::new_fs_with_options(const fbl::RefP
   BootfsView view = bootfs->bootfs_reader_.root();
   for (auto item : view) {
     LTRACEF("name=[%.*s]\n", static_cast<int>(item.name.length()), item.name.data());
-    auto vmo = VmoFileNode::New().value();
-    auto result = tree.add_entry(split_and_filter(item.name, '/'), ktl::unique_ptr<FsNodeOps>(vmo));
+    auto memory = MemoryFileNode::New().value();
+    auto result =
+        tree.add_entry(split_and_filter(item.name, '/'), ktl::unique_ptr<FsNodeOps>(memory));
     ZX_ASSERT(result.is_ok());
   }
 

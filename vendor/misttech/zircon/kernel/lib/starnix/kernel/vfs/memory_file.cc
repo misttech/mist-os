@@ -3,7 +3,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "lib/mistos/starnix/kernel/vfs/vmo_file.h"
+#include "lib/mistos/starnix/kernel/vfs/memory_file.h"
 
 #include <lib/fit/result.h>
 #include <lib/mistos/starnix/kernel/task/current_task.h>
@@ -24,11 +24,14 @@
 #include <ktl/span.h>
 #include <object/vm_object_dispatcher.h>
 
+#include "lib/mistos/starnix/kernel/logging/logging.h"
+#include "lib/mistos/starnix/kernel/mm/memory.h"
+
 #include <ktl/enforce.h>
 
 namespace starnix {
 
-fit::result<Errno, VmoFileNode*> VmoFileNode::New() {
+fit::result<Errno, MemoryFileNode*> MemoryFileNode::New() {
   KernelHandle<VmObjectDispatcher> vmo_kernel_handle;
   fbl::RefPtr<VmObjectPaged> vmo;
   zx_rights_t vmo_rights;
@@ -49,37 +52,24 @@ fit::result<Errno, VmoFileNode*> VmoFileNode::New() {
   }
 
   fbl::AllocChecker ac;
-  auto ops =
-      new (&ac) VmoFileNode(ktl::move(vmo_kernel_handle) /*, MemoryXattrStorage::Default()*/);
+  auto ops = new (&ac)
+      MemoryFileNode(MemoryObject::From(Handle::Make(ktl::move(vmo_kernel_handle), vmo_rights)));
   if (!ac.check()) {
     return fit::error(errno(ENOMEM));
   }
   return fit::ok(ops);
 }
 
-VmoFileNode* VmoFileNode::from_vmo(fbl::RefPtr<VmObject> vmo) {
-  KernelHandle<VmObjectDispatcher> vmo_kernel_handle;
-  zx_rights_t vmo_rights;
-
-  // build and point a dispatcher at it
-  zx_status_t status = VmObjectDispatcher::Create(ktl::move(vmo), vmo->size(),
-                                                  VmObjectDispatcher::InitialMutability::kMutable,
-                                                  &vmo_kernel_handle, &vmo_rights);
-
-  if (status != ZX_OK) {
-    return nullptr;
-  }
-
+MemoryFileNode* MemoryFileNode::from_memory(fbl::RefPtr<MemoryObject> memory) {
   fbl::AllocChecker ac;
-  auto ops =
-      new (&ac) VmoFileNode(ktl::move(vmo_kernel_handle) /*, MemoryXattrStorage::Default()*/);
+  auto ops = new (&ac) MemoryFileNode(ktl::move(memory));
   ASSERT(ac.check());
   return ops;
 }
 
-void VmoFileNode::initial_info(FsNodeInfo& info) {}
+void MemoryFileNode::initial_info(FsNodeInfo& info) { info.size = memory_->get_content_size(); }
 
-fit::result<Errno, ktl::unique_ptr<FileOps>> VmoFileNode::create_file_ops(
+fit::result<Errno, ktl::unique_ptr<FileOps>> MemoryFileNode::create_file_ops(
     /*FileOpsCore& locked,*/ const FsNode& node, const CurrentTask& current_task,
     OpenFlags _flags) {
   OpenFlagsImpl flags(_flags);
@@ -90,58 +80,55 @@ fit::result<Errno, ktl::unique_ptr<FileOps>> VmoFileNode::create_file_ops(
 
   // Produce a VMO handle with rights reduced to those requested in |flags|.
   // TODO(b/319240806): Accumulate required rights, rather than starting from `DEFAULT`.
-  // auto desired_rights = ZX_DEFAULT_VMO_RIGHTS | ZX_RIGHT_RESIZE;
+  auto desired_rights = ZX_DEFAULT_VMO_RIGHTS | ZX_RIGHT_RESIZE;
   if (!flags.can_read()) {
-    /*desired_rights.remove(zx::Rights::READ);*/
+    desired_rights &= ~ZX_RIGHT_READ;
   }
   if (!flags.can_write()) {
-    /*desired_rights.remove(zx::Rights::WRITE | zx::Rights::RESIZE);*/
+    desired_rights &= ~(ZX_RIGHT_WRITE | ZX_RIGHT_RESIZE);
   }
 
-  fbl::RefPtr<VmObjectDispatcher> scoped_vmo = vmo_.dispatcher();
+  auto scoped_memory = memory_->duplicate_handle(desired_rights);
+  if (scoped_memory.is_error()) {
+    return fit::error(errno(EIO));
+  }
+  auto file_object = MemoryFileObject::New(scoped_memory.value());
 
-  auto file_object = VmoFileObject::New(ktl::move(scoped_vmo));
-  return fit::ok(ktl::unique_ptr<VmoFileObject>(file_object));
+  return fit::ok(ktl::unique_ptr<MemoryFileObject>(file_object));
 }
 
-fit::result<Errno> VmoFileNode::truncate(const FsNode& node, const CurrentTask& current_task,
-                                         uint64_t length) {
+fit::result<Errno> MemoryFileNode::truncate(const FsNode& node, const CurrentTask& current_task,
+                                            uint64_t length) {
   return fit::error(errno(ENOTSUP));
 }
 
-fit::result<Errno> VmoFileNode::allocate(const FsNode& node, const CurrentTask& current_task,
-                                         FallocMode mode, uint64_t offset, uint64_t length) {
+fit::result<Errno> MemoryFileNode::allocate(const FsNode& node, const CurrentTask& current_task,
+                                            FallocMode mode, uint64_t offset, uint64_t length) {
   return fit::error(errno(ENOTSUP));
 }
 
-VmoFileObject* VmoFileObject::New(fbl::RefPtr<VmObjectDispatcher> vmo) {
+MemoryFileObject* MemoryFileObject::New(fbl::RefPtr<MemoryObject> memory) {
   fbl::AllocChecker ac;
-  auto ops = new (&ac) VmoFileObject(ktl::move(vmo));
+  auto ops = new (&ac) MemoryFileObject(ktl::move(memory));
   ASSERT(ac.check());
   return ops;
 }
 
-fit::result<Errno, size_t> VmoFileObject::read(const fbl::RefPtr<VmObjectDispatcher>& vmo,
-                                               const FileObject& file, size_t offset,
-                                               OutputBuffer* data) {
+fit::result<Errno, size_t> MemoryFileObject::read(const MemoryObject& memory,
+                                                  const FileObject& file, size_t offset,
+                                                  OutputBuffer* data) {
   size_t actual;
   auto info = file.node()->info();
   auto file_length = info->size;
   auto want_read = data->available();
   if (offset < file_length) {
     auto to_read = (file_length < offset + want_read) ? (file_length - offset) : (want_read);
-    fbl::AllocChecker ac;
-    uint8_t* buf = new (ac) uint8_t[to_read];
-    if (!ac.check()) {
-      return fit::error(errno(ENOMEM));
-    }
-    zx_status_t status = vmo->vmo()->Read(buf, offset, to_read);
-    if (status != ZX_OK) {
+    auto buf = memory.read_to_vec(offset, to_read);
+    if (buf.is_error()) {
       return fit::error(errno(EIO));
     }
-
     // drop(info);
-    auto result = data->write_all(ktl::span{buf, to_read});
+    auto result = data->write_all(ktl::span{buf.value().data(), to_read});
     if (result.is_error())
       return result.take_error();
     actual = to_read;
@@ -151,10 +138,10 @@ fit::result<Errno, size_t> VmoFileObject::read(const fbl::RefPtr<VmObjectDispatc
   return fit::ok(actual);
 }
 
-fit::result<Errno, size_t> VmoFileObject::write(const fbl::RefPtr<VmObjectDispatcher>& vmo,
-                                                const FileObject& file,
-                                                const CurrentTask& current_task, size_t offset,
-                                                InputBuffer* data) {
+fit::result<Errno, size_t> MemoryFileObject::write(const MemoryObject& memory,
+                                                   const FileObject& file,
+                                                   const CurrentTask& current_task, size_t offset,
+                                                   InputBuffer* data) {
   auto want_write = data->available();
   auto result = data->peek_all();
   if (result.is_error())
@@ -222,15 +209,15 @@ fit::result<Errno, size_t> VmoFileObject::write(const fbl::RefPtr<VmObjectDispat
 
     if (write_end > info.size) {
       if (write_end > info.storage_size()) {
-        if (auto result = update_vmo_file_size(vmo, info, write_end); result.is_error())
+        if (auto result = update_memory_file_size(memory, info, write_end); result.is_error())
           return result.take_error();
       }
       update_content_size = true;
     }
-    auto status = vmo->vmo()->Write(buf.data(), offset, want_write);
+    /*auto status = vmo->vmo()->Write(buf.data(), offset, want_write);
     if (status != ZX_OK) {
       return fit::error(errno(EIO));
-    }
+    }*/
 
     if (update_content_size) {
       info.size = write_end;
@@ -244,9 +231,8 @@ fit::result<Errno, size_t> VmoFileObject::write(const fbl::RefPtr<VmObjectDispat
   return file.node()->update_info<fit::result<Errno, size_t>>(mutator);
 }
 
-fit::result<Errno, fbl::RefPtr<VmObject>> VmoFileObject::get_vmo(
-    const fbl::RefPtr<VmObjectDispatcher>&, const FileObject&, const CurrentTask&,
-    ProtectionFlags prot) {
+fit::result<Errno, fbl::RefPtr<MemoryObject>> MemoryFileObject::get_memory(
+    const fbl::RefPtr<MemoryObject>&, const FileObject&, const CurrentTask&, ProtectionFlags prot) {
   return fit::error(errno(ENOTSUP));
 }
 
@@ -254,7 +240,7 @@ fit::result<Errno, FileHandle> new_memfd(const CurrentTask& current_task, FsStri
                                          SealFlags seals, OpenFlags flags) {
   auto fs = anon_fs(current_task->kernel());
 
-  auto new_result = VmoFileNode::New();
+  auto new_result = MemoryFileNode::New();
   if (new_result.is_error())
     return new_result.take_error();
 
@@ -276,21 +262,21 @@ fit::result<Errno, FileHandle> new_memfd(const CurrentTask& current_task, FsStri
   return FileObject::New(ktl::move(open_result.value()), namespace_node, flags);
 }
 
-fit::result<Errno, size_t> update_vmo_file_size(const fbl::RefPtr<VmObjectDispatcher>& vmo,
-                                                FsNodeInfo& node_info, size_t requested_size) {
+fit::result<Errno, size_t> update_memory_file_size(const MemoryObject& memory,
+                                                   FsNodeInfo& node_info, size_t requested_size) {
   ASSERT(requested_size <= MAX_LFS_FILESIZE);
   auto size_result = round_up_to_system_page_size(requested_size);
   if (size_result.is_error())
     return size_result.take_error();
   auto size = size_result.value();
-  zx_status_t status = vmo->SetSize(size);
-  if (status != ZX_OK) {
-    switch (status) {
+  auto status = memory.set_size(size);
+  if (status.is_error()) {
+    switch (status.error_value()) {
       case ZX_ERR_NO_MEMORY:
       case ZX_ERR_OUT_OF_RANGE:
         return fit::error(errno(ENOMEM));
       default:
-        PANIC("encountered impossible error: %d", status);
+        impossible_error(status.error_value());
     }
   }
   node_info.blocks = size / node_info.blksize;
