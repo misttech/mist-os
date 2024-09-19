@@ -2,13 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_STARNIX_MODULES_BOOTFS_TESTS_ZBI_FILE_H_
-#define VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_STARNIX_MODULES_BOOTFS_TESTS_ZBI_FILE_H_
+#ifndef VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_STARNIX_LIB_BOOTFS_INCLUDE_LIB_STARNIX_BOOTFS_TESTS_ZBI_FILE_H_
+#define VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_STARNIX_LIB_BOOTFS_INCLUDE_LIB_STARNIX_BOOTFS_TESTS_ZBI_FILE_H_
 
 #include <object/vm_object_dispatcher.h>
 #include <vm/vm_object_paged.h>
 
-namespace unit_testing {
+namespace bootfs::testing {
 
 // This object facilitates doing fprintf directly into the VMO representing
 // the symbolizer markup data file.  This gets the symbolizer context for the
@@ -47,6 +47,6 @@ class ZbiFile {
   size_t pos_ = 0;
 };
 
-}  // namespace unittest
+}  // namespace bootfs::testing
 
-#endif  // VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_STARNIX_MODULES_BOOTFS_TESTS_ZBI_FILE_H_
+#endif  // VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_STARNIX_LIB_BOOTFS_INCLUDE_LIB_STARNIX_BOOTFS_TESTS_ZBI_FILE_H_

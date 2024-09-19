@@ -12,6 +12,7 @@ source_set("tests") {
     "io_buffers-test.cc",
 
     #"loader-test.cc",
+    "fs/mistos/bootfs-test.cc",
     "fs/mistos/tree_builder-test.cc",
     "fs/tmpfs-test.cc",
     "memory_manager-test.cc",
