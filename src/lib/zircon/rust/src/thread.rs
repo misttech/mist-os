@@ -101,7 +101,7 @@ impl Thread {
             sys::zx_thread_read_state(
                 thread_raw,
                 sys::ZX_THREAD_STATE_GENERAL_REGS,
-                &mut state as *mut _ as *mut u8,
+                std::ptr::from_mut(&mut state).cast::<u8>(),
                 std::mem::size_of_val(&state),
             )
         };
@@ -117,7 +117,7 @@ impl Thread {
             sys::zx_thread_write_state(
                 thread_raw,
                 sys::ZX_THREAD_STATE_GENERAL_REGS,
-                &state as *const _ as *const u8,
+                std::ptr::from_ref(&state).cast::<u8>(),
                 std::mem::size_of_val(&state),
             )
         };

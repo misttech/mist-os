@@ -62,9 +62,9 @@ impl Channel {
         // SAFETY: bytes and handles are valid to write to for their lengths
         match unsafe {
             self.read_raw(
-                bytes.as_mut_ptr() as *mut u8,
+                bytes.as_mut_ptr().cast::<u8>(),
                 bytes.len(),
-                handles.as_mut_ptr() as *mut Handle,
+                handles.as_mut_ptr().cast::<Handle>(),
                 handles.len(),
             )
         } {
@@ -73,11 +73,11 @@ impl Channel {
                 ChannelReadResult::Ok(unsafe {
                     (
                         std::slice::from_raw_parts_mut(
-                            bytes.as_mut_ptr() as *mut u8,
+                            bytes.as_mut_ptr().cast::<u8>(),
                             actual_bytes as usize,
                         ),
                         std::slice::from_raw_parts_mut(
-                            handles.as_mut_ptr() as *mut Handle,
+                            handles.as_mut_ptr().cast::<Handle>(),
                             actual_handles as usize,
                         ),
                     )
@@ -114,7 +114,7 @@ impl Channel {
                 raw_handle,
                 0, // opts
                 bytes,
-                handles as *mut _,
+                handles.cast::<sys::zx_handle_t>(),
                 bytes_len as u32,
                 handles_len as u32,
                 &mut actual_bytes,
@@ -192,9 +192,9 @@ impl Channel {
         // SAFETY: bytes and handles are valid to write to for their lengths
         match unsafe {
             self.read_etc_raw(
-                bytes.as_mut_ptr() as *mut u8,
+                bytes.as_mut_ptr().cast::<u8>(),
                 bytes.len(),
-                handles.as_mut_ptr() as *mut HandleInfo,
+                handles.as_mut_ptr().cast::<HandleInfo>(),
                 handles.len(),
             )
         } {
@@ -203,11 +203,11 @@ impl Channel {
                 ChannelReadResult::Ok(unsafe {
                     (
                         std::slice::from_raw_parts_mut(
-                            bytes.as_mut_ptr() as *mut u8,
+                            bytes.as_mut_ptr().cast::<u8>(),
                             actual_bytes as usize,
                         ),
                         std::slice::from_raw_parts_mut(
-                            handles.as_mut_ptr() as *mut HandleInfo,
+                            handles.as_mut_ptr().cast::<HandleInfo>(),
                             actual_handles as usize,
                         ),
                     )
@@ -250,7 +250,7 @@ impl Channel {
                 self.raw_handle(),
                 0, // options
                 bytes,
-                handles as *mut sys::zx_handle_info_t,
+                handles.cast::<sys::zx_handle_info_t>(),
                 bytes_len as u32,
                 handles_len as u32,
                 &mut actual_bytes,
@@ -373,7 +373,7 @@ impl Channel {
                 0, // options
                 bytes,
                 bytes_len as u32,
-                handles as *const sys::zx_handle_t,
+                handles.cast::<sys::zx_handle_t>(),
                 handles_len as u32,
             ))
         };
@@ -504,7 +504,7 @@ impl Channel {
                 0, // options
                 bytes,
                 bytes_len as u32,
-                handles as *mut sys::zx_handle_disposition_t,
+                handles.cast::<sys::zx_handle_disposition_t>(),
                 handles_len as u32,
             ))
         };
@@ -712,9 +712,9 @@ impl Channel {
                 bytes_in.len(),
                 handles_in.as_mut_ptr(),
                 handles_in.len(),
-                bytes_out.as_mut_ptr() as *mut u8,
+                bytes_out.as_mut_ptr().cast::<u8>(),
                 bytes_out.len(),
-                handles_out.as_mut_ptr() as *mut Handle,
+                handles_out.as_mut_ptr().cast::<Handle>(),
                 handles_out.len(),
             )?
         };
@@ -723,11 +723,11 @@ impl Channel {
         unsafe {
             Ok((
                 std::slice::from_raw_parts_mut(
-                    bytes_out.as_mut_ptr() as *mut u8,
+                    bytes_out.as_mut_ptr().cast::<u8>(),
                     actual_bytes as usize,
                 ),
                 std::slice::from_raw_parts_mut(
-                    handles_out.as_mut_ptr() as *mut Handle,
+                    handles_out.as_mut_ptr().cast::<Handle>(),
                     actual_handles as usize,
                 ),
             ))
@@ -861,11 +861,11 @@ impl Channel {
                 &sys::zx_channel_call_args_t {
                     wr_bytes: bytes_in,
                     wr_num_bytes: bytes_in_len as u32,
-                    wr_handles: handles_in as *mut sys::zx_handle_t,
+                    wr_handles: handles_in.cast::<sys::zx_handle_t>(),
                     wr_num_handles: handles_in_len as u32,
                     rd_bytes: bytes_out,
                     rd_num_bytes: bytes_out_len as u32,
-                    rd_handles: handles_out as *mut sys::zx_handle_t,
+                    rd_handles: handles_out.cast::<sys::zx_handle_t>(),
                     rd_num_handles: handles_out_len as u32,
                 },
                 &mut actual_read_bytes,
@@ -1132,9 +1132,9 @@ impl Channel {
                 bytes_in.len(),
                 handles_in.as_mut_ptr(),
                 handles_in.len(),
-                bytes_out.as_mut_ptr() as *mut u8,
+                bytes_out.as_mut_ptr().cast::<u8>(),
                 bytes_out.len(),
-                handles_out.as_mut_ptr() as *mut HandleInfo,
+                handles_out.as_mut_ptr().cast::<HandleInfo>(),
                 handles_out.len(),
             )?
         };
@@ -1143,11 +1143,11 @@ impl Channel {
         unsafe {
             Ok((
                 std::slice::from_raw_parts_mut(
-                    bytes_out.as_mut_ptr() as *mut u8,
+                    bytes_out.as_mut_ptr().cast::<u8>(),
                     actual_bytes as usize,
                 ),
                 std::slice::from_raw_parts_mut(
-                    handles_out.as_mut_ptr() as *mut HandleInfo,
+                    handles_out.as_mut_ptr().cast::<HandleInfo>(),
                     actual_handles as usize,
                 ),
             ))
@@ -1286,11 +1286,11 @@ impl Channel {
                 &mut sys::zx_channel_call_etc_args_t {
                     wr_bytes: bytes_in,
                     wr_num_bytes: bytes_in_len as u32,
-                    wr_handles: handles_in as *mut sys::zx_handle_disposition_t,
+                    wr_handles: handles_in.cast::<sys::zx_handle_disposition_t>(),
                     wr_num_handles: handles_in_len as u32,
                     rd_bytes: bytes_out,
                     rd_num_bytes: bytes_out_len as u32,
-                    rd_handles: handles_out as *mut sys::zx_handle_info_t,
+                    rd_handles: handles_out.cast::<sys::zx_handle_info_t>(),
                     rd_num_handles: handles_out_len as u32,
                 },
                 &mut actual_read_bytes,

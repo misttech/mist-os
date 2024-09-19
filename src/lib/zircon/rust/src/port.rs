@@ -436,9 +436,8 @@ impl Port {
     /// [zx_port_queue](https://fuchsia.dev/fuchsia-src/reference/syscalls/port_queue.md)
     /// syscall.
     pub fn queue(&self, packet: &Packet) -> Result<(), Status> {
-        let status = unsafe {
-            sys::zx_port_queue(self.raw_handle(), &packet.0 as *const sys::zx_port_packet_t)
-        };
+        let status =
+            unsafe { sys::zx_port_queue(self.raw_handle(), std::ptr::from_ref(&packet.0)) };
         ok(status)
     }
 

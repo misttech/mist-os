@@ -155,7 +155,7 @@ impl Vmo {
         unsafe {
             self.read_raw(
                 // TODO(https://fxbug.dev/42079723) use MaybeUninit::slice_as_mut_ptr when stable
-                data.as_mut_ptr() as *mut u8,
+                data.as_mut_ptr().cast::<u8>(),
                 data.len(),
                 offset,
             )?
@@ -167,7 +167,7 @@ impl Vmo {
             // have to trust that the kernel didn't lie when it said it wrote to the entire
             // buffer, but as long as that assumption is valid them it's safe to assume this
             // slice is init.
-            unsafe { std::slice::from_raw_parts_mut(data.as_mut_ptr() as *mut u8, data.len()) },
+            unsafe { std::slice::from_raw_parts_mut(data.as_mut_ptr().cast::<u8>(), data.len()) },
         )
     }
 
@@ -203,7 +203,7 @@ impl Vmo {
         // TODO(https://fxbug.dev/42079727): Use MaybeUninit::slice_as_bytes_mut once stable.
         let buffer = unsafe {
             std::slice::from_raw_parts_mut(
-                array.as_mut_ptr() as *mut MaybeUninit<u8>,
+                array.as_mut_ptr().cast::<MaybeUninit<u8>>(),
                 N * std::mem::size_of::<T>(),
             )
         };
@@ -219,7 +219,7 @@ impl Vmo {
 
     /// Same as read, but returns a `T`.
     pub fn read_to_object<T: FromBytes>(&self, offset: u64) -> Result<T, Status> {
-        let mut object = MaybeUninit::uninit();
+        let mut object = MaybeUninit::<T>::uninit();
         // SAFETY: T is FromBytes, which means that any bit pattern is valid. Interpreting
         // MaybeUninit<T> as [MaybeUninit<u8>] is safe because T's alignment requirements
         // are larger than, or equal to, u8's.
@@ -227,7 +227,7 @@ impl Vmo {
         // TODO(https://fxbug.dev/42079727): Use MaybeUninit::as_bytes_mut once stable.
         let buffer = unsafe {
             std::slice::from_raw_parts_mut(
-                object.as_mut_ptr() as *mut MaybeUninit<u8>,
+                object.as_mut_ptr().cast::<MaybeUninit<u8>>(),
                 std::mem::size_of::<T>(),
             )
         };

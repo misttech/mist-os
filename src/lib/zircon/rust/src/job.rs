@@ -135,7 +135,6 @@ impl Job {
                     .collect();
                 let sys_count = sys_pol.len() as u32;
 
-                let sys_pol_ptr = sys_pol.as_ptr();
                 ok(unsafe {
                     // No handles or values are moved as a result of this call (regardless of
                     // success), and the values used here are safely dropped when this function
@@ -144,7 +143,7 @@ impl Job {
                         self.raw_handle(),
                         sys_opt,
                         sys_topic,
-                        sys_pol_ptr as *const u8,
+                        sys_pol.as_ptr().cast::<u8>(),
                         sys_count,
                     )
                 })
@@ -158,7 +157,6 @@ impl Job {
                 };
                 let sys_count = 1;
 
-                let sys_pol_ptr = &sys_pol as *const sys::zx_policy_timer_slack;
                 ok(unsafe {
                     // Requires that `self` contains a currently valid handle.
                     // No handles or values are moved as a result of this call (regardless of
@@ -168,7 +166,7 @@ impl Job {
                         self.raw_handle(),
                         sys_opt,
                         sys_topic,
-                        sys_pol_ptr as *const u8,
+                        std::ptr::from_ref(&sys_pol).cast::<u8>(),
                         sys_count,
                     )
                 })
@@ -207,7 +205,7 @@ impl Job {
                 self.raw_handle(),
                 Koid::from(*koid).raw_koid(),
                 rights,
-                &mut handle as *mut zx_handle_t,
+                std::ptr::from_mut(&mut handle),
             )
         };
         ok(status)?;

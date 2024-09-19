@@ -79,7 +79,7 @@ impl<R: IntoBytes + FromBytes, W: IntoBytes + FromBytes> Fifo<R, W> {
             sys::zx_fifo_write(
                 self.raw_handle(),
                 std::mem::size_of::<W>(),
-                buf as *mut u8,
+                buf.cast::<u8>(),
                 count,
                 &mut actual_count,
             )
@@ -120,11 +120,11 @@ impl<R: IntoBytes + FromBytes, W: IntoBytes + FromBytes> Fifo<R, W> {
     pub fn read_uninit(&self, bytes: &mut [MaybeUninit<R>]) -> Result<&mut [R], Status> {
         // SAFETY: the slice is valid to write to for its entire length, and this call will not
         // read from the bytes
-        let valid_count = unsafe { self.read_raw(bytes.as_mut_ptr() as *mut R, bytes.len())? };
+        let valid_count = unsafe { self.read_raw(bytes.as_mut_ptr().cast::<R>(), bytes.len())? };
         let (valid, _uninit) = bytes.split_at_mut(valid_count);
 
         // SAFETY: the kernel initialized all bytes, strip out MaybeUninit
-        unsafe { Ok(std::slice::from_raw_parts_mut(valid.as_mut_ptr() as *mut R, valid.len())) }
+        unsafe { Ok(std::slice::from_raw_parts_mut(valid.as_mut_ptr().cast::<R>(), valid.len())) }
     }
 
     /// Attempts to read some number of elements out of the fifo. On success, returns the number of
@@ -144,7 +144,7 @@ impl<R: IntoBytes + FromBytes, W: IntoBytes + FromBytes> Fifo<R, W> {
             sys::zx_fifo_read(
                 self.raw_handle(),
                 std::mem::size_of::<R>(),
-                buf as *mut u8,
+                buf.cast::<u8>(),
                 count,
                 &mut actual_count,
             )

@@ -28,7 +28,7 @@ pub fn object_wait_many(
     items: &mut [WaitItem<'_>],
     deadline: MonotonicTime,
 ) -> Result<bool, Status> {
-    let items_ptr = items.as_mut_ptr() as *mut sys::zx_wait_item_t;
+    let items_ptr = items.as_mut_ptr().cast::<sys::zx_wait_item_t>();
     let status = unsafe { sys::zx_object_wait_many(items_ptr, items.len(), deadline.into_nanos()) };
     if status == sys::ZX_ERR_CANCELED {
         return Ok(true);

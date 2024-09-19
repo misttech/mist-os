@@ -41,7 +41,7 @@ impl<Output: Timeline> Clock<Output> {
                 unsafe {
                     sys::zx_clock_create(
                         sys::ZX_CLOCK_ARGS_VERSION_1 | opts.bits(),
-                        &args as *const _ as *const u8,
+                        std::ptr::from_ref(&args).cast::<u8>(),
                         &mut out,
                     )
                 }
@@ -73,7 +73,7 @@ impl<Output: Timeline> Clock<Output> {
             sys::zx_clock_get_details(
                 self.raw_handle(),
                 sys::ZX_CLOCK_ARGS_VERSION_1,
-                out_details.as_mut_ptr() as *mut u8,
+                out_details.as_mut_ptr().cast::<u8>(),
             )
         };
         ok(status)?;
@@ -90,7 +90,7 @@ impl<Output: Timeline> Clock<Output> {
         let options = update.options();
         let args = sys::zx_clock_update_args_v2_t::from(update);
         let status = unsafe {
-            sys::zx_clock_update(self.raw_handle(), options, &args as *const _ as *const u8)
+            sys::zx_clock_update(self.raw_handle(), options, std::ptr::from_ref(&args).cast::<u8>())
         };
         ok(status)?;
         Ok(())

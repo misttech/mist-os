@@ -70,7 +70,7 @@ impl DebugLog {
             sys::zx_debuglog_read(
                 self.raw_handle(),
                 0, /* options are unused, must be 0 */
-                &mut record as *mut _ as *mut u8,
+                std::ptr::from_mut(&mut record).cast::<u8>(),
                 std::mem::size_of_val(&record),
             )
         };

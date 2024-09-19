@@ -73,7 +73,7 @@ where
         sys::zx_object_get_property(
             handle.raw_handle(),
             *P::PROPERTY,
-            out.as_mut_ptr() as *mut u8,
+            out.as_mut_ptr().cast::<u8>(),
             std::mem::size_of::<P::PropTy>(),
         )
     };
@@ -92,7 +92,7 @@ where
         sys::zx_object_set_property(
             handle.raw_handle(),
             *P::PROPERTY,
-            val as *const P::PropTy as *const u8,
+            std::ptr::from_ref(val).cast::<u8>(),
             std::mem::size_of::<P::PropTy>(),
         )
     };

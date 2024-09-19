@@ -88,7 +88,7 @@ where
         sys::zx_object_get_info(
             handle.raw_handle(),
             *Q::TOPIC,
-            out.as_mut_ptr() as *mut u8,
+            out.as_mut_ptr().cast::<u8>(),
             std::mem::size_of_val(out),
             &mut actual,
             &mut avail,
@@ -103,7 +103,7 @@ where
     // traits to be instantiated from arbitrary bytes.
     let initialized: &mut [Q::InfoTy] = unsafe {
         std::slice::from_raw_parts_mut(
-            initialized.as_mut_ptr() as *mut Q::InfoTy,
+            initialized.as_mut_ptr().cast::<Q::InfoTy>(),
             initialized.len(),
         )
     };

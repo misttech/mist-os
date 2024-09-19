@@ -95,7 +95,7 @@ impl Stream {
     ) -> Result<usize, Status> {
         // TODO(https://fxbug.dev/42079723) use MaybeUninit::slice_as_mut_ptr when stable
         let mut iovec =
-            [sys::zx_iovec_t { buffer: buffer.as_mut_ptr() as *mut u8, capacity: buffer.len() }];
+            [sys::zx_iovec_t { buffer: buffer.as_mut_ptr().cast::<u8>(), capacity: buffer.len() }];
         // SAFETY: The buffer in `iovec` comes from a mutable slice so we know it's safe to pass it
         // to `readv`.
         unsafe { self.readv(options, &mut iovec) }
@@ -161,7 +161,7 @@ impl Stream {
     ) -> Result<usize, Status> {
         // TODO(https://fxbug.dev/42079723) Use MaybeUninit::slice_as_mut_ptr when stable.
         let mut iovec =
-            [sys::zx_iovec_t { buffer: buffer.as_mut_ptr() as *mut u8, capacity: buffer.len() }];
+            [sys::zx_iovec_t { buffer: buffer.as_mut_ptr().cast::<u8>(), capacity: buffer.len() }];
         // SAFETY: The buffer in `iovec` comes from a mutable slice so we know it's safe to pass it
         // to `readv_at`.
         unsafe { self.readv_at(options, offset, &mut iovec) }
@@ -289,7 +289,7 @@ impl std::io::Read for Stream {
     fn read_vectored(&mut self, bufs: &mut [std::io::IoSliceMut<'_>]) -> std::io::Result<usize> {
         // SAFETY: `zx_iovec_t` and `IoSliceMut` have the same layout.
         let mut iovecs = unsafe {
-            std::slice::from_raw_parts_mut(bufs.as_mut_ptr() as *mut sys::zx_iovec_t, bufs.len())
+            std::slice::from_raw_parts_mut(bufs.as_mut_ptr().cast::<sys::zx_iovec_t>(), bufs.len())
         };
         // SAFETY: `IoSliceMut` can only be constructed from a mutable slice so we know it's safe to
         // pass to `readv`.
@@ -311,7 +311,7 @@ impl std::io::Write for Stream {
     fn write_vectored(&mut self, bufs: &[std::io::IoSlice<'_>]) -> std::io::Result<usize> {
         // SAFETY: `zx_iovec_t` and `IoSliceMut` have the same layout.
         let iovecs = unsafe {
-            std::slice::from_raw_parts(bufs.as_ptr() as *const sys::zx_iovec_t, bufs.len())
+            std::slice::from_raw_parts(bufs.as_ptr().cast::<sys::zx_iovec_t>(), bufs.len())
         };
         Ok(self.writev(StreamWriteOptions::empty(), &iovecs)?)
     }

@@ -299,12 +299,12 @@ impl Socket {
         // SAFETY: `bytes` is valid to write to for its whole length.
         // TODO(https://fxbug.dev/42079723) use MaybeUninit::slice_as_mut_ptr when stable.
         let actual =
-            unsafe { self.read_raw_opts(bytes.as_mut_ptr() as *mut u8, bytes.len(), opts)? };
+            unsafe { self.read_raw_opts(bytes.as_mut_ptr().cast::<u8>(), bytes.len(), opts)? };
         let (valid, _uninit) = bytes.split_at_mut(actual);
 
         // SAFETY: the kernel has initialized all of `valid`'s bytes.
         // TODO(https://fxbug.dev/42079723) use MaybeUninit::slice_assume_init_mut when stable.
-        Ok(unsafe { std::slice::from_raw_parts_mut(valid.as_mut_ptr() as *mut u8, valid.len()) })
+        Ok(unsafe { std::slice::from_raw_parts_mut(valid.as_mut_ptr().cast::<u8>(), valid.len()) })
     }
 
     /// Close half of the socket, so attempts by the other side to write will fail.
