@@ -15,7 +15,10 @@ use starnix_modules_ashmem::ashmem_device_init;
 use starnix_modules_gpu::gpu_device_init;
 use starnix_modules_gralloc::gralloc_device_init;
 use starnix_modules_input::uinput::register_uinput_device;
-use starnix_modules_input::{EventProxyMode, InputDevice};
+use starnix_modules_input::{
+    EventProxyMode, InputDevice, InputEventsRelay, DEFAULT_KEYBOARD_DEVICE_ID,
+    DEFAULT_TOUCH_DEVICE_ID,
+};
 use starnix_modules_magma::magma_device_init;
 use starnix_modules_perfetto_consumer::start_perfetto_consumer_thread;
 use starnix_modules_touch_power_policy::TouchPowerPolicyDevice;
@@ -177,11 +180,27 @@ pub fn run_container_features(
             InputDevice::new_touch(display_width, display_height, &kernel.inspect_node);
         let keyboard_device = InputDevice::new_keyboard(&kernel.inspect_node);
 
-        touch_device.clone().register(locked, &kernel.kthreads.system_task());
-        keyboard_device.clone().register(locked, &kernel.kthreads.system_task());
-        register_uinput_device(locked, &kernel.kthreads.system_task());
+        touch_device.clone().register(
+            locked,
+            &kernel.kthreads.system_task(),
+            DEFAULT_TOUCH_DEVICE_ID,
+        );
+        keyboard_device.clone().register(
+            locked,
+            &kernel.kthreads.system_task(),
+            DEFAULT_KEYBOARD_DEVICE_ID,
+        );
 
-        touch_device.start_touch_relay(&kernel, touch_source_client, EventProxyMode::WakeContainer);
+        let input_events_relay = InputEventsRelay::new();
+        input_events_relay.clone().start_relays(
+            &kernel,
+            EventProxyMode::WakeContainer,
+            touch_source_client,
+            touch_device.open_files.clone(),
+        );
+
+        register_uinput_device(locked, &kernel.kthreads.system_task(), input_events_relay);
+
         keyboard_device.start_keyboard_relay(&kernel, keyboard, view_ref);
         keyboard_device.start_button_relay(&kernel, registry_proxy, EventProxyMode::WakeContainer);
 

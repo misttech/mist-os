@@ -6,10 +6,12 @@
 
 mod input_device;
 mod input_event_conversion;
+mod input_event_relay;
 mod input_file;
 
 pub mod uinput;
 
 pub use input_device::*;
 pub use input_event_conversion::*;
+pub use input_event_relay::*;
 pub use input_file::*;

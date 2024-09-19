@@ -20,6 +20,7 @@ rustc_library("input") {
   sources = [
     "input_device.rs",
     "input_event_conversion.rs",
+    "input_event_relay.rs",
     "input_file.rs",
     "lib.rs",
     "uinput.rs",
