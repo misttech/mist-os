@@ -58,6 +58,8 @@ pub struct FullmacDevice {
     fullmac_impl_sync_proxy: fidl_fullmac::WlanFullmacImpl_SynchronousProxy,
 }
 
+/// TODO(https://fxbug.dev/368323681): Users should be notified when the WlanFullmacImpl channel
+/// closes.
 impl FullmacDevice {
     pub fn new(
         fullmac_impl_sync_proxy: fidl_fullmac::WlanFullmacImpl_SynchronousProxy,

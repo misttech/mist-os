@@ -17,13 +17,59 @@
 
 typedef struct wlan_fullmac_mlme_handle_t wlan_fullmac_mlme_handle_t;
 
-extern "C" wlan_fullmac_mlme_handle_t *start_fullmac_mlme(zx_handle_t fullmac_client_end_handle);
+/**
+ * Starts and runs the FullMAC MLME and SME futures on a separate thread. MLME will call the given
+ * `run_shutdown_completer` when it exits.
+ *
+ * # Safety
+ *
+ * This function is unsafe for the following reasons:
+ *
+ *   - This function cannot guarantee `fullmac_client_end_handle` is a valid handle.
+ *   - This function cannot guarantee `run_shutdown_completer` is thread-safe.
+ *   - This function cannot guarantee `shutdown_completer` points to a valid object when
+ *     `run_shutdown_completer` is called.
+ *
+ * By calling this function, the caller promises the following:
+ *
+ *   - The `fullmac_client_end_handle` is a valid handle.
+ *   - The `run_shutdown_completer` function is thread-safe.
+ *   - The `shutdown_completer` pointer will point to a valid object at least until
+ *     `run_shutdown_completer` is called.
+ *
+ * It is additionally the caller's responsibility to deallocate the returned FullmacMlmeHandle.
+ * The caller promises that they will eventually call `delete_fullmac_mlme` on the returned
+ * FullmacMlmeHandle.
+ */
+extern "C" wlan_fullmac_mlme_handle_t *start_fullmac_mlme(
+    zx_handle_t fullmac_client_end_handle, void *shutdown_completer,
+    void (*run_shutdown_completer)(void *shutdown_completer, zx_status_t status));
 
+/**
+ * Request that the FullMAC MLME stops. This is non-blocking.
+ *
+ * It is assumed that |mlme| is valid (i.e., the user has not called
+ * |delete_fullmac_mlme_handle| yet.
+ *
+ * This should be synchronized with calls to |start_fullmac_mlme| and
+ * |delete_fullmac_mlme_handle|.
+ *
+ * TODO(https://fxbug.dev/368323681): Consider replacing |stop_fullmac_mlme| and
+ * |delete_fullmac_mlme| with an internal FIDL protocol.
+ */
 extern "C" void stop_fullmac_mlme(wlan_fullmac_mlme_handle_t *mlme);
 
 /**
- * FFI interface: Stop and delete a FullMAC MLME via the FullmacMlmeHandle. Takes ownership
- * and invalidates the passed FullmacMlmeHandle.
+ * Takes ownership of and deallocates the passed FullmacMlmeHandle.
+ *
+ * If |mlme| is non-null, this will join the FullMAC MLME thread and block the calling thread
+ * until FullMAC MLME has exited.
+ *
+ * If the user has not called |stop_fullmac_mlme| before |delete_fullmac_mlme_handle|, this will
+ * request that the FullMAC MLME thread stop before joining thread to avoid blocking forever.
+ *
+ * TODO(https://fxbug.dev/368323681): Consider replacing |stop_fullmac_mlme| and
+ * |delete_fullmac_mlme| with an internal FIDL protocol.
  *
  * # Safety
  *
@@ -31,6 +77,6 @@ extern "C" void stop_fullmac_mlme(wlan_fullmac_mlme_handle_t *mlme);
  * the MLME. This API is fundamentally unsafe, and relies on the caller to
  * pass the correct pointer and make no further calls on it later.
  */
-extern "C" void delete_fullmac_mlme(wlan_fullmac_mlme_handle_t *mlme);
+extern "C" void delete_fullmac_mlme_handle(wlan_fullmac_mlme_handle_t *mlme);
 
 #endif  // SRC_CONNECTIVITY_WLAN_LIB_MLME_FULLMAC_C_BINDING_BINDINGS_H_

@@ -19,6 +19,7 @@ use futures::future::BoxFuture;
 use futures::StreamExt;
 use tracing::{error, info, warn};
 use wlan_common::sink::UnboundedSink;
+use wlan_ffi_transport::completers::Completer;
 use wlan_sme::serve::create_sme;
 use {
     fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_internal as fidl_internal,
@@ -93,14 +94,30 @@ enum DriverState {
 pub struct FullmacMlmeHandle {
     driver_event_sender: mpsc::UnboundedSender<FullmacDriverEvent>,
     mlme_loop_join_handle: Option<std::thread::JoinHandle<()>>,
+    stop_requested: bool,
 }
 
 impl FullmacMlmeHandle {
-    pub fn stop(&mut self) {
+    pub fn request_stop(&mut self) {
         info!("Requesting MLME stop...");
         if let Err(e) = self.driver_event_sender.unbounded_send(FullmacDriverEvent::Stop) {
             error!("Cannot signal MLME event loop thread: {}", e);
+        } else {
+            // Only set this to true if sending the Stop event succeeded. Most likely, this means
+            // that the receiver was dropped and the MLME thread has already exited. But just in
+            // case sending can result in a different error, this will let us retry sending the
+            // Stop event in |Self::delete|. If it fails again, then we only emit another error
+            // log.
+            self.stop_requested = true;
         }
+    }
+
+    pub fn delete(mut self) {
+        if !self.stop_requested {
+            warn!("Called delete on FullmacMlmeHandle before calling stop.");
+            self.request_stop()
+        }
+
         match self.mlme_loop_join_handle.take() {
             Some(join_handle) => {
                 if let Err(e) = join_handle.join() {
@@ -110,13 +127,6 @@ impl FullmacMlmeHandle {
             None => warn!("Called stop on already stopped MLME"),
         }
         info!("MLME main loop thread has shutdown.");
-    }
-
-    pub fn delete(mut self) {
-        if self.mlme_loop_join_handle.is_some() {
-            warn!("Called delete on FullmacMlmeHandle before calling stop.");
-            self.stop()
-        }
     }
 }
 
@@ -129,9 +139,13 @@ const INSPECT_VMO_SIZE_BYTES: usize = 1000 * 1024;
 /// creates the SME and MLME main loop futures. See the `start` function in this file for details.
 ///
 /// Returns a handle to MLME on success, and an error if MLME failed to initialize.
-pub fn start_and_serve_on_separate_thread<D: DeviceOps + Send + 'static>(
+pub fn start_and_serve_on_separate_thread<F, D: DeviceOps + Send + 'static>(
     device: D,
-) -> anyhow::Result<FullmacMlmeHandle> {
+    shutdown_completer: Completer<F>,
+) -> anyhow::Result<FullmacMlmeHandle>
+where
+    F: FnOnce(zx::sys::zx_status_t) + 'static,
+{
     // Logger requires the executor to be initialized first.
     let mut executor = fasync::LocalExecutor::new();
     logger::init();
@@ -158,7 +172,8 @@ pub fn start_and_serve_on_separate_thread<D: DeviceOps + Send + 'static>(
             inspect_usme_node,
             startup_sender,
         );
-        executor.run(future);
+        let result = executor.run(future);
+        shutdown_completer.reply(result);
     });
 
     match executor.run_singlethreaded(startup_receiver) {
@@ -177,6 +192,7 @@ pub fn start_and_serve_on_separate_thread<D: DeviceOps + Send + 'static>(
     Ok(FullmacMlmeHandle {
         driver_event_sender,
         mlme_loop_join_handle: Some(mlme_loop_join_handle),
+        stop_requested: false,
     })
 }
 
@@ -206,7 +222,7 @@ async fn start_and_serve<D: DeviceOps + Send + 'static>(
     inspector: Inspector,
     inspect_usme_node: fuchsia_inspect::Node,
     startup_sender: oneshot::Sender<Result<(), FullmacMlmeError>>,
-) {
+) -> Result<(), zx::Status> {
     let StartedDriver { mlme_main_loop_fut, sme_fut } =
         match start(device, driver_event_stream, driver_event_sender, inspector, inspect_usme_node)
             .await
@@ -217,13 +233,19 @@ async fn start_and_serve<D: DeviceOps + Send + 'static>(
             }
             Err(e) => {
                 startup_sender.send(Err(e)).unwrap();
-                return;
+                return Err(zx::Status::INTERNAL);
             }
         };
 
     match futures::try_join!(mlme_main_loop_fut, sme_fut) {
-        Ok(_) => info!("MLME and/or SME event loop exited gracefully"),
-        Err(e) => error!("MLME and/or SME event loop exited with error: {:?}", e),
+        Ok(_) => {
+            info!("MLME and/or SME event loop exited gracefully");
+            Ok(())
+        }
+        Err(e) => {
+            error!("MLME and/or SME event loop exited with error: {:?}", e);
+            Err(zx::Status::INTERNAL)
+        }
     }
 }
 
@@ -402,14 +424,17 @@ mod tests {
         h.driver_event_sender
             .unbounded_send(FullmacDriverEvent::Stop)
             .expect("expect sending driver Stop event to succeed");
-        assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Ready(()));
+        assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Ready(Ok(())));
     }
 
     #[test]
     fn test_mlme_startup_fails_due_to_device_start() {
         let (mut h, mut test_fut) = TestHelper::set_up();
         h.fake_device.lock().unwrap().start_fn_status_mock = Some(zx::sys::ZX_ERR_BAD_STATE);
-        assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Ready(()));
+        assert_variant!(
+            h.exec.run_until_stalled(&mut test_fut),
+            Poll::Ready(Err(zx::Status::INTERNAL))
+        );
 
         let startup_result =
             assert_variant!(h.startup_receiver.try_recv(), Ok(Some(result)) => result);
@@ -421,7 +446,10 @@ mod tests {
         let bootstrap = false;
         let (mut h, mut test_fut) = TestHelper::set_up_with_usme_bootstrap(bootstrap);
         h.usme_bootstrap_proxy.take();
-        assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Ready(()));
+        assert_variant!(
+            h.exec.run_until_stalled(&mut test_fut),
+            Poll::Ready(Err(zx::Status::INTERNAL))
+        );
 
         let startup_result =
             assert_variant!(h.startup_receiver.try_recv(), Ok(Some(result)) => result);
@@ -439,7 +467,10 @@ mod tests {
             .unwrap()
             .device
             .mac_implementation_type = fidl_common::MacImplementationType::Softmac;
-        assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Ready(()));
+        assert_variant!(
+            h.exec.run_until_stalled(&mut test_fut),
+            Poll::Ready(Err(zx::Status::INTERNAL))
+        );
 
         let startup_result =
             assert_variant!(h.startup_receiver.try_recv(), Ok(Some(result)) => result);
@@ -457,7 +488,10 @@ mod tests {
             .unwrap()
             .data_plane
             .data_plane_type = fidl_common::DataPlaneType::EthernetDevice;
-        assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Ready(()));
+        assert_variant!(
+            h.exec.run_until_stalled(&mut test_fut),
+            Poll::Ready(Err(zx::Status::INTERNAL))
+        );
 
         let startup_result =
             assert_variant!(h.startup_receiver.try_recv(), Ok(Some(result)) => result);
@@ -468,7 +502,10 @@ mod tests {
     fn test_mlme_startup_fails_due_to_query_device_info_error() {
         let (mut h, mut test_fut) = TestHelper::set_up();
         h.fake_device.lock().unwrap().query_device_info_mock = None;
-        assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Ready(()));
+        assert_variant!(
+            h.exec.run_until_stalled(&mut test_fut),
+            Poll::Ready(Err(zx::Status::INTERNAL))
+        );
 
         let startup_result =
             assert_variant!(h.startup_receiver.try_recv(), Ok(Some(result)) => result);
@@ -479,7 +516,10 @@ mod tests {
     fn test_mlme_startup_fails_due_to_query_mac_sublayer_support_error() {
         let (mut h, mut test_fut) = TestHelper::set_up();
         h.fake_device.lock().unwrap().query_mac_sublayer_support_mock = None;
-        assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Ready(()));
+        assert_variant!(
+            h.exec.run_until_stalled(&mut test_fut),
+            Poll::Ready(Err(zx::Status::INTERNAL))
+        );
 
         let startup_result =
             assert_variant!(h.startup_receiver.try_recv(), Ok(Some(result)) => result);
@@ -490,7 +530,10 @@ mod tests {
     fn test_mlme_startup_fails_due_to_query_security_support_error() {
         let (mut h, mut test_fut) = TestHelper::set_up();
         h.fake_device.lock().unwrap().query_security_support_mock = None;
-        assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Ready(()));
+        assert_variant!(
+            h.exec.run_until_stalled(&mut test_fut),
+            Poll::Ready(Err(zx::Status::INTERNAL))
+        );
 
         let startup_result =
             assert_variant!(h.startup_receiver.try_recv(), Ok(Some(result)) => result);
@@ -501,7 +544,10 @@ mod tests {
     fn test_mlme_startup_fails_due_to_query_spectrum_management_support_error() {
         let (mut h, mut test_fut) = TestHelper::set_up();
         h.fake_device.lock().unwrap().query_spectrum_management_support_mock = None;
-        assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Ready(()));
+        assert_variant!(
+            h.exec.run_until_stalled(&mut test_fut),
+            Poll::Ready(Err(zx::Status::INTERNAL))
+        );
 
         let startup_result =
             assert_variant!(h.startup_receiver.try_recv(), Ok(Some(result)) => result);
@@ -515,7 +561,10 @@ mod tests {
         assert_variant!(h.startup_receiver.try_recv(), Ok(Some(Ok(()))));
 
         std::mem::drop(h.generic_sme_proxy.take());
-        assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Ready(()));
+        assert_variant!(
+            h.exec.run_until_stalled(&mut test_fut),
+            Poll::Ready(Err(zx::Status::INTERNAL))
+        );
     }
 
     #[test]
@@ -525,7 +574,10 @@ mod tests {
         assert_variant!(h.startup_receiver.try_recv(), Ok(Some(Ok(()))));
 
         std::mem::drop(h.fake_device.lock().unwrap().fullmac_ifc_client_end.take());
-        assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Ready(()));
+        assert_variant!(
+            h.exec.run_until_stalled(&mut test_fut),
+            Poll::Ready(Err(zx::Status::INTERNAL))
+        );
     }
 
     struct TestHelper {
@@ -540,14 +592,14 @@ mod tests {
     }
 
     impl TestHelper {
-        pub fn set_up() -> (Self, Pin<Box<impl Future<Output = ()>>>) {
+        pub fn set_up() -> (Self, Pin<Box<impl Future<Output = Result<(), zx::Status>>>>) {
             let bootstrap = true;
             Self::set_up_with_usme_bootstrap(bootstrap)
         }
 
         pub fn set_up_with_usme_bootstrap(
             bootstrap: bool,
-        ) -> (Self, Pin<Box<impl Future<Output = ()>>>) {
+        ) -> (Self, Pin<Box<impl Future<Output = Result<(), zx::Status>>>>) {
             let exec = fasync::TestExecutor::new();
 
             let (mut fake_device, _driver_calls) = FakeFullmacDevice::new();

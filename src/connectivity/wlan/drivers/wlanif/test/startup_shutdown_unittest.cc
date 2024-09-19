@@ -18,9 +18,11 @@ namespace {
 struct BaseWlanFullmacServerForStartup
     : public fidl::testing::TestBase<fuchsia_wlan_fullmac::WlanFullmacImpl> {
   explicit BaseWlanFullmacServerForStartup(
-      fidl::ServerEnd<fuchsia_wlan_fullmac::WlanFullmacImpl> server_end)
-      : binding_(fdf_dispatcher_get_async_dispatcher(fdf_dispatcher_get_current_dispatcher()),
-                 std::move(server_end), this, fidl::kIgnoreBindingClosure) {}
+      fidl::ServerEnd<fuchsia_wlan_fullmac::WlanFullmacImpl> server_end) {
+    binding_.emplace(fdf_dispatcher_get_async_dispatcher(fdf_dispatcher_get_current_dispatcher()),
+                     std::move(server_end), this,
+                     [](auto f) { FDF_LOG(INFO, "BaseWlanFullmacServer unbinding"); });
+  }
 
   void Start(StartRequest& request, StartCompleter::Sync& completer) override {
     // Acquire/Construct the WlanFullmacIfc, UsmeBootstrap, and GenericSme endpoints.
@@ -91,7 +93,7 @@ struct BaseWlanFullmacServerForStartup
     ZX_PANIC("Not implemented: %s", name.c_str());
   }
 
-  fidl::ServerBinding<fuchsia_wlan_fullmac::WlanFullmacImpl> binding_;
+  std::optional<fidl::ServerBinding<fuchsia_wlan_fullmac::WlanFullmacImpl>> binding_;
   std::optional<fidl::ClientEnd<::fuchsia_wlan_fullmac::WlanFullmacImplIfc>>
       fullmac_ifc_client_endpoint_;
   std::optional<fidl::Client<fuchsia_wlan_sme::UsmeBootstrap>> usme_bootstrap_client_;
@@ -179,6 +181,42 @@ TEST(StartupShutdownTest, StartFailsIfQuerySpectrumManagementSupport) {
   };
   DriverTestType<QuerySpectrumManagementSupportFails> driver_test;
   ASSERT_FALSE(driver_test.StartDriver().is_ok());
+}
+
+TEST(StartupShutdownTest, DroppingIfcChannelCausesDroppedNode) {
+  DriverTestType<BaseWlanFullmacServerForStartup> driver_test;
+  ASSERT_TRUE(driver_test.StartDriver().is_ok());
+
+  driver_test.RunInEnvironmentTypeContext([](auto& env) {
+    BaseWlanFullmacServerForStartup& server = env.wlan_fullmac_server_.value();
+    server.fullmac_ifc_client_endpoint_.reset();
+  });
+
+  while (driver_test.RunInNodeContext<bool>([](auto& node) { return node.HasNode(); })) {
+    std::this_thread::sleep_for(std::chrono::milliseconds(5));
+  }
+
+  // Note: wlanif::Device completes PrepareStop with errors, but it doesn't get propagated by the
+  // framework.
+  ASSERT_TRUE(driver_test.StopDriver().is_ok());
+}
+
+TEST(StartupShutdownTest, DroppingGenericSmeChannelCausesDroppedNode) {
+  DriverTestType<BaseWlanFullmacServerForStartup> driver_test;
+  ASSERT_TRUE(driver_test.StartDriver().is_ok());
+
+  driver_test.RunInEnvironmentTypeContext([](auto& env) {
+    BaseWlanFullmacServerForStartup& server = env.wlan_fullmac_server_.value();
+    server.generic_sme_client_endpoint_.reset();
+  });
+
+  while (driver_test.RunInNodeContext<bool>([](auto& node) { return node.HasNode(); })) {
+    std::this_thread::sleep_for(std::chrono::milliseconds(5));
+  }
+
+  // Note: wlanif::Device completes PrepareStop with errors, but it doesn't get propagated by the
+  // framework.
+  ASSERT_TRUE(driver_test.StopDriver().is_ok());
 }
 
 }  // namespace
