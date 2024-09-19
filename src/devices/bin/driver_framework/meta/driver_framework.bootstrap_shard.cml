@@ -412,7 +412,10 @@
             from: "#boot-drivers",
         },
         {
-            service: "fuchsia.hardware.spmi.Service",
+            service: [
+                "fuchsia.hardware.spmi.SubTargetService",
+                "fuchsia.hardware.spmi.TargetService",
+            ],
             from: "#boot-drivers",
         },
         {
