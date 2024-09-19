@@ -26,6 +26,18 @@
 // This is the first and only ICD loaded, so it should have a "0-" prepended.
 const char* kIcdFilename = "0-libvulkan_fake.so";
 
+// This file contains hermetic tests of the Vulkan loader service. A hermetic copy of the service
+// and its dependencies are created inside RealmBuilder, using test_realm.cm as a template. The
+// /dev/class/gpu and /dev/class/goldfish-pipe server implementations are housed in
+// pkg-server-main.cc, along with a fake Magma MSD implementation.
+//
+// The Magma MSD implementation provides an ICD component path of
+// fuchsia-pkg://fuchsia.com/vulkan_loader_tests#meta/test_vulkan_driver.cm for the vulkan loader to
+// read from. The "ICD" contained there has a normal manifest.json and libvulkan_fake.json file, but
+// there's no real ICD - instead bin/pkg-server (the same pkg-server executable as above) is used as
+// the ICD shared library, since the contents don't matter for these tests as long as the file is
+// marked executable.
+
 class VulkanLoader : public testing::Test {
  protected:
   void SetUp() override {
@@ -57,8 +69,10 @@ class VulkanLoader : public testing::Test {
   std::optional<fidl::WireSyncClient<fuchsia_vulkan_loader::Loader>> loader_;
 };
 
+// Test that loader service can use `metadata.json` and `libvulkan_fake.json` to load the ICD, and
+// that the ICD VMO returned has the correct properties.
 TEST_F(VulkanLoader, ManifestLoad) {
-  // manifest.json remaps this to bin/pkg-server.
+  // manifest.json remaps 0-libvulkan_fake.so to bin/pkg-server.
   zx::result icd = GetIcd(kIcdFilename);
   ASSERT_TRUE(icd.is_ok()) << icd.status_string();
   ASSERT_TRUE(icd->is_valid());
@@ -75,7 +89,8 @@ TEST_F(VulkanLoader, ManifestLoad) {
 }
 
 // Check that writes to one VMO returned by the server will not modify a separate VMO returned by
-// the service.
+// the service. Requires that zx_process_write_memory is enabled on the device for the result to be
+// meaningful.
 TEST_F(VulkanLoader, VmosIndependent) {
   // manifest.json remaps this to bin/pkg-server.
   zx::result icd = GetIcd(kIcdFilename);
@@ -113,6 +128,7 @@ TEST_F(VulkanLoader, VmosIndependent) {
   EXPECT_EQ(original_value, *static_cast<uint8_t*>(mapper2.start()));
 }
 
+// Test that the DeviceFs returned from `ConnectToDeviceFs` looks as expected.
 TEST_F(VulkanLoader, DeviceFs) {
   auto dev_fs = fidl::Endpoints<fuchsia_io::Directory>::Create();
   {
@@ -135,6 +151,7 @@ TEST_F(VulkanLoader, DeviceFs) {
   EXPECT_EQ((*response)->simple_result(), 5u);
 }
 
+// Test that `GetSupportedFeatures` returns the correct values.
 TEST_F(VulkanLoader, Features) {
   auto response = loader()->GetSupportedFeatures();
   ASSERT_TRUE(response.ok()) << response;
@@ -144,6 +161,9 @@ TEST_F(VulkanLoader, Features) {
   EXPECT_EQ(response->features, kExpectedFeatures);
 }
 
+// Test that ConnectToManifestFs gives access to a manifest fs with the expected files.
+// https://fuchsia.dev/fuchsia-src/contribute/governance/rfcs/0205_vulkan_loader?hl=en#filesystem_serving
+// describes the contents of this filesystem.
 TEST_F(VulkanLoader, ManifestFs) {
   auto manifest_fs = fidl::Endpoints<fuchsia_io::Directory>::Create();
   {
@@ -168,6 +188,7 @@ TEST_F(VulkanLoader, ManifestFs) {
   EXPECT_EQ(kManifestFileSize, read_size);
 }
 
+// Test that the goldfish files in the device-fs are connected correctly.
 TEST_F(VulkanLoader, GoldfishSyncDeviceFs) {
   auto dev_fs = fidl::Endpoints<fuchsia_io::Directory>::Create();
   {
@@ -195,6 +216,8 @@ TEST_F(VulkanLoader, GoldfishSyncDeviceFs) {
   }
 }
 
+// Test that the manifest FS and device FS are exposed through out/debug from the component, and
+// that they have the right contents (see src/graphics/bin/vulkan_loader/README.md for details).
 TEST_F(VulkanLoader, DebugFilesystems) {
   ASSERT_TRUE(GetIcd(kIcdFilename).is_ok());  // Wait for idle.
 
