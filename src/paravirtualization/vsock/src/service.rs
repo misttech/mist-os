@@ -126,10 +126,10 @@ impl Error {
     }
 }
 
-fn map_driver_result(result: Result<i32, fidl::Error>) -> Result<(), Error> {
+fn map_driver_result(result: Result<Result<(), i32>, fidl::Error>) -> Result<(), Error> {
     result
-        .map_err(|x| Error::DriverCommunication(x.into()))
-        .and_then(|x| zx::Status::ok(x).map_err(Error::Driver))
+        .map_err(|x| Error::DriverCommunication(x.into()))?
+        .map_err(|e| Error::Driver(zx::Status::from_raw(e)))
 }
 
 struct ClientContextState {
@@ -227,7 +227,7 @@ impl Vsock {
 
         device
             .start(callbacks_client)
-            .map(|x| map_driver_result(x))
+            .map(map_driver_result)
             .err_into::<anyhow::Error>()
             .await
             .context("Failed to start device")?;
@@ -599,13 +599,13 @@ impl State {
         &mut self,
         addr: &addr::Vsock,
     ) -> impl Future<Output = Result<(), Error>> + 'static {
-        self.device.send_rst(&addr.clone()).map(|x| map_driver_result(x))
+        self.device.send_rst(&addr.clone()).map(map_driver_result)
     }
     fn send_shutdown(
         &mut self,
         addr: &addr::Vsock,
     ) -> impl Future<Output = Result<(), Error>> + 'static {
-        self.device.send_shutdown(&addr).map(|x| map_driver_result(x))
+        self.device.send_shutdown(&addr).map(map_driver_result)
     }
 
     // Processes a single callback from the `device`. This is intended to be used by

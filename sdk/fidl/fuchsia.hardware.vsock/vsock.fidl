@@ -56,9 +56,7 @@ closed protocol Device {
     // will stop if it detects the other end of the Callbacks channel has closed.
     strict Start(resource struct {
         cb client_end:Callbacks;
-    }) -> (struct {
-        status zx.Status;
-    });
+    }) -> () error zx.Status;
     // Will send a request to open a connection with the remote specified in the
     // `addr`. The `data` socket is stored and will be used for data transmission
     // should the connection get established successfully, otherwise it will close
@@ -68,9 +66,7 @@ closed protocol Device {
     strict SendRequest(resource struct {
         addr Addr;
         data zx.Handle:SOCKET;
-    }) -> (struct {
-        status zx.Status;
-    });
+    }) -> () error zx.Status;
     // Request a shutdown to begin for the connection indicated by the given `addr`.
     // This immediately stops any data from being sent on the connection, although
     // data may still be received up until Callbacks.Rst is called to indicate the
@@ -78,25 +74,19 @@ closed protocol Device {
     // SendRequest or SendResponse.
     strict SendShutdown(struct {
         addr Addr;
-    }) -> (struct {
-        status zx.Status;
-    });
+    }) -> () error zx.Status;
     // Request a rst be sent to the host. The device will also release the resources
     // for any connection that may exist for `addr`.
     strict SendRst(struct {
         addr Addr;
-    }) -> (struct {
-        status zx.Status;
-    });
+    }) -> () error zx.Status;
     // Causes a 'response' to get sent to the host, gives the driver a `data` socket
     // to use for sending and receiving data on the established connection. It is
     // only correct to use this in response to a Callbacks.Request.
     strict SendResponse(resource struct {
         addr Addr;
         data zx.Handle:SOCKET;
-    }) -> (struct {
-        status zx.Status;
-    });
+    }) -> () error zx.Status;
     // Query the current context id of the driver. The local CID is never needed
     // in interactions with the same device, and retrieving it is only useful for
     // debugging or if you have some other communication channel to a different host

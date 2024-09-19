@@ -58,7 +58,7 @@ mod tests {
             let (cb, responder) =
                 unwrap_msg!(DeviceRequest::Start{cb, responder} from driver_server);
             let driver_callbacks = cb.into_proxy().unwrap();
-            responder.send(zx::Status::OK.into_raw()).unwrap();
+            responder.send(Ok(())).unwrap();
             let _ = tx.send((driver_server, driver_callbacks));
         })
         .detach();
@@ -133,7 +133,7 @@ mod tests {
         // expect a response
         let (_, _server_data_socket, responder) =
             unwrap_msg!(DeviceRequest::SendResponse{addr, data, responder} from driver.client);
-        responder.send(zx::Status::OK.into_raw())?;
+        responder.send(Ok(()))?;
 
         Ok(())
     }
@@ -162,7 +162,7 @@ mod tests {
         // expect a response
         let (_, _server_data_socket, responder) =
             unwrap_msg!(DeviceRequest::SendResponse{addr, data, responder} from driver.client);
-        responder.send(zx::Status::OK.into_raw())?;
+        responder.send(Ok(()))?;
 
         assert_eq!(accept_fut.await?, Ok(*addr::Vsock::new(8000, 80, 4)));
 
@@ -183,7 +183,7 @@ mod tests {
         {
             let (addr, _server_data_socket, responder) =
                 unwrap_msg!(DeviceRequest::SendRequest{addr, data, responder} from driver.client);
-            responder.send(zx::Status::OK.into_raw())?;
+            responder.send(Ok(()))?;
             // Now simulate an incoming RST for a rejected connection
             driver.callbacks.rst(&addr)?;
             // Leave this scope to drop the server_data_socket
@@ -204,7 +204,7 @@ mod tests {
         let request = app_client.connect(4, 8000, con);
         let (addr, server_data_socket_request, responder) =
             unwrap_msg!(DeviceRequest::SendRequest{addr, data, responder} from driver.client);
-        responder.send(zx::Status::OK.into_raw())?;
+        responder.send(Ok(()))?;
         driver.callbacks.response(&addr)?;
         let _ = request.await?.map_err(zx::Status::from_raw)?;
 

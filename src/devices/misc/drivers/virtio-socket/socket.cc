@@ -82,46 +82,46 @@ void SocketDevice::Start(::fuchsia_hardware_vsock::wire::DeviceStartRequest* req
   // queueing new ones.
   UpdateRxRingLocked();
 
-  completer.Reply(ZX_OK);
+  completer.ReplySuccess();
 }
 
 void SocketDevice::SendRst(::fuchsia_hardware_vsock::wire::DeviceSendRstRequest* request,
                            SendRstCompleter::Sync& completer) {
   fbl::AutoLock lock(&lock_);
   CleanupConAndRstLocked(ConnectionKey(request->addr));
-  completer.Reply(ZX_OK);
+  completer.ReplySuccess();
 }
 
 void SocketDevice::SendShutdown(::fuchsia_hardware_vsock::wire::DeviceSendShutdownRequest* request,
                                 SendShutdownCompleter::Sync& completer) {
   fbl::AutoLock lock(&lock_);
   if (!callbacks_.is_valid()) {
-    completer.Reply(ZX_ERR_BAD_STATE);
+    completer.ReplyError(ZX_ERR_BAD_STATE);
     return;
   }
 
   auto conn = connections_.find(ConnectionKey(request->addr));
   if (conn == connections_.end() || conn->IsShuttingDown()) {
-    completer.Reply(ZX_ERR_BAD_STATE);
+    completer.ReplyError(ZX_ERR_BAD_STATE);
     return;
   }
 
   if (conn->BeginShutdown()) {
     SendOpLocked(conn.CopyPointer(), VIRTIO_VSOCK_OP_SHUTDOWN);
   }
-  completer.Reply(ZX_OK);
+  completer.ReplySuccess();
 }
 
 void SocketDevice::SendRequest(SendRequestRequestView request,
                                SendRequestCompleter::Sync& completer) {
   fbl::AutoLock lock(&lock_);
   if (!callbacks_.is_valid()) {
-    completer.Reply(ZX_ERR_BAD_STATE);
+    completer.ReplyError(ZX_ERR_BAD_STATE);
     return;
   }
 
   if (connections_.find(ConnectionKey(request->addr)) != connections_.end()) {
-    completer.Reply(ZX_ERR_ALREADY_BOUND);
+    completer.ReplyError(ZX_ERR_ALREADY_BOUND);
     return;
   }
   auto conn = fbl::MakeRefCounted<Connection>(
@@ -129,19 +129,19 @@ void SocketDevice::SendRequest(SendRequestRequestView request,
       cpp20::bind_front(&SocketDevice::ConnectionSocketSignalled, this), cid_, lock_);
   connections_.insert(conn);
   SendOpLocked(conn, VIRTIO_VSOCK_OP_REQUEST);
-  completer.Reply(ZX_OK);
+  completer.ReplySuccess();
 }
 
 void SocketDevice::SendResponse(::fuchsia_hardware_vsock::wire::DeviceSendResponseRequest* request,
                                 SendResponseCompleter::Sync& completer) {
   fbl::AutoLock lock(&lock_);
   if (!callbacks_.is_valid()) {
-    completer.Reply(ZX_ERR_BAD_STATE);
+    completer.ReplyError(ZX_ERR_BAD_STATE);
     return;
   }
 
   if (connections_.find(ConnectionKey(request->addr)) != connections_.end()) {
-    completer.Reply(ZX_ERR_ALREADY_BOUND);
+    completer.ReplyError(ZX_ERR_ALREADY_BOUND);
     return;
   }
   auto conn = fbl::MakeRefCounted<Connection>(
@@ -152,7 +152,7 @@ void SocketDevice::SendResponse(::fuchsia_hardware_vsock::wire::DeviceSendRespon
 
   connections_.insert(conn);
   SendOpLocked(conn, VIRTIO_VSOCK_OP_RESPONSE);
-  completer.Reply(ZX_OK);
+  completer.ReplySuccess();
 }
 
 void SocketDevice::GetCid(GetCidCompleter::Sync& completer) {
