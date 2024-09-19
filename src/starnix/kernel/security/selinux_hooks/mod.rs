@@ -5,8 +5,8 @@
 pub(super) mod task;
 pub(super) mod testing;
 
-use super::{FsNodeSecurityXattr, FsNodeState};
-use crate::task::CurrentTask;
+use super::FsNodeSecurityXattr;
+use crate::task::{CurrentTask, Task};
 use crate::vfs::fs_args::MountParams;
 use crate::vfs::{
     DirEntry, FileSystem, FileSystemHandle, FsNode, FsStr, FsString, NamespaceNode, ValueOrSize,
@@ -23,6 +23,7 @@ use starnix_sync::Mutex;
 use starnix_uapi::arc_key::WeakKey;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::mount_flags::MountFlags;
+use starnix_uapi::ownership::WeakRef;
 use starnix_uapi::unmount_flags::UnmountFlags;
 use starnix_uapi::{errno, error};
 use std::collections::HashSet;
@@ -69,7 +70,7 @@ pub(super) fn fs_node_init_with_dentry(
     // This hook is called every time an `FsNode` is linked to a `DirEntry`, so it is expected that
     // the `FsNode` may already have been labeled.
     let fs_node = &dir_entry.node;
-    if fs_node.info().security_state.sid.is_some() {
+    if fs_node.info().security_state.label.is_initialized() {
         return Ok(());
     }
 
@@ -102,7 +103,7 @@ pub(super) fn fs_node_init_on_create(
     _parent: &FsNode,
 ) -> Result<Option<FsNodeSecurityXattr>, Errno> {
     // By definition this is a new `FsNode` so should not have already been labeled!
-    if new_node.info().security_state.sid.is_some() {
+    if !new_node.info().security_state.label.is_initialized() {
         log_warn!(
             "fs_node_init_on_create: node {} in {:?} already created?",
             new_node.info().ino,
@@ -203,8 +204,9 @@ fn fs_node_resolve_security_label(
 ) -> Option<SecurityId> {
     // Early-return here, so that the `fs_node.info()` read lock is released before performing
     // the resolution logic below.
-    if let Some(sid) = fs_node.info().security_state.sid {
-        return Some(sid);
+    let cached_sid = get_cached_sid(fs_node);
+    if cached_sid.is_some() {
+        return cached_sid;
     }
 
     let fs = fs_node.fs();
@@ -486,18 +488,59 @@ impl FileSystemState {
     }
 }
 
+/// Implicitly used by [`crate::vfs::FsNodeInfo`] to store security label state.
+#[derive(Debug, Clone, Default)]
+pub(super) enum FsNodeLabel {
+    #[default]
+    Uninitialized,
+    SecurityId {
+        sid: SecurityId,
+    },
+    FromTask {
+        weak_task: WeakRef<Task>,
+    },
+}
+
+impl FsNodeLabel {
+    fn is_initialized(&self) -> bool {
+        !matches!(self, FsNodeLabel::Uninitialized)
+    }
+}
+
 /// Sets the cached security id associated with `fs_node` to `sid`. Storing the security id will
 /// cause the security id to *not* be recomputed by the SELinux LSM when determining the effective
 /// security id of this [`FsNode`].
-fn set_cached_sid(fs_node: &FsNode, sid: SecurityId) {
-    fs_node.update_info(|info| info.security_state = FsNodeState { sid: Some(sid) });
+pub(super) fn set_cached_sid(fs_node: &FsNode, sid: SecurityId) {
+    fs_node.update_info(|info| info.security_state.label = FsNodeLabel::SecurityId { sid });
+}
+
+/// Sets the Task associated with `fs_node` to `task`.
+/// The effective security id of the [`FsNode`] will be that of the task, even if the security id
+/// of the task changes.
+pub(super) fn fs_node_set_label_with_task(fs_node: &FsNode, task: WeakRef<Task>) {
+    fs_node
+        .update_info(|info| info.security_state.label = FsNodeLabel::FromTask { weak_task: task });
 }
 
 /// Clears the cached security id on `fs_node`. Clearing the security id will cause the security id
 /// to be be recomputed by the SELinux LSM when determining the effective security id of this
 /// [`FsNode`].
-fn clear_cached_sid(fs_node: &FsNode) {
-    fs_node.update_info(|info| info.security_state = FsNodeState { sid: None });
+pub(super) fn clear_cached_sid(fs_node: &FsNode) {
+    fs_node.update_info(|info| info.security_state.label = FsNodeLabel::Uninitialized);
+}
+
+/// Returns the security id currently stored in `fs_node`, if any. This API should only be used
+/// by code that is responsible for controlling the cached security id; e.g., to check its
+/// current value before engaging logic that may compute a new value. Access control enforcement
+/// code should use `get_effective_fs_node_security_id()`, *not* this function.
+pub(super) fn get_cached_sid(fs_node: &FsNode) -> Option<SecurityId> {
+    match fs_node.info().security_state.label.clone() {
+        FsNodeLabel::SecurityId { sid } => Some(sid),
+        FsNodeLabel::FromTask { weak_task } => {
+            weak_task.upgrade().map(|t| t.read().security_state.attrs.current_sid)
+        }
+        FsNodeLabel::Uninitialized => None,
+    }
 }
 
 #[cfg(test)]
@@ -528,7 +571,7 @@ mod tests {
 
         // Clear the cached SID to force it to be (re-)resolved from the label.
         clear_cached_sid(node);
-        assert_eq!(None, testing::get_cached_sid(node));
+        assert_eq!(None, get_cached_sid(node));
 
         // `fs_node_getsecurity()` should now fall-back to the policy's "file" Context.
         let default_file_context = security_server
@@ -544,7 +587,7 @@ mod tests {
         )
         .unwrap();
         assert_eq!(result, ValueOrSize::Value(default_file_context));
-        assert!(testing::get_cached_sid(node).is_some());
+        assert!(get_cached_sid(node).is_some());
     }
 
     #[fuchsia::test]
@@ -570,7 +613,7 @@ mod tests {
 
         // Clear the cached SID to force it to be (re-)resolved from the label.
         clear_cached_sid(node);
-        assert_eq!(None, testing::get_cached_sid(node));
+        assert_eq!(None, get_cached_sid(node));
 
         // `fs_node_getsecurity()` should report the same invalid string as is in the xattr.
         let result = fs_node_getsecurity(
@@ -584,7 +627,7 @@ mod tests {
         assert_eq!(result, ValueOrSize::Value(INVALID_CONTEXT.into()));
 
         // No SID should be cached for the node.
-        assert_eq!(None, testing::get_cached_sid(node));
+        assert_eq!(None, get_cached_sid(node));
 
         // The effective SID of the node should be "unlabeled".
         assert_eq!(
@@ -615,7 +658,7 @@ mod tests {
 
         // Clear the cached SID to force it to be (re-)resolved from the label.
         clear_cached_sid(node);
-        assert_eq!(None, testing::get_cached_sid(node));
+        assert_eq!(None, get_cached_sid(node));
 
         // `fs_node_getsecurity()` should report the same valid Security Context string as the xattr holds.
         let result = fs_node_getsecurity(
@@ -629,7 +672,7 @@ mod tests {
         assert_eq!(result, ValueOrSize::Value(VALID_SECURITY_CONTEXT.into()));
 
         // There should be a SID cached, and it should map to the valid Security Context.
-        let cached_sid = testing::get_cached_sid(node).unwrap();
+        let cached_sid = get_cached_sid(node).unwrap();
         assert_eq!(
             security_server.sid_to_security_context(cached_sid).unwrap(),
             VALID_SECURITY_CONTEXT
@@ -659,6 +702,6 @@ mod tests {
         .expect("setxattr");
 
         // Verify that the SID now cached on the node corresponds to VALID_SECURITY_CONTEXT.
-        assert_eq!(Some(expected_sid), testing::get_cached_sid(node));
+        assert_eq!(Some(expected_sid), get_cached_sid(node));
     }
 }
