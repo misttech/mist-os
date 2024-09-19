@@ -7,7 +7,7 @@ use crate::api::value::merge_map;
 use crate::api::ConfigError;
 use crate::environment::Environment;
 use crate::nested::{nested_get, nested_remove, nested_set};
-use crate::ConfigLevel;
+use crate::{ConfigLevel, EnvironmentContext};
 use anyhow::{bail, Context, Result};
 use config_macros::include_default;
 use fuchsia_lockfile::Lockfile;
@@ -21,8 +21,125 @@ use std::io::{BufReader, BufWriter, ErrorKind, Read, Write};
 use std::path::{Path, PathBuf};
 use tracing::error;
 
+fn format_env_variables_error(preamble: &Option<String>, values: &Vec<ConfigValue>) -> String {
+    let error_list_string = values
+        .iter()
+        .map(|cv| {
+            format!(
+                "    -\"{}\" points to \"{}\", which expands to {}",
+                cv.path, cv.value, cv.expansion,
+            )
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
+    let flags_string = values
+        .iter()
+        .map(|cv| format!("--config {}=\"{}\"", cv.path, cv.value))
+        .collect::<Vec<_>>()
+        .join(" ");
+    let mut error_title = concat!(
+        "One or more configuration values includes an env variable. ",
+        "Please expand these in the command line."
+    )
+    .to_string();
+    if let Some(p) = preamble {
+        error_title = format!("{error_title}\n{p}");
+    }
+    let mut msg = format!("{error_title}\n{error_list_string}\n\n");
+    msg.push_str("These values can be overridden with the following flags:\n");
+    msg.push_str("    ");
+    msg.push_str(flags_string.as_str());
+    msg
+}
+
+#[derive(Debug)]
+pub struct ConfigValue {
+    /// Dot-delimited path to the config value.
+    pub path: String,
+    /// The string value from the config.
+    pub value: String,
+    /// The string value from the config after env expansion.
+    pub expansion: String,
+}
+
+#[derive(thiserror::Error, Debug)]
+pub enum AssertNoEnvError {
+    #[error("{}", format_env_variables_error(.0, .1))]
+    EnvVariablesFound(Option<String>, Vec<ConfigValue>),
+    #[error("critical unexpected error during no-env assert: {:?}", .0)]
+    Unexpected(#[source] anyhow::Error),
+}
+
+pub trait AssertNoEnv {
+    /// Looks through the entirety of the config map to find if there are any definitions that are
+    /// intended to be substituted with environment variables.
+    fn assert_no_env(
+        &self,
+        preamble: Option<String>,
+        ctx: &EnvironmentContext,
+    ) -> Result<(), AssertNoEnvError>;
+}
+
 /// The type of a configuration level's mapping.
 pub type ConfigMap = Map<String, Value>;
+
+impl AssertNoEnv for ConfigMap {
+    fn assert_no_env(
+        &self,
+        preamble: Option<String>,
+        ctx: &EnvironmentContext,
+    ) -> Result<(), AssertNoEnvError> {
+        struct KeyValue<'a> {
+            key: String,
+            value: &'a serde_json::Value,
+        }
+
+        let mut values =
+            self.iter().map(|(k, value)| KeyValue { key: k.into(), value }).collect::<Vec<_>>();
+        let mut errors = Vec::<ConfigValue>::new();
+        loop {
+            let Some(kv) = values.pop() else { break };
+            match &kv.value {
+                Value::Object(ref map) => {
+                    for (k, v) in map.iter() {
+                        let full_path = format!("{}.{}", kv.key, k);
+                        values.push(KeyValue { key: full_path, value: v });
+                    }
+                }
+                Value::Null | Value::Bool(_) | Value::Number(_) => {}
+                val @ Value::String(ref s) => {
+                    match crate::mapping::env_var::env_var_check(&ctx, val) {
+                        Some(expansion) => {
+                            errors.push(ConfigValue { path: kv.key, value: s.clone(), expansion })
+                        }
+                        None => {}
+                    }
+                }
+                Value::Array(ref arr) => {
+                    for elmnt in arr.iter() {
+                        values.push(KeyValue { key: kv.key.clone(), value: elmnt })
+                    }
+                }
+            }
+        }
+
+        if errors.is_empty() {
+            Ok(())
+        } else {
+            Err(AssertNoEnvError::EnvVariablesFound(preamble, errors))
+        }
+    }
+}
+
+impl AssertNoEnv for Config {
+    fn assert_no_env(
+        &self,
+        preamble: Option<String>,
+        ctx: &EnvironmentContext,
+    ) -> Result<(), AssertNoEnvError> {
+        self.default.assert_no_env(preamble, ctx)
+    }
+}
 
 /// An individually loaded configuration file, including the path it came from
 /// if it was loaded from disk.
@@ -36,7 +153,7 @@ pub struct ConfigFile {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Config {
-    default: ConfigMap,
+    pub(crate) default: ConfigMap,
     global: Option<ConfigFile>,
     user: Option<ConfigFile>,
     build: Option<ConfigFile>,
@@ -235,8 +352,14 @@ impl Default for ConfigFile {
     }
 }
 
+impl Default for Config {
+    fn default() -> Self {
+        Self::new(None, None, None, ConfigMap::new(), ConfigMap::new())
+    }
+}
+
 impl Config {
-    fn new(
+    pub(crate) fn new(
         global: Option<ConfigFile>,
         build: Option<ConfigFile>,
         user: Option<ConfigFile>,
@@ -450,15 +573,14 @@ impl fmt::Display for Config {
     }
 }
 
-////////////////////////////////////////////////////////////////////////////////
-// tests
-
 #[cfg(test)]
 mod test {
     use super::*;
     use crate::nested::RecursiveMap;
     use regex::Regex;
     use serde_json::json;
+    use std::collections::HashMap;
+    use tempfile::tempdir;
 
     const ERROR: &'static [u8] = b"0";
 
@@ -1142,5 +1264,83 @@ mod test {
             _ => anyhow::bail!("additive mode should return a Value::Array full of all values."),
         }
         Ok(())
+    }
+
+    #[test]
+    fn test_config_error_report() {
+        // Build the following:
+        //
+        // {
+        //   "foo": "$TEST_ENV_VAR_OF_SOME_KIND",  // expands to "whatever"
+        //   "inner_map": {
+        //     "bar": true,
+        //     "baz": "$TEST_ENV_VAR_OF_SOME_KIND",  // expands to "whatever"
+        //     "leaf": {
+        //       "last": "$TEST_ENV_VAR_TWOOO",     // expands to "whomever"
+        //       "last_other": ["$NONEXISTENT_VAR", "blah"],
+        //     }
+        //   }
+        // }
+        static TEST_ENV_VAR1: &'static str = "TEST_ENV_VAR_OF_SOME_KIND";
+        static TEST_ENV_VAR1_VALUE: &'static str = "whatever";
+        static TEST_ENV_VAR2: &'static str = "TEST_ENV_VAR_TWOOO";
+        static TEST_ENV_VAR2_VALUE: &'static str = "whomever";
+        let mut config_map = ConfigMap::new();
+        config_map.insert("foo".to_owned(), Value::String(format!("${TEST_ENV_VAR1}")));
+        let mut inner_map = ConfigMap::new();
+        inner_map.insert("bar".to_owned(), Value::Bool(true));
+        // Escaped sequence here.
+        inner_map.insert("baz".to_owned(), Value::String(format!("${TEST_ENV_VAR1}")));
+        let mut map_leaf = ConfigMap::new();
+        map_leaf.insert("last".to_owned(), Value::String(format!("${TEST_ENV_VAR2}")));
+        map_leaf.insert(
+            "last_other".to_owned(),
+            Value::Array(vec![
+                Value::String("$NONEXISTENT_VAR".to_owned()),
+                Value::String("blah".to_owned()),
+            ]),
+        );
+        inner_map.insert("leaf".to_owned(), Value::Object(map_leaf));
+        config_map.insert("inner_map".to_owned(), Value::Object(inner_map));
+
+        // Now that we have the map set up, let's do the actual testing.
+        let isolate_dir = tempdir().expect("tempdir");
+        let mut env_vars = HashMap::new();
+        env_vars.insert(TEST_ENV_VAR1.to_string(), TEST_ENV_VAR1_VALUE.to_string());
+        env_vars.insert(TEST_ENV_VAR2.to_string(), TEST_ENV_VAR2_VALUE.to_string());
+        let context = EnvironmentContext::isolated(
+            crate::environment::ExecutableKind::Test,
+            isolate_dir.path().to_owned(),
+            env_vars,
+            Default::default(),
+            None,
+            None,
+            true,
+        )
+        .expect("env context creation");
+        let result = config_map.assert_no_env(None, &context);
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        let AssertNoEnvError::EnvVariablesFound(None, config_values) = err else {
+            panic!("wrong error type: {err:?}");
+        };
+        assert!(
+            config_values.iter().any(|cv| cv.path.as_str() == "inner_map.leaf.last"
+                && cv.value == format!("${TEST_ENV_VAR2}")
+                && cv.expansion.replace("\"", "") == TEST_ENV_VAR2_VALUE.to_owned()),
+            "config error not found in {config_values:?}"
+        );
+        assert!(
+            config_values.iter().any(|cv| cv.path.as_str() == "inner_map.baz"
+                && cv.value == format!("${TEST_ENV_VAR1}")
+                && cv.expansion.replace("\"", "") == TEST_ENV_VAR1_VALUE.to_owned()),
+            "config error not found in {config_values:?}"
+        );
+        assert!(
+            config_values.iter().any(|cv| cv.path.as_str() == "foo"
+                && cv.value == format!("${TEST_ENV_VAR1}")
+                && cv.expansion.replace("\"", "") == TEST_ENV_VAR1_VALUE.to_owned()),
+            "config error not found in {config_values:?}"
+        );
     }
 }

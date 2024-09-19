@@ -26,11 +26,28 @@ fn check(ctx: &EnvironmentContext, value: &String, regex: &Regex) -> bool {
     true
 }
 
-pub(crate) fn env_var(ctx: &EnvironmentContext, value: Value) -> Option<Value> {
-    lazy_static! {
-        static ref REGEX: Regex = Regex::new(r"\$([A-Z][A-Z0-9_]*)").unwrap();
-    }
+lazy_static! {
+    static ref REGEX: Regex = Regex::new(r"\$([A-Z][A-Z0-9_]*)").unwrap();
+}
 
+/// Replaces an env var (if it is one) with `Some(v)`, else `None`. Not to be confused with
+/// `env_var` which can return `Some(v)` even if something has not been replaced by an env
+/// variable. This will _only_ return a replaced env variable string value.
+pub fn env_var_check(ctx: &EnvironmentContext, value: &Value) -> Option<String> {
+    let e = preprocess(value)?;
+    if !check(ctx, &e, &*REGEX) {
+        return None;
+    }
+    if REGEX.is_match(&e) {
+        let res = replace(&e, &*REGEX, |v| ctx.env_var(v).map_err(|_| anyhow!("")));
+        // At this point we know it's a string, given it matches a regex, etc, so convert the
+        // value to a string.
+        return Some(postprocess(res).to_string());
+    }
+    None
+}
+
+pub fn env_var(ctx: &EnvironmentContext, value: Value) -> Option<Value> {
     let env_string = preprocess(&value);
     if let Some(ref e) = env_string {
         if !check(ctx, e, &*REGEX) {

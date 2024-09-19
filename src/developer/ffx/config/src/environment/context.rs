@@ -4,7 +4,7 @@
 
 use crate::api::value::ValueStrategy;
 use crate::api::{ConfigError, ConfigValue};
-use crate::storage::Config;
+use crate::storage::{AssertNoEnv, Config};
 use crate::{is_analytics_disabled, BuildOverride, ConfigMap, ConfigQuery, Environment};
 use anyhow::{Context, Result};
 use camino::{Utf8Path, Utf8PathBuf};
@@ -87,6 +87,36 @@ impl EnvironmentContext {
             self_path: std::env::current_exe().unwrap(),
             no_environment,
         }
+    }
+
+    /// Initializes an environment type that is just the bare minimum, containing no ambient configuration, only
+    /// the runtime args.
+    pub fn core(exe_kind: ExecutableKind, runtime_args: ConfigMap) -> Result<Self> {
+        let cache = Arc::default();
+        let res = Self {
+            kind: EnvironmentKind::CoreContext,
+            exe_kind: exe_kind.clone(),
+            // For simplicity, the runtime_args will be kept empty.
+            runtime_args: ConfigMap::new(),
+            env_vars: None,
+            env_file_path: None,
+            no_environment: true,
+            cache,
+            self_path: std::env::current_exe().unwrap(),
+        };
+
+        // This just takes the whole config and makes it a flattened map of "default" and no other
+        // levels. The first pass at verification is for the runtime args, the second is for after
+        // the runtime args have overwritten the default config. The default config is built in, so
+        // this is to allow for a transition period in which the default config doesn't rely on
+        // environment variables, and they can be removed periodically.
+        runtime_args.assert_no_env(None, &res)?;
+        res.cache.overwrite_default(&runtime_args)?;
+        res.cache
+            .assert_no_env(Some("These errors are from the default config".to_owned()), &res)?;
+        // TODO(b/368058956): Print a sanitized config into the logs so we can use it for
+        // debugging.
+        Ok(res)
     }
 
     /// Initialize an environment type for a config domain context, with a
