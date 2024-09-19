@@ -727,7 +727,7 @@ mod tests {
             .expect("Creating transaction for new file");
         let id = root_dir
             .directory()
-            .create_child_file(&mut transaction, name, None)
+            .create_child_file(&mut transaction, name)
             .await
             .expect("Creating new_file")
             .object_id();

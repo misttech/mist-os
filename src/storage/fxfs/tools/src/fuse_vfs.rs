@@ -69,8 +69,7 @@ impl FuseFs {
                 )
                 .await?;
 
-            let child_dir =
-                dir.create_child_dir(&mut transaction, name.osstr_to_str()?, None).await?;
+            let child_dir = dir.create_child_dir(&mut transaction, name.osstr_to_str()?).await?;
             transaction.commit().await?;
 
             Ok(ReplyEntry {
@@ -397,8 +396,7 @@ impl FuseFs {
                 )
                 .await?;
 
-            let child_file =
-                dir.create_child_file(&mut transaction, name.osstr_to_str()?, None).await?;
+            let child_file = dir.create_child_file(&mut transaction, name.osstr_to_str()?).await?;
             transaction.commit().await?;
             let child_id = child_file.object_id();
 

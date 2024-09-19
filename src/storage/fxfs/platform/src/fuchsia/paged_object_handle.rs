@@ -2183,7 +2183,7 @@ mod tests {
                     .await
                     .unwrap();
                 file = root_dir
-                    .create_child_file(&mut transaction, "foo", None)
+                    .create_child_file(&mut transaction, "foo")
                     .await
                     .expect("create_child_file failed");
                 {

@@ -1524,7 +1524,6 @@ mod tests {
             &mut transaction,
             HandleOptions::default(),
             Some(&InsecureCrypt::new()),
-            None,
         )
         .await
         .expect("create_object failed");

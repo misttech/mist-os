@@ -2020,7 +2020,7 @@ mod tests {
         volume
             .root_dir()
             .directory()
-            .create_child_file(&mut transaction, "foo", None)
+            .create_child_file(&mut transaction, "foo")
             .await
             .expect("create_child_file failed");
         transaction.commit().await.expect("commit failed");

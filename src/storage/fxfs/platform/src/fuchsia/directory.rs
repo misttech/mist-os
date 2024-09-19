@@ -246,14 +246,23 @@ impl FxDirectory {
         create_attributes: Option<&fio::MutableNodeAttributes>,
     ) -> Result<Arc<dyn FxNode>, Error> {
         if create_dir {
-            Ok(Arc::new(FxDirectory::new(
+            let dir = Arc::new(FxDirectory::new(
                 Some(self.clone()),
-                self.directory.create_child_dir(transaction, name, create_attributes).await?,
-            )) as Arc<dyn FxNode>)
+                self.directory.create_child_dir(transaction, name).await?,
+            ));
+            if let Some(attrs) = create_attributes {
+                dir.directory().update_attributes(transaction, Some(&attrs), 0, None).await?;
+            }
+            Ok(dir as Arc<dyn FxNode>)
         } else {
-            Ok(FxFile::new(
-                self.directory.create_child_file(transaction, name, create_attributes).await?,
-            ) as Arc<dyn FxNode>)
+            let file = FxFile::new(self.directory.create_child_file(transaction, name).await?);
+            if let Some(attrs) = create_attributes {
+                file.handle()
+                    .uncached_handle()
+                    .update_attributes(transaction, Some(&attrs), None)
+                    .await?;
+            }
+            Ok(file as Arc<dyn FxNode>)
         }
     }
 

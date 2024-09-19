@@ -1177,7 +1177,6 @@ impl Journal {
             SuperBlockInstance::A.object_id(),
             HandleOptions::default(),
             None,
-            None,
         )
         .await
         .context("create super block")?;
@@ -1190,7 +1189,6 @@ impl Journal {
             &mut transaction,
             SuperBlockInstance::B.object_id(),
             HandleOptions::default(),
-            None,
             None,
         )
         .await
@@ -1205,7 +1203,6 @@ impl Journal {
             &root_parent,
             &mut transaction,
             journal_handle_options(),
-            None,
             None,
         )
         .await
@@ -1849,7 +1846,7 @@ mod tests {
                 .await
                 .expect("new_transaction failed");
             let handle = root_directory
-                .create_child_file(&mut transaction, "test", None)
+                .create_child_file(&mut transaction, "test")
                 .await
                 .expect("create_child_file failed");
 
@@ -1911,7 +1908,7 @@ mod tests {
                 .await
                 .expect("new_transaction failed");
             let handle = root_directory
-                .create_child_file(&mut transaction, "test", None)
+                .create_child_file(&mut transaction, "test")
                 .await
                 .expect("create_child_file failed");
             transaction.commit().await.expect("commit failed");
@@ -1936,7 +1933,7 @@ mod tests {
                     .await
                     .expect("new_transaction failed");
                 let handle = root_directory
-                    .create_child_file(&mut transaction, &format!("{}", i), None)
+                    .create_child_file(&mut transaction, &format!("{}", i))
                     .await
                     .expect("create_child_file failed");
                 transaction.commit().await.expect("commit failed");
@@ -1988,7 +1985,7 @@ mod tests {
                 .await
                 .expect("new_transaction failed");
             let handle = root_directory
-                .create_child_file(&mut transaction, "test2", None)
+                .create_child_file(&mut transaction, "test2")
                 .await
                 .expect("create_child_file failed");
             transaction.commit().await.expect("commit failed");
@@ -2056,7 +2053,7 @@ mod tests {
                     .await
                     .expect("new_transaction failed");
                 root_directory
-                    .create_child_file(&mut transaction, &format!("a {i}"), None)
+                    .create_child_file(&mut transaction, &format!("a {i}"))
                     .await
                     .expect("create_child_file failed");
                 if transaction.commit().await.expect("commit failed") > super::CHUNK_SIZE {
@@ -2084,7 +2081,7 @@ mod tests {
                     .await
                     .expect("new_transaction failed");
                 root_directory
-                    .create_child_file(&mut transaction, &format!("b {i}"), None)
+                    .create_child_file(&mut transaction, &format!("b {i}"))
                     .await
                     .expect("create_child_file failed");
                 if transaction.commit().await.expect("commit failed") > 2 * super::CHUNK_SIZE {
@@ -2124,7 +2121,7 @@ mod tests {
                 .await
                 .expect("new_transaction failed");
             root_directory
-                .create_child_file(&mut transaction, &format!("d"), None)
+                .create_child_file(&mut transaction, &format!("d"))
                 .await
                 .expect("create_child_file failed");
             transaction.commit().await.expect("commit failed");

@@ -110,6 +110,10 @@ impl FxFile {
         self.handle.uncached_handle().verified_file()
     }
 
+    pub fn handle(&self) -> &PagedObjectHandle {
+        &self.handle
+    }
+
     /// If this instance has not been marked to be purged, returns an OpenedNode instance.
     /// If marked for purging, returns None.
     pub fn clone_as_opened_node(self: &Arc<Self>) -> Option<OpenedNode<FxFile>> {
