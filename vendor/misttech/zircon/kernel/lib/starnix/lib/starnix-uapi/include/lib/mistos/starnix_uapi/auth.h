@@ -19,7 +19,7 @@ struct FsCred {
   gid_t gid;
 
   // Define static method to create root FsCred
-  static FsCred root() { return {0, 0}; }
+  static FsCred root() { return {.uid=0, .gid=0}; }
 };
 
 struct Capabilities {
@@ -33,7 +33,7 @@ struct Credentials {
   gid_t egid;
   uid_t saved_uid;
   gid_t saved_gid;
-  //fbl::Vector<gid_t> groups;
+  // fbl::Vector<gid_t> groups;
 
   // See https://man7.org/linux/man-pages/man2/setfsuid.2.html
   uid_t fsuid;
@@ -119,7 +119,7 @@ struct Credentials {
             .fsgid = _gid};
   }
 
-  FsCred as_fscred() const { return {fsuid, fsgid}; }
+  FsCred as_fscred() const { return {.uid = fsuid, .gid = fsgid}; }
 };
 
 }  // namespace starnix_uapi
