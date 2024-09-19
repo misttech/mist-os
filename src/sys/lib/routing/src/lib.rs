@@ -160,8 +160,7 @@ impl RouteRequest {
                 Ok(Self::ExposeConfig(e.clone()))
             }
             ExposeDecl::Dictionary(_) => {
-                // TODO(https://fxbug.dev/301674053) implement dictionary routing and make this
-                // method From instead of TryFrom.
+                // Only bedrock routing supports dictionaries, the legacy RouteRequest does not.
                 Err(RoutingError::unsupported_capability_type(
                     moniker.clone(),
                     CapabilityTypeName::Dictionary,

@@ -133,7 +133,8 @@ impl DictExt for Dict {
     ) -> Result<Option<Capability>, RouterError> {
         let mut current_capability: Capability = self.clone().into();
         let moniker = moniker.into();
-        for next_name in path.iter_segments() {
+        let num_segments = path.iter_segments().count();
+        for (next_idx, next_name) in path.iter_segments().enumerate() {
             // We have another name but no subdictionary, so exit.
             let Capability::Dictionary(current_dict) = &current_capability else { return Ok(None) };
 
@@ -146,7 +147,14 @@ impl DictExt for Dict {
             let Some(capability) = capability else { return Ok(None) };
 
             // Resolve the capability, this is a noop if it's not a router.
-            current_capability = capability.route(request.try_clone()?).await?;
+            let mut request = request.try_clone()?;
+            if next_idx < num_segments - 1 {
+                // If `request.debug` is true, that should only apply to the capability at `path`.
+                // Since we're not looking up the final path segment, set `debug = false`, to
+                // obtain the actual Dict and not its debug info.
+                request.debug = false;
+            }
+            current_capability = capability.route(request).await?;
         }
         Ok(Some(current_capability))
     }

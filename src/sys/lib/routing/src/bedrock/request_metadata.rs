@@ -25,6 +25,22 @@ pub fn protocol_metadata(availability: cm_types::Availability) -> sandbox::Dict 
     metadata
 }
 
+/// Returns a `Dict` containing Router Request metadata specifying a Dictionary
+/// porcelain type.
+pub fn dictionary_metadata(availability: cm_types::Availability) -> sandbox::Dict {
+    let metadata = sandbox::Dict::new();
+    metadata
+        .insert(
+            cm_types::Name::new(METADATA_KEY_TYPE).unwrap(),
+            sandbox::Capability::Data(sandbox::Data::String(String::from(
+                cm_rust::CapabilityTypeName::Dictionary.to_string(),
+            ))),
+        )
+        .unwrap();
+    metadata.set_availability(availability);
+    metadata
+}
+
 /// Returns a `Dict` containing Router Request metadata specifying a Config
 /// porcelain type.
 pub fn config_metadata(availability: cm_types::Availability) -> sandbox::Dict {

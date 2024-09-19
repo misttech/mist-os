@@ -8,11 +8,13 @@ use crate::capability_source::{CapabilitySource, ComponentCapability, ComponentS
 use crate::component_instance::{ComponentInstanceInterface, WeakComponentInstanceInterface};
 use crate::error::RoutingError;
 use crate::{DictExt, LazyGet};
+use async_trait::async_trait;
 use cm_rust::NativeIntoFidl;
 use cm_types::{IterablePath, RelativePath};
 use futures::{future, FutureExt};
 use itertools::Itertools;
 use moniker::ChildName;
+use router_error::RouterError;
 use sandbox::{Capability, Dict, Request, Routable, Router};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -180,7 +182,29 @@ fn extend_dict_with_dictionary<C: ComponentInstanceInterface + 'static>(
             }),
         );
     } else {
-        router = Router::new_ok(dict.clone());
+        struct DictRouter {
+            dict: Dict,
+            source: CapabilitySource,
+        }
+        #[async_trait]
+        impl Routable for DictRouter {
+            async fn route(&self, request: Request) -> Result<Capability, RouterError> {
+                if request.debug {
+                    Ok(self
+                        .source
+                        .clone()
+                        .try_into()
+                        .expect("failed to convert capability source to dictionary"))
+                } else {
+                    Ok(self.dict.clone().into())
+                }
+            }
+        }
+        let source = CapabilitySource::Component(ComponentSource {
+            capability: ComponentCapability::Dictionary(decl.clone()),
+            moniker: component.moniker().clone(),
+        });
+        router = Router::new(DictRouter { dict: dict.clone(), source });
     }
     match declared_dictionaries.insert_capability(&decl.name, dict.into()) {
         Ok(()) => (),

@@ -3,16 +3,24 @@
 // found in the LICENSE file.
 
 use crate::model::component::WeakComponentInstance;
-use ::routing::bedrock::request_metadata::protocol_metadata;
-use ::routing::bedrock::sandbox_construction::ComponentSandbox;
+use ::routing::bedrock::request_metadata::{
+    dictionary_metadata, protocol_metadata, runner_metadata,
+};
+use ::routing::bedrock::sandbox_construction::{ComponentSandbox, ProgramInput};
 use ::routing::DictExt;
-use cm_rust::{ExposeDecl, ExposeProtocolDecl, UseDecl, UseProtocolDecl};
-use sandbox::{Capability, Dict, Request, Router};
+use cm_rust::{
+    ExposeDecl, ExposeDictionaryDecl, ExposeProtocolDecl, ExposeRunnerDecl, UseDecl,
+    UseProtocolDecl, UseRunnerDecl,
+};
+use sandbox::{Capability, Request, Router};
 
 /// A request to route a capability through the bedrock layer from use.
 #[derive(Clone, Debug)]
 pub enum UseRouteRequest {
     UseProtocol(UseProtocolDecl),
+    // decl is never used outside Debug, but include it for consistency
+    #[allow(dead_code)]
+    UseRunner(UseRunnerDecl),
 }
 
 impl TryFrom<UseDecl> for UseRouteRequest {
@@ -21,6 +29,7 @@ impl TryFrom<UseDecl> for UseRouteRequest {
     fn try_from(decl: UseDecl) -> Result<Self, Self::Error> {
         match decl {
             UseDecl::Protocol(decl) => Ok(Self::UseProtocol(decl)),
+            UseDecl::Runner(decl) => Ok(Self::UseRunner(decl)),
             decl => Err(decl),
         }
     }
@@ -30,7 +39,7 @@ impl UseRouteRequest {
     pub fn into_router(
         self,
         target: WeakComponentInstance,
-        program_input_dict: &Dict,
+        program_input: &ProgramInput,
         debug: bool,
     ) -> (Router, Request) {
         match self {
@@ -40,7 +49,8 @@ impl UseRouteRequest {
                     debug,
                     metadata: protocol_metadata(decl.availability),
                 };
-                let Some(capability) = program_input_dict.get_capability(&decl.target_path) else {
+                let Some(capability) = program_input.namespace.get_capability(&decl.target_path)
+                else {
                     panic!(
                         "router for capability {:?} is missing from program input dictionary for \
                          component {}",
@@ -56,38 +66,48 @@ impl UseRouteRequest {
                 };
                 (router, request)
             }
+            Self::UseRunner(_) => {
+                // A component can only use one runner, it must be this one.
+                let program_input = program_input.runner.lock().unwrap();
+                let router = program_input
+                    .as_ref()
+                    .expect("component has `use runner` but no runner in program input?")
+                    .clone();
+                let request = Request {
+                    target: target.clone().into(),
+                    debug,
+                    metadata: runner_metadata(cm_rust::Availability::Required),
+                };
+                (router, request)
+            }
         }
     }
 
     pub fn availability(&self) -> cm_rust::Availability {
         match self {
             Self::UseProtocol(p) => p.availability,
+            Self::UseRunner(_) => cm_rust::Availability::Required,
         }
     }
 }
 
-/// A request to route a capability through the bedrock layer from use or expose.
+/// A request to route a capability through the bedrock layer from expose.
 #[derive(Clone, Debug)]
-pub enum RouteRequest {
-    Use(UseRouteRequest),
+pub enum ExposeRouteRequest {
     ExposeProtocol(ExposeProtocolDecl),
+    ExposeDictionary(ExposeDictionaryDecl),
+    ExposeRunner(ExposeRunnerDecl),
 }
 
-impl TryFrom<UseDecl> for RouteRequest {
-    type Error = UseDecl;
-
-    fn try_from(decl: UseDecl) -> Result<Self, Self::Error> {
-        Ok(Self::Use(decl.try_into()?))
-    }
-}
-
-impl TryFrom<&Vec<&ExposeDecl>> for RouteRequest {
+impl TryFrom<&Vec<&ExposeDecl>> for ExposeRouteRequest {
     type Error = ();
 
     fn try_from(exposes: &Vec<&ExposeDecl>) -> Result<Self, Self::Error> {
         if exposes.len() == 1 {
             match exposes[0] {
                 ExposeDecl::Protocol(decl) => Ok(Self::ExposeProtocol(decl.clone())),
+                ExposeDecl::Dictionary(decl) => Ok(Self::ExposeDictionary(decl.clone())),
+                ExposeDecl::Runner(decl) => Ok(Self::ExposeRunner(decl.clone())),
                 _ => Err(()),
             }
         } else {
@@ -96,7 +116,7 @@ impl TryFrom<&Vec<&ExposeDecl>> for RouteRequest {
     }
 }
 
-impl RouteRequest {
+impl ExposeRouteRequest {
     pub fn into_router(
         self,
         target: WeakComponentInstance,
@@ -104,7 +124,6 @@ impl RouteRequest {
         debug: bool,
     ) -> (Router, Request) {
         match self {
-            Self::Use(r) => r.into_router(target, &sandbox.program_input.namespace, debug),
             Self::ExposeProtocol(decl) => {
                 let request = Request {
                     target: target.clone().into(),
@@ -129,13 +148,106 @@ impl RouteRequest {
                 };
                 (router, request)
             }
+            Self::ExposeDictionary(decl) => {
+                let request = Request {
+                    target: target.clone().into(),
+                    debug,
+                    metadata: dictionary_metadata(decl.availability),
+                };
+                let Some(capability) =
+                    sandbox.component_output_dict.get_capability(&decl.target_name)
+                else {
+                    panic!(
+                        "router for capability {:?} is missing from component output dictionary for \
+                         component {}",
+                        decl.target_name, target.moniker
+                    );
+                };
+                let Capability::Router(router) = capability else {
+                    panic!(
+                        "program input dictionary for component {} had an entry with an unexpected \
+                                 type: {:?}",
+                        target.moniker, capability
+                    );
+                };
+                (router, request)
+            }
+            Self::ExposeRunner(decl) => {
+                let request = Request {
+                    target: target.clone().into(),
+                    debug,
+                    metadata: runner_metadata(cm_rust::Availability::Required),
+                };
+                let Some(capability) =
+                    sandbox.component_output_dict.get_capability(&decl.target_name)
+                else {
+                    panic!(
+                        "router for capability {:?} is missing from component output dictionary for \
+                         component {}",
+                        decl.target_name, target.moniker
+                    );
+                };
+                let Capability::Router(router) = capability else {
+                    panic!(
+                        "program input dictionary for component {} had an entry with an unexpected \
+                                 type: {:?}",
+                        target.moniker, capability
+                    );
+                };
+                (router, request)
+            }
+        }
+    }
+
+    pub fn availability(&self) -> cm_rust::Availability {
+        match self {
+            Self::ExposeProtocol(p) => p.availability,
+            Self::ExposeDictionary(d) => d.availability,
+            Self::ExposeRunner(_) => cm_rust::Availability::Required,
+        }
+    }
+}
+
+/// A request to route a capability through the bedrock layer from use or expose.
+#[derive(Clone, Debug)]
+pub enum RouteRequest {
+    Use(UseRouteRequest),
+    Expose(ExposeRouteRequest),
+}
+
+impl TryFrom<UseDecl> for RouteRequest {
+    type Error = UseDecl;
+
+    fn try_from(decl: UseDecl) -> Result<Self, Self::Error> {
+        Ok(Self::Use(decl.try_into()?))
+    }
+}
+
+impl TryFrom<&Vec<&ExposeDecl>> for RouteRequest {
+    type Error = ();
+
+    fn try_from(exposes: &Vec<&ExposeDecl>) -> Result<Self, Self::Error> {
+        Ok(Self::Expose(exposes.try_into()?))
+    }
+}
+
+impl RouteRequest {
+    pub fn into_router(
+        self,
+        target: WeakComponentInstance,
+        sandbox: &ComponentSandbox,
+        debug: bool,
+    ) -> (Router, Request) {
+        match self {
+            Self::Use(r) => r.into_router(target, &sandbox.program_input, debug),
+            Self::Expose(r) => r.into_router(target, sandbox, debug),
         }
     }
 
     pub fn availability(&self) -> cm_rust::Availability {
         match self {
             Self::Use(u) => u.availability(),
-            Self::ExposeProtocol(p) => p.availability,
+            Self::Expose(e) => e.availability(),
         }
     }
 }
