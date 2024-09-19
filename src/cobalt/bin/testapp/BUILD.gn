@@ -2,6 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/testing/cc_test_executable.gni")
 import("//third_party/cobalt/metrics_registry.gni")
 
 group("testapp") {
@@ -35,7 +36,7 @@ metrics_registry("internal_metrics_registry") {
   generate_cc = true
 }
 
-executable("cobalt_testapp") {
+cc_test_executable("cobalt_testapp") {
   testonly = true
   output_name = "cobalt_testapp"
   sources = [
