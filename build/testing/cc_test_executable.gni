@@ -39,7 +39,7 @@ template("cc_test_executable") {
       disable_lto = true
     }
 
-    if (disable_lto) {
+    if (disable_lto && !is_gcc) {
       if (!defined(configs)) {
         configs = []
       }
