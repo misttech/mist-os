@@ -165,6 +165,10 @@ class Dwc3 : public Dwc3Type,
 
     bool got_not_ready{false};
     bool stalled{false};
+
+    // Used for synchronizing endpoint state and ep specific hardware registers
+    // This should be acquired before Dwc3::lock_ if acquiring both locks.
+    fbl::Mutex lock;
   };
 
   struct UserEndpoint {
@@ -174,12 +178,8 @@ class Dwc3 : public Dwc3Type,
     UserEndpoint(UserEndpoint&&) = delete;
     UserEndpoint& operator=(UserEndpoint&&) = delete;
 
-    // Used for synchronizing endpoint state and ep specific hardware registers
-    // This should be acquired before Dwc3::lock_ if acquiring both locks.
-    fbl::Mutex lock;
-
-    TA_GUARDED(lock) Fifo fifo;
-    TA_GUARDED(lock) Endpoint ep;
+    TA_GUARDED(ep.lock) Fifo fifo;
+    Endpoint ep;
   };
 
   // A small helper class which basically allows us to have a collection of user
@@ -200,7 +200,7 @@ class Dwc3 : public Dwc3Type,
       endpoints_.reset(new UserEndpoint[count_]);
       for (size_t i = 0; i < count_; ++i) {
         UserEndpoint& uep = endpoints_[i];
-        fbl::AutoLock lock(&uep.lock);
+        fbl::AutoLock lock(&uep.ep.lock);
         const_cast<uint8_t&>(uep.ep.ep_num) = static_cast<uint8_t>(i) + kUserEndpointStartNum;
       }
     }
@@ -334,14 +334,14 @@ class Dwc3 : public Dwc3Type,
   void EpReadTrb(Endpoint& ep, Fifo& fifo, const dwc3_trb_t* src, dwc3_trb_t* dst) TA_EXCL(lock_);
 
   // Methods specific to user endpoints
-  void UserEpQueueNext(UserEndpoint& uep) TA_REQ(uep.lock) TA_EXCL(lock_);
-  zx_status_t UserEpCancelAll(UserEndpoint& uep) TA_EXCL(lock_, uep.lock);
+  void UserEpQueueNext(UserEndpoint& uep) TA_REQ(uep.ep.lock) TA_EXCL(lock_);
+  zx_status_t UserEpCancelAll(UserEndpoint& uep) TA_EXCL(lock_, uep.ep.lock);
 
   // Cancel all currently in flight requests, and return a list of requests
   // which were in-flight.  Note that these requests have not been completed
   // yet.  It is the responsibility of the caller to (eventually) take care of
   // this once the lock has been dropped.
-  [[nodiscard]] RequestQueue UserEpCancelAllLocked(UserEndpoint& uep) TA_REQ(uep.lock)
+  [[nodiscard]] RequestQueue UserEpCancelAllLocked(UserEndpoint& uep) TA_REQ(uep.ep.lock)
       TA_EXCL(lock_);
 
   // Commands

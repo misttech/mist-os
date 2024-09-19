@@ -64,7 +64,7 @@ void Dwc3::Ep0StartEndpoints() {
   CmdStartNewConfig(ep0_.out, 2);
 
   for (UserEndpoint& uep : user_endpoints_) {
-    fbl::AutoLock lock(&uep.lock);
+    fbl::AutoLock lock(&uep.ep.lock);
 
     if (uep.ep.enabled) {
       EpSetConfig(uep.ep, true);
