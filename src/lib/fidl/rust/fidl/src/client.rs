@@ -806,6 +806,7 @@ pub mod sync {
 
     use super::*;
     use fuchsia_zircon::{self as zx, AsHandleRef};
+    use std::mem::MaybeUninit;
 
     /// A synchronous client for making FIDL calls.
     #[derive(Debug)]
@@ -878,23 +879,27 @@ pub mod sync {
                 msg,
             )?;
 
-            let mut buf = zx::MessageBufEtc::new();
-            buf.ensure_capacity_bytes(zx::sys::ZX_CHANNEL_MAX_MSG_BYTES as usize);
-            buf.ensure_capacity_handle_infos(zx::sys::ZX_CHANNEL_MAX_MSG_HANDLES as usize);
+            // Stack-allocate these buffers to avoid the heap and reuse any populated pages from
+            // previous function calls. Use uninitialized memory so that the only writes to this
+            // array will be by the kernel for whatever's actually used for the reply.
+            let bytes_out =
+                &mut [MaybeUninit::<u8>::uninit(); zx::sys::ZX_CHANNEL_MAX_MSG_BYTES as usize];
+            let handles_out = &mut [const { MaybeUninit::<zx::HandleInfo>::uninit() };
+                zx::sys::ZX_CHANNEL_MAX_MSG_HANDLES as usize];
 
             // TODO: We should be able to use the same memory to back the bytes we use for writing
             // and reading.
-            self.channel
-                .call_etc(deadline, &write_bytes, &mut write_handles, &mut buf)
+            let (bytes_out, handles_out) = self
+                .channel
+                .call_etc_uninit(deadline, &write_bytes, &mut write_handles, bytes_out, handles_out)
                 .map_err(|e| self.wrap_error(Error::ClientCall, e))?;
 
-            let (bytes, mut handle_infos) = buf.split();
-            let (header, body_bytes) = decode_transaction_header(&bytes)?;
+            let (header, body_bytes) = decode_transaction_header(bytes_out)?;
             if header.ordinal != ordinal {
                 return Err(Error::InvalidResponseOrdinal);
             }
             let mut output = Decode::<Response>::new_empty();
-            Decoder::decode_into::<Response>(&header, body_bytes, &mut handle_infos, &mut output)?;
+            Decoder::decode_into::<Response>(&header, body_bytes, handles_out, &mut output)?;
             Ok(output)
         }
 
