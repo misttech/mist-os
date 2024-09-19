@@ -273,14 +273,17 @@ impl<SM: SessionManager> BlockServer<SM> {
 struct SessionHelper<SM: SessionManager> {
     session_manager: Arc<SM>,
     block_size: u32,
-    peer_fifo: zx::Fifo,
+    peer_fifo: zx::Fifo<BlockFifoResponse, BlockFifoRequest>,
     vmos: Mutex<BTreeMap<u16, Arc<zx::Vmo>>>,
     message_groups: FifoMessageGroups,
 }
 
 impl<SM: SessionManager> SessionHelper<SM> {
-    fn new(session_manager: Arc<SM>, block_size: u32) -> Result<(Self, zx::Fifo), zx::Status> {
-        let (peer_fifo, fifo) = zx::Fifo::create(16, std::mem::size_of::<BlockFifoRequest>())?;
+    fn new(
+        session_manager: Arc<SM>,
+        block_size: u32,
+    ) -> Result<(Self, zx::Fifo<BlockFifoRequest, BlockFifoResponse>), zx::Status> {
+        let (peer_fifo, fifo) = zx::Fifo::create(16)?;
         Ok((
             Self {
                 session_manager,
@@ -302,7 +305,7 @@ impl<SM: SessionManager> SessionHelper<SM> {
                     | zx::Rights::SIGNAL
                     | zx::Rights::WAIT;
                 match self.peer_fifo.duplicate_handle(rights) {
-                    Ok(fifo) => responder.send(Ok(fifo))?,
+                    Ok(fifo) => responder.send(Ok(fifo.downcast()))?,
                     Err(s) => responder.send(Err(s.into_raw()))?,
                 }
                 Ok(())

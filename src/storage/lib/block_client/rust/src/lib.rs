@@ -1149,7 +1149,7 @@ mod tests {
 
             // Set up a mock server.
             let (server_fifo, client_fifo) =
-                zx::Fifo::create(16, std::mem::size_of::<BlockFifoRequest>())
+                zx::Fifo::<BlockFifoRequest, BlockFifoResponse>::create(16)
                     .expect("Fifo::create failed");
             let maybe_server_fifo = std::sync::Mutex::new(Some(client_fifo));
 
@@ -1204,7 +1204,9 @@ mod tests {
                                         match request {
                                             block::SessionRequest::GetFifo { responder } => {
                                                 match maybe_server_fifo.lock().unwrap().take() {
-                                                    Some(fifo) => responder.send(Ok(fifo)),
+                                                    Some(fifo) => {
+                                                        responder.send(Ok(fifo.downcast()))
+                                                    }
                                                     None => responder.send(Err(
                                                         zx::Status::NO_RESOURCES.into_raw(),
                                                     )),

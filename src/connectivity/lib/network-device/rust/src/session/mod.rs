@@ -780,9 +780,8 @@ mod tests {
         assert_eq!(length, expected_length);
     }
 
-    fn make_fifos<K: AllocKind>() -> (Fifo<DescId<K>>, fuchsia_zircon::Fifo) {
-        let size = std::mem::size_of::<DescId<K>>();
-        let (handle, other_end) = fuchsia_zircon::Fifo::create(1, size).unwrap();
+    fn make_fifos<K: AllocKind>() -> (Fifo<DescId<K>>, fuchsia_zircon::Fifo<DescId<K>>) {
+        let (handle, other_end) = fuchsia_zircon::Fifo::create(1).unwrap();
         (Fifo::from_fifo(handle), other_end)
     }
 

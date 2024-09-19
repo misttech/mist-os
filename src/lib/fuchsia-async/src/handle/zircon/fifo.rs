@@ -13,8 +13,7 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 use zerocopy::{FromBytes, Immutable, IntoBytes};
 
-/// Marker trait for types that can be read/written with a `Fifo`. Unsafe
-/// because not all types may be represented by arbitrary bit patterns.
+/// Marker trait for types that can be read/written with a `Fifo`.
 ///
 /// An implementation is provided for all types that implement
 /// [`IntoBytes`], [`FromBytes`], and [`Immutable`].
@@ -40,7 +39,7 @@ pub unsafe trait FifoWriteBuffer<T> {
     ///
     /// The returned memory *must* be initialized and at least `count() *
     /// sizeof<T>()` bytes long.
-    fn as_bytes_ptr(&self) -> *const u8;
+    fn as_ptr(&self) -> *const T;
 }
 
 /// A buffer used to read `T` from [`Fifo`] objects.
@@ -60,7 +59,7 @@ pub unsafe trait FifoReadBuffer<T> {
     ///
     /// The returned memory *must* be at least `count() * sizeof<T>()` bytes
     /// long.
-    fn as_bytes_ptr_mut(&mut self) -> *mut u8;
+    fn as_mut_ptr(&mut self) -> *mut T;
 }
 
 unsafe impl<T: FifoEntry> FifoWriteBuffer<T> for [T] {
@@ -68,9 +67,8 @@ unsafe impl<T: FifoEntry> FifoWriteBuffer<T> for [T] {
         self.len()
     }
 
-    fn as_bytes_ptr(&self) -> *const u8 {
-        // SAFETY: Guaranteed by bounds on T.
-        self.as_bytes().as_ptr()
+    fn as_ptr(&self) -> *const T {
+        self.as_ptr()
     }
 }
 
@@ -79,9 +77,8 @@ unsafe impl<T: FifoEntry> FifoReadBuffer<T> for [T] {
         self.len()
     }
 
-    fn as_bytes_ptr_mut(&mut self) -> *mut u8 {
-        // SAFETY: Guaranteed by bounds on T.
-        self.as_mut_bytes().as_mut_ptr()
+    fn as_mut_ptr(&mut self) -> *mut T {
+        self.as_mut_ptr()
     }
 }
 
@@ -90,9 +87,8 @@ unsafe impl<T: FifoEntry> FifoWriteBuffer<T> for T {
         1
     }
 
-    fn as_bytes_ptr(&self) -> *const u8 {
-        // SAFETY: Guaranteed by bounds on T.
-        self.as_bytes().as_ptr()
+    fn as_ptr(&self) -> *const T {
+        self as *const T
     }
 }
 
@@ -101,9 +97,8 @@ unsafe impl<T: FifoEntry> FifoReadBuffer<T> for T {
         1
     }
 
-    fn as_bytes_ptr_mut(&mut self) -> *mut u8 {
-        // SAFETY: Guaranteed by bounds on T.
-        self.as_mut_bytes().as_mut_ptr()
+    fn as_mut_ptr(&mut self) -> *mut T {
+        self as *mut T
     }
 }
 
@@ -112,10 +107,8 @@ unsafe impl<T: FifoEntry> FifoReadBuffer<T> for MaybeUninit<T> {
         1
     }
 
-    fn as_bytes_ptr_mut(&mut self) -> *mut u8 {
-        // SAFETY: Guaranteed by bounds on T if initialized. If uninitialized,
-        // contract is that the returned bytes can only be written into.
-        self.as_mut_ptr() as _
+    fn as_mut_ptr(&mut self) -> *mut T {
+        self.as_mut_ptr()
     }
 }
 
@@ -124,12 +117,10 @@ unsafe impl<T: FifoEntry> FifoReadBuffer<T> for [MaybeUninit<T>] {
         self.len()
     }
 
-    fn as_bytes_ptr_mut(&mut self) -> *mut u8 {
+    fn as_mut_ptr(&mut self) -> *mut T {
         // TODO(https://github.com/rust-lang/rust/issues/63569): Use
         // `MaybeUninit::slice_as_mut_ptr` once stable.
-        // SAFETY: Guaranteed by bounds on T if initialized. If uninitialized,
-        // contract is that the returned bytes can only be written into.
-        self.as_mut_ptr() as _
+        self.as_mut_ptr() as *mut T
     }
 }
 
@@ -166,14 +157,11 @@ unsafe impl<'a, T: FifoEntry, B: ?Sized + FifoWriteBuffer<T>> FifoWriteBuffer<T>
         self.buffer.count() - self.offset
     }
 
-    fn as_bytes_ptr(&self) -> *const u8 {
+    fn as_ptr(&self) -> *const T {
         debug_assert!(self.offset <= self.buffer.count());
-
-        let buffer_bytes = self.buffer.as_bytes_ptr();
-        let count = self.offset * std::mem::size_of::<T>();
         // SAFETY: Protected by the debug assertion above and a correct
         // implementation of `FifoWriteBuffer` by `B`.
-        unsafe { buffer_bytes.add(count) }
+        unsafe { self.buffer.as_ptr().add(self.offset) }
     }
 }
 
@@ -253,13 +241,11 @@ where
 
 /// An I/O object representing a `Fifo`.
 pub struct Fifo<R, W = R> {
-    handle: RWHandle<zx::Fifo>,
-    read_marker: PhantomData<R>,
-    write_marker: PhantomData<W>,
+    handle: RWHandle<zx::Fifo<R, W>>,
 }
 
-impl<R, W> AsRef<zx::Fifo> for Fifo<R, W> {
-    fn as_ref(&self) -> &zx::Fifo {
+impl<R, W> AsRef<zx::Fifo<R, W>> for Fifo<R, W> {
+    fn as_ref(&self) -> &zx::Fifo<R, W> {
         self.handle.get_ref()
     }
 }
@@ -270,8 +256,8 @@ impl<R, W> AsHandleRef for Fifo<R, W> {
     }
 }
 
-impl<R, W> From<Fifo<R, W>> for zx::Fifo {
-    fn from(fifo: Fifo<R, W>) -> zx::Fifo {
+impl<R, W> From<Fifo<R, W>> for zx::Fifo<R, W> {
+    fn from(fifo: Fifo<R, W>) -> zx::Fifo<R, W> {
         fifo.handle.into_inner()
     }
 }
@@ -282,8 +268,8 @@ impl<R: FifoEntry, W: FifoEntry> Fifo<R, W> {
     /// # Panics
     ///
     /// If called on a thread that does not have a current async executor.
-    pub fn from_fifo(fifo: zx::Fifo) -> Self {
-        Fifo { handle: RWHandle::new(fifo), read_marker: PhantomData, write_marker: PhantomData }
+    pub fn from_fifo(fifo: impl Into<zx::Fifo<R, W>>) -> Self {
+        Fifo { handle: RWHandle::new(fifo.into()) }
     }
 
     /// Writes entries to the fifo and registers this `Fifo` as
@@ -297,15 +283,14 @@ impl<R: FifoEntry, W: FifoEntry> Fifo<R, W> {
     ) -> Poll<Result<usize, zx::Status>> {
         ready!(self.handle.poll_writable(cx)?);
 
-        let elem_size = std::mem::size_of::<W>();
-        let bytes = entries.as_bytes_ptr();
+        let buf = entries.as_ptr();
         let count = entries.count();
         let fifo = self.as_ref();
         // SAFETY: Safety relies on the pointer returned by `B` being valid,
         // which itself depends on a correct implementation of `FifoEntry` for
         // `W`.
         loop {
-            let result = unsafe { fifo.write_ptr(elem_size, bytes, count) };
+            let result = unsafe { fifo.write_raw(buf, count) };
             match result {
                 Err(zx::Status::SHOULD_WAIT) => ready!(self.handle.need_writable(cx)?),
                 Err(e) => return Poll::Ready(Err(e)),
@@ -323,8 +308,7 @@ impl<R: FifoEntry, W: FifoEntry> Fifo<R, W> {
     ) -> Poll<Result<usize, zx::Status>> {
         ready!(self.handle.poll_readable(cx)?);
 
-        let elem_size = std::mem::size_of::<R>();
-        let bytes = entries.as_bytes_ptr_mut();
+        let buf = entries.as_mut_ptr();
         let count = entries.count();
         let fifo = self.as_ref();
 
@@ -332,7 +316,7 @@ impl<R: FifoEntry, W: FifoEntry> Fifo<R, W> {
             // SAFETY: Safety relies on the pointer returned by `B` being valid,
             // which itself depends on a correct implementation of `FifoEntry` for
             // `R`.
-            let result = unsafe { fifo.read_ptr(elem_size, bytes, count) };
+            let result = unsafe { fifo.read_raw(buf, count) };
 
             match result {
                 Err(zx::Status::SHOULD_WAIT) => ready!(self.handle.need_readable(cx)?),
@@ -472,7 +456,7 @@ mod tests {
         Copy, Clone, Debug, PartialEq, Eq, Default, IntoBytes, KnownLayout, FromBytes, Immutable,
     )]
     #[repr(C)]
-    struct entry {
+    struct Entry {
         a: u32,
         b: u32,
     }
@@ -481,20 +465,19 @@ mod tests {
         Clone, Debug, PartialEq, Eq, Default, IntoBytes, KnownLayout, FromBytes, Immutable,
     )]
     #[repr(C)]
-    struct wrong_entry {
+    struct WrongEntry {
         a: u16,
     }
 
     #[test]
     fn can_read_write() {
         let mut exec = TestExecutor::new();
-        let element = entry { a: 10, b: 20 };
+        let element = Entry { a: 10, b: 20 };
 
-        let (tx, rx) =
-            zx::Fifo::create(2, ::std::mem::size_of::<entry>()).expect("failed to create zx fifo");
-        let (tx, rx) = (Fifo::<entry>::from_fifo(tx), Fifo::<entry>::from_fifo(rx));
+        let (tx, rx) = zx::Fifo::<Entry>::create(2).expect("failed to create zx fifo");
+        let (tx, rx) = (Fifo::from_fifo(tx), Fifo::from_fifo(rx));
 
-        let mut buffer = entry::default();
+        let mut buffer = Entry::default();
         let receive_future = rx.read_entries(&mut buffer).map_ok(|count| {
             assert_eq!(count, 1);
         });
@@ -513,13 +496,13 @@ mod tests {
     #[test]
     fn read_wrong_size() {
         let mut exec = TestExecutor::new();
-        let elements = &[entry { a: 10, b: 20 }][..];
+        let elements = &[Entry { a: 10, b: 20 }][..];
 
-        let (tx, rx) =
-            zx::Fifo::create(2, ::std::mem::size_of::<entry>()).expect("failed to create zx fifo");
-        let (tx, rx) = (Fifo::<entry>::from_fifo(tx), Fifo::<wrong_entry>::from_fifo(rx));
+        let (tx, rx) = zx::Fifo::<Entry>::create(2).expect("failed to create zx fifo");
+        let wrong_rx = zx::Fifo::<WrongEntry>::from(rx.into_handle());
+        let (tx, rx) = (Fifo::from_fifo(tx), Fifo::from_fifo(wrong_rx));
 
-        let mut buffer = wrong_entry::default();
+        let mut buffer = WrongEntry::default();
         let receive_future = rx
             .read_entries(&mut buffer)
             .map_ok(|count| panic!("read should have failed, got {}", count));
@@ -541,11 +524,12 @@ mod tests {
     #[test]
     fn write_wrong_size() {
         let mut exec = TestExecutor::new();
-        let elements = &[wrong_entry { a: 10 }][..];
+        let elements = &[WrongEntry { a: 10 }][..];
 
-        let (tx, rx) =
-            zx::Fifo::create(2, ::std::mem::size_of::<entry>()).expect("failed to create zx fifo");
-        let (tx, _rx) = (Fifo::<wrong_entry>::from_fifo(tx), Fifo::<entry>::from_fifo(rx));
+        let (tx, rx) = zx::Fifo::<Entry>::create(2).expect("failed to create zx fifo");
+        let wrong_tx = zx::Fifo::<WrongEntry>::from(tx.into_handle());
+        let wrong_rx = zx::Fifo::<WrongEntry>::from(rx.into_handle());
+        let (tx, _rx) = (Fifo::from_fifo(wrong_tx), Fifo::from_fifo(wrong_rx));
 
         let sender = Timer::new(10.millis().after_now()).then(|()| tx.write_entries(elements));
 
@@ -562,11 +546,10 @@ mod tests {
 
         let mut exec = TestExecutor::new();
         let elements =
-            &[entry { a: 10, b: 20 }, entry { a: 30, b: 40 }, entry { a: 50, b: 60 }][..];
+            &[Entry { a: 10, b: 20 }, Entry { a: 30, b: 40 }, Entry { a: 50, b: 60 }][..];
 
-        let (tx, rx) =
-            zx::Fifo::create(2, ::std::mem::size_of::<entry>()).expect("failed to create zx fifo");
-        let (tx, rx) = (Fifo::<entry>::from_fifo(tx), Fifo::<entry>::from_fifo(rx));
+        let (tx, rx) = zx::Fifo::<Entry>::create(2).expect("failed to create zx fifo");
+        let (tx, rx) = (Fifo::from_fifo(tx), Fifo::from_fifo(rx));
 
         // Use `writes_completed` to verify that not all writes
         // are transmitted at once, and the last write is actually blocked.
@@ -582,7 +565,7 @@ mod tests {
         // Wait 10 ms, then read the messages from the fifo.
         let receive_future = async {
             Timer::new(10.millis().after_now()).await;
-            let mut buffer = entry::default();
+            let mut buffer = Entry::default();
             let count = rx.read_entries(&mut buffer).await?;
             assert_eq!(writes_completed.load(Ordering::SeqCst), 1);
             assert_eq!(count, 1);
@@ -611,11 +594,10 @@ mod tests {
     fn write_more_than_full() {
         let mut exec = TestExecutor::new();
         let elements =
-            &[entry { a: 10, b: 20 }, entry { a: 30, b: 40 }, entry { a: 50, b: 60 }][..];
+            &[Entry { a: 10, b: 20 }, Entry { a: 30, b: 40 }, Entry { a: 50, b: 60 }][..];
 
-        let (tx, rx) =
-            zx::Fifo::create(2, ::std::mem::size_of::<entry>()).expect("failed to create zx fifo");
-        let (tx, rx) = (Fifo::<entry>::from_fifo(tx), Fifo::<entry>::from_fifo(rx));
+        let (tx, rx) = zx::Fifo::<Entry>::create(2).expect("failed to create zx fifo");
+        let (tx, rx) = (Fifo::from_fifo(tx), Fifo::from_fifo(rx));
 
         let sender = tx.write_entries(elements);
 
@@ -623,7 +605,7 @@ mod tests {
         let receive_future = async {
             Timer::new(10.millis().after_now()).await;
             for e in elements {
-                let mut buffer = [entry::default(); 1];
+                let mut buffer = [Entry::default(); 1];
                 let count = rx.read_entries(&mut buffer[..]).await?;
                 assert_eq!(count, 1);
                 assert_eq!(&buffer[0], e);
@@ -643,17 +625,16 @@ mod tests {
     fn read_multiple() {
         let mut exec = TestExecutor::new();
         let elements =
-            &[entry { a: 10, b: 20 }, entry { a: 30, b: 40 }, entry { a: 50, b: 60 }][..];
-        let (tx, rx) = zx::Fifo::create(elements.len(), ::std::mem::size_of::<entry>())
-            .expect("failed to create zx fifo");
-        let (tx, rx) = (Fifo::<entry>::from_fifo(tx), Fifo::<entry>::from_fifo(rx));
+            &[Entry { a: 10, b: 20 }, Entry { a: 30, b: 40 }, Entry { a: 50, b: 60 }][..];
+        let (tx, rx) = zx::Fifo::<Entry>::create(elements.len()).expect("failed to create zx fifo");
+        let (tx, rx) = (Fifo::from_fifo(tx), Fifo::from_fifo(rx));
 
         let write_fut = async {
             tx.write_entries(&elements[..]).await.expect("failed write entries");
         };
         let read_fut = async {
             // Use a larger buffer to show partial reads.
-            let mut buffer = [entry::default(); 5];
+            let mut buffer = [Entry::default(); 5];
             let count = rx.read_entries(&mut buffer[..]).await.expect("failed to read entries");
             assert_eq!(count, elements.len());
             assert_eq!(&buffer[..count], &elements[..]);
@@ -665,10 +646,9 @@ mod tests {
     fn read_one() {
         let mut exec = TestExecutor::new();
         let elements =
-            &[entry { a: 10, b: 20 }, entry { a: 30, b: 40 }, entry { a: 50, b: 60 }][..];
-        let (tx, rx) = zx::Fifo::create(elements.len(), ::std::mem::size_of::<entry>())
-            .expect("failed to create zx fifo");
-        let (tx, rx) = (Fifo::<entry>::from_fifo(tx), Fifo::<entry>::from_fifo(rx));
+            &[Entry { a: 10, b: 20 }, Entry { a: 30, b: 40 }, Entry { a: 50, b: 60 }][..];
+        let (tx, rx) = zx::Fifo::<Entry>::create(elements.len()).expect("failed to create zx fifo");
+        let (tx, rx) = (Fifo::from_fifo(tx), Fifo::from_fifo(rx));
 
         let write_fut = async {
             tx.write_entries(&elements[..]).await.expect("failed write entries");
@@ -685,16 +665,15 @@ mod tests {
     #[test]
     fn maybe_uninit_single() {
         let mut exec = TestExecutor::new();
-        let element = entry { a: 10, b: 20 };
-        let (tx, rx) =
-            zx::Fifo::create(1, ::std::mem::size_of::<entry>()).expect("failed to create zx fifo");
-        let (tx, rx) = (Fifo::<entry>::from_fifo(tx), Fifo::<entry>::from_fifo(rx));
+        let element = Entry { a: 10, b: 20 };
+        let (tx, rx) = zx::Fifo::<Entry>::create(1).expect("failed to create zx fifo");
+        let (tx, rx) = (Fifo::from_fifo(tx), Fifo::from_fifo(rx));
 
         let write_fut = async {
             tx.write_entries(&element).await.expect("failed write entries");
         };
         let read_fut = async {
-            let mut buffer = MaybeUninit::<entry>::uninit();
+            let mut buffer = MaybeUninit::<Entry>::uninit();
             let count = rx.read_entries(&mut buffer).await.expect("failed to read entries");
             assert_eq!(count, 1);
             // SAFETY: We just read a new entry into the buffer.
@@ -708,17 +687,16 @@ mod tests {
     fn maybe_uninit_slice() {
         let mut exec = TestExecutor::new();
         let elements =
-            &[entry { a: 10, b: 20 }, entry { a: 30, b: 40 }, entry { a: 50, b: 60 }][..];
-        let (tx, rx) = zx::Fifo::create(elements.len(), ::std::mem::size_of::<entry>())
-            .expect("failed to create zx fifo");
-        let (tx, rx) = (Fifo::<entry>::from_fifo(tx), Fifo::<entry>::from_fifo(rx));
+            &[Entry { a: 10, b: 20 }, Entry { a: 30, b: 40 }, Entry { a: 50, b: 60 }][..];
+        let (tx, rx) = zx::Fifo::<Entry>::create(elements.len()).expect("failed to create zx fifo");
+        let (tx, rx) = (Fifo::from_fifo(tx), Fifo::from_fifo(rx));
 
         let write_fut = async {
             tx.write_entries(&elements[..]).await.expect("failed write entries");
         };
         let read_fut = async {
             // Use a larger buffer to show partial reads.
-            let mut buffer = [MaybeUninit::<entry>::uninit(); 15];
+            let mut buffer = [MaybeUninit::<Entry>::uninit(); 15];
             let count = rx.read_entries(&mut buffer[..]).await.expect("failed to read entries");
             assert_eq!(count, elements.len());
             let read = &mut buffer[..count];
