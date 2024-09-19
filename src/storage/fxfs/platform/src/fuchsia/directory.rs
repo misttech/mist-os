@@ -2007,6 +2007,38 @@ mod tests {
     }
 
     #[fuchsia::test]
+    async fn test_remove_large_xattr() {
+        let fixture = TestFixture::new().await;
+        {
+            let root = fixture.root();
+            let dir = open_dir_checked(
+                &root,
+                fio::OpenFlags::CREATE
+                    | fio::OpenFlags::RIGHT_READABLE
+                    | fio::OpenFlags::RIGHT_WRITABLE
+                    | fio::OpenFlags::DIRECTORY,
+                "foo",
+            )
+            .await;
+
+            dir.set_extended_attribute(
+                "name".as_bytes(),
+                fio::ExtendedAttributeValue::Bytes(vec![17u8; 300]),
+                fio::SetExtendedAttributeMode::Create,
+            )
+            .await
+            .expect("FIDL call failed")
+            .expect("Set xattr failed");
+
+            dir.remove_extended_attribute("name".as_bytes())
+                .await
+                .expect("FIDL call failed")
+                .expect("Set xattr failed");
+        }
+        fixture.close().await;
+    }
+
+    #[fuchsia::test]
     async fn test_create_dir_with_mutable_node_attributes() {
         let fixture = TestFixture::new().await;
         {

@@ -644,7 +644,7 @@ impl<'a> ScannedStore<'a> {
         object_id: u64,
         attribute_id: u64,
         range: &Range<u64>,
-        device_offset: Option<u64>,
+        device_offset: u64,
         bs: u64,
     ) -> Result<(), Error> {
         if range.start % bs > 0 || range.end % bs > 0 {
@@ -680,8 +680,7 @@ impl<'a> ScannedStore<'a> {
                 } = attributes;
                 match attributes.iter().find(|(attr_id, _)| *attr_id == attribute_id) {
                     Some((_, size)) => {
-                        if device_offset.is_some()
-                            && !*in_graveyard
+                        if !*in_graveyard
                             && !tombstoned_attributes.contains(&attribute_id)
                             && range.end > round_up(*size, bs).unwrap()
                         {
@@ -702,9 +701,7 @@ impl<'a> ScannedStore<'a> {
                         ))?;
                     }
                 }
-                if device_offset.is_some() {
-                    *allocated_size += len;
-                }
+                *allocated_size += len;
             }
             Some(ScannedObject::Graveyard | ScannedObject::Tombstone) => { /* NOP */ }
             None => {
@@ -712,22 +709,20 @@ impl<'a> ScannedStore<'a> {
                     .warning(FsckWarning::ExtentForNonexistentObject(self.store_id, object_id))?;
             }
         }
-        if let Some(device_offset) = device_offset {
-            if device_offset % bs > 0 {
-                self.fsck.error(FsckError::MisalignedExtent(
-                    self.store_id,
-                    object_id,
-                    range.clone(),
-                    device_offset,
-                ))?;
-            }
-            let item = Item::new(
-                AllocatorKey { device_range: device_offset..device_offset + len },
-                AllocatorValue::Abs { count: 1, owner_object_id: self.store_id },
-            );
-            let lower_bound: AllocatorKey = item.key.lower_bound_for_merge_into();
-            self.fsck.allocations.merge_into(item, &lower_bound, allocator::merge::merge);
+        if device_offset % bs > 0 {
+            self.fsck.error(FsckError::MisalignedExtent(
+                self.store_id,
+                object_id,
+                range.clone(),
+                device_offset,
+            ))?;
         }
+        let item = Item::new(
+            AllocatorKey { device_range: device_offset..device_offset + len },
+            AllocatorValue::Abs { count: 1, owner_object_id: self.store_id },
+        );
+        let lower_bound: AllocatorKey = item.key.lower_bound_for_merge_into();
+        self.fsck.allocations.merge_into(item, &lower_bound, allocator::merge::merge);
         Ok(())
     }
 
@@ -831,7 +826,8 @@ async fn scan_extents_and_directory_children<'a>(
                 value: ObjectValue::Extent(extent),
                 ..
             } => {
-                let device_offset = if let ExtentValue::Some { device_offset, .. } = extent {
+                // Ignore deleted extents.
+                if let ExtentValue::Some { device_offset, .. } = extent {
                     let size = range.length().unwrap_or(0);
                     allocated_bytes += size;
 
@@ -849,12 +845,10 @@ async fn scan_extents_and_directory_children<'a>(
                         [FragmentationStats::get_histogram_bucket_for_size(size)] += 1;
                     extent_count += 1;
 
-                    Some(*device_offset)
-                } else {
-                    None
+                    scanned
+                        .process_extent(*object_id, *attribute_id, range, *device_offset, bs)
+                        .await?;
                 };
-
-                scanned.process_extent(*object_id, *attribute_id, range, device_offset, bs).await?
             }
             ItemRef {
                 key: ObjectKey { object_id, data: ObjectKeyData::Child { .. } },
