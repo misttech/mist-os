@@ -82,7 +82,6 @@ _sdk_source_sets_list = [
   "//sdk/lib/fidl/cpp:natural_ostream",
   "//sdk/lib/fidl/cpp",
   "//sdk/lib/syslog/cpp",
-  "//zircon/system/ulib/ddk-platform-defs",
   "//zircon/system/ulib/hwreg:hwreg_sdk",
   "//zircon/system/ulib/inspect",
   "//zircon/system/ulib/mmio-ptr",
