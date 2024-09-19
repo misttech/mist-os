@@ -5,6 +5,7 @@
 
 #include "lib/mistos/starnix/kernel/vfs/file_system.h"
 
+#include <lib/mistos/starnix/kernel/task/current_task.h>
 #include <lib/mistos/starnix/kernel/task/process_group.h>
 #include <lib/mistos/starnix/kernel/task/task.h>
 #include <lib/mistos/starnix/kernel/task/thread_group.h>
@@ -74,7 +75,7 @@ void FileSystem::set_root(FsNodeOps* root) { set_root_node(FsNode::new_root(root
 
 // Set up the root of the filesystem. Must not be called more than once.
 void FileSystem::set_root_node(FsNode* root) {
-  if (root->node_id == 0) {
+  if (root->node_id_ == 0) {
     root->set_id(next_node_id());
   }
 
@@ -92,7 +93,7 @@ void FileSystem::set_root_node(FsNode* root) {
 
 bool FileSystem::has_permanent_entries() const { return false; }
 
-WeakFsNodeHandle FileSystem::prepare_node_for_insertion(const CurrentTask& current_task,
+WeakFsNodeHandle FileSystem::prepare_node_for_insertion(/*const CurrentTask& current_task,*/
                                                         const FsNodeHandle& node) {
   /*
     if let Some(label) = self.selinux_context.get() {
@@ -111,11 +112,18 @@ WeakFsNodeHandle FileSystem::prepare_node_for_insertion(const CurrentTask& curre
 FsNodeHandle FileSystem::create_node_with_id(const CurrentTask& current_task,
                                              ktl::unique_ptr<FsNodeOps> ops, ino_t id,
                                              FsNodeInfo info) {
+  auto creds = current_task->creds();
+  return create_node_with_id(ktl::move(ops), id, info, creds);
+}
+
+FsNodeHandle FileSystem::create_node_with_id(ktl::unique_ptr<FsNodeOps> ops, ino_t id,
+                                             FsNodeInfo info,
+                                             const starnix_uapi::Credentials& credentials) {
   auto node =
-      FsNode::new_uncached(current_task, ktl::move(ops), fbl::RefPtr<FileSystem>(this), id, info);
+      FsNode::new_uncached(ktl::move(ops), fbl::RefPtr<FileSystem>(this), id, info, credentials);
   {
     Guard<Mutex> lock(&nodes_lock_);
-    nodes_.insert(prepare_node_for_insertion(current_task, node));
+    nodes_.insert(prepare_node_for_insertion(/*current_task,*/ node));
   }
   return node;
 }
