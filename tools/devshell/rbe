@@ -115,7 +115,7 @@ function test_bazel_rbe() {
   setup_bazel_workspace
   (
     cd "$BAZEL_TEST_DIR/workspace" &&
-      ../bazel --nohome_rc test --config=remote --config=sponge :all
+      ../bazel --nohome_rc test --config=remote --config=resultstore :all
   )
 }
 
