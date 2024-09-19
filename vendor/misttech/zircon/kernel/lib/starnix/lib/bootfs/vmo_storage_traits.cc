@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "lib/modules/bootfs/vmo_storage_traits.h"
+#include "lib/starnix/bootfs/vmo_storage_traits.h"
 
 #include <lib/fit/result.h>
 #include <zircon/errors.h>

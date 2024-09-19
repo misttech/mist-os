@@ -250,6 +250,20 @@ class CurrentTask : public MemoryAccessorExt {
                                                              const ktl::string_view& initial_name,
                                                              fbl::RefPtr<FsContext> fs);
 
+  /// Create a task that runs inside the kernel.
+  ///
+  /// There is no underlying Zircon process to host the task. Instead, the work done by this task
+  /// is performed by a thread in the original Starnix process, possible as part of a thread
+  /// pool.
+  ///
+  /// This function is the preferred way to create a context for doing background work inside the
+  /// kernel.
+  ///
+  /// Rather than calling this function directly, consider using `kthreads`, which provides both
+  /// a system task and a threadpool on which the task can do work.
+  static fit::result<Errno, CurrentTask> create_system_task(const fbl::RefPtr<Kernel>& kernel,
+                                                            fbl::RefPtr<FsContext> fs);
+
  private:
   template <typename TaskInfoFactory>
   static fit::result<Errno, TaskBuilder> create_task(const fbl::RefPtr<Kernel>& kernel,

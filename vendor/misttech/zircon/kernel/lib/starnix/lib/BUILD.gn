@@ -4,6 +4,7 @@
 
 group("lib") {
   deps = [
+    "bootfs",
     "starnix-sync",
     "starnix-uapi",
   ]
