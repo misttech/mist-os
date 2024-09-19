@@ -34,18 +34,20 @@
 
 use crate::{addr, port};
 use anyhow::{format_err, Context as _};
+use const_unwrap::const_unwrap_option;
 use fidl::endpoints;
+use fidl::endpoints::{ControlHandle, RequestStream};
 use fidl_fuchsia_hardware_vsock::{
     CallbacksMarker, CallbacksRequest, CallbacksRequestStream, DeviceProxy,
 };
 use fidl_fuchsia_vsock::{
     AcceptorProxy, ConnectionRequest, ConnectionRequestStream, ConnectionTransport,
-    ConnectorRequest, ConnectorRequestStream,
+    ConnectorControlHandle, ConnectorRequest, ConnectorRequestStream, SIGNAL_STREAM_INCOMING,
 };
 use futures::channel::{mpsc, oneshot};
 use futures::{future, select, Future, FutureExt, Stream, StreamExt, TryFutureExt, TryStreamExt};
 use std::cell::{RefCell, RefMut};
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use std::convert::Infallible;
 use std::ops::Deref;
 use std::pin::Pin;
@@ -53,6 +55,9 @@ use std::rc::Rc;
 use std::task::{Context, Poll};
 use thiserror::Error;
 use {fuchsia_async as fasync, fuchsia_zircon as zx};
+
+const ZXIO_SIGNAL_INCOMING: zx::Signals =
+    const_unwrap_option(zx::Signals::from_bits(SIGNAL_STREAM_INCOMING));
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 enum EventType {
@@ -89,6 +94,8 @@ enum Error {
     DriverCommunication(#[source] anyhow::Error),
     #[error("Driver reset the connection")]
     ConnectionReset,
+    #[error("There are no more connections in the accept queue")]
+    NoConnectionsInQueue,
 }
 
 impl From<oneshot::Canceled> for Error {
@@ -108,6 +115,7 @@ impl Error {
                 *err.downcast_ref::<zx::Status>().unwrap_or(&zx::Status::INTERNAL)
             }
             Error::ConnectionReset => zx::Status::PEER_CLOSED,
+            Error::NoConnectionsInQueue => zx::Status::SHOULD_WAIT,
         }
     }
     pub fn is_comm_failure(&self) -> bool {
@@ -124,18 +132,83 @@ fn map_driver_result(result: Result<i32, fidl::Error>) -> Result<(), Error> {
         .and_then(|x| zx::Status::ok(x).map_err(Error::Driver))
 }
 
+struct ClientContextState {
+    queue: VecDeque<addr::Vsock>,
+    // local_port -> backlog_size
+    backlogs: HashMap<u32, u32>,
+    control: ConnectorControlHandle,
+    signaled: bool,
+}
+
+#[derive(Clone)]
+pub struct ClientContext(Rc<RefCell<ClientContextState>>);
+
+impl ClientContext {
+    fn new(control: ConnectorControlHandle) -> ClientContext {
+        ClientContext(Rc::new(RefCell::new(ClientContextState {
+            queue: VecDeque::new(),
+            backlogs: HashMap::new(),
+            signaled: false,
+            control,
+        })))
+    }
+
+    fn add_port(&self, port: u32, backlog: u32) {
+        self.0.borrow_mut().backlogs.insert(port, backlog);
+    }
+
+    fn remove_port(&self, port: u32) {
+        self.0.borrow_mut().backlogs.remove(&port);
+    }
+
+    fn push_addr(&self, addr: addr::Vsock) -> bool {
+        let mut ctx = self.0.borrow_mut();
+        if ctx.backlogs[&addr.local_port] == 0 {
+            return false;
+        }
+        *ctx.backlogs.get_mut(&addr.local_port).unwrap() -= 1;
+        ctx.queue.push_back(addr);
+        if ctx.signaled == false {
+            let _ = ctx.control.signal_peer(zx::Signals::empty(), ZXIO_SIGNAL_INCOMING);
+            ctx.signaled = true
+        }
+        return true;
+    }
+
+    fn pop_addr(&self) -> Option<addr::Vsock> {
+        let mut ctx = self.0.borrow_mut();
+        if let Some(addr) = ctx.queue.pop_front() {
+            *ctx.backlogs.get_mut(&addr.local_port).unwrap() += 1;
+            if ctx.queue.len() == 0 {
+                let _ = ctx.control.signal_peer(ZXIO_SIGNAL_INCOMING, zx::Signals::empty());
+                ctx.signaled = false;
+            }
+            Some(addr)
+        } else {
+            None
+        }
+    }
+
+    fn ports(&self) -> Vec<u32> {
+        self.0.borrow_mut().backlogs.iter().map(|(port, _)| *port).collect()
+    }
+}
+
+enum Listener {
+    Channel(mpsc::UnboundedSender<addr::Vsock>),
+    Queue(ClientContext),
+}
+
 struct State {
     device: DeviceProxy,
     events: HashMap<Event, oneshot::Sender<()>>,
     used_ports: port::Tracker,
-    listens: HashMap<u32, mpsc::UnboundedSender<addr::Vsock>>,
+    listeners: HashMap<u32, Listener>,
     tasks: fasync::TaskGroup,
 }
 
 #[derive(Clone)]
-pub struct Vsock {
-    inner: Rc<RefCell<State>>,
-}
+pub struct Vsock(Rc<RefCell<State>>);
 
 impl Vsock {
     /// Creates a new vsock service connected to the given `DeviceProxy`
@@ -163,10 +236,10 @@ impl Vsock {
             device,
             events: HashMap::new(),
             used_ports: port::Tracker::new(),
-            listens: HashMap::new(),
+            listeners: HashMap::new(),
             tasks: fasync::TaskGroup::new(),
         };
-        let service = Vsock { inner: Rc::new(RefCell::new(service)) };
+        let service = Vsock(Rc::new(RefCell::new(service)));
         let callback_loop = service.clone().run_callbacks(server_stream);
         Ok((service, callback_loop))
     }
@@ -198,8 +271,35 @@ impl Vsock {
         Ok(())
     }
 
+    async fn accept(
+        &self,
+        client: &ClientContext,
+        con: ConnectionTransport,
+    ) -> Result<addr::Vsock, Error> {
+        if let Some(addr) = client.pop_addr() {
+            let data = con.data;
+            let con = con.con.into_stream().map_err(|x| Error::ClientCommunication(x.into()))?;
+            let shutdown_event = self.send_response(&addr, data)?.await?;
+            self.borrow_mut().tasks.local(
+                self.clone()
+                    .run_connection(addr.clone(), shutdown_event, con, None)
+                    .map_err(|err| tracing::warn!("Error {} whilst running connection", err))
+                    .map(|_| ()),
+            );
+            // TODO: check if we want want to return the local port for the connection or the local
+            // port which the request came over.
+            Ok(addr)
+        } else {
+            Err(Error::NoConnectionsInQueue)
+        }
+    }
+
     // Handles a single incoming client request.
-    async fn handle_request(&self, request: ConnectorRequest) -> Result<(), Error> {
+    async fn handle_request(
+        &self,
+        client: &ClientContext,
+        request: ConnectorRequest,
+    ) -> Result<(), Error> {
         match request {
             ConnectorRequest::Connect { remote_cid, remote_port, con, responder } => responder
                 .send(
@@ -210,6 +310,14 @@ impl Vsock {
             ConnectorRequest::Listen { local_port, acceptor, responder } => responder.send(
                 self.start_listener(acceptor, local_port).map_err(|e| e.into_status().into_raw()),
             ),
+            ConnectorRequest::Listen2 { local_port, backlog, responder } => responder.send(
+                self.listen_port_and_queue(client, local_port, backlog)
+                    .map_err(|e| e.into_status().into_raw()),
+            ),
+            ConnectorRequest::Accept { con, responder } => match self.accept(client, con).await {
+                Ok(addr) => responder.send(Ok(&addr)),
+                Err(e) => responder.send(Err(e.into_status().into_raw())),
+            },
         }
         .map_err(|e| Error::ClientCommunication(e.into()))
     }
@@ -219,6 +327,7 @@ impl Vsock {
     /// Takes ownership of a `RequestStream` that is most likely created from a `ServicesServer`
     /// and processes any incoming requests on it.
     pub async fn run_client_connection(self, request: ConnectorRequestStream) {
+        let client = ClientContext::new(request.control_handle());
         let self_ref = &self;
         let fut = request
             .map_err(|err| Error::ClientCommunication(err.into()))
@@ -226,11 +335,14 @@ impl Vsock {
             // made something more sensible.
             .try_for_each_concurrent(4, |request| {
                 self_ref
-                    .handle_request(request)
+                    .handle_request(&client, request)
                     .or_else(|e| future::ready(if e.is_comm_failure() { Err(e) } else { Ok(()) }))
             });
         if let Err(e) = fut.await {
             tracing::info!("Failed to handle request {}", e);
+        }
+        for port in client.ports() {
+            self.deregister(Deregister::Listen(port));
         }
     }
     fn alloc_ephemeral_port(self) -> Option<AllocatedPort> {
@@ -244,13 +356,38 @@ impl Vsock {
             tracing::info!("Rejecting request to listen on ephemeral port {}", port);
             return Err(Error::ConnectionRefused);
         }
-        match self.borrow_mut().listens.entry(port) {
+        match self.borrow_mut().listeners.entry(port) {
             std::collections::hash_map::Entry::Vacant(entry) => {
                 let (sender, receiver) = mpsc::unbounded();
                 let listen =
                     ListenStream { local_port: port, service: self.clone(), stream: receiver };
-                entry.insert(sender);
+                entry.insert(Listener::Channel(sender));
                 Ok(listen)
+            }
+            _ => {
+                tracing::info!("Attempt to listen on already bound port {}", port);
+                Err(Error::AlreadyBound)
+            }
+        }
+    }
+
+    // Creates a queueing system.
+    // These requests come from the device via the run_callbacks future.
+    fn listen_port_and_queue(
+        &self,
+        client: &ClientContext,
+        port: u32,
+        backlog: u32,
+    ) -> Result<(), Error> {
+        if port::is_ephemeral(port) {
+            tracing::info!("Rejecting request to listen on ephemeral port {}", port);
+            return Err(Error::ConnectionRefused);
+        }
+        match self.borrow_mut().listeners.entry(port) {
+            std::collections::hash_map::Entry::Vacant(entry) => {
+                entry.insert(Listener::Queue(client.clone()));
+                client.add_port(port, backlog);
+                Ok(())
             }
             _ => {
                 tracing::info!("Attempt to listen on already bound port {}", port);
@@ -430,7 +567,7 @@ impl Vsock {
 
     /// Mutably borrow the wrapped value.
     fn borrow_mut(&self) -> RefMut<'_, State> {
-        self.inner.borrow_mut()
+        self.0.borrow_mut()
     }
 
     // Deregisters the specified event.
@@ -447,7 +584,9 @@ impl State {
                 self.events.remove(&e);
             }
             Deregister::Listen(p) => {
-                self.listens.remove(&p);
+                if let Some(Listener::Queue(client)) = self.listeners.remove(&p) {
+                    client.remove_port(p);
+                }
             }
             Deregister::Port(p) => {
                 self.used_ports.free(p);
@@ -484,9 +623,19 @@ impl State {
             }
             CallbacksRequest::Request { addr, control_handle: _control_handle } => {
                 let addr = addr::Vsock::from(addr);
-                match self.listens.get(&addr.local_port) {
-                    Some(sender) => {
+                match self.listeners.get(&addr.local_port) {
+                    Some(Listener::Channel(sender)) => {
                         let _ = sender.unbounded_send(addr.clone());
+                    }
+                    Some(Listener::Queue(client)) => {
+                        if client.push_addr(addr.clone()) == false {
+                            tracing::warn!(
+                                "Request on port {} denied due to full backlog",
+                                addr.local_port
+                            );
+                            let task = self.send_rst(&addr).map(|_| ());
+                            self.tasks.local(task);
+                        }
                     }
                     None => {
                         tracing::warn!("Request on port {} with no listener", addr.local_port);

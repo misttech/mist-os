@@ -139,6 +139,37 @@ mod tests {
     }
 
     #[fasync::run_until_stalled(test)]
+    async fn basic_listen2() -> Result<(), anyhow::Error> {
+        let (mut driver, service) = common_setup().await?;
+
+        let app_client = make_client(&service)?;
+
+        // Should reject listening at the ephemeral port ranges.
+        assert_eq!(app_client.listen2(49152, 1).await?, Err(zx::sys::ZX_ERR_UNAVAILABLE));
+
+        // Listen on a reasonable value.
+        assert_eq!(app_client.listen2(8000, 1).await?, Ok(()));
+
+        // Validate that we cannot listen twice
+        assert_eq!(app_client.listen2(8000, 1).await?, Err(zx::sys::ZX_ERR_ALREADY_BOUND));
+
+        // Create a connection from the driver
+        driver.callbacks.request(&*addr::Vsock::new(8000, 80, 4))?;
+        let (_data_socket, _client_end, con) = make_con()?;
+
+        let accept_fut = app_client.accept(con);
+
+        // expect a response
+        let (_, _server_data_socket, responder) =
+            unwrap_msg!(DeviceRequest::SendResponse{addr, data, responder} from driver.client);
+        responder.send(zx::Status::OK.into_raw())?;
+
+        assert_eq!(accept_fut.await?, Ok(*addr::Vsock::new(8000, 80, 4)));
+
+        Ok(())
+    }
+
+    #[fasync::run_until_stalled(test)]
     async fn reject_connection() -> Result<(), anyhow::Error> {
         let (mut driver, service) = common_setup().await?;
 

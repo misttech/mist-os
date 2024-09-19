@@ -7,6 +7,10 @@ library fuchsia.vsock;
 using zx;
 using fuchsia.hardware.vsock;
 
+const USER_SIGNAL_0 uint32 = 0x01000000;
+
+const SIGNAL_STREAM_INCOMING uint32 = USER_SIGNAL_0;
+
 /// Collection of objects that represent an open connection.
 type ConnectionTransport = resource struct {
     /// `data` socket that is ultimately given to the underlying vsock driver and
@@ -57,4 +61,20 @@ closed protocol Connector {
         local_port uint32;
         acceptor client_end:Acceptor;
     }) -> () error zx.Status;
+    /// Registers a listener for a local port. There can only be one listener for
+    /// a single port at a time. The channel will have `SIGNAL_STREAM_INCOMING` asserted
+    /// by the server when there a connection ready to accept.
+    strict Listen2(struct {
+        local_port uint32;
+        /// The maximum length to which the queue of pending connections waiting to
+        /// be accepted.
+        backlog uint32;
+    }) -> () error zx.Status;
+    /// Accept a pending connection from the queue after `Listen2` was invoked and
+    /// `SIGNAL_STREAM_INCOMING` was signaled.
+    strict Accept(resource struct {
+        con ConnectionTransport;
+    }) -> (struct {
+        addr fuchsia.hardware.vsock.Addr;
+    }) error zx.Status;
 };
