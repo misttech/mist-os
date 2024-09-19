@@ -11,11 +11,13 @@ ffx_plugin("ffx_repository_remove") {
   deps = [
     "//src/developer/ffx/fidl:fuchsia.developer.ffx_rust",
     "//src/developer/ffx/lib/fho:lib",
+    "//src/lib/fidl/rust/fidl",
     "//third_party/rust_crates:async-trait",
   ]
   test_deps = [
     "//src/developer/ffx/config:lib",
     "//src/lib/fuchsia",
+    "//src/lib/fuchsia-async",
     "//third_party/rust_crates:futures",
   ]
 
