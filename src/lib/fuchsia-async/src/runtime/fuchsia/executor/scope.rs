@@ -381,13 +381,19 @@ mod state {
 
         pub fn set_cancelled_and_drain(
             &mut self,
-        ) -> (HashMap<usize, Arc<Task>>, hash_set::Drain<'_, WeakScopeRef>, ScopeWaker) {
+        ) -> (
+            HashMap<usize, Arc<Task>>,
+            HashMap<usize, JoinResult>,
+            hash_set::Drain<'_, WeakScopeRef>,
+            ScopeWaker,
+        ) {
             self.status = Status::Cancelled;
             let all_tasks = std::mem::take(&mut self.all_tasks);
+            let join_results = std::mem::take(&mut self.join_results);
             let waker =
                 if all_tasks.is_empty() { ScopeWaker::empty() } else { self.on_task_removed(0) };
             let children = self.children.drain();
-            (all_tasks, children, waker)
+            (all_tasks, join_results, children, waker)
         }
 
         pub fn poll_no_tasks(&mut self) -> Poll<()> {
@@ -664,13 +670,14 @@ impl ScopeRef {
         let mut scopes = vec![self.clone()];
         while let Some(scope) = scopes.pop() {
             let mut state = scope.lock();
-            let (tasks, children, scope_waker) = state.set_cancelled_and_drain();
+            let (tasks, join_handles, children, scope_waker) = state.set_cancelled_and_drain();
             scopes.extend(children.filter_map(|child| child.upgrade()));
             scope_waker.wake_and_release(state);
             // Call task destructors once the scope lock is released so we don't risk a deadlock.
             for (_id, task) in tasks {
                 task.future.try_drop().expect("Expected drop to succeed");
             }
+            std::mem::drop(join_handles);
         }
     }
 }

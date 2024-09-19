@@ -70,6 +70,9 @@ fn make_threads_state(sleeping: u8, notified: u8) -> u16 {
     sleeping as u16 | ((notified as u16) << 8)
 }
 
+#[cfg(test)]
+static ACTIVE_EXECUTORS: AtomicUsize = AtomicUsize::new(0);
+
 pub(crate) struct Executor {
     pub(super) port: zx::Port,
     pub(super) done: AtomicBool,
@@ -99,6 +102,10 @@ impl Executor {
         let source = None;
 
         let collector = Collector::new();
+
+        #[cfg(test)]
+        ACTIVE_EXECUTORS.fetch_add(1, Ordering::Relaxed);
+
         Executor {
             port: zx::Port::create(),
             done: AtomicBool::new(false),
@@ -556,6 +563,13 @@ impl Executor {
     }
 }
 
+#[cfg(test)]
+impl Drop for Executor {
+    fn drop(&mut self) {
+        ACTIVE_EXECUTORS.fetch_sub(1, Ordering::Relaxed);
+    }
+}
+
 /// A handle to an executor.
 #[derive(Clone)]
 pub struct EHandle {
@@ -763,5 +777,19 @@ fn waker_drop(weak_raw: *const ()) {
     // SAFETY: `weak_raw` comes from a previous call to `into_raw`.
     unsafe {
         Weak::from_raw(weak_raw as *const Task);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::ACTIVE_EXECUTORS;
+    use crate::SendExecutor;
+    use std::sync::atomic::Ordering;
+
+    #[test]
+    fn test_no_leaks() {
+        std::thread::spawn(|| SendExecutor::new(1).run(async {})).join().unwrap();
+
+        assert_eq!(ACTIVE_EXECUTORS.load(Ordering::Relaxed), 0);
     }
 }
