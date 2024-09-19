@@ -4,6 +4,7 @@
 
 import("//build/components.gni")
 import("//build/rust/rustc_test.gni")
+import("//build/testing/cc_test_executable.gni")
 
 rustc_test("tests_bin") {
   edition = "2021"
@@ -78,7 +79,7 @@ fuchsia_package("gunit-runner-example-tests") {
   ]
 }
 
-executable("gunit_simple_test") {
+cc_test_executable("gunit_simple_test") {
   testonly = true
   sources = [ "simple_test.cc" ]
   deps = [ "//src/sys/test_runners/gtest/test_data:gunit_main" ]

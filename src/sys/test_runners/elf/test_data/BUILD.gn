@@ -3,8 +3,9 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
+import("//build/testing/cc_test_executable.gni")
 
-executable("passing_test") {
+cc_test_executable("passing_test") {
   testonly = true
   sources = [ "passing_test.cc" ]
 }
@@ -16,7 +17,7 @@ fuchsia_component("passing_test_component") {
   deps = [ ":passing_test" ]
 }
 
-executable("failing_test") {
+cc_test_executable("failing_test") {
   testonly = true
   sources = [ "failing_test.cc" ]
 }
@@ -28,7 +29,7 @@ fuchsia_component("failing_test_component") {
   deps = [ ":failing_test" ]
 }
 
-executable("arg_test") {
+cc_test_executable("arg_test") {
   testonly = true
   sources = [ "arg_test.cc" ]
 }
@@ -40,7 +41,7 @@ fuchsia_component("arg_test_component") {
   deps = [ ":arg_test" ]
 }
 
-executable("environ_test") {
+cc_test_executable("environ_test") {
   testonly = true
   sources = [ "environ_test.cc" ]
 }
@@ -52,7 +53,7 @@ fuchsia_component("environ_test_component") {
   deps = [ ":environ_test" ]
 }
 
-executable("ambient_exec_test") {
+cc_test_executable("ambient_exec_test") {
   testonly = true
   sources = [ "ambient_exec_test.cc" ]
   deps = [ "//zircon/system/ulib/zx" ]
