@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
+import("//build/testing/cc_test_executable.gni")
 
 group("cpp") {
   testonly = true
@@ -35,7 +36,7 @@ source_set("bounded_list_node") {
   public_configs = [ "//sdk/config" ]
 }
 
-executable("bounded_list_node_test") {
+cc_test_executable("bounded_list_node_test") {
   testonly = true
   output_name = "bounded_list_node_test"
   sources = [ "bounded_list_node_unittest.cc" ]
@@ -45,7 +46,7 @@ executable("bounded_list_node_test") {
   ]
 }
 
-executable("read_visitor_test") {
+cc_test_executable("read_visitor_test") {
   testonly = true
   output_name = "read_visitor_test"
   sources = [ "read_visitor_unittest.cc" ]

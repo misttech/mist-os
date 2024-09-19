@@ -47,3 +47,7 @@ template("cc_test_executable") {
     }
   }
 }
+
+set_defaults("cc_test_executable") {
+  configs = default_executable_configs
+}

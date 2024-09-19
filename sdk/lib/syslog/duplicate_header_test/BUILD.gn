@@ -5,13 +5,14 @@
 import("//build/components.gni")
 import("//build/cpp/sdk_source_set.gni")
 import("//build/test.gni")
+import("//build/testing/cc_test_executable.gni")
 
 group("tests") {
   testonly = true
   deps = [ ":duplicate-header-test" ]
 }
 
-executable("duplicate-header-test") {
+cc_test_executable("duplicate-header-test") {
   testonly = true
   sources = [ "duplicate_header_unittest.cc" ]
   deps = [

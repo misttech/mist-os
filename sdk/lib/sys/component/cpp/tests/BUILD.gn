@@ -4,6 +4,7 @@
 
 import("//build/components.gni")
 import("//build/test.gni")
+import("//build/testing/cc_test_executable.gni")
 
 group("tests") {
   testonly = true
@@ -60,7 +61,7 @@ executable("echo_server_sc_bin") {
   ]
 }
 
-executable("realm_builder_test_bin") {
+cc_test_executable("realm_builder_test_bin") {
   testonly = true
 
   sources = [ "realm_builder_test.cc" ]
@@ -85,7 +86,7 @@ executable("realm_builder_test_bin") {
   ]
 }
 
-executable("internal_test_bin") {
+cc_test_executable("internal_test_bin") {
   testonly = true
 
   sources = [ "internal_test.cc" ]

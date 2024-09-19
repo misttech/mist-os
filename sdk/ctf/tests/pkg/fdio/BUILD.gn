@@ -2,6 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/testing/cc_test_executable.gni")
 import("//sdk/ctf/build/ctf.gni")
 
 shebang = "#!resolve fuchsia-pkg://fuchsia.com/fdio-spawn-tests"
@@ -9,7 +10,7 @@ if (defined(cts_version) && cts_version != "") {
   shebang += "_${cts_version}"
 }
 
-executable("fdio-spawn-tests-bin") {
+cc_test_executable("fdio-spawn-tests-bin") {
   output_name = "fdio-spawn-tests-bin"
   testonly = true
   visibility = [ ":*" ]
@@ -87,7 +88,7 @@ fuchsia_component("fake-launcher-util-component") {
 }
 
 # A simple test utility that returns the integer value provided to it in its first argument.
-executable("return-arg-test-util-bin") {
+cc_test_executable("return-arg-test-util-bin") {
   testonly = true
   output_name = "return_arg_test_util"
   sources = [ "return_arg_util.cc" ]

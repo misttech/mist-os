@@ -4,8 +4,9 @@
 
 import("//build/components.gni")
 import("//build/rust/rustc_binary.gni")
+import("//build/testing/cc_test_executable.gni")
 
-executable("getaddrinfo_test") {
+cc_test_executable("getaddrinfo_test") {
   testonly = true
 
   sources = [ "getaddrinfo_test.cc" ]

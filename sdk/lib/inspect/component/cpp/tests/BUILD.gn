@@ -4,9 +4,10 @@
 
 import("//build/components.gni")
 import("//build/test.gni")
+import("//build/testing/cc_test_executable.gni")
 
 # Service tests (ie only FIDL)
-executable("inspect_service_llcpp_unittests_bin") {
+cc_test_executable("inspect_service_llcpp_unittests_bin") {
   testonly = true
   sources = [ "service_unittests.cc" ]
   deps = [

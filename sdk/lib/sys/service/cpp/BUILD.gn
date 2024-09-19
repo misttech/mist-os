@@ -4,6 +4,7 @@
 
 import("//build/components.gni")
 import("//build/cpp/sdk_source_set.gni")
+import("//build/testing/cc_test_executable.gni")
 
 sdk_source_set("cpp") {
   category = "partner"
@@ -39,7 +40,7 @@ sdk_source_set("cpp") {
   configs += [ "//build/config:Wno-conversion" ]
 }
 
-executable("sys_service_unittests") {
+cc_test_executable("sys_service_unittests") {
   testonly = true
 
   sources = [

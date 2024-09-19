@@ -5,6 +5,7 @@
 import("//build/components.gni")
 import("//build/fidl/fidl.gni")
 import("//build/test.gni")
+import("//build/testing/cc_test_executable.gni")
 
 group("tests") {
   testonly = true
@@ -54,7 +55,7 @@ fuchsia_unittest_component("incoming_test") {
   deps = [ ":incoming_test_bin" ]
 }
 
-executable("incoming_integration_test_bin") {
+cc_test_executable("incoming_integration_test_bin") {
   testonly = true
 
   sources = [ "incoming_integration_test.cc" ]
@@ -146,7 +147,7 @@ fuchsia_component("echo_service_server") {
   manifest = "meta/echo_service_server.cml"
 }
 
-executable("cpp_outgoing_directory_test_bin") {
+cc_test_executable("cpp_outgoing_directory_test_bin") {
   testonly = true
 
   sources = [ "outgoing_directory_test.cc" ]
@@ -166,7 +167,7 @@ executable("cpp_outgoing_directory_test_bin") {
   ]
 }
 
-executable("cpp_outgoing_directory_integration_test_bin") {
+cc_test_executable("cpp_outgoing_directory_integration_test_bin") {
   testonly = true
 
   sources = [ "outgoing_directory_integration_test.cc" ]
