@@ -43,6 +43,7 @@ zx_library("starnix_core") {
     "vfs/fs_context.cc",
     "vfs/fs_node.cc",
     "vfs/fs_node_ops.cc",
+    "vfs/memory_file.cc",
     "vfs/module.cc",
     "vfs/mount.cc",
     "vfs/namespace.cc",
@@ -50,7 +51,6 @@ zx_library("starnix_core") {
     "vfs/path.cc",
     "vfs/simple_directory.cc",
     "vfs/syscalls.cc",
-    "vfs/vmo_file.cc",
     "vfs/xattr.cc",
   ]
 

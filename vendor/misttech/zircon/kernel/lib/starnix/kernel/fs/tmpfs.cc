@@ -10,8 +10,8 @@
 #include <lib/mistos/starnix/kernel/vfs/file_object.h>
 #include <lib/mistos/starnix/kernel/vfs/file_ops.h>
 #include <lib/mistos/starnix/kernel/vfs/fs_node.h>
+#include <lib/mistos/starnix/kernel/vfs/memory_file.h>
 #include <lib/mistos/starnix/kernel/vfs/module.h>
-#include <lib/mistos/starnix/kernel/vfs/vmo_file.h>
 #include <lib/mistos/starnix_uapi/auth.h>
 #include <lib/mistos/starnix_uapi/errors.h>
 #include <lib/mistos/starnix_uapi/file_mode.h>
@@ -222,7 +222,7 @@ fit::result<Errno, FsNodeHandle> create_child_node(const CurrentTask& current_ta
   ktl::unique_ptr<FsNodeOps> ops;
   auto fmt = mode.fmt();
   if (fmt == FileMode::IFREG) {
-    auto new_result = VmoFileNode::New();
+    auto new_result = MemoryFileNode::New();
     if (new_result.is_error())
       return new_result.take_error();
     ops = ktl::unique_ptr<FsNodeOps>(new_result.value());
