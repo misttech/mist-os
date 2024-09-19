@@ -12,6 +12,8 @@
 
 namespace paver {
 
+using FindPartitionResult = GptDevicePartitioner::FindPartitionResult;
+
 class KolaPartitioner : public DevicePartitioner {
  public:
   static zx::result<std::unique_ptr<DevicePartitioner>> Initialize(
@@ -42,6 +44,11 @@ class KolaPartitioner : public DevicePartitioner {
   zx::result<> Flush() const override { return zx::ok(); }
 
   zx::result<> OnStop() const override;
+
+  // Like FindPartition() above, but also returns the GPT partition entry.
+  zx::result<FindPartitionResult> FindPartitionDetails(const PartitionSpec& spec) const;
+
+  GptDevice* GetGpt() const { return gpt_->GetGpt(); }
 
  private:
   KolaPartitioner(std::unique_ptr<GptDevicePartitioner> gpt) : gpt_(std::move(gpt)) {}

@@ -139,6 +139,7 @@ source_set("kola") {
     ":paver-core",
     "//src/lib/uuid",
     "//src/storage/gpt",
+    "//zircon/system/ulib/hwreg",
   ]
 }
 
