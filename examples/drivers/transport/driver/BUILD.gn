@@ -8,7 +8,8 @@ group("driver") {
   deps = [
     "v1:child_component",
     "v1:parent_component",
-    "v2:pkg",
+    "v2:child_bazel_package",
+    "v2:parent_bazel_package",
   ]
 }
 
