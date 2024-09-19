@@ -112,9 +112,20 @@ if (is_host) {
     deps = [
       ":ffx_build_dir_config_file($default_toolchain)",
       ":host",
+      ":tool_manifest",
       "frontends/ffx:ffx_bin($host_toolchain)",
       "tools($host_toolchain)",
     ]
+  }
+
+  # Generates  the list of tools that are not compiled into the main ffx.
+  # This is used via configuration to make ffx hermetic vs. scanning and reading
+  # files.
+  generated_file("tool_manifest") {
+    deps = [ "tools:bins($host_toolchain)" ]
+    outputs = [ "$root_build_dir/ffx_tools.json" ]
+    data_keys = [ "ffx_tool" ]
+    output_conversion = "json"
   }
 
   install_host_tools("host") {

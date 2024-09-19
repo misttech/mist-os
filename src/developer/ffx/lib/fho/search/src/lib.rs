@@ -8,16 +8,19 @@ use ffx_command::{
 };
 use ffx_config::{EnvironmentContext, Sdk, SelectMode};
 use fho_metadata::FhoToolMetadata;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
-
 use std::collections::HashMap;
-use std::fs::File;
+use std::fs::{self, File};
 use std::os::unix::process::CommandExt;
 use std::path::{Path, PathBuf};
 use std::process::ExitStatus;
 
 /// The config key for holding subtool search paths.
 pub const FFX_SUBTOOL_PATHS_CONFIG: &str = "ffx.subtool-search-paths";
+
+/// The config key for holding the external subtool manifest.
+pub const FFX_SUBTOOL_MANIFEST_CONFIG: &str = "ffx.subtool-manifest";
 
 /// Path information about a subtool
 #[derive(Clone, Debug)]
@@ -41,6 +44,17 @@ pub struct ExternalSubToolSuite {
     context: EnvironmentContext,
     workspace_tools: HashMap<String, SubToolLocation>,
 }
+
+//LINT.IfChange(subtool_manifest)
+/// Subtool manifest entry
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub(crate) struct SubToolManifestEntry {
+    pub(crate) category: String,
+    pub(crate) executable: PathBuf,
+    pub(crate) executable_metadata: PathBuf,
+    pub(crate) name: String,
+}
+// LINT.ThenChange(//src/developer/ffx/build/ffx_tool.gni:subtool_manifest)
 
 #[async_trait::async_trait(?Send)]
 impl ToolRunner for ExternalSubTool {
@@ -70,6 +84,34 @@ impl ExternalSubToolSuite {
     fn with_tools_from(context: EnvironmentContext, subtool_paths: &[impl AsRef<Path>]) -> Self {
         let workspace_tools =
             find_workspace_tools(subtool_paths).map(|tool| (tool.name.to_owned(), tool)).collect();
+        Self { context, workspace_tools }
+    }
+
+    /// Loads the subtools from the provided manifest. This avoids scanning directories and
+    /// reading files that are not expected and will break the hermeticity expectations.
+    fn with_tools_manifest(context: EnvironmentContext, subtool_manifest: PathBuf) -> Self {
+        let file = fs::File::open(&subtool_manifest).expect("file should open");
+        let entries: Vec<SubToolManifestEntry> =
+            serde_json::from_reader(file).expect("manifest should be json");
+
+        let workspace_tools: HashMap<String, SubToolLocation> = entries
+            .iter()
+            .filter_map(|item| {
+                SubToolLocation::from_path(
+                    FfxToolSource::Workspace,
+                    &item.executable,
+                    &item.executable_metadata,
+                )
+            })
+            .map(|tool| (tool.name.to_owned(), tool))
+            .collect();
+
+        if workspace_tools.is_empty() {
+            // This really should not happen, but it is not fatal, so just log an error...
+            tracing::error!(
+                "Subtool manifest {subtool_manifest:?} is empty. No workspace subtools defined."
+            );
+        }
         Self { context, workspace_tools }
     }
 
@@ -107,13 +149,23 @@ impl ExternalSubToolSuite {
 #[async_trait::async_trait(?Send)]
 impl ToolSuite for ExternalSubToolSuite {
     async fn from_env(env: &EnvironmentContext) -> Result<Self> {
-        let subtool_config: Vec<Value> = env
-            .query(FFX_SUBTOOL_PATHS_CONFIG)
-            .select(SelectMode::All)
-            .get_file()
-            .await
-            .unwrap_or_else(|_| vec![]);
-        Ok(Self::with_tools_from(env.clone(), &get_subtool_paths(subtool_config)))
+        let subtool_manifest: PathBuf =
+            env.query(FFX_SUBTOOL_MANIFEST_CONFIG).get_file().await.unwrap_or_default();
+
+        // If the subtool manifest is configured, it use it to load the information for
+        // external subtools. Otherwise scan the directories. The manifest file is used when
+        // ffx is being run hermetically, and should not scan and read directories.
+        if subtool_manifest.exists() {
+            Ok(Self::with_tools_manifest(env.clone(), subtool_manifest))
+        } else {
+            let subtool_config: Vec<Value> = env
+                .query(FFX_SUBTOOL_PATHS_CONFIG)
+                .select(SelectMode::All)
+                .get_file()
+                .await
+                .unwrap_or_else(|_| vec![]);
+            Ok(Self::with_tools_from(env.clone(), &get_subtool_paths(subtool_config)))
+        }
     }
 
     fn global_command_list() -> &'static [&'static argh::CommandInfo] {
@@ -410,7 +462,7 @@ mod tests {
         );
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn scan_workspace_subtool_directory() {
         let test_env = ffx_config::test_init().await.expect("test init");
 
@@ -492,6 +544,49 @@ mod tests {
             })
             .await
             .expect("should be able to find mock subtool in suite");
+    }
+
+    #[fuchsia::test]
+    async fn test_with_tools_manifest() {
+        let test_env = ffx_config::test_init().await.expect("test init");
+
+        create_mock_subtool(
+            test_env.isolate_root.path(),
+            "ffx-sample1",
+            Valid(FhoToolMetadata::new("sample1", "what")),
+        );
+        let subtool_manifest = test_env.isolate_root.path().join("subtools.json");
+        let metadata = test_env.isolate_root.path().join("ffx-sample1.json");
+        let executable = test_env.isolate_root.path().join("ffx-sample1");
+        let contents = vec![
+            SubToolManifestEntry {
+                category: "internal".into(),
+                executable: executable.clone(),
+                executable_metadata: metadata.clone(),
+                name: "ffx-sample1".into(),
+            },
+            SubToolManifestEntry {
+                category: "internal".into(),
+                executable: "/path/to/ffx-executable2".into(),
+                executable_metadata: metadata.clone(),
+                name: "ffx-ex2".into(),
+            },
+        ];
+        fs::write(&subtool_manifest, serde_json::to_string(&contents).expect("serialized data"))
+            .expect("subtool manifest written");
+
+        let suite =
+            ExternalSubToolSuite::with_tools_manifest(test_env.context.clone(), subtool_manifest);
+
+        let ffx_cmd = FfxCommandLine {
+            command: vec!["ffx".to_owned()],
+            ffx_args: vec![],
+            global: Ffx { subcommand: vec!["sample1".to_owned()], ..Default::default() },
+        };
+        let cmd = suite.find_workspace_tool(&ffx_cmd);
+
+        assert!(cmd.is_some(), "Expected external command to be found");
+        assert_eq!(cmd.unwrap().path, executable)
     }
 
     #[test]
