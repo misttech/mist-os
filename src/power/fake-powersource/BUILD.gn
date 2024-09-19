@@ -5,6 +5,7 @@
 import("//build/components.gni")
 import("//build/drivers.gni")
 import("//build/test.gni")
+import("//build/testing/cc_test_executable.gni")
 
 driver_bind_rules("fake_battery_bind") {
   rules = "meta/fake-battery-driver.bind"
@@ -51,7 +52,7 @@ fuchsia_driver_package("fake-battery") {
   driver_components = [ ":fake_battery_component" ]
 }
 
-executable("cpp_test") {
+cc_test_executable("cpp_test") {
   testonly = true
   output_name = "fake-battery-driver-unittests"
   sources = [ "fake-battery-driver-unittest.cc" ]
