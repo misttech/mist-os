@@ -24,7 +24,7 @@ in a single location aims to provide a few benefits:
                 state: 1,
                 trip_points: [
                     {
-                        sensor: '/dev/sys/platform/05:03:a/thermal',
+                        sensor_name: '/dev/sys/platform/05:03:a/thermal',
                         activate_at: 75,
                         deactivate_below: 71,
                     },
@@ -34,7 +34,7 @@ in a single location aims to provide a few benefits:
                 state: 2,
                 trip_points: [
                     {
-                        sensor: '/dev/sys/platform/05:03:a/thermal',
+                        sensor_name: '/dev/sys/platform/05:03:a/thermal',
                         activate_at: 86,
                         deactivate_below: 82,
                     },
@@ -59,7 +59,7 @@ describes
 * `trip_points` - an array of trip points that will activate this thermal state
 
 A “trip point” is described by three keys:
-* `sensor` - path to the sensor driver that this trip point corresponds to
+* `sensor_name` - name of the sensor driver that this trip point corresponds to
 * `activate_at` - the thermal load at which this trip point will become active
 * `deactivate_below` - the thermal load at which this trip point becomes deactivated
 
@@ -78,7 +78,7 @@ The [thermal_config](/src/power/power-manager/thermal_config/thermal_config.gni)
 implements a built-in validator. The validator runs at compile time as long as the `thermal_config`
 target is included in the build graph. It will ensure 1) the file is valid JSON5, and 2) the JSON5
 format adheres to the expected format (defined by the parsing library
-[here](/src/power/power-manager/thermal_config/parser/lib.rs)).
+[here](/src/power/power-manager/thermal_config/parser/src/lib.rs)).
 
 ## Raw temperature vs thermal load
 
