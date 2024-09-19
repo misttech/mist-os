@@ -244,7 +244,16 @@ fn fs_node_resolve_security_label(
 #[macro_export]
 macro_rules! todo_check_permission {
     (TODO($bug_url:literal, $todo_message:literal), $permission_check:expr, $source_sid:expr, $target_sid:expr, $permission:expr $(,)?) => {{
-        if check_permission($permission_check, $source_sid, $target_sid, $permission).is_err() {
+        use crate::security::selinux_hooks::check_permission_internal;
+        if check_permission_internal(
+            $permission_check,
+            $source_sid,
+            $target_sid,
+            $permission,
+            "todo_deny",
+        )
+        .is_err()
+        {
             use starnix_logging::track_stub;
             track_stub!(TODO($bug_url), $todo_message);
         }
@@ -259,6 +268,25 @@ fn check_permission<P: ClassPermission + Into<Permission> + Clone + 'static>(
     target_sid: SecurityId,
     permission: P,
 ) -> Result<(), Errno> {
+    check_permission_internal(permission_check, source_sid, target_sid, permission, "denied")
+}
+
+/// Checks that `subject_sid` has the specified process `permission` on `self`.
+fn check_self_permission(
+    permission_check: &PermissionCheck<'_>,
+    subject_sid: SecurityId,
+    permission: ProcessPermission,
+) -> Result<(), Errno> {
+    check_permission(permission_check, subject_sid, subject_sid, permission)
+}
+
+fn check_permission_internal<P: ClassPermission + Into<Permission> + Clone + 'static>(
+    permission_check: &PermissionCheck<'_>,
+    source_sid: SecurityId,
+    target_sid: SecurityId,
+    permission: P,
+    deny_result: &str,
+) -> Result<(), Errno> {
     let PermissionCheckResult { permit, audit } =
         permission_check.has_permission(source_sid, target_sid, permission.clone());
 
@@ -266,7 +294,7 @@ fn check_permission<P: ClassPermission + Into<Permission> + Clone + 'static>(
         use bstr::BStr;
 
         // TODO: https://fxbug.dev/362707360 - Add details to audit logging.
-        let result = if permit { "allowed" } else { "denied" };
+        let result = if permit { "allowed" } else { deny_result };
         let tclass = permission.class().name();
         let permission_name = permission.into().name();
         let security_server = permission_check.security_server();
@@ -289,15 +317,6 @@ fn check_permission<P: ClassPermission + Into<Permission> + Clone + 'static>(
     } else {
         error!(EACCES)
     }
-}
-
-/// Checks that `subject_sid` has the specified process `permission` on `self`.
-fn check_self_permission(
-    permission_check: &PermissionCheck<'_>,
-    subject_sid: SecurityId,
-    permission: ProcessPermission,
-) -> Result<(), Errno> {
-    check_permission(permission_check, subject_sid, subject_sid, permission)
 }
 
 /// Returns the security state structure for the kernel.
