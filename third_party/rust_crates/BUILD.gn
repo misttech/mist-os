@@ -1168,14 +1168,6 @@ group("xml-rs") {
   public_deps = [ ":xml-rs-v0_8_0" ]
 }
 
-# NOTE(b/367420574): This is a manual edit to enable a soft transition. Until
-# b/367420574 is finished and this is removed, users of `fx
-# update-rustc-third-party` should manually restore this whenever `cargo-gnaw`
-# overwrites it.
-group("zerocopy_0_0_0_alpha_0") {
-  public_deps = [ ":zerocopy" ]
-}
-
 group("zerocopy") {
   public_deps = [ ":zerocopy-v0_8_0-alpha_21" ]
 }
