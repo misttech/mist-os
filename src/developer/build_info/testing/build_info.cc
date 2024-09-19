@@ -24,12 +24,12 @@ void FakeProviderImpl::GetBuildInfo(GetBuildInfoCallback callback) {
   build_info.set_version(info_ref_->version_);
 
   if (info_ref_->platform_version_.empty()) {
-    info_ref_->version_ = FakeProviderImpl::kPlatformVersionDefault;
+    info_ref_->platform_version_ = FakeProviderImpl::kPlatformVersionDefault;
   }
   build_info.set_platform_version(info_ref_->platform_version_);
 
   if (info_ref_->product_version_.empty()) {
-    info_ref_->version_ = FakeProviderImpl::kProductVersionDefault;
+    info_ref_->product_version_ = FakeProviderImpl::kProductVersionDefault;
   }
   build_info.set_product_version(info_ref_->product_version_);
 
