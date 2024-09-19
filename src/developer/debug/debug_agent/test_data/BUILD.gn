@@ -6,6 +6,8 @@
 
 # Test .so ---------------------------------------------------------------------
 
+import("//build/testing/cc_test_executable.gni")
+
 group("debug_so") {
   testonly = true
 
@@ -63,7 +65,7 @@ group("test_executables") {
   }
 }
 
-executable("breakpoint_test_exe") {
+cc_test_executable("breakpoint_test_exe") {
   testonly = true
   output_name = "breakpoint_test_exe"
   sources = [ "breakpoint_test_exe.cc" ]
@@ -78,7 +80,7 @@ executable("load_so_exe") {
   deps = [ ":debug_agent_test_loadable_module" ]
 }
 
-executable("multithreaded_breakpoint_test_exe") {
+cc_test_executable("multithreaded_breakpoint_test_exe") {
   testonly = true
   output_name = "multithreaded_breakpoint_test_exe"
 
@@ -90,7 +92,7 @@ executable("multithreaded_breakpoint_test_exe") {
   configs += [ "//build/config:Wno-vla-cxx-extension" ]
 }
 
-executable("watchpoint_test_exe") {
+cc_test_executable("watchpoint_test_exe") {
   testonly = true
   output_name = "watchpoint_test_exe"
 
@@ -98,7 +100,7 @@ executable("watchpoint_test_exe") {
 }
 
 if (current_cpu == "x64") {
-  executable("write_register_test_exe") {
+  cc_test_executable("write_register_test_exe") {
     testonly = true
     output_name = "write_register_test_exe"
 
@@ -133,15 +135,15 @@ executable("backtrace_request") {
   ]
 }
 
-executable("debug_test_true") {
+cc_test_executable("debug_test_true") {
   sources = [ "true.c" ]
 }
 
-executable("debug_test_false") {
+cc_test_executable("debug_test_false") {
   sources = [ "false.c" ]
 }
 
-executable("test_suite") {
+cc_test_executable("test_suite") {
   output_name = "test_suite"
 
   sources = [

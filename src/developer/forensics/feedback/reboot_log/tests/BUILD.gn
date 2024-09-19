@@ -4,11 +4,12 @@
 
 import("//build/components.gni")
 import("//build/components/fuchsia_unittest_component.gni")
+import("//build/testing/cc_test_executable.gni")
 
 ###############################################################################
 # EXECUTABLES
 ###############################################################################
-executable("graceful_reboot_reason_unittest_exe") {
+cc_test_executable("graceful_reboot_reason_unittest_exe") {
   testonly = true
 
   sources = [ "graceful_reboot_reason_unittest.cc" ]
@@ -27,7 +28,7 @@ executable("graceful_reboot_reason_unittest_exe") {
   ]
 }
 
-executable("reboot_log_unittest_exe") {
+cc_test_executable("reboot_log_unittest_exe") {
   testonly = true
 
   sources = [ "reboot_log_unittest.cc" ]
@@ -47,7 +48,7 @@ executable("reboot_log_unittest_exe") {
   ]
 }
 
-executable("reboot_reason_unittest_exe") {
+cc_test_executable("reboot_reason_unittest_exe") {
   testonly = true
 
   sources = [ "reboot_reason_unittest.cc" ]

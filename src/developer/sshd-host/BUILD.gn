@@ -5,6 +5,7 @@
 import("//build/assembly/config_data_for_assembly.gni")
 import("//build/components.gni")
 import("//build/config.gni")
+import("//build/testing/cc_test_executable.gni")
 import("//src/sys/core/build/core_shard.gni")
 
 group("tests") {
@@ -97,7 +98,7 @@ config_data_for_assembly("config_eng") {
   outputs = [ "sshd_config" ]
 }
 
-executable("test") {
+cc_test_executable("test") {
   testonly = true
   output_name = "sshd-host-test"
   sources = [ "test.cc" ]

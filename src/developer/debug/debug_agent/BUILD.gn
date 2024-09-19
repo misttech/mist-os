@@ -4,6 +4,7 @@
 
 import("//build/components.gni")
 import("//build/test.gni")
+import("//build/testing/cc_test_executable.gni")
 
 static_library("lib") {
   sources = [
@@ -260,7 +261,7 @@ fuchsia_component("debug_agent_launcher_component") {
   ]
 }
 
-executable("zxdb_test_app") {
+cc_test_executable("zxdb_test_app") {
   sources = [ "zxdb_test_app.cc" ]
   deps = [ "//zircon/system/ulib/zx" ]
 

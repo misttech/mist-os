@@ -4,13 +4,14 @@
 
 import("//build/components.gni")
 import("//build/components/fuchsia_unittest_component.gni")
+import("//build/testing/cc_test_executable.gni")
 
 visibility = [ ":*" ]
 
 ###############################################################################
 # EXECUTABLES
 ###############################################################################
-executable("data_provider_unittest_exe") {
+cc_test_executable("data_provider_unittest_exe") {
   testonly = true
 
   sources = [
@@ -53,7 +54,7 @@ executable("data_provider_unittest_exe") {
   configs += [ "//build/config:Wno-conversion" ]
 }
 
-executable("inspect_data_budget_unittest_exe") {
+cc_test_executable("inspect_data_budget_unittest_exe") {
   testonly = true
 
   sources = [ "inspect_data_budget_unittest.cc" ]
@@ -73,7 +74,7 @@ executable("inspect_data_budget_unittest_exe") {
   configs += [ "//build/config:Wno-conversion" ]
 }
 
-executable("log_source_unittest_exe") {
+cc_test_executable("log_source_unittest_exe") {
   testonly = true
 
   sources = [ "log_source_unittest.cc" ]
@@ -92,7 +93,7 @@ executable("log_source_unittest_exe") {
   ]
 }
 
-executable("metadata_unittest_exe") {
+cc_test_executable("metadata_unittest_exe") {
   testonly = true
 
   sources = [ "metadata_unittest.cc" ]
@@ -115,7 +116,7 @@ executable("metadata_unittest_exe") {
   ]
 }
 
-executable("screenshot_unittest_exe") {
+cc_test_executable("screenshot_unittest_exe") {
   testonly = true
 
   sources = [ "screenshot_unittest.cc" ]

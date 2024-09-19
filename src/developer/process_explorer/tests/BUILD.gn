@@ -4,6 +4,7 @@
 
 import("//build/components.gni")
 import("//build/test.gni")
+import("//build/testing/cc_test_executable.gni")
 
 group("tests") {
   testonly = true
@@ -26,7 +27,7 @@ executable("mock_process") {
   deps = []
 }
 
-executable("integration_test") {
+cc_test_executable("integration_test") {
   testonly = true
   output_name = "process_explorer_integration_test"
 

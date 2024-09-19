@@ -4,13 +4,14 @@
 
 import("//build/components.gni")
 import("//build/components/fuchsia_unittest_component.gni")
+import("//build/testing/cc_test_executable.gni")
 
 visibility = [ ":*" ]
 
 ###############################################################################
 # EXECUTABLES
 ###############################################################################
-executable("annotation_map_unittest_exe") {
+cc_test_executable("annotation_map_unittest_exe") {
   testonly = true
 
   sources = [ "annotation_map_unittest.cc" ]
@@ -23,7 +24,7 @@ executable("annotation_map_unittest_exe") {
   ]
 }
 
-executable("crash_register_unittest_exe") {
+cc_test_executable("crash_register_unittest_exe") {
   testonly = true
 
   sources = [ "crash_register_unittest.cc" ]
@@ -46,7 +47,7 @@ executable("crash_register_unittest_exe") {
   ]
 }
 
-executable("crash_reporter_unittest_exe") {
+cc_test_executable("crash_reporter_unittest_exe") {
   testonly = true
 
   sources = [
@@ -85,7 +86,7 @@ executable("crash_reporter_unittest_exe") {
   ]
 }
 
-executable("crash_server_unittest_exe") {
+cc_test_executable("crash_server_unittest_exe") {
   testonly = true
 
   # "crash_server_unittest" is rather generic for the default_output_dir that
@@ -107,7 +108,7 @@ executable("crash_server_unittest_exe") {
   ]
 }
 
-executable("dart_module_parser_unittest_exe") {
+cc_test_executable("dart_module_parser_unittest_exe") {
   testonly = true
 
   sources = [ "dart_module_parser_unittest.cc" ]
@@ -121,7 +122,7 @@ executable("dart_module_parser_unittest_exe") {
   ]
 }
 
-executable("filing_result_unittest_exe") {
+cc_test_executable("filing_result_unittest_exe") {
   testonly = true
 
   sources = [ "filing_result_unittest.cc" ]
@@ -134,7 +135,7 @@ executable("filing_result_unittest_exe") {
   ]
 }
 
-executable("inspect_manager_unittest_exe") {
+cc_test_executable("inspect_manager_unittest_exe") {
   testonly = true
 
   # "inspect_manager_unittest" is rather generic for the default_output_dir
@@ -160,7 +161,7 @@ executable("inspect_manager_unittest_exe") {
   ]
 }
 
-executable("product_quotas_unittest_exe") {
+cc_test_executable("product_quotas_unittest_exe") {
   testonly = true
 
   sources = [ "product_quotas_unittest.cc" ]
@@ -176,7 +177,7 @@ executable("product_quotas_unittest_exe") {
   ]
 }
 
-executable("queue_unittest_exe") {
+cc_test_executable("queue_unittest_exe") {
   testonly = true
 
   sources = [
@@ -202,7 +203,7 @@ executable("queue_unittest_exe") {
   ]
 }
 
-executable("reporting_policy_watcher_unittest_exe") {
+cc_test_executable("reporting_policy_watcher_unittest_exe") {
   testonly = true
 
   sources = [ "reporting_policy_watcher_unittest.cc" ]
@@ -216,7 +217,7 @@ executable("reporting_policy_watcher_unittest_exe") {
   ]
 }
 
-executable("report_util_unittest_exe") {
+cc_test_executable("report_util_unittest_exe") {
   testonly = true
 
   sources = [ "report_util_unittest.cc" ]
@@ -229,7 +230,7 @@ executable("report_util_unittest_exe") {
   ]
 }
 
-executable("sized_data_reader_unittest_exe") {
+cc_test_executable("sized_data_reader_unittest_exe") {
   testonly = true
 
   sources = [ "sized_data_reader_unittest.cc" ]
@@ -244,7 +245,7 @@ executable("sized_data_reader_unittest_exe") {
   ]
 }
 
-executable("snapshot_collector_unittest_exe") {
+cc_test_executable("snapshot_collector_unittest_exe") {
   testonly = true
 
   sources = [
@@ -268,7 +269,7 @@ executable("snapshot_collector_unittest_exe") {
   ]
 }
 
-executable("snapshot_persistence_metadata_unittest_exe") {
+cc_test_executable("snapshot_persistence_metadata_unittest_exe") {
   testonly = true
 
   sources = [ "snapshot_persistence_metadata_unittest.cc" ]
@@ -284,7 +285,7 @@ executable("snapshot_persistence_metadata_unittest_exe") {
   ]
 }
 
-executable("snapshot_persistence_unittest_exe") {
+cc_test_executable("snapshot_persistence_unittest_exe") {
   testonly = true
 
   sources = [ "snapshot_persistence_unittest.cc" ]
@@ -303,7 +304,7 @@ executable("snapshot_persistence_unittest_exe") {
   ]
 }
 
-executable("snapshot_store_unittest_exe") {
+cc_test_executable("snapshot_store_unittest_exe") {
   testonly = true
 
   sources = [ "snapshot_store_unittest.cc" ]
@@ -320,7 +321,7 @@ executable("snapshot_store_unittest_exe") {
   ]
 }
 
-executable("report_store_unittest_exe") {
+cc_test_executable("report_store_unittest_exe") {
   testonly = true
 
   sources = [ "report_store_unittest.cc" ]
@@ -343,7 +344,7 @@ executable("report_store_unittest_exe") {
   ]
 }
 
-executable("report_store_metadata_unittest_exe") {
+cc_test_executable("report_store_metadata_unittest_exe") {
   testonly = true
 
   sources = [ "report_store_metadata_unittest.cc" ]
