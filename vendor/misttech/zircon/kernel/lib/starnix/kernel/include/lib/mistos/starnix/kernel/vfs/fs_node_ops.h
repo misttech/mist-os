@@ -10,7 +10,6 @@
 #include <lib/mistos/starnix/kernel/vfs/fs_node_info.h>
 #include <lib/mistos/starnix/kernel/vfs/namespace_node.h>
 #include <lib/mistos/starnix/kernel/vfs/path.h>
-#include <lib/mistos/starnix/kernel/vfs/xattr.h>
 #include <lib/mistos/starnix_uapi/auth.h>
 #include <lib/mistos/starnix_uapi/device_type.h>
 #include <lib/mistos/starnix_uapi/errors.h>
@@ -24,6 +23,7 @@
 
 #include <asm/stat.h>
 #include <linux/fsverity.h>
+#include <linux/xattr.h>
 
 namespace starnix {
 
@@ -36,6 +36,27 @@ using FileMode = starnix_uapi::FileMode;
 using DeviceType = starnix_uapi::DeviceType;
 using FsCred = starnix_uapi::FsCred;
 struct SymlinkTarget;
+
+enum class XattrOp {
+  Set,
+  Create,
+  Replace,
+};
+
+class XattrOpHelper {
+ public:
+  static uint32_t into_flags(XattrOp op) {
+    switch (op) {
+      case XattrOp::Set:
+        return 0;
+      case XattrOp::Create:
+        return XATTR_CREATE;
+      case XattrOp::Replace:
+        return XATTR_REPLACE;
+    }
+    return 0;  // Default to 0 if op is not recognized
+  }
+};
 
 /// Returns a value, or the size required to contains it.
 template <typename T>
@@ -264,8 +285,44 @@ class FsNodeOps {
   }                                                                                                \
   using __fs_node_impl_dir_readonly_force_semicolon = int
 
-/// Implements [`FsNodeOps::set_xattr`] by delegating to another [`FsNodeOps`]
-/// object.
+class XattrStorage {
+ public:
+  /// Delegate for [`FsNodeOps::get_xattr`].
+  virtual fit::result<Errno, FsString> get_xattr(const FsStr& name) const = 0;
+
+  /// Delegate for [`FsNodeOps::set_xattr`].
+  virtual fit::result<Errno> set_xattr(const FsStr& name, const FsStr& value, XattrOp op) const = 0;
+
+  /// Delegate for [`FsNodeOps::remove_xattr`].
+  virtual fit::result<Errno> remove_xattr(const FsStr& name) const = 0;
+
+  /// Delegate for [`FsNodeOps::list_xattrs`].
+  virtual fit::result<Errno, fbl::Vector<FsString>> list_xattrs(const FsStr& name) const = 0;
+
+  virtual ~XattrStorage() = default;
+};
+
+/// Implements extended attribute ops for [`FsNodeOps`] by delegating to another object which
+/// implements the [`XattrStorage`] trait or a similar interface. For example:
+///
+/// ```
+/// struct Xattrs {}
+///
+/// impl XattrStorage for Xattrs {
+///     // implement XattrStorage
+/// }
+///
+/// struct Node {
+///     xattrs: Xattrs
+/// }
+///
+/// impl FsNodeOps for Node {
+///     // Delegate extended attribute ops in FsNodeOps to self.xattrs
+///     fs_node_impl_xattr_delegate!(self, self.xattrs);
+///
+///     // add other FsNodeOps impls here
+/// }
+/// ```
 #define fs_node_impl_xattr_delegate(delegate)                                                  \
   fit::result<Errno, ValueOrSize<FsString>> get_xattr(                                         \
       const FsNode& node, const CurrentTask& current_task, const FsStr& name, size_t max_size) \
