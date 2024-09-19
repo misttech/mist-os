@@ -11,7 +11,7 @@ use futures::{TryFutureExt, TryStreamExt};
 use std::cmp::Reverse;
 use std::collections::HashMap;
 
-const CPU_DRIVER_TIMEOUT: Duration = Duration::from_seconds(60);
+const CPU_DRIVER_TIMEOUT: Duration = Duration::from_seconds(5);
 
 pub async fn get_cpu_ctrl_proxy(
     node_info: &str,

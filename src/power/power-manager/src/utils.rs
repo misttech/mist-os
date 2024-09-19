@@ -113,7 +113,7 @@ impl CobaltIntHistogram {
     }
 }
 
-const TEMPERATURE_DRIVER_TIMEOUT: Duration = Duration::from_seconds(60);
+const TEMPERATURE_DRIVER_TIMEOUT: Duration = Duration::from_seconds(5);
 
 pub async fn get_temperature_driver_proxy(
     sensor_name: &str,
