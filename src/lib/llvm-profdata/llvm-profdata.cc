@@ -369,14 +369,14 @@ void MergeCounters(cpp20::span<std::byte> to, cpp20::span<const std::byte> from)
 }
 
 void UseData(cpp20::span<std::byte> self_data, uintptr_t& bias_var, const char* what,
-             cpp20::span<std::byte> data) {
+             size_t alignment, cpp20::span<std::byte> data) {
   ZX_ASSERT_MSG(data.size_bytes() >= self_data.size_bytes(),
                 "cannot relocate %zu bytes of %s with only %zu bytes left!", self_data.size_bytes(),
                 what, data.size_bytes());
 
   const uintptr_t old_addr = reinterpret_cast<uintptr_t>(self_data.data());
   const uintptr_t new_addr = reinterpret_cast<uintptr_t>(data.data());
-  ZX_ASSERT(new_addr % LlvmProfdata::kAlign == 0);
+  ZX_ASSERT(new_addr % alignment == 0);
   const uintptr_t new_bias = new_addr - old_addr;
 
   // Now that the data has been copied (or merged), start updating the new
@@ -546,12 +546,12 @@ void LlvmProfdata::MergeLiveData(LiveData to, LiveData from) {
 void LlvmProfdata::UseLiveData(LiveData data) {
 #ifdef INSTR_PROF_PROFILE_BITMAP_BIAS_VAR
   UseData(cpp20::as_writable_bytes(ProfBitmapData()), INSTR_PROF_PROFILE_BITMAP_BIAS_VAR, "bitmap",
-          data.bitmap);
+          1, data.bitmap);
 #else
   ZX_ASSERT_MSG(data.bitmap.empty(), "bitmap bytes cannot be relocated");
 #endif
   UseData(cpp20::as_writable_bytes(ProfCountersData()), INSTR_PROF_PROFILE_COUNTER_BIAS_VAR,
-          "counters", data.counters);
+          "counters", LiveDataCountersAlignment(), data.counters);
 }
 
 void LlvmProfdata::UseLinkTimeLiveData() {

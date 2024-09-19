@@ -16,6 +16,11 @@ class LlvmProfdata {
     cpp20::span<std::byte> counters, bitmap;
   };
 
+  // This is the minimum alignment required for LiveData::counters::data().
+  static size_t LiveDataCountersAlignment() {
+    return UsingSingleByteCounters() ? 1 : sizeof(uint64_t);
+  }
+
   // The object can be default-constructed and copied into, but cannot be used
   // in its default-constructed state.
   LlvmProfdata() = default;
