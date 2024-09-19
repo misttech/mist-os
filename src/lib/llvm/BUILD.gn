@@ -23,10 +23,12 @@ if (true) {
   prebuilt_instance_id = prebuilt_cipd_version.instance_id
 
   old_prebuilt_instance_ids = [
-    "YLA3-L3DfwImnY-bZ1oAEl3B6anO5dz1LMhSsiF7l7UC",  # linux-amd64
-    "ke6AnH4NtJ8SnhpX9sfCwGJKFFDCTNbaWJzLxOeCYkkC",  # linux-arm64
-    "JhfSTBh7lzST9p5tPypiYKwYOfcbXnMFNA9jluclYoMC",  # mac-amd64
-    "9g5EChWXrTRWNiVpKBRQ-mazvSkQ034yYONFQxdw_CgC",  # mac-arm64
+    "6pjf04ojQend7Yn7V2EqMU5Yd7rT6fdLt_VCETiVE20C",  # linux-amd64
+    "0UeQ8-HnMhF7Gl1VqjUd9NhyIeblz5SGLwR94I2V91gC",  # linux-arm64
+    "92DQKmMU06UjL3Hg3RClzuGOwnu4QmC9MLwsimJpZfwC",  # mac-amd64
+    "AhZdzeYyfmS7oH8iTHhWgyp6ZahnkID7KmAgCjfYoVQC",  # mac-arm64
+    "DasLFaL2XnayGHEew4ScQWfCPDVR9PDj0Yfq22m4fGcC",  # fuchsia-amd64
+    "688rAnuUP4_F5zG5z7z49ZRo4J78p9dtmA2rb5spgQwC",  # fuchsia-arm64
   ]
 
   using_old_prebuilt = old_prebuilt_instance_ids + [ prebuilt_instance_id ] -
@@ -134,6 +136,10 @@ llvm_library("LLVMAArch64CodeGen") {
     ":LLVMTargetParser",
     ":LLVMTransformUtils",
   ]
+
+  if (!using_old_prebuilt) {
+    deps += [ ":LLVMVectorize" ]
+  }
 }
 
 llvm_library("LLVMAArch64Desc") {
@@ -180,6 +186,10 @@ llvm_library("LLVMAnalysis") {
     ":LLVMProfileData",
     ":LLVMSupport",
   ]
+
+  if (!using_old_prebuilt) {
+    deps += [ ":LLVMTargetParser" ]
+  }
 }
 
 llvm_library("LLVMAggressiveInstCombine") {
@@ -199,21 +209,40 @@ llvm_library("LLVMAsmParser") {
   ]
 }
 
-llvm_library("LLVMAsmPrinter") {
-  deps = [
-    ":LLVMAnalysis",
-    ":LLVMBinaryFormat",
-    ":LLVMCodeGen",
-    ":LLVMCore",
-    ":LLVMDebugInfoCodeView",
-    ":LLVMDebugInfoDWARF",
-    ":LLVMDebugInfoMSF",
-    ":LLVMMC",
-    ":LLVMMCParser",
-    ":LLVMRemarks",
-    ":LLVMSupport",
-    ":LLVMTarget",
-  ]
+if (using_old_prebuilt) {
+  llvm_library("LLVMAsmPrinter") {
+    deps = [
+      ":LLVMAnalysis",
+      ":LLVMBinaryFormat",
+      ":LLVMCodeGen",
+      ":LLVMCore",
+      ":LLVMDebugInfoCodeView",
+      ":LLVMDebugInfoDWARF",
+      ":LLVMDebugInfoMSF",
+      ":LLVMMC",
+      ":LLVMMCParser",
+      ":LLVMRemarks",
+      ":LLVMSupport",
+      ":LLVMTarget",
+    ]
+  }
+} else {
+  llvm_library("LLVMAsmPrinter") {
+    deps = [
+      ":LLVMAnalysis",
+      ":LLVMBinaryFormat",
+      ":LLVMCodeGen",
+      ":LLVMCore",
+      ":LLVMDebugInfoCodeView",
+      ":LLVMDebugInfoDWARF",
+      ":LLVMMC",
+      ":LLVMMCParser",
+      ":LLVMRemarks",
+      ":LLVMSupport",
+      ":LLVMTarget",
+      ":LLVMTargetParser",
+    ]
+  }
 }
 
 llvm_library("LLVMBinaryFormat") {
@@ -246,19 +275,45 @@ llvm_library("LLVMBitstreamReader") {
   deps = [ ":LLVMSupport" ]
 }
 
-llvm_library("LLVMCodeGen") {
-  deps = [
-    ":LLVMAnalysis",
-    ":LLVMBitReader",
-    ":LLVMBitWriter",
-    ":LLVMCore",
-    ":LLVMMC",
-    ":LLVMProfileData",
-    ":LLVMScalarOpts",
-    ":LLVMSupport",
-    ":LLVMTarget",
-    ":LLVMTransformUtils",
-  ]
+if (using_old_prebuilt) {
+  llvm_library("LLVMCodeGen") {
+    deps = [
+      ":LLVMAnalysis",
+      ":LLVMBitReader",
+      ":LLVMBitWriter",
+      ":LLVMCore",
+      ":LLVMMC",
+      ":LLVMProfileData",
+      ":LLVMScalarOpts",
+      ":LLVMSupport",
+      ":LLVMTarget",
+      ":LLVMTransformUtils",
+    ]
+  }
+} else {
+  llvm_library("LLVMCGData") {
+    deps = [
+      ":LLVMObject",
+      ":LLVMSupport",
+    ]
+  }
+
+  llvm_library("LLVMCodeGen") {
+    deps = [
+      ":LLVMAnalysis",
+      ":LLVMCGData",
+      ":LLVMCodeGenTypes",
+      ":LLVMCore",
+      ":LLVMMC",
+      ":LLVMObjCARCOpts",
+      ":LLVMProfileData",
+      ":LLVMScalarOpts",
+      ":LLVMSupport",
+      ":LLVMTarget",
+      ":LLVMTargetParser",
+      ":LLVMTransformUtils",
+    ]
+  }
 }
 
 llvm_library("LLVMCFGuard") {
@@ -282,15 +337,34 @@ llvm_library("LLVMCore") {
   ]
 }
 
-llvm_library("LLVMCoroutines") {
-  deps = [
-    ":LLVMAnalysis",
-    ":LLVMCore",
-    ":LLVMScalarOpts",
-    ":LLVMSupport",
-    ":LLVMTransformUtils",
-    ":LLVMipo",
-  ]
+if (using_old_prebuilt) {
+  llvm_library("LLVMCoroutines") {
+    deps = [
+      ":LLVMAnalysis",
+      ":LLVMCore",
+      ":LLVMScalarOpts",
+      ":LLVMSupport",
+      ":LLVMTransformUtils",
+      ":LLVMipo",
+    ]
+  }
+} else {
+  llvm_library("LLVMCoroutines") {
+    deps = [
+      ":LLVMAnalysis",
+      ":LLVMCore",
+      ":LLVMScalarOpts",
+      ":LLVMSupport",
+      ":LLVMTargetParser",
+      ":LLVMTransformUtils",
+    ]
+  }
+}
+
+if (!using_old_prebuilt) {
+  llvm_library("LLVMDebugInfoBTF") {
+    deps = [ ":LLVMSupport" ]
+  }
 }
 
 llvm_library("LLVMDebugInfoCodeView") {
@@ -324,25 +398,52 @@ llvm_library("LLVMDemangle") {
   deps = []
 }
 
-llvm_library("LLVMExecutionEngine") {
-  deps = [
-    ":LLVMCore",
-    ":LLVMMC",
-    ":LLVMObject",
-    ":LLVMOrcTargetProcess",
-    ":LLVMRuntimeDyld",
-    ":LLVMSupport",
-    ":LLVMTarget",
-  ]
+if (using_old_prebuilt) {
+  llvm_library("LLVMExecutionEngine") {
+    deps = [
+      ":LLVMCore",
+      ":LLVMMC",
+      ":LLVMObject",
+      ":LLVMOrcTargetProcess",
+      ":LLVMRuntimeDyld",
+      ":LLVMSupport",
+      ":LLVMTarget",
+    ]
+  }
+} else {
+  llvm_library("LLVMExecutionEngine") {
+    deps = [
+      ":LLVMCore",
+      ":LLVMMC",
+      ":LLVMObject",
+      ":LLVMOrcTargetProcess",
+      ":LLVMRuntimeDyld",
+      ":LLVMSupport",
+      ":LLVMTargetParser",
+    ]
+  }
 }
 
-llvm_library("LLVMFrontendOffloading") {
-  deps = [
-    ":LLVMCore",
-    ":LLVMSupport",
-    ":LLVMTargetParser",
-    ":LLVMTransformUtils",
-  ]
+if (using_old_prebuilt) {
+  llvm_library("LLVMFrontendOffloading") {
+    deps = [
+      ":LLVMCore",
+      ":LLVMSupport",
+      ":LLVMTargetParser",
+      ":LLVMTransformUtils",
+    ]
+  }
+} else {
+  llvm_library("LLVMFrontendOffloading") {
+    deps = [
+      ":LLVMBinaryFormat",
+      ":LLVMCore",
+      ":LLVMObject",
+      ":LLVMSupport",
+      ":LLVMTargetParser",
+      ":LLVMTransformUtils",
+    ]
+  }
 }
 
 llvm_library("LLVMFrontendOpenMP") {
@@ -357,6 +458,10 @@ llvm_library("LLVMFrontendOpenMP") {
     ":LLVMTargetParser",
     ":LLVMTransformUtils",
   ]
+
+  if (!using_old_prebuilt) {
+    deps += [ ":LLVMDemangle" ]
+  }
 }
 
 llvm_library("LLVMGlobalISel") {
@@ -370,6 +475,10 @@ llvm_library("LLVMGlobalISel") {
     ":LLVMTarget",
     ":LLVMTransformUtils",
   ]
+
+  if (!using_old_prebuilt) {
+    deps += [ ":LLVMCodeGenTypes" ]
+  }
 }
 
 llvm_library("LLVMHipStdPar") {
@@ -400,27 +509,64 @@ llvm_library("LLVMInstrumentation") {
     ":LLVMSupport",
     ":LLVMTransformUtils",
   ]
+
+  if (!using_old_prebuilt) {
+    deps += [ ":LLVMTargetParser" ]
+  }
 }
 
-llvm_library("LLVMipo") {
+llvm_library("LLVMLinker") {
   deps = [
-    ":LLVMAggressiveInstCombine",
-    ":LLVMAnalysis",
-    ":LLVMBitReader",
-    ":LLVMBitWriter",
     ":LLVMCore",
-    ":LLVMFrontendOpenMP",
-    ":LLVMIRReader",
-    ":LLVMInstCombine",
-    ":LLVMInstrumentation",
-    ":LLVMLinker",
     ":LLVMObject",
-    ":LLVMProfileData",
-    ":LLVMScalarOpts",
     ":LLVMSupport",
     ":LLVMTransformUtils",
-    ":LLVMVectorize",
   ]
+
+  if (!using_old_prebuilt) {
+    deps += [ ":LLVMTargetParser" ]
+  }
+}
+
+if (using_old_prebuilt) {
+  llvm_library("LLVMipo") {
+    deps = [
+      ":LLVMAggressiveInstCombine",
+      ":LLVMAnalysis",
+      ":LLVMBitReader",
+      ":LLVMBitWriter",
+      ":LLVMCore",
+      ":LLVMFrontendOpenMP",
+      ":LLVMIRReader",
+      ":LLVMInstCombine",
+      ":LLVMInstrumentation",
+      ":LLVMLinker",
+      ":LLVMObject",
+      ":LLVMProfileData",
+      ":LLVMScalarOpts",
+      ":LLVMSupport",
+      ":LLVMTransformUtils",
+      ":LLVMVectorize",
+    ]
+  }
+} else {
+  llvm_library("LLVMipo") {
+    deps = [
+      ":LLVMAnalysis",
+      ":LLVMBitReader",
+      ":LLVMBitWriter",
+      ":LLVMCore",
+      ":LLVMFrontendOpenMP",
+      ":LLVMIRReader",
+      ":LLVMInstrumentation",
+      ":LLVMLinker",
+      ":LLVMObject",
+      ":LLVMProfileData",
+      ":LLVMSupport",
+      ":LLVMTargetParser",
+      ":LLVMTransformUtils",
+    ]
+  }
 }
 
 llvm_library("LLVMIRPrinter") {
@@ -437,15 +583,6 @@ llvm_library("LLVMIRReader") {
     ":LLVMBitReader",
     ":LLVMCore",
     ":LLVMSupport",
-  ]
-}
-
-llvm_library("LLVMLinker") {
-  deps = [
-    ":LLVMCore",
-    ":LLVMObject",
-    ":LLVMSupport",
-    ":LLVMTransformUtils",
   ]
 }
 
@@ -516,71 +653,105 @@ llvm_library("LLVMOrcTargetProcess") {
     ":LLVMOrcShared",
     ":LLVMSupport",
   ]
-}
 
-llvm_library("LLVMPasses") {
-  deps = [
-    ":LLVMAggressiveInstCombine",
-    ":LLVMAnalysis",
-    ":LLVMCore",
-    ":LLVMCoroutines",
-    ":LLVMHipStdPar",
-    ":LLVMInstCombine",
-    ":LLVMInstrumentation",
-    ":LLVMObjCARCOpts",
-    ":LLVMScalarOpts",
-    ":LLVMSupport",
-    ":LLVMTarget",
-    ":LLVMTransformUtils",
-    ":LLVMVectorize",
-    ":LLVMipo",
-  ]
-}
-
-llvm_library("LLVMProfileData") {
-  deps = [
-    ":LLVMCore",
-    ":LLVMDebugInfoDWARF",
-    ":LLVMDemangle",
-    ":LLVMObject",
-    ":LLVMSupport",
-    ":LLVMSymbolize",
-  ]
+  if (!using_old_prebuilt) {
+    deps += [ ":LLVMTargetParser" ]
+  }
 }
 
 if (using_old_prebuilt) {
-  group("LLVMRISCVDesc") {
-  }
-  group("LLVMRISCVDisassembler") {
-  }
-  group("LLVMRISCVInfo") {
+  llvm_library("LLVMPasses") {
+    deps = [
+      ":LLVMAggressiveInstCombine",
+      ":LLVMAnalysis",
+      ":LLVMCore",
+      ":LLVMCoroutines",
+      ":LLVMHipStdPar",
+      ":LLVMInstCombine",
+      ":LLVMInstrumentation",
+      ":LLVMObjCARCOpts",
+      ":LLVMScalarOpts",
+      ":LLVMSupport",
+      ":LLVMTarget",
+      ":LLVMTransformUtils",
+      ":LLVMVectorize",
+      ":LLVMipo",
+    ]
   }
 } else {
-  llvm_library("LLVMRISCVDesc") {
+  llvm_library("LLVMPasses") {
     deps = [
-      ":LLVMMC",
-      ":LLVMRISCVInfo",
+      ":LLVMAggressiveInstCombine",
+      ":LLVMAnalysis",
+      ":LLVMCFGuard",
+      ":LLVMCodeGen",
+      ":LLVMCore",
+      ":LLVMCoroutines",
+      ":LLVMHipStdPar",
+      ":LLVMIRPrinter",
+      ":LLVMInstCombine",
+      ":LLVMInstrumentation",
+      ":LLVMObjCARCOpts",
+      ":LLVMScalarOpts",
       ":LLVMSupport",
+      ":LLVMTarget",
+      ":LLVMTransformUtils",
+      ":LLVMVectorize",
+      ":LLVMipo",
+    ]
+  }
+}
+
+if (using_old_prebuilt) {
+  llvm_library("LLVMProfileData") {
+    deps = [
+      ":LLVMCore",
+      ":LLVMDebugInfoDWARF",
+      ":LLVMDemangle",
+      ":LLVMObject",
+      ":LLVMSupport",
+      ":LLVMSymbolize",
+    ]
+  }
+} else {
+  llvm_library("LLVMProfileData") {
+    deps = [
+      ":LLVMBitstreamReader",
+      ":LLVMCore",
+      ":LLVMDebugInfoDWARF",
+      ":LLVMDemangle",
+      ":LLVMObject",
+      ":LLVMSupport",
+      ":LLVMSymbolize",
       ":LLVMTargetParser",
     ]
   }
+}
 
-  llvm_library("LLVMRISCVDisassembler") {
-    deps = [
-      ":LLVMMC",
-      ":LLVMMCDisassembler",
-      ":LLVMRISCVDesc",
-      ":LLVMRISCVInfo",
-      ":LLVMSupport",
-    ]
-  }
+llvm_library("LLVMRISCVDesc") {
+  deps = [
+    ":LLVMMC",
+    ":LLVMRISCVInfo",
+    ":LLVMSupport",
+    ":LLVMTargetParser",
+  ]
+}
 
-  llvm_library("LLVMRISCVInfo") {
-    deps = [
-      ":LLVMMC",
-      ":LLVMSupport",
-    ]
-  }
+llvm_library("LLVMRISCVDisassembler") {
+  deps = [
+    ":LLVMMC",
+    ":LLVMMCDisassembler",
+    ":LLVMRISCVDesc",
+    ":LLVMRISCVInfo",
+    ":LLVMSupport",
+  ]
+}
+
+llvm_library("LLVMRISCVInfo") {
+  deps = [
+    ":LLVMMC",
+    ":LLVMSupport",
+  ]
 }
 
 llvm_library("LLVMRemarks") {
@@ -597,17 +768,41 @@ llvm_library("LLVMRuntimeDyld") {
     ":LLVMObject",
     ":LLVMSupport",
   ]
+
+  if (!using_old_prebuilt) {
+    deps += [ ":LLVMTargetParser" ]
+  }
 }
 
-llvm_library("LLVMScalarOpts") {
-  deps = [
-    ":LLVMAggressiveInstCombine",
-    ":LLVMAnalysis",
-    ":LLVMCore",
-    ":LLVMInstCombine",
-    ":LLVMSupport",
-    ":LLVMTransformUtils",
-  ]
+if (!using_old_prebuilt) {
+  llvm_library("LLVMSandboxIR") {
+    deps = [
+      ":LLVMCore",
+      ":LLVMSupport",
+    ]
+  }
+}
+
+if (using_old_prebuilt) {
+  llvm_library("LLVMScalarOpts") {
+    deps = [
+      ":LLVMAggressiveInstCombine",
+      ":LLVMAnalysis",
+      ":LLVMCore",
+      ":LLVMInstCombine",
+      ":LLVMSupport",
+      ":LLVMTransformUtils",
+    ]
+  }
+} else {
+  llvm_library("LLVMScalarOpts") {
+    deps = [
+      ":LLVMAnalysis",
+      ":LLVMCore",
+      ":LLVMSupport",
+      ":LLVMTransformUtils",
+    ]
+  }
 }
 
 llvm_library("LLVMSelectionDAG") {
@@ -634,6 +829,13 @@ llvm_library("LLVMSymbolize") {
     ":LLVMObject",
     ":LLVMSupport",
   ]
+
+  if (!using_old_prebuilt) {
+    deps += [
+      ":LLVMDebugInfoBTF",
+      ":LLVMTargetParser",
+    ]
+  }
 }
 
 llvm_library("LLVMTarget") {
@@ -643,6 +845,10 @@ llvm_library("LLVMTarget") {
     ":LLVMMC",
     ":LLVMSupport",
   ]
+
+  if (!using_old_prebuilt) {
+    deps += [ ":LLVMTargetParser" ]
+  }
 }
 
 llvm_library("LLVMTargetParser") {
@@ -662,6 +868,10 @@ llvm_library("LLVMTransformUtils") {
     ":LLVMCore",
     ":LLVMSupport",
   ]
+
+  if (!using_old_prebuilt) {
+    deps += [ ":LLVMTargetParser" ]
+  }
 }
 
 llvm_library("LLVMVectorize") {
@@ -671,28 +881,57 @@ llvm_library("LLVMVectorize") {
     ":LLVMSupport",
     ":LLVMTransformUtils",
   ]
+
+  if (!using_old_prebuilt) {
+    deps += [ ":LLVMSandboxIR" ]
+  }
 }
 
-llvm_library("LLVMX86CodeGen") {
-  deps = [
-    ":LLVMAnalysis",
-    ":LLVMAsmPrinter",
-    ":LLVMCFGuard",
-    ":LLVMCodeGen",
-    ":LLVMCodeGenTypes",
-    ":LLVMCore",
-    ":LLVMGlobalISel",
-    ":LLVMInstrumentation",
-    ":LLVMMC",
-    ":LLVMProfileData",
-    ":LLVMSelectionDAG",
-    ":LLVMSupport",
-    ":LLVMTarget",
-    ":LLVMTargetParser",
-    ":LLVMTransformUtils",
-    ":LLVMX86Desc",
-    ":LLVMX86Info",
-  ]
+if (using_old_prebuilt) {
+  llvm_library("LLVMX86CodeGen") {
+    deps = [
+      ":LLVMAnalysis",
+      ":LLVMAsmPrinter",
+      ":LLVMCFGuard",
+      ":LLVMCodeGen",
+      ":LLVMCodeGenTypes",
+      ":LLVMCore",
+      ":LLVMGlobalISel",
+      ":LLVMInstrumentation",
+      ":LLVMMC",
+      ":LLVMProfileData",
+      ":LLVMSelectionDAG",
+      ":LLVMSupport",
+      ":LLVMTarget",
+      ":LLVMTargetParser",
+      ":LLVMTransformUtils",
+      ":LLVMX86Desc",
+      ":LLVMX86Info",
+    ]
+  }
+} else {
+  llvm_library("LLVMX86CodeGen") {
+    deps = [
+      ":LLVMAnalysis",
+      ":LLVMAsmPrinter",
+      ":LLVMCFGuard",
+      ":LLVMCodeGen",
+      ":LLVMCore",
+      ":LLVMGlobalISel",
+      ":LLVMIRPrinter",
+      ":LLVMInstrumentation",
+      ":LLVMMC",
+      ":LLVMProfileData",
+      ":LLVMScalarOpts",
+      ":LLVMSelectionDAG",
+      ":LLVMSupport",
+      ":LLVMTarget",
+      ":LLVMTargetParser",
+      ":LLVMTransformUtils",
+      ":LLVMX86Desc",
+      ":LLVMX86Info",
+    ]
+  }
 }
 
 llvm_library("LLVMX86Desc") {
