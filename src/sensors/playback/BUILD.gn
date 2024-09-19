@@ -5,6 +5,7 @@
 import("//build/components.gni")
 import("//build/dist/resource.gni")
 import("//build/test.gni")
+import("//build/testing/cc_test_executable.gni")
 
 group("tests") {
   testonly = true
@@ -192,7 +193,7 @@ fuchsia_package("sensors_playback_with_test_data") {
   ]
 }
 
-executable("playback_integration_test_bin") {
+cc_test_executable("playback_integration_test_bin") {
   testonly = true
   sources = [ "playback_integration_test.cc" ]
   deps = [
