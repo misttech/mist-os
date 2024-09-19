@@ -13,6 +13,7 @@
 #include <ktl/array.h>
 #include <ktl/move.h>
 #include <ktl/optional.h>
+#include <ktl/string_view.h>
 #include <ktl/unique_ptr.h>
 
 #include <linux/fs.h>
@@ -24,10 +25,10 @@ namespace starnix_uapi {
 // A description of a resource.
 struct ResourceDesc {
   // The name of the resource.
-  const char* name;
+  ktl::string_view name;
 
   // The units in which limits on the resource are expressed.
-  const char* unit;
+  ktl::string_view unit;
 };
 
 enum class ResourceEnum : uint32_t {
@@ -98,37 +99,37 @@ struct Resource {
   ResourceDesc desc() {
     switch (value) {
       case ResourceEnum::CPU:
-        return {"Max cpu time", "seconds"};
+        return {.name = "Max cpu time"sv, .unit = "seconds"sv};
       case ResourceEnum::FSIZE:
-        return {"Max file size", "bytes"};
+        return {.name = "Max file size"sv, .unit = "bytes"sv};
       case ResourceEnum::DATA:
-        return {"Max data size", "bytes"};
+        return {.name = "Max data size"sv, .unit = "bytes"sv};
       case ResourceEnum::STACK:
-        return {"Max stack size", "bytes"};
+        return {.name = "Max stack size"sv, .unit = "bytes"sv};
       case ResourceEnum::CORE:
-        return {"Max core file size", "bytes"};
+        return {.name = "Max core file size"sv, .unit = "bytes"sv};
       case ResourceEnum::RSS:
-        return {"Max resident set", "bytes"};
+        return {.name = "Max resident set"sv, .unit = "bytes"sv};
       case ResourceEnum::NPROC:
-        return {"Max processes", "processes"};
+        return {.name = "Max processes"sv, .unit = "processes"sv};
       case ResourceEnum::NOFILE:
-        return {"Max open files", "files"};
+        return {.name = "Max open files"sv, .unit = "files"sv};
       case ResourceEnum::MEMLOCK:
-        return {"Max locked memory", "bytes"};
+        return {.name = "Max locked memory"sv, .unit = "bytes"sv};
       case ResourceEnum::AS:
-        return {"Max address space", "bytes"};
+        return {.name = "Max address space"sv, .unit = "bytes"sv};
       case ResourceEnum::LOCKS:
-        return {"Max file locks", "bytes"};
+        return {.name = "Max file locks"sv, .unit = "bytes"sv};
       case ResourceEnum::SIGPENDING:
-        return {"Max pending signals", "signals"};
+        return {.name = "Max pending signals"sv, .unit = "signals"sv};
       case ResourceEnum::MSGQUEUE:
-        return {"Max msgqueue size", "bytes"};
+        return {.name = "Max msgqueue size"sv, .unit = "bytes"sv};
       case ResourceEnum::NICE:
-        return {"Max nice priority", ""};
+        return {.name = "Max nice priority"sv, .unit = ""sv};
       case ResourceEnum::RTPRIO:
-        return {"Max realtime priority", ""};
+        return {.name = "Max realtime priority"sv, .unit = ""sv};
       case ResourceEnum::RTTIME:
-        return {"Max realtime timeout", "us"};
+        return {.name = "Max realtime timeout"sv, .unit = "us"sv};
     }
   }
 
@@ -139,7 +140,7 @@ struct Resource {
 };
 
 // Define INFINITE_LIMIT and other constants
-const rlimit INFINITE_LIMIT = {RLIM_INFINITY, RLIM_INFINITY};
+const rlimit INFINITE_LIMIT = {.rlim_cur = RLIM_INFINITY, .rlim_max = RLIM_INFINITY};
 
 // Most default limit values are the same that are used in GVisor, see
 // https://github.com/google/gvisor/blob/master/pkg/abi/linux/limits.go .
@@ -152,13 +153,13 @@ const unsigned long SIGPENDING_LIMIT = 0x1FFFFFFF;
 
 // Define DEFAULT_LIMITS as std::array
 const std::array<std::pair<Resource, rlimit>, 7> DEFAULT_LIMITS = {
-    {{{ResourceEnum::STACK}, {_STK_LIM, RLIM_INFINITY}},
-     {{ResourceEnum::CORE}, {0, RLIM_INFINITY}},
-     {{ResourceEnum::NPROC}, {NPROC_LIMIT, NPROC_LIMIT}},
-     {{ResourceEnum::NOFILE}, {INR_OPEN_CUR, INR_OPEN_MAX}},
-     {{ResourceEnum::MEMLOCK}, {MLOCK_LIMIT, MLOCK_LIMIT}},
-     {{ResourceEnum::SIGPENDING}, {SIGPENDING_LIMIT, SIGPENDING_LIMIT}},
-     {{ResourceEnum::MSGQUEUE}, {MQ_BYTES_MAX, MQ_BYTES_MAX}}}};
+    {{{ResourceEnum::STACK}, {.rlim_cur = _STK_LIM, .rlim_max = RLIM_INFINITY}},
+     {{ResourceEnum::CORE}, {.rlim_cur = 0, .rlim_max = RLIM_INFINITY}},
+     {{ResourceEnum::NPROC}, {.rlim_cur = NPROC_LIMIT, .rlim_max = NPROC_LIMIT}},
+     {{ResourceEnum::NOFILE}, {.rlim_cur = INR_OPEN_CUR, .rlim_max = INR_OPEN_MAX}},
+     {{ResourceEnum::MEMLOCK}, {.rlim_cur = MLOCK_LIMIT, .rlim_max = MLOCK_LIMIT}},
+     {{ResourceEnum::SIGPENDING}, {.rlim_cur = SIGPENDING_LIMIT, .rlim_max = SIGPENDING_LIMIT}},
+     {{ResourceEnum::MSGQUEUE}, {.rlim_cur = MQ_BYTES_MAX, .rlim_max = MQ_BYTES_MAX}}}};
 
 class ResourceLimits {
  public:
