@@ -68,12 +68,6 @@ open protocol Device {
     });
 };
 
-// TODO(362267368): Remove this after controller drivers have been transitioned to one of the two
-// services below.
-service Service {
-    device client_end:Device;
-};
-
 /// This service represents an SPMI target device. Clients have access to the entire SPMI register
 /// range.
 service TargetService {
