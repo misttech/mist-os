@@ -157,6 +157,8 @@ class BlockBuffer {
   void *data_ = nullptr;
 };
 
+// It should be acquired in shared mode before any operations modifying data and metadata (i.e.,
+// data, node and meta blocks). GC and checkpoint acquire it exclusively.
 inline std::shared_mutex &GetGlobalLock() {
   static fbl::NoDestructor<std::shared_mutex> global_lock;
   return *global_lock;

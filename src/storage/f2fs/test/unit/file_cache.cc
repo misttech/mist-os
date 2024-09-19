@@ -19,8 +19,7 @@ TEST_F(FileCacheTest, WaitOnWriteback) {
   char buf[kPageSize];
   FileTester::AppendToFile(&vnode<File>(), buf, kPageSize);
 
-  WritebackOperation op = {.bSync = false};
-  vnode<File>().Writeback(op);
+  vnode<File>().Writeback(false, true);
   LockedPage page = GetPage(0);
   ASSERT_TRUE(page->IsWriteback());
   page.WaitOnWriteback();
@@ -51,9 +50,6 @@ TEST_F(FileCacheTest, EvictActivePages) {
   FileTester::AppendToFile(&file, buf, kPageSize);
   FileTester::AppendToFile(&file, buf, kPageSize);
 
-  // Configure op to flush dirty Pages in a sync manner.
-  WritebackOperation op = {.bSync = true, .bReleasePages = false};
-
   constexpr uint64_t kPageNum = 2;
   fbl::RefPtr<Page> unlock_page;
   Page *raw_pages[kPageNum];
@@ -68,7 +64,7 @@ TEST_F(FileCacheTest, EvictActivePages) {
   }
 
   // Flush every dirty Page regardless of its active flag.
-  ASSERT_EQ(file.Writeback(op), kPageNum);
+  ASSERT_EQ(file.Writeback(true, false), kPageNum);
 
   for (auto i = 0ULL; i < kPageNum; ++i) {
     LockedPage page = GetPage(i);
@@ -87,9 +83,7 @@ TEST_F(FileCacheTest, EvictActivePages) {
   }
 
   // Evict every inactive Page.
-  op.bReleasePages = true;
-  op.bSync = false;
-  ASSERT_EQ(file.Writeback(op), 0ULL);
+  ASSERT_EQ(file.Writeback(false, true), 0ULL);
 
   for (auto i = 0ULL; i < kPageNum; ++i) {
     ASSERT_FALSE(raw_pages[i]->IsActive());
@@ -106,7 +100,7 @@ TEST_F(FileCacheTest, WritebackOperation) {
                            .end = 2,
                            .to_write = 2,
                            .bSync = true,
-                           .bReleasePages = false,
+                           .bReclaim = false,
                            .if_page = [&key](const fbl::RefPtr<Page> &page) {
                              if (page->GetKey() <= key) {
                                return ZX_OK;
@@ -119,6 +113,7 @@ TEST_F(FileCacheTest, WritebackOperation) {
   FileTester::AppendToFile(&file, buf, kPageSize);
   FileTester::AppendToFile(&file, buf, kPageSize);
   // Flush the Page of 1st block.
+  std::lock_guard gc_lock(f2fs::GetGlobalLock());
   {
     LockedPage page = GetPage(0);
     ASSERT_EQ(file.GetDirtyPageCount(), 2U);
@@ -187,8 +182,7 @@ TEST_F(FileCacheTest, Recycle) {
   }
 
   // Remove |raw_page| from the list to invoke Page::fbl_recycle().
-  WritebackOperation op = {.bSync = true, .bReleasePages = false};
-  file.Writeback(op);
+  file.Writeback(true);
   ASSERT_FALSE(raw_page->IsDirty());
 
   // raw_page should be inacive and keep a reference in the tree after Page::fbl_recycle().
@@ -327,6 +321,7 @@ TEST_F(FileCacheTest, Basic) {
 
   // Write out some dirty pages
   WritebackOperation op = {.end = nblocks / 2, .bSync = true};
+  fs::SharedLock lock(f2fs::GetGlobalLock());
   file.Writeback(op);
 
   // Check if each page has a correct dirty flag.
@@ -421,8 +416,7 @@ TEST_F(WritebackTest, DataWriteFailure) {
   ASSERT_EQ(vnode<File>().FindPage(0, &page), ZX_OK);
   ASSERT_TRUE(page->IsDirty());
 
-  WritebackOperation op = {.bSync = true};
-  vnode<File>().Writeback(op);
+  vnode<File>().Writeback(true, true);
   ASSERT_FALSE(page->IsDirty());
 
   // I/O failure
@@ -430,11 +424,10 @@ TEST_F(WritebackTest, DataWriteFailure) {
   LockedPage(page).SetDirty();
   ASSERT_TRUE(page->IsDirty());
   DeviceTester::SetHook(fs_.get(), hook);
-  vnode<File>().Writeback(op);
+  vnode<File>().Writeback(true, true);
   ASSERT_TRUE(page->IsDirty());
   {
-    op.bSync = false;
-    vnode<File>().Writeback(op);
+    vnode<File>().Writeback(false, true);
     LockedPage locked_page(page);
     locked_page.WaitOnWriteback();
     ASSERT_TRUE(page->IsDirty());
@@ -442,7 +435,7 @@ TEST_F(WritebackTest, DataWriteFailure) {
 
   // Retry
   DeviceTester::SetHook(fs_.get(), nullptr);
-  vnode<File>().Writeback(op);
+  vnode<File>().Writeback(false, true);
   ASSERT_FALSE(page->IsDirty());
   ASSERT_FALSE(fs_->GetSuperblockInfo().TestCpFlags(CpFlag::kCpErrorFlag));
 }

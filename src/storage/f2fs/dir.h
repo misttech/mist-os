@@ -107,7 +107,8 @@ class Dir : public VnodeF2fs, public fbl::Recyclable<Dir> {
       __TA_REQUIRES(mutex_) __TA_REQUIRES_SHARED(f2fs::GetGlobalLock());
 
   // recovery
-  zx::result<> RecoverLink(VnodeF2fs &vnode) __TA_EXCLUDES(mutex_, f2fs::GetGlobalLock());
+  zx::result<> RecoverLink(VnodeF2fs &vnode) __TA_EXCLUDES(mutex_)
+      __TA_REQUIRES_SHARED(f2fs::GetGlobalLock());
 
   zx_status_t GetVmo(fuchsia_io::wire::VmoFlags flags, zx::vmo *out_vmo) final {
     return ZX_ERR_NOT_SUPPORTED;

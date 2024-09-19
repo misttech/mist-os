@@ -43,9 +43,8 @@ struct WritebackOperation {
   pgoff_t to_write = kPgOffMax;  // The number of dirty Pages to be written.
   bool bSync = false;            // If true, FileCache::Writeback() waits for writeback Pages to be
                                  // written to disk.
-  bool bReleasePages =
-      true;  // If true, it releases clean Pages while traversing FileCache::page_tree_.
-  bool bReclaim = false;             // If true, it is invoked for memory reclaim.
+  bool bReclaim =
+      false;  // If true, it releases inactive Pages while traversing FileCache::page_tree_.
   VnodeCallback if_vnode = nullptr;  // If set, it determines which vnodes are subject to writeback.
   PageCallback if_page = nullptr;    // If set, it determines which Pages are subject to writeback.
   PageTaggingCallback page_cb =
@@ -349,8 +348,8 @@ class FileCache {
   F2fs *fs() const;
   VmoManager &GetVmoManager() { return *vmo_manager_; }
 
-  // It returns a set of locked dirty Pages that meet |operation|.
-  std::vector<LockedPage> GetLockedDirtyPages(const WritebackOperation &operation)
+  // It returns a set of dirty Pages that meet |operation|.
+  std::vector<fbl::RefPtr<Page>> GetDirtyPages(const WritebackOperation &operation)
       __TA_EXCLUDES(tree_lock_);
   // It evicts every clean, inactive  page.
   void EvictCleanPages() __TA_EXCLUDES(tree_lock_);

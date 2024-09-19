@@ -219,7 +219,7 @@ zx_status_t VnodeF2fs::GetNewDataPage(pgoff_t index, bool new_i_size, LockedPage
     page->SetUptodate();
     page.Zero();
   } else {
-    ZX_ASSERT_MSG(data_blkaddr == kNewAddr, "%lu page should have kNewAddr but (0x%x)",
+    ZX_ASSERT_MSG(data_blkaddr == kNewAddr, " %lu page should have kNewAddr but (0x%x)",
                   page->GetKey(), data_blkaddr);
   }
 
@@ -291,7 +291,6 @@ zx_status_t VnodeF2fs::GetNewDataPage(pgoff_t index, bool new_i_size, LockedPage
 #endif
 
 block_t VnodeF2fs::GetBlockAddr(LockedPage &page) {
-  ZX_DEBUG_ASSERT(page->IsUptodate());
   if (!page.ClearDirtyForIo()) {
     return kNullAddr;
   }
@@ -323,7 +322,6 @@ block_t VnodeF2fs::GetBlockAddr(LockedPage &page) {
 }
 
 block_t VnodeF2fs::GetBlockAddrOnDataSegment(LockedPage &page) {
-  ZX_DEBUG_ASSERT(page->IsUptodate());
   ZX_DEBUG_ASSERT(!IsMeta());
   ZX_DEBUG_ASSERT(!IsNode());
   if (!page.ClearDirtyForIo()) {
@@ -378,7 +376,7 @@ block_t VnodeF2fs::GetBlockAddrOnDataSegment(LockedPage &page) {
   (*dnode_page_or).GetPage<NodePage>().SetDataBlkaddr(ofs_in_dnode, new_addr);
   (*dnode_page_or).SetDirty();
   UpdateExtentCache(page->GetIndex(), new_addr);
-  UpdateVersion(superblock_info_.GetCheckpointVer());
+  data_version_ = superblock_info_.GetCheckpointVer();
   return new_addr;
 }
 

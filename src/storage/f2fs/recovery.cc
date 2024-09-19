@@ -45,6 +45,7 @@ zx::result<F2fs::FsyncInodeList> F2fs::FindFsyncDnodes() {
   block_t blkaddr = segment_manager_->StartBlock(curseg->segno) + curseg->next_blkoff;
   PageList inode_pages;
   FsyncInodeList inode_list;
+  fs::SharedLock lock(f2fs::GetGlobalLock());
 
   while (true) {
     bool new_entry = false;

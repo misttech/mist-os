@@ -97,7 +97,7 @@ class CheckpointTest : public F2fsFakeDevTestFixture {
     *cp_out = std::move(cp_page[0]);
   }
 
-  void GetLastCheckpoint(uint32_t expect_cp_position, bool after_mkfs, LockedPage *cp_out) {
+  void GetLastCheckpoint(uint32_t expect_cp_position, bool after_mkfs, fbl::RefPtr<Page> *cp_out) {
     const Superblock &raw_superblock = fs_->GetSuperblockInfo().GetSuperblock();
     Checkpoint *cp_block1 = nullptr, *cp_block2 = nullptr;
     LockedPage cp_page1, cp_page2;
@@ -113,13 +113,13 @@ class CheckpointTest : public F2fsFakeDevTestFixture {
     }
 
     if (after_mkfs) {
-      *cp_out = std::move(cp_page1);
+      *cp_out = cp_page1.CopyRefPtr();
     } else if (cp_block1 && cp_block2) {
       if (VerAfter(cp_block2->checkpoint_ver, cp_block1->checkpoint_ver)) {
-        *cp_out = std::move(cp_page2);
+        *cp_out = cp_page2.CopyRefPtr();
         ASSERT_EQ(cp_block1->checkpoint_ver, cp_block2->checkpoint_ver - 1);
       } else {
-        *cp_out = std::move(cp_page1);
+        *cp_out = cp_page1.CopyRefPtr();
         ASSERT_EQ(cp_block2->checkpoint_ver, cp_block1->checkpoint_ver - 1);
       }
     }
@@ -171,7 +171,7 @@ class CheckpointTest : public F2fsFakeDevTestFixture {
 TEST_F(CheckpointTest, Version) {
   CheckpointCallback check_version = [this](uint32_t expect_cp_position, uint32_t expect_cp_ver,
                                             bool after_mkfs) {
-    LockedPage cp_page;
+    fbl::RefPtr<Page> cp_page;
 
     GetLastCheckpoint(expect_cp_position, after_mkfs, &cp_page);
     Checkpoint *cp = cp_page->GetAddress<Checkpoint>();
@@ -188,7 +188,7 @@ TEST_F(CheckpointTest, NatBitmap) {
 
   CheckpointCallback check_nat_bitmap = [this](uint32_t expect_cp_position, uint32_t expect_cp_ver,
                                                bool after_mkfs) {
-    LockedPage cp_page;
+    fbl::RefPtr<Page> cp_page;
 
     // 1. Get last checkpoint
     GetLastCheckpoint(expect_cp_position, after_mkfs, &cp_page);
@@ -253,7 +253,7 @@ TEST_F(CheckpointTest, SitBitmap) {
 
   CheckpointCallback check_sit_bitmap = [this](uint32_t expect_cp_position, uint32_t expect_cp_ver,
                                                bool after_mkfs) {
-    LockedPage cp_page;
+    fbl::RefPtr<Page> cp_page;
 
     // 1. Get last checkpoint
     GetLastCheckpoint(expect_cp_position, after_mkfs, &cp_page);
@@ -308,7 +308,7 @@ TEST_F(CheckpointTest, SitBitmap) {
 TEST_F(CheckpointTest, AddOrphanInode) {
   CheckpointCallback check_add_orphan_inode = [this](uint32_t expect_cp_position,
                                                      uint32_t expect_cp_ver, bool after_mkfs) {
-    LockedPage cp_page;
+    fbl::RefPtr<Page> cp_page;
 
     // 1. Get last checkpoint
     GetLastCheckpoint(expect_cp_position, after_mkfs, &cp_page);
@@ -387,7 +387,7 @@ TEST_F(CheckpointTest, AddOrphanInode) {
 TEST_F(CheckpointTest, RemoveOrphanInode) {
   CheckpointCallback check_remove_orphan_inode = [this](uint32_t expect_cp_position,
                                                         uint32_t expect_cp_ver, bool after_mkfs) {
-    LockedPage cp_page;
+    fbl::RefPtr<Page> cp_page;
     SuperblockInfo &superblock_info = fs_->GetSuperblockInfo();
 
     // 1. Get last checkpoint
@@ -468,7 +468,7 @@ TEST_F(CheckpointTest, RemoveOrphanInode) {
 TEST_F(CheckpointTest, PurgeOrphanInode) {
   CheckpointCallback check_recover_orphan_inode = [this](uint32_t expect_cp_position,
                                                          uint32_t expect_cp_ver, bool after_mkfs) {
-    LockedPage cp_page;
+    fbl::RefPtr<Page> cp_page;
     SuperblockInfo &superblock_info = fs_->GetSuperblockInfo();
 
     // 1. Get last checkpoint
@@ -479,14 +479,14 @@ TEST_F(CheckpointTest, PurgeOrphanInode) {
     uint32_t orphan_inos = kOrphansPerBlock;
     auto &vnodes = GetVnodes();
     if (!after_mkfs) {
-      // 2. Check recovery orphan inodes
+      // Reset FileCache for node pages
+      fs_->GetNodeVnode().CleanupCache();
       ASSERT_TRUE(superblock_info.TestCpFlags(CpFlag::kCpOrphanPresentFlag));
       ASSERT_EQ(vnodes.size(), orphan_inos);
 
       for (auto &vnode_refptr : vnodes) {
         ASSERT_EQ(vnode_refptr.get()->GetNlink(), (uint32_t)1);
       }
-
       // Check device peer closed exception
       {
         auto hook = [](const block_fifo_request_t &_req, const zx::vmo *_vmo) {
@@ -550,7 +550,7 @@ TEST_F(CheckpointTest, CompactedSummaries) TA_NO_THREAD_SAFETY_ANALYSIS {
                                                      bool after_mkfs) TA_NO_THREAD_SAFETY_ANALYSIS {
     DisableFsck();
 
-    LockedPage cp_page;
+    fbl::RefPtr<Page> cp_page;
     SegmentManager &segment_manager = fs_->GetSegmentManager();
 
     // 1. Get last checkpoint
@@ -645,7 +645,7 @@ TEST_F(CheckpointTest, NormalSummaries) TA_NO_THREAD_SAFETY_ANALYSIS {
                                                      bool after_mkfs) TA_NO_THREAD_SAFETY_ANALYSIS {
     DisableFsck();
 
-    LockedPage cp_page;
+    fbl::RefPtr<Page> cp_page;
     SegmentManager &segment_manager = fs_->GetSegmentManager();
 
     // 1. Get last checkpoint
@@ -736,7 +736,7 @@ TEST_F(CheckpointTest, SitJournal) TA_NO_THREAD_SAFETY_ANALYSIS {
 
   CheckpointCallback check_sit_journal = [this](uint32_t expect_cp_position, uint32_t expect_cp_ver,
                                                 bool after_mkfs) TA_NO_THREAD_SAFETY_ANALYSIS {
-    LockedPage cp_page;
+    fbl::RefPtr<Page> cp_page;
     SegmentManager &segment_manager = fs_->GetSegmentManager();
     auto &segnos = GetPrevValues();
 
@@ -817,7 +817,7 @@ TEST_F(CheckpointTest, NatJournal) TA_NO_THREAD_SAFETY_ANALYSIS {
     NodeManager &node_manager = fs_->GetNodeManager();
     SegmentManager &segment_manager = fs_->GetSegmentManager();
     CursegInfo *curseg = fs_->GetSegmentManager().CURSEG_I(CursegType::kCursegHotData);
-    LockedPage cp_page;
+    fbl::RefPtr<Page> cp_page;
     auto &nids = GetPrevValues();
 
     // 1. Get last checkpoint
@@ -955,9 +955,7 @@ TEST_F(CheckpointTest, CpError) {
 }
 
 TEST_F(CheckpointTest, ValidateCheckpointFirstCpPackDiskFail) {
-  WritebackOperation op;
-  op.bSync = true;
-  fs_->GetMetaVnode().Writeback(op);
+  fs_->GetMetaVnode().Writeback(true, true);
 
   block_t cp_start_blk_no = LeToCpu(fs_->GetSuperblockInfo().GetSuperblock().cp_blkaddr);
   block_t target_addr = cp_start_blk_no * kDefaultSectorsPerBlock;
@@ -984,9 +982,7 @@ TEST_F(CheckpointTest, ValidateCheckpointFirstCpPackDiskFail) {
 }
 
 TEST_F(CheckpointTest, ValidateCheckpointSecondCpPackDiskFail) {
-  WritebackOperation op;
-  op.bSync = true;
-  fs_->GetMetaVnode().Writeback(op);
+  fs_->GetMetaVnode().Writeback(true, true);
 
   block_t cp_start_blk_no = LeToCpu(fs_->GetSuperblockInfo().GetSuperblock().cp_blkaddr);
   block_t first_cp_blk_no = cp_start_blk_no;
@@ -1023,9 +1019,7 @@ TEST_F(CheckpointTest, ValidateCheckpointSecondCpPackDiskFail) {
 TEST_F(CheckpointTest, FlushNatEntriesDiskFail) {
   DisableFsck();
 
-  WritebackOperation op;
-  op.bSync = true;
-  fs_->GetMetaVnode().Writeback(op);
+  fs_->GetMetaVnode().Writeback(true, true);
 
   pgoff_t target_addr =
       MapTester::GetCurrentNatAddr(fs_->GetNodeManager(), 0) * kDefaultSectorsPerBlock;
@@ -1059,9 +1053,7 @@ TEST_F(CheckpointTest, FlushNatEntriesDiskFail) {
 TEST_F(CheckpointTest, FlushSitEntriesDiskFail) TA_NO_THREAD_SAFETY_ANALYSIS {
   DisableFsck();
 
-  WritebackOperation op;
-  op.bSync = true;
-  fs_->GetMetaVnode().Writeback(op);
+  fs_->GetMetaVnode().Writeback(true, true);
 
   block_t cp_start_blk_no = LeToCpu(fs_->GetSuperblockInfo().GetSuperblock().cp_blkaddr);
 
@@ -1118,8 +1110,7 @@ TEST_F(CheckpointTest, DoCheckpointDiskFail) {
   DisableFsck();
 
   WritebackOperation op;
-  op.bSync = true;
-  fs_->GetMetaVnode().Writeback(op);
+  fs_->GetMetaVnode().Writeback(true, true);
 
   auto hook = [&](const block_fifo_request_t &_req, const zx::vmo *_vmo) {
     if (_req.command.opcode == BLOCK_OPCODE_WRITE &&
@@ -1141,9 +1132,7 @@ TEST_F(CheckpointTest, DoCheckpointDiskFail) {
 TEST_F(CheckpointTest, ReadCompactSummaryDiskFail) TA_NO_THREAD_SAFETY_ANALYSIS {
   DisableFsck();
 
-  WritebackOperation op;
-  op.bSync = true;
-  fs_->GetMetaVnode().Writeback(op);
+  fs_->GetMetaVnode().Writeback(true, true);
 
   block_t target_addr = fs_->GetSegmentManager().StartSumBlock() * kDefaultSectorsPerBlock;
 
@@ -1168,9 +1157,7 @@ TEST_F(CheckpointTest, ReadCompactSummaryDiskFail) TA_NO_THREAD_SAFETY_ANALYSIS 
 TEST_F(CheckpointTest, ReadNormalSummaryDiskFail) TA_NO_THREAD_SAFETY_ANALYSIS {
   DisableFsck();
 
-  WritebackOperation op;
-  op.bSync = true;
-  fs_->GetMetaVnode().Writeback(op);
+  fs_->GetMetaVnode().Writeback(true, true);
 
   block_t target_addr = fs_->GetSegmentManager().SumBlkAddr(
                             kNrCursegType, static_cast<int>(CursegType::kCursegWarmData)) *

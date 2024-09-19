@@ -48,7 +48,7 @@ class GcTest : public F2fsFakeDevTestFixture {
         FileTester::AppendToFile(file_vn.get(), buf.data(), buf.size());
         file_names.push_back(file_name);
         EXPECT_EQ(file_vn->Close(), ZX_OK);
-        file_vn->Writeback();
+        file_vn->Writeback(true, true);
       }
       sync_completion_t completion;
       fs_->ScheduleWriter(&completion);
@@ -86,9 +86,7 @@ TEST_F(GcTest, CpError) TA_NO_THREAD_SAFETY_ANALYSIS {
 TEST_F(GcTest, CheckpointDiskReadFailOnSyncFs) TA_NO_THREAD_SAFETY_ANALYSIS {
   DisableFsck();
 
-  WritebackOperation op;
-  op.bSync = true;
-  fs_->GetMetaVnode().Writeback(op);
+  fs_->GetMetaVnode().Writeback(true, true);
 
   pgoff_t target_addr = fs_->GetSegmentManager().CurrentSitAddr(0) * kDefaultSectorsPerBlock;
 
@@ -118,9 +116,7 @@ TEST_F(GcTest, CheckpointDiskReadFailOnSyncFs) TA_NO_THREAD_SAFETY_ANALYSIS {
 TEST_F(GcTest, CheckpointDiskReadFailOnGc) TA_NO_THREAD_SAFETY_ANALYSIS {
   DisableFsck();
 
-  WritebackOperation op;
-  op.bSync = true;
-  fs_->GetMetaVnode().Writeback(op);
+  fs_->GetMetaVnode().Writeback(true, true);
 
   pgoff_t target_addr = fs_->GetSegmentManager().CurrentSitAddr(0) * kDefaultSectorsPerBlock;
 
@@ -146,9 +142,7 @@ TEST_F(GcTest, CheckpointDiskReadFailOnGc) TA_NO_THREAD_SAFETY_ANALYSIS {
 TEST_F(GcTest, CheckpointDiskReadFailOnGcPreFree) TA_NO_THREAD_SAFETY_ANALYSIS {
   DisableFsck();
 
-  WritebackOperation op;
-  op.bSync = true;
-  fs_->GetMetaVnode().Writeback(op);
+  fs_->GetMetaVnode().Writeback(true, true);
 
   pgoff_t target_addr = fs_->GetSegmentManager().CurrentSitAddr(0) * kDefaultSectorsPerBlock;
 
@@ -183,8 +177,7 @@ TEST_F(GcTest, PageColdData) {
       0,
   };
   FileTester::AppendToFile(file.get(), buf, sizeof(buf));
-  WritebackOperation op = {.bSync = true};
-  file->Writeback(op);
+  file->Writeback(true, true);
 
   MakeGcTriggerCondition(10);
   fs_->GetSegmentManager().DisableFgGc();
@@ -200,7 +193,7 @@ TEST_F(GcTest, PageColdData) {
     ASSERT_TRUE(pages_or->front()->IsDirty());
   }
   // If kPageColdData flag is not set, allocate its block as SSR or LFS.
-  ASSERT_NE(file->Writeback(op), 0UL);
+  ASSERT_NE(file->Writeback(true, true), 0UL);
   auto new_blk_addr_or = file->FindDataBlkAddr(0);
   ASSERT_EQ(old_blk_addr_or.is_error(), false);
   ASSERT_NE(new_blk_addr_or.value(), old_blk_addr_or.value());
@@ -216,7 +209,7 @@ TEST_F(GcTest, PageColdData) {
   CursegInfo *cold_curseg = fs_->GetSegmentManager().CURSEG_I(CursegType::kCursegColdData);
   auto expected_addr = fs_->GetSegmentManager().NextFreeBlkAddr(CursegType::kCursegColdData);
   ASSERT_EQ(cold_curseg->alloc_type, static_cast<uint8_t>(AllocMode::kLFS));
-  ASSERT_NE(file->Writeback(op), 0UL);
+  ASSERT_NE(file->Writeback(true, true), 0UL);
   new_blk_addr_or = file->FindDataBlkAddr(0);
   ASSERT_EQ(old_blk_addr_or.is_error(), false);
   ASSERT_NE(new_blk_addr_or.value(), old_blk_addr_or.value());
@@ -242,8 +235,7 @@ TEST_F(GcTest, OrphanFileGc) {
       0xAA,
   };
   FileTester::AppendToFile(file.get(), buffer, kPageSize);
-  WritebackOperation op = {.bSync = true};
-  file->Writeback(op);
+  file->Writeback(true, true);
 
   fs_->GetSegmentManager().AllocateNewSegments();
   fs_->SyncFs();
@@ -295,8 +287,7 @@ TEST_F(GcTest, ReadVmoDuringGc) {
       0xAA,
   };
   FileTester::AppendToFile(file.get(), buffer, kPageSize);
-  WritebackOperation op = {.bSync = true};
-  file->Writeback(op);
+  file->Writeback(true, true);
 
   fs_->GetSegmentManager().AllocateNewSegments();
   fs_->SyncFs();

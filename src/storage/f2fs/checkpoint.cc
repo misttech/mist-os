@@ -40,7 +40,7 @@ pgoff_t F2fs::FlushDirtyMetaPages(bool is_commit) {
   if (superblock_info_->GetPageCount(CountType::kDirtyMeta) == 0) {
     return 0;
   }
-  WritebackOperation operation = {.bReleasePages = HasNotEnoughMemory()};
+  WritebackOperation operation = {.bReclaim = GetMemoryStatus(MemoryStatus::kNeedReclaim)};
   if (is_commit) {
     operation.bSync = true;
     operation.page_cb = [](fbl::RefPtr<Page> page, bool is_last_page) {
@@ -274,7 +274,7 @@ zx_status_t F2fs::GetValidCheckpoint() {
 pgoff_t F2fs::FlushDirtyDataPages(WritebackOperation &operation) {
   pgoff_t total_nwritten = 0;
   GetVCache().ForDirtyVnodesIf(
-      [&](fbl::RefPtr<VnodeF2fs> &vnode) {
+      [&](fbl::RefPtr<VnodeF2fs> &vnode) TA_NO_THREAD_SAFETY_ANALYSIS {
         if (!vnode->IsValid()) {
           ZX_ASSERT(vnode->ClearDirty());
         } else if (vnode->GetDirtyPageCount()) {
@@ -321,7 +321,7 @@ void F2fs::FlushDirsAndNodes() {
   // Here, we just schedule dirty Pages to be written back on storage.
   do {
     // Write out all dirty dentry pages and remove orphans from dirty list.
-    WritebackOperation op = {.bReleasePages = HasNotEnoughMemory()};
+    WritebackOperation op = {.bReclaim = GetMemoryStatus(MemoryStatus::kNeedReclaim)};
     op.if_vnode = [](fbl::RefPtr<VnodeF2fs> &vnode) {
       if (vnode->IsDir() || !vnode->IsValid()) {
         return ZX_OK;
@@ -334,7 +334,7 @@ void F2fs::FlushDirsAndNodes() {
   // POR: we should ensure that there is no dirty node pages
   // until finishing nat/sit flush.
   do {
-    WritebackOperation op = {.bReleasePages = HasNotEnoughMemory()};
+    WritebackOperation op = {.bReclaim = GetMemoryStatus(MemoryStatus::kNeedReclaim)};
     auto ret = FlushDirtyNodePages(op);
     ZX_ASSERT_MSG(ret.is_ok(), "Failed to flush node pages (%ul) %s",
                   superblock_info_->GetPageCount(CountType::kDirtyNodes), ret.status_string());
@@ -471,7 +471,7 @@ zx_status_t F2fs::DoCheckpoint(bool is_umount) {
     }
     GetSegmentManager().ClearPrefreeSegments();
     superblock_info.ClearDirty();
-    meta_vnode_->CleanupPages();
+    meta_vnode_->CleanupCache();
     ClearVnodeSet();
   }
   return ZX_OK;
@@ -499,21 +499,25 @@ uint32_t F2fs::GetFreeSectionsForDirtyPages() {
 }
 
 // Release-acquire ordering between the writeback (loader) and others such as checkpoint and gc.
-bool F2fs::CanReclaim() const { return !stop_reclaim_flag_.test(std::memory_order_acquire); }
 bool F2fs::IsTearDown() const { return teardown_flag_.test(std::memory_order_relaxed); }
 void F2fs::SetTearDown() { teardown_flag_.test_and_set(std::memory_order_relaxed); }
 
 // We guarantee that this checkpoint procedure should not fail.
 zx_status_t F2fs::WriteCheckpoint(bool is_umount) {
+  std::lock_guard gc_lock(f2fs::GetGlobalLock());
+  return WriteCheckpointUnsafe(is_umount);
+}
+
+zx_status_t F2fs::WriteCheckpointUnsafe(bool is_umount) {
   if (superblock_info_->TestCpFlags(CpFlag::kCpErrorFlag)) {
     return ZX_ERR_BAD_STATE;
   }
-  std::lock_guard gc_lock(f2fs::GetGlobalLock());
   ZX_DEBUG_ASSERT(segment_manager_->FreeSections() > GetFreeSectionsForDirtyPages());
   FlushDirsAndNodes();
 
-  if (is_umount) {
-    GetVCache().EvictInactiveVnodes();
+  if (GetMemoryStatus(MemoryStatus::kNeedReclaim) || is_umount) {
+    node_vnode_->CleanupCache();
+    GetVCache().Shrink();
   }
 
   // update checkpoint pack index

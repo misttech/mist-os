@@ -48,6 +48,7 @@ test("f2fs_unit") {
     "unit/file_cache.cc",
     "unit/fsck.cc",
     "unit/inline.cc",
+    "unit/memory_pressure.cc",
     "unit/mkfs.cc",
     "unit/mmap.cc",
     "unit/mount.cc",

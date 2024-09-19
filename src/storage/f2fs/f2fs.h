@@ -85,7 +85,6 @@
 namespace f2fs {
 
 zx::result<std::unique_ptr<Superblock>> LoadSuperblock(BcacheMapper &bc);
-
 class F2fs final {
  public:
   // Not copyable or moveable
@@ -135,13 +134,10 @@ class F2fs final {
   }
   PlatformVfs *vfs() const { return vfs_; }
 
-  // For testing Reset() and TakeBc()
-  bool IsValid() const;
   zx_status_t LoadSuper(std::unique_ptr<Superblock> sb);
   void Reset();
   zx_status_t GrabMetaPage(pgoff_t index, LockedPage *out);
   zx_status_t GetMetaPage(pgoff_t index, LockedPage *out);
-  bool CanReclaim() const;
   bool IsTearDown() const;
   void SetTearDown();
 
@@ -156,9 +152,11 @@ class F2fs final {
   void PutSuper();
   void Sync(SyncCallback closure = nullptr) __TA_EXCLUDES(f2fs::GetGlobalLock());
   zx_status_t SyncFs(bool bShutdown = false) __TA_EXCLUDES(f2fs::GetGlobalLock());
+  zx_status_t SyncFile(VnodeF2fs &vnode) __TA_EXCLUDES(f2fs::GetGlobalLock());
+
   zx_status_t DoCheckpoint(bool is_umount) __TA_REQUIRES(f2fs::GetGlobalLock());
-  zx_status_t WriteCheckpoint(bool is_umount) __TA_EXCLUDES(f2fs::GetGlobalLock())
-      __TA_REQUIRES_SHARED(writeback_mutex_);
+  zx_status_t WriteCheckpoint(bool is_umount) __TA_EXCLUDES(f2fs::GetGlobalLock());
+  zx_status_t WriteCheckpointUnsafe(bool is_umount) __TA_REQUIRES(f2fs::GetGlobalLock());
 
   // recovery.cc
   // For the list of fsync inodes, used only during recovery
@@ -187,8 +185,10 @@ class F2fs final {
   using FsyncInodeList = fbl::DoublyLinkedList<std::unique_ptr<FsyncInodeEntry>>;
 
   FsyncInodeEntry *GetFsyncInode(FsyncInodeList &inode_list, nid_t ino);
-  zx_status_t RecoverDentry(NodePage &ipage, VnodeF2fs &vnode);
-  zx_status_t RecoverInode(VnodeF2fs &vnode, NodePage &node_page);
+  zx_status_t RecoverDentry(NodePage &ipage, VnodeF2fs &vnode)
+      __TA_REQUIRES_SHARED(f2fs::GetGlobalLock());
+  zx_status_t RecoverInode(VnodeF2fs &vnode, NodePage &node_page)
+      __TA_REQUIRES_SHARED(f2fs::GetGlobalLock());
   zx::result<FsyncInodeList> FindFsyncDnodes();
   void CheckIndexInPrevNodes(block_t blkaddr);
   void DoRecoverData(VnodeF2fs &vnode, NodePage &page);
@@ -204,15 +204,6 @@ class F2fs final {
     return zx::error(ZX_ERR_BAD_STATE);
   }
 
-  // For testing
-  void SetVfsForTests(std::unique_ptr<PlatformVfs> vfs) { vfs_for_tests_ = std::move(vfs); }
-  zx::result<std::unique_ptr<PlatformVfs>> TakeVfsForTests() {
-    if (vfs_for_tests_) {
-      return zx::ok(std::move(vfs_for_tests_));
-    }
-    return zx::error(ZX_ERR_UNAVAILABLE);
-  }
-
   zx::result<> MakeReadOperations(std::vector<LockedPage> &pages, std::vector<block_t> &addrs,
                                   PageType type, bool is_sync = true);
   zx::result<> MakeReadOperation(LockedPage &page, block_t blk_addr, PageType type,
@@ -226,20 +217,11 @@ class F2fs final {
     writer_->ScheduleWriteBlocks(completion, std::move(pages), flush);
   }
 
-  void ScheduleWritebackAndReclaimPages(size_t num_pages = kDefaultBlocksPerSegment);
+  void ScheduleWritebackAndReclaimPages();
 
-  zx::result<> WaitForWriteback() __TA_EXCLUDES(writeback_mutex_);
-  zx::result<uint32_t> StartGc() __TA_EXCLUDES(f2fs::GetGlobalLock())
-      __TA_REQUIRES(writeback_mutex_);
+  zx::result<uint32_t> StartGc() __TA_REQUIRES(f2fs::GetGlobalLock());
   void BalanceFs(uint32_t num_blocks = 0) __TA_EXCLUDES(f2fs::GetGlobalLock(), writeback_mutex_);
-  bool HasNotEnoughMemory(size_t factor = 1) {
-    // release-acquire ordering with MemoryPressureWatcher::OnLevelChanged().
-    auto level = current_memory_pressure_level_.load(std::memory_order_acquire);
-    return (level > MemoryPressure::kLow &&
-            superblock_info_->GetPageCount(CountType::kDirtyData)) ||
-           (level == MemoryPressure::kUnknown &&
-            superblock_info_->GetPageCount(CountType::kDirtyData) * factor >= kMaxDirtyDataPages);
-  }
+  bool GetMemoryStatus(MemoryStatus action);
   void WaitForAvailableMemory() __TA_EXCLUDES(writeback_mutex_);
 
   bool IsOnRecovery() const { return on_recovery_; }
@@ -254,6 +236,17 @@ class F2fs final {
       __TA_EXCLUDES(vnode_set_mutex_);
   void ClearVnodeSet() __TA_EXCLUDES(vnode_set_mutex_);
 
+  // for tests
+  bool IsValid() const;
+  void SetVfsForTests(std::unique_ptr<PlatformVfs> vfs) { vfs_for_tests_ = std::move(vfs); }
+  zx::result<std::unique_ptr<PlatformVfs>> TakeVfsForTests() {
+    if (vfs_for_tests_) {
+      return zx::ok(std::move(vfs_for_tests_));
+    }
+    return zx::error(ZX_ERR_UNAVAILABLE);
+  }
+  void SetMemoryPressure(MemoryPressure level) { current_memory_pressure_level_ = level; }
+
  private:
   void StartMemoryPressureWatcher();
 
@@ -265,12 +258,11 @@ class F2fs final {
       __TA_REQUIRES(f2fs::GetGlobalLock());
 
   std::atomic_flag teardown_flag_ = ATOMIC_FLAG_INIT;
-  std::atomic_flag stop_reclaim_flag_ = ATOMIC_FLAG_INIT;
 
-  // It synchronizes the execution of gc and writeback tasks that flush dirty data pages and
-  // produce additional dirty node pages. |writeback_mutex_| should be acquired before
-  // f2fs::GetGlobalLock() to avoid deadlock.
-  std::shared_timed_mutex writeback_mutex_;
+  // It is used for waiters of |memory_cvar_|.
+  // It should be acquired before f2fs::GetGlobalLock() to avoid deadlock.
+  std::shared_mutex writeback_mutex_;
+  std::condition_variable_any memory_cvar_;
 
   FuchsiaDispatcher dispatcher_;
   PlatformVfs *const vfs_ = nullptr;

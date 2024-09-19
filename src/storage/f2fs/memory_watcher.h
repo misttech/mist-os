@@ -23,6 +23,12 @@ enum class MemoryPressure {
   kHigh,
 };
 
+enum class MemoryStatus {
+  kNeedReclaim = 0,
+  kNeedCheckpoint,
+  kNeedWriteback,
+};
+
 using MemoryPressureCallback = fit::callback<void(MemoryPressure level)>;
 constexpr uint32_t kMaxID = std::numeric_limits<uint32_t>::max();
 

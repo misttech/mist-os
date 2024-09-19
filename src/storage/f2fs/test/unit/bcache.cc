@@ -427,8 +427,7 @@ TEST_P(F2fsMountedBcacheMapperTest, ReadWrite) {
   // Read verify again after clearing file cache
   char r_buf[kPageSize];
   {
-    WritebackOperation op = {.bSync = true};
-    test_file_ptr->Writeback(op);
+    test_file_ptr->Writeback(true, true);
     test_file_ptr->ResetFileCache();
   }
   w_buf_iter = w_buf.get();

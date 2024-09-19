@@ -50,10 +50,11 @@ class VnodeCache {
       __TA_EXCLUDES(list_lock_);
 
   // It traverses vnode_tables and execute cb with every vnode.
-  zx_status_t ForAllVnodes(VnodeCallback callback) __TA_EXCLUDES(table_lock_);
+  zx_status_t ForAllVnodes(VnodeCallback callback, bool evict_inactive = false)
+      __TA_EXCLUDES(table_lock_);
 
-  // It evicts every inactive vnode.
-  void EvictInactiveVnodes() __TA_EXCLUDES(table_lock_);
+  // It evicts all inactive vnodes and resets the cache of active vnodes.
+  void Shrink() __TA_EXCLUDES(table_lock_);
 
   bool IsDirtyListEmpty() __TA_EXCLUDES(list_lock_) {
     bool ret = false;

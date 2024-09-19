@@ -539,8 +539,8 @@ std::vector<bool> FileCache::GetDirtyPagesInfo(pgoff_t index, size_t max_scan) {
   return read_blocks;
 }
 
-std::vector<LockedPage> FileCache::GetLockedDirtyPages(const WritebackOperation &operation) {
-  std::vector<LockedPage> pages;
+std::vector<fbl::RefPtr<Page>> FileCache::GetDirtyPages(const WritebackOperation &operation) {
+  std::vector<fbl::RefPtr<Page>> pages;
   pgoff_t nwritten = 0;
 
   std::lock_guard tree_lock(tree_lock_);
@@ -548,19 +548,17 @@ std::vector<LockedPage> FileCache::GetLockedDirtyPages(const WritebackOperation 
   // Get Pages from |operation.start| to |operation.end|.
   while (nwritten <= operation.to_write && current != page_tree_.end() &&
          current->GetKey() < operation.end) {
-    LockedPage locked_page;
+    fbl::RefPtr<Page> page;
     auto raw_page = current.CopyPointer();
     if (raw_page->IsActive()) {
       if (raw_page->IsDirty()) {
         auto prev_key = raw_page->GetKey();
-        auto locked_page_or = GetLockedPageFromRawUnsafe(raw_page);
-        if (locked_page_or.is_error()) {
+        page = fbl::MakeRefPtrUpgradeFromRaw(raw_page, tree_lock_);
+        if (page == nullptr) {
+          recycle_cvar_.wait(tree_lock_);
+          // It is being recycled. It is unavailable now.
           current = page_tree_.lower_bound(prev_key);
           continue;
-        }
-        // Re-check if it is dirty after locking.
-        if (locked_page_or->IsDirty()) {
-          locked_page = std::move(*locked_page_or);
         }
       }
       ++current;
@@ -569,26 +567,24 @@ std::vector<LockedPage> FileCache::GetLockedDirtyPages(const WritebackOperation 
       ZX_DEBUG_ASSERT(!raw_page->IsWriteback());
       if (raw_page->IsDirty()) {
         ZX_DEBUG_ASSERT(raw_page->IsLastReference());
-        locked_page = LockedPage(fbl::ImportFromRawPtr(raw_page));
-      } else if (operation.bReleasePages || !vnode_->IsActive()) {
-        // For inactive Pages, try to evict clean Pages if operation.bReleasePages is set or if
-        // their vnodes are inactive(closed).
+        page = fbl::ImportFromRawPtr(raw_page);
+      } else if (operation.bReclaim) {
+        // Evict clean Pages if operation.bReclaim is set
         fbl::RefPtr<Page> evicted = fbl::ImportFromRawPtr(raw_page);
         EvictUnsafe(raw_page);
       }
     }
-    if (!locked_page) {
+    if (!page) {
       continue;
     }
-    if (!operation.if_page || operation.if_page(locked_page.CopyRefPtr()) == ZX_OK) {
-      locked_page->SetActive();
-      pages.push_back(std::move(locked_page));
+    if (!operation.if_page || operation.if_page(page) == ZX_OK) {
+      page->SetActive();
+      pages.push_back(std::move(page));
       ++nwritten;
     } else {
-      auto page_ref = locked_page.release();
       // It prevents |page| from entering RecyclePage() and
       // keeps |page| alive in FileCache.
-      [[maybe_unused]] auto leak = fbl::ExportToRawPtr(&page_ref);
+      [[maybe_unused]] auto leak = fbl::ExportToRawPtr(&page);
     }
   }
   return pages;

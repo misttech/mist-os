@@ -252,10 +252,8 @@ TEST_F(FileTest, Truncate) {
   ASSERT_EQ(std::memcmp(&r_buf[data_size], zero.data(), after - data_size), 0);
 
   // Clear all dirty pages.
-  WritebackOperation op = {.bReleasePages = true};
-  test_file_ptr->Writeback(op);
-  op.bSync = true;
-  test_file_ptr->Writeback(op);
+  test_file_ptr->Writeback(false, true);
+  test_file_ptr->Writeback(true, true);
 
   // Truncate to a smaller size, and check the page state and content.
   after = Page::Size() / 2;
@@ -301,16 +299,14 @@ TEST_F(FileTest, WritebackWhileTruncate) {
     size_t offset = 0;
     ASSERT_EQ(FileTester::Write(file.get(), w_buf, Page::Size(), offset, &offset), ZX_OK);
     ASSERT_EQ(file->GetSize(), Page::Size());
-    WritebackOperation op = {.bSync = false};
-    ASSERT_EQ(file->Writeback(op), 1UL);
+    ASSERT_EQ(file->Writeback(false, true), 1UL);
     ASSERT_EQ(file->Close(), ZX_OK);
   }
 
   // Test the case where writeback pages are assigned addrs but invalidated before writing them to
   // disk. Because of the pre-scheduled tasks, file->Truncate() executes in prior to the writeback
   // task requsting write IOs for |file|.
-  WritebackOperation op = {.bSync = false};
-  ASSERT_EQ(file->Writeback(op), written_blocks);
+  ASSERT_EQ(file->Writeback(false, true), written_blocks);
   file->Truncate(0);
   for (size_t i = 0; i < written_blocks; ++i) {
     LockedPage page;
@@ -364,8 +360,7 @@ TEST_F(FileTest, MixedSizeWrite) {
 
   // Read verify again after clearing file cache
   {
-    WritebackOperation op = {.bSync = true};
-    test_file_ptr->Writeback(op);
+    test_file_ptr->Writeback(true, true);
     test_file_ptr->ResetFileCache();
   }
   w_buf_iter = w_buf.get();
@@ -401,8 +396,7 @@ TEST_F(FileTest, LargeChunkReadWrite) {
 
   // Read verify again after clearing file cache
   {
-    WritebackOperation op = {.bSync = true};
-    test_file_vn->Writeback(op);
+    test_file_vn->Writeback(true, true);
     test_file_vn->ResetFileCache();
   }
   std::vector<char> r_buf(kDataSize, 0);
@@ -470,8 +464,7 @@ TEST_F(FileTest, MixedSizeWriteUnaligned) {
 
   // Read verify again after clearing file cache
   {
-    WritebackOperation op = {.bSync = true};
-    test_file_ptr->Writeback(op);
+    test_file_ptr->Writeback(true, true);
     test_file_vn->ResetFileCache();
   }
   w_buf_iter = w_buf.get();
@@ -508,10 +501,8 @@ TEST_F(FileTest, Readahead) {
   ASSERT_EQ(test_file_vn->GetSize(), kDataSize);
 
   auto cleanup_file_cache = [&](fbl::RefPtr<File> &test_file_vn) {
-    WritebackOperation op = {.bSync = true};
-    test_file_vn->Writeback(op);
-    WritebackOperation op1 = {.bReleasePages = true};
-    test_file_vn->Writeback(op1);
+    test_file_vn->Writeback(true, false);
+    test_file_vn->Writeback(false, true);
   };
 
   cleanup_file_cache(test_file_vn);

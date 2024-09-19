@@ -50,8 +50,7 @@ void FaultInjectToDnodeAndTruncate(NodeManager &node_manager, fbl::RefPtr<VnodeF
   block_t temp_block_address;
 
   // Write out dirty nodes to allocate lba
-  WritebackOperation op = {.bSync = true};
-  vnode->fs()->GetNodeVnode().Writeback(op);
+  vnode->fs()->GetNodeVnode().Writeback(true, true);
   MapTester::GetCachedNatEntryBlockAddress(node_manager, node_id, temp_block_address);
   vnode->fs()->GetNodeVnode().InvalidatePages();
 

@@ -65,12 +65,9 @@ void F2fs::StartMemoryPressureWatcher() {
   if (dispatcher_) {
     memory_pressure_watcher_ =
         std::make_unique<MemoryPressureWatcher>(dispatcher_, [this](MemoryPressure level) {
-          MemoryPressure prev_level = current_memory_pressure_level_;
-          // release-acquire ordering with HasNotEnoughMemory() and NeedToWriteback().
+          // release-acquire ordering with GetMemoryStatus()
           current_memory_pressure_level_.store(level, std::memory_order_release);
-          if (level > prev_level) {
-            ScheduleWritebackAndReclaimPages();
-          }
+          ScheduleWritebackAndReclaimPages();
           FX_LOGS(INFO) << "Memory pressure level: " << MemoryPressureWatcher::ToString(level);
         });
   }
@@ -208,18 +205,18 @@ void F2fs::PutSuper() {
   Reset();
 }
 
-void F2fs::ScheduleWritebackAndReclaimPages(size_t num_pages) {
-  // Schedule a Writer task for kernel to reclaim memory pages until the current memory pressure
-  // becomes normal. If memory pressure events are not available, the task runs until the number of
-  // dirty Pages is less than kMaxDirtyDataPages / 4. |writeback_flag_| ensures that neither
-  // checkpoint nor gc runs during this writeback. If there is not enough space, stop writeback as
-  // flushing N of dirty Pages can produce N of additional dirty node Pages in the worst case.
-  if (HasNotEnoughMemory()) {
+void F2fs::ScheduleWritebackAndReclaimPages() {
+  // Schedule a writeback task for kernel to reclaim pager-backed/discardable VMOs until memory
+  // pressure gets lower. It ensures that neither checkpoint nor gc runs during writeback. If there
+  // is not enough space, it stops to avoid out of space.
+  if (GetMemoryStatus(MemoryStatus::kNeedReclaim)) {
     auto promise = fpromise::make_promise([this]() __TA_EXCLUDES(writeback_mutex_) {
-      std::lock_guard<std::shared_timed_mutex> lock(writeback_mutex_);
-      while (!segment_manager_->HasNotEnoughFreeSecs() && CanReclaim() && HasNotEnoughMemory(4)) {
+      std::lock_guard lock(writeback_mutex_);
+      fs::SharedLock fs_lock(f2fs::GetGlobalLock());
+      while (!segment_manager_->HasNotEnoughFreeSecs() &&
+             GetMemoryStatus(MemoryStatus::kNeedWriteback)) {
         GetVCache().ForDirtyVnodesIf(
-            [&](fbl::RefPtr<VnodeF2fs>& vnode) {
+            [&](fbl::RefPtr<VnodeF2fs>& vnode) TA_NO_THREAD_SAFETY_ANALYSIS {
               WritebackOperation op = {.bReclaim = true};
               vnode->Writeback(op);
               return ZX_OK;
@@ -231,8 +228,13 @@ void F2fs::ScheduleWritebackAndReclaimPages(size_t num_pages) {
               return ZX_ERR_NEXT;
             });
       }
-      node_vnode_->CleanupPages();
-      GetVCache().EvictInactiveVnodes();
+      // If memory pressure is high even after data writeback, do checkpoint to clear inactive
+      // vnodes and to unlock discardable VMOs.
+      if (GetMemoryStatus(MemoryStatus::kNeedCheckpoint)) {
+        fs_lock.unlock();
+        WriteCheckpoint(false);
+      }
+      memory_cvar_.notify_all();
       return fpromise::ok();
     });
     writer_->ScheduleWriteback(std::move(promise));
@@ -241,10 +243,7 @@ void F2fs::ScheduleWritebackAndReclaimPages(size_t num_pages) {
 
 zx_status_t F2fs::SyncFs(bool bShutdown) {
   // TODO:: Consider !superblock_info_.IsDirty()
-  // Stop writeback before checkpoint or gc
-  FlagGuard flag(&stop_reclaim_flag_);
-  ZX_ASSERT(flag);
-  std::lock_guard<std::shared_timed_mutex> lock(writeback_mutex_);
+  std::lock_guard lock(f2fs::GetGlobalLock());
   if (bShutdown) {
     FX_LOGS(INFO) << "prepare for shutdown";
     // Stop listening to memorypressure.
@@ -270,7 +269,7 @@ zx_status_t F2fs::SyncFs(bool bShutdown) {
         }
       }
       target_vnodes = 0;
-      WritebackOperation op = {.to_write = kDefaultBlocksPerSegment};
+      WritebackOperation op = {.to_write = kDefaultBlocksPerSegment, .bReclaim = true};
       op.if_vnode = [&target_vnodes](fbl::RefPtr<VnodeF2fs>& vnode) {
         if ((!vnode->IsDir() && vnode->GetDirtyPageCount()) || !vnode->IsValid()) {
           ++target_vnodes;
@@ -278,11 +277,10 @@ zx_status_t F2fs::SyncFs(bool bShutdown) {
         }
         return ZX_ERR_NEXT;
       };
-      fs::SharedLock lock(f2fs::GetGlobalLock());
       FlushDirtyDataPages(op);
     } while (superblock_info_->GetPageCount(CountType::kDirtyData) && target_vnodes);
   }
-  return WriteCheckpoint(bShutdown);
+  return WriteCheckpointUnsafe(bShutdown);
 }
 
 #if 0  // porting needed
@@ -559,19 +557,45 @@ zx::result<fbl::RefPtr<VnodeF2fs>> F2fs::CreateNewVnode(umode_t mode, std::optio
   return zx::ok(std::move(vnode));
 }
 
-zx::result<> F2fs::WaitForWriteback() {
-  if (!writeback_mutex_.try_lock_shared_for(std::chrono::seconds(kWriteTimeOut))) {
-    return zx::error(ZX_ERR_TIMED_OUT);
-  }
-  writeback_mutex_.unlock_shared();
-  return zx::ok();
+bool F2fs::GetMemoryStatus(MemoryStatus status) {
+  // release-acquire ordering with MemoryPressureWatcher::OnLevelChanged().
+  MemoryPressure current = current_memory_pressure_level_.load(std::memory_order_acquire);
+  bool high_pressure = current > MemoryPressure::kLow ||
+                       (current == MemoryPressure::kUnknown &&
+                        superblock_info_->GetPageCount(CountType::kDirtyData) +
+                                superblock_info_->GetPageCount(CountType::kDirtyDents) +
+                                superblock_info_->GetPageCount(CountType::kDirtyNodes) >=
+                            kMaxDirtyDataPages);
+
+  switch (status) {
+    case MemoryStatus::kNeedReclaim:
+      return high_pressure;
+
+    case MemoryStatus::kNeedCheckpoint:
+      return high_pressure && (superblock_info_->GetPageCount(CountType::kDirtyDents) > 0 ||
+                               superblock_info_->GetPageCount(CountType::kDirtyNodes) > 0);
+
+    case MemoryStatus::kNeedWriteback:
+      return high_pressure && superblock_info_->GetPageCount(CountType::kDirtyData) > 0;
+  };
+
+  return false;
 }
 
 void F2fs::WaitForAvailableMemory() {
-  while (HasNotEnoughMemory()) {
-    ScheduleWritebackAndReclaimPages();
-    ZX_ASSERT(WaitForWriteback().is_ok());
+  if (!GetMemoryStatus(MemoryStatus::kNeedReclaim)) {
+    return;
   }
+  fs::SharedLock lock(writeback_mutex_);
+  memory_cvar_.wait_for(lock, std::chrono::seconds(kWriteTimeOut), [this]() {
+    if (segment_manager_->HasNotEnoughFreeSecs() ||
+        (!GetMemoryStatus(MemoryStatus::kNeedWriteback) &&
+         !GetMemoryStatus(MemoryStatus::kNeedCheckpoint))) {
+      return true;
+    }
+    ScheduleWritebackAndReclaimPages();
+    return false;
+  });
 }
 
 // This function balances dirty node and dentry pages.
@@ -584,10 +608,8 @@ void F2fs::BalanceFs(uint32_t num_blocks) {
   // If there is not enough memory, wait for writeback.
   WaitForAvailableMemory();
   if (segment_manager_->HasNotEnoughFreeSecs(0, num_blocks)) {
-    // Stop writeback before gc. The writeback won't be invoked until gc acquires enough sections.
-    FlagGuard flag(&stop_reclaim_flag_);
-    ZX_ASSERT(flag);
-    std::lock_guard<std::shared_timed_mutex> lock(writeback_mutex_);
+    // Wait for writeback before gc. The writeback task stops when there is not enough space.
+    std::lock_guard lock(f2fs::GetGlobalLock());
     if (auto ret = StartGc(); ret.is_error()) {
       // Run() returns ZX_ERR_UNAVAILABLE when there is no available victim section, otherwise BUG
       ZX_DEBUG_ASSERT(ret.error_value() == ZX_ERR_UNAVAILABLE);
@@ -595,8 +617,20 @@ void F2fs::BalanceFs(uint32_t num_blocks) {
   }
 }
 
+zx_status_t F2fs::SyncFile(VnodeF2fs& vnode) {
+  std::lock_guard lock(f2fs::GetGlobalLock());
+  WritebackOperation op;
+  vnode.Writeback(op);
+  vnode.ClearFlag(InodeInfoFlag::kNeedCp);
+  WriteCheckpointUnsafe(false);
+  if (superblock_info_->TestCpFlags(CpFlag::kCpErrorFlag)) {
+    return ZX_ERR_BAD_STATE;
+  }
+  return ZX_OK;
+}
+
 zx::result<uint32_t> F2fs::StartGc() {
-  // For testinggc_type
+  // For testing
   if (!segment_manager_->CanGc()) {
     return zx::ok(0);
   }
@@ -618,7 +652,7 @@ zx::result<uint32_t> F2fs::StartGc() {
     // free by checkpoint. Then, we secure free segments which doesn't need fggc any more.
     if (segment_manager_->PrefreeSegments()) {
       auto before = segment_manager_->FreeSections();
-      if (zx_status_t ret = WriteCheckpoint(false); ret != ZX_OK) {
+      if (zx_status_t ret = WriteCheckpointUnsafe(false); ret != ZX_OK) {
         return zx::error(ret);
       }
       sec_freed =
@@ -642,7 +676,7 @@ zx::result<uint32_t> F2fs::StartGc() {
 
     if (gc_type == GcType::kFgGc) {
       segment_manager_->SetCurVictimSec(kNullSecNo);
-      if (zx_status_t ret = WriteCheckpoint(false); ret != ZX_OK) {
+      if (zx_status_t ret = WriteCheckpointUnsafe(false); ret != ZX_OK) {
         return zx::error(ret);
       }
       ++sec_freed;
