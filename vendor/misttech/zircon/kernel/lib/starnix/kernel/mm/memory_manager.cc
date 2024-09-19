@@ -52,62 +52,6 @@ namespace {
 
 using namespace starnix;
 
-// Based on from sys_vmo_create (syscalls/vmo.cc)
-fit::result<Errno, fbl::RefPtr<MemoryObject>> create_memory(uint64_t size) {
-  LTRACEF("size %#" PRIx64 "\n", size);
-
-  bool is_user_space = ThreadDispatcher::GetCurrent() != nullptr;
-
-  if (is_user_space) {
-    auto up = ProcessDispatcher::GetCurrent();
-    zx_status_t res = up->EnforceBasicPolicy(ZX_POL_NEW_VMO);
-    if (res != ZX_OK)
-      return fit::error(MemoryManager::get_errno_for_map_err(res));
-  }
-
-  zx::result<VmObjectDispatcher::CreateStats> parse_result =
-      VmObjectDispatcher::parse_create_syscall_flags(ZX_VMO_RESIZABLE, size);
-  if (parse_result.is_error()) {
-    return fit::error(MemoryManager::get_errno_for_map_err(parse_result.error_value()));
-  }
-  VmObjectDispatcher::CreateStats stats = parse_result.value();
-
-  // mremap can grow memory regions, so make sure the VMO is resizable.
-  fbl::RefPtr<VmObjectPaged> vmo;
-  zx_status_t status =
-      VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY | (is_user_space ? PMM_ALLOC_FLAG_CAN_WAIT : 0),
-                            stats.flags, stats.size, &vmo);
-
-  switch (status) {
-    case ZX_OK:
-      break;
-    case ZX_ERR_NO_MEMORY:
-    case ZX_ERR_OUT_OF_RANGE:
-      return fit::error<Errno>(errno(ENOMEM));
-    default:
-      return fit::error<Errno>(impossible_error(status));
-  }
-
-  // create a Vm Object dispatcher
-  KernelHandle<VmObjectDispatcher> kernel_handle;
-  zx_rights_t rights;
-  zx_status_t result = VmObjectDispatcher::Create(ktl::move(vmo), size,
-                                                  VmObjectDispatcher::InitialMutability::kMutable,
-                                                  &kernel_handle, &rights);
-
-  switch (result) {
-    case ZX_OK:
-      break;
-    case ZX_ERR_NO_MEMORY:
-    case ZX_ERR_OUT_OF_RANGE:
-      return fit::error<Errno>(errno(ENOMEM));
-    default:
-      return fit::error<Errno>(impossible_error(status));
-  }
-
-  return fit::ok(MemoryObject::From(Handle::Make(ktl::move(kernel_handle), rights)));
-}
-
 zx_vm_option_t user_vmar_flags() {
   return ZX_VM_SPECIFIC | ZX_VM_CAN_MAP_SPECIFIC | ZX_VM_CAN_MAP_READ | ZX_VM_CAN_MAP_WRITE |
          ZX_VM_CAN_MAP_EXECUTE;
@@ -1040,9 +984,9 @@ fit::result<Errno, UserAddress> MemoryManager::set_brk(const CurrentTask& curren
   // Ensure that there is address-space set aside for the program break.
   ProgramBreak brk;
   if (!(*_state)->brk.has_value()) {
-    auto memory = create_memory(kProgramBreakLimit);
+    auto memory = create_vmo(kProgramBreakLimit, ZX_VMO_RESIZABLE);
     if (memory.is_error()) {
-      return memory.take_error();
+      return fit::error(MemoryManager::get_errno_for_map_err(memory.error_value()));
     }
     memory->set_zx_name("starnix-brk");
 
@@ -1643,9 +1587,9 @@ UserAddress MemoryManager::get_random_base(size_t length) {
 }
 
 fit::result<Errno, fbl::RefPtr<MemoryObject>> create_anonymous_mapping_memory(uint64_t size) {
-  auto memory_or_error = create_memory(size);
+  auto memory_or_error = create_vmo(size, ZX_VMO_RESIZABLE);
   if (memory_or_error.is_error()) {
-    return memory_or_error.take_error();
+    return fit::error(MemoryManager::get_errno_for_map_err(memory_or_error.error_value()));
   }
 
   memory_or_error->set_zx_name("starnix-anon");

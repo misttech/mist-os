@@ -2,21 +2,32 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "lib/modules/bootfs/bootfs.h"
+#include "lib/mistos/starnix/kernel/fs/mistos/bootfs.h"
 
+#include <lib/fit/result.h>
+#include <lib/mistos/starnix/kernel/fs/mistos/tree_builder.h>
 #include <lib/mistos/starnix/kernel/mm/memory.h>
+#include <lib/mistos/starnix/kernel/task/current_task.h>
+#include <lib/mistos/starnix/kernel/task/task.h>
 #include <lib/mistos/starnix/kernel/vfs/fs_node.h>
+#include <lib/mistos/starnix/kernel/vfs/fs_node_ops.h>
+#include <lib/mistos/starnix/kernel/vfs/simple_directory.h>
+#include <lib/mistos/starnix/kernel/vfs/vmo_file.h>
 #include <lib/mistos/util/status.h>
 #include <lib/zbitl/error-stdio.h>
 #include <lib/zbitl/view.h>
+#include <trace.h>
 #include <zircon/assert.h>
 
+#include <fbl/alloc_checker.h>
 #include <fbl/ref_ptr.h>
 #include <ktl/move.h>
 #include <vm/pinned_vm_object.h>
 #include <vm/vm_object.h>
 
-namespace bootfs {
+#define LOCAL_TRACE 0
+
+namespace starnix {
 
 using namespace starnix_uapi;
 
@@ -125,6 +136,30 @@ class ScratchAllocator {
 }
 */
 
+fbl::Vector<ktl::string_view> split_and_filter(const ktl::string_view& str, char delimiter) {
+  fbl::Vector<ktl::string_view> result;
+  ktl::string_view::size_type start = 0, end;
+
+  while ((end = str.find(delimiter, start)) != std::string_view::npos) {
+    auto token = str.substr(start, end - start);
+    if (!token.empty()) {
+      fbl::AllocChecker ac;
+      result.push_back(token, &ac);
+      ASSERT(ac.check());
+    }
+    start = end + 1;
+  }
+
+  // Add the last token
+  auto last_token = str.substr(start);
+  if (!last_token.empty()) {
+    fbl::AllocChecker ac;
+    result.push_back(last_token, &ac);
+    ASSERT(ac.check());
+  }
+
+  return result;
+}
 
 }  // namespace
 
@@ -146,85 +181,39 @@ fit::result<Errno, FileSystemHandle> BootFs::new_fs_with_options(const fbl::RefP
     return fit::error(errno(ENOMEM));
   }
 
-  auto fs = FileSystem::New(kernel, {CacheModeType::Permanent}, ktl::move(bootfs), options);
-  auto mount_options = fs->options().params;
+  auto fs = FileSystem::New(kernel, {.type = CacheModeType::Permanent}, ktl::move(bootfs), options);
+  TreeBuilder tree = TreeBuilder::empty_dir();
+  auto mode = FILE_MODE(IFDIR, 0755);
 
-  /*auto result = [&]() -> fit::result<Errno, FileMode> {
-    auto mode_str = mount_options.remove("mode");
-    if (mode_str) {
-      return FileMode::from_string({mode_str->data(), mode_str->size()});
-    } else {
-      return fit::ok(FILE_MODE(IFDIR, 0777));
-    }
-  }();
-
-  if (result.is_error()) {
-    return result.take_error();
+  BootfsView view = bootfs->bootfs_reader_.root();
+  for (auto item : view) {
+    LTRACEF("name=[%.*s]\n", static_cast<int>(item.name.length()), item.name.data());
+    auto vmo = VmoFileNode::New().value();
+    auto result = tree.add_entry(split_and_filter(item.name, '/'), ktl::unique_ptr<FsNodeOps>(vmo));
+    ZX_ASSERT(result.is_ok());
   }
-  FileMode mode = result.value();
 
-  auto result_uid = [&]() -> fit::result<Errno, uid_t> {
-    auto uid_str = mount_options.remove("uid");
-    if (uid_str) {
-      return parse<uid_t>({uid_str->data(), uid_str->size()});
-    } else {
-      return fit::ok(0);
-    }
-  }();
-  if (result_uid.is_error()) {
-    return result.take_error();
-  }
-  uid_t uid = result_uid.value();
+  auto root = tree.build(fs);
 
-  auto result_gid = [&]() -> fit::result<Errno, gid_t> {
-    auto gid_str = mount_options.remove("gid");
-    if (gid_str) {
-      return parse<uid_t>({gid_str->data(), gid_str->size()});
-    } else {
-      return fit::ok(0);
-    }
-  }();
-  if (result_gid.is_error()) {
-    return result.take_error();
-  }
-  uid_t gid = result_gid.value();
-
-  // BootfsDirectory::New()
   auto root_node =
-      FsNode::new_root_with_properties(nullptr, [&mode, &uid, &gid](FsNodeInfo& info) -> void {
+      FsNode::new_root_with_properties(root, [&mode /*, &uid, &gid*/](FsNodeInfo& info) -> void {
         info.chmod(mode);
-        info.uid = uid;
-        info.gid = gid;
+        info.uid = 0;
+        info.gid = 0;
       });
-  fs->set_root_node(root_node);*/
-
-  if (!mount_options.is_empty()) {
-    /*track_stub!(
-        TODO("https://fxbug.dev/322873419"),
-        "unknown tmpfs options, see logs for strings"
-    );*/
-    /*log_warn!(
-        "Unknown tmpfs options: {}",
-        itertools::join(mount_options.iter().map(|(k, v)| format!("{k}={v}")), ",")
-    );*/
-  }
+  fs->set_root_node(root_node);
 
   return fit::ok(ktl::move(fs));
 }
 
-uint32_t from_be_bytes(const ktl::array<uint8_t, 4>& bytes) {
-  uint32_t value;
-  std::memcpy(&value, bytes.data(), sizeof(value));
-  return ntohl(value);  // Convert from network byte order (big-endian)
+uint32_t from_be_bytes(const std::array<uint8_t, 4>& bytes) {
+  return (static_cast<uint32_t>(bytes[0]) << 24) | (static_cast<uint32_t>(bytes[1]) << 16) |
+         (static_cast<uint32_t>(bytes[2]) << 8) | static_cast<uint32_t>(bytes[3]);
 }
 
 fit::result<Errno, struct statfs> BootFs::statfs(const FileSystem& fs,
                                                  const CurrentTask& current_task) {
   struct statfs stat = default_statfs(from_be_bytes(ktl::array<uint8_t, 4>{'m', 'b', 'f', 's'}));
-  // Pretend we have a ton of free space.
-  stat.f_blocks = 0x100000000;
-  stat.f_bavail = 0x100000000;
-  stat.f_bfree = 0x100000000;
   return fit::ok(stat);
 }
 
@@ -263,11 +252,11 @@ BootFs::BootFs(HandleOwner zbi_vmo) {
     if (auto result = BootfsReader::Create(std::move(bootfs_vmo)); result.is_error()) {
       // Fail(result.error_value());
     } else {
-      bootfs_reader_ = std::move(result.value());
+      bootfs_reader_ = ktl::move(result.value());
     }
   }
 }
 
 BootFs::~BootFs() = default;
 
-}  // namespace bootfs
+}  // namespace starnix
