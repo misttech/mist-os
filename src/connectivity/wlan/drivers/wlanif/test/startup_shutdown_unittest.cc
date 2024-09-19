@@ -4,23 +4,102 @@
 
 #include <fidl/fuchsia.wlan.fullmac/cpp/fidl.h>
 #include <fidl/fuchsia.wlan.fullmac/cpp/test_base.h>
+#include <fidl/fuchsia.wlan.sme/cpp/fidl.h>
 #include <lib/driver/testing/cpp/driver_test.h>
 
 #include <gtest/gtest.h>
 
 #include "src/connectivity/wlan/drivers/wlanif/device.h"
-#include "src/connectivity/wlan/lib/mlme/fullmac/c-binding/testing/bindings_stubs.h"
 
-struct FakeWlanFullmacServer final
+namespace {
+
+// Implements enough of the WlanFullmacImpl API to test that wlanif::Device can start up.
+// The user can inject errors by inheriting from this class and overriding any relevant functions.
+struct BaseWlanFullmacServerForStartup
     : public fidl::testing::TestBase<fuchsia_wlan_fullmac::WlanFullmacImpl> {
-  explicit FakeWlanFullmacServer(fidl::ServerEnd<fuchsia_wlan_fullmac::WlanFullmacImpl> server_end)
+  explicit BaseWlanFullmacServerForStartup(
+      fidl::ServerEnd<fuchsia_wlan_fullmac::WlanFullmacImpl> server_end)
       : binding_(fdf_dispatcher_get_async_dispatcher(fdf_dispatcher_get_current_dispatcher()),
                  std::move(server_end), this, fidl::kIgnoreBindingClosure) {}
 
-  void NotImplemented_(const std::string& name, ::fidl::CompleterBase& completer) override {}
+  void Start(StartRequest& request, StartCompleter::Sync& completer) override {
+    // Acquire/Construct the WlanFullmacIfc, UsmeBootstrap, and GenericSme endpoints.
+    fullmac_ifc_client_endpoint_ = std::move(request.ifc());
+    auto usme_bootstrap_endpoints = fidl::CreateEndpoints<fuchsia_wlan_sme::UsmeBootstrap>();
+    usme_bootstrap_client_ =
+        fidl::Client(std::move(usme_bootstrap_endpoints.value().client),
+                     fdf_dispatcher_get_async_dispatcher(fdf_dispatcher_get_current_dispatcher()));
+    auto generic_sme_endpoints = fidl::CreateEndpoints<fuchsia_wlan_sme::GenericSme>();
+    generic_sme_client_endpoint_ = std::move(generic_sme_endpoints.value().client);
+
+    // Make the required UsmeBootstrap.Start during driver Start.
+    usme_bootstrap_client_.value()
+        ->Start(fuchsia_wlan_sme::UsmeBootstrapStartRequest(
+            std::move(generic_sme_endpoints.value().server),
+            fuchsia_wlan_sme::LegacyPrivacySupport(false, false)))
+        .Then([&](fidl::Result<fuchsia_wlan_sme::UsmeBootstrap::Start>& result) mutable {
+          ZX_ASSERT(result.is_ok());
+          inspect_vmo_ = std::move(result->inspect_vmo());
+        });
+
+    completer.Reply(zx::ok(fuchsia_wlan_fullmac::WlanFullmacImplStartResponse(
+        usme_bootstrap_endpoints.value().server.TakeChannel())));
+  }
+
+  void Query(QueryCompleter::Sync& completer) override {
+    fuchsia_wlan_fullmac::WlanFullmacImplQueryResponse response;
+
+    fuchsia_wlan_fullmac::WlanFullmacBandCapability band_capability;
+    band_capability.band(fuchsia_wlan_common::WlanBand::kTwoGhz)
+        .basic_rate_count(1)
+        .basic_rate_list({1})
+        .operating_channel_count(1)
+        .operating_channel_list({1});
+
+    response.info()
+        .sta_addr(std::array<uint8_t, 6>{8, 8, 8, 8, 8, 8})
+        .role(fuchsia_wlan_common::WlanMacRole::kClient)
+        .band_cap_count(1)
+        .band_cap_list({band_capability});
+
+    completer.Reply(fit::ok(std::move(response)));
+  }
+
+  void QueryMacSublayerSupport(QueryMacSublayerSupportCompleter::Sync& completer) override {
+    fuchsia_wlan_common::MacSublayerSupport response(
+        fuchsia_wlan_common::RateSelectionOffloadExtension(false),
+        fuchsia_wlan_common::DataPlaneExtension(
+            fuchsia_wlan_common::DataPlaneType::kGenericNetworkDevice),
+        fuchsia_wlan_common::DeviceExtension(
+            true, fuchsia_wlan_common::MacImplementationType::kFullmac, false));
+    completer.Reply(fit::ok(response));
+  }
+
+  void QuerySecuritySupport(QuerySecuritySupportCompleter::Sync& completer) override {
+    fuchsia_wlan_common::SecuritySupport response(fuchsia_wlan_common::SaeFeature(false, true),
+                                                  fuchsia_wlan_common::MfpFeature(false));
+    completer.Reply(fit::ok(response));
+  }
+
+  void QuerySpectrumManagementSupport(
+      QuerySpectrumManagementSupportCompleter::Sync& completer) override {
+    fuchsia_wlan_common::SpectrumManagementSupport response;
+    completer.Reply(fit::ok(response));
+  }
+
+  void NotImplemented_(const std::string& name, ::fidl::CompleterBase& completer) override {
+    ZX_PANIC("Not implemented: %s", name.c_str());
+  }
+
   fidl::ServerBinding<fuchsia_wlan_fullmac::WlanFullmacImpl> binding_;
+  std::optional<fidl::ClientEnd<::fuchsia_wlan_fullmac::WlanFullmacImplIfc>>
+      fullmac_ifc_client_endpoint_;
+  std::optional<fidl::Client<fuchsia_wlan_sme::UsmeBootstrap>> usme_bootstrap_client_;
+  std::optional<fidl::ClientEnd<fuchsia_wlan_sme::GenericSme>> generic_sme_client_endpoint_;
+  std::optional<zx::vmo> inspect_vmo_;
 };
 
+template <typename FullmacServer>
 struct WlanifDriverTestEnvironment : public fdf_testing::Environment {
   zx::result<> Serve(fdf::OutgoingDirectory& to_driver_vfs) final {
     fuchsia_wlan_fullmac::Service::InstanceHandler handler;
@@ -38,53 +117,68 @@ struct WlanifDriverTestEnvironment : public fdf_testing::Environment {
     return zx::ok();
   }
 
-  std::optional<FakeWlanFullmacServer> wlan_fullmac_server_;
+  std::optional<FullmacServer> wlan_fullmac_server_;
 };
 
+template <typename FullmacServer>
 class TestConfig final {
  public:
   using DriverType = wlanif::Device;
-  using EnvironmentType = WlanifDriverTestEnvironment;
+  using EnvironmentType = WlanifDriverTestEnvironment<FullmacServer>;
 };
 
-struct StartupShutdownTest : public ::testing::Test {
-  fdf_testing::ForegroundDriverTest<TestConfig> driver_test_;
-  bindings_stubs::FullmacMlmeBindingsStubs bindings_stubs_;
-};
+template <typename FullmacServer>
+using DriverTestType = fdf_testing::BackgroundDriverTest<TestConfig<FullmacServer>>;
 
-TEST_F(StartupShutdownTest, BasicStartupAndShutdownCallsFfi) {
-  wlan_fullmac_mlme_handle_t fake_handle;
-  libsync::Completion start_called;
-  bindings_stubs_.start_fullmac_mlme_stub = [&](zx_handle_t) {
-    start_called.Signal();
-    return &fake_handle;
-  };
-  libsync::Completion stop_called;
-  bindings_stubs_.stop_fullmac_mlme_stub = [&](wlan_fullmac_mlme_handle_t* handle) {
-    ASSERT_EQ(handle, &fake_handle);
-    stop_called.Signal();
-  };
-
-  libsync::Completion delete_called;
-  bindings_stubs_.delete_fullmac_mlme_stub = [&](wlan_fullmac_mlme_handle_t* handle) {
-    ASSERT_EQ(handle, &fake_handle);
-    delete_called.Signal();
-  };
-
-  ASSERT_TRUE(driver_test_.StartDriver().is_ok());
-  ASSERT_TRUE(start_called.signaled());
-  ASSERT_FALSE(stop_called.signaled());
-  ASSERT_FALSE(delete_called.signaled());
-
-  ASSERT_TRUE(driver_test_.StopDriver().is_ok());
-  ASSERT_TRUE(stop_called.signaled());
-  ASSERT_FALSE(delete_called.signaled());
-
-  driver_test_.ShutdownAndDestroyDriver();
-  ASSERT_TRUE(delete_called.signaled());
+TEST(StartupShutdownTest, BasicStartupShutdown) {
+  DriverTestType<BaseWlanFullmacServerForStartup> driver_test;
+  ASSERT_TRUE(driver_test.StartDriver().is_ok());
+  ASSERT_TRUE(driver_test.StopDriver().is_ok());
 }
 
-TEST_F(StartupShutdownTest, StartFailsIfMlmeStartFails) {
-  bindings_stubs_.start_fullmac_mlme_stub = [](zx_handle_t) { return nullptr; };
-  ZX_ASSERT(driver_test_.StartDriver().is_error());
+TEST(StartupShutdownTest, StartFailsIfQueryFails) {
+  struct QueryFails : public BaseWlanFullmacServerForStartup {
+    using BaseWlanFullmacServerForStartup::BaseWlanFullmacServerForStartup;
+    void Query(QueryCompleter::Sync& completer) override {
+      completer.Reply(zx::error(ZX_ERR_INTERNAL));
+    }
+  };
+  DriverTestType<QueryFails> driver_test;
+  ASSERT_FALSE(driver_test.StartDriver().is_ok());
 }
+
+TEST(StartupShutdownTest, StartFailsIfQueryMacSublayerSupportFails) {
+  struct QueryMacSublayerSupportFails : public BaseWlanFullmacServerForStartup {
+    using BaseWlanFullmacServerForStartup::BaseWlanFullmacServerForStartup;
+    void QueryMacSublayerSupport(QueryMacSublayerSupportCompleter::Sync& completer) override {
+      completer.Reply(zx::error(ZX_ERR_INTERNAL));
+    }
+  };
+  DriverTestType<QueryMacSublayerSupportFails> driver_test;
+  ASSERT_FALSE(driver_test.StartDriver().is_ok());
+}
+
+TEST(StartupShutdownTest, StartFailsIfQuerySecuritySupport) {
+  struct QuerySecuritySupportFails : public BaseWlanFullmacServerForStartup {
+    using BaseWlanFullmacServerForStartup::BaseWlanFullmacServerForStartup;
+    void QuerySecuritySupport(QuerySecuritySupportCompleter::Sync& completer) override {
+      completer.Reply(zx::error(ZX_ERR_INTERNAL));
+    }
+  };
+  DriverTestType<QuerySecuritySupportFails> driver_test;
+  ASSERT_FALSE(driver_test.StartDriver().is_ok());
+}
+
+TEST(StartupShutdownTest, StartFailsIfQuerySpectrumManagementSupport) {
+  struct QuerySpectrumManagementSupportFails : public BaseWlanFullmacServerForStartup {
+    using BaseWlanFullmacServerForStartup::BaseWlanFullmacServerForStartup;
+    void QuerySpectrumManagementSupport(
+        QuerySpectrumManagementSupportCompleter::Sync& completer) override {
+      completer.Reply(zx::error(ZX_ERR_INTERNAL));
+    }
+  };
+  DriverTestType<QuerySpectrumManagementSupportFails> driver_test;
+  ASSERT_FALSE(driver_test.StartDriver().is_ok());
+}
+
+}  // namespace

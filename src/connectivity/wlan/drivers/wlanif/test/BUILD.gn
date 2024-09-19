@@ -20,10 +20,11 @@ cc_test_executable("startup_shutdown_unittest") {
   deps = [
     "//sdk/fidl/fuchsia.driver.framework:fuchsia.driver.framework_cpp",
     "//sdk/fidl/fuchsia.wlan.fullmac:fuchsia.wlan.fullmac_cpp",
+    "//sdk/fidl/fuchsia.wlan.sme:fuchsia.wlan.sme_cpp",
     "//sdk/lib/async_patterns/testing/cpp:cpp",
     "//sdk/lib/driver/testing/cpp:cpp",
     "//sdk/lib/sys/cpp/testing:cpp",
-    "//src/connectivity/wlan/drivers/wlanif:lib_source_mlme_stub",
+    "//src/connectivity/wlan/drivers/wlanif:lib_source",
     "//src/lib/fxl/test:gtest_main",
     "//third_party/googletest:gtest",
     "//zircon/system/ulib/sync",
@@ -32,20 +33,20 @@ cc_test_executable("startup_shutdown_unittest") {
   ]
 }
 
-fuchsia_unittest_package("wlanif_unittest") {
+fuchsia_unittest_package("wlanif_startup_shutdown_unittest") {
   deps = [ ":startup_shutdown_unittest" ]
   test_specs = {
-    # Some tests mock MLME failing to start. In those cases, wlanif will emit error logs.
+    # Some tests return errors to MLME's FIDL requests on startup.
+    # In those cases, MLME will emit error logs.
     log_settings = {
       max_severity = "ERROR"
     }
   }
 }
-
 group("tests") {
   testonly = true
   deps = [
     ":wlanif_bind_test",
-    ":wlanif_unittest",
+    ":wlanif_startup_shutdown_unittest",
   ]
 }
