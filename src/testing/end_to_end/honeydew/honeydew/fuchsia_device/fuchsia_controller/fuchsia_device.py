@@ -119,6 +119,7 @@ class FuchsiaDevice(
     fuchsia_device_interface.FuchsiaDevice,
     affordances_capable.RebootCapableDevice,
     affordances_capable.FuchsiaDeviceLogger,
+    affordances_capable.FuchsiaDeviceClose,
 ):
     """FuchsiaDevice abstract base class implementation using
     Fuchsia-Controller.
@@ -144,8 +145,7 @@ class FuchsiaDevice(
         self._ffx_config: custom_types.FFXConfig = ffx_config
 
         self._on_device_boot_fns: list[Callable[[], None]] = []
-
-        self._wlan_policy: wlan_policy_fc.WlanPolicy | None = None
+        self._on_device_close_fns: list[Callable[[], None]] = []
 
         self.health_check()
 
@@ -448,13 +448,13 @@ class FuchsiaDevice(
         Returns:
             wlan_policy.WlanPolicy object
         """
-        self._wlan_policy = wlan_policy_fc.WlanPolicy(
+        return wlan_policy_fc.WlanPolicy(
             device_name=self.device_name,
             ffx=self.ffx,
             fuchsia_controller=self.fuchsia_controller,
             reboot_affordance=self,
+            fuchsia_device_close=self,
         )
-        return self._wlan_policy
 
     @properties.Affordance
     def wlan(self) -> wlan.Wlan:
@@ -499,8 +499,9 @@ class FuchsiaDevice(
     # List all the public methods
     def close(self) -> None:
         """Clean up method."""
-        if self._wlan_policy:
-            self._wlan_policy.close()
+        for on_device_close_fns in self._on_device_close_fns:
+            _LOGGER.info("Calling %s", on_device_close_fns.__qualname__)
+            on_device_close_fns()
 
     def health_check(self) -> None:
         """Ensure device is healthy.
@@ -616,8 +617,20 @@ class FuchsiaDevice(
         )
 
     def register_for_on_device_boot(self, fn: Callable[[], None]) -> None:
-        """Register a function that will be called in on_device_boot."""
+        """Register a function that will be called in `on_device_boot()`.
+
+        Args:
+            fn: Function that need to be called after FuchsiaDevice boot up.
+        """
         self._on_device_boot_fns.append(fn)
+
+    def register_for_on_device_close(self, fn: Callable[[], None]) -> None:
+        """Register a function that will be called during device clean up in `close()`.
+
+        Args:
+            fn: Function that need to be called during FuchsiaDevice cleanup.
+        """
+        self._on_device_close_fns.append(fn)
 
     def snapshot(self, directory: str, snapshot_file: str | None = None) -> str:
         """Captures the snapshot of the device.

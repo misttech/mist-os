@@ -375,6 +375,7 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
             ffx=self.fd_obj.ffx,
             fuchsia_controller=self.fd_obj.fuchsia_controller,
             reboot_affordance=self.fd_obj,
+            fuchsia_device_close=self.fd_obj,
         )
 
     @mock.patch.object(
@@ -506,9 +507,52 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
         )
 
     # List all the tests related to public methods
-    def test_close(self) -> None:
+    @parameterized.expand(
+        [
+            (
+                {
+                    "label": "no_register_for_on_device_close",
+                    "register_for_on_device_close": None,
+                    "expected_exception": False,
+                },
+            ),
+            (
+                {
+                    "label": "register_for_on_device_close_fn_returning_success",
+                    "register_for_on_device_close": lambda: None,
+                    "expected_exception": False,
+                },
+            ),
+            (
+                {
+                    "label": "register_for_on_device_close_fn_returning_exception",
+                    "register_for_on_device_close": lambda: 1 / 0,
+                    "expected_exception": True,
+                },
+            ),
+        ],
+        name_func=_custom_test_name_func,
+    )
+    def test_close(
+        self,
+        parameterized_dict: dict[str, Any],
+    ) -> None:
         """Testcase for FuchsiaDevice.close()"""
-        self.fd_obj.close()
+        # Reset the `_on_device_close_fns` variable at the beginning of the test
+        self.fd_obj._on_device_close_fns = []
+
+        if parameterized_dict["register_for_on_device_close"]:
+            self.fd_obj.register_for_on_device_close(
+                parameterized_dict["register_for_on_device_close"]
+            )
+        if parameterized_dict["expected_exception"]:
+            with self.assertRaises(Exception):
+                self.fd_obj.close()
+        else:
+            self.fd_obj.close()
+
+        # Reset the `_on_device_close_fns` variable at the end of the test
+        self.fd_obj._on_device_close_fns = []
 
     @mock.patch.object(
         fuchsia_controller_transport.FuchsiaController,
@@ -714,6 +758,11 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
     def test_register_for_on_device_boot(self) -> None:
         """Testcase for BaseFuchsiaDevice.register_for_on_device_boot()"""
         self.fd_obj.register_for_on_device_boot(fn=lambda: None)
+
+    def test_register_for_on_device_close(self) -> None:
+        """Testcase for BaseFuchsiaDevice.register_for_on_device_close()"""
+        self.fd_obj.register_for_on_device_boot(fn=lambda: None)
+        self.fd_obj.close()
 
     @parameterized.expand(
         [

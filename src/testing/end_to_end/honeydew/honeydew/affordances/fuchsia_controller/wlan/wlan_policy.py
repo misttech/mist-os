@@ -118,6 +118,7 @@ class WlanPolicy(AsyncAdapter, wlan_policy.WlanPolicy):
         ffx: ffx_transport.FFX,
         fuchsia_controller: fc_transport.FuchsiaController,
         reboot_affordance: affordances_capable.RebootCapableDevice,
+        fuchsia_device_close: affordances_capable.FuchsiaDeviceClose,
     ) -> None:
         """Create a WLAN Policy Fuchsia Controller affordance.
 
@@ -126,16 +127,20 @@ class WlanPolicy(AsyncAdapter, wlan_policy.WlanPolicy):
             ffx: FFX transport.
             fuchsia_controller: Fuchsia Controller transport.
             reboot_affordance: Object that implements RebootCapableDevice.
+            fuchsia_device_close: Object that implements FuchsiaDeviceClose.
         """
         super().__init__()
         self._verify_supported(device_name, ffx)
 
         self._fc_transport = fuchsia_controller
         self._reboot_affordance = reboot_affordance
+        self._fuchsia_device_close = fuchsia_device_close
         self._client_controller: ClientControllerState | None = None
 
         self._connect_proxy()
         self._reboot_affordance.register_for_on_device_boot(self._connect_proxy)
+
+        self._fuchsia_device_close.register_for_on_device_close(self.close)
 
     def close(self) -> None:
         """Release handle on client controller.

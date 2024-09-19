@@ -130,6 +130,10 @@ class WlanPolicyFCTests(unittest.TestCase):
             spec=affordances_capable.RebootCapableDevice,
             autospec=True,
         )
+        self.fuchsia_device_close_obj = mock.MagicMock(
+            spec=affordances_capable.FuchsiaDeviceClose,
+            autospec=True,
+        )
         self.fc_transport_obj = mock.MagicMock(
             spec=fc_transport.FuchsiaController,
             autospec=True,
@@ -148,6 +152,7 @@ class WlanPolicyFCTests(unittest.TestCase):
             ffx=self.ffx_transport_obj,
             fuchsia_controller=self.fc_transport_obj,
             reboot_affordance=self.reboot_affordance_obj,
+            fuchsia_device_close=self.fuchsia_device_close_obj,
         )
         self.client_state_updates_proxy: (
             f_wlan_policy.ClientStateUpdatesClient | None
@@ -215,6 +220,7 @@ class WlanPolicyFCTests(unittest.TestCase):
                 ffx=self.ffx_transport_obj,
                 fuchsia_controller=self.fc_transport_obj,
                 reboot_affordance=self.reboot_affordance_obj,
+                fuchsia_device_close=self.fuchsia_device_close_obj,
             )
 
     def test_init_connect_proxy(self) -> None:
