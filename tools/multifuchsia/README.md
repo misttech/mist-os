@@ -378,3 +378,8 @@ Extra notes:
     `fuchsia_update_and_build@internal.timer`.
 *   If you want to skip the `./multifuchsia update` part of the workflow, create
     a symlink from `snapshots/update.success` to `build.success`.
+*   With multifuchsia you will have multiple `$FUCHSIA_DIR` directories, at
+    least one per checkout. Hence adding `$FUCHSIA_DIR/.jiri_root/bin/` to your
+    `PATH` in your shell resource config file will lead to undesired side
+    effects. As [recommended in the Fuchsia developer docs](https://fuchsia.dev/fuchsia-src/development/build/fx?hl=en#setting-up-fx)
+    for `fx`, leveraging tools like `direnv` or `dotenv` is highly recommended.
