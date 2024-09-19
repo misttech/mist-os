@@ -47,10 +47,14 @@ def GetSplitRustToolchainPaths(packages, host_platforms, target_platforms=None):
         # Currently disabled; see https://fxbug.dev/325488864.
         # "wasm32-unknown-unknown",
         "x86_64-unknown-linux-gnu",
-    ] + ([
-        "x86_64-apple-darwin",
-        "aarch64-apple-darwin",
-    ] if any("mac-" in plat for plat in host_platforms) else [])
+    ] + (
+        [
+            "x86_64-apple-darwin",
+            "aarch64-apple-darwin",
+        ]
+        if any("mac-" in plat for plat in host_platforms)
+        else []
+    )
     rust_toolchain_packages = []
     if "rust" not in packages:
         return rust_toolchain_packages
@@ -82,7 +86,10 @@ def GetRustToolchainCommands(rust_toolchain_packages, tag):
         return rust_command
 
     # Only download ${platform} Host toolchain packages
-    rust_command += ["-package", "fuchsia/third_party/rust/host/${platform}=%s" % (tag)]
+    rust_command += [
+        "-package",
+        "fuchsia/third_party/rust/host/${platform}=%s" % (tag),
+    ]
 
     for package in rust_toolchain_packages:
         # Skip host packages, keep all target
@@ -121,15 +128,22 @@ before commands are run for any package.
 """,
     )
     parser.add_argument(
-        "version", nargs="?", default="latest", help="CIPD version to promote"
+        "version",
+        nargs="?",
+        default="latest",
+        help="CIPD version to promote. Defaults to latest. Example: git_revision:507c05bead4026ed8841512095b4218119eb479f",
     )
-    parser.add_argument("--package", "-p", action="append", help="CIPD package name")
+    parser.add_argument(
+        "--package", "-p", action="append", help="CIPD package name"
+    )
     parser.add_argument(
         "--manifest",
         default=default_jiri_manifest,
         help="Jiri manifest file to edit",
     )
-    parser.add_argument("--tag", default="git_revision", help="CIPD tag to publish")
+    parser.add_argument(
+        "--tag", default="git_revision", help="CIPD tag to publish"
+    )
     parser.add_argument(
         "--platforms",
         action="append",
@@ -154,7 +168,9 @@ before commands are run for any package.
             args.platforms.append("windows-amd64")
 
     # Rust separate host/target toolchain
-    rust_toolchain_packages = GetSplitRustToolchainPaths(args.package, args.platforms)
+    rust_toolchain_packages = GetSplitRustToolchainPaths(
+        args.package, args.platforms
+    )
 
     packages = [
         package if "/" in package else "fuchsia/third_party/" + package
@@ -180,7 +196,8 @@ before commands are run for any package.
     ]
 
     package_tags = {
-        package["pin"]["package"]: PackageTag(package) for package in resolved_packages
+        package["pin"]["package"]: PackageTag(package)
+        for package in resolved_packages
     }
     tag_set = set(t for t in package_tags.values())
     if len(tag_set) != 1:
@@ -201,19 +218,26 @@ before commands are run for any package.
 
     cmd.append(args.manifest)
 
-    def DryRun(args):
+    def DryRun(args, cwd=None):
         print(args)
 
     run = DryRun if args.dry_run else subprocess.check_call
 
     run(cmd)
 
-    update_lockfiles = os.path.join(FUCHSIA_DIR, "integration", "update-lockfiles.sh")
+    update_lockfiles = os.path.join(
+        FUCHSIA_DIR, "integration", "update-lockfiles.sh"
+    )
     if os.path.isfile(update_lockfiles):
         run([update_lockfiles])
     else:
-        sys.stderr.write("Warning: update-lockfiles.sh not found, falling back to jiri\n")
-        run([JIRI, "resolve", "-local-manifest"])
+        sys.stderr.write(
+            "Warning: update-lockfiles.sh not found, falling back to jiri\n"
+        )
+        run(
+            [JIRI, "resolve", "-local-manifest"],
+            cwd=os.path.join(FUCHSIA_DIR, "integration"),
+        )
 
     sys.stderr.write("\nRun this command to download the updated package:\n")
     sys.stderr.write("$ jiri fetch-packages -local-manifest\n")
