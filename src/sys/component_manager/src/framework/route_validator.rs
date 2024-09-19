@@ -23,7 +23,7 @@ use futures::TryStreamExt;
 use lazy_static::lazy_static;
 use moniker::{ExtendedMoniker, Moniker};
 use router_error::{Explain, RouterError};
-use sandbox::{Request, Router};
+use sandbox::Router;
 use std::cmp::Ordering;
 use std::sync::{Arc, Weak};
 use tracing::warn;
@@ -372,7 +372,7 @@ impl RouteRequest {
         (fsys::RouteOutcome, ExtendedMoniker, Option<Vec<fsys::ServiceInstance>>),
         RouterError,
     > {
-        let res: Result<(Router, Request), ActionError> = async move {
+        let res: Result<Router, ActionError> = async move {
             let resolved_state = instance.lock_resolved_state().await.map_err(|err| {
                 ActionError::from(StartActionError::ResolveActionError {
                     moniker: instance.moniker.clone(),
@@ -382,8 +382,8 @@ impl RouteRequest {
             Ok(route_request.into_router(instance.as_weak(), &resolved_state.sandbox))
         }
         .await;
-        let (router, request) = res.map_err(|e| RouterError::NotFound(Arc::new(e)))?;
-        router.route(Some(request), true).await.map(|capability| {
+        let router = res.map_err(|e| RouterError::NotFound(Arc::new(e)))?;
+        router.route(None, true).await.map(|capability| {
             let capability_source = CapabilitySource::try_from(capability)
                 .expect("failed to convert capability to capability source");
             let source_moniker = capability_source.source_moniker();

@@ -4,8 +4,6 @@
 
 use crate::capability::CapabilityProvider;
 use crate::model::component::WeakComponentInstance;
-use ::routing::component_instance::ComponentInstanceInterface;
-use ::routing::DictExt;
 use async_trait::async_trait;
 use clonable_error::ClonableError;
 use cm_rust::{Availability, CapabilityTypeName};
@@ -16,7 +14,9 @@ use moniker::Moniker;
 use router_error::RouterError;
 use routing::availability::AvailabilityMetadata;
 use routing::bedrock::request_metadata::METADATA_KEY_TYPE;
+use routing::component_instance::ComponentInstanceInterface;
 use routing::error::{ComponentInstanceError, RoutingError};
+use routing::DictExt;
 use sandbox::{Dict, RemotableCapability, Request};
 use std::collections::HashMap;
 use std::sync::Arc;

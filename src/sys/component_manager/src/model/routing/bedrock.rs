@@ -3,16 +3,13 @@
 // found in the LICENSE file.
 
 use crate::model::component::WeakComponentInstance;
-use ::routing::bedrock::request_metadata::{
-    dictionary_metadata, protocol_metadata, runner_metadata,
-};
 use ::routing::bedrock::sandbox_construction::{ComponentSandbox, ProgramInput};
 use ::routing::DictExt;
 use cm_rust::{
     ExposeDecl, ExposeDictionaryDecl, ExposeProtocolDecl, ExposeRunnerDecl, UseDecl,
     UseProtocolDecl, UseRunnerDecl,
 };
-use sandbox::{Capability, Request, Router};
+use sandbox::{Capability, Router};
 
 /// A request to route a capability through the bedrock layer from use.
 #[derive(Clone, Debug)]
@@ -40,13 +37,9 @@ impl UseRouteRequest {
         self,
         target: WeakComponentInstance,
         program_input: &ProgramInput,
-    ) -> (Router, Request) {
+    ) -> Router {
         match self {
             Self::UseProtocol(decl) => {
-                let request = Request {
-                    target: target.clone().into(),
-                    metadata: protocol_metadata(decl.availability),
-                };
                 let Some(capability) = program_input.namespace.get_capability(&decl.target_path)
                 else {
                     panic!(
@@ -62,7 +55,7 @@ impl UseRouteRequest {
                         target.moniker, capability
                     );
                 };
-                (router, request)
+                router
             }
             Self::UseRunner(_) => {
                 // A component can only use one runner, it must be this one.
@@ -71,11 +64,7 @@ impl UseRouteRequest {
                     .as_ref()
                     .expect("component has `use runner` but no runner in program input?")
                     .clone();
-                let request = Request {
-                    target: target.clone().into(),
-                    metadata: runner_metadata(cm_rust::Availability::Required),
-                };
-                (router, request)
+                router
             }
         }
     }
@@ -114,17 +103,9 @@ impl TryFrom<&Vec<&ExposeDecl>> for ExposeRouteRequest {
 }
 
 impl ExposeRouteRequest {
-    pub fn into_router(
-        self,
-        target: WeakComponentInstance,
-        sandbox: &ComponentSandbox,
-    ) -> (Router, Request) {
+    pub fn into_router(self, target: WeakComponentInstance, sandbox: &ComponentSandbox) -> Router {
         match self {
             Self::ExposeProtocol(decl) => {
-                let request = Request {
-                    target: target.clone().into(),
-                    metadata: protocol_metadata(decl.availability),
-                };
                 let Some(capability) =
                     sandbox.component_output_dict.get_capability(&decl.target_name)
                 else {
@@ -141,13 +122,9 @@ impl ExposeRouteRequest {
                         target.moniker, capability
                     );
                 };
-                (router, request)
+                router
             }
             Self::ExposeDictionary(decl) => {
-                let request = Request {
-                    target: target.clone().into(),
-                    metadata: dictionary_metadata(decl.availability),
-                };
                 let Some(capability) =
                     sandbox.component_output_dict.get_capability(&decl.target_name)
                 else {
@@ -164,13 +141,9 @@ impl ExposeRouteRequest {
                         target.moniker, capability
                     );
                 };
-                (router, request)
+                router
             }
             Self::ExposeRunner(decl) => {
-                let request = Request {
-                    target: target.clone().into(),
-                    metadata: runner_metadata(cm_rust::Availability::Required),
-                };
                 let Some(capability) =
                     sandbox.component_output_dict.get_capability(&decl.target_name)
                 else {
@@ -187,7 +160,7 @@ impl ExposeRouteRequest {
                         target.moniker, capability
                     );
                 };
-                (router, request)
+                router
             }
         }
     }
@@ -225,11 +198,7 @@ impl TryFrom<&Vec<&ExposeDecl>> for RouteRequest {
 }
 
 impl RouteRequest {
-    pub fn into_router(
-        self,
-        target: WeakComponentInstance,
-        sandbox: &ComponentSandbox,
-    ) -> (Router, Request) {
+    pub fn into_router(self, target: WeakComponentInstance, sandbox: &ComponentSandbox) -> Router {
         match self {
             Self::Use(r) => r.into_router(target, &sandbox.program_input),
             Self::Expose(r) => r.into_router(target, sandbox),

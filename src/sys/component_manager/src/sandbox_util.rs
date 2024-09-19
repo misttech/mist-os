@@ -10,7 +10,7 @@ use ::routing::capability_source::CapabilitySource;
 use ::routing::component_instance::ComponentInstanceInterface;
 use ::routing::error::{ComponentInstanceError, RoutingError};
 use ::routing::policy::GlobalPolicyChecker;
-use ::routing::WeakInstanceTokenExt;
+use ::routing::{WeakInstanceTokenExt, WithDefault};
 use async_trait::async_trait;
 use cm_util::WeakTaskGroup;
 use fidl::endpoints::{ProtocolMarker, RequestStream};
@@ -229,18 +229,18 @@ impl<T: Routable + 'static> RoutableExt for T {
                 request: Option<Request>,
                 debug: bool,
             ) -> Result<Capability, RouterError> {
-                let request = request.ok_or_else(|| RouterError::InvalidArgs)?;
                 if debug {
-                    return self.router.route(Some(request), debug).await;
+                    return self.router.route(request, debug).await;
                 }
+                let request = request.ok_or_else(|| RouterError::InvalidArgs)?;
 
                 let ExtendedInstance::Component(target) =
                     request.target.clone().to_instance().upgrade().map_err(RoutingError::from)?
                 else {
                     return Err(cm_unexpected());
                 };
-                let entry = self.router.clone().into_directory_entry(
-                    request,
+                let subrouter = self.router.clone().with_default(request);
+                let entry = subrouter.into_directory_entry(
                     self.entry_type,
                     target.execution_scope.clone(),
                     move |err| {

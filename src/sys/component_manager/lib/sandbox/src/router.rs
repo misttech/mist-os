@@ -188,21 +188,6 @@ mod tests {
     use cm_types::Availability;
     use fidl::handle::Channel;
 
-    #[derive(Debug)]
-    struct FakeInstanceToken {}
-
-    impl FakeInstanceToken {
-        fn new() -> WeakInstanceToken {
-            WeakInstanceToken { inner: Arc::new(FakeInstanceToken {}) }
-        }
-    }
-
-    impl crate::WeakInstanceTokenAny for FakeInstanceToken {
-        fn as_any(&self) -> &dyn std::any::Any {
-            self
-        }
-    }
-
     #[fuchsia::test]
     async fn route_and_use_connector_with_dropped_receiver() {
         // We want to test vending a sender with a router, dropping the associated receiver, and
@@ -217,10 +202,7 @@ mod tests {
                 Capability::Data(Data::String(Availability::Required.to_string())),
             )
             .unwrap();
-        let capability = router
-            .route(Some(Request { target: FakeInstanceToken::new(), metadata }), false)
-            .await
-            .unwrap();
+        let capability = router.route(None, false).await.unwrap();
         let sender = match capability {
             Capability::Connector(c) => c,
             c => panic!("Bad enum {:#?}", c),
