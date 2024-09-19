@@ -5,7 +5,6 @@
             metric_type: "Occurrence",
             selector: [
                 "core/exceptions:root/crash_counts:{MONIKER}",
-                "core/exceptions:root/crash_counts:app\\/sys\\/{MONIKER}",
             ],
         },
     ],
