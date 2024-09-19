@@ -84,7 +84,14 @@ fuchsia_unittest_package("power-manager-integration-test") {
     "//src/power/power-manager/testing/fake_root",
   ]
   test_specs = {
-    environments = basic_envs
+    environments = [
+      astro_env,
+      nelson_env,
+      nuc7_env,
+      nuc11_env,
+      sherlock_env,
+      vim3_env,
+    ]
 
     # CpuManager emits "Expected positive total_time_delta" error message
     log_settings = {
