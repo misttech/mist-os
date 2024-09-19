@@ -15,7 +15,9 @@ common_vars = {
 # SDK library.
 zx_library("zbi") {
   forward_variables_from(common_vars, "*")
-  sdk_publishable = "excluded"
+
+  # TODO(https://fxbug.dev/331991540): Determine an appropriate solution for building firmware SDK.
+  sdk_publishable = "firmware_sdk"
 }
 
 # In-tree library.

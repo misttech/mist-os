@@ -7,7 +7,10 @@ import("//build/test.gni")
 
 sdk_source_set("sparse") {
   sdk_name = "storage_sdk_sparse"
-  category = "excluded"
+
+  # TODO(https://fxbug.dev/331991540): Determine an appropriate solution for building firmware SDK.
+  category = "firmware_sdk"
+
   include_base = "//src/storage"
   sources = [
     "sparse.c",

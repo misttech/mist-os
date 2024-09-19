@@ -343,9 +343,22 @@ template("sdk_source_set") {
                            [
                              "source_dir",
                              "testonly",
-                             "category",
                              "sdk_area",
                            ])
+
+    # Atoms for the Firmware SDK, which is not a real IDK, use this template,
+    # but none of the supported categories are appropriate. Specifically, this
+    # template contains special logic related to the Bazel SDK for "internal"
+    # category. Thus, allow "firmware_sdk" in this template then convert it
+    # to "internal" for the atom.
+    # TODO(https://fxbug.dev/331991540): Determine an appropriate solution for
+    # building the firmware SDK.
+    category = invoker.category
+    if (category == "firmware_sdk" ||
+        # TODO(https://fxbug.dev/365996258): Remove third_party uses and delete.
+        category == "experimental") {
+      category = "internal"
+    }
 
     id = sdk_id
 

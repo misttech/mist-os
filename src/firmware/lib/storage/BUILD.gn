@@ -14,6 +14,11 @@ config("includes") {
 }
 
 sdk_source_set("storage") {
+  sdk_name = "firmware_sdk_storage"
+
+  # TODO(https://fxbug.dev/331991540): Determine an appropriate solution for building firmware SDK.
+  category = "firmware_sdk"
+
   sources = [
     "gpt_utils.c",
     "gpt_utils.h",
@@ -22,8 +27,6 @@ sdk_source_set("storage") {
     "storage.c",
     "storage.h",
   ]
-  sdk_name = "firmware_sdk_storage"
-  category = "excluded"
   include_base = "//src/firmware"
   public_deps = [
     "//src/storage/lib/sparse/c:sparse",

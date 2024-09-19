@@ -28,12 +28,15 @@ common_vars = {
 # SDK library.
 zx_library("zircon_boot") {
   forward_variables_from(common_vars, "*")
+
+  # TODO(https://fxbug.dev/331991540): Determine an appropriate solution for building firmware SDK.
+  sdk_publishable = "firmware_sdk"
+
   public_deps += [
     "//src/firmware/lib/abr",
     "//src/firmware/lib/zbi",
     "//third_party/android/platform/external/avb",
   ]
-  sdk_publishable = "excluded"
 }
 
 # In-tree library.

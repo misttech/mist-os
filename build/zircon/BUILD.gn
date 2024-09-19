@@ -37,7 +37,8 @@ group("sdk_category_partner_allowlist") {
   ]
 }
 group("sdk_category_internal_allowlist") {
-  # See https://fxbug.dev/331961405. This can be removed once the "internal IDK" is eliminated.
+  # See https://fxbug.dev/333125197 and https://fxbug.dev/331961405. This can be
+  # removed once the "internal IDK" is eliminated.
   visibility = [
     "//src/devices/lib/mmio/*",
     "//src/devices/testing/*",
@@ -47,7 +48,9 @@ group("sdk_category_internal_allowlist") {
     "//zircon/system/ulib/mmio-ptr/*",
   ]
 }
-group("sdk_category_excluded_allowlist") {
-  # See https://fxbug.dev/331961405.
+group("sdk_category_firmware_allowlist") {
+  # See https://fxbug.dev/331962496 and https://fxbug.dev/331961405. This can be
+  # removed when the firmware SDK is no longer using zx_library().
+
   visibility = [ "//src/firmware/lib/*" ]
 }
