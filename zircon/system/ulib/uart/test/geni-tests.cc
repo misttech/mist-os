@@ -7,6 +7,7 @@
 #include <lib/uart/uart.h>
 
 #include <cstdint>
+#include <string>
 
 #include <zxtest/zxtest.h>
 
@@ -132,11 +133,11 @@ TEST(GeniTests, TxIrqOnly) {
       // Set tx_fifo_watermark on main
       .ExpectRead(uint32_t{0b0100'0000'0000'0000'0000'0000'0000'0000}, 0x610)
       .ExpectRead(uint32_t{0b0000'0000'0000'0000'0000'0000'0000'0000}, 0x640)
+      // Mask the tx fifo irq
+      .ExpectWrite(uint32_t{0b0100'0000'0000'0000'0000'0000'0000'0000}, 0x620)
       // Clear set status
       .ExpectWrite(uint32_t{0b0100'0000'0000'0000'0000'0000'0000'0000}, 0x618)
-      .ExpectWrite(uint32_t{0b0000'0000'0000'0000'0000'0000'0000'0000}, 0x648)
-      // Mask the tx fifo irq
-      .ExpectWrite(uint32_t{0b0100'0000'0000'0000'0000'0000'0000'0000}, 0x620);
+      .ExpectWrite(uint32_t{0b0000'0000'0000'0000'0000'0000'0000'0000}, 0x648);
 
   int call_count = 0;
   driver.Interrupt(
@@ -161,11 +162,11 @@ TEST(GeniTests, RxIrqEmptyFifo) {
       // irq status valid but empty fifo
       .ExpectRead(uint32_t{0b0000'0000'0000'0000'0000'0000'0000'0000}, 0x610)
       .ExpectRead(uint32_t{0b0000'1000'0000'0000'0000'0000'0000'0000}, 0x640)
+      // Read from the fifo status register - 0 bytes
+      .ExpectRead(uint32_t{0b0000'0000'0000'0000'0000'0000'0000'0000}, 0x804)
       // Clear what was read on both
       .ExpectWrite(uint32_t{0b0000'0000'0000'0000'0000'0000'0000'0000}, 0x618)
-      .ExpectWrite(uint32_t{0b0000'1000'0000'0000'0000'0000'0000'0000}, 0x648)
-      // Read from the fifo status register - 0 bytes
-      .ExpectRead(uint32_t{0b0000'0000'0000'0000'0000'0000'0000'0000}, 0x804);
+      .ExpectWrite(uint32_t{0b0000'1000'0000'0000'0000'0000'0000'0000}, 0x648);
 
   // Empty Fifo bit is set, so it should just return.
 
@@ -189,13 +190,13 @@ TEST(GeniTests, RxTimeoutIrqWithNonEmptyFifoAndNonFullQueue) {
       // Check last and rx watermark.
       .ExpectRead(uint32_t{0b0000'0000'0000'0000'0000'0000'0000'0000}, 0x610)
       .ExpectRead(uint32_t{0b0000'0100'0000'0000'0000'0000'0000'0000}, 0x640)
-      // Clear what was read on both
-      .ExpectWrite(uint32_t{0b0000'0000'0000'0000'0000'0000'0000'0000}, 0x618)
-      .ExpectWrite(uint32_t{0b0000'0100'0000'0000'0000'0000'0000'0000}, 0x648)
       // Read from the fifo status register - 1 words * word_width (4)
       .ExpectRead(uint32_t{0b0000'0000'0000'0000'0000'0000'0000'0001}, 0x804)
       // Read from the fifo
-      .ExpectRead(uint32_t{0b0100'0001'0100'0001'0100'0001'0100'0001}, 0x780);
+      .ExpectRead(uint32_t{0b0100'0001'0100'0001'0100'0001'0100'0001}, 0x780)
+      // Clear what was read on both
+      .ExpectWrite(uint32_t{0b0000'0000'0000'0000'0000'0000'0000'0000}, 0x618)
+      .ExpectWrite(uint32_t{0b0000'0100'0000'0000'0000'0000'0000'0000}, 0x648);
 
   int call_count = 0;
   driver.Interrupt([](auto& sync, auto& waiter,
@@ -220,9 +221,6 @@ TEST(GeniTests, RxIrqWithNonEmptyFifoAndFullQueue) {
       // Check last and rx watermark.
       .ExpectRead(uint32_t{0b0000'0000'0000'0000'0000'0000'0000'0000}, 0x610)
       .ExpectRead(uint32_t{0b0000'1100'0000'0000'0000'0000'0000'0000}, 0x640)
-      // Clear what was read on both
-      .ExpectWrite(uint32_t{0b0000'0000'0000'0000'0000'0000'0000'0000}, 0x618)
-      .ExpectWrite(uint32_t{0b0000'1100'0000'0000'0000'0000'0000'0000}, 0x648)
       // Read from the fifo status register - 1 words * word_width (4)
       .ExpectRead(uint32_t{0b0000'0000'0000'0000'0000'0000'0000'0001}, 0x804)
       // Read fifo once before the call below stops it.
@@ -233,6 +231,9 @@ TEST(GeniTests, RxIrqWithNonEmptyFifoAndFullQueue) {
       .ExpectWrite(uint32_t{0b0000'1100'0000'0000'0000'0000'0000'0000}, 0x650)
       // Clear from status
       .ExpectWrite(uint32_t{0b0000'1100'0000'0000'0000'0000'0000'0000}, 0x618)
+      .ExpectWrite(uint32_t{0b0000'1100'0000'0000'0000'0000'0000'0000}, 0x648)
+      // Clear what was read on both
+      .ExpectWrite(uint32_t{0b0000'0000'0000'0000'0000'0000'0000'0000}, 0x618)
       .ExpectWrite(uint32_t{0b0000'1100'0000'0000'0000'0000'0000'0000}, 0x648);
 
   int call_count = 0;
@@ -244,6 +245,75 @@ TEST(GeniTests, RxIrqWithNonEmptyFifoAndFullQueue) {
                    });
 
   EXPECT_EQ(call_count, 1);
+}
+
+TEST(GeniTests, RxLastByteInterruptWithAllBytesValidInTheLastWord) {
+  SimpleTestDriver driver(kTestConfig);
+
+  InitWithInterrupt(driver);
+
+  // Now actual IRQ Handler expectations.
+  driver.io()
+      .mock()
+      // Check last and rx watermark.
+      .ExpectRead(uint32_t{0b0000'0000'0000'0000'0000'0000'0000'0000}, 0x610)
+      .ExpectRead(uint32_t{0b0000'0100'0000'0000'0000'0000'0000'0000}, 0x640)
+      // Read from the fifo status register - 2 full words * word_width (4)
+      .ExpectRead(uint32_t{0b1000'0000'0000'0000'0000'0000'0000'0010}, 0x804)
+      // Read from the fifo
+      .ExpectRead(uint32_t{0b0100'0100'0100'0011'0100'0010'0100'0001}, 0x780)
+      .ExpectRead(uint32_t{0b0100'1000'0100'0111'0100'0110'0100'0101}, 0x780)
+      // Clear what was read on both
+      .ExpectWrite(uint32_t{0b0000'0000'0000'0000'0000'0000'0000'0000}, 0x618)
+      .ExpectWrite(uint32_t{0b0000'0100'0000'0000'0000'0000'0000'0000}, 0x648);
+
+  int call_count = 0;
+  std::string read_chars;
+  driver.Interrupt([](auto& sync, auto& waiter,
+                      auto&& disable_tx_irq) { FAIL("Unexpected call on |tx| irq callback."); },
+                   [&](auto& sync, auto&& reader, auto&& full) {
+                     call_count++;
+                     char c = static_cast<char>(reader());
+                     read_chars.push_back(c);
+                   });
+
+  EXPECT_EQ(read_chars, "ABCDEFGH");
+  EXPECT_EQ(8, call_count);
+}
+
+TEST(GeniTests, RxLastByteInterruptWithPartialBytesValidInTheLastWord) {
+  SimpleTestDriver driver(kTestConfig);
+
+  InitWithInterrupt(driver);
+
+  // Now actual IRQ Handler expectations.
+  driver.io()
+      .mock()
+      // Check last and rx watermark.
+      .ExpectRead(uint32_t{0b0000'0000'0000'0000'0000'0000'0000'0000}, 0x610)
+      .ExpectRead(uint32_t{0b0000'0100'0000'0000'0000'0000'0000'0000}, 0x640)
+      // Read from the fifo status register -
+      // 1 full word * word_width (4) + 1 partial word of 3 bytes
+      .ExpectRead(uint32_t{0b1011'0000'0000'0000'0000'0000'0000'0010}, 0x804)
+      // Read from the fifo
+      .ExpectRead(uint32_t{0b0100'0100'0100'0011'0100'0010'0100'0001}, 0x780)
+      .ExpectRead(uint32_t{0b0000'0000'0100'0111'0100'0110'0100'0101}, 0x780)
+      // Clear what was read on both
+      .ExpectWrite(uint32_t{0b0000'0000'0000'0000'0000'0000'0000'0000}, 0x618)
+      .ExpectWrite(uint32_t{0b0000'0100'0000'0000'0000'0000'0000'0000}, 0x648);
+
+  int call_count = 0;
+  std::string read_chars;
+  driver.Interrupt([](auto& sync, auto& waiter,
+                      auto&& disable_tx_irq) { FAIL("Unexpected call on |tx| irq callback."); },
+                   [&](auto& sync, auto&& reader, auto&& full) {
+                     call_count++;
+                     char c = static_cast<char>(reader());
+                     read_chars.push_back(c);
+                   });
+
+  EXPECT_EQ(read_chars, "ABCDEFG");
+  EXPECT_EQ(7, call_count);
 }
 
 }  // namespace

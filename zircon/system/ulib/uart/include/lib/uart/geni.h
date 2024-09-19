@@ -66,19 +66,42 @@ struct SecondaryClockRegister {
   static auto Get() { return ClockRegister::Get(0x4c); }
 };
 
-struct FifoStatusRegister : public hwreg::RegisterBase<FifoStatusRegister, uint32_t> {
-  DEF_FIELD(27, 0, count);  // in words
-  DEF_FIELD(30, 28, last_byte);
-  DEF_BIT(31, partial);  // determines if last_byte is valid.
-  static auto Get(uint32_t offset) { return hwreg::RegisterAddr<FifoStatusRegister>(offset); }
+// RX_FIFO_STATUS / GENI_RX_FIFO_STATUS
+//
+// This register is not documented in the Hardware register description
+// doc, but is referred in both the Hardware register description and the QUP
+// v3 Hardware Programming Guide.
+//
+// Experiments show that the register definitions below match the hardware
+// behavior.
+struct RxFifoStatusRegister : public hwreg::RegisterBase<RxFifoStatusRegister, uint32_t> {
+  static auto Get() { return hwreg::RegisterAddr<RxFifoStatusRegister>(0x804); }
+
+  // Determines if the FIFO has received the last byte.
+  DEF_BIT(31, last_byte_received);
+
+  // If not zero, number of valid bytes in the last FIFO word.
+  // If zero, all bytes in the last FIFO word are valid.
+  //
+  // Valid only if `last_byte_received` is true and this field is not zero.
+  DEF_FIELD(30, 28, valid_bytes_in_last_word_if_not_zero);
+
+  // Number of available words in the FIFO.
+  DEF_FIELD(24, 0, word_count);
 };
 
-struct TxFifoStatusRegister {
-  static auto Get() { return FifoStatusRegister::Get(0x800); }
-};
+// TX_FIFO_STATUS
+//
+// This register is not documented in the Hardware register description
+// doc.
+//
+// Experiments show that the register definitions below match the hardware
+// behavior.
+struct TxFifoStatusRegister : public hwreg::RegisterBase<TxFifoStatusRegister, uint32_t> {
+  static auto Get() { return hwreg::RegisterAddr<TxFifoStatusRegister>(0x800); }
 
-struct RxFifoStatusRegister {
-  static auto Get() { return FifoStatusRegister::Get(0x804); }
+  // Number of available words in the FIFO.
+  DEF_FIELD(27, 0, word_count);
 };
 
 struct IrqStatusRegister : public hwreg::RegisterBase<IrqStatusRegister, uint32_t> {
@@ -372,7 +395,7 @@ class Driver : public DriverBase<Driver, ZBI_KERNEL_DRIVER_GENI_UART, zbi_dcfg_s
       return 0;
     }
 
-    auto fifo_count = TxFifoStatusRegister::Get().ReadFrom(io.io()).count();
+    auto fifo_count = TxFifoStatusRegister::Get().ReadFrom(io.io()).word_count();
     // Block until it drops below the watermark.
     if (fifo_count >= kTxFifoWatermark) {
       return 0;
@@ -411,7 +434,7 @@ class Driver : public DriverBase<Driver, ZBI_KERNEL_DRIVER_GENI_UART, zbi_dcfg_s
 
   template <class IoProvider>
   std::optional<uint8_t> Read(IoProvider& io) {
-    if (RxFifoStatusRegister::Get().ReadFrom(io.io()).count() == 0) {
+    if (RxFifoStatusRegister::Get().ReadFrom(io.io()).word_count() == 0) {
       return {};
     }
     return RxFifoRegister::Get().ReadFrom(io.io()).data() & 0xff;
@@ -498,11 +521,6 @@ class Driver : public DriverBase<Driver, ZBI_KERNEL_DRIVER_GENI_UART, zbi_dcfg_s
   void Interrupt(IoProvider& io, Lock& lock, Waiter& waiter, Tx&& tx, Rx&& rx) {
     auto m_status = MainIrqStatusRegister::Get().ReadFrom(io.io());
     auto s_status = SecondaryIrqStatusRegister::Get().ReadFrom(io.io());
-    // Clear the flags we're handling.
-    auto m_clear = MainIrqStatusClearRegister::Get().FromValue(m_status.reg_value());
-    m_clear.WriteTo(io.io());
-    auto s_clear = SecondaryIrqStatusClearRegister::Get().FromValue(s_status.reg_value());
-    s_clear.WriteTo(io.io());
 
     // As this driver is for debug output only, there is no handling of errors,
     // illegal commands, etc.
@@ -523,11 +541,12 @@ class Driver : public DriverBase<Driver, ZBI_KERNEL_DRIVER_GENI_UART, zbi_dcfg_s
 
       // Compute the total bytes up front and then we can check on the last
       // fifo if we should expect fewer bytes.
-      uint32_t to_drain = rx_fifo_status.count() * rx_fifo_width_;
-      if (rx_fifo_status.partial()) {
+      uint32_t to_drain = rx_fifo_status.word_count() * rx_fifo_width_;
+      if (rx_fifo_status.last_byte_received() &&
+          rx_fifo_status.valid_bytes_in_last_word_if_not_zero() != 0) {
         // Remove the full fifo size and re-add up to the last byte
         to_drain -= rx_fifo_width_;
-        to_drain += rx_fifo_status.last_byte();
+        to_drain += rx_fifo_status.valid_bytes_in_last_word_if_not_zero();
       }
       bool rx_disabled = false;
       // Loop once per full fifo (4 bytes) and let the remainder catch the
@@ -554,6 +573,12 @@ class Driver : public DriverBase<Driver, ZBI_KERNEL_DRIVER_GENI_UART, zbi_dcfg_s
         m_status.command_abort()) {
       tx(lock, waiter, [&]() { EnableTxInterrupt(io, false); });
     }
+
+    // Clear the flags we're handling.
+    auto m_clear = MainIrqStatusClearRegister::Get().FromValue(m_status.reg_value());
+    m_clear.WriteTo(io.io());
+    auto s_clear = SecondaryIrqStatusClearRegister::Get().FromValue(s_status.reg_value());
+    s_clear.WriteTo(io.io());
   }
 
  private:
