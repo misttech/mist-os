@@ -303,56 +303,111 @@ impl Channel {
     /// Write a message to a channel. Wraps the
     /// [zx_channel_write](https://fuchsia.dev/fuchsia-src/reference/syscalls/channel_write.md)
     /// syscall.
+    ///
+    /// On return, the elements pointed to by `handles` will have been zeroed to reflect
+    /// the fact that the handles have been transferred.
     pub fn write(&self, bytes: &[u8], handles: &mut [Handle]) -> Result<(), Status> {
-        let opts = 0;
-        let n_bytes: u32 = bytes.len().try_into().map_err(|_| Status::OUT_OF_RANGE)?;
-        let n_handles: u32 = handles.len().try_into().map_err(|_| Status::OUT_OF_RANGE)?;
-        unsafe {
-            let status = sys::zx_channel_write(
+        // SAFETY: provided pointers are valid because they come from references.
+        unsafe { self.write_raw(bytes.as_ptr(), bytes.len(), handles.as_mut_ptr(), handles.len()) }
+    }
+
+    /// Write a message to a channel. Wraps the
+    /// [zx_channel_write](https://fuchsia.dev/fuchsia-src/reference/syscalls/channel_write.md)
+    /// syscall.
+    ///
+    /// On return, the elements pointed to by `handles` will have been zeroed to reflect the
+    /// fact that the handles have been transferred.
+    ///
+    /// # Safety
+    ///
+    /// `bytes` must be valid to read from for `bytes_len` elements.
+    ///
+    /// `handles` must be valid to read from and write to for `handles_len` elements.
+    pub unsafe fn write_raw(
+        &self,
+        bytes: *const u8,
+        bytes_len: usize,
+        handles: *mut Handle,
+        handles_len: usize,
+    ) -> Result<(), Status> {
+        // SAFETY: caller is responsible for upholding pointer invariants. `Handle` is a
+        // `repr(transparent)` wrapper around `zx_handle_t`.
+        let res = unsafe {
+            ok(sys::zx_channel_write(
                 self.raw_handle(),
-                opts,
-                bytes.as_ptr(),
-                n_bytes,
-                handles.as_ptr() as *const sys::zx_handle_t,
-                n_handles,
-            );
-            // Handles are consumed by zx_channel_write so prevent the destructor from being called.
-            for handle in handles {
-                std::mem::forget(std::mem::replace(handle, Handle::invalid()));
-            }
-            ok(status)?;
-            Ok(())
+                0, // options
+                bytes,
+                bytes_len as u32,
+                handles as *const sys::zx_handle_t,
+                handles_len as u32,
+            ))
+        };
+
+        // Outgoing handles have been consumed by zx_channel_write_etc. Zero them to inhibit drop
+        // implementations.
+        // SAFETY: caller guarantees that `handles` is valid to write to for `handles_len`
+        // elements. `Handle` is valid when it is all zeroes.
+        unsafe {
+            std::ptr::write_bytes(handles, 0, handles_len);
+        }
+
+        res
+    }
+
+    /// Write a message to a channel. Wraps the
+    /// [zx_channel_write_etc](https://fuchsia.dev/fuchsia-src/reference/syscalls/channel_write_etc.md)
+    /// syscall.
+    ///
+    /// On return, the elements pointed to by `handles` will have been zeroed to reflect the
+    /// fact that the handles have been transferred.
+    pub fn write_etc(
+        &self,
+        bytes: &[u8],
+        handles: &mut [HandleDisposition<'_>],
+    ) -> Result<(), Status> {
+        // SAFETY: provided pointers come from valid references.
+        unsafe {
+            self.write_etc_raw(bytes.as_ptr(), bytes.len(), handles.as_mut_ptr(), handles.len())
         }
     }
 
     /// Write a message to a channel. Wraps the
     /// [zx_channel_write_etc](https://fuchsia.dev/fuchsia-src/reference/syscalls/channel_write_etc.md)
     /// syscall.
-    pub fn write_etc(
+    ///
+    /// On return, the elements pointed to by `handles` will have been zeroed to reflect the
+    /// fact that the handles have been transferred.
+    ///
+    /// # Safety
+    ///
+    /// `bytes` must be valid to read from for `bytes_len` bytes.
+    ///
+    /// `handles` must be valid to read from and write to for `handles_len` elements.
+    pub unsafe fn write_etc_raw(
         &self,
-        bytes: &[u8],
-        handle_dispositions: &mut [HandleDisposition<'_>],
+        bytes: *const u8,
+        bytes_len: usize,
+        handles: *mut HandleDisposition<'_>,
+        handles_len: usize,
     ) -> Result<(), Status> {
-        let n_bytes: u32 = bytes.len().try_into().map_err(|_| Status::OUT_OF_RANGE)?;
-        let n_handle_dispositions: u32 =
-            handle_dispositions.len().try_into().map_err(|_| Status::OUT_OF_RANGE)?;
+        // SAFETY: caller is responsible for upholding pointer invariants. HandleDisposition is
+        // ABI-compatible with zx_handle_disposition_t, we can treat them interchangeably.
         let res = unsafe {
             ok(sys::zx_channel_write_etc(
                 self.raw_handle(),
                 0, // options
-                bytes.as_ptr(),
-                n_bytes,
-                // SAFETY: HandleDisposition is ABI-compatible with zx_handle_disposition_t, allow
-                // the kernel to treat them interchangeably and to interpret the latter as the
-                // former after this call returns.
-                handle_dispositions.as_mut_ptr() as *mut sys::zx_handle_disposition_t,
-                n_handle_dispositions,
+                bytes,
+                bytes_len as u32,
+                handles as *mut sys::zx_handle_disposition_t,
+                handles_len as u32,
             ))
         };
 
         // Outgoing handles are consumed by zx_channel_write_etc so prevent the destructor from
         // being called. Don't overwrite the status field so that callers can inspect it.
-        for disposition in handle_dispositions {
+        // SAFETY: mutable slice invariants are upheld by this method's caller
+        let handles = unsafe { std::slice::from_raw_parts_mut(handles, handles_len) };
+        for disposition in handles {
             std::mem::forget(disposition.take_op());
         }
 
@@ -361,6 +416,9 @@ impl Channel {
 
     /// Send a message consisting of the given bytes and handles to a channel and block until a
     /// reply is received or the timeout is reached.
+    ///
+    /// On return, the elements pointed to by `handles` will have been zeroed to reflect the
+    /// fact that the handles have been transferred.
     ///
     /// The first four bytes of the written and read back messages are treated as a transaction ID
     /// of type `zx_txid_t`. The kernel generates a txid for the written message, replacing that
@@ -410,6 +468,9 @@ impl Channel {
     /// reply is received or the timeout is reached. Returns initialized slices of byte message and
     /// handles on success. Care should be taken to avoid handle leaks by either transferring the
     /// returned handles out to another type or dropping them explicitly.
+    ///
+    /// On return, the elements pointed to by `handles_in` will have been zeroed to reflect the
+    /// fact that the handles have been transferred.
     ///
     /// The first four bytes of the written and read back messages are treated as a transaction ID
     /// of type `zx_txid_t`. The kernel generates a txid for the written message, replacing that
@@ -559,6 +620,9 @@ impl Channel {
     /// Send a message consisting of the given bytes and handles to a channel and block until a
     /// reply is received or the timeout is reached.
     ///
+    /// On return, the elements pointed to by `handle_dispositions` will have been zeroed to reflect
+    /// the fact that the handles have been transferred.
+    ///
     /// The first four bytes of the written and read back messages are treated as a transaction ID
     /// of type `zx_txid_t`. The kernel generates a txid for the written message, replacing that
     /// part of the message as read from userspace. In other words, the first four bytes of
@@ -609,6 +673,9 @@ impl Channel {
     /// reply is received or the timeout is reached. Returns initialized slices of byte message and
     /// handles on success. Care should be taken to avoid handle leaks by either transferring the
     /// returned handles out to another type or dropping them explicitly.
+    ///
+    /// On return, the elements pointed to by `handles_in` will have been zeroed to reflect
+    /// the fact that the handles have been transferred.
     ///
     /// The first four bytes of the written and read back messages are treated as a transaction ID
     /// of type `zx_txid_t`. The kernel generates a txid for the written message, replacing that
