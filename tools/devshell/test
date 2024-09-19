@@ -44,7 +44,7 @@ for arg in "$@"; do
   fi
 done
 
-if $info_only || ( ! $has_e2e && $host_tests_only ); then
+if ! is_feature_enabled "legacy_fxtest" || $info_only || ( ! $has_e2e && $host_tests_only ); then
   # skip slow operations when not necessary.
   :
 else
@@ -79,5 +79,6 @@ args=()
 if is_feature_enabled "legacy_fxtest"; then
   run-dart-tool fxtest "${args[@]}" "$@"
 else
+  fx-command-run host-tool --print symbolizer > /dev/null
   fx-command-run host-tool test2 "${args[@]}" "$@"
 fi
