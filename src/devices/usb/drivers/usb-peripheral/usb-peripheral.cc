@@ -531,6 +531,8 @@ zx_status_t UsbPeripheral::GetDescriptor(uint8_t request_type, uint16_t value, u
 
 zx_status_t UsbPeripheral::SetConfiguration(uint8_t configuration) {
   bool configured = configuration > 0;
+  // TODO(b/355271738): Logs added to debug b/355271738. Remove when fixed.
+  zxlogf(INFO, "%s configuration %d", __func__, configuration);
 
   fbl::AutoLock lock(&lock_);
   for (auto& config : configurations_) {
@@ -833,6 +835,9 @@ void UsbPeripheral::CommonSetConnected(bool connected) {
     fbl::AutoLock lock(&lock_);
     std::swap(connected_, was_connected);
   }
+
+  // TODO(b/355271738): Logs added to debug b/355271738. Remove when fixed.
+  zxlogf(INFO, "%s connected %d, was_connected %d", __func__, connected, was_connected);
 
   if (was_connected != connected) {
     if (!connected) {
