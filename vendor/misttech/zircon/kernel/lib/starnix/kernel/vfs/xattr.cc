@@ -28,6 +28,10 @@ fit::result<Errno> MemoryXattrStorage::remove_xattr(const FsStr& name) const {
   return fit::error(errno(ENOTSUP));
 }
 
-MemoryXattrStorage MemoryXattrStorage::Default() { return {}; }
+fit::result<Errno, fbl::Vector<FsString>> MemoryXattrStorage::list_xattrs(const FsStr& name) const {
+  return fit::ok(fbl::Vector<FsString>());
+}
+
+MemoryXattrStorage MemoryXattrStorage::Default() { return MemoryXattrStorage(); }
 
 }  // namespace starnix
