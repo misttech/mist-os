@@ -4,14 +4,22 @@
 
 use async_trait::async_trait;
 use fidl::endpoints::Proxy;
-use fuchsia_runtime::{HandleInfo, HandleType};
+use std::sync::LazyLock;
 use test_runners_elf_lib::launcher::ComponentLauncher;
 use test_runners_lib::elf::{Component, KernelError};
 use test_runners_lib::errors::*;
 use test_runners_lib::launch;
 use test_runners_lib::logs::LoggerStream;
 use zx::HandleBased;
-use {fidl_fuchsia_fuzzer as fuzzer, fidl_fuchsia_process as fproc, fuchsia_zircon as zx};
+use {
+    fidl_fuchsia_fuzzer as fuzzer, fidl_fuchsia_process as fproc, fuchsia_runtime as runtime,
+    fuchsia_zircon as zx,
+};
+
+static VDSO_VMO: LazyLock<zx::Handle> = LazyLock::new(|| {
+    runtime::take_startup_handle(runtime::HandleInfo::new(runtime::HandleType::VdsoVmo, 0))
+        .expect("failed to take vDSO handle")
+});
 
 #[derive(Default)]
 pub struct FuzzComponentLauncher {}
@@ -40,10 +48,18 @@ impl ComponentLauncher for FuzzComponentLauncher {
             args: Some(args),
             name_infos: None,
             environs: component.environ.clone(),
-            handle_infos: Some(vec![fproc::HandleInfo {
-                handle: channel.into_zx_channel().into_handle(),
-                id: HandleInfo::new(HandleType::User0, 0).as_raw(),
-            }]),
+            handle_infos: Some(vec![
+                fproc::HandleInfo {
+                    handle: channel.into_zx_channel().into_handle(),
+                    id: runtime::HandleInfo::new(runtime::HandleType::User0, 0).as_raw(),
+                },
+                fproc::HandleInfo {
+                    handle: VDSO_VMO
+                        .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                        .map_err(launch::LaunchError::DuplicateVdso)?,
+                    id: runtime::HandleInfo::new(runtime::HandleType::VdsoVmo, 0).as_raw(),
+                },
+            ]),
             loader_proxy_chan: Some(loader_client.into_channel()),
             executable_vmo,
             options: component.options,

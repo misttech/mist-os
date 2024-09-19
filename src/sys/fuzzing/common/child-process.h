@@ -67,6 +67,9 @@ class ChildProcess final {
   //
   __WARN_UNUSED_RESULT zx_status_t AddChannel(uint32_t id, zx::channel channel);
 
+  // Adds the vDSO VMO handle
+  __WARN_UNUSED_RESULT zx_status_t AddVmoVdso();
+
   // Spawns the new child process. Returns an error if a previous process was spawned but has not
   // been |Kill|ed and |Reset|, or if spawning fails.
   __WARN_UNUSED_RESULT zx_status_t Spawn();
