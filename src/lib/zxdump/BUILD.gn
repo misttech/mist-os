@@ -5,6 +5,7 @@
 import("//build/components.gni")
 import("//build/host.gni")
 import("//build/test.gni")
+import("//build/testing/cc_test_executable.gni")
 import("//build/zircon/c_utils.gni")
 import("//build/zircon/migrated_targets.gni")
 
@@ -265,7 +266,7 @@ test_children_data("unittests-children") {
   }
 }
 
-executable("zxdump-test-child") {
+cc_test_executable("zxdump-test-child") {
   testonly = true
 
   # Don't sanitize the test program in ways that give it too much accessible

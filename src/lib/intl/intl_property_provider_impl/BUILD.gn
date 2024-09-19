@@ -6,6 +6,7 @@ import("//build/components.gni")
 import("//build/fidl/fidl.gni")
 import("//build/icu/icu_source_set.gni")
 import("//build/icu/third_party_icu_headers.gni")
+import("//build/testing/cc_test_executable.gni")
 
 group("tests") {
   testonly = true
@@ -73,7 +74,7 @@ icu_source_set("intl_property_provider_impl") {
   ]
 }
 
-executable("intl_property_provider_impl_test_bin") {
+cc_test_executable("intl_property_provider_impl_test_bin") {
   testonly = true
   output_name = "intl_property_provider_impl_test"
 
@@ -117,7 +118,7 @@ icu_source_set("locale_util") {
   ]
 }
 
-executable("locale_util_unit_test_bin") {
+cc_test_executable("locale_util_unit_test_bin") {
   testonly = true
   output_name = "locale_util_unit_test"
 

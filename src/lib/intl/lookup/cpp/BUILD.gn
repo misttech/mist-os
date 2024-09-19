@@ -4,6 +4,7 @@
 
 import("//build/components.gni")
 import("//build/icu/icu_source_set.gni")
+import("//build/testing/cc_test_executable.gni")
 
 group("cpp") {
   testonly = true
@@ -39,7 +40,7 @@ executable("bin") {
   deps = [ ":lib" ]
 }
 
-executable("intl_lookup_cpp_unittests") {
+cc_test_executable("intl_lookup_cpp_unittests") {
   testonly = true
   sources = [ "lookup_test.cc" ]
   deps = [

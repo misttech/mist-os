@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
+import("//build/testing/cc_test_executable.gni")
 import("//build/testing/environments.gni")
 
 source_set("cpp") {
@@ -17,7 +18,7 @@ source_set("cpp") {
   ]
 }
 
-executable("test_bin") {
+cc_test_executable("test_bin") {
   testonly = true
   output_name = "fuchsia-async-cpp-test"
   sources = [ "executor_test.cc" ]

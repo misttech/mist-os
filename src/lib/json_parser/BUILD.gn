@@ -6,6 +6,8 @@
 # This is a transitional target and will be removed soon.
 # Bug: 36759
 
+import("//build/testing/cc_test_executable.gni")
+
 group("json") {
   public_deps = [ ":json_parser" ]
 }
@@ -28,7 +30,7 @@ source_set("json_parser") {
   ]
 }
 
-executable("json_parser_unittests_bin") {
+cc_test_executable("json_parser_unittests_bin") {
   testonly = true
 
   output_name = "json_parser_unittests"
