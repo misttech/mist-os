@@ -386,6 +386,21 @@ pub trait Peered: HandleBased {
             unsafe { sys::zx_object_signal_peer(handle, clear_mask.bits(), set_mask.bits()) };
         ok(status)
     }
+
+    /// Returns true if the handle has received the `PEER_CLOSED` signal.
+    ///
+    /// # Errors
+    ///
+    /// See https://fuchsia.dev/reference/syscalls/object_wait_one?hl=en#errors for a full list of
+    /// errors. Note that `Status::TIMED_OUT` errors are converted to `Ok(false)` and all other
+    /// errors are propagated.
+    fn is_closed(&self) -> Result<bool, Status> {
+        match self.wait_handle(Signals::OBJECT_PEER_CLOSED, MonotonicTime::INFINITE_PAST) {
+            Ok(signals) => Ok(signals.contains(Signals::OBJECT_PEER_CLOSED)),
+            Err(Status::TIMED_OUT) => Ok(false),
+            Err(e) => Err(e),
+        }
+    }
 }
 
 /// Zircon object types.
@@ -825,5 +840,14 @@ mod tests {
         assert_eq!(hi.handle.into_raw(), RAW_HANDLE);
         assert_eq!(hi.object_type, ObjectType::VMO);
         assert_eq!(hi.rights, Rights::EXECUTE);
+    }
+
+    #[test]
+    fn basic_peer_closed() {
+        let (lhs, rhs) = crate::EventPair::create();
+        assert!(!lhs.is_closed().unwrap());
+        assert!(!rhs.is_closed().unwrap());
+        drop(rhs);
+        assert!(lhs.is_closed().unwrap());
     }
 }

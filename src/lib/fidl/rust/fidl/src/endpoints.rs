@@ -126,6 +126,18 @@ pub trait SynchronousProxy: Sized + Send + Sync {
     /// writing to the channel is unsafe because the proxy assumes it has
     /// exclusive control over these operations.
     fn as_channel(&self) -> &Channel;
+
+    /// Returns true if the proxy has received the `PEER_CLOSED` signal.
+    ///
+    /// # Errors
+    ///
+    /// See https://fuchsia.dev/reference/syscalls/object_wait_one?hl=en#errors for a full list of
+    /// errors. Note that `Status::TIMED_OUT` errors are converted to `Ok(false)` and all other
+    /// errors are propagated.
+    fn is_closed(&self) -> Result<bool, zx::Status> {
+        use zx::Peered;
+        self.as_channel().is_closed()
+    }
 }
 
 /// A stream of requests coming into a FIDL server over a channel.
