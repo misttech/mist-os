@@ -1904,7 +1904,7 @@ mod tests {
     use starnix_uapi::open_flags::OpenFlags;
     use std::sync::atomic::{AtomicBool, Ordering};
     use std::sync::Arc;
-    use zerocopy::{AsBytes, FromBytes, LE, U64};
+    use zerocopy::{FromBytes, IntoBytes, LE, U64};
 
     #[::fuchsia::test]
     async fn test_append_truncate_race() {
@@ -1963,7 +1963,8 @@ mod tests {
                 .expect("read failed");
             let mut last = None;
             let buffer = &Vec::from(buffer)[..amount];
-            for i in buffer.chunks_exact(8).map(|chunk| U64::<LE>::read_from(chunk).unwrap()) {
+            for i in buffer.chunks_exact(8).map(|chunk| U64::<LE>::read_from_bytes(chunk).unwrap())
+            {
                 if let Some(last) = last {
                     assert!(i.get() > last, "buffer: {:?}", buffer);
                 }

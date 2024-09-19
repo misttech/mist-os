@@ -20,7 +20,7 @@ use starnix_uapi::{
     MSC_CNT, REL_CNT, SW_CNT,
 };
 use std::collections::VecDeque;
-use zerocopy::AsBytes as _; // for `as_bytes()`
+use zerocopy::IntoBytes as _; // for `as_bytes()`
 
 const INPUT_EVENT_SIZE: usize = std::mem::size_of::<uapi::input_event>();
 

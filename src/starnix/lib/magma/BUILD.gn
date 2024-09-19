@@ -11,7 +11,7 @@ rustc_library("magma") {
     "src/magma.rs",
   ]
 
-  deps = [ "//third_party/rust_crates:zerocopy" ]
+  deps = [ "//third_party/rust_crates:zerocopy_0_0_0_alpha_0" ]
 
   configs += [ "//src/starnix/config:starnix_clippy_lints" ]
 }

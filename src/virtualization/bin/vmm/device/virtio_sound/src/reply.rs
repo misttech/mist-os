@@ -6,7 +6,7 @@ use crate::wire;
 use crate::wire::LE32;
 use anyhow::{anyhow, Error};
 use std::io::Write;
-use zerocopy::AsBytes;
+use zerocopy::IntoBytes;
 
 /// Type alias to reduce generic parameter noise.
 pub type ReadableChain<'a, 'b> = virtio_device::chain::ReadableChain<

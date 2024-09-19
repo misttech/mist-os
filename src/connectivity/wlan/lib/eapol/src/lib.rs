@@ -11,7 +11,7 @@ use wlan_bitfield::bitfield;
 use wlan_common::append::{Append, BufferTooSmall};
 use wlan_common::big_endian::{BigEndianU16, BigEndianU64};
 use wlan_common::buffer_reader::BufferReader;
-use zerocopy::{AsBytes, ByteSlice, FromBytes, FromZeros, NoCell, Ref, Unaligned};
+use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout, Ref, SplitByteSlice, Unaligned};
 
 #[derive(Debug, Error)]
 pub enum Error {
@@ -39,12 +39,12 @@ impl From<BufferTooSmall> for Error {
     }
 }
 
-pub enum Frame<B: ByteSlice> {
+pub enum Frame<B: SplitByteSlice> {
     Key(KeyFrameRx<B>),
     Unsupported(Ref<B, EapolFields>),
 }
 
-impl<B: ByteSlice> Frame<B> {
+impl<B: SplitByteSlice> Frame<B> {
     pub fn parse_fixed_fields(bytes: B) -> Result<Ref<B, EapolFields>, Error> {
         let mut reader = BufferReader::new(bytes);
         reader.read().ok_or(Error::FrameTruncated)
@@ -53,7 +53,7 @@ impl<B: ByteSlice> Frame<B> {
 
 // IEEE Std 802.11-2016, 12.7.2, Figure 12-32
 #[derive(Debug)]
-pub struct KeyFrameRx<B: ByteSlice> {
+pub struct KeyFrameRx<B: SplitByteSlice> {
     pub eapol_fields: Ref<B, EapolFields>,
     pub key_frame_fields: Ref<B, KeyFrameFields>,
     pub key_mic: B, /* AKM dependent size */
@@ -61,7 +61,7 @@ pub struct KeyFrameRx<B: ByteSlice> {
     pub key_data: B,
 }
 
-impl<B: ByteSlice> KeyFrameRx<B> {
+impl<B: SplitByteSlice> KeyFrameRx<B> {
     pub fn parse(mic_len: usize, eapol_pdu_buf: B) -> Result<Self, Error> {
         let mut reader = BufferReader::new(eapol_pdu_buf);
         let eapol_fields = reader.read::<EapolFields>().ok_or(Error::FrameTruncated)?;
@@ -260,7 +260,17 @@ impl From<KeyFrameBuf> for Vec<u8> {
 
 // IEEE Std 802.1X-2010, 11.9, Table 11-5
 #[derive(
-    AsBytes, FromZeros, FromBytes, NoCell, Debug, Clone, Copy, PartialEq, Eq, Unaligned, Default,
+    IntoBytes,
+    KnownLayout,
+    FromBytes,
+    Immutable,
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Unaligned,
+    Default,
 )]
 #[repr(C)]
 pub struct KeyDescriptor(u8);
@@ -286,10 +296,10 @@ impl KeyType {
 
 // IEEE Std 802.1X-2010, 11.3.1
 #[derive(
-    AsBytes,
-    FromZeros,
+    IntoBytes,
+    KnownLayout,
     FromBytes,
-    NoCell,
+    Immutable,
     Debug,
     Clone,
     Copy,
@@ -309,7 +319,7 @@ impl ProtocolVersion {
 }
 
 // IEEE Std 802.1X-2010, 11.3.2, Table 11-3
-#[derive(AsBytes, FromZeros, FromBytes, NoCell, Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(IntoBytes, KnownLayout, FromBytes, Immutable, Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(C)]
 pub struct PacketType(u8);
 
@@ -342,11 +352,11 @@ impl PacketType {
     13      smk_message,
     14..=15 _, // reserved
 )]
-#[derive(AsBytes, FromZeros, FromBytes, NoCell, PartialEq, Clone, Default)]
+#[derive(IntoBytes, KnownLayout, FromBytes, Immutable, PartialEq, Clone, Default)]
 #[repr(C)]
 pub struct KeyInformation(pub u16);
 
-#[derive(AsBytes, FromZeros, FromBytes, NoCell, Debug, Clone, Unaligned)]
+#[derive(IntoBytes, KnownLayout, FromBytes, Immutable, Debug, Clone, Unaligned)]
 #[repr(C, packed)]
 pub struct EapolFields {
     pub version: ProtocolVersion,
@@ -355,7 +365,7 @@ pub struct EapolFields {
 }
 
 // IEEE Std 802.11-2016, 12.7.2, Figure 12-32
-#[derive(AsBytes, FromZeros, FromBytes, NoCell, Default, Debug, Clone, Unaligned)]
+#[derive(IntoBytes, KnownLayout, FromBytes, Immutable, Default, Debug, Clone, Unaligned)]
 #[repr(C, packed)]
 pub struct KeyFrameFields {
     pub descriptor_type: KeyDescriptor,

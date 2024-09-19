@@ -11,7 +11,7 @@ use fuchsia_async::{self as fasync, Time, Timer};
 use fuchsia_zircon::{self as zx, Vmo};
 use futures::{join, FutureExt};
 use std::fs::*;
-use zerocopy::AsBytes;
+use zerocopy::IntoBytes;
 use {fidl_fuchsia_io as fio, fuchsia_component as component};
 
 type Result<T> = std::result::Result<T, Error>;

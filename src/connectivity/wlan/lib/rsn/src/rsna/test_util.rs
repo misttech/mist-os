@@ -660,7 +660,7 @@ pub struct FourwayTestEnv {
 
 // TODO(b/310961096): We should prefer to use the FourwayTestEnv in tests to avoid inconsistent
 // test behavior and construction.
-pub fn send_msg_to_fourway<B: ByteSlice + std::fmt::Debug>(
+pub fn send_msg_to_fourway<B: SplitByteSlice + std::fmt::Debug>(
     fourway: &mut Fourway,
     msg: eapol::KeyFrameRx<B>,
     s_key_replay_counter: SupplicantKeyReplayCounter,
@@ -680,7 +680,7 @@ pub fn send_msg_to_fourway<B: ByteSlice + std::fmt::Debug>(
     update_sink
 }
 
-fn make_verified<B: ByteSlice + std::fmt::Debug>(
+fn make_verified<B: SplitByteSlice + std::fmt::Debug>(
     frame: eapol::KeyFrameRx<B>,
     role: Role,
     s_key_replay_counter: SupplicantKeyReplayCounter,
@@ -744,7 +744,7 @@ impl FourwayTestEnv {
         .expect("error deriving PTK")
     }
 
-    fn make_verified<B: ByteSlice + std::fmt::Debug>(
+    fn make_verified<B: SplitByteSlice + std::fmt::Debug>(
         &self,
         frame: eapol::KeyFrameRx<B>,
         role: Role,
@@ -770,7 +770,7 @@ impl FourwayTestEnv {
         }
     }
 
-    pub fn send_msg_to_authenticator<B: ByteSlice + std::fmt::Debug>(
+    pub fn send_msg_to_authenticator<B: SplitByteSlice + std::fmt::Debug>(
         &mut self,
         msg: eapol::KeyFrameRx<B>,
         s_key_replay_counter: SupplicantKeyReplayCounter,
@@ -783,7 +783,7 @@ impl FourwayTestEnv {
         update_sink
     }
 
-    pub fn send_msg_to_supplicant<B: ByteSlice + std::fmt::Debug>(
+    pub fn send_msg_to_supplicant<B: SplitByteSlice + std::fmt::Debug>(
         &mut self,
         msg: eapol::KeyFrameRx<B>,
         s_key_replay_counter: SupplicantKeyReplayCounter,
@@ -797,7 +797,7 @@ impl FourwayTestEnv {
         update_sink
     }
 
-    pub fn send_msg1_to_supplicant<'a, B: ByteSlice + std::fmt::Debug>(
+    pub fn send_msg1_to_supplicant<'a, B: SplitByteSlice + std::fmt::Debug>(
         &mut self,
         msg1: eapol::KeyFrameRx<B>,
         s_key_replay_counter: SupplicantKeyReplayCounter,
@@ -813,7 +813,7 @@ impl FourwayTestEnv {
         (msg2, ptk)
     }
 
-    pub fn send_msg1_to_supplicant_expect_err<B: ByteSlice + std::fmt::Debug>(
+    pub fn send_msg1_to_supplicant_expect_err<B: SplitByteSlice + std::fmt::Debug>(
         &mut self,
         msg1: eapol::KeyFrameRx<B>,
         s_key_replay_counter: SupplicantKeyReplayCounter,
@@ -826,7 +826,7 @@ impl FourwayTestEnv {
         assert!(result.is_err(), "Supplicant successfully processed illegal msg #1");
     }
 
-    pub fn send_msg2_to_authenticator<'a, B: ByteSlice + std::fmt::Debug>(
+    pub fn send_msg2_to_authenticator<'a, B: SplitByteSlice + std::fmt::Debug>(
         &mut self,
         msg2: eapol::KeyFrameRx<B>,
         s_key_replay_counter: SupplicantKeyReplayCounter,
@@ -840,7 +840,7 @@ impl FourwayTestEnv {
         expect_eapol_resp(&a_update_sink[..])
     }
 
-    pub fn send_msg3_to_supplicant<'a, B: ByteSlice + std::fmt::Debug>(
+    pub fn send_msg3_to_supplicant<'a, B: SplitByteSlice + std::fmt::Debug>(
         &mut self,
         msg3: eapol::KeyFrameRx<B>,
         s_key_replay_counter: SupplicantKeyReplayCounter,
@@ -854,7 +854,7 @@ impl FourwayTestEnv {
         (msg4, s_ptk, s_gtk)
     }
 
-    pub fn send_msg3_to_supplicant_capture_updates<B: ByteSlice + std::fmt::Debug>(
+    pub fn send_msg3_to_supplicant_capture_updates<B: SplitByteSlice + std::fmt::Debug>(
         &mut self,
         msg3: eapol::KeyFrameRx<B>,
         s_key_replay_counter: SupplicantKeyReplayCounter,
@@ -867,7 +867,7 @@ impl FourwayTestEnv {
         assert!(result.is_ok(), "Supplicant failed processing msg #3: {}", result.unwrap_err());
     }
 
-    pub fn send_msg3_to_supplicant_expect_err<B: ByteSlice + std::fmt::Debug>(
+    pub fn send_msg3_to_supplicant_expect_err<B: SplitByteSlice + std::fmt::Debug>(
         &mut self,
         msg3: eapol::KeyFrameRx<B>,
         s_key_replay_counter: SupplicantKeyReplayCounter,
@@ -880,7 +880,7 @@ impl FourwayTestEnv {
         assert!(result.is_err(), "Supplicant successfully processed illegal msg #3");
     }
 
-    pub fn send_msg4_to_authenticator<B: ByteSlice + std::fmt::Debug>(
+    pub fn send_msg4_to_authenticator<B: SplitByteSlice + std::fmt::Debug>(
         &mut self,
         msg4: eapol::KeyFrameRx<B>,
         s_key_replay_counter: SupplicantKeyReplayCounter,

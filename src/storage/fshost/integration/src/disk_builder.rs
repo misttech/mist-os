@@ -29,7 +29,7 @@ use std::ops::Deref;
 use storage_isolated_driver_manager::fvm::{create_fvm_volume, set_up_fvm};
 use storage_isolated_driver_manager::zxcrypt;
 use uuid::Uuid;
-use zerocopy::{AsBytes, NoCell};
+use zerocopy::{Immutable, IntoBytes};
 use {fidl_fuchsia_io as fio, fidl_fuchsia_logger as flogger};
 
 const GPT_DRIVER_PATH: &str = "gpt.cm";
@@ -748,7 +748,7 @@ impl DiskBuilder {
         const ZBI_FLAGS_STORAGE_COMPRESSED: u32 = 0x00000001;
 
         #[repr(C)]
-        #[derive(AsBytes, NoCell)]
+        #[derive(IntoBytes, Immutable)]
         struct ZbiHeader {
             type_: u32,
             length: u32,

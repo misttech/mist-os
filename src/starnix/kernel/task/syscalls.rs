@@ -10,7 +10,7 @@ use static_assertions::const_assert;
 use std::cmp;
 use std::ffi::CString;
 use std::sync::Arc;
-use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell};
+use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
 
 use crate::execution::execute_task;
 use crate::mm::{DumpPolicy, MemoryAccessor, MemoryAccessorExt, PAGE_SIZE};
@@ -1724,7 +1724,7 @@ pub fn sys_swapoff(
     Ok(())
 }
 
-#[derive(Default, Debug, AsBytes, FromBytes, FromZeros, NoCell)]
+#[derive(Default, Debug, IntoBytes, KnownLayout, FromBytes, Immutable)]
 #[repr(C)]
 struct KcmpParams {
     mask: usize,
@@ -1733,7 +1733,7 @@ struct KcmpParams {
 
 static KCMP_PARAMS: Lazy<KcmpParams> = Lazy::new(|| {
     let mut params = KcmpParams::default();
-    zx::cprng_draw(params.as_bytes_mut());
+    zx::cprng_draw(params.as_mut_bytes());
     // Ensure the shuffle is odd so that multiplying a usize by this value is a permutation.
     params.shuffle |= 1;
     params

@@ -4,7 +4,7 @@
 
 use std::marker::PhantomData;
 use wlan_bitfield::bitfield;
-use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell};
+use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
 
 // IEEE Std 802.11-2016, 9.2.4.1.3
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
@@ -118,7 +118,7 @@ impl PowerState {
     14      protected,
     15      htc_order
 )]
-#[derive(AsBytes, FromZeros, FromBytes, NoCell, PartialEq, Eq, Clone, Copy)]
+#[derive(IntoBytes, KnownLayout, FromBytes, Immutable, PartialEq, Eq, Clone, Copy)]
 #[repr(C)]
 pub struct FrameControl(pub u16);
 
@@ -139,7 +139,7 @@ impl FrameControl {
     0..=3   frag_num,
     4..=15  seq_num,
 )]
-#[derive(AsBytes, FromZeros, FromBytes, NoCell, PartialEq, Eq, Clone, Copy)]
+#[derive(IntoBytes, KnownLayout, FromBytes, Immutable, PartialEq, Eq, Clone, Copy)]
 #[repr(C)]
 pub struct SequenceControl(pub u16);
 
@@ -151,7 +151,7 @@ pub struct SequenceControl(pub u16);
     31      rdg_more_ppdu,
 )]
 #[repr(C)]
-#[derive(AsBytes, FromZeros, FromBytes, NoCell, Copy, Clone, PartialEq, Eq)]
+#[derive(IntoBytes, KnownLayout, FromBytes, Immutable, Copy, Clone, PartialEq, Eq)]
 pub struct HtControl(pub u32);
 
 #[derive(PartialEq, Eq)]

@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use bitflags::bitflags;
-use zerocopy::{AsBytes, FromBytes};
+use zerocopy::{FromBytes, IntoBytes};
 
 use crate::vfs::FsString;
 use starnix_uapi::errors::Errno;
@@ -237,8 +237,8 @@ impl SocketAddress {
                 }
             }
             AF_VSOCK => {
-                let vsock_address = sockaddr_vm::read_from(&*address);
-                if let Some(address) = vsock_address {
+                let vsock_address = sockaddr_vm::read_from_bytes(&*address);
+                if let Ok(address) = vsock_address {
                     SocketAddress::Vsock(address.svm_port)
                 } else {
                     SocketAddress::Unspecified
@@ -254,11 +254,11 @@ impl SocketAddress {
                 let addrlen = std::cmp::min(address.len(), sockaddr_len);
                 SocketAddress::Inet6(address[..addrlen].to_vec())
             }
-            AF_NETLINK => match sockaddr_nl::read_from(&*address) {
-                Some(addr) => {
+            AF_NETLINK => match sockaddr_nl::read_from_bytes(&*address) {
+                Ok(addr) => {
                     SocketAddress::Netlink(NetlinkAddress::new(addr.nl_pid, addr.nl_groups))
                 }
-                None => return error!(EINVAL),
+                Err(_) => return error!(EINVAL),
             },
             AF_PACKET => {
                 let sockaddr_len = std::mem::size_of::<sockaddr_ll>();
@@ -302,7 +302,7 @@ impl SocketAddress {
                 let mut bytes = vec![0u8; std::mem::size_of::<sockaddr_vm>()];
                 let vm_addr =
                     sockaddr_vm { svm_family: AF_VSOCK, svm_port: *port, ..sockaddr_vm::default() };
-                vm_addr.write_to(&mut bytes[..]);
+                let _ = vm_addr.write_to(&mut bytes[..]);
                 bytes
             }
             SocketAddress::Inet(addr)

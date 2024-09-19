@@ -10,7 +10,7 @@ use starnix_logging::log_info;
 use starnix_sync::{Locked, Unlocked};
 use static_assertions::const_assert_eq;
 use std::sync::{Arc, Weak};
-use zerocopy::{FromBytes, FromZeros, NoCell};
+use zerocopy::{FromBytes, Immutable, KnownLayout};
 
 /// Android passes bootloader messages across reboot via a special "misc" partition.  Since Starnix
 /// acts as a de-facto bootloader for Android, we need to be able to read these bootloader messages,
@@ -24,7 +24,7 @@ pub struct AndroidBootloaderMessageStore(Weak<RemoteBlockDevice>);
 
 // See bootable/recovery/bootloader_message for the canonical format.
 #[repr(C)]
-#[derive(Copy, Clone, FromBytes, NoCell, FromZeros)]
+#[derive(Copy, Clone, Immutable, KnownLayout, FromBytes)]
 struct BootloaderMessageRaw {
     command: [u8; 32],
     _status: [u8; 32],
@@ -84,8 +84,8 @@ impl AndroidBootloaderMessageStore {
             const_assert_eq!(std::mem::size_of::<BootloaderMessageRaw>(), 2048);
             let mut buf = vec![0u8; 2048];
             device.read(0, &mut buf)?;
-            BootloaderMessageRaw::read_from(&buf[..])
-                .ok_or(anyhow!("Failed to deserialize bootloader message"))
+            BootloaderMessageRaw::read_from_bytes(&buf[..])
+                .map_err(|_| anyhow!("Failed to deserialize bootloader message"))
                 .and_then(|raw| BootloaderMessage::try_from(raw))
         } else {
             Err(anyhow!("Can't read bootloader message; device is inaccessible"))
@@ -116,6 +116,7 @@ pub fn android_bootloader_message_store_init(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use zerocopy::FromZeros as _;
 
     #[test]
     fn test_read_null_terminated() {

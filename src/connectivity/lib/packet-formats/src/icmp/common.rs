@@ -7,13 +7,23 @@
 use core::num::NonZeroU16;
 
 use zerocopy::byteorder::network_endian::U16;
-use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell, Unaligned};
+use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout, Unaligned};
 
 use super::{IcmpUnusedCode, IdAndSeq, OriginalPacket};
 
 /// An ICMP Destination Unreachable message.
 #[derive(
-    Copy, Clone, Debug, Default, Eq, PartialEq, FromZeros, FromBytes, AsBytes, NoCell, Unaligned,
+    Copy,
+    Clone,
+    Debug,
+    Default,
+    Eq,
+    PartialEq,
+    KnownLayout,
+    FromBytes,
+    IntoBytes,
+    Immutable,
+    Unaligned,
 )]
 #[repr(C)]
 pub struct IcmpDestUnreachable {
@@ -68,7 +78,9 @@ impl IcmpDestUnreachable {
 }
 
 /// An ICMP Echo Request message.
-#[derive(Copy, Clone, Debug, Eq, PartialEq, FromZeros, FromBytes, AsBytes, NoCell, Unaligned)]
+#[derive(
+    Copy, Clone, Debug, Eq, PartialEq, KnownLayout, FromBytes, IntoBytes, Immutable, Unaligned,
+)]
 #[repr(C)]
 pub struct IcmpEchoRequest {
     pub(super) id_seq: IdAndSeq,
@@ -110,7 +122,9 @@ impl IcmpEchoRequest {
 }
 
 /// An ICMP Echo Reply message.
-#[derive(Copy, Clone, Debug, Eq, PartialEq, FromZeros, FromBytes, AsBytes, NoCell, Unaligned)]
+#[derive(
+    Copy, Clone, Debug, Eq, PartialEq, KnownLayout, FromBytes, IntoBytes, Immutable, Unaligned,
+)]
 #[repr(C)]
 pub struct IcmpEchoReply {
     pub(super) id_seq: IdAndSeq,
@@ -145,7 +159,17 @@ impl IcmpEchoReply {
 
 /// An ICMP Time Exceeded message.
 #[derive(
-    Copy, Clone, Default, Debug, Eq, PartialEq, FromZeros, FromBytes, AsBytes, NoCell, Unaligned,
+    Copy,
+    Clone,
+    Default,
+    Debug,
+    Eq,
+    PartialEq,
+    KnownLayout,
+    FromBytes,
+    IntoBytes,
+    Immutable,
+    Unaligned,
 )]
 #[repr(C)]
 pub struct IcmpTimeExceeded {

@@ -7,12 +7,14 @@ use super::user_address::UserAddress;
 use super::PAGE_SIZE;
 use once_cell::sync::Lazy;
 use smallvec::SmallVec;
-use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell};
+use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
 
 pub type UserBuffers = SmallVec<[UserBuffer; 1]>;
 
 /// Matches iovec_t.
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, AsBytes, FromZeros, FromBytes, NoCell)]
+#[derive(
+    Debug, Default, Clone, Copy, PartialEq, Eq, IntoBytes, KnownLayout, FromBytes, Immutable,
+)]
 #[repr(C)]
 pub struct UserBuffer {
     pub address: UserAddress,

@@ -16,7 +16,7 @@ use {fidl_fuchsia_io as fio, fuchsia_zircon_status as zx};
 
 // This isn't actually unused, but rustc can't seem to tell otherwise.
 #[allow(unused_imports)]
-use zerocopy::{AsBytes, Ref};
+use zerocopy::{IntoBytes, Ref};
 
 pub async fn lsusb(usb_device_dir: fio::DirectoryProxy, args: Args) -> Result<()> {
     if args.tree {
@@ -73,7 +73,7 @@ async fn list_device(
         .await
         .context(format!("DeviceGetDeviceDescriptor failed for {}", devname))?;
 
-    let device_desc = Ref::<_, DeviceDescriptor>::new(device_desc_buf.as_ref()).unwrap();
+    let device_desc = Ref::<_, DeviceDescriptor>::from_bytes(device_desc_buf.as_ref()).unwrap();
 
     if let Some(UsbDevice { vendor_id, product_id }) = args.device {
         // Return early if this isn't the device that was asked about.

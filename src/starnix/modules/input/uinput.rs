@@ -367,7 +367,7 @@ impl FileOps for UinputDevice {
         data: &mut dyn vfs::buffers::InputBuffer,
     ) -> Result<usize, Errno> {
         let content = data.read_all()?;
-        let event = uapi::input_event::read_from(&content).ok_or_else(|| errno!(EINVAL))?;
+        let event = uapi::input_event::read_from_bytes(&content).map_err(|_| errno!(EINVAL))?;
 
         let mut inner = self.inner.lock();
 

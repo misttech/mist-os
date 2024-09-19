@@ -51,7 +51,7 @@ rustc_library("fuchsia-async") {
       "//third_party/rust_crates:rustc-hash",
       "//third_party/rust_crates:socket2",
       "//third_party/rust_crates:thiserror",
-      "//third_party/rust_crates:zerocopy",
+      "//third_party/rust_crates:zerocopy_0_0_0_alpha_0",
     ]
     if (fuchsia_async_trace_level_logging) {
       configs += [ ":trace_level_logging" ]

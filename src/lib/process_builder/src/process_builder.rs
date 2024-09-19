@@ -1484,15 +1484,14 @@ mod tests {
     // contained in it.
     fn parse_handle_info_from_message(message: &zx::MessageBuf) -> Result<Vec<HandleInfo>, Error> {
         let bytes = message.bytes();
-        let header = Ref::<&[u8], process_args::MessageHeader>::new_from_prefix(bytes)
-            .ok_or(anyhow!("Failed to parse process_args header"))?
-            .0;
+        let (header, _) = Ref::<&[u8], process_args::MessageHeader>::from_prefix(bytes)
+            .map_err(|_| anyhow!("Failed to parse process_args header"))?;
 
         let offset = header.handle_info_off as usize;
         let len = mem::size_of::<u32>() * message.n_handles();
         let info_bytes = &bytes[offset..offset + len];
-        let raw_info = Ref::<&[u8], [u32]>::new_slice(info_bytes)
-            .ok_or(anyhow!("Failed to parse raw handle info"))?;
+        let raw_info = Ref::<&[u8], [u32]>::from_bytes(info_bytes)
+            .map_err(|_| anyhow!("Failed to parse raw handle info"))?;
 
         Ok(raw_info.iter().map(|raw| HandleInfo::try_from(*raw)).collect::<Result<_, _>>()?)
     }

@@ -8,9 +8,9 @@ use wlan_common::mac;
 use zerocopy::Ref;
 
 pub fn set_more_data(buffer: &mut [u8]) -> Result<(), Error> {
-    let (frame_ctrl, _) = Ref::<&mut [u8], mac::FrameControl>::new_from_prefix(buffer)
-        .ok_or(format_err!("could not parse frame control header"))?;
-    let frame_ctrl = frame_ctrl.into_mut();
+    let (frame_ctrl, _) = Ref::<&mut [u8], mac::FrameControl>::from_prefix(buffer)
+        .map_err(|_| format_err!("could not parse frame control header"))?;
+    let frame_ctrl = Ref::into_mut(frame_ctrl);
     frame_ctrl.set_more_data(true);
     Ok(())
 }

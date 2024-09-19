@@ -15,7 +15,9 @@ use core::hash::Hash;
 
 use net_types::ip::{GenericOverIp, Ip, IpAddr, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr};
 use packet::{BufferViewMut, PacketBuilder, ParsablePacket, ParseMetadata};
-use zerocopy::{ByteSlice, ByteSliceMut, FromBytes, FromZeros, IntoBytes, NoCell, Unaligned};
+use zerocopy::{
+    FromBytes, Immutable, IntoBytes, KnownLayout, SplitByteSlice, SplitByteSliceMut, Unaligned,
+};
 
 use crate::error::{IpParseError, IpParseResult};
 use crate::ethernet::EthernetIpExt;
@@ -57,7 +59,7 @@ impl IpProtoExt for Ipv6 {
 /// packet parsing and serialization.
 pub trait IpExt: EthernetIpExt + IcmpIpExt {
     /// An IP packet type for this IP version.
-    type Packet<B: ByteSlice>: IpPacket<B, Self, Builder = Self::PacketBuilder>
+    type Packet<B: SplitByteSlice>: IpPacket<B, Self, Builder = Self::PacketBuilder>
         + GenericOverIp<Self, Type = Self::Packet<B>>
         + GenericOverIp<Ipv4, Type = Ipv4Packet<B>>
         + GenericOverIp<Ipv6, Type = Ipv6Packet<B>>;
@@ -66,12 +68,12 @@ pub trait IpExt: EthernetIpExt + IcmpIpExt {
 }
 
 impl IpExt for Ipv4 {
-    type Packet<B: ByteSlice> = Ipv4Packet<B>;
+    type Packet<B: SplitByteSlice> = Ipv4Packet<B>;
     type PacketBuilder = Ipv4PacketBuilder;
 }
 
 impl IpExt for Ipv6 {
-    type Packet<B: ByteSlice> = Ipv6Packet<B>;
+    type Packet<B: SplitByteSlice> = Ipv6Packet<B>;
     type PacketBuilder = Ipv6PacketBuilder;
 }
 
@@ -98,7 +100,17 @@ pub enum Nat64TranslationResult<S, E> {
 /// using the same layout as the Traffic Class field in IPv6 and the Type Of
 /// Service field in IPv4: 6 higher bits for DSCP and 2 lower bits for ECN.
 #[derive(
-    Default, Debug, Clone, Copy, PartialEq, Eq, FromZeros, FromBytes, IntoBytes, NoCell, Unaligned,
+    Default,
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    KnownLayout,
+    FromBytes,
+    IntoBytes,
+    Immutable,
+    Unaligned,
 )]
 #[repr(C)]
 pub struct DscpAndEcn(u8);
@@ -150,7 +162,7 @@ impl From<u8> for DscpAndEcn {
 /// An IPv4 or IPv6 packet.
 ///
 /// `IpPacket` is implemented by `Ipv4Packet` and `Ipv6Packet`.
-pub trait IpPacket<B: ByteSlice, I: IpExt>:
+pub trait IpPacket<B: SplitByteSlice, I: IpExt>:
     Sized + Debug + ParsablePacket<B, (), Error = IpParseError<I>>
 {
     /// A builder for this packet type.
@@ -181,7 +193,7 @@ pub trait IpPacket<B: ByteSlice, I: IpExt>:
     /// `set_ttl` updates the packet's TTL/Hop Limit in place.
     fn set_ttl(&mut self, ttl: u8)
     where
-        B: ByteSliceMut;
+        B: SplitByteSliceMut;
 
     /// Get the body.
     fn body(&self) -> &[u8];
@@ -211,13 +223,13 @@ pub trait IpPacket<B: ByteSlice, I: IpExt>:
         body_fragments: IT,
     ) -> IpParseResult<I, ()>
     where
-        B: ByteSliceMut;
+        B: SplitByteSliceMut;
 
     /// Copies the full packet into a `Vec`.
     fn to_vec(&self) -> Vec<u8>;
 }
 
-impl<B: ByteSlice> IpPacket<B, Ipv4> for Ipv4Packet<B> {
+impl<B: SplitByteSlice> IpPacket<B, Ipv4> for Ipv4Packet<B> {
     type Builder = Ipv4PacketBuilder;
     type VersionSpecificMeta = Ipv4OnlyMeta;
 
@@ -238,7 +250,7 @@ impl<B: ByteSlice> IpPacket<B, Ipv4> for Ipv4Packet<B> {
     }
     fn set_ttl(&mut self, ttl: u8)
     where
-        B: ByteSliceMut,
+        B: SplitByteSliceMut,
     {
         Ipv4Packet::set_ttl(self, ttl)
     }
@@ -260,7 +272,7 @@ impl<B: ByteSlice> IpPacket<B, Ipv4> for Ipv4Packet<B> {
         body_fragments: IT,
     ) -> IpParseResult<Ipv4, ()>
     where
-        B: ByteSliceMut,
+        B: SplitByteSliceMut,
     {
         crate::ipv4::reassemble_fragmented_packet(buffer, header, body_fragments)
     }
@@ -270,7 +282,7 @@ impl<B: ByteSlice> IpPacket<B, Ipv4> for Ipv4Packet<B> {
     }
 }
 
-impl<B: ByteSlice> IpPacket<B, Ipv6> for Ipv6Packet<B> {
+impl<B: SplitByteSlice> IpPacket<B, Ipv6> for Ipv6Packet<B> {
     type Builder = Ipv6PacketBuilder;
     type VersionSpecificMeta = ();
 
@@ -291,7 +303,7 @@ impl<B: ByteSlice> IpPacket<B, Ipv6> for Ipv6Packet<B> {
     }
     fn set_ttl(&mut self, ttl: u8)
     where
-        B: ByteSliceMut,
+        B: SplitByteSliceMut,
     {
         Ipv6Packet::set_hop_limit(self, ttl)
     }
@@ -311,7 +323,7 @@ impl<B: ByteSlice> IpPacket<B, Ipv6> for Ipv6Packet<B> {
         body_fragments: IT,
     ) -> IpParseResult<Ipv6, ()>
     where
-        B: ByteSliceMut,
+        B: SplitByteSliceMut,
     {
         crate::ipv6::reassemble_fragmented_packet(buffer, header, body_fragments)
     }

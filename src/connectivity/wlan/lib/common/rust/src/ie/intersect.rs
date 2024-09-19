@@ -246,14 +246,14 @@ pub struct ClientRates<'a>(pub &'a [SupportedRate]);
 impl<'a> From<&'a [u8]> for ApRates<'a> {
     fn from(rates: &'a [u8]) -> Self {
         // This is always safe, as SupportedRate is a newtype of u8.
-        Self(Ref::new_slice(rates).unwrap().into_slice())
+        Self(Ref::into_ref(Ref::from_bytes(rates).unwrap()))
     }
 }
 
 impl<'a> From<&'a [u8]> for ClientRates<'a> {
     fn from(rates: &'a [u8]) -> Self {
         // This is always safe, as SupportedRate is a newtype of u8.
-        Self(Ref::new_slice(rates).unwrap().into_slice())
+        Self(Ref::into_ref(Ref::from_bytes(rates).unwrap()))
     }
 }
 

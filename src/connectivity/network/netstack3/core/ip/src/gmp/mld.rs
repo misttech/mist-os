@@ -30,7 +30,7 @@ use packet_formats::ipv6::ext_hdrs::{
 use packet_formats::ipv6::{Ipv6PacketBuilder, Ipv6PacketBuilderWithHbhOptions};
 use packet_formats::utils::NonZeroDuration;
 use thiserror::Error;
-use zerocopy::ByteSlice;
+use zerocopy::SplitByteSlice;
 
 use crate::internal::base::{IpLayerHandler, IpPacketDestination};
 use crate::internal::device::IpDeviceSendContext;
@@ -84,7 +84,7 @@ pub trait MldContext<BT: MldBindingsTypes>:
 /// A blanket implementation is provided for all `C: MldContext`.
 pub trait MldPacketHandler<BC, DeviceId> {
     /// Receive an MLD packet.
-    fn receive_mld_packet<B: ByteSlice>(
+    fn receive_mld_packet<B: SplitByteSlice>(
         &mut self,
         bindings_ctx: &mut BC,
         device: &DeviceId,
@@ -95,7 +95,7 @@ pub trait MldPacketHandler<BC, DeviceId> {
 }
 
 impl<BC: MldBindingsContext, CC: MldContext<BC>> MldPacketHandler<BC, CC::DeviceId> for CC {
-    fn receive_mld_packet<B: ByteSlice>(
+    fn receive_mld_packet<B: SplitByteSlice>(
         &mut self,
         bindings_ctx: &mut BC,
         device: &CC::DeviceId,
@@ -146,7 +146,7 @@ impl<BC: MldBindingsContext, CC: MldContext<BC>> MldPacketHandler<BC, CC::Device
     }
 }
 
-impl<B: ByteSlice> GmpMessage<Ipv6> for Mldv1Body<B> {
+impl<B: SplitByteSlice> GmpMessage<Ipv6> for Mldv1Body<B> {
     fn group_addr(&self) -> Ipv6Addr {
         self.group_addr
     }

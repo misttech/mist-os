@@ -89,8 +89,8 @@ async fn load_metadata(
         )
         .await
         .context("Read header")?;
-    let header = format::Header::ref_from_prefix(&header_block[..])
-        .ok_or(anyhow!("Header has invalid size"))?;
+    let (header, _) = format::Header::ref_from_prefix(&header_block[..])
+        .map_err(|_| anyhow!("Header has invalid size"))?;
     header.ensure_integrity(client.block_count(), client.block_size() as u64)?;
     let partition_table_offset = header.part_start * bs as u64;
     let partition_table_size = (header.num_parts * header.part_size) as usize;
@@ -118,8 +118,8 @@ async fn load_metadata(
         for i in 0..header.num_parts as usize {
             let entry_raw = &partition_table_blocks
                 [i * header.part_size as usize..(i + 1) * header.part_size as usize];
-            let entry = format::PartitionTableEntry::ref_from_prefix(entry_raw)
-                .ok_or(anyhow!("Failed to parse partition {i}"))?;
+            let (entry, _) = format::PartitionTableEntry::ref_from_prefix(entry_raw)
+                .map_err(|_| anyhow!("Failed to parse partition {i}"))?;
             if entry.is_empty() {
                 continue;
             }

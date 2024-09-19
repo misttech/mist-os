@@ -18,10 +18,10 @@ use crate::{key_data, Error, ProtectionInfo};
 use anyhow::{ensure, format_err};
 use eapol::KeyFrameBuf;
 use tracing::error;
-use zerocopy::ByteSlice;
+use zerocopy::SplitByteSlice;
 
 // IEEE Std 802.11-2016, 12.7.6.2
-fn handle_message_1<B: ByteSlice>(
+fn handle_message_1<B: SplitByteSlice>(
     cfg: &Config,
     pmk: &[u8],
     snonce: &[u8],
@@ -46,7 +46,7 @@ fn handle_message_1<B: ByteSlice>(
 }
 
 // IEEE Std 802.11-2016, 12.7.6.3
-fn create_message_2<B: ByteSlice>(
+fn create_message_2<B: SplitByteSlice>(
     cfg: &Config,
     kck: &[u8],
     protection: &NegotiatedProtection,
@@ -86,7 +86,7 @@ fn create_message_2<B: ByteSlice>(
 // IEEE Std 802.11-2016, 12.7.6.4
 // This function will never return an empty GTK unless the protection is WPA1, in which case this is
 // not set until a subsequent GroupKey handshake.
-fn handle_message_3<B: ByteSlice>(
+fn handle_message_3<B: SplitByteSlice>(
     cfg: &Config,
     kck: &[u8],
     kek: &[u8],
@@ -179,7 +179,7 @@ fn handle_message_3<B: ByteSlice>(
 }
 
 // IEEE Std 802.11-2016, 12.7.6.5
-fn create_message_4<B: ByteSlice>(
+fn create_message_4<B: SplitByteSlice>(
     protection: &NegotiatedProtection,
     kck: &[u8],
     msg3: &eapol::KeyFrameRx<B>,
@@ -227,7 +227,7 @@ pub fn new(cfg: Config, pmk: Vec<u8>) -> State {
 }
 
 impl State {
-    pub fn on_eapol_key_frame<B: ByteSlice>(
+    pub fn on_eapol_key_frame<B: SplitByteSlice>(
         self,
         update_sink: &mut UpdateSink,
         frame: FourwayHandshakeFrame<B>,

@@ -86,7 +86,7 @@ use std::ffi::CStr;
 use std::mem::MaybeUninit;
 use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
-use zerocopy::{AsBytes, FromBytes, NoCell};
+use zerocopy::{FromBytes, Immutable, IntoBytes};
 use {fidl_fuchsia_posix as fposix, fidl_fuchsia_starnix_binder as fbinder, fuchsia_zircon as zx};
 
 // The name used to track the duration of a local binder ioctl.
@@ -1293,7 +1293,7 @@ struct SharedBuffer<'a, T> {
     _phantom_data: std::marker::PhantomData<T>,
 }
 
-impl<'a, T: AsBytes> SharedBuffer<'a, T> {
+impl<'a, T: IntoBytes> SharedBuffer<'a, T> {
     /// Creates a new `SharedBuffer`, which represents a sub-region of `memory` starting at `offset`
     /// bytes, with `length` bytes.
     ///
@@ -1997,7 +1997,7 @@ impl Command {
             | Self::IncRef(obj)
             | Self::DecRef(obj) => {
                 #[repr(C, packed)]
-                #[derive(AsBytes, NoCell)]
+                #[derive(IntoBytes, Immutable)]
                 struct AcquireRefData {
                     command: binder_driver_return_protocol,
                     weak_ref_addr: u64,
@@ -2017,7 +2017,7 @@ impl Command {
             }
             Self::Error(error_val) => {
                 #[repr(C, packed)]
-                #[derive(AsBytes, NoCell)]
+                #[derive(IntoBytes, Immutable)]
                 struct ErrorData {
                     command: binder_driver_return_protocol,
                     error_val: i32,
@@ -2033,7 +2033,7 @@ impl Command {
             Self::OnewayTransaction(data) | Self::Transaction { data, .. } | Self::Reply(data) => {
                 if let Some(security_context_buffer) = data.buffers.security_context.as_ref() {
                     #[repr(C, packed)]
-                    #[derive(AsBytes, NoCell)]
+                    #[derive(IntoBytes, Immutable)]
                     struct TransactionData {
                         command: binder_driver_return_protocol,
                         data: [u8; std::mem::size_of::<binder_transaction_data>()],
@@ -2053,7 +2053,7 @@ impl Command {
                     )
                 } else {
                     #[repr(C, packed)]
-                    #[derive(AsBytes, NoCell)]
+                    #[derive(IntoBytes, Immutable)]
                     struct TransactionData {
                         command: binder_driver_return_protocol,
                         data: [u8; std::mem::size_of::<binder_transaction_data>()],
@@ -2084,7 +2084,7 @@ impl Command {
             }
             Self::DeadBinder(cookie) | Self::ClearDeathNotificationDone(cookie) => {
                 #[repr(C, packed)]
-                #[derive(AsBytes, NoCell)]
+                #[derive(IntoBytes, Immutable)]
                 struct DeadBinderData {
                     command: binder_driver_return_protocol,
                     cookie: binder_uintptr_t,
@@ -4121,7 +4121,7 @@ impl BinderDriver {
                             // Patch the pointer with the translated address.
                             translated_buffer_address
                                 .write_to_prefix(&mut parent_buffer_payload[parent_offset..])
-                                .ok_or_else(|| errno!(EINVAL))?;
+                                .map_err(|_| errno!(EINVAL))?;
                         }
 
                         // Update the scatter-gather buffer to account for the buffer we just wrote.
@@ -4166,12 +4166,13 @@ impl BinderDriver {
                         }
 
                         // Verify alignment and size before reading the data as a [u32].
-                        let (layout, _) = zerocopy::Ref::<&mut [u8], [u32]>::new_slice_from_prefix(
-                            &mut parent_buffer_payload[parent_offset..],
-                            num_fds,
-                        )
-                        .ok_or_else(|| errno!(EINVAL))?;
-                        let fd_array = layout.into_mut_slice();
+                        let (layout, _) =
+                            zerocopy::Ref::<&mut [u8], [u32]>::from_prefix_with_elems(
+                                &mut parent_buffer_payload[parent_offset..],
+                                num_fds,
+                            )
+                            .map_err(|_| errno!(EINVAL))?;
+                        let fd_array = zerocopy::Ref::into_mut(layout);
 
                         // Dup each file descriptor and re-write the value of the new FD.
                         for fd in fd_array {
@@ -4346,12 +4347,12 @@ impl SerializedBinderObject {
     /// Deserialize a binder object from `data`. `data` must be large enough to fit the size of the
     /// serialized object, or else this method fails.
     fn from_bytes(data: &[u8]) -> Result<Self, Errno> {
-        let object_header =
-            binder_object_header::read_from_prefix(data).ok_or_else(|| errno!(EINVAL))?;
+        let (object_header, _) =
+            binder_object_header::read_from_prefix(data).map_err(|_| errno!(EINVAL))?;
         match object_header.type_ {
             BINDER_TYPE_BINDER => {
-                let object =
-                    flat_binder_object::read_from_prefix(data).ok_or_else(|| errno!(EINVAL))?;
+                let (object, _) =
+                    flat_binder_object::read_from_prefix(data).map_err(|_| errno!(EINVAL))?;
                 Ok(Self::Object {
                     local: LocalBinderObject {
                         // SAFETY: Union read.
@@ -4362,8 +4363,8 @@ impl SerializedBinderObject {
                 })
             }
             BINDER_TYPE_HANDLE => {
-                let object =
-                    flat_binder_object::read_from_prefix(data).ok_or_else(|| errno!(EINVAL))?;
+                let (object, _) =
+                    flat_binder_object::read_from_prefix(data).map_err(|_| errno!(EINVAL))?;
                 Ok(Self::Handle {
                     // SAFETY: Union read.
                     handle: unsafe { object.__bindgen_anon_1.handle }.into(),
@@ -4372,8 +4373,8 @@ impl SerializedBinderObject {
                 })
             }
             BINDER_TYPE_FD => {
-                let object =
-                    flat_binder_object::read_from_prefix(data).ok_or_else(|| errno!(EINVAL))?;
+                let (object, _) =
+                    flat_binder_object::read_from_prefix(data).map_err(|_| errno!(EINVAL))?;
                 Ok(Self::File {
                     // SAFETY: Union read.
                     fd: FdNumber::from_raw(unsafe { object.__bindgen_anon_1.handle } as i32),
@@ -4382,8 +4383,8 @@ impl SerializedBinderObject {
                 })
             }
             BINDER_TYPE_PTR => {
-                let object =
-                    binder_buffer_object::read_from_prefix(data).ok_or_else(|| errno!(EINVAL))?;
+                let (object, _) =
+                    binder_buffer_object::read_from_prefix(data).map_err(|_| errno!(EINVAL))?;
                 Ok(Self::Buffer {
                     buffer: UserAddress::from(object.buffer),
                     length: object.length as usize,
@@ -4393,8 +4394,8 @@ impl SerializedBinderObject {
                 })
             }
             BINDER_TYPE_FDA => {
-                let object =
-                    binder_fd_array_object::read_from_prefix(data).ok_or_else(|| errno!(EINVAL))?;
+                let (object, _) =
+                    binder_fd_array_object::read_from_prefix(data).map_err(|_| errno!(EINVAL))?;
                 Ok(Self::FileArray {
                     num_fds: object.num_fds as usize,
                     parent: object.parent as usize,
@@ -4424,6 +4425,7 @@ impl SerializedBinderObject {
                     cookie: cookie,
                 })
                 .write_to_prefix(data)
+                .ok()
             }
             SerializedBinderObject::Object { local, flags } => {
                 struct_with_union_into_bytes!(flat_binder_object {
@@ -4433,6 +4435,7 @@ impl SerializedBinderObject {
                     cookie: local.strong_ref_addr.ptr() as u64,
                 })
                 .write_to_prefix(data)
+                .ok()
             }
             SerializedBinderObject::File { fd, flags, cookie } => {
                 struct_with_union_into_bytes!(flat_binder_object {
@@ -4442,6 +4445,7 @@ impl SerializedBinderObject {
                     cookie: cookie,
                 })
                 .write_to_prefix(data)
+                .ok()
             }
             SerializedBinderObject::Buffer { buffer, length, parent, parent_offset, flags } => {
                 binder_buffer_object {
@@ -4453,6 +4457,7 @@ impl SerializedBinderObject {
                     flags,
                 }
                 .write_to_prefix(data)
+                .ok()
             }
             SerializedBinderObject::FileArray { num_fds, parent, parent_offset } => {
                 binder_fd_array_object {
@@ -4463,6 +4468,7 @@ impl SerializedBinderObject {
                     parent_offset: parent_offset as u64,
                 }
                 .write_to_prefix(data)
+                .ok()
             }
         }
         .ok_or_else(|| errno!(EINVAL))
@@ -4630,7 +4636,7 @@ pub mod tests {
         BINDER_TYPE_WEAK_HANDLE,
     };
     use std::sync::Weak;
-    use zerocopy::FromZeros;
+    use zerocopy::{FromZeros, KnownLayout};
 
     const BASE_ADDR: UserAddress = UserAddress::const_from(0x0000000000000100);
     const VMO_LENGTH: usize = 4096;
@@ -5069,7 +5075,7 @@ pub mod tests {
         assert!(data.iter().all(|b| *b == DATA_FILL));
 
         let mut data = [0u64; OFFSETS_COUNT];
-        memory.read(data.as_bytes_mut(), DATA_LEN as u64).expect("read VMO failed");
+        memory.read(data.as_mut_bytes(), DATA_LEN as u64).expect("read VMO failed");
         assert!(data.iter().all(|b| *b == OFFSETS_FILL));
     }
 
@@ -6179,7 +6185,7 @@ pub mod tests {
 
         // Serialize a C struct that points to the above string.
         #[repr(C)]
-        #[derive(AsBytes, NoCell)]
+        #[derive(IntoBytes, Immutable)]
         struct Bar {
             foo_str: UserAddress,
             len: i32,
@@ -6486,7 +6492,7 @@ pub mod tests {
 
         // Serialize a C struct with an fd array.
         #[repr(C)]
-        #[derive(AsBytes, FromZeros, FromBytes, NoCell)]
+        #[derive(IntoBytes, KnownLayout, FromBytes, Immutable)]
         struct Bar {
             len: u32,
             fds: [u32; 2],
@@ -6677,7 +6683,7 @@ pub mod tests {
 
             // Serialize a C struct with an fd array.
             #[repr(C)]
-            #[derive(AsBytes, FromBytes, FromZeros, NoCell)]
+            #[derive(IntoBytes, KnownLayout, FromBytes, Immutable)]
             struct Bar {
                 len: u32,
                 fds: [u32; 2],
@@ -6797,7 +6803,7 @@ pub mod tests {
 
         // Serialize a C struct with an fd array.
         #[repr(C)]
-        #[derive(AsBytes, FromBytes, FromZeros, NoCell)]
+        #[derive(IntoBytes, KnownLayout, FromBytes, Immutable)]
         struct Bar {
             len: u32,
             fds: [u32; 2],

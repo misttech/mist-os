@@ -16,7 +16,7 @@ use fidl_fuchsia_wlan_mlme::EapolResultCode;
 use std::collections::HashSet;
 use tracing::{error, info};
 use wlan_statemachine::StateMachine;
-use zerocopy::ByteSlice;
+use zerocopy::SplitByteSlice;
 
 const MAX_KEY_FRAME_RETRIES: u32 = 3;
 
@@ -483,7 +483,7 @@ impl EssSa {
         Error::EapolHandshakeIncomplete("Unexpected timeout while establishing RSNA".to_string())
     }
 
-    pub fn on_eapol_frame<B: ByteSlice>(
+    pub fn on_eapol_frame<B: SplitByteSlice>(
         &mut self,
         update_sink: &mut UpdateSink,
         frame: eapol::Frame<B>,
@@ -545,7 +545,7 @@ impl EssSa {
         Ok(())
     }
 
-    fn on_eapol_key_frame<B: ByteSlice>(
+    fn on_eapol_key_frame<B: SplitByteSlice>(
         &mut self,
         update_sink: &mut UpdateSink,
         frame: eapol::KeyFrameRx<B>,

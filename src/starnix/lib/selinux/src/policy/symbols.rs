@@ -16,7 +16,7 @@ use anyhow::Context as _;
 use std::fmt::Debug;
 use std::num::NonZeroU32;
 use std::ops::Deref;
-use zerocopy::{little_endian as le, FromBytes, FromZeroes, NoCell, Unaligned};
+use zerocopy::{little_endian as le, FromBytes, Immutable, KnownLayout, Unaligned};
 
 /// The `type` field value for a [`Constraint`] that contains an [`ExtensibleBitmap`] and
 /// [`TypeSet`].
@@ -75,7 +75,7 @@ where
 }
 
 /// Binary metadata prefix to [`SymbolList`] objects.
-#[derive(Clone, Debug, FromZeroes, FromBytes, NoCell, PartialEq, Unaligned)]
+#[derive(Clone, Debug, KnownLayout, FromBytes, Immutable, PartialEq, Unaligned)]
 #[repr(C, packed)]
 pub(super) struct Metadata {
     /// The number of primary names referred to in the associated [`SymbolList`].
@@ -192,7 +192,7 @@ impl<PS: ParseStrategy> ValidateArray<CommonSymbolStaticMetadata, u8> for Common
 }
 
 /// Static (that is, fixed-sized) metadata for a common symbol.
-#[derive(Clone, Debug, FromZeroes, FromBytes, NoCell, PartialEq, Unaligned)]
+#[derive(Clone, Debug, KnownLayout, FromBytes, Immutable, PartialEq, Unaligned)]
 #[repr(C, packed)]
 pub(super) struct CommonSymbolStaticMetadata {
     /// The length of the `[u8]` key stored in the associated [`CommonSymbolMetadata`].
@@ -264,7 +264,7 @@ impl<PS: ParseStrategy> ValidateArray<PermissionMetadata, u8> for Permission<PS>
     }
 }
 
-#[derive(Clone, Debug, FromZeroes, FromBytes, NoCell, PartialEq, Unaligned)]
+#[derive(Clone, Debug, KnownLayout, FromBytes, Immutable, PartialEq, Unaligned)]
 #[repr(C, packed)]
 pub(super) struct PermissionMetadata {
     /// The length of the `[u8]` in the associated [`Permission`].
@@ -351,7 +351,7 @@ impl<PS: ParseStrategy> ValidateArray<ConstraintCount, Constraint<PS>> for Const
     }
 }
 
-#[derive(Clone, Debug, FromZeroes, FromBytes, NoCell, PartialEq, Unaligned)]
+#[derive(Clone, Debug, KnownLayout, FromBytes, Immutable, PartialEq, Unaligned)]
 #[repr(C, packed)]
 pub(super) struct ConstraintCount(le::U32);
 
@@ -417,7 +417,7 @@ where
     }
 }
 
-#[derive(Clone, Debug, FromZeroes, FromBytes, NoCell, PartialEq, Unaligned)]
+#[derive(Clone, Debug, KnownLayout, FromBytes, Immutable, PartialEq, Unaligned)]
 #[repr(C, packed)]
 pub(super) struct ConstraintMetadata {
     constraint_type: le::U32,
@@ -678,7 +678,7 @@ where
     }
 }
 
-#[derive(Clone, Debug, FromZeroes, FromBytes, NoCell, PartialEq, Unaligned)]
+#[derive(Clone, Debug, KnownLayout, FromBytes, Immutable, PartialEq, Unaligned)]
 #[repr(C, packed)]
 pub(super) struct ClassDefaults {
     default_user: le::U32,
@@ -841,7 +841,7 @@ impl<PS: ParseStrategy> ValidateArray<ClassValidateTransitionsCount, Constraint<
     }
 }
 
-#[derive(Clone, Debug, FromZeroes, FromBytes, NoCell, PartialEq, Unaligned)]
+#[derive(Clone, Debug, KnownLayout, FromBytes, Immutable, PartialEq, Unaligned)]
 #[repr(C, packed)]
 pub(super) struct ClassValidateTransitionsCount(le::U32);
 
@@ -961,7 +961,7 @@ where
     }
 }
 
-#[derive(Clone, Debug, FromZeroes, FromBytes, NoCell, PartialEq, Unaligned)]
+#[derive(Clone, Debug, KnownLayout, FromBytes, Immutable, PartialEq, Unaligned)]
 #[repr(C, packed)]
 pub(super) struct ClassMetadata {
     key_length: le::U32,
@@ -1059,7 +1059,7 @@ impl<PS: ParseStrategy> ValidateArray<RoleStaticMetadata, u8> for RoleMetadata<P
     }
 }
 
-#[derive(Clone, Debug, FromZeroes, FromBytes, NoCell, PartialEq, Unaligned)]
+#[derive(Clone, Debug, KnownLayout, FromBytes, Immutable, PartialEq, Unaligned)]
 #[repr(C, packed)]
 pub(super) struct RoleStaticMetadata {
     length: le::U32,
@@ -1169,7 +1169,7 @@ impl<PS: ParseStrategy> ValidateArray<TypeMetadata, u8> for Type<PS> {
     }
 }
 
-#[derive(Clone, Debug, FromZeroes, FromBytes, NoCell, PartialEq, Unaligned)]
+#[derive(Clone, Debug, KnownLayout, FromBytes, Immutable, PartialEq, Unaligned)]
 #[repr(C, packed)]
 pub(super) struct TypeMetadata {
     length: le::U32,
@@ -1268,7 +1268,7 @@ impl<PS: ParseStrategy> ValidateArray<UserMetadata, u8> for UserData<PS> {
     }
 }
 
-#[derive(Clone, Debug, FromZeroes, FromBytes, NoCell, PartialEq, Unaligned)]
+#[derive(Clone, Debug, KnownLayout, FromBytes, Immutable, PartialEq, Unaligned)]
 #[repr(C, packed)]
 pub(super) struct UserMetadata {
     length: le::U32,
@@ -1438,7 +1438,7 @@ impl<PS: ParseStrategy> ValidateArray<ConditionalBooleanMetadata, u8> for Condit
     }
 }
 
-#[derive(Clone, Debug, FromZeroes, FromBytes, NoCell, PartialEq, Unaligned)]
+#[derive(Clone, Debug, KnownLayout, FromBytes, Immutable, PartialEq, Unaligned)]
 #[repr(C, packed)]
 pub(super) struct ConditionalBooleanMetadata {
     id: le::U32,
@@ -1545,7 +1545,7 @@ impl<PS: ParseStrategy> ValidateArray<SensitivityStaticMetadata, u8> for Sensiti
     }
 }
 
-#[derive(Clone, Debug, FromZeroes, FromBytes, NoCell, PartialEq, Unaligned)]
+#[derive(Clone, Debug, KnownLayout, FromBytes, Immutable, PartialEq, Unaligned)]
 #[repr(C, packed)]
 pub(super) struct SensitivityStaticMetadata {
     length: le::U32,
@@ -1604,7 +1604,7 @@ impl<PS: ParseStrategy> ValidateArray<CategoryMetadata, u8> for Category<PS> {
     }
 }
 
-#[derive(Clone, Debug, FromZeroes, FromBytes, NoCell, PartialEq, Unaligned)]
+#[derive(Clone, Debug, KnownLayout, FromBytes, Immutable, PartialEq, Unaligned)]
 #[repr(C, packed)]
 pub(super) struct CategoryMetadata {
     length: le::U32,

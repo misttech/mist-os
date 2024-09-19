@@ -227,7 +227,7 @@ fvm_deps = [
   "//third_party/rust_crates:sha2",
   "//third_party/rust_crates:tracing",
   "//third_party/rust_crates:uuid",
-  "//third_party/rust_crates:zerocopy",
+  "//third_party/rust_crates:zerocopy_0_0_0_alpha_0",
 ]
 
 rustc_binary("fvm_rust") {

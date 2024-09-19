@@ -7,7 +7,7 @@ mod wire;
 use anyhow::{anyhow, Error};
 use std::io::{Read, Seek};
 use std::mem;
-use zerocopy::FromBytes;
+use zerocopy::{FromBytes, Immutable, KnownLayout};
 
 // Each QCOW file starts with this magic value "QFI\xfb".
 const QCOW_MAGIC: u32 = 0x514649fb;
@@ -53,14 +53,14 @@ fn read_header(file: &mut std::fs::File) -> Result<wire::Header, Error> {
     let mut buf = vec![0u8; HEADER_SIZE];
     file.seek(std::io::SeekFrom::Start(0))?;
     file.read_exact(&mut buf)?;
-    // Header::read_from should not fail if `buf` is of the correct size.
-    Ok(wire::Header::read_from(buf.as_slice()).expect("read_from failed unexpectedly"))
+    // Header::read_from_bytes should not fail if `buf` is of the correct size.
+    Ok(wire::Header::read_from_bytes(buf.as_slice()).expect("read_from failed unexpectedly"))
 }
 
 /// Loads a translation table from a backing file.
 ///
 /// This is used to load both the L1 and L2 tables
-fn load_tranlsation_table<Entry: FromBytes + Sized>(
+fn load_tranlsation_table<Entry: FromBytes + KnownLayout + Immutable + Sized>(
     file: &mut std::fs::File,
     num_entries: u64,
     table_offset: u64,
@@ -80,8 +80,8 @@ fn load_tranlsation_table<Entry: FromBytes + Sized>(
         .chunks_exact(entry_size as usize)
         // Deserialize and unwrap. This should never fail so long as we pass the correct
         // slice size to `chunks_exact`.
-        .map(Entry::read_from)
-        .map(Option::unwrap)
+        .map(Entry::read_from_bytes)
+        .map(Result::unwrap)
         .collect::<Vec<Entry>>())
 }
 

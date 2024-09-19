@@ -10,7 +10,7 @@ use std::fmt::{self, Debug, Formatter};
 use std::ops::{Range, RangeBounds};
 
 use arrayvec::ArrayVec;
-use zerocopy::ByteSlice;
+use zerocopy::SplitByteSlice;
 
 use crate::{
     canonicalize_range, take_back, take_back_mut, take_front, take_front_mut,
@@ -1004,15 +1004,15 @@ impl<const N: usize> InnerPacketBuilder for ArrayVec<u8, N> {
     }
 }
 
-/// An [`InnerPacketBuilder`] created from any [`B: ByteSlice`].
+/// An [`InnerPacketBuilder`] created from any [`B: SplitByteSlice`].
 ///
 /// `ByteSliceInnerPacketBuilder<B>` implements `InnerPacketBuilder` so long as
-/// `B: ByteSlice`.
+/// `B: SplitByteSlice`.
 ///
-/// [`B: ByteSlice`]: zerocopy::ByteSlice
+/// [`B: SplitByteSlice`]: zerocopy::SplitByteSlice
 pub struct ByteSliceInnerPacketBuilder<B>(pub B);
 
-impl<B: ByteSlice> InnerPacketBuilder for ByteSliceInnerPacketBuilder<B> {
+impl<B: SplitByteSlice> InnerPacketBuilder for ByteSliceInnerPacketBuilder<B> {
     fn bytes_len(&self) -> usize {
         self.0.deref().bytes_len()
     }
@@ -1021,7 +1021,7 @@ impl<B: ByteSlice> InnerPacketBuilder for ByteSliceInnerPacketBuilder<B> {
     }
 }
 
-impl<B: ByteSlice> Debug for ByteSliceInnerPacketBuilder<B> {
+impl<B: SplitByteSlice> Debug for ByteSliceInnerPacketBuilder<B> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(f, "ByteSliceInnerPacketBuilder({:?})", self.0.as_ref())
     }

@@ -14,7 +14,7 @@ use ieee80211::{MacAddr, MacAddrBytes, Ssid};
 use tracing::warn;
 use wlan_common::ie::rsn::akm::AKM_SAE;
 use wlan_sae as sae;
-use zerocopy::ByteSlice;
+use zerocopy::SplitByteSlice;
 
 /// IEEE Std 802.11-2016, 12.4.4.1
 /// Elliptic curve group 19 is the default supported group -- all SAE peers must support it, and in
@@ -114,7 +114,7 @@ impl Method {
     }
 
     // Unused as only PSK is supported so far.
-    pub fn on_eapol_key_frame<B: ByteSlice>(
+    pub fn on_eapol_key_frame<B: SplitByteSlice>(
         &self,
         _update_sink: &mut UpdateSink,
         _frame: Dot11VerifiedKeyFrame<B>,

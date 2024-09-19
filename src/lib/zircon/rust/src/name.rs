@@ -5,7 +5,7 @@
 use crate::sys::ZX_MAX_NAME_LEN;
 use crate::Status;
 use bstr::BStr;
-use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell};
+use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
 
 /// A wrapper around zircon name fields.
 ///
@@ -14,15 +14,15 @@ use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell};
 ///
 /// Can be created from regular strings or byte slices.
 #[derive(
-    AsBytes,
+    IntoBytes,
     Copy,
     Clone,
     Default,
     Eq,
+    KnownLayout,
     FromBytes,
-    FromZeros,
     Hash,
-    NoCell,
+    Immutable,
     PartialEq,
     PartialOrd,
     Ord,

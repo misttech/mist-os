@@ -18,7 +18,7 @@ use fxfs_macros::{migrate_nodefault, Migrate};
 use serde::de::{Error as SerdeError, Visitor};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use static_assertions::assert_cfg;
-use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell};
+use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
 
 pub mod ff1;
 
@@ -233,7 +233,7 @@ impl XtsCipherSet {
         for sector in buffer.chunks_exact_mut(SECTOR_SIZE as usize) {
             let mut tweak = Tweak(sector_offset as u128);
             // The same key is used for encrypting the data and computing the tweak.
-            cipher.encrypt_block(GenericArray::from_mut_slice(tweak.as_bytes_mut()));
+            cipher.encrypt_block(GenericArray::from_mut_slice(tweak.as_mut_bytes()));
             cipher.decrypt_with_backend(XtsProcessor::new(tweak, sector));
             sector_offset += 1;
         }
@@ -260,7 +260,7 @@ impl XtsCipherSet {
         for sector in buffer.chunks_exact_mut(SECTOR_SIZE as usize) {
             let mut tweak = Tweak(sector_offset as u128);
             // The same key is used for encrypting the data and computing the tweak.
-            cipher.encrypt_block(GenericArray::from_mut_slice(tweak.as_bytes_mut()));
+            cipher.encrypt_block(GenericArray::from_mut_slice(tweak.as_mut_bytes()));
             cipher.encrypt_with_backend(XtsProcessor::new(tweak, sector));
             sector_offset += 1;
         }
@@ -337,7 +337,7 @@ pub trait Crypt: Send + Sync {
 
 // This assumes little-endianness which is likely to always be the case.
 assert_cfg!(target_endian = "little");
-#[derive(AsBytes, FromBytes, FromZeros, NoCell)]
+#[derive(IntoBytes, KnownLayout, FromBytes, Immutable)]
 #[repr(C)]
 struct Tweak(u128);
 

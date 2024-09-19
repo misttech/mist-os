@@ -2,18 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell};
+use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
 
 /// A value Starnix has received from userspace.
 ///
 /// Typically, these values are received in syscall arguments and need to be validated before they
 /// can be used directly. For example, integers need to be checked for overflow during arithmetical
 /// operation.
-#[derive(Clone, Copy, Eq, PartialEq, AsBytes, FromZeros, FromBytes, NoCell)]
+#[derive(Clone, Copy, Eq, PartialEq, IntoBytes, KnownLayout, FromBytes, Immutable)]
 #[repr(transparent)]
-pub struct UserValue<T: Copy + Eq + AsBytes + FromZeros + FromBytes + NoCell>(T);
+pub struct UserValue<T: Copy + Eq + IntoBytes + FromBytes + Immutable>(T);
 
-impl<T: Copy + Eq + AsBytes + FromZeros + FromBytes + NoCell> UserValue<T> {
+impl<T: Copy + Eq + IntoBytes + FromBytes + Immutable> UserValue<T> {
     /// Create a UserValue from a raw value provided by userspace.
     pub fn from_raw(raw: T) -> Self {
         Self(raw)
@@ -30,13 +30,13 @@ impl<T: Copy + Eq + AsBytes + FromZeros + FromBytes + NoCell> UserValue<T> {
     }
 }
 
-impl<T: Copy + Eq + AsBytes + FromZeros + FromBytes + NoCell> From<T> for UserValue<T> {
+impl<T: Copy + Eq + IntoBytes + FromBytes + Immutable> From<T> for UserValue<T> {
     fn from(value: T) -> Self {
         Self::from_raw(value)
     }
 }
 
-impl<T: PartialEq<T> + Copy + Eq + AsBytes + FromZeros + FromBytes + NoCell> PartialEq<T>
+impl<T: PartialEq<T> + Copy + Eq + IntoBytes + FromBytes + Immutable> PartialEq<T>
     for UserValue<T>
 {
     fn eq(&self, other: &T) -> bool {

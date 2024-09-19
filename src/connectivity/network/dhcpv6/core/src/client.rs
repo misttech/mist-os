@@ -20,7 +20,7 @@ use std::hash::Hash;
 use std::marker::PhantomData;
 use std::time::Duration;
 use tracing::{debug, info, warn};
-use zerocopy::ByteSlice;
+use zerocopy::SplitByteSlice;
 
 use crate::{ClientDuid, Instant, InstantExt as _};
 
@@ -352,7 +352,7 @@ impl<I: Instant> InformationRequesting<I> {
     /// Handles reply to information requests based on [RFC 8415, Section 18.2.10.4].
     ///
     /// [RFC 8415, Section 18.2.10.4]: https://tools.ietf.org/html/rfc8415#section-18.2.10.4
-    fn reply_message_received<B: ByteSlice>(
+    fn reply_message_received<B: SplitByteSlice>(
         self,
         msg: v6::Message<'_, B>,
         now: I,
@@ -1036,7 +1036,7 @@ impl<V> IaChecker for HashMap<v6::IAID, V> {
 ///
 /// The choice made by this function is (2): an error will be returned in such
 /// cases to inform callers that they should ignore the entire message.
-fn process_options<B: ByteSlice, IaNaChecker: IaChecker, IaPdChecker: IaChecker>(
+fn process_options<B: SplitByteSlice, IaNaChecker: IaChecker, IaPdChecker: IaChecker>(
     msg: &v6::Message<'_, B>,
     exchange_type: ExchangeType,
     want_client_id: Option<&[u8]>,
@@ -1917,7 +1917,7 @@ impl<I: Instant> ServerDiscovery<I> {
         )
     }
 
-    fn advertise_message_received<R: Rng, B: ByteSlice>(
+    fn advertise_message_received<R: Rng, B: SplitByteSlice>(
         self,
         options_to_request: &[v6::OptionCode],
         rng: &mut R,
@@ -2926,7 +2926,7 @@ pub struct IaUpdate<V> {
 // Processes a Reply to Solicit (with fast commit), Request, Renew, or Rebind.
 //
 // If an error is returned, the message should be ignored.
-fn process_reply_with_leases<B: ByteSlice, I: Instant>(
+fn process_reply_with_leases<B: SplitByteSlice, I: Instant>(
     client_id: &[u8],
     server_id: &[u8],
     current_non_temporary_addresses: &HashMap<v6::IAID, AddressEntry<I>>,
@@ -3465,7 +3465,7 @@ impl<I: Instant> Requesting<I> {
         }
     }
 
-    fn reply_message_received<R: Rng, B: ByteSlice>(
+    fn reply_message_received<R: Rng, B: SplitByteSlice>(
         self,
         options_to_request: &[v6::OptionCode],
         rng: &mut R,
@@ -4360,7 +4360,7 @@ impl<I: Instant, const IS_REBINDING: bool> RenewingOrRebinding<I, IS_REBINDING> 
         self.send_and_schedule_retransmission(transaction_id, options_to_request, rng, now)
     }
 
-    fn reply_message_received<R: Rng, B: ByteSlice>(
+    fn reply_message_received<R: Rng, B: SplitByteSlice>(
         self,
         options_to_request: &[v6::OptionCode],
         rng: &mut R,
@@ -4631,7 +4631,7 @@ struct Transition<I> {
 
 impl<I: Instant> ClientState<I> {
     /// Handles a received advertise message.
-    fn advertise_message_received<R: Rng, B: ByteSlice>(
+    fn advertise_message_received<R: Rng, B: SplitByteSlice>(
         self,
         options_to_request: &[v6::OptionCode],
         rng: &mut R,
@@ -4654,7 +4654,7 @@ impl<I: Instant> ClientState<I> {
     }
 
     /// Handles a received reply message.
-    fn reply_message_received<R: Rng, B: ByteSlice>(
+    fn reply_message_received<R: Rng, B: SplitByteSlice>(
         self,
         options_to_request: &[v6::OptionCode],
         rng: &mut R,
@@ -4991,7 +4991,7 @@ impl<I: Instant, R: Rng> ClientStateMachine<I, R> {
     /// # Panics
     ///
     /// `handle_reply` panics if current state is None.
-    pub fn handle_message_receive<B: ByteSlice>(
+    pub fn handle_message_receive<B: SplitByteSlice>(
         &mut self,
         msg: v6::Message<'_, B>,
         now: I,

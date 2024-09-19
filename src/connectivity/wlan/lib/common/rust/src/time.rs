@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use std::ops;
-use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell};
+use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
 
 /// Representation of N IEEE 802.11 TimeUnits.
 /// A TimeUnit is defined as 1024 micro seconds.
@@ -11,10 +11,10 @@ use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell};
 /// and can easily overflow. However, there is usually no need to ever work with TUs > 0xFFFF.
 #[repr(C)]
 #[derive(
-    AsBytes,
-    FromZeros,
+    IntoBytes,
+    KnownLayout,
     FromBytes,
-    NoCell,
+    Immutable,
     Copy,
     Clone,
     Debug,

@@ -11,7 +11,7 @@ use std::collections::BTreeMap;
 use std::fs::File;
 use std::io::Write;
 use tracing::debug;
-use zerocopy::AsBytes;
+use zerocopy::IntoBytes;
 
 use crate::zbi_items::{ZbiBoardInfo, ZbiPlatformId};
 

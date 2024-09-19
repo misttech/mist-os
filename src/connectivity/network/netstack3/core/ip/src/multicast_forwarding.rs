@@ -24,7 +24,7 @@ use netstack3_base::{
     InstantContext, TimerBindingsTypes, TimerContext,
 };
 use packet_formats::ip::IpPacket;
-use zerocopy::ByteSlice;
+use zerocopy::SplitByteSlice;
 
 use crate::internal::multicast_forwarding::packet_queue::QueuePacketOutcome;
 use crate::internal::multicast_forwarding::route::{Action, MulticastRouteTargets};
@@ -111,7 +111,7 @@ pub(crate) fn lookup_multicast_route_or_stash_packet<I, B, CC, BC>(
 ) -> Option<MulticastRouteTargets<CC::DeviceId>>
 where
     I: IpLayerIpExt,
-    B: ByteSlice,
+    B: SplitByteSlice,
     CC: MulticastForwardingStateContext<I, BC> + MulticastForwardingDeviceContext<I>,
     BC: MulticastForwardingBindingsContext,
 {

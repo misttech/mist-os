@@ -10,7 +10,7 @@ use anyhow::{anyhow, Error};
 use futures::TryStreamExt;
 use std::cell::Cell;
 use std::io::{Read, Write};
-use zerocopy::{AsBytes, FromBytes, NoCell};
+use zerocopy::{FromBytes, Immutable, IntoBytes};
 
 /// Wraps a request parsed from a virtqueue.
 ///
@@ -63,9 +63,9 @@ impl<'a, 'b> RequestWrapper<'a, 'b> {
             }
         }
 
-        let header = match T::read_from(&self.header_buf[..]) {
-            Some(header) => header,
-            None => {
+        let header = match T::read_from_bytes(&self.header_buf[..]) {
+            Ok(header) => header,
+            Err(_) => {
                 return Err(anyhow!(
                     "{}: failed to parse header of type {} from {} bytes",
                     self.name,
@@ -420,7 +420,7 @@ impl<'s> PcmStream<'s> {
 /// This trait enables a generic implementation of VIRTIO_SND_R_*_INFO requests.
 /// See 5.14.6.1 Item Information Request
 trait Info {
-    type WireT: AsBytes + NoCell + std::fmt::Debug;
+    type WireT: IntoBytes + Immutable + std::fmt::Debug;
     fn get_info(&self) -> &Self::WireT;
 }
 

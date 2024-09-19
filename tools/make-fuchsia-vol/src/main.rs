@@ -23,7 +23,7 @@ use std::ops::Range;
 use std::os::unix::fs::FileExt;
 use std::process::Command;
 use std::str::FromStr;
-use zerocopy::{AsBytes, NoCell};
+use zerocopy::{Immutable, IntoBytes};
 
 const fn part_type(guid: &'static str) -> PartType {
     PartType { guid, os: OperatingSystem::None }
@@ -924,7 +924,7 @@ fn part_range(disk: &GptDisk<'_>, part_id: u32) -> Range<u64> {
 const MAX_TRIES: u8 = 7;
 const MAX_PRIORITY: u8 = 15;
 
-#[derive(AsBytes, NoCell)]
+#[derive(IntoBytes, Immutable)]
 #[repr(C, packed)]
 #[derive(Default)]
 struct AbrData {
@@ -938,7 +938,7 @@ struct AbrData {
     // A CRC32 comes next.
 }
 
-#[derive(AsBytes, NoCell)]
+#[derive(IntoBytes, Immutable)]
 #[repr(C, packed)]
 #[derive(Default)]
 struct AbrSlotData {

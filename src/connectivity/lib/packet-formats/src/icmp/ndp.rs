@@ -9,7 +9,7 @@ use core::time::Duration;
 
 use net_types::ip::{Ipv6, Ipv6Addr};
 use zerocopy::byteorder::network_endian::{U16, U32};
-use zerocopy::{AsBytes, ByteSlice, FromBytes, FromZeros, NoCell, Unaligned};
+use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout, SplitByteSlice, Unaligned};
 
 use crate::icmp::{IcmpIpExt, IcmpPacket, IcmpPacketRaw, IcmpUnusedCode};
 use crate::utils::NonZeroDuration;
@@ -17,7 +17,7 @@ use crate::utils::NonZeroDuration;
 /// An ICMPv6 packet with an NDP message.
 #[allow(missing_docs)]
 #[derive(Debug)]
-pub enum NdpPacket<B: ByteSlice> {
+pub enum NdpPacket<B: SplitByteSlice> {
     RouterSolicitation(IcmpPacket<Ipv6, B, RouterSolicitation>),
     RouterAdvertisement(IcmpPacket<Ipv6, B, RouterAdvertisement>),
     NeighborSolicitation(IcmpPacket<Ipv6, B, NeighborSolicitation>),
@@ -28,7 +28,7 @@ pub enum NdpPacket<B: ByteSlice> {
 /// A raw ICMPv6 packet with an NDP message.
 #[allow(missing_docs)]
 #[derive(Debug)]
-pub enum NdpPacketRaw<B: ByteSlice> {
+pub enum NdpPacketRaw<B: SplitByteSlice> {
     RouterSolicitation(IcmpPacketRaw<Ipv6, B, RouterSolicitation>),
     RouterAdvertisement(IcmpPacketRaw<Ipv6, B, RouterAdvertisement>),
     NeighborSolicitation(IcmpPacketRaw<Ipv6, B, NeighborSolicitation>),
@@ -106,7 +106,17 @@ pub type OptionSequenceBuilder<'a, I> =
 
 /// An NDP Router Solicitation.
 #[derive(
-    Copy, Clone, Default, Debug, FromZeros, FromBytes, AsBytes, NoCell, Unaligned, PartialEq, Eq,
+    Copy,
+    Clone,
+    Default,
+    Debug,
+    KnownLayout,
+    FromBytes,
+    IntoBytes,
+    Immutable,
+    Unaligned,
+    PartialEq,
+    Eq,
 )]
 #[repr(C)]
 pub struct RouterSolicitation {
@@ -188,7 +198,9 @@ impl TryFrom<u8> for RoutePreference {
 }
 
 /// An NDP Router Advertisement.
-#[derive(Copy, Clone, Debug, FromZeros, FromBytes, AsBytes, NoCell, Unaligned, PartialEq, Eq)]
+#[derive(
+    Copy, Clone, Debug, KnownLayout, FromBytes, IntoBytes, Immutable, Unaligned, PartialEq, Eq,
+)]
 #[repr(C)]
 pub struct RouterAdvertisement {
     current_hop_limit: u8,
@@ -334,7 +346,9 @@ impl RouterAdvertisement {
 }
 
 /// An NDP Neighbor Solicitation.
-#[derive(Copy, Clone, Debug, FromZeros, FromBytes, AsBytes, NoCell, Unaligned, PartialEq, Eq)]
+#[derive(
+    Copy, Clone, Debug, KnownLayout, FromBytes, IntoBytes, Immutable, Unaligned, PartialEq, Eq,
+)]
 #[repr(C)]
 pub struct NeighborSolicitation {
     _reserved: [u8; 4],
@@ -357,7 +371,9 @@ impl NeighborSolicitation {
 }
 
 /// An NDP Neighbor Advertisement.
-#[derive(Copy, Clone, Debug, FromZeros, FromBytes, AsBytes, NoCell, Unaligned, PartialEq, Eq)]
+#[derive(
+    Copy, Clone, Debug, KnownLayout, FromBytes, IntoBytes, Immutable, Unaligned, PartialEq, Eq,
+)]
 #[repr(C)]
 pub struct NeighborAdvertisement {
     flags_rso: u8,
@@ -443,7 +459,9 @@ impl NeighborAdvertisement {
 }
 
 /// An ICMPv6 Redirect Message.
-#[derive(Copy, Clone, Debug, FromZeros, FromBytes, AsBytes, NoCell, Unaligned, PartialEq, Eq)]
+#[derive(
+    Copy, Clone, Debug, KnownLayout, FromBytes, IntoBytes, Immutable, Unaligned, PartialEq, Eq,
+)]
 #[repr(C)]
 pub struct Redirect {
     _reserved: [u8; 4],
@@ -467,7 +485,7 @@ pub mod options {
     };
     use packet::BufferView as _;
     use zerocopy::byteorder::network_endian::U32;
-    use zerocopy::{AsBytes, ByteSlice, FromBytes, FromZeros, NoCell, Ref, Unaligned};
+    use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout, Ref, SplitByteSlice, Unaligned};
 
     use super::NonZeroNdpLifetime;
     use crate::utils::NonZeroDuration;
@@ -607,7 +625,7 @@ pub mod options {
     /// ```
     ///
     /// [RFC 4191 section 2.3]: https://datatracker.ietf.org/doc/html/rfc4191#section-2.3
-    #[derive(FromZeros, FromBytes, AsBytes, NoCell, Unaligned)]
+    #[derive(KnownLayout, FromBytes, IntoBytes, Immutable, Unaligned)]
     #[repr(C)]
     struct RouteInformationHeader {
         prefix_length: u8,
@@ -709,7 +727,7 @@ pub mod options {
         }
 
         fn serialize(&self, buffer: &mut [u8]) {
-            let (mut hdr, buffer) = Ref::<_, RouteInformationHeader>::new_from_prefix(buffer)
+            let (mut hdr, buffer) = Ref::<_, RouteInformationHeader>::from_prefix(buffer)
                 .expect("expected buffer to hold enough bytes for serialization");
 
             let prefix_bytes_len = self.prefix_bytes_len();
@@ -736,7 +754,9 @@ pub mod options {
     /// See [RFC 4861 section 4.6.2].
     ///
     /// [RFC 4861 section 4.6.2]: https://tools.ietf.org/html/rfc4861#section-4.6.2
-    #[derive(Debug, FromZeros, FromBytes, AsBytes, NoCell, Unaligned, PartialEq, Eq, Clone)]
+    #[derive(
+        Debug, KnownLayout, FromBytes, IntoBytes, Immutable, Unaligned, PartialEq, Eq, Clone,
+    )]
     #[repr(C)]
     pub struct PrefixInformation {
         prefix_length: u8,
@@ -868,18 +888,18 @@ pub mod options {
     ///
     /// [RFC 3971 section 5.3.2]: https://tools.ietf.org/html/rfc3971#section-5.3.2
     #[derive(Debug, PartialEq, Eq, Copy, Clone, PartialOrd, Ord)]
-    pub struct NdpNonce<B: ByteSlice> {
+    pub struct NdpNonce<B: SplitByteSlice> {
         nonce: B,
     }
 
-    impl<B: ByteSlice> NdpNonce<B> {
+    impl<B: SplitByteSlice> NdpNonce<B> {
         /// The bytes of the nonce.
         pub fn bytes(&self) -> &[u8] {
             let Self { nonce } = self;
             nonce.deref()
         }
 
-        /// Constructs an `NdpNonce` from a `B: ByteSlice`, returning an error
+        /// Constructs an `NdpNonce` from a `B: SplitByteSlice`, returning an error
         /// if the resulting nonce would not have a valid length.
         pub fn new(value: B) -> Result<Self, InvalidNonceError> {
             let bytes = value.deref();
@@ -904,7 +924,7 @@ pub mod options {
         }
     }
 
-    impl<B: ByteSlice> AsRef<[u8]> for NdpNonce<B> {
+    impl<B: SplitByteSlice> AsRef<[u8]> for NdpNonce<B> {
         fn as_ref(&self) -> &[u8] {
             self.bytes()
         }
@@ -1007,8 +1027,9 @@ pub mod options {
                 NdpOptionType::SourceLinkLayerAddress => NdpOption::SourceLinkLayerAddress(data),
                 NdpOptionType::TargetLinkLayerAddress => NdpOption::TargetLinkLayerAddress(data),
                 NdpOptionType::PrefixInformation => {
-                    let data = Ref::<_, PrefixInformation>::new(data).ok_or(OptionParseErr)?;
-                    NdpOption::PrefixInformation(data.into_ref())
+                    let data = Ref::<_, PrefixInformation>::from_bytes(data)
+                        .map_err(|_| OptionParseErr)?;
+                    NdpOption::PrefixInformation(Ref::into_ref(data))
                 }
                 NdpOptionType::RedirectedHeader => NdpOption::RedirectedHeader {
                     original_packet: &data[REDIRECTED_HEADER_OPTION_RESERVED_BYTES_LENGTH..],
@@ -1032,13 +1053,14 @@ pub mod options {
                     // As per RFC 8106 section 5.1, the 32 bit lifetime field immediately
                     // follows the reserved field.
                     let (lifetime, data) =
-                        Ref::<_, U32>::new_from_prefix(data).ok_or(OptionParseErr)?;
+                        Ref::<_, U32>::from_prefix(data).map_err(|_| OptionParseErr)?;
 
                     // As per RFC 8106 section 5.1, the list of addresses immediately
                     // follows the lifetime field.
-                    let addresses = Ref::<_, [Ipv6Addr]>::new_slice_unaligned(data)
-                        .ok_or(OptionParseErr)?
-                        .into_slice();
+                    let addresses = Ref::into_ref(
+                        Ref::<_, [Ipv6Addr]>::unaligned_from_bytes(data)
+                            .map_err(|_| OptionParseErr)?,
+                    );
 
                     // As per RFC 8106 section 5.3.1, the addresses should all be unicast.
                     if !addresses.iter().all(UnicastAddress::is_unicast) {
@@ -1053,7 +1075,7 @@ pub mod options {
                 NdpOptionType::RouteInformation => {
                     // RouteInfoFixed represents the part of the RouteInformation option
                     // with a known and fixed length. See RFC 4191 section 2.3.
-                    #[derive(FromZeros, FromBytes, NoCell, Unaligned)]
+                    #[derive(KnownLayout, FromBytes, Immutable, Unaligned)]
                     #[repr(C)]
                     struct RouteInfoFixed {
                         prefix_length: u8,
@@ -1756,14 +1778,12 @@ mod tests {
             expected[5] |= 1 << 6;
         }
         expected[5] |= u8::from(preference) << 3;
-        let (mut router_lifetime, _rest) =
-            Ref::<_, U16>::new_from_prefix(&mut expected[6..]).unwrap();
+        let (mut router_lifetime, _rest) = Ref::<_, U16>::from_prefix(&mut expected[6..]).unwrap();
         router_lifetime.set(router_lifetime_seconds);
-        let (mut reachable_time, _rest) =
-            Ref::<_, U32>::new_from_prefix(&mut expected[8..]).unwrap();
+        let (mut reachable_time, _rest) = Ref::<_, U32>::from_prefix(&mut expected[8..]).unwrap();
         reachable_time.set(reachable_time_seconds);
         let (mut retransmit_timer, _rest) =
-            Ref::<_, U32>::new_from_prefix(&mut expected[12..]).unwrap();
+            Ref::<_, U32>::from_prefix(&mut expected[12..]).unwrap();
         retransmit_timer.set(retransmit_timer_seconds);
 
         let mut c = internet_checksum::Checksum::new();
@@ -1886,8 +1906,7 @@ mod tests {
         expected[1] = expected_option_length / 8;
         expected[2] = prefix_length;
         expected[3] = u8::from(preference) << 3;
-        let (mut lifetime_seconds, _rest) =
-            Ref::<_, U32>::new_from_prefix(&mut expected[4..]).unwrap();
+        let (mut lifetime_seconds, _rest) = Ref::<_, U32>::from_prefix(&mut expected[4..]).unwrap();
         lifetime_seconds.set(route_lifetime_seconds);
         expected[8..].copy_from_slice(prefix.bytes());
 

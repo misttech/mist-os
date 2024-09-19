@@ -5,10 +5,10 @@
 use crate::big_endian::BigEndianU16;
 use crate::buffer_reader::BufferReader;
 use crate::mac::{round_up, MacAddr};
-use zerocopy::{AsBytes, ByteSlice, FromBytes, FromZeros, NoCell, Ref, Unaligned};
+use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout, Ref, SplitByteSlice, Unaligned};
 
 // IEEE Std 802.11-2016, 9.3.2.2.2
-#[derive(FromZeros, FromBytes, AsBytes, NoCell, Unaligned)]
+#[derive(KnownLayout, FromBytes, IntoBytes, Immutable, Unaligned)]
 #[repr(C, packed)]
 pub struct AmsduSubframeHdr {
     // Note this is the same as the IEEE 802.3 frame format.
@@ -26,7 +26,7 @@ pub struct AmsduSubframe<B> {
 /// successful. Parsing is only successful if the byte stream starts with a valid subframe.
 /// TODO(https://fxbug.dev/42104386): The received AMSDU should not be greater than `max_amsdu_len`, specified in
 /// HtCapabilities IE of Association. Warn or discard if violated.
-impl<B: ByteSlice> AmsduSubframe<B> {
+impl<B: SplitByteSlice> AmsduSubframe<B> {
     pub fn parse(buffer_reader: &mut BufferReader<B>) -> Option<Self> {
         let hdr = buffer_reader.read::<AmsduSubframeHdr>()?;
         let msdu_len = hdr.msdu_len.to_native() as usize;
@@ -66,8 +66,14 @@ mod tests {
             mac::DataFrame::parse(bytes.as_slice(), false)
                 .expect("failed to parse aggregated data frame"),
             [
-                mac::LlcFrame { hdr: Ref::new(MSDU_1_LLC_HDR).unwrap(), body: MSDU_1_PAYLOAD },
-                mac::LlcFrame { hdr: Ref::new(MSDU_2_LLC_HDR).unwrap(), body: MSDU_2_PAYLOAD },
+                mac::LlcFrame {
+                    hdr: Ref::from_bytes(MSDU_1_LLC_HDR).unwrap(),
+                    body: MSDU_1_PAYLOAD,
+                },
+                mac::LlcFrame {
+                    hdr: Ref::from_bytes(MSDU_2_LLC_HDR).unwrap(),
+                    body: MSDU_2_PAYLOAD,
+                },
             ],
         );
     }
@@ -78,7 +84,7 @@ mod tests {
         data::harness::assert_msdus_llc_frame_eq(
             mac::DataFrame::parse(bytes.as_slice(), false)
                 .expect("failed to parse aggregated data frame"),
-            [mac::LlcFrame { hdr: Ref::new(MSDU_1_LLC_HDR).unwrap(), body: MSDU_1_PAYLOAD }],
+            [mac::LlcFrame { hdr: Ref::from_bytes(MSDU_1_LLC_HDR).unwrap(), body: MSDU_1_PAYLOAD }],
         );
     }
 }

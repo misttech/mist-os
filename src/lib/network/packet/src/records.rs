@@ -23,7 +23,7 @@ use core::convert::Infallible as Never;
 use core::marker::PhantomData;
 use core::ops::Deref;
 
-use zerocopy::ByteSlice;
+use zerocopy::SplitByteSlice;
 
 use crate::serialize::InnerPacketBuilder;
 use crate::util::{FromRaw, MaybeParsed};
@@ -101,7 +101,7 @@ where
 impl<B, R> RecordsRaw<B, R>
 where
     R: for<'a> RecordsRawImpl<'a>,
-    B: ByteSlice,
+    B: SplitByteSlice,
 {
     /// Raw-parses a sequence of records with a context.
     ///
@@ -162,7 +162,7 @@ where
 impl<B, R> RecordsRaw<B, R>
 where
     R: for<'a> RecordsRawImpl<'a> + RecordsImplLayout<Context = ()>,
-    B: ByteSlice,
+    B: SplitByteSlice,
 {
     /// Raw-parses a sequence of records.
     ///
@@ -175,7 +175,7 @@ where
 
 impl<B, R> Deref for RecordsRaw<B, R>
 where
-    B: ByteSlice,
+    B: SplitByteSlice,
     R: RecordsImplLayout,
 {
     type Target = [u8];
@@ -664,7 +664,7 @@ fn align_up_to(offset: usize, x: usize, y: usize) -> usize {
 
 impl<B, R> Records<B, R>
 where
-    B: ByteSlice,
+    B: SplitByteSlice,
     R: for<'a> RecordsImpl<'a>,
 {
     /// Parses a sequence of records with a context.
@@ -715,7 +715,7 @@ where
 
 impl<B, R> Records<B, R>
 where
-    B: ByteSlice,
+    B: SplitByteSlice,
     R: for<'a> RecordsImpl<'a, Context = ()>,
 {
     /// Parses a sequence of records.
@@ -731,7 +731,7 @@ where
 impl<B, R> FromRaw<RecordsRaw<B, R>, ()> for Records<B, R>
 where
     for<'a> R: RecordsImpl<'a>,
-    B: ByteSlice,
+    B: SplitByteSlice,
 {
     type Error = R::Error;
 
@@ -754,7 +754,7 @@ where
 
 impl<'a, B, R> Records<B, R>
 where
-    B: 'a + ByteSlice,
+    B: 'a + SplitByteSlice,
     R: RecordsImpl<'a>,
 {
     /// Iterates over options.
@@ -905,7 +905,7 @@ impl<'a> BufferView<&'a [u8]> for LongLivedBuff<'a> {
 #[cfg(test)]
 mod tests {
     use test_case::test_case;
-    use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell, Ref, Unaligned};
+    use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout, Ref, Unaligned};
 
     use super::*;
 
@@ -917,10 +917,10 @@ mod tests {
     fn get_empty_tuple_mut_ref<'a>() -> &'a mut () {
         // This is a hack since `&mut ()` is invalid.
         let bytes: &mut [u8] = &mut [];
-        zerocopy::Ref::<_, ()>::new_unaligned(bytes).unwrap().into_mut()
+        zerocopy::Ref::into_mut(zerocopy::Ref::<_, ()>::unaligned_from_bytes(bytes).unwrap())
     }
 
-    #[derive(Debug, AsBytes, FromZeros, FromBytes, NoCell, Unaligned)]
+    #[derive(Debug, IntoBytes, KnownLayout, FromBytes, Immutable, Unaligned)]
     #[repr(C)]
     struct DummyRecord {
         a: [u8; 2],
@@ -1162,7 +1162,7 @@ mod tests {
         assert_eq!(rec.b, 0x03);
     }
 
-    fn validate_parsed_stateful_context_records<B: ByteSlice>(
+    fn validate_parsed_stateful_context_records<B: SplitByteSlice>(
         records: Records<B, StatefulContextRecordImpl>,
         context: StatefulContext,
     ) {
@@ -1340,7 +1340,7 @@ pub mod options {
 
     use const_unwrap::const_unwrap_option;
     use zerocopy::byteorder::ByteOrder;
-    use zerocopy::{AsBytes, FromBytes, NoCell, Unaligned};
+    use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout, Unaligned};
 
     use super::*;
 
@@ -1547,8 +1547,9 @@ pub mod options {
     /// See the docs for [`OptionLayout::KindLenField`] for more information.
     pub trait KindLenField:
         FromBytes
-        + AsBytes
-        + NoCell
+        + IntoBytes
+        + KnownLayout
+        + Immutable
         + Unaligned
         + Into<usize>
         + TryFrom<usize, Error = TryFromIntError>

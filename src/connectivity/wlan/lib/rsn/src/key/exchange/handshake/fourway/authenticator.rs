@@ -20,7 +20,7 @@ use crate::Error;
 use anyhow::{ensure, format_err};
 use std::fmt;
 use tracing::{error, warn};
-use zerocopy::ByteSlice;
+use zerocopy::SplitByteSlice;
 
 #[derive(Debug, PartialEq)]
 pub enum State {
@@ -95,7 +95,7 @@ impl State {
         }
     }
 
-    pub fn on_eapol_key_frame<B: ByteSlice>(
+    pub fn on_eapol_key_frame<B: SplitByteSlice>(
         self,
         update_sink: &mut UpdateSink,
         frame: FourwayHandshakeFrame<B>,
@@ -211,7 +211,7 @@ fn initiate_internal(
     Ok(())
 }
 
-fn process_message_2<B: ByteSlice>(
+fn process_message_2<B: SplitByteSlice>(
     update_sink: &mut UpdateSink,
     pmk: &[u8],
     cfg: &Config,
@@ -270,7 +270,7 @@ fn process_message_2<B: ByteSlice>(
     Ok((ptk, gtk, igtk, key_replay_counter))
 }
 
-fn process_message_4<B: ByteSlice>(
+fn process_message_4<B: SplitByteSlice>(
     update_sink: &mut UpdateSink,
     cfg: &Config,
     ptk: &Ptk,
@@ -289,7 +289,7 @@ fn process_message_4<B: ByteSlice>(
 }
 
 // IEEE Std 802.11-2016, 12.7.6.2
-fn create_message_1<B: ByteSlice>(
+fn create_message_1<B: SplitByteSlice>(
     anonce: B,
     protection: &NegotiatedProtection,
     key_replay_counter: AuthenticatorKeyReplayCounter,
@@ -329,7 +329,7 @@ fn create_message_1<B: ByteSlice>(
 }
 
 // IEEE Std 802.11-2016, 12.7.6.3
-pub fn handle_message_2<B: ByteSlice>(
+pub fn handle_message_2<B: SplitByteSlice>(
     pmk: &[u8],
     cfg: &Config,
     anonce: &[u8],
@@ -443,7 +443,7 @@ fn create_message_3(
 }
 
 // IEEE Std 802.11-2016, 12.7.6.5
-pub fn handle_message_4<B: ByteSlice>(
+pub fn handle_message_4<B: SplitByteSlice>(
     cfg: &Config,
     kck: &[u8],
     key_replay_counter: AuthenticatorKeyReplayCounter,

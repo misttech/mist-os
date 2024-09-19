@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use num_traits::FromPrimitive;
-use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell, Ref};
+use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout, Ref};
 
 #[repr(u8)]
 #[derive(num_derive::FromPrimitive)]
@@ -27,7 +27,7 @@ pub enum DescriptorType {
 }
 
 #[repr(C, packed)]
-#[derive(AsBytes, FromZeros, FromBytes, NoCell)]
+#[derive(IntoBytes, KnownLayout, FromBytes, Immutable)]
 pub struct DeviceDescriptor {
     pub b_length: u8,
     pub b_descriptor_type: u8,
@@ -46,7 +46,7 @@ pub struct DeviceDescriptor {
 }
 
 #[repr(C, packed)]
-#[derive(AsBytes, FromZeros, FromBytes, NoCell)]
+#[derive(IntoBytes, KnownLayout, FromBytes, Immutable)]
 pub struct ConfigurationDescriptor {
     pub b_length: u8,
     pub b_descriptor_type: u8,
@@ -59,7 +59,7 @@ pub struct ConfigurationDescriptor {
 }
 
 #[repr(C, packed)]
-#[derive(AsBytes, FromZeros, FromBytes, NoCell)]
+#[derive(IntoBytes, KnownLayout, FromBytes, Immutable)]
 pub struct InterfaceInfoDescriptor {
     pub b_length: u8,
     pub b_descriptor_type: u8,
@@ -73,7 +73,7 @@ pub struct InterfaceInfoDescriptor {
 }
 
 #[repr(C, packed)]
-#[derive(AsBytes, FromZeros, FromBytes, NoCell)]
+#[derive(IntoBytes, KnownLayout, FromBytes, Immutable)]
 pub struct EndpointInfoDescriptor {
     pub b_length: u8,
     pub b_descriptor_type: u8,
@@ -84,7 +84,7 @@ pub struct EndpointInfoDescriptor {
 }
 
 #[repr(C, packed)]
-#[derive(AsBytes, FromZeros, FromBytes, NoCell)]
+#[derive(IntoBytes, KnownLayout, FromBytes, Immutable)]
 pub struct HidDescriptor {
     pub b_length: u8,
     pub b_descriptor_type: u8,
@@ -94,7 +94,7 @@ pub struct HidDescriptor {
 }
 
 #[repr(C, packed)]
-#[derive(AsBytes, FromZeros, FromBytes, NoCell)]
+#[derive(IntoBytes, KnownLayout, FromBytes, Immutable)]
 pub struct SsEpCompDescriptorInfo {
     pub b_length: u8,
     pub b_descriptor_type: u8,
@@ -104,7 +104,7 @@ pub struct SsEpCompDescriptorInfo {
 }
 
 #[repr(C, packed)]
-#[derive(AsBytes, FromZeros, FromBytes, NoCell)]
+#[derive(IntoBytes, KnownLayout, FromBytes, Immutable)]
 pub struct SsIsochEpCompDescriptor {
     pub b_length: u8,
     pub b_descriptor_type: u8,
@@ -113,7 +113,7 @@ pub struct SsIsochEpCompDescriptor {
 }
 
 #[repr(C, packed)]
-#[derive(AsBytes, FromZeros, FromBytes, NoCell)]
+#[derive(IntoBytes, KnownLayout, FromBytes, Immutable)]
 pub struct InterfaceAssocDescriptor {
     pub b_length: u8,
     pub b_descriptor_type: u8,
@@ -126,7 +126,7 @@ pub struct InterfaceAssocDescriptor {
 }
 
 #[repr(C, packed)]
-#[derive(AsBytes, FromZeros, FromBytes, NoCell)]
+#[derive(IntoBytes, KnownLayout, FromBytes, Immutable)]
 pub struct HidDescriptorEntry {
     pub b_descriptor_type: u8,
     pub w_descriptor_length: u16,
@@ -154,7 +154,7 @@ impl<'a> HidDescriptorIter<'a> {
     }
 
     pub fn get(&self) -> Ref<&[u8], HidDescriptor> {
-        Ref::new(&self.buffer[0..(std::mem::size_of::<HidDescriptor>())]).unwrap()
+        Ref::from_bytes(&self.buffer[0..(std::mem::size_of::<HidDescriptor>())]).unwrap()
     }
 }
 
@@ -169,7 +169,7 @@ impl<'a> Iterator for HidDescriptorIter<'a> {
         let slice = &self.buffer[self.offset..self.offset + len];
         self.offset += len;
 
-        Ref::new(slice)
+        Ref::from_bytes(slice).ok()
     }
 }
 
@@ -202,9 +202,15 @@ impl<'a> Iterator for DescriptorIterator<'a> {
         let slice = &self.buffer[self.offset..self.offset + length];
 
         let desc = match DescriptorType::from_u8(desc_type) {
-            Some(DescriptorType::Config) => Ref::new(slice).map(|d| Descriptor::Config(d)),
-            Some(DescriptorType::Interface) => Ref::new(slice).map(|d| Descriptor::Interface(d)),
-            Some(DescriptorType::Endpoint) => Ref::new(slice).map(|d| Descriptor::Endpoint(d)),
+            Some(DescriptorType::Config) => {
+                Ref::from_bytes(slice).map(|d| Descriptor::Config(d)).ok()
+            }
+            Some(DescriptorType::Interface) => {
+                Ref::from_bytes(slice).map(|d| Descriptor::Interface(d)).ok()
+            }
+            Some(DescriptorType::Endpoint) => {
+                Ref::from_bytes(slice).map(|d| Descriptor::Endpoint(d)).ok()
+            }
             Some(DescriptorType::Hid) => {
                 if length < std::mem::size_of::<HidDescriptor>() {
                     None
@@ -215,13 +221,13 @@ impl<'a> Iterator for DescriptorIterator<'a> {
                 }
             }
             Some(DescriptorType::SsEpCompanion) => {
-                Ref::new(slice).map(|d| Descriptor::SsEpCompanion(d))
+                Ref::from_bytes(slice).map(|d| Descriptor::SsEpCompanion(d)).ok()
             }
             Some(DescriptorType::SsIsochEpCompanion) => {
-                Ref::new(slice).map(|d| Descriptor::SsIsochEpCompanion(d))
+                Ref::from_bytes(slice).map(|d| Descriptor::SsIsochEpCompanion(d)).ok()
             }
             Some(DescriptorType::InterfaceAssociation) => {
-                Ref::new(slice).map(|d| Descriptor::InterfaceAssociation(d))
+                Ref::from_bytes(slice).map(|d| Descriptor::InterfaceAssociation(d)).ok()
             }
             _ => Some(Descriptor::Unknown(slice)),
         };

@@ -33,7 +33,7 @@ use packet_formats::ip::IpPacket as _;
 use packet_formats::ipv4::{Ipv4FragmentType, Ipv4Header as _, Ipv4Packet};
 use packet_formats::ipv6::Ipv6Packet;
 use packet_formats::utils::NonZeroDuration;
-use zerocopy::ByteSlice;
+use zerocopy::SplitByteSlice;
 
 pub(crate) mod api;
 
@@ -1847,13 +1847,13 @@ pub trait NudIcmpIpExt: packet_formats::ip::IpExt {
     type Metadata;
 
     /// Extracts IP-version specific metadata from `packet`.
-    fn extract_metadata<B: ByteSlice>(packet: &Self::Packet<B>) -> Self::Metadata;
+    fn extract_metadata<B: SplitByteSlice>(packet: &Self::Packet<B>) -> Self::Metadata;
 }
 
 impl NudIcmpIpExt for Ipv4 {
     type Metadata = (usize, Ipv4FragmentType);
 
-    fn extract_metadata<B: ByteSlice>(packet: &Ipv4Packet<B>) -> Self::Metadata {
+    fn extract_metadata<B: SplitByteSlice>(packet: &Ipv4Packet<B>) -> Self::Metadata {
         (packet.header_len(), packet.fragment_type())
     }
 }
@@ -1861,7 +1861,7 @@ impl NudIcmpIpExt for Ipv4 {
 impl NudIcmpIpExt for Ipv6 {
     type Metadata = ();
 
-    fn extract_metadata<B: ByteSlice>(_: &Ipv6Packet<B>) -> () {}
+    fn extract_metadata<B: SplitByteSlice>(_: &Ipv6Packet<B>) -> () {}
 }
 
 /// The execution context which allows sending ICMP destination unreachable

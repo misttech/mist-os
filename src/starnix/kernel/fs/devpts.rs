@@ -938,7 +938,7 @@ mod tests {
     use starnix_uapi::file_mode::{AccessCheck, FileMode};
     use starnix_uapi::signals::{SIGCHLD, SIGTTOU};
 
-    fn ioctl<T: zerocopy::AsBytes + zerocopy::FromBytes + zerocopy::NoCell + Copy>(
+    fn ioctl<T: zerocopy::IntoBytes + zerocopy::FromBytes + zerocopy::Immutable + Copy>(
         locked: &mut Locked<'_, Unlocked>,
         current_task: &CurrentTask,
         file: &FileHandle,

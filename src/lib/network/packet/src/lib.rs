@@ -403,7 +403,10 @@ use std::convert::Infallible as Never;
 use std::ops::{Bound, Range, RangeBounds};
 use std::{cmp, mem};
 
-use zerocopy::{AsBytes, ByteSlice, ByteSliceMut, FromBytes, NoCell, Ref, Unaligned};
+use zerocopy::{
+    FromBytes, FromZeros as _, Immutable, IntoBytes, KnownLayout, Ref, SplitByteSlice,
+    SplitByteSliceMut, Unaligned,
+};
 
 /// A buffer that may be fragmented in multiple parts which are discontiguous in
 /// memory.
@@ -1196,7 +1199,7 @@ impl GrowBufferMut for Never {
 ///
 /// `BufferView` is implemented for mutable references to byte slices (`&mut
 /// &[u8]` and `&mut &mut [u8]`).
-pub trait BufferView<B: ByteSlice>: Sized + AsRef<[u8]> {
+pub trait BufferView<B: SplitByteSlice>: Sized + AsRef<[u8]> {
     /// The length of the buffer's body.
     fn len(&self) -> usize {
         self.as_ref().len()
@@ -1279,9 +1282,9 @@ pub trait BufferView<B: ByteSlice>: Sized + AsRef<[u8]> {
     /// `size_of::<T>()` bytes in length, `peek_obj_front` returns `None`.
     fn peek_obj_front<T>(&mut self) -> Option<&T>
     where
-        T: FromBytes + NoCell + Unaligned,
+        T: FromBytes + KnownLayout + Immutable + Unaligned,
     {
-        Some(Ref::<_, T>::new_unaligned_from_prefix((&*self).as_ref())?.0.into_ref())
+        Some(Ref::into_ref(Ref::<_, T>::unaligned_from_prefix((&*self).as_ref()).ok()?.0))
     }
 
     /// Takes an object from the front of the buffer's body.
@@ -1294,11 +1297,11 @@ pub trait BufferView<B: ByteSlice>: Sized + AsRef<[u8]> {
     /// `take_obj_front` returns `None`.
     fn take_obj_front<T>(&mut self) -> Option<Ref<B, T>>
     where
-        T: Unaligned,
+        T: KnownLayout + Immutable + Unaligned,
     {
         let bytes = self.take_front(mem::size_of::<T>())?;
-        // new_unaligned only returns None if there aren't enough bytes
-        Some(Ref::new_unaligned(bytes).unwrap())
+        // unaligned_from_bytes only returns None if there aren't enough bytes
+        Some(Ref::unaligned_from_bytes(bytes).unwrap())
     }
 
     /// Takes a slice of objects from the front of the buffer's body.
@@ -1315,12 +1318,12 @@ pub trait BufferView<B: ByteSlice>: Sized + AsRef<[u8]> {
     /// Panics if `T` is a zero-sized type.
     fn take_slice_front<T>(&mut self, n: usize) -> Option<Ref<B, [T]>>
     where
-        T: Unaligned,
+        T: Immutable + Unaligned,
     {
         let bytes = self.take_front(n * mem::size_of::<T>())?;
-        // `new_slice_unaligned` will return `None` only if `bytes.len()` is
+        // `unaligned_from_bytes` will return `None` only if `bytes.len()` is
         // not a multiple of `mem::size_of::<T>()`.
-        Some(Ref::new_slice_unaligned(bytes).unwrap())
+        Some(Ref::unaligned_from_bytes(bytes).unwrap())
     }
 
     /// Peeks at an object at the back of the buffer's body.
@@ -1331,9 +1334,9 @@ pub trait BufferView<B: ByteSlice>: Sized + AsRef<[u8]> {
     /// `size_of::<T>()` bytes in length, `peek_obj_back` returns `None`.
     fn peek_obj_back<T>(&mut self) -> Option<&T>
     where
-        T: FromBytes + NoCell + Unaligned,
+        T: FromBytes + KnownLayout + Immutable + Unaligned,
     {
-        Some(Ref::<_, T>::new_unaligned_from_suffix((&*self).as_ref())?.1.into_ref())
+        Some(Ref::into_ref(Ref::<_, T>::unaligned_from_suffix((&*self).as_ref()).ok()?.1))
     }
 
     /// Takes an object from the back of the buffer's body.
@@ -1346,11 +1349,11 @@ pub trait BufferView<B: ByteSlice>: Sized + AsRef<[u8]> {
     /// `take_obj_back` returns `None`.
     fn take_obj_back<T>(&mut self) -> Option<Ref<B, T>>
     where
-        T: Unaligned,
+        T: Immutable + KnownLayout + Unaligned,
     {
         let bytes = self.take_back(mem::size_of::<T>())?;
-        // new_unaligned only returns None if there aren't enough bytes
-        Some(Ref::new_unaligned(bytes).unwrap())
+        // unaligned_from_bytes only returns None if there aren't enough bytes
+        Some(Ref::unaligned_from_bytes(bytes).unwrap())
     }
 
     /// Takes a slice of objects from the back of the buffer's body.
@@ -1367,12 +1370,12 @@ pub trait BufferView<B: ByteSlice>: Sized + AsRef<[u8]> {
     /// Panics if `T` is a zero-sized type.
     fn take_slice_back<T>(&mut self, n: usize) -> Option<Ref<B, [T]>>
     where
-        T: Unaligned,
+        T: Immutable + Unaligned,
     {
         let bytes = self.take_back(n * mem::size_of::<T>())?;
-        // `new_slice_unaligned` will return `None` only if `bytes.len()` is
+        // `unaligned_from_bytes` will return `None` only if `bytes.len()` is
         // not a multiple of `mem::size_of::<T>()`.
-        Some(Ref::new_slice_unaligned(bytes).unwrap())
+        Some(Ref::unaligned_from_bytes(bytes).unwrap())
     }
 }
 
@@ -1384,7 +1387,7 @@ pub trait BufferView<B: ByteSlice>: Sized + AsRef<[u8]> {
 /// # Notable implementations
 ///
 /// `BufferViewMut` is implemented for `&mut &mut [u8]`.
-pub trait BufferViewMut<B: ByteSliceMut>: BufferView<B> + AsMut<[u8]> {
+pub trait BufferViewMut<B: SplitByteSliceMut>: BufferView<B> + AsMut<[u8]> {
     /// Takes `n` bytes from the front of the buffer's body and zeroes them.
     ///
     /// `take_front_zero` is like [`BufferView::take_front`], except that it
@@ -1453,11 +1456,13 @@ pub trait BufferViewMut<B: ByteSliceMut>: BufferView<B> + AsMut<[u8]> {
     /// previously stored in the buffer are not leaked.
     fn take_obj_front_zero<T>(&mut self) -> Option<Ref<B, T>>
     where
-        T: Unaligned,
+        T: KnownLayout + Immutable + Unaligned,
     {
         let bytes = self.take_front(mem::size_of::<T>())?;
-        // new_unaligned_zeroed only returns None if there aren't enough bytes
-        Some(Ref::new_unaligned_zeroed(bytes).unwrap())
+        // unaligned_from_bytes only returns None if there aren't enough bytes
+        let mut obj: Ref<_, _> = Ref::unaligned_from_bytes(bytes).unwrap();
+        Ref::bytes_mut(&mut obj).zero();
+        Some(obj)
     }
 
     /// Takes an object from the back of the buffer's body and zeroes it.
@@ -1468,11 +1473,13 @@ pub trait BufferViewMut<B: ByteSliceMut>: BufferView<B> + AsMut<[u8]> {
     /// stored in the buffer are not leaked.
     fn take_obj_back_zero<T>(&mut self) -> Option<Ref<B, T>>
     where
-        T: Unaligned,
+        T: KnownLayout + Immutable + Unaligned,
     {
         let bytes = self.take_back(mem::size_of::<T>())?;
-        // new_unaligned_zeroed only returns None if there aren't enough bytes
-        Some(Ref::new_unaligned_zeroed(bytes).unwrap())
+        // unaligned_from_bytes only returns None if there aren't enough bytes
+        let mut obj: Ref<_, _> = Ref::unaligned_from_bytes(bytes).unwrap();
+        Ref::bytes_mut(&mut obj).zero();
+        Some(obj)
     }
 
     /// Writes an object to the front of the buffer's body, consuming the bytes.
@@ -1485,7 +1492,7 @@ pub trait BufferViewMut<B: ByteSliceMut>: BufferView<B> + AsMut<[u8]> {
     /// length, `write_obj_front` returns `None`.
     fn write_obj_front<T>(&mut self, obj: &T) -> Option<()>
     where
-        T: ?Sized + AsBytes + NoCell,
+        T: ?Sized + IntoBytes + Immutable,
     {
         let mut bytes = self.take_front(mem::size_of_val(obj))?;
         bytes.copy_from_slice(obj.as_bytes());
@@ -1502,7 +1509,7 @@ pub trait BufferViewMut<B: ByteSliceMut>: BufferView<B> + AsMut<[u8]> {
     /// `write_obj_back` returns `None`.
     fn write_obj_back<T>(&mut self, obj: &T) -> Option<()>
     where
-        T: ?Sized + AsBytes + NoCell,
+        T: ?Sized + IntoBytes + Immutable,
     {
         let mut bytes = self.take_back(mem::size_of_val(obj))?;
         bytes.copy_from_slice(obj.as_bytes());
@@ -1589,7 +1596,7 @@ impl ParseMetadata {
 /// buffer. For performance reasons, it is recommended that as much of the
 /// packet object as possible be stored as references into the body in order to
 /// avoid copying.
-pub trait ParsablePacket<B: ByteSlice, ParseArgs>: Sized {
+pub trait ParsablePacket<B: SplitByteSlice, ParseArgs>: Sized {
     /// The type of errors returned from [`parse`] and [`parse_mut`].
     ///
     /// [`parse`]: ParsablePacket::parse
@@ -1645,7 +1652,7 @@ pub trait ParsablePacket<B: ByteSlice, ParseArgs>: Sized {
     /// [`parse`]: ParsablePacket::parse
     fn parse_mut<BV: BufferViewMut<B>>(buffer: BV, args: ParseArgs) -> Result<Self, Self::Error>
     where
-        B: ByteSliceMut,
+        B: SplitByteSliceMut,
     {
         Self::parse(buffer, args)
     }
@@ -2154,7 +2161,7 @@ mod tests {
     // Test a BufferView implementation. Call with a view into a buffer with no
     // extra capacity whose body contains [0, 1, ..., 9]. After the call
     // returns, call test_buffer_view_post on the buffer.
-    fn test_buffer_view<B: ByteSlice, BV: BufferView<B>>(mut view: BV) {
+    fn test_buffer_view<B: SplitByteSlice, BV: BufferView<B>>(mut view: BV) {
         assert_eq!(view.len(), 10);
         assert_eq!(view.take_front(1).unwrap().as_ref(), &[0][..]);
         assert_eq!(view.len(), 9);
@@ -2176,7 +2183,7 @@ mod tests {
     // Test a BufferViewMut implementation. Call with a mutable view into a buffer
     // with no extra capacity whose body contains [0, 1, ..., 9]. After the call
     // returns, call test_buffer_view_post on the buffer.
-    fn test_buffer_view_mut<B: ByteSliceMut, BV: BufferViewMut<B>>(mut view: BV) {
+    fn test_buffer_view_mut<B: SplitByteSliceMut, BV: BufferViewMut<B>>(mut view: BV) {
         assert_eq!(view.len(), 10);
         assert_eq!(view.as_mut()[0], 0);
         assert_eq!(view.take_front_zero(1).unwrap().as_ref(), &[0][..]);
@@ -2240,7 +2247,7 @@ mod tests {
         // modifies the bytes that were consumed so tests can make sure that the
         // `parse_mut` function was actually called and that the bytes are mutable.
         struct TestParsablePacket {}
-        impl<B: ByteSlice> ParsablePacket<B, &[u8]> for TestParsablePacket {
+        impl<B: SplitByteSlice> ParsablePacket<B, &[u8]> for TestParsablePacket {
             type Error = ();
             fn parse<BV: BufferView<B>>(
                 mut buffer: BV,
@@ -2257,7 +2264,7 @@ mod tests {
                 args: &[u8],
             ) -> Result<TestParsablePacket, ()>
             where
-                B: ByteSliceMut,
+                B: SplitByteSliceMut,
             {
                 assert_eq!(buffer.as_ref(), args);
                 buffer.take_front(1).unwrap().as_mut()[0] += 1;
@@ -2520,7 +2527,7 @@ mod tests {
 
     #[test]
     fn with_header_mut_with_meta() {
-        #[derive(zerocopy::FromZeros, FromBytes, AsBytes, NoCell, Unaligned)]
+        #[derive(zerocopy:: KnownLayout, FromBytes, IntoBytes, Immutable, Unaligned)]
         #[repr(C)]
         struct Header {
             two_bytes: [u8; 2],
@@ -2532,7 +2539,7 @@ mod tests {
         #[derive(Debug)]
         struct ParseError;
 
-        impl<B: ByteSlice> ParsablePacket<B, ()> for TestParsablePacket<B> {
+        impl<B: SplitByteSlice> ParsablePacket<B, ()> for TestParsablePacket<B> {
             type Error = ParseError;
             fn parse<BV: BufferView<B>>(
                 mut buffer: BV,
@@ -2547,14 +2554,14 @@ mod tests {
                 _args: (),
             ) -> Result<TestParsablePacket<B>, ParseError>
             where
-                B: ByteSliceMut,
+                B: SplitByteSliceMut,
             {
                 let header = buffer.take_obj_front::<Header>().ok_or(ParseError)?;
                 Ok(TestParsablePacket { header })
             }
 
             fn parse_metadata(&self) -> ParseMetadata {
-                let header_len = self.header.bytes().len();
+                let header_len = Ref::bytes(&self.header).len();
                 ParseMetadata::from_packet(header_len, 0, 0)
             }
         }

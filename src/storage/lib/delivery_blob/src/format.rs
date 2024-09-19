@@ -12,7 +12,7 @@ use bitflags::bitflags;
 use crc::Hasher32 as _;
 use static_assertions::const_assert_eq;
 use zerocopy::byteorder::{LE, U32, U64};
-use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell, Unaligned};
+use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout, Unaligned};
 
 use crate::{DeliveryBlobError, DeliveryBlobHeader, DeliveryBlobType, Type1Blob};
 
@@ -46,7 +46,7 @@ impl From<&Type1Blob> for SerializedType1Flags {
 }
 
 /// Serialized header of an RFC 0207 compliant delivery blob.
-#[derive(AsBytes, FromZeros, FromBytes, NoCell, Unaligned, Clone, Copy, Debug)]
+#[derive(IntoBytes, KnownLayout, FromBytes, Immutable, Unaligned, Clone, Copy, Debug)]
 #[repr(C)]
 pub(crate) struct SerializedHeader {
     magic: [u8; 4],
@@ -82,7 +82,7 @@ impl From<&DeliveryBlobHeader> for SerializedHeader {
 /// **WARNING**: Changes to this format must be done in a backwards compatible manner, or a new
 /// delivery blob type should be created. This format should be considered an implementation detail,
 /// and not relied on outside of storage-owned components.
-#[derive(AsBytes, FromZeros, FromBytes, NoCell, Unaligned, Clone, Copy, Debug)]
+#[derive(IntoBytes, KnownLayout, FromBytes, Immutable, Unaligned, Clone, Copy, Debug)]
 #[repr(C)]
 pub(crate) struct SerializedType1Blob {
     // Header:

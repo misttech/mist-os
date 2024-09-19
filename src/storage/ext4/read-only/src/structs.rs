@@ -38,7 +38,7 @@ use std::mem::size_of;
 use std::{fmt, str};
 use thiserror::Error;
 use zerocopy::byteorder::little_endian::{U16 as LEU16, U32 as LEU32, U64 as LEU64};
-use zerocopy::{ByteSlice, FromBytes, FromZeros, NoCell, Ref, Unaligned};
+use zerocopy::{FromBytes, Immutable, KnownLayout, Ref, SplitByteSlice, Unaligned};
 
 // Block Group 0 Padding
 pub const FIRST_BG_PADDING: u64 = 1024;
@@ -53,7 +53,7 @@ pub const MIN_EXT4_SIZE: u64 = FIRST_BG_PADDING + size_of::<SuperBlock>() as u64
 /// The smallest supported INode size.
 pub const MINIMUM_INODE_SIZE: u64 = 128;
 
-#[derive(FromZeros, FromBytes, NoCell, Unaligned)]
+#[derive(KnownLayout, FromBytes, Immutable, Unaligned)]
 #[repr(C)]
 pub struct ExtentHeader {
     /// Magic number: 0xF30A
@@ -72,7 +72,7 @@ pub struct ExtentHeader {
 // https://ext4.wiki.kernel.org/index.php/Ext4_Disk_Layout
 assert_eq_size!(ExtentHeader, [u8; 12]);
 
-#[derive(FromZeros, FromBytes, NoCell, Unaligned)]
+#[derive(KnownLayout, FromBytes, Immutable, Unaligned)]
 #[repr(C)]
 pub struct ExtentIndex {
     /// Indexes logical blocks.
@@ -87,7 +87,7 @@ pub struct ExtentIndex {
 // https://ext4.wiki.kernel.org/index.php/Ext4_Disk_Layout
 assert_eq_size!(ExtentIndex, [u8; 12]);
 
-#[derive(Clone, FromZeros, FromBytes, NoCell, Unaligned)]
+#[derive(Clone, KnownLayout, FromBytes, Immutable, Unaligned)]
 #[repr(C)]
 pub struct Extent {
     /// First logical block.
@@ -118,7 +118,7 @@ pub struct DirEntry2 {
     pub e2d_name: [u8; 255],
 }
 
-#[derive(FromZeros, FromBytes, NoCell, Unaligned, std::fmt::Debug)]
+#[derive(KnownLayout, FromBytes, Immutable, Unaligned, std::fmt::Debug)]
 #[repr(C)]
 pub struct DirEntryHeader {
     /// INode number of entry
@@ -134,7 +134,7 @@ pub struct DirEntryHeader {
 // https://ext4.wiki.kernel.org/index.php/Ext4_Disk_Layout
 assert_eq_size!(DirEntryHeader, [u8; 8]);
 
-#[derive(FromZeros, FromBytes, NoCell, Unaligned)]
+#[derive(KnownLayout, FromBytes, Immutable, Unaligned)]
 #[repr(C)]
 pub struct SuperBlock {
     /// INode count.
@@ -325,7 +325,7 @@ pub struct SuperBlock {
 // https://ext4.wiki.kernel.org/index.php/Ext4_Disk_Layout
 assert_eq_size!(SuperBlock, [u8; 1024]);
 
-#[derive(FromZeros, FromBytes, NoCell, Unaligned)]
+#[derive(KnownLayout, FromBytes, Immutable, Unaligned)]
 #[repr(C)]
 pub struct BlockGroupDesc32 {
     /// Blocks bitmap block.
@@ -359,7 +359,7 @@ assert_eq_size!(BlockGroupDesc32, [u8; 32]);
 
 // TODO(https://fxbug.dev/42073143): There are more fields in BlockGroupDesc if the filesystem is 64bit.
 // Uncomment this when we add support.
-// #[derive(FromZeros, FromBytes, NoCell, Unaligned)]
+// #[derive(FromZeros, FromBytes, Immutable, Unaligned)]
 // #[repr(C)]
 // pub struct BlockGroupDesc64 {
 //     pub base: BlockGroupDesc32,
@@ -379,14 +379,14 @@ assert_eq_size!(BlockGroupDesc32, [u8; 32]);
 // https://ext4.wiki.kernel.org/index.php/Ext4_Disk_Layout
 // assert_eq_size!(BlockGroupDesc64, [u8; 64]);
 
-#[derive(FromZeros, FromBytes, NoCell)]
+#[derive(KnownLayout, FromBytes, Immutable)]
 #[repr(C)]
-pub struct ExtentTreeNode<B: ByteSlice> {
+pub struct ExtentTreeNode<B: SplitByteSlice> {
     pub header: Ref<B, ExtentHeader>,
     pub entries: B,
 }
 
-#[derive(FromZeros, FromBytes, NoCell, Unaligned)]
+#[derive(KnownLayout, FromBytes, Immutable, Unaligned)]
 #[repr(C)]
 pub struct INode {
     /// Access permission flags.
@@ -451,7 +451,7 @@ pub struct INode {
 // https://ext4.wiki.kernel.org/index.php/Ext4_Disk_Layout
 assert_eq_size!(INode, [u8; 160]);
 
-#[derive(FromZeros, FromBytes, NoCell, Unaligned, Debug)]
+#[derive(KnownLayout, FromBytes, Immutable, Unaligned, Debug)]
 #[repr(C)]
 pub struct XattrHeader {
     pub e_magic: LEU32,
@@ -462,7 +462,7 @@ pub struct XattrHeader {
     e_reserved: [u8; 8],
 }
 
-#[derive(FromZeros, FromBytes, NoCell, Unaligned, Debug)]
+#[derive(KnownLayout, FromBytes, Immutable, Unaligned, Debug)]
 #[repr(C)]
 pub struct XattrEntryHeader {
     pub e_name_len: u8,
@@ -651,7 +651,7 @@ pub const BANNED_FEATURE_INCOMPAT: u32 = FeatureIncompat::Compression as u32 |
 
 // TODO(mbrunson): Update this trait to follow error conventions similar to ExtentTreeNode::parse.
 /// All functions to help parse data into respective structs.
-pub trait ParseToStruct: FromBytes + NoCell + Unaligned + Sized {
+pub trait ParseToStruct: FromBytes + KnownLayout + Immutable + Unaligned + Sized {
     fn from_reader_with_offset(reader: &dyn Reader, offset: u64) -> Result<Self, ParsingError> {
         if offset < FIRST_BG_PADDING {
             return Err(ParsingError::InvalidAddress(
@@ -676,20 +676,21 @@ pub trait ParseToStruct: FromBytes + NoCell + Unaligned + Sized {
     ///
     /// `Self` is the ext4 struct that represents the given `data`.
     fn to_struct_ref(data: &[u8], error_type: ParsingError) -> Result<&Self, ParsingError> {
-        Ref::<&[u8], Self>::new(data).map(|res| res.into_ref()).ok_or(error_type)
+        Ref::<&[u8], Self>::from_bytes(data).map(|res| Ref::into_ref(res)).map_err(|_| error_type)
     }
 }
 
 /// Apply to all EXT4 structs as seen above.
-impl<T: FromBytes + NoCell + Unaligned> ParseToStruct for T {}
+impl<T: FromBytes + KnownLayout + Immutable + Unaligned> ParseToStruct for T {}
 
-impl<B: ByteSlice> ExtentTreeNode<B> {
+impl<B: SplitByteSlice> ExtentTreeNode<B> {
     /// Parses a slice of bytes to create an `ExtentTreeNode`.
     ///
     /// `data` must be large enough to construct an ExtentHeader. If not, `None`
     /// is returned. `data` is consumed by this operation.
     pub fn parse(data: B) -> Option<Self> {
-        Ref::<B, ExtentHeader>::new_from_prefix(data)
+        Ref::<B, ExtentHeader>::from_prefix(data)
+            .ok()
             .map(|(header, entries)| Self { header, entries })
     }
 }

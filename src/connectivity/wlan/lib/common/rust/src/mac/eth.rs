@@ -4,7 +4,7 @@
 
 use crate::big_endian::BigEndianU16;
 use crate::mac::MacAddr;
-use zerocopy::{AsBytes, ByteSlice, FromBytes, FromZeros, NoCell, Ref, Unaligned};
+use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout, Ref, SplitByteSlice, Unaligned};
 
 // RFC 704, Appendix B.2
 // https://www.iana.org/assignments/ieee-802-numbers/ieee-802-numbers.xhtml
@@ -15,7 +15,7 @@ pub const ETHER_TYPE_IPV6: u16 = 0x86DD;
 pub const MAX_ETH_FRAME_LEN: usize = 2048;
 
 // IEEE Std 802.3-2015, 3.1.1
-#[derive(FromZeros, FromBytes, AsBytes, NoCell, Unaligned, Clone, Copy, Debug)]
+#[derive(KnownLayout, FromBytes, IntoBytes, Immutable, Unaligned, Clone, Copy, Debug)]
 #[repr(C, packed)]
 pub struct EthernetIIHdr {
     pub da: MacAddr,
@@ -23,14 +23,14 @@ pub struct EthernetIIHdr {
     pub ether_type: BigEndianU16,
 }
 
-pub struct EthernetFrame<B: ByteSlice> {
+pub struct EthernetFrame<B: SplitByteSlice> {
     pub hdr: Ref<B, EthernetIIHdr>,
     pub body: B,
 }
 
-impl<B: ByteSlice> EthernetFrame<B> {
+impl<B: SplitByteSlice> EthernetFrame<B> {
     pub fn parse(bytes: B) -> Option<Self> {
-        let (hdr, body) = Ref::new_unaligned_from_prefix(bytes)?;
+        let (hdr, body) = Ref::unaligned_from_prefix(bytes).ok()?;
         Some(Self { hdr, body })
     }
 }
@@ -47,7 +47,7 @@ mod tests {
             13, 14, // ether_type
             99, 99, // trailing bytes
         ];
-        let (mut hdr, body) = Ref::<_, EthernetIIHdr>::new_unaligned_from_prefix(&mut bytes[..])
+        let (mut hdr, body) = Ref::<_, EthernetIIHdr>::unaligned_from_prefix(&mut bytes[..])
             .expect("cannot create ethernet header.");
         assert_eq!(hdr.da, MacAddr::from([1u8, 2, 3, 4, 5, 6]));
         assert_eq!(hdr.sa, MacAddr::from([7u8, 8, 9, 10, 11, 12]));

@@ -7,7 +7,7 @@ use crate::header::Header;
 use crate::key::{Key, SignFailure, SIGNATURE_SIZE};
 
 use ring::digest;
-use zerocopy::AsBytes;
+use zerocopy::IntoBytes;
 
 const HASH_SIZE: u64 = 0x40;
 
@@ -293,8 +293,9 @@ mod tests {
         if vbmeta_bytes[..expected_header_bytes.len()] != expected_header_bytes {
             // the bytes didn't line up as expected, so compare the two header structs
             // directly, first, as it can have prettier results.
-            let expected_header =
-                Ref::<_, Header>::new(&expected_header_bytes as &[u8]).unwrap().into_ref();
+            let expected_header = Ref::into_ref(
+                Ref::<_, Header>::from_bytes(&expected_header_bytes as &[u8]).unwrap(),
+            );
             assert_eq!(
                 vbmeta.header(),
                 expected_header,

@@ -17,7 +17,7 @@ rustc_library("surpass") {
   ]
 
   if (target_cpu == "x64" || target_cpu == "arm64") {
-    deps += [ "//third_party/rust_crates:zerocopy" ]
+    deps += [ "//third_party/rust_crates:zerocopy_0_0_0_alpha_0" ]
   }
 
   # TODO(https://fxbug.dev/42175080): Fix the leaks and remove this.

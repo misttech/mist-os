@@ -11,16 +11,16 @@ use std::marker::PhantomData;
 use std::mem::MaybeUninit;
 use std::pin::Pin;
 use std::task::{Context, Poll};
-use zerocopy::{AsBytes, FromBytes, NoCell};
+use zerocopy::{FromBytes, Immutable, IntoBytes};
 
 /// Marker trait for types that can be read/written with a `Fifo`. Unsafe
 /// because not all types may be represented by arbitrary bit patterns.
 ///
 /// An implementation is provided for all types that implement
-/// [`AsBytes`], [`FromBytes`], and [`NoCell`].
-pub trait FifoEntry: AsBytes + FromBytes + NoCell {}
+/// [`IntoBytes`], [`FromBytes`], and [`Immutable`].
+pub trait FifoEntry: IntoBytes + FromBytes + Immutable {}
 
-impl<O: AsBytes + FromBytes + NoCell> FifoEntry for O {}
+impl<O: IntoBytes + FromBytes + Immutable> FifoEntry for O {}
 
 /// A buffer used to write `T` into [`Fifo`] objects.
 ///
@@ -81,7 +81,7 @@ unsafe impl<T: FifoEntry> FifoReadBuffer<T> for [T] {
 
     fn as_bytes_ptr_mut(&mut self) -> *mut u8 {
         // SAFETY: Guaranteed by bounds on T.
-        self.as_bytes_mut().as_mut_ptr()
+        self.as_mut_bytes().as_mut_ptr()
     }
 }
 
@@ -103,7 +103,7 @@ unsafe impl<T: FifoEntry> FifoReadBuffer<T> for T {
 
     fn as_bytes_ptr_mut(&mut self) -> *mut u8 {
         // SAFETY: Guaranteed by bounds on T.
-        self.as_bytes_mut().as_mut_ptr()
+        self.as_mut_bytes().as_mut_ptr()
     }
 }
 
@@ -466,16 +466,20 @@ mod tests {
     use fuchsia_zircon::prelude::*;
     use futures::future::try_join;
     use futures::prelude::*;
-    use zerocopy::{FromZeros, NoCell};
+    use zerocopy::{Immutable, KnownLayout};
 
-    #[derive(Copy, Clone, Debug, PartialEq, Eq, Default, AsBytes, FromZeros, FromBytes, NoCell)]
+    #[derive(
+        Copy, Clone, Debug, PartialEq, Eq, Default, IntoBytes, KnownLayout, FromBytes, Immutable,
+    )]
     #[repr(C)]
     struct entry {
         a: u32,
         b: u32,
     }
 
-    #[derive(Clone, Debug, PartialEq, Eq, Default, AsBytes, FromZeros, FromBytes, NoCell)]
+    #[derive(
+        Clone, Debug, PartialEq, Eq, Default, IntoBytes, KnownLayout, FromBytes, Immutable,
+    )]
     #[repr(C)]
     struct wrong_entry {
         a: u16,

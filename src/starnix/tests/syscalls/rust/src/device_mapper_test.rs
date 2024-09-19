@@ -526,7 +526,7 @@ mod tests {
         };
         assert!(ret == 0, "dm table load ioctl failed: {:?}", std::io::Error::last_os_error());
         let (io_struct_bytes, _) = io_vec.split_at(std::mem::size_of::<linux_uapi::dm_ioctl>());
-        let io_struct = linux_uapi::dm_ioctl::read_from(io_struct_bytes).unwrap();
+        let io_struct = linux_uapi::dm_ioctl::read_from_bytes(io_struct_bytes).unwrap();
         assert_eq!(io_struct.flags, DM_INACTIVE_PRESENT_FLAG);
         assert_eq!(io_struct.target_count, 0);
 
@@ -955,7 +955,7 @@ mod tests {
         };
         assert!(ret == 0, "dm table load ioctl failed: {:?}", std::io::Error::last_os_error());
         let (io_struct_bytes, _) = io_vec.split_at(std::mem::size_of::<linux_uapi::dm_ioctl>());
-        let io_struct = linux_uapi::dm_ioctl::read_from(io_struct_bytes).unwrap();
+        let io_struct = linux_uapi::dm_ioctl::read_from_bytes(io_struct_bytes).unwrap();
         assert_eq!(
             io_struct.flags,
             DM_INACTIVE_PRESENT_FLAG | DM_ACTIVE_PRESENT_FLAG | DM_SUSPEND_FLAG | DM_READONLY_FLAG
@@ -1024,7 +1024,7 @@ mod tests {
         };
         assert!(ret == 0, "dm list devices ioctl failed: {:?}", std::io::Error::last_os_error());
         let (io_struct_bytes, _) = io_vec.split_at(std::mem::size_of::<linux_uapi::dm_ioctl>());
-        let io_struct = linux_uapi::dm_ioctl::read_from(io_struct_bytes).unwrap();
+        let io_struct = linux_uapi::dm_ioctl::read_from_bytes(io_struct_bytes).unwrap();
         assert_eq!(io_struct.flags, DM_BUFFER_FULL_FLAG);
 
         // Cleanup -- delete all created dm-devices.
@@ -1116,7 +1116,7 @@ mod tests {
 
         let (io_struct_bytes, data_bytes) =
             io_vec.split_at(std::mem::size_of::<linux_uapi::dm_ioctl>());
-        let io_struct = linux_uapi::dm_ioctl::read_from(io_struct_bytes).unwrap();
+        let io_struct = linux_uapi::dm_ioctl::read_from_bytes(io_struct_bytes).unwrap();
         let mut next = 0;
         let mut data_size = io_struct.data_size as usize
             - std::cmp::min(
@@ -1124,7 +1124,7 @@ mod tests {
                 std::mem::size_of::<linux_uapi::dm_ioctl>(),
             );
         while data_size > 0 {
-            let name_list = linux_uapi::dm_name_list::read_from(
+            let name_list = linux_uapi::dm_name_list::read_from_bytes(
                 &data_bytes[next..next + std::mem::size_of::<linux_uapi::dm_name_list>()],
             )
             .unwrap();
@@ -1194,7 +1194,7 @@ mod tests {
         };
         assert!(ret == 0, "dm list versions ioctl failed: {:?}", std::io::Error::last_os_error());
         let (io_struct_bytes, _) = io_vec.split_at(std::mem::size_of::<linux_uapi::dm_ioctl>());
-        let io_struct = linux_uapi::dm_ioctl::read_from(io_struct_bytes).unwrap();
+        let io_struct = linux_uapi::dm_ioctl::read_from_bytes(io_struct_bytes).unwrap();
         assert_eq!(io_struct.flags, DM_BUFFER_FULL_FLAG);
     }
 
@@ -1231,7 +1231,7 @@ mod tests {
         assert!(ret == 0, "dm list versions ioctl failed: {:?}", std::io::Error::last_os_error());
         let (io_struct_bytes, data_bytes) =
             io_vec.split_at(std::mem::size_of::<linux_uapi::dm_ioctl>());
-        let io_struct = linux_uapi::dm_ioctl::read_from(io_struct_bytes).unwrap();
+        let io_struct = linux_uapi::dm_ioctl::read_from_bytes(io_struct_bytes).unwrap();
         let mut next = 0;
         let mut data_size = io_struct.data_size as usize
             - std::cmp::min(
@@ -1239,7 +1239,7 @@ mod tests {
                 std::mem::size_of::<linux_uapi::dm_ioctl>(),
             );
         while data_size > 0 {
-            let target_versions = linux_uapi::dm_target_versions::read_from(
+            let target_versions = linux_uapi::dm_target_versions::read_from_bytes(
                 &data_bytes[next..next + std::mem::size_of::<linux_uapi::dm_target_versions>()],
             )
             .unwrap();
@@ -1333,7 +1333,7 @@ mod tests {
         assert!(ret == 0, "dm table status ioctl failed: {:?}", std::io::Error::last_os_error());
 
         let (io_struct_bytes, _) = io_vec.split_at(std::mem::size_of::<linux_uapi::dm_ioctl>());
-        let io_struct = linux_uapi::dm_ioctl::read_from(io_struct_bytes).unwrap();
+        let io_struct = linux_uapi::dm_ioctl::read_from_bytes(io_struct_bytes).unwrap();
         assert_eq!(
             io_struct.flags,
             DM_BUFFER_FULL_FLAG | DM_ACTIVE_PRESENT_FLAG | DM_READONLY_FLAG
@@ -1409,7 +1409,7 @@ mod tests {
         assert!(ret == 0, "dm table status ioctl failed: {:?}", std::io::Error::last_os_error());
         // DM_TABLE_STATUS will return no target metadata if there is no active table.
         let (io_struct_bytes, _) = io_vec.split_at(std::mem::size_of::<linux_uapi::dm_ioctl>());
-        let io_struct = linux_uapi::dm_ioctl::read_from(io_struct_bytes).unwrap();
+        let io_struct = linux_uapi::dm_ioctl::read_from_bytes(io_struct_bytes).unwrap();
         assert_eq!(io_struct.data_size, 305);
         assert_eq!(io_struct.data_start, std::mem::size_of::<linux_uapi::dm_ioctl>() as u32);
         assert_eq!(io_struct.flags, DM_INACTIVE_PRESENT_FLAG);
@@ -1506,7 +1506,7 @@ mod tests {
         assert!(ret == 0, "dm table status ioctl failed: {:?}", std::io::Error::last_os_error());
 
         let (io_struct_bytes, rest) = io_vec.split_at(std::mem::size_of::<linux_uapi::dm_ioctl>());
-        let io_struct = linux_uapi::dm_ioctl::read_from(io_struct_bytes).unwrap();
+        let io_struct = linux_uapi::dm_ioctl::read_from_bytes(io_struct_bytes).unwrap();
         let mut next = 0;
         let mut data_size = io_struct.data_size as usize
             - std::cmp::min(
@@ -1514,7 +1514,7 @@ mod tests {
                 std::mem::size_of::<linux_uapi::dm_ioctl>(),
             );
         while data_size > 0 {
-            let target_specs = linux_uapi::dm_target_spec::read_from(
+            let target_specs = linux_uapi::dm_target_spec::read_from_bytes(
                 &rest[next..next + std::mem::size_of::<linux_uapi::dm_target_spec>()],
             )
             .unwrap();
@@ -1637,7 +1637,7 @@ mod tests {
         assert!(ret == 0, "dm table status ioctl failed: {:?}", std::io::Error::last_os_error());
 
         let (io_struct_bytes, rest) = io_vec.split_at(std::mem::size_of::<linux_uapi::dm_ioctl>());
-        let io_struct = linux_uapi::dm_ioctl::read_from(io_struct_bytes).unwrap();
+        let io_struct = linux_uapi::dm_ioctl::read_from_bytes(io_struct_bytes).unwrap();
         let mut next = 0;
         let mut data_size = io_struct.data_size as usize
             - std::cmp::min(
@@ -1645,7 +1645,7 @@ mod tests {
                 std::mem::size_of::<linux_uapi::dm_ioctl>(),
             );
         while data_size > 0 {
-            let target_specs = linux_uapi::dm_target_spec::read_from(
+            let target_specs = linux_uapi::dm_target_spec::read_from_bytes(
                 &rest[next..next + std::mem::size_of::<linux_uapi::dm_target_spec>()],
             )
             .unwrap();
@@ -1774,7 +1774,7 @@ mod tests {
         assert!(ret == 0, "dm table status ioctl failed: {:?}", std::io::Error::last_os_error());
 
         let (io_struct_bytes, rest) = io_vec.split_at(std::mem::size_of::<linux_uapi::dm_ioctl>());
-        let io_struct = linux_uapi::dm_ioctl::read_from(io_struct_bytes).unwrap();
+        let io_struct = linux_uapi::dm_ioctl::read_from_bytes(io_struct_bytes).unwrap();
         let mut next = 0;
         let mut data_size = io_struct.data_size as usize
             - std::cmp::min(
@@ -1782,7 +1782,7 @@ mod tests {
                 std::mem::size_of::<linux_uapi::dm_ioctl>(),
             );
         while data_size > 0 {
-            let target_specs = linux_uapi::dm_target_spec::read_from(
+            let target_specs = linux_uapi::dm_target_spec::read_from_bytes(
                 &rest[next..next + std::mem::size_of::<linux_uapi::dm_target_spec>()],
             )
             .unwrap();

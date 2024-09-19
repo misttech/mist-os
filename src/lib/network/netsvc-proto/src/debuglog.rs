@@ -14,7 +14,7 @@ use packet::{
 };
 use std::num::NonZeroU16;
 use zerocopy::byteorder::little_endian::U32;
-use zerocopy::{AsBytes, ByteSlice, FromBytes, FromZeros, NoCell, Ref, Unaligned};
+use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout, Ref, SplitByteSlice, Unaligned};
 
 pub const MULTICAST_PORT: NonZeroU16 = const_unwrap_option(NonZeroU16::new(33337));
 pub const ACK_PORT: NonZeroU16 = const_unwrap_option(NonZeroU16::new(33338));
@@ -26,7 +26,7 @@ const MAX_NODENAME_LENGTH: usize = 64;
 pub const ACK_SIZE: usize = std::mem::size_of::<PacketHead>();
 
 #[repr(C)]
-#[derive(FromZeros, FromBytes, AsBytes, NoCell, Unaligned)]
+#[derive(KnownLayout, FromBytes, IntoBytes, Immutable, Unaligned)]
 pub struct PacketHead {
     magic: U32,
     seqno: U32,
@@ -38,7 +38,7 @@ pub struct DebugLogPacket<B> {
     data: ValidStr<B>,
 }
 
-impl<B: ByteSlice> DebugLogPacket<B> {
+impl<B: SplitByteSlice> DebugLogPacket<B> {
     pub fn seqno(&self) -> u32 {
         self.head.seqno.get()
     }
@@ -61,7 +61,7 @@ pub enum ParseError {
 
 impl<B> ParsablePacket<B, ()> for DebugLogPacket<B>
 where
-    B: ByteSlice,
+    B: SplitByteSlice,
 {
     type Error = ParseError;
 

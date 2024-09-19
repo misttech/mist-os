@@ -3,10 +3,12 @@
 // found in the LICENSE file.
 
 use fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211;
-use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell};
+use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
 
 #[repr(C)]
-#[derive(AsBytes, FromZeros, FromBytes, NoCell, PartialEq, Eq, Clone, Copy, Debug, Default)]
+#[derive(
+    IntoBytes, KnownLayout, FromBytes, Immutable, PartialEq, Eq, Clone, Copy, Debug, Default,
+)]
 pub struct ReasonCode(pub u16);
 
 impl From<fidl_ieee80211::ReasonCode> for ReasonCode {

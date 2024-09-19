@@ -23,7 +23,7 @@ use starnix_uapi::{
     FBIOGET_VSCREENINFO, FBIOPUT_VSCREENINFO, FB_TYPE_PACKED_PIXELS, FB_VISUAL_TRUECOLOR,
 };
 use std::sync::Arc;
-use zerocopy::AsBytes;
+use zerocopy::IntoBytes;
 use {
     fidl_fuchsia_io as fio, fidl_fuchsia_math as fmath,
     fidl_fuchsia_ui_composition as fuicomposition, fidl_fuchsia_ui_display_singleton as fuidisplay,
@@ -200,7 +200,8 @@ impl FileOps for Framebuffer {
             FBIOGET_FSCREENINFO => {
                 let info = self.info.read();
                 let finfo = fb_fix_screeninfo {
-                    id: zerocopy::FromBytes::read_from(&b"Starnix\0\0\0\0\0\0\0\0\0"[..]).unwrap(),
+                    id: zerocopy::FromBytes::read_from_bytes(&b"Starnix\0\0\0\0\0\0\0\0\0"[..])
+                        .unwrap(),
                     smem_start: 0,
                     smem_len: self.memory_len,
                     type_: FB_TYPE_PACKED_PIXELS,

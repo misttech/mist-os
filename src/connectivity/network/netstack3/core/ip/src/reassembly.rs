@@ -48,7 +48,7 @@ use packet_formats::ip::IpPacket;
 use packet_formats::ipv4::{Ipv4Header, Ipv4Packet};
 use packet_formats::ipv6::ext_hdrs::Ipv6ExtensionHeaderData;
 use packet_formats::ipv6::Ipv6Packet;
-use zerocopy::{ByteSlice, ByteSliceMut};
+use zerocopy::{SplitByteSlice, SplitByteSliceMut};
 
 /// The maximum amount of time from receipt of the first fragment to reassembly
 /// of a packet. Note, "first fragment" does not mean a fragment with offset 0;
@@ -107,7 +107,7 @@ pub trait FragmentHandler<I: IpExt, BC> {
     /// # Panics
     ///
     /// Panics if the packet has no fragment data.
-    fn process_fragment<B: ByteSlice>(
+    fn process_fragment<B: SplitByteSlice>(
         &mut self,
         bindings_ctx: &mut BC,
         packet: I::Packet<B>,
@@ -132,7 +132,7 @@ pub trait FragmentHandler<I: IpExt, BC> {
     /// `reassemble_packet` from the one passed to `process_fragment` when
     /// processing a packet with a given `key` as `reassemble_packet` will fail
     /// to cancel the reassembly timer.
-    fn reassemble_packet<B: ByteSliceMut, BV: BufferViewMut<B>>(
+    fn reassemble_packet<B: SplitByteSliceMut, BV: BufferViewMut<B>>(
         &mut self,
         bindings_ctx: &mut BC,
         key: &FragmentCacheKey<I::Addr>,
@@ -143,7 +143,7 @@ pub trait FragmentHandler<I: IpExt, BC> {
 impl<I: IpExt, BC: FragmentBindingsContext, CC: FragmentContext<I, BC>> FragmentHandler<I, BC>
     for CC
 {
-    fn process_fragment<B: ByteSlice>(
+    fn process_fragment<B: SplitByteSlice>(
         &mut self,
         bindings_ctx: &mut BC,
         packet: I::Packet<B>,
@@ -172,7 +172,7 @@ impl<I: IpExt, BC: FragmentBindingsContext, CC: FragmentContext<I, BC>> Fragment
         })
     }
 
-    fn reassemble_packet<B: ByteSliceMut, BV: BufferViewMut<B>>(
+    fn reassemble_packet<B: SplitByteSliceMut, BV: BufferViewMut<B>>(
         &mut self,
         bindings_ctx: &mut BC,
         key: &FragmentCacheKey<I::Addr>,
@@ -233,13 +233,13 @@ pub trait FragmentablePacket {
     fn fragment_data(&self) -> (u32, u16, bool);
 }
 
-impl<B: ByteSlice> FragmentablePacket for Ipv4Packet<B> {
+impl<B: SplitByteSlice> FragmentablePacket for Ipv4Packet<B> {
     fn fragment_data(&self) -> (u32, u16, bool) {
         (u32::from(self.id()), self.fragment_offset(), self.mf_flag())
     }
 }
 
-impl<B: ByteSlice> FragmentablePacket for Ipv6Packet<B> {
+impl<B: SplitByteSlice> FragmentablePacket for Ipv6Packet<B> {
     fn fragment_data(&self) -> (u32, u16, bool) {
         for ext_hdr in self.iter_extension_hdrs() {
             if let Ipv6ExtensionHeaderData::Fragment { fragment_data } = ext_hdr.data() {
@@ -259,7 +259,7 @@ impl<B: ByteSlice> FragmentablePacket for Ipv6Packet<B> {
 
 /// Possible return values for [`IpPacketFragmentCache::process_fragment`].
 #[derive(Debug)]
-pub enum FragmentProcessingState<I: IpExt, B: ByteSlice> {
+pub enum FragmentProcessingState<I: IpExt, B: SplitByteSlice> {
     /// The provided packet is not fragmented so no processing is required.
     /// The packet is returned with this value without any modification.
     NotNeeded(I::Packet<B>),
@@ -450,7 +450,7 @@ impl<I: IpExt, BT: FragmentBindingsTypes> IpPacketFragmentCache<I, BT> {
     /// # Panics
     ///
     /// Panics if the packet has no fragment data.
-    fn process_fragment<B: ByteSlice>(
+    fn process_fragment<B: SplitByteSlice>(
         &mut self,
         packet: I::Packet<B>,
     ) -> (FragmentProcessingState<I, B>, Option<CacheTimerAction<I::Addr>>)
@@ -702,7 +702,7 @@ impl<I: IpExt, BT: FragmentBindingsTypes> IpPacketFragmentCache<I, BT> {
     /// `reassemble_packet` from the one passed to `process_fragment` when
     /// processing a packet with a given `key` as `reassemble_packet` will fail
     /// to cancel the reassembly timer.
-    fn reassemble_packet<B: ByteSliceMut, BV: BufferViewMut<B>>(
+    fn reassemble_packet<B: SplitByteSliceMut, BV: BufferViewMut<B>>(
         &mut self,
         key: &FragmentCacheKey<I::Addr>,
         buffer: BV,
@@ -765,7 +765,7 @@ impl<I: IpExt, BT: FragmentBindingsTypes> IpPacketFragmentCache<I, BT> {
 }
 
 /// Gets the header bytes for a packet.
-fn get_header<B: ByteSlice, I: IpExt>(packet: &I::Packet<B>) -> Vec<u8> {
+fn get_header<B: SplitByteSlice, I: IpExt>(packet: &I::Packet<B>) -> Vec<u8> {
     match packet.as_ip_addr_ref() {
         IpAddr::V4(packet) => packet.copy_header_bytes_for_fragment(),
         IpAddr::V6(packet) => {

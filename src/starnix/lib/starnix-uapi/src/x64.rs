@@ -5,10 +5,10 @@
 #![allow(non_camel_case_types)]
 
 use crate::uref;
-use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell};
+use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
 
 #[repr(C)]
-#[derive(Debug, Copy, Clone, AsBytes, FromBytes, FromZeros, NoCell)]
+#[derive(Debug, Copy, Clone, IntoBytes, KnownLayout, FromBytes, Immutable)]
 pub struct user_fpregs_struct {
     pub cwd: std::os::raw::c_ushort,
     pub swd: std::os::raw::c_ushort,
@@ -34,7 +34,7 @@ impl Default for user_fpregs_struct {
 }
 
 #[repr(C)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeros, NoCell)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, KnownLayout, FromBytes, Immutable)]
 pub struct user_regs_struct {
     pub r15: std::os::raw::c_ulong,
     pub r14: std::os::raw::c_ulong,
@@ -66,7 +66,7 @@ pub struct user_regs_struct {
 }
 
 #[repr(C)]
-#[derive(Debug, Copy, Clone, AsBytes, FromBytes, FromZeros, NoCell)]
+#[derive(Debug, Copy, Clone, IntoBytes, KnownLayout, FromBytes, Immutable)]
 pub struct user {
     pub regs: user_regs_struct,
     pub u_fpvalid: std::os::raw::c_int,

@@ -43,7 +43,7 @@ rustc_library("lib") {
     "//third_party/rust_crates:socket2",
     "//third_party/rust_crates:tokio",
     "//third_party/rust_crates:tracing",
-    "//third_party/rust_crates:zerocopy",
+    "//third_party/rust_crates:zerocopy_0_0_0_alpha_0",
   ]
 
   test_deps = [

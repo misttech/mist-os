@@ -27,7 +27,7 @@ rustc_library("openthread") {
     "//third_party/rust_crates:static_assertions",
     "//third_party/rust_crates:thiserror",
     "//third_party/rust_crates:tracing",
-    "//third_party/rust_crates:zerocopy",
+    "//third_party/rust_crates:zerocopy_0_0_0_alpha_0",
   ]
   test_deps = [ "//third_party/rust_crates:assert_matches" ]
 

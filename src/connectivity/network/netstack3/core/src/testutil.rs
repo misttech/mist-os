@@ -67,7 +67,7 @@ use netstack3_tcp::testutil::{ClientBuffers, ProvidedBuffers, TestSendBuffer};
 use netstack3_tcp::{BufferSizes, RingBuffer, TcpBindingsTypes};
 use netstack3_udp::{UdpBindingsTypes, UdpPacketMeta, UdpReceiveBindingsContext, UdpSocketId};
 use packet::{Buf, BufferMut};
-use zerocopy::ByteSlice;
+use zerocopy::SplitByteSlice;
 
 use crate::api::CoreApi;
 use crate::context::prelude::*;
@@ -1314,7 +1314,7 @@ impl DeviceSocketBindingsContext<DeviceId<Self>> for FakeBindingsCtx {
 }
 
 impl<I: IpExt> RawIpSocketsBindingsContext<I, DeviceId<Self>> for FakeBindingsCtx {
-    fn receive_packet<B: ByteSlice>(
+    fn receive_packet<B: SplitByteSlice>(
         &self,
         _socket: &RawIpSocketId<I, WeakDeviceId<Self>, Self>,
         _packet: &I::Packet<B>,

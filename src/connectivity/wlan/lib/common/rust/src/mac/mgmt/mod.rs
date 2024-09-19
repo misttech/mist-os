@@ -4,7 +4,7 @@
 
 use super::{MgmtFrame, MgmtSubtype};
 use crate::ie;
-use zerocopy::{ByteSlice, Ref};
+use zerocopy::{Ref, SplitByteSlice};
 
 mod fields;
 mod reason;
@@ -20,7 +20,7 @@ pub struct NoAck<const NO_ACK: bool, T>(pub T);
 
 impl<const NO_ACK: bool, B> NoAck<NO_ACK, ActionBody<B>>
 where
-    B: ByteSlice,
+    B: SplitByteSlice,
 {
     // NOTE: The management frame subtype is not part of the body. This function assumes whether or
     //       not acknowledgement is required.
@@ -52,7 +52,7 @@ pub type ActionNoAckFrame<B> = NoAck<true, ActionBody<B>>;
 #[derive(Debug)]
 pub enum ActionFrame<B>
 where
-    B: ByteSlice,
+    B: SplitByteSlice,
 {
     Ack(ActionAckFrame<B>),
     NoAck(ActionNoAckFrame<B>),
@@ -60,7 +60,7 @@ where
 
 impl<B> ActionFrame<B>
 where
-    B: ByteSlice,
+    B: SplitByteSlice,
 {
     pub fn parse(subtype: MgmtSubtype, bytes: B) -> Option<Self> {
         match subtype {
@@ -102,7 +102,7 @@ where
 
 impl<B> AsRef<ActionBody<B>> for ActionFrame<B>
 where
-    B: ByteSlice,
+    B: SplitByteSlice,
 {
     fn as_ref(&self) -> &ActionBody<B> {
         match self {
@@ -114,7 +114,7 @@ where
 
 impl<B> From<ActionAckFrame<B>> for ActionFrame<B>
 where
-    B: ByteSlice,
+    B: SplitByteSlice,
 {
     fn from(frame: ActionAckFrame<B>) -> Self {
         ActionFrame::Ack(frame)
@@ -123,7 +123,7 @@ where
 
 impl<B> From<ActionNoAckFrame<B>> for ActionFrame<B>
 where
-    B: ByteSlice,
+    B: SplitByteSlice,
 {
     fn from(frame: ActionNoAckFrame<B>) -> Self {
         ActionFrame::NoAck(frame)
@@ -136,7 +136,7 @@ where
 #[derive(Debug)]
 pub struct ActionBody<B>
 where
-    B: ByteSlice,
+    B: SplitByteSlice,
 {
     pub action_hdr: Ref<B, ActionHdr>,
     pub elements: B,
@@ -144,10 +144,11 @@ where
 
 impl<B> ActionBody<B>
 where
-    B: ByteSlice,
+    B: SplitByteSlice,
 {
     pub fn parse(bytes: B) -> Option<Self> {
-        Ref::new_unaligned_from_prefix(bytes)
+        Ref::unaligned_from_prefix(bytes)
+            .ok()
             .map(|(action_hdr, elements)| ActionBody { action_hdr, elements })
     }
 }
@@ -155,7 +156,7 @@ where
 #[derive(Debug)]
 pub struct AssocReqFrame<B>
 where
-    B: ByteSlice,
+    B: SplitByteSlice,
 {
     pub assoc_req_hdr: Ref<B, AssocReqHdr>,
     pub elements: B,
@@ -163,10 +164,11 @@ where
 
 impl<B> AssocReqFrame<B>
 where
-    B: ByteSlice,
+    B: SplitByteSlice,
 {
     pub fn parse(bytes: B) -> Option<Self> {
-        Ref::new_unaligned_from_prefix(bytes)
+        Ref::unaligned_from_prefix(bytes)
+            .ok()
             .map(|(assoc_req_hdr, elements)| AssocReqFrame { assoc_req_hdr, elements })
     }
 
@@ -178,7 +180,7 @@ where
 #[derive(Debug)]
 pub struct AssocRespFrame<B>
 where
-    B: ByteSlice,
+    B: SplitByteSlice,
 {
     pub assoc_resp_hdr: Ref<B, AssocRespHdr>,
     pub elements: B,
@@ -186,10 +188,11 @@ where
 
 impl<B> AssocRespFrame<B>
 where
-    B: ByteSlice,
+    B: SplitByteSlice,
 {
     pub fn parse(bytes: B) -> Option<Self> {
-        Ref::new_unaligned_from_prefix(bytes)
+        Ref::unaligned_from_prefix(bytes)
+            .ok()
             .map(|(assoc_resp_hdr, elements)| AssocRespFrame { assoc_resp_hdr, elements })
     }
 
@@ -206,7 +209,7 @@ where
 #[derive(Debug)]
 pub struct AuthFrame<B>
 where
-    B: ByteSlice,
+    B: SplitByteSlice,
 {
     pub auth_hdr: Ref<B, AuthHdr>,
     pub elements: B,
@@ -214,10 +217,11 @@ where
 
 impl<B> AuthFrame<B>
 where
-    B: ByteSlice,
+    B: SplitByteSlice,
 {
     pub fn parse(bytes: B) -> Option<Self> {
-        Ref::new_unaligned_from_prefix(bytes)
+        Ref::unaligned_from_prefix(bytes)
+            .ok()
             .map(|(auth_hdr, elements)| AuthFrame { auth_hdr, elements })
     }
 
@@ -230,14 +234,14 @@ where
 #[derive(Debug)]
 pub struct ProbeReqFrame<B>
 where
-    B: ByteSlice,
+    B: SplitByteSlice,
 {
     pub elements: B,
 }
 
 impl<B> ProbeReqFrame<B>
 where
-    B: ByteSlice,
+    B: SplitByteSlice,
 {
     pub fn parse(bytes: B) -> Option<Self> {
         Some(ProbeReqFrame { elements: bytes })
@@ -248,7 +252,7 @@ where
 //                                   variants with fields and change those variants to tuple
 //                                   variants instead.
 #[derive(Debug)]
-pub enum MgmtBody<B: ByteSlice> {
+pub enum MgmtBody<B: SplitByteSlice> {
     Beacon { bcn_hdr: Ref<B, BeaconHdr>, elements: B },
     ProbeReq(ProbeReqFrame<B>),
     ProbeResp { probe_resp_hdr: Ref<B, ProbeRespHdr>, elements: B },
@@ -261,27 +265,27 @@ pub enum MgmtBody<B: ByteSlice> {
     Unsupported { subtype: MgmtSubtype },
 }
 
-impl<B: ByteSlice> MgmtBody<B> {
+impl<B: SplitByteSlice> MgmtBody<B> {
     pub fn parse(subtype: MgmtSubtype, bytes: B) -> Option<Self> {
         match subtype {
             MgmtSubtype::BEACON => {
-                let (bcn_hdr, elements) = Ref::new_unaligned_from_prefix(bytes)?;
+                let (bcn_hdr, elements) = Ref::unaligned_from_prefix(bytes).ok()?;
                 Some(MgmtBody::Beacon { bcn_hdr, elements })
             }
             MgmtSubtype::PROBE_REQ => ProbeReqFrame::parse(bytes).map(From::from),
             MgmtSubtype::PROBE_RESP => {
-                let (probe_resp_hdr, elements) = Ref::new_unaligned_from_prefix(bytes)?;
+                let (probe_resp_hdr, elements) = Ref::unaligned_from_prefix(bytes).ok()?;
                 Some(MgmtBody::ProbeResp { probe_resp_hdr, elements })
             }
             MgmtSubtype::AUTH => AuthFrame::parse(bytes).map(From::from),
             MgmtSubtype::ASSOC_REQ => AssocReqFrame::parse(bytes).map(From::from),
             MgmtSubtype::ASSOC_RESP => AssocRespFrame::parse(bytes).map(From::from),
             MgmtSubtype::DEAUTH => {
-                let (deauth_hdr, elements) = Ref::new_unaligned_from_prefix(bytes)?;
+                let (deauth_hdr, elements) = Ref::unaligned_from_prefix(bytes).ok()?;
                 Some(MgmtBody::Deauthentication { deauth_hdr, elements })
             }
             MgmtSubtype::DISASSOC => {
-                let (disassoc_hdr, elements) = Ref::new_unaligned_from_prefix(bytes)?;
+                let (disassoc_hdr, elements) = Ref::unaligned_from_prefix(bytes).ok()?;
                 Some(MgmtBody::Disassociation { disassoc_hdr, elements })
             }
             MgmtSubtype::ACTION => {
@@ -297,7 +301,7 @@ impl<B: ByteSlice> MgmtBody<B> {
 
 impl<B> From<ProbeReqFrame<B>> for MgmtBody<B>
 where
-    B: ByteSlice,
+    B: SplitByteSlice,
 {
     fn from(frame: ProbeReqFrame<B>) -> Self {
         MgmtBody::ProbeReq(frame)
@@ -306,7 +310,7 @@ where
 
 impl<B> From<AuthFrame<B>> for MgmtBody<B>
 where
-    B: ByteSlice,
+    B: SplitByteSlice,
 {
     fn from(frame: AuthFrame<B>) -> Self {
         MgmtBody::Authentication(frame)
@@ -315,7 +319,7 @@ where
 
 impl<B> From<AssocReqFrame<B>> for MgmtBody<B>
 where
-    B: ByteSlice,
+    B: SplitByteSlice,
 {
     fn from(frame: AssocReqFrame<B>) -> Self {
         MgmtBody::AssociationReq(frame)
@@ -324,7 +328,7 @@ where
 
 impl<B> From<AssocRespFrame<B>> for MgmtBody<B>
 where
-    B: ByteSlice,
+    B: SplitByteSlice,
 {
     fn from(frame: AssocRespFrame<B>) -> Self {
         MgmtBody::AssociationResp(frame)
@@ -333,7 +337,7 @@ where
 
 impl<B> From<ActionFrame<B>> for MgmtBody<B>
 where
-    B: ByteSlice,
+    B: SplitByteSlice,
 {
     fn from(frame: ActionFrame<B>) -> Self {
         MgmtBody::Action(frame)
@@ -342,7 +346,7 @@ where
 
 impl<B> TryFrom<MgmtFrame<B>> for MgmtBody<B>
 where
-    B: ByteSlice,
+    B: SplitByteSlice,
 {
     type Error = ();
 

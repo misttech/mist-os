@@ -712,8 +712,8 @@ mod test {
             let mut event_bytes = VecOutputBuffer::new(INPUT_EVENT_SIZE);
             match file.read(&mut locked, current_task, &mut event_bytes) {
                 Ok(INPUT_EVENT_SIZE) => Some(
-                    uapi::input_event::read_from(Vec::from(event_bytes).as_slice())
-                        .ok_or(anyhow!("failed to read input_event from buffer")),
+                    uapi::input_event::read_from_bytes(Vec::from(event_bytes).as_slice())
+                        .map_err(|_| anyhow!("failed to read input_event from buffer")),
                 ),
                 Ok(other_size) => {
                     Some(Err(anyhow!("got {} bytes (expected {})", other_size, INPUT_EVENT_SIZE)))

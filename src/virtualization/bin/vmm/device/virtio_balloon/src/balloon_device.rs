@@ -38,7 +38,7 @@ fn read_mem_stat<'a, 'b, N: DriverNotify, M: DriverMem>(
 ) -> Option<VirtioBalloonMemStat> {
     let mut arr = [0; std::mem::size_of::<VirtioBalloonMemStat>()];
     if chain.read_exact(&mut arr).is_ok() {
-        VirtioBalloonMemStat::read_from(arr.as_slice())
+        VirtioBalloonMemStat::read_from_bytes(arr.as_slice()).ok()
     } else {
         None
     }

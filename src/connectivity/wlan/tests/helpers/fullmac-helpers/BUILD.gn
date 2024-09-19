@@ -24,7 +24,7 @@ rustc_library("fullmac-helpers") {
     "//src/lib/fidl/rust/fidl",
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:lazy_static",
-    "//third_party/rust_crates:zerocopy",
+    "//third_party/rust_crates:zerocopy_0_0_0_alpha_0",
   ]
   sources = [
     "src/config.rs",

@@ -3,14 +3,14 @@
 // found in the LICENSE file.
 
 use crate::append::{Append, BufferTooSmall, TrackedAppend};
-use zerocopy::ByteSliceMut;
+use zerocopy::SplitByteSliceMut;
 
 pub struct BufferWriter<B> {
     buffer: B,
     written: usize,
 }
 
-impl<B: ByteSliceMut> BufferWriter<B> {
+impl<B: SplitByteSliceMut> BufferWriter<B> {
     pub fn new(buffer: B) -> Self {
         Self { buffer, written: 0 }
     }
@@ -38,7 +38,7 @@ impl<B: ByteSliceMut> BufferWriter<B> {
     }
 }
 
-impl<B: ByteSliceMut> Append for BufferWriter<B> {
+impl<B: SplitByteSliceMut> Append for BufferWriter<B> {
     fn append_bytes(&mut self, bytes: &[u8]) -> Result<(), BufferTooSmall> {
         self.next_mut_slice(bytes.len())?.copy_from_slice(bytes);
         Ok(())
@@ -57,7 +57,7 @@ impl<B: ByteSliceMut> Append for BufferWriter<B> {
     }
 }
 
-impl<B: ByteSliceMut> TrackedAppend for BufferWriter<B> {
+impl<B: SplitByteSliceMut> TrackedAppend for BufferWriter<B> {
     fn bytes_appended(&self) -> usize {
         self.written
     }

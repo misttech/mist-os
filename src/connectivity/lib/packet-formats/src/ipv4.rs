@@ -23,7 +23,9 @@ use packet::{
     ParsablePacket, ParseMetadata, ReusableBuffer, SerializeError, SerializeTarget, Serializer,
 };
 use zerocopy::byteorder::network_endian::U16;
-use zerocopy::{AsBytes, ByteSlice, ByteSliceMut, FromBytes, FromZeros, NoCell, Ref, Unaligned};
+use zerocopy::{
+    FromBytes, Immutable, IntoBytes, KnownLayout, Ref, SplitByteSlice, SplitByteSliceMut, Unaligned,
+};
 
 use crate::error::{IpParseError, IpParseResult, ParseError};
 use crate::ip::{
@@ -59,7 +61,7 @@ pub enum Ipv4FragmentType {
 
 /// The prefix of the IPv4 header which precedes any header options and the
 /// body.
-#[derive(FromZeros, FromBytes, AsBytes, NoCell, Unaligned)]
+#[derive(KnownLayout, FromBytes, IntoBytes, Immutable, Unaligned)]
 #[repr(C)]
 pub struct HeaderPrefix {
     version_ihl: u8,
@@ -227,21 +229,21 @@ pub struct Ipv4Packet<B> {
     body: B,
 }
 
-impl<B: ByteSlice, I: IpExt> GenericOverIp<I> for Ipv4Packet<B> {
+impl<B: SplitByteSlice, I: IpExt> GenericOverIp<I> for Ipv4Packet<B> {
     type Type = <I as IpExt>::Packet<B>;
 }
 
-impl<B: ByteSlice> Ipv4Header for Ipv4Packet<B> {
+impl<B: SplitByteSlice> Ipv4Header for Ipv4Packet<B> {
     fn get_header_prefix(&self) -> &HeaderPrefix {
         &self.hdr_prefix
     }
 }
 
-impl<B: ByteSlice> ParsablePacket<B, ()> for Ipv4Packet<B> {
+impl<B: SplitByteSlice> ParsablePacket<B, ()> for Ipv4Packet<B> {
     type Error = IpParseError<Ipv4>;
 
     fn parse_metadata(&self) -> ParseMetadata {
-        let header_len = self.hdr_prefix.bytes().len() + self.options.bytes().len();
+        let header_len = Ref::bytes(&self.hdr_prefix).len() + self.options.bytes().len();
         ParseMetadata::from_packet(header_len, self.body.len(), 0)
     }
 
@@ -250,7 +252,7 @@ impl<B: ByteSlice> ParsablePacket<B, ()> for Ipv4Packet<B> {
     }
 }
 
-impl<B: ByteSlice> FromRaw<Ipv4PacketRaw<B>, ()> for Ipv4Packet<B> {
+impl<B: SplitByteSlice> FromRaw<Ipv4PacketRaw<B>, ()> for Ipv4Packet<B> {
     type Error = IpParseError<Ipv4>;
 
     fn try_from_raw_with(raw: Ipv4PacketRaw<B>, _args: ()) -> Result<Self, Self::Error> {
@@ -308,7 +310,7 @@ fn compute_header_checksum(hdr_prefix: &[u8], options: &[u8]) -> [u8; 2] {
     c.checksum()
 }
 
-impl<B: ByteSlice> Ipv4Packet<B> {
+impl<B: SplitByteSlice> Ipv4Packet<B> {
     /// Iterate over the IPv4 header options.
     pub fn iter_options(&self) -> impl Iterator<Item = Ipv4Option<'_>> {
         self.options.iter()
@@ -316,7 +318,7 @@ impl<B: ByteSlice> Ipv4Packet<B> {
 
     // Compute the header checksum, skipping the checksum field itself.
     fn compute_header_checksum(&self) -> [u8; 2] {
-        compute_header_checksum(self.hdr_prefix.bytes(), self.options.bytes())
+        compute_header_checksum(Ref::bytes(&self.hdr_prefix), self.options.bytes())
     }
 
     /// The packet body.
@@ -326,7 +328,7 @@ impl<B: ByteSlice> Ipv4Packet<B> {
 
     /// The size of the header prefix and options.
     pub fn header_len(&self) -> usize {
-        self.hdr_prefix.bytes().len() + self.options.bytes().len()
+        Ref::bytes(&self.hdr_prefix).len() + self.options.bytes().len()
     }
 
     /// Return a buffer that is a copy of the header bytes in this
@@ -338,7 +340,7 @@ impl<B: ByteSlice> Ipv4Packet<B> {
         let expected_bytes_len = self.header_len();
         let mut bytes = Vec::with_capacity(expected_bytes_len);
 
-        bytes.extend_from_slice(self.hdr_prefix.bytes());
+        bytes.extend_from_slice(Ref::bytes(&self.hdr_prefix));
         bytes.extend_from_slice(self.options.bytes());
 
         // `bytes`'s length should be exactly `expected_bytes_len`.
@@ -544,16 +546,16 @@ impl<B: ByteSlice> Ipv4Packet<B> {
     pub fn to_vec(&self) -> Vec<u8> {
         let Ipv4Packet { hdr_prefix, options, body } = self;
         let mut buf = Vec::with_capacity(
-            hdr_prefix.bytes().len() + options.bytes().len() + body.as_bytes().len(),
+            Ref::bytes(&hdr_prefix).len() + options.bytes().len() + body.as_bytes().len(),
         );
-        buf.extend(hdr_prefix.bytes());
+        buf.extend(Ref::bytes(&hdr_prefix));
         buf.extend(options.bytes());
         buf.extend(body.as_bytes());
         buf
     }
 }
 
-impl<B: ByteSliceMut> Ipv4Packet<B> {
+impl<B: SplitByteSliceMut> Ipv4Packet<B> {
     /// Set the source IP address.
     ///
     /// Set the source IP address and update the header checksum accordingly.
@@ -596,7 +598,7 @@ impl<B: ByteSliceMut> Ipv4Packet<B> {
 
 impl<B> Debug for Ipv4Packet<B>
 where
-    B: ByteSlice,
+    B: SplitByteSlice,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), fmt::Error> {
         f.debug_struct("Ipv4Packet")
@@ -630,17 +632,17 @@ pub struct Ipv4PacketRaw<B> {
     body: MaybeParsed<B, B>,
 }
 
-impl<B: ByteSlice> Ipv4Header for Ipv4PacketRaw<B> {
+impl<B: SplitByteSlice> Ipv4Header for Ipv4PacketRaw<B> {
     fn get_header_prefix(&self) -> &HeaderPrefix {
         &self.hdr_prefix
     }
 }
 
-impl<B: ByteSlice> ParsablePacket<B, ()> for Ipv4PacketRaw<B> {
+impl<B: SplitByteSlice> ParsablePacket<B, ()> for Ipv4PacketRaw<B> {
     type Error = IpParseError<Ipv4>;
 
     fn parse_metadata(&self) -> ParseMetadata {
-        let header_len = self.hdr_prefix.bytes().len() + self.options.len();
+        let header_len = Ref::bytes(&self.hdr_prefix).len() + self.options.len();
         ParseMetadata::from_packet(header_len, self.body.len(), 0)
     }
 
@@ -674,7 +676,7 @@ impl<B: ByteSlice> ParsablePacket<B, ()> for Ipv4PacketRaw<B> {
     }
 }
 
-impl<B: ByteSlice> Ipv4PacketRaw<B> {
+impl<B: SplitByteSlice> Ipv4PacketRaw<B> {
     /// Return the body.
     ///
     /// `body` returns [`MaybeParsed::Complete`] if the entire body is present
@@ -685,7 +687,7 @@ impl<B: ByteSlice> Ipv4PacketRaw<B> {
     }
 }
 
-impl<B: ByteSliceMut> Ipv4PacketRaw<B> {
+impl<B: SplitByteSliceMut> Ipv4PacketRaw<B> {
     /// Set the source IP address.
     ///
     /// Set the source IP address and update the header checksum accordingly.
@@ -984,7 +986,7 @@ const MF_FLAG_OFFSET: u8 = 0;
 
 /// Reassembles a fragmented IPv4 packet into a parsed IPv4 packet.
 pub(crate) fn reassemble_fragmented_packet<
-    B: ByteSliceMut,
+    B: SplitByteSliceMut,
     BV: BufferViewMut<B>,
     I: Iterator<Item = Vec<u8>>,
 >(
@@ -1018,7 +1020,7 @@ pub(crate) fn reassemble_fragmented_packet<
 
     // We know the call to `unwrap` will not fail because we just copied the header
     // bytes into `bytes`.
-    let mut header = Ref::<_, HeaderPrefix>::new_unaligned_from_prefix(bytes).unwrap().0;
+    let mut header = Ref::<_, HeaderPrefix>::unaligned_from_prefix(bytes).unwrap().0;
 
     // Update the total length field.
     header.total_len.set(u16::try_from(byte_count).unwrap());
@@ -1538,7 +1540,7 @@ mod tests {
         let mut buf = &bytes[..];
         let packet = buf.parse::<Ipv4PacketRaw<_>>().unwrap();
         let Ipv4PacketRaw { hdr_prefix, options, body } = &packet;
-        assert_eq!(hdr_prefix.bytes(), &bytes[0..20]);
+        assert_eq!(Ref::bytes(&hdr_prefix), &bytes[0..20]);
         assert_eq!(options.as_ref().complete().unwrap().deref(), []);
         // We must've captured the incomplete bytes in body:
         assert_eq!(body, &MaybeParsed::Incomplete(PAYLOAD));
@@ -1552,7 +1554,7 @@ mod tests {
         let mut buf = &bytes[..];
         let packet = buf.parse::<Ipv4PacketRaw<_>>().unwrap();
         let Ipv4PacketRaw { hdr_prefix, options, body } = &packet;
-        assert_eq!(hdr_prefix.bytes(), bytes);
+        assert_eq!(Ref::bytes(&hdr_prefix), bytes);
         assert_eq!(options.as_ref().incomplete().unwrap(), &[]);
         assert_eq!(body.complete().unwrap(), []);
         // validation should fail:

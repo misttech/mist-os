@@ -26,7 +26,7 @@ use std::borrow::Cow;
 use std::collections::{HashMap, VecDeque};
 use std::mem::size_of;
 use std::sync::atomic::{AtomicI32, Ordering};
-use zerocopy::AsBytes;
+use zerocopy::IntoBytes;
 
 const DATA_SIZE: usize = size_of::<inotify_event>();
 

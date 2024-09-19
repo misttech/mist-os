@@ -13,7 +13,7 @@ use net_types::ethernet::Mac;
 use net_types::ip::{IpAddress, Ipv4Addr};
 use packet::{BufferView, BufferViewMut, InnerPacketBuilder, ParsablePacket, ParseMetadata};
 use zerocopy::byteorder::network_endian::U16;
-use zerocopy::{AsBytes, ByteSlice, FromBytes, FromZeros, NoCell, Ref, Unaligned};
+use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout, Ref, SplitByteSlice, Unaligned};
 
 use crate::error::{ParseError, ParseResult};
 
@@ -34,7 +34,7 @@ create_protocol_enum!(
 );
 
 /// A trait to represent an ARP hardware type.
-pub trait HType: FromBytes + AsBytes + NoCell + Unaligned + Copy + Clone + Hash + Eq {
+pub trait HType: FromBytes + IntoBytes + Immutable + Unaligned + Copy + Clone + Hash + Eq {
     /// The hardware type.
     const HTYPE: ArpHardwareType;
     /// The in-memory size of an instance of the type.
@@ -44,7 +44,7 @@ pub trait HType: FromBytes + AsBytes + NoCell + Unaligned + Copy + Clone + Hash 
 }
 
 /// A trait to represent an ARP protocol type.
-pub trait PType: FromBytes + AsBytes + NoCell + Unaligned + Copy + Clone + Hash + Eq {
+pub trait PType: FromBytes + IntoBytes + Immutable + Unaligned + Copy + Clone + Hash + Eq {
     /// The protocol type.
     const PTYPE: ArpNetworkType;
     /// The in-memory size of an instance of the type.
@@ -80,7 +80,7 @@ create_protocol_enum!(
     }
 );
 
-#[derive(Default, FromZeros, FromBytes, AsBytes, NoCell, Unaligned)]
+#[derive(Default, KnownLayout, FromBytes, IntoBytes, Immutable, Unaligned)]
 #[repr(C)]
 struct Header {
     htype: U16, // Hardware (e.g. Ethernet)
@@ -116,9 +116,11 @@ impl Header {
 /// Note that `peek_arp_types` only inspects certain fields in the header, and
 /// so `peek_arp_types` succeeding does not guarantee that a subsequent call to
 /// `parse` will also succeed.
-pub fn peek_arp_types<B: ByteSlice>(bytes: B) -> ParseResult<(ArpHardwareType, ArpNetworkType)> {
-    let (header, _) = Ref::<B, Header>::new_unaligned_from_prefix(bytes)
-        .ok_or_else(debug_err_fn!(ParseError::Format, "too few bytes for header"))?;
+pub fn peek_arp_types<B: SplitByteSlice>(
+    bytes: B,
+) -> ParseResult<(ArpHardwareType, ArpNetworkType)> {
+    let (header, _) = Ref::<B, Header>::unaligned_from_prefix(bytes)
+        .map_err(|_| debug_err!(ParseError::Format, "too few bytes for header"))?;
 
     let hw = ArpHardwareType::try_from(header.htype.get()).ok().ok_or_else(debug_err_fn!(
         ParseError::NotSupported,
@@ -149,7 +151,7 @@ pub fn peek_arp_types<B: ByteSlice>(bytes: B) -> ParseResult<(ArpHardwareType, A
 // Body has the same memory layout (thanks to repr(C)) as an ARP body. Thus, we
 // can simply reinterpret the bytes of the ARP body as a Body and then safely
 // access its fields.
-#[derive(FromZeros, FromBytes, AsBytes, NoCell, Unaligned)]
+#[derive(KnownLayout, FromBytes, IntoBytes, Immutable, Unaligned)]
 #[repr(C)]
 struct Body<HwAddr, ProtoAddr> {
     sha: HwAddr,
@@ -168,15 +170,17 @@ pub struct ArpPacket<B, HwAddr, ProtoAddr> {
     body: Ref<B, Body<HwAddr, ProtoAddr>>,
 }
 
-impl<B: ByteSlice, HwAddr, ProtoAddr> ParsablePacket<B, ()> for ArpPacket<B, HwAddr, ProtoAddr>
+impl<B: SplitByteSlice, HwAddr, ProtoAddr> ParsablePacket<B, ()> for ArpPacket<B, HwAddr, ProtoAddr>
 where
-    HwAddr: Copy + HType + FromBytes + Unaligned,
-    ProtoAddr: Copy + PType + FromBytes + Unaligned,
+    HwAddr: Copy + HType + FromBytes + KnownLayout + Unaligned,
+    ProtoAddr: Copy + PType + FromBytes + KnownLayout + Unaligned,
 {
     type Error = ParseError;
 
     fn parse_metadata(&self) -> ParseMetadata {
-        ParseMetadata::from_inner_packet(self.header.bytes().len() + self.body.bytes().len())
+        ParseMetadata::from_inner_packet(
+            Ref::bytes(&self.header).len() + Ref::bytes(&self.body).len(),
+        )
     }
 
     fn parse<BV: BufferView<B>>(mut buffer: BV, _args: ()) -> ParseResult<Self> {
@@ -212,10 +216,10 @@ where
     }
 }
 
-impl<B: ByteSlice, HwAddr, ProtoAddr> ArpPacket<B, HwAddr, ProtoAddr>
+impl<B: SplitByteSlice, HwAddr, ProtoAddr> ArpPacket<B, HwAddr, ProtoAddr>
 where
-    HwAddr: Copy + HType + FromBytes + NoCell + Unaligned,
-    ProtoAddr: Copy + PType + FromBytes + NoCell + Unaligned,
+    HwAddr: Copy + HType + FromBytes + KnownLayout + Immutable + Unaligned,
+    ProtoAddr: Copy + PType + FromBytes + KnownLayout + Immutable + Unaligned,
 {
     /// The type of ARP packet
     pub fn operation(&self) -> ArpOp {
@@ -285,8 +289,8 @@ impl<HwAddr, ProtoAddr> ArpPacketBuilder<HwAddr, ProtoAddr> {
 
 impl<HwAddr, ProtoAddr> InnerPacketBuilder for ArpPacketBuilder<HwAddr, ProtoAddr>
 where
-    HwAddr: Copy + HType + FromBytes + AsBytes + NoCell + Unaligned,
-    ProtoAddr: Copy + PType + FromBytes + AsBytes + NoCell + Unaligned,
+    HwAddr: Copy + HType + FromBytes + IntoBytes + Immutable + Unaligned,
+    ProtoAddr: Copy + PType + FromBytes + IntoBytes + Immutable + Unaligned,
 {
     fn bytes_len(&self) -> usize {
         mem::size_of::<Header>() + mem::size_of::<Body<HwAddr, ProtoAddr>>()
@@ -461,7 +465,7 @@ mod tests {
         // Assert that parsing a particular header results in an error.
         fn assert_header_err(header: Header, err: ParseError) {
             let mut buf = [0; ARP_ETHERNET_IPV4_PACKET_LEN];
-            *Ref::<_, Header>::new_unaligned_from_prefix(&mut buf[..]).unwrap().0 = header;
+            *Ref::<_, Header>::unaligned_from_prefix(&mut buf[..]).unwrap().0 = header;
             assert_err(&buf[..], err);
         }
 

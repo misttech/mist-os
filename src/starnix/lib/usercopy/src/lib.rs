@@ -349,7 +349,7 @@ impl Usercopy {
                 let mut buf = zx::MessageBuf::new();
                 exception_channel.read(&mut buf).unwrap();
 
-                let excp_info = zx::sys::zx_exception_info_t::read_from(buf.bytes()).unwrap();
+                let excp_info = zx::sys::zx_exception_info_t::read_from_bytes(buf.bytes()).unwrap();
 
                 if excp_info.type_ != zx::sys::ZX_EXCP_FATAL_PAGE_FAULT {
                     // Only process page faults.

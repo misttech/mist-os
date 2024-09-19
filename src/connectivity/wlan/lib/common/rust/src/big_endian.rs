@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use byteorder::{BigEndian, ByteOrder};
-use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell, Unaligned};
+use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout, Unaligned};
 
 macro_rules! big_endian_inttype {
     ($struct_name:ident, $inttype:ty, $read_fn:ident, $write_fn:ident, $width:expr) => {
@@ -13,10 +13,10 @@ macro_rules! big_endian_inttype {
             Copy,
             Debug,
             Default,
-            AsBytes,
-            FromZeros,
+            IntoBytes,
             FromBytes,
-            NoCell,
+            KnownLayout,
+            Immutable,
             Unaligned,
             PartialEq,
             Eq,

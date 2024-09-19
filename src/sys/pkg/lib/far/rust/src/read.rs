@@ -8,7 +8,7 @@ use crate::{
 };
 use std::convert::TryInto as _;
 use std::io::{Read, Seek, SeekFrom};
-use zerocopy::AsBytes as _;
+use zerocopy::IntoBytes as _;
 
 /// A struct to open and read FAR-formatted archive.
 #[derive(Debug)]
@@ -44,7 +44,7 @@ where
                     .map_err(|_| { Error::InvalidDirectoryChunkLen(dir_index.length.get()) })?
             ];
         source.seek(SeekFrom::Start(dir_index.offset.get())).map_err(Error::Seek)?;
-        source.read_exact(directory_entries.as_bytes_mut()).map_err(Error::Read)?;
+        source.read_exact(directory_entries.as_mut_bytes()).map_err(Error::Read)?;
         let directory_entries = directory_entries.into_boxed_slice();
 
         // Read path data
@@ -74,7 +74,7 @@ where
     // Assumes `source` cursor is at the beginning of the file.
     fn read_index_header(source: &mut T) -> Result<Index, Error> {
         let mut index = Index::default();
-        source.read_exact(index.as_bytes_mut()).map_err(Error::Read)?;
+        source.read_exact(index.as_mut_bytes()).map_err(Error::Read)?;
         if index.magic != MAGIC_INDEX_VALUE {
             Err(Error::InvalidMagic(index.magic))
         } else if index.length.get() % INDEX_ENTRY_LEN != 0
@@ -97,7 +97,7 @@ where
         let mut previous_entry: Option<IndexEntry> = None;
         for _ in 0..index.length.get() / INDEX_ENTRY_LEN {
             let mut entry = IndexEntry::default();
-            source.read_exact(entry.as_bytes_mut()).map_err(Error::Read)?;
+            source.read_exact(entry.as_mut_bytes()).map_err(Error::Read)?;
 
             let expected_offset = if let Some(previous_entry) = previous_entry {
                 if previous_entry.chunk_type >= entry.chunk_type {

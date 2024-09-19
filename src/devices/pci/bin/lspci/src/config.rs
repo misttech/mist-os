@@ -4,11 +4,11 @@
 use crate::util::is_set;
 use bitfield::bitfield;
 use std::fmt;
-use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell, Ref};
+use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout, Ref};
 
 // PCI Local Bus Specification v3.0 section 6.1
 #[repr(C, packed)]
-#[derive(AsBytes, FromZeros, FromBytes, NoCell)]
+#[derive(IntoBytes, KnownLayout, FromBytes, Immutable)]
 pub struct Type00Config {
     pub vendor_id: u16,
     pub device_id: u16,
@@ -38,13 +38,13 @@ pub struct Type00Config {
 
 impl Type00Config {
     pub fn new(config: &[u8]) -> Ref<&[u8], Type00Config> {
-        let (config, _) = Ref::new_from_prefix(config).unwrap();
+        let (config, _) = Ref::from_prefix(config).unwrap();
         config
     }
 }
 
 #[repr(C, packed)]
-#[derive(AsBytes, FromZeros, FromBytes, NoCell)]
+#[derive(IntoBytes, KnownLayout, FromBytes, Immutable)]
 pub struct Type01Config {
     pub vendor_id: u16,
     pub device_id: u16,
@@ -84,7 +84,7 @@ pub struct Type01Config {
 
 impl Type01Config {
     pub fn new(config: &[u8]) -> Ref<&[u8], Type01Config> {
-        let (config, _) = Ref::new_from_prefix(config).unwrap();
+        let (config, _) = Ref::from_prefix(config).unwrap();
         config
     }
 }

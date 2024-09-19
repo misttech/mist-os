@@ -875,7 +875,7 @@ pub fn ptrace_dispatch(
             const SI_MAX_SIZE_AS_USIZE: usize = SI_MAX_SIZE as usize;
 
             let siginfo_mem = current_task.read_memory_to_array::<SI_MAX_SIZE_AS_USIZE>(data)?;
-            let header = SignalInfoHeader::read_from(&siginfo_mem[..SI_HEADER_SIZE]).unwrap();
+            let header = SignalInfoHeader::read_from_bytes(&siginfo_mem[..SI_HEADER_SIZE]).unwrap();
 
             let mut bytes = [0u8; SI_MAX_SIZE as usize - SI_HEADER_SIZE];
             bytes.copy_from_slice(&siginfo_mem[SI_HEADER_SIZE..SI_MAX_SIZE as usize]);
@@ -900,7 +900,7 @@ pub fn ptrace_dispatch(
                 let (size, info) = ptrace.get_target_syscall(&tracee, &state)?;
                 let dst: UserRef<ptrace_syscall_info> = UserRef::from(data);
                 let len = std::cmp::min(std::mem::size_of::<ptrace_syscall_info>(), addr.ptr());
-                // SAFETY: ptrace_syscall_info does not implement FromBytes/AsBytes,
+                // SAFETY: ptrace_syscall_info does not implement FromBytes/IntoBytes,
                 // so this has to happen manually.
                 let src = unsafe {
                     std::slice::from_raw_parts(

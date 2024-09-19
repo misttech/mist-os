@@ -23,7 +23,7 @@ use netstack3_filter::RawIpBody;
 use packet::{BufferMut, SliceBufViewMut};
 use packet_formats::icmp;
 use packet_formats::ip::{DscpAndEcn, IpPacket};
-use zerocopy::ByteSlice;
+use zerocopy::SplitByteSlice;
 
 use crate::internal::raw::counters::RawIpSocketCounters;
 use crate::internal::raw::filter::RawIpSocketIcmpFilter;
@@ -50,7 +50,7 @@ pub trait RawIpSocketsBindingsContext<I: IpExt, D: StrongDeviceIdentifier>:
     RawIpSocketsBindingsTypes + Sized
 {
     /// Called for each received IP packet that matches the provided socket.
-    fn receive_packet<B: ByteSlice>(
+    fn receive_packet<B: SplitByteSlice>(
         &self,
         socket: &RawIpSocketId<I, D::Weak, Self>,
         packet: &I::Packet<B>,
@@ -638,7 +638,7 @@ pub trait RawIpSocketMapContext<I: IpExt, BT: RawIpSocketsBindingsTypes>:
 /// A type that provides the raw IP socket functionality required by core.
 pub trait RawIpSocketHandler<I: IpExt, BC>: DeviceIdContext<AnyDevice> {
     /// Deliver a received IP packet to all appropriate raw IP sockets.
-    fn deliver_packet_to_raw_ip_sockets<B: ByteSlice>(
+    fn deliver_packet_to_raw_ip_sockets<B: SplitByteSlice>(
         &mut self,
         bindings_ctx: &mut BC,
         packet: &I::Packet<B>,
@@ -652,7 +652,7 @@ where
     BC: RawIpSocketsBindingsContext<I, CC::DeviceId>,
     CC: RawIpSocketMapContext<I, BC>,
 {
-    fn deliver_packet_to_raw_ip_sockets<B: ByteSlice>(
+    fn deliver_packet_to_raw_ip_sockets<B: SplitByteSlice>(
         &mut self,
         bindings_ctx: &mut BC,
         packet: &I::Packet<B>,
@@ -712,7 +712,7 @@ enum DeliveryOutcome {
 }
 
 /// Returns whether the given packet should be delivered to the given socket.
-fn check_packet_for_delivery<I: IpExt, D: StrongDeviceIdentifier, B: ByteSlice>(
+fn check_packet_for_delivery<I: IpExt, D: StrongDeviceIdentifier, B: SplitByteSlice>(
     packet: &I::Packet<B>,
     device: &D,
     socket: &RawIpSocketLockedState<I, D::Weak>,
@@ -879,7 +879,7 @@ mod test {
     impl<I: IpExt, D: Copy + FakeStrongDeviceId> RawIpSocketsBindingsContext<I, D>
         for FakeBindingsCtx<D>
     {
-        fn receive_packet<B: ByteSlice>(
+        fn receive_packet<B: SplitByteSlice>(
             &self,
             socket: &RawIpSocketId<I, D::Weak, Self>,
             packet: &I::Packet<B>,

@@ -21,7 +21,7 @@ use netstack3_core::sync::Mutex;
 use netstack3_core::IpExt;
 use packet::Buf;
 use packet_formats::ip::IpPacket as _;
-use zerocopy::ByteSlice;
+use zerocopy::SplitByteSlice;
 use zx::{HandleBased, Peered};
 use {
     fidl_fuchsia_net as fnet, fidl_fuchsia_posix as fposix,
@@ -51,7 +51,7 @@ impl RawIpSocketsBindingsTypes for BindingsCtx {
 }
 
 impl<I: IpExt> RawIpSocketsBindingsContext<I, DeviceId> for BindingsCtx {
-    fn receive_packet<B: ByteSlice>(
+    fn receive_packet<B: SplitByteSlice>(
         &self,
         socket: &RawIpSocketId<I>,
         packet: &I::Packet<B>,
@@ -73,7 +73,7 @@ impl<I: IpExt> SocketState<I> {
         SocketState { rx_queue: Mutex::new(MessageQueue::new(event)) }
     }
 
-    fn enqueue_rx_packet<B: ByteSlice>(&self, packet: &I::Packet<B>, device: WeakDeviceId) {
+    fn enqueue_rx_packet<B: SplitByteSlice>(&self, packet: &I::Packet<B>, device: WeakDeviceId) {
         // NB: Perform the expensive tasks before taking the message queue lock.
         let packet = ReceivedIpPacket::new::<B>(packet, device);
         self.rx_queue.lock().receive(packet);
@@ -96,7 +96,7 @@ struct ReceivedIpPacket<I: Ip> {
 }
 
 impl<I: IpExt> ReceivedIpPacket<I> {
-    fn new<B: ByteSlice>(packet: &I::Packet<B>, device: WeakDeviceId) -> Self {
+    fn new<B: SplitByteSlice>(packet: &I::Packet<B>, device: WeakDeviceId) -> Self {
         // NB: Match Linux, and only provide the packet header for IPv4.
         let data = match I::VERSION {
             IpVersion::V4 => packet.to_vec(),

@@ -18,7 +18,9 @@ use std::{mem, str};
 use thiserror::Error;
 use uuid::Uuid;
 use zerocopy::byteorder::network_endian::{U16, U32};
-use zerocopy::{AsBytes, ByteSlice, FromBytes, FromZeros, NoCell, Ref, Unaligned};
+use zerocopy::{
+    FromBytes, Immutable, IntoByteSlice, IntoBytes, KnownLayout, Ref, SplitByteSlice, Unaligned,
+};
 
 /// A DHCPv6 packet parsing error.
 #[allow(missing_docs)]
@@ -52,7 +54,7 @@ impl From<Never> for ParseError {
 ///
 /// [RFC 8415, Section 7.3]: https://tools.ietf.org/html/rfc8415#section-7.3
 #[allow(missing_docs)]
-#[derive(Debug, PartialEq, FromPrimitive, AsBytes, NoCell, Copy, Clone)]
+#[derive(Debug, PartialEq, FromPrimitive, IntoBytes, Immutable, Copy, Clone)]
 #[repr(u8)]
 pub enum MessageType {
     Solicit = 1,
@@ -132,7 +134,7 @@ impl StatusCode {
 ///
 /// [RFC 8415, Section 21.13]: https://tools.ietf.org/html/rfc8415#section-21.13
 #[allow(missing_docs)]
-#[derive(thiserror::Error, Debug, PartialEq, FromPrimitive, AsBytes, NoCell, Copy, Clone)]
+#[derive(thiserror::Error, Debug, PartialEq, FromPrimitive, IntoBytes, Immutable, Copy, Clone)]
 #[repr(u16)]
 pub enum ErrorStatusCode {
     #[error("unspecified failure")]
@@ -263,7 +265,7 @@ pub enum ParsedDhcpOption<'a> {
 
 /// An overlay representation of an IA_NA option.
 #[derive(Debug, PartialEq)]
-pub struct IanaData<B: ByteSlice> {
+pub struct IanaData<B: SplitByteSlice> {
     header: Ref<B, IanaHeader>,
     options: Records<B, ParsedDhcpOptionImpl>,
 }
@@ -346,12 +348,12 @@ impl TimeValue {
     }
 }
 
-impl<'a, B: ByteSlice> IanaData<B> {
+impl<'a, B: SplitByteSlice> IanaData<B> {
     /// Constructs a new `IanaData` from a `ByteSlice`.
     fn new(buf: B) -> Result<Self, ParseError> {
         let buf_len = buf.len();
-        let (header, options) = Ref::new_unaligned_from_prefix(buf)
-            .ok_or(ParseError::InvalidOpLen(OptionCode::Iana, buf_len))?;
+        let (header, options) = Ref::unaligned_from_prefix(buf)
+            .map_err(|_| ParseError::InvalidOpLen(OptionCode::Iana, buf_len))?;
         let options = Records::<B, ParsedDhcpOptionImpl>::parse_with_context(options, ())?;
         Ok(IanaData { header, options })
     }
@@ -388,7 +390,9 @@ impl<'a, B: ByteSlice> IanaData<B> {
 }
 
 /// An overlay for the fixed fields of an IA_NA option.
-#[derive(FromZeros, FromBytes, AsBytes, NoCell, Unaligned, Debug, PartialEq, Copy, Clone)]
+#[derive(
+    KnownLayout, FromBytes, IntoBytes, Immutable, Unaligned, Debug, PartialEq, Copy, Clone,
+)]
 #[repr(C)]
 struct IanaHeader {
     iaid: U32,
@@ -398,17 +402,17 @@ struct IanaHeader {
 
 /// An overlay representation of an IA Address option.
 #[derive(Debug, PartialEq)]
-pub struct IaAddrData<B: ByteSlice> {
+pub struct IaAddrData<B: SplitByteSlice> {
     header: Ref<B, IaAddrHeader>,
     options: Records<B, ParsedDhcpOptionImpl>,
 }
 
-impl<'a, B: ByteSlice> IaAddrData<B> {
+impl<'a, B: SplitByteSlice> IaAddrData<B> {
     /// Constructs a new `IaAddrData` from a `ByteSlice`.
     pub fn new(buf: B) -> Result<Self, ParseError> {
         let buf_len = buf.len();
-        let (header, options) = Ref::new_unaligned_from_prefix(buf)
-            .ok_or(ParseError::InvalidOpLen(OptionCode::IaAddr, buf_len))?;
+        let (header, options) = Ref::unaligned_from_prefix(buf)
+            .map_err(|_| ParseError::InvalidOpLen(OptionCode::IaAddr, buf_len))?;
         let options = Records::<B, ParsedDhcpOptionImpl>::parse_with_context(options, ())?;
         Ok(IaAddrData { header, options })
     }
@@ -445,7 +449,9 @@ impl<'a, B: ByteSlice> IaAddrData<B> {
 }
 
 /// An overlay for the fixed fields of an IA Address option.
-#[derive(FromZeros, FromBytes, AsBytes, NoCell, Unaligned, Debug, PartialEq, Copy, Clone)]
+#[derive(
+    KnownLayout, FromBytes, IntoBytes, Immutable, Unaligned, Debug, PartialEq, Copy, Clone,
+)]
 #[repr(C)]
 struct IaAddrHeader {
     addr: Ipv6Addr,
@@ -454,7 +460,9 @@ struct IaAddrHeader {
 }
 
 /// An overlay for the fixed fields of an IA_PD option.
-#[derive(FromZeros, FromBytes, AsBytes, NoCell, Unaligned, Debug, PartialEq, Copy, Clone)]
+#[derive(
+    KnownLayout, FromBytes, IntoBytes, Immutable, Unaligned, Debug, PartialEq, Copy, Clone,
+)]
 #[repr(C)]
 struct IaPdHeader {
     iaid: U32,
@@ -466,17 +474,17 @@ struct IaPdHeader {
 ///
 /// [RFC 8415 section 21.21]: https://datatracker.ietf.org/doc/html/rfc8415#section-21.21
 #[derive(Debug, PartialEq)]
-pub struct IaPdData<B: ByteSlice> {
+pub struct IaPdData<B: SplitByteSlice> {
     header: Ref<B, IaPdHeader>,
     options: Records<B, ParsedDhcpOptionImpl>,
 }
 
-impl<'a, B: ByteSlice> IaPdData<B> {
+impl<'a, B: SplitByteSlice> IaPdData<B> {
     /// Constructs a new `IaPdData` from a `ByteSlice`.
     fn new(buf: B) -> Result<Self, ParseError> {
         let buf_len = buf.len();
-        let (header, options) = Ref::new_unaligned_from_prefix(buf)
-            .ok_or(ParseError::InvalidOpLen(OptionCode::IaPd, buf_len))?;
+        let (header, options) = Ref::unaligned_from_prefix(buf)
+            .map_err(|_| ParseError::InvalidOpLen(OptionCode::IaPd, buf_len))?;
         let options = Records::<B, ParsedDhcpOptionImpl>::parse_with_context(options, ())?;
         Ok(IaPdData { header, options })
     }
@@ -513,7 +521,9 @@ impl<'a, B: ByteSlice> IaPdData<B> {
 }
 
 /// An overlay for the fixed fields of an IA Prefix option.
-#[derive(FromZeros, FromBytes, AsBytes, NoCell, Unaligned, Debug, PartialEq, Copy, Clone)]
+#[derive(
+    KnownLayout, FromBytes, IntoBytes, Immutable, Unaligned, Debug, PartialEq, Copy, Clone,
+)]
 #[repr(C)]
 struct IaPrefixHeader {
     preferred_lifetime_secs: U32,
@@ -526,17 +536,17 @@ struct IaPrefixHeader {
 ///
 /// [RFC 8415 section 21.22]: https://datatracker.ietf.org/doc/html/rfc8415#section-21.22
 #[derive(Debug, PartialEq)]
-pub struct IaPrefixData<B: ByteSlice> {
+pub struct IaPrefixData<B: SplitByteSlice> {
     header: Ref<B, IaPrefixHeader>,
     options: Records<B, ParsedDhcpOptionImpl>,
 }
 
-impl<'a, B: ByteSlice> IaPrefixData<B> {
+impl<'a, B: SplitByteSlice> IaPrefixData<B> {
     /// Constructs a new `IaPrefixData` from a `ByteSlice`.
     pub fn new(buf: B) -> Result<Self, ParseError> {
         let buf_len = buf.len();
-        let (header, options) = Ref::new_unaligned_from_prefix(buf)
-            .ok_or(ParseError::InvalidOpLen(OptionCode::IaPrefix, buf_len))?;
+        let (header, options) = Ref::unaligned_from_prefix(buf)
+            .map_err(|_| ParseError::InvalidOpLen(OptionCode::IaPrefix, buf_len))?;
         let options = Records::<B, ParsedDhcpOptionImpl>::parse_with_context(options, ())?;
         Ok(IaPrefixData { header, options })
     }
@@ -577,7 +587,7 @@ mod checked {
 
     use mdns::protocol::{DomainBuilder, EmbeddedPacketBuilder};
     use packet::BufferViewMut;
-    use zerocopy::ByteSliceMut;
+    use zerocopy::SplitByteSliceMut;
 
     use super::ParseError;
 
@@ -620,7 +630,7 @@ mod checked {
             self.builder.bytes_len()
         }
 
-        pub(crate) fn serialize<B: ByteSliceMut, BV: BufferViewMut<B>>(&self, bv: &mut BV) {
+        pub(crate) fn serialize<B: SplitByteSliceMut, BV: BufferViewMut<B>>(&self, bv: &mut BV) {
             let () = self.builder.serialize(bv);
         }
     }
@@ -1214,7 +1224,7 @@ pub struct Message<'a, B> {
     options: Records<B, ParsedDhcpOptionImpl>,
 }
 
-impl<'a, B: ByteSlice> Message<'a, B> {
+impl<'a, B: SplitByteSlice> Message<'a, B> {
     /// Returns the message type.
     pub fn msg_type(&self) -> MessageType {
         self.msg_type
@@ -1231,7 +1241,7 @@ impl<'a, B: ByteSlice> Message<'a, B> {
     }
 }
 
-impl<'a, B: 'a + ByteSlice> ParsablePacket<B, ()> for Message<'a, B> {
+impl<'a, B: 'a + SplitByteSlice + IntoByteSlice<'a>> ParsablePacket<B, ()> for Message<'a, B> {
     type Error = ParseError;
 
     fn parse_metadata(&self) -> ParseMetadata {
@@ -1246,8 +1256,9 @@ impl<'a, B: 'a + ByteSlice> ParsablePacket<B, ()> for Message<'a, B> {
     fn parse<BV: BufferView<B>>(mut buf: BV, _args: ()) -> Result<Self, ParseError> {
         let msg_type =
             MessageType::try_from(buf.take_byte_front().ok_or(ParseError::BufferExhausted)?)?;
-        let transaction_id =
-            buf.take_obj_front::<TransactionId>().ok_or(ParseError::BufferExhausted)?.into_ref();
+        let transaction_id = Ref::into_ref(
+            buf.take_obj_front::<TransactionId>().ok_or(ParseError::BufferExhausted)?,
+        );
         let options = Records::<_, ParsedDhcpOptionImpl>::parse(buf.take_rest_front())?;
         Ok(Message { msg_type, transaction_id, options })
     }

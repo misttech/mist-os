@@ -21,7 +21,7 @@ use starnix_uapi::time::{duration_from_timespec, timespec_from_duration, timespe
 use starnix_uapi::vfs::FdEvents;
 use starnix_uapi::{error, itimerspec, TFD_TIMER_ABSTIME};
 use std::sync::{Arc, Weak};
-use zerocopy::AsBytes;
+use zerocopy::IntoBytes;
 
 pub trait TimerOps: Send + Sync + 'static {
     /// Starts the timer with the specified `deadline`.

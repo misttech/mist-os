@@ -4,7 +4,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell};
+use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
 
 pub const MAGMA_API_VERSION: u32 = 3;
 pub const MAGMA_VENDOR_ID_MALI: u32 = 5045;
@@ -63,7 +63,7 @@ impl Default for magma_poll_item {
 }
 pub type magma_poll_item_t = magma_poll_item;
 #[repr(C)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeros, NoCell)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, KnownLayout, FromBytes, Immutable)]
 pub struct magma_exec_resource {
     pub buffer_id: magma_buffer_id_t,
     pub offset: u64,
@@ -71,7 +71,7 @@ pub struct magma_exec_resource {
 }
 pub type magma_exec_resource_t = magma_exec_resource;
 #[repr(C)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeros, NoCell)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, KnownLayout, FromBytes, Immutable)]
 pub struct magma_exec_command_buffer {
     pub resource_index: u32,
     pub unused: u32,
@@ -120,14 +120,14 @@ impl Default for magma_inline_command_buffer {
 }
 pub type magma_inline_command_buffer_t = magma_inline_command_buffer;
 #[repr(C)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeros, NoCell)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, KnownLayout, FromBytes, Immutable)]
 pub struct magma_total_time_query_result {
     pub gpu_time_ns: u64,
     pub monotonic_time_ns: u64,
 }
 pub type magma_total_time_query_result_t = magma_total_time_query_result;
 #[repr(C)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeros, NoCell)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, KnownLayout, FromBytes, Immutable)]
 pub struct magma_buffer_offset {
     pub buffer_id: u64,
     pub offset: u64,
@@ -135,14 +135,14 @@ pub struct magma_buffer_offset {
 }
 pub type magma_buffer_offset_t = magma_buffer_offset;
 #[repr(C)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeros, NoCell)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, KnownLayout, FromBytes, Immutable)]
 pub struct magma_buffer_info {
     pub committed_byte_count: u64,
     pub size: u64,
 }
 pub type magma_buffer_info_t = magma_buffer_info;
 #[repr(C)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeros, NoCell)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, KnownLayout, FromBytes, Immutable)]
 pub struct magma_image_create_info {
     pub drm_format: u64,
     pub drm_format_modifiers: [u64; 16usize],
@@ -152,7 +152,7 @@ pub struct magma_image_create_info {
 }
 pub type magma_image_create_info_t = magma_image_create_info;
 #[repr(C)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeros, NoCell)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, KnownLayout, FromBytes, Immutable)]
 pub struct magma_image_info {
     pub plane_strides: [u64; 4usize],
     pub plane_offsets: [u32; 4usize],
@@ -497,13 +497,13 @@ extern "C" {
 pub type __u32 = ::std::os::raw::c_uint;
 pub type __u64 = ::std::os::raw::c_ulonglong;
 #[repr(C)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeros, NoCell)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, KnownLayout, FromBytes, Immutable)]
 pub struct virtmagma_ioctl_args_handshake {
     pub handshake_inout: __u32,
     pub version_out: __u32,
 }
 #[repr(C)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeros, NoCell)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, KnownLayout, FromBytes, Immutable)]
 pub struct virtmagma_ioctl_args_magma_command {
     pub request_address: __u64,
     pub request_size: __u64,
@@ -511,7 +511,7 @@ pub struct virtmagma_ioctl_args_magma_command {
     pub response_size: __u64,
 }
 #[repr(C)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeros, NoCell)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, KnownLayout, FromBytes, Immutable)]
 pub struct virtmagma_command_descriptor {
     pub descriptor_size: __u64,
     pub descriptor: __u64,
@@ -523,25 +523,25 @@ pub struct virtmagma_command_descriptor {
     pub semaphores: __u64,
 }
 #[repr(C)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeros, NoCell)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, KnownLayout, FromBytes, Immutable)]
 pub struct virtmagma_create_image_wrapper {
     pub create_info: __u64,
     pub create_info_size: __u64,
 }
 #[repr(C)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeros, NoCell)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, KnownLayout, FromBytes, Immutable)]
 pub struct virtmagma_get_image_info_wrapper {
     pub image_info_out: __u64,
     pub image_info_size: __u64,
 }
 #[repr(C)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeros, NoCell)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, KnownLayout, FromBytes, Immutable)]
 pub struct virtmagma_buffer_set_name_wrapper {
     pub name_address: __u64,
     pub name_size: __u64,
 }
 #[repr(C, packed)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeros, NoCell)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, KnownLayout, FromBytes, Immutable)]
 pub struct virtio_magma_config {
     pub dummy: u64,
 }
@@ -714,21 +714,21 @@ pub const virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_ERR_INVALID_ARGUMENT: virtio_
     12294;
 pub type virtio_magma_ctrl_type = ::std::os::raw::c_ushort;
 #[repr(C, packed)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeros, NoCell)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, KnownLayout, FromBytes, Immutable)]
 pub struct virtio_magma_ctrl_hdr {
     pub type_: u32,
     pub flags: u32,
 }
 pub type virtio_magma_ctrl_hdr_t = virtio_magma_ctrl_hdr;
 #[repr(C, packed)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeros, NoCell)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, KnownLayout, FromBytes, Immutable)]
 pub struct virtio_magma_device_import_ctrl {
     pub hdr: virtio_magma_ctrl_hdr_t,
     pub device_channel: u32,
 }
 pub type virtio_magma_device_import_ctrl_t = virtio_magma_device_import_ctrl;
 #[repr(C, packed)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeros, NoCell)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, KnownLayout, FromBytes, Immutable)]
 pub struct virtio_magma_device_import_resp {
     pub hdr: virtio_magma_ctrl_hdr_t,
     pub device_out: u64,
@@ -736,20 +736,20 @@ pub struct virtio_magma_device_import_resp {
 }
 pub type virtio_magma_device_import_resp_t = virtio_magma_device_import_resp;
 #[repr(C, packed)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeros, NoCell)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, KnownLayout, FromBytes, Immutable)]
 pub struct virtio_magma_device_release_ctrl {
     pub hdr: virtio_magma_ctrl_hdr_t,
     pub device: u64,
 }
 pub type virtio_magma_device_release_ctrl_t = virtio_magma_device_release_ctrl;
 #[repr(C, packed)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeros, NoCell)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, KnownLayout, FromBytes, Immutable)]
 pub struct virtio_magma_device_release_resp {
     pub hdr: virtio_magma_ctrl_hdr_t,
 }
 pub type virtio_magma_device_release_resp_t = virtio_magma_device_release_resp;
 #[repr(C, packed)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeros, NoCell)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, KnownLayout, FromBytes, Immutable)]
 pub struct virtio_magma_device_query_ctrl {
     pub hdr: virtio_magma_ctrl_hdr_t,
     pub device: u64,
@@ -757,7 +757,7 @@ pub struct virtio_magma_device_query_ctrl {
 }
 pub type virtio_magma_device_query_ctrl_t = virtio_magma_device_query_ctrl;
 #[repr(C, packed)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeros, NoCell)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, KnownLayout, FromBytes, Immutable)]
 pub struct virtio_magma_device_query_resp {
     pub hdr: virtio_magma_ctrl_hdr_t,
     pub result_buffer_out: u64,
@@ -766,14 +766,14 @@ pub struct virtio_magma_device_query_resp {
 }
 pub type virtio_magma_device_query_resp_t = virtio_magma_device_query_resp;
 #[repr(C, packed)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeros, NoCell)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, KnownLayout, FromBytes, Immutable)]
 pub struct virtio_magma_device_create_connection_ctrl {
     pub hdr: virtio_magma_ctrl_hdr_t,
     pub device: u64,
 }
 pub type virtio_magma_device_create_connection_ctrl_t = virtio_magma_device_create_connection_ctrl;
 #[repr(C, packed)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeros, NoCell)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, KnownLayout, FromBytes, Immutable)]
 pub struct virtio_magma_device_create_connection_resp {
     pub hdr: virtio_magma_ctrl_hdr_t,
     pub connection_out: u64,
@@ -781,34 +781,34 @@ pub struct virtio_magma_device_create_connection_resp {
 }
 pub type virtio_magma_device_create_connection_resp_t = virtio_magma_device_create_connection_resp;
 #[repr(C, packed)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeros, NoCell)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, KnownLayout, FromBytes, Immutable)]
 pub struct virtio_magma_connection_release_ctrl {
     pub hdr: virtio_magma_ctrl_hdr_t,
     pub connection: u64,
 }
 pub type virtio_magma_connection_release_ctrl_t = virtio_magma_connection_release_ctrl;
 #[repr(C, packed)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeros, NoCell)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, KnownLayout, FromBytes, Immutable)]
 pub struct virtio_magma_connection_release_resp {
     pub hdr: virtio_magma_ctrl_hdr_t,
 }
 pub type virtio_magma_connection_release_resp_t = virtio_magma_connection_release_resp;
 #[repr(C, packed)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeros, NoCell)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, KnownLayout, FromBytes, Immutable)]
 pub struct virtio_magma_connection_get_error_ctrl {
     pub hdr: virtio_magma_ctrl_hdr_t,
     pub connection: u64,
 }
 pub type virtio_magma_connection_get_error_ctrl_t = virtio_magma_connection_get_error_ctrl;
 #[repr(C, packed)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeros, NoCell)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, KnownLayout, FromBytes, Immutable)]
 pub struct virtio_magma_connection_get_error_resp {
     pub hdr: virtio_magma_ctrl_hdr_t,
     pub result_return: u64,
 }
 pub type virtio_magma_connection_get_error_resp_t = virtio_magma_connection_get_error_resp;
 #[repr(C, packed)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeros, NoCell)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, KnownLayout, FromBytes, Immutable)]
 pub struct virtio_magma_connection_create_context_ctrl {
     pub hdr: virtio_magma_ctrl_hdr_t,
     pub connection: u64,
@@ -816,7 +816,7 @@ pub struct virtio_magma_connection_create_context_ctrl {
 pub type virtio_magma_connection_create_context_ctrl_t =
     virtio_magma_connection_create_context_ctrl;
 #[repr(C, packed)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeros, NoCell)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, KnownLayout, FromBytes, Immutable)]
 pub struct virtio_magma_connection_create_context_resp {
     pub hdr: virtio_magma_ctrl_hdr_t,
     pub context_id_out: u64,
@@ -825,7 +825,7 @@ pub struct virtio_magma_connection_create_context_resp {
 pub type virtio_magma_connection_create_context_resp_t =
     virtio_magma_connection_create_context_resp;
 #[repr(C, packed)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeros, NoCell)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, KnownLayout, FromBytes, Immutable)]
 pub struct virtio_magma_connection_release_context_ctrl {
     pub hdr: virtio_magma_ctrl_hdr_t,
     pub connection: u64,
@@ -834,14 +834,14 @@ pub struct virtio_magma_connection_release_context_ctrl {
 pub type virtio_magma_connection_release_context_ctrl_t =
     virtio_magma_connection_release_context_ctrl;
 #[repr(C, packed)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeros, NoCell)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, KnownLayout, FromBytes, Immutable)]
 pub struct virtio_magma_connection_release_context_resp {
     pub hdr: virtio_magma_ctrl_hdr_t,
 }
 pub type virtio_magma_connection_release_context_resp_t =
     virtio_magma_connection_release_context_resp;
 #[repr(C, packed)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeros, NoCell)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, KnownLayout, FromBytes, Immutable)]
 pub struct virtio_magma_connection_create_buffer_ctrl {
     pub hdr: virtio_magma_ctrl_hdr_t,
     pub connection: u64,
@@ -849,7 +849,7 @@ pub struct virtio_magma_connection_create_buffer_ctrl {
 }
 pub type virtio_magma_connection_create_buffer_ctrl_t = virtio_magma_connection_create_buffer_ctrl;
 #[repr(C, packed)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeros, NoCell)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, KnownLayout, FromBytes, Immutable)]
 pub struct virtio_magma_connection_create_buffer_resp {
     pub hdr: virtio_magma_ctrl_hdr_t,
     pub size_out: u64,
@@ -859,7 +859,7 @@ pub struct virtio_magma_connection_create_buffer_resp {
 }
 pub type virtio_magma_connection_create_buffer_resp_t = virtio_magma_connection_create_buffer_resp;
 #[repr(C, packed)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeros, NoCell)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, KnownLayout, FromBytes, Immutable)]
 pub struct virtio_magma_connection_release_buffer_ctrl {
     pub hdr: virtio_magma_ctrl_hdr_t,
     pub connection: u64,
@@ -868,14 +868,14 @@ pub struct virtio_magma_connection_release_buffer_ctrl {
 pub type virtio_magma_connection_release_buffer_ctrl_t =
     virtio_magma_connection_release_buffer_ctrl;
 #[repr(C, packed)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeros, NoCell)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, KnownLayout, FromBytes, Immutable)]
 pub struct virtio_magma_connection_release_buffer_resp {
     pub hdr: virtio_magma_ctrl_hdr_t,
 }
 pub type virtio_magma_connection_release_buffer_resp_t =
     virtio_magma_connection_release_buffer_resp;
 #[repr(C, packed)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeros, NoCell)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, KnownLayout, FromBytes, Immutable)]
 pub struct virtio_magma_connection_import_buffer_ctrl {
     pub hdr: virtio_magma_ctrl_hdr_t,
     pub connection: u64,
@@ -883,7 +883,7 @@ pub struct virtio_magma_connection_import_buffer_ctrl {
 }
 pub type virtio_magma_connection_import_buffer_ctrl_t = virtio_magma_connection_import_buffer_ctrl;
 #[repr(C, packed)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeros, NoCell)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, KnownLayout, FromBytes, Immutable)]
 pub struct virtio_magma_connection_import_buffer_resp {
     pub hdr: virtio_magma_ctrl_hdr_t,
     pub size_out: u64,
@@ -893,7 +893,7 @@ pub struct virtio_magma_connection_import_buffer_resp {
 }
 pub type virtio_magma_connection_import_buffer_resp_t = virtio_magma_connection_import_buffer_resp;
 #[repr(C, packed)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeros, NoCell)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, KnownLayout, FromBytes, Immutable)]
 pub struct virtio_magma_connection_create_semaphore_ctrl {
     pub hdr: virtio_magma_ctrl_hdr_t,
     pub connection: u64,
@@ -901,7 +901,7 @@ pub struct virtio_magma_connection_create_semaphore_ctrl {
 pub type virtio_magma_connection_create_semaphore_ctrl_t =
     virtio_magma_connection_create_semaphore_ctrl;
 #[repr(C, packed)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeros, NoCell)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, KnownLayout, FromBytes, Immutable)]
 pub struct virtio_magma_connection_create_semaphore_resp {
     pub hdr: virtio_magma_ctrl_hdr_t,
     pub semaphore_out: u64,
@@ -911,7 +911,7 @@ pub struct virtio_magma_connection_create_semaphore_resp {
 pub type virtio_magma_connection_create_semaphore_resp_t =
     virtio_magma_connection_create_semaphore_resp;
 #[repr(C, packed)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeros, NoCell)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, KnownLayout, FromBytes, Immutable)]
 pub struct virtio_magma_connection_release_semaphore_ctrl {
     pub hdr: virtio_magma_ctrl_hdr_t,
     pub connection: u64,
@@ -920,14 +920,14 @@ pub struct virtio_magma_connection_release_semaphore_ctrl {
 pub type virtio_magma_connection_release_semaphore_ctrl_t =
     virtio_magma_connection_release_semaphore_ctrl;
 #[repr(C, packed)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeros, NoCell)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, KnownLayout, FromBytes, Immutable)]
 pub struct virtio_magma_connection_release_semaphore_resp {
     pub hdr: virtio_magma_ctrl_hdr_t,
 }
 pub type virtio_magma_connection_release_semaphore_resp_t =
     virtio_magma_connection_release_semaphore_resp;
 #[repr(C, packed)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeros, NoCell)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, KnownLayout, FromBytes, Immutable)]
 pub struct virtio_magma_connection_import_semaphore2_ctrl {
     pub hdr: virtio_magma_ctrl_hdr_t,
     pub connection: u64,
@@ -937,7 +937,7 @@ pub struct virtio_magma_connection_import_semaphore2_ctrl {
 pub type virtio_magma_connection_import_semaphore2_ctrl_t =
     virtio_magma_connection_import_semaphore2_ctrl;
 #[repr(C, packed)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeros, NoCell)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, KnownLayout, FromBytes, Immutable)]
 pub struct virtio_magma_connection_import_semaphore2_resp {
     pub hdr: virtio_magma_ctrl_hdr_t,
     pub semaphore_out: u64,
@@ -947,7 +947,7 @@ pub struct virtio_magma_connection_import_semaphore2_resp {
 pub type virtio_magma_connection_import_semaphore2_resp_t =
     virtio_magma_connection_import_semaphore2_resp;
 #[repr(C, packed)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeros, NoCell)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, KnownLayout, FromBytes, Immutable)]
 pub struct virtio_magma_connection_perform_buffer_op_ctrl {
     pub hdr: virtio_magma_ctrl_hdr_t,
     pub connection: u64,
@@ -959,7 +959,7 @@ pub struct virtio_magma_connection_perform_buffer_op_ctrl {
 pub type virtio_magma_connection_perform_buffer_op_ctrl_t =
     virtio_magma_connection_perform_buffer_op_ctrl;
 #[repr(C, packed)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeros, NoCell)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, KnownLayout, FromBytes, Immutable)]
 pub struct virtio_magma_connection_perform_buffer_op_resp {
     pub hdr: virtio_magma_ctrl_hdr_t,
     pub result_return: u64,
@@ -967,7 +967,7 @@ pub struct virtio_magma_connection_perform_buffer_op_resp {
 pub type virtio_magma_connection_perform_buffer_op_resp_t =
     virtio_magma_connection_perform_buffer_op_resp;
 #[repr(C, packed)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeros, NoCell)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, KnownLayout, FromBytes, Immutable)]
 pub struct virtio_magma_connection_map_buffer_ctrl {
     pub hdr: virtio_magma_ctrl_hdr_t,
     pub connection: u64,
@@ -979,14 +979,14 @@ pub struct virtio_magma_connection_map_buffer_ctrl {
 }
 pub type virtio_magma_connection_map_buffer_ctrl_t = virtio_magma_connection_map_buffer_ctrl;
 #[repr(C, packed)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeros, NoCell)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, KnownLayout, FromBytes, Immutable)]
 pub struct virtio_magma_connection_map_buffer_resp {
     pub hdr: virtio_magma_ctrl_hdr_t,
     pub result_return: u64,
 }
 pub type virtio_magma_connection_map_buffer_resp_t = virtio_magma_connection_map_buffer_resp;
 #[repr(C, packed)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeros, NoCell)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, KnownLayout, FromBytes, Immutable)]
 pub struct virtio_magma_connection_unmap_buffer_ctrl {
     pub hdr: virtio_magma_ctrl_hdr_t,
     pub connection: u64,
@@ -995,13 +995,13 @@ pub struct virtio_magma_connection_unmap_buffer_ctrl {
 }
 pub type virtio_magma_connection_unmap_buffer_ctrl_t = virtio_magma_connection_unmap_buffer_ctrl;
 #[repr(C, packed)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeros, NoCell)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, KnownLayout, FromBytes, Immutable)]
 pub struct virtio_magma_connection_unmap_buffer_resp {
     pub hdr: virtio_magma_ctrl_hdr_t,
 }
 pub type virtio_magma_connection_unmap_buffer_resp_t = virtio_magma_connection_unmap_buffer_resp;
 #[repr(C, packed)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeros, NoCell)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, KnownLayout, FromBytes, Immutable)]
 pub struct virtio_magma_connection_execute_command_ctrl {
     pub hdr: virtio_magma_ctrl_hdr_t,
     pub connection: u64,
@@ -1011,7 +1011,7 @@ pub struct virtio_magma_connection_execute_command_ctrl {
 pub type virtio_magma_connection_execute_command_ctrl_t =
     virtio_magma_connection_execute_command_ctrl;
 #[repr(C, packed)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeros, NoCell)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, KnownLayout, FromBytes, Immutable)]
 pub struct virtio_magma_connection_execute_command_resp {
     pub hdr: virtio_magma_ctrl_hdr_t,
     pub result_return: u64,
@@ -1019,7 +1019,7 @@ pub struct virtio_magma_connection_execute_command_resp {
 pub type virtio_magma_connection_execute_command_resp_t =
     virtio_magma_connection_execute_command_resp;
 #[repr(C, packed)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeros, NoCell)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, KnownLayout, FromBytes, Immutable)]
 pub struct virtio_magma_connection_execute_immediate_commands_ctrl {
     pub hdr: virtio_magma_ctrl_hdr_t,
     pub connection: u64,
@@ -1030,7 +1030,7 @@ pub struct virtio_magma_connection_execute_immediate_commands_ctrl {
 pub type virtio_magma_connection_execute_immediate_commands_ctrl_t =
     virtio_magma_connection_execute_immediate_commands_ctrl;
 #[repr(C, packed)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeros, NoCell)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, KnownLayout, FromBytes, Immutable)]
 pub struct virtio_magma_connection_execute_immediate_commands_resp {
     pub hdr: virtio_magma_ctrl_hdr_t,
     pub result_return: u64,
@@ -1038,21 +1038,21 @@ pub struct virtio_magma_connection_execute_immediate_commands_resp {
 pub type virtio_magma_connection_execute_immediate_commands_resp_t =
     virtio_magma_connection_execute_immediate_commands_resp;
 #[repr(C, packed)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeros, NoCell)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, KnownLayout, FromBytes, Immutable)]
 pub struct virtio_magma_connection_flush_ctrl {
     pub hdr: virtio_magma_ctrl_hdr_t,
     pub connection: u64,
 }
 pub type virtio_magma_connection_flush_ctrl_t = virtio_magma_connection_flush_ctrl;
 #[repr(C, packed)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeros, NoCell)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, KnownLayout, FromBytes, Immutable)]
 pub struct virtio_magma_connection_flush_resp {
     pub hdr: virtio_magma_ctrl_hdr_t,
     pub result_return: u64,
 }
 pub type virtio_magma_connection_flush_resp_t = virtio_magma_connection_flush_resp;
 #[repr(C, packed)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeros, NoCell)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, KnownLayout, FromBytes, Immutable)]
 pub struct virtio_magma_connection_get_notification_channel_handle_ctrl {
     pub hdr: virtio_magma_ctrl_hdr_t,
     pub connection: u64,
@@ -1060,7 +1060,7 @@ pub struct virtio_magma_connection_get_notification_channel_handle_ctrl {
 pub type virtio_magma_connection_get_notification_channel_handle_ctrl_t =
     virtio_magma_connection_get_notification_channel_handle_ctrl;
 #[repr(C, packed)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeros, NoCell)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, KnownLayout, FromBytes, Immutable)]
 pub struct virtio_magma_connection_get_notification_channel_handle_resp {
     pub hdr: virtio_magma_ctrl_hdr_t,
     pub result_return: u32,
@@ -1068,7 +1068,7 @@ pub struct virtio_magma_connection_get_notification_channel_handle_resp {
 pub type virtio_magma_connection_get_notification_channel_handle_resp_t =
     virtio_magma_connection_get_notification_channel_handle_resp;
 #[repr(C, packed)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeros, NoCell)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, KnownLayout, FromBytes, Immutable)]
 pub struct virtio_magma_connection_read_notification_channel_ctrl {
     pub hdr: virtio_magma_ctrl_hdr_t,
     pub connection: u64,
@@ -1078,7 +1078,7 @@ pub struct virtio_magma_connection_read_notification_channel_ctrl {
 pub type virtio_magma_connection_read_notification_channel_ctrl_t =
     virtio_magma_connection_read_notification_channel_ctrl;
 #[repr(C, packed)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeros, NoCell)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, KnownLayout, FromBytes, Immutable)]
 pub struct virtio_magma_connection_read_notification_channel_resp {
     pub hdr: virtio_magma_ctrl_hdr_t,
     pub buffer_size_out: u64,
@@ -1088,7 +1088,7 @@ pub struct virtio_magma_connection_read_notification_channel_resp {
 pub type virtio_magma_connection_read_notification_channel_resp_t =
     virtio_magma_connection_read_notification_channel_resp;
 #[repr(C, packed)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeros, NoCell)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, KnownLayout, FromBytes, Immutable)]
 pub struct virtio_magma_buffer_clean_cache_ctrl {
     pub hdr: virtio_magma_ctrl_hdr_t,
     pub buffer: u64,
@@ -1098,14 +1098,14 @@ pub struct virtio_magma_buffer_clean_cache_ctrl {
 }
 pub type virtio_magma_buffer_clean_cache_ctrl_t = virtio_magma_buffer_clean_cache_ctrl;
 #[repr(C, packed)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeros, NoCell)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, KnownLayout, FromBytes, Immutable)]
 pub struct virtio_magma_buffer_clean_cache_resp {
     pub hdr: virtio_magma_ctrl_hdr_t,
     pub result_return: u64,
 }
 pub type virtio_magma_buffer_clean_cache_resp_t = virtio_magma_buffer_clean_cache_resp;
 #[repr(C, packed)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeros, NoCell)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, KnownLayout, FromBytes, Immutable)]
 pub struct virtio_magma_buffer_set_cache_policy_ctrl {
     pub hdr: virtio_magma_ctrl_hdr_t,
     pub buffer: u64,
@@ -1113,21 +1113,21 @@ pub struct virtio_magma_buffer_set_cache_policy_ctrl {
 }
 pub type virtio_magma_buffer_set_cache_policy_ctrl_t = virtio_magma_buffer_set_cache_policy_ctrl;
 #[repr(C, packed)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeros, NoCell)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, KnownLayout, FromBytes, Immutable)]
 pub struct virtio_magma_buffer_set_cache_policy_resp {
     pub hdr: virtio_magma_ctrl_hdr_t,
     pub result_return: u64,
 }
 pub type virtio_magma_buffer_set_cache_policy_resp_t = virtio_magma_buffer_set_cache_policy_resp;
 #[repr(C, packed)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeros, NoCell)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, KnownLayout, FromBytes, Immutable)]
 pub struct virtio_magma_buffer_get_cache_policy_ctrl {
     pub hdr: virtio_magma_ctrl_hdr_t,
     pub buffer: u64,
 }
 pub type virtio_magma_buffer_get_cache_policy_ctrl_t = virtio_magma_buffer_get_cache_policy_ctrl;
 #[repr(C, packed)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeros, NoCell)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, KnownLayout, FromBytes, Immutable)]
 pub struct virtio_magma_buffer_get_cache_policy_resp {
     pub hdr: virtio_magma_ctrl_hdr_t,
     pub cache_policy_out: u64,
@@ -1135,7 +1135,7 @@ pub struct virtio_magma_buffer_get_cache_policy_resp {
 }
 pub type virtio_magma_buffer_get_cache_policy_resp_t = virtio_magma_buffer_get_cache_policy_resp;
 #[repr(C, packed)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeros, NoCell)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, KnownLayout, FromBytes, Immutable)]
 pub struct virtio_magma_buffer_set_name_ctrl {
     pub hdr: virtio_magma_ctrl_hdr_t,
     pub buffer: u64,
@@ -1143,14 +1143,14 @@ pub struct virtio_magma_buffer_set_name_ctrl {
 }
 pub type virtio_magma_buffer_set_name_ctrl_t = virtio_magma_buffer_set_name_ctrl;
 #[repr(C, packed)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeros, NoCell)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, KnownLayout, FromBytes, Immutable)]
 pub struct virtio_magma_buffer_set_name_resp {
     pub hdr: virtio_magma_ctrl_hdr_t,
     pub result_return: u64,
 }
 pub type virtio_magma_buffer_set_name_resp_t = virtio_magma_buffer_set_name_resp;
 #[repr(C, packed)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeros, NoCell)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, KnownLayout, FromBytes, Immutable)]
 pub struct virtio_magma_buffer_get_info_ctrl {
     pub hdr: virtio_magma_ctrl_hdr_t,
     pub buffer: u64,
@@ -1158,21 +1158,21 @@ pub struct virtio_magma_buffer_get_info_ctrl {
 }
 pub type virtio_magma_buffer_get_info_ctrl_t = virtio_magma_buffer_get_info_ctrl;
 #[repr(C, packed)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeros, NoCell)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, KnownLayout, FromBytes, Immutable)]
 pub struct virtio_magma_buffer_get_info_resp {
     pub hdr: virtio_magma_ctrl_hdr_t,
     pub result_return: u64,
 }
 pub type virtio_magma_buffer_get_info_resp_t = virtio_magma_buffer_get_info_resp;
 #[repr(C, packed)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeros, NoCell)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, KnownLayout, FromBytes, Immutable)]
 pub struct virtio_magma_buffer_get_handle_ctrl {
     pub hdr: virtio_magma_ctrl_hdr_t,
     pub buffer: u64,
 }
 pub type virtio_magma_buffer_get_handle_ctrl_t = virtio_magma_buffer_get_handle_ctrl;
 #[repr(C, packed)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeros, NoCell)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, KnownLayout, FromBytes, Immutable)]
 pub struct virtio_magma_buffer_get_handle_resp {
     pub hdr: virtio_magma_ctrl_hdr_t,
     pub handle_out: u64,
@@ -1180,14 +1180,14 @@ pub struct virtio_magma_buffer_get_handle_resp {
 }
 pub type virtio_magma_buffer_get_handle_resp_t = virtio_magma_buffer_get_handle_resp;
 #[repr(C, packed)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeros, NoCell)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, KnownLayout, FromBytes, Immutable)]
 pub struct virtio_magma_buffer_export_ctrl {
     pub hdr: virtio_magma_ctrl_hdr_t,
     pub buffer: u64,
 }
 pub type virtio_magma_buffer_export_ctrl_t = virtio_magma_buffer_export_ctrl;
 #[repr(C, packed)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeros, NoCell)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, KnownLayout, FromBytes, Immutable)]
 pub struct virtio_magma_buffer_export_resp {
     pub hdr: virtio_magma_ctrl_hdr_t,
     pub buffer_handle_out: u64,
@@ -1195,40 +1195,40 @@ pub struct virtio_magma_buffer_export_resp {
 }
 pub type virtio_magma_buffer_export_resp_t = virtio_magma_buffer_export_resp;
 #[repr(C, packed)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeros, NoCell)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, KnownLayout, FromBytes, Immutable)]
 pub struct virtio_magma_semaphore_signal_ctrl {
     pub hdr: virtio_magma_ctrl_hdr_t,
     pub semaphore: u64,
 }
 pub type virtio_magma_semaphore_signal_ctrl_t = virtio_magma_semaphore_signal_ctrl;
 #[repr(C, packed)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeros, NoCell)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, KnownLayout, FromBytes, Immutable)]
 pub struct virtio_magma_semaphore_signal_resp {
     pub hdr: virtio_magma_ctrl_hdr_t,
 }
 pub type virtio_magma_semaphore_signal_resp_t = virtio_magma_semaphore_signal_resp;
 #[repr(C, packed)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeros, NoCell)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, KnownLayout, FromBytes, Immutable)]
 pub struct virtio_magma_semaphore_reset_ctrl {
     pub hdr: virtio_magma_ctrl_hdr_t,
     pub semaphore: u64,
 }
 pub type virtio_magma_semaphore_reset_ctrl_t = virtio_magma_semaphore_reset_ctrl;
 #[repr(C, packed)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeros, NoCell)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, KnownLayout, FromBytes, Immutable)]
 pub struct virtio_magma_semaphore_reset_resp {
     pub hdr: virtio_magma_ctrl_hdr_t,
 }
 pub type virtio_magma_semaphore_reset_resp_t = virtio_magma_semaphore_reset_resp;
 #[repr(C, packed)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeros, NoCell)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, KnownLayout, FromBytes, Immutable)]
 pub struct virtio_magma_semaphore_export_ctrl {
     pub hdr: virtio_magma_ctrl_hdr_t,
     pub semaphore: u64,
 }
 pub type virtio_magma_semaphore_export_ctrl_t = virtio_magma_semaphore_export_ctrl;
 #[repr(C, packed)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeros, NoCell)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, KnownLayout, FromBytes, Immutable)]
 pub struct virtio_magma_semaphore_export_resp {
     pub hdr: virtio_magma_ctrl_hdr_t,
     pub semaphore_handle_out: u64,
@@ -1236,7 +1236,7 @@ pub struct virtio_magma_semaphore_export_resp {
 }
 pub type virtio_magma_semaphore_export_resp_t = virtio_magma_semaphore_export_resp;
 #[repr(C, packed)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeros, NoCell)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, KnownLayout, FromBytes, Immutable)]
 pub struct virtio_magma_poll_ctrl {
     pub hdr: virtio_magma_ctrl_hdr_t,
     pub items: u64,
@@ -1245,42 +1245,42 @@ pub struct virtio_magma_poll_ctrl {
 }
 pub type virtio_magma_poll_ctrl_t = virtio_magma_poll_ctrl;
 #[repr(C, packed)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeros, NoCell)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, KnownLayout, FromBytes, Immutable)]
 pub struct virtio_magma_poll_resp {
     pub hdr: virtio_magma_ctrl_hdr_t,
     pub result_return: u64,
 }
 pub type virtio_magma_poll_resp_t = virtio_magma_poll_resp;
 #[repr(C, packed)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeros, NoCell)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, KnownLayout, FromBytes, Immutable)]
 pub struct virtio_magma_initialize_tracing_ctrl {
     pub hdr: virtio_magma_ctrl_hdr_t,
     pub channel: u32,
 }
 pub type virtio_magma_initialize_tracing_ctrl_t = virtio_magma_initialize_tracing_ctrl;
 #[repr(C, packed)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeros, NoCell)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, KnownLayout, FromBytes, Immutable)]
 pub struct virtio_magma_initialize_tracing_resp {
     pub hdr: virtio_magma_ctrl_hdr_t,
     pub result_return: u64,
 }
 pub type virtio_magma_initialize_tracing_resp_t = virtio_magma_initialize_tracing_resp;
 #[repr(C, packed)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeros, NoCell)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, KnownLayout, FromBytes, Immutable)]
 pub struct virtio_magma_initialize_logging_ctrl {
     pub hdr: virtio_magma_ctrl_hdr_t,
     pub channel: u32,
 }
 pub type virtio_magma_initialize_logging_ctrl_t = virtio_magma_initialize_logging_ctrl;
 #[repr(C, packed)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeros, NoCell)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, KnownLayout, FromBytes, Immutable)]
 pub struct virtio_magma_initialize_logging_resp {
     pub hdr: virtio_magma_ctrl_hdr_t,
     pub result_return: u64,
 }
 pub type virtio_magma_initialize_logging_resp_t = virtio_magma_initialize_logging_resp;
 #[repr(C, packed)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeros, NoCell)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, KnownLayout, FromBytes, Immutable)]
 pub struct virtio_magma_connection_enable_performance_counter_access_ctrl {
     pub hdr: virtio_magma_ctrl_hdr_t,
     pub connection: u64,
@@ -1289,7 +1289,7 @@ pub struct virtio_magma_connection_enable_performance_counter_access_ctrl {
 pub type virtio_magma_connection_enable_performance_counter_access_ctrl_t =
     virtio_magma_connection_enable_performance_counter_access_ctrl;
 #[repr(C, packed)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeros, NoCell)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, KnownLayout, FromBytes, Immutable)]
 pub struct virtio_magma_connection_enable_performance_counter_access_resp {
     pub hdr: virtio_magma_ctrl_hdr_t,
     pub result_return: u64,
@@ -1297,7 +1297,7 @@ pub struct virtio_magma_connection_enable_performance_counter_access_resp {
 pub type virtio_magma_connection_enable_performance_counter_access_resp_t =
     virtio_magma_connection_enable_performance_counter_access_resp;
 #[repr(C, packed)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeros, NoCell)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, KnownLayout, FromBytes, Immutable)]
 pub struct virtio_magma_connection_enable_performance_counters_ctrl {
     pub hdr: virtio_magma_ctrl_hdr_t,
     pub connection: u64,
@@ -1307,7 +1307,7 @@ pub struct virtio_magma_connection_enable_performance_counters_ctrl {
 pub type virtio_magma_connection_enable_performance_counters_ctrl_t =
     virtio_magma_connection_enable_performance_counters_ctrl;
 #[repr(C, packed)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeros, NoCell)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, KnownLayout, FromBytes, Immutable)]
 pub struct virtio_magma_connection_enable_performance_counters_resp {
     pub hdr: virtio_magma_ctrl_hdr_t,
     pub result_return: u64,
@@ -1315,7 +1315,7 @@ pub struct virtio_magma_connection_enable_performance_counters_resp {
 pub type virtio_magma_connection_enable_performance_counters_resp_t =
     virtio_magma_connection_enable_performance_counters_resp;
 #[repr(C, packed)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeros, NoCell)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, KnownLayout, FromBytes, Immutable)]
 pub struct virtio_magma_connection_create_performance_counter_buffer_pool_ctrl {
     pub hdr: virtio_magma_ctrl_hdr_t,
     pub connection: u64,
@@ -1323,7 +1323,7 @@ pub struct virtio_magma_connection_create_performance_counter_buffer_pool_ctrl {
 pub type virtio_magma_connection_create_performance_counter_buffer_pool_ctrl_t =
     virtio_magma_connection_create_performance_counter_buffer_pool_ctrl;
 #[repr(C, packed)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeros, NoCell)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, KnownLayout, FromBytes, Immutable)]
 pub struct virtio_magma_connection_create_performance_counter_buffer_pool_resp {
     pub hdr: virtio_magma_ctrl_hdr_t,
     pub pool_id_out: u64,
@@ -1333,7 +1333,7 @@ pub struct virtio_magma_connection_create_performance_counter_buffer_pool_resp {
 pub type virtio_magma_connection_create_performance_counter_buffer_pool_resp_t =
     virtio_magma_connection_create_performance_counter_buffer_pool_resp;
 #[repr(C, packed)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeros, NoCell)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, KnownLayout, FromBytes, Immutable)]
 pub struct virtio_magma_connection_release_performance_counter_buffer_pool_ctrl {
     pub hdr: virtio_magma_ctrl_hdr_t,
     pub connection: u64,
@@ -1342,7 +1342,7 @@ pub struct virtio_magma_connection_release_performance_counter_buffer_pool_ctrl 
 pub type virtio_magma_connection_release_performance_counter_buffer_pool_ctrl_t =
     virtio_magma_connection_release_performance_counter_buffer_pool_ctrl;
 #[repr(C, packed)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeros, NoCell)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, KnownLayout, FromBytes, Immutable)]
 pub struct virtio_magma_connection_release_performance_counter_buffer_pool_resp {
     pub hdr: virtio_magma_ctrl_hdr_t,
     pub result_return: u64,
@@ -1350,7 +1350,7 @@ pub struct virtio_magma_connection_release_performance_counter_buffer_pool_resp 
 pub type virtio_magma_connection_release_performance_counter_buffer_pool_resp_t =
     virtio_magma_connection_release_performance_counter_buffer_pool_resp;
 #[repr(C, packed)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeros, NoCell)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, KnownLayout, FromBytes, Immutable)]
 pub struct virtio_magma_connection_add_performance_counter_buffer_offsets_to_pool_ctrl {
     pub hdr: virtio_magma_ctrl_hdr_t,
     pub connection: u64,
@@ -1361,7 +1361,7 @@ pub struct virtio_magma_connection_add_performance_counter_buffer_offsets_to_poo
 pub type virtio_magma_connection_add_performance_counter_buffer_offsets_to_pool_ctrl_t =
     virtio_magma_connection_add_performance_counter_buffer_offsets_to_pool_ctrl;
 #[repr(C, packed)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeros, NoCell)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, KnownLayout, FromBytes, Immutable)]
 pub struct virtio_magma_connection_add_performance_counter_buffer_offsets_to_pool_resp {
     pub hdr: virtio_magma_ctrl_hdr_t,
     pub result_return: u64,
@@ -1369,7 +1369,7 @@ pub struct virtio_magma_connection_add_performance_counter_buffer_offsets_to_poo
 pub type virtio_magma_connection_add_performance_counter_buffer_offsets_to_pool_resp_t =
     virtio_magma_connection_add_performance_counter_buffer_offsets_to_pool_resp;
 #[repr(C, packed)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeros, NoCell)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, KnownLayout, FromBytes, Immutable)]
 pub struct virtio_magma_connection_remove_performance_counter_buffer_from_pool_ctrl {
     pub hdr: virtio_magma_ctrl_hdr_t,
     pub connection: u64,
@@ -1379,7 +1379,7 @@ pub struct virtio_magma_connection_remove_performance_counter_buffer_from_pool_c
 pub type virtio_magma_connection_remove_performance_counter_buffer_from_pool_ctrl_t =
     virtio_magma_connection_remove_performance_counter_buffer_from_pool_ctrl;
 #[repr(C, packed)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeros, NoCell)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, KnownLayout, FromBytes, Immutable)]
 pub struct virtio_magma_connection_remove_performance_counter_buffer_from_pool_resp {
     pub hdr: virtio_magma_ctrl_hdr_t,
     pub result_return: u64,
@@ -1387,7 +1387,7 @@ pub struct virtio_magma_connection_remove_performance_counter_buffer_from_pool_r
 pub type virtio_magma_connection_remove_performance_counter_buffer_from_pool_resp_t =
     virtio_magma_connection_remove_performance_counter_buffer_from_pool_resp;
 #[repr(C, packed)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeros, NoCell)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, KnownLayout, FromBytes, Immutable)]
 pub struct virtio_magma_connection_dump_performance_counters_ctrl {
     pub hdr: virtio_magma_ctrl_hdr_t,
     pub connection: u64,
@@ -1397,7 +1397,7 @@ pub struct virtio_magma_connection_dump_performance_counters_ctrl {
 pub type virtio_magma_connection_dump_performance_counters_ctrl_t =
     virtio_magma_connection_dump_performance_counters_ctrl;
 #[repr(C, packed)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeros, NoCell)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, KnownLayout, FromBytes, Immutable)]
 pub struct virtio_magma_connection_dump_performance_counters_resp {
     pub hdr: virtio_magma_ctrl_hdr_t,
     pub result_return: u64,
@@ -1405,7 +1405,7 @@ pub struct virtio_magma_connection_dump_performance_counters_resp {
 pub type virtio_magma_connection_dump_performance_counters_resp_t =
     virtio_magma_connection_dump_performance_counters_resp;
 #[repr(C, packed)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeros, NoCell)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, KnownLayout, FromBytes, Immutable)]
 pub struct virtio_magma_connection_clear_performance_counters_ctrl {
     pub hdr: virtio_magma_ctrl_hdr_t,
     pub connection: u64,
@@ -1415,7 +1415,7 @@ pub struct virtio_magma_connection_clear_performance_counters_ctrl {
 pub type virtio_magma_connection_clear_performance_counters_ctrl_t =
     virtio_magma_connection_clear_performance_counters_ctrl;
 #[repr(C, packed)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeros, NoCell)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, KnownLayout, FromBytes, Immutable)]
 pub struct virtio_magma_connection_clear_performance_counters_resp {
     pub hdr: virtio_magma_ctrl_hdr_t,
     pub result_return: u64,
@@ -1423,7 +1423,7 @@ pub struct virtio_magma_connection_clear_performance_counters_resp {
 pub type virtio_magma_connection_clear_performance_counters_resp_t =
     virtio_magma_connection_clear_performance_counters_resp;
 #[repr(C, packed)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeros, NoCell)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, KnownLayout, FromBytes, Immutable)]
 pub struct virtio_magma_connection_read_performance_counter_completion_ctrl {
     pub hdr: virtio_magma_ctrl_hdr_t,
     pub connection: u64,
@@ -1432,7 +1432,7 @@ pub struct virtio_magma_connection_read_performance_counter_completion_ctrl {
 pub type virtio_magma_connection_read_performance_counter_completion_ctrl_t =
     virtio_magma_connection_read_performance_counter_completion_ctrl;
 #[repr(C, packed)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeros, NoCell)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, KnownLayout, FromBytes, Immutable)]
 pub struct virtio_magma_connection_read_performance_counter_completion_resp {
     pub hdr: virtio_magma_ctrl_hdr_t,
     pub trigger_id_out: u64,
@@ -1445,7 +1445,7 @@ pub struct virtio_magma_connection_read_performance_counter_completion_resp {
 pub type virtio_magma_connection_read_performance_counter_completion_resp_t =
     virtio_magma_connection_read_performance_counter_completion_resp;
 #[repr(C, packed)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeros, NoCell)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, KnownLayout, FromBytes, Immutable)]
 pub struct virtio_magma_virt_connection_create_image_ctrl {
     pub hdr: virtio_magma_ctrl_hdr_t,
     pub connection: u64,
@@ -1454,7 +1454,7 @@ pub struct virtio_magma_virt_connection_create_image_ctrl {
 pub type virtio_magma_virt_connection_create_image_ctrl_t =
     virtio_magma_virt_connection_create_image_ctrl;
 #[repr(C, packed)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeros, NoCell)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, KnownLayout, FromBytes, Immutable)]
 pub struct virtio_magma_virt_connection_create_image_resp {
     pub hdr: virtio_magma_ctrl_hdr_t,
     pub size_out: u64,
@@ -1465,7 +1465,7 @@ pub struct virtio_magma_virt_connection_create_image_resp {
 pub type virtio_magma_virt_connection_create_image_resp_t =
     virtio_magma_virt_connection_create_image_resp;
 #[repr(C, packed)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeros, NoCell)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, KnownLayout, FromBytes, Immutable)]
 pub struct virtio_magma_virt_connection_get_image_info_ctrl {
     pub hdr: virtio_magma_ctrl_hdr_t,
     pub connection: u64,
@@ -1475,7 +1475,7 @@ pub struct virtio_magma_virt_connection_get_image_info_ctrl {
 pub type virtio_magma_virt_connection_get_image_info_ctrl_t =
     virtio_magma_virt_connection_get_image_info_ctrl;
 #[repr(C, packed)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeros, NoCell)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, KnownLayout, FromBytes, Immutable)]
 pub struct virtio_magma_virt_connection_get_image_info_resp {
     pub hdr: virtio_magma_ctrl_hdr_t,
     pub result_return: u64,
@@ -1483,21 +1483,21 @@ pub struct virtio_magma_virt_connection_get_image_info_resp {
 pub type virtio_magma_virt_connection_get_image_info_resp_t =
     virtio_magma_virt_connection_get_image_info_resp;
 #[repr(C, packed)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeros, NoCell)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, KnownLayout, FromBytes, Immutable)]
 pub struct virtio_magma_internal_release_handle_ctrl {
     pub hdr: virtio_magma_ctrl_hdr_t,
     pub handle: u32,
 }
 pub type virtio_magma_internal_release_handle_ctrl_t = virtio_magma_internal_release_handle_ctrl;
 #[repr(C, packed)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeros, NoCell)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, KnownLayout, FromBytes, Immutable)]
 pub struct virtio_magma_internal_release_handle_resp {
     pub hdr: virtio_magma_ctrl_hdr_t,
     pub result_return: u64,
 }
 pub type virtio_magma_internal_release_handle_resp_t = virtio_magma_internal_release_handle_resp;
 #[repr(C, packed)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeros, NoCell)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, KnownLayout, FromBytes, Immutable)]
 pub struct virtio_magma_internal_map_ctrl {
     pub hdr: virtio_magma_ctrl_hdr_t,
     pub buffer: u32,
@@ -1505,7 +1505,7 @@ pub struct virtio_magma_internal_map_ctrl {
 }
 pub type virtio_magma_internal_map_ctrl_t = virtio_magma_internal_map_ctrl;
 #[repr(C, packed)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeros, NoCell)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, KnownLayout, FromBytes, Immutable)]
 pub struct virtio_magma_internal_map_resp {
     pub hdr: virtio_magma_ctrl_hdr_t,
     pub address_out: u64,
@@ -1513,7 +1513,7 @@ pub struct virtio_magma_internal_map_resp {
 }
 pub type virtio_magma_internal_map_resp_t = virtio_magma_internal_map_resp;
 #[repr(C, packed)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeros, NoCell)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, KnownLayout, FromBytes, Immutable)]
 pub struct virtio_magma_internal_unmap_ctrl {
     pub hdr: virtio_magma_ctrl_hdr_t,
     pub buffer: u32,
@@ -1521,7 +1521,7 @@ pub struct virtio_magma_internal_unmap_ctrl {
 }
 pub type virtio_magma_internal_unmap_ctrl_t = virtio_magma_internal_unmap_ctrl;
 #[repr(C, packed)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeros, NoCell)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, KnownLayout, FromBytes, Immutable)]
 pub struct virtio_magma_internal_unmap_resp {
     pub hdr: virtio_magma_ctrl_hdr_t,
     pub result_return: u64,

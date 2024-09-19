@@ -308,11 +308,13 @@ mod tests {
 
         file.ioctl(&mut locked, &current_task, BLKGETSIZE64, arg_addr.into())
             .expect("ioctl failed");
-        let value = u64::read_from(current_task.read_memory(arg_addr, &mut arg).unwrap()).unwrap();
+        let value =
+            u64::read_from_bytes(current_task.read_memory(arg_addr, &mut arg).unwrap()).unwrap();
         assert_eq!(value, 1024);
 
         file.ioctl(&mut locked, &current_task, BLKGETSIZE, arg_addr.into()).expect("ioctl failed");
-        let value = u64::read_from(current_task.read_memory(arg_addr, &mut arg).unwrap()).unwrap();
+        let value =
+            u64::read_from_bytes(current_task.read_memory(arg_addr, &mut arg).unwrap()).unwrap();
         assert_eq!(value, 2);
 
         let mut buf = VecOutputBuffer::new(512);

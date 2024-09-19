@@ -5,7 +5,7 @@
 use std::mem::size_of;
 use std::ops::Deref;
 use thiserror::Error;
-use zerocopy::{AsBytes, FromBytes, NoCell, Ref, Unaligned};
+use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout, Ref, Unaligned};
 
 #[derive(Error, Debug)]
 #[error("Buffer is too small for the written data")]
@@ -20,7 +20,7 @@ pub trait Append {
 
     fn append_value<T>(&mut self, value: &T) -> Result<(), BufferTooSmall>
     where
-        T: AsBytes + NoCell + ?Sized,
+        T: IntoBytes + Immutable + ?Sized,
     {
         self.append_bytes(value.as_bytes())
     }
@@ -31,10 +31,10 @@ pub trait Append {
 
     fn append_value_zeroed<T>(&mut self) -> Result<Ref<&mut [u8], T>, BufferTooSmall>
     where
-        T: FromBytes + Unaligned,
+        T: FromBytes + KnownLayout + Immutable + Unaligned,
     {
         let bytes = self.append_bytes_zeroed(size_of::<T>())?;
-        Ok(Ref::new_unaligned(bytes).unwrap())
+        Ok(Ref::unaligned_from_bytes(bytes).unwrap())
     }
 
     fn append_array_zeroed<T>(
@@ -42,10 +42,10 @@ pub trait Append {
         num_elems: usize,
     ) -> Result<Ref<&mut [u8], [T]>, BufferTooSmall>
     where
-        T: FromBytes + Unaligned,
+        T: FromBytes + Immutable + Unaligned,
     {
         let bytes = self.append_bytes_zeroed(size_of::<T>() * num_elems)?;
-        Ok(Ref::new_slice_unaligned(bytes).unwrap())
+        Ok(Ref::unaligned_from_bytes(bytes).unwrap())
     }
 }
 

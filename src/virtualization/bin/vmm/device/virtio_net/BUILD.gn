@@ -76,7 +76,7 @@ rustc_binary("virtio_net_bin") {
     "//third_party/rust_crates:num-derive",
     "//third_party/rust_crates:num-traits",
     "//third_party/rust_crates:tracing",
-    "//third_party/rust_crates:zerocopy",
+    "//third_party/rust_crates:zerocopy_0_0_0_alpha_0",
   ]
 
   test_deps = [

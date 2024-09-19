@@ -273,7 +273,7 @@ fn process_write_definitions(
                     error::FrameWriteError,
                     ie::{self, IE_PREFIX_LEN, SUPPORTED_RATES_MAX_LEN},
                 },
-                wlan_frame_writer::__zerocopy::AsBytes,
+                wlan_frame_writer::__zerocopy::IntoBytes,
                 std::convert::AsRef,
                 std::mem::size_of,
             };

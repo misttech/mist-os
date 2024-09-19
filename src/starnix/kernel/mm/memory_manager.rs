@@ -47,7 +47,7 @@ use std::ops::{Deref, DerefMut, Range};
 use std::sync::Arc;
 use syncio::zxio::zxio_default_maybe_faultable_copy;
 use usercopy::slice_to_maybe_uninit_mut;
-use zerocopy::{AsBytes, FromBytes, NoCell};
+use zerocopy::{FromBytes, Immutable, IntoBytes};
 use zx::VmarInfo;
 
 pub const ZX_VM_SPECIFIC_OVERWRITE: zx::VmarFlags =
@@ -2533,7 +2533,7 @@ pub trait MemoryAccessorExt: MemoryAccessor {
         error!(ENAMETOOLONG)
     }
 
-    fn write_object<T: AsBytes + NoCell>(
+    fn write_object<T: IntoBytes + Immutable>(
         &self,
         user: UserRef<T>,
         object: &T,
@@ -2541,7 +2541,7 @@ pub trait MemoryAccessorExt: MemoryAccessor {
         self.write_memory(user.addr(), object.as_bytes())
     }
 
-    fn write_objects<T: AsBytes + NoCell>(
+    fn write_objects<T: IntoBytes + Immutable>(
         &self,
         user: UserRef<T>,
         objects: &[T],
@@ -4031,7 +4031,7 @@ mod tests {
         PR_SET_VMA_ANON_NAME,
     };
     use std::ffi::CString;
-    use zerocopy::FromZeros;
+    use zerocopy::KnownLayout;
 
     #[::fuchsia::test]
     async fn test_brk() {
@@ -4793,7 +4793,7 @@ mod tests {
 
     #[::fuchsia::test]
     async fn test_read_object_partial() {
-        #[derive(Debug, Default, Copy, Clone, FromZeros, FromBytes, NoCell, PartialEq)]
+        #[derive(Debug, Default, Copy, Clone, KnownLayout, FromBytes, Immutable, PartialEq)]
         struct Items {
             val: [i32; 4],
         }

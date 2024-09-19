@@ -39,7 +39,7 @@ use packet_formats::icmp::mld::MldPacket;
 use packet_formats::icmp::ndp::options::NdpNonce;
 use packet_formats::icmp::ndp::NonZeroNdpLifetime;
 use packet_formats::utils::NonZeroDuration;
-use zerocopy::ByteSlice;
+use zerocopy::SplitByteSlice;
 
 use crate::internal::base::{IpCounters, IpPacketDestination};
 use crate::internal::device::config::{
@@ -997,7 +997,7 @@ pub trait Ipv6DeviceHandler<BC>: IpDeviceHandler<Ipv6, BC> {
     );
 
     /// Receives an MLD packet for processing.
-    fn receive_mld_packet<B: ByteSlice>(
+    fn receive_mld_packet<B: SplitByteSlice>(
         &mut self,
         bindings_ctx: &mut BC,
         device: &Self::DeviceId,
@@ -1181,7 +1181,7 @@ impl<
         })
     }
 
-    fn receive_mld_packet<B: ByteSlice>(
+    fn receive_mld_packet<B: SplitByteSlice>(
         &mut self,
         bindings_ctx: &mut BC,
         device: &Self::DeviceId,

@@ -4,7 +4,7 @@
 // Keep all consts and type defs for completeness.
 #![allow(dead_code)]
 
-use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell};
+use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
 
 pub use zerocopy::byteorder::little_endian::{U16 as LE16, U64 as LE64};
 
@@ -18,7 +18,7 @@ pub const VIRTIO_MEM_REQ_UNPLUG: u16 = 1;
 pub const VIRTIO_MEM_REQ_UNPLUG_ALL: u16 = 2;
 pub const VIRTIO_MEM_REQ_STATE: u16 = 3;
 
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromZeros, FromBytes, NoCell)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, KnownLayout, FromBytes, Immutable)]
 #[repr(C, packed)]
 pub struct VirtioMemRequest {
     pub ty: LE16,
@@ -38,7 +38,7 @@ pub const VIRTIO_MEM_STATE_PLUGGED: u16 = 0;
 pub const VIRTIO_MEM_STATE_UNPLUGGED: u16 = 1;
 pub const VIRTIO_MEM_STATE_MIXED: u16 = 2;
 
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromZeros, FromBytes, NoCell)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, KnownLayout, FromBytes, Immutable)]
 #[repr(C, packed)]
 pub struct VirtioMemResponse {
     pub ty: LE16,

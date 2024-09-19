@@ -4,10 +4,10 @@
 
 #![allow(non_camel_case_types)]
 
-use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell};
+use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
 
 #[repr(C)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeros, NoCell)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, KnownLayout, FromBytes, Immutable)]
 pub struct user_regs_struct {
     pub regs: [u64; 31usize],
     pub sp: u64,
@@ -17,7 +17,7 @@ pub struct user_regs_struct {
 
 #[repr(C)]
 #[repr(align(16))]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeros, NoCell)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, KnownLayout, FromBytes, Immutable)]
 pub struct user_fpsimd_struct {
     pub vregs: [crate::__uint128_t; 32usize],
     pub fpsr: u32,

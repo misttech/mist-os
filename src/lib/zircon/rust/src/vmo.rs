@@ -481,7 +481,7 @@ mod tests {
     use fidl_fuchsia_kernel as fkernel;
     use fuchsia_component::client::connect_channel_to_protocol;
     use test_case::test_case;
-    use zerocopy::FromZeroes;
+    use zerocopy::KnownLayout;
 
     #[test]
     fn vmo_create_contiguous_invalid_handle() {
@@ -602,7 +602,7 @@ mod tests {
     #[test_case(1)]
     fn vmo_read_to_object(read_offset: usize) {
         #[repr(C)]
-        #[derive(Debug, Eq, FromBytes, FromZeroes, PartialEq)]
+        #[derive(Debug, Eq, KnownLayout, FromBytes, PartialEq)]
         struct Object {
             a: u8,
             b: u8,

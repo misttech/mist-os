@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell, Unaligned};
+use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout, Unaligned};
 
 /// WSC Technical Specification v2.0.7, Section 8.2.5, Table 7 and Section 12, Table 28
 #[derive(Eq, PartialEq, Hash, Clone, Debug)]
@@ -28,7 +28,7 @@ pub struct ProbeRespWsc {
 
 #[repr(C, packed)]
 #[derive(
-    Eq, PartialEq, Hash, AsBytes, FromZeros, FromBytes, NoCell, Unaligned, Copy, Clone, Debug,
+    Eq, PartialEq, Hash, IntoBytes, KnownLayout, FromBytes, Immutable, Unaligned, Copy, Clone, Debug,
 )]
 pub struct WpsState(pub u8);
 

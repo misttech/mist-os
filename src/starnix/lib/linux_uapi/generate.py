@@ -30,36 +30,15 @@ RAW_LINES = (
     MODULE_DOC_COMMENT
     + """
 
-use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell};
-
-unsafe impl<Storage> AsBytes for __BindgenBitfieldUnit<Storage>
-where
-    Storage: AsBytes,
-{
-    fn only_derive_is_allowed_to_implement_this_trait() {}
-}
-
-unsafe impl<Storage> FromBytes for __BindgenBitfieldUnit<Storage>
-where
-    Storage: FromBytes,
-{
-    fn only_derive_is_allowed_to_implement_this_trait() {}
-}
-
-unsafe impl<Storage> FromZeros for __BindgenBitfieldUnit<Storage>
-where
-    Storage: FromZeros,
-{
-    fn only_derive_is_allowed_to_implement_this_trait() {}
-}
+use zerocopy::{IntoBytes, FromBytes, KnownLayout, Immutable};
 
 #[repr(transparent)]
-#[derive(Debug, Default, Clone, Copy, Eq, PartialEq, Hash, Ord, PartialOrd, AsBytes, FromBytes, FromZeros, NoCell)]
+#[derive(Debug, Default, Clone, Copy, Eq, PartialEq, Hash, Ord, PartialOrd, IntoBytes, FromBytes, KnownLayout, Immutable)]
 pub struct uaddr {
     pub addr: u64,
 }
 
-#[derive(Debug, Default, Clone, Copy, Eq, PartialEq, Hash, Ord, PartialOrd, AsBytes, FromBytes, FromZeros, NoCell)]
+#[derive(Debug, Default, Clone, Copy, Eq, PartialEq, Hash, Ord, PartialOrd, IntoBytes, FromBytes, KnownLayout, Immutable)]
 #[repr(transparent)]
 pub struct uref<T> {
     pub addr: uaddr,
@@ -90,80 +69,101 @@ INCLUDE_DIRS = [
 
 # Additional traits that should be added to types matching the regexps.
 AUTO_DERIVE_TRAITS = [
-    (r"__BindgenBitfieldUnit", ["NoCell"]),
+    (
+        r"__BindgenBitfieldUnit",
+        ["Immutable", "IntoBytes", "KnownLayout", "FromBytes"],
+    ),
     (
         r"__IncompleteArrayField",
-        ["Clone", "AsBytes, FromBytes", "NoCell", "FromZeros"],
+        ["Clone", "IntoBytes", "FromBytes", "KnownLayout", "Immutable"],
     ),
-    (r"__BindgenUnionField", ["AsBytes, FromBytes", "NoCell", "FromZeros"]),
+    (
+        r"__BindgenUnionField",
+        ["IntoBytes", "FromBytes", "KnownLayout", "Immutable"],
+    ),
     (
         r"__sifields__bindgen_ty_(2|3|7)",
-        ["AsBytes, FromBytes", "NoCell", "FromZeros"],
+        ["IntoBytes", "FromBytes", "KnownLayout", "Immutable"],
     ),
     (
         r"binder_transaction_data__bindgen_ty_2__bindgen_ty_1",
-        ["AsBytes", "FromBytes", "NoCell", "FromZeros"],
+        ["IntoBytes", "FromBytes", "KnownLayout", "Immutable"],
     ),
-    (r"binder_transaction_data.*", ["FromBytes", "NoCell", "FromZeros"]),
+    (r"binder_transaction_data.*", ["KnownLayout", "FromBytes", "Immutable"]),
     (
         r"bpf_attr__bindgen_ty_(1|3|5|6|7|9|10|11|12|13|16|17|18|19)(_.+)?$",
-        ["AsBytes", "FromBytes", "NoCell", "FromZeros"],
+        ["IntoBytes", "FromBytes", "KnownLayout", "Immutable"],
     ),
-    (r"bpf_attr.*", ["FromBytes", "NoCell", "FromZeros"]),
-    (r"bpf_insn", ["AsBytes", "FromBytes", "NoCell", "FromZeros", "PartialEq"]),
-    (r"bpf_sockopt", ["AsBytes", "FromBytes", "NoCell", "FromZeros"]),
-    (r"bpf_sock_addr", ["AsBytes", "FromBytes", "NoCell", "FromZeros"]),
-    (r"flat_binder_object.*", ["FromBytes", "NoCell", "FromZeros"]),
+    (r"bpf_attr.*", ["KnownLayout", "FromBytes", "Immutable"]),
+    (
+        r"bpf_insn",
+        ["KnownLayout", "IntoBytes", "FromBytes", "Immutable", "PartialEq"],
+    ),
+    (r"bpf_sockopt", ["KnownLayout", "IntoBytes", "FromBytes", "Immutable"]),
+    (r"bpf_sock_addr", ["KnownLayout", "IntoBytes", "FromBytes", "Immutable"]),
+    (r"flat_binder_object.*", ["KnownLayout", "FromBytes", "Immutable"]),
     (
         r"usb_functionfs_event.*",
-        ["Clone", "AsBytes", "FromBytes", "NoCell", "FromZeros"],
+        ["KnownLayout", "Clone", "IntoBytes", "FromBytes", "Immutable"],
     ),
-    (r"fuse_dirent", ["Clone", "AsBytes", "FromBytes", "NoCell", "FromZeros"]),
-    (r"ifreq.*", ["FromBytes", "NoCell", "FromZeros"]),
-    (r"if_settings.*", ["FromBytes", "NoCell", "FromZeros"]),
-    (r"in6_addr", ["AsBytes", "FromBytes", "NoCell", "FromZeros"]),
-    (r"in6_pktinfo", ["AsBytes", "FromBytes", "NoCell", "FromZeros"]),
-    (r"inotify_event", ["AsBytes", "NoCell"]),
-    (r"dm_name_list", ["AsBytes", "NoCell", "FromBytes", "FromZeros"]),
-    (r"dm_target_versions", ["AsBytes", "NoCell", "FromBytes", "FromZeros"]),
+    (
+        r"fuse_dirent",
+        ["KnownLayout", "Clone", "IntoBytes", "FromBytes", "Immutable"],
+    ),
+    (r"ifreq.*", ["KnownLayout", "FromBytes", "Immutable"]),
+    (r"if_settings.*", ["KnownLayout", "FromBytes", "Immutable"]),
+    (r"in6_addr", ["IntoBytes", "FromBytes", "KnownLayout", "Immutable"]),
+    (r"in6_pktinfo", ["IntoBytes", "FromBytes", "KnownLayout", "Immutable"]),
+    (r"inotify_event", ["KnownLayout", "IntoBytes", "Immutable"]),
+    (r"dm_name_list", ["KnownLayout", "IntoBytes", "Immutable", "FromBytes"]),
+    (
+        r"dm_target_versions",
+        ["KnownLayout", "IntoBytes", "Immutable", "FromBytes"],
+    ),
     (
         r"fsverity_digest",
-        ["Clone", "AsBytes", "NoCell", "FromBytes", "FromZeros"],
+        ["KnownLayout", "Clone", "IntoBytes", "Immutable", "FromBytes"],
     ),
-    (r"fscrypt_add_key_arg", ["FromBytes", "FromZeros", "NoCell"]),
-    (r"fscrypt_remove_key_arg", ["FromBytes", "FromZeros", "NoCell"]),
-    (r"fscrypt_key_specifier", ["FromBytes", "FromZeros", "NoCell"]),
+    (r"fscrypt_add_key_arg", ["KnownLayout", "FromBytes", "Immutable"]),
+    (r"fscrypt_remove_key_arg", ["KnownLayout", "FromBytes", "Immutable"]),
+    (r"fscrypt_key_specifier", ["KnownLayout", "FromBytes", "Immutable"]),
     (
         r"fscrypt_key_specifier__bindgen_ty_1",
-        ["FromBytes", "FromZeros", "NoCell"],
+        ["KnownLayout", "FromBytes", "Immutable"],
     ),
     (
         r"input_event",
-        ["AsBytes", "FromBytes", "NoCell", "FromZeros", "PartialEq"],
+        ["KnownLayout", "IntoBytes", "FromBytes", "Immutable", "PartialEq"],
     ),
-    (r"input_id", ["AsBytes", "FromBytes", "NoCell", "FromZeros", "PartialEq"]),
-    (r"ip6t_ip6", ["AsBytes", "FromBytes", "NoCell", "FromZeros"]),
-    (r"ip6?t_entry", ["AsBytes", "FromBytes", "NoCell", "FromZeros"]),
-    (r"ip6?t_get_entries", ["FromBytes", "NoCell", "FromZeros"]),
-    (r"ip6?t_replace", ["AsBytes", "FromBytes", "NoCell", "FromZeros"]),
-    (r"nf_conntrack_man_proto", ["FromBytes", "NoCell", "FromZeros"]),
-    (r"nf_inet_addr", ["FromBytes", "NoCell", "FromZeros"]),
+    (
+        r"input_id",
+        ["KnownLayout", "IntoBytes", "FromBytes", "Immutable", "PartialEq"],
+    ),
+    (r"ip6t_ip6", ["IntoBytes", "FromBytes", "KnownLayout", "Immutable"]),
+    (r"ip6?t_entry", ["IntoBytes", "FromBytes", "KnownLayout", "Immutable"]),
+    (r"ip6?t_get_entries", ["KnownLayout", "FromBytes", "Immutable"]),
+    (r"ip6?t_replace", ["IntoBytes", "FromBytes", "KnownLayout", "Immutable"]),
+    (r"nf_conntrack_man_proto", ["KnownLayout", "FromBytes", "Immutable"]),
+    (r"nf_inet_addr", ["KnownLayout", "FromBytes", "Immutable"]),
     (
         r"nf_nat(_ipv4)?(_multi)?_range(_compat)?",
-        ["FromBytes", "NoCell", "FromZeros"],
+        ["KnownLayout", "FromBytes", "Immutable"],
     ),
-    (r"robust_list_head", ["FromBytes", "NoCell", "FromZeros"]),
-    (r"robust_list", ["FromBytes", "NoCell", "FromZeros"]),
-    (r"sigevent", ["FromBytes", "NoCell", "FromZeros"]),
-    (r"sigval", ["AsBytes", "FromBytes", "NoCell", "FromZeros"]),
-    (r"__sk_buff", ["AsBytes", "FromBytes", "NoCell", "FromZeros"]),
-    (r"sockaddr_in*", ["AsBytes", "FromBytes", "NoCell", "FromZeros"]),
-    (r"sockaddr_ll*", ["AsBytes", "FromBytes", "NoCell", "FromZeros"]),
-    (r"sock_fprog", ["FromBytes", "NoCell", "FromZeros"]),
-    (r"sysinfo", ["AsBytes", "NoCell"]),
-    (r"timeval", ["AsBytes", "FromBytes", "NoCell", "FromZeros", "PartialEq"]),
-    (r"xt_counters_info", ["FromBytes", "NoCell", "FromZeros"]),
-    (r"xt_tproxy_target_info_v1", ["FromBytes", "NoCell", "FromZeros"]),
+    (r"robust_list_head", ["KnownLayout", "FromBytes", "Immutable"]),
+    (r"robust_list", ["KnownLayout", "FromBytes", "Immutable"]),
+    (r"sigevent", ["KnownLayout", "FromBytes", "Immutable"]),
+    (r"sigval", ["KnownLayout", "IntoBytes", "FromBytes", "Immutable"]),
+    (r"__sk_buff", ["KnownLayout", "IntoBytes", "FromBytes", "Immutable"]),
+    (r"sockaddr_in*", ["KnownLayout", "IntoBytes", "FromBytes", "Immutable"]),
+    (r"sockaddr_ll*", ["KnownLayout", "IntoBytes", "FromBytes", "Immutable"]),
+    (r"sock_fprog", ["KnownLayout", "FromBytes", "Immutable"]),
+    (r"sysinfo", ["KnownLayout", "IntoBytes", "Immutable"]),
+    (
+        r"timeval",
+        ["KnownLayout", "IntoBytes", "FromBytes", "Immutable", "PartialEq"],
+    ),
+    (r"xt_counters_info", ["KnownLayout", "FromBytes", "Immutable"]),
+    (r"xt_tproxy_target_info_v1", ["KnownLayout", "FromBytes", "Immutable"]),
 ]
 
 # General replacements to apply to the contents of the file. These are tuples of
@@ -176,9 +176,9 @@ REPLACEMENTS = [
         ': &\'static std::ffi::CStr = c"\\2";\n',
     ),
     # Change `__IncompleteArrayField` representation to `transparent`, which is necessary to
-    # allow it to derive `AsBytes`.
+    # allow it to derive `IntoBytes`.
     # TODO(https://github.com/google/zerocopy/issues/10): Remove this once zerocopy is updated
-    # to allow `AsBytes` for generic structs with `repr(C)`.
+    # to allow `IntoBytes` for generic structs with `repr(C)`.
     (
         r"#\[repr\(C\)\]\n"
         r"#\[derive\((([A-Za-z]+, )*[A-Za-z]+)\)\]\n"
@@ -187,17 +187,17 @@ REPLACEMENTS = [
         #[derive(\\1)]
         pub struct \\3""",
     ),
-    # Add AsBytes/FromBytes/FromZeros to every copyable struct regardless of
+    # Add IntoBytes/FromBytes/KnownLayout/Immutable to every copyable struct regardless of
     # name.
     # TODO(https://github.com/rust-lang/rust-bindgen/issues/2170):
     # Remove in favor of bindgen support for custom derives.
     (
         r"\n#\[derive\(Debug, Default, Copy, Clone(, FromBytes)?\)\]\n",
-        "\n#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]\n",
+        "\n#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]\n",
     ),
     (
         r"\n#\[derive\(Debug, Copy, Clone(, FromBytes)?\)\]\n",
-        "\n#[derive(Debug, Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]\n",
+        "\n#[derive(Debug, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]\n",
     ),
     # Use uaddr/uref in place of pointers for compat with zerocopy traits. Because
     # the target of the pointer is in userspace anyway, treating it as an opaque

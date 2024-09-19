@@ -18,7 +18,7 @@ rustc_library("zbi-rs") {
 
   deps = [
     "//third_party/rust_crates:bitflags",
-    "//third_party/rust_crates:zerocopy",
+    "//third_party/rust_crates:zerocopy_0_0_0_alpha_0",
   ]
 
   non_rust_deps = [ "//sdk/lib/zbi-format" ]
@@ -39,7 +39,7 @@ rustc_test("zbi-rs-test") {
   deps = [
     "//third_party/rust_crates:bitflags",
     "//third_party/rust_crates:hex",
-    "//third_party/rust_crates:zerocopy",
+    "//third_party/rust_crates:zerocopy_0_0_0_alpha_0",
   ]
 
   non_rust_deps = [ "//sdk/lib/zbi-format" ]

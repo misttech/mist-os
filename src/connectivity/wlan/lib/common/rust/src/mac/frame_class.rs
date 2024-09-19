@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::mac;
-use zerocopy::ByteSlice;
+use zerocopy::SplitByteSlice;
 
 #[derive(Copy, Clone, PartialOrd, PartialEq, Debug, Ord, Eq)]
 pub enum FrameClass {
@@ -13,7 +13,7 @@ pub enum FrameClass {
 }
 
 /// Converts a MacFrame into a FrameClass.
-impl<B: ByteSlice> From<&mac::MacFrame<B>> for FrameClass {
+impl<B: SplitByteSlice> From<&mac::MacFrame<B>> for FrameClass {
     fn from(mac_frame: &mac::MacFrame<B>) -> FrameClass {
         frame_class(&mac_frame.frame_ctrl())
     }

@@ -7,7 +7,7 @@
 
 #![allow(unused_imports)]
 
-use zerocopy::{AsBytes, FromBytes, FromZeroes};
+use zerocopy::{FromBytes, IntoBytes};
 
 /// 'a'
 pub const CHAR_CONST: u8 = 97;
@@ -38,27 +38,27 @@ pub struct StructWithPointers {
 }
 
 #[repr(C)]
-#[derive(AsBytes, Clone, Copy, Debug, Eq, FromBytes, FromZeroes, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, FromBytes, IntoBytes, PartialEq)]
 pub struct StructWithStringArrays {
     pub str: [u8; 10],
     pub strs: [[u8; 6]; 4],
 }
 
 #[repr(C)]
-#[derive(AsBytes, Clone, Copy, Debug, Eq, FromBytes, FromZeroes, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, FromBytes, IntoBytes, PartialEq)]
 pub struct OverlayStructVariant {
     pub value: u64,
 }
 
 #[repr(C)]
-#[derive(AsBytes, Clone, Copy)]
+#[derive(Clone, Copy, IntoBytes)]
 pub struct OverlayWithEquallySizedVariants {
     pub discriminant: OverlayWithEquallySizedVariantsDiscriminant,
     pub variant: OverlayWithEquallySizedVariantsVariant,
 }
 
 #[repr(u64)]
-#[derive(AsBytes, Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, IntoBytes, PartialEq)]
 pub enum OverlayWithEquallySizedVariantsDiscriminant {
     A = 1,
     B = 2,
@@ -68,7 +68,7 @@ pub enum OverlayWithEquallySizedVariantsDiscriminant {
 
 // TODO(https://github.com/rust-lang/rust/issues/49804): Define anonymously.
 #[repr(C)]
-#[derive(AsBytes, Clone, Copy)]
+#[derive(Clone, Copy, IntoBytes)]
 pub union OverlayWithEquallySizedVariantsVariant {
     pub a: u64,
     pub b: i64,
@@ -130,7 +130,7 @@ pub struct OverlayWithDifferentlySizedVariants {
 }
 
 #[repr(u64)]
-#[derive(AsBytes, Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, IntoBytes, PartialEq)]
 pub enum OverlayWithDifferentlySizedVariantsDiscriminant {
     A = 1,
     B = 2,

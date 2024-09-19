@@ -36,7 +36,7 @@ _common_deps = [
   "//third_party/rust_crates:serde_json",
   "//third_party/rust_crates:serial_test",
   "//third_party/rust_crates:test-case",
-  "//third_party/rust_crates:zerocopy",
+  "//third_party/rust_crates:zerocopy_0_0_0_alpha_0",
 ]
 if (is_host) {
   rustc_test("starnix_syscalls_rust_host_tests") {
@@ -71,7 +71,7 @@ rustc_binary("fscrypt_test_bin") {
     "//third_party/rust_crates:rand",
     "//third_party/rust_crates:serde",
     "//third_party/rust_crates:serde_json",
-    "//third_party/rust_crates:zerocopy",
+    "//third_party/rust_crates:zerocopy_0_0_0_alpha_0",
   ]
 
   source_root = "src/fscrypt_child.rs"

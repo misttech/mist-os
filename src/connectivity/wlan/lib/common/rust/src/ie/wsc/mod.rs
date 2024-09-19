@@ -15,10 +15,10 @@ pub use parse::*;
 pub use reader::*;
 
 use crate::big_endian::BigEndianU16;
-use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell, Unaligned};
+use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout, Unaligned};
 
 #[repr(C, packed)]
-#[derive(AsBytes, FromZeros, FromBytes, NoCell, Unaligned)]
+#[derive(IntoBytes, KnownLayout, FromBytes, Immutable, Unaligned)]
 pub struct AttributeHeader {
     id: Id,
     body_len: BigEndianU16,

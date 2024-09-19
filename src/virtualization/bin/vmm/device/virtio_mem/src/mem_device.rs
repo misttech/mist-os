@@ -12,14 +12,14 @@ use std::io::{Read, Write};
 use virtio_device::chain::{ReadableChain, Remaining, WritableChain};
 use virtio_device::mem::DriverMem;
 use virtio_device::queue::DriverNotify;
-use zerocopy::{AsBytes, FromBytes};
+use zerocopy::{FromBytes, IntoBytes};
 
 fn read_request<'a, 'b, N: DriverNotify, M: DriverMem>(
     chain: &mut ReadableChain<'a, 'b, N, M>,
 ) -> Result<wire::VirtioMemRequest, Error> {
     let mut arr = [0; std::mem::size_of::<wire::VirtioMemRequest>()];
     chain.read_exact(&mut arr)?;
-    Ok(wire::VirtioMemRequest::read_from(arr.as_slice()).unwrap())
+    Ok(wire::VirtioMemRequest::read_from_bytes(arr.as_slice()).unwrap())
 }
 
 fn write_response<'a, 'b, N: DriverNotify, M: DriverMem>(
@@ -376,7 +376,7 @@ mod tests {
             let slice = unsafe {
                 std::slice::from_raw_parts::<u8>(data as usize as *const u8, len as usize)
             };
-            wire::VirtioMemResponse::read_from(slice)
+            wire::VirtioMemResponse::read_from_bytes(slice)
                 .expect("Failed to read result from returned chain")
         }
         // Send a single mem request and get a response

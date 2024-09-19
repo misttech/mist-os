@@ -48,7 +48,7 @@ use packet_formats::ip::{DscpAndEcn, IpPacket as _, IpPacketBuilder as _};
 use packet_formats::ipv4::{Ipv4FragmentType, Ipv4Packet};
 use packet_formats::ipv6::Ipv6Packet;
 use thiserror::Error;
-use zerocopy::ByteSlice;
+use zerocopy::SplitByteSlice;
 
 use crate::internal::device::slaac::SlaacCounters;
 use crate::internal::device::state::{
@@ -3447,7 +3447,7 @@ pub enum DropReason {
 pub fn receive_ipv4_packet_action<
     BC: IpLayerBindingsContext<Ipv4, CC::DeviceId>,
     CC: IpLayerContext<Ipv4, BC> + CounterContext<IpCounters<Ipv4>>,
-    B: ByteSlice,
+    B: SplitByteSlice,
 >(
     core_ctx: &mut CC,
     bindings_ctx: &mut BC,
@@ -3521,7 +3521,7 @@ pub fn receive_ipv4_packet_action<
 pub fn receive_ipv6_packet_action<
     BC: IpLayerBindingsContext<Ipv6, CC::DeviceId>,
     CC: IpLayerContext<Ipv6, BC> + CounterContext<IpCounters<Ipv6>>,
-    B: ByteSlice,
+    B: SplitByteSlice,
 >(
     core_ctx: &mut CC,
     bindings_ctx: &mut BC,
@@ -3645,7 +3645,7 @@ pub fn receive_ipv6_packet_action<
 /// [`receive_ipv4_packet_action`] and [`receive_ipv6_packet_action`].
 fn receive_ip_multicast_packet_action<
     I: IpLayerIpExt,
-    B: ByteSlice,
+    B: SplitByteSlice,
     BC: IpLayerBindingsContext<I, CC::DeviceId>,
     CC: IpLayerContext<I, BC> + CounterContext<IpCounters<I>>,
 >(
@@ -3697,7 +3697,7 @@ fn receive_ip_multicast_packet_action<
 /// [`receive_ipv4_packet_action`] and [`receive_ipv6_packet_action`].
 fn receive_ip_packet_action_common<
     I: IpLayerIpExt,
-    B: ByteSlice,
+    B: SplitByteSlice,
     BC: IpLayerBindingsContext<I, CC::DeviceId>,
     CC: IpLayerContext<I, BC> + CounterContext<IpCounters<I>>,
 >(

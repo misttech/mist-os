@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use anyhow::{anyhow, ensure, Error};
-use zerocopy::{AsBytes, FromBytes, FromZeroes, NoCell};
+use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
 
 const MAX_PARTITION_ENTRIES: u32 = 128;
 
@@ -12,7 +12,7 @@ pub const GPT_REVISION: u32 = 0x10000;
 pub const GPT_HEADER_SIZE: usize = 92;
 
 /// GPT disk header.
-#[derive(Clone, Debug, Eq, PartialEq, NoCell, AsBytes, FromZeroes, FromBytes)]
+#[derive(Clone, Debug, Eq, PartialEq, Immutable, IntoBytes, KnownLayout, FromBytes)]
 #[repr(C)]
 pub struct Header {
     /// Must be GPT_SIGNATURE
@@ -164,7 +164,7 @@ impl Header {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, NoCell, AsBytes, FromZeroes, FromBytes)]
+#[derive(Clone, Debug, Eq, PartialEq, Immutable, IntoBytes, KnownLayout, FromBytes)]
 #[repr(C)]
 pub struct PartitionTableEntry {
     pub type_guid: [u8; 16],

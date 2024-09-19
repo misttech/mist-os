@@ -10,7 +10,7 @@ use net_types::ip::Ipv4Addr;
 use packet::records::{ParsedRecord, RecordParseResult, Records, RecordsImpl, RecordsImplLayout};
 use packet::{BufferView, ParsablePacket, ParseMetadata};
 use zerocopy::byteorder::network_endian::U16;
-use zerocopy::{AsBytes, ByteSlice, FromBytes, FromZeros, NoCell, Ref, Unaligned};
+use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout, Ref, SplitByteSlice, Unaligned};
 
 use super::{
     parse_v3_possible_floating_point, peek_message_type, IgmpMessage, IgmpNonEmptyBody,
@@ -52,7 +52,7 @@ macro_rules! declare_no_body {
             bytes: BV,
         ) -> Result<Self::VariableBody, ParseError>
         where
-            B: ByteSlice,
+            B: SplitByteSlice,
         {
             if bytes.len() != 0 {
                 Err(ParseError::NotExpected)
@@ -63,7 +63,7 @@ macro_rules! declare_no_body {
 
         fn body_bytes(_body: &Self::VariableBody) -> &[u8]
         where
-            B: ByteSlice,
+            B: SplitByteSlice,
         {
             &[]
         }
@@ -102,7 +102,7 @@ impl<B> MessageType<B> for IgmpMembershipQueryV2 {
 /// A `MembershipQueryData` struct represents the fixed data in IGMPv3
 /// Membership Queries.
 /// It is defined as the `FixedHeader` type for `IgmpMembershipQueryV3`.
-#[derive(Copy, Clone, Debug, AsBytes, FromZeros, FromBytes, NoCell, Unaligned)]
+#[derive(Copy, Clone, Debug, IntoBytes, KnownLayout, FromBytes, Immutable, Unaligned)]
 #[repr(C)]
 pub struct MembershipQueryData {
     group_address: Ipv4Addr,
@@ -205,7 +205,7 @@ impl<B> MessageType<B> for IgmpMembershipQueryV3 {
         mut bytes: BV,
     ) -> Result<Self::VariableBody, ParseError>
     where
-        B: ByteSlice,
+        B: SplitByteSlice,
     {
         bytes
             .take_slice_front::<Ipv4Addr>(header.number_of_sources() as usize)
@@ -214,9 +214,9 @@ impl<B> MessageType<B> for IgmpMembershipQueryV3 {
 
     fn body_bytes(body: &Self::VariableBody) -> &[u8]
     where
-        B: ByteSlice,
+        B: SplitByteSlice,
     {
-        body.bytes()
+        Ref::bytes(body)
     }
 }
 
@@ -225,7 +225,7 @@ impl<B> MessageType<B> for IgmpMembershipQueryV3 {
 /// A `MembershipReportV3Data` struct represents the fixed data in IGMPv3
 /// Membership Reports.
 /// It is defined as the `FixedHeader` type for `IgmpMembershipReportV3`.
-#[derive(Copy, Clone, Debug, AsBytes, FromZeros, FromBytes, NoCell, Unaligned)]
+#[derive(Copy, Clone, Debug, IntoBytes, KnownLayout, FromBytes, Immutable, Unaligned)]
 #[repr(C)]
 pub struct MembershipReportV3Data {
     _reserved: [u8; 2],
@@ -263,7 +263,7 @@ create_protocol_enum!(
 /// The `GroupRecordHeader` is followed by a series of source IPv4 addresses.
 ///
 /// [RFC 3376 section 4.2.4]: https://tools.ietf.org/html/rfc3376#section-4.2.4
-#[derive(Copy, Clone, Debug, AsBytes, FromZeros, FromBytes, NoCell, Unaligned)]
+#[derive(Copy, Clone, Debug, IntoBytes, KnownLayout, FromBytes, Immutable, Unaligned)]
 #[repr(C)]
 pub struct GroupRecordHeader {
     record_type: u8,
@@ -309,7 +309,7 @@ pub struct GroupRecord<B> {
     sources: Ref<B, [Ipv4Addr]>,
 }
 
-impl<B: ByteSlice> GroupRecord<B> {
+impl<B: SplitByteSlice> GroupRecord<B> {
     /// Returns the group record header.
     pub fn header(&self) -> &GroupRecordHeader {
         self.header.deref()
@@ -348,14 +348,14 @@ impl<B> MessageType<B> for IgmpMembershipReportV3 {
         bytes: BV,
     ) -> Result<Self::VariableBody, ParseError>
     where
-        B: ByteSlice,
+        B: SplitByteSlice,
     {
         Records::parse_with_context(bytes.into_rest(), header.number_of_group_records().into())
     }
 
     fn body_bytes(body: &Self::VariableBody) -> &[u8]
     where
-        B: ByteSlice,
+        B: SplitByteSlice,
     {
         body.bytes()
     }
@@ -453,7 +453,7 @@ impl_igmp_simple_message_type!(IgmpLeaveGroup, LeaveGroup, Ipv4Addr);
 /// statically-typed packet struct after parsing is complete.
 #[allow(missing_docs)]
 #[derive(Debug)]
-pub enum IgmpPacket<B: ByteSlice> {
+pub enum IgmpPacket<B: SplitByteSlice> {
     MembershipQueryV2(IgmpMessage<B, IgmpMembershipQueryV2>),
     MembershipQueryV3(IgmpMessage<B, IgmpMembershipQueryV3>),
     MembershipReportV1(IgmpMessage<B, IgmpMembershipReportV1>),
@@ -462,7 +462,7 @@ pub enum IgmpPacket<B: ByteSlice> {
     LeaveGroup(IgmpMessage<B, IgmpLeaveGroup>),
 }
 
-impl<B: ByteSlice> ParsablePacket<B, ()> for IgmpPacket<B> {
+impl<B: SplitByteSlice> ParsablePacket<B, ()> for IgmpPacket<B> {
     type Error = ParseError;
 
     fn parse_metadata(&self) -> ParseMetadata {
@@ -521,7 +521,7 @@ mod tests {
         igmp_leave_group::LEAVE_GROUP,
     ];
 
-    fn serialize_to_bytes<B: ByteSlice + Debug, M: MessageType<B> + Debug>(
+    fn serialize_to_bytes<B: SplitByteSlice + Debug, M: MessageType<B> + Debug>(
         igmp: &IgmpMessage<B, M>,
     ) -> Vec<u8>
     where
@@ -537,7 +537,7 @@ mod tests {
     }
 
     fn serialize_to_bytes_inner<
-        B: ByteSlice + Debug,
+        B: SplitByteSlice + Debug,
         M: MessageType<B, VariableBody = ()> + Debug,
     >(
         igmp: &IgmpMessage<B, M>,
@@ -546,7 +546,7 @@ mod tests {
     }
 
     fn test_parse_and_serialize<
-        B: ByteSlice + Debug,
+        B: SplitByteSlice + Debug,
         BV: BufferView<B>,
         M: MessageType<B> + Debug,
         F: FnOnce(&IgmpMessage<B, M>),

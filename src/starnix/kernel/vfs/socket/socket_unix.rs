@@ -29,7 +29,7 @@ use starnix_uapi::{
     SO_ATTACH_BPF, SO_BROADCAST, SO_ERROR, SO_KEEPALIVE, SO_LINGER, SO_NO_CHECK, SO_PASSCRED,
     SO_PEERCRED, SO_PEERSEC, SO_RCVBUF, SO_REUSEADDR, SO_REUSEPORT, SO_SNDBUF,
 };
-use zerocopy::AsBytes;
+use zerocopy::IntoBytes;
 
 use starnix_sync::{FileOpsCore, Locked, Mutex, Unlocked};
 use std::sync::Arc;

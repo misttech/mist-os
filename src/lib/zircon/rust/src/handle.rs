@@ -22,8 +22,8 @@ use std::mem::{self, ManuallyDrop};
     PartialOrd,
     Hash,
     zerocopy::FromBytes,
-    zerocopy::FromZeros,
-    zerocopy::NoCell,
+    zerocopy::KnownLayout,
+    zerocopy::Immutable,
 )]
 #[repr(transparent)]
 pub struct Koid(sys::zx_koid_t);

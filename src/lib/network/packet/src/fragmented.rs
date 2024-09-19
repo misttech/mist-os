@@ -4,7 +4,7 @@
 
 use core::ops::{Range, RangeBounds};
 
-use zerocopy::{ByteSlice, ByteSliceMut};
+use zerocopy::{SplitByteSlice, SplitByteSliceMut};
 
 use crate::{canonicalize_range, take_back, take_back_mut, take_front, take_front_mut};
 
@@ -14,10 +14,10 @@ use crate::{canonicalize_range, take_back, take_back_mut, take_front, take_front
 /// constructed from and, as a result, operations on a `FragmentedByteSlice` may
 /// mutate the backing slice.
 #[derive(Debug, Eq, PartialEq)]
-pub struct FragmentedByteSlice<'a, B: ByteSlice>(&'a mut [B]);
+pub struct FragmentedByteSlice<'a, B: SplitByteSlice>(&'a mut [B]);
 
 /// A single byte slice fragment in a [`FragmentedByteSlice`].
-pub trait Fragment: ByteSlice {
+pub trait Fragment: SplitByteSlice {
     /// Takes `n` bytes from the front of this fragment.
     ///
     /// After a call to `take_front(n)`, the fragment is `n` bytes shorter.
@@ -362,7 +362,7 @@ impl<'a, B: 'a + Fragment> FragmentedByteSlice<'a, B> {
     }
 }
 
-impl<'a, B: 'a + ByteSliceMut + Fragment> FragmentedByteSlice<'a, B> {
+impl<'a, B: 'a + SplitByteSliceMut + Fragment> FragmentedByteSlice<'a, B> {
     /// Iterates over mutable references to all the bytes in this
     /// `FragmentedByteSlice`.
     pub fn iter_mut(&mut self) -> impl '_ + Iterator<Item = &'_ mut u8> {
@@ -391,7 +391,7 @@ impl<'a, B: 'a + ByteSliceMut + Fragment> FragmentedByteSlice<'a, B> {
     /// Panics if `self.len() != other.len()`.
     pub fn copy_from<BB>(&mut self, other: &FragmentedByteSlice<'_, BB>)
     where
-        BB: ByteSlice,
+        BB: SplitByteSlice,
     {
         // keep an iterator over the fragments in other.
         let mut oth = other.0.iter().map(|z| z.as_ref());

@@ -18,7 +18,7 @@ use std::mem::{size_of, size_of_val};
 use std::num::TryFromIntError;
 use std::os::raw::{c_char, c_int, c_uint, c_void};
 use std::pin::Pin;
-use zerocopy::{AsBytes, FromBytes};
+use zerocopy::{FromBytes, IntoBytes};
 use zxio::{
     msghdr, sockaddr, sockaddr_storage, socklen_t, zx_handle_t, zx_status_t, zxio_object_type_t,
     zxio_seek_origin_t, zxio_storage_t, ZXIO_SHUTDOWN_OPTIONS_READ, ZXIO_SHUTDOWN_OPTIONS_WRITE,
@@ -313,40 +313,40 @@ fn parse_control_messages(data: &[u8]) -> Vec<ControlMessage> {
         }
         let header_data = &data[pos..];
         let header = match zxio::cmsghdr::read_from_prefix(header_data) {
-            Some(h) if h.cmsg_len as usize > CMSG_HEADER_SIZE => h,
+            Ok((h, _)) if h.cmsg_len as usize > CMSG_HEADER_SIZE => h,
             _ => return result,
         };
 
         let msg_data = &data[pos + CMSG_HEADER_SIZE..pos + header.cmsg_len as usize];
         let msg = match (header.cmsg_level as u32, header.cmsg_type as u32) {
             (zxio::SOL_IP, zxio::IP_TOS) => {
-                ControlMessage::IpTos(u8::read_from_prefix(msg_data).unwrap())
+                ControlMessage::IpTos(u8::read_from_prefix(msg_data).unwrap().0)
             }
             (zxio::SOL_IP, zxio::IP_TTL) => {
-                ControlMessage::IpTtl(c_int::read_from_prefix(msg_data).unwrap() as u8)
+                ControlMessage::IpTtl(c_int::read_from_prefix(msg_data).unwrap().0 as u8)
             }
             (zxio::SOL_IP, zxio::IP_RECVORIGDSTADDR) => ControlMessage::IpRecvOrigDstAddr(
-                <[u8; size_of::<zxio::sockaddr_in>()]>::read_from_prefix(msg_data).unwrap(),
+                <[u8; size_of::<zxio::sockaddr_in>()]>::read_from_prefix(msg_data).unwrap().0,
             ),
             (zxio::SOL_IPV6, zxio::IPV6_TCLASS) => {
-                ControlMessage::Ipv6Tclass(c_int::read_from_prefix(msg_data).unwrap() as u8)
+                ControlMessage::Ipv6Tclass(c_int::read_from_prefix(msg_data).unwrap().0 as u8)
             }
             (zxio::SOL_IPV6, zxio::IPV6_HOPLIMIT) => {
-                ControlMessage::Ipv6HopLimit(c_int::read_from_prefix(msg_data).unwrap() as u8)
+                ControlMessage::Ipv6HopLimit(c_int::read_from_prefix(msg_data).unwrap().0 as u8)
             }
             (zxio::SOL_IPV6, zxio::IPV6_PKTINFO) => {
-                let pkt_info = zxio::in6_pktinfo::read_from_prefix(msg_data).unwrap();
+                let pkt_info = zxio::in6_pktinfo::read_from_prefix(msg_data).unwrap().0;
                 ControlMessage::Ipv6PacketInfo {
                     local_addr: unsafe { pkt_info.ipi6_addr.__in6_union.__s6_addr },
                     iface: pkt_info.ipi6_ifindex,
                 }
             }
             (zxio::SOL_SOCKET, zxio::SO_TIMESTAMP) => {
-                let timeval = zxio::timeval::read_from_prefix(msg_data).unwrap();
+                let timeval = zxio::timeval::read_from_prefix(msg_data).unwrap().0;
                 ControlMessage::Timestamp { sec: timeval.tv_sec, usec: timeval.tv_usec }
             }
             (zxio::SOL_SOCKET, zxio::SO_TIMESTAMPNS) => {
-                let timespec = zxio::timespec::read_from_prefix(msg_data).unwrap();
+                let timespec = zxio::timespec::read_from_prefix(msg_data).unwrap().0;
                 ControlMessage::TimestampNs { sec: timespec.tv_sec, nsec: timespec.tv_nsec }
             }
             _ => panic!(

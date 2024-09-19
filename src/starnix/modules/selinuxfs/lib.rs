@@ -38,7 +38,7 @@ use starnix_uapi::{errno, error, off_t, statfs, SELINUX_MAGIC};
 use std::borrow::Cow;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
-use zerocopy::{AsBytes, NoCell};
+use zerocopy::{Immutable, IntoBytes};
 
 /// The version of the SELinux "status" file this implementation implements.
 const SELINUX_STATUS_VERSION: u32 = 1;
@@ -46,7 +46,7 @@ const SELINUX_STATUS_VERSION: u32 = 1;
 /// Header of the C-style struct exposed via the /sys/fs/selinux/status file,
 /// to userspace. Defined here (instead of imported through bindgen) as selinux
 /// headers are not exposed through  kernel uapi headers.
-#[derive(AsBytes, Copy, Clone, NoCell)]
+#[derive(IntoBytes, Copy, Clone, Immutable)]
 #[repr(C, align(4))]
 struct SeLinuxStatusHeader {
     /// Version number of this structure (1).
@@ -62,7 +62,7 @@ impl Default for SeLinuxStatusHeader {
 /// Value part of the C-style struct exposed via the /sys/fs/selinux/status file,
 /// to userspace. Defined here (instead of imported through bindgen) as selinux
 /// headers are not exposed through  kernel uapi headers.
-#[derive(AsBytes, Copy, Clone, Default, NoCell)]
+#[derive(IntoBytes, Copy, Clone, Default, Immutable)]
 #[repr(C, align(4))]
 struct SeLinuxStatusValue {
     /// `0` means permissive mode, `1` means enforcing mode.
@@ -855,7 +855,7 @@ mod tests {
 
     use fuchsia_zircon::{self as zx, AsHandleRef as _};
     use selinux::SecurityServer;
-    use zerocopy::{FromBytes, FromZeroes};
+    use zerocopy::{FromBytes, KnownLayout};
 
     #[fuchsia::test]
     fn status_vmo_has_correct_size_and_rights() {
@@ -881,7 +881,7 @@ mod tests {
         assert_eq!((rights & zx::Rights::RESIZE), zx::Rights::NONE);
     }
 
-    #[derive(FromBytes, FromZeroes)]
+    #[derive(KnownLayout, FromBytes)]
     #[repr(C, align(4))]
     struct TestSeLinuxStatusT {
         version: u32,

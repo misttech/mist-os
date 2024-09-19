@@ -6,7 +6,7 @@ use crate::buffer_reader::{BufferReader, IntoBufferReader};
 use crate::{ie, UnalignedView};
 use ieee80211::MacAddr;
 use num::Unsigned;
-use zerocopy::{AsBytes, ByteSlice, NoCell, Ref};
+use zerocopy::{Immutable, IntoBytes, KnownLayout, Ref, SplitByteSlice};
 
 mod ctrl;
 mod data;
@@ -38,18 +38,18 @@ pub type Aid = u16;
 // 2007.
 pub const MAX_AID: u16 = 2007;
 
-pub trait AsBytesExt: AsBytes + NoCell + Sized {
+pub trait IntoBytesExt: IntoBytes + KnownLayout + Immutable + Sized {
     /// Gets a byte slice reference from a reference to `Self`.
     ///
     /// This is essentially the reverse of `Ref` constructors and can be used to construct `Ref`
     /// fields in `zerocopy` types from a reference to `Self` instead of bytes.
     fn as_bytes_ref(&self) -> Ref<&'_ [u8], Self> {
-        Ref::new(self.as_bytes())
-            .expect("Unaligned or missized byte slice from `AsBytes` implementation.")
+        Ref::from_bytes(self.as_bytes())
+            .expect("Unaligned or missized byte slice from `IntoBytes` implementation.")
     }
 }
 
-impl<T> AsBytesExt for T where T: AsBytes + NoCell + Sized {}
+impl<T> IntoBytesExt for T where T: IntoBytes + Immutable + KnownLayout + Sized {}
 
 pub struct CtrlFrame<B> {
     // Control Header: frame control
@@ -60,7 +60,7 @@ pub struct CtrlFrame<B> {
 
 impl<B> CtrlFrame<B>
 where
-    B: ByteSlice,
+    B: SplitByteSlice,
 {
     pub fn parse(reader: impl IntoBufferReader<B>) -> Option<Self> {
         let reader = reader.into_buffer_reader();
@@ -107,7 +107,7 @@ pub struct DataFrame<B> {
 
 impl<B> DataFrame<B>
 where
-    B: ByteSlice,
+    B: SplitByteSlice,
 {
     pub fn parse(reader: impl IntoBufferReader<B>, is_body_aligned: bool) -> Option<Self> {
         let reader = reader.into_buffer_reader();
@@ -155,7 +155,7 @@ where
 
 impl<B> IntoIterator for DataFrame<B>
 where
-    B: ByteSlice,
+    B: SplitByteSlice,
 {
     type IntoIter = IntoMsduIter<B>;
     type Item = Msdu<B>;
@@ -176,7 +176,7 @@ pub struct MgmtFrame<B> {
 
 impl<B> MgmtFrame<B>
 where
-    B: ByteSlice,
+    B: SplitByteSlice,
 {
     pub fn parse(reader: impl IntoBufferReader<B>, is_body_aligned: bool) -> Option<Self> {
         let reader = reader.into_buffer_reader();
@@ -236,7 +236,7 @@ pub enum MacFrame<B> {
     Unsupported { frame_ctrl: FrameControl },
 }
 
-impl<B: ByteSlice> MacFrame<B> {
+impl<B: SplitByteSlice> MacFrame<B> {
     /// Parses a MAC frame from bytes.
     ///
     /// If `is_body_aligned` is `true`, then the frame body **must** be aligned to four bytes.
@@ -284,7 +284,7 @@ impl<B> From<MgmtFrame<B>> for MacFrame<B> {
 }
 
 /// Skips optional padding required for body alignment.
-fn skip_body_alignment_padding<B: ByteSlice>(
+fn skip_body_alignment_padding<B: SplitByteSlice>(
     hdr_len: usize,
     reader: &mut BufferReader<B>,
 ) -> Option<()> {

@@ -13,14 +13,14 @@
 #![allow(non_snake_case)]
 #![allow(non_upper_case_globals)]
 
-use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell};
+use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
 
 pub type zx_status_t = i32;
 pub type reqid_t = u32;
 pub type groupid_t = u16;
 pub type vmoid_t = u16;
 #[repr(C)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeros, NoCell)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, KnownLayout, FromBytes, Immutable)]
 pub struct BlockFifoCommand {
     pub opcode: u8,
     pub padding_to_satisfy_zerocopy: [u8; 3usize],
@@ -38,7 +38,7 @@ const _: () = {
 };
 pub type block_fifo_command_t = BlockFifoCommand;
 #[repr(C)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeros, NoCell)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, KnownLayout, FromBytes, Immutable)]
 pub struct BlockFifoRequest {
     pub command: block_fifo_command_t,
     pub reqid: reqid_t,
@@ -73,7 +73,7 @@ const _: () = {
         [::std::mem::offset_of!(BlockFifoRequest, trace_flow_id) - 40usize];
 };
 #[repr(C)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeros, NoCell)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, KnownLayout, FromBytes, Immutable)]
 pub struct BlockFifoResponse {
     pub status: zx_status_t,
     pub reqid: reqid_t,

@@ -503,7 +503,7 @@ pub fn read_siginfo(
     siginfo_ref: UserAddress,
 ) -> Result<SignalInfo, Errno> {
     let siginfo_mem = current_task.read_memory_to_array::<SI_MAX_SIZE_AS_USIZE>(siginfo_ref)?;
-    let header = SignalInfoHeader::read_from(&siginfo_mem[..SI_HEADER_SIZE]).unwrap();
+    let header = SignalInfoHeader::read_from_bytes(&siginfo_mem[..SI_HEADER_SIZE]).unwrap();
 
     if header.signo != 0 && header.signo != signal.number() {
         return error!(EINVAL);
@@ -872,7 +872,7 @@ mod tests {
         SIGUSR1,
     };
     use starnix_uapi::{uaddr, uid_t, SI_QUEUE};
-    use zerocopy::AsBytes;
+    use zerocopy::IntoBytes;
 
     #[cfg(target_arch = "x86_64")]
     #[::fuchsia::test]
@@ -1986,7 +1986,7 @@ mod tests {
             code: SI_QUEUE,
             ..SignalInfoHeader::default()
         };
-        header.write_to(&mut data[..SI_HEADER_SIZE]);
+        let _ = header.write_to(&mut data[..SI_HEADER_SIZE]);
         data[PID_DATA_OFFSET..PID_DATA_OFFSET + 4].copy_from_slice(&current_pid.to_ne_bytes());
         data[UID_DATA_OFFSET..UID_DATA_OFFSET + 4].copy_from_slice(&current_uid.to_ne_bytes());
         data[VALUE_DATA_OFFSET..VALUE_DATA_OFFSET + 8].copy_from_slice(&TEST_VALUE.to_ne_bytes());

@@ -4,7 +4,7 @@
 
 use crate::mac::{FrameControl, HtControl, MacAddr, OptionalField, Presence, SequenceControl};
 use wlan_bitfield::bitfield;
-use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell, Unaligned};
+use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout, Unaligned};
 
 // IEEE Std 802.11-2016, 9.2.4.5.1, Table 9-6
 #[bitfield(
@@ -15,13 +15,15 @@ use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell, Unaligned};
     8..=15  high_byte, // interpretation varies
 )]
 #[repr(C)]
-#[derive(AsBytes, FromZeros, FromBytes, NoCell, Copy, Clone, PartialEq, Eq)]
+#[derive(IntoBytes, KnownLayout, FromBytes, Immutable, Copy, Clone, PartialEq, Eq)]
 pub struct QosControl(pub u16);
 
 pub type Addr4 = MacAddr;
 
 // IEEE Std 802.11-2016, 9.3.2.1
-#[derive(FromZeros, FromBytes, AsBytes, NoCell, Unaligned, PartialEq, Eq, Clone, Copy, Debug)]
+#[derive(
+    KnownLayout, FromBytes, IntoBytes, Immutable, Unaligned, PartialEq, Eq, Clone, Copy, Debug,
+)]
 #[repr(C, packed)]
 pub struct FixedDataHdrFields {
     pub frame_ctrl: FrameControl,
@@ -152,7 +154,7 @@ mod tests {
     fn fixed_fields_dst_addr() {
         let mut fixed_fields = make_data_hdr(None, [0, 0], None);
         let (mut fixed_fields, _) =
-            Ref::<_, FixedDataHdrFields>::new_unaligned_from_prefix(&mut fixed_fields[..])
+            Ref::<_, FixedDataHdrFields>::unaligned_from_prefix(&mut fixed_fields[..])
                 .expect("invalid data header");
         let mut fc = FrameControl(0);
         fc.set_to_ds(true);
@@ -167,7 +169,7 @@ mod tests {
     fn fixed_fields_src_addr() {
         let mut fixed_fields = make_data_hdr(None, [0, 0], None);
         let (mut fixed_fields, _) =
-            Ref::<_, FixedDataHdrFields>::new_unaligned_from_prefix(&mut fixed_fields[..])
+            Ref::<_, FixedDataHdrFields>::unaligned_from_prefix(&mut fixed_fields[..])
                 .expect("invalid data header");
         let mut fc = FrameControl(0);
         // to_ds == false && from_ds == false
@@ -200,7 +202,7 @@ mod tests {
     fn fixed_fields_ta() {
         let mut fixed_fields = make_data_hdr(None, [0, 0], None);
         let (fixed_fields, _) =
-            Ref::<_, FixedDataHdrFields>::new_unaligned_from_prefix(&mut fixed_fields[..])
+            Ref::<_, FixedDataHdrFields>::unaligned_from_prefix(&mut fixed_fields[..])
                 .expect("invalid data header");
         assert_eq!(
             data_transmitter_addr(&fixed_fields),
@@ -212,7 +214,7 @@ mod tests {
     fn fixed_fields_ra() {
         let mut fixed_fields = make_data_hdr(None, [0, 0], None);
         let (fixed_fields, _) =
-            Ref::<_, FixedDataHdrFields>::new_unaligned_from_prefix(&mut fixed_fields[..])
+            Ref::<_, FixedDataHdrFields>::unaligned_from_prefix(&mut fixed_fields[..])
                 .expect("invalid data header");
         assert_eq!(data_receiver_addr(&fixed_fields), MacAddr::from([3; 6])); // Addr2
     }
@@ -221,7 +223,7 @@ mod tests {
     fn fixed_fields_bssid() {
         let mut fixed_fields = make_data_hdr(None, [0, 0], None);
         let (mut fixed_fields, _) =
-            Ref::<_, FixedDataHdrFields>::new_unaligned_from_prefix(&mut fixed_fields[..])
+            Ref::<_, FixedDataHdrFields>::unaligned_from_prefix(&mut fixed_fields[..])
                 .expect("invalid data header");
         let mut fc = FrameControl(0);
         // to_ds == false && from_ds == false

@@ -5,17 +5,17 @@
 use super::{AttributeHeader, Id};
 use crate::buffer_reader::BufferReader;
 use std::mem::size_of;
-use zerocopy::ByteSlice;
+use zerocopy::SplitByteSlice;
 
 pub struct Reader<B>(BufferReader<B>);
 
-impl<B: ByteSlice> Reader<B> {
+impl<B: SplitByteSlice> Reader<B> {
     pub fn new(bytes: B) -> Self {
         Reader(BufferReader::new(bytes))
     }
 }
 
-impl<B: ByteSlice> Iterator for Reader<B> {
+impl<B: SplitByteSlice> Iterator for Reader<B> {
     type Item = (Id, B);
 
     fn next(&mut self) -> Option<Self::Item> {

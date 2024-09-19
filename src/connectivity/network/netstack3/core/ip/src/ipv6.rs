@@ -10,7 +10,7 @@ use packet_formats::ipv6::ext_hdrs::{
     Ipv6ExtensionHeaderData,
 };
 use packet_formats::ipv6::Ipv6Packet;
-use zerocopy::ByteSlice;
+use zerocopy::SplitByteSlice;
 
 /// What to do with an IPv6 packet after parsing an extension header.
 #[derive(Debug, PartialEq, Eq)]
@@ -38,7 +38,7 @@ pub(crate) enum Ipv6PacketAction {
 /// headers in `packet`. Otherwise, we will only attempt to process the
 /// hop-by-hop extension header (which MUST be the first extension header if
 /// present) as per RFC 8200 section 4.
-pub(crate) fn handle_extension_headers<CC: DeviceIdContext<AnyDevice>, B: ByteSlice>(
+pub(crate) fn handle_extension_headers<CC: DeviceIdContext<AnyDevice>, B: SplitByteSlice>(
     core_ctx: &mut CC,
     device: &CC::DeviceId,
     frame_dst: Option<FrameDestination>,
@@ -114,7 +114,7 @@ pub(crate) fn handle_extension_headers<CC: DeviceIdContext<AnyDevice>, B: ByteSl
 fn handle_hop_by_hop_options_ext_hdr<
     'a,
     CC: DeviceIdContext<AnyDevice>,
-    B: ByteSlice,
+    B: SplitByteSlice,
     I: Iterator<Item = ExtensionHeaderOption<HopByHopOptionData<'a>>>,
 >(
     _bindings_ctx: &mut CC,
@@ -139,7 +139,7 @@ fn handle_hop_by_hop_options_ext_hdr<
 }
 
 /// Handles a fragment extension header for a `packet`.
-fn handle_fragment_ext_hdr<'a, CC: DeviceIdContext<AnyDevice>, B: ByteSlice>(
+fn handle_fragment_ext_hdr<'a, CC: DeviceIdContext<AnyDevice>, B: SplitByteSlice>(
     _bindings_ctx: &mut CC,
     _device: &CC::DeviceId,
     _frame_dst: Option<FrameDestination>,
@@ -157,7 +157,7 @@ fn handle_fragment_ext_hdr<'a, CC: DeviceIdContext<AnyDevice>, B: ByteSlice>(
 fn handle_destination_options_ext_hdr<
     'a,
     CC: DeviceIdContext<AnyDevice>,
-    B: ByteSlice,
+    B: SplitByteSlice,
     I: Iterator<Item = ExtensionHeaderOption<DestinationOptionData<'a>>>,
 >(
     _bindings_ctx: &mut CC,

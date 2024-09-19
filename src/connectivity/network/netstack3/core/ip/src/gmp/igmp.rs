@@ -29,7 +29,7 @@ use packet_formats::ipv4::{
 };
 use packet_formats::utils::NonZeroDuration;
 use thiserror::Error;
-use zerocopy::ByteSlice;
+use zerocopy::SplitByteSlice;
 
 use crate::internal::base::{IpLayerHandler, IpPacketDestination};
 use crate::internal::device::IpDeviceSendContext;
@@ -176,7 +176,7 @@ impl<BC: IgmpBindingsContext, CC: IgmpContext<BC>> IgmpPacketHandler<BC, CC::Dev
     }
 }
 
-impl<B: ByteSlice, M: MessageType<B, FixedHeader = Ipv4Addr>> GmpMessage<Ipv4>
+impl<B: SplitByteSlice, M: MessageType<B, FixedHeader = Ipv4Addr>> GmpMessage<Ipv4>
     for IgmpMessage<B, M>
 {
     fn group_addr(&self) -> Ipv4Addr {

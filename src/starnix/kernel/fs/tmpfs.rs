@@ -357,7 +357,7 @@ mod test {
     use starnix_uapi::file_mode::AccessCheck;
     use starnix_uapi::mount_flags::MountFlags;
     use starnix_uapi::vfs::ResolveFlags;
-    use zerocopy::AsBytes;
+    use zerocopy::IntoBytes;
 
     #[::fuchsia::test]
     async fn test_tmpfs() {

@@ -32,7 +32,7 @@ readonly RAW_LINES="// Copyright 2023 The Fuchsia Authors. All rights reserved.
 // Allow unused definitions
 #![allow(dead_code, unused_results)]
 
-use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell};
+use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
 
 // Configure linkage for MacOS.
 #[cfg(target_os = \"macos\")]
@@ -68,7 +68,7 @@ echo ${tmp}
     --with-derive-default \
     --with-derive-partialeq \
     --impl-debug \
-    --with-derive-custom-struct 'zbi_.*_t'=FromBytes,AsBytes,FromZeros,NoCell \
+    --with-derive-custom-struct 'zbi_.*_t'=FromBytes,IntoBytes,Immutable,KnownLayout \
     --output ${OUTPUT} \
     --allowlist-type 'zbi_.+_t' \
     --allowlist-var 'ZBI_.+' \

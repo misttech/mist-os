@@ -24,7 +24,9 @@ use packet::{
     ParsablePacket, ParseMetadata, ReusableBuffer, SerializeError, SerializeTarget, Serializer,
 };
 use zerocopy::byteorder::network_endian::U16;
-use zerocopy::{AsBytes, ByteSlice, ByteSliceMut, FromBytes, FromZeros, NoCell, Ref, Unaligned};
+use zerocopy::{
+    FromBytes, Immutable, IntoBytes, KnownLayout, Ref, SplitByteSlice, SplitByteSliceMut, Unaligned,
+};
 
 use crate::error::{IpParseError, IpParseErrorAction, IpParseResult, ParseError};
 use crate::icmp::Icmpv6ParameterProblemCode;
@@ -172,7 +174,7 @@ fn ext_hdr_err_fn(hdr: &FixedHeader, err: Ipv6ExtensionHeaderParsingError) -> Ip
 }
 
 /// The IPv6 fixed header which precedes any extension headers and the body.
-#[derive(Debug, Default, FromZeros, FromBytes, AsBytes, NoCell, Unaligned, PartialEq)]
+#[derive(Debug, Default, KnownLayout, FromBytes, IntoBytes, Immutable, Unaligned, PartialEq)]
 #[repr(C)]
 pub struct FixedHeader {
     version_tc_flowlabel: [u8; 4],
@@ -278,21 +280,21 @@ pub struct Ipv6Packet<B> {
     proto: Ipv6Proto,
 }
 
-impl<B: ByteSlice, I: IpExt> GenericOverIp<I> for Ipv6Packet<B> {
+impl<B: SplitByteSlice, I: IpExt> GenericOverIp<I> for Ipv6Packet<B> {
     type Type = <I as IpExt>::Packet<B>;
 }
 
-impl<B: ByteSlice> Ipv6Header for Ipv6Packet<B> {
+impl<B: SplitByteSlice> Ipv6Header for Ipv6Packet<B> {
     fn get_fixed_header(&self) -> &FixedHeader {
         &self.fixed_hdr
     }
 }
 
-impl<B: ByteSlice> ParsablePacket<B, ()> for Ipv6Packet<B> {
+impl<B: SplitByteSlice> ParsablePacket<B, ()> for Ipv6Packet<B> {
     type Error = IpParseError<Ipv6>;
 
     fn parse_metadata(&self) -> ParseMetadata {
-        let header_len = self.fixed_hdr.bytes().len() + self.extension_hdrs.bytes().len();
+        let header_len = Ref::bytes(&self.fixed_hdr).len() + self.extension_hdrs.bytes().len();
         ParseMetadata::from_packet(header_len, self.body.len(), 0)
     }
 
@@ -301,7 +303,7 @@ impl<B: ByteSlice> ParsablePacket<B, ()> for Ipv6Packet<B> {
     }
 }
 
-impl<B: ByteSlice> FromRaw<Ipv6PacketRaw<B>, ()> for Ipv6Packet<B> {
+impl<B: SplitByteSlice> FromRaw<Ipv6PacketRaw<B>, ()> for Ipv6Packet<B> {
     type Error = IpParseError<Ipv6>;
 
     fn try_from_raw_with(raw: Ipv6PacketRaw<B>, _args: ()) -> Result<Self, Self::Error> {
@@ -374,7 +376,7 @@ impl<B: ByteSlice> FromRaw<Ipv6PacketRaw<B>, ()> for Ipv6Packet<B> {
     }
 }
 
-impl<B: ByteSlice> Ipv6Packet<B> {
+impl<B: SplitByteSlice> Ipv6Packet<B> {
     /// Returns an iterator over the extension headers.
     pub fn iter_extension_hdrs(&self) -> impl Iterator<Item = Ipv6ExtensionHeader<'_>> {
         self.extension_hdrs.iter()
@@ -431,7 +433,7 @@ impl<B: ByteSlice> Ipv6Packet<B> {
         let expected_bytes_len = self.header_len() - IPV6_FRAGMENT_EXT_HDR_LEN;
         let mut bytes = Vec::with_capacity(expected_bytes_len);
 
-        bytes.extend_from_slice(self.fixed_hdr.bytes());
+        bytes.extend_from_slice(Ref::bytes(&self.fixed_hdr));
 
         // We cannot simply copy over the extension headers because we want
         // discard the first fragment header, so we iterate over our
@@ -518,7 +520,7 @@ impl<B: ByteSlice> Ipv6Packet<B> {
     }
 
     fn header_len(&self) -> usize {
-        self.fixed_hdr.bytes().len() + self.extension_hdrs.bytes().len()
+        Ref::bytes(&self.fixed_hdr).len() + self.extension_hdrs.bytes().len()
     }
 
     fn fragment_header_present(&self) -> bool {
@@ -776,16 +778,16 @@ impl<B: ByteSlice> Ipv6Packet<B> {
     pub fn to_vec(&self) -> Vec<u8> {
         let Ipv6Packet { fixed_hdr, extension_hdrs, body, proto: _ } = self;
         let mut buf = Vec::with_capacity(
-            fixed_hdr.bytes().len() + extension_hdrs.bytes().len() + body.as_bytes().len(),
+            Ref::bytes(&fixed_hdr).len() + extension_hdrs.bytes().len() + body.as_bytes().len(),
         );
-        buf.extend(fixed_hdr.bytes());
+        buf.extend(Ref::bytes(&fixed_hdr));
         buf.extend(extension_hdrs.bytes());
         buf.extend(body.as_bytes());
         buf
     }
 }
 
-impl<B: ByteSliceMut> Ipv6Packet<B> {
+impl<B: SplitByteSliceMut> Ipv6Packet<B> {
     /// Set the source IP address.
     pub fn set_src_ip(&mut self, addr: Ipv6Addr) {
         self.fixed_hdr.src_ip = addr;
@@ -807,7 +809,7 @@ impl<B: ByteSliceMut> Ipv6Packet<B> {
     }
 }
 
-impl<B: ByteSlice> Debug for Ipv6Packet<B> {
+impl<B: SplitByteSlice> Debug for Ipv6Packet<B> {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), fmt::Error> {
         f.debug_struct("Ipv6Packet")
             .field("src_ip", &self.src_ip())
@@ -864,13 +866,13 @@ pub struct Ipv6PacketRaw<B> {
     body_proto: Result<(MaybeParsed<B, B>, Ipv6Proto), ExtHdrParseError>,
 }
 
-impl<B: ByteSlice> Ipv6Header for Ipv6PacketRaw<B> {
+impl<B: SplitByteSlice> Ipv6Header for Ipv6PacketRaw<B> {
     fn get_fixed_header(&self) -> &FixedHeader {
         &self.fixed_hdr
     }
 }
 
-impl<B: ByteSlice> ParsablePacket<B, ()> for Ipv6PacketRaw<B> {
+impl<B: SplitByteSlice> ParsablePacket<B, ()> for Ipv6PacketRaw<B> {
     type Error = IpParseError<Ipv6>;
 
     fn parse<BV: BufferView<B>>(mut buffer: BV, _args: ()) -> Result<Self, Self::Error> {
@@ -932,13 +934,13 @@ impl<B: ByteSlice> ParsablePacket<B, ()> for Ipv6PacketRaw<B> {
     }
 
     fn parse_metadata(&self) -> ParseMetadata {
-        let header_len = self.fixed_hdr.bytes().len() + self.extension_hdrs.len();
+        let header_len = Ref::bytes(&self.fixed_hdr).len() + self.extension_hdrs.len();
         let body_len = self.body_proto.as_ref().map(|(b, _p)| b.len()).unwrap_or(0);
         ParseMetadata::from_packet(header_len, body_len, 0)
     }
 }
 
-impl<B: ByteSlice> Ipv6PacketRaw<B> {
+impl<B: SplitByteSlice> Ipv6PacketRaw<B> {
     /// Returns the body and upper-layer Protocol Number.
     ///
     /// If extension headers failed to parse, `body_proto` returns
@@ -985,7 +987,7 @@ impl<B: ByteSlice> Ipv6PacketRaw<B> {
     }
 }
 
-impl<B: ByteSliceMut> Ipv6PacketRaw<B> {
+impl<B: SplitByteSliceMut> Ipv6PacketRaw<B> {
     /// Set the source IP address.
     pub fn set_src_ip(&mut self, addr: Ipv6Addr) {
         self.fixed_hdr.src_ip = addr;
@@ -1097,7 +1099,7 @@ fn next_multiple_of_eight(x: usize) -> usize {
 }
 
 impl Ipv6PacketBuilder {
-    fn serialize_fixed_hdr<B: ByteSliceMut, BV: BufferViewMut<B>>(
+    fn serialize_fixed_hdr<B: SplitByteSliceMut, BV: BufferViewMut<B>>(
         &self,
         mut buffer: BV,
         payload_len: usize,
@@ -1243,7 +1245,7 @@ where
 
 /// Reassembles a fragmented packet into a parsed IP packet.
 pub(crate) fn reassemble_fragmented_packet<
-    B: ByteSliceMut,
+    B: SplitByteSliceMut,
     BV: BufferViewMut<B>,
     I: Iterator<Item = Vec<u8>>,
 >(
@@ -1288,7 +1290,7 @@ pub(crate) fn reassemble_fragmented_packet<
 
     // We know the call to `unwrap` will not fail because we just copied the header
     // bytes into `bytes`.
-    let mut header = Ref::<_, FixedHeader>::new_unaligned_from_prefix(bytes).unwrap().0;
+    let mut header = Ref::<_, FixedHeader>::unaligned_from_prefix(bytes).unwrap().0;
 
     // Update the payload length field.
     header.payload_len.set(u16::try_from(payload_length).unwrap());

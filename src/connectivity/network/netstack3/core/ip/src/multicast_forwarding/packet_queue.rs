@@ -16,7 +16,7 @@ use netstack3_base::{
 };
 use packet::{Buf, ParseBufferMut};
 use packet_formats::ip::IpPacket;
-use zerocopy::ByteSlice;
+use zerocopy::SplitByteSlice;
 
 use crate::internal::multicast_forwarding::{
     MulticastForwardingBindingsContext, MulticastForwardingBindingsTypes,
@@ -97,7 +97,7 @@ impl<I: IpLayerIpExt, D: WeakDeviceIdentifier, BC: MulticastForwardingBindingsCo
         frame_dst: Option<FrameDestination>,
     ) -> QueuePacketOutcome
     where
-        B: ByteSlice,
+        B: SplitByteSlice,
     {
         let was_empty = self.table.is_empty();
         let outcome = match self.table.entry(key) {
@@ -246,7 +246,7 @@ pub struct QueuedPacket<I: Ip, D: WeakDeviceIdentifier> {
 }
 
 impl<I: IpLayerIpExt, D: WeakDeviceIdentifier> QueuedPacket<I, D> {
-    fn new<B: ByteSlice>(
+    fn new<B: SplitByteSlice>(
         device: &D::Strong,
         packet: &I::Packet<B>,
         frame_dst: Option<FrameDestination>,
@@ -270,7 +270,7 @@ pub(crate) struct ValidIpPacketBuf<I: Ip> {
 }
 
 impl<I: IpLayerIpExt> ValidIpPacketBuf<I> {
-    fn new<B: ByteSlice>(packet: &I::Packet<B>) -> Self {
+    fn new<B: SplitByteSlice>(packet: &I::Packet<B>) -> Self {
         Self { buffer: Buf::new(packet.to_vec(), ..), _version_marker: Default::default() }
     }
 

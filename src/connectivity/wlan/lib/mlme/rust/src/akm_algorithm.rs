@@ -7,7 +7,7 @@ use anyhow::{bail, Error};
 use fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211;
 use tracing::error;
 use wlan_common::mac;
-use zerocopy::ByteSlice;
+use zerocopy::SplitByteSlice;
 
 /// AkmState indicates the current status of authentication after each event is handled by an
 /// AkmAlgorithm.
@@ -82,7 +82,7 @@ impl AkmAlgorithm {
         }
     }
 
-    pub fn handle_auth_frame<A: AkmAction, B: ByteSlice>(
+    pub fn handle_auth_frame<A: AkmAction, B: SplitByteSlice>(
         &mut self,
         actions: &mut A,
         auth_frame: mac::AuthFrame<B>,
@@ -163,7 +163,7 @@ mod tests {
     use super::*;
     use fidl_fuchsia_wlan_mlme as fidl_mlme;
     use wlan_common::assert_variant;
-    use wlan_common::mac::AsBytesExt;
+    use wlan_common::mac::IntoBytesExt;
 
     struct MockAkmAction {
         sent_frames: Vec<(mac::AuthAlgorithmNumber, u16, mac::StatusCode, Vec<u8>)>,

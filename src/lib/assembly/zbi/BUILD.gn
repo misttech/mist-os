@@ -18,7 +18,7 @@ rustc_library("zbi") {
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:camino",
     "//third_party/rust_crates:tracing",
-    "//third_party/rust_crates:zerocopy",
+    "//third_party/rust_crates:zerocopy_0_0_0_alpha_0",
   ]
   sources = [
     "src/lib.rs",

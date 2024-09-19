@@ -32,7 +32,9 @@ use std::str::FromStr;
 use thiserror::Error;
 use witness::NonEmptyValidStr;
 use zerocopy::byteorder::network_endian::U16;
-use zerocopy::{AsBytes, ByteSlice, ByteSliceMut, FromBytes, FromZeros, NoCell, Ref, Unaligned};
+use zerocopy::{
+    FromBytes, Immutable, IntoBytes, KnownLayout, Ref, SplitByteSlice, SplitByteSliceMut, Unaligned,
+};
 
 /// The port netsvc uses to send TFTP traffic from.
 pub const OUTGOING_PORT: NonZeroU16 = const_unwrap_option(NonZeroU16::new(33340));
@@ -58,9 +60,9 @@ mod witness {
 
     /// A witness type for non empty [`ValidStr`]s.
     #[derive(Debug)]
-    pub(super) struct NonEmptyValidStr<B: zerocopy::ByteSlice>(ValidStr<B>);
+    pub(super) struct NonEmptyValidStr<B: zerocopy::SplitByteSlice>(ValidStr<B>);
 
-    impl<B: zerocopy::ByteSlice> NonEmptyValidStr<B> {
+    impl<B: zerocopy::SplitByteSlice> NonEmptyValidStr<B> {
         /// Creates a new [`NonEmptyValidStr`] iff `str` is not empty.
         pub(super) fn new(str: ValidStr<B>) -> Option<Self> {
             if str.as_str().is_empty() {
@@ -71,7 +73,7 @@ mod witness {
         }
     }
 
-    impl<B: zerocopy::ByteSlice> std::ops::Deref for NonEmptyValidStr<B> {
+    impl<B: zerocopy::SplitByteSlice> std::ops::Deref for NonEmptyValidStr<B> {
         type Target = ValidStr<B>;
         fn deref(&self) -> &Self::Target {
             let Self(b) = self;
@@ -250,7 +252,7 @@ impl OptionCollection {
         self.iter().map(|o| o.serialized_len()).sum()
     }
 
-    fn parse<B: ByteSlice, BV: BufferView<B>>(buffer: &mut BV) -> Result<Self, ParseError> {
+    fn parse<B: SplitByteSlice, BV: BufferView<B>>(buffer: &mut BV) -> Result<Self, ParseError> {
         // options always come at the end, we'll try to gather options until the
         // buffer is exhausted or we've already gathered as many options as we
         // can fit
@@ -271,7 +273,7 @@ impl OptionCollection {
         Ok(Self(vec))
     }
 
-    fn serialize<B: ByteSliceMut, BV: BufferView<B>>(&self, buffer: &mut BV) {
+    fn serialize<B: SplitByteSliceMut, BV: BufferView<B>>(&self, buffer: &mut BV) {
         self.iter().for_each(|v| v.serialize(buffer))
     }
 
@@ -324,7 +326,7 @@ impl std::iter::FromIterator<Forceable<TftpOption>> for AllOptions {
 
 /// The body of a Read or Write request.
 #[derive(Debug)]
-pub struct RequestBody<B: ByteSlice> {
+pub struct RequestBody<B: SplitByteSlice> {
     filename: NonEmptyValidStr<B>,
     mode: TftpMode,
     options: OptionCollection,
@@ -332,7 +334,7 @@ pub struct RequestBody<B: ByteSlice> {
 
 impl<B> RequestBody<B>
 where
-    B: ByteSlice,
+    B: SplitByteSlice,
 {
     fn parse<BV: BufferView<B>>(buffer: &mut BV) -> Result<Self, ParseError> {
         let filename = ValidStr::new_null_terminated_from_buffer(buffer)
@@ -369,14 +371,14 @@ where
 
 /// The body of a data message.
 #[derive(Debug)]
-pub struct DataBody<B: ByteSlice> {
+pub struct DataBody<B: SplitByteSlice> {
     block: Ref<B, U16>,
     payload: B,
 }
 
 impl<B> DataBody<B>
 where
-    B: ByteSlice,
+    B: SplitByteSlice,
 {
     fn parse<BV: BufferView<B>>(buffer: &mut BV) -> Result<Self, ParseError> {
         let block = buffer.take_obj_front::<U16>().ok_or(ParseError::InvalidLength)?;
@@ -395,13 +397,13 @@ where
 
 /// The body of an Ack message.
 #[derive(Debug)]
-pub struct AckBody<B: ByteSlice> {
+pub struct AckBody<B: SplitByteSlice> {
     block: Ref<B, U16>,
 }
 
 impl<B> AckBody<B>
 where
-    B: ByteSlice,
+    B: SplitByteSlice,
 {
     fn parse<BV: BufferView<B>>(buffer: &mut BV) -> Result<Self, ParseError> {
         let block = buffer.take_obj_front::<U16>().ok_or(ParseError::InvalidLength)?;
@@ -415,14 +417,14 @@ where
 
 /// The body of an error message.
 #[derive(Debug)]
-pub struct ErrorBody<B: ByteSlice> {
+pub struct ErrorBody<B: SplitByteSlice> {
     error: TftpError,
     msg: ValidStr<B>,
 }
 
 impl<B> ErrorBody<B>
 where
-    B: ByteSlice,
+    B: SplitByteSlice,
 {
     fn parse<BV: BufferView<B>>(buffer: &mut BV) -> Result<Self, ParseError> {
         let error =
@@ -448,7 +450,7 @@ pub struct OptionAckBody {
 }
 
 impl OptionAckBody {
-    fn parse<B: ByteSlice, BV: BufferView<B>>(buffer: &mut BV) -> Result<Self, ParseError> {
+    fn parse<B: SplitByteSlice, BV: BufferView<B>>(buffer: &mut BV) -> Result<Self, ParseError> {
         let options = OptionCollection::parse(buffer)?;
         Ok(Self { options })
     }
@@ -462,7 +464,7 @@ impl OptionAckBody {
 ///
 /// Implements [`ParsablePacket`] to parse from wire representation.
 #[derive(Debug)]
-pub enum TftpPacket<B: ByteSlice> {
+pub enum TftpPacket<B: SplitByteSlice> {
     ReadRequest(RequestBody<B>),
     WriteRequest(RequestBody<B>),
     Data(DataBody<B>),
@@ -471,7 +473,7 @@ pub enum TftpPacket<B: ByteSlice> {
     OptionAck(OptionAckBody),
 }
 
-impl<B: ByteSlice> TftpPacket<B> {
+impl<B: SplitByteSlice> TftpPacket<B> {
     /// Gets the opcode for the packet.
     pub fn opcode(&self) -> Opcode {
         match self {
@@ -529,7 +531,7 @@ impl<B: ByteSlice> TftpPacket<B> {
 
 impl<B> ParsablePacket<B, ()> for TftpPacket<B>
 where
-    B: ByteSlice,
+    B: SplitByteSlice,
 {
     type Error = ParseError;
 
@@ -721,7 +723,7 @@ impl Forceable<TftpOption> {
     }
 
     /// Serializes the option into a buffer view.
-    pub fn serialize<B: ByteSliceMut, BV: BufferView<B>>(&self, bv: &mut BV) {
+    pub fn serialize<B: SplitByteSliceMut, BV: BufferView<B>>(&self, bv: &mut BV) {
         let Forceable { value, forced } = self;
         let (option, value) = value.get_option_and_value();
         write_option_and_value(bv, option.as_ref(), *forced, value);
@@ -730,7 +732,7 @@ impl Forceable<TftpOption> {
 
 fn write_str<B, BV>(buff: &mut BV, v: &str)
 where
-    B: ByteSliceMut,
+    B: SplitByteSliceMut,
     BV: BufferView<B>,
 {
     write_str_forced(buff, v, false)
@@ -738,7 +740,7 @@ where
 
 fn write_str_forced<B, BV>(buff: &mut BV, v: &str, forced: bool)
 where
-    B: ByteSliceMut,
+    B: SplitByteSliceMut,
     BV: BufferView<B>,
 {
     let extra = if forced { 2 } else { 1 };
@@ -755,7 +757,7 @@ where
 
 fn write_option_and_value<B, BV, V>(buff: &mut BV, option: &str, forced: bool, value: V)
 where
-    B: ByteSliceMut,
+    B: SplitByteSliceMut,
     BV: BufferView<B>,
     V: std::fmt::Display,
 {
@@ -766,7 +768,7 @@ where
     impl<'a, B, BV> std::io::Write for BVIoWriter<'a, B, BV>
     where
         BV: BufferView<B>,
-        B: ByteSliceMut,
+        B: SplitByteSliceMut,
     {
         fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
             let Self(bv, std::marker::PhantomData) = self;
@@ -787,7 +789,7 @@ where
 }
 
 #[repr(C)]
-#[derive(FromZeros, FromBytes, AsBytes, NoCell, Unaligned)]
+#[derive(KnownLayout, FromBytes, IntoBytes, Immutable, Unaligned)]
 struct MessageHead {
     opcode: U16,
 }

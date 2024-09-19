@@ -24,7 +24,7 @@ use starnix_uapi::{
     bpf_prog_type_BPF_PROG_TYPE_SOCKET_FILTER, bpf_prog_type_BPF_PROG_TYPE_TRACEPOINT,
     bpf_prog_type_BPF_PROG_TYPE_XDP, errno, error,
 };
-use zerocopy::{AsBytes, FromBytes, NoCell};
+use zerocopy::{FromBytes, Immutable, IntoBytes};
 
 /// The different type of BPF programs.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
@@ -130,7 +130,7 @@ impl Program {
     ) -> Result<u64, ()>
     where
         L: LockBefore<BpfHelperOps>,
-        T: AsBytes + FromBytes + NoCell,
+        T: IntoBytes + FromBytes + Immutable,
     {
         if let Some(vm) = self.vm.as_ref() {
             let mut context = HelperFunctionContext {

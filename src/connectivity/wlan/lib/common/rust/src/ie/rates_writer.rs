@@ -8,11 +8,11 @@ use crate::ie::{
     write_extended_supported_rates, write_supported_rates, EXTENDED_SUPPORTED_RATES_MAX_LEN,
     SUPPORTED_RATES_MAX_LEN,
 };
-use zerocopy::ByteSlice;
+use zerocopy::SplitByteSlice;
 
 pub struct RatesWriter<S>(S);
 
-impl<S: ByteSlice> RatesWriter<S> {
+impl<S: SplitByteSlice> RatesWriter<S> {
     pub fn try_new(rates: S) -> Result<RatesWriter<S>, FrameWriteError> {
         if rates.len() == 0 {
             Err(FrameWriteError::InvalidData(format!("no rates to write")))

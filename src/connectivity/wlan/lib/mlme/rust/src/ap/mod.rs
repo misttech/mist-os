@@ -17,7 +17,7 @@ use tracing::{debug, error, info, trace, warn};
 use wlan_common::mac::{self, CapabilityInfo};
 use wlan_common::timer::{EventId, Timer};
 use wlan_common::TimeUnit;
-use zerocopy::ByteSlice;
+use zerocopy::SplitByteSlice;
 use {
     fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_minstrel as fidl_minstrel,
     fidl_fuchsia_wlan_mlme as fidl_mlme, fidl_fuchsia_wlan_softmac as fidl_softmac,
@@ -410,7 +410,7 @@ impl<D: DeviceOps> Ap<D> {
         }
     }
 
-    pub async fn handle_mac_frame_rx<B: ByteSlice>(
+    pub async fn handle_mac_frame_rx<B: SplitByteSlice>(
         &mut self,
         bytes: B,
         rx_info: fidl_softmac::WlanRxInfo,

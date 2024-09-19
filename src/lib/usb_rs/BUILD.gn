@@ -55,7 +55,7 @@ rustc_library("usb_rs") {
 
     deps += [
       "//third_party/rust_crates:nix",
-      "//third_party/rust_crates:zerocopy",
+      "//third_party/rust_crates:zerocopy_0_0_0_alpha_0",
     ]
   }
 }

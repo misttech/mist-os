@@ -4,7 +4,9 @@
 
 use crate::UnalignedView;
 use core::mem::size_of;
-use zerocopy::{ByteSlice, ByteSliceMut, FromBytes, NoCell, Ref, Unaligned};
+use zerocopy::{
+    FromBytes, Immutable, KnownLayout, Ref, SplitByteSlice, SplitByteSliceMut, Unaligned,
+};
 
 /// Types that can be converted into a `BufferReader` over a `ByteSlice`.
 ///
@@ -14,7 +16,7 @@ pub trait IntoBufferReader<B> {
     fn into_buffer_reader(self) -> BufferReader<B>;
 }
 
-impl<B: ByteSlice> IntoBufferReader<B> for B {
+impl<B: SplitByteSlice> IntoBufferReader<B> for B {
     fn into_buffer_reader(self) -> BufferReader<B> {
         BufferReader::new(self)
     }
@@ -25,53 +27,55 @@ pub struct BufferReader<B> {
     bytes_read: usize,
 }
 
-impl<B: ByteSlice> BufferReader<B> {
+impl<B: SplitByteSlice> BufferReader<B> {
     pub fn new(bytes: B) -> Self {
         BufferReader { buffer: Some(bytes), bytes_read: 0 }
     }
 
     pub fn read<T>(&mut self) -> Option<Ref<B, T>>
     where
-        T: Unaligned + FromBytes,
+        T: Unaligned + KnownLayout + Immutable + FromBytes,
     {
-        self.read_bytes(size_of::<T>()).map(|bytes| Ref::new_unaligned(bytes).unwrap())
+        self.read_bytes(size_of::<T>()).map(|bytes| Ref::unaligned_from_bytes(bytes).unwrap())
     }
 
     pub fn read_unaligned<T>(&mut self) -> Option<UnalignedView<B, T>>
     where
-        T: FromBytes,
+        T: FromBytes + Immutable,
     {
-        self.read_bytes(size_of::<T>()).map(|bytes| UnalignedView::new_unaligned(bytes).unwrap())
+        self.read_bytes(size_of::<T>())
+            .map(|bytes| UnalignedView::unaligned_from_bytes(bytes).unwrap())
     }
 
     pub fn peek<T>(&self) -> Option<Ref<&[u8], T>>
     where
-        T: Unaligned + FromBytes,
+        T: Unaligned + Immutable + KnownLayout + FromBytes,
     {
-        self.peek_bytes(size_of::<T>()).map(|bytes| Ref::new_unaligned(bytes).unwrap())
+        self.peek_bytes(size_of::<T>()).map(|bytes| Ref::unaligned_from_bytes(bytes).unwrap())
     }
 
     pub fn peek_unaligned<T>(&self) -> Option<UnalignedView<&[u8], T>>
     where
-        T: FromBytes,
+        T: FromBytes + Immutable,
     {
-        self.peek_bytes(size_of::<T>()).map(|bytes| UnalignedView::new_unaligned(bytes).unwrap())
+        self.peek_bytes(size_of::<T>())
+            .map(|bytes| UnalignedView::unaligned_from_bytes(bytes).unwrap())
     }
 
     pub fn read_array<T>(&mut self, num_elems: usize) -> Option<Ref<B, [T]>>
     where
-        T: Unaligned + FromBytes,
+        T: Unaligned + FromBytes + Immutable,
     {
         self.read_bytes(size_of::<T>() * num_elems)
-            .map(|bytes| Ref::new_slice_unaligned(bytes).unwrap())
+            .map(|bytes| Ref::unaligned_from_bytes(bytes).unwrap())
     }
 
     pub fn peek_array<T>(&self, num_elems: usize) -> Option<Ref<&[u8], [T]>>
     where
-        T: Unaligned + FromBytes,
+        T: Unaligned + FromBytes + Immutable,
     {
         self.peek_bytes(size_of::<T>() * num_elems)
-            .map(|bytes| Ref::new_slice_unaligned(bytes).unwrap())
+            .map(|bytes| Ref::unaligned_from_bytes(bytes).unwrap())
     }
 
     pub fn read_byte(&mut self) -> Option<u8> {
@@ -92,14 +96,14 @@ impl<B: ByteSlice> BufferReader<B> {
     /// ```
     pub fn read_value<T>(&mut self) -> Option<T>
     where
-        T: FromBytes + NoCell + Copy,
+        T: FromBytes + Immutable + Copy,
     {
         self.read_unaligned::<T>().map(|view| view.get())
     }
 
     pub fn peek_value<T>(&self) -> Option<T>
     where
-        T: FromBytes + NoCell + Copy,
+        T: FromBytes + Immutable + Copy,
     {
         self.peek_unaligned::<T>().map(|view| view.get())
     }
@@ -141,28 +145,28 @@ impl<B: ByteSlice> BufferReader<B> {
     }
 }
 
-impl<B: ByteSliceMut> BufferReader<B> {
+impl<B: SplitByteSliceMut> BufferReader<B> {
     pub fn peek_mut<T>(&mut self) -> Option<Ref<&mut [u8], T>>
     where
-        T: Unaligned + FromBytes,
+        T: Unaligned + FromBytes + Immutable + KnownLayout,
     {
-        self.peek_bytes_mut(size_of::<T>()).map(|bytes| Ref::new_unaligned(bytes).unwrap())
+        self.peek_bytes_mut(size_of::<T>()).map(|bytes| Ref::unaligned_from_bytes(bytes).unwrap())
     }
 
     pub fn peek_mut_unaligned<T>(&mut self) -> Option<UnalignedView<&mut [u8], T>>
     where
-        T: FromBytes,
+        T: FromBytes + KnownLayout + Immutable,
     {
         self.peek_bytes_mut(size_of::<T>())
-            .map(|bytes| UnalignedView::new_unaligned(bytes).unwrap())
+            .map(|bytes| UnalignedView::unaligned_from_bytes(bytes).unwrap())
     }
 
     pub fn peek_array_mut<T>(&mut self, num_elems: usize) -> Option<Ref<&mut [u8], [T]>>
     where
-        T: Unaligned + FromBytes,
+        T: Unaligned + FromBytes + Immutable,
     {
         self.peek_bytes_mut(size_of::<T>() * num_elems)
-            .map(|bytes| Ref::new_slice_unaligned(bytes).unwrap())
+            .map(|bytes| Ref::unaligned_from_bytes(bytes).unwrap())
     }
 
     pub fn peek_bytes_mut(&mut self, len: usize) -> Option<&mut [u8]> {
@@ -179,7 +183,7 @@ impl<B: ByteSliceMut> BufferReader<B> {
     }
 }
 
-impl<B: ByteSlice> IntoBufferReader<B> for BufferReader<B> {
+impl<B: SplitByteSlice> IntoBufferReader<B> for BufferReader<B> {
     fn into_buffer_reader(self) -> BufferReader<B> {
         self
     }
@@ -188,10 +192,10 @@ impl<B: ByteSlice> IntoBufferReader<B> for BufferReader<B> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use zerocopy::{AsBytes, FromZeros, NoCell};
+    use zerocopy::{Immutable, IntoBytes};
 
     #[repr(C, packed)]
-    #[derive(AsBytes, FromZeros, FromBytes, NoCell, Unaligned)]
+    #[derive(IntoBytes, KnownLayout, FromBytes, Immutable, Unaligned)]
     struct Foo {
         x: u8,
         y: u16,

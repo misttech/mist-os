@@ -5,7 +5,7 @@
 use super::PAGE_SIZE;
 use bitflags::bitflags;
 use linux_uapi as uapi;
-use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell};
+use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
 
 pub const EPOLLWAKEUP: u32 = 1 << 29;
 pub const EPOLLONESHOT: u32 = 1 << 30;
@@ -58,7 +58,7 @@ pub fn default_statfs(magic: u32) -> uapi::statfs {
 }
 
 #[repr(C)]
-#[derive(AsBytes, FromBytes, FromZeros, NoCell)]
+#[derive(IntoBytes, KnownLayout, FromBytes, Immutable)]
 pub struct EpollEvent(uapi::epoll_event);
 
 impl EpollEvent {

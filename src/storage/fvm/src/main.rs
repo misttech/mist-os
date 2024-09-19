@@ -34,7 +34,7 @@ use vfs::directory::entry_container::Directory;
 use vfs::directory::helper::DirectlyMutable;
 use vfs::execution_scope::ExecutionScope;
 use vfs::path::Path;
-use zerocopy::{FromBytes, FromZeroes, IntoBytes, NoCell};
+use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
 use {fidl_fuchsia_hardware_block_volume as fvolume, fidl_fuchsia_io as fio, fuchsia_zircon as zx};
 
 // See //src/storage/fvm/format.h for a detailed description of the FVM format.
@@ -49,7 +49,7 @@ const BLOCK_SIZE: u64 = 8192;
 const MAX_SLICE_COUNT: u64 = u32::MAX as u64;
 
 #[repr(C)]
-#[derive(Clone, Copy, FromBytes, FromZeroes, IntoBytes, NoCell)]
+#[derive(Clone, Copy, KnownLayout, FromBytes, IntoBytes, Immutable)]
 struct Header {
     magic: u64,
     major_version: u64,
@@ -88,7 +88,7 @@ impl Header {
 }
 
 #[repr(C)]
-#[derive(Clone, Copy, FromBytes, FromZeroes, IntoBytes, NoCell)]
+#[derive(Clone, Copy, KnownLayout, FromBytes, IntoBytes, Immutable)]
 struct PartitionEntry {
     type_guid: [u8; 16],
     guid: [u8; 16],
@@ -126,7 +126,7 @@ impl PartitionEntry {
 }
 
 #[repr(C)]
-#[derive(Clone, Copy, FromBytes, FromZeroes, IntoBytes, NoCell)]
+#[derive(Clone, Copy, KnownLayout, FromBytes, IntoBytes, Immutable)]
 struct SliceEntry(u64);
 
 impl SliceEntry {
@@ -182,8 +182,8 @@ impl Metadata {
         device: &RemoteBlockClient,
         offset: u64,
     ) -> Result<Self, Error> {
-        let header =
-            Header::ref_from_prefix(header_block).ok_or(anyhow!("Block size too small"))?;
+        let (header, _) =
+            Header::ref_from_prefix(header_block).map_err(|_| anyhow!("Block size too small"))?;
         ensure!(header.magic == MAGIC, "Magic mismatch");
         ensure!(
             header.slice_size > 0 && header.slice_size % BLOCK_SIZE == 0,
@@ -215,7 +215,7 @@ impl Metadata {
             .enumerate()
             .skip(1) // The first partition is unused.
             .filter_map(|(index, e)| {
-                let partition = PartitionEntry::read_from(e).unwrap();
+                let partition = PartitionEntry::read_from_bytes(e).unwrap();
                 partition.is_allocated().then(|| (index as u16, partition))
             })
             .collect();
@@ -225,7 +225,7 @@ impl Metadata {
             buffer.as_slice()[part_table_size..part_table_size + allocation_size]
                 .chunks_exact(std::mem::size_of::<SliceEntry>())
                 .skip(1) // The first slice entry is unused.
-                .map(|e| SliceEntry::read_from(e).unwrap())
+                .map(|e| SliceEntry::read_from_bytes(e).unwrap())
                 .collect()
         };
 
@@ -238,14 +238,14 @@ impl Metadata {
             (BLOCK_SIZE + self.header.vpartition_table_size) as usize
                 + self.header.allocation_size()?
         ];
-        let header = Header::mut_from_prefix(&mut buffer).unwrap();
+        let (header, _) = Header::mut_from_prefix(&mut buffer).unwrap();
         *header = self.header;
         header.generation += 1;
         header.hash.fill(0);
 
         // Write out the partitions:
         for (&index, partition) in &self.partitions {
-            let entry = PartitionEntry::mut_from_prefix(
+            let (entry, _) = PartitionEntry::mut_from_prefix(
                 &mut buffer[BLOCK_SIZE as usize
                     + std::mem::size_of::<PartitionEntry>() * index as usize..],
             )
@@ -254,7 +254,7 @@ impl Metadata {
         }
 
         // Write out the allocation table.  The first slice entry is unused.
-        SliceEntry::mut_slice_from(
+        <[SliceEntry]>::mut_from_bytes(
             &mut buffer[(BLOCK_SIZE + self.header.vpartition_table_size) as usize..],
         )
         .unwrap()[1..1 + self.allocations.len()]
@@ -263,7 +263,7 @@ impl Metadata {
         // Compute the hash.
         let mut hasher = Sha256::new();
         hasher.update(&buffer);
-        let header = Header::mut_from_prefix(buffer.as_mut_slice()).unwrap();
+        let (header, _) = Header::mut_from_prefix(buffer.as_mut_slice()).unwrap();
         header.hash.copy_from_slice(hasher.finalize().as_slice());
 
         device.write_at(BufferSlice::Memory(&buffer), offset).await?;
@@ -332,8 +332,8 @@ impl Fvm {
 
             metadata.push(Metadata::read(header_block.as_slice(), &client, 0).await);
 
-            let header = Header::ref_from_prefix(header_block.as_slice())
-                .ok_or(anyhow!("Block size too small"))?;
+            let (header, _) = Header::ref_from_prefix(header_block.as_slice())
+                .map_err(|_| anyhow!("Block size too small"))?;
             // TODO(https://fxbug.dev/357467643): Check offset is sensible.
             let secondary_offset = header.offset_for_slot(1);
             client.read_at(MutableBufferSlice::Memory(&mut header_block), secondary_offset).await?;

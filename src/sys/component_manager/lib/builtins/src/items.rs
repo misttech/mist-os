@@ -148,7 +148,7 @@ mod tests {
         ZBI_ITEM_NO_CRC32,
     };
     use zerocopy::byteorder::little_endian::U32;
-    use zerocopy::AsBytes;
+    use zerocopy::IntoBytes;
 
     const ZBI_HEADER_SIZE: usize = size_of::<zbi_header_t>();
 

@@ -61,7 +61,7 @@ impl Peers {
 
     fn make_task_if_nonexistent(&mut self, peer_id: PeerId) -> &mut PeerTask {
         match self.peers.inner().entry(peer_id) {
-            Entry::Occupied(task_entry) => task_entry.into_mut(),
+            Entry::Occupied(task_entry) => Ref::into_mut(task_entry),
             Entry::Vacant(task_entry) => {
                 let task = PeerTask::spawn_new(peer_id, self.profile_proxy.clone());
                 task_entry.insert(Box::pin(task))

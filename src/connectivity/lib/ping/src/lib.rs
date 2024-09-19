@@ -30,14 +30,14 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 use thiserror::Error;
 use zerocopy::byteorder::network_endian::U16;
-use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell, Unaligned};
+use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout, Unaligned};
 
 /// The number of bytes of an ICMP (v4 or v6) header.
 pub const ICMP_HEADER_LEN: usize = std::mem::size_of::<IcmpHeader>();
 
 /// ICMP header representation.
 #[repr(C)]
-#[derive(FromZeros, FromBytes, AsBytes, NoCell, Unaligned, Debug, PartialEq, Eq, Clone)]
+#[derive(KnownLayout, FromBytes, IntoBytes, Immutable, Unaligned, Debug, PartialEq, Eq, Clone)]
 struct IcmpHeader {
     r#type: u8,
     code: u8,
@@ -386,7 +386,7 @@ where
 
 fn verify_packet<I: IpExt>(addr: I::SockAddr, packet: &[u8]) -> Result<PingData<I>, PingError> {
     let (reply, body): (zerocopy::Ref<_, IcmpHeader>, _) =
-        zerocopy::Ref::new_unaligned_from_prefix(packet).ok_or_else(|| PingError::Parse)?;
+        zerocopy::Ref::unaligned_from_prefix(packet).map_err(|_| PingError::Parse)?;
 
     // The identifier cannot be verified, since ICMP socket implementations rewrites the field on
     // send and uses its value to demultiplex packets for delivery to sockets on receive.
@@ -395,7 +395,7 @@ fn verify_packet<I: IpExt>(addr: I::SockAddr, packet: &[u8]) -> Result<PingData<
     // verified the checksum since the code and identifier fields must be inspected. Also, the
     // ICMPv6 checksum computation includes a pseudo header which includes the src and dst
     // addresses, and the dst/local address is not readily available.
-    let &IcmpHeader { r#type, code, checksum: _, id: _, sequence } = reply.into_ref();
+    let &IcmpHeader { r#type, code, checksum: _, id: _, sequence } = zerocopy::Ref::into_ref(reply);
 
     if r#type != I::ECHO_REPLY_TYPE {
         return Err(PingError::ReplyType { got: r#type, want: I::ECHO_REPLY_TYPE });
@@ -417,7 +417,7 @@ mod test {
     use std::cell::RefCell;
     use std::collections::VecDeque;
     use std::task::{Context, Poll};
-    use zerocopy::AsBytes as _;
+    use zerocopy::IntoBytes as _;
 
     // A fake impl of a IcmpSocket which computes and buffers a reply when `send_to` is called,
     // which is then returned when `recv_from` is called. The order in which replies are returned
@@ -482,9 +482,9 @@ mod test {
                 .copied()
                 .collect::<Vec<u8>>();
             let (mut header, _): (zerocopy::Ref<_, IcmpHeader>, _) =
-                match zerocopy::Ref::new_unaligned_from_prefix(&mut buf[..]) {
-                    Some(layout_verified) => layout_verified,
-                    None => {
+                match zerocopy::Ref::unaligned_from_prefix(&mut buf[..]) {
+                    Ok(layout_verified) => layout_verified,
+                    Err(_) => {
                         return Poll::Ready(Err(std::io::Error::new(
                             std::io::ErrorKind::InvalidInput,
                             "failed to parse ICMP header from provided bytes",

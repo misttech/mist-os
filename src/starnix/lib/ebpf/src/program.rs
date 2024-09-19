@@ -12,7 +12,7 @@ use linux_uapi::{bpf_insn, sock_filter};
 use std::collections::HashMap;
 use std::fmt::Formatter;
 use std::sync::Arc;
-use zerocopy::{AsBytes, FromBytes, NoCell};
+use zerocopy::{FromBytes, Immutable, IntoBytes};
 
 /// A counter that allows to generate new ids for parameters. The namespace is the same as for id
 /// generated for types while verifying an ebpf program, but it is started a u64::MAX / 2 and so is
@@ -297,12 +297,12 @@ impl<C: EbpfRunContext> EbpfProgram<C> {
     /// scratch memory must be provided by the caller to this
     /// function.  The translated CBPF program will use the last 16
     /// words of |data|.
-    pub fn run<T: AsBytes + FromBytes + NoCell>(
+    pub fn run<T: IntoBytes + FromBytes + Immutable>(
         &self,
         run_context: &mut C::Context<'_>,
         data: &mut T,
     ) -> u64 {
-        self.run_with_slice(run_context, data.as_bytes_mut())
+        self.run_with_slice(run_context, data.as_mut_bytes())
     }
 
     /// Executes the current program on the provided data.  Warning: If
@@ -345,7 +345,7 @@ mod test {
     use crate::conformance::test::parse_asm;
     use crate::{FieldMapping, FieldType};
     use linux_uapi::*;
-    use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell};
+    use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
 
     const BPF_ALU_ADD_K: u16 = (BPF_ALU | BPF_ADD | BPF_K) as u16;
     const BPF_ALU_SUB_K: u16 = (BPF_ALU | BPF_SUB | BPF_K) as u16;
@@ -527,7 +527,7 @@ mod test {
     }
 
     #[repr(C)]
-    #[derive(Debug, Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
+    #[derive(Debug, Copy, Clone, IntoBytes, Immutable, KnownLayout, FromBytes)]
     struct ProgramArgument {
         /// Pointer to an array of u64
         pub data: u64,

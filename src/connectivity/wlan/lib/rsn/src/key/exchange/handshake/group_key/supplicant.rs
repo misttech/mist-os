@@ -14,7 +14,7 @@ use crate::rsna::{
 use crate::{format_rsn_err, key_data, Error};
 use bytes::Bytes;
 use eapol::KeyFrameBuf;
-use zerocopy::ByteSlice;
+use zerocopy::SplitByteSlice;
 
 /// Implementation of 802.11's Group Key Handshake for the Supplicant role.
 #[derive(Debug, PartialEq)]
@@ -26,7 +26,7 @@ pub struct Supplicant {
 
 impl Supplicant {
     // IEEE Std 802.11-2016, 12.7.7.2
-    pub fn on_eapol_key_frame<B: ByteSlice>(
+    pub fn on_eapol_key_frame<B: SplitByteSlice>(
         &mut self,
         update_sink: &mut UpdateSink,
         msg1: GroupKeyHandshakeFrame<B>,
@@ -86,7 +86,7 @@ impl Supplicant {
         Ok(())
     }
 
-    fn extract_key_data<B: ByteSlice>(
+    fn extract_key_data<B: SplitByteSlice>(
         &self,
         frame: &eapol::KeyFrameRx<B>,
         key_data: &[u8],
@@ -128,7 +128,7 @@ impl Supplicant {
     }
 
     // IEEE Std 802.11-2016, 12.7.7.3
-    fn create_message_2<B: ByteSlice>(
+    fn create_message_2<B: SplitByteSlice>(
         &self,
         msg1: &eapol::KeyFrameRx<B>,
     ) -> Result<KeyFrameBuf, Error> {
@@ -192,7 +192,7 @@ mod tests {
     const IGTK_IPN: [u8; 6] = [0xab; 6];
     const IGTK_KEY_ID: u16 = 4;
 
-    fn make_verified<B: ByteSlice>(
+    fn make_verified<B: SplitByteSlice>(
         key_frame: eapol::KeyFrameRx<B>,
         role: Role,
         protection: &NegotiatedProtection,

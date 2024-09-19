@@ -27,7 +27,9 @@ use packet::{
     ParseMetadata, SerializeTarget, Serializer,
 };
 use zerocopy::byteorder::network_endian::{U16, U32};
-use zerocopy::{AsBytes, ByteSlice, ByteSliceMut, FromBytes, FromZeros, NoCell, Ref, Unaligned};
+use zerocopy::{
+    FromBytes, Immutable, IntoBytes, KnownLayout, Ref, SplitByteSlice, SplitByteSliceMut, Unaligned,
+};
 
 use crate::error::{ParseError, ParseResult};
 use crate::ip::IpProto;
@@ -48,7 +50,7 @@ pub const MAX_OPTIONS_LEN: usize = MAX_HDR_LEN - HDR_PREFIX_LEN;
 const CHECKSUM_OFFSET: usize = 16;
 const CHECKSUM_RANGE: Range<usize> = CHECKSUM_OFFSET..CHECKSUM_OFFSET + 2;
 
-#[derive(Debug, Default, FromZeros, FromBytes, AsBytes, NoCell, Unaligned, PartialEq)]
+#[derive(Debug, Default, KnownLayout, FromBytes, IntoBytes, Immutable, Unaligned, PartialEq)]
 #[repr(C)]
 struct HeaderPrefix {
     src_port: U16,
@@ -132,7 +134,17 @@ mod data_offset_reserved_flags {
     /// the reserved bits to zero, we could be changing the semantics of a TCP
     /// segment.
     #[derive(
-        FromZeros, FromBytes, AsBytes, NoCell, Unaligned, Copy, Clone, Debug, Default, Eq, PartialEq,
+        KnownLayout,
+        FromBytes,
+        IntoBytes,
+        Immutable,
+        Unaligned,
+        Copy,
+        Clone,
+        Debug,
+        Default,
+        Eq,
+        PartialEq,
     )]
     #[repr(transparent)]
     pub(super) struct DataOffsetReservedFlags(U16);
@@ -248,11 +260,11 @@ impl<A: IpAddress> TcpParseArgs<A> {
     }
 }
 
-impl<B: ByteSlice, A: IpAddress> ParsablePacket<B, TcpParseArgs<A>> for TcpSegment<B> {
+impl<B: SplitByteSlice, A: IpAddress> ParsablePacket<B, TcpParseArgs<A>> for TcpSegment<B> {
     type Error = ParseError;
 
     fn parse_metadata(&self) -> ParseMetadata {
-        let header_len = self.hdr_prefix.bytes().len() + self.options.bytes().len();
+        let header_len = Ref::bytes(&self.hdr_prefix).len() + self.options.bytes().len();
         ParseMetadata::from_packet(header_len, self.body.len(), 0)
     }
 
@@ -261,7 +273,7 @@ impl<B: ByteSlice, A: IpAddress> ParsablePacket<B, TcpParseArgs<A>> for TcpSegme
     }
 }
 
-impl<B: ByteSlice, A: IpAddress> FromRaw<TcpSegmentRaw<B>, TcpParseArgs<A>> for TcpSegment<B> {
+impl<B: SplitByteSlice, A: IpAddress> FromRaw<TcpSegmentRaw<B>, TcpParseArgs<A>> for TcpSegment<B> {
     type Error = ParseError;
 
     fn try_from_raw_with(
@@ -283,17 +295,17 @@ impl<B: ByteSlice, A: IpAddress> FromRaw<TcpSegmentRaw<B>, TcpParseArgs<A>> for 
         let body = raw.body;
 
         let hdr_bytes = (hdr_prefix.data_offset() * 4) as usize;
-        if hdr_bytes != hdr_prefix.bytes().len() + options.bytes().len() {
+        if hdr_bytes != Ref::bytes(&hdr_prefix).len() + options.bytes().len() {
             return debug_err!(
                 Err(ParseError::Format),
                 "invalid data offset: {} for header={} + options={}",
                 hdr_prefix.data_offset(),
-                hdr_prefix.bytes().len(),
+                Ref::bytes(&hdr_prefix).len(),
                 options.bytes().len()
             );
         }
 
-        let parts = [hdr_prefix.bytes(), options.bytes(), body.deref().as_ref()];
+        let parts = [Ref::bytes(&hdr_prefix), options.bytes(), body.deref().as_ref()];
         let checksum = compute_transport_checksum_parts(
             args.src_ip,
             args.dst_ip,
@@ -314,7 +326,7 @@ impl<B: ByteSlice, A: IpAddress> FromRaw<TcpSegmentRaw<B>, TcpParseArgs<A>> for 
     }
 }
 
-impl<B: ByteSlice> TcpSegment<B> {
+impl<B: SplitByteSlice> TcpSegment<B> {
     /// Iterate over the TCP header options.
     pub fn iter_options(&self) -> impl Iterator<Item = TcpOption<'_>> + Debug + Clone {
         self.options.iter()
@@ -387,7 +399,7 @@ impl<B: ByteSlice> TcpSegment<B> {
 
     /// The length of the header prefix and options.
     pub fn header_len(&self) -> usize {
-        self.hdr_prefix.bytes().len() + self.options.bytes().len()
+        Ref::bytes(&self.hdr_prefix).len() + self.options.bytes().len()
     }
 
     // The length of the segment as calculated from the header prefix, options,
@@ -462,7 +474,7 @@ impl<B: ByteSlice> TcpSegment<B> {
     }
 }
 
-impl<B: ByteSliceMut> TcpSegment<B> {
+impl<B: SplitByteSliceMut> TcpSegment<B> {
     /// Set the source port of the UDP packet.
     pub fn set_src_port(&mut self, new: NonZeroU16) {
         let old = self.hdr_prefix.src_port;
@@ -493,7 +505,7 @@ impl<B: ByteSliceMut> TcpSegment<B> {
 /// A `TcpFlowHeader` may be the result of a partially parsed TCP segment in
 /// [`TcpSegmentRaw`].
 #[derive(
-    Debug, Default, FromZeros, FromBytes, AsBytes, NoCell, Unaligned, PartialEq, Copy, Clone,
+    Debug, Default, KnownLayout, FromBytes, IntoBytes, Immutable, Unaligned, PartialEq, Copy, Clone,
 )]
 #[repr(C)]
 pub struct TcpFlowHeader {
@@ -511,7 +523,7 @@ impl TcpFlowHeader {
 }
 
 #[derive(Debug)]
-struct PartialHeaderPrefix<B: ByteSlice> {
+struct PartialHeaderPrefix<B: SplitByteSlice> {
     flow: Ref<B, TcpFlowHeader>,
     rest: B,
 }
@@ -522,7 +534,7 @@ struct PartialHeaderPrefix<B: ByteSlice> {
 /// can deliver the ICMP message to the right socket and also perform checks
 /// against the sequence number to make sure it corresponds to an in-flight
 /// segment.
-#[derive(Debug, Default, FromZeros, FromBytes, AsBytes, NoCell, Unaligned, PartialEq)]
+#[derive(Debug, Default, KnownLayout, FromBytes, IntoBytes, Immutable, Unaligned, PartialEq)]
 #[repr(C)]
 pub struct TcpFlowAndSeqNum {
     /// The flow header.
@@ -561,7 +573,7 @@ impl TcpFlowAndSeqNum {
 ///
 /// [`TcpSegment`] provides a [`FromRaw`] implementation that can be used to
 /// validate a `TcpSegmentRaw`.
-pub struct TcpSegmentRaw<B: ByteSlice> {
+pub struct TcpSegmentRaw<B: SplitByteSlice> {
     hdr_prefix: MaybeParsed<Ref<B, HeaderPrefix>, PartialHeaderPrefix<B>>,
     // Invariant: At most MAX_OPTIONS_LEN bytes long. This guarantees that we
     // can store these in an `ArrayVec<u8, MAX_OPTIONS_LEN>` in `builder`.
@@ -571,15 +583,15 @@ pub struct TcpSegmentRaw<B: ByteSlice> {
 
 impl<B> ParsablePacket<B, ()> for TcpSegmentRaw<B>
 where
-    B: ByteSlice,
+    B: SplitByteSlice,
 {
     type Error = ParseError;
 
     fn parse_metadata(&self) -> ParseMetadata {
         let header_len = self.options.len()
             + match &self.hdr_prefix {
-                MaybeParsed::Complete(h) => h.bytes().len(),
-                MaybeParsed::Incomplete(h) => h.flow.bytes().len() + h.rest.len(),
+                MaybeParsed::Complete(h) => Ref::bytes(&h).len(),
+                MaybeParsed::Incomplete(h) => Ref::bytes(&h.flow).len() + h.rest.len(),
             };
         ParseMetadata::from_packet(header_len, self.body.len(), 0)
     }
@@ -624,7 +636,7 @@ where
     }
 }
 
-impl<B: ByteSlice> TcpSegmentRaw<B> {
+impl<B: SplitByteSlice> TcpSegmentRaw<B> {
     /// Gets the flow header from this packet.
     pub fn flow_header(&self) -> TcpFlowHeader {
         match &self.hdr_prefix {
@@ -1040,7 +1052,7 @@ pub mod options {
         OptionBuilder, OptionLayout, OptionParseErr, OptionParseLayout, OptionsImpl,
     };
     use packet::BufferViewMut as _;
-    use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell, Unaligned};
+    use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout, Unaligned};
 
     use super::*;
 
@@ -1088,7 +1100,7 @@ pub mod options {
     ///
     /// [RFC 2018]: https://tools.ietf.org/html/rfc2018
     #[derive(
-        Copy, Clone, Eq, PartialEq, Debug, FromZeros, FromBytes, AsBytes, NoCell, Unaligned,
+        Copy, Clone, Eq, PartialEq, Debug, KnownLayout, FromBytes, IntoBytes, Immutable, Unaligned,
     )]
     #[repr(C)]
     pub struct TcpSackBlock {
@@ -1156,9 +1168,9 @@ pub mod options {
                         Ok(Some(TcpOption::SackPermitted))
                     }
                 }
-                self::OPTION_KIND_SACK => Ok(Some(TcpOption::Sack(
-                    Ref::new_slice(data).ok_or(OptionParseErr)?.into_slice(),
-                ))),
+                self::OPTION_KIND_SACK => Ok(Some(TcpOption::Sack(Ref::into_ref(
+                    Ref::from_bytes(data).map_err(|_| OptionParseErr)?,
+                )))),
                 self::OPTION_KIND_TIMESTAMP => {
                     if data.len() != 8 {
                         Err(OptionParseErr)
@@ -1520,10 +1532,10 @@ mod tests {
             .unwrap_b();
 
         // Set all three reserved bits and update the checksum.
-        let mut hdr_prefix = Ref::<_, HeaderPrefix>::new_unaligned(buffer.as_mut()).unwrap();
+        let mut hdr_prefix = Ref::<_, HeaderPrefix>::unaligned_from_bytes(buffer.as_mut()).unwrap();
         let old_checksum = hdr_prefix.checksum;
         let old_data_offset_reserved_flags = hdr_prefix.data_offset_reserved_flags;
-        hdr_prefix.data_offset_reserved_flags.as_bytes_mut()[0] |= 0b00000111;
+        hdr_prefix.data_offset_reserved_flags.as_mut_bytes()[0] |= 0b00000111;
         hdr_prefix.checksum = internet_checksum::update(
             old_checksum,
             old_data_offset_reserved_flags.as_bytes(),

@@ -19,7 +19,7 @@ _common_deps = [
   "//third_party/rust_crates:derivative",
   "//third_party/rust_crates:log",
   "//third_party/rust_crates:thiserror",
-  "//third_party/rust_crates:zerocopy",
+  "//third_party/rust_crates:zerocopy_0_0_0_alpha_0",
 ]
 
 _common_sources = [
@@ -104,7 +104,7 @@ rustc_fuzzer("fuzz-parse-packet") {
     "//src/lib/network/packet",
     "//third_party/rust_crates:arbitrary",
     "//third_party/rust_crates:log",
-    "//third_party/rust_crates:zerocopy",
+    "//third_party/rust_crates:zerocopy_0_0_0_alpha_0",
   ]
   configs -= [ "//build/config/rust/lints:allow_unused_results" ]
 }

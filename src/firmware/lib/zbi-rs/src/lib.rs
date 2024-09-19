@@ -40,7 +40,7 @@ use core::fmt::{Debug, Display, Formatter};
 use core::mem::{size_of, take};
 use core::ops::DerefMut;
 use zbi_format::*;
-use zerocopy::{AsBytes, ByteSlice, ByteSliceMut, NoCell, Ref};
+use zerocopy::{Immutable, IntoByteSlice, IntoBytes, Ref, SplitByteSlice, SplitByteSliceMut};
 
 type ZbiResult<T> = Result<T, ZbiError>;
 
@@ -63,7 +63,7 @@ const ZBI_ARCH_KERNEL_TYPE: ZbiType = ZbiType::KernelRiscv64;
 ///
 /// * `Ok(aligned_slice)` - on success, which can have `length == 0`
 /// * [`ZbiError::TooBig`] - returned if there is not enough space to align the slice
-pub fn align_buffer<B: ByteSlice>(buffer: B) -> ZbiResult<B> {
+pub fn align_buffer<B: SplitByteSlice>(buffer: B) -> ZbiResult<B> {
     let tail_offset = get_align_buffer_offset(&buffer[..])?;
     let (_, aligned_buffer) = buffer.split_at(tail_offset);
     Ok(aligned_buffer)
@@ -79,21 +79,21 @@ pub fn align_buffer<B: ByteSlice>(buffer: B) -> ZbiResult<B> {
 /// Since all headers in [`ZbiContainer`] are [`ZBI_ALIGNMENT_USIZE`] aligned payload may be followed by padding,
 /// which is included in [`ZbiContainer`] length, but not in each [`ZbiItem`]
 #[derive(Debug)]
-pub struct ZbiItem<B: ByteSlice> {
+pub struct ZbiItem<B: SplitByteSlice> {
     /// ZBI header
     pub header: Ref<B, ZbiHeader>,
     /// Payload corresponding to ZBI header
     pub payload: B,
 }
 
-impl<B: ByteSlice, C: ByteSlice> PartialEq<ZbiItem<C>> for ZbiItem<B> {
+impl<B: SplitByteSlice, C: SplitByteSlice> PartialEq<ZbiItem<C>> for ZbiItem<B> {
     fn eq(&self, other: &ZbiItem<C>) -> bool {
         self.header.as_bytes() == other.header.as_bytes()
             && self.payload.as_bytes() == other.payload.as_bytes()
     }
 }
 
-impl<B: ByteSlice + PartialEq> ZbiItem<B> {
+impl<B: SplitByteSlice + PartialEq> ZbiItem<B> {
     /// Attempts to parse provided buffer.
     ///
     /// # Arguments
@@ -123,7 +123,8 @@ impl<B: ByteSlice + PartialEq> ZbiItem<B> {
     pub fn parse(buffer: B) -> ZbiResult<(ZbiItem<B>, B)> {
         is_zbi_aligned(&buffer)?;
 
-        let (hdr, payload) = Ref::<B, ZbiHeader>::new_from_prefix(buffer).ok_or(ZbiError::Error)?;
+        let (hdr, payload) =
+            Ref::<B, ZbiHeader>::from_prefix(buffer).map_err(|_| ZbiError::Error)?;
 
         let item_payload_len =
             usize::try_from(hdr.length).map_err(|_| ZbiError::PlatformBadLength)?;
@@ -168,7 +169,7 @@ impl<B: ByteSlice + PartialEq> ZbiItem<B> {
     }
 }
 
-impl<B: ByteSliceMut + PartialEq> ZbiItem<B> {
+impl<B: SplitByteSliceMut + PartialEq> ZbiItem<B> {
     /// Create `ZbiItem` with provided information and payload length.
     ///
     ///
@@ -221,7 +222,7 @@ impl<B: ByteSliceMut + PartialEq> ZbiItem<B> {
             u32::try_from(payload_len).map_err(|_| ZbiError::PlatformBadLength)?;
 
         let (mut header, item_tail) =
-            Ref::<B, ZbiHeader>::new_from_prefix(buffer).ok_or(ZbiError::Error)?;
+            Ref::<B, ZbiHeader>::from_prefix(buffer).map_err(|_| ZbiError::Error)?;
         header.type_ = type_ as u32;
         header.length = payload_len_u32;
         header.extra = extra;
@@ -245,7 +246,7 @@ impl<B: ByteSliceMut + PartialEq> ZbiItem<B> {
 /// Both cases would allow to iterate over elements in the container via [`ZbiContainer::iter`] or
 /// [`ZbiContainer::iter_mut`].
 #[derive(Debug, PartialEq)]
-pub struct ZbiContainer<B: ByteSlice> {
+pub struct ZbiContainer<B: SplitByteSlice> {
     /// Container specific [`ZbiHeader`], witch would be first element if ZBI buffer.
     ///
     /// `header.length` would show how many bytes after this header is used for ZBI elements and
@@ -267,7 +268,7 @@ pub struct ZbiContainer<B: ByteSlice> {
     buffer: B,
 }
 
-impl<B: ByteSlice> ZbiContainer<B> {
+impl<B: SplitByteSlice> ZbiContainer<B> {
     // Helper to construct [`ZbiContainer`] which handles `paload_length` value, which should be
     // in sync with `header.length`.
     fn construct(header: Ref<B, ZbiHeader>, buffer: B) -> ZbiResult<Self> {
@@ -298,7 +299,11 @@ impl<B: ByteSlice> ZbiContainer<B> {
 
     /// Immutable iterator over ZBI elements. First element is first ZBI element after
     /// container header. Container header is not available via iterator.
-    pub fn iter(&self) -> ZbiContainerIterator<impl ByteSlice + Default + Debug + PartialEq + '_> {
+    pub fn iter(
+        &self,
+    ) -> ZbiContainerIterator<
+        impl SplitByteSlice + IntoByteSlice<'_> + Default + Debug + PartialEq + '_,
+    > {
         ZbiContainerIterator {
             state: Ok(()),
             buffer: &self.buffer[..self.get_payload_length_usize()],
@@ -316,7 +321,7 @@ impl<B: ByteSlice> ZbiContainer<B> {
     /// * Err([`ZbiError::Truncated`]) - if container is empty
     pub fn get_bootable_kernel_item(
         &self,
-    ) -> ZbiResult<ZbiItem<impl ByteSlice + Default + Debug + PartialEq + '_>> {
+    ) -> ZbiResult<ZbiItem<impl SplitByteSlice + Default + Debug + PartialEq + '_>> {
         let hdr = &self.header;
         if hdr.length == 0 {
             return Err(ZbiError::Truncated);
@@ -338,8 +343,8 @@ impl<B: ByteSlice> ZbiContainer<B> {
     /// * Returns `Err` if container is not a bootable ZBI kernel or is truncated.
     pub fn get_kernel_entry_and_reserved_memory_size(&self) -> ZbiResult<(u64, u64)> {
         let kernel = self.get_bootable_kernel_item()?;
-        let (header, _) = Ref::<_, zbi_kernel_t>::new_from_prefix(kernel.payload)
-            .ok_or(ZbiError::IncompleteKernel)?;
+        let (header, _) = Ref::<_, zbi_kernel_t>::from_prefix(kernel.payload)
+            .map_err(|_| ZbiError::IncompleteKernel)?;
         Ok((header.entry, header.reserve_memory_size))
     }
 
@@ -371,7 +376,7 @@ impl<B: ByteSlice> ZbiContainer<B> {
         is_zbi_aligned(&buffer)?;
 
         let (header, payload) =
-            Ref::<B, ZbiHeader>::new_from_prefix(buffer).ok_or(ZbiError::Error)?;
+            Ref::<B, ZbiHeader>::from_prefix(buffer).map_err(|_| ZbiError::Error)?;
 
         let length: usize = header.length.try_into().map_err(|_| ZbiError::TooBig)?;
         if length > payload.len() {
@@ -404,7 +409,7 @@ impl<B: ByteSlice> ZbiContainer<B> {
     }
 }
 
-impl<B: ByteSliceMut + PartialEq> ZbiContainer<B> {
+impl<B: SplitByteSliceMut + PartialEq> ZbiContainer<B> {
     fn set_payload_length_usize(&mut self, len: usize) -> ZbiResult<()> {
         if self.buffer.len() < len {
             return Err(ZbiError::Truncated);
@@ -635,7 +640,10 @@ impl<B: ByteSliceMut + PartialEq> ZbiContainer<B> {
     /// # let cont1_element_0 = &container_1.iter().next().unwrap();
     /// # assert_eq!(cont0_element_1, cont1_element_0);
     /// ```
-    pub fn extend(&mut self, other: &ZbiContainer<impl ByteSlice + PartialEq>) -> ZbiResult<()> {
+    pub fn extend(
+        &mut self,
+        other: &ZbiContainer<impl SplitByteSlice + PartialEq>,
+    ) -> ZbiResult<()> {
         let new_length = self
             .get_payload_length_usize()
             .checked_add(other.get_payload_length_usize())
@@ -647,7 +655,7 @@ impl<B: ByteSliceMut + PartialEq> ZbiContainer<B> {
         for b in other.iter() {
             let start = self.get_payload_length_usize();
             let end = start + core::mem::size_of::<ZbiHeader>();
-            self.buffer[start..end].clone_from_slice(b.header.bytes());
+            self.buffer[start..end].clone_from_slice(Ref::bytes(&b.header));
             let start = end;
             let end = start + b.payload.len();
             self.buffer[start..end].clone_from_slice(&b.payload);
@@ -680,12 +688,12 @@ impl<B: ByteSliceMut + PartialEq> ZbiContainer<B> {
     }
 }
 
-impl<B: ByteSlice + PartialEq + DerefMut> ZbiContainer<B> {
+impl<B: SplitByteSlice + PartialEq + DerefMut> ZbiContainer<B> {
     /// Mutable iterator over ZBI elements. First element is first ZBI element after
     /// container header. Container header is not available via iterator.
     pub fn iter_mut(
         &mut self,
-    ) -> ZbiContainerIterator<impl ByteSliceMut + Debug + Default + PartialEq + '_> {
+    ) -> ZbiContainerIterator<impl SplitByteSliceMut + Debug + Default + PartialEq + '_> {
         let length = self.get_payload_length_usize();
         ZbiContainerIterator { state: Ok(()), buffer: &mut self.buffer[..length] }
     }
@@ -702,7 +710,7 @@ pub struct ZbiContainerIterator<B> {
     buffer: B,
 }
 
-impl<B: ByteSlice + PartialEq + Default + Debug> Iterator for ZbiContainerIterator<B> {
+impl<B: SplitByteSlice + PartialEq + Default + Debug> Iterator for ZbiContainerIterator<B> {
     type Item = ZbiItem<B>;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -737,7 +745,7 @@ impl<B: ByteSlice + PartialEq + Default + Debug> Iterator for ZbiContainerIterat
 }
 
 #[repr(u32)]
-#[derive(AsBytes, Clone, Copy, Debug, Eq, PartialEq, NoCell)]
+#[derive(IntoBytes, Clone, Copy, Debug, Eq, PartialEq, Immutable)]
 /// All possible [`ZbiHeader`]`.type` values.
 pub enum ZbiType {
     /// Each ZBI starts with a container header.
@@ -1225,7 +1233,7 @@ impl Display for ZbiError {
 }
 
 // Returns offset/idx of the first buffer element that will be aligned to `ZBI_ALIGNMENT`
-fn get_align_buffer_offset(buffer: impl ByteSlice) -> ZbiResult<usize> {
+fn get_align_buffer_offset(buffer: impl SplitByteSlice) -> ZbiResult<usize> {
     let addr = buffer.as_ptr() as usize;
     match addr % ZBI_ALIGNMENT_USIZE {
         0 => Ok(0),
@@ -1240,7 +1248,7 @@ fn get_align_buffer_offset(buffer: impl ByteSlice) -> ZbiResult<usize> {
 }
 
 // Check if buffer is ZbiAligned
-fn is_zbi_aligned(buffer: &impl ByteSlice) -> ZbiResult<()> {
+fn is_zbi_aligned(buffer: &impl SplitByteSlice) -> ZbiResult<()> {
     match (buffer.as_ptr() as usize) % ZBI_ALIGNMENT_USIZE {
         0 => Ok(()),
         _ => Err(ZbiError::BadAlignment),
@@ -1276,7 +1284,7 @@ pub fn merge_within(buffer: &mut [u8], second_start: usize) -> ZbiResult<ZbiCont
     let second_payload_end = second_payload_start + second_payload_len;
     buffer.copy_within(second_payload_start..second_payload_end, first_container_size);
     // Updates first ZBI header length
-    let hdr = Ref::<_, ZbiHeader>::new_from_prefix(&mut buffer[..]).unwrap().0.into_mut();
+    let hdr = Ref::into_mut(Ref::<_, ZbiHeader>::from_prefix(&mut buffer[..]).unwrap().0);
     hdr.length = hdr
         .length
         .checked_add(u32::try_from(second_payload_len).unwrap())
@@ -1297,7 +1305,7 @@ mod tests {
         pub fn new(buffer: &'a mut [u8]) -> TestZbiBuilder<'a> {
             TestZbiBuilder { buffer, tail_offset: 0 }
         }
-        pub fn add<T: AsBytes + NoCell>(mut self, t: T) -> Self {
+        pub fn add<T: IntoBytes + Immutable>(mut self, t: T) -> Self {
             t.write_to_prefix(&mut self.buffer[self.tail_offset..]).unwrap();
             self.tail_offset += size_of::<T>();
             self
@@ -1410,7 +1418,7 @@ mod tests {
         assert_eq!(item.payload.len(), expect.length.try_into().unwrap());
 
         let u32_array =
-            Ref::<&[u8], [u32]>::new_slice_from_prefix(&buffer.0[..ZBI_HEADER_SIZE], 8).unwrap().0;
+            Ref::<&[u8], [u32]>::from_prefix_with_elems(&buffer.0[..ZBI_HEADER_SIZE], 8).unwrap().0;
         assert_eq!(u32_array[0], expect.type_);
         assert_eq!(u32_array[1], expect.length);
         assert_eq!(u32_array[2], expect.extra);
@@ -1458,7 +1466,7 @@ mod tests {
         let mut buffer = ZbiAligned::default();
         let buffer = TestZbiBuilder::new(&mut buffer.0[..]).container_hdr(0).build();
         let buffer_hdr_extra_expected =
-            Ref::<&[u8], [u32]>::new_slice_from_prefix(&buffer[8..12], 1).unwrap().0[0];
+            Ref::<&[u8], [u32]>::from_prefix_with_elems(&buffer[8..12], 1).unwrap().0[0];
 
         let (zbi_item, _tail) = ZbiItem::parse(buffer).unwrap();
 
@@ -1470,13 +1478,13 @@ mod tests {
         let mut buffer = ZbiAligned::default();
         let buffer_build = TestZbiBuilder::new(&mut buffer.0[..]).container_hdr(0).build();
         let buffer_hdr_type =
-            Ref::<&[u8], [u32]>::new_slice_from_prefix(&buffer_build[0..4], 1).unwrap().0[0];
+            Ref::<&[u8], [u32]>::from_prefix_with_elems(&buffer_build[0..4], 1).unwrap().0[0];
         assert_eq!(buffer_hdr_type, ZBI_TYPE_CONTAINER);
 
         let (mut zbi_item, _tail) = ZbiItem::parse(&mut buffer_build[..]).unwrap();
         zbi_item.header.type_ = ZBI_TYPE_KERNEL_X64;
         let buffer_hdr_type =
-            Ref::<&[u8], [u32]>::new_slice_from_prefix(&buffer_build[0..4], 1).unwrap().0[0];
+            Ref::<&[u8], [u32]>::from_prefix_with_elems(&buffer_build[0..4], 1).unwrap().0[0];
         assert_eq!(buffer_hdr_type, ZBI_TYPE_KERNEL_X64);
     }
 
@@ -1675,7 +1683,7 @@ mod tests {
         let mut it = zbi_container.iter();
         for (expected_hdr, expected_payload) in expected_items.iter() {
             let Some(item) = it.next() else { panic!("expecting iterator with value") };
-            assert_eq!(item.header.into_ref(), expected_hdr);
+            assert_eq!(Ref::into_ref(item.header), expected_hdr);
             assert_eq!(&item.payload[..], *expected_payload);
         }
         assert!(it.next().is_none());
@@ -2178,7 +2186,7 @@ mod tests {
         check_container_made_of(&container, &new_entries);
     }
 
-    fn check_container_made_of<B: ByteSlice + PartialEq>(
+    fn check_container_made_of<B: SplitByteSlice + PartialEq>(
         container: &ZbiContainer<B>,
         expected_items: &[(ZbiHeader, &[u8])],
     ) {
@@ -2409,7 +2417,7 @@ mod tests {
         assert_eq!(container.iter_mut().count(), 0);
     }
 
-    fn byteslice_cmp(byteslice: impl ByteSlice, slice: &[u8]) -> bool {
+    fn byteslice_cmp(byteslice: impl SplitByteSlice, slice: &[u8]) -> bool {
         byteslice.len() == slice.len() && byteslice.iter().zip(slice.iter()).all(|(a, b)| a == b)
     }
 

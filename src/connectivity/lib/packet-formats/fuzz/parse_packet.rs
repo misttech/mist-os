@@ -23,7 +23,7 @@ use packet_formats::ipv6::Ipv6Packet;
 use packet_formats::tcp::{TcpParseArgs, TcpSegment};
 use packet_formats::udp::{UdpPacket, UdpParseArgs};
 use packet_formats_dhcp::v6::Message as Dhcpv6Message;
-use zerocopy::ByteSlice;
+use zerocopy::SplitByteSlice;
 
 /// Packet formats whose parsers are provided by the [`packet_formats_dhcp`]
 /// crate.
@@ -75,14 +75,14 @@ enum PacketFormatsPacketType {
     UdpPacketv6(Fuzzed<UdpParseArgs<Ipv6Addr>>),
 }
 
-trait ParseAndIgnore<A, B: ByteSlice> {
+trait ParseAndIgnore<A, B: SplitByteSlice> {
     /// Parse the provided value to check for crashes and ignore the result.
     fn parse_and_ignore<BV: BufferView<B>>(input: BV, args: A);
 }
 
 impl<B, A, T> ParseAndIgnore<A, B> for T
 where
-    B: ByteSlice,
+    B: SplitByteSlice,
     T: ParsablePacket<B, A>,
 {
     fn parse_and_ignore<BV: BufferView<B>>(input: BV, args: A) {

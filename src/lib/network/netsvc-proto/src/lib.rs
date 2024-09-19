@@ -11,7 +11,7 @@ pub mod tftp;
 
 use thiserror::Error;
 
-/// A witness type for a valid string backed by a [`zerocopy::ByteSlice`].
+/// A witness type for a valid string backed by a [`zerocopy::SplitByteSlice`].
 struct ValidStr<B>(B);
 
 /// Helper to convince the compiler we're holding buffer views.
@@ -21,7 +21,7 @@ fn as_buffer_view_mut<'a, B: packet::BufferViewMut<&'a mut [u8]>>(
     v
 }
 
-fn find_null_termination<B: zerocopy::ByteSlice>(b: &B) -> Option<usize> {
+fn find_null_termination<B: zerocopy::SplitByteSlice>(b: &B) -> Option<usize> {
     b.as_ref().iter().enumerate().find_map(|(index, c)| (*c == 0).then(|| index))
 }
 
@@ -35,7 +35,7 @@ pub enum ValidStrError {
 
 impl<B> ValidStr<B>
 where
-    B: zerocopy::ByteSlice,
+    B: zerocopy::SplitByteSlice,
 {
     /// Attempts to create a new `ValidStr` that wraps all the contents of
     /// `bytes`.
@@ -96,7 +96,7 @@ where
 
 impl<B> std::fmt::Debug for ValidStr<B>
 where
-    B: zerocopy::ByteSlice,
+    B: zerocopy::SplitByteSlice,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
         self.as_str().fmt(f)
@@ -105,7 +105,7 @@ where
 
 impl<B> AsRef<str> for ValidStr<B>
 where
-    B: zerocopy::ByteSlice,
+    B: zerocopy::SplitByteSlice,
 {
     fn as_ref(&self) -> &str {
         self.as_str()

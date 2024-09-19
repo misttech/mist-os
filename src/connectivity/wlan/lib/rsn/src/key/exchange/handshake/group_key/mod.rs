@@ -7,7 +7,7 @@ use crate::key::exchange::{self};
 use crate::rsna::{Dot11VerifiedKeyFrame, NegotiatedProtection, Role, UpdateSink};
 use crate::{rsn_ensure, Error};
 use bytes::Bytes;
-use zerocopy::ByteSlice;
+use zerocopy::SplitByteSlice;
 
 mod supplicant;
 
@@ -18,11 +18,11 @@ enum RoleHandler {
 
 // Struct which carries EAPOL key frames which comply with IEEE Std 802.11-2016, 12.7.2 and
 // IEEE Std 802.11-2016, 12.7.7.
-pub struct GroupKeyHandshakeFrame<B: ByteSlice> {
+pub struct GroupKeyHandshakeFrame<B: SplitByteSlice> {
     frame: Dot11VerifiedKeyFrame<B>,
 }
 
-impl<B: ByteSlice> GroupKeyHandshakeFrame<B> {
+impl<B: SplitByteSlice> GroupKeyHandshakeFrame<B> {
     pub fn from_verified(frame: Dot11VerifiedKeyFrame<B>, role: Role) -> Result<Self, Error> {
         // Safe since the frame will be wrapped again in a `Dot11VerifiedKeyFrame` when being accessed.
         let raw_frame = frame.unsafe_get_raw();
@@ -148,7 +148,7 @@ impl GroupKey {
         }
     }
 
-    pub fn on_eapol_key_frame<B: ByteSlice>(
+    pub fn on_eapol_key_frame<B: SplitByteSlice>(
         &mut self,
         update_sink: &mut UpdateSink,
         frame: Dot11VerifiedKeyFrame<B>,

@@ -17,7 +17,7 @@ use std::pin::Pin;
 use std::time::Duration;
 use timeout::timeout;
 use zerocopy::byteorder::big_endian::U16;
-use zerocopy::{ByteSlice, FromBytes, FromZeros, NoCell, Ref, Unaligned};
+use zerocopy::{FromBytes, Immutable, KnownLayout, Ref, SplitByteSlice, Unaligned};
 
 const HOST_PORT: u16 = 5554;
 const REPLY_TIMEOUT: Duration = Duration::from_millis(500);
@@ -30,7 +30,7 @@ enum PacketType {
     Fastboot,
 }
 
-#[derive(FromZeros, FromBytes, NoCell, Unaligned)]
+#[derive(KnownLayout, FromBytes, Immutable, Unaligned)]
 #[repr(C)]
 struct Header {
     id: u8,
@@ -38,14 +38,14 @@ struct Header {
     sequence: U16,
 }
 
-struct Packet<B: ByteSlice> {
+struct Packet<B: SplitByteSlice> {
     header: Ref<B, Header>,
     data: B,
 }
 
-impl<B: ByteSlice> Packet<B> {
+impl<B: SplitByteSlice> Packet<B> {
     fn parse(bytes: B) -> Option<Packet<B>> {
-        let (header, data) = Ref::new_from_prefix(bytes)?;
+        let (header, data) = Ref::from_prefix(bytes).ok()?;
         Some(Self { header, data })
     }
 

@@ -36,7 +36,7 @@ rustc_library("rust") {
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:static_assertions",
     "//third_party/rust_crates:thiserror",
-    "//third_party/rust_crates:zerocopy",
+    "//third_party/rust_crates:zerocopy_0_0_0_alpha_0",
   ]
 
   test_deps = [

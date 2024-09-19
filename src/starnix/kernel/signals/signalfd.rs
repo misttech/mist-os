@@ -14,7 +14,7 @@ use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::signals::SigSet;
 use starnix_uapi::vfs::FdEvents;
 use starnix_uapi::{errno, error, signalfd_siginfo, SFD_NONBLOCK};
-use zerocopy::AsBytes;
+use zerocopy::IntoBytes;
 
 pub struct SignalFd {
     mask: Mutex<SigSet>,

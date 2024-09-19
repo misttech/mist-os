@@ -3067,7 +3067,7 @@ mod tests {
     use crate::testing::*;
     use starnix_uapi::vfs::default_statfs;
     use starnix_uapi::{O_RDONLY, SEEK_CUR, SEEK_END, SEEK_SET};
-    use zerocopy::AsBytes;
+    use zerocopy::IntoBytes;
 
     #[::fuchsia::test]
     async fn test_sys_lseek() -> Result<(), Errno> {

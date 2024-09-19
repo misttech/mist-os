@@ -32,7 +32,7 @@ use packet_formats::testutil::{
 };
 use packet_formats::utils::NonZeroDuration;
 use rand::Rng;
-use zerocopy::ByteSlice;
+use zerocopy::SplitByteSlice;
 
 use netstack3_base::testutil::{
     assert_empty, set_logger_for_test, FakeInstant, FakeNetwork, FakeNetworkLinks, StepResult,
@@ -1124,7 +1124,7 @@ fn test_receiving_router_advertisement_mtu_option() {
 
 fn get_source_link_layer_option<L: LinkAddress, B>(options: &Options<B>) -> Option<L>
 where
-    B: ByteSlice,
+    B: SplitByteSlice,
 {
     options.iter().find_map(|o| match o {
         NdpOption::SourceLinkLayerAddress(a) => {

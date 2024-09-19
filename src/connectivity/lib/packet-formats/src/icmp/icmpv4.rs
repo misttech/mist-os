@@ -9,7 +9,7 @@ use core::fmt;
 use net_types::ip::{GenericOverIp, Ipv4, Ipv4Addr};
 use packet::{BufferView, ParsablePacket, ParseMetadata};
 use zerocopy::byteorder::network_endian::U32;
-use zerocopy::{AsBytes, ByteSlice, FromBytes, FromZeros, NoCell, Unaligned};
+use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout, SplitByteSlice, Unaligned};
 
 use crate::error::{ParseError, ParseResult};
 
@@ -27,7 +27,7 @@ use super::{
 /// knowing the message type ahead of time while still getting the benefits of a
 /// statically-typed packet struct after parsing is complete.
 #[allow(missing_docs)]
-pub enum Icmpv4Packet<B: ByteSlice> {
+pub enum Icmpv4Packet<B: SplitByteSlice> {
     EchoReply(IcmpPacket<Ipv4, B, IcmpEchoReply>),
     DestUnreachable(IcmpPacket<Ipv4, B, IcmpDestUnreachable>),
     Redirect(IcmpPacket<Ipv4, B, Icmpv4Redirect>),
@@ -38,7 +38,7 @@ pub enum Icmpv4Packet<B: ByteSlice> {
     TimestampReply(IcmpPacket<Ipv4, B, Icmpv4TimestampReply>),
 }
 
-impl<B: ByteSlice + fmt::Debug> fmt::Debug for Icmpv4Packet<B> {
+impl<B: SplitByteSlice + fmt::Debug> fmt::Debug for Icmpv4Packet<B> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         use self::Icmpv4Packet::*;
         match self {
@@ -54,7 +54,7 @@ impl<B: ByteSlice + fmt::Debug> fmt::Debug for Icmpv4Packet<B> {
     }
 }
 
-impl<B: ByteSlice> ParsablePacket<B, IcmpParseArgs<Ipv4Addr>> for Icmpv4Packet<B> {
+impl<B: SplitByteSlice> ParsablePacket<B, IcmpParseArgs<Ipv4Addr>> for Icmpv4Packet<B> {
     type Error = ParseError;
 
     fn parse_metadata(&self) -> ParseMetadata {
@@ -106,7 +106,7 @@ impl<B: ByteSlice> ParsablePacket<B, IcmpParseArgs<Ipv4Addr>> for Icmpv4Packet<B
 /// knowing the message type ahead of time while still getting the benefits of a
 /// statically-typed packet struct after parsing is complete.
 #[allow(missing_docs)]
-pub enum Icmpv4PacketRaw<B: ByteSlice> {
+pub enum Icmpv4PacketRaw<B: SplitByteSlice> {
     EchoReply(IcmpPacketRaw<Ipv4, B, IcmpEchoReply>),
     DestUnreachable(IcmpPacketRaw<Ipv4, B, IcmpDestUnreachable>),
     Redirect(IcmpPacketRaw<Ipv4, B, Icmpv4Redirect>),
@@ -117,7 +117,7 @@ pub enum Icmpv4PacketRaw<B: ByteSlice> {
     TimestampReply(IcmpPacketRaw<Ipv4, B, Icmpv4TimestampReply>),
 }
 
-impl<B: ByteSlice> ParsablePacket<B, ()> for Icmpv4PacketRaw<B> {
+impl<B: SplitByteSlice> ParsablePacket<B, ()> for Icmpv4PacketRaw<B> {
     type Error = ParseError;
 
     fn parse_metadata(&self) -> ParseMetadata {
@@ -229,7 +229,7 @@ create_protocol_enum!(
 );
 
 /// An ICMPv4 Redirect Message.
-#[derive(Copy, Clone, Debug, FromZeros, FromBytes, AsBytes, NoCell, Unaligned)]
+#[derive(Copy, Clone, Debug, KnownLayout, FromBytes, IntoBytes, Immutable, Unaligned)]
 #[repr(C)]
 pub struct Icmpv4Redirect {
     gateway: Ipv4Addr,
@@ -248,7 +248,9 @@ create_protocol_enum!(
 
 impl_icmp_message!(Ipv4, IcmpTimeExceeded, TimeExceeded, Icmpv4TimeExceededCode, OriginalPacket<B>);
 
-#[derive(Copy, Clone, Debug, FromZeros, FromBytes, AsBytes, NoCell, Unaligned, Eq, PartialEq)]
+#[derive(
+    Copy, Clone, Debug, KnownLayout, FromBytes, IntoBytes, Immutable, Unaligned, Eq, PartialEq,
+)]
 #[repr(C)]
 struct IcmpTimestampData {
     origin_timestamp: U32,
@@ -256,7 +258,9 @@ struct IcmpTimestampData {
     tx_timestamp: U32,
 }
 
-#[derive(Copy, Clone, Debug, FromZeros, FromBytes, AsBytes, NoCell, Unaligned, Eq, PartialEq)]
+#[derive(
+    Copy, Clone, Debug, KnownLayout, FromBytes, IntoBytes, Immutable, Unaligned, Eq, PartialEq,
+)]
 #[repr(C)]
 struct Timestamp {
     id_seq: IdAndSeq,
@@ -264,7 +268,7 @@ struct Timestamp {
 }
 
 /// An ICMPv4 Timestamp Request message.
-#[derive(Copy, Clone, Debug, FromZeros, FromBytes, AsBytes, NoCell, Unaligned)]
+#[derive(Copy, Clone, Debug, KnownLayout, FromBytes, IntoBytes, Immutable, Unaligned)]
 #[repr(transparent)]
 pub struct Icmpv4TimestampRequest(Timestamp);
 
@@ -306,7 +310,9 @@ impl Icmpv4TimestampRequest {
 }
 
 /// An ICMPv4 Timestamp Reply message.
-#[derive(Copy, Clone, Debug, FromZeros, FromBytes, AsBytes, NoCell, Unaligned, Eq, PartialEq)]
+#[derive(
+    Copy, Clone, Debug, KnownLayout, FromBytes, IntoBytes, Immutable, Unaligned, Eq, PartialEq,
+)]
 #[repr(transparent)]
 pub struct Icmpv4TimestampReply(Timestamp);
 
@@ -324,7 +330,7 @@ create_protocol_enum! (
 );
 
 /// An ICMPv4 Parameter Problem message.
-#[derive(Copy, Clone, Debug, FromZeros, FromBytes, AsBytes, NoCell, Unaligned)]
+#[derive(Copy, Clone, Debug, KnownLayout, FromBytes, IntoBytes, Immutable, Unaligned)]
 #[repr(C)]
 pub struct Icmpv4ParameterProblem {
     pointer: u8,
@@ -357,7 +363,7 @@ mod tests {
     use crate::icmp::{IcmpMessage, MessageBody};
     use crate::ipv4::{Ipv4Header, Ipv4Packet, Ipv4PacketBuilder};
 
-    fn serialize_to_bytes<B: ByteSlice + Debug, M: IcmpMessage<Ipv4> + Debug>(
+    fn serialize_to_bytes<B: SplitByteSlice + Debug, M: IcmpMessage<Ipv4> + Debug>(
         src_ip: Ipv4Addr,
         dst_ip: Ipv4Addr,
         icmp: &IcmpPacket<Ipv4, B, M>,

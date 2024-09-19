@@ -264,7 +264,7 @@ mod tests {
         let (ret, arg_vec) = add_encryption_key(&root_dir);
         assert!(ret == 0, "add encryption key ioctl failed: {:?}", std::io::Error::last_os_error());
         let (arg_struct_bytes, _) = arg_vec.split_at(std::mem::size_of::<fscrypt_add_key_arg>());
-        let arg_struct = fscrypt_add_key_arg::read_from(arg_struct_bytes).unwrap();
+        let arg_struct = fscrypt_add_key_arg::read_from_bytes(arg_struct_bytes).unwrap();
         let ret = unsafe { set_encryption_policy(&dir, arg_struct.key_spec.u.identifier.value) };
         assert!(
             ret == 0,
@@ -322,7 +322,7 @@ mod tests {
         let (ret, arg_vec) = add_encryption_key(&root_dir);
         assert!(ret == 0, "add encryption key ioctl failed: {:?}", std::io::Error::last_os_error());
         let (arg_struct_bytes, _) = arg_vec.split_at(std::mem::size_of::<fscrypt_add_key_arg>());
-        let arg_struct = fscrypt_add_key_arg::read_from(arg_struct_bytes).unwrap();
+        let arg_struct = fscrypt_add_key_arg::read_from_bytes(arg_struct_bytes).unwrap();
         let ret = unsafe { set_encryption_policy(&dir, arg_struct.key_spec.u.identifier.value) };
         assert!(
             ret == 0,
@@ -368,7 +368,7 @@ mod tests {
         let (ret, arg_vec) = add_encryption_key(&root_dir);
         assert!(ret == 0, "add encryption key ioctl failed: {:?}", std::io::Error::last_os_error());
         let (arg_struct_bytes, _) = arg_vec.split_at(std::mem::size_of::<fscrypt_add_key_arg>());
-        let arg_struct = fscrypt_add_key_arg::read_from(arg_struct_bytes).unwrap();
+        let arg_struct = fscrypt_add_key_arg::read_from_bytes(arg_struct_bytes).unwrap();
         let ret = unsafe { set_encryption_policy(&dir, arg_struct.key_spec.u.identifier.value) };
         assert!(
             ret == 0,
@@ -480,7 +480,7 @@ mod tests {
         let (ret, arg_vec) = add_encryption_key(&root_dir);
         assert!(ret == 0, "add encryption key ioctl failed: {:?}", std::io::Error::last_os_error());
         let (arg_struct_bytes, _) = arg_vec.split_at(std::mem::size_of::<fscrypt_add_key_arg>());
-        let arg_struct_1 = fscrypt_add_key_arg::read_from(arg_struct_bytes).unwrap();
+        let arg_struct_1 = fscrypt_add_key_arg::read_from_bytes(arg_struct_bytes).unwrap();
 
         let ret = unsafe { set_encryption_policy(&dir, arg_struct_1.key_spec.u.identifier.value) };
 
@@ -493,7 +493,7 @@ mod tests {
         let (ret, arg_vec) = add_encryption_key(&root_dir);
         assert!(ret == 0, "add encryption key ioctl failed: {:?}", std::io::Error::last_os_error());
         let (arg_struct_bytes, _) = arg_vec.split_at(std::mem::size_of::<fscrypt_add_key_arg>());
-        let arg_struct_2 = fscrypt_add_key_arg::read_from(arg_struct_bytes).unwrap();
+        let arg_struct_2 = fscrypt_add_key_arg::read_from_bytes(arg_struct_bytes).unwrap();
         let ret = unsafe { set_encryption_policy(&dir, arg_struct_2.key_spec.u.identifier.value) };
 
         assert!(
@@ -532,7 +532,7 @@ mod tests {
         let (ret, arg_vec) = add_encryption_key(&root_dir);
         assert!(ret == 0, "add encryption key ioctl failed: {:?}", std::io::Error::last_os_error());
         let (arg_struct_bytes, _) = arg_vec.split_at(std::mem::size_of::<fscrypt_add_key_arg>());
-        let arg_struct = fscrypt_add_key_arg::read_from(arg_struct_bytes).unwrap();
+        let arg_struct = fscrypt_add_key_arg::read_from_bytes(arg_struct_bytes).unwrap();
 
         let file =
             std::fs::File::create_new(dir_path.join("file.txt")).expect("create file failed");
@@ -557,7 +557,7 @@ mod tests {
         let (ret, arg_vec) = add_encryption_key(&root_dir);
         assert!(ret == 0, "add encryption key ioctl failed: {:?}", std::io::Error::last_os_error());
         let (arg_struct_bytes, _) = arg_vec.split_at(std::mem::size_of::<fscrypt_add_key_arg>());
-        let arg_struct = fscrypt_add_key_arg::read_from(arg_struct_bytes).unwrap();
+        let arg_struct = fscrypt_add_key_arg::read_from_bytes(arg_struct_bytes).unwrap();
         std::fs::create_dir(dir_path.join("subdir")).expect("create dir failed");
         let ret = unsafe { set_encryption_policy(&dir, arg_struct.key_spec.u.identifier.value) };
         assert!(
@@ -658,7 +658,7 @@ mod tests {
         let (ret, arg_vec) = add_encryption_key(&root_dir);
         assert!(ret == 0, "add encryption key ioctl failed: {:?}", std::io::Error::last_os_error());
         let (arg_struct_bytes, _) = arg_vec.split_at(std::mem::size_of::<fscrypt_add_key_arg>());
-        let arg_struct = fscrypt_add_key_arg::read_from(arg_struct_bytes).unwrap();
+        let arg_struct = fscrypt_add_key_arg::read_from_bytes(arg_struct_bytes).unwrap();
         let ret = unsafe { set_encryption_policy(&dir, arg_struct.key_spec.u.identifier.value) };
         assert!(
             ret == 0,
@@ -839,7 +839,7 @@ mod tests {
         let (ret, arg_vec) = add_encryption_key(&root_dir);
         assert!(ret == 0, "add encryption key ioctl failed: {:?}", std::io::Error::last_os_error());
         let (arg_struct_bytes, _) = arg_vec.split_at(std::mem::size_of::<fscrypt_add_key_arg>());
-        let arg_struct = fscrypt_add_key_arg::read_from(arg_struct_bytes).unwrap();
+        let arg_struct = fscrypt_add_key_arg::read_from_bytes(arg_struct_bytes).unwrap();
 
         std::os::unix::fs::chown(dir_path.clone(), Some(1000), Some(1000)).expect("chown failed");
         let ret = unsafe { set_encryption_policy(&dir, arg_struct.key_spec.u.identifier.value) };
@@ -871,7 +871,7 @@ mod tests {
         let (ret, arg_vec) = add_encryption_key(&root_dir);
         assert!(ret == 0, "add encryption key ioctl failed: {:?}", std::io::Error::last_os_error());
         let (arg_struct_bytes, _) = arg_vec.split_at(std::mem::size_of::<fscrypt_add_key_arg>());
-        let arg_struct = fscrypt_add_key_arg::read_from(arg_struct_bytes).unwrap();
+        let arg_struct = fscrypt_add_key_arg::read_from_bytes(arg_struct_bytes).unwrap();
 
         let ret = unsafe { set_encryption_policy(&dir, arg_struct.key_spec.u.identifier.value) };
         assert!(
@@ -924,7 +924,7 @@ mod tests {
         let (ret, arg_vec) = add_encryption_key(&root_dir);
         assert!(ret == 0, "add encryption key ioctl failed: {:?}", std::io::Error::last_os_error());
         let (arg_struct_bytes, _) = arg_vec.split_at(std::mem::size_of::<fscrypt_add_key_arg>());
-        let arg_struct = fscrypt_add_key_arg::read_from(arg_struct_bytes).unwrap();
+        let arg_struct = fscrypt_add_key_arg::read_from_bytes(arg_struct_bytes).unwrap();
 
         let ret = unsafe { set_encryption_policy(&dir, arg_struct.key_spec.u.identifier.value) };
         assert!(

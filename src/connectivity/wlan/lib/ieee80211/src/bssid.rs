@@ -4,15 +4,15 @@
 
 use crate::mac_addr::{MacAddr, MacAddrByteArray, MacAddrBytes, MacFmt, OuiFmt};
 use std::fmt;
-use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell, Unaligned};
+use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout, Unaligned};
 
 // Bssid is a newtype to wrap MacAddrBytes where a BSSID is explicitly required.
 #[repr(transparent)]
 #[derive(
-    FromZeros,
+    KnownLayout,
     FromBytes,
-    AsBytes,
-    NoCell,
+    IntoBytes,
+    Immutable,
     Unaligned,
     Clone,
     Copy,

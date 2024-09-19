@@ -8,12 +8,10 @@
 #![allow(unused_imports)]
 
 use bitflags::bitflags;
-use zerocopy::{AsBytes, FromBytes, FromZeroes};
+use zerocopy::{FromBytes, IntoBytes};
 
 #[repr(C)]
-#[derive(
-    AsBytes, FromZeroes, FromBytes, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash,
-)]
+#[derive(IntoBytes, FromBytes, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Uint8Bits(u8);
 
 bitflags! {
@@ -30,9 +28,7 @@ bitflags! {
 }
 
 #[repr(C)]
-#[derive(
-    AsBytes, FromZeroes, FromBytes, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash,
-)]
+#[derive(IntoBytes, FromBytes, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Uint16Bits(u16);
 
 bitflags! {
@@ -57,9 +53,7 @@ bitflags! {
 }
 
 #[repr(C)]
-#[derive(
-    AsBytes, FromZeroes, FromBytes, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash,
-)]
+#[derive(IntoBytes, FromBytes, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Uint32Bits(u32);
 
 bitflags! {
@@ -70,9 +64,7 @@ bitflags! {
 }
 
 #[repr(C)]
-#[derive(
-    AsBytes, FromZeroes, FromBytes, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash,
-)]
+#[derive(IntoBytes, FromBytes, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Uint64Bits(u64);
 
 bitflags! {
@@ -84,9 +76,7 @@ bitflags! {
 
 /// Bits with a one-line comment.
 #[repr(C)]
-#[derive(
-    AsBytes, FromZeroes, FromBytes, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash,
-)]
+#[derive(IntoBytes, FromBytes, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct BitsWithOneLineComment(u8);
 
 bitflags! {
@@ -109,9 +99,7 @@ bitflags! {
 ///         many-line
 ///           comment.
 #[repr(C)]
-#[derive(
-    AsBytes, FromZeroes, FromBytes, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash,
-)]
+#[derive(IntoBytes, FromBytes, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct BitsWithManyLineComment(u16);
 
 bitflags! {

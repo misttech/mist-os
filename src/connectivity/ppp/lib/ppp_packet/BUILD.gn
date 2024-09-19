@@ -15,7 +15,7 @@ rustc_library("ppp_packet") {
     "//third_party/rust_crates:byteorder",
     "//third_party/rust_crates:thiserror",
     "//third_party/rust_crates:tracing",
-    "//third_party/rust_crates:zerocopy",
+    "//third_party/rust_crates:zerocopy_0_0_0_alpha_0",
   ]
 
   sources = [
@@ -36,7 +36,7 @@ rustc_test("ppp_packet_test_bin") {
     "//third_party/rust_crates:byteorder",
     "//third_party/rust_crates:thiserror",
     "//third_party/rust_crates:tracing",
-    "//third_party/rust_crates:zerocopy",
+    "//third_party/rust_crates:zerocopy_0_0_0_alpha_0",
   ]
 
   sources = [

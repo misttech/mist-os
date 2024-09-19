@@ -7,7 +7,7 @@ use anyhow::{format_err, Error};
 use fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211;
 use std::fmt;
 use std::str::FromStr;
-use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell, Unaligned};
+use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout, Unaligned};
 
 // Strictly speaking, the MAC address is not defined in 802.11, but it's defined
 // here for convenience.
@@ -18,10 +18,10 @@ pub const NULL_ADDR: MacAddr = MacAddr([0x00; fidl_ieee80211::MAC_ADDR_LEN as us
 
 #[repr(transparent)]
 #[derive(
-    FromZeros,
+    KnownLayout,
     FromBytes,
-    AsBytes,
-    NoCell,
+    IntoBytes,
+    Immutable,
     Unaligned,
     Clone,
     Copy,

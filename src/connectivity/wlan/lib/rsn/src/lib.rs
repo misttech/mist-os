@@ -30,7 +30,7 @@ use tracing::warn;
 use wlan_common::ie::rsn::cipher::Cipher;
 use wlan_common::ie::rsn::rsne::{self, Rsne};
 use wlan_common::ie::wpa::WpaIe;
-use zerocopy::ByteSlice;
+use zerocopy::SplitByteSlice;
 
 pub use crate::auth::psk;
 pub use crate::key::gtk::{self, GtkProvider};
@@ -111,7 +111,7 @@ impl Supplicant {
         self.esssa.reset_security_associations();
     }
 
-    pub fn on_eapol_frame<B: ByteSlice>(
+    pub fn on_eapol_frame<B: SplitByteSlice>(
         &mut self,
         update_sink: &mut UpdateSink,
         frame: eapol::Frame<B>,
@@ -297,7 +297,7 @@ impl Authenticator {
     /// unsupported types; the Authenticator will filter and drop all unexpected frames.
     /// Outbound EAPOL frames, status and key updates will be pushed into the `update_sink`.
     /// The method will return an `Error` if the frame was invalid.
-    pub fn on_eapol_frame<B: ByteSlice>(
+    pub fn on_eapol_frame<B: SplitByteSlice>(
         &mut self,
         update_sink: &mut UpdateSink,
         frame: eapol::Frame<B>,

@@ -10,7 +10,7 @@
 use anyhow::{ensure, Context, Error};
 use fuchsia_component::client::connect_to_protocol;
 use fuchsia_zircon as zx;
-use zerocopy::{FromBytes, FromZeros, NoCell};
+use zerocopy::{FromBytes, Immutable, KnownLayout};
 
 /// The following types and constants are defined in sdk/lib/zbi-format/include/lib/zbi-format/zbi.h.
 const ZBI_TYPE_STORAGE_RAMDISK: u32 = 0x4b534452;
@@ -19,7 +19,7 @@ const ZBI_ITEM_MAGIC: u32 = 0xb5781729;
 const ZBI_FLAGS_STORAGE_COMPRESSED: u32 = 0x00000001;
 
 #[repr(C)]
-#[derive(FromZeros, FromBytes, NoCell)]
+#[derive(KnownLayout, FromBytes, Immutable)]
 struct ZbiHeader {
     type_: u32,
     length: u32,
@@ -36,7 +36,8 @@ async fn create_ramdisk(zbi_vmo: zx::Vmo) -> Result<String, Error> {
     zbi_vmo.read(&mut header_buf, 0).context("reading zbi item header")?;
     // Expect is fine here - we made the buffer ourselves to the exact size of the header so
     // something is very wrong if we trip this.
-    let header = ZbiHeader::read_from(header_buf.as_slice()).expect("buffer was the wrong size");
+    let header =
+        ZbiHeader::read_from_bytes(header_buf.as_slice()).expect("buffer was the wrong size");
 
     ensure!(
         header.flags & ZBI_FLAGS_VERSION != 0,

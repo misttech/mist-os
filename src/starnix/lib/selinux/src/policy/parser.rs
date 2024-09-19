@@ -5,7 +5,7 @@
 use std::fmt::Debug;
 use std::io::{Cursor, Seek as _, SeekFrom};
 use std::ops::Deref;
-use zerocopy::{ByteSlice, FromBytes, NoCell, Ref, Unaligned};
+use zerocopy::{FromBytes, Immutable, KnownLayout, Ref, SplitByteSlice, Unaligned};
 
 /// Trait for a cursor that can emit a slice of "remaining" data, and advance forward.
 trait ParseCursor: Sized {
@@ -71,33 +71,34 @@ pub trait ParseStrategy: Debug + PartialEq + Sized {
     type Input;
 
     /// Type of successfully parsed output from `Self::parse()`.
-    type Output<T: Debug + FromBytes + NoCell + PartialEq + Unaligned>: Debug + PartialEq;
+    type Output<T: Debug + FromBytes + KnownLayout + Immutable + PartialEq + Unaligned>: Debug
+        + PartialEq;
 
     /// Type of successfully parsed output from `Self::parse_slice()`.
-    type Slice<T: Debug + FromBytes + NoCell + PartialEq + Unaligned>: Debug + PartialEq;
+    type Slice<T: Debug + FromBytes + Immutable + PartialEq + Unaligned>: Debug + PartialEq;
 
     /// Parses a `Self::Output<T>` from the next bytes underlying `self`. If the parse succeeds,
     /// then return `(Some(output), self)` after advancing past the parsed bytes. Otherwise, return
     /// `None` without advancing past the parsed bytes.
-    fn parse<T: Clone + Debug + FromBytes + NoCell + PartialEq + Unaligned>(
+    fn parse<T: Clone + Debug + FromBytes + KnownLayout + Immutable + PartialEq + Unaligned>(
         self,
     ) -> Option<(Self::Output<T>, Self)>;
 
     /// Parses a `Self::Slice<T>` of `count` elements from the next bytes underlying `self`. If the
     /// parse succeeds, then return `(Some(slice), self)` after advancing past the parsed bytes.
     /// Otherwise, return `None` without advancing past the parsed bytes.
-    fn parse_slice<T: Clone + Debug + FromBytes + NoCell + PartialEq + Unaligned>(
+    fn parse_slice<T: Clone + Debug + FromBytes + Immutable + PartialEq + Unaligned>(
         self,
         count: usize,
     ) -> Option<(Self::Slice<T>, Self)>;
 
     /// Dereferences borrow of `Self::Output<T>` as borrow of `T`.
-    fn deref<'a, T: Debug + FromBytes + NoCell + PartialEq + Unaligned>(
+    fn deref<'a, T: Debug + FromBytes + KnownLayout + Immutable + PartialEq + Unaligned>(
         output: &'a Self::Output<T>,
     ) -> &'a T;
 
     /// Dereferences borrow of `Self::Slice<T>` as borrow of `[T]`.
-    fn deref_slice<'a, T: Debug + FromBytes + NoCell + PartialEq + Unaligned>(
+    fn deref_slice<'a, T: Debug + FromBytes + Immutable + PartialEq + Unaligned>(
         slice: &'a Self::Slice<T>,
     ) -> &'a [T];
 
@@ -130,49 +131,49 @@ pub trait ParseStrategy: Debug + PartialEq + Sized {
 /// error[E0515]: cannot return value referencing local variable `bytes`
 /// ```
 #[derive(Clone, Debug, PartialEq)]
-pub struct ByRef<B: ByteSlice> {
+pub struct ByRef<B: SplitByteSlice> {
     input: B,
     tail: B,
 }
 
-impl<B: ByteSlice + Clone> ByRef<B> {
+impl<B: SplitByteSlice + Clone> ByRef<B> {
     /// Returns a new [`ByRef`] that wraps `bytes_slice`.
     pub fn new(byte_slice: B) -> Self {
         Self { input: byte_slice.clone(), tail: byte_slice }
     }
 }
 
-impl<B: Debug + ByteSlice + PartialEq> ParseStrategy for ByRef<B> {
+impl<B: Debug + SplitByteSlice + PartialEq> ParseStrategy for ByRef<B> {
     type Input = B;
-    type Output<T: Debug + FromBytes + NoCell + PartialEq + Unaligned> = Ref<B, T>;
-    type Slice<T: Debug + FromBytes + NoCell + PartialEq + Unaligned> = Ref<B, [T]>;
+    type Output<T: Debug + FromBytes + KnownLayout + Immutable + PartialEq + Unaligned> = Ref<B, T>;
+    type Slice<T: Debug + FromBytes + Immutable + PartialEq + Unaligned> = Ref<B, [T]>;
 
     /// Returns a [`Ref<B, T>`] as the parsed output of the next bytes in the underlying
     /// [`ByteSlice`].
-    fn parse<T: Debug + FromBytes + NoCell + PartialEq + Unaligned>(
+    fn parse<T: Debug + FromBytes + KnownLayout + Immutable + PartialEq + Unaligned>(
         self,
     ) -> Option<(Self::Output<T>, Self)> {
-        let (output, tail) = Ref::new_unaligned_from_prefix(self.tail)?;
+        let (output, tail) = Ref::unaligned_from_prefix(self.tail).ok()?;
         Some((output, Self { input: self.input, tail }))
     }
 
     /// Returns a `Ref<B, [T]>` as the parsed output of the next bytes in the underlying
     /// [`ByteSlice`].
-    fn parse_slice<T: Clone + Debug + FromBytes + NoCell + PartialEq + Unaligned>(
+    fn parse_slice<T: Clone + Debug + FromBytes + Immutable + PartialEq + Unaligned>(
         self,
         num: usize,
     ) -> Option<(Self::Slice<T>, Self)> {
-        let (slice, tail) = Ref::new_slice_unaligned_from_prefix(self.tail, num)?;
+        let (slice, tail) = Ref::unaligned_from_prefix_with_elems(self.tail, num).ok()?;
         Some((slice, Self { input: self.input, tail }))
     }
 
-    fn deref<'a, T: Debug + FromBytes + NoCell + PartialEq + Unaligned>(
+    fn deref<'a, T: Debug + FromBytes + KnownLayout + Immutable + PartialEq + Unaligned>(
         output: &'a Self::Output<T>,
     ) -> &'a T {
         output.deref() as &T
     }
 
-    fn deref_slice<'a, T: Debug + FromBytes + NoCell + PartialEq + Unaligned>(
+    fn deref_slice<'a, T: Debug + FromBytes + Immutable + PartialEq + Unaligned>(
         slice: &'a Self::Slice<T>,
     ) -> &'a [T] {
         slice.deref() as &[T]
@@ -219,14 +220,14 @@ where
     Cursor<T>: Debug + ParseCursor + PartialEq,
 {
     type Input = T;
-    type Output<O: Debug + FromBytes + NoCell + PartialEq + Unaligned> = O;
-    type Slice<S: Debug + FromBytes + NoCell + PartialEq + Unaligned> = Vec<S>;
+    type Output<O: Debug + FromBytes + KnownLayout + Immutable + PartialEq + Unaligned> = O;
+    type Slice<S: Debug + FromBytes + Immutable + PartialEq + Unaligned> = Vec<S>;
 
     /// Returns an `P` as the parsed output of the next bytes in the underlying [`Cursor`] data.
-    fn parse<P: Clone + Debug + FromBytes + NoCell + PartialEq + Unaligned>(
+    fn parse<P: Clone + Debug + FromBytes + KnownLayout + Immutable + PartialEq + Unaligned>(
         mut self,
     ) -> Option<(Self::Output<P>, Self)> {
-        let output = P::read_from_prefix(ParseCursor::remaining_slice(&self.0))?;
+        let (output, _) = P::read_from_prefix(ParseCursor::remaining_slice(&self.0)).ok()?;
         if self.0.seek_forward(std::mem::size_of_val(&output)).is_err() {
             return None;
         }
@@ -235,11 +236,13 @@ where
 
     /// Returns a `Vec<T>` of `count` items as the parsed output of the next bytes in the underlying
     /// [`Cursor`] data.
-    fn parse_slice<PS: Clone + Debug + FromBytes + NoCell + PartialEq + Unaligned>(
+    fn parse_slice<PS: Clone + Debug + FromBytes + Immutable + PartialEq + Unaligned>(
         mut self,
         count: usize,
     ) -> Option<(Self::Slice<PS>, Self)> {
-        let (slice, _) = PS::slice_from_prefix(ParseCursor::remaining_slice(&self.0), count)?;
+        let (slice, _) =
+            <[PS]>::ref_from_prefix_with_elems(ParseCursor::remaining_slice(&self.0), count)
+                .ok()?;
         let size = std::mem::size_of_val(&slice);
         let slice = slice.to_owned();
         if self.0.seek_forward(size).is_err() {
@@ -248,13 +251,13 @@ where
         Some((slice, self))
     }
 
-    fn deref<'a, D: Debug + FromBytes + NoCell + PartialEq + Unaligned>(
+    fn deref<'a, D: Debug + FromBytes + KnownLayout + Immutable + PartialEq + Unaligned>(
         output: &'a Self::Output<D>,
     ) -> &'a D {
         output
     }
 
-    fn deref_slice<'a, DS: Debug + FromBytes + NoCell + PartialEq + Unaligned>(
+    fn deref_slice<'a, DS: Debug + FromBytes + Immutable + PartialEq + Unaligned>(
         slice: &'a Self::Slice<DS>,
     ) -> &'a [DS] {
         slice
@@ -272,9 +275,9 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use zerocopy::{little_endian as le, FromZeroes};
+    use zerocopy::little_endian as le;
 
-    #[derive(Clone, Debug, FromBytes, FromZeroes, NoCell, PartialEq, Unaligned)]
+    #[derive(Clone, Debug, KnownLayout, FromBytes, Immutable, PartialEq, Unaligned)]
     #[repr(C, packed)]
     struct SomeNumbers {
         a: u8,
@@ -286,7 +289,7 @@ mod tests {
     // Ensure that "return parser + parsed output" pattern works on `ByValue`.
     fn do_by_value<
         D: AsRef<[u8]> + Debug + PartialEq,
-        T: Clone + Debug + FromBytes + NoCell + PartialEq + Unaligned,
+        T: Clone + Debug + FromBytes + KnownLayout + Immutable + PartialEq + Unaligned,
     >(
         data: D,
     ) -> (T, ByValue<D>) {
@@ -295,7 +298,7 @@ mod tests {
     }
     fn do_slice_by_value<
         D: AsRef<[u8]> + Debug + PartialEq,
-        T: Clone + Debug + FromBytes + NoCell + PartialEq + Unaligned,
+        T: Clone + Debug + FromBytes + Immutable + PartialEq + Unaligned,
     >(
         data: D,
         count: usize,

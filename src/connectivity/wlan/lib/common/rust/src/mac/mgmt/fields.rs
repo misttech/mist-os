@@ -8,7 +8,7 @@ use crate::mac::{
 };
 use crate::TimeUnit;
 use wlan_bitfield::bitfield;
-use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell, Unaligned};
+use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout, Unaligned};
 
 // IEEE Std 802.11-2016, 9.4.1.4
 #[bitfield(
@@ -28,12 +28,12 @@ use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell, Unaligned};
     14      delayed_block_ack,
     15      immediate_block_ack,
 )]
-#[derive(AsBytes, FromZeros, FromBytes, NoCell, PartialEq, Eq, Clone, Copy, Hash)]
+#[derive(IntoBytes, KnownLayout, FromBytes, Immutable, PartialEq, Eq, Clone, Copy, Hash)]
 #[repr(C)]
 pub struct CapabilityInfo(pub u16);
 
 // IEEE Std 802.11-2016, 9.4.1.11, Table Table 9-47
-#[derive(AsBytes, FromZeros, FromBytes, NoCell, Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(IntoBytes, KnownLayout, FromBytes, Immutable, Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(C)]
 pub struct ActionCategory(u8);
 
@@ -67,7 +67,9 @@ impl ActionCategory {
 }
 
 // IEEE Std 802.11-2016, 9.3.3.2
-#[derive(FromZeros, FromBytes, AsBytes, NoCell, Unaligned, PartialEq, Eq, Clone, Copy, Debug)]
+#[derive(
+    KnownLayout, FromBytes, IntoBytes, Immutable, Unaligned, PartialEq, Eq, Clone, Copy, Debug,
+)]
 #[repr(C, packed)]
 pub struct MgmtHdr {
     pub frame_ctrl: FrameControl,
@@ -93,7 +95,9 @@ impl MgmtHdr {
 
 // IEEE Std 802.11-2016, 9.4.1.1
 #[repr(C)]
-#[derive(AsBytes, FromZeros, FromBytes, NoCell, PartialEq, Eq, Copy, Clone, Debug, Default)]
+#[derive(
+    IntoBytes, KnownLayout, FromBytes, Immutable, PartialEq, Eq, Copy, Clone, Debug, Default,
+)]
 pub struct AuthAlgorithmNumber(pub u16);
 
 impl AuthAlgorithmNumber {
@@ -106,7 +110,7 @@ impl AuthAlgorithmNumber {
 }
 
 // IEEE Std 802.11-2016, 9.3.3.3
-#[derive(FromZeros, FromBytes, AsBytes, NoCell, Unaligned, Clone, Copy, Debug)]
+#[derive(KnownLayout, FromBytes, IntoBytes, Immutable, Unaligned, Clone, Copy, Debug)]
 #[repr(C, packed)]
 pub struct BeaconHdr {
     // IEEE Std 802.11-2016, 9.4.1.10, 11.1.3.1, and 11.22
@@ -128,7 +132,7 @@ impl BeaconHdr {
 }
 
 // IEEE Std 802.11-2016, 9.3.3.12
-#[derive(Default, FromZeros, FromBytes, AsBytes, NoCell, Unaligned, Clone, Copy, Debug)]
+#[derive(Default, KnownLayout, FromBytes, IntoBytes, Immutable, Unaligned, Clone, Copy, Debug)]
 #[repr(C, packed)]
 pub struct AuthHdr {
     pub auth_alg_num: AuthAlgorithmNumber,
@@ -137,14 +141,14 @@ pub struct AuthHdr {
 }
 
 // IEEE Std 802.11-2016, 9.3.3.13
-#[derive(Default, FromZeros, FromBytes, AsBytes, NoCell, Unaligned, Clone, Copy, Debug)]
+#[derive(Default, KnownLayout, FromBytes, IntoBytes, Immutable, Unaligned, Clone, Copy, Debug)]
 #[repr(C, packed)]
 pub struct DeauthHdr {
     pub reason_code: ReasonCode,
 }
 
 // IEEE Std 802.11-2016, 9.3.3.6
-#[derive(FromZeros, FromBytes, AsBytes, NoCell, Unaligned, Clone, Copy, Debug)]
+#[derive(KnownLayout, FromBytes, IntoBytes, Immutable, Unaligned, Clone, Copy, Debug)]
 #[repr(C, packed)]
 pub struct AssocReqHdr {
     // IEEE Std 802.11-2016, 9.4.1.4
@@ -153,7 +157,7 @@ pub struct AssocReqHdr {
 }
 
 // IEEE Std 802.11-2016, 9.3.3.7
-#[derive(FromZeros, FromBytes, AsBytes, NoCell, Unaligned, Clone, Copy, Debug)]
+#[derive(KnownLayout, FromBytes, IntoBytes, Immutable, Unaligned, Clone, Copy, Debug)]
 #[repr(C, packed)]
 pub struct AssocRespHdr {
     // IEEE Std 802.11-2016, 9.4.1.4
@@ -163,14 +167,14 @@ pub struct AssocRespHdr {
 }
 
 // IEEE Std 802.11-2016, 9.3.3.5
-#[derive(Default, FromZeros, FromBytes, AsBytes, NoCell, Unaligned, Clone, Copy, Debug)]
+#[derive(Default, KnownLayout, FromBytes, IntoBytes, Immutable, Unaligned, Clone, Copy, Debug)]
 #[repr(C, packed)]
 pub struct DisassocHdr {
     pub reason_code: ReasonCode,
 }
 
 // IEEE Std 802.11-2016, 9.3.3.11
-#[derive(FromZeros, FromBytes, AsBytes, NoCell, Unaligned, Clone, Copy, Debug)]
+#[derive(KnownLayout, FromBytes, IntoBytes, Immutable, Unaligned, Clone, Copy, Debug)]
 #[repr(C, packed)]
 pub struct ProbeRespHdr {
     // IEEE Std 802.11-2016, 9.4.1.10, 11.1.3.1, and 11.22
@@ -192,7 +196,7 @@ impl ProbeRespHdr {
 }
 
 // IEEE Std 802.11-2016, 9.3.3.14
-#[derive(FromZeros, FromBytes, AsBytes, NoCell, Unaligned, Clone, Copy, Debug)]
+#[derive(KnownLayout, FromBytes, IntoBytes, Immutable, Unaligned, Clone, Copy, Debug)]
 #[repr(C, packed)]
 pub struct ActionHdr {
     pub action: ActionCategory,
@@ -200,7 +204,9 @@ pub struct ActionHdr {
 
 // IEEE Std 802.11-2016, 9.6.5.1
 #[repr(C)]
-#[derive(AsBytes, FromZeros, FromBytes, NoCell, PartialEq, Eq, Copy, Clone, Debug, Default)]
+#[derive(
+    IntoBytes, KnownLayout, FromBytes, Immutable, PartialEq, Eq, Copy, Clone, Debug, Default,
+)]
 pub struct BlockAckAction(pub u8);
 
 impl BlockAckAction {
@@ -211,7 +217,9 @@ impl BlockAckAction {
 
 // IEEE Std 802.11-2016, 9.4.1.14
 #[repr(C)]
-#[derive(AsBytes, FromZeros, FromBytes, NoCell, PartialEq, Eq, Copy, Clone, Debug, Default)]
+#[derive(
+    IntoBytes, KnownLayout, FromBytes, Immutable, PartialEq, Eq, Copy, Clone, Debug, Default,
+)]
 pub struct BlockAckPolicy(pub u8);
 
 impl BlockAckPolicy {
@@ -226,7 +234,7 @@ impl BlockAckPolicy {
     2..=5  tid,
     6..=15 buffer_size,
 )]
-#[derive(AsBytes, FromZeros, FromBytes, NoCell, PartialEq, Eq, Clone, Copy, Default)]
+#[derive(IntoBytes, KnownLayout, FromBytes, Immutable, PartialEq, Eq, Clone, Copy, Default)]
 #[repr(C)]
 pub struct BlockAckParameters(pub u16);
 
@@ -236,7 +244,7 @@ pub struct BlockAckParameters(pub u16);
     11      initiator,
     12..=15 tid,
 )]
-#[derive(AsBytes, FromZeros, FromBytes, NoCell, PartialEq, Eq, Clone, Copy, Default)]
+#[derive(IntoBytes, KnownLayout, FromBytes, Immutable, PartialEq, Eq, Clone, Copy, Default)]
 #[repr(C)]
 pub struct DelbaParameters(pub u16);
 
@@ -245,12 +253,12 @@ pub struct DelbaParameters(pub u16);
     0..=3  fragment_number, // Always set to 0 (IEEE Std 802.11-2016, 9.6.5.2)
     4..=15 starting_sequence_number,
 )]
-#[derive(AsBytes, FromZeros, FromBytes, NoCell, PartialEq, Eq, Clone, Copy, Default)]
+#[derive(IntoBytes, KnownLayout, FromBytes, Immutable, PartialEq, Eq, Clone, Copy, Default)]
 #[repr(C)]
 pub struct BlockAckStartingSequenceControl(pub u16);
 
 // IEEE Std 802.11-2016, 9.6.5.2 - ADDBA stands for Add BlockAck.
-#[derive(Default, FromZeros, FromBytes, AsBytes, NoCell, Unaligned, Clone, Copy, Debug)]
+#[derive(Default, KnownLayout, FromBytes, IntoBytes, Immutable, Unaligned, Clone, Copy, Debug)]
 #[repr(C, packed)]
 pub struct AddbaReqHdr {
     pub action: BlockAckAction,
@@ -268,7 +276,7 @@ pub struct AddbaReqHdr {
 }
 
 // IEEE Std 802.11-2016, 9.6.5.3 - ADDBA stands for Add BlockAck.
-#[derive(Default, FromZeros, FromBytes, AsBytes, NoCell, Unaligned, Clone, Copy, Debug)]
+#[derive(Default, KnownLayout, FromBytes, IntoBytes, Immutable, Unaligned, Clone, Copy, Debug)]
 #[repr(C, packed)]
 pub struct AddbaRespHdr {
     pub action: BlockAckAction,
@@ -286,7 +294,7 @@ pub struct AddbaRespHdr {
 }
 
 // IEEE Std 802.11-2016, 9.6.5.4 - DELBA stands for Delete BlockAck.
-#[derive(Default, FromZeros, FromBytes, AsBytes, NoCell, Unaligned, Clone, Copy, Debug)]
+#[derive(Default, KnownLayout, FromBytes, IntoBytes, Immutable, Unaligned, Clone, Copy, Debug)]
 #[repr(C, packed)]
 pub struct DelbaHdr {
     pub action: BlockAckAction,
@@ -300,7 +308,9 @@ pub struct DelbaHdr {
 
 // IEEE Std 802.11-2016, 9.6.2.1
 #[repr(C)]
-#[derive(AsBytes, FromZeros, FromBytes, NoCell, PartialEq, Eq, Copy, Clone, Debug, Default)]
+#[derive(
+    IntoBytes, KnownLayout, FromBytes, Immutable, PartialEq, Eq, Copy, Clone, Debug, Default,
+)]
 pub struct SpectrumMgmtAction(pub u8);
 
 impl SpectrumMgmtAction {

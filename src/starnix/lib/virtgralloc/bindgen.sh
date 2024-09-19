@@ -14,7 +14,7 @@ readonly RAW_LINES="// Copyright 2023 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use zerocopy::{AsBytes, FromBytes, FromZeroes};"
+use zerocopy::{AsBytes, FromBytes, FromZeros};"
 
 # Type/define pairs, used to generate a list of variables to work around
 # https://github.com/rust-lang/rust-bindgen/issues/316
@@ -65,10 +65,10 @@ PATH="$PWD/prebuilt/third_party/rust/linux-x64/bin:$PATH" \
   -I $temp_include_dir \
   -I $(pwd)
 
-# TODO: Figure out how to get bindgen to derive AsBytes, FromBytes, and FromZeroes.
+# TODO: Figure out how to get bindgen to derive AsBytes, FromBytes, and FromZeros.
 #       See https://github.com/rust-lang/rust-bindgen/issues/1089
 sed -i \
-  's/derive(Debug, Default, Copy, Clone)/derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeroes, zerocopy::NoCell)/' \
+  's/derive(Debug, Default, Copy, Clone)/derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeros, zerocopy::NoCell)/' \
   src/starnix/lib/virtgralloc/src/virtgralloc.rs
 
 # TODO: Revisit once we're using a rust-bindgen that generates CStr instead of

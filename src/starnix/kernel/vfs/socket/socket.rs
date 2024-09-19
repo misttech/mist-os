@@ -47,7 +47,7 @@ use std::ffi::CStr;
 use std::mem::size_of;
 use std::net::IpAddr;
 use std::sync::Arc;
-use zerocopy::{AsBytes, FromBytes as _};
+use zerocopy::{FromBytes as _, IntoBytes};
 
 pub const DEFAULT_LISTEN_BACKLOG: usize = 1024;
 
@@ -502,13 +502,13 @@ impl Socket {
                     if let Some(errno) = maybe_errno {
                         return errno;
                     }
-                    sockaddr_in {
+                    let _ = sockaddr_in {
                         sin_family: AF_INET,
                         sin_port: 0,
                         sin_addr: in_addr { s_addr },
                         __pad: Default::default(),
                     }
-                    .write_to_prefix(addr.as_bytes_mut());
+                    .write_to_prefix(addr.as_mut_bytes());
                     addr
                 };
 
@@ -576,6 +576,7 @@ impl Socket {
                     unsafe { in_ifreq.ifr_ifru.ifru_addr }.as_bytes(),
                 )
                 .expect("sockaddr_in is smaller than sockaddr")
+                .0
                 .sin_addr
                 .s_addr;
                 if addr != 0 {

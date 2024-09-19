@@ -21,7 +21,9 @@ use packet::{
     ParseMetadata, SerializeTarget, Serializer,
 };
 use zerocopy::byteorder::network_endian::U16;
-use zerocopy::{AsBytes, ByteSlice, ByteSliceMut, FromBytes, FromZeros, NoCell, Ref, Unaligned};
+use zerocopy::{
+    FromBytes, Immutable, IntoBytes, KnownLayout, Ref, SplitByteSlice, SplitByteSliceMut, Unaligned,
+};
 
 use crate::error::{ParseError, ParseResult};
 use crate::ip::IpProto;
@@ -31,7 +33,7 @@ pub(crate) const HEADER_BYTES: usize = 8;
 const CHECKSUM_OFFSET: usize = 6;
 const CHECKSUM_RANGE: Range<usize> = CHECKSUM_OFFSET..CHECKSUM_OFFSET + 2;
 
-#[derive(Debug, FromZeros, FromBytes, AsBytes, NoCell, Unaligned)]
+#[derive(Debug, KnownLayout, FromBytes, IntoBytes, Immutable, Unaligned)]
 #[repr(C)]
 struct Header {
     src_port: U16,
@@ -66,7 +68,7 @@ impl<A: IpAddress> UdpParseArgs<A> {
     }
 }
 
-impl<B: ByteSlice, A: IpAddress> FromRaw<UdpPacketRaw<B>, UdpParseArgs<A>> for UdpPacket<B> {
+impl<B: SplitByteSlice, A: IpAddress> FromRaw<UdpPacketRaw<B>, UdpParseArgs<A>> for UdpPacket<B> {
     type Error = ParseError;
 
     fn try_from_raw_with(raw: UdpPacketRaw<B>, args: UdpParseArgs<A>) -> Result<Self, Self::Error> {
@@ -81,7 +83,7 @@ impl<B: ByteSlice, A: IpAddress> FromRaw<UdpPacketRaw<B>, UdpParseArgs<A>> for U
         // this means that it shouldn't be validated. In IPv6, the checksum is
         // mandatory, so this is an error.
         if checksum != [0, 0] {
-            let parts = [header.bytes(), body.deref().as_ref()];
+            let parts = [Ref::bytes(&header), body.deref().as_ref()];
             let checksum = compute_transport_checksum_parts(
                 args.src_ip,
                 args.dst_ip,
@@ -116,11 +118,11 @@ impl<B: ByteSlice, A: IpAddress> FromRaw<UdpPacketRaw<B>, UdpParseArgs<A>> for U
     }
 }
 
-impl<B: ByteSlice, A: IpAddress> ParsablePacket<B, UdpParseArgs<A>> for UdpPacket<B> {
+impl<B: SplitByteSlice, A: IpAddress> ParsablePacket<B, UdpParseArgs<A>> for UdpPacket<B> {
     type Error = ParseError;
 
     fn parse_metadata(&self) -> ParseMetadata {
-        ParseMetadata::from_packet(self.header.bytes().len(), self.body.len(), 0)
+        ParseMetadata::from_packet(Ref::bytes(&self.header).len(), self.body.len(), 0)
     }
 
     fn parse<BV: BufferView<B>>(buffer: BV, args: UdpParseArgs<A>) -> ParseResult<Self> {
@@ -129,7 +131,7 @@ impl<B: ByteSlice, A: IpAddress> ParsablePacket<B, UdpParseArgs<A>> for UdpPacke
     }
 }
 
-impl<B: ByteSlice> UdpPacket<B> {
+impl<B: SplitByteSlice> UdpPacket<B> {
     /// The packet body.
     pub fn body(&self) -> &[u8] {
         self.body.deref()
@@ -208,7 +210,7 @@ impl<B: ByteSlice> UdpPacket<B> {
     }
 }
 
-impl<B: ByteSliceMut> UdpPacket<B> {
+impl<B: SplitByteSliceMut> UdpPacket<B> {
     /// Set the source port of the UDP packet.
     pub fn set_src_port(&mut self, new: u16) {
         let old = self.header.src_port;
@@ -244,7 +246,7 @@ impl<B: ByteSliceMut> UdpPacket<B> {
 ///
 /// A `UdpPacketHeader` may be the result of a partially parsed UDP packet in
 /// [`UdpPacketRaw`].
-#[derive(Debug, Default, FromZeros, FromBytes, AsBytes, NoCell, Unaligned, PartialEq)]
+#[derive(Debug, Default, KnownLayout, FromBytes, IntoBytes, Immutable, Unaligned, PartialEq)]
 #[repr(C)]
 struct UdpFlowHeader {
     src_port: U16,
@@ -253,7 +255,7 @@ struct UdpFlowHeader {
 
 /// A partially parsed UDP packet header.
 #[derive(Debug)]
-struct PartialHeader<B: ByteSlice> {
+struct PartialHeader<B: SplitByteSlice> {
     flow: Ref<B, UdpFlowHeader>,
     rest: B,
 }
@@ -271,22 +273,22 @@ struct PartialHeader<B: ByteSlice> {
 ///
 /// [`UdpPacket`] provides a [`FromRaw`] implementation that can be used to
 /// validate a `UdpPacketRaw`.
-pub struct UdpPacketRaw<B: ByteSlice> {
+pub struct UdpPacketRaw<B: SplitByteSlice> {
     header: MaybeParsed<Ref<B, Header>, PartialHeader<B>>,
     body: MaybeParsed<B, B>,
 }
 
 impl<B, I> ParsablePacket<B, IpVersionMarker<I>> for UdpPacketRaw<B>
 where
-    B: ByteSlice,
+    B: SplitByteSlice,
     I: Ip,
 {
     type Error = ParseError;
 
     fn parse_metadata(&self) -> ParseMetadata {
         let header_len = match &self.header {
-            MaybeParsed::Complete(h) => h.bytes().len(),
-            MaybeParsed::Incomplete(h) => h.flow.bytes().len() + h.rest.len(),
+            MaybeParsed::Complete(h) => Ref::bytes(&h).len(),
+            MaybeParsed::Incomplete(h) => Ref::bytes(&h.flow).len() + h.rest.len(),
         };
         ParseMetadata::from_packet(header_len, self.body.len(), 0)
     }
@@ -353,7 +355,7 @@ where
     }
 }
 
-impl<B: ByteSlice> UdpPacketRaw<B> {
+impl<B: SplitByteSlice> UdpPacketRaw<B> {
     /// The source UDP port, if any.
     ///
     /// The source port is optional, and may have been omitted by the sender.
@@ -827,7 +829,7 @@ mod tests {
         let packet =
             bv.parse_with::<_, UdpPacketRaw<_>>(IpVersionMarker::<Ipv4>::default()).unwrap();
         let UdpPacketRaw { header, body } = &packet;
-        assert_eq!(header.as_ref().complete().unwrap().bytes(), &buf[..8]);
+        assert_eq!(Ref::bytes(&header.as_ref().complete().unwrap()), &buf[..8]);
         assert_eq!(body.incomplete().unwrap(), &buf[8..]);
         assert!(UdpPacket::try_from_raw_with(
             packet,
@@ -841,7 +843,7 @@ mod tests {
         let packet =
             bv.parse_with::<_, UdpPacketRaw<_>>(IpVersionMarker::<Ipv4>::default()).unwrap();
         let UdpPacketRaw { header, body } = &packet;
-        assert_eq!(header.as_ref().complete().unwrap().bytes(), &buf[..8]);
+        assert_eq!(Ref::bytes(&header.as_ref().complete().unwrap()), &buf[..8]);
         assert_eq!(body.incomplete().unwrap(), []);
         assert!(UdpPacket::try_from_raw_with(
             packet,
@@ -857,7 +859,7 @@ mod tests {
         let packet =
             bv.parse_with::<_, UdpPacketRaw<_>>(IpVersionMarker::<Ipv6>::default()).unwrap();
         let UdpPacketRaw { header, body } = &packet;
-        assert_eq!(header.as_ref().complete().unwrap().bytes(), &buf[..8]);
+        assert_eq!(Ref::bytes(&header.as_ref().complete().unwrap()), &buf[..8]);
         assert_eq!(body.incomplete().unwrap(), []);
         // Now try same thing but with a body that's actually big enough to
         // justify len being 0.
@@ -867,7 +869,7 @@ mod tests {
         let packet =
             bv.parse_with::<_, UdpPacketRaw<_>>(IpVersionMarker::<Ipv6>::default()).unwrap();
         let UdpPacketRaw { header, body } = &packet;
-        assert_eq!(header.as_ref().complete().unwrap().bytes(), &buf[..8]);
+        assert_eq!(Ref::bytes(header.as_ref().complete().unwrap()), &buf[..8]);
         assert_eq!(body.complete().unwrap(), &buf[8..]);
     }
 

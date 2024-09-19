@@ -11,7 +11,7 @@
 // Allow unused definitions
 #![allow(dead_code, unused_results)]
 
-use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell};
+use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
 
 // Configure linkage for MacOS.
 #[cfg(target_os = "macos")]
@@ -21,7 +21,7 @@ extern "C" {}
 
 pub const ZBI_BOARD_NAME_LEN: u64 = 32;
 #[repr(C)]
-#[derive(Debug, Default, Copy, Clone, PartialEq, FromBytes, AsBytes, FromZeros, NoCell)]
+#[derive(Debug, Default, Copy, Clone, PartialEq, FromBytes, IntoBytes, Immutable, KnownLayout)]
 pub struct zbi_platform_id_t {
     pub vid: u32,
     pub pid: u32,
@@ -39,7 +39,7 @@ const _: () = {
         [::core::mem::offset_of!(zbi_platform_id_t, board_name) - 8usize];
 };
 #[repr(C)]
-#[derive(Debug, Default, Copy, Clone, PartialEq, FromBytes, AsBytes, FromZeros, NoCell)]
+#[derive(Debug, Default, Copy, Clone, PartialEq, FromBytes, IntoBytes, Immutable, KnownLayout)]
 pub struct zbi_board_info_t {
     pub revision: u32,
 }
@@ -55,7 +55,7 @@ pub type zbi_topology_processor_flags_t = u16;
 pub const ZBI_TOPOLOGY_PROCESSOR_FLAGS_PRIMARY: zbi_topology_processor_flags_t = 1;
 pub const ZBI_TOPOLOGY_PROCESSOR_FLAGS_INTERRUPT: zbi_topology_processor_flags_t = 2;
 #[repr(C)]
-#[derive(Debug, Default, Copy, Clone, PartialEq, FromBytes, AsBytes, FromZeros, NoCell)]
+#[derive(Debug, Default, Copy, Clone, PartialEq, FromBytes, IntoBytes, Immutable, KnownLayout)]
 pub struct zbi_topology_arm64_info_t {
     pub cluster_1_id: u8,
     pub cluster_2_id: u8,
@@ -81,7 +81,7 @@ const _: () = {
         [::core::mem::offset_of!(zbi_topology_arm64_info_t, gic_id) - 4usize];
 };
 #[repr(C)]
-#[derive(FromBytes, AsBytes, FromZeros, NoCell)]
+#[derive(FromBytes, IntoBytes, Immutable, KnownLayout)]
 pub struct zbi_topology_x64_info_t {
     pub apic_ids: [u32; 4usize],
     pub apic_id_count: u32,
@@ -112,7 +112,7 @@ impl ::core::fmt::Debug for zbi_topology_x64_info_t {
     }
 }
 #[repr(C)]
-#[derive(Debug, Default, Copy, Clone, PartialEq, FromBytes, AsBytes, FromZeros, NoCell)]
+#[derive(Debug, Default, Copy, Clone, PartialEq, FromBytes, IntoBytes, Immutable, KnownLayout)]
 pub struct zbi_topology_riscv64_info_t {
     pub hart_id: u64,
     pub isa_strtab_index: u32,
@@ -135,7 +135,7 @@ pub const ZBI_TOPOLOGY_ARCHITECTURE_INFO_ARM64: u64 = 1;
 pub const ZBI_TOPOLOGY_ARCHITECTURE_INFO_X64: u64 = 2;
 pub const ZBI_TOPOLOGY_ARCHITECTURE_INFO_RISCV64: u64 = 3;
 #[repr(C)]
-#[derive(Debug, Default, Copy, Clone, PartialEq, FromBytes, AsBytes, FromZeros, NoCell)]
+#[derive(Debug, Default, Copy, Clone, PartialEq, FromBytes, IntoBytes, Immutable, KnownLayout)]
 pub struct zbi_topology_cluster_t {
     pub performance_class: u8,
 }
@@ -148,7 +148,7 @@ const _: () = {
         [::core::mem::offset_of!(zbi_topology_cluster_t, performance_class) - 0usize];
 };
 #[repr(C)]
-#[derive(Debug, Default, Copy, Clone, PartialEq, FromBytes, AsBytes, FromZeros, NoCell)]
+#[derive(Debug, Default, Copy, Clone, PartialEq, FromBytes, IntoBytes, Immutable, KnownLayout)]
 pub struct zbi_topology_cache_t {
     pub cache_id: u32,
 }
@@ -160,7 +160,7 @@ const _: () = {
         [::core::mem::offset_of!(zbi_topology_cache_t, cache_id) - 0usize];
 };
 #[repr(C)]
-#[derive(Debug, Default, Copy, Clone, PartialEq, FromBytes, AsBytes, FromZeros, NoCell)]
+#[derive(Debug, Default, Copy, Clone, PartialEq, FromBytes, IntoBytes, Immutable, KnownLayout)]
 pub struct zbi_topology_die_t {
     pub reserved: u64,
 }
@@ -172,7 +172,7 @@ const _: () = {
         [::core::mem::offset_of!(zbi_topology_die_t, reserved) - 0usize];
 };
 #[repr(C)]
-#[derive(Debug, Default, Copy, Clone, PartialEq, FromBytes, AsBytes, FromZeros, NoCell)]
+#[derive(Debug, Default, Copy, Clone, PartialEq, FromBytes, IntoBytes, Immutable, KnownLayout)]
 pub struct zbi_topology_socket_t {
     pub reserved: u64,
 }
@@ -185,7 +185,7 @@ const _: () = {
         [::core::mem::offset_of!(zbi_topology_socket_t, reserved) - 0usize];
 };
 #[repr(C)]
-#[derive(Debug, Default, Copy, Clone, PartialEq, FromBytes, AsBytes, FromZeros, NoCell)]
+#[derive(Debug, Default, Copy, Clone, PartialEq, FromBytes, IntoBytes, Immutable, KnownLayout)]
 pub struct zbi_topology_numa_region_t {
     pub start: u64,
     pub size: u64,
@@ -232,7 +232,7 @@ pub const ZBI_KERNEL_DRIVER_RISCV_PLIC: zbi_kernel_driver_t = 1128877136;
 pub const ZBI_KERNEL_DRIVER_RISCV_GENERIC_TIMER: zbi_kernel_driver_t = 1296651346;
 pub const ZBI_KERNEL_DRIVER_PXA_UART: zbi_kernel_driver_t = 1347961173;
 #[repr(C)]
-#[derive(Debug, Default, Copy, Clone, PartialEq, FromBytes, AsBytes, FromZeros, NoCell)]
+#[derive(Debug, Default, Copy, Clone, PartialEq, FromBytes, IntoBytes, Immutable, KnownLayout)]
 pub struct zbi_dcfg_simple_t {
     pub mmio_phys: u64,
     pub irq: u32,
@@ -255,7 +255,7 @@ pub const ZBI_KERNEL_DRIVER_IRQ_FLAGS_LEVEL_TRIGGERED: zbi_kernel_driver_irq_fla
 pub const ZBI_KERNEL_DRIVER_IRQ_FLAGS_POLARITY_LOW: zbi_kernel_driver_irq_flags_t = 4;
 pub const ZBI_KERNEL_DRIVER_IRQ_FLAGS_POLARITY_HIGH: zbi_kernel_driver_irq_flags_t = 8;
 #[repr(C)]
-#[derive(Debug, Default, Copy, Clone, PartialEq, FromBytes, AsBytes, FromZeros, NoCell)]
+#[derive(Debug, Default, Copy, Clone, PartialEq, FromBytes, IntoBytes, Immutable, KnownLayout)]
 pub struct zbi_dcfg_simple_pio_t {
     pub base: u16,
     pub reserved: u16,
@@ -274,7 +274,7 @@ const _: () = {
         [::core::mem::offset_of!(zbi_dcfg_simple_pio_t, irq) - 4usize];
 };
 #[repr(C)]
-#[derive(Debug, Default, Copy, Clone, PartialEq, FromBytes, AsBytes, FromZeros, NoCell)]
+#[derive(Debug, Default, Copy, Clone, PartialEq, FromBytes, IntoBytes, Immutable, KnownLayout)]
 pub struct zbi_dcfg_arm_psci_driver_t {
     pub use_hvc: u8,
     pub reserved: [u8; 7usize],
@@ -303,7 +303,7 @@ const _: () = {
         [::core::mem::offset_of!(zbi_dcfg_arm_psci_driver_t, reboot_recovery_args) - 80usize];
 };
 #[repr(C)]
-#[derive(Debug, Default, Copy, Clone, PartialEq, FromBytes, AsBytes, FromZeros, NoCell)]
+#[derive(Debug, Default, Copy, Clone, PartialEq, FromBytes, IntoBytes, Immutable, KnownLayout)]
 pub struct zbi_dcfg_arm_gic_v2_driver_t {
     pub mmio_phys: u64,
     pub msi_frame_phys: u64,
@@ -344,7 +344,7 @@ const _: () = {
         [::core::mem::offset_of!(zbi_dcfg_arm_gic_v2_driver_t, reserved) - 54usize];
 };
 #[repr(C)]
-#[derive(Debug, Default, Copy, Clone, PartialEq, FromBytes, AsBytes, FromZeros, NoCell)]
+#[derive(Debug, Default, Copy, Clone, PartialEq, FromBytes, IntoBytes, Immutable, KnownLayout)]
 pub struct zbi_dcfg_arm_gic_v3_driver_t {
     pub mmio_phys: u64,
     pub gicd_offset: u64,
@@ -379,7 +379,7 @@ const _: () = {
         [::core::mem::offset_of!(zbi_dcfg_arm_gic_v3_driver_t, reserved1) - 45usize];
 };
 #[repr(C)]
-#[derive(Debug, Default, Copy, Clone, PartialEq, FromBytes, AsBytes, FromZeros, NoCell)]
+#[derive(Debug, Default, Copy, Clone, PartialEq, FromBytes, IntoBytes, Immutable, KnownLayout)]
 pub struct zbi_dcfg_arm_generic_timer_driver_t {
     pub irq_phys: u32,
     pub irq_virt: u32,
@@ -402,7 +402,7 @@ const _: () = {
         [::core::mem::offset_of!(zbi_dcfg_arm_generic_timer_driver_t, freq_override) - 12usize];
 };
 #[repr(C)]
-#[derive(Debug, Default, Copy, Clone, PartialEq, FromBytes, AsBytes, FromZeros, NoCell)]
+#[derive(Debug, Default, Copy, Clone, PartialEq, FromBytes, IntoBytes, Immutable, KnownLayout)]
 pub struct zbi_dcfg_amlogic_hdcp_driver_t {
     pub preset_phys: u64,
     pub hiu_phys: u64,
@@ -422,7 +422,7 @@ const _: () = {
         [::core::mem::offset_of!(zbi_dcfg_amlogic_hdcp_driver_t, hdmitx_phys) - 16usize];
 };
 #[repr(C)]
-#[derive(Debug, Default, Copy, Clone, PartialEq, FromBytes, AsBytes, FromZeros, NoCell)]
+#[derive(Debug, Default, Copy, Clone, PartialEq, FromBytes, IntoBytes, Immutable, KnownLayout)]
 pub struct zbi_dcfg_amlogic_rng_driver_t {
     pub rng_data_phys: u64,
     pub rng_status_phys: u64,
@@ -444,7 +444,7 @@ const _: () = {
     ) - 16usize];
 };
 #[repr(C)]
-#[derive(Debug, Default, Copy, Clone, PartialEq, FromBytes, AsBytes, FromZeros, NoCell)]
+#[derive(Debug, Default, Copy, Clone, PartialEq, FromBytes, IntoBytes, Immutable, KnownLayout)]
 pub struct zbi_dcfg_generic32_watchdog_action_t {
     pub addr: u64,
     pub clr_mask: u32,
@@ -468,7 +468,7 @@ pub const ZBI_KERNEL_DRIVER_GENERIC32_WATCHDOG_FLAGS_ENABLED:
     zbi_kernel_driver_generic32_watchdog_flags_t = 1;
 pub const ZBI_KERNEL_DRIVER_GENERIC32_WATCHDOG_MIN_PERIOD: i64 = 1000000;
 #[repr(C)]
-#[derive(Debug, Default, Copy, Clone, PartialEq, FromBytes, AsBytes, FromZeros, NoCell)]
+#[derive(Debug, Default, Copy, Clone, PartialEq, FromBytes, IntoBytes, Immutable, KnownLayout)]
 pub struct zbi_dcfg_generic32_watchdog_t {
     pub pet_action: zbi_dcfg_generic32_watchdog_action_t,
     pub enable_action: zbi_dcfg_generic32_watchdog_action_t,
@@ -497,7 +497,7 @@ const _: () = {
         [::core::mem::offset_of!(zbi_dcfg_generic32_watchdog_t, reserved) - 60usize];
 };
 #[repr(C)]
-#[derive(Debug, Default, Copy, Clone, PartialEq, FromBytes, AsBytes, FromZeros, NoCell)]
+#[derive(Debug, Default, Copy, Clone, PartialEq, FromBytes, IntoBytes, Immutable, KnownLayout)]
 pub struct zbi_dcfg_riscv_plic_driver_t {
     pub mmio_phys: u64,
     pub num_irqs: u32,
@@ -517,7 +517,7 @@ const _: () = {
         [::core::mem::offset_of!(zbi_dcfg_riscv_plic_driver_t, reserved) - 12usize];
 };
 #[repr(C)]
-#[derive(Debug, Default, Copy, Clone, PartialEq, FromBytes, AsBytes, FromZeros, NoCell)]
+#[derive(Debug, Default, Copy, Clone, PartialEq, FromBytes, IntoBytes, Immutable, KnownLayout)]
 pub struct zbi_dcfg_riscv_generic_timer_driver_t {
     pub freq_hz: u32,
     pub reserved: u32,
@@ -549,7 +549,7 @@ pub const ZBI_PIXEL_FORMAT_BGR_888_X: zbi_pixel_format_t = 262155;
 pub const ZBI_PIXEL_FORMAT_ARGB_2_10_10_10: zbi_pixel_format_t = 262156;
 pub const ZBI_PIXEL_FORMAT_ABGR_2_10_10_10: zbi_pixel_format_t = 262157;
 #[repr(C)]
-#[derive(Debug, Default, Copy, Clone, PartialEq, FromBytes, AsBytes, FromZeros, NoCell)]
+#[derive(Debug, Default, Copy, Clone, PartialEq, FromBytes, IntoBytes, Immutable, KnownLayout)]
 pub struct zbi_swfb_t {
     pub base: u64,
     pub width: u32,
@@ -568,7 +568,7 @@ const _: () = {
     ["Offset of field: zbi_swfb_t::format"][::core::mem::offset_of!(zbi_swfb_t, format) - 20usize];
 };
 #[repr(C)]
-#[derive(Debug, Default, Copy, Clone, PartialEq, FromBytes, AsBytes, FromZeros, NoCell)]
+#[derive(Debug, Default, Copy, Clone, PartialEq, FromBytes, IntoBytes, Immutable, KnownLayout)]
 pub struct zbi_kernel_t {
     pub entry: u64,
     pub reserve_memory_size: u64,
@@ -586,7 +586,7 @@ pub const ZBI_MEM_TYPE_RAM: zbi_mem_type_t = 1;
 pub const ZBI_MEM_TYPE_PERIPHERAL: zbi_mem_type_t = 2;
 pub const ZBI_MEM_TYPE_RESERVED: zbi_mem_type_t = 3;
 #[repr(C)]
-#[derive(Debug, Default, Copy, Clone, PartialEq, FromBytes, AsBytes, FromZeros, NoCell)]
+#[derive(Debug, Default, Copy, Clone, PartialEq, FromBytes, IntoBytes, Immutable, KnownLayout)]
 pub struct zbi_mem_range_t {
     pub paddr: u64,
     pub length: u64,
@@ -607,7 +607,7 @@ const _: () = {
         [::core::mem::offset_of!(zbi_mem_range_t, reserved) - 20usize];
 };
 #[repr(C)]
-#[derive(Debug, Default, Copy, Clone, PartialEq, FromBytes, AsBytes, FromZeros, NoCell)]
+#[derive(Debug, Default, Copy, Clone, PartialEq, FromBytes, IntoBytes, Immutable, KnownLayout)]
 pub struct zbi_nvram_t {
     pub base: u64,
     pub length: u64,
@@ -623,7 +623,7 @@ pub const ZBI_PARTITION_NAME_LEN: u64 = 32;
 pub const ZBI_PARTITION_GUID_LEN: u64 = 16;
 pub type zbi_partition_guid_t = [u8; 16usize];
 #[repr(C)]
-#[derive(Debug, Default, Copy, Clone, PartialEq, FromBytes, AsBytes, FromZeros, NoCell)]
+#[derive(Debug, Default, Copy, Clone, PartialEq, FromBytes, IntoBytes, Immutable, KnownLayout)]
 pub struct zbi_partition_t {
     pub type_guid: zbi_partition_guid_t,
     pub uniq_guid: zbi_partition_guid_t,
@@ -650,7 +650,7 @@ const _: () = {
         [::core::mem::offset_of!(zbi_partition_t, name) - 56usize];
 };
 #[repr(C)]
-#[derive(Debug, Default, Copy, Clone, PartialEq, FromBytes, AsBytes, FromZeros, NoCell)]
+#[derive(Debug, Default, Copy, Clone, PartialEq, FromBytes, IntoBytes, Immutable, KnownLayout)]
 pub struct zbi_partition_map_t {
     pub block_count: u64,
     pub block_size: u64,
@@ -726,7 +726,7 @@ pub const ZBI_FLAGS_VERSION: zbi_flags_t = 65536;
 pub const ZBI_FLAGS_CRC32: zbi_flags_t = 131072;
 pub const ZBI_ITEM_NO_CRC32: u32 = 1250420950;
 #[repr(C)]
-#[derive(Debug, Default, Copy, Clone, PartialEq, FromBytes, AsBytes, FromZeros, NoCell)]
+#[derive(Debug, Default, Copy, Clone, PartialEq, FromBytes, IntoBytes, Immutable, KnownLayout)]
 pub struct zbi_header_t {
     pub type_: zbi_type_t,
     pub length: u32,
