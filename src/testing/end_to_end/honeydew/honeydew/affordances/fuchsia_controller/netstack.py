@@ -7,11 +7,16 @@ from __future__ import annotations
 
 import logging
 
+import fidl.fuchsia_net_interfaces as f_net_interfaces
+from fuchsia_controller_py import Channel, ZxStatus
+from fuchsia_controller_py.wrappers import AsyncAdapter, asyncmethod
+
 from honeydew import errors
 from honeydew.interfaces.affordances import netstack
 from honeydew.interfaces.device_classes import affordances_capable
 from honeydew.interfaces.transports import ffx as ffx_transport
 from honeydew.interfaces.transports import fuchsia_controller as fc_transport
+from honeydew.typing.custom_types import FidlEndpoint
 from honeydew.typing.netstack import InterfaceProperties
 
 # List of required FIDLs for this affordance.
@@ -21,8 +26,13 @@ _REQUIRED_CAPABILITIES = [
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
+# Fuchsia Controller proxies
+_STATE_PROXY = FidlEndpoint(
+    "core/network/netstack", "fuchsia.net.interfaces.State"
+)
 
-class Netstack(netstack.Netstack):
+
+class Netstack(AsyncAdapter, netstack.Netstack):
     """WLAN affordance implemented with Fuchsia Controller."""
 
     def __init__(
@@ -45,6 +55,9 @@ class Netstack(netstack.Netstack):
 
         self._fc_transport = fuchsia_controller
         self._reboot_affordance = reboot_affordance
+
+        self._connect_proxy()
+        self._reboot_affordance.register_for_on_device_boot(self._connect_proxy)
 
     def _verify_supported(self, device: str, ffx: ffx_transport.FFX) -> None:
         """Check if WLAN Policy is supported on the DUT.
@@ -72,7 +85,15 @@ class Netstack(netstack.Netstack):
                     "WLAN FC affordance."
                 )
 
-    def list_interfaces(self) -> list[InterfaceProperties]:
+    def _connect_proxy(self) -> None:
+        """Re-initializes connection to the WLAN stack."""
+        self._state_proxy = f_net_interfaces.State.Client(
+            self._fc_transport.connect_device_proxy(_STATE_PROXY)
+        )
+
+    @asyncmethod
+    # pylint: disable-next=invalid-overridden-method
+    async def list_interfaces(self) -> list[InterfaceProperties]:
         """List interfaces.
 
         Returns:
@@ -80,5 +101,44 @@ class Netstack(netstack.Netstack):
 
         Raises:
             HoneydewNetstackError: Error from the netstack.
+            TypeError: Received invalid Watcher events from netstack.
         """
-        raise NotImplementedError()
+        client, server = Channel.create()
+        watcher = f_net_interfaces.Watcher.Client(client.take())
+
+        try:
+            self._state_proxy.get_watcher(
+                options=f_net_interfaces.WatcherOptions(
+                    address_properties_interest=None,
+                    include_non_assigned_addresses=None,
+                ),
+                watcher=server.take(),
+            )
+        except ZxStatus as status:
+            raise errors.HoneydewNetstackError(
+                f"State.GetWatcher() error {status}"
+            ) from status
+
+        properties: list[InterfaceProperties] = []
+
+        while True:
+            try:
+                resp = await watcher.watch()
+            except ZxStatus as status:
+                raise errors.HoneydewNetstackError(
+                    f"Watcher.Watch() error {status}"
+                ) from status
+
+            event = resp.event
+            if event.existing:
+                properties.append(InterfaceProperties.from_fidl(event.existing))
+            elif event.idle:
+                # No more information readily available.
+                break
+            else:
+                raise errors.HoneydewNetstackError(
+                    "Received invalid Watcher event from netstack. "
+                    f"Expected existing or idle events, got {event}"
+                )
+
+        return properties

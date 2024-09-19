@@ -23,9 +23,8 @@ class NetstackTests(fuchsia_base_test.FuchsiaBaseTest):
 
     def test_list_interfaces(self) -> None:
         """Verify list_interfaces() works on device."""
-        with asserts.assert_raises(NotImplementedError):
-            interfaces = self.device.netstack.list_interfaces()
-            asserts.assert_greater(len(interfaces), 0)
+        interfaces = self.device.netstack.list_interfaces()
+        asserts.assert_greater(len(interfaces), 0)
 
 
 if __name__ == "__main__":
