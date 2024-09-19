@@ -8,6 +8,7 @@
 
 #include <lib/fit/result.h>
 #include <lib/mistos/starnix/kernel/mm/flags.h>
+#include <lib/mistos/starnix_uapi/errors.h>
 #include <zircon/rights.h>
 #include <zircon/syscalls/object.h>
 #include <zircon/types.h>
@@ -21,8 +22,6 @@
 #include <object/handle.h>
 #include <object/vm_address_region_dispatcher.h>
 #include <object/vm_object_dispatcher.h>
-
-#include "object/dispatcher.h"
 
 namespace starnix {
 
@@ -62,9 +61,9 @@ class MemoryObject : public fbl::RefCounted<MemoryObject> {
 
   static fbl::RefPtr<MemoryObject> From(HandleOwner vmo);
 
-  ktl::optional<fbl::RefPtr<VmObjectDispatcher>> as_vmo();
+  ktl::optional<std::reference_wrapper<Vmo>> as_vmo();
 
-  ktl::optional<fbl::RefPtr<VmObjectDispatcher>> into_vmo();
+  ktl::optional<Vmo> into_vmo();
 
   uint64_t get_content_size() const;
 
@@ -118,6 +117,12 @@ class MemoryObject : public fbl::RefCounted<MemoryObject> {
 
   ktl::variant<Vmo, RingBuf> variant_;
 };
+
+fit::result<zx_status_t, fbl::RefPtr<MemoryObject>> create_vmo(uint64_t size, uint32_t options);
+fit::result<zx_status_t, fbl::RefPtr<MemoryObject>> create_child_vmo(const Vmo& vmo,
+                                                                     uint32_t options,
+                                                                     uint64_t offset,
+                                                                     uint64_t size);
 
 }  // namespace starnix
 

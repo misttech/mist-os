@@ -59,7 +59,7 @@ class AutoReleasableTask {
 /// for this use case, please consider adding one that follows the new pattern of actually running
 /// the test on the spawned task.
 ktl::pair<fbl::RefPtr<Kernel>, starnix::testing::AutoReleasableTask>
-create_kernel_task_and_unlocked_with_pkgfs();
+create_kernel_task_and_unlocked_with_bootfs();
 
 /// An old way of creating a task for testing
 ///

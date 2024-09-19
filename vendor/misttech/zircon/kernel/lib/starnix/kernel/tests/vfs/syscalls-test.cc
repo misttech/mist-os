@@ -32,7 +32,7 @@ bool test_sys_dup3() {
 bool test_sys_open_cloexec() {
   BEGIN_TEST;
 
-  auto [kernel, current_task] = create_kernel_task_and_unlocked_with_pkgfs();
+  auto [kernel, current_task] = create_kernel_task_and_unlocked_with_bootfs();
 
   auto path_addr = map_memory(*current_task, UserAddress(), PAGE_SIZE);
   ktl::string_view path("data/testfile.txt");

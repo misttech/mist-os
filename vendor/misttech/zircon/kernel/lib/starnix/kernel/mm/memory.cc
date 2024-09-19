@@ -27,6 +27,7 @@
 #define LOCAL_TRACE STARNIX_KERNEL_GLOBAL_TRACE(2)
 
 namespace {
+  
 // adapted from syscalls/vmar.cc
 zx_status_t vmar_map_common(zx_vm_option_t options, fbl::RefPtr<VmAddressRegionDispatcher> vmar,
                             uint64_t vmar_offset, zx_rights_t vmar_rights,
@@ -126,27 +127,177 @@ zx_status_t vmar_map_common(zx_vm_option_t options, fbl::RefPtr<VmAddressRegionD
 
 namespace starnix {
 
+// Based on from sys_vmo_create (syscalls/vmo.cc)
+fit::result<zx_status_t, fbl::RefPtr<MemoryObject>> create_vmo(uint64_t size, uint32_t options) {
+  LTRACEF("size %#" PRIx64 "\n", size);
+
+  bool is_user_space = ThreadDispatcher::GetCurrent() != nullptr;
+
+  if (is_user_space) {
+    auto up = ProcessDispatcher::GetCurrent();
+    zx_status_t res = up->EnforceBasicPolicy(ZX_POL_NEW_VMO);
+    if (res != ZX_OK) {
+      return fit::error(res);
+    }
+  }
+
+  zx::result<VmObjectDispatcher::CreateStats> parse_result =
+      VmObjectDispatcher::parse_create_syscall_flags(options, size);
+  if (parse_result.is_error()) {
+    return fit::error(parse_result.error_value());
+  }
+  VmObjectDispatcher::CreateStats stats = parse_result.value();
+
+  // mremap can grow memory regions, so make sure the VMO is resizable.
+  fbl::RefPtr<VmObjectPaged> vmo;
+  zx_status_t status =
+      VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY | (is_user_space ? PMM_ALLOC_FLAG_CAN_WAIT : 0),
+                            stats.flags, stats.size, &vmo);
+  if (status != ZX_OK) {
+    return fit::error(status);
+  }
+
+  // create a Vm Object dispatcher
+  KernelHandle<VmObjectDispatcher> kernel_handle;
+  zx_rights_t rights;
+  zx_status_t result = VmObjectDispatcher::Create(ktl::move(vmo), size,
+                                                  VmObjectDispatcher::InitialMutability::kMutable,
+                                                  &kernel_handle, &rights);
+  if (result != ZX_OK) {
+    return fit::error(result);
+  }
+  return fit::ok(MemoryObject::From(Handle::Make(ktl::move(kernel_handle), rights)));
+}
+
+fit::result<zx_status_t, fbl::RefPtr<MemoryObject>> create_child_vmo(const Vmo& vmo,
+                                                                     uint32_t options,
+                                                                     uint64_t offset,
+                                                                     uint64_t size) {
+  zx_status_t status;
+  fbl::RefPtr<VmObject> child_vmo;
+  bool no_write = false;
+
+  uint64_t vmo_size = 0;
+  status = VmObject::RoundSize(size, &vmo_size);
+  if (status != ZX_OK) {
+    return fit::error(status);
+  }
+
+  // Resizing a VMO requires the WRITE permissions, but NO_WRITE forbids the WRITE
+  // permissions, as
+  // such it does not make sense to create a VMO with both of these.
+  if ((options & ZX_VMO_CHILD_NO_WRITE) && (options & ZX_VMO_CHILD_RESIZABLE)) {
+    return fit::error(ZX_ERR_INVALID_ARGS);
+  }
+
+  // Writable is a property of the handle, not the object, so we consume this option here
+  // before calling CreateChild.
+  if (options & ZX_VMO_CHILD_NO_WRITE) {
+    no_write = true;
+    options &= ~ZX_VMO_CHILD_NO_WRITE;
+  }
+
+  // lookup the dispatcher from handle, save a copy of the rights for later. We must hold
+  // onto
+  // the refptr of this VMO up until we create the dispatcher. The reason for this is that
+  // VmObjectDispatcher::Create sets the user_id and page_attribution_id in the created
+  // child vmo. Should the vmo destroyed between creating the child and setting the id in
+  // the dispatcher the currently unset user_id may be used to re-attribute a parent.
+  // Holding the refptr prevents any destruction from occurring.
+  zx_rights_t in_rights = vmo.vmo->rights();
+  if (!vmo.vmo->HasRights(ZX_RIGHT_DUPLICATE | ZX_RIGHT_READ)) {
+    return fit::error(ZX_ERR_ACCESS_DENIED);
+  }
+
+  // clone the vmo into a new one
+  status = vmo.dispatcher()->CreateChild(options, offset, size, in_rights & ZX_RIGHT_GET_PROPERTY,
+                                         &child_vmo);
+  if (status != ZX_OK) {
+    return fit::error(status);
+  }
+
+  DEBUG_ASSERT(child_vmo);
+
+  // This checks that the child VMO is explicitly created with ZX_VMO_CHILD_SNAPSHOT.
+  // There are other ways that VMOs can be effectively immutable, for instance if the VMO
+  // is created with ZX_VMO_CHILD_SNAPSHOT_AT_LEAST_ON_WRITE and meets certain criteria it
+  // will be "upgraded" to a snapshot. However this behavior is not guaranteed at the API
+  // level. A choice was made to conservatively only mark VMOs as immutable when the user
+  // explicitly creates a VMO in a way that is guaranteed at the API level to always
+  // output an immutable VMO.
+  auto initial_mutability = VmObjectDispatcher::InitialMutability::kMutable;
+  if (no_write && (options & ZX_VMO_CHILD_SNAPSHOT)) {
+    initial_mutability = VmObjectDispatcher::InitialMutability::kImmutable;
+  }
+
+  // create a Vm Object dispatcher
+  KernelHandle<VmObjectDispatcher> kernel_handle;
+  zx_rights_t default_rights;
+
+  // A reference child shares the same content size manager as the parent.
+  if (options & ZX_VMO_CHILD_REFERENCE) {
+    auto result = vmo.dispatcher()->content_size_manager();
+    if (result.is_error()) {
+      return fit::error(result.status_value());
+    }
+    status = VmObjectDispatcher::CreateWithCsm(ktl::move(child_vmo), ktl::move(*result),
+                                               initial_mutability, &kernel_handle, &default_rights);
+  } else {
+    status = VmObjectDispatcher::Create(ktl::move(child_vmo), size, initial_mutability,
+                                        &kernel_handle, &default_rights);
+  }
+
+  // Set the rights to the new handle to no greater than the input (parent) handle minus
+  // the RESIZE
+  // right, which is added independently based on ZX_VMO_CHILD_RESIZABLE; it is possible
+  // for a non-resizable parent to have a resizable child and vice versa. Always allow
+  // GET/SET_PROPERTY so the user can set ZX_PROP_NAME on the new clone.
+  zx_rights_t rights = (in_rights & ~ZX_RIGHT_RESIZE) |
+                       (options & ZX_VMO_CHILD_RESIZABLE ? ZX_RIGHT_RESIZE : 0) |
+                       ZX_RIGHT_GET_PROPERTY | ZX_RIGHT_SET_PROPERTY;
+
+  // Unless it was explicitly requested to be removed, WRITE can be added to CoW clones at
+  // the expense of executability.
+  if (no_write) {
+    rights &= ~ZX_RIGHT_WRITE;
+    // NO_WRITE and RESIZABLE cannot be specified together, so we should not have the
+    // RESIZE right.
+    DEBUG_ASSERT((rights & ZX_RIGHT_RESIZE) == 0);
+  } else if (options & (ZX_VMO_CHILD_SNAPSHOT | ZX_VMO_CHILD_SNAPSHOT_AT_LEAST_ON_WRITE |
+                        ZX_VMO_CHILD_SNAPSHOT_MODIFIED)) {
+    rights &= ~ZX_RIGHT_EXECUTE;
+    rights |= ZX_RIGHT_WRITE;
+  }
+
+  // make sure we're somehow not elevating rights beyond what a new vmo should have
+  DEBUG_ASSERT(((default_rights | ZX_RIGHT_EXECUTE) & rights) == rights);
+
+  return fit::ok(MemoryObject::From(Handle::Make(ktl::move(kernel_handle), rights)));
+}
+
 fbl::RefPtr<MemoryObject> MemoryObject::From(HandleOwner vmo) {
   fbl::AllocChecker ac;
-  fbl::RefPtr<MemoryObject> memory =
-      fbl::AdoptRef(new (&ac) MemoryObject(Vmo{.vmo = ktl::move(vmo)}));
+  fbl::RefPtr<MemoryObject> memory = fbl::AdoptRef(new (&ac) MemoryObject(Vmo{ktl::move(vmo)}));
   ASSERT(ac.check());
   return ktl::move(memory);
 }
 
-ktl::optional<fbl::RefPtr<VmObjectDispatcher>> MemoryObject::as_vmo() {
+ktl::optional<std::reference_wrapper<Vmo>> MemoryObject::as_vmo() {
+  return ktl::visit(
+      MemoryObject::overloaded{
+          [](Vmo& vmo) { return ktl::optional<std::reference_wrapper<Vmo>>(vmo); },
+          [](RingBuf&) { return ktl::optional<std::reference_wrapper<Vmo>>(ktl::nullopt); },
+      },
+      variant_);
+}
+
+ktl::optional<Vmo> MemoryObject::into_vmo() {
   return ktl::visit(MemoryObject::overloaded{
-                        [](const Vmo& vmo) {
-                          return ktl::optional<fbl::RefPtr<VmObjectDispatcher>>(vmo.dispatcher());
-                        },
-                        [](const RingBuf&) {
-                          return ktl::optional<fbl::RefPtr<VmObjectDispatcher>>(ktl::nullopt);
-                        },
+                        [](Vmo& vmo) { return ktl::optional<Vmo>(ktl::move(vmo)); },
+                        [](RingBuf&) { return ktl::optional<Vmo>(ktl::nullopt); },
                     },
                     variant_);
 }
-
-// ktl::optional<fbl::RefPtr<VmObjectDispatcher>> MemoryObject::into_vmo() {}
 
 uint64_t MemoryObject::get_content_size() const {
   return ktl::visit(MemoryObject::overloaded{
@@ -193,116 +344,15 @@ fit::result<zx_status_t> MemoryObject::set_size(uint64_t size) const {
 fit::result<zx_status_t, fbl::RefPtr<MemoryObject>> MemoryObject::create_child(uint32_t options,
                                                                                uint64_t offset,
                                                                                uint64_t size) {
-  return ktl::visit(
-      MemoryObject::overloaded{
-          [&](const Vmo& vmo) -> fit::result<zx_status_t, fbl::RefPtr<MemoryObject>> {
-            zx_status_t status;
-            fbl::RefPtr<VmObject> child_vmo;
-            bool no_write = false;
-
-            uint64_t vmo_size = 0;
-            status = VmObject::RoundSize(size, &vmo_size);
-            if (status != ZX_OK) {
-              return fit::error(status);
-            }
-
-            // Resizing a VMO requires the WRITE permissions, but NO_WRITE forbids the WRITE
-            // permissions, as
-            // such it does not make sense to create a VMO with both of these.
-            if ((options & ZX_VMO_CHILD_NO_WRITE) && (options & ZX_VMO_CHILD_RESIZABLE)) {
-              return fit::error(ZX_ERR_INVALID_ARGS);
-            }
-
-            // Writable is a property of the handle, not the object, so we consume this option here
-            // before calling CreateChild.
-            if (options & ZX_VMO_CHILD_NO_WRITE) {
-              no_write = true;
-              options &= ~ZX_VMO_CHILD_NO_WRITE;
-            }
-
-            // lookup the dispatcher from handle, save a copy of the rights for later. We must hold
-            // onto
-            // the refptr of this VMO up until we create the dispatcher. The reason for this is that
-            // VmObjectDispatcher::Create sets the user_id and page_attribution_id in the created
-            // child vmo. Should the vmo destroyed between creating the child and setting the id in
-            // the dispatcher the currently unset user_id may be used to re-attribute a parent.
-            // Holding the refptr prevents any destruction from occurring.
-            zx_rights_t in_rights = vmo.vmo->rights();
-            if (!vmo.vmo->HasRights(ZX_RIGHT_DUPLICATE | ZX_RIGHT_READ)) {
-              return fit::error(ZX_ERR_ACCESS_DENIED);
-            }
-
-            // clone the vmo into a new one
-            status = vmo.dispatcher()->CreateChild(options, offset, size,
-                                                   in_rights & ZX_RIGHT_GET_PROPERTY, &child_vmo);
-            if (status != ZX_OK) {
-              return fit::error(status);
-            }
-
-            DEBUG_ASSERT(child_vmo);
-
-            // This checks that the child VMO is explicitly created with ZX_VMO_CHILD_SNAPSHOT.
-            // There are other ways that VMOs can be effectively immutable, for instance if the VMO
-            // is created with ZX_VMO_CHILD_SNAPSHOT_AT_LEAST_ON_WRITE and meets certain criteria it
-            // will be "upgraded" to a snapshot. However this behavior is not guaranteed at the API
-            // level. A choice was made to conservatively only mark VMOs as immutable when the user
-            // explicitly creates a VMO in a way that is guaranteed at the API level to always
-            // output an immutable VMO.
-            auto initial_mutability = VmObjectDispatcher::InitialMutability::kMutable;
-            if (no_write && (options & ZX_VMO_CHILD_SNAPSHOT)) {
-              initial_mutability = VmObjectDispatcher::InitialMutability::kImmutable;
-            }
-
-            // create a Vm Object dispatcher
-            KernelHandle<VmObjectDispatcher> kernel_handle;
-            zx_rights_t default_rights;
-
-            // A reference child shares the same content size manager as the parent.
-            if (options & ZX_VMO_CHILD_REFERENCE) {
-              auto result = vmo.dispatcher()->content_size_manager();
-              if (result.is_error()) {
-                return fit::error(result.status_value());
-              }
-              status = VmObjectDispatcher::CreateWithCsm(ktl::move(child_vmo), ktl::move(*result),
-                                                         initial_mutability, &kernel_handle,
-                                                         &default_rights);
-            } else {
-              status = VmObjectDispatcher::Create(ktl::move(child_vmo), size, initial_mutability,
-                                                  &kernel_handle, &default_rights);
-            }
-
-            // Set the rights to the new handle to no greater than the input (parent) handle minus
-            // the RESIZE
-            // right, which is added independently based on ZX_VMO_CHILD_RESIZABLE; it is possible
-            // for a non-resizable parent to have a resizable child and vice versa. Always allow
-            // GET/SET_PROPERTY so the user can set ZX_PROP_NAME on the new clone.
-            zx_rights_t rights = (in_rights & ~ZX_RIGHT_RESIZE) |
-                                 (options & ZX_VMO_CHILD_RESIZABLE ? ZX_RIGHT_RESIZE : 0) |
-                                 ZX_RIGHT_GET_PROPERTY | ZX_RIGHT_SET_PROPERTY;
-
-            // Unless it was explicitly requested to be removed, WRITE can be added to CoW clones at
-            // the expense of executability.
-            if (no_write) {
-              rights &= ~ZX_RIGHT_WRITE;
-              // NO_WRITE and RESIZABLE cannot be specified together, so we should not have the
-              // RESIZE right.
-              DEBUG_ASSERT((rights & ZX_RIGHT_RESIZE) == 0);
-            } else if (options & (ZX_VMO_CHILD_SNAPSHOT | ZX_VMO_CHILD_SNAPSHOT_AT_LEAST_ON_WRITE |
-                                  ZX_VMO_CHILD_SNAPSHOT_MODIFIED)) {
-              rights &= ~ZX_RIGHT_EXECUTE;
-              rights |= ZX_RIGHT_WRITE;
-            }
-
-            // make sure we're somehow not elevating rights beyond what a new vmo should have
-            DEBUG_ASSERT(((default_rights | ZX_RIGHT_EXECUTE) & rights) == rights);
-
-            return fit::ok(MemoryObject::From(Handle::Make(ktl::move(kernel_handle), rights)));
-          },
-          [](const RingBuf&) -> fit::result<zx_status_t, fbl::RefPtr<MemoryObject>> {
-            return fit::error(ZX_ERR_NOT_SUPPORTED);
-          },
-      },
-      variant_);
+  return ktl::visit(MemoryObject::overloaded{
+                        [&](const Vmo& vmo) -> fit::result<zx_status_t, fbl::RefPtr<MemoryObject>> {
+                          return create_child_vmo(vmo, options, offset, size);
+                        },
+                        [](const RingBuf&) -> fit::result<zx_status_t, fbl::RefPtr<MemoryObject>> {
+                          return fit::error(ZX_ERR_NOT_SUPPORTED);
+                        },
+                    },
+                    variant_);
 }
 
 fit::result<zx_status_t, fbl::RefPtr<MemoryObject>> MemoryObject::duplicate_handle(

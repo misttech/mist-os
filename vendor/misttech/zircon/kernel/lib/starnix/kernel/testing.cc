@@ -5,6 +5,7 @@
 
 #include "lib/mistos/starnix/testing/testing.h"
 
+#include <lib/mistos/starnix/kernel/fs/mistos/bootfs.h>
 #include <lib/mistos/starnix/kernel/fs/tmpfs.h>
 #include <lib/mistos/starnix/kernel/mm/flags.h>
 #include <lib/mistos/starnix/kernel/mm/syscalls.h>
@@ -16,6 +17,8 @@
 #include <lib/mistos/starnix/kernel/vfs/fs_context.h>
 #include <lib/mistos/starnix/kernel/vfs/fs_node.h>
 #include <lib/mistos/starnix/kernel/vfs/namespace.h>
+#include <lib/starnix/bootfs/tests/data/bootfs.zbi.h>
+#include <lib/starnix/bootfs/tests/zbi_file.h>
 
 #include <fbl/ref_ptr.h>
 
@@ -55,18 +58,18 @@ create_kernel_task_and_unlocked_with_fs_and_selinux(
   return ktl::pair(kernel, testing::AutoReleasableTask::From(ktl::move(init_task)));
 }
 
-/// TODO (Herrera) fix to open Bootfs from ZBI
 /// Create a FileSystemHandle for use in testing.
 ///
-/// Open "/pkg" and returns an FsContext rooted in that directory.
-FileSystemHandle create_pkgfs(const fbl::RefPtr<Kernel>& kernel) {
-  // For now use a TmpFs
-  return TmpFs::new_fs(kernel);
+/// Open "/boot" and returns an FsContext rooted in that directory.
+FileSystemHandle create_bootfs(const fbl::RefPtr<Kernel>& kernel) {
+  bootfs::testing::ZbiFile zbi;
+  zbi.Write({kBootFsZbi, sizeof(kBootFsZbi) - 1});
+  return BootFs::new_fs(kernel, HandleOwner(ktl::move(zbi).Finish()));
 }
 
 ktl::pair<fbl::RefPtr<Kernel>, starnix::testing::AutoReleasableTask>
-create_kernel_task_and_unlocked_with_pkgfs() {
-  return create_kernel_task_and_unlocked_with_fs_and_selinux(create_pkgfs);
+create_kernel_task_and_unlocked_with_bootfs() {
+  return create_kernel_task_and_unlocked_with_fs_and_selinux(create_bootfs);
 }
 
 ktl::pair<fbl::RefPtr<Kernel>, starnix::testing::AutoReleasableTask>
