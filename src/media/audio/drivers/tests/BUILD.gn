@@ -4,6 +4,7 @@
 
 import("//build/components.gni")
 import("//build/test.gni")
+import("//build/testing/cc_test_executable.gni")
 import("//src/media/audio/hardware.gni")
 
 group("tests") {
@@ -31,7 +32,7 @@ fuchsia_unittest_package("audio_driver_tests") {
   test_type = "device"
 }
 
-executable("audio_driver_tests_bin") {
+cc_test_executable("audio_driver_tests_bin") {
   testonly = true
   output_name = "audio_driver_tests"
 

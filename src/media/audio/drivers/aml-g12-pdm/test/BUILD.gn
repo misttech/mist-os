@@ -5,8 +5,9 @@
 import("//build/components.gni")
 import("//build/drivers.gni")
 import("//build/test.gni")
+import("//build/testing/cc_test_executable.gni")
 
-executable("aml-g12-pdm-test-bin") {
+cc_test_executable("aml-g12-pdm-test-bin") {
   testonly = true
   configs += [ "//build/config:all_source" ]
   sources = [

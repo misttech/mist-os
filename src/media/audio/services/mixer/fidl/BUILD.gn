@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
+import("//build/testing/cc_test_executable.gni")
 
 group("tests") {
   testonly = true
@@ -72,7 +73,7 @@ source_set("fidl") {
   deps = [ "//sdk/lib/syslog/cpp" ]
 }
 
-executable("fidl_unittests") {
+cc_test_executable("fidl_unittests") {
   output_name = "audio_services_mixer_fidl_unittests"
   testonly = true
 

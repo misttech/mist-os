@@ -4,6 +4,7 @@
 
 import("//build/components.gni")
 import("//build/fuzz.gni")
+import("//build/testing/cc_test_executable.gni")
 import("//third_party/cobalt/metrics_registry.gni")
 
 metrics_registry("media_metrics_registry") {
@@ -132,7 +133,7 @@ source_set("shared") {
   ]
 }
 
-executable("unittest_bin") {
+cc_test_executable("unittest_bin") {
   visibility = [ ":*" ]
   testonly = true
   output_name = "audio_core_shared_unittests"

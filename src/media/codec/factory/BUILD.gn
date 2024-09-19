@@ -4,6 +4,7 @@
 
 import("//build/components.gni")
 import("//build/components/fuchsia_unittest_package.gni")
+import("//build/testing/cc_test_executable.gni")
 
 source_set("factory_source") {
   sources = [
@@ -60,7 +61,7 @@ executable("factory") {
   deps = [ ":factory_source" ]
 }
 
-executable("codec_detect_hw_encode_test_bin") {
+cc_test_executable("codec_detect_hw_encode_test_bin") {
   output_name = "codec_detect_hw_encode_test"
 
   testonly = true
@@ -74,7 +75,7 @@ executable("codec_detect_hw_encode_test_bin") {
   ]
 }
 
-executable("codec_detect_hw_decode_test_bin") {
+cc_test_executable("codec_detect_hw_decode_test_bin") {
   output_name = "codec_detect_hw_decode_test"
 
   testonly = true
@@ -123,7 +124,7 @@ fuchsia_test_package("codec_detect_hw_encode_test") {
   }
 }
 
-executable("codec_factory_integration_test_exe") {
+cc_test_executable("codec_factory_integration_test_exe") {
   output_name = "codec_factory_integration_test"
   testonly = true
 

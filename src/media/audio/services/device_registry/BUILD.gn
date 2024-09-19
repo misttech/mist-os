@@ -5,6 +5,7 @@
 import("//build/components.gni")
 import("//build/fidl/toolchain.gni")
 import("//build/test.gni")
+import("//build/testing/cc_test_executable.gni")
 
 ## Groups
 group("tests") {
@@ -63,7 +64,7 @@ executable("device_registry_bin") {
   ]
 }
 
-executable("device_registry_unittests_bin") {
+cc_test_executable("device_registry_unittests_bin") {
   testonly = true
   output_name = "audio_services_device_registry_unittests"
 
@@ -90,7 +91,7 @@ executable("device_registry_unittests_bin") {
   ]
 }
 
-executable("device_registry_warning_unittests_bin") {
+cc_test_executable("device_registry_warning_unittests_bin") {
   testonly = true
   output_name = "audio_services_device_registry_warning_unittests"
 

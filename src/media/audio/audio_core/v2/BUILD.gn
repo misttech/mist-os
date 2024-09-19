@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
+import("//build/testing/cc_test_executable.gni")
 
 source_set("audio_core_lib") {
   sources = [
@@ -77,7 +78,7 @@ source_set("audio_core_main") {
   ]
 }
 
-executable("unittest_bin") {
+cc_test_executable("unittest_bin") {
   visibility = [ ":*" ]
   testonly = true
   output_name = "audio_core_v2_unittests"

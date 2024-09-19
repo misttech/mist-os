@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
+import("//build/testing/cc_test_executable.gni")
 import("//src/media/audio/hardware.gni")
 
 fuchsia_unittest_package("audio_core_hardware_tests") {
@@ -15,7 +16,7 @@ fuchsia_unittest_package("audio_core_hardware_tests") {
   test_type = "system"
 }
 
-executable("audio_core_hardware_tests_bin") {
+cc_test_executable("audio_core_hardware_tests_bin") {
   testonly = true
   output_name = "audio_core_hardware_tests"
 

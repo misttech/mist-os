@@ -5,8 +5,9 @@
 import("//build/components.gni")
 import("//build/drivers.gni")
 import("//build/test.gni")
+import("//build/testing/cc_test_executable.gni")
 
-executable("usb-audio-test-bin") {
+cc_test_executable("usb-audio-test-bin") {
   testonly = true
   sources = [ "usb-audio-test.cc" ]
   deps = [

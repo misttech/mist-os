@@ -8,6 +8,7 @@ import("//build/components.gni")
 import("//build/drivers.gni")
 import("//build/fuzz.gni")
 import("//build/test.gni")
+import("//build/testing/cc_test_executable.gni")
 
 driver_bind_rules("ihda_controller_bind") {
   rules = "meta/intel_hda.bind"
@@ -175,7 +176,7 @@ fuchsia_unittest_package("intel-hda-controller-test") {
   }
 }
 
-executable("intel-hda-stream-test-bin") {
+cc_test_executable("intel-hda-stream-test-bin") {
   testonly = true
   sources = [ "intel-hda-stream-test.cc" ]
   deps = [
@@ -200,7 +201,7 @@ fuchsia_unittest_package("intel-hda-stream-test") {
   }
 }
 
-executable("intel-dsp-stream-test-bin") {
+cc_test_executable("intel-dsp-stream-test-bin") {
   testonly = true
   sources = [ "intel-dsp-stream-test.cc" ]
   deps = [
