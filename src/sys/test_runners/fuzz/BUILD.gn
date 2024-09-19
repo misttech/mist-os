@@ -41,6 +41,13 @@ fuchsia_component("fuzz-test-runner-component") {
   deps = [ ":bin" ]
 }
 
+fuchsia_component("fuzz-starnix-test-runner-component") {
+  testonly = true
+  component_name = "fuzz-starnix-test-runner"
+  manifest = "meta/fuzz_starnix_test_runner.cml"
+  deps = [ ":bin" ]
+}
+
 fuchsia_package("fuzz-test-runner") {
   testonly = true
   visibility = [
@@ -49,5 +56,8 @@ fuchsia_package("fuzz-test-runner") {
     "//sdk/ctf/*",
     "//src/sys/test_manager:*",
   ]
-  deps = [ ":fuzz-test-runner-component" ]
+  deps = [
+    ":fuzz-starnix-test-runner-component",
+    ":fuzz-test-runner-component",
+  ]
 }

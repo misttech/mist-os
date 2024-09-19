@@ -34,6 +34,10 @@
                     from: "#fuzz_test_runner",
                 },
                 {
+                    runner: "fuzz_starnix_test_runner",
+                    from: "#fuzz_starnix_test_runner",
+                },
+                {
                     runner: "gtest_runner",
                     from: "#gtest_runner",
                 },
