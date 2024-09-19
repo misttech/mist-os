@@ -16,7 +16,7 @@ rustc_library("ieee80211") {
     "//third_party/rust_crates:arbitrary",
     "//third_party/rust_crates:hex",
     "//third_party/rust_crates:thiserror",
-    "//third_party/rust_crates:zerocopy_0_0_0_alpha_0",
+    "//third_party/rust_crates:zerocopy",
   ]
 
   test_deps = [ "//third_party/rust_crates:lazy_static" ]

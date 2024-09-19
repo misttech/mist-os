@@ -70,7 +70,7 @@ rustc_binary("fshost") {
     "//third_party/rust_crates:scopeguard",
     "//third_party/rust_crates:tracing",
     "//third_party/rust_crates:uuid",
-    "//third_party/rust_crates:zerocopy_0_0_0_alpha_0",
+    "//third_party/rust_crates:zerocopy",
     "//third_party/rust_crates:zstd",
     "//third_party/zstd",
   ]

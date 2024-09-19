@@ -404,7 +404,7 @@ rustc_library("starnix_core") {
     "//third_party/rust_crates:tracing-mutex",
     "//third_party/rust_crates:utf8parse",
     "//third_party/rust_crates:uuid",
-    "//third_party/rust_crates:zerocopy_0_0_0_alpha_0",
+    "//third_party/rust_crates:zerocopy",
   ]
 
   test_deps = [

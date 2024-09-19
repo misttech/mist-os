@@ -21,7 +21,7 @@ rustc_library("linux_uapi") {
     assert(false, "Need uapi definition for the '$current_cpu` architecture")
   }
 
-  deps = [ "//third_party/rust_crates:zerocopy_0_0_0_alpha_0" ]
+  deps = [ "//third_party/rust_crates:zerocopy" ]
   configs += [ "//src/starnix/config:starnix_clippy_lints" ]
 
   disable_clippy = true

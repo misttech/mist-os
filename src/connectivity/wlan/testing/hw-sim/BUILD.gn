@@ -45,7 +45,7 @@ rustc_library("wlan-hw-sim") {
     "//third_party/rust_crates:hex",
     "//third_party/rust_crates:lazy_static",
     "//third_party/rust_crates:tracing",
-    "//third_party/rust_crates:zerocopy_0_0_0_alpha_0",
+    "//third_party/rust_crates:zerocopy",
   ]
 
   sources = [

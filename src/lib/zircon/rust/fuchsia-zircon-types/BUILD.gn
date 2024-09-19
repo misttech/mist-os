@@ -6,7 +6,7 @@ import("//build/components.gni")
 import("//build/rust/rustc_library.gni")
 import("//build/rust/rustc_test.gni")
 
-_common_deps = [ "//third_party/rust_crates:zerocopy_0_0_0_alpha_0" ]
+_common_deps = [ "//third_party/rust_crates:zerocopy" ]
 _common_sources = [ "src/lib.rs" ]
 
 rustc_library("fuchsia-zircon-types") {

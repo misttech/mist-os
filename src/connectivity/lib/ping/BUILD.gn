@@ -17,7 +17,7 @@ rustc_library("ping") {
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:socket2",
     "//third_party/rust_crates:thiserror",
-    "//third_party/rust_crates:zerocopy_0_0_0_alpha_0",
+    "//third_party/rust_crates:zerocopy",
   ]
   if (is_fuchsia) {
     deps += [

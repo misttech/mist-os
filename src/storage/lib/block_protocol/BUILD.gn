@@ -12,6 +12,6 @@ rustc_library("block_protocol") {
   ]
   deps = [
     "//third_party/rust_crates:bitflags",
-    "//third_party/rust_crates:zerocopy_0_0_0_alpha_0",
+    "//third_party/rust_crates:zerocopy",
   ]
 }

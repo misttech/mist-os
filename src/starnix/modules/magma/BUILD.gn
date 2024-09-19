@@ -43,6 +43,6 @@ rustc_library("magma") {
     "//src/starnix/lib/starnix-uapi",
     "//third_party/rust_crates:bstr",
     "//third_party/rust_crates:vk-sys",
-    "//third_party/rust_crates:zerocopy_0_0_0_alpha_0",
+    "//third_party/rust_crates:zerocopy",
   ]
 }

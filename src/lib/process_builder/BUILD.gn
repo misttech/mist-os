@@ -26,7 +26,7 @@ rustc_library("process_builder") {
     "//third_party/rust_crates:num-traits",
     "//third_party/rust_crates:static_assertions",
     "//third_party/rust_crates:thiserror",
-    "//third_party/rust_crates:zerocopy_0_0_0_alpha_0",
+    "//third_party/rust_crates:zerocopy",
   ]
 
   test_deps = [

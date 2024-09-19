@@ -14,7 +14,7 @@ rustc_library("fuzz-util") {
     "//src/connectivity/lib/net-types",
     "//src/connectivity/lib/packet-formats",
     "//third_party/rust_crates:arbitrary",
-    "//third_party/rust_crates:zerocopy_0_0_0_alpha_0",
+    "//third_party/rust_crates:zerocopy",
   ]
 
   sources = [

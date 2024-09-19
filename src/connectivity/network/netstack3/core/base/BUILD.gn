@@ -65,7 +65,7 @@ rustc_library_with_features("netstack3-base") {
     "//third_party/rust_crates:rand",
     "//third_party/rust_crates:smallvec",
     "//third_party/rust_crates:thiserror",
-    "//third_party/rust_crates:zerocopy_0_0_0_alpha_0",
+    "//third_party/rust_crates:zerocopy",
 
     # TODO(https://github.com/rust-lang/rust/issues/62502): remove this module.
     "//src/connectivity/network/netstack3/core/fakestd",

@@ -18,7 +18,7 @@ rustc_library("gpt") {
     "//third_party/rust_crates:crc",
     "//third_party/rust_crates:tracing",
     "//third_party/rust_crates:uuid",
-    "//third_party/rust_crates:zerocopy_0_0_0_alpha_0",
+    "//third_party/rust_crates:zerocopy",
   ]
   test_deps = [
     ":gpt_testing",
@@ -48,7 +48,7 @@ rustc_library("gpt_testing") {
     "//src/lib/zircon/rust:fuchsia-zircon",
     "//third_party/rust_crates:crc",
     "//third_party/rust_crates:uuid",
-    "//third_party/rust_crates:zerocopy_0_0_0_alpha_0",
+    "//third_party/rust_crates:zerocopy",
   ]
   sources = [ "src/testing.rs" ]
   source_root = "src/testing.rs"

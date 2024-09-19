@@ -15,7 +15,7 @@ rustc_library("core") {
     "//third_party/rust_crates:thiserror",
   ]
 
-  test_deps = [ "//third_party/rust_crates:zerocopy_0_0_0_alpha_0" ]
+  test_deps = [ "//third_party/rust_crates:zerocopy" ]
 
   sources = [
     "src/fixed.rs",

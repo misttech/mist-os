@@ -49,7 +49,7 @@ rustc_binary("virtio_sound_bin") {
     "//third_party/rust_crates:scopeguard",
     "//third_party/rust_crates:tokio",
     "//third_party/rust_crates:tracing",
-    "//third_party/rust_crates:zerocopy_0_0_0_alpha_0",
+    "//third_party/rust_crates:zerocopy",
   ]
 
   test_deps = [ "//third_party/rust_crates:pretty_assertions" ]

@@ -40,7 +40,7 @@ rustc_test("netstack3_ip_integration_test") {
     "//third_party/rust_crates:rand",
     "//third_party/rust_crates:scopeguard",
     "//third_party/rust_crates:test-case",
-    "//third_party/rust_crates:zerocopy_0_0_0_alpha_0",
+    "//third_party/rust_crates:zerocopy",
   ]
   configs -= [ "//build/config/rust/lints:allow_unused_results" ]
   configs += [ "//src/connectivity/network/netstack3:netstack3_configs" ]

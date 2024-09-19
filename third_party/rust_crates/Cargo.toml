@@ -241,11 +241,7 @@ utf8parse = "0.1"
 vm-device = "0.1.0"
 walkdir = "2.2.7"
 which = "4.0.2"
-zerocopy = { version = "0.8.0-alpha.5", features = ["derive", "simd"] }
-# This is really 0.8.0-alpha.21. The zerocopy author (joshlf@) explicitly
-# published 0.0.0-alpha.0 in order to support a soft transition to
-# 0.8.0-alpha.21. See b/367420574.
-zerocopy_0_0_0_alpha_0 = { package = "zerocopy", version = "0.0.0-alpha.0", features = ["derive", "simd"] }
+zerocopy = { version = "0.8.0-alpha.21", features = ["derive", "simd"] }
 zstd = "0.11.2"
 
 [dependencies.tracing-subscriber]
@@ -1016,10 +1012,7 @@ env_vars = ["OUT_DIR=../../../../compat/valico"]
 [gn.package.valuable."0.1.0"]
 rustflags = []
 
-[gn.package.zerocopy."0.8.0-alpha.5"]
-rustflags = [ "--cfg=zerocopy_generic_bounds_in_const_fn", "--cfg=zerocopy_aarch64_simd", "--cfg=zerocopy_panic_in_const" ]
-
-[gn.package.zerocopy."0.0.0-alpha.0"]
+[gn.package.zerocopy."0.8.0-alpha.21"]
 rustflags = [ "--cfg=zerocopy_generic_bounds_in_const_fn", "--cfg=zerocopy_aarch64_simd", "--cfg=zerocopy_panic_in_const" ]
 
 [gn.package.zstd-safe."5.0.2+zstd.1.5.2"]

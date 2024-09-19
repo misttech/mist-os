@@ -111,7 +111,7 @@ rustc_library_with_features("netstack3-core") {
     # remove this module.
     "//src/lib/fakealloc",
   ]
-  _testutils_deps = [ "//third_party/rust_crates:zerocopy_0_0_0_alpha_0" ]
+  _testutils_deps = [ "//third_party/rust_crates:zerocopy" ]
 
   feature_sets = [
     {

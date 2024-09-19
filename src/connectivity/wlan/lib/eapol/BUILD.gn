@@ -14,7 +14,7 @@ rustc_library("eapol") {
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:thiserror",
     "//third_party/rust_crates:tracing",
-    "//third_party/rust_crates:zerocopy_0_0_0_alpha_0",
+    "//third_party/rust_crates:zerocopy",
   ]
 
   sources = [ "src/lib.rs" ]

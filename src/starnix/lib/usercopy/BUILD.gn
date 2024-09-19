@@ -59,7 +59,7 @@ rustc_library("usercopy") {
   deps = [
     "//src/lib/fuchsia-runtime",
     "//src/lib/zircon/rust:fuchsia-zircon",
-    "//third_party/rust_crates:zerocopy_0_0_0_alpha_0",
+    "//third_party/rust_crates:zerocopy",
   ]
   non_rust_deps = [ ":usercopy_assembly_routines" ]
   with_unit_tests = true

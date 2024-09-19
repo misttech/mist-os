@@ -22,7 +22,7 @@ rustc_library("qcow") {
 
   deps = [
     "//third_party/rust_crates:anyhow",
-    "//third_party/rust_crates:zerocopy_0_0_0_alpha_0",
+    "//third_party/rust_crates:zerocopy",
   ]
 }
 

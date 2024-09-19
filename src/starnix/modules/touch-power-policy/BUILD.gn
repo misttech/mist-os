@@ -17,6 +17,6 @@ rustc_library("touch-power-policy") {
     "//src/starnix/kernel:starnix_logging",
     "//src/starnix/lib/starnix-sync",
     "//src/starnix/lib/starnix-uapi",
-    "//third_party/rust_crates:zerocopy_0_0_0_alpha_0",
+    "//third_party/rust_crates:zerocopy",
   ]
 }
