@@ -503,8 +503,7 @@ pub enum HandleOp<'a> {
     Duplicate(HandleRef<'a>),
 }
 
-/// Operation to perform on handles during write.
-/// Based on zx_handle_disposition_t, but does not match the same layout.
+/// Operation to perform on handles during write. ABI-compatible with `zx_handle_disposition_t`.
 #[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 #[repr(C)]
 pub struct HandleDisposition<'a> {
@@ -521,6 +520,26 @@ pub struct HandleDisposition<'a> {
 }
 
 static_assertions::assert_eq_size!(HandleDisposition<'_>, sys::zx_handle_disposition_t);
+static_assertions::const_assert_eq!(
+    std::mem::offset_of!(HandleDisposition<'_>, operation),
+    std::mem::offset_of!(sys::zx_handle_disposition_t, operation)
+);
+static_assertions::const_assert_eq!(
+    std::mem::offset_of!(HandleDisposition<'_>, handle),
+    std::mem::offset_of!(sys::zx_handle_disposition_t, handle)
+);
+static_assertions::const_assert_eq!(
+    std::mem::offset_of!(HandleDisposition<'_>, object_type),
+    std::mem::offset_of!(sys::zx_handle_disposition_t, type_)
+);
+static_assertions::const_assert_eq!(
+    std::mem::offset_of!(HandleDisposition<'_>, rights),
+    std::mem::offset_of!(sys::zx_handle_disposition_t, rights)
+);
+static_assertions::const_assert_eq!(
+    std::mem::offset_of!(HandleDisposition<'_>, result),
+    std::mem::offset_of!(sys::zx_handle_disposition_t, result)
+);
 
 impl<'a> HandleDisposition<'a> {
     pub fn new(
@@ -618,6 +637,22 @@ pub struct HandleInfo {
 }
 
 static_assertions::assert_eq_size!(HandleInfo, sys::zx_handle_info_t);
+static_assertions::const_assert_eq!(
+    std::mem::offset_of!(HandleInfo, handle),
+    std::mem::offset_of!(sys::zx_handle_info_t, handle)
+);
+static_assertions::const_assert_eq!(
+    std::mem::offset_of!(HandleInfo, object_type),
+    std::mem::offset_of!(sys::zx_handle_info_t, ty)
+);
+static_assertions::const_assert_eq!(
+    std::mem::offset_of!(HandleInfo, rights),
+    std::mem::offset_of!(sys::zx_handle_info_t, rights)
+);
+static_assertions::const_assert_eq!(
+    std::mem::offset_of!(HandleInfo, _unused),
+    std::mem::offset_of!(sys::zx_handle_info_t, unused)
+);
 
 impl HandleInfo {
     /// Make a new `HandleInfo`.
