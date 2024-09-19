@@ -126,21 +126,22 @@ async fn main() -> Result<(), Error> {
             .unwrap();
     }
     if config.data_filesystem_format == "fxfs" {
-        svc_dir
-            .add_entry(
-                fidl_fuchsia_fxfs::CryptManagementMarker::PROTOCOL_NAME,
-                vfs::service::endpoint(move |_scope, server_end| {
-                    crypt_service_exposed_dir
-                        .as_ref_directory()
-                        .open(
-                            fidl_fuchsia_fxfs::CryptManagementMarker::PROTOCOL_NAME,
-                            fio::OpenFlags::empty(),
-                            server_end.into(),
-                        )
-                        .unwrap();
-                }),
-            )
-            .unwrap();
+        if let Some(dir) = crypt_service_exposed_dir {
+            svc_dir
+                .add_entry(
+                    fidl_fuchsia_fxfs::CryptManagementMarker::PROTOCOL_NAME,
+                    vfs::service::endpoint(move |_scope, server_end| {
+                        dir.as_ref_directory()
+                            .open(
+                                fidl_fuchsia_fxfs::CryptManagementMarker::PROTOCOL_NAME,
+                                fio::OpenFlags::empty(),
+                                server_end.into(),
+                            )
+                            .unwrap();
+                    }),
+                )
+                .unwrap();
+        }
     }
     export.add_entry("svc", svc_dir).unwrap();
 

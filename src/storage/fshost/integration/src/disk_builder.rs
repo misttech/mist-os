@@ -8,7 +8,7 @@ use delivery_blob::{delivery_blob_path, CompressionMode, Type1Blob};
 use device_watcher::{recursive_wait_and_open, recursive_wait_and_open_directory};
 use fidl::endpoints::{create_proxy, Proxy as _, ServerEnd};
 use fidl_fuchsia_device::{ControllerMarker, ControllerProxy};
-use fidl_fuchsia_fs_startup::MountOptions;
+use fidl_fuchsia_fs_startup::{CreateOptions, MountOptions};
 use fidl_fuchsia_fxfs::{BlobCreatorProxy, CryptManagementMarker, CryptMarker, KeyPurpose};
 use fidl_fuchsia_hardware_block::BlockMarker;
 use fs_management::filesystem::ServingMultiVolumeFilesystem;
@@ -385,7 +385,11 @@ impl DiskBuilder {
         fxfs.format().await.expect("format failed");
         let mut fs = fxfs.serve_multi_volume().await.expect("serve_multi_volume failed");
         let blob_volume = fs
-            .create_volume("blob", MountOptions { as_blob: Some(true), ..MountOptions::default() })
+            .create_volume(
+                "blob",
+                CreateOptions::default(),
+                MountOptions { as_blob: Some(true), ..MountOptions::default() },
+            )
             .await
             .expect("failed to create blob volume");
         let blob_creator = connect_to_protocol_at_dir_svc::<fidl_fuchsia_fxfs::BlobCreatorMarker>(
@@ -622,7 +626,7 @@ impl DiskBuilder {
 
         let vol = {
             let vol = fs
-                .create_volume("unencrypted", MountOptions::default())
+                .create_volume("unencrypted", CreateOptions::default(), MountOptions::default())
                 .await
                 .expect("create_volume failed");
             vol.bind_to_path("/unencrypted_volume").unwrap();
@@ -648,6 +652,7 @@ impl DiskBuilder {
             );
             fs.create_volume(
                 "data",
+                CreateOptions::default(),
                 MountOptions { crypt: crypt_service, ..MountOptions::default() },
             )
             .await

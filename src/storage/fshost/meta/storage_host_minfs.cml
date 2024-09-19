@@ -1,0 +1,109 @@
+// Copyright 2024 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    include: [ "inspect/offer.shard.cml" ],
+    children: [
+        {
+            name: "storage_host",
+            url: "#meta/storage-host.cm",
+            startup: "eager",
+        },
+        {
+            name: "fvm",
+            url: "#meta/fvm2.cm",
+        },
+    ],
+    capabilities: [
+        {
+            directory: "blob",
+            rights: [ "rw*" ],
+            path: "/fs/blob/root",
+        },
+        {
+            directory: "blob-exec",
+            rights: [
+                "execute",
+                "rw*",
+            ],
+            path: "/fs/blob/root",
+        },
+        {
+            protocol: [ "fuchsia.update.verify.BlobfsVerifier" ],
+        },
+        {
+            protocol: "fuchsia.fxfs.BlobCreator",
+            path: "/fs/blob/svc/fuchsia.fxfs.BlobCreator",
+        },
+        {
+            protocol: "fuchsia.fxfs.BlobReader",
+            path: "/fs/blob/svc/fuchsia.fxfs.BlobReader",
+        },
+    ],
+    use: [
+        {
+            protocol: "fuchsia.storagehost.StorageHost",
+            from: "#storage_host",
+        },
+        {
+            directory: "partitions",
+            from: "#storage_host",
+            rights: [ "rw*" ],
+            path: "/partitions",
+        },
+        {
+            protocol: "fuchsia.component.Realm",
+            from: "framework",
+        },
+    ],
+    offer: [
+        {
+            protocol: [ "fuchsia.logger.LogSink" ],
+            from: "parent",
+            to: [
+                "#fvm",
+                "#storage_host",
+            ],
+        },
+        {
+            protocol: [ "fuchsia.tracing.provider.Registry" ],
+            from: "parent",
+            to: [ "#storage_host" ],
+            availability: "optional",
+        },
+    ],
+    expose: [
+        {
+            directory: [
+                "blob",
+                "blob-exec",
+            ],
+            from: "self",
+        },
+        {
+            directory: "partitions",
+            from: "#storage_host",
+        },
+        {
+            directory: "volumes",
+            from: "#fvm",
+        },
+        {
+            protocol: "fuchsia.fs.startup.Volumes",
+            from: "#fvm",
+        },
+        {
+            protocol: "fuchsia.update.verify.BlobfsVerifier",
+            from: "self",
+        },
+        {
+            protocol: "fuchsia.fxfs.BlobCreator",
+            from: "self",
+        },
+        {
+            protocol: "fuchsia.fxfs.BlobReader",
+            from: "self",
+            availability: "same_as_target",
+        },
+    ],
+}

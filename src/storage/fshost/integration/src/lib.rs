@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use assert_matches::assert_matches;
 use fidl::endpoints::{create_proxy, ServerEnd};
 use fidl_fuchsia_fxfs::BlobReaderMarker;
 use fuchsia_component::client::connect_to_protocol_at_dir_root;
@@ -167,6 +168,7 @@ impl TestFixtureBuilder {
             ramdisk_vmo: None,
             crash_reports,
             torn_down: TornDown(false),
+            ignore_crash_reports: false,
         };
 
         tracing::info!(
@@ -205,13 +207,18 @@ pub struct TestFixture {
     pub ramdisk_vmo: Option<zx::Vmo>,
     pub crash_reports: mpsc::Receiver<ffeedback::CrashReport>,
     torn_down: TornDown,
+    ignore_crash_reports: bool,
 }
 
 impl TestFixture {
     pub async fn tear_down(mut self) {
         tracing::info!(realm_name = ?self.realm.root.child_name(), "tearing down");
+        // Check the crash reports before destroying the realm because tearing down the realm can
+        // cause mounting errors that trigger a crash report.
+        if !self.ignore_crash_reports {
+            assert_matches!(self.crash_reports.try_next(), Ok(None) | Err(_));
+        }
         self.realm.destroy().await.unwrap();
-        assert_eq!(self.crash_reports.next().await, None);
         self.torn_down.0 = true;
     }
 
@@ -362,10 +369,16 @@ impl TestFixture {
         expected_program: &'_ str,
         expected_signature: &'_ str,
     ) {
+        tracing::info!("Waiting for {count} crash reports");
         for _ in 0..count {
             let report = self.crash_reports.next().await.expect("Sender closed");
             assert_eq!(report.program_name.as_deref(), Some(expected_program));
             assert_eq!(report.crash_signature.as_deref(), Some(expected_signature));
         }
+    }
+
+    /// Ignore crash reports when tearing down the fixture.
+    pub fn ignore_crash_reports(&mut self) {
+        self.ignore_crash_reports = true;
     }
 }

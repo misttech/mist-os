@@ -20,6 +20,7 @@ use fshost_test_fixture::{
 use fuchsia_component::client::connect_to_named_protocol_at_dir_root;
 use fuchsia_zircon::{self as zx, HandleBased};
 use futures::FutureExt;
+use regex::Regex;
 use {fidl_fuchsia_fshost as fshost, fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
 #[cfg(feature = "fxfs")]
@@ -149,10 +150,21 @@ async fn data_formatted_no_fuchsia_boot() {
 async fn data_formatted_with_small_initial_volume() {
     let mut builder = new_builder();
     builder.with_disk().format_volumes(volumes_spec()).data_volume_size(1);
-    let fixture = builder.build().await;
+
+    #[allow(unused_mut)]
+    let mut fixture = builder.build().await;
 
     fixture.check_fs_type("blob", blob_fs_type()).await;
     fixture.check_fs_type("data", data_fs_type()).await;
+
+    // With the storage-host configuration, the FVM driver is responsible for mounting the data
+    // volume, and we use the error code returned to decide whether to generate a crash report.
+    // Specifically, we look for the `WRONG_TYPE` error code and if we get that, we assume it's most
+    // likely due to FDR or flashing.  In this test, the error is something other than `WRONG_TYPE`
+    // so it generates a crash report, which is arguably the right thing to do, but you won't get a
+    // crash report for the non storage-host configuration or for fxfs.
+    #[cfg(all(feature = "storage-host", not(feature = "fxfs")))]
+    fixture.ignore_crash_reports();
 
     fixture.tear_down().await;
 }
@@ -167,10 +179,21 @@ async fn data_formatted_with_small_initial_volume_big_target() {
         fshost_test_fixture::disk_builder::DEFAULT_DISK_SIZE * 2,
     );
     builder.with_disk().format_volumes(volumes_spec()).data_volume_size(1);
-    let fixture = builder.build().await;
+
+    #[allow(unused_mut)]
+    let mut fixture = builder.build().await;
 
     fixture.check_fs_type("blob", blob_fs_type()).await;
     fixture.check_fs_type("data", data_fs_type()).await;
+
+    // With the storage-host configuration, the FVM driver is responsible for mounting the data
+    // volume, and we use the error code returned to decide whether to generate a crash report.
+    // Specifically, we look for the `WRONG_TYPE` error code and if we get that, we assume it's most
+    // likely due to FDR or flashing.  In this test, the error is something other than `WRONG_TYPE`
+    // so it generates a crash report, which is arguably the right thing to do, but you won't get a
+    // crash report for the non storage-host configuration or for fxfs.
+    #[cfg(all(feature = "storage-host", not(feature = "fxfs")))]
+    fixture.ignore_crash_reports();
 
     fixture.tear_down().await;
 }
@@ -233,6 +256,8 @@ async fn ramdisk_blob_and_data_mounted_no_existing_data_partition() {
 }
 
 #[fuchsia::test]
+// TODO(https://fxbug.dev/339491886): Make this work with storage-host.
+#[cfg_attr(feature = "storage-host", ignore)]
 async fn ramdisk_data_ignores_non_ramdisk() {
     let mut builder = new_builder();
     builder.fshost().set_config_value("ramdisk_image", true);
@@ -270,7 +295,8 @@ async fn ramdisk_data_ignores_non_ramdisk() {
 }
 
 #[fuchsia::test]
-#[cfg_attr(feature = "fxblob", ignore)]
+// TODO(https://fxbug.dev/339491886): Make this work with storage-host.
+#[cfg_attr(any(feature = "fxblob", feature = "storage-host"), ignore)]
 async fn partition_max_size_set() {
     let mut builder = new_builder();
     builder
@@ -463,6 +489,8 @@ async fn tmp_is_available() {
 }
 
 #[fuchsia::test]
+// TODO(https://fxbug.dev/339491886): Make this work with storage-host.
+#[cfg_attr(feature = "storage-host", ignore)]
 async fn netboot_set() {
     // Set the netboot flag
     let mut builder = new_builder().netboot();
@@ -511,7 +539,8 @@ async fn ramdisk_image_serves_zbi_ramdisk_contents_with_unformatted_data() {
 
 // Test that fshost handles the case where the FVM is within a GPT partition.
 #[fuchsia::test]
-#[cfg_attr(feature = "fxblob", ignore)]
+// TODO(https://fxbug.dev/339491886): port to storage-host
+#[cfg_attr(any(feature = "fxblob", feature = "storage-host"), ignore)]
 async fn fvm_within_gpt() {
     let mut builder = new_builder();
     builder.with_disk().format_volumes(volumes_spec()).with_gpt().format_data(data_fs_spec());
@@ -774,7 +803,8 @@ async fn disable_block_watcher() {
 }
 
 #[fuchsia::test]
-#[cfg_attr(feature = "fxblob", ignore)]
+// TODO(https://fxbug.dev/339491886): Make this work with storage-host.
+#[cfg_attr(any(feature = "fxblob", feature = "storage-host"), ignore)]
 async fn reset_fvm_partitions() {
     let mut builder = new_builder();
     builder.fshost().set_config_value("data_max_bytes", DEFAULT_DATA_VOLUME_SIZE);
@@ -882,20 +912,32 @@ async fn reset_fvm_partitions_no_existing_data_partition() {
     fixture.check_fs_type("blob", blob_fs_type()).await;
     fixture.check_fs_type("data", data_fs_type()).await;
 
-    let fvm_proxy = fuchsia_fs::directory::open_directory_deprecated(
-        &fixture.dir("dev-topological", fio::OpenFlags::empty()),
-        "sys/platform/ram-disk/ramctl/ramdisk-0/block/fvm",
-        fio::OpenFlags::empty(),
-    )
-    .await
-    .expect("Failed to open the fvm");
+    let volumes_dir;
+    let expected;
+    #[cfg(feature = "storage-host")]
+    {
+        volumes_dir = fixture.dir("volumes", fio::OpenFlags::empty());
+        expected = [r"^blobfs$", r"^data$"];
+    }
+    #[cfg(not(feature = "storage-host"))]
+    {
+        volumes_dir = fuchsia_fs::directory::open_directory_deprecated(
+            &fixture.dir("dev-topological", fio::OpenFlags::empty()),
+            "sys/platform/ram-disk/ramctl/ramdisk-0/block/fvm",
+            fio::OpenFlags::empty(),
+        )
+        .await
+        .expect("Failed to open the fvm");
+        expected = [r"^blobfs", r"data", r"^device_controller$", r"^device_protocol$"];
+    }
+
+    let mut expected: Vec<_> = expected.into_iter().map(|r| Regex::new(r).unwrap()).collect();
 
     // Ensure that the account and virtualization partitions were successfully destroyed. The
     // partitions are removed from devfs asynchronously, so use a timeout.
     let start_time = std::time::Instant::now();
-    let mut dir_entries = fuchsia_fs::directory::readdir(&fvm_proxy)
-        .await
-        .expect("Failed to readdir the fvm DirectoryProxy");
+    let mut dir_entries =
+        fuchsia_fs::directory::readdir(&volumes_dir).await.expect("Failed to readdir the volumes");
     while dir_entries
         .iter()
         .find(|x| x.name.contains("account") || x.name.contains("virtualization"))
@@ -906,25 +948,19 @@ async fn reset_fvm_partitions_no_existing_data_partition() {
             panic!("The account or virtualization partition still exists in devfs after 30 secs");
         }
         std::thread::sleep(std::time::Duration::from_secs(1));
-        dir_entries = fuchsia_fs::directory::readdir(&fvm_proxy)
+        dir_entries = fuchsia_fs::directory::readdir(&volumes_dir)
             .await
             .expect("Failed to readdir the fvm DirectoryProxy");
     }
-    let mut count = 0;
-    let mut data_name = "".to_string();
     for entry in dir_entries {
         let name = entry.name;
-        if name.contains("blobfs") || name.contains("device") {
-            count += 1;
-        } else if name.contains("data") {
-            data_name = name;
-            count += 1;
-        } else {
-            panic!("Unexpected entry name: {name}");
-        }
+        let position = expected
+            .iter()
+            .position(|r| r.is_match(&name))
+            .unwrap_or_else(|| panic!("Unexpected entry name: {name}"));
+        expected.swap_remove(position);
     }
-    assert_eq!(count, 4);
-    assert_ne!(&data_name, "");
+    assert!(expected.is_empty(), "Missing {expected:?}");
 
     fixture.tear_down().await;
 }
@@ -932,7 +968,8 @@ async fn reset_fvm_partitions_no_existing_data_partition() {
 // Toggle migration mode
 
 #[fuchsia::test]
-#[cfg_attr(feature = "fxblob", ignore)]
+// TODO(https://fxbug.dev/339491886): port to storage-host
+#[cfg_attr(any(feature = "fxblob", feature = "storage-host"), ignore)]
 async fn migration_toggle() {
     let mut builder = new_builder();
     builder
@@ -963,7 +1000,8 @@ async fn migration_toggle() {
 }
 
 #[fuchsia::test]
-#[cfg_attr(feature = "fxblob", ignore)]
+// TODO(https://fxbug.dev/339491886): port to storage-host
+#[cfg_attr(any(feature = "fxblob", feature = "storage-host"), ignore)]
 async fn migration_to_fxfs() {
     let mut builder = new_builder();
     builder
@@ -984,7 +1022,8 @@ async fn migration_to_fxfs() {
 }
 
 #[fuchsia::test]
-#[cfg_attr(feature = "fxblob", ignore)]
+// TODO(https://fxbug.dev/339491886): port to storage-host
+#[cfg_attr(any(feature = "fxblob", feature = "storage-host"), ignore)]
 async fn migration_to_minfs() {
     let mut builder = new_builder();
     builder

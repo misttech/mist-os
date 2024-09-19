@@ -14,21 +14,25 @@ use block_server::{BlockServer, PartitionInfo};
 use device::{Device, VmoIdWrapper};
 use fidl::endpoints::{ClientEnd, DiscoverableProtocolMarker, ServerEnd};
 use fidl_fuchsia_fs_startup::{
-    CreateOptions, MountOptions, StartOptions, StartupMarker, StartupRequest, StartupRequestStream,
-    VolumeRequest, VolumeRequestStream, VolumesMarker, VolumesRequest, VolumesRequestStream,
+    CompressionAlgorithm, CreateOptions, EvictionPolicyOverride, FormatOptions, MountOptions,
+    StartOptions, StartupMarker, StartupRequest, StartupRequestStream, VolumeRequest,
+    VolumeRequestStream, VolumesMarker, VolumesRequest, VolumesRequestStream,
 };
 use fidl_fuchsia_hardware_block::BlockMarker;
+use fs_management::filesystem::{BlockConnector, Filesystem};
+use fs_management::{ComponentType, FSConfig, Options};
 use fuchsia_runtime::HandleType;
 use futures::future::try_join_all;
 use futures::stream::TryStreamExt;
 use mapping::{Mapping, MappingExt as _};
+use regex::Regex;
 use sha2::{Digest, Sha256};
 use std::borrow::Cow;
 use std::collections::{BTreeMap, HashMap};
 use std::fmt::Formatter;
 use std::future::Future;
 use std::sync::{Arc, Mutex};
-use tracing::{debug, error, warn};
+use tracing::{debug, error, info, warn};
 use uuid::Uuid;
 use vfs::directory::entry_container::Directory;
 use vfs::directory::helper::DirectlyMutable;
@@ -240,7 +244,6 @@ impl Metadata {
         ];
         let (header, _) = Header::mut_from_prefix(&mut buffer).unwrap();
         *header = self.header;
-        header.generation += 1;
         header.hash.fill(0);
 
         // Write out the partitions:
@@ -396,6 +399,11 @@ impl Fvm {
                 warn!("Duplicate slice entry: 0x{:x?}", allocation.0);
             }
         }
+
+        info!(
+            "Mounted fvm, partitions: {:?}",
+            metadata.partitions.iter().map(|(_, e)| e.name()).collect::<Vec<_>>()
+        );
 
         Ok(Self {
             device: Arc::new(Device::new(client)),
@@ -791,12 +799,12 @@ impl Component {
                     responder.send(Err(zx::Status::NOT_SUPPORTED.into_raw()))?;
                 }
                 VolumeRequest::Mount { responder, outgoing_directory, options } => responder.send(
-                    self.handle_mount(partition_index, outgoing_directory, options).await.map_err(
-                        |error| {
+                    self.handle_mount(partition_index, outgoing_directory, options, false)
+                        .await
+                        .map_err(|error| {
                             error!(?error, partition_index, "Failed to mount volume");
                             map_to_raw_status(error)
-                        },
-                    ),
+                        }),
                 )?,
                 VolumeRequest::SetLimit { responder, bytes } => {
                     let fvm = self.fvm();
@@ -821,23 +829,9 @@ impl Component {
         self: &Arc<Self>,
         partition_index: u16,
         server_end: ServerEnd<fio::DirectoryMarker>,
-        _options: MountOptions,
+        options: MountOptions,
+        format: bool,
     ) -> Result<(), Error> {
-        let outgoing_dir = vfs::directory::immutable::simple();
-        let svc_dir = vfs::directory::immutable::simple();
-        outgoing_dir.add_entry("svc", svc_dir.clone())?;
-        let weak = Arc::downgrade(self);
-        svc_dir.add_entry(
-            fvolume::VolumeMarker::PROTOCOL_NAME,
-            vfs::service::host(move |requests| {
-                let weak = weak.clone();
-                async move {
-                    if let Some(me) = weak.upgrade() {
-                        let _ = me.handle_volume(partition_index, requests).await;
-                    }
-                }
-            }),
-        )?;
         let fvm = self.fvm();
         let partition_info = {
             let inner = fvm.inner.read().await;
@@ -851,22 +845,106 @@ impl Component {
                 name: partition.name().to_string(),
             }
         };
-        self.mounted.lock().unwrap().insert(
-            partition_index,
-            Arc::new(BlockServer::new(
-                partition_info,
-                Arc::new(PartitionInterface { partition_index, fvm }),
-            )),
-        );
-        outgoing_dir.open(
-            self.scope.clone(),
-            fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::RIGHT_WRITABLE
-                | fio::OpenFlags::DIRECTORY
-                | fio::OpenFlags::RIGHT_EXECUTABLE,
-            Path::dot(),
-            server_end.into_channel().into(),
-        );
+
+        let block_server = Arc::new(BlockServer::new(
+            partition_info,
+            Arc::new(PartitionInterface { partition_index, fvm }),
+        ));
+        let server_end = server_end.into_channel().into();
+
+        if let Some(uri) = options.uri {
+            // For now we only support URIs of the form: "#meta/<component_name>.cm".
+            let re = Regex::new(r"^#meta/(.*)\.cm$").unwrap();
+            let Some(caps) = re.captures(&uri) else { bail!(zx::Status::INVALID_ARGS) };
+
+            struct ComponentName(String);
+            impl FSConfig for ComponentName {
+                fn options(&self) -> Options<'_> {
+                    Options {
+                        component_name: &self.0,
+                        reuse_component_after_serving: false,
+                        format_options: FormatOptions::default(),
+                        start_options: StartOptions {
+                            read_only: false,
+                            verbose: false,
+                            fsck_after_every_transaction: false,
+                            write_compression_level: -1,
+                            write_compression_algorithm: CompressionAlgorithm::ZstdChunked,
+                            cache_eviction_policy_override: EvictionPolicyOverride::None,
+                            startup_profiling_seconds: 0,
+                        },
+                        component_type: ComponentType::default(),
+                    }
+                }
+            }
+
+            struct Server(ExecutionScope, Arc<BlockServer<SessionManager<PartitionInterface>>>);
+
+            impl BlockConnector for Server {
+                fn connect_volume(&self) -> Result<ClientEnd<fvolume::VolumeMarker>, Error> {
+                    let (client, stream) = fidl::endpoints::create_request_stream()?;
+                    let block_server = self.1.clone();
+                    self.0.spawn(async move {
+                        let _ = block_server.handle_requests(stream).await;
+                    });
+                    Ok(client)
+                }
+            }
+
+            let mut fs = Filesystem::new(
+                Server(self.scope.clone(), block_server.clone()),
+                ComponentName(caps[1].to_string()),
+            );
+
+            if format {
+                fs.format().await?;
+            }
+
+            // TODO(https://fxbug.dev/357467643): Support properly shutting down the filesystem.
+            // For now, just leak the mounted filesystem.
+            let exposed_dir = fs.serve().await?.take_exposed_dir();
+
+            self.mounted.lock().unwrap().insert(partition_index, block_server);
+
+            let _ = exposed_dir.open(
+                fio::OpenFlags::RIGHT_READABLE
+                    | fio::OpenFlags::POSIX_EXECUTABLE
+                    | fio::OpenFlags::POSIX_WRITABLE,
+                fio::ModeType::empty(),
+                ".",
+                server_end,
+            );
+        } else {
+            // Expose the volume as a block device.
+            let outgoing_dir = vfs::directory::immutable::simple();
+            let svc_dir = vfs::directory::immutable::simple();
+            outgoing_dir.add_entry("svc", svc_dir.clone())?;
+            let weak = Arc::downgrade(self);
+            svc_dir.add_entry(
+                fvolume::VolumeMarker::PROTOCOL_NAME,
+                vfs::service::host(move |requests| {
+                    let weak = weak.clone();
+                    async move {
+                        if let Some(me) = weak.upgrade() {
+                            let _ = me.handle_volume(partition_index, requests).await;
+                        }
+                    }
+                }),
+            )?;
+
+            self.mounted.lock().unwrap().insert(partition_index, block_server.clone());
+
+            outgoing_dir.open(
+                self.scope.clone(),
+                fio::OpenFlags::RIGHT_READABLE
+                    | fio::OpenFlags::RIGHT_WRITABLE
+                    | fio::OpenFlags::DIRECTORY
+                    | fio::OpenFlags::RIGHT_EXECUTABLE,
+                Path::dot(),
+                server_end,
+            );
+        }
+
         Ok(())
     }
 
@@ -889,6 +967,7 @@ impl Component {
         let fvm = self.fvm.lock().unwrap().as_ref().unwrap().clone();
         let inner = fvm.inner.upgradable_read().await;
         let Some(type_guid) = create_options.type_guid else {
+            warn!("Unable to create volume; missing type GUID");
             bail!(zx::Status::INVALID_ARGS);
         };
         let guid = create_options.guid.unwrap_or_else(|| Uuid::new_v4().to_bytes_le());
@@ -906,7 +985,7 @@ impl Component {
         async move {
             self.add_volume_to_volumes_directory(partition_index, name)?;
 
-            self.handle_mount(partition_index, outgoing_directory, mount_options).await
+            self.handle_mount(partition_index, outgoing_directory, mount_options, true).await
         }
         .await
         .map_err(|error| {

@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::device::BlockDevice;
-use crate::environment::{Filesystem, FilesystemLauncher};
+use crate::environment::{Container, Filesystem, FilesystemLauncher, FxfsContainer};
 use anyhow::{Context, Error, Result};
 use fidl_fuchsia_device::ControllerProxy;
 use fs_management::filesystem::ServingMultiVolumeFilesystem;
@@ -69,9 +69,10 @@ pub async fn mount_or_format_data(
             .await
             .context("failed to make new device")?,
     );
-    let mut filesystem = launcher.serve_fxblob(device.as_mut()).await.context("serving Fxblob")?;
-    let data =
-        launcher.serve_data_fxblob(&mut filesystem).await.context("serving data from Fxblob")?;
+    let mut container = Box::new(FxfsContainer::new(
+        launcher.serve_fxblob(device.as_mut()).await.context("serving Fxblob")?,
+    ));
+    let data = container.serve_data(&launcher).await.context("serving data from Fxblob")?;
 
-    Ok((filesystem, data))
+    Ok((container.into_fs(), data))
 }

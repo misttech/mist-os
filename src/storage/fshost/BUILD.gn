@@ -92,6 +92,8 @@ rustc_binary("fshost") {
     "src/device.rs",
     "src/device/constants.rs",
     "src/environment.rs",
+    "src/environment/fvm_container.rs",
+    "src/environment/fxfs_container.rs",
     "src/fxblob.rs",
     "src/inspect.rs",
     "src/main.rs",

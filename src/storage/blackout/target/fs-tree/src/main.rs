@@ -8,7 +8,7 @@ use blackout_target::static_tree::{DirectoryEntry, EntryDistribution};
 use blackout_target::{Test, TestServer};
 use fidl::endpoints::{create_proxy, Proxy as _};
 use fidl_fuchsia_device::{ControllerMarker, ControllerProxy};
-use fidl_fuchsia_fs_startup::MountOptions;
+use fidl_fuchsia_fs_startup::{CreateOptions, MountOptions};
 use fidl_fuchsia_fxfs::{CryptManagementMarker, CryptMarker, KeyPurpose};
 use fidl_fuchsia_hardware_block_volume::VolumeManagerMarker;
 use fs_management::filesystem::{ServingMultiVolumeFilesystem, ServingSingleVolumeFilesystem};
@@ -98,6 +98,7 @@ impl FsTree {
         );
         fs.create_volume(
             "default",
+            CreateOptions::default(),
             MountOptions { crypt: crypt_service, ..MountOptions::default() },
         )
         .await?;

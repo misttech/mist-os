@@ -12,7 +12,7 @@ use diagnostics_reader::{ArchiveReader, Inspect};
 use either::Either;
 use fidl::endpoints::Proxy as _;
 use fidl_fuchsia_device::ControllerMarker;
-use fidl_fuchsia_fs_startup::MountOptions;
+use fidl_fuchsia_fs_startup::{CreateOptions, MountOptions};
 use fidl_fuchsia_fxfs::{CryptManagementMarker, CryptMarker, KeyPurpose};
 use fs_management::filesystem::Filesystem;
 use fs_management::FSConfig;
@@ -188,7 +188,11 @@ impl<FSC: Clone + FSConfig> FsEnvironment<FSC> {
             );
             let mut instance = fs.serve_multi_volume().await.unwrap();
             let vol = instance
-                .create_volume("default", MountOptions { crypt, ..MountOptions::default() })
+                .create_volume(
+                    "default",
+                    CreateOptions::default(),
+                    MountOptions { crypt, ..MountOptions::default() },
+                )
                 .await
                 .unwrap();
             vol.bind_to_path(MOUNT_PATH).unwrap();

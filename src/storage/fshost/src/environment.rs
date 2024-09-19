@@ -2,13 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+mod fvm_container;
+mod fxfs_container;
+
 use crate::copier::recursive_copy;
 use crate::crypt::fxfs::{self, CryptService};
 use crate::crypt::zxcrypt::{UnsealOutcome, ZxcryptDevice};
 use crate::crypt::{get_policy, Policy};
 use crate::device::constants::{
     BLOBFS_PARTITION_LABEL, BLOBFS_TYPE_GUID, DATA_PARTITION_LABEL, DATA_TYPE_GUID,
-    DEFAULT_F2FS_MIN_BYTES, FVM_DRIVER_PATH, LEGACY_DATA_PARTITION_LABEL, ZXCRYPT_DRIVER_PATH,
+    DATA_VOLUME_LABEL, DEFAULT_F2FS_MIN_BYTES, FVM_DRIVER_PATH, LEGACY_DATA_PARTITION_LABEL,
+    UNENCRYPTED_VOLUME_LABEL, ZXCRYPT_DRIVER_PATH,
 };
 use crate::device::{BlockDevice, Device};
 use crate::inspect::register_migration_status;
@@ -24,9 +28,11 @@ use fs_management::filesystem::{
 };
 use fs_management::format::DiskFormat;
 use fs_management::partition::fvm_allocate_partition;
-use fs_management::{Blobfs, ComponentType, F2fs, FSConfig, Fxfs, Minfs};
+use fs_management::{Blobfs, ComponentType, F2fs, FSConfig, Fvm, Fxfs, Minfs};
 use fuchsia_component::client::{connect_to_protocol, connect_to_protocol_at_path};
 use futures::lock::Mutex;
+use fvm_container::FvmContainer;
+pub use fxfs_container::FxfsContainer;
 use std::collections::HashSet;
 use std::sync::Arc;
 use uuid::Uuid;
@@ -60,10 +66,14 @@ pub trait Environment: Send + Sync {
     /// the overall Fxfs instance. Mount_blob_volume and mount_data_volume still need to be called.
     async fn mount_fxblob(&mut self, device: &mut dyn Device) -> Result<(), Error>;
 
-    /// Mounts Fxblob's blob volume on the given device.
+    /// Creates a static instance of Fxfs on `device` and calls serve_multi_volume(). Only creates
+    /// the overall Fvm instance. Mount_blob_volume and mount_data_volume still need to be called.
+    async fn mount_fvm(&mut self, device: &mut dyn Device) -> Result<(), Error>;
+
+    /// Mounts the blob volume on the already mounted container filesystem.
     async fn mount_blob_volume(&mut self) -> Result<(), Error>;
 
-    /// Mounts Fxblob's data volume on the given device.
+    /// Mounts data volume on the already mounted container filesystem.
     async fn mount_data_volume(&mut self) -> Result<(), Error>;
 
     /// Called after the fvm driver is bound. Waits for the block driver to bind itself to the
@@ -121,7 +131,7 @@ pub enum Filesystem {
         ServingMultiVolumeFilesystem,
         String,
     ),
-    ServingVolumeInFxblob(
+    ServingVolumeInMultiVolume(
         // We hold onto crypt service here to avoid it prematurely shutting down.
         #[allow(dead_code)] Option<CryptService>,
         String,
@@ -138,7 +148,7 @@ impl Filesystem {
         }
     }
 
-    pub fn crypt_service(&mut self) -> Result<fio::DirectoryProxy, Error> {
+    pub fn crypt_service(&mut self) -> Result<Option<fio::DirectoryProxy>, Error> {
         let (proxy, server) = create_proxy::<fio::DirectoryMarker>()?;
         match self {
             Filesystem::Queue(queue) => queue.crypt_service_exposed_dir.push(server),
@@ -146,16 +156,17 @@ impl Filesystem {
             Filesystem::ServingMultiVolume(crypt_service, ..) => crypt_service
                 .exposed_dir()
                 .clone(fio::OpenFlags::CLONE_SAME_RIGHTS, server.into_channel().into())?,
-            Filesystem::ServingVolumeInFxblob(crypt_service_option, volume_name, ..) => {
-                crypt_service_option
-                    .as_ref()
-                    .ok_or(anyhow!("volume {} doesn't have a crypt service", volume_name))?
-                    .exposed_dir()
-                    .clone(fio::OpenFlags::CLONE_SAME_RIGHTS, server.into_channel().into())?
+            Filesystem::ServingVolumeInMultiVolume(crypt_service_option, ..) => {
+                match crypt_service_option {
+                    Some(s) => s
+                        .exposed_dir()
+                        .clone(fio::OpenFlags::CLONE_SAME_RIGHTS, server.into_channel().into())?,
+                    None => return Ok(None),
+                }
             }
             Filesystem::Shutdown => bail!(anyhow!("filesystem is shutting down")),
         }
-        Ok(proxy)
+        Ok(Some(proxy))
     }
 
     pub fn exposed_dir(
@@ -173,10 +184,10 @@ impl Filesystem {
                 .ok_or(anyhow!("data volume {} not found", data_volume_name))?
                 .exposed_dir()
                 .clone(fio::OpenFlags::CLONE_SAME_RIGHTS, server.into_channel().into())?,
-            Filesystem::ServingVolumeInFxblob(_, data_volume_name) => serving_fs
+            Filesystem::ServingVolumeInMultiVolume(_, volume_name) => serving_fs
                 .unwrap()
-                .volume(&data_volume_name)
-                .ok_or(anyhow!("data volume {} not found", data_volume_name))?
+                .volume(&volume_name)
+                .ok_or(anyhow!("volume {volume_name} not found"))?
                 .exposed_dir()
                 .clone(fio::OpenFlags::CLONE_SAME_RIGHTS, server.into_channel().into())?,
             Filesystem::Shutdown => bail!(anyhow!("filesystem is shutting down")),
@@ -202,7 +213,7 @@ impl Filesystem {
     pub fn volume(&mut self, volume_name: &str) -> Option<&mut ServingVolume> {
         match self {
             Filesystem::ServingMultiVolume(_, fs, _) => fs.volume_mut(&volume_name),
-            Filesystem::ServingVolumeInFxblob(..) => unreachable!(),
+            Filesystem::ServingVolumeInMultiVolume(..) => unreachable!(),
             _ => None,
         }
     }
@@ -225,7 +236,7 @@ impl Filesystem {
             Filesystem::ServingMultiVolume(_, fs, _) => {
                 fs.shutdown().await.context("shutdown failed")
             }
-            Filesystem::ServingVolumeInFxblob(_, volume_name) => {
+            Filesystem::ServingVolumeInMultiVolume(_, volume_name) => {
                 serving_fs.unwrap().shutdown_volume(&volume_name).await.context("shutdown failed")
             }
             Filesystem::Shutdown => Err(anyhow!("double shutdown!")),
@@ -233,12 +244,99 @@ impl Filesystem {
     }
 }
 
+/// Trait that captures the common interface between different multi-volume filesystems (there
+/// should be concrete implementations for Fxfs and Fvm).
+#[async_trait]
+pub trait Container: Send + Sync {
+    /// Returns fs_management's wrapper around the container filesystem.
+    fn fs(&mut self) -> &mut ServingMultiVolumeFilesystem;
+
+    /// Converts into fs_management's wrapper.
+    fn into_fs(self: Box<Self>) -> ServingMultiVolumeFilesystem;
+
+    /// Returns the label used for the blob volume.
+    fn blobfs_volume_label(&self) -> &'static str;
+
+    /// Called to check the blob volume if required.
+    async fn maybe_check_blob_volume(&mut self) -> Result<(), Error> {
+        // Default to not checking.
+        Ok(())
+    }
+
+    /// Returns the current set of volumes for this container.
+    async fn get_volumes(&mut self) -> Result<Vec<String>, Error> {
+        // We expect the startup protocol to work with fxblob. There are no options for
+        // reformatting the entire fxfs partition now that blobfs is one of the volumes.
+        let volumes_dir = fuchsia_fs::directory::open_directory_deprecated(
+            self.fs().exposed_dir(),
+            "volumes",
+            fuchsia_fs::OpenFlags::empty(),
+        )
+        .await
+        .context("opening volumes directory")?;
+        Ok(fuchsia_fs::directory::readdir(&volumes_dir)
+            .await
+            .context("reading volumes directory")?
+            .into_iter()
+            .map(|e| e.name)
+            .collect())
+    }
+
+    /// Serves the data volume on this container.
+    async fn serve_data(&mut self, launcher: &FilesystemLauncher) -> Result<Filesystem, Error>;
+
+    /// Recreates the data volume.
+    async fn format_data(&mut self, launcher: &FilesystemLauncher) -> Result<Filesystem, Error>;
+
+    /// Typically called by `format_data` implementations to remove all the non-blob volumes.
+    async fn remove_all_non_blob_volumes(&mut self) -> Result<(), Error> {
+        let blobfs_volume_label = self.blobfs_volume_label();
+        let fs = self.fs();
+        let volumes_dir = fuchsia_fs::directory::open_directory_no_describe_deprecated(
+            fs.exposed_dir(),
+            "volumes",
+            fuchsia_fs::OpenFlags::empty(),
+        )?;
+        let volumes = fuchsia_fs::directory::readdir(&volumes_dir).await?;
+        for volume in volumes {
+            if &volume.name != blobfs_volume_label {
+                // Unmount mounted non-blob volumes.
+                if fs.volume(&volume.name).is_some() {
+                    fs.shutdown_volume(&volume.name).await.with_context(|| {
+                        format!("unable to shutdown volume \"{}\" for reformat", volume.name)
+                    })?;
+                }
+                // Remove any non-blob volumes.
+                fs.remove_volume(&volume.name)
+                    .await
+                    .with_context(|| format!("failed to remove volume: {}", volume.name))?;
+            }
+        }
+        Ok(())
+    }
+
+    /// Called to shred the encryption keys for the data volume.
+    async fn shred_data(&mut self) -> Result<(), Error>;
+}
+
+/// This trait exists to make working with `container` easier below and avoid the
+/// somewhat hard to read repeated implementation you see below.
+trait MaybeFs {
+    fn maybe_fs(&mut self) -> Option<&mut ServingMultiVolumeFilesystem>;
+}
+
+impl MaybeFs for Option<Box<dyn Container>> {
+    fn maybe_fs(&mut self) -> Option<&mut ServingMultiVolumeFilesystem> {
+        self.as_mut().map(|c| c.fs())
+    }
+}
+
 /// Implements the Environment trait and keeps track of mounted filesystems.
 pub struct FshostEnvironment {
     config: Arc<fshost_config::Config>,
-    // `fxblob` is set inside mount_fxblob() and represents the overall Fxfs instance which
-    // contains both a data and blob volume.
-    fxblob: Option<ServingMultiVolumeFilesystem>,
+    // `container` is set inside mount_fxblob() or mount_fvm() and represents the overall
+    // Fxfs/Fvm instance which contains both a data and blob volume.
+    container: Option<Box<dyn Container>>,
     blobfs: Filesystem,
     data: Filesystem,
     fvm: Option<(/*topological_path*/ String, /*device_directory*/ fio::DirectoryProxy)>,
@@ -258,7 +356,7 @@ impl FshostEnvironment {
     ) -> Self {
         Self {
             config: config.clone(),
-            fxblob: None,
+            container: None,
             blobfs: Filesystem::Queue(FilesystemQueue::default()),
             data: Filesystem::Queue(FilesystemQueue::default()),
             fvm: None,
@@ -282,26 +380,26 @@ impl FshostEnvironment {
     /// Returns a proxy for the exposed dir of the Blobfs filesystem.  This can be called before
     /// Blobfs is mounted and it will get routed once Blobfs is mounted.
     pub fn blobfs_exposed_dir(&mut self) -> Result<fio::DirectoryProxy, Error> {
-        self.blobfs.exposed_dir(self.fxblob.as_mut())
+        self.blobfs.exposed_dir(self.container.maybe_fs())
     }
 
     /// Returns a proxy for the exposed dir of the data filesystem.  This can be called before
     /// "/data" is mounted and it will get routed once the data partition is mounted.
     pub fn data_exposed_dir(&mut self) -> Result<fio::DirectoryProxy, Error> {
-        self.data.exposed_dir(self.fxblob.as_mut())
+        self.data.exposed_dir(self.container.maybe_fs())
     }
 
     /// Returns a proxy for the exposed dir of the data filesystem's crypt service. This can be
     /// called before "/data" is mounted and it will get routed once the data partition is
     /// mounted and the crypt service becomes available. Fails for single volume filesystems.
-    pub fn crypt_service_exposed_dir(&mut self) -> Result<fio::DirectoryProxy, Error> {
+    pub fn crypt_service_exposed_dir(&mut self) -> Result<Option<fio::DirectoryProxy>, Error> {
         self.data.crypt_service()
     }
 
     /// Returns a proxy for the root of the data filesystem.  This can be called before "/data" is
     /// mounted and it will get routed once the data partition is mounted.
     pub fn data_root(&mut self) -> Result<fio::DirectoryProxy, Error> {
-        self.data.root(self.fxblob.as_mut())
+        self.data.root(self.container.maybe_fs())
     }
 
     pub fn launcher(&self) -> Arc<FilesystemLauncher> {
@@ -658,21 +756,39 @@ impl Environment for FshostEnvironment {
             "Mounting fxblob"
         );
         let serving_fs = self.launcher.serve_fxblob(device).await?;
-        self.fxblob = Some(serving_fs);
+        self.container = Some(Box::new(FxfsContainer::new(serving_fs)));
+        Ok(())
+    }
+
+    async fn mount_fvm(&mut self, device: &mut dyn Device) -> Result<(), Error> {
+        tracing::info!(
+            path = %device.path(),
+            expected_format = "fvm",
+            "Mounting fvm"
+        );
+        let serving_fs = self.launcher.serve_fvm(device).await?;
+        self.container = Some(Box::new(FvmContainer::new(serving_fs)));
         Ok(())
     }
 
     async fn mount_blob_volume(&mut self) -> Result<(), Error> {
         let _ = self.blobfs.queue().ok_or_else(|| anyhow!("blobfs partition already mounted"))?;
 
-        let multi_vol_fs =
-            self.fxblob.as_mut().ok_or_else(|| anyhow!("ServingMultiVolumeFilesystem is None"))?;
-        let () = multi_vol_fs
-            .check_volume("blob", None)
-            .await
-            .context("Failed to verify the blob volume")?;
-        let blobfs = multi_vol_fs
-            .open_volume("blob", MountOptions { as_blob: Some(true), ..MountOptions::default() })
+        let container = self.container.as_mut().ok_or_else(|| anyhow!("Missing container!"))?;
+
+        container.maybe_check_blob_volume().await?;
+
+        let label = container.blobfs_volume_label();
+        let blobfs = container
+            .fs()
+            .open_volume(
+                label,
+                MountOptions {
+                    as_blob: Some(true),
+                    uri: Some(format!("#meta/blobfs.cm")),
+                    ..MountOptions::default()
+                },
+            )
             .await
             .context("Failed to open the blob volume")?;
         let exposed_dir = blobfs.exposed_dir();
@@ -680,8 +796,8 @@ impl Environment for FshostEnvironment {
         for server in queue.exposed_dir_queue.drain(..) {
             exposed_dir.clone(fio::OpenFlags::CLONE_SAME_RIGHTS, server.into_channel().into())?;
         }
-        self.blobfs = Filesystem::ServingVolumeInFxblob(None, "blob".to_string());
-        if let Err(e) = multi_vol_fs.set_byte_limit("blob", self.config.blobfs_max_bytes).await {
+        self.blobfs = Filesystem::ServingVolumeInMultiVolume(None, label.to_string());
+        if let Err(e) = container.fs().set_byte_limit(label, self.config.blobfs_max_bytes).await {
             tracing::warn!("Failed to set byte limit for the blob volume: {:?}", e);
         }
         Ok(())
@@ -690,21 +806,23 @@ impl Environment for FshostEnvironment {
     async fn mount_data_volume(&mut self) -> Result<(), Error> {
         let _ = self.data.queue().ok_or_else(|| anyhow!("data partition already mounted"))?;
 
-        let multi_vol_fs =
-            self.fxblob.as_mut().ok_or_else(|| anyhow!("ServingMultiVolumeFilesystem is None"))?;
-        let mut filesystem = self.launcher.serve_data_fxblob(multi_vol_fs).await?;
-        if let Err(e) = multi_vol_fs.set_byte_limit("data", self.config.data_max_bytes).await {
+        let container = self.container.as_mut().ok_or_else(|| anyhow!("Missing container!"))?;
+        let mut filesystem = container.serve_data(&self.launcher).await?;
+        if let Err(e) =
+            container.fs().set_byte_limit(DATA_VOLUME_LABEL, self.config.data_max_bytes).await
+        {
             tracing::warn!("Failed to set byte limit for the data volume: {:?}", e);
         }
         let queue = self.data.queue().unwrap();
-        let exposed_dir = filesystem.exposed_dir(self.fxblob.as_mut())?;
-        let crypt_service_exposed_dir = filesystem.crypt_service()?;
+        let exposed_dir = filesystem.exposed_dir(Some(container.fs()))?;
         for server in queue.exposed_dir_queue.drain(..) {
             exposed_dir.clone(fio::OpenFlags::CLONE_SAME_RIGHTS, server.into_channel().into())?;
         }
-        for server in queue.crypt_service_exposed_dir.drain(..) {
-            crypt_service_exposed_dir
-                .clone(fio::OpenFlags::CLONE_SAME_RIGHTS, server.into_channel().into())?;
+        if let Some(crypt_service) = filesystem.crypt_service()? {
+            for server in queue.crypt_service_exposed_dir.drain(..) {
+                crypt_service
+                    .clone(fio::OpenFlags::CLONE_SAME_RIGHTS, server.into_channel().into())?;
+            }
         }
         self.data = filesystem;
         Ok(())
@@ -860,11 +978,14 @@ impl Environment for FshostEnvironment {
             exposed_dir.clone(fio::OpenFlags::CLONE_SAME_RIGHTS, server.into_channel().into())?;
         }
         match &filesystem {
-            Filesystem::ServingMultiVolume(..) | Filesystem::ServingVolumeInFxblob(..) => {
-                let crypt_service_exposed_dir = filesystem.crypt_service()?;
-                for server in queue.crypt_service_exposed_dir.drain(..) {
-                    crypt_service_exposed_dir
-                        .clone(fio::OpenFlags::CLONE_SAME_RIGHTS, server.into_channel().into())?;
+            Filesystem::ServingMultiVolume(..) | Filesystem::ServingVolumeInMultiVolume(..) => {
+                if let Some(crypt_service_exposed_dir) = filesystem.crypt_service()? {
+                    for server in queue.crypt_service_exposed_dir.drain(..) {
+                        crypt_service_exposed_dir.clone(
+                            fio::OpenFlags::CLONE_SAME_RIGHTS,
+                            server.into_channel().into(),
+                        )?;
+                    }
                 }
             }
             _ => {}
@@ -875,44 +996,35 @@ impl Environment for FshostEnvironment {
     }
 
     async fn shred_data(&mut self) -> Result<(), Error> {
-        if self.config.data_filesystem_format != "fxfs" {
-            return Err(anyhow!("Can't shred data; not fxfs"));
-        }
         if !self.data.is_serving() {
             return Err(anyhow!("Can't shred data; not already mounted"));
         }
-        // Erase the keybag.
-        let unencrypted = if let Some(fxblob) = &mut self.fxblob {
-            fxblob.volume_mut("unencrypted")
+        if let Some(container) = self.container.as_mut() {
+            container.shred_data().await
         } else {
-            self.data.volume("unencrypted")
+            if self.config.data_filesystem_format != "fxfs" {
+                return Err(anyhow!("Can't shred data; not fxfs"));
+            }
+            fxfs::shred_key_bag(
+                self.data
+                    .volume(UNENCRYPTED_VOLUME_LABEL)
+                    .context("Failed to find unencrypted volume")?,
+            )
+            .await
         }
-        .context("Failed to find unencrypted volume")?;
-        let dir = fuchsia_fs::directory::open_directory_deprecated(
-            unencrypted.root(),
-            "keys",
-            fio::OpenFlags::RIGHT_WRITABLE,
-        )
-        .await
-        .context("Failed to open keys dir")?;
-        dir.unlink("fxfs-data", &fio::UnlinkOptions::default())
-            .await?
-            .map_err(|e| anyhow!(zx::Status::from_raw(e)))
-            .context("Failed to remove keybag")?;
-        Ok(())
     }
 
     async fn shutdown(&mut self) -> Result<(), Error> {
         // If we encounter an error, log it, but continue trying to shut down the remaining
         // filesystems.
-        self.blobfs.shutdown(self.fxblob.as_mut()).await.unwrap_or_else(|error| {
+        self.blobfs.shutdown(self.container.maybe_fs()).await.unwrap_or_else(|error| {
             tracing::error!(?error, "failed to shut down blobfs");
         });
-        self.data.shutdown(self.fxblob.as_mut()).await.unwrap_or_else(|error| {
+        self.data.shutdown(self.container.maybe_fs()).await.unwrap_or_else(|error| {
             tracing::error!(?error, "failed to shut down data");
         });
-        if let Some(fxfs) = self.fxblob.take() {
-            fxfs.shutdown().await.unwrap_or_else(|error| {
+        if let Some(container) = self.container.take() {
+            container.into_fs().shutdown().await.unwrap_or_else(|error| {
                 tracing::error!(?error, "failed to shut down fxfs");
             })
         }
@@ -1053,7 +1165,7 @@ impl FilesystemLauncher {
         if self.config.check_filesystems {
             tracing::info!(?format, "fsck started");
             if let Err(error) = fs.fsck().await {
-                self.report_corruption(format, &error);
+                self.report_corruption(format.as_str(), &error);
                 if self.config.format_data_on_corruption {
                     tracing::info!("Reformatting filesystem, expect data loss...");
                     return Ok(ServeFilesystemStatus::FormatRequired);
@@ -1095,7 +1207,7 @@ impl FilesystemLauncher {
         match serve_fut.await {
             Ok(fs) => Ok(fs),
             Err(error) => {
-                self.report_corruption(format, &error);
+                self.report_corruption(format.as_str(), &error);
                 if self.config.format_data_on_corruption {
                     tracing::info!("Reformatting filesystem, expect data loss...");
                     Ok(ServeFilesystemStatus::FormatRequired)
@@ -1186,7 +1298,7 @@ impl FilesystemLauncher {
         if self.config.check_filesystems {
             tracing::info!("fsck started for fxblob");
             if let Err(error) = fs.fsck().await {
-                self.report_corruption(DiskFormat::Fxfs, &error);
+                self.report_corruption("fxfs", &error);
                 return Err(error);
             } else {
                 tracing::info!("fsck completed OK for fxblob");
@@ -1195,95 +1307,16 @@ impl FilesystemLauncher {
         fs.serve_multi_volume().await
     }
 
-    /// Serves the data volume from Fxblob, formatting any non-blob volumes as needed.
-    pub async fn serve_data_fxblob(
+    /// Starts serving Fvm without opening any volumes.
+    pub async fn serve_fvm(
         &self,
-        serving_multi_vol_fs: &mut ServingMultiVolumeFilesystem,
-    ) -> Result<Filesystem, Error> {
-        let mut format_needed = false;
-        tracing::info!(expected_format = "fxfs", "Mounting /data");
-
-        // We expect the startup protocol to work with fxblob. There are no options for
-        // reformatting the entire fxfs partition now that blobfs is one of the volumes.
-        let volumes_dir = fuchsia_fs::directory::open_directory_deprecated(
-            serving_multi_vol_fs.exposed_dir(),
-            "volumes",
-            fuchsia_fs::OpenFlags::empty(),
-        )
-        .await
-        .context("opening volumes directory")?;
-        let volumes = fuchsia_fs::directory::readdir(&volumes_dir)
-            .await
-            .context("reading volumes directory")?;
-        let needed =
-            HashSet::from(["blob".to_string(), "data".to_string(), "unencrypted".to_string()]);
-        let mut found = HashSet::new();
-        for volume in volumes {
-            found.insert(volume.name);
-        }
-
-        if found != needed {
-            format_needed = true;
-        }
-
-        if format_needed {
-            Ok(self.format_data_in_fxblob(serving_multi_vol_fs).await?)
-        } else {
-            match fxfs::unlock_data_volume(serving_multi_vol_fs, &self.config).await {
-                Ok(Some((crypt_service, volume_name, _))) => {
-                    Ok(Filesystem::ServingVolumeInFxblob(Some(crypt_service), volume_name))
-                }
-                Ok(None) => {
-                    tracing::warn!(
-                        "could not find keybag. Perhaps the keys were shredded? \
-                        Reformatting the data and unencrypted volumes."
-                    );
-                    self.format_data_in_fxblob(serving_multi_vol_fs).await
-                }
-                Err(error) => {
-                    self.report_corruption(DiskFormat::Fxfs, &error);
-                    tracing::error!(
-                        ?error,
-                        "unlock_data_volume failed. Reformatting the data and unencrypted volumes."
-                    );
-                    Ok(self.format_data_in_fxblob(serving_multi_vol_fs).await?)
-                }
-            }
-        }
-    }
-
-    async fn format_data_in_fxblob(
-        &self,
-        serving_multi_vol_fs: &mut ServingMultiVolumeFilesystem,
-    ) -> Result<Filesystem, Error> {
-        // Reset fxfs volumes before reinitializing.
-        let volumes_dir = fuchsia_fs::directory::open_directory_no_describe_deprecated(
-            serving_multi_vol_fs.exposed_dir(),
-            "volumes",
-            fuchsia_fs::OpenFlags::empty(),
-        )?;
-        let volumes = fuchsia_fs::directory::readdir(&volumes_dir).await?;
-        for volume in volumes {
-            if volume.name != "blob".to_string() {
-                // Unmount mounted non-blob volumes.
-                if serving_multi_vol_fs.volume(&volume.name).is_some() {
-                    serving_multi_vol_fs.shutdown_volume(&volume.name).await?;
-                }
-                // Remove any non-blob volumes.
-                serving_multi_vol_fs
-                    .remove_volume(&volume.name)
-                    .await
-                    .with_context(|| format!("failed to remove volume: {:?}", volume.name))?;
-            }
-        }
-
-        let (crypt_service, volume_name, _) =
-            fxfs::init_data_volume(serving_multi_vol_fs, &self.config)
-                .await
-                .context("initializing data volume encryption")?;
-        let filesystem = Filesystem::ServingVolumeInFxblob(Some(crypt_service), volume_name);
-
-        Ok(filesystem)
+        device: &mut dyn Device,
+    ) -> Result<ServingMultiVolumeFilesystem, Error> {
+        let mut fs = fs_management::filesystem::Filesystem::from_boxed_config(
+            device.block_connector()?,
+            Box::new(Fvm { component_type: ComponentType::StaticChild }),
+        );
+        fs.serve_multi_volume().await
     }
 
     pub async fn format_data<FSC: FSConfig>(
@@ -1361,12 +1394,19 @@ impl FilesystemLauncher {
         Ok(filesystem)
     }
 
-    fn report_corruption(&self, format: DiskFormat, error: &Error) {
-        tracing::error!(?format, ?error, "FILESYSTEM CORRUPTION DETECTED!");
+    fn report_corruption(&self, format: &str, error: &Error) {
+        tracing::error!(format, ?error, "FILESYSTEM CORRUPTION DETECTED!");
         tracing::error!(
             "Please file a bug to the Storage component in http://fxbug.dev, including a \
             device snapshot collected with `ffx target snapshot` if possible.",
         );
+
+        let report = fidl_fuchsia_feedback::CrashReport {
+            program_name: Some(format.to_string()),
+            crash_signature: Some(format!("fuchsia-{format}-corruption")),
+            is_fatal: Some(false),
+            ..Default::default()
+        };
 
         fasync::Task::spawn(async move {
             let proxy = if let Ok(proxy) =
@@ -1376,12 +1416,6 @@ impl FilesystemLauncher {
             } else {
                 tracing::error!("Failed to connect to crash report service");
                 return;
-            };
-            let report = fidl_fuchsia_feedback::CrashReport {
-                program_name: Some(format.as_str().to_owned()),
-                crash_signature: Some(format!("fuchsia-{}-corruption", format.as_str())),
-                is_fatal: Some(false),
-                ..Default::default()
             };
             if let Err(e) = proxy.file_report(report).await {
                 tracing::error!(?e, "Failed to file crash report");
