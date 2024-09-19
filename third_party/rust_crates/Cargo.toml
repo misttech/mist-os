@@ -247,7 +247,7 @@ zstd = "0.11.2"
 [dependencies.tracing-subscriber]
 version = "0.3.18"
 default-features = false
-features = ["env-filter", "fmt", "registry", "std", "tracing-log"]
+features = ["ansi", "env-filter", "fmt", "registry", "std", "tracing-log"]
 
 # Target-side only dependencies
 [target.'cfg(target_os = "fuchsia")'.dependencies]

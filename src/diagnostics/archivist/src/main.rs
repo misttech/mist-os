@@ -70,6 +70,7 @@ async fn init_diagnostics(config: &Config) -> Result<(), Error> {
         // dynamically filter them at runtime.
         tracing::subscriber::set_global_default(
             tracing_subscriber::fmt()
+                .with_ansi(false)
                 .event_format(DebugLogEventFormatter)
                 .with_writer(std::io::stdout)
                 .with_max_level(Level::TRACE)
