@@ -32,6 +32,8 @@ use default_drop::{DefaultDrop, WithDefaultDrop};
 use ifaces::{ClientIface, ConnectResult, IfaceManager, ScanEnd};
 use nl80211::{Nl80211, Nl80211Attr, Nl80211BandAttr, Nl80211Cmd, Nl80211FrequencyAttr};
 
+// TODO(https://fxbug.dev/368005870): Need to reconsider the consequences of using
+// the same iface name, even when an iface is recreated.
 const IFACE_NAME: &str = "wlan";
 
 async fn handle_wifi_sta_iface_request(req: fidl_wlanix::WifiStaIfaceRequest) -> Result<(), Error> {
@@ -147,6 +149,7 @@ async fn handle_wifi_chip_request<I: IfaceManager>(
                 }
             }
         }
+        // TODO(https://fxbug.dev/366027488): GetAvailableModes is hardcoded.
         fidl_wlanix::WifiChipRequest::GetAvailableModes { responder } => {
             info!("fidl_wlanix::WifiChipRequest::GetAvailableModes");
             let response = fidl_wlanix::WifiChipGetAvailableModesResponse {
@@ -174,12 +177,14 @@ async fn handle_wifi_chip_request<I: IfaceManager>(
             };
             responder.send(&response).context("send GetId response")?;
         }
+        // TODO(https://fxbug.dev/366028666): GetMode is hardcoded.
         fidl_wlanix::WifiChipRequest::GetMode { responder } => {
             info!("fidl_wlanix::WifiChipRequest::GetMode");
             let response =
                 fidl_wlanix::WifiChipGetModeResponse { mode: Some(0), ..Default::default() };
             responder.send(&response).context("send GetMode response")?;
         }
+        // TODO(https://fxbug.dev/366027491): GetCapabilities is hardcoded.
         fidl_wlanix::WifiChipRequest::GetCapabilities { responder } => {
             info!("fidl_wlanix::WifiChipRequest::GetCapabilities");
             let response = fidl_wlanix::WifiChipGetCapabilitiesResponse {
