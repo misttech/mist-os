@@ -37,7 +37,7 @@ import("config.gni")
 #       - excluded         : the atom may not be included in SDKs;
 #       - experimental     : the atom is available with no quality guarantee;
 #       - internal         : the atom is exposed in-tree to the Bazel SDK build via `@internal_sdk`.
-#       - cts              : the atom may be used in the Fuchsia Compatibility Test Suite;
+#       - cts              : Currently unsupported - See https://fxbug.dev/367760026.
 #       - partner_internal : The atom may be used internally by other atoms in SDKs for partners.
 #       - partner          : The atom may be included in SDKs for partners.
 #       - public           : The atom may be included in SDKs for all Fuchsia developers.
@@ -168,9 +168,11 @@ template("sdk_atom") {
       _allowed_categories + [ category ] - [ category ] != _allowed_categories,
       "'${target_name}' has unsupported SDK category '${category}'. Must be one of ${_allowed_categories}.")
 
+  # "cts" is not properly implemented and should not be used. See
+  # https://fxbug.dev/367760026.
   # The public IDK does not yet exist, so "public" should not be used.
   assert(
-      category != "public",
+      category != "cts" && category != "public",
       "'${target_name}' has SDK category '${category}', which is not yet supported.")
 
   if (defined(invoker.api)) {

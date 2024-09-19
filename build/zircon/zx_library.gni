@@ -402,8 +402,6 @@ template("zx_library") {
           data_deps += [ "//build/zircon:sdk_category_partner_allowlist" ]
         } else if (sdk_category == "internal") {
           data_deps += [ "//build/zircon:sdk_category_internal_allowlist" ]
-        } else if (sdk_category == "cts") {
-          data_deps += [ "//build/zircon:sdk_category_cts_allowlist" ]
         } else if (sdk_category == "excluded") {
           data_deps += [ "//build/zircon:sdk_category_excluded_allowlist" ]
         } else {

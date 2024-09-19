@@ -107,7 +107,7 @@ Each SDK Atom has an `category` parameter with one of the following values:
 - `excluded`: the Atom may not be included in SDKs;
 - `experimental`: (this SDK category does not make much sense);
 - `internal`: supported for use within the Fuchsia platform source tree;
-- `cts`: supported for use in the Compatibility Tests for Fuchsia;
+- `cts`: supported for use in the Compatibility Tests for Fuchsia (not yet supported)
 - `partner_internal`: supported for use in non-source SDK atoms in the
   `partner` category but not exposed to the SDK users;
 - `partner`: supported for use by select partners;

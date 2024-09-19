@@ -8,7 +8,7 @@ import("//build/zircon/zx_library.gni")
 # LINT.IfChange
 zx_library("fbl") {
   sdk = "source"
-  sdk_publishable = "cts"
+  sdk_publishable = "internal"
   sdk_headers = [
     "fbl/algorithm.h",
     "fbl/alloc_checker.h",

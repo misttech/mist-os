@@ -32,8 +32,10 @@ class SdkCommonTests(unittest.TestCase):
     def test_categories(self) -> None:
         atoms = [_atom("hello", "internal"), _atom("world", "partner")]
         self.assertEqual([*detect_category_violations("internal", atoms)], [])
-        atoms = [_atom("hello", "internal"), _atom("world", "cts")]
-        self.assertEqual([*detect_category_violations("internal", atoms)], [])
+        atoms = [_atom("hello", "partner"), _atom("world", "partner_internal")]
+        self.assertEqual(
+            [*detect_category_violations("partner_internal", atoms)], []
+        )
 
     def test_categories_failure(self) -> None:
         atoms = [_atom("hello", "internal"), _atom("world", "partner")]
@@ -45,9 +47,9 @@ class SdkCommonTests(unittest.TestCase):
         )
         atoms = [_atom("hello", "internal"), _atom("world", "partner")]
         self.assertEqual(
-            [*detect_category_violations("cts", atoms)],
+            [*detect_category_violations("partner", atoms)],
             [
-                '"hello" has publication level "internal", which is incompatible with "cts".'
+                '"hello" has publication level "internal", which is incompatible with "partner".'
             ],
         )
 
@@ -56,6 +58,12 @@ class SdkCommonTests(unittest.TestCase):
         self.assertRaisesRegex(
             Exception,
             '"world" has SDK category "public", which is not yet supported.',
+            lambda: [*detect_category_violations("internal", atoms)],
+        )
+        atoms = [_atom("hello", "partner"), _atom("world", "cts")]
+        self.assertRaisesRegex(
+            Exception,
+            '"world" has SDK category "cts", which is not yet supported.',
             lambda: [*detect_category_violations("internal", atoms)],
         )
 
