@@ -248,6 +248,11 @@
             to: "#console-launcher",
         },
         {
+            service: "fuchsia.gpu.magma.Service",
+            from: "#boot-drivers",
+            to: "#console-launcher",
+        },
+        {
             protocol: "fuchsia.paver.Paver",
             from: "#paver",
             to: "#console-launcher",
@@ -305,6 +310,12 @@
             from: "#system-activity-governor",
             to: "#console-launcher",
             availability: "optional",
+            source_availability: "unknown",
+        },
+        {
+            protocol: "fuchsia.power.broker.Topology",
+            from: "#power-broker",
+            to: "#console-launcher",
             source_availability: "unknown",
         },
     ],

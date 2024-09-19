@@ -6,6 +6,7 @@
 #define SRC_GRAPHICS_DRIVERS_MSD_ARM_MALI_SRC_FUCHSIA_POWER_MANAGER_H_
 
 #include <fidl/fuchsia.power.broker/cpp/fidl.h>
+#include <lib/driver/power/cpp/power-support.h>
 #include <lib/inspect/cpp/inspect.h>
 
 #include "parent_device.h"
@@ -20,6 +21,10 @@ class FuchsiaPowerManager final : public TimeoutSource {
     virtual void SetPowerState(bool enabled, PowerStateCallback completer) = 0;
     virtual PowerManager* GetPowerManager() = 0;
   };
+  struct PowerGoals {
+    zx::event on_ready_for_work_token;
+  };
+
   explicit FuchsiaPowerManager(Owner* owner);
 
   bool Initialize(ParentDevice* parent_device, inspect::Node& node);
@@ -34,9 +39,12 @@ class FuchsiaPowerManager final : public TimeoutSource {
   bool DisablePower();
   bool LeaseIsRequested();
 
+  PowerGoals GetPowerGoals();
+
   static constexpr char kHardwarePowerElementName[] = "mali-gpu-hardware";
   static constexpr uint8_t kPoweredDownPowerLevel = 0;
   static constexpr uint8_t kPoweredUpPowerLevel = 1;
+  static constexpr char kOnReadyForWorkPowerElementName[] = "mali-on-ready-for-work";
 
  private:
   void CheckRequiredLevel();
@@ -51,6 +59,11 @@ class FuchsiaPowerManager final : public TimeoutSource {
   fidl::WireClient<fuchsia_power_broker::RequiredLevel> hardware_power_required_level_client_;
   std::vector<zx::event> assertive_power_dep_tokens_;
   std::vector<zx::event> opportunistic_power_dep_tokens_;
+
+  zx::event on_ready_for_work_token_;
+  fidl::ClientEnd<fuchsia_power_broker::ElementControl> on_ready_for_work_control_client_end_;
+  std::optional<fdf_power::ElementRunner> on_ready_for_work_runner_;
+
   fidl::ClientEnd<fuchsia_power_broker::LeaseControl> lease_control_client_end_;
 
   inspect::BoolProperty power_lease_active_;
