@@ -6,6 +6,7 @@ import("//build/bind/bind.gni")
 import("//build/components.gni")
 import("//build/drivers.gni")
 import("//build/test.gni")
+import("//build/testing/cc_test_executable.gni")
 
 wlanphy_sources = [
   "device.cc",
@@ -58,7 +59,7 @@ fuchsia_driver_package("wlanphy") {
 
 # unit tests start here
 
-executable("wlanphy_device_test") {
+cc_test_executable("wlanphy_device_test") {
   testonly = true
   sources = wlanphy_sources + [ "tests/wlanphy_device_test.cc" ]
 

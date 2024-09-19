@@ -12,8 +12,9 @@
 # OF THIS SOFTWARE.
 
 import("//build/components.gni")
+import("//build/testing/cc_test_executable.gni")
 
-executable("recovery_trigger_test") {
+cc_test_executable("recovery_trigger_test") {
   output_name = "recovery_trigger_test"
   testonly = true
   sources = [ "recovery_trigger_test.cc" ]

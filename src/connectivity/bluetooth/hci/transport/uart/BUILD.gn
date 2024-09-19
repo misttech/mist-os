@@ -6,6 +6,7 @@ import("//build/bind/bind.gni")
 import("//build/components.gni")
 import("//build/drivers.gni")
 import("//build/test.gni")
+import("//build/testing/cc_test_executable.gni")
 
 driver_bind_rules("bt_transport_uart_bind") {
   rules = "meta/bt_transport_uart.bind"
@@ -63,7 +64,7 @@ fuchsia_driver_package("uart") {
   driver_components = [ ":bt-transport-uart" ]
 }
 
-executable("tests_executable") {
+cc_test_executable("tests_executable") {
   testonly = true
 
   output_name = "bt-transport-uart-tests"

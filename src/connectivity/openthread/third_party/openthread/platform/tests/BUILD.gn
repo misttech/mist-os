@@ -4,6 +4,7 @@
 
 import("//build/components.gni")
 import("//build/config.gni")
+import("//build/testing/cc_test_executable.gni")
 import("//third_party/openthread/openthread_upstream_version.gni")
 
 group("tests") {
@@ -42,7 +43,7 @@ fuchsia_unittest_package("threadstack-bootstrap-unittests") {
   }
 }
 
-executable("unittests-bin") {
+cc_test_executable("unittests-bin") {
   output_name = "threadstack-unittests"
 
   testonly = true
@@ -75,7 +76,7 @@ executable("unittests-bin") {
   ]
 }
 
-executable("bootstrap-unittests-bin") {
+cc_test_executable("bootstrap-unittests-bin") {
   output_name = "threadstack-bootstrap-unittests"
 
   testonly = true

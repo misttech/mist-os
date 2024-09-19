@@ -6,6 +6,7 @@ import("//build/assembly/config_data_for_assembly.gni")
 import("//build/components.gni")
 import("//build/fuzz.gni")
 import("//build/test.gni")
+import("//build/testing/cc_test_executable.gni")
 
 declare_args() {
   # Enables the tracing feature of mdns, which can be turned on using
@@ -240,7 +241,7 @@ fuchsia_fuzzer_package("mdns-fuzzers") {
   cpp_fuzzer_components = [ ":packet-reader-fuzzer-component" ]
 }
 
-executable("mdns_netemul_test_agent") {
+cc_test_executable("mdns_netemul_test_agent") {
   testonly = true
 
   sources = [ "test/mdns_netemul_test_agent.cc" ]
@@ -302,7 +303,7 @@ fuchsia_test_component("mdns-netemul-v6-test") {
   ]
 }
 
-executable("mdns_netemul_multi_network_test_agent") {
+cc_test_executable("mdns_netemul_multi_network_test_agent") {
   testonly = true
 
   sources = [ "test/mdns_netemul_multi_network_test_agent.cc" ]

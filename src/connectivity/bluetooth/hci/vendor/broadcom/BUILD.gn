@@ -7,6 +7,7 @@ import("//build/cipd.gni")
 import("//build/components.gni")
 import("//build/drivers.gni")
 import("//build/test.gni")
+import("//build/testing/cc_test_executable.gni")
 
 driver_bind_rules("bcm_hci_bind") {
   rules = "meta/bcm_hci.bind"
@@ -85,7 +86,7 @@ fuchsia_driver_package("broadcom") {
   }
 }
 
-executable("tests_executable") {
+cc_test_executable("tests_executable") {
   testonly = true
 
   output_name = "bt-hci-broadcom-tests"

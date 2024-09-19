@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
+import("//build/testing/cc_test_executable.gni")
 
 source_set("fidl") {
   sources = [ "hanging_getter.h" ]
@@ -10,7 +11,7 @@ source_set("fidl") {
   public_deps = [ "//sdk/lib/fit" ]
 }
 
-executable("tests_bin") {
+cc_test_executable("tests_bin") {
   testonly = true
   output_name = "bt-lib-fidl-unittests"
 

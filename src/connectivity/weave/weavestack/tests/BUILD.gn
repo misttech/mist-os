@@ -4,13 +4,14 @@
 
 import("//build/components.gni")
 import("//build/config.gni")
+import("//build/testing/cc_test_executable.gni")
 
 group("tests") {
   testonly = true
   public_deps = [ ":package-test" ]
 }
 
-executable("unittests") {
+cc_test_executable("unittests") {
   output_name = "weavestack_unittests"
 
   testonly = true

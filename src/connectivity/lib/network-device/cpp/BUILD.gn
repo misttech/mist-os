@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
+import("//build/testing/cc_test_executable.gni")
 
 source_set("cpp") {
   sources = [
@@ -25,7 +26,7 @@ source_set("cpp") {
   ]
 }
 
-executable("cpp-test") {
+cc_test_executable("cpp-test") {
   testonly = true
 
   sources = [ "network_device_client_test.cc" ]

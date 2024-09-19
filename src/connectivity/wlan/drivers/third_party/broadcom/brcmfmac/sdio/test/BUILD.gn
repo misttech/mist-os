@@ -12,8 +12,9 @@
 # OF THIS SOFTWARE.
 
 import("//build/components.gni")
+import("//build/testing/cc_test_executable.gni")
 
-executable("sdio_test") {
+cc_test_executable("sdio_test") {
   output_name = "sdio_test"
   testonly = true
   sources = [ "sdio_test.cc" ]
