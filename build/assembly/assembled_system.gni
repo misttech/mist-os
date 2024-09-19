@@ -725,18 +725,6 @@ template("assembled_system") {
         rebase_path(files.product_assembly_config, root_build_dir),
       ]
 
-      if (ramdisk_in_zbi) {
-        args += [
-          "--mode",
-          "embed-in-zbi",
-        ]
-      } else if (!_supports_blobs) {
-        args += [
-          "--mode",
-          "bootfs",
-        ]
-      }
-
       args += [
         "--input-bundles-dir",
         rebase_path(files.platform_common_aibs_dir, root_build_dir),
@@ -863,18 +851,6 @@ template("assembled_system") {
       if (defined(invoker.assembly_include_account_in_fvm) &&
           invoker.assembly_include_account_in_fvm) {
         args += [ "--include-account" ]
-      }
-
-      if (ramdisk_in_zbi) {
-        args += [
-          "--mode",
-          "embed-in-zbi",
-        ]
-      } else if (!_supports_blobs) {
-        args += [
-          "--mode",
-          "bootfs",
-        ]
       }
 
       deps = []

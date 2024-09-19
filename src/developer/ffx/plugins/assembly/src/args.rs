@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use argh::{ArgsInfo, FromArgs};
 use camino::Utf8PathBuf;
 use ffx_core::ffx_command;
@@ -56,39 +56,6 @@ pub struct CreateSystemArgs {
     /// base packages to the same TUF repository.
     #[argh(option)]
     pub base_package_name: Option<String>,
-
-    /// mode indicating where to place packages.
-    #[argh(option, default = "default_package_mode()")]
-    pub mode: PackageMode,
-}
-
-/// Mode indicating where to place packages.
-#[derive(Debug, PartialEq)]
-pub enum PackageMode {
-    /// Put packages in a disk image (FVM or Fxfs).
-    DiskImage,
-
-    /// Put packages in a disk image (FVM or Fxfs) as a ramdisk in the ZBI.
-    DiskImageInZbi,
-
-    /// Put packages into BootFS.
-    BootFS,
-}
-
-impl FromStr for PackageMode {
-    type Err = anyhow::Error;
-    fn from_str(s: &str) -> Result<Self> {
-        match s {
-            "disk" => Ok(PackageMode::DiskImage),
-            "embed-in-zbi" => Ok(PackageMode::DiskImageInZbi),
-            "bootfs" => Ok(PackageMode::BootFS),
-            _ => Err(anyhow!("invalid package mode: {}", s)),
-        }
-    }
-}
-
-fn default_package_mode() -> PackageMode {
-    PackageMode::DiskImage
 }
 
 /// construct an UpdatePackage using images and package.
@@ -311,10 +278,6 @@ pub struct ProductArgs {
     /// disable validation of the assembly's packages
     #[argh(option, default = "Default::default()")]
     pub package_validation: PackageValidationHandling,
-
-    /// mode indicating where to place packages.
-    #[argh(option, default = "default_package_mode()")]
-    pub mode: PackageMode,
 
     /// path to an AIB containing a customized kernel zbi to use instead of the
     /// one in the platform AIBs.

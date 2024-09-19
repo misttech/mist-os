@@ -9,14 +9,14 @@ use crate::{vbmeta, zbi};
 
 use anyhow::{anyhow, Context, Result};
 use assembly_config_schema::ImageAssemblyConfig;
-use assembly_images_config::{Fvm, Fxfs, Image, VBMeta, Zbi};
+use assembly_images_config::{FilesystemImageMode, Fvm, Fxfs, Image, VBMeta, Zbi};
 use assembly_manifest::AssemblyManifest;
 use assembly_tool::{SdkToolProvider, ToolProvider};
 use assembly_update_packages_manifest::UpdatePackagesManifest;
 use assembly_util as util;
 use assembly_util::PackageDestination;
 use camino::{Utf8Path, Utf8PathBuf};
-use ffx_assembly_args::{CreateSystemArgs, PackageMode};
+use ffx_assembly_args::CreateSystemArgs;
 use fuchsia_pkg::{PackageManifest, PackagePath};
 use serde_json::ser;
 use std::collections::BTreeSet;
@@ -30,7 +30,6 @@ pub async fn create_system(args: CreateSystemArgs) -> Result<()> {
         outdir,
         gendir,
         base_package_name,
-        mut mode,
     } = args;
 
     let gendir = gendir.unwrap_or_else(|| outdir.clone());
@@ -40,11 +39,7 @@ pub async fn create_system(args: CreateSystemArgs) -> Result<()> {
     let image_assembly_config: ImageAssemblyConfig = util::read_config(image_assembly_config)
         .context("Failed to read the image assembly config")?;
     let images_config = &image_assembly_config.images_config;
-
-    if image_assembly_config.netboot_mode {
-        mode = PackageMode::DiskImageInZbi;
-    }
-
+    let mode = image_assembly_config.image_mode;
     // Get the tool set.
     let tools = SdkToolProvider::try_new()?;
 
@@ -86,7 +81,7 @@ pub async fn create_system(args: CreateSystemArgs) -> Result<()> {
         // Determine whether blobfs should be compressed.
         // We refrain from compressing blobfs if the FVM is destined for the ZBI, because the ZBI
         // compression will be more optimized.
-        let compress_blobfs = !matches!(&mode, PackageMode::DiskImageInZbi);
+        let compress_blobfs = !matches!(&mode, FilesystemImageMode::Ramdisk);
 
         // TODO: warn if bootfs_only mode
         if let Some(base_package) = &base_package {
@@ -122,7 +117,7 @@ pub async fn create_system(args: CreateSystemArgs) -> Result<()> {
 
     // Find the first standard disk image that was generated.
     let disk_image_for_zbi: Option<Utf8PathBuf> = match &mode {
-        PackageMode::DiskImageInZbi => assembly_manifest.images.iter().find_map(|i| match i {
+        FilesystemImageMode::Ramdisk => assembly_manifest.images.iter().find_map(|i| match i {
             assembly_manifest::Image::FVM(path) => Some(path.clone()),
             assembly_manifest::Image::Fxfs { path, .. } => Some(path.clone()),
             _ => None,

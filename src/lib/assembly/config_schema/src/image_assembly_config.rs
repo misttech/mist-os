@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use assembly_images_config::ImagesConfig;
+use assembly_images_config::{FilesystemImageMode, ImagesConfig};
 use assembly_util::FileEntry;
 use camino::{Utf8Path, Utf8PathBuf};
 use serde::{Deserialize, Serialize};
@@ -71,9 +71,9 @@ pub struct ImageAssemblyConfig {
     /// Devicetree binary to be added to zbi
     pub devicetree: Option<Utf8PathBuf>,
 
-    /// Whether to create netbootable image
+    /// How to generate the filesystem image.
     #[serde(default)]
-    pub netboot_mode: bool,
+    pub image_mode: FilesystemImageMode,
 }
 
 impl ImageAssemblyConfig {
@@ -94,7 +94,7 @@ impl ImageAssemblyConfig {
             board_name: "my_board".into(),
             board_driver_arguments: None,
             devicetree: Some("path/to/devicetree/binary".into()),
-            netboot_mode: false,
+            image_mode: Default::default(),
         }
     }
 }

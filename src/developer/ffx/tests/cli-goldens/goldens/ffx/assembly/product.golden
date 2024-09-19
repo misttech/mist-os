@@ -110,18 +110,6 @@
     {
       "kind": {
         "Option": {
-          "arg_name": "mode"
-        }
-      },
-      "optionality": "optional",
-      "long": "--mode",
-      "short": null,
-      "description": "mode indicating where to place packages.",
-      "hidden": false
-    },
-    {
-      "kind": {
-        "Option": {
           "arg_name": "custom-kernel-aib"
         }
       },

@@ -8,7 +8,8 @@ use assembly_component_id_index::ComponentIdIndexBuilder;
 use assembly_config_capabilities::{Config, ConfigValueType};
 use assembly_config_schema::platform_config::storage_config::StorageConfig;
 use assembly_images_config::{
-    BlobfsLayout, DataFilesystemFormat, DataFvmVolumeConfig, FvmVolumeConfig, VolumeConfig,
+    BlobfsLayout, DataFilesystemFormat, DataFvmVolumeConfig, FilesystemImageMode, FvmVolumeConfig,
+    VolumeConfig,
 };
 use assembly_util::{BootfsDestination, FileEntry};
 
@@ -112,7 +113,7 @@ impl DefineSubsystemConfiguration<StorageConfig> for StorageSubsystemConfig {
         let gpt_all = context.board_info.filesystems.gpt_all;
 
         // Collect the arguments from the product.
-        let ramdisk_image = context.ramdisk_image;
+        let ramdisk_image = storage_config.filesystems.image_mode == FilesystemImageMode::Ramdisk;
         let no_zxcrypt = storage_config.filesystems.no_zxcrypt;
         let format_data_on_corruption = storage_config.filesystems.format_data_on_corruption.0;
         let nand = storage_config.filesystems.watch_for_nand;
