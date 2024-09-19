@@ -5,8 +5,9 @@
 import("//build/components.gni")
 import("//build/drivers.gni")
 import("//build/test.gni")
+import("//build/testing/cc_test_executable.gni")
 
-executable("aml-thermistor-test-bin") {
+cc_test_executable("aml-thermistor-test-bin") {
   configs += [ "//build/config:all_source" ]
   testonly = true
   sources = [
