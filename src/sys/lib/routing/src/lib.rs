@@ -470,12 +470,8 @@ async fn perform_route<C>(
 where
     C: ComponentInstanceInterface + 'static,
 {
-    let request = Request {
-        target: WeakComponentInstanceInterface::new(target).into(),
-        debug: true,
-        metadata,
-    };
-    let capability = router.route(request).await?;
+    let request = Request { target: WeakComponentInstanceInterface::new(target).into(), metadata };
+    let capability = router.route(Some(request), true).await?;
     Ok(RouteSource::new(capability.try_into().unwrap()))
 }
 

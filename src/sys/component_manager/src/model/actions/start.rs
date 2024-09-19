@@ -447,15 +447,15 @@ async fn open_runner(
     // Open up a channel to the runner.
     let request = Request {
         target: component.as_weak().into(),
-        debug: false,
         metadata: runner_metadata(cm_rust::Availability::Required),
     };
-    let runner_capability =
-        runner_router.route(request).await.map_err(|err| StartActionError::ResolveRunnerError {
+    let runner_capability = runner_router.route(Some(request), false).await.map_err(|err| {
+        StartActionError::ResolveRunnerError {
             moniker: component.moniker.clone(),
             err: Box::new(err),
             runner: runner_name.clone(),
-        })?;
+        }
+    })?;
     match &runner_capability {
         // Built-in runners are hosted by a LaunchTaskOnReceive, which returns a Connector
         // capability for new routes.

@@ -3270,11 +3270,13 @@ async fn source_component_stopping_when_routing() {
         let entry = output
             .get_capability(&RelativePath::new("foo").unwrap())
             .unwrap()
-            .route(sandbox::Request {
-                target: root.as_weak().into(),
-                debug: false,
-                metadata: protocol_metadata(Availability::Required),
-            })
+            .route(
+                Some(sandbox::Request {
+                    target: root.as_weak().into(),
+                    metadata: protocol_metadata(Availability::Required),
+                }),
+                false,
+            )
             .await
             .unwrap();
 
@@ -3335,11 +3337,13 @@ async fn source_component_stopped_after_routing_before_open() {
     let cap = output
         .get_capability(&RelativePath::new("foo").unwrap())
         .unwrap()
-        .route(sandbox::Request {
-            target: root.as_weak().into(),
-            debug: false,
-            metadata: protocol_metadata(Availability::Required),
-        })
+        .route(
+            Some(sandbox::Request {
+                target: root.as_weak().into(),
+                metadata: protocol_metadata(Availability::Required),
+            }),
+            false,
+        )
         .await
         .unwrap();
     let sender = match cap {
@@ -3405,11 +3409,13 @@ async fn source_component_shutdown_after_routing_before_open() {
     let cap = output
         .get_capability(&RelativePath::new("foo").unwrap())
         .unwrap()
-        .route(sandbox::Request {
-            target: root.as_weak().into(),
-            debug: false,
-            metadata: protocol_metadata(Availability::Required),
-        })
+        .route(
+            Some(sandbox::Request {
+                target: root.as_weak().into(),
+                metadata: protocol_metadata(Availability::Required),
+            }),
+            false,
+        )
         .await
         .unwrap();
     let sender = match cap {

@@ -81,10 +81,9 @@ where
     };
     let request = sandbox::Request {
         target: component.as_weak().into(),
-        debug: false,
         metadata: request_metadata::config_metadata(use_config.availability),
     };
-    let data = match router.route(request).await? {
+    let data = match router.route(Some(request), false).await? {
         sandbox::Capability::Data(d) => d,
         sandbox::Capability::Unit(_) => return Ok(use_config.default.clone()),
         other => {

@@ -16,7 +16,8 @@ use thiserror::Error;
 /// capabilities from them.
 #[async_trait]
 pub trait Routable: Send + Sync {
-    async fn route(&self, request: Request) -> Result<Capability, RouterError>;
+    async fn route(&self, request: Option<Request>, debug: bool)
+        -> Result<Capability, RouterError>;
 }
 
 /// [`Request`] contains metadata around how to obtain a capability.
@@ -24,9 +25,6 @@ pub trait Routable: Send + Sync {
 pub struct Request {
     /// A reference to the requesting component.
     pub target: WeakInstanceToken,
-
-    /// If true, debug information is requested instead of the actual capabilithy.
-    pub debug: bool,
 
     /// Metadata associated with the request.
     pub metadata: Dict,
@@ -49,7 +47,7 @@ impl Request {
             })
             .transpose()?;
         let metadata = self.metadata.shallow_copy().map_err(|()| RouterError::InvalidArgs)?;
-        Ok(Self { target: self.target.clone(), debug: self.debug, metadata })
+        Ok(Self { target: self.target.clone(), metadata })
     }
 }
 
@@ -75,22 +73,33 @@ impl fmt::Debug for Router {
 /// that takes a request and returns such future.
 impl<F> Routable for F
 where
-    F: Fn(Request) -> BoxFuture<'static, Result<Capability, RouterError>> + Send + Sync + 'static,
+    F: Fn(Option<Request>, bool) -> BoxFuture<'static, Result<Capability, RouterError>>
+        + Send
+        + Sync
+        + 'static,
 {
     // We use the desugared form of `async_trait` to avoid unnecessary boxing.
-    fn route<'a, 'b>(&'a self, request: Request) -> BoxFuture<'b, Result<Capability, RouterError>>
+    fn route<'a, 'b>(
+        &'a self,
+        request: Option<Request>,
+        debug: bool,
+    ) -> BoxFuture<'b, Result<Capability, RouterError>>
     where
         'a: 'b,
         Self: 'b,
     {
-        self(request)
+        self(request, debug)
     }
 }
 
 #[async_trait]
 impl Routable for Router {
-    async fn route(&self, request: Request) -> Result<Capability, RouterError> {
-        Router::route(self, request).await
+    async fn route(
+        &self,
+        request: Option<Request>,
+        debug: bool,
+    ) -> Result<Capability, RouterError> {
+        Router::route(self, request, debug).await
     }
 }
 
@@ -115,8 +124,12 @@ impl Router {
     }
 
     /// Obtain a capability from this router, following the description in `request`.
-    pub async fn route(&self, request: Request) -> Result<Capability, RouterError> {
-        self.routable.route(request).await
+    pub async fn route(
+        &self,
+        request: Option<Request>,
+        debug: bool,
+    ) -> Result<Capability, RouterError> {
+        self.routable.route(request, debug).await
     }
 }
 
@@ -137,9 +150,13 @@ impl fmt::Display for CapabilityNotCloneableError {
 
 #[async_trait]
 impl Routable for Capability {
-    async fn route(&self, request: Request) -> Result<Capability, RouterError> {
+    async fn route(
+        &self,
+        request: Option<Request>,
+        debug: bool,
+    ) -> Result<Capability, RouterError> {
         match self.try_clone() {
-            Ok(Capability::Router(router)) => router.route(request).await,
+            Ok(Capability::Router(router)) => router.route(request, debug).await,
             Ok(capability) => Ok(capability),
             Err(_) => Err(RouterError::NotFound(Arc::new(CapabilityNotCloneableError {}))),
         }
@@ -148,14 +165,18 @@ impl Routable for Capability {
 
 #[async_trait]
 impl Routable for Dict {
-    async fn route(&self, request: Request) -> Result<Capability, RouterError> {
-        Capability::Dictionary(self.clone()).route(request).await
+    async fn route(
+        &self,
+        request: Option<Request>,
+        debug: bool,
+    ) -> Result<Capability, RouterError> {
+        Capability::Dictionary(self.clone()).route(request, debug).await
     }
 }
 
 #[async_trait]
 impl Routable for RouterError {
-    async fn route(&self, _: Request) -> Result<Capability, RouterError> {
+    async fn route(&self, _: Option<Request>, _: bool) -> Result<Capability, RouterError> {
         Err(self.clone())
     }
 }
@@ -197,7 +218,7 @@ mod tests {
             )
             .unwrap();
         let capability = router
-            .route(Request { target: FakeInstanceToken::new(), debug: false, metadata })
+            .route(Some(Request { target: FakeInstanceToken::new(), metadata }), false)
             .await
             .unwrap();
         let sender = match capability {

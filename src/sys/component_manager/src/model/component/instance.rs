@@ -1184,7 +1184,12 @@ struct CapabilityRequestedHook {
 
 #[async_trait]
 impl Routable for CapabilityRequestedHook {
-    async fn route(&self, request: Request) -> Result<Capability, RouterError> {
+    async fn route(
+        &self,
+        request: Option<Request>,
+        debug: bool,
+    ) -> Result<Capability, RouterError> {
+        let request = request.ok_or_else(|| RouterError::InvalidArgs)?;
         fn cm_unexpected() -> RouterError {
             RoutingError::from(ComponentInstanceError::ComponentManagerInstanceUnexpected {}).into()
         }
@@ -1215,7 +1220,7 @@ impl Routable for CapabilityRequestedHook {
             receiver: receiver.clone(),
         });
         source.hooks.dispatch(&event).await;
-        let capability = if request.debug {
+        let capability = if debug {
             CapabilitySource::Component(ComponentSource {
                 capability: self.capability_decl.clone().into(),
                 moniker: self.source.moniker.clone(),
@@ -1241,8 +1246,12 @@ struct ProgramRouter {
 
 #[async_trait]
 impl Routable for ProgramRouter {
-    async fn route(&self, request: Request) -> Result<Capability, RouterError> {
-        if request.debug {
+    async fn route(
+        &self,
+        request: Option<Request>,
+        debug: bool,
+    ) -> Result<Capability, RouterError> {
+        if debug {
             let source = CapabilitySource::Component(ComponentSource {
                 capability: self.capability.clone(),
                 moniker: self.component.moniker.clone(),
@@ -1251,6 +1260,7 @@ impl Routable for ProgramRouter {
                 .try_into()
                 .expect("failed to convert capability source to dictionary"));
         }
+        let request = request.ok_or_else(|| RouterError::InvalidArgs)?;
         fn open_error(e: OpenOutgoingDirError) -> OpenError {
             CapabilityProviderError::from(ComponentProviderError::from(e)).into()
         }

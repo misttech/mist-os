@@ -648,7 +648,7 @@ fn use_from_parent_router(
 
     let program_input_dict_additions = program_input_dict_additions.clone();
 
-    Router::new(move |request| {
+    Router::new(move |request: Option<Request>, debug: bool| {
         let source_path = source_path.clone();
         let component_input_capability = component_input_capability.clone();
         let router = match program_input_dict_additions.get_capability(&source_path) {
@@ -659,7 +659,7 @@ fn use_from_parent_router(
             // capability, let's use the component input dictionary.
             _ => component_input_capability,
         };
-        async move { router.route(request).await }.boxed()
+        async move { router.route(request, debug).await }.boxed()
     })
 }
 
@@ -913,8 +913,12 @@ impl<C: ComponentInstanceInterface + 'static> UnitRouter<C> {
 
 #[async_trait]
 impl<C: ComponentInstanceInterface + 'static> sandbox::Routable for UnitRouter<C> {
-    async fn route(&self, request: Request) -> Result<Capability, RouterError> {
-        if request.debug {
+    async fn route(
+        &self,
+        request: Option<Request>,
+        debug: bool,
+    ) -> Result<Capability, RouterError> {
+        if debug {
             return Ok(CapabilitySource::Void(VoidSource {
                 capability: self.capability.clone(),
                 moniker: self.component.moniker.clone(),
@@ -922,6 +926,7 @@ impl<C: ComponentInstanceInterface + 'static> sandbox::Routable for UnitRouter<C
             .try_into()
             .expect("failed to convert capability source to dictionary"));
         }
+        let request = request.ok_or_else(|| RouterError::InvalidArgs)?;
         let availability = request.metadata.get_availability().ok_or(RouterError::InvalidArgs)?;
         match availability {
             cm_rust::Availability::Required | cm_rust::Availability::SameAsTarget => {

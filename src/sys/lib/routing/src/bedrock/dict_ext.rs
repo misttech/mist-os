@@ -32,7 +32,8 @@ pub trait DictExt {
         &self,
         moniker: impl Into<ExtendedMoniker> + Send,
         path: &'a impl IterablePath,
-        request: Request,
+        request: Option<Request>,
+        debug: bool,
     ) -> Result<Option<Capability>, RouterError>;
 }
 
@@ -129,7 +130,8 @@ impl DictExt for Dict {
         &self,
         moniker: impl Into<ExtendedMoniker> + Send,
         path: &'a impl IterablePath,
-        request: Request,
+        request: Option<Request>,
+        debug: bool,
     ) -> Result<Option<Capability>, RouterError> {
         let mut current_capability: Capability = self.clone().into();
         let moniker = moniker.into();
@@ -147,14 +149,16 @@ impl DictExt for Dict {
             let Some(capability) = capability else { return Ok(None) };
 
             // Resolve the capability, this is a noop if it's not a router.
-            let mut request = request.try_clone()?;
-            if next_idx < num_segments - 1 {
+            let debug = if next_idx < num_segments - 1 {
                 // If `request.debug` is true, that should only apply to the capability at `path`.
                 // Since we're not looking up the final path segment, set `debug = false`, to
                 // obtain the actual Dict and not its debug info.
-                request.debug = false;
-            }
-            current_capability = capability.route(request).await?;
+                false
+            } else {
+                debug
+            };
+            let request = request.as_ref().map(|r| r.try_clone()).transpose()?;
+            current_capability = capability.route(request, debug).await?;
         }
         Ok(Some(current_capability))
     }

@@ -33,16 +33,25 @@ impl<T: Routable + 'static> LazyGet for T {
 
         #[async_trait]
         impl<P: IterablePath + Debug + 'static> Routable for ScopedDictRouter<P> {
-            async fn route(&self, request: Request) -> Result<Capability, RouterError> {
-                // If `request.debug` is true, that should only apply to the capability at `path`.
+            async fn route(
+                &self,
+                request: Option<Request>,
+                debug: bool,
+            ) -> Result<Capability, RouterError> {
+                // If `debug` is true, that should only apply to the capability at `path`.
                 // Here we're looking up the containing dictionary, so set `debug = false`, to
                 // obtain the actual Dict and not its debug info.
-                let mut init_request = request.try_clone()?;
-                init_request.debug = false;
-                match self.router.route(init_request).await? {
+                let init_request = request.as_ref().map(|r| r.try_clone()).transpose()?;
+                match self.router.route(init_request, false).await? {
                     Capability::Dictionary(dict) => {
+                        let request = request.as_ref().map(|r| r.try_clone()).transpose()?;
                         let maybe_capability = dict
-                            .get_with_request(self.not_found_error.clone(), &self.path, request)
+                            .get_with_request(
+                                self.not_found_error.clone(),
+                                &self.path,
+                                request,
+                                debug,
+                            )
                             .await?;
                         maybe_capability.ok_or_else(|| self.not_found_error.clone().into())
                     }

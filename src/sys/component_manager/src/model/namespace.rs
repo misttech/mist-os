@@ -176,11 +176,8 @@ fn protocol_use(
     component: &Arc<ComponentInstance>,
     program_input: &ProgramInput,
 ) -> DirEntry {
-    let (router, request) = BedrockUseRouteRequest::UseProtocol(decl.clone()).into_router(
-        component.as_weak(),
-        program_input,
-        false,
-    );
+    let (router, request) = BedrockUseRouteRequest::UseProtocol(decl.clone())
+        .into_router(component.as_weak(), program_input);
 
     // When there are router errors, they are sent to the error handler, which reports
     // errors.

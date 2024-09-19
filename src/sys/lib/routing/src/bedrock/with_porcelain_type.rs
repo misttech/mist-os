@@ -44,7 +44,12 @@ impl WithPorcelainType for Router {
 
         #[async_trait]
         impl Routable for RouterWithPorcelainType {
-            async fn route(&self, request: Request) -> Result<Capability, RouterError> {
+            async fn route(
+                &self,
+                request: Option<Request>,
+                debug: bool,
+            ) -> Result<Capability, RouterError> {
+                let request = request.ok_or_else(|| RouterError::InvalidArgs)?;
                 let RouterWithPorcelainType { router, porcelain_type, moniker } = self;
                 let Capability::Data(Data::String(capability_type)) = request
                     .metadata
@@ -62,7 +67,7 @@ impl WithPorcelainType for Router {
                 };
                 let porcelain_type = porcelain_type.to_string();
                 if capability_type == porcelain_type {
-                    router.route(request).await
+                    router.route(Some(request), debug).await
                 } else {
                     Err(RoutingError::BedrockWrongCapabilityType {
                         moniker: moniker.clone(),
@@ -117,7 +122,7 @@ mod tests {
         let proxy = base.with_porcelain_type(CapabilityTypeName::Protocol, Moniker::root());
         let metadata = protocol_metadata(Availability::Optional);
         let capability = proxy
-            .route(Request { target: FakeInstanceToken::new(), debug: false, metadata })
+            .route(Some(Request { target: FakeInstanceToken::new(), metadata }), false)
             .await
             .unwrap();
         let capability = match capability {
@@ -141,7 +146,7 @@ mod tests {
             .unwrap();
         metadata.set_availability(Availability::Optional);
         let error = proxy
-            .route(Request { target: FakeInstanceToken::new(), debug: false, metadata })
+            .route(Some(Request { target: FakeInstanceToken::new(), metadata }), false)
             .await
             .unwrap_err();
         assert_matches!(

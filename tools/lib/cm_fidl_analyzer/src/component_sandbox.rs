@@ -35,8 +35,8 @@ fn new_debug_only_router(source: CapabilitySource) -> Router {
     let moniker = source.source_moniker();
     let cap: Capability =
         source.try_into().expect("failed to convert capability source to dictionary");
-    Router::new(move |request: Request| {
-        if !request.debug {
+    Router::new(move |_request: Option<Request>, debug: bool| {
+        if !debug {
             future::ready(Err(RouterError::NotFound(Arc::new(
                 RoutingError::NonDebugRoutesUnsupported { moniker: moniker.clone() },
             ))))
@@ -194,7 +194,11 @@ pub(crate) fn program_output_router(component: &Arc<ComponentInstanceForAnalyzer
     }
     #[async_trait]
     impl Routable for ProgramOutputRouter {
-        async fn route(&self, _request: Request) -> Result<Capability, RouterError> {
+        async fn route(
+            &self,
+            _request: Option<Request>,
+            _debug: bool,
+        ) -> Result<Capability, RouterError> {
             let component =
                 self.weak_component.upgrade().expect("part of component tree was dropped");
             let sandbox =
@@ -217,7 +221,11 @@ pub(crate) fn static_children_component_output_dictionary_routers(
     }
     #[async_trait]
     impl Routable for ChildrenComponentOutputRouters {
-        async fn route(&self, _request: Request) -> Result<Capability, RouterError> {
+        async fn route(
+            &self,
+            _request: Option<Request>,
+            _debug: bool,
+        ) -> Result<Capability, RouterError> {
             let component =
                 self.weak_component.upgrade().expect("part of component tree was dropped");
             let child = component

@@ -100,8 +100,7 @@ impl RouterExt for Router {
                     // Use the weakest availability, so that it gets immediately upgraded to
                     // the availability in `router`.
                     metadata.set_availability(cm_types::Availability::Transitional);
-                    let request =
-                        Request { target: weak_component.clone(), debug: false, metadata };
+                    let request = Request { target: weak_component.clone(), metadata };
                     // TODO: Should we convert the Open to a Directory here if the Router wraps a
                     // Dict?
                     Capability::DirEntry(DirEntry::new(router.into_directory_entry(
@@ -174,7 +173,10 @@ impl RouterExt for Router {
                 // Request a capability from the `router`.
                 let result = self
                     .router
-                    .route(self.request.try_clone().map_err(|_e| zx::Status::INVALID_ARGS)?)
+                    .route(
+                        Some(self.request.try_clone().map_err(|_e| zx::Status::INVALID_ARGS)?),
+                        false,
+                    )
                     .await;
                 let error = match result {
                     Ok(capability) => {

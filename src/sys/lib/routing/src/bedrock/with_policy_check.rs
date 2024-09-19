@@ -74,13 +74,18 @@ impl<C: ComponentInstanceInterface + 'static> PolicyCheckRouter<C> {
 
 #[async_trait]
 impl<C: ComponentInstanceInterface + 'static> Routable for PolicyCheckRouter<C> {
-    async fn route(&self, request: Request) -> Result<Capability, RouterError> {
+    async fn route(
+        &self,
+        request: Option<Request>,
+        debug: bool,
+    ) -> Result<Capability, RouterError> {
+        let request = request.ok_or_else(|| RouterError::InvalidArgs)?;
         #[cfg(not(target_os = "fuchsia"))]
         if let Ok(Some(Capability::Data(sandbox::Data::Uint64(num)))) =
             request.metadata.get(&cm_types::Name::new(SKIP_POLICY_CHECKS).unwrap())
         {
             if num > 0 {
-                return self.router.route(request).await;
+                return self.router.route(Some(request), debug).await;
             }
         }
         let target = request
@@ -96,7 +101,7 @@ impl<C: ComponentInstanceInterface + 'static> Routable for PolicyCheckRouter<C> 
             .into());
         };
         match self.policy_checker.can_route_capability(&self.capability_source, &moniker) {
-            Ok(()) => self.router.route(request).await,
+            Ok(()) => self.router.route(Some(request), debug).await,
             Err(policy_error) => Err(RoutingError::PolicyError(policy_error).into()),
         }
     }

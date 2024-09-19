@@ -379,11 +379,11 @@ impl RouteRequest {
                     err: Box::new(err),
                 })
             })?;
-            Ok(route_request.into_router(instance.as_weak(), &resolved_state.sandbox, true))
+            Ok(route_request.into_router(instance.as_weak(), &resolved_state.sandbox))
         }
         .await;
         let (router, request) = res.map_err(|e| RouterError::NotFound(Arc::new(e)))?;
-        router.route(request).await.map(|capability| {
+        router.route(Some(request), true).await.map(|capability| {
             let capability_source = CapabilitySource::try_from(capability)
                 .expect("failed to convert capability to capability source");
             let source_moniker = capability_source.source_moniker();

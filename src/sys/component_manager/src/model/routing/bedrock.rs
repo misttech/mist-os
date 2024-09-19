@@ -40,13 +40,11 @@ impl UseRouteRequest {
         self,
         target: WeakComponentInstance,
         program_input: &ProgramInput,
-        debug: bool,
     ) -> (Router, Request) {
         match self {
             Self::UseProtocol(decl) => {
                 let request = Request {
                     target: target.clone().into(),
-                    debug,
                     metadata: protocol_metadata(decl.availability),
                 };
                 let Some(capability) = program_input.namespace.get_capability(&decl.target_path)
@@ -75,7 +73,6 @@ impl UseRouteRequest {
                     .clone();
                 let request = Request {
                     target: target.clone().into(),
-                    debug,
                     metadata: runner_metadata(cm_rust::Availability::Required),
                 };
                 (router, request)
@@ -121,13 +118,11 @@ impl ExposeRouteRequest {
         self,
         target: WeakComponentInstance,
         sandbox: &ComponentSandbox,
-        debug: bool,
     ) -> (Router, Request) {
         match self {
             Self::ExposeProtocol(decl) => {
                 let request = Request {
                     target: target.clone().into(),
-                    debug,
                     metadata: protocol_metadata(decl.availability),
                 };
                 let Some(capability) =
@@ -151,7 +146,6 @@ impl ExposeRouteRequest {
             Self::ExposeDictionary(decl) => {
                 let request = Request {
                     target: target.clone().into(),
-                    debug,
                     metadata: dictionary_metadata(decl.availability),
                 };
                 let Some(capability) =
@@ -175,7 +169,6 @@ impl ExposeRouteRequest {
             Self::ExposeRunner(decl) => {
                 let request = Request {
                     target: target.clone().into(),
-                    debug,
                     metadata: runner_metadata(cm_rust::Availability::Required),
                 };
                 let Some(capability) =
@@ -236,11 +229,10 @@ impl RouteRequest {
         self,
         target: WeakComponentInstance,
         sandbox: &ComponentSandbox,
-        debug: bool,
     ) -> (Router, Request) {
         match self {
-            Self::Use(r) => r.into_router(target, &sandbox.program_input, debug),
-            Self::Expose(r) => r.into_router(target, sandbox, debug),
+            Self::Use(r) => r.into_router(target, &sandbox.program_input),
+            Self::Expose(r) => r.into_router(target, sandbox),
         }
     }
 

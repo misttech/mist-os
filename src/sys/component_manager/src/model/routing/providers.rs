@@ -80,7 +80,8 @@ impl CapabilityProvider for DefaultComponentCapabilityProvider {
                 &self.name,
                 // Routers in `program_output_dict` do not check availability but we need a
                 // request to run hooks.
-                Request { target: self.target.clone().into(), debug: false, metadata },
+                Some(Request { target: self.target.clone().into(), metadata }),
+                false,
             )
             .await?
             .ok_or_else(|| RoutingError::BedrockNotPresentInDictionary {

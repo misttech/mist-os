@@ -8,6 +8,7 @@ use async_trait::async_trait;
 use cm_types::Availability;
 use fidl_fuchsia_component_sandbox as fsandbox;
 use moniker::ExtendedMoniker;
+use router_error::RouterError;
 use sandbox::{Capability, Request, Router};
 
 struct AvailabilityRouter {
@@ -18,7 +19,12 @@ struct AvailabilityRouter {
 
 #[async_trait]
 impl sandbox::Routable for AvailabilityRouter {
-    async fn route(&self, request: Request) -> Result<Capability, router_error::RouterError> {
+    async fn route(
+        &self,
+        request: Option<Request>,
+        debug: bool,
+    ) -> Result<Capability, RouterError> {
+        let request = request.ok_or_else(|| RouterError::InvalidArgs)?;
         let AvailabilityRouter { router, availability, moniker } = self;
         // The availability of the request must be compatible with the
         // availability of this step of the route.
@@ -36,7 +42,7 @@ impl sandbox::Routable for AvailabilityRouter {
             Ok(updated) => {
                 request.metadata.set_availability(updated);
                 // Everything checks out, forward the request.
-                router.route(request).await
+                router.route(Some(request), debug).await
             }
             Err(e) => Err(RoutingError::from(e).into()),
         }
@@ -95,7 +101,7 @@ mod tests {
         let metadata = Dict::new();
         metadata.set_availability(Availability::Optional);
         let capability = proxy
-            .route(Request { target: FakeComponentToken::new(), debug: false, metadata })
+            .route(Some(Request { target: FakeComponentToken::new(), metadata }), false)
             .await
             .unwrap();
         let capability = match capability {
@@ -114,7 +120,7 @@ mod tests {
         let metadata = Dict::new();
         metadata.set_availability(Availability::Required);
         let error = proxy
-            .route(Request { target: FakeComponentToken::new(), debug: false, metadata })
+            .route(Some(Request { target: FakeComponentToken::new(), metadata }), false)
             .await
             .unwrap_err();
         assert_matches!(

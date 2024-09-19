@@ -989,9 +989,13 @@ impl ComponentInstance {
 
         #[async_trait]
         impl Routable for ProgramOutput {
-            async fn route(&self, request: Request) -> Result<Capability, RouterError> {
+            async fn route(
+                &self,
+                request: Option<Request>,
+                debug: bool,
+            ) -> Result<Capability, RouterError> {
                 let component = self.component.upgrade().map_err(RoutingError::from)?;
-                component.get_program_output_dict().await?.route(request).await
+                component.get_program_output_dict().await?.route(request, debug).await
             }
         }
 
@@ -1012,9 +1016,13 @@ impl ComponentInstance {
 
         #[async_trait]
         impl Routable for ComponentOutput {
-            async fn route(&self, request: Request) -> Result<Capability, RouterError> {
+            async fn route(
+                &self,
+                request: Option<Request>,
+                debug: bool,
+            ) -> Result<Capability, RouterError> {
                 let component = self.component.upgrade().map_err(RoutingError::from)?;
-                component.get_component_output_dict().await?.route(request).await
+                component.get_component_output_dict().await?.route(request, debug).await
             }
         }
 

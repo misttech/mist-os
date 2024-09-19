@@ -188,8 +188,12 @@ fn extend_dict_with_dictionary<C: ComponentInstanceInterface + 'static>(
         }
         #[async_trait]
         impl Routable for DictRouter {
-            async fn route(&self, request: Request) -> Result<Capability, RouterError> {
-                if request.debug {
+            async fn route(
+                &self,
+                _request: Option<Request>,
+                debug: bool,
+            ) -> Result<Capability, RouterError> {
+                if debug {
                     Ok(self
                         .source
                         .clone()
@@ -225,8 +229,8 @@ fn make_dict_extending_router(
     source_dict_router: Router,
     source: CapabilitySource,
 ) -> Router {
-    let route_fn = move |request: Request| {
-        if request.debug {
+    let route_fn = move |request: Option<Request>, debug: bool| {
+        if debug {
             return future::ok(
                 source
                     .clone()
@@ -239,7 +243,8 @@ fn make_dict_extending_router(
         let dict = dict.clone();
         let source_moniker = source.source_moniker();
         async move {
-            let source_dict = match source_dict_router.route(request).await? {
+            let request = request.ok_or_else(|| RouterError::InvalidArgs)?;
+            let source_dict = match source_dict_router.route(Some(request), debug).await? {
                 Capability::Dictionary(d) => Some(d),
                 // Optional from void.
                 cap @ Capability::Unit(_) => return Ok(cap),
@@ -279,12 +284,13 @@ fn make_dict_extending_router(
 fn weak_reference_program_output_router<C: ComponentInstanceInterface + 'static>(
     weak_component: WeakComponentInstanceInterface<C>,
 ) -> Router {
-    Router::new(move |request: Request| {
+    Router::new(move |request: Option<Request>, debug: bool| {
         let weak_component = weak_component.clone();
         async move {
+            let request = request.ok_or_else(|| RouterError::InvalidArgs)?;
             let component = weak_component.upgrade().map_err(RoutingError::from)?;
             let sandbox = component.component_sandbox().await.map_err(RoutingError::from)?;
-            sandbox.program_output_dict.route(request).await
+            sandbox.program_output_dict.route(Some(request), debug).await
         }
         .boxed()
     })
