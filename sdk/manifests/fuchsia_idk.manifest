@@ -369,6 +369,7 @@ fidl_library://fidl/fuchsia.version
 fidl_library://fidl/fuchsia.weave
 fidl_library://fidl/fuchsia.web
 fidl_library://fidl/fuchsia.wlan.common
+fidl_library://fidl/fuchsia.wlan.fullmac (unstable)
 fidl_library://fidl/fuchsia.wlan.ieee80211
 fidl_library://fidl/fuchsia.wlan.phyimpl
 fidl_library://fidl/fuchsia.wlan.policy

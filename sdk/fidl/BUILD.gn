@@ -192,6 +192,7 @@ sdk_fidl_targets = [
   "//sdk/fidl/fuchsia.weave:fuchsia.weave",
   "//sdk/fidl/fuchsia.web:fuchsia.web",
   "//sdk/fidl/fuchsia.wlan.common:fuchsia.wlan.common",
+  "//sdk/fidl/fuchsia.wlan.fullmac:fuchsia.wlan.fullmac",
   "//sdk/fidl/fuchsia.wlan.ieee80211:fuchsia.wlan.ieee80211",
   "//sdk/fidl/fuchsia.wlan.phyimpl:fuchsia.wlan.phyimpl",
   "//sdk/fidl/fuchsia.wlan.policy:fuchsia.wlan.policy",
