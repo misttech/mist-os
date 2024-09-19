@@ -223,7 +223,7 @@ zx_status_t crashlog_to_vmo(fbl::RefPtr<VmObject>* out, size_t* out_size) {
   return ZX_OK;
 }
 
-void bootstrap_vmos(Handle** handles) {
+void bootstrap_vmos(ktl::span<Handle*, userboot::kHandleCount> handles) {
   // The instrumentation VMOs need to be created prior to the rootfs as the information for these
   // vmos is in the phys handoff region, which becomes inaccessible once the rootfs is created.
   zx_status_t status = InstrumentationData::GetVmos(&handles[userboot::kFirstInstrumentationData]);
@@ -231,10 +231,11 @@ void bootstrap_vmos(Handle** handles) {
 
   HandoffEnd end = EndHandoff();
 
-  ktl::copy(end.extra_phys_vmos.begin(), end.extra_phys_vmos.end(),
-            &handles[userboot::kFirstExtraPhysVmo]);
+  for (size_t i = 0; i < PhysVmo::kMaxExtraHandoffPhysVmos; ++i) {
+    handles[userboot::kFirstExtraPhysVmo + i] = end.extra_phys_vmos[i].release();
+  }
 
-  handles[userboot::kZbi] = end.zbi;
+  handles[userboot::kZbi] = end.zbi.release();
 
   // Crashlog.
   fbl::RefPtr<VmObject> crashlog_vmo;
@@ -295,8 +296,9 @@ void userboot_init() {
   MessagePacketPtr msg;
   zx_status_t status = MessagePacket::Create(nullptr, 0, userboot::kHandleCount, &msg);
   ASSERT(status == ZX_OK);
-  Handle** const handles = msg->mutable_handles();
+
   DEBUG_ASSERT(msg->num_handles() == userboot::kHandleCount);
+  ktl::span<Handle*, userboot::kHandleCount> handles{msg->mutable_handles(), msg->num_handles()};
 
   // Create the process.
   KernelHandle<ProcessDispatcher> process_handle;

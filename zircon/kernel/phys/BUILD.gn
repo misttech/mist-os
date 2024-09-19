@@ -722,6 +722,13 @@ source_set("handoff") {
     "//zircon/kernel/lib/crypto:crypto-entropy-src.headers",
   ]
 
+  if (toolchain_environment == "kernel") {
+    public_deps += [
+      # handoff.h has #include <object/handle.h>
+      "//zircon/kernel/object:headers",
+    ]
+  }
+
   if (!is_kernel) {
     public_deps += [ "//zircon/system/public" ]
   }

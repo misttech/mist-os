@@ -190,10 +190,9 @@ extern "C" [[noreturn]] void PhysbootHandoff(PhysHandoff* handoff);
 
 // These functions relate to PhysHandoff but exist only in the kernel proper.
 
-#include <sys/types.h>
+#include <stddef.h>
 
-// Forward declaration; defined in <object/handle.h>.
-class Handle;
+#include <object/handle.h>
 
 // Called as soon as the physmap is available to set the gPhysHandoff pointer.
 void HandoffFromPhys(paddr_t handoff_paddr);
@@ -206,12 +205,12 @@ void HandoffFromPhys(paddr_t handoff_paddr);
 // (see EndHandoff()).
 struct HandoffEnd {
   // The data ZBI.
-  Handle* zbi;
+  HandleOwner zbi;
 
   // The VMOs deriving from the phys environment. As returned by EndHandoff(),
   // the entirety of the array will be populated by real handles (if only by
   // stub VMOs) (as is convenient for userboot, its intended caller).
-  std::array<Handle*, PhysVmo::kMaxExtraHandoffPhysVmos> extra_phys_vmos;
+  std::array<HandleOwner, PhysVmo::kMaxExtraHandoffPhysVmos> extra_phys_vmos;
 };
 
 // Formally ends the hand-off phase, unsetting gPhysHandoff and returning the
