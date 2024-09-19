@@ -8,7 +8,9 @@
 #include <lib/stdcompat/span.h>
 #include <lib/zx/vmar.h>
 
+#include <algorithm>
 #include <optional>
+#include <ranges>
 #include <type_traits>
 
 #include "abi.h"
@@ -275,7 +277,7 @@ class RemoteDynamicLinker {
 
   // Shorthand to create an InitialModuleList element for a root module, which
   // always has an explicit name.
-  static InitModule RootModule(DecodedModulePtr decoded_module, const Soname& visible_name) {
+  static InitModule RootModule(DecodedModulePtr decoded_module, Soname visible_name) {
     return InitModule{
         .decoded_module = std::move(decoded_module),
         .visible_name = visible_name,
@@ -373,7 +375,7 @@ class RemoteDynamicLinker {
   // Find an existing Module in the modules() list by name or SONAME.  Returns
   // nullptr if none matches.  The returned pointer is invalidated by adding
   // modules to the list.
-  Module* FindModule(const Soname& soname) {
+  Module* FindModule(Soname soname) {
     auto it = std::find(modules_.begin(), modules_.end(), soname);
     if (it != modules_.end()) {
       return &*it;
@@ -381,63 +383,18 @@ class RemoteDynamicLinker {
     return nullptr;
   }
 
-  // This is just a shorthand for std::all_of on the modules() list.
-  template <typename T>
-  bool OnModules(T&& callback) {
-    return OnModules(modules_, std::forward<T>(callback));
-  }
-  template <typename T>
-  bool OnModules(T&& callback) const {
-    return OnModules(modules_, std::forward<T>(callback));
-  }
-
   // This returns false if any module was not successfully decoded enough to
   // attempt relocation on it.  If this returns true, some modules may still
   // have errors like missing or incomplete symbol or relocation information,
   // but it's at least valid to call Relocate on them to generate whatever
   // specific errors might result.
-  bool AllModulesValid() const { return OnModules(&Module::HasModule); }
-
-  // This returns a view object that iterates over the modules() list but skips
-  // modules where the bool(Module&) callback returns false.
-  template <typename Predicate>
-  auto FilteredModules(Predicate&& predicate) {
-    static_assert(std::is_invocable_r_v<bool, Predicate, Module&>);
-    return FilteredModules(modules_, std::forward<Predicate>(predicate));
-  }
-  template <typename Predicate>
-  auto FilteredModules(Predicate&& predicate) const {
-    static_assert(std::is_invocable_r_v<bool, Predicate, const Module&>);
-    return FilteredModules(modules_, std::forward<Predicate>(predicate));
-  }
+  bool AllModulesValid() const { return std::ranges::all_of(modules_, &Module::HasModule); }
 
   // This is a shorthand for a view filtered down to modules that have been
   // decoded successfully enough to attempt relocation on them, i.e. where
   // .HasModule() returns true.
-  auto ValidModules() { return FilteredModules(&Module::HasModule); }
-  auto ValidModules() const { return FilteredModules(&Module::HasModule); }
-
-  // This filters the list with any predicate on Module.
-  template <typename T, typename Predicate>
-  bool OnFilteredModules(T&& callback, Predicate&& predicate) {
-    return OnModules(FilteredModules(std::forward<Predicate>(predicate)),
-                     std::forward<T>(callback));
-  }
-  template <typename T, typename Predicate>
-  bool OnFilteredModules(T&& callback, Predicate&& predicate) const {
-    return OnModules(FilteredModules(std::forward<Predicate>(predicate)),
-                     std::forward<T>(callback));
-  }
-
-  // This filters the list to exclude modules where .HasModule() fails.
-  template <typename T>
-  bool OnValidModules(T&& callback) {
-    return OnModules(ValidModules(), std::forward<T>(callback));
-  }
-  template <typename T>
-  bool OnValidModules(T&& callback) const {
-    return OnModules(ValidModules(), std::forward<T>(callback));
-  }
+  auto ValidModules() { return std::views::filter(modules_, &Module::HasModule); }
+  auto ValidModules() const { return std::views::filter(modules_, &Module::HasModule); }
 
   // Initialize the session by finding and decoding all the modules.  The root
   // modules from initial_modules (those with `.visible_name` set) go onto the
@@ -475,7 +432,7 @@ class RemoteDynamicLinker {
 
     assert(!initial_modules.empty());
 
-    assert(std::all_of(initial_modules.begin(), initial_modules.end(), [](const auto& init) {
+    assert(std::ranges::all_of(initial_modules, [](const auto& init) {
       return init.decoded_module && init.decoded_module->HasModule();
     }));
 
@@ -657,7 +614,7 @@ class RemoteDynamicLinker {
       }
       return module.Allocate(diag, vmar, vmar_offset);
     };
-    return OnModules(ValidModules(), allocate);
+    return std::ranges::all_of(ValidModules(), allocate);
   }
 
   // Acquire a StaticTlsDescResolver for Relocate that uses the stub dynamic
@@ -726,9 +683,9 @@ class RemoteDynamicLinker {
       });
     };
 
-    return OnModules(valid_modules, relocate) && FinishAbi(diag) &&
+    return std::ranges::all_of(valid_modules, relocate) && FinishAbi(diag) &&
            (Zygote == RemoteLoadZygote::kNo ||  // No need for non-zygote.
-            OnModules(valid_modules, protect_segments));
+            std::ranges::all_of(valid_modules, protect_segments));
   }
 
   // Load each module into the VMARs created by Allocate.  This should only be
@@ -745,7 +702,7 @@ class RemoteDynamicLinker {
   template <class Diagnostics>
   bool Load(Diagnostics& diag) {
     auto load = [&diag](Module& module) { return module.Load(diag); };
-    return OnValidModules(load);
+    return std::ranges::all_of(ValidModules(), load);
   }
 
   // This should only be called after Load (and everything before) has
@@ -786,7 +743,7 @@ class RemoteDynamicLinker {
 
   // Add a new module to the list.  If no decoded_module is supplied here,
   // it must be fetched later as a dependency.
-  void EmplaceModule(const Soname& name, std::optional<uint32_t> loaded_by_modid,
+  void EmplaceModule(Soname name, std::optional<uint32_t> loaded_by_modid,
                      DecodedModulePtr decoded_module = {}, bool symbols_visible = true) {
     modules_.emplace_back(name, loaded_by_modid);
     if (decoded_module) {
@@ -806,7 +763,7 @@ class RemoteDynamicLinker {
     }
 
     const uint32_t loaded_by_modid = module.module().symbolizer_modid;
-    for (const Soname& soname : module.decoded().needed()) {
+    for (Soname soname : module.decoded().needed()) {
       if (!FindModule(soname)) {
         EmplaceModule(soname, loaded_by_modid);
       }
@@ -857,25 +814,6 @@ class RemoteDynamicLinker {
                               elfldltl::ZirconError{result.error_value()});
     }
     return true;
-  }
-
-  template <typename List, typename T>
-  static bool OnModules(List&& modules, T&& callback) {
-    auto invoke = [&callback](auto& module) -> bool {
-      // Wrap it in std::invoke so a pointer to method can be used, since
-      // std::all_of doesn't.  (C++20 std::ranges::all_of does, so that could
-      // replace OnModules completely.)
-      return std::invoke(callback, module);
-    };
-    return std::all_of(std::begin(modules), std::end(modules), invoke);
-  }
-
-  template <typename Predicate>
-  static auto FilteredModules(List& modules, Predicate&& predicate) {
-    // Use a span to get a copyable view of the List, which must be used only
-    // by reference.
-    std::span view{modules};
-    return std::views::filter(view, std::forward<Predicate>(predicate));
   }
 
   AbiStubPtr abi_stub_;
