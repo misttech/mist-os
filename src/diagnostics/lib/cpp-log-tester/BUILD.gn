@@ -6,8 +6,9 @@ import("//build/components.gni")
 import("//build/cpp/sdk_source_set.gni")
 import("//build/rust/rustc_staticlib.gni")
 import("//build/test.gni")
+import("//build/testing/cc_test_executable.gni")
 
-executable("cpp-log-tester-unittest") {
+cc_test_executable("cpp-log-tester-unittest") {
   testonly = true
   sources = [ "test.cc" ]
   deps = [

@@ -4,6 +4,7 @@
 
 import("//build/components.gni")
 import("//build/rust/rustc_binary.gni")
+import("//build/testing/cc_test_executable.gni")
 
 declare_args() {
   # Controls how many bytes of space on disk are used to persist device logs.
@@ -43,7 +44,7 @@ fuchsia_shell_package("log_listener_shell_pkg") {
   ]
 }
 
-executable("log_listener_return_code_test") {
+cc_test_executable("log_listener_return_code_test") {
   testonly = true
 
   sources = [ "log_listener_return_code_test.cc" ]
