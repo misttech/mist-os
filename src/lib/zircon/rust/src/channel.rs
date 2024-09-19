@@ -49,11 +49,11 @@ impl Channel {
     /// [zx_channel_read](https://fuchsia.dev/fuchsia-src/reference/syscalls/channel_read.md)
     /// syscall. Care should be taken to avoid handle leaks by either transferring the
     /// returned handles out to another type or dropping them explicitly.
-    pub fn read_uninit(
+    pub fn read_uninit<'b, 'h>(
         &self,
-        bytes: &mut [MaybeUninit<u8>],
-        handles: &mut [MaybeUninit<Handle>],
-    ) -> ChannelReadResult<(&mut [u8], &mut [Handle])> {
+        bytes: &'b mut [MaybeUninit<u8>],
+        handles: &'h mut [MaybeUninit<Handle>],
+    ) -> ChannelReadResult<(&'b mut [u8], &'h mut [Handle])> {
         // SAFETY: bytes and handles are valid to write to for their lengths
         match unsafe {
             self.read_raw(
@@ -151,10 +151,14 @@ impl Channel {
             handles.truncate(0);
             match self.read_uninit(bytes.spare_capacity_mut(), handles.spare_capacity_mut()) {
                 ChannelReadResult::Ok((byte_slice, handle_slice)) => {
+                    // Drop the output slices before mutating the input buffers.
+                    let (bytes_len, handles_len) = (byte_slice.len(), handle_slice.len());
+                    drop((byte_slice, handle_slice));
+
                     // SAFETY: the kernel has initialized the vecs up to the length of these slices.
                     unsafe {
-                        bytes.set_len(byte_slice.len());
-                        handles.set_len(handle_slice.len());
+                        bytes.set_len(bytes_len);
+                        handles.set_len(handles_len);
                     }
                     return Ok(());
                 }
@@ -167,14 +171,17 @@ impl Channel {
         }
     }
 
-    /// Read a message from a channel. Wraps the
+    /// Read a message from a channel. Care should be taken to avoid handle leaks by either
+    /// transferring the returned handles out to another type or dropping them explicitly.
+    ///
+    /// Wraps the
     /// [zx_channel_read](https://fuchsia.dev/fuchsia-src/reference/syscalls/channel_read.md)
     /// syscall.
-    pub fn read_etc_uninit(
+    pub fn read_etc_uninit<'b, 'h>(
         &self,
-        bytes: &mut [MaybeUninit<u8>],
-        handles: &mut [MaybeUninit<HandleInfo>],
-    ) -> ChannelReadResult<(&mut [u8], &mut [HandleInfo])> {
+        bytes: &'b mut [MaybeUninit<u8>],
+        handles: &'h mut [MaybeUninit<HandleInfo>],
+    ) -> ChannelReadResult<(&'b mut [u8], &'h mut [HandleInfo])> {
         // SAFETY: bytes and handles are valid to write to for their lengths
         match unsafe {
             self.read_etc_raw(
@@ -284,10 +291,14 @@ impl Channel {
             handles.clear();
             match self.read_etc_uninit(bytes.spare_capacity_mut(), handles.spare_capacity_mut()) {
                 ChannelReadResult::Ok((byte_slice, handle_slice)) => {
+                    // Drop the output slices before mutating the input buffers.
+                    let (bytes_len, handles_len) = (byte_slice.len(), handle_slice.len());
+                    drop((byte_slice, handle_slice));
+
                     // SAFETY: the kernel has initialized the vecs up to the length of these slices.
                     unsafe {
-                        bytes.set_len(byte_slice.len());
-                        handles.set_len(handle_slice.len());
+                        bytes.set_len(bytes_len);
+                        handles.set_len(handles_len);
                     }
                     return Ok(());
                 }
@@ -454,11 +465,15 @@ impl Channel {
             buf.handles.spare_capacity_mut(),
         )?;
 
+        // Drop the output slices before mutating the input buffers.
+        let (bytes_len, handles_len) = (actual_bytes.len(), actual_handles.len());
+        drop((actual_bytes, actual_handles));
+
         // SAFETY: the kernel has initialized these slices with valid values after the call above
         // succeeded.
         unsafe {
-            buf.bytes.set_len(actual_bytes.len());
-            buf.handles.set_len(actual_handles.len());
+            buf.bytes.set_len(bytes_len);
+            buf.handles.set_len(handles_len);
         }
 
         Ok(())
@@ -486,14 +501,14 @@ impl Channel {
     /// syscall.
     ///
     /// On failure returns the both the main and read status.
-    pub fn call_uninit(
+    pub fn call_uninit<'b, 'h>(
         &self,
         timeout: MonotonicTime,
         bytes_in: &[u8],
         handles_in: &mut [Handle],
-        bytes_out: &mut [MaybeUninit<u8>],
-        handles_out: &mut [MaybeUninit<Handle>],
-    ) -> Result<(&mut [u8], &mut [Handle]), Status> {
+        bytes_out: &'b mut [MaybeUninit<u8>],
+        handles_out: &'h mut [MaybeUninit<Handle>],
+    ) -> Result<(&'b mut [u8], &'h mut [Handle]), Status> {
         // SAFETY: in-pointers are both valid to read from for their provided lengths, and
         // out-pointers are both valid to write to for their provided lengths.
         let (actual_bytes, actual_handles) = unsafe {
@@ -659,11 +674,15 @@ impl Channel {
             buf.handle_infos.spare_capacity_mut(),
         )?;
 
+        // Drop the output slices before mutating the input buffers.
+        let (bytes_len, handles_len) = (actual_bytes.len(), actual_handles.len());
+        drop((actual_bytes, actual_handles));
+
         // SAFETY: the kernel has initialized these slices with valid values after the call above
         // succeeded.
         unsafe {
-            buf.bytes.set_len(actual_bytes.len());
-            buf.handle_infos.set_len(actual_handles.len());
+            buf.bytes.set_len(bytes_len);
+            buf.handle_infos.set_len(handles_len);
         }
 
         Ok(())
@@ -693,14 +712,14 @@ impl Channel {
     /// syscall.
     ///
     /// On failure returns the both the main and read status.
-    pub fn call_etc_uninit(
+    pub fn call_etc_uninit<'b, 'h>(
         &self,
         timeout: MonotonicTime,
         bytes_in: &[u8],
         handles_in: &mut [HandleDisposition<'_>],
-        bytes_out: &mut [MaybeUninit<u8>],
-        handles_out: &mut [MaybeUninit<HandleInfo>],
-    ) -> Result<(&mut [u8], &mut [HandleInfo]), Status> {
+        bytes_out: &'b mut [MaybeUninit<u8>],
+        handles_out: &'h mut [MaybeUninit<HandleInfo>],
+    ) -> Result<(&'b mut [u8], &'h mut [HandleInfo]), Status> {
         // SAFETY: in-pointers are both valid to read from for their provided lengths, and
         // out-pointers are both valid to write to for their provided lengths.
         let (actual_bytes, actual_handles) = unsafe {
@@ -1138,7 +1157,9 @@ mod tests {
         let mut empty = vec![];
         assert!(p1.write(b"hello", &mut empty).is_ok());
 
-        let result = p2.read_uninit(&mut vec![], &mut vec![]);
+        let mut bytes = vec![];
+        let mut handles = vec![];
+        let result = p2.read_uninit(&mut bytes, &mut handles);
         assert_eq!(result, ChannelReadResult::BufferTooSmall { bytes_avail: 5, handles_avail: 0 });
     }
 
@@ -1149,7 +1170,9 @@ mod tests {
         let mut empty = vec![];
         assert!(p1.write_etc(b"hello", &mut empty).is_ok());
 
-        let result = p2.read_etc_uninit(&mut vec![], &mut vec![]);
+        let mut bytes = vec![];
+        let mut handles = vec![];
+        let result = p2.read_etc_uninit(&mut bytes, &mut handles);
         assert_eq!(result, ChannelReadResult::BufferTooSmall { bytes_avail: 5, handles_avail: 0 });
     }
 
