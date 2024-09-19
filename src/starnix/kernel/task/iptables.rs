@@ -725,6 +725,7 @@ impl IpTables {
                         | CommitError::TransparentProxyWithInvalidMatcher(_)
                         | CommitError::CyclicalRoutineGraph(_)
                         | CommitError::RedirectWithInvalidMatcher(_)
+                        | CommitError::MasqueradeWithInvalidMatcher(_)
                         | CommitError::ErrorOnChange(_)),
                     ) => {
                         log_warn!(

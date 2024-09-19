@@ -4327,7 +4327,7 @@ async fn setup_redirect_test<'a>(
         Resource::Rule(Rule {
             id: RuleId { routine: routine_id.clone(), index: 0 },
             matchers: Matchers { transport_protocol: Some(matcher), ..Default::default() },
-            action: Action::Redirect { dst_port: redirect },
+            action: Action::Redirect { dst_port: redirect.map(fnet_filter_ext::PortRange) },
         }),
     ];
     controller

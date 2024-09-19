@@ -62,10 +62,10 @@ pub enum FidlConversionError {
     InvalidPortMatcherRange,
     #[error("transparent proxy action specified an invalid local port of 0")]
     UnspecifiedTransparentProxyPort,
-    #[error("redirect action specified an invalid destination port of 0")]
-    UnspecifiedRedirectPort,
-    #[error("invalid redirect port range (start must be <= end)")]
-    InvalidRedirectPortRange,
+    #[error("NAT action specified an invalid rewrite port of 0")]
+    UnspecifiedNatPort,
+    #[error("invalid port range (start must be <= end)")]
+    InvalidPortRange,
     #[error("non-error result variant could not be converted to an error")]
     NotAnError,
 }
@@ -939,7 +939,8 @@ pub enum Action {
     Jump(String),
     Return,
     TransparentProxy(TransparentProxy),
-    Redirect { dst_port: Option<RangeInclusive<NonZeroU16>> },
+    Redirect { dst_port: Option<PortRange> },
+    Masquerade { src_port: Option<PortRange> },
 }
 
 /// Extension type for [`fnet_filter::TransparentProxy_`].
@@ -948,6 +949,31 @@ pub enum TransparentProxy {
     LocalAddr(fnet::IpAddress),
     LocalPort(NonZeroU16),
     LocalAddrAndPort(fnet::IpAddress, NonZeroU16),
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct PortRange(pub RangeInclusive<NonZeroU16>);
+
+impl From<PortRange> for fnet_filter::PortRange {
+    fn from(range: PortRange) -> Self {
+        let PortRange(range) = range;
+        Self { start: range.start().get(), end: range.end().get() }
+    }
+}
+
+impl TryFrom<fnet_filter::PortRange> for PortRange {
+    type Error = FidlConversionError;
+
+    fn try_from(range: fnet_filter::PortRange) -> Result<Self, Self::Error> {
+        let fnet_filter::PortRange { start, end } = range;
+        if start > end {
+            Err(FidlConversionError::InvalidPortRange)
+        } else {
+            let start = NonZeroU16::new(start).ok_or(FidlConversionError::UnspecifiedNatPort)?;
+            let end = NonZeroU16::new(end).ok_or(FidlConversionError::UnspecifiedNatPort)?;
+            Ok(Self(start..=end))
+        }
+    }
 }
 
 impl From<Action> for fnet_filter::Action {
@@ -972,10 +998,11 @@ impl From<Action> for fnet_filter::Action {
                 }
             }),
             Action::Redirect { dst_port } => Self::Redirect(fnet_filter::Redirect {
-                dst_port: dst_port.map(|range| fnet_filter::PortRange {
-                    start: range.start().get(),
-                    end: range.end().get(),
-                }),
+                dst_port: dst_port.map(Into::into),
+                __source_breaking: SourceBreaking,
+            }),
+            Action::Masquerade { src_port } => Self::Masquerade(fnet_filter::Masquerade {
+                src_port: src_port.map(Into::into),
                 __source_breaking: SourceBreaking,
             }),
         }
@@ -1019,22 +1046,11 @@ impl TryFrom<fnet_filter::Action> for Action {
             fnet_filter::Action::Redirect(fnet_filter::Redirect {
                 dst_port,
                 __source_breaking,
-            }) => {
-                let dst_port = dst_port
-                    .map(|fnet_filter::PortRange { start, end }| {
-                        if start > end {
-                            Err(FidlConversionError::InvalidRedirectPortRange)
-                        } else {
-                            let start = NonZeroU16::new(start)
-                                .ok_or(FidlConversionError::UnspecifiedRedirectPort)?;
-                            let end = NonZeroU16::new(end)
-                                .ok_or(FidlConversionError::UnspecifiedRedirectPort)?;
-                            Ok(start..=end)
-                        }
-                    })
-                    .transpose()?;
-                Ok(Self::Redirect { dst_port })
-            }
+            }) => Ok(Self::Redirect { dst_port: dst_port.map(TryInto::try_into).transpose()? }),
+            fnet_filter::Action::Masquerade(fnet_filter::Masquerade {
+                src_port,
+                __source_breaking,
+            }) => Ok(Self::Masquerade { src_port: src_port.map(TryInto::try_into).transpose()? }),
             fnet_filter::Action::__SourceBreaking { .. } => {
                 Err(FidlConversionError::UnknownUnionVariant(type_names::ACTION))
             }
@@ -1405,8 +1421,10 @@ pub enum ChangeValidationError {
     InvalidPortMatcher,
     #[error("rule specifies an invalid transparent proxy action")]
     InvalidTransparentProxyAction,
-    #[error("rule specifies an invalid redirect action")]
-    InvalidRedirectAction,
+    #[error("rule specifies an invalid NAT action")]
+    InvalidNatAction,
+    #[error("rule specifies an invalid port range")]
+    InvalidPortRange,
 }
 
 impl TryFrom<fnet_filter::ChangeValidationError> for ChangeValidationError {
@@ -1427,9 +1445,8 @@ impl TryFrom<fnet_filter::ChangeValidationError> for ChangeValidationError {
             fnet_filter::ChangeValidationError::InvalidTransparentProxyAction => {
                 Ok(Self::InvalidTransparentProxyAction)
             }
-            fnet_filter::ChangeValidationError::InvalidRedirectAction => {
-                Ok(Self::InvalidRedirectAction)
-            }
+            fnet_filter::ChangeValidationError::InvalidNatAction => Ok(Self::InvalidNatAction),
+            fnet_filter::ChangeValidationError::InvalidPortRange => Ok(Self::InvalidPortRange),
             fnet_filter::ChangeValidationError::Ok
             | fnet_filter::ChangeValidationError::NotReached => {
                 Err(FidlConversionError::NotAnError)
@@ -1511,6 +1528,11 @@ pub enum CommitError {
         protocol matcher: {0:?}"
     )]
     RedirectWithInvalidMatcher(RuleId),
+    #[error(
+        "rule has a Masquerade action that specifies a source port but not a valid transport \
+        protocol matcher: {0:?}"
+    )]
+    MasqueradeWithInvalidMatcher(RuleId),
     #[error("routine forms a cycle {0:?}")]
     CyclicalRoutineGraph(RoutineId),
     #[error("invalid change was pushed: {0:?}")]
@@ -1663,7 +1685,8 @@ pub(crate) fn handle_change_validation_result(
                         | fnet_filter::ChangeValidationError::InvalidAddressMatcher
                         | fnet_filter::ChangeValidationError::InvalidPortMatcher
                         | fnet_filter::ChangeValidationError::InvalidTransparentProxyAction
-                        | fnet_filter::ChangeValidationError::InvalidRedirectAction) => {
+                        | fnet_filter::ChangeValidationError::InvalidNatAction
+                        | fnet_filter::ChangeValidationError::InvalidPortRange) => {
                             let error = error
                                 .try_into()
                                 .expect("`Ok` and `NotReached` are handled in another arm");
@@ -1704,6 +1727,9 @@ pub(crate) fn handle_commit_result(
         }
         fnet_filter::CommitResult::RedirectWithInvalidMatcher(rule_id) => {
             Err(CommitError::RedirectWithInvalidMatcher(rule_id.into()))
+        }
+        fnet_filter::CommitResult::MasqueradeWithInvalidMatcher(rule_id) => {
+            Err(CommitError::MasqueradeWithInvalidMatcher(rule_id.into()))
         }
         fnet_filter::CommitResult::CyclicalRoutineGraph(routine_id) => {
             Err(CommitError::CyclicalRoutineGraph(routine_id.into()))

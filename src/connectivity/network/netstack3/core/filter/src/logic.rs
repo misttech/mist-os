@@ -86,6 +86,17 @@ pub(crate) enum RoutineResult<I: IpExt> {
         /// If absent, the destination port of the packet is not rewritten.
         dst_port: Option<RangeInclusive<NonZeroU16>>,
     },
+    /// Source NAT (SNAT) should be performed to rewrite the source address of the
+    /// packet to one owned by the outgoing interface.
+    Masquerade {
+        /// The optional range of source ports used to rewrite the packet.
+        ///
+        /// If absent, the source port of the packet is not rewritten.
+        //
+        // TODO(https://fxbug.dev/341771631): implement Masquerade NAT.
+        #[allow(dead_code)]
+        src_port: Option<RangeInclusive<NonZeroU16>>,
+    },
 }
 
 impl<I: IpExt> RoutineResult<I> {
@@ -94,7 +105,8 @@ impl<I: IpExt> RoutineResult<I> {
             RoutineResult::Accept
             | RoutineResult::Drop
             | RoutineResult::TransparentLocalDelivery { .. }
-            | RoutineResult::Redirect { .. } => true,
+            | RoutineResult::Redirect { .. }
+            | RoutineResult::Masquerade { .. } => true,
             RoutineResult::Return => false,
         }
     }
@@ -164,6 +176,9 @@ where
                 Action::Redirect { dst_port } => {
                     return RoutineResult::Redirect { dst_port: dst_port.clone() }
                 }
+                Action::Masquerade { src_port } => {
+                    return RoutineResult::Masquerade { src_port: src_port.clone() }
+                }
             }
         }
     }
@@ -190,8 +205,8 @@ where
                     "transparent local delivery is only valid in INGRESS hook; got {result:?}"
                 )
             }
-            result @ RoutineResult::Redirect { .. } => {
-                unreachable!("Redirect NAT is only valid in NAT routines; got {result:?}")
+            result @ (RoutineResult::Redirect { .. } | RoutineResult::Masquerade { .. }) => {
+                unreachable!("NAT actions are only valid in NAT routines; got {result:?}")
             }
         }
     }
@@ -216,8 +231,8 @@ where
             RoutineResult::TransparentLocalDelivery { addr, port } => {
                 return IngressVerdict::TransparentLocalDelivery { addr, port };
             }
-            result @ RoutineResult::Redirect { .. } => {
-                unreachable!("Redirect NAT is only valid in NAT routines; got {result:?}")
+            result @ (RoutineResult::Redirect { .. } | RoutineResult::Masquerade { .. }) => {
+                unreachable!("NAT actions are only valid in NAT routines; got {result:?}")
             }
         }
     }

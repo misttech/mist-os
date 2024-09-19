@@ -1082,8 +1082,8 @@ async fn inspect_filtering_state(name: &str) {
     use fnet_filter_ext::{
         Action, AddressMatcher, AddressMatcherType, Change, Controller, ControllerId, Domain,
         InstalledIpRoutine, InstalledNatRoutine, InterfaceMatcher, IpHook, Matchers, Namespace,
-        NamespaceId, NatHook, PortMatcher, Resource, Routine, RoutineId, RoutineType, Rule, RuleId,
-        TransportProtocolMatcher,
+        NamespaceId, NatHook, PortMatcher, PortRange, Resource, Routine, RoutineId, RoutineType,
+        Rule, RuleId, TransportProtocolMatcher,
     };
 
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
@@ -1269,7 +1269,9 @@ async fn inspect_filtering_state(name: &str) {
                         }),
                         ..Default::default()
                     },
-                    action: Action::Redirect { dst_port: Some(NONZERO_PORT..=NONZERO_PORT) },
+                    action: Action::Redirect {
+                        dst_port: Some(PortRange(NONZERO_PORT..=NONZERO_PORT)),
+                    },
                 }),
             ]
             .into_iter()

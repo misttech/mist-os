@@ -1437,7 +1437,9 @@ impl Entry {
                     }
                     let start = NonZeroU16::new(range.start).ok_or_else(invalid_range_fn)?;
                     let end = NonZeroU16::new(range.end).ok_or_else(invalid_range_fn)?;
-                    Ok(Some(fnet_filter_ext::Action::Redirect { dst_port: Some(start..=end) }))
+                    Ok(Some(fnet_filter_ext::Action::Redirect {
+                        dst_port: Some(fnet_filter_ext::PortRange(start..=end)),
+                    }))
                 }
             }
 
@@ -3570,7 +3572,7 @@ mod tests {
                     ..Default::default()
                 },
                 action: fnet_filter_ext::Action::Redirect {
-                    dst_port: Some(NONZERO_PORT..=NONZERO_PORT),
+                    dst_port: Some(fnet_filter_ext::PortRange(NONZERO_PORT..=NONZERO_PORT)),
                 },
             },
             fnet_filter_ext::Rule {
@@ -3585,7 +3587,9 @@ mod tests {
                     }),
                     ..Default::default()
                 },
-                action: fnet_filter_ext::Action::Redirect { dst_port: Some(NONZERO_PORT_RANGE) },
+                action: fnet_filter_ext::Action::Redirect {
+                    dst_port: Some(fnet_filter_ext::PortRange(NONZERO_PORT_RANGE)),
+                },
             },
             fnet_filter_ext::Rule {
                 id: fnet_filter_ext::RuleId {

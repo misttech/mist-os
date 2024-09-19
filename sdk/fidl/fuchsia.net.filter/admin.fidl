@@ -111,10 +111,12 @@ closed protocol NamespaceController {
             /// The change included a transparent proxy action with an invalid
             /// configuration (e.g. a local port of 0).
             INVALID_TRANSPARENT_PROXY_ACTION = 7;
-            /// The change included a redirect NAT action with an invalid
-            /// configuration (e.g. a destination port of 0 or an invalid port
-            /// range).
-            INVALID_REDIRECT_ACTION = 8;
+            /// The change included a NAT action with an invalid configuration
+            /// (e.g. a destination or source port of 0).
+            INVALID_NAT_ACTION = 8;
+            /// The change included an action with an invalid port range (e.g.
+            /// the range start was not <= range end).
+            INVALID_PORT_RANGE = 9;
         }>:MAX_BATCH_SIZE;
     });
 
@@ -183,6 +185,11 @@ closed protocol NamespaceController {
         /// transport protocol to ensure that the packet has either a TCP or UDP
         /// header.
         7: redirect_with_invalid_matcher RuleId;
+        /// A rule has a Masquerade action without a corresponding valid
+        /// matcher: if the action specifies a source port, the rule must match
+        /// on transport protocol to ensure that the packet has either a TCP or
+        /// UDP header.
+        8: masquerade_with_invalid_matcher RuleId;
     });
 };
 

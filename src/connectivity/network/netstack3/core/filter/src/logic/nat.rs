@@ -137,6 +137,9 @@ impl<I: IpExt> NatHook<I> for IngressHook {
                 );
                 ControlFlow::Break((verdict.into(), nat_type))
             }
+            result @ RoutineResult::Masquerade { .. } => {
+                unreachable!("masquerade NAT is only valid in EGRESS hook; got {result:?}")
+            }
         }
     }
 
@@ -201,6 +204,9 @@ impl<I: IpExt> NatHook<I> for LocalEgressHook {
                 unreachable!(
                     "transparent local delivery is only valid in INGRESS hook; got {result:?}"
                 )
+            }
+            result @ RoutineResult::Masquerade { .. } => {
+                unreachable!("masquerade NAT is only valid in EGRESS hook; got {result:?}")
             }
             RoutineResult::Redirect { dst_port } => {
                 ControlFlow::Break(configure_redirect_nat::<Self, _, _, _, _>(
