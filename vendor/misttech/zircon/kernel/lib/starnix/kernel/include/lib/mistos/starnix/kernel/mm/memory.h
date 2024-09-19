@@ -15,6 +15,7 @@
 
 #include <fbl/ref_counted.h>
 #include <fbl/ref_ptr.h>
+#include <fbl/vector.h>
 #include <ktl/move.h>
 #include <ktl/optional.h>
 #include <ktl/span.h>
@@ -78,9 +79,17 @@ class MemoryObject : public fbl::RefCounted<MemoryObject> {
 
   fit::result<zx_status_t, fbl::RefPtr<MemoryObject>> duplicate_handle(zx_rights_t rights) const;
 
+  /// Read from a virtual memory object.
+  ///
   fit::result<zx_status_t> read(ktl::span<uint8_t>& data, uint64_t offset) const;
 
+  /// Same as read, but reads into memory that might not be initialized, returning an initialized
+  /// slice of bytes on success.
   fit::result<zx_status_t> read_uninit(ktl::span<uint8_t>& data, uint64_t offset) const;
+
+  /// Same as read, but returns a Vec.
+  fit::result<zx_status_t, fbl::Vector<uint8_t>> read_to_vec(uint64_t offset,
+                                                             uint64_t length) const;
 
   fit::result<zx_status_t> write(const ktl::span<const uint8_t>& data, uint64_t offset) const;
 

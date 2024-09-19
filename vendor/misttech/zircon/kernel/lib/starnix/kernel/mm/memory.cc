@@ -14,7 +14,9 @@
 #include <zircon/types.h>
 
 #include <fbl/alloc_checker.h>
+#include <fbl/vector.h>
 #include <ktl/span.h>
+#include <object/handle.h>
 #include <object/process_dispatcher.h>
 #include <object/vm_address_region_dispatcher.h>
 #include <object/vm_object_dispatcher.h>
@@ -22,12 +24,11 @@
 #include <vm/vm_object.h>
 
 #include "../kernel_priv.h"
-#include "object/handle.h"
 
 #define LOCAL_TRACE STARNIX_KERNEL_GLOBAL_TRACE(2)
 
 namespace {
-  
+
 // adapted from syscalls/vmar.cc
 zx_status_t vmar_map_common(zx_vm_option_t options, fbl::RefPtr<VmAddressRegionDispatcher> vmar,
                             uint64_t vmar_offset, zx_rights_t vmar_rights,
@@ -402,6 +403,27 @@ fit::result<zx_status_t> MemoryObject::read(ktl::span<uint8_t>& data, uint64_t o
 fit::result<zx_status_t> MemoryObject::read_uninit(ktl::span<uint8_t>& data,
                                                    uint64_t offset) const {
   return MemoryObject::read(data, offset);
+}
+
+fit::result<zx_status_t, fbl::Vector<uint8_t>> MemoryObject::read_to_vec(uint64_t offset,
+                                                                         uint64_t length) const {
+  fbl::AllocChecker ac;
+  fbl::Vector<uint8_t> buffer;
+  buffer.reserve(length, &ac);
+  if (!ac.check()) {
+    return fit::error(ZX_ERR_NO_MEMORY);
+  }
+  ktl::span<uint8_t> data{buffer.data(), length};
+  auto result = read_uninit(data, offset);
+  if (result.is_error()) {
+    return result.take_error();
+  }
+  {
+    // SAFETY: since read_uninit succeeded we know that we can consider the buffer
+    // initialized.
+    buffer.set_size(length);
+  }
+  return fit::ok(ktl::move(buffer));
 }
 
 fit::result<zx_status_t> MemoryObject::write(const ktl::span<const uint8_t>& data,

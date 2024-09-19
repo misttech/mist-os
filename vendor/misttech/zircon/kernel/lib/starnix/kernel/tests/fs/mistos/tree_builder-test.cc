@@ -8,7 +8,7 @@
 #include <lib/mistos/starnix/kernel/task/kernel.h>
 #include <lib/mistos/starnix/kernel/task/task.h>
 #include <lib/mistos/starnix/kernel/vfs/fs_node.h>
-#include <lib/mistos/starnix/kernel/vfs/vmo_file.h>
+#include <lib/mistos/starnix/kernel/vfs/memory_file.h>
 #include <lib/mistos/starnix/testing/testing.h>
 #include <lib/unittest/unittest.h>
 
@@ -38,10 +38,10 @@ bool two_files() {
   ASSERT(ac.check());
 
   ASSERT_TRUE(
-      tree.add_entry(path_a, ktl::move(ktl::unique_ptr<FsNodeOps>(VmoFileNode::New().value())))
+      tree.add_entry(path_a, ktl::move(ktl::unique_ptr<FsNodeOps>(MemoryFileNode::New().value())))
           .is_ok());
   ASSERT_TRUE(
-      tree.add_entry(path_b, ktl::move(ktl::unique_ptr<FsNodeOps>(VmoFileNode::New().value())))
+      tree.add_entry(path_b, ktl::move(ktl::unique_ptr<FsNodeOps>(MemoryFileNode::New().value())))
           .is_ok());
 
   auto root = tree.build(fs);
@@ -80,13 +80,13 @@ bool overlapping_paths() {
   ASSERT(ac.check());
 
   ASSERT_TRUE(
-      tree.add_entry(path_a, ktl::move(ktl::unique_ptr<FsNodeOps>(VmoFileNode::New().value())))
+      tree.add_entry(path_a, ktl::move(ktl::unique_ptr<FsNodeOps>(MemoryFileNode::New().value())))
           .is_ok());
   ASSERT_TRUE(
-      tree.add_entry(path_b, ktl::move(ktl::unique_ptr<FsNodeOps>(VmoFileNode::New().value())))
+      tree.add_entry(path_b, ktl::move(ktl::unique_ptr<FsNodeOps>(MemoryFileNode::New().value())))
           .is_ok());
   ASSERT_TRUE(
-      tree.add_entry(path_c, ktl::move(ktl::unique_ptr<FsNodeOps>(VmoFileNode::New().value())))
+      tree.add_entry(path_c, ktl::move(ktl::unique_ptr<FsNodeOps>(MemoryFileNode::New().value())))
           .is_ok());
 
   auto root = tree.build(fs);
