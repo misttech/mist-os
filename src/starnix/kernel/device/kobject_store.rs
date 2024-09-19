@@ -53,6 +53,11 @@ impl KObjectStore {
         self.get_or_create_class("tty".into(), self.virtual_bus())
     }
 
+    // This class name is exposed to userspace. It's unclear whether we should be using this name.
+    pub fn starnix_class(&self) -> Class {
+        self.get_or_create_class("starnix".into(), self.virtual_bus())
+    }
+
     pub fn get_or_create_bus(&self, name: &FsStr) -> Bus {
         let collection =
             Collection::new(self.bus.get_or_create_child(name, BusCollectionDirectory::new));

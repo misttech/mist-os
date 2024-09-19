@@ -3,8 +3,6 @@
 // found in the LICENSE file.
 
 use rutabaga_gfx::*;
-use starnix_core::device::kobject::DeviceMetadata;
-use starnix_core::device::DeviceMode;
 use starnix_core::fs::sysfs::DeviceDirectory;
 use starnix_core::task::CurrentTask;
 use starnix_core::vfs::{FileOps, FsNode};
@@ -33,21 +31,15 @@ where
     let kernel = current_task.kernel();
     let registry = &kernel.device_registry;
 
-    let starnix_class =
-        registry.objects.get_or_create_class("starnix".into(), registry.objects.virtual_bus());
-
-    let gpu_type: DeviceType =
-        registry.register_dyn_chrdev(create_gpu_device).expect("gpu device register failed.");
-
     let _ = RutabagaBuilder::new(RutabagaComponentType::Gfxstream, 0)
         .build(RutabagaFenceHandler::new(move |_| {}), std::option::Option::None);
 
-    registry.add_device(
+    registry.add_and_register_dyn_device(
         locked,
         current_task,
         "virtio-gpu".into(),
-        DeviceMetadata::new("virtio-gpu".into(), gpu_type, DeviceMode::Char),
-        starnix_class,
+        registry.objects.starnix_class(),
         DeviceDirectory::new,
+        create_gpu_device,
     );
 }

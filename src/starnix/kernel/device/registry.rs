@@ -280,6 +280,27 @@ impl DeviceRegistry {
         device
     }
 
+    pub fn add_and_register_dyn_device<F, N, L>(
+        &self,
+        locked: &mut Locked<'_, L>,
+        current_task: &CurrentTask,
+        name: &FsStr,
+        class: Class,
+        create_device_sysfs_ops: F,
+        device: impl DeviceOps,
+    ) -> Device
+    where
+        F: Fn(Device) -> N + Send + Sync + 'static,
+        N: FsNodeOps,
+        L: LockBefore<FileOpsCore>,
+    {
+        let device_type = self.register_dyn_chrdev(device).expect("register dynamic char device");
+        let metadata = DeviceMetadata::new(name.into(), device_type, DeviceMode::Char);
+        let device = self.objects.create_device(name, metadata, class, create_device_sysfs_ops);
+        self.notify_device(locked, current_task, device.clone());
+        device
+    }
+
     pub fn add_device<F, N, L>(
         &self,
         locked: &mut Locked<'_, L>,
