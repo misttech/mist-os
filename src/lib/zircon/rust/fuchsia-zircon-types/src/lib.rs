@@ -655,6 +655,7 @@ pub const ZX_VMO_CHILD_SNAPSHOT_MODIFIED: u32 = 1 << 7;
 // channel write size constants
 pub const ZX_CHANNEL_MAX_MSG_HANDLES: u32 = 64;
 pub const ZX_CHANNEL_MAX_MSG_BYTES: u32 = 65536;
+pub const ZX_CHANNEL_MAX_MSG_IOVEC: u32 = 8192;
 
 // fifo write size constants
 pub const ZX_FIFO_MAX_SIZE_BYTES: u32 = 4096;
@@ -728,6 +729,9 @@ pub struct zx_handle_info_t {
     pub unused: u32,
 }
 
+pub const ZX_CHANNEL_READ_MAY_DISCARD: u32 = 1;
+pub const ZX_CHANNEL_WRITE_USE_IOVEC: u32 = 2;
+
 #[repr(C)]
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct zx_channel_call_args_t {
@@ -752,6 +756,14 @@ pub struct zx_channel_call_etc_args_t {
     pub wr_num_handles: u32,
     pub rd_num_bytes: u32,
     pub rd_num_handles: u32,
+}
+
+#[repr(C)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+pub struct zx_channel_iovec_t {
+    pub buffer: *const u8,
+    pub capacity: u32,
+    pub reserved: u32,
 }
 
 #[repr(C)]

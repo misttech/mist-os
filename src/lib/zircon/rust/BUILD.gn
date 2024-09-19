@@ -9,6 +9,7 @@ import("//build/rust/rustc_test.gni")
 
 _common_sources = [
   "src/bti.rs",
+  "src/channel/io_slice.rs",
   "src/channel/message_buf.rs",
   "src/channel/mod.rs",
   "src/clock.rs",
