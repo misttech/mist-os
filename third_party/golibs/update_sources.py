@@ -19,7 +19,7 @@ import sys
 def is_source(f):
     """Returns true iff the input file name is considered a source file."""
     return not f.endswith('_test.go') and (
-        f.endswith('.go') or f.endswith('.s'))
+            f.endswith('.go') or f.endswith('.s') or f.endswith('.binpb'))
 
 
 def all_sources(golibs_dir, lib_name):
