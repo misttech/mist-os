@@ -44,6 +44,7 @@ python_library("honeydew_no_testonly") {
     "affordances/fuchsia_controller/bluetooth/profiles/__init__.py",
     "affordances/fuchsia_controller/bluetooth/profiles/bluetooth_gap.py",
     "affordances/fuchsia_controller/bluetooth/profiles/bluetooth_le.py",
+    "affordances/fuchsia_controller/netstack.py",
     "affordances/fuchsia_controller/rtc.py",
     "affordances/fuchsia_controller/tracing.py",
     "affordances/fuchsia_controller/ui/__init__.py",
@@ -77,6 +78,7 @@ python_library("honeydew_no_testonly") {
     "interfaces/affordances/bluetooth/profiles/bluetooth_gap.py",
     "interfaces/affordances/bluetooth/profiles/bluetooth_le.py",
     "interfaces/affordances/inspect.py",
+    "interfaces/affordances/netstack.py",
     "interfaces/affordances/rtc.py",
     "interfaces/affordances/session.py",
     "interfaces/affordances/system_power_state_controller.py",
@@ -107,6 +109,7 @@ python_library("honeydew_no_testonly") {
     "typing/bluetooth.py",
     "typing/custom_types.py",
     "typing/ffx.py",
+    "typing/netstack.py",
     "typing/screenshot_image.py",
     "typing/ui.py",
     "typing/wlan.py",
@@ -144,7 +147,7 @@ group("honeydew_fidl_ir_and_deps") {
   testonly = false
 
   data_deps = [
-    # Required by Fuchsia Controller usage in Honeydew affordances and device claseses.
+    # Required by Fuchsia Controller usage in Honeydew affordances and device classes.
     "//sdk/fidl/fuchsia.bluetooth.gatt2:fuchsia.bluetooth.gatt2_host_test_data(${toolchain_variant.base})",
     "//sdk/fidl/fuchsia.bluetooth.le:fuchsia.bluetooth.le_host_test_data(${toolchain_variant.base})",
     "//sdk/fidl/fuchsia.bluetooth.sys:fuchsia.bluetooth.sys_host_test_data(${toolchain_variant.base})",
@@ -157,6 +160,7 @@ group("honeydew_fidl_ir_and_deps") {
     "//sdk/fidl/fuchsia.hwinfo:fuchsia.hwinfo_host_test_data(${toolchain_variant.base})",
     "//sdk/fidl/fuchsia.io:fuchsia.io_host_test_data(${toolchain_variant.base})",
     "//sdk/fidl/fuchsia.location.namedplace:fuchsia.location.namedplace_host_test_data(${toolchain_variant.base})",
+    "//sdk/fidl/fuchsia.net.interfaces:fuchsia.net.interfaces_host_test_data(${toolchain_variant.base})",
     "//sdk/fidl/fuchsia.tracing.controller:fuchsia.tracing.controller_host_test_data(${toolchain_variant.base})",
     "//sdk/fidl/fuchsia.ui.test.input:fuchsia.ui.test.input_host_test_data(${toolchain_variant.base})",
     "//sdk/fidl/fuchsia.wlan.device.service:fuchsia.wlan.device.service_host_test_data(${toolchain_variant.base})",

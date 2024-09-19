@@ -8,6 +8,7 @@ from collections.abc import Callable
 
 from honeydew.interfaces.affordances import (
     inspect,
+    netstack,
     rtc,
     session,
     system_power_state_controller,
@@ -273,6 +274,15 @@ class FuchsiaDevice(abc.ABC):
     @properties.Affordance
     @abc.abstractmethod
     def wlan(self) -> wlan.Wlan:
+        """Returns a Wlan affordance object.
+
+        Returns:
+            wlan.Wlan object
+        """
+
+    @properties.Affordance
+    @abc.abstractmethod
+    def netstack(self) -> netstack.Netstack:
         """Returns a Wlan affordance object.
 
         Returns:

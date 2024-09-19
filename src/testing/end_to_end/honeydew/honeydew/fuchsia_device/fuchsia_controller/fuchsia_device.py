@@ -23,6 +23,7 @@ from honeydew import errors
 from honeydew.affordances.ffx import inspect as inspect_ffx
 from honeydew.affordances.ffx import session as session_ffx
 from honeydew.affordances.ffx.ui import screenshot as screenshot_ffx
+from honeydew.affordances.fuchsia_controller import netstack as netstack_fc
 from honeydew.affordances.fuchsia_controller import rtc as rtc_fc
 from honeydew.affordances.fuchsia_controller import tracing as tracing_fc
 from honeydew.affordances.fuchsia_controller.bluetooth.profiles import (
@@ -479,6 +480,20 @@ class FuchsiaDevice(
         return inspect_ffx.Inspect(
             device_name=self.device_name,
             ffx=self.ffx,
+        )
+
+    @properties.Affordance
+    def netstack(self) -> netstack_fc.Netstack:
+        """Returns a netstack affordance object.
+
+        Returns:
+            netstack.Netstack object
+        """
+        return netstack_fc.Netstack(
+            device_name=self.device_name,
+            ffx=self.ffx,
+            fuchsia_controller=self.fuchsia_controller,
+            reboot_affordance=self,
         )
 
     # List all the public methods
