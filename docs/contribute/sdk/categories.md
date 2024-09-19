@@ -111,7 +111,7 @@ Each SDK Atom has an `category` parameter with one of the following values:
 - `partner_internal`: supported for use in non-source SDK atoms in the
   `partner` category but not exposed to the SDK users;
 - `partner`: supported for use by select partners;
-- `public`: supported for use by the general public.
+- `public`: supported for use by the general public (not yet supported)
 
 These categories form an ordered list with a monotonically increasing audience.
 For example, an SDK Atom in the `public` category is necessarily available to

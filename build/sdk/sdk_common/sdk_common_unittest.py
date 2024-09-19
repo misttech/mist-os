@@ -30,21 +30,33 @@ def _atom(name: str, category: str, area: str | None = None) -> Atom:
 
 class SdkCommonTests(unittest.TestCase):
     def test_categories(self) -> None:
-        atoms = [_atom("hello", "internal"), _atom("world", "public")]
+        atoms = [_atom("hello", "internal"), _atom("world", "partner")]
         self.assertEqual([*detect_category_violations("internal", atoms)], [])
         atoms = [_atom("hello", "internal"), _atom("world", "cts")]
         self.assertEqual([*detect_category_violations("internal", atoms)], [])
 
     def test_categories_failure(self) -> None:
-        atoms = [_atom("hello", "internal"), _atom("world", "public")]
+        atoms = [_atom("hello", "internal"), _atom("world", "partner")]
         self.assertEqual(
-            [*detect_category_violations("partner", atoms)],
-            ["hello has publication level internal, incompatible with partner"],
+            [*detect_category_violations("partner_internal", atoms)],
+            [
+                '"hello" has publication level "internal", which is incompatible with "partner_internal".'
+            ],
         )
-        atoms = [_atom("hello", "internal"), _atom("world", "public")]
+        atoms = [_atom("hello", "internal"), _atom("world", "partner")]
         self.assertEqual(
             [*detect_category_violations("cts", atoms)],
-            ["hello has publication level internal, incompatible with cts"],
+            [
+                '"hello" has publication level "internal", which is incompatible with "cts".'
+            ],
+        )
+
+    def test_unsupported_categories(self) -> None:
+        atoms = [_atom("hello", "internal"), _atom("world", "public")]
+        self.assertRaisesRegex(
+            Exception,
+            '"world" has SDK category "public", which is not yet supported.',
+            lambda: [*detect_category_violations("internal", atoms)],
         )
 
     def test_category_name_bogus(self) -> None:
@@ -96,7 +108,7 @@ class SdkCommonTests(unittest.TestCase):
         # Category violation
         atoms = [
             _atom("hello", "internal", "So Not A Real Area"),
-            _atom("hello", "public"),
+            _atom("hello", "partner"),
         ]
         self.assertEqual(
             [*v.detect_violations("partner", atoms)],
@@ -105,7 +117,7 @@ class SdkCommonTests(unittest.TestCase):
  - //hello
  - //hello
 """,
-                "hello has publication level internal, incompatible with partner",
+                '"hello" has publication level "internal", which is incompatible with "partner".',
                 "hello specifies invalid API area 'So Not A Real Area'. Valid areas: ['Unknown']",
                 "hello must specify an API area. Valid areas: ['Unknown']",
             ],

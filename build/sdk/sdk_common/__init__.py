@@ -117,9 +117,15 @@ def detect_category_violations(
     """Yields strings describing mismatches in publication categories."""
     category_index = _index_for_category(category)
     for atom in atoms:
+        # The public IDK does not yet exist, so "public" should not be used.
+        if atom.category == "public":
+            raise Exception(
+                '"%s" has SDK category "%s", which is not yet supported.'
+                % (atom, atom.category)
+            )
         if _index_for_category(atom.category) < category_index:
             yield (
-                "%s has publication level %s, incompatible with %s"
+                '"%s" has publication level "%s", which is incompatible with "%s".'
                 % (atom, atom.category, category)
             )
 

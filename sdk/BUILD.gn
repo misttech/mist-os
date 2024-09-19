@@ -493,7 +493,7 @@ if (current_toolchain == default_toolchain) {
 sdk_documentation("open_source") {
   name = "open_source"
 
-  category = "public"
+  category = "partner"
 
   files = []
   foreach(file,
@@ -515,7 +515,7 @@ sdk_documentation("open_source") {
 sdk_documentation("musl_license") {
   name = "musl_license"
 
-  category = "public"
+  category = "partner"
 
   files = [
     {
@@ -539,7 +539,7 @@ sdk_documentation("musl_license") {
 sdk_documentation("sdk_notice") {
   name = "sdk_notice"
 
-  category = "public"
+  category = "partner"
 
   files = [
     {

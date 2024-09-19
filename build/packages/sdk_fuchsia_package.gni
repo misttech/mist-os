@@ -23,7 +23,7 @@ import("//tools/cmc/build/expect_includes.gni")
 # sdk_fuchsia_package("my-sdk-package") {
 #   distribution_name = "my-package"
 #   package_label = ":my-package"
-#   category = "public"
+#   category = "partner"
 #   expected_files_exact = [
 #     "relative/path/to/file_a",
 #   ]
