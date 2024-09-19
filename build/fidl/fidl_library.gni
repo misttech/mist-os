@@ -78,23 +78,69 @@ template("fidl_library") {
 
   target_dir = get_label_info(main_target_name, "dir")
   is_vendor_library = string_replace(target_dir, "//vendor/", "") != target_dir
+  assert(
+      !is_vendor_library || !defined(invoker.sdk_category) ||
+          invoker.sdk_category == "partner",
+      "In vendor repos, only libraries in the vendor SDK should have `sdk_category` set.")
 
-  # Whether an SDK category other than "excluded" was specified.
-  # It does not actually indicate whether the library is included in any SDK.
-  has_non_excluded_sdk_category =
-      defined(invoker.sdk_category) && invoker.sdk_category != "excluded"
+  is_unversioned_vendor_sdk = false
 
-  _is_in_sdk_category_not_really_in_an_sdk_ =
-      has_non_excluded_sdk_category && (invoker.sdk_category == "internal" ||
-                                        invoker.sdk_category == "experimental")
+  # Validate `sdk_category` while determining `category_allowlist_deps`, which
+  # will be used later.
+  if (defined(invoker.sdk_category)) {
+    # Ensure that all libraries in an SDK category that could affect anything
+    # other than the platform build are in the appropriate allowlist targets.
+    # The same lists are also used to determine what to include in the IDK,
+    # helping ensure that libraries assigned an SDK category also appear in the
+    # appropriate artifacts.
+    category = invoker.sdk_category
+    sdk_category_string_for_assert = category
 
-  # Included libraries require compatibility tests unless they are in one of the
-  # categories that isn't really included in the Core IDK in any way.
-  requires_compatibility_tests = has_non_excluded_sdk_category &&
-                                 !_is_in_sdk_category_not_really_in_an_sdk_
-  if (!has_non_excluded_sdk_category) {
-    not_needed([ "_is_in_sdk_category_not_really_in_an_sdk_" ])
+    if (category == "excluded" || category == "experimental") {
+      assert(
+          false,
+          "SDK category '$category' is not currently supported for FIDL libraries. Please contact the Platform Versioning team to discuss your use case.")
+    } else if (category == "internal") {
+      # Is not included in an IDK and has no compatibility requirements.
+      category_allowlist_deps = []
+    } else if (category == "cts") {
+      # The cts category is not currently implemented (i.e., no compatibility
+      # checks). See https://fxbug.dev/367760026.
+      assert(false, "SDK category '$category' is not currently supported.")
+    } else if (category == "partner_internal") {
+      # Ensures that all libraries in the "partner_internal" category are in the
+      # "sdk_partner_internal_libs_allowlist" target, which is used to ensure
+      # that the API compatibility tests actually run on these libraries.
+      category_allowlist_deps =
+          [ "//sdk/fidl:sdk_partner_internal_libs_allowlist" ]
+    } else if (category == "partner") {
+      if (is_vendor_library) {
+        # Vendor SDK libraries are `is_sdk_included_publishable` but not in the
+        # "fuchsia" namespace, not intended to be compaitibility tested, and do
+        # not ap appear in allowlists. They specify "unversioned" for clarity.
+        assert(defined(invoker.versioned) && invoker.versioned == "unversioned")
+        category_allowlist_deps = []
+        is_unversioned_vendor_sdk = true
+      } else {
+        category_allowlist_deps = [ "//sdk/fidl:sdk_fidl_partner_allowlist" ]
+      }
+    } else if (category == "public") {
+      # The public IDK does not yet exist. A similar allowlist will need to be
+      # added when implementing it.
+      assert(false, "SDK category '$category' is not currently supported.")
+    } else {
+      assert(false, "Unrecognized SDK category '$category'.")
+    }
+  } else {
+    category_allowlist_deps = []
+    sdk_category_string_for_assert = "not specified"
   }
+
+  # All libraries in an SDK category (supported by this template) require
+  # compatibility tests unless they are in the "internal" category, which
+  # contains libraries that are not really included in the Core IDK in any way.
+  requires_compatibility_tests =
+      defined(invoker.sdk_category) && invoker.sdk_category != "internal"
 
   # All publishable libraries must have compatibility tests.
   # All such libraries are publishable except for those in partner_internal.
@@ -103,23 +149,18 @@ template("fidl_library") {
 
   _is_test_only = defined(invoker.testonly) && invoker.testonly
 
-  is_unversioned_vendor_sdk = false
-  not_needed([ "is_unversioned_vendor_sdk" ])  # Unused in many paths.
-  if (is_vendor_library) {
-    if (has_non_excluded_sdk_category) {
-      assert(invoker.sdk_category == "partner")
-
-      # Vendor SDK libraries are are `is_sdk_included_publishable` but not in the
-      # "fuchsia" namespace and not intended to be compaitibility tested. They
-      # specify "unversioned" so that they can be excluded here.
-      assert(defined(invoker.versioned) && invoker.versioned == "unversioned")
-
-      is_unversioned_vendor_sdk = true
-
-      requires_compatibility_tests = false
-      is_sdk_included_publishable = true
-    }
+  if (is_unversioned_vendor_sdk) {
+    # Override the values set above to account for this special case as
+    # described where the variable above was set.
+    requires_compatibility_tests = false
+    is_sdk_included_publishable = true
   }
+
+  assert(
+      (requires_compatibility_tests ||
+           (is_sdk_included_publishable && !is_vendor_library)) ==
+          (category_allowlist_deps != []),
+      "Libraries that require compatibility tests or are publishable in an IDK must be in an allowlist to ensure they are compatibility tested and included in the IDK.")
 
   stable = defined(invoker.stable) && invoker.stable
 
@@ -220,7 +261,7 @@ template("fidl_library") {
 
     fidlc_versioned_arg = invoker.versioned
   } else if (_is_test_only) {
-    assert(!has_non_excluded_sdk_category)
+    assert(!defined(invoker.sdk_category))
     fidlc_versioned_arg = "unversioned"
   } else if (library_name ==
              "fuchsia." + string_replace(library_name, "fuchsia.", "", 1)) {
@@ -285,8 +326,9 @@ template("fidl_library") {
           (fidlc_versioned_arg == "fuchsia" && _is_banjo_sysmem && !stable &&
                !requires_compatibility_tests && !is_sdk_included_publishable) ||
           (fidlc_versioned_arg == "fuchsia:HEAD" && !stable &&
-               (requires_compatibility_tests == has_non_excluded_sdk_category ||
-                    (_is_in_sdk_category_not_really_in_an_sdk_ &&
+               (requires_compatibility_tests == defined(invoker.sdk_category) ||
+                    (defined(invoker.sdk_category) &&
+                         invoker.sdk_category == "internal" &&
                          !requires_compatibility_tests) ||
                     (_is_unstable_partner_internal &&
                          invoker.sdk_category == "partner_internal"))) ||
@@ -294,16 +336,16 @@ template("fidl_library") {
                _is_unversioned_libraries_used_by_sdk_prebuilts_or_ctf) ||
           (fidlc_versioned_arg == "unversioned" && !stable &&
                !requires_compatibility_tests &&
-               (!has_non_excluded_sdk_category || is_unversioned_vendor_sdk ||
+               (!defined(invoker.sdk_category) || is_unversioned_vendor_sdk ||
                     _is_test_example_library)) ||
-          (_is_test_only && !stable && !has_non_excluded_sdk_category &&
+          (_is_test_only && !stable && !defined(invoker.sdk_category) &&
                !requires_compatibility_tests &&
                (fidlc_versioned_arg == "unversioned" ||
                     _is_documentation_example ||
                     fidlc_versioned_arg == "test:1" ||
                     _is_test_versioned_in_fuchsia)) ||
           (_is_internal_zx_library && fidlc_versioned_arg == "fuchsia"),
-      "Library '$library_name' has an unexpected combination of stability ('$stable'), versioned ('$fidlc_versioned_arg'), SDK inclusion ('$has_non_excluded_sdk_category'),  publishable ('$is_sdk_included_publishable'), compatibility testing requirements ('$requires_compatibility_tests'), and `testonly` ('$_is_test_only').")
+      "Library '$library_name' has an unexpected combination of stability ('$stable'), versioned ('$fidlc_versioned_arg'), SDK category ('${sdk_category_string_for_assert}'),  publishable ('$is_sdk_included_publishable'), compatibility testing requirements ('$requires_compatibility_tests'), and `testonly` ('$_is_test_only').")
 
   fidl_ir(compilation_target_name) {
     forward_variables_from(invoker, invoker_variables_to_forward_to_fidl_ir)
@@ -553,27 +595,12 @@ template("fidl_library") {
     ]
 
     deps = [
-      ":$plasa_fragment_target_name",
-      ":$verification_target_name",
-    ]
-
-    # Ignore the FIDL libraries that are only present in private versions of
-    # the SDK as they don't have the same versioning constraints.
-    if (!is_unversioned_vendor_sdk && defined(invoker.sdk_category) &&
-        invoker.sdk_category == "partner") {
-      deps += [ "//sdk/fidl:sdk_fidl_partner_allowlist" ]
-    }
-
-    # Ensures that all libraries that are in the "partner_internal" category are
-    # in the "sdk_partner_internal_libs_allowlist" target. This is used to
-    # ensure that the API compatibility tests actually run on these libraries.
-    if (defined(invoker.sdk_category) &&
-        invoker.sdk_category == "partner_internal") {
-      deps += [ "//sdk/fidl:sdk_partner_internal_libs_allowlist" ]
-    }
+             ":$plasa_fragment_target_name",
+             ":$verification_target_name",
+           ] + category_allowlist_deps
   }
 
-  if (has_non_excluded_sdk_category) {
+  if (defined(invoker.sdk_category)) {
     sdk_category = invoker.sdk_category
     if (stable) {
       api_reference = "$library_name.api"
@@ -702,7 +729,7 @@ template("fidl_library") {
         }
       }
     }
-  } else {  # has_non_excluded_sdk_category
+  } else {  # defined(invoker.sdk_category)
     not_needed(invoker, [ "sdk_area" ])
     not_needed([ "sdk_atom_deps" ])
   }
