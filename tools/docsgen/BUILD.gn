@@ -123,7 +123,7 @@ compiled_action("invoke_clidoc") {
     sdk_host_tools_visibility_bridge_label,
 
     # TODO(https://fxbug.dev/42167576) check if triage belongs in sdk docs.
-    "//src/diagnostics/triage:triage_bin",
+    "//src/diagnostics/triage:triage_bin($host_toolchain)",
   ]
 
   metadata = {
