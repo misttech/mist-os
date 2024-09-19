@@ -208,7 +208,12 @@ async fn create_realm_instance(
             child = child.eager();
         }
         let child_ref = match source {
-            fnetemul::ChildSource::Component(url) => builder.add_child(&name, &url, child).await?,
+            fnetemul::ChildSource::Component(url) => {
+                builder.add_child(&name, &url, child).await.map_err(|e| {
+                    error!("error adding child {name} with URL: {url}: {e:?}");
+                    e
+                })?
+            }
             fnetemul::ChildSource::Mock(dir) => {
                 let dir = dir.into_proxy().expect("failed to create proxy from channel");
                 builder
