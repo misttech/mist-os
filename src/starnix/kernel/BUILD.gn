@@ -306,6 +306,7 @@ rustc_library("starnix_core") {
     "//sdk/fidl/fuchsia.posix.socket.packet:fuchsia.posix.socket.packet_rust",
     "//sdk/fidl/fuchsia.posix.socket.raw:fuchsia.posix.socket.raw_rust",
     "//sdk/fidl/fuchsia.power.broker:fuchsia.power.broker_rust",
+    "//sdk/fidl/fuchsia.power.observability:fuchsia.power.observability_rust",
     "//sdk/fidl/fuchsia.power.suspend:fuchsia.power.suspend_rust",
     "//sdk/fidl/fuchsia.power.system:fuchsia.power.system_rust",
     "//sdk/fidl/fuchsia.recovery:fuchsia.recovery_rust",

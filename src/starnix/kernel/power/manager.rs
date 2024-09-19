@@ -20,9 +20,9 @@ use starnix_sync::{Mutex, MutexGuard};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::{errno, error};
 use {
-    fidl_fuchsia_power_broker as fbroker, fidl_fuchsia_power_system as fsystem,
-    fidl_fuchsia_session_power as fpower, fidl_fuchsia_starnix_runner as frunner,
-    fuchsia_inspect as inspect, fuchsia_zircon as zx,
+    fidl_fuchsia_power_broker as fbroker, fidl_fuchsia_power_observability as fobs,
+    fidl_fuchsia_power_system as fsystem, fidl_fuchsia_session_power as fpower,
+    fidl_fuchsia_starnix_runner as frunner, fuchsia_inspect as inspect, fuchsia_zircon as zx,
 };
 
 cfg_if::cfg_if! {
@@ -41,13 +41,6 @@ struct PowerElement {
     lessor_proxy: fbroker::LessorSynchronousProxy,
     level_proxy: Option<fbroker::CurrentLevelSynchronousProxy>,
 }
-
-// String keys used for various suspend events.  We should try to keep these
-// keys in sync across binaries.
-const SUSPEND_FAILED_AT: &str = "failed_at_ns";
-const SUSPEND_ATTEMPTED_AT: &str = "attempted_at_ns";
-const SUSPEND_RESUMED_AT: &str = "resumed_at_ns";
-const SUSPEND_REQUESTED_STATE: &str = "requested_power_state";
 
 /// Manager for suspend and resume.
 #[derive(Default)]
@@ -499,8 +492,8 @@ impl SuspendResumeManager {
     pub fn suspend(&self, state: SuspendState) -> Result<(), Errno> {
         log_info!(target=?state, "Initiating suspend");
         self.lock().inspect_node.add_entry(|node| {
-            node.record_int(SUSPEND_ATTEMPTED_AT, zx::MonotonicTime::get().into_nanos());
-            node.record_string(SUSPEND_REQUESTED_STATE, state.to_str());
+            node.record_int(fobs::SUSPEND_ATTEMPTED_AT, zx::MonotonicTime::get().into_nanos());
+            node.record_string(fobs::SUSPEND_REQUESTED_STATE, state.to_str());
         });
 
         let waiter = SuspendWaiter::new();
@@ -535,14 +528,14 @@ impl SuspendResumeManager {
             SuspendResult::Success => self.wait_for_power_level(STARNIX_POWER_ON_LEVEL)?,
             SuspendResult::Failure => {
                 self.lock().inspect_node.add_entry(|node| {
-                    node.record_int(SUSPEND_FAILED_AT, now.into_nanos());
+                    node.record_int(fobs::SUSPEND_FAILED_AT, now.into_nanos());
                 });
                 return error!(EINVAL, format!("failed to suspend at ns: {}", &now.into_nanos()));
             }
         }
 
         self.lock().inspect_node.add_entry(|node| {
-            node.record_int(SUSPEND_RESUMED_AT, now.into_nanos());
+            node.record_int(fobs::SUSPEND_RESUMED_AT, now.into_nanos());
         });
         log_info!(state=?state, "Resumed from suspend");
 
