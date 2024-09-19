@@ -502,6 +502,9 @@ void x86_feature_debug(void) {
              eax.num_general_counters(), edx.num_fixed_counters());
     }
   }
+  print_property("hyp_pv_clock", g_hypervisor_has_pv_clock);
+  print_property("hyp_pv_eoi", g_hypervisor_has_pv_eoi);
+  print_property("hyp_pv_ipi", g_hypervisor_has_pv_ipi);
   Printf("\n\n");
 }
 
