@@ -66,7 +66,7 @@ class FsNode final
  public:
   // The node idenfier for this FsNode. By default, this will be used as the inode number of
   // this node.
-  ino_t node_id = 0;
+  ino_t node_id_ = 0;
 
   /// The pipe located at this node, if any.
   ///
@@ -147,6 +147,13 @@ class FsNode final
   static FsNodeHandle new_uncached(const CurrentTask& current_task, ktl::unique_ptr<FsNodeOps> ops,
                                    const FileSystemHandle& fs, ino_t node_id, FsNodeInfo info);
 
+  /// Create a node without inserting it into the FileSystem node cache (no CurrentTask is needed).
+  /// This is usually not what you want! Only use if you're also using get_or_create_node, like
+  /// ext4.
+  // [C++ only]
+  static FsNodeHandle new_uncached(ktl::unique_ptr<FsNodeOps> ops, const FileSystemHandle& fs,
+                                   ino_t node_id, FsNodeInfo info, const Credentials& credentials);
+
   FsNodeHandle into_handle() {
     FsNodeHandle handle = fbl::AdoptRef(this);
     weak_handle = util::WeakPtr<FsNode>(handle.get());
@@ -159,9 +166,9 @@ class FsNode final
                               const Credentials& credentials);
 
  public:
-  void set_id(ino_t _node_id) {
-    DEBUG_ASSERT(node_id == 0);
-    node_id = _node_id;
+  void set_id(ino_t node_id) {
+    DEBUG_ASSERT(node_id_ == 0);
+    node_id_ = node_id;
     /*
       if self.info.get_mut().ino == 0 {
           self.info.get_mut().ino = node_id;
@@ -228,7 +235,7 @@ class FsNode final
   using fbl::RefCountedUpgradeable<FsNode>::AddRefMaybeInDestructor;
 
   // Required to instantiate fbl::DefaultKeyedObjectTraits.
-  ino_t GetKey() const { return node_id; }
+  ino_t GetKey() const { return node_id_; }
 
   // Required to instantiate fbl::DefaultHashTraits.
   static size_t GetHash(ino_t key) { return key; }

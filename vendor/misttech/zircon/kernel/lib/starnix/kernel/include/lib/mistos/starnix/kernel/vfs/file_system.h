@@ -120,24 +120,38 @@ class FileSystem : private fbl::RefCountedUpgradeable<FileSystem> {
   //
   // Currently, apply the required selinux context if the selinux workaround is enabled on this
   // filesystem.
-  WeakFsNodeHandle prepare_node_for_insertion(const CurrentTask& current_task,
+  WeakFsNodeHandle prepare_node_for_insertion(/*const CurrentTask& current_task,*/
                                               const FsNodeHandle& node);
 
-  /// Get or create an FsNode for this file system.
+  template <typename CreateFn>
+  fit::result<Errno, FsNodeHandle> get_or_create_node(const CurrentTask& current_task,
+                                                      ktl::optional<ino_t> node_id,
+                                                      CreateFn&& create_fn) {
+    static_assert(std::is_invocable_r_v<fit::result<Errno, FsNodeHandle>, CreateFn, ino_t>);
+    return get_and_validate_or_create_node(
+        current_task, node_id, [](const FsNodeHandle&) -> bool { return true; }, create_fn);
+  }
+
+  /// Get a node that is validated with the callback, or create an FsNode for
+  /// this file system.
   ///
   /// If node_id is Some, then this function checks the node cache to
   /// determine whether this node is already open. If so, the function
-  /// returns the existing FsNode. If not, the function calls the given
-  /// create_fn function to create the FsNode.
+  /// returns the existing FsNode if it passes the validation check. If no
+  /// node exists, or a node does but fails the validation check, the function
+  /// calls the given create_fn function to create the FsNode.
   ///
   /// If node_id is None, then this function assigns a new identifier number
   /// and calls the given create_fn function to create the FsNode with the
   /// assigned number.
   ///
   /// Returns Err only if create_fn returns Err.
-  template <typename CreateFn>
-  fit::result<Errno, FsNodeHandle> get_or_create_node(const CurrentTask& current_task,
-                                                      ktl::optional<ino_t> node_id) {
+  template <typename ValidateFn, typename CreateFn>
+  fit::result<Errno, FsNodeHandle> get_and_validate_or_create_node(const CurrentTask& current_task,
+                                                                   ktl::optional<ino_t> node_id,
+                                                                   ValidateFn&& validate_fn,
+                                                                   CreateFn&& create_fn) {
+    static_assert(std::is_invocable_r_v<bool, ValidateFn, const FsNodeHandle&>);
     static_assert(std::is_invocable_r_v<fit::result<Errno, FsNodeHandle>, CreateFn, ino_t>);
     return fit::ok(FsNodeHandle());
   }
@@ -148,10 +162,15 @@ class FileSystem : private fbl::RefCountedUpgradeable<FileSystem> {
   FsNodeHandle create_node_with_id(const CurrentTask& current_task, ktl::unique_ptr<FsNodeOps> ops,
                                    ino_t id, FsNodeInfo info);
 
+  // [C++ only]
+  FsNodeHandle create_node_with_id(ktl::unique_ptr<FsNodeOps> ops, ino_t id, FsNodeInfo info,
+                                   const starnix_uapi::Credentials& credentials);
+
   template <typename NodeInfoFn>
   FsNodeHandle create_node(const CurrentTask& current_task, ktl::unique_ptr<FsNodeOps> ops,
-                           NodeInfoFn info) {
+                           NodeInfoFn&& info) {
     static_assert(std::is_invocable_r_v<FsNodeInfo, NodeInfoFn, ino_t>);
+
     auto node_id = next_node_id();
     return create_node_with_id(current_task, ktl::move(ops), node_id, info(node_id));
   }

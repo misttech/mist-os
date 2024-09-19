@@ -6,6 +6,7 @@
 #include "lib/mistos/starnix/kernel/vfs/fs_node.h"
 
 #include <lib/fit/result.h>
+#include <lib/mistos/starnix/kernel/task/current_task.h>
 #include <lib/mistos/starnix/kernel/task/kernel.h>
 #include <lib/mistos/starnix/kernel/task/process_group.h>
 #include <lib/mistos/starnix/kernel/task/task.h>
@@ -32,9 +33,14 @@ namespace starnix {
 
 FsNodeHandle FsNode::new_uncached(const CurrentTask& current_task, ktl::unique_ptr<FsNodeOps> ops,
                                   const FileSystemHandle& fs, ino_t node_id, FsNodeInfo info) {
-  // auto creds = current_task.creds();
+  auto creds = current_task->creds();
+  return FsNode::new_uncached(ktl::move(ops), fs, node_id, info, creds)->into_handle();
+}
+
+FsNodeHandle FsNode::new_uncached(ktl::unique_ptr<FsNodeOps> ops, const FileSystemHandle& fs,
+                                  ino_t node_id, FsNodeInfo info, const Credentials& credentials) {
   return FsNode::new_internal(ktl::move(ops), fs->kernel(), util::WeakPtr(fs.get()), node_id, info,
-                              Credentials::root())
+                              credentials)
       ->into_handle();
 }
 
@@ -70,13 +76,13 @@ FsNode* FsNode::new_internal(ktl::unique_ptr<FsNodeOps> ops, util::WeakPtr<Kerne
 FsNode::~FsNode() = default;
 
 FsNode::FsNode(WeakFsNodeHandle _weak_handle, util::WeakPtr<Kernel> kernel,
-               ktl::unique_ptr<FsNodeOps> ops, util::WeakPtr<FileSystem> fs, ino_t _node_id,
+               ktl::unique_ptr<FsNodeOps> ops, util::WeakPtr<FileSystem> fs, ino_t node_id,
                ktl::optional<PipeHandle> _fifo, FsNodeInfo info)
     : weak_handle(ktl::move(_weak_handle)),
       ops_(ktl::move(ops)),
       kernel_(ktl::move(kernel)),
       fs_(ktl::move(fs)),
-      node_id(_node_id),
+      node_id_(node_id),
       fifo(ktl::move(_fifo)),
       info_(ktl::move(info)) {}
 
