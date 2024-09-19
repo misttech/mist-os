@@ -227,7 +227,7 @@ void PrettyTypeManager::AddDefaultCppPrettyTypes() {
   // pretty-printing row. So these two strings make one program with the line between them being
   // substituted below.
   std::string tree_before_emit = R"(
-    auto size = __tree_.__pair3_.__value_;
+    auto size = __tree_.__size_;
     // Uncomment to emit size record (unsure if this is confusing).
     // $zxdb::AppendNameValueRow("[size]", size);
 
@@ -270,8 +270,8 @@ void PrettyTypeManager::AddDefaultCppPrettyTypes() {
       }
     }
   )";
-  GetterList tree_getter_list{{"size", "__tree_.__pair3_.__value_"},
-                              {"empty", "__tree_.__pair3_.__value_ == 0"}};
+  GetterList tree_getter_list{{"size", "__tree_.__size_"},
+                              {"empty", "__tree_.__size_ == 0"}};
   cpp_.emplace_back(InternalGlob("std::__2::set<*>"),
                     std::make_unique<PrettyGenericContainer>(
                         tree_before_emit + "$zxdb::AppendNameValueRow(\"\", cur_node.__value_);\n" +
@@ -305,11 +305,11 @@ void PrettyTypeManager::AddDefaultCppPrettyTypes() {
 
   // Unordered_set and unordered_map. See "tree" versions (for set and map) above.
   std::string hash_table_before_emit = R"(
-    auto size = __table_.__p2_.__value_;
+    auto size = __table_.__size_;
     // Uncomment to emit size record (unsure if this is confusing).
     // $zxdb::AppendNameValueRow("[size]", size);
 
-    auto cur_node_ptr = __table_.__p1_.__value_.__next_;
+    auto cur_node_ptr = __table_.__first_node_.__next_;
     auto nodes_emitted = 0;
     while (cur_node_ptr && nodes_emitted < size) {
       if (nodes_emitted > $zxdb::GetMaxArraySize()) {
@@ -324,8 +324,8 @@ void PrettyTypeManager::AddDefaultCppPrettyTypes() {
       cur_node_ptr = cur_node.__next_;
     }
   )";
-  GetterList hash_table_getter_list{{"size", "__tree_.__p2_.__value_"},
-                                    {"empty", "__tree_.__p2_.__value_ == 0"}};
+  GetterList hash_table_getter_list{{"size", "__tree_.__size_"},
+                                    {"empty", "__tree_.__size_ == 0"}};
   cpp_.emplace_back(
       InternalGlob("std::__2::unordered_set<*>"),
       std::make_unique<PrettyGenericContainer>(
