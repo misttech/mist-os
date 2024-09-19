@@ -205,11 +205,14 @@ class SystemPowerStateController(
     def idle_suspend_timer_based_resume(
         self,
         duration: int,
+        verify_duration: bool = True,
     ) -> None:
         """Perform idle-suspend and timer-based-resume operation on the device.
 
         Args:
             duration: Resume timer duration in seconds.
+            verify_duration: If set to True, verifies suspend-resume operation completed with in the
+                duration specified. If set to False, skips this verification. Default is True.
 
         Raises:
             errors.SystemPowerStateControllerError: In case of failure
@@ -219,6 +222,7 @@ class SystemPowerStateController(
             suspend_state=system_power_state_controller_interface.IdleSuspend(),
             resume_mode=system_power_state_controller_interface.TimerResume(
                 duration=duration,
+                verify_duration=verify_duration,
             ),
         )
 
@@ -725,6 +729,9 @@ class SystemPowerStateController(
             resume_mode,
             (system_power_state_controller_interface.TimerResume,),
         ):
+            return
+
+        if resume_mode.verify_duration is False:
             return
 
         # It could take few milliseconds for the device to fully resume after the timer fires.
