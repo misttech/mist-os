@@ -4,6 +4,7 @@
 
 import("//build/components.gni")
 import("//build/dist/resource.gni")
+import("//build/testing/cc_test_executable.gni")
 import("//src/graphics/lib/magma/gnbuild/magma.gni")
 
 resource("test_firmware") {
@@ -11,7 +12,7 @@ resource("test_firmware") {
   outputs = [ "lib/firmware/test_firmware.txt" ]
 }
 
-executable("unit_tests") {
+cc_test_executable("unit_tests") {
   testonly = true
   output_name = "magma_unit_tests"
 

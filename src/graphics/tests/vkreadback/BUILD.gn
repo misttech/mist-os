@@ -5,6 +5,7 @@
 import("//build/components.gni")
 import("//build/packages/sdk_fuchsia_package.gni")
 import("//build/test.gni")
+import("//build/testing/cc_test_executable.gni")
 import("//build/testing/environments.gni")
 import("//src/graphics/lib/magma/gnbuild/magma.gni")
 import("//src/lib/vulkan/vulkan.gni")
@@ -29,7 +30,7 @@ source_set("helper") {
 }
 
 # Built both on Fuchsia and on the host.
-executable("vkreadback_test") {
+cc_test_executable("vkreadback_test") {
   sources = [ "vkreadback_test.cc" ]
 
   deps = [

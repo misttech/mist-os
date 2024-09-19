@@ -2,9 +2,10 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/testing/cc_test_executable.gni")
 import("//src/graphics/lib/magma/gnbuild/magma.gni")
 
-executable("msd_arm_mali_nonhardware_tests") {
+cc_test_executable("msd_arm_mali_nonhardware_tests") {
   testonly = true
 
   sources = []
@@ -78,7 +79,7 @@ source_set("tests_not_requiring_hardware") {
   ]
 }
 
-executable("msd_arm_mali_lifecycle_tests") {
+cc_test_executable("msd_arm_mali_lifecycle_tests") {
   testonly = true
   sources = [
     "driver_logger_harness_dfv2.cc",

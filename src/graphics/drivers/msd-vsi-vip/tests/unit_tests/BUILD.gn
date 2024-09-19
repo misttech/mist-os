@@ -3,8 +3,9 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
+import("//build/testing/cc_test_executable.gni")
 
-executable("nonhardware_tests") {
+cc_test_executable("nonhardware_tests") {
   testonly = true
   output_name = "msd-vsi-vip-nonhardware-tests"
 

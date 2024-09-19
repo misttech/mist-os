@@ -4,6 +4,7 @@
 
 import("//build/components/fuchsia_test_component.gni")
 import("//build/packages/sdk_fuchsia_package.gni")
+import("//build/testing/cc_test_executable.gni")
 import("//src/graphics/lib/magma/gnbuild/magma.gni")
 
 group("integration") {
@@ -60,7 +61,7 @@ fuchsia_structured_config_cpp_elf_lib("conformance-config") {
   cm_label = ":conformance-config-manifest"
 }
 
-executable("magma_conformance_tests") {
+cc_test_executable("magma_conformance_tests") {
   sources = [
     "main.cc",
     "test_magma.cc",
@@ -97,7 +98,7 @@ executable("magma_conformance_tests") {
   }
 }
 
-executable("magma_conformance_tests_hermetic") {
+cc_test_executable("magma_conformance_tests_hermetic") {
   testonly = true
 
   defines = [ "MAGMA_HERMETIC=1" ]
@@ -135,7 +136,7 @@ executable("magma_conformance_tests_hermetic") {
   }
 }
 
-executable("virtmagma_conformance_tests") {
+cc_test_executable("virtmagma_conformance_tests") {
   testonly = true
 
   defines = [ "VIRTMAGMA=1" ]
@@ -157,7 +158,7 @@ executable("virtmagma_conformance_tests") {
   ]
 }
 
-executable("virtmagma_no_cpp_test") {
+cc_test_executable("virtmagma_no_cpp_test") {
   testonly = true
 
   # TODO(https://fxbug.dev/42170578) - use configs to set -no-stdlib++ in a way that doesn't
@@ -183,7 +184,7 @@ executable("virtmagma_no_cpp_test") {
   exclude_toolchain_tags = [ "asan" ]
 }
 
-executable("virtmagma_sync_file_tests") {
+cc_test_executable("virtmagma_sync_file_tests") {
   testonly = true
 
   defines = [ "VIRTMAGMA=1" ]

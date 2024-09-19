@@ -3,8 +3,9 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
+import("//build/testing/cc_test_executable.gni")
 
-executable("goldfish_test_bin") {
+cc_test_executable("goldfish_test_bin") {
   testonly = true
   output_name = "goldfish_test"
 

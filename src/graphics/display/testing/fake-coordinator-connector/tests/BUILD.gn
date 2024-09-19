@@ -4,6 +4,7 @@
 
 import("//build/components.gni")
 import("//build/test.gni")
+import("//build/testing/cc_test_executable.gni")
 
 group("tests") {
   testonly = true
@@ -13,7 +14,7 @@ group("tests") {
   ]
 }
 
-executable("fake-display-coordinator-connector-unittest-bin") {
+cc_test_executable("fake-display-coordinator-connector-unittest-bin") {
   output_name = "fake-display-coordinator-connector-unittest"
   testonly = true
 

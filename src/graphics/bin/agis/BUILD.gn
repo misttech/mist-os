@@ -3,8 +3,9 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
+import("//build/testing/cc_test_executable.gni")
 
-executable("test-bin") {
+cc_test_executable("test-bin") {
   testonly = true
   output_name = "agis_test"
   sources = [ "test.cc" ]
@@ -20,7 +21,7 @@ executable("test-bin") {
   ]
 }
 
-executable("vtc-test-bin") {
+cc_test_executable("vtc-test-bin") {
   output_name = "vtc_test"
   sources = [ "vtc_test.cc" ]
   deps = [
