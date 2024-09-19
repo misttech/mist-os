@@ -1,9 +1,0 @@
-{
-    "flash": {
-        "gcs": {
-            "token": [
-                "$HOME/.boto"
-            ]
-        }
-    }
-}
