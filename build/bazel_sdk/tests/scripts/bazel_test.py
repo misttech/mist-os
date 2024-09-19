@@ -320,6 +320,7 @@ class BazelRepositoryMap(object):
             "fuchsia_clang": self.IGNORED_REPO,
             "bazel_tools": self.IGNORED_REPO,
             "local_config_cc": self.IGNORED_REPO,
+            "host_platform": self.IGNORED_REPO,
         }
 
         if not fuchsia_sdk_dir:

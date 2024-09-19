@@ -6,9 +6,24 @@
 
 load("@bazel_skylib//lib:selects.bzl", "selects")
 load("//:api_version.bzl", "INTERNAL_ONLY_VALID_TARGET_APIS")
+load(":target_compatibility.bzl", "define_host_can_build_fuchsia_flag")
 
 package(
     default_visibility = ["//:__subpackages__"],
+)
+
+# An internal flag used by the "can_host_build_fuchsia" condition below.
+define_host_can_build_fuchsia_flag(
+    name = "_host_can_build_fuchsia_flag",
+)
+
+# A condition that holds True if the current Bazel host system is
+# supported by the Fuchsia SDK cross-toolchain.
+config_setting(
+    name = "can_host_build_fuchsia",
+    flag_values = {
+        ":_host_can_build_fuchsia_flag": "yes",
+    },
 )
 
 # The version of the Fuchsia toolchain. Specific to particular local builds of

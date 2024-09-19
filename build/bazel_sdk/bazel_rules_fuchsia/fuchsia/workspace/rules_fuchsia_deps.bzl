@@ -10,6 +10,7 @@ load(
     "//fuchsia/workspace:check_bazel_version.bzl",
     "assert_bazel_version",
 )
+load("@platforms//host:extension.bzl", "host_platform_repo")
 
 # buildifier: disable=function-docstring
 def rules_fuchsia_deps():
@@ -39,4 +40,9 @@ def rules_fuchsia_deps():
         repo_rule = http_archive,
         sha256 = "5308fc1d8865406a49427ba24a9ab53087f17f5266a7aabbfc28823f3916e1ca",
         url = "https://github.com/bazelbuild/platforms/releases/download/0.0.6/platforms-0.0.6.tar.gz",
+    )
+
+    maybe(
+        name = "host_platform",
+        repo_rule = host_platform_repo,
     )
