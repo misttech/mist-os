@@ -3,11 +3,9 @@
 # found in the LICENSE file.
 
 group("lib") {
-  deps = [ "bootfs" ]
 }
 
 group("tests") {
-  deps = [ "bootfs:tests" ]
 }
 
 group("benchmarks") {

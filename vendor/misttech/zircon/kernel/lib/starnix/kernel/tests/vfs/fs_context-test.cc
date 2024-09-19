@@ -38,7 +38,7 @@ bool test_umask() {
 
 bool test_chdir() {
   BEGIN_TEST;
-  auto [kernel, current_task] = create_kernel_task_and_unlocked_with_pkgfs();
+  auto [kernel, current_task] = create_kernel_task_and_unlocked_with_bootfs();
 
   ASSERT_TRUE("/" == current_task->fs()->cwd().path_escaping_chroot());
   END_TEST;
