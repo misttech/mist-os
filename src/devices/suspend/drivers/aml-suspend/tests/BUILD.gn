@@ -21,6 +21,7 @@ cc_test_executable("aml-suspend-test-bin") {
     "//sdk/fidl/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_cpp",
     "//sdk/fidl/fuchsia.hardware.suspend:fuchsia.hardware.suspend_cpp",
     "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_cpp",
+    "//sdk/fidl/fuchsia.power.observability:fuchsia.power.observability_cpp",
     "//sdk/lib/async-loop:async-loop-cpp",
     "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/driver/compat/cpp",

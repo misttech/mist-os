@@ -17,9 +17,10 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Instant;
 use {
-    fidl_fuchsia_hardware_suspend as fhsuspend, fidl_fuchsia_power_suspend as fsuspend,
-    fidl_fuchsia_power_system as fsystem, fidl_test_suspendcontrol as tsc,
-    fidl_test_systemactivitygovernor as ftest, fuchsia_async as fasync,
+    fidl_fuchsia_hardware_suspend as fhsuspend, fidl_fuchsia_power_observability as fobs,
+    fidl_fuchsia_power_suspend as fsuspend, fidl_fuchsia_power_system as fsystem,
+    fidl_test_suspendcontrol as tsc, fidl_test_systemactivitygovernor as ftest,
+    fuchsia_async as fasync,
 };
 
 const REALM_FACTORY_CHILD_NAME: &str = "test_realm_factory";
@@ -259,7 +260,13 @@ async fn lease(controller: &PowerElementContext, level: u8) -> Result<fbroker::L
     Ok(lease_control)
 }
 
-const MACRO_LOOP_EXIT: bool = false; // useful in development; prevent hangs from inspect mismatch
+// Report prolonged match delay after this many loops.
+const DELAY_NOTIFICATION: usize = 10;
+
+// Spend no more than this many loop turns before giving up for the inspect to match.
+const MAX_LOOPS_COUNT: usize = 20;
+
+const RESTART_DELAY: zx::Duration = zx::Duration::from_seconds(1);
 
 macro_rules! block_until_inspect_matches {
     ($sag_moniker:expr, $($tree:tt)+) => {{
@@ -284,14 +291,16 @@ macro_rules! block_until_inspect_matches {
             match tree_assertion.run(&data) {
                 Ok(_) => break,
                 Err(error) => {
-                    if i == 10 {
-                        tracing::warn!(?error, "Still awaiting inspect match after 10 tries");
+                    if i == DELAY_NOTIFICATION {
+                        tracing::warn!(?error, "Still awaiting inspect match after {} tries", DELAY_NOTIFICATION);
                     }
-                    if MACRO_LOOP_EXIT && i == 50 {  // upper bound, so test terminates on mismatch
-                        return Err(error.into())
+                    if  i >= MAX_LOOPS_COUNT {  // upper bound, so test terminates on mismatch
+                        // Print the actual, so we know why the match failed if it does.
+                        return Err(anyhow::anyhow!("err: {}: last observed {:?}", error, &data));
                     }
                 }
             }
+            fasync::Timer::new(fasync::Time::after(RESTART_DELAY)).await;
         }
     }};
 }
@@ -336,16 +345,16 @@ async fn test_activity_governor_increments_suspend_success_on_application_activi
                 },
             },
             suspend_stats: {
-                success_count: 0u64,
-                fail_count: 0u64,
-                last_failed_error: 0u64,
-                last_time_in_suspend: -1i64,
-                last_time_in_suspend_operations: -1i64,
+               ref fobs::SUSPEND_SUCCESS_COUNT: 0u64,
+               ref fobs::SUSPEND_FAIL_COUNT: 0u64,
+               ref fobs::SUSPEND_LAST_FAILED_ERROR: 0u64,
+               ref fobs::SUSPEND_LAST_TIMESTAMP: -1i64,
+               ref fobs::SUSPEND_LAST_DURATION: -1i64,
             },
             suspend_events: {
             },
             wake_leases: {},
-            unhandled_suspend_failures: 0u64,
+            ref fobs::UNHANDLED_SUSPEND_FAILURES_COUNT: 0u64,
             "fuchsia.inspect.Health": contains {
                 status: "OK",
             },
@@ -392,23 +401,23 @@ async fn test_activity_governor_increments_suspend_success_on_application_activi
                 },
             },
             suspend_stats: {
-                success_count: 1u64,
-                fail_count: 0u64,
-                last_failed_error: 0u64,
-                last_time_in_suspend: 2u64,
-                last_time_in_suspend_operations: 1u64,
+                ref fobs::SUSPEND_SUCCESS_COUNT: 1u64,
+                ref fobs::SUSPEND_FAIL_COUNT: 0u64,
+                ref fobs::SUSPEND_LAST_FAILED_ERROR: 0u64,
+                ref fobs::SUSPEND_LAST_TIMESTAMP: 2u64,
+                ref fobs::SUSPEND_LAST_DURATION: 1u64,
             },
             suspend_events: {
                 "0": {
-                    suspended: AnyProperty,
+                    ref fobs::SUSPEND_ATTEMPTED_AT: AnyProperty,
                 },
                 "1": {
-                    resumed: AnyProperty,
-                    duration: 2u64,
+                    ref fobs::SUSPEND_LAST_TIMESTAMP: AnyProperty,
+                    ref fobs::SUSPEND_RESUMED_AT: AnyProperty,
                 },
             },
             wake_leases: {},
-            unhandled_suspend_failures: 0u64,
+            ref fobs::UNHANDLED_SUSPEND_FAILURES_COUNT: 0u64,
             "fuchsia.inspect.Health": contains {
                 status: "OK",
             },
@@ -440,23 +449,23 @@ async fn test_activity_governor_increments_suspend_success_on_application_activi
                 },
             },
             suspend_stats: {
-                success_count: 1u64,
-                fail_count: 0u64,
-                last_failed_error: 0u64,
-                last_time_in_suspend: 2u64,
-                last_time_in_suspend_operations: 1u64,
+                ref fobs::SUSPEND_SUCCESS_COUNT: 1u64,
+                ref fobs::SUSPEND_FAIL_COUNT: 0u64,
+                ref fobs::SUSPEND_LAST_FAILED_ERROR: 0u64,
+                ref fobs::SUSPEND_LAST_TIMESTAMP: 2u64,
+                ref fobs::SUSPEND_LAST_DURATION: 1u64,
             },
             suspend_events: {
                 "0": {
-                    suspended: AnyProperty,
+                   ref fobs::SUSPEND_ATTEMPTED_AT: AnyProperty,
                 },
                 "1": {
-                    resumed: AnyProperty,
-                    duration: 2u64,
+                    ref fobs::SUSPEND_RESUMED_AT: AnyProperty,
+                    ref fobs::SUSPEND_LAST_TIMESTAMP: 2u64,
                 },
             },
             wake_leases: {},
-            unhandled_suspend_failures: 0u64,
+            ref fobs::UNHANDLED_SUSPEND_FAILURES_COUNT: 0u64,
             "fuchsia.inspect.Health": contains {
                 status: "OK",
             },
@@ -503,30 +512,30 @@ async fn test_activity_governor_increments_suspend_success_on_application_activi
                 },
             },
             suspend_stats: {
-                success_count: 2u64,
-                fail_count: 0u64,
-                last_failed_error: 0u64,
-                last_time_in_suspend: 3u64,
-                last_time_in_suspend_operations: 1u64,
+                ref fobs::SUSPEND_SUCCESS_COUNT: 2u64,
+                ref fobs::SUSPEND_FAIL_COUNT: 0u64,
+                ref fobs::SUSPEND_LAST_FAILED_ERROR: 0u64,
+                ref fobs::SUSPEND_LAST_TIMESTAMP: 3u64,
+                ref fobs::SUSPEND_LAST_DURATION: 1u64,
             },
             suspend_events: {
                 "0": {
-                    suspended: AnyProperty,
+                   ref fobs::SUSPEND_ATTEMPTED_AT: AnyProperty,
                 },
                 "1": {
-                    resumed: AnyProperty,
-                    duration: 2u64,
+                    ref fobs::SUSPEND_RESUMED_AT: AnyProperty,
+                    ref fobs::SUSPEND_LAST_TIMESTAMP: 2u64,
                 },
                 "2": {
-                    suspended: AnyProperty,
+                   ref fobs::SUSPEND_ATTEMPTED_AT: AnyProperty,
                 },
                 "3": {
-                    resumed: AnyProperty,
-                    duration: 3u64,
+                    ref fobs::SUSPEND_RESUMED_AT: AnyProperty,
+                    ref fobs::SUSPEND_LAST_TIMESTAMP: 3u64,
                 },
             },
             wake_leases: {},
-            unhandled_suspend_failures: 0u64,
+            ref fobs::UNHANDLED_SUSPEND_FAILURES_COUNT: 0u64,
             "fuchsia.inspect.Health": contains {
                 status: "OK",
             },
@@ -598,23 +607,23 @@ async fn test_activity_governor_raises_execution_state_power_level_on_wake_handl
                 },
             },
             suspend_stats: {
-                success_count: 1u64,
-                fail_count: 0u64,
-                last_failed_error: 0u64,
-                last_time_in_suspend: 2u64,
-                last_time_in_suspend_operations: 1u64,
+                ref fobs::SUSPEND_SUCCESS_COUNT: 1u64,
+                ref fobs::SUSPEND_FAIL_COUNT: 0u64,
+                ref fobs::SUSPEND_LAST_FAILED_ERROR: 0u64,
+                ref fobs::SUSPEND_LAST_TIMESTAMP: 2u64,
+                ref fobs::SUSPEND_LAST_DURATION: 1u64,
             },
             suspend_events: {
                 "0": {
-                    suspended: AnyProperty,
+                   ref fobs::SUSPEND_ATTEMPTED_AT: AnyProperty,
                 },
                 "1": {
-                    resumed: AnyProperty,
-                    duration: 2u64,
+                    ref fobs::SUSPEND_RESUMED_AT: AnyProperty,
+                    ref fobs::SUSPEND_LAST_TIMESTAMP: 2u64,
                 },
             },
             wake_leases: {},
-            unhandled_suspend_failures: 0u64,
+            ref fobs::UNHANDLED_SUSPEND_FAILURES_COUNT: 0u64,
             "fuchsia.inspect.Health": contains {
                 status: "OK",
             },
@@ -655,30 +664,30 @@ async fn test_activity_governor_raises_execution_state_power_level_on_wake_handl
                 },
             },
             suspend_stats: {
-                success_count: 2u64,
-                fail_count: 0u64,
-                last_failed_error: 0u64,
-                last_time_in_suspend: 3u64,
-                last_time_in_suspend_operations: 1u64,
+                ref fobs::SUSPEND_SUCCESS_COUNT: 2u64,
+                ref fobs::SUSPEND_FAIL_COUNT: 0u64,
+                ref fobs::SUSPEND_LAST_FAILED_ERROR: 0u64,
+                ref fobs::SUSPEND_LAST_TIMESTAMP: 3u64,
+                ref fobs::SUSPEND_LAST_DURATION: 1u64,
             },
             suspend_events: {
                 "0": {
-                    suspended: AnyProperty,
+                   ref fobs::SUSPEND_ATTEMPTED_AT: AnyProperty,
                 },
                 "1": {
-                    resumed: AnyProperty,
-                    duration: 2u64,
+                    ref fobs::SUSPEND_RESUMED_AT: AnyProperty,
+                    ref fobs::SUSPEND_LAST_TIMESTAMP: 2u64,
                 },
                 "2": {
-                    suspended: AnyProperty,
+                   ref fobs::SUSPEND_ATTEMPTED_AT: AnyProperty,
                 },
                 "3": {
-                    resumed: AnyProperty,
-                    duration: 3u64,
+                    ref fobs::SUSPEND_RESUMED_AT: AnyProperty,
+                    ref fobs::SUSPEND_LAST_TIMESTAMP: 3u64,
                 },
             },
             wake_leases: {},
-            unhandled_suspend_failures: 0u64,
+            ref fobs::UNHANDLED_SUSPEND_FAILURES_COUNT: 0u64,
             "fuchsia.inspect.Health": contains {
                 status: "OK",
             },
@@ -750,23 +759,23 @@ async fn test_activity_governor_raises_execution_state_power_level_on_full_wake_
                 },
             },
             suspend_stats: {
-                success_count: 1u64,
-                fail_count: 0u64,
-                last_failed_error: 0u64,
-                last_time_in_suspend: 2u64,
-                last_time_in_suspend_operations: 1u64,
+                ref fobs::SUSPEND_SUCCESS_COUNT: 1u64,
+                ref fobs::SUSPEND_FAIL_COUNT: 0u64,
+                ref fobs::SUSPEND_LAST_FAILED_ERROR: 0u64,
+                ref fobs::SUSPEND_LAST_TIMESTAMP: 2u64,
+                ref fobs::SUSPEND_LAST_DURATION: 1u64,
             },
             suspend_events: {
                 "0": {
-                    suspended: AnyProperty,
+                   ref fobs::SUSPEND_ATTEMPTED_AT: AnyProperty,
                 },
                 "1": {
-                    resumed: AnyProperty,
-                    duration: 2u64,
+                    ref fobs::SUSPEND_RESUMED_AT: AnyProperty,
+                    ref fobs::SUSPEND_LAST_TIMESTAMP: 2u64,
                 },
             },
             wake_leases: {},
-            unhandled_suspend_failures: 0u64,
+            ref fobs::UNHANDLED_SUSPEND_FAILURES_COUNT: 0u64,
             "fuchsia.inspect.Health": contains {
                 status: "OK",
             },
@@ -807,30 +816,30 @@ async fn test_activity_governor_raises_execution_state_power_level_on_full_wake_
                 },
             },
             suspend_stats: {
-                success_count: 2u64,
-                fail_count: 0u64,
-                last_failed_error: 0u64,
-                last_time_in_suspend: 3u64,
-                last_time_in_suspend_operations: 1u64,
+                ref fobs::SUSPEND_SUCCESS_COUNT: 2u64,
+                ref fobs::SUSPEND_FAIL_COUNT: 0u64,
+                ref fobs::SUSPEND_LAST_FAILED_ERROR: 0u64,
+                ref fobs::SUSPEND_LAST_TIMESTAMP: 3u64,
+                ref fobs::SUSPEND_LAST_DURATION: 1u64,
             },
             suspend_events: {
                 "0": {
-                    suspended: AnyProperty,
+                   ref fobs::SUSPEND_ATTEMPTED_AT: AnyProperty,
                 },
                 "1": {
-                    resumed: AnyProperty,
-                    duration: 2u64,
+                    ref fobs::SUSPEND_RESUMED_AT: AnyProperty,
+                    ref fobs::SUSPEND_LAST_TIMESTAMP: 2u64,
                 },
                 "2": {
-                    suspended: AnyProperty,
+                   ref fobs::SUSPEND_ATTEMPTED_AT: AnyProperty,
                 },
                 "3": {
-                    resumed: AnyProperty,
-                    duration: 3u64,
+                    ref fobs::SUSPEND_RESUMED_AT: AnyProperty,
+                    ref fobs::SUSPEND_LAST_TIMESTAMP: 3u64,
                 },
             },
             wake_leases: {},
-            unhandled_suspend_failures: 0u64,
+            ref fobs::UNHANDLED_SUSPEND_FAILURES_COUNT: 0u64,
             "fuchsia.inspect.Health": contains {
                 status: "OK",
             },
@@ -888,17 +897,17 @@ async fn test_activity_governor_shows_resume_latency_in_inspect() -> Result<()> 
                     },
                 },
                 suspend_stats: {
-                    success_count: 0u64,
-                    fail_count: 0u64,
-                    last_failed_error: 0u64,
-                    last_time_in_suspend: -1i64,
-                    last_time_in_suspend_operations: -1i64,
+                    ref fobs::SUSPEND_SUCCESS_COUNT: 0u64,
+                    ref fobs::SUSPEND_FAIL_COUNT: 0u64,
+                    ref fobs::SUSPEND_LAST_FAILED_ERROR: 0u64,
+                    ref fobs::SUSPEND_LAST_TIMESTAMP: -1i64,
+                    ref fobs::SUSPEND_LAST_DURATION: -1i64,
                 },
                 suspend_events: {
                 },
                 wake_leases: {},
-                unhandled_suspend_failures: 0u64,
-            "fuchsia.inspect.Health": contains {
+                ref fobs::UNHANDLED_SUSPEND_FAILURES_COUNT: 0u64,
+                "fuchsia.inspect.Health": contains {
                     status: "OK",
                 },
             }
@@ -958,16 +967,16 @@ async fn test_activity_governor_forwards_resume_latency_to_suspender() -> Result
                 },
             },
             suspend_stats: {
-                success_count: 0u64,
-                fail_count: 0u64,
-                last_failed_error: 0u64,
-                last_time_in_suspend: -1i64,
-                last_time_in_suspend_operations: -1i64,
+                ref fobs::SUSPEND_SUCCESS_COUNT: 0u64,
+                ref fobs::SUSPEND_FAIL_COUNT: 0u64,
+                ref fobs::SUSPEND_LAST_FAILED_ERROR: 0u64,
+                ref fobs::SUSPEND_LAST_TIMESTAMP: -1i64,
+                ref fobs::SUSPEND_LAST_DURATION: -1i64,
             },
             suspend_events: {
             },
             wake_leases: {},
-            unhandled_suspend_failures: 0u64,
+            ref fobs::UNHANDLED_SUSPEND_FAILURES_COUNT: 0u64,
             "fuchsia.inspect.Health": contains {
                 status: "OK",
             },
@@ -1013,23 +1022,23 @@ async fn test_activity_governor_forwards_resume_latency_to_suspender() -> Result
                 },
             },
             suspend_stats: {
-                success_count: 1u64,
-                fail_count: 0u64,
-                last_failed_error: 0u64,
-                last_time_in_suspend: 1000u64,
-                last_time_in_suspend_operations: 50u64,
+                ref fobs::SUSPEND_SUCCESS_COUNT: 1u64,
+                ref fobs::SUSPEND_FAIL_COUNT: 0u64,
+                ref fobs::SUSPEND_LAST_FAILED_ERROR: 0u64,
+                ref fobs::SUSPEND_LAST_TIMESTAMP: 1000u64,
+                ref fobs::SUSPEND_LAST_DURATION: 50u64,
             },
             suspend_events: {
                 "0": {
-                    suspended: AnyProperty,
+                   ref fobs::SUSPEND_ATTEMPTED_AT: AnyProperty,
                 },
                 "1": {
-                    resumed: AnyProperty,
-                    duration: 1000u64,
+                    ref fobs::SUSPEND_RESUMED_AT: AnyProperty,
+                    ref fobs::SUSPEND_LAST_TIMESTAMP: 1000u64,
                 },
             },
             wake_leases: {},
-            unhandled_suspend_failures: 0u64,
+            ref fobs::UNHANDLED_SUSPEND_FAILURES_COUNT: 0u64,
             "fuchsia.inspect.Health": contains {
                 status: "OK",
             },
@@ -1089,16 +1098,16 @@ async fn test_activity_governor_increments_fail_count_on_suspend_error() -> Resu
                 },
             },
             suspend_stats: {
-                success_count: 0u64,
-                fail_count: 0u64,
-                last_failed_error: 0u64,
-                last_time_in_suspend: -1i64,
-                last_time_in_suspend_operations: -1i64,
+                ref fobs::SUSPEND_SUCCESS_COUNT: 0u64,
+                ref fobs::SUSPEND_FAIL_COUNT: 0u64,
+                ref fobs::SUSPEND_LAST_FAILED_ERROR: 0u64,
+                ref fobs::SUSPEND_LAST_TIMESTAMP: -1i64,
+                ref fobs::SUSPEND_LAST_DURATION: -1i64,
             },
             suspend_events: {
             },
             wake_leases: {},
-            unhandled_suspend_failures: 0u64,
+            ref fobs::UNHANDLED_SUSPEND_FAILURES_COUNT: 0u64,
             "fuchsia.inspect.Health": contains {
                 status: "OK",
             },
@@ -1136,22 +1145,22 @@ async fn test_activity_governor_increments_fail_count_on_suspend_error() -> Resu
                 },
             },
             suspend_stats: {
-                success_count: 0u64,
-                fail_count: 1u64,
-                last_failed_error: 7u64,
-                last_time_in_suspend: -1i64,
-                last_time_in_suspend_operations: -1i64,
+                ref fobs::SUSPEND_SUCCESS_COUNT: 0u64,
+                ref fobs::SUSPEND_FAIL_COUNT: 1u64,
+                ref fobs::SUSPEND_LAST_FAILED_ERROR: 7u64,
+                ref fobs::SUSPEND_LAST_TIMESTAMP: -1i64,
+                ref fobs::SUSPEND_LAST_DURATION: -1i64,
             },
             suspend_events: {
                 "0": {
-                    suspended: AnyProperty,
+                   ref fobs::SUSPEND_ATTEMPTED_AT: AnyProperty,
                 },
                 "1": {
-                    suspend_failed: AnyProperty,
+                    ref fobs::SUSPEND_FAILED_AT: AnyProperty,
                 },
             },
             wake_leases: {},
-            unhandled_suspend_failures: NonZeroUintProperty,
+            ref fobs::UNHANDLED_SUSPEND_FAILURES_COUNT: NonZeroUintProperty,
             "fuchsia.inspect.Health": contains {
                 status: "OK",
             },
@@ -1211,16 +1220,16 @@ async fn test_activity_governor_suspends_successfully_after_failure() -> Result<
                 },
             },
             suspend_stats: {
-                success_count: 0u64,
-                fail_count: 0u64,
-                last_failed_error: 0u64,
-                last_time_in_suspend: -1i64,
-                last_time_in_suspend_operations: -1i64,
+                ref fobs::SUSPEND_SUCCESS_COUNT: 0u64,
+                ref fobs::SUSPEND_FAIL_COUNT: 0u64,
+                ref fobs::SUSPEND_LAST_FAILED_ERROR: 0u64,
+                ref fobs::SUSPEND_LAST_TIMESTAMP: -1i64,
+                ref fobs::SUSPEND_LAST_DURATION: -1i64,
             },
             suspend_events: {
             },
             wake_leases: {},
-            unhandled_suspend_failures: 0u64,
+            ref fobs::UNHANDLED_SUSPEND_FAILURES_COUNT: 0u64,
             "fuchsia.inspect.Health": contains {
                 status: "OK",
             },
@@ -1258,22 +1267,22 @@ async fn test_activity_governor_suspends_successfully_after_failure() -> Result<
                 },
             },
             suspend_stats: {
-                success_count: 0u64,
-                fail_count: 1u64,
-                last_failed_error: 7u64,
-                last_time_in_suspend: -1i64,
-                last_time_in_suspend_operations: -1i64,
+                ref fobs::SUSPEND_SUCCESS_COUNT: 0u64,
+                ref fobs::SUSPEND_FAIL_COUNT: 1u64,
+                ref fobs::SUSPEND_LAST_FAILED_ERROR: 7u64,
+                ref fobs::SUSPEND_LAST_TIMESTAMP: -1i64,
+                ref fobs::SUSPEND_LAST_DURATION: -1i64,
             },
             suspend_events: {
                 "0": {
-                    suspended: AnyProperty,
+                   ref fobs::SUSPEND_ATTEMPTED_AT: AnyProperty,
                 },
                 "1": {
-                    suspend_failed: AnyProperty,
+                    ref fobs::SUSPEND_FAILED_AT: AnyProperty,
                 },
             },
             wake_leases: {},
-            unhandled_suspend_failures: NonZeroUintProperty,
+            ref fobs::UNHANDLED_SUSPEND_FAILURES_COUNT: NonZeroUintProperty,
             "fuchsia.inspect.Health": contains {
                 status: "OK",
             },
@@ -1321,25 +1330,25 @@ async fn test_activity_governor_suspends_successfully_after_failure() -> Result<
                 },
             },
             suspend_stats: {
-                success_count: 1u64,
-                fail_count: 1u64,
-                last_failed_error: 7u64,
-                last_time_in_suspend: 2u64,
-                last_time_in_suspend_operations: 1u64,
+                ref fobs::SUSPEND_SUCCESS_COUNT: 1u64,
+                ref fobs::SUSPEND_FAIL_COUNT: 1u64,
+                ref fobs::SUSPEND_LAST_FAILED_ERROR: 7u64,
+                ref fobs::SUSPEND_LAST_TIMESTAMP: 2u64,
+                ref fobs::SUSPEND_LAST_DURATION: 1u64,
             },
             suspend_events: {
                 "0": {
-                    suspended: AnyProperty,
+                   ref fobs::SUSPEND_ATTEMPTED_AT: AnyProperty,
                 },
                 "1": {
-                    suspend_failed: AnyProperty,
+                    ref fobs::SUSPEND_FAILED_AT: AnyProperty,
                 },
                 "2": {
-                    suspended: AnyProperty,
+                   ref fobs::SUSPEND_ATTEMPTED_AT: AnyProperty,
                 },
                 "3": {
-                    resumed: AnyProperty,
-                    duration: 2u64,
+                    ref fobs::SUSPEND_RESUMED_AT: AnyProperty,
+                    ref fobs::SUSPEND_LAST_TIMESTAMP: 2u64,
                 },
             },
         }
@@ -1456,23 +1465,23 @@ async fn test_activity_governor_suspends_after_listener_hanging_on_resume() -> R
                 },
             },
             suspend_stats: {
-                success_count: 1u64,
-                fail_count: 0u64,
-                last_failed_error: 0u64,
-                last_time_in_suspend: 2u64,
-                last_time_in_suspend_operations: 1u64,
+                ref fobs::SUSPEND_SUCCESS_COUNT: 1u64,
+                ref fobs::SUSPEND_FAIL_COUNT: 0u64,
+                ref fobs::SUSPEND_LAST_FAILED_ERROR: 0u64,
+                ref fobs::SUSPEND_LAST_TIMESTAMP: 2u64,
+                ref fobs::SUSPEND_LAST_DURATION: 1u64,
             },
             suspend_events: {
                 "0": {
-                    suspended: AnyProperty,
+                   ref fobs::SUSPEND_ATTEMPTED_AT: AnyProperty,
                 },
                 "1": {
-                    resumed: AnyProperty,
-                    duration: 2u64,
+                    ref fobs::SUSPEND_RESUMED_AT: AnyProperty,
+                    ref fobs::SUSPEND_LAST_TIMESTAMP: 2u64,
                 },
             },
             wake_leases: {},
-            unhandled_suspend_failures: 0u64,
+            ref fobs::UNHANDLED_SUSPEND_FAILURES_COUNT: 0u64,
             "fuchsia.inspect.Health": contains {
                 status: "OK",
             },
@@ -1637,23 +1646,23 @@ async fn test_activity_governor_handles_listener_raising_power_levels() -> Resul
                 },
             },
             suspend_stats: {
-                success_count: 1u64,
-                fail_count: 0u64,
-                last_failed_error: 0u64,
-                last_time_in_suspend: 2u64,
-                last_time_in_suspend_operations: 1u64,
+                ref fobs::SUSPEND_SUCCESS_COUNT: 1u64,
+                ref fobs::SUSPEND_FAIL_COUNT: 0u64,
+                ref fobs::SUSPEND_LAST_FAILED_ERROR: 0u64,
+                ref fobs::SUSPEND_LAST_TIMESTAMP: 2u64,
+                ref fobs::SUSPEND_LAST_DURATION: 1u64,
             },
             suspend_events: {
                 "0": {
-                    suspended: AnyProperty,
+                   ref fobs::SUSPEND_ATTEMPTED_AT: AnyProperty,
                 },
                 "1": {
-                    resumed: AnyProperty,
-                    duration: 2u64,
+                    ref fobs::SUSPEND_RESUMED_AT: AnyProperty,
+                    ref fobs::SUSPEND_LAST_TIMESTAMP: 2u64,
                 },
             },
             wake_leases: {},
-            unhandled_suspend_failures: 0u64,
+            ref fobs::UNHANDLED_SUSPEND_FAILURES_COUNT: 0u64,
             "fuchsia.inspect.Health": contains {
                 status: "OK",
             },
@@ -1700,30 +1709,30 @@ async fn test_activity_governor_handles_listener_raising_power_levels() -> Resul
                 },
             },
             suspend_stats: {
-                success_count: 2u64,
-                fail_count: 0u64,
-                last_failed_error: 0u64,
-                last_time_in_suspend: 3u64,
-                last_time_in_suspend_operations: 1u64,
+                ref fobs::SUSPEND_SUCCESS_COUNT: 2u64,
+                ref fobs::SUSPEND_FAIL_COUNT: 0u64,
+                ref fobs::SUSPEND_LAST_FAILED_ERROR: 0u64,
+                ref fobs::SUSPEND_LAST_TIMESTAMP: 3u64,
+                ref fobs::SUSPEND_LAST_DURATION: 1u64,
             },
             suspend_events: {
                 "0": {
-                    suspended: AnyProperty,
+                   ref fobs::SUSPEND_ATTEMPTED_AT: AnyProperty,
                 },
                 "1": {
-                    resumed: AnyProperty,
-                    duration: 2u64,
+                    ref fobs::SUSPEND_RESUMED_AT: AnyProperty,
+                    ref fobs::SUSPEND_LAST_TIMESTAMP: 2u64,
                 },
                 "2": {
-                    suspended: AnyProperty,
+                   ref fobs::SUSPEND_ATTEMPTED_AT: AnyProperty,
                 },
                 "3": {
-                    resumed: AnyProperty,
-                    duration: 3u64,
+                    ref fobs::SUSPEND_RESUMED_AT: AnyProperty,
+                    ref fobs::SUSPEND_LAST_TIMESTAMP: 3u64,
                 },
             },
             wake_leases: {},
-            unhandled_suspend_failures: 0u64,
+            ref fobs::UNHANDLED_SUSPEND_FAILURES_COUNT: 0u64,
             "fuchsia.inspect.Health": contains {
                 status: "OK",
             },
@@ -1822,22 +1831,22 @@ async fn test_activity_governor_handles_suspend_failure() -> Result<()> {
                 },
             },
             suspend_stats: {
-                success_count: 0u64,
-                fail_count: 1u64,
-                last_failed_error: 0u64,
-                last_time_in_suspend: -1i64,
-                last_time_in_suspend_operations: -1i64,
+                ref fobs::SUSPEND_SUCCESS_COUNT: 0u64,
+                ref fobs::SUSPEND_FAIL_COUNT: 1u64,
+                ref fobs::SUSPEND_LAST_FAILED_ERROR: 0u64,
+                ref fobs::SUSPEND_LAST_TIMESTAMP: -1i64,
+                ref fobs::SUSPEND_LAST_DURATION: -1i64,
             },
             suspend_events: {
                 "0": {
-                    suspended: AnyProperty,
+                   ref fobs::SUSPEND_ATTEMPTED_AT: AnyProperty,
                 },
                 "1": {
-                    suspend_failed: AnyProperty,
+                    ref fobs::SUSPEND_FAILED_AT: AnyProperty,
                 },
             },
             wake_leases: {},
-            unhandled_suspend_failures: 0u64,
+            ref fobs::UNHANDLED_SUSPEND_FAILURES_COUNT: 0u64,
             "fuchsia.inspect.Health": contains {
                 status: "OK",
             },
@@ -2010,16 +2019,16 @@ async fn test_activity_governor_handles_boot_signal() -> Result<()> {
                 },
             },
             suspend_stats: {
-                success_count: 0u64,
-                fail_count: 0u64,
-                last_failed_error: 0u64,
-                last_time_in_suspend: -1i64,
-                last_time_in_suspend_operations: -1i64,
+                ref fobs::SUSPEND_SUCCESS_COUNT: 0u64,
+                ref fobs::SUSPEND_FAIL_COUNT: 0u64,
+                ref fobs::SUSPEND_LAST_FAILED_ERROR: 0u64,
+                ref fobs::SUSPEND_LAST_TIMESTAMP: -1i64,
+                ref fobs::SUSPEND_LAST_DURATION: -1i64,
             },
             suspend_events: {
             },
             wake_leases: {},
-            unhandled_suspend_failures: 0u64,
+            ref fobs::UNHANDLED_SUSPEND_FAILURES_COUNT: 0u64,
             "fuchsia.inspect.Health": contains {
                 status: "OK",
             },
@@ -2053,19 +2062,19 @@ async fn test_activity_governor_handles_boot_signal() -> Result<()> {
                 },
             },
             suspend_stats: {
-                success_count: 0u64,
-                fail_count: 0u64,
-                last_failed_error: 0u64,
-                last_time_in_suspend: -1i64,
-                last_time_in_suspend_operations: -1i64,
+                ref fobs::SUSPEND_SUCCESS_COUNT: 0u64,
+                ref fobs::SUSPEND_FAIL_COUNT: 0u64,
+                ref fobs::SUSPEND_LAST_FAILED_ERROR: 0u64,
+                ref fobs::SUSPEND_LAST_TIMESTAMP: -1i64,
+                ref fobs::SUSPEND_LAST_DURATION: -1i64,
             },
             suspend_events: {
                 "0": {
-                    suspended: AnyProperty,
+                    ref fobs::SUSPEND_ATTEMPTED_AT: AnyProperty,
                 }
             },
             wake_leases: {},
-            unhandled_suspend_failures: 0u64,
+            ref fobs::UNHANDLED_SUSPEND_FAILURES_COUNT: 0u64,
             "fuchsia.inspect.Health": contains {
                 status: "OK",
             },

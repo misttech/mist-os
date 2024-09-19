@@ -26,6 +26,11 @@ from honeydew.interfaces.transports import ffx as ffx_transport
 from honeydew.typing import custom_types
 from honeydew.utils import decorators
 
+# TODO: b/354239403: This can not be done today, but probably should be done at
+# some point:
+# import fidl.fuchsia_power_observability as fobs
+# Then, replace all labels appearing in constants.fidl with strings from there.
+
 
 class _StarnixCmds:
     """Class to hold Starnix commands."""
@@ -579,7 +584,7 @@ class SystemPowerStateController(
         # "suspend_stats": {
         #     "fail_count": 0,
         #     "last_failed_error": 0,
-        #     "last_time_in_suspend": 3053743875,
+        #     "last_time_in_suspend_ns": 3053743875,
         #     "last_time_in_suspend_operations": 188959,
         #     "success_count": 1
         # },
@@ -595,7 +600,7 @@ class SystemPowerStateController(
             )
 
         suspend_resume_duration_nano_sec: float = suspend_resume_stats_after[
-            "last_time_in_suspend"
+            "last_time_in_suspend_ns"
         ]
         suspend_resume_duration_sec: float = round(
             suspend_resume_duration_nano_sec / 1e9, 4
@@ -637,22 +642,22 @@ class SystemPowerStateController(
         """
         # suspend_resume_events_before:
         # {
-        #     '0': {'suspended': 75685149500},
-        #     '1': {'resumed': 76510325583},
+        #     '0': {'attempted_at_ns': 75685149500},
+        #     '1': {'resumed_at_ns': 76510325583},
         # }
 
         # suspend_resume_events_after:
         # {
-        #     '0': {'suspended': 75685149500},
-        #     '1': {'resumed': 76510325583},
-        #     '2': {'suspended': 109243654875},
-        #     '3': {'resumed': 109833015166}
+        #     '0': {'attempted_at_ns': 75685149500},
+        #     '1': {'resumed_at_ns': 76510325583},
+        #     '2': {'attempted_at_ns': 109243654875},
+        #     '3': {'resumed_at_ns': 109833015166}
         # }
 
         # current_suspend_resume_events:
         # {
-        #     '2': {'suspended': 109243654875},
-        #     '3': {'resumed': 109833015166}
+        #     '2': {'attempted_at_ns': 109243654875},
+        #     '3': {'resumed_at_ns': 109833015166}
         # }
         current_suspend_resume_events: dict[str, dict[str, int]] = {
             k: v
@@ -669,15 +674,20 @@ class SystemPowerStateController(
         suspend_enter_timer: int | None = None
         suspend_exit_timer: int | None = None
         for k, v in current_suspend_resume_events.items():
-            if "suspended" in v:
-                suspend_enter_timer = v["suspended"]
-            elif "resumed" in v:
-                suspend_exit_timer = v["resumed"]
+            if "attempted_at_ns" in v:
+                suspend_enter_timer = v["attempted_at_ns"]
+            elif "resumed_at_ns" in v:
+                suspend_exit_timer = v["resumed_at_ns"]
         if (
             suspend_enter_timer is None
             or suspend_exit_timer is None
             or suspend_exit_timer < suspend_enter_timer
         ):
+            _LOGGER.info(
+                "FSH inspect based suspend_resume_events associated with current suspend-resume operation: {}".format(
+                    current_suspend_resume_events
+                )
+            )
             raise errors.SystemPowerStateControllerError(
                 f"Based on FSH inspect data, '{suspend_state}' followed "
                 f"by '{resume_mode}' operation didn't succeed on "
@@ -806,17 +816,17 @@ class SystemPowerStateController(
         #                     },
         #                     "suspend_events": {
         #                         "0": {
-        #                             "suspended": 20226056875
+        #                             "attempted_at_ns": 20226056875
         #                         },
         #                         "1": {
         #                             "duration": 3053743875,
-        #                             "resumed": 23281073708
+        #                             "resumed_at_ns": 23281073708
         #                         }
         #                     },
         #                     "suspend_stats": {
         #                         "fail_count": 0,
         #                         "last_failed_error": 0,
-        #                         "last_time_in_suspend": 3053743875,
+        #                         "last_time_in_suspend_ns": 3053743875,
         #                         "last_time_in_suspend_operations": 188959,
         #                         "success_count": 1
         #                     },
@@ -884,8 +894,8 @@ class SystemPowerStateController(
         #         "payload": {
         #             'root': {
         #                 'suspend_events': {
-        #                     '0': {'suspended': 73886828041},
-        #                     '1': {'resumed': 75687395083}
+        #                     '0': {'attempted_at_ns': 73886828041},
+        #                     '1': {'resumed_at_ns': 75687395083}
         #                 }
         #             }
         #         },
