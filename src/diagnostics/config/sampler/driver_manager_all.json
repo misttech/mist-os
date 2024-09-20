@@ -407,7 +407,7 @@
             ],
             "metric_id": 104,
             "metric_type": "Integer",
-            "selector": "bootstrap/driver_manager:root/sysmem/heaps/SysmemContiguousPool:free_at_high_water_mark",
+            "selector": "bootstrap/sysmem:root/sysmem/heaps/SysmemContiguousPool:free_at_high_water_mark",
             "project_id": 3509424520
         },
         {
@@ -416,7 +416,7 @@
             ],
             "metric_id": 105,
             "metric_type": "Integer",
-            "selector": "bootstrap/driver_manager:root/sysmem/heaps/SysmemContiguousPool:used_size",
+            "selector": "bootstrap/sysmem:root/sysmem/heaps/SysmemContiguousPool:used_size",
             "project_id": 3509424520
         },
         {
@@ -425,7 +425,7 @@
             ],
             "metric_id": 104,
             "metric_type": "Integer",
-            "selector": "bootstrap/driver_manager:root/sysmem/heaps/SysmemAmlogicProtectedPool:free_at_high_water_mark",
+            "selector": "bootstrap/sysmem:root/sysmem/heaps/SysmemAmlogicProtectedPool:free_at_high_water_mark",
             "project_id": 3509424520
         },
         {
@@ -434,7 +434,7 @@
             ],
             "metric_id": 105,
             "metric_type": "Integer",
-            "selector": "bootstrap/driver_manager:root/sysmem/heaps/SysmemAmlogicProtectedPool:used_size",
+            "selector": "bootstrap/sysmem:root/sysmem/heaps/SysmemAmlogicProtectedPool:used_size",
             "project_id": 3509424520
         },
         {
@@ -443,7 +443,7 @@
             ],
             "metric_id": 104,
             "metric_type": "Integer",
-            "selector": "bootstrap/driver_manager:root/sysmem/heaps/tee_secure:free_at_high_water_mark",
+            "selector": "bootstrap/sysmem:root/sysmem/heaps/tee_secure:free_at_high_water_mark",
             "project_id": 3509424520
         },
         {
@@ -452,7 +452,7 @@
             ],
             "metric_id": 105,
             "metric_type": "Integer",
-            "selector": "bootstrap/driver_manager:root/sysmem/heaps/tee_secure:used_size",
+            "selector": "bootstrap/sysmem:root/sysmem/heaps/tee_secure:used_size",
             "project_id": 3509424520
         }
     ],
