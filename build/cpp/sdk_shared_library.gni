@@ -142,6 +142,21 @@ set_defaults("sdk_shared_library") {
 template("sdk_shared_library") {
   assert(defined(invoker.category), "Must define an SDK category")
 
+  # Only categories that are included in an IDK makes sense.
+  valid_categories = [
+    # "excluded" is deprecated.
+    # "experimental" is deprecated.
+    # "internal" does not apply to shared libraries.
+    # "cts" is only for ABI compatibility and thus not applicable.
+    # "partner_internal" is only for ABI compatibility and thus not applicable.
+    "partner",
+    # "public" is not yet implemented.
+  ]
+  assert(
+      valid_categories + [ invoker.category ] - [ invoker.category ] !=
+          valid_categories,
+      "'${target_name}' has unsupported SDK category '${invoker.category}'. Must be one of ${valid_categories}.")
+
   output_name = target_name
   if (defined(invoker.output_name)) {
     output_name = invoker.output_name
@@ -156,8 +171,7 @@ template("sdk_shared_library") {
 
   no_headers = defined(invoker.no_headers) && invoker.no_headers
 
-  if ((invoker.category == "partner" || invoker.category == "public") &&
-      !no_headers) {
+  if (!no_headers) {
     api_reference = "${atom_name}.api"
     if (defined(invoker.api)) {
       api_reference = invoker.api

@@ -69,7 +69,38 @@ set_defaults("sdk_static_library") {
 
 template("sdk_static_library") {
   assert(defined(invoker.category), "Must define an SDK category")
+
+  # Only categories that are included in an IDK makes sense.
+  valid_categories = [
+    # "excluded" is deprecated.
+    # "experimental" is deprecated.
+    "internal",  # TODO(https://fxbug.dev/333125197): Disable once allowlisted
+                 # uses below are removed.
+
+    # "cts" is only for ABI compatibility and thus not applicable.
+    # "partner_internal" is only for ABI compatibility and thus not applicable.
+    "partner",
+
+    # "public" is not yet implemented.
+  ]
+
+  # Remove categories that should not be used in new targets.
+  valid_categories_for_error_message = valid_categories - [ "internal" ]
+
+  assert(
+      valid_categories + [ invoker.category ] - [ invoker.category ] !=
+          valid_categories,
+      "'${target_name}' has unsupported SDK category '${invoker.category}'. Must be one of ${valid_categories_for_error_message}.")
+
   is_internal = invoker.category == "internal"
+
+  # TODO(https://fxbug.dev/331961405): Remove "internal" support once these
+  # libraries are moved to the core IDK or the "internal IDK" is eliminated.
+  # TODO(https://fxbug.dev/326252240): Remove fake-* once the existing deps are
+  # switched to the new targets in //sdk and the ones on //src are deleted.
+  assert(!is_internal || target_name == "devicetree" ||
+             target_name == "fake-bti" || target_name == "fake-object",
+         "Do not add more internal static libraries.")
 
   output_name = target_name
   if (defined(invoker.output_name)) {
