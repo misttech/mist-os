@@ -155,6 +155,8 @@ def fuchsia_package(
         platform = platform,
         target_compatible_with = target_compat,
         tags = tags + ["manual"],
+        # TODO(b/368434718) remove this once we have better c++ packaging support
+        hack_ignore_cpp = kwargs.pop("HACK_IGNORE_CPP", None),
         **kwargs
     )
 
@@ -331,8 +333,21 @@ def _build_fuchsia_package_impl(ctx):
     ]
 
     # Add all of the collected resources
+    all_resources = ctx.attr.collected_resources[FuchsiaCollectedPackageResourcesInfo].collected_resources.to_list()
+
+    # TODO(b/368434718) remove this hack when we are able to better handle libc++ packaging when it isn't needed
+    if ctx.attr.hack_ignore_cpp:
+        filtered = []
+
+        # We need to strip out the libc++ libraries that have been statically linked
+        for r in all_resources:
+            if r.dest.startswith("lib/libc++") or r.dest.startswith("lib/libunwind.so"):
+                continue
+            filtered.append(r)
+        all_resources = filtered
+
     package_resources.extend(
-        ctx.attr.collected_resources[FuchsiaCollectedPackageResourcesInfo].collected_resources.to_list(),
+        all_resources,
     )
 
     # Resources that we will pass through the debug symbol stripping process
@@ -646,6 +661,10 @@ _build_fuchsia_package, _build_fuchsia_package_test = rule_variants(
             If this value is not set we will fall back to the cpu setting to determine
             the correct platform.
             """,
+        ),
+        "hack_ignore_cpp": attr.bool(
+            doc = "Please do not use this attribute unless you talk with the SDK team.",
+            default = False,
         ),
         "_fuchsia_sdk_debug_symbols": attr.label(
             doc = "Include debug symbols from @fuchsia_sdk.",
