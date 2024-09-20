@@ -2,10 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{RegistrationConflictMode, RepoStorageType};
 use anyhow::{bail, Result};
 use ffx_config::EnvironmentContext;
-use fidl_fuchsia_pkg_ext::RepositoryConfig;
+use fidl_fuchsia_pkg_ext::{
+    RepositoryConfig, RepositoryRegistrationAliasConflictMode, RepositoryStorageType,
+};
 use nix::sys::wait::{waitpid, WaitPidFlag, WaitStatus};
 use nix::unistd::Pid;
 use schemars::JsonSchema;
@@ -73,8 +74,8 @@ pub struct PkgServerInfo {
     pub address: SocketAddr,
     pub repo_path: PathType,
     pub registration_aliases: Vec<String>,
-    pub registration_storage_type: RepoStorageType,
-    pub registration_alias_conflict_mode: RegistrationConflictMode,
+    pub registration_storage_type: RepositoryStorageType,
+    pub registration_alias_conflict_mode: RepositoryRegistrationAliasConflictMode,
     pub server_mode: ServerMode,
     pub repo_config: RepositoryConfig,
     pub pid: u32,
@@ -266,8 +267,8 @@ pub async fn write_instance_info(
     address: &SocketAddr,
     repo_path: PathType,
     aliases: Vec<String>,
-    storage_type: RepoStorageType,
-    conflict_mode: RegistrationConflictMode,
+    storage_type: RepositoryStorageType,
+    conflict_mode: RepositoryRegistrationAliasConflictMode,
     repo_config: RepositoryConfig,
 ) -> Result<()> {
     let instance_root = if let Some(context) = env_context {
@@ -323,8 +324,8 @@ mod tests {
             &addr,
             PathBuf::new().as_path().into(),
             vec![],
-            RepoStorageType::Ephemeral,
-            RegistrationConflictMode::ErrorOut,
+            RepositoryStorageType::Ephemeral,
+            RepositoryRegistrationAliasConflictMode::ErrorOut,
             repo_config,
         )
         .await
@@ -352,8 +353,8 @@ mod tests {
             &addr,
             PathBuf::new().as_path().into(),
             vec![],
-            RepoStorageType::Ephemeral,
-            RegistrationConflictMode::ErrorOut,
+            RepositoryStorageType::Ephemeral,
+            RepositoryRegistrationAliasConflictMode::ErrorOut,
             repo_config,
         )
         .await
@@ -379,11 +380,11 @@ mod tests {
             name: instance_name.into(),
             address: (Ipv6Addr::UNSPECIFIED, 8000).into(),
             repo_path: Path::new("").into(),
-            registration_alias_conflict_mode: RegistrationConflictMode::ErrorOut,
+            registration_alias_conflict_mode: RepositoryRegistrationAliasConflictMode::ErrorOut,
             server_mode: ServerMode::Foreground,
             pid: process::id(),
             registration_aliases: vec![],
-            registration_storage_type: RepoStorageType::Ephemeral,
+            registration_storage_type: RepositoryStorageType::Ephemeral,
             repo_config,
         };
         assert!(info.is_running());
@@ -419,11 +420,11 @@ mod tests {
             name: instance_name.into(),
             address: (Ipv6Addr::UNSPECIFIED, 8000).into(),
             repo_path: Path::new("").into(),
-            registration_alias_conflict_mode: RegistrationConflictMode::ErrorOut,
+            registration_alias_conflict_mode: RepositoryRegistrationAliasConflictMode::ErrorOut,
             server_mode: ServerMode::Foreground,
             pid: process::id(),
             registration_aliases: vec![],
-            registration_storage_type: RepoStorageType::Ephemeral,
+            registration_storage_type: RepositoryStorageType::Ephemeral,
             repo_config,
         };
 
@@ -444,11 +445,11 @@ mod tests {
             name: instance_name.into(),
             address: (Ipv6Addr::UNSPECIFIED, 8000).into(),
             repo_path: PathBuf::from("path1").as_path().into(),
-            registration_alias_conflict_mode: RegistrationConflictMode::ErrorOut,
+            registration_alias_conflict_mode: RepositoryRegistrationAliasConflictMode::ErrorOut,
             server_mode: ServerMode::Foreground,
             pid: process::id(),
             registration_aliases: vec![],
-            registration_storage_type: RepoStorageType::Ephemeral,
+            registration_storage_type: RepositoryStorageType::Ephemeral,
             repo_config,
         };
 
@@ -483,11 +484,11 @@ mod tests {
             name: instance_name.into(),
             address: (Ipv6Addr::UNSPECIFIED, 8000).into(),
             repo_path: Path::new("").into(),
-            registration_alias_conflict_mode: RegistrationConflictMode::ErrorOut,
+            registration_alias_conflict_mode: RepositoryRegistrationAliasConflictMode::ErrorOut,
             server_mode: ServerMode::Foreground,
             pid: process::id(),
             registration_aliases: vec![],
-            registration_storage_type: RepoStorageType::Ephemeral,
+            registration_storage_type: RepositoryStorageType::Ephemeral,
             repo_config,
         };
 
@@ -512,11 +513,11 @@ mod tests {
             name: instance_name.into(),
             address: (Ipv6Addr::UNSPECIFIED, 8000).into(),
             repo_path: Path::new("").into(),
-            registration_alias_conflict_mode: RegistrationConflictMode::ErrorOut,
+            registration_alias_conflict_mode: RepositoryRegistrationAliasConflictMode::ErrorOut,
             server_mode: ServerMode::Foreground,
             pid: process::id(),
             registration_aliases: vec![],
-            registration_storage_type: RepoStorageType::Ephemeral,
+            registration_storage_type: RepositoryStorageType::Ephemeral,
             repo_config: repo_config_1,
         };
 
@@ -530,11 +531,11 @@ mod tests {
             name: another_instance_name.into(),
             address: (Ipv6Addr::UNSPECIFIED, 8000).into(),
             repo_path: Path::new("").into(),
-            registration_alias_conflict_mode: RegistrationConflictMode::ErrorOut,
+            registration_alias_conflict_mode: RepositoryRegistrationAliasConflictMode::ErrorOut,
             server_mode: ServerMode::Foreground,
             pid: process::id(),
             registration_aliases: vec![],
-            registration_storage_type: RepoStorageType::Ephemeral,
+            registration_storage_type: RepositoryStorageType::Ephemeral,
             repo_config: repo_config_2,
         };
         mgr.write_instance(&info_1).expect("written OK");
@@ -564,11 +565,11 @@ mod tests {
             name: instance_name.into(),
             address: (Ipv6Addr::UNSPECIFIED, 8000).into(),
             repo_path: Path::new("").into(),
-            registration_alias_conflict_mode: RegistrationConflictMode::ErrorOut,
+            registration_alias_conflict_mode: RepositoryRegistrationAliasConflictMode::ErrorOut,
             server_mode: ServerMode::Foreground,
             pid: process::id(),
             registration_aliases: vec![],
-            registration_storage_type: RepoStorageType::Ephemeral,
+            registration_storage_type: RepositoryStorageType::Ephemeral,
             repo_config: repo_config_1,
         };
 
@@ -582,11 +583,11 @@ mod tests {
             name: another_instance_name.into(),
             address: (Ipv6Addr::UNSPECIFIED, 8000).into(),
             repo_path: Path::new("").into(),
-            registration_alias_conflict_mode: RegistrationConflictMode::ErrorOut,
+            registration_alias_conflict_mode: RepositoryRegistrationAliasConflictMode::ErrorOut,
             server_mode: ServerMode::Foreground,
             pid: 0,
             registration_aliases: vec![],
-            registration_storage_type: RepoStorageType::Ephemeral,
+            registration_storage_type: RepositoryStorageType::Ephemeral,
             repo_config: repo_config_2,
         };
         mgr.write_instance(&info_1).expect("written OK");
@@ -629,11 +630,11 @@ mod tests {
             name: instance_name.into(),
             address: (Ipv6Addr::UNSPECIFIED, 8000).into(),
             repo_path: Path::new("").into(),
-            registration_alias_conflict_mode: RegistrationConflictMode::ErrorOut,
+            registration_alias_conflict_mode: RepositoryRegistrationAliasConflictMode::ErrorOut,
             server_mode: ServerMode::Foreground,
             pid: 0,
             registration_aliases: vec![],
-            registration_storage_type: RepoStorageType::Ephemeral,
+            registration_storage_type: RepositoryStorageType::Ephemeral,
             repo_config,
         };
 
@@ -666,11 +667,11 @@ mod tests {
             name: instance_name.into(),
             address: (Ipv6Addr::UNSPECIFIED, 8000).into(),
             repo_path: Path::new("").into(),
-            registration_alias_conflict_mode: RegistrationConflictMode::ErrorOut,
+            registration_alias_conflict_mode: RepositoryRegistrationAliasConflictMode::ErrorOut,
             server_mode: ServerMode::Foreground,
             pid: process::id(),
             registration_aliases: vec![],
-            registration_storage_type: RepoStorageType::Ephemeral,
+            registration_storage_type: RepositoryStorageType::Ephemeral,
             repo_config,
         };
 
@@ -693,11 +694,11 @@ mod tests {
             name: instance_name.into(),
             address: (Ipv6Addr::UNSPECIFIED, 8000).into(),
             repo_path: Path::new("").into(),
-            registration_alias_conflict_mode: RegistrationConflictMode::ErrorOut,
+            registration_alias_conflict_mode: RepositoryRegistrationAliasConflictMode::ErrorOut,
             server_mode: ServerMode::Foreground,
             pid: 0,
             registration_aliases: vec![],
-            registration_storage_type: RepoStorageType::Ephemeral,
+            registration_storage_type: RepositoryStorageType::Ephemeral,
             repo_config,
         };
 
@@ -721,11 +722,11 @@ mod tests {
             name: instance_name.into(),
             address: (Ipv6Addr::UNSPECIFIED, 8000).into(),
             repo_path: Path::new("").into(),
-            registration_alias_conflict_mode: RegistrationConflictMode::ErrorOut,
+            registration_alias_conflict_mode: RepositoryRegistrationAliasConflictMode::ErrorOut,
             server_mode: ServerMode::Foreground,
             pid: process::id(),
             registration_aliases: vec![],
-            registration_storage_type: RepoStorageType::Ephemeral,
+            registration_storage_type: RepositoryStorageType::Ephemeral,
             repo_config,
         };
 
@@ -763,11 +764,11 @@ mod tests {
             name: "some-server".into(),
             address: (Ipv6Addr::UNSPECIFIED, 8000).into(),
             repo_path: Path::new("").into(),
-            registration_alias_conflict_mode: RegistrationConflictMode::ErrorOut,
+            registration_alias_conflict_mode: RepositoryRegistrationAliasConflictMode::ErrorOut,
             server_mode: ServerMode::Foreground,
             pid: child.id(),
             registration_aliases: vec![],
-            registration_storage_type: RepoStorageType::Ephemeral,
+            registration_storage_type: RepositoryStorageType::Ephemeral,
             repo_config,
         };
         // There is race condition in which the fake server process could crash (e.g. if the bash

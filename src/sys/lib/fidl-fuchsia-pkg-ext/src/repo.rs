@@ -6,11 +6,14 @@ use crate::errors::{MirrorConfigError, RepositoryParseError, RepositoryUrlParseE
 use fidl_fuchsia_pkg as fidl;
 use http::Uri;
 use http_uri_ext::HttpUriExt as _;
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::{fmt, mem};
 
 /// Convenience wrapper for the FIDL RepositoryStorageType.
-#[derive(Clone, Hash, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[derive(
+    Clone, Hash, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, JsonSchema,
+)]
 #[serde(rename_all = "snake_case")]
 pub enum RepositoryStorageType {
     /// Store the repository in-memory. This metadata will be lost if the process or device is
@@ -23,7 +26,9 @@ pub enum RepositoryStorageType {
 }
 
 /// Convenience wrapper for the FIDL RepositoryRegistrationAliasConflictMode.
-#[derive(Clone, Hash, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[derive(
+    Clone, Hash, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, JsonSchema,
+)]
 #[serde(rename_all = "snake_case")]
 pub enum RepositoryRegistrationAliasConflictMode {
     /// When conflicting aliases found during registration process, error out.

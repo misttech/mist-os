@@ -551,7 +551,7 @@ pub async fn serve_impl<W: Write + 'static>(
                     };
 
                 let repo_config = repo_client
-                    .get_config(repo_url, mirror_url, storage_type)
+                    .get_config(repo_url, mirror_url, storage_type.clone())
                     .map_err(|e| bug!("{e}"))?;
 
                 repo_manager.add(&repo_name, repo_client);
@@ -563,8 +563,11 @@ pub async fn serve_impl<W: Write + 'static>(
                     &cmd.address,
                     product_bundle.as_std_path().into(),
                     aliases.into_iter().collect(),
-                    cmd.storage_type.unwrap_or(RepositoryStorageType::Ephemeral).into(),
-                    cmd.alias_conflict_mode.into(),
+                    storage_type.unwrap_or(fidl_fuchsia_pkg_ext::RepositoryStorageType::Ephemeral),
+                    match cmd.alias_conflict_mode {
+                        fidl_fuchsia_developer_ffx::RepositoryRegistrationAliasConflictMode::ErrorOut => fidl_fuchsia_pkg_ext::RepositoryRegistrationAliasConflictMode::ErrorOut,
+                        fidl_fuchsia_developer_ffx::RepositoryRegistrationAliasConflictMode::Replace => fidl_fuchsia_pkg_ext::RepositoryRegistrationAliasConflictMode::Replace,
+                    },
                     repo_config,
                 )
                 .await
@@ -630,7 +633,7 @@ pub async fn serve_impl<W: Write + 'static>(
                 };
 
             let repo_config = repo_client
-                .get_config(repo_url, mirror_url, storage_type)
+                .get_config(repo_url, mirror_url, storage_type.clone())
                 .map_err(|e| bug!("{e}"))?;
             repo_manager.add(&repo_name, repo_client);
 
@@ -645,8 +648,11 @@ pub async fn serve_impl<W: Write + 'static>(
                 &cmd.address,
                 repo_path.as_std_path().into(),
                 cmd.alias.clone(),
-                cmd.storage_type.unwrap_or(RepositoryStorageType::Ephemeral).into(),
-                cmd.alias_conflict_mode.into(),
+                storage_type.unwrap_or(fidl_fuchsia_pkg_ext::RepositoryStorageType::Ephemeral),
+                match cmd.alias_conflict_mode {
+                    fidl_fuchsia_developer_ffx::RepositoryRegistrationAliasConflictMode::ErrorOut => fidl_fuchsia_pkg_ext::RepositoryRegistrationAliasConflictMode::ErrorOut,
+                    fidl_fuchsia_developer_ffx::RepositoryRegistrationAliasConflictMode::Replace => fidl_fuchsia_pkg_ext::RepositoryRegistrationAliasConflictMode::Replace,
+                },
                 repo_config,
             )
             .await
@@ -782,7 +788,6 @@ mod test {
     use fuchsia_repo::test_utils;
     use futures::channel::mpsc;
     use futures::TryStreamExt;
-    use pkg::{RegistrationConflictMode, RepoStorageType};
     use std::collections::BTreeSet;
     use std::sync::Mutex;
     use std::time;
@@ -1359,8 +1364,9 @@ mod test {
             address: (REPO_IPV4_ADDR, REPO_PORT).into(),
             repo_path: repo_path.as_path().into(),
             registration_aliases: vec![],
-            registration_storage_type: RepoStorageType::Ephemeral,
-            registration_alias_conflict_mode: RegistrationConflictMode::ErrorOut,
+            registration_storage_type: fidl_fuchsia_pkg_ext::RepositoryStorageType::Ephemeral,
+            registration_alias_conflict_mode:
+                fidl_fuchsia_pkg_ext::RepositoryRegistrationAliasConflictMode::ErrorOut,
             server_mode: ServerMode::Background,
             pid: std::process::id(),
             repo_config,

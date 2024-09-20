@@ -166,9 +166,10 @@ mod tests {
     use ffx_config::TestEnv;
     use fho::Format;
     use fidl_fuchsia_developer_ffx::{RepositoryRegistryMarker, RepositoryRegistryRequest};
-    use fidl_fuchsia_pkg_ext::RepositoryConfigBuilder;
+    use fidl_fuchsia_pkg_ext::{
+        RepositoryConfigBuilder, RepositoryRegistrationAliasConflictMode, RepositoryStorageType,
+    };
     use futures::channel::oneshot::channel;
-    use pkg::{RegistrationConflictMode, RepoStorageType};
     use serde_json::Value;
     use std::net::Ipv4Addr;
     use std::os::unix::fs::PermissionsExt as _;
@@ -212,8 +213,8 @@ mod tests {
             address,
             repo_path: PathBuf::from("/somewhere").as_path().into(),
             registration_aliases: vec![],
-            registration_storage_type: RepoStorageType::Ephemeral,
-            registration_alias_conflict_mode: RegistrationConflictMode::ErrorOut,
+            registration_storage_type: RepositoryStorageType::Ephemeral,
+            registration_alias_conflict_mode: RepositoryRegistrationAliasConflictMode::ErrorOut,
             server_mode: ServerMode::Foreground,
             pid: child.id(),
             repo_config,
@@ -236,8 +237,8 @@ mod tests {
             address,
             repo_path: PathBuf::from("/somewhere").as_path().into(),
             registration_aliases: vec![],
-            registration_storage_type: RepoStorageType::Ephemeral,
-            registration_alias_conflict_mode: RegistrationConflictMode::ErrorOut,
+            registration_storage_type: RepositoryStorageType::Ephemeral,
+            registration_alias_conflict_mode: RepositoryRegistrationAliasConflictMode::ErrorOut,
             server_mode: ServerMode::Daemon,
             pid: process::id(),
             repo_config,
