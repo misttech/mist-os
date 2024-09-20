@@ -618,6 +618,12 @@ pub trait OnWakeOps: Send + Sync {
     fn on_wake(&self, current_task: &CurrentTask, baton_lease: &zx::Channel);
 }
 
+/// The signal that the runner raises when handing over an event to the kernel.
+pub const RUNNER_PROXY_EVENT_SIGNAL: zx::Signals = zx::Signals::USER_0;
+
+/// The signal that the kernel raises to indicate that a message has been handled.
+pub const KERNEL_PROXY_EVENT_SIGNAL: zx::Signals = zx::Signals::USER_1;
+
 /// Creates a proxy between `remote_channel` and the returned `zx::Channel`.
 ///
 /// The proxying is done by the Starnix runner, and allows messages on the channel to wake
