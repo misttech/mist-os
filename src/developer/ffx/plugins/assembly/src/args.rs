@@ -270,11 +270,6 @@ pub struct ProductArgs {
     #[argh(option)]
     pub legacy_bundle: Option<Utf8PathBuf>,
 
-    /// a file containing a ProductPackageConfig with additional packages
-    /// to include which are not in the assembly input bundle
-    #[argh(option)]
-    pub additional_packages_path: Option<Utf8PathBuf>,
-
     /// disable validation of the assembly's packages
     #[argh(option, default = "Default::default()")]
     pub package_validation: PackageValidationHandling,

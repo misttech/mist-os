@@ -30,7 +30,6 @@ pub fn assemble(args: ProductArgs) -> Result<()> {
         gendir: _,
         input_bundles_dir,
         legacy_bundle,
-        additional_packages_path,
         package_validation,
         custom_kernel_aib,
         developer_overrides,
@@ -281,12 +280,6 @@ Resulting product is not supported and may misbehave!
     builder
         .add_product_base_drivers(product.base_drivers)
         .context("Adding product-provided base-drivers")?;
-
-    if let Some(package_config_path) = additional_packages_path {
-        let additional_packages =
-            read_config(package_config_path).context("Reading additional package config")?;
-        builder.add_product_packages(additional_packages).context("Adding additional packages")?;
-    }
 
     // Add devicetree binary
     if let Some(devicetree_path) = &board_info.devicetree {
