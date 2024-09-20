@@ -39,6 +39,7 @@ use fidl::endpoints;
 use fidl::endpoints::{ControlHandle, RequestStream};
 use fidl_fuchsia_hardware_vsock::{
     CallbacksMarker, CallbacksRequest, CallbacksRequestStream, DeviceProxy, VMADDR_CID_HOST,
+    VMADDR_CID_LOCAL,
 };
 use fidl_fuchsia_vsock::{
     AcceptorProxy, ConnectionRequest, ConnectionRequestStream, ConnectionTransport,
@@ -46,7 +47,7 @@ use fidl_fuchsia_vsock::{
 };
 use futures::channel::{mpsc, oneshot};
 use futures::{future, select, Future, FutureExt, Stream, StreamExt, TryFutureExt, TryStreamExt};
-use std::cell::{RefCell, RefMut};
+use std::cell::{Ref, RefCell, RefMut};
 use std::collections::{HashMap, VecDeque};
 use std::convert::Infallible;
 use std::ops::Deref;
@@ -58,6 +59,11 @@ use {fuchsia_async as fasync, fuchsia_zircon as zx};
 
 const ZXIO_SIGNAL_INCOMING: zx::Signals =
     const_unwrap_option(zx::Signals::from_bits(SIGNAL_STREAM_INCOMING));
+
+type Cid = u32;
+type Port = u32;
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+struct Addr(Cid, Port);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 enum EventType {
@@ -74,8 +80,8 @@ struct Event {
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 enum Deregister {
     Event(Event),
-    Listen(u32),
-    Port(u32),
+    Listen(Addr),
+    Port(Addr),
 }
 
 #[derive(Error, Debug)]
@@ -135,7 +141,7 @@ fn map_driver_result(result: Result<Result<(), i32>, fidl::Error>) -> Result<(),
 struct ClientContextState {
     queue: VecDeque<addr::Vsock>,
     // local_port -> backlog_size
-    backlogs: HashMap<u32, u32>,
+    backlogs: HashMap<Addr, u32>,
     control: ConnectorControlHandle,
     signaled: bool,
 }
@@ -153,20 +159,21 @@ impl ClientContext {
         })))
     }
 
-    fn add_port(&self, port: u32, backlog: u32) {
+    fn add_port(&self, port: Addr, backlog: u32) {
         self.0.borrow_mut().backlogs.insert(port, backlog);
     }
 
-    fn remove_port(&self, port: u32) {
+    fn remove_port(&self, port: Addr) {
         self.0.borrow_mut().backlogs.remove(&port);
     }
 
     fn push_addr(&self, addr: addr::Vsock) -> bool {
         let mut ctx = self.0.borrow_mut();
-        if ctx.backlogs[&addr.local_port] == 0 {
+        let backlog_key = Addr(addr.remote_cid, addr.local_port);
+        if ctx.backlogs[&backlog_key] == 0 {
             return false;
         }
-        *ctx.backlogs.get_mut(&addr.local_port).unwrap() -= 1;
+        *ctx.backlogs.get_mut(&backlog_key).unwrap() -= 1;
         ctx.queue.push_back(addr);
         if ctx.signaled == false {
             let _ = ctx.control.signal_peer(zx::Signals::empty(), ZXIO_SIGNAL_INCOMING);
@@ -178,7 +185,7 @@ impl ClientContext {
     fn pop_addr(&self) -> Option<addr::Vsock> {
         let mut ctx = self.0.borrow_mut();
         if let Some(addr) = ctx.queue.pop_front() {
-            *ctx.backlogs.get_mut(&addr.local_port).unwrap() += 1;
+            *ctx.backlogs.get_mut(&Addr(addr.remote_cid, addr.local_port)).unwrap() += 1;
             if ctx.queue.len() == 0 {
                 let _ = ctx.control.signal_peer(ZXIO_SIGNAL_INCOMING, zx::Signals::empty());
                 ctx.signaled = false;
@@ -189,7 +196,7 @@ impl ClientContext {
         }
     }
 
-    fn ports(&self) -> Vec<u32> {
+    fn ports(&self) -> Vec<Addr> {
         self.0.borrow_mut().backlogs.iter().map(|(port, _)| *port).collect()
     }
 }
@@ -200,11 +207,25 @@ enum Listener {
 }
 
 struct State {
-    device: DeviceProxy,
+    guest_vsock_device: Option<DeviceProxy>,
+    loopback_vsock_device: Option<DeviceProxy>,
+    local_cid: Cid,
     events: HashMap<Event, oneshot::Sender<()>>,
-    used_ports: port::Tracker,
-    listeners: HashMap<u32, Listener>,
+    used_ports: HashMap<Cid, port::Tracker>,
+    listeners: HashMap<Addr, Listener>,
     tasks: fasync::TaskGroup,
+}
+
+impl State {
+    fn device(&self, addr: &addr::Vsock) -> &DeviceProxy {
+        match (addr.remote_cid, &self.guest_vsock_device, &self.loopback_vsock_device) {
+            (VMADDR_CID_LOCAL, _, Some(loopback)) => &loopback,
+            (VMADDR_CID_HOST, Some(guest), _) => &guest,
+            (VMADDR_CID_HOST, None, Some(loopback)) => &loopback,
+            (cid, None, Some(loopback)) if cid == self.local_cid => &loopback,
+            _ => unreachable!("Shouldn't be able to end up here!"),
+        }
+    }
 }
 
 #[derive(Clone)]
@@ -219,29 +240,43 @@ impl Vsock {
     /// to be evaluated for other methods on the returned `Self` to complete successfully. Unless
     /// a fatal error occurs the future will never yield a result and will execute infinitely.
     pub async fn new(
-        device: DeviceProxy,
-    ) -> Result<(Self, impl Future<Output = Result<Infallible, anyhow::Error>>), anyhow::Error>
+        guest_vsock_device: Option<DeviceProxy>,
+        loopback_vsock_device: Option<DeviceProxy>,
+    ) -> Result<(Self, impl Future<Output = Result<Vec<Infallible>, anyhow::Error>>), anyhow::Error>
     {
-        let (callbacks_client, callbacks_server) = endpoints::create_endpoints::<CallbacksMarker>();
-        let server_stream = callbacks_server.into_stream()?;
+        let mut server_streams = Vec::new();
+        let mut start_device = |device: &DeviceProxy| {
+            let (callbacks_client, callbacks_server) =
+                endpoints::create_endpoints::<CallbacksMarker>();
+            server_streams.push(callbacks_server.into_stream().unwrap());
 
-        device
-            .start(callbacks_client)
-            .map(map_driver_result)
-            .err_into::<anyhow::Error>()
-            .await
-            .context("Failed to start device")?;
-
+            device.start(callbacks_client).map(map_driver_result).err_into::<anyhow::Error>()
+        };
+        let mut local_cid = VMADDR_CID_LOCAL;
+        if let Some(ref device) = guest_vsock_device {
+            start_device(device).await.context("Failed to start guest device")?;
+            local_cid = device.get_cid().await?;
+        }
+        if let Some(ref device) = loopback_vsock_device {
+            start_device(device).await.context("Failed to start loopback device")?;
+        }
         let service = State {
-            device,
+            guest_vsock_device,
+            loopback_vsock_device,
+            local_cid,
             events: HashMap::new(),
-            used_ports: port::Tracker::new(),
+            used_ports: HashMap::new(),
             listeners: HashMap::new(),
             tasks: fasync::TaskGroup::new(),
         };
+
         let service = Vsock(Rc::new(RefCell::new(service)));
-        let callback_loop = service.clone().run_callbacks(server_stream);
-        Ok((service, callback_loop))
+        let callback_loops: Vec<_> = server_streams
+            .into_iter()
+            .map(|stream| service.clone().run_callbacks(stream))
+            .collect();
+
+        Ok((service, future::try_join_all(callback_loops)))
     }
     async fn run_callbacks(
         self,
@@ -253,6 +288,10 @@ impl Vsock {
         // The only way to get here is if our callbacks stream ended, since our notifications
         // cannot disconnect as we are holding a reference to them in |service|.
         Err(format_err!("Driver disconnected"))
+    }
+
+    fn supported_cid(&self, cid: u32) -> bool {
+        cid == VMADDR_CID_HOST || cid == VMADDR_CID_LOCAL || cid == self.borrow().local_cid
     }
 
     // Spawns a new asynchronous task for listening for incoming connections on a port.
@@ -346,9 +385,9 @@ impl Vsock {
             self.deregister(Deregister::Listen(port));
         }
     }
-    fn alloc_ephemeral_port(self) -> Option<AllocatedPort> {
-        let p = self.borrow_mut().used_ports.allocate();
-        p.map(|p| AllocatedPort { port: p, service: self })
+    fn alloc_ephemeral_port(self, cid: Cid) -> Option<AllocatedPort> {
+        let p = self.borrow_mut().used_ports.entry(cid).or_default().allocate();
+        p.map(|p| AllocatedPort { port: Addr(cid, p), service: self })
     }
     // Creates a `ListenStream` that will retrieve raw incoming connection requests.
     // These requests come from the device via the run_callbacks future.
@@ -357,7 +396,7 @@ impl Vsock {
             tracing::info!("Rejecting request to listen on ephemeral port {}", port);
             return Err(Error::ConnectionRefused);
         }
-        match self.borrow_mut().listeners.entry(port) {
+        match self.borrow_mut().listeners.entry(Addr(VMADDR_CID_HOST, port)) {
             std::collections::hash_map::Entry::Vacant(entry) => {
                 let (sender, receiver) = mpsc::unbounded();
                 let listen =
@@ -381,7 +420,7 @@ impl Vsock {
         cid: u32,
         backlog: u32,
     ) -> Result<(), Error> {
-        if cid != VMADDR_CID_HOST {
+        if !self.supported_cid(cid) {
             tracing::info!("Rejecting request to listen on unsupported CID {}", cid);
             return Err(Error::ConnectionRefused);
         }
@@ -389,10 +428,10 @@ impl Vsock {
             tracing::info!("Rejecting request to listen on ephemeral port {}", port);
             return Err(Error::ConnectionRefused);
         }
-        match self.borrow_mut().listeners.entry(port) {
+        match self.borrow_mut().listeners.entry(Addr(cid, port)) {
             std::collections::hash_map::Entry::Vacant(entry) => {
                 entry.insert(Listener::Queue(client.clone()));
-                client.add_port(port, backlog);
+                client.add_port(Addr(cid, port), backlog);
                 Ok(())
             }
             _ => {
@@ -432,10 +471,10 @@ impl Vsock {
         let response_callback =
             self.register_event(Event { action: EventType::Response, addr: addr.clone() })?;
 
-        let send_request_fut = self.borrow_mut().device.send_request(&addr, data);
+        let send_request_fut = self.borrow_mut().send_request(&addr, data);
 
         Ok(async move {
-            map_driver_result(send_request_fut.await)?;
+            send_request_fut.await?;
             Ok((shutdown_callback, response_callback))
         })
     }
@@ -447,10 +486,10 @@ impl Vsock {
         let shutdown_callback =
             self.register_event(Event { action: EventType::Shutdown, addr: addr.clone() })?;
 
-        let send_request_fut = self.borrow_mut().device.send_response(&addr.clone(), data);
+        let send_request_fut = self.borrow_mut().send_response(&addr, data);
 
         Ok(async move {
-            map_driver_result(send_request_fut.await)?;
+            send_request_fut.await?;
             Ok(shutdown_callback)
         })
     }
@@ -547,14 +586,14 @@ impl Vsock {
         remote_port: u32,
         con: ConnectionTransport,
     ) -> Result<u32, Error> {
-        if remote_cid != VMADDR_CID_HOST {
+        if !self.supported_cid(remote_cid) {
             tracing::info!("Rejecting request to connect to unsupported CID {}", remote_cid);
             return Err(Error::ConnectionRefused);
         }
         let data = con.data;
         let con = con.con.into_stream().map_err(|x| Error::ClientCommunication(x.into()))?;
-        let port = self.clone().alloc_ephemeral_port().ok_or(Error::OutOfPorts)?;
-        let port_value = *port;
+        let port = self.clone().alloc_ephemeral_port(remote_cid).ok_or(Error::OutOfPorts)?;
+        let port_value = port.port.1;
         let addr = addr::Vsock::new(port_value, remote_port, remote_cid);
         let (shutdown_event, response_event) = self.send_request(&addr, data)?.await?;
         let mut shutdown_event = shutdown_event.fuse();
@@ -580,6 +619,10 @@ impl Vsock {
         self.0.borrow_mut()
     }
 
+    fn borrow(&self) -> Ref<'_, State> {
+        self.0.borrow()
+    }
+
     // Deregisters the specified event.
     fn deregister(&self, event: Deregister) {
         self.borrow_mut().deregister(event);
@@ -593,29 +636,43 @@ impl State {
             Deregister::Event(e) => {
                 self.events.remove(&e);
             }
-            Deregister::Listen(p) => {
-                if let Some(Listener::Queue(client)) = self.listeners.remove(&p) {
-                    client.remove_port(p);
+            Deregister::Listen(a) => {
+                if let Some(Listener::Queue(client)) = self.listeners.remove(&a) {
+                    client.remove_port(a);
                 }
             }
             Deregister::Port(p) => {
-                self.used_ports.free(p);
+                self.used_ports.get_mut(&p.0).unwrap().free(p.1);
             }
         }
     }
 
     // Wrappers around device functions with nicer type signatures
+    fn send_request(
+        &mut self,
+        addr: &addr::Vsock,
+        data: zx::Socket,
+    ) -> impl Future<Output = Result<(), Error>> {
+        self.device(addr).send_request(&addr.clone(), data).map(map_driver_result)
+    }
+    fn send_response(
+        &mut self,
+        addr: &addr::Vsock,
+        data: zx::Socket,
+    ) -> impl Future<Output = Result<(), Error>> {
+        self.device(addr).send_response(&addr.clone(), data).map(map_driver_result)
+    }
     fn send_rst(
         &mut self,
         addr: &addr::Vsock,
     ) -> impl Future<Output = Result<(), Error>> + 'static {
-        self.device.send_rst(&addr.clone()).map(map_driver_result)
+        self.device(addr).send_rst(&addr.clone()).map(map_driver_result)
     }
     fn send_shutdown(
         &mut self,
         addr: &addr::Vsock,
     ) -> impl Future<Output = Result<(), Error>> + 'static {
-        self.device.send_shutdown(&addr).map(map_driver_result)
+        self.device(addr).send_shutdown(&addr).map(map_driver_result)
     }
 
     // Processes a single callback from the `device`. This is intended to be used by
@@ -633,7 +690,7 @@ impl State {
             }
             CallbacksRequest::Request { addr, control_handle: _control_handle } => {
                 let addr = addr::Vsock::from(addr);
-                match self.listeners.get(&addr.local_port) {
+                match self.listeners.get(&Addr(addr.remote_cid, addr.local_port)) {
                     Some(Listener::Channel(sender)) => {
                         let _ = sender.unbounded_send(addr.clone());
                     }
@@ -669,13 +726,13 @@ impl State {
 
 struct AllocatedPort {
     service: Vsock,
-    port: u32,
+    port: Addr,
 }
 
 impl Deref for AllocatedPort {
-    type Target = u32;
+    type Target = Addr;
 
-    fn deref(&self) -> &u32 {
+    fn deref(&self) -> &Addr {
         &self.port
     }
 }
@@ -716,14 +773,14 @@ impl Future for OneshotEvent {
 }
 
 struct ListenStream {
-    local_port: u32,
+    local_port: Port,
     service: Vsock,
     stream: mpsc::UnboundedReceiver<addr::Vsock>,
 }
 
 impl Drop for ListenStream {
     fn drop(&mut self) {
-        self.service.deregister(Deregister::Listen(self.local_port));
+        self.service.deregister(Deregister::Listen(Addr(VMADDR_CID_HOST, self.local_port)));
     }
 }
 

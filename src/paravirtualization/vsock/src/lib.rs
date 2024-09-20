@@ -16,6 +16,7 @@ mod tests {
     use fidl::endpoints::{self, Proxy};
     use fidl_fuchsia_hardware_vsock::{
         CallbacksProxy, DeviceMarker, DeviceRequest, DeviceRequestStream, VMADDR_CID_HOST,
+        VMADDR_CID_LOCAL,
     };
     use fidl_fuchsia_vsock::{
         AcceptorMarker, AcceptorRequest, ConnectionMarker, ConnectionProxy, ConnectionTransport,
@@ -63,7 +64,7 @@ mod tests {
         })
         .detach();
 
-        let (service, event_loop) = Vsock::new(driver_client.into_proxy()?).await?;
+        let (service, event_loop) = Vsock::new(None, Some(driver_client.into_proxy()?)).await?;
         fasync::Task::local(event_loop.map_err(|x| panic!("Event loop stopped {}", x)).map(|_| ()))
             .detach();
         let (driver_server, driver_callbacks) = rx.await?;
@@ -123,7 +124,7 @@ mod tests {
         }
 
         // Create a connection from the driver
-        driver.callbacks.request(&*addr::Vsock::new(8000, 80, 4))?;
+        driver.callbacks.request(&*addr::Vsock::new(8000, 80, VMADDR_CID_HOST))?;
         let (_data_socket, _client_end, con) = make_con()?;
 
         let (_, responder) =
@@ -145,21 +146,21 @@ mod tests {
 
         // Should reject listening at the ephemeral port ranges.
         assert_eq!(
-            app_client.listen2(49152, VMADDR_CID_HOST, 1).await?,
+            app_client.listen2(49152, VMADDR_CID_LOCAL, 1).await?,
             Err(zx::sys::ZX_ERR_UNAVAILABLE)
         );
 
         // Listen on a reasonable value.
-        assert_eq!(app_client.listen2(8000, VMADDR_CID_HOST, 1).await?, Ok(()));
+        assert_eq!(app_client.listen2(8000, VMADDR_CID_LOCAL, 1).await?, Ok(()));
 
         // Validate that we cannot listen twice
         assert_eq!(
-            app_client.listen2(8000, VMADDR_CID_HOST, 1).await?,
+            app_client.listen2(8000, VMADDR_CID_LOCAL, 1).await?,
             Err(zx::sys::ZX_ERR_ALREADY_BOUND)
         );
 
         // Create a connection from the driver
-        driver.callbacks.request(&*addr::Vsock::new(8000, 80, 4))?;
+        driver.callbacks.request(&*addr::Vsock::new(8000, 80, VMADDR_CID_LOCAL))?;
         let (_data_socket, _client_end, con) = make_con()?;
 
         let accept_fut = app_client.accept(con);
@@ -169,7 +170,7 @@ mod tests {
             unwrap_msg!(DeviceRequest::SendResponse{addr, data, responder} from driver.client);
         responder.send(Ok(()))?;
 
-        assert_eq!(accept_fut.await?, Ok(*addr::Vsock::new(8000, 80, 4)));
+        assert_eq!(accept_fut.await?, Ok(*addr::Vsock::new(8000, 80, VMADDR_CID_LOCAL)));
 
         Ok(())
     }
@@ -226,7 +227,7 @@ mod tests {
         client_end_request.on_closed().await?;
 
         // Listener should still be active and receive a connection
-        driver.callbacks.request(&*addr::Vsock::new(9000, 80, 4))?;
+        driver.callbacks.request(&*addr::Vsock::new(9000, 80, VMADDR_CID_HOST))?;
         let (_data_socket, _client_end, _con) = make_con()?;
 
         let (_addr, responder) =

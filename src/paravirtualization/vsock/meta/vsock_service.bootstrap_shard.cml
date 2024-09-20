@@ -21,5 +21,19 @@
             from: "#archivist",
             to: "#vsock",
         },
+        {
+            protocol: "fuchsia.hardware.vsock.Device",
+            from: "#vsock-loopback",
+            as: "fuchsia.hardware.vsock.Device-Loopback",
+            to: "#vsock",
+            availability: "optional",
+            source_availability: "unknown",
+        },
+        {
+            from: "void",
+            to: "#vsock",
+            config: "fuchsia.vsock.GuestToHostSupported",
+            availability: "optional",
+        },
     ],
 }

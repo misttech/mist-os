@@ -11,6 +11,7 @@ const EPHEMERAL_PORT_RANGE: Range<u32> = 49152..65535;
 pub fn is_ephemeral(port: u32) -> bool {
     port >= EPHEMERAL_PORT_RANGE.start && port < EPHEMERAL_PORT_RANGE.end
 }
+
 pub struct Tracker {
     // TODO: use a bit-vec instead
     used: HashSet<u32>,
@@ -39,6 +40,12 @@ impl Tracker {
     }
     pub fn new() -> Self {
         Tracker { used: HashSet::new(), next_allocation: EPHEMERAL_PORT_RANGE.start }
+    }
+}
+
+impl Default for Tracker {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
