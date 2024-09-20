@@ -2,12 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fidl_fuchsia_wlan_policy as fidl_policy;
 use fidl_test_wlan_realm::WlanConfig;
-use fuchsia_zircon::prelude::*;
 use ieee80211::Bssid;
 use wlan_common::bss::Protection;
 use wlan_hw_sim::*;
+use {fidl_fuchsia_wlan_policy as fidl_policy, fuchsia_zircon as zx};
 
 /// Test a client can connect to a network with no protection by simulating an AP that sends out
 /// hard coded authentication and association response frames.
@@ -24,7 +23,7 @@ async fn connect_to_open_network() {
 
     let () = connect_or_timeout(
         &mut helper,
-        30.seconds(),
+        zx::Duration::from_seconds(30),
         &AP_SSID,
         &bss,
         &Protection::Open,

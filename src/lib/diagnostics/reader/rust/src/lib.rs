@@ -13,7 +13,7 @@ use fidl_fuchsia_diagnostics::{
 use fuchsia_async::{self as fasync, DurationExt, TimeoutExt};
 use fuchsia_component::client;
 use fuchsia_sync::Mutex;
-use fuchsia_zircon::{self as zx, Duration, DurationNum};
+use fuchsia_zircon::{self as zx, Duration};
 use futures::channel::mpsc;
 use futures::prelude::*;
 use futures::sink::SinkExt;
@@ -373,7 +373,8 @@ impl ArchiveReader {
                 .await;
 
             if self.retry_config.on_empty() && result.len() < self.minimum_schema_count {
-                fasync::Timer::new(fasync::Time::after(RETRY_DELAY_MS.millis())).await;
+                fasync::Timer::new(fasync::Time::after(zx::Duration::from_millis(RETRY_DELAY_MS)))
+                    .await;
             } else {
                 return Ok(result);
             }
@@ -706,7 +707,7 @@ mod tests {
                 "realm_builder\\:{}/test_component:root",
                 instance.root.child_name()
             ))
-            .with_timeout(0.nanos());
+            .with_timeout(zx::Duration::from_nanos(0));
         let result = reader.snapshot::<Inspect>().await;
         assert!(result.unwrap().is_empty());
         Ok(())

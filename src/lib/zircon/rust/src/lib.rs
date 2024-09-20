@@ -91,7 +91,7 @@ pub use fuchsia_zircon_status::*;
 /// Prelude containing common utility traits.
 /// Designed for use like `use fuchsia_zircon::prelude::*;`
 pub mod prelude {
-    pub use crate::{AsHandleRef, DurationNum, HandleBased, Peered};
+    pub use crate::{AsHandleRef, HandleBased, Peered};
 }
 
 pub mod sys {

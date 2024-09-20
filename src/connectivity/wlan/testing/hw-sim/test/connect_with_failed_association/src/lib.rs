@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use fidl_test_wlan_realm::WlanConfig;
-use fuchsia_zircon::DurationNum;
 use ieee80211::{Bssid, Ssid};
 use std::pin::pin;
 use wlan_common::bss::Protection;
@@ -12,7 +11,7 @@ use wlan_hw_sim::event::{action, branch, Handler};
 use wlan_hw_sim::*;
 use {
     fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_policy as fidl_policy,
-    fidl_fuchsia_wlan_tap as fidl_tap,
+    fidl_fuchsia_wlan_tap as fidl_tap, fuchsia_zircon as zx,
 };
 
 fn scan_and_associate<'h>(
@@ -94,7 +93,7 @@ async fn connect_with_failed_association() {
     let phy = helper.proxy();
     let () = helper
         .run_until_complete_or_timeout(
-            240.seconds(),
+            zx::Duration::from_seconds(240),
             format!("connecting to {} ({})", AP_SSID.to_string_not_redactable(), bssid),
             scan_and_associate(&phy, &AP_SSID, &bssid, &Channel::new(1, Cbw::Cbw20)),
             save_network_fut,

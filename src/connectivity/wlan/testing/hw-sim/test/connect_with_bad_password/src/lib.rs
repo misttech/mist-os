@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 use fidl_fuchsia_wlan_policy as fidl_policy;
 use fidl_test_wlan_realm::WlanConfig;
-use fuchsia_zircon::prelude::*;
 use fuchsia_zircon::{self as zx};
 use ieee80211::{Bssid, Ssid};
 use lazy_static::lazy_static;
@@ -81,7 +80,7 @@ async fn connect_with_bad_password() {
     // is provided. The DisconnectStatus::CredentialsFailed status should be returned by policy.
     fail_to_connect_or_timeout(
         &mut helper,
-        60.seconds(),
+        zx::Duration::from_seconds(60),
         &Ssid::try_from("wpa3network").unwrap(),
         &BSSID,
         &Protection::Wpa3Personal,
@@ -96,7 +95,7 @@ async fn connect_with_bad_password() {
     // provided. The DisconnectStatus::CredentialsFailed status should be returned by policy.
     fail_to_connect_or_timeout(
         &mut helper,
-        30.seconds(),
+        zx::Duration::from_seconds(30),
         &Ssid::try_from("wpa2network").unwrap(),
         &BSSID,
         &Protection::Wpa2Personal,
@@ -111,7 +110,7 @@ async fn connect_with_bad_password() {
     // provided. The DisconnectStatus::CredentialsFailed status should be returned by policy.
     fail_to_connect_or_timeout(
         &mut helper,
-        30.seconds(),
+        zx::Duration::from_seconds(30),
         &Ssid::try_from("wpa1network").unwrap(),
         &BSSID,
         &Protection::Wpa1,

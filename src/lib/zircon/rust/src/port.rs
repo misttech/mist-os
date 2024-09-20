@@ -482,12 +482,12 @@ bitflags! {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{DurationNum, Event};
+    use crate::{Duration, Event};
     use assert_matches::assert_matches;
 
     #[test]
     fn port_basic() {
-        let ten_ms = 10.millis();
+        let ten_ms = Duration::from_millis(10);
 
         let port = Port::create();
 
@@ -505,7 +505,7 @@ mod tests {
 
     #[test]
     fn wait_async_once() {
-        let ten_ms = 10.millis();
+        let ten_ms = Duration::from_millis(10);
         let key = 42;
 
         let port = Port::create();

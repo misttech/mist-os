@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fuchsia_zircon::prelude::DurationNum;
 use fuchsia_zircon::{self as zx};
 
 use ieee80211::{Bssid, MacAddr};
@@ -87,7 +86,7 @@ impl From<DeauthenticateTimeout> for Event {
 pub struct RsnaCompletionTimeout;
 impl TimeoutDuration for RsnaCompletionTimeout {
     fn timeout_duration(&self) -> zx::Duration {
-        RSNA_COMPLETION_TIMEOUT_MILLIS.millis()
+        zx::Duration::from_millis(RSNA_COMPLETION_TIMEOUT_MILLIS)
     }
 }
 
@@ -95,7 +94,7 @@ impl TimeoutDuration for RsnaCompletionTimeout {
 pub struct RsnaResponseTimeout;
 impl TimeoutDuration for RsnaResponseTimeout {
     fn timeout_duration(&self) -> zx::Duration {
-        RSNA_RESPONSE_TIMEOUT_MILLIS.millis()
+        zx::Duration::from_millis(RSNA_RESPONSE_TIMEOUT_MILLIS)
     }
 }
 
@@ -106,7 +105,7 @@ pub struct RsnaRetransmissionTimeout {
 }
 impl TimeoutDuration for RsnaRetransmissionTimeout {
     fn timeout_duration(&self) -> zx::Duration {
-        RSNA_RETRANSMISSION_TIMEOUT_MILLIS.millis()
+        zx::Duration::from_millis(RSNA_RETRANSMISSION_TIMEOUT_MILLIS)
     }
 }
 
@@ -114,7 +113,7 @@ impl TimeoutDuration for RsnaRetransmissionTimeout {
 pub struct InspectPulseCheck;
 impl TimeoutDuration for InspectPulseCheck {
     fn timeout_duration(&self) -> zx::Duration {
-        INSPECT_PULSE_CHECK_MINUTES.minutes()
+        zx::Duration::from_minutes(INSPECT_PULSE_CHECK_MINUTES)
     }
 }
 
@@ -122,7 +121,7 @@ impl TimeoutDuration for InspectPulseCheck {
 pub struct InspectPulsePersist;
 impl TimeoutDuration for InspectPulsePersist {
     fn timeout_duration(&self) -> zx::Duration {
-        INSPECT_PULSE_PERSIST_MINUTES.minutes()
+        zx::Duration::from_minutes(INSPECT_PULSE_PERSIST_MINUTES)
     }
 }
 
@@ -130,7 +129,7 @@ impl TimeoutDuration for InspectPulsePersist {
 pub struct SaeTimeout(pub u64);
 impl TimeoutDuration for SaeTimeout {
     fn timeout_duration(&self) -> zx::Duration {
-        SAE_RETRANSMISSION_TIMEOUT_MILLIS.millis()
+        zx::Duration::from_millis(SAE_RETRANSMISSION_TIMEOUT_MILLIS)
     }
 }
 
@@ -138,6 +137,6 @@ impl TimeoutDuration for SaeTimeout {
 pub struct DeauthenticateTimeout;
 impl TimeoutDuration for DeauthenticateTimeout {
     fn timeout_duration(&self) -> zx::Duration {
-        DEAUTHENTICATE_TIMEOUT_MILLIS.millis()
+        zx::Duration::from_millis(DEAUTHENTICATE_TIMEOUT_MILLIS)
     }
 }

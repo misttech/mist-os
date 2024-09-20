@@ -4,7 +4,6 @@
 
 use fidl_fuchsia_wlan_tap::WlantapPhyProxy;
 use fidl_test_wlan_realm::WlanConfig;
-use fuchsia_zircon::DurationNum as _;
 use futures::channel::oneshot;
 use futures::{join, TryFutureExt};
 use ieee80211::MacAddr;
@@ -20,7 +19,10 @@ use wlan_hw_sim::{
     wait_until_client_state, Beacon, NetworkConfigBuilder, AP_MAC_ADDR, AP_SSID, CLIENT_MAC_ADDR,
     ETH_DST_MAC, WLANCFG_DEFAULT_AP_CHANNEL,
 };
-use {fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_policy as fidl_policy};
+use {
+    fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_policy as fidl_policy,
+    fuchsia_zircon as zx,
+};
 
 const PASS_PHRASE: &str = "wpa2duel";
 
@@ -79,7 +81,7 @@ async fn verify_client_connects_to_ap(
         pin!(initiate_connect(&client_controller, update_stream, &network_id, sender));
 
     let client_fut = client_helper.run_until_complete_or_timeout(
-        10.seconds(),
+        zx::Duration::from_seconds(10),
         "connecting to AP",
         event::on_scan(action::send_advertisements_and_scan_completion(
             &client_proxy,
@@ -100,7 +102,7 @@ async fn verify_client_connects_to_ap(
     let connect_confirm_receiver = pin!(connect_confirm_receiver);
     let ap_fut = ap_helper
         .run_until_complete_or_timeout(
-            10.seconds(),
+            zx::Duration::from_seconds(10),
             "serving as an AP",
             event::on_transmit(
                 action::send_packet(&client_proxy, rx_info_with_default_ap())
@@ -165,7 +167,7 @@ async fn send_then_receive(
                 let get_next_frame_fut = netdevice_helper::recv(session);
                 let mut get_next_frame_fut = pin!(get_next_frame_fut);
                 match test_utils::timeout_after(
-                    WAIT_FOR_PAYLOAD_INTERVAL.millis(),
+                    zx::Duration::from_millis(WAIT_FOR_PAYLOAD_INTERVAL),
                     &mut get_next_frame_fut,
                 )
                 .await
@@ -207,7 +209,7 @@ async fn send_then_receive(
             Some(mut receiver_from_peer) => {
                 info!("{} awaiting acknowledgement of payload receipt from {}", me.name, peer.name);
                 match test_utils::timeout_after(
-                    WAIT_FOR_ACK_INTERVAL.millis(),
+                    zx::Duration::from_millis(WAIT_FOR_ACK_INTERVAL),
                     &mut receiver_from_peer,
                 )
                 .await
@@ -287,7 +289,7 @@ async fn verify_ethernet_in_both_directions(
     let client_with_timeout = client_helper.run_until_complete_or_timeout(
         // TODO(https://fxbug.dev/42153436): This time should be reduced to 5 seconds
         // once Policy no longer mistakenly schedules unneeded scans.
-        60.seconds(),
+        zx::Duration::from_seconds(60),
         "client trying to exchange data with a peer behind AP",
         event::on_transmit(
             action::send_packet(&ap_proxy, rx_info_with_default_ap()).context("client -> AP"),
@@ -297,7 +299,7 @@ async fn verify_ethernet_in_both_directions(
     let peer_behind_ap_with_timeout = ap_helper.run_until_complete_or_timeout(
         // TODO(https://fxbug.dev/42153436): This time should be reduced to 5 seconds
         // once Policy no longer mistakenly schedules unneeded scans.
-        60.seconds(),
+        zx::Duration::from_seconds(60),
         "AP forwarding data between client and its peer",
         event::on_transmit(
             action::send_packet(&client_proxy, rx_info_with_default_ap()).context("AP -> client"),

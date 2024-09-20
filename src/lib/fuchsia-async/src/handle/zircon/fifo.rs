@@ -483,10 +483,12 @@ mod tests {
         });
 
         // add a timeout to receiver so if test is broken it doesn't take forever
-        let receiver = receive_future.on_timeout(300.millis().after_now(), || panic!("timeout"));
+        let receiver = receive_future
+            .on_timeout(zx::Duration::from_millis(300).after_now(), || panic!("timeout"));
 
         // Sends an entry after the timeout has passed
-        let sender = Timer::new(10.millis().after_now()).then(|()| tx.write_entries(&element));
+        let sender = Timer::new(zx::Duration::from_millis(10).after_now())
+            .then(|()| tx.write_entries(&element));
 
         let done = try_join(receiver, sender);
         exec.run_singlethreaded(done).expect("failed to run receive future on executor");
@@ -508,10 +510,12 @@ mod tests {
             .map_ok(|count| panic!("read should have failed, got {}", count));
 
         // add a timeout to receiver so if test is broken it doesn't take forever
-        let receiver = receive_future.on_timeout(300.millis().after_now(), || panic!("timeout"));
+        let receiver = receive_future
+            .on_timeout(zx::Duration::from_millis(300).after_now(), || panic!("timeout"));
 
         // Sends an entry after the timeout has passed
-        let sender = Timer::new(10.millis().after_now()).then(|()| tx.write_entries(elements));
+        let sender = Timer::new(zx::Duration::from_millis(10).after_now())
+            .then(|()| tx.write_entries(elements));
 
         let done = try_join(receiver, sender);
         let res = exec.run_singlethreaded(done);
@@ -531,7 +535,8 @@ mod tests {
         let wrong_rx = zx::Fifo::<WrongEntry>::from(rx.into_handle());
         let (tx, _rx) = (Fifo::from_fifo(wrong_tx), Fifo::from_fifo(wrong_rx));
 
-        let sender = Timer::new(10.millis().after_now()).then(|()| tx.write_entries(elements));
+        let sender = Timer::new(zx::Duration::from_millis(10).after_now())
+            .then(|()| tx.write_entries(elements));
 
         let res = exec.run_singlethreaded(sender);
         match res {
@@ -564,7 +569,7 @@ mod tests {
 
         // Wait 10 ms, then read the messages from the fifo.
         let receive_future = async {
-            Timer::new(10.millis().after_now()).await;
+            Timer::new(zx::Duration::from_millis(10).after_now()).await;
             let mut buffer = Entry::default();
             let count = rx.read_entries(&mut buffer).await?;
             assert_eq!(writes_completed.load(Ordering::SeqCst), 1);
@@ -583,7 +588,8 @@ mod tests {
         };
 
         // add a timeout to receiver so if test is broken it doesn't take forever
-        let receiver = receive_future.on_timeout(300.millis().after_now(), || panic!("timeout"));
+        let receiver = receive_future
+            .on_timeout(zx::Duration::from_millis(300).after_now(), || panic!("timeout"));
 
         let done = try_join(receiver, sender);
 
@@ -603,7 +609,7 @@ mod tests {
 
         // Wait 10 ms, then read the messages from the fifo.
         let receive_future = async {
-            Timer::new(10.millis().after_now()).await;
+            Timer::new(zx::Duration::from_millis(10).after_now()).await;
             for e in elements {
                 let mut buffer = [Entry::default(); 1];
                 let count = rx.read_entries(&mut buffer[..]).await?;
@@ -614,7 +620,8 @@ mod tests {
         };
 
         // add a timeout to receiver so if test is broken it doesn't take forever
-        let receiver = receive_future.on_timeout(300.millis().after_now(), || panic!("timeout"));
+        let receiver = receive_future
+            .on_timeout(zx::Duration::from_millis(300).after_now(), || panic!("timeout"));
 
         let done = try_join(receiver, sender);
 

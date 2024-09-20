@@ -111,9 +111,8 @@ impl BssScorerInner {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211;
-    use fuchsia_zircon::DurationNum;
     use wlan_common::fake_bss_description;
+    use {fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fuchsia_zircon as zx};
 
     const BSSID: [u8; 6] = [1, 3, 3, 7, 4, 2];
 
@@ -177,13 +176,13 @@ mod tests {
         // Two connect failures at the 0th second mark.
         bss_scorer.report_connect_failure(Bssid::from(BSSID), &connect_failure());
         bss_scorer.report_connect_failure(Bssid::from(BSSID), &connect_failure());
-        exec.set_fake_time(fasync::Time::after(300.seconds()));
+        exec.set_fake_time(fasync::Time::after(zx::Duration::from_seconds(300)));
         assert_eq!(bss_scorer.score_bss(&fake_bss(-50)), -60);
         bss_scorer.report_connect_failure(Bssid::from(BSSID), &connect_failure());
         // At 300th second mark, three connect failures are considered as recent.
         assert_eq!(bss_scorer.score_bss(&fake_bss(-50)), -65);
 
-        exec.set_fake_time(fasync::Time::after(1.seconds()));
+        exec.set_fake_time(fasync::Time::after(zx::Duration::from_seconds(1)));
         // At 301th second mark, the two connect failures from the 0th second mark are
         // evicted, leaving one recent connect failure.
         assert_eq!(bss_scorer.score_bss(&fake_bss(-50)), -55);

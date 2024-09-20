@@ -6,7 +6,6 @@ use anyhow::{Context, Error};
 use fidl_fuchsia_wlan_common::{WlanTxResult, WlanTxResultCode, WlanTxResultEntry};
 use fidl_test_wlan_realm::WlanConfig;
 use fuchsia_async::Interval;
-use fuchsia_zircon::DurationNum;
 use futures::channel::mpsc;
 use futures::StreamExt;
 use ieee80211::{Bssid, MacAddrBytes};
@@ -26,7 +25,10 @@ use wlan_hw_sim::{
     test_utils, ApAdvertisement, Beacon, AP_SSID, CLIENT_MAC_ADDR, ETH_DST_MAC,
 };
 use zerocopy::IntoBytes;
-use {fidl_fuchsia_wlan_policy as fidl_policy, fidl_fuchsia_wlan_tap as fidl_tap};
+use {
+    fidl_fuchsia_wlan_policy as fidl_policy, fidl_fuchsia_wlan_tap as fidl_tap,
+    fuchsia_zircon as zx,
+};
 // Remedy for https://fxbug.dev/42162128 (https://fxbug.dev/42108316)
 // Refer to |KMinstrelUpdateIntervalForHwSim| in //src/connectivity/wlan/drivers/wlan/device.cpp
 const DATA_FRAME_INTERVAL_NANOS: i64 = 4_000_000;
@@ -231,14 +233,16 @@ async fn send_eth_beacons<'a>(
     };
     let buf = ethernet_header.as_bytes();
 
-    let mut timer_stream = Interval::new(DATA_FRAME_INTERVAL_NANOS.nanos());
+    let mut timer_stream = Interval::new(zx::Duration::from_nanos(DATA_FRAME_INTERVAL_NANOS));
     let mut intervals_since_last_beacon: i64 = i64::max_value() / DATA_FRAME_INTERVAL_NANOS;
     loop {
         timer_stream.next().await;
 
         // The auto-deauthentication timeout is 10.24 seconds. Send a beacon before then to stay
         // connected.
-        if (intervals_since_last_beacon * DATA_FRAME_INTERVAL_NANOS).nanos() >= 8765.millis() {
+        if zx::Duration::from_nanos(intervals_since_last_beacon * DATA_FRAME_INTERVAL_NANOS)
+            >= zx::Duration::from_millis(8765)
+        {
             intervals_since_last_beacon = 0;
             Beacon {
                 channel: Channel::new(1, Cbw::Cbw20),
@@ -273,7 +277,7 @@ async fn rate_selection() {
 
     let () = connect_or_timeout(
         &mut helper,
-        30.seconds(),
+        zx::Duration::from_seconds(30),
         &AP_SSID,
         &BSS_MINSTL,
         &Protection::Open,
@@ -291,7 +295,7 @@ async fn rate_selection() {
     let mut tx_vec_counts = HashMap::new();
     let snapshot = helper
         .run_until_complete_or_timeout(
-            30.seconds(),
+            zx::Duration::from_seconds(30),
             "verify rate selection converges to 130",
             send_tx_result_and_minstrel_convergence(
                 &phy,

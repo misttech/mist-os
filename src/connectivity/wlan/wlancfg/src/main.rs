@@ -14,7 +14,6 @@ use fuchsia_async::DurationExt;
 use fuchsia_component::server::ServiceFs;
 use fuchsia_inspect::component;
 use fuchsia_inspect_contrib::auto_persist;
-use fuchsia_zircon::prelude::*;
 use futures::channel::{mpsc, oneshot};
 use futures::future::OptionFuture;
 use futures::lock::Mutex;
@@ -46,7 +45,7 @@ use wlancfg_lib::telemetry::{
 use wlancfg_lib::util;
 use {
     fidl_fuchsia_wlan_policy as fidl_policy, fuchsia_async as fasync,
-    fuchsia_trace_provider as ftrace_provider, wlan_trace as wtrace,
+    fuchsia_trace_provider as ftrace_provider, fuchsia_zircon as zx, wlan_trace as wtrace,
 };
 
 const REGULATORY_LISTENER_TIMEOUT_SEC: i64 = 30;
@@ -69,7 +68,7 @@ async fn serve_fidl(
 ) -> Result<Infallible, Error> {
     // Wait a bit for the country code to be set before serving the policy APIs.
     let regulatory_listener_timeout =
-        fasync::Timer::new(REGULATORY_LISTENER_TIMEOUT_SEC.seconds().after_now());
+        fasync::Timer::new(zx::Duration::from_seconds(REGULATORY_LISTENER_TIMEOUT_SEC).after_now());
     select! {
         _ = regulatory_listener_timeout.fuse() => {
             // Log at info level because we expect RegulatoryManager may in some
@@ -180,7 +179,7 @@ async fn serve_fidl(
 async fn saved_networks_manager_metrics_loop(saved_networks: Arc<dyn SavedNetworksManagerApi>) {
     loop {
         saved_networks.record_periodic_metrics().await;
-        fasync::Timer::new(24.hours().after_now()).await;
+        fasync::Timer::new(zx::Duration::from_hours(24).after_now()).await;
     }
 }
 

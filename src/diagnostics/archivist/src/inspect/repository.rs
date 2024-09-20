@@ -300,12 +300,11 @@ mod tests {
     use diagnostics_assertions::assert_data_tree;
     use fidl::endpoints::Proxy;
     use fidl::AsHandleRef;
-    use fidl_fuchsia_inspect as finspect;
     use fuchsia_inspect::{Inspector, InspectorConfig};
-    use fuchsia_zircon::DurationNum;
     use moniker::ExtendedMoniker;
     use selectors::FastError;
     use std::sync::LazyLock;
+    use {fidl_fuchsia_inspect as finspect, fuchsia_zircon as zx};
 
     const TEST_URL: &str = "fuchsia-pkg://test";
     static ESCROW_TEST_RIGHTS: LazyLock<zx::Rights> = LazyLock::new(|| {
@@ -347,7 +346,7 @@ mod tests {
         assert!(data_repo.inner.read().get(&identity).is_some());
         drop(server_end);
         while data_repo.inner.read().get(&identity).is_some() {
-            fasync::Timer::new(fasync::Time::after(100_i64.millis())).await;
+            fasync::Timer::new(fasync::Time::after(zx::Duration::from_millis(100_i64))).await;
         }
     }
 
@@ -385,7 +384,7 @@ mod tests {
         // When the directory disconnects, both the pipeline matchers and the repo are cleaned
         drop(server_end);
         while data_repo.inner.read().get(&identity).is_some() {
-            fasync::Timer::new(fasync::Time::after(100_i64.millis())).await;
+            fasync::Timer::new(fasync::Time::after(zx::Duration::from_millis(100_i64))).await;
         }
 
         assert!(!pipeline.static_hierarchy_allowlist().component_was_added(&moniker));
@@ -480,7 +479,7 @@ mod tests {
         }
         drop(ep0);
         while repo.inner.read().get(&identity).is_some() {
-            fasync::Timer::new(fasync::Time::after(100_i64.millis())).await;
+            fasync::Timer::new(fasync::Time::after(zx::Duration::from_millis(100_i64))).await;
         }
     }
 

@@ -243,7 +243,7 @@ mod tests {
     use diagnostics_assertions::assert_data_tree;
     use fuchsia_async::DurationExt;
     use fuchsia_inspect_derive::WithInspect;
-    use fuchsia_zircon::DurationNum;
+    use fuchsia_zircon as zx;
 
     #[test]
     fn bool_to_property() {
@@ -404,7 +404,7 @@ mod tests {
         });
 
         // A half second passes.
-        exec.set_fake_time(500.millis().after_now());
+        exec.set_fake_time(zx::Duration::from_millis(500).after_now());
 
         // If we transferred 500 bytes then, we should have 1000 bytes per second.
         d.record_transferred(500, fasync::Time::now());
@@ -418,7 +418,7 @@ mod tests {
         });
 
         // In 5 seconds, we transfer 500 more bytes which is much slower.
-        exec.set_fake_time(5.seconds().after_now());
+        exec.set_fake_time(zx::Duration::from_seconds(5).after_now());
         d.record_transferred(500, fasync::Time::now());
         assert_data_tree!(inspector, root: {
             data_stream: {

@@ -133,12 +133,11 @@ mod tests {
     use super::*;
     use crate::watchable_map;
     use fidl::endpoints::create_proxy;
-    use fuchsia_async as fasync;
     use fuchsia_inspect::{Inspector, InspectorConfig};
-    use fuchsia_zircon::prelude::*;
     use futures::task::Poll;
     use wlan_common::assert_variant;
     use wlan_common::test_utils::ExpectWithin;
+    use {fuchsia_async as fasync, fuchsia_zircon as zx};
 
     #[fuchsia::test]
     fn test_serve_phys_exits_when_watching_devices_fails() {
@@ -173,11 +172,10 @@ mod tests {
 
         // Run the PHY service to pick up the new PHY.
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
-        match exec.run_until_stalled(
-            &mut phy_events
-                .next()
-                .expect_within(60.seconds(), "phy_watcher did not observe device addition"),
-        ) {
+        match exec.run_until_stalled(&mut phy_events.next().expect_within(
+            zx::Duration::from_seconds(60),
+            "phy_watcher did not observe device addition",
+        )) {
             Poll::Ready(Some(event)) => match event {
                 watchable_map::MapEvent::KeyInserted(key) => {
                     assert_eq!(key, 0)
@@ -192,11 +190,10 @@ mod tests {
         // Now drop the other end of the PHY and observe that the PHY is removed from the map.
         drop(phy_server);
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(()));
-        match exec.run_until_stalled(
-            &mut phy_events
-                .next()
-                .expect_within(60.seconds(), "phy_watcher did not observe device removal"),
-        ) {
+        match exec.run_until_stalled(&mut phy_events.next().expect_within(
+            zx::Duration::from_seconds(60),
+            "phy_watcher did not observe device removal",
+        )) {
             Poll::Ready(Some(event)) => match event {
                 watchable_map::MapEvent::KeyRemoved(key) => {
                     assert_eq!(key, 0)

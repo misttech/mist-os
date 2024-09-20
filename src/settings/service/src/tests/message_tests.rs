@@ -6,7 +6,7 @@ use crate::message::action_fuse::ActionFuse;
 use crate::message::base::{Audience, Filter, MessageEvent, MessengerType, Status};
 use crate::message::receptor::Receptor;
 use crate::tests::message_utils::verify_payload;
-use fuchsia_zircon::DurationNum;
+use fuchsia_zircon as zx;
 use futures::future::BoxFuture;
 use futures::lock::Mutex;
 use futures::StreamExt;
@@ -271,7 +271,7 @@ fn test_timeout() {
         let mut reply_receptor = messenger_client_1.message_with_timeout(
             ORIGINAL.clone(),
             Audience::Address(crate::Address::Test(2)),
-            Some(timeout_ms.millis()),
+            Some(zx::Duration::from_millis(timeout_ms)),
         );
 
         verify_payload(

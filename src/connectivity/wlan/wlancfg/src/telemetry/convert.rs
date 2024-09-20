@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fuchsia_zircon::{self as zx, DurationNum};
+use fuchsia_zircon::{self as zx};
 use wlan_common::bss::Protection as BssProtection;
 use {fidl_fuchsia_wlan_sme as fidl_sme, wlan_metrics_registry as metrics};
 
@@ -22,11 +22,11 @@ pub fn convert_user_wait_time(
 ) -> metrics::ConnectivityWlanMetricDimensionWaitTime {
     use metrics::ConnectivityWlanMetricDimensionWaitTime::*;
     match duration {
-        x if x < 1.second() => LessThan1Second,
-        x if x < 3.seconds() => LessThan3Seconds,
-        x if x < 5.seconds() => LessThan5Seconds,
-        x if x < 8.seconds() => LessThan8Seconds,
-        x if x < 15.seconds() => LessThan15Seconds,
+        x if x < zx::Duration::from_seconds(1) => LessThan1Second,
+        x if x < zx::Duration::from_seconds(3) => LessThan3Seconds,
+        x if x < zx::Duration::from_seconds(5) => LessThan5Seconds,
+        x if x < zx::Duration::from_seconds(8) => LessThan8Seconds,
+        x if x < zx::Duration::from_seconds(15) => LessThan15Seconds,
         _ => AtLeast15Seconds,
     }
 }

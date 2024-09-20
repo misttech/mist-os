@@ -4,7 +4,6 @@
 
 use anyhow::format_err;
 use fidl_test_wlan_realm::WlanConfig;
-use fuchsia_zircon::prelude::*;
 use futures::channel::oneshot;
 use futures::join;
 use ieee80211::{Bssid, Ssid};
@@ -16,7 +15,10 @@ use wlan_hw_sim::event::action::{self, AuthenticationControl, AuthenticationTap}
 use wlan_hw_sim::event::{branch, Handler};
 use wlan_hw_sim::*;
 use wlan_rsn::rsna::UpdateSink;
-use {fidl_fuchsia_wlan_policy as fidl_policy, fidl_fuchsia_wlan_tap as fidl_tap};
+use {
+    fidl_fuchsia_wlan_policy as fidl_policy, fidl_fuchsia_wlan_tap as fidl_tap,
+    fuchsia_zircon as zx,
+};
 
 fn scan_and_connect<'h>(
     phy: &'h fidl_tap::WlantapPhyProxy,
@@ -120,7 +122,7 @@ async fn handle_tx_event_hooks() {
     });
     helper
         .run_until_complete_or_timeout(
-            30.seconds(),
+            zx::Duration::from_seconds(30),
             format!("connecting to {} ({:02X?})", AP_SSID.to_string_not_redactable(), bssid),
             scan_and_connect(
                 &phy,

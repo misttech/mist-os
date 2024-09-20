@@ -22,7 +22,7 @@ use fuchsia_component::server::{ServiceFs, ServiceFsDir, ServiceObj};
 #[cfg(test)]
 use fuchsia_fs::OpenFlags;
 use fuchsia_inspect::component;
-use fuchsia_zircon::{Duration, DurationNum};
+use fuchsia_zircon::Duration;
 use futures::lock::Mutex;
 use futures::StreamExt;
 use settings_storage::device_storage::DeviceStorage;
@@ -797,7 +797,7 @@ where
             delegate.clone(),
             DEFAULT_SETTING_PROXY_MAX_ATTEMPTS,
             DEFAULT_TEARDOWN_TIMEOUT,
-            Some(DEFAULT_SETTING_PROXY_RESPONSE_TIMEOUT_MS.millis()),
+            Some(Duration::from_millis(DEFAULT_SETTING_PROXY_RESPONSE_TIMEOUT_MS)),
             true,
             setting_proxies_node.create_child(format!("{setting_type:?}")),
             Arc::clone(&listener_logger),

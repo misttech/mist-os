@@ -17,7 +17,7 @@ use fuchsia_inspect::{Node as InspectNode, StringReference};
 use fuchsia_inspect_contrib::inspect_insert;
 use fuchsia_inspect_contrib::log::WriteInspect;
 use fuchsia_sync::Mutex;
-use fuchsia_zircon::{self as zx, DurationNum};
+use fuchsia_zircon::{self as zx};
 use futures::channel::{mpsc, oneshot};
 use futures::future::FutureExt;
 use futures::select;
@@ -445,7 +445,9 @@ async fn starting_state(
             // PHY associated with this AP interface is busy scanning.  A future attempt to start
             // may succeed.
             if remaining_retries > 0 {
-                let retry_timer = fasync::Timer::new(AP_START_RETRY_INTERVAL.seconds().after_now());
+                let retry_timer = fasync::Timer::new(
+                    zx::Duration::from_seconds(AP_START_RETRY_INTERVAL).after_now(),
+                );
                 let mut retry_timer = retry_timer.fuse();
 
                 // To ensure that the state machine remains responsive, process any incoming

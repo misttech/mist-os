@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 use fidl_fuchsia_wlan_policy as fidl_policy;
 use fidl_test_wlan_realm::WlanConfig;
-use fuchsia_zircon::prelude::*;
 use fuchsia_zircon::{self as zx};
 use ieee80211::Bssid;
 use lazy_static::lazy_static;
@@ -54,7 +53,7 @@ async fn connecting_to_aps_with_wrong_credential_types() {
         security_type: fidl_policy::SecurityType::None,
         password: None,
     };
-    let timeout: zx::Duration = 30.seconds();
+    let timeout: zx::Duration = zx::Duration::from_seconds(30);
 
     // Test a client fails to connect to a network protected by WPA2-PSK if no
     // password is provided. The DisconnectStatus::CredentialsFailed status should be

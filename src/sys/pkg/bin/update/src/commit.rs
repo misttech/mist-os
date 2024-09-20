@@ -92,7 +92,7 @@ mod tests {
     use super::*;
     use fidl_fuchsia_update::CommitStatusProviderRequest;
     use fuchsia_sync::Mutex;
-    use fuchsia_zircon::{DurationNum, EventPair, HandleBased, Peered};
+    use fuchsia_zircon::{EventPair, HandleBased, Peered};
     use futures::pin_mut;
     use futures::task::Poll;
 
@@ -153,7 +153,7 @@ mod tests {
         observer.assert_events(&[CommitEvent::Begin]);
 
         // Once we hit the warning duration, we should get a warning event.
-        executor.set_fake_time(fasync::Time::after(1.seconds()));
+        executor.set_fake_time(fasync::Time::after(zx::Duration::from_seconds(1)));
         assert!(executor.wake_expired_timers());
         match executor.run_until_stalled(&mut fut) {
             Poll::Ready(res) => panic!("future unexpectedly completed with: {res:?}"),

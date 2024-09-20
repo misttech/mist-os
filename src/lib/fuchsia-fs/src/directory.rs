@@ -1076,7 +1076,7 @@ mod tests {
     const DATA_FILE_CONTENTS: &str = "Hello World!\n";
 
     #[cfg(target_os = "fuchsia")]
-    use fuchsia_zircon::DurationNum;
+    use fuchsia_zircon as zx;
 
     #[cfg(target_os = "fuchsia")]
     const LONG_DURATION: Duration = Duration::from_seconds(30);
@@ -1778,7 +1778,7 @@ mod tests {
         // in the past.
         let (dir, _server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
             .expect("could not create proxy");
-        let result = readdir_recursive(&dir, Some(0.nanos()))
+        let result = readdir_recursive(&dir, Some(zx::Duration::from_nanos(0)))
             .collect::<Vec<Result<DirEntry, RecursiveEnumerateError>>>()
             .await
             .into_iter()

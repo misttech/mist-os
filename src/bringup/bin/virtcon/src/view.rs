@@ -20,7 +20,6 @@ use fidl_fuchsia_hardware_display::VirtconMode;
 use fidl_fuchsia_hardware_power_statecontrol::{AdminMarker, AdminSynchronousProxy, RebootReason};
 use fidl_fuchsia_hardware_pty::WindowSize;
 use fuchsia_component::client::connect_channel_to_protocol;
-use fuchsia_zircon::prelude::*;
 use fuchsia_zircon::{self as zx};
 use futures::future::{join_all, FutureExt as _};
 use pty::key_util::{CodePoint, HidUsage};
@@ -436,7 +435,7 @@ impl VirtualConsoleViewAssistant {
                         let admin = AdminSynchronousProxy::new(client_end);
                         match admin.reboot(
                             RebootReason::UserRequest,
-                            zx::MonotonicTime::after(5.second()),
+                            zx::MonotonicTime::after(zx::Duration::from_seconds(5)),
                         )? {
                             Ok(()) => {
                                 // Wait for the world to end.

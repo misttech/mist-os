@@ -39,12 +39,12 @@ pub fn object_wait_many(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{AsHandleRef, DurationNum, Event};
+    use crate::{AsHandleRef, Duration, Event};
 
     #[test]
     fn wait_and_signal() {
         let event = Event::create();
-        let ten_ms = 10.millis();
+        let ten_ms = Duration::from_millis(10);
 
         // Waiting on it without setting any signal should time out.
         assert_eq!(
@@ -75,7 +75,7 @@ mod tests {
 
     #[test]
     fn wait_many_and_signal() {
-        let ten_ms = 10.millis();
+        let ten_ms = Duration::from_millis(10);
         let e1 = Event::create();
         let e2 = Event::create();
 

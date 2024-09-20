@@ -200,7 +200,7 @@ mod tests {
     use crate::handle::channel::Channel;
     use crate::runtime::fuchsia::executor::Time;
     use crate::{LocalExecutor, SendExecutor, TestExecutor, Timer};
-    use fuchsia_zircon::{self as zx, DurationNum};
+    use fuchsia_zircon::{self as zx};
     use futures::future;
     use std::pin::pin;
 
@@ -469,7 +469,7 @@ mod tests {
         let t = crate::Task::spawn(async move {
             let mut handles = Vec::new();
             tx.write(bytes, &mut handles).expect("failed to write message");
-            Timer::new(Time::after(0.nanos())).await;
+            Timer::new(Time::after(zx::Duration::from_nanos(0))).await;
         });
         pending_read_fut.await.expect("read future did not complete");
         t.await;

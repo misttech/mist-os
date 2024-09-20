@@ -3,12 +3,14 @@
 // found in the LICENSE file.
 
 use fidl_test_wlan_realm::WlanConfig;
-use fuchsia_zircon::prelude::*;
 use tracing::info;
 use wlan_common::assert_variant;
 use wlan_common::bss::Protection;
 use wlan_hw_sim::*;
-use {fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_policy as fidl_policy};
+use {
+    fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_policy as fidl_policy,
+    fuchsia_zircon as zx,
+};
 
 /// Tests that an idle interface is automatically connected to a saved network, if present and
 /// available, when client connections are enabled.
@@ -67,7 +69,7 @@ async fn autoconnect_idle_iface() {
 
     connect_or_timeout_with(
         &mut helper,
-        30.seconds(),
+        zx::Duration::from_seconds(30),
         &AP_SSID,
         &AP_MAC_ADDR,
         &Protection::Open,

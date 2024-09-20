@@ -321,7 +321,7 @@ mod tests {
 
     use assert_matches::assert_matches;
     use async_utils::PollExt;
-    use fuchsia_zircon::DurationNum;
+    use fuchsia_zircon as zx;
     use std::pin::Pin;
 
     const INITIAL_MEDIA_VOLUME: f32 = 0.8;
@@ -557,7 +557,7 @@ mod tests {
         exec.run_until_stalled(&mut relay_fut).expect_pending("should be pending");
 
         // Mimic no volume change by waiting out the maximum time we will wait for a new volume.
-        exec.set_fake_time(105.millis().after_now());
+        exec.set_fake_time(zx::Duration::from_millis(105).after_now());
         let _ = exec.wake_expired_timers();
 
         exec.run_until_stalled(&mut relay_fut).expect_pending("should be pending");
@@ -598,7 +598,7 @@ mod tests {
         exec.run_until_stalled(&mut relay_fut).expect_pending("should be pending");
 
         // Mimic no volume change by waiting out the maximum time we will wait for a new volume.
-        exec.set_fake_time(105.millis().after_now());
+        exec.set_fake_time(zx::Duration::from_millis(105).after_now());
         let _ = exec.wake_expired_timers();
 
         exec.run_until_stalled(&mut relay_fut).expect_pending("should be pending");

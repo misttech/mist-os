@@ -511,7 +511,7 @@ mod tests {
     use fidl::endpoints::create_proxy_and_stream;
     use fidl_fuchsia_metrics::MetricEventPayload;
     use fuchsia_inspect::Inspector;
-    use fuchsia_zircon::DurationNum;
+    use fuchsia_zircon as zx;
     use futures::task::Poll;
     use std::pin::Pin;
     use test_case::test_case;
@@ -529,7 +529,7 @@ mod tests {
             .telemetry_sender
             .send(TelemetryEvent::SystemStateUpdate { update: update.clone() });
 
-        test_helper.advance_by(25.seconds(), &mut test_fut);
+        test_helper.advance_by(zx::Duration::from_seconds(25), &mut test_fut);
 
         update.system_state = IpVersions {
             ipv4: Some(State {
@@ -569,7 +569,7 @@ mod tests {
         );
 
         test_helper.cobalt_events.clear();
-        test_helper.advance_by(3575.seconds(), &mut test_fut);
+        test_helper.advance_by(zx::Duration::from_seconds(3575), &mut test_fut);
 
         // At the 1 hour mark, the new state is logged via periodic telemetry.
         // All metrics are the same as before, except for the elapsed duration and the
@@ -656,7 +656,7 @@ mod tests {
 
         test_helper.cobalt_events.clear();
 
-        test_helper.advance_by(2.hours(), &mut test_fut);
+        test_helper.advance_by(zx::Duration::from_hours(2), &mut test_fut);
         update.system_state = IpVersions {
             ipv4: Some(State {
                 link: LinkState::Internet,
@@ -699,7 +699,7 @@ mod tests {
         test_helper
             .telemetry_sender
             .send(TelemetryEvent::NetworkConfig { has_default_ipv4_route, has_default_ipv6_route });
-        test_helper.advance_by(1.hour(), &mut test_fut);
+        test_helper.advance_by(zx::Duration::from_hours(1), &mut test_fut);
 
         let logged_metrics = test_helper
             .get_logged_metrics(metrics::REACHABILITY_GLOBAL_DEFAULT_ROUTE_DURATION_METRIC_ID);
@@ -766,7 +766,7 @@ mod tests {
     fn test_state_snapshot_duration_inspect_stats() {
         let (mut test_helper, mut test_fut) = setup_test();
 
-        test_helper.advance_by(25.seconds(), &mut test_fut);
+        test_helper.advance_by(zx::Duration::from_seconds(25), &mut test_fut);
 
         let time_series = test_helper.get_time_series(&mut test_fut);
         let internet_available_sec: Vec<_> =
@@ -797,7 +797,7 @@ mod tests {
             time_series.lock().total_duration_sec.minutely_iter().map(|v| *v).collect();
         assert_eq!(total_duration_sec, vec![25]);
 
-        test_helper.advance_by(15.seconds(), &mut test_fut);
+        test_helper.advance_by(zx::Duration::from_seconds(15), &mut test_fut);
 
         // Now 40 seconds mark
 
@@ -826,7 +826,7 @@ mod tests {
             .telemetry_sender
             .send(TelemetryEvent::SystemStateUpdate { update: update.clone() });
 
-        test_helper.advance_by(50.seconds(), &mut test_fut);
+        test_helper.advance_by(zx::Duration::from_seconds(50), &mut test_fut);
 
         // Now 90 seconds mark
 
@@ -855,7 +855,7 @@ mod tests {
             .telemetry_sender
             .send(TelemetryEvent::SystemStateUpdate { update: update.clone() });
 
-        test_helper.advance_by(60.seconds(), &mut test_fut);
+        test_helper.advance_by(zx::Duration::from_seconds(60), &mut test_fut);
 
         // Now 120 seconds mark
 

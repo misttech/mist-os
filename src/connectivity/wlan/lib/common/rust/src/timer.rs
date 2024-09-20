@@ -92,7 +92,7 @@ mod tests {
     use super::*;
     use crate::assert_variant;
     use fuchsia_async as fasync;
-    use fuchsia_zircon::{self as zx, DurationNum};
+    use fuchsia_zircon::{self as zx};
     use futures::channel::mpsc::UnboundedSender;
     use std::pin::pin;
     use std::task::Poll;
@@ -100,7 +100,7 @@ mod tests {
     type TestEvent = u32;
     impl TimeoutDuration for TestEvent {
         fn timeout_duration(&self) -> zx::Duration {
-            10.seconds()
+            zx::Duration::from_seconds(10)
         }
     }
 
@@ -108,8 +108,8 @@ mod tests {
     fn test_timer_schedule_at() {
         let _exec = fasync::TestExecutor::new();
         let (mut timer, mut time_stream) = create_timer::<TestEvent>();
-        let timeout1 = zx::MonotonicTime::after(5.seconds());
-        let timeout2 = zx::MonotonicTime::after(10.seconds());
+        let timeout1 = zx::MonotonicTime::after(zx::Duration::from_seconds(5));
+        let timeout2 = zx::MonotonicTime::after(zx::Duration::from_seconds(10));
         assert_eq!(timer.schedule_at(timeout1, 7), 0);
         assert_eq!(timer.schedule_at(timeout2, 9), 1);
 
@@ -132,8 +132,8 @@ mod tests {
     fn test_timer_schedule_after() {
         let _exec = fasync::TestExecutor::new();
         let (mut timer, mut time_stream) = create_timer::<TestEvent>();
-        let timeout1 = 1000.seconds();
-        let timeout2 = 5.seconds();
+        let timeout1 = zx::Duration::from_seconds(1000);
+        let timeout2 = zx::Duration::from_seconds(5);
         assert_eq!(timer.schedule_after(timeout1, 7), 0);
         assert_eq!(timer.schedule_after(timeout2, 9), 1);
 
@@ -158,14 +158,14 @@ mod tests {
     fn test_timer_schedule() {
         let _exec = fasync::TestExecutor::new();
         let (mut timer, mut time_stream) = create_timer::<TestEvent>();
-        let start = zx::MonotonicTime::after(0.millis());
+        let start = zx::MonotonicTime::after(zx::Duration::from_millis(0));
 
         assert_eq!(timer.schedule(5u32), 0);
 
         let (t, event) = time_stream.try_next().unwrap().expect("expect time entry");
         assert_eq!(event.id, 0);
         assert_eq!(event.event, 5);
-        assert!(start + 10.seconds() <= t);
+        assert!(start + zx::Duration::from_seconds(10) <= t);
     }
 
     #[test]
@@ -175,10 +175,10 @@ mod tests {
             let (timer, time_stream) = mpsc::unbounded::<ScheduledEvent<TestEvent>>();
             let mut timeout_stream = make_async_timed_event_stream(time_stream);
             let now = zx::MonotonicTime::get();
-            schedule(&timer, now + 40.millis(), 0);
-            schedule(&timer, now + 10.millis(), 1);
-            schedule(&timer, now + 20.millis(), 2);
-            schedule(&timer, now + 30.millis(), 3);
+            schedule(&timer, now + zx::Duration::from_millis(40), 0);
+            schedule(&timer, now + zx::Duration::from_millis(10), 1);
+            schedule(&timer, now + zx::Duration::from_millis(20), 2);
+            schedule(&timer, now + zx::Duration::from_millis(30), 3);
 
             let mut events = vec![];
             for _ in 0u32..4 {

@@ -550,7 +550,7 @@ impl UnpopulatedInspectDataContainer {
 mod test {
     use super::*;
     use fuchsia_inspect::Node;
-    use fuchsia_zircon::DurationNum;
+    use fuchsia_zircon as zx;
     use futures::StreamExt;
     use std::sync::LazyLock;
 
@@ -568,7 +568,7 @@ mod test {
             fidl::endpoints::create_proxy_and_stream::<fio::DirectoryMarker>().unwrap();
         fasync::Task::spawn(async move {
             while stream.next().await.is_some() {
-                fasync::Timer::new(fasync::Time::after(100000.second())).await;
+                fasync::Timer::new(fasync::Time::after(zx::Duration::from_seconds(100000))).await;
             }
         })
         .detach();

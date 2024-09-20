@@ -10,7 +10,7 @@ use std::task::Poll;
 use diagnostics_assertions::assert_data_tree;
 use fuchsia_async as fasync;
 use fuchsia_inspect::Inspector;
-use fuchsia_zircon::{Duration, DurationNum, MonotonicTime};
+use fuchsia_zircon::{Duration, MonotonicTime};
 use futures::channel::mpsc::{UnboundedReceiver, UnboundedSender};
 use futures::channel::oneshot;
 use futures::lock::Mutex;
@@ -1033,7 +1033,7 @@ fn test_timeout() {
     let mut fut = pin!(async move {
         let setting_type = SettingType::Unknown;
         let environment = TestEnvironmentBuilder::new(setting_type)
-            .set_timeout(SETTING_PROXY_TIMEOUT_MS.millis(), true)
+            .set_timeout(Duration::from_millis(SETTING_PROXY_TIMEOUT_MS), true)
             .build()
             .await;
 
@@ -1133,7 +1133,7 @@ fn test_timeout_no_retry() {
     let mut fut = pin!(async move {
         let setting_type = SettingType::Unknown;
         let environment = TestEnvironmentBuilder::new(setting_type)
-            .set_timeout(SETTING_PROXY_TIMEOUT_MS.millis(), false)
+            .set_timeout(Duration::from_millis(SETTING_PROXY_TIMEOUT_MS), false)
             .build()
             .await;
 

@@ -6,10 +6,9 @@ use fidl::endpoints::{create_proxy, ServerEnd};
 use fidl_fidl_examples_routing_echo::EchoMarker;
 use fuchsia_async::DurationExt;
 use fuchsia_component::client::*;
-use fuchsia_zircon::DurationNum;
 use {
     fidl_fuchsia_component_decl as fcdecl, fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as fsys,
-    fuchsia_async as fasync,
+    fuchsia_async as fasync, fuchsia_zircon as zx,
 };
 
 async fn get_manifest(query: &fsys::RealmQueryProxy, moniker: &str) -> fcdecl::Component {
@@ -311,7 +310,7 @@ pub async fn echo_server() {
             assert_eq!(entries, expected_entries);
             break;
         }
-        fasync::Timer::new(100.millis().after_now()).await;
+        fasync::Timer::new(zx::Duration::from_millis(100).after_now()).await;
     }
 }
 

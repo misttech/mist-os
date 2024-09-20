@@ -233,7 +233,6 @@ mod test {
     use super::*;
     use crate::{LocalExecutor, SendExecutor, TestExecutor};
     use assert_matches::assert_matches;
-    use fuchsia_zircon::prelude::*;
     use fuchsia_zircon::Duration;
     use futures::future::Either;
     use futures::prelude::*;
@@ -241,8 +240,8 @@ mod test {
     #[test]
     fn shorter_fires_first() {
         let mut exec = LocalExecutor::new();
-        let shorter = Timer::new(Time::after(100.millis()));
-        let longer = Timer::new(Time::after(1.second()));
+        let shorter = Timer::new(Time::after(Duration::from_millis(100)));
+        let longer = Timer::new(Time::after(Duration::from_seconds(1)));
         match exec.run_singlethreaded(future::select(shorter, longer)) {
             Either::Left(_) => {}
             Either::Right(_) => panic!("wrong timer fired"),
@@ -252,8 +251,8 @@ mod test {
     #[test]
     fn shorter_fires_first_multithreaded() {
         let mut exec = SendExecutor::new(4);
-        let shorter = Timer::new(Time::after(100.millis()));
-        let longer = Timer::new(Time::after(1.second()));
+        let shorter = Timer::new(Time::after(Duration::from_millis(100)));
+        let longer = Timer::new(Time::after(Duration::from_seconds(1)));
         match exec.run(future::select(shorter, longer)) {
             Either::Left(_) => {}
             Either::Right(_) => panic!("wrong timer fired"),
@@ -264,7 +263,7 @@ mod test {
     fn fires_after_timeout() {
         let mut exec = TestExecutor::new_with_fake_time();
         exec.set_fake_time(Time::from_nanos(0));
-        let deadline = Time::after(5.seconds());
+        let deadline = Time::after(Duration::from_seconds(5));
         let mut future = Timer::new(deadline);
         assert_eq!(Poll::Pending, exec.run_until_stalled(&mut future));
         exec.set_fake_time(deadline);
@@ -293,7 +292,7 @@ mod test {
         let counter = Arc::new(::std::sync::atomic::AtomicUsize::new(0));
         let mut future = {
             let counter = counter.clone();
-            Interval::new(5.seconds())
+            Interval::new(Duration::from_seconds(5))
                 .map(move |()| {
                     counter.fetch_add(1, Ordering::SeqCst);
                 })
@@ -306,7 +305,7 @@ mod test {
 
         // Pretend to wait until the next timer
         let first_deadline = TestExecutor::next_timer().expect("Expected a pending timeout (1)");
-        assert!(first_deadline >= 5.seconds() + start);
+        assert!(first_deadline >= Duration::from_seconds(5) + start);
         exec.set_fake_time(first_deadline);
         assert_eq!(Poll::Pending, exec.run_until_stalled(&mut future));
         assert_eq!(1, counter.load(Ordering::SeqCst));
@@ -321,7 +320,7 @@ mod test {
         assert_eq!(Poll::Pending, exec.run_until_stalled(&mut future));
         assert_eq!(2, counter.load(Ordering::SeqCst));
 
-        assert_eq!(second_deadline, first_deadline + 5.seconds());
+        assert_eq!(second_deadline, first_deadline + Duration::from_seconds(5));
     }
 
     #[test]
@@ -329,10 +328,10 @@ mod test {
         let mut exec = TestExecutor::new_with_fake_time();
         exec.set_fake_time(Time::from_nanos(0));
 
-        let mut timer = Timer::new(Time::after(1.seconds()));
+        let mut timer = Timer::new(Time::after(Duration::from_seconds(1)));
         assert_eq!(Poll::Pending, exec.run_until_stalled(&mut timer));
 
-        exec.set_fake_time(Time::after(1.seconds()));
+        exec.set_fake_time(Time::after(Duration::from_seconds(1)));
         assert_eq!(Poll::Ready(()), exec.run_until_stalled(&mut timer));
     }
 }

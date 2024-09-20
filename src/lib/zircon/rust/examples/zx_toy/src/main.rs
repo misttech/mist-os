@@ -4,10 +4,10 @@
 
 extern crate fuchsia_zircon as zircon;
 
-use zircon::{DurationNum, Time};
+use zircon::Time;
 
 pub fn main() {
     println!("before sleep, time = {:?}", Time::get());
-    1_000_000_000.nanos().sleep();
+    zx::Duration::from_nanos(1_000_000_000).sleep();
     println!("after sleep, time = {:?}", Time::get());
 }

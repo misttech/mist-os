@@ -1442,7 +1442,7 @@ impl<T: std::fmt::Debug> ChannelReadResult<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{DurationNum, HandleOp, ObjectType, Port, Rights, Signals, Vmo};
+    use crate::{Duration, HandleOp, ObjectType, Port, Rights, Signals, Vmo};
     use std::thread;
 
     #[test]
@@ -2020,7 +2020,7 @@ mod tests {
 
     #[test]
     fn channel_call_timeout() {
-        let ten_ms = 10.millis();
+        let ten_ms = Duration::from_millis(10);
 
         // Create a pair of channels and a virtual memory object.
         let (p1, p2) = Channel::create();
@@ -2049,7 +2049,7 @@ mod tests {
 
     #[test]
     fn channel_call_vectored_timeout() {
-        let ten_ms = 10.millis();
+        let ten_ms = Duration::from_millis(10);
 
         // Create a pair of channels and a virtual memory object.
         let (p1, p2) = Channel::create();
@@ -2083,7 +2083,7 @@ mod tests {
 
     #[test]
     fn channel_call_etc_timeout() {
-        let ten_ms = 10.millis();
+        let ten_ms = Duration::from_millis(10);
 
         // Create a pair of channels and a virtual memory object.
         let (p1, p2) = Channel::create();
@@ -2105,7 +2105,7 @@ mod tests {
 
     #[test]
     fn channel_call_etc_vectored_timeout() {
-        let ten_ms = 10.millis();
+        let ten_ms = Duration::from_millis(10);
 
         // Create a pair of channels and a virtual memory object.
         let (p1, p2) = Channel::create();
@@ -2143,8 +2143,11 @@ mod tests {
             let mut buf = MessageBuf::new();
             // if either the read or the write fail, this thread will panic,
             // resulting in tx being dropped, which will be noticed by the rx.
-            p2.wait_handle(Signals::CHANNEL_READABLE, MonotonicTime::after(1.seconds()))
-                .expect("callee wait error");
+            p2.wait_handle(
+                Signals::CHANNEL_READABLE,
+                MonotonicTime::after(Duration::from_seconds(1)),
+            )
+            .expect("callee wait error");
             p2.read(&mut buf).expect("callee read error");
 
             let (bytes, handles) = buf.split_mut();
@@ -2167,8 +2170,13 @@ mod tests {
         // stalling forever if a developer makes a mistake locally in this
         // crate. Tests of Zircon behavior or virtualization behavior should be
         // covered elsewhere. See https://fxbug.dev/42106187.
-        p1.call(MonotonicTime::after(30.seconds()), b"txidcall", &mut vec![], &mut buf)
-            .expect("channel call error");
+        p1.call(
+            MonotonicTime::after(Duration::from_seconds(30)),
+            b"txidcall",
+            &mut vec![],
+            &mut buf,
+        )
+        .expect("channel call error");
         assert_eq!(&buf.bytes()[4..], b"response");
         assert_eq!(buf.n_handles(), 0);
 
@@ -2189,8 +2197,11 @@ mod tests {
             let mut buf = MessageBuf::new();
             // if either the read or the write fail, this thread will panic,
             // resulting in tx being dropped, which will be noticed by the rx.
-            p2.wait_handle(Signals::CHANNEL_READABLE, MonotonicTime::after(1.seconds()))
-                .expect("callee wait error");
+            p2.wait_handle(
+                Signals::CHANNEL_READABLE,
+                MonotonicTime::after(Duration::from_seconds(1)),
+            )
+            .expect("callee wait error");
             p2.read(&mut buf).expect("callee read error");
 
             let (bytes, handles) = buf.split_mut();
@@ -2214,7 +2225,7 @@ mod tests {
         // crate. Tests of Zircon behavior or virtualization behavior should be
         // covered elsewhere. See https://fxbug.dev/42106187.
         p1.callv(
-            MonotonicTime::after(30.seconds()),
+            MonotonicTime::after(Duration::from_seconds(30)),
             &[ChannelIoSlice::new(b"txid"), ChannelIoSlice::new(b"call")],
             &mut vec![],
             &mut buf,
@@ -2240,8 +2251,11 @@ mod tests {
             let mut buf = MessageBuf::new();
             // if either the read or the write fail, this thread will panic,
             // resulting in tx being dropped, which will be noticed by the rx.
-            p2.wait_handle(Signals::CHANNEL_READABLE, MonotonicTime::after(1.seconds()))
-                .expect("callee wait error");
+            p2.wait_handle(
+                Signals::CHANNEL_READABLE,
+                MonotonicTime::after(Duration::from_seconds(1)),
+            )
+            .expect("callee wait error");
             p2.read(&mut buf).expect("callee read error");
 
             let (bytes, handles) = buf.split_mut();
@@ -2272,7 +2286,7 @@ mod tests {
         // crate. Tests of Zircon behavior or virtualization behavior should be
         // covered elsewhere. See https://fxbug.dev/42106187.
         p1.call_etc(
-            MonotonicTime::after(30.seconds()),
+            MonotonicTime::after(Duration::from_seconds(30)),
             b"txidcall",
             &mut handle_dispositions,
             &mut buf,
@@ -2301,8 +2315,11 @@ mod tests {
             let mut buf = MessageBuf::new();
             // if either the read or the write fail, this thread will panic,
             // resulting in tx being dropped, which will be noticed by the rx.
-            p2.wait_handle(Signals::CHANNEL_READABLE, MonotonicTime::after(1.seconds()))
-                .expect("callee wait error");
+            p2.wait_handle(
+                Signals::CHANNEL_READABLE,
+                MonotonicTime::after(Duration::from_seconds(1)),
+            )
+            .expect("callee wait error");
             p2.read(&mut buf).expect("callee read error");
 
             let (bytes, handles) = buf.split_mut();
@@ -2333,7 +2350,7 @@ mod tests {
         // crate. Tests of Zircon behavior or virtualization behavior should be
         // covered elsewhere. See https://fxbug.dev/42106187.
         p1.callv_etc(
-            MonotonicTime::after(30.seconds()),
+            MonotonicTime::after(Duration::from_seconds(30)),
             &[ChannelIoSlice::new(b"txi"), ChannelIoSlice::new(b"dcall")],
             &mut handle_dispositions,
             &mut buf,

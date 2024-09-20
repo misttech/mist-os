@@ -6,9 +6,7 @@ use anyhow::{format_err, Error};
 use diagnostics_assertions::{assert_data_tree, AnyProperty};
 use diagnostics_hierarchy::DiagnosticsHierarchy;
 use diagnostics_reader::{ArchiveReader, ComponentSelector, Inspect};
-use fidl_fuchsia_wlan_policy as fidl_policy;
 use fidl_test_wlan_realm::WlanConfig;
-use fuchsia_zircon::DurationNum;
 use ieee80211::Bssid;
 use lazy_static::lazy_static;
 use std::pin::pin;
@@ -16,6 +14,7 @@ use wlan_common::bss::Protection;
 use wlan_common::channel::{Cbw, Channel};
 use wlan_hw_sim::event::{action, Handler};
 use wlan_hw_sim::*;
+use {fidl_fuchsia_wlan_policy as fidl_policy, fuchsia_zircon as zx};
 
 lazy_static! {
     static ref BSSID: Bssid = Bssid::from([0x62, 0x73, 0x73, 0x66, 0x6f, 0x6f]);
@@ -107,7 +106,7 @@ async fn verify_wlan_inspect() {
         });
         let () = helper
             .run_until_complete_or_timeout(
-                240.seconds(),
+                zx::Duration::from_seconds(240),
                 format!("connecting to {} ({})", AP_SSID.to_string_not_redactable(), *BSSID),
                 event::on_scan(action::send_advertisements_and_scan_completion(&phy, probes))
                     .or(event::on_transmit(action::connect_with_open_authentication(

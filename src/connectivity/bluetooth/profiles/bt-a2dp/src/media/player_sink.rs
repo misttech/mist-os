@@ -424,13 +424,12 @@ mod tests {
     use fuchsia_bluetooth::types::Channel;
     use fuchsia_inspect_derive::WithInspect;
     use fuchsia_sync::Mutex;
-    use fuchsia_zircon::DurationNum;
     use futures::channel::mpsc;
     use futures::io::AsyncWriteExt;
     use futures::task::Poll;
     use std::pin::pin;
     use std::sync::{Arc, RwLock};
-    use {fidl_fuchsia_metrics as cobalt, fuchsia_inspect as inspect};
+    use {fidl_fuchsia_metrics as cobalt, fuchsia_inspect as inspect, fuchsia_zircon as zx};
 
     fn fake_cobalt_sender() -> (bt_metrics::MetricsLogger, cobalt::MetricEventLoggerRequestStream) {
         let (c, s) = fidl::endpoints::create_proxy_and_stream::<cobalt::MetricEventLoggerMarker>()
@@ -717,7 +716,7 @@ mod tests {
         let sbc_packet_size = 85u64;
 
         media_sender.try_send(Ok(raw.clone())).expect("should be able to send into stream");
-        exec.set_fake_time(fasync::Time::after(1.seconds()));
+        exec.set_fake_time(fasync::Time::after(zx::Duration::from_seconds(1)));
         assert!(exec.run_until_stalled(&mut decode_fut).is_pending());
 
         // Expect a request for status and respond as they setup the player after data is first

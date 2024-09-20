@@ -414,60 +414,6 @@ impl Duration<TicksUnit> {
     }
 }
 
-pub trait DurationNum: Sized {
-    fn nanos(self) -> Duration<NsUnit>;
-    fn micros(self) -> Duration<NsUnit>;
-    fn millis(self) -> Duration<NsUnit>;
-    fn seconds(self) -> Duration<NsUnit>;
-    fn minutes(self) -> Duration<NsUnit>;
-    fn hours(self) -> Duration<NsUnit>;
-
-    // Singular versions to allow for `1.milli()` and `1.second()`, etc.
-    fn micro(self) -> Duration<NsUnit> {
-        self.micros()
-    }
-    fn milli(self) -> Duration<NsUnit> {
-        self.millis()
-    }
-    fn second(self) -> Duration<NsUnit> {
-        self.seconds()
-    }
-    fn minute(self) -> Duration<NsUnit> {
-        self.minutes()
-    }
-    fn hour(self) -> Duration<NsUnit> {
-        self.hours()
-    }
-}
-
-// Note: this could be implemented for other unsized integer types, but it doesn't seem
-// necessary to support the usual case.
-impl DurationNum for i64 {
-    fn nanos(self) -> Duration<NsUnit> {
-        Duration::from_nanos(self)
-    }
-
-    fn micros(self) -> Duration<NsUnit> {
-        Duration::from_micros(self)
-    }
-
-    fn millis(self) -> Duration<NsUnit> {
-        Duration::from_millis(self)
-    }
-
-    fn seconds(self) -> Duration<NsUnit> {
-        Duration::from_seconds(self)
-    }
-
-    fn minutes(self) -> Duration<NsUnit> {
-        Duration::from_minutes(self)
-    }
-
-    fn hours(self) -> Duration<NsUnit> {
-        Duration::from_hours(self)
-    }
-}
-
 /// An object representing a Zircon timer, such as the one returned by
 /// [zx_timer_create](https://fuchsia.dev/fuchsia-src/reference/syscalls/timer_create.md).
 ///
@@ -589,7 +535,7 @@ mod tests {
     #[test]
     fn monotonic_time_increases() {
         let time1 = MonotonicTime::get();
-        1_000.nanos().sleep();
+        Duration::from_nanos(1_000).sleep();
         let time2 = MonotonicTime::get();
         assert!(time2 > time1);
     }
@@ -597,7 +543,7 @@ mod tests {
     #[test]
     fn ticks_increases() {
         let ticks1 = MonotonicTicks::get();
-        1_000.nanos().sleep();
+        Duration::from_nanos(1_000).sleep();
         let ticks2 = MonotonicTicks::get();
         assert!(ticks2 > ticks1);
     }
@@ -605,7 +551,7 @@ mod tests {
     #[test]
     fn boot_time_increases() {
         let time1 = BootTime::get();
-        1_000.nanos().sleep();
+        Duration::from_nanos(1_000).sleep();
         let time2 = BootTime::get();
         assert!(time2 > time1);
     }
@@ -613,14 +559,14 @@ mod tests {
     #[test]
     fn boot_ticks_increases() {
         let ticks1 = BootTicks::get();
-        1_000.nanos().sleep();
+        Duration::from_nanos(1_000).sleep();
         let ticks2 = BootTicks::get();
         assert!(ticks2 > ticks1);
     }
 
     #[test]
     fn tick_length() {
-        let sleep_time = 1.milli();
+        let sleep_time = Duration::from_millis(1);
         let ticks1 = MonotonicTicks::get();
         sleep_time.sleep();
         let ticks2 = MonotonicTicks::get();
@@ -634,7 +580,7 @@ mod tests {
 
     #[test]
     fn sleep() {
-        let sleep_ns = 1.millis();
+        let sleep_ns = Duration::from_millis(1);
         let time1 = MonotonicTime::get();
         sleep_ns.sleep();
         let time2 = MonotonicTime::get();
@@ -662,9 +608,9 @@ mod tests {
 
     #[test]
     fn timer_basic() {
-        let slack = 0.millis();
-        let ten_ms = 10.millis();
-        let five_secs = 5.seconds();
+        let slack = Duration::from_millis(0);
+        let ten_ms = Duration::from_millis(10);
+        let five_secs = Duration::from_seconds(5);
 
         // Create a timer
         let timer = MonotonicTimer::create();
@@ -692,9 +638,9 @@ mod tests {
 
     #[test]
     fn boot_timer_basic() {
-        let slack = 0.millis();
-        let ten_ms = 10.millis();
-        let five_secs = 5.seconds();
+        let slack = Duration::from_millis(0);
+        let ten_ms = Duration::from_millis(10);
+        let five_secs = Duration::from_seconds(5);
 
         // Create a timer
         let timer = BootTimer::create();

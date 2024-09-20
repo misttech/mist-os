@@ -11,7 +11,7 @@ use fdio::{SpawnAction, SpawnOptions};
 use fidl_fuchsia_io as fio;
 use fidl_fuchsia_storage_ext4::{MountVmoResult, Server_Marker, ServiceMarker, Success};
 use fuchsia_runtime::{HandleInfo, HandleType};
-use fuchsia_zircon::{self as zx, AsHandleRef, DurationNum};
+use fuchsia_zircon::{self as zx, AsHandleRef};
 use maplit::hashmap;
 use ramdevice_client::RamdiskClient;
 use sha2::{Digest, Sha256};
@@ -143,7 +143,10 @@ async fn ext4_server_mounts_block_device_and_dies_on_close() -> Result<(), Error
     .unwrap();
 
     std::mem::drop(dir_proxy);
-    process.wait_handle(zx::Signals::TASK_TERMINATED, zx::MonotonicTime::after(5.seconds()))?;
+    process.wait_handle(
+        zx::Signals::TASK_TERMINATED,
+        zx::MonotonicTime::after(zx::Duration::from_seconds(5)),
+    )?;
     Ok(())
 }
 

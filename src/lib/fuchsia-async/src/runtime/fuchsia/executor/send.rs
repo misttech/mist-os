@@ -189,7 +189,7 @@ impl Drop for SendExecutor {
 mod tests {
     use super::SendExecutor;
     use crate::{Task, Timer};
-    use fuchsia_zircon::DurationNum;
+    use fuchsia_zircon as zx;
     use futures::channel::oneshot;
     use std::sync::{Arc, Condvar, Mutex};
 
@@ -198,7 +198,7 @@ mod tests {
         SendExecutor::new(2).run(async {
             // The timer will only fire on one thread, so use one so we can get to a point where
             // only one thread is running.
-            Timer::new(10.millis()).await;
+            Timer::new(zx::Duration::from_millis(10)).await;
 
             let (tx, rx) = oneshot::channel();
             let pair = Arc::new((Mutex::new(false), Condvar::new()));

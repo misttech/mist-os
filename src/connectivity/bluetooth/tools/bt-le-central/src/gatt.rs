@@ -783,7 +783,7 @@ mod tests {
     use bt_fidl_mocks::gatt2::{ClientMock, RemoteServiceMock};
     use fidl::endpoints::create_proxy_and_stream;
     use fidl_fuchsia_bluetooth_gatt2::{ClientMarker, ServiceHandle};
-    use fuchsia_zircon::DurationNum;
+    use fuchsia_zircon as zx;
     use futures::future::FutureExt;
     use futures::{join, select};
     use std::pin::pin;
@@ -797,7 +797,7 @@ mod tests {
         let read_fut = do_read_by_type(&args, &gatt_client);
 
         let (service_proxy, mut service_mock) =
-            RemoteServiceMock::new(20.seconds()).expect("failed to create mock");
+            RemoteServiceMock::new(zx::Duration::from_seconds(20)).expect("failed to create mock");
 
         gatt_client.write().active_service = Some(ActiveService::new(service_proxy));
 
@@ -813,7 +813,7 @@ mod tests {
     #[fuchsia::test]
     async fn test_connect_and_enable_notify() {
         let (client_proxy, mut client_mock) =
-            ClientMock::new(20.seconds()).expect("failed to create mock");
+            ClientMock::new(zx::Duration::from_seconds(20)).expect("failed to create mock");
         let gatt_client = GattClient::new(client_proxy);
 
         let services =
@@ -831,7 +831,8 @@ mod tests {
         };
         let service_stream =
             service_server.into_stream().expect("failed to turn server into stream");
-        let mut service_mock = RemoteServiceMock::from_stream(service_stream, 20.seconds());
+        let mut service_mock =
+            RemoteServiceMock::from_stream(service_stream, zx::Duration::from_seconds(20));
 
         let characteristics = Vec::new();
         let expect_discover_fut = service_mock.expect_discover_characteristics(&characteristics);

@@ -235,7 +235,6 @@ mod test {
     use crate::make_test_config;
     use chrono::DateTime;
     use test_util::assert_near;
-    use zx::DurationNum;
 
     const INITIAL_MONO: zx::MonotonicTime = zx::MonotonicTime::from_nanos(7_000_000_000);
     const STD_DEV: zx::Duration = zx::Duration::from_millis(88);
@@ -311,7 +310,8 @@ mod test {
         for freq in &[0.999, 1.0, 1.001] {
             let initial_sample = create_sample(TEST_UTC_STR, INITIAL_MONO);
             let mut window = EstimationWindow::new(&initial_sample);
-            for sample in create_sample_set(&initial_sample, 20, 1.hour(), *freq) {
+            for sample in create_sample_set(&initial_sample, 20, zx::Duration::from_hours(1), *freq)
+            {
                 window.add_sample(&sample).unwrap();
             }
             assert_near!(window.frequency().unwrap(), *freq, 0.0000001);
@@ -321,8 +321,16 @@ mod test {
     #[fuchsia::test]
     fn estimation_window_outside_window() {
         let initial = create_sample(TEST_UTC_STR, INITIAL_MONO);
-        let earlier = Sample::new(initial.utc - 1.hour(), initial.monotonic - 1.hour(), STD_DEV);
-        let later = Sample::new(initial.utc + 36.hours(), initial.monotonic + 36.hours(), STD_DEV);
+        let earlier = Sample::new(
+            initial.utc - zx::Duration::from_hours(1),
+            initial.monotonic - zx::Duration::from_hours(1),
+            STD_DEV,
+        );
+        let later = Sample::new(
+            initial.utc + zx::Duration::from_hours(36),
+            initial.monotonic + zx::Duration::from_hours(36),
+            STD_DEV,
+        );
 
         let mut window = EstimationWindow::new(&initial);
         assert_eq!(window.add_sample(&earlier), Err(AddSampleError::BeforeWindow));
@@ -333,7 +341,7 @@ mod test {
     fn estimation_window_insufficient_samples() {
         let initial_sample = create_sample(TEST_UTC_STR, INITIAL_MONO);
         let mut window = EstimationWindow::new(&initial_sample);
-        for sample in create_sample_set(&initial_sample, 10, 1.hour(), 0.9876) {
+        for sample in create_sample_set(&initial_sample, 10, zx::Duration::from_hours(1), 0.9876) {
             window.add_sample(&sample).unwrap();
         }
         assert_eq!(window.frequency(), Err(GetFrequencyError::InsufficientSamples));
@@ -371,10 +379,20 @@ mod test {
     fn frequency_estimator_valid() {
         // Two days of data at an initial frequency.
         let mut samples = vec![create_sample(TEST_UTC_STR, INITIAL_MONO)];
-        extend_sample_set(&mut samples, 47, 1.hour() + 1.second(), 0.999);
+        extend_sample_set(
+            &mut samples,
+            47,
+            zx::Duration::from_hours(1) + zx::Duration::from_seconds(1),
+            0.999,
+        );
         // Two more days of data at an different frequency (plus one extra sample so we can close
         // the fourth day)
-        extend_sample_set(&mut samples, 49, 1.hour() + 1.second(), 0.998);
+        extend_sample_set(
+            &mut samples,
+            49,
+            zx::Duration::from_hours(1) + zx::Duration::from_seconds(1),
+            0.998,
+        );
 
         let config = make_test_config();
         let mut estimator = FrequencyEstimator::new(&samples.remove(0), config);
@@ -395,8 +413,18 @@ mod test {
     #[fuchsia::test]
     fn frequency_estimator_disjoint_update() {
         let mut samples = vec![create_sample(TEST_UTC_STR, INITIAL_MONO)];
-        extend_sample_set(&mut samples, 11, 1.hour() + 1.second(), 1.1);
-        extend_sample_set(&mut samples, 25, 1.hour() + 1.second(), 0.999);
+        extend_sample_set(
+            &mut samples,
+            11,
+            zx::Duration::from_hours(1) + zx::Duration::from_seconds(1),
+            1.1,
+        );
+        extend_sample_set(
+            &mut samples,
+            25,
+            zx::Duration::from_hours(1) + zx::Duration::from_seconds(1),
+            0.999,
+        );
 
         let config = make_test_config();
         let mut estimator = FrequencyEstimator::new(&samples.remove(0), config);
@@ -417,8 +445,18 @@ mod test {
     fn frequency_estimator_insufficient_samples() {
         let mut samples = vec![create_sample(TEST_UTC_STR, INITIAL_MONO)];
         // Note the first day only has 6 samples so should be ignored.
-        extend_sample_set(&mut samples, 6, 4.hour() + 1.second(), 1.1);
-        extend_sample_set(&mut samples, 25, 1.hour() + 1.second(), 0.999);
+        extend_sample_set(
+            &mut samples,
+            6,
+            zx::Duration::from_hours(4) + zx::Duration::from_seconds(1),
+            1.1,
+        );
+        extend_sample_set(
+            &mut samples,
+            25,
+            zx::Duration::from_hours(1) + zx::Duration::from_seconds(1),
+            0.999,
+        );
 
         let config = make_test_config();
         let mut estimator = FrequencyEstimator::new(&samples.remove(0), config);
@@ -439,7 +477,12 @@ mod test {
     #[fuchsia::test]
     fn frequency_estimator_overlaps_leap_second() {
         let mut samples = vec![create_sample(LEAP_UTC_STR, INITIAL_MONO)];
-        extend_sample_set(&mut samples, 25, 1.hour() + 1.second(), 0.999);
+        extend_sample_set(
+            &mut samples,
+            25,
+            zx::Duration::from_hours(1) + zx::Duration::from_seconds(1),
+            0.999,
+        );
 
         let config = make_test_config();
         let mut estimator = FrequencyEstimator::new(&samples.remove(0), config);

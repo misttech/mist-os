@@ -119,7 +119,6 @@ pub fn time_at_monotonic<Reference: zx::Timeline, Output: zx::Timeline>(
 mod test {
     use super::*;
     use test_util::{assert_geq, assert_leq};
-    use zx::DurationNum;
 
     const BACKSTOP: zx::SyntheticTime = zx::SyntheticTime::from_nanos(1234567890);
     const TIME_DIFF: zx::Duration = zx::Duration::from_seconds(5);
@@ -150,20 +149,23 @@ mod test {
             (TEST_REFERENCE + TEST_OFFSET).into_nanos()
         );
         assert_eq!(
-            transform.synthetic(TEST_REFERENCE + 200.millis()).into_nanos(),
-            (TEST_REFERENCE + TEST_OFFSET + 200.millis()).into_nanos(),
+            transform.synthetic(TEST_REFERENCE + zx::Duration::from_millis(200)).into_nanos(),
+            (TEST_REFERENCE + TEST_OFFSET + zx::Duration::from_millis(200)).into_nanos(),
         );
         assert_eq!(
-            transform.synthetic(TEST_REFERENCE - 100.millis()).into_nanos(),
-            (TEST_REFERENCE + TEST_OFFSET - 100.millis()).into_nanos(),
+            transform.synthetic(TEST_REFERENCE - zx::Duration::from_millis(100)).into_nanos(),
+            (TEST_REFERENCE + TEST_OFFSET - zx::Duration::from_millis(100)).into_nanos(),
         );
 
         assert_eq!(transform.error_bound(TEST_REFERENCE), TEST_ERROR_BOUND);
         assert_eq!(
-            transform.error_bound(TEST_REFERENCE + 1.milli()),
+            transform.error_bound(TEST_REFERENCE + zx::Duration::from_millis(1)),
             TEST_ERROR_BOUND + TEST_ERROR_BOUND_GROWTH as u64
         );
-        assert_eq!(transform.error_bound(TEST_REFERENCE - 1.milli()), TEST_ERROR_BOUND as u64);
+        assert_eq!(
+            transform.error_bound(TEST_REFERENCE - zx::Duration::from_millis(1)),
+            TEST_ERROR_BOUND as u64
+        );
     }
 
     #[fuchsia::test]
@@ -183,17 +185,30 @@ mod test {
             (TEST_REFERENCE + TEST_OFFSET).into_nanos(),
         );
         assert_eq!(
-            transform.synthetic(TEST_REFERENCE + 200.millis()).into_nanos(),
-            (TEST_REFERENCE + TEST_OFFSET + 200.millis() + (25 * 200).nanos()).into_nanos(),
+            transform.synthetic(TEST_REFERENCE + zx::Duration::from_millis(200)).into_nanos(),
+            (TEST_REFERENCE
+                + TEST_OFFSET
+                + zx::Duration::from_millis(200)
+                + zx::Duration::from_nanos(25 * 200))
+            .into_nanos(),
         );
         assert_eq!(
-            transform.synthetic(TEST_REFERENCE - 100.millis()).into_nanos(),
-            (TEST_REFERENCE + TEST_OFFSET - 100.millis() - (25 * 100).nanos()).into_nanos(),
+            transform.synthetic(TEST_REFERENCE - zx::Duration::from_millis(100)).into_nanos(),
+            (TEST_REFERENCE + TEST_OFFSET
+                - zx::Duration::from_millis(100)
+                - zx::Duration::from_nanos(25 * 100))
+            .into_nanos(),
         );
 
         assert_eq!(transform.error_bound(TEST_REFERENCE), TEST_ERROR_BOUND);
-        assert_eq!(transform.error_bound(TEST_REFERENCE + 1.milli()), TEST_ERROR_BOUND as u64);
-        assert_eq!(transform.error_bound(TEST_REFERENCE - 1.milli()), TEST_ERROR_BOUND as u64);
+        assert_eq!(
+            transform.error_bound(TEST_REFERENCE + zx::Duration::from_millis(1)),
+            TEST_ERROR_BOUND as u64
+        );
+        assert_eq!(
+            transform.error_bound(TEST_REFERENCE - zx::Duration::from_millis(1)),
+            TEST_ERROR_BOUND as u64
+        );
     }
 
     #[fuchsia::test]
@@ -213,20 +228,27 @@ mod test {
             (TEST_REFERENCE + TEST_OFFSET).into_nanos(),
         );
         assert_eq!(
-            transform.synthetic(TEST_REFERENCE + 200.millis()).into_nanos(),
-            (TEST_REFERENCE + TEST_OFFSET + 200.millis() - (50 * 200).nanos()).into_nanos(),
+            transform.synthetic(TEST_REFERENCE + zx::Duration::from_millis(200)).into_nanos(),
+            (TEST_REFERENCE + TEST_OFFSET + zx::Duration::from_millis(200)
+                - zx::Duration::from_nanos(50 * 200))
+            .into_nanos(),
         );
         assert_eq!(
-            transform.synthetic(TEST_REFERENCE - 100.millis()).into_nanos(),
-            (TEST_REFERENCE + TEST_OFFSET - 100.millis() + (50 * 100).nanos()).into_nanos(),
+            transform.synthetic(TEST_REFERENCE - zx::Duration::from_millis(100)).into_nanos(),
+            (TEST_REFERENCE + TEST_OFFSET - zx::Duration::from_millis(100)
+                + zx::Duration::from_nanos(50 * 100))
+            .into_nanos(),
         );
 
         assert_eq!(transform.error_bound(TEST_REFERENCE), TEST_ERROR_BOUND);
         assert_eq!(
-            transform.error_bound(TEST_REFERENCE + 1.second()),
+            transform.error_bound(TEST_REFERENCE + zx::Duration::from_seconds(1)),
             TEST_ERROR_BOUND + (TEST_ERROR_BOUND_GROWTH * 1000) as u64
         );
-        assert_eq!(transform.error_bound(TEST_REFERENCE - 1.second()), TEST_ERROR_BOUND as u64);
+        assert_eq!(
+            transform.error_bound(TEST_REFERENCE - zx::Duration::from_seconds(1)),
+            TEST_ERROR_BOUND as u64
+        );
     }
 
     #[fuchsia::test]
@@ -249,19 +271,22 @@ mod test {
             error_bound_growth_ppm: 0,
         };
 
-        assert_eq!(transform_1.difference(&transform_1, TEST_REFERENCE), 0.nanos());
+        assert_eq!(
+            transform_1.difference(&transform_1, TEST_REFERENCE),
+            zx::Duration::from_nanos(0)
+        );
         assert_eq!(transform_1.difference(&transform_2, TEST_REFERENCE), TEST_OFFSET);
         assert_eq!(
             transform_2.difference(&transform_1, TEST_REFERENCE),
             zx::Duration::from_nanos(-TEST_OFFSET.into_nanos())
         );
         assert_eq!(
-            transform_1.difference(&transform_2, TEST_REFERENCE + 500.millis()),
-            TEST_OFFSET + (75 * 500).nanos()
+            transform_1.difference(&transform_2, TEST_REFERENCE + zx::Duration::from_millis(500)),
+            TEST_OFFSET + zx::Duration::from_nanos(75 * 500)
         );
         assert_eq!(
-            transform_1.difference(&transform_2, TEST_REFERENCE - 300.millis()),
-            TEST_OFFSET - (75 * 300).nanos()
+            transform_1.difference(&transform_2, TEST_REFERENCE - zx::Duration::from_millis(300)),
+            TEST_OFFSET - zx::Duration::from_nanos(75 * 300)
         );
     }
 

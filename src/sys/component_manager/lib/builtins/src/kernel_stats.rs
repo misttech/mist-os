@@ -190,7 +190,6 @@ fn calculate_cpu_loads(
 mod tests {
     use super::*;
     use fuchsia_component::client::connect_to_protocol;
-    use zx::DurationNum as _;
     use {fidl_fuchsia_kernel as fkernel, fuchsia_async as fasync};
 
     async fn get_info_resource() -> Result<Resource, Error> {
@@ -276,7 +275,8 @@ mod tests {
     #[fuchsia::test]
     async fn get_cpu_load() -> Result<(), Error> {
         let kernel_stats_provider = serve_kernel_stats(OnError::Panic).await?;
-        let cpu_loads = kernel_stats_provider.get_cpu_load(1.seconds().into_nanos()).await?;
+        let cpu_loads =
+            kernel_stats_provider.get_cpu_load(zx::Duration::from_seconds(1).into_nanos()).await?;
 
         assert!(
             cpu_loads.iter().all(|l| l > &0.0 && l <= &100.0),

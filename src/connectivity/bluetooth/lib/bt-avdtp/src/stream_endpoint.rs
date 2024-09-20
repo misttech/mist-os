@@ -5,7 +5,7 @@
 use fuchsia_async::{DurationExt, Task, TimeoutExt};
 use fuchsia_bluetooth::types::{A2dpDirection, Channel};
 use fuchsia_sync::Mutex;
-use fuchsia_zircon::{Duration, DurationNum, Status};
+use fuchsia_zircon::{Duration, Status};
 use futures::stream::Stream;
 use futures::{io, FutureExt};
 use std::fmt;
@@ -312,7 +312,7 @@ impl StreamEndpoint {
                 };
                 let closed_fut = transport
                     .closed()
-                    .on_timeout(3.seconds().after_now(), || Err(Status::TIMED_OUT));
+                    .on_timeout(Duration::from_seconds(3).after_now(), || Err(Status::TIMED_OUT));
                 if let Err(Status::TIMED_OUT) = closed_fut.await {
                     let _ = peer.abort(&seid).await;
                     *state.lock() = StreamState::Aborting;

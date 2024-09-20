@@ -516,7 +516,7 @@ mod tests {
     use fuchsia_fs::directory::{
         readdir_inclusive, DirEntry, DirentKind, WatchEvent, WatchMessage, Watcher,
     };
-    use fuchsia_zircon::DurationNum as _;
+    use fuchsia_zircon as zx;
     use futures::StreamExt as _;
     use std::path::PathBuf;
 
@@ -648,7 +648,10 @@ mod tests {
 
             // Before the blob is finished writing, we shouldn't see any watch events for it.
             assert_matches!(
-                watcher.next().on_timeout(500.millis().after_now(), || None).await,
+                watcher
+                    .next()
+                    .on_timeout(zx::Duration::from_millis(500).after_now(), || None)
+                    .await,
                 None
             );
 

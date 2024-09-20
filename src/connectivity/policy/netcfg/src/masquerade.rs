@@ -10,14 +10,13 @@ use fidl::endpoints::ControlHandle;
 use fidl_fuchsia_net::Subnet;
 use fnet_masquerade::Error;
 use fuchsia_async::DurationExt as _;
-use fuchsia_zircon::DurationNum as _;
 use futures::stream::LocalBoxStream;
 use futures::{future, StreamExt as _, TryStreamExt as _};
 use net_declare::fidl_subnet;
 use tracing::error;
 use {
     fidl_fuchsia_net_filter_deprecated as fnet_filter_deprecated,
-    fidl_fuchsia_net_masquerade as fnet_masquerade,
+    fidl_fuchsia_net_masquerade as fnet_masquerade, fuchsia_zircon as zx,
 };
 
 use crate::filter::FilterEnabledState;
@@ -203,7 +202,8 @@ impl<Filter: fnet_filter_deprecated::FilterProxyInterface> Masquerade<Filter> {
                 Err(fnet_filter_deprecated::FilterUpdateNatRulesError::GenerationMismatch) => {
                     // We need to try again.
                     fuchsia_async::Timer::new(
-                        crate::filter::FILTER_CAS_RETRY_INTERVAL_MILLIS.millis().after_now(),
+                        zx::Duration::from_millis(crate::filter::FILTER_CAS_RETRY_INTERVAL_MILLIS)
+                            .after_now(),
                     )
                     .await;
                 }

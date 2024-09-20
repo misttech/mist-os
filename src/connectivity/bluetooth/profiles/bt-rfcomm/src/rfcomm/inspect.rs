@@ -163,7 +163,7 @@ mod tests {
     use diagnostics_assertions::{assert_data_tree, AnyProperty};
     use fuchsia_async::DurationExt;
     use fuchsia_inspect_derive::WithInspect;
-    use fuchsia_zircon::DurationNum;
+    use fuchsia_zircon as zx;
 
     use crate::rfcomm::session::channel::Credits;
 
@@ -300,7 +300,7 @@ mod tests {
             },
         });
 
-        exec.set_fake_time(1.seconds().after_now());
+        exec.set_fake_time(zx::Duration::from_seconds(1).after_now());
         // An inbound transfer should have no impact on the outbound stats.
         stream.record_inbound_transfer(500, fasync::Time::now());
         assert_data_tree!(inspect, root: {
@@ -318,7 +318,7 @@ mod tests {
             },
         });
 
-        exec.set_fake_time(1.seconds().after_now());
+        exec.set_fake_time(zx::Duration::from_seconds(1).after_now());
         stream.record_outbound_transfer(250, fasync::Time::now());
         assert_data_tree!(inspect, root: {
             inbound_stream: {

@@ -3,9 +3,8 @@
 // found in the LICENSE file.
 
 use fidl_fuchsia_examples_inspect::{ReverserRequest, ReverserRequestStream};
-use fuchsia_async as fasync;
-use fuchsia_zircon::DurationNum;
 use futures::TryStreamExt;
+use {fuchsia_async as fasync, fuchsia_zircon as zx};
 
 // [START reverser_def]
 pub struct ReverserServerFactory {}
@@ -37,7 +36,7 @@ impl ReverserServer {
                 let ReverserRequest::Reverse { input, responder: _ } = request;
                 let _result = input.chars().rev().collect::<String>();
                 // Yes, this is silly. Just for codelab purposes.
-                fasync::Timer::new(fasync::Time::after(10.hours())).await
+                fasync::Timer::new(fasync::Time::after(zx::Duration::from_hours(10))).await
             }
         })
         .detach();

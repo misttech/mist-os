@@ -66,7 +66,7 @@ impl TimeUnit {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use fuchsia_zircon::{self as zx, DurationNum};
+    use fuchsia_zircon::{self as zx};
 
     #[fuchsia::test]
     fn one_time_unit_conversion_to_microseconds() {
@@ -82,14 +82,14 @@ mod tests {
 
     #[fuchsia::test]
     fn one_time_unit_conversion_to_duration() {
-        assert_eq!(zx::Duration::from(TimeUnit(1)), 1024.micros());
+        assert_eq!(zx::Duration::from(TimeUnit(1)), zx::Duration::from_micros(1024));
     }
 
     #[fuchsia::test]
     fn time_unit_conversion_to_duration_is_linear() {
-        assert_eq!(zx::Duration::from(TimeUnit(0)), 0.micros());
-        assert_eq!(zx::Duration::from(TimeUnit(1)), 1024.micros());
-        assert_eq!(zx::Duration::from(TimeUnit(200)), 204800.micros());
+        assert_eq!(zx::Duration::from(TimeUnit(0)), zx::Duration::from_micros(0));
+        assert_eq!(zx::Duration::from(TimeUnit(1)), zx::Duration::from_micros(1024));
+        assert_eq!(zx::Duration::from(TimeUnit(200)), zx::Duration::from_micros(204800));
     }
 
     #[fuchsia::test]

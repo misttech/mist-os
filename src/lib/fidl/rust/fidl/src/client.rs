@@ -969,7 +969,7 @@ mod tests {
     use anyhow::{Context as _, Error};
     use assert_matches::assert_matches;
     use fuchsia_async::{DurationExt, TimeoutExt};
-    use fuchsia_zircon::{AsHandleRef, DurationNum};
+    use fuchsia_zircon::AsHandleRef;
     use futures::channel::oneshot;
     use futures::stream::FuturesUnordered;
     use futures::task::{noop_waker, waker, ArcWake};
@@ -1034,7 +1034,10 @@ mod tests {
             // Server
             let mut received = MessageBufEtc::new();
             server_end
-                .wait_handle(zx::Signals::CHANNEL_READABLE, zx::MonotonicTime::after(5.seconds()))
+                .wait_handle(
+                    zx::Signals::CHANNEL_READABLE,
+                    zx::MonotonicTime::after(zx::Duration::from_seconds(5)),
+                )
                 .expect("failed to wait for channel readable");
             server_end.read_etc(&mut received).expect("failed to read on server end");
             let (buf, _handles) = received.split_mut();
@@ -1050,7 +1053,7 @@ mod tests {
                 SEND_DATA,
                 SEND_ORDINAL,
                 DynamicFlags::empty(),
-                zx::MonotonicTime::after(5.seconds()),
+                zx::MonotonicTime::after(zx::Duration::from_seconds(5)),
             )
             .context("sending query")?;
         assert_eq!(SEND_DATA, response_data);
@@ -1065,7 +1068,10 @@ mod tests {
             // Server
             let mut received = MessageBufEtc::new();
             server_end
-                .wait_handle(zx::Signals::CHANNEL_READABLE, zx::MonotonicTime::after(5.seconds()))
+                .wait_handle(
+                    zx::Signals::CHANNEL_READABLE,
+                    zx::MonotonicTime::after(zx::Duration::from_seconds(5)),
+                )
                 .expect("failed to wait for channel readable");
             server_end.read_etc(&mut received).expect("failed to read on server end");
             let (buf, _handles) = received.split_mut();
@@ -1089,13 +1095,13 @@ mod tests {
                 SEND_DATA,
                 SEND_ORDINAL,
                 DynamicFlags::empty(),
-                zx::MonotonicTime::after(5.seconds()),
+                zx::MonotonicTime::after(zx::Duration::from_seconds(5)),
             )
             .context("sending query")?;
         assert_eq!(SEND_DATA, response_data);
 
         let event_buf = client
-            .wait_for_event(zx::MonotonicTime::after(5.seconds()))
+            .wait_for_event(zx::MonotonicTime::after(zx::Duration::from_seconds(5)))
             .context("waiting for event")?;
         let (bytes, _handles) = event_buf.split();
         let (header, _body) = decode_transaction_header(&bytes).expect("event decode");
@@ -1111,12 +1117,14 @@ mod tests {
         let client2 = client1.clone();
 
         let thread1 = thread::spawn(move || {
-            let result = client1.wait_for_event(zx::MonotonicTime::after(5.seconds()));
+            let result =
+                client1.wait_for_event(zx::MonotonicTime::after(zx::Duration::from_seconds(5)));
             assert!(result.is_ok());
         });
 
         let thread2 = thread::spawn(move || {
-            let result = client2.wait_for_event(zx::MonotonicTime::after(5.seconds()));
+            let result =
+                client2.wait_for_event(zx::MonotonicTime::after(zx::Duration::from_seconds(5)));
             assert!(result.is_ok());
         });
 
@@ -1144,7 +1152,7 @@ mod tests {
             &server_end,
         );
         assert_matches!(
-            client.wait_for_event(zx::MonotonicTime::after(5.seconds())),
+            client.wait_for_event(zx::MonotonicTime::after(zx::Duration::from_seconds(5))),
             Err(crate::Error::UnexpectedSyncResponse)
         );
         Ok(())
@@ -1169,7 +1177,7 @@ mod tests {
                 SEND_DATA,
                 SEND_ORDINAL,
                 DynamicFlags::empty(),
-                zx::MonotonicTime::after(5.seconds())
+                zx::MonotonicTime::after(zx::Duration::from_seconds(5))
             ),
             Err(crate::Error::ClientChannelClosed {
                 status: zx_status::Status::PEER_CLOSED,
@@ -1194,7 +1202,7 @@ mod tests {
                 SEND_DATA,
                 SEND_ORDINAL,
                 DynamicFlags::empty(),
-                zx::MonotonicTime::after(5.seconds())
+                zx::MonotonicTime::after(zx::Duration::from_seconds(5))
             ),
             Err(crate::Error::ClientChannelClosed {
                 status: zx_status::Status::PEER_CLOSED,
@@ -1228,8 +1236,9 @@ mod tests {
         };
 
         // add a timeout to receiver so if test is broken it doesn't take forever
-        let receiver = receiver
-            .on_timeout(300.millis().after_now(), || panic!("did not receive message in time!"));
+        let receiver = receiver.on_timeout(zx::Duration::from_millis(300).after_now(), || {
+            panic!("did not receive message in time!")
+        });
 
         client
             .send::<u8>(SEND_DATA, SEND_ORDINAL, DynamicFlags::empty())
@@ -1259,8 +1268,9 @@ mod tests {
         };
 
         // add a timeout to receiver so if test is broken it doesn't take forever
-        let receiver = receiver
-            .on_timeout(300.millis().after_now(), || panic!("did not receiver message in time!"));
+        let receiver = receiver.on_timeout(zx::Duration::from_millis(300).after_now(), || {
+            panic!("did not receiver message in time!")
+        });
 
         let sender = client
             .send_query::<u8, u8, SEND_ORDINAL>(SEND_DATA, DynamicFlags::empty())
@@ -1268,8 +1278,9 @@ mod tests {
             .unwrap_or_else(|e| panic!("fidl error: {:?}", e));
 
         // add a timeout to receiver so if test is broken it doesn't take forever
-        let sender = sender
-            .on_timeout(300.millis().after_now(), || panic!("did not receive response in time!"));
+        let sender = sender.on_timeout(zx::Duration::from_millis(300).after_now(), || {
+            panic!("did not receive response in time!")
+        });
 
         let ((), ()) = join!(receiver, sender);
     }
@@ -1289,8 +1300,9 @@ mod tests {
                 .expect("failed to write epitaph");
         };
         // add a timeout to receiver so if test is broken it doesn't take forever
-        let receiver = receiver
-            .on_timeout(300.millis().after_now(), || panic!("did not receive message in time!"));
+        let receiver = receiver.on_timeout(zx::Duration::from_millis(300).after_now(), || {
+            panic!("did not receive message in time!")
+        });
 
         let sender = async move {
             const ORDINAL: u64 = 42 << 32;
@@ -1304,8 +1316,9 @@ mod tests {
             );
         };
         // add a timeout to sender so if test is broken it doesn't take forever
-        let sender = sender
-            .on_timeout(300.millis().after_now(), || panic!("did not receive response in time!"));
+        let sender = sender.on_timeout(zx::Duration::from_millis(300).after_now(), || {
+            panic!("did not receive response in time!")
+        });
 
         let ((), ()) = join!(receiver, sender);
     }
@@ -1419,8 +1432,9 @@ mod tests {
             .map(|(x, _stream)| assert!(x.is_none(), "should have emptied"));
 
         // add a timeout to receiver so if test is broken it doesn't take forever
-        let recv =
-            recv.on_timeout(300.millis().after_now(), || panic!("did not receive event in time!"));
+        let recv = recv.on_timeout(zx::Duration::from_millis(300).after_now(), || {
+            panic!("did not receive event in time!")
+        });
 
         recv.await;
     }
@@ -1461,8 +1475,9 @@ mod tests {
                 .map(|(x, _stream)| assert!(x.is_none(), "should have emptied"));
 
             // add a timeout to receiver so if test is broken it doesn't take forever
-            let recv = recv
-                .on_timeout(300.millis().after_now(), || panic!("did not receive event in time!"));
+            let recv = recv.on_timeout(zx::Duration::from_millis(300).after_now(), || {
+                panic!("did not receive event in time!")
+            });
 
             recv.await;
         }
@@ -1504,8 +1519,9 @@ mod tests {
         });
 
         // add a timeout to receiver so if test is broken it doesn't take forever
-        let recv =
-            recv.on_timeout(300.millis().after_now(), || panic!("did not receive event in time!"));
+        let recv = recv.on_timeout(zx::Duration::from_millis(300).after_now(), || {
+            panic!("did not receive event in time!")
+        });
 
         recv.await;
     }
@@ -1883,8 +1899,9 @@ mod tests {
         };
 
         // add a timeout to receiver so if test is broken it doesn't take forever
-        let receiver = receiver
-            .on_timeout(300.millis().after_now(), || panic!("did not receiver message in time!"));
+        let receiver = receiver.on_timeout(zx::Duration::from_millis(300).after_now(), || {
+            panic!("did not receiver message in time!")
+        });
 
         let sender = client
             .send_query::<u8, u8, SEND_ORDINAL>(SEND_DATA, DynamicFlags::empty())
@@ -1892,8 +1909,9 @@ mod tests {
             .unwrap_or_else(|e| panic!("fidl error: {:?}", e));
 
         // add a timeout to receiver so if test is broken it doesn't take forever
-        let sender = sender
-            .on_timeout(300.millis().after_now(), || panic!("did not receive response in time!"));
+        let sender = sender.on_timeout(zx::Duration::from_millis(300).after_now(), || {
+            panic!("did not receive response in time!")
+        });
 
         let ((), ()) = join!(receiver, sender);
 
@@ -1942,7 +1960,7 @@ mod tests {
 
         futures
             .collect::<Vec<_>>()
-            .on_timeout(1.seconds().after_now(), || panic!("timed out!"))
+            .on_timeout(zx::Duration::from_seconds(1).after_now(), || panic!("timed out!"))
             .await;
     }
 

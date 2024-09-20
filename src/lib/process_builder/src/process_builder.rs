@@ -7,7 +7,7 @@ use anyhow::{anyhow, Context};
 use fidl::endpoints::{ClientEnd, Proxy};
 use fuchsia_async::{self as fasync, TimeoutExt};
 use fuchsia_runtime::{HandleInfo, HandleType};
-use fuchsia_zircon::{self as zx, AsHandleRef, DurationNum, HandleBased};
+use fuchsia_zircon::{self as zx, AsHandleRef, HandleBased};
 use futures::prelude::*;
 use std::ffi::{CStr, CString};
 use std::{iter, mem};
@@ -838,12 +838,11 @@ pub async fn get_dynamic_linker<'a>(
 
     // Retrieve the dynamic linker as a VMO from fuchsia.ldsvc.Loader
     const LDSO_LOAD_TIMEOUT_SEC: i64 = 30;
-    let load_fut = ldsvc
-        .load_object(interp_str)
-        .map_err(ProcessBuilderError::LoadDynamicLinker)
-        .on_timeout(fasync::Time::after(LDSO_LOAD_TIMEOUT_SEC.seconds()), || {
-            Err(ProcessBuilderError::LoadDynamicLinkerTimeout())
-        });
+    let load_fut =
+        ldsvc.load_object(interp_str).map_err(ProcessBuilderError::LoadDynamicLinker).on_timeout(
+            fasync::Time::after(zx::Duration::from_seconds(LDSO_LOAD_TIMEOUT_SEC)),
+            || Err(ProcessBuilderError::LoadDynamicLinkerTimeout()),
+        );
     let (status, ld_vmo) = load_fut.await?;
     zx::Status::ok(status).map_err(|s| {
         ProcessBuilderError::GenericStatus(

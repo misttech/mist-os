@@ -41,12 +41,12 @@ impl EventPair {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{DurationNum, Signals, Status, Time};
+    use crate::{Duration, Signals, Status, Time};
 
     #[test]
     fn wait_and_signal_peer() {
         let (p1, p2) = EventPair::create();
-        let eighty_ms = 80.millis();
+        let eighty_ms = Duration::from_millis(80);
 
         // Waiting on one without setting any signal should time out.
         assert_eq!(p2.wait_handle(Signals::USER_0, Time::after(eighty_ms)), Err(Status::TIMED_OUT));

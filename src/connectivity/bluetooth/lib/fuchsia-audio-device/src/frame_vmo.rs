@@ -4,7 +4,7 @@
 
 use fidl_fuchsia_hardware_audio::*;
 use fuchsia_async as fasync;
-use fuchsia_zircon::{self as zx, DurationNum, HandleBased};
+use fuchsia_zircon::{self as zx, HandleBased};
 use futures::task::{Context, Poll, Waker};
 use futures::FutureExt;
 use tracing::debug;
@@ -396,7 +396,7 @@ impl FrameVmo {
         let leftover_frames = frames as i64 % fps;
         let nanos = (leftover_frames * 1_000_000_000i64) / fps;
         let roundup_nano = if 0 != ((leftover_frames * 1_000_000_000i64) % fps) { 1 } else { 0 };
-        secs.seconds() + (nanos + roundup_nano).nanos()
+        zx::Duration::from_seconds(secs) + zx::Duration::from_nanos(nanos + roundup_nano)
     }
 }
 
@@ -438,30 +438,30 @@ mod tests {
     #[fixture(with_test_vmo)]
     #[fuchsia::test]
     fn duration_from_frames(vmo: FrameVmo) {
-        assert_eq!(ONE_FRAME_NANOS.nanos(), vmo.duration_from_frames(1));
-        assert_eq!(TWO_FRAME_NANOS.nanos(), vmo.duration_from_frames(2));
-        assert_eq!(THREE_FRAME_NANOS.nanos(), vmo.duration_from_frames(3));
+        assert_eq!(zx::Duration::from_nanos(ONE_FRAME_NANOS), vmo.duration_from_frames(1));
+        assert_eq!(zx::Duration::from_nanos(TWO_FRAME_NANOS), vmo.duration_from_frames(2));
+        assert_eq!(zx::Duration::from_nanos(THREE_FRAME_NANOS), vmo.duration_from_frames(3));
 
-        assert_eq!(1.second(), vmo.duration_from_frames(TEST_FPS as usize));
+        assert_eq!(zx::Duration::from_seconds(1), vmo.duration_from_frames(TEST_FPS as usize));
 
-        assert_eq!(1500.millis(), vmo.duration_from_frames(72000));
+        assert_eq!(zx::Duration::from_millis(1500), vmo.duration_from_frames(72000));
     }
 
     #[fixture(with_test_vmo)]
     #[fuchsia::test]
     fn frames_from_duration(vmo: FrameVmo) {
-        assert_eq!(0, vmo.frames_from_duration(0.nanos()));
+        assert_eq!(0, vmo.frames_from_duration(zx::Duration::from_nanos(0)));
 
-        assert_eq!(0, vmo.frames_from_duration((ONE_FRAME_NANOS - 1).nanos()));
-        assert_eq!(1, vmo.frames_from_duration(ONE_FRAME_NANOS.nanos()));
+        assert_eq!(0, vmo.frames_from_duration(zx::Duration::from_nanos(ONE_FRAME_NANOS - 1)));
+        assert_eq!(1, vmo.frames_from_duration(zx::Duration::from_nanos(ONE_FRAME_NANOS)));
 
         // Three frames is an exact number of nanoseconds, testing the edge.
-        assert_eq!(2, vmo.frames_from_duration((THREE_FRAME_NANOS - 1).nanos()));
-        assert_eq!(3, vmo.frames_from_duration(THREE_FRAME_NANOS.nanos()));
-        assert_eq!(3, vmo.frames_from_duration((THREE_FRAME_NANOS + 1).nanos()));
+        assert_eq!(2, vmo.frames_from_duration(zx::Duration::from_nanos(THREE_FRAME_NANOS - 1)));
+        assert_eq!(3, vmo.frames_from_duration(zx::Duration::from_nanos(THREE_FRAME_NANOS)));
+        assert_eq!(3, vmo.frames_from_duration(zx::Duration::from_nanos(THREE_FRAME_NANOS + 1)));
 
-        assert_eq!(TEST_FPS as usize, vmo.frames_from_duration(1.second()));
-        assert_eq!(72000, vmo.frames_from_duration(1500.millis()));
+        assert_eq!(TEST_FPS as usize, vmo.frames_from_duration(zx::Duration::from_seconds(1)));
+        assert_eq!(72000, vmo.frames_from_duration(zx::Duration::from_millis(1500)));
 
         assert_eq!(10660, vmo.frames_from_duration(zx::Duration::from_nanos(222084000)));
     }
@@ -515,19 +515,25 @@ mod tests {
 
         assert_eq!(0, vmo.frames_before(start_time));
 
-        assert_eq!(1, vmo.frames_before(start_time + ONE_FRAME_NANOS.nanos()));
-        assert_eq!(2, vmo.frames_before(start_time + (THREE_FRAME_NANOS - 1).nanos()));
-        assert_eq!(3, vmo.frames_before(start_time + THREE_FRAME_NANOS.nanos()));
+        assert_eq!(1, vmo.frames_before(start_time + zx::Duration::from_nanos(ONE_FRAME_NANOS)));
+        assert_eq!(
+            2,
+            vmo.frames_before(start_time + zx::Duration::from_nanos(THREE_FRAME_NANOS - 1))
+        );
+        assert_eq!(3, vmo.frames_before(start_time + zx::Duration::from_nanos(THREE_FRAME_NANOS)));
 
-        assert_eq!(TEST_FPS as usize / 4, vmo.frames_before(start_time + 250.millis()));
+        assert_eq!(
+            TEST_FPS as usize / 4,
+            vmo.frames_before(start_time + zx::Duration::from_millis(250))
+        );
 
-        let three_quarters_dur = 375.millis();
+        let three_quarters_dur = zx::Duration::from_millis(375);
         assert_eq!(3 * TEST_FPS as usize / 8, vmo.frames_before(start_time + three_quarters_dur));
 
-        assert_eq!(10521, vmo.frames_before(start_time + 219188000.nanos()));
+        assert_eq!(10521, vmo.frames_before(start_time + zx::Duration::from_nanos(219188000)));
 
-        frames_before_exact(&mut vmo, 273533747037, 219188000.nanos(), 10521);
-        frames_before_exact(&mut vmo, 714329925362, 219292000.nanos(), 10526);
+        frames_before_exact(&mut vmo, 273533747037, zx::Duration::from_nanos(219188000), 10521);
+        frames_before_exact(&mut vmo, 714329925362, zx::Duration::from_nanos(219292000), 10526);
     }
 
     #[fixture(with_test_vmo)]
@@ -654,7 +660,7 @@ mod tests {
 
         let _handle = vmo.set_format(TEST_FPS, format, 2, frames, 0).unwrap();
 
-        let half_dur = 250.millis();
+        let half_dur = zx::Duration::from_millis(250);
 
         // Start in the past so we can be sure the frames are in the past.
         let start_time = fasync::Time::now() - half_dur;
@@ -685,12 +691,14 @@ mod tests {
         vmo.start(start_time).unwrap();
 
         // Just before the frame finishes, we shouldn't be able to get it.
-        exec.set_fake_time(start_time + THREE_FRAME_NANOS.nanos() - 1.nanos());
+        exec.set_fake_time(
+            start_time + zx::Duration::from_nanos(THREE_FRAME_NANOS) - zx::Duration::from_nanos(1),
+        );
         let mut one_frame_buf = [0; 1];
         vmo.poll_read(2, &mut one_frame_buf, &mut no_wake_cx)
             .expect_pending("third frame shouldn't be ready");
         // Exactly when the frame finishes, should be able to get the frame.
-        exec.set_fake_time(start_time + THREE_FRAME_NANOS.nanos());
+        exec.set_fake_time(start_time + zx::Duration::from_nanos(THREE_FRAME_NANOS));
         let res = vmo.poll_read(2, &mut one_frame_buf, &mut no_wake_cx);
         let (idx, missed) = res.expect("third frame should be ready").expect("no error");
 
@@ -701,7 +709,7 @@ mod tests {
         // a bunch of time has passed, let's get one frame again.
         let much_later_ns = 3999 * THREE_FRAME_NANOS;
         let next_frame_idx = 3998 * 3 + 2;
-        exec.set_fake_time(start_time + much_later_ns.nanos());
+        exec.set_fake_time(start_time + zx::Duration::from_nanos(much_later_ns));
         let res = vmo.poll_read(next_frame_idx, &mut one_frame_buf, &mut no_wake_cx);
         let (idx, missed) = res.expect("frame should be ready").expect("no error");
         assert_eq!(0, missed);
@@ -709,9 +717,9 @@ mod tests {
         assert_eq!(next_frame_idx + 1, idx);
 
         let mut all_frames_len = 0;
-        let mut total_duration = 0.nanos();
+        let mut total_duration = zx::Duration::from_nanos(0);
 
-        let moment_length = 10_000.nanos();
+        let moment_length = zx::Duration::from_nanos(10_000);
 
         let mut moment_start = start_time;
         let mut moment_end = moment_start;
@@ -719,7 +727,7 @@ mod tests {
 
         let mut ten_frames_buf = [0; 10];
 
-        while total_duration < 250.millis() {
+        while total_duration < zx::Duration::from_millis(250) {
             moment_end += moment_length;
             exec.set_fake_time(moment_end);
             total_duration += moment_length;
@@ -733,7 +741,7 @@ mod tests {
             all_frames_len += ten_frames_buf.len();
             assert_eq!(
                 all_frames_len,
-                vmo.frames_before(moment_end + 1.nanos()),
+                vmo.frames_before(moment_end + zx::Duration::from_nanos(1)),
                 "frame miscount after {:?} - {:?} moment",
                 moment_start,
                 moment_end

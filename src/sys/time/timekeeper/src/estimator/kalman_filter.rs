@@ -168,7 +168,6 @@ mod test {
     use super::*;
     use crate::make_test_config;
     use test_util::assert_near;
-    use zx::DurationNum;
 
     const TIME_1: zx::MonotonicTime = zx::MonotonicTime::from_nanos(10_000_000_000);
     const TIME_2: zx::MonotonicTime = zx::MonotonicTime::from_nanos(20_000_000_000);
@@ -200,10 +199,10 @@ mod test {
         assert_eq!(transform.synthetic(TIME_2).into_nanos(), (TIME_2 + OFFSET_1).into_nanos());
         assert_eq!(transform.error_bound(TIME_1), 2 * SQRT_COV_1);
         // Earlier time should return same error bound.
-        assert_eq!(transform.error_bound(TIME_1 - 1.second()), 2 * SQRT_COV_1);
+        assert_eq!(transform.error_bound(TIME_1 - zx::Duration::from_seconds(1)), 2 * SQRT_COV_1);
         // Later time should have a higher bound.
         assert_eq!(
-            transform.error_bound(TIME_1 + 1.second()),
+            transform.error_bound(TIME_1 + zx::Duration::from_seconds(1)),
             2 * SQRT_COV_1 + 2000 * config.get_oscillator_error_std_dev_ppm() as u64
         );
         assert_eq!(filter.monotonic(), TIME_1);
