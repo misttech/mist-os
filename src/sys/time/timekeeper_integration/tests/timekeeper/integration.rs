@@ -507,7 +507,7 @@ async fn test_slew_clock() {
         )
         .await
         .unwrap();
-        let clock_rate = clock.get_details().unwrap().mono_to_synthetic.rate;
+        let clock_rate = clock.get_details().unwrap().reference_to_synthetic.rate;
         assert_eq!(clock_rate.reference_ticks, clock_rate.synthetic_ticks);
         let last_generation_counter = clock.get_details().unwrap().generation_counter;
 
@@ -527,7 +527,7 @@ async fn test_slew_clock() {
         // After the second sample, the clock is running slightly slower than the reference.
         poll_until!(|| clock.get_details().unwrap().generation_counter != last_generation_counter)
             .await;
-        let slew_rate = clock.get_details().unwrap().mono_to_synthetic.rate;
+        let slew_rate = clock.get_details().unwrap().reference_to_synthetic.rate;
         assert_lt!(slew_rate.synthetic_ticks, slew_rate.reference_ticks);
 
         // TODO(https://fxbug.dev/42143927) - verify that the slew completes.

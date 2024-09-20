@@ -12,7 +12,7 @@ use fidl_fuchsia_time_external::Status;
 use fuchsia_inspect::{
     Inspector, IntProperty, Node, NumericProperty, Property, StringProperty, UintProperty,
 };
-use fuchsia_runtime::{UtcClock, UtcTime, UtcTimeline};
+use fuchsia_runtime::{UtcClock, UtcClockDetails, UtcTime};
 use fuchsia_sync::Mutex;
 use fuchsia_zircon as zx;
 use futures::FutureExt;
@@ -107,7 +107,7 @@ pub struct ClockDetails {
     /// The generation counter as documented in the UtcClock.
     generation_counter: u32,
     /// The monotonic time from the monotonic-UTC correspondence pair, in ns.
-    monotonic_offset: i64,
+    reference_offset: i64,
     /// The UTC time from the monotonic-UTC correspondence pair, in ns.
     utc_offset: i64,
     /// The ratio between UTC tick rate and monotonic tick rate in parts per million, expressed as
@@ -127,12 +127,12 @@ impl ClockDetails {
     }
 }
 
-impl From<zx::ClockDetails<UtcTimeline>> for ClockDetails {
-    fn from(details: zx::ClockDetails<UtcTimeline>) -> ClockDetails {
+impl From<UtcClockDetails> for ClockDetails {
+    fn from(details: UtcClockDetails) -> ClockDetails {
         // Handle the potential for a divide by zero in an unset rate.
         let rate_ppm = match (
-            details.mono_to_synthetic.rate.synthetic_ticks,
-            details.mono_to_synthetic.rate.reference_ticks,
+            details.reference_to_synthetic.rate.synthetic_ticks,
+            details.reference_to_synthetic.rate.reference_ticks,
         ) {
             (0, _) => -ONE_MILLION,
             (_, 0) => std::i32::MAX,
@@ -141,8 +141,8 @@ impl From<zx::ClockDetails<UtcTimeline>> for ClockDetails {
         ClockDetails {
             retrieval_monotonic: monotonic_time(),
             generation_counter: details.generation_counter,
-            monotonic_offset: details.mono_to_synthetic.reference_offset.into_nanos(),
-            utc_offset: details.mono_to_synthetic.synthetic_offset.into_nanos(),
+            reference_offset: details.reference_to_synthetic.reference_offset.into_nanos(),
+            utc_offset: details.reference_to_synthetic.synthetic_offset.into_nanos(),
             rate_ppm,
             error_bounds: details.error_bounds,
             reason: None,
@@ -526,6 +526,7 @@ mod tests {
     };
     use crate::time_source::FakePushTimeSource;
     use diagnostics_assertions::{assert_data_tree, AnyProperty};
+    use fuchsia_runtime::UtcClockUpdate;
     use lazy_static::lazy_static;
 
     const BACKSTOP_TIME: i64 = 111111111;
@@ -541,12 +542,12 @@ mod tests {
         static ref VALID_DETAILS: zx::sys::zx_clock_details_v1_t = zx::sys::zx_clock_details_v1_t {
             options: 0,
             backstop_time: BACKSTOP_TIME,
-            ticks_to_synthetic: zx::sys::zx_clock_transformation_t {
+            reference_ticks_to_synthetic: zx::sys::zx_clock_transformation_t {
                 reference_offset: 777777777777,
                 synthetic_offset: 787878787878,
                 rate: zx::sys::zx_clock_rate_t { reference_ticks: 1_000, synthetic_ticks: 1_000 },
             },
-            mono_to_synthetic: zx::sys::zx_clock_transformation_t {
+            reference_to_synthetic: zx::sys::zx_clock_transformation_t {
                 reference_offset: 888888888888,
                 synthetic_offset: 898989898989,
                 rate: zx::sys::zx_clock_rate_t {
@@ -597,8 +598,8 @@ mod tests {
     fn valid_clock_details_conversion() {
         let details = ClockDetails::from(zx::ClockDetails::from(VALID_DETAILS.clone()));
         assert_eq!(details.generation_counter, GENERATION_COUNTER);
-        assert_eq!(details.utc_offset, VALID_DETAILS.mono_to_synthetic.synthetic_offset);
-        assert_eq!(details.monotonic_offset, VALID_DETAILS.mono_to_synthetic.reference_offset);
+        assert_eq!(details.utc_offset, VALID_DETAILS.reference_to_synthetic.synthetic_offset);
+        assert_eq!(details.reference_offset, VALID_DETAILS.reference_to_synthetic.reference_offset);
         assert_eq!(details.rate_ppm, RATE_ADJUST);
         assert_eq!(details.error_bounds, ERROR_BOUNDS);
     }
@@ -606,12 +607,12 @@ mod tests {
     #[fuchsia::test]
     fn invalid_clock_details_conversion() {
         let mut zx_details = zx::ClockDetails::from(VALID_DETAILS.clone());
-        zx_details.mono_to_synthetic.rate.synthetic_ticks = 1000;
-        zx_details.mono_to_synthetic.rate.reference_ticks = 0;
+        zx_details.reference_to_synthetic.rate.synthetic_ticks = 1000;
+        zx_details.reference_to_synthetic.rate.reference_ticks = 0;
         let details = ClockDetails::from(zx::ClockDetails::from(zx_details));
         assert_eq!(details.generation_counter, GENERATION_COUNTER);
-        assert_eq!(details.utc_offset, VALID_DETAILS.mono_to_synthetic.synthetic_offset);
-        assert_eq!(details.monotonic_offset, VALID_DETAILS.mono_to_synthetic.reference_offset);
+        assert_eq!(details.utc_offset, VALID_DETAILS.reference_to_synthetic.synthetic_offset);
+        assert_eq!(details.reference_offset, VALID_DETAILS.reference_to_synthetic.reference_offset);
         assert_eq!(details.rate_ppm, std::i32::MAX);
         assert_eq!(details.error_bounds, ERROR_BOUNDS);
     }
@@ -660,7 +661,7 @@ mod tests {
         let monotonic_time = zx::MonotonicTime::get();
         clock
             .update(
-                zx::ClockUpdate::<UtcTimeline>::builder()
+                UtcClockUpdate::builder()
                     .absolute_value(monotonic_time, UtcTime::from_nanos(BACKSTOP_TIME + 1234))
                     .rate_adjust(0)
                     .error_bounds(0),
@@ -672,7 +673,7 @@ mod tests {
         let monotonic_time = zx::MonotonicTime::get();
         clock
             .update(
-                zx::ClockUpdate::<UtcTimeline>::builder()
+                UtcClockUpdate::builder()
                     .absolute_value(monotonic_time, UtcTime::from_nanos(BACKSTOP_TIME + 2345))
                     .rate_adjust(RATE_ADJUST)
                     .error_bounds(ERROR_BOUNDS),
@@ -698,7 +699,7 @@ mod tests {
                     last_update: contains {
                         retrieval_monotonic: AnyProperty,
                         generation_counter: 2u64,
-                        monotonic_offset: monotonic_time.into_nanos() as i64,
+                        reference_offset: monotonic_time.into_nanos() as i64,
                         utc_offset: (BACKSTOP_TIME + 2345) as i64,
                         rate_ppm: RATE_ADJUST as i64,
                         error_bounds: ERROR_BOUNDS,
@@ -948,7 +949,7 @@ mod tests {
                     last_update: contains {
                         retrieval_monotonic: AnyProperty,
                         generation_counter: 0u64,
-                        monotonic_offset: AnyProperty,
+                        reference_offset: AnyProperty,
                         utc_offset: AnyProperty,
                         rate_ppm: AnyProperty,
                         error_bounds: AnyProperty,

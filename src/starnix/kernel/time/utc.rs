@@ -4,7 +4,7 @@
 
 use crate::vdso::vdso_loader::MemoryMappedVvar;
 use fuchsia_runtime::{
-    duplicate_utc_clock_handle, UtcClock as UtcClockHandle, UtcTime, UtcTimeline,
+    duplicate_utc_clock_handle, UtcClock as UtcClockHandle, UtcClockTransform, UtcTime,
 };
 use fuchsia_zircon::{
     AsHandleRef, ClockTransformation, {self as zx},
@@ -21,7 +21,7 @@ use starnix_sync::Mutex;
 #[derive(Debug)]
 struct UtcClock {
     real_utc_clock: UtcClockHandle,
-    current_transform: ClockTransformation<UtcTimeline>,
+    current_transform: UtcClockTransform,
     real_utc_clock_started: bool,
 }
 
@@ -83,7 +83,8 @@ impl UtcClock {
             }
         }
         if self.real_utc_clock_started {
-            self.current_transform = self.real_utc_clock.get_details().unwrap().mono_to_synthetic;
+            self.current_transform =
+                self.real_utc_clock.get_details().unwrap().reference_to_synthetic;
         }
     }
 
@@ -122,7 +123,7 @@ pub fn estimate_monotonic_deadline_from_utc(utc: UtcTime) -> zx::MonotonicTime {
     {
         if let Some(test_time) = UTC_CLOCK_OVERRIDE_FOR_TESTING.with(|cell| {
             cell.borrow().as_ref().map(|test_clock| {
-                test_clock.get_details().unwrap().mono_to_synthetic.apply_inverse(utc)
+                test_clock.get_details().unwrap().reference_to_synthetic.apply_inverse(utc)
             })
         }) {
             return test_time;

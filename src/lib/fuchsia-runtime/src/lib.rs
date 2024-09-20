@@ -12,26 +12,14 @@
 
 #![deny(missing_docs)]
 
-use {
-    fuchsia_zircon::{
-        sys::{zx_handle_t, zx_status_t, ZX_HANDLE_INVALID}, // handle type (primitive, non-owning)
-        Clock,
-        Handle,
-        HandleBased,
-        Job,
-        Process,
-        Rights,
-        Status,
-        Thread,
-        Time,
-        Timeline,
-        Unowned,
-        Vmar,
-    },
-    num_derive::FromPrimitive,
-    num_traits::cast::FromPrimitive,
-    thiserror::Error,
+use fuchsia_zircon::sys::{zx_handle_t, zx_status_t, ZX_HANDLE_INVALID};
+use fuchsia_zircon::{
+    Clock, ClockDetails, ClockTransformation, ClockUpdate, Handle, HandleBased, Job,
+    MonotonicTimeline, Process, Rights, Status, Thread, Time, Timeline, Unowned, Vmar,
 };
+use num_derive::FromPrimitive;
+use num_traits::cast::FromPrimitive;
+use thiserror::Error;
 
 // TODO(https://fxbug.dev/42139436): Document these.
 #[allow(missing_docs)]
@@ -367,8 +355,21 @@ impl Timeline for UtcTimeline {}
 /// A UTC timestamp, measured in nanoseconds since Jan 1 1970.
 pub type UtcTime = Time<UtcTimeline>;
 
-/// A UTC clock that will return UTC timestamps.
-pub type UtcClock = Clock<UtcTimeline>;
+/// A clock that will return UTC timestamps.
+// TODO(https://fxbug.dev/356911500) switch to boot timeline
+pub type UtcClock = Clock<MonotonicTimeline, UtcTimeline>;
+
+/// Details of a UTC clock.
+// TODO(https://fxbug.dev/356911500) switch to boot timeline
+pub type UtcClockDetails = ClockDetails<MonotonicTimeline, UtcTimeline>;
+
+/// A transformation for the UTC clock.
+// TODO(https://fxbug.dev/356911500) switch to boot timeline
+pub type UtcClockTransform = ClockTransformation<MonotonicTimeline, UtcTimeline>;
+
+/// An update for the UTC clock.
+// TODO(https://fxbug.dev/356911500) switch to boot timeline
+pub type UtcClockUpdate = ClockUpdate<MonotonicTimeline, UtcTimeline>;
 
 fn utc_clock() -> Unowned<'static, UtcClock> {
     // SAFETY: basic FFI call which returns either a valid handle or ZX_HANDLE_INVALID.

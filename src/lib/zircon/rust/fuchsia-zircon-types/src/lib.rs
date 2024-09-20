@@ -590,8 +590,8 @@ pub struct zx_clock_transformation_t {
 pub struct zx_clock_details_v1_t {
     pub options: u64,
     pub backstop_time: zx_time_t,
-    pub ticks_to_synthetic: zx_clock_transformation_t,
-    pub mono_to_synthetic: zx_clock_transformation_t,
+    pub reference_ticks_to_synthetic: zx_clock_transformation_t,
+    pub reference_to_synthetic: zx_clock_transformation_t,
     pub error_bound: u64,
     pub query_ticks: zx_ticks_t,
     pub last_value_update_ticks: zx_ticks_t,

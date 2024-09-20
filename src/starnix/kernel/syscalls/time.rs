@@ -542,7 +542,7 @@ mod test {
     use crate::mm::PAGE_SIZE;
     use crate::testing::*;
     use crate::time::utc::UtcClockOverrideGuard;
-    use fuchsia_runtime::{UtcClock, UtcTimeline};
+    use fuchsia_runtime::{UtcClock, UtcClockUpdate};
     use fuchsia_zircon::HandleBased;
     use starnix_uapi::ownership::OwnedRef;
     use starnix_uapi::signals;
@@ -594,8 +594,7 @@ mod test {
         );
 
         // Slow |test_clock| down and verify that we sleep long enough.
-        let slow_clock_update =
-            zx::ClockUpdate::<UtcTimeline>::builder().rate_adjust(-1000).build();
+        let slow_clock_update = UtcClockUpdate::builder().rate_adjust(-1000).build();
         test_clock.update(slow_clock_update).unwrap();
 
         let before = test_clock.read().unwrap();
@@ -619,7 +618,7 @@ mod test {
         );
 
         // Speed |test_clock| up.
-        let slow_clock_update = zx::ClockUpdate::<UtcTimeline>::builder().rate_adjust(1000).build();
+        let slow_clock_update = UtcClockUpdate::builder().rate_adjust(1000).build();
         test_clock.update(slow_clock_update).unwrap();
 
         let before = test_clock.read().unwrap();

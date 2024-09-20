@@ -8,14 +8,12 @@ mod kalman_filter;
 use crate::diagnostics::{Diagnostics, Event};
 use crate::enums::{FrequencyDiscardReason, Track};
 use crate::time_source::Sample;
-use crate::Config;
+use crate::{Config, UtcTransform};
 use chrono::prelude::*;
 use frequency::FrequencyEstimator;
-use fuchsia_runtime::UtcTimeline;
 use fuchsia_zircon as zx;
 use kalman_filter::KalmanFilter;
 use std::sync::Arc;
-use time_util::Transform;
 use tracing::{info, warn};
 
 /// The maximum change in Kalman filter estimate that can occur before we discard any previous
@@ -129,9 +127,9 @@ impl<D: Diagnostics> Estimator<D> {
         }
     }
 
-    /// Returns a `Transform` describing the estimated synthetic time and error as a function
+    /// Returns a `UtcTransform` describing the estimated synthetic time and error as a function
     /// of the monotonic time.
-    pub fn transform(&self) -> Transform<UtcTimeline> {
+    pub fn transform(&self) -> UtcTransform {
         self.filter.transform()
     }
 }

@@ -244,8 +244,8 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn utc_clock_is_cloned() {
-        let clock =
-            zx::Clock::create(zx::ClockOpts::MONOTONIC, None).expect("failed to create clock");
+        let clock = fuchsia_runtime::UtcClock::create(zx::ClockOpts::MONOTONIC, None)
+            .expect("failed to create clock");
         let expected_clock_koid =
             clock.as_handle_ref().get_koid().expect("failed to get clock koid");
 
